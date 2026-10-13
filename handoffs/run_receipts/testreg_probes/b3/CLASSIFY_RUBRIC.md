@@ -1,4 +1,13 @@
-# TESTREG Task 3.1 逐檔分類規則（主委與三家共用；草案，待諮詢 r3 定案）
+# TESTREG Task 3.1 逐檔分類規則（主委與三家共用；諮詢 r3 定案，`handoffs/reconcile/20261010-testreg-x-consult-r3/synth.md`）
+
+## r3 定案之補充規則（優先於下文）
+1. **空表判定（`hollow-empty-df`）**：`generate_features` 之回傳 `features_df` 只有索引（`momentum/FeatureEngineering/feature_factory.py:4005-4006`）。以**函式與斷言**為單位：比對其值、欄名、雜湊、NaN／inf、跨標的值隔離者 ⇒ note 標 `hollow-empty-df`、該函式列入 rewrite_targets（改讀落盤原始輸出或 registry 群組值，且須斷言非空欄集合與產出清冊；範例 `tests/feature_engineering/test_ff_cross_symbol_value_isolation.py:121-128`）；只驗索引、列數、特徵數、metadata、落盤路徑者**不算**空心。標 correctness 而讀空表值者一律空心。
+2. **既有紅**：範圍內已實證 29 支（逐支首個壞提交見 `handoffs/20261010-testreg-x-consult-r3-claude.md` 題二與 `20261013-light-sweep.tsv`）。note 標 `existing-red:<首個壞提交>`；FRAMEPATH b1 造成之兩支另標 `framepath-b1-caused`（owner FRAMEPATH，本表照常分類）。能不動斷言修者列 rewrite 並於 note 寫修法；須改斷言者 note 標 `needs-existing-red-receipt`（SPEC v44 收據）。
+3. **FRAMEPATH 治理檔**：`framepath_governed_in_scope.txt`（52 檔）內之檔，note 加 `governed`——其實體改寫待 FRAMEPATH 檢查② 修訂戳記後（分類照做）。
+4. **重複執行**：同一設定重複生成而無獨立斷言差異者 note 標 `dup-run:<對照 nodeid>`（例：V-6 之 use_searchsorted 參數化在 CGSA 路徑為同一實作，`momentum/FeatureEngineering/timeframe/tf_aligner.py:72` 只在已無生產呼叫者之 `align_to_primary` 內）；去重須以 rewrite（斷言不減、附收據）為之，不得以慢為淘汰理由。
+5. **real_kline 欄**：輸入表之 `real_kline` 只認字面，經輔助函式讀真實 K 線者會誤標 N——以讀碼為準。
+6. **碼證**：`repo 相對路徑:行` 或 `repo 相對路徑:起-訖`。
+7. **比對器**：`compare_classify.py` 為 fail-closed（缺列／多列／重複／值域／nodeid 形與存在／碼證檔行／tab 任一違反即 rc 1；反例 `compare_classify_mutations.out`），交件表須能通過。
 
 ## 權威來源（本檔只摘要，不另立定義）
 - 欄位與值域：契約 `tests/registry/testreg_schema.json` 之 `catalog.entries`、`enums`（`charter_category`、`oracle`、`claim`、`file_disposition`、`retire_evidence_level`）。
@@ -28,4 +37,6 @@ path	guarantee	oracle	claim	disposition	rewrite_targets	tombstones	evidence	note
 - 範圍清單：`handoffs/run_receipts/testreg_probes/b3/G{1..4}.txt`（聯集＝`phase3_scope.txt`，149 檔）。
 - 逐檔輸入表：`handoffs/run_receipts/testreg_probes/b3/20261013-phase3-input.tsv`（測試數、行數、真實 K 線、標記、記錄器最近結果與耗時合計〔`unknown`＝無紀錄，不得當成 0〕、複查訊號、首末提交日）。
 - FRAMEPATH 諮詢 r4 已判之 30 檔：`handoffs/reconcile/20260928-framepath-x-consult-r4/synth.md:76-107`、`:194-213`（①本批必跑／②覆蓋等價／③已刪節點／④重型；為 FRAMEPATH b1 處置用，不等於本表欄位，僅作輸入）。
-- 範圍內 12 支既有紅與歸因：`handoffs/20261010-testreg-x-consult-r3-claude.md` 題二表。
+- 範圍內 29 支既有紅與歸因：`handoffs/20261010-testreg-x-consult-r3-claude.md` 題二表與其「追加」段、`20261013-light-sweep.tsv`。
+- FRAMEPATH 治理檔：`framepath_governed_in_scope.txt`。
+- 主委版分類表：`claude_G{1..4}.md`（Claude 子代理逐檔讀碼、未實跑；三家須獨立判定後逐列攻之）。

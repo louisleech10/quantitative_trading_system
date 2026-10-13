@@ -1,0 +1,14 @@
+ok   baseline rc=0
+ok   missing_row rc=1
+ok   duplicate_row rc=1
+ok   extra_row rc=1
+ok   bad_guarantee_enum rc=1
+ok   unclassified_oracle rc=1
+ok   missing_function rc=1
+ok   keep_with_targets rc=1
+ok   evidence_out_of_range rc=1
+ok   evidence_missing_file rc=1
+ok   note_with_tab rc=1
+ok   bad_tombstone rc=1
+ok   no_table rc=1
+tmp=/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/tmp.70rToPiHtV
