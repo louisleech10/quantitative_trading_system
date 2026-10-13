@@ -389,6 +389,30 @@ def test_d_v21_accepts_defective_receipts(dr_base, tmp_path):
     assert bad.returncode != 0 and any(l.startswith("V21") for l in (bad.stdout + bad.stderr).splitlines())
 
 
+def test_d_v21_existing_receipt_after_head_advances(dr_base, tmp_path):
+    """head 判定同 receipts.mutation：改寫與收據提交後 HEAD 再前進一個無關提交，既有收據之 head 為 HEAD 之祖先
+    ⇒ `validate --require-executed` 仍 rc 0；把收據之 head 改為非祖先（另一分支提交）⇒ rc≠0。"""
+    r = _work(dr_base, tmp_path, "v21adv")
+    _apply_rewrite(r, "red")
+    r.write_json(receipt_rel(NID["test_red"]), red_receipt(dr_base))
+    r.put_entry(entry(DF, disposition="rewrite", rewrite_targets=[NID["test_red"]], disposition_ref=APPROVAL,
+                      rewrite_receipt=None))
+    r.commit("rewrite with defective receipt")
+    r.write("README", "x\n")
+    r.commit("unrelated")
+    ok = r.run("validate", "--require-executed")
+    assert ok.returncode == 0, ok.stdout + ok.stderr
+    r.git("checkout", "-q", "-b", "side", dr_base["good"])
+    side = r.commit("side")
+    r.git("checkout", "-q", "-")
+    rc = json.loads(r.read(receipt_rel(NID["test_red"])))
+    rc["head"] = side
+    r.write_json(receipt_rel(NID["test_red"]), rc)
+    r.commit("receipt head not ancestor")
+    bad = r.run("validate", "--require-executed")
+    assert bad.returncode != 0, bad.stdout + bad.stderr
+
+
 def test_d_named_seam_exists_and_returns_none_without_receipt(dr_base, tmp_path):
     """具名縫 `defective_rewrite_errors(ctx, nodeid)`：無收據 ⇒ None（同 `literal_fix_errors` 之約定）。"""
     assert callable(getattr(testreg, "defective_rewrite_errors", None))

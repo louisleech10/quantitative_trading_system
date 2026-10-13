@@ -122,7 +122,7 @@
       "file_rule": "收據檔＝<dir>/<函式層 nodeid 之 / 換成 __、:: 換成 --->.json，與改寫同提交",
       "rule": [
         "用途（v43／SPEC v44）：目標測試函式為缺陷目標——kind=existing_red：於 head 已紅且紅在過期斷言；kind=vacuous：斷言空心、生產錯誤不使其轉紅——致 receipts.mutation 之「目標每一斷言行皆被殺」不可滿足時之改寫途徑；成立 ⇒ V19 對該函式放行，其他規則照常",
-        "target_nodeid 為函式層 nodeid 且存在於 head 與受驗之樹；head＝受驗時之 HEAD（一次性）；approval_ref 存在於 repo 工作目錄；收據檔、compare_patch_path、bisect_log_path、各 patch_path 須在受驗之樹（pre-commit 時須已暫存）",
+        "target_nodeid 為函式層 nodeid 且存在於 head（rev）與受驗之樹；head 之判定同 receipts.mutation：新增或變更之收據 head＝受驗時之 HEAD，既有收據之 head 須為 HEAD 之祖先（使 V21 於後續收尾時仍可驗）；approval_ref 存在於 repo 工作目錄；收據檔、compare_patch_path、bisect_log_path、各 patch_path 須在受驗之樹（pre-commit 時須已暫存）",
         "defect_lines 非空，每項為目標於 head 之斷言多重集合（assertion_nodes 依 inline_rule 展開）中某元素之 provenance（file:line），由 validate 重算比對",
         "compare_patch_path 之 sha256＝compare_patch_sha256；patch 所及之檔恰為目標所在測試檔；套於 head 後目標函式之 ast.dump（include_attributes=False）等於受驗之樹中同 nodeid 函式者",
         "compare_baseline_session_id 所指 session 之 head＝收據 head、diff_digest＝head 乾淨樹套 compare_patch 後之值，且其中目標函式（函式層，參數化取全部案例）全為 passed",
