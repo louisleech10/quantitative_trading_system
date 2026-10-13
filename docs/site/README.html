@@ -203,6 +203,13 @@
 <td>docs/PROBEWINSOR_SPEC.md</td>
 <td>2026-10-13 收案。偵察 r1 → SPEC／TODO 審查 r2–r10（34 條 finding 全處置；白話審閱 白話說明/Archived/PROBEWINSOR規格審閱.md 由委員共識代決，使用者 2026-10-12 離線委派）→ 戳記 R1（codex、composer）→ 實作 b1：baseline af01e2c3、生產碼 55585abd（89 passed）、Task 1.3 歸因 e9543e64（test_tf_aligner 替身補行）、收據 d908befa 與比對器 fail-closed（a69faad8、20aa19a6、a484b88e）→ 審碼 r1–r4 三家（使用者 2026-10-13「現在可以回到三家委員」，6a02c6dc）收斂。r10 收斂檔僅兩家戳記（grok 未曾審 SPEC 時之戳記）；本票不再領 impl。census 外既有紅 5 支登 HP-PREREDGAP。下一步：TESTREG 第 3 批（Task 3.1 須問三家 V-6 是否改／加主流粗接細 1h＋12h 完整 oracle）</td>
 </tr>
+<tr>
+<td>051</td>
+<td>HP-TESTREG</td>
+<td>進行中</td>
+<td>docs/TESTREG_SPEC.md</td>
+<td>全票排序第 5a 步；第 1、2 批已收批（沿革見 HP-FRAMEPATH 列）。第 3 批 Task 3.1（2026-10-13 開工；使用者同日睡前「依序做，有問題你跟委員共識決定」、不換 session）：範圍 149 檔（Task 3.1 規則對現況盤點機械導出，handoffs/run_receipts/testreg_probes/b3/phase3_scope.txt；分四組 G1–G4.txt）；主委版四組分類表 claude_G{1..4}.md（keep 89、rewrite 60）；分類規則草案 CLASSIFY_RUBRIC.md；比對器 compare_classify.py。實證（提交 9836a074）：範圍內既有紅 29 支、逐支 bisect（'unknown' 週期同因 14 支＝c6c93b84；failopen_matrix 2＝c76a9ecc；batch1_followup 5＝d229336e；<strong>FRAMEPATH b1 5584102d 造成而其閘未選入 2 支</strong>：test_nan_propagation_inventory_complete〔invariance_envelope 略過〕、test_cgsa_config_hash_passed_correctly〔未選入〕⇒ 諮詢 r2 方案甲前提⑤被推翻）；V-6 backend[True] 906.8 秒（原 5,856）；粗接細探針兩模式各約 850 秒、oracle 與生產逐列相等；features_df 只有索引（feature_factory.py:4006）⇒ 以其值比對之測試系統性空心；FRAMEPATH 處置驗證器檢查② 以凍結提交比對，範圍內 52 檔受其治理。諮詢 r3（三家；brief handoffs/20261010-TESTREG-X-CONSULT-R3-BRIEF.md、主委獨立版 handoffs/20261010-testreg-x-consult-r3-claude.md）已派。下一步：r3 收斂銷帳 → 依共識（必要時 SPEC v44 修訂審查戳記）→ G1–G4 分類輪 → 寫 catalog（領 b3 許可）→ Task 3.2 子批。本機 3 筆提交推送被權限分類器擋（Out-of-Place Publication），待使用者決定</td>
+</tr>
 </tbody>
 </table></div>
 <!-- END GENERATED: handoff-pending -->
