@@ -1718,3 +1718,31 @@ def test_no_enum_copies_in_testreg_source():
     """`grep -c "A22\\|EXACT\\|correctness" scripts/testreg.py` == 0（枚舉一律讀 schema）。"""
     text = TESTREG.read_text(encoding="utf-8")
     assert sum(text.count(w) for w in ("A22", "EXACT", "correctness")) == 0
+
+
+# ── 第 3 批：V15 暫存區增量（catalog 有數十個 rewrite entry 後之秒級；只驗 entry 與 HEAD 不同或檔有暫存變更者）──
+
+def _v15_staged(r: TmpRepo, capsys) -> List[str]:
+    testreg.main(["--repo", str(r.root), "check", "--staged"])
+    return [l for l in capsys.readouterr().err.splitlines() if l.startswith("V15 ")]
+
+
+def test_v15_staged_incremental_rechecks_changed_file_and_entry(tmp_path, capsys):
+    """rewrite entry 已提交於 HEAD：①entry 未變、檔之目標函式改名並暫存 ⇒ V15 仍擋（檔有暫存變更）；②entry 改指
+    不存在之函式並暫存 ⇒ V15 擋（entry 與 HEAD 不同）；③只暫存無關之生產檔 ⇒ 無 V15 列。只依 entry 差異增量之實作
+    於 ① 即紅；只依檔變更增量之實作於 ② 即紅。"""
+    r = _cat_edit(_base(tmp_path), _rewrite_entry)
+    r.commit("rewrite entry")
+    r.write("tests/test_calc.py", T_CALC.replace("def test_add():", "def test_add_renamed():"))
+    r.stage("tests/test_calc.py")
+    assert any("tests/test_calc.py::test_add" in l for l in _v15_staged(r, capsys))
+    r.git("reset", "-q")
+    r.write("tests/test_calc.py", T_CALC)
+    _cat_edit(r, lambda c: _rewrite_entry(c, targets=("tests/test_calc.py::test_nope",)))
+    r.stage("tests/registry/catalog.json")
+    assert any("test_nope" in l for l in _v15_staged(r, capsys))
+    r.git("reset", "-q")
+    r.git("checkout", "-q", "--", "tests/registry/catalog.json")
+    r.write("momentum/calc.py", CALC + "\n# note\n")
+    r.stage("momentum/calc.py")
+    assert _v15_staged(r, capsys) == []

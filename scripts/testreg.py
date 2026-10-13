@@ -2123,16 +2123,21 @@ def rule_v14(ctx: Context) -> List[Finding]:
 def rule_v15(ctx: Context) -> List[Finding]:
     """V15。"""
     out, t = [], _tree(ctx)
-    # 第 3 批：catalog 有數十個 rewrite entry 後，逐檔 git show 使 pre-commit 之 check --staged 多約 0.8 秒（越過
-    # §C 秒級門檻）⇒ 先以單一 git cat-file --batch 批次預讀
-    t.prefetch([p for p, e in _entries(ctx).items()
-                if _scoped(ctx, p) and isinstance(e, dict) and e.get("rewrite_targets")])
-    for p, e in sorted(_entries(ctx).items()):
-        if _scoped(ctx, p) and isinstance(e, dict) and e.get("rewrite_targets"):
-            fns = set(_function_nodeids(t, p))
-            for n in e.get("rewrite_targets") or []:
-                if str(n).split("::")[0] != p or re.sub(r"\[.*\]$", "", str(n)) not in fns:
-                    out.append(Finding("V15", p, f"rewrite_targets {n} 不屬本檔或函式不存在"))
+    # 第 3 批：catalog 有數十個 rewrite entry 後，pre-commit 之 check --staged 逐檔讀取（git show）與解析使冷啟動
+    # 多約 1 秒（越過 §C 秒級門檻）⇒ ①暫存區模式只驗「entry 與 HEAD catalog 不同」或「該檔有暫存變更」者（其餘與
+    # HEAD 之評估相同，HEAD 已經 pre-commit 驗過；全量由 `validate` 驗）②餘者以單一 git cat-file --batch 批次預讀
+    changed = ctx.extra.get("changed") if ctx.tree == "staged" else None
+    head_entries = (ctx.head_catalog or {}).get("entries", {}) if changed is not None else {}
+    todo = sorted(p for p, e in _entries(ctx).items()
+                  if _scoped(ctx, p) and isinstance(e, dict) and e.get("rewrite_targets")
+                  and (changed is None or p in changed or head_entries.get(p) != e))
+    t.prefetch(todo)
+    entries = _entries(ctx)
+    for p in todo:
+        fns = set(_function_nodeids(t, p))
+        for n in entries[p].get("rewrite_targets") or []:
+            if str(n).split("::")[0] != p or re.sub(r"\[.*\]$", "", str(n)) not in fns:
+                out.append(Finding("V15", p, f"rewrite_targets {n} 不屬本檔或函式不存在"))
     return out
 
 
