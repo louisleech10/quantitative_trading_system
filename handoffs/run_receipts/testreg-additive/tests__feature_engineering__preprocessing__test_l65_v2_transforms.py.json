@@ -1,0 +1,46 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py::test_append_mode_column_order_is_originals_then_rank_suffix",
+  "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py::test_non_optimized_configs_never_enter_optimized_path",
+  "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py::test_single_copy_equivalence_on_window_filled_frame"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "baseline_session_id": "a578d247-a900-4e33-8ad2-2eb0e4a52191",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_l65_v2_transforms.py.compare.patch",
+ "compare_patch_sha256": "b0413adf78269df5e1807f172649b77d898dd31880456000ccb015f167f1d361",
+ "fingerprint": "5897bf5e6a987a2050b8167ab0985a5561b67b841f06d3c68bc9985ee1ccecf0",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_mask_all",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_l65_v2_transforms.py/m_mask_all.patch",
+   "patch_sha256": "2664fdc4afb84b2732bc0ae76e8ee5bf23c63a9ef5757bb830ff960fdd17a08f",
+   "session_id": "85cbff0d-a28f-440d-8bbf-ad825abb5822"
+  },
+  {
+   "id": "m_optimized_skip_winsor",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_l65_v2_transforms.py/m_optimized_skip_winsor.patch",
+   "patch_sha256": "19748c41e2392e09c55f7e33581348a9173f938bc98a06eaac9cefba5525b9a6",
+   "session_id": "bbfc0fc3-7518-4b12-9b54-82f283313b1f"
+  },
+  {
+   "id": "m_always_optimized",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_l65_v2_transforms.py/m_always_optimized.patch",
+   "patch_sha256": "80004c9f1e7af85219a0088c04896d877949b45220fabcc62c870b3b8abaac99",
+   "session_id": "20eda3a9-1de2-4965-ba50-085f2dc8f677"
+  },
+  {
+   "id": "m_append_order",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_l65_v2_transforms.py/m_append_order.patch",
+   "patch_sha256": "71aa98a582bc7923c3303461cf0f8bd1c2ec073455e83074b71b44c7169e685c",
+   "session_id": "97ae2b26-7228-49d1-bec7-777eb016c1ee"
+  },
+  {
+   "id": "m_no_scipy_flag",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_l65_v2_transforms.py/m_no_scipy_flag.patch",
+   "patch_sha256": "1a94afb9d35335018ab36fd3eab8a4e4507fa15ee0bb7e342457abd0ac005e61",
+   "session_id": "69dfc606-ab38-4539-b786-c6bfd31fc977"
+  }
+ ],
+ "path": "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py"
+}

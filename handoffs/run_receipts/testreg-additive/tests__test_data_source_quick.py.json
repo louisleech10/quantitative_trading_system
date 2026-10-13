@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/test_data_source_quick.py::test_ema_values_follow_selected_data_source"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "baseline_session_id": "58cc7f0b-0e92-4b0f-8d42-0a36763a1e4e",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_data_source_quick.py.compare.patch",
+ "compare_patch_sha256": "16d047440ddaa992a0ab14fbda390227faad22d80df557fdebfce77ab4805703",
+ "fingerprint": "5abf4950deb2ee1fd9cdd8c3fcf591ecd2a317e29ef7d2bf215c4b6b0d1a5b73",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_src_close",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_data_source_quick.py/m_src_close.patch",
+   "patch_sha256": "9ca77bdf264a253435868c64eb588e82c241a0f09fa452ddb0a2365f04f5b2c2",
+   "session_id": "d7434921-5a22-4ce0-a673-fb1f2cdb2dec"
+  },
+  {
+   "id": "m_adjust_true",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_data_source_quick.py/m_adjust_true.patch",
+   "patch_sha256": "3c7a0f83ce3fde38be407b10f0c1a1ff0f65559352c6be623ebb4020272ebcbb",
+   "session_id": "3afed792-1a2c-45da-a564-3aad1f33f708"
+  },
+  {
+   "id": "m_fx_drop_source",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_data_source_quick.py/m_fx_drop_source.patch",
+   "patch_sha256": "393df81f047eda69d836e2af3a7deff06fb8c9ef1db92f89f598dfb1a6b088cb",
+   "session_id": "2282d798-c42e-4d6c-8c43-9decddbb891e"
+  }
+ ],
+ "path": "tests/test_data_source_quick.py"
+}

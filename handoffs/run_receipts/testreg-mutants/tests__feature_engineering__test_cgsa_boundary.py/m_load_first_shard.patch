@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/core/column_group_registry.py b/momentum/FeatureEngineering/core/column_group_registry.py
+index 1e4ea939..4c66f88e 100644
+--- a/momentum/FeatureEngineering/core/column_group_registry.py
++++ b/momentum/FeatureEngineering/core/column_group_registry.py
+@@ -322,7 +322,7 @@ class ColumnGroupRegistry:
+             try:
+                 out = np.empty((group.n_rows, group.n_cols), dtype=np.float32)
+                 for shard in group.shards:
+-                    arr = np.load(shard.disk_path, mmap_mode="r", allow_pickle=False)
++                    arr = np.load(group.shards[0].disk_path, mmap_mode="r", allow_pickle=False)
+                     out[:, shard.col_start:shard.col_end] = arr
+                     del arr
+                 return out

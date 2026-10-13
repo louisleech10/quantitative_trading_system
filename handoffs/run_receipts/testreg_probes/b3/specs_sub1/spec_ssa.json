@@ -1,0 +1,9 @@
+{"path": "tests/test_searchsorted_align.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m_side_left", "file": "momentum/FeatureEngineering/timeframe/tf_aligner.py",
+   "old": "        idx = np.searchsorted(source_close_ns, decision_ns, side=\"right\") - 1\n",
+   "new": "        idx = np.searchsorted(source_close_ns, decision_ns, side=\"left\") - 1\n"},
+  {"id": "m_open_as_close", "file": "momentum/FeatureEngineering/timeframe/tf_aligner.py",
+   "old": "        source_close_ns = source_s * _NS_PER_SECOND + np.int64(source_dur_ns)\n",
+   "new": "        source_close_ns = source_s * _NS_PER_SECOND\n"}]}

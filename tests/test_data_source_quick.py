@@ -6,6 +6,7 @@
 
 import pandas as pd
 import numpy as np
+import pytest
 from momentum.FeatureEngineering.feature_extractor import FeatureExtractor, StrategyParams
 from api.core.logging import get_logger
 
@@ -145,6 +146,27 @@ def test_data_source_impact():
         logger.info("✅ 成功：不同 data_source 產生不同的 EMA 值")
         logger.info("   data_source 參數正確生效")
         return True
+
+
+@pytest.mark.parametrize('data_source', ['close', 'volume', 'taker_ratio'])
+def test_ema_values_follow_selected_data_source(data_source):
+    """純增：上列 test_data_source_impact 讀取之 ema_5 等欄已被特徵輸出過濾，KeyError 被 except 吞掉後 return False
+    （pytest 只警告、永不失敗）。本案斷言所選數據源之 EMA(5,20,60) 特徵值逐列等於獨立遞迴定義
+    （y0＝x0、y_t＝a·x_t＋(1−a)·y_{t−1}、a＝2/(span+1)）。"""
+    df = create_mock_data(100)
+    out, _names = FeatureExtractor().extract_features_from_strategy(
+        df.copy(), StrategyParams(strategy_type='ema_three_line', data_source=data_source,
+                                  params={'ema_short': 5, 'ema_mid': 20, 'ema_long': 60, 'volume_threshold': 0.6}))
+    x = df[data_source].to_numpy(dtype=float)
+    for span in (5, 20, 60):
+        a = 2.0 / (span + 1)
+        want = np.empty_like(x)
+        want[0] = x[0]
+        for i in range(1, len(x)):
+            want[i] = a * x[i] + (1 - a) * want[i - 1]
+        col = f'{data_source}_ema{span}_value'
+        np.testing.assert_allclose(out[col].to_numpy(), want, rtol=1e-12, atol=0, err_msg=col)
+
 
 if __name__ == '__main__':
     try:

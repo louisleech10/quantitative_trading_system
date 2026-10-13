@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/test_cgsa_boundary.py::test_single_column_larger_than_shard_target_gets_one_column_per_shard"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "baseline_session_id": "73c0efe9-1612-4acf-a49b-30b6b56ddbc1",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_cgsa_boundary.py.compare.patch",
+ "compare_patch_sha256": "39f3d9c7202bf24371abf6d959ce170ae4a1d7a1d727e2e4ddfc83b6f1a79caa",
+ "fingerprint": "842effaa58b1c26b15fd0a9f033d7a5b2d55c90b85222730a0d4814aac710de1",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_two_cols_floor",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_cgsa_boundary.py/m_two_cols_floor.patch",
+   "patch_sha256": "4c5b6c958efd0093abb405dc4d2b7d41451d80d8af073adfc1e1724f70a1f9fc",
+   "session_id": "284ef066-0532-4459-a75a-10eb508d5eca"
+  },
+  {
+   "id": "m_load_first_shard",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_cgsa_boundary.py/m_load_first_shard.patch",
+   "patch_sha256": "08a64390eadbcada8c9d584557f0c993e9ca94ba17f1b1388688da63c4d0668c",
+   "session_id": "e7560316-c611-4cfe-b7de-6d8c15fc3687"
+  }
+ ],
+ "path": "tests/feature_engineering/test_cgsa_boundary.py"
+}

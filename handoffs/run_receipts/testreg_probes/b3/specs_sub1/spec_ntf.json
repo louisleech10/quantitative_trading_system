@@ -1,0 +1,9 @@
+{"path": "tests/feature_engineering/preprocessing/test_l65_native_tf.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "mutants": [
+  {"id": "m_always_native_inplace", "file": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+   "old": "        if not use_native:\n            logger.info(\n                \"[L6.5] native-tf in-place skipped: group=%s reason=%s \"\n",
+   "new": "        if False:\n            logger.info(\n                \"[L6.5] native-tf in-place skipped: group=%s reason=%s \"\n"},
+  {"id": "m_min_rows", "file": "momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py",
+   "old": "_MIN_NATIVE_ROWS = 50  # Avoid tiny groups where overhead dominates.\n",
+   "new": "_MIN_NATIVE_ROWS = 5  # Avoid tiny groups where overhead dominates.\n"}]}

@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/strategy_registry.py b/momentum/FeatureEngineering/strategy_registry.py
+index 03c219c0..6e183759 100644
+--- a/momentum/FeatureEngineering/strategy_registry.py
++++ b/momentum/FeatureEngineering/strategy_registry.py
+@@ -193,7 +193,7 @@ class StrategyRegistry:
+     
+     def list_strategies(self) -> List[str]:
+         """列出所有已註冊策略"""
+-        return list(self._strategies.keys())
++        return []
+     
+     def extract_features(
+         self,

@@ -1,0 +1,12 @@
+{"path": "tests/test_dynamic_indicator_system.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m_drop_strategy", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "            feature_names.extend(strategy_features)\n", "new": "            pass\n"},
+  {"id": "m_dup_name", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "            feature_names.extend(strategy_features)\n",
+   "new": "            feature_names.extend(strategy_features + strategy_features[:1])\n"},
+  {"id": "m_keep_ts", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        keep_columns = ['timestamp'] + feature_names\n", "new": "        keep_columns = ['timestamp']\n"},
+  {"id": "m_list_empty", "file": "momentum/FeatureEngineering/strategy_registry.py",
+   "old": "        return list(self._strategies.keys())\n", "new": "        return []\n"}]}

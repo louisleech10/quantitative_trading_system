@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/timeframe/tf_aligner.py b/momentum/FeatureEngineering/timeframe/tf_aligner.py
+index b0b5cdb6..3d41f7dc 100644
+--- a/momentum/FeatureEngineering/timeframe/tf_aligner.py
++++ b/momentum/FeatureEngineering/timeframe/tf_aligner.py
+@@ -165,7 +165,7 @@ class TimeframeAligner:
+         decision_ns = primary_ns + (np.int64(primary_dur_ns) if decision_mode == "close_time" else np.int64(0))
+         source_close_ns = source_s * _NS_PER_SECOND + np.int64(source_dur_ns)
+ 
+-        idx = np.searchsorted(source_close_ns, decision_ns, side="right") - 1
++        idx = np.searchsorted(source_close_ns, decision_ns, side="left") - 1
+         idx = idx.astype(np.int64, copy=False)
+         idx[idx < 0] = -1
+ 

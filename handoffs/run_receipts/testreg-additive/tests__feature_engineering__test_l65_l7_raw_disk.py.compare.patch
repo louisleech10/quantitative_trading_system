@@ -1,0 +1,40 @@
+diff --git a/tests/feature_engineering/test_l65_l7_raw_disk.py b/tests/feature_engineering/test_l65_l7_raw_disk.py
+index 6ed30845..3a929251 100644
+--- a/tests/feature_engineering/test_l65_l7_raw_disk.py
++++ b/tests/feature_engineering/test_l65_l7_raw_disk.py
+@@ -117,6 +117,35 @@ def test_precheck_passthrough_mode_c_uses_same_codepath(
+         storage._precheck_l7_raw_stream_disk_space(tmp_path / "features", [("big", group)])
+ 
+ 
++
++def test_precheck_enforced_through_mode_c_stream_entry(
++    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
++) -> None:
++    """純增：上列 test_precheck_passthrough_mode_c_uses_same_codepath 宣稱 Mode C（preprocessor=None 直通）亦受同一預檢，
++    卻直接呼叫 _precheck_l7_raw_stream_disk_space、未經 Mode C 入口。本案經 write_raw_from_registry_stream
++    （preprocessor=None、l65_mode="none"）：可用空間 1 byte ⇒ 擲串流落盤空間不足之 OSError。"""
++    monkeypatch.setenv("FFACT_CGSA_SHARD_BYTES", "1MiB")
++    monkeypatch.setenv("FFACT_L7_DISK_SAFETY_FACTOR", "1.0")
++    monkeypatch.setenv("FFACT_L7_MIN_FREE_GIB", "0")
++
++    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
++    n_rows, n_cols = 8192, 4096
++    registry.save_data(_build_group("big", n_rows, n_cols), np.zeros((n_rows, n_cols), np.float32))
++
++    storage = FeatureStorage(str(tmp_path / "features"))
++    monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: 1)
++    with pytest.raises(OSError, match="Insufficient disk space for L7_raw streaming persist"):
++        storage.write_raw_from_registry_stream(
++            symbol="SYN",
++            tf="12h",
++            config_hash="cfg_mode_c",
++            registry=registry,
++            preprocessor=None,
++            cleanup_intermediate=True,
++            l65_mode="none",
++        )
++
++
+ def test_per_part_check_passes_with_source_reclaimable(
+     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+ ) -> None:

@@ -1,0 +1,14 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/_numba_transforms.py b/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
+index 73bf627f..2a456f0a 100644
+--- a/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
++++ b/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
+@@ -381,7 +381,8 @@ def rolling_winsorize_array(
+     min_periods: int = 63,
+ ) -> np.ndarray:
+     """Causal quantile winsorization on float32 array, column-wise."""
+-    lowers, uppers = rolling_quantile_2d(arr, lower_q, upper_q, window, min_periods)
++    lowers, uppers = rolling_quantile_2d(np.ascontiguousarray(arr[::-1]), lower_q, upper_q, window, min_periods)
++    lowers, uppers = np.ascontiguousarray(lowers[::-1]), np.ascontiguousarray(uppers[::-1])
+     nan_mask = np.isnan(arr)
+     valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+     clipped = np.clip(arr, lowers, uppers)

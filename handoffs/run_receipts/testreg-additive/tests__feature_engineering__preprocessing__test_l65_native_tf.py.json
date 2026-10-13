@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/preprocessing/test_l65_native_tf.py::test_legacy_path_equals_transform_of_pre_expanded_group"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "baseline_session_id": "37164958-a0e1-4d75-9b37-ca8772c51293",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_l65_native_tf.py.compare.patch",
+ "compare_patch_sha256": "6188e6276679c1300ed87ecd25e8f8b070bce85e2c4d93d844649ef9f033ad60",
+ "fingerprint": "b9b37783a567cf28eed421641a86ae2f8318ef776736048add5f1bd87be33d3e",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_always_native_inplace",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_l65_native_tf.py/m_always_native_inplace.patch",
+   "patch_sha256": "19019b15bd5221b06995183767433bd6a1f9229290e0849b0761966ea310d9d9",
+   "session_id": "cf563600-d65d-42fb-80d2-13b7d90babb4"
+  },
+  {
+   "id": "m_min_rows",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_l65_native_tf.py/m_min_rows.patch",
+   "patch_sha256": "7d11ae7cb35f75824fdfafd4ae52d64e4eda354d3d1db0d30c6588f7e67bcb4b",
+   "session_id": "1d8cd207-991b-4460-88ba-8db711742171"
+  }
+ ],
+ "path": "tests/feature_engineering/preprocessing/test_l65_native_tf.py"
+}

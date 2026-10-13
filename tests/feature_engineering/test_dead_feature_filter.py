@@ -408,3 +408,29 @@ class TestPerformance:
         elapsed = time.perf_counter() - t0
         assert elapsed < 10.0, f"Performance regression: took {elapsed:.2f}s for 10K×20K"
         assert isinstance(dead, frozenset)
+
+
+
+def test_dead_verdict_matches_injected_kind_on_random_matrix() -> None:
+    """純增：上列 TestSharedStandardContract::test_same_verdict_on_random_matrix 只比對兩實作彼此一致，而
+    dead_column_mask 與 find_dead_columns 皆委派 stable_mask.dead_column_decision（同源，共同錯誤不現形）。本案以注入方式
+    本身為獨立期望：注入常數之欄、有效樣本 < 100 之欄為死欄；其餘（≥200 列標準常態、全有效）為活欄。"""
+    rs = np.random.RandomState(7)
+    for _ in range(30):
+        rows = rs.randint(200, 2000)
+        n_cols = rs.randint(2, 25)
+        data = rs.randn(rows, n_cols)
+        cols = [f"c{j}" for j in range(n_cols)]
+        expected = set()
+        for j in range(n_cols):
+            r = rs.rand()
+            if r < 0.2:
+                data[:, j] = 42.0
+                expected.add(cols[j])
+            elif r < 0.4:
+                data[rs.randint(0, 100):, j] = np.nan
+                expected.add(cols[j])
+        np_mask = dead_column_mask(data, min_valid_samples=100)
+        assert {cols[j] for j in range(n_cols) if np_mask[j]} == expected
+        df_dead, _ = find_dead_columns(pd.DataFrame(data, columns=cols), min_valid_samples=100)
+        assert set(df_dead) == expected

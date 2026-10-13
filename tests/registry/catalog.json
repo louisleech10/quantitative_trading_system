@@ -3046,8 +3046,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-review-r50/synth.md",
    "guarantee": [
     "A17"
    ],
@@ -3057,9 +3057,7 @@
    "path": "tests/feature_engineering/test_failopen_frozen_diff.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/test_failopen_frozen_diff.py::test_v8_frozen_list_covers_existing_test_assertion_changes"
-   ],
+   "rewrite_targets": [],
    "ticket": "FAIL-OPEN"
   },
   "tests/feature_engineering/test_failopen_golden.py": {
@@ -12242,7 +12240,7 @@
     "smoke"
    ],
    "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-review-r50/synth.md",
    "guarantee": [
     "A12",
     "A14",
@@ -12260,9 +12258,7 @@
    "rewrite_targets": [
     "tests/test_phase_d_granular_control.py::TestD1ConcurrentConfigWrite::test_concurrent_batch_toggle_no_crash",
     "tests/test_phase_d_granular_control.py::TestD1ConcurrentConfigWrite::test_concurrent_config_read_write_no_corruption",
-    "tests/test_phase_d_granular_control.py::TestD1EdgeCases::test_edge_case_all_enabled_matches_default",
-    "tests/test_phase_d_granular_control.py::TestD4APISpecification::test_presets_api_documented",
-    "tests/test_phase_d_granular_control.py::TestD4APISpecification::test_version_updated"
+    "tests/test_phase_d_granular_control.py::TestD1EdgeCases::test_edge_case_all_enabled_matches_default"
    ],
    "ticket": "unknown"
   },
@@ -12461,8 +12457,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-review-r50/synth.md",
    "guarantee": [
     "A14",
     "A15",
@@ -12477,9 +12473,7 @@
    "path": "tests/test_winsorize_partition_opt.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/test_winsorize_partition_opt.py::test_legacy_equivalent_no_extra_copy_quantile"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/test_xgboost_advanced_metrics.py": {

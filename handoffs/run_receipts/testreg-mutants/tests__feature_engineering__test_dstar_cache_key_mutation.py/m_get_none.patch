@@ -1,0 +1,12 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/_d_star_cache.py b/momentum/FeatureEngineering/preprocessing/_d_star_cache.py
+index 4f8e2d98..c7fd1598 100644
+--- a/momentum/FeatureEngineering/preprocessing/_d_star_cache.py
++++ b/momentum/FeatureEngineering/preprocessing/_d_star_cache.py
+@@ -493,6 +493,7 @@ class DStarCache:
+         }
+ 
+     def get(self, column: str, col_values: Optional[np.ndarray] = None) -> Optional[float]:
++        return None
+         if not self.is_enabled:
+             return None
+ 

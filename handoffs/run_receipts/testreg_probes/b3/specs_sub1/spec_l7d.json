@@ -1,0 +1,6 @@
+{"path": "tests/feature_engineering/test_l65_l7_raw_disk.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
+ "mutants": [
+  {"id": "m_skip_precheck", "file": "momentum/FeatureEngineering/feature_storage.py",
+   "old": "        self._precheck_l7_raw_stream_disk_space(run_dir, groups_list)\n",
+   "new": "        pass\n"}]}

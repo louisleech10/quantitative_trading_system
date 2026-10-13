@@ -1,0 +1,9 @@
+{"path": "tests/test_cross_symbol_features.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m_drop_relative_only", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        if params.get('relative_only') is True:\n            return True\n",
+   "new": "        if False:\n            return True\n"},
+  {"id": "m_dist_unscaled", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "            (df[data_source] - df[ema_short_col]) / (df[ema_short_col] + 1e-10)\n",
+   "new": "            (df[data_source] - df[ema_short_col])\n"}]}

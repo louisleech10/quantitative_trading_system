@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/core/column_group_registry.py b/momentum/FeatureEngineering/core/column_group_registry.py
+index 1e4ea939..5558caa3 100644
+--- a/momentum/FeatureEngineering/core/column_group_registry.py
++++ b/momentum/FeatureEngineering/core/column_group_registry.py
+@@ -833,7 +833,7 @@ class ColumnGroupRegistry:
+         width = max(2, len(str(len(slices) - 1)))
+         try:
+             for idx, (col_start, col_end) in enumerate(slices):
+-                shard_path = self._work_dir / f"{group.group_id}.shard{idx:0{width}d}.npy"
++                shard_path = self._work_dir.parent / f"{group.group_id}.shard{idx:0{width}d}.npy"
+                 shard_arr = np.ascontiguousarray(data_fp32[:, col_start:col_end])
+                 self._persist_group_array(
+                     f"{group.group_id}#shard{idx}",

@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+index ba0522a8..03381b1f 100644
+--- a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
++++ b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+@@ -2953,7 +2953,7 @@ class FeaturePreprocessor:
+         """Original transform logic applied to a full DataFrame."""
+         self._fracdiff_processed_columns = set()
+         self._dstar_failed_columns = set()
+-        if self._can_use_optimized_dataframe_path():
++        if True:
+             return self._transform_single_optimized_df(features_df)
+ 
+         # FFSTAT：決策紀錄之當次脈絡（群組之原生週期與層、本次輸入欄集合）

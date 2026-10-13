@@ -1,0 +1,12 @@
+{"path": "tests/test_data_source_quick.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m_src_close", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "        df[ema_short_col] = df[data_source].ewm(span=short, adjust=False).mean()\n",
+   "new": "        df[ema_short_col] = df['close'].ewm(span=short, adjust=False).mean()\n"},
+  {"id": "m_adjust_true", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "        df[ema_mid_col] = df[data_source].ewm(span=mid, adjust=False).mean()\n",
+   "new": "        df[ema_mid_col] = df[data_source].ewm(span=mid, adjust=True).mean()\n"},
+  {"id": "m_fx_drop_source", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "                data_source=strategy_params.data_source\n            )\n            feature_names.extend(strategy_features)\n",
+   "new": "                data_source='close'\n            )\n            feature_names.extend(strategy_features)\n"}]}

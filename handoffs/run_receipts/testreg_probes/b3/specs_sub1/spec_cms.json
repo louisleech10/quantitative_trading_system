@@ -1,0 +1,24 @@
+{
+ "path": "tests/feature_engineering/test_cgsa_multi_symbol_isolation.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "mutants": [
+  {
+   "id": "m_leaf_no_tf",
+   "file": "momentum/FeatureEngineering/run_paths.py",
+   "old": "    leaf = f\"{safe_token(symbol)}_{safe_token(timeframe)}_{config_hash[:8]}\"\n",
+   "new": "    leaf = f\"{safe_token(symbol)}_{config_hash[:8]}\"\n"
+  },
+  {
+   "id": "m_shard_in_parent",
+   "file": "momentum/FeatureEngineering/core/column_group_registry.py",
+   "old": "                shard_path = self._work_dir / f\"{group.group_id}.shard{idx:0{width}d}.npy\"\n",
+   "new": "                shard_path = self._work_dir.parent / f\"{group.group_id}.shard{idx:0{width}d}.npy\"\n"
+  },
+  {
+   "id": "m_load_first_shard",
+   "file": "momentum/FeatureEngineering/core/column_group_registry.py",
+   "old": "                    arr = np.load(shard.disk_path, mmap_mode=\"r\", allow_pickle=False)\n                    out[:, shard.col_start:shard.col_end] = arr\n                    del arr\n",
+   "new": "                    arr = np.load(group.shards[0].disk_path, mmap_mode=\"r\", allow_pickle=False)\n                    out[:, shard.col_start:shard.col_end] = arr\n                    del arr\n"
+  }
+ ]
+}

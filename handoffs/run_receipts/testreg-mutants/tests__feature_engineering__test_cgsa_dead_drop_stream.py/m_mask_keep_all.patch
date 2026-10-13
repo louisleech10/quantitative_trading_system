@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/utils/dead_feature_filter.py b/momentum/FeatureEngineering/utils/dead_feature_filter.py
+index 80ae22e1..2d10ed9a 100644
+--- a/momentum/FeatureEngineering/utils/dead_feature_filter.py
++++ b/momentum/FeatureEngineering/utils/dead_feature_filter.py
+@@ -139,7 +139,7 @@ def dead_column_mask(
+     decision = _stable_mask.dead_column_decision(
+         np.asarray(array, dtype=np.float64), nan_rate_threshold=None, min_valid=min_valid_samples
+     )
+-    return np.asarray(decision.dead, dtype=bool)
++    return np.zeros(np.asarray(decision.dead).shape, dtype=bool)
+ 
+ 
+ def drop_dead_columns(

@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/stable_mask.py b/momentum/FeatureEngineering/preprocessing/stable_mask.py
+index 11a00704..42de3ddf 100644
+--- a/momentum/FeatureEngineering/preprocessing/stable_mask.py
++++ b/momentum/FeatureEngineering/preprocessing/stable_mask.py
+@@ -311,7 +311,7 @@ def _dead_columns_2d(arr: np.ndarray, nan_rate_threshold: Optional[float], min_v
+             warnings.simplefilter("ignore", category=RuntimeWarning)
+             col_min = np.nanmin(masked, axis=0) if n_rows else np.full(n_cols, np.nan)
+             col_max = np.nanmax(masked, axis=0) if n_rows else np.full(n_cols, np.nan)
+-    constant = ~(col_min < col_max)  # 無有限值（NaN）或全同值
++    constant = np.zeros(n_cols, dtype=bool)
+     reason = np.full(n_cols, None, dtype=object)
+     dead = np.zeros(n_cols, dtype=bool)
+     rules = []

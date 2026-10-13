@@ -1,0 +1,46 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/test_failopen_winsor.py::test_validator_final_scan_reports_nan_created_by_winsor_window_mask",
+  "tests/feature_engineering/test_failopen_winsor.py::test_validator_winsor_is_point_in_time_after_window_fills",
+  "tests/feature_engineering/test_failopen_winsor.py::test_validator_winsor_skipped_only_when_preprocessing_and_winsor_both_enabled"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "baseline_session_id": "52da8513-1c8a-4697-b72b-937901641d5b",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_failopen_winsor.py.compare.patch",
+ "compare_patch_sha256": "4f98f05e51b7c3645100863d744b44d1f78c364a263a73e2b76831bd13d21bb1",
+ "fingerprint": "dcb6aee6c91b16f7a5a771e8b8efe82ffd425bcb5a1e1bd9a2b7a820be485b13",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_lookahead",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_failopen_winsor.py/m_lookahead.patch",
+   "patch_sha256": "8d8127ffbeef79e2b984c6a9c87afbb056ca9af65d3ebad5cfdc50c2a0837ccf",
+   "session_id": "9e103b6a-66ee-4f26-84eb-49f2120af8da"
+  },
+  {
+   "id": "m_mask_wide",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_failopen_winsor.py/m_mask_wide.patch",
+   "patch_sha256": "cae9ed6d2f5b4142d42c8721da5d89419943ef417325b1b6e02cc7abb889851f",
+   "session_id": "92a93812-6e1f-401a-9a0a-1e8550f486dc"
+  },
+  {
+   "id": "m_no_mask",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_failopen_winsor.py/m_no_mask.patch",
+   "patch_sha256": "47b642011ea571d38c1b7d8f9d5e798657bba3175604e3e0495d37f0deaf2d00",
+   "session_id": "bff8511f-b441-4602-9457-b456a89e6328"
+  },
+  {
+   "id": "m_ignore_preprocessing",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_failopen_winsor.py/m_ignore_preprocessing.patch",
+   "patch_sha256": "1761a487975583874681b86bfbe2e79367142b6b4eaaa7bc3d5c965b8258c20e",
+   "session_id": "0eb74a9c-50e8-4626-accf-9a5b66000f7a"
+  },
+  {
+   "id": "m_validate_raises",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_failopen_winsor.py/m_validate_raises.patch",
+   "patch_sha256": "32418bc2f44d23a1fc27cc0e5570315583cfafdd0d6aa301f4380645a191536d",
+   "session_id": "86720127-e42b-4d1e-bb2e-bbfa84e972c8"
+  }
+ ],
+ "path": "tests/feature_engineering/test_failopen_winsor.py"
+}

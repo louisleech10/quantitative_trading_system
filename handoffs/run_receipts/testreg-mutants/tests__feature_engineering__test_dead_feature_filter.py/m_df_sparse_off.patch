@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/utils/dead_feature_filter.py b/momentum/FeatureEngineering/utils/dead_feature_filter.py
+index 80ae22e1..f542bd60 100644
+--- a/momentum/FeatureEngineering/utils/dead_feature_filter.py
++++ b/momentum/FeatureEngineering/utils/dead_feature_filter.py
+@@ -89,7 +89,7 @@ def find_dead_columns(
+         for c, const, valid in zip(cols, np.asarray(decision.constant), np.asarray(decision.valid_count)):
+             if const:
+                 constant_cols_l.append(str(c))
+-            if valid < min_valid_samples:
++            if valid < 0:
+                 sparse_cols_l.append(str(c))
+     others = [c for c in df.columns if c not in set(numeric)]
+     if others:

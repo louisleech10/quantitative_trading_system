@@ -1,0 +1,20 @@
+{
+ "added_nodeids": [
+  "tests/test_data_source_simple.py::test_data_source_changes_ema_values"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "baseline_session_id": "ed8dbac1-9147-4d32-bafb-3bd9e4d5cbfd",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_data_source_simple.py.compare.patch",
+ "compare_patch_sha256": "a6d2756340aaf985540ab65218d5e0061b51120fca80e82d89f9ebf755708cf3",
+ "fingerprint": "f152b12f7e8da1363e0875737a44de19acbcce137ca64494ce49a35f8f83714e",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_ema_close_only",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_data_source_simple.py/m_ema_close_only.patch",
+   "patch_sha256": "9cdedd47bae26c2c73d0ea7ebb6adf1997867950402d0c479cfc338945897b98",
+   "session_id": "98e60666-3d88-450f-a202-e3c4d1992afb"
+  }
+ ],
+ "path": "tests/test_data_source_simple.py"
+}

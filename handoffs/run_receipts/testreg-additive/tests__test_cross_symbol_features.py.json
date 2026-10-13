@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/test_cross_symbol_features.py::test_relative_only_features_invariant_to_price_and_volume_scale"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "baseline_session_id": "a8bb39bd-e6d2-4f92-b035-e7b8c8378b70",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_cross_symbol_features.py.compare.patch",
+ "compare_patch_sha256": "9a750dbb4614918fdda5670bb8bfc5172e2cdbba593a7f172f92364b44427ff1",
+ "fingerprint": "faecaf70b34da5dc6ce1134a42472add80cc4f9822f62a1b3b738fe042206d15",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_drop_relative_only",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m_drop_relative_only.patch",
+   "patch_sha256": "34db1b3a038c94cead8bcf0e7ffce03839dd695165f1e38ea741471495183eec",
+   "session_id": "27f72ff8-bc69-4c5e-8734-a5649a5975d7"
+  },
+  {
+   "id": "m_dist_unscaled",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m_dist_unscaled.patch",
+   "patch_sha256": "ada96cd99fb85df54cc27d5ae304d5d8481fbe8096475dfe3fd271fa41313f00",
+   "session_id": "47379c1e-129b-4977-b3b1-7c73f5139edc"
+  }
+ ],
+ "path": "tests/test_cross_symbol_features.py"
+}

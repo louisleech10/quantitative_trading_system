@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/indicators/ema_extractor.py b/momentum/FeatureEngineering/indicators/ema_extractor.py
+index 83897dd8..bd0c6854 100644
+--- a/momentum/FeatureEngineering/indicators/ema_extractor.py
++++ b/momentum/FeatureEngineering/indicators/ema_extractor.py
+@@ -98,7 +98,7 @@ class EMAExtractor(BaseStrategyExtractor):
+         
+         # 計算 EMA 值（僅用於計算相對特徵，不作為獨立特徵）
+         ema_short_col = feature_name_mapping['ema_short']
+-        df[ema_short_col] = df[data_source].ewm(span=short, adjust=False).mean()
++        df[ema_short_col] = df['close'].ewm(span=short, adjust=False).mean()
+         feature_names.append(ema_short_col)
+ 
+         # 兼容性欄位（供 data_source 變化測試使用）

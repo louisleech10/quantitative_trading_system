@@ -1,0 +1,45 @@
+{
+ "added_nodeids": [
+  "tests/test_volume_threshold_fix.py::test_volume_threshold_validation_strict",
+  "tests/test_volume_threshold_fix.py::test_volume_threshold_zero_spike_and_distance"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "baseline_session_id": "c7e31692-6988-42db-b5f2-be85f6ee6610",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_volume_threshold_fix.py.compare.patch",
+ "compare_patch_sha256": "f98095861960e6aba9ff996b7426e503622031cf951c97283b1571369aca404d",
+ "fingerprint": "cd9ff45e5f158988241920c02e81a537dd242eeb1f45d4c0892d779a825712bf",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_reject_zero",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_volume_threshold_fix.py/m_reject_zero.patch",
+   "patch_sha256": "94cbd198f60d4fcab577f6c70bf63e3faa44f32512420e2c914418e0c07425b5",
+   "session_id": "020b0479-5c26-4e52-806c-5ce90ac2e51b"
+  },
+  {
+   "id": "m_accept_wide",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_volume_threshold_fix.py/m_accept_wide.patch",
+   "patch_sha256": "78aadbbc6d46efd893056a10cf78b9cce4d5f10809a7264c30749d01bae318de",
+   "session_id": "6f811089-0163-4fd1-94fc-920dd22e9d0a"
+  },
+  {
+   "id": "m_spike_name",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_volume_threshold_fix.py/m_spike_name.patch",
+   "patch_sha256": "9d096501870893dbd627df93edfce256dbcdf50bffd77a9f4b8b617156769dd7",
+   "session_id": "a5a1b142-f7d4-4a61-9fda-3d1a9a9db21c"
+  },
+  {
+   "id": "m_spike_shift",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_volume_threshold_fix.py/m_spike_shift.patch",
+   "patch_sha256": "eec8d091c0c901b5c41f48076405c62ab88edd679840d5dada80de328effab1d",
+   "session_id": "b5b22c26-79c2-4965-b0d3-129084bb0c99"
+  },
+  {
+   "id": "m_dist_shift",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_volume_threshold_fix.py/m_dist_shift.patch",
+   "patch_sha256": "da92805ff417bd5249febb17fd9f911375821efd67fd6feb742935f7d1d8e86c",
+   "session_id": "bdb697a4-cd72-4e6b-a935-bac8e4eea6d7"
+  }
+ ],
+ "path": "tests/test_volume_threshold_fix.py"
+}

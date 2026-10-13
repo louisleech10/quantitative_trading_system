@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/stable_mask.py b/momentum/FeatureEngineering/preprocessing/stable_mask.py
+index 11a00704..ef3d7a41 100644
+--- a/momentum/FeatureEngineering/preprocessing/stable_mask.py
++++ b/momentum/FeatureEngineering/preprocessing/stable_mask.py
+@@ -244,7 +244,7 @@ def mask_incomplete_window_inplace(values: np.ndarray, window: int) -> np.ndarra
+     finite = np.isfinite(arr)
+     has = finite.any(axis=0)
+     first = np.where(has, np.argmax(finite, axis=0), arr.shape[0])
+-    cut = np.minimum(first + int(window) - 1, arr.shape[0])
++    cut = np.full_like(first, arr.shape[0])
+     arr[np.arange(arr.shape[0])[:, None] < cut[None, :]] = np.nan
+     return values
+ 

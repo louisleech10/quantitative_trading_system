@@ -1,0 +1,54 @@
+diff --git a/tests/feature_engineering/test_failopen_winsor.py b/tests/feature_engineering/test_failopen_winsor.py
+index a6a13199..2a71c85f 100644
+--- a/tests/feature_engineering/test_failopen_winsor.py
++++ b/tests/feature_engineering/test_failopen_winsor.py
+@@ -84,3 +84,49 @@ def test_winsor_rescans_nan_and_inf(monkeypatch: pytest.MonkeyPatch) -> None:
+ 
+     assert validation.has_inf is True
+     assert validation.has_nan is True
++
++
++
++def test_validator_winsor_is_point_in_time_after_window_fills() -> None:
++    """純增：上列 test_validator_winsor_is_point_in_time 之檢查列 0／62／63／120／200／250 全落在縮尾窗（252）未滿而遮為
++    NaN 之前 251 列，基線與擾動皆 NaN、equal_nan 恆過。本案加長至 700 列並於 300／450／600 列放極端值，於窗已滿之列
++    （≥251）檢查：基線為有限值，且把該列之後之值加 10,000 不改變該列。"""
++    rng = np.random.default_rng(20260611)
++    values = rng.normal(size=700).astype(np.float32)
++    values[[300, 450, 600]] = 100.0
++    frame = pd.DataFrame({"feature": values})
++    validator = FeatureValidator()
++    baseline = validator.winsorize(frame)
++    rows = [251, 299, 300, 449, 450, 600, 698]
++    assert np.isfinite(baseline.iloc[rows, 0].to_numpy()).all()
++    for row in rows:
++        perturbed = frame.copy()
++        perturbed.iloc[row + 1 :, 0] += np.float32(10_000.0)
++        candidate = validator.winsorize(perturbed)
++        np.testing.assert_allclose(candidate.iloc[row, 0], baseline.iloc[row, 0], atol=1e-6, rtol=0.0)
++
++
++@pytest.mark.parametrize(
++    ("preprocessing", "winsor", "expected"),
++    [(True, True, 0), (True, False, 1), (False, True, 1), (False, False, 1)],
++)
++def test_validator_winsor_skipped_only_when_preprocessing_and_winsor_both_enabled(
++    preprocessing: bool,
++    winsor: bool,
++    expected: int,
++) -> None:
++    """純增：上列 test_each_config_path_applies_at_most_one_winsor 之 cgsa 參數被 del 未用（同一情境跑兩次），且只測
++    preprocessing 與 winsorization 同開或同關。本案四種組合：只有兩者皆開（L6.5 已縮尾）才跳過 validator 縮尾。"""
++    validator = FeatureValidator()
++    frame = pd.DataFrame({"feature": np.arange(320, dtype=np.float32)})
++    validator.validate_factory_output(_result(frame, preprocessing=preprocessing, winsor=winsor))
++    assert validator._last_winsorization_count == expected
++
++
++def test_validator_final_scan_reports_nan_created_by_winsor_window_mask() -> None:
++    """純增：上列 test_winsor_rescans_nan_and_inf 以 monkeypatch 替換 winsorize 注入 NaN／inf，未經真實縮尾。本案不替換：
++    全有限之 320 列輸入經 validator 縮尾（窗 252）後前 251 列遮為 NaN，最終掃描須回報 has_nan，且回傳表即縮尾後之表。"""
++    result = _result(pd.DataFrame({"feature": np.arange(320, dtype=np.float32)}), preprocessing=False, winsor=False)
++    validation = FeatureValidator().validate_factory_output(result)
++    assert validation.has_nan is True
++    assert int(result.features_df["feature"].isna().sum()) == 251

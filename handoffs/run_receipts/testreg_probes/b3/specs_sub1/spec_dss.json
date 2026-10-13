@@ -1,0 +1,6 @@
+{"path": "tests/test_data_source_simple.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m_ema_close_only", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        df[ema_short_col] = df[data_source].ewm(span=short, adjust=False).mean()\n",
+   "new": "        df[ema_short_col] = df['close'].ewm(span=short, adjust=False).mean()\n"}]}

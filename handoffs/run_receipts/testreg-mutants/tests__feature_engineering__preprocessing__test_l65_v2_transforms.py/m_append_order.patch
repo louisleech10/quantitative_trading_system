@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+index ba0522a8..45a5ffb7 100644
+--- a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
++++ b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+@@ -3946,7 +3946,7 @@ class FeaturePreprocessor:
+             result.loc[:, columns] = ranked_df
+         else:
+             ranked_df = ranked_df.rename(columns={column: f"{column}_rank" for column in columns})
+-            result = pd.concat([result, ranked_df], axis=1)
++            result = pd.concat([ranked_df, result], axis=1)
+ 
+         return result
+ 

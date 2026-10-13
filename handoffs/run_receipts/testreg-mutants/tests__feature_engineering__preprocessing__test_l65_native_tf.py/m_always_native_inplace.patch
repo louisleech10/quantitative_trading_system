@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+index ba0522a8..7eeac0aa 100644
+--- a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
++++ b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+@@ -1376,7 +1376,7 @@ class FeaturePreprocessor:
+             source_n_rows=source_n_rows,
+             scaled_config=scaled_config,
+         )
+-        if not use_native:
++        if False:
+             logger.info(
+                 "[L6.5] native-tf in-place skipped: group=%s reason=%s "
+                 "src_tf=%s primary_tf=%s native_rows=%d",

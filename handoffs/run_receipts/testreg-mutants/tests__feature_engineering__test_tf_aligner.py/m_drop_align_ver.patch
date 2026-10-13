@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_factory.py b/momentum/FeatureEngineering/feature_factory.py
+index 9de23c94..0ab6c442 100644
+--- a/momentum/FeatureEngineering/feature_factory.py
++++ b/momentum/FeatureEngineering/feature_factory.py
+@@ -4138,7 +4138,7 @@ class FeatureFactory:
+         config_payload["_end_date"] = end_date
+         # Explicitly include timeframe kwarg in hash to ensure 12h/1h results never share cache.
+         config_payload["_timeframe"] = timeframe
+-        config_payload["_mtf_align_version"] = CURRENT_MTF_ALIGN_VERSION
++        config_payload["_mtf_align_version"] = 2
+         # FFSTAT Task 2.3 ⑨：預熱政策（逐欄穩定點）與倍數表內容皆改變輸出值 ⇒ 納入快取鍵（改前快取一律未命中）
+         config_payload["_warmup_policy"] = _stable_mask.WARMUP_POLICY
+         config_payload["_warmup_table_sha256"] = _warmup_lookup.table_sha256()

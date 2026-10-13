@@ -1,0 +1,12 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/_numba_transforms.py b/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
+index 73bf627f..88e44b8a 100644
+--- a/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
++++ b/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
+@@ -388,7 +388,6 @@ def rolling_winsorize_array(
+     arr[valid_bounds] = clipped[valid_bounds]
+     arr[nan_mask] = np.nan
+     # FFSTAT Task 2.3 第①類（R6 甲）：窗未湊滿之列（自首個有限值起 window−1 列）遮為 NaN；計算本身不變
+-    _stable_mask.mask_incomplete_window_inplace(arr, window)
+     return arr
+ 
+ 

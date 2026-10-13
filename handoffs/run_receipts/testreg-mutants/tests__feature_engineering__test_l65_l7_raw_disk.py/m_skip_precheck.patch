@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_storage.py b/momentum/FeatureEngineering/feature_storage.py
+index 6daae96b..d8a4b1ae 100644
+--- a/momentum/FeatureEngineering/feature_storage.py
++++ b/momentum/FeatureEngineering/feature_storage.py
+@@ -975,7 +975,7 @@ class FeatureStorage:
+         if not groups_list:
+             raise ValueError("write_raw_from_registry_stream requires non-empty registry groups")
+ 
+-        self._precheck_l7_raw_stream_disk_space(run_dir, groups_list)
++        pass
+ 
+         temp_root = run_dir / f".tmp-raw-{uuid.uuid4().hex}"
+         temp_artifact_dir = temp_root / "raw"

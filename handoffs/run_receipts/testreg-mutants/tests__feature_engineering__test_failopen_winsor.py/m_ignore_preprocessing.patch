@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_validator.py b/momentum/FeatureEngineering/feature_validator.py
+index a7925a94..b1accdf4 100644
+--- a/momentum/FeatureEngineering/feature_validator.py
++++ b/momentum/FeatureEngineering/feature_validator.py
+@@ -220,7 +220,7 @@ class FeatureValidator:
+         if not isinstance(config_used, dict):
+             return False
+         preprocessing = config_used.get("preprocessing") or {}
+-        if not isinstance(preprocessing, dict) or not preprocessing.get("enabled", False):
++        if not isinstance(preprocessing, dict):
+             return False
+         winsor = preprocessing.get("winsorization") or {}
+         return isinstance(winsor, dict) and bool(winsor.get("enabled", False))

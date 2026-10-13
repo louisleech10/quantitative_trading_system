@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_validator.py b/momentum/FeatureEngineering/feature_validator.py
+index a7925a94..77067bf6 100644
+--- a/momentum/FeatureEngineering/feature_validator.py
++++ b/momentum/FeatureEngineering/feature_validator.py
+@@ -153,7 +153,7 @@ class FeatureValidator:
+                 if winsor_window is None
+                 else self.winsorize(features_df, window=winsor_window)
+             )
+-            self._last_winsorization_count = 1
++            raise RuntimeError("mutant")
+         result.features_df = features_df
+ 
+         # Winsorization must not hide newly-created invalid values.  The

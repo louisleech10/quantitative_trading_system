@@ -12,14 +12,14 @@
 |---|---|---|---|
 | `tests/feature_engineering/test_dstar_cache_key_mutation.py` | 七支負向測試無正向基線（get 恆不命中時七支亦不失敗） | 同鍵同值種下後命中 0.375 | 暫存樹試作（收據自檢於 v49 試作補丁下；主樹待 v49 落地後重產） |
 | `tests/feature_engineering/test_tf_aligner.py` | hash 測試未隔離對齊版本 | 穩定性＋只改對齊版本則 hash 變 | 暫存樹試作（收據自檢於 v49 試作補丁下；主樹待 v49 落地後重產） |
-| `tests/feature_engineering/test_cgsa_multi_symbol_isolation.py` | 分片迴圈空轉、隔離由測試自建 | 真跨分片＋經生產路徑之 symbol 隔離 | 待做 |
-| `tests/feature_engineering/test_cgsa_boundary.py` | 「小於一列」情境被 32MiB 下限吃掉 | 真跨分片之 1 列／1 欄／釋放 | 待做 |
-| `tests/feature_engineering/test_cgsa_dead_drop_stream.py` | 對照 oracle 與待測同源 | 硬編期望死欄集合 | 待做 |
-| `tests/feature_engineering/test_dead_feature_filter.py` | 兩實作同源對照 | 硬編期望判定 | 待做 |
-| `tests/feature_engineering/test_failopen_winsor.py` | PIT 檢查列皆在窗未滿前（NaN 比 NaN） | 檢查列 ≥251、加長序列 | 待做 |
-| `tests/feature_engineering/test_l65_l7_raw_disk.py` | Mode C 宣稱未經其入口 | 經 write_raw_from_registry_stream(preprocessor=None) 觸發預檢 | 待做 |
-| `tests/feature_engineering/preprocessing/test_l65_native_tf.py` | 只斷形狀 | 斷 legacy 路徑理由／與 flag=0 逐位元相等 | 待做 |
-| `tests/feature_engineering/preprocessing/test_l65_v2_transforms.py` | NaN 比 NaN、legacy profile 自指 | 有限值前提＋加長 fixture | 待做 |
+| `tests/feature_engineering/test_cgsa_multi_symbol_isolation.py` | 分片迴圈空轉、隔離由測試自建 | 真跨分片＋經生產路徑之 symbol 隔離 | 暫存樹試作（收據自檢於 v49 試作補丁下） |
+| `tests/feature_engineering/test_cgsa_boundary.py` | 「小於一列」情境被 32MiB 下限吃掉 | 真跨分片之 1 列／1 欄／釋放 | 暫存樹試作（收據自檢於 v49 試作補丁下） |
+| `tests/feature_engineering/test_cgsa_dead_drop_stream.py` | 對照 oracle 與待測同源 | 硬編期望死欄集合 | 暫存樹試作（收據自檢於 v49 試作補丁下） |
+| `tests/feature_engineering/test_dead_feature_filter.py` | 兩實作同源對照 | 硬編期望判定 | 暫存樹試作（收據自檢於 v49 試作補丁下） |
+| `tests/feature_engineering/test_failopen_winsor.py` | PIT 檢查列皆在窗未滿前（NaN 比 NaN） | 檢查列 ≥251、加長序列 | 暫存樹試作（收據自檢於 v49 試作補丁下） |
+| `tests/feature_engineering/test_l65_l7_raw_disk.py` | Mode C 宣稱未經其入口 | 經 write_raw_from_registry_stream(preprocessor=None) 觸發預檢 | 暫存樹試作（收據自檢於 v49 試作補丁下） |
+| `tests/feature_engineering/preprocessing/test_l65_native_tf.py` | 只斷形狀 | 斷 legacy 路徑理由／與 flag=0 逐位元相等 | 暫存樹試作（收據自檢於 v49 試作補丁下） |
+| `tests/feature_engineering/preprocessing/test_l65_v2_transforms.py` | NaN 比 NaN、legacy profile 自指 | 有限值前提＋加長 fixture | 暫存樹試作（收據自檢於 v49 試作補丁下） |
 | `tests/test_data_source_quick.py` | 吞例外回 False | 直接斷言範圍 | 暫存樹試作（同上；新測試以獨立遞迴 EMA 定義逐列比對） |
 | `tests/test_data_source_simple.py` | 0 函式（G-c） | 模組層搬入函式、以斷言取代 exit | 🔴 契約缺口 Q2：檔尾為混合分支 if（印出＋else 內 exit(1)），非「只含結束類」之 if ⇒ 須 AST 同構搬入，卻又禁新增函式含 exit ⇒ 無合法 G-c 改法 |
 | `tests/test_dynamic_indicator_system.py` | 回傳布林代斷言 | 改為斷言 | 暫存樹試作（同上） |

@@ -1,0 +1,20 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/test_dstar_cache_key_mutation.py::test_same_key_seeded_payload_hits"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "baseline_session_id": "633a478f-6e6a-4c81-9d76-df46121aa784",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_dstar_cache_key_mutation.py.compare.patch",
+ "compare_patch_sha256": "05655106987471667d94181bc35a9cf3bd9adb4944d0d867ae87e2816310de6b",
+ "fingerprint": "d6738938c005286234f2733e710a60cde781f8f874a9d2725c4b3a25cc7f6c96",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_get_none",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_dstar_cache_key_mutation.py/m_get_none.patch",
+   "patch_sha256": "3793ec544689d87caaabf5d81f8ea269b3d43536d076ec8e515a73677c8ef8e3",
+   "session_id": "cafa3d18-8238-4fea-b622-e5382e966a40"
+  }
+ ],
+ "path": "tests/feature_engineering/test_dstar_cache_key_mutation.py"
+}

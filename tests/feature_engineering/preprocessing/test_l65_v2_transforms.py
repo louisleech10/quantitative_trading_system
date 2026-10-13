@@ -274,6 +274,83 @@ def test_single_copy_append_mode_preserves_legacy_order(monkeypatch: pytest.Monk
     )
 
 
+
+def test_single_copy_equivalence_on_window_filled_frame(monkeypatch: pytest.MonkeyPatch) -> None:
+    """純增：上列 test_single_copy_equivalence 之 6 列 frame 經窗未滿遮罩後數值欄全 NaN（實測有限值 0），數值比對為
+    NaN 比 NaN。本案以 600 列（固定種子）重做：legacy 輸出之數值欄須有有限值，且 optimized 與 legacy 逐元素相近
+    （NaN 位置相同）。gaussian 步驟需 scipy（專案依賴）：以前提斷言取代略過分支。"""
+    assert HAS_SCIPY
+    monkeypatch.delenv("FFACT_L65_OPTIMIZATION_PROFILE", raising=False)
+    monkeypatch.setenv("FFACT_USE_POLARS", "0")
+    rs = np.random.RandomState(3)
+    n = 600
+    frame = pd.DataFrame(
+        {
+            "trend": np.cumsum(rs.randn(n)),
+            "constant": np.full(n, 7.0),
+            "with_nan": np.where(rs.rand(n) < 0.1, np.nan, rs.randn(n)),
+            "negative": -np.abs(rs.randn(n)),
+            "label": ["x"] * n,
+        }
+    )
+    optimized = FeaturePreprocessor(_single_copy_config()).transform(frame)
+    legacy = FeaturePreprocessor(_single_copy_config())._transform_single_legacy(frame)
+    numeric = [column for column in legacy.columns if column != "label"]
+    assert np.isfinite(legacy.loc[:, numeric].to_numpy(dtype=np.float64)).sum() > 0
+    np.testing.assert_allclose(
+        optimized.loc[:, numeric].to_numpy(dtype=np.float32),
+        legacy.loc[:, numeric].to_numpy(dtype=np.float32),
+        rtol=1e-5,
+        atol=1e-8,
+        equal_nan=True,
+    )
+
+
+@pytest.mark.parametrize(("profile", "mode"), [("legacy", "replace"), (None, "append")])
+def test_non_optimized_configs_never_enter_optimized_path(
+    monkeypatch: pytest.MonkeyPatch, profile, mode
+) -> None:
+    """純增：上列 test_single_copy_legacy_profile_fallback 與 test_single_copy_append_mode_preserves_legacy_order 以
+    transform 結果比對 _transform_single_legacy（4 列 frame 數值欄全 NaN；兩路徑等價時走錯路徑亦過），只斷言旗標函式
+    回傳 False，未驗 transform 真的不走 optimized。本案把 _transform_single_optimized_df 換成記錄呼叫之替身：legacy
+    profile（replace）與 append 模式之 transform 皆不得呼叫它。"""
+    if profile is None:
+        monkeypatch.delenv("FFACT_L65_OPTIMIZATION_PROFILE", raising=False)
+    else:
+        monkeypatch.setenv("FFACT_L65_OPTIMIZATION_PROFILE", profile)
+    monkeypatch.setenv("FFACT_USE_POLARS", "0")
+    calls = []
+
+    def _spy(self, features_df):
+        calls.append(len(features_df))
+        return features_df
+
+    monkeypatch.setattr(FeaturePreprocessor, "_transform_single_optimized_df", _spy)
+    config = {
+        "mode": mode,
+        "winsorization": {"method": "sigma", "sigma_k": 2.0, "apply_to": "all"},
+        "rank_transform": {"enabled": True, "window": 2, "apply_to": "all"},
+    }
+    FeaturePreprocessor(config).transform(pd.DataFrame({"alpha": [1.0, 2.0, 3.0, 4.0], "beta": [2.0, 2.0, np.nan, 5.0]}))
+    assert calls == []
+
+
+def test_append_mode_column_order_is_originals_then_rank_suffix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """純增：上列 test_single_copy_append_mode_preserves_legacy_order 之欄序比對對象是同一 legacy 路徑之輸出（自指）。
+    本案寫明期望：append 模式下原欄在前、`<欄>_rank` 依原欄序接在後。"""
+    monkeypatch.delenv("FFACT_L65_OPTIMIZATION_PROFILE", raising=False)
+    monkeypatch.setenv("FFACT_USE_POLARS", "0")
+    config = {
+        "mode": "append",
+        "winsorization": {"method": "sigma", "sigma_k": 2.0, "apply_to": "all"},
+        "rank_transform": {"enabled": True, "window": 2, "apply_to": "all"},
+    }
+    result = FeaturePreprocessor(config).transform(
+        pd.DataFrame({"alpha": [1.0, 2.0, 3.0, 4.0], "beta": [2.0, 2.0, np.nan, 5.0]})
+    )
+    assert list(result.columns) == ["alpha", "beta", "alpha_rank", "beta_rank"]
+
+
 def test_l65_v2_benchmark_cli_help() -> None:
     result = subprocess.run(
         [sys.executable, "scripts/benchmark_l65_v2.py", "--help"],

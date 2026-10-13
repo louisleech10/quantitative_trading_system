@@ -1,0 +1,41 @@
+{
+ "added_nodeids": [
+  "tests/test_dynamic_indicator_system.py::test_ema_dynamic_extraction_asserts",
+  "tests/test_dynamic_indicator_system.py::test_mixed_indicators_no_name_collision",
+  "tests/test_dynamic_indicator_system.py::test_registry_lists_registered_strategies",
+  "tests/test_dynamic_indicator_system.py::test_rsi_macd_dynamic_extraction_asserts"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "baseline_session_id": "2250922e-2bce-405a-95f2-06a16a92feee",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_dynamic_indicator_system.py.compare.patch",
+ "compare_patch_sha256": "03c7c2cf3afb87d7575b7d367e5bbfe49415375fd0ae3692befb678251998142",
+ "fingerprint": "70a3e340df373be9eb28814d05e4d7cee506edf529a01525f3651529695536b2",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_drop_strategy",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_dynamic_indicator_system.py/m_drop_strategy.patch",
+   "patch_sha256": "f907f7d0c64d4f37abdbeb3a605c550495b159ce35e98d21254793c9129925f4",
+   "session_id": "97342411-e770-4b9a-af31-fe5478aee1e8"
+  },
+  {
+   "id": "m_dup_name",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_dynamic_indicator_system.py/m_dup_name.patch",
+   "patch_sha256": "9fd4c9b199ccfd94964aa098b27896f3e6d989cbc303bb9989c83d4c6a253191",
+   "session_id": "d0b577f9-4cd3-45d7-a8aa-15427788bf76"
+  },
+  {
+   "id": "m_keep_ts",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_dynamic_indicator_system.py/m_keep_ts.patch",
+   "patch_sha256": "08d3bfb5109bf1651f56f13976aa5c4e916b68f78977c857da9bf301d52bfe4c",
+   "session_id": "c5dd8a75-f386-4d4b-9121-0483640e28ac"
+  },
+  {
+   "id": "m_list_empty",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_dynamic_indicator_system.py/m_list_empty.patch",
+   "patch_sha256": "574f6b1ae309479cf9cf77619e8c82c61d062267bad7792c3dd4e5a9104b5b43",
+   "session_id": "1904fc24-901d-4718-b919-3f95b8f41886"
+  }
+ ],
+ "path": "tests/test_dynamic_indicator_system.py"
+}

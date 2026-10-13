@@ -1,0 +1,36 @@
+{
+ "path": "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "mutants": [
+  {
+   "id": "m_mask_all",
+   "file": "momentum/FeatureEngineering/preprocessing/stable_mask.py",
+   "old": "    cut = np.minimum(first + int(window) - 1, arr.shape[0])\n",
+   "new": "    cut = np.full_like(first, arr.shape[0])\n"
+  },
+  {
+   "id": "m_optimized_skip_winsor",
+   "file": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+   "old": "        if winsor_positions and self.winsor_config.get(\"enabled\", True):\n            working_values[:, winsor_positions] = self._winsorize_2d_legacy_equivalent(\n",
+   "new": "        if False:\n            working_values[:, winsor_positions] = self._winsorize_2d_legacy_equivalent(\n"
+  },
+  {
+   "id": "m_always_optimized",
+   "file": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+   "old": "        if self._can_use_optimized_dataframe_path():\n            return self._transform_single_optimized_df(features_df)\n",
+   "new": "        if True:\n            return self._transform_single_optimized_df(features_df)\n"
+  },
+  {
+   "id": "m_append_order",
+   "file": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+   "old": "            result = pd.concat([result, ranked_df], axis=1)\n",
+   "new": "            result = pd.concat([ranked_df, result], axis=1)\n"
+  },
+  {
+   "id": "m_no_scipy_flag",
+   "file": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+   "old": "    HAS_SCIPY = True\n",
+   "new": "    HAS_SCIPY = False\n"
+  }
+ ]
+}

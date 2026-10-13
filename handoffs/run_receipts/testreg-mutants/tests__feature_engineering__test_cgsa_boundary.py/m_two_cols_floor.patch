@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/core/column_group_registry.py b/momentum/FeatureEngineering/core/column_group_registry.py
+index 1e4ea939..21bf3d5e 100644
+--- a/momentum/FeatureEngineering/core/column_group_registry.py
++++ b/momentum/FeatureEngineering/core/column_group_registry.py
+@@ -933,7 +933,7 @@ class ColumnGroupRegistry:
+         if total_bytes <= target_bytes:
+             return [(0, n_cols)]
+ 
+-        cols_per_shard = max(1, target_bytes // bytes_per_col)
++        cols_per_shard = max(2, target_bytes // bytes_per_col)
+         if cols_per_shard < 1:
+             cols_per_shard = 1
+             logger.warning(

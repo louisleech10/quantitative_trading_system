@@ -1,0 +1,16 @@
+diff --git a/tests/feature_engineering/test_dstar_cache_key_mutation.py b/tests/feature_engineering/test_dstar_cache_key_mutation.py
+index da8c34b1..aec2bd20 100644
+--- a/tests/feature_engineering/test_dstar_cache_key_mutation.py
++++ b/tests/feature_engineering/test_dstar_cache_key_mutation.py
+@@ -144,3 +144,11 @@ def test_mutation_strong_value_fingerprint_mismatch_is_rejected(tmp_path: Path)
+     assert isinstance(target, DStarCache)
+     with pytest.raises(AssertionError, match="strong_value_fp"):
+         _assert_no_stale_hit(target, values=VALUES_B, label="strong_value_fp")
++
++
++def test_same_key_seeded_payload_hits(tmp_path: Path) -> None:
++    """正向對照（純增）：同脈絡同值種下後，另開之快取以同值查詢須命中 0.375——上列七支「錯鍵不得命中」於 get 恆不命中
++    （例：恆回 None）時亦全綠，本案補其基線，使「錯鍵被拒」之結論可證偽。"""
++    _seed_payload(tmp_path, BASE_CONTEXT)
++    again = _cache(tmp_path, BASE_CONTEXT)
++    assert again.get("feature_fracdiff", VALUES_A) == 0.375

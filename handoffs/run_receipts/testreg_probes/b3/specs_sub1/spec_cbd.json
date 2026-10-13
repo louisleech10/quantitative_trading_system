@@ -1,0 +1,9 @@
+{"path": "tests/feature_engineering/test_cgsa_boundary.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "mutants": [
+  {"id": "m_two_cols_floor", "file": "momentum/FeatureEngineering/core/column_group_registry.py",
+   "old": "        cols_per_shard = max(1, target_bytes // bytes_per_col)\n",
+   "new": "        cols_per_shard = max(2, target_bytes // bytes_per_col)\n"},
+  {"id": "m_load_first_shard", "file": "momentum/FeatureEngineering/core/column_group_registry.py",
+   "old": "                    arr = np.load(shard.disk_path, mmap_mode=\"r\", allow_pickle=False)\n                    out[:, shard.col_start:shard.col_end] = arr\n                    del arr\n",
+   "new": "                    arr = np.load(group.shards[0].disk_path, mmap_mode=\"r\", allow_pickle=False)\n                    out[:, shard.col_start:shard.col_end] = arr\n                    del arr\n"}]}

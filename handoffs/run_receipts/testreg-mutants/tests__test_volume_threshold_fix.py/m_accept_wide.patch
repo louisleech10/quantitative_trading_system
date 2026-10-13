@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/indicators/ema_extractor.py b/momentum/FeatureEngineering/indicators/ema_extractor.py
+index 83897dd8..0bbab409 100644
+--- a/momentum/FeatureEngineering/indicators/ema_extractor.py
++++ b/momentum/FeatureEngineering/indicators/ema_extractor.py
+@@ -53,7 +53,7 @@ class EMAExtractor(BaseStrategyExtractor):
+         
+         # 驗證 volume_threshold 範圍（允許 0，表示不考慮成交量條件）
+         volume_threshold = params['volume_threshold']
+-        if not (0 <= volume_threshold <= 1):
++        if not (-1 <= volume_threshold <= 2):
+             raise ValueError(
+                 f"volume_threshold 必須在 0-1 之間（含 0 和 1）, 收到: {volume_threshold}"
+             )

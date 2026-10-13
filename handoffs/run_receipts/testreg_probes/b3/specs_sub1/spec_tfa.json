@@ -1,0 +1,9 @@
+{"path": "tests/feature_engineering/test_tf_aligner.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
+ "mutants": [
+  {"id": "m_drop_align_ver", "file": "momentum/FeatureEngineering/feature_factory.py",
+   "old": "        config_payload[\"_mtf_align_version\"] = CURRENT_MTF_ALIGN_VERSION\n",
+   "new": "        config_payload[\"_mtf_align_version\"] = 2\n"},
+  {"id": "m_nondet_hash", "file": "momentum/FeatureEngineering/feature_factory.py",
+   "old": "        config_payload[\"_mtf_align_version\"] = CURRENT_MTF_ALIGN_VERSION\n",
+   "new": "        config_payload[\"_mtf_align_version\"] = __import__(\"time\").perf_counter_ns()\n"}]}

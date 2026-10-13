@@ -1,0 +1,27 @@
+diff --git a/tests/feature_engineering/test_tf_aligner.py b/tests/feature_engineering/test_tf_aligner.py
+index 79ff8a7f..9a36a463 100644
+--- a/tests/feature_engineering/test_tf_aligner.py
++++ b/tests/feature_engineering/test_tf_aligner.py
+@@ -195,3 +195,22 @@ def test_resume_rejects_stale_idxmap(tmp_path: Path) -> None:
+     assert not MultiTFGenerator._tf_alignment_version_current(registry, "12h", (LayerSource.L1,))
+     MultiTFGenerator._drop_timeframe_groups_from_registry(registry, "12h", (LayerSource.L1,))
+     assert not registry.has_layers_for_timeframe("12h", (LayerSource.L1,))
++
++
++def test_hash_isolates_align_version(monkeypatch: pytest.MonkeyPatch) -> None:
++    """純增：其餘輸入不變時 config hash 穩定；只改 feature_factory 所用之 CURRENT_MTF_ALIGN_VERSION，hash 須改變——上列
++    test_hash_changes_with_align_version 只比對手組之舊式 hash，自 hash 拿掉對齊版本仍綠，本案隔離所宣稱之性質。"""
++    import momentum.FeatureEngineering.feature_factory as ff_mod
++
++    factory = FeatureFactory.__new__(FeatureFactory)
++    factory._adapter_registry = SimpleNamespace(get_last_timestamp=lambda symbol, timeframe: 123)
++    config = SimpleNamespace(
++        preprocessing=SimpleNamespace(enabled=True, winsorization=SimpleNamespace(enabled=True)),
++        model_dump=lambda by_alias=True: {
++            "timeframes": {"training": ["12h", "1h"], "alignment_mode": "open_minus"},
++        }
++    )
++    base = factory._compute_config_hash(config, "BTCUSDT", "1h")
++    assert factory._compute_config_hash(config, "BTCUSDT", "1h") == base
++    monkeypatch.setattr(ff_mod, "CURRENT_MTF_ALIGN_VERSION", CURRENT_MTF_ALIGN_VERSION + 1)
++    assert factory._compute_config_hash(config, "BTCUSDT", "1h") != base

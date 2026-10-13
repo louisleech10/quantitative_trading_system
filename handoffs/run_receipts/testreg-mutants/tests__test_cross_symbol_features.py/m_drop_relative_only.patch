@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_extractor.py b/momentum/FeatureEngineering/feature_extractor.py
+index 6c3bb757..bcd4e2dd 100644
+--- a/momentum/FeatureEngineering/feature_extractor.py
++++ b/momentum/FeatureEngineering/feature_extractor.py
+@@ -485,7 +485,7 @@ class FeatureExtractor:
+     def _should_filter_absolute_features(self, strategy_params: StrategyParams) -> bool:
+         """判斷是否應過濾絕對值特徵（跨標的模式）"""
+         params = strategy_params.params or {}
+-        if params.get('relative_only') is True:
++        if False:
+             return True
+ 
+         if os.environ.get('QTS_RELATIVE_ONLY') == '1':

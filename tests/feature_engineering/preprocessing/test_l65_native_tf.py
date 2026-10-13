@@ -231,6 +231,41 @@ class TestNativePathInPlace:
         assert result.shape == (n_native * ratio, n_cols)
 
 
+
+@pytest.mark.parametrize(
+    ("n_native", "ratio", "flag"),
+    [(200, 12, "0"), (40, 24, "1")],
+)
+def test_legacy_path_equals_transform_of_pre_expanded_group(tmp_path, monkeypatch, n_native, ratio, flag):
+    """純增：上列 TestNativePathInPlace::test_flag_off_uses_legacy_path 與 test_too_few_native_rows_fallback 只斷言輸出形狀
+    （native 與 legacy 形狀相同，走錯路徑亦過；後者 10×12 列於縮尾窗遮罩下全 NaN）。legacy＝先以 idx_map 展開再轉換，
+    故其輸出須逐位元等於「把 source[idx_map] 當一般（非 compact）群組轉換」之結果，且含有限值。兩情境：旗標關（200 列）、
+    旗標開但 native 列數 40 < 50 而退回 legacy（×24 ⇒ 960 列，窗湊得滿）。"""
+    monkeypatch.setenv("FFACT_L65_NATIVE_TF", flag)
+    source = _make_synthetic_native_data(n_native, 2)
+    idx_map = _make_idx_map_uniform(n_native, ratio)
+    registry = _make_compact_registry(tmp_path / "compact", source=source, idx_map=idx_map)
+    FeaturePreprocessor(_basic_l65_config()).transform_registry_groups(registry, n_workers=1)
+    out = registry.load_data("12h_L1_compact")
+    expanded = ColumnGroupRegistry(tmp_path / "expanded")
+    expanded.save_data(
+        ColumnGroup(
+            group_id="g_expanded",
+            layer=LayerSource.L1,
+            timeframe="1h",
+            data_source="close",
+            indicator="TEST",
+            columns=("a", "b"),
+            shape=(len(idx_map), 2),
+            dtype="float32",
+        ),
+        source[idx_map].astype(np.float32),
+    )
+    FeaturePreprocessor(_basic_l65_config()).transform_registry_groups(expanded, n_workers=1)
+    expected = expanded.load_data("g_expanded")
+    assert np.isfinite(expected).sum() > 0 and np.array_equal(out, expected, equal_nan=True)
+
+
 class TestNonCompactGroupUnaffected:
     def test_non_compact_group_flag_independent(self, tmp_path, monkeypatch):
         """Non-compact (no alignment) groups must behave identically with flag on/off."""

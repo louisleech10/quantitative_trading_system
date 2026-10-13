@@ -1,0 +1,11 @@
+diff --git a/momentum/FeatureEngineering/run_paths.py b/momentum/FeatureEngineering/run_paths.py
+index 29ee19c1..8b439f0a 100644
+--- a/momentum/FeatureEngineering/run_paths.py
++++ b/momentum/FeatureEngineering/run_paths.py
+@@ -34,5 +34,5 @@ def features_run_dir(root: Path, symbol: str, timeframe: str, config_hash: str)
+ def cgsa_work_dir(root: Path, symbol: str, timeframe: str, config_hash: str) -> Path:
+     """回傳既有 CGSA default work 目錄。"""
+     validate_config_hash(config_hash)
+-    leaf = f"{safe_token(symbol)}_{safe_token(timeframe)}_{config_hash[:8]}"
++    leaf = f"{safe_token(symbol)}_{config_hash[:8]}"
+     return (Path(root) / leaf).resolve()

@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+index ba0522a8..cb738c07 100644
+--- a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
++++ b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+@@ -113,7 +113,7 @@ NON_DEGRADABLE_ERRORS = (
+ try:
+     from scipy.special import ndtri
+ 
+-    HAS_SCIPY = True
++    HAS_SCIPY = False
+ except Exception:
+     HAS_SCIPY = False
+     ndtri = None

@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_extractor.py b/momentum/FeatureEngineering/feature_extractor.py
+index 6c3bb757..1b7facd4 100644
+--- a/momentum/FeatureEngineering/feature_extractor.py
++++ b/momentum/FeatureEngineering/feature_extractor.py
+@@ -136,7 +136,7 @@ class FeatureExtractor:
+                 params=strategy_params.params,
+                 data_source=strategy_params.data_source
+             )
+-            feature_names.extend(strategy_features)
++            pass
+             self.logger.info(
+                 f"提取 {strategy_params.strategy_type} 策略特徵: {len(strategy_features)} 個 "
+                 f"(數據源: {strategy_params.data_source})"

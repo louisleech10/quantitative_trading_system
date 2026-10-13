@@ -1,0 +1,9 @@
+{"path": "tests/feature_engineering/test_dead_feature_filter.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "mutants": [
+  {"id": "m_const_off", "file": "momentum/FeatureEngineering/preprocessing/stable_mask.py",
+   "old": "    constant = ~(col_min < col_max)  # 無有限值（NaN）或全同值\n",
+   "new": "    constant = np.zeros(n_cols, dtype=bool)\n"},
+  {"id": "m_df_sparse_off", "file": "momentum/FeatureEngineering/utils/dead_feature_filter.py",
+   "old": "            if valid < min_valid_samples:\n                sparse_cols_l.append(str(c))\n",
+   "new": "            if valid < 0:\n                sparse_cols_l.append(str(c))\n"}]}

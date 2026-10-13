@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/test_cgsa_multi_symbol_isolation.py::test_shards_isolated_across_production_symbol_tf_workdirs"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "baseline_session_id": "39bd4a91-5257-4b1b-aa86-c4df7c36b59d",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_cgsa_multi_symbol_isolation.py.compare.patch",
+ "compare_patch_sha256": "a5e335dbbefd3dc7e17e5fef5c501158a60fbfd36f2bb7267ce11baa21755d79",
+ "fingerprint": "2d44da06fb17bcbe9e37b5055e0351f20cb7787193225759ad7b8b38450ecbe0",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_leaf_no_tf",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_cgsa_multi_symbol_isolation.py/m_leaf_no_tf.patch",
+   "patch_sha256": "3c9a3c9409b3f7c3b3a1b7805411b84f73a32ae1f1c61a3bf99ba93b553458ca",
+   "session_id": "9df5c7be-640a-47a8-9e4f-2bca51916fdb"
+  },
+  {
+   "id": "m_shard_in_parent",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_cgsa_multi_symbol_isolation.py/m_shard_in_parent.patch",
+   "patch_sha256": "106e20c75eb3cf7ddde4110bc511a389cddd7b56f754aa730dac1e01c9f8853e",
+   "session_id": "6fcba72c-ccbb-439c-87e7-2c22a73801f1"
+  },
+  {
+   "id": "m_load_first_shard",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_cgsa_multi_symbol_isolation.py/m_load_first_shard.patch",
+   "patch_sha256": "08a64390eadbcada8c9d584557f0c993e9ca94ba17f1b1388688da63c4d0668c",
+   "session_id": "b04e8995-fbaa-4b92-bf9e-11a6c827c240"
+  }
+ ],
+ "path": "tests/feature_engineering/test_cgsa_multi_symbol_isolation.py"
+}

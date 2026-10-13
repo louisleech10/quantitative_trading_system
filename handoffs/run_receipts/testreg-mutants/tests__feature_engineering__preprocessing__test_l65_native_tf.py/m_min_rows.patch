@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py b/momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py
+index 8b786e4f..592cf34f 100644
+--- a/momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py
++++ b/momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py
+@@ -233,7 +233,7 @@ def apply_idx_map_to_array(
+ # ---------------------------------------------------------------------------
+ # Dispatch decision
+ # ---------------------------------------------------------------------------
+-_MIN_NATIVE_ROWS = 50  # Avoid tiny groups where overhead dominates.
++_MIN_NATIVE_ROWS = 5  # Avoid tiny groups where overhead dominates.
+ _MIN_SCALED_WINDOW = 5  # Below this the scaled rolling window is not meaningful.
+ 
+ 

@@ -1,0 +1,30 @@
+diff --git a/tests/test_searchsorted_align.py b/tests/test_searchsorted_align.py
+index e63a35d2..4eb0de73 100644
+--- a/tests/test_searchsorted_align.py
++++ b/tests/test_searchsorted_align.py
+@@ -156,6 +156,25 @@ def test_no_future_leak_after_searchsorted(monkeypatch):
+     assert TimeframeAligner.validate_no_future_leak(aligned, primary_ts)
+ 
+ 
++
++def test_searchsorted_open_minus_matches_independent_pit_expectation(monkeypatch):
++    """純增：上列 test_no_future_leak_after_searchsorted 以生產端 validate_no_future_leak 為 oracle（自指）。本案以獨立推導之
++    PIT 期望：OPEN_MINUS 於 12h 主 K 開盤時刻 T 決策，只可用收盤（開盤＋1h）≤ T 之最後一根 1h 來源 K；來源值＝其開盤距
++    2026-01-01 之小時數 ⇒ 主 K 開盤 12:00＋12h·k（k＝0…5）對應來源值 11＋12k。"""
++    monkeypatch.setenv("FFACT_USE_SEARCHSORTED", "1")
++    source_index = pd.date_range("2026-01-01", periods=72, freq="1h")
++    source_df = pd.DataFrame({"feature": np.arange(72, dtype=np.float32)}, index=source_index)
++    primary_index = pd.date_range("2026-01-01 12:00:00", periods=6, freq="12h")
++    aligned = TimeframeAligner.align_to_primary(
++        source_df=source_df,
++        source_tf="1h",
++        primary_timestamps=_to_ms(primary_index),
++        primary_tf="12h",
++        alignment_mode=AlignmentMode.OPEN_MINUS,
++    )
++    np.testing.assert_array_equal(aligned["feature"].to_numpy(), np.array([11, 23, 35, 47, 59, 71], dtype=np.float32))
++
++
+ def test_searchsorted_align_preserves_source_timestamps_attr():
+     """T1.9: 對齊輸出需保存 source_timestamps attrs。"""
+     source_index = pd.date_range("2026-01-01", periods=36, freq="1h")

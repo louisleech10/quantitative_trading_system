@@ -1,0 +1,14 @@
+{"path": "tests/test_volume_threshold_fix.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m_reject_zero", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "if not (0 <= volume_threshold <= 1):", "new": "if not (0 < volume_threshold <= 1):"},
+  {"id": "m_accept_wide", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "if not (0 <= volume_threshold <= 1):", "new": "if not (-1 <= volume_threshold <= 2):"},
+  {"id": "m_spike_name", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "        volume_spike_col = feature_name_mapping['volume_spike']\n",
+   "new": "        volume_spike_col = 'spk_' + data_source\n"},
+  {"id": "m_spike_shift", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "            df['taker_ratio'] > volume_threshold\n", "new": "            df['taker_ratio'] > volume_threshold + 0.1\n"},
+  {"id": "m_dist_shift", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "            df['taker_ratio'] - volume_threshold\n", "new": "            df['taker_ratio'] - volume_threshold - 0.01\n"}]}

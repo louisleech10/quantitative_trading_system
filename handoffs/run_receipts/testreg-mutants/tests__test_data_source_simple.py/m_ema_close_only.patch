@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_extractor.py b/momentum/FeatureEngineering/feature_extractor.py
+index 6c3bb757..6d66061f 100644
+--- a/momentum/FeatureEngineering/feature_extractor.py
++++ b/momentum/FeatureEngineering/feature_extractor.py
+@@ -307,7 +307,7 @@ class FeatureExtractor:
+         
+         # 計算 EMA 值（僅用於計算相對特徵，不作為獨立特徵）
+         ema_short_col = feature_name_mapping['ema_short']
+-        df[ema_short_col] = df[data_source].ewm(span=short, adjust=False).mean()
++        df[ema_short_col] = df['close'].ewm(span=short, adjust=False).mean()
+         
+         ema_mid_col = feature_name_mapping['ema_mid']
+         df[ema_mid_col] = df[data_source].ewm(span=mid, adjust=False).mean()

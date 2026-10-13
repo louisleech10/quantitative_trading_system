@@ -53,6 +53,24 @@ def test_shard_bytes_below_one_row_falls_back_safely(tmp_path: Path, monkeypatch
     assert np.array_equal(loaded, data)
 
 
+
+def test_single_column_larger_than_shard_target_gets_one_column_per_shard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """純增：上列 test_shard_bytes_below_one_row_falls_back_safely 之 1MiB 被夾至 32MiB 下限，8×1024 float32 遠小於下限、
+    走單檔路徑，「分片目標小於單位資料」之情境從未發生。分片按欄切，單位為「一欄」：本案令單欄位元組（8,388,609 列×4）
+    大於 32MiB 下限，2 欄 ⇒ 每片恰 1 欄共 2 片，且讀回逐值相等（兩欄值不同，分片錯置可見）。"""
+    monkeypatch.setenv("FFACT_CGSA_SHARD_BYTES", "1MiB")
+    registry = ColumnGroupRegistry(tmp_path, memory_buffer_groups=0)
+    n_rows = 32 * 1024 * 1024 // 4 + 1
+    data = np.empty((n_rows, 2), np.float32)
+    data[:, 0] = np.arange(n_rows, dtype=np.float32) % 1000
+    data[:, 1] = -data[:, 0] - 1
+    registry.save_data(_group("g_wide_col", n_rows, 2), data)
+    assert [(s.col_start, s.col_end) for s in registry.get("g_wide_col").shards] == [(0, 1), (1, 2)]
+    assert np.array_equal(registry.load_data("g_wide_col"), data)
+
+
 def test_release_storage_is_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """release_storage on an already-released group must be safe and return 0."""
     monkeypatch.setenv("FFACT_CGSA_SHARD_BYTES", "1MiB")

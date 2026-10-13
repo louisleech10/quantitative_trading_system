@@ -249,6 +249,66 @@ def test_registry_listing():
     
     return len(strategies) >= 3
 
+
+def test_ema_dynamic_extraction_asserts():
+    """純增：上列五支皆 return 布林代替斷言（pytest 只警告、永不失敗）；本組逐一斷言。EMA 策略（系統已註冊）提取之特徵
+    名非空，且皆為回傳表之欄。"""
+    np.random.seed(11)
+    features_df, names = FeatureExtractor().extract_features_from_strategy(
+        create_mock_data(), StrategyParams(strategy_type='ema_three_line', data_source='close',
+                                           params={'ema_short': 5, 'ema_mid': 20, 'ema_long': 60,
+                                                   'volume_threshold': 0.6}),
+        include_basic_features=False)
+    assert names and set(names) <= set(features_df.columns)
+
+
+def test_rsi_macd_dynamic_extraction_asserts():
+    """純增：手動註冊 RSI、MACD 後各自提取之特徵名非空，且皆為回傳表之欄。"""
+    registry = StrategyRegistry()
+    registry.register_strategy(name='rsi', description='RSI', required_params=['period'],
+                               optional_params={'overbought': 70, 'oversold': 30}, extractor=RSIExtractor())
+    registry.register_strategy(name='macd', description='MACD', required_params=['fast', 'slow', 'signal'],
+                               extractor=MACDExtractor())
+    np.random.seed(12)
+    df = create_mock_data()
+    for strategy, params in (('rsi', {'period': 14, 'overbought': 70, 'oversold': 30}),
+                             ('macd', {'fast': 12, 'slow': 26, 'signal': 9})):
+        features_df, names = FeatureExtractor().extract_features_from_strategy(
+            df.copy(), StrategyParams(strategy_type=strategy, params=params, data_source='close'),
+            include_basic_features=False)
+        assert names and set(names) <= set(features_df.columns), strategy
+
+
+def test_mixed_indicators_no_name_collision():
+    """純增：EMA、RSI、MACD 三策略之特徵名各自非空且合併後無重名（上列 test_mixed_indicators 只印出衝突）。"""
+    registry = StrategyRegistry()
+    registry.register_strategy(name='rsi', description='RSI', required_params=['period'], extractor=RSIExtractor())
+    registry.register_strategy(name='macd', description='MACD', required_params=['fast', 'slow', 'signal'],
+                               extractor=MACDExtractor())
+    np.random.seed(13)
+    df = create_mock_data()
+    groups = []
+    for strategy, params in (('ema_three_line', {'ema_short': 5, 'ema_mid': 20, 'ema_long': 60,
+                                                 'volume_threshold': 0.6}),
+                             ('rsi', {'period': 14, 'overbought': 70, 'oversold': 30}),
+                             ('macd', {'fast': 12, 'slow': 26, 'signal': 9})):
+        _df, names = FeatureExtractor().extract_features_from_strategy(
+            df.copy(), StrategyParams(strategy_type=strategy, params=params, data_source='close'),
+            include_basic_features=False)
+        groups.append(names)
+    assert all(groups)
+    every = [n for g in groups for n in g]
+    assert len(every) == len(set(every))
+
+
+def test_registry_lists_registered_strategies():
+    """純增：註冊 RSI、MACD 後，策略清單含 ema_three_line、rsi、macd（上列 test_registry_listing 只 return 比較結果）。"""
+    registry = StrategyRegistry()
+    registry.register_strategy(name='rsi', description='RSI', required_params=['period'], extractor=RSIExtractor())
+    registry.register_strategy(name='macd', description='MACD', required_params=['fast', 'slow', 'signal'],
+                               extractor=MACDExtractor())
+    assert {'ema_three_line', 'rsi', 'macd'} <= set(registry.list_strategies())
+
 if __name__ == "__main__":
     print("=" * 70)
     print("完全動態指標系統測試")

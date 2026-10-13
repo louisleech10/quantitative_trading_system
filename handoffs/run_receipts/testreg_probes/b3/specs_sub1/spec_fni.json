@@ -1,0 +1,14 @@
+{"path": "tests/test_feature_naming_integration.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m_drop_strategy", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "            feature_names.extend(strategy_features)\n", "new": "            pass\n"},
+  {"id": "m_spike_source_dep", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "            df['taker_ratio'] > volume_threshold\n",
+   "new": "            df['taker_ratio'] > (volume_threshold if data_source == 'close' else volume_threshold + 0.1)\n"},
+  {"id": "m_slope_noprefix", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "        ema_short_slope_col = f\"{data_source}_ema_short_slope_pct\"\n",
+   "new": "        ema_short_slope_col = \"ema_short_slope_pct\"\n"},
+  {"id": "m_names_drop_nobasic", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        return FeatureExtractionResult(features_df=features_df, feature_names=feature_names)\n",
+   "new": "        return FeatureExtractionResult(features_df=features_df, feature_names=feature_names if include_basic_features else [])\n"}]}

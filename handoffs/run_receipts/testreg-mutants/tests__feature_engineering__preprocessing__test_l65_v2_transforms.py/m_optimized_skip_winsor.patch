@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+index ba0522a8..122c6b5b 100644
+--- a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
++++ b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+@@ -2872,7 +2872,7 @@ class FeaturePreprocessor:
+         )
+         # FFSTAT r34：縮尾開關須生效（改前本路徑與 `_transform_single_legacy` 無視 `winsorization.enabled`，
+         # 關閉縮尾仍縮尾；預設值與 `_transform_context` 同為 True）
+-        if winsor_positions and self.winsor_config.get("enabled", True):
++        if False:
+             working_values[:, winsor_positions] = self._winsorize_2d_legacy_equivalent(
+                 working_values[:, winsor_positions]
+             )

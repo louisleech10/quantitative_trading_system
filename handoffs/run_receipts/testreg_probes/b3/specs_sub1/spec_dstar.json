@@ -1,0 +1,5 @@
+{"path": "tests/feature_engineering/test_dstar_cache_key_mutation.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "mutants": [{"id": "m_get_none", "file": "momentum/FeatureEngineering/preprocessing/_d_star_cache.py",
+              "old": "    def get(self, column: str, col_values: Optional[np.ndarray] = None) -> Optional[float]:\n        if not self.is_enabled:\n",
+              "new": "    def get(self, column: str, col_values: Optional[np.ndarray] = None) -> Optional[float]:\n        return None\n        if not self.is_enabled:\n"}]}

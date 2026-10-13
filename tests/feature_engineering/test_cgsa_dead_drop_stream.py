@@ -196,3 +196,24 @@ def test_cgsa_matches_frame_path_dead_set(tmp_path) -> None:
     assert cgsa_dead == set(frame_dead), (
         f"CGSA stream dead set 與 frame-path 不一致: cgsa={cgsa_dead} frame={set(frame_dead)}"
     )
+
+
+
+def test_cgsa_and_frame_path_dead_set_match_injected_expectation(tmp_path) -> None:
+    """純增：上列 test_cgsa_matches_frame_path_dead_set 只比對兩路徑彼此一致，而兩路徑皆委派
+    stable_mask.dead_column_decision（同源，共同錯誤不現形）。本案以 _build_columns_and_data 之注入本身為獨立期望：
+    常數（42）、有效樣本 50 < 100、全 NaN 三欄為死欄，兩欄標準常態為活欄；兩路徑各自須等於此期望。"""
+    cols, data = _build_columns_and_data()
+    expected = {"g_constant", "g_sparse", "g_allnan"}
+    frame_dead, _ = find_dead_columns(pd.DataFrame(data, columns=cols), min_valid_samples=MIN_VALID)
+    assert set(frame_dead) == expected
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    registry.save_data(_group("1h_L2_mixed", cols, data), data)
+    storage = FeatureStorage(str(tmp_path / "features"))
+    raw_dir, _ = storage.write_raw_from_registry_stream(
+        symbol="SYN", tf="1h", config_hash="cfg_contract_expected",
+        registry=registry, preprocessor=None,
+        cleanup_intermediate=True, l65_mode="none",
+        dead_drop_min_valid=MIN_VALID,
+    )
+    assert set(cols) - {_strip_tf_tag(c) for c in _collect_output_columns(raw_dir)} == expected

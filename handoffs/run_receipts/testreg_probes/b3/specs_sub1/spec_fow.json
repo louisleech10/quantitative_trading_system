@@ -1,0 +1,36 @@
+{
+ "path": "tests/feature_engineering/test_failopen_winsor.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+ "mutants": [
+  {
+   "id": "m_lookahead",
+   "file": "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
+   "old": "    lowers, uppers = rolling_quantile_2d(arr, lower_q, upper_q, window, min_periods)\n",
+   "new": "    lowers, uppers = rolling_quantile_2d(np.ascontiguousarray(arr[::-1]), lower_q, upper_q, window, min_periods)\n    lowers, uppers = np.ascontiguousarray(lowers[::-1]), np.ascontiguousarray(uppers[::-1])\n"
+  },
+  {
+   "id": "m_mask_wide",
+   "file": "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
+   "old": "    _stable_mask.mask_incomplete_window_inplace(arr, window)\n    return arr\n",
+   "new": "    _stable_mask.mask_incomplete_window_inplace(arr, 2 * window)\n    return arr\n"
+  },
+  {
+   "id": "m_no_mask",
+   "file": "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
+   "old": "    _stable_mask.mask_incomplete_window_inplace(arr, window)\n    return arr\n",
+   "new": "    return arr\n"
+  },
+  {
+   "id": "m_ignore_preprocessing",
+   "file": "momentum/FeatureEngineering/feature_validator.py",
+   "old": "    if not isinstance(preprocessing, dict) or not preprocessing.get(\"enabled\", False):\n",
+   "new": "    if not isinstance(preprocessing, dict):\n"
+  },
+  {
+   "id": "m_validate_raises",
+   "file": "momentum/FeatureEngineering/feature_validator.py",
+   "old": "            self._last_winsorization_count = 1\n",
+   "new": "            raise RuntimeError(\"mutant\")\n"
+  }
+ ]
+}

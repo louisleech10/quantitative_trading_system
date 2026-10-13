@@ -1,0 +1,20 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/test_l65_l7_raw_disk.py::test_precheck_enforced_through_mode_c_stream_entry"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
+ "baseline_session_id": "61926fae-96f0-480a-bdb0-3e1624464fd3",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_l65_l7_raw_disk.py.compare.patch",
+ "compare_patch_sha256": "c45ca81d73ee016fde5e3695bb430e4591d44ad2772b2549a1fb48d0e062a73b",
+ "fingerprint": "f010c585d0f7796acf101eec1856b17d16e65a86aa147e00dd5a52bdb7efbaa6",
+ "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "mutants": [
+  {
+   "id": "m_skip_precheck",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_l65_l7_raw_disk.py/m_skip_precheck.patch",
+   "patch_sha256": "8fcf33fee10f19cf4cee6765b1ec841e6993d1201506f6b130e27f0f0899ad31",
+   "session_id": "27b311d9-0ba2-4d73-88f2-f2638c0a082a"
+  }
+ ],
+ "path": "tests/feature_engineering/test_l65_l7_raw_disk.py"
+}
