@@ -1,0 +1,47 @@
+== M15 不讀模組 pytestmark 之參數化層（codex r50 P1-01） ==
+FAILED test_z_session_scope_module_pytestmark_parametrize_pytest_param_enumerable
+================= 1 failed, 14 passed, 53 deselected in 5.55s ==================
+== M16 pytest.param 元素視為不可列舉 ==
+FAILED test_z_session_scope_module_pytestmark_parametrize_pytest_param_enumerable
+================= 1 failed, 14 passed, 53 deselected in 5.44s ==================
+== M17 基底解析不到改為略過（grok r50 P1-01） ==
+FAILED test_z2_session_scope_base_class_from_other_module_not_enumerable
+================= 1 failed, 14 passed, 53 deselected in 5.49s ==================
+== M18 不掃類別本體 fixture（grok r50 P1-02） ==
+FAILED test_z3_session_scope_class_body_param_fixture_not_enumerable
+================= 1 failed, 14 passed, 53 deselected in 5.51s ==================
+== M19 R 不遍歷 fixture（K4-1） ==
+FAILED test_aa1_fixture_argument_symbols_enter_scenario
+FAILED test_aa2_class_autouse_local_import_enters_scenario
+================= 2 failed, 13 passed, 53 deselected in 5.32s ==================
+== M20 目錄層 autouse 納入 R ==
+FAILED test_aa3_directory_autouse_is_environment_not_scenario
+================= 1 failed, 14 passed, 53 deselected in 5.26s ==================
+== M21 可見即套用 ==
+FAILED test_aa3_directory_autouse_is_environment_not_scenario
+FAILED test_aa4_visible_but_unrequested_fixture_not_in_scenario
+================= 2 failed, 13 passed, 53 deselected in 5.25s ==================
+== M22 情境綁定只看所改之檔 ==
+FAILED test_ab_binding_requires_killer_to_modify_referenced_symbol
+================= 1 failed, 14 passed, 53 deselected in 5.37s ==================
+== M23 不比對 assert 條件 ==
+FAILED test_y2_gc_mixed_if_requires_adjacent_same_condition_assert[wrong_cond]
+================= 1 failed, 14 passed, 53 deselected in 5.30s ==================
+== M24 assert 不必緊接 ==
+FAILED test_y2_gc_mixed_if_requires_adjacent_same_condition_assert[not_adjacent]
+================= 1 failed, 14 passed, 53 deselected in 5.44s ==================
+== M25 不檢條件之無副作用 ==
+FAILED test_y5_gc_exit_outside_rule_not_applicable[call_cond]
+================= 1 failed, 14 passed, 53 deselected in 5.32s ==================
+== M26 不檢直接子敘述 ==
+FAILED test_y5_gc_exit_outside_rule_not_applicable[nested]
+================= 1 failed, 14 passed, 53 deselected in 5.51s ==================
+== M27 不檢只在一側 ==
+FAILED test_y5_gc_exit_outside_rule_not_applicable[both_sides]
+================= 1 failed, 14 passed, 53 deselected in 5.33s ==================
+== M28 不要求 assert 綁定 ==
+FAILED test_y2_gc_mixed_if_requires_adjacent_same_condition_assert[no_assert]
+FAILED test_y2_gc_mixed_if_requires_adjacent_same_condition_assert[wrong_cond]
+FAILED test_y2_gc_mixed_if_requires_adjacent_same_condition_assert[not_adjacent]
+================= 3 failed, 12 passed, 53 deselected in 5.23s ==================
+restored to trial

@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 48,
+  "version": 49,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -166,11 +166,11 @@
         "compare_patch_path 之 sha256＝compare_patch_sha256；所及之檔恰為 path；套於 head 後之檔內容＝受驗之樹之 path 內容",
         "舊函式不動：head 之 path 中每一測試函式（含類別方法；依 pytest.ini 收集規則）於受驗之樹皆存在，且 ast.dump（include_attributes=False，含裝飾器與預設參數）全同",
         "結構白名單：受驗之樹 path 之模組頂層敘述序列，扣除新增之頂層節點後，與 head 者逐一 AST 相同（G-c 之搬移除外，見下條）；新增之頂層節點只得為 Import／ImportFrom（v47：不得為星號匯入，且其綁定之名不得與 head 之 path 中任何綁定或載入之名相同）、名稱合 python_functions 之 FunctionDef／AsyncFunctionDef（v47：裝飾器只准 pytest.mark.parametrize）、名稱合 python_classes 之 ClassDef（無裝飾器、本體只含 docstring 與名稱合 python_functions、裝飾器只准 pytest.mark.parametrize 之方法）；head 既有之測試類別不得增刪方法；不得新增或改動 pytestmark、usefixtures、fixture 定義與任何其他模組層可執行敘述",
-        "G-c（head 之 path 無任何測試函式）：「模組層可執行敘述」＝head 模組頂層中，Import、ImportFrom、FunctionDef、AsyncFunctionDef、ClassDef、首句 docstring、右值為純字面之賦值、`if __name__ == \"__main__\":` 區塊**以外**之敘述（前列各類留在模組層、不須搬移）；可執行敘述中，除「結束類敘述」外，於受驗之樹不得留在模組層，且須依原序逐一 AST 相同地出現於新增函式本體（各新增函式本體依新增順序串接，其間可插入他敘述）；結束類敘述＝呼叫 exit、quit、sys.exit、os._exit 之運算式敘述、`raise SystemExit…`，及本體與 else 皆只含結束類敘述之 if——此類不得搬入，且新增函式之任何位置皆不得含之（以斷言取代以結束碼報錯）",
+        "G-c（head 之 path 無任何測試函式）：「模組層可執行敘述」＝head 模組頂層中，Import、ImportFrom、FunctionDef、AsyncFunctionDef、ClassDef、首句 docstring、右值為純字面之賦值、`if __name__ == \"__main__\":` 區塊**以外**之敘述（前列各類留在模組層、不須搬移）；可執行敘述中，除「結束類敘述」外，於受驗之樹不得留在模組層，且須依原序逐一 AST 相同地出現於新增函式本體（各新增函式本體依新增順序串接，其間可插入他敘述）；結束類敘述＝呼叫 exit、quit、sys.exit、os._exit 之運算式敘述、`raise SystemExit…`，及本體與 else 皆只含結束類敘述之 if——此類不得搬入，且新增函式之任何位置皆不得含之（以斷言取代以結束碼報錯）；（v49）head 模組層之 if 含結束類敘述而非前述特例者：結束類（非 if 形）須全為該 if 本體或 else 之直接子敘述、只在一側、且 if 條件只含名稱／常數／比較／布林／一元／二元運算／tuple／list 節點（不得含呼叫、屬性、下標）⇒ 搬入時剝除該等結束類（本體剝空補 pass、else 剝空即無 else），比對以剝除後之 AST，且同一新增函式中緊接其後之敘述須為 assert C（結束類在 else）或 assert not C（在本體；C 與原條件 AST 相同、訊息只得為字面或無）；不合者 ⇒ 本收據不適用",
         "added_nodeids＝受驗之樹中新增之函式層 nodeid 之全集（不多不少、至少一項）；每一新增函式依 inline_rule 展開後至少一個斷言元素",
         "baseline_session_id 所指 session 之 head＝收據 head、diff_digest＝head 乾淨樹套 compare_patch 後之值；added_nodeids 全部參數案例皆 passed",
         "mutants 至少一項（types.additive_mutant_item）；每項 patch 只改 production_roots；session 為 head＋compare_patch＋該補丁、執行 path 全檔；對每一新增函式之每一斷言元素之位置 P，至少一個 mutant 之 session 中該新增函式 outcome∈{failed,error}、phase_failed＝call 且 fail_frames 含落在 P 所屬敘述行範圍與該函式行範圍之 frame",
-        "情境綁定（codex r8 P1-03）：令 T＝entry 之 rewrite_targets 所涵蓋且存在於 head 之函式（rewrite_targets 空＝head 之全部測試函式）；對每一 t∈T，R(t)＝t 本體（含同模組被呼叫之非測試函式，遞移）中以 Name／Attribute 載入、經 path 之匯入（含函式內匯入；v47：名稱無明示綁定時，依模組層星號匯入之來源解析——來源於 production_roots 內且有此頂層定義或其 __all__ 含之）解析至 production_roots 下模組之符號（模組路徑, 名稱）之集合；須 R(t) ⊆ ∪{R(a) : a 為新增函式}；R(t) 非空者至少一個殺 mutant 之 patch 所及之檔∈R(t) 之模組路徑；有 t 之 R(t) 為空 ⇒ 本收據不適用（G-c 之 T 為空，免本條）",
+        "情境綁定（codex r8 P1-03）：令 T＝entry 之 rewrite_targets 所涵蓋且存在於 head 之函式（rewrite_targets 空＝head 之全部測試函式）；對每一 t∈T，R(t)＝t 本體及（v49）實際套用於 t 之 fixture 本體（函式參數〔扣 self、request、參數化名〕、函式／類別／模組層 usefixtures、定義於測試模組本身〔頂層與類別〕之 autouse，及其遞移依賴；fixture 來源同 receipts.session_scope ②；目錄鏈 conftest 與外掛之 autouse 屬環境不入；AST only、不做收集；各依其所在模組之匯入解析）（皆含同模組被呼叫之非測試函式，遞移）中以 Name／Attribute 載入、經 path 之匯入（含函式內匯入；v47：名稱無明示綁定時，依模組層星號匯入之來源解析——來源於 production_roots 內且有此頂層定義或其 __all__ 含之）解析至 production_roots 下模組之符號（模組路徑, 名稱）之集合；須 R(t) ⊆ ∪{R(a) : a 為新增函式}；R(t) 非空者至少一個殺 mutant 之 patch 所改之頂層定義（v49：依 head 該檔模組頂層之 def／class〔含裝飾器行〕或賦值目標名對應補丁舊側之刪改行與插入點）∈R(t)；有 t 之 R(t) 為空 ⇒ 本收據不適用（G-c 之 T 為空，免本條）",
         "（v47）新增偵測力：對每一 t∈T，至少一個殺新增函式之 mutant，於其 session 中 t 之全部紀錄皆 passed（t 對該 mutant 盲）——證新增函式帶來舊目標所無之偵測力；舊目標對全部殺新增函式之 mutant 皆失敗者不得以本收據結案（應以 receipts.mutation 改寫）",
         "全部 session 之 duration_class 相同且＝fingerprint；baseline 與各 mutant 之 session 皆須合 receipts.session_scope（以 path 全檔為範圍）；任一 session 不在本機 ledger ⇒ unverifiable、rc≠0；diff_digest 之重算同 receipts.defective_rewrite 末條"
       ]
@@ -178,7 +178,7 @@
     "session_scope": {
       "rule": [
         "（v46，諮詢 r8；修審碼 r1 CODEX-R1-P1-01）凡收據宣稱「某 session 中目標（函式層 nodeid N，所在檔 F）全部參數案例皆 passed／某結果」者，該 session 須同時滿足：①ledger.session_record.argv_norm 之位置參數含 N、F 或 F 之上層目錄之一，且 option 之 keyword、markexpr 為空、deselect 為空、lf、stepwise 與（v47）keepduplicates 為否",
-        "②案例數靜態列舉 E(N)：N 所屬函式之 parametrize 裝飾器、其所屬測試類別之 parametrize 裝飾器與模組 pytestmark 之 parametrize 之 argvalues 長度之積（無任何 parametrize ⇒ 1）；argvalues 須為字面 list／tuple（元素含 pytest.param 者各計 1），或模組層於該定義行之前最後一次綁定為此類字面之名稱；N 之參數、（v47）函式／類別／模組 pytestmark 之 usefixtures 直接標記與 autouse fixture（皆含遞移依賴）若請求任一以 params 定義之 fixture，或 argvalues 不可如上解析 ⇒ 不可列舉，該收據不成立（fail-closed）；（v47）測試類別之基底類別於同模組者，其 parametrize 裝飾器與 pytestmark 遞移納入；基底不可於同模組解析（且非 object）⇒ 不可列舉；（v48）fixture 之可見範圍＝測試檔、其目錄鏈上之 conftest.py，及各 conftest.py 之 pytest_plugins 字面所列模組（近者覆蓋遠者；外掛模組先於載入它之 conftest）",
+        "②案例數靜態列舉 E(N)：N 所屬函式之 parametrize 裝飾器、其所屬測試類別之 parametrize 裝飾器與模組 pytestmark 之 parametrize 之 argvalues 長度之積（無任何 parametrize ⇒ 1）；argvalues 須為字面 list／tuple（元素含 pytest.param 者各計 1），或模組層於該定義行之前最後一次綁定為此類字面之名稱；N 之參數、（v47）函式／類別／模組 pytestmark 之 usefixtures 直接標記與 autouse fixture（皆含遞移依賴）若請求任一以 params 定義之 fixture，或 argvalues 不可如上解析 ⇒ 不可列舉，該收據不成立（fail-closed）；（v47）測試類別之基底類別於同模組者，其 parametrize 裝飾器與 pytestmark 遞移納入；基底不可於同模組解析（且非 object）⇒ 不可列舉；（v48）fixture 之可見範圍＝測試檔、其目錄鏈上之 conftest.py，及各 conftest.py 之 pytest_plugins 字面所列模組（近者覆蓋遠者；外掛模組先於載入它之 conftest）；（v49）另含測試類別本體之 fixture（同模組基底先、子類後，近者覆蓋遠者）",
         "③session 中基底 nodeid（去參數化後綴）＝N 之紀錄數＝E(N)，且彼此 nodeid 不重複（v47：以 ledger 檔之原始 test 紀錄逐筆計，不經以 nodeid 為鍵之彙整；任一 nodeid 出現逾一筆 ⇒ 不成立）",
         "conftest 或外掛以 pytest_collection_modifyitems 等鉤子靜默移除案例之動態形不在本規則判定範圍（docs/TESTREG_SPEC.md §N R13）"
       ]

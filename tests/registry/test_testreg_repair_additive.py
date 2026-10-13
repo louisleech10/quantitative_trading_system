@@ -817,3 +817,242 @@ def test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerab
     assert sum(1 for n in test_records(ra_uf["repo"], sid) if n.startswith(f"{UMOD}::test_m[")) == 2
     errs = testreg.session_scope_errors(_ctx(ra_uf["repo"]), sid, f"{UMOD}::test_m")
     assert any("不可靜態列舉" in e for e in errs), errs
+
+
+# ── v52（修訂審查 r50 處置；只增）──────────────────────────────────────────────────────────────────────────────────
+# (z)(z2)(z3)：session_scope ② 之模組層 pytestmark 參數化（pytest.param 元素）、他模組基底、類別本體 params fixture
+MP, XB, CB = "tests/test_mp.py", "tests/test_xb.py", "tests/test_cb.py"
+T_MP = ('import pytest\n\npytestmark = pytest.mark.parametrize("x", [pytest.param(1, id="one"), pytest.param(2, id="two")])'
+        '\n\n\ndef test_m(x):\n    assert x > 0\n')
+HELPER_BASE = "class Base:\n    pass\n"
+T_XB = "from tests.helper_base import Base\n\n\nclass TestC(Base):\n    def test_a(self):\n        assert True\n"
+T_CB = ("import pytest\n\n\nclass TestCb:\n    @pytest.fixture(params=[1, 2])\n    def cfx(self, request):\n"
+        "        return request.param\n\n    def test_c(self, cfx):\n        assert cfx > 0\n")
+
+
+@pytest.fixture(scope="module")
+def ra_v52s(tmp_path_factory) -> Dict[str, Any]:
+    """(z)(z2)(z3) 共用暫存 repo（無 autouse，各檔互不影響）；各檔各跑一 session（整檔）。"""
+    r = make_repo(tmp_path_factory.mktemp("ra_v52s"), {"momentum/__init__.py": "", "momentum/other.py": OTHER,
+                                                       "tests/helper_base.py": HELPER_BASE, MP: T_MP, XB: T_XB, CB: T_CB})
+    return {"repo": r, "sid": {p: _run_with(r, [], p) for p in (MP, XB, CB)}}
+
+
+def test_z_session_scope_module_pytestmark_parametrize_pytest_param_enumerable(ra_v52s):
+    """(z) 模組層 pytestmark = pytest.mark.parametrize("x", [pytest.param(…), pytest.param(…)])（前提：2 筆）⇒ 靜態列舉
+    為 2、與紀錄數相符，session_scope 成立（不讀模組 pytestmark 之參數化層、或不把 pytest.param 計為一案之實作會不符）。"""
+    sid = ra_v52s["sid"][MP]
+    recs = test_records(ra_v52s["repo"], sid)
+    assert sorted(n for n in recs if n.startswith(f"{MP}::test_m[")) == [f"{MP}::test_m[one]", f"{MP}::test_m[two]"]
+    assert testreg.session_scope_errors(_ctx(ra_v52s["repo"]), sid, f"{MP}::test_m") == []
+
+
+def test_z2_session_scope_base_class_from_other_module_not_enumerable(ra_v52s):
+    """(z2) 測試類別之基底自他模組匯入（同模組解析不到、非 object；前提：1 筆）⇒ 以「不可靜態列舉」為理由不成立
+    （把「基底解析不到」當作略過之實作會列舉為 1 而放行）。"""
+    sid = ra_v52s["sid"][XB]
+    assert [n for n in test_records(ra_v52s["repo"], sid) if n.startswith(f"{XB}::TestC::test_a")] == \
+        [f"{XB}::TestC::test_a"]
+    errs = testreg.session_scope_errors(_ctx(ra_v52s["repo"]), sid, f"{XB}::TestC::test_a")
+    assert any("不可靜態列舉" in e for e in errs), errs
+
+
+def test_z3_session_scope_class_body_param_fixture_not_enumerable(ra_v52s):
+    """(z3) 測試類別本體內 @pytest.fixture(params=[1, 2]) 被方法請求（前提：2 筆）⇒「不可靜態列舉」（只掃模組頂層 fixture
+    之實作會少算為 1）。"""
+    sid = ra_v52s["sid"][CB]
+    assert sum(1 for n in test_records(ra_v52s["repo"], sid) if n.startswith(f"{CB}::TestCb::test_c[")) == 2
+    errs = testreg.session_scope_errors(_ctx(ra_v52s["repo"]), sid, f"{CB}::TestCb::test_c")
+    assert any("不可靜態列舉" in e for e in errs), errs
+
+
+# (aa1)–(aa4)：情境綁定之 R(t) 納入實際套用之 fixture 閉包（K4-1）；只看 R 相關錯誤，故不需真實 session（虛 session 用合法格式之
+#    uuid 與 hex，使收據通過形狀檢查而進入後段；各案先斷言已到達後段〔unverifiable 出現〕以防空心）
+ABSENT_BASE, ABSENT_MUT, ABSENT_FP = ("00000000-0000-4000-8000-0000000000b1", "00000000-0000-4000-8000-0000000000b2",
+                                     "0" * 64)
+K4 = "tests/test_k4.py"
+K4_CONFTEST = ('import pytest\n\n\n@pytest.fixture\ndef adder():\n    from momentum.calc import add\n    return add\n\n\n'
+               '@pytest.fixture\ndef unused_fx():\n    from momentum.calc import safe_div\n    return safe_div\n\n\n'
+               '@pytest.fixture(autouse=True)\ndef _env_tag():\n    from momentum.calc import tag\n    return tag\n')
+T_K4 = ('import pytest\n\n\ndef test_fx_arg(adder):\n    try:\n        assert adder(1, 1) == 2\n    except Exception:\n'
+        '        return False\n\n\nclass TestAuto:\n    @pytest.fixture(autouse=True)\n    def _imp(self):\n'
+        '        from momentum.calc import scale\n        self.scale = scale\n\n    def test_cls_auto(self):\n'
+        '        try:\n            assert self.scale(2) == 4\n        except Exception:\n            return False\n\n\n'
+        'def test_doc_only():\n    assert "x" in "xyz"\n')
+K4_NEW = T_K4.replace("import pytest\n", "import pytest\nfrom momentum.calc import add, scale\n", 1) + \
+    "\n\ndef test_add_and_scale_direct():\n    assert add(1, 1) == 2\n    assert scale(2) == 4\n"
+K4_TARGETS = [f"{K4}::test_fx_arg", f"{K4}::TestAuto::test_cls_auto", f"{K4}::test_doc_only"]
+
+
+@pytest.fixture(scope="module")
+def ra_k4(tmp_path_factory) -> Dict[str, Any]:
+    """(aa) 暫存 repo：conftest 有被請求之 adder、未被請求之 unused_fx、目錄層 autouse 之 _env_tag；測試類別有類別內
+    autouse（函式內匯入 scale 掛到 self）。改寫只新增 test_add_and_scale_direct；收據之 session 為虛（只驗 R 相關錯誤）。"""
+    r = make_repo(tmp_path_factory.mktemp("ra_k4"), {"momentum/__init__.py": "", "momentum/calc.py": CALC_GOOD,
+                                                     "tests/conftest.py": K4_CONFTEST, K4: T_K4})
+    cat = r.catalog()
+    cat["entries"][K4].update(entry(K4, disposition="rewrite", rewrite_targets=K4_TARGETS, disposition_ref=APPROVAL))
+    r.set_catalog(cat)
+    r.write(APPROVAL, f"# approval\n{K4}\n")
+    mp = f"{MUT_DIR}/k4_m_add.patch"
+    msha = write_patch(r, "momentum/calc.py", CALC_GOOD.replace("    return a + b\n", "    return a - b\n", 1), mp)
+    cp = "handoffs/run_receipts/testreg-additive/k4.compare.patch"
+    csha = write_patch(r, K4, K4_NEW, cp)
+    head = r.commit("k4")
+    r.write(K4, K4_NEW)
+    r.write_json(additive_rel(K4), {
+        "path": K4, "head": head, "approval_ref": APPROVAL, "fingerprint": ABSENT_FP, "compare_patch_path": cp,
+        "compare_patch_sha256": csha, "added_nodeids": [f"{K4}::test_add_and_scale_direct"],
+        "baseline_session_id": ABSENT_BASE, "mutants": [{"id": "m_add", "patch_path": mp, "patch_sha256": msha,
+                                                         "session_id": ABSENT_MUT}]})
+    return {"repo": r, "errs": testreg.additive_rewrite_errors(_ctx(r), K4) or []}
+
+
+def test_aa1_fixture_argument_symbols_enter_scenario(ra_k4):
+    """(aa1) test_fx_arg 經 fixture 參數 adder（函式內匯入 add）使用生產碼 ⇒ R 非空、且新增函式引用 add 即滿足 ⊆（不遍歷
+    fixture 之實作判為「未引用任何生產符號」）。前提：已到達後段（unverifiable）。"""
+    assert any("unverifiable" in e for e in ra_k4["errs"]), ra_k4["errs"]
+    assert not [e for e in ra_k4["errs"] if "test_fx_arg" in e and "情境綁定" in e and "定義" not in e], ra_k4["errs"]
+
+
+def test_aa2_class_autouse_local_import_enters_scenario(ra_k4):
+    """(aa2) TestAuto::test_cls_auto 經類別內 autouse fixture 之函式內匯入取得 scale ⇒ R 含 scale、新增函式引用 scale 即
+    滿足（不遍歷類別內 autouse 之實作判為「未引用任何生產符號」）。前提：已到達後段（unverifiable）。"""
+    assert any("unverifiable" in e for e in ra_k4["errs"]), ra_k4["errs"]
+    assert not [e for e in ra_k4["errs"] if "test_cls_auto" in e and "情境綁定" in e and "定義" not in e], ra_k4["errs"]
+
+
+def test_aa3_directory_autouse_is_environment_not_scenario(ra_k4):
+    """(aa3) test_doc_only 不經生產碼；conftest 之目錄層 autouse _env_tag 雖匯入 tag，屬環境不入 R ⇒ 仍「未引用任何生產符號」
+    （本收據不適用）（把目錄層 autouse 納入之實作使 R＝{tag} 而不報）。"""
+    assert any("test_doc_only" in e and "未引用任何生產符號" in e for e in ra_k4["errs"]), ra_k4["errs"]
+
+
+def test_aa4_visible_but_unrequested_fixture_not_in_scenario(ra_k4):
+    """(aa4) conftest 之 unused_fx（匯入 safe_div）可見但未被 test_fx_arg 請求 ⇒ 不入 R；新增函式未引用 safe_div 不報
+    （把「可見」當「套用」之實作會要求引用 safe_div）。前提：已到達後段（unverifiable）。"""
+    assert any("unverifiable" in e for e in ra_k4["errs"]), ra_k4["errs"]
+    assert not [e for e in ra_k4["errs"] if "safe_div" in e], ra_k4["errs"]
+
+
+# (ab)：情境綁定之殺 mutant 須改動 R(t) 中之符號定義（非僅同檔）
+N_SCALED = f"{GB}::test_quick_scaled"
+GB_V52 = {"other_symbol": T_GB.replace("from momentum.calc import add, safe_div\n",
+                                       "from momentum.calc import add, safe_div\nfrom momentum.calc import scale\n", 1)
+          + "\n\ndef test_quick_scaled():\n    assert safe_div(scale(3), 3) == 2\n"}
+
+
+@pytest.fixture(scope="module")
+def ra_ab(tmp_path_factory) -> Dict[str, Any]:
+    """(ab) 暫存 repo：舊目標 test_quick 只引用 safe_div；新增 test_quick_scaled 由 m_scale（改同檔之 scale）殺。"""
+    r = make_repo(tmp_path_factory.mktemp("ra_ab"), {"momentum/__init__.py": "", "momentum/calc.py": CALC_GOOD,
+                                                     "momentum/other.py": OTHER, GB: T_GB})
+    cat = r.catalog()
+    cat["entries"][GB].update(entry(GB, disposition="rewrite", rewrite_targets=[N_QUICK], disposition_ref=APPROVAL))
+    r.set_catalog(cat)
+    r.write(APPROVAL, f"# approval\n{GB}\n")
+    f, old, new = MUTANTS["m_scale"]
+    mp = f"{MUT_DIR}/ab_m_scale.patch"
+    msha = write_patch(r, f, r.read(f).replace(old, new, 1), mp)
+    cp = "handoffs/run_receipts/testreg-additive/ab.compare.patch"
+    csha = write_patch(r, GB, GB_V52["other_symbol"], cp)
+    head = r.commit("ab")
+    base = _run_with(r, [cp], GB)
+    kill = _run_with(r, [cp, mp], GB)
+    return {"repo": r, "head": head, "cp": cp, "csha": csha, "mp": mp, "msha": msha, "base": base, "kill": kill}
+
+
+def test_ab_binding_requires_killer_to_modify_referenced_symbol(ra_ab, tmp_path):
+    """(ab) 前提：m_scale 殺 test_quick_scaled、test_quick 對之盲。只附 m_scale（改同檔之 scale，非舊目標所引用之
+    safe_div）⇒ 情境綁定不成立（以補丁所改之頂層定義判定；只看所改之檔之實作會放行）。"""
+    fx = ra_ab
+    recs = test_records(fx["repo"], fx["kill"])
+    assert recs[N_SCALED]["outcome"] == "failed" and recs[N_QUICK]["outcome"] == "passed"
+    r = _work(fx, tmp_path, "ab")
+    _apply(r, GB, GB_V52["other_symbol"])
+    r.write_json(additive_rel(GB), {
+        "path": GB, "head": fx["head"], "approval_ref": APPROVAL, "fingerprint": _dc(fx, fx["base"], fx["kill"]),
+        "compare_patch_path": fx["cp"], "compare_patch_sha256": fx["csha"], "added_nodeids": [N_SCALED],
+        "baseline_session_id": fx["base"],
+        "mutants": [{"id": "m_scale", "patch_path": fx["mp"], "patch_sha256": fx["msha"], "session_id": fx["kill"]}]})
+    errs = testreg.additive_rewrite_errors(_ctx(r), GB)
+    assert any("情境綁定" in e and "定義" in e for e in errs), errs
+
+
+# (y1)–(y7)：G-c 之混合分支 if（K5）
+YM, YN, YC, YB = "tests/test_ym.py", "tests/test_yn.py", "tests/test_yc.py", "tests/test_yb.py"
+T_YM = 'from momentum.calc import add\n\na = add(1, 2)\nif a == 3:\n    print("ok")\nelse:\n    print("bad")\n    exit(1)\n'
+T_YN = ('from momentum.calc import add\n\na = add(1, 2)\nif a == 3:\n    print("ok")\nelse:\n    for _ in range(1):\n'
+        '        exit(2)\n    exit(1)\n')  # else 有直接子敘述之 exit(1)，另有迴圈內之 exit(2)
+T_YC = 'from momentum.calc import add\n\nif add(1, 2) == 3:\n    print("ok")\nelse:\n    exit(1)\n'
+T_YB = 'from momentum.calc import add\n\na = add(1, 2)\nif a == 3:\n    print("ok")\n    exit(0)\nelse:\n    exit(1)\n'
+_YM_FN = ('from momentum.calc import add\n\n\ndef test_ym():\n    a = add(1, 2)\n    if a == 3:\n        print("ok")\n'
+          '    else:\n        print("bad")\n')
+Y_VARIANTS = {  # 名稱：(檔, 改寫後全文, 期望理由子字串〔None＝G-c 無錯〕)
+    "ok": (YM, _YM_FN + "    assert a == 3\n", None),
+    "no_assert": (YM, _YM_FN, "緊接"),
+    "wrong_cond": (YM, _YM_FN + "    assert a >= 3\n", "緊接"),
+    "not_adjacent": (YM, _YM_FN + '    print("done")\n    assert a == 3\n', "緊接"),
+    "nested": (YN, 'from momentum.calc import add\n\n\ndef test_yn():\n    a = add(1, 2)\n    if a == 3:\n'
+                   '        print("ok")\n    else:\n        for _ in range(1):\n            pass\n    assert a == 3\n', "不適用"),
+    "call_cond": (YC, 'from momentum.calc import add\n\n\ndef test_yc():\n    if add(1, 2) == 3:\n        print("ok")\n'
+                      '    assert add(1, 2) == 3\n', "不適用"),
+    "both_sides": (YB, 'from momentum.calc import add\n\n\ndef test_yb():\n    a = add(1, 2)\n    if a == 3:\n'
+                       '        print("ok")\n    assert a == 3\n', "不適用"),
+}
+
+
+@pytest.fixture(scope="module")
+def ra_y(tmp_path_factory) -> Dict[str, Any]:
+    """(y) 暫存 repo：四個 G-c 原檔為 head（rewrite、rewrite_targets 空）；各變體之 compare patch；session 為虛（只驗 G-c
+    結構錯誤）。"""
+    r = make_repo(tmp_path_factory.mktemp("ra_y"), {"momentum/__init__.py": "", "momentum/calc.py": CALC_GOOD,
+                                                    YM: T_YM, YN: T_YN, YC: T_YC, YB: T_YB})
+    cat = r.catalog()
+    for p in (YM, YN, YC, YB):
+        cat["entries"][p].update(entry(p, disposition="rewrite", rewrite_targets=[], disposition_ref=APPROVAL))
+    r.set_catalog(cat)
+    r.write(APPROVAL, f"# approval\n{YM} {YN} {YC} {YB}\n")
+    mp = f"{MUT_DIR}/y_m_add.patch"
+    msha = write_patch(r, "momentum/calc.py", CALC_GOOD.replace("    return a + b\n", "    return a - b\n", 1), mp)
+    cps = {}
+    for k, (p, text, _why) in Y_VARIANTS.items():
+        rel = f"handoffs/run_receipts/testreg-additive/y_{k}.compare.patch"
+        cps[k] = (rel, write_patch(r, p, text, rel))
+    head = r.commit("y")
+    return {"repo": r, "head": head, "mp": mp, "msha": msha, "cps": cps}
+
+
+def _y_errs(fx, tmp_path, variant: str) -> List[str]:
+    p, text, _why = Y_VARIANTS[variant]
+    r = _work(fx, tmp_path, f"y_{variant}")
+    _apply(r, p, text)
+    fn = text.split("def ", 1)[1].split("(", 1)[0]
+    r.write_json(additive_rel(p), {
+        "path": p, "head": fx["head"], "approval_ref": APPROVAL, "fingerprint": ABSENT_FP,
+        "compare_patch_path": fx["cps"][variant][0], "compare_patch_sha256": fx["cps"][variant][1],
+        "added_nodeids": [f"{p}::{fn}"], "baseline_session_id": ABSENT_BASE,
+        "mutants": [{"id": "m_add", "patch_path": fx["mp"], "patch_sha256": fx["msha"], "session_id": ABSENT_MUT}]})
+    errs = testreg.additive_rewrite_errors(_ctx(r), p) or []
+    assert any("unverifiable" in e for e in errs), errs  # 前提：已過形狀檢查、到達後段
+    return [e for e in errs if e.startswith("G-c")]
+
+
+def test_y1_gc_mixed_if_stripped_with_adjacent_assert_valid(ra_y, tmp_path):
+    """(y1) 檔尾 if 之 else 含印出與 exit(1)：搬入時剝除 exit、緊接 assert a == 3 ⇒ G-c 結構無錯。"""
+    assert _y_errs(ra_y, tmp_path, "ok") == []
+
+
+@pytest.mark.parametrize("variant", ["no_assert", "wrong_cond", "not_adjacent"])
+def test_y2_gc_mixed_if_requires_adjacent_same_condition_assert(ra_y, tmp_path, variant):
+    """(y2–y4) 缺 assert、assert 條件與原 if 不同（AST）、assert 不緊接 ⇒ 以「緊接 assert 其條件」為理由不成立。"""
+    errs = _y_errs(ra_y, tmp_path, variant)
+    assert any(Y_VARIANTS[variant][2] in e for e in errs), errs
+
+
+@pytest.mark.parametrize("variant", ["nested", "call_cond", "both_sides"])
+def test_y5_gc_exit_outside_rule_not_applicable(ra_y, tmp_path, variant):
+    """(y5–y7) else 除直接之 exit(1) 外另有迴圈內之 exit(2)（非 if 本體／else 之直接子敘述）、條件含呼叫（再求值有副作用之虞）、兩側皆有結束類
+    ⇒ 以「本收據不適用」為理由不成立。"""
+    errs = _y_errs(ra_y, tmp_path, variant)
+    assert any(Y_VARIANTS[variant][2] in e for e in errs), errs
