@@ -136,8 +136,8 @@
 <tr>
 <td>5a</td>
 <td><strong>TESTREG 測試清冊</strong>（你 10/9 插入；<strong>規格與施工清單皆已核可、已蓋章（10/11）；第 1 批已收批（10/12，審碼四輪、兩家第 4 輪零意見；grok 額度用罄依你選擇暫改兩家）</strong>）</td>
-<td>全部測試檔（現 653 個）建清冊並自動維護：自動記錄結果與耗時、新增測試當下就檢查、有證據才淘汰、全專案測試檢查只能變多不能變少、不准對既有測試加 skip／xfail、只跑相關測試且一定不少跑；另查明 <code>test_failopen_correctness.py</code> 的 V-6 項目為何單項要 1 小時 40 分。分四批做（規格 <code>docs/TESTREG_SPEC.md</code> 第 40 版、施工清單 <code>docs/manifests/TESTREG.json</code>；白話審閱 <code>Archived/TESTREG規格審閱.md</code>、<code>Archived/TESTREG規格v17修正審閱.md</code>、<code>Archived/TESTREG規格v33修正審閱.md</code>）。「每行程式被哪些測試跑到」動態對照表列為先不做（要先累積記錄器資料）</td>
-<td>第 2 批；四批做完才回 FRAMEPATH 第二批（開工前先修 FRAMEPATH 那條過嚴的總表檢查）</td>
+<td>全部測試檔（現 653 個）建清冊並自動維護：自動記錄結果與耗時、新增測試當下就檢查、有證據才淘汰、全專案測試檢查只能變多不能變少、不准對既有測試加 skip／xfail、只跑相關測試且一定不少跑；另查明 <code>test_failopen_correctness.py</code> 的 V-6 項目為何單項要 1 小時 40 分。分四批做（規格 <code>docs/TESTREG_SPEC.md</code> 第 46 版、施工清單 <code>docs/manifests/TESTREG.json</code>；白話審閱 <code>Archived/TESTREG規格審閱.md</code>、<code>Archived/TESTREG規格v17修正審閱.md</code>、<code>Archived/TESTREG規格v33修正審閱.md</code>）。「每行程式被哪些測試跑到」動態對照表列為先不做（要先累積記錄器資料）。<strong>第 3 批另查到、要在之後處理的</strong>：①特徵工廠測試範圍內有 52 檔受 FRAMEPATH 的總表檢查凍結，它們的改寫要等該檢查修好才能做；②早已不會執行到的舊程式碼裡的空心檢查，直接連程式一起刪；③施工清單階段寫好的驗收測試，之後只能新增不能改（現在沒有機械擋，屬已知缺口）</td>
+<td>第 3 批（分類）；四批做完才回 FRAMEPATH 第二批（開工前先修 FRAMEPATH 那條過嚴的總表檢查，並修它「挑選要跑哪些測試」漏選 2 個被弄壞測試的問題）</td>
 </tr>
 <tr>
 <td>6</td>
