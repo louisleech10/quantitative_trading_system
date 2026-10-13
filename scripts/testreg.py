@@ -44,6 +44,7 @@ import math
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1504,13 +1505,49 @@ class _NoGitCtxEnv:
         return False
 
 
+_STRUCTURAL_PATCH = re.compile(r"^(new file mode|deleted file mode|rename from|rename to|copy from|copy to) ", re.M)
+
+
+def _index_apply(ctx: Context, head: str, texts: Sequence[str]):
+    """暫存 index：read-tree head、依序 `apply --cached` 補丁（不建 worktree）。回傳 (env, tmpdir) 或 None（套用失敗）。
+    呼叫端用畢須刪 tmpdir。"""
+    tmp = Path(tempfile.mkdtemp(prefix="testreg-idx-"))
+    with _NoGitCtxEnv():
+        env = dict(os.environ, GIT_INDEX_FILE=str(tmp / "index"))
+    if subprocess.run(["git", "-C", str(ctx.repo_root), "read-tree", head], env=env, capture_output=True).returncode:
+        shutil.rmtree(tmp, ignore_errors=True)
+        return None
+    for i, text in enumerate(texts):
+        pf = tmp / f"p{i}.patch"
+        pf.write_text(text, encoding="utf-8")
+        if subprocess.run(["git", "-C", str(ctx.repo_root), "apply", "--cached", str(pf)], env=env,
+                          capture_output=True).returncode:
+            shutil.rmtree(tmp, ignore_errors=True)
+            return None
+    return env, tmp
+
+
 def _digest_with(ctx: Context, head: str, patches: Sequence[str]) -> str:
-    """於 head 乾淨樹依序套用 patches（取受驗之樹之補丁內容）後之 diff_digest（記錄器之單一實作）。"""
+    """於 head 乾淨樹依序套用 patches（取受驗之樹之補丁內容）後之 diff_digest（記錄器之單一實作）。
+    （SPEC v46）補丁皆只修改既有檔時，以暫存 index 重算：`git diff --cached <head> --binary` 與乾淨 worktree 套用後之
+    `git diff HEAD --binary` 逐位元相同、且無未追蹤檔 ⇒ 依記錄器 `diff_digest` 公式重算（不建 worktree；真實規模約
+    0.1 秒）；補丁含新增、刪除、改名或複製之檔 ⇒ 退回暫存 worktree 法（未追蹤檔與 .gitignore 之語意須實樹判定）。"""
     key = (head, tuple(patches))
     cache = ctx.extra.setdefault("digests", {})
     if key in cache:
         return cache[key]
     texts = [_tree(ctx).read(rel) or "" for rel in patches]  # 受驗之樹（含暫存區）之內容先於移除環境前讀出
+    if not any(_STRUCTURAL_PATCH.search(x) for x in texts):
+        got = _index_apply(ctx, head, texts)
+        if got is not None:
+            env, tmp = got
+            try:
+                diff = subprocess.run(["git", "-C", str(ctx.repo_root), "diff", "--cached", head, "--binary"],
+                                      env=env, capture_output=True, check=True).stdout
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+            cache[key] = hashlib.sha256(diff).hexdigest() if diff else "clean"
+            return cache[key]
     tmp = Path(tempfile.mkdtemp(prefix="testreg-digest-"))
     wt = tmp / "wt"
     with _NoGitCtxEnv():
@@ -1643,6 +1680,20 @@ class _PatchedTree:
     def __init__(self, ctx: Context, head: str, patch_rel: str):
         self._files: Dict[str, Optional[str]] = {}
         text = _tree(ctx).read(patch_rel) or ""
+        if not _STRUCTURAL_PATCH.search(text):  # SPEC v46：只修改既有檔之補丁以暫存 index 讀取（不建 worktree）
+            got = _index_apply(ctx, head, [text])
+            if got is None:
+                self._files = {p: None for p in _patch_paths(text)}
+                return
+            env, itmp = got
+            try:
+                for p in _patch_paths(text):
+                    proc = subprocess.run(["git", "-C", str(ctx.repo_root), "show", f":{p}"], env=env,
+                                          capture_output=True)
+                    self._files[p] = proc.stdout.decode("utf-8") if proc.returncode == 0 else None
+            finally:
+                shutil.rmtree(itmp, ignore_errors=True)
+            return
         tmp = Path(tempfile.mkdtemp(prefix="testreg-cp-"))
         wt = tmp / "wt"
         with _NoGitCtxEnv():
@@ -1706,7 +1757,8 @@ def rule_v07_change_requires_receipt(ctx: Context) -> List[Finding]:
     for p, e in sorted(_entries(ctx).items()):
         if isinstance(e, dict) and e.get("disposition") == "rewrite" and changed.get(p) in ("M", "A"):
             if not e.get("rewrite_receipt"):
-                out.append(Finding("V07", p, "待改寫檔有暫存變更而無 rewrite_receipt"))
+                if not _defective_all_ok(ctx, e):  # v44：每一目標皆有成立之缺陷目標改寫收據亦可
+                    out.append(Finding("V07", p, "待改寫檔有暫存變更而無 rewrite_receipt（或缺陷目標改寫收據未全成立）"))
             else:
                 out.extend(Finding("V07", p, err) for err in _rewrite_receipt_errors(ctx, e))
     return out
@@ -3077,6 +3129,255 @@ def literal_fix_errors(ctx: Context, path: str) -> Optional[List[str]]:
     return errs
 
 
+def defective_rewrite_receipt_rel(schema: Mapping[str, Any], nodeid: str) -> str:
+    """契約 `receipts.defective_rewrite.file_rule`：函式層 nodeid 之缺陷目標改寫收據之 repo 相對路徑。"""
+    return f"{schema['receipts']['defective_rewrite']['dir']}/{nodeid.replace('/', '__').replace('::', '--')}.json"
+
+
+class _OverlayTree(_Tree):
+    """rev:<head> 之樹，另以 overrides（路徑→內容）覆蓋（改寫後函式之斷言於 head＋compare_patch 之樹重算）。"""
+
+    def __init__(self, root: Path, rev: str, overrides: Mapping[str, str]):
+        super().__init__(root, f"rev:{rev}")
+        self._cache.update(overrides)
+
+
+def _frame_in(tr: Mapping[str, Any], f: str, lo: int, hi: int) -> bool:
+    return any(fr.rsplit(":", 1)[0] == f and lo <= int(fr.rsplit(":", 1)[1]) <= hi for fr in tr.get("fail_frames", []))
+
+
+def _prov_key(e: Mapping[str, Any]) -> Optional[str]:
+    return f"{e['prov'][0]}:{e['prov'][1]}" if e.get("prov") else None
+
+
+def _pure_literal(n: Any) -> bool:
+    """純字面運算式：Constant、正負號常數、其 tuple／list／set、鍵值皆純字面之 dict。"""
+    if isinstance(n, ast.Constant):
+        return True
+    if isinstance(n, ast.UnaryOp) and isinstance(n.op, (ast.USub, ast.UAdd)) and isinstance(n.operand, ast.Constant):
+        return True
+    if isinstance(n, (ast.Tuple, ast.List, ast.Set)):
+        return all(_pure_literal(e) for e in n.elts)
+    if isinstance(n, ast.Dict):
+        return all(k is not None and _pure_literal(k) for k in n.keys) and all(_pure_literal(v) for v in n.values)
+    return False
+
+
+def _expected_literal_ids(fn: Any, lineno: int) -> set:
+    """（SPEC v46）缺陷斷言之「期望值字面」所含之 Constant 節點 id：`assert X == L`／`assert L == X`（單一 Eq、恰一側為
+    純字面）之該側；或 `pytest.raises(..., match=L)` 之 match 字面。其他形態 ⇒ 空集合（不適用既有紅收據）。"""
+    for n in ast.walk(fn):
+        if isinstance(n, ast.Assert) and n.lineno == lineno:
+            t = n.test
+            if isinstance(t, ast.Compare) and len(t.ops) == 1 and isinstance(t.ops[0], ast.Eq):
+                sides = [s for s in (t.left, t.comparators[0]) if _pure_literal(s)]
+                if len(sides) == 1:
+                    return {id(x) for x in ast.walk(sides[0]) if isinstance(x, ast.Constant)}
+            return set()
+        if isinstance(n, ast.Call) and n.lineno == lineno and \
+                (getattr(n.func, "attr", None) == "raises" or getattr(n.func, "id", None) == "raises"):
+            for kw in n.keywords:
+                if kw.arg == "match" and _pure_literal(kw.value):
+                    return {id(x) for x in ast.walk(kw.value) if isinstance(x, ast.Constant)}
+            return set()
+    return set()
+
+
+def _iso_const_only(a: Any, b: Any, allowed: set) -> Tuple[bool, int]:
+    """兩 AST 逐節點同構（型別、欄位、子節點數相同），唯一允許之差異為 ast.Constant 之值且該節點（a 側）之 id 屬
+    allowed（缺陷斷言之期望值字面）。回傳 (是否成立, 差異之 Constant 數)。"""
+    if type(a) is not type(b):
+        return False, 0
+    if isinstance(a, ast.Constant):
+        if type(a.value) is type(b.value) and a.value == b.value and getattr(a, "kind", None) == getattr(b, "kind", None):
+            return True, 0
+        return id(a) in allowed, 1
+    n = 0
+    for field in a._fields:
+        va, vb = getattr(a, field, None), getattr(b, field, None)
+        if isinstance(va, list) or isinstance(vb, list):
+            if not (isinstance(va, list) and isinstance(vb, list)) or len(va) != len(vb):
+                return False, 0
+            pairs = list(zip(va, vb))
+        else:
+            pairs = [(va, vb)]
+        for x, y in pairs:
+            if isinstance(x, ast.AST) or isinstance(y, ast.AST):
+                if not (isinstance(x, ast.AST) and isinstance(y, ast.AST)):
+                    return False, 0
+                ok, k = _iso_const_only(x, y, allowed)
+                if not ok:
+                    return False, 0
+                n += k
+            elif x != y:
+                return False, 0
+    return True, n
+
+
+def defective_rewrite_errors(ctx: Context, nodeid: str) -> Optional[List[str]]:
+    """契約 `receipts.defective_rewrite`（SPEC v45 Task 3.0；kind 只有 existing_red）：函式層 nodeid 之既有紅改寫收據。
+    無收據 ⇒ None；有 ⇒ 不符之清單（空＝成立，該函式之 V19 放行、V07／V21 認可）。條件：head 判定同 receipts.mutation；
+    approval_ref 含目標與首個壞提交前 8 碼；defect_lines 恰一項＝目標於 head 失敗所在、位於目標函式本體之斷言；好壞兩
+    提交（good＝first_bad 之第一親代、first_bad 為 head 祖先或相同）之乾淨樹 session 分別全過與 call 期失敗；改寫後函式
+    與目標之 AST 同構、唯一差異為缺陷敘述內之 Constant 值；baseline 全過；改寫後函式每一斷言元素皆有殺 mutant；各 session
+    綁定其提交＋補丁且 duration_class 一致＝fingerprint。函式定位依受驗之樹 pytest.ini 之收集規則。"""
+    s = ctx.schema
+    t = _tree(ctx)
+    rel = defective_rewrite_receipt_rel(s, nodeid)
+    text = t.read(rel)
+    if text is None:
+        return None
+    try:
+        r = json.loads(text)
+    except ValueError:
+        return ["缺陷目標改寫收據非 JSON"]
+    errs = list(_seam("validate_shape")(r, {"type": "types.receipt_defective_rewrite"}, s))
+    if errs:
+        return errs
+    if r["target_nodeid"] != nodeid:
+        errs.append(f"收據 target_nodeid {r['target_nodeid']} ≠ {nodeid}")
+    hp = _receipt_head_problem(ctx, rel, r["head"])
+    if hp:
+        errs.append(hp)
+    ap = ctx.repo_root / r["approval_ref"]  # 收斂檔依慣例不進 git
+    if not ap.is_file():
+        errs.append(f"approval_ref {r['approval_ref']} 不存在")
+    else:
+        body = ap.read_text(encoding="utf-8", errors="replace")
+        if nodeid not in body or r["first_bad_commit"][:8] not in body:
+            errs.append("approval_ref 未同時引用目標 nodeid 與首個壞提交前 8 碼")
+    path, qual = _split_nodeid(nodeid)
+    head_eng = _engine_for(ctx, f"rev:{r['head']}")
+    fp_, cp_, _f, _t = _collect_patterns(t)
+    if nodeid not in _function_nodeids(head_eng.tree, path) or nodeid not in _function_nodeids(t, path):
+        return errs + ["目標函式不存在於 head 或受驗之樹"]
+    tfn = _test_functions(head_eng.tree.read(path), fp_, cp_).get(qual)
+    old_els = head_eng.elements(nodeid)
+    if len(r["defect_lines"]) != 1:
+        return errs + ["defect_lines 須恰一項（只准目標於 head 失敗所在之斷言）"]
+    dl = r["defect_lines"][0]
+    de = next((e for e in old_els if _prov_key(e) == dl), None)
+    if de is None:
+        return errs + [f"defect_lines {dl} 非目標於 head 之斷言位置"]
+    _f0, lo, hi = de["prov"]
+    if _f0 != path or tfn is None or not (tfn.lineno <= lo and hi <= tfn.end_lineno):
+        errs.append("defect_lines 之斷言須位於目標函式本體（非 helper、非 fixture）")
+    dcs: set = set()
+
+    def bound(sid: str, rev: str, patches: List[str], label: str) -> Optional[Dict[str, Any]]:
+        sess = _ledger_session(ctx, sid)
+        if sess is None:
+            errs.append(f"unverifiable：{label} 之 session {sid} 不在 ledger")
+            return None
+        info = sess["session"] or {}
+        dcs.add(info.get("duration_class"))
+        if info.get("head") != rev or info.get("diff_digest") != _digest_with(ctx, rev, patches):
+            errs.append(f"{label} 之 session 不綁定其提交＋補丁")
+        return sess
+
+    def recs_of(sess: Optional[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+        return [x for n_, x in (sess or {"tests": {}})["tests"].items() if re.sub(r"\[.*\]$", "", n_) == nodeid]
+
+    def failed_call(sess: Optional[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+        tr = _fn_record(sess, nodeid) if sess is not None else None
+        return tr if tr is not None and tr["outcome"] in ("failed", "error") and tr.get("phase_failed") == "call" else None
+
+    tr = failed_call(bound(r["target_session_id"], r["head"], [], "target"))
+    if tr is None:
+        errs.append("目標於 head 未於 call 期失敗（非既有紅）")
+    elif not _frame_in(tr, path, lo, hi):
+        errs.append("目標於 head 之失敗位置不在 defect_lines 所屬斷言")
+    fb, gd = r["first_bad_commit"], r["good_commit"]
+    if not (fb == r["head"] or _is_ancestor(ctx.repo_root, fb, r["head"])):
+        errs.append("first_bad_commit 非收據 head 之祖先")
+    parent = _run_git(ctx.repo_root, "rev-parse", f"{fb}^1", check=False).stdout.strip()
+    if gd != parent:
+        errs.append("good_commit 須為 first_bad_commit 之第一親代")
+    else:
+        gr = recs_of(bound(r["good_session_id"], gd, [], "good"))
+        if not gr or any(x.get("outcome") != "passed" for x in gr):
+            errs.append("good 提交之 session 中目標未全過")
+        btr = failed_call(bound(r["bad_session_id"], fb, [], "bad"))
+        if btr is None:
+            errs.append("first_bad 提交之 session 中目標未於 call 期失敗")
+        else:  # SPEC v46：失敗須落在 first_bad 版目標中與缺陷斷言同正規化鍵之斷言（行號可位移）
+            same = [e["prov"] for e in _engine_for(ctx, f"rev:{fb}").elements(nodeid) if e["key"] == de["key"]]
+            if not any(_frame_in(btr, *p) for p in same):
+                errs.append("first_bad 提交之失敗位置不在與缺陷斷言同鍵之斷言")
+    cp = r["compare_patch_path"]
+    ptext = t.read(cp)
+    if ptext is None or hashlib.sha256(ptext.encode("utf-8")).hexdigest() != r["compare_patch_sha256"]:
+        return errs + ["compare_patch 不存在或 sha256 不符"]
+    if set(_patch_paths(ptext)) != {path}:
+        errs.append("compare_patch 所及之檔須恰為目標所在測試檔")
+    patched = _PatchedTree(ctx, r["head"], cp).read(path)
+    if patched is None:
+        return errs + ["compare_patch 套於 head 失敗"]
+    a = _test_functions(patched, fp_, cp_).get(qual)
+    b = _test_functions(t.read(path), fp_, cp_).get(qual)
+    if a is None or b is None or ast.dump(a) != ast.dump(b):
+        errs.append("compare_patch 套用後之目標函式與受驗之樹不同")
+    if a is None or tfn is None:
+        return errs + ["改寫後函式或目標函式不可解析"]
+    ok, ndiff = _iso_const_only(tfn, a, _expected_literal_ids(tfn, lo))
+    if not ok or ndiff == 0:
+        errs.append("改寫只准改缺陷斷言之期望值字面常數（單一 == 比較之純字面一側或 pytest.raises 之 match；AST 須同構、至少一處差異）")
+    br = recs_of(bound(r["compare_baseline_session_id"], r["head"], [cp], "compare_baseline"))
+    if not br or any(x.get("outcome") != "passed" for x in br):
+        errs.append("改寫後函式於 baseline session 未全過")
+    new_els = _Engine(_OverlayTree(ctx.repo_root, r["head"], {path: patched})).elements(nodeid)
+    roots = tuple(s["receipts"]["E0"]["production_roots"])
+    kills = []
+    files = {e["prov"][0] for e in new_els} or {path}
+    for m in r["mutants"]:
+        label = f"mutant {m['id']}"
+        pt = t.read(m["patch_path"])
+        if pt is None or hashlib.sha256(pt.encode("utf-8")).hexdigest() != m["patch_sha256"]:
+            errs.append(f"{label} 補丁不存在或 sha256 不符")
+            continue
+        if any(not p.startswith(roots) for p in _patch_paths(pt)):
+            errs.append(f"{label} 修改 production_roots 以外之檔")
+            continue
+        if m["session_id"] != m["compare_session_id"] or set(m["compare_outcomes"]) != {nodeid}:
+            errs.append(f"{label} 之 session 或 compare_outcomes 不合（須同一 session、鍵＝目標）")
+        sm = bound(m["session_id"], r["head"], [cp, m["patch_path"]], label)
+        mr = _fn_record(sm, nodeid) if sm is not None else None
+        if mr is None:
+            errs.append(f"{label} 之 session 無目標紀錄")
+            continue
+        loc = next((f for f in mr.get("fail_frames", []) if f.rsplit(":", 1)[0] in files), None)
+        if mr["outcome"] != m["target_outcome"] or loc != m["target_fail_loc"] or \
+                mr["outcome"] != m["compare_outcomes"].get(nodeid):
+            errs.append(f"{label} 之結果與紀錄不符")
+        if mr["outcome"] in ("failed", "error"):
+            kills.append((m, mr))
+    for e in new_els:
+        f, elo, ehi = e["prov"]
+        owner = e.get("owner") or (f, elo, ehi, "helper")
+        hit = False
+        for m, mr in kills:
+            loc = m["target_fail_loc"]
+            if not loc or loc.rsplit(":", 1)[0] != f or not elo <= int(loc.rsplit(":", 1)[1]) <= ehi:
+                continue
+            if owner[3] == "fixture":
+                hit = mr["phase_failed"] in ("setup", "teardown") and _frame_in(mr, owner[0], owner[1], owner[2])
+            else:
+                hit = mr["phase_failed"] == "call" and _frame_in(mr, owner[0], owner[1], owner[2])
+            if hit:
+                break
+        if not hit:
+            errs.append(f"改寫後斷言 {f}:{elo} 無對應之殺 mutant")
+    if None in dcs or len(dcs) > 1 or (dcs and r["fingerprint"] not in dcs):
+        errs.append("各 session 之 duration_class 不一或不等於 fingerprint")
+    return errs
+
+
+def _defective_all_ok(ctx: Context, entry: Mapping[str, Any]) -> bool:
+    """v44：rewrite_targets 所涵蓋之每一函式層 nodeid 皆有成立之缺陷目標改寫收據。"""
+    cov = _covered(ctx, entry)
+    return bool(cov) and all(_seam("defective_rewrite_errors")(ctx, n) == [] for n in cov)
+
+
 def rule_v19(ctx: Context) -> List[Finding]:
     """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定；測試檔有成立之字面對映修正收據〔`literal_fix_errors`
     為空〕⇒ 該檔之測試一次性放行）。"""
@@ -3171,7 +3472,12 @@ def rule_v19(ctx: Context) -> List[Finding]:
             new = collections.Counter()  # 新增 skip／skipif／xfail（函式、類別、模組 pytestmark、本體 pytest.skip／xfail）⇒ 視為空
         dec = _seam("multiset_decreased")(old, new)
         if dec and nid not in tombs and not _rewrite_ok(ctx, nid):
+            dre = _seam("defective_rewrite_errors")(ctx, nid)  # SPEC v44 Task 3.0：缺陷目標改寫收據
+            if dre == []:
+                continue
             why = f"；字面對映修正收據不成立：{'；'.join(lit[path_][:3])}" if lit[path_] else ""
+            if dre:
+                why += f"；缺陷目標改寫收據不成立：{'；'.join(dre[:3])}"
             out.append(Finding("V19", nid, f"斷言多重集合減少 {len(dec)} 項（須同提交立碑或附 rewrite 收據）{why}"))
     return out
 
@@ -3203,7 +3509,8 @@ def rule_v21(ctx: Context) -> List[Finding]:
     for p, e in sorted(_entries(ctx).items()):
         if isinstance(e, dict) and e.get("disposition") == "rewrite":
             if not e.get("rewrite_receipt"):
-                out.append(Finding("V21", p, "rewrite 未執行（rewrite_receipt 為 null）"))
+                if not _defective_all_ok(ctx, e):  # v44：每一目標皆有成立之缺陷目標改寫收據 ⇒ 已執行
+                    out.append(Finding("V21", p, "rewrite 未執行（rewrite_receipt 為 null，且缺陷目標改寫收據未全成立）"))
             else:
                 out += [Finding("V21", p, err) for err in _rewrite_receipt_errors(ctx, e)]
     return out
