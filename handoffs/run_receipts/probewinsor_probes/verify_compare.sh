@@ -10,7 +10,8 @@ PY="${R}/venv/bin/python"
 C="${R}/handoffs/run_receipts/probewinsor_probes/affected_compare.py"
 RU="${R}/handoffs/run_receipts/probewinsor_probes/out/ratiounsafe_ppoff_fixed.json"
 AT="${R}/handoffs/run_receipts/probewinsor_probes/affected_attribution.json"
-mkdir -p "${TMP}"
+# 每次執行用新建之子目錄（r3 CODEX-R3-P1-01：重用同目錄時舊收據會讓「本次未寫收據」之變體假綠）
+mkdir -p "${TMP}" && RUN="$(mktemp -d "${TMP}/run.XXXXXX")" || { echo "建暫存子目錄失敗"; exit 2; }
 fails=0
 check() {  # check <案名> <實得 rc> <預期 rc> [<jq 條件> <收據>]
   local name="$1" got="$2" want="$3"
@@ -23,17 +24,17 @@ check() {  # check <案名> <實得 rc> <預期 rc> [<jq 條件> <收據>]
   echo "OK   ${name}：rc=${got}"
 }
 cd "${R}" || exit 2
-echo '{"tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version": {}}' > "${TMP}/attr_empty.json"
-jq '.equal = false | .arms.on.equal = false | .arms.on.diff_keys = ["columns"]' "${RU}" > "${TMP}/ru_bad.json"
+echo '{"tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version": {}}' > "${RUN}/attr_empty.json"
+jq '.equal = false | .arms.on.equal = false | .arms.on.diff_keys = ["columns"]' "${RU}" > "${RUN}/ru_bad.json"
 
-"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${RU}" --attribution "${AT}" --receipt "${TMP}/rc_ok.json" > /dev/null 2>&1
-check "真實輸入" "$?" 0 '.pass == true and .attribution_errors == [] and .ratiounsafe_errors == []' "${TMP}/rc_ok.json"
-"${PY}" "${C}" "${OUT}" anchor fixed --attribution "${AT}" --receipt "${TMP}/rc_nru.json" > /dev/null 2>&1
+"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${RU}" --attribution "${AT}" --receipt "${RUN}/rc_ok.json" > /dev/null 2>&1
+check "真實輸入" "$?" 0 '.pass == true and .attribution_errors == [] and .ratiounsafe_errors == []' "${RUN}/rc_ok.json"
+"${PY}" "${C}" "${OUT}" anchor fixed --attribution "${AT}" --receipt "${RUN}/rc_nru.json" > /dev/null 2>&1
 check "缺 --ratiounsafe" "$?" 2
-"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${RU}" --attribution "${TMP}/attr_empty.json" --receipt "${TMP}/rc_empty.json" > /dev/null 2>&1
-check "空歸因" "$?" 1 '.pass == false and (.attribution_errors | length) > 0' "${TMP}/rc_empty.json"
-"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${TMP}/ru_bad.json" --attribution "${AT}" --receipt "${TMP}/rc_rubad.json" > /dev/null 2>&1
-check "RATIOUNSAFE 不等" "$?" 1 '.pass == false and (.ratiounsafe_errors | length) > 0' "${TMP}/rc_rubad.json"
+"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${RU}" --attribution "${RUN}/attr_empty.json" --receipt "${RUN}/rc_empty.json" > /dev/null 2>&1
+check "空歸因" "$?" 1 '.pass == false and (.attribution_errors | length) > 0' "${RUN}/rc_empty.json"
+"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${RUN}/ru_bad.json" --attribution "${AT}" --receipt "${RUN}/rc_rubad.json" > /dev/null 2>&1
+check "RATIOUNSAFE 不等" "$?" 1 '.pass == false and (.ratiounsafe_errors | length) > 0' "${RUN}/rc_rubad.json"
 
 [ "${fails}" -eq 0 ] || { echo "verify_compare：${fails} 案不符"; exit 1; }
 echo "verify_compare：4 案皆符"
