@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 44,
+  "version": 45,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -125,12 +125,13 @@
         "approval_ref 存在於 repo 工作目錄，且其內文同時含 target_nodeid 與 first_bad_commit 之前 8 碼（裁定之交叉引用）",
         "defect_lines 恰一項，＝目標於 head 之某斷言元素（assertion_nodes 依 inline_rule 展開）之 provenance（file:line），且該元素位於目標函式本體（目標所在測試檔、函式行範圍內；不得為 helper 或 fixture 內之斷言），由 validate 重算比對",
         "target_session_id 所指 session 之 head＝收據 head、diff_digest＝head 乾淨樹（無補丁）之值；其中目標紀錄 outcome∈{failed,error}、phase_failed＝call，且 fail_frames 含落在 defect_lines 元素所屬斷言敘述行範圍（lineno..end_lineno）之 frame",
-        "first_bad_commit 為收據 head 之祖先或相同；good_commit＝first_bad_commit 之第一親代（git rev-parse <first_bad_commit>^1）；good_session_id 所指 session 之 head＝good_commit、diff_digest＝good_commit 乾淨樹之值，其中目標全為 passed；bad_session_id 所指 session 之 head＝first_bad_commit、diff_digest＝first_bad_commit 乾淨樹之值，其中目標紀錄 outcome∈{failed,error} 且 phase_failed＝call",
+        "first_bad_commit 為收據 head 之祖先或相同；good_commit＝first_bad_commit 之第一親代（git rev-parse <first_bad_commit>^1）；good_session_id 所指 session 之 head＝good_commit、diff_digest＝good_commit 乾淨樹之值，其中目標全為 passed；bad_session_id 所指 session 之 head＝first_bad_commit、diff_digest＝first_bad_commit 乾淨樹之值，其中目標紀錄 outcome∈{failed,error} 且 phase_failed＝call，且（v45）其 fail_frames 含落在 first_bad_commit 版目標中與 defect_lines 元素同正規化鍵之斷言敘述行範圍之 frame（行號可位移、鍵須相同）",
         "compare_patch_path 之 sha256＝compare_patch_sha256；patch 所及之檔恰為目標所在測試檔；套於 head 後目標函式之 ast.dump（include_attributes=False）等於受驗之樹中同 nodeid 函式者",
-        "只准改過期期望值字面：改寫後函式（head＋compare_patch 之樹）與目標（head）之 AST 逐節點同構（節點型別與欄位相同、子節點數相同），唯一允許之差異為 ast.Constant 之 value，且差異節點須位於 defect_lines 元素所屬敘述之行範圍內；至少一處差異",
+        "只准改過期期望值字面：改寫後函式（head＋compare_patch 之樹）與目標（head）之 AST 逐節點同構（節點型別與欄位相同、子節點數相同），唯一允許之差異為 ast.Constant 之 value，且（v45）差異之 Constant 須全在缺陷斷言之期望值字面子樹內——缺陷斷言為 assert X == L 或 assert L == X（單一 Eq，且恰一側為純字面：Constant、正負號常數、其 tuple／list／set、鍵值皆純字面之 dict）時為該純字面側；為 pytest.raises(…, match=L) 時為 match 之純字面；其他形態（含非 Eq 比較、容差、無純字面側）不適用本收據；至少一處差異",
         "compare_baseline_session_id 所指 session 之 head＝收據 head、diff_digest＝head 乾淨樹套 compare_patch 後之值，且其中目標函式（函式層，參數化取全部案例）全為 passed",
         "mutants 至少一項（形同 types.mutant_item，其 target_* 欄指改寫後函式，compare_outcomes 鍵集合＝{target_nodeid}）；每項 patch 只改 production_roots；session_id 與 compare_session_id 皆為 head＋compare_patch＋該補丁之 session（二者須相等）；對改寫後函式之每一斷言元素之位置 P，至少一個 mutant 之 target_outcome∈{failed,error} 且 target_fail_loc 落在 P 所屬敘述行範圍，殺點計入條件同 receipts.mutation.rule 之 phase 與 frame 規定",
-        "全部 session（target、good、bad、compare_baseline 與 mutants 之各 session）之 duration_class 相同且＝fingerprint；任一 session 不在本機 ledger ⇒ unverifiable、rc≠0"
+        "全部 session（target、good、bad、compare_baseline 與 mutants 之各 session）之 duration_class 相同且＝fingerprint；任一 session 不在本機 ledger ⇒ unverifiable、rc≠0",
+        "（v45）diff_digest 之重算（本收據與 receipts.mutation、receipts.literal_fix 共用）：補丁皆只修改既有檔時得以暫存 index 為之（read-tree＋apply --cached＋diff --cached --binary，結果須與乾淨 worktree 套補丁後依記錄器公式之值逐位元相同）；補丁含新增、刪除、改名或複製之檔時以乾淨 worktree 為之"
       ]
     },
     "literal_fix": {

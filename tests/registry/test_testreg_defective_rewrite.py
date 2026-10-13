@@ -92,7 +92,26 @@ def test_other():
 
 def _check_scale():
     assert scale(1) == 2
+
+
+def test_tol():
+    assert abs(scale(1) - 2) < 1e-9
+
+
+def test_mixed():
+    assert values(3) == [0, 2, 4]
+    assert scale(1) == 2
 '''
+# v46：首個壞提交之後、head 之前另有一提交——檔首加一行（全檔行號位移＋1）並修正 test_mixed 之 values 期望值
+# ⇒ test_mixed 於 first_bad 失敗在 values 斷言、於 head 失敗在 scale 斷言（同鍵綁定之反例）；其餘目標行號位移而同鍵
+MIXED_FIX_OLD = "def test_mixed():\n    assert values(3) == [0, 2, 4]\n"
+MIXED_FIX_NEW = "def test_mixed():\n    assert values(3) == [0, 3, 6]\n"
+DUP_INPUT_OLD = "    assert scale(1) == 2\n    assert add(1, 1) == 2\n"
+DUP_INPUT_NEW = "    assert scale(2) == 6\n    assert add(1, 1) == 2\n"  # 改輸入常數（非期望值）
+TOL_OLD, TOL_NEW = "    assert abs(scale(1) - 2) < 1e-9\n", "    assert abs(scale(1) - 2) < 10\n"  # 放寬容差
+MIXED_OLD = "def test_mixed():\n    assert values(3) == [0, 3, 6]\n    assert scale(1) == 2\n"
+MIXED_NEW = "def test_mixed():\n    assert values(3) == [0, 3, 6]\n    assert scale(1) == 3\n"
+# 註：HOLLOW_OLD（`values(3) == [0, 2, 4]`）於 head 只剩 test_hollow 一處（test_mixed 已於位移提交改為 [0, 3, 6]）
 RED_OLD = "    assert scale(x) == 2\n"
 RED_NEW = "    assert scale(x) == 3\n"
 HOLLOW_OLD = "    assert values(3) == [0, 2, 4]\n"
@@ -114,7 +133,8 @@ MUTANTS = {  # 名稱: (calc.py〔首個壞提交後〕舊片段, 新片段)
     "m_noop": ("def validate_input(x):\n", "# noop\ndef validate_input(x):\n"),
     "m_testfile": None,  # 改測試檔之 mutant（反例用）
 }
-NID = {n: f"{DF}::{n}" for n in ("test_red", "test_hollow", "test_vac", "test_dup", "test_helper_red", "test_other")}
+NID = {n: f"{DF}::{n}" for n in ("test_red", "test_hollow", "test_vac", "test_dup", "test_helper_red", "test_other",
+                                  "test_tol", "test_mixed")}
 
 
 def receipt_rel(nodeid: str) -> str:
@@ -153,15 +173,18 @@ def dr_base(tmp_path_factory) -> Dict[str, Any]:
     good = r.head()
     r.write("momentum/calc.py", CALC_BAD)  # 行為改變 ⇒ test_red、test_hollow、test_dup、test_helper_red 之期望值過期
     bad = r.commit("scale x3, values i*3")
+    r.write(DF, "# shift\n" + r.read(DF).replace(MIXED_FIX_OLD, MIXED_FIX_NEW, 1))
+    r.commit("shift lines, fix test_mixed values")
     # 裁定檔須交叉引用目標 nodeid 與首個壞提交前 8 碼（契約 rule）；另一份不含交叉引用者供反例
     r.write(APPROVAL, f"# approval\n{NID['test_red']} {NID['test_hollow']} {NID['test_dup']} "
-                      f"{NID['test_helper_red']} first bad {bad[:8]}\n")
+                      f"{NID['test_helper_red']} {NID['test_tol']} {NID['test_mixed']} first bad {bad[:8]}\n")
     r.write(APPROVAL_PLAIN, "# approval without cross reference\n")
     sha = {m: _patch_for(r, m) for m in MUTANTS}
     pp = {m: f"handoffs/run_receipts/testreg-mutants/{m}.patch" for m in MUTANTS}
     d = "handoffs/run_receipts/testreg-defective-rewrite"
     cp = {k: f"{d}/{k}.compare.patch" for k in
-          ("red", "hollow", "red_drop_add", "red_bad_expect", "red_setup", "dup", "helper")}
+          ("red", "hollow", "red_drop_add", "red_bad_expect", "red_setup", "dup", "helper", "dup_input", "tol",
+           "mixed")}
     src = r.read(DF)
     csha = {
         "red": write_patch(r, DF, src.replace(RED_OLD, RED_NEW), cp["red"]),
@@ -172,6 +195,9 @@ def dr_base(tmp_path_factory) -> Dict[str, Any]:
         "red_setup": write_patch(r, DF, src.replace(RED_OLD, RED_NEW).replace(SETUP_OLD, SETUP_NEW, 1), cp["red_setup"]),
         "dup": write_patch(r, DF, src.replace(DUP_OLD, DUP_NEW, 1), cp["dup"]),
         "helper": write_patch(r, DF, src.replace(HELPER_OLD, HELPER_NEW, 1), cp["helper"]),
+        "dup_input": write_patch(r, DF, src.replace(DUP_INPUT_OLD, DUP_INPUT_NEW, 1), cp["dup_input"]),
+        "tol": write_patch(r, DF, src.replace(TOL_OLD, TOL_NEW, 1), cp["tol"]),
+        "mixed": write_patch(r, DF, src.replace(MIXED_OLD, MIXED_NEW, 1), cp["mixed"]),
     }
     # 補丁與裁定檔本身為未追蹤檔，會進 diff_digest ⇒ 提交使 HEAD 乾淨，收據 head＝此提交
     head = r.commit("patches")
@@ -196,11 +222,21 @@ def dr_base(tmp_path_factory) -> Dict[str, Any]:
     sess["hollow@head"] = _run_with(r, [], NID["test_hollow"], NID["test_vac"])
     for k in ("red_setup", "dup", "helper"):
         sess[f"{k}@base"] = _run_with(r, [cp[k]], NID["test_red"], NID["test_dup"], NID["test_helper_red"])
+    # v46 新增
+    sess["v46@head"] = _run_with(r, [], NID["test_tol"], NID["test_mixed"], NID["test_dup"])
+    for k in ("dup_input", "tol", "mixed"):
+        sess[f"{k}@base"] = _run_with(r, [cp[k]], NID["test_dup"], NID["test_tol"], NID["test_mixed"])
     # 好壞兩提交之乾淨樹 session（記錄器以 -p 注入；兩提交樹中皆已有該外掛檔）
     for name, rev in (("good", good), ("bad", bad)):
         r.git("checkout", "-q", "--detach", rev)
         try:
             sess[name] = _run_with(r, [], NID["test_red"], NID["test_hollow"])
+        finally:
+            r.git("checkout", "-q", branch)
+    for name, rev in (("good2", good), ("bad2", bad)):  # v46：test_dup、test_tol、test_mixed 之好壞兩提交 session
+        r.git("checkout", "-q", "--detach", rev)
+        try:
+            sess[name] = _run_with(r, [], NID["test_dup"], NID["test_tol"], NID["test_mixed"])
         finally:
             r.git("checkout", "-q", branch)
     # 非 head 祖先之「首個壞提交」：自 good 分出之另一分支提交（第一親代＝good）
@@ -298,6 +334,12 @@ def _apply_rewrite(r: TmpRepo, which: str) -> None:
         r.write(DF, src.replace(HELPER_OLD, HELPER_NEW, 1))
     elif which == "vac":
         r.write(DF, src.replace(VAC_OLD, VAC_NEW, 1))
+    elif which == "dup_input":
+        r.write(DF, src.replace(DUP_INPUT_OLD, DUP_INPUT_NEW, 1))
+    elif which == "tol":
+        r.write(DF, src.replace(TOL_OLD, TOL_NEW, 1))
+    elif which == "mixed":
+        r.write(DF, src.replace(MIXED_OLD, MIXED_NEW, 1))
     else:
         raise AssertionError(which)
 
@@ -609,3 +651,110 @@ def test_v45_named_seam_none_without_receipt_and_empty_when_valid(dr_base, tmp_p
     assert testreg.defective_rewrite_errors(testreg.build_context(r.root), NID["test_red"]) == []
     r.write_json(receipt_rel(NID["test_red"]), _red_neg(dr_base, "approval_no_crossref"))
     assert testreg.defective_rewrite_errors(testreg.build_context(r.root), NID["test_red"])
+
+
+# ── v46 新增（修訂審查 r44 處置）──────────────────────────────────────────────────────────────────────────────────
+
+def _v46_receipt(fx, target: str, needle: str, compare: str, nth: int = 0) -> Dict[str, Any]:
+    """test_dup／test_tol／test_mixed 之收據：好壞兩提交 session 取 good2／bad2、head 取 v46@head、mutant 紀錄取
+    該補丁之 baseline session（只供反例）。"""
+    rc = _receipt(fx, target, needle, compare, ("m_scale",), "v46@head", nth, mut_sess=f"{compare}@base")
+    rc["good_session_id"], rc["bad_session_id"] = fx["sess"]["good2"], fx["sess"]["bad2"]
+    rc["fingerprint"] = _fingerprint(fx, rc)
+    return rc
+
+
+def test_v46_input_literal_change_blocks(dr_base, tmp_path):
+    """改輸入常數（`scale(1) == 2` → `scale(2) == 6`）：期望值以外之常數改變 ⇒ 擋下（只准改期望值字面）。"""
+    rc = _v46_receipt(dr_base, "test_dup", "assert scale(1) == 2", "dup_input")
+    _blocked_with(dr_base, tmp_path, "input", "dup_input", "test_dup", rc, "期望值字面")
+
+
+def test_v46_tolerance_change_blocks(dr_base, tmp_path):
+    """放寬容差（`< 1e-9` → `< 10`）：非單一 == 比較 ⇒ 不適用本收據、擋下。"""
+    rc = _v46_receipt(dr_base, "test_tol", "assert abs(scale(1) - 2) < 1e-9", "tol")
+    _blocked_with(dr_base, tmp_path, "tol", "tol", "test_tol", rc, "期望值字面")
+
+
+def test_v46_first_bad_fails_at_other_assertion_blocks(dr_base, tmp_path):
+    """test_mixed 於 first_bad 失敗在 values 斷言、於 head 失敗在 scale 斷言 ⇒ bad session 之失敗位置不在與缺陷同鍵
+    之斷言、擋下。"""
+    rc = _v46_receipt(dr_base, "test_mixed", "assert scale(1) == 2", "mixed", 2)  # 第 3 處（test_dup、_check_scale 之後）
+    _blocked_with(dr_base, tmp_path, "mixed", "mixed", "test_mixed", rc, "同鍵")
+
+
+def test_v46_line_shift_same_key_receipt_valid(dr_base, tmp_path):
+    """first_bad 與 head 之間另有提交使全檔行號位移：缺陷斷言於 head 之行號 ≠ 於 first_bad 之失敗行號，而同鍵 ⇒ 收據
+    成立（具名縫回 []）。"""
+    r = _work(dr_base, tmp_path, "shift")
+    _apply_rewrite(r, "red")
+    rc = red_receipt(dr_base)
+    bad_rec = test_records(dr_base["repo"], dr_base["sess"]["bad"])[NID["test_red"]]
+    head_line = int(rc["defect_lines"][0].rsplit(":", 1)[1])
+    assert all(int(f.rsplit(":", 1)[1]) != head_line for f in bad_rec["fail_frames"] if f.startswith(DF))
+    r.write_json(receipt_rel(NID["test_red"]), rc)
+    assert testreg.defective_rewrite_errors(testreg.build_context(r.root), NID["test_red"]) == []
+
+
+def _real_scale_worktree(tmp_path: Path) -> Path:
+    """真實規模：本 repo HEAD 之暫存 worktree（全量檔案），供 digest 兩法比對；呼叫端負責移除。"""
+    import subprocess as _sp
+    wt = tmp_path / "realwt"
+    _sp.run(["git", "-C", str(REPO), "worktree", "add", "-q", "--detach", str(wt), "HEAD"], check=True,
+            capture_output=True)
+    return wt
+
+
+def test_v46_digest_index_equals_worktree_real_scale(tmp_path, monkeypatch):
+    """`_digest_with` 之暫存 index 法與暫存 worktree 法於真實規模逐位元相等（改測試檔、改生產檔、兩者疊加、新增檔），
+    且 index 法 7 組（不同補丁組合）合計 < 3 s；`_PatchedTree` 兩法讀出相同。mutant：index 法漏 `--binary` 或
+    改用 worktree 之相對路徑即與 worktree 法不等。"""
+    import subprocess as _sp
+    wt = _real_scale_worktree(tmp_path)
+    try:
+        def mk(rel: str, needle: str, add: str, name: str, new_file: bool = False) -> str:
+            pdir = wt / "handoffs/run_receipts/testreg-digest-probe"
+            pdir.mkdir(parents=True, exist_ok=True)
+            p = wt / rel
+            if new_file:
+                p.write_text(add, encoding="utf-8")
+                _sp.run(["git", "-C", str(wt), "add", "-N", rel], check=True)
+            else:
+                old = p.read_text(encoding="utf-8")
+                p.write_text(old.replace(needle, needle + add, 1), encoding="utf-8")
+            text = _sp.run(["git", "-C", str(wt), "diff", "--binary"], check=True, capture_output=True,
+                           text=True).stdout
+            _sp.run(["git", "-C", str(wt), "reset", "-q"], check=True)
+            _sp.run(["git", "-C", str(wt), "checkout", "-q", "--", "."], check=True)
+            if new_file:
+                p.unlink()
+            out = pdir / f"{name}.patch"
+            out.write_text(text, encoding="utf-8")
+            return str(out.relative_to(wt))
+
+        a = mk("tests/registry/test_testreg_markers.py", "\n", "# probe a\n", "a")
+        b = mk("momentum/FeatureEngineering/feature_naming.py", "\n", "# probe b\n", "b")
+        c = mk("tests/zz_digest_probe.txt", "", "new\n", "c", new_file=True)
+        combos = [[a], [b], [a, b], [b, a], [c], [a, c], []]
+        head = _sp.run(["git", "-C", str(wt), "rev-parse", "HEAD"], check=True, capture_output=True,
+                       text=True).stdout.strip()
+        ctx = testreg.build_context(wt)
+        modify_only = [cmb for cmb in combos if c not in cmb]  # 只修改既有檔 ⇒ 走 index 法
+        t0 = time.perf_counter()
+        quick = [testreg._digest_with(ctx, head, cmb) for cmb in modify_only]
+        elapsed = time.perf_counter() - t0
+        fast = [testreg._digest_with(ctx, head, cmb) for cmb in combos]  # 含新增檔者退回 worktree 法（快取已含前者）
+        monkeypatch.setattr(testreg, "_STRUCTURAL_PATCH", __import__("re").compile(r"(?s).*"))  # 強制 worktree 法
+        ctx2 = testreg.build_context(wt)
+        slow = [testreg._digest_with(ctx2, head, cmb) for cmb in combos]
+        assert fast == slow
+        assert quick == [d for d, cmb in zip(fast, combos) if c not in cmb]
+        assert len(set(fast)) == len({tuple(sorted(x)) for x in combos})  # 不同補丁集合 ⇒ 不同 digest
+        assert elapsed < 3.0, elapsed  # index 法 5 組合計（worktree 法單組約 3.6 s）
+        monkeypatch.undo()
+        pa = testreg._PatchedTree(testreg.build_context(wt), head, a).read("tests/registry/test_testreg_markers.py")
+        monkeypatch.setattr(testreg, "_STRUCTURAL_PATCH", __import__("re").compile(r"(?s).*"))
+        pb = testreg._PatchedTree(testreg.build_context(wt), head, a).read("tests/registry/test_testreg_markers.py")
+        assert pa == pb and pa is not None and "# probe a" in pa
+    finally:
+        _sp.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(wt)], capture_output=True)
