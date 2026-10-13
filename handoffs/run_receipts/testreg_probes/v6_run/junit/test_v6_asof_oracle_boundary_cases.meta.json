@@ -1,0 +1,1 @@
+{"state_key": "2d674e1886038a52dd4f6ed1a22356cf7a784ce5237336a33d1670c35d44e60d|tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases", "rc": 0, "file": "tests/feature_engineering/test_failopen_correctness.py", "seconds": 3.5, "ledger_new": ["e6de1fa2-ade7-4c4b-a1de-9338181614be.jsonl"]}

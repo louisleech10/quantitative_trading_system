@@ -1,0 +1,14 @@
+cmd: /Users/louis/Desktop/quantitative_trading_system/venv/bin/python /Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/testreg_probes/v6_prof_site/v6_prof_core.py /Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/testreg_probes/v6_run/profile/test_v6_close_time_oracle_matches_pipeline_True_.parts -- -q -p no:cacheprovider -o log_cli=false --log-level=WARNING --tb=short tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/feature_engineering/test_failopen_correctness.py .                 [100%]
+
+======================== 1 passed in 6105.02s (1:41:45) ========================
+rc=0 complete=True elapsed=6110.3s parts=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/testreg_probes/v6_run/profile/test_v6_close_time_oracle_matches_pipeline_True_.parts
+prof_rc=0

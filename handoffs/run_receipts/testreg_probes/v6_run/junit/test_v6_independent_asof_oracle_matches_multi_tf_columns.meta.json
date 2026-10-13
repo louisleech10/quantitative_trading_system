@@ -1,0 +1,1 @@
+{"state_key": "2d674e1886038a52dd4f6ed1a22356cf7a784ce5237336a33d1670c35d44e60d|tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns", "rc": 0, "file": "tests/feature_engineering/test_failopen_correctness.py", "seconds": 5813.6, "ledger_new": ["1dc6fb2e-f7f1-45d3-bf3b-ada4bc4c56e9.jsonl"]}

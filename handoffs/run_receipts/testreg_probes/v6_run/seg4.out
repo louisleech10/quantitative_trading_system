@@ -1,0 +1,7 @@
+tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns: skip-done（5813.6s）
+tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases: skip-done（3.5s）
+tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[False]: skip-done（5787.0s）
+tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[True]: skip-done（5855.7s）
+tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[False]: rc=0 outcome=passed
+PAUSED（本段已用 5953 秒 ≥ 120.0）；同命令接續
+seg_rc=3

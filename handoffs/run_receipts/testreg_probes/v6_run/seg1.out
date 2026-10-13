@@ -1,0 +1,3 @@
+tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns: rc=0 outcome=passed
+PAUSED（本段已用 5814 秒 ≥ 1.0）；同命令接續
+seg_rc=3

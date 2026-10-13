@@ -1,0 +1,13 @@
+V19 tests/registry/test_testreg_gate_wiring.py::test_02_expired_quarantine_still_blocks: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_02_valid_quarantine_absorbs_matching_caused: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04c_current_failures_only_from_new_session_matching_argv: 斷言多重集合減少 3 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04c_no_matching_new_session_never_quarantined: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04d_orchestration_absorbs_only_matching_new_failure: 斷言多重集合減少 2 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04d_orchestration_moved_failure_blocks: 斷言多重集合減少 2 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04e_anchor_call_does_not_overwrite_snapshot: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04f_other_failure_inputs_never_absorbed: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04f_quarantined_verdict_is_the_verdict_path: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_04i_gate_main_end_to_end_verdict: 斷言多重集合減少 5 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_06_quarantine_mismatch_blocks: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_boundary_02_quarantine_parametrized_nodeid_matched_at_function_level: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）
+V19 tests/registry/test_testreg_gate_wiring.py::test_mutation_orchestration_ignores_snapshot_absorbs_moved_failure: 斷言多重集合減少 1 項（須同提交立碑或附 rewrite 收據）

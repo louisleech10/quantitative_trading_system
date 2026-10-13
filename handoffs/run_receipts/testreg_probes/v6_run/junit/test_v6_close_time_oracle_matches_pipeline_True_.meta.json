@@ -1,0 +1,1 @@
+{"state_key": "922f978a9979464469f5f74b316ac222444d2dd54219448213f20f41705fcaad|tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]", "rc": 0, "file": "tests/feature_engineering/test_failopen_correctness.py", "seconds": 6001.6, "ledger_new": ["48fe7e4b-b7c9-406c-9125-4b26cca40113.jsonl"]}
