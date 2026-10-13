@@ -1,0 +1,3 @@
+tests/feature_engineering/test_failopen_consumer.py	disposition	rewrite	輕量掃描實證 2 支既有紅（20261013-light-sweep.tsv；HANDOFF 坑記 ICFIRSTALIGN 期 HEAD 紅）；codex、grok 判 rewrite，主委與 composer 漏列
+tests/feature_engineering/test_ffstat_all_tested.py	disposition	rewrite	主委實跑確認 test_untested_column_marked_and_not_counted_as_tested 紅（'unknown' 週期同因，20261013-g1-suspected.tsv）；grok 判 rewrite
+tests/feature_engineering/test_ffstat_all_tested.py	add_targets	tests/feature_engineering/test_ffstat_all_tested.py::test_untested_column_marked_and_not_counted_as_tested	同上；三版 keep 未列此目標
