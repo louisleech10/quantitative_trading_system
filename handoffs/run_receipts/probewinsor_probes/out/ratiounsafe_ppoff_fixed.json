@@ -1,0 +1,16 @@
+{
+ "compare": "freeze_ratiounsafe_baseline.s1_record(arm, False) vs tests/_golden/ratiounsafe/baseline.json#s1_<arm>_preprocessing_disabled",
+ "arms": {
+  "off": {
+   "equal": true,
+   "diff_keys": [],
+   "seconds": 18.3
+  },
+  "on": {
+   "equal": true,
+   "diff_keys": [],
+   "seconds": 13.1
+  }
+ },
+ "equal": true
+}

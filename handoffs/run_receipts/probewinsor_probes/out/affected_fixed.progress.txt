@@ -1,0 +1,38 @@
+label=fixed head=55585abdf5521bca0252291c1e4f296dea7154ea start=1791869493
+1/35 tests/api/test_batch_alias.py rc=0 seconds=4  17 passed in 0.85s 
+2/35 tests/feature_engineering/test_batch1_followup.py rc=1 seconds=81  5 failed, 15 passed in 77.98s (0:01:17) 
+3/35 tests/feature_engineering/test_cgsa_disk_precheck.py rc=0 seconds=3  10 passed in 0.38s 
+4/35 tests/feature_engineering/test_failopen_correctness.py rc=0 seconds=4251  11 passed, 6 deselected in 4247.89s (1:10:47) 
+5/35 tests/feature_engineering/test_failopen_manifest.py rc=0 seconds=222  52 passed in 217.97s (0:03:37) 
+6/35 tests/feature_engineering/test_failopen_matrix.py rc=1 seconds=1214  3 failed, 3 passed in 1210.55s (0:20:10) 
+7/35 tests/feature_engineering/test_failopen_producer.py rc=0 seconds=212  19 passed in 208.73s (0:03:28) 
+8/35 tests/feature_engineering/test_failopen_winsor.py rc=0 seconds=4  6 passed in 0.46s 
+9/35 tests/feature_engineering/test_icfirstalign_l3_arms.py rc=0 seconds=12  8 passed in 9.81s 
+10/35 tests/feature_engineering/test_mtf_align_golden.py rc=0 seconds=4  3 passed in 0.77s 
+11/35 tests/feature_engineering/test_tf_aligner.py rc=1 seconds=2  1 failed, 4 passed in 0.51s 
+12/35 tests/momentum/test_feature_factory_optimization_e2e.py rc=0 seconds=20  7 passed in 18.05s 
+13/35 tests/momentum/test_feature_factory_optimization_perf.py rc=0 seconds=18  5 passed in 15.36s 
+14/35 tests/test_cgsa_resume.py rc=1 seconds=71  1 failed, 26 passed in 68.44s (0:01:08) 
+15/35 tests/test_feature_factory_batch2d.py rc=0 seconds=4  3 passed, 1 warning in 0.59s 
+16/35 tests/test_l65_parallel.py rc=0 seconds=4  18 passed in 1.04s 
+17/35 tests/test_preview_feature_count.py rc=0 seconds=10  52 passed in 8.13s 
+18/35 tests/feature_engineering/preprocessing/test_causal_winsor.py rc=1 seconds=4  2 failed, 4 passed in 0.86s 
+19/35 tests/feature_engineering/test_b6_warmup_trim.py rc=0 seconds=15  11 passed, 14 warnings in 12.02s 
+20/35 tests/feature_engineering/test_failopen_contract.py rc=0 seconds=23  17 passed in 20.70s 
+21/35 tests/feature_engineering/test_ffstat_calibration.py rc=0 seconds=6181  74 passed, 4239 warnings in 6177.11s (1:42:57) 
+22/35 tests/feature_engineering/test_ffstat_stable_start.py rc=1 seconds=7135  1 failed, 89 passed, 26140 warnings in 4867.62s (1:21:07) 
+paused at=23 t=1791889184
+23/35 tests/feature_engineering/test_icfirstalign_icfirst.py rc=0 seconds=154  34 passed, 116 warnings in 149.90s (0:02:29) 
+24/35 tests/feature_engineering/test_l65_raw_metadata.py rc=0 seconds=4  1 passed in 0.28s 
+25/35 tests/feature_library/test_phase1.py rc=0 seconds=3  14 passed in 0.31s 
+26/35 tests/feature_library/test_phase4.py rc=0 seconds=5  14 passed in 2.22s 
+27/35 tests/test_feature_factory_config.py rc=0 seconds=4  22 passed in 1.43s 
+28/35 tests/test_feature_factory_mcp.py rc=0 seconds=312  8 passed in 309.04s (0:05:09) 
+29/35 tests/test_phase_b_granular_control.py rc=0 seconds=13  40 passed in 9.35s 
+30/35 tests/test_phase_d_granular_control.py rc=0 seconds=8  23 passed in 5.20s 
+31/35 tests/feature_engineering/test_ratiounsafe_registry.py rc=0 seconds=173  39 passed in 170.07s (0:02:50) 
+32/35 tests/api/test_feature_factory_batch_resume.py rc=0 seconds=10  17 passed, 1 warning in 5.12s 
+33/35 tests/api/test_batch_retention.py rc=0 seconds=14  39 passed in 11.72s 
+34/35 tests/api/test_batch_date.py rc=0 seconds=10  9 passed in 5.59s 
+35/35 tests/api/test_run_lifecycle_api.py rc=1 seconds=4  2 failed, 16 passed in 1.40s 
+done end=1791889911

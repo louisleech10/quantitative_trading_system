@@ -1,0 +1,761 @@
+{
+ "ticket": "PROBEWINSOR",
+ "task": "1.3",
+ "anchor_head": "af01e2c3dc7ee6b4e88fcbe074cc5bd8238aa98b",
+ "fixed_head": "55585abdf5521bca0252291c1e4f296dea7154ea",
+ "deselect": {
+  "tests/feature_engineering/test_failopen_correctness.py": "not test_v6_"
+ },
+ "anchor_green_fixed_red": [
+  "tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version"
+ ],
+ "anchor_red_head_existing": [
+  "tests/feature_engineering/test_batch1_followup.py::TestGolden::test_golden_default_winsor_matches_public_validator",
+  "tests/feature_engineering/test_batch1_followup.py::TestN3::test_n3_min_periods_prefix_and_l65_deduplication",
+  "tests/feature_engineering/test_batch1_followup.py::TestN3::test_n3_public_validator_default_and_w100_match_baseline",
+  "tests/feature_engineering/test_batch1_followup.py::TestN3::test_n3_window_edges",
+  "tests/feature_engineering/test_batch1_followup.py::test_real_kline_stream_nan_ratio_matches_written_arrays",
+  "tests/feature_engineering/test_failopen_matrix.py::test_matrix_whole_layer_failure_fail_closed",
+  "tests/feature_engineering/test_failopen_matrix.py::test_matrix_whole_layer_failure_partial_status",
+  "tests/feature_engineering/test_failopen_matrix.py::test_v8_frozen_doc_covers_every_existing_assertion_change",
+  "tests/test_cgsa_resume.py::test_cgsa_config_hash_passed_correctly",
+  "tests/feature_engineering/preprocessing/test_causal_winsor.py::test_all_l65_entrypoints_causal",
+  "tests/feature_engineering/preprocessing/test_causal_winsor.py::test_fracdiff_warmup_freeze_no_leak",
+  "tests/feature_engineering/test_ffstat_stable_start.py::test_nan_propagation_inventory_complete",
+  "tests/api/test_run_lifecycle_api.py::test_generate_warmup_delete_lease_chain",
+  "tests/api/test_run_lifecycle_api.py::test_lease_sink_holds_until_release"
+ ],
+ "anchor_red_fixed_green": [],
+ "incomplete": [],
+ "per_file": {
+  "tests/api/test_batch_alias.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 17,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 17,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_batch1_followup.py": {
+   "anchor": {
+    "rc": 1,
+    "seconds": 91,
+    "counts": {
+     "passed": 15,
+     "failed": 5,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 1,
+    "seconds": 81,
+    "counts": {
+     "passed": 15,
+     "failed": 5,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_cgsa_disk_precheck.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 10,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 10,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_failopen_correctness.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 5204,
+    "counts": {
+     "passed": 11,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4251,
+    "counts": {
+     "passed": 11,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_failopen_manifest.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 319,
+    "counts": {
+     "passed": 52,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 222,
+    "counts": {
+     "passed": 52,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_failopen_matrix.py": {
+   "anchor": {
+    "rc": 1,
+    "seconds": 16550,
+    "counts": {
+     "passed": 3,
+     "failed": 3,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 1,
+    "seconds": 1214,
+    "counts": {
+     "passed": 3,
+     "failed": 3,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_failopen_producer.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 212,
+    "counts": {
+     "passed": 19,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 212,
+    "counts": {
+     "passed": 19,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_failopen_winsor.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 6,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 6,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_icfirstalign_l3_arms.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 12,
+    "counts": {
+     "passed": 8,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 12,
+    "counts": {
+     "passed": 8,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_mtf_align_golden.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 3,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 3,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_tf_aligner.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 5,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 1,
+    "seconds": 2,
+    "counts": {
+     "passed": 4,
+     "failed": 1,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/momentum/test_feature_factory_optimization_e2e.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 20,
+    "counts": {
+     "passed": 7,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 20,
+    "counts": {
+     "passed": 7,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/momentum/test_feature_factory_optimization_perf.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 19,
+    "counts": {
+     "passed": 5,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 18,
+    "counts": {
+     "passed": 5,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_cgsa_resume.py": {
+   "anchor": {
+    "rc": 1,
+    "seconds": 70,
+    "counts": {
+     "passed": 26,
+     "failed": 1,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 1,
+    "seconds": 71,
+    "counts": {
+     "passed": 26,
+     "failed": 1,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_feature_factory_batch2d.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 3,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 3,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_l65_parallel.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 18,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 18,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_preview_feature_count.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 12,
+    "counts": {
+     "passed": 52,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 10,
+    "counts": {
+     "passed": 52,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/preprocessing/test_causal_winsor.py": {
+   "anchor": {
+    "rc": 1,
+    "seconds": 4,
+    "counts": {
+     "passed": 4,
+     "failed": 2,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 1,
+    "seconds": 4,
+    "counts": {
+     "passed": 4,
+     "failed": 2,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_b6_warmup_trim.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 14,
+    "counts": {
+     "passed": 11,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 15,
+    "counts": {
+     "passed": 11,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_failopen_contract.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 24,
+    "counts": {
+     "passed": 17,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 23,
+    "counts": {
+     "passed": 17,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_ffstat_calibration.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 6091,
+    "counts": {
+     "passed": 74,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 6181,
+    "counts": {
+     "passed": 74,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_ffstat_stable_start.py": {
+   "anchor": {
+    "rc": 1,
+    "seconds": 4498,
+    "counts": {
+     "passed": 89,
+     "failed": 1,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 1,
+    "seconds": 7135,
+    "counts": {
+     "passed": 89,
+     "failed": 1,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_icfirstalign_icfirst.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 143,
+    "counts": {
+     "passed": 34,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 154,
+    "counts": {
+     "passed": 34,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_l65_raw_metadata.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 1,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 1,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_library/test_phase1.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 14,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 14,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_library/test_phase4.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 5,
+    "counts": {
+     "passed": 14,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 5,
+    "counts": {
+     "passed": 14,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_feature_factory_config.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 3,
+    "counts": {
+     "passed": 22,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 4,
+    "counts": {
+     "passed": 22,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_feature_factory_mcp.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 307,
+    "counts": {
+     "passed": 8,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 312,
+    "counts": {
+     "passed": 8,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_phase_b_granular_control.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 12,
+    "counts": {
+     "passed": 40,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 13,
+    "counts": {
+     "passed": 40,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/test_phase_d_granular_control.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 7,
+    "counts": {
+     "passed": 23,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 8,
+    "counts": {
+     "passed": 23,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/feature_engineering/test_ratiounsafe_registry.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 171,
+    "counts": {
+     "passed": 39,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 173,
+    "counts": {
+     "passed": 39,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/api/test_feature_factory_batch_resume.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 8,
+    "counts": {
+     "passed": 17,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 10,
+    "counts": {
+     "passed": 17,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/api/test_batch_retention.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 14,
+    "counts": {
+     "passed": 39,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 14,
+    "counts": {
+     "passed": 39,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/api/test_batch_date.py": {
+   "anchor": {
+    "rc": 0,
+    "seconds": 8,
+    "counts": {
+     "passed": 9,
+     "failed": 0,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 0,
+    "seconds": 10,
+    "counts": {
+     "passed": 9,
+     "failed": 0,
+     "skipped": 0
+    }
+   }
+  },
+  "tests/api/test_run_lifecycle_api.py": {
+   "anchor": {
+    "rc": 1,
+    "seconds": 4,
+    "counts": {
+     "passed": 16,
+     "failed": 2,
+     "skipped": 0
+    }
+   },
+   "fixed": {
+    "rc": 1,
+    "seconds": 4,
+    "counts": {
+     "passed": 16,
+     "failed": 2,
+     "skipped": 0
+    }
+   }
+  }
+ },
+ "ratiounsafe": {
+  "compare": "freeze_ratiounsafe_baseline.s1_record(arm, False) vs tests/_golden/ratiounsafe/baseline.json#s1_<arm>_preprocessing_disabled",
+  "arms": {
+   "off": {
+    "equal": true,
+    "diff_keys": [],
+    "seconds": 18.3
+   },
+   "on": {
+    "equal": true,
+    "diff_keys": [],
+    "seconds": 13.1
+   }
+  },
+  "equal": true
+ },
+ "attribution": {
+  "tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version": {
+   "cause": "測試之 config 替身（SimpleNamespace 只帶 model_dump）無 preprocessing；Task 1.2 之 _probe_gate_salt 依 SPEC 邊界 07 經 l65_enabled 缺鍵即拋 ValueError（刻意 fail-closed），致 _compute_config_hash 於修正後拋錯。真實 FactoryConfig 必有 preprocessing（預設 enabled=True），生產路徑不受影響。",
+   "disposition": "替身補 preprocessing=SimpleNamespace(enabled=True, winsorization=SimpleNamespace(enabled=True)) 一行（總開關開 ⇒ 不加鹽、雜湊與改前同），不改斷言；SPEC v10 §P Task 1.3 邊界③、manifest forbidden[0] 同步；提交 e9543e64；待 b1 審碼核可。",
+   "rerun_after_disposition": {
+    "head": "e9543e64ec11d806c6788d412cf2ba3567805a51",
+    "command": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_tf_aligner.py",
+    "result": "5 passed"
+   }
+  }
+ },
+ "unattributed": [],
+ "pass": true
+}
