@@ -1,0 +1,76 @@
+path	rc	seconds	summary	failed_nodeids
+tests/feature_engineering/preprocessing/test_cache_version_invalid.py	0	4	============================== 2 passed in 0.32s ===============================	-
+tests/feature_engineering/preprocessing/test_causal_pin_force.py	0	4	============================== 6 passed in 0.56s ===============================	-
+tests/feature_engineering/preprocessing/test_causal_winsor.py	1	4	========================= 2 failed, 4 passed in 0.99s ==========================	[100%],tests/feature_engineering/preprocessing/test_causal_winsor.py::test_fracdiff_warmup_freeze_no_leak,tests/feature_engineering/preprocessing/test_causal_winsor.py::test_all_l65_entrypoints_causal
+tests/feature_engineering/preprocessing/test_d_star_atomic_write.py	0	4	============================== 1 passed in 0.34s ===============================	-
+tests/feature_engineering/preprocessing/test_d_star_col_fingerprint.py	0	3	============================== 12 passed in 0.32s ==============================	-
+tests/feature_engineering/preprocessing/test_d_star_isolation.py	0	3	============================== 2 passed in 0.29s ===============================	-
+tests/feature_engineering/preprocessing/test_d_star_legacy_migration_audit.py	0	3	============================== 2 passed in 0.31s ===============================	-
+tests/feature_engineering/preprocessing/test_d_star_stale_invalidation.py	0	3	============================== 2 passed in 0.30s ===============================	-
+tests/feature_engineering/preprocessing/test_fast_adf_synthetic.py	1	5	========================= 1 failed, 5 passed in 0.64s ==========================	tests/feature_engineering/preprocessing/test_fast_adf_synthetic.py::test_feature_preprocessor_uses_fast_adf_when_enabled
+tests/feature_engineering/preprocessing/test_hurst_prior.py	0	3	============================== 5 passed in 0.33s ===============================	-
+tests/feature_engineering/preprocessing/test_l65_native_tf.py	0	4	============================== 6 passed in 0.97s ===============================	-
+tests/feature_engineering/preprocessing/test_l65_phase0_gate.py	1	4	========================= 1 failed, 1 warning in 0.60s =========================	[100%],scripts.benchmark_l65:benchmark_l65.py:1123,tests/feature_engineering/preprocessing/test_l65_phase0_gate.py::test_l65_phase0_gate_command_smoke
+tests/feature_engineering/preprocessing/test_layer_filter.py	1	4	============================== 4 failed in 0.52s ===============================	tests/feature_engineering/preprocessing/test_layer_filter.py::test_layer_filter_optimized_profile_processes_only_l1_l2,tests/feature_engineering/preprocessing/test_layer_filter.py::test_layer_filter_legacy_profile_restores_l1_to_l4,tests/feature_engineering/preprocessing/test_layer_filter.py::test_unknown_layer_fails_closed,tests/feature_engineering/preprocessing/test_layer_filter.py::test_layer_filter_runs_non_stationary_adf_only_for_target_layers
+tests/feature_engineering/preprocessing/test_native_tf_helpers.py	0	4	============================== 34 passed in 0.42s ==============================	-
+tests/feature_engineering/preprocessing/test_non_stationary_cache.py	1	3	============================== 2 failed in 0.46s ===============================	tests/feature_engineering/preprocessing/test_non_stationary_cache.py::test_non_stationary_cache_reuses_adf_result,tests/feature_engineering/preprocessing/test_non_stationary_cache.py::test_high_nan_no_adf_for_non_stationary_selection
+tests/feature_engineering/preprocessing/test_perf_winsor_identical.py	0	15	============================= 16 passed in 11.71s ==============================	-
+tests/feature_engineering/preprocessing/test_precision_corr.py	1	4	========================= 2 failed, 1 passed in 0.53s ==========================	tests/feature_engineering/preprocessing/test_precision_corr.py::test_precision_corr_002_matches_001,tests/feature_engineering/preprocessing/test_precision_corr.py::test_precision_override_reaches_find_min_d
+tests/feature_engineering/preprocessing/test_slow_path_parallel.py	1	6	========================= 1 failed, 7 passed in 2.36s ==========================	tests/feature_engineering/preprocessing/test_slow_path_parallel.py::test_joblib_pickle_fail_falls_back_to_serial
+tests/feature_engineering/test_adf_safe_skip.py	0	3	============================= 130 passed in 0.45s ==============================	-
+tests/feature_engineering/test_cascade_blacklist.py	0	3	============================== 30 passed in 0.38s ==============================	-
+tests/feature_engineering/test_cgsa_boundary.py	0	3	============================== 6 passed in 0.32s ===============================	-
+tests/feature_engineering/test_cgsa_compact_alignment.py	0	3	============================== 2 passed in 0.30s ===============================	-
+tests/feature_engineering/test_cgsa_dead_drop_stream.py	0	4	============================== 4 passed in 0.51s ===============================	-
+tests/feature_engineering/test_cgsa_disk_precheck.py	0	4	============================== 10 passed in 0.52s ==============================	-
+tests/feature_engineering/test_cgsa_multi_symbol_isolation.py	0	4	============================== 2 passed in 0.44s ===============================	-
+tests/feature_engineering/test_dead_feature_filter.py	0	13	============================= 40 passed in 10.36s ==============================	-
+tests/feature_engineering/test_dstar_cache_key_mutation.py	0	4	============================== 7 passed in 0.32s ===============================	-
+tests/feature_engineering/test_failopen_consumer.py	1	6	========================= 2 failed, 10 passed in 1.68s =========================	tests/feature_engineering/test_failopen_consumer.py::test_training_rejects_partial,tests/feature_engineering/test_failopen_consumer.py::test_legacy_reader_strict_rejects_ic_and_training
+tests/feature_engineering/test_failopen_golden.py	0	3	============================== 1 passed in 0.28s ===============================	-
+tests/feature_engineering/test_failopen_winsor.py	0	3	============================== 6 passed in 0.50s ===============================	-
+tests/feature_engineering/test_feature_naming.py	0	3	============================== 45 passed in 0.38s ==============================	-
+tests/feature_engineering/test_feature_reader.py	0	3	============================== 1 passed in 0.38s ===============================	-
+tests/feature_engineering/test_ffstat_apply_to.py	0	4	============================== 14 passed in 1.20s ==============================	-
+tests/feature_engineering/test_fracdiff_maxlag_derivation.py	1	3	========================= 1 failed, 7 passed in 0.45s ==========================	tests/feature_engineering/test_fracdiff_maxlag_derivation.py::test_short_dataframe_fracdiff_keeps_row_count
+tests/feature_engineering/test_l65_l7_raw_disk.py	0	3	============================== 6 passed in 0.57s ===============================	-
+tests/feature_engineering/test_l65_raw_metadata.py	0	3	============================== 1 passed in 0.28s ===============================	-
+tests/feature_engineering/test_l7_codec.py	0	3	============================== 10 passed in 0.38s ==============================	-
+tests/feature_engineering/test_multi_tf_layer_counts.py	0	3	============================== 2 passed in 0.28s ===============================	-
+tests/feature_engineering/test_numeric_guards.py	0	3	============================== 9 passed in 0.43s ===============================	-
+tests/feature_engineering/test_tf_aligner.py	0	3	============================== 5 passed in 0.30s ===============================	-
+tests/feature_engineering/test_v2_timestamp_golden.py	0	5	============================== 3 passed in 0.85s ===============================	-
+tests/test_cgsa_compact_alignment.py	0	4	============================== 8 passed in 0.69s ===============================	-
+tests/test_cgsa_manifest_schema.py	0	4	============================== 3 passed in 1.20s ===============================	-
+tests/test_cgsa_multi_tf.py	0	3	============================== 18 passed in 0.34s ==============================	-
+tests/test_cgsa_phase2_flags.py	0	3	============================== 14 passed in 0.28s ==============================	-
+tests/test_cgsa_pipeline.py	0	3	============================== 2 passed in 0.38s ===============================	-
+tests/test_cgsa_sharding.py	0	6	============================== 9 passed in 3.16s ===============================	-
+tests/test_column_group.py	0	3	============================== 10 passed in 0.30s ==============================	-
+tests/test_cross_symbol_features.py	0	3	======================== 1 passed, 2 warnings in 0.30s =========================	-
+tests/test_data_source_quick.py	0	3	======================== 1 passed, 3 warnings in 0.36s =========================	-
+tests/test_data_source_simple.py	5	3	-	-
+tests/test_dynamic_indicator_system.py	0	3	======================== 5 passed, 9 warnings in 0.30s =========================	-
+tests/test_feature_factory_batch2b.py	0	4	============================== 5 passed in 0.34s ===============================	-
+tests/test_feature_factory_batch2c.py	0	4	============================== 2 passed in 0.69s ===============================	-
+tests/test_feature_factory_batch2d.py	0	3	========================= 3 passed, 1 warning in 0.58s =========================	-
+tests/test_feature_factory_config.py	0	4	============================== 22 passed in 1.39s ==============================	-
+tests/test_feature_naming_integration.py	0	3	======================== 4 passed, 10 warnings in 0.32s ========================	-
+tests/test_feature_storage_validator_factory.py	0	3	============================== 2 passed in 0.41s ===============================	-
+tests/test_fracdiff_fft_opt.py	1	3	========================= 1 failed, 11 passed in 0.47s =========================	tests/test_fracdiff_fft_opt.py::TestFindMinDPrecomputedMatchesOriginal::test_find_min_d_precomputed_matches_original
+tests/test_hardware_utils.py	0	3	============================== 7 passed in 0.28s ===============================	-
+tests/test_l65_parallel.py	0	4	============================== 18 passed in 1.01s ==============================	-
+tests/test_l7_parallel_persist.py	0	3	============================== 12 passed in 0.53s ==============================	-
+tests/test_label_generator.py	0	3	============================== 1 passed in 0.28s ===============================	-
+tests/test_meta_features.py	0	3	============================== 3 passed in 0.28s ===============================	-
+tests/test_multi_window_rolling.py	0	6	============================== 12 passed in 1.78s ==============================	-
+tests/test_numba_rolling.py	0	4	============================== 47 passed in 1.04s ==============================	-
+tests/test_phase_a_granular_control.py	0	3	============================== 53 passed in 0.47s ==============================	-
+tests/test_phase_b_granular_control.py	0	12	============================== 40 passed in 8.80s ==============================	-
+tests/test_phase_d_granular_control.py	0	8	============================== 23 passed in 5.08s ==============================	-
+tests/test_preview_feature_count.py	0	11	============================== 52 passed in 8.09s ==============================	-
+tests/test_relative_strength.py	0	3	============================== 1 passed in 0.28s ===============================	-
+tests/test_searchsorted_align.py	0	3	============================== 20 passed in 0.36s ==============================	-
+tests/test_timeframe_aligner.py	0	4	============================== 6 passed in 0.40s ===============================	-
+tests/test_volume_threshold_fix.py	0	3	======================== 2 passed, 3 warnings in 0.35s =========================	-
+tests/test_winsorize_partition_opt.py	0	3	============================== 13 passed in 0.53s ==============================	-
