@@ -88,6 +88,11 @@
 <td>排序第 2 步：逐欄比對凍結基準與現值，找出從哪個 commit 開始變、是否為已核准之修正；是刻意修正就附證據重凍，否則當缺陷修</td>
 </tr>
 <tr>
+<td><strong>舊版特徵產生器：同資料來源、不同 EMA 參數時欄名相撞</strong>（2026-10-14 TESTREG 第 3 批試改測試時查到）</td>
+<td>型態分析（<code>api/routes/pattern_analysis.py</code> 第 522 行）、XGBoost 批次（<code>api/services/xgboost_batch_service.py</code> 第 525 行）、特徵任務（<code>api/services/feature_task_service.py</code> 第 174 行）走舊產生器。同一資料來源設兩組 EMA 參數時，<code>close_ema_trend_aligned</code> 等幾個欄名不帶參數、兩組同名但數值不同；前兩處合併時「同名就跳過」，第二組的這幾欄被<strong>靜默丟掉</strong>，看起來卻像兩組都有。新的特徵工廠沒有引用這個舊產生器</td>
+<td>不屬 TESTREG 範圍；要另開一張票，插在全票排序哪一步依規定先跟委員評估（TESTREG 第 3 批收批時一併提）</td>
+</tr>
+<tr>
 <td><strong>IC 為何用 Spearman 沒有文件；它只看方向、不看幅度</strong></td>
 <td>預設用 Spearman（排名相關，業界常用、不怕極端值），但沒有任何文件寫理由。它只看排名，可能篩出「小漲小跌都猜對、大跌猜錯」的特徵：IC 好看，實盤卻被幾次大跌打穿</td>
 <td>排序第 10 步補寫選擇理由；要不要加看幅度或尾部虧損的檢查，屆時請你決定</td>
