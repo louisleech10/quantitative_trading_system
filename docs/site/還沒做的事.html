@@ -93,6 +93,11 @@
 <td>不屬 TESTREG 範圍；要另開一張票，插在全票排序哪一步依規定先跟委員評估（TESTREG 第 3 批收批時一併提）</td>
 </tr>
 <tr>
+<td><strong>舊版特徵產生器看「測試名字」決定行為</strong>（2026-10-14 TESTREG 第 3 批試改測試時查到）</td>
+<td><code>momentum/FeatureEngineering/feature_extractor.py</code> 的 <code>_should_filter_absolute_features</code> 除了看設定 <code>relative_only</code>，還會看「現在跑的測試名字裡有沒有 <code>test_cross_symbol_features</code>」，有就自動過濾掉絕對價格欄。所以那支「跨標的特徵都是相對值」的測試會過，是因為程式認出它在被測；正式使用時預設不過濾，會輸出 <code>close_ema5_value</code> 等絕對值欄。用到這個產生器的是型態分析與 XGBoost 批次（同上一列）</td>
+<td>不屬 TESTREG 範圍；要另開一張票（拿掉看測試名字的分支；測試改為明確帶 <code>relative_only</code>），插在全票排序哪一步依規定先跟委員評估（TESTREG 第 3 批收批時與上一列一併提）。新測試已先避開這個分支、直接測 <code>relative_only</code> 的真實行為</td>
+</tr>
+<tr>
 <td><strong>IC 為何用 Spearman 沒有文件；它只看方向、不看幅度</strong></td>
 <td>預設用 Spearman（排名相關，業界常用、不怕極端值），但沒有任何文件寫理由。它只看排名，可能篩出「小漲小跌都猜對、大跌猜錯」的特徵：IC 好看，實盤卻被幾次大跌打穿</td>
 <td>排序第 10 步補寫選擇理由；要不要加看幅度或尾部虧損的檢查，屆時請你決定</td>

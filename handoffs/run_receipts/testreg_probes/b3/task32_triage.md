@@ -20,15 +20,15 @@
 | `tests/feature_engineering/test_l65_l7_raw_disk.py` | Mode C 宣稱未經其入口 | 經 write_raw_from_registry_stream(preprocessor=None) 觸發預檢 | 待做 |
 | `tests/feature_engineering/preprocessing/test_l65_native_tf.py` | 只斷形狀 | 斷 legacy 路徑理由／與 flag=0 逐位元相等 | 待做 |
 | `tests/feature_engineering/preprocessing/test_l65_v2_transforms.py` | NaN 比 NaN、legacy profile 自指 | 有限值前提＋加長 fixture | 待做 |
-| `tests/test_data_source_quick.py` | 吞例外回 False | 直接斷言範圍 | 待做 |
-| `tests/test_data_source_simple.py` | 0 函式（G-c） | 模組層搬入函式、以斷言取代 exit | 待做 |
+| `tests/test_data_source_quick.py` | 吞例外回 False | 直接斷言範圍 | 暫存樹試作（同上；新測試以獨立遞迴 EMA 定義逐列比對） |
+| `tests/test_data_source_simple.py` | 0 函式（G-c） | 模組層搬入函式、以斷言取代 exit | 🔴 契約缺口 Q2：檔尾為混合分支 if（印出＋else 內 exit(1)），非「只含結束類」之 if ⇒ 須 AST 同構搬入，卻又禁新增函式含 exit ⇒ 無合法 G-c 改法 |
 | `tests/test_dynamic_indicator_system.py` | 回傳布林代斷言 | 改為斷言 | 暫存樹試作（同上） |
-| `tests/test_feature_naming_integration.py` | 零斷言只印 | 斷言預期名與無衝突 | 暫存樹：新測試已寫、mutant 設計中；另查到生產缺陷（同 data_source 不同 EMA 參數欄名相撞），已登 白話說明/還沒做的事.md |
+| `tests/test_feature_naming_integration.py` | 零斷言只印 | 斷言預期名與無衝突 | 暫存樹試作（收據自檢於 v49 試作補丁下）；另查到生產缺陷（同 data_source 不同 EMA 參數欄名相撞），已登 白話說明/還沒做的事.md |
 | `tests/test_volume_threshold_fix.py` | 零斷言回布林 | 斷言 -0.1／1.1 被拒 | 暫存樹試作（同上） |
-| `tests/test_cross_symbol_features.py` | 只印警示、條件永不命中 | 斷言相對值範圍 | 待做 |
-| `tests/test_phase_d_granular_control.py` | 五支空心（恆等式、無競爭） | 非空 override 差異、文件檢查具體化 | 待做 |
-| `tests/test_searchsorted_align.py` | oracle 自指（生產 validate_no_future_leak） | 獨立 PIT 期望 | 待做 |
-| `tests/test_winsorize_partition_opt.py` | 只驗 numpy 語意、不碰待測 | 驗待測函式不多複製 | 待做 |
+| `tests/test_cross_symbol_features.py` | 只印警示、條件永不命中 | 斷言相對值範圍 | 暫存樹試作（同上）；另查到生產缺陷：`_should_filter_absolute_features` 以 PYTEST_CURRENT_TEST 含本檔名即過濾（測試名改變生產行為），新測試先中性化該變數再測 relative_only 契約 |
+| `tests/test_phase_d_granular_control.py` | 五支空心（恆等式、無競爭） | 非空 override 差異、文件檢查具體化 | 🔴 契約缺口 Q1：D4 兩目標只讀 docs/API_SPECIFICATION.md（R(t)＝∅）⇒ 檔級 additive 不適用 |
+| `tests/test_searchsorted_align.py` | oracle 自指（生產 validate_no_future_leak） | 獨立 PIT 期望 | 暫存樹試作（同上；獨立推導 PIT 期望 11＋12k） |
+| `tests/test_winsorize_partition_opt.py` | 只驗 numpy 語意、不碰待測 | 驗待測函式不多複製 | 🔴 契約缺口 Q1：舊目標未引用任何生產符號（R(t)＝∅）⇒ additive 不適用；新測試（就地改寫）已寫於暫存樹 |
 
 ## C. 第二子批以後（真實 K 線、重項或須另議）
 - 真實 K 線／無耗時紀錄：`atomic/test_handcoded_reference.py`、`preprocessing/test_ff_causal_golden.py`、`preprocessing/test_fast_adf_gate.py`、`tests/test_feature_factory_operators.py`
