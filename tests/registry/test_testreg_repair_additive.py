@@ -418,6 +418,10 @@ def test_mutation_infra_errors_always_empty_lets_negative_through(ra, tmp_path, 
     """mutant：`infrastructure_repair_errors` 恆回 [] ⇒ 修後未全過之反例亦不再有 V21 列（證 V21 依賴該判定）。"""
     r = _work(ra, tmp_path, "mut")
     _apply(r, "tests/helpers_tf.py", HELPER_FIXED)
+    cat = r.catalog()  # 只留 test_ga.py 一個 rewrite entry（他檔之未執行與本 mutant 無關）
+    for other in (GB, GC):
+        cat["entries"][other].update(entry(other))
+    r.set_catalog(cat)
     r.write_json(infra_rel(N_GA), infra_receipt(ra, repaired_session_id=ra["s"]["ga@head"]))
     monkeypatch.setattr(testreg, "infrastructure_repair_errors", lambda ctx, nodeid: [])
     assert testreg.main(["--repo", str(r.root), "validate", "--require-executed"]) == 0
@@ -561,7 +565,7 @@ def test_mutation_session_scope_wired_into_existing_red(ra, tmp_path, monkeypatc
     _apply(r, "tests/helpers_tf.py", HELPER_FIXED)
     r.write_json(infra_rel(N_GA), infra_receipt(ra))
     assert testreg.infrastructure_repair_errors(_ctx(r), N_GA) == []
-    monkeypatch.setattr(testreg, "session_scope_errors", lambda ctx, sid, nodeid: ["scope"])
+    monkeypatch.setattr(testreg, "session_scope_errors", lambda ctx, sid, nodeid, tree=None: ["scope"])
     assert testreg.infrastructure_repair_errors(_ctx(r), N_GA)
     src = (Path(testreg.__file__)).read_text(encoding="utf-8")
     body = src.split("def defective_rewrite_errors", 1)[1].split("\ndef ", 1)[0]
