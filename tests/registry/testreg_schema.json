@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 42,
+  "version": 43,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -31,6 +31,8 @@
     "receipt_E1": {"type": "object", "additional_properties": false, "fields": {"nodeid": {"type": "string", "format": "nodeid", "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "replacement_nodeid": {"type": "string", "format": "nodeid", "required": true}, "target_ast_sha256": {"type": "string", "format": "hex", "required": true}, "replacement_ast_sha256": {"type": "string", "format": "hex", "required": true}, "fixture_closure_sha256": {"type": "string", "format": "hex", "required": true}, "module_context_sha256": {"type": "string", "format": "hex", "required": true}}},
     "receipt_literal_fix": {"type": "object", "additional_properties": false, "fields": {"path": {"type": "string", "format": "test_path", "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "map": {"type": "map", "values": {"type": "string"}, "required": true, "desc": "假測試檔識別之雙射字面對映（舊→新）；規則見 receipts.literal_fix"}, "approval_ref": {"type": "string", "format": "repo_path", "required": true, "desc": "核可本修正之收斂檔（reconcile synth）"}, "session_id": {"type": "string", "format": "uuid", "required": true, "desc": "v41：改名後該檔實跑之記錄器 session（於 head 乾淨樹套 patch_path 執行）"}, "patch_path": {"type": "string", "format": "repo_path", "required": true, "desc": "v41：session 所執行之樹＝head 套此補丁"}}},
     "receipt_mutation": {"type": "object", "additional_properties": false, "fields": {"target_nodeid": {"type": "string", "format": "nodeid", "required": true}, "compare_nodeids": {"type": "array", "items": "string", "items_format": "nodeid", "min_items": 1, "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "fingerprint": {"type": "string", "format": "hex", "required": true, "desc": "全部 mutant 之 session_id 與 compare_session_id 所指 session 之 duration_class（須全部相同）"}, "target_assertion_lines": {"type": "array", "items": "string", "items_format": "file_line", "required": true}, "mutants": {"type": "array", "items": "types.mutant_item", "min_items": 1, "required": true}, "compare_patch_path": {"type": "string|null", "format": "repo_path", "required": true, "desc": "套於 head 後產生 compare 函式之補丁；compare 函式皆存在於 head 者為 null"}, "compare_patch_sha256": {"type": "string|null", "format": "hex", "required": true}}},
+    "receipt_defective_rewrite": {"type": "object", "additional_properties": false, "fields": {"kind": {"type": "enum", "values": "enums.defective_kind", "required": true}, "target_nodeid": {"type": "string", "format": "nodeid", "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "approval_ref": {"type": "string", "format": "repo_path", "required": true}, "fingerprint": {"type": "string", "format": "hex", "required": true}, "defect_lines": {"type": "array", "items": "string", "items_format": "file_line", "min_items": 1, "required": true}, "compare_patch_path": {"type": "string", "format": "repo_path", "required": true}, "compare_patch_sha256": {"type": "string", "format": "hex", "required": true}, "compare_baseline_session_id": {"type": "string", "format": "uuid", "required": true}, "first_bad_commit": {"type": "string|null", "format": "sha40", "required": true}, "good_commit": {"type": "string|null", "format": "sha40", "required": true}, "bisect_log_path": {"type": "string|null", "format": "repo_path", "required": true}, "target_session_id": {"type": "string|null", "format": "uuid", "required": true}, "survivors": {"type": "array", "items": "types.survivor_item", "required": true}, "mutants": {"type": "array", "items": "types.mutant_item", "min_items": 1, "required": true}}},
+    "survivor_item": {"type": "object", "additional_properties": false, "fields": {"id": {"type": "string", "format": "identifier", "required": true}, "defect_line": {"type": "string", "format": "file_line", "required": true}, "patch_path": {"type": "string", "format": "repo_path", "required": true}, "patch_sha256": {"type": "string", "format": "hex", "required": true}, "session_id": {"type": "string", "format": "uuid", "required": true}, "compare_session_id": {"type": "string", "format": "uuid", "required": true}}},
     "mutant_item": {"type": "object", "additional_properties": false, "fields": {"id": {"type": "string", "format": "identifier", "required": true}, "patch_path": {"type": "string", "format": "repo_path", "required": true}, "patch_sha256": {"type": "string", "format": "hex", "required": true}, "session_id": {"type": "string", "format": "uuid", "required": true}, "compare_session_id": {"type": "string", "format": "uuid", "required": true}, "target_outcome": {"type": "enum", "values": "enums.outcome", "required": true}, "target_fail_loc": {"type": "string|null", "format": "file_line", "required": true}, "compare_outcomes": {"type": "map", "key_format": "nodeid", "values": {"type": "enum", "values": "enums.outcome"}, "required": true}}},
     "must_check": {"type": "object", "additional_properties": false, "fields": {"must": {"type": "array", "items": "string", "items_format": "nodeid_param", "required": true}, "missing": {"type": "array", "items": "string", "items_format": "nodeid_param", "required": true}}},
     "subbatch_file": {"type": "object", "additional_properties": false, "fields": {"rc": {"type": "int", "required": true}, "reused": {"type": "bool", "required": true}}},
@@ -114,6 +116,23 @@
     "skip_rule": "受驗之樹中帶 skip／skipif／xfail 標記（函式或其所在類別之裝飾器、模組層 pytestmark）或本體頂層敘述呼叫 pytest.skip／pytest.xfail 之測試函式，其斷言多重集合為空（HEAD 已帶者兩樹皆空，不溯及既往）；故對既有測試新增 skip／skipif／xfail 即使其舊元素全數減少（V19）"
   },
   "receipts": {
+    "defective_rewrite": {
+      "type": "types.receipt_defective_rewrite",
+      "dir": "handoffs/run_receipts/testreg-defective-rewrite",
+      "file_rule": "收據檔＝<dir>/<函式層 nodeid 之 / 換成 __、:: 換成 --->.json，與改寫同提交",
+      "rule": [
+        "用途（v43／SPEC v44）：目標測試函式為缺陷目標——kind=existing_red：於 head 已紅且紅在過期斷言；kind=vacuous：斷言空心、生產錯誤不使其轉紅——致 receipts.mutation 之「目標每一斷言行皆被殺」不可滿足時之改寫途徑；成立 ⇒ V19 對該函式放行，其他規則照常",
+        "target_nodeid 為函式層 nodeid 且存在於 head 與受驗之樹；head＝受驗時之 HEAD（一次性）；approval_ref 存在於 repo 工作目錄；收據檔、compare_patch_path、bisect_log_path、各 patch_path 須在受驗之樹（pre-commit 時須已暫存）",
+        "defect_lines 非空，每項為目標於 head 之斷言多重集合（assertion_nodes 依 inline_rule 展開）中某元素之 provenance（file:line），由 validate 重算比對",
+        "compare_patch_path 之 sha256＝compare_patch_sha256；patch 所及之檔恰為目標所在測試檔；套於 head 後目標函式之 ast.dump（include_attributes=False）等於受驗之樹中同 nodeid 函式者",
+        "compare_baseline_session_id 所指 session 之 head＝收據 head、diff_digest＝head 乾淨樹套 compare_patch 後之值，且其中目標函式（函式層，參數化取全部案例）全為 passed",
+        "kind=existing_red：first_bad_commit、good_commit 為 sha40、互異，且 good_commit 為 first_bad_commit 之祖先；bisect_log_path 存在；target_session_id 所指 session 之 head＝收據 head、diff_digest＝head 乾淨樹（無補丁）之值，目標紀錄 outcome∈{failed,error} 且 phase_failed＝call，其 fail_frames 含落在某 defect_lines 元素所屬斷言敘述行範圍（lineno..end_lineno）之 frame；survivors 須為空陣列",
+        "kind=vacuous：survivors 至少一項，每一 defect_lines 位置至少一項之 defect_line 等於它；每項 patch 只改 receipts.E0.production_roots 下之檔；其 session_id（head＋該補丁）中目標全為 passed；其 compare_session_id（head＋compare_patch＋該補丁）中改寫後函式 outcome∈{failed,error}、phase_failed＝call，且 fail_frames 含落在改寫後函式之某斷言元素（於 head＋compare_patch 之樹重算）所屬敘述行範圍之 frame，該元素之正規化鍵不屬目標於 head 之斷言多重集合（即新增或改變之斷言）；target_session_id、first_bad_commit、good_commit、bisect_log_path 須為 null",
+        "mutants 至少一項（形同 types.mutant_item，其 target_* 欄指改寫後函式，compare_outcomes 鍵集合＝{target_nodeid}）；每項 patch 只改 production_roots；session_id 與 compare_session_id 皆為 head＋compare_patch＋該補丁之 session（二者須相等）；對改寫後函式（head＋compare_patch 之樹）之每一斷言元素之位置 P，至少一個 mutant 之 target_outcome∈{failed,error} 且 target_fail_loc 落在 P 所屬敘述行範圍，殺點計入條件同 receipts.mutation.rule 之 phase 與 frame 規定；改寫後函式無斷言元素 ⇒ 不得用本收據",
+        "斷言差限縮：目標於 head 之斷言多重集合減去改寫後函式之斷言多重集合（以 assertion_nodes.normalize 之鍵比）所得之每一元素，其 provenance 皆屬 defect_lines",
+        "全部 session（target_session_id、compare_baseline_session_id、survivors 與 mutants 之各 session）之 duration_class 相同且＝fingerprint；任一 session 不在本機 ledger ⇒ unverifiable、rc≠0"
+      ]
+    },
     "literal_fix": {
       "type": "types.receipt_literal_fix",
       "dir": "handoffs/run_receipts/testreg-literal-fix",
@@ -301,7 +320,7 @@
     {"id": "V04", "rule": "write_once 欄位值與 `git show HEAD:tests/registry/catalog.json` 同鍵值相等（HEAD 無該鍵者免）"},
     {"id": "V05", "rule": "所有 enum 與 items_enum 欄位值屬其 enums 集合；陣列長度 ≥ min_items"},
     {"id": "V06", "rule": "disposition=rewrite ⇒ disposition_ref 非 null"},
-    {"id": "V07", "rule": "rewrite_receipt 非 null ⇒ 依 receipts.mutation 全部 rule 與 binding_rule 驗過；暫存區中 disposition=rewrite 之檔有內容變更 ⇒ 同提交之 rewrite_receipt 非 null 且驗過"},
+    {"id": "V07", "rule": "rewrite_receipt 非 null ⇒ 依 receipts.mutation 全部 rule 與 binding_rule 驗過；暫存區中 disposition=rewrite 之檔有內容變更 ⇒ 同提交之 rewrite_receipt 非 null 且驗過，或（v43）rewrite_targets 所涵蓋之每一函式層 nodeid 皆有依 receipts.defective_rewrite 成立之缺陷目標改寫收據"},
     {"id": "V08", "rule": "每一碑 evidence_receipt 存在且依其 evidence_level 對應之 receipts 規則與 type（V17）驗過；收據須綁定其授權對象：E0／E1 收據之 nodeid、mutation 收據之 target_nodeid 均 == 該碑之 nodeid；rewrite_receipt 之 target_nodeid 屬該 entry 之 rewrite_targets 所涵蓋函式；target_assertion_lines 於收據 head 重算相等；E2 與 rewrite 收據一律含 binding_rule 驗證（日常 pre-commit 即驗，不只於 V21）；本提交新增或內容變更之收據其 head == 當前 HEAD（pre-commit 時即新提交之父），既有未變之收據其 head 為 HEAD 之祖先且不重驗 AST 雜湊——其 replaced_by 函式之後續修改本身受 V19／V20 保護（削弱須新收據、刪除須新碑並經碑鏈解析）"},
     {"id": "V09", "rule": "evidence_level∈{E1,E2} ⇒ replaced_by 非空，且每一 replaced_by 之函式於「受驗之樹」存在（pre-commit＝暫存區之樹；hook 與手動 validate＝工作樹；收據之 head 欄記執行 mutation 時之 HEAD，replacement 可為該提交新增者）；E0 ⇒ replaced_by 為空"},
     {"id": "V10", "rule": "碑之 nodeid 之函式於工作樹不存在"},
@@ -313,9 +332,9 @@
     {"id": "V16", "rule": "guarantee／oracle／claim 任一欄含 unclassified ⇒ 該欄必恰為 [\"unclassified\"]（不得與其他值混用）、其 path 列於 bootstrap.paths_file，且 HEAD catalog 中同鍵之同欄不含非 unclassified 值（已分類者不得改回 unclassified）；「已分類」之計數一律以「三欄皆不含 unclassified」判定"},
     {"id": "V17", "rule": "全部欄位依其 type、format、items、items_format、items_enum、min_items、max_items_ref、min、finite、const、key_format、additional_properties 與 types.* 遞迴驗形（format 以 formats 正則 re.fullmatch；type 含 null 者方可為 null；陣列元素逐一驗）；本規則同一實作供 catalog、summary、收據與閘收據共用"},
     {"id": "V18", "rule": "bootstrap.paths_file 若存在於 HEAD，則工作樹內容 == HEAD 內容"},
-    {"id": "V19", "rule": "對每一測試函式（函式層 nodeid），比較 HEAD 與暫存區或工作樹之斷言多重集合（assertion_nodes 經 normalize 與 inline_rule 展開；tests/ 下 helper 或 fixture 之修改因展開而反映到其每一呼叫者）；任一元素減少 ⇒ 該 nodeid 須於同提交立碑，或屬某 disposition=rewrite 之 entry 之 rewrite_targets（空＝整檔）且同提交之 rewrite_receipt 驗過，或所在測試檔有依 receipts.literal_fix 成立之字面對映修正收據（v40）；否則 rc≠0"},
+    {"id": "V19", "rule": "對每一測試函式（函式層 nodeid），比較 HEAD 與暫存區或工作樹之斷言多重集合（assertion_nodes 經 normalize 與 inline_rule 展開；tests/ 下 helper 或 fixture 之修改因展開而反映到其每一呼叫者）；任一元素減少 ⇒ 該 nodeid 須於同提交立碑，或屬某 disposition=rewrite 之 entry 之 rewrite_targets（空＝整檔）且同提交之 rewrite_receipt 驗過，或所在測試檔有依 receipts.literal_fix 成立之字面對映修正收據（v40），或（v43）該 nodeid 有依 receipts.defective_rewrite 成立之缺陷目標改寫收據；否則 rc≠0"},
     {"id": "V20", "rule": "HEAD 中存在之測試函式（函式層 nodeid）於暫存區或工作樹不存在 ⇒ 須於同提交立碑；改名＝刪除＋新增：純改名立 E1 碑、改名兼改內容立 E2 碑（mutation 收據以舊函式為 target、新函式為 compare），replaced_by 皆為新名；否則 rc≠0"},
-    {"id": "V21", "rule": "（僅 `validate --require-executed`，用於 Task 3.3、4.3 收尾）每一 disposition=rewrite 之 entry 之 rewrite_receipt 非 null 且依 receipts.mutation（含 binding_rule）驗過；未執行之 rewrite ⇒ rc≠0"},
+    {"id": "V21", "rule": "（僅 `validate --require-executed`，用於 Task 3.3、4.3 收尾）每一 disposition=rewrite 之 entry 之 rewrite_receipt 非 null 且依 receipts.mutation（含 binding_rule）驗過，或（v43）其 rewrite_targets 所涵蓋之每一函式層 nodeid 皆有依 receipts.defective_rewrite 成立之缺陷目標改寫收據；未執行之 rewrite ⇒ rc≠0"},
     {"id": "V22", "rule": "暫存區或工作樹中任一 docs/manifests/*.json 相對 HEAD 有變更（新增或修改）⇒ 對 catalog 之每一碑（不限新碑），若其 nodeid 或檔路徑出現在該變更 manifest 之選測位置，該 manifest 須滿足 manifest_closed 或 manifest_tombstone_aware；否則 rc≠0（不符列之訊息含該 manifest 路徑；防以改 manifest 之方式繞過 V14）"}
   ],
   "manifest_selection_keys": {"keys": ["test_files", "script_acceptance", "gate_cmd"], "prefixed_strings": "manifest 任一處之字串，其首個空白分隔 token ∈ {affected_tests, affected_must, affected_groups}（即 framepath_affected_gate.manifest_groups 所解析之列，例 batch_card.risk_mitigation）"},
@@ -328,6 +347,7 @@
   },
   "enums": {
     "file_disposition": ["keep", "rewrite"],
+    "defective_kind": ["existing_red", "vacuous"],
     "oracle": ["EXACT", "TOLERANCE", "METAMORPHIC", "STATISTICAL", "PROPERTY", "SMOKE", "unclassified"],
     "claim": ["correctness", "contract", "regression", "smoke", "perf", "unclassified"],
     "retire_evidence_level": ["E0", "E1", "E2"],

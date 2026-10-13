@@ -23,6 +23,10 @@
 - 起因（新碼證）：TESTREG Task 2.4 之 V-6 慢因 cProfile（收據 `handoffs/run_receipts/testreg-v6-profile.json`）顯示公開域預熱探測之縮尾佔 85%；第 2 批審碼 r1 兩家同判探測縮尾門檻（`momentum/FeatureEngineering/feature_factory.py:2686–2695` 只看 `winsorization.enabled`）與公開輸出（`:3863` 看 `preprocessing.enabled`）不一致屬 FF 正確性缺陷、須現在另開票（`handoffs/reconcile/20261010-testreg-b2-review-r1/synth.md`；TESTREG SPEC §N R9）。依賴：TESTREG 第 3 批 Task 3.1／3.2 逐檔判定並實跑 FF 測試（含 `test_failopen_correctness.py` 之 V-6，前處理關閉、現約 8 小時），其行為與耗時取決於本修正。
 - 裁定（選項逐字）：「TESTREG 第 2 批收批後、第 3 批前（推薦）」——新增第 5a-1 步 PROBEWINSOR。
 
+## 委員諮詢依新碼證之註記（2026-10-13，使用者離線委派共識決）
+- 新碼證：①FRAMEPATH 處置驗證器檢查②（`tests/feature_engineering/test_framepath_disposition.py` 之 `check_2`）以凍結提交比對其治理檔之位元組、不排除他票提交，TESTREG 第 3 批範圍 149 檔中 52 檔屬之；②FRAMEPATH b1（`5584102d`）造成之兩支紅未被其受影響測試閘選入（一支以不變性信封略過、一支未選入），推翻 TESTREG 諮詢 r2 方案甲之前提。收斂檔 `handoffs/reconcile/20261010-testreg-x-consult-r3/synth.md`（三家一致）。
+- 註記（不改全序）：第 5 步 FRAMEPATH 之「b2 前 TODO 修訂」（檢查②可辨識本票改動、受影響測試閘具名選入來源並以 b1 錨點重放驗證、兩支 b1 造成之紅之修正）須先於第 5a 步 TESTREG 對上述 52 個治理檔之實體改寫子批；TESTREG 之分類（Task 3.1）、非治理檔子批與第 4 批不受此限。
+
 ## 全序
 | 序 | 項目（大小） | 內容 | 硬依賴 |
 |---|---|---|---|
@@ -31,7 +35,7 @@
 | 3 | RATIOUNSAFE（小） | `_is_ratio_unsafe_column` 對落盤帶週期欄名失效（`ohlc_12h_pattern_*` 之第二段為 `12h`；真實 manifest 43／43 漏判）⇒ 改讀結構化類別，IC 頁與 L6.5 共用；真實帶週期欄名測試 | 2 |
 | 4 | ICFIRSTALIGN 乙（大） | IC-first 建／復用 CGSA registry、L6.5 pre-IC 只縮尾／平穩化、raw 只由 registry 串流寫出（不依賴空 frame 分支）、L6.5 失敗語意明定並配 mutation；raw 讀回／選欄讀回／processed（`write_processed` 傳 row_index）三處時間軸、sidecar 必填、禁位置對齊；不可變 run context＋選窗介面；FU-2 全 NaN 守衛；MEM-RSS 對照量測（證明漏擋才改閘）；post-IC 鎖 Polars 正式臂；label h 留 GLOBALH 接口；IC-first 測試遷離 `FFACT_USE_CGSA=0` | 2、3 |
 | 5 | FRAMEPATH（大） | 刪環境變數分派、legacy 多週期、frame 週期標記器、frame L7 落盤、舊特徵 h5 讀取（不含 IC 服務內部 h5、`kline_cache.h5`）；遷移／刪 frame 測試與腳本 | 4 |
-| 5a | TESTREG（大；2026-10-09 使用者裁定插入，於 FRAMEPATH b1 收尾後、b2 前） | 測試清冊自動維護：記錄器（耗時／結果／執行時間）、產出端登記檢查、自動過時標記、受影響測試挑選查清冊；首次分類由委員逐檔判斷保留／改寫／淘汰（淘汰須證覆蓋等價） | 5（b1） |
+| 5a | TESTREG（大；2026-10-09 使用者裁定插入，於 FRAMEPATH b1 收尾後、b2 前） | 測試清冊自動維護：記錄器（耗時／結果／執行時間）、產出端登記檢查、自動過時標記、受影響測試挑選查清冊；首次分類由委員逐檔判斷保留／改寫／淘汰（淘汰須證覆蓋等價） | 5（b1）；FRAMEPATH 治理檔之改寫子批另依 5 之 b2 前 TODO 修訂（見 2026-10-13 註記） |
 | 5a-1 | PROBEWINSOR（大；2026-10-12 使用者裁定插入，於 TESTREG b2 收批後、b3 前） | 公開域預熱探測之縮尾門檻與公開輸出一致（前處理關閉時探測不縮尾）；前處理開／關 × 縮尾開之對照驗收：`warmup_late_columns.probe_late`、加倍次數與深度、公開輸出首個有限值；真實 kline | 5a（b2） |
 | 6 | FF-NAME（大） | Task 0＝SPEC 重寫（刪 layer1_only、ADF 白名單、frame 世代閘）；造名全面改三段式（衍生層、單指標層、`ms_`／`tr_`／`ent_`、L4 lag）、週期標記器統一、單一名稱解析器、前後端解析、命名世代鹽、刪 `adf_safe_skip` 死碼；failopen 基準於此重凍一次 | 5 |
 | 7 | PRE-PROV＝FFDSTAR 改寫（中） | run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態（含縮尾、成功亦寫）、失敗群組、轉換臂別；IC 讀取保留 manifest、ingest cache 依身分鍵失效 | 6 |
