@@ -211,6 +211,11 @@ class TestChild(TestBase):
         assert a > 0
 '''
 
+# ── v49（修訂審查 r47 處置；只增）：根 conftest 以 pytest_plugins 載入之外掛模組中帶 params 之 fixture ─────────
+CONFTEST_V49 = 'pytest_plugins = ["tests.plug_fx"]\n'
+PLUG_V49 = "import pytest\n\n\n@pytest.fixture(params=[1, 2])\ndef plug_fx(request):\n    return request.param\n"
+T_P_V49_ADD = "\n\ndef test_plug(plug_fx):\n    assert plug_fx > 0\n"
+
 
 def infra_rel(nodeid: str) -> str:
     """獨立 oracle：依契約 receipts.infrastructure_repair.file_rule。"""
@@ -267,6 +272,10 @@ def ra(tmp_path_factory) -> Dict[str, Any]:
     cat2["entries"][GK] = entry(GK, disposition="rewrite", rewrite_targets=[N_K], disposition_ref=APPROVAL)
     cat2["entries"][GS] = entry(GS, disposition="rewrite", rewrite_targets=[N_S], disposition_ref=APPROVAL)
     r.set_catalog(cat2)
+    # v49（只增）
+    r.write("tests/conftest.py", CONFTEST_V49)
+    r.write("tests/plug_fx.py", PLUG_V49)
+    r.write(PF, T_P_V48 + T_P_V49_ADD)
     good = r.commit("catalog")
     r.write("momentum/calc.py", CALC_BAD)
     bad = r.commit("tag strict")
@@ -702,3 +711,14 @@ def test_r_star_import_old_target_additive_valid(ra, tmp_path):
     _apply(r, GS, GS_VARIANTS["ok"])
     r.write_json(additive_rel(GS), _additive_receipt_v48(ra, GS, "gs", "ok", ("m_div",), [N_S2]))
     assert testreg.additive_rewrite_errors(_ctx(r), GS) == []
+
+
+# ── v49（修訂審查 r47 處置；只增）────────────────────────────────────────────────────────────────────────────────
+
+def test_s_session_scope_plugin_param_fixture_not_enumerable(ra):
+    """(s) test_plug 請求根 conftest 以 pytest_plugins 載入之外掛模組中以 params 定義之 fixture（前提：整檔 session 中
+    有 2 筆）⇒ session_scope 以「不可靜態列舉」為理由不成立（只掃測試檔與目錄鏈 conftest 之實作會少算為 1）。"""
+    recs = test_records(ra["repo"], ra["s"]["p@file"])
+    assert sum(1 for n in recs if n.startswith(f"{PF}::test_plug[")) == 2
+    errs = testreg.session_scope_errors(_ctx(ra["repo"]), ra["s"]["p@file"], f"{PF}::test_plug")
+    assert any("不可靜態列舉" in e for e in errs), errs

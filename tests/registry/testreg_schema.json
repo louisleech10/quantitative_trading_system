@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 47,
+  "version": 48,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -178,7 +178,7 @@
     "session_scope": {
       "rule": [
         "（v46，諮詢 r8；修審碼 r1 CODEX-R1-P1-01）凡收據宣稱「某 session 中目標（函式層 nodeid N，所在檔 F）全部參數案例皆 passed／某結果」者，該 session 須同時滿足：①ledger.session_record.argv_norm 之位置參數含 N、F 或 F 之上層目錄之一，且 option 之 keyword、markexpr 為空、deselect 為空、lf、stepwise 與（v47）keepduplicates 為否",
-        "②案例數靜態列舉 E(N)：N 所屬函式之 parametrize 裝飾器、其所屬測試類別之 parametrize 裝飾器與模組 pytestmark 之 parametrize 之 argvalues 長度之積（無任何 parametrize ⇒ 1）；argvalues 須為字面 list／tuple（元素含 pytest.param 者各計 1），或模組層於該定義行之前最後一次綁定為此類字面之名稱；N 之參數、（v47）函式／類別／模組 pytestmark 之 usefixtures 直接標記與 autouse fixture（皆含遞移依賴）若請求任一以 params 定義之 fixture，或 argvalues 不可如上解析 ⇒ 不可列舉，該收據不成立（fail-closed）；（v47）測試類別之基底類別於同模組者，其 parametrize 裝飾器與 pytestmark 遞移納入；基底不可於同模組解析（且非 object）⇒ 不可列舉",
+        "②案例數靜態列舉 E(N)：N 所屬函式之 parametrize 裝飾器、其所屬測試類別之 parametrize 裝飾器與模組 pytestmark 之 parametrize 之 argvalues 長度之積（無任何 parametrize ⇒ 1）；argvalues 須為字面 list／tuple（元素含 pytest.param 者各計 1），或模組層於該定義行之前最後一次綁定為此類字面之名稱；N 之參數、（v47）函式／類別／模組 pytestmark 之 usefixtures 直接標記與 autouse fixture（皆含遞移依賴）若請求任一以 params 定義之 fixture，或 argvalues 不可如上解析 ⇒ 不可列舉，該收據不成立（fail-closed）；（v47）測試類別之基底類別於同模組者，其 parametrize 裝飾器與 pytestmark 遞移納入；基底不可於同模組解析（且非 object）⇒ 不可列舉；（v48）fixture 之可見範圍＝測試檔、其目錄鏈上之 conftest.py，及各 conftest.py 之 pytest_plugins 字面所列模組（近者覆蓋遠者；外掛模組先於載入它之 conftest）",
         "③session 中基底 nodeid（去參數化後綴）＝N 之紀錄數＝E(N)，且彼此 nodeid 不重複（v47：以 ledger 檔之原始 test 紀錄逐筆計，不經以 nodeid 為鍵之彙整；任一 nodeid 出現逾一筆 ⇒ 不成立）",
         "conftest 或外掛以 pytest_collection_modifyitems 等鉤子靜默移除案例之動態形不在本規則判定範圍（docs/TESTREG_SPEC.md §N R13）"
       ]

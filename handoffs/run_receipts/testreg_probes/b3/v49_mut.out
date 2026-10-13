@@ -1,0 +1,3 @@
+# SPEC v49（修訂審查 r47 處置）mutation 自證——主委 2026-10-14
+# 暫存樹＝d6f75f0f＋v49_trial_impl.patch＋v49 驗收檔；全檔 test_testreg_repair_additive.py＋test_testreg_defective_rewrite.py → 99 passed（181.3 秒）
+M8_plugin_scan_off rc=1  FAILED test_s_session_scope_plugin_param_fixture_not_enumerable
