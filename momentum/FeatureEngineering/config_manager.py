@@ -18,6 +18,7 @@ from momentum.FeatureEngineering.feature_config import (
     PreprocessingConfig,
     TailRiskConfig,
     ValidationResult,
+    l65_enabled,
 )
 
 logger = get_logger(__name__)
@@ -335,7 +336,7 @@ class ConfigManager:
             + meta_count
             # labels are target variables, NOT input features; excluded from preprocessing
         )
-        if config.preprocessing.enabled:
+        if l65_enabled(config):
             preprocess_multiplier = self._estimate_preprocessing_multiplier(config.preprocessing)
             preprocessing_added = max(0, int(base_total_before_preprocessing * (preprocess_multiplier - 1.0)))
 

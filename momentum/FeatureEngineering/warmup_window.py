@@ -17,6 +17,7 @@ import pandas as pd
 
 from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
+from momentum.FeatureEngineering.feature_config import l65_enabled
 
 if TYPE_CHECKING:
     from momentum.FeatureEngineering.feature_config import FactoryConfig
@@ -253,9 +254,9 @@ def _collect_l65_stack_bars(config: "FactoryConfig") -> int:
     fracdiff 寬度**不依 fracdiff 開關**一律計入（SPEC v49）：同設定開／關平穩化之公開域載入起點須相同，否則
     以累計和實作之滾動統計（L3 Std／Skew／Kurt 等）之浮點誤差依起算點而異，基礎欄值不再逐位元組相同（§G ②；
     主委實跑 2026-09-28：MIDPRICE／MIDPOINT 之 Kurt 欄開關兩次 hash 不同）。"""
-    pp = config.preprocessing
-    if not pp.enabled:
+    if not l65_enabled(config):  # PROBEWINSOR Task 1.1：總開關唯一判斷
         return 0
+    pp = config.preprocessing
     total = 0
     if pp.winsorization.enabled:
         total += int(pp.winsorization.window)

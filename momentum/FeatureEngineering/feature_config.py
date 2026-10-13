@@ -201,6 +201,25 @@ CALIBRATION_BARS_INTRADAY_DEFAULT = 1000
 CALIBRATION_BARS_DAILY_DEFAULT = 500
 
 
+def l65_enabled(config: Any) -> bool:
+    """前處理（公開 L6.5）總開關之唯一判斷（docs/PROBEWINSOR_SPEC.md Task 1.1）：生成模式、公開前處理器、平穩化
+    前置關卡、預熱 D₀ 之 L6.5 堆疊窗、公開域預熱探測之縮尾、快取身分鹽、估欄數皆經此判斷，不得各自讀
+    `preprocessing.enabled`（各自判斷曾致探測於總開關關閉時仍縮尾）。缺 `preprocessing` 或其 `enabled` ⇒ ValueError。"""
+    preprocessing = getattr(config, "preprocessing", None)
+    if preprocessing is None:
+        raise ValueError(
+            "FactoryConfig.preprocessing is missing; cannot dispatch L6.5 mode "
+            "(expected explicit Mode A/B/C selection)."
+        )
+    enabled = getattr(preprocessing, "enabled", None)
+    if enabled is None:
+        raise ValueError(
+            "FactoryConfig.preprocessing.enabled is missing; cannot dispatch "
+            "L6.5 mode (expected bool)."
+        )
+    return bool(enabled)
+
+
 def resolve_calibration_bars(timeframe: str, calibration_bars: Optional[int],
                              by_timeframe: Optional[Dict[str, int]]) -> int:
     """平穩化校準長度 N（FFSTAT v58 §C）之唯一決定處：`calibration_bars_by_timeframe` 列有該週期者用之；否則

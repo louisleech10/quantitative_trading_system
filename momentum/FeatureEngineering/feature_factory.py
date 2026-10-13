@@ -81,6 +81,7 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
 )
 from momentum.FeatureEngineering.utils.nan_stats import abnormal_nan_count
 from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
+from momentum.FeatureEngineering.feature_config import l65_enabled
 from momentum.FeatureEngineering.warmup_window import (
     OutputWindow,
     build_warmup_metadata,
@@ -95,6 +96,9 @@ from momentum.FeatureEngineering.warmup_window import (
 )
 
 logger = get_logger(__name__)
+
+# PROBEWINSOR Task 1.2：探測縮尾與總開關同源之快取身分鹽（docs/PROBEWINSOR_SPEC.md）
+PROBE_L65_GATE_SALT = "probe_winsor_follows_public_l65_v1"
 
 
 class CGSARegistryRequiredError(RuntimeError):
@@ -359,10 +363,10 @@ class FeatureFactory:
     @staticmethod
     def _stationarity_config_enabled(config: "FactoryConfig") -> bool:
         """L6.5 開啟且 fracdiff 或 ADF 差分任一開啟（平穩化開啟；FFSTAT 校準前置關卡之觸發條件）。"""
+        if not l65_enabled(config):  # PROBEWINSOR Task 1.1：總開關唯一判斷
+            return False
         pp = config.preprocessing
-        return bool(pp.enabled) and (
-            bool(pp.fractional_differencing.enabled) or bool(pp.adf_differencing.enabled)
-        )
+        return bool(pp.fractional_differencing.enabled) or bool(pp.adf_differencing.enabled)
 
     def _run_calibration_gate(self, symbol: str, timeframes: List[str], config: "FactoryConfig",
                               output_start: Optional[str], public_window: Optional[OutputWindow]) -> None:
@@ -2684,8 +2688,9 @@ class FeatureFactory:
         return to_utc(pd.DatetimeIndex(self._coerce_index_to_datetime(index)))
 
     def _calibration_winsorizer(self, config: FactoryConfig, timeframe: str) -> Optional[FeaturePreprocessor]:
-        """校準域之縮尾器（與公開域 L6.5 native-tf 子實例同一設定：窗依原生週期縮放）；縮尾關 ⇒ None。"""
-        if not config.preprocessing.winsorization.enabled:
+        """校準域與公開域預熱探測之縮尾器（與公開域 L6.5 native-tf 子實例同一設定：窗依原生週期縮放）；前處理總開關關
+        （公開輸出不建前處理器）或縮尾關 ⇒ None（PROBEWINSOR Task 1.1：總開關與公開輸出同源）。"""
+        if not l65_enabled(config) or not config.preprocessing.winsorization.enabled:
             return None
         from momentum.FeatureEngineering.preprocessing._native_tf_helpers import scale_preprocessing_config_for_native
 
@@ -3155,7 +3160,7 @@ class FeatureFactory:
     ) -> Dict[str, Any]:
         """Describe both requested preprocessing and what the raw artifact contains."""
         preprocessing = getattr(config, "preprocessing", None)
-        config_enabled = bool(getattr(preprocessing, "enabled", False))
+        config_enabled = l65_enabled(config)  # PROBEWINSOR Task 1.1：總開關唯一判斷
         raw_enabled = bool(raw_preprocessing_config) and config_enabled
         step_names = {
             "winsorization": "winsorization",
@@ -3215,21 +3220,8 @@ class FeatureFactory:
         # Any combination that cannot be unambiguously resolved must raise
         # rather than silently default. Callers downstream rely on this exact
         # set of three values for cache invalidation and routing decisions.
-        preprocessing = getattr(config, "preprocessing", None)
-        if preprocessing is None:
-            raise ValueError(
-                "FactoryConfig.preprocessing is missing; cannot dispatch L6.5 mode "
-                "(expected explicit Mode A/B/C selection)."
-            )
-        enabled_attr = getattr(preprocessing, "enabled", None)
-        if enabled_attr is None:
-            raise ValueError(
-                "FactoryConfig.preprocessing.enabled is missing; cannot dispatch "
-                "L6.5 mode (expected bool)."
-            )
-        if not bool(enabled_attr):
-            return "none"
-        return "ic_first_pre"
+        # PROBEWINSOR Task 1.1：總開關唯一判斷（缺鍵之 ValueError 訊息同改前）
+        return "ic_first_pre" if l65_enabled(config) else "none"
 
 
 
@@ -3860,7 +3852,7 @@ class FeatureFactory:
         if persist:
             preprocessor = None
             preprocessing_config: Optional[Dict[str, Any]] = None
-            if getattr(config.preprocessing, "enabled", False):
+            if l65_mode != "none":  # PROBEWINSOR Task 1.1：與探測同源（l65_enabled）
                 preprocessing_config = self._build_l7_raw_preprocessing_config(config)
                 context = self._build_preprocessing_context(raw_data, config)
                 preprocessor = FeaturePreprocessor(preprocessing_config, context=context)
@@ -4101,6 +4093,19 @@ class FeatureFactory:
             return preset_config.__class__.model_validate(merged_payload)
         return self._config_manager.get_merged_config(config_override)
 
+    def config_identity(self, symbol: str, timeframe: str, config_override: Optional[dict] = None,
+                        start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
+        """一次生成之身分（＝`generate_features` 所用之 config_hash；PROBEWINSOR Task 1.4 供批次續跑核對完成項）。"""
+        return self._compute_config_hash(self._resolve_config(config_override), symbol, timeframe,
+                                         start_date=start_date, end_date=end_date)
+
+    @staticmethod
+    def _probe_gate_salt(config: "FactoryConfig") -> Optional[str]:
+        """快取身分鹽（PROBEWINSOR Task 1.2）：前處理總開關關且縮尾子開關開 ⇒ `PROBE_L65_GATE_SALT`；否則 None。"""
+        if not l65_enabled(config) and bool(config.preprocessing.winsorization.enabled):
+            return PROBE_L65_GATE_SALT
+        return None
+
     def _compute_config_hash(
         self,
         config: "FactoryConfig",
@@ -4137,6 +4142,11 @@ class FeatureFactory:
         # FFSTAT Task 2.3 ⑨：預熱政策（逐欄穩定點）與倍數表內容皆改變輸出值 ⇒ 納入快取鍵（改前快取一律未命中）
         config_payload["_warmup_policy"] = _stable_mask.WARMUP_POLICY
         config_payload["_warmup_table_sha256"] = _warmup_lookup.table_sha256()
+        # PROBEWINSOR Task 1.2：探測縮尾改與總開關同源只改變「總開關關＋縮尾開」之輸出 ⇒ 只此子空間加鹽，
+        # 使改前同 hash 之 registry／成品（多週期 resume 不比對載入窗）不被沿用；其餘子空間 hash 不變
+        probe_salt = self._probe_gate_salt(config)
+        if probe_salt is not None:
+            config_payload["_probe_l65_gate"] = probe_salt
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 

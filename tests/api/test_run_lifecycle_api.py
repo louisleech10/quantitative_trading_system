@@ -566,6 +566,8 @@ async def test_resume_batch_retains_completed_item_with_present_manifest(
     service._safe_persist_checkpoint(checkpoint)
     execute_mock = AsyncMock()
     monkeypatch.setattr(service, "execute_resume", execute_mock)
+    # PROBEWINSOR Task 1.4：續跑核對完成項身分——本測之完成項視為目前碼所產（身分＝其 run hash）
+    monkeypatch.setattr(service, "_resume_identity", lambda _checkpoint: (lambda _symbol, _timeframe: "cfg_batch2d"))
 
     response = await service.resume_batch("batch-present")
 

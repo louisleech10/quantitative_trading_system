@@ -1195,6 +1195,8 @@ async def test_retention_crash_a_resume_batch_path_marks_pending(
     checkpoint["queued_items"] = []
     service._write_checkpoint_atomic(checkpoint)
     calls_before = len(mock_browse_registrar.calls)
+    # PROBEWINSOR Task 1.4：續跑核對完成項身分——本測之完成項視為目前碼所產（身分＝其 run hash）
+    monkeypatch.setattr(service, "_resume_identity", lambda _checkpoint: (lambda _symbol, _timeframe: "cfg_batch_ret"))
 
     result = await service.resume_batch(batch_id)
 

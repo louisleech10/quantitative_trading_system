@@ -253,21 +253,11 @@ class FeatureFactoryBatchService:
         if checkpoint is None:
             raise FileNotFoundError(f"batch checkpoint not found: {batch_id}")
 
-        completed_items = checkpoint.get("completed_items", [])
-        retained_completed = []
-        for item in completed_items:
-            run_hash = self._resolve_completed_run_hash(item)
-            if run_hash is None:
-                logger.warning("Legacy completed item has no resolvable run hash: %s", item)
-                retained_completed.append(item)
-                continue
-            if self._completed_manifest_exists(item, run_hash):
-                retained_completed.append(item)
-                continue
+        retained_completed, requeued = self._partition_completed_items(checkpoint, self._resume_identity(checkpoint))
+        for item in requeued:
             checkpoint.setdefault("queued_items", []).append({
                 "symbol": item.get("symbol"), "timeframe": item.get("timeframe")
             })
-            logger.info("Requeued completed item with missing run manifest: %s", item)
         checkpoint["completed_items"] = retained_completed
 
         if self._is_batch_retention_enabled():
@@ -333,6 +323,61 @@ class FeatureFactoryBatchService:
         browse_id = str(item.get("browse_task_id") or "")
         match = re.fullmatch(rf"browse_{re.escape(symbol)}_{re.escape(timeframe)}_([A-Za-z0-9_.-]{{1,64}})", browse_id)
         return match.group(1) if match else None
+
+    def _partition_completed_items(
+        self,
+        checkpoint: Dict[str, Any],
+        identity: Callable[[str, str], str],
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """續跑時完成項之去留（PROBEWINSOR Task 1.4）：run hash 無法解析之舊格式項保留（改前契約，不重算身分）；
+        manifest 不在、或目前碼之身分（`identity(symbol, timeframe)`）拋例外或不等於 run hash ⇒ 重排；其餘保留。"""
+        retained: List[Dict[str, Any]] = []
+        requeued: List[Dict[str, Any]] = []
+        for item in checkpoint.get("completed_items", []):
+            run_hash = self._resolve_completed_run_hash(item)
+            if run_hash is None:
+                logger.warning("Legacy completed item has no resolvable run hash: %s", item)
+                retained.append(item)
+                continue
+            if not self._completed_manifest_exists(item, run_hash):
+                logger.info("Requeued completed item with missing run manifest: %s", item)
+                requeued.append(item)
+                continue
+            try:
+                current = identity(str(item.get("symbol") or ""), str(item.get("timeframe") or ""))
+            except Exception as exc:  # 無法確認身分 ⇒ 不以舊結果充當完成
+                logger.warning("Requeued completed item; identity check failed: %s (%s)", item, exc)
+                requeued.append(item)
+                continue
+            if current != run_hash:
+                logger.info("Requeued completed item; identity changed %s -> %s: %s", run_hash, current, item)
+                requeued.append(item)
+                continue
+            retained.append(item)
+        return retained, requeued
+
+    @staticmethod
+    def _resume_identity(checkpoint: Dict[str, Any]) -> Callable[[str, str], str]:
+        """以 checkpoint 之請求（設定、起訖日）與批次生成同一 kline 目錄建目前碼之身分函式（PROBEWINSOR Task 1.4）。"""
+        from momentum.factories import create_feature_factory
+
+        payload = checkpoint.get("request_payload") or {}
+        config_override = payload.get("config_override")
+        start_date = payload.get("start_date")
+        end_date = payload.get("end_date")
+        cache_dir: Optional[str] = None
+        try:
+            from api.core.config import settings
+
+            cache_dir = str(settings.data_cache_path / "feature_klines")
+        except Exception:
+            pass  # 同 _compute_single_body：使用 create_feature_factory 預設值
+        factory = create_feature_factory(cache_dir=cache_dir)
+
+        def identity(symbol: str, timeframe: str) -> str:
+            return factory.config_identity(symbol, timeframe, config_override, start_date, end_date)
+
+        return identity
 
     @staticmethod
     def _completed_manifest_exists(item: Dict[str, Any], run_hash: str) -> bool:
