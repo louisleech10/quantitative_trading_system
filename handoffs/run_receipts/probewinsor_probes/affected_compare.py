@@ -64,12 +64,44 @@ def _results(out: Path, label: str, path: str) -> Tuple[Dict[str, str], str]:
     return results, ""
 
 
+def _ratiounsafe_errors(result: Any) -> List[str]:
+    """RATIOUNSAFE 比對產物之形狀與結論：須為物件、`equal` 恰為 True、off 與 on 兩臂皆在且各 `equal` 為 True、無差異鍵。"""
+    if not isinstance(result, dict):
+        return ["RATIOUNSAFE 產物非物件"]
+    errors = [] if result.get("equal") is True else ["RATIOUNSAFE equal 非 True"]
+    arms = result.get("arms")
+    if not isinstance(arms, dict):
+        return errors + ["RATIOUNSAFE 無 arms"]
+    for arm in ("off", "on"):
+        entry = arms.get(arm)
+        if not isinstance(entry, dict) or entry.get("equal") is not True or entry.get("diff_keys") != []:
+            errors.append(f"RATIOUNSAFE 臂 {arm} 缺或不等")
+    return errors
+
+
+def _attribution_errors(record: Any) -> List[str]:
+    """單筆歸因之形狀：物件；`cause`、`disposition` 為非空字串；`rerun_after_disposition` 含非空 head、command、result，
+    且 result 為全過（含 passed、不含 failed／error）。語意核可由審碼完成，此處只擋缺件與空殼。"""
+    if not isinstance(record, dict):
+        return ["歸因非物件"]
+    errors = [f"缺 {k}" for k in ("cause", "disposition") if not (isinstance(record.get(k), str) and record[k].strip())]
+    rerun = record.get("rerun_after_disposition")
+    if not isinstance(rerun, dict):
+        return errors + ["缺 rerun_after_disposition"]
+    errors += [f"rerun 缺 {k}" for k in ("head", "command", "result")
+               if not (isinstance(rerun.get(k), str) and rerun[k].strip())]
+    result = str(rerun.get("result", ""))
+    if "passed" not in result or "failed" in result or "error" in result:
+        errors.append(f"rerun 結果非全過：{result!r}")
+    return errors
+
+
 def main(argv: List[str]) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("out_dir")
     parser.add_argument("anchor_label")
     parser.add_argument("fixed_label")
-    parser.add_argument("--ratiounsafe", default=None)
+    parser.add_argument("--ratiounsafe", required=True)
     parser.add_argument("--attribution", default=None)
     parser.add_argument("--receipt", default=str(REPO / "handoffs/run_receipts/probewinsor-affected.json"))
     args = parser.parse_args(argv)
@@ -116,14 +148,18 @@ def main(argv: List[str]) -> int:
         "incomplete": incomplete,
         "per_file": per_file,
     }
-    if args.ratiounsafe:  # ratiounsafe_ppoff_compare.py 之產物（前處理關臂重產 vs baseline.json）
-        receipt["ratiounsafe"] = json.loads(Path(args.ratiounsafe).read_text(encoding="utf-8"))
-    # 錨點綠而修正後紅者須逐項具名歸因（SPEC Task 1.3：經審碼核可後以 TODO 修訂處置；不得放寬斷言換綠）
+    # RATIOUNSAFE 前處理關臂比對為必要證據（SPEC Task 1.3）：缺、不合形或任一臂不等 ⇒ 不通過（不以缺席當相等）
+    receipt["ratiounsafe"] = json.loads(Path(args.ratiounsafe).read_text(encoding="utf-8"))
+    receipt["ratiounsafe_errors"] = _ratiounsafe_errors(receipt["ratiounsafe"])
+    # 錨點綠而修正後紅者須逐項具名歸因（SPEC Task 1.3：經審碼核可後以 TODO 修訂處置；不得放寬斷言換綠）；
+    # 每筆須含非空 cause、disposition 與處置後重跑證據（head、command、result 且 result 為全過）
     attribution = json.loads(Path(args.attribution).read_text(encoding="utf-8")) if args.attribution else {}
     receipt["attribution"] = attribution
     receipt["unattributed"] = [n for n in anchor_green_fixed_red if n not in attribution]
-    receipt["pass"] = (not incomplete and not receipt["unattributed"]
-                       and receipt.get("ratiounsafe", {}).get("equal", True))
+    receipt["attribution_errors"] = [f"{n}：{e}" for n in anchor_green_fixed_red if n in attribution
+                                     for e in _attribution_errors(attribution[n])]
+    receipt["pass"] = (not incomplete and not receipt["unattributed"] and not receipt["attribution_errors"]
+                       and not receipt["ratiounsafe_errors"])
     Path(args.receipt).write_text(json.dumps(receipt, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"pass={receipt['pass']} anchor_green_fixed_red={len(anchor_green_fixed_red)} "
           f"anchor_red={len(anchor_red)} incomplete={len(incomplete)} → {args.receipt}")

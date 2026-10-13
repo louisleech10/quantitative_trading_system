@@ -745,6 +745,7 @@
   },
   "equal": true
  },
+ "ratiounsafe_errors": [],
  "attribution": {
   "tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version": {
    "cause": "測試之 config 替身（SimpleNamespace 只帶 model_dump）無 preprocessing；Task 1.2 之 _probe_gate_salt 依 SPEC 邊界 07 經 l65_enabled 缺鍵即拋 ValueError（刻意 fail-closed），致 _compute_config_hash 於修正後拋錯。真實 FactoryConfig 必有 preprocessing（預設 enabled=True），生產路徑不受影響。",
@@ -757,5 +758,6 @@
   }
  },
  "unattributed": [],
+ "attribution_errors": [],
  "pass": true
 }
