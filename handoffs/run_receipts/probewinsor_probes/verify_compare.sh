@@ -1,20 +1,39 @@
 #!/usr/bin/env bash
-# 驗 affected_compare.py 之 fail-closed：真實輸入通過；缺 --ratiounsafe、空歸因、RATIOUNSAFE 不等皆不通過
+# 驗 affected_compare.py 之 fail-closed（審碼 r1 CODEX-R1-P1-01／02；r2 CODEX-R2-P1-01：逐案斷言預期 rc 與收據欄位，任一不符 ⇒ exit 1）：
+#   ①真實輸入 rc 0 且 pass=True ②缺 --ratiounsafe rc 2 ③空歸因 rc 1 且 attribution_errors 非空、pass=False
+#   ④RATIOUNSAFE 一臂不等 rc 1 且 ratiounsafe_errors 非空、pass=False
+# 用法：bash verify_compare.sh <兩輪 junit 與進度之 out_dir> <暫存目錄>
 set -u
-R=/Users/louis/Desktop/quantitative_trading_system
-S=/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/b433f210-2afd-44b3-b365-54a46b211dec/scratchpad
+OUT="${1:?out_dir}"; TMP="${2:?tmp_dir}"
+R="$(cd "$(dirname "$0")/../../.." && pwd)"
 PY="${R}/venv/bin/python"
 C="${R}/handoffs/run_receipts/probewinsor_probes/affected_compare.py"
 RU="${R}/handoffs/run_receipts/probewinsor_probes/out/ratiounsafe_ppoff_fixed.json"
 AT="${R}/handoffs/run_receipts/probewinsor_probes/affected_attribution.json"
+mkdir -p "${TMP}"
+fails=0
+check() {  # check <案名> <實得 rc> <預期 rc> [<jq 條件> <收據>]
+  local name="$1" got="$2" want="$3"
+  if [ "${got}" != "${want}" ]; then
+    echo "FAIL ${name}：rc=${got}（預期 ${want}）"; fails=$((fails + 1)); return
+  fi
+  if [ $# -ge 5 ] && ! jq -e "$4" "$5" > /dev/null 2>&1; then
+    echo "FAIL ${name}：收據不合 $4"; fails=$((fails + 1)); return
+  fi
+  echo "OK   ${name}：rc=${got}"
+}
 cd "${R}" || exit 2
-echo '{"tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version": {}}' > "${S}/attr_empty.json"
-jq '.equal = false | .arms.on.equal = false | .arms.on.diff_keys = ["columns"]' "${RU}" > "${S}/ru_bad.json"
-"${PY}" "${C}" "${S}/affected" anchor fixed --ratiounsafe "${RU}" --attribution "${AT}" --receipt "${S}/rc_ok.json" > /dev/null 2>&1
-echo "真實輸入 rc=$?（預期 0）"
-"${PY}" "${C}" "${S}/affected" anchor fixed --attribution "${AT}" --receipt "${S}/rc_nru.json" > /dev/null 2>&1
-echo "缺 --ratiounsafe rc=$?（預期非 0）"
-"${PY}" "${C}" "${S}/affected" anchor fixed --ratiounsafe "${RU}" --attribution "${S}/attr_empty.json" --receipt "${S}/rc_empty.json" > /dev/null 2>&1
-echo "空歸因 rc=$?（預期 1）；errors=$(jq -c '.attribution_errors' "${S}/rc_empty.json")"
-"${PY}" "${C}" "${S}/affected" anchor fixed --ratiounsafe "${S}/ru_bad.json" --attribution "${AT}" --receipt "${S}/rc_rubad.json" > /dev/null 2>&1
-echo "RATIOUNSAFE 不等 rc=$?（預期 1）；errors=$(jq -c '.ratiounsafe_errors' "${S}/rc_rubad.json")"
+echo '{"tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version": {}}' > "${TMP}/attr_empty.json"
+jq '.equal = false | .arms.on.equal = false | .arms.on.diff_keys = ["columns"]' "${RU}" > "${TMP}/ru_bad.json"
+
+"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${RU}" --attribution "${AT}" --receipt "${TMP}/rc_ok.json" > /dev/null 2>&1
+check "真實輸入" "$?" 0 '.pass == true and .attribution_errors == [] and .ratiounsafe_errors == []' "${TMP}/rc_ok.json"
+"${PY}" "${C}" "${OUT}" anchor fixed --attribution "${AT}" --receipt "${TMP}/rc_nru.json" > /dev/null 2>&1
+check "缺 --ratiounsafe" "$?" 2
+"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${RU}" --attribution "${TMP}/attr_empty.json" --receipt "${TMP}/rc_empty.json" > /dev/null 2>&1
+check "空歸因" "$?" 1 '.pass == false and (.attribution_errors | length) > 0' "${TMP}/rc_empty.json"
+"${PY}" "${C}" "${OUT}" anchor fixed --ratiounsafe "${TMP}/ru_bad.json" --attribution "${AT}" --receipt "${TMP}/rc_rubad.json" > /dev/null 2>&1
+check "RATIOUNSAFE 不等" "$?" 1 '.pass == false and (.ratiounsafe_errors | length) > 0' "${TMP}/rc_rubad.json"
+
+[ "${fails}" -eq 0 ] || { echo "verify_compare：${fails} 案不符"; exit 1; }
+echo "verify_compare：4 案皆符"
