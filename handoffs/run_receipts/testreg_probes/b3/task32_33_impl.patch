@@ -1,0 +1,306 @@
+diff --git a/scripts/testreg.py b/scripts/testreg.py
+index 5335e871..7f7ac01f 100644
+--- a/scripts/testreg.py
++++ b/scripts/testreg.py
+@@ -45,6 +45,7 @@ import os
+ import re
+ import shlex
+ import shutil
++import statistics
+ import subprocess
+ import sys
+ import tempfile
+@@ -4684,7 +4685,185 @@ def run_subbatch(repo_root: Path, manifest_path: str, phase: int, base: str, *,
+     nodeid 於 base 之 detached worktree 重跑同 nodeid，以 `framepath_affected_gate.classify` 歸屬（模組屬性取用）；
+     收據形狀＝schema `types.subbatch_receipt`，寫入前驗形並驗 `subbatch_gate` 所列欄間關係；回傳 0＝本子批造成＝0
+     且無缺且無未完成檔、1＝否、3＝暫停（progress.json state＝paused）。"""
+-    raise NotImplementedError("TESTREG Task 3.2")
++    root = Path(repo_root).resolve()
++    g = _gate_module()
++    try:
++        return _run_subbatch(g, root, manifest_path, phase, base, out, receipt, max_seconds)
++    except g.Paused:
++        runner = _SUBBATCH_RUNNER.get("runner")
++        if runner is not None:
++            runner.progress("paused", "", [], state="paused")
++        sys.stdout.write("TESTREG run：PAUSED（本段時間預算用盡，停於兩次 pytest 呼叫之間）；以同一命令接續\n")
++        return 3
++    except g.GateError as exc:
++        raise TestregError(f"RUN {exc}") from exc
++
++
++_SUBBATCH_RUNNER: Dict[str, Any] = {}
++
++
++def _subbatch_changed(g: Any, root: Path, base: str) -> List[str]:
++    """changed_paths＝base 至工作樹之 diff ∪ 未追蹤檔，扣閘之 FP_EXCLUDES（handoffs／__pycache__／生成之已追蹤清冊）。"""
++    out = {p for p in _git_out(root, "diff", "--name-only", "--no-renames", base).splitlines() if p}
++    out |= {p for p in _git_out(root, "ls-files", "--others", "--exclude-standard", "-z").split("\0") if p}
++    return sorted(p for p in out if not g._fp_excluded(p))
++
++
++def _subbatch_collect(g: Any, test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
++    """完整收集（含類別方法與參數化）：逐行 nodeid 之輸出所需 verbosity 依 pytest.ini 之 addopts 而異（本 repo 之
++    addopts 含 -v ⇒ -qq；無 -v 之倉 ⇒ -q），兩者依序試，取第一個逐行印出 nodeid 者；皆無 ⇒ TestregError。"""
++    tail = ""
++    for q in ("-q", "-qq"):
++        g.restore_generated(cwd)
++        try:
++            proc = g._pytest(["--collect-only", q, "-p", "no:cacheprovider", test_file], cwd, env,
++                             timeout=g.COLLECT_TIMEOUT_SECONDS)
++        except subprocess.TimeoutExpired as exc:
++            raise TestregError(f"RUN {test_file} collect 逾 {g.COLLECT_TIMEOUT_SECONDS} 秒未返回") from exc
++        finally:
++            g.restore_generated(cwd)
++        ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
++        if proc.returncode == 0 and ids:
++            return ids
++        tail = (proc.stdout + proc.stderr)[-300:]
++    raise TestregError(f"RUN {test_file} 收集失敗或為空：{tail}")
++
++
++def _base_worktree(g: Any, root: Path, out: Path, base: str) -> Path:
++    """base 之 detached worktree（接續時沿用同一棵）：HEAD＝base、工作樹乾淨（豁免 data_cache symlink 與 __pycache__）。"""
++    wt = out / f"base_{base[:12]}" / "wt"
++    if not wt.exists():
++        wt.parent.mkdir(parents=True, exist_ok=True)
++        _git_out(root, "worktree", "add", "--detach", str(wt), base)
++    if _git_out(wt, "rev-parse", "HEAD").strip() != base:
++        raise TestregError(f"RUN base worktree {wt} 之 HEAD ≠ {base[:12]}")
++    dirty = [ln for ln in _git_out(wt, "status", "--porcelain").splitlines() if ln.strip() and not g._benign_status(ln)]
++    if dirty:
++        raise TestregError(f"RUN base worktree 不乾淨：{dirty[:5]}")
++    dc = root / "data_cache"
++    if dc.exists() and not (wt / "data_cache").exists():
++        (wt / "data_cache").symlink_to(dc)
++    return wt
++
++
++def _subbatch_inputs_digest(g: Any, root: Path, base: str, head: str, manifest_sha: str, phase: int,
++                            schema: Mapping[str, Any]) -> str:
++    h = hashlib.sha256()
++    for part in (base, head, _git_out(root, "diff", "--binary", "HEAD", "--", ".", *g.FP_EXCLUDES),
++                 g.content_inputs(root), manifest_sha, str(phase),
++                 *(_sha256_file(root / rel) or "<missing>"
++                   for rel in (schema["catalog"]["path"], SCHEMA_REL, "scripts/testreg.py"))):
++        h.update(part.encode("utf-8", "replace"))
++        h.update(b"\0")
++    return h.hexdigest()
++
++
++def _subbatch_relation_errors(r: Mapping[str, Any], collected: Mapping[str, Sequence[str]]) -> List[str]:
++    """契約 `subbatch_gate` 所列欄間關係（寫入前自驗；任一不符 ⇒ 不寫 pass）。"""
++    errs = []
++    sel = [x["path"] for x in r["selection"]["selected"]]
++    if set(r["files"]) != set(sel):
++        errs.append("files 鍵集合 ≠ selection.selected 之 path 集合")
++    if set(r["expected"]) != set().union(*(set(collected.get(p, ())) for p in sel)):
++        errs.append("expected ≠ 選中各檔 collect 所得 nodeid 之聯集")
++    if not set(r["results"]) <= set(r["expected"]):
++        errs.append("results 鍵不 ⊆ expected")
++    if r["missing"] != sorted(n for n in r["expected"] if n not in r["results"]):
++        errs.append("missing ≠ expected 中無 results 者")
++    bad = {n for n, o in r["results"].items() if o != "passed"}
++    if set(r["caused"]) & set(r["head_red"]) or set(r["caused"]) | set(r["head_red"]) != bad:
++        errs.append("caused 與 head_red 須互斥且聯集＝results 中非 passed 者")
++    if r["pass"] != (not r["caused"] and not r["missing"] and not r["incomplete_files"]):
++        errs.append("pass ≠（caused、missing、incomplete_files 皆空）")
++    return errs
++
++
++def _run_subbatch(g: Any, root: Path, manifest_path: str, phase: int, base: str, out: Optional[Path],
++                  receipt: Path, max_seconds: Optional[float]) -> int:
++    schema = load_schema(root)
++    base_sha = _git_out(root, "rev-parse", "--verify", f"{base}^{{commit}}").strip()
++    head_sha = _git_out(root, "rev-parse", "HEAD").strip()
++    mpath = root / manifest_path
++    try:
++        mbytes = mpath.read_bytes()
++        manifest = json.loads(mbytes.decode("utf-8"))
++    except (OSError, ValueError) as exc:
++        raise TestregError(f"MANIFEST {manifest_path}: 不存在或不可解析") from exc
++    out = Path(out).resolve() if out is not None else \
++        Path(tempfile.gettempdir()) / f"testreg_run_p{phase}_{base_sha[:12]}"
++    out.mkdir(parents=True, exist_ok=True)
++    env = dict(os.environ, PYTHONPATH=str(root))
++    changed = _subbatch_changed(g, root, base_sha)
++    must = _seam("must_from_manifest")(root, manifest, phase)
++    sel = _seam("impact")(root, changed, must, previously_failed_from_summary(root))
++    files = [x["path"] for x in sel["selected"]]
++    collected: Dict[str, List[str]] = {}
++    incomplete: List[str] = []
++    for f in files:
++        try:
++            collected[f] = _subbatch_collect(g, f, root, env)
++        except TestregError as exc:
++            sys.stderr.write(f"{exc}\n")
++            collected[f] = []
++            incomplete.append(f)
++    expected = sorted(set().union(*(set(v) for v in collected.values())))
++    ledger_dir = root / schema["ledger"]["dir"]
++    # 時間預算自執行起算（收集不計）：首段至少執行一個檔，於兩次呼叫之間停下
++    runner = _SUBBATCH_RUNNER["runner"] = g.Runner(out, max_seconds, len(expected), ledger_dir=ledger_dir)
++    batch: Dict[str, Dict[str, str]] = {}
++    per_file: Dict[str, Dict[str, Any]] = {}
++    for f in files:
++        ids = collected[f]
++        if not ids:
++            per_file[f] = {"rc": -1, "reused": False}
++            continue
++        tag = f.replace("/", "_")
++        xml = out / "junit" / (tag + ".xml")
++        meta = xml.with_suffix(".meta.json")
++        before = (meta.stat().st_ino, meta.stat().st_mtime_ns) if meta.is_file() else None
++        key = g.state_key(root, f, phase, env) + "|" + "|".join(ids)
++        rc, res = runner.run(f, xml, root, env, None, (), key, ids, phase="run")
++        after = (meta.stat().st_ino, meta.stat().st_mtime_ns) if meta.is_file() else None
++        per_file[f] = {"rc": rc, "reused": before is not None and before == after}
++        if rc not in g.RUN_RC_OK or set(ids) - set(res):
++            incomplete.append(f)
++        batch.update({n: dict(v) for n, v in res.items() if n in ids})
++    not_passed = [n for n in expected if n in batch and batch[n].get("outcome") != "passed"]
++    anchor_res: Dict[str, Dict[str, str]] = {}
++    if not_passed:
++        wt = _base_worktree(g, root, out, base_sha)
++        base_env = dict(os.environ, PYTHONPATH=str(wt))
++        for f in dict.fromkeys(n.split("::", 1)[0] for n in not_passed):
++            ids = [n for n in not_passed if n.split("::", 1)[0] == f]
++            if not (wt / f).is_file():
++                continue
++            akey = "base|" + g.state_key(wt, f, phase, base_env) + "|" + "|".join(ids)
++            arc, ares = runner.run(f, out / "base_junit" / (f.replace("/", "_") + ".xml"), wt, base_env, ids, (),
++                                   akey, ids, phase="anchor")
++            anchor_res.update(g.anchor_usable(arc, ares, ids))
++    runner.progress("done", "", [], state="finished")
++    cls = g.classify(expected, batch, anchor_res)
++    results = {n: batch[n]["outcome"] for n in expected if n in batch}
++    rcpt: Dict[str, Any] = {
++        "manifest_path": manifest_path, "manifest_sha256": hashlib.sha256(mbytes).hexdigest(), "phase": phase,
++        "base": base_sha, "head": head_sha,
++        "inputs_digest": _subbatch_inputs_digest(g, root, base_sha, head_sha, hashlib.sha256(mbytes).hexdigest(),
++                                                 phase, schema),
++        "changed_paths": changed, "selection": sel, "files": per_file, "expected": expected, "results": results,
++        "incomplete_files": sorted(set(incomplete)), "missing": sorted(n for n in expected if n not in results),
++        "caused": sorted(cls["caused"]), "head_red": sorted(cls["head_red"]), "pass": False}
++    rcpt["pass"] = not rcpt["caused"] and not rcpt["missing"] and not rcpt["incomplete_files"]
++    errs = [*_seam("validate_shape")(rcpt, {"type": "types.subbatch_receipt"}, schema, "subbatch_receipt"),
++            *_subbatch_relation_errors(rcpt, collected)]
++    if errs:
++        raise TestregError(f"RUN 收據不合契約：{errs[:5]}")
++    rp = receipt if Path(receipt).is_absolute() else root / receipt
++    rp.parent.mkdir(parents=True, exist_ok=True)
++    rp.write_text(json.dumps(rcpt, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
++    sys.stdout.write(f"TESTREG run：files={len(files)} expected={len(expected)} incomplete={len(rcpt['incomplete_files'])} "
++                     f"missing={len(rcpt['missing'])} caused={len(rcpt['caused'])} head_red={len(rcpt['head_red'])} "
++                     f"pass={rcpt['pass']}\n")
++    return 0 if rcpt["pass"] else 1
+ 
+ 
+ # ── Task 3.3／4.3：成效報告 ──────────────────────────────────────────────────────────────────────────
+@@ -4695,7 +4874,91 @@ def effect_report(repo_root: Path, scope: Sequence[str] = ()) -> Dict[str, Any]:
+     且其 entry 之函式皆有碑之檔數）、evidence_levels（各等級碑數）、saved_seconds_per_full_run（每一被淘汰函式層 nodeid
+     之全部參數化 nodeid 於 summary 中 outcome=passed 紀錄之 duration_s 中位數之和；任一被淘汰 nodeid 無此紀錄 ⇒ 字面
+     "unknown"，不寫 0、不外插）；scope 為碑 nodeid 之路徑前綴（空＝全部），記於報告 scope 欄。"""
+-    raise NotImplementedError("TESTREG Task 3.3")
++    root = Path(repo_root).resolve()
++    s = load_schema(root)
++    cat = load_catalog(root)
++    scope = list(scope)
++    all_tombs = [t for t in cat.get("tombstones", []) if isinstance(t, dict) and isinstance(t.get("nodeid"), str)]
++    tombs = [t for t in all_tombs if not scope or any(t["nodeid"].startswith(p) for p in scope)]
++    levels = {k: 0 for k in s["enums"]["retire_evidence_level"]}
++    for t in tombs:
++        levels[t["evidence_level"]] = levels.get(t["evidence_level"], 0) + 1
++    tomb_ids = {t["nodeid"] for t in all_tombs}
++    wt, head = _Tree(root, "worktree"), _Tree(root, "HEAD")
++    entries = cat.get("entries", {})
++    retired_files = 0
++    for p in sorted({t["nodeid"].split("::", 1)[0] for t in tombs}):
++        if p not in entries or wt.read(p) is not None:
++            continue
++        fns = _function_nodeids(head, p)
++        if all(n in tomb_ids for n in fns):  # HEAD 無此檔（刪除已提交）⇒ 同 V01：有碑即算
++            retired_files += 1
++    nodes = _summary_nodes(root)
++    params: Dict[str, List[str]] = {}
++    for k in nodes:
++        params.setdefault(re.sub(r"\[.*\]$", "", k), []).append(k)
++    total, unknown = 0.0, False
++    for nid in sorted({t["nodeid"] for t in tombs}):
++        if nid not in params:
++            unknown = True
++            break
++        for k in params[nid]:
++            durs = [r["duration_s"] for r in nodes[k] if r.get("outcome") == "passed"]
++            if not durs:
++                unknown = True
++                break
++            total += float(statistics.median(durs))
++        if unknown:
++            break
++    return {"scope": scope, "retired_functions": len(tombs), "retired_files": retired_files,
++            "evidence_levels": levels, "saved_seconds_per_full_run": "unknown" if unknown else total}
++
++
++def _summary_nodes(repo_root: Path) -> Dict[str, List[Dict[str, Any]]]:
++    """summary 之 nodes（合法性同 `previously_failed_from_summary`）；不存在或不合法 ⇒ {}。"""
++    s = load_schema(repo_root)
++    try:
++        obj = json.loads((Path(repo_root) / s["summary"]["path"]).read_text(encoding="utf-8"))
++    except (OSError, ValueError):
++        return {}
++    if not isinstance(obj, dict) or obj.get("schema_version") != s["version"] or obj.get("k") != s["summary"]["k"] \
++            or _seam("validate_shape")(obj, s["summary"]["shape"], s):
++        return {}
++    return obj["nodes"]
++
++
++def _cli_effect(root: Path, out: Optional[str], recompute: Optional[str], scope: Sequence[str]) -> int:
++    """`effect --out`：寫報告（寫入前驗形）；`effect --recompute`：讀報告驗形後以其 scope 重算，逐欄 == 才 rc 0；
++    不符一律以 `EFFECT ` 開頭之列寫 stderr、rc 1。"""
++    s = load_schema(root)
++    spec = {"type": "types.effect_report"}
++    if out is not None:
++        rep = effect_report(root, scope)
++        errs = _seam("validate_shape")(rep, spec, s, "effect_report")
++        if errs:
++            for e in errs:
++                sys.stderr.write(f"EFFECT {e}\n")
++            return 1
++        p = Path(out) if Path(out).is_absolute() else root / out
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_text(json.dumps(rep, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
++        return 0
++    p = Path(recompute) if Path(recompute).is_absolute() else root / recompute
++    try:
++        rep = json.loads(p.read_text(encoding="utf-8"))
++    except (OSError, ValueError):
++        sys.stderr.write(f"EFFECT {recompute}: 不存在或非 JSON\n")
++        return 1
++    errs = _seam("validate_shape")(rep, spec, s, "effect_report")
++    if errs:
++        for e in errs:
++            sys.stderr.write(f"EFFECT {e}\n")
++        return 1
++    again = effect_report(root, rep["scope"])
++    bad = [k for k in sorted(again) if rep.get(k) != again[k]]
++    for k in bad:
++        sys.stderr.write(f"EFFECT {k}: 報告 {rep.get(k)!r} ≠ 重算 {again[k]!r}\n")
++    return 1 if bad else 0
+ 
+ 
+ # ── CLI ──────────────────────────────────────────────────────────────────────────────────────────────
+@@ -4751,8 +5014,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
+         elif args.cmd == "impact":
+             sys.stdout.write(json.dumps(_cli_impact(root, args.changed_from, args.manifest, args.phase),
+                                         ensure_ascii=False, sort_keys=True) + "\n")
++        elif args.cmd == "effect":
++            return _cli_effect(root, args.out, args.recompute, args.scope)
+         else:
+-            raise TestregError(f"USAGE {args.cmd}: 第 2 批以後實作")
++            return _seam("run_subbatch")(root, args.manifest, args.phase, args.base,
++                                         out=Path(args.out) if args.out else None, receipt=Path(args.receipt),
++                                         max_seconds=args.max_seconds)
+     except TestregError as exc:
+         sys.stderr.write(str(exc).splitlines()[0] + "\n")
+         return 2
