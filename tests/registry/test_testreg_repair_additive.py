@@ -722,3 +722,28 @@ def test_s_session_scope_plugin_param_fixture_not_enumerable(ra):
     assert sum(1 for n in recs if n.startswith(f"{PF}::test_plug[")) == 2
     errs = testreg.session_scope_errors(_ctx(ra["repo"]), ra["s"]["p@file"], f"{PF}::test_plug")
     assert any("不可靜態列舉" in e for e in errs), errs
+
+
+# ── v50（修訂審查 r48 處置；只增）：外掛模組中 autouse＋params 之 fixture，測試函式不請求 ────────────────────────────
+CONFTEST_V50 = 'pytest_plugins = ["tests.plug_auto"]\n'
+PLUG_V50 = "import pytest\n\n\n@pytest.fixture(autouse=True, params=[1, 2])\ndef plug_auto(request):\n    return request.param\n"
+PA = "tests/test_pa.py"
+T_PA_V50 = "def test_pa():\n    assert True\n"
+
+
+@pytest.fixture(scope="module")
+def ra_auto(tmp_path_factory) -> Dict[str, Any]:
+    """(t) 專用暫存 repo：autouse 外掛 fixture 會參數化同一 session 之全部測試，故不併入 ra。"""
+    r = make_repo(tmp_path_factory.mktemp("ra_auto"), {"momentum/__init__.py": "", "momentum/other.py": OTHER,
+                                                       "tests/conftest.py": CONFTEST_V50,
+                                                       "tests/plug_auto.py": PLUG_V50, PA: T_PA_V50})
+    return {"repo": r, "sid": _run_with(r, [], PA)}
+
+
+def test_t_session_scope_plugin_autouse_param_fixture_not_enumerable(ra_auto):
+    """(t) test_pa 不請求任何 fixture，但根 conftest 以 pytest_plugins 載入之外掛模組中有 autouse＋params 之 fixture
+    （前提：整檔 session 中有 2 筆）⇒ session_scope 以「不可靜態列舉」為理由不成立（不遍歷外掛 autouse 之實作會少算為 1）。"""
+    recs = test_records(ra_auto["repo"], ra_auto["sid"])
+    assert sum(1 for n in recs if n.startswith(f"{PA}::test_pa[")) == 2
+    errs = testreg.session_scope_errors(_ctx(ra_auto["repo"]), ra_auto["sid"], f"{PA}::test_pa")
+    assert any("不可靜態列舉" in e for e in errs), errs

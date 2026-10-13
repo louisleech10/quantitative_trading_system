@@ -1,0 +1,6 @@
+== M9 (autouse traversal removed) ==
+tests/registry/test_testreg_repair_additive.py::test_t_session_scope_plugin_autouse_param_fixture_not_enumerable FAILED [ 50%]
+tests/registry/test_testreg_repair_additive.py::test_s_session_scope_plugin_param_fixture_not_enumerable PASSED [100%]
+FAILED tests/registry/test_testreg_repair_additive.py::test_t_session_scope_plugin_autouse_param_fixture_not_enumerable
+========================= 1 failed, 1 passed in 26.26s =========================
+restored to trial
