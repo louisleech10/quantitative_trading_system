@@ -1,0 +1,6 @@
+tests/api/test_xgboost_sequence_features.py
+tests/momentum/Analysis/test_ichc_xsec_capability.py
+tests/momentum/Strategy/test_performance_metrics.py
+tests/momentum/test_monotonicity_tester.py
+tests/phase24/test_rolling_oos_validator.py
+tests/test_multi_symbol_xgboost.py

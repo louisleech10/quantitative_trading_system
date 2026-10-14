@@ -1,0 +1,121 @@
+diff --git a/tests/test_phase2_integration.py b/tests/test_phase2_integration.py
+index cb51e91d..b2de8b82 100644
+--- a/tests/test_phase2_integration.py
++++ b/tests/test_phase2_integration.py
+@@ -440,3 +440,116 @@ def run_all_tests():
+ 
+ if __name__ == "__main__":
+     run_all_tests()
++
++
++class TestPhase2RoutesAndOptimizerSampling:
++    """補強：經生產路由與 OptunaOptimizer 採樣迴圈驗證（獨立 oracle＝config/strategies.yaml 原文與手設範圍）。"""
++
++    def test_list_strategies_route_matches_yaml(self):
++        """GET /api/v1/optimization/strategies：回應之策略 id 與參數數須逐一等於 YAML 原文（且與註冊表一致）。"""
++        from pathlib import Path as _Path
++
++        import yaml as _yaml
++        from fastapi.testclient import TestClient as _TC
++
++        from api.main import app as _app
++
++        doc = _yaml.safe_load((_Path(__file__).resolve().parents[1] / "config" / "strategies.yaml").read_text(
++            encoding="utf-8"))["strategies"]
++        want = {sid: len(cfg["parameters"]) for sid, cfg in doc.items()}
++        r = _TC(_app).get("/api/v1/optimization/strategies")
++        body = r.json() if r.status_code == 200 else {}
++        got = {s["strategy_id"]: s["parameter_count"] for s in body.get("strategies", [])}
++        assert r.status_code == 200 and got == want and body["total"] == len(want) \
++            and sorted(got) == sorted(m.strategy_id for m in strategy_registry.list_strategies()), (r.status_code, got)
++
++    def test_strategy_detail_route_and_404(self):
++        """GET /strategies/three_line 之參數名／範圍／步長須等於 YAML 原文；未知 id ⇒ 404。"""
++        from pathlib import Path as _Path
++
++        import yaml as _yaml
++        from fastapi.testclient import TestClient as _TC
++
++        from api.main import app as _app
++
++        doc = _yaml.safe_load((_Path(__file__).resolve().parents[1] / "config" / "strategies.yaml").read_text(
++            encoding="utf-8"))["strategies"]
++        want = [(p["name"], p["min_value"], p["max_value"], p["step"]) for p in doc["three_line"]["parameters"]]
++        client = _TC(_app)
++        r = client.get("/api/v1/optimization/strategies/three_line")
++        detail = r.json().get("strategy", {}) if r.status_code == 200 else {}
++        got = [(p["name"], p.get("min_value"), p.get("max_value"), p.get("step")) for p in detail.get("parameters", [])]
++        missing = client.get("/api/v1/optimization/strategies/invalid_strategy_xyz")
++        assert r.status_code == 200 and detail["strategy_id"] == "three_line" and got == want \
++            and missing.status_code == 404, (r.status_code, got, missing.status_code)
++
++    def test_optimizer_single_objective_samples_with_frontend_ranges(self, tmp_path, monkeypatch):
++        """單目標 objective：INT 參數須以前端覆蓋範圍採樣（distributions 精確等於手設範圍、步長 1）。"""
++        import asyncio as _asyncio
++        import types as _types
++
++        from momentum.Optimization import optuna_optimizer as _oo
++
++        # 範圍互不重疊且間距滿足各策略驗證器（long−short≥10、long−mid≥15）⇒ 任何採樣值皆合法
++        ranges = {"short_period": (5, 10), "mid_period": (20, 30), "long_period": (50, 70)}
++        expect_names = {"three_line": ["short_period", "mid_period", "long_period"],
++                        "short_long_cross": ["short_period", "long_period"],
++                        "mid_long_cross": ["mid_period", "long_period"]}
++        captured = []
++
++        async def _fake_analyze(request):
++            captured.append(dict(request.strategy_config.params))
++            return _types.SimpleNamespace(separation=0.5)
++
++        monkeypatch.setattr(_oo, "SignalDensityRequest", lambda **kw: _types.SimpleNamespace(**kw))
++        for logic, names in expect_names.items():
++            opt = OptunaOptimizer(
++                study_name=f"p2-{logic}", case_storage=Mock(spec=["case_exists", "get_case"]),
++                checkpoint_dir=str(tmp_path / logic), enable_progress_monitor=False,
++                parameter_ranges=ParameterRanges(ema_short_range=ranges["short_period"],
++                                                 ema_mid_range=ranges["mid_period"],
++                                                 ema_long_range=ranges["long_period"],
++                                                 data_sources=["close"], strategy_logics=[logic]))
++            monkeypatch.setattr(opt, "_analyze_signal_density_request", _fake_analyze)
++            trial = optuna.create_study(direction="maximize").ask()
++            int_names = [p.name for p in strategy_registry.get_strategy(logic).parameters if p.type == ParameterType.INT]
++            assert _asyncio.run(opt._objective_function_core(trial)) == 0.5 and int_names == names \
++                and {n: (trial.distributions[n].low, trial.distributions[n].high, trial.distributions[n].step)
++                     for n in names} == {n: (*ranges[n], 1) for n in names} \
++                and captured[-1]["data_source"] == "close" and captured[-1]["indicator_type"] == "ema", logic
++
++    def test_optimizer_multi_objective_samples_with_frontend_ranges(self, tmp_path, monkeypatch):
++        """多目標 objective：同上之採樣範圍；回傳 (separation, stability) 手算＝(0.6−0.2, 1−0.1/0.4)＝(0.4, 0.75)。"""
++        import asyncio as _asyncio
++        import types as _types
++
++        from momentum.Optimization import optuna_optimizer as _oo
++
++        # 範圍互不重疊且間距滿足各策略驗證器（long−short≥10、long−mid≥15）⇒ 任何採樣值皆合法
++        ranges = {"short_period": (5, 10), "mid_period": (20, 30), "long_period": (50, 70)}
++        expect_names = {"three_line": ["short_period", "mid_period", "long_period"],
++                        "short_long_cross": ["short_period", "long_period"],
++                        "mid_long_cross": ["mid_period", "long_period"]}
++
++        async def _fake_analyze(request):
++            return _types.SimpleNamespace(
++                positive_avg_density=0.6, negative_avg_density=0.2, positive_std_density=0.1,
++                negative_std_density=0.1, p_value=0.01, cohens_d=1.0, stability_cv=0.2, case_level_densities=[])
++
++        monkeypatch.setattr(_oo, "SignalDensityRequest", lambda **kw: _types.SimpleNamespace(**kw))
++        for logic, names in expect_names.items():
++            opt = OptunaOptimizer(
++                study_name=f"p2m-{logic}", case_storage=Mock(spec=["case_exists", "get_case"]),
++                checkpoint_dir=str(tmp_path / logic), enable_progress_monitor=False, use_multi_objective=True,
++                parameter_ranges=ParameterRanges(ema_short_range=ranges["short_period"],
++                                                 ema_mid_range=ranges["mid_period"],
++                                                 ema_long_range=ranges["long_period"],
++                                                 data_sources=["close"], strategy_logics=[logic]))
++            monkeypatch.setattr(opt, "_analyze_signal_density_request", _fake_analyze)
++            opt.case_timestamps = {}
++            trial = optuna.create_study(directions=["maximize", "minimize"]).ask()
++            int_names = [p.name for p in strategy_registry.get_strategy(logic).parameters if p.type == ParameterType.INT]
++            assert np.allclose(_asyncio.run(opt._multi_objective_function_core(trial)), (0.4, 0.75)) \
++                and int_names == names \
++                and {n: (trial.distributions[n].low, trial.distributions[n].high, trial.distributions[n].step)
++                     for n in names} == {n: (*ranges[n], 1) for n in names}, logic

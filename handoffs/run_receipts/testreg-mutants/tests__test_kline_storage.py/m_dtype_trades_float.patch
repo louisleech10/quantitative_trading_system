@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_storage.py b/momentum/DataExtraction/kline_storage.py
+index c2fd4023..8c347bed 100644
+--- a/momentum/DataExtraction/kline_storage.py
++++ b/momentum/DataExtraction/kline_storage.py
+@@ -224,7 +224,7 @@ class KlineStorageManager:
+         'taker_buy_volume': 'float32',
+         'taker_ratio': 'float32',
+         'quote_volume': 'float32',
+-        'number_of_trades': 'int32'
++        'number_of_trades': 'float32'
+     }
+ 
+     def __init__(self, cache_dir: Optional[str] = None):

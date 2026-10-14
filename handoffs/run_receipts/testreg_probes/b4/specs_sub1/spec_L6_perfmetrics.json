@@ -1,0 +1,36 @@
+{
+ "path": "tests/momentum/Strategy/test_performance_metrics.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "mutants": [
+  {
+   "id": "m_mdd_vs_initial_not_peak",
+   "file": "momentum/Strategy/performance_metrics.py",
+   "old": "        drawdown = (self.equity_curve / running_max) - 1.0\n        return _safe_float(drawdown.min(), 0.0)\n",
+   "new": "        drawdown = (self.equity_curve / self.equity_curve.iloc[0]) - 1.0\n        return _safe_float(drawdown.min(), 0.0)\n"
+  },
+  {
+   "id": "m_expectancy_loss_sign_flipped",
+   "file": "momentum/Strategy/performance_metrics.py",
+   "old": "        return win_rate * avg_win - (1.0 - win_rate) * abs(avg_loss)\n",
+   "new": "        return win_rate * avg_win + (1.0 - win_rate) * abs(avg_loss)\n"
+  },
+  {
+   "id": "m_sharpe_sample_std",
+   "file": "momentum/Strategy/performance_metrics.py",
+   "old": "        std_ret = _safe_float(returns.std(ddof=0), 0.0)\n",
+   "new": "        std_ret = _safe_float(returns.std(ddof=1), 0.0)\n"
+  },
+  {
+   "id": "m_sortino_uses_full_std",
+   "file": "momentum/Strategy/performance_metrics.py",
+   "old": "        downside_std = _safe_float(downside.std(ddof=0), 0.0)\n",
+   "new": "        downside_std = _safe_float(returns.std(ddof=0), 0.0)\n"
+  },
+  {
+   "id": "m_cagr_period_off_by_one",
+   "file": "momentum/Strategy/performance_metrics.py",
+   "old": "        n_periods = len(self.equity_curve) - 1\n",
+   "new": "        n_periods = len(self.equity_curve)\n"
+  }
+ ]
+}

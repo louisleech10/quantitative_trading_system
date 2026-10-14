@@ -133,3 +133,17 @@ def test_empty_import_id_also_rejected_for_spec_and_scan() -> None:
   with pytest.raises(ValueError, match="event_import_id"):
     ICAnalyzeRequest(symbol="BTCUSDT", timeframe="1h", event_import_id="",
                      event_label_scan={"decision_offset_bars_max": 2, "horizon_bars_max": 3})
+
+
+def test_empty_import_id_rejected_for_spec_branch() -> None:
+  """TESTREG 4.2 純增：補 `event_label_spec` 分支之空字串 import id 必擋（原目標只斷 scan）。
+
+  對照組：同一份 spec 帶非空 import id 必須放行，證明擋下的理由是「空 id」而非 spec 本身。
+  """
+  import pytest
+
+  with pytest.raises(ValueError, match="event_label_spec 需搭配 event_import_id"):
+    ICAnalyzeRequest(symbol="BTCUSDT", timeframe="1h", event_import_id="",
+                     event_label_spec={"horizon_bars": 2})
+  assert ICAnalyzeRequest(symbol="BTCUSDT", timeframe="1h", event_import_id="imp-1",
+                          event_label_spec={"horizon_bars": 2}).event_label_spec.horizon_bars == 2

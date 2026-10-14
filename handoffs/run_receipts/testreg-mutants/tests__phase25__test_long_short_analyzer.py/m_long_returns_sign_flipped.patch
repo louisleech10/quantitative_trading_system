@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/long_short_analyzer.py b/momentum/Analysis/long_short_analyzer.py
+index 17f7ba1c..2da868a0 100644
+--- a/momentum/Analysis/long_short_analyzer.py
++++ b/momentum/Analysis/long_short_analyzer.py
+@@ -122,7 +122,7 @@ class LongShortAnalyzer:
+         long_sel = long_mask.fillna(False) & ret_fin
+         short_sel = short_mask.fillna(False) & ret_fin
+ 
+-        long_returns = ret.loc[long_sel].astype(float)
++        long_returns = -ret.loc[long_sel].astype(float)
+         short_raw_returns = ret.loc[short_sel].astype(float)
+         short_returns = -short_raw_returns
+ 

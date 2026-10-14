@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_storage.py b/momentum/DataExtraction/kline_storage.py
+index c2fd4023..f700712d 100644
+--- a/momentum/DataExtraction/kline_storage.py
++++ b/momentum/DataExtraction/kline_storage.py
+@@ -934,7 +934,7 @@ class KlineStorageManager:
+             if existing_df is not None and len(existing_df) > 0:
+                 # 合併數據並去重
+                 combined_df = pd.concat([existing_df, df], ignore_index=True)
+-                combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='last')
++                combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='first')
+                 combined_df = combined_df.sort_values('timestamp').reset_index(drop=True)
+ 
+                 # 寫入合併後的數據

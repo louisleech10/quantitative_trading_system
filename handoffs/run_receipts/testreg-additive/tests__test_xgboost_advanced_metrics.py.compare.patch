@@ -1,0 +1,29 @@
+diff --git a/tests/test_xgboost_advanced_metrics.py b/tests/test_xgboost_advanced_metrics.py
+index 1850b4c6..018bf813 100644
+--- a/tests/test_xgboost_advanced_metrics.py
++++ b/tests/test_xgboost_advanced_metrics.py
+@@ -93,3 +93,24 @@ def test_cross_symbol_validator():
+     )
+ 
+     assert result.verdict in {"good", "moderate", "poor", "unknown"}
++
++
++def test_expectancy_calculator_hand_calc_exact():
++    """TESTREG 4.2 純增：固定小輸入手算 win_rate／avg_win／avg_loss／expectancy 精確比對。
++
++    手算：proba≥0.6 之交易＝[0.03, -0.01, 0.01, -0.02, 0.0]（0.6 邊界含入、0.05 因 proba 0.2 排除）
++    ⇒ total 5；勝（>0）＝0.03、0.01 ⇒ win_rate 0.4、avg_win 0.02；敗（≤0）＝-0.01、-0.02、0.0 ⇒ avg_loss -0.01；
++    expectancy＝0.4×0.02＋0.6×(-0.01)＝0.002。模型路徑另以恆等式 expectancy＝交易報酬平均（獨立 oracle）比對。
++    """
++    calculator = ExpectancyCalculator()
++    fixed = calculator.estimate_expectancy(
++        price_changes=np.array([0.03, -0.01, 0.01, -0.02, 0.05, 0.0]),
++        predicted_proba=np.array([0.9, 0.7, 0.6, 0.65, 0.2, 0.8]),
++        threshold=0.6,
++    )
++    analyzer, X, y = _train_analyzer()
++    y_pred = analyzer.model.predict_proba(X)[:, 1]
++    price_changes = (y * 0.02) + (1 - y) * -0.01
++    model_res = calculator.estimate_expectancy(price_changes=price_changes, predicted_proba=y_pred, threshold=0.6)
++    traded = np.asarray(price_changes, dtype=float)[np.asarray(y_pred) >= 0.6]
++    assert fixed.total_trades == 5 and np.allclose([fixed.win_rate, fixed.avg_win, fixed.avg_loss, fixed.expectancy], [0.4, 0.02, -0.01, 0.002], rtol=0, atol=1e-12) and model_res.total_trades == traded.size and np.isclose(model_res.expectancy, float(traded.mean()), rtol=0, atol=1e-12)

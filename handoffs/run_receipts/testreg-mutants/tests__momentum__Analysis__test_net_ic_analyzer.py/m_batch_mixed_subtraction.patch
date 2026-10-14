@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/net_ic_analyzer.py b/momentum/Analysis/net_ic_analyzer.py
+index c58e88f2..d14356f6 100644
+--- a/momentum/Analysis/net_ic_analyzer.py
++++ b/momentum/Analysis/net_ic_analyzer.py
+@@ -454,7 +454,7 @@ class NetICAnalyzer:
+             # SCHEMA_COST_ENABLED
+             assert self._cost_bps is not None  # validated in __init__
+             cost_bps = float(self._cost_bps)
+-            drag = self.compute_cost_drag(cost_bps, turnover_f)
++            drag = gross_f - self.compute_cost_drag(cost_bps, turnover_f)
+             cost_drags.append(drag)
+             cond, is_eval, is_prof = self._series_conditional_metrics(
+                 series_obj,

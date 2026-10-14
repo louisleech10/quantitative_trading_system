@@ -1,0 +1,35 @@
+{
+ "added_nodeids": [
+  "tests/momentum/event_samples/test_event_disposition_ledger.py::test_hermetic_contract_change_takes_effect_without_manual_cache_clear",
+  "tests/momentum/event_samples/test_event_disposition_ledger.py::test_hermetic_contract_change_with_preserved_mtime_still_takes_effect",
+  "tests/momentum/event_samples/test_event_disposition_ledger.py::test_hermetic_duplicate_json_key_in_contract_is_fail_closed",
+  "tests/momentum/event_samples/test_event_disposition_ledger.py::test_hermetic_observed_semantics_survive_contract_reordering"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "baseline_session_id": "6f9dcabb-cadc-4f2e-9ee4-a09920900ec9",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__event_samples__test_event_disposition_ledger.py.compare.patch",
+ "compare_patch_sha256": "8d8ae23b65a4b9cc31f53b6d30884b7af6f6c394b3de6ffa3ea406a28d8e47f3",
+ "fingerprint": "34f2511cfddfc6c2b374de8e7071e59950fdf0d7d4a2b176c12b3ef8b44ec8cb",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_cache_key_from_other_path",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__event_samples__test_event_disposition_ledger.py/m_cache_key_from_other_path.patch",
+   "patch_sha256": "f227e51072f8ba52c6affd9ce34b6e743b35182f75afefdefe39764409cbb69b",
+   "session_id": "ab0e01da-a63c-4627-99c5-4ae1cc269731"
+  },
+  {
+   "id": "m_no_duplicate_key_hook",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__event_samples__test_event_disposition_ledger.py/m_no_duplicate_key_hook.patch",
+   "patch_sha256": "6c7e583ecc54f8150e2708cac72e922995f62888d1bc47080958ebbdf19385b6",
+   "session_id": "8f422575-f0a1-4824-822f-1688bca16848"
+  },
+  {
+   "id": "m_observed_by_order",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__event_samples__test_event_disposition_ledger.py/m_observed_by_order.patch",
+   "patch_sha256": "fe5e0fa2eaeaf135e48f5056e2b730da5be898f47de4a3de25b277cf119d8d47",
+   "session_id": "0904324f-19a1-41d5-b028-8bc7a05e7ba1"
+  }
+ ],
+ "path": "tests/momentum/event_samples/test_event_disposition_ledger.py"
+}

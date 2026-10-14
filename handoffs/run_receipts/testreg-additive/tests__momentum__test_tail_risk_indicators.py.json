@@ -1,0 +1,60 @@
+{
+ "added_nodeids": [
+  "tests/momentum/test_tail_risk_indicators.py::test_mdd_invalid_price_masks_that_row_only_and_keeps_prior_rows",
+  "tests/momentum/test_tail_risk_indicators.py::test_tail_risk_extreme_matches_independent_numpy_oracle",
+  "tests/momentum/test_tail_risk_indicators.py::test_tail_risk_many_nans_never_emits_values_from_missing_prefix",
+  "tests/momentum/test_tail_risk_indicators.py::test_tail_risk_one_sided_gpr_is_nan_not_capped",
+  "tests/momentum/test_tail_risk_indicators.py::test_udvr_zero_downside_is_nan_after_warmup"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+ "baseline_session_id": "9d39afec-73af-43e4-9a77-753003b2e308",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__test_tail_risk_indicators.py.compare.patch",
+ "compare_patch_sha256": "1ca724868a8f02da72509246039c7d956aa3570b39c109f42dd45fa6bb1f1356",
+ "fingerprint": "8bca7e2f330094acb19040aff067ab15159b0a02a3e38afa67d427891323a719",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_gpr_no_zero_loss_guard",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_tail_risk_indicators.py/m_gpr_no_zero_loss_guard.patch",
+   "patch_sha256": "3acb4ef406856df51192d35a7c9cd77954cbf6747dc408d0cb63291253acf15f",
+   "session_id": "e51c5e99-f0a4-47c3-9c50-80f1efcc564b"
+  },
+  {
+   "id": "m_udvr_epsilon_denominator",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_tail_risk_indicators.py/m_udvr_epsilon_denominator.patch",
+   "patch_sha256": "9d71038b3f960c64a0bd7a16f2f932891204a3223e9e63545456a4d52fa9d467",
+   "session_id": "53416354-3f5d-45db-9499-5b5bef298388"
+  },
+  {
+   "id": "m_mdd_invalid_price_not_masked",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_tail_risk_indicators.py/m_mdd_invalid_price_not_masked.patch",
+   "patch_sha256": "cbd93f9d856af1a34ed0574dd8da73b4f82427b0739a2003b195d60a5caaa5e2",
+   "session_id": "48b17ba0-431d-4eff-abe9-7c72967daac3"
+  },
+  {
+   "id": "m_cvar_wrong_tail",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_tail_risk_indicators.py/m_cvar_wrong_tail.patch",
+   "patch_sha256": "5e69e5bc54bf7a9b2d85bd232290e4474aa50df6fa822a604d931dce35897e83",
+   "session_id": "59e45521-b35a-41e9-b09c-5e06ae1c012b"
+  },
+  {
+   "id": "m_rv_down_mean_not_sum",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_tail_risk_indicators.py/m_rv_down_mean_not_sum.patch",
+   "patch_sha256": "b955dada43e7bd91ca7669f00e479db61b99b58c3da58e9b98625e9b893ec912",
+   "session_id": "491060b4-ae35-45e2-bdb5-e43467dc8625"
+  },
+  {
+   "id": "m_mdd_peak_window_short",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_tail_risk_indicators.py/m_mdd_peak_window_short.patch",
+   "patch_sha256": "cdd83f0e1ea970bb3bdd1ce80e92a991693156c1e52b974863b08cdb2d36239e",
+   "session_id": "d4b44921-361d-4c12-9829-5c6a79901637"
+  },
+  {
+   "id": "m_rv_fillna_missing_returns",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_tail_risk_indicators.py/m_rv_fillna_missing_returns.patch",
+   "patch_sha256": "b903e059ac565904604e4c747d8482941d17ccb9a68611611a2dd45202292d02",
+   "session_id": "3629e68f-b690-43c4-bef4-e741a72ee521"
+  }
+ ],
+ "path": "tests/momentum/test_tail_risk_indicators.py"
+}

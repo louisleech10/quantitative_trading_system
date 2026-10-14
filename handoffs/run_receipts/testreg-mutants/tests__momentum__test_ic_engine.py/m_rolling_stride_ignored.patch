@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/ic_engine.py b/momentum/Analysis/ic_engine.py
+index 727817be..dee84625 100644
+--- a/momentum/Analysis/ic_engine.py
++++ b/momentum/Analysis/ic_engine.py
+@@ -430,7 +430,7 @@ class ICEngine:
+             window_key = f"window_{window}"
+             if method == "spearman":
+                 corr_matrix = rolling_window_rank_corr(
+-                    x_values, y_values, window=int(window), stride=int(stride)
++                    x_values, y_values, window=int(window), stride=1
+                 )
+             else:
+                 # pearson（及 non-spearman）：維持 raw rolling pearson

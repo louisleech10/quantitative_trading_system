@@ -1,0 +1,33 @@
+{
+ "added_nodeids": [
+  "tests/phase25/test_long_short_analyzer.py::test_asymmetric_quantile_def_counts_follow_configured_sets",
+  "tests/phase25/test_long_short_analyzer.py::test_both_sides_negative_ic_concrete_outcome"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "baseline_session_id": "16128a87-aea8-472d-97bf-83474febdfa5",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__phase25__test_long_short_analyzer.py.compare.patch",
+ "compare_patch_sha256": "79e69ea4492689eee24061702f744236c3ec26d64571b30102cc7f9fa283cf02",
+ "fingerprint": "e8d760398c1fbc378a86350cc48b2477ac5b2058ed92a86c62ae2e4792a21d05",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_long_quantiles_key_typo",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase25__test_long_short_analyzer.py/m_long_quantiles_key_typo.patch",
+   "patch_sha256": "1566a8213cf7554b2dcfd6e61e14487773357ddbcef5353e73f2e41fd8e37271",
+   "session_id": "f2adc558-e21e-49d2-abfd-4dde800aed3b"
+  },
+  {
+   "id": "m_long_returns_sign_flipped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase25__test_long_short_analyzer.py/m_long_returns_sign_flipped.patch",
+   "patch_sha256": "b08e34b63e90d7c2f8bed87449c900343aeefd75253988e3c963f971297a30fd",
+   "session_id": "f9f05aae-a330-4a9d-b09e-077248191c13"
+  },
+  {
+   "id": "m_short_returns_not_negated",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase25__test_long_short_analyzer.py/m_short_returns_not_negated.patch",
+   "patch_sha256": "c2c7fc4297993e0c8bc8456a7041cf30416adaab168c2c708c2a8808078c87b3",
+   "session_id": "d9f2a1cf-0a78-48fb-9d7b-503f374cb7c6"
+  }
+ ],
+ "path": "tests/phase25/test_long_short_analyzer.py"
+}

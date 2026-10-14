@@ -612,3 +612,17 @@ def test_cache_hit_no_owner_net_ic_not_crash() -> None:
     assert "features" in out
     _assert_union_unavailable(out["features"]["f1"]["net_factor_return"])
     assert out["summary"]["evaluable_count"] == 0
+
+
+def test_batch_analyze_cost_drag_hand_calc_rejects_mixed_and_x2() -> None:
+    """TESTREG 4.2 純增：M1／M2 之真探針——經生產 `batch_analyze` 驗 cost_drag_return。
+
+    手算 oracle：(10/1e4)×1.5＝0.0015、(10/1e4)×0.3＝0.0003、平均 0.0009。
+    混減（IC − cost×turnover）或 ×2（四腿計費）在生產路徑出現即紅。
+    """
+    out = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0}).batch_analyze(
+        {"f1": {"gross_ic": 0.05}, "f2": {"gross_ic": 0.02}},
+        {"f1": 1.5, "f2": 0.3},
+    )
+    drags = {name: out["features"][name]["cost_drag_return"] for name in ("f1", "f2")}
+    assert drags == {"f1": pytest.approx(0.0015), "f2": pytest.approx(0.0003)} and out["summary"]["avg_cost_drag_return"] == pytest.approx(0.0009)

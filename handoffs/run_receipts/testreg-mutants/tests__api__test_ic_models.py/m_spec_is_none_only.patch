@@ -1,0 +1,13 @@
+diff --git a/api/models/ic_models.py b/api/models/ic_models.py
+index 21bc184d..1b14eec7 100644
+--- a/api/models/ic_models.py
++++ b/api/models/ic_models.py
+@@ -251,7 +251,7 @@ class ICAnalyzeRequest(BaseModel):
+            理由：兩者都在說「要分析哪些事件」，同時給就有兩個真相源。
+            legacy 非事件呼叫端只帶 `event_timestamps`、不帶 `event_import_id`，**行為不變**。
+         """
+-        if self.event_label_spec is not None and not self.event_import_id:
++        if self.event_label_spec is not None and self.event_import_id is None:
+             raise ValueError(
+                 "event_label_spec 需搭配 event_import_id（GAP-3 Task 7.0b ③）"
+                 "——只給分析參數而不說對哪一批，會靜默套到預設批上"

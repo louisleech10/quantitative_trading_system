@@ -1,0 +1,18 @@
+diff --git a/momentum/Analysis/ic_filter_orchestrator.py b/momentum/Analysis/ic_filter_orchestrator.py
+index 0d4d3896..e6c8475a 100644
+--- a/momentum/Analysis/ic_filter_orchestrator.py
++++ b/momentum/Analysis/ic_filter_orchestrator.py
+@@ -335,12 +335,7 @@ def _build_close_carrier(raw_data: pd.DataFrame, feature_index: pd.Index) -> pd.
+ 
+     改前以 kline 之 RangeIndex 直接 `reindex(features_df.index)`，無一列對上（carrier 恆全 NaN）。
+     """
+-    source_index = _normalize_frame_time_index(raw_data, "raw_data")
+-    close = pd.Series(
+-        pd.to_numeric(raw_data["close"], errors="coerce").to_numpy(dtype=np.float64),
+-        index=source_index,
+-    )
+-    return _rekey_close_carrier(close, feature_index)
++    return pd.to_numeric(raw_data["close"], errors="coerce").reindex(feature_index).rename("close")
+ 
+ 
+ def _numeric_payload_sha256(data: pd.Series | pd.DataFrame) -> str:

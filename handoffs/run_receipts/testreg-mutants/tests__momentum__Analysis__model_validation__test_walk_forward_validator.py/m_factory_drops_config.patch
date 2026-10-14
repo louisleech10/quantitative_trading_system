@@ -1,0 +1,13 @@
+diff --git a/momentum/factories.py b/momentum/factories.py
+index 0d8382fc..ab77e0bd 100644
+--- a/momentum/factories.py
++++ b/momentum/factories.py
+@@ -664,7 +664,7 @@ def create_walk_forward_validator(
+     """Factory — M2 Walk-Forward 驗證器。"""
+     from momentum.Analysis.model_validation.walk_forward_validator import WalkForwardValidator
+ 
+-    return WalkForwardValidator(config=config)
++    return WalkForwardValidator()
+ 
+ 
+ def create_sample_weight_calculator(

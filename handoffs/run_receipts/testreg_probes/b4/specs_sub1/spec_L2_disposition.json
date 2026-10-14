@@ -1,0 +1,24 @@
+{
+ "path": "tests/momentum/event_samples/test_event_disposition_ledger.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "mutants": [
+  {
+   "id": "m_cache_key_from_other_path",
+   "file": "momentum/Analysis/event_samples/event_disposition.py",
+   "old": "    cached = _load_values(hashlib.sha256(_CONTRACT.read_bytes()).hexdigest())\n",
+   "new": "    cached = _load_values(hashlib.sha256((Path(__file__).resolve().parents[2] / \"Analysis/contracts/split_unify.json\").read_bytes()).hexdigest())\n"
+  },
+  {
+   "id": "m_no_duplicate_key_hook",
+   "file": "momentum/Analysis/event_samples/event_disposition.py",
+   "old": "    data = json.loads(_CONTRACT.read_text(encoding=\"utf-8\"), object_pairs_hook=_no_duplicate_keys)\n",
+   "new": "    data = json.loads(_CONTRACT.read_text(encoding=\"utf-8\"))\n"
+  },
+  {
+   "id": "m_observed_by_order",
+   "file": "momentum/Analysis/event_samples/event_disposition.py",
+   "old": "    return {\"consumed\": str(observed[\"consumed\"]), \"row_missing\": str(observed[\"row_missing\"])}\n",
+   "new": "    _ordered = list(observed.values())\n    return {\"consumed\": str(_ordered[0]), \"row_missing\": str(_ordered[1])}\n"
+  }
+ ]
+}

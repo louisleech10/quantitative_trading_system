@@ -1,0 +1,13 @@
+diff --git a/api/routes/optimization.py b/api/routes/optimization.py
+index 89261da3..93f6e6db 100644
+--- a/api/routes/optimization.py
++++ b/api/routes/optimization.py
+@@ -376,7 +376,7 @@ async def get_strategy_detail(strategy_id: str):
+             # 根據類型添加額外字段
+             if param.type in ["int", "float"]:
+                 param_dict["min_value"] = param.min_value
+-                param_dict["max_value"] = param.max_value
++                param_dict["max_value"] = param.min_value
+                 param_dict["step"] = param.step
+             elif param.type == "categorical":
+                 param_dict["choices"] = param.choices

@@ -1,0 +1,21 @@
+diff --git a/tests/phase24/test_factor_centrality_analyzer.py b/tests/phase24/test_factor_centrality_analyzer.py
+index 3605a015..d3b3ded1 100644
+--- a/tests/phase24/test_factor_centrality_analyzer.py
++++ b/tests/phase24/test_factor_centrality_analyzer.py
+@@ -145,3 +145,16 @@ def test_compute_rolling_centrality_empty_input():
+     analyzer = FactorCentralityAnalyzer({})
+     rolling = analyzer.compute_rolling_centrality(pd.DataFrame())
+     assert rolling.empty
++
++
++def test_detect_crowding_regime_values_hand_calc():
++    """TESTREG 4.2 純增：regime／crowding_ratio／trend 以手算值比對（原目標只驗回聲與全值域）。
++
++    linspace(0.1, 0.5, 10) 中 ≥0.3 者為後 5 個（0.3222…0.5）⇒ crowding_ratio＝5/10＝0.5，
++    恰在 crowded 邊界（≥0.5）⇒ regime＝crowded；遞增 ⇒ rising；反序 ⇒ falling，比例不變。
++    """
++    analyzer = FactorCentralityAnalyzer({"crowded_threshold": 0.3})
++    index = pd.date_range("2024-01-01", periods=10, freq="12h")
++    up = analyzer.detect_crowding_regime(pd.DataFrame({"f0": np.linspace(0.1, 0.5, 10)}, index=index), "f0")
++    down = analyzer.detect_crowding_regime(pd.DataFrame({"f0": np.linspace(0.5, 0.1, 10)}, index=index), "f0")
++    assert (up, down) == ({"feature": "f0", "regime": "crowded", "crowding_ratio": 0.5, "trend": "rising", "latest": 0.5}, {"feature": "f0", "regime": "crowded", "crowding_ratio": 0.5, "trend": "falling", "latest": 0.1})

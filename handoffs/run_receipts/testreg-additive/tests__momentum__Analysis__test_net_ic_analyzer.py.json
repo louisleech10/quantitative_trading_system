@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/test_net_ic_analyzer.py::test_batch_analyze_cost_drag_hand_calc_rejects_mixed_and_x2"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "baseline_session_id": "ff6dda3a-e2c4-4769-8473-ad6c8097baea",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__test_net_ic_analyzer.py.compare.patch",
+ "compare_patch_sha256": "2ae0f59fa27542adf1479894982459d570c195e5ac37d4f2ac179606ddcaea60",
+ "fingerprint": "c141674efe9d92ded716fb1806ab0ca0631a4240fb1b901795d3e644097cfac2",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_batch_mixed_subtraction",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_net_ic_analyzer.py/m_batch_mixed_subtraction.patch",
+   "patch_sha256": "3e79213c5791d60748c80ba4eae9af6c3b3d59ab7520041b1bc543746d9648d4",
+   "session_id": "5005497a-e6f1-4110-b043-c4d16a1ff5e0"
+  },
+  {
+   "id": "m_cost_drag_x2",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_net_ic_analyzer.py/m_cost_drag_x2.patch",
+   "patch_sha256": "d7a8508df8f77c1b4da2a1d521262863a83d4a425f31f897976d761907379fd8",
+   "session_id": "e8269490-28ca-4a9f-97e8-d5bbc673255f"
+  }
+ ],
+ "path": "tests/momentum/Analysis/test_net_ic_analyzer.py"
+}

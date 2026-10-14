@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/survivor_contract.py b/momentum/Analysis/survivor_contract.py
+index 6c298116..6964985c 100644
+--- a/momentum/Analysis/survivor_contract.py
++++ b/momentum/Analysis/survivor_contract.py
+@@ -531,7 +531,7 @@ def build_survivor_output(
+         event_obj["statistic_kind"] = ef.get("statistic_kind") if isinstance(ef, dict) else None
+         event_obj["label_binary"] = (
+             copy.deepcopy(ef.get("label_binary"))
+-            if isinstance(ef, dict) and event_obj["label_source"] == "imported_binary_label"
++            if isinstance(ef, dict) and event_obj["label_source"] == "event_label_value"
+             else None
+         )
+         # CODEX-R1-P1-03：conditional IC 卻無 event_context ⇒ build 期 fail-closed（不產全 null 的事件倖存者）

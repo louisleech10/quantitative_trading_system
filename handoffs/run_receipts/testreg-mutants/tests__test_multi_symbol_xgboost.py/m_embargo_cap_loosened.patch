@@ -1,0 +1,13 @@
+diff --git a/api/models/pattern_analysis_models.py b/api/models/pattern_analysis_models.py
+index a0b2b934..186ed630 100644
+--- a/api/models/pattern_analysis_models.py
++++ b/api/models/pattern_analysis_models.py
+@@ -238,7 +238,7 @@ class XGBoostBatchAnalysisRequest(BaseModel):
+     embargo_pct: Optional[float] = Field(
+         default=None,
+         ge=0,
+-        le=0.1,
++        le=1.0,
+         description="Embargo 緩衝比例（0-0.1）"
+     )
+     xgboost_params: Optional[Dict[str, Any]] = Field(

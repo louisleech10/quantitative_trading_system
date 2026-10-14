@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/phase24/test_factor_return_analyzer.py::test_compute_risk_metrics_calmar_nan_iff_no_drawdown_with_hand_oracle"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "baseline_session_id": "19c21594-bdb0-4194-8f67-383ba63a1d47",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__phase24__test_factor_return_analyzer.py.compare.patch",
+ "compare_patch_sha256": "8fef1f695bbf4135e565234bb2318bb875215424a47c88e142df616039d19c4c",
+ "fingerprint": "7d80f793114dc0fabd48051b6e41b452d549f731f25f48b3dbf81f9adba21eb2",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_drawdown_missing_minus_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_factor_return_analyzer.py/m_drawdown_missing_minus_one.patch",
+   "patch_sha256": "8c627edc13801131e7b7da42dddb233877935d1a6597b1e099fa68ada07d113b",
+   "session_id": "d4588bc1-453d-4a9c-8a18-4678db17275d"
+  },
+  {
+   "id": "m_peak_cummin",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_factor_return_analyzer.py/m_peak_cummin.patch",
+   "patch_sha256": "b32dd06982c4abfc93e7b7a106c2bfc101680c4c684089b5f17381b27ae52f5f",
+   "session_id": "3ad413ff-ff3c-47e1-903b-a743ee92034a"
+  },
+  {
+   "id": "m_calmar_signed_mdd",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_factor_return_analyzer.py/m_calmar_signed_mdd.patch",
+   "patch_sha256": "51a30f861291f14062561a408463aa070ada842afbe85c206ecd4bdcd39ff15d",
+   "session_id": "ae34b537-e489-402c-b754-e9e023b79615"
+  }
+ ],
+ "path": "tests/phase24/test_factor_return_analyzer.py"
+}

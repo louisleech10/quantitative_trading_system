@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/event_samples/import_contract.py b/momentum/Analysis/event_samples/import_contract.py
+index 38e816ce..855c1b47 100644
+--- a/momentum/Analysis/event_samples/import_contract.py
++++ b/momentum/Analysis/event_samples/import_contract.py
+@@ -328,7 +328,7 @@ def detect_t0_unit_ms(value: Any, *, contract: Optional[dict] = None) -> int:
+     v = int(value)
+     if ms_min <= v < ms_max:
+         return v
+-    if ms_min <= v * 1000 < ms_max:
++    if v * 1000 < ms_max:
+         return v * 1000
+     raise T0UnitUndetectedError(value)
+ 

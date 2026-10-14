@@ -1,0 +1,15 @@
+diff --git a/momentum/Analysis/monotonicity_tester.py b/momentum/Analysis/monotonicity_tester.py
+index 4b478a08..79578987 100644
+--- a/momentum/Analysis/monotonicity_tester.py
++++ b/momentum/Analysis/monotonicity_tester.py
+@@ -136,8 +136,8 @@ class MonotonicityTester:
+                 "sharpe": np.nan,
+             }
+ 
+-        low_mask = quantile_bins == valid_bins.min()
+-        high_mask = quantile_bins == valid_bins.max()
++        low_mask = quantile_bins == valid_bins.max()
++        high_mask = quantile_bins == valid_bins.min()
+         low_values = data.loc[low_mask, "label"].astype(float)
+         high_values = data.loc[high_mask, "label"].astype(float)
+ 

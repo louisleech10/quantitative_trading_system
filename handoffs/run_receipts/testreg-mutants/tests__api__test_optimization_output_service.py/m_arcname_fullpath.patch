@@ -1,0 +1,13 @@
+diff --git a/api/services/optimization_output_service.py b/api/services/optimization_output_service.py
+index 3edbdf73..fe6c984f 100644
+--- a/api/services/optimization_output_service.py
++++ b/api/services/optimization_output_service.py
+@@ -110,7 +110,7 @@ class OptimizationOutputService:
+         with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+             for file_path in files:
+                 if file_path.exists() and file_path.is_file():
+-                    zip_file.write(file_path, arcname=file_path.name)
++                    zip_file.write(file_path, arcname=str(file_path))
+         return buffer.getvalue()
+ 
+     @staticmethod

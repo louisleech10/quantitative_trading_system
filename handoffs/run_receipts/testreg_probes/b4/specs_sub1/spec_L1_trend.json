@@ -1,0 +1,36 @@
+{
+ "path": "tests/phase24/test_trend_analyzer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "mutants": [
+  {
+   "id": "m_down_degrades_to_flat",
+   "file": "momentum/Analysis/trend_analyzer.py",
+   "old": "            trend = \"up\" if slope > 0 else \"down\" if slope < 0 else \"flat\"\n",
+   "new": "            trend = \"up\" if slope > 0 else \"flat\"\n"
+  },
+  {
+   "id": "m_significance_reversed",
+   "file": "momentum/Analysis/trend_analyzer.py",
+   "old": "        elif p_value <= self._significance and r_squared >= self._r2_threshold:\n",
+   "new": "        elif p_value >= self._significance and r_squared >= self._r2_threshold:\n"
+  },
+  {
+   "id": "m_skip_winsorize",
+   "file": "momentum/Analysis/trend_analyzer.py",
+   "old": "        winsorized = self._winsorize(series)\n",
+   "new": "        winsorized = series\n"
+  },
+  {
+   "id": "m_half_life_le5",
+   "file": "momentum/Analysis/trend_analyzer.py",
+   "old": "        if ic_decay_half_life is not None and np.isfinite(ic_decay_half_life) and ic_decay_half_life < 5:\n",
+   "new": "        if ic_decay_half_life is not None and np.isfinite(ic_decay_half_life) and ic_decay_half_life <= 5:\n"
+  },
+  {
+   "id": "m_no_warning_escalation",
+   "file": "momentum/Analysis/trend_analyzer.py",
+   "old": "            elif recommendation == \"警告\":\n                recommendation = \"危險\"\n",
+   "new": "            elif recommendation == \"警告\":\n                recommendation = \"警告\"\n"
+  }
+ ]
+}

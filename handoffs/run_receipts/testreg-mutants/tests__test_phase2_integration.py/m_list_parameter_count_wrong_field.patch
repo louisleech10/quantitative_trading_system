@@ -1,0 +1,13 @@
+diff --git a/api/routes/optimization.py b/api/routes/optimization.py
+index 89261da3..29676eeb 100644
+--- a/api/routes/optimization.py
++++ b/api/routes/optimization.py
+@@ -323,7 +323,7 @@ async def list_strategies():
+                 "complexity": metadata.complexity,
+                 "icon": metadata.icon,
+                 "tags": metadata.tags,
+-                "parameter_count": len(metadata.parameters),
++                "parameter_count": len(metadata.supported_indicators),
+                 "supported_indicators": metadata.supported_indicators,
+                 "supported_data_sources": metadata.supported_data_sources
+             })

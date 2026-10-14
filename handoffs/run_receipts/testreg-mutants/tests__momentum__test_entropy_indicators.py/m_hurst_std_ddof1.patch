@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/entropy_indicators.py b/momentum/FeatureEngineering/atomic/entropy_indicators.py
+index 83ea708d..9283a06a 100644
+--- a/momentum/FeatureEngineering/atomic/entropy_indicators.py
++++ b/momentum/FeatureEngineering/atomic/entropy_indicators.py
+@@ -282,7 +282,7 @@ class EntropyIndicatorEngine:
+             demeaned = trimmed - trimmed.mean(axis=1, keepdims=True)
+             cumulative = np.cumsum(demeaned, axis=1)
+             r = cumulative.max(axis=1) - cumulative.min(axis=1)
+-            s = trimmed.std(axis=1)
++            s = trimmed.std(axis=1, ddof=1)
+             rs = r / np.where(s == 0.0, np.nan, s)
+             valid_rs = rs[np.isfinite(rs)]
+             if len(valid_rs) == 0:

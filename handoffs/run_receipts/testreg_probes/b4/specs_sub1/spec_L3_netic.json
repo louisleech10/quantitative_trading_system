@@ -1,0 +1,18 @@
+{
+ "path": "tests/momentum/Analysis/test_net_ic_analyzer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "mutants": [
+  {
+   "id": "m_batch_mixed_subtraction",
+   "file": "momentum/Analysis/net_ic_analyzer.py",
+   "old": "            drag = self.compute_cost_drag(cost_bps, turnover_f)\n",
+   "new": "            drag = gross_f - self.compute_cost_drag(cost_bps, turnover_f)\n"
+  },
+  {
+   "id": "m_cost_drag_x2",
+   "file": "momentum/Analysis/net_ic_analyzer.py",
+   "old": "        return float((float(cost_bps) / 10000.0) * float(turnover))\n",
+   "new": "        return float((float(cost_bps) / 10000.0) * float(turnover) * 2.0)\n"
+  }
+ ]
+}

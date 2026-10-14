@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/strategy_validation/cscv.py b/momentum/Analysis/strategy_validation/cscv.py
+index c98a922b..1598c971 100644
+--- a/momentum/Analysis/strategy_validation/cscv.py
++++ b/momentum/Analysis/strategy_validation/cscv.py
+@@ -56,7 +56,7 @@ def iter_cscv_splits(*, n_obs: int, s_blocks: int) -> Iterator[Tuple[np.ndarray,
+             f"CSCV 預算超限：path_count={path_count}（上限 {_MAX_PATHS}）、"
+             f"path_count*n_obs={path_count * n_obs}（上限 {_MAX_ELEMENTS}）"
+         )
+-    return _iter_splits(n_obs, s_blocks)
++    return (p for p in list(_iter_splits(n_obs, s_blocks)))
+ 
+ 
+ def _iter_splits(n_obs: int, s_blocks: int) -> Iterator[Tuple[np.ndarray, np.ndarray]]:

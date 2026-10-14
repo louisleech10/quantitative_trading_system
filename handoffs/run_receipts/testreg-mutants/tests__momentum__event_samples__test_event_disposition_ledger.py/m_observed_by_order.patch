@@ -1,0 +1,14 @@
+diff --git a/momentum/Analysis/event_samples/event_disposition.py b/momentum/Analysis/event_samples/event_disposition.py
+index c769a99f..fd69bdc9 100644
+--- a/momentum/Analysis/event_samples/event_disposition.py
++++ b/momentum/Analysis/event_samples/event_disposition.py
+@@ -208,7 +208,8 @@ def observed_values() -> Dict[str, str]:
+         raise ValueError(
+             f"observed 之兩個語意不得映射到同一值：{observed}（fail-closed）"
+         )
+-    return {"consumed": str(observed["consumed"]), "row_missing": str(observed["row_missing"])}
++    _ordered = list(observed.values())
++    return {"consumed": str(_ordered[0]), "row_missing": str(_ordered[1])}
+ 
+ 
+ def excluded_by_symbol(rows: Sequence[DispositionRow]) -> List[str]:

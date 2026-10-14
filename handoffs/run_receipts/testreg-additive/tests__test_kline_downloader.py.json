@@ -1,0 +1,63 @@
+{
+ "added_nodeids": [
+  "tests/test_kline_downloader.py::test_download_batch_and_error_paths_with_stubbed_client",
+  "tests/test_kline_downloader.py::test_download_klines_stubbed_client_full_oracle_and_storage_roundtrip"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "baseline_session_id": "d2e28686-1de1-4e76-9071-927e9fdc35c8",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_kline_downloader.py.compare.patch",
+ "compare_patch_sha256": "93ad6b06af9dde5973d6fed013d79c538fb3c6079a6ba4229cb09368c61194c2",
+ "fingerprint": "98c4e534b5bcaa3d095023d80ab361e39779e5c82eeb09cda30ebddd807ec1ba",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_ts_from_close_time",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_ts_from_close_time.patch",
+   "patch_sha256": "49197489eac51b9f69104ab7a639bd5bf20d282582a8932542a0e54ee9a61dc6",
+   "session_id": "e306fd7a-e59e-4faa-8e87-bdd146bc0c2f"
+  },
+  {
+   "id": "m_zero_volume_ratio_zero",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_zero_volume_ratio_zero.patch",
+   "patch_sha256": "19b17ed19877cc5390e2875098a74866ff6cff76685eccac8b617fd0c4395205",
+   "session_id": "fa4812ab-caa4-4ce1-abfc-6a2c2964dfc7"
+  },
+  {
+   "id": "m_4h_maps_to_1h",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_4h_maps_to_1h.patch",
+   "patch_sha256": "d95c4aa6b3557d1fd857992f675f499913dcc69bf2166befe29154aa4963841d",
+   "session_id": "80088cb4-6f14-4c6f-8a71-a7e2e1727e25"
+  },
+  {
+   "id": "m_ping_truthiness",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_ping_truthiness.patch",
+   "patch_sha256": "ffeab92a85916d4120d0a8f6615150e35ef692f2e481aabb898e3913fd998eb2",
+   "session_id": "9e006df1-caad-4fa6-811b-52b631c8ee2d"
+  },
+  {
+   "id": "m_skip_save_nonempty",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_skip_save_nonempty.patch",
+   "patch_sha256": "6f7167eff180fcce9a5cc023c394ad0c3fd267f1d1c7009efafa208878f3e8a1",
+   "session_id": "6424c487-be7b-4718-80db-b80afef9cd45"
+  },
+  {
+   "id": "m_stop_on_error_inverted",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_stop_on_error_inverted.patch",
+   "patch_sha256": "b6fbe3e00aa68c8486c5d8fb3c500506900cca00d7a1b2e18ddb4db27b4effd6",
+   "session_id": "e6970974-8ea0-4c69-a8cc-7244dd972c30"
+  },
+  {
+   "id": "m_valueerror_wrapped_as_runtime",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_valueerror_wrapped_as_runtime.patch",
+   "patch_sha256": "d75d85743085e2218cb3f73e6819c20f425852af63271338e12b5503ef195305",
+   "session_id": "ddcb20a2-3862-4b06-87d9-1c62d7dc6adb"
+  },
+  {
+   "id": "m_registry_get_only_checks_empty",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_kline_downloader.py/m_registry_get_only_checks_empty.patch",
+   "patch_sha256": "328277dc8d765d1a2b5472a22478875b4ad6d5d524e8f85090b965b9a1c0dd1a",
+   "session_id": "b9127a32-4039-48d3-b7a2-efcb7c355f2d"
+  }
+ ],
+ "path": "tests/test_kline_downloader.py"
+}

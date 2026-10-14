@@ -1,0 +1,13 @@
+diff --git a/api/services/ic_analysis_service.py b/api/services/ic_analysis_service.py
+index 19271d9c..34a268c1 100644
+--- a/api/services/ic_analysis_service.py
++++ b/api/services/ic_analysis_service.py
+@@ -492,7 +492,7 @@ def _resolve_feature_count(request, *, entrypoint: str = "analyze") -> Optional[
+     🔴 解析失敗仍回 `None`——**不填假值**。UAT 已證實填充值比沒有更誤導
+     （`progress==0.12` 卡 15 分鐘，使用者以為還在動）。
+     """
+-    return ic_analysis_service.resolve_planned_feature_count(request, entrypoint=entrypoint)
++    return resolve_run_feature_count(config_hash=getattr(request, "config_hash", None))
+ 
+ FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
+ 

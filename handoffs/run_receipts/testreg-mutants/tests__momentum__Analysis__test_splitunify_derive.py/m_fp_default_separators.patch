@@ -1,0 +1,13 @@
+diff --git a/momentum/core/split_preview.py b/momentum/core/split_preview.py
+index e8093033..ffc60ff9 100644
+--- a/momentum/core/split_preview.py
++++ b/momentum/core/split_preview.py
+@@ -172,7 +172,7 @@ def build_row_time_fingerprint(
+         )
+     order = np.argsort(pos, kind="mergesort")
+     rows = [[int(pos[i]), int(ms[i]), str(symbol), str(base_universe_hash)] for i in order]
+-    payload = json.dumps(rows, sort_keys=True, separators=(",", ":"))
++    payload = json.dumps(rows, sort_keys=True)
+     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+ 
+ 

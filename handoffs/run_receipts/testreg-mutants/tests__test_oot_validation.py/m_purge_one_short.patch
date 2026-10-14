@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/time_splitter.py b/momentum/Analysis/time_splitter.py
+index 5df8eb6c..03fecd78 100644
+--- a/momentum/Analysis/time_splitter.py
++++ b/momentum/Analysis/time_splitter.py
+@@ -534,7 +534,7 @@ class PurgedTimeSeriesSplit:
+             
+             # Purge: 移除訓練集末端
+             if self.purge_gap > 0 and len(train_idx) > self.purge_gap:
+-                train_idx = train_idx[:-self.purge_gap]
++                train_idx = train_idx[:-(self.purge_gap - 1)]
+             
+             # Embargo: 移除驗證集開頭
+             if self.embargo_pct > 0:

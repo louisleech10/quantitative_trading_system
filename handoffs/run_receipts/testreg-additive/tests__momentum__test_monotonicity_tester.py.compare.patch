@@ -1,0 +1,35 @@
+diff --git a/tests/momentum/test_monotonicity_tester.py b/tests/momentum/test_monotonicity_tester.py
+index 31ab68bd..cb70f305 100644
+--- a/tests/momentum/test_monotonicity_tester.py
++++ b/tests/momentum/test_monotonicity_tester.py
+@@ -236,3 +236,30 @@ def test_assign_quantiles_pit_matches_helper():
+         expected.reset_index(drop=True),
+         check_names=False,
+     )
++
++
++def test_long_short_tstat_matches_scipy_nondegenerate_independent_bins():
++    """Long-Short t-stat／p 值／spread 對獨立 oracle（非退化）。
++
++    非單調常態特徵＋正相關 label；分組不用產線 _assign_quantiles，而於測試內以
++    np.quantile 獨立重算 PIT expanding 5 分位（t≥99 起、當根與歷史共同分位、右閉區間）：
++    bin(t) = #{內部分位點 < x_t}。先確認低／高兩組不同且 5 個 bin 皆出現，再與 scipy 比對。
++    """
++    n = 300
++    rng = np.random.default_rng(0)
++    f = rng.normal(size=n)
++    y = f + rng.normal(scale=0.1, size=n)
++    feature = pd.Series(f, name="feature")
++    label = pd.Series(y, name="label")
++    tester = MonotonicityTester({"num_quantiles": 5, "min_group_size": 10, "min_samples": 100})
++
++    result = tester.compute_long_short_spread(feature, label, num_quantiles=5)
++
++    oracle_bins = np.full(n, -1)
++    for t in range(99, n):
++        edges = np.quantile(f[: t + 1], [0.2, 0.4, 0.6, 0.8])
++        oracle_bins[t] = int(np.sum(edges < f[t]))
++    low_y = y[oracle_bins == 0]
++    high_y = y[oracle_bins == 4]
++    expected = stats.ttest_ind(high_y, low_y)
++    assert sorted(set(oracle_bins[oracle_bins >= 0].tolist())) == [0, 1, 2, 3, 4] and len(low_y) > 5 and len(high_y) > 5 and np.isclose(result["tstat"], expected.statistic) and expected.statistic > 5 and np.isclose(result["pvalue"], expected.pvalue) and np.isclose(result["spread"], high_y.mean() - low_y.mean()), f"result={result} expected_t={expected.statistic}"

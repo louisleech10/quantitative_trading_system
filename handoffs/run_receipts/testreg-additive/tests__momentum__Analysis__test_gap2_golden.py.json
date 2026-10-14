@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/test_gap2_golden.py::test_fit_projection_spy_matches_counter_and_basis_widths"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r14/synth.md",
+ "baseline_session_id": "2aa86228-03ec-4bec-886a-9ae2d759ed0f",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__test_gap2_golden.py.compare.patch",
+ "compare_patch_sha256": "add915c8744e587def51f1bfaf40e9804c47ce9ec8c10dc02fd5fc201589be38",
+ "fingerprint": "483190f8ed50c19e6ba35f0d60189be7fa8fcdda85b50e0f73cc6099c9774b30",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_loo_keeps_self",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_gap2_golden.py/m_loo_keeps_self.patch",
+   "patch_sha256": "7e2fc825a61c3f27ffc47b74e3c711b26d81ff80cff510191877c3b0e35c15cc",
+   "session_id": "2a27ee3d-5572-4a05-b52f-a38ec7146c55"
+  },
+  {
+   "id": "m_seq_offbyone",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_gap2_golden.py/m_seq_offbyone.patch",
+   "patch_sha256": "1841f5dda531a030eba9ee0a9a51aa72332849e5a940a728dec50fd82cf4d6c2",
+   "session_id": "2891fa55-e2bc-48b6-a341-bb2e7682fad0"
+  },
+  {
+   "id": "m_removed_drop_last_survivor",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_gap2_golden.py/m_removed_drop_last_survivor.patch",
+   "patch_sha256": "03307df34dc09bf714aac637a0034c4b5da48a7d0318879fca73fa3070d288ab",
+   "session_id": "002edfa0-63d6-4056-8185-761b4fdd4e39"
+  }
+ ],
+ "path": "tests/momentum/Analysis/test_gap2_golden.py"
+}

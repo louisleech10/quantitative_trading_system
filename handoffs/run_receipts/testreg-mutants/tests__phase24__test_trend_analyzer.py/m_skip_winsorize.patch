@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/trend_analyzer.py b/momentum/Analysis/trend_analyzer.py
+index 747193ca..156d331a 100644
+--- a/momentum/Analysis/trend_analyzer.py
++++ b/momentum/Analysis/trend_analyzer.py
+@@ -43,7 +43,7 @@ class TrendAnalyzer:
+                 "interpretation": "序列近乎常數，趨勢為平坦",
+             }
+ 
+-        winsorized = self._winsorize(series)
++        winsorized = series
+         x = np.arange(len(winsorized), dtype=float)
+         reg = linregress(x, winsorized.values.astype(float))
+ 

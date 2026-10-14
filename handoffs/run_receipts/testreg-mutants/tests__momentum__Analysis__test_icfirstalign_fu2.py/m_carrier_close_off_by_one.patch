@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/ic_filter_orchestrator.py b/momentum/Analysis/ic_filter_orchestrator.py
+index 0d4d3896..f4f89631 100644
+--- a/momentum/Analysis/ic_filter_orchestrator.py
++++ b/momentum/Analysis/ic_filter_orchestrator.py
+@@ -337,7 +337,7 @@ def _build_close_carrier(raw_data: pd.DataFrame, feature_index: pd.Index) -> pd.
+     """
+     source_index = _normalize_frame_time_index(raw_data, "raw_data")
+     close = pd.Series(
+-        pd.to_numeric(raw_data["close"], errors="coerce").to_numpy(dtype=np.float64),
++        pd.to_numeric(raw_data["close"], errors="coerce").shift(1).to_numpy(dtype=np.float64),
+         index=source_index,
+     )
+     return _rekey_close_carrier(close, feature_index)

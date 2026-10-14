@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/factor_centrality_analyzer.py b/momentum/Analysis/factor_centrality_analyzer.py
+index b82a91a0..f3f13d6c 100644
+--- a/momentum/Analysis/factor_centrality_analyzer.py
++++ b/momentum/Analysis/factor_centrality_analyzer.py
+@@ -183,7 +183,7 @@ class FactorCentralityAnalyzer:
+         x = np.arange(len(series), dtype=float)
+         slope = float(np.polyfit(x, series.values.astype(float), 1)[0]) if len(series) >= 3 else 0.0
+         trend = "rising" if slope > 0 else "falling" if slope < 0 else "flat"
+-        regime = "crowded" if crowding_ratio >= 0.5 else "normal"
++        regime = "crowded" if crowding_ratio > 0.5 else "normal"
+         return {
+             "feature": feature_name,
+             "regime": regime,

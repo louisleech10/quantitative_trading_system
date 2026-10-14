@@ -1,0 +1,13 @@
+diff --git a/momentum/Strategy/performance_metrics.py b/momentum/Strategy/performance_metrics.py
+index 249220be..0ea89e25 100644
+--- a/momentum/Strategy/performance_metrics.py
++++ b/momentum/Strategy/performance_metrics.py
+@@ -70,7 +70,7 @@ class PerformanceMetrics:
+         if start <= 0 or end <= 0:
+             return 0.0
+ 
+-        n_periods = len(self.equity_curve) - 1
++        n_periods = len(self.equity_curve)
+         years = n_periods / self.periods_per_year
+         return (end / start) ** (1.0 / years) - 1.0
+ 

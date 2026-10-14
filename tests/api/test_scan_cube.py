@@ -548,3 +548,65 @@ def test_cube_failure_does_not_kill_scan_results(monkeypatch):
     )
     cube = svc.ICAnalysisService._build_scan_cube(service, "t1", object(), [])
     assert cube["status"] == "failed" and "disk full" in cube["reason"]
+
+
+def test_wiring_run_scan_grid_persists_cube_then_strips_report(tmp_path, monkeypatch):
+    """TESTREG 純增改寫：經**生產** `_run_scan_grid` 收尾段驗「先落檔、再剝除 report」。
+
+    舊測試自己 pop report 再斷言未洩漏（生產端剝除從未被執行），且其
+    `DEFAULT_ROOT` monkeypatch 對已綁定之預設參數無效。本測試：
+    ① 替身 `create_scan_cube_store` 把 `build_cube` 綁到 `tmp_path`（不碰 repo 之 data_cache）；
+    ② 以替身 `_run_scan_cell` 回帶 sentinel 之 report，跑真實 `_run_scan_grid`；
+    ③ 回傳 payload 不得含 report／sentinel，且 tmp 下之立方體須逐列保有每格 report 之 rows
+       （證明 `_build_scan_cube` 在剝除**之前**拿到 report）。
+    """
+    import asyncio
+    import types
+
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    service = ICAnalysisService.__new__(ICAnalysisService)
+    names = ["f0", "f1"]
+
+    def _fake_cell(analyzer_factory, request, cell_batch, **kwargs):
+        spec = cell_batch["event_label_spec"]
+        return {
+            "capability": "available", "reason": None, "n_events": 5,
+            "report": {
+                "summary_table": [_row(n, 0.1 + spec["decision_offset_bars"] * 0.01) for n in names],
+                "analysis_status": "ok_oos",
+                "__sentinel__": "MUST_NOT_LEAK",
+            },
+        }
+
+    monkeypatch.setattr(service, "_run_scan_cell", _fake_cell, raising=False)
+    monkeypatch.setattr(
+        "momentum.factories.create_scan_cube_store",
+        lambda: types.SimpleNamespace(
+            build_cube=lambda *a, **k: sc.build_cube(*a, root=tmp_path, **k)),
+    )
+    event_batch = {
+        "event_label_spec": {"horizon_bars": 1, "entry_price_semantic": "next_open",
+                             "label_return_mode": "return", "decision_offset_bars": 0},
+        "event_label_scan": {"decision_offset_bars_max": 1, "horizon_bars_max": 2},
+    }
+    progress: list = []
+    out = asyncio.run(service._run_scan_grid(
+        "t_strip", lambda: None, object(), event_batch,
+        features_path=None, meta_path=None, feature_manifest_path=None,
+        labels_path=None, kline_reader=None, config_override=None,
+        progress_callback=progress.append,
+    ))
+
+    payload = json.dumps(out, default=str)
+    assert "MUST_NOT_LEAK" not in payload and all("report" not in c for c in out["scan_results"]), \
+        "生產 _run_scan_grid 未剝除 report ⇒ 會洩進 HTTP status"
+
+    expected = {(k, h, n) for k in (0, 1) for h in (1, 2) for n in names}
+    page = sc.query_cube(tmp_path, "t_strip", limit=100)
+    got = {(r["k"], r["h"], r["feature_name"]) for r in page["rows"]}
+    ic_by_k = {(r["k"], r["feature_name"]): r["ic_mean"] for r in page["rows"]}
+    assert (out["cube"]["status"] == "ok" and page["total"] == len(expected) and got == expected
+            and ic_by_k[(1, "f0")] == 0.1 + 1 * 0.01
+            and out["cube"]["metrics"] == [c for c in _row("x") if c != "feature_name"]), \
+        "立方體未拿到剝除前之 report rows（落檔與剝除順序錯）"

@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/pit_stats.py b/momentum/Analysis/pit_stats.py
+index 1baa1683..0b78c88d 100644
+--- a/momentum/Analysis/pit_stats.py
++++ b/momentum/Analysis/pit_stats.py
+@@ -338,7 +338,7 @@ def pit_expanding_qcut_label(
+ 
+     counts = effective_count(values)
+     for t in range(n):
+-        if counts[t] < min_samples:
++        if counts[t] <= min_samples:
+             continue
+         if not np.isfinite(values[t]):
+             continue

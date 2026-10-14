@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/event_samples/pattern_bridge.py b/momentum/Analysis/event_samples/pattern_bridge.py
+index 9f879eb1..4fd763a6 100644
+--- a/momentum/Analysis/event_samples/pattern_bridge.py
++++ b/momentum/Analysis/event_samples/pattern_bridge.py
+@@ -27,7 +27,7 @@ from momentum.Analysis.pattern_extractor import PatternExtractor, PatternSplitRe
+ 
+ logger = get_logger(__name__)
+ 
+-SURVIVOR_SCHEMA_VERSION_REQUIRED = 2
++SURVIVOR_SCHEMA_VERSION_REQUIRED = 3
+ 
+ 
+ @dataclass(frozen=True)

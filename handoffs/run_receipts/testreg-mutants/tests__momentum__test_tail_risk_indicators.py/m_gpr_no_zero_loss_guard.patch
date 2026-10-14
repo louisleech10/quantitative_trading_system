@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+index d6aaadf3..6d34e9d6 100644
+--- a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
++++ b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+@@ -186,7 +186,7 @@ class TailRiskIndicatorEngine:
+         for window in self.windows:
+             gain_sum = gains.rolling(window).sum()
+             loss_sum = losses.rolling(window).sum()
+-            gpr = gain_sum / loss_sum.replace(0.0, np.nan)
++            gpr = gain_sum / loss_sum
+             output[f"tr_gpr_{window}"] = gpr.clip(lower=0.0, upper=100.0)
+ 
+         return pd.DataFrame(output, index=returns.index)

@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/model_validation/walk_forward_validator.py b/momentum/Analysis/model_validation/walk_forward_validator.py
+index 1b212ea6..0e0ae87f 100644
+--- a/momentum/Analysis/model_validation/walk_forward_validator.py
++++ b/momentum/Analysis/model_validation/walk_forward_validator.py
+@@ -299,7 +299,7 @@ class WalkForwardValidator:
+ 
+         mean_gap = float(np.mean(valid_gaps)) if valid_gaps else 0.0
+         trend = self._infer_auc_trend(valid_aucs)
+-        degradation_periods = [r.period_index for r in period_results if r.test_auc is not None and r.test_auc < 0.5]
++        degradation_periods = [r.period_index for r in period_results if r.test_auc is not None and r.test_auc > 0.5]
+         feature_stability = self._compute_feature_stability(period_results)
+ 
+         report = WalkForwardReport(

@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/phase24/test_rolling_oos_validator.py::test_auto_reduce_step_exact_splits_and_no_overlap"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "baseline_session_id": "c43bfc2e-e805-4277-9931-42bde0b85261",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__phase24__test_rolling_oos_validator.py.compare.patch",
+ "compare_patch_sha256": "c0239ea09880b74f9fbacfda9fdf5f3ffbda65e1ff125648146b59b7d669dff5",
+ "fingerprint": "d40fdbebea977db533e691e9e4b9fe6b2147532e40effcbb047d6696e265b97c",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_step_never_reduced",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_rolling_oos_validator.py/m_step_never_reduced.patch",
+   "patch_sha256": "b0efd767ccdc17f33b5dcc73a8482c1883b31428c7d5e88638ab16ded0e27dfc",
+   "session_id": "fcf738a7-a429-45e3-95ad-63428250eb71"
+  },
+  {
+   "id": "m_test_overlaps_last_train_bar",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_rolling_oos_validator.py/m_test_overlaps_last_train_bar.patch",
+   "patch_sha256": "563961a920322444f52c700ca48c15025726a52fc3702975870c086a8cbcc4b9",
+   "session_id": "e4556bfa-5b88-4159-b029-5ff604635ec6"
+  }
+ ],
+ "path": "tests/phase24/test_rolling_oos_validator.py"
+}

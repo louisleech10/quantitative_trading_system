@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/marginal_ic.py b/momentum/Analysis/marginal_ic.py
+index f0c1064d..9a845a87 100644
+--- a/momentum/Analysis/marginal_ic.py
++++ b/momentum/Analysis/marginal_ic.py
+@@ -525,7 +525,7 @@ def compute_marginal_ic(
+         }
+     elif removed_budget_ok:
+         for c in removed_names:
+-            removed[c] = _one(c, survivors)
++            removed[c] = _one(c, survivors[:-1])
+         views["removed_candidates"] = _view_status(list(removed.values()))
+     else:
+         views["removed_candidates"] = {"status": "not_computed", "reason": budget_reason}

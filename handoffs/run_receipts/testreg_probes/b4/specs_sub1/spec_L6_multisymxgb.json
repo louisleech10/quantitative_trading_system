@@ -1,0 +1,30 @@
+{
+ "path": "tests/test_multi_symbol_xgboost.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "mutants": [
+  {
+   "id": "m_singleton_guard_dropped",
+   "file": "api/utils/case_storage.py",
+   "old": "    if _case_storage_manager is None:\n",
+   "new": "    if True:\n"
+  },
+  {
+   "id": "m_by_symbol_missing_returns_all",
+   "file": "api/utils/case_storage.py",
+   "old": "        case_ids = self.symbol_index.get(symbol, [])\n",
+   "new": "        case_ids = self.symbol_index.get(symbol)\n"
+  },
+  {
+   "id": "m_time_series_split_default_off",
+   "file": "api/models/pattern_analysis_models.py",
+   "old": "        default=True,\n        description=\"是否使用時間序列切分避免洩漏\"\n",
+   "new": "        default=False,\n        description=\"是否使用時間序列切分避免洩漏\"\n"
+  },
+  {
+   "id": "m_embargo_cap_loosened",
+   "file": "api/models/pattern_analysis_models.py",
+   "old": "        le=0.1,\n",
+   "new": "        le=1.0,\n"
+  }
+ ]
+}

@@ -1,0 +1,42 @@
+{
+ "path": "tests/momentum/Analysis/model_validation/test_walk_forward_validator.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "mutants": [
+  {
+   "id": "m_factory_drops_config",
+   "file": "momentum/factories.py",
+   "old": "    return WalkForwardValidator(config=config)\n",
+   "new": "    return WalkForwardValidator()\n"
+  },
+  {
+   "id": "m_rolling_no_purge",
+   "file": "momentum/Analysis/model_validation/walk_forward_validator.py",
+   "old": "            train_end = train_start + train_size\n            test_start = train_end + self.config.purge_gap\n",
+   "new": "            train_end = train_start + train_size\n            test_start = train_end\n"
+  },
+  {
+   "id": "m_expanding_no_purge",
+   "file": "momentum/Analysis/model_validation/walk_forward_validator.py",
+   "old": "        train_end = initial_train_size\n        while True:\n            test_start = train_end + self.config.purge_gap\n",
+   "new": "        train_end = initial_train_size\n        while True:\n            test_start = train_end\n"
+  },
+  {
+   "id": "m_proba_class0",
+   "file": "momentum/Analysis/model_validation/walk_forward_validator.py",
+   "old": "                return proba[:, 1]\n",
+   "new": "                return proba[:, 0]\n"
+  },
+  {
+   "id": "m_hit_rate_reversed",
+   "file": "momentum/Analysis/model_validation/walk_forward_validator.py",
+   "old": "            hit_rate = float(np.mean(auc_array >= self.config.auc_threshold))\n",
+   "new": "            hit_rate = float(np.mean(auc_array < self.config.auc_threshold))\n"
+  },
+  {
+   "id": "m_degradation_reversed",
+   "file": "momentum/Analysis/model_validation/walk_forward_validator.py",
+   "old": "r.test_auc is not None and r.test_auc < 0.5]\n",
+   "new": "r.test_auc is not None and r.test_auc > 0.5]\n"
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/trend_analyzer.py b/momentum/Analysis/trend_analyzer.py
+index 747193ca..2e093dc5 100644
+--- a/momentum/Analysis/trend_analyzer.py
++++ b/momentum/Analysis/trend_analyzer.py
+@@ -200,7 +200,7 @@ class TrendAnalyzer:
+                 recommendation = "警告"
+                 reason += " + half_life 偏短"
+             elif recommendation == "警告":
+-                recommendation = "危險"
++                recommendation = "警告"
+                 reason += " + half_life 偏短"
+ 
+         return {

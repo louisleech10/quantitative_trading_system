@@ -1,0 +1,13 @@
+diff --git a/momentum/Strategy/vectorized_backtest.py b/momentum/Strategy/vectorized_backtest.py
+index dbdc222e..d1ae9f91 100644
+--- a/momentum/Strategy/vectorized_backtest.py
++++ b/momentum/Strategy/vectorized_backtest.py
+@@ -364,7 +364,7 @@ class VectorizedBacktest:
+                 idx = int(timestamp_to_index[trade.exit_time])
+             else:
+                 idx = int(prices.index.get_loc(trade.exit_time))
+-            pnl_map[idx] = pnl_map.get(idx, 0.0) + float(trade.pnl_pct)
++            pnl_map[idx] = float(trade.pnl_pct)
+ 
+         returns = np.zeros(len(prices), dtype=float)
+         for idx, pnl in pnl_map.items():

@@ -1,0 +1,42 @@
+{
+ "path": "tests/test_phase2_integration.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "mutants": [
+  {
+   "id": "m_registry_instance_not_initialized",
+   "file": "momentum/Analysis/strategy_registry.py",
+   "old": "strategy_registry = StrategyRegistry()\n",
+   "new": "strategy_registry = StrategyRegistry.__new__(StrategyRegistry)\n"
+  },
+  {
+   "id": "m_detail_unknown_id_500",
+   "file": "api/routes/optimization.py",
+   "old": "        raise HTTPException(status_code=404, detail=f\"Strategy '{strategy_id}' not found\")\n",
+   "new": "        raise HTTPException(status_code=500, detail=f\"Strategy '{strategy_id}' not found\")\n"
+  },
+  {
+   "id": "m_list_parameter_count_wrong_field",
+   "file": "api/routes/optimization.py",
+   "old": "                \"parameter_count\": len(metadata.parameters),\n",
+   "new": "                \"parameter_count\": len(metadata.supported_indicators),\n"
+  },
+  {
+   "id": "m_detail_max_copies_min",
+   "file": "api/routes/optimization.py",
+   "old": "                param_dict[\"max_value\"] = param.max_value\n",
+   "new": "                param_dict[\"max_value\"] = param.min_value\n"
+  },
+  {
+   "id": "m_single_objective_ignores_frontend_ranges",
+   "file": "momentum/Optimization/optuna_optimizer.py",
+   "old": "            # 步驟1: 採樣固定參數（data_source, strategy_logic, indicator_type）\n            data_source = trial.suggest_categorical(\n                'data_source',\n                self.parameter_ranges.data_sources\n            )\n\n            strategy_logic = trial.suggest_categorical(\n                'strategy_logic',\n                self.parameter_ranges.strategy_logics\n            )\n\n            # 指標類型：尊重用戶在前端的選擇\n            # 如果用戶選擇了特定指標類型，則只使用該類型；否則使用所有可用類型\n            indicator_type = trial.suggest_categorical(\n                'indicator_type',\n                self.parameter_ranges.indicator_types\n            )\n\n            # 步驟2: 根據策略元數據動態採樣參數\n            # Lazy import to avoid circular dependency\n            from momentum.Analysis.strategy_registry import strategy_registry\n\n            try:\n                metadata = strategy_registry.get_strategy(strategy_logic)\n            except ValueError as e:\n                self.logger.error(f\"Strategy '{strategy_logic}' not found: {e}\")\n                raise optuna.TrialPruned()\n\n            # 動態採樣策略參數\n            params = {}\n\n            # 參數範圍覆蓋邏輯: 優先使用前端傳遞的 parameter_ranges，否則使用 YAML 默認值\n            range_overrides = {}\n            if self.parameter_ranges:\n",
+   "new": "            # 步驟1: 採樣固定參數（data_source, strategy_logic, indicator_type）\n            data_source = trial.suggest_categorical(\n                'data_source',\n                self.parameter_ranges.data_sources\n            )\n\n            strategy_logic = trial.suggest_categorical(\n                'strategy_logic',\n                self.parameter_ranges.strategy_logics\n            )\n\n            # 指標類型：尊重用戶在前端的選擇\n            # 如果用戶選擇了特定指標類型，則只使用該類型；否則使用所有可用類型\n            indicator_type = trial.suggest_categorical(\n                'indicator_type',\n                self.parameter_ranges.indicator_types\n            )\n\n            # 步驟2: 根據策略元數據動態採樣參數\n            # Lazy import to avoid circular dependency\n            from momentum.Analysis.strategy_registry import strategy_registry\n\n            try:\n                metadata = strategy_registry.get_strategy(strategy_logic)\n            except ValueError as e:\n                self.logger.error(f\"Strategy '{strategy_logic}' not found: {e}\")\n                raise optuna.TrialPruned()\n\n            # 動態採樣策略參數\n            params = {}\n\n            # 參數範圍覆蓋邏輯: 優先使用前端傳遞的 parameter_ranges，否則使用 YAML 默認值\n            range_overrides = {}\n            if not self.parameter_ranges:\n"
+  },
+  {
+   "id": "m_multi_objective_ignores_frontend_ranges",
+   "file": "momentum/Optimization/optuna_optimizer.py",
+   "old": "            # 步驟1: 採樣固定參數\n            data_source = trial.suggest_categorical(\n                'data_source',\n                self.parameter_ranges.data_sources\n            )\n\n            strategy_logic = trial.suggest_categorical(\n                'strategy_logic',\n                self.parameter_ranges.strategy_logics\n            )\n\n            # 指標類型：尊重用戶在前端的選擇\n            # 如果用戶選擇了特定指標類型，則只使用該類型；否則使用所有可用類型\n            indicator_type = trial.suggest_categorical(\n                'indicator_type',\n                self.parameter_ranges.indicator_types\n            )\n\n            # 步驟2: 根據策略元數據動態採樣參數\n            # Lazy import to avoid circular dependency\n            from momentum.Analysis.strategy_registry import strategy_registry\n\n            try:\n                metadata = strategy_registry.get_strategy(strategy_logic)\n            except ValueError as e:\n                self.logger.error(f\"Strategy '{strategy_logic}' not found: {e}\")\n                raise optuna.TrialPruned()\n\n            # 動態採樣策略參數\n            params = {}\n\n            # 參數範圍覆蓋邏輯: 優先使用前端傳遞的 parameter_ranges，否則使用 YAML 默認值\n            range_overrides = {}\n            if self.parameter_ranges:\n",
+   "new": "            # 步驟1: 採樣固定參數\n            data_source = trial.suggest_categorical(\n                'data_source',\n                self.parameter_ranges.data_sources\n            )\n\n            strategy_logic = trial.suggest_categorical(\n                'strategy_logic',\n                self.parameter_ranges.strategy_logics\n            )\n\n            # 指標類型：尊重用戶在前端的選擇\n            # 如果用戶選擇了特定指標類型，則只使用該類型；否則使用所有可用類型\n            indicator_type = trial.suggest_categorical(\n                'indicator_type',\n                self.parameter_ranges.indicator_types\n            )\n\n            # 步驟2: 根據策略元數據動態採樣參數\n            # Lazy import to avoid circular dependency\n            from momentum.Analysis.strategy_registry import strategy_registry\n\n            try:\n                metadata = strategy_registry.get_strategy(strategy_logic)\n            except ValueError as e:\n                self.logger.error(f\"Strategy '{strategy_logic}' not found: {e}\")\n                raise optuna.TrialPruned()\n\n            # 動態採樣策略參數\n            params = {}\n\n            # 參數範圍覆蓋邏輯: 優先使用前端傳遞的 parameter_ranges，否則使用 YAML 默認值\n            range_overrides = {}\n            if not self.parameter_ranges:\n"
+  }
+ ]
+}

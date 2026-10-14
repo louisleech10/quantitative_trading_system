@@ -426,3 +426,53 @@ def test_early_return_paths_carry_annualization():
         _default_params(),
     )
     assert single.annualization["source"] == "default_730"
+
+
+def test_trailing_stop_exact_trade_path_and_cost_pnl():
+    """移動停損實質版（手推 oracle）：同 test_trailing_stop_triggered 之 fixture、明示成本 0.001／0.0005。
+
+    第 0 根進場 100（stop 98、tp 106）；第 1 根 high 103 ≥ 啟動價 101 ⇒ trailing＝103−1＝102，
+    low 101 ≤ 102 ⇒ trailing_stop 出場價 102。第 2 根再進場 104（stop 102）；第 3 根 low 100 ⇒ stop_loss 102。
+    第 4 根進場 101 即資料尾 ⇒ data_end 101。每筆 pnl_pct＝(出−進)/進 − 2×(0.001+0.0005)，pnl＝0.1×pnl_pct。
+    """
+    vb = VectorizedBacktest(commission=0.001, slippage=0.0005)
+    prices = _build_prices([100, 102, 104, 103, 101])
+    prices.loc[2, "high"] = 108
+    prices.loc[3, "low"] = 100
+    proba = pd.Series([0.9, 0.9, 0.9, 0.9, 0.9], dtype=float)
+    atr = pd.Series([1, 1, 1, 1, 1], dtype=float)
+    result = vb.run_backtest(prices, proba, atr, _default_params(stop_loss_atr=2.0, trailing_stop_activation=1.0))
+    ts = prices["timestamp"].tolist()
+    expected_path = [
+        ("trailing_stop", 100.0, 102.0, ts[0], ts[1]),
+        ("stop_loss", 104.0, 102.0, ts[2], ts[3]),
+        ("data_end", 101.0, 101.0, ts[4], ts[4]),
+    ]
+    got_path = [(t.exit_reason, t.entry_price, t.exit_price, t.entry_time, t.exit_time) for t in result.trades]
+    assert got_path == expected_path, got_path
+    expected_pct = [(102 - 100) / 100 - 0.003, (102 - 104) / 104 - 0.003, 0.0 - 0.003]
+    assert all(abs(t.pnl_pct - e) < 1e-12 and abs(t.pnl - 0.1 * e) < 1e-12
+               for t, e in zip(result.trades, expected_pct)), [(t.pnl_pct, t.pnl) for t in result.trades]
+
+
+def test_calculate_equity_curve_compounds_known_exit_pnl_pct():
+    """權益曲線手算 oracle：各筆 pnl_pct 落在其 exit bar、同 bar 多筆相加後逐 bar 複利。
+
+    T1 於第 1 根 +2%；T2（−1%）與 T3（+0.5%）同於第 2 根 ⇒ 曲線＝[1, 1.02, 1.02×(1−0.005)]。
+    pnl 刻意與 pnl_pct 不同（pnl＝0.1×pnl_pct），誤用 pnl 會被抓到。
+    """
+    vb = VectorizedBacktest()
+    prices = _build_prices([100, 101, 102])
+    ts = prices["timestamp"].tolist()
+
+    def _trade(exit_ts, pct):
+        return Trade(
+            entry_time=ts[0], entry_price=100, exit_time=exit_ts, exit_price=100 * (1 + pct),
+            position_size=0.1, direction="long", pnl=0.1 * pct, pnl_pct=pct,
+            exit_reason="signal_exit", mae=-0.01, mfe=0.02,
+        )
+
+    curve = vb._calculate_equity_curve([_trade(ts[1], 0.02), _trade(ts[2], -0.01), _trade(ts[2], 0.005)], prices)
+    expected = np.array([1.0, 1.02, 1.02 * (1.0 - 0.005)])
+    assert list(curve.index) == list(prices.index) and np.allclose(curve.to_numpy(), expected, rtol=0, atol=1e-12), \
+        curve.tolist()

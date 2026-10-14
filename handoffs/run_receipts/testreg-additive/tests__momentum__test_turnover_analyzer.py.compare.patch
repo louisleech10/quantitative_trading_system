@@ -1,0 +1,35 @@
+diff --git a/tests/momentum/test_turnover_analyzer.py b/tests/momentum/test_turnover_analyzer.py
+index e4417582..5754998a 100644
+--- a/tests/momentum/test_turnover_analyzer.py
++++ b/tests/momentum/test_turnover_analyzer.py
+@@ -256,3 +256,30 @@ def test_compute_turnover_time_series_qcut_failure(monkeypatch):
+     assert len(result["timestamps"]) == len(series)
+     assert all(v is None for v in result["quantile_turnovers"])
+     assert all(v is None for v in result["rank_change_rates"])
++
++
++def test_quantile_turnover_hand_computed_top_entries_exits():
++    """頂分位換手率之獨立手算 oracle（不重抄生產公式）。
++
++    序列：前 MIN_SAMPLES 根為 1..MIN_SAMPLES 嚴格遞增（第 MIN_SAMPLES 根＝歷史最大 ⇒ 頂分位 label 4）；
++    其後每根若為「新高」⇒ 頂分位 4、「新低」⇒ 底分位 0。狀態（自 t=MIN_SAMPLES-1）：
++    T T T B T B B T T ⇒ 頂分位遮罩 1 1 1 0 1 0 0 1 1 ⇒ |Δ| 自 t=MIN_SAMPLES 起 0 0 1 1 1 0 1 0 ⇒ 均值 4/8＝0.5。
++    """
++    pattern = ["T", "T", "B", "T", "B", "B", "T", "T"]
++    vals = list(np.arange(1, MIN_SAMPLES + 1, dtype=float))
++    hi, lo = float(MIN_SAMPLES), 1.0
++    for p in pattern:
++        if p == "T":
++            hi += 1000.0
++            vals.append(hi)
++        else:
++            lo -= 1000.0
++            vals.append(lo)
++    series = pd.Series(vals)
++    hand_labels = [np.nan] * (MIN_SAMPLES - 1) + [4.0] + [4.0 if p == "T" else 0.0 for p in pattern]
++
++    labels = pit_expanding_qcut_label(series, q=5, min_samples=MIN_SAMPLES, duplicates="drop")
++    turnover = TurnoverAnalyzer({"num_quantiles": 5}).compute_quantile_turnover(series, num_quantiles=5)
++
++    assert np.isclose(turnover, 0.5) and np.array_equal(labels.to_numpy(), np.array(hand_labels), equal_nan=True), \
++        f"turnover={turnover}"

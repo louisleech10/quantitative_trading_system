@@ -1,0 +1,48 @@
+{
+  "path": "tests/test_kline_storage.py",
+  "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+  "mutants": [
+    {
+      "id": "m_dtype_trades_float",
+      "file": "momentum/DataExtraction/kline_storage.py",
+      "old": "        'quote_volume': 'float32',\n        'number_of_trades': 'int32'\n    }\n",
+      "new": "        'quote_volume': 'float32',\n        'number_of_trades': 'float32'\n    }\n"
+    },
+    {
+      "id": "m_range_end_exclusive",
+      "file": "momentum/DataExtraction/kline_storage.py",
+      "old": "                df = df[(df['timestamp'] >= start_value) & (df['timestamp'] <= end_value)]\n",
+      "new": "                df = df[(df['timestamp'] >= start_value) & (df['timestamp'] < end_value)]\n"
+    },
+    {
+      "id": "m_meta_source_hardcoded",
+      "file": "momentum/DataExtraction/kline_storage.py",
+      "old": "                    tf_group.attrs['data_source'] = data_source\n",
+      "new": "                    tf_group.attrs['data_source'] = \"binance\"\n"
+    },
+    {
+      "id": "m_append_keep_first",
+      "file": "momentum/DataExtraction/kline_storage.py",
+      "old": "                combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='last')\n",
+      "new": "                combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='first')\n"
+    },
+    {
+      "id": "m_index_add_no_sort",
+      "file": "momentum/DataExtraction/kline_storage.py",
+      "old": "                if timeframe not in cache_index[symbol]:\n                    cache_index[symbol].append(timeframe)\n                    cache_index[symbol].sort()\n\n            elif operation == 'remove':\n",
+      "new": "                if timeframe not in cache_index[symbol]:\n                    cache_index[symbol].append(timeframe)\n\n            elif operation == 'remove':\n"
+    },
+    {
+      "id": "m_validate_low_close_copy_paste",
+      "file": "momentum/DataExtraction/kline_storage.py",
+      "old": "        if not (df['low'] <= df['close']).all():\n",
+      "new": "        if not (df['low'] <= df['high']).all():\n"
+    },
+    {
+      "id": "m_integrity_tf_key_upper",
+      "file": "momentum/DataExtraction/kline_storage.py",
+      "old": "            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)\n\n            # 允許10%誤差\n",
+      "new": "            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe.upper(), 3600)\n\n            # 允許10%誤差\n"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Strategy/test_performance_metrics.py::test_cagr_matches_independent_oracle",
+  "tests/momentum/Strategy/test_performance_metrics.py::test_expectancy_exact_hand_value",
+  "tests/momentum/Strategy/test_performance_metrics.py::test_max_drawdown_exact_hand_value",
+  "tests/momentum/Strategy/test_performance_metrics.py::test_sharpe_ratio_matches_independent_oracle",
+  "tests/momentum/Strategy/test_performance_metrics.py::test_sortino_ratio_matches_independent_oracle"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "baseline_session_id": "ec97586c-8fe7-40dd-a1a2-dc94dd574048",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Strategy__test_performance_metrics.py.compare.patch",
+ "compare_patch_sha256": "b3aeaac7a4b61fa369626fbe6abfec80af354eddba40f232671953d6f9cba62e",
+ "fingerprint": "974eabe8a48e3d120a6cf1ff82cd4e05737581bdfa0175e479dc3dd21aa7d5ad",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_mdd_vs_initial_not_peak",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_performance_metrics.py/m_mdd_vs_initial_not_peak.patch",
+   "patch_sha256": "71920e1f49063cfd73396d7ddcf89065606224f3a6395133dea8eab0f9913864",
+   "session_id": "0e137b48-a47e-4a92-9e2b-d6fd55f2c2ea"
+  },
+  {
+   "id": "m_expectancy_loss_sign_flipped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_performance_metrics.py/m_expectancy_loss_sign_flipped.patch",
+   "patch_sha256": "056046f24097f193c909399357adea70dba74c98e551823f5d1befc25842420a",
+   "session_id": "6c8da5b7-b4fc-4282-8a93-830058cda9b8"
+  },
+  {
+   "id": "m_sharpe_sample_std",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_performance_metrics.py/m_sharpe_sample_std.patch",
+   "patch_sha256": "24e3ba1cbd4798b0423f291df22ac3503faaa06b42f6df9f9912b68960ebbd68",
+   "session_id": "068a4c12-fd02-4cec-81f3-e6b379693302"
+  },
+  {
+   "id": "m_sortino_uses_full_std",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_performance_metrics.py/m_sortino_uses_full_std.patch",
+   "patch_sha256": "019ee8e46927502192e2bb94fec501363856aa155f6dd0510cb5c84e602c6523",
+   "session_id": "9564e4bc-ea8d-4db6-880c-d3398a1e0b73"
+  },
+  {
+   "id": "m_cagr_period_off_by_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_performance_metrics.py/m_cagr_period_off_by_one.patch",
+   "patch_sha256": "b14939aa2b2ea4a30fafb6d69112b8a0138c801bf6f461d7ceae85d9eb451cfe",
+   "session_id": "6d3e69f3-1e73-41c5-b6d0-527c714e0979"
+  }
+ ],
+ "path": "tests/momentum/Strategy/test_performance_metrics.py"
+}

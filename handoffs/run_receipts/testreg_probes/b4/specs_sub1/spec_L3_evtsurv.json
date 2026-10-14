@@ -1,0 +1,18 @@
+{
+ "path": "tests/momentum/Analysis/test_evtlabel_survivor_consumer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r14/synth.md",
+ "mutants": [
+  {
+   "id": "m_consumer_version_drift",
+   "file": "momentum/Analysis/event_samples/pattern_bridge.py",
+   "old": "SURVIVOR_SCHEMA_VERSION_REQUIRED = 2\n",
+   "new": "SURVIVOR_SCHEMA_VERSION_REQUIRED = 3\n"
+  },
+  {
+   "id": "m_label_binary_wrong_source_gate",
+   "file": "momentum/Analysis/survivor_contract.py",
+   "old": "            if isinstance(ef, dict) and event_obj[\"label_source\"] == \"imported_binary_label\"\n",
+   "new": "            if isinstance(ef, dict) and event_obj[\"label_source\"] == \"event_label_value\"\n"
+  }
+ ]
+}

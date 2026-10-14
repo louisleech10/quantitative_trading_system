@@ -1,0 +1,18 @@
+{
+ "path": "tests/api/test_optimization_output_service.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "mutants": [
+  {
+   "id": "m_arcname_fullpath",
+   "file": "api/services/optimization_output_service.py",
+   "old": "                    zip_file.write(file_path, arcname=file_path.name)\n",
+   "new": "                    zip_file.write(file_path, arcname=str(file_path))\n"
+  },
+  {
+   "id": "m_drop_isfile_check",
+   "file": "api/services/optimization_output_service.py",
+   "old": "                if file_path.exists() and file_path.is_file():\n",
+   "new": "                if file_path.exists():\n"
+  }
+ ]
+}

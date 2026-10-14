@@ -1,0 +1,46 @@
+{
+ "added_nodeids": [
+  "tests/phase24/test_trend_analyzer.py::test_analyze_multi_dimension_ic_down_centrality_up_is_danger",
+  "tests/phase24/test_trend_analyzer.py::test_analyze_trend_down_matches_independent_regression_oracle",
+  "tests/phase24/test_trend_analyzer.py::test_combine_signal_half_life_escalation_table"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "baseline_session_id": "ff4cf48a-f8d8-4064-9d10-47e2fd73769a",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__phase24__test_trend_analyzer.py.compare.patch",
+ "compare_patch_sha256": "478c579fd77e66d8d3794815247835fe1eb44975dd17ee3fbc2510c6de4c4084",
+ "fingerprint": "cd551659c3f6e96b56358f3fe6ac417de6fcd6c3097286e49e436780801c1a2a",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_down_degrades_to_flat",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_trend_analyzer.py/m_down_degrades_to_flat.patch",
+   "patch_sha256": "785b37dcbcd31dcf856cdc4fa5b73b5ef32acf0de2f42c0edd7d04acd2c03f5e",
+   "session_id": "121b505d-4ba4-4d04-91b7-2e4c82106b4a"
+  },
+  {
+   "id": "m_significance_reversed",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_trend_analyzer.py/m_significance_reversed.patch",
+   "patch_sha256": "ab1b76391d297192e5ddda6dbe1a72e7d8540230463fcac80f70f79db52eb992",
+   "session_id": "9ecb9c0f-9450-48c0-98e7-9a3c5526e598"
+  },
+  {
+   "id": "m_skip_winsorize",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_trend_analyzer.py/m_skip_winsorize.patch",
+   "patch_sha256": "d89e642a3e9492268130256c2fdc1e8618a3e8f2d88c173549ab679ba15f766f",
+   "session_id": "94341972-0361-4858-a56f-04105959e1ad"
+  },
+  {
+   "id": "m_half_life_le5",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_trend_analyzer.py/m_half_life_le5.patch",
+   "patch_sha256": "9dc28554f060962375717846127312c862160ea3ed73f8d0537229beb2edf1ce",
+   "session_id": "bfbf9e69-d223-4030-915e-9ba88cd9d1ed"
+  },
+  {
+   "id": "m_no_warning_escalation",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_trend_analyzer.py/m_no_warning_escalation.patch",
+   "patch_sha256": "9da6210347276fc56eb819c7b2fbb015e7012a8c5fd87d0e23b66930e26f7363",
+   "session_id": "7fc8743b-7159-45d1-959e-dc8ed1557910"
+  }
+ ],
+ "path": "tests/phase24/test_trend_analyzer.py"
+}

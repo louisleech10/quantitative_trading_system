@@ -1,0 +1,18 @@
+{
+ "path": "tests/momentum/Optimization/test_optuna_objectives.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "mutants": [
+  {
+   "id": "m_nsga2_switch_inverted",
+   "file": "momentum/Optimization/optuna_optimizer.py",
+   "old": "        if objective_directions and len(objective_directions) > 1 and self.sampler_type != \"NSGA-II\":\n",
+   "new": "        if objective_directions and len(objective_directions) > 1 and self.sampler_type == \"NSGA-II\":\n"
+  },
+  {
+   "id": "m_nsga2_switch_off_by_one",
+   "file": "momentum/Optimization/optuna_optimizer.py",
+   "old": "        if objective_directions and len(objective_directions) > 1 and self.sampler_type != \"NSGA-II\":\n",
+   "new": "        if objective_directions and len(objective_directions) > 2 and self.sampler_type != \"NSGA-II\":\n"
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{
+ "path": "tests/phase24/test_parameter_sensitivity_analyzer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "mutants": [
+  {
+   "id": "m_robust_appended_to_high_list",
+   "file": "momentum/Analysis/parameter_sensitivity_analyzer.py",
+   "old": "            if risk == \"low\":\n                robust.append(family_name)\n",
+   "new": "            if risk == \"low\":\n                high_risk.append(family_name)\n"
+  },
+  {
+   "id": "m_robust_includes_medium",
+   "file": "momentum/Analysis/parameter_sensitivity_analyzer.py",
+   "old": "            if risk == \"low\":\n                robust.append(family_name)\n",
+   "new": "            if risk in (\"low\", \"medium\"):\n                robust.append(family_name)\n"
+  },
+  {
+   "id": "m_ic_std_ddof1",
+   "file": "momentum/Analysis/parameter_sensitivity_analyzer.py",
+   "old": "        ic_std = float(df[\"ic_mean\"].std(ddof=0)) if len(df) > 1 else 0.0\n",
+   "new": "        ic_std = float(df[\"ic_mean\"].std(ddof=1)) if len(df) > 1 else 0.0\n"
+  }
+ ]
+}

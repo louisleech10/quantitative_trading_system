@@ -174,3 +174,26 @@ def test_build_zip_bytes_includes_files(tmp_path):
     content = service.build_zip_bytes([file_a, file_b])
     assert isinstance(content, bytes)
     assert len(content) > 0
+
+
+import io as _io_zip_new
+import zipfile as _zipfile_new
+
+
+def test_build_zip_bytes_roundtrip_names_and_contents(tmp_path):
+    service = OptimizationOutputService()
+
+    file_a = tmp_path / "a.txt"
+    file_b = tmp_path / "b.txt"
+    file_a.write_text("A", encoding="utf-8")
+    file_b.write_text("B", encoding="utf-8")
+    missing = tmp_path / "missing.txt"
+    sub_dir = tmp_path / "sub_dir"
+    sub_dir.mkdir()
+
+    content = service.build_zip_bytes([file_a, file_b, missing, sub_dir])
+    with _zipfile_new.ZipFile(_io_zip_new.BytesIO(content)) as zf:
+        names = sorted(zf.namelist())
+        payload = {name: zf.read(name).decode("utf-8") for name in names if not name.endswith("/")}
+
+    assert names == ["a.txt", "b.txt"] and payload == {"a.txt": "A", "b.txt": "B"}, (names, payload)

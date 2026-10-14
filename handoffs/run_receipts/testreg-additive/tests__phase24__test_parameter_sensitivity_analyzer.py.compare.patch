@@ -1,0 +1,54 @@
+diff --git a/tests/phase24/test_parameter_sensitivity_analyzer.py b/tests/phase24/test_parameter_sensitivity_analyzer.py
+index 0997f7f7..8c556a33 100644
+--- a/tests/phase24/test_parameter_sensitivity_analyzer.py
++++ b/tests/phase24/test_parameter_sensitivity_analyzer.py
+@@ -154,3 +154,49 @@ def test_compute_ic_and_icir_proxy_edge_cases():
+ def test_extract_param_value_without_suffix():
+     value = ParameterSensitivityAnalyzer._extract_param_value("feature_alpha")
+     assert value == "feature_alpha"
++
++
++def test_batch_analyze_classifies_stable_robust_and_noisy_not_robust():
++    """TESTREG 純增改寫：batch_analyze 須把 stable 家族收進 robust、noisy 不得進 robust；
++    各家族 ic_std／風險分級對獨立 oracle（scipy spearman＋手算 std(ddof=0)＋文件門檻）。
++
++    舊測試只驗 high_risk_families／robust_families 兩鍵存在（生產無條件回傳）⇒ 恆綠。
++    """
++    from scipy import stats as _stats
++
++    idx = pd.date_range("2024-01-01", periods=240, freq="12h")
++    rng = np.random.default_rng(11)
++    base = rng.normal(size=240)
++    labels = pd.Series(base + rng.normal(scale=0.1, size=240), index=idx)
++    df = pd.DataFrame(
++        {
++            "stable_10": base + rng.normal(scale=0.01, size=240),
++            "stable_20": base + rng.normal(scale=0.01, size=240),
++            "stable_30": base + rng.normal(scale=0.01, size=240),
++            "noisy_10": rng.normal(size=240),
++            "noisy_20": rng.normal(size=240),
++            "noisy_30": rng.normal(size=240),
++        },
++        index=idx,
++    )
++    analyzer = ParameterSensitivityAnalyzer({"min_family_size": 3, "ic_std_threshold_low": 0.02, "ic_std_threshold_high": 0.05})
++    result = analyzer.batch_analyze(df, labels)
++
++    assert result["robust_families"] == ["stable"] and "noisy" not in result["robust_families"] and "stable" not in result["high_risk_families"] and result["summary"]["robust_count"] == 1, result
++
++    def _oracle(prefix):
++        cols = [f"{prefix}_{p}" for p in (10, 20, 30)]
++        ics = np.array([_stats.spearmanr(df[c].to_numpy(), labels.to_numpy())[0] for c in cols])
++        prods = [df[c].to_numpy() * labels.to_numpy() for c in cols]
++        icirs = np.array([p.mean() / np.sqrt(((p - p.mean()) ** 2).sum() / (p.size - 1)) for p in prods])
++        ic_std = float(np.sqrt(((ics - ics.mean()) ** 2).mean()))
++        icir_std = float(np.sqrt(((icirs - icirs.mean()) ** 2).mean()))
++        risk = "low" if (ic_std < 0.02 and icir_std < 0.15) else ("medium" if (ic_std < 0.05 and icir_std < 0.3) else "high")
++        return ic_std, risk
++
++    oracle = {fam: _oracle(fam) for fam in ("stable", "noisy")}
++    assert set(result["families"]) == {"stable", "noisy"} and all(
++        abs(result["families"][fam]["stability_metrics"]["ic_std_across_params"] - oracle[fam][0]) <= 1e-12
++        and result["families"][fam]["stability_metrics"]["overfitting_risk"] == oracle[fam][1]
++        for fam in oracle
++    ), (oracle, {f: v["stability_metrics"] for f, v in result["families"].items()})

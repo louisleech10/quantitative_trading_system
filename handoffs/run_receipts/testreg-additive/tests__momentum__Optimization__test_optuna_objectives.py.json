@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Optimization/test_optuna_objectives.py::test_multi_objective_study_auto_switches_to_nsga2_sampler"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "baseline_session_id": "7ee5b9e4-697d-425a-a11e-dca7662cb8be",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Optimization__test_optuna_objectives.py.compare.patch",
+ "compare_patch_sha256": "9a2832b2cb2d6c5ab8665cc6e5f8f497d4d4e891968258965467ea6179aa2c30",
+ "fingerprint": "5f8b6c8b31b8e23b21789646c91af2def7d883f7debe4d278737015c60309775",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_nsga2_switch_inverted",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Optimization__test_optuna_objectives.py/m_nsga2_switch_inverted.patch",
+   "patch_sha256": "62a49ad4c273342007a1e49e5977246a39facaabeb457f3dc179dfc4e2ddf5d8",
+   "session_id": "cde14b9f-7871-4bee-b88a-d9fa6fdab327"
+  },
+  {
+   "id": "m_nsga2_switch_off_by_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Optimization__test_optuna_objectives.py/m_nsga2_switch_off_by_one.patch",
+   "patch_sha256": "fc9c93d6c3cb33a8d7a26ddc0857889f6fc9a7fecc1d98eb1edb968c2f7a4b65",
+   "session_id": "eabf3af1-0273-487c-bdc8-58ba2ce1c5f3"
+  }
+ ],
+ "path": "tests/momentum/Optimization/test_optuna_objectives.py"
+}

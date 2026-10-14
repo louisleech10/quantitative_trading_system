@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/expectancy_calculator.py b/momentum/Analysis/expectancy_calculator.py
+index 8628028e..a51d5d66 100644
+--- a/momentum/Analysis/expectancy_calculator.py
++++ b/momentum/Analysis/expectancy_calculator.py
+@@ -85,7 +85,7 @@ class ExpectancyCalculator:
+         avg_win = float(np.mean(wins)) if len(wins) > 0 else 0.0
+         avg_loss = float(np.mean(losses)) if len(losses) > 0 else 0.0
+ 
+-        expectancy = win_rate * avg_win + (1 - win_rate) * avg_loss
++        expectancy = win_rate * avg_win - (1 - win_rate) * avg_loss
+         note = "此為粗估值，精確值需回測系統計算"
+ 
+         logger.info(

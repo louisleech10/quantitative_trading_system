@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/rolling_oos_validator.py b/momentum/Analysis/rolling_oos_validator.py
+index 39f56ac3..b0492969 100644
+--- a/momentum/Analysis/rolling_oos_validator.py
++++ b/momentum/Analysis/rolling_oos_validator.py
+@@ -176,7 +176,7 @@ class RollingOOSValidator:
+                 test_end = train_end + self._test_window
+                 if test_end > n_samples:
+                     break
+-                splits.append((range(train_start, train_end), range(train_end, test_end)))
++                splits.append((range(train_start, train_end), range(train_end - 1, test_end)))
+                 start += step
+ 
+             if len(splits) >= self._min_splits or step <= 1:

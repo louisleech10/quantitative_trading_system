@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/expectancy_calculator.py b/momentum/Analysis/expectancy_calculator.py
+index 8628028e..ba1aa81c 100644
+--- a/momentum/Analysis/expectancy_calculator.py
++++ b/momentum/Analysis/expectancy_calculator.py
+@@ -62,7 +62,7 @@ class ExpectancyCalculator:
+         if len(price_changes) != len(predicted_proba):
+             raise ValueError("price_changes 與 predicted_proba 長度不一致")
+ 
+-        trade_mask = predicted_proba >= threshold
++        trade_mask = predicted_proba > threshold
+         trade_returns = price_changes[trade_mask]
+ 
+         total_trades = int(len(trade_returns))

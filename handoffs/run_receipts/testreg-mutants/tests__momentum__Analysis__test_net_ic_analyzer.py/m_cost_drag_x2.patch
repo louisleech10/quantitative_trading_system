@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/net_ic_analyzer.py b/momentum/Analysis/net_ic_analyzer.py
+index c58e88f2..5ca82f1e 100644
+--- a/momentum/Analysis/net_ic_analyzer.py
++++ b/momentum/Analysis/net_ic_analyzer.py
+@@ -177,7 +177,7 @@ class NetICAnalyzer:
+ 
+         呼叫前提:turnover 已過 profile 檢查(有限且 ≥0)。
+         """
+-        return float((float(cost_bps) / 10000.0) * float(turnover))
++        return float((float(cost_bps) / 10000.0) * float(turnover) * 2.0)
+ 
+     def compute_net_factor_return(
+         self,

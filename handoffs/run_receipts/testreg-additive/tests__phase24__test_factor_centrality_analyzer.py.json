@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/phase24/test_factor_centrality_analyzer.py::test_detect_crowding_regime_values_hand_calc"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "baseline_session_id": "91f72351-87a5-4225-b9db-20194dd96ad2",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__phase24__test_factor_centrality_analyzer.py.compare.patch",
+ "compare_patch_sha256": "1c66882b5c918ff1ad346d6205a587a8582328c67dbb5b72cbc6a93201512021",
+ "fingerprint": "a766f9331105e3e8be42d1cc17938f6b7cc4da101a8a419d2c1a6caac6957a29",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_regime_strict_gt",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_factor_centrality_analyzer.py/m_regime_strict_gt.patch",
+   "patch_sha256": "4df55e24eeae0400dcf96ae21c80d5dd900cefacdb2ec17b5a419da2829fbdb7",
+   "session_id": "83907167-c248-4446-997b-d0c6b674983d"
+  },
+  {
+   "id": "m_trend_sign_flipped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_factor_centrality_analyzer.py/m_trend_sign_flipped.patch",
+   "patch_sha256": "fa8db344495ac63e107599cc52f0285fdd64d6b3bcd9d0f8f20ea5a41fa02b99",
+   "session_id": "20768fcb-8677-4c3d-af34-69f27b1eb7de"
+  }
+ ],
+ "path": "tests/phase24/test_factor_centrality_analyzer.py"
+}

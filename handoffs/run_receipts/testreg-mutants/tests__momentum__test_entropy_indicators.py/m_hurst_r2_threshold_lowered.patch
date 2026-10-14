@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/entropy_indicators.py b/momentum/FeatureEngineering/atomic/entropy_indicators.py
+index 83ea708d..c9081693 100644
+--- a/momentum/FeatureEngineering/atomic/entropy_indicators.py
++++ b/momentum/FeatureEngineering/atomic/entropy_indicators.py
+@@ -303,7 +303,7 @@ class EntropyIndicatorEngine:
+         ss_tot = np.sum((y - np.mean(y)) ** 2)
+         r_squared = 1.0 - ss_res / ss_tot if ss_tot != 0 else 0.0
+ 
+-        if r_squared < 0.1:
++        if r_squared < 0.01:
+             return np.nan
+         return float(slope)
+ 

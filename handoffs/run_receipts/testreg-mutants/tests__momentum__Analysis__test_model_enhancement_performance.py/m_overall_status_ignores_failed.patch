@@ -1,0 +1,13 @@
+diff --git a/api/services/model_enhancement_service.py b/api/services/model_enhancement_service.py
+index 23f650a6..230f2b3a 100644
+--- a/api/services/model_enhancement_service.py
++++ b/api/services/model_enhancement_service.py
+@@ -145,7 +145,7 @@ class ModelEnhancementService:
+                 module_results[module_name] = final_response
+ 
+         statuses = [item.status for item in module_results.values()]
+-        overall_status = "failed" if "failed" in statuses else "completed"
++        overall_status = "completed"
+         elapsed = (datetime.now() - start_time).total_seconds()
+ 
+         return FullEnhancementResponse(

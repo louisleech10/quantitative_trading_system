@@ -1,0 +1,29 @@
+diff --git a/tests/momentum/Analysis/strategy_validation/test_cscv.py b/tests/momentum/Analysis/strategy_validation/test_cscv.py
+index a5712fff..7148dd7c 100644
+--- a/tests/momentum/Analysis/strategy_validation/test_cscv.py
++++ b/tests/momentum/Analysis/strategy_validation/test_cscv.py
+@@ -85,3 +85,24 @@ def test_s_equals_two():
+     assert len(paths) == 2
+     assert np.array_equal(paths[0][0], np.arange(0, 5)) and np.array_equal(paths[0][1], np.arange(5, 10))
+     assert np.array_equal(paths[1][0], np.arange(5, 10)) and np.array_equal(paths[1][1], np.arange(0, 5))
++
++
++def test_is_lazy_generator_pulls_one_combination_per_next(monkeypatch):
++    """⑥′ 生產端真 lazy：next() 一次只自 combinations 取一組（若先物化全部 path 則取 924 組）；首組值手算。"""
++    import itertools as _it
++    import types as _types
++
++    from momentum.Analysis.strategy_validation import cscv as _cscv_mod
++
++    pulled = []
++
++    def _counting(iterable, r):
++        for c in _it.combinations(iterable, r):
++            pulled.append(c)
++            yield c
++
++    monkeypatch.setattr(_cscv_mod, "itertools", _types.SimpleNamespace(combinations=_counting))
++    gen = iter_cscv_splits(n_obs=1200, s_blocks=12)
++    first_is, first_oos = next(gen)
++    assert inspect.isgenerator(gen) and len(pulled) == 1 and np.array_equal(first_is, np.arange(0, 600)) \
++        and np.array_equal(first_oos, np.arange(600, 1200)), f"next() 一次取了 {len(pulled)} 組"

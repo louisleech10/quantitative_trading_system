@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/long_short_analyzer.py b/momentum/Analysis/long_short_analyzer.py
+index 17f7ba1c..5cd63f91 100644
+--- a/momentum/Analysis/long_short_analyzer.py
++++ b/momentum/Analysis/long_short_analyzer.py
+@@ -33,7 +33,7 @@ class LongShortAnalyzer:
+         cfg = config or {}
+         self._config = cfg
+         self._num_quantiles = int(cfg.get("num_quantiles", 5))
+-        self._long_quantiles = list(cfg.get("long_quantiles", [4, 5]))
++        self._long_quantiles = list(cfg.get("long_quantile", [4, 5]))
+         self._short_quantiles = list(cfg.get("short_quantiles", [1, 2]))
+         # 模組進入門檻（樣本對數）；與 bin 分配 min_samples=100 兩層分離
+         self._min_samples = int(cfg.get("min_samples", 30))

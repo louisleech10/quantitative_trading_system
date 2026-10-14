@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/test_model_enhancement_performance.py::test_phase5_full_enhancement_outcomes_are_asserted"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "baseline_session_id": "dada57d6-db88-4a74-a53e-120882a0fed5",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__test_model_enhancement_performance.py.compare.patch",
+ "compare_patch_sha256": "0e7a3828f697856bf50fdbcd3427df58ff4af0fb248933dd63a443a1e855dc3c",
+ "fingerprint": "dcc6efa805b23a9011df03d74552ccf8c2a80c9e2accd16a5faca3e87bafd89d",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_overall_status_ignores_failed",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_model_enhancement_performance.py/m_overall_status_ignores_failed.patch",
+   "patch_sha256": "10266228547aa62efa5469f1c93b8dbd02424b0c589ab471fb0295c99a9afb80",
+   "session_id": "e85b1bfa-0e00-4ecc-ae06-4e77c600be5f"
+  },
+  {
+   "id": "m_wf_drops_request_config",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_model_enhancement_performance.py/m_wf_drops_request_config.patch",
+   "patch_sha256": "1e836044b0f3caf813a39d918de99bf80404116a2689b2432d8da8bec0cfc8db",
+   "session_id": "22f0e1d8-72ba-4490-9e55-eddc1c4cba76"
+  },
+  {
+   "id": "m_rolling_ignores_purge",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_model_enhancement_performance.py/m_rolling_ignores_purge.patch",
+   "patch_sha256": "6d765016ad6cecfbb4d748b9fe869370f64cdb2a673fce4666775dca15f8052d",
+   "session_id": "c8ea98ab-e0bf-4168-9ff7-5fe901ce8a04"
+  }
+ ],
+ "path": "tests/momentum/Analysis/test_model_enhancement_performance.py"
+}

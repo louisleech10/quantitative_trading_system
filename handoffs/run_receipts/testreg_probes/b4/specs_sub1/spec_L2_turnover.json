@@ -1,0 +1,18 @@
+{
+ "path": "tests/momentum/test_turnover_analyzer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+ "mutants": [
+  {
+   "id": "m_qcut_warmup_off_by_one",
+   "file": "momentum/Analysis/pit_stats.py",
+   "old": "    counts = effective_count(values)\n    for t in range(n):\n        if counts[t] < min_samples:\n            continue\n        if not np.isfinite(values[t]):\n            continue\n        hist = values[: t + 1]\n        finite = hist[np.isfinite(hist)]\n        try:\n            # labels=False → integer bin ids 0..\n",
+   "new": "    counts = effective_count(values)\n    for t in range(n):\n        if counts[t] <= min_samples:\n            continue\n        if not np.isfinite(values[t]):\n            continue\n        hist = values[: t + 1]\n        finite = hist[np.isfinite(hist)]\n        try:\n            # labels=False → integer bin ids 0..\n"
+  },
+  {
+   "id": "m_turnover_counts_entries_only",
+   "file": "momentum/Analysis/turnover_analyzer.py",
+   "old": "        changes = top_mask.diff().abs()\n",
+   "new": "        changes = top_mask.diff().clip(lower=0)\n"
+  }
+ ]
+}

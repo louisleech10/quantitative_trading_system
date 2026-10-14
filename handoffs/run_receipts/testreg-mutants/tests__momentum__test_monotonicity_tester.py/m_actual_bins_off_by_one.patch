@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/monotonicity_tester.py b/momentum/Analysis/monotonicity_tester.py
+index 4b478a08..69b5c3be 100644
+--- a/momentum/Analysis/monotonicity_tester.py
++++ b/momentum/Analysis/monotonicity_tester.py
+@@ -232,7 +232,7 @@ class MonotonicityTester:
+         valid = bins.dropna()
+         if valid.empty:
+             return None
+-        actual_bins = int(valid.max()) + 1
++        actual_bins = int(valid.max())
+         if actual_bins < num_quantiles and num_quantiles > 3:
+             return self._assign_quantiles(data, 3)
+         return bins

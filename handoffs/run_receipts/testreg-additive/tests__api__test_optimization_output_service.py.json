@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/api/test_optimization_output_service.py::test_build_zip_bytes_roundtrip_names_and_contents"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "baseline_session_id": "4484001c-f681-4799-86de-f0c2827b9b16",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__api__test_optimization_output_service.py.compare.patch",
+ "compare_patch_sha256": "1e466cfa8750d87fb85d141526626a04c350f2e55910594e57318c4f3c71f863",
+ "fingerprint": "e8e72515cd0cd9ac395a9a0e7e6928d1667f226d6e37d94e6c766112fa60a0f0",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_arcname_fullpath",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_optimization_output_service.py/m_arcname_fullpath.patch",
+   "patch_sha256": "646ea80b54c197a6ffa39df83e5de3f9d9e23447e220f8e7542e3ff9f3b8540b",
+   "session_id": "4a9837dc-2881-4135-8fef-d7b3a803b1ab"
+  },
+  {
+   "id": "m_drop_isfile_check",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_optimization_output_service.py/m_drop_isfile_check.patch",
+   "patch_sha256": "4a7ab171d5cb80c891cc54197179f3470accb27e8301d900a2e161aa98a7edcb",
+   "session_id": "e5581891-e89a-4154-8a53-73dac732323e"
+  }
+ ],
+ "path": "tests/api/test_optimization_output_service.py"
+}

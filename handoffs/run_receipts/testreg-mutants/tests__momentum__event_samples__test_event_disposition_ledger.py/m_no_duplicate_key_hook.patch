@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/event_samples/event_disposition.py b/momentum/Analysis/event_samples/event_disposition.py
+index c769a99f..15140435 100644
+--- a/momentum/Analysis/event_samples/event_disposition.py
++++ b/momentum/Analysis/event_samples/event_disposition.py
+@@ -54,7 +54,7 @@ def _load_values(_content_sha: str) -> Dict[str, Any]:
+     被保留」（同奈秒寫入、`cp -p`、`os.utime` 還原）時快取仍回舊值。
+     ⇒ 鍵改為內容之 sha256：內容變了就換鍵，與 mtime 無關。
+     """
+-    data = json.loads(_CONTRACT.read_text(encoding="utf-8"), object_pairs_hook=_no_duplicate_keys)
++    data = json.loads(_CONTRACT.read_text(encoding="utf-8"))
+     vals = data.get("event_disposition_values")
+     if not isinstance(vals, dict) or not vals:
+         raise ValueError(

@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/marginal_ic.py b/momentum/Analysis/marginal_ic.py
+index f0c1064d..f8784716 100644
+--- a/momentum/Analysis/marginal_ic.py
++++ b/momentum/Analysis/marginal_ic.py
+@@ -507,7 +507,7 @@ def compute_marginal_ic(
+ 
+     if loo_budget_ok:  # 🔒 超限 ⇒ 整體 not_computed、無部分值（§V-22a mutation 目標行）
+         for f in survivors:
+-            S = [s for s in survivors if s != f]  # 🔒 依名稱排除自身（§V-4／V-18 mutation 目標行）
++            S = [s for s in survivors]  # 🔒 依名稱排除自身（§V-4／V-18 mutation 目標行）
+             per_feature[f] = _one(f, S)
+         for i, f in enumerate(order):
+             stat = _one(f, order[:i])

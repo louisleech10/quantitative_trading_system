@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/ic_engine.py b/momentum/Analysis/ic_engine.py
+index 727817be..78a1cbcc 100644
+--- a/momentum/Analysis/ic_engine.py
++++ b/momentum/Analysis/ic_engine.py
+@@ -455,7 +455,7 @@ class ICEngine:
+                 hit_rate = np.nan
+             else:
+                 ic_mean = float(np.nanmean(values))
+-                ic_std = float(np.nanstd(values))
++                ic_std = float(np.nanstd(values, ddof=1))
+                 icir = float(ic_mean / ic_std) if ic_std > 0 else np.nan
+                 hit_rate = float(np.mean(values > 0))
+ 

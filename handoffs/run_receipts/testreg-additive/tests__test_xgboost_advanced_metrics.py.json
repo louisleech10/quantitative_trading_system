@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/test_xgboost_advanced_metrics.py::test_expectancy_calculator_hand_calc_exact"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "baseline_session_id": "12012ddb-a5d3-46c2-b4ed-dbf196d94dd7",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_xgboost_advanced_metrics.py.compare.patch",
+ "compare_patch_sha256": "0aad0a3f91543c85d7a7e624182f1f75afac86b49b02665bf5ba7c696f0ceff7",
+ "fingerprint": "c7e864d21bc55f069377104229f6d43d56a0a1219853e048df90a5a1b9f58ce9",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_expectancy_loss_sign_flipped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_xgboost_advanced_metrics.py/m_expectancy_loss_sign_flipped.patch",
+   "patch_sha256": "07afc0e68d818c97a29c710a174d53ccc52c741de11606ba4f16d34a4d3ad947",
+   "session_id": "65a12859-8eee-4715-b3ef-8ffbe0c5857c"
+  },
+  {
+   "id": "m_threshold_strict_gt",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_xgboost_advanced_metrics.py/m_threshold_strict_gt.patch",
+   "patch_sha256": "6025672650b434a1c0387bf1a532c87abee8f9ef68506ff327977cadf5dd85b6",
+   "session_id": "0614e543-3388-4bed-bd31-3b3f0568863a"
+  },
+  {
+   "id": "m_zero_return_counted_as_win",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_xgboost_advanced_metrics.py/m_zero_return_counted_as_win.patch",
+   "patch_sha256": "58b1ce12a60f0c76345b79f96e4451705ea14d47ad86ef9a8951599b670949c8",
+   "session_id": "d9783c06-1865-4a30-9be9-e6a9c6daedfc"
+  }
+ ],
+ "path": "tests/test_xgboost_advanced_metrics.py"
+}

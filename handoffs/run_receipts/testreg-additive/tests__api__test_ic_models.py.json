@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/api/test_ic_models.py::test_empty_import_id_rejected_for_spec_branch"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "baseline_session_id": "be1ee6ad-0948-4109-ac4f-a1efb2a4ac91",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__api__test_ic_models.py.compare.patch",
+ "compare_patch_sha256": "11b67b956a6a78406dd3cd524a27dca86bc1c4845c10b9d5e1de46ac7853bb14",
+ "fingerprint": "52ed4b217065e837ab62508f7faf3e439c8e991e6bcbd731794e360d30f956c4",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_spec_is_none_only",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_ic_models.py/m_spec_is_none_only.patch",
+   "patch_sha256": "e02f535bd1451a8149eebd0605bc2b3c32d41d672f770333141ea1e0d84b851b",
+   "session_id": "2cfba162-741d-425f-a92e-8bec0ffd9137"
+  },
+  {
+   "id": "m_spec_wrong_field",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_ic_models.py/m_spec_wrong_field.patch",
+   "patch_sha256": "03acc76cb4b0d5cf284d9d8e13c88371999f6c34b08bee1bb6f65f4bc72a7bba",
+   "session_id": "84f1df5e-0947-4dc7-9d2f-6ba266852376"
+  }
+ ],
+ "path": "tests/api/test_ic_models.py"
+}

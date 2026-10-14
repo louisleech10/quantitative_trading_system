@@ -1,0 +1,12 @@
+{
+ "path": "tests/momentum/Analysis/strategy_validation/test_cscv.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "mutants": [
+  {
+   "id": "m_eager_materialize_paths",
+   "file": "momentum/Analysis/strategy_validation/cscv.py",
+   "old": "    return _iter_splits(n_obs, s_blocks)\n",
+   "new": "    return (p for p in list(_iter_splits(n_obs, s_blocks)))\n"
+  }
+ ]
+}

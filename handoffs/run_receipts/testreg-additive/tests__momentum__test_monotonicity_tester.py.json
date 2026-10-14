@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/momentum/test_monotonicity_tester.py::test_long_short_tstat_matches_scipy_nondegenerate_independent_bins"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+ "baseline_session_id": "99227d22-e353-4c90-ac0f-a2f254987e44",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__test_monotonicity_tester.py.compare.patch",
+ "compare_patch_sha256": "d330b490c07b44ba2f2459e7d2c440c9396e1604f8ccd17966e1d8ded09f6bbd",
+ "fingerprint": "2be2b627dcb58c0489e83bbd793fcb916402cf891413b7765418af095f589c1b",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_low_high_groups_swapped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_monotonicity_tester.py/m_low_high_groups_swapped.patch",
+   "patch_sha256": "994b4a1b745fbdd3b57052fa7f24d93825a694891fd2ed9b3d970e8655d10c28",
+   "session_id": "a57ac83e-b8e4-4e88-91f5-8f352b1dcf9f"
+  },
+  {
+   "id": "m_ttest_args_reversed",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_monotonicity_tester.py/m_ttest_args_reversed.patch",
+   "patch_sha256": "35de85e092a455cabea66973cef7973ffb81897a8c1a3c3e3b9b4826c6e79869",
+   "session_id": "b1b4c936-f195-4eba-ba21-f58742d85033"
+  },
+  {
+   "id": "m_actual_bins_off_by_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_monotonicity_tester.py/m_actual_bins_off_by_one.patch",
+   "patch_sha256": "68ddd359331876d6896c2f543d7c8b2640d86e349b94cf4a779b7f81c1ad2002",
+   "session_id": "1103ef84-7f7a-4d73-b5a8-38b339d074b0"
+  }
+ ],
+ "path": "tests/momentum/test_monotonicity_tester.py"
+}

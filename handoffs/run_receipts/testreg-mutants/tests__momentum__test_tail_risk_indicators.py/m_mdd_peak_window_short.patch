@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+index d6aaadf3..903724a0 100644
+--- a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
++++ b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+@@ -207,7 +207,7 @@ class TailRiskIndicatorEngine:
+ 
+         output: Dict[str, pd.Series] = {}
+         for window in self.mdd_windows:
+-            rolling_max = close.rolling(window).max()
++            rolling_max = close.rolling(window - 1).max()
+             drawdown = (close - rolling_max) / rolling_max.replace(0.0, np.nan)
+             mdd = drawdown.rolling(window).min().abs()
+             if invalid_price.any():

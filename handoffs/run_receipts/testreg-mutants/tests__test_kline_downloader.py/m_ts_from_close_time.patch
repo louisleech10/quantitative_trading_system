@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/providers/binance_provider.py b/momentum/DataExtraction/providers/binance_provider.py
+index dc27ad87..1b16e40b 100644
+--- a/momentum/DataExtraction/providers/binance_provider.py
++++ b/momentum/DataExtraction/providers/binance_provider.py
+@@ -467,7 +467,7 @@ class BinanceProvider(KlineProviderBase):
+         ])
+ 
+         # 類型轉換
+-        df['timestamp'] = (df['open_time'] / 1000).astype('int64')  # 毫秒轉秒
++        df['timestamp'] = (df['close_time'] / 1000).astype('int64')  # 毫秒轉秒
+ 
+         for col in ['open', 'high', 'low', 'close', 'volume', 'taker_buy_volume', 'quote_volume']:
+             df[col] = df[col].astype('float32')

@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/test_turnover_analyzer.py::test_quantile_turnover_hand_computed_top_entries_exits"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+ "baseline_session_id": "a0825287-d94b-44fc-88d2-1b28587798e3",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__test_turnover_analyzer.py.compare.patch",
+ "compare_patch_sha256": "8cc95fa1e3dabefa463dd74629b71146e66b01d3e5e5dee4290e6b3efca0584d",
+ "fingerprint": "830c911dd410de97b16fb8cf7989c38124ca07bf106d992987eab64774f1b4fb",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_qcut_warmup_off_by_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_turnover_analyzer.py/m_qcut_warmup_off_by_one.patch",
+   "patch_sha256": "d0800ca50f11e0beb59539594853adf4f14e9a7e3cbfeee3cd2dfa185ab94934",
+   "session_id": "89acf804-b25c-4c0e-b2e6-ab1fb82a0a43"
+  },
+  {
+   "id": "m_turnover_counts_entries_only",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_turnover_analyzer.py/m_turnover_counts_entries_only.patch",
+   "patch_sha256": "ab458a66473c185b4df86ce76dc40fd88840f54ab11b3afa67c4b0b169da7424",
+   "session_id": "d95610c2-74be-4bf0-9396-8a11fc2b4dd9"
+  }
+ ],
+ "path": "tests/momentum/test_turnover_analyzer.py"
+}

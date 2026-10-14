@@ -1,0 +1,18 @@
+{
+ "path": "tests/api/test_ic_models.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "mutants": [
+  {
+   "id": "m_spec_is_none_only",
+   "file": "api/models/ic_models.py",
+   "old": "        if self.event_label_spec is not None and not self.event_import_id:\n",
+   "new": "        if self.event_label_spec is not None and self.event_import_id is None:\n"
+  },
+  {
+   "id": "m_spec_wrong_field",
+   "file": "api/models/ic_models.py",
+   "old": "        if self.event_label_spec is not None and not self.event_import_id:\n",
+   "new": "        if self.event_label_spec is not None and not self.event_timestamps:\n"
+  }
+ ]
+}

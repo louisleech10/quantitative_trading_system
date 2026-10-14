@@ -1,0 +1,24 @@
+{
+ "path": "tests/test_xgboost_advanced_metrics.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "mutants": [
+  {
+   "id": "m_expectancy_loss_sign_flipped",
+   "file": "momentum/Analysis/expectancy_calculator.py",
+   "old": "        expectancy = win_rate * avg_win + (1 - win_rate) * avg_loss\n",
+   "new": "        expectancy = win_rate * avg_win - (1 - win_rate) * avg_loss\n"
+  },
+  {
+   "id": "m_threshold_strict_gt",
+   "file": "momentum/Analysis/expectancy_calculator.py",
+   "old": "        trade_mask = predicted_proba >= threshold\n",
+   "new": "        trade_mask = predicted_proba > threshold\n"
+  },
+  {
+   "id": "m_zero_return_counted_as_win",
+   "file": "momentum/Analysis/expectancy_calculator.py",
+   "old": "        wins = trade_returns[trade_returns > 0]\n",
+   "new": "        wins = trade_returns[trade_returns >= 0]\n"
+  }
+ ]
+}

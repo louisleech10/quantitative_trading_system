@@ -1,0 +1,20 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/strategy_validation/test_cscv.py::test_is_lazy_generator_pulls_one_combination_per_next"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "baseline_session_id": "ba5dfab4-76c6-4489-9bd4-6070a8da6540",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__strategy_validation__test_cscv.py.compare.patch",
+ "compare_patch_sha256": "973c7e12591697d943b74a4b17f3ec78640cb3be7575db2b1933484cdc28a7f8",
+ "fingerprint": "481ddbf11101653f4b8a843ad2a08224b4717d245da85adb61771d3cad99baeb",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_eager_materialize_paths",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__strategy_validation__test_cscv.py/m_eager_materialize_paths.patch",
+   "patch_sha256": "52085accb0995a12fd05741c2aa66e3b46a4a29708685d2079ba9cb5d139e760",
+   "session_id": "89ef6ea1-23a6-42de-bfa1-0e8440a4e7ee"
+  }
+ ],
+ "path": "tests/momentum/Analysis/strategy_validation/test_cscv.py"
+}

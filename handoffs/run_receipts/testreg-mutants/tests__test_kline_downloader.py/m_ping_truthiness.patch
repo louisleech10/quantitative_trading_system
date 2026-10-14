@@ -1,0 +1,16 @@
+diff --git a/momentum/DataExtraction/providers/binance_provider.py b/momentum/DataExtraction/providers/binance_provider.py
+index dc27ad87..f41c507c 100644
+--- a/momentum/DataExtraction/providers/binance_provider.py
++++ b/momentum/DataExtraction/providers/binance_provider.py
+@@ -609,9 +609,9 @@ class BinanceProvider(KlineProviderBase):
+             bool: API是否可用
+         """
+         try:
+-            self.client.ping()
++            ok = bool(self.client.ping())
+             self.logger.info("Binance API ping successful")
+-            return True
++            return ok
+         except Exception as e:
+             self.logger.error(f"Binance API ping failed: {e}")
+             return False

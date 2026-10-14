@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/test_append_fix.py::test_multi_range_append_isolated_cache_sum_and_revision"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "baseline_session_id": "4b22ca96-e18f-487e-b0cf-823a3a0ad0c2",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_append_fix.py.compare.patch",
+ "compare_patch_sha256": "2e6271675d296c21a9fcc3b19976ae8fb971e07fa63d6034b098ba2c00e9f045",
+ "fingerprint": "4d6ba548e5454940c768315be9c2573a4123468bdb08e41e9d31dd7bccbb5875",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_append_dedup_keep_first",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_append_fix.py/m_append_dedup_keep_first.patch",
+   "patch_sha256": "6e14f6cf34fb1e11582d248de9c4db64a3a648e4fc2eedde9284dd4e5eeff53f",
+   "session_id": "3d5531cd-6591-4209-af92-4ddafd8a8fde"
+  },
+  {
+   "id": "m_read_range_excludes_end",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_append_fix.py/m_read_range_excludes_end.patch",
+   "patch_sha256": "63dbea914b538bdad8107aaad7e4ea2f4a757302a273aeaa6c2ab06e49ac0a62",
+   "session_id": "54adbca2-8046-4779-a8f1-0e245942220d"
+  }
+ ],
+ "path": "tests/test_append_fix.py"
+}

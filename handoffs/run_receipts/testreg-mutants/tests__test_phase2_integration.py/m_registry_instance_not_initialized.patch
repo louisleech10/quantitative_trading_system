@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/strategy_registry.py b/momentum/Analysis/strategy_registry.py
+index cd486ee9..09b31e6a 100644
+--- a/momentum/Analysis/strategy_registry.py
++++ b/momentum/Analysis/strategy_registry.py
+@@ -493,7 +493,7 @@ class StrategyRegistry:
+ # ==================== 單例實例 ====================
+ 
+ # 創建全局單例實例
+-strategy_registry = StrategyRegistry()
++strategy_registry = StrategyRegistry.__new__(StrategyRegistry)
+ 
+ 
+ # ==================== 便捷函數 ====================

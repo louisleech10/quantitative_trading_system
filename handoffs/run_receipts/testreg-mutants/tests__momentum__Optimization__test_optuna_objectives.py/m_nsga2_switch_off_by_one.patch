@@ -1,0 +1,13 @@
+diff --git a/momentum/Optimization/optuna_optimizer.py b/momentum/Optimization/optuna_optimizer.py
+index ef62787b..f36aa1ba 100644
+--- a/momentum/Optimization/optuna_optimizer.py
++++ b/momentum/Optimization/optuna_optimizer.py
+@@ -707,7 +707,7 @@ class OptunaOptimizer:
+             objective_directions = self.objective.directions
+             objective_direction = self.objective.direction
+ 
+-        if objective_directions and len(objective_directions) > 1 and self.sampler_type != "NSGA-II":
++        if objective_directions and len(objective_directions) > 2 and self.sampler_type != "NSGA-II":
+             from optuna.samplers import NSGAIISampler
+ 
+             sampler = NSGAIISampler(seed=self.random_seed)

@@ -1,0 +1,33 @@
+{
+ "added_nodeids": [
+  "tests/test_oot_validation.py::test_purged_split_embargo_drops_exact_validation_head",
+  "tests/test_oot_validation.py::test_purged_split_removes_exactly_purge_gap_from_training_end"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "baseline_session_id": "c565113e-4fe5-4907-afd3-3d1694757a16",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_oot_validation.py.compare.patch",
+ "compare_patch_sha256": "2c8d664b93dc5dbff69ff94e23b353716468ef3fdcd908edf8326c23af1c1d22",
+ "fingerprint": "803811261cf629ce1111497f7a9e9c6db077e0dfe25bcb9462a1f080ebf7f7f0",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_purge_one_short",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_oot_validation.py/m_purge_one_short.patch",
+   "patch_sha256": "7154c78f5de69a5c79b26c3bad88e216b96f6ca9e87c06b417186ef6df1dedb3",
+   "session_id": "f1829078-f0d7-4145-8b9c-ee5df281487a"
+  },
+  {
+   "id": "m_embargo_no_floor",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_oot_validation.py/m_embargo_no_floor.patch",
+   "patch_sha256": "7869797f003afae0faae9ff9ce0fce47ec78429492f90e364eedf46ccee6647f",
+   "session_id": "77efd177-39bd-4c2f-a897-db57d6c4f9b5"
+  },
+  {
+   "id": "m_embargo_trims_tail",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_oot_validation.py/m_embargo_trims_tail.patch",
+   "patch_sha256": "de3cae50d3b48da1e1fb237cfe627d270c3e580bc551e7526fe2d68d8d638b91",
+   "session_id": "4aa07c79-e295-47b4-aa0e-ec5bbf23d072"
+  }
+ ],
+ "path": "tests/test_oot_validation.py"
+}

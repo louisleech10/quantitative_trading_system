@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/model_validation/walk_forward_validator.py b/momentum/Analysis/model_validation/walk_forward_validator.py
+index 1b212ea6..b0f78df7 100644
+--- a/momentum/Analysis/model_validation/walk_forward_validator.py
++++ b/momentum/Analysis/model_validation/walk_forward_validator.py
+@@ -289,7 +289,7 @@ class WalkForwardValidator:
+             std_auc = float(np.std(auc_array))
+             min_auc = float(np.min(auc_array))
+             max_auc = float(np.max(auc_array))
+-            hit_rate = float(np.mean(auc_array >= self.config.auc_threshold))
++            hit_rate = float(np.mean(auc_array < self.config.auc_threshold))
+         else:
+             mean_auc = 0.0
+             std_auc = 0.0

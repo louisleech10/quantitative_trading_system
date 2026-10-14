@@ -1,0 +1,24 @@
+{
+ "path": "tests/api/test_xgboost_sequence_features.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "mutants": [
+  {
+   "id": "m_window_includes_to",
+   "file": "api/services/xgboost_batch_service.py",
+   "old": "            window_indices = list(range(start_idx, row_idx, sequence_stride))\n",
+   "new": "            window_indices = list(range(start_idx + sequence_stride, row_idx + 1, sequence_stride))\n"
+  },
+  {
+   "id": "m_flatten_no_transpose",
+   "file": "api/services/xgboost_batch_service.py",
+   "old": "        flattened_values = window_values.T.reshape(-1)\n",
+   "new": "        flattened_values = window_values.reshape(-1)\n"
+  },
+  {
+   "id": "m_last_takes_first_row",
+   "file": "api/services/xgboost_batch_service.py",
+   "old": "                values = window_values[-1]\n",
+   "new": "                values = window_values[0]\n"
+  }
+ ]
+}

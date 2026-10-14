@@ -1,0 +1,13 @@
+diff --git a/api/services/xgboost_batch_service.py b/api/services/xgboost_batch_service.py
+index 02063f95..82c9a6a6 100644
+--- a/api/services/xgboost_batch_service.py
++++ b/api/services/xgboost_batch_service.py
+@@ -1178,7 +1178,7 @@ class XGBoostBatchService:
+             if start_idx < 0:
+                 return None
+ 
+-            window_indices = list(range(start_idx, row_idx, sequence_stride))
++            window_indices = list(range(start_idx + sequence_stride, row_idx + 1, sequence_stride))
+             if len(window_indices) != window_size:
+                 return None
+ 

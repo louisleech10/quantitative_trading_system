@@ -1,0 +1,13 @@
+diff --git a/api/services/xgboost_batch_service.py b/api/services/xgboost_batch_service.py
+index 02063f95..694aae7a 100644
+--- a/api/services/xgboost_batch_service.py
++++ b/api/services/xgboost_batch_service.py
+@@ -1254,7 +1254,7 @@ class XGBoostBatchService:
+             elif method_lower == "max":
+                 values = window_values.max(axis=0)
+             elif method_lower == "last":
+-                values = window_values[-1]
++                values = window_values[0]
+             elif method_lower == "slope":
+                 if len(window_values) == 1:
+                     values = np.zeros(window_values.shape[1])

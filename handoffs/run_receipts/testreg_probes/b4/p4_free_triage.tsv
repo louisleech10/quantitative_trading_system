@@ -1,0 +1,101 @@
+tests/governance/test_stamp_no_task_rejected.py	1	0	0	 3 passed in 1.13s 
+tests/governance/test_todofmt_contract.py	1	0	0	 31 passed in 3.36s 
+tests/governance/test_verify_gate_b4.py	4	0	0	 12 passed in 4.69s 
+tests/governance/test_verify_gate_o3.py	1	0	0	 10 passed in 2.57s 
+tests/governance/test_verify_gate_o3ext.py	1	0	0	 9 passed in 1.46s 
+tests/momentum/Analysis/test_evtlabel_survivor_consumer.py	1	0	0	 8 passed in 1.13s 
+tests/momentum/Analysis/test_factor_return_stopgap.py	2	1	1	 1 failed, 11 passed in 15.46s 
+tests/momentum/Analysis/test_gap2_golden.py	1	0	0	 5 passed in 242.34s (0:04:02) 
+tests/momentum/Analysis/test_ic_data_cache_hermetic.py	1	0	0	 1 passed in 2.16s 
+tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py	1	1	1	 1 failed in 239.02s (0:03:59) 
+tests/momentum/Analysis/test_ic_persist_redirect_isolation.py	2	0	0	 12 passed in 10.87s 
+tests/momentum/Analysis/test_icfirstalign_fu2.py	1	0	0	 13 passed in 8.25s 
+tests/momentum/Analysis/test_ichc_contract_sync.py	1	1	1	 1 failed, 4 passed in 1.03s 
+tests/momentum/Analysis/test_ichc_p2_golden.py	2	1	1	 1 failed, 5 passed in 10.95s 
+tests/momentum/Analysis/test_ichc_xsec_capability.py	1	0	0	 4 passed in 1.00s 
+tests/momentum/Analysis/test_lightgbm_analyzer.py	1	0	0	 21 passed, 57 warnings in 3.17s 
+tests/momentum/Analysis/test_model_enhancement_performance.py	1	0	0	 1 passed in 9.92s 
+tests/momentum/Analysis/test_net_ic_analyzer.py	2	0	0	 35 passed in 0.99s 
+tests/momentum/Analysis/test_splitunify_derive.py	1	0	0	 121 passed in 1.44s 
+tests/performance/test_memory_pressure.py	whole	1	5	 no tests ran in 0.71s 
+tests/test_append_fix.py	1	0	0	 1 passed in 0.94s 
+tests/test_density_comparison.py	1	0	0	 1 skipped in 0.66s 
+tests/test_feature_factory_api.py	1	0	0	 5 passed in 287.37s (0:04:47) 
+tests/test_frontend_integration.py	5	0	0	 5 passed, 2 warnings in 0.66s 
+tests/test_functional_wrapper.py	whole	1	5	 no tests ran in 0.65s 
+tests/test_kline_data_service.py	5	0	0	 5 passed, 6 warnings in 1.52s 
+tests/test_kline_downloader.py	6	0	0	 6 passed, 10 warnings in 2.04s 
+tests/test_kline_storage.py	6	0	0	 6 passed, 6 warnings in 0.94s 
+tests/test_multi_symbol_xgboost.py	2	0	0	 3 passed in 1.39s 
+tests/test_oot_validation.py	2	0	0	 18 passed in 3.28s 
+tests/test_optimization_flow.py	1	0	0	 1 skipped in 0.68s 
+tests/test_optuna_cache_fixes.py	2	0	0	 17 passed in 1.30s 
+tests/test_parameter_range_fix.py	1	0	0	 1 skipped in 0.68s 
+tests/test_phase1_registry.py	whole	1	5	 no tests ran in 1.25s 
+tests/test_phase2_integration.py	5	0	0	 12 passed in 1.47s 
+tests/test_phase_c_granular_control.py	3	0	0	 53 passed in 0.79s 
+tests/test_xgboost_advanced_metrics.py	1	0	0	 6 passed in 3.63s 
+tests/test_xgboost_fix.py	whole	1	5	 no tests ran in 2.07s 
+tests/test_xgboost_json_fix.py	1	0	0	 1 passed, 1 warning in 0.77s 
+tests/analysis/test_api_endpoints.py	1	0	0	 23 passed in 2.60s 
+tests/analysis/test_performance.py	9	0	0	 2 passed, 9 skipped in 0.71s 
+tests/analysis/test_signal_analysis_service.py	5	0	0	 16 passed, 3 skipped in 0.88s 
+tests/analysis/test_signal_density_analyzer.py	16	0	0	 14 passed, 16 skipped in 0.74s 
+tests/golden/l65/test_l65_golden.py	4	1	1	 1 failed, 3 passed, 2 warnings in 8.34s 
+tests/momentum/Analysis/model_validation/test_walk_forward_validator.py	1	0	0	 15 passed in 2.17s 
+tests/momentum/Analysis/strategy_validation/test_cscv.py	1	0	0	 9 passed in 1.04s 
+tests/momentum/DataExtraction/test_search_download_pagination.py	1	0	0	 43 passed, 1 skipped in 7.25s 
+tests/momentum/Optimization/test_model_hyperparam_enhanced.py	4	2	1	 2 failed, 30 passed in 1.83s 
+tests/momentum/Optimization/test_optuna_objectives.py	1	0	0	 4 passed, 6 warnings in 2.08s 
+tests/momentum/Strategy/test_performance_metrics.py	2	0	0	 56 passed in 0.78s 
+tests/momentum/Strategy/test_vectorized_backtest.py	2	0	0	 37 passed in 1.18s 
+tests/momentum/event_samples/test_event_disposition_ledger.py	4	0	0	 14 passed in 1.34s 
+tests/momentum/event_samples/test_feature_materialization.py	2	2	1	 2 failed, 5 passed in 8.94s 
+tests/momentum/event_samples/test_pipeline.py	1	1	1	 1 failed, 5 passed in 1.50s 
+tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py	whole	1	0	 4 passed in 0.74s 
+tests/phase24/test_deep_analysis_config.py	1	0	0	 7 passed in 1.16s 
+tests/phase24/test_factor_centrality_analyzer.py	1	0	0	 14 passed in 1.35s 
+tests/phase24/test_factor_return_analyzer.py	1	0	0	 14 passed in 1.67s 
+tests/phase24/test_parameter_sensitivity_analyzer.py	1	0	0	 11 passed in 1.21s 
+tests/phase24/test_rolling_oos_validator.py	1	0	0	 10 passed in 1.30s 
+tests/phase24/test_trend_analyzer.py	3	0	0	 10 passed in 1.14s 
+tests/phase25/test_long_short_analyzer.py	2	0	1	 2 failed, 7 passed in 1.29s 
+tests/api/test_framepath_api_h5.py	1	0	timeout	-
+tests/api/test_cross_timeframe_event_analysis.py	2	0	0	 4 passed in 1.10s 
+tests/api/test_feature_api.py	1	0	0	 5 passed, 4 warnings in 2.24s 
+tests/api/test_gap3_ic_feature_cap.py	1	1	1	 1 failed, 3 passed in 1.30s 
+tests/api/test_gap3_ic_progress_fields.py	1	0	0	 5 passed in 2.30s 
+tests/api/test_gap3_t0_unit_detect.py	1	0	0	 7 passed in 2.08s 
+tests/api/test_ic_models.py	1	0	0	 11 passed in 0.93s 
+tests/api/test_ichc_event_timestamps.py	1	1	1	 1 failed, 6 passed, 2 warnings in 43.08s 
+tests/api/test_optimization_output_service.py	1	0	0	 3 passed in 0.61s 
+tests/api/test_scan_cube.py	1	0	0	 29 passed in 1.08s 
+tests/api/test_xgboost_sequence_features.py	2	0	0	 3 passed in 1.13s 
+tests/momentum/test_data_preprocessor.py	1	0	0	 10 passed in 1.11s 
+tests/momentum/test_entropy_indicators.py	1	0	0	 12 passed in 5.33s 
+tests/momentum/test_feature_factory_timestamp_filter.py	1	1	1	 1 failed, 1 passed in 0.75s 
+tests/momentum/test_feature_library_config_hash.py	3	3	1	 3 failed, 1 passed in 0.71s 
+tests/momentum/test_feature_library_row_index.py	2	0	0	 3 passed, 2 skipped in 0.64s 
+tests/momentum/test_feature_preprocessor.py	5	3	1	 3 failed, 11 passed in 1.66s 
+tests/momentum/test_ic_1eb_b2_wiring.py	1	0	timeout	16:08:28 [WARNING] No preloaded label file (labels_dfNone): mainline label will be generated from kline with configured horizon (normal path, not an error)
+tests/momentum/test_ic_crash_real_config.py	2	2	1	 2 failed in 1.76s 
+tests/momentum/test_ic_engine.py	1	0	0	 44 passed, 2 warnings in 1.42s 
+tests/momentum/test_la2_lookahead.py	2	2	1	 2 failed, 11 passed, 5 warnings in 3.26s 
+tests/momentum/test_memory_chunking.py	2	1	1	 1 failed, 14 passed in 2.11s 
+tests/momentum/test_microstructure_indicators.py	3	3	1	 3 failed, 10 passed in 1.13s 
+tests/momentum/test_monotonicity_tester.py	1	0	0	 16 passed in 1.53s 
+tests/momentum/test_stage_timings.py	1	0	0	 6 passed in 0.99s 
+tests/momentum/test_tail_risk_indicators.py	5	0	0	 13 passed in 1.48s 
+tests/momentum/test_turnover_analyzer.py	1	0	0	 17 passed in 1.25s 
+tests/governance/test_decouple_baseline.py	2	0	0	 9 passed in 24.86s 
+tests/governance/test_govb1_b31_recovery.py	1	0	0	 37 passed in 10.88s 
+tests/governance/test_govb1_contract_matrix.py	9	0	timeout	-
+tests/governance/test_govb1_factkey_gen.py	1	0	0	 215 passed in 45.63s 
+tests/governance/test_govb1_factkey_hook.py	4	0	0	 16 passed, 3 skipped in 10.38s 
+tests/governance/test_govb1_findings_kind.py	1	0	0	 32 passed in 262.53s (0:04:22) 
+tests/governance/test_govb1_gate_selfcheck.py	1	0	0	 10 passed in 4.81s 
+tests/governance/test_govb1_lifecycle_matrix.py	2	0	0	 21 passed in 4.14s 
+tests/governance/test_govb1_zero_findings.py	4	0	0	 29 passed in 3.06s 
+tests/governance/test_govb37_friction_tally.py	2	0	0	 45 passed, 2 skipped in 2.08s 
+tests/governance/test_govflow_manifest.py	1	0	0	 14 passed in 28.82s 
+tests/governance/test_reconcile_completeness_enforced.py	1	0	0	 7 passed in 3.88s 

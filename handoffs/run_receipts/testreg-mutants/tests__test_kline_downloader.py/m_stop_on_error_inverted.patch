@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_download_service.py b/momentum/DataExtraction/kline_download_service.py
+index de7d5fc3..8905dcf8 100644
+--- a/momentum/DataExtraction/kline_download_service.py
++++ b/momentum/DataExtraction/kline_download_service.py
+@@ -364,7 +364,7 @@ class KlineDownloadService:
+                     progress_callback(i, total, symbol, False, None)
+ 
+                 # 是否停止
+-                if stop_on_error:
++                if not stop_on_error:
+                     self.logger.error(f"Stopping batch download due to error (stop_on_error=True)")
+                     break
+ 

@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/event_samples/event_disposition.py b/momentum/Analysis/event_samples/event_disposition.py
+index c769a99f..335ff456 100644
+--- a/momentum/Analysis/event_samples/event_disposition.py
++++ b/momentum/Analysis/event_samples/event_disposition.py
+@@ -78,7 +78,7 @@ def disposition_values() -> Dict[str, Any]:
+     `observed_values()` 回被污染值、`_check("probe_only_value", …)` 通過。
+     🔴 淺複製不夠——`observed` 是巢狀 mapping，淺複製仍共用同一個內層 dict。
+     """
+-    cached = _load_values(hashlib.sha256(_CONTRACT.read_bytes()).hexdigest())
++    cached = _load_values(hashlib.sha256((Path(__file__).resolve().parents[2] / "Analysis/contracts/split_unify.json").read_bytes()).hexdigest())
+     return copy.deepcopy(cached)
+ 
+ 

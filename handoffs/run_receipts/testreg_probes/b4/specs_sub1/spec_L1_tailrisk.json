@@ -1,0 +1,48 @@
+{
+ "path": "tests/momentum/test_tail_risk_indicators.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+ "mutants": [
+  {
+   "id": "m_gpr_no_zero_loss_guard",
+   "file": "momentum/FeatureEngineering/atomic/tail_risk_indicators.py",
+   "old": "            gpr = gain_sum / loss_sum.replace(0.0, np.nan)\n",
+   "new": "            gpr = gain_sum / loss_sum\n"
+  },
+  {
+   "id": "m_udvr_epsilon_denominator",
+   "file": "momentum/FeatureEngineering/atomic/tail_risk_indicators.py",
+   "old": "            output[f\"tr_ud_vol_ratio_{window}\"] = rv_up / rv_down.replace(0.0, np.nan)\n",
+   "new": "            output[f\"tr_ud_vol_ratio_{window}\"] = rv_up / (rv_down + 1e-12)\n"
+  },
+  {
+   "id": "m_mdd_invalid_price_not_masked",
+   "file": "momentum/FeatureEngineering/atomic/tail_risk_indicators.py",
+   "old": "            if invalid_price.any():\n                mdd = mdd.where(~invalid_price, np.nan)\n",
+   "new": ""
+  },
+  {
+   "id": "m_cvar_wrong_tail",
+   "file": "momentum/FeatureEngineering/atomic/tail_risk_indicators.py",
+   "old": "                    lambda values: np.nanmean(values[values <= np.nanquantile(values, alpha)])\n",
+   "new": "                    lambda values: np.nanmean(values[values <= np.nanquantile(values, 1 - alpha)])\n"
+  },
+  {
+   "id": "m_rv_down_mean_not_sum",
+   "file": "momentum/FeatureEngineering/atomic/tail_risk_indicators.py",
+   "old": "            rv_down_map[window] = np.sqrt(down_sq.rolling(window).sum())\n",
+   "new": "            rv_down_map[window] = np.sqrt(down_sq.rolling(window).mean())\n"
+  },
+  {
+   "id": "m_mdd_peak_window_short",
+   "file": "momentum/FeatureEngineering/atomic/tail_risk_indicators.py",
+   "old": "            rolling_max = close.rolling(window).max()\n",
+   "new": "            rolling_max = close.rolling(window - 1).max()\n"
+  },
+  {
+   "id": "m_rv_fillna_missing_returns",
+   "file": "momentum/FeatureEngineering/atomic/tail_risk_indicators.py",
+   "old": "        squared = returns.pow(2)\n",
+   "new": "        squared = returns.fillna(0.0).pow(2)\n"
+  }
+ ]
+}

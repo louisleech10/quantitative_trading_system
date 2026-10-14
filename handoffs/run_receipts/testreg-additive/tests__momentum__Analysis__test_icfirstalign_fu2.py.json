@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/test_icfirstalign_fu2.py::test_production_carrier_keys_by_timestamp_not_position"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "baseline_session_id": "5d61b96f-deb3-4038-aeae-fa65b1af10a2",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__test_icfirstalign_fu2.py.compare.patch",
+ "compare_patch_sha256": "e823a542df15c2154e6d8cdb971b59e5f870921702434b41dadc2f06d271109c",
+ "fingerprint": "4c591b442dbae06bdcb90b8dafac1b347791594c380b72ca9eced8c8981306a8",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_carrier_close_off_by_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_icfirstalign_fu2.py/m_carrier_close_off_by_one.patch",
+   "patch_sha256": "a0494840b40b2cef26ce6a0b9d3bd1340ca918ffce7c2e431583341d8bc8cd7e",
+   "session_id": "b750a3bc-da7a-4bbb-bc41-f4ac998b427d"
+  },
+  {
+   "id": "m_carrier_rekey_ffill",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_icfirstalign_fu2.py/m_carrier_rekey_ffill.patch",
+   "patch_sha256": "11ab2a21cc5b2f101ba2726fc63107f7a19e40ba9f98172ba4d3cb1eee1ac3c4",
+   "session_id": "1a2eb36f-644c-45e0-8763-a1fbfa9dc1d6"
+  }
+ ],
+ "path": "tests/momentum/Analysis/test_icfirstalign_fu2.py"
+}

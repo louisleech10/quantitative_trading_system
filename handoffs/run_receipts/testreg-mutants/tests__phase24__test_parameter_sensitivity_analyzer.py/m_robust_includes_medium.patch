@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/parameter_sensitivity_analyzer.py b/momentum/Analysis/parameter_sensitivity_analyzer.py
+index 03487854..da88bc94 100644
+--- a/momentum/Analysis/parameter_sensitivity_analyzer.py
++++ b/momentum/Analysis/parameter_sensitivity_analyzer.py
+@@ -159,7 +159,7 @@ class ParameterSensitivityAnalyzer:
+             risk = family_result["stability_metrics"]["overfitting_risk"]
+             if risk == "high":
+                 high_risk.append(family_name)
+-            if risk == "low":
++            if risk in ("low", "medium"):
+                 robust.append(family_name)
+ 
+         summary = {

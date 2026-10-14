@@ -1,0 +1,13 @@
+diff --git a/momentum/Strategy/performance_metrics.py b/momentum/Strategy/performance_metrics.py
+index 249220be..7774796b 100644
+--- a/momentum/Strategy/performance_metrics.py
++++ b/momentum/Strategy/performance_metrics.py
+@@ -139,7 +139,7 @@ class PerformanceMetrics:
+         win_rate = len(wins) / total
+         avg_win = float(np.mean(wins)) if wins else 0.0
+         avg_loss = float(np.mean(losses)) if losses else 0.0
+-        return win_rate * avg_win - (1.0 - win_rate) * abs(avg_loss)
++        return win_rate * avg_win + (1.0 - win_rate) * abs(avg_loss)
+ 
+     def system_quality_number(self) -> float:
+         returns = np.asarray(self._trade_pnl_pcts(), dtype=float)

@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/momentum/test_ic_engine.py::test_rolling_ic_spearman_matches_scipy_per_window_and_icir_hand_computed"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+ "baseline_session_id": "461f745d-b7dd-4557-a5ca-db7d149dc6b1",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__test_ic_engine.py.compare.patch",
+ "compare_patch_sha256": "743cf0492995b4e9879d91563b2f2cbc40c457d2ad89aa56dda703e2cee537de",
+ "fingerprint": "b22f464222d688251f426113333f6a0520f1606e226319dc59d01c0af1b96173",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_rolling_stride_ignored",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_ic_engine.py/m_rolling_stride_ignored.patch",
+   "patch_sha256": "3afd79a21a5c4d98a66c100b77eee8485b5357cbbca0d28b1f6f6eb1d0c806be",
+   "session_id": "65cde4d7-fc62-4472-9587-461e3c73ddba"
+  },
+  {
+   "id": "m_rolling_spearman_branch_to_pearson",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_ic_engine.py/m_rolling_spearman_branch_to_pearson.patch",
+   "patch_sha256": "04c008dbbba7740f6406ca0e5c7894624faa9e46707c90e5dbde243c65830fdd",
+   "session_id": "9a185fa7-6c89-4069-90e8-4b2b396b37f9"
+  },
+  {
+   "id": "m_icir_std_ddof1",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_ic_engine.py/m_icir_std_ddof1.patch",
+   "patch_sha256": "a2afb6c96432f7e2c2821c0b7a1d07e2d73a02d8f8c985e02b9d1ebfe4746356",
+   "session_id": "543c2cd1-c594-4fb2-8f95-e70d71469b80"
+  }
+ ],
+ "path": "tests/momentum/test_ic_engine.py"
+}

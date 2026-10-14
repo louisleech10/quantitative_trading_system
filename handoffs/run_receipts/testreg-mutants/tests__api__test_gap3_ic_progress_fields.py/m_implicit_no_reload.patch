@@ -1,0 +1,12 @@
+diff --git a/api/services/ic_analysis_service.py b/api/services/ic_analysis_service.py
+index 19271d9c..efb2521f 100644
+--- a/api/services/ic_analysis_service.py
++++ b/api/services/ic_analysis_service.py
+@@ -619,7 +619,6 @@ class ICAnalysisService:
+         if not (symbol and timeframe):
+             return None
+         config_hash = (getattr(request, "config_hash", None) or "").strip()
+-        self._feature_library.reload_registry()
+         entry = (
+             self._feature_library.get_entry(symbol, timeframe, config_hash)
+             if config_hash

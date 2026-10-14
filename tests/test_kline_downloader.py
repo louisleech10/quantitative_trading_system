@@ -479,3 +479,123 @@ def main():
 if __name__ == "__main__":
     success = main()
     sys.exit(0 if success else 1)
+
+
+import pytest
+import numpy as _np_kl_new
+from datetime import timezone as _tz_kl_new
+
+
+def test_download_klines_stubbed_client_full_oracle_and_storage_roundtrip(tmp_path, monkeypatch):
+    """以替身取代幣安網路 Client（回固定幣安 12 欄原始格式），其餘全走生產碼：
+    BinanceProvider 分批與轉換、KlineDownloadService 路由與存檔、KlineStorageManager 讀回。
+    期望值由輸入逐值手算（全量、非前 10 根）；1h 與 4h 各一；存檔讀回須與下載結果逐欄一致。"""
+    step_ms = {"1h": 3_600_000, "4h": 14_400_000}
+
+    def _bar(k, open_ms, interval):
+        vol = 0.0 if k % 7 == 3 else float(10 + k)
+        tb = 0.0 if vol == 0.0 else float(k % 5 + 1)
+        o = 100.0 + k
+        return [open_ms, str(o), str(o + 2.0), str(o - 1.0), str(o + 0.5), str(vol),
+                open_ms + step_ms[interval] - 1, str(vol * 2.0), k, str(tb), str(tb * 2.0), "0"]
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ping(self):
+            return {}
+
+        def get_klines(self, symbol, interval, startTime, endTime, limit):
+            out, t, k = [], startTime, 0
+            while t <= endTime and len(out) < limit:
+                out.append(_bar(k, t, interval))
+                t += step_ms[interval]
+                k += 1
+            return out
+
+    monkeypatch.setattr("momentum.DataExtraction.providers.binance_provider.Client", _FakeClient)
+    monkeypatch.setenv("LEGACY_KLINE_CACHE_DIR", str(tmp_path / "no_legacy"))
+    storage = KlineStorageManager(cache_dir=str(tmp_path / "storage"))
+    downloader = KlineDownloadService(storage_manager=storage, failure_log_path=str(tmp_path / "logs" / "f.json"))
+    downloader.registry.register("binance", BinanceProvider())
+
+    start = datetime(2024, 1, 1, 0, 0)
+    start_s = int(datetime(2024, 1, 1, 0, 0, tzinfo=_tz_kl_new.utc).timestamp())
+    df = downloader.download_klines(source="binance", symbol="ETHUSDT", start_time=start,
+                                    end_time=start + timedelta(hours=99), timeframe="1h", save_to_storage=True)
+    ks = _np_kl_new.arange(100)
+    vol = _np_kl_new.where(ks % 7 == 3, 0.0, 10.0 + ks)
+    tb = _np_kl_new.where(vol == 0.0, 0.0, ks % 5 + 1.0)
+    exp_ratio = _np_kl_new.where(vol > 0, tb / _np_kl_new.where(vol > 0, vol, 1.0), 0.5)
+    assert (
+        len(df) == 100
+        and (df["timestamp"].to_numpy() == start_s + ks * 3600).all()
+        and _np_kl_new.allclose(df["open"].to_numpy(), 100.0 + ks)
+        and _np_kl_new.allclose(df["high"].to_numpy(), 102.0 + ks)
+        and _np_kl_new.allclose(df["low"].to_numpy(), 99.0 + ks)
+        and _np_kl_new.allclose(df["close"].to_numpy(), 100.5 + ks)
+        and _np_kl_new.allclose(df["volume"].to_numpy(), vol)
+        and _np_kl_new.allclose(df["taker_buy_volume"].to_numpy(), tb)
+        and _np_kl_new.allclose(df["taker_ratio"].to_numpy(), exp_ratio, atol=1e-6)
+        and ((df["low"] <= df["open"]) & (df["open"] <= df["high"]) & (df["low"] <= df["close"]) & (df["close"] <= df["high"])).all()
+    ), df.head(12)
+
+    stored = storage.read_klines("ETHUSDT", "1h")
+    cols = ["timestamp", "open", "high", "low", "close", "volume", "taker_buy_volume", "taker_ratio"]
+    assert stored is not None and len(stored) == 100 and all((stored[c].to_numpy() == df[c].to_numpy()).all() for c in cols), stored
+
+    df4 = downloader.download_klines(source="binance", symbol="BTCUSDT", start_time=start,
+                                     end_time=start + timedelta(hours=4 * 49), timeframe="4h", save_to_storage=False)
+    assert len(df4) == 50 and (df4["timestamp"].to_numpy() == start_s + _np_kl_new.arange(50) * 14400).all(), df4["timestamp"].head()
+
+
+def test_download_batch_and_error_paths_with_stubbed_client(tmp_path, monkeypatch):
+    """替身 Client 下，批量下載之部分失敗不中斷（stop_on_error=False）且結果／失敗清單／進度回呼逐筆正確；
+    無效 symbol 與未註冊來源須拋 ValueError（不得被吞）；註冊表列出 binance。"""
+    def _bar(k, open_ms):
+        o = 50.0 + k
+        return [open_ms, str(o), str(o + 1.0), str(o - 1.0), str(o), "20.0",
+                open_ms + 3_599_999, "40.0", k, "5.0", "10.0", "0"]
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def ping(self):
+            return {}
+
+        def get_klines(self, symbol, interval, startTime, endTime, limit):
+            out, t, k = [], startTime, 0
+            while t <= endTime and len(out) < limit:
+                out.append(_bar(k, t))
+                t += 3_600_000
+                k += 1
+            return out
+
+    monkeypatch.setattr("momentum.DataExtraction.providers.binance_provider.Client", _FakeClient)
+    monkeypatch.setenv("LEGACY_KLINE_CACHE_DIR", str(tmp_path / "no_legacy"))
+    storage = KlineStorageManager(cache_dir=str(tmp_path / "storage"))
+    downloader = KlineDownloadService(storage_manager=storage, failure_log_path=str(tmp_path / "logs" / "f.json"))
+    downloader.registry.register("binance", BinanceProvider())
+    start = datetime(2024, 3, 1, 0, 0)
+    end = start + timedelta(hours=9)
+
+    calls = []
+    symbols = ["BTCUSDT", "ethusdt", "BNBUSDT", "ADAUSDT", "SOLUSDT"]
+    results, failed = downloader.download_batch(
+        source="binance", symbols=symbols, start_time=start, end_time=end, timeframe="1h",
+        save_to_storage=False, progress_callback=lambda i, n, s, ok, d: calls.append((i, n, s, ok, None if d is None else len(d))),
+        stop_on_error=False,
+    )
+    expected_calls = [(1, 5, "BTCUSDT", True, 10), (2, 5, "ethusdt", False, None), (3, 5, "BNBUSDT", True, 10),
+                      (4, 5, "ADAUSDT", True, 10), (5, 5, "SOLUSDT", True, 10)]
+    assert sorted(results) == ["ADAUSDT", "BNBUSDT", "BTCUSDT", "SOLUSDT"] and failed == ["ethusdt"] and calls == expected_calls, (sorted(results), failed, calls)
+
+    with pytest.raises(ValueError, match="Invalid symbol format"):
+        downloader.download_klines(source="binance", symbol="btcusdt", start_time=start, end_time=end,
+                                   timeframe="1h", save_to_storage=False)
+    with pytest.raises(ValueError, match="Unknown source"):
+        downloader.download_klines(source="okx", symbol="BTCUSDT", start_time=start, end_time=end,
+                                   timeframe="1h", save_to_storage=False)
+    assert downloader.registry.list_sources() == ["binance"] and downloader.registry.ping_all() == {"binance": True}

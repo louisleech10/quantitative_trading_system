@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/providers/binance_provider.py b/momentum/DataExtraction/providers/binance_provider.py
+index dc27ad87..6999557b 100644
+--- a/momentum/DataExtraction/providers/binance_provider.py
++++ b/momentum/DataExtraction/providers/binance_provider.py
+@@ -187,7 +187,7 @@ class BinanceProvider(KlineProviderBase):
+         '30m': Client.KLINE_INTERVAL_30MINUTE,
+         '1h': Client.KLINE_INTERVAL_1HOUR,
+         '2h': Client.KLINE_INTERVAL_2HOUR,
+-        '4h': Client.KLINE_INTERVAL_4HOUR,
++        '4h': Client.KLINE_INTERVAL_1HOUR,
+         '6h': Client.KLINE_INTERVAL_6HOUR,
+         '8h': Client.KLINE_INTERVAL_8HOUR,
+         '12h': Client.KLINE_INTERVAL_12HOUR,

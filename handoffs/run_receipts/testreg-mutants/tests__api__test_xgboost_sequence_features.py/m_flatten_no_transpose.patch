@@ -1,0 +1,13 @@
+diff --git a/api/services/xgboost_batch_service.py b/api/services/xgboost_batch_service.py
+index 02063f95..1eb661b3 100644
+--- a/api/services/xgboost_batch_service.py
++++ b/api/services/xgboost_batch_service.py
+@@ -1219,7 +1219,7 @@ class XGBoostBatchService:
+         """
+         # 轉置後展平: (n_features, window_size) -> flat
+         # 這樣每個特徵的時間序列會連續排列
+-        flattened_values = window_values.T.reshape(-1)
++        flattened_values = window_values.reshape(-1)
+ 
+         flattened_feature_names: List[str] = []
+         # 先按特徵名稱，再按時間順序（從舊到新）

@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/test_data_preprocessor.py::test_preprocess_full_sample_clips_to_full_period_quantiles_single_outlier"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+ "baseline_session_id": "4d012cfb-6abd-40d8-9122-f80c7cfb0108",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__test_data_preprocessor.py.compare.patch",
+ "compare_patch_sha256": "77d55c3e55a063459603e2eda2707d634d76880b88a860506d8275c3cec83045",
+ "fingerprint": "911f428758f514482d3da259305611398d4f89520ad9019a497c5b1e828ecef4",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_static_percentile_no_upper_clip",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_data_preprocessor.py/m_static_percentile_no_upper_clip.patch",
+   "patch_sha256": "681ed3084bc95f9d1790238d0112c98ce13b5bb0f393feb680ce304772a40890",
+   "session_id": "682c7858-a298-4f46-96df-711a195d7d3f"
+  },
+  {
+   "id": "m_full_sample_routed_to_pit",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_data_preprocessor.py/m_full_sample_routed_to_pit.patch",
+   "patch_sha256": "7fc5a78f6619be56c418d219da119cd4779e461b52e6b8ebc77213e9e4c93341",
+   "session_id": "3def3245-bcf0-4992-9cee-94aa7d445d8f"
+  }
+ ],
+ "path": "tests/momentum/test_data_preprocessor.py"
+}

@@ -1,0 +1,18 @@
+{
+ "path": "tests/phase24/test_rolling_oos_validator.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "mutants": [
+  {
+   "id": "m_step_never_reduced",
+   "file": "momentum/Analysis/rolling_oos_validator.py",
+   "old": "            step = max(1, step // 2)\n",
+   "new": "            step = max(1, step)\n"
+  },
+  {
+   "id": "m_test_overlaps_last_train_bar",
+   "file": "momentum/Analysis/rolling_oos_validator.py",
+   "old": "                splits.append((range(train_start, train_end), range(train_end, test_end)))\n",
+   "new": "                splits.append((range(train_start, train_end), range(train_end - 1, test_end)))\n"
+  }
+ ]
+}

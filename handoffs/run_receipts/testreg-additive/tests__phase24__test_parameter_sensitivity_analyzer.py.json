@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/phase24/test_parameter_sensitivity_analyzer.py::test_batch_analyze_classifies_stable_robust_and_noisy_not_robust"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "baseline_session_id": "3c56dab2-1869-408d-aa41-c919c977cbaf",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__phase24__test_parameter_sensitivity_analyzer.py.compare.patch",
+ "compare_patch_sha256": "c37c87f898ad2b6213aeb6e7ba4f6973af00d41c6a098176282724bb6f66b6b0",
+ "fingerprint": "b625f6c7b2864d83ae6b580d66c33068fa55eb19c8ae5c70373da4c5709a67d8",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_robust_appended_to_high_list",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_parameter_sensitivity_analyzer.py/m_robust_appended_to_high_list.patch",
+   "patch_sha256": "1557e621567880aaac1a70bef7a6d5c9abab90a0cfc8739f598a4ca81f20272b",
+   "session_id": "cfafa630-61bf-4c09-b63c-82d664003632"
+  },
+  {
+   "id": "m_robust_includes_medium",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_parameter_sensitivity_analyzer.py/m_robust_includes_medium.patch",
+   "patch_sha256": "b068258f8ef04835f9150d379ce5d5cc698c332a2cdb36e05dc96d8d6d0b64f2",
+   "session_id": "5b7e1045-9acd-494b-b566-79d60563870a"
+  },
+  {
+   "id": "m_ic_std_ddof1",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__phase24__test_parameter_sensitivity_analyzer.py/m_ic_std_ddof1.patch",
+   "patch_sha256": "8f6d3d5efd5d2724cfc908936390e869a568874df8a65a4ed4fd044a86e0d079",
+   "session_id": "d4829c7b-f75d-42e9-87bf-08ae55b6cc49"
+  }
+ ],
+ "path": "tests/phase24/test_parameter_sensitivity_analyzer.py"
+}

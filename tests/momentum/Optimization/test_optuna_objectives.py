@@ -219,3 +219,43 @@ async def test_multi_objective_auto_nsga2_sampler():
 
     assert len(study.directions) == 2
     assert result.total_trials >= 3
+
+
+def test_multi_objective_study_auto_switches_to_nsga2_sampler():
+    """TESTREG 純增改寫：多目標 objective＋sampler_type=TPE ⇒ 生產 create_study 自動換成 NSGAIISampler。
+
+    舊測試只驗 directions 長度與 trials 數；optuna TPE 本身支援多目標，刪掉自動切換仍綠。
+    本測試直接斷言 study.sampler 之型別與 directions 逐項（maximize, minimize）。
+    """
+    import asyncio
+
+    rng = np.random.default_rng(0)
+    predicted_proba = pd.Series(np.linspace(0.1, 0.9, 60))
+    close = 100 + np.cumsum(rng.standard_normal(60) * 0.2)
+    prices = pd.DataFrame({"open": close, "high": close + 1, "low": close - 1, "close": close})
+    atr_values = pd.Series(np.full(60, 1.0))
+    objective = StrategyBacktestObjective(
+        backtest_engine=DummyBacktestEngine(),
+        prices=prices,
+        predicted_proba=predicted_proba,
+        atr_values=atr_values,
+        target_metric="expectancy",
+        constraints={"max_drawdown": -1.0, "min_win_rate": 0.0, "min_trades": 0},
+        multi_objective=True,
+    )
+
+    with tempfile.NamedTemporaryFile(suffix=".db") as f:
+        optimizer = OptunaOptimizer(
+            study_name="task310_multi_nsga2",
+            storage=f"sqlite:///{f.name}",
+            objective=objective,
+            sampler_type="TPE",
+            n_trials=3,
+            enable_progress_monitor=False,
+        )
+        study = optimizer.create_study()
+        result = asyncio.run(optimizer.optimize())
+
+    expected_dirs = [optuna.study.StudyDirection.MAXIMIZE, optuna.study.StudyDirection.MINIMIZE]
+    assert isinstance(study.sampler, optuna.samplers.NSGAIISampler) and list(study.directions) == expected_dirs and result.total_trials >= 3, \
+        f"多目標未自動切換 NSGA-II：sampler={type(study.sampler).__name__}, directions={study.directions}"

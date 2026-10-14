@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/time_splitter.py b/momentum/Analysis/time_splitter.py
+index 5df8eb6c..96658a6f 100644
+--- a/momentum/Analysis/time_splitter.py
++++ b/momentum/Analysis/time_splitter.py
+@@ -540,7 +540,7 @@ class PurgedTimeSeriesSplit:
+             if self.embargo_pct > 0:
+                 embargo_size = max(1, int(len(val_idx) * self.embargo_pct))
+                 if embargo_size < len(val_idx):
+-                    val_idx = val_idx[embargo_size:]
++                    val_idx = val_idx[:-embargo_size]
+             
+             # 檢查是否有足夠樣本
+             if len(train_idx) < 10:

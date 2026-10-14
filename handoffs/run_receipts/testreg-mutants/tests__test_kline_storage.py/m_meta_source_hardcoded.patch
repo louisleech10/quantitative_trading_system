@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_storage.py b/momentum/DataExtraction/kline_storage.py
+index c2fd4023..594885ff 100644
+--- a/momentum/DataExtraction/kline_storage.py
++++ b/momentum/DataExtraction/kline_storage.py
+@@ -843,7 +843,7 @@ class KlineStorageManager:
+                     tf_group.attrs['time_range_start'] = expected_time_range[0]
+                     tf_group.attrs['time_range_end'] = expected_time_range[1]
+                     tf_group.attrs['total_bars'] = expected_row_count
+-                    tf_group.attrs['data_source'] = data_source
++                    tf_group.attrs['data_source'] = "binance"
+                     tf_group.attrs['timeframe'] = timeframe
+                     tf_group.attrs['is_complete'] = True
+                     tf_group.attrs['data_checksum'] = data_checksum

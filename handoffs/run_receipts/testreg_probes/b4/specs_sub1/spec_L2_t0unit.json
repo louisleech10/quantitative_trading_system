@@ -1,0 +1,30 @@
+{
+ "path": "tests/api/test_gap3_t0_unit_detect.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "mutants": [
+  {
+   "id": "m_ms_lower_exclusive",
+   "file": "momentum/Analysis/event_samples/import_contract.py",
+   "old": "    if ms_min <= v < ms_max:\n        return v\n",
+   "new": "    if ms_min < v < ms_max:\n        return v\n"
+  },
+  {
+   "id": "m_ms_upper_inclusive",
+   "file": "momentum/Analysis/event_samples/import_contract.py",
+   "old": "    if ms_min <= v < ms_max:\n        return v\n",
+   "new": "    if ms_min <= v <= ms_max:\n        return v\n"
+  },
+  {
+   "id": "m_sec_lower_dropped",
+   "file": "momentum/Analysis/event_samples/import_contract.py",
+   "old": "    if ms_min <= v * 1000 < ms_max:\n",
+   "new": "    if v * 1000 < ms_max:\n"
+  },
+  {
+   "id": "m_service_skips_unit_normalize",
+   "file": "api/services/case_import_service.py",
+   "old": "        self._pipeline.normalize_t0_units(records, contract=self._contract)\n",
+   "new": "        pass\n"
+  }
+ ]
+}

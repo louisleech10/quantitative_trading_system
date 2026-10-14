@@ -84,3 +84,23 @@ class TestXsecCapabilityStatus:
     def test_xsec_core_outputs_still_present(self, xsec_report):
         assert isinstance(xsec_report.get("summary_table"), list)
         assert xsec_report["filter_log"]["mode"] == "cross_sectional"
+
+
+def test_xsec_production_sections_are_contract_status_not_bare(xsec_report):
+    """M4 真探針（純增）：生產端 analyze_cross_sectional 實產之五節＋marginal_ic
+    每節都須為帶契約 status 與非空 reason 之 dict（裸 {} 即報問題）。
+
+    生產端若把任一節組裝回裸 {}（mutant），本斷言轉紅——取代舊探針只改測試自建 dict 之恆綠。
+    """
+    _allowed = contract_enum("capability_status")
+    _found = [
+        f"{sec}: {xsec_report.get(sec)!r}"
+        for sec in FIVE_SECTIONS + ("marginal_ic",)
+        if not (
+            isinstance(xsec_report.get(sec), dict)
+            and xsec_report[sec].get("status") in _allowed
+            and xsec_report[sec].get("status") == "not_applicable"
+            and xsec_report[sec].get("reason") == "cross_sectional_mode"
+        )
+    ]
+    assert _found == [] and isinstance(xsec_report["filter_log"], dict) and xsec_report["filter_log"].get("mode") == "cross_sectional", f"生產端 xsec 節裸空或 status/reason 錯：{_found}"

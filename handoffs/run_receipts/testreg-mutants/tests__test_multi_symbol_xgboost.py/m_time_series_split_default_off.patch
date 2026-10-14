@@ -1,0 +1,13 @@
+diff --git a/api/models/pattern_analysis_models.py b/api/models/pattern_analysis_models.py
+index a0b2b934..7e2b981c 100644
+--- a/api/models/pattern_analysis_models.py
++++ b/api/models/pattern_analysis_models.py
+@@ -228,7 +228,7 @@ class XGBoostBatchAnalysisRequest(BaseModel):
+         description="多時間尺度窗口（如 [8, 16, 32]）"
+     )
+     time_series_split: bool = Field(
+-        default=True,
++        default=False,
+         description="是否使用時間序列切分避免洩漏"
+     )
+     purge_gap: Optional[int] = Field(

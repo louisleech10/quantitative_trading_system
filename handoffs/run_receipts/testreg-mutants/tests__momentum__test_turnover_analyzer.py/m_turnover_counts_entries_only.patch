@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/turnover_analyzer.py b/momentum/Analysis/turnover_analyzer.py
+index d8f15dcf..99b7f72a 100644
+--- a/momentum/Analysis/turnover_analyzer.py
++++ b/momentum/Analysis/turnover_analyzer.py
+@@ -88,7 +88,7 @@ class TurnoverAnalyzer:
+ 
+         top_mask = (quantiles == max_label).astype(float)
+         top_mask = top_mask.where(quantiles.notna(), np.nan)
+-        changes = top_mask.diff().abs()
++        changes = top_mask.diff().clip(lower=0)
+         finite = changes[np.isfinite(changes.to_numpy(dtype=float))]
+         if finite.empty:
+             return 0.0

@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/test_ichc_xsec_capability.py::test_xsec_production_sections_are_contract_status_not_bare"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "baseline_session_id": "d3e375fe-d668-47da-b375-2af55b231b2c",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__test_ichc_xsec_capability.py.compare.patch",
+ "compare_patch_sha256": "94dc29db59f976dbf948fa91f64195071bf952a7817e9d9864f8ee3393752baa",
+ "fingerprint": "12b9f5d27869f81333634d1f0adc35b755dec61e848a9d3cb0fe1c2201fa7eeb",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_grouped_ic_bare_dict",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_ichc_xsec_capability.py/m_grouped_ic_bare_dict.patch",
+   "patch_sha256": "c545fddf356a7d9afee27d6baa6b213e77496a5e233871fe60e91be77ce3e77f",
+   "session_id": "c39d7892-ad15-4494-9099-279ec1cb95df"
+  },
+  {
+   "id": "m_xsec_reason_dropped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_ichc_xsec_capability.py/m_xsec_reason_dropped.patch",
+   "patch_sha256": "127a896cb47894e0bbcb6744bb94de86e0cd9db68ee55d459149ca2a507fac47",
+   "session_id": "20723bca-5b81-42b6-a034-84ce2f641397"
+  }
+ ],
+ "path": "tests/momentum/Analysis/test_ichc_xsec_capability.py"
+}

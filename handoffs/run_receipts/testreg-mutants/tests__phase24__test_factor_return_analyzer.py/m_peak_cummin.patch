@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/factor_return_analyzer.py b/momentum/Analysis/factor_return_analyzer.py
+index 3a11e524..c6eef9e7 100644
+--- a/momentum/Analysis/factor_return_analyzer.py
++++ b/momentum/Analysis/factor_return_analyzer.py
+@@ -238,7 +238,7 @@ class FactorReturnAnalyzer:
+             sortino = np.nan
+ 
+         equity = (1.0 + clean).cumprod()
+-        rolling_peak = equity.cummax()
++        rolling_peak = equity.cummin()
+         # 避免 0/0 或 inf equity 污染 drawdown
+         with np.errstate(divide="ignore", invalid="ignore"):
+             drawdown = equity / rolling_peak - 1.0

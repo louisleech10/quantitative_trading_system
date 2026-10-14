@@ -128,3 +128,54 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
+import pytest as _pytest_new
+from pydantic import ValidationError as _ValidationError_new
+import api.utils.case_storage as _case_storage_mod_new
+from api.utils.case_storage import CaseStorageManager as _CaseStorageManager_new
+from api.utils.case_storage import get_case_storage_manager as _get_case_storage_manager_new
+from api.models.case_models import CaseRecord as _CaseRecord_new
+
+
+def test_api_model_multi_symbol_fields_and_leak_safe_defaults():
+    """XGBoostBatchAnalysisRequest 接受多標的列表並保序；防洩漏預設（time_series_split=True）與
+    指標 data_source 預設 close；embargo_pct 上限 0.1 之驗證生效。期望值為契約手寫值。"""
+    req = XGBoostBatchAnalysisRequest(
+        symbols=["BTCUSDT", "ETHUSDT"],
+        timeframe="12h",
+        indicators=[
+            IndicatorParamsConfig(
+                indicator="ema_three_line",
+                data_source="close",
+                params={"ema_short": 5, "ema_mid": 20, "ema_long": 60}
+            ),
+            IndicatorParamsConfig(indicator="rsi", params={"period": 14}),
+        ],
+        lookback_bars=200,
+        cv_folds=5
+    )
+    assert type(req.symbols) is list and req.symbols == ["BTCUSDT", "ETHUSDT"] and req.time_series_split is True and req.sequence_feature_mode == "aggregate" and req.indicators[1].data_source == "close" and req.indicators[0].params == {"ema_short": 5, "ema_mid": 20, "ema_long": 60}, f"req={req!r}"
+    with _pytest_new.raises(_ValidationError_new):
+        XGBoostBatchAnalysisRequest(
+            symbols=["BTCUSDT"],
+            indicators=[IndicatorParamsConfig(indicator="rsi", params={})],
+            embargo_pct=0.5,
+        )
+
+
+def test_case_storage_multi_symbol_isolation_via_singleton(tmp_path, monkeypatch):
+    """多標的案例獲取（tmp 存檔，不讀真實 data_cache/cases.json）：
+    單例入口 get_case_storage_manager 回傳已建立之實例；BTC 2 筆、ETH 1 筆依標的隔離，合併 3 筆。"""
+    mgr = _CaseStorageManager_new(use_persistent_storage=False, json_path=str(tmp_path / "cases.json"))
+    monkeypatch.setattr(_case_storage_mod_new, "_case_storage_manager", mgr)
+    mgr.save_cases([
+        _CaseRecord_new(case_id="BTCUSDT_1_1", symbol="BTCUSDT", timeframe="12h", timestamp=1, positive_case=1),
+        _CaseRecord_new(case_id="BTCUSDT_2_0", symbol="BTCUSDT", timeframe="12h", timestamp=2, positive_case=0),
+        _CaseRecord_new(case_id="ETHUSDT_3_1", symbol="ETHUSDT", timeframe="12h", timestamp=3, positive_case=1),
+    ])
+    storage = _get_case_storage_manager_new()
+    btc = storage.get_cases_by_symbol("BTCUSDT")
+    eth = storage.get_cases_by_symbol("ETHUSDT")
+    merged = btc + eth
+    assert storage is mgr and sorted(c.case_id for c in btc) == ["BTCUSDT_1_1", "BTCUSDT_2_0"] and [c.case_id for c in eth] == ["ETHUSDT_3_1"] and len(merged) == 3 and {c.symbol for c in merged} == {"BTCUSDT", "ETHUSDT"} and storage.get_cases_by_symbol("XRPUSDT") == [], f"btc={btc} eth={eth}"

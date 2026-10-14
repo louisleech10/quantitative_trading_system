@@ -1,0 +1,12 @@
+diff --git a/momentum/DataExtraction/kline_storage.py b/momentum/DataExtraction/kline_storage.py
+index c2fd4023..3c935e96 100644
+--- a/momentum/DataExtraction/kline_storage.py
++++ b/momentum/DataExtraction/kline_storage.py
+@@ -1503,7 +1503,6 @@ class KlineStorageManager:
+ 
+                 if timeframe not in cache_index[symbol]:
+                     cache_index[symbol].append(timeframe)
+-                    cache_index[symbol].sort()
+ 
+             elif operation == 'remove':
+                 if symbol in cache_index and timeframe in cache_index[symbol]:

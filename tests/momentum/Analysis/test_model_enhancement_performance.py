@@ -185,3 +185,56 @@ def test_phase5_performance_targets():
         asyncio.run(_run_async())
 
     _bench("Full Enhancement", 900.0, run_full_enhancement)
+
+
+def test_phase5_full_enhancement_outcomes_are_asserted():
+    """效能測試之回傳面補強：Full Enhancement 之回傳不得丟棄。
+
+    手算 oracle：payload 無 train_plan／calib_idx／model_artifact ⇒ calibration 依 LA-2 fail-closed（status=failed，
+    reason 含 CalibratorReceipt required）⇒ 整體 status=failed；其餘五模組 completed 且結果與請求設定一致
+    （rolling 模式、CPCV 路徑數＝C(6,2)=15、學習曲線兩個 fraction、權重樣本數＝n）。
+    """
+    import math as _math
+
+    rng = np.random.default_rng(7)
+    n, f = 600, 6
+    X = pd.DataFrame(rng.normal(size=(n, f)), columns=[f"f{i}" for i in range(f)])
+    logits = X["f0"] * 1.2 - X["f1"] * 0.8 + rng.normal(0, 0.8, n)
+    y = (1 / (1 + np.exp(-logits)) > 0.55).astype(int)
+    model = LogisticRegression(max_iter=500).fit(X, y)
+    inputs = {
+        "model": model, "model_factory": lambda: LogisticRegression(max_iter=500), "X": X, "y": y,
+        "feature_names": X.columns.tolist(), "y_true": y, "y_pred_proba": model.predict_proba(X)[:, 1],
+        "timestamps": pd.date_range("2023-01-01", periods=n, freq="12h").to_numpy(),
+        "returns": rng.normal(0.001, 0.02, n), "X_train": X.iloc[:360].copy(), "X_test": X.iloc[360:].copy(),
+        "y_train": y[:360], "X_cal": X.iloc[:360].copy(), "y_cal": y[:360],
+    }
+    service = ModelEnhancementService(
+        calibrator_factory=create_probability_calibrator,
+        walk_forward_factory=create_walk_forward_validator,
+        sample_weight_factory=create_sample_weight_calculator,
+        adversarial_factory=create_adversarial_validator,
+        cpcv_factory=create_combinatorial_purged_cv,
+        learning_curve_factory=create_learning_curve_analyzer,
+        task_payload_provider=lambda _task_id: {"result": {"enhancement_inputs": inputs}},
+    )
+    six = ["calibration", "walk_forward", "sample_weight", "adversarial", "cpcv", "learning_curve"]
+    resp = asyncio.run(service.execute_full_enhancement(FullEnhancementRequest(
+        model_task_id="phase5-outcomes", modules=six,
+        config_overrides={
+            "walk_forward": {"mode": "rolling", "train_size": 200, "test_size": 50, "purge_gap": 5},
+            "cpcv": {"n_groups": 6, "n_test_groups": 2, "max_paths": 15},
+            "learning_curve": {"train_fractions": [0.4, 1.0]},
+        },
+    )))
+    mods = resp.modules
+    assert resp.status == "failed" and sorted(mods) == sorted(six) and mods["calibration"].status == "failed" \
+        and "CalibratorReceipt required" in (mods["calibration"].skipped_reason or ""), resp.status
+    # rolling 期數手算：train_start=50k，須 50k+200+purge 5+50 <= 600 ⇒ k=0..6 共 7 期
+    assert all(mods[m].status == "completed" and mods[m].module == m and mods[m].result for m in six[1:]) \
+        and mods["walk_forward"].result["rolling"]["mode"] == "rolling" \
+        and mods["walk_forward"].result["rolling"]["n_periods"] == len(range(0, n - (200 + 5 + 50) + 1, 50)) == 7 \
+        and mods["cpcv"].result["cpcv"]["n_paths"] == _math.comb(6, 2) == len(mods["cpcv"].result["cpcv"]["path_aucs"]) \
+        and mods["learning_curve"].result["learning_curve"]["data_curve"]["fractions"] == [0.4, 1.0] \
+        and mods["sample_weight"].result["sample_weights"]["summary"]["n_samples"] == n, \
+        {m: mods[m].status for m in six}

@@ -1,0 +1,24 @@
+{
+ "path": "tests/phase25/test_long_short_analyzer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "mutants": [
+  {
+   "id": "m_long_quantiles_key_typo",
+   "file": "momentum/Analysis/long_short_analyzer.py",
+   "old": "        self._long_quantiles = list(cfg.get(\"long_quantiles\", [4, 5]))\n",
+   "new": "        self._long_quantiles = list(cfg.get(\"long_quantile\", [4, 5]))\n"
+  },
+  {
+   "id": "m_long_returns_sign_flipped",
+   "file": "momentum/Analysis/long_short_analyzer.py",
+   "old": "        long_returns = ret.loc[long_sel].astype(float)\n",
+   "new": "        long_returns = -ret.loc[long_sel].astype(float)\n"
+  },
+  {
+   "id": "m_short_returns_not_negated",
+   "file": "momentum/Analysis/long_short_analyzer.py",
+   "old": "        short_returns = -short_raw_returns\n",
+   "new": "        short_returns = short_raw_returns\n"
+  }
+ ]
+}

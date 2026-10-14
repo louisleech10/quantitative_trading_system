@@ -1,0 +1,18 @@
+{
+ "path": "tests/momentum/Analysis/test_splitunify_derive.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "mutants": [
+  {
+   "id": "m_fp_field_order_swapped",
+   "file": "momentum/core/split_preview.py",
+   "old": "    rows = [[int(pos[i]), int(ms[i]), str(symbol), str(base_universe_hash)] for i in order]\n",
+   "new": "    rows = [[int(ms[i]), int(pos[i]), str(symbol), str(base_universe_hash)] for i in order]\n"
+  },
+  {
+   "id": "m_fp_default_separators",
+   "file": "momentum/core/split_preview.py",
+   "old": "    payload = json.dumps(rows, sort_keys=True, separators=(\",\", \":\"))\n",
+   "new": "    payload = json.dumps(rows, sort_keys=True)\n"
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_storage.py b/momentum/DataExtraction/kline_storage.py
+index c2fd4023..1bd68bb7 100644
+--- a/momentum/DataExtraction/kline_storage.py
++++ b/momentum/DataExtraction/kline_storage.py
+@@ -610,7 +610,7 @@ class KlineStorageManager:
+         if not (df['low'] <= df['open']).all():
+             return False, "low must be <= open"
+ 
+-        if not (df['low'] <= df['close']).all():
++        if not (df['low'] <= df['high']).all():
+             return False, "low must be <= close"
+ 
+         # 檢查taker_ratio範圍（0-1）

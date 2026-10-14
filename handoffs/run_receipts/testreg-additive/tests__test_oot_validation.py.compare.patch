@@ -1,0 +1,32 @@
+diff --git a/tests/test_oot_validation.py b/tests/test_oot_validation.py
+index 8f4b9fa1..b1feebf2 100644
+--- a/tests/test_oot_validation.py
++++ b/tests/test_oot_validation.py
+@@ -566,3 +566,27 @@ class TestOOTIntegration:
+ if __name__ == "__main__":
+     # 可以直接執行此檔案進行測試
+     pytest.main([__file__, "-v", "--tb=short"])
++
++
++def test_purged_split_removes_exactly_purge_gap_from_training_end():
++    """Purge 從嚴（手算 oracle）：n＝100、n_splits＝3 ⇒ 擴張式切分第 k 折原訓練＝[0, 25k)、驗證＝[25k, 25k+25)；
++    purge_gap＝5 ⇒ 訓練恰為 [0, 25k−5)，驗證不變，且 val_min − train_max − 1 恰＝5（少移一根即失敗）。"""
++    splitter = PurgedTimeSeriesSplit(n_splits=3, purge_gap=5, embargo_pct=0.0)
++    folds = [(tr.tolist(), va.tolist()) for tr, va in splitter.split(np.zeros((100, 2)))]
++    expected = [(list(range(0, 25 * k - 5)), list(range(25 * k, 25 * k + 25))) for k in (1, 2, 3)]
++    assert folds == expected and all(va[0] - tr[-1] - 1 == 5 for tr, va in folds), \
++        [(tr[-1], va[0], len(va)) for tr, va in folds]
++
++
++def test_purged_split_embargo_drops_exact_validation_head():
++    """Embargo 從嚴（手算 oracle）：每折驗證集原 25 根，embargo_size＝max(1, int(25×pct))。
++    pct＝0.1 ⇒ 去頭 2 根、驗證＝[25k+2, 25k+25)；pct＝0.01 ⇒ int 為 0 但下限 1 ⇒ 去頭 1 根；訓練集不受影響。"""
++    got = {}
++    for pct in (0.1, 0.01):
++        splitter = PurgedTimeSeriesSplit(n_splits=3, purge_gap=0, embargo_pct=pct)
++        got[pct] = [(tr.tolist(), va.tolist()) for tr, va in splitter.split(np.zeros((100, 2)))]
++    expected = {
++        pct: [(list(range(0, 25 * k)), list(range(25 * k + drop, 25 * k + 25))) for k in (1, 2, 3)]
++        for pct, drop in ((0.1, 2), (0.01, 1))
++    }
++    assert got == expected, {p: [(va[0], va[-1], len(va)) for _tr, va in f] for p, f in got.items()}

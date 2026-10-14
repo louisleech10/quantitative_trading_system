@@ -1,0 +1,20 @@
+diff --git a/tests/phase24/test_rolling_oos_validator.py b/tests/phase24/test_rolling_oos_validator.py
+index c0e4e52c..e81ac51d 100644
+--- a/tests/phase24/test_rolling_oos_validator.py
++++ b/tests/phase24/test_rolling_oos_validator.py
+@@ -110,3 +110,15 @@ def test_validate_batch_with_skipped_feature_summary_counts():
+     result = analyzer.validate_batch(features_df, labels, top_n=2)
+     assert result["summary"]["total_validated"] >= 1
+     assert result["features"]["f2"].get("skipped", False) is True
++
++
++def test_auto_reduce_step_exact_splits_and_no_overlap():
++    """自動縮步精確驗：n=260、train100/test20、step50 只得 3 段（<min_splits=5）⇒ 縮為 step25。
++
++    手算 oracle：step25 起點 s∈{0,25,50,75,100,125}（s=150 時 test_end=270>260 停）共 6 段；
++    每段 train=range(s,s+100)、test=range(s+100,s+120)，test 緊接 train 之後且不重疊（OOS 無前視）。
++    """
++    analyzer = RollingOOSValidator({"train_window": 100, "test_window": 20, "step": 50, "min_splits": 5})
++    splits = analyzer._generate_splits(260)
++    expected = [(range(s, s + 100), range(s + 100, s + 120)) for s in (0, 25, 50, 75, 100, 125)]
++    assert [(tr, te) for tr, te in splits] == expected and all(max(tr) < min(te) and set(tr).isdisjoint(te) for tr, te in splits), f"splits={splits}"

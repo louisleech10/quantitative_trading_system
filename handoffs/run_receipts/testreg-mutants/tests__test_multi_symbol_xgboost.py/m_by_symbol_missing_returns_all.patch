@@ -1,0 +1,13 @@
+diff --git a/api/utils/case_storage.py b/api/utils/case_storage.py
+index bea82548..e2442855 100644
+--- a/api/utils/case_storage.py
++++ b/api/utils/case_storage.py
+@@ -170,7 +170,7 @@ class CaseStorageManager:
+         Returns:
+             List[CaseRecord]: 案例列表
+         """
+-        case_ids = self.symbol_index.get(symbol, [])
++        case_ids = self.symbol_index.get(symbol)
+         return self.get_cases(case_ids)
+ 
+ 

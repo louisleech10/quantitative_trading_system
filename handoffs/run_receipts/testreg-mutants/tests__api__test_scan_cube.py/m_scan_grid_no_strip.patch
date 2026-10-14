@@ -1,0 +1,13 @@
+diff --git a/api/services/ic_analysis_service.py b/api/services/ic_analysis_service.py
+index 19271d9c..92744554 100644
+--- a/api/services/ic_analysis_service.py
++++ b/api/services/ic_analysis_service.py
+@@ -1463,8 +1463,6 @@ class ICAnalysisService:
+         # 🔴 `SCANCUBE` Task 2.3：**三步驟，順序不可調換**。
+         #    ① 落檔（此時還需要 report）② 立刻剝除 ③ 只把摘要放進回傳
+         cube = self._build_scan_cube(task_id, request, results)
+-        for cell in results:
+-            cell.pop("report", None)  # ← 少這行，GB 級 report 會進 HTTP status
+ 
+         return {
+             "scan_total": total,

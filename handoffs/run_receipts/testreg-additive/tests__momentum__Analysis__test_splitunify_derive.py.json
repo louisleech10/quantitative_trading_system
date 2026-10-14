@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_matches_handbuilt_canonical_payload_oracle"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "baseline_session_id": "b511193d-4e3f-4b1e-aae4-6dd839862662",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__test_splitunify_derive.py.compare.patch",
+ "compare_patch_sha256": "b477e9202da7eb70f2d0c3dd892623cbf10fe1e660085f3e3cf1d6467cdbb537",
+ "fingerprint": "5ad62a68a4e1645e80b8fde980a0e61b568391893c9bf7fca6bae511d7744e58",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_fp_field_order_swapped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_splitunify_derive.py/m_fp_field_order_swapped.patch",
+   "patch_sha256": "27d54dc209467074b4ca60404b93b8a5e12fa7d1568f28e755a2ae449b85e805",
+   "session_id": "8a1dee06-ff14-41a5-abd2-d45ce248b4c5"
+  },
+  {
+   "id": "m_fp_default_separators",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_splitunify_derive.py/m_fp_default_separators.patch",
+   "patch_sha256": "c261792e35303469aac8b42cd6415911319c7f105dc0bf2f81e22e7098ed6af0",
+   "session_id": "cc849674-6a0c-48ca-a78a-44a9f0cf23c7"
+  }
+ ],
+ "path": "tests/momentum/Analysis/test_splitunify_derive.py"
+}

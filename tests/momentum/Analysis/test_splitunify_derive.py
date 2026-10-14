@@ -2361,3 +2361,22 @@ def test_anchor_ms_ge_feature_cutoff_ms_fail_closed() -> None:
             train, test, bad, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
         )
     assert "e_geo" in str(ei.value), f"訊息未指名事件：{ei.value}"
+
+
+import hashlib as _hashlib_fp_new
+
+
+def test_fingerprint_matches_handbuilt_canonical_payload_oracle() -> None:
+    """獨立 oracle：不經 `build_row_time_fingerprint`，以 hashlib＋json 依 D-001-C2 第 1 點手組 canonical payload
+    （`list[list]`、每列 `[int(position), int(feature_ts_ms), str(symbol), str(base_universe_hash)]`、依 position 遞增、
+    `sort_keys=True, separators=(",",":")`）重算 sha256，須等於 plan 上 producer 寫入之 train／test 指紋。"""
+    index, train, test, _, _, _ = _basic_case()
+
+    def _oracle(plan):
+        rows = [[int(p), int(index[int(p)]), SYM, "deadbeef"] for p in sorted(int(x) for x in plan.row_index_local)]
+        text = json.dumps(rows, sort_keys=True, separators=(",", ":"))
+        return _hashlib_fp_new.sha256(text.encode("utf-8")).hexdigest()
+
+    assert _oracle(train) == train.row_time_fingerprint and _oracle(test) == test.row_time_fingerprint, (
+        _oracle(train), train.row_time_fingerprint, _oracle(test), test.row_time_fingerprint,
+    )

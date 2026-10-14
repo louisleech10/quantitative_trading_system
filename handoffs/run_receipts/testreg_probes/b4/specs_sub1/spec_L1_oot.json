@@ -1,0 +1,24 @@
+{
+ "path": "tests/test_oot_validation.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "mutants": [
+  {
+   "id": "m_purge_one_short",
+   "file": "momentum/Analysis/time_splitter.py",
+   "old": "                train_idx = train_idx[:-self.purge_gap]\n",
+   "new": "                train_idx = train_idx[:-(self.purge_gap - 1)]\n"
+  },
+  {
+   "id": "m_embargo_no_floor",
+   "file": "momentum/Analysis/time_splitter.py",
+   "old": "                embargo_size = max(1, int(len(val_idx) * self.embargo_pct))\n",
+   "new": "                embargo_size = int(len(val_idx) * self.embargo_pct)\n"
+  },
+  {
+   "id": "m_embargo_trims_tail",
+   "file": "momentum/Analysis/time_splitter.py",
+   "old": "                    val_idx = val_idx[embargo_size:]\n",
+   "new": "                    val_idx = val_idx[:-embargo_size]\n"
+  }
+ ]
+}

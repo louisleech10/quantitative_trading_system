@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+index d6aaadf3..ded6f9e0 100644
+--- a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
++++ b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+@@ -167,7 +167,7 @@ class TailRiskIndicatorEngine:
+         return pd.DataFrame(output, index=returns.index)
+ 
+     def _compute_rv_components(self, returns: pd.Series) -> Dict[int, pd.Series]:
+-        squared = returns.pow(2)
++        squared = returns.fillna(0.0).pow(2)
+         up_sq = squared.where(returns > 0, 0.0)
+         down_sq = squared.where(returns < 0, 0.0)
+ 

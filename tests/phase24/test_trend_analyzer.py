@@ -121,3 +121,46 @@ def test_analyze_multi_dimension_includes_optional_dimensions():
 def test_ensure_trend_dict_skip_result():
     skipped = SkippedResult(module_name="trend_analysis", reason="x", error_type="INSUFFICIENT_DATA")
     assert TrendAnalyzer._ensure_trend_dict(skipped) is None
+
+
+def test_analyze_trend_down_matches_independent_regression_oracle():
+    """完全線性下降（80 點）：趨勢必為 'down'（非退化值 'flat'），斜率與獨立 numpy 實作
+    （np.quantile 1%／99% 縮尾 ＋ np.polyfit 一次回歸）逐值相符，r²≈1、p 值極小。"""
+    idx = pd.date_range("2024-01-01", periods=80, freq="12h")
+    values = np.linspace(1.0, 0.2, 80)
+    analyzer = TrendAnalyzer({"min_samples": 20})
+    result = analyzer.analyze_trend(pd.Series(values, index=idx), "ic")
+    clipped = np.clip(values, np.quantile(values, 0.01), np.quantile(values, 0.99))
+    oracle_slope = float(np.polyfit(np.arange(80, dtype=float), clipped, 1)[0])
+    assert result["trend"] == "down" and abs(result["slope"] - oracle_slope) < 1e-12 \
+        and result["r_squared"] > 0.99 and result["p_value"] < 1e-10, result
+
+
+def test_analyze_multi_dimension_ic_down_centrality_up_is_danger():
+    """IC 線性下降＋中心度線性上升（half_life＝3）⇒ 兩維度分別為 down／up，組合訊號必為「危險」。"""
+    idx = pd.date_range("2024-01-01", periods=80, freq="12h")
+    analyzer = TrendAnalyzer({"min_samples": 20})
+    payload = analyzer.analyze_multi_dimension(
+        feature_name="f1",
+        rolling_ic=pd.Series(np.linspace(1.0, 0.2, 80), index=idx),
+        rolling_centrality=pd.Series(np.linspace(0.1, 0.5, 80), index=idx),
+        ic_decay_half_life=3.0,
+    )["f1"]
+    assert payload["combined_signal"]["recommendation"] == "危險" and payload["ic_trend"]["trend"] == "down" \
+        and payload["centrality_trend"]["trend"] == "up", payload
+
+
+def test_combine_signal_half_life_escalation_table():
+    """half_life＜5 之升級分支逐格：flat＋up 為「警告」，half_life 4.0 升為「危險」、5.0（不＜5）與 None 不升；
+    up＋down 為「正常」，half_life 4.0 升為「警告」；down＋up 本為「危險」，NaN half_life 不影響。"""
+    analyzer = TrendAnalyzer({})
+    cases = [
+        (("flat", "up", 4.0), "危險"),
+        (("flat", "up", 5.0), "警告"),
+        (("flat", "up", None), "警告"),
+        (("up", "down", 4.0), "警告"),
+        (("up", "down", None), "正常"),
+        (("down", "up", float("nan")), "危險"),
+    ]
+    got = [analyzer._combine_signal({"trend": a}, {"trend": b}, h)["recommendation"] for (a, b, h), _ in cases]
+    assert got == [want for _, want in cases], list(zip(cases, got))

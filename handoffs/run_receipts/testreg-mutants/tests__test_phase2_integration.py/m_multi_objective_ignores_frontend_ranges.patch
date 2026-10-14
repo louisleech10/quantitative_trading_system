@@ -1,0 +1,13 @@
+diff --git a/momentum/Optimization/optuna_optimizer.py b/momentum/Optimization/optuna_optimizer.py
+index ef62787b..ecea2992 100644
+--- a/momentum/Optimization/optuna_optimizer.py
++++ b/momentum/Optimization/optuna_optimizer.py
+@@ -1626,7 +1626,7 @@ class OptunaOptimizer:
+ 
+             # 參數範圍覆蓋邏輯: 優先使用前端傳遞的 parameter_ranges，否則使用 YAML 默認值
+             range_overrides = {}
+-            if self.parameter_ranges:
++            if not self.parameter_ranges:
+                 # 構建參數名到範圍的映射
+                 if hasattr(self.parameter_ranges, 'ema_short_range') and self.parameter_ranges.ema_short_range:
+                     range_overrides['short_period'] = self.parameter_ranges.ema_short_range

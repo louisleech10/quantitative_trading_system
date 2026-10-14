@@ -1,0 +1,38 @@
+{
+ "added_nodeids": [
+  "tests/api/test_gap3_t0_unit_detect.py::test_gap3_t0_unit_detect_band_edges_hit_production_detector"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "baseline_session_id": "75b30af9-4c29-40b0-8c95-b2b73f3420c8",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__api__test_gap3_t0_unit_detect.py.compare.patch",
+ "compare_patch_sha256": "6036a79a755dceba13a78736883f6258c99135bcaa2f9beeca5bfe1cb87b3e69",
+ "fingerprint": "4a01958facd062b0363776ef833fb4c7d7185f68d22067456761bc850d29fc12",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_ms_lower_exclusive",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_gap3_t0_unit_detect.py/m_ms_lower_exclusive.patch",
+   "patch_sha256": "d804d5d9be675c2fbc450bf4056e22e50c5cfedeb165d83a8a4c7f2a750b9a84",
+   "session_id": "3d1a4bd1-603a-49dd-9a30-1c38aa296f2b"
+  },
+  {
+   "id": "m_ms_upper_inclusive",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_gap3_t0_unit_detect.py/m_ms_upper_inclusive.patch",
+   "patch_sha256": "5842e71b3d48762c66858ca70a265aaa0b161150d1f715eb817aff87f80bb814",
+   "session_id": "56801803-2f38-45e4-8817-a011917cbcba"
+  },
+  {
+   "id": "m_sec_lower_dropped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_gap3_t0_unit_detect.py/m_sec_lower_dropped.patch",
+   "patch_sha256": "fc00bf696636578973f604e84a0249cbeb6225ab5ddc62c3b0a4b50a7d800767",
+   "session_id": "d17e4617-35e9-4814-82b0-39f8765a8965"
+  },
+  {
+   "id": "m_service_skips_unit_normalize",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_gap3_t0_unit_detect.py/m_service_skips_unit_normalize.patch",
+   "patch_sha256": "ba588f4c2e970896e2a8c2d9c87c9135ec42f03eff0fa95d36d260593fe3d7dd",
+   "session_id": "4d76cb7a-b1f7-4ec8-9892-b96c8ca5a374"
+  }
+ ],
+ "path": "tests/api/test_gap3_t0_unit_detect.py"
+}

@@ -1,0 +1,24 @@
+{
+ "path": "tests/momentum/Analysis/test_gap2_golden.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r14/synth.md",
+ "mutants": [
+  {
+   "id": "m_loo_keeps_self",
+   "file": "momentum/Analysis/marginal_ic.py",
+   "old": "            S = [s for s in survivors if s != f]  # 🔒 依名稱排除自身（§V-4／V-18 mutation 目標行）\n",
+   "new": "            S = [s for s in survivors]  # 🔒 依名稱排除自身（§V-4／V-18 mutation 目標行）\n"
+  },
+  {
+   "id": "m_seq_offbyone",
+   "file": "momentum/Analysis/marginal_ic.py",
+   "old": "            stat = _one(f, order[:i])\n",
+   "new": "            stat = _one(f, order[:i + 1])\n"
+  },
+  {
+   "id": "m_removed_drop_last_survivor",
+   "file": "momentum/Analysis/marginal_ic.py",
+   "old": "            removed[c] = _one(c, survivors)\n",
+   "new": "            removed[c] = _one(c, survivors[:-1])\n"
+  }
+ ]
+}

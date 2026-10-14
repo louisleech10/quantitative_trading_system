@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_download_service.py b/momentum/DataExtraction/kline_download_service.py
+index de7d5fc3..afd470f5 100644
+--- a/momentum/DataExtraction/kline_download_service.py
++++ b/momentum/DataExtraction/kline_download_service.py
+@@ -108,7 +108,7 @@ class ProviderRegistry:
+         Raises:
+             ValueError: 數據源未註冊
+         """
+-        if source_name not in self._providers:
++        if not self._providers:
+             available = ', '.join(self.list_sources())
+             raise ValueError(
+                 f"Unknown source: '{source_name}'. "

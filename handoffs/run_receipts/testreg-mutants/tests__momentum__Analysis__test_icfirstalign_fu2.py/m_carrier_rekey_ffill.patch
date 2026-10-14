@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/ic_filter_orchestrator.py b/momentum/Analysis/ic_filter_orchestrator.py
+index 0d4d3896..9b639551 100644
+--- a/momentum/Analysis/ic_filter_orchestrator.py
++++ b/momentum/Analysis/ic_filter_orchestrator.py
+@@ -321,7 +321,7 @@ def _rekey_close_carrier(close: pd.Series, feature_index: pd.Index) -> pd.Series
+         index=_utc_instant_key(close.index),
+     )
+     carrier = pd.Series(
+-        keyed.reindex(_utc_instant_key(feature_index)).to_numpy(dtype=np.float64),
++        keyed.reindex(_utc_instant_key(feature_index), method="ffill").to_numpy(dtype=np.float64),
+         index=feature_index,
+         name="close",
+     )

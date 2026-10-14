@@ -1,0 +1,53 @@
+{
+ "added_nodeids": [
+  "tests/test_phase2_integration.py::TestPhase2RoutesAndOptimizerSampling::test_list_strategies_route_matches_yaml",
+  "tests/test_phase2_integration.py::TestPhase2RoutesAndOptimizerSampling::test_optimizer_multi_objective_samples_with_frontend_ranges",
+  "tests/test_phase2_integration.py::TestPhase2RoutesAndOptimizerSampling::test_optimizer_single_objective_samples_with_frontend_ranges",
+  "tests/test_phase2_integration.py::TestPhase2RoutesAndOptimizerSampling::test_strategy_detail_route_and_404"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "baseline_session_id": "a5da22c9-7bc6-461e-bfe8-920613d06205",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_phase2_integration.py.compare.patch",
+ "compare_patch_sha256": "398f25ff6df97ce1630342fd3912cc139f38d8c3b8a99d07ff05127955b9c570",
+ "fingerprint": "456280222f80db0b7e1b5013509f6439814329a0125d3c7e32504fa4f1ab9fe6",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_registry_instance_not_initialized",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase2_integration.py/m_registry_instance_not_initialized.patch",
+   "patch_sha256": "2c5d3bfbdccd5e6ee5c7eb41c2159ce42a61b02a369633ac29e9b0f37cca416a",
+   "session_id": "ef9edb69-753e-4d0a-a28b-b7ac37260a8c"
+  },
+  {
+   "id": "m_detail_unknown_id_500",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase2_integration.py/m_detail_unknown_id_500.patch",
+   "patch_sha256": "e6a97be2b121f3904bc4aa28814aa6b5a533299271f6eb652e3ca29fd81dc9d8",
+   "session_id": "7bb812e4-6551-4233-b3cf-bfe5d310b91a"
+  },
+  {
+   "id": "m_list_parameter_count_wrong_field",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase2_integration.py/m_list_parameter_count_wrong_field.patch",
+   "patch_sha256": "c6cfffc3dd72d8fb67a274f01203c6a887d1fee291173cbc6a3bff20d7021ae6",
+   "session_id": "c1ccdcbf-11b5-4502-984d-fd3ac9d2e59b"
+  },
+  {
+   "id": "m_detail_max_copies_min",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase2_integration.py/m_detail_max_copies_min.patch",
+   "patch_sha256": "ac53baa1037243f4de17419bcbe5baddb1bb196510b065620948ff3ce3619c19",
+   "session_id": "0380105c-0064-4cea-93d1-7c9eaad03e4c"
+  },
+  {
+   "id": "m_single_objective_ignores_frontend_ranges",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase2_integration.py/m_single_objective_ignores_frontend_ranges.patch",
+   "patch_sha256": "b5d67db5023e7421643a18f2a46f752e84a16dd50d636a3f4333ec00910acd40",
+   "session_id": "bb0eccb2-e760-45fb-a02e-2c96ae8fde43"
+  },
+  {
+   "id": "m_multi_objective_ignores_frontend_ranges",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase2_integration.py/m_multi_objective_ignores_frontend_ranges.patch",
+   "patch_sha256": "a385483c08a9e618dbc2e287f93e125c96b45ac861819ce1cc8c609ab6601662",
+   "session_id": "867e5aea-4dd6-48af-b0cb-eea6b4b0f80e"
+  }
+ ],
+ "path": "tests/test_phase2_integration.py"
+}

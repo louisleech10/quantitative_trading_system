@@ -1,0 +1,13 @@
+diff --git a/momentum/Strategy/performance_metrics.py b/momentum/Strategy/performance_metrics.py
+index 249220be..54fe7c23 100644
+--- a/momentum/Strategy/performance_metrics.py
++++ b/momentum/Strategy/performance_metrics.py
+@@ -91,7 +91,7 @@ class PerformanceMetrics:
+             return 0.0
+         mean_ret = _safe_float(returns.mean(), 0.0)
+         downside = returns[returns < 0]
+-        downside_std = _safe_float(downside.std(ddof=0), 0.0)
++        downside_std = _safe_float(returns.std(ddof=0), 0.0)
+         if downside_std == 0:
+             return 0.0
+         excess = mean_ret - self.risk_free_rate / self.periods_per_year

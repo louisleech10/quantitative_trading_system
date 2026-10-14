@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/factor_return_analyzer.py b/momentum/Analysis/factor_return_analyzer.py
+index 3a11e524..ff93e102 100644
+--- a/momentum/Analysis/factor_return_analyzer.py
++++ b/momentum/Analysis/factor_return_analyzer.py
+@@ -246,7 +246,7 @@ class FactorReturnAnalyzer:
+         if not np.isfinite(max_drawdown):
+             max_drawdown = np.nan
+         calmar = (
+-            float(annualized_return / abs(max_drawdown))
++            float(annualized_return / max_drawdown)
+             if np.isfinite(annualized_return)
+             and np.isfinite(max_drawdown)
+             and max_drawdown < 0

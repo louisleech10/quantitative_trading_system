@@ -1,0 +1,27 @@
+diff --git a/tests/phase24/test_factor_return_analyzer.py b/tests/phase24/test_factor_return_analyzer.py
+index b151f8e0..ce8eac89 100644
+--- a/tests/phase24/test_factor_return_analyzer.py
++++ b/tests/phase24/test_factor_return_analyzer.py
+@@ -354,3 +354,22 @@ def test_mutation_lookahead_phase24():
+     assert production_position.tolist() != fs_full.tolist(), (
+         "M-lookahead FALSIFY: production must not equal full-sample qcut"
+     )
++
++
++def test_compute_risk_metrics_calmar_nan_iff_no_drawdown_with_hand_oracle():
++    """無回撤（單調正報酬）⇒ max_drawdown 恰為 0 且 calmar 必為 NaN；有回撤序列之 max_drawdown 與 calmar
++    對純 Python 手算 oracle（逐筆淨值、歷史高點、(1+mean)^P−1 ÷ |MDD|）逐值一致。"""
++    analyzer = FactorReturnAnalyzer({})
++    mono = analyzer.compute_risk_metrics(pd.Series([0.01] * 50), periods_per_year=365)
++    assert mono["max_drawdown"] == 0.0 and np.isnan(mono["calmar_ratio"]), mono
++
++    rets = [0.01, -0.02, 0.005, 0.01, -0.01, 0.015]
++    eq, peak, mdd = 1.0, 1.0, 0.0
++    for r in rets:
++        eq *= 1.0 + r
++        peak = max(peak, eq)
++        mdd = min(mdd, eq / peak - 1.0)
++    mean = sum(rets) / len(rets)
++    calmar_oracle = ((1.0 + mean) ** 365 - 1.0) / abs(mdd)
++    got = analyzer.compute_risk_metrics(pd.Series(rets), periods_per_year=365)
++    assert mdd < 0 and abs(got["max_drawdown"] - mdd) < 1e-12 and abs(got["calmar_ratio"] - calmar_oracle) < 1e-9, (got, mdd, calmar_oracle)

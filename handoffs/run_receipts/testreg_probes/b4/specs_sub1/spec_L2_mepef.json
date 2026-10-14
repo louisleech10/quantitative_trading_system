@@ -1,0 +1,24 @@
+{
+ "path": "tests/momentum/Analysis/test_model_enhancement_performance.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "mutants": [
+  {
+   "id": "m_overall_status_ignores_failed",
+   "file": "api/services/model_enhancement_service.py",
+   "old": "        overall_status = \"failed\" if \"failed\" in statuses else \"completed\"\n",
+   "new": "        overall_status = \"completed\"\n"
+  },
+  {
+   "id": "m_wf_drops_request_config",
+   "file": "api/services/model_enhancement_service.py",
+   "old": "        validator = self.walk_forward_factory(config=self._request_to_config(request))\n",
+   "new": "        validator = self.walk_forward_factory(config=None)\n"
+  },
+  {
+   "id": "m_rolling_ignores_purge",
+   "file": "momentum/Analysis/model_validation/walk_forward_validator.py",
+   "old": "            train_end = train_start + train_size\n            test_start = train_end + self.config.purge_gap\n",
+   "new": "            train_end = train_start + train_size\n            test_start = train_end\n"
+  }
+ ]
+}

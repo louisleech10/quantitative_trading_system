@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+index d6aaadf3..8112a3ea 100644
+--- a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
++++ b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+@@ -175,7 +175,7 @@ class TailRiskIndicatorEngine:
+         rv_down_map: Dict[int, pd.Series] = {}
+         for window in self.rv_windows:
+             rv_up_map[window] = np.sqrt(up_sq.rolling(window).sum())
+-            rv_down_map[window] = np.sqrt(down_sq.rolling(window).sum())
++            rv_down_map[window] = np.sqrt(down_sq.rolling(window).mean())
+         return rv_up_map, rv_down_map
+ 
+     def _compute_gpr(self, returns: pd.Series) -> pd.DataFrame:

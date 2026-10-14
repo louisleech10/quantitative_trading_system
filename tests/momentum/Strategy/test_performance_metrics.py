@@ -238,3 +238,47 @@ def test_trade_dict_fields_path_covered():
 def test_cagr_end_non_positive_returns_zero():
     metrics = PerformanceMetrics(pd.Series([1.0, 0.0]), [])
     assert metrics.cagr() == 0.0
+
+
+def test_max_drawdown_exact_hand_value(sample_equity_curve, sample_trades):
+    """MDD 手算：曲線峰值 1.08 後跌至 1.06 為最深回撤 ⇒ 1.06/1.08 − 1（另一回撤 1.01/1.02 − 1 較淺）"""
+    metrics = _get_metric_instance(sample_equity_curve, sample_trades)
+    assert metrics.max_drawdown() == pytest.approx(1.06 / 1.08 - 1.0, rel=1e-9, abs=1e-12) and metrics.max_drawdown() < 1.01 / 1.02 - 1.0, f"MDD={metrics.max_drawdown()}"
+
+
+def test_expectancy_exact_hand_value(sample_equity_curve, sample_trades):
+    """expectancy 手算：pnl=[0.005, −0.004, 0.008]；勝率 2/3、均贏 0.0065、均虧 0.004
+    ⇒ 2/3×0.0065 − 1/3×0.004 = 0.003"""
+    metrics = PerformanceMetrics(sample_equity_curve, sample_trades)
+    assert metrics.expectancy() == pytest.approx(0.003, rel=1e-9, abs=1e-15), f"expectancy={metrics.expectancy()}"
+
+
+def test_sharpe_ratio_matches_independent_oracle(sample_equity_curve, sample_trades):
+    """Sharpe 獨立 oracle：純 Python 逐期報酬、母體標準差（ddof=0）、rf=0.02/730、×sqrt(730)"""
+    metrics = _get_metric_instance(sample_equity_curve, sample_trades)
+    eq = [1.0, 1.02, 1.01, 1.05, 1.08, 1.06, 1.10]
+    rets = [eq[i] / eq[i - 1] - 1.0 for i in range(1, len(eq))]
+    mean_r = sum(rets) / len(rets)
+    pstd = (sum((r - mean_r) ** 2 for r in rets) / len(rets)) ** 0.5
+    oracle = (mean_r - 0.02 / 730) / pstd * 730 ** 0.5
+    assert metrics.sharpe_ratio() == pytest.approx(oracle, rel=1e-9), f"sharpe={metrics.sharpe_ratio()} oracle={oracle}"
+
+
+def test_sortino_ratio_matches_independent_oracle(sample_equity_curve, sample_trades):
+    """Sortino 獨立 oracle：分母只取負報酬之母體標準差（兩筆負報酬：1.01/1.02−1、1.06/1.08−1）"""
+    metrics = _get_metric_instance(sample_equity_curve, sample_trades)
+    eq = [1.0, 1.02, 1.01, 1.05, 1.08, 1.06, 1.10]
+    rets = [eq[i] / eq[i - 1] - 1.0 for i in range(1, len(eq))]
+    mean_r = sum(rets) / len(rets)
+    downs = [r for r in rets if r < 0]
+    d_mean = sum(downs) / len(downs)
+    d_std = (sum((r - d_mean) ** 2 for r in downs) / len(downs)) ** 0.5
+    oracle = (mean_r - 0.02 / 730) / d_std * 730 ** 0.5
+    assert len(downs) == 2 and metrics.sortino_ratio() == pytest.approx(oracle, rel=1e-9), f"sortino={metrics.sortino_ratio()} oracle={oracle}"
+
+
+def test_cagr_matches_independent_oracle(sample_equity_curve, sample_trades):
+    """CAGR 獨立 oracle：7 點曲線＝6 期，年數＝6/730 ⇒ 1.10 ** (730/6) − 1"""
+    metrics = _get_metric_instance(sample_equity_curve, sample_trades)
+    oracle = 1.10 ** (730.0 / 6.0) - 1.0
+    assert metrics.cagr() == pytest.approx(oracle, rel=1e-9), f"cagr={metrics.cagr()} oracle={oracle}"

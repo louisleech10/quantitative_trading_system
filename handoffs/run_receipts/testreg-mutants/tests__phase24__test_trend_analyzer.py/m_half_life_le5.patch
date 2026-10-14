@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/trend_analyzer.py b/momentum/Analysis/trend_analyzer.py
+index 747193ca..ea36247d 100644
+--- a/momentum/Analysis/trend_analyzer.py
++++ b/momentum/Analysis/trend_analyzer.py
+@@ -195,7 +195,7 @@ class TrendAnalyzer:
+             reason = "IC 改善且擁擠度降低"
+             action = "可維持配置"
+ 
+-        if ic_decay_half_life is not None and np.isfinite(ic_decay_half_life) and ic_decay_half_life < 5:
++        if ic_decay_half_life is not None and np.isfinite(ic_decay_half_life) and ic_decay_half_life <= 5:
+             if recommendation == "正常":
+                 recommendation = "警告"
+                 reason += " + half_life 偏短"

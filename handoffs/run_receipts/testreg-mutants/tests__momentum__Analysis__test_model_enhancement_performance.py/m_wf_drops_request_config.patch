@@ -1,0 +1,13 @@
+diff --git a/api/services/model_enhancement_service.py b/api/services/model_enhancement_service.py
+index 23f650a6..514ce50b 100644
+--- a/api/services/model_enhancement_service.py
++++ b/api/services/model_enhancement_service.py
+@@ -339,7 +339,7 @@ class ModelEnhancementService:
+                 error_type="INSUFFICIENT_DATA",
+             )
+ 
+-        validator = self.walk_forward_factory(config=self._request_to_config(request))
++        validator = self.walk_forward_factory(config=None)
+         return validator.validate(
+             model_factory=model_factory,
+             X=X,

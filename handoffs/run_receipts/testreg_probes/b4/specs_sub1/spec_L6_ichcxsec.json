@@ -1,0 +1,18 @@
+{
+ "path": "tests/momentum/Analysis/test_ichc_xsec_capability.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+ "mutants": [
+  {
+   "id": "m_grouped_ic_bare_dict",
+   "file": "momentum/Analysis/ic_filter_orchestrator.py",
+   "old": "            \"grouped_ic\": dict(_xsec_na),\n",
+   "new": "            \"grouped_ic\": {},\n"
+  },
+  {
+   "id": "m_xsec_reason_dropped",
+   "file": "momentum/Analysis/ic_filter_orchestrator.py",
+   "old": "        _xsec_na = {\"status\": _na_status, \"reason\": \"cross_sectional_mode\"}\n",
+   "new": "        _xsec_na = {\"status\": _na_status}\n"
+  }
+ ]
+}

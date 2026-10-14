@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/data_preprocessor.py b/momentum/Analysis/data_preprocessor.py
+index 6a52fa7c..96c160b0 100644
+--- a/momentum/Analysis/data_preprocessor.py
++++ b/momentum/Analysis/data_preprocessor.py
+@@ -435,7 +435,7 @@ class DataPreprocessor:
+     ) -> pd.Series:
+         mode = self.resolve_fit_mode(fit_mode=fit_mode, fit_mask=fit_mask)
+ 
+-        if mode == "pit_expanding":
++        if mode in ("pit_expanding", "full_sample"):
+             return self._clip_series_pit(series, method, lower, upper)
+ 
+         if mode == "train_mask":

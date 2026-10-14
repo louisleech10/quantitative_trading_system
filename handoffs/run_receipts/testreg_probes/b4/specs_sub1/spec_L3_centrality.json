@@ -1,0 +1,18 @@
+{
+ "path": "tests/phase24/test_factor_centrality_analyzer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "mutants": [
+  {
+   "id": "m_regime_strict_gt",
+   "file": "momentum/Analysis/factor_centrality_analyzer.py",
+   "old": "        regime = \"crowded\" if crowding_ratio >= 0.5 else \"normal\"\n",
+   "new": "        regime = \"crowded\" if crowding_ratio > 0.5 else \"normal\"\n"
+  },
+  {
+   "id": "m_trend_sign_flipped",
+   "file": "momentum/Analysis/factor_centrality_analyzer.py",
+   "old": "        trend = \"rising\" if slope > 0 else \"falling\" if slope < 0 else \"flat\"\n",
+   "new": "        trend = \"rising\" if slope < 0 else \"falling\" if slope > 0 else \"flat\"\n"
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/monotonicity_tester.py b/momentum/Analysis/monotonicity_tester.py
+index 4b478a08..4d54dfc6 100644
+--- a/momentum/Analysis/monotonicity_tester.py
++++ b/momentum/Analysis/monotonicity_tester.py
+@@ -151,7 +151,7 @@ class MonotonicityTester:
+ 
+         spread = float(high_values.mean() - low_values.mean())
+         ttest = stats.ttest_ind(
+-            high_values, low_values, nan_policy="omit"
++            low_values, high_values, nan_policy="omit"
+         )
+         tstat = float(ttest.statistic)
+         pvalue = float(ttest.pvalue)

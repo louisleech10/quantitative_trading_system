@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/model_validation/walk_forward_validator.py b/momentum/Analysis/model_validation/walk_forward_validator.py
+index 1b212ea6..e8fb884a 100644
+--- a/momentum/Analysis/model_validation/walk_forward_validator.py
++++ b/momentum/Analysis/model_validation/walk_forward_validator.py
+@@ -175,7 +175,7 @@ class WalkForwardValidator:
+         period_index = 0
+         train_end = initial_train_size
+         while True:
+-            test_start = train_end + self.config.purge_gap
++            test_start = train_end
+             test_end = test_start + test_size
+             if test_end > n_samples:
+                 break

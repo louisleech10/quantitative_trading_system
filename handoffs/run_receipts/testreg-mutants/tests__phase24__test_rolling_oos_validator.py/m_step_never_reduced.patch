@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/rolling_oos_validator.py b/momentum/Analysis/rolling_oos_validator.py
+index 39f56ac3..9a4c214b 100644
+--- a/momentum/Analysis/rolling_oos_validator.py
++++ b/momentum/Analysis/rolling_oos_validator.py
+@@ -181,7 +181,7 @@ class RollingOOSValidator:
+ 
+             if len(splits) >= self._min_splits or step <= 1:
+                 break
+-            step = max(1, step // 2)
++            step = max(1, step)
+ 
+         return splits
+ 

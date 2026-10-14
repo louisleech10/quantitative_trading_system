@@ -1,0 +1,18 @@
+{
+  "path": "tests/momentum/Analysis/test_icfirstalign_fu2.py",
+  "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+  "mutants": [
+    {
+      "id": "m_carrier_close_off_by_one",
+      "file": "momentum/Analysis/ic_filter_orchestrator.py",
+      "old": "        pd.to_numeric(raw_data[\"close\"], errors=\"coerce\").to_numpy(dtype=np.float64),\n        index=source_index,\n",
+      "new": "        pd.to_numeric(raw_data[\"close\"], errors=\"coerce\").shift(1).to_numpy(dtype=np.float64),\n        index=source_index,\n"
+    },
+    {
+      "id": "m_carrier_rekey_ffill",
+      "file": "momentum/Analysis/ic_filter_orchestrator.py",
+      "old": "        keyed.reindex(_utc_instant_key(feature_index)).to_numpy(dtype=np.float64),\n",
+      "new": "        keyed.reindex(_utc_instant_key(feature_index), method=\"ffill\").to_numpy(dtype=np.float64),\n"
+    }
+  ]
+}

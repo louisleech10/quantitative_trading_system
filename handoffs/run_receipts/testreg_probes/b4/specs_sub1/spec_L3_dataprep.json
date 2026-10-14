@@ -1,0 +1,18 @@
+{
+ "path": "tests/momentum/test_data_preprocessor.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+ "mutants": [
+  {
+   "id": "m_static_percentile_no_upper_clip",
+   "file": "momentum/Analysis/data_preprocessor.py",
+   "old": "            return series.clip(lo, hi)\n",
+   "new": "            return series.clip(lo, None)\n"
+  },
+  {
+   "id": "m_full_sample_routed_to_pit",
+   "file": "momentum/Analysis/data_preprocessor.py",
+   "old": "        if mode == \"pit_expanding\":\n            return self._clip_series_pit(series, method, lower, upper)\n",
+   "new": "        if mode in (\"pit_expanding\", \"full_sample\"):\n            return self._clip_series_pit(series, method, lower, upper)\n"
+  }
+ ]
+}

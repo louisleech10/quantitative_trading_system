@@ -1,0 +1,95 @@
+diff --git a/tests/momentum/event_samples/test_event_disposition_ledger.py b/tests/momentum/event_samples/test_event_disposition_ledger.py
+index 8570c669..3b3453c3 100644
+--- a/tests/momentum/event_samples/test_event_disposition_ledger.py
++++ b/tests/momentum/event_samples/test_event_disposition_ledger.py
+@@ -358,3 +358,90 @@ def test_returned_values_are_defensive_copy_not_cache_alias() -> None:
+     assert disposition_values()["observed"]["consumed"] == base_observed["consumed"], (
+         "再次取得之值集仍帶有前次突變"
+     )
++
++
++def test_hermetic_contract_change_takes_effect_without_manual_cache_clear(tmp_path, monkeypatch) -> None:
++    """密閉版（不改入庫契約）：模組契約路徑指向 tmp 複本；改複本後同行程**立即**生效、還原後回原值。
++
++    同時釘住「快取鍵與實際讀檔須出自同一契約路徑」——鍵若另算自他處，改複本會回舊值。
++    """
++    import json as _json
++    import time as _time
++
++    from momentum.Analysis.event_samples import event_disposition as _ed_mod
++    from momentum.Analysis.event_samples.event_disposition import observed_values as _obs
++
++    probe = tmp_path / "split_unify.json"
++    orig = CONTRACT.read_text(encoding="utf-8")
++    probe.write_text(orig, encoding="utf-8")
++    monkeypatch.setattr(_ed_mod, "_CONTRACT", probe)
++    warm = _obs()                                   # warm cache（不清）
++    raw = _json.loads(orig)
++    raw["event_disposition_values"]["ic_disposition"].append("probe_only_value")
++    raw["event_disposition_values"]["observed"]["row_missing"] = "probe_only_value"
++    _time.sleep(0.01)
++    probe.write_text(_json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    got = _obs()                                    # 不清快取
++    probe.write_text(orig, encoding="utf-8")
++    assert got["row_missing"] == "probe_only_value" and _obs() == warm, f"got={got} warm={warm}"
++
++
++def test_hermetic_contract_change_with_preserved_mtime_still_takes_effect(tmp_path, monkeypatch) -> None:
++    """密閉版：tmp 複本內容變更而 mtime 被保留時，快取仍須失效。"""
++    import json as _json
++    import os as _os
++
++    from momentum.Analysis.event_samples import event_disposition as _ed_mod
++    from momentum.Analysis.event_samples.event_disposition import observed_values as _obs
++
++    probe = tmp_path / "split_unify.json"
++    orig = CONTRACT.read_text(encoding="utf-8")
++    probe.write_text(orig, encoding="utf-8")
++    monkeypatch.setattr(_ed_mod, "_CONTRACT", probe)
++    warm = _obs()
++    st = probe.stat()
++    raw = _json.loads(orig)
++    raw["event_disposition_values"]["ic_disposition"].append("probe_mtime_value")
++    raw["event_disposition_values"]["observed"]["row_missing"] = "probe_mtime_value"
++    probe.write_text(_json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    _os.utime(probe, ns=(st.st_atime_ns, st.st_mtime_ns))
++    same_mtime = probe.stat().st_mtime_ns == st.st_mtime_ns
++    got = _obs()
++    assert same_mtime and got["row_missing"] == "probe_mtime_value" and warm["row_missing"] != got["row_missing"], \
++        f"mtime 保留時回舊值：{got} vs warm={warm}"
++
++
++def test_hermetic_duplicate_json_key_in_contract_is_fail_closed(tmp_path, monkeypatch) -> None:
++    """密閉版：tmp 複本含重複 JSON 成員 ⇒ observed_values fail-closed（ValueError「重複 JSON 鍵」）。"""
++    from momentum.Analysis.event_samples import event_disposition as _ed_mod
++    from momentum.Analysis.event_samples.event_disposition import observed_values as _obs
++
++    probe = tmp_path / "split_unify.json"
++    orig = CONTRACT.read_text(encoding="utf-8")
++    probe.write_text(orig.replace('"consumed": "ic_consumed",',
++                                  '"consumed": "ic_consumed",\n      "consumed": "align_failed",', 1),
++                     encoding="utf-8")
++    monkeypatch.setattr(_ed_mod, "_CONTRACT", probe)
++    disposition_values.cache_clear()
++    pytest.raises(ValueError, _obs).match("重複 JSON 鍵")
++
++
++def test_hermetic_observed_semantics_survive_contract_reordering(tmp_path, monkeypatch) -> None:
++    """密閉版：tmp 複本之 observed 鍵以相反順序重建 ⇒ 語意（具名鍵）不變。"""
++    import json as _json
++
++    from momentum.Analysis.event_samples import event_disposition as _ed_mod
++    from momentum.Analysis.event_samples.event_disposition import observed_values as _obs
++
++    probe = tmp_path / "split_unify.json"
++    orig = CONTRACT.read_text(encoding="utf-8")
++    probe.write_text(orig, encoding="utf-8")
++    monkeypatch.setattr(_ed_mod, "_CONTRACT", probe)
++    raw = _json.loads(orig)
++    ov = raw["event_disposition_values"]["observed"]
++    base = {"consumed": ov["consumed"], "row_missing": ov["row_missing"]}   # 獨立 oracle：直接讀原檔之具名鍵
++    raw["event_disposition_values"]["observed"] = {"row_missing": ov["row_missing"], "consumed": ov["consumed"]}
++    probe.write_text(_json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    disposition_values.cache_clear()
++    assert _obs() == base and list(disposition_values()["observed"]) == ["row_missing", "consumed"], \
++        "契約鍵順序調換後語意被反轉——順序依賴未消除"

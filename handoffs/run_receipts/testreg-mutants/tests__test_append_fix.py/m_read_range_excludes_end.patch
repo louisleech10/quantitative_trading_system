@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_storage.py b/momentum/DataExtraction/kline_storage.py
+index c2fd4023..9a8435fe 100644
+--- a/momentum/DataExtraction/kline_storage.py
++++ b/momentum/DataExtraction/kline_storage.py
+@@ -1098,7 +1098,7 @@ class KlineStorageManager:
+                 end_value = int(end_time.timestamp()) if isinstance(end_time, datetime) else int(end_time)
+ 
+             if start_value is not None and end_value is not None:
+-                df = df[(df['timestamp'] >= start_value) & (df['timestamp'] <= end_value)]
++                df = df[(df['timestamp'] >= start_value) & (df['timestamp'] < end_value)]
+             elif start_value is not None:
+                 df = df[df['timestamp'] >= start_value]
+             elif end_value is not None:

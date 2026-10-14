@@ -173,3 +173,26 @@ def test_mutation_guard_removed_all_nan_passes_silently(production: Tuple[Any, p
     broken["close"] = np.nan
     carrier = ifo._build_close_carrier(broken, orch._ic_cache["features_df"].index)
     assert carrier.isna().all()
+
+
+def test_production_carrier_keys_by_timestamp_not_position(production: Tuple[Any, pd.DataFrame]) -> None:
+    """TESTREG 純增改寫：生產 carrier 依時間戳（非位置）取 close——經真實 analyze 與真實 `_build_close_carrier`。
+
+    舊 mutation 探針只呼叫測試自寫之替身、未經生產碼。本測試：
+    ① 真實 production analyze 之 `_ic_cache["close_series"]` 須有有限值且於每個特徵時間戳等於獨立依時間戳取之 kline close；
+    ② 自真實 kline 挖掉落在特徵軸上之部分時間戳列（列位置因而位移）後呼叫生產 `_build_close_carrier`：
+       被挖之時間戳須為 NaN、其餘逐值等於 kline close——位置式 reindex 必然對不上。
+    """
+    orch, raw = production
+    carrier = orch._ic_cache["close_series"]
+    index = orch._ic_cache["features_df"].index
+    assert np.isfinite(carrier.to_numpy(dtype=np.float64)).any() and np.array_equal(carrier.to_numpy(dtype=np.float64), _kline_close_at(raw, carrier.index).to_numpy(dtype=np.float64), equal_nan=True), "生產 carrier 未依時間戳取 kline close"
+
+    ts = pd.to_numeric(raw["timestamp"])
+    raw_dt = pd.DatetimeIndex(pd.to_datetime(ts, unit="ms" if ts.max() > 10**11 else "s"))
+    key = index.tz_convert("UTC").tz_localize(None) if index.tz is not None else index
+    gapped = raw.loc[~np.asarray(raw_dt.isin(key[len(key) // 4: len(key) // 2: 5]))]
+    full = _kline_close_at(raw, index).to_numpy(dtype=np.float64)
+    expected = _kline_close_at(gapped, index).to_numpy(dtype=np.float64)
+    n_gap = int((np.isfinite(full) & np.isnan(expected)).sum())
+    assert n_gap > 0 and np.array_equal(ifo._build_close_carrier(gapped, index).to_numpy(dtype=np.float64), expected, equal_nan=True), "挖列後 carrier 與依時間戳之 kline close 不符（位置式對齊）"

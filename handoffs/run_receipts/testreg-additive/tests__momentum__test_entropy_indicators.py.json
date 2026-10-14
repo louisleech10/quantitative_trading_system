@@ -1,0 +1,32 @@
+{
+ "added_nodeids": [
+  "tests/momentum/test_entropy_indicators.py::test_hurst_low_r_squared_matches_independent_rs_oracle"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+ "baseline_session_id": "f28b71c9-b46f-4e31-98c2-48f1c12bdb92",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__test_entropy_indicators.py.compare.patch",
+ "compare_patch_sha256": "c1bacbcdcb4098f0cd93e8e2752b9b666b3ef40e770695a732f03010148dddb3",
+ "fingerprint": "118573477e8614a2992dd9cc74f3e82c3be0c550a56604f4e4fe9936b793498a",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_hurst_r2_threshold_lowered",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_entropy_indicators.py/m_hurst_r2_threshold_lowered.patch",
+   "patch_sha256": "2ae52ad0ad280ed6a9b342aa16e0a6e1908899f31e784414ec6e6be716607bf7",
+   "session_id": "b31c4002-2eed-4681-9b87-9bb1a2b2ea26"
+  },
+  {
+   "id": "m_hurst_std_ddof1",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_entropy_indicators.py/m_hurst_std_ddof1.patch",
+   "patch_sha256": "d51e77eb396bd1d5865061b1c6f4b7373f434493878a004f0894464408113b55",
+   "session_id": "3c91d087-475a-44ae-b9a6-b2de5d5c48f5"
+  },
+  {
+   "id": "m_hurst_no_demean",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__test_entropy_indicators.py/m_hurst_no_demean.patch",
+   "patch_sha256": "f3128241b82690132d9655b96c27df274e496bc5fff42883cd657118b78f7324",
+   "session_id": "26f9b8c1-b4eb-4686-b0b0-cd7c41e0e066"
+  }
+ ],
+ "path": "tests/momentum/test_entropy_indicators.py"
+}

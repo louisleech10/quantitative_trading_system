@@ -1,0 +1,24 @@
+{
+ "path": "tests/momentum/test_entropy_indicators.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+ "mutants": [
+  {
+   "id": "m_hurst_r2_threshold_lowered",
+   "file": "momentum/FeatureEngineering/atomic/entropy_indicators.py",
+   "old": "        if r_squared < 0.1:\n",
+   "new": "        if r_squared < 0.01:\n"
+  },
+  {
+   "id": "m_hurst_std_ddof1",
+   "file": "momentum/FeatureEngineering/atomic/entropy_indicators.py",
+   "old": "            s = trimmed.std(axis=1)\n",
+   "new": "            s = trimmed.std(axis=1, ddof=1)\n"
+  },
+  {
+   "id": "m_hurst_no_demean",
+   "file": "momentum/FeatureEngineering/atomic/entropy_indicators.py",
+   "old": "            demeaned = trimmed - trimmed.mean(axis=1, keepdims=True)\n",
+   "new": "            demeaned = trimmed\n"
+  }
+ ]
+}

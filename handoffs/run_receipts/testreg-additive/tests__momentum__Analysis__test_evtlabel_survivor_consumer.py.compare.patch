@@ -1,0 +1,49 @@
+diff --git a/tests/momentum/Analysis/test_evtlabel_survivor_consumer.py b/tests/momentum/Analysis/test_evtlabel_survivor_consumer.py
+index 53196cd2..a85bcfa2 100644
+--- a/tests/momentum/Analysis/test_evtlabel_survivor_consumer.py
++++ b/tests/momentum/Analysis/test_evtlabel_survivor_consumer.py
+@@ -112,3 +112,44 @@ def test_consumer_itself_is_not_modified_by_this_ticket():
+     src = inspect.getsource(_survivor_feature_names)
+     assert "imported_binary_label" not in src, "consumer 不該認得本票的 label_source"
+     assert "label_binary" not in src, "consumer 不該依賴本票新增的欄位"
++
++
++from momentum.Analysis.survivor_contract import (  # noqa: E402
++    build_survivor_output as _build_survivor_output_new,
++    compute_event_identity as _compute_event_identity_new,
++)
++
++
++def test_binary_provenance_survives_producer_payload_into_consumer():
++    """TESTREG 4.2 純增：四鍵由**生產寫出端** `build_survivor_output` 組出（非測試自建字典）。
++
++    oracle＝輸入之 `event_filter.label_binary` 逐值比對；再把同一份 payload 餵 consumer，
++    證明寫出端之 schema_version 與接收端要求一致（端到端交接）。
++    """
++    import pandas as pd
++
++    stamps = [1704067200000 + i * 43200000 for i in range(40)]
++    label_binary_in = {"import_id": "imp-1", "n_pos": 136, "n_neg": 29, "label_origin_values": ["0", "1"]}
++    payload = _build_survivor_output_new(
++        report_meta={
++            "symbol": "ETHUSDT", "timeframe": "12h", "n_samples": len(stamps),
++            "event_filter": {"applied": True, "label_source": "imported_binary_label",
++                             "statistic_kind": "binary_discrimination", "label_binary": dict(label_binary_in)},
++        },
++        filtered_features=["f_a", "f_b"], marginal_ic_result=None, composite_result=None,
++        summary_by_feature={}, root_analysis_status="degraded_full_sample",
++        event_identity=_compute_event_identity_new(None, stamps),
++        split_context={"full_index": pd.Index(stamps, dtype="int64")},
++        event_context={
++            "event_manifest_hash": "1" * 64, "label_definition_hash": "2" * 64,
++            "decision_time_rule": "t0_open_minus_k_bars", "feature_cutoff_rule": "max_close_le_decision_at",
++            "label_window_rule": "close_to_close:horizon_bars=2", "control_kind": "user_labeled_same_trigger",
++        },
++        config_hash="c" * 8, features_source_hash="f" * 64, features_path=None, labels_content_hash="l" * 64,
++        symbol="ETHUSDT", timeframe="12h", case_id="ic_gatekeeper", generated_at="2026-10-14T00:00:00Z",
++        fit_mode="full_sample", pit_stats_version=None, ic_method="spearman", label_horizon=2,
++        label_return_type="log", report_ref="ic_report_ic_gatekeeper.json",
++    )
++    lb = payload["sample_scope"]["event"]["label_binary"]
++    assert set(lb) == {"import_id", "n_pos", "n_neg", "label_origin_values"} and lb == label_binary_in
++    assert payload["schema_version"] == SURVIVOR_SCHEMA_VERSION_REQUIRED and _survivor_feature_names(payload) == ["f_a", "f_b"]

@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_download_service.py b/momentum/DataExtraction/kline_download_service.py
+index de7d5fc3..0f59ef6f 100644
+--- a/momentum/DataExtraction/kline_download_service.py
++++ b/momentum/DataExtraction/kline_download_service.py
+@@ -267,7 +267,7 @@ class KlineDownloadService:
+             provider._validate_dataframe(df)
+ 
+             # 6. 自動保存到HDF5（使用append模式避免覆蓋已有數據）
+-            if save_to_storage and not df.empty and self.storage:
++            if save_to_storage and df.empty and self.storage:
+                 try:
+                     self.storage.append_klines(symbol, timeframe, df)
+                     self.logger.info(

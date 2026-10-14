@@ -1,0 +1,13 @@
+diff --git a/momentum/Strategy/vectorized_backtest.py b/momentum/Strategy/vectorized_backtest.py
+index dbdc222e..2d365568 100644
+--- a/momentum/Strategy/vectorized_backtest.py
++++ b/momentum/Strategy/vectorized_backtest.py
+@@ -259,7 +259,7 @@ class VectorizedBacktest:
+                 if stop_loss is not None:
+                     maybe_trailing = RiskManager.calculate_trailing_stop(
+                         entry_price=entry_price,
+-                        current_high=high,
++                        current_high=close,
+                         atr=max(atr_value, 0.0) if not pd.isna(atr_value) else 0.0,
+                         activation_multiplier=trailing_activation,
+                     )

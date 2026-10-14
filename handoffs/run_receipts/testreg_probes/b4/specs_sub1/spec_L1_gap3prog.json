@@ -1,0 +1,24 @@
+{
+ "path": "tests/api/test_gap3_ic_progress_fields.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "mutants": [
+  {
+   "id": "m_implicit_no_reload",
+   "file": "api/services/ic_analysis_service.py",
+   "old": "        config_hash = (getattr(request, \"config_hash\", None) or \"\").strip()\n        self._feature_library.reload_registry()\n",
+   "new": "        config_hash = (getattr(request, \"config_hash\", None) or \"\").strip()\n"
+  },
+  {
+   "id": "m_full_analysis_count_none",
+   "file": "api/services/ic_analysis_service.py",
+   "old": "            \"feature_count\": _resolve_feature_count(request, entrypoint=\"full_analysis\"),\n",
+   "new": "            \"feature_count\": None,\n"
+  },
+  {
+   "id": "m_resolver_explicit_hash_only",
+   "file": "api/services/ic_analysis_service.py",
+   "old": "    return ic_analysis_service.resolve_planned_feature_count(request, entrypoint=entrypoint)\n",
+   "new": "    return resolve_run_feature_count(config_hash=getattr(request, \"config_hash\", None))\n"
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "path": "tests/api/test_scan_cube.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "mutants": [
+  {
+   "id": "m_scan_grid_no_strip",
+   "file": "api/services/ic_analysis_service.py",
+   "old": "        cube = self._build_scan_cube(task_id, request, results)\n        for cell in results:\n            cell.pop(\"report\", None)  # ← 少這行，GB 級 report 會進 HTTP status\n",
+   "new": "        cube = self._build_scan_cube(task_id, request, results)\n"
+  },
+  {
+   "id": "m_scan_grid_strip_before_build",
+   "file": "api/services/ic_analysis_service.py",
+   "old": "        cube = self._build_scan_cube(task_id, request, results)\n        for cell in results:\n            cell.pop(\"report\", None)  # ← 少這行，GB 級 report 會進 HTTP status\n",
+   "new": "        for cell in results:\n            cell.pop(\"report\", None)  # ← 少這行，GB 級 report 會進 HTTP status\n        cube = self._build_scan_cube(task_id, request, results)\n"
+  }
+ ]
+}

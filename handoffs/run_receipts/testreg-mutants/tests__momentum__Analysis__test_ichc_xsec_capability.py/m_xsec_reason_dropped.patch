@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/ic_filter_orchestrator.py b/momentum/Analysis/ic_filter_orchestrator.py
+index 0d4d3896..33738d85 100644
+--- a/momentum/Analysis/ic_filter_orchestrator.py
++++ b/momentum/Analysis/ic_filter_orchestrator.py
+@@ -2341,7 +2341,7 @@ class ICFilterOrchestrator:
+ 
+         _na_status = "not_applicable"
+         assert _na_status in contract_enum("capability_status")
+-        _xsec_na = {"status": _na_status, "reason": "cross_sectional_mode"}
++        _xsec_na = {"status": _na_status}
+ 
+         analysis_results = {
+             "filter_log": {

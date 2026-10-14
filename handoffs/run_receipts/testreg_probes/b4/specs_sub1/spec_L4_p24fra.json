@@ -1,0 +1,24 @@
+{
+ "path": "tests/phase24/test_factor_return_analyzer.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+ "mutants": [
+  {
+   "id": "m_drawdown_missing_minus_one",
+   "file": "momentum/Analysis/factor_return_analyzer.py",
+   "old": "            drawdown = equity / rolling_peak - 1.0\n",
+   "new": "            drawdown = equity / rolling_peak\n"
+  },
+  {
+   "id": "m_peak_cummin",
+   "file": "momentum/Analysis/factor_return_analyzer.py",
+   "old": "        rolling_peak = equity.cummax()\n",
+   "new": "        rolling_peak = equity.cummin()\n"
+  },
+  {
+   "id": "m_calmar_signed_mdd",
+   "file": "momentum/Analysis/factor_return_analyzer.py",
+   "old": "            float(annualized_return / abs(max_drawdown))\n",
+   "new": "            float(annualized_return / max_drawdown)\n"
+  }
+ ]
+}

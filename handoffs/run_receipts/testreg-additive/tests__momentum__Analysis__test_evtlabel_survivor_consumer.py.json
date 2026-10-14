@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Analysis/test_evtlabel_survivor_consumer.py::test_binary_provenance_survives_producer_payload_into_consumer"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r14/synth.md",
+ "baseline_session_id": "ff1d0324-e886-4835-8ff8-93fe1ecfbf28",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Analysis__test_evtlabel_survivor_consumer.py.compare.patch",
+ "compare_patch_sha256": "e2746622fe9e034815591e1680fefe87324549fc8e77c8002a51f33fcb4f52cc",
+ "fingerprint": "6e6eb7f841720c6772dc18a9efde69a4777e3cb9007dda1b024af8cd5f6a421d",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_consumer_version_drift",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_evtlabel_survivor_consumer.py/m_consumer_version_drift.patch",
+   "patch_sha256": "b5584cd8df918a559cba743b86a7af413833586415be67ed7dd5a9ff07fb1e54",
+   "session_id": "9b542c71-7ffa-46d6-96f8-2f787d3c3174"
+  },
+  {
+   "id": "m_label_binary_wrong_source_gate",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Analysis__test_evtlabel_survivor_consumer.py/m_label_binary_wrong_source_gate.patch",
+   "patch_sha256": "b7400fb3530f15f5dbade4a8eb57fc44d9ccf20eba03db3f894aa4b3a3aecc7c",
+   "session_id": "f057a3f9-219c-4fe2-904b-18fb16ac3ae8"
+  }
+ ],
+ "path": "tests/momentum/Analysis/test_evtlabel_survivor_consumer.py"
+}

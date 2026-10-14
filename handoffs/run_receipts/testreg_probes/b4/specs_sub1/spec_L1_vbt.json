@@ -1,0 +1,30 @@
+{
+ "path": "tests/momentum/Strategy/test_vectorized_backtest.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "mutants": [
+  {
+   "id": "m_trailing_uses_close",
+   "file": "momentum/Strategy/vectorized_backtest.py",
+   "old": "                        current_high=high,\n",
+   "new": "                        current_high=close,\n"
+  },
+  {
+   "id": "m_cost_single_side",
+   "file": "momentum/Strategy/vectorized_backtest.py",
+   "old": "            trade_pnl_pct_raw = (exit_price - entry_price) / entry_price\n            total_cost = (self.commission + self.slippage) * 2\n",
+   "new": "            trade_pnl_pct_raw = (exit_price - entry_price) / entry_price\n            total_cost = (self.commission + self.slippage)\n"
+  },
+  {
+   "id": "m_pnl_map_overwrite",
+   "file": "momentum/Strategy/vectorized_backtest.py",
+   "old": "            pnl_map[idx] = pnl_map.get(idx, 0.0) + float(trade.pnl_pct)\n",
+   "new": "            pnl_map[idx] = float(trade.pnl_pct)\n"
+  },
+  {
+   "id": "m_curve_uses_pnl",
+   "file": "momentum/Strategy/vectorized_backtest.py",
+   "old": "            pnl_map[idx] = pnl_map.get(idx, 0.0) + float(trade.pnl_pct)\n",
+   "new": "            pnl_map[idx] = pnl_map.get(idx, 0.0) + float(trade.pnl)\n"
+  }
+ ]
+}

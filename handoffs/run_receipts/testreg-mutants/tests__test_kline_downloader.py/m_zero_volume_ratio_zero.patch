@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/providers/binance_provider.py b/momentum/DataExtraction/providers/binance_provider.py
+index dc27ad87..4416b208 100644
+--- a/momentum/DataExtraction/providers/binance_provider.py
++++ b/momentum/DataExtraction/providers/binance_provider.py
+@@ -478,7 +478,7 @@ class BinanceProvider(KlineProviderBase):
+         df['taker_ratio'] = np.where(
+             df['volume'] > 0,
+             df['taker_buy_volume'] / df['volume'],
+-            0.5  # volume=0時默認0.5（中性）
++            0.0  # volume=0時默認0.5（中性）
+         ).astype('float32')
+ 
+         # 確保taker_ratio在0-1範圍

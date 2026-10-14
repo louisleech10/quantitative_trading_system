@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/expectancy_calculator.py b/momentum/Analysis/expectancy_calculator.py
+index 8628028e..bca6201e 100644
+--- a/momentum/Analysis/expectancy_calculator.py
++++ b/momentum/Analysis/expectancy_calculator.py
+@@ -78,7 +78,7 @@ class ExpectancyCalculator:
+                 note="無符合閾值交易，期望值為 0"
+             )
+ 
+-        wins = trade_returns[trade_returns > 0]
++        wins = trade_returns[trade_returns >= 0]
+         losses = trade_returns[trade_returns <= 0]
+ 
+         win_rate = float(len(wins) / total_trades)

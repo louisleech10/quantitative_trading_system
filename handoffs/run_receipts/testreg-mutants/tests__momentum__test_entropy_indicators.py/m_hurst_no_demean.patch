@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/entropy_indicators.py b/momentum/FeatureEngineering/atomic/entropy_indicators.py
+index 83ea708d..19f64951 100644
+--- a/momentum/FeatureEngineering/atomic/entropy_indicators.py
++++ b/momentum/FeatureEngineering/atomic/entropy_indicators.py
+@@ -279,7 +279,7 @@ class EntropyIndicatorEngine:
+             if num_chunks < 2:
+                 continue
+             trimmed = values[: num_chunks * size].reshape(num_chunks, size)
+-            demeaned = trimmed - trimmed.mean(axis=1, keepdims=True)
++            demeaned = trimmed
+             cumulative = np.cumsum(demeaned, axis=1)
+             r = cumulative.max(axis=1) - cumulative.min(axis=1)
+             s = trimmed.std(axis=1)

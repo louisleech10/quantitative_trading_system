@@ -1,0 +1,39 @@
+{
+ "added_nodeids": [
+  "tests/momentum/Strategy/test_vectorized_backtest.py::test_calculate_equity_curve_compounds_known_exit_pnl_pct",
+  "tests/momentum/Strategy/test_vectorized_backtest.py::test_trailing_stop_exact_trade_path_and_cost_pnl"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+ "baseline_session_id": "bbfbe61d-ad93-4238-8e8e-62e5ce57dfac",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__momentum__Strategy__test_vectorized_backtest.py.compare.patch",
+ "compare_patch_sha256": "74a023f419ff2ed5eed61d808e735c177427b7f66b8773f598979e3a5a066c81",
+ "fingerprint": "97d17a7d96961c22765bc60bc852e2dd4fa06a2412fd1a007033fa63143f59c9",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_trailing_uses_close",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_vectorized_backtest.py/m_trailing_uses_close.patch",
+   "patch_sha256": "c1e239c5158b065a298f4f46b23ccc7b90904c8ae04da72fc61291f785f5caf9",
+   "session_id": "bcd72da7-1235-4308-a1a5-8fc3bb62c4e3"
+  },
+  {
+   "id": "m_cost_single_side",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_vectorized_backtest.py/m_cost_single_side.patch",
+   "patch_sha256": "d7a3021b8832ac265d0cbdc28f64b80e4065ac5cf0b977fb0ff319291b98af07",
+   "session_id": "c6a6a1f1-105c-4217-86fb-2ba8c214426d"
+  },
+  {
+   "id": "m_pnl_map_overwrite",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_vectorized_backtest.py/m_pnl_map_overwrite.patch",
+   "patch_sha256": "52c0a07f90946067c40ce1410f66d63adb91ea597cc3e70b6b45686b72d18c57",
+   "session_id": "cd27f77a-72e9-48b3-ac2f-c7144aabcbcc"
+  },
+  {
+   "id": "m_curve_uses_pnl",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__momentum__Strategy__test_vectorized_backtest.py/m_curve_uses_pnl.patch",
+   "patch_sha256": "547c5dda0dbd543d24e4fc21e7c3c63ef0722f7b3f663e4e0b483e76704d19a6",
+   "session_id": "c512903e-a4cd-487c-a04e-fc8bd9a348ba"
+  }
+ ],
+ "path": "tests/momentum/Strategy/test_vectorized_backtest.py"
+}

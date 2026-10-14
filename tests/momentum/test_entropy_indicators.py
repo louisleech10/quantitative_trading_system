@@ -109,3 +109,55 @@ def test_perm_entropy_constant_values() -> None:
 def test_perm_entropy_invalid_m() -> None:
     with pytest.raises(ValueError):
         _engine(perm_m=1)
+
+
+def test_hurst_low_r_squared_matches_independent_rs_oracle() -> None:
+    """ent_hurst_55 逐列對獨立純 Python R/S 實作（不呼叫生產碼）：暖機後之 NaN 位置（R²<0.1 置 NaN 分支）
+    與數值皆須一致，且暖機後同時存在 NaN 與有限值（分支真被鑑別，非只靠暖機 NaN）。"""
+    import math as _m
+
+    def _oracle(vals):
+        v = [float(x) for x in vals if _m.isfinite(x)]
+        n = len(v)
+        if n < 20:
+            return float("nan")
+        hi = max(n // 2, 10)
+        sizes = sorted({int(_m.floor(10 ** (1.0 + (_m.log10(hi) - 1.0) * j / 5))) for j in range(6)})
+        xs, ys = [], []
+        for size in sizes:
+            if size < 10 or size >= n or n // size < 2:
+                continue
+            rs_list = []
+            for c in range(n // size):
+                chunk = v[c * size:(c + 1) * size]
+                mu = sum(chunk) / size
+                acc, cmax, cmin = 0.0, -float("inf"), float("inf")
+                for x in chunk:
+                    acc += x - mu
+                    cmax, cmin = max(cmax, acc), min(cmin, acc)
+                sd = _m.sqrt(sum((x - mu) ** 2 for x in chunk) / size)
+                if sd != 0.0:
+                    rs_list.append((cmax - cmin) / sd)
+            if rs_list and sum(rs_list) > 0:
+                xs.append(_m.log(size))
+                ys.append(_m.log(sum(rs_list) / len(rs_list)))
+        if len(xs) < 2:
+            return float("nan")
+        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+        slope = sum((a - mx) * (b - my) for a, b in zip(xs, ys)) / sum((a - mx) ** 2 for a in xs)
+        icp = my - slope * mx
+        ss_res = sum((b - (slope * a + icp)) ** 2 for a, b in zip(xs, ys))
+        ss_tot = sum((b - my) ** 2 for b in ys)
+        r2 = 1.0 - ss_res / ss_tot if ss_tot != 0 else 0.0
+        return float("nan") if r2 < 0.1 else slope
+
+    data = _make_data()
+    data["close"] = np.random.uniform(99.9, 100.1, len(data))
+    prod = _engine().compute_all(data)["ent_hurst_55"].to_numpy()
+    ret = data["close"].astype(float).pct_change().to_numpy()
+    w = 55
+    orc = np.full(len(ret), np.nan)
+    for i in range(w, len(ret)):
+        orc[i] = _oracle(ret[i - w + 1:i + 1])
+    post = prod[w:]
+    assert np.isnan(post).any() and np.isfinite(post).any() and np.array_equal(np.isnan(prod), np.isnan(orc)) and np.allclose(prod[np.isfinite(orc)], orc[np.isfinite(orc)], rtol=1e-9, atol=1e-12), (int(np.isnan(post).sum()), int(np.isnan(orc[w:]).sum()))

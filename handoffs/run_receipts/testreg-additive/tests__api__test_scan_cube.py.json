@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/api/test_scan_cube.py::test_wiring_run_scan_grid_persists_cube_then_strips_report"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+ "baseline_session_id": "45e43a1f-defe-41ba-8a36-5b32d9bdbc70",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__api__test_scan_cube.py.compare.patch",
+ "compare_patch_sha256": "39f924d35a80314d4364cc7227487939354af7320eddacde87ce15288edcfb24",
+ "fingerprint": "ef855bd79262224db1d146ed9f843072040b58baf2d6f406af7c5d2f10906d24",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_scan_grid_no_strip",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_scan_cube.py/m_scan_grid_no_strip.patch",
+   "patch_sha256": "1216313224f63a1adb856dd5755eda6091db4f9bb5dad9cfd1b41050a5a18db0",
+   "session_id": "605a5e31-b2f1-40dd-95ae-a1258d4e5381"
+  },
+  {
+   "id": "m_scan_grid_strip_before_build",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__api__test_scan_cube.py/m_scan_grid_strip_before_build.patch",
+   "patch_sha256": "ec120c2d02ca0d2fc195d1d8702051069cdd0195ef70be410602b89cea16f735",
+   "session_id": "8fb51013-465f-4117-9f93-dbe2e95885fb"
+  }
+ ],
+ "path": "tests/api/test_scan_cube.py"
+}

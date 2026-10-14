@@ -1,0 +1,13 @@
+diff --git a/momentum/Strategy/vectorized_backtest.py b/momentum/Strategy/vectorized_backtest.py
+index dbdc222e..5f7f1c72 100644
+--- a/momentum/Strategy/vectorized_backtest.py
++++ b/momentum/Strategy/vectorized_backtest.py
+@@ -279,7 +279,7 @@ class VectorizedBacktest:
+                 continue
+ 
+             trade_pnl_pct_raw = (exit_price - entry_price) / entry_price
+-            total_cost = (self.commission + self.slippage) * 2
++            total_cost = (self.commission + self.slippage)
+             trade_pnl_pct = trade_pnl_pct_raw - total_cost
+             trade_pnl = position_size * trade_pnl_pct
+ 

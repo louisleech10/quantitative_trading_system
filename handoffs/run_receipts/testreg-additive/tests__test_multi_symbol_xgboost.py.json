@@ -1,0 +1,39 @@
+{
+ "added_nodeids": [
+  "tests/test_multi_symbol_xgboost.py::test_api_model_multi_symbol_fields_and_leak_safe_defaults",
+  "tests/test_multi_symbol_xgboost.py::test_case_storage_multi_symbol_isolation_via_singleton"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "baseline_session_id": "7e64d004-d37b-43d8-9e8e-c20a4026105c",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_multi_symbol_xgboost.py.compare.patch",
+ "compare_patch_sha256": "49d2da77a32efda13c5d36bebabcf5c495994ec4d7e0d700badeaba1261cedcf",
+ "fingerprint": "5003a9a2f4d420a57aedf98a7238cf9a3e16b258e5aa2d73b5a584240b6f8296",
+ "head": "92ab0efd30de6a78ab1e85f5442170eb7b42b952",
+ "mutants": [
+  {
+   "id": "m_singleton_guard_dropped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_multi_symbol_xgboost.py/m_singleton_guard_dropped.patch",
+   "patch_sha256": "fb3ba9e44b570c1ca6a15ba7fad7677b817278926d61961dd3d57217d9e665a6",
+   "session_id": "e897daa7-df9a-4bbc-be3d-8561138230d4"
+  },
+  {
+   "id": "m_by_symbol_missing_returns_all",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_multi_symbol_xgboost.py/m_by_symbol_missing_returns_all.patch",
+   "patch_sha256": "7938d4e2eb0c214f807c563aa1524c1d9bf2dc90a5e637d9e4f6f1278fa1d340",
+   "session_id": "1e850a61-9788-4572-b882-d3addb249578"
+  },
+  {
+   "id": "m_time_series_split_default_off",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_multi_symbol_xgboost.py/m_time_series_split_default_off.patch",
+   "patch_sha256": "6bafbe88cde7f6cffeb49f489e43c2ad118937374cc075cb2632b5b26f257b3b",
+   "session_id": "ba9de909-8074-418d-a3e8-f50a2e19afcf"
+  },
+  {
+   "id": "m_embargo_cap_loosened",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_multi_symbol_xgboost.py/m_embargo_cap_loosened.patch",
+   "patch_sha256": "40a64f8135dc20369b0e348f6663b3d8399924de6b54cfbdf9a16e8fde180f7a",
+   "session_id": "9f007006-1b48-4202-a88d-7fb674dc7a4e"
+  }
+ ],
+ "path": "tests/test_multi_symbol_xgboost.py"
+}

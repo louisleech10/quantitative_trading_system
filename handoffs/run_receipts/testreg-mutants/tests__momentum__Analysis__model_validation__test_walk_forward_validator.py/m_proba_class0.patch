@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/model_validation/walk_forward_validator.py b/momentum/Analysis/model_validation/walk_forward_validator.py
+index 1b212ea6..a5270b7d 100644
+--- a/momentum/Analysis/model_validation/walk_forward_validator.py
++++ b/momentum/Analysis/model_validation/walk_forward_validator.py
+@@ -325,7 +325,7 @@ class WalkForwardValidator:
+         if hasattr(model, "predict_proba"):
+             proba = np.asarray(model.predict_proba(X))
+             if proba.ndim == 2 and proba.shape[1] > 1:
+-                return proba[:, 1]
++                return proba[:, 0]
+             return proba.reshape(-1)
+         if hasattr(model, "decision_function"):
+             scores = np.asarray(model.decision_function(X))

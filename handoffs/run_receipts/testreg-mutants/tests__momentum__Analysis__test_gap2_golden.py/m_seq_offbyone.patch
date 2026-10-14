@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/marginal_ic.py b/momentum/Analysis/marginal_ic.py
+index f0c1064d..19575389 100644
+--- a/momentum/Analysis/marginal_ic.py
++++ b/momentum/Analysis/marginal_ic.py
+@@ -510,7 +510,7 @@ def compute_marginal_ic(
+             S = [s for s in survivors if s != f]  # 🔒 依名稱排除自身（§V-4／V-18 mutation 目標行）
+             per_feature[f] = _one(f, S)
+         for i, f in enumerate(order):
+-            stat = _one(f, order[:i])
++            stat = _one(f, order[:i + 1])
+             sequential.append({"feature": f, "step": i, **stat})
+         views["loo"] = _view_status(list(per_feature.values()))
+         views["sequential"] = _view_status(sequential)

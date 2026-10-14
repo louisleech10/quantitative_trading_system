@@ -1,0 +1,38 @@
+diff --git a/tests/momentum/test_ic_engine.py b/tests/momentum/test_ic_engine.py
+index cc463374..ab018f95 100644
+--- a/tests/momentum/test_ic_engine.py
++++ b/tests/momentum/test_ic_engine.py
+@@ -607,3 +607,33 @@ def test_fit_exponential_decay_low_r2_warning():
+ 
+     result = ICEngine._fit_exponential_decay(horizons, ic_values)
+     assert result["fit_warning_reason"] == "low_r2"
++
++
++def test_rolling_ic_spearman_matches_scipy_per_window_and_icir_hand_computed():
++    """TESTREG 純增改寫：rolling Spearman IC 逐窗對 scipy.stats.spearmanr、窗數＝(n-w)//stride+1、ICIR 對手算。
++
++    舊測試只斷鍵存在、長度>0、icir>0、hit_rate>0.8（算法錯但同號仍綠）。章程 §E1 要求逐窗 scipy 差分。
++    """
++    n, w, stride = 80, 10, 2
++    features, label = _make_sample_data(n_samples=n)
++    engine = ICEngine({"icir": {"window": w}})
++
++    rolling = engine.compute_rolling_ic(features, label, windows=[w], stride=stride, method="spearman")
++    y = label.to_numpy(dtype=float)
++    ends = list(range(w, n + 1, stride))
++    exp = {
++        f: np.array([stats.spearmanr(features[f].to_numpy(dtype=float)[e - w:e], y[e - w:e])[0] for e in ends])
++        for f in features.columns
++    }
++    got = {f: np.asarray(rolling[f][f"window_{w}"], dtype=float) for f in features.columns}
++    assert len(ends) == (n - w) // stride + 1 and all(got[f].shape == exp[f].shape and float(np.max(np.abs(got[f] - exp[f]))) <= 1e-12 for f in features.columns), \
++        {f: (got[f].shape, exp[f].shape) for f in features.columns}
++
++    icir = engine.compute_icir(rolling)
++    assert all(
++        abs(icir[f]["ic_mean"] - float(exp[f].sum() / exp[f].size)) <= 1e-12
++        and abs(icir[f]["ic_std"] - float(np.sqrt(((exp[f] - exp[f].sum() / exp[f].size) ** 2).sum() / exp[f].size))) <= 1e-12
++        and abs(icir[f]["icir"] - float(exp[f].sum() / exp[f].size) / float(np.sqrt(((exp[f] - exp[f].sum() / exp[f].size) ** 2).sum() / exp[f].size))) <= 1e-9
++        and icir[f]["ic_hit_rate"] == float((exp[f] > 0).sum() / exp[f].size)
++        for f in features.columns
++    ), icir

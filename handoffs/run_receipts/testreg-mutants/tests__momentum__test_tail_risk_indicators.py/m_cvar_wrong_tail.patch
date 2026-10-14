@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+index d6aaadf3..b480bf3b 100644
+--- a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
++++ b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+@@ -135,7 +135,7 @@ class TailRiskIndicatorEngine:
+             for window in self.windows:
+                 var = returns.rolling(window).quantile(alpha)
+                 cvar = returns.rolling(window).apply(
+-                    lambda values: np.nanmean(values[values <= np.nanquantile(values, alpha)])
++                    lambda values: np.nanmean(values[values <= np.nanquantile(values, 1 - alpha)])
+                     if np.isfinite(values).sum() > 0
+                     else np.nan,
+                     raw=True,

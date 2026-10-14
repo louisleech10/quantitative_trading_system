@@ -1,0 +1,24 @@
+{
+ "path": "tests/momentum/test_ic_engine.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+ "mutants": [
+  {
+   "id": "m_rolling_stride_ignored",
+   "file": "momentum/Analysis/ic_engine.py",
+   "old": "                    x_values, y_values, window=int(window), stride=int(stride)\n",
+   "new": "                    x_values, y_values, window=int(window), stride=1\n"
+  },
+  {
+   "id": "m_rolling_spearman_branch_to_pearson",
+   "file": "momentum/Analysis/ic_engine.py",
+   "old": "            if method == \"spearman\":\n                corr_matrix = rolling_window_rank_corr(\n",
+   "new": "            if method == \"spearman_rank\":\n                corr_matrix = rolling_window_rank_corr(\n"
+  },
+  {
+   "id": "m_icir_std_ddof1",
+   "file": "momentum/Analysis/ic_engine.py",
+   "old": "                ic_std = float(np.nanstd(values))\n",
+   "new": "                ic_std = float(np.nanstd(values, ddof=1))\n"
+  }
+ ]
+}

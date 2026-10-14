@@ -1,0 +1,30 @@
+diff --git a/tests/momentum/Analysis/test_gap2_golden.py b/tests/momentum/Analysis/test_gap2_golden.py
+index 685fe2d2..99f2b3ea 100644
+--- a/tests/momentum/Analysis/test_gap2_golden.py
++++ b/tests/momentum/Analysis/test_gap2_golden.py
+@@ -166,3 +166,25 @@ def test_mutation_counter_without_fit_call_breaks_spy(monkeypatch):
+     res2 = dataclasses.replace(res, n_regressions=2 * len(small_surv) + len(small_removed) + 1)
+     with pytest.raises(AssertionError):
+         assert res2.n_regressions == len(calls)  # spy（13）≠ counter（14）
++
++
++def test_fit_projection_spy_matches_counter_and_basis_widths(monkeypatch):
++    """生產 compute_marginal_ic 之 fit_projection 實呼叫（spy）須逐次對上獨立手算之設計矩陣寬度多重集，且計數器＝spy。
++
++    oracle（不經生產碼）：k 個 survivors、m 個 removed ⇒ LOO k 次各 k-1 欄、sequential k 次依序 0..k-1 欄、
++    removed m 次各 k 欄 ⇒ 共 2k+m 次。
++    """
++    df, y, tr, te, surv, removed = _bench_data()
++    small_surv, small_removed = surv[:5], removed[:3]
++    widths = []
++    real = mic.fit_projection
++
++    def spy(z_target, z_basis):
++        widths.append(int(np.asarray(z_basis).shape[1]))
++        return real(z_target, z_basis)
++
++    monkeypatch.setattr(mic, "fit_projection", spy)
++    res = compute_marginal_ic(df, y, train_mask=tr, test_mask=te, survivors=small_surv, extra_candidates=small_removed, params=MarginalICParams(n_bootstrap=1), fit_scope="train")
++    k, m = len(small_surv), len(small_removed)
++    expected = sorted([k - 1] * k + list(range(k)) + [k] * m)
++    assert res.n_regressions == len(widths) and sorted(widths) == expected, (res.n_regressions, sorted(widths), expected)

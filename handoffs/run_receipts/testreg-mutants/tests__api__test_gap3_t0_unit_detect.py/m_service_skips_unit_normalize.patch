@@ -1,0 +1,13 @@
+diff --git a/api/services/case_import_service.py b/api/services/case_import_service.py
+index 8168141c..9b7553ae 100644
+--- a/api/services/case_import_service.py
++++ b/api/services/case_import_service.py
+@@ -1233,7 +1233,7 @@ class EventImportService:
+         不合規 ⇒ 拒收、落檔數 0。"""
+         # GAP-3 UX Task 1.4：t0 單位偵測（CSV／JSON **共用**同一函式物件，經 pipeline 出口；R3）。
+         # 判不出者原樣保留 ⇒ 下方 validate 以契約既有之單位 reason 逐列拒，不猜預設值。
+-        self._pipeline.normalize_t0_units(records, contract=self._contract)
++        pass
+         # 殘留 `R-B2-1`：秒級 t0 之 `event_id` 摩擦。使用者顯式要求時（opt-in，預設關 ⇒ A-4′ 不推斷），
+         # 於**單位正規化之後**由契約之唯一實作逐列產生 ms 版 ID——不改 upload bytes，
+         # 故 `upload_sha256` 與 Task 1.6 之來源 provenance 仍指向使用者實際上傳的那個檔。

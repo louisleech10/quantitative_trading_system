@@ -1,0 +1,76 @@
+diff --git a/tests/momentum/Analysis/model_validation/test_walk_forward_validator.py b/tests/momentum/Analysis/model_validation/test_walk_forward_validator.py
+index e0603c24..a07e5fe8 100644
+--- a/tests/momentum/Analysis/model_validation/test_walk_forward_validator.py
++++ b/tests/momentum/Analysis/model_validation/test_walk_forward_validator.py
+@@ -4,6 +4,8 @@ import pytest
+ from momentum.Analysis.model_validation.walk_forward_validator import (
+     WalkForwardReport,
+ )
++from momentum.factories import create_walk_forward_validator as _create_wfv_additive
++from sklearn.metrics import roc_auc_score as _roc_auc_additive
+ 
+ 
+ def test_W1_data_too_short(walk_forward_validator, synthetic_binary_data, model_factory):
+@@ -209,3 +211,62 @@ def test_rolling_feature_stability_has_reasonable_ratio(walk_forward_validator,
+     assert isinstance(report, WalkForwardReport)
+     assert report.feature_stability
+     assert all(0.0 <= value <= 1.0 for value in report.feature_stability.values())
++
++
++def test_W9_reversed_scorer_is_unstable_with_all_periods_degraded(synthetic_binary_data):
++    """W9 實質版：固定反向打分之替身模型 ⇒ 每個 OOS 窗 AUC 皆 < 0.5（以 sklearn 獨立重算比對），
++    assessment 必為 unstable、degradation_periods＝全部 period；窗數以 purge／步長手算。"""
++    X, y = synthetic_binary_data
++    y_arr = np.asarray(y)
++    purge, train_n, test_n, step = 7, 500, 100, 100
++
++    def _reverse_scores(frame):
++        z = -(frame["feature_0"].to_numpy() * 1.5 - frame["feature_1"].to_numpy() * 0.7)
++        return 1.0 / (1.0 + np.exp(-z))
++
++    class _ReversedScorer:
++        def fit(self, X_fit, y_fit):
++            return self
++
++        def predict_proba(self, X_pred):
++            p1 = _reverse_scores(X_pred)
++            return np.column_stack([1.0 - p1, p1])
++
++    validator = _create_wfv_additive(config={
++        "mode": "rolling", "purge_gap": purge, "train_size": train_n, "test_size": test_n,
++    })  # step_size 未給 ⇒ 步長＝test_size＝step
++    report = validator.validate(
++        model_factory=_ReversedScorer, X=X, y=y_arr, feature_names=X.columns.tolist(),
++    )["rolling"]
++    expected_n = (len(X) - train_n - purge - test_n) // step + 1
++    oracle_auc = []
++    for k in range(expected_n):
++        lo = k * step + train_n + purge
++        oracle_auc.append(_roc_auc_additive(y_arr[lo:lo + test_n], _reverse_scores(X.iloc[lo:lo + test_n])))
++    got_auc = [p.test_auc for p in report.period_results]
++    assert report.n_periods == expected_n and all(a < 0.5 for a in oracle_auc) and np.allclose(got_auc, oracle_auc, atol=1e-12), \
++        f"OOS AUC 與獨立重算不符：got={got_auc} oracle={oracle_auc}"
++    assert report.assessment == "unstable" and report.degradation_periods == list(range(expected_n)) \
++        and report.oos_hit_rate == 0.0, (report.assessment, report.degradation_periods, report.oos_hit_rate)
++
++
++def test_walk_forward_purge_gap_separates_train_and_test_in_both_modes(synthetic_binary_data, model_factory):
++    """洩漏從嚴：每個 period 之 test_start − train_end 恰等於設定之 purge_gap（rolling 與 expanding），
++    且窗起訖與窗數以手算 oracle 逐一比對（expanding 之訓練窗恆自 0 起、train_end < test_start）。"""
++    X, y = synthetic_binary_data
++    purge = 7
++    validator = _create_wfv_additive(config={"mode": "both", "purge_gap": purge, "train_size": 500, "test_size": 100})
++    n = len(X)
++
++    both = validator.validate(model_factory=model_factory, X=X, y=y, feature_names=X.columns.tolist())
++    rolling = both.get("rolling")
++    expanding = both.get("expanding")
++    exp_rolling = [(s, s + 500, s + 500 + purge, s + 600 + purge) for s in range(0, n, 100) if s + 600 + purge <= n]
++    got_rolling = [(p.train_start_idx, p.train_end_idx, p.test_start_idx, p.test_end_idx) for p in rolling.period_results]
++    assert got_rolling == exp_rolling and all(p.test_start_idx - p.train_end_idx == purge for p in rolling.period_results), \
++        f"rolling 窗與 purge 間隔不符：{got_rolling[:3]} vs {exp_rolling[:3]}"
++
++    exp_expanding = [(0, e, e + purge, e + purge + 100) for e in range(500, n, 100) if e + purge + 100 <= n]
++    got_expanding = [(p.train_start_idx, p.train_end_idx, p.test_start_idx, p.test_end_idx) for p in expanding.period_results]
++    assert got_expanding == exp_expanding and all(p.train_end_idx < p.test_start_idx for p in expanding.period_results), \
++        f"expanding 窗與 purge 間隔不符：{got_expanding[:3]} vs {exp_expanding[:3]}"

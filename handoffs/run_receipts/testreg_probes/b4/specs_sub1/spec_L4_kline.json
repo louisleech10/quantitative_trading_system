@@ -1,0 +1,54 @@
+{
+ "path": "tests/test_kline_downloader.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "mutants": [
+  {
+   "id": "m_ts_from_close_time",
+   "file": "momentum/DataExtraction/providers/binance_provider.py",
+   "old": "        df['timestamp'] = (df['open_time'] / 1000).astype('int64')  # 毫秒轉秒\n",
+   "new": "        df['timestamp'] = (df['close_time'] / 1000).astype('int64')  # 毫秒轉秒\n"
+  },
+  {
+   "id": "m_zero_volume_ratio_zero",
+   "file": "momentum/DataExtraction/providers/binance_provider.py",
+   "old": "            0.5  # volume=0時默認0.5（中性）\n",
+   "new": "            0.0  # volume=0時默認0.5（中性）\n"
+  },
+  {
+   "id": "m_4h_maps_to_1h",
+   "file": "momentum/DataExtraction/providers/binance_provider.py",
+   "old": "        '4h': Client.KLINE_INTERVAL_4HOUR,\n",
+   "new": "        '4h': Client.KLINE_INTERVAL_1HOUR,\n"
+  },
+  {
+   "id": "m_ping_truthiness",
+   "file": "momentum/DataExtraction/providers/binance_provider.py",
+   "old": "            self.client.ping()\n            self.logger.info(\"Binance API ping successful\")\n            return True\n",
+   "new": "            ok = bool(self.client.ping())\n            self.logger.info(\"Binance API ping successful\")\n            return ok\n"
+  },
+  {
+   "id": "m_skip_save_nonempty",
+   "file": "momentum/DataExtraction/kline_download_service.py",
+   "old": "            if save_to_storage and not df.empty and self.storage:\n",
+   "new": "            if save_to_storage and df.empty and self.storage:\n"
+  },
+  {
+   "id": "m_stop_on_error_inverted",
+   "file": "momentum/DataExtraction/kline_download_service.py",
+   "old": "                if stop_on_error:\n",
+   "new": "                if not stop_on_error:\n"
+  },
+  {
+   "id": "m_valueerror_wrapped_as_runtime",
+   "file": "momentum/DataExtraction/kline_download_service.py",
+   "old": "        except ValueError as e:\n",
+   "new": "        except KeyError as e:\n"
+  },
+  {
+   "id": "m_registry_get_only_checks_empty",
+   "file": "momentum/DataExtraction/kline_download_service.py",
+   "old": "        if source_name not in self._providers:\n",
+   "new": "        if not self._providers:\n"
+  }
+ ]
+}

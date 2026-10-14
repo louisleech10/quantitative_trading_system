@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/ic_filter_orchestrator.py b/momentum/Analysis/ic_filter_orchestrator.py
+index 0d4d3896..37b49e5d 100644
+--- a/momentum/Analysis/ic_filter_orchestrator.py
++++ b/momentum/Analysis/ic_filter_orchestrator.py
+@@ -2351,7 +2351,7 @@ class ICFilterOrchestrator:
+             "summary_table": summary_table,
+             "ic_decay": dict(_xsec_na),
+             "quantile_returns": dict(_xsec_na),
+-            "grouped_ic": dict(_xsec_na),
++            "grouped_ic": {},
+             "correlation_matrix": {"features": [], "matrix": []},
+             "diversification_metrics": {},
+             "rolling_ic_series": {

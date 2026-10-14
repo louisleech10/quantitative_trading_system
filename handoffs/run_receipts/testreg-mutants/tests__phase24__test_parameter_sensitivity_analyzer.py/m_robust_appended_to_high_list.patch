@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/parameter_sensitivity_analyzer.py b/momentum/Analysis/parameter_sensitivity_analyzer.py
+index 03487854..85c97264 100644
+--- a/momentum/Analysis/parameter_sensitivity_analyzer.py
++++ b/momentum/Analysis/parameter_sensitivity_analyzer.py
+@@ -160,7 +160,7 @@ class ParameterSensitivityAnalyzer:
+             if risk == "high":
+                 high_risk.append(family_name)
+             if risk == "low":
+-                robust.append(family_name)
++                high_risk.append(family_name)
+ 
+         summary = {
+             "total_families": len(result_families),

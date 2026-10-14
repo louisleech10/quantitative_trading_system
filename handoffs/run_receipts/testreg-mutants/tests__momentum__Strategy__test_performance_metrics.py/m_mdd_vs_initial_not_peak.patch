@@ -1,0 +1,13 @@
+diff --git a/momentum/Strategy/performance_metrics.py b/momentum/Strategy/performance_metrics.py
+index 249220be..38a510f3 100644
+--- a/momentum/Strategy/performance_metrics.py
++++ b/momentum/Strategy/performance_metrics.py
+@@ -107,7 +107,7 @@ class PerformanceMetrics:
+         if self.equity_curve.empty:
+             return 0.0
+         running_max = self.equity_curve.cummax().replace(0, np.nan)
+-        drawdown = (self.equity_curve / running_max) - 1.0
++        drawdown = (self.equity_curve / self.equity_curve.iloc[0]) - 1.0
+         return _safe_float(drawdown.min(), 0.0)
+ 
+     def max_drawdown_duration(self) -> int:

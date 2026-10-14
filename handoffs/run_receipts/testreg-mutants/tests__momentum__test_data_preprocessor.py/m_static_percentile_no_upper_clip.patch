@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/data_preprocessor.py b/momentum/Analysis/data_preprocessor.py
+index 6a52fa7c..b1f829bc 100644
+--- a/momentum/Analysis/data_preprocessor.py
++++ b/momentum/Analysis/data_preprocessor.py
+@@ -543,7 +543,7 @@ class DataPreprocessor:
+             upper_q = upper / 100.0
+             lo = fit_series.quantile(lower_q)
+             hi = fit_series.quantile(upper_q)
+-            return series.clip(lo, hi)
++            return series.clip(lo, None)
+ 
+         if method == "mad":
+             median = np.nanmedian(fit_series)

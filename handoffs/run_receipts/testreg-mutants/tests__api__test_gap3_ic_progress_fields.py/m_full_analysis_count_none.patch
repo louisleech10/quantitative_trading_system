@@ -1,0 +1,13 @@
+diff --git a/api/services/ic_analysis_service.py b/api/services/ic_analysis_service.py
+index 19271d9c..fe598794 100644
+--- a/api/services/ic_analysis_service.py
++++ b/api/services/ic_analysis_service.py
+@@ -2643,7 +2643,7 @@ class ICAnalysisService:
+             "created_at": datetime.now().isoformat(),
+             # 🔴 `CODEX-R4-P2-01`：`/full-analysis` 的 task_info 原本**沒有這個欄位**
+             #    ⇒ Task 6.3 的特徵數在整個 full-analysis 路徑上一律回 None。
+-            "feature_count": _resolve_feature_count(request, entrypoint="full_analysis"),
++            "feature_count": None,
+         }
+ 
+         with self._lock:

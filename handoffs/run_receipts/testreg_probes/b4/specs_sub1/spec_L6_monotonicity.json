@@ -1,0 +1,24 @@
+{
+ "path": "tests/momentum/test_monotonicity_tester.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+ "mutants": [
+  {
+   "id": "m_low_high_groups_swapped",
+   "file": "momentum/Analysis/monotonicity_tester.py",
+   "old": "        low_mask = quantile_bins == valid_bins.min()\n        high_mask = quantile_bins == valid_bins.max()\n",
+   "new": "        low_mask = quantile_bins == valid_bins.max()\n        high_mask = quantile_bins == valid_bins.min()\n"
+  },
+  {
+   "id": "m_ttest_args_reversed",
+   "file": "momentum/Analysis/monotonicity_tester.py",
+   "old": "            high_values, low_values, nan_policy=\"omit\"\n",
+   "new": "            low_values, high_values, nan_policy=\"omit\"\n"
+  },
+  {
+   "id": "m_actual_bins_off_by_one",
+   "file": "momentum/Analysis/monotonicity_tester.py",
+   "old": "        actual_bins = int(valid.max()) + 1\n",
+   "new": "        actual_bins = int(valid.max())\n"
+  }
+ ]
+}

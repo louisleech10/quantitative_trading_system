@@ -1,0 +1,13 @@
+diff --git a/momentum/DataExtraction/kline_storage.py b/momentum/DataExtraction/kline_storage.py
+index c2fd4023..c4ee3ad4 100644
+--- a/momentum/DataExtraction/kline_storage.py
++++ b/momentum/DataExtraction/kline_storage.py
+@@ -1614,7 +1614,7 @@ class KlineStorageManager:
+             time_diffs = df_sorted['timestamp'].diff()
+ 
+             # 獲取timeframe秒數（P2-10修復：使用類常量）
+-            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
++            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe.upper(), 3600)
+ 
+             # 允許10%誤差
+             expected_diff = timeframe_seconds

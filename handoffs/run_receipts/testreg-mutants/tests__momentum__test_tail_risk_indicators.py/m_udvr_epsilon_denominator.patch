@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+index d6aaadf3..8e7f3aac 100644
+--- a/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
++++ b/momentum/FeatureEngineering/atomic/tail_risk_indicators.py
+@@ -163,7 +163,7 @@ class TailRiskIndicatorEngine:
+         for window in self.rv_windows:
+             rv_up = rv_up_map[window]
+             rv_down = rv_down_map[window]
+-            output[f"tr_ud_vol_ratio_{window}"] = rv_up / rv_down.replace(0.0, np.nan)
++            output[f"tr_ud_vol_ratio_{window}"] = rv_up / (rv_down + 1e-12)
+         return pd.DataFrame(output, index=returns.index)
+ 
+     def _compute_rv_components(self, returns: pd.Series) -> Dict[int, pd.Series]:

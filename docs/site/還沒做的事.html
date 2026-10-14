@@ -321,6 +321,13 @@
 ②<code>preprocessing/test_l65_phase0_gate.py</code> 之冒煙測試仍紅（只給 64 列，FF-STAT 後不夠校準），現行改測試規則無合法改法，
 登 SPEC §N R17；同一工具已由 <code>tests/performance/test_l65_phase0_gate.py</code>（80 列）測到。③<code>scripts/build_l65_golden.py</code>
 第 716 行 golden 建置 2a 模式也把週期寫成 <code>&quot;fixture&quot;</code>（與已修之 benchmark 同病），沒有測試覆蓋，用到時再修。</p>
+<p><strong>TESTREG 第 4 批改不了的測試</strong>（2026-10-14 Task 4.2 查到；SPEC §N R18、R19）：①38 個檔屬特徵工廠刪除票（FRAMEPATH）
+管轄，改了會讓那張票的驗收轉紅，等那張票修完驗收規則再一起改。②另有約 140 個測試目標，現行「改測試的證明規則」沒有合法
+路徑：本來就紅且要改測試輸入的 27 個、每次都被跳過的 36 個（多半寫死已刪除的舊特徵資料）、測試根本沒呼叫生產程式碼的 55 個、
+共用的輸出導向夾具使證明做不成的 1 檔、整檔跑超過 5 分鐘的 11 個、被同檔前述問題連帶擋住的 11 個。你已定規則不再修訂，
+這些維持「待改寫」標記，功能多半仍有其他測試覆蓋。清單在 <code>handoffs/run_receipts/testreg_probes/b4/p4_not_applicable.tsv</code>。
+③<code>tests/test_append_fix.py</code>、<code>tests/test_kline_storage.py</code> 的舊測試每跑一次會真的連 Binance 寫本機 K 線快取（真實資料、
+不進 git），新補的測試已改寫暫存目錄。</p>
 <p><strong>治理線</strong>：兩條治理工作線已於 2026-08-14 由你裁定不再擴建，故本清單不列（狀態見 <code>docs/ROADMAP.md</code> 生成區塊）。</p>
 <hr />
 <h2 id="五這份怎麼維護">五、這份怎麼維護</h2>

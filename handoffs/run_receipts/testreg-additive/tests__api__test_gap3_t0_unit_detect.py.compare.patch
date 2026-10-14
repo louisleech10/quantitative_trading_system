@@ -1,0 +1,30 @@
+diff --git a/tests/api/test_gap3_t0_unit_detect.py b/tests/api/test_gap3_t0_unit_detect.py
+index 19b0c914..7a05a673 100644
+--- a/tests/api/test_gap3_t0_unit_detect.py
++++ b/tests/api/test_gap3_t0_unit_detect.py
+@@ -125,3 +125,25 @@ def test_gap3_t0_unit_detect_undetectable_still_rejected_end_to_end(_isolated_st
+     reasons = {f["reason"] for f in r.json()["detail"]["failures"]}
+     assert "invalid_timestamp_unit" in reasons
+     assert client.get("/api/v1/case/events").json()["total"] == 0
++
++
++def test_gap3_t0_unit_detect_band_edges_hit_production_detector(_isolated_storage):
++    """④′ 帶界實打生產偵測函式（取代 ④ 之自證恆等式）＋混單位批端到端逐列正規化。
++
++    Oracle＝手算：ms 帶 [ms_min, ms_min*1000) 原樣；秒帶 [ms_min/1000, ms_min) ×1000；其外 raise。
++    """
++    from momentum.Analysis.event_samples.import_contract import T0UnitUndetectedError as _undetected
++    from momentum.Analysis.event_samples.import_contract import detect_t0_unit_ms as _det
++
++    ms_min = int(create_event_sample_pipeline().import_contract()["ms_magnitude_min"])
++    top = ms_min * 1000
++    assert (_det(ms_min), _det(top - 1), _det(ms_min // 1000), _det(ms_min - 1)) == (
++        ms_min, top - 1, ms_min, (ms_min - 1) * 1000)
++    for bad in (top, ms_min // 1000 - 1):
++        pytest.raises(_undetected, _det, bad)
++    # 同一批內秒級與毫秒級並存 ⇒ 匯入服務須逐列判定（秒列 ×1000、毫秒列原樣）
++    recs = [make_event(0, label=1, t0=SECONDS_INPUT, event_id=f"ETHUSDT:12h:{EXPECTED_MS}"),
++            make_event(1, label=0, t0=EXPECTED_MS + 43200000, event_id=f"ETHUSDT:12h:{EXPECTED_MS + 43200000}")]
++    r = client.post("/api/v1/case/import-events/json", json={"records": recs})
++    det = client.get(f"/api/v1/case/events/{r.json().get('import_id')}").json() if r.status_code == 200 else {}
++    assert [rec["t0"] for rec in det.get("records", [])] == [EXPECTED_MS, EXPECTED_MS + 43200000], r.text

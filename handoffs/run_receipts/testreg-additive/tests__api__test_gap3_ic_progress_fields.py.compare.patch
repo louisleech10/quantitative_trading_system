@@ -1,0 +1,82 @@
+diff --git a/tests/api/test_gap3_ic_progress_fields.py b/tests/api/test_gap3_ic_progress_fields.py
+index 5acb3498..db1d2901 100644
+--- a/tests/api/test_gap3_ic_progress_fields.py
++++ b/tests/api/test_gap3_ic_progress_fields.py
+@@ -150,3 +150,77 @@ def test_gap3_ic_progress_fields_resolver_reads_registry_only():
+     # ③ 只給 symbol/timeframe（無 hash）⇒ 一律 None，不猜
+     assert resolve_run_feature_count(
+         symbol=with_count[0].get("symbol"), timeframe=with_count[0].get("timeframe")) is None
++
++
++def test_gap3_ic_progress_fields_hermetic_implicit_latest_and_full_analysis_task_info(tmp_path, monkeypatch):
++    """密閉版：受控 registry 注入＋真打 `/full-analysis` 後讀 task 回應之 `feature_count`。
++
++    隱式 latest：注入同一 symbol/12h 三筆——較舊已物化（9000）、較新已物化（4321）、
++    最新但 manifest 不存在（50000，孤兒須跳過）⇒ 期望＝4321（由本測試寫入之 manifest 決定）。
++    `/full-analysis`：features 檔之 `features` 資料集寬 77 欄 ⇒ 經 `response_model` 後之
++    task 回應 `feature_count` 須為 77（只看原始碼字面不足以證明鍵有值）。
++    """
++    import h5py as _h5py_pf
++    import json as _json_pf
++
++    service = svc_mod.ic_analysis_service
++    registry = service._feature_library._registry  # noqa: SLF001
++    original_entries = list(registry._entries)  # noqa: SLF001
++    original_path = registry._path  # noqa: SLF001
++    staged = tmp_path / "registry.json"
++    started_ids = []
++
++    def _manifest(name, total):
++        p = tmp_path / name / "feature_manifest.json"
++        p.parent.mkdir(parents=True, exist_ok=True)
++        p.write_text(_json_pf.dumps({"total_features": total}), encoding="utf-8")
++        return str(p)
++
++    rows = [
++        {"symbol": "ICPROGHERM", "timeframe": "12h", "config_hash": "progherm01",
++         "feature_count": 9000, "hdf5_relative_path": _manifest("old", 9000),
++         "last_generated_at": 1_900_000_001},
++        {"symbol": "ICPROGHERM", "timeframe": "12h", "config_hash": "progherm02",
++         "feature_count": 4321, "hdf5_relative_path": _manifest("new", 4321),
++         "last_generated_at": 1_900_000_002},
++        {"symbol": "ICPROGHERM", "timeframe": "12h", "config_hash": "progherm03",
++         "feature_count": 50000, "hdf5_relative_path": str(tmp_path / "gone" / "feature_manifest.json"),
++         "last_generated_at": 1_900_000_003},
++    ]
++    staged.write_text(_json_pf.dumps(original_entries + rows), encoding="utf-8")
++    registry._path = staged  # noqa: SLF001
++
++    features_h5 = tmp_path / "features.h5"
++    with _h5py_pf.File(str(features_h5), "w") as handle:
++        handle.create_dataset("features", data=[[0.0] * 77] * 3)
++    monkeypatch.setattr(service, "_start_background_coroutine", lambda factory: None)
++
++    class _ImplicitHermetic:
++        mode = "longitudinal"
++        symbol = "ICPROGHERM"
++        timeframe = "12h"
++        config_hash = None
++        features_path = None
++        symbols = None
++        cross_sectional_runs = None
++
++    try:
++        got = svc_mod._resolve_feature_count(_ImplicitHermetic())
++        planned = svc_mod.ICAnalysisService.resolve_planned_feature_count(service, _ImplicitHermetic())
++        assert got == 4321 and planned == 4321, f"隱式 latest 解析錯：got={got} planned={planned}"
++
++        r = client.post(f"{API}/full-analysis", json={
++            "features_path": str(features_h5), "labels_path": str(tmp_path / "labels.h5"),
++            "symbol": "ICPROGHERM", "timeframe": "12h",
++        })
++        task_id = (r.json() or {}).get("task_id") if r.status_code == 200 else None
++        started_ids.append(task_id)
++        body = client.get(f"{API}/task/{task_id}").json() if task_id else {}
++        assert r.status_code == 200 and body.get("feature_count") == 77, \
++            f"/full-analysis 任務回應之 feature_count 錯：{r.status_code} {r.text} {body}"
++    finally:
++        registry._path = original_path  # noqa: SLF001
++        registry._entries = original_entries  # noqa: SLF001
++        with service._lock:  # noqa: SLF001
++            for tid in started_ids:
++                service._tasks.pop(tid, None)

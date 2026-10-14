@@ -116,3 +116,57 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"測試異常: {e}", exc_info=True)
         sys.exit(1)
+
+
+def test_multi_range_append_isolated_cache_sum_and_revision(tmp_path, monkeypatch):
+    """TESTREG 4.2 純增：密封版多區間 append（tmp_path 快取、Binance client 以回放替身）。
+
+    原目標直連 Binance 並寫生產 ./data_cache；生產快取已有歷史時總數斷言恆成立。
+    本測試於**空快取**驗：兩區間並存、總筆數＝兩段之和（手算各 161 根）、各區間以
+    read_klines 時間切片取回筆數不變；再下載與第二段尾端重疊之 3 根「修訂值」，
+    去重須保留最新下載（keep last），總筆數不變。
+    """
+    monkeypatch.setenv("LEGACY_KLINE_CACHE_DIR", str(tmp_path / "legacy_empty"))
+    storage = KlineStorageManager(cache_dir=str(tmp_path / "cache"))
+    service = KlineDownloadService(storage_manager=storage, failure_log_path=str(tmp_path / "failures.json"))
+    provider = BinanceProvider()
+    revision = {"close_bump": 0.0}
+    hour_ms = 3_600_000
+
+    class _ReplayClient:
+        """Binance get_klines 契約替身：startTime／endTime 皆 inclusive、整點對齊、limit 截斷。"""
+
+        def ping(self):
+            return {}
+
+        def get_klines(self, *, symbol, interval, startTime, endTime, limit):
+            rows = []
+            ts = -(-int(startTime) // hour_ms) * hour_ms
+            while ts <= int(endTime) and len(rows) < int(limit):
+                base = 1000.0 + float((ts // hour_ms) % 97) + revision["close_bump"]
+                close = base + 0.5
+                rows.append([ts, str(base), str(base + 1.0), str(base - 1.0), str(close), "10.0",
+                             ts + hour_ms - 1, "10000.0", 5, "4.0", "4000.0", "0"])
+                ts += hour_ms
+            return rows
+
+    provider.client = _ReplayClient()
+    service.registry.register("binance", provider)
+
+    df1 = service.download_klines(symbol="ETHUSDT", timeframe="1h", start_time=datetime(2024, 5, 20, 20, 0),
+                                  end_time=datetime(2024, 5, 27, 12, 0), source="binance", save_to_storage=True)
+    df2 = service.download_klines(symbol="ETHUSDT", timeframe="1h", start_time=datetime(2025, 10, 20, 20, 0),
+                                  end_time=datetime(2025, 10, 27, 12, 0), source="binance", save_to_storage=True)
+    revision["close_bump"] = 7.0
+    service.download_klines(symbol="ETHUSDT", timeframe="1h", start_time=datetime(2025, 10, 27, 10, 0),
+                            end_time=datetime(2025, 10, 27, 12, 0), source="binance", save_to_storage=True)
+
+    full = storage.read_klines("ETHUSDT", "1h", validate_continuity=False)
+    r1 = storage.read_klines("ETHUSDT", "1h", start_time=int(df1["timestamp"].min()),
+                             end_time=int(df1["timestamp"].max()), validate_continuity=False)
+    r2 = storage.read_klines("ETHUSDT", "1h", start_time=int(df2["timestamp"].min()),
+                             end_time=int(df2["timestamp"].max()), validate_continuity=False)
+    rev_start = int((datetime(2025, 10, 27, 10, 0) - datetime(1970, 1, 1)).total_seconds())
+    tail_close = full.loc[full["timestamp"] >= rev_start, "close"].tolist()
+    expected_tail = [1000.0 + float((s * 1000 // hour_ms) % 97) + 7.5 for s in (rev_start, rev_start + 3600, rev_start + 7200)]
+    assert (len(df1), len(df2), len(full), len(r1), len(r2)) == (161, 161, 322, 161, 161) and tail_close == expected_tail
