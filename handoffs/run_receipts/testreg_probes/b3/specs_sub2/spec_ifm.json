@@ -1,0 +1,30 @@
+{
+  "path": "tests/feature_engineering/test_icfirstalign_memory.py",
+  "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
+  "mutants": [
+    {
+      "id": "m2_disk_image_accepted",
+      "file": "momentum/FeatureEngineering/memory_budget.py",
+      "old": "        if protocol is None or protocol in REJECTED_BUS_PROTOCOLS:\n",
+      "new": "        if protocol is None:\n"
+    },
+    {
+      "id": "m2_unknown_backing_accepted",
+      "file": "momentum/FeatureEngineering/memory_budget.py",
+      "old": "        if protocol is None or protocol in REJECTED_BUS_PROTOCOLS:\n",
+      "new": "        if protocol in REJECTED_BUS_PROTOCOLS:\n"
+    },
+    {
+      "id": "m2_abort_receipt_ignored",
+      "file": "momentum/FeatureEngineering/memory_budget.py",
+      "old": "            owned.extend(str(p) for p in receipt.get(\"owned_paths\") or [])\n",
+      "new": "            owned.extend([])\n"
+    },
+    {
+      "id": "m2_real_disk_rejected",
+      "file": "momentum/FeatureEngineering/memory_budget.py",
+      "old": "REJECTED_BUS_PROTOCOLS = (\"Disk Image\",)\n",
+      "new": "REJECTED_BUS_PROTOCOLS = (\"Disk Image\", \"Apple Fabric\")\n"
+    }
+  ]
+}

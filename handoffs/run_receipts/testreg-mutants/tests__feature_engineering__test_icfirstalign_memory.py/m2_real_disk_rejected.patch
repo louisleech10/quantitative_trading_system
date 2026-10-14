@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/memory_budget.py b/momentum/FeatureEngineering/memory_budget.py
+index 89e5f526..2c2c67b6 100644
+--- a/momentum/FeatureEngineering/memory_budget.py
++++ b/momentum/FeatureEngineering/memory_budget.py
+@@ -91,7 +91,7 @@ MSG_ESTIMATE_EXCEEDED = "任務峰值估算低估"
+ # 換頁擴充上限之 sysctl（SPEC v35；讀不到 ⇒ 擴充計 0、記 memory_swap_expand_unreadable）
+ SWAPFILE_SYSCTLS = ("vm.compressor.swapper.swapfile_limit", "vm.compressor.swapper.swapfile_cnt",
+                     "vm.compressor.swapper.swapfile_size_max")
+-REJECTED_BUS_PROTOCOLS = ("Disk Image",)
++REJECTED_BUS_PROTOCOLS = ("Disk Image", "Apple Fabric")
+ SWAP_VOLUME = "/System/Volumes/VM"
+ L2_SPILL_THRESHOLD_BYTES = 500_000_000  # FeatureFactory._spill_to_memmap 之 float64 估計門檻（同值）
+ 

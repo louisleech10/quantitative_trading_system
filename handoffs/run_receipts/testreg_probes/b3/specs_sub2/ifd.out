@@ -1,0 +1,18 @@
+{
+ "added": [
+  "tests/feature_engineering/test_icfirstalign_domain.py::test_only_reroute_needed_is_retried_serially_base_budget_error_returned"
+ ],
+ "mutant_failures": {
+  "m2_reroute_never_retried": {
+   "test_reroute_needed_retried_serially_after_wave_join": "failed",
+   "test_only_reroute_needed_is_retried_serially_base_budget_error_returned": "failed",
+   "test_scheduler_serial_route_records_reasons": "failed",
+   "test_multi_symbol_reroute_keeps_failed_attempt_routes": "failed"
+  },
+  "m2_any_budget_error_retried": {
+   "test_mutation_reroute_not_retried": "failed",
+   "test_only_reroute_needed_is_retried_serially_base_budget_error_returned": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_icfirstalign_domain.py.json

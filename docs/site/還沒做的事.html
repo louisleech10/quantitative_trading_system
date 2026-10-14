@@ -98,6 +98,11 @@
 <td>不屬 TESTREG 範圍；要另開一張票（拿掉看測試名字的分支；測試改為明確帶 <code>relative_only</code>），插在全票排序哪一步依規定先跟委員評估（TESTREG 第 3 批收批時與上一列一併提）。新測試已先避開這個分支、直接測 <code>relative_only</code> 的真實行為</td>
 </tr>
 <tr>
+<td><strong>滾動彙總遇到重複欄名會直接崩潰</strong>（2026-10-14 TESTREG 第 3 批試改測試時查到）</td>
+<td>特徵工廠 L3 滾動彙總（<code>momentum/FeatureEngineering/operators/rolling_aggregator.py</code> 第 343 行）收到兩個同名欄、且資料不是一直線時，報 <code>ValueError</code>（陣列形狀對不上）整段停掉。上游各層輸出若有同名欄只記警告、不去重（<code>feature_factory.py</code> 第 733 行），所以理論上會走到；目前實際生成沒遇過。原本那支測試用一直線的假資料（斜率是常數、被死欄剔除）再加「預期失敗」標記，把崩潰蓋住了</td>
+<td>不屬 TESTREG 範圍（測試批不改生產碼）；要另開一張票決定「去重或明確報錯」，插在全票排序哪一步依規定先跟委員評估（TESTREG 第 3 批收批時與上兩列一併提）。該測試之改寫等這張票</td>
+</tr>
+<tr>
 <td><strong>IC 為何用 Spearman 沒有文件；它只看方向、不看幅度</strong></td>
 <td>預設用 Spearman（排名相關，業界常用、不怕極端值），但沒有任何文件寫理由。它只看排名，可能篩出「小漲小跌都猜對、大跌猜錯」的特徵：IC 好看，實盤卻被幾次大跌打穿</td>
 <td>排序第 10 步補寫選擇理由；要不要加看幅度或尾部虧損的檢查，屆時請你決定</td>
@@ -308,6 +313,9 @@
 <code>test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh</code>（CGSA 續跑未觸發 <code>resume_from_manifest</code>）、
 <code>test_cgsa_resume.py::test_cgsa_config_hash_passed_correctly</code>（測試用的簡化設定物件缺屬性）、
 <code>test_batch_alias.py::test_patch_batch_alias_deleting_returns_409</code>（API 測試 <code>TypeError</code>）。排序第 2 步各自歸因後修碼或修測試。</p>
+<p><strong>每跑必改寫已追蹤檔的 3 支舊測試</strong>（2026-10-14 TESTREG 量測時查到）：<code>preprocessing/test_fast_adf_gate.py</code> 改寫
+<code>tests/golden/l65/fast_adf_gate_report.json</code>、<code>atomic/test_handcoded_reference.py</code> 改寫 <code>tests/_golden/ff_deepaudit/</code> 兩份差異表，
+內容只差時間戳，跑完工作樹就髒。新測試已不寫已追蹤檔；舊測試之輸出改導暫存，併 TESTREG 後續子批或排序第 2 步處理。</p>
 <p><strong>治理線</strong>：兩條治理工作線已於 2026-08-14 由你裁定不再擴建，故本清單不列（狀態見 <code>docs/ROADMAP.md</code> 生成區塊）。</p>
 <hr />
 <h2 id="五這份怎麼維護">五、這份怎麼維護</h2>

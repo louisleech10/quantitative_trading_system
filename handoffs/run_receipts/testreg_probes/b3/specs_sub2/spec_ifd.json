@@ -1,0 +1,8 @@
+{"path": "tests/feature_engineering/test_icfirstalign_domain.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
+ "mutants": [
+  {"id": "m2_reroute_never_retried", "file": "momentum/FeatureEngineering/memory_budget.py",
+   "old": "                if isinstance(exc, MemoryRerouteNeeded):\n", "new": "                if False:\n"},
+  {"id": "m2_any_budget_error_retried", "file": "momentum/FeatureEngineering/memory_budget.py",
+   "old": "                if isinstance(exc, MemoryRerouteNeeded):\n",
+   "new": "                if isinstance(exc, GenerationMemoryBudgetExceeded):\n"}]}

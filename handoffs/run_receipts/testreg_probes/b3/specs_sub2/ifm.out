@@ -1,0 +1,56 @@
+{
+ "added": [
+  "tests/feature_engineering/test_icfirstalign_memory.py::test_assert_disk_backed_rejects_disk_image_and_unknown_backing",
+  "tests/feature_engineering/test_icfirstalign_memory.py::test_recover_aborted_run_removes_paths_registered_in_abort_receipt_and_owned_list"
+ ],
+ "mutant_failures": {
+  "m2_disk_image_accepted": {
+   "test_disk_backing_rejected_before_allocation[Disk Image]": "failed",
+   "test_assert_disk_backed_rejects_disk_image_and_unknown_backing": "failed"
+  },
+  "m2_unknown_backing_accepted": {
+   "test_disk_backing_rejected_before_allocation[None]": "failed",
+   "test_assert_disk_backed_rejects_disk_image_and_unknown_backing": "failed"
+  },
+  "m2_abort_receipt_ignored": {
+   "test_recover_aborted_run_removes_paths_registered_in_abort_receipt_and_owned_list": "failed"
+  },
+  "m2_real_disk_rejected": {
+   "test_boundary_03_temp_registry_removed_when_budget_exceeded": "failed",
+   "test_declared_completeness_l2_combinations[0-True-1]": "failed",
+   "test_declared_completeness_l2_combinations[0-True-4]": "failed",
+   "test_declared_completeness_l2_combinations[0-False-1]": "failed",
+   "test_declared_completeness_l2_combinations[0-False-4]": "failed",
+   "test_declared_completeness_l2_combinations[1-True-1]": "failed",
+   "test_declared_completeness_l2_combinations[1-True-4]": "failed",
+   "test_declared_completeness_l2_combinations[1-False-1]": "failed",
+   "test_declared_completeness_l2_combinations[1-False-4]": "failed",
+   "test_declared_completeness_l1_combinations[0]": "failed",
+   "test_declared_completeness_l1_combinations[1]": "failed",
+   "test_branch_table_coverage_over_population": "failed",
+   "test_safety_gap_refused_before_arm[L2.pandas_parallel-category_tables_sum-env6-l2]": "failed",
+   "test_safety_gap_refused_before_arm[L2.pandas_parallel-merge_return-env7-l2]": "failed",
+   "test_safety_gap_refused_before_arm[L1.parallel-engine_tables-env8-l1]": "failed",
+   "test_safety_gap_refused_before_arm[PostIC.transform_selected-accumulated_processed-env9-postic]": "failed",
+   "test_mutation_safety_gap_component_dropped[L2.pandas_parallel-category_tables_sum-env6-l2]": "failed",
+   "test_mutation_safety_gap_component_dropped[L2.pandas_parallel-merge_return-env7-l2]": "failed",
+   "test_mutation_safety_gap_component_dropped[L1.parallel-engine_tables-env8-l1]": "failed",
+   "test_mutation_safety_gap_component_dropped[PostIC.transform_selected-accumulated_processed-env9-postic]": "failed",
+   "test_preallocation_refusal_before_first_layer": "failed",
+   "test_mutation_check_removed_layer_runs": "failed",
+   "test_disk_backing_real_internal_disk_passes": "failed",
+   "test_assert_disk_backed_rejects_disk_image_and_unknown_backing": "failed",
+   "test_temp_memmap_created_under_mapping_root": "failed",
+   "test_mapped_tags_match_observed_allocations[l2_spill]": "failed",
+   "test_mapped_tags_match_observed_allocations[mtf_align_dense]": "failed",
+   "test_mapped_tags_match_observed_allocations[mtf_align_sharded]": "failed",
+   "test_mapped_tags_match_observed_allocations[mtf_align_compact]": "failed",
+   "test_mutation_run_mapping_released_after_run_end": "failed",
+   "test_mutation_mtf_aligned_output_tagged_anon": "failed",
+   "test_guard_start_failure_refuses_generation": "failed",
+   "test_probe_stop_loss_keeps_partial_series": "failed",
+   "test_mutation_probe_series_written_at_end_only": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_icfirstalign_memory.py.json

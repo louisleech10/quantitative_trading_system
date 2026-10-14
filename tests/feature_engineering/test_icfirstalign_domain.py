@@ -1462,6 +1462,30 @@ def test_mutation_reroute_not_retried(tmp_path: Path, monkeypatch: pytest.Monkey
     assert isinstance(out[0], mb.GenerationMemoryBudgetExceeded)
 
 
+def test_only_reroute_needed_is_retried_serially_base_budget_error_returned(tmp_path: Path) -> None:
+    """純增：上列 test_mutation_reroute_not_retried 之 worker 拋基底類 GenerationMemoryBudgetExceeded，替換
+    MemoryRerouteNeeded 與否結果相同（測不到重試分支）。本案同一波兩任務：A 拋基底類（非低估）⇒ 原樣回傳例外、不重試；
+    B 拋 MemoryRerouteNeeded（估算低估）⇒ 波次 join 後以正式串行臂重試一次、回串行結果；串行臂只被 B 呼叫。"""
+    serial_calls: List[Any] = []
+
+    def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
+        if payload == 1:
+            raise mb.GenerationMemoryBudgetExceeded(desc.task_id, 0, 0, 0, "x")
+        raise mb.MemoryRerouteNeeded(desc.task_id, 20, 40, int(desc.envelope), mb.MSG_ESTIMATE_EXCEEDED)
+
+    def serial(payload: Any) -> Any:
+        serial_calls.append(payload)
+        return ("serial", payload)
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=2, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    out = sched.run([mb.Task("A", 40, 1), mb.Task("B", 40, 2)], worker, serial, lambda w: None)
+    assert isinstance(out[0], mb.GenerationMemoryBudgetExceeded) and not isinstance(out[0], mb.MemoryRerouteNeeded) \
+        and out[1] == ("serial", 2) and serial_calls == [2], (out, serial_calls)
+
+
 def test_available_insufficient_falls_back_to_serial_without_pool(tmp_path: Path) -> None:
     """SPEC v35：新增量 > 剩餘可用量 A（准入之可吸收量）⇒ 不准入並行、於根以正式串行臂執行，executor 建立 0 次
     （多週期、多標的、API 批次三入口共用之排程器）。"""

@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/test_icfirstalign_domain.py::test_only_reroute_needed_is_retried_serially_base_budget_error_returned"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
+ "baseline_session_id": "c4f77261-9142-40fa-8f07-a38145cffc42",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_icfirstalign_domain.py.compare.patch",
+ "compare_patch_sha256": "2ff33cebbeea08c629495d7ce43548eefb7410cfc8b513ed199ae24c169c718f",
+ "fingerprint": "f94f8a01cdf82e6fcde2cf39d0c9f24c0fa5da2469bbdcec7ba8346cbd89a73b",
+ "head": "558e221dbf6d1b38014768be108aa64a5a741924",
+ "mutants": [
+  {
+   "id": "m2_reroute_never_retried",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_icfirstalign_domain.py/m2_reroute_never_retried.patch",
+   "patch_sha256": "97a6115dfa7b8a7952c76217d4bd112b2cd0e523f8f616506b6480b40137888d",
+   "session_id": "eff1116a-e9fe-4af1-a4c5-5791709e4b6d"
+  },
+  {
+   "id": "m2_any_budget_error_retried",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_icfirstalign_domain.py/m2_any_budget_error_retried.patch",
+   "patch_sha256": "f236fbf70c8f41dfe317a5ea34b13c66dae94fe5a2c6943b4c2da4232cf7133e",
+   "session_id": "a371366f-d4d5-4ea8-a991-69335c2624ef"
+  }
+ ],
+ "path": "tests/feature_engineering/test_icfirstalign_domain.py"
+}

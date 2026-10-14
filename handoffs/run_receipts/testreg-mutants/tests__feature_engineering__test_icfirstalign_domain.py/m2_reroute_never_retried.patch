@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/memory_budget.py b/momentum/FeatureEngineering/memory_budget.py
+index 89e5f526..6b3147d8 100644
+--- a/momentum/FeatureEngineering/memory_budget.py
++++ b/momentum/FeatureEngineering/memory_budget.py
+@@ -1897,7 +1897,7 @@ class MemoryBudgetScheduler:
+                 self._join_confirmed(state)
+                 self._collect_worker_routes(state)
+                 exc = state.future.exception()
+-                if isinstance(exc, MemoryRerouteNeeded):
++                if False:
+                     rerouted.append(state)  # SPEC v35：該波 join 後於根之正式串行 producer 重試一次
+                     continue
+                 value = exc if exc is not None else state.future.result()

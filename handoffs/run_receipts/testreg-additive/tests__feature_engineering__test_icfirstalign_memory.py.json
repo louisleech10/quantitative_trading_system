@@ -1,0 +1,39 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/test_icfirstalign_memory.py::test_assert_disk_backed_rejects_disk_image_and_unknown_backing",
+  "tests/feature_engineering/test_icfirstalign_memory.py::test_recover_aborted_run_removes_paths_registered_in_abort_receipt_and_owned_list"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
+ "baseline_session_id": "81de8f8c-4f03-459d-a3e7-328c857d7a51",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__test_icfirstalign_memory.py.compare.patch",
+ "compare_patch_sha256": "36ccd2bf71e9b8c545c6e97250bcce06c8c1b2613b8ec1312ff75c14f793e0db",
+ "fingerprint": "4d394ef8d3a7dbcfe88c3426cd5f49db1ea0eac3e38ff105e5e59e1b8b877b22",
+ "head": "558e221dbf6d1b38014768be108aa64a5a741924",
+ "mutants": [
+  {
+   "id": "m2_disk_image_accepted",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_icfirstalign_memory.py/m2_disk_image_accepted.patch",
+   "patch_sha256": "218482ed98598cd5348a90044bead7de04053461a7b559bcf6caefe705326865",
+   "session_id": "3bb400b0-964e-4ec1-b612-a6e237faccd6"
+  },
+  {
+   "id": "m2_unknown_backing_accepted",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_icfirstalign_memory.py/m2_unknown_backing_accepted.patch",
+   "patch_sha256": "b39aa158d7e34bcec79b6c1998cae4689e17026bea062a484be2a8515dda45a9",
+   "session_id": "c894309d-f2cc-4f00-bfc0-484985ea12fc"
+  },
+  {
+   "id": "m2_abort_receipt_ignored",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_icfirstalign_memory.py/m2_abort_receipt_ignored.patch",
+   "patch_sha256": "810fef5f4a1ada84dd88155cfe7c844cf15735a2785507265d1ac6401f1fe018",
+   "session_id": "c06298ff-5971-4c81-98bf-977fb51e3ffb"
+  },
+  {
+   "id": "m2_real_disk_rejected",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__test_icfirstalign_memory.py/m2_real_disk_rejected.patch",
+   "patch_sha256": "0c7824eeb9ca4dd4b75fc78512e2f4cf96d3de937166c7d4063c96f917b17e72",
+   "session_id": "1770fd8e-f419-4b6f-a073-028b6ddc026b"
+  }
+ ],
+ "path": "tests/feature_engineering/test_icfirstalign_memory.py"
+}

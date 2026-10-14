@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/memory_budget.py b/momentum/FeatureEngineering/memory_budget.py
+index 89e5f526..f0370213 100644
+--- a/momentum/FeatureEngineering/memory_budget.py
++++ b/momentum/FeatureEngineering/memory_budget.py
+@@ -1060,7 +1060,7 @@ def assert_disk_backed(paths: Sequence[Path]) -> None:
+         if path is None:
+             continue
+         protocol = backing_bus_protocol(Path(path))
+-        if protocol is None or protocol in REJECTED_BUS_PROTOCOLS:
++        if protocol in REJECTED_BUS_PROTOCOLS:
+             raise MemoryMeasurementUnavailable(
+                 f"映射／成品目錄 {path} 之磁碟後援無法確認（BusProtocol={protocol!r}）；RAM disk 或磁碟映像上拒絕生成"
+             )

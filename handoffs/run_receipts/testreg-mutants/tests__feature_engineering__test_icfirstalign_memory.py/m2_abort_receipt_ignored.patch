@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/memory_budget.py b/momentum/FeatureEngineering/memory_budget.py
+index 89e5f526..a1f0e309 100644
+--- a/momentum/FeatureEngineering/memory_budget.py
++++ b/momentum/FeatureEngineering/memory_budget.py
+@@ -1196,7 +1196,7 @@ def recover_aborted_run(run_dir: Path) -> Dict[str, Any]:
+         report["abort_receipt"] = str(receipt_path)
+         try:
+             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+-            owned.extend(str(p) for p in receipt.get("owned_paths") or [])
++            owned.extend([])
+         except (OSError, ValueError):
+             pass
+     owned_file = run_dir / OWNED_PATHS_NAME

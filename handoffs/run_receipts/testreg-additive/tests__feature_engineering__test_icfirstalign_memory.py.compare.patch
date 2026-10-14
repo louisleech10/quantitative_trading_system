@@ -1,0 +1,52 @@
+diff --git a/tests/feature_engineering/test_icfirstalign_memory.py b/tests/feature_engineering/test_icfirstalign_memory.py
+index d686312e..d974268a 100644
+--- a/tests/feature_engineering/test_icfirstalign_memory.py
++++ b/tests/feature_engineering/test_icfirstalign_memory.py
+@@ -803,6 +803,20 @@ def test_mutation_disk_backing_platform_only(tmp_path: Path, monkeypatch: pytest
+     mb.assert_disk_backed([tmp_path])
+ 
+ 
++def test_assert_disk_backed_rejects_disk_image_and_unknown_backing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
++    """純增：上列 test_mutation_disk_backing_platform_only 把受測函式本身換成 mutant 後呼叫之，無任何斷言（恆過）。
++    本案測真實 assert_disk_backed：後援為 Disk Image 或取不到（None）⇒ MemoryMeasurementUnavailable；實體磁碟後援
++    （Apple Fabric）⇒ 通過。"""
++    monkeypatch.setattr(mb, "backing_bus_protocol", lambda path: "Disk Image")
++    with pytest.raises(mb.MemoryMeasurementUnavailable, match="Disk Image"):
++        mb.assert_disk_backed([tmp_path])
++    monkeypatch.setattr(mb, "backing_bus_protocol", lambda path: None)
++    with pytest.raises(mb.MemoryMeasurementUnavailable, match="None"):
++        mb.assert_disk_backed([tmp_path])
++    monkeypatch.setattr(mb, "backing_bus_protocol", lambda path: "Apple Fabric")
++    mb.assert_disk_backed([tmp_path])
++
++
+ def test_temp_memmap_created_under_mapping_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+     """暫存 memmap 一律建於 run 之映射根（不沿用 TMPDIR）：TMPDIR 指向另一目錄 ⇒ 映射檔仍在映射根下。"""
+     from momentum.FeatureEngineering import memmap_utils
+@@ -1426,6 +1440,26 @@ def test_mutation_recovery_ignores_abort_receipt(tmp_path: Path, monkeypatch: py
+     assert owned.exists()
+ 
+ 
++def test_recover_aborted_run_removes_paths_registered_in_abort_receipt_and_owned_list(tmp_path: Path) -> None:
++    """純增：上列 test_mutation_recovery_ignores_abort_receipt 把受測函式換成空函式後斷言暫存仍在（未建 abort 收據與
++    登記，真函式下亦綠）。本案測真實 recover_aborted_run：abort 收據之 owned_paths（目錄）與 owned_paths.json 所列
++    （檔案）皆被刪並列入回報；未登記之目錄保留。"""
++    run = tmp_path / "run"
++    run.mkdir()
++    owned_dir = tmp_path / "owned_tmp"
++    owned_dir.mkdir()
++    (owned_dir / "chunk.bin").write_bytes(b"0")
++    owned_file = tmp_path / "owned.mmap"
++    owned_file.write_bytes(b"0")
++    keep = tmp_path / "unregistered"
++    keep.mkdir()
++    (run / mb.ABORT_RECEIPT_NAME).write_text(json.dumps({"owned_paths": [str(owned_dir)]}), encoding="utf-8")
++    (run / mb.OWNED_PATHS_NAME).write_text(json.dumps([str(owned_file)]), encoding="utf-8")
++    report = mb.recover_aborted_run(run)
++    assert not owned_dir.exists() and not owned_file.exists() and keep.exists() and \
++        sorted(report["removed"]) == sorted([str(owned_dir), str(owned_file)]), report
++
++
+ # ---------------------------------------------------------------- Task 4.3 量測停損
+ 
+ PROBE = h.REPO / "handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py"
