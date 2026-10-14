@@ -1,0 +1,53 @@
+path	rc	seconds	summary	failed_nodeids
+tests/governance/test_docrot_claim_committee_backing.py	0	6	============================== 6 passed in 1.23s ===============================	-
+tests/governance/test_docrot_e3_brief_placeholder.py	0	5	============================== 19 passed in 1.90s ==============================	-
+tests/governance/test_docrot_f2_total_items_count.py	0	12	============================== 14 passed in 6.13s ==============================	-
+tests/governance/test_factkey_write_guard.py	0	7	============================== 11 passed in 2.65s ==============================	-
+tests/governance/test_family_registry.py	0	12	============================== 49 passed in 9.47s ==============================	-
+tests/governance/test_fkperf_cutover.py	0	64	======================== 12 passed in 60.25s (0:01:00) =========================	-
+tests/governance/test_fkperf_differential.py	timeout	302	-	-
+tests/governance/test_fkperf_govb1_equiv.py	0	6	============================== 6 passed in 1.30s ===============================	-
+tests/governance/test_fkperf_scale.py	timeout	302	-	-
+tests/governance/test_g7_trailer_precheck.py	0	6	============================== 9 passed in 2.10s ===============================	-
+tests/governance/test_gate_b4_wrapper_and_scripts.py	0	11	============================== 51 passed in 8.01s ==============================	-
+tests/governance/test_gate_claude_narrow.py	0	16	============================= 41 passed in 13.38s ==============================	-
+tests/governance/test_gate_decision.py	0	29	============================= 17 passed in 25.24s ==============================	-
+tests/governance/test_gate_deny_audit.py	0	4	============================== 5 passed in 0.94s ===============================	-
+tests/governance/test_gate_deny_fields.py	0	19	============================= 25 passed in 16.38s ==============================	-
+tests/governance/test_gate_impl_dispatch.py	0	7	============================== 4 passed in 2.10s ===============================	-
+tests/governance/test_gate_impl_requires_manifest.py	0	7	============================== 25 passed in 3.70s ==============================	-
+tests/governance/test_gate_lex_b3r_c5.py	0	132	======================== 26 passed in 128.62s (0:02:08) ========================	-
+tests/governance/test_gate_lexical_contract.py	0	21	============================== 9 passed in 16.39s ==============================	-
+tests/governance/test_gate_selfgate_newline.py	0	5	============================== 9 passed in 1.46s ===============================	-
+tests/governance/test_gate_structured_verdict.py	0	10	============================== 31 passed in 6.71s ==============================	-
+tests/governance/test_gate_todo_routing.py	0	8	============================== 11 passed in 4.61s ==============================	-
+tests/governance/test_gov_check_cheap_first.py	0	11	======================== 12 passed, 1 xfailed in 7.49s =========================	-
+tests/governance/test_gov_check_dep_failclosed.py	0	10	============================== 11 passed in 6.34s ==============================	-
+tests/governance/test_gov_enforcement_registry.py	0	20	============================= 23 passed in 16.21s ==============================	-
+tests/governance/test_govb1_b31_recovery.py	0	14	============================= 37 passed in 10.88s ==============================	-
+tests/governance/test_govb1_b50_workspace_drift.py	0	7	============================== 22 passed in 3.45s ==============================	-
+tests/governance/test_govb1_brief_id_pattern.py	0	5	============================== 9 passed in 1.56s ===============================	-
+tests/governance/test_govb1_contract_matrix.py	timeout	302	-	-
+tests/governance/test_govb1_expected_delta.py	0	24	============================= 39 passed in 20.02s ==============================	-
+tests/governance/test_govb1_factkey_gen.py	0	51	============================= 215 passed in 45.63s =============================	-
+tests/governance/test_govb1_factkey_hook.py	0	16	======================== 16 passed, 3 skipped in 10.38s ========================	-
+tests/governance/test_govb1_factverified.py	0	13	============================== 41 passed in 7.83s ==============================	-
+tests/governance/test_govb1_findings_kind.py	0	267	======================== 32 passed in 262.53s (0:04:22) ========================	-
+tests/governance/test_govb1_gate_selfcheck.py	0	9	============================== 10 passed in 4.81s ==============================	-
+tests/governance/test_govb1_lifecycle_matrix.py	0	8	============================== 21 passed in 4.14s ==============================	-
+tests/governance/test_govb1_template_check_ext.py	0	27	============================= 52 passed in 22.58s ==============================	-
+tests/governance/test_govb1_zero_findings.py	0	7	============================== 29 passed in 3.06s ==============================	-
+tests/governance/test_govb1_zeroid_no_regression.py	0	20	============================= 12 passed in 15.06s ==============================	-
+tests/governance/test_govb37_friction_tally.py	0	6	======================== 45 passed, 2 skipped in 2.08s =========================	-
+tests/governance/test_govb49_path_grant.py	0	65	=================== 39 passed, 1 xfailed in 60.66s (0:01:00) ===================	-
+tests/governance/test_govflow_manifest.py	0	34	============================= 14 passed in 28.82s ==============================	-
+tests/governance/test_low_risk_impl_requires_reconcile.py	0	14	============================== 5 passed in 8.77s ===============================	-
+tests/governance/test_mutation_scope_extension.py	0	19	============================= 10 passed in 15.40s ==============================	-
+tests/governance/test_narrow_check_router.py	0	14	============================= 14 passed in 10.33s ==============================	-
+tests/governance/test_patch_locus_check.py	0	10	============================== 18 passed in 4.95s ==============================	-
+tests/governance/test_plain_docs_render.py	0	11	============================== 4 passed in 7.65s ===============================	-
+tests/governance/test_precommit_autofix.py	0	9	============================== 7 passed in 4.56s ===============================	-
+tests/governance/test_reconcile_completeness_enforced.py	0	7	============================== 7 passed in 3.88s ===============================	-
+tests/governance/test_reconcile_target_bound_to_synth.py	0	5	============================== 7 passed in 2.27s ===============================	-
+tests/governance/test_redispatch.py	0	112	======================= 110 passed in 109.74s (0:01:49) ========================	-
+tests/governance/test_registry_v2_shape.py	0	8	============================== 11 passed in 3.34s ==============================	-
