@@ -228,13 +228,13 @@
       }
     ],
     "risk_mitigation": [
-      "contract_sha256 tests/_golden/framepath/test_disposition.json 0430e1bb21fd20c836e74e5ba922169030bed9d9f491e7b2dfb21c7b6d23ca20",
+      "contract_sha256 tests/_golden/framepath/test_disposition.json 2bf4f5c1f0d650f4858542fc8d089007c0efa0310aaf65c0826be0386c8636f9",
       "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
       "contract_sha256 tests/feature_engineering/test_framepath_invariance.py 268ce549cc47c5bf5dd4088021149d49274b4bba2607d5ae37f8cae620d38d77",
       "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py d89de272a19b08327d27689774e5b186adc012c7085b476d2c19cd4cd380a4a2",
-      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py e0ad74229dacc179dc86fc5fe847210045c039547d42a7dd23240bf8dcea4579",
+      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py 25e54a68843403630b4373f5bc954805fc7b7d27728ae0f45155eee7546b5977",
       "contract_sha256 tests/api/test_framepath_api_h5.py cff7c8e1e2d1f8dbe28c4a1ed789bb940969716dc0def2ed4098b5aeec2df562",
-      "contract_sha256 handoffs/run_receipts/20261008-framepath-disposition-view.md 35808ff1cfe4ddcea5cab435113adcc1e13947c5f705c02f0e7a91d6925740ba",
+      "contract_sha256 handoffs/run_receipts/20261008-framepath-disposition-view.md a99b2b8d22fc5ed6c69de021562991af3218c706a32f71c9dc149b0b7921aec8",
       "contract_sha256 tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/manifest.json 2578303559d26e59ccfd5542fc686a844a5fe375b4191a3264fa5799488c00b5",
       "contract_sha256 tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/columns.json.gz 9ab9c606873fd28b6d47cf47624c7181de2a413629d49db20600429642c6c694",
       "contract_sha256 tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/g1.parquet bbfc090f5d579f850b4665f0cd2fb13d532d5870fce399003089cbdfded813c1",
@@ -276,7 +276,8 @@
       "審查 r36：boundary_21 以 AST 判指名舊讀取結構不存在（coverage 無 h5py／V1 manifest.json；IC list_features 無舊 h5／parquet: 枝；瀏覽服務無 parquet_path、7.0 轉向、manifest.get(\"total_rows\") 退回、_load_hdf5_features_df／_csv_chunk_generator_from_hdf5，h5py 只准於 _load_cgsa_kline_timestamps；瀏覽器服務無 _feature_library／_feature_reader 與其工廠匯入），附早退留死碼之 mutation；affected_tests 改為操作所在 ∪ SPEC 該 Phase 段落具名之測試檔（phase=1／2／3＝30／33／1 檔）；判定函式 structural_residues",
       "審查 r37：structural_residues 改以 _bound_names 取 h5py 於各檔之全部綁定名（含 import as、from h5py import），別名之匯入與使用同判；kline 讀取之別名使用仍合法；附三種別名 mutation",
       "審查 r38：manifest 分批文字 b2 改為 Task 2.1–2.8，coverage_risk 之 API 驗收描述同步 v17 boundary_13–21 與 Task 2.8 affected_tests（doc-sync）",
-      "審查 r39：V1 版面 fixture 三檔記 contract_sha256，與四支驗收測試同列凍結契約（FROZEN_CONTRACT_FILES：⓪ sha256、實作許可錨點後不得改、首個生產碼提交後不得改），附掏空 fixture 之 mutation"
+      "審查 r39：V1 版面 fixture 三檔記 contract_sha256，與四支驗收測試同列凍結契約（FROZEN_CONTRACT_FILES：⓪ sha256、實作許可錨點後不得改、首個生產碼提交後不得改），附掏空 fixture 之 mutation",
+      "v22 D11（偵察諮詢 r6 收斂）：本票提交以結構化附註辨識（Ticket-Batch root／Governance-Scope 第二 token）；② 只被他票改過之治理檔不比對、本票將動者以 build_disposition.py --rebase 重錨（處置表 rebase 段記 base_commit／foreign_commits）並衝突檢查；⑥ 與 ⑦ 活文件登記表逐本票提交歸屬、⑥ 另准本票白話審閱索引列；⑦ 清冊改生成物完整性檢查；⓪ 凍結次序依核定期（凍結檔於生產碼後之改動須被其後本票實作許可涵蓋、同一提交混改一律紅）；受影響閘 collect 空檔（rc 5＋no tests collected）視為空集合並記 empty_collect；text_apply 對有 rebase 紀錄之檔以基準位元組套用；b2 首步修 b1 遺留兩紅（nan 盤點 receipt 重產、cgsa_resume 替身建 registry）並以 b1 錨點重放受影響閘證兩紅選入（不足 fail-closed 估全跑時數交使用者）"
     ],
     "coverage_risk": [
       "Task 1.1：test_framepath_invariance（C1–C9 逐格無容差、C5＝C1、run_status、記憶體閘、C9 前置條件、compare_domain 禁排除鍵與非純量、注入讀數拒跑、比對器無週期／標的字面、兩 mutant）；M1–M4 worktree mutation 收據",

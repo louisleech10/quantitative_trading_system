@@ -78,24 +78,25 @@ def ast_dump(node: ast.AST) -> str:
 GIT_PREFIX = ("git", "-c", "core.quotepath=off")  # 審查 r46：路徑輸出一律不跳脫（非 ASCII 路徑原樣）
 
 
-def _git(*args: str, check: bool = True) -> bytes:
-    proc = subprocess.run([*GIT_PREFIX, *args], cwd=REPO, capture_output=True)
+def _git(*args: str, check: bool = True, repo: Path = REPO) -> bytes:
+    proc = subprocess.run([*GIT_PREFIX, *args], cwd=repo, capture_output=True)
     if check and proc.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} rc={proc.returncode}: {proc.stderr.decode('utf-8', 'replace')}")
     return proc.stdout
 
 
 class HeadReader:
-    """HEAD 6e07e0ad 之檔內容讀取（`git cat-file`，結果快取）。"""
+    """HEAD 6e07e0ad 之檔內容讀取（`git cat-file`，結果快取）。`repo` 供 mutation 之暫存 git repo 使用（SPEC v22 D11）。"""
 
-    def __init__(self, commit: str) -> None:
+    def __init__(self, commit: str, repo: Path = REPO) -> None:
         self.commit = commit
+        self.repo = repo
         self._cache: Dict[str, Optional[bytes]] = {}
         self._types: Dict[str, Optional[str]] = {}
 
     def obj_type(self, path: str) -> Optional[str]:
         if path not in self._types:
-            proc = subprocess.run(["git", "cat-file", "-t", f"{self.commit}:{path}"], cwd=REPO, capture_output=True)
+            proc = subprocess.run(["git", "cat-file", "-t", f"{self.commit}:{path}"], cwd=self.repo, capture_output=True)
             self._types[path] = proc.stdout.decode().strip() if proc.returncode == 0 else None
         return self._types[path]
 
@@ -104,7 +105,7 @@ class HeadReader:
             if self.obj_type(path) != "blob":
                 self._cache[path] = None
             else:
-                self._cache[path] = _git("cat-file", "blob", f"{self.commit}:{path}")
+                self._cache[path] = _git("cat-file", "blob", f"{self.commit}:{path}", repo=self.repo)
         return self._cache[path]
 
 
@@ -573,14 +574,42 @@ NEW_FILE_KEYS = {"path", "phase", "task"}
 FACT_ROW_KEYS = {"row_id", "phase"}
 TOP_KEYS = {"schema", "head_commit", "python", "spec", "population", "collect", "hash_algorithms", "nodeids",
             "operations", "new_files", "fact_key_rows", "ignored_baseline"}
+# SPEC v22 D11.2：選填之重錨紀錄 {治理檔 path: {"base_commit": 40hex, "foreign_commits": [40hex, …]}}——該檔 ② 之期望
+# 改以 base_commit 版位元組＋同一操作計算（操作之定位與摘錄仍對錨點 6e07e0ad 解析）；由產生器 --rebase 寫入
+OPTIONAL_TOP_KEYS = {"rebase"}
+REBASE_ENTRY_KEYS = {"base_commit", "foreign_commits"}
+_SHA40_RE = re.compile(r"[0-9a-f]{40}")
+
+
+def rebase_schema_errors(disp: Dict[str, Any]) -> List[str]:
+    rb = disp.get("rebase")
+    if rb is None:
+        return []
+    if not isinstance(rb, dict):
+        return ["rebase 須為物件 {path: {base_commit, foreign_commits}}"]
+    errs: List[str] = []
+    governed = set(governed_files(disp))
+    for path, ent in rb.items():
+        if path not in governed:
+            errs.append(f"rebase {path!r} 不在治理檔（母體 ∪ 操作表 path）")
+        if not isinstance(ent, dict) or set(ent) != REBASE_ENTRY_KEYS:
+            errs.append(f"rebase {path!r} 欄位須恰為 {sorted(REBASE_ENTRY_KEYS)}")
+            continue
+        if not (isinstance(ent["base_commit"], str) and _SHA40_RE.fullmatch(ent["base_commit"])):
+            errs.append(f"rebase {path!r} base_commit 須為 40 位小寫十六進位")
+        fc = ent["foreign_commits"]
+        if not (isinstance(fc, list) and fc and all(isinstance(c, str) and _SHA40_RE.fullmatch(c) for c in fc)):
+            errs.append(f"rebase {path!r} foreign_commits 須為非空之 40 位提交編號陣列")
+    return errs
 
 
 def schema_errors(disp: Dict[str, Any], spec_text: str) -> List[str]:
     """處置表封閉 schema（SPEC 驗證⑤⑥之三清單 schema 與 nodeid 表／操作表必填欄）。"""
     errs: List[str] = []
-    if set(disp) != TOP_KEYS:
-        errs.append(f"頂層鍵不符：多 {sorted(set(disp) - TOP_KEYS)} 缺 {sorted(TOP_KEYS - set(disp))}")
+    if not TOP_KEYS <= set(disp) <= TOP_KEYS | OPTIONAL_TOP_KEYS:
+        errs.append(f"頂層鍵不符：多 {sorted(set(disp) - TOP_KEYS - OPTIONAL_TOP_KEYS)} 缺 {sorted(TOP_KEYS - set(disp))}")
         return errs
+    errs += rebase_schema_errors(disp)
     for row in disp["nodeids"]:
         if not isinstance(row, dict) or not set(row) <= NODEID_KEYS:
             errs.append(f"nodeid 列未知欄位：{row}")
@@ -779,15 +808,207 @@ def expected_vs_current(path: str, head_b: Optional[bytes], cur_b: Optional[byte
     return None if cur_b == head_b else "無操作而位元組與 HEAD 不等"
 
 
+# ---------------------------------------------------------------------------
+# SPEC v22 D11.2：重錨（他票改過之治理檔以他票最近改動後版本為新基準）與衝突檢查
+# ---------------------------------------------------------------------------
+
+WHOLE_FILE_KINDS = ("replace-file", "delete-file")
+
+
+def _top_key(stmt: ast.stmt) -> Tuple[str, str]:
+    """模組層敘述之歸屬鍵：函式／類別＝名稱；其餘＝整句傾印（任何改動即成「刪一句＋增一句」）。"""
+    if isinstance(stmt, _DEF_TYPES):
+        return ("def", stmt.name)
+    return ("stmt", ast_dump(stmt))
+
+
+def _top_groups(tree: ast.Module) -> Dict[Tuple[str, str], List[str]]:
+    groups: Dict[Tuple[str, str], List[str]] = {}
+    for stmt in tree.body:
+        groups.setdefault(_top_key(stmt), []).append(ast_dump(stmt))
+    return groups
+
+
+def touched_top_keys(anchor_tree: ast.Module, base_tree: ast.Module) -> Set[Tuple[str, str]]:
+    """錨點→基準之間有改動之頂層定義（Python AST 節點）：同鍵之敘述傾印序列不同者（新增、刪除、改寫皆計）。"""
+    a, b = _top_groups(anchor_tree), _top_groups(base_tree)
+    return {k for k in set(a) | set(b) if a.get(k) != b.get(k)}
+
+
+def _top_level_of(tree: ast.Module, node: ast.AST) -> ast.stmt:
+    for stmt in tree.body:
+        if any(n is node for n in ast.walk(stmt)):
+            return stmt
+    raise LocatorError("目標不在任一模組層敘述內")
+
+
+def json_touched_pointers(a: Any, b: Any, prefix: Tuple[str, ...] = ()) -> List[Tuple[str, ...]]:
+    """兩 JSON 文件之差異位置（token 序列）：dict 逐鍵下探；list 長度不同即整個 list 計為改動（索引位移保守處理）。"""
+    if isinstance(a, dict) and isinstance(b, dict):
+        out: List[Tuple[str, ...]] = []
+        for k in sorted(set(a) | set(b)):
+            if k not in a or k not in b:
+                out.append(prefix + (k,))
+            else:
+                out += json_touched_pointers(a[k], b[k], prefix + (k,))
+        return out
+    if isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        out = []
+        for i, (x, y) in enumerate(zip(a, b)):
+            out += json_touched_pointers(x, y, prefix + (str(i),))
+        return out
+    return [] if canonical_json(a) == canonical_json(b) else [prefix]
+
+
+def rebase_conflicts(path: str, anchor_b: Optional[bytes], base_b: Optional[bytes],
+                     ops: Sequence[Dict[str, Any]]) -> List[str]:
+    """衝突檢查：他票自錨點至新基準之改動所觸之頂層定義（Python）或 JSON pointer，與本票對該檔任一操作（不分 phase）之
+    目標相交 ⇒ 列出（fail-closed，須重新處置並經審查；不得以「操作不變」放行）。整檔操作、檔於任一側不存在、無法解析
+    皆視為相交。"""
+    if anchor_b is None or base_b is None:
+        return [f"{path}：錨點或基準不存在此檔"]
+    if anchor_b == base_b:
+        return []
+    errs: List[str] = []
+    for op in ops:
+        if op["kind"] in WHOLE_FILE_KINDS:
+            errs.append(f"{path}：{op['id']}（{op['kind']}）為整檔操作，他票已改此檔")
+    ext = ext_of(path)
+    if ext == ".py":
+        py_ops = [op for op in ops if op["kind"] in PY_KINDS]
+        if not py_ops:
+            return errs
+        try:
+            a_tree, b_tree = ast.parse(anchor_b.decode("utf-8")), ast.parse(base_b.decode("utf-8"))
+        except SyntaxError as exc:
+            return errs + [f"{path}：無法解析（{exc}）"]
+        touched = touched_top_keys(a_tree, b_tree)
+        for op in py_ops:
+            try:
+                top = _top_level_of(a_tree, resolve_locator(a_tree, op["kind"], op["locator"]).node)
+            except LocatorError as exc:
+                errs.append(f"{path}：{op['id']} 於錨點無法定位（{exc}）")
+                continue
+            if _top_key(top) in touched:
+                errs.append(f"{path}：他票改動之頂層定義 {_top_key(top)[1][:80]!r} 與 {op['id']}（{op['kind']}）之目標相交")
+    elif ext == ".json":
+        pointers = [op for op in ops if op["kind"] == "delete-json-path"]
+        if not pointers:
+            return errs
+        try:
+            touched_ptrs = json_touched_pointers(json.loads(anchor_b), json.loads(base_b))
+        except ValueError as exc:
+            return errs + [f"{path}：JSON 無法解析（{exc}）"]
+        for op in pointers:
+            tgt = tuple(_pointer_tokens(op["pointer"]))
+            for t in touched_ptrs:
+                if t[: len(tgt)] == tgt or tgt[: len(t)] == t:
+                    errs.append(f"{path}：他票改動之 JSON pointer /{'/'.join(t)} 與 {op['id']} 之 {op['pointer']} 相交")
+                    break
+    return errs
+
+
+def _node_path(root: ast.AST, target: ast.AST) -> Optional[List[Tuple[str, Optional[int]]]]:
+    if root is target:
+        return []
+    for field, val in ast.iter_fields(root):
+        items = [(i, x) for i, x in enumerate(val)] if isinstance(val, list) else [(None, val)]
+        for i, child in items:
+            if isinstance(child, ast.AST):
+                sub = _node_path(child, target)
+                if sub is not None:
+                    return [(field, i)] + sub
+    return None
+
+
+def _follow(root: ast.AST, steps: Sequence[Tuple[str, Optional[int]]]) -> ast.AST:
+    node = root
+    for field, i in steps:
+        val = getattr(node, field)
+        node = val[i] if i is not None else val
+    return node
+
+
+def rebase_ops(anchor_src: str, base_src: str, ops: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """把對錨點解析之 Python 操作轉成對基準之同一操作：目標所在頂層敘述於兩側傾印相同（衝突檢查保證），沿同一 AST
+    結構路徑取基準之對應節點，行號類定位（stmt、import_alias）改用基準行號；轉換後於基準重新解析須得同一摘錄傾印，
+    否則 LocatorError（fail-closed）。非 Python 操作原樣回傳。"""
+    a_tree, b_tree = ast.parse(anchor_src), ast.parse(base_src)
+    b_groups: Dict[Tuple[str, str], List[ast.stmt]] = {}
+    for stmt in b_tree.body:
+        b_groups.setdefault(_top_key(stmt), []).append(stmt)
+    out: List[Dict[str, Any]] = []
+    for op in ops:
+        if op["kind"] not in PY_KINDS:
+            out.append(op)
+            continue
+        t = resolve_locator(a_tree, op["kind"], op["locator"])
+        top = _top_level_of(a_tree, t.node)
+        key = _top_key(top)
+        same = [s for s in a_tree.body if _top_key(s) == key]
+        cands = b_groups.get(key, [])
+        if len(cands) != len(same) or any(ast_dump(x) != ast_dump(y) for x, y in zip(same, cands)):
+            raise LocatorError(f"{op['id']}：目標所在頂層定義於基準已改（應先過衝突檢查）")
+        b_top = cands[[i for i, s in enumerate(same) if s is top][0]]
+        anchor_node = t.container if t.action == "remove_alias" else t.node
+        b_node = _follow(b_top, _node_path(top, anchor_node) or [])
+        loc = dict(op["locator"])
+        if loc.get("category") == "stmt":
+            loc["lineno"], loc["end_lineno"] = b_node.lineno, b_node.end_lineno
+        elif loc.get("category") == "import_alias":
+            loc["lineno"] = b_node.lineno
+        new_op = dict(op, locator=loc)
+        if resolve_locator(b_tree, op["kind"], loc).excerpt_dump() != t.excerpt_dump():
+            raise LocatorError(f"{op['id']}：於基準重新定位之摘錄與錨點不同")
+        out.append(new_op)
+    return out
+
+
+def _foreign_hint(path: str, foreign_touched: Set[str]) -> str:
+    return "（此檔錨點以來曾被他票改過：須以產生器 --rebase 重錨，見 SPEC v22 D11.2）" if path in foreign_touched else ""
+
+
 def check_2(disp: Dict[str, Any], phase: int, head: HeadReader,
-            current_reader=current_bytes) -> List[str]:
+            current_reader=current_bytes, foreign_only: Optional[Iterable[str]] = None,
+            read_at=None, foreign_touched: Optional[Iterable[str]] = None) -> List[str]:
+    """②（SPEC v22 D11.2）：
+    - 「只被他票提交改過、未被本票提交改過、且工作樹相對 HEAD 未改」（`foreign_only`，D11.1 定義）且本批 E 無該檔操作者
+      不比對（E 有該檔操作者仍比對——本票之操作未執行不得因他票碰過該檔而放行）；
+    - 處置表 `rebase` 有該檔者：先做衝突檢查（全部 phase 之操作），相交即紅；不相交 ⇒ 期望＝基準提交之位元組＋E 之同一
+      操作（定位經 `rebase_ops` 轉換）；
+    - 其餘：期望＝錨點位元組＋E 之操作（原規則）。
+    `foreign_only`／`foreign_touched` 未給（None）⇒ 以本 repo 之 git 歷史計算（mutation 測試以暫存 repo 明給）。"""
     e_ops = ops_in(disp, phase)
+    skip = set(foreign_only_paths() if foreign_only is None else foreign_only)
+    touched = set(foreign_and_ticket_paths()[0] if foreign_touched is None else foreign_touched)
+    rebase = disp.get("rebase") or {}
+    read_at = read_at or _git_show_bytes
     errs = []
     for path in governed_files(disp):
         file_ops = [op for op in e_ops if op["path"] == path]
-        diff = expected_vs_current(path, head.read(path), current_reader(path), file_ops)
+        if path in skip and not file_ops:
+            continue
+        cur = current_reader(path)
+        ent = rebase.get(path)
+        if ent is None:
+            diff = expected_vs_current(path, head.read(path), cur, file_ops)
+            if diff:
+                errs.append(f"② {path}：{diff}{_foreign_hint(path, touched)}")
+            continue
+        anchor_b, base_b = head.read(path), read_at(ent["base_commit"], path)
+        conflicts = rebase_conflicts(path, anchor_b, base_b, [op for op in disp["operations"] if op["path"] == path])
+        if conflicts:
+            errs += [f"② 重錨衝突（fail-closed）：{c}" for c in conflicts]
+            continue
+        try:
+            ops = rebase_ops(anchor_b.decode("utf-8"), base_b.decode("utf-8"), file_ops) \
+                if ext_of(path) == ".py" and any(op["kind"] in PY_KINDS for op in file_ops) else file_ops
+        except (SyntaxError, LocatorError) as exc:
+            errs.append(f"② {path}：重錨後無法定位操作（{exc}）")
+            continue
+        diff = expected_vs_current(path, base_b, cur, ops)
         if diff:
-            errs.append(f"② {path}：{diff}")
+            errs.append(f"② {path}（基準 {ent['base_commit'][:8]}）：{diff}（若他票於基準後又改此檔，須再重錨）")
     return errs
 
 
@@ -1064,33 +1285,81 @@ def _filter_ignored(paths: Iterable[str]) -> List[str]:
     return sorted({p for p in paths if p.endswith(IGNORED_EXTS) and "__pycache__/" not in p})
 
 
-TICKET_COMMIT_RE = re.compile(r"framepath", re.IGNORECASE)
-_LOG_FMT = ("%x00%H%x1f%s%x1f%(trailers:key=Ticket-Batch,valueonly,separator=;)"
-            "%x1f%(trailers:key=Governance-Scope,valueonly,separator=;)")
+# SPEC v22 D11.1：本票提交＝`Ticket-Batch` 附註之 root（`/` 前）等於 TICKET_ROOT，或 `Governance-Scope` 附註值以空白
+# 切分後第二個 token 等於 FRAMEPATH（第一個 token 恆為 `out-of-epic`）；標題與附註內文之子字串一律不計（取代 D10①）。
+# 同一附註鍵有多值時以 \x1e 分隔（不用 `;`，免與附註內文混淆）。
+TICKET_GS_TOKEN = "FRAMEPATH"
+_LOG_FMT = ("%x00%H%x1f%s%x1f%(trailers:key=Ticket-Batch,valueonly,separator=%x1e)"
+            "%x1f%(trailers:key=Governance-Scope,valueonly,separator=%x1e)")
 
 
-def split_commit_paths(log_text: str) -> Tuple[Set[str], Set[str]]:
-    """`git log --format=_LOG_FMT --name-only` 之輸出 → (本票提交所改路徑, 他票提交所改路徑)。本票提交＝標題或
-    Ticket-Batch／Governance-Scope 附註含 FRAMEPATH（不分大小寫）。"""
-    ticket: Set[str] = set()
-    foreign: Set[str] = set()
+def is_ticket_commit(ticket_batch: str, governance_scope: str) -> bool:
+    """D11.1 之本票提交判定（只看兩個結構化附註之封閉 token）。"""
+    if any(v.strip().split("/", 1)[0].strip() == TICKET_ROOT for v in ticket_batch.split("\x1e")):
+        return True
+    return any(len(v.split()) >= 2 and v.split()[1] == TICKET_GS_TOKEN for v in governance_scope.split("\x1e"))
+
+
+def parse_commit_log(log_text: str) -> List[Tuple[str, bool, Set[str]]]:
+    """`git log --format=_LOG_FMT --name-only` 之輸出 → 依輸出序之 (提交, 是否本票提交, 所改路徑)。"""
+    out: List[Tuple[str, bool, Set[str]]] = []
     for block in log_text.split("\x00")[1:]:
         head, _, files = block.partition("\n")
         fields = (head.split("\x1f") + ["", "", "", ""])[:4]
         paths = {p for p in files.splitlines() if p.strip()}
-        (ticket if TICKET_COMMIT_RE.search(" ".join(fields[1:])) else foreign).update(paths)
+        out.append((fields[0].strip(), is_ticket_commit(fields[2], fields[3]), paths))
+    return out
+
+
+def split_commit_paths(log_text: str) -> Tuple[Set[str], Set[str]]:
+    """`git log --format=_LOG_FMT --name-only` 之輸出 → (本票提交所改路徑, 他票提交所改路徑)；本票提交依 D11.1。"""
+    ticket: Set[str] = set()
+    foreign: Set[str] = set()
+    for _sha, mine, paths in parse_commit_log(log_text):
+        (ticket if mine else foreign).update(paths)
     return ticket, foreign
 
 
-def foreign_only_paths() -> Set[str]:
+def commit_log(repo: Path = REPO, rev_range: Optional[str] = None, *paths: str, reverse: bool = False) -> str:
+    args = ["log", f"--format={_LOG_FMT}", "--name-only", *(["--reverse"] if reverse else []),
+            rev_range or f"{HEAD_SHORT}..HEAD", "--", *paths]
+    return _git(*args, repo=repo).decode("utf-8", "replace")
+
+
+def foreign_and_ticket_paths(repo: Path = REPO, anchor: str = HEAD_SHORT) -> Tuple[Set[str], Set[str]]:
+    """錨點至 HEAD 間 (他票提交所改路徑, 本票提交所改路徑)。"""
+    ticket, foreign = split_commit_paths(commit_log(repo, f"{anchor}..HEAD"))
+    return foreign, ticket
+
+
+def foreign_only_paths(repo: Path = REPO, anchor: str = HEAD_SHORT) -> Set[str]:
     """實作期 b1（並行他票提交）：錨點 6e07e0ad 至 HEAD 間只被他票提交改過、未被本票提交改過、且工作樹相對 HEAD
-    未改之路徑——他票之正常提交（如 Javis 信箱工具）不屬本票範圍，自 ⑤(a)／⑦ 之「錨點以來改動」中排除；本票提交
-    或工作樹（本批未提交改動）碰到者一律照常受檢。"""
-    ticket, foreign = split_commit_paths(_git("log", f"--format={_LOG_FMT}", "--name-only",
-                                              f"{HEAD_SHORT}..HEAD", "--").decode("utf-8", "replace"))
-    wt = {p for p in _git("diff", "--name-only", "HEAD").decode().splitlines() if p}
-    wt |= {p for p in _git("ls-files", "--others", "--exclude-standard").decode().splitlines() if p}
+    未改之路徑——他票之正常提交（如 Javis 信箱工具）不屬本票範圍，自 ⑤(a)／⑦ 之「錨點以來改動」中排除、② 不比對
+    （SPEC v22 D11.2）；本票提交或工作樹（本批未提交改動）碰到者一律照常受檢。本票提交之辨識依 D11.1。"""
+    foreign, ticket = foreign_and_ticket_paths(repo, anchor)
+    wt = {p for p in _git("diff", "--name-only", "HEAD", repo=repo).decode().splitlines() if p}
+    wt |= {p for p in _git("ls-files", "--others", "--exclude-standard", repo=repo).decode().splitlines() if p}
     return foreign - ticket - wt
+
+
+def rebase_history_errors(disp: Dict[str, Any], repo: Path = REPO, anchor: str = HEAD_SHORT) -> List[str]:
+    """處置表 `rebase` 每列（D11.2）須對得上 git 歷史：基準為錨點之後代；錨點至基準間改過該檔之提交恰為所記之
+    foreign_commits（依時間序）且全為他票提交（D11.1）——重錨不得吸收本票自己之改動。"""
+    errs: List[str] = []
+    for path, ent in (disp.get("rebase") or {}).items():
+        base = ent["base_commit"]
+        if subprocess.run(["git", "merge-base", "--is-ancestor", anchor, base], cwd=repo,
+                          capture_output=True).returncode != 0:
+            errs.append(f"② rebase {path}：基準 {base[:8]} 非錨點 {anchor} 之後代")
+            continue
+        hist = [(sha, mine) for sha, mine, paths in parse_commit_log(commit_log(repo, f"{anchor}..{base}", path,
+                                                                                  reverse=True)) if path in paths]
+        mine = [sha[:8] for sha, m in hist if m]
+        if mine:
+            errs.append(f"② rebase {path}：錨點至基準間有本票提交改此檔 {mine}（重錨只准吸收他票改動）")
+        if [sha for sha, _ in hist] != ent["foreign_commits"]:
+            errs.append(f"② rebase {path}：所記 foreign_commits 與錨點至基準之改檔提交不符")
+    return errs
 
 
 def git_added_and_untracked() -> Set[str]:
@@ -1147,11 +1416,83 @@ def _fact_rows_without(doc: Dict[str, Any], drop_ids: Set[str]) -> Dict[str, Any
     return out
 
 
-def check_6(disp: Dict[str, Any], phase: int, head_doc: Dict[str, Any], cur_doc: Dict[str, Any]) -> List[str]:
+# SPEC v22 D11.9：`plaindocs-index` 表無識別碼欄；本票提交（與工作樹）另准增刪「白話審閱文件路徑位於 白話說明/ 且檔名
+# 以 FRAMEPATH 起首」之列（連結欄為 Markdown 連結，相對於該表 target〔白話說明/README.md〕所在目錄解析）；他列照舊。
+PLAINDOCS_INDEX_KEY = "plaindocs-index"
+PLAINDOCS_DIR = "白話說明"
+PLAINDOCS_LINK_COL = "打開這份"
+PLAINDOCS_TICKET_PREFIX = "FRAMEPATH"
+_MD_LINK_RE = re.compile(r"\[[^\]\n]*\]\(([^()\s]+)\)")
+
+
+def is_ticket_plaindoc_row(table: Dict[str, Any], row: Any) -> bool:
+    import posixpath
+
+    cols = table.get("columns")
+    if not (isinstance(cols, list) and PLAINDOCS_LINK_COL in cols and isinstance(row, list)):
+        return False
+    ci = cols.index(PLAINDOCS_LINK_COL)
+    cell = row[ci] if len(row) > ci else None
+    m = _MD_LINK_RE.fullmatch(cell.strip()) if isinstance(cell, str) else None
+    if m is None or m.group(1).startswith("/") or "\\" in m.group(1) or ":" in m.group(1):
+        return False
+    target = table.get("target")
+    base = posixpath.dirname(target[0]) if isinstance(target, list) and len(target) == 1 and isinstance(target[0], str) \
+        else PLAINDOCS_DIR
+    full = posixpath.normpath(posixpath.join(base, m.group(1)))
+    return full.startswith(PLAINDOCS_DIR + "/") and posixpath.basename(full).startswith(PLAINDOCS_TICKET_PREFIX)
+
+
+def _without_ticket_plaindocs(doc: Dict[str, Any]) -> Dict[str, Any]:
+    table = doc.get(PLAINDOCS_INDEX_KEY)
+    if not (isinstance(table, dict) and isinstance(table.get("rows"), list)):
+        return doc
+    out = copy.deepcopy(doc)
+    out[PLAINDOCS_INDEX_KEY]["rows"] = [r for r in table["rows"] if not is_ticket_plaindoc_row(table, r)]
+    return out
+
+
+def check_6(disp: Dict[str, Any], phase: int, head_doc: Dict[str, Any], cur_doc: Dict[str, Any],
+            label: str = "HEAD→現行") -> List[str]:
+    """單段改動（before＝head_doc、after＝cur_doc；⑥ 只餵本票提交與工作樹之段，D11.3）只得觸及 fact_key_rows（phase ≤
+    本批）所列之列，及 D11.9 之本票白話審閱索引列。"""
     allowed = {item["row_id"] for item in disp["fact_key_rows"] if item["phase"] <= phase}
+    head_doc, cur_doc = _without_ticket_plaindocs(head_doc), _without_ticket_plaindocs(cur_doc)
     if canonical_json(_fact_rows_without(head_doc, allowed)) != canonical_json(_fact_rows_without(cur_doc, allowed)):
-        return [f"⑥ scripts/fact_keys.json 於 fact_key_rows（phase ≤ {phase}）以外之列與 HEAD 不等"]
+        return [f"⑥ scripts/fact_keys.json 於 fact_key_rows（phase ≤ {phase}）以外之列有改動（{label}）"]
     return []
+
+
+def _json_at(repo: Path, rev: str, rel: str) -> Dict[str, Any]:
+    proc = subprocess.run(["git", "show", f"{rev}:{rel}"], cwd=repo, capture_output=True)
+    return json.loads(proc.stdout) if proc.returncode == 0 else {}
+
+
+def ticket_revisions(rel: str, repo: Path = REPO, anchor: str = HEAD_SHORT,
+                     current_reader=None) -> List[Tuple[str, Dict[str, Any], Dict[str, Any]]]:
+    """SPEC v22 D11.3 之逐提交歸屬（JSON 檔 `rel`）：每一本票提交（D11.1）改動該檔者取 `commit^→commit`，末項為
+    `HEAD→工作樹`；他票提交之改動不計（不比錨點與現行之淨差——本票改越界列後被他票改回仍紅）。回傳 [(標籤, before, after)]。"""
+    out: List[Tuple[str, Dict[str, Any], Dict[str, Any]]] = []
+    for sha, mine, paths in parse_commit_log(commit_log(repo, f"{anchor}..HEAD", reverse=True)):
+        if mine and rel in paths:
+            out.append((f"本票提交 {sha[:8]}：commit^→commit", _json_at(repo, f"{sha}^", rel), _json_at(repo, sha, rel)))
+    cur = (current_reader or (lambda r: json.loads((repo / r).read_text(encoding="utf-8"))))(rel)
+    out.append(("HEAD→工作樹", _json_at(repo, "HEAD", rel), cur))
+    return out
+
+
+def fact_key_revisions(repo: Path = REPO, anchor: str = HEAD_SHORT,
+                       current_reader=None) -> List[Tuple[str, Dict[str, Any], Dict[str, Any]]]:
+    """⑥（SPEC v22 D11.3）：scripts/fact_keys.json 之逐本票提交與工作樹改動段。"""
+    return ticket_revisions(FACT_KEYS_REL, repo, anchor, current_reader)
+
+
+def check_6_revisions(disp: Dict[str, Any], phase: int,
+                      revisions: Sequence[Tuple[str, Dict[str, Any], Dict[str, Any]]]) -> List[str]:
+    errs: List[str] = []
+    for label, before, after in revisions:
+        errs += check_6(disp, phase, before, after, label)
+    return errs
 
 
 def git_changed_paths() -> Set[str]:
@@ -1193,19 +1534,87 @@ def _live_doc_without_ticket_rows(doc: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def check_7_live_doc(head_doc: Dict[str, Any], cur_doc: Dict[str, Any]) -> List[str]:
+def check_7_live_doc(head_doc: Dict[str, Any], cur_doc: Dict[str, Any], label: str = "HEAD→現行") -> List[str]:
     errs = _live_doc_ticket_row_errors(cur_doc)
     if canonical_json(_live_doc_without_ticket_rows(head_doc)) != canonical_json(_live_doc_without_ticket_rows(cur_doc)):
-        errs.append(f"⑦ {LIVE_DOC_REGISTRY_REL} 於本票文件 exact 列以外與 HEAD 不等")
+        errs.append(f"⑦ {LIVE_DOC_REGISTRY_REL} 於本票文件 exact 列以外有改動（{label}）")
     return errs
 
 
-def check_7(disp: Dict[str, Any], changed: Set[str]) -> List[str]:
+def check_7_live_doc_revisions(revisions: Sequence[Tuple[str, Dict[str, Any], Dict[str, Any]]]) -> List[str]:
+    """活文件登記表之逐本票提交歸屬（SPEC v22 D11.1／D11.3 同構推及 ⑦：他票提交之改動〔他票登記自身 SPEC 列〕不計，
+    本票提交與工作樹之改動只准本票文件 exact 列）。"""
+    errs: List[str] = []
+    for label, before, after in revisions:
+        errs += check_7_live_doc(before, after, label)
+    return errs
+
+
+# SPEC v22 D11.7：collect-only 時 `tests/conftest.py`（pytest_collection_modifyitems → scripts/build_l65_golden.py
+# write_test_inventory_from_nodeids）改寫之已追蹤清冊——與受影響測試閘 GENERATED_TRACKED（D10②）同一檔。⑦ 不無條件
+# 豁免：改動之內容須等於以現行樹 collect 重產之結果（collect 副作用免報、手動竄改仍抓）。
+GENERATED_INVENTORY_REL = "tests/golden/l65/test_inventory.txt"
+INVENTORY_EMPTY = b"BLOCKER: no L6.5/preprocessing tests collected\n"  # 生成器於收集不到相關 nodeid 時之輸出
+INVENTORY_COLLECT_TIMEOUT = 600
+
+
+def regenerate_inventory(files: Sequence[str], repo: Path = REPO) -> bytes:
+    """以現行樹 collect-only 收集 `files`（同 D10② 之生成規則：由 conftest 之 collection hook 寫出清冊）並回傳寫出之
+    位元組；呼叫前之清冊位元組於結束時原樣寫回（不留副作用）。collect 失敗 ⇒ RuntimeError。"""
+    inv = repo / GENERATED_INVENTORY_REL
+    saved = inv.read_bytes() if inv.is_file() else None
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "--collect-only", "-q", "-o", "addopts=--import-mode=importlib",
+             "-p", "no:cacheprovider", *files], cwd=repo, capture_output=True, text=True,
+            timeout=INVENTORY_COLLECT_TIMEOUT)
+        if proc.returncode != 0:
+            raise RuntimeError(f"collect rc={proc.returncode}：{proc.stdout[-800:]}{proc.stderr[-400:]}")
+        return inv.read_bytes()
+    finally:
+        if saved is None:
+            if inv.exists():
+                inv.unlink()  # 呼叫前不存在 ⇒ 撤除本次 collect 寫出者
+        else:
+            inv.write_bytes(saved)
+
+
+def inventory_integrity_errors(content: Optional[bytes], regenerate=regenerate_inventory) -> List[str]:
+    """清冊生成物完整性（D11.7）：現行內容須等於「collect 其所列檔」重產之結果；每行須為 `檔::名` 之 nodeid（生成器之
+    輸出形態），全空收集之生成輸出（INVENTORY_EMPTY）視為生成物。"""
+    if content is None:
+        return [f"⑦ {GENERATED_INVENTORY_REL} 被刪除（生成物不得刪）"]
+    if content == INVENTORY_EMPTY:
+        return []
+    lines = content.decode("utf-8", "replace").splitlines()
+    if not lines or any("::" not in ln or ln != ln.strip() for ln in lines):
+        return [f"⑦ {GENERATED_INVENTORY_REL} 含非 nodeid 行（非生成器輸出形態）"]
+    files = sorted({ln.split("::", 1)[0] for ln in lines})
+    try:
+        regenerated = regenerate(files)
+    except (RuntimeError, subprocess.TimeoutExpired) as exc:
+        return [f"⑦ {GENERATED_INVENTORY_REL} 所列檔無法 collect 重產：{str(exc)[:300]}"]
+    if regenerated != content:
+        return [f"⑦ {GENERATED_INVENTORY_REL} 與以現行樹 collect 重產之結果不等（手動改動？）"]
+    return []
+
+
+def inventory_check_current(path: str) -> List[str]:
+    return inventory_integrity_errors(current_bytes(path))
+
+
+def check_7(disp: Dict[str, Any], changed: Set[str], inventory_check=inventory_check_current) -> List[str]:
+    """⑦：既有檔改動須在母體 ∪ 操作表 ∪ new_files。collect 清冊（D11.7）於改動時改走 `inventory_check(path)`（回傳
+    錯誤清單；預設＝現行內容之生成物完整性檢查）；明給 None ⇒ 照一般路徑計越界（不豁免）。"""
     allowed = set(governed_files(disp)) | {item["path"] for item in disp["new_files"]}
     exempt = {FACT_KEYS_REL, LIVE_DOC_REGISTRY_REL}  # 前者由⑥、後者由 check_7_live_doc 裁決
+    errs: List[str] = []
+    if inventory_check is not None and GENERATED_INVENTORY_REL in changed:
+        exempt.add(GENERATED_INVENTORY_REL)
+        errs += inventory_check(GENERATED_INVENTORY_REL)
     # 已追蹤之 numba／位元組碼快取（`__pycache__/`，任一測試執行即改寫；同⑤(b) 之過濾，SPEC v16 A5）
     bad = sorted(p for p in changed if p not in exempt and p not in allowed and "__pycache__/" not in p)
-    return [f"⑦ 既有檔改動不在母體 ∪ 操作表 ∪ new_files：{bad}"] if bad else []
+    return errs + ([f"⑦ 既有檔改動不在母體 ∪ 操作表 ∪ new_files：{bad}"] if bad else [])
 
 
 def collect_nodeids(files: Sequence[str]) -> Set[str]:
@@ -1411,21 +1820,62 @@ PRODUCTION_ROOTS = ("momentum", "api", "config")
 BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
 
 
+def approval_permits(audit_lines: Iterable[str]) -> List[str]:
+    """審計紀錄中本票（root 恰為 TICKET_ROOT）全部實作許可 `impl_token_issued` 之 round_start_head（依紀錄序）。"""
+    out: List[str] = []
+    for line in audit_lines:
+        if '"impl_token_issued"' not in line:
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if ev.get("event") == "impl_token_issued" and ev.get("root") == TICKET_ROOT \
+                and re.fullmatch(r"[0-9a-f]{40}", str(ev.get("round_start_head", ""))):
+            out.append(ev["round_start_head"])
+    return out
+
+
+def _audit_permits() -> List[str]:
+    p = REPO / AUDIT_REL
+    return approval_permits(p.read_text(encoding="utf-8", errors="replace").splitlines()) if p.is_file() else []
+
+
+def git_is_ancestor(a: str, b: str, repo: Path = REPO) -> bool:
+    """a 為 b 之祖先或相同（`git merge-base --is-ancestor`）；任一不存在 ⇒ False。"""
+    return subprocess.run(["git", "merge-base", "--is-ancestor", a, b], cwd=repo, capture_output=True).returncode == 0
+
+
 def history_errors(commits_after_anchor: Sequence[Tuple[str, Set[str]]], frozen: Sequence[str],
-                   baseline: str = BASELINE_REL) -> List[str]:
+                   baseline: str = BASELINE_REL, permits: Optional[Sequence[str]] = None,
+                   is_ancestor=git_is_ancestor) -> List[str]:
     """git 歷史之凍結次序（審查 r23 CODEX-R23-P1-01／P1-02）。`commits_after_anchor`＝錨點之後依時間序之
-    (commit, 該提交改動之路徑集合)。規則：①首個改動生產碼（momentum／api／config）之提交之後，不得再有改動
-    `frozen`（四支驗收測試與 manifest）之提交；②基準檔之每一次加入或改動皆須在首個生產碼提交之前（不得同一提交混改）。
+    (commit, 該提交改動之路徑集合)。規則：①（SPEC v22 D11.8 核定期）首個改動生產碼（momentum／api／config）之提交之後
+    （含該提交）改動 `frozen`（四支驗收測試與 manifest）之提交 c，須被其後之本票實作許可涵蓋——存在許可 P（`permits`＝
+    審計紀錄 impl_token_issued 之 round_start_head）為 c 之後代（或相同），且 c 與 P 之間（不含 c、含 P）無生產碼提交
+    （修訂未核定前不得實作下一批）；同一提交混改生產碼與凍結檔者一律紅（無從先核定）；②基準檔之每一次加入或改動皆須
+    在首個生產碼提交之前（不得同一提交混改）。
     實作期 r43（SPEC v19 D2）：原 ②「加入後不得再改」使錨點碼態下之補格重凍（同碼態、無生產改動）亦恆紅；生產碼開始改動後
-    仍一律禁改。"""
+    仍一律禁改。`permits` 未給（None）⇒ 讀本 repo 之 `.claude/gate/audit.log`。"""
     errs: List[str] = []
-    first_prod = next((i for i, (_, paths) in enumerate(commits_after_anchor)
-                       if any(_in_roots(p, PRODUCTION_ROOTS) for p in paths)), None)
+    permits = _audit_permits() if permits is None else list(permits)
+    is_prod = [any(_in_roots(p, PRODUCTION_ROOTS) for p in paths) for _, paths in commits_after_anchor]
+    first_prod = next((i for i, prod in enumerate(is_prod) if prod), None)
     if first_prod is not None:
-        for c, paths in commits_after_anchor[first_prod + 1:] + commits_after_anchor[first_prod:first_prod + 1]:
+        for i in range(first_prod, len(commits_after_anchor)):
+            c, paths = commits_after_anchor[i]
             touched = sorted(set(paths) & set(frozen))
-            if touched:
-                errs.append(f"⓪ 生產碼改動開始後之提交 {c[:8]} 仍改動凍結檔：{touched}")
+            if not touched:
+                continue
+            if is_prod[i]:
+                errs.append(f"⓪ 提交 {c[:8]} 同時改動生產碼與凍結檔：{touched}")
+                continue
+            later_prod = [commits_after_anchor[j][0] for j in range(i + 1, len(commits_after_anchor)) if is_prod[j]]
+            covering = [p for p in permits if is_ancestor(c, p)
+                        and not any(is_ancestor(q, p) for q in later_prod)]
+            if not covering:
+                errs.append(f"⓪ 生產碼改動開始後之提交 {c[:8]} 改動凍結檔 {touched}，未被其後之本票實作許可涵蓋"
+                            f"（須許可之 round_start_head 為其後代、且其間無生產碼提交）")
     base_idx = [i for i, (_, paths) in enumerate(commits_after_anchor) if baseline in paths]
     if first_prod is not None:
         late = [commits_after_anchor[i][0][:8] for i in base_idx if i >= first_prod]
@@ -1562,7 +2012,9 @@ def test_mutation_nodeid_table_row_dropped_with_op_ids_is_red():
 
 
 def test_check_2_per_file_expected(ctx):
+    # SPEC v22 D11.2：check_2 預設以本 repo 之 foreign_only_paths()／他票改過之路徑判定（見 check_2 docstring）
     assert check_2(ctx["disp"], ctx["phase"], ctx["head"]) == []
+    assert rebase_history_errors(ctx["disp"]) == []
 
 
 def test_check_3_rewrite_keeps_assertions(ctx):
@@ -2191,8 +2643,9 @@ def test_mutation_affected_gate_r59_anchor_restore_and_collect_progress(tmp_path
 
 
 def test_mutation_split_commit_paths_foreign_vs_ticket():
-    """實作期 b1：他票並行提交（如 Javis 信箱工具）之路徑不計入本票 ⑤(a)／⑦；本票提交（標題或附註含 FRAMEPATH）
-    之路徑照常受檢；同一路徑兩者皆改者屬本票。mutation：分類規則改成全部本票 ⇒ 他票路徑入本票（紅）。"""
+    """實作期 b1：他票並行提交（如 Javis 信箱工具）之路徑不計入本票 ⑤(a)／⑦；本票提交（SPEC v22 D11.1：Ticket-Batch
+    root＝20260928-FRAMEPATH，或 Governance-Scope 第二 token＝FRAMEPATH）之路徑照常受檢；同一路徑兩者皆改者屬本票。
+    mutation：分類規則改成全部本票、或改回標題／附註子字串 ⇒ 他票路徑入本票（紅）。"""
     log = ("\x00a1\x1fdocs(framepath): SPEC v21\x1f\x1fout-of-epic FRAMEPATH TODO\n\ndocs/FRAMEPATH_SPEC.md\nshared.txt\n"
            "\x00b2\x1ffeat(javis): 信箱\x1f\x1fout-of-epic Javis 信箱工具\n\nscripts/javis_mail.sh\nshared.txt\n"
            "\x00c3\x1frefactor: 刪 frame\x1f20260928-FRAMEPATH/b1\x1f\n\nmomentum/x.py\n")
@@ -2204,6 +2657,371 @@ def test_mutation_split_commit_paths_foreign_vs_ticket():
                                                         f"{HEAD_SHORT}..HEAD", "--").decode("utf-8", "replace"))
     assert "scripts/javis_mail.sh" in real_foreign - real_ticket  # 本 repo 實況：Javis 信箱工具為他票
     assert "docs/FRAMEPATH_SPEC.md" in real_ticket
+    # SPEC v22 D11.1：TESTREG 提交（標題含「FRAMEPATH 閘接線」、附註內文含「HP/RM-FRAMEPATH」）判他票
+    testreg = ("\x00d4\x1ffeat(testreg): Task 2.3 FRAMEPATH 閘接線\x1f20261010-TESTREG/b2\x1fout-of-epic TESTREG 第 2 批"
+               "\n\nscripts/testreg.py\n"
+               "\x00e5\x1fdocs(testreg): 交接\x1f\x1fout-of-epic TESTREG 第 2 批（fact_keys HP/RM-FRAMEPATH 列）"
+               "\n\ntests/registry/catalog.json\n")
+    t2, f2 = split_commit_paths(log + testreg)
+    assert t2 == ticket
+    assert f2 == foreign | {"scripts/testreg.py", "tests/registry/catalog.json"}
+    assert {"scripts/testreg.py", "tests/registry/catalog.json"} <= real_foreign - real_ticket  # 本 repo 實況
+
+
+def test_mutation_d11_1_testreg_commit_is_foreign():
+    """M-D11.1（SPEC v22）：本票提交只認結構化附註之封閉 token——Ticket-Batch root 恰為 20260928-FRAMEPATH，或
+    Governance-Scope 第二 token 恰為 FRAMEPATH；標題、附註內文之子字串、同後綴他票 root 一律判他票。本 repo 之
+    d57a9f3b／14452799（TESTREG）判他票、5584102d／f7d558aa／ed3f6533（FRAMEPATH）判本票。
+    mutation：判定改回「標題或附註含 FRAMEPATH」⇒ TESTREG 兩例判本票（紅）。"""
+    assert not is_ticket_commit("20261010-TESTREG/b2", "out-of-epic TESTREG 第 2 批 Task 2.3 與 SPEC v41–v43 實作")
+    assert not is_ticket_commit("", "out-of-epic TESTREG 第 2 批進度與交接（fact_keys HP/RM-FRAMEPATH 列之 TESTREG 段）")
+    assert not is_ticket_commit("20260927-FRAMEPATH/b1", "")          # 同後綴之他票 root
+    assert not is_ticket_commit("", "out-of-epic FRAMEPATHX 文件")      # token 須恰等
+    assert not is_ticket_commit("", "FRAMEPATH out-of-epic")             # 只認第二個 token
+    assert is_ticket_commit("20260928-FRAMEPATH/b1", "out-of-epic FRAMEPATH b1 實作")
+    assert is_ticket_commit("20260928-FRAMEPATH", "")
+    assert is_ticket_commit("small", "out-of-epic FRAMEPATH TODO 審查 r39 修補")
+    assert is_ticket_commit("20261010-TESTREG/b2\x1e20260928-FRAMEPATH/b2", "")  # 同鍵多值
+    log = ("\x00d57a\x1ffeat(testreg): Task 2.3 FRAMEPATH 閘接線\x1f20261010-TESTREG/b2\x1fout-of-epic TESTREG 第 2 批"
+           "（HP/RM-FRAMEPATH 列）\n\nscripts/testreg.py\n")
+    assert split_commit_paths(log) == (set(), {"scripts/testreg.py"})
+    real = {sha[:8]: mine for sha, mine, _paths in parse_commit_log(commit_log())}
+    assert real["d57a9f3b"] is False and real["14452799"] is False
+    assert real["5584102d"] is True and real["f7d558aa"] is True and real["ed3f6533"] is True
+
+
+def _commit_tmp(repo: Path, subject: str, trailers: Sequence[str], files: Dict[str, str]) -> str:
+    for rel, text in files.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text, encoding="utf-8")
+    base = ["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run([*base, "add", "-A"], check=True, capture_output=True)
+    msg = subject + ("\n\n" + "\n".join(trailers) if trailers else "")
+    subprocess.run([*base, "commit", "-qm", msg], check=True, capture_output=True)
+    return subprocess.run([*base, "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+
+
+_TB_FOREIGN = "Ticket-Batch: 20261010-TESTREG/b2"
+_TB_TICKET = "Ticket-Batch: 20260928-FRAMEPATH/b2"
+
+
+def _tmp_reader(repo: Path):
+    return lambda p: (repo / p).read_bytes() if (repo / p).is_file() else None
+
+
+def test_mutation_d11_2a_foreign_only_governed_file_not_compared(tmp_path):
+    """M-D11.2a（SPEC v22）：治理檔只被他票提交改過（含標題提 FRAMEPATH 之 TESTREG 提交）、未被本票提交改過、工作樹未改
+    ⇒ ② 不比對（綠）；工作樹改了該檔 ⇒ 照常比對（紅）；本批 E 有該檔操作而未執行 ⇒ 仍比對（紅，不因他票碰過放行）。
+    重錨紀錄須對得上 git 歷史（錨點至基準間不得有本票提交改該檔）。mutation：② 撤回他票排除 ⇒ 第一個斷言紅。"""
+    a0 = "def test_a():\n    assert 1\n"
+    b0 = "def test_b():\n    assert 1\n\n\ndef test_frame():\n    assert 2\n"
+    repo, anchor = _git_tmp_repo(tmp_path, {"tests/a.py": a0, "tests/b.py": b0})
+    c_foreign = _commit_tmp(repo, "feat(testreg): FRAMEPATH 閘接線", [_TB_FOREIGN, "Governance-Scope: out-of-epic TESTREG x"],
+                            {"tests/a.py": a0 + "\n\ndef test_a2():\n    assert 3\n"})
+    c_ticket = _commit_tmp(repo, "refactor(framepath): b2", [_TB_TICKET],
+                           {"tests/b.py": "def test_b():\n    assert 1\n"})
+    op = _op("delete-node", {"category": "def", "qualname": "test_frame"}, id="OP-B", path="tests/b.py", phase=1)
+    disp = {"population": {"files": ["tests/a.py", "tests/b.py"]}, "operations": [op]}
+    head, cur = HeadReader(anchor, repo), _tmp_reader(repo)
+    foreign, _ticket = foreign_and_ticket_paths(repo, anchor)
+    fo = foreign_only_paths(repo, anchor)
+    assert fo == {"tests/a.py"}
+    assert check_2(disp, 1, head, cur, foreign_only=fo, foreign_touched=foreign) == []
+    assert check_2(disp, 1, head, cur, foreign_only=set(), foreign_touched=foreign) != []  # 不排除 ⇒ 錨點比對必紅
+    # 本批 E 有該檔之操作（未執行）⇒ 即使只被他票改過仍比對
+    op_a = _op("delete-node", {"category": "def", "qualname": "test_a"}, id="OP-A", path="tests/a.py", phase=1)
+    assert any("tests/a.py" in e for e in check_2(dict(disp, operations=[op, op_a]), 1, head, cur,
+                                                     foreign_only=fo, foreign_touched=foreign))
+    # 工作樹改該檔 ⇒ 不再屬只被他票改過 ⇒ 比對（紅）
+    (repo / "tests/a.py").write_text(a0 + "\n\ndef test_a2():\n    assert 4\n", encoding="utf-8")
+    fo_wt = foreign_only_paths(repo, anchor)
+    assert "tests/a.py" not in fo_wt
+    assert check_2(disp, 1, head, cur, foreign_only=fo_wt, foreign_touched=foreign) != []
+    # 重錨紀錄之歷史核對
+    ok = {"rebase": {"tests/a.py": {"base_commit": c_foreign, "foreign_commits": [c_foreign]}}}
+    assert rebase_history_errors(dict(disp, **ok), repo, anchor) == []
+    bad_ticket = {"rebase": {"tests/b.py": {"base_commit": c_ticket, "foreign_commits": [c_ticket]}}}
+    assert rebase_history_errors(dict(disp, **bad_ticket), repo, anchor) != []
+    bad_list = {"rebase": {"tests/a.py": {"base_commit": c_ticket, "foreign_commits": []}}}
+    assert rebase_history_errors(dict(disp, **bad_list), repo, anchor) != []
+    assert rebase_schema_errors(dict(disp, **bad_list)) != []  # foreign_commits 須非空
+    assert rebase_schema_errors(dict(disp, rebase={"tests/zz.py": ok["rebase"]["tests/a.py"]})) != []  # 非治理檔
+
+
+_RB_ANCHOR = '''import os
+
+
+def test_target(monkeypatch):
+    x = run()
+    frame_only()
+    assert x
+
+
+def test_other():
+    assert 1
+'''
+
+
+def test_mutation_d11_2b_rebase_conflict_on_operation_target_is_red():
+    """M-D11.2b（SPEC v22）：重錨後 ② 以基準位元組＋同一操作計算期望（行號類定位隨基準轉換）；他票改到本票操作之目標
+    函式（頂層定義）或 JSON pointer ⇒ 衝突檢查紅（fail-closed，不得以「操作不變」放行）；他票只改不相干之定義 ⇒ 綠。
+    mutation：衝突檢查恆空 ⇒ JSON 目標被他票改仍綠、Python 案無「重錨衝突」（紅）。"""
+    lines = _RB_ANCHOR.splitlines()
+    ln = lines.index("    frame_only()") + 1
+    ops = [_op("delete-node", {"category": "stmt", "qualname": "test_target", "lineno": ln, "end_lineno": ln},
+               id="OP-S", path="tests/x.py", phase=2),
+           _op("delete-node", {"category": "import_alias", "lineno": 1, "name": "os"}, id="OP-I", path="tests/x.py",
+               phase=2)]
+    base_ok = "import sys\n\n\ndef helper():\n    return 0\n\n\n" + _RB_ANCHOR.replace("    assert 1\n", "    assert 2\n")
+    base_bad = _RB_ANCHOR.replace("    x = run()\n", "    x = run(fast=True)\n")
+    sha = "b" * 40
+    disp = {"population": {"files": ["tests/x.py"]}, "operations": ops,
+            "rebase": {"tests/x.py": {"base_commit": sha, "foreign_commits": [sha]}}}
+
+    def run2(base: str, current: str, with_rebase: bool = True) -> List[str]:
+        d = disp if with_rebase else {k: v for k, v in disp.items() if k != "rebase"}
+        return check_2(d, 2, _SrcHead(_RB_ANCHOR), lambda p: current.encode(), foreign_only=set(),
+                       read_at=lambda c, p: base.encode(), foreign_touched={"tests/x.py"})
+
+    done_ok = base_ok.replace("import os\n", "").replace("    frame_only()\n", "")
+    assert rebase_conflicts("tests/x.py", _RB_ANCHOR.encode(), base_ok.encode(), ops) == []
+    assert run2(base_ok, done_ok) == []                       # 重錨（行號位移）後照表執行 ⇒ 綠
+    assert run2(base_ok, done_ok, with_rebase=False) != []    # 未重錨 ⇒ 錨點比對紅
+    assert run2(base_ok, done_ok.replace("    assert x\n", "    assert True\n")) != []  # 重錨後仍抓表外改動
+    done_bad = base_bad.replace("import os\n", "").replace("    frame_only()\n", "")
+    assert rebase_conflicts("tests/x.py", _RB_ANCHOR.encode(), base_bad.encode(), ops) != []
+    assert any("重錨衝突" in e and "OP-S" in e for e in run2(base_bad, done_bad))
+    # JSON：他票改到本票 delete-json-path 之目標（或其所在 list 長度）⇒ 衝突；改不相干之鍵 ⇒ 不衝突且照表比對
+    j_anchor = {"rows": [[1, "RM-FRAMEPATH", "a"], [2, "RM-X", "b"]], "other": {"k": 1}}
+    jop = [{"id": "OP-J", "phase": 2, "path": "t.json", "kind": "delete-json-path", "pointer": "/rows/0"}]
+    jdisp = {"population": {"files": ["t.json"]}, "operations": jop,
+             "rebase": {"t.json": {"base_commit": sha, "foreign_commits": [sha]}}}
+
+    def runj(base: Dict[str, Any], current: Dict[str, Any]) -> List[str]:
+        return check_2(jdisp, 2, _SrcHead(json.dumps(j_anchor)), lambda p: json.dumps(current).encode(),
+                       foreign_only=set(), read_at=lambda c, p: json.dumps(base).encode(), foreign_touched=set())
+
+    j_unrelated = dict(j_anchor, other={"k": 2})
+    assert runj(j_unrelated, {"rows": [[2, "RM-X", "b"]], "other": {"k": 2}}) == []
+    j_target = {"rows": [[1, "RM-FRAMEPATH", "CHANGED"], [2, "RM-X", "b"]], "other": {"k": 1}}
+    assert any("重錨衝突" in e for e in runj(j_target, {"rows": [[2, "RM-X", "b"]], "other": {"k": 1}}))
+    j_len = {"rows": [[0, "RM-NEW", "n"]] + j_anchor["rows"], "other": {"k": 1}}
+    assert rebase_conflicts("t.json", json.dumps(j_anchor).encode(), json.dumps(j_len).encode(), jop) != []
+    # 整檔操作：他票改過該檔即衝突
+    rop = [{"id": "OP-R", "phase": 2, "path": "s.sh", "kind": "replace-file"}]
+    assert rebase_conflicts("s.sh", b"echo a\n", b"echo b\n", rop) != []
+
+
+_FK_ANCHOR = {"_schema": {}, "t": {"columns": ["序", "識別碼", "狀態"],
+                                   "rows": [[1, "RM-FRAMEPATH", "a"], [2, "RM-X", "b"]]}}
+
+
+def _fk(rm_framepath: str, rm_x: str) -> str:
+    doc = copy.deepcopy(_FK_ANCHOR)
+    doc["t"]["rows"][0][2], doc["t"]["rows"][1][2] = rm_framepath, rm_x
+    return json.dumps(doc, ensure_ascii=False, indent=1) + "\n"
+
+
+def test_mutation_d11_3_ticket_commit_out_of_scope_row_reverted_by_foreign_is_red(tmp_path):
+    """M-D11.3（SPEC v22）：⑥ 逐本票提交歸屬——本票提交改越界列（RM-X）、其後他票改回 ⇒ 錨點對現行淨差為零，仍紅；
+    他票改越界列、本票只改允許列 ⇒ 綠；工作樹改越界列 ⇒ 紅。mutation：⑥ 改回錨點對現行整份比對（或不分提交歸屬）⇒
+    第一案綠（紅）。"""
+    disp = {"fact_key_rows": [{"row_id": "RM-FRAMEPATH", "phase": 1}]}
+    repo, anchor = _git_tmp_repo(tmp_path / "a", {FACT_KEYS_REL: _fk("a", "b")})
+    _commit_tmp(repo, "docs(framepath): 交接", [_TB_TICKET], {FACT_KEYS_REL: _fk("a", "z")})
+    _commit_tmp(repo, "docs(testreg): 交接", [_TB_FOREIGN], {FACT_KEYS_REL: _fk("a", "b")})
+    assert check_6(disp, 1, json.loads(_fk("a", "b")), json.loads((repo / FACT_KEYS_REL).read_text())) == []  # 淨差零
+    revs = fact_key_revisions(repo, anchor)
+    assert any("本票提交" in e for e in check_6_revisions(disp, 1, revs))
+    repo2, anchor2 = _git_tmp_repo(tmp_path / "b", {FACT_KEYS_REL: _fk("a", "b")})
+    _commit_tmp(repo2, "docs(testreg): HP-TESTREG", [_TB_FOREIGN], {FACT_KEYS_REL: _fk("a", "y")})
+    _commit_tmp(repo2, "docs(framepath): b2", ["Governance-Scope: out-of-epic FRAMEPATH b2 交接"],
+                {FACT_KEYS_REL: _fk("c", "y")})
+    assert check_6_revisions(disp, 1, fact_key_revisions(repo2, anchor2)) == []
+    (repo2 / FACT_KEYS_REL).write_text(_fk("c", "w"), encoding="utf-8")
+    assert any("HEAD→工作樹" in e for e in check_6_revisions(disp, 1, fact_key_revisions(repo2, anchor2)))
+
+
+def test_mutation_d11_live_doc_registry_per_commit(tmp_path):
+    """活文件登記表（⑦）同 ⑥ 之逐提交歸屬：他票提交登記自身 SPEC 列 ⇒ 不計（綠）；本票提交登記他票列、其後他票刪回
+    ⇒ 紅；工作樹登記他票列 ⇒ 紅。mutation：改回錨點對現行整份比對 ⇒ 第一案紅、第二案綠（紅）。"""
+    def reg(*rows):
+        return json.dumps({"exact": [list(r) for r in rows], "prefix": []}, ensure_ascii=False) + "\n"
+
+    base_row = ("docs/A_SPEC.md", "LIVE-SPEC")
+    repo, anchor = _git_tmp_repo(tmp_path / "a", {LIVE_DOC_REGISTRY_REL: reg(base_row)})
+    _commit_tmp(repo, "docs(testreg): SPEC v1", [_TB_FOREIGN], {LIVE_DOC_REGISTRY_REL: reg(base_row, ("docs/T_SPEC.md",
+                                                                                                    "LIVE-SPEC"))})
+    _commit_tmp(repo, "docs(framepath): 登記", [_TB_TICKET],
+                {LIVE_DOC_REGISTRY_REL: reg(base_row, ("docs/T_SPEC.md", "LIVE-SPEC"),
+                                            ("docs/FRAMEPATH_SPEC.md", "LIVE-SPEC"))})
+    assert check_7_live_doc_revisions(ticket_revisions(LIVE_DOC_REGISTRY_REL, repo, anchor)) == []
+    assert check_7_live_doc(json.loads(reg(base_row)), json.loads((repo / LIVE_DOC_REGISTRY_REL).read_text())) != []
+    repo2, anchor2 = _git_tmp_repo(tmp_path / "b", {LIVE_DOC_REGISTRY_REL: reg(base_row)})
+    _commit_tmp(repo2, "docs(framepath): 誤登", [_TB_TICKET], {LIVE_DOC_REGISTRY_REL: reg(base_row, ("docs/X.md", "HIST"))})
+    _commit_tmp(repo2, "docs(testreg): 刪回", [_TB_FOREIGN], {LIVE_DOC_REGISTRY_REL: reg(base_row)})
+    assert any("本票提交" in e for e in check_7_live_doc_revisions(ticket_revisions(LIVE_DOC_REGISTRY_REL, repo2, anchor2)))
+    (repo / LIVE_DOC_REGISTRY_REL).write_text(reg(base_row, ("docs/T_SPEC.md", "LIVE-SPEC"),
+                                                  ("docs/FRAMEPATH_SPEC.md", "LIVE-SPEC"), ("docs/Y.md", "HIST")),
+                                              encoding="utf-8")
+    assert any("HEAD→工作樹" in e for e in check_7_live_doc_revisions(ticket_revisions(LIVE_DOC_REGISTRY_REL, repo, anchor)))
+
+
+def test_mutation_d11_8_frozen_change_needs_later_permit(tmp_path):
+    """M-D11.8（SPEC v22 核定期）：生產碼提交之後改動凍結檔之提交，須其後有本票實作許可（round_start_head 為其後代、
+    且其間無生產碼提交）涵蓋 ⇒ 綠；無許可、許可早於改動、許可前已有下一批生產碼提交、同一提交混改 ⇒ 紅。另以暫存 git
+    repo 實測祖先判定與審計紀錄解析。mutation：撤除涵蓋條件或其間無生產碼條件 ⇒ 對應紅案轉綠（紅）。"""
+    t, m, prod = FROZEN_ACCEPTANCE_TESTS[0], MANIFEST_REL, "momentum/x.py"
+    line = ["p1", "rev", "docs", "p2", "docs2"]
+    sha = {k: (k + "0" * 40)[:40] for k in line}
+    idx = {sha[k]: i for i, k in enumerate(line)}  # 線性歷史：a 為 b 之祖先 ⇔ 序號不大於
+    anc = lambda a, b: a in idx and b in idx and idx[a] <= idx[b]  # noqa: E731
+    hist = [(sha["p1"], {prod}), (sha["rev"], {t, m}), (sha["docs"], {"docs/a.md"}), (sha["p2"], {prod}),
+            (sha["docs2"], {"docs/b.md"})]
+    frozen = (t, m)
+    assert history_errors(hist, frozen, permits=[sha["docs"]], is_ancestor=anc) == []       # 許可涵蓋 ⇒ 綠
+    assert history_errors(hist, frozen, permits=[sha["rev"]], is_ancestor=anc) == []        # 許可即在改動提交上
+    assert history_errors(hist, frozen, permits=[], is_ancestor=anc) != []                  # 無許可 ⇒ 紅
+    assert history_errors(hist, frozen, permits=[sha["p1"]], is_ancestor=anc) != []         # 許可早於改動 ⇒ 紅
+    assert history_errors(hist, frozen, permits=[sha["docs2"]], is_ancestor=anc) != []      # 許可前已實作下一批 ⇒ 紅
+    mixed = [(sha["p1"], {prod}), (sha["rev"], {t, prod}), (sha["docs"], {"docs/a.md"})]
+    assert history_errors(mixed, frozen, permits=[sha["docs"]], is_ancestor=anc) != []      # 同一提交混改 ⇒ 紅
+    # 真實 git：祖先判定與審計紀錄
+    repo, anchor = _git_tmp_repo(tmp_path, {"README": "x\n"})
+    c_prod = _commit_tmp(repo, "b1", [_TB_TICKET], {prod: "a = 1\n"})
+    c_rev = _commit_tmp(repo, "rev", ["Governance-Scope: out-of-epic FRAMEPATH TODO 修訂"], {t: "assert 1\n"})
+    c_doc = _commit_tmp(repo, "doc", [], {"docs/a.md": "x\n"})
+    real_hist = [(c_prod, {prod}), (c_rev, {t}), (c_doc, {"docs/a.md"})]
+    ev = lambda h, root=TICKET_ROOT: json.dumps({"event": "impl_token_issued", "root": root,  # noqa: E731
+                                                 "round_start_head": h})
+    permits = approval_permits(["=== x ===", ev(c_prod), ev(c_doc, "20261010-TESTREG"), ev(c_doc)])
+    assert permits == [c_prod, c_doc]
+    ga = lambda a, b: git_is_ancestor(a, b, repo)  # noqa: E731
+    assert history_errors(real_hist, frozen, permits=permits, is_ancestor=ga) == []
+    assert history_errors(real_hist, frozen, permits=permits[:1], is_ancestor=ga) != []
+    assert history_errors(real_hist, frozen, permits=approval_permits([ev(c_doc, "20261010-TESTREG")]),
+                          is_ancestor=ga) != []                                              # 他票許可不算
+
+
+def _plaindocs(*rows) -> Dict[str, Any]:
+    return {"_schema": {}, "plaindocs-index": {"target": ["白話說明/README.md"], "render": "table",
+                                               "columns": ["你想問", "打開這份", "維護規則"], "rows": [list(r) for r in rows]}}
+
+
+def test_mutation_d11_9_plaindocs_index_ticket_rows_only():
+    """M-D11.9（SPEC v22）：⑥ 另准本票段增刪 plaindocs-index 中「白話審閱文件路徑位於 白話說明/ 且檔名以 FRAMEPATH
+    起首」之列；增他票列（TESTREG）、問句含 FRAMEPATH 而連結非 FRAMEPATH 檔、以 ../ 逃出 白話說明/、改他列 ⇒ 紅。
+    本 repo 之 8 筆本票提交（e506a570 等）增刪本票審閱列 ⇒ 不紅。mutation：判定恆真或改看問句欄 ⇒ 紅案轉綠（紅）。"""
+    disp = {"fact_key_rows": [{"row_id": "RM-FRAMEPATH", "phase": 1}]}
+    now = ("現在在做什麼？", "[現在做到哪.md](現在做到哪.md)", "整段覆蓋")
+    before = _plaindocs(now)
+    ok_rows = [("FRAMEPATH 規格第 22 版要我核可什麼？", "[FRAMEPATH規格v22修正審閱.md](FRAMEPATH規格v22修正審閱.md)", "核可後封存"),
+               ("FRAMEPATH 舊審閱", "[FRAMEPATH規格v16修正審閱.md](Archived/FRAMEPATH規格v16修正審閱.md)", "封存")]
+    for r in ok_rows:
+        assert check_6(disp, 1, before, _plaindocs(now, r)) == []        # 增本票列
+        assert check_6(disp, 1, _plaindocs(now, r), before) == []        # 刪本票列
+    bad_rows = [("TESTREG 規格要我核可什麼？", "[TESTREG規格審閱.md](TESTREG規格審閱.md)", "核可後封存"),
+                ("FRAMEPATH 規格要我核可什麼？", "[規格審閱.md](規格審閱.md)", "核可後封存"),
+                ("FRAMEPATH 越界", "[FRAMEPATH.md](../docs/FRAMEPATH.md)", "x"),
+                ("FRAMEPATH 純文字", "FRAMEPATH規格v22修正審閱.md", "x")]
+    for r in bad_rows:
+        assert check_6(disp, 1, before, _plaindocs(now, r)) != [], r
+    assert check_6(disp, 1, before, _plaindocs((now[0], now[1], "改了"))) != []           # 改他列 ⇒ 紅
+    # 他列改成本票連結（借本票豁免刪他列）⇒ 紅
+    assert check_6(disp, 1, before, _plaindocs(ok_rows[0])) != []
+    real = {label.split()[1][:8]: (b, a) for label, b, a in fact_key_revisions() if label.startswith("本票提交")}
+    for c in ("e506a570", "dc91faa4", "d252ca63", "6807e56a", "0eaddd11", "bfd683b0", "d0461057", "27d80c04"):
+        b, a = real[c]
+        assert canonical_json(b.get(PLAINDOCS_INDEX_KEY)) != canonical_json(a.get(PLAINDOCS_INDEX_KEY)), c
+        assert check_6(load_json(DISPOSITION_REL), 1, b, a) == [], c
+
+
+def test_mutation_d11_11c_text_apply_uses_rebase_base():
+    """SPEC v22 D11.11(c)：text_apply 對有 rebase 紀錄之檔以 base_commit 位元組套用（他票改動保留、行號類定位隨基準
+    轉換），結果過 ②；衝突 ⇒ 拒套。mutation：text_apply 忽略 rebase（用錨點位元組）⇒ 他票改動遺失、② 紅（紅）。"""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("framepath_text_apply",
+                                                  REPO / "handoffs/run_receipts/framepath_probes/text_apply.py")
+    ta = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ta)
+    lines = _RB_ANCHOR.splitlines()
+    ln = lines.index("    frame_only()") + 1
+    ops = [_op("delete-node", {"category": "stmt", "qualname": "test_target", "lineno": ln, "end_lineno": ln},
+               id="OP-S", path="tests/x.py", phase=2)]
+    base = "import sys\n\n\ndef helper():\n    return 0\n\n\n" + _RB_ANCHOR
+    sha = "b" * 40
+    disp = {"population": {"files": ["tests/x.py"]}, "operations": ops,
+            "rebase": {"tests/x.py": {"base_commit": sha, "foreign_commits": [sha]}}}
+    head = _SrcHead(_RB_ANCHOR)
+    read_at = lambda c, p: base.encode()  # noqa: E731
+    new, diff = ta.apply_file(disp, "tests/x.py", 2, head, read_at)
+    assert diff is None
+    text = new.decode("utf-8")
+    assert "def helper():" in text and "import sys" in text and "frame_only()" not in text
+    assert check_2(disp, 2, head, lambda p: new, foreign_only=set(), read_at=read_at, foreign_touched=set()) == []
+    bad_base = _RB_ANCHOR.replace("    x = run()\n", "    x = run(fast=True)\n")
+    with pytest.raises(SystemExit):
+        ta.apply_file(disp, "tests/x.py", 2, head, lambda c, p: bad_base.encode())
+    plain, _ = ta.apply_file({k: v for k, v in disp.items() if k != "rebase"}, "tests/x.py", 2, head)
+    assert "def helper():" not in plain.decode("utf-8")  # 無 rebase 紀錄 ⇒ 錨點位元組（對照）
+
+
+def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
+    """SPEC v22 D11.12：受影響閘 collect 對無測試函式之檔（pytest rc 5 且輸出含 no tests collected）於 plan 視為空集合
+    （不選入、記 empty_collect）；A 組（未給 sink）、匯入錯誤（rc 2）、rc 5 但無該字樣 ⇒ 仍 GateError。以子行程實跑
+    pytest（暫存目錄之 pytest.ini 同本 repo 之 addopts，`-v` 抵銷一個 `-q` 使摘要行輸出）。
+    mutation：rc 5 一律放行（不看字樣）、或任何非 0 皆放行 ⇒ 對應紅案轉綠（紅）。"""
+    g = _affected_gate()
+    assert g.is_empty_collect(5, "\nno tests collected in 0.01s\n")
+    assert not g.is_empty_collect(5, "")
+    assert not g.is_empty_collect(2, "no tests collected")
+    (tmp_path / "pytest.ini").write_text("[pytest]\naddopts = -v --tb=short --import-mode=importlib\n", encoding="utf-8")
+    (tmp_path / "test_empty.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "test_broken.py").write_text("import framepath_no_such_module_xyz\n", encoding="utf-8")
+    (tmp_path / "test_ok.py").write_text("def test_a():\n    assert True\n", encoding="utf-8")
+    env = dict(os.environ, PYTHONPATH=str(REPO))
+    sink: List[str] = []
+    assert g.collect("test_empty.py", tmp_path, env, sink) == [] and sink == ["test_empty.py"]
+    with pytest.raises(g.GateError):  # A 組：未給 sink ⇒ 照舊拒
+        g.collect("test_empty.py", tmp_path, env)
+    with pytest.raises(g.GateError):  # 匯入錯誤 rc≠5 ⇒ 給 sink 亦拒
+        g.collect("test_broken.py", tmp_path, env, sink)
+    assert sink == ["test_empty.py"]
+    assert g.collect("test_ok.py", tmp_path, env, sink) == ["test_ok.py::test_a"]
+    sel, skip = g.select_expected({"test_empty.py": [], "test_ok.py": ["test_ok.py::test_a"]},
+                                  {"test_ok.py": {"refs": {}, "taint": {}, "heavy": False}}, {}, {}, [], [], False)
+    assert set(sel) == {"test_ok.py::test_a"} and skip == {}
+
+
+def test_mutation_d11_7_inventory_hand_edit_is_red():
+    """M-D11.7（SPEC v22）：⑦ 對 collect 清冊做生成物完整性檢查——以現行樹 collect 重產之內容 ⇒ 不紅；手動改一行或刪
+    一行 ⇒ 紅；未給 oracle ⇒ 照一般越界（不無條件豁免）。實跑 collect（單檔，秒級），結束後清冊位元組原樣寫回。
+    mutation：清冊無條件豁免 ⇒ 手改一行仍綠（紅）。"""
+    target = "tests/feature_engineering/test_ff_fullchain_truncation_mr.py"
+    before = current_bytes(GENERATED_INVENTORY_REL)
+    good = regenerate_inventory([target])
+    assert current_bytes(GENERATED_INVENTORY_REL) == before  # 重產不留副作用
+    assert good != INVENTORY_EMPTY and len(good.splitlines()) >= 2
+    cache = {(target,): good}
+
+    def regen(files):
+        key = tuple(files)
+        if key not in cache:
+            cache[key] = regenerate_inventory(files)
+        return cache[key]
+
+    lines = good.decode("utf-8").splitlines()
+    tampered = ("\n".join([lines[0] + "_x"] + lines[1:]) + "\n").encode("utf-8")
+    dropped = ("\n".join(lines[1:]) + "\n").encode("utf-8")
+    assert inventory_integrity_errors(good, regen) == []
+    assert inventory_integrity_errors(tampered, regen) != []
+    assert inventory_integrity_errors(dropped, regen) != []
+    assert inventory_integrity_errors(b"not a nodeid\n", regen) != []
+    disp = {"population": {"files": []}, "operations": [], "new_files": []}
+    assert check_7(disp, {GENERATED_INVENTORY_REL}, lambda p: inventory_integrity_errors(good, regen)) == []
+    assert check_7(disp, {GENERATED_INVENTORY_REL}, lambda p: inventory_integrity_errors(tampered, regen)) != []
+    assert check_7(disp, {GENERATED_INVENTORY_REL}, None) != []
 
 
 def test_mutation_affected_gate_runner_resume_pause_progress(tmp_path):
@@ -2352,14 +3170,19 @@ def test_check_5_new_and_ignored_files(ctx):
 
 
 def test_check_6_fact_keys_rows(ctx):
-    head_doc = json.loads(ctx["head"].read(FACT_KEYS_REL))
+    # SPEC v22 D11.3：取代「錨點與現行整份比對」——工作樹段比 HEAD→工作樹（下行），另逐本票提交比 commit^→commit
+    head_doc = _json_at(REPO, "HEAD", FACT_KEYS_REL)
     assert check_6(ctx["disp"], ctx["phase"], head_doc, load_json(FACT_KEYS_REL)) == []
+    assert check_6_revisions(ctx["disp"], ctx["phase"], fact_key_revisions()) == []
 
 
 def test_check_7_changed_paths_in_scope(ctx):
     assert check_7(ctx["disp"], git_changed_paths()) == []
-    head_doc = json.loads(ctx["head"].read(LIVE_DOC_REGISTRY_REL))
+    # 活文件登記表：同 ⑥ 之逐提交歸屬（SPEC v22 D11.1／D11.3 同構）——工作樹段比 HEAD→工作樹（下行），另逐本票提交比
+    # commit^→commit；他票登記自身 SPEC 列（PROBEWINSOR、TESTREG）不計
+    head_doc = _json_at(REPO, "HEAD", LIVE_DOC_REGISTRY_REL)
     assert check_7_live_doc(head_doc, load_json(LIVE_DOC_REGISTRY_REL)) == []
+    assert check_7_live_doc_revisions(ticket_revisions(LIVE_DOC_REGISTRY_REL)) == []
 
 
 def test_mutation_live_doc_registry_foreign_row_is_red():

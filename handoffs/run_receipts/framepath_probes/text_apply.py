@@ -3,6 +3,8 @@
 py：def／stmt 整段刪（含 decorator）；dict_item／seq_elem／parametrize_elem／import_alias 以欄位位移刪子字串與其逗號；
 rename 改 def 名；rewrite 以新全文（依原縮排）取代。json：delete-json-path 後以 indent=2 寫回。replace-file／delete-file 照做。
 FFACT_USE_CGSA 剝除另以正規化容許，不在此套用（試作測試照 HEAD 原樣留 env 設定，生產碼已不讀）。
+SPEC v22 D11.11(c)：處置表 `rebase` 有紀錄之檔，改以其 base_commit 之位元組套用（Python 操作之定位經驗證器
+`rebase_ops` 轉成基準行號）；先過驗證器同一衝突檢查，相交即拒（不套用）。驗證亦以基準位元組＋轉換後之操作比對。
 """
 import ast
 import json
@@ -12,11 +14,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from tests.feature_engineering import test_framepath_disposition as V  # noqa: E402
-
-disp = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-W = Path(sys.argv[2])
-P = int(sys.argv[3])
-head = V.HeadReader(disp["head_commit"])
 
 
 def offsets(src):
@@ -116,27 +113,60 @@ def apply_py(src, ops):
     return src
 
 
-paths = sorted({op["path"] for op in disp["operations"] if op["phase"] <= P})
-bad = []
-for path in paths:
-    ops = [op for op in disp["operations"] if op["path"] == path and op["phase"] <= P]
-    hb = head.read(path)
-    dst = W / path
+def source_and_ops(disp, path, ops, head, read_at=V._git_show_bytes):
+    """回傳 (套用來源位元組, 對該來源之操作)：有 rebase 紀錄 ⇒ base_commit 位元組＋經 rebase_ops 轉換之操作（衝突檢查
+    相交 ⇒ SystemExit）；否則錨點位元組＋原操作。"""
+    ent = (disp.get("rebase") or {}).get(path)
+    anchor_b = head.read(path)
+    if ent is None:
+        return anchor_b, ops
+    base_b = read_at(ent["base_commit"], path)
+    conflicts = V.rebase_conflicts(path, anchor_b, base_b, [op for op in disp["operations"] if op["path"] == path])
+    if conflicts:
+        raise SystemExit("重錨衝突（不套用）：\n  " + "\n  ".join(conflicts))
+    if path.endswith(".py") and any(op["kind"] in V.PY_KINDS for op in ops):
+        ops = V.rebase_ops(anchor_b.decode("utf-8"), base_b.decode("utf-8"), ops)
+    return base_b, ops
+
+
+def apply_file(disp, path, phase, head, read_at=V._git_show_bytes):
+    """單檔：回傳 (新位元組〔None＝刪檔〕, 與期望之差異說明或 None)。"""
+    ops = [op for op in disp["operations"] if op["path"] == path and op["phase"] <= phase]
     if any(op["kind"] == "delete-file" for op in ops):
-        if dst.exists():
-            dst.unlink()
-        continue
+        return None, None
+    src_b, ops = source_and_ops(disp, path, ops, head, read_at)
     if path.endswith(".py"):
-        new = apply_py(hb.decode("utf-8"), [o for o in ops if o["kind"] in V.PY_KINDS]).encode("utf-8")
+        new = apply_py(src_b.decode("utf-8"), [o for o in ops if o["kind"] in V.PY_KINDS]).encode("utf-8")
     elif path.endswith(".json"):
-        doc = V.json_delete_paths(json.loads(hb), [o["pointer"] for o in ops if o["kind"] == "delete-json-path"])
+        doc = V.json_delete_paths(json.loads(src_b), [o["pointer"] for o in ops if o["kind"] == "delete-json-path"])
         new = (json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     else:
         rep = [o for o in ops if o["kind"] == "replace-file"]
-        new = rep[0]["new_content"].encode("utf-8") if rep else hb
-    dst.write_bytes(new)
-    diff = V.expected_vs_current(path, hb, new, ops)
-    if diff:
-        bad.append(f"{path}: {diff}")
-print(f"files={len(paths)} mismatch={len(bad)}")
-print("\n".join(bad))
+        new = rep[0]["new_content"].encode("utf-8") if rep else src_b
+    return new, V.expected_vs_current(path, src_b, new, ops)
+
+
+def main() -> int:
+    disp = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+    w = Path(sys.argv[2])
+    phase = int(sys.argv[3])
+    head = V.HeadReader(disp["head_commit"])
+    paths = sorted({op["path"] for op in disp["operations"] if op["phase"] <= phase})
+    bad = []
+    for path in paths:
+        new, diff = apply_file(disp, path, phase, head)
+        dst = w / path
+        if new is None:
+            if dst.exists():
+                dst.unlink()
+            continue
+        dst.write_bytes(new)
+        if diff:
+            bad.append(f"{path}: {diff}")
+    print(f"files={len(paths)} mismatch={len(bad)}")
+    print("\n".join(bad))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

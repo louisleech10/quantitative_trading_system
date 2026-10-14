@@ -425,7 +425,19 @@ def _pytest(args: Sequence[str], cwd: Path, env: Mapping[str, str],
 COLLECT_TIMEOUT_SECONDS = 900  # 單檔 collect-only（只匯入與收集，不執行測試本體）之上限；逾時即具名停下
 
 
-def collect(test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
+PYTEST_RC_NO_TESTS = 5  # pytest ExitCode.NO_TESTS_COLLECTED
+NO_TESTS_MARKER = "no tests collected"
+
+
+def is_empty_collect(rc: int, output: str) -> bool:
+    """SPEC v22 D11.12：檔內無測試函式之測試檔＝rc 5 且輸出含「no tests collected」（兩者皆須成立）。"""
+    return rc == PYTEST_RC_NO_TESTS and NO_TESTS_MARKER in output
+
+
+def collect(test_file: str, cwd: Path, env: Mapping[str, str],
+            empty_sink: Optional[List[str]] = None) -> List[str]:
+    """單檔 collect-only → nodeid 清單。`empty_sink` 給定（plan 之 B／C／清單外／impact 檔）時，D11.12 之空檔回 [] 並記入
+    sink（收據 `empty_collect`）；未給（A 組）或其餘非 0 rc／收集為空 ⇒ GateError（fail-closed）。"""
     # 諮詢 r5 CODEX-R5-P1-01：本專案 pytest.ini 下 `-q` 輸出表頭與 `<Function …>`，`-qq` 才逐行輸出 nodeid
     # 審查 r59：collect 前後亦寫 progress.json（挑選與 A 組收集階段可監看），逾時具名停下（不無限等待）
     runner = globals().get("_RUNNER")
@@ -443,6 +455,9 @@ def collect(test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
     if runner is not None:
         runner.progress("collect", test_file, [], state="finished-call")
     ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
+    if empty_sink is not None and not ids and is_empty_collect(proc.returncode, proc.stdout + proc.stderr):
+        empty_sink.append(test_file)
+        return []
     if proc.returncode != 0 or not ids:
         raise GateError(f"{test_file} 收集失敗或為空 rc={proc.returncode}：{proc.stdout[-500:]}{proc.stderr[-500:]}")
     return ids
@@ -1500,7 +1515,8 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
         taint = {q: set(a["taint"].get(q, set())) | set(b["taint"].get(q, set())) for q in {*a["taint"], *b["taint"]}}
         return {"refs": refs, "taint": taint, "heavy": bool(a["heavy"] or b["heavy"])}
 
-    collected = {f: collect(f, repo, env) for f in b_group + c_group}
+    empty: List[str] = []  # SPEC v22 D11.12：無測試函式之檔（rc 5、no tests collected）＝空集合，不選入，收據 empty_collect
+    collected = {f: collect(f, repo, env, empty) for f in b_group + c_group}
     scans: Dict[str, Dict[str, object]] = {f: merged_scan(f) for f in collected}
     # 清單外之測試檔亦受 S2 約束（審查 r51）：全部 tests/ 下 test_*.py 經同一傳遞分析，有 taint 者納入（只選 taint 之
     # nodeid，不整檔），收據記 extra_files。
@@ -1516,12 +1532,12 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
             scans[rel] = scan
             extra.append(rel)
     for rel in extra:
-        collected[rel] = collect(rel, repo, env)
+        collected[rel] = collect(rel, repo, env, empty)
     # impact.selected 之檔整檔執行（gate_feed 第二步）；不在 A／B／C／extra 者併入 extra_files
     impact_files = {x["path"]: list(x["reasons"]) for x in impact["selected"]}
     for rel in sorted(impact_files):
         if rel not in collected and rel not in A_GROUP and rel not in a_group:
-            collected[rel] = collect(rel, repo, env)
+            collected[rel] = collect(rel, repo, env, empty)
             extra.append(rel)
     missing = must_missing(must, collected)
     if missing:
@@ -1548,6 +1564,7 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
         "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs, env, out=out, manifest=manifest,
                                             previously_failed=previously_failed),
         "extra_files": extra,
+        "empty_collect": sorted(set(empty)),
         "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
         "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,
         **fields,

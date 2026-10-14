@@ -1,0 +1,26 @@
+{
+ "spec": "docs/FRAMEPATH_SPEC.md v22 D11.6",
+ "method": "worktree at 5584102d (b1 commit), anchor 5584102d^, current selection tooling overlaid (scripts/framepath_affected_gate.py, scripts/testreg.py, tests/registry/{catalog.json,testreg_schema.json}, tests/feature_engineering/test_framepath_disposition.py, tests/_golden/framepath/test_disposition.json); plan() called directly with phase 1",
+ "anchor": "5584102d^",
+ "production_files": [
+  "momentum/FeatureEngineering/feature_factory.py",
+  "momentum/FeatureEngineering/memory_budget.py",
+  "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+  "momentum/FeatureEngineering/timeframe/multi_tf_generator.py"
+ ],
+ "selected_count": 10068,
+ "targets": {
+  "tests/feature_engineering/test_ffstat_stable_start.py::test_nan_propagation_inventory_complete": {
+   "selected": true,
+   "sources": []
+  },
+  "tests/test_cgsa_resume.py::test_cgsa_config_hash_passed_correctly": {
+   "selected": true,
+   "sources": [
+    "extra_files"
+   ]
+  }
+ },
+ "plan_sha256": "2a3e01fe7e905afde781bd42ad757ac29f748760a99c68189c979c176c0e593e",
+ "pass": true
+}
