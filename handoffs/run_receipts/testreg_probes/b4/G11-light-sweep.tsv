@@ -1,0 +1,53 @@
+path	rc	seconds	summary	failed_nodeids
+tests/momentum/Analysis/test_gap2_survivor_persist.py	0	37	============================= 12 passed in 32.14s ==============================	-
+tests/momentum/Analysis/test_ic1d_baseline.py	0	52	============================= 18 passed in 47.40s ==============================	-
+tests/momentum/Analysis/test_ic1d_orchestrator_integration.py	0	31	============================== 5 passed in 26.93s ==============================	-
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py	1	155	======================== 2 failed in 149.91s (0:02:29) =========================	[,[100%],tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline,tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+tests/momentum/Analysis/test_ic_1a_cut1_leakage.py	0	5	============================== 5 passed in 1.01s ===============================	-
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py	1	20	======================== 1 failed, 12 passed in 16.82s =========================	[,tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path
+tests/momentum/Analysis/test_ic_1a_cut1_split.py	0	4	============================== 14 passed in 1.02s ==============================	-
+tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py	0	5	============================== 8 passed in 1.13s ===============================	-
+tests/momentum/Analysis/test_ic_1eb_b5_golden.py	0	5	======================== 3 passed, 15 skipped in 1.22s =========================	-
+tests/momentum/Analysis/test_ic_api_real_kline_pit.py	0	4	============================== 2 passed in 0.68s ===============================	-
+tests/momentum/Analysis/test_ic_artifact.py	0	5	============================== 4 passed in 2.26s ===============================	-
+tests/momentum/Analysis/test_ic_data_cache_hermetic.py	0	5	============================== 1 passed in 2.16s ===============================	-
+tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py	1	242	======================== 1 failed in 239.02s (0:03:59) =========================	[100%],tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py::test_golden_redirect_on_off_sha256
+tests/momentum/Analysis/test_ic_persist_redirect_isolation.py	0	16	============================= 12 passed in 10.87s ==============================	-
+tests/momentum/Analysis/test_ic_persist_redirect_unit.py	0	5	============================== 36 passed in 2.03s ==============================	-
+tests/momentum/Analysis/test_ic_split_adapter.py	0	4	============================== 5 passed in 0.95s ===============================	-
+tests/momentum/Analysis/test_icfirstalign_cache.py	0	11	======================== 44 passed, 7 warnings in 7.70s ========================	-
+tests/momentum/Analysis/test_icfirstalign_fu2.py	0	12	============================== 13 passed in 8.25s ==============================	-
+tests/momentum/Analysis/test_ichc_capacity_contract.py	0	4	============================== 5 passed in 0.90s ===============================	-
+tests/momentum/Analysis/test_ichc_config_compat.py	0	4	============================== 4 passed in 1.00s ===============================	-
+tests/momentum/Analysis/test_ichc_contract_load.py	0	5	============================== 12 passed in 1.05s ==============================	-
+tests/momentum/Analysis/test_ichc_contract_sync.py	1	6	========================= 1 failed, 4 passed in 1.03s ==========================	tests/momentum/Analysis/test_ichc_contract_sync.py::TestThreeWaySync::test_r6_wider_contract_nodes_consistent
+tests/momentum/Analysis/test_ichc_event_honesty.py	0	14	============================== 5 passed in 10.88s ==============================	-
+tests/momentum/Analysis/test_ichc_p2_export_matrix.py	0	4	============================== 4 passed in 0.94s ===============================	-
+tests/momentum/Analysis/test_ichc_p2_golden.py	1	14	========================= 1 failed, 5 passed in 10.95s =========================	[,tests/momentum/Analysis/test_ichc_p2_golden.py::TestTG1Golden::test_feature_set_and_config_exact
+tests/momentum/Analysis/test_ichc_split_metadata.py	0	22	============================== 3 passed in 18.90s ==============================	-
+tests/momentum/Analysis/test_ichc_turnover_gate.py	0	13	============================== 4 passed in 8.52s ===============================	-
+tests/momentum/Analysis/test_ichc_wiring_check.py	0	15	============================== 5 passed in 12.14s ==============================	-
+tests/momentum/Analysis/test_ichc_xsec_capability.py	0	4	============================== 4 passed in 1.00s ===============================	-
+tests/momentum/Analysis/test_learning_curve_analyzer.py	0	5	============================== 14 passed in 2.06s ==============================	-
+tests/momentum/Analysis/test_lightgbm_analyzer.py	0	6	======================= 21 passed, 57 warnings in 3.17s ========================	-
+tests/momentum/Analysis/test_lightgbm_edge_cases.py	0	10	====================== 104 passed, 205 warnings in 6.49s =======================	-
+tests/momentum/Analysis/test_long_short_analyzer.py	0	4	============================== 5 passed in 1.02s ===============================	-
+tests/momentum/Analysis/test_marginal_ic.py	0	19	============================= 34 passed in 14.69s ==============================	-
+tests/momentum/Analysis/test_model_comparison.py	0	5	============================== 6 passed in 1.10s ===============================	-
+tests/momentum/Analysis/test_model_config_manager.py	0	5	============================== 6 passed in 1.05s ===============================	-
+tests/momentum/Analysis/test_model_enhancement_performance.py	0	13	============================== 1 passed in 9.92s ===============================	-
+tests/momentum/Analysis/test_model_factories_phase3.py	0	5	============================== 4 passed in 1.17s ===============================	-
+tests/momentum/Analysis/test_model_trainer_protocol.py	0	5	======================== 3 passed, 5 warnings in 1.35s =========================	-
+tests/momentum/Analysis/test_net_ic_analyzer.py	0	4	============================== 35 passed in 0.99s ==============================	-
+tests/momentum/Analysis/test_net_ic_schema_profiles.py	0	5	============================== 1 passed in 0.69s ===============================	-
+tests/momentum/Analysis/test_prediction_analyzer_equity.py	0	4	============================== 10 passed in 0.97s ==============================	-
+tests/momentum/Analysis/test_probability_calibrator.py	0	4	============================== 18 passed in 1.28s ==============================	-
+tests/momentum/Analysis/test_sample_weight_calculator.py	0	4	============================== 16 passed in 1.00s ==============================	-
+tests/momentum/Analysis/test_shared_analyzers_lightgbm.py	0	5	======================== 5 passed, 7 warnings in 1.58s =========================	-
+tests/momentum/Analysis/test_splitunify_canonical_holdout.py	0	4	======================== 11 passed, 8 skipped in 1.07s =========================	-
+tests/momentum/Analysis/test_splitunify_contract.py	0	7	============================== 14 passed in 3.82s ==============================	-
+tests/momentum/Analysis/test_splitunify_derive.py	0	5	============================= 121 passed in 1.44s ==============================	-
+tests/momentum/Analysis/test_splitunify_golden.py	0	7	============================== 30 passed in 3.62s ==============================	-
+tests/momentum/Analysis/test_splitunify_stage3_observation.py	0	4	========================= 3 passed, 1 skipped in 1.12s =========================	-
+tests/momentum/Analysis/test_survivor_contract.py	0	15	============================= 61 passed in 10.82s ==============================	-
+tests/momentum/Analysis/test_xgboost_protocol_methods.py	0	6	============================== 3 passed in 2.30s ===============================	-
