@@ -1,0 +1,38 @@
+path	rc	seconds	summary	failed_nodeids
+tests/momentum/event_samples/test_gap3_horizon_curve.py	0	6	============================== 4 passed in 1.85s ===============================	-
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py	0	4	============================== 14 passed in 1.17s ==============================	-
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py	0	6	============================== 31 passed in 2.66s ==============================	-
+tests/momentum/event_samples/test_gap3_split_blocked.py	0	5	============================== 9 passed in 1.76s ===============================	-
+tests/momentum/event_samples/test_gap3_two_stage_path.py	0	4	============================== 8 passed in 1.21s ===============================	-
+tests/momentum/event_samples/test_generator_adapters.py	0	5	============================== 23 passed in 1.89s ==============================	-
+tests/momentum/event_samples/test_ic_event_feature_row_key.py	0	4	============================= 14 skipped in 0.75s ==============================	-
+tests/momentum/event_samples/test_import_contract.py	0	4	============================== 59 passed in 1.22s ==============================	-
+tests/momentum/event_samples/test_isolation_terms.py	0	5	============================== 11 passed in 1.22s ==============================	-
+tests/momentum/event_samples/test_lookahead_registry.py	0	4	============================== 31 passed in 1.16s ==============================	-
+tests/momentum/event_samples/test_metrics_glossary.py	0	4	============================== 14 passed in 1.38s ==============================	-
+tests/momentum/event_samples/test_mutation_guard.py	0	4	============================== 12 passed in 1.58s ==============================	-
+tests/momentum/event_samples/test_pattern_bridge.py	0	7	============================== 10 passed in 4.10s ==============================	-
+tests/momentum/event_samples/test_pipeline.py	1	5	========================= 1 failed, 5 passed in 1.50s ==========================	tests/momentum/event_samples/test_pipeline.py::test_factories_single_outlet_and_contract_readonly
+tests/momentum/event_samples/test_random_control.py	0	9	============================== 34 passed in 6.25s ==============================	-
+tests/momentum/event_samples/test_return_table_by_label.py	0	5	============================== 13 passed in 1.55s ==============================	-
+tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py	0	5	============================== 4 passed in 0.74s ===============================	-
+tests/momentum/event_samples/test_splitunify_m5_coords_probe.py	0	4	============================== 1 passed in 0.74s ===============================	-
+tests/momentum/event_samples/test_splitunify_wiring.py	0	4	============================== 17 passed in 1.49s ==============================	-
+tests/momentum/event_samples/test_tables.py	0	6	============================== 7 passed in 2.94s ===============================	-
+tests/optimization/test_optimization_integration.py	0	4	============================== 9 passed in 1.30s ===============================	-
+tests/optimization/test_optuna_optimizer_advanced.py	0	5	======================== 25 passed, 4 warnings in 2.23s ========================	-
+tests/optimization/test_optuna_optimizer_basic.py	0	5	======================= 18 passed, 14 warnings in 2.05s ========================	-
+tests/optimization/test_phase4_optimization_task_service_events.py	0	4	============================== 2 passed in 0.80s ===============================	-
+tests/phase24/test_deep_analysis_config.py	0	4	============================== 7 passed in 1.16s ===============================	-
+tests/phase24/test_factor_centrality_analyzer.py	0	4	============================== 14 passed in 1.35s ==============================	-
+tests/phase24/test_factor_return_analyzer.py	0	5	============================== 14 passed in 1.67s ==============================	-
+tests/phase24/test_parameter_sensitivity_analyzer.py	0	4	============================== 11 passed in 1.21s ==============================	-
+tests/phase24/test_rolling_oos_validator.py	0	4	============================== 10 passed in 1.30s ==============================	-
+tests/phase24/test_trend_analyzer.py	0	4	============================== 10 passed in 1.14s ==============================	-
+tests/phase25/test_factor_exposure_analyzer.py	0	4	============================== 13 passed in 1.17s ==============================	-
+tests/phase25/test_factor_orthogonalizer.py	0	4	============================== 11 passed in 1.16s ==============================	-
+tests/phase25/test_feature_quality_diagnostics.py	0	4	============================== 12 passed in 1.46s ==============================	-
+tests/phase25/test_long_short_analyzer.py	1	4	========================= 2 failed, 7 passed in 1.29s ==========================	tests/phase25/test_long_short_analyzer.py::test_quantile_exceeds_samples,tests/phase25/test_long_short_analyzer.py::test_assign_quantiles_none_for_constant_feature
+tests/phase26/test_deep_analysis_factories.py	0	4	============================== 1 passed in 1.18s ===============================	-
+tests/phase26/test_deep_analysis_integration.py	0	6	============================== 13 passed in 2.66s ==============================	-
+tests/phase26/test_ic_reporter_deep_analysis.py	0	4	============================== 2 passed in 1.16s ===============================	-
