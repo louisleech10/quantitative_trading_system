@@ -5587,8 +5587,9 @@ _SUBBATCH_RUNNER: Dict[str, Any] = {}
 
 
 def _subbatch_changed(g: Any, root: Path, base: str) -> List[str]:
-    """changed_paths＝base 至工作樹之 diff ∪ 未追蹤檔，扣閘之 FP_EXCLUDES（handoffs／__pycache__／生成之已追蹤清冊）。"""
-    out = {p for p in _git_out(root, "diff", "--name-only", "--no-renames", base).splitlines() if p}
+    """changed_paths＝base 至工作樹之 diff ∪ 未追蹤檔，扣閘之 FP_EXCLUDES（handoffs／__pycache__／生成之已追蹤清冊）。
+    兩者皆以 -z 取原始路徑（含引號、控制字元之檔名不經 git 之 C 引號跳脫；審碼 r3 CODEX-R3-P2-01）。"""
+    out = {p for p in _git_out(root, "diff", "--name-only", "--no-renames", "-z", base).split("\0") if p}
     out |= {p for p in _git_out(root, "ls-files", "--others", "--exclude-standard", "-z").split("\0") if p}
     return sorted(p for p in out if not g._fp_excluded(p))
 

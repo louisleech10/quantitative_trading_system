@@ -200,3 +200,19 @@ def test_run_changed_paths_keep_non_ascii_and_space_paths(tmp_path):
     assert {"白話說明/進度.md", "uat_samples/events_mapping拷貝.csv", "uat_samples/events copy.csv",
             "tests/test_rw.py"} <= set(rcpt["changed_paths"]), rcpt["changed_paths"]
     assert set(rcpt["files"]) == {"tests/test_rw.py"}
+
+
+def test_run_changed_paths_records_raw_path_for_git_quoted_names(tmp_path):
+    """審碼 r3 CODEX-R3-P2-01：檔名含雙引號時 git（即使 core.quotepath=off）以 C 引號跳脫輸出 ⇒ changed_paths 須記
+    原始路徑，不得記跳脫後之顯示文字（已追蹤檔改動與未追蹤檔兩路皆同）。"""
+    files = dict(FILES)
+    files['docs/report "v1".md'] = "舊\n"
+    r = _repo(tmp_path, files)
+    base = r.head()
+    r.write("tests/test_rw.py", FILES["tests/test_rw.py"].replace("assert f() == 1\n", "assert f() == 1\n    assert f() > 0\n"))
+    r.write('docs/report "v1".md', "新\n")
+    r.write('uat_samples/note "copy".csv', "a\n")
+    proc, rcpt = _run(r, base, tmp_path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert {'docs/report "v1".md', 'uat_samples/note "copy".csv'} <= set(rcpt["changed_paths"]) and \
+        not [p for p in rcpt["changed_paths"] if p.startswith('"')], rcpt["changed_paths"]
