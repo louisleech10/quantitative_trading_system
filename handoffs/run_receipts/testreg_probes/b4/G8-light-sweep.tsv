@@ -1,0 +1,53 @@
+path	rc	seconds	summary	failed_nodeids
+tests/momentum/test_la0_lookahead.py	1	157	=================== 2 failed, 10 passed in 152.38s (0:02:32) ===================	[,[100%],tests/momentum/test_la0_lookahead.py::test_after_golden_deep_equal,tests/momentum/test_la0_lookahead.py::test_after_golden_split_off_deep_equal
+tests/momentum/test_la1_lookahead.py	timeout	302	-	-
+tests/momentum/test_la2_lookahead.py	1	7	=================== 2 failed, 11 passed, 5 warnings in 3.26s ===================	[,[,momentum.FeatureEngineering.labels.label_generator:label_generator.py:60,momentum.FeatureEngineering.labels.label_generator:label_generator.py:60,momentum.FeatureEngineering.labels.label_generator:label_generator.py:106,momentum.FeatureEngineering.labels.label_generator:label_generator.py:106,tests/momentum/test_la2_lookahead.py::test_winsorized_disabled,tests/momentum/test_la2_lookahead.py::test_config_theater
+tests/momentum/test_label_generator_extended.py	0	3	============================== 6 passed in 0.58s ===============================	-
+tests/momentum/test_lightgbm_analyzer_phase3.py	0	5	======================== 3 passed, 10 warnings in 2.40s ========================	-
+tests/momentum/test_memory_chunking.py	1	5	========================= 1 failed, 14 passed in 2.11s =========================	tests/momentum/test_memory_chunking.py::TestL65ColumnChunking::test_single_column
+tests/momentum/test_microstructure_indicators.py	1	4	========================= 3 failed, 10 passed in 1.13s =========================	tests/momentum/test_microstructure_indicators.py::test_constant_price,tests/momentum/test_microstructure_indicators.py::test_zero_range_bar,tests/momentum/test_microstructure_indicators.py::test_roll_positive_autocov
+tests/momentum/test_monotonicity_tester.py	0	6	============================== 16 passed in 1.53s ==============================	-
+tests/momentum/test_oot_validator.py	0	4	============================== 5 passed in 1.13s ===============================	-
+tests/momentum/test_pit_stats.py	0	6	============================== 44 passed in 3.00s ==============================	-
+tests/momentum/test_psi_calculator.py	0	4	============================== 4 passed in 1.10s ===============================	-
+tests/momentum/test_redundancy_filter.py	0	4	============================== 24 passed in 1.02s ==============================	-
+tests/momentum/test_rolling_auc.py	0	4	============================== 4 passed in 1.05s ===============================	-
+tests/momentum/test_stage_timings.py	0	4	============================== 6 passed in 0.99s ===============================	-
+tests/momentum/test_statistical_validator.py	0	7	============================== 19 passed in 3.85s ==============================	-
+tests/momentum/test_tail_risk_indicators.py	0	5	============================== 13 passed in 1.48s ==============================	-
+tests/momentum/test_tier_config.py	0	4	============================== 10 passed in 1.11s ==============================	-
+tests/momentum/test_tier_toggle_sync.py	0	5	============================== 12 passed in 1.02s ==============================	-
+tests/momentum/test_turnover_analyzer.py	0	4	============================== 17 passed in 1.25s ==============================	-
+tests/momentum/test_validated_series_is_used_series.py	0	24	============================== 5 passed in 21.42s ==============================	-
+tests/momentum/test_xgboost_analyzer_purged_cv.py	0	5	============================== 1 passed in 1.62s ===============================	-
+tests/momentum/test_xgboost_analyzer_time_series.py	0	4	============================== 1 passed in 1.15s ===============================	-
+tests/momentum/test_xgboost_calibration_pr_predictions.py	0	4	============================== 2 passed in 1.26s ===============================	-
+tests/momentum/test_xgboost_protocol_methods_phase3.py	0	6	============================== 2 passed in 2.48s ===============================	-
+tests/governance/test_prered_allowed_red.py	0	32	============================== 4 passed in 28.46s ==============================	-
+tests/governance/test_brief_conformance.py	0	5	============================== 9 passed in 1.60s ===============================	-
+tests/governance/test_claimcheck_verbatim_exempt.py	0	6	============================== 26 passed in 2.74s ==============================	-
+tests/governance/test_completeness_degrade.py	0	9	============================== 12 passed in 6.12s ==============================	-
+tests/governance/test_completeness_id.py	0	5	============================== 6 passed in 1.98s ===============================	-
+tests/governance/test_completeness_idlike_fp.py	0	11	============================== 30 passed in 7.35s ==============================	-
+tests/governance/test_completeness_idlike_heading.py	0	5	============================== 11 passed in 1.82s ==============================	-
+tests/governance/test_completeness_lock.py	0	7	============================== 15 passed in 4.17s ==============================	-
+tests/governance/test_completeness_oracles.py	0	7	============================== 11 passed in 4.37s ==============================	-
+tests/governance/test_completeness_selfcheck.py	0	9	============================== 7 passed in 6.59s ===============================	-
+tests/governance/test_completeness_semantic.py	0	8	============================== 6 passed in 4.98s ===============================	-
+tests/governance/test_cxrun_selfcheck_prompt.py	0	7	============================== 7 passed in 4.04s ===============================	-
+tests/governance/test_cxrun_stamp_format_gate.py	0	7	============================== 5 passed in 3.58s ===============================	-
+tests/governance/test_cxrun_stamp_prompt.py	0	10	============================== 11 passed in 6.85s ==============================	-
+tests/governance/test_cxrun_watchdog_stale_done.py	0	70	========================= 6 passed in 67.26s (0:01:07) =========================	-
+tests/governance/test_debt_clear.py	0	85	======================== 50 passed in 81.32s (0:01:21) =========================	-
+tests/governance/test_debt_clear_stamp_unlock.py	0	13	============================== 6 passed in 9.51s ===============================	-
+tests/governance/test_debt_emit.py	0	86	======================== 89 passed in 81.76s (0:01:21) =========================	-
+tests/governance/test_debt_gate.py	0	18	======================== 14 passed, 1 xfailed in 12.41s ========================	-
+tests/governance/test_debt_ledger.py	0	13	============================== 20 passed in 7.65s ==============================	-
+tests/governance/test_decouple_baseline.py	0	32	============================== 9 passed in 24.86s ==============================	-
+tests/governance/test_dispatch_wrapper.py	0	8	============================== 7 passed in 2.59s ===============================	-
+tests/governance/test_doc_format_precheck.py	0	10	============================== 47 passed in 5.03s ==============================	-
+tests/governance/test_docrot2_class_routing.py	0	11	============================== 11 passed in 3.98s ==============================	-
+tests/governance/test_docrot2_metrics.py	0	42	============================= 104 passed in 34.58s =============================	-
+tests/governance/test_docrot2_migration.py	0	19	============================= 48 passed in 14.29s ==============================	-
+tests/governance/test_docrot2_registry.py	0	12	============================== 73 passed in 9.08s ==============================	-
+tests/governance/test_docrot2_write_guard.py	0	31	============================= 117 passed in 26.42s =============================	-

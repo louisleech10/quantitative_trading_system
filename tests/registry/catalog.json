@@ -4945,15 +4945,16 @@
   },
   "tests/governance/test_brief_conformance.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_brief_conformance.py",
    "quarantine": [],
@@ -4963,15 +4964,16 @@
   },
   "tests/governance/test_claimcheck_verbatim_exempt.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_claimcheck_verbatim_exempt.py",
    "quarantine": [],
@@ -4981,15 +4983,17 @@
   },
   "tests/governance/test_completeness_degrade.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A19",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_completeness_degrade.py",
    "quarantine": [],
@@ -4999,15 +5003,16 @@
   },
   "tests/governance/test_completeness_id.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_completeness_id.py",
    "quarantine": [],
@@ -5017,15 +5022,16 @@
   },
   "tests/governance/test_completeness_idlike_fp.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_completeness_idlike_fp.py",
    "quarantine": [],
@@ -5035,15 +5041,16 @@
   },
   "tests/governance/test_completeness_idlike_heading.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_completeness_idlike_heading.py",
    "quarantine": [],
@@ -5053,15 +5060,16 @@
   },
   "tests/governance/test_completeness_lock.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_completeness_lock.py",
    "quarantine": [],
@@ -5071,15 +5079,18 @@
   },
   "tests/governance/test_completeness_oracles.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A13",
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "TOLERANCE"
    ],
    "path": "tests/governance/test_completeness_oracles.py",
    "quarantine": [],
@@ -5089,15 +5100,17 @@
   },
   "tests/governance/test_completeness_selfcheck.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A19",
+    "A6",
+    "A9"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_completeness_selfcheck.py",
    "quarantine": [],
@@ -5107,15 +5120,19 @@
   },
   "tests/governance/test_completeness_semantic.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A19",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/governance/test_completeness_semantic.py",
    "quarantine": [],
@@ -5125,15 +5142,16 @@
   },
   "tests/governance/test_cxrun_selfcheck_prompt.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_cxrun_selfcheck_prompt.py",
    "quarantine": [],
@@ -5143,15 +5161,16 @@
   },
   "tests/governance/test_cxrun_stamp_format_gate.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A19",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_cxrun_stamp_format_gate.py",
    "quarantine": [],
@@ -5161,15 +5180,17 @@
   },
   "tests/governance/test_cxrun_stamp_prompt.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A19",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_cxrun_stamp_prompt.py",
    "quarantine": [],
@@ -5179,15 +5200,17 @@
   },
   "tests/governance/test_cxrun_watchdog_stale_done.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A19",
+    "A6",
+    "A9"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_cxrun_watchdog_stale_done.py",
    "quarantine": [],
@@ -5197,15 +5220,17 @@
   },
   "tests/governance/test_debt_clear.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A13",
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_debt_clear.py",
    "quarantine": [],
@@ -5215,15 +5240,15 @@
   },
   "tests/governance/test_debt_clear_stamp_unlock.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_debt_clear_stamp_unlock.py",
    "quarantine": [],
@@ -5233,15 +5258,17 @@
   },
   "tests/governance/test_debt_emit.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6",
+    "A9"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_debt_emit.py",
    "quarantine": [],
@@ -5251,15 +5278,18 @@
   },
   "tests/governance/test_debt_gate.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "perf"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A10",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/governance/test_debt_gate.py",
    "quarantine": [],
@@ -5269,15 +5299,16 @@
   },
   "tests/governance/test_debt_ledger.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_debt_ledger.py",
    "quarantine": [],
@@ -5287,33 +5318,38 @@
   },
   "tests/governance/test_decouple_baseline.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A11",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_decouple_baseline.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/governance/test_decouple_baseline.py::test_empty_baseline_is_strictest_not_skip",
+    "tests/governance/test_decouple_baseline.py::test_new_violation_is_detected"
+   ],
    "ticket": "GOV"
   },
   "tests/governance/test_dispatch_wrapper.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_dispatch_wrapper.py",
    "quarantine": [],
@@ -5323,15 +5359,16 @@
   },
   "tests/governance/test_doc_format_precheck.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_doc_format_precheck.py",
    "quarantine": [],
@@ -5341,15 +5378,15 @@
   },
   "tests/governance/test_docrot2_class_routing.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_docrot2_class_routing.py",
    "quarantine": [],
@@ -5359,15 +5396,17 @@
   },
   "tests/governance/test_docrot2_metrics.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A19",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_docrot2_metrics.py",
    "quarantine": [],
@@ -5377,15 +5416,16 @@
   },
   "tests/governance/test_docrot2_migration.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_docrot2_migration.py",
    "quarantine": [],
@@ -5395,15 +5435,16 @@
   },
   "tests/governance/test_docrot2_registry.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_docrot2_registry.py",
    "quarantine": [],
@@ -5413,15 +5454,16 @@
   },
   "tests/governance/test_docrot2_write_guard.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A16",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_docrot2_write_guard.py",
    "quarantine": [],
@@ -6295,15 +6337,16 @@
   },
   "tests/governance/test_prered_allowed_red.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A17",
+    "A18"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/governance/test_prered_allowed_red.py",
    "quarantine": [],
@@ -10378,15 +10421,24 @@
   },
   "tests/momentum/test_la0_lookahead.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "correctness",
+    "regression"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A14",
+    "A17",
+    "A2",
+    "A22",
+    "A6",
+    "A8"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "METAMORPHIC",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_la0_lookahead.py",
    "quarantine": [],
@@ -10396,15 +10448,24 @@
   },
   "tests/momentum/test_la1_lookahead.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "correctness",
+    "regression"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A14",
+    "A17",
+    "A19",
+    "A2",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "METAMORPHIC",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_la1_lookahead.py",
    "quarantine": [],
@@ -10414,33 +10475,47 @@
   },
   "tests/momentum/test_la2_lookahead.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "correctness"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A14",
+    "A15",
+    "A17",
+    "A2",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "METAMORPHIC",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_la2_lookahead.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/momentum/test_la2_lookahead.py::test_config_theater",
+    "tests/momentum/test_la2_lookahead.py::test_winsorized_disabled"
+   ],
    "ticket": "IC-LA2"
   },
   "tests/momentum/test_label_generator_extended.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A2",
+    "A3",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_label_generator_extended.py",
    "quarantine": [],
@@ -10450,15 +10525,21 @@
   },
   "tests/momentum/test_lightgbm_analyzer_phase3.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "perf",
+    "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A10",
+    "A11",
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/momentum/test_lightgbm_analyzer_phase3.py",
    "quarantine": [],
@@ -10468,69 +10549,93 @@
   },
   "tests/momentum/test_memory_chunking.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "smoke"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A2",
+    "A6",
+    "A7"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "PROPERTY",
+    "SMOKE",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_memory_chunking.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/momentum/test_memory_chunking.py::TestL65ColumnChunking::test_chunked_matches_non_chunked",
+    "tests/momentum/test_memory_chunking.py::TestL65ColumnChunking::test_single_column"
+   ],
    "ticket": "unknown"
   },
   "tests/momentum/test_microstructure_indicators.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "smoke"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/momentum/test_microstructure_indicators.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/momentum/test_microstructure_indicators.py::test_constant_price",
+    "tests/momentum/test_microstructure_indicators.py::test_roll_positive_autocov",
+    "tests/momentum/test_microstructure_indicators.py::test_zero_range_bar"
+   ],
    "ticket": "unknown"
   },
   "tests/momentum/test_monotonicity_tester.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A15",
+    "A3",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_monotonicity_tester.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/momentum/test_monotonicity_tester.py::test_long_short_tstat_matches_scipy"
+   ],
    "ticket": "unknown"
   },
   "tests/momentum/test_oot_validator.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A2",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/momentum/test_oot_validator.py",
    "quarantine": [],
@@ -10540,15 +10645,22 @@
   },
   "tests/momentum/test_pit_stats.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "correctness"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A14",
+    "A15",
+    "A2",
+    "A3",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "METAMORPHIC",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_pit_stats.py",
    "quarantine": [],
@@ -10558,15 +10670,18 @@
   },
   "tests/momentum/test_psi_calculator.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/momentum/test_psi_calculator.py",
    "quarantine": [],
@@ -10576,15 +10691,17 @@
   },
   "tests/momentum/test_redundancy_filter.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A3",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_redundancy_filter.py",
    "quarantine": [],
@@ -10594,15 +10711,17 @@
   },
   "tests/momentum/test_rolling_auc.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/momentum/test_rolling_auc.py",
    "quarantine": [],
@@ -10612,33 +10731,42 @@
   },
   "tests/momentum/test_stage_timings.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A13",
+    "A19"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/momentum/test_stage_timings.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/momentum/test_stage_timings.py::test_decorator_records_and_accumulates"
+   ],
    "ticket": "EVTLABEL"
   },
   "tests/momentum/test_statistical_validator.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "correctness"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A15",
+    "A4",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "STATISTICAL",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_statistical_validator.py",
    "quarantine": [],
@@ -10648,33 +10776,43 @@
   },
   "tests/momentum/test_tail_risk_indicators.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "smoke"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A3",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/momentum/test_tail_risk_indicators.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/momentum/test_tail_risk_indicators.py::test_mdd_invalid_price",
+    "tests/momentum/test_tail_risk_indicators.py::test_tail_risk_extreme",
+    "tests/momentum/test_tail_risk_indicators.py::test_tail_risk_many_nans",
+    "tests/momentum/test_tail_risk_indicators.py::test_tail_risk_one_sided",
+    "tests/momentum/test_tail_risk_indicators.py::test_udvr_zero_downside"
+   ],
    "ticket": "unknown"
   },
   "tests/momentum/test_tier_config.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/momentum/test_tier_config.py",
    "quarantine": [],
@@ -10684,15 +10822,16 @@
   },
   "tests/momentum/test_tier_toggle_sync.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/momentum/test_tier_toggle_sync.py",
    "quarantine": [],
@@ -10702,33 +10841,42 @@
   },
   "tests/momentum/test_turnover_analyzer.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "correctness"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A15",
+    "A2",
+    "A3",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_turnover_analyzer.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_targets": [
+    "tests/momentum/test_turnover_analyzer.py::test_quantile_turnover_matches_expected"
+   ],
    "ticket": "unknown"
   },
   "tests/momentum/test_validated_series_is_used_series.py": {
    "claim": [
-    "unclassified"
+    "contract",
+    "correctness"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A2",
+    "A8"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT"
    ],
    "path": "tests/momentum/test_validated_series_is_used_series.py",
    "quarantine": [],
@@ -10738,15 +10886,15 @@
   },
   "tests/momentum/test_xgboost_analyzer_purged_cv.py": {
    "claim": [
-    "unclassified"
+    "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A20"
    ],
    "oracle": [
-    "unclassified"
+    "SMOKE"
    ],
    "path": "tests/momentum/test_xgboost_analyzer_purged_cv.py",
    "quarantine": [],
@@ -10756,15 +10904,15 @@
   },
   "tests/momentum/test_xgboost_analyzer_time_series.py": {
    "claim": [
-    "unclassified"
+    "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A20"
    ],
    "oracle": [
-    "unclassified"
+    "SMOKE"
    ],
    "path": "tests/momentum/test_xgboost_analyzer_time_series.py",
    "quarantine": [],
@@ -10774,15 +10922,17 @@
   },
   "tests/momentum/test_xgboost_calibration_pr_predictions.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A15",
+    "A20"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "TOLERANCE"
    ],
    "path": "tests/momentum/test_xgboost_calibration_pr_predictions.py",
    "quarantine": [],
@@ -10792,15 +10942,18 @@
   },
   "tests/momentum/test_xgboost_protocol_methods_phase3.py": {
    "claim": [
-    "unclassified"
+    "contract"
    ],
    "disposition": "keep",
-   "disposition_ref": null,
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
    "guarantee": [
-    "unclassified"
+    "A11",
+    "A12",
+    "A6"
    ],
    "oracle": [
-    "unclassified"
+    "EXACT",
+    "SMOKE"
    ],
    "path": "tests/momentum/test_xgboost_protocol_methods_phase3.py",
    "quarantine": [],

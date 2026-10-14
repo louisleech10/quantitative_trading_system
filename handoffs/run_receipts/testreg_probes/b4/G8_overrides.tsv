@@ -1,0 +1,1 @@
+tests/momentum/test_la2_lookahead.py	disposition	rewrite	兩支測試呼叫未宣告之系統 rg（subprocess），本機無 ripgrep 即 FileNotFoundError 紅（G8-light-sweep 實證）；屬測試可攜性缺陷，2:2 分歧依碼證與較嚴版取 rewrite（CODEX-R12-P1-02、GROK-R12-P1-01）
