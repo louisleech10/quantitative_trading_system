@@ -1,0 +1,1 @@
+tests/governance/mutation_red/test_completeness_mutations.py	disposition	keep	test_m4b 之 docstring 明示 out-of-scope 只記 receipt、不 assert 抓到，斷言與宣稱一致非空心（CODEX-R16-P1-01、GROK-R16-P1-01 碼證成立）；整檔缺 rc==0 正對照屬新增測試（add:）

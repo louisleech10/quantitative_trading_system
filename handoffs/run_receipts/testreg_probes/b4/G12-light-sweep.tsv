@@ -1,0 +1,53 @@
+path	rc	seconds	summary	failed_nodeids
+tests/performance/test_searchsorted_perf.py	0	5	============================== 2 passed in 1.23s ===============================	-
+tests/performance/test_cgsa_memory.py	0	4	============================== 1 passed in 0.78s ===============================	-
+tests/performance/test_l65_parallel_perf.py	0	4	============================== 2 passed in 1.19s ===============================	-
+tests/performance/test_l65_perf.py	0	6	======================== 4 passed, 4 warnings in 2.86s =========================	-
+tests/performance/test_l65_phase0_gate.py	0	4	========================= 3 passed, 1 warning in 0.85s =========================	-
+tests/performance/test_l7_persist_perf.py	0	4	============================== 2 passed in 1.52s ===============================	-
+tests/performance/test_memory_pressure.py	5	4	============================ no tests ran in 0.71s =============================	-
+tests/performance/test_multi_window_perf.py	1	49	========================= 1 failed, 1 passed in 45.78s =========================	[,tests/performance/test_multi_window_perf.py::test_multi_window_speedup
+tests/performance/test_numba_rolling_perf.py	0	6	============================== 2 passed in 3.04s ===============================	-
+tests/test_append_fix.py	0	4	============================== 1 passed in 0.94s ===============================	-
+tests/test_density_comparison.py	0	4	============================== 1 skipped in 0.66s ==============================	-
+tests/test_feature_factory_api.py	0	293	======================== 5 passed in 287.37s (0:04:47) =========================	-
+tests/test_feature_factory_browse_api.py	0	5	============================== 8 passed in 1.55s ===============================	-
+tests/test_feature_factory_export_api.py	0	4	============================== 5 passed in 1.36s ===============================	-
+tests/test_frontend_integration.py	0	3	======================== 5 passed, 2 warnings in 0.66s =========================	-
+tests/test_functional_wrapper.py	5	3	============================ no tests ran in 0.65s =============================	-
+tests/test_indicator_engine_dataframe.py	0	3	============================== 2 passed in 0.66s ===============================	-
+tests/test_kline_data_service.py	0	4	======================== 5 passed, 6 warnings in 1.52s =========================	-
+tests/test_kline_downloader.py	0	5	======================== 6 passed, 10 warnings in 2.04s ========================	-
+tests/test_kline_storage.py	0	4	======================== 6 passed, 6 warnings in 0.94s =========================	-
+tests/test_legacy_storage_step6.py	0	4	============================== 2 passed in 0.70s ===============================	-
+tests/test_multi_symbol_xgboost.py	0	4	============================== 3 passed in 1.39s ===============================	-
+tests/test_oot_validation.py	0	6	============================== 18 passed in 3.28s ==============================	-
+tests/test_optimization_flow.py	0	5	============================== 1 skipped in 0.68s ==============================	-
+tests/test_optuna_cache_fixes.py	0	4	============================== 17 passed in 1.30s ==============================	-
+tests/test_parameter_range_fix.py	0	4	============================== 1 skipped in 0.68s ==============================	-
+tests/test_pattern_extractor.py	0	5	============================== 1 passed in 1.58s ===============================	-
+tests/test_phase1_registry.py	5	4	============================ no tests ran in 1.25s =============================	-
+tests/test_phase2_integration.py	0	4	============================== 12 passed in 1.47s ==============================	-
+tests/test_phase_c_granular_control.py	0	4	============================== 53 passed in 0.79s ==============================	-
+tests/test_regime_detector.py	0	6	============================== 25 passed in 2.94s ==============================	-
+tests/test_storage_path_fix.py	0	4	========================= 1 passed, 1 warning in 1.49s =========================	-
+tests/test_xgboost_advanced_metrics.py	0	7	============================== 6 passed in 3.63s ===============================	-
+tests/test_xgboost_analyzer.py	0	7	============================== 2 passed in 2.35s ===============================	-
+tests/test_xgboost_fix.py	5	6	============================ no tests ran in 2.07s =============================	-
+tests/test_xgboost_json_fix.py	0	4	========================= 1 passed, 1 warning in 0.77s =========================	-
+tests/analysis/test_api_endpoints.py	0	6	============================== 23 passed in 2.60s ==============================	-
+tests/analysis/test_drift_regime.py	0	4	============================== 3 passed in 0.67s ===============================	-
+tests/analysis/test_performance.py	0	4	========================= 2 passed, 9 skipped in 0.71s =========================	-
+tests/analysis/test_signal_analysis_service.py	0	5	======================== 16 passed, 3 skipped in 0.88s =========================	-
+tests/analysis/test_signal_density_analyzer.py	0	6	======================== 14 passed, 16 skipped in 0.74s ========================	-
+tests/decoupling/test_import_scanner.py	0	4	============================== 55 passed in 0.94s ==============================	-
+tests/docs_tooling/test_check_doc_anchors.py	0	5	============================== 11 passed in 1.35s ==============================	-
+tests/docs_tooling/test_check_doc_manifest_b.py	0	4	============================== 19 passed in 0.80s ==============================	-
+tests/fixtures/test_data_manifest.py	0	4	============================== 5 passed in 1.03s ===============================	-
+tests/golden/ic_phase1_contract/test_baseline_frozen.py	0	4	============================== 1 passed in 0.78s ===============================	-
+tests/golden/ic_phase1_contract/test_split_leakage_golden.py	0	4	============================== 2 passed in 0.94s ===============================	-
+tests/golden/l65/test_l65_golden.py	1	12	=================== 1 failed, 3 passed, 2 warnings in 8.34s ====================	tests/golden/l65/test_l65_golden.py::test_l65_golden_inventory_exists
+tests/golden/la1/test_attribution_validator.py	0	4	============================== 24 passed in 0.84s ==============================	-
+tests/golden/la1/test_b4_golden_rebaseline.py	timeout	302	17:51:20 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)	[,[,[,[,[,[,[,[
+tests/golden/la2/test_attribution_validator.py	0	5	============================== 18 passed in 1.42s ==============================	-
+tests/governance/mutation_red/test_completeness_mutations.py	0	7	============================== 11 passed in 4.42s ==============================	-
