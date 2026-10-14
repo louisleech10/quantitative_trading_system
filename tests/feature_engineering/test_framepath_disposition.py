@@ -1579,12 +1579,24 @@ def regenerate_inventory(files: Sequence[str], repo: Path = REPO) -> bytes:
             inv.write_bytes(saved)
 
 
-def inventory_integrity_errors(content: Optional[bytes], regenerate=regenerate_inventory) -> List[str]:
+def inventory_integrity_errors(content: Optional[bytes], regenerate=regenerate_inventory,
+                               head_content: Optional[bytes] = None) -> List[str]:
     """清冊生成物完整性（D11.7）：現行內容須等於「collect 其所列檔」重產之結果；每行須為 `檔::名` 之 nodeid（生成器之
-    輸出形態），全空收集之生成輸出（INVENTORY_EMPTY）視為生成物。"""
+    輸出形態）。全空收集之生成輸出（INVENTORY_EMPTY）只在「HEAD 版清冊亦為空標記（或不存在）」或「以 HEAD 版所列檔
+    collect 重產確為空」時視為生成物（審查 r63 CODEX-R63-P1-01：非空清冊被換成空標記不得無條件放行）。"""
     if content is None:
         return [f"⑦ {GENERATED_INVENTORY_REL} 被刪除（生成物不得刪）"]
     if content == INVENTORY_EMPTY:
+        if head_content is None or head_content == INVENTORY_EMPTY:
+            return []
+        head_files = sorted({ln.split("::", 1)[0] for ln in head_content.decode("utf-8", "replace").splitlines()
+                             if "::" in ln})
+        try:
+            regenerated = regenerate(head_files)
+        except (RuntimeError, subprocess.TimeoutExpired) as exc:
+            return [f"⑦ {GENERATED_INVENTORY_REL} 為空標記而 HEAD 版所列檔無法 collect 重產：{str(exc)[:300]}"]
+        if regenerated != INVENTORY_EMPTY:
+            return [f"⑦ {GENERATED_INVENTORY_REL} 被換成空集合標記，而以 HEAD 版所列檔 collect 重產非空（手動改動？）"]
         return []
     lines = content.decode("utf-8", "replace").splitlines()
     if not lines or any("::" not in ln or ln != ln.strip() for ln in lines):
@@ -1600,7 +1612,7 @@ def inventory_integrity_errors(content: Optional[bytes], regenerate=regenerate_i
 
 
 def inventory_check_current(path: str) -> List[str]:
-    return inventory_integrity_errors(current_bytes(path))
+    return inventory_integrity_errors(current_bytes(path), head_content=_git_show_bytes("HEAD", path))
 
 
 def check_7(disp: Dict[str, Any], changed: Set[str], inventory_check=inventory_check_current) -> List[str]:
@@ -2989,6 +3001,12 @@ def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
         g.collect("test_broken.py", tmp_path, env, sink)
     assert sink == ["test_empty.py"]
     assert g.collect("test_ok.py", tmp_path, env, sink) == ["test_ok.py::test_a"]
+    # 審查 r63：plan 經 collect_or_empty 以三參數呼叫 collect（TESTREG 凍結驗收以三參數替身替換 collect）
+    sink2: List[str] = []
+    assert g.collect_or_empty("test_empty.py", tmp_path, env, sink2) == [] and sink2 == ["test_empty.py"]
+    with pytest.raises(g.GateError):
+        g.collect_or_empty("test_broken.py", tmp_path, env, sink2)
+    assert g.collect_or_empty("test_ok.py", tmp_path, env, sink2) == ["test_ok.py::test_a"]
     sel, skip = g.select_expected({"test_empty.py": [], "test_ok.py": ["test_ok.py::test_a"]},
                                   {"test_ok.py": {"refs": {}, "taint": {}, "heavy": False}}, {}, {}, [], [], False)
     assert set(sel) == {"test_ok.py::test_a"} and skip == {}
@@ -3022,6 +3040,17 @@ def test_mutation_d11_7_inventory_hand_edit_is_red():
     assert check_7(disp, {GENERATED_INVENTORY_REL}, lambda p: inventory_integrity_errors(good, regen)) == []
     assert check_7(disp, {GENERATED_INVENTORY_REL}, lambda p: inventory_integrity_errors(tampered, regen)) != []
     assert check_7(disp, {GENERATED_INVENTORY_REL}, None) != []
+
+
+def test_mutation_d11_7_empty_sentinel_not_unconditional():
+    """審查 r63 CODEX-R63-P1-01：非空清冊（HEAD 版）被換成空集合標記 ⇒ 以 HEAD 版所列檔重產非空 ⇒ 紅；HEAD 版亦為
+    空標記或不存在 ⇒ 不紅；HEAD 版所列檔重產確為空 ⇒ 不紅。mutation：空標記無條件放行 ⇒ 第一案綠（紅）。"""
+    head = b"tests/x/test_a.py::test_one\ntests/x/test_a.py::test_two\n"
+    nonempty = {("tests/x/test_a.py",): head}
+    assert inventory_integrity_errors(INVENTORY_EMPTY, lambda fs: nonempty[tuple(fs)], head_content=head) != []
+    assert inventory_integrity_errors(INVENTORY_EMPTY, lambda fs: INVENTORY_EMPTY, head_content=head) == []
+    assert inventory_integrity_errors(INVENTORY_EMPTY, lambda fs: head, head_content=INVENTORY_EMPTY) == []
+    assert inventory_integrity_errors(INVENTORY_EMPTY, lambda fs: head, head_content=None) == []
 
 
 def test_mutation_affected_gate_runner_resume_pause_progress(tmp_path):

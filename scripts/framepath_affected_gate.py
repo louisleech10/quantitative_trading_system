@@ -434,10 +434,27 @@ def is_empty_collect(rc: int, output: str) -> bool:
     return rc == PYTEST_RC_NO_TESTS and NO_TESTS_MARKER in output
 
 
+class EmptyCollect(GateError):
+    """SPEC v22 D11.12：檔內無測試函式（rc 5＋no tests collected）。屬 GateError ⇒ A 組直呼 `collect` 時仍 fail-closed；
+    plan 經 `collect_or_empty` 捕捉後記入收據 `empty_collect`。"""
+
+
+def collect_or_empty(test_file: str, cwd: Path, env: Mapping[str, str], empty_sink: List[str]) -> List[str]:
+    """plan 之 B／C／清單外／impact 檔：D11.12 空檔回 [] 並記入 sink。`collect` 以模組屬性呼叫且維持三參數介面
+    （審查 r63 實跑：TESTREG 凍結驗收以三參數替身替換 `collect`，四參數呼叫使其 10 項 TypeError）。"""
+    try:
+        return collect(test_file, cwd, env)
+    except EmptyCollect:
+        empty_sink.append(test_file)
+        return []
+
+
 def collect(test_file: str, cwd: Path, env: Mapping[str, str],
             empty_sink: Optional[List[str]] = None) -> List[str]:
-    """單檔 collect-only → nodeid 清單。`empty_sink` 給定（plan 之 B／C／清單外／impact 檔）時，D11.12 之空檔回 [] 並記入
-    sink（收據 `empty_collect`）；未給（A 組）或其餘非 0 rc／收集為空 ⇒ GateError（fail-closed）。"""
+    """單檔 collect-only → nodeid 清單。D11.12 空檔 ⇒ 給 `empty_sink` 時回 [] 並記入，未給 ⇒ EmptyCollect；其餘非 0
+    rc／收集為空 ⇒ GateError（fail-closed）。plan 一律經 `collect_or_empty` 以三參數呼叫本函式。"""
+    if empty_sink is not None:
+        return collect_or_empty(test_file, cwd, env, empty_sink)
     # 諮詢 r5 CODEX-R5-P1-01：本專案 pytest.ini 下 `-q` 輸出表頭與 `<Function …>`，`-qq` 才逐行輸出 nodeid
     # 審查 r59：collect 前後亦寫 progress.json（挑選與 A 組收集階段可監看），逾時具名停下（不無限等待）
     runner = globals().get("_RUNNER")
@@ -455,9 +472,8 @@ def collect(test_file: str, cwd: Path, env: Mapping[str, str],
     if runner is not None:
         runner.progress("collect", test_file, [], state="finished-call")
     ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
-    if empty_sink is not None and not ids and is_empty_collect(proc.returncode, proc.stdout + proc.stderr):
-        empty_sink.append(test_file)
-        return []
+    if not ids and is_empty_collect(proc.returncode, proc.stdout + proc.stderr):
+        raise EmptyCollect(f"{test_file} 無測試函式（rc={proc.returncode}、{NO_TESTS_MARKER}）")
     if proc.returncode != 0 or not ids:
         raise GateError(f"{test_file} 收集失敗或為空 rc={proc.returncode}：{proc.stdout[-500:]}{proc.stderr[-500:]}")
     return ids
@@ -1516,7 +1532,7 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
         return {"refs": refs, "taint": taint, "heavy": bool(a["heavy"] or b["heavy"])}
 
     empty: List[str] = []  # SPEC v22 D11.12：無測試函式之檔（rc 5、no tests collected）＝空集合，不選入，收據 empty_collect
-    collected = {f: collect(f, repo, env, empty) for f in b_group + c_group}
+    collected = {f: collect_or_empty(f, repo, env, empty) for f in b_group + c_group}
     scans: Dict[str, Dict[str, object]] = {f: merged_scan(f) for f in collected}
     # 清單外之測試檔亦受 S2 約束（審查 r51）：全部 tests/ 下 test_*.py 經同一傳遞分析，有 taint 者納入（只選 taint 之
     # nodeid，不整檔），收據記 extra_files。
@@ -1532,12 +1548,12 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
             scans[rel] = scan
             extra.append(rel)
     for rel in extra:
-        collected[rel] = collect(rel, repo, env, empty)
+        collected[rel] = collect_or_empty(rel, repo, env, empty)
     # impact.selected 之檔整檔執行（gate_feed 第二步）；不在 A／B／C／extra 者併入 extra_files
     impact_files = {x["path"]: list(x["reasons"]) for x in impact["selected"]}
     for rel in sorted(impact_files):
         if rel not in collected and rel not in A_GROUP and rel not in a_group:
-            collected[rel] = collect(rel, repo, env, empty)
+            collected[rel] = collect_or_empty(rel, repo, env, empty)
             extra.append(rel)
     missing = must_missing(must, collected)
     if missing:
@@ -1627,7 +1643,7 @@ def main(argv: Sequence[str]) -> int:
     adm = admission([*a_ids, *sel["selected"]], times)
     if args.plan:
         plan_path = REPO / f"handoffs/run_receipts/framepath-b{batch}-affected-plan.json"
-        plan_path.write_text(json.dumps({"spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "anchor": anchor,
+        plan_path.write_text(json.dumps({"spec": "docs/FRAMEPATH_SPEC.md v22 D8＋D11", "phase": args.phase, "anchor": anchor,
                                          **sel, "admission": adm}, ensure_ascii=False, indent=1, default=sorted) + "\n",
                              encoding="utf-8")
         print(f"FRAMEPATH affected plan：collected={sum(len(v) for v in sel['collected'].values())} "
@@ -1740,11 +1756,12 @@ def main(argv: Sequence[str]) -> int:
     if bad:
         raise GateError(f"verdict 收據欄驗證不符：{bad[:5]}")
     receipt = {
-        "spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "repo_head": _git(REPO, "rev-parse", "HEAD").strip(),
+        "spec": "docs/FRAMEPATH_SPEC.md v22 D8＋D11", "phase": args.phase, "repo_head": _git(REPO, "rev-parse", "HEAD").strip(),
         "selection": {"selected": sel["selected"], "skipped": sel["skipped"], "s2_symbols": sel["s2_symbols"],
                       "align_triggered": sel["align_triggered"], "light_files": sel["light_files"],
                       "invariance_baseline_sha256": sel["invariance_baseline_sha256"],
-                      "inputs_digest": sel["inputs_digest"], "admission": adm, "admitted": args.admit is not None},
+                      "inputs_digest": sel["inputs_digest"], "admission": adm, "admitted": args.admit is not None,
+                      "empty_collect": sel.get("empty_collect", [])},  # 審查 r63 CODEX-R63-P2-02
         "residual_defs": sel["residual_defs"], "residual_executed": sorted(hits & set(sel["residual_defs"])),
         "residual_unexecuted": unexecuted,
         "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(a_files),
