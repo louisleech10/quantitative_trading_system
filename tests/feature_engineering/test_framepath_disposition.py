@@ -2129,13 +2129,20 @@ def test_affected_gate_state_key_binds_tree_and_file(tmp_path):
 
 def test_affected_gate_anchor_worktree_verification(tmp_path):
     """審查 r47（CODEX-R47-P1-02）：錨點工作樹須 HEAD＝本票最晚許可錨點、乾淨（封閉豁免僅 data_cache symlink 與
-    __pycache__）、生產碼同碼態錨點；主工作樹（HEAD 非錨點或不乾淨）⇒ 拒。"""
+    __pycache__）；主工作樹（HEAD 非錨點或不乾淨）⇒ 拒。SPEC v23 D12.1：錨點碼態由許可錨點界定，不再比對寫死之
+    6e07e0ad 生產碼（b2 起許可錨點含 b1 生產碼改動，該比對恆拒）。"""
     g = _affected_gate()
     assert g._benign_status("?? data_cache") and g._benign_status(" M momentum/x/__pycache__/a.nbi")
     assert not g._benign_status("?? data_cache_other") and not g._benign_status(" M tests/a.py")
     assert not g._benign_status("?? scripts/new.py")
     with pytest.raises(g.GateError):
         g.verify_anchor_worktree(REPO, "0" * 40)
+    # SPEC v23 D12.1：寫死之碼態錨點常數與其生產碼等值比對已刪
+    import inspect
+
+    assert not hasattr(g, "CODE_ANCHOR")
+    src = inspect.getsource(g.verify_anchor_worktree)
+    assert "CODE_ANCHOR" not in src and "PRODUCTION_ROOTS" not in src
 
 
 def test_mutation_affected_gate_r48_hardening(tmp_path, monkeypatch):
@@ -2156,7 +2163,9 @@ def test_mutation_affected_gate_r48_hardening(tmp_path, monkeypatch):
 def test_mutation_affected_gate_anchor_worktree_real(tmp_path):
     """審查 r49（CODEX-R49-P1-01）：以真實錨點工作樹（本票最晚實作許可之提交，稀疏檢出只含 pytest.ini 以控秒級與磁碟）
     實跑 verify_anchor_worktree：合法狀態（無 data_cache 或指向主工作樹之 symlink）通過；實體 data_cache 目錄、
-    指向他處之 symlink、被忽略之輸入檔（.env）、追蹤檔改動，各自拒絕。"""
+    指向他處之 symlink、被忽略之輸入檔（.env）、追蹤檔改動，各自拒絕。SPEC v23 D12.1：許可錨點之生產碼可異於
+    6e07e0ad（b2 起含 b1 生產碼改動），合法錨點工作樹照常通過；錨點工作樹 HEAD 為真實他提交（如 6e07e0ad，當其非
+    許可錨點時）⇒ 拒。"""
     g = _affected_gate()
     anchor = g.resolve_anchor()
     wt = tmp_path / "anchor_wt"
@@ -2187,6 +2196,12 @@ def test_mutation_affected_gate_anchor_worktree_real(tmp_path):
             g.verify_anchor_worktree(wt, anchor)
         with pytest.raises(g.GateError):  # HEAD ≠ 錨點
             g.verify_anchor_worktree(wt, "0" * 40)
+        # SPEC v23 D12.1：以真實他提交（碼態舊錨點 6e07e0ad）為錨點 ⇒ HEAD ≠ 錨點而拒（HEAD 條件為碼態界定之唯一來源）
+        old = subprocess.run(["git", "rev-parse", "6e07e0ad^{commit}"], cwd=REPO, check=True, capture_output=True,
+                             text=True).stdout.strip()
+        if old != anchor:
+            with pytest.raises(g.GateError):
+                g.verify_anchor_worktree(wt, old)
     finally:
         git("worktree", "remove", "--force", str(wt))
 

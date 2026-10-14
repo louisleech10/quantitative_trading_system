@@ -11,7 +11,7 @@
    pytest 參數、phase、有效環境），指紋相同且結果完整才沿用（中斷後接續），否則重跑；pytest rc 非 0／1 ⇒ 該檔視為未完成。
 4. 非綠 nodeid 於錨點工作樹重跑同 nodeid；錨點＝本票最晚一筆實作許可之 round_start_head（`.claude/gate/audit.log`，
    與處置驗證器 ⓪ 同一函式），工作樹由本腳本自建（或 `--anchor-worktree` 指定）並驗：HEAD＝錨點、工作樹乾淨、
-   生產碼（momentum／api／config）與碼態錨點 6e07e0ad 相同。結果類別＋例外型別＋訊息首行（只遮暫存路徑與位址、
+   被忽略之實體輸入不存在（SPEC v23 D12.1：錨點碼態由許可錨點界定，不比對寫死之 6e07e0ad）。結果類別＋例外型別＋訊息首行（只遮暫存路徑與位址、
    數字不遮）皆同者歸「HEAD 既有紅」，其餘一律「本批造成」。
 5. 通過＝A 組全綠、E 完整、無多出之 nodeid、本批造成＝0。收據寫 `--receipt`。
 
@@ -44,7 +44,6 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 MANIFEST_REL = "docs/manifests/FRAMEPATH.json"
-CODE_ANCHOR = "6e07e0ad"
 PRODUCTION_ROOTS = ("momentum", "api", "config")
 A_FILES = (
     "tests/feature_engineering/test_framepath_disposition.py",
@@ -579,17 +578,15 @@ def _benign_status(line: str) -> bool:
 
 
 def verify_anchor_worktree(wt: Path, anchor: str) -> None:
-    """錨點工作樹：HEAD＝錨點、工作樹乾淨（無追蹤檔改動、無未追蹤檔）、生產碼與碼態錨點相同。"""
+    """錨點工作樹：HEAD＝錨點（本票最晚一筆實作許可之 round_start_head）、工作樹乾淨（無追蹤檔改動、無未追蹤檔）、
+    被忽略之實體輸入不存在。SPEC v23 D12.1：錨點之碼態即「本批動工前之碼態」，由許可錨點本身界定，不再比對寫死之
+    6e07e0ad（b2 起許可錨點已含 b1 生產碼改動；b1 之等值性已由 b1 許可錨點之 HEAD 條件涵蓋）。"""
     head = _git(wt, "rev-parse", "HEAD").strip()
     if head != anchor:
         raise GateError(f"錨點工作樹 HEAD {head[:8]} ≠ 本票實作許可錨點 {anchor[:8]}")
     dirty = [ln for ln in _git(wt, "status", "--porcelain").splitlines() if ln.strip() and not _benign_status(ln)]
     if dirty:
         raise GateError(f"錨點工作樹不乾淨：{dirty[:10]}")
-    prod = [p for p in _git(wt, "diff", "--name-only", CODE_ANCHOR, "HEAD", "--", *PRODUCTION_ROOTS).splitlines()
-            if p and "/__pycache__/" not in p]
-    if prod:
-        raise GateError(f"錨點之生產碼與碼態錨點 {CODE_ANCHOR} 不同：{prod[:10]}")
     # 審查 r48：被 git 忽略之實體輸入（實體 data_cache 等）不得存在；data_cache 只准指向主工作樹之 symlink 或不存在
     dc = wt / "data_cache"
     if dc.exists() or dc.is_symlink():

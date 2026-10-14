@@ -13492,16 +13492,30 @@
    "id": "OP-073",
    "phase": 2,
    "path": "tests/test_cgsa_resume.py",
-   "kind": "delete-node",
-   "excerpt_sha256": "a69092344139669677e0f71fdc6485c14e712d526b78ccac22f71ea17c601be1",
-   "excerpt": "monkeypatch.setattr(feature_factory, \"_try_load_cache\", lambda *args, **kwargs: None)",
-   "frame_basis": "_try_load_cache 首步讀 load_factory_output（factory h5，SPEC §A FACT-RECEIPT），Task 2.1 整刪；打樁目標不存在即 AttributeError｜承接：n/a（測試本身保留，驗證意圖不變）",
+   "kind": "rewrite",
+   "excerpt_sha256": "377c219c42cdf3c1fe0d29b0b95a94ed1465d4951b2c4afaccd7c2175f7ea51a",
+   "excerpt": "def test_cgsa_config_hash_passed_correctly(\n    feature_factory: FeatureFactory,\n    monkeypatch: pytest.MonkeyPatch,\n) -> None:\n    \"\"\"測試 generate_features：config_hash 應正確傳入 _prepare_cgsa_registry。\"\"\"\n    # PRE-RED Task 2.2：04176c18 起 _prepare_cgsa_registry 之前之輸出窗解析、預熱覆蓋檢查與校準關卡讀取 config\n    # 其他欄位 ⇒ 改用真實 FactoryConfig（於 monkeypatch 前取得，不 stub check_l1_warmup_coverage／resolve_output_window）\n    from momentum.FeatureEngineering.config_manager import ConfigManager\n\n    config = ConfigManager().get_merged_config({\"timeframes\": {\"primary\": \"1h\", \"training\": [\"1h\"]}})\n    captured: dict[str, str] = {}\n\n    monkeypatch.setattr(feature_factory, \"_resolve_config\", lambda override: config)\n    monkeypatch.setattr(feature_factory, \"_compute_config_hash\", lambda *args, **kwargs: \"1234567890abcdef\")\n    monkeypatch.setattr(feature_factory, \"_try_load_cache\", lambda *args, **kwargs: None)\n\n    def fake_prepare(symbol: str, timeframe: str, config_hash: str = \"\") -> None:\n        captured[\"symbol\"] = symbol\n        captured[\"timeframe\"] = timeframe\n        captured[\"config_hash\"] = config_hash\n        return None\n\n    monkeypatch.setattr(feature_factory, \"_prepare_cgsa_registry\", fake_prepare)\n\n    def stop_after_prepare(*args, **kwargs):\n        raise RuntimeError(\"stop-after-prepare\")\n\n    monkeypatch.setattr(feature_factory, \"_layer0_data_ingestion\", stop_after_prepare)\n\n    with pytest.raises(RuntimeError, match=\"stop-after-prepare\"):\n        feature_factory.generate_features(\"ETHUSDT\", \"1h\", persist=False)\n\n    assert captured == {\n        \"symbol\": \"ETHUSDT\",\n        \"timeframe\": \"1h\",\n        \"config_hash\": \"1234567890abcdef\",\n    }",
+   "frame_basis": "SPEC v22 D11.5／v23 D12.2：b1 起生成只走 CGSA、registry 為 None 即於 L1 前拋 CGSARegistryRequiredError，原替身 fake_prepare 回 None 使本測試到不了 stop-after-prepare；另 _try_load_cache 首步讀 load_factory_output（factory h5），Task 2.1 整刪，打樁目標不存在（原 OP-073 之刪除併入本改寫）｜承接：替身改建 CGSA registry（ColumnGroupRegistry，work_dir 於 tmp_path），流程走到 L0；config_hash 傳遞斷言與 stop-after-prepare 斷言逐字保留",
    "nodeids": [],
    "locator": {
-    "category": "stmt",
-    "qualname": "test_cgsa_config_hash_passed_correctly",
-    "lineno": 135,
-    "end_lineno": 135
+    "category": "def",
+    "qualname": "test_cgsa_config_hash_passed_correctly"
+   },
+   "rewrite": {
+    "reason": "替身 fake_prepare 改回傳 ColumnGroupRegistry（新增 tmp_path fixture 承載 work_dir），刪 _try_load_cache 打樁（Task 2.1 已刪該方法）；HEAD :150 with pytest.raises(..., match=\"stop-after-prepare\") 與 :153 assert captured == {...}（config_hash 傳遞）逐字保留、位置等價，無刪除之斷言。",
+    "preserved_assertions": [
+     {
+      "lineno": 150,
+      "ast_sha256": "82b57b35ee62b7e6b4047554da8e83820f545a13db2f6432adc1cfe2e8d94172"
+     },
+     {
+      "lineno": 153,
+      "ast_sha256": "e232199fb49006b03783644d6fae4302f007cd6cb0c9f583f89c49cbfa5a7c0d"
+     }
+    ],
+    "removed_assertions": [],
+    "new_source": "def test_cgsa_config_hash_passed_correctly(\n    feature_factory: FeatureFactory,\n    monkeypatch: pytest.MonkeyPatch,\n    tmp_path: Path,\n) -> None:\n    \"\"\"測試 generate_features：config_hash 應正確傳入 _prepare_cgsa_registry。\"\"\"\n    # PRE-RED Task 2.2：04176c18 起 _prepare_cgsa_registry 之前之輸出窗解析、預熱覆蓋檢查與校準關卡讀取 config\n    # 其他欄位 ⇒ 改用真實 FactoryConfig（於 monkeypatch 前取得，不 stub check_l1_warmup_coverage／resolve_output_window）\n    # FRAMEPATH（SPEC v22 D11.5／v23 D12.2）：生成只走 CGSA，registry 為 None 即於 L1 前具名拒絕\n    # （CGSARegistryRequiredError）⇒ 替身改為建立 CGSA registry，使流程走到 L0（stop-after-prepare）；\n    # 舊特徵 h5 快取查詢 `_try_load_cache` 已刪（Task 2.1），其打樁一併移除\n    from momentum.FeatureEngineering.config_manager import ConfigManager\n\n    config = ConfigManager().get_merged_config({\"timeframes\": {\"primary\": \"1h\", \"training\": [\"1h\"]}})\n    captured: dict[str, str] = {}\n\n    monkeypatch.setattr(feature_factory, \"_resolve_config\", lambda override: config)\n    monkeypatch.setattr(feature_factory, \"_compute_config_hash\", lambda *args, **kwargs: \"1234567890abcdef\")\n\n    def fake_prepare(symbol: str, timeframe: str, config_hash: str = \"\") -> ColumnGroupRegistry:\n        captured[\"symbol\"] = symbol\n        captured[\"timeframe\"] = timeframe\n        captured[\"config_hash\"] = config_hash\n        return ColumnGroupRegistry(work_dir=tmp_path / \"cgsa_work\" / f\"{symbol}_{timeframe}_{config_hash[:8]}\")\n\n    monkeypatch.setattr(feature_factory, \"_prepare_cgsa_registry\", fake_prepare)\n\n    def stop_after_prepare(*args, **kwargs):\n        raise RuntimeError(\"stop-after-prepare\")\n\n    monkeypatch.setattr(feature_factory, \"_layer0_data_ingestion\", stop_after_prepare)\n\n    with pytest.raises(RuntimeError, match=\"stop-after-prepare\"):\n        feature_factory.generate_features(\"ETHUSDT\", \"1h\", persist=False)\n\n    assert captured == {\n        \"symbol\": \"ETHUSDT\",\n        \"timeframe\": \"1h\",\n        \"config_hash\": \"1234567890abcdef\",\n    }\n",
+    "new_source_ast_sha256": "e77378a39a0db3640879698ff971927759b978831556070b6482d1263af6508e"
    }
   },
   {
