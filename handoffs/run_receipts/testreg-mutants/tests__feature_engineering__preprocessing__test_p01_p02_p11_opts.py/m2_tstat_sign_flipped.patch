@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py b/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py
+index e30f3678..b0c3165c 100644
+--- a/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py
++++ b/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py
+@@ -216,7 +216,7 @@ def adf_pvalue_fast(
+         return _adf_fallback_statsmodels(series, lag=lag, sample_size=sample_size), True
+ 
+     try:
+-        pvalue = float(mackinnonp(t_statistic, regression="c", N=1))
++        pvalue = float(mackinnonp(-t_statistic, regression="c", N=1))
+     except Exception:
+         return _adf_fallback_statsmodels(series, lag=lag, sample_size=sample_size), True
+ 

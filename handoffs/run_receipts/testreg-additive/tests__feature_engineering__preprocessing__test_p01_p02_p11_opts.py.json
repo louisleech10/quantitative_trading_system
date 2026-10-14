@@ -1,0 +1,26 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py::test_fast_adf_matches_statsmodels_same_spec_and_direction"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r3/synth.md",
+ "baseline_session_id": "31386a8f-29ab-441a-b57d-7a3b9543e9d4",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_p01_p02_p11_opts.py.compare.patch",
+ "compare_patch_sha256": "8ab905806a59f85945e4c100dd0b14822595c8b446487119106c621982f33a9f",
+ "fingerprint": "97f0c47e2aa416ce543d1f778a7c229093e637bbad05785d208139e9301a2a87",
+ "head": "19dca149d259bdd1eb0a11490888232332112557",
+ "mutants": [
+  {
+   "id": "m2_fast_p_bias_1_3",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_p01_p02_p11_opts.py/m2_fast_p_bias_1_3.patch",
+   "patch_sha256": "ef4beda88daefc36c72849f37d84d2b209930ff2ae1233a29282a6276e0e88d6",
+   "session_id": "6471fe0b-f8ec-4597-a488-67689b582550"
+  },
+  {
+   "id": "m2_tstat_sign_flipped",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_p01_p02_p11_opts.py/m2_tstat_sign_flipped.patch",
+   "patch_sha256": "291010392b25b4ad13ef292a23ed01fc780c47da95b990ea7f3e12bf7ff6920a",
+   "session_id": "f898aee9-4aa4-4dc9-b0a5-41622d89480e"
+  }
+ ],
+ "path": "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py"
+}

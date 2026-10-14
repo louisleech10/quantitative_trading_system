@@ -217,6 +217,34 @@ def _make_fracdiff_items(n_rows: int, n_cols: int) -> list:
     return items
 
 
+def test_fast_adf_matches_statsmodels_same_spec_and_direction() -> None:
+    """純增：上列 TestP01FastADF 之隨機遊走與 statsmodels 對照三支只用模組共用 RNG 之單一序列（結果依執行順序而變）、
+    statsmodels 用 AIC 選 lag（與 fast 之 lag 0 規格不同）且以寬鬆或「任一方」條件判定（fast 壞而 statsmodels 對仍過）。
+    本案以固定種子之 20 條白噪音與 20 條隨機遊走（各 500 根）：fast（lag 0、sample_size 500）之 p 值與 statsmodels 同規格
+    （maxlag 0、常數項、不自動選 lag）逐條差 < 1e-6；白噪音 p 皆 < 0.01、隨機遊走 p 平均 > 0.3。"""
+    from statsmodels.tsa.stattools import adfuller
+    from momentum.FeatureEngineering.preprocessing._fast_adf_numba import (
+        FAST_ADF_ENGINE_VERSION,
+        MIN_ADF_OBSERVATIONS,
+        THRESHOLD_BAND_HIGH,
+        THRESHOLD_BAND_LOW,
+        adf_pvalue_fast,
+        warmup_numba,
+    )
+
+    warmup_numba()
+    rng = np.random.default_rng(20261014)
+    noise = [rng.standard_normal(500) for _ in range(20)]
+    walks = [np.cumsum(rng.standard_normal(500)) for _ in range(20)]
+    fast = {k: [adf_pvalue_fast(s, lag=0, sample_size=500)[0] for s in v] for k, v in (("noise", noise), ("walk", walks))}
+    ref = {k: [float(adfuller(s, maxlag=0, regression="c", autolag=None)[1]) for s in v]
+           for k, v in (("noise", noise), ("walk", walks))}
+    assert FAST_ADF_ENGINE_VERSION and 500 >= MIN_ADF_OBSERVATIONS and THRESHOLD_BAND_LOW < THRESHOLD_BAND_HIGH and \
+        max(fast["noise"]) < 0.01 and float(np.mean(fast["walk"])) > 0.3, (max(fast["noise"]), np.mean(fast["walk"]))
+    gap = max(abs(a - b) for k in fast for a, b in zip(fast[k], ref[k]))
+    assert gap < 1e-6, gap
+
+
 class TestP02SlowPathParallel:
     """P0.2: loky 並行 ADF 壓力測試與正確性驗證。"""
 

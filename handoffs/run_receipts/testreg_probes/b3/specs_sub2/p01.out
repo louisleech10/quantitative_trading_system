@@ -1,0 +1,16 @@
+{
+ "added": [
+  "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py::test_fast_adf_matches_statsmodels_same_spec_and_direction"
+ ],
+ "mutant_failures": {
+  "m2_fast_p_bias_1_3": {
+   "test_fast_adf_matches_statsmodels_same_spec_and_direction": "failed"
+  },
+  "m2_tstat_sign_flipped": {
+   "TestP01FastADF::test_stationary_series_pvalue_below_threshold": "failed",
+   "TestP01FastADF::test_fast_adf_close_to_statsmodels_on_stationary": "failed",
+   "test_fast_adf_matches_statsmodels_same_spec_and_direction": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_p01_p02_p11_opts.py.json

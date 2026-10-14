@@ -2587,7 +2587,7 @@
     "smoke"
    ],
    "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b3-review-r3/synth.md",
    "guarantee": [
     "A10",
     "A15",
@@ -2606,8 +2606,7 @@
    "rewrite_targets": [
     "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py::TestP01FastADF::test_fast_adf_close_to_statsmodels_on_random_walk",
     "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py::TestP01FastADF::test_fast_adf_close_to_statsmodels_on_stationary",
-    "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py::TestP01FastADF::test_random_walk_pvalue_above_threshold",
-    "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py::TestP02SlowPathParallel::test_p02_stress_rss_budget_with_browser_overhead"
+    "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py::TestP01FastADF::test_random_walk_pvalue_above_threshold"
    ],
    "ticket": "unknown"
   },
