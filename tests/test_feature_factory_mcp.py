@@ -117,3 +117,21 @@ def test_mcp_generate_features_forwards_primary_timeframe_and_summarizes():
     assert "config_override" in real_params and calls == [("BTCUSDT", primary, override)] * 2, calls
     assert ok == {"feature_count": 7, "generation_time": 1.5, "layer_counts": {"L1": 7}, "metadata": {"k": "v"},
                   "hdf5_path": ""} and bad == {"error": "boom-xyz"}, (ok, bad)
+
+
+def test_mcp_generate_features_uses_primary_timeframe_from_override():
+    """純增（審碼 r6 CODEX-R6-P2-01）：上列替身測試之 override 不改主週期，包裝層若改以預設設定（不帶 override）取主週期
+    仍過。本案 override 把主週期改為 4h（與預設 12h 不同），斷言工廠以 4h 呼叫。"""
+    calls = []
+
+    class _Factory:
+        def generate_features(self, symbol, timeframe, config_override=None):
+            calls.append(timeframe)
+            return type("R", (), {"feature_count": 1, "generation_time": 0.0, "layer_counts": {}, "metadata": {},
+                                  "hdf5_path": ""})()
+
+    config_manager = ConfigManager()
+    override = {"timeframes": {"primary": "4h"}}
+    default_primary = config_manager.get_merged_config().timeframes.primary
+    FeatureFactoryMCP(_Factory(), config_manager).generate_features("BTCUSDT", override)
+    assert callable(create_feature_factory) and default_primary != "4h" and calls == ["4h"], (default_primary, calls)

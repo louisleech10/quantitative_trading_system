@@ -1,0 +1,6 @@
+{"path": "tests/test_feature_factory_mcp.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r5/synth.md",
+ "mutants": [
+  {"id": "m2_primary_from_default_config", "file": "momentum/FeatureEngineering/mcp/feature_factory_mcp.py",
+   "old": "            merged = self._config_manager.get_merged_config(config)\n            timeframe = merged.timeframes.primary\n",
+   "new": "            merged = self._config_manager.get_merged_config()\n            timeframe = merged.timeframes.primary\n"}]}

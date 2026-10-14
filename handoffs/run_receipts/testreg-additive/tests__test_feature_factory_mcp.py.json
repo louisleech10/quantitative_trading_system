@@ -1,31 +1,19 @@
 {
  "added_nodeids": [
-  "tests/test_feature_factory_mcp.py::test_mcp_generate_features_forwards_primary_timeframe_and_summarizes"
+  "tests/test_feature_factory_mcp.py::test_mcp_generate_features_uses_primary_timeframe_from_override"
  ],
  "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r5/synth.md",
- "baseline_session_id": "11170293-31e6-41ac-8b40-0bd88101da78",
+ "baseline_session_id": "81f91f62-3e68-452a-9eff-b649e6851fb1",
  "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_feature_factory_mcp.py.compare.patch",
- "compare_patch_sha256": "b474679eb531a6cf662d530738afddaae201ccbff2710627eed04bf502816bef",
- "fingerprint": "d97f4583c4ece5ccebad4a1672c917a8fb2fbdaa0d55e517aebb391cbfec3871",
- "head": "96c3dfe49940c027ffb7c4a05db22d45cae04a10",
+ "compare_patch_sha256": "4121679a072b15a35c6fc332902766801edac280c3ecb83e5bf675755d516a94",
+ "fingerprint": "24b9bf5c2e36e36e144c038dc6313b679f7796950f02a69c91fd6e4fdc169158",
+ "head": "699b30450fb7059ce4df71102c65a344682dd046",
  "mutants": [
   {
-   "id": "m2_override_dropped",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_factory_mcp.py/m2_override_dropped.patch",
-   "patch_sha256": "eef32123f87e733b13b2d122075da2a34e00db3b872b70a8dec5c9a66fb896db",
-   "session_id": "e9910e2b-556a-4828-a902-42ac2abd2d59"
-  },
-  {
-   "id": "m2_metadata_dropped",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_factory_mcp.py/m2_metadata_dropped.patch",
-   "patch_sha256": "263b32884b2353c654d973741ea56337c5db2d84652237d6b484a3e36b3bfb02",
-   "session_id": "42b2e893-b7f8-4fa7-a7d4-299c6e01257e"
-  },
-  {
-   "id": "m2_error_message_lost",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_factory_mcp.py/m2_error_message_lost.patch",
-   "patch_sha256": "417a875e1c3deedca17b3b3a22310683e5ced60fadb48c89ea4906864006b242",
-   "session_id": "5526ace2-f112-44b1-aad2-0ada8deaec8f"
+   "id": "m2_primary_from_default_config",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_factory_mcp.py/m2_primary_from_default_config.patch",
+   "patch_sha256": "1e7ada74b79b452177a8a4aab36c728d4ff41a2263ea9704e5a4880380838d27",
+   "session_id": "c670f6d4-63cb-4b87-a075-b05ef7908809"
   }
  ],
  "path": "tests/test_feature_factory_mcp.py"

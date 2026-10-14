@@ -1,0 +1,11 @@
+{
+ "added": [
+  "tests/test_feature_factory_mcp.py::test_mcp_generate_features_uses_primary_timeframe_from_override"
+ ],
+ "mutant_failures": {
+  "m2_primary_from_default_config": {
+   "test_mcp_generate_features_uses_primary_timeframe_from_override": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__test_feature_factory_mcp.py.json

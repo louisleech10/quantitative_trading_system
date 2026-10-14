@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+index f9fcb6fe..f43561e1 100644
+--- a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
++++ b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+@@ -22,7 +22,7 @@ class FeatureFactoryMCP:
+     def generate_features(self, symbol: str, config: Optional[Dict] = None) -> Dict:
+         """Generate features via FeatureFactory."""
+         try:
+-            merged = self._config_manager.get_merged_config(config)
++            merged = self._config_manager.get_merged_config()
+             timeframe = merged.timeframes.primary
+             result = self._factory.generate_features(
+                 symbol,
