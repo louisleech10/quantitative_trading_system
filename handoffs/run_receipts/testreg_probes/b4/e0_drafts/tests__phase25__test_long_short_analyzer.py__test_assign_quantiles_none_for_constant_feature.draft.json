@@ -1,0 +1,13 @@
+{
+ "nodeid": "tests/phase25/test_long_short_analyzer.py::test_assign_quantiles_none_for_constant_feature",
+ "head": "c0773d8330258a5232a14207298032436061b70b",
+ "ledger_ref": {
+  "session_id": "82fc8405-634b-46a0-a262-715ae7700e3c",
+  "nodeid": "tests/phase25/test_long_short_analyzer.py::test_assign_quantiles_none_for_constant_feature"
+ },
+ "exception_type": "AttributeError",
+ "exception_origin": "tests/phase25/test_long_short_analyzer.py:76",
+ "deleted_module": "momentum.Analysis.long_short_analyzer",
+ "deleted_symbol": "_assign_quantiles_with_fallback",
+ "deleting_commit": "dba5716f15bab3e35119ca6031e89298c70aea0f"
+}

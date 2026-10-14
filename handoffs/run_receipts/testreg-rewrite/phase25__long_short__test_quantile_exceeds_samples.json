@@ -1,0 +1,40 @@
+{
+ "compare_nodeids": [
+  "tests/momentum/Analysis/test_long_short_analyzer.py::test_quantile_exceeds_samples"
+ ],
+ "compare_patch_path": null,
+ "compare_patch_sha256": null,
+ "fingerprint": "69b9057411950028b12e4990bbccf619d7560d3dbe011572fac1566e1bb771fa",
+ "head": "c0773d8330258a5232a14207298032436061b70b",
+ "mutants": [
+  {
+   "compare_outcomes": {
+    "tests/momentum/Analysis/test_long_short_analyzer.py::test_quantile_exceeds_samples": "failed"
+   },
+   "compare_session_id": "d28149ad-d84b-4895-ad7b-acf9b6515756",
+   "id": "m_cannot_form_reason_mislabeled",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/phase25__long_short__test_quantile_exceeds_samples/m_cannot_form_reason_mislabeled.patch",
+   "patch_sha256": "b7d4920925cd87e7a802a0e5d92a0352243418e02f19f0f63782aa267adaf7da",
+   "session_id": "d28149ad-d84b-4895-ad7b-acf9b6515756",
+   "target_fail_loc": "tests/phase25/test_long_short_analyzer.py:22",
+   "target_outcome": "failed"
+  },
+  {
+   "compare_outcomes": {
+    "tests/momentum/Analysis/test_long_short_analyzer.py::test_quantile_exceeds_samples": "failed"
+   },
+   "compare_session_id": "55ada0ef-f711-4929-8e48-47cc8b782789",
+   "id": "m_cannot_form_returns_empty_dict",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/phase25__long_short__test_quantile_exceeds_samples/m_cannot_form_returns_empty_dict.patch",
+   "patch_sha256": "75ee9ff4bb52c865f9aedb5326aec554c56f7ac67d26fc56a82d8db117141139",
+   "session_id": "55ada0ef-f711-4929-8e48-47cc8b782789",
+   "target_fail_loc": "tests/phase25/test_long_short_analyzer.py:23",
+   "target_outcome": "failed"
+  }
+ ],
+ "target_assertion_lines": [
+  "tests/phase25/test_long_short_analyzer.py:22",
+  "tests/phase25/test_long_short_analyzer.py:23"
+ ],
+ "target_nodeid": "tests/phase25/test_long_short_analyzer.py::test_quantile_exceeds_samples"
+}

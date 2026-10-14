@@ -1,0 +1,13 @@
+diff --git a/momentum/Analysis/long_short_analyzer.py b/momentum/Analysis/long_short_analyzer.py
+index 17f7ba1c..70d5cad9 100644
+--- a/momentum/Analysis/long_short_analyzer.py
++++ b/momentum/Analysis/long_short_analyzer.py
+@@ -114,7 +114,7 @@ class LongShortAnalyzer:
+             if n_feat_finite < _BIN_MIN_SAMPLES:
+                 return SkippedResult(
+                     module_name="long_short_analysis",
+-                    reason="cannot form quantiles",
++                    reason=f"insufficient samples: {n_feat_finite} < {_BIN_MIN_SAMPLES}",
+                     error_type="NUMERICAL_ERROR",
+                 )
+ 

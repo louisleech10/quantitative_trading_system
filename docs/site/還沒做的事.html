@@ -326,7 +326,9 @@
 路徑：本來就紅且要改測試輸入的 27 個、每次都被跳過的 36 個（多半寫死已刪除的舊特徵資料）、測試根本沒呼叫生產程式碼的 55 個、
 共用的輸出導向夾具使證明做不成的 1 檔、整檔跑超過 5 分鐘的 11 個、被同檔前述問題連帶擋住的 11 個。你已定規則不再修訂，
 這些維持「待改寫」標記，功能多半仍有其他測試覆蓋。清單在 <code>handoffs/run_receipts/testreg_probes/b4/p4_not_applicable.tsv</code>。
-③<code>tests/test_append_fix.py</code>、<code>tests/test_kline_storage.py</code> 的舊測試每跑一次會真的連 Binance 寫本機 K 線快取（真實資料、
+另 <code>tests/phase25/test_long_short_analyzer.py</code> 有三支該淘汰的重複／壞測試先留著（SPEC §N R20）：一支呼叫已刪除的
+內部函式、恆紅，現行「淘汰證明」格式只涵蓋模組層的刪除；另兩支的淘汰證明已做好，但這個檔前一批剛補過新測試，現行規則不允許
+在已補過的檔再刪函式。③<code>tests/test_append_fix.py</code>、<code>tests/test_kline_storage.py</code> 的舊測試每跑一次會真的連 Binance 寫本機 K 線快取（真實資料、
 不進 git），新補的測試已改寫暫存目錄。</p>
 <p><strong>治理線</strong>：兩條治理工作線已於 2026-08-14 由你裁定不再擴建，故本清單不列（狀態見 <code>docs/ROADMAP.md</code> 生成區塊）。</p>
 <hr />

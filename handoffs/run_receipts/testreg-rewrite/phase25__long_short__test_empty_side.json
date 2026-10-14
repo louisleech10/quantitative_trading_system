@@ -1,0 +1,27 @@
+{
+ "compare_nodeids": [
+  "tests/momentum/Analysis/test_long_short_analyzer.py::test_empty_side"
+ ],
+ "compare_patch_path": null,
+ "compare_patch_sha256": null,
+ "fingerprint": "79d72879202050ffaed23e73b63e1abf5194764b23256d7fef2b80b6b38dad0a",
+ "head": "c0773d8330258a5232a14207298032436061b70b",
+ "mutants": [
+  {
+   "compare_outcomes": {
+    "tests/momentum/Analysis/test_long_short_analyzer.py::test_empty_side": "failed"
+   },
+   "compare_session_id": "94026855-a05d-4e9c-8d43-9e0578bcaac3",
+   "id": "m_analyze_returns_tuple",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/phase25__long_short__test_empty_side/m_analyze_returns_tuple.patch",
+   "patch_sha256": "1d4c6bb7853f2dac1cca5cf6eca113f2ae1512eab2ee91a33337ebc198eb94ff",
+   "session_id": "94026855-a05d-4e9c-8d43-9e0578bcaac3",
+   "target_fail_loc": "tests/phase25/test_long_short_analyzer.py:41",
+   "target_outcome": "failed"
+  }
+ ],
+ "target_assertion_lines": [
+  "tests/phase25/test_long_short_analyzer.py:41"
+ ],
+ "target_nodeid": "tests/phase25/test_long_short_analyzer.py::test_empty_side"
+}

@@ -1,0 +1,9 @@
+{
+ "nodeid": "tests/phase25/test_factor_exposure_analyzer.py::test_hhi_normalization",
+ "head": "c0773d8330258a5232a14207298032436061b70b",
+ "replacement_nodeid": "tests/momentum/Analysis/test_factor_exposure_analyzer.py::test_hhi_normalization",
+ "target_ast_sha256": "0d235d54edeb3556dae676e96dba25cdbd614d53253d0b5a3798f8d03fcd9e0c",
+ "replacement_ast_sha256": "0d235d54edeb3556dae676e96dba25cdbd614d53253d0b5a3798f8d03fcd9e0c",
+ "fixture_closure_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+ "module_context_sha256": "180b8a950fdb90139754248331c39bc22a0fb20fe8f82c41d1cfef71c74df412"
+}

@@ -1,0 +1,31 @@
+diff --git a/momentum/Analysis/long_short_analyzer.py b/momentum/Analysis/long_short_analyzer.py
+index 17f7ba1c..bf0d933d 100644
+--- a/momentum/Analysis/long_short_analyzer.py
++++ b/momentum/Analysis/long_short_analyzer.py
+@@ -98,7 +98,7 @@ class LongShortAnalyzer:
+                 module_name="long_short_analysis",
+                 reason=f"insufficient samples: {n_pair} < {self._min_samples}",
+                 error_type="INSUFFICIENT_DATA",
+-            )
++            ), None
+ 
+         use_quantiles = max(2, int(num_quantiles or self._num_quantiles))
+         # RB-3：先在 feature 原時序 PIT 分箱（禁 feat.where(ret.*) 污染），再對齊 finite returns 只算 metrics
+@@ -116,7 +116,7 @@ class LongShortAnalyzer:
+                     module_name="long_short_analysis",
+                     reason="cannot form quantiles",
+                     error_type="NUMERICAL_ERROR",
+-                )
++                ), None
+ 
+         # 分箱後 reindex 對齊 finite future_returns 只算 metrics（±inf 排除）
+         long_sel = long_mask.fillna(False) & ret_fin
+@@ -163,7 +163,7 @@ class LongShortAnalyzer:
+             "recommendation": recommendation,
+             # schema 鎖：固定 q == requested（禁暗示全域實際 bin 數）
+             "num_quantiles_used": use_quantiles,
+-        }
++        }, None
+ 
+     def batch_analyze(
+         self,

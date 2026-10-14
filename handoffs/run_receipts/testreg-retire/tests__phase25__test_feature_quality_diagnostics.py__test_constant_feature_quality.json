@@ -1,0 +1,9 @@
+{
+ "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_constant_feature_quality",
+ "head": "c0773d8330258a5232a14207298032436061b70b",
+ "replacement_nodeid": "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_constant_feature_quality",
+ "target_ast_sha256": "c5f8ad29e1f45482b4ece3b2efe6433ef49737a299a20396b10b90e2246874bc",
+ "replacement_ast_sha256": "c5f8ad29e1f45482b4ece3b2efe6433ef49737a299a20396b10b90e2246874bc",
+ "fixture_closure_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+ "module_context_sha256": "c2835b8d4bbcc245d9c8b9e2a449b0ab22c103065d71c4131f6656bfe455015a"
+}

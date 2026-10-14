@@ -1,0 +1,25 @@
+diff --git a/momentum/Analysis/long_short_analyzer.py b/momentum/Analysis/long_short_analyzer.py
+index 17f7ba1c..510e6f78 100644
+--- a/momentum/Analysis/long_short_analyzer.py
++++ b/momentum/Analysis/long_short_analyzer.py
+@@ -112,11 +112,15 @@ class LongShortAnalyzer:
+             # reduced-bin / require_full_q 全期 NaN label 但 n 足夠 → 走空側 + 不建議
+             n_feat_finite = int(feat_fin.sum())
+             if n_feat_finite < _BIN_MIN_SAMPLES:
+-                return SkippedResult(
+-                    module_name="long_short_analysis",
+-                    reason="cannot form quantiles",
+-                    error_type="NUMERICAL_ERROR",
+-                )
++                empty_long = self._compute_side_metrics(pd.Series([], dtype=float), pd.Series([], dtype=float), "long")
++                empty_short = self._compute_side_metrics(pd.Series([], dtype=float), pd.Series([], dtype=float), "short")
++                return {
++                    "long_analysis": empty_long,
++                    "short_analysis": empty_short,
++                    "asymmetry": self._classify_asymmetry(np.nan, np.nan),
++                    "recommendation": "不建議",
++                    "num_quantiles_used": n_labeled,
++                }
+ 
+         # 分箱後 reindex 對齊 finite future_returns 只算 metrics（±inf 排除）
+         long_sel = long_mask.fillna(False) & ret_fin

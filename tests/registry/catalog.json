@@ -14302,5 +14302,150 @@
    "ticket": "unknown"
   }
  },
- "tombstones": []
+ "tombstones": [
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_exposure_analyzer.py__test_hhi_normalization.json",
+   "nodeid": "tests/phase25/test_factor_exposure_analyzer.py::test_hhi_normalization",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_exposure_analyzer.py::test_hhi_normalization"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_exposure_analyzer.py__test_single_asset_mode.json",
+   "nodeid": "tests/phase25/test_factor_exposure_analyzer.py::test_single_asset_mode",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_exposure_analyzer.py::test_single_asset_mode"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_exposure_analyzer.py__test_unnormalized_weights.json",
+   "nodeid": "tests/phase25/test_factor_exposure_analyzer.py::test_unnormalized_weights",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_exposure_analyzer.py::test_unnormalized_weights"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_orthogonalizer.py__test_already_orthogonal.json",
+   "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_already_orthogonal",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_already_orthogonal"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_orthogonalizer.py__test_default_priority_order.json",
+   "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_default_priority_order",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_default_priority_order"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_orthogonalizer.py__test_nan_factors_orth.json",
+   "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_nan_factors_orth",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_nan_factors_orth"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_orthogonalizer.py__test_near_zero_residual.json",
+   "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_near_zero_residual",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_near_zero_residual"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_orthogonalizer.py__test_pca_outputs_components_and_loadings.json",
+   "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_pca_outputs_components_and_loadings",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_pca_outputs_components_and_loadings"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_orthogonalizer.py__test_single_factor_orth.json",
+   "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_single_factor_orth",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_single_factor_orth"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_factor_orthogonalizer.py__test_underdetermined_system.json",
+   "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_underdetermined_system",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_underdetermined_system"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_feature_quality_diagnostics.py__test_adf_timeout_single.json",
+   "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_adf_timeout_single",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_adf_timeout_single"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_feature_quality_diagnostics.py__test_all_nan_feature_quality.json",
+   "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_all_nan_feature_quality",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_all_nan_feature_quality"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_feature_quality_diagnostics.py__test_constant_feature_quality.json",
+   "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_constant_feature_quality",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_constant_feature_quality"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_feature_quality_diagnostics.py__test_insufficient_adf_samples.json",
+   "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_insufficient_adf_samples",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_insufficient_adf_samples"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_feature_quality_diagnostics.py__test_no_rolling_ic_for_drift.json",
+   "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_no_rolling_ic_for_drift",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_no_rolling_ic_for_drift"
+   ]
+  },
+  {
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "evidence_level": "E1",
+   "evidence_receipt": "handoffs/run_receipts/testreg-retire/tests__phase25__test_feature_quality_diagnostics.py__test_single_feature_quality.json",
+   "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_single_feature_quality",
+   "replaced_by": [
+    "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_single_feature_quality"
+   ]
+  }
+ ]
 }

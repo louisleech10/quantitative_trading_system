@@ -1,0 +1,9 @@
+{
+ "nodeid": "tests/phase25/test_factor_orthogonalizer.py::test_single_factor_orth",
+ "head": "c0773d8330258a5232a14207298032436061b70b",
+ "replacement_nodeid": "tests/momentum/Analysis/test_factor_orthogonalizer.py::test_single_factor_orth",
+ "target_ast_sha256": "0f5d06a9e6bc823d3544a9a50d9001aeeb7ca658176dce3fbf0fb6a277a13c12",
+ "replacement_ast_sha256": "0f5d06a9e6bc823d3544a9a50d9001aeeb7ca658176dce3fbf0fb6a277a13c12",
+ "fixture_closure_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+ "module_context_sha256": "70ebddd1aa39e6068d12f00a68619e4152406ae8e4e0ebee70e8ae146487d645"
+}

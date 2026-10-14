@@ -1,0 +1,21 @@
+{
+ "slug": "phase25__long_short__test_quantile_exceeds_samples",
+ "target": "tests/phase25/test_long_short_analyzer.py::test_quantile_exceeds_samples",
+ "compare": [
+  "tests/momentum/Analysis/test_long_short_analyzer.py::test_quantile_exceeds_samples"
+ ],
+ "mutants": [
+  {
+   "id": "m_cannot_form_reason_mislabeled",
+   "file": "momentum/Analysis/long_short_analyzer.py",
+   "old": "                    reason=\"cannot form quantiles\",\n",
+   "new": "                    reason=f\"insufficient samples: {n_feat_finite} < {_BIN_MIN_SAMPLES}\",\n"
+  },
+  {
+   "id": "m_cannot_form_returns_empty_dict",
+   "file": "momentum/Analysis/long_short_analyzer.py",
+   "old": "                return SkippedResult(\n                    module_name=\"long_short_analysis\",\n                    reason=\"cannot form quantiles\",\n                    error_type=\"NUMERICAL_ERROR\",\n                )\n",
+   "new": "                empty_long = self._compute_side_metrics(pd.Series([], dtype=float), pd.Series([], dtype=float), \"long\")\n                empty_short = self._compute_side_metrics(pd.Series([], dtype=float), pd.Series([], dtype=float), \"short\")\n                return {\n                    \"long_analysis\": empty_long,\n                    \"short_analysis\": empty_short,\n                    \"asymmetry\": self._classify_asymmetry(np.nan, np.nan),\n                    \"recommendation\": \"不建議\",\n                    \"num_quantiles_used\": n_labeled,\n                }\n"
+  }
+ ]
+}

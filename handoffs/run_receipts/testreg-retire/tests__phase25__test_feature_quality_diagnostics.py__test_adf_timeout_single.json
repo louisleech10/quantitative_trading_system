@@ -1,0 +1,9 @@
+{
+ "nodeid": "tests/phase25/test_feature_quality_diagnostics.py::test_adf_timeout_single",
+ "head": "c0773d8330258a5232a14207298032436061b70b",
+ "replacement_nodeid": "tests/momentum/Analysis/test_feature_quality_diagnostics.py::test_adf_timeout_single",
+ "target_ast_sha256": "a5a395f53c57f55e7b59ad1de917bc9cb53205850462b8a8c156951b1138205a",
+ "replacement_ast_sha256": "a5a395f53c57f55e7b59ad1de917bc9cb53205850462b8a8c156951b1138205a",
+ "fixture_closure_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+ "module_context_sha256": "afe505657bfe9491c36d1cc7f60749623d19dc089bdeb7070274511a2c6d1e2c"
+}
