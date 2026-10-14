@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/operators/rolling_aggregator.py b/momentum/FeatureEngineering/operators/rolling_aggregator.py
+index dc2448cc..8e4f8ab5 100644
+--- a/momentum/FeatureEngineering/operators/rolling_aggregator.py
++++ b/momentum/FeatureEngineering/operators/rolling_aggregator.py
+@@ -1100,7 +1100,7 @@ class RollingAggregator:
+             "std": "Std",
+             "mean": "Mean",
+             "rank": "Rank",
+-            "zscore": "ZScore",
++            "zscore": "Zscore",
+             "skew": "Skew",
+             "kurt": "Kurt",
+             "min": "Min",

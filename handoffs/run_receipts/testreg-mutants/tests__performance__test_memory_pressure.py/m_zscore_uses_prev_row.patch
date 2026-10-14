@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/operators/numba_rolling.py b/momentum/FeatureEngineering/operators/numba_rolling.py
+index 25625362..36b17258 100644
+--- a/momentum/FeatureEngineering/operators/numba_rolling.py
++++ b/momentum/FeatureEngineering/operators/numba_rolling.py
+@@ -308,7 +308,7 @@ def fused_rolling_stats(data: np.ndarray, window: int) -> np.ndarray:
+         if np.isnan(std_value) or std_value <= 0.0:
+             output[row_idx, 5] = np.nan
+         else:
+-            output[row_idx, 5] = (data[row_idx] - mean) / std_value
++            output[row_idx, 5] = (data[row_idx - 1] - mean) / std_value
+ 
+     return output.astype(np.float32)
+ 

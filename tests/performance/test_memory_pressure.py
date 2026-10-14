@@ -22,8 +22,6 @@ import time
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -372,3 +370,55 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def test_l3_multiwindow_output_matches_estimate_and_rolling_oracle_on_real_kline():
+    """G-c 改寫（純增）：原檔無測試函式，模組層唯一可執行敘述（sys.path.insert）依原序搬入本函式；phase1–4 剖析
+    腳本仍以 python 直跑（規模大、只印不判，不於 pytest 執行）。本函式以真實 kline（kline_cache.h5 首個 symbol／tf
+    之前 600 根，open/high/low/close/volume）小規模驗 L3 RollingAggregator 之預設臂：
+    ① 輸出欄數＝phase1 估算式 n_cols × n_win × n_agg 且欄名為 `<欄>_<Agg>_W<w>`；② 每格 float32（記憶體＝列×欄×4
+    bytes，phase1 之 float32 降精度前提）；③ 每窗前 w−1 列為 NaN、其後皆有值；④ mean／std(ddof=1)／min／max／range
+    ／zscore 與 numpy sliding_window_view 之獨立 float64 oracle 逐值相符（窗＝含當列之前 w 根，無 look-ahead）。"""
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    import h5py
+    from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator as _RA
+
+    repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    with h5py.File(os.path.join(repo, "data_cache", "feature_klines", "kline_cache.h5"), "r") as f:
+        sym = sorted(k for k in f.keys() if k != "_metadata")[0]
+        tf = sorted(f[sym].keys())[0]
+        raw = pd.DataFrame(f[sym][tf]["data"][()][:600])
+    base_cols = ["open", "high", "low", "close", "volume"]
+    df = raw[base_cols].astype(np.float64)
+    windows = [5, 13, 34]
+    aggs = ["mean", "std", "min", "max", "range", "zscore"]
+    labels = {"mean": "Mean", "std": "Std", "min": "Min", "max": "Max", "range": "Range", "zscore": "ZScore"}
+    result = _RA({"enabled": True, "windows": windows, "aggregators": aggs, "apply_to": "all"}).compute_all(df)
+
+    n_rows, n_cols = df.shape
+    expected_names = {f"{c}_{labels[a]}_W{w}" for c in base_cols for a in aggs for w in windows}
+    assert result.shape == (n_rows, n_cols * len(windows) * len(aggs)) and set(result.columns) == expected_names, \
+        f"L3 輸出欄與 phase1 估算式不符：{result.shape} {sorted(set(result.columns) ^ expected_names)[:6]}"
+    assert set(result.dtypes) == {np.dtype(np.float32)} and \
+        int(result.memory_usage(index=False, deep=True).sum()) == n_rows * n_cols * len(windows) * len(aggs) * 4, \
+        f"L3 輸出非 float32（記憶體＝列×欄×4 不成立）：{set(result.dtypes)}"
+
+    arr = df.to_numpy(dtype=np.float64)
+    for w in windows:
+        sw = np.lib.stride_tricks.sliding_window_view(arr, w, axis=0)  # (n_rows−w+1, n_cols, w)；第 i 列＝列 i..i+w−1
+        o_mean, o_std = sw.mean(axis=-1), sw.std(axis=-1, ddof=1)
+        o_min, o_max = sw.min(axis=-1), sw.max(axis=-1)
+        o_z = (arr[w - 1:] - o_mean) / o_std
+
+        def got(a: str) -> np.ndarray:
+            return result[[f"{c}_{labels[a]}_W{w}" for c in base_cols]].to_numpy(dtype=np.float64)
+
+        every = np.concatenate([got(a) for a in aggs], axis=1)
+        assert np.isnan(every[: w - 1]).all() and np.isfinite(every[w - 1:]).all(), f"W{w} 暖機列 NaN 邊界錯位"
+        assert np.allclose(got("mean")[w - 1:], o_mean, rtol=1e-6, atol=0.0), f"W{w} mean 與 oracle 不符"
+        assert np.allclose(got("std")[w - 1:], o_std, rtol=1e-5, atol=0.0), f"W{w} std(ddof=1) 與 oracle 不符"
+        assert np.allclose(got("min")[w - 1:], o_min, rtol=1e-6, atol=0.0) and \
+            np.allclose(got("max")[w - 1:], o_max, rtol=1e-6, atol=0.0) and \
+            np.allclose(got("range")[w - 1:], o_max - o_min, rtol=1e-5, atol=1e-6 * np.abs(o_max).max()), \
+            f"W{w} min/max/range 與 oracle 不符"
+        assert np.allclose(got("zscore")[w - 1:], o_z, rtol=1e-5, atol=1e-5), f"W{w} zscore 與 oracle 不符"

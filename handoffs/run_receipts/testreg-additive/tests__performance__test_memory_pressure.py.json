@@ -1,0 +1,56 @@
+{
+ "added_nodeids": [
+  "tests/performance/test_memory_pressure.py::test_l3_multiwindow_output_matches_estimate_and_rolling_oracle_on_real_kline"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "baseline_session_id": "7e5d5bdb-ed7f-436e-bf87-4e5e72a47933",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__performance__test_memory_pressure.py.compare.patch",
+ "compare_patch_sha256": "de1b83511e342fe9db5c6d52d1e90a8e0f121729e7039709c2720248723a4978",
+ "fingerprint": "8999ae87106f36a8faaf73ae5d12dd65998095a9b74bfeb95a75ab6fa820fe0d",
+ "head": "3854de9d36c3d47fce2f165429c81261bd4f7139",
+ "mutants": [
+  {
+   "id": "m_label_zscore_case",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__performance__test_memory_pressure.py/m_label_zscore_case.patch",
+   "patch_sha256": "69364bde716479ed8d60fcb96423904c76436651afc355c92420d3989cc1334b",
+   "session_id": "4fa7a01b-08d3-4e50-83d8-c6361a8d411f"
+  },
+  {
+   "id": "m_l3_output_float64",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__performance__test_memory_pressure.py/m_l3_output_float64.patch",
+   "patch_sha256": "bc221f9cf34bcdd3ce49482ee42eec60f261f1beab4f3be10ce19af04a113765",
+   "session_id": "06f9870f-9f07-40b9-b71f-0f991de12c39"
+  },
+  {
+   "id": "m_warmup_off_by_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__performance__test_memory_pressure.py/m_warmup_off_by_one.patch",
+   "patch_sha256": "46f9c3f8cc81c7faddc7e547dedc0d2ad31d057cb582e3652ed7344b2cd1429f",
+   "session_id": "1399612a-2e63-4e2d-9202-e9a6d211caa4"
+  },
+  {
+   "id": "m_window_start_off_by_one",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__performance__test_memory_pressure.py/m_window_start_off_by_one.patch",
+   "patch_sha256": "77e77bdc41c9d17e7559275644e3307c15a0a9717d8e71600fc181ff4fb51223",
+   "session_id": "ace53cbe-d1e5-46e8-8b3d-661be9e2b4d9"
+  },
+  {
+   "id": "m_std_population_ddof0",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__performance__test_memory_pressure.py/m_std_population_ddof0.patch",
+   "patch_sha256": "c5390694879ababf90095e2141b02b0631fbc100156bb5e0c5e335fc4d191307",
+   "session_id": "74730a52-d6a6-4ede-a28e-3f679c58ffd4"
+  },
+  {
+   "id": "m_range_index_reads_max",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__performance__test_memory_pressure.py/m_range_index_reads_max.patch",
+   "patch_sha256": "0ef845f46902fb6d7287213840198dfe8b30cb1fab9a3b76800542967869a463",
+   "session_id": "aca8eee2-69e2-4eea-8be0-e084bf309a68"
+  },
+  {
+   "id": "m_zscore_uses_prev_row",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__performance__test_memory_pressure.py/m_zscore_uses_prev_row.patch",
+   "patch_sha256": "ced39660239ceb68794224ac1f85b5a08fefabd132a717ff0360bb5543e0f908",
+   "session_id": "5b66ffcb-91d1-457f-a349-ed8e7d28bac3"
+  }
+ ],
+ "path": "tests/performance/test_memory_pressure.py"
+}

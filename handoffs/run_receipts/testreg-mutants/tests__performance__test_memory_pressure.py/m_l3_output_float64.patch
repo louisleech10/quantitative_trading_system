@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/operators/rolling_aggregator.py b/momentum/FeatureEngineering/operators/rolling_aggregator.py
+index dc2448cc..c59249b4 100644
+--- a/momentum/FeatureEngineering/operators/rolling_aggregator.py
++++ b/momentum/FeatureEngineering/operators/rolling_aggregator.py
+@@ -587,7 +587,7 @@ class RollingAggregator:
+                 if not chunk_results[step_key]:
+                     continue
+ 
+-                chunk_matrix = np.column_stack(chunk_results[step_key]).astype(np.float32, copy=False)
++                chunk_matrix = np.column_stack(chunk_results[step_key]).astype(np.float64, copy=False)
+                 chunk_frame = pd.DataFrame(
+                     data=chunk_matrix,
+                     index=features_df.index,

@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/operators/numba_rolling.py b/momentum/FeatureEngineering/operators/numba_rolling.py
+index 25625362..1b0cb0f3 100644
+--- a/momentum/FeatureEngineering/operators/numba_rolling.py
++++ b/momentum/FeatureEngineering/operators/numba_rolling.py
+@@ -252,7 +252,7 @@ def _window_moments(data: np.ndarray, end: int, window: int) -> tuple[bool, floa
+ 
+     回傳 (全有效, mean, m2, m3, m4, min, max)；窗內任一 NaN ⇒ 全有效＝False。常數窗（max＝min）之 m2／m3／m4
+     明定為 0（二遍法於相同值之和仍可能有末位誤差而使 x−mean≠0）。每列只讀該窗之值 ⇒ 與起算點無關。"""
+-    start = end - window + 1
++    start = end - window + 2
+     total = 0.0
+     vmin = data[start]
+     vmax = vmin

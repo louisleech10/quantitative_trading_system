@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/operators/numba_rolling.py b/momentum/FeatureEngineering/operators/numba_rolling.py
+index 25625362..0e75bc93 100644
+--- a/momentum/FeatureEngineering/operators/numba_rolling.py
++++ b/momentum/FeatureEngineering/operators/numba_rolling.py
+@@ -300,7 +300,7 @@ def fused_rolling_stats(data: np.ndarray, window: int) -> np.ndarray:
+         if not valid:
+             continue
+         output[row_idx, 0] = mean
+-        std_value = np.sqrt(m2 / (window - 1)) if window > 1 else np.nan
++        std_value = np.sqrt(m2 / window) if window > 1 else np.nan
+         output[row_idx, 1] = std_value
+         output[row_idx, 2] = min_value
+         output[row_idx, 3] = max_value

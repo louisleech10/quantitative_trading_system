@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/operators/numba_rolling.py b/momentum/FeatureEngineering/operators/numba_rolling.py
+index 25625362..7b99485d 100644
+--- a/momentum/FeatureEngineering/operators/numba_rolling.py
++++ b/momentum/FeatureEngineering/operators/numba_rolling.py
+@@ -295,7 +295,7 @@ def fused_rolling_stats(data: np.ndarray, window: int) -> np.ndarray:
+     if n_rows == 0:
+         return output.astype(np.float32)
+ 
+-    for row_idx in range(window - 1, n_rows):
++    for row_idx in range(window, n_rows):
+         valid, mean, m2, _m3, _m4, min_value, max_value = _window_moments(data, row_idx, window)
+         if not valid:
+             continue

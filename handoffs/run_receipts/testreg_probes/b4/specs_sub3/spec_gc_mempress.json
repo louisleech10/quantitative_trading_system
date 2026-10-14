@@ -1,0 +1,48 @@
+{
+ "path": "tests/performance/test_memory_pressure.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+ "mutants": [
+  {
+   "id": "m_label_zscore_case",
+   "file": "momentum/FeatureEngineering/operators/rolling_aggregator.py",
+   "old": "            \"zscore\": \"ZScore\",\n",
+   "new": "            \"zscore\": \"Zscore\",\n"
+  },
+  {
+   "id": "m_l3_output_float64",
+   "file": "momentum/FeatureEngineering/operators/rolling_aggregator.py",
+   "old": "                chunk_matrix = np.column_stack(chunk_results[step_key]).astype(np.float32, copy=False)\n",
+   "new": "                chunk_matrix = np.column_stack(chunk_results[step_key]).astype(np.float64, copy=False)\n"
+  },
+  {
+   "id": "m_warmup_off_by_one",
+   "file": "momentum/FeatureEngineering/operators/numba_rolling.py",
+   "old": "    for row_idx in range(window - 1, n_rows):\n        valid, mean, m2, _m3, _m4, min_value, max_value = _window_moments(data, row_idx, window)\n",
+   "new": "    for row_idx in range(window, n_rows):\n        valid, mean, m2, _m3, _m4, min_value, max_value = _window_moments(data, row_idx, window)\n"
+  },
+  {
+   "id": "m_window_start_off_by_one",
+   "file": "momentum/FeatureEngineering/operators/numba_rolling.py",
+   "old": "    start = end - window + 1\n",
+   "new": "    start = end - window + 2\n"
+  },
+  {
+   "id": "m_std_population_ddof0",
+   "file": "momentum/FeatureEngineering/operators/numba_rolling.py",
+   "old": "        std_value = np.sqrt(m2 / (window - 1)) if window > 1 else np.nan\n",
+   "new": "        std_value = np.sqrt(m2 / window) if window > 1 else np.nan\n"
+  },
+  {
+   "id": "m_range_index_reads_max",
+   "file": "momentum/FeatureEngineering/operators/rolling_aggregator.py",
+   "old": "        \"range\": 4,\n        \"zscore\": 5,\n        \"skew\": 6,\n",
+   "new": "        \"range\": 3,\n        \"zscore\": 5,\n        \"skew\": 6,\n"
+  },
+  {
+   "id": "m_zscore_uses_prev_row",
+   "file": "momentum/FeatureEngineering/operators/numba_rolling.py",
+   "old": "            output[row_idx, 5] = (data[row_idx] - mean) / std_value\n",
+   "new": "            output[row_idx, 5] = (data[row_idx - 1] - mean) / std_value\n"
+  }
+ ]
+}

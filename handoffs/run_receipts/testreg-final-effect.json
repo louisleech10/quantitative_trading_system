@@ -1,0 +1,11 @@
+{
+ "evidence_levels": {
+  "E0": 0,
+  "E1": 16,
+  "E2": 0
+ },
+ "retired_files": 0,
+ "retired_functions": 16,
+ "saved_seconds_per_full_run": "unknown",
+ "scope": []
+}
