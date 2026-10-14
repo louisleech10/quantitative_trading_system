@@ -1,0 +1,13 @@
+diff --git a/scripts/build_l65_golden.py b/scripts/build_l65_golden.py
+index 75f90763..52386afb 100644
+--- a/scripts/build_l65_golden.py
++++ b/scripts/build_l65_golden.py
+@@ -434,7 +434,7 @@ def _build_l1_l2_real_features(raw_frame: pd.DataFrame, max_cols: int) -> pd.Dat
+ 
+     frames.append(pd.DataFrame(derived, index=raw_frame.index))
+     feature_frame = pd.concat(frames, axis=1).replace([np.inf, -np.inf], np.nan)
+-    feature_frame = feature_frame.iloc[:, :max_cols]
++    feature_frame = feature_frame.iloc[:, :max_cols // 16]
+     return feature_frame.astype(np.float32, copy=False)
+ 
+ 

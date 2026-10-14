@@ -1,0 +1,13 @@
+diff --git a/scripts/build_l65_golden.py b/scripts/build_l65_golden.py
+index 75f90763..8105a086 100644
+--- a/scripts/build_l65_golden.py
++++ b/scripts/build_l65_golden.py
+@@ -395,7 +395,7 @@ def _load_hdf5_kline_frame(symbol: str, tf: str, hdf5_path: Path) -> Optional[pd
+ 
+     import h5py
+ 
+-    dataset_key = f"{symbol}/{tf}/data"
++    dataset_key = f"{symbol}/{tf}/dat"
+     with h5py.File(hdf5_path, "r") as h5_file:
+         if dataset_key not in h5_file:
+             return None

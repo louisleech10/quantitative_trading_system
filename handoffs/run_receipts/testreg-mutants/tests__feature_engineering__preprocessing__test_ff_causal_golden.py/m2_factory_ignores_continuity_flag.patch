@@ -1,0 +1,13 @@
+diff --git a/momentum/factories.py b/momentum/factories.py
+index 0d8382fc..53d1deda 100644
+--- a/momentum/factories.py
++++ b/momentum/factories.py
+@@ -280,7 +280,7 @@ def create_feature_factory(
+     storage = create_kline_storage_manager(cache_dir)
+     config_manager = ConfigManager()
+     registry = AdapterRegistry()
+-    registry.register(CryptoSpotAdapter(storage, validate_continuity=validate_continuity))
++    registry.register(CryptoSpotAdapter(storage, validate_continuity=True))
+ 
+     return FeatureFactory(config_manager, registry)
+ 

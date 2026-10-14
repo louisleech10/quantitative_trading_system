@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py b/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py
+index e30f3678..d0cbe5fd 100644
+--- a/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py
++++ b/momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py
+@@ -224,7 +224,7 @@ def adf_pvalue_fast(
+         return _adf_fallback_statsmodels(series, lag=lag, sample_size=sample_size), True
+     if THRESHOLD_BAND_LOW <= pvalue <= THRESHOLD_BAND_HIGH:
+         return _adf_fallback_statsmodels(series, lag=lag, sample_size=sample_size), True
+-    return pvalue, False
++    return pvalue * 1.4, False
+ 
+ 
+ def warmup_numba() -> None:

@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+index ba0522a8..8090efc1 100644
+--- a/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
++++ b/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py
+@@ -4004,7 +4004,7 @@ class FeaturePreprocessor:
+                 ranked_df.loc[:, constant_columns] = constant_values
+ 
+         clipped = ranked_df.clip(lower=lower, upper=upper)
+-        gaussian_arr = ndtri(clipped.to_numpy(dtype=np.float64, copy=False))
++        gaussian_arr = ndtri(1.0 - clipped.to_numpy(dtype=np.float64, copy=False))
+         gaussian_arr[selected.isna().to_numpy()] = np.nan
+         return gaussian_arr.astype(np.float32, copy=False)
+ 

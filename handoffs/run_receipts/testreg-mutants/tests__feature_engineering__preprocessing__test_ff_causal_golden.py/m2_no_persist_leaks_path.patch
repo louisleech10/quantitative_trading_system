@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_factory.py b/momentum/FeatureEngineering/feature_factory.py
+index 9de23c94..7ea986ba 100644
+--- a/momentum/FeatureEngineering/feature_factory.py
++++ b/momentum/FeatureEngineering/feature_factory.py
+@@ -4011,7 +4011,7 @@ class FeatureFactory:
+             layer_counts=layer_counts,
+             config_used=config_payload,
+             compute_warnings=merged_warnings,
+-            hdf5_path=manifest_path if persist else "",
++            hdf5_path=manifest_path,
+         )
+ 
+         try:

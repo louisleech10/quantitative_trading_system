@@ -1,0 +1,15 @@
+{"path": "tests/feature_engineering/preprocessing/test_ff_causal_golden.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "mutants": [
+  {"id": "m2_rank_ties_undercount", "file": "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
+   "old": "                    out[r, c] = np.float32((less + (equal + 1.0) / 2.0) / count)\n",
+   "new": "                    out[r, c] = np.float32((less + equal / 2.0) / count)\n"},
+  {"id": "m2_gaussian_sign_flip", "file": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+   "old": "        gaussian_arr = ndtri(clipped.to_numpy(dtype=np.float64, copy=False))\n",
+   "new": "        gaussian_arr = ndtri(1.0 - clipped.to_numpy(dtype=np.float64, copy=False))\n"},
+  {"id": "m2_no_persist_leaks_path", "file": "momentum/FeatureEngineering/feature_factory.py",
+   "old": "            hdf5_path=manifest_path if persist else \"\",\n",
+   "new": "            hdf5_path=manifest_path,\n"},
+  {"id": "m2_factory_ignores_continuity_flag", "file": "momentum/factories.py",
+   "old": "    registry.register(CryptoSpotAdapter(storage, validate_continuity=validate_continuity))\n",
+   "new": "    registry.register(CryptoSpotAdapter(storage, validate_continuity=True))\n"}]}

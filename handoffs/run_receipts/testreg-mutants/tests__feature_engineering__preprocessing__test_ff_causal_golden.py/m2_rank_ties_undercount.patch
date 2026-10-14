@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/preprocessing/_numba_transforms.py b/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
+index 73bf627f..c6461bd5 100644
+--- a/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
++++ b/momentum/FeatureEngineering/preprocessing/_numba_transforms.py
+@@ -74,7 +74,7 @@ if _HAS_NUMBA:
+                     out[r, c] = 0.5
+                 else:
+                     # average-method percentile rank
+-                    out[r, c] = np.float32((less + (equal + 1.0) / 2.0) / count)
++                    out[r, c] = np.float32((less + equal / 2.0) / count)
+         return out
+ 
+ else:

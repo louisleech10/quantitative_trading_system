@@ -1,0 +1,38 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/preprocessing/test_fast_adf_gate.py::test_fast_adf_per_sample_agreement_on_real_kline"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "baseline_session_id": "d6356018-46a2-4bd5-b221-6888f58a31df",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_fast_adf_gate.py.compare.patch",
+ "compare_patch_sha256": "c9bf253c0c7d4dd2755ae039202fd17be319ff624f6bffc9b4a4e630230f6aa8",
+ "fingerprint": "6dd2469fc7f62015ce49bcf3aa52c325118a4d77bae5cb1326dd775676836249",
+ "head": "9a30f6212d96720b4caa9f6b21b349e866ceb755",
+ "mutants": [
+  {
+   "id": "m2_fast_p_bias_1_3",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_fast_adf_gate.py/m2_fast_p_bias_1_3.patch",
+   "patch_sha256": "ef4beda88daefc36c72849f37d84d2b209930ff2ae1233a29282a6276e0e88d6",
+   "session_id": "caa94ce4-9b91-43f6-9381-2b53fb71b3a7"
+  },
+  {
+   "id": "m2_fast_p_bias_1_4",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_fast_adf_gate.py/m2_fast_p_bias_1_4.patch",
+   "patch_sha256": "020055f23c3e3a6bd857d4d0a1324be07716c06f1cc2603edbeff72e5c345dbc",
+   "session_id": "8f4e396c-f278-4b85-afe4-5f16d396f0b1"
+  },
+  {
+   "id": "m2_loader_wrong_key",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_fast_adf_gate.py/m2_loader_wrong_key.patch",
+   "patch_sha256": "5a3a1e6abe92a8c247461cbfabf834a08264b0e7a7788c14f5ae93747fbc7290",
+   "session_id": "91345cda-8cba-4f42-aaf4-6809fba67705"
+  },
+  {
+   "id": "m2_builder_drops_columns",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_fast_adf_gate.py/m2_builder_drops_columns.patch",
+   "patch_sha256": "949e4d511ea0ea073439e24cd88797053d44792c3ca08c7587f6583778b62da7",
+   "session_id": "152ae0a7-d1da-4aa5-964f-fc5763b7db85"
+  }
+ ],
+ "path": "tests/feature_engineering/preprocessing/test_fast_adf_gate.py"
+}

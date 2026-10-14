@@ -1,0 +1,39 @@
+{
+ "added_nodeids": [
+  "tests/feature_engineering/preprocessing/test_ff_causal_golden.py::test_causal_preprocessing_matches_independent_rank_oracle_on_real_baseline",
+  "tests/feature_engineering/preprocessing/test_ff_causal_golden.py::test_real_generate_e2e_no_persist_returns_no_artifact_paths"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "baseline_session_id": "6555b68f-079a-4691-b874-f075d508a9ae",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_ff_causal_golden.py.compare.patch",
+ "compare_patch_sha256": "5ca8c23c1835c4354d5db8c275fd20b601a332d44770d41cbe4984fcec261991",
+ "fingerprint": "48db397defbd793741e691b84b2aa6bdd792f55b36503a2bfc7c81707bdaf5d2",
+ "head": "9a30f6212d96720b4caa9f6b21b349e866ceb755",
+ "mutants": [
+  {
+   "id": "m2_rank_ties_undercount",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_ff_causal_golden.py/m2_rank_ties_undercount.patch",
+   "patch_sha256": "6b81234ac5ba89efb5aa923b2a6a2a97e5958edbdb5df26f574beaf532149e3b",
+   "session_id": "563bc9c4-419d-428c-80f3-957cfef35ed3"
+  },
+  {
+   "id": "m2_gaussian_sign_flip",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_ff_causal_golden.py/m2_gaussian_sign_flip.patch",
+   "patch_sha256": "2d5e73e5fff1168d6a08c46a99519fbf38777a11d910d08c515557065116570d",
+   "session_id": "0d798937-16e6-47e2-9f52-f9c78fee9974"
+  },
+  {
+   "id": "m2_no_persist_leaks_path",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_ff_causal_golden.py/m2_no_persist_leaks_path.patch",
+   "patch_sha256": "f9edfe2fa12fa5349e1c0dc9cfffb33e606f4e4d87075b06a99e46bba7c34d70",
+   "session_id": "f741818f-f3b7-4274-b4e6-5ed55338e39a"
+  },
+  {
+   "id": "m2_factory_ignores_continuity_flag",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__feature_engineering__preprocessing__test_ff_causal_golden.py/m2_factory_ignores_continuity_flag.patch",
+   "patch_sha256": "9ae9e7b79aea37e2dff4f9e62158c0e3eb8d2e435d2d296399f63619f2ca85fb",
+   "session_id": "f565a534-c18d-4683-b99d-d74b4b8b97bf"
+  }
+ ],
+ "path": "tests/feature_engineering/preprocessing/test_ff_causal_golden.py"
+}

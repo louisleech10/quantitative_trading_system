@@ -296,3 +296,24 @@ def test_fast_adf_1000_sample_gate() -> None:
     _atomic_write_json(REPORT_PATH, report)
 
     assert failures == []
+
+
+def test_fast_adf_per_sample_agreement_on_real_kline(monkeypatch, tmp_path) -> None:
+    """純增：上列 gate 缺資料或樣本不足時 pytest.skip（correctness gate 應為失敗）、只以聚合門檻判定（一致率 >0.99、
+    d* 中位差 <0.02，可掩蓋少數樣本之判定翻轉），且每跑改寫已追蹤之報告檔。本案以同一批真實 K 線樣本：skip 改為失敗、
+    報告寫入導至 tmp；逐樣本斷言 fast 與 statsmodels（固定 lag 0）之 ADF 平穩判定（p ≤ 0.10）相同，且兩者 d* 差 ≤ 0.05。"""
+    monkeypatch.setattr(__name__ + ".REPORT_PATH", tmp_path / "fast_adf_gate_report.json")
+    monkeypatch.setattr(pytest, "skip", pytest.fail)
+    samples = collect_gate_samples()
+    flips, d_gaps = [], []
+    for sample in samples:
+        values = np.asarray(sample["values"], dtype=np.float64)
+        key = (sample["symbol"], sample["timeframe"], sample["column"], sample["window_index"])
+        fast_pvalue, _fallback = adf_pvalue_fast(values, lag=0, sample_size=WINDOW_SIZE)
+        reference_pvalue = _statsmodels_fixed_lag_pvalue(values, lag=0)
+        if (fast_pvalue <= ADF_THRESHOLD) != (reference_pvalue <= ADF_THRESHOLD):
+            flips.append((key, fast_pvalue, reference_pvalue))
+        gap = abs(_d_star(values, use_fast=True) - _d_star(values, use_fast=False))
+        if gap > 0.05:
+            d_gaps.append((key, gap))
+    assert len(samples) >= MIN_GATE_SAMPLES and not flips and not d_gaps, (len(samples), flips[:5], d_gaps[:5])

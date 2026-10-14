@@ -1,0 +1,23 @@
+{
+ "added": [
+  "tests/feature_engineering/preprocessing/test_fast_adf_gate.py::test_fast_adf_per_sample_agreement_on_real_kline"
+ ],
+ "mutant_failures": {
+  "m2_fast_p_bias_1_3": {
+   "test_fast_adf_per_sample_agreement_on_real_kline": "failed"
+  },
+  "m2_fast_p_bias_1_4": {
+   "test_fast_adf_1000_sample_gate": "failed",
+   "test_fast_adf_per_sample_agreement_on_real_kline": "failed"
+  },
+  "m2_loader_wrong_key": {
+   "test_fast_adf_1000_sample_gate": "skipped",
+   "test_fast_adf_per_sample_agreement_on_real_kline": "failed"
+  },
+  "m2_builder_drops_columns": {
+   "test_fast_adf_1000_sample_gate": "skipped",
+   "test_fast_adf_per_sample_agreement_on_real_kline": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_fast_adf_gate.py.json

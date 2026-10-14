@@ -171,3 +171,70 @@ def test_real_generate_e2e_causal_preprocessing_no_persist(tmp_path, monkeypatch
     assert result.feature_count > 0
     assert result.features_df.shape[0] > 100
     assert not np.isinf(result.features_df.select_dtypes(include=[np.number]).to_numpy()).any()
+
+
+def test_causal_preprocessing_matches_independent_rank_oracle_on_real_baseline() -> None:
+    """純增：上列 test_causal_preprocessing_changes_legacy_values_on_real_baseline 之 oracle 於 rank 步直接呼叫生產
+    _rolling_rank_numba（自我參照，rank 實作錯時兩邊同錯）。本案同真實基準、同設定，rank 改以測試內獨立實作：窗內
+    （含當列、只計有限值）平均法百分位 (less + (equal + 1) / 2) / count、有限值數 < min_periods 為 NaN、全等窗為 0.5；
+    其餘步驟（滾動分位縮尾、縮尾不完整窗遮罩、ndtri、gaussian 窗未滿遮罩）同上列。"""
+    frame = pd.read_parquet(REAL_BASELINE).select_dtypes(include=[np.number]).iloc[:1000, :3].astype(float)
+    window = 252
+    min_periods = max(20, window // 4)
+    config = {
+        "mode": "replace",
+        "causal_preprocessing": True,
+        "winsorization": {"enabled": True, "method": "quantile", "quantile_range": [0.05, 0.95], "window": window, "apply_to": "all"},
+        "rank_transform": {"enabled": False},
+        "adaptive_zscore": {"enabled": False},
+        "gaussian_normalize": {"enabled": True, "clip_range": [0.001, 0.999], "apply_to": "all"},
+    }
+    actual = FeaturePreprocessor(config).transform(frame)
+
+    lower = frame.rolling(window, min_periods=min_periods).quantile(0.05)
+    upper = frame.rolling(window, min_periods=min_periods).quantile(0.95)
+    clipped = frame.where(lower.isna() | upper.isna(), frame.clip(lower=lower, upper=upper, axis=1))
+    clipped = _mask_incomplete_window(clipped, window)
+
+    def pct_rank(w: np.ndarray) -> float:
+        x = w[-1]
+        if np.isnan(x):
+            return np.nan
+        v = w[~np.isnan(w)]
+        if v.size < min_periods:
+            return np.nan
+        less, equal = int((v < x).sum()), int((v == x).sum())
+        return 0.5 if less == 0 and equal == v.size else (less + (equal + 1.0) / 2.0) / v.size
+
+    ranked = clipped.rolling(window, min_periods=1).apply(pct_rank, raw=True).astype(np.float32).astype(float)
+    expected = pd.DataFrame(ndtri(ranked.clip(0.001, 0.999).to_numpy(float)), index=frame.index, columns=frame.columns)
+    for column in expected.columns:
+        finite = np.flatnonzero(np.isfinite(clipped[column].to_numpy(dtype=np.float64)))
+        cut = len(expected) if finite.size == 0 else min(int(finite[0]) + window - 1, len(expected))
+        expected.iloc[:cut, expected.columns.get_loc(column)] = np.nan
+
+    kernel = _rolling_rank_numba(clipped.to_numpy(dtype=np.float64), window, min_periods)
+    a, e = actual.to_numpy(np.float32), expected.to_numpy(np.float32)
+    gap = float(np.nanmax(np.abs(a - e))) if np.isfinite(a - e).any() else float("nan")
+    assert np.allclose(kernel, ranked.to_numpy(np.float32), atol=0, equal_nan=True), "rank 核心 ≠ 獨立實作"
+    assert HAS_SCIPY and list(actual.columns) == list(frame.columns) and int(np.isfinite(e).sum()) > 500 and \
+        np.allclose(a, e, atol=1e-6, equal_nan=True), (int(np.isfinite(e).sum()), gap)
+
+
+def test_real_generate_e2e_no_persist_returns_no_artifact_paths(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """純增：上列 test_real_generate_e2e_causal_preprocessing_no_persist 名為 no-persist 卻無 no-persist 斷言，且其
+    features_df 只含索引（CGSA 串流結果不帶欄）⇒ 形狀／inf 斷言作用於空欄表。本案同設定 persist=False，斷言回傳不指向
+    任何產物（hdf5_path、metadata.raw_path 皆空），且特徵數 > 0、資料區間列數 > 100。"""
+    storage = create_kline_storage_manager()
+    klines = storage.read_klines("ETHUSDT", "1h", validate_continuity=False)
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work"))
+    result = create_feature_factory(validate_continuity=False).generate_features(
+        "ETHUSDT",
+        "1h",
+        config_override={"preset": "minimal", "preprocessing": {"causal_preprocessing": True, "winsorization": {"window": 252}}},
+        force_regenerate=True,
+        persist=False,
+    )
+    assert len(klines) > 100 and result.hdf5_path == "" and result.metadata["raw_path"] == "" and \
+        result.feature_count > 0 and len(result.features_df.index) > 100, \
+        (len(klines), result.hdf5_path, result.metadata.get("raw_path"), result.feature_count)

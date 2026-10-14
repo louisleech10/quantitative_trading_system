@@ -1,0 +1,23 @@
+{
+ "added": [
+  "tests/feature_engineering/preprocessing/test_ff_causal_golden.py::test_causal_preprocessing_matches_independent_rank_oracle_on_real_baseline",
+  "tests/feature_engineering/preprocessing/test_ff_causal_golden.py::test_real_generate_e2e_no_persist_returns_no_artifact_paths"
+ ],
+ "mutant_failures": {
+  "m2_rank_ties_undercount": {
+   "test_causal_preprocessing_matches_independent_rank_oracle_on_real_baseline": "failed"
+  },
+  "m2_gaussian_sign_flip": {
+   "test_causal_preprocessing_changes_legacy_values_on_real_baseline": "failed",
+   "test_causal_preprocessing_matches_independent_rank_oracle_on_real_baseline": "failed"
+  },
+  "m2_no_persist_leaks_path": {
+   "test_real_generate_e2e_no_persist_returns_no_artifact_paths": "failed"
+  },
+  "m2_factory_ignores_continuity_flag": {
+   "test_real_generate_e2e_causal_preprocessing_no_persist": "failed",
+   "test_real_generate_e2e_no_persist_returns_no_artifact_paths": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__feature_engineering__preprocessing__test_ff_causal_golden.py.json
