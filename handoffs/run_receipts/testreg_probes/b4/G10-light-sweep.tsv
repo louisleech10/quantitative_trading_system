@@ -1,0 +1,53 @@
+path	rc	seconds	summary	failed_nodeids
+tests/governance/test_result_state_format_failed.py	0	35	============================= 19 passed in 31.59s ==============================	-
+tests/governance/test_rolegate_predispatch.py	0	23	============================= 20 passed in 18.20s ==============================	-
+tests/governance/test_session_name_guard_wired.py	0	4	============================== 3 passed in 0.69s ===============================	-
+tests/governance/test_spec_xref_check.py	0	7	============================== 31 passed in 3.67s ==============================	-
+tests/governance/test_stamp_no_task_rejected.py	0	4	============================== 3 passed in 1.13s ===============================	-
+tests/governance/test_stamp_taskid_inject.py	0	59	============================= 70 passed in 56.51s ==============================	-
+tests/governance/test_sync_check.py	0	5	============================== 6 passed in 1.44s ===============================	-
+tests/governance/test_synth_attribution_hook.py	0	5	============================== 7 passed in 1.56s ===============================	-
+tests/governance/test_template_check_todofmt.py	0	9	============================== 21 passed in 4.59s ==============================	-
+tests/governance/test_todofmt_constitution_sync.py	0	5	============================== 13 passed in 1.75s ==============================	-
+tests/governance/test_todofmt_contract.py	0	6	============================== 31 passed in 3.36s ==============================	-
+tests/governance/test_todofmt_freeze_check.py	0	7	============================== 16 passed in 4.47s ==============================	-
+tests/governance/test_todofmt_sample_fftfmeta.py	0	8	============================== 18 passed in 5.21s ==============================	-
+tests/governance/test_todofmt_sample_self.py	0	4	============================== 9 passed in 1.06s ===============================	-
+tests/governance/test_todofmt_template.py	0	4	============================== 18 passed in 0.68s ==============================	-
+tests/governance/test_todofmt_write_guard.py	0	10	============================== 34 passed in 6.25s ==============================	-
+tests/governance/test_verdictgate_p1.py	0	18	============================= 32 passed in 15.79s ==============================	-
+tests/governance/test_verdictgate_p2.py	0	25	============================= 32 passed in 22.11s ==============================	-
+tests/governance/test_verdictgate_p3.py	0	50	============================= 47 passed in 45.71s ==============================	-
+tests/governance/test_verdictgate_p4.py	0	8	============================== 29 passed in 4.32s ==============================	-
+tests/governance/test_verify_gate.py	0	14	============================= 28 passed in 11.28s ==============================	-
+tests/governance/test_verify_gate_b3.py	0	9	============================== 17 passed in 6.28s ==============================	-
+tests/governance/test_verify_gate_b4.py	0	8	============================== 12 passed in 4.69s ==============================	-
+tests/governance/test_verify_gate_b5.py	0	7	============================== 18 passed in 3.89s ==============================	-
+tests/governance/test_verify_gate_o3.py	0	6	============================== 10 passed in 2.57s ==============================	-
+tests/governance/test_verify_gate_o3ext.py	0	5	============================== 9 passed in 1.46s ===============================	-
+tests/governance/test_verify_gate_overstrict.py	0	10	============================== 7 passed in 5.57s ===============================	-
+tests/governance/test_verify_gate_r7ext.py	0	10	============================== 9 passed in 5.39s ===============================	-
+tests/governance/test_verify_gate_redteam.py	0	9	============================== 13 passed in 4.35s ==============================	-
+tests/governance/test_waived_adversarial_still_stamps.py	0	8	============================== 6 passed in 4.02s ===============================	-
+tests/governance/test_zero_findings_guard.py	0	5	============================== 6 passed in 0.96s ===============================	-
+tests/governance/test_zero_findings_sentinel.py	0	5	============================== 6 passed in 1.80s ===============================	-
+tests/momentum/Analysis/test_ic_persist_redirect_inventory.py	1	4	========================= 1 failed, 3 passed in 0.96s ==========================	tests/momentum/Analysis/test_ic_persist_redirect_inventory.py::test_sixteen_caller_inventory_is_complete
+tests/momentum/Analysis/test_adversarial_validator.py	0	10	============================== 13 passed in 5.70s ==============================	-
+tests/momentum/Analysis/test_analysis_exporter.py	0	4	============================== 7 passed in 0.91s ===============================	-
+tests/momentum/Analysis/test_binary_discrimination.py	0	4	======================== 14 passed, 2 warnings in 0.94s ========================	-
+tests/momentum/Analysis/test_event_label_mode_contract.py	0	6	============================== 18 passed in 1.58s ==============================	-
+tests/momentum/Analysis/test_evtlabel_e2e_realkline.py	0	8	============================== 6 passed in 2.03s ===============================	-
+tests/momentum/Analysis/test_evtlabel_isolation_channel.py	0	6	============================== 14 passed in 1.19s ==============================	-
+tests/momentum/Analysis/test_evtlabel_oracle.py	0	10	============================== 27 passed in 6.51s ==============================	-
+tests/momentum/Analysis/test_evtlabel_stage3.py	0	4	============================== 19 passed in 0.94s ==============================	-
+tests/momentum/Analysis/test_evtlabel_stage5.py	0	5	============================== 19 passed in 1.08s ==============================	-
+tests/momentum/Analysis/test_evtlabel_survivor_consumer.py	0	5	============================== 8 passed in 1.13s ===============================	-
+tests/momentum/Analysis/test_factor_combiner.py	0	10	============================== 11 passed in 5.37s ==============================	-
+tests/momentum/Analysis/test_factor_exposure_analyzer.py	0	4	======================== 43 passed, 7 warnings in 0.98s ========================	-
+tests/momentum/Analysis/test_factor_orthogonalizer.py	0	5	============================== 7 passed in 1.15s ===============================	-
+tests/momentum/Analysis/test_factor_return_analyzer.py	0	6	============================== 17 passed in 2.18s ==============================	-
+tests/momentum/Analysis/test_factor_return_stopgap.py	1	20	======================== 1 failed, 11 passed in 15.46s =========================	tests/momentum/Analysis/test_factor_return_stopgap.py::test_factor_return_consumer_allowlist
+tests/momentum/Analysis/test_feature_quality_diagnostics.py	0	6	============================== 6 passed in 1.30s ===============================	-
+tests/momentum/Analysis/test_feature_toggle_registry.py	0	4	============================== 12 passed in 0.96s ==============================	-
+tests/momentum/Analysis/test_gap2_golden.py	0	247	======================== 5 passed in 242.34s (0:04:02) =========================	-
+tests/momentum/Analysis/test_gap2_stage6b_wiring.py	0	143	======================== 13 passed in 139.08s (0:02:19) ========================	-

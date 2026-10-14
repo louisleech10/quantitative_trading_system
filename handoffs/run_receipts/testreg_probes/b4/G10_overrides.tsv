@@ -1,0 +1,2 @@
+tests/governance/test_stamp_no_task_rejected.py	drop_targets	tests/governance/test_stamp_no_task_rejected.py::test_no_task_stamp_rejected	主斷言 rc≠0 有效，訊息 OR 斷言偏弱不升 rewrite（GROK-R14-P1-02；使用者「不要摳細節」）
+tests/momentum/Analysis/test_factor_exposure_analyzer.py	claim	contract,regression	oracle analyzer_oracle.json 為既有 analyzer 傾印（自指 golden），依規則不得標 correctness（GROK-R14-P2-01）
