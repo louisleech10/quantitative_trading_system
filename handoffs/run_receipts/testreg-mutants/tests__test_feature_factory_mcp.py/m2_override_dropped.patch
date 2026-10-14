@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+index f9fcb6fe..b83ace53 100644
+--- a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
++++ b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+@@ -27,7 +27,7 @@ class FeatureFactoryMCP:
+             result = self._factory.generate_features(
+                 symbol,
+                 timeframe,
+-                config_override=config,
++                config_override=None,
+             )
+             return self._summarize_result(result)
+         except Exception as exc:

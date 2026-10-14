@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+index f9fcb6fe..4c40bc18 100644
+--- a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
++++ b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+@@ -179,7 +179,7 @@ class FeatureFactoryMCP:
+             "feature_count": result.feature_count,
+             "generation_time": result.generation_time,
+             "layer_counts": result.layer_counts,
+-            "metadata": result.metadata,
++            "metadata": {},
+             "hdf5_path": result.hdf5_path,
+         }
+ 

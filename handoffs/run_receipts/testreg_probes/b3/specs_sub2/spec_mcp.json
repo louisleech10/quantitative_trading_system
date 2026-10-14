@@ -1,0 +1,10 @@
+{"path": "tests/test_feature_factory_mcp.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r5/synth.md",
+ "mutants": [
+  {"id": "m2_override_dropped", "file": "momentum/FeatureEngineering/mcp/feature_factory_mcp.py",
+   "old": "                config_override=config,\n", "new": "                config_override=None,\n"},
+  {"id": "m2_metadata_dropped", "file": "momentum/FeatureEngineering/mcp/feature_factory_mcp.py",
+   "old": "            \"metadata\": result.metadata,\n", "new": "            \"metadata\": {},\n"},
+  {"id": "m2_error_message_lost", "file": "momentum/FeatureEngineering/mcp/feature_factory_mcp.py",
+   "old": "            logger.error(\"Feature generation failed for %s: %s\", symbol, exc, exc_info=True)\n            return {\"error\": str(exc)}\n",
+   "new": "            logger.error(\"Feature generation failed for %s: %s\", symbol, exc, exc_info=True)\n            return {\"error\": type(exc).__name__}\n"}]}

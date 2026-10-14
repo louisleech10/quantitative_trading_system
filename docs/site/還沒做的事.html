@@ -316,6 +316,11 @@
 <p><strong>每跑必改寫已追蹤檔的 3 支舊測試</strong>（2026-10-14 TESTREG 量測時查到）：<code>preprocessing/test_fast_adf_gate.py</code> 改寫
 <code>tests/golden/l65/fast_adf_gate_report.json</code>、<code>atomic/test_handcoded_reference.py</code> 改寫 <code>tests/_golden/ff_deepaudit/</code> 兩份差異表，
 內容只差時間戳，跑完工作樹就髒。新測試已不寫已追蹤檔；舊測試之輸出改導暫存，併 TESTREG 後續子批或排序第 2 步處理。</p>
+<p><strong>TESTREG 另議兩檔之殘留</strong>（2026-10-14 審碼 r5 三家表態）：①<code>tests/test_feature_factory_mcp.py</code> 之舊冒煙測試對 BTCUSDT
+跑真實完整生成（約 309 秒、寫真實 data_cache），斷言空心；已補秒級替身工廠測試，舊測試依規則保留，其副作用待後續清理。
+②<code>preprocessing/test_l65_phase0_gate.py</code> 之冒煙測試仍紅（只給 64 列，FF-STAT 後不夠校準），現行改測試規則無合法改法，
+登 SPEC §N R17；同一工具已由 <code>tests/performance/test_l65_phase0_gate.py</code>（80 列）測到。③<code>scripts/build_l65_golden.py</code>
+第 716 行 golden 建置 2a 模式也把週期寫成 <code>&quot;fixture&quot;</code>（與已修之 benchmark 同病），沒有測試覆蓋，用到時再修。</p>
 <p><strong>治理線</strong>：兩條治理工作線已於 2026-08-14 由你裁定不再擴建，故本清單不列（狀態見 <code>docs/ROADMAP.md</code> 生成區塊）。</p>
 <hr />
 <h2 id="五這份怎麼維護">五、這份怎麼維護</h2>

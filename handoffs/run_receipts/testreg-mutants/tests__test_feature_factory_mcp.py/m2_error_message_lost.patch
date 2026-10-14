@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+index f9fcb6fe..7b724eb4 100644
+--- a/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
++++ b/momentum/FeatureEngineering/mcp/feature_factory_mcp.py
+@@ -32,7 +32,7 @@ class FeatureFactoryMCP:
+             return self._summarize_result(result)
+         except Exception as exc:
+             logger.error("Feature generation failed for %s: %s", symbol, exc, exc_info=True)
+-            return {"error": str(exc)}
++            return {"error": type(exc).__name__}
+ 
+     def preview_feature_count(self, config: Optional[Dict] = None) -> Dict:
+         """Preview feature counts and resource usage."""
