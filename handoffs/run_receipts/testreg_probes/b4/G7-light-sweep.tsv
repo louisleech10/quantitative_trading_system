@@ -1,0 +1,42 @@
+path	rc	seconds	summary	failed_nodeids
+tests/feature_library/test_phase1.py	0	5	============================== 14 passed in 0.75s ==============================	-
+tests/feature_library/test_phase4.py	0	6	============================== 14 passed in 2.72s ==============================	-
+tests/feature_library/test_phase3.py	1	4	========================= 2 failed, 6 passed in 0.79s ==========================	[,tests/feature_library/test_phase3.py::test_feature_library_load_multi_raises_on_any_missing,tests/feature_library/test_phase3.py::test_feature_library_ensure_fresh_true
+tests/feature_library/test_phase5.py	0	4	============================== 7 passed in 1.26s ===============================	-
+tests/feature_library/test_phase2.py	0	4	============================== 8 passed in 0.62s ===============================	-
+tests/momentum/test_coverage_analyzer.py	0	4	============================== 7 passed in 1.02s ===============================	-
+tests/momentum/test_feature_factory_optimization_e2e.py	0	22	============================== 7 passed in 19.43s ==============================	-
+tests/momentum/test_feature_factory_optimization_perf.py	0	22	============================== 5 passed in 18.17s ==============================	-
+tests/momentum/test_feature_storage.py	0	5	======================== 13 passed, 8 warnings in 0.93s ========================	-
+tests/momentum/test_case_shap.py	0	5	============================== 4 passed in 1.92s ===============================	-
+tests/momentum/test_close_coterminalize.py	0	7	============================== 6 passed in 3.72s ===============================	-
+tests/momentum/test_cv_validator.py	0	4	======================== 7 passed, 2 warnings in 1.11s =========================	-
+tests/momentum/test_data_preprocessor.py	0	4	============================== 10 passed in 1.11s ==============================	-
+tests/momentum/test_entropy_indicators.py	0	8	============================== 12 passed in 5.33s ==============================	-
+tests/momentum/test_event_filter.py	0	4	============================== 17 passed in 1.08s ==============================	-
+tests/momentum/test_export_formats.py	0	4	============================== 12 passed in 0.98s ==============================	-
+tests/momentum/test_factories.py	0	4	============================== 2 passed in 1.00s ===============================	-
+tests/momentum/test_feature_extractor.py	0	4	======================== 7 passed, 8 warnings in 0.71s =========================	-
+tests/momentum/test_feature_factory_timestamp_filter.py	1	4	========================= 1 failed, 1 passed in 0.75s ==========================	tests/momentum/test_feature_factory_timestamp_filter.py::test_layer0_date_filter_keeps_second_epoch_rows
+tests/momentum/test_feature_library_config_hash.py	1	4	========================= 3 failed, 1 passed in 0.71s ==========================	[,[,[,tests/momentum/test_feature_library_config_hash.py::test_load_with_config_hash_disambig,tests/momentum/test_feature_library_config_hash.py::test_load_without_config_hash_matches_find_latest_materialized,tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable
+tests/momentum/test_feature_library_registry_facade.py	0	4	============================== 4 passed in 0.72s ===============================	-
+tests/momentum/test_feature_library_row_index.py	0	4	========================= 3 passed, 2 skipped in 0.64s =========================	-
+tests/momentum/test_feature_preprocessor.py	1	5	========================= 3 failed, 11 passed in 1.66s =========================	tests/momentum/test_feature_preprocessor.py::test_adf_nan_heavy,tests/momentum/test_feature_preprocessor.py::test_fracdiff_convergence_failure,tests/momentum/test_feature_preprocessor.py::test_fracdiff_adf_coexist
+tests/momentum/test_feature_reader_public_artifact.py	0	4	============================== 2 passed in 1.06s ===============================	-
+tests/momentum/test_feature_validator.py	1	4	=================== 2 failed, 4 passed, 7 warnings in 0.78s ====================	[,[,tests/momentum/test_feature_validator.py::test_feature_validation,tests/momentum/test_feature_validator.py::test_validate_correlation_threshold
+tests/momentum/test_ic_1eb_b2_wiring.py	timeout	303	16:08:28 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)	-
+tests/momentum/test_ic_1eb_b3_xsec.py	0	7	============================== 11 passed in 3.21s ==============================	-
+tests/momentum/test_ic_1eb_b4_fullstack.py	0	25	============================= 20 passed in 21.84s ==============================	-
+tests/momentum/test_ic_config.py	0	4	============================== 6 passed in 1.06s ===============================	-
+tests/momentum/test_ic_crash_real_config.py	1	5	============================== 2 failed in 1.76s ===============================	[,[100%],tests/momentum/test_ic_crash_real_config.py::test_stage4_grouped_uses_real_pydantic_config,tests/momentum/test_ic_crash_real_config.py::test_default_grouped_config_does_not_raise_with_kline
+tests/momentum/test_ic_cross_sectional_cut2.py	1	5	=================== 1 failed, 6 passed, 2 warnings in 1.78s ====================	[100%],tests/momentum/test_ic_cross_sectional_cut2.py::test_cross_sectional_e2e_real_path_append_and_analyze
+tests/momentum/test_ic_decay_log.py	0	4	========================= 2 passed, 1 warning in 1.07s =========================	-
+tests/momentum/test_ic_e2e.py	1	8	========================= 4 failed, 1 skipped in 3.93s =========================	[,[,[,[,tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_full_pipeline_global_mode,tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_refilter_uses_cache,tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_event_mode_with_query,tests/momentum/test_ic_e2e.py::TestICGatekeeperE2E::test_report_json_structure
+tests/momentum/test_ic_engine.py	0	5	======================== 44 passed, 2 warnings in 1.42s ========================	-
+tests/momentum/test_ic_engine_performance.py	0	4	============================== 2 skipped in 1.03s ==============================	-
+tests/momentum/test_ic_feature_filter.py	1	8	========================= 1 failed, 6 passed in 3.13s ==========================	[,tests/momentum/test_ic_feature_filter.py::test_analyze_applies_feature_filter_metadata_and_summary_limit
+tests/momentum/test_ic_filter_orchestrator.py	1	8	================== 1 failed, 43 passed, 96 warnings in 3.92s ===================	[,tests/momentum/test_ic_filter_orchestrator.py::test_stage4_ic_calculation_with_kline_reader
+tests/momentum/test_ic_phase0_golden.py	0	4	========================= 3 passed, 1 warning in 1.08s =========================	-
+tests/momentum/test_ic_reporter.py	0	4	============================== 8 passed in 1.00s ===============================	-
+tests/momentum/test_ic_timeaxis.py	0	6	============================== 7 passed in 1.61s ===============================	-
+tests/momentum/test_la0_b4_orchestrator.py	0	4	============================== 5 passed in 1.13s ===============================	-
