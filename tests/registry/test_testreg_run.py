@@ -181,3 +181,22 @@ def test_resume_after_change_reruns_changed_file(tmp_path):
     assert proc.returncode == 0
     assert rcpt["files"]["tests/test_other.py"]["reused"] is False
     assert "tests/test_other.py::test_o3" in rcpt["expected"] and rcpt["results"]["tests/test_other.py::test_o3"] == "passed"
+
+
+def test_run_changed_paths_keep_non_ascii_and_space_paths(tmp_path):
+    """repo 實存情境（2026-10-14 子批 2 閘被擋）：工作樹有中文／含空白檔名之未追蹤檔（Finder 複本「…拷貝.csv」），
+    或已追蹤之中文檔名文件（白話說明/*.md）有改動 ⇒ 閘照常放行，changed_paths 以原始路徑（非 git 引號跳脫）記錄。"""
+    files = dict(FILES)
+    files["白話說明/進度.md"] = "舊\n"
+    r = _repo(tmp_path, files)
+    base = r.head()
+    r.write("tests/test_rw.py", FILES["tests/test_rw.py"].replace("assert f() == 1\n", "assert f() == 1\n    assert f() > 0\n"))
+    r.write("白話說明/進度.md", "新\n")
+    r.write("uat_samples/events_mapping拷貝.csv", "a\n")
+    r.write("uat_samples/events copy.csv", "a\n")
+    proc, rcpt = _run(r, base, tmp_path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert testreg.validate_shape(rcpt, {"type": "types.subbatch_receipt"}, schema()) == []
+    assert {"白話說明/進度.md", "uat_samples/events_mapping拷貝.csv", "uat_samples/events copy.csv",
+            "tests/test_rw.py"} <= set(rcpt["changed_paths"]), rcpt["changed_paths"]
+    assert set(rcpt["files"]) == {"tests/test_rw.py"}
