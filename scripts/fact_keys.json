@@ -3840,11 +3840,6 @@
         "只寫結論，不寫過程"
       ],
       [
-        "FRAMEPATH 規格第 22 版（D11）要我核可什麼？",
-        "[FRAMEPATH規格v22修正審閱.md](FRAMEPATH規格v22修正審閱.md)",
-        "核可後移入 Archived/，不再增修"
-      ],
-      [
         "某張已完成的票，結論是什麼？",
         "[FF-STAT結論.md](FF-STAT結論.md)、[GAP-3結論.md](GAP-3結論.md)、[TODO優化結論.md](TODO優化結論.md) 等 `<票名>結論.md`",
         "只寫結論，不寫過程"
