@@ -1,0 +1,53 @@
+path	rc	seconds	summary	failed_nodeids
+tests/api/test_feature_factory_batch_resume.py	0	10	======================== 17 passed, 1 warning in 6.03s =========================	-
+tests/api/test_run_lifecycle_api.py	1	5	========================= 2 failed, 16 passed in 1.56s =========================	[,tests/api/test_run_lifecycle_api.py::test_lease_sink_holds_until_release,tests/api/test_run_lifecycle_api.py::test_generate_warmup_delete_lease_chain
+tests/api/test_batch_alias.py	0	12	============================== 17 passed in 1.03s ==============================	-
+tests/api/test_batch_date.py	0	10	============================== 9 passed in 6.16s ===============================	-
+tests/api/test_batch_retention.py	0	16	============================= 39 passed in 11.55s ==============================	-
+tests/api/test_feature_browser_routes.py	0	6	============================== 4 passed in 2.19s ===============================	-
+tests/api/test_feature_browser_service.py	0	4	============================== 7 passed in 1.08s ===============================	-
+tests/api/test_feature_explorer_optimizations.py	0	5	============================== 11 passed in 0.98s ==============================	-
+tests/api/test_feature_factory_batch_quality.py	0	4	======================== 7 passed, 2 warnings in 1.36s =========================	-
+tests/api/test_framepath_api_h5.py	timeout	302	-	-
+tests/api/test_ic_deep_analysis.py	0	43	============================= 45 passed in 38.55s ==============================	-
+tests/api/test_ic_list_features.py	0	5	============================== 1 skipped in 1.13s ==============================	-
+tests/api/test_b4_bulk_delete_orphan.py	0	6	============================== 17 passed in 2.84s ==============================	-
+tests/api/test_batch_adapters_injection.py	0	4	============================== 4 passed in 0.88s ===============================	-
+tests/api/test_batch_download_multi_timeframe.py	0	5	============================== 4 passed in 0.54s ===============================	-
+tests/api/test_batch_layer_metrics.py	0	4	============================== 3 passed in 0.58s ===============================	-
+tests/api/test_batch_progress_normalize.py	0	4	============================== 3 passed in 0.61s ===============================	-
+tests/api/test_batch_status_layer.py	0	5	============================== 8 passed in 1.30s ===============================	-
+tests/api/test_cross_timeframe_event_analysis.py	0	4	============================== 4 passed in 1.10s ===============================	-
+tests/api/test_data_quality_report.py	0	4	============================== 14 passed in 0.85s ==============================	-
+tests/api/test_event_label_alignment.py	0	5	============================== 12 passed in 1.45s ==============================	-
+tests/api/test_event_label_rule_wire.py	0	4	============================== 4 passed in 1.01s ===============================	-
+tests/api/test_evtlabel_disclosure.py	0	4	============================== 15 passed in 1.02s ==============================	-
+tests/api/test_evtlabel_staging.py	0	4	============================== 40 passed in 1.14s ==============================	-
+tests/api/test_evtwarmup.py	0	26	======================= 14 passed, 3 warnings in 22.33s ========================	-
+tests/api/test_export_api.py	0	20	============================== 8 passed in 16.55s ==============================	-
+tests/api/test_export_routes.py	0	6	============================== 5 passed in 1.95s ===============================	-
+tests/api/test_failopen_api_flags.py	0	4	============================== 4 passed in 0.94s ===============================	-
+tests/api/test_feature_api.py	0	7	======================== 5 passed, 4 warnings in 2.24s =========================	-
+tests/api/test_feature_export.py	0	5	============================== 27 passed in 1.71s ==============================	-
+tests/api/test_feature_factory_batch_list.py	0	6	============================== 3 passed in 2.12s ===============================	-
+tests/api/test_feature_factory_batch_step4.py	0	7	======================== 11 passed, 1 warning in 3.90s =========================	-
+tests/api/test_feature_factory_service_browse_summary.py	0	4	============================== 8 passed in 0.92s ===============================	-
+tests/api/test_feature_factory_service_phase_d.py	0	4	============================== 6 passed in 0.82s ===============================	-
+tests/api/test_feature_factory_timeframe_validation_step6.py	0	5	============================== 1 passed in 2.00s ===============================	-
+tests/api/test_feature_kline_download_chain.py	0	4	============================== 6 passed in 0.64s ===============================	-
+tests/api/test_feature_toggle_routes.py	0	5	============================== 7 passed in 1.87s ===============================	-
+tests/api/test_ff_progress_normalize.py	0	4	============================== 11 passed in 0.58s ==============================	-
+tests/api/test_gap3_contract_csv_guard.py	0	4	============================== 8 passed in 1.01s ===============================	-
+tests/api/test_gap3_contract_reason_registry.py	0	4	============================== 18 passed in 0.95s ==============================	-
+tests/api/test_gap3_csv_import.py	0	7	============================== 15 passed in 3.83s ==============================	-
+tests/api/test_gap3_csv_provenance.py	0	5	============================== 10 passed in 1.97s ==============================	-
+tests/api/test_gap3_csv_ragged_rows.py	0	5	============================== 15 passed in 1.99s ==============================	-
+tests/api/test_gap3_csv_roundtrip.py	0	5	============================== 6 passed in 1.95s ===============================	-
+tests/api/test_gap3_declaration_mandatory.py	0	5	============================== 19 passed in 2.06s ==============================	-
+tests/api/test_gap3_event_analysis_horizon_purge.py	1	6	========================= 6 failed, 21 passed in 2.42s =========================	tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly,tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once,tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed,tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud,tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_timeframe_seconds_identity,tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values
+tests/api/test_gap3_event_batch_detail_dims.py	0	5	============================== 10 passed in 1.88s ==============================	-
+tests/api/test_gap3_event_delete.py	0	6	============================== 15 passed in 2.01s ==============================	-
+tests/api/test_gap3_feature_coverage_gate.py	0	5	============================== 23 passed in 2.05s ==============================	-
+tests/api/test_gap3_future_column_inventory_drift.py	0	4	============================== 2 passed in 0.98s ===============================	-
+tests/api/test_gap3_heterogeneous_rows.py	0	5	============================== 6 passed in 1.93s ===============================	-
+tests/api/test_gap3_horizon_declaration.py	0	5	============================== 10 passed in 1.96s ==============================	-

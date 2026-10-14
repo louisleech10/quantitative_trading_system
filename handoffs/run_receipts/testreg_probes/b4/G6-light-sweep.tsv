@@ -1,0 +1,53 @@
+path	rc	seconds	summary	failed_nodeids
+tests/api/test_gap3_ic_event_label_defaults.py	0	5	============================== 30 passed in 1.42s ==============================	-
+tests/api/test_gap3_ic_feature_cap.py	1	4	========================= 1 failed, 3 passed in 1.30s ==========================	tests/api/test_gap3_ic_feature_cap.py::test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract
+tests/api/test_gap3_ic_progress_fields.py	0	6	============================== 5 passed in 2.30s ===============================	-
+tests/api/test_gap3_ic_stop_gate.py	1	6	========================= 7 failed, 23 passed in 2.61s =========================	[,[,[,[,[,[,tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_rejects_big_run_without_creating_task,tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded,tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_covers_cross_sectional_runs,tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file,tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot,tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action,tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_stop_gate_alive_no_big_matrix_loaded
+tests/api/test_gap3_import.py	0	6	============================== 16 passed in 2.51s ==============================	-
+tests/api/test_gap3_lookahead_declaration.py	0	6	============================== 11 passed in 2.29s ==============================	-
+tests/api/test_gap3_lookahead_depth.py	0	6	============================== 9 passed in 2.01s ===============================	-
+tests/api/test_gap3_oos_downgrade.py	0	7	============================== 43 passed in 1.26s ==============================	-
+tests/api/test_gap3_random_control.py	0	6	============================== 27 passed in 2.86s ==============================	-
+tests/api/test_gap3_scan_grid.py	1	5	========================= 7 failed, 12 passed in 1.88s =========================	[,[,[,[,[,[,[,tests/api/test_gap3_scan_grid.py::test_scan_grid_shape_is_exactly_nine_cells,tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_has_its_own_receipt_hash,tests/api/test_gap3_scan_grid.py::test_scan_grid_infeasible_cell_is_unavailable_without_killing_others,tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_timeout_keeps_partial_results,tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_gets_its_own_analyzer,tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_receives_its_own_embargo_override,tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_summary_is_populated_from_real_shape
+tests/api/test_gap3_source_digest.py	0	5	============================== 18 passed in 2.02s ==============================	-
+tests/api/test_gap3_source_json_hint.py	0	6	============================== 10 passed in 2.18s ==============================	-
+tests/api/test_gap3_t0_unit_detect.py	0	5	============================== 7 passed in 2.08s ===============================	-
+tests/api/test_ic_analysis_api.py	0	20	============================= 12 passed in 14.79s ==============================	-
+tests/api/test_ic_analysis_service.py	1	8	==================== 3 failed, 6 passed, 2 skipped in 4.40s ====================	[,[,[,tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_real_3sym_oracle,tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise,tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_mutation_rangeindex_regresses
+tests/api/test_ic_la1_degraded_gate.py	0	90	======================== 28 passed in 86.49s (0:01:26) =========================	-
+tests/api/test_ic_models.py	0	6	============================== 11 passed in 0.93s ==============================	-
+tests/api/test_ic_response_v2.py	0	46	======================== 7 passed, 1 warning in 42.50s =========================	-
+tests/api/test_ic_run_selector.py	0	5	========================= 4 passed, 3 skipped in 1.45s =========================	-
+tests/api/test_ic_transform_feature_loading.py	0	6	============================== 6 passed in 1.46s ===============================	-
+tests/api/test_icfirstalign_batch_domain.py	0	9	============================== 11 passed in 5.35s ==============================	-
+tests/api/test_ichc_event_timestamps.py	1	46	=================== 1 failed, 6 passed, 2 warnings in 43.08s ===================	tests/api/test_ichc_event_timestamps.py::TestServiceWiringSource::test_service_passes_event_timestamps_kwarg
+tests/api/test_icpostleak_api.py	0	17	======================= 31 passed, 35 warnings in 12.18s =======================	-
+tests/api/test_icresult_paging.py	0	12	============================== 41 passed in 8.32s ==============================	-
+tests/api/test_isolation_disclosure.py	0	25	============================= 10 passed in 21.78s ==============================	-
+tests/api/test_lookahead_rename_attack.py	0	5	============================== 25 passed in 1.10s ==============================	-
+tests/api/test_ml_pipeline_strategy_validation.py	0	6	============================== 9 passed in 2.29s ===============================	-
+tests/api/test_model_api_endpoints.py	0	6	============================== 4 passed in 2.13s ===============================	-
+tests/api/test_model_enhancement_routes.py	0	6	============================== 3 passed in 2.08s ===============================	-
+tests/api/test_model_enhancement_service.py	0	5	============================== 5 passed in 2.02s ===============================	-
+tests/api/test_model_task_cache.py	0	4	============================== 2 passed in 0.57s ===============================	-
+tests/api/test_optimization_output_service.py	0	4	============================== 3 passed in 0.61s ===============================	-
+tests/api/test_period_auto_align.py	0	26	============================== 8 passed in 22.01s ==============================	-
+tests/api/test_phase4_optimization_routes.py	0	6	============================== 10 passed in 2.23s ==============================	-
+tests/api/test_progress_rss_fields.py	0	4	============================== 7 passed in 0.87s ===============================	-
+tests/api/test_ratiounsafe_ic_page.py	0	5	======================== 6 passed, 5 warnings in 2.04s =========================	-
+tests/api/test_scan_cube.py	0	4	============================== 29 passed in 1.08s ==============================	-
+tests/api/test_scan_cube_api.py	0	4	============================== 12 passed in 1.31s ==============================	-
+tests/api/test_single_progress_rss.py	0	4	============================== 3 passed in 0.87s ===============================	-
+tests/api/test_splitunify_disclosure.py	0	29	============================= 28 passed in 24.70s ==============================	-
+tests/api/test_splitunify_event_scan_projection.py	1	8	=================== 1 failed, 15 passed, 23 skipped in 4.35s ===================	tests/api/test_splitunify_event_scan_projection.py::test_required_real_data_present_or_fail_closed
+tests/api/test_splitunify_event_study_only.py	0	8	============================== 8 passed in 4.93s ===============================	-
+tests/api/test_splitunify_ic_disposition_wiring.py	0	4	============================== 1 skipped in 0.57s ==============================	-
+tests/api/test_splitunify_route_shared_resolver.py	0	4	============================== 1 passed in 1.07s ===============================	-
+tests/api/test_stage_progress.py	0	17	============================= 22 passed in 14.29s ==============================	-
+tests/api/test_tfwindow.py	0	81	=================== 9 passed, 1 warning in 76.95s (0:01:16) ====================	-
+tests/api/test_tier_api.py	0	4	============================== 4 passed in 0.59s ===============================	-
+tests/api/test_warmup_warning.py	0	5	============================== 7 passed in 1.46s ===============================	-
+tests/api/test_watchlist_routes.py	0	5	============================== 2 passed in 2.03s ===============================	-
+tests/api/test_worker_logging.py	0	6	============================== 13 passed in 2.36s ==============================	-
+tests/api/test_xgboost_sequence_features.py	0	4	============================== 3 passed in 1.13s ===============================	-
+tests/api/test_xgboost_training_gate.py	0	4	============================== 1 passed in 0.57s ===============================	-
