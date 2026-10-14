@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_extractor.py b/momentum/FeatureEngineering/feature_extractor.py
+index 6c3bb757..73a971d3 100644
+--- a/momentum/FeatureEngineering/feature_extractor.py
++++ b/momentum/FeatureEngineering/feature_extractor.py
+@@ -162,7 +162,7 @@ class FeatureExtractor:
+ 
+         # 移除不必要的原始欄位，只保留特徵
+         keep_columns = ['timestamp'] + feature_names
+-        features_df = features_df[keep_columns]
++        features_df = features_df[[k for k in keep_columns if not k.endswith('_value')]]
+         
+         self.logger.info(f"特徵提取完成 - 總共 {len(feature_names)} 個特徵")
+         

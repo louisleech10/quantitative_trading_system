@@ -1,0 +1,12 @@
+{"path": "tests/feature_engineering/atomic/test_handcoded_reference.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+ "mutants": [
+  {"id": "m2_vf_no_abs", "file": "momentum/FeatureEngineering/atomic/volume_indicators.py",
+   "old": "        vf = volume.values * np.abs(2.0 * (dm / cm - 1.0)) * trend * 100.0\n",
+   "new": "        vf = volume.values * (2.0 * (dm / cm - 1.0)) * trend * 100.0\n"},
+  {"id": "m2_trend_lookahead", "file": "momentum/FeatureEngineering/atomic/volume_indicators.py",
+   "old": "        trend = np.where(hlc > np.roll(hlc, 1), 1.0, -1.0)\n",
+   "new": "        trend = np.where(np.roll(hlc, -1) > hlc, 1.0, -1.0)\n"},
+  {"id": "m2_slow_window_wrong", "file": "momentum/FeatureEngineering/atomic/volume_indicators.py",
+   "old": "        ema_slow = talib.EMA(vf.astype(float), timeperiod=slow)\n",
+   "new": "        ema_slow = talib.EMA(vf.astype(float), timeperiod=slow + 34)\n"}]}

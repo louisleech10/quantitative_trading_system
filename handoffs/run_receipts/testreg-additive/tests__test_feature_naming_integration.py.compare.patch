@@ -1,58 +1,37 @@
 diff --git a/tests/test_feature_naming_integration.py b/tests/test_feature_naming_integration.py
-index 8e8df872..c031dd0f 100644
+index c031dd0f..acfc967a 100644
 --- a/tests/test_feature_naming_integration.py
 +++ b/tests/test_feature_naming_integration.py
-@@ -193,6 +193,54 @@ def test_different_params_same_indicator():
-     
-     return len(collision) == 0
+@@ -241,6 +241,33 @@ def test_strategy_names_across_sources_share_only_source_independent_columns():
+     for n in shared:
+         np.testing.assert_array_equal(out_ca[n].to_numpy(), out_va[n].to_numpy())
  
 +
-+def test_close_source_expected_feature_names():
-+    """純增：上列四支只印出比對結果或 return 布林（pytest 只警告、永不失敗）；本組逐一斷言。CLOSE 數據源之 EMA(5,20,60)
-+    特徵名含上列 test_close_data_source 所列之預期名。"""
++def test_close_source_expected_names_are_returned_columns():
++    """純增（審碼 r2 CODEX-R2-P2-02）：上列 test_close_source_expected_feature_names 只驗名稱清單；本案同參數另驗回傳表
++    確含同名欄（名稱清單與資料欄不得脫鉤）。"""
 +    np.random.seed(21)
-+    _df, names = FeatureExtractor().extract_features_from_strategy(
++    df, names = FeatureExtractor().extract_features_from_strategy(
 +        create_mock_kline_data(), StrategyParams(strategy_type='ema_three_line', data_source='close',
 +                                                 params={'ema_short': 5, 'ema_mid': 20, 'ema_long': 60,
 +                                                         'volume_threshold': 0.6}))
 +    expected = {'close_ema5_value', 'close_ema20_value', 'close_ema60_value', 'close_ema5-20_distance',
 +                'close_ema20-60_distance', 'close_ema_trend_aligned', 'close_ema5-20_cross_signal'}
 +    assert expected <= set(names), sorted(expected - set(names))
++    assert expected <= set(df.columns), sorted(expected - set(df.columns))
 +
 +
-+def test_volume_source_expected_feature_names():
-+    """純增：VOLUME 數據源之 EMA(6,15,28) 特徵名含上列 test_volume_data_source 所列之預期名。"""
++def test_volume_source_expected_names_are_returned_columns():
++    """純增（審碼 r2 CODEX-R2-P2-02）：VOLUME 數據源 EMA(6,15,28) 之預期名同時在名稱清單與回傳表之欄中。"""
 +    np.random.seed(22)
-+    _df, names = FeatureExtractor().extract_features_from_strategy(
++    df, names = FeatureExtractor().extract_features_from_strategy(
 +        create_mock_kline_data(), StrategyParams(strategy_type='ema_three_line', data_source='volume',
 +                                                 params={'ema_short': 6, 'ema_mid': 15, 'ema_long': 28,
 +                                                         'volume_threshold': 0.7}))
 +    expected = {'volume_ema6_value', 'volume_ema15_value', 'volume_ema28_value', 'volume_ema6-15_distance',
 +                'volume_ema15-28_distance', 'volume_ema_trend_aligned'}
 +    assert expected <= set(names), sorted(expected - set(names))
-+
-+
-+def test_strategy_names_across_sources_share_only_source_independent_columns():
-+    """純增：不同數據源（close、volume）同參數之策略特徵（不含基礎特徵）間，只有與數據源無關之欄（只依 taker_ratio 與
-+    門檻：volume_spike_*、taker_ratio_distance_*）同名，且兩邊值逐列相等（同值重複、非衝突）——上列 test_no_collision
-+    宣稱「無衝突」但只印出。註：同數據源不同參數時另有多欄同名而值不同（例 close_ema_trend_aligned），屬生產端命名
-+    缺陷、另案處理（handoffs/run_receipts/testreg_probes/b3/task32_triage.md），本案不把該行為寫成預期。"""
-+    np.random.seed(23)
-+    df = create_mock_kline_data()
-+
-+    def run(source, short, mid, long, thr):
-+        return FeatureExtractor().extract_features_from_strategy(
-+            df.copy(), StrategyParams(strategy_type='ema_three_line', data_source=source,
-+                                      params={'ema_short': short, 'ema_mid': mid, 'ema_long': long,
-+                                              'volume_threshold': thr}),
-+            include_basic_features=False)
-+    out_ca, close_a = run('close', 5, 20, 60, 0.6)
-+    out_va, volume_a = run('volume', 5, 20, 60, 0.6)
-+    assert close_a and volume_a
-+    shared = sorted(set(close_a) & set(volume_a))
-+    assert all(n.startswith(('volume_spike_', 'taker_ratio_distance_')) for n in shared), shared
-+    for n in shared:
-+        np.testing.assert_array_equal(out_ca[n].to_numpy(), out_va[n].to_numpy())
++    assert expected <= set(df.columns), sorted(expected - set(df.columns))
 +
  if __name__ == "__main__":
      print("=" * 70)

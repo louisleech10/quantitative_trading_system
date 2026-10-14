@@ -241,6 +241,33 @@ def test_strategy_names_across_sources_share_only_source_independent_columns():
     for n in shared:
         np.testing.assert_array_equal(out_ca[n].to_numpy(), out_va[n].to_numpy())
 
+
+def test_close_source_expected_names_are_returned_columns():
+    """純增（審碼 r2 CODEX-R2-P2-02）：上列 test_close_source_expected_feature_names 只驗名稱清單；本案同參數另驗回傳表
+    確含同名欄（名稱清單與資料欄不得脫鉤）。"""
+    np.random.seed(21)
+    df, names = FeatureExtractor().extract_features_from_strategy(
+        create_mock_kline_data(), StrategyParams(strategy_type='ema_three_line', data_source='close',
+                                                 params={'ema_short': 5, 'ema_mid': 20, 'ema_long': 60,
+                                                         'volume_threshold': 0.6}))
+    expected = {'close_ema5_value', 'close_ema20_value', 'close_ema60_value', 'close_ema5-20_distance',
+                'close_ema20-60_distance', 'close_ema_trend_aligned', 'close_ema5-20_cross_signal'}
+    assert expected <= set(names), sorted(expected - set(names))
+    assert expected <= set(df.columns), sorted(expected - set(df.columns))
+
+
+def test_volume_source_expected_names_are_returned_columns():
+    """純增（審碼 r2 CODEX-R2-P2-02）：VOLUME 數據源 EMA(6,15,28) 之預期名同時在名稱清單與回傳表之欄中。"""
+    np.random.seed(22)
+    df, names = FeatureExtractor().extract_features_from_strategy(
+        create_mock_kline_data(), StrategyParams(strategy_type='ema_three_line', data_source='volume',
+                                                 params={'ema_short': 6, 'ema_mid': 15, 'ema_long': 28,
+                                                         'volume_threshold': 0.7}))
+    expected = {'volume_ema6_value', 'volume_ema15_value', 'volume_ema28_value', 'volume_ema6-15_distance',
+                'volume_ema15-28_distance', 'volume_ema_trend_aligned'}
+    assert expected <= set(names), sorted(expected - set(names))
+    assert expected <= set(df.columns), sorted(expected - set(df.columns))
+
 if __name__ == "__main__":
     print("=" * 70)
     print("動態特徵命名系統整合測試")

@@ -1,0 +1,21 @@
+{
+ "added": [
+  "tests/feature_engineering/atomic/test_handcoded_reference.py::test_klinger_kvo_matches_independent_oracle_on_real_kline"
+ ],
+ "mutant_failures": {
+  "m2_vf_no_abs": {
+   "test_klinger_vf_worked_example_golden": "failed",
+   "test_klinger_kvo_matches_independent_oracle_on_real_kline": "failed",
+   "test_literature_reference_diff_table_recorded": "failed"
+  },
+  "m2_trend_lookahead": {
+   "test_klinger_vf_worked_example_golden": "failed",
+   "test_klinger_kvo_matches_independent_oracle_on_real_kline": "failed",
+   "test_handcoded_no_lookahead_invariant": "failed"
+  },
+  "m2_slow_window_wrong": {
+   "test_klinger_kvo_matches_independent_oracle_on_real_kline": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__feature_engineering__atomic__test_handcoded_reference.py.json

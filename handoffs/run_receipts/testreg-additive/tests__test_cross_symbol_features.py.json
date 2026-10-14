@@ -1,25 +1,37 @@
 {
  "added_nodeids": [
-  "tests/test_cross_symbol_features.py::test_relative_only_features_invariant_to_price_and_volume_scale"
+  "tests/test_cross_symbol_features.py::test_relative_only_scale_invariance_nonvacuous"
  ],
- "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
- "baseline_session_id": "a8bb39bd-e6d2-4f92-b035-e7b8c8378b70",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r2/synth.md",
+ "baseline_session_id": "e7a1d964-666e-451b-a8ec-553636037d66",
  "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_cross_symbol_features.py.compare.patch",
- "compare_patch_sha256": "9a750dbb4614918fdda5670bb8bfc5172e2cdbba593a7f172f92364b44427ff1",
- "fingerprint": "faecaf70b34da5dc6ce1134a42472add80cc4f9822f62a1b3b738fe042206d15",
- "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "compare_patch_sha256": "1c93e8006cfcf4a7f1dc03613705b0006904cf344fc7c0d572f776a1b5d6fa8f",
+ "fingerprint": "81ed5d9b1057d5f4976d28310d34bb3d8be4cb9a4cf6f5477b48d62694420148",
+ "head": "bd6b50c1da970e7db3dc8aa16dd1231db7583ad6",
  "mutants": [
   {
-   "id": "m_drop_relative_only",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m_drop_relative_only.patch",
-   "patch_sha256": "34db1b3a038c94cead8bcf0e7ffce03839dd695165f1e38ea741471495183eec",
-   "session_id": "27f72ff8-bc69-4c5e-8734-a5649a5975d7"
+   "id": "m2_empty_result",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m2_empty_result.patch",
+   "patch_sha256": "2c9e0e1ca2cd5d253ec6d18307511353cd0c1ecab71f1a31b0dbec8713104856",
+   "session_id": "1140ba19-ab6d-4435-b120-cbf36087d642"
   },
   {
-   "id": "m_dist_unscaled",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m_dist_unscaled.patch",
+   "id": "m2_drop_last_col",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m2_drop_last_col.patch",
+   "patch_sha256": "f0f318b60f95fad04e64b904d3c541c8e03033dc1e44d88fb07fb1edf399e5bf",
+   "session_id": "b6448e72-4a5c-44e0-ba20-fe2e0a193fb8"
+  },
+  {
+   "id": "m2_drop_first_row",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m2_drop_first_row.patch",
+   "patch_sha256": "de9fefa40f5f0b893ef019720248b7b99c49246d06e8149960aac631f0c64dac",
+   "session_id": "47176777-2b7a-455f-a586-58ab6495fc5c"
+  },
+  {
+   "id": "m2_dist_unscaled",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_cross_symbol_features.py/m2_dist_unscaled.patch",
    "patch_sha256": "ada96cd99fb85df54cc27d5ae304d5d8481fbe8096475dfe3fd271fa41313f00",
-   "session_id": "47379c1e-129b-4977-b3b1-7c73f5139edc"
+   "session_id": "5fcd1a5d-4a30-4261-a7cc-dda50f80f333"
   }
  ],
  "path": "tests/test_cross_symbol_features.py"

@@ -1,0 +1,13 @@
+diff --git a/api/services/feature_factory_service.py b/api/services/feature_factory_service.py
+index 8c127556..50f4eeb0 100644
+--- a/api/services/feature_factory_service.py
++++ b/api/services/feature_factory_service.py
+@@ -3762,6 +3762,8 @@ class FeatureFactoryService:
+         config = self._resolve_config(None)
+         config_dict = config.model_dump(by_alias=True)
+ 
++        if threading.current_thread() is not threading.main_thread():
++            raise RuntimeError('mutant: batch_toggle not thread-safe')
+         results = []
+         for toggle in toggles:
+             path = toggle.get("path", "")

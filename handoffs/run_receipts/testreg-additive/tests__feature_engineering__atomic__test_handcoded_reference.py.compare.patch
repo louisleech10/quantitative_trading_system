@@ -1,0 +1,39 @@
+diff --git a/tests/feature_engineering/atomic/test_handcoded_reference.py b/tests/feature_engineering/atomic/test_handcoded_reference.py
+index 17b7a884..f880a182 100644
+--- a/tests/feature_engineering/atomic/test_handcoded_reference.py
++++ b/tests/feature_engineering/atomic/test_handcoded_reference.py
+@@ -116,6 +116,34 @@ def test_klinger_kvo_ema_from_golden_vf() -> None:
+     np.testing.assert_allclose(impl_kvo[mask], expected_kvo[mask], rtol=1e-10, atol=1e-6)
+ 
+ 
++def test_klinger_kvo_matches_independent_oracle_on_real_kline() -> None:
++    """純增：上列 test_klinger_kvo_ema_from_golden_vf 以 8 根 bar 比 EMA34/55（前 54 根必為 NaN）⇒ 比對空陣列、恆過。
++    本案於真實 BTCUSDT 12h（data_cache/feature_klines，≥500 根）以測試內獨立實作之 VF（Stock.Indicators 公式：trend
++    比當根與前一根 H+L+C、cm 同向累加 dm／反轉以前一根 dm＋當根 dm 重置；cm＝0 之 VF 記 0）→ talib EMA34 − EMA55 為
++    oracle，逐列比對 Klinger 計算本體（_compute_klinger；compute_all 另依穩定點遮罩前段，非本案範圍），且兩者皆有值
++    之列數 ≥ 總列數 − 54（只容 EMA55 暖身）。"""
++    from momentum.factories import create_kline_storage_manager
++
++    bars = create_kline_storage_manager(cache_dir="data_cache/feature_klines").read_klines(
++        "BTCUSDT", "12h", validate_continuity=False)
++    engine = VolumeIndicatorEngine({"indicators": []}, ["close"])
++    impl_kvo = engine._compute_klinger(bars).iloc[:, 0].to_numpy(dtype=float)
++    h, lo, c, v = (bars[k].to_numpy(dtype=float) for k in ("high", "low", "close", "volume"))
++    hlc, dm, n = h + lo + c, h - lo, len(h)
++    trend, cm = np.ones(n), np.empty(n)
++    cm[0] = dm[0]
++    for i in range(1, n):
++        trend[i] = 1.0 if hlc[i] > hlc[i - 1] else -1.0
++        cm[i] = cm[i - 1] + dm[i] if trend[i] == trend[i - 1] else dm[i - 1] + dm[i]
++    with np.errstate(divide="ignore", invalid="ignore"):
++        vf = v * np.abs(2.0 * (dm / cm - 1.0)) * trend * 100.0
++    vf = np.where(np.isfinite(vf), vf, 0.0)
++    expected = talib.EMA(vf, timeperiod=34) - talib.EMA(vf, timeperiod=55)
++    mask = ~(np.isnan(impl_kvo) | np.isnan(expected))
++    assert n >= 500 and mask.sum() >= n - 54, (int(mask.sum()), n)
++    np.testing.assert_allclose(impl_kvo[mask], expected[mask], rtol=1e-9, atol=1e-3)
++
++
+ def test_eom_matches_simplified_reference(ohlcv_df) -> None:
+     """EOM 維持 simplified（corr≈1 vs canonical，僅 scale 差）。"""
+     engine = VolumeIndicatorEngine({"indicators": []}, ["close"])

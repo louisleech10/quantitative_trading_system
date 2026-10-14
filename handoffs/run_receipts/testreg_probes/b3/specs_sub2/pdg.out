@@ -1,0 +1,28 @@
+{
+ "added": [
+  "tests/test_phase_d_granular_control.py::TestD1ResultContracts::test_concurrent_toggle_and_schema_return_per_call_results",
+  "tests/test_phase_d_granular_control.py::TestD1ResultContracts::test_explicit_all_enabled_override_matches_default_count"
+ ],
+ "mutant_failures": {
+  "m2_toggle_ignores_value": {
+   "TestD1ResultContracts::test_concurrent_toggle_and_schema_return_per_call_results": "failed"
+  },
+  "m2_toggle_thread_unsafe": {
+   "TestD1ConcurrentConfigWrite::test_concurrent_batch_toggle_no_crash": "failed",
+   "TestD1ConcurrentConfigWrite::test_concurrent_config_read_write_no_corruption": "failed",
+   "TestD1ResultContracts::test_concurrent_toggle_and_schema_return_per_call_results": "failed"
+  },
+  "m2_toggle_returns_stale_config": {
+   "TestD1ResultContracts::test_concurrent_toggle_and_schema_return_per_call_results": "failed"
+  },
+  "m2_merge_appends_lists": {
+   "TestD1EdgeCases::test_edge_case_1_category_enabled_but_all_indicators_disabled": "failed",
+   "TestD1EdgeCases::test_edge_case_only_one_indicator_disabled": "failed",
+   "TestD1DownstreamDependency::test_edge_case_3_rolling_agg_respects_layer1_count": "failed",
+   "TestD1ResultContracts::test_concurrent_toggle_and_schema_return_per_call_results": "failed",
+   "TestD1ResultContracts::test_explicit_all_enabled_override_matches_default_count": "failed",
+   "TestD3EndToEnd::test_e2e_toggle_then_preview_reflects_change": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__test_phase_d_granular_control.py.json

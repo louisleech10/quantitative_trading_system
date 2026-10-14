@@ -219,5 +219,34 @@ def test_relative_only_features_invariant_to_price_and_volume_scale(monkeypatch)
         np.testing.assert_allclose(a[x].to_numpy(float), b[x].to_numpy(float), rtol=1e-8, atol=1e-12, err_msg=x)
 
 
+def test_relative_only_scale_invariance_nonvacuous(monkeypatch):
+    """純增（審碼 r2 CODEX-R2-P2-01）：上列尺度不變性測試在產生器回傳空特徵名時迴圈不執行而過；本案同情境先斷言兩版
+    特徵名非空且相同、每一特徵名皆為兩版回傳表之欄、兩表列數等於輸入根數，再逐欄比對尺度不變性。"""
+    monkeypatch.setenv('PYTEST_CURRENT_TEST', 'neutral')
+    rs = np.random.RandomState(7)
+    n = 100
+    c = 100 * np.exp(np.cumsum(rs.randn(n) * 0.01))
+    o = c * (1 + rs.randn(n) * 0.003)
+    h = np.maximum(o, c) * (1 + np.abs(rs.randn(n)) * 0.004)
+    lo = np.minimum(o, c) * (1 - np.abs(rs.randn(n)) * 0.004)
+    v = rs.uniform(800, 1200, n)
+    tr = rs.uniform(0.3, 0.8, n)
+
+    def bars(kp, kv):
+        return pd.DataFrame({'timestamp': pd.date_range('2024-01-01', periods=n, freq='12h'),
+                             'open': o * kp, 'high': h * kp, 'low': lo * kp, 'close': c * kp, 'volume': v * kv,
+                             'taker_buy_volume': v * kv * tr, 'taker_ratio': tr, 'quote_volume': v * kv * c * kp})
+    sp = StrategyParams(strategy_type='ema_three_line', data_source='close',
+                        params={'ema_short': 5, 'ema_mid': 20, 'ema_long': 60, 'volume_threshold': 0.6,
+                                'relative_only': True})
+    a, names = FeatureExtractor().extract_features_from_strategy(bars(1000.0, 1.0), sp)
+    b, names_b = FeatureExtractor().extract_features_from_strategy(bars(1.0, 1000.0), sp)
+    assert names and names == names_b, (names, names_b)
+    assert set(names) <= set(a.columns) and set(names) <= set(b.columns), sorted(set(names) - set(a.columns))
+    assert len(a) == len(b) == n, (len(a), len(b))
+    for x in names:
+        np.testing.assert_allclose(a[x].to_numpy(float), b[x].to_numpy(float), rtol=1e-8, atol=1e-12, err_msg=x)
+
+
 if __name__ == "__main__":
     test_cross_symbol_features()

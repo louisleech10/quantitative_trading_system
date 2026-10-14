@@ -411,6 +411,58 @@ class TestD1ConcurrentConfigWrite:
         assert len(errors) == 0, f"Concurrent read/write errors: {errors}"
 
 
+class TestD1ResultContracts:
+    """純增：上列 D1 併發兩支只斷言「無例外」（batch_toggle 實為無狀態之預覽計算，不寫檔），
+    test_edge_case_all_enabled_matches_default 以空 override 與預設比較（同一呼叫兩次、恆真）。本組斷言其真實契約。"""
+
+    def test_concurrent_toggle_and_schema_return_per_call_results(self, feature_factory_service):
+        """併發之 batch_toggle 每一呼叫回傳之設定反映其自身切換值、預覽等於同值之循序結果；併發 get_schema 等於循序結果；
+        皆無例外。"""
+        svc = feature_factory_service
+        path = "atomic_indicators.trend.indicators.SMA.enabled"
+        ref = {v: svc.batch_toggle([{"path": path, "value": v}])["preview"] for v in (True, False)}
+        schema0 = svc.get_schema()
+        assert ref[True]["total_features"] > ref[False]["total_features"], ref
+        out, schemas, errors = {}, [], []
+
+        def writer(i):
+            try:
+                out[i] = svc.batch_toggle([{"path": path, "value": i % 2 == 0}])
+            except Exception as e:
+                errors.append(f"writer {i}: {e!r}")
+
+        def reader():
+            try:
+                schemas.append(svc.get_schema())
+            except Exception as e:
+                errors.append(f"reader: {e!r}")
+
+        threads = [threading.Thread(target=writer, args=(i,)) for i in range(6)]
+        threads += [threading.Thread(target=reader) for _ in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=60)
+        assert not errors and len(out) == 6 and schemas == [schema0] * 6, (errors, len(out), len(schemas))
+        for i, r in sorted(out.items()):
+            v = i % 2 == 0
+            sma = [x for x in r["config"]["atomic_indicators"]["trend"]["indicators"] if x["name"] == "SMA"]
+            assert [x["enabled"] for x in sma] == [v] and r["preview"] == ref[v], (i, sma, r["preview"], ref[v])
+
+    def test_explicit_all_enabled_override_matches_default_count(self, tmp_path):
+        """以 repo 預設設定（不讀本機 user 設定）為準：對每一含指標清單之類別，明示 override 類別與其每一指標
+        enabled=True（清單整份取代），預覽總特徵數與預設相同（預設即全開）。"""
+        cm = ConfigManager(user_config_path=str(tmp_path / "absent_user_scan_config.yaml"))
+        default = cm.get_merged_config()
+        atomic = default.model_dump(by_alias=True)["atomic_indicators"]
+        override = {"atomic_indicators": {
+            c: {"enabled": True, "indicators": [dict(x, enabled=True) for x in cfg["indicators"]]}
+            for c, cfg in atomic.items() if isinstance(cfg, dict) and cfg.get("indicators")}}
+        explicit = cm.get_merged_config(override)
+        n_exp, n_def = cm.preview_feature_count(explicit).total_features, cm.preview_feature_count(default).total_features
+        assert len(override["atomic_indicators"]) >= 4 and n_exp == n_def, (sorted(override["atomic_indicators"]), n_exp, n_def)
+
+
 # ===========================================================
 # D3: 端對端測試（config → preview → verify）
 # ===========================================================

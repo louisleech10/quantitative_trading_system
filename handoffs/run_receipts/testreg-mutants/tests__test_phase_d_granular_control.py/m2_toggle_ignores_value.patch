@@ -1,0 +1,13 @@
+diff --git a/api/services/feature_factory_service.py b/api/services/feature_factory_service.py
+index 8c127556..ffbb1707 100644
+--- a/api/services/feature_factory_service.py
++++ b/api/services/feature_factory_service.py
+@@ -4170,7 +4170,7 @@ class FeatureFactoryService:
+             i += 1
+ 
+         if isinstance(current, dict):
+-            current[parts[-1]] = value
++            current[parts[-1]] = True
+             return True
+         return False
+ 

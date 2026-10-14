@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/volume_indicators.py b/momentum/FeatureEngineering/atomic/volume_indicators.py
+index f56b0731..d3d5a544 100644
+--- a/momentum/FeatureEngineering/atomic/volume_indicators.py
++++ b/momentum/FeatureEngineering/atomic/volume_indicators.py
+@@ -266,7 +266,7 @@ class VolumeIndicatorEngine:
+         close = data["close"].astype(float)
+         volume = data["volume"].astype(float)
+         hlc = (high + low + close).values
+-        trend = np.where(hlc > np.roll(hlc, 1), 1.0, -1.0)
++        trend = np.where(np.roll(hlc, -1) > hlc, 1.0, -1.0)
+         trend[0] = 1.0
+         dm = (high - low).values
+         cm = self._klinger_cumulative_measurement(dm, trend)

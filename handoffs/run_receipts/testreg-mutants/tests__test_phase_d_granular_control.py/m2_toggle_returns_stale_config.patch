@@ -1,0 +1,13 @@
+diff --git a/api/services/feature_factory_service.py b/api/services/feature_factory_service.py
+index 8c127556..f101e167 100644
+--- a/api/services/feature_factory_service.py
++++ b/api/services/feature_factory_service.py
+@@ -3773,7 +3773,7 @@ class FeatureFactoryService:
+         preview = self._config_manager.preview_feature_count(updated_config)
+         return {
+             "results": results,
+-            "config": updated_config.model_dump(by_alias=True),
++            "config": config.model_dump(by_alias=True),
+             "preview": preview.model_dump(),
+         }
+ 

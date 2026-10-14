@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/config_manager.py b/momentum/FeatureEngineering/config_manager.py
+index ae869ec9..f3c566d5 100644
+--- a/momentum/FeatureEngineering/config_manager.py
++++ b/momentum/FeatureEngineering/config_manager.py
+@@ -476,7 +476,7 @@ class ConfigManager:
+             if isinstance(value, dict) and isinstance(merged.get(key), dict):
+                 merged[key] = self.deep_merge(merged[key], value)
+             else:
+-                merged[key] = copy.deepcopy(value)
++                merged[key] = (merged[key] + copy.deepcopy(value)) if isinstance(value, list) and isinstance(merged.get(key), list) else copy.deepcopy(value)
+         return merged
+ 
+     def _normalize_data_source_aliases(self, config: Dict[str, Any]) -> Dict[str, Any]:

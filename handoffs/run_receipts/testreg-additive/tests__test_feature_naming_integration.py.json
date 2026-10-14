@@ -1,39 +1,26 @@
 {
  "added_nodeids": [
-  "tests/test_feature_naming_integration.py::test_close_source_expected_feature_names",
-  "tests/test_feature_naming_integration.py::test_strategy_names_across_sources_share_only_source_independent_columns",
-  "tests/test_feature_naming_integration.py::test_volume_source_expected_feature_names"
+  "tests/test_feature_naming_integration.py::test_close_source_expected_names_are_returned_columns",
+  "tests/test_feature_naming_integration.py::test_volume_source_expected_names_are_returned_columns"
  ],
- "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
- "baseline_session_id": "93db1c33-ccaf-4bb3-9295-14e3d1f87f96",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r2/synth.md",
+ "baseline_session_id": "66df5732-ba1e-4663-ada1-2eb2cb513de2",
  "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_feature_naming_integration.py.compare.patch",
- "compare_patch_sha256": "d7d632d7e0db33137ec4897e73f02cb3f8342eace242eeaf9d4aafa52b8da1f5",
- "fingerprint": "dd9f93e466a46a2a9f0d4db7d1394b9c5787f66f942c2680b945e930d5374215",
- "head": "b56403182fa35b2b8c20bbce356e73e41466f14a",
+ "compare_patch_sha256": "06fc329b273b404784356d6d8b71af9169fd149c593a340d5dba3488938fddf9",
+ "fingerprint": "ccc6714e9e81a447c7bb71a258565702a22bea34f84650cd3384304158d03dc2",
+ "head": "bd6b50c1da970e7db3dc8aa16dd1231db7583ad6",
  "mutants": [
   {
-   "id": "m_drop_strategy",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_naming_integration.py/m_drop_strategy.patch",
+   "id": "m2_drop_strategy",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_naming_integration.py/m2_drop_strategy.patch",
    "patch_sha256": "f907f7d0c64d4f37abdbeb3a605c550495b159ce35e98d21254793c9129925f4",
-   "session_id": "2a076b79-96af-4fc8-a78e-ff650d880913"
+   "session_id": "958c2d18-4ea5-420a-ba5a-b4eb9b68e06e"
   },
   {
-   "id": "m_spike_source_dep",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_naming_integration.py/m_spike_source_dep.patch",
-   "patch_sha256": "919004a794e994f0d95a74b3e1b1388578a04481939ea4c5f19ec34a70b41f75",
-   "session_id": "24ccfdcf-c7de-4960-a321-ff22507600e0"
-  },
-  {
-   "id": "m_slope_noprefix",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_naming_integration.py/m_slope_noprefix.patch",
-   "patch_sha256": "0946739c491013b6fdad43350973a2685b3a7b2362c43b938dfae169779a6202",
-   "session_id": "de71ae89-7ad7-4c01-97e8-75eefa06def6"
-  },
-  {
-   "id": "m_names_drop_nobasic",
-   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_naming_integration.py/m_names_drop_nobasic.patch",
-   "patch_sha256": "6a4dae25e7ca0bcefc6c8c766d2001a73b931519d1f62270da47019e884571fb",
-   "session_id": "7c9ae1a3-5818-4c74-85bc-10de55e878c6"
+   "id": "m2_drop_value_cols",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_feature_naming_integration.py/m2_drop_value_cols.patch",
+   "patch_sha256": "98d7211639dc6766aeef707e2340ba068d11f510115b47750dba5864519ce631",
+   "session_id": "f07d9464-832a-4d2f-aad1-e58c7c48fbc4"
   }
  ],
  "path": "tests/test_feature_naming_integration.py"

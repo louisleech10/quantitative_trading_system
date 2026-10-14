@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/volume_indicators.py b/momentum/FeatureEngineering/atomic/volume_indicators.py
+index f56b0731..8facf20a 100644
+--- a/momentum/FeatureEngineering/atomic/volume_indicators.py
++++ b/momentum/FeatureEngineering/atomic/volume_indicators.py
+@@ -271,7 +271,7 @@ class VolumeIndicatorEngine:
+         dm = (high - low).values
+         cm = self._klinger_cumulative_measurement(dm, trend)
+         cm = np.where(cm == 0, np.nan, cm)
+-        vf = volume.values * np.abs(2.0 * (dm / cm - 1.0)) * trend * 100.0
++        vf = volume.values * (2.0 * (dm / cm - 1.0)) * trend * 100.0
+         vf = np.nan_to_num(vf, nan=0.0, posinf=0.0, neginf=0.0)
+         ema_fast = talib.EMA(vf.astype(float), timeperiod=fast)
+         ema_slow = talib.EMA(vf.astype(float), timeperiod=slow)

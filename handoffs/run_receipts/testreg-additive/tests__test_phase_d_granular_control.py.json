@@ -1,0 +1,39 @@
+{
+ "added_nodeids": [
+  "tests/test_phase_d_granular_control.py::TestD1ResultContracts::test_concurrent_toggle_and_schema_return_per_call_results",
+  "tests/test_phase_d_granular_control.py::TestD1ResultContracts::test_explicit_all_enabled_override_matches_default_count"
+ ],
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "baseline_session_id": "47e74e00-71ac-4d8f-9990-c04d0645d6ab",
+ "compare_patch_path": "handoffs/run_receipts/testreg-additive/tests__test_phase_d_granular_control.py.compare.patch",
+ "compare_patch_sha256": "5fd69821642317c49d2d0116b8d55d334142968088e2865952944da94af26296",
+ "fingerprint": "afe8f2dbb1e212a6be1995efe1d008825b0364bacdddd56c41b2e1ee6e1e1e49",
+ "head": "bd6b50c1da970e7db3dc8aa16dd1231db7583ad6",
+ "mutants": [
+  {
+   "id": "m2_toggle_ignores_value",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase_d_granular_control.py/m2_toggle_ignores_value.patch",
+   "patch_sha256": "0140ea92760dd64058301bcd1f1228c2c7f78304f10974a446c8b31f82df5906",
+   "session_id": "512c9913-4a72-47bd-9998-32ce2fa74d43"
+  },
+  {
+   "id": "m2_toggle_thread_unsafe",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase_d_granular_control.py/m2_toggle_thread_unsafe.patch",
+   "patch_sha256": "3da2fc1d2a887bc714805da99cf5b106d7408b3cd48ac9886357063799fd27f5",
+   "session_id": "b85e83e4-fe8a-441e-9e27-614fd3e38b22"
+  },
+  {
+   "id": "m2_toggle_returns_stale_config",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase_d_granular_control.py/m2_toggle_returns_stale_config.patch",
+   "patch_sha256": "e36c7cc6089e228c8c6c5f71168fcc5541cd58591f55cd0fb8ddd120ec75fe15",
+   "session_id": "cd2ba39e-b064-4acb-9169-af2e0706808b"
+  },
+  {
+   "id": "m2_merge_appends_lists",
+   "patch_path": "handoffs/run_receipts/testreg-mutants/tests__test_phase_d_granular_control.py/m2_merge_appends_lists.patch",
+   "patch_sha256": "21eaa594de1cb1c49b9d393cb976713b518e404dddb4886125f4a2085c149490",
+   "session_id": "8f0c83bf-8f9c-48d6-ac7f-abf5e428f29a"
+  }
+ ],
+ "path": "tests/test_phase_d_granular_control.py"
+}

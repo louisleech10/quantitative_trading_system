@@ -1,0 +1,8 @@
+{"path": "tests/test_feature_naming_integration.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r2/synth.md",
+ "mutants": [
+  {"id": "m2_drop_strategy", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "            feature_names.extend(strategy_features)\n", "new": "            pass\n"},
+  {"id": "m2_drop_value_cols", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        features_df = features_df[keep_columns]\n",
+   "new": "        features_df = features_df[[k for k in keep_columns if not k.endswith('_value')]]\n"}]}

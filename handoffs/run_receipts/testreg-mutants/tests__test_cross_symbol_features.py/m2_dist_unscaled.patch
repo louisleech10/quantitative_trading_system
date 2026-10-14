@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/indicators/ema_extractor.py b/momentum/FeatureEngineering/indicators/ema_extractor.py
+index 83897dd8..6d928c1a 100644
+--- a/momentum/FeatureEngineering/indicators/ema_extractor.py
++++ b/momentum/FeatureEngineering/indicators/ema_extractor.py
+@@ -121,7 +121,7 @@ class EMAExtractor(BaseStrategyExtractor):
+         # 1. 價格與 EMA(short) 距離（百分比）
+         price_ema_short_dist_col = f"{data_source}_price_ema_short_distance_pct"
+         df[price_ema_short_dist_col] = (
+-            (df[data_source] - df[ema_short_col]) / (df[ema_short_col] + 1e-10)
++            (df[data_source] - df[ema_short_col])
+         )
+         feature_names.append(price_ema_short_dist_col)
+         

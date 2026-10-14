@@ -1,0 +1,19 @@
+{
+ "added": [
+  "tests/test_feature_naming_integration.py::test_close_source_expected_names_are_returned_columns",
+  "tests/test_feature_naming_integration.py::test_volume_source_expected_names_are_returned_columns"
+ ],
+ "mutant_failures": {
+  "m2_drop_strategy": {
+   "test_close_source_expected_feature_names": "failed",
+   "test_volume_source_expected_feature_names": "failed",
+   "test_close_source_expected_names_are_returned_columns": "failed",
+   "test_volume_source_expected_names_are_returned_columns": "failed"
+  },
+  "m2_drop_value_cols": {
+   "test_close_source_expected_names_are_returned_columns": "failed",
+   "test_volume_source_expected_names_are_returned_columns": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__test_feature_naming_integration.py.json

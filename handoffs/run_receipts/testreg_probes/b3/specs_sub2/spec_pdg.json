@@ -1,0 +1,15 @@
+{"path": "tests/test_phase_d_granular_control.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+ "mutants": [
+  {"id": "m2_toggle_ignores_value", "file": "api/services/feature_factory_service.py",
+   "old": "            current[parts[-1]] = value\n",
+   "new": "            current[parts[-1]] = True\n"},
+  {"id": "m2_toggle_thread_unsafe", "file": "api/services/feature_factory_service.py",
+   "old": "        results = []\n        for toggle in toggles:\n",
+   "new": "        if threading.current_thread() is not threading.main_thread():\n            raise RuntimeError('mutant: batch_toggle not thread-safe')\n        results = []\n        for toggle in toggles:\n"},
+  {"id": "m2_toggle_returns_stale_config", "file": "api/services/feature_factory_service.py",
+   "old": "            \"config\": updated_config.model_dump(by_alias=True),\n",
+   "new": "            \"config\": config.model_dump(by_alias=True),\n"},
+  {"id": "m2_merge_appends_lists", "file": "momentum/FeatureEngineering/config_manager.py",
+   "old": "                merged[key] = copy.deepcopy(value)\n",
+   "new": "                merged[key] = (merged[key] + copy.deepcopy(value)) if isinstance(value, list) and isinstance(merged.get(key), list) else copy.deepcopy(value)\n"}]}

@@ -1,0 +1,22 @@
+{
+ "added": [
+  "tests/test_cross_symbol_features.py::test_relative_only_scale_invariance_nonvacuous"
+ ],
+ "mutant_failures": {
+  "m2_empty_result": {
+   "test_relative_only_scale_invariance_nonvacuous": "failed"
+  },
+  "m2_drop_last_col": {
+   "test_relative_only_features_invariant_to_price_and_volume_scale": "failed",
+   "test_relative_only_scale_invariance_nonvacuous": "failed"
+  },
+  "m2_drop_first_row": {
+   "test_relative_only_scale_invariance_nonvacuous": "failed"
+  },
+  "m2_dist_unscaled": {
+   "test_relative_only_features_invariant_to_price_and_volume_scale": "failed",
+   "test_relative_only_scale_invariance_nonvacuous": "failed"
+  }
+ }
+}
+OK receipt=handoffs/run_receipts/testreg-additive/tests__test_cross_symbol_features.py.json

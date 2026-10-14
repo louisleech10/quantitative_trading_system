@@ -1,0 +1,15 @@
+{"path": "tests/test_cross_symbol_features.py",
+ "approval_ref": "handoffs/reconcile/20261010-testreg-b3-review-r2/synth.md",
+ "mutants": [
+  {"id": "m2_empty_result", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        return FeatureExtractionResult(features_df=features_df, feature_names=feature_names)\n",
+   "new": "        return FeatureExtractionResult(features_df=features_df[['timestamp']], feature_names=[])\n"},
+  {"id": "m2_drop_last_col", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        features_df = features_df[keep_columns]\n",
+   "new": "        features_df = features_df[keep_columns[:-1]]\n"},
+  {"id": "m2_drop_first_row", "file": "momentum/FeatureEngineering/feature_extractor.py",
+   "old": "        features_df = features_df[keep_columns]\n",
+   "new": "        features_df = features_df[keep_columns].iloc[1:]\n"},
+  {"id": "m2_dist_unscaled", "file": "momentum/FeatureEngineering/indicators/ema_extractor.py",
+   "old": "            (df[data_source] - df[ema_short_col]) / (df[ema_short_col] + 1e-10)\n",
+   "new": "            (df[data_source] - df[ema_short_col])\n"}]}

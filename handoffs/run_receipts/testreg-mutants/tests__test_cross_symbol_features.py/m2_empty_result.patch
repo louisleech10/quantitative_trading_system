@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/feature_extractor.py b/momentum/FeatureEngineering/feature_extractor.py
+index 6c3bb757..7971e99c 100644
+--- a/momentum/FeatureEngineering/feature_extractor.py
++++ b/momentum/FeatureEngineering/feature_extractor.py
+@@ -166,7 +166,7 @@ class FeatureExtractor:
+         
+         self.logger.info(f"特徵提取完成 - 總共 {len(feature_names)} 個特徵")
+         
+-        return FeatureExtractionResult(features_df=features_df, feature_names=feature_names)
++        return FeatureExtractionResult(features_df=features_df[['timestamp']], feature_names=[])
+     
+     def extract_price_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+         """

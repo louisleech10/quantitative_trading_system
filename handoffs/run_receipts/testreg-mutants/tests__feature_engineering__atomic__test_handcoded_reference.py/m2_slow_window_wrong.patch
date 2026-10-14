@@ -1,0 +1,13 @@
+diff --git a/momentum/FeatureEngineering/atomic/volume_indicators.py b/momentum/FeatureEngineering/atomic/volume_indicators.py
+index f56b0731..9ad489c3 100644
+--- a/momentum/FeatureEngineering/atomic/volume_indicators.py
++++ b/momentum/FeatureEngineering/atomic/volume_indicators.py
+@@ -274,7 +274,7 @@ class VolumeIndicatorEngine:
+         vf = volume.values * np.abs(2.0 * (dm / cm - 1.0)) * trend * 100.0
+         vf = np.nan_to_num(vf, nan=0.0, posinf=0.0, neginf=0.0)
+         ema_fast = talib.EMA(vf.astype(float), timeperiod=fast)
+-        ema_slow = talib.EMA(vf.astype(float), timeperiod=slow)
++        ema_slow = talib.EMA(vf.astype(float), timeperiod=slow + 34)
+         kvo = ema_fast - ema_slow
+         return pd.DataFrame(
+             {f"hlcv_volume_Klinger_{fast}_{slow}": pd.Series(kvo, index=data.index)},

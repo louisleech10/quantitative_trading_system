@@ -1,16 +1,14 @@
 diff --git a/tests/test_cross_symbol_features.py b/tests/test_cross_symbol_features.py
-index e93a716f..dd0e865e 100644
+index dd0e865e..cd4d59c5 100644
 --- a/tests/test_cross_symbol_features.py
 +++ b/tests/test_cross_symbol_features.py
-@@ -190,5 +190,34 @@ def test_cross_symbol_features():
-     print()
+@@ -219,5 +219,34 @@ def test_relative_only_features_invariant_to_price_and_volume_scale(monkeypatch)
+         np.testing.assert_allclose(a[x].to_numpy(float), b[x].to_numpy(float), rtol=1e-8, atol=1e-12, err_msg=x)
  
  
-+def test_relative_only_features_invariant_to_price_and_volume_scale(monkeypatch):
-+    """純增：上列 test_cross_symbol_features 之「無絕對值特徵」成立，只因生產端 _should_filter_absolute_features 見
-+    PYTEST_CURRENT_TEST 含本檔名即自動過濾（生產環境預設不過濾；此以測試名改變生產行為之缺陷另案登記），其「範圍相似」
-+    只印出不斷言。本案先中性化 PYTEST_CURRENT_TEST，測真實契約：relative_only=True 時不出 *_value 特徵，且同一走勢之
-+    「價格×1000」與「成交量×1000」兩版本之每一特徵逐列相等（相對特徵之尺度不變性）。"""
++def test_relative_only_scale_invariance_nonvacuous(monkeypatch):
++    """純增（審碼 r2 CODEX-R2-P2-01）：上列尺度不變性測試在產生器回傳空特徵名時迴圈不執行而過；本案同情境先斷言兩版
++    特徵名非空且相同、每一特徵名皆為兩版回傳表之欄、兩表列數等於輸入根數，再逐欄比對尺度不變性。"""
 +    monkeypatch.setenv('PYTEST_CURRENT_TEST', 'neutral')
 +    rs = np.random.RandomState(7)
 +    n = 100
@@ -29,8 +27,10 @@ index e93a716f..dd0e865e 100644
 +                        params={'ema_short': 5, 'ema_mid': 20, 'ema_long': 60, 'volume_threshold': 0.6,
 +                                'relative_only': True})
 +    a, names = FeatureExtractor().extract_features_from_strategy(bars(1000.0, 1.0), sp)
-+    b, _ = FeatureExtractor().extract_features_from_strategy(bars(1.0, 1000.0), sp)
-+    assert not [x for x in names if x.endswith('_value')], names
++    b, names_b = FeatureExtractor().extract_features_from_strategy(bars(1.0, 1000.0), sp)
++    assert names and names == names_b, (names, names_b)
++    assert set(names) <= set(a.columns) and set(names) <= set(b.columns), sorted(set(names) - set(a.columns))
++    assert len(a) == len(b) == n, (len(a), len(b))
 +    for x in names:
 +        np.testing.assert_allclose(a[x].to_numpy(float), b[x].to_numpy(float), rtol=1e-8, atol=1e-12, err_msg=x)
 +
