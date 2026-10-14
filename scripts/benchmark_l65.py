@@ -672,7 +672,7 @@ def _run_single_synthetic(
     return _run_l65_transform(
         frame,
         symbol="SYNTHETIC",
-        timeframe="fixture",
+        timeframe="1h",  # 合成資料為每小時頻率（make_synthetic_l65_dataset 之 freq="H"）；FF-STAT 校準長度須由週期換算
         gate_id=gate_id,
         repeat_index=repeat_index,
         layers=layers,
