@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FRAMEPATH 規格 v25（D14）審閱：大機器專用的測試不再在本機跑</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">FRAMEPATH規格v25修正審閱.md</span></nav>
+<main>
+<h1 id="framepath-規格-v25d14審閱大機器專用的測試不再在本機跑">FRAMEPATH 規格 v25（D14）審閱：大機器專用的測試不再在本機跑</h1>
+<blockquote>
+<p><strong>這份是給你審的。</strong> 第二批的關卡把一支「只能在 24GB 以上機器跑」的測試（全鏈截斷不變性完整版）選進來，在這台 8GB 電腦上跑了 8 小時，最後 4 項因記憶體不足被擋下、等於白跑。原因是「本機跑不動」只寫在 ROADMAP 的文字裡，關卡讀不到。
+<strong>程式改了沒：產品程式一行沒動。</strong> 只改關卡的挑選工具、它的驗收測試，並新增一份機器讀得懂的「大機器專用測試清單」。</p>
+</blockquote>
+<hr />
+<h2 id="一改了什麼">一、改了什麼</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>問題</th>
+<th>改成</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>「本機跑不動、換機再跑」只寫在 ROADMAP 文字，工具讀不到</td>
+<td>新增 <code>tests/hardware_requirements.json</code>，列出兩支大機器專用測試（全鏈截斷完整版、多週期截斷完整版）與需要的記憶體（24GB）</td>
+</tr>
+<tr>
+<td>關卡照樣把它們選進來跑</td>
+<td>關卡比對本機記憶體：不夠就不選，收據寫明「歸大機器驗證（RM-FULLSCALE）」；換到 24GB 以上機器就自動照常選入</td>
+</tr>
+<tr>
+<td>本機要驗的東西會不會因此少驗</td>
+<td>不會。本機原本就由「縮小版」代驗同一批缺陷（那支仍照常跑）；完整版本來就排在換機後</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="二沒採用的做法">二、沒採用的做法</h2>
+<ul>
+<li>「已跑完的結果，只要它依賴的檔案沒變就沿用」：業界有人這樣做（例：pytest-testmon），但它判斷依賴時會漏掉資料檔和外部腳本，漏了就會把過期的結果當成通過＝假綠。這裡驗的是量化正確性，不冒這個險。</li>
+</ul>
+<h2 id="三委員審查第-67-輪">三、委員審查（第 67 輪）</h2>
+<ul>
+<li>Composer、Grok：零問題、可進下一步。</li>
+<li>Codex 提一條：「如果清單檔被刪掉，關卡就不會擋任何測試」。<strong>我們不採</strong>：清單檔有被版本控管、現實中不存在被刪的狀況；而且真被刪掉時，關卡第一組（必須全綠）裡有一支測試會要求清單裡一定要有那兩支大機器測試，少了就紅、第二批就提交不了——已經有機器擋住。要改成「缺檔就報錯」得連帶改測試清冊的一堆測試，屬於摳假設細節。蓋章時 Codex 會再看一次這個理由。</li>
+</ul>
+<h2 id="四代價照實說">四、代價（照實說）</h2>
+<ul>
+<li>關卡改了 ⇒ 之前跑完的 70 個檔要重跑。扣掉白跑的 8 小時，那些檔約 <strong>5.6 小時</strong>。</li>
+<li>加上還沒跑的部分（含縮小版截斷測試約 5 小時、校準測試約 1.7 小時等），整個關卡估計還要 <strong>約 14–16 小時</strong>。</li>
+<li>為什麼這麼久：幾支真實資料測試每一項都把整條特徵產線完整跑一次（含「故意改壞程式、確認測試會抓到」的對照組，每組再跑兩次）。內容是對的（抓偷看未來的標準做法），但寫法很重。把它們改成「用短一點的真實資料切片」是測試清冊下一版（v53）已排的項目。</li>
+</ul>
+<h2 id="五你要決定的">五、你要決定的</h2>
+<p>同意 v25（D14）嗎？同意 → 三家蓋章 → 重領第二批許可 → 跑關卡（約 14–16 小時，背景分段、可中斷接續、每 10 分鐘監看）→ 提交第二批。</p>
+<hr />
+<p>維護規則：本票核可後移入 <code>Archived/</code>；不再增修。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/FRAMEPATH規格v25修正審閱.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
