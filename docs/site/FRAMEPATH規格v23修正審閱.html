@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FRAMEPATH 規格 v23（D12）審閱：第二批動工時發現的兩個小洞</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">FRAMEPATH規格v23修正審閱.md</span></nav>
+<main>
+<h1 id="framepath-規格-v23d12審閱第二批動工時發現的兩個小洞">FRAMEPATH 規格 v23（D12）審閱：第二批動工時發現的兩個小洞</h1>
+<blockquote>
+<p><strong>這份是給你審的。</strong> v22 核可、蓋章後，我領了第二批（刪舊特徵 h5 讀寫鏈）的施工許可並把改動做完，自檢時發現兩個「驗收工具本身」的小洞，照規則驗收工具不准私改，所以先回頭修規格。三家審一輪（第 65 輪）全部零問題。
+<strong>程式改了沒：第二批的產品程式改動已經做好，但還沒提交</strong>（存成補丁，等這版核可、重新領許可後才提交）。這版本身只改驗收工具與處置表一條。</p>
+</blockquote>
+<hr />
+<h2 id="一第二批做好了什麼尚未提交">一、第二批做好了什麼（尚未提交）</h2>
+<ul>
+<li>刪掉舊特徵 h5 的寫入、讀取、快取查詢，以及舊版面（V1）的整條寫讀鏈；API 對舊 h5 一律回「已不支援」（新格式照常）。K 線資料檔、案例 h5、IC 匯出 h5 等仍在用的都沒動。</li>
+<li>照處置表改 33 個測試檔、刪 6 個（83 項操作，全部對得上）。</li>
+<li>第一批留下的紅測試之一（NaN 盤點）已修好轉綠。</li>
+<li>驗收：舊 h5 相關的 33 項、CGSA 唯一路徑的 27 項全過，前端 build 通過。特徵輸出「一個位元都不能變」的重型檢查，等重新領許可後在正式關卡裡跑。</li>
+</ul>
+<h2 id="二發現的兩個小洞與改法">二、發現的兩個小洞與改法</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>問題</th>
+<th>改成</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>①</td>
+<td>「這批改了哪些測試要跑」的工具，會先建一份「動工前」的副本來比對紅測試是不是本批造成；它寫死要求副本的產品程式等於本票開工那天的版本。第一批時剛好成立，第二批的起點已含第一批的改動，所以永遠不成立</td>
+<td>拿掉這條寫死的比對；「動工前」就以這批許可記錄的起點為準（原本的其他保護都保留）</td>
+</tr>
+<tr>
+<td>②</td>
+<td>第一批留下的另一支紅測試（CGSA 續跑設定），規格說要改它的假資料，但處置表沒有對應的「改寫」項目，照規則不能手改</td>
+<td>處置表把原本那條「刪一行」的項目換成「改寫」：假資料改成會建立特徵登記表，原本的檢查一項都不少、位置也不動。改後那支測試綠了</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="三測了什麼">三、測了什麼</h2>
+<ul>
+<li>驗收工具自檢（模擬第二批完成）：只剩「待你重新核可、重領許可」和「三個要你刪的暫存檔」造成的紅，其餘全綠。</li>
+<li>測試清冊那組驗收 68 項全過；CGSA 續跑那支 1 項通過（整檔 27 項過）。</li>
+</ul>
+<h2 id="四你要決定的">四、你要決定的</h2>
+<p>同意 v23（D12）嗎？同意 → 三家蓋章 → 重領第二批許可 → 跑「受影響測試」關卡（先估時，超過 2 小時先報你）→ 提交第二批。</p>
+<p>另外仍請你刪除為了領許可暫時放回的檔（第一批已刪的 3 個）與一個暫存檔：
+<code>rm scripts/fix_spec_v1_to_v1_1.py tests/test_multi_tf_golden_equivalence.py tests/test_primary_self_align_skip.py /tmp/x_head</code></p>
+<hr />
+<p>維護規則：本票核可後移入 <code>Archived/</code>；不再增修。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/FRAMEPATH規格v23修正審閱.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
