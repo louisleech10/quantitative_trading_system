@@ -2994,6 +2994,17 @@ def test_mutation_d11_11c_text_apply_uses_rebase_base():
     assert "def helper():" not in plain.decode("utf-8")  # 無 rebase 紀錄 ⇒ 錨點位元組（對照）
 
 
+def test_mutation_affected_gate_d13_external_import_names_not_s2():
+    """SPEC v24 D13：S2 不計自標準庫／第三方匯入之綁定名之刪改；自生產模組（momentum／api／config）匯入、相對匯入、同名
+    另有非匯入綁定者照舊計入。mutation：外部匯入名入 S2（b2 實測選入 8,304 項）⇒ 第一斷言紅；生產匯入名被排除 ⇒ 第二斷言紅。"""
+    g = _affected_gate()
+    body = ast.parse("import numpy as np\nimport time\nfrom pathlib import Path\nfrom momentum.core import config\n"
+                     "from . import sibling\nimport queue\nqueue = None\n").body
+    ext = g._external_import_names(body)
+    assert {"np", "time", "Path"} <= ext and "queue" not in ext
+    assert not ({"config", "sibling"} & ext)
+
+
 def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
     """SPEC v22 D11.12：受影響閘 collect 對無測試函式之檔（pytest rc 5 且輸出含 no tests collected）於 plan 視為空集合
     （不選入、記 empty_collect）；A 組（未給 sink）、匯入錯誤（rc 2）、rc 5 但無該字樣 ⇒ 仍 GateError。以子行程實跑

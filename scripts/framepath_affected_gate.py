@@ -1178,8 +1178,11 @@ def production_changes(repo: Path, anchor: str) -> Tuple[set, set, List[str], Li
             nb, n_other = _bindings(new_body)
             if o_other != n_other:
                 raise GateError(f"{f}{':' + owner if owner else ''} 之非定義、非綁定敘述改變，無法機械判定影響範圍")
-            gone = set(ob) - set(nb)
-            changed_names = {k for k in set(ob) & set(nb) if ob[k] != nb[k]}
+            # SPEC v24 D13：只自非生產模組（標準庫／第三方）匯入之綁定名之增刪改不入 S2——拿掉未用之 `np`／`Path` 等
+            # 匯入不改任何行為，裸名比對卻會命中幾乎全部測試（b2 實測選入 8,304 項）；自生產模組匯入者照舊計入
+            ext = _external_import_names(old_body) | _external_import_names(new_body)
+            gone = (set(ob) - set(nb)) - ext
+            changed_names = {k for k in set(ob) & set(nb) if ob[k] != nb[k]} - ext
             deleted |= gone
             residual |= changed_names
             for q, node in nd.items():
@@ -1223,6 +1226,29 @@ def _bindings(body: Sequence[ast.stmt]) -> Tuple[Dict[str, str], List[str]]:
             continue
         other.append(ast.dump(st))
     return named, other
+
+
+def _external_import_names(body: Sequence[ast.stmt]) -> set:
+    """SPEC v24 D13：本層 Import／ImportFrom 中，來源為非生產模組（絕對匯入且頂層套件不在 PRODUCTION_ROOTS）之本地綁定名；
+    相對匯入與自 momentum／api／config 匯入者不算（照舊入 S2）。同名另有非匯入綁定者亦不算（保守）。"""
+    roots = {r.strip("/").split("/")[0] for r in PRODUCTION_ROOTS}
+    ext, non_ext = set(), set()
+    for st in body:
+        if isinstance(st, ast.Import):
+            for a in st.names:
+                local = a.asname or a.name.split(".")[0]
+                (non_ext if a.name.split(".")[0] in roots else ext).add(local)
+        elif isinstance(st, ast.ImportFrom):
+            top = (st.module or "").split(".")[0]
+            for a in st.names:
+                local = a.asname or a.name
+                (non_ext if st.level or top in roots else ext).add(local)
+        elif isinstance(st, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = st.targets if isinstance(st, ast.Assign) else [st.target]
+            non_ext.update(n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name))
+        elif isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            non_ext.add(st.name)
+    return ext - non_ext
 
 
 def _dangling_refs(repo: Path, deleted: Iterable[str]) -> List[str]:

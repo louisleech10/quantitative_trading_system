@@ -232,7 +232,7 @@
       "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
       "contract_sha256 tests/feature_engineering/test_framepath_invariance.py 268ce549cc47c5bf5dd4088021149d49274b4bba2607d5ae37f8cae620d38d77",
       "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py d89de272a19b08327d27689774e5b186adc012c7085b476d2c19cd4cd380a4a2",
-      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py a04b8fb82a794f1aa13402868b481e7c251b63e9d96ac6cd184a77641e9dc59a",
+      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py 640ac9c5f6d6e7aa83a381922316d09b21d64473839bb8a814045da49e8ded7e",
       "contract_sha256 tests/api/test_framepath_api_h5.py cff7c8e1e2d1f8dbe28c4a1ed789bb940969716dc0def2ed4098b5aeec2df562",
       "contract_sha256 handoffs/run_receipts/20261008-framepath-disposition-view.md 9a94bdbdfcc3b4871701e118aa4274d4d7d7d897f20b28cd0cb6f950b9e4e9f8",
       "contract_sha256 tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/manifest.json 2578303559d26e59ccfd5542fc686a844a5fe375b4191a3264fa5799488c00b5",
@@ -278,7 +278,8 @@
       "審查 r38：manifest 分批文字 b2 改為 Task 2.1–2.8，coverage_risk 之 API 驗收描述同步 v17 boundary_13–21 與 Task 2.8 affected_tests（doc-sync）",
       "審查 r39：V1 版面 fixture 三檔記 contract_sha256，與四支驗收測試同列凍結契約（FROZEN_CONTRACT_FILES：⓪ sha256、實作許可錨點後不得改、首個生產碼提交後不得改），附掏空 fixture 之 mutation",
       "v22 D11（偵察諮詢 r6 收斂）：本票提交以結構化附註辨識（Ticket-Batch root／Governance-Scope 第二 token）；② 只被他票改過之治理檔不比對、本票將動者以 build_disposition.py --rebase 重錨（處置表 rebase 段記 base_commit／foreign_commits）並衝突檢查；⑥ 與 ⑦ 活文件登記表逐本票提交歸屬、⑥ 另准本票白話審閱索引列；⑦ 清冊改生成物完整性檢查；⓪ 凍結次序依核定期（凍結檔於生產碼後之改動須被其後本票實作許可涵蓋、同一提交混改一律紅）；受影響閘 collect 空檔（rc 5＋no tests collected）視為空集合並記 empty_collect；text_apply 對有 rebase 紀錄之檔以基準位元組套用；b2 首步修 b1 遺留兩紅（nan 盤點 receipt 重產、cgsa_resume 替身建 registry）並以 b1 錨點重放受影響閘證兩紅選入（不足 fail-closed 估全跑時數交使用者）",
-      "v23 D12（b2 實作期發現）：受影響閘 verify_anchor_worktree 刪「生產碼同寫死 CODE_ANCHOR 6e07e0ad」一條（b2 起許可錨點含 b1 生產碼、恆拒），錨點碼態由本票最晚實作許可之 round_start_head 界定，保留 HEAD＝許可錨點、工作樹乾淨、被忽略實體輸入不存在；TFD 只增斷言（無 CODE_ANCHOR、verify 不引 PRODUCTION_ROOTS、以真實他提交 6e07e0ad 為錨點 ⇒ 拒）；D11.5 以 add_v17_ops.py 之 replaces 機制把 OP-073（刪 _try_load_cache 打樁之 delete-node）改為同函式之 phase=2 rewrite（替身 fake_prepare 回 ColumnGroupRegistry、HEAD :150／:153 斷言保留、無刪除斷言；與原 delete-node 同函式重疊故取代而非新增），處置表以 build_disposition.py 程序內重產（collect／drift／ignored 取自現行表，未改決策重產與現行表零差異）並 --rebase 補回 test_run_lifecycle_api.py 重錨段，逐項閱讀視圖重產"
+      "v23 D12（b2 實作期發現）：受影響閘 verify_anchor_worktree 刪「生產碼同寫死 CODE_ANCHOR 6e07e0ad」一條（b2 起許可錨點含 b1 生產碼、恆拒），錨點碼態由本票最晚實作許可之 round_start_head 界定，保留 HEAD＝許可錨點、工作樹乾淨、被忽略實體輸入不存在；TFD 只增斷言（無 CODE_ANCHOR、verify 不引 PRODUCTION_ROOTS、以真實他提交 6e07e0ad 為錨點 ⇒ 拒）；D11.5 以 add_v17_ops.py 之 replaces 機制把 OP-073（刪 _try_load_cache 打樁之 delete-node）改為同函式之 phase=2 rewrite（替身 fake_prepare 回 ColumnGroupRegistry、HEAD :150／:153 斷言保留、無刪除斷言；與原 delete-node 同函式重疊故取代而非新增），處置表以 build_disposition.py 程序內重產（collect／drift／ignored 取自現行表，未改決策重產與現行表零差異）並 --rebase 補回 test_run_lifecycle_api.py 重錨段，逐項閱讀視圖重產",
+      "v24 D13（TESTREG 偵察 r19 D-1）：受影響閘 production_changes 之模組層綁定比對排除只自標準庫／第三方匯入之綁定名（_external_import_names；生產模組匯入、相對匯入、同名另有非匯入綁定者照舊入 S2）；b2 模擬選入 8,304→2,685 項，餘 4 慢檔約 14.6 小時待 TESTREG 慢測試物理切片修訂後再跑 b2 關卡；TFD 增 test_mutation_affected_gate_d13_external_import_names_not_s2"
     ],
     "coverage_risk": [
       "Task 1.1：test_framepath_invariance（C1–C9 逐格無容差、C5＝C1、run_status、記憶體閘、C9 前置條件、compare_domain 禁排除鍵與非純量、注入讀數拒跑、比對器無週期／標的字面、兩 mutant）；M1–M4 worktree mutation 收據",
