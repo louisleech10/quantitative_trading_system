@@ -1,0 +1,19 @@
+{
+  "_doc": "本機跑不動之大機器專用測試（RM-FULLSCALE）。受影響閘於機器實體記憶體低於 min_memory_gib 時不選入並記於 plan 收據 hardware_blocked；機器達標則照常選入。新增或移除須同步 docs/ROADMAP.md RM-FULLSCALE 清單。",
+  "entries": [
+    {
+      "path": "tests/feature_engineering/test_ff_fullchain_truncation_mr.py",
+      "ticket": "RM-FULLSCALE",
+      "item": "④",
+      "min_memory_gib": 24,
+      "reason": "全設定全鏈截斷 MR 完整版；8GB 本機兩度 SIGKILL（諮詢 r4）、2026-10-16 b2 受影響閘實跑 8 小時後 4 項生成記憶體預算不足；本機以 test_ff_fullchain_truncation_small_mr.py 代驗具名缺陷"
+    },
+    {
+      "path": "tests/feature_engineering/test_ff_multitf_truncation_mr.py",
+      "ticket": "RM-FULLSCALE",
+      "item": "⑤",
+      "min_memory_gib": 24,
+      "reason": "全設定 1h＋4h＋12h 多週期截斷 MR 完整版；另需 BTCUSDT 1h ≥ 34,302 根真實長歷史（本機 20,352 根）"
+    }
+  ]
+}

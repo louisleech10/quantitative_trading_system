@@ -347,6 +347,49 @@ FP_EXCLUDES = (":(exclude,glob)**/__pycache__/**", ":(exclude,glob)handoffs/**",
 # 被 git 忽略、但測試讀取之資料輸入（審查 r60）：內容入指紋
 DATA_INPUTS = ("data_cache/feature_klines/kline_cache.h5",)
 
+# SPEC v25 D14：大機器專用測試登記（RM-FULLSCALE）；機器實體記憶體低於 min_memory_gib 之檔不選入
+HARDWARE_REQUIREMENTS_REL = "tests/hardware_requirements.json"
+_GIB = 1 << 30
+
+
+def machine_memory_bytes() -> int:
+    """本機實體記憶體位元組（POSIX sysconf；darwin 與 linux 皆可用）。"""
+    return int(os.sysconf("SC_PAGE_SIZE")) * int(os.sysconf("SC_PHYS_PAGES"))
+
+
+def load_hardware_requirements(repo: Path) -> List[Dict[str, object]]:
+    """讀並驗大機器專用測試登記；格式不符、路徑非既有 tests/ 下 test_*.py、ticket 非 RM-FULLSCALE、需求非正整數或
+    路徑重複 ⇒ GateError（fail-closed）。檔案不存在 ⇒ 空清單（不排除任何檔＝全照常選入，偏多跑之安全方向）。"""
+    p = Path(repo) / HARDWARE_REQUIREMENTS_REL
+    if not p.is_file():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        raise GateError(f"{HARDWARE_REQUIREMENTS_REL} 非合法 JSON：{exc}") from exc
+    entries = data.get("entries") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        raise GateError(f"{HARDWARE_REQUIREMENTS_REL} 缺 entries 清單")
+    seen: set = set()
+    for e in entries:
+        path = e.get("path") if isinstance(e, dict) else None
+        mem = e.get("min_memory_gib") if isinstance(e, dict) else None
+        ok = (isinstance(path, str) and re.fullmatch(r"tests/(?:[\w.-]+/)*test_[\w-]+\.py", path)
+              and (Path(repo) / path).is_file() and e.get("ticket") == "RM-FULLSCALE"
+              and isinstance(mem, int) and not isinstance(mem, bool) and mem > 0
+              and isinstance(e.get("reason"), str) and e["reason"].strip() and path not in seen)
+        if not ok:
+            raise GateError(f"{HARDWARE_REQUIREMENTS_REL} 條目不合格式：{e!r}")
+        seen.add(path)
+    return entries
+
+
+def hardware_blocked(entries: Sequence[Mapping[str, object]], memory_bytes: int) -> Dict[str, Dict[str, object]]:
+    """純函式：機器記憶體低於需求之登記檔 → {path: {ticket, item, min_memory_gib, machine_memory_gib}}；達標者不列。"""
+    return {str(e["path"]): {"ticket": e["ticket"], "item": e.get("item"), "min_memory_gib": e["min_memory_gib"],
+                             "machine_memory_gib": round(memory_bytes / _GIB, 1)}
+            for e in entries if memory_bytes < int(e["min_memory_gib"]) * _GIB}
+
 
 def _file_sha(p: Path) -> str:
     """檔案內容 sha256；每次實讀位元組（審查 r61：不以大小／mtime 快取——metadata 可被保留而內容已換）。"""
@@ -1355,6 +1398,7 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
     for rel in (TESTREG_CATALOG_REL, TESTREG_SCHEMA_REL, "scripts/testreg.py"):
         h.update(f"{rel}\0{_sha_file_or_empty(Path(repo) / rel)}\0".encode("utf-8"))
     h.update(b"previously_failed\0" + json.dumps(sorted(previously_failed or [])).encode("utf-8") + b"\0")
+    h.update(f"machine_memory\0{machine_memory_bytes()}\0".encode("utf-8"))  # SPEC v25 D14：選入依機器記憶體
     return h.hexdigest()
 
 
@@ -1589,6 +1633,16 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
             selected.setdefault(nid, [])
             selected[nid] += [f"impact:{r}" for r in reasons]
             skipped.pop(nid, None)
+    # SPEC v25 D14：本機記憶體不足之大機器專用測試（RM-FULLSCALE 登記）不選入；must 落入其中 ⇒ 拒跑
+    blocked = hardware_blocked(load_hardware_requirements(repo), machine_memory_bytes())
+    blocked_must = [n for n in must if n.split("::", 1)[0] in blocked]
+    if blocked_must:
+        raise GateError(f"manifest affected_must 落入本機跑不動之大機器專用測試：{blocked_must}")
+    for path, row in blocked.items():
+        row["nodeids"] = sorted(n for n in selected if n.split("::", 1)[0] == path)
+        for nid in row["nodeids"]:
+            selected.pop(nid)
+            skipped[nid] = f"hardware_blocked:{row['ticket']}"
     baseline = repo / INVARIANCE_BASELINE_REL
     fields = {"testreg_impact": impact, "catalog_sha256": _sha_file_or_empty(repo / TESTREG_CATALOG_REL),
               "previously_failed": list(previously_failed), "tombstone_resolutions": resolutions,
@@ -1604,6 +1658,7 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
                                             previously_failed=previously_failed),
         "extra_files": extra,
         "empty_collect": sorted(set(empty)),
+        "hardware_blocked": blocked,
         "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
         "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,
         **fields,
@@ -1784,7 +1839,8 @@ def main(argv: Sequence[str]) -> int:
                       "align_triggered": sel["align_triggered"], "light_files": sel["light_files"],
                       "invariance_baseline_sha256": sel["invariance_baseline_sha256"],
                       "inputs_digest": sel["inputs_digest"], "admission": adm, "admitted": args.admit is not None,
-                      "empty_collect": sel.get("empty_collect", [])},  # 審查 r63 CODEX-R63-P2-02
+                      "empty_collect": sel.get("empty_collect", []),  # 審查 r63 CODEX-R63-P2-02
+                      "hardware_blocked": sel.get("hardware_blocked", {})},  # SPEC v25 D14
         "residual_defs": sel["residual_defs"], "residual_executed": sorted(hits & set(sel["residual_defs"])),
         "residual_unexecuted": unexecuted,
         "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(a_files),

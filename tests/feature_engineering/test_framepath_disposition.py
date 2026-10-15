@@ -3005,6 +3005,64 @@ def test_mutation_affected_gate_d13_external_import_names_not_s2():
     assert not ({"config", "sibling"} & ext)
 
 
+def test_mutation_affected_gate_d14_hardware_blocked():
+    """SPEC v25 D14：登記於 tests/hardware_requirements.json 之大機器專用測試，機器實體記憶體低於需求即不選入、達標即選入。
+    mutation：不比對記憶體（恆排除或恆選入）⇒ 第一或第二斷言紅；登記檔缺兩支 RM-FULLSCALE 完整版 ⇒ 第三斷言紅。"""
+    g = _affected_gate()
+    entries = g.load_hardware_requirements(REPO)
+    gib = 1 << 30
+    low = g.hardware_blocked(entries, 8 * gib)
+    assert set(low) == {e["path"] for e in entries} and all(v["ticket"] == "RM-FULLSCALE" for v in low.values())
+    assert g.hardware_blocked(entries, 64 * gib) == {}
+    assert {"tests/feature_engineering/test_ff_fullchain_truncation_mr.py",
+            "tests/feature_engineering/test_ff_multitf_truncation_mr.py"} <= set(low)
+
+
+@pytest.mark.parametrize("bad", [
+    {"path": "tests/feature_engineering/test_no_such_file.py", "ticket": "RM-FULLSCALE", "min_memory_gib": 24, "reason": "x"},
+    {"path": "tests/feature_engineering/test_ff_fullchain_truncation_mr.py", "ticket": "OTHER", "min_memory_gib": 24,
+     "reason": "x"},
+    {"path": "tests/feature_engineering/test_ff_fullchain_truncation_mr.py", "ticket": "RM-FULLSCALE", "min_memory_gib": 0,
+     "reason": "x"},
+    {"path": "tests/feature_engineering/test_ff_fullchain_truncation_mr.py", "ticket": "RM-FULLSCALE",
+     "min_memory_gib": True, "reason": "x"},
+    {"path": "tests/feature_engineering/test_ff_fullchain_truncation_mr.py", "ticket": "RM-FULLSCALE", "min_memory_gib": 24,
+     "reason": " "},
+])
+def test_mutation_affected_gate_d14_registry_fail_closed(tmp_path, bad):
+    """SPEC v25 D14：登記檔條目不合格式（路徑不存在、ticket 非 RM-FULLSCALE、需求非正整數、無理由）⇒ GateError。"""
+    g = _affected_gate()
+    target = tmp_path / "tests/feature_engineering/test_ff_fullchain_truncation_mr.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("", encoding="utf-8")
+    (tmp_path / g.HARDWARE_REQUIREMENTS_REL).write_text(json.dumps({"entries": [bad]}), encoding="utf-8")
+    with pytest.raises(g.GateError):
+        g.load_hardware_requirements(tmp_path)
+
+
+def test_mutation_affected_gate_d14_plan_wiring():
+    """SPEC v25 D14：plan 以本機記憶體套登記、把被擋檔之 nodeid 自 selected 移入 skipped 並記於收據 hardware_blocked，
+    且 inputs_digest 綁機器記憶體。mutation：刪 plan 之套用（或不移出 selected、不記收據、digest 不綁記憶體）⇒ 紅。"""
+    src = (REPO / "scripts/framepath_affected_gate.py").read_text(encoding="utf-8")
+    fns = {n.name: ast.get_source_segment(src, n) for n in ast.parse(src).body if isinstance(n, ast.FunctionDef)}
+    assert "hardware_blocked(load_hardware_requirements(repo), machine_memory_bytes())" in fns["plan"]
+    assert "selected.pop(nid)" in fns["plan"] and '"hardware_blocked": blocked' in fns["plan"]
+    assert "machine_memory_bytes()" in fns["plan_inputs_digest"]
+
+
+def test_mutation_affected_gate_d14_registry_missing_or_duplicate(tmp_path):
+    """SPEC v25 D14：登記檔不存在 ⇒ 空清單（不排除＝全照常選入）；路徑重複 ⇒ GateError。"""
+    g = _affected_gate()
+    assert g.load_hardware_requirements(tmp_path) == []
+    target = tmp_path / "tests/test_x.py"
+    target.parent.mkdir(parents=True)
+    target.write_text("", encoding="utf-8")
+    row = {"path": "tests/test_x.py", "ticket": "RM-FULLSCALE", "min_memory_gib": 24, "reason": "x"}
+    (tmp_path / g.HARDWARE_REQUIREMENTS_REL).write_text(json.dumps({"entries": [row, row]}), encoding="utf-8")
+    with pytest.raises(g.GateError):
+        g.load_hardware_requirements(tmp_path)
+
+
 def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
     """SPEC v22 D11.12：受影響閘 collect 對無測試函式之檔（pytest rc 5 且輸出含 no tests collected）於 plan 視為空集合
     （不選入、記 empty_collect）；A 組（未給 sink）、匯入錯誤（rc 2）、rc 5 但無該字樣 ⇒ 仍 GateError。以子行程實跑
