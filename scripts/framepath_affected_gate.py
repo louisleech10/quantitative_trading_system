@@ -403,6 +403,50 @@ def trace_record(trace_dir: Path, repo: Path) -> Optional[Dict[str, object]]:
             "venv": venv_fingerprint(repo), "tool": _trace_tool_hash(repo), "processes": len(recs)}
 
 
+# r69（GROK-R69-P0-01、CODEX-R69-P1-01、GROK-R69-P1-02）：C 層 I/O（h5py／polars／pyarrow 等）之讀取不經 Python open、
+# 不入 trace ⇒ 沿用改以「呼叫開始時之內容快照 vs 目前」之改動路徑判定：改動須全數屬「未讀之文字類檔」方得沿用；
+# 資料類副檔名、DATA_INPUTS、pytest 設定類檔、測試相關目錄增刪之 .py 一律失效（偏多跑）。
+DATA_SUFFIXES = (".h5", ".hdf5", ".parquet", ".arrow", ".feather", ".npy", ".npz", ".pkl", ".pickle", ".csv", ".tsv",
+                 ".db", ".sqlite", ".zip", ".gz", ".bz2", ".xz", ".bin", ".joblib", ".nc", ".zarr")
+CONFIG_NAMES = frozenset({"conftest.py", "pytest.ini", "setup.cfg", "tox.ini", "pyproject.toml", "sitecustomize.py",
+                          "usercustomize.py"})
+
+
+def snapshot_map(repo: Path) -> Dict[str, str]:
+    """內容快照：已追蹤（工作樹內容；不存在＝<missing>）＋未追蹤未忽略檔（皆扣 FP_EXCLUDES）＋ DATA_INPUTS（鍵 data:<路徑>）。"""
+    rels = set(_git(repo, "ls-files", "--", ".", *FP_EXCLUDES).splitlines())
+    rels |= set(_git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", *FP_EXCLUDES).splitlines())
+    out = {rel: _path_state(Path(repo) / rel) for rel in sorted(p for p in rels if p)}
+    for rel in DATA_INPUTS:
+        out[f"data:{rel}"] = _path_state(Path(repo) / rel)
+    return out
+
+
+def _parent(p: str) -> str:
+    return p.rsplit("/", 1)[0] if "/" in p else ""
+
+
+def changes_reusable(then: Mapping[str, str], now: Mapping[str, str], rec: Mapping[str, object], test_file: str) -> bool:
+    """純函式：快照之間之改動路徑全數可忽略（未讀之文字類檔）⇒ True；見上方規則。"""
+    read = set(dict(rec.get("files") or {}))
+    listed = set(dict(rec.get("dirs") or {}))
+    read_dirs = {_parent(p) for p in read}
+    near, d = {""}, _parent(test_file)  # 測試檔所在目錄及其各上層（conftest／套件探索之範圍）
+    while d:
+        near.add(d)
+        d = _parent(d)
+    for p in set(then) | set(now):
+        if then.get(p) == now.get(p):
+            continue
+        name = p.rsplit("/", 1)[-1]
+        if (p.startswith("data:") or p in read or p.endswith(DATA_SUFFIXES) or name in CONFIG_NAMES
+                or name.endswith(".pth") or _parent(p) in listed):
+            return False
+        if (p in then) != (p in now) and p.endswith(".py") and (_parent(p) in read_dirs or _parent(p) in near):
+            return False
+    return True
+
+
 def trace_valid(rec: Mapping[str, object], repo: Path) -> bool:
     """trace 中每項於目前狀態皆不變（檔內容、目錄項目、venv 套件、記錄工具）。"""
     try:
@@ -643,6 +687,28 @@ class Runner:
             "done": self.done, "total": self.total, "pid": os.getpid(), "updated_at": time.time(),
             "segment_elapsed": round(time.monotonic() - self.start, 1)}, ensure_ascii=False), encoding="utf-8")
 
+    def _snapshot_path(self, ref: str) -> Path:
+        return self.out / "snapshots" / f"{ref}.json"
+
+    def reusable(self, m: Mapping[str, object], key: str, call_id: Optional[str], cwd: Path, test_file: str) -> bool:
+        """SPEC v25 D16（r69 修正）：meta 帶 trace ⇒ trace 必須仍有效，且（state_key 相同，或 call_id 相同且呼叫開始時
+        快照至今之改動全數可忽略〔changes_reusable〕）；meta 無 trace（未記錄、未完成、untraced）⇒ 只依 state_key。"""
+        rec = m.get("trace")
+        if not isinstance(rec, dict):
+            return m.get("state_key") == key
+        if not trace_valid(rec, cwd):
+            return False
+        if m.get("state_key") == key:
+            return True
+        snap = self._snapshot_path(str(m.get("snapshot") or ""))
+        if call_id is None or m.get("call_id") != call_id or not m.get("snapshot") or not snap.is_file():
+            return False
+        try:
+            then = json.loads(snap.read_text(encoding="utf-8"))
+        except ValueError:
+            return False
+        return changes_reusable(then, snapshot_map(cwd), rec, test_file)
+
     def run(self, test_file: str, xml: Path, cwd: Path, env: Mapping[str, str], nodeids: Optional[Sequence[str]],
             extra: Sequence[str], key: str, count_ids: Sequence[str], phase: str = "BC",
             probe_dir: Optional[Path] = None, trace_dir: Optional[Path] = None,
@@ -652,11 +718,9 @@ class Runner:
             # 審查 r57：結果檔或 meta 損毀（中斷於寫入中）一律視為未命中、重跑該呼叫，不得使接續崩潰
             try:
                 m = json.loads(meta.read_text(encoding="utf-8"))
-                # SPEC v25 D16：state_key 相同，或 call_id 相同且該次實際讀到之檔皆未變
-                same = isinstance(m, dict) and m.get("rc") in RUN_RC_OK and (
-                    m.get("state_key") == key or (call_id is not None and m.get("call_id") == call_id
-                                                  and isinstance(m.get("trace"), dict) and trace_valid(m["trace"], cwd)))
-                res = junit_results(xml.read_text(encoding="utf-8"), test_file) if same else None
+                res = junit_results(xml.read_text(encoding="utf-8"), test_file) \
+                    if isinstance(m, dict) and m.get("rc") in RUN_RC_OK and self.reusable(m, key, call_id, cwd, test_file) \
+                    else None
             except (ValueError, ET.ParseError, OSError):
                 res = None
             if res is not None and not set(count_ids) - set(res):
@@ -676,6 +740,15 @@ class Runner:
             for stale in trace_dir.glob("*.json*"):
                 stale.unlink()
         restore_generated(cwd)  # 審查 r58／r59：本次呼叫之工作樹（主或錨點）之清冊先還原
+        snap_ref = None
+        if trace_dir is not None:  # SPEC v25 D16（r69）：呼叫開始時之內容快照，供日後判定改動是否可忽略
+            snap = json.dumps(snapshot_map(cwd), sort_keys=True, ensure_ascii=False)
+            snap_ref = hashlib.sha256(snap.encode("utf-8")).hexdigest()
+            sp = self._snapshot_path(snap_ref)
+            if not sp.is_file():
+                sp.parent.mkdir(parents=True, exist_ok=True)
+                sp.with_suffix(".tmp").write_text(snap, encoding="utf-8")
+                os.replace(sp.with_suffix(".tmp"), sp)
         self.progress(phase, test_file, count_ids)
         t0 = time.monotonic()
         if meta.exists():
@@ -688,7 +761,7 @@ class Runner:
         tmp.write_text(json.dumps({"state_key": key, "rc": rc, "file": test_file,
                                    "seconds": round(time.monotonic() - t0, 1),
                                    "ledger_new": sorted(self._ledger_names() - before),
-                                   "call_id": call_id,  # SPEC v25 D16
+                                   "call_id": call_id, "snapshot": snap_ref,  # SPEC v25 D16
                                    "trace": trace_record(trace_dir, cwd) if trace_dir is not None else None}),
                        encoding="utf-8")
         os.replace(tmp, meta)  # 審查 r57：原子替換

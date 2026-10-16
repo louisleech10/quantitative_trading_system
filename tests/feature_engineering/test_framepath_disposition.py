@@ -3135,6 +3135,39 @@ def test_mutation_affected_gate_d16_trace_valid_only_on_read_inputs(tmp_path):
         assert g.trace_record(trace, repo) is None
 
 
+def _d16_runner_fixture(tmp_path, monkeypatch):
+    g = _affected_gate()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "in.txt").write_text("1", encoding="utf-8")
+    (repo / "doc.md").write_text("1", encoding="utf-8")
+    xml = tmp_path / "out" / "t.xml"
+    xml.parent.mkdir()
+    xml.write_text('<testsuites><testsuite><testcase classname="tests.t" name="test_a"/></testsuite></testsuites>',
+                   encoding="utf-8")
+    snap_of = lambda root: {p.name: g._path_state(p) for p in sorted(root.iterdir())}  # noqa: E731
+    monkeypatch.setattr(g, "snapshot_map", snap_of)
+    monkeypatch.setattr(g, "restore_generated", lambda cwd: None)
+    calls = []
+    monkeypatch.setattr(g, "run_file", lambda *a, **k: (calls.append(1), (0, {"tests/t.py::test_a": {"outcome": "passed"}}))[1])
+    r = g.Runner(tmp_path / "out", None, 1)
+    snap = json.dumps(snap_of(repo), sort_keys=True, ensure_ascii=False)
+    ref = hashlib.sha256(snap.encode("utf-8")).hexdigest()
+    r._snapshot_path(ref).parent.mkdir(parents=True)
+    r._snapshot_path(ref).write_text(snap, encoding="utf-8")
+    trace = {"files": {"in.txt": g._path_state(repo / "in.txt")}, "dirs": {}, "venv": g.venv_fingerprint(repo),
+             "tool": g._trace_tool_hash(repo)}
+
+    def write_meta(state_key="old"):
+        xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": state_key, "rc": 0, "file": "tests/t.py",
+                                                             "call_id": "C", "snapshot": ref, "trace": trace}),
+                                                 encoding="utf-8")
+
+    def run(call_id="C", key="new"):
+        r.run("tests/t.py", xml, repo, {}, None, (), key, ["tests/t.py::test_a"], call_id=call_id)
+    return g, repo, calls, write_meta, run
+
+
 def test_mutation_affected_gate_d16_runner_reuses_by_trace(tmp_path, monkeypatch):
     """SPEC v25 D16：Runner.run——state_key 不同但 call_id 相同且 trace 仍有效 ⇒ 沿用不呼叫 pytest；trace 失效或 call_id
     不同 ⇒ 重跑。mutation：沿用條件不看 trace 或不看 call_id ⇒ 紅。"""
@@ -3148,8 +3181,16 @@ def test_mutation_affected_gate_d16_runner_reuses_by_trace(tmp_path, monkeypatch
                    encoding="utf-8")
     trace = {"files": {"in.txt": g._path_state(repo / "in.txt")}, "dirs": {}, "venv": g.venv_fingerprint(repo),
              "tool": g._trace_tool_hash(repo)}
+    # r69：call_id 枝另須呼叫開始時之快照（其後只改未讀文字檔方可沿用）；本案快照＝目前，改動為空
+    snap_of = lambda root: {p.name: g._path_state(p) for p in sorted(root.iterdir())}  # noqa: E731
+    monkeypatch.setattr(g, "snapshot_map", snap_of)
+    snap = json.dumps(snap_of(repo), sort_keys=True, ensure_ascii=False)
+    ref = hashlib.sha256(snap.encode("utf-8")).hexdigest()
+    (tmp_path / "out" / "snapshots").mkdir()
+    (tmp_path / "out" / "snapshots" / f"{ref}.json").write_text(snap, encoding="utf-8")
+    trace_meta = {"call_id": "C", "trace": trace, "snapshot": ref}
     xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": "old", "rc": 0, "file": "tests/t.py",
-                                                         "call_id": "C", "trace": trace}), encoding="utf-8")
+                                                         **trace_meta}), encoding="utf-8")
     calls = []
     monkeypatch.setattr(g, "restore_generated", lambda cwd: None)
     monkeypatch.setattr(g, "run_file", lambda *a, **k: (calls.append(1), (0, {"tests/t.py::test_a": {"outcome": "passed"}}))[1])
@@ -3159,10 +3200,61 @@ def test_mutation_affected_gate_d16_runner_reuses_by_trace(tmp_path, monkeypatch
     r.run("tests/t.py", xml, repo, {}, None, (), "new", ["tests/t.py::test_a"], call_id="D")
     assert calls == [1]
     xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": "old", "rc": 0, "file": "tests/t.py",
-                                                         "call_id": "C", "trace": trace}), encoding="utf-8")
+                                                         **trace_meta}), encoding="utf-8")
     (repo / "in.txt").write_text("2", encoding="utf-8")
     r.run("tests/t.py", xml, repo, {}, None, (), "new", ["tests/t.py::test_a"], call_id="C")
     assert calls == [1, 1]
+
+
+def test_mutation_affected_gate_d16_r69_unread_text_change_reused(tmp_path, monkeypatch):
+    """r69：call_id 相同、trace 有效、快照至今只改未讀之文字檔（doc.md）⇒ 沿用。mutation：任何改動皆失效 ⇒ 紅。"""
+    g, repo, calls, write_meta, run = _d16_runner_fixture(tmp_path, monkeypatch)
+    write_meta()
+    (repo / "doc.md").write_text("2", encoding="utf-8")
+    run()
+    assert calls == []
+
+
+def test_mutation_affected_gate_d16_r69_state_key_branch_requires_trace(tmp_path, monkeypatch):
+    """r69 CODEX-R69-P1-01／GROK-R69-P1-02：meta 帶 trace 時，state_key 相同亦須 trace 仍有效（handoffs 不入 state_key，
+    讀過之收據改動只由 trace 看見）。mutation：state_key 枝短路不檢 trace ⇒ 紅。"""
+    g, repo, calls, write_meta, run = _d16_runner_fixture(tmp_path, monkeypatch)
+    write_meta(state_key="SAME")
+    (repo / "in.txt").write_text("2", encoding="utf-8")
+    run(key="SAME")
+    assert calls == [1]
+
+
+@pytest.mark.parametrize("path, reusable", [
+    ("docs/x.md", True),                       # 未讀之文字檔
+    ("tests/other/test_y.py", True),           # 未讀之他測試檔內容改動
+    ("data:data_cache/feature_klines/kline_cache.h5", False),  # GROK-R69-P0-01：DATA_INPUTS（h5py 之 C 層讀取不入 trace）
+    ("tests/_golden/x/frame.h5", False),       # 資料類副檔名（C 層讀取可能）
+    ("tests/_golden/x/frame.parquet", False),
+    ("tests/feature_engineering/conftest.py", False),  # pytest 以存在檢查載入
+    ("pytest.ini", False),
+    ("read.json", False),                      # 讀過之檔
+])
+def test_mutation_affected_gate_d16_r69_changes_reusable(path, reusable):
+    """r69：快照至今之改動逐類判定（changes_reusable）。mutation：不判資料類／DATA_INPUTS／設定類 ⇒ 對應案紅。"""
+    g = _affected_gate()
+    rec = {"files": {"read.json": "x"}, "dirs": {}}
+    then = {"read.json": "x"}
+    then[path] = "a"
+    now = dict(then)
+    now[path] = "b"
+    assert g.changes_reusable(then, now, rec, "tests/feature_engineering/test_z.py") is reusable
+
+
+def test_mutation_affected_gate_d16_r69_added_py_near_test_invalidates():
+    """r69：測試檔所在目錄（及上層）或讀過檔之目錄新增／刪除 .py ⇒ 失效（套件探索靠存在檢查）；無關目錄新增 .py ⇒ 可沿用。"""
+    g = _affected_gate()
+    rec = {"files": {"momentum/a/mod.py": "x"}, "dirs": {}}
+    base = {"momentum/a/mod.py": "x"}
+    t = "tests/feature_engineering/test_z.py"
+    assert g.changes_reusable(base, {**base, "tests/feature_engineering/helper_new.py": "n"}, rec, t) is False
+    assert g.changes_reusable(base, {**base, "momentum/a/new.py": "n"}, rec, t) is False
+    assert g.changes_reusable(base, {**base, "scripts/tool_new.py": "n"}, rec, t) is True
 
 
 def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
