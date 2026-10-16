@@ -412,13 +412,26 @@ CONFIG_NAMES = frozenset({"conftest.py", "pytest.ini", "setup.cfg", "tox.ini", "
                           "usercustomize.py"})
 
 
+# r70：被 git 忽略之資料類檔（如 data_cache/kline_cache.h5 經 h5py 讀取）不在已追蹤集合、C 層讀取亦不入 trace ⇒ 全數入快照
+IGNORED_DATA_SUFFIXES = DATA_SUFFIXES + (".json",)
+IGNORED_SKIP_PREFIXES = ("venv/", ".git/", "handoffs/", ".testreg/", ".claude/", ".agent_logs/", ".ruff_cache/",
+                         ".pytest_cache/", ".codex/", ".gstack/", ".antigravitycli/", "node_modules/",
+                         "frontend/node_modules/")
+
+
 def snapshot_map(repo: Path) -> Dict[str, str]:
-    """內容快照：已追蹤（工作樹內容；不存在＝<missing>）＋未追蹤未忽略檔（皆扣 FP_EXCLUDES）＋ DATA_INPUTS（鍵 data:<路徑>）。"""
+    """內容快照：已追蹤（工作樹內容；不存在＝<missing>）＋未追蹤未忽略檔（皆扣 FP_EXCLUDES）＋ DATA_INPUTS（鍵 data:<路徑>）
+    ＋被忽略之資料類檔（IGNORED_DATA_SUFFIXES；扣工具／日誌目錄與 __pycache__；鍵 ign:<路徑>；內容 sha256，實測約 1.3 GB／1.3 秒）。"""
     rels = set(_git(repo, "ls-files", "--", ".", *FP_EXCLUDES).splitlines())
     rels |= set(_git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", *FP_EXCLUDES).splitlines())
     out = {rel: _path_state(Path(repo) / rel) for rel in sorted(p for p in rels if p)}
     for rel in DATA_INPUTS:
         out[f"data:{rel}"] = _path_state(Path(repo) / rel)
+    ignored = _git(repo, "ls-files", "--others", "--ignored", "--exclude-standard", "--", ".").splitlines()
+    for rel in sorted(p for p in ignored if p.endswith(IGNORED_DATA_SUFFIXES) and not p.startswith(IGNORED_SKIP_PREFIXES)
+                      and "/__pycache__/" not in f"/{p}" and f"data:{p}" not in out):
+        # 二進位資料類（C 層讀取可能）以 ign: 鍵 ⇒ 改動一律失效；.json 由 Python 讀取必入 trace ⇒ 以原路徑為鍵，讀過才失效
+        out[f"ign:{rel}" if rel.endswith(DATA_SUFFIXES) else rel] = _path_state(Path(repo) / rel)
     return out
 
 
@@ -439,7 +452,7 @@ def changes_reusable(then: Mapping[str, str], now: Mapping[str, str], rec: Mappi
         if then.get(p) == now.get(p):
             continue
         name = p.rsplit("/", 1)[-1]
-        if (p.startswith("data:") or p in read or p.endswith(DATA_SUFFIXES) or name in CONFIG_NAMES
+        if (p.startswith(("data:", "ign:")) or p in read or p.endswith(DATA_SUFFIXES) or name in CONFIG_NAMES
                 or name.endswith(".pth") or _parent(p) in listed):
             return False
         if (p in then) != (p in now) and p.endswith(".py") and (_parent(p) in read_dirs or _parent(p) in near):

@@ -3234,6 +3234,7 @@ def test_mutation_affected_gate_d16_r69_state_key_branch_requires_trace(tmp_path
     ("tests/feature_engineering/conftest.py", False),  # pytest 以存在檢查載入
     ("pytest.ini", False),
     ("read.json", False),                      # 讀過之檔
+    ("ign:data_cache/kline_cache.h5", False),  # r70 CODEX-R70-P1-01：被忽略之資料類檔（h5py 讀取）
 ])
 def test_mutation_affected_gate_d16_r69_changes_reusable(path, reusable):
     """r69：快照至今之改動逐類判定（changes_reusable）。mutation：不判資料類／DATA_INPUTS／設定類 ⇒ 對應案紅。"""
@@ -3244,6 +3245,31 @@ def test_mutation_affected_gate_d16_r69_changes_reusable(path, reusable):
     now = dict(then)
     now[path] = "b"
     assert g.changes_reusable(then, now, rec, "tests/feature_engineering/test_z.py") is reusable
+
+
+def test_mutation_affected_gate_d16_r70_snapshot_includes_ignored_data(tmp_path):
+    """r70 CODEX-R70-P1-01：snapshot_map 收被 git 忽略之資料類檔（鍵 ign:）並以內容 sha256 記；工具目錄（.codex 等）與
+    非資料類被忽略檔不收；內容改動 ⇒ 快照不同。mutation：不收被忽略資料檔 ⇒ 第一斷言紅。"""
+    g = _affected_gate()
+    repo = tmp_path / "repo"
+    (repo / "data_cache").mkdir(parents=True)
+    (repo / ".codex").mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / ".gitignore").write_text("data_cache/\n.codex/\n*.log\n", encoding="utf-8")
+    (repo / "data_cache" / "kline_cache.h5").write_bytes(b"v1")
+    (repo / ".codex" / "state.json").write_text("{}", encoding="utf-8")
+    (repo / "run.log").write_text("x", encoding="utf-8")
+    snap = g.snapshot_map(repo)
+    assert "ign:data_cache/kline_cache.h5" in snap
+    assert not any(k.startswith("ign:.codex/") or k == "ign:run.log" for k in snap)
+    (repo / "data_cache" / "kline_cache.h5").write_bytes(b"v2")
+    assert g.snapshot_map(repo)["ign:data_cache/kline_cache.h5"] != snap["ign:data_cache/kline_cache.h5"]
+    # 被忽略之 .json（Python 讀取、必入 trace）以原路徑為鍵：屬文字類，讀過才失效
+    (repo / "data_cache" / "registry.json").write_text("{}", encoding="utf-8")
+    snap2 = g.snapshot_map(repo)
+    assert "data_cache/registry.json" in snap2 and "ign:data_cache/registry.json" not in snap2
+    assert g.changes_reusable(snap2, {**snap2, "data_cache/registry.json": "changed"}, {"files": {}, "dirs": {}},
+                              "tests/t/test_x.py") is True
 
 
 def test_mutation_affected_gate_d16_r69_added_py_near_test_invalidates():
