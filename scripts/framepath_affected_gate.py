@@ -1527,6 +1527,12 @@ def out_exclusion(repo: Path, out_dir: Optional[Path]) -> Optional[str]:
     return f":(exclude){rel.as_posix()}/**" if rel.parts else None
 
 
+def default_out_dir(repo: Path, batch: int) -> Path:
+    """SPEC v25 D18：結果目錄預設於 repo 內被 git 忽略之 `.testreg/framepath_gate_b<N>`（重開機不清；原預設系統暫存區
+    於 macOS 開機時清空，2026-10-16 實際因重開機遺失全部已跑結果）。"""
+    return Path(repo) / ".testreg" / f"framepath_gate_b{batch}"
+
+
 def check_out_dir(out_dir: Path, repo: Path) -> None:
     """`--out` 不得為 repo 根或其祖先（排除前綴會吞掉全部未追蹤內容）。"""
     o, r = Path(out_dir).resolve(), Path(repo).resolve()
@@ -1869,7 +1875,7 @@ def current_batch() -> int:
 
 def main(argv: Sequence[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--out", default=None, help="junit 暫存目錄（預設系統暫存下固定名，供接續）")
+    ap.add_argument("--out", default=None, help="結果目錄（預設 .testreg/framepath_gate_b<N>，repo 內被 git 忽略、重開機不清，供接續）")
     ap.add_argument("--anchor-worktree", default=None)
     ap.add_argument("--plan", action="store_true",
                     help="只產出 D8 挑選（選入／未跑逐項理由、估時與 admission）收據，不執行測試本體")
@@ -1883,7 +1889,7 @@ def main(argv: Sequence[str]) -> int:
     batch = current_batch()
     args.phase = BATCH_PHASE[batch]
     args.receipt = str(REPO / f"handoffs/run_receipts/framepath-b{batch}-affected.json")
-    out = Path(args.out or Path(tempfile.gettempdir()) / f"framepath_affected_b{batch}").resolve()
+    out = Path(args.out or default_out_dir(REPO, batch)).resolve()
     check_out_dir(out, REPO)
     anchor = resolve_anchor()
     global _RUNNER

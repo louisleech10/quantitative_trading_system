@@ -3320,6 +3320,17 @@ def test_mutation_affected_gate_d16_r69_added_py_near_test_invalidates():
     assert g.changes_reusable(base, {**base, "scripts/tool_new.py": "n"}, rec, t) is True
 
 
+def test_mutation_affected_gate_d18_default_out_persistent():
+    """SPEC v25 D18：結果目錄預設於 repo 內被 git 忽略之 .testreg/framepath_gate_b<N>（重開機不清）；main 以之為 --out 預設。
+    mutation：預設改回系統暫存區（tempfile.gettempdir）⇒ 第一或第三斷言紅。"""
+    g = _affected_gate()
+    d = g.default_out_dir(REPO, 2)
+    assert d.resolve().is_relative_to(REPO.resolve()) and d.parts[-2:] == (".testreg", "framepath_gate_b2")
+    assert subprocess.run(["git", "check-ignore", "-q", str(d / "x")], cwd=REPO).returncode == 0
+    src = (REPO / "scripts/framepath_affected_gate.py").read_text(encoding="utf-8")
+    assert "Path(args.out or default_out_dir(REPO, batch))" in src and "tempfile.gettempdir()" not in src
+
+
 def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
     """SPEC v22 D11.12：受影響閘 collect 對無測試函式之檔（pytest rc 5 且輸出含 no tests collected）於 plan 視為空集合
     （不選入、記 empty_collect）；A 組（未給 sink）、匯入錯誤（rc 2）、rc 5 但無該字樣 ⇒ 仍 GateError。以子行程實跑
