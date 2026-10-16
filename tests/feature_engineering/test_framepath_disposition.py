@@ -3379,6 +3379,16 @@ def test_mutation_affected_gate_d18_junit_from_ledger_matches_pytest_identity(tm
         assert g.failure_identity(real[nid]) == g.failure_identity(rebuilt[nid]), nid
 
 
+@pytest.mark.parametrize("outcome", ["skipped", "xfailed", "xpassed"])
+def test_mutation_affected_gate_d18_junit_from_ledger_rejects_unreconstructable(outcome):
+    """審查 r74 CODEX-R74-P1-01：紀錄器不存 skip／xfail 原因 ⇒ junit_from_ledger 對 skipped／xfailed／xpassed 拒絕（ValueError），
+    還原程序據以不還原該檔、交閘重跑。mutation：以空訊息輸出 skipped ⇒ 不拋例外 ⇒ 紅。"""
+    g = _affected_gate()
+    with pytest.raises(ValueError):
+        g.junit_from_ledger("tests/t.py", [{"nodeid": "tests/t.py::test_a", "outcome": outcome}])
+    assert "<failure" not in g.junit_from_ledger("tests/t.py", [{"nodeid": "tests/t.py::test_a", "outcome": "passed"}])
+
+
 def test_mutation_affected_gate_d18_untraced_reuse_requires_ignored_inputs_unchanged(tmp_path, monkeypatch):
     """D18（審查 r73 CODEX-R73-P1-02）：無 trace 之沿用／還原結果，state_key 相同仍須被忽略之資料（data:／ign:／ignt:）
     自寫入快照後未變；缺快照 ⇒ 不沿用；一般無 trace 結果（非沿用／還原）照舊只依 state_key。mutation：不檢快照 ⇒ 紅。"""

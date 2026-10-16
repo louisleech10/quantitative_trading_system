@@ -110,7 +110,7 @@ def junit_results(xml_text: str, test_file: str) -> Dict[str, Dict[str, str]]:
 def junit_from_ledger(test_file: str, recs: Sequence[Mapping[str, object]]) -> str:
     """D18：由 TESTREG 紀錄器逐 nodeid 紀錄重建 junit，形狀同 pytest junitxml（`_pytest/junitxml.py`）：call 失敗為
     `<failure message="<型別>: <訊息首行>">`、setup／teardown 失敗為 `<error message='failed on setup with "<型別>: <首行>"'>`、
-    跳過為 `<skipped type="pytest.skip">`；皆不寫 failure／error 之 type 屬性（pytest 不寫）。setup／teardown 例外為多行者，pytest
+    passed 無子節點；skipped／xfailed／xpassed ⇒ ValueError（紀錄器不存原因，審查 r74）；皆不寫 failure／error 之 type 屬性（pytest 不寫）。setup／teardown 例外為多行者，pytest
     首行缺結尾引號而紀錄器只存首行、無從得知 ⇒ 不符、錨點歸屬判本批造成（偏嚴）。訊息首行＝紀錄器
     exception_head（str(例外) 首行、截 300 字；逾 300 字者與 pytest 原文不同 ⇒ 錨點歸屬判本批造成，偏嚴）。"""
     module = test_file[:-3].replace("/", ".")
@@ -130,8 +130,9 @@ def junit_from_ledger(test_file: str, recs: Sequence[Mapping[str, object]]) -> s
             ET.SubElement(case, "error", message=f'failed on {phase} with "{reason}"')
         elif outcome in ("failed", "error"):
             ET.SubElement(case, "failure", message=reason)
-        elif outcome == "skipped":
-            ET.SubElement(case, "skipped", type="pytest.skip", message=head)
+        elif outcome != "passed":
+            # 審查 r74：skipped／xfailed／xpassed 之原因紀錄器不存，無從重建與 pytest 同形之 junit ⇒ 拒絕（呼叫端不還原、閘重跑）
+            raise ValueError(f"{r['nodeid']} outcome={outcome} 無法由紀錄重建")
     root = ET.Element("testsuites", name="pytest tests")
     root.append(suite)
     return ET.tostring(root, encoding="unicode")
