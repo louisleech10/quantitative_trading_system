@@ -330,6 +330,89 @@ def _testreg_schema(repo: Path) -> Dict[str, object]:
 ENV_PREFIXES = tuple(_testreg_schema(REPO)["ledger"]["env_prefixes"])
 
 
+# ── SPEC v25 D16：結果沿用以「該次 pytest 呼叫實際讀到之檔」為準（執行期記錄；業界 pytest-testmon／Bazel 同理）──────
+# 每次 A／B／C 呼叫之子行程環境帶 FRAMEPATH_TRACE_DIR 並把 scripts/framepath_trace_site 置於 PYTHONPATH 首位，
+# 由其 sitecustomize 於每個 Python 行程（含 multiprocessing worker）裝 scripts/framepath_trace.py 之讀取記錄器。
+# 呼叫結束後於 meta 記 trace：讀取之 repo 檔（內容 sha256；不存在亦記）、列舉之 repo 目錄（項目名清單 sha256）、
+# venv 套件清單指紋、記錄工具本身指紋。沿用條件（Runner.run）：state_key 相同（原規則），或 call_id 相同且 trace
+# 中每項於目前狀態皆不變。任一行程未正常結束、有無法追蹤之子行程（非 Python 或環境未帶記錄器）、記錄器例外 ⇒
+# trace＝None（只能依 state_key 沿用，偏多跑）。
+TRACE_SITE_DIR = REPO / "scripts" / "framepath_trace_site"
+TRACE_DIR_ENV = "FRAMEPATH_TRACE_DIR"
+TRACE_TOOL_FILES = ("scripts/framepath_affected_gate.py", "scripts/framepath_trace.py",
+                    "scripts/framepath_trace_site/sitecustomize.py")
+_TRACE_SKIP_PREFIXES = ("venv/", ".git/")
+
+
+def _trace_tool_hash(repo: Path) -> str:
+    """記錄工具指紋：記錄器與 sitecustomize 全文＋閘於測試行程內載入之外掛函式原始碼（閘其餘部分不在測試行程執行）。"""
+    h = hashlib.sha256()
+    for rel in TRACE_TOOL_FILES[1:]:
+        p = Path(repo) / rel
+        h.update(p.read_bytes() if p.is_file() else b"<missing>")
+    gp = Path(repo) / TRACE_TOOL_FILES[0]
+    src = gp.read_text(encoding="utf-8") if gp.is_file() else ""
+    fns = {n.name: ast.get_source_segment(src, n) or "" for n in ast.parse(src).body if isinstance(n, ast.FunctionDef)}
+    for name in ("install_def_probe", "pytest_configure"):
+        h.update(fns.get(name, "").encode("utf-8"))
+    return h.hexdigest()
+
+
+def venv_fingerprint(repo: Path) -> str:
+    """venv 已安裝套件（site-packages 下 *.dist-info 目錄名，含版本）＋ Python 版本。"""
+    names = sorted(p.name for p in (Path(repo) / "venv" / "lib").glob("python*/site-packages/*.dist-info"))
+    return hashlib.sha256(("\n".join(names) + "\n" + sys.version).encode("utf-8")).hexdigest()
+
+
+def _path_state(p: Path) -> str:
+    if p.is_dir():
+        return "<dir>"
+    return _file_sha(p) if p.is_file() else "<missing>"
+
+
+def _listing_state(p: Path) -> str:
+    if not p.is_dir():
+        return "<notdir>"
+    return hashlib.sha256("\n".join(sorted(os.listdir(p))).encode("utf-8")).hexdigest()
+
+
+def _trace_rel(path: str, root: str) -> Optional[str]:
+    if not path.startswith(root):
+        return None
+    rel = path[len(root):]
+    if rel.startswith(_TRACE_SKIP_PREFIXES) or "/__pycache__/" in f"/{rel}" or rel in TRACE_TOOL_FILES:
+        return None
+    return rel
+
+
+def trace_record(trace_dir: Path, repo: Path) -> Optional[Dict[str, object]]:
+    """彙整該次呼叫各行程之讀取記錄；不可沿用之情形回 None（見上方說明）。"""
+    recs = []
+    for p in sorted(Path(trace_dir).glob("*.json")) if Path(trace_dir).is_dir() else []:
+        try:
+            recs.append(json.loads(p.read_text(encoding="utf-8")))
+        except ValueError:
+            return None
+    if not recs or any(not r.get("complete") or r.get("untraced") or r.get("errors") for r in recs):
+        return None
+    root = str(Path(repo).resolve()) + os.sep
+    files = {rel for r in recs for p in r.get("files", []) if (rel := _trace_rel(p, root)) is not None}
+    dirs = {rel for r in recs for p in r.get("dirs", []) if (rel := _trace_rel(p, root)) is not None}
+    return {"files": {rel: _path_state(Path(repo) / rel) for rel in sorted(files)},
+            "dirs": {rel: _listing_state(Path(repo) / rel) for rel in sorted(dirs)},
+            "venv": venv_fingerprint(repo), "tool": _trace_tool_hash(repo), "processes": len(recs)}
+
+
+def trace_valid(rec: Mapping[str, object], repo: Path) -> bool:
+    """trace 中每項於目前狀態皆不變（檔內容、目錄項目、venv 套件、記錄工具）。"""
+    try:
+        return (all(_path_state(Path(repo) / rel) == st for rel, st in dict(rec["files"]).items())
+                and all(_listing_state(Path(repo) / rel) == st for rel, st in dict(rec["dirs"]).items())
+                and rec["venv"] == venv_fingerprint(repo) and rec["tool"] == _trace_tool_hash(repo))
+    except (KeyError, TypeError, ValueError, OSError):
+        return False
+
+
 def env_fingerprint(env: Mapping[str, str]) -> str:
     """有效執行環境（審查 r48）：影響生成／測試之環境變數前綴之鍵值、Python 執行檔與版本。"""
     keys = sorted(k for k in env if k.startswith(ENV_PREFIXES))
@@ -562,14 +645,18 @@ class Runner:
 
     def run(self, test_file: str, xml: Path, cwd: Path, env: Mapping[str, str], nodeids: Optional[Sequence[str]],
             extra: Sequence[str], key: str, count_ids: Sequence[str], phase: str = "BC",
-            probe_dir: Optional[Path] = None) -> Tuple[int, Dict[str, Dict[str, str]]]:
+            probe_dir: Optional[Path] = None, trace_dir: Optional[Path] = None,
+            call_id: Optional[str] = None) -> Tuple[int, Dict[str, Dict[str, str]]]:
         meta = xml.with_suffix(".meta.json")
         if xml.is_file() and meta.is_file():
             # 審查 r57：結果檔或 meta 損毀（中斷於寫入中）一律視為未命中、重跑該呼叫，不得使接續崩潰
             try:
                 m = json.loads(meta.read_text(encoding="utf-8"))
-                res = junit_results(xml.read_text(encoding="utf-8"), test_file) \
-                    if isinstance(m, dict) and m.get("state_key") == key and m.get("rc") in RUN_RC_OK else None
+                # SPEC v25 D16：state_key 相同，或 call_id 相同且該次實際讀到之檔皆未變
+                same = isinstance(m, dict) and m.get("rc") in RUN_RC_OK and (
+                    m.get("state_key") == key or (call_id is not None and m.get("call_id") == call_id
+                                                  and isinstance(m.get("trace"), dict) and trace_valid(m["trace"], cwd)))
+                res = junit_results(xml.read_text(encoding="utf-8"), test_file) if same else None
             except (ValueError, ET.ParseError, OSError):
                 res = None
             if res is not None and not set(count_ids) - set(res):
@@ -584,6 +671,10 @@ class Runner:
             probe_dir.mkdir(parents=True, exist_ok=True)
             for stale in probe_dir.glob("*.json"):
                 stale.unlink()
+        if trace_dir is not None:
+            trace_dir.mkdir(parents=True, exist_ok=True)
+            for stale in trace_dir.glob("*.json*"):
+                stale.unlink()
         restore_generated(cwd)  # 審查 r58／r59：本次呼叫之工作樹（主或錨點）之清冊先還原
         self.progress(phase, test_file, count_ids)
         t0 = time.monotonic()
@@ -596,7 +687,10 @@ class Runner:
         tmp = meta.with_suffix(".tmp")
         tmp.write_text(json.dumps({"state_key": key, "rc": rc, "file": test_file,
                                    "seconds": round(time.monotonic() - t0, 1),
-                                   "ledger_new": sorted(self._ledger_names() - before)}), encoding="utf-8")
+                                   "ledger_new": sorted(self._ledger_names() - before),
+                                   "call_id": call_id,  # SPEC v25 D16
+                                   "trace": trace_record(trace_dir, cwd) if trace_dir is not None else None}),
+                       encoding="utf-8")
         os.replace(tmp, meta)  # 審查 r57：原子替換
         self.done += len(count_ids)
         self.progress(phase, test_file, count_ids, state="finished-call")
@@ -1753,8 +1847,14 @@ def main(argv: Sequence[str]) -> int:
         if fresh:
             for stale in d.glob("*.json"):
                 stale.unlink()
-        return dict(env, PYTHONPATH=f"{REPO}{os.pathsep}{REPO / 'scripts'}", FRAMEPATH_DEF_PROBE_DIR=str(d),
-                    FRAMEPATH_DEF_PROBE_DEFS=",".join(sel["residual_defs"]))
+        return dict(env, PYTHONPATH=f"{TRACE_SITE_DIR}{os.pathsep}{REPO}{os.pathsep}{REPO / 'scripts'}",
+                    FRAMEPATH_DEF_PROBE_DIR=str(d), FRAMEPATH_DEF_PROBE_DEFS=",".join(sel["residual_defs"]),
+                    **{TRACE_DIR_ENV: str(d / "trace")})  # SPEC v25 D16
+
+    def call_id(f: str, ids: Sequence[str], label: str) -> str:
+        """SPEC v25 D16：同一呼叫之身分（檔、nodeid、旗標、phase、組別、有效環境）。"""
+        return hashlib.sha256(json.dumps([f, list(ids), list(PYTEST_FLAGS), list(PROBE_PLUGIN_ARGS), args.phase, label,
+                                          env_fingerprint(env)]).encode("utf-8")).hexdigest()
 
     probe_dirs: List[Path] = []
     for f in a_files:
@@ -1773,7 +1873,8 @@ def main(argv: Sequence[str]) -> int:
             prc, pres = runner.run(f, out / "a_junit" / (f.replace("/", "_") + suffix + ".xml"), REPO,
                                    probe_env(name, False), None if (part is rest and not first) else part,
                                    PROBE_PLUGIN_ARGS, state_key(REPO, f, args.phase, env) + "|" + "|".join(part),
-                                   part, phase="A", probe_dir=probe_root / name)
+                                   part, phase="A", probe_dir=probe_root / name, trace_dir=probe_root / name / "trace",
+                                   call_id=call_id(f, part, "A" + suffix))
             rcs.append(prc)
             res.update(pres)
         rc = max(rcs) if all(r in RUN_RC_OK for r in rcs) else next(r for r in rcs if r not in RUN_RC_OK)
@@ -1802,7 +1903,8 @@ def main(argv: Sequence[str]) -> int:
         probe_dirs.append(probe_root / name)
         rc, res = runner.run(f, out / "junit" / (tag + ".xml"), REPO, probe_env(name, False), None if whole else ids,
                              PROBE_PLUGIN_ARGS, state_key(REPO, f, args.phase, env) + "|" + "|".join(ids), ids,
-                             probe_dir=probe_root / name)
+                             probe_dir=probe_root / name, trace_dir=probe_root / name / "trace",
+                             call_id=call_id(f, ids, "BC"))
         if rc not in RUN_RC_OK or set(ids) - set(res):
             incomplete.append(f)
         # 只計入選入之 nodeid（沿用之舊結果檔可能含整檔結果）；junit 名稱對不上者以 missing 擋下

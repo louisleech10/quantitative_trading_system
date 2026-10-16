@@ -16531,6 +16531,21 @@
    "path": "scripts/framepath_affected_gate.py",
    "phase": 1,
    "task": "1.5"
+  },
+  {
+   "path": "scripts/framepath_trace.py",
+   "phase": 2,
+   "task": "1.5"
+  },
+  {
+   "path": "scripts/framepath_trace_site/sitecustomize.py",
+   "phase": 2,
+   "task": "1.5"
+  },
+  {
+   "path": "tests/hardware_requirements.json",
+   "phase": 2,
+   "task": "1.5"
   }
  ],
  "fact_key_rows": [

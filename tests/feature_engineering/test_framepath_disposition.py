@@ -3063,6 +3063,108 @@ def test_mutation_affected_gate_d14_registry_missing_or_duplicate(tmp_path):
         g.load_hardware_requirements(tmp_path)
 
 
+def _d16_traced_python(tmp_path, code: str, extra_env=None):
+    """以受影響閘同法（PYTHONPATH 首位 framepath_trace_site、FRAMEPATH_TRACE_DIR）跑一段 Python，回 trace 目錄。"""
+    g = _affected_gate()
+    trace = tmp_path / "trace"
+    env = dict(os.environ, PYTHONPATH=f"{g.TRACE_SITE_DIR}{os.pathsep}{REPO}", **{g.TRACE_DIR_ENV: str(trace)})
+    env.update(extra_env or {})
+    subprocess.run([sys.executable, "-c", code], cwd=str(tmp_path), env=env, check=True, capture_output=True)
+    return g, trace
+
+
+def test_mutation_affected_gate_d16_trace_records_reads_children_and_untraced(tmp_path):
+    """SPEC v25 D16：讀取記錄器實跑——父行程讀檔、列目錄、spawn 之 multiprocessing 子行程讀檔皆入 trace；寫入不入；
+    非 Python 子行程 ⇒ untraced ⇒ trace_record 回 None。mutation：記錄器漏子行程或漏 listdir ⇒ 對應斷言紅。"""
+    repo = tmp_path / "repo"
+    (repo / "d").mkdir(parents=True)
+    (repo / "a.txt").write_text("A", encoding="utf-8")
+    (repo / "b.txt").write_text("B", encoding="utf-8")
+    code = textwrap.dedent(f"""
+        import multiprocessing as mp, os
+        def child(p):
+            open(p).read()
+        if __name__ == "__main__":
+            open({str(repo / 'a.txt')!r}).read()
+            os.listdir({str(repo / 'd')!r})
+            open({str(repo / 'w.txt')!r}, "w").write("x")
+            ctx = mp.get_context("spawn")
+            pr = ctx.Process(target=child, args=({str(repo / 'b.txt')!r},)); pr.start(); pr.join()
+    """)
+    trace = tmp_path / "trace"
+    script = tmp_path / "run_trace.py"
+    script.write_text(code, encoding="utf-8")
+    g = _affected_gate()
+    env = dict(os.environ, PYTHONPATH=f"{g.TRACE_SITE_DIR}{os.pathsep}{REPO}", **{g.TRACE_DIR_ENV: str(trace)})
+    subprocess.run([sys.executable, str(script)], cwd=str(tmp_path), env=env, check=True, capture_output=True)
+    rec = g.trace_record(trace, repo)
+    assert rec is not None and rec["processes"] >= 2
+    assert {"a.txt", "b.txt"} <= set(rec["files"]) and "w.txt" not in rec["files"]
+    assert "d" in rec["dirs"]
+    (tmp_path / "x").mkdir()
+    g2, trace2 = _d16_traced_python(tmp_path / "x", "import subprocess; subprocess.run(['true'])")
+    assert g2.trace_record(trace2, repo) is None
+
+
+def test_mutation_affected_gate_d16_trace_valid_only_on_read_inputs(tmp_path):
+    """SPEC v25 D16：trace_valid——未讀之檔改動仍有效；讀過之檔改動、被列目錄新增項目、venv 套件變動皆失效；
+    trace_record 於任一行程未完成或有錯誤時回 None。mutation：trace_valid 恆真／不比對目錄 ⇒ 紅。"""
+    g = _affected_gate()
+    repo = tmp_path / "repo"
+    (repo / "d").mkdir(parents=True)
+    (repo / "read.txt").write_text("1", encoding="utf-8")
+    (repo / "other.txt").write_text("1", encoding="utf-8")
+    trace = tmp_path / "trace"
+    trace.mkdir()
+    root = str(repo.resolve())
+    row = {"pid": 1, "complete": True, "files": [f"{root}/read.txt", f"{root}/venv/x.py", f"{root}/m/__pycache__/a.pyc"],
+           "dirs": [f"{root}/d"], "untraced": [], "errors": 0}
+    (trace / "1.json").write_text(json.dumps(row), encoding="utf-8")
+    rec = g.trace_record(trace, repo)
+    assert set(rec["files"]) == {"read.txt"} and set(rec["dirs"]) == {"d"}
+    assert g.trace_valid(rec, repo)
+    (repo / "other.txt").write_text("2", encoding="utf-8")
+    assert g.trace_valid(rec, repo)
+    (repo / "read.txt").write_text("2", encoding="utf-8")
+    assert not g.trace_valid(rec, repo)
+    (repo / "read.txt").write_text("1", encoding="utf-8")
+    (repo / "d" / "new").write_text("", encoding="utf-8")
+    assert not g.trace_valid(rec, repo)
+    for bad in ({"complete": False}, {"errors": 1}, {"untraced": [{"prog": "bash"}]}):
+        (trace / "1.json").write_text(json.dumps({**row, **bad}), encoding="utf-8")
+        assert g.trace_record(trace, repo) is None
+
+
+def test_mutation_affected_gate_d16_runner_reuses_by_trace(tmp_path, monkeypatch):
+    """SPEC v25 D16：Runner.run——state_key 不同但 call_id 相同且 trace 仍有效 ⇒ 沿用不呼叫 pytest；trace 失效或 call_id
+    不同 ⇒ 重跑。mutation：沿用條件不看 trace 或不看 call_id ⇒ 紅。"""
+    g = _affected_gate()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "in.txt").write_text("1", encoding="utf-8")
+    xml = tmp_path / "out" / "t.xml"
+    xml.parent.mkdir()
+    xml.write_text('<testsuites><testsuite><testcase classname="tests.t" name="test_a"/></testsuite></testsuites>',
+                   encoding="utf-8")
+    trace = {"files": {"in.txt": g._path_state(repo / "in.txt")}, "dirs": {}, "venv": g.venv_fingerprint(repo),
+             "tool": g._trace_tool_hash(repo)}
+    xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": "old", "rc": 0, "file": "tests/t.py",
+                                                         "call_id": "C", "trace": trace}), encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(g, "restore_generated", lambda cwd: None)
+    monkeypatch.setattr(g, "run_file", lambda *a, **k: (calls.append(1), (0, {"tests/t.py::test_a": {"outcome": "passed"}}))[1])
+    r = g.Runner(tmp_path / "out", None, 1)
+    r.run("tests/t.py", xml, repo, {}, None, (), "new", ["tests/t.py::test_a"], call_id="C")
+    assert calls == []
+    r.run("tests/t.py", xml, repo, {}, None, (), "new", ["tests/t.py::test_a"], call_id="D")
+    assert calls == [1]
+    xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": "old", "rc": 0, "file": "tests/t.py",
+                                                         "call_id": "C", "trace": trace}), encoding="utf-8")
+    (repo / "in.txt").write_text("2", encoding="utf-8")
+    r.run("tests/t.py", xml, repo, {}, None, (), "new", ["tests/t.py::test_a"], call_id="C")
+    assert calls == [1, 1]
+
+
 def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
     """SPEC v22 D11.12：受影響閘 collect 對無測試函式之檔（pytest rc 5 且輸出含 no tests collected）於 plan 視為空集合
     （不選入、記 empty_collect）；A 組（未給 sink）、匯入錯誤（rc 2）、rc 5 但無該字樣 ⇒ 仍 GateError。以子行程實跑
