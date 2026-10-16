@@ -107,6 +107,36 @@ def junit_results(xml_text: str, test_file: str) -> Dict[str, Dict[str, str]]:
     return out
 
 
+def junit_from_ledger(test_file: str, recs: Sequence[Mapping[str, object]]) -> str:
+    """D18：由 TESTREG 紀錄器逐 nodeid 紀錄重建 junit，形狀同 pytest junitxml（`_pytest/junitxml.py`）：call 失敗為
+    `<failure message="<型別>: <訊息首行>">`、setup／teardown 失敗為 `<error message='failed on setup with "<型別>: <首行>"'>`、
+    跳過為 `<skipped type="pytest.skip">`；皆不寫 failure／error 之 type 屬性（pytest 不寫）。setup／teardown 例外為多行者，pytest
+    首行缺結尾引號而紀錄器只存首行、無從得知 ⇒ 不符、錨點歸屬判本批造成（偏嚴）。訊息首行＝紀錄器
+    exception_head（str(例外) 首行、截 300 字；逾 300 字者與 pytest 原文不同 ⇒ 錨點歸屬判本批造成，偏嚴）。"""
+    module = test_file[:-3].replace("/", ".")
+    suite = ET.Element("testsuite", name="pytest")
+    for r in recs:
+        parts = str(r["nodeid"]).split("::")
+        case = ET.SubElement(suite, "testcase", classname=".".join([module, *parts[1:-1]]), name=parts[-1],
+                             time=str(r.get("duration_s") or 0))
+        outcome, phase = r.get("outcome"), r.get("phase_failed")
+        etype, head = str(r.get("exception_type") or ""), str(r.get("exception_head") or "")
+        reason = f"{etype}: {head}" if head else etype
+        # pytest ExceptionInfo：AssertionError 之 repr 以 "AssertionError('assert " 起首（訊息不含單引號）⇒ 去
+        # "AssertionError: " 前綴；首行以外之單引號紀錄器不可見 ⇒ 判斷不符時錨點歸屬判本批造成（偏嚴）
+        if etype == "AssertionError" and head.startswith("assert ") and "'" not in head:
+            reason = head
+        if outcome in ("failed", "error") and phase in ("setup", "teardown"):
+            ET.SubElement(case, "error", message=f'failed on {phase} with "{reason}"')
+        elif outcome in ("failed", "error"):
+            ET.SubElement(case, "failure", message=reason)
+        elif outcome == "skipped":
+            ET.SubElement(case, "skipped", type="pytest.skip", message=head)
+    root = ET.Element("testsuites", name="pytest tests")
+    root.append(suite)
+    return ET.tostring(root, encoding="unicode")
+
+
 _MASKS = (
     (re.compile(r"/(?:private/)?(?:var|tmp)/[^\s'\"]+"), "<tmp>"),
     (re.compile(r"0x[0-9a-fA-F]+"), "<hex>"),
@@ -431,7 +461,12 @@ def snapshot_map(repo: Path) -> Dict[str, str]:
     for rel in sorted(p for p in ignored if p.endswith(IGNORED_DATA_SUFFIXES) and not p.startswith(IGNORED_SKIP_PREFIXES)
                       and "/__pycache__/" not in f"/{p}" and f"data:{p}" not in out):
         # 二進位資料類（C 層讀取可能）以 ign: 鍵 ⇒ 改動一律失效；.json 由 Python 讀取必入 trace ⇒ 以原路徑為鍵，讀過才失效
-        out[f"ign:{rel}" if rel.endswith(DATA_SUFFIXES) else rel] = _path_state(Path(repo) / rel)
+        st = _path_state(Path(repo) / rel)
+        if rel.endswith(DATA_SUFFIXES):
+            out[f"ign:{rel}"] = st
+        else:  # .json：原路徑鍵（文字類）＋ ignt: 鍵（供無 trace 結果綁定，D18 審查 r73）
+            out[rel] = st
+            out[f"ignt:{rel}"] = st
     return out
 
 
@@ -448,16 +483,27 @@ def changes_reusable(then: Mapping[str, str], now: Mapping[str, str], rec: Mappi
     while d:
         near.add(d)
         d = _parent(d)
-    for p in set(then) | set(now):
-        if then.get(p) == now.get(p):
+    for key in set(then) | set(now):
+        if then.get(key) == now.get(key):
             continue
+        p = key[len("ignt:"):] if key.startswith("ignt:") else key  # 被忽略之 .json：文字類，以原路徑比對讀取
         name = p.rsplit("/", 1)[-1]
-        if (p.startswith(("data:", "ign:")) or p in read or p.endswith(DATA_SUFFIXES) or name in CONFIG_NAMES
+        if (key.startswith(("data:", "ign:")) or p in read or p.endswith(DATA_SUFFIXES) or name in CONFIG_NAMES
                 or name.endswith(".pth") or _parent(p) in listed):
             return False
-        if (p in then) != (p in now) and p.endswith(".py") and (_parent(p) in read_dirs or _parent(p) in near):
+        if (key in then) != (key in now) and p.endswith(".py") and (_parent(p) in read_dirs or _parent(p) in near):
             return False
     return True
+
+
+UNTRACED_BOUND_PREFIXES = ("data:", "ign:", "ignt:")
+
+
+def untraced_inputs_unchanged(then: Mapping[str, str], now: Mapping[str, str]) -> bool:
+    """純函式（D18，審查 r73）：無 trace 之結果（D15 沿用、D18 還原）不知實際讀取 ⇒ 被 git 忽略之資料（DATA_INPUTS、
+    被忽略之二進位資料類與 .json）任一自快照後改動即不得沿用（已追蹤檔與未追蹤未忽略檔由 state_key 綁定）。"""
+    keys = {k for k in set(then) | set(now) if k.startswith(UNTRACED_BOUND_PREFIXES)}
+    return all(then.get(k) == now.get(k) for k in keys)
 
 
 def trace_valid(rec: Mapping[str, object], repo: Path) -> bool:
@@ -708,7 +754,19 @@ class Runner:
         快照至今之改動全數可忽略〔changes_reusable〕）；meta 無 trace（未記錄、未完成、untraced）⇒ 只依 state_key。"""
         rec = m.get("trace")
         if not isinstance(rec, dict):
-            return m.get("state_key") == key
+            if m.get("state_key") != key:
+                return False
+            if not (m.get("recovered_from") or m.get("carried_over")):
+                return True
+            # D18（審查 r73）：沿用／還原之結果另須被忽略之資料自寫入當下快照後未變（缺快照 ⇒ 不沿用）
+            snap = self._snapshot_path(str(m.get("snapshot") or ""))
+            if not m.get("snapshot") or not snap.is_file():
+                return False
+            try:
+                then = json.loads(snap.read_text(encoding="utf-8"))
+            except ValueError:
+                return False
+            return untraced_inputs_unchanged(then, snapshot_map(cwd))
         if not trace_valid(rec, cwd):
             return False
         if m.get("state_key") == key:

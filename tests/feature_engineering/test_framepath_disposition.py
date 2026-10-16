@@ -3331,6 +3331,98 @@ def test_mutation_affected_gate_d18_default_out_persistent():
     assert "Path(args.out or default_out_dir(REPO, batch))" in src and "tempfile.gettempdir()" not in src
 
 
+def test_mutation_affected_gate_d18_junit_from_ledger_matches_pytest_identity(tmp_path):
+    """D18（審查 r73）：junit_from_ledger 由紀錄器同式之紀錄（exception_type＋str(例外) 首行）重建之 junit，其
+    failure_identity 與 pytest 實產 junit 逐項相同（call 斷言失敗、多行例外、setup 失敗）。mutation：寫 type 屬性或訊息
+    只放首行 ⇒ 紅。"""
+    g = _affected_gate()
+    proj = tmp_path / "proj"
+    (proj / "tests").mkdir(parents=True)
+    (proj / "tests" / "test_x.py").write_text(textwrap.dedent("""
+        import pytest
+        @pytest.fixture
+        def broken():
+            raise RuntimeError("setup boom")
+        def test_assert():
+            assert 1 == 2
+        def test_multiline():
+            raise ValueError("bad value\\nsecond line")
+        def test_setup(broken):
+            pass
+        def test_ok():
+            pass
+    """), encoding="utf-8")
+    (proj / "tests" / "conftest.py").write_text(textwrap.dedent("""
+        import json, pytest
+        RECS = {}
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_runtest_makereport(item, call):
+            out = yield
+            rep = out.get_result()
+            if call.excinfo is not None and rep.failed:
+                v = call.excinfo.value
+                head = str(v).strip().splitlines()[0][:300] if str(v).strip() else ""
+                RECS[item.nodeid] = {"nodeid": item.nodeid, "outcome": "failed", "phase_failed": call.when,
+                                     "exception_type": type(v).__name__, "exception_head": head}
+            elif call.when == "call" and rep.passed:
+                RECS.setdefault(item.nodeid, {"nodeid": item.nodeid, "outcome": "passed"})
+        def pytest_sessionfinish(session):
+            open("recs.json", "w").write(json.dumps(list(RECS.values())))
+    """), encoding="utf-8")
+    subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--junitxml=real.xml",
+                    "tests/test_x.py"], cwd=str(proj), capture_output=True)
+    real = g.junit_results((proj / "real.xml").read_text(encoding="utf-8"), "tests/test_x.py")
+    recs = json.loads((proj / "recs.json").read_text(encoding="utf-8"))
+    rebuilt = g.junit_results(g.junit_from_ledger("tests/test_x.py", recs), "tests/test_x.py")
+    assert set(real) == set(rebuilt) and len(real) == 4
+    for nid in real:
+        assert g.failure_identity(real[nid]) == g.failure_identity(rebuilt[nid]), nid
+
+
+def test_mutation_affected_gate_d18_untraced_reuse_requires_ignored_inputs_unchanged(tmp_path, monkeypatch):
+    """D18（審查 r73 CODEX-R73-P1-02）：無 trace 之沿用／還原結果，state_key 相同仍須被忽略之資料（data:／ign:／ignt:）
+    自寫入快照後未變；缺快照 ⇒ 不沿用；一般無 trace 結果（非沿用／還原）照舊只依 state_key。mutation：不檢快照 ⇒ 紅。"""
+    g = _affected_gate()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    xml = tmp_path / "out" / "t.xml"
+    xml.parent.mkdir()
+    xml.write_text('<testsuites><testsuite><testcase classname="tests.t" name="test_a"/></testsuite></testsuites>',
+                   encoding="utf-8")
+    state = {"ignt:data_cache/features/registry.json": "v1", "ign:data_cache/k.h5": "h1", "docs/x.md": "d1"}
+    monkeypatch.setattr(g, "snapshot_map", lambda root: dict(state))
+    monkeypatch.setattr(g, "restore_generated", lambda cwd: None)
+    calls = []
+    monkeypatch.setattr(g, "run_file", lambda *a, **k: (calls.append(1), (0, {"tests/t.py::test_a": {"outcome": "passed"}}))[1])
+    r = g.Runner(tmp_path / "out", None, 1)
+    snap = json.dumps(dict(state), sort_keys=True)
+    ref = hashlib.sha256(snap.encode("utf-8")).hexdigest()
+    r._snapshot_path(ref).parent.mkdir(parents=True)
+    r._snapshot_path(ref).write_text(snap, encoding="utf-8")
+
+    def meta(**extra):
+        xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": "K", "rc": 0, "file": "tests/t.py",
+                                                             "trace": None, **extra}), encoding="utf-8")
+
+    def run():
+        r.run("tests/t.py", xml, repo, {}, None, (), "K", ["tests/t.py::test_a"])
+    meta(recovered_from={"session_id": "s"}, snapshot=ref)
+    state["docs/x.md"] = "d2"
+    run()
+    assert calls == []  # 只改已追蹤文字檔（由 state_key 綁）⇒ 沿用
+    meta(recovered_from={"session_id": "s"}, snapshot=ref)
+    state["ignt:data_cache/features/registry.json"] = "v2"
+    run()
+    assert calls == [1]  # 被忽略之 .json 改動 ⇒ 重跑
+    meta(recovered_from={"session_id": "s"})
+    state["ignt:data_cache/features/registry.json"] = "v1"
+    run()
+    assert calls == [1, 1]  # 缺快照 ⇒ 重跑
+    meta()
+    run()
+    assert calls == [1, 1]  # 一般無 trace 結果 ⇒ 只依 state_key
+
+
 def test_mutation_affected_gate_d11_12_empty_collect(tmp_path):
     """SPEC v22 D11.12：受影響閘 collect 對無測試函式之檔（pytest rc 5 且輸出含 no tests collected）於 plan 視為空集合
     （不選入、記 empty_collect）；A 組（未給 sink）、匯入錯誤（rc 2）、rc 5 但無該字樣 ⇒ 仍 GateError。以子行程實跑
