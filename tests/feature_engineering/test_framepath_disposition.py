@@ -1489,9 +1489,28 @@ def fact_key_revisions(repo: Path = REPO, anchor: str = HEAD_SHORT,
 
 def check_6_revisions(disp: Dict[str, Any], phase: int,
                       revisions: Sequence[Tuple[str, Dict[str, Any], Dict[str, Any]]]) -> List[str]:
+    """SPEC v25 D17：本票提交段之越界改動，若其後某本票提交段恰為其逐字還原（後段 before＝前段 after、後段 after＝前段
+    before，皆以「扣 fact_key_rows 與本票白話索引列」之越界視圖比），兩段合併為淨零不計；工作樹段不得作還原段；他票改回
+    不在 revisions 內，仍紅（D11.3 不變）。"""
+    allowed = {item["row_id"] for item in disp["fact_key_rows"] if item["phase"] <= phase}
+
+    def view(doc: Dict[str, Any]) -> str:
+        return canonical_json(_fact_rows_without(_without_ticket_plaindocs(doc), allowed))
+
+    views = [(label, view(before), view(after)) for label, before, after in revisions]
+    cleared: Set[int] = set()
+    for i, (label_i, b_i, a_i) in enumerate(views):
+        if b_i == a_i or i in cleared or label_i == "HEAD→工作樹":
+            continue
+        for j in range(i + 1, len(views)):
+            label_j, b_j, a_j = views[j]
+            if label_j != "HEAD→工作樹" and j not in cleared and b_j == a_i and a_j == b_i:
+                cleared |= {i, j}
+                break
     errs: List[str] = []
-    for label, before, after in revisions:
-        errs += check_6(disp, phase, before, after, label)
+    for k, (label, before, after) in enumerate(revisions):
+        if k not in cleared:
+            errs += check_6(disp, phase, before, after, label)
     return errs
 
 
@@ -2867,6 +2886,24 @@ def test_mutation_d11_3_ticket_commit_out_of_scope_row_reverted_by_foreign_is_re
     assert check_6_revisions(disp, 1, fact_key_revisions(repo2, anchor2)) == []
     (repo2 / FACT_KEYS_REL).write_text(_fk("c", "w"), encoding="utf-8")
     assert any("HEAD→工作樹" in e for e in check_6_revisions(disp, 1, fact_key_revisions(repo2, anchor2)))
+
+
+def test_mutation_d17_ticket_self_revert_pair_nets_zero(tmp_path):
+    """SPEC v25 D17：本票提交改越界列、其後本票提交逐字改回 ⇒ 兩段合併淨零，綠；改回但非逐字（改成他值）⇒ 紅；只在工作樹
+    改回 ⇒ 紅（工作樹段不得作還原段）。mutation：不做配對（D11.3 原樣）⇒ 第一案紅；配對不要求逐字 ⇒ 第二案綠。"""
+    disp = {"fact_key_rows": [{"row_id": "RM-FRAMEPATH", "phase": 1}]}
+    repo, anchor = _git_tmp_repo(tmp_path / "a", {FACT_KEYS_REL: _fk("a", "b")})
+    _commit_tmp(repo, "docs(framepath): 交接", [_TB_TICKET], {FACT_KEYS_REL: _fk("a", "z")})
+    _commit_tmp(repo, "docs(framepath): 撤回", [_TB_TICKET], {FACT_KEYS_REL: _fk("c", "b")})
+    assert check_6_revisions(disp, 1, fact_key_revisions(repo, anchor)) == []
+    repo2, anchor2 = _git_tmp_repo(tmp_path / "b", {FACT_KEYS_REL: _fk("a", "b")})
+    _commit_tmp(repo2, "docs(framepath): 交接", [_TB_TICKET], {FACT_KEYS_REL: _fk("a", "z")})
+    _commit_tmp(repo2, "docs(framepath): 撤回錯", [_TB_TICKET], {FACT_KEYS_REL: _fk("a", "w")})
+    assert any("本票提交" in e for e in check_6_revisions(disp, 1, fact_key_revisions(repo2, anchor2)))
+    repo3, anchor3 = _git_tmp_repo(tmp_path / "c", {FACT_KEYS_REL: _fk("a", "b")})
+    _commit_tmp(repo3, "docs(framepath): 交接", [_TB_TICKET], {FACT_KEYS_REL: _fk("a", "z")})
+    (repo3 / FACT_KEYS_REL).write_text(_fk("a", "b"), encoding="utf-8")
+    assert any("本票提交" in e for e in check_6_revisions(disp, 1, fact_key_revisions(repo3, anchor3)))
 
 
 def test_mutation_d11_live_doc_registry_per_commit(tmp_path):
