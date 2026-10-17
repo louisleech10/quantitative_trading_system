@@ -69,7 +69,11 @@ export VG_PUSH_RANGES="${_pp_ranges}" VG_PUSH_LOCALS="${_pp_locals}" VG_PUSH_ALL
 #   跨平台盲區（BSD/GNU `realpath`、`stat -f %m` vs `-c %Y`）現在**沒有任何東西擋**。
 #   若日後回頭大改治理，應把此段改回 `--no-probe`。
 # 測試刪改未經委員審清單者不得 push（業界「未審不得合併」；使用者 2026-10-17「同意小任務也一定要派委員審清單」）
-if [ -f scripts/test_change_review.sh ] && ! bash scripts/test_change_review.sh check; then
+if [ ! -f scripts/test_change_review.sh ]; then
+  echo "pre-push: ✗ scripts/test_change_review.sh 不存在 → 拒 push（fail-closed，審碼 CODEX-R1-P1-02）" >&2
+  exit 1
+fi
+if ! bash scripts/test_change_review.sh check; then
   exit 1
 fi
 _GC_MODE="--fast"

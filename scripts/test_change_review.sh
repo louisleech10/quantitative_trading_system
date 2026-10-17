@@ -18,6 +18,14 @@ case "${1:-}" in
     exit 0 ;;
   check)
     [ -d "$D" ] || exit 0
+    # 未綁定之 tree 紀錄（post-commit bind 失敗）：HEAD 史上有同 tree 之 commit ⇒ 補綁為 pending（照擋）；
+    # 無任何 commit 對應（提交中止所留）⇒ 殘檔刪除（審碼 CODEX-R1-P1-02）
+    for t in "$D"/tree-*.txt; do
+      [ -e "$t" ] || continue
+      tree="${t##*/tree-}"; tree="${tree%.txt}"
+      sha="$(git log --format='%H %T' HEAD | awk -v t="$tree" '$2==t {print $1; exit}')"
+      if [ -n "$sha" ]; then mv "$t" "$D/pending-$sha.txt"; else rm -f "$t"; fi
+    done
     n=0
     for p in "$D"/pending-*.txt; do
       [ -e "$p" ] || continue
