@@ -327,7 +327,7 @@ def main() -> None:
         config_hash = str(result.metadata.get("config_hash", ""))
         reader = FeatureReader("data_cache/features")
         frames: List[pd.DataFrame] = []
-        for _group_name, group_df in reader.stream_groups("ETHUSDT", config_hash):
+        for _group_name, group_df in reader.stream_groups_v2("ETHUSDT", "1h", config_hash, artifact_kind="raw"):
             frames.append(group_df)
         if frames:
             features_df = pd.concat(frames, axis=1)
