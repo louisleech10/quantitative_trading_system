@@ -198,7 +198,8 @@
       {"item": "Task 2.4 邊界：記憶體不足被終止 ⇒ 以 watch_run.sh 記峰值、重試至多一次（執行程序）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
       {"item": "Task 3.1／4.1 邊界：三家皆擬淘汰而無可得證據等級 ⇒ keep 並登 §N needs-research；只部分函式擬淘汰 ⇒ 只列該些函式（委員分類程序；淘汰之機械約束由 V01／V08／V10 驗）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
       {"item": "Task 3.2／4.2 邊界：收據驗不過 ⇒ 該 nodeid 退回 keep 並登 §N（執行程序；收據之機械驗證由 V07–V10 擋）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
-      {"item": "Task 4.3 邊界：任一檔處置阻於後續票 ⇒ 分類仍須填、處置以 blocked-by 登 §N（收案程序；分類完整由 V16 與 Task 4.1 驗證計數擋）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"}
+      {"item": "Task 4.3 邊界：任一檔處置阻於後續票 ⇒ 分類仍須填、處置以 blocked-by 登 §N（收案程序；分類完整由 V16 與 Task 4.1 驗證計數擋）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
+      {"item": "Task 4.4 處置四選一與量化硬約束之逐支判定（審碼程序；處置完整由 Task 4.3 之 validate --require-executed 擋）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"}
     ]
   }
 }
