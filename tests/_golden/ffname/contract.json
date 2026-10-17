@@ -1,7 +1,7 @@
 {
   "contract": "ffname",
   "spec": "docs/FFNAME_SPEC.md",
-  "spec_version": "v15",
+  "spec_version": "v16",
   "naming_version": 2,
   "grammar": {
     "segment_separator": "_",
@@ -150,6 +150,11 @@
     ],
     "golden_value_hash_len": 16,
     "oracle_classes": ["name_free", "remap_recompute"],
+    "remap_exempt_prefixes": {
+      "tests/_golden/failopen/baseline.json": ["environment"],
+      "tests/_golden/fftfmeta/baseline.json": ["frozen_at_head"],
+      "tests/_golden/icfirstalign/probe_baseline.json": []
+    },
     "no_column_records": {
       "tests/_golden/failopen/baseline.json": {"class": "remap_recompute", "reason": "僅群組 npy 與層級雜湊；registry 值雜湊與 merged_L7 名序值雜湊（scripts/freeze_failopen_baseline.py:379-402）含欄名或依欄名排序"},
       "tests/_golden/ffstat/nan_propagation_classes.json": {"class": "name_free", "reason": "函式 NaN 傳播分類，無特徵欄名"},

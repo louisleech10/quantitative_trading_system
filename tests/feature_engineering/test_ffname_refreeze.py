@@ -117,6 +117,22 @@ def _json_at(node: Any, path: str) -> Any:
     return node
 
 
+def _leaf_paths(node: Any, prefix: str = "") -> List[str]:
+    """JSON 全部葉路徑（`/` 連接，與 `_json_at` 同格式）；空容器本身視為葉。"""
+    if isinstance(node, dict) and node:
+        return [p for k, v in node.items() for p in _leaf_paths(v, f"{prefix}/{k}" if prefix else str(k))]
+    if isinstance(node, list) and node:
+        return [p for i, v in enumerate(node) for p in _leaf_paths(v, f"{prefix}/{i}" if prefix else str(i))]
+    return [prefix]
+
+
+def remap_expected_paths(rel: str, old: Any) -> set:
+    """`remap_recompute` 須重算之封閉路徑集合＝改前 golden 全部葉路徑，扣除契約 `refreeze.remap_exempt_prefixes[rel]`
+    （僅限執行環境與凍結提交等非產物欄位）。"""
+    exempt = REFREEZE.get("remap_exempt_prefixes", {}).get(rel, [])
+    return {p for p in _leaf_paths(old) if not any(p == e or p.startswith(e + "/") for e in exempt)}
+
+
 def remap_recompute_mismatches(rel: str, baseline: Dict[str, Any], mapping: Dict[str, str]) -> List[str]:
     """SPEC v15 §G `remap_recompute`：以 golden 自身雜湊函式對重凍產物重算（新名經 baseline 映射之反函數換回舊名），
     結果之每一欄位須與改前 golden（`frozen_at_head` 之該檔）對應欄位相等。重算本體＝`freeze.remap_recompute_golden`
@@ -133,6 +149,10 @@ def remap_recompute_mismatches(rel: str, baseline: Dict[str, Any], mapping: Dict
         return [f"remap_recompute_empty:{rel}"]
     old = json.loads(old_bytes.decode("utf-8"))
     bad: List[str] = []
+    # 審查 r16 CODEX-R16-P1-01：重算須涵蓋改前 golden 之全部葉路徑（扣除契約 `remap_exempt_prefixes`），缺漏或多出皆違規
+    expected = remap_expected_paths(rel, old)
+    bad += [f"remap_path_omitted:{rel}:{p}" for p in sorted(expected - set(recomputed))]
+    bad += [f"remap_path_extra:{rel}:{p}" for p in sorted(set(recomputed) - expected)]
     for path, value in recomputed.items():
         try:
             if _json_at(old, path) != value:
@@ -285,6 +305,30 @@ def test_remap_recompute_oracle_reproduces_pre_change_bytes():
     names = [rel for rel, e in REFREEZE["no_column_records"].items() if e["class"] == "remap_recompute"]
     assert names
     assert {rel: remap_recompute_mismatches(rel, baseline, mapping) for rel in names} == {rel: [] for rel in names}
+
+
+def test_mutation_remap_recompute_omitting_paths_is_caught(monkeypatch):
+    """審查 r16 CODEX-R16-P1-01 mutant：重算只回傳部分路徑（省略發生差異之欄位）⇒ remap_path_omitted；
+    對照組：回傳全部封閉路徑且值等於改前 ⇒ 無違規（證明 oracle 非恆紅）；多回傳一條 ⇒ remap_path_extra。"""
+    baseline = _baseline()
+    mapping = _mapping(baseline)
+    rel = next(r for r, e in REFREEZE["no_column_records"].items() if e["class"] == "remap_recompute")
+    old_bytes = _pre_change_golden(rel, baseline)
+    assert old_bytes is not None
+    old = json.loads(old_bytes.decode("utf-8"))
+    expected = sorted(remap_expected_paths(rel, old))
+    assert len(expected) > 1
+    full = {p: _json_at(old, p) for p in expected}
+
+    monkeypatch.setattr(freeze, "remap_recompute_golden", lambda path, inverse: dict(full))
+    assert remap_recompute_mismatches(rel, baseline, mapping) == []
+    partial = dict(list(full.items())[:1])
+    monkeypatch.setattr(freeze, "remap_recompute_golden", lambda path, inverse: dict(partial))
+    bad = remap_recompute_mismatches(rel, baseline, mapping)
+    assert bad and all(b.startswith(f"remap_path_omitted:{rel}:") for b in bad)
+    monkeypatch.setattr(freeze, "remap_recompute_golden", lambda path, inverse: {**full, "ffname_probe_extra": 1})
+    assert remap_recompute_mismatches(rel, baseline, mapping) == [f"remap_path_extra:{rel}:ffname_probe_extra",
+                                                                   f"remap_path_missing:{rel}:ffname_probe_extra"]
 
 
 def test_mutation_name_free_bytes_changed_is_caught():
