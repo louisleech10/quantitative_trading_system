@@ -1,6 +1,6 @@
 """GAP-3 UX Task 6.0 驗收（`-k ic_feature_cap`）——IC 錯誤 reason 之登記處。
 
-邊界①：契約 `reasons` 含 `analysis_rejected` 分類且其中有 `feature_count_exceeds_cap`，`len(r) == 4`。
+邊界①：契約 `reasons` 含 `analysis_rejected` 分類且其中有 `feature_count_exceeds_cap`，分類集合逐名等值（原 `len(r) == 4`，EVTWARMUP 加 `oos_downgrade` 後改）。
 邊界②：`api/` 與 `frontend/src/` 內該字面之硬編碼數 `== 0`（一律由契約取字面）。
 
 🔴 斷言一律用**成員資格**（`in`）而非等值——Task 7.7 會往**同一個** `analysis_rejected`
@@ -25,7 +25,15 @@ def test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract():
     r = c["reasons"]
     assert "analysis_rejected" in r
     assert "feature_count_exceeds_cap" in r["analysis_rejected"]
-    assert len(r) == 4
+    # 分類集合逐名釘住（原 `len(r) == 4` 寫於 GAP-3 Task 6.0；EVTWARMUP B1 39b48531 依規格
+    # 新增 `oos_downgrade` 分類後計數過期——改為逐名等值，比計數更嚴：多／少／改名皆紅）
+    assert set(r) == {
+        "analysis_rejected",
+        "event_fallback",
+        "net_ic_unavailable",
+        "oos_downgrade",
+        "xsec_not_applicable",
+    }
     # 🔴 這是**匯入**契約以外的檔：reason 不屬 event_import_contract（那是匯入契約）
     assert not (REPO / "momentum" / "Analysis" / "contracts" / "event_import_contract.json").read_text(
         encoding="utf-8").count("feature_count_exceeds_cap")

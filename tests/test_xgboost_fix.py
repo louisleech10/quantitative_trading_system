@@ -4,102 +4,60 @@
 驗證 train_model 可以同時接受：
 1. pandas DataFrame
 2. numpy array + feature_names
+
+TESTREG b5：原為模組層腳本（print，try/except 吞錯，pytest 收集 0 項），改寫為 pytest 函式，
+保留原測試 1–3 之檢查；原只 print 之項改為斷言。
 """
 
 import numpy as np
 import pandas as pd
+import pytest
+
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
 
-print("=" * 70)
-print("測試 XGBoost Analyzer 的 numpy array 支援")
-print("=" * 70)
+_N_SAMPLES = 100
+_N_FEATURES = 5
+_FEATURE_NAMES = [f"feature_{i}" for i in range(_N_FEATURES)]
 
-# 建立測試數據
-n_samples = 100
-n_features = 5
 
-# 特徵名稱
-feature_names = [f'feature_{i}' for i in range(n_features)]
+def _data() -> tuple:
+    rng = np.random.default_rng(0)
+    X_array = rng.standard_normal((_N_SAMPLES, _N_FEATURES))
+    y = np.zeros(_N_SAMPLES, dtype=int)
+    y[_N_SAMPLES // 2:] = 1  # 確保有兩個類別
+    return X_array, y
 
-# 測試數據
-X_array = np.random.randn(n_samples, n_features)
-y = np.random.randint(0, 2, n_samples)
 
-# 確保有兩個類別
-y[:50] = 0
-y[50:] = 1
-
-print(f"\n數據準備:")
-print(f"  樣本數: {n_samples}")
-print(f"  特徵數: {n_features}")
-print(f"  特徵名稱: {feature_names}")
-print(f"  標籤分佈: 0={sum(y==0)}, 1={sum(y==1)}")
-
-# 測試 1: numpy array + feature_names
-print("\n" + "=" * 70)
-print("測試 1: numpy array + feature_names")
-print("=" * 70)
-
-analyzer1 = XGBoostAnalyzer()
-try:
-    performance1 = analyzer1.train_model(
-        X=X_array,
-        y=y,
-        feature_names=feature_names,
-        early_stopping_rounds=5,
-        eval_size=0.2
+def test_train_model_accepts_numpy_with_feature_names() -> None:
+    """測試 1：numpy array + feature_names 可訓練，特徵名稱已儲存。"""
+    X_array, y = _data()
+    analyzer = XGBoostAnalyzer()
+    perf = analyzer.train_model(
+        X=X_array, y=y, feature_names=_FEATURE_NAMES, early_stopping_rounds=5, eval_size=0.2
     )
-    print(f"✅ 測試 1 通過")
-    print(f"   Train AUC: {performance1.in_sample_train_auc:.4f}")
-    print(f"   CV AUC: {performance1.cv_auc_mean:.4f}")
-    print(f"   特徵名稱已儲存: {analyzer1.feature_names}")
-except Exception as e:
-    print(f"❌ 測試 1 失敗: {e}")
-    import traceback
-    traceback.print_exc()
+    assert list(analyzer.feature_names) == _FEATURE_NAMES
+    assert np.isfinite(perf.in_sample_train_auc)
+    assert np.isfinite(perf.cv_auc_mean)
 
-# 測試 2: pandas DataFrame (舊方式，應該仍然有效)
-print("\n" + "=" * 70)
-print("測試 2: pandas DataFrame (向後兼容)")
-print("=" * 70)
 
-X_df = pd.DataFrame(X_array, columns=feature_names)
-analyzer2 = XGBoostAnalyzer()
-try:
-    performance2 = analyzer2.train_model(
-        X=X_df,
-        y=y,
-        early_stopping_rounds=5,
-        eval_size=0.2
+def test_train_model_accepts_dataframe_equivalently() -> None:
+    """測試 2：pandas DataFrame（向後相容）可訓練，結果與 numpy+feature_names 一致。"""
+    X_array, y = _data()
+    a_np = XGBoostAnalyzer()
+    p_np = a_np.train_model(
+        X=X_array, y=y, feature_names=_FEATURE_NAMES, early_stopping_rounds=5, eval_size=0.2
     )
-    print(f"✅ 測試 2 通過")
-    print(f"   Train AUC: {performance2.in_sample_train_auc:.4f}")
-    print(f"   CV AUC: {performance2.cv_auc_mean:.4f}")
-    print(f"   特徵名稱已儲存: {analyzer2.feature_names}")
-except Exception as e:
-    print(f"❌ 測試 2 失敗: {e}")
-    import traceback
-    traceback.print_exc()
-
-# 測試 3: numpy array 沒有 feature_names (應該失敗)
-print("\n" + "=" * 70)
-print("測試 3: numpy array 沒有 feature_names (預期失敗)")
-print("=" * 70)
-
-analyzer3 = XGBoostAnalyzer()
-try:
-    performance3 = analyzer3.train_model(
-        X=X_array,
-        y=y,
-        early_stopping_rounds=5,
-        eval_size=0.2
+    a_df = XGBoostAnalyzer()
+    p_df = a_df.train_model(
+        X=pd.DataFrame(X_array, columns=_FEATURE_NAMES), y=y, early_stopping_rounds=5, eval_size=0.2
     )
-    print(f"❌ 測試 3 未按預期失敗")
-except ValueError as e:
-    print(f"✅ 測試 3 正確拋出錯誤: {e}")
-except Exception as e:
-    print(f"⚠️  測試 3 拋出非預期錯誤: {e}")
+    assert list(a_df.feature_names) == _FEATURE_NAMES
+    assert np.isclose(p_df.in_sample_train_auc, p_np.in_sample_train_auc)
+    assert np.isclose(p_df.cv_auc_mean, p_np.cv_auc_mean)
 
-print("\n" + "=" * 70)
-print("所有測試完成")
-print("=" * 70)
+
+def test_train_model_numpy_without_feature_names_raises() -> None:
+    """測試 3：numpy array 未給 feature_names ⇒ ValueError。"""
+    X_array, y = _data()
+    with pytest.raises(ValueError, match="feature_names"):
+        XGBoostAnalyzer().train_model(X=X_array, y=y, early_stopping_rounds=5, eval_size=0.2)

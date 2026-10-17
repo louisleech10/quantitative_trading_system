@@ -295,6 +295,13 @@ def attach_unit_calibration(preprocessor: Any, pre_history: Any, public_columns:
         index = pd.Timestamp("1970-01-01", tz="UTC") + pd.to_timedelta(np.arange(len(frame)), unit="s")
     frame = frame.set_axis(index, axis=0)
     timeframe = timeframe or preprocessor._decision_scope()[0]  # 未給則同前處理器脈絡之週期
+    if not timeframe or timeframe == "unknown":
+        # 單元測試之前處理器常無週期脈絡（空字串／'unknown'），而欄名週期標記只收合法週期（c6c93b84 起）⇒
+        # 以本模組之主週期補上，並同步寫入前處理器脈絡，使其後之決策與標記同一週期（TESTREG Task 4.4 G-a）
+        import dataclasses
+        timeframe = PRIMARY_TF
+        preprocessor._preprocessing_context = dataclasses.replace(preprocessor._preprocessing_context,
+                                                                  timeframe=timeframe)
     n = preprocessor._stationarity_n_for(timeframe)
     output_start = pd.Timestamp(index[-1]) + pd.Timedelta(seconds=1)
     values, first, last, empty = {}, {}, {}, []

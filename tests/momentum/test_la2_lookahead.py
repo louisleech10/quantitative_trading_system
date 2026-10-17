@@ -209,43 +209,62 @@ def _assert_winsorize_returns_reader_zero() -> None:
     # 2) schema 不得再有該欄
     assert "winsorize_returns" not in LabelConfig.model_fields
     # 3) production py/yaml reader=0（排除 tests/docs/handoffs/Archived）
-    # rg returncode: 0=有命中→FAIL；1=無命中→PASS；≥2=rg 錯→FAIL（禁靜默 pass）
+    # 以 git 列檔（同 rg 預設尊重 .gitignore）＋純 Python 掃描，不依賴外部 rg 執行檔；
+    # 列檔失敗或掃描面為空 → FAIL（禁靜默 pass）
+    files = _production_source_files((".py", ".yaml", ".yml"))
+    hits = _scan_lines(files, "winsorize_returns")
+    assert hits == [], (
+        "winsorize_returns reader must be 0 (no hits); got hits:\n" + "\n".join(hits)
+    )
+
+
+def _production_source_files(suffixes: tuple[str, ...]) -> list[Path]:
+    """列出 repo 內非忽略檔中屬 production 範圍者（排除 tests/docs/handoffs/Archived）。"""
     proc = subprocess.run(
-        [
-            "rg",
-            "-n",
-            "winsorize_returns",
-            "--glob",
-            "*.py",
-            "--glob",
-            "*.yaml",
-            "--glob",
-            "*.yml",
-            "--glob",
-            "!tests/**",
-            "--glob",
-            "!docs/**",
-            "--glob",
-            "!handoffs/**",
-            "--glob",
-            "!**/Archived/**",
-            str(_REPO_ROOT),
-        ],
+        ["git", "ls-files", "-co", "--exclude-standard"],
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
         check=False,
     )
-    if proc.returncode >= 2:
+    if proc.returncode != 0:
         raise AssertionError(
-            f"rg failed (returncode={proc.returncode}): "
+            f"git ls-files failed (returncode={proc.returncode}): "
             f"{(proc.stderr or '').strip() or '(no stderr)'}"
         )
-    hits = [ln for ln in (proc.stdout or "").splitlines() if ln.strip()]
-    assert proc.returncode == 1 and hits == [], (
-        f"winsorize_returns reader must be 0 (rg rc=1 no hits); "
-        f"got rc={proc.returncode} hits:\n" + "\n".join(hits)
-    )
+    out: list[Path] = []
+    for rel in (proc.stdout or "").splitlines():
+        rel = rel.strip()
+        if not rel or not rel.endswith(suffixes):
+            continue
+        parts = rel.split("/")
+        if parts[0] in ("tests", "docs", "handoffs") or "Archived" in parts[:-1]:
+            continue
+        p = _REPO_ROOT / rel
+        if p.is_file():
+            out.append(p)
+    # 掃描面不得為空（否則恆 0 命中＝假綠）；production 必含此二檔
+    rels = {p.relative_to(_REPO_ROOT).as_posix() for p in out}
+    assert "momentum/Analysis/ic_config_schema.py" in rels, "scan surface missing production py"
+    assert "config/ic_config.yaml" in rels, "scan surface missing production yaml"
+    return out
+
+
+def _scan_lines(files: list[Path], pattern: str) -> list[str]:
+    """回傳 `path:lineno:line` 形式之命中列（regex 搜尋）。"""
+    import re
+
+    rx = re.compile(pattern)
+    hits: list[str] = []
+    for p in files:
+        try:
+            text = p.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for i, ln in enumerate(text.splitlines(), start=1):
+            if rx.search(ln):
+                hits.append(f"{p.relative_to(_REPO_ROOT).as_posix()}:{i}:{ln}")
+    return hits
 
 
 def _assert_allowlist_b1_four_rows() -> None:
@@ -811,27 +830,19 @@ def test_config_theater() -> None:
     assert "sample_weight" in ui
 
     # runtime 行為不受 yaml enabled 控：train_model 無 sample_weight/calibrator wiring
-    # （grep production train path 不讀這兩個 enabled 開關）
-    import subprocess
-
-    proc = subprocess.run(
-        [
-            "rg",
-            "-n",
-            r"probability_calibration|sample_weight",
-            "momentum/Analysis/xgboost_analyzer.py",
-            "momentum/Analysis/lightgbm_analyzer.py",
-            "api/services/xgboost_task_service.py",
-        ],
-        capture_output=True,
-        text=True,
-        cwd=str(_REPO_ROOT),
-        check=False,
-    )
+    # （grep production train path 不讀這兩個 enabled 開關；純 Python 掃描，不依賴外部 rg）
+    train_paths = [
+        _REPO_ROOT / "momentum/Analysis/xgboost_analyzer.py",
+        _REPO_ROOT / "momentum/Analysis/lightgbm_analyzer.py",
+        _REPO_ROOT / "api/services/xgboost_task_service.py",
+    ]
+    existing = [p for p in train_paths if p.is_file()]
+    # 掃描面不得為空（否則恆 0 命中＝假綠）
+    assert existing, "train path scan surface empty"
     # train path 不應因 yaml enabled 呼叫 calibrator/sample_weight
     hits = [
         ln
-        for ln in (proc.stdout or "").splitlines()
+        for ln in _scan_lines(existing, r"probability_calibration|sample_weight")
         if "enabled" in ln.lower() or "sample_weight" in ln or "probability_calibration" in ln
     ]
     # 允許 0 命中；若有命中不得是 train wiring

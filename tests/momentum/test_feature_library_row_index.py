@@ -2,7 +2,10 @@
 
 驗證 `load` V2 路徑貼回持久化時間軸:
 - helper 機制(attach / no-op / length-guard):快、可證偽、mutation-sensitive。
-- 真實 12h run 端到端(G-1 值守恆 / G-2 時間軸 byte-equal):artifact 缺則 skip。
+- 真實 12h run 端到端(G-1 值守恆 / G-2 時間軸 byte-equal):session fixture `tmp_feature_runs`
+  (tests/momentum/conftest.py)以真實 kline 於 tmp 物化之小型 BTCUSDT 12h run;registry 條目／
+  row_index artifact 缺則 fail-closed(不 skip;原釘選之 e53e2290… artifact 已依 2026-10-03 裁定刪除,
+  舊寫法恆 skip、斷言從未執行)。
 
 mutation 對照(見 SPEC §V):
 - 移除 `df.index = row_index` → `test_attach_sets_datetime_index` FAIL。
@@ -11,7 +14,7 @@ mutation 對照(見 SPEC §V):
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -21,18 +24,18 @@ from momentum.factories import create_feature_library
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
+# helper 機制測試之 config_hash 引數(假 reader,不讀資料,hash 值無關)。
 HASH_A = "e53e22906c35363757f4cd49d27f973e"
-MINI_REGISTRY_PATH = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "ic_run_selector_mini_registry.json"
-)
 
 
 @pytest.fixture
-def pinned_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    registry_copy = tmp_path / "registry.json"
-    registry_copy.write_text(MINI_REGISTRY_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(registry_copy))
-    return registry_copy
+def runs(monkeypatch: pytest.MonkeyPatch, tmp_feature_runs: Dict[str, Any]) -> Dict[str, Any]:
+    """指向 tmp registry 並 chdir 至 tmp root(`create_feature_library()` 之相對 data_cache/features 解析到 tmp)。"""
+    if (tmp_feature_runs["symbol"], tmp_feature_runs["timeframe"]) != (SYMBOL, TIMEFRAME):
+        raise RuntimeError("tmp_feature_runs 之 symbol/timeframe 與本檔常數不符")
+    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(tmp_feature_runs["registry"]))
+    monkeypatch.chdir(tmp_feature_runs["root"])
+    return tmp_feature_runs
 
 
 # ---------------------------------------------------------------------------
@@ -84,28 +87,29 @@ def test_attach_length_mismatch_raises(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 真實 12h run:端到端 G-1/G-2(artifact 缺則 skip)
+# 真實 12h run(tmp 物化):端到端 G-1/G-2(資料缺則 fail-closed)
 # ---------------------------------------------------------------------------
 
 
-def _require_materialized(lib) -> None:
-    if lib._registry.get(SYMBOL, TIMEFRAME, HASH_A) is None:
-        pytest.skip(f"missing registry run {HASH_A}")
+def _require_materialized(lib, config_hash: str) -> None:
+    """物化 run 須已登記且帶持久化 row_index;缺則 fail-closed(不 skip)。"""
+    if lib._registry.get(SYMBOL, TIMEFRAME, config_hash) is None:
+        pytest.fail("missing registry run(tmp 物化資料缺失 ⇒ fail-closed)")
     try:
-        axis = lib._reader.load_row_index_v2(SYMBOL, TIMEFRAME, HASH_A, artifact_kind="raw")
-    except Exception as exc:  # noqa: BLE001 - artifact 缺是 skip 條件非測試失敗
-        pytest.skip(f"row_index artifact unreadable: {exc}")
-    if axis is None:
-        pytest.skip("run has no persisted row_index (old run)")
+        persisted = lib._reader.load_row_index_v2(SYMBOL, TIMEFRAME, config_hash, artifact_kind="raw")
+    except Exception as exc:  # noqa: BLE001 - artifact 缺＝物化資料缺失 ⇒ fail-closed
+        pytest.fail(f"row_index artifact unreadable: {exc}")
+    if persisted is None:
+        pytest.fail("materialized run has no persisted row_index")
 
 
 @pytest.mark.ic_run_selector
-def test_load_real_run_attaches_persisted_axis(pinned_registry: Path) -> None:
+def test_load_real_run_attaches_persisted_axis(runs: Dict[str, Any]) -> None:
     """G-2:load 回的 index 與持久化 timestamps.parquet byte-equal。"""
     lib = create_feature_library()
-    _require_materialized(lib)
-    df = lib.load(SYMBOL, TIMEFRAME, config_hash=HASH_A)
-    axis = lib._reader.load_row_index_v2(SYMBOL, TIMEFRAME, HASH_A, artifact_kind="raw")
+    _require_materialized(lib, runs["hash_a"])
+    df = lib.load(SYMBOL, TIMEFRAME, config_hash=runs["hash_a"])
+    axis = lib._reader.load_row_index_v2(SYMBOL, TIMEFRAME, runs["hash_a"], artifact_kind="raw")
 
     assert isinstance(df.index, pd.DatetimeIndex)
     assert df.index.name == "timestamp"
@@ -113,22 +117,28 @@ def test_load_real_run_attaches_persisted_axis(pinned_registry: Path) -> None:
     assert np.array_equal(
         df.index.view("int64") // 10**9, axis.view("int64") // 10**9
     )
+    # 獨立 oracle:持久化時間軸＝生成當下之主時間軸(epoch 秒;非由 load 路徑導出)
+    gen_seconds = runs["index_a"]
+    assert np.array_equal(df.index.view("int64") // 10**9, gen_seconds)
 
 
 @pytest.mark.ic_run_selector
-def test_load_real_run_value_conservation(pinned_registry: Path) -> None:
-    """G-1:attach 不動特徵值——抽樣欄位與 reader 直讀 parquet 逐值相等。"""
+def test_load_real_run_value_conservation(runs: Dict[str, Any]) -> None:
+    """G-1:attach 不動特徵值——全部欄位與 reader 直讀 parquet 逐值相等。"""
     lib = create_feature_library()
-    _require_materialized(lib)
-    df = lib.load(SYMBOL, TIMEFRAME, config_hash=HASH_A)
+    _require_materialized(lib, runs["hash_a"])
+    df = lib.load(SYMBOL, TIMEFRAME, config_hash=runs["hash_a"])
 
-    # 獨立 oracle:直接向 reader 取同批抽樣欄位(不經 attach 路徑)
-    sample_cols = list(df.columns[:: max(1, len(df.columns) // 50)])[:50]
+    # 獨立 oracle:直接向 reader 取同批欄位(不經 attach 路徑);小型 tmp run ⇒ 全欄比對(原抽樣 ≤50 欄)
+    sample_cols = list(df.columns)
     raw = lib._reader.load_columns_v2(
-        SYMBOL, TIMEFRAME, HASH_A, sample_cols, artifact_kind="raw", consumer="browse"
+        SYMBOL, TIMEFRAME, runs["hash_a"], sample_cols, artifact_kind="raw", consumer="browse"
     )
     # reader 直讀為位置序;attach 只改 label 不改序 → 逐位置值須相等
     got = df[sample_cols].to_numpy()
     exp = raw[sample_cols].to_numpy()
     assert got.shape == exp.shape
     assert np.array_equal(got, exp, equal_nan=True)
+    # 逐欄 dtype 不變(attach 不得轉型)
+    got_dtypes, exp_dtypes = list(df[sample_cols].dtypes), list(raw[sample_cols].dtypes)
+    assert got_dtypes == exp_dtypes

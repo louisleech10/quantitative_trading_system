@@ -5,11 +5,19 @@ from momentum.Analysis.ic_config_schema import ICConfig, load_ic_config
 from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
 
 
+_EPOCH_SECONDS = [1704067200 + 86400 * idx for idx in range(80)]
+
+
+def _feature_time_index() -> pd.DatetimeIndex:
+    """特徵／標籤之時間索引：與 kline `timestamp` 同一 UTC 時刻（ICFIRSTALIGN：IC 路徑拒收 RangeIndex）。"""
+    return pd.DatetimeIndex(pd.to_datetime(_EPOCH_SECONDS, unit="s"), name="timestamp")
+
+
 class _DummyReader:
     def read_klines(self, _symbol: str, _timeframe: str) -> pd.DataFrame:
         return pd.DataFrame(
             {
-                "timestamp": [1704067200 + 86400 * idx for idx in range(80)],
+                "timestamp": list(_EPOCH_SECONDS),
                 "close": np.linspace(100.0, 120.0, 80),
                 "close_EMA_55": np.linspace(99.0, 119.0, 80),
             }
@@ -39,7 +47,7 @@ def test_stage4_grouped_uses_real_pydantic_config() -> None:
 
     config = _real_grouped_config()
     orchestrator = ICFilterOrchestrator(config)
-    index = pd.RangeIndex(80)
+    index = _feature_time_index()
     features_df = pd.DataFrame(
         {
             "feature_pos": np.linspace(0.0, 1.0, 80),
@@ -67,7 +75,7 @@ def test_default_grouped_config_does_not_raise_with_kline() -> None:
 
     config = load_ic_config()
     orchestrator = ICFilterOrchestrator(config)
-    index = pd.RangeIndex(80)
+    index = _feature_time_index()
     features_df = pd.DataFrame(
         {
             "feature_pos": np.linspace(0.0, 1.0, 80),

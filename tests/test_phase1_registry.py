@@ -5,171 +5,93 @@ Phase 1 策略註冊系統測試
 
 Author: Claude
 Date: 2025-12-03
+
+TESTREG b5：原為模組層腳本（print + sys.exit，pytest 收集 0 項），改寫為 pytest 函式，
+保留原 Test 1–10 之檢查；原只 print 不斷言之項改為斷言。
 """
 
-import sys
-from pathlib import Path
+import pytest
 
-# 添加項目路徑
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+from momentum.Analysis.strategy_registry import strategy_registry
+from momentum.Optimization.strategy_metadata import StrategyMetadata
 
-print("=" * 60)
-print("Phase 1 策略註冊系統測試")
-print("=" * 60)
+_STRATEGY_IDS = ("three_line", "short_long_cross", "mid_long_cross")
 
-# Test 1: 導入模組
-print("\n[Test 1] 導入模組...")
-try:
-    from momentum.Analysis.strategy_registry import strategy_registry
-    from momentum.Optimization.strategy_metadata import StrategyMetadata
-    print("✅ 模組導入成功")
-except Exception as e:
-    print(f"❌ 模組導入失敗: {e}")
-    sys.exit(1)
 
-# Test 2: 列出所有策略
-print("\n[Test 2] 列出所有策略...")
-try:
+def test_list_strategies_contains_builtin() -> None:
+    """Test 2：列出策略，內建三策略皆在且為 StrategyMetadata。"""
     strategies = strategy_registry.list_strategies()
-    print(f"✅ 找到 {len(strategies)} 個策略:")
-    for strategy in strategies:
-        print(f"   - {strategy.strategy_id}: {strategy.display_name} ({strategy.category})")
-except Exception as e:
-    print(f"❌ 列出策略失敗: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+    ids = {s.strategy_id for s in strategies}
+    assert set(_STRATEGY_IDS) <= ids
+    assert all(isinstance(s, StrategyMetadata) for s in strategies)
 
-# Test 3: 獲取 three_line 策略元數據
-print("\n[Test 3] 獲取 three_line 策略元數據...")
-try:
+
+def test_three_line_metadata() -> None:
+    """Test 3：three_line 元數據含三個週期參數，min ≤ default ≤ max。"""
     three_line = strategy_registry.get_strategy("three_line")
-    print(f"✅ 策略: {three_line.display_name}")
-    print(f"   描述: {three_line.description}")
-    print(f"   參數數量: {len(three_line.parameters)}")
-    print(f"   參數列表:")
-    for param in three_line.parameters:
-        print(f"      - {param.name} ({param.type.value}): "
-              f"{param.min_value} - {param.max_value}, default={param.default_value}")
-except Exception as e:
-    print(f"❌ 獲取元數據失敗: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+    names = [p.name for p in three_line.parameters]
+    assert names == ["short_period", "mid_period", "long_period"]
+    for p in three_line.parameters:
+        assert p.min_value <= p.default_value <= p.max_value
 
-# Test 4: 測試參數驗證（有效參數）
-print("\n[Test 4] 測試參數驗證（有效參數）...")
-try:
-    valid_params = {
-        "short_period": 7,
-        "mid_period": 25,
-        "long_period": 70
-    }
-    result = strategy_registry.validate_parameters("three_line", valid_params)
-    if result.is_valid:
-        print(f"✅ 參數驗證通過")
-    else:
-        print(f"❌ 參數驗證失敗: {result.errors}")
-except Exception as e:
-    print(f"❌ 驗證過程異常: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
 
-# Test 5: 測試參數驗證（無效參數 - 範圍錯誤）
-print("\n[Test 5] 測試參數驗證（無效參數 - 範圍錯誤）...")
-try:
-    invalid_params = {
-        "short_period": 20,  # 超出範圍 (max=15)
-        "mid_period": 25,
-        "long_period": 70
-    }
-    result = strategy_registry.validate_parameters("three_line", invalid_params)
-    if not result.is_valid:
-        print(f"✅ 正確識別無效參數:")
-        for error in result.errors:
-            print(f"   - {error}")
-    else:
-        print(f"❌ 應該識別出無效參數，但驗證通過了")
-except Exception as e:
-    print(f"❌ 驗證過程異常: {e}")
-    import traceback
-    traceback.print_exc()
+def test_validate_parameters_valid() -> None:
+    """Test 4：有效參數通過驗證。"""
+    result = strategy_registry.validate_parameters(
+        "three_line", {"short_period": 7, "mid_period": 25, "long_period": 70}
+    )
+    assert result.is_valid, result.errors
 
-# Test 6: 測試參數驗證（無效參數 - 約束錯誤）
-print("\n[Test 6] 測試參數驗證（無效參數 - 約束錯誤）...")
-try:
-    invalid_params = {
-        "short_period": 25,  # short > mid，違反約束
-        "mid_period": 20,
-        "long_period": 70
-    }
-    result = strategy_registry.validate_parameters("three_line", invalid_params)
-    if not result.is_valid:
-        print(f"✅ 正確識別約束錯誤:")
-        for error in result.errors:
-            print(f"   - {error}")
-    else:
-        print(f"❌ 應該識別出約束錯誤，但驗證通過了")
-except Exception as e:
-    print(f"❌ 驗證過程異常: {e}")
-    import traceback
-    traceback.print_exc()
 
-# Test 7: 測試獲取計算函數
-print("\n[Test 7] 測試獲取計算函數...")
-try:
+def test_validate_parameters_out_of_range() -> None:
+    """Test 5：超出參數範圍被拒絕。
+
+    原腳本寫死 short_period=20（假設 max=15），現行元數據範圍已改（見 Test 3），
+    故改由元數據取 max_value+1，保住「範圍錯誤須被識別」之原意。
+    """
+    meta = strategy_registry.get_strategy("three_line")
+    short_def = next(p for p in meta.parameters if p.name == "short_period")
+    too_big = int(short_def.max_value) + 1
+    result = strategy_registry.validate_parameters(
+        "three_line",
+        {"short_period": too_big, "mid_period": too_big + 1, "long_period": too_big + 2},
+    )
+    assert not result.is_valid
+    assert result.errors
+
+
+def test_validate_parameters_constraint_violation() -> None:
+    """Test 6：short > mid 違反約束被拒絕。"""
+    result = strategy_registry.validate_parameters(
+        "three_line", {"short_period": 25, "mid_period": 20, "long_period": 70}
+    )
+    assert not result.is_valid
+    assert result.errors
+
+
+def test_get_calculator_and_validator() -> None:
+    """Test 7–8：three_line 之計算函數與驗證函數可取得且來自策略模組。"""
     calculator = strategy_registry.get_calculator("three_line")
-    print(f"✅ 獲取計算函數成功: {calculator.__name__}")
-    print(f"   函數模組: {calculator.__module__}")
-except Exception as e:
-    print(f"❌ 獲取計算函數失敗: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-
-# Test 8: 測試獲取驗證函數
-print("\n[Test 8] 測試獲取驗證函數...")
-try:
+    assert callable(calculator)
+    assert calculator.__module__ == "momentum.Analysis.strategies.three_line_strategy"
     validator = strategy_registry.get_validator("three_line")
-    if validator:
-        print(f"✅ 獲取驗證函數成功: {validator.__name__}")
-        print(f"   函數模組: {validator.__module__}")
-    else:
-        print(f"⚠️  該策略沒有自定義驗證函數")
-except Exception as e:
-    print(f"❌ 獲取驗證函數失敗: {e}")
-    import traceback
-    traceback.print_exc()
+    assert validator is not None and callable(validator)
 
-# Test 9: 測試參數範圍提取
-print("\n[Test 9] 測試參數範圍提取（用於 Optuna）...")
-try:
+
+def test_get_parameter_ranges_matches_metadata() -> None:
+    """Test 9：Optuna 參數範圍與元數據一致。"""
     ranges = strategy_registry.get_parameter_ranges("three_line")
-    print(f"✅ 提取參數範圍成功:")
-    for param_name, range_info in ranges.items():
-        print(f"   - {param_name}: {range_info}")
-except Exception as e:
-    print(f"❌ 提取參數範圍失敗: {e}")
-    import traceback
-    traceback.print_exc()
+    meta = strategy_registry.get_strategy("three_line")
+    assert set(ranges) == {p.name for p in meta.parameters}
+    for p in meta.parameters:
+        assert ranges[p.name]["min"] == p.min_value
+        assert ranges[p.name]["max"] == p.max_value
 
-# Test 10: 測試其他策略
-print("\n[Test 10] 測試其他策略 (short_long_cross, mid_long_cross)...")
-try:
-    for strategy_id in ["short_long_cross", "mid_long_cross"]:
-        strategy = strategy_registry.get_strategy(strategy_id)
-        calculator = strategy_registry.get_calculator(strategy_id)
-        print(f"✅ {strategy_id}:")
-        print(f"   顯示名稱: {strategy.display_name}")
-        print(f"   參數數量: {len(strategy.parameters)}")
-        print(f"   計算函數: {calculator.__name__}")
-except Exception as e:
-    print(f"❌ 測試其他策略失敗: {e}")
-    import traceback
-    traceback.print_exc()
 
-print("\n" + "=" * 60)
-print("✅ Phase 1 測試完成！策略註冊系統工作正常。")
-print("=" * 60)
+@pytest.mark.parametrize("strategy_id", ["short_long_cross", "mid_long_cross"])
+def test_other_strategies_resolvable(strategy_id: str) -> None:
+    """Test 10：其他策略之元數據與計算函數可取得。"""
+    strategy = strategy_registry.get_strategy(strategy_id)
+    assert strategy.strategy_id == strategy_id
+    assert len(strategy.parameters) > 0
+    assert callable(strategy_registry.get_calculator(strategy_id))

@@ -29,7 +29,20 @@ def test_factories_single_outlet_and_contract_readonly():
     assert "required_fields" in p.import_contract()
     assert "allowed_filtering_params" in p.condition_engine_contract()
     src = (Path(__file__).resolve().parents[3] / "momentum" / "factories.py").read_text(encoding="utf-8")
-    assert len(re.findall(r"^def create_event_|^def create_condition_", src, flags=re.M)) == 1
+    # TESTREG b5：「事件域只一個出口」前提已過期——SPLITUNIFY B10C/B10D/B10E（41a82ac5、fd55d018、68b793ac、
+    # 2fca67d0，2026-09-19）依各自 SPEC 新增具名出口。改為：pipeline 出口恰一個，且事件／條件域出口集合等於具名白名單
+    # （未經登記之新出口仍會紅）。
+    outlets = re.findall(r"^def (create_event_\w+|create_condition_\w+)", src, flags=re.M)
+    assert outlets.count("create_event_sample_pipeline") == 1
+    assert sorted(outlets) == sorted(
+        [
+            "create_event_sample_pipeline",
+            "create_event_label_spec_resolver",
+            "create_event_analysis_record_copier",
+            "create_event_id_canonicalizer",
+            "create_event_disposition_ledger",
+        ]
+    )
     # 唯讀：改寫回傳不污染
     c = p.condition_engine_contract()
     c["allowed_filtering_params"].append("evil")

@@ -405,6 +405,7 @@ def test_mutation_m7_1_rsi_input_swap_fails_semantics(
         np.testing.assert_array_equal(actual[0], expected[0])
 
 
+@pytest.mark.requires_kline
 def test_mutation_m7_2_polars_claim_but_pandas_fallback_fails_sentinel(
     monkeypatch: pytest.MonkeyPatch,
     requires_kline_data,
@@ -418,12 +419,27 @@ def test_mutation_m7_2_polars_claim_but_pandas_fallback_fails_sentinel(
     factory = create_feature_factory(cache_dir="data_cache/feature_klines", validate_continuity=False)
     config = factory._resolve_config({"operators": {"enabled": True, "momentum": {"enabled": True, "lags": [1]}}})
     calls = {"polars": 0}
+    original_polars = DerivedOperatorEngine.compute_all_polars
 
-    def _fake_polars(self: DerivedOperatorEngine, *args: Any, **kwargs: Any) -> pd.DataFrame:
-        return DerivedOperatorEngine.compute_all(self, *args, **kwargs)
+    # 與 V7.2 同一 sentinel：計數 compute_all_polars 實際被呼叫次數（原寫法計數器未接線，
+    # calls 恆 0 ⇒ pytest.raises 恆過＝空心探針）
+    def _counting_polars(self: DerivedOperatorEngine, *args: Any, **kwargs: Any) -> pd.DataFrame:
+        calls["polars"] += 1
+        return original_polars(self, *args, **kwargs)
 
-    monkeypatch.setattr(DerivedOperatorEngine, "compute_all_polars", _fake_polars)
+    monkeypatch.setattr(DerivedOperatorEngine, "compute_all_polars", _counting_polars)
     monkeypatch.setattr(polars_adapter, "polars_enabled", lambda: True)
+
+    # 正向對照：未注入 mutant 時 sentinel 必命中（防恆紅之 sentinel 使探針恆綠）
+    _ = factory._layer2_derived_features(layer1, raw, config).data
+    assert calls["polars"] >= 1
+
+    # Mutant：聲稱走 polars 臂（選路仍回 L2.polars），實際默默回退 pandas 計算
+    def _claim_polars_but_pandas(self: FeatureFactory, layer1_df, data, cfg):
+        return FeatureFactory._layer2_derived_pandas(self, layer1_df, data, cfg)
+
+    monkeypatch.setattr(FeatureFactory, "_layer2_derived_polars", _claim_polars_but_pandas)
+    calls["polars"] = 0
     _ = factory._layer2_derived_features(layer1, raw, config).data
     with pytest.raises(AssertionError):
         assert calls["polars"] >= 1

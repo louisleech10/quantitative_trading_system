@@ -90,12 +90,22 @@ def test_gaussian_boundary() -> None:
     pre = FeaturePreprocessor(
         {
             "causal_preprocessing": True,
+            # TESTREG b5：gaussian 因果排名窗＝_rolling_window()（winsor.window→rank.window→252）；預設 252 > 100 列
+            # 會使全欄遮為 NaN、原斷言對空陣列恆真。明示窗 20 並關縮尾，以隔離 gaussian 邊界行為。
+            "winsorization": {"enabled": False},
+            "rank_transform": {"enabled": False, "window": 20},
             "gaussian_normalize": {"enabled": True, "apply_to": "all", "clip_range": [0.001, 0.999]},
             "mode": "append",
         }
     )
     out = pre.transform(df)
     assert np.isfinite(out["f1_gaussian"].dropna().to_numpy()).all()
+    values = out["f1_gaussian"].dropna().to_numpy()
+    assert values.size > 0
+    # 0→1 跳變處因果排名落在上界（rank=1）⇒ 須被 clip_range 上界截住，得有限之 ppf(0.999)，不得為 inf
+    from scipy.stats import norm
+
+    assert np.isclose(values.max(), norm.ppf(0.999), atol=1e-4)
 
 
 def test_winsor_then_zscore() -> None:
@@ -103,13 +113,21 @@ def test_winsor_then_zscore() -> None:
     pre = FeaturePreprocessor(
         {
             "causal_preprocessing": True,
-            "winsorization": {"enabled": True, "method": "sigma", "sigma_k": 0.0, "apply_to": "all"},
+            # TESTREG b5：明示縮尾窗 20；預設窗 252 > 101 列會使縮尾後全欄遮為 NaN、原 fillna(0) 斷言恆真
+            "winsorization": {"enabled": True, "method": "sigma", "sigma_k": 0.0, "window": 20, "apply_to": "all"},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
             "mode": "append",
         }
     )
     out = pre.transform(df)
     assert np.isfinite(out["f1_zscore_20"].fillna(0.0).to_numpy()).all()
+    z = out["f1_zscore_20"]
+    assert z.notna().sum() > 0
+    # 縮尾先於 zscore：極端值 1000 已被截（不再原樣進 zscore）
+    assert out["f1"].iloc[-1] < 1000.0
+    # 常數段標準差為 0 ⇒ epsilon 保護下 zscore 為 0（非 inf/NaN）
+    assert np.allclose(z.iloc[:-1].dropna().to_numpy(), 0.0)
+    assert np.isfinite(z.iloc[-1])
 
 
 def test_external_false_matches_causal_true_core_transforms() -> None:

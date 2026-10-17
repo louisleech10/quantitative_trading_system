@@ -191,7 +191,7 @@ def test_4_data_integrity_validation(env):
 
 @_TZ_XFAIL
 def test_5_performance_benchmark(env):
-    """快取讀取 100 根：不呼叫上游、筆數與值正確，且耗時在寬鬆上限內（原目標 100ms；CI 噪音下放寬為 1s 僅防退化成網路呼叫量級）。"""
+    """快取讀取 100 根：不呼叫上游、筆數與值正確，且耗時 < 100ms（原驗收門檻，不放寬）。"""
     import time
 
     svc, provider, storage, up = env
@@ -208,4 +208,4 @@ def test_5_performance_benchmark(env):
     assert provider.calls == []
     assert len(df) == 100
     _assert_same_bars(df, _expected(up, s2, e2))
-    assert elapsed < 1.0
+    assert elapsed < 0.100

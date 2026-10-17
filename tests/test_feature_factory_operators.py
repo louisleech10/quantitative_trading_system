@@ -131,9 +131,21 @@ def test_rolling_aggregator_slope_rank_zscore():
     assert np.isclose(rolled[zscore_col].iloc[idx], expected_zscore, equal_nan=True, atol=1e-5)
 
 
-@pytest.mark.xfail(reason="L3 streaming dead-column pruning now removes duplicate-input slope cols")
+@pytest.mark.xfail(
+    strict=True,
+    raises=ValueError,
+    reason=(
+        "生產缺陷：RollingAggregator 遇重複欄名時 features_df[chunk_cols] 每個重名各選出全部同名欄，"
+        "產出欄數倍增超過預配置 memmap（rolling_aggregator.py:343 ValueError: could not broadcast "
+        "(200,4) into (200,2)）；numba 路徑亦於 numba_rolling.py:263 typing 失敗後退回 pandas；"
+        "見 白話說明/還沒做的事.md"
+    ),
+)
 def test_rolling_aggregator_handles_duplicate_columns():
-    base = pd.Series(np.arange(20, dtype=float))
+    # 非線性（隨機漫步，固定種子）且列數足夠：線性輸入之 slope 為常數、20 列有效樣本不足，
+    # 兩者皆會被 L3 死欄過濾合法剔除（唯一欄名亦得 0 欄），無法驗到「重複欄名」本身。
+    rng = np.random.default_rng(0)
+    base = pd.Series(np.cumsum(rng.normal(size=200)))
     features = pd.concat([base.rename("dup"), (base * 2).rename("dup")], axis=1)
 
     agg = RollingAggregator({"windows": [5], "aggregators": ["slope"]})

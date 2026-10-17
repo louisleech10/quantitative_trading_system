@@ -85,6 +85,22 @@ def test_micro_insufficient_data() -> None:
     assert out["ms_amihud_illiq_55"].isna().all()
 
 
+def _post_warmup(out: pd.DataFrame, prefix: str) -> pd.DataFrame:
+    """取 prefix 欄之暖機後區段：因果 rolling 窗未滿之前段為 NaN 屬設計；
+    NaN 只准出現在開頭連續暖機段（中段出現 NaN 即 FAIL），且暖機後須有值（防空集合恆真）。"""
+    sub = out.filter(like=prefix)
+    assert sub.shape[1] > 0, f"no columns with prefix {prefix}"
+    for col in sub.columns:
+        s = sub[col]
+        first = s.first_valid_index()
+        assert first is not None, f"{col} all NaN"
+        assert s.loc[first:].notna().all(), f"{col} has NaN after warmup"
+    start = max(sub[c].first_valid_index() for c in sub.columns)
+    post = sub.loc[start:]
+    assert len(post) > 0
+    return post
+
+
 def test_constant_price() -> None:
     engine = _engine()
     data = _make_data()
@@ -92,8 +108,8 @@ def test_constant_price() -> None:
     data["high"] = 100.0
     data["low"] = 100.0
     out = engine.compute_all(data)
-    assert (out.filter(like="ms_kyle_lambda_") == 0.0).all().all()
-    assert (out.filter(like="ms_roll_spread_") == 0.0).all().all()
+    assert (_post_warmup(out, "ms_kyle_lambda_") == 0.0).all().all()
+    assert (_post_warmup(out, "ms_roll_spread_") == 0.0).all().all()
 
 
 def test_ofi_fallback() -> None:
@@ -116,7 +132,7 @@ def test_zero_range_bar() -> None:
     data = _make_data()
     data["high"] = data["low"]
     out = engine.compute_all(data)
-    assert (out.filter(like="ms_cs_spread_") == 0.0).all().all()
+    assert (_post_warmup(out, "ms_cs_spread_") == 0.0).all().all()
 
 
 def test_roll_positive_autocov() -> None:
@@ -124,7 +140,7 @@ def test_roll_positive_autocov() -> None:
     data = _make_data()
     data["close"] = np.arange(len(data), dtype=float)
     out = engine.compute_all(data)
-    assert (out.filter(like="ms_roll_spread_") >= 0.0).all().all()
+    assert (_post_warmup(out, "ms_roll_spread_") >= 0.0).all().all()
 
 
 def test_vpin_zero_volume() -> None:

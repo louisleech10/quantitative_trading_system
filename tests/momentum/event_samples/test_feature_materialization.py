@@ -67,24 +67,33 @@ def prep(bars, idxs, labels=None):
 
 def test_long_segment_equals_full_history(bars):
     """驗證①：足長段（start_date 留足 warmup）物化 vs 全史，同事件列逐值 atol=1e-12。"""
-    df, rec = prep(bars, [500, 600, 700, 800])
+    # TESTREG b5：d229336e（FFSTAT 第 4 批）起縮尾預設開（窗 252）且逐欄穩定點＝預熱 K＋縮尾窗，minimal 之
+    # close_12h_trend_EMA_55 穩定點晚至 idx≈507（2024-09-12）⇒ 原首事件 idx500 落入 warmup 而入失敗清單。
+    # 事件整體後移 100 根（同間距），保住「足長段 vs 全史」原意。
+    df, rec = prep(bars, [600, 700, 800, 900])
     full, h_full, f_full = materialize_features_at_decision(rec, bars, dict(FC), events=df)
     seg, h_seg, f_seg = materialize_features_at_decision(
         rec, bars, dict(FC, start_date="2024-05-01"), events=df
-        # idx500≈2024-09-07；段起 2024-05-01（idx≈242）⇒ 首事件前置 ≥250 根。
+        # idx600≈2024-10-27；段起 2024-05-01（idx≈242）⇒ 首事件前置 ≥350 根。
         # 遞迴族（RSI/MACD 之 Wilder/EMA）需 ~200 根收斂至儲存量子內（D-001 A-01 實測：
         # 57 根時 RSI 差 0.59、200+ 根全欄落量子級）。
     )
     assert f_full.empty and f_seg.empty
+    assert len(full) == 4 and len(seg) == 4
     assert_frames_equal_with_exception(full, seg, atol=1e-12, rtol_default=SEGMENT_CONVERGENCE_RTOL)
 
 
 def test_causal_invariant_truncate_future(bars):
     """驗證②：截斷 decision_at 之後的資料重算，事件列逐值不變（exact）。"""
-    df, rec = prep(bars, [300, 350])
-    full, _, _ = materialize_features_at_decision(rec, bars, dict(FC), events=df)
-    # idx350 ≈ BASE+350*12h ＝ 2024-06-23；end_date 設在其後一天 ⇒ 未來全截斷
-    trunc, _, _ = materialize_features_at_decision(rec, bars, dict(FC, end_date="2024-06-25"), events=df)
+    # TESTREG b5：d229336e 起逐欄穩定點＝預熱 K＋縮尾窗 252，原事件 idx300/350 兩者皆落 warmup ⇒ 全史與截斷
+    # 皆無特徵列，比較退化為兩張空表（欄集合又因截斷段無穩定列而異 ⇒ 紅）。事件後移至全欄穩定點
+    # （最晚 EMA_55 idx≈507）之後，並斷言兩事件皆有特徵列，防比較再度空轉。
+    df, rec = prep(bars, [600, 650])
+    full, _, f_full = materialize_features_at_decision(rec, bars, dict(FC), events=df)
+    # idx650 ≈ BASE+650*12h ＝ 2024-11-21；end_date 設在其後兩天 ⇒ 未來全截斷
+    trunc, _, f_trunc = materialize_features_at_decision(rec, bars, dict(FC, end_date="2024-11-23"), events=df)
+    assert f_full.empty and f_trunc.empty
+    assert len(full) == 2
     assert_frames_equal_with_exception(full, trunc, atol=0.0)
 
 

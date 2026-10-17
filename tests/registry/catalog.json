@@ -815,8 +815,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r9/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A11",
     "A12",
@@ -831,9 +831,7 @@
    "path": "tests/api/test_framepath_api_h5.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_framepath_api_h5.py::test_boundary_01_generation_ignores_hand_placed_factory_h5_and_force_flag"
-   ],
+   "rewrite_targets": [],
    "ticket": "FRAMEPATH"
   },
   "tests/api/test_gap3_contract_csv_guard.py": {
@@ -1148,8 +1146,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A11",
     "A12",
@@ -1161,9 +1159,7 @@
    "path": "tests/api/test_gap3_ic_feature_cap.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_gap3_ic_feature_cap.py::test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract"
-   ],
+   "rewrite_targets": [],
    "ticket": "GAP3UX"
   },
   "tests/api/test_gap3_ic_progress_fields.py": {
@@ -1657,8 +1653,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A13",
@@ -1673,9 +1669,7 @@
    "path": "tests/api/test_ichc_event_timestamps.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_ichc_event_timestamps.py::TestServiceWiringSource::test_service_passes_event_timestamps_kwarg"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC-HC"
   },
   "tests/api/test_icpostleak_api.py": {
@@ -2582,8 +2576,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A13",
     "A14",
@@ -2599,10 +2593,7 @@
    "path": "tests/feature_engineering/preprocessing/test_causal_winsor.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_causal_winsor.py::test_all_l65_entrypoints_causal",
-    "tests/feature_engineering/preprocessing/test_causal_winsor.py::test_fracdiff_warmup_freeze_no_leak"
-   ],
+   "rewrite_targets": [],
    "ticket": "FEATURE-FACTORY"
   },
   "tests/feature_engineering/preprocessing/test_d_star_atomic_write.py": {
@@ -2707,8 +2698,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A15",
     "A6"
@@ -2720,9 +2711,7 @@
    "path": "tests/feature_engineering/preprocessing/test_fast_adf_synthetic.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_fast_adf_synthetic.py::test_feature_preprocessor_uses_fast_adf_when_enabled"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/preprocessing/test_ff_causal_golden.py": {
@@ -2833,8 +2822,8 @@
    "claim": [
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A10"
    ],
@@ -2845,9 +2834,7 @@
    "path": "tests/feature_engineering/preprocessing/test_l65_phase0_gate.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_l65_phase0_gate.py::test_l65_phase0_gate_command_smoke"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py": {
@@ -2883,8 +2870,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A3",
     "A6"
@@ -2895,12 +2882,7 @@
    "path": "tests/feature_engineering/preprocessing/test_layer_filter.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_layer_filter.py::test_layer_filter_legacy_profile_restores_l1_to_l4",
-    "tests/feature_engineering/preprocessing/test_layer_filter.py::test_layer_filter_optimized_profile_processes_only_l1_l2",
-    "tests/feature_engineering/preprocessing/test_layer_filter.py::test_layer_filter_runs_non_stationary_adf_only_for_target_layers",
-    "tests/feature_engineering/preprocessing/test_layer_filter.py::test_unknown_layer_fails_closed"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/preprocessing/test_native_tf_helpers.py": {
@@ -2927,8 +2909,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A13",
     "A19",
@@ -2940,10 +2922,7 @@
    "path": "tests/feature_engineering/preprocessing/test_non_stationary_cache.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_non_stationary_cache.py::test_high_nan_no_adf_for_non_stationary_selection",
-    "tests/feature_engineering/preprocessing/test_non_stationary_cache.py::test_non_stationary_cache_reuses_adf_result"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/preprocessing/test_p01_p02_p11_opts.py": {
@@ -3006,8 +2985,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A13",
     "A3"
@@ -3019,10 +2998,7 @@
    "path": "tests/feature_engineering/preprocessing/test_precision_corr.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_precision_corr.py::test_precision_corr_002_matches_001",
-    "tests/feature_engineering/preprocessing/test_precision_corr.py::test_precision_override_reaches_find_min_d"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/preprocessing/test_slow_path_parallel.py": {
@@ -3030,8 +3006,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A6",
     "A7",
@@ -3043,9 +3019,7 @@
    "path": "tests/feature_engineering/preprocessing/test_slow_path_parallel.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_slow_path_parallel.py::test_joblib_pickle_fail_falls_back_to_serial"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/test_adf_safe_skip.py": {
@@ -3743,8 +3717,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A1",
     "A15",
@@ -3758,10 +3732,7 @@
    "path": "tests/feature_engineering/test_ff_wrapper_path_correctness.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/test_ff_wrapper_path_correctness.py::test_mutation_m7_2_polars_claim_but_pandas_fallback_fails_sentinel",
-    "tests/feature_engineering/test_ff_wrapper_path_correctness.py::test_v7_3_l65_polars_optimized_and_fracdiff_serial_paths"
-   ],
+   "rewrite_targets": [],
    "ticket": "FF"
   },
   "tests/feature_engineering/test_ffstat_all_tested.py": {
@@ -3769,8 +3740,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A1",
     "A17",
@@ -3783,9 +3754,7 @@
    "path": "tests/feature_engineering/test_ffstat_all_tested.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/test_ffstat_all_tested.py::test_untested_column_marked_and_not_counted_as_tested"
-   ],
+   "rewrite_targets": [],
    "ticket": "FFSTAT"
   },
   "tests/feature_engineering/test_ffstat_apply_to.py": {
@@ -3983,8 +3952,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A13",
     "A2",
@@ -3996,10 +3965,7 @@
    "path": "tests/feature_engineering/test_fracdiff_maxlag_derivation.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/test_fracdiff_maxlag_derivation.py::test_fracdiff_auto_max_lag_is_calibration_derived_not_df_length",
-    "tests/feature_engineering/test_fracdiff_maxlag_derivation.py::test_short_dataframe_fracdiff_keeps_row_count"
-   ],
+   "rewrite_targets": [],
    "ticket": "FF"
   },
   "tests/feature_engineering/test_framepath_cgsa_only.py": {
@@ -4836,8 +4802,8 @@
     "contract",
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A17",
     "A3"
@@ -4849,12 +4815,7 @@
    "path": "tests/golden/l65/test_l65_golden.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/golden/l65/test_l65_golden.py::test_l65_golden_inventory_exists",
-    "tests/golden/l65/test_l65_golden.py::test_l65_golden_tier1_structure_exists",
-    "tests/golden/l65/test_l65_golden.py::test_l65_golden_tier2a_synthetic_baseline_exists",
-    "tests/golden/l65/test_l65_golden.py::test_l65_golden_tier2b_real_shortwindow_supported_or_blocked"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/golden/la1/test_attribution_validator.py": {
@@ -6011,8 +5972,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r13/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A16",
     "A17",
@@ -6024,17 +5985,7 @@
    "path": "tests/governance/test_govb1_contract_matrix.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/governance/test_govb1_contract_matrix.py::test_g7_ambient_m_gate_check_not_red",
-    "tests/governance/test_govb1_contract_matrix.py::test_gate_only_g5_g6_green",
-    "tests/governance/test_govb1_contract_matrix.py::test_mutation_g5_g6_empty_extract_fails",
-    "tests/governance/test_govb1_contract_matrix.py::test_r6_u1u2u4_g7_worktree_space_quote_paths",
-    "tests/governance/test_govb1_contract_matrix.py::test_r7_v5_undeclared_space_quote_still_fails_g7",
-    "tests/governance/test_govb1_contract_matrix.py::test_t01_f2_frozen_hashes_self_consistent",
-    "tests/governance/test_govb1_contract_matrix.py::test_t01_f3_g7_when_committed",
-    "tests/governance/test_govb1_contract_matrix.py::test_waiver_b5_active_when_b5_start_anchored",
-    "tests/governance/test_govb1_contract_matrix.py::test_waiver_b5_range_does_not_touch_forbidden"
-   ],
+   "rewrite_targets": [],
    "ticket": "GOVERNANCE"
   },
   "tests/governance/test_govb1_expected_delta.py": {
@@ -7895,8 +7846,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r14/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A11",
     "A12",
@@ -7908,10 +7859,7 @@
    "path": "tests/momentum/Analysis/test_factor_return_stopgap.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/Analysis/test_factor_return_stopgap.py::test_factor_return_consumer_allowlist",
-    "tests/momentum/Analysis/test_factor_return_stopgap.py::test_mutation_m1b_drop_tier_exclusion"
-   ],
+   "rewrite_targets": [],
    "ticket": "1CFR-STOPGAP"
   },
   "tests/momentum/Analysis/test_feature_quality_diagnostics.py": {
@@ -8478,8 +8426,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12"
    ],
@@ -8489,9 +8437,7 @@
    "path": "tests/momentum/Analysis/test_ichc_contract_sync.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/Analysis/test_ichc_contract_sync.py::TestThreeWaySync::test_r6_wider_contract_nodes_consistent"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC-HC"
   },
   "tests/momentum/Analysis/test_ichc_event_honesty.py": {
@@ -8537,8 +8483,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A3",
@@ -8550,10 +8496,7 @@
    "path": "tests/momentum/Analysis/test_ichc_p2_golden.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/Analysis/test_ichc_p2_golden.py::TestFlattenUnit::test_m1_mutation_probe_key_rename_breaks_golden_shape",
-    "tests/momentum/Analysis/test_ichc_p2_golden.py::TestTG1Golden::test_feature_set_and_config_exact"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC-HC"
   },
   "tests/momentum/Analysis/test_ichc_split_metadata.py": {
@@ -9170,8 +9113,8 @@
     "contract",
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A6"
@@ -9183,12 +9126,7 @@
    "path": "tests/momentum/Optimization/test_model_hyperparam_enhanced.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/Optimization/test_model_hyperparam_enhanced.py::test_lightgbm_search_space_ranges",
-    "tests/momentum/Optimization/test_model_hyperparam_enhanced.py::test_overfitting_detection_pruned",
-    "tests/momentum/Optimization/test_model_hyperparam_enhanced.py::test_trial_user_attrs_recorded",
-    "tests/momentum/Optimization/test_model_hyperparam_enhanced.py::test_xgboost_search_space_ranges"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/momentum/Optimization/test_optuna_objectives.py": {
@@ -9757,8 +9695,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r17/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A1",
     "A13",
@@ -9775,10 +9713,7 @@
    "path": "tests/momentum/event_samples/test_feature_materialization.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/event_samples/test_feature_materialization.py::test_causal_invariant_truncate_future",
-    "tests/momentum/event_samples/test_feature_materialization.py::test_long_segment_equals_full_history"
-   ],
+   "rewrite_targets": [],
    "ticket": "GAP3-B1"
   },
   "tests/momentum/event_samples/test_gap3_analysis_label_producer.py": {
@@ -10143,8 +10078,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A1",
     "A11",
@@ -10159,9 +10094,7 @@
    "path": "tests/momentum/event_samples/test_pipeline.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/event_samples/test_pipeline.py::test_factories_single_outlet_and_contract_readonly"
-   ],
+   "rewrite_targets": [],
    "ticket": "GAP3-B5"
   },
   "tests/momentum/event_samples/test_random_control.py": {
@@ -10590,8 +10523,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A1",
     "A6"
@@ -10602,17 +10535,15 @@
    "path": "tests/momentum/test_feature_factory_timestamp_filter.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_feature_factory_timestamp_filter.py::test_layer0_date_filter_keeps_second_epoch_rows"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/momentum/test_feature_library_config_hash.py": {
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A13",
@@ -10624,11 +10555,7 @@
    "path": "tests/momentum/test_feature_library_config_hash.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable",
-    "tests/momentum/test_feature_library_config_hash.py::test_load_with_config_hash_disambig",
-    "tests/momentum/test_feature_library_config_hash.py::test_load_without_config_hash_matches_find_latest_materialized"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/momentum/test_feature_library_registry_facade.py": {
@@ -10653,8 +10580,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A1",
     "A6",
@@ -10666,10 +10593,7 @@
    "path": "tests/momentum/test_feature_library_row_index.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_feature_library_row_index.py::test_load_real_run_attaches_persisted_axis",
-    "tests/momentum/test_feature_library_row_index.py::test_load_real_run_value_conservation"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/momentum/test_feature_preprocessor.py": {
@@ -10678,8 +10602,8 @@
     "perf",
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A10",
     "A2",
@@ -10694,13 +10618,7 @@
    "path": "tests/momentum/test_feature_preprocessor.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_feature_preprocessor.py::test_adf_nan_heavy",
-    "tests/momentum/test_feature_preprocessor.py::test_fracdiff_adf_coexist",
-    "tests/momentum/test_feature_preprocessor.py::test_fracdiff_convergence_failure",
-    "tests/momentum/test_feature_preprocessor.py::test_gaussian_boundary",
-    "tests/momentum/test_feature_preprocessor.py::test_winsor_then_zscore"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/momentum/test_feature_reader_public_artifact.py": {
@@ -10773,8 +10691,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A11",
     "A12",
@@ -10789,9 +10707,7 @@
    "path": "tests/momentum/test_ic_1eb_b2_wiring.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_ic_1eb_b2_wiring.py::test_t22_refilter_oos_scope_remains_test"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/momentum/test_ic_1eb_b3_xsec.py": {
@@ -10865,8 +10781,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A6"
@@ -10877,10 +10793,7 @@
    "path": "tests/momentum/test_ic_crash_real_config.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_ic_crash_real_config.py::test_default_grouped_config_does_not_raise_with_kline",
-    "tests/momentum/test_ic_crash_real_config.py::test_stage4_grouped_uses_real_pydantic_config"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/momentum/test_ic_cross_sectional_cut2.py": {
@@ -11185,8 +11098,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A14",
@@ -11203,10 +11116,7 @@
    "path": "tests/momentum/test_la2_lookahead.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_la2_lookahead.py::test_config_theater",
-    "tests/momentum/test_la2_lookahead.py::test_winsorized_disabled"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC-LA2"
   },
   "tests/momentum/test_label_generator_extended.py": {
@@ -11259,8 +11169,8 @@
     "contract",
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A2",
     "A6",
@@ -11275,10 +11185,7 @@
    "path": "tests/momentum/test_memory_chunking.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_memory_chunking.py::TestL65ColumnChunking::test_chunked_matches_non_chunked",
-    "tests/momentum/test_memory_chunking.py::TestL65ColumnChunking::test_single_column"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/momentum/test_microstructure_indicators.py": {
@@ -11286,8 +11193,8 @@
     "contract",
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r12/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A6"
@@ -11299,11 +11206,7 @@
    "path": "tests/momentum/test_microstructure_indicators.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_microstructure_indicators.py::test_constant_price",
-    "tests/momentum/test_microstructure_indicators.py::test_roll_positive_autocov",
-    "tests/momentum/test_microstructure_indicators.py::test_zero_range_bar"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/momentum/test_monotonicity_tester.py": {
@@ -13017,8 +12920,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A2",
     "A3",
@@ -13032,9 +12935,7 @@
    "path": "tests/test_feature_factory_operators.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/test_feature_factory_operators.py::test_rolling_aggregator_handles_duplicate_columns"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/test_feature_naming_integration.py": {
@@ -13079,8 +12980,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A13",
     "A15",
@@ -13094,9 +12995,7 @@
    "path": "tests/test_fracdiff_fft_opt.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/test_fracdiff_fft_opt.py::TestFindMinDPrecomputedMatchesOriginal::test_find_min_d_precomputed_matches_original"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/test_frontend_integration.py": {
@@ -13121,8 +13020,8 @@
    "claim": [
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12",
     "A15",
@@ -13586,8 +13485,8 @@
    "claim": [
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12"
    ],
@@ -14025,8 +13924,8 @@
    "claim": [
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r2/synth.md",
    "guarantee": [
     "A12"
    ],

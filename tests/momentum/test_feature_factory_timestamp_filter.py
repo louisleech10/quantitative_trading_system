@@ -11,6 +11,14 @@ class _StubAdapterRegistry:
     def __init__(self, df: pd.DataFrame) -> None:
         self._df = df
 
+    # TESTREG b5：d229336e（FFSTAT v52）起 L0 對每個已註冊 adapter 查 `.market` 是否在倍數表量測範圍；
+    # 替身補 list_all／get（ETHUSDT ⇒ crypto，同 tests/feature_engineering/test_ffstat_calibration.py 之替身）
+    def list_all(self) -> list[str]:
+        return ["binance"]
+
+    def get(self, name: str) -> SimpleNamespace:
+        return SimpleNamespace(market="crypto")
+
     def fetch_aligned(self, symbol: str, timeframe: str, sources: list[str]) -> pd.DataFrame:
         return self._df.copy()
 

@@ -13,6 +13,8 @@ from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObj
 
 
 class StubTrainer:
+    # TESTREG b5：LA-2 B2 F9 起訓練器輸出 `in_sample_train_auc`（lightgbm_analyzer／xgboost_analyzer／model_types），
+    # 舊鍵 `train_auc_mean` 已不存在；替身改用現行鍵，否則 gap 恆為 0、過擬合剪枝永不觸發。
     def __init__(self, perf=None, error: Exception | None = None):
         self.perf = perf
         self.error = error
@@ -24,7 +26,7 @@ class StubTrainer:
             raise self.error
         if self.perf is not None:
             return self.perf
-        return SimpleNamespace(train_auc_mean=0.78, cv_auc_mean=0.72)
+        return SimpleNamespace(in_sample_train_auc=0.78, cv_auc_mean=0.72)
 
 
 def make_objective(**kwargs):
@@ -70,7 +72,7 @@ def test_evaluate_returns_auc():
 
 
 def test_overfitting_detection_pruned():
-    trainer = StubTrainer(perf=SimpleNamespace(train_auc_mean=0.95, cv_auc_mean=0.70))
+    trainer = StubTrainer(perf=SimpleNamespace(in_sample_train_auc=0.95, cv_auc_mean=0.70))
     objective = make_objective(trainer=trainer, max_train_val_gap=0.1)
     trial = make_lightgbm_trial()
     params = objective.create_search_space(trial)
@@ -98,7 +100,7 @@ def test_model_training_failure_fatal():
 
 
 def test_auc_below_random():
-    trainer = StubTrainer(perf=SimpleNamespace(train_auc_mean=0.52, cv_auc_mean=0.49))
+    trainer = StubTrainer(perf=SimpleNamespace(in_sample_train_auc=0.52, cv_auc_mean=0.49))
     objective = make_objective(trainer=trainer, max_train_val_gap=0.2)
     trial = make_lightgbm_trial()
     params = objective.create_search_space(trial)
@@ -147,8 +149,14 @@ def test_invalid_model_type():
 
 def test_lightgbm_search_space_ranges():
     objective = make_objective(engine="lightgbm")
-    params = objective.create_search_space(make_lightgbm_trial())
+    trial = make_lightgbm_trial()
+    params = objective.create_search_space(trial)
     assert 0.005 <= params["learning_rate"] <= 0.2
+    # TESTREG b5：上式之值為 FixedTrial 自餵之 0.05 原樣回傳（FixedTrial 越界只 warn），不觸及生產範圍；
+    # 改斷言 create_search_space 實際交給 optuna 之分布邊界
+    dist = trial.distributions["learning_rate"]
+    assert 0.005 <= dist.low < dist.high <= 0.2
+    assert dist.log is True
 
 
 def test_xgboost_search_space_ranges():
@@ -178,6 +186,9 @@ def test_xgboost_search_space_ranges():
     )
     params = objective.create_search_space(trial)
     assert 1 <= params["max_depth"] <= 12
+    # TESTREG b5：上式之值為 FixedTrial 自餵之 6 原樣回傳；改斷言實際交給 optuna 之分布邊界
+    dist = trial.distributions["max_depth"]
+    assert 1 <= dist.low < dist.high <= 12
 
 
 def test_trial_user_attrs_recorded():
@@ -185,9 +196,13 @@ def test_trial_user_attrs_recorded():
     trial = make_lightgbm_trial()
     params = objective.create_search_space(trial)
     objective.evaluate(params)
-    assert "train_auc" in trial.user_attrs
+    # TESTREG b5：LA-2 B2 F9 統一 `in_sample_train_auc`（不再寫 orphan `train_auc`）；補值斷言
+    assert "in_sample_train_auc" in trial.user_attrs
     assert "val_auc" in trial.user_attrs
     assert "train_val_gap" in trial.user_attrs
+    assert trial.user_attrs["in_sample_train_auc"] == pytest.approx(0.78)
+    assert trial.user_attrs["val_auc"] == pytest.approx(0.72)
+    assert trial.user_attrs["train_val_gap"] == pytest.approx(0.06)
 
 
 def test_cv_folds_parameter():
@@ -342,7 +357,7 @@ def test_xgboost_max_depth_upper_bound_error():
 def test_evaluate_xgboost_path():
     X = pd.DataFrame(np.random.randn(200, 3), columns=["a", "b", "c"])
     y = np.random.randint(0, 2, size=200)
-    trainer = StubTrainer(perf=SimpleNamespace(train_auc_mean=0.77, cv_auc_mean=0.74))
+    trainer = StubTrainer(perf=SimpleNamespace(in_sample_train_auc=0.77, cv_auc_mean=0.74))
     objective = ModelHyperparamObjective(
         trainer=trainer,
         features=X,

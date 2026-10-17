@@ -88,7 +88,9 @@ class TestL65ColumnChunking:
         from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
         config = self._make_config()
-        df = self._make_wide_df(n_rows=100, n_cols=1)
+        # 列數須超過因果暖機遮罩（rank 20 + adaptive_zscore 讀 `windows` 預設 100 + winsor 20，
+        # 共遮前 137 列）；100 列會整欄合法遮成 NaN，與「單欄能處理」無關。改用同類測試之 200 列。
+        df = self._make_wide_df(n_rows=200, n_cols=1)
 
         pp = FeaturePreprocessor(config)
         pp._column_chunk_size = 10

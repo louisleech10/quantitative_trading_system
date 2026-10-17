@@ -390,8 +390,7 @@ def test_mutation_m1b_drop_tier_exclusion(monkeypatch: pytest.MonkeyPatch) -> No
         return ICConfig.model_validate(data)
 
     monkeypatch.setattr(ICFilterOrchestrator, "_apply_tier_config", force_on)
+    # 比照 M1：於 mutant 下呼叫被守之原測試，證明其 off 支路會紅（原寫法在探針內直接對被
+    # patch 函式之回傳值斷言，任何實作都紅＝自指，未證明原測試有牙）
     with pytest.raises(AssertionError):
-        # enabled=False 建構,但 apply 被 monkey 成 True → off 支路紅
-        orch = _build_orchestrator(preset="intermediate", factor_return_enabled=False)
-        applied = orch._apply_tier_config(orch._config)
-        assert applied.factor_return.enabled is False
+        test_pure_tier_respects_enabled_flag("intermediate")

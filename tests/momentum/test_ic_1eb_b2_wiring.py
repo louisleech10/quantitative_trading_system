@@ -709,10 +709,20 @@ def test_t22_refilter_oos_scope_remains_test():
     }
 
     # 模擬 analyze 寫 cache 後 refilter（含 split_context）
+    # analyze 於 stage1 後將 fit_mode／pit_stats_version 寫入 metadata（LA-0 M4：refilter 前檢兩者，
+    # 缺則 invalidate 並 raise）；此處以同一解析 helper 取 fit_mode，忠實模擬 analyze 之 cache。
+    from momentum.Analysis.pit_stats import PIT_STATS_VERSION
+
+    fit_mode, _fit_mask = orch._resolve_stage1_fit(config, split_context=split_context)
+    assert fit_mode == "train_mask"
     orch._ic_cache = {
         "features_df": features,
         "label_series": label,
-        "metadata": {"symbol": "BTCUSDT"},
+        "metadata": {
+            "symbol": "BTCUSDT",
+            "fit_mode": fit_mode,
+            "pit_stats_version": PIT_STATS_VERSION,
+        },
         "icir": _minimal_ic_results(features)["icir"],
         "rolling_ic": {},
         "ic_decay": {},

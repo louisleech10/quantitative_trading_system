@@ -56,8 +56,18 @@ class TestThreeWaySync:
         for literal in ("insufficient_events", "turnover_disabled"):
             assert literal in all_reasons
             assert literal in orch_src  # 消費點存在
-        # report_sections：五節鍵在 orchestrator 組裝面皆出現
+        # report_sections：各節鍵在其消費面皆出現。
+        # TESTREG b5：GAP-3 UX Task 7.5 新增之 event_return_table 為「事件後報酬表」表格層之 reason／鍵集登記處，
+        # 唯一消費點＝momentum/Analysis/event_samples/tables.py（_event_return_table_contract），非 orchestrator 組裝面；
+        # 該節改對其具名消費點查，其餘節照舊須在 orchestrator 出現（未登記於此表之新節仍須在 orchestrator 出現）。
+        section_consumers = {
+            "event_return_table": REPO / "momentum/Analysis/event_samples/tables.py",
+        }
         for section in contract["report_sections"]:
+            if section in section_consumers:
+                consumer_src = section_consumers[section].read_text(encoding="utf-8")
+                assert f'"{section}"' in consumer_src, f"{section} 無消費點"
+                continue
             assert f'"{section}"' in orch_src or section == "net_ic_analysis"
 
     def test_m6_tamper_one_side_breaks(self):

@@ -43,9 +43,48 @@ def live_receipt(helpers):
     return helpers.build_receipt(report, config_hash)
 
 
+# TESTREG b5：receipt 凍結（a943e500，2026-08-17）後 ICConfig **只新增**下列預設欄、既有欄預設值零變更
+# （以 a943e500 版 ic_config_schema.py 重算 model_dump 之雜湊＝凍結值 c1616bdf…，逐鍵比對僅 ADDED）。
+# config 雜湊比對改為：現行預設 config 剔除此具名清單後須與凍結雜湊 byte 相同——既有欄任一預設改動、
+# 或未登記之新欄，仍會紅。新增欄對 golden 數值無影響由 test_per_feature_canonical_exact 逐 path exact 把關。
+_ICCONFIG_FIELDS_ADDED_SINCE_FREEZE = (
+    ("marginal_ic",),  # ab53c24e 2026-08-19
+    ("event_filter", "min_test_events"),  # 39b48531 2026-09-08
+    ("event_filter", "min_events_per_class"),  # a69287f3 2026-09-10
+    ("event_filter", "negative_control_n"),  # a69287f3
+    ("event_filter", "oracle_seed"),  # a69287f3
+    ("event_filter", "perm_budget_total"),  # a69287f3
+    ("event_filter", "negative_control_budget_seconds"),  # 77aa5817 2026-09-10
+    ("thresholds", "rank_biserial_min"),  # a69287f3
+)
+
+
+def _config_hash_without_post_freeze_fields(helpers) -> str:
+    import hashlib
+
+    from momentum.Analysis.ic_config_schema import ICConfig
+
+    dump = ICConfig().model_dump(mode="json")
+    for path in _ICCONFIG_FIELDS_ADDED_SINCE_FREEZE:
+        node = dump
+        for key in path[:-1]:
+            node = node[key]
+        del node[path[-1]]  # 欄若被移除／改名 ⇒ KeyError，須回頭檢視
+    return hashlib.sha256(helpers.canonical_json_bytes(dump)).hexdigest()
+
+
 class TestTG1Golden:
-    def test_feature_set_and_config_exact(self, frozen_receipt, live_receipt):
-        assert live_receipt["config_hash"] == frozen_receipt["config_hash"]
+    def test_feature_set_and_config_exact(self, helpers, frozen_receipt, live_receipt):
+        import hashlib
+
+        from momentum.Analysis.ic_config_schema import ICConfig
+
+        # live 主流程所用 config 即現行預設 ICConfig（全量雜湊）
+        assert live_receipt["config_hash"] == hashlib.sha256(
+            helpers.canonical_json_bytes(ICConfig().model_dump(mode="json"))
+        ).hexdigest()
+        # 剔除凍結後新增之具名欄 ⇒ 與凍結雜湊 byte 相同
+        assert _config_hash_without_post_freeze_fields(helpers) == frozen_receipt["config_hash"]
         assert (
             live_receipt["feature_set_sha256"] == frozen_receipt["feature_set_sha256"]
         )
@@ -115,37 +154,69 @@ class TestFlattenUnit:
         status_in = {"featC": {"status": "not_applicable", "reason": "cross_sectional_mode"}}
         assert self._reporter()._flatten_quantile_returns(status_in) == status_in
 
-    def test_m1_mutation_probe_key_rename_breaks_golden_shape(self, helpers):
-        """M1 等價探針：映射鍵改名（模擬）→ canonical 抽取結果必變。"""
+    def test_m1_mutation_probe_key_rename_breaks_golden_shape(self, helpers, monkeypatch):
+        """M1 等價探針：映射鍵改名（模擬）→ canonical 抽取結果必變。
+
+        TESTREG b5：原寫法只改「測試輸入字典」之鍵名，未變異生產 `_flatten_quantile_returns`，
+        只證「不同輸入得不同雜湊」。改為對生產 flatten 注入變異（輸入不變），斷言 golden 抽取可分辨。
+        """
+        from momentum.Analysis.ic_reporter import ICReporter
+
         base = {
             "featD": {
                 "quantile_returns": {
                     "quantile_mean_returns": {"Q1": 0.1},
                     "cumulative_returns": {"Q1": [0.1]},
-                    "long_short_spread": 0.2,
                     "long_short_tstat": 1.0,
                 },
                 "monotonicity_score": 0.7,
+                "long_short": {"spread": 0.2, "tstat": 1.0},
             }
         }
         good = helpers.extract_quantile_canonical(
             self._reporter()._flatten_quantile_returns(base)
         )
-        mutated = {
-            "featD": {
-                "quantile_returns": {
-                    "quantile_mean_returns_RENAMED": {"Q1": 0.1},
+        assert good["featD"] == helpers.extract_quantile_canonical(
+            {
+                "featD": {
+                    "quantile_mean_returns": {"Q1": 0.1},
                     "cumulative_returns": {"Q1": [0.1]},
                     "long_short_spread": 0.2,
                     "long_short_tstat": 1.0,
-                },
-                "monotonicity_score": 0.7,
+                    "monotonicity_score": 0.7,
+                }
             }
-        }
-        bad = helpers.extract_quantile_canonical(
-            self._reporter()._flatten_quantile_returns(mutated)
-        )
-        assert good != bad
-        assert (
-            good["featD"]["canonical_sha256"] != bad["featD"]["canonical_sha256"]
-        )
+        )["featD"]
+
+        original = ICReporter._flatten_quantile_returns
+
+        def _rename_qmr(qr_tree):
+            # 變異①：攤平映射把 quantile_mean_returns 改名
+            return {
+                feature: (
+                    {("quantile_mean_returns_RENAMED" if k == "quantile_mean_returns" else k): v
+                     for k, v in payload.items()}
+                    if isinstance(payload, dict) else payload
+                )
+                for feature, payload in original(qr_tree).items()
+            }
+
+        def _drop_long_short_lift(qr_tree):
+            # 變異②：漏做 long_short.spread → long_short_spread 上提
+            return {
+                feature: (
+                    {k: v for k, v in payload.items() if k != "long_short_spread"}
+                    if isinstance(payload, dict) else payload
+                )
+                for feature, payload in original(qr_tree).items()
+            }
+
+        for mutant in (_rename_qmr, _drop_long_short_lift):
+            monkeypatch.setattr(ICReporter, "_flatten_quantile_returns", staticmethod(mutant))
+            bad = helpers.extract_quantile_canonical(
+                self._reporter()._flatten_quantile_returns(base)
+            )
+            assert good != bad
+            assert (
+                good["featD"]["canonical_sha256"] != bad["featD"]["canonical_sha256"]
+            )

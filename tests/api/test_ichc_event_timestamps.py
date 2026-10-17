@@ -86,7 +86,12 @@ class TestServiceWiringSource:
 
     def test_service_passes_event_timestamps_kwarg(self):
         src = self._src("api/services/ic_analysis_service.py")
-        assert re.search(r"event_timestamps=request\.event_timestamps or None", src)
+        # fe5f715e（GAP-3 UX Task 7.0b）把 kwarg 寫法改為「先賦值、事件分支覆寫、再以 kwarg 傳入
+        # analyzer.analyze」——原 regex 只認 kwarg 字面而過期；改驗兩節點：取值點與 analyze 呼叫透傳。
+        assert re.search(r"event_timestamps\s*=\s*request\.event_timestamps or None", src)
+        assert re.search(
+            r"analyzer\.analyze,[\s\S]{0,400}?event_timestamps=event_timestamps,", src
+        )
         # CODEX-R5-P1-01：full-analysis path 同型漏接已補
         assert re.search(r'event_timestamps=getattr\(request, "event_timestamps", None\) or None', src)
         assert "not supported in API yet" not in src  # warning 已移除
