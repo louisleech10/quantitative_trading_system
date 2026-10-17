@@ -1014,7 +1014,7 @@ tasks:
       
       參見 §4.5.1 CGSA Pipeline 新流程圖。
       每個 layer 的 output 都是新的 ColumnGroups + .npy 註冊到 Registry。
-      Fallback: FFACT_USE_CGSA=0 可切回 legacy pd.concat 路徑。
+      Fallback: FFACT_USE_CGSA=0 可切回 legacy pd.concat 路徑。（FRAMEPATH 已刪 legacy 路徑與此開關）
       
       注意：此 task 是 Phase 2 架構變更的核心，涉及多個 layer 的輸入/輸出改造。
       Phase 3 (Numba) 將進一步優化 L3 的演算法，但 L3 的 per-group 介面在這裡建立。
@@ -1042,7 +1042,7 @@ tasks:
       - "在 feature_factory per-TF pipeline 不再呼叫 _combine_layers()"
       - "在 FeatureEngineering pipeline 路徑不再呼叫 concat_with_memmap()"
       - "L3/L4/L5/L6 均改為 per-ColumnGroup 輸入/輸出"
-      - "FFACT_USE_CGSA=0 可完整切回 legacy 路徑"
+      - "FFACT_USE_CGSA=0 可完整切回 legacy 路徑（FRAMEPATH 已刪 legacy 路徑與此開關）"
       - "所有修改函式有完整 type hints"
     failure_modes:
       - scenario: "L5 cross-sectional 需要多 group 的同 row 資料"
@@ -1405,7 +1405,7 @@ tasks:
       □ re-profile 完成 — 確認 L3 是剩餘 top-1 瓶頸
       □ grep -r "from api\." momentum/ → 0 結果 (R1)
       □ momentum/factories.py 包含 create_column_group_registry()
-      □ 所有 fallback env var 可切回 (FFACT_USE_CGSA=0)
+      □ 所有 fallback env var 可切回 (FFACT_USE_CGSA=0；FRAMEPATH 已刪此開關)
       □ Pre-commit checklist 全部 ✓
     wave: 19
     agent: gem-reviewer

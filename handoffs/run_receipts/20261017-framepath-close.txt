@@ -1,21 +1,26 @@
-FRAMEPATH Task 4.2 收案總檢（2026-10-17，HEAD 230a3b02＋工作樹 b4 改動）
+FRAMEPATH Task 4.2 收案總檢（2026-10-17；SPEC v26 D19；HEAD 5b27c418＋b4 審碼 r1 修補之工作樹）
 
-命令：git grep -l -E 'FFACT_USE_CGSA|_cgsa_enabled|load_factory_output|save_factory_output|_factory\.h5|_legacy_native_row_maps|_generate_multi_tf_legacy|_try_load_cache' -- momentum api scripts frontend/src tests
-
-命中檔（全部）：
-  scripts/fact_keys.json
-  scripts/framepath_affected_gate.py
-  tests/_golden/batch2d/cgsa_baseline.json
-  tests/_golden/failopen/baseline.json
-  tests/_golden/framepath/test_disposition.json
-  tests/api/test_framepath_api_h5.py
-  tests/feature_engineering/test_framepath_cgsa_only.py
-  tests/feature_engineering/test_framepath_disposition.py
-
-白名單外之命中：
-  scripts/framepath_affected_gate.py
-
-說明：scripts/framepath_affected_gate.py 為本票新增之受影響測試閘（SPEC v20 D6 新檔），其 FFACT_KEY 常數與 _cgsa_enabled 字面為靜態分析偵測對象之名稱，非呼叫；同屬本票新增工具，視同白名單之「本票新測」。
-生產碼（momentum／api／frontend/src）命中：0 檔
-
-其他驗證：FRAMEPATH_PHASE=3 tests/feature_engineering/test_framepath_disposition.py -k check 24 passed；b4 改動之 24 個測試檔 --collect-only 489 collected rc=0；Task 4.1 三份文件 grep 0。
+① 殘留掃描一（命令：handoffs/run_receipts/framepath_probes/close_scans.sh 之 scan1，git grep 已追蹤檔）
+   命中：scripts/fact_keys.json、scripts/framepath_affected_gate.py、tests/_golden/batch2d/cgsa_baseline.json、
+         tests/_golden/failopen/baseline.json、tests/_golden/framepath/test_disposition.json、tests/api/test_framepath_api_h5.py、
+         tests/feature_engineering/test_framepath_cgsa_only.py、tests/feature_engineering/test_framepath_disposition.py
+   判定：全在白名單（framepath_affected_gate.py 依 v26 D19 明列）；生產碼 momentum／api／frontend/src 命中 0。
+② 殘留掃描二（scan2）
+   命中：docs/ROADMAP.md（「以下為沿革」之後）、scripts/fact_keys.json（同）、tests/_golden/framepath/test_disposition.json、
+         tests/feature_engineering/test_framepath_disposition.py（合成測例字面，v26 D19）
+   判定：全在白名單。
+③ 殘留掃描三（scan3）
+   命中：docs/FFNAME_SPEC.md:23、:39、:111（v26 D19：全文允許）；docs/ROADMAP.md:60（首個命中位置 525 > 「以下為沿革」位置 332）；
+         docs/plan/feature-factory-optimization/plan.yaml:1017、:1045、:1408（同行帶「FRAMEPATH 已刪」標註）
+   判定：全在允許條件內。
+④ bash scripts/gen_fact_key_blocks.sh（檢查模式）：rc=0（主工作樹）。註：乾淨 clone 中 rc=1，因其引用之
+   handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md 不在 git（handoffs 不入庫），屬環境差異非本票造成。
+⑤ bash scripts/check_decoupling.sh：現行與錨點 6e07e0ad（暫存 worktree 實跑後移除）皆 rc=1、皆僅 Rule 2/3/4 一條紅
+   （import scanner；現行兩處 R3 為 api/routes/ic_analysis.py、api/services/ic_analysis_service.py 之 assert_filtered_export_fresh，
+   錨點已存在）⇒ 紅燈數不多於錨點。
+⑥ Task 1.1 不變測試：b2 受影響閘 A 組 tests/feature_engineering/test_framepath_invariance.py 62 項 failures=0 errors=0
+   （handoffs/run_receipts/framepath-b2-affected.json groups.A；.testreg/framepath_gate_b2/a_junit）；其後
+   git diff d0931a00 HEAD -- momentum api frontend/src 為 0 檔 ⇒ 生產碼未再變，結果仍適用。
+⑦ allowed_red：grep -ci framepath tests/_golden/prered/allowed_red.json → 0。
+⑧ 其他：FRAMEPATH_PHASE=3 tests/feature_engineering/test_framepath_disposition.py -k check 24 passed；b4 改動之測試檔
+   --collect-only 489 collected rc=0；Task 4.1 三份文件（ARCHITECTURE、DEVELOPMENT_GUIDE、FF_FAILOPEN_FROZEN_TESTS）grep 0。
