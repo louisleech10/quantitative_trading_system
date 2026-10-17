@@ -150,40 +150,6 @@ def test_feature_summary(temp_storage_path, sample_features):
           f"高相關性對: {len(summary['high_correlation_pairs'])}")
 
 
-def test_feature_file_operations(temp_storage_path, sample_features):
-    """測試特徵檔案操作 (列出、檢查、刪除)"""
-    features_df, feature_names, params = sample_features
-    storage = FeatureStorage(base_path=temp_storage_path)
-    
-    case_id = "TEST_ETHUSDT_1735905600_3"
-    symbol = "ETHUSDT"
-    timeframe = "1h"
-    
-    # 檢查檔案不存在
-    assert not storage.feature_file_exists(case_id)
-    
-    # 儲存特徵
-    storage.save_features_to_hdf5(
-        case_id, symbol, timeframe, features_df, feature_names,
-        strategy_params={'strategy_type': params.strategy_type, 'params': params.params}
-    )
-    
-    # 檢查檔案存在
-    assert storage.feature_file_exists(case_id)
-    
-    # 列出檔案
-    file_list = storage.list_feature_files()
-    assert len(file_list) >= 1
-    assert any(f['case_id'] == case_id for f in file_list)
-    
-    # 刪除檔案
-    success = storage.delete_features(case_id)
-    assert success
-    
-    # 檢查檔案已刪除
-    assert not storage.feature_file_exists(case_id)
-    
-    print("✅ 特徵檔案操作測試通過")
 
 
 def test_edge_case_file_not_found(temp_storage_path):
@@ -223,7 +189,11 @@ def test_cgsa_registry_reports_insufficient_disk(monkeypatch, tmp_path):
 
 
 def test_cgsa_parquet_uses_float32_when_values_exceed_float16(tmp_path):
-    """測試 BTC 價格尺度特徵不會因 float16 overflow 變成 inf。"""
+    """測試 BTC 價格尺度特徵不會因 float16 overflow 變成 inf。
+
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入
+    write_raw_from_registry_stream（共用 _select_parquet_storage_columns 之 float16→float32 退回）。
+    """
     registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
     data = np.array(
         [
@@ -247,21 +217,24 @@ def test_cgsa_parquet_uses_float32_when_values_exceed_float16(tmp_path):
     )
 
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
-    storage.persist_registry_to_parquet("BTCUSDT", "hash", registry)
+    raw_dir, stream_summary = storage.write_raw_from_registry_stream("BTCUSDT", "12h", "hash", registry)
 
-    output_dir = tmp_path / "features" / "BTCUSDT" / "hash"
-    df = pd.read_parquet(output_dir / "test_high_price.parquet")
-    manifest = json.loads((output_dir / "manifest.json").read_text())
+    df = pd.read_parquet(raw_dir / "test_high_price.parquet")
+    manifest = json.loads((raw_dir.parent / "feature_manifest.json").read_text())
 
     assert str(df["btc_price_feature"].dtype) == "float32"
     assert np.isinf(df["btc_price_feature"].to_numpy()).sum() == 0
     assert df["btc_price_feature"].tolist() == [60000.0, 70000.0, 80000.0]
-    assert manifest["dtype"] == "mixed"
+    assert stream_summary["storage_dtype"] == "mixed"
     assert manifest["groups"]["test_high_price"]["dtype"] == "mixed"
 
 
 def test_cgsa_parquet_uses_float32_when_float16_underflows_tiny_values(tmp_path):
-    """測試極小價格尺度特徵不會因 float16 underflow 變成 0。"""
+    """測試極小價格尺度特徵不會因 float16 underflow 變成 0。
+
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入
+    write_raw_from_registry_stream（共用 _select_parquet_storage_columns 之 underflow 退回 float32）。
+    """
     registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
     data = np.array(
         [
@@ -285,21 +258,25 @@ def test_cgsa_parquet_uses_float32_when_float16_underflows_tiny_values(tmp_path)
     )
 
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
-    storage.persist_registry_to_parquet("TINYUSDT", "hash", registry)
+    raw_dir, stream_summary = storage.write_raw_from_registry_stream("TINYUSDT", "12h", "hash", registry)
 
-    output_dir = tmp_path / "features" / "TINYUSDT" / "hash"
-    df = pd.read_parquet(output_dir / "test_tiny_price.parquet")
-    manifest = json.loads((output_dir / "manifest.json").read_text())
+    df = pd.read_parquet(raw_dir / "test_tiny_price.parquet")
+    manifest = json.loads((raw_dir.parent / "feature_manifest.json").read_text())
 
     assert str(df["tiny_positive"].dtype) == "float32"
     np.testing.assert_allclose(df["tiny_positive"].to_numpy(), data[:, 0], rtol=1e-7, atol=0)
     np.testing.assert_allclose(df["tiny_negative"].to_numpy(), data[:, 1], rtol=1e-7, atol=0)
-    assert manifest["dtype"] == "float32"
+    assert stream_summary["storage_dtype"] == "float32"
     assert manifest["groups"]["test_tiny_price"]["dtype"] == "float32"
 
 
 def test_cgsa_parquet_keeps_float16_when_safe(tmp_path):
-    """測試一般尺度特徵仍保留 float16 壓縮。"""
+    """測試一般尺度特徵仍保留 float16 壓縮。
+
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入
+    write_raw_from_registry_stream（dtype_summary 由共用 _build_dtype_summary 產生，記於
+    feature_manifest.json 之 generation_metadata）。
+    """
     registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
     data = np.array([[100.0, 1.0], [200.0, 2.0]], dtype=np.float32)
     registry.save_data(
@@ -316,24 +293,28 @@ def test_cgsa_parquet_keeps_float16_when_safe(tmp_path):
     )
 
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
-    storage.persist_registry_to_parquet("ETHUSDT", "hash", registry)
+    raw_dir, stream_summary = storage.write_raw_from_registry_stream("ETHUSDT", "12h", "hash", registry)
 
-    output_dir = tmp_path / "features" / "ETHUSDT" / "hash"
-    df = pd.read_parquet(output_dir / "test_small.parquet")
-    manifest = json.loads((output_dir / "manifest.json").read_text())
+    df = pd.read_parquet(raw_dir / "test_small.parquet")
+    manifest = json.loads((raw_dir.parent / "feature_manifest.json").read_text())
 
     assert str(df["small_price"].dtype) == "float16"
-    assert manifest["dtype"] == "float16"
+    assert stream_summary["storage_dtype"] == "float16"
     assert manifest["groups"]["test_small"]["dtype"] == "float16"
     # Task 1: dtype_summary structured payload always present.
-    summary = manifest["dtype_summary"]
+    summary = manifest["generation_metadata"]["dtype_summary"]
     assert summary["counts"] == {"float16": 1}
     assert summary["float32_fallback_count"] == 0
     assert summary["float32_fallback_parts"] == []
+    assert stream_summary["dtype_summary"] == summary
 
 
 def test_cgsa_manifest_dtype_summary_records_mixed_dtype(tmp_path):
-    """Mixed-dtype runs must surface per-dtype counts + the fallback group list."""
+    """Mixed-dtype runs must surface per-dtype counts + the fallback group list.
+
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入
+    write_raw_from_registry_stream（dtype_summary 記於 feature_manifest.json 之 generation_metadata）。
+    """
     registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
     safe = np.array([[100.0, 1.0], [200.0, 2.0], [300.0, 3.0]], dtype=np.float32)
     overflow = np.array(
@@ -366,14 +347,14 @@ def test_cgsa_manifest_dtype_summary_records_mixed_dtype(tmp_path):
     )
 
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
-    storage.persist_registry_to_parquet("MIXEDUSDT", "hash", registry)
+    raw_dir, stream_summary = storage.write_raw_from_registry_stream("MIXEDUSDT", "12h", "hash", registry)
 
     manifest = json.loads(
-        (tmp_path / "features" / "MIXEDUSDT" / "hash" / "manifest.json").read_text()
+        (raw_dir.parent / "feature_manifest.json").read_text()
     )
 
-    assert manifest["dtype"] == "mixed"
-    summary = manifest["dtype_summary"]
+    assert stream_summary["storage_dtype"] == "mixed"
+    summary = manifest["generation_metadata"]["dtype_summary"]
     assert summary["counts"] == {"float16": 1, "mixed": 1}
     assert summary["column_counts"] == {"float16": 3, "float32": 1}
     assert summary["float32_fallback_count"] == 1
@@ -381,7 +362,11 @@ def test_cgsa_manifest_dtype_summary_records_mixed_dtype(tmp_path):
 
 
 def test_cgsa_parquet_mixed_part_falls_back_per_column(tmp_path):
-    """同一 parquet part 內只有不安全欄位應退回 float32。"""
+    """同一 parquet part 內只有不安全欄位應退回 float32。
+
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入
+    write_raw_from_registry_stream（共用 _select_parquet_storage_columns 之逐欄退回）。
+    """
     registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
     data = np.array(
         [[100.0, 60000.0], [200.0, 70000.0], [300.0, 80000.0]],
@@ -401,22 +386,26 @@ def test_cgsa_parquet_mixed_part_falls_back_per_column(tmp_path):
     )
 
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
-    storage.persist_registry_to_parquet("MIXCOLUSDT", "hash", registry)
+    raw_dir, stream_summary = storage.write_raw_from_registry_stream("MIXCOLUSDT", "12h", "hash", registry)
 
-    output_dir = tmp_path / "features" / "MIXCOLUSDT" / "hash"
-    df = pd.read_parquet(output_dir / "grp_mixed_columns.parquet")
-    manifest = json.loads((output_dir / "manifest.json").read_text())
+    df = pd.read_parquet(raw_dir / "grp_mixed_columns.parquet")
+    manifest = json.loads((raw_dir.parent / "feature_manifest.json").read_text())
 
     assert str(df["safe_small"].dtype) == "float16"
     assert str(df["unsafe_big"].dtype) == "float32"
-    assert manifest["dtype"] == "mixed"
+    assert stream_summary["storage_dtype"] == "mixed"
     assert manifest["groups"]["grp_mixed_columns"]["dtype"] == "mixed"
-    assert manifest["dtype_summary"]["counts"] == {"mixed": 1}
-    assert manifest["dtype_summary"]["column_counts"] == {"float16": 1, "float32": 1}
+    assert manifest["generation_metadata"]["dtype_summary"]["counts"] == {"mixed": 1}
+    assert manifest["generation_metadata"]["dtype_summary"]["column_counts"] == {"float16": 1, "float32": 1}
+    assert manifest["groups"]["grp_mixed_columns"]["float32_columns"] == ["unsafe_big"]
 
 
 def test_l7_disk_precheck_raises_when_estimate_exceeds_free_space(monkeypatch, tmp_path):
-    """L7 entry guard fails fast when aggregate estimate exceeds free disk."""
+    """L7 entry guard fails fast when aggregate estimate exceeds free disk.
+
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）與其預檢已刪；改驗 V2 串流寫入
+    write_raw_from_registry_stream 之入口磁碟預檢（_precheck_l7_raw_stream_disk_space），且失敗時不安裝 raw。
+    """
     registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
     data = np.ones((4, 2), dtype=np.float32)
     registry.save_data(
@@ -436,16 +425,24 @@ def test_l7_disk_precheck_raises_when_estimate_exceeds_free_space(monkeypatch, t
     monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: 1)
 
     try:
-        storage.persist_registry_to_parquet("DISKFULL", "hash", registry)
+        storage.write_raw_from_registry_stream("DISKFULL", "12h", "hash", registry)
         assert False, "Expected aggregate L7 disk pre-check to fail"
     except OSError as exc:
         message = str(exc)
-        assert "Insufficient disk space for L7 persist" in message
+        assert "Insufficient disk space for L7_raw streaming persist" in message
         assert "safety_factor" in message
+    assert not (tmp_path / "features" / "DISKFULL" / "12h" / "hash" / "raw").exists()
 
 
 def test_l7_disk_precheck_accounts_for_reclaimable_npy(monkeypatch, tmp_path):
-    """L7 precheck 應用 streaming budget，不因可回收 .npy 總量誤判失敗。"""
+    """L7 precheck 應用 streaming budget，不因可回收 .npy 總量誤判失敗。
+
+    FRAMEPATH Task 2.5：V1 預檢（_precheck_l7_disk_space）隨 persist_registry_to_parquet 刪除；改驗
+    V2 串流寫入 write_raw_from_registry_stream 入口所呼叫之 _precheck_l7_raw_stream_disk_space。
+    預留下限設 0 以單獨驗可回收 .npy 之扣抵（不扣抵 ⇒ 需約 2.8 GiB > 可用 1 GiB ⇒ 拋錯）。
+    """
+    monkeypatch.setenv("FFACT_L7_MIN_FREE_GIB", "0")
+    monkeypatch.delenv("FFACT_L7_DISK_SAFETY_FACTOR", raising=False)
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
     one_gib = 1024 ** 3
     group_count = 1000
@@ -468,10 +465,9 @@ def test_l7_disk_precheck_accounts_for_reclaimable_npy(monkeypatch, tmp_path):
 
     monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: one_gib)
 
-    storage._precheck_l7_disk_space(
-        tmp_path / "features" / "STREAM" / "hash",
+    storage._precheck_l7_raw_stream_disk_space(
+        tmp_path / "features" / "STREAM" / "12h" / "hash",
         groups,
-        batch_limit=2,
     )
 
 

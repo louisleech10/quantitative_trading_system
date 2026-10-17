@@ -41,36 +41,6 @@ def test_save_features_to_hdf5_writes_float32() -> None:
 
 # ── T1-02: load_factory_output returns float32 ──
 
-def test_load_factory_output_returns_float32() -> None:
-    """load_factory_output should return float32 even if stored as float64."""
-    from momentum.FeatureEngineering.feature_storage import FeatureStorage
-
-    storage = FeatureStorage()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        storage.base_path = Path(tmpdir)
-        hdf5_file = Path(tmpdir) / "TESTUSDT_1h_factory.h5"
-
-        with h5py.File(hdf5_file, "w") as f:
-            group = f.create_group("TESTUSDT/1h")
-            group.create_dataset(
-                "features",
-                data=np.array([[1.0], [2.0], [3.0]], dtype=np.float64),
-            )
-            group.create_dataset(
-                "timestamps",
-                data=np.array([1, 2, 3], dtype=np.int64),
-            )
-            str_dtype = h5py.string_dtype(encoding="utf-8")
-            group.create_dataset(
-                "feature_names",
-                data=np.array(["feat_a"], dtype=object),
-                dtype=str_dtype,
-            )
-            group.attrs["metadata_json"] = "{}"
-
-        result = storage.load_factory_output("TESTUSDT", "1h")
-        assert result is not None
-        assert result.features_df["feat_a"].dtype == np.float32
 
 
 # ── T1-03: KlineStorageManager.get_last_timestamp returns None for non-existent ──

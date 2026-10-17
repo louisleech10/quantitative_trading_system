@@ -2388,53 +2388,21 @@ class ICAnalysisService:
         timeframe: Optional[str] = None,
         config_hash: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Read available feature list from V7 Parquet or legacy HDF5.
+        """Read available feature list of a V2 run：(symbol, timeframe, config_hash) → FeatureReader.list_features_v2.
 
-        V2 query: (symbol, timeframe, config_hash) → FeatureReader.list_features_v2.
-        V7 path: features_path = 'parquet:{symbol}:{config_hash}' → FeatureReader.
-        Legacy: features_path = '/path/to/file.h5' → h5py.
+        FRAMEPATH Task 2.6：舊位址（`features_path`，含舊 Parquet 位址字串與舊特徵 h5 檔）已不支援 ⇒ ValueError
+        （route 轉 400，訊息含原位址並指向三元組）。
         """
+        if features_path:
+            raise ValueError(
+                f"features_path 舊位址已不支援：{features_path}；請改用 symbol、timeframe、config_hash 三元組指定特徵 run"
+            )
+        if not (symbol and timeframe and config_hash):
+            raise ValueError("symbol, timeframe and config_hash are required")
+
         metadata = self._load_meta(meta_path)
-
-        if symbol and timeframe and config_hash:
-            reader = create_feature_reader()
-            names = reader.list_features_v2(symbol, timeframe, config_hash)
-            return self._build_feature_items(names, metadata)
-
-        if not features_path:
-            raise ValueError("features_path or (symbol, timeframe, config_hash) is required")
-
-        # V7 Parquet path via FeatureReader
-        if features_path.startswith("parquet:"):
-            parts = features_path.split(":")
-            if len(parts) != 3:
-                raise ValueError("Invalid Parquet source format, expected parquet:{symbol}:{config_hash}")
-            _, symbol, config_hash = parts
-            reader = create_feature_reader()
-            names = reader.list_features(symbol, config_hash)
-            return self._build_feature_items(names, metadata)
-
-        # Legacy HDF5 path
-        path = Path(features_path)
-        if not path.exists():
-            raise FileNotFoundError(f"features_path not found: {features_path}")
-
-        with h5py.File(path, "r") as h5_file:
-            if "data" not in h5_file:
-                raise ValueError("Invalid features HDF5: missing 'data' group")
-            group = h5_file["data"]
-
-            if "feature_names" in group:
-                raw_names = group["feature_names"][:]
-                names = [
-                    item.decode("utf-8") if isinstance(item, bytes) else str(item)
-                    for item in raw_names
-                ]
-            elif "features" in group and len(group["features"].shape) == 2:
-                names = [f"feature_{i}" for i in range(group["features"].shape[1])]
-            else:
-                raise ValueError("Invalid features HDF5: missing feature_names/features")
-
+        reader = create_feature_reader()
+        names = reader.list_features_v2(symbol, timeframe, config_hash)
         return self._build_feature_items(names, metadata)
 
     def compute_ic_from_l7_raw(

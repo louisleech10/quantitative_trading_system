@@ -71,23 +71,25 @@ def test_feature_library_list_available() -> None:
 
 
 def test_feature_library_load_success() -> None:
-    """load should return DataFrame when registry/storage both have data."""
+    """load should return DataFrame when registry/V2 reader both have data."""
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
 
     mock_registry = MagicMock()
-    mock_registry.find_latest.return_value = {
+    mock_registry.find_latest_materialized.return_value = {
         "symbol": "BTC",
         "timeframe": "1h",
         "config_hash": "h",
     }
 
-    mock_result = MagicMock()
-    mock_result.features_df = pd.DataFrame({"feat_a": [1.0, 2.0]})
+    mock_reader = MagicMock()
+    mock_reader.load_manifest_v2.return_value = {"run_status": "complete"}
+    mock_reader.list_features_v2.return_value = ["feat_a"]
+    mock_reader.load_columns_v2.return_value = pd.DataFrame({"feat_a": [1.0, 2.0]})
+    mock_reader.load_row_index_v2.return_value = None
 
     mock_storage = MagicMock()
-    mock_storage.load_factory_output.return_value = mock_result
 
-    lib = FeatureLibrary(mock_registry, mock_storage)
+    lib = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)
     df = lib.load("BTC", "1h")
     assert len(df) == 2
 
@@ -116,15 +118,17 @@ def test_feature_library_load_multi_raises_on_any_missing() -> None:
             return {"symbol": "BTC", "timeframe": "1h", "config_hash": "h"}
         return None
 
-    mock_registry.find_latest.side_effect = fake_find
+    mock_registry.find_latest_materialized.side_effect = fake_find
 
-    mock_result = MagicMock()
-    mock_result.features_df = pd.DataFrame({"f": [1.0]})
+    mock_reader = MagicMock()
+    mock_reader.load_manifest_v2.return_value = {"run_status": "complete"}
+    mock_reader.list_features_v2.return_value = ["f"]
+    mock_reader.load_columns_v2.return_value = pd.DataFrame({"f": [1.0]})
+    mock_reader.load_row_index_v2.return_value = None
 
     mock_storage = MagicMock()
-    mock_storage.load_factory_output.return_value = mock_result
 
-    lib = FeatureLibrary(mock_registry, mock_storage)
+    lib = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)
     with pytest.raises(FeatureNotFoundError):
         lib.load_multi(["BTC", "ETH"], "1h")
 

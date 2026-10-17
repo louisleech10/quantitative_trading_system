@@ -121,10 +121,14 @@ def test_cgsa_force_fresh_skips_existing_manifest(
 def test_cgsa_config_hash_passed_correctly(
     feature_factory: FeatureFactory,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """測試 generate_features：config_hash 應正確傳入 _prepare_cgsa_registry。"""
     # PRE-RED Task 2.2：04176c18 起 _prepare_cgsa_registry 之前之輸出窗解析、預熱覆蓋檢查與校準關卡讀取 config
     # 其他欄位 ⇒ 改用真實 FactoryConfig（於 monkeypatch 前取得，不 stub check_l1_warmup_coverage／resolve_output_window）
+    # FRAMEPATH（SPEC v22 D11.5／v23 D12.2）：生成只走 CGSA，registry 為 None 即於 L1 前具名拒絕
+    # （CGSARegistryRequiredError）⇒ 替身改為建立 CGSA registry，使流程走到 L0（stop-after-prepare）；
+    # 舊特徵 h5 快取查詢 `_try_load_cache` 已刪（Task 2.1），其打樁一併移除
     from momentum.FeatureEngineering.config_manager import ConfigManager
 
     config = ConfigManager().get_merged_config({"timeframes": {"primary": "1h", "training": ["1h"]}})
@@ -132,13 +136,12 @@ def test_cgsa_config_hash_passed_correctly(
 
     monkeypatch.setattr(feature_factory, "_resolve_config", lambda override: config)
     monkeypatch.setattr(feature_factory, "_compute_config_hash", lambda *args, **kwargs: "1234567890abcdef")
-    monkeypatch.setattr(feature_factory, "_try_load_cache", lambda *args, **kwargs: None)
 
-    def fake_prepare(symbol: str, timeframe: str, config_hash: str = "") -> None:
+    def fake_prepare(symbol: str, timeframe: str, config_hash: str = "") -> ColumnGroupRegistry:
         captured["symbol"] = symbol
         captured["timeframe"] = timeframe
         captured["config_hash"] = config_hash
-        return None
+        return ColumnGroupRegistry(work_dir=tmp_path / "cgsa_work" / f"{symbol}_{timeframe}_{config_hash[:8]}")
 
     monkeypatch.setattr(feature_factory, "_prepare_cgsa_registry", fake_prepare)
 

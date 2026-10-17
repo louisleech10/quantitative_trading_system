@@ -70,19 +70,21 @@ def test_load_multi_returns_dict_keyed_by_symbol() -> None:
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
 
     mock_registry = MagicMock()
-    mock_registry.find_latest.return_value = {
+    mock_registry.find_latest_materialized.return_value = {
         "symbol": "X",
         "timeframe": "1h",
         "config_hash": "h",
     }
 
-    mock_result = MagicMock()
-    mock_result.features_df = pd.DataFrame({"f": [1.0]})
+    mock_reader = MagicMock()
+    mock_reader.load_manifest_v2.return_value = {"run_status": "complete"}
+    mock_reader.list_features_v2.return_value = ["f"]
+    mock_reader.load_columns_v2.return_value = pd.DataFrame({"f": [1.0]})
+    mock_reader.load_row_index_v2.return_value = None
 
     mock_storage = MagicMock()
-    mock_storage.load_factory_output.return_value = mock_result
 
-    library = FeatureLibrary(mock_registry, mock_storage)
+    library = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)
     result = library.load_multi(["SYM1", "SYM2"], "1h")
     assert isinstance(result, dict)
     assert "SYM1" in result

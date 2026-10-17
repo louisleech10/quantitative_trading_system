@@ -343,13 +343,13 @@ async def get_result_feature_detail(task_id: str, feature_name: str, revision: O
 
 @router.get("/features/list", response_model=FeatureListResponse)
 async def list_available_features(
-    features_path: Optional[str] = Query(None, description="Legacy features path or parquet key"),
+    features_path: Optional[str] = Query(None, description="舊位址（已不支援，帶值即 400；請用 symbol/timeframe/config_hash）"),
     meta_path: Optional[str] = None,
     symbol: Optional[str] = Query(None, description="Feature Library symbol"),
     timeframe: Optional[str] = Query(None, description="Feature Library timeframe"),
     config_hash: Optional[str] = Query(None, description="Feature Library config_hash"),
 ):
-    """List available features from HDF5 + optional metadata."""
+    """List available features of a V2 run（symbol/timeframe/config_hash）+ optional metadata."""
     try:
         features = ic_analysis_service.list_features(
             features_path=features_path,

@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
-import h5py
 import numpy as np
 import pandas as pd
 
@@ -71,11 +70,6 @@ class CoverageAnalyzer:
             if coverage < threshold:
                 low_features.append(feature_name)
         return low_features
-
-    @staticmethod
-    def _resolve_feature_file_path(symbol: str, timeframe: str, feature_base_path: str) -> Path:
-        base_path = Path(feature_base_path).expanduser().resolve()
-        return base_path / f"{symbol}_{timeframe}_factory.h5"
 
     def _find_latest_v2_config_hash(
         self,
@@ -147,67 +141,34 @@ class CoverageAnalyzer:
         timeframe: str,
         feature_base_path: str,
     ) -> pd.DataFrame | None:
-        """Load features for a symbol: V2 → V7 → legacy HDF5。"""
+        """Load features for a symbol（只讀 V2：{symbol}/{timeframe}/{config_hash}/feature_manifest.json）；無 V2 run ⇒ None。"""
         base = Path(feature_base_path).expanduser().resolve()
         tf = timeframe.strip()
 
-        # V2 path: {symbol}/{timeframe}/{config_hash}/feature_manifest.json
         v2_manifest_bundle = self._load_v2_manifest_for_symbol(symbol, tf, feature_base_path)
-        if v2_manifest_bundle is not None:
-            manifest, config_hash = v2_manifest_bundle
-            try:
-                reader = self._get_feature_reader(str(base))
-                columns = self._collect_v2_columns(manifest)
-                if columns:
-                    df = reader.load_columns_v2(symbol, tf, config_hash, columns, artifact_kind="raw")
-                    if not df.empty:
-                        logger.info(
-                            "Coverage: loaded %s via V2 FeatureReader (%d cols)",
-                            symbol,
-                            len(df.columns),
-                        )
-                        return df
-            except Exception as exc:
-                logger.warning(
-                    "Coverage: V2 FeatureReader failed for %s: %s, falling back",
-                    symbol,
-                    exc,
-                )
-
-        # V7 path: scan for manifest.json in feature_base_path/{symbol}/*/
-        sym_dir = base / symbol
-        if sym_dir.is_dir():
-            for config_dir in sorted(sym_dir.iterdir(), reverse=True):
-                manifest_path = config_dir / "manifest.json"
-                if manifest_path.exists():
-                    try:
-                        reader = self._get_feature_reader(str(base))
-                        config_hash = config_dir.name
-                        columns = reader.list_features(symbol, config_hash)
-                        if columns:
-                            df = reader.load_columns(symbol, config_hash, columns)
-                            if not df.empty:
-                                logger.info(
-                                    "Coverage: loaded %s via FeatureReader (%d cols)",
-                                    symbol, len(df.columns),
-                                )
-                                return df
-                    except Exception as exc:
-                        logger.warning(
-                            "Coverage: FeatureReader failed for %s: %s, falling back to HDF5",
-                            symbol, exc,
-                        )
-
-        # Legacy HDF5 fallback
-        file_path = self._resolve_feature_file_path(symbol, timeframe, feature_base_path)
-        if not file_path.exists():
-            logger.warning("Coverage matrix feature file not found: %s", file_path)
+        if v2_manifest_bundle is None:
+            logger.warning("Coverage: no V2 feature run for %s/%s under %s", symbol, tf, base)
             return None
+        manifest, config_hash = v2_manifest_bundle
         try:
-            return self._load_feature_dataframe(file_path)
+            reader = self._get_feature_reader(str(base))
+            columns = self._collect_v2_columns(manifest)
+            if columns:
+                df = reader.load_columns_v2(symbol, tf, config_hash, columns, artifact_kind="raw")
+                if not df.empty:
+                    logger.info(
+                        "Coverage: loaded %s via V2 FeatureReader (%d cols)",
+                        symbol,
+                        len(df.columns),
+                    )
+                    return df
         except Exception as exc:
-            logger.warning("Coverage matrix failed to read %s: %s", file_path, exc)
-            return None
+            logger.warning(
+                "Coverage: V2 FeatureReader failed for %s: %s",
+                symbol,
+                exc,
+            )
+        return None
 
     def _get_feature_reader(self, feature_base_path: str) -> IFeatureReader:
         if self._feature_reader_factory is None:
@@ -215,57 +176,6 @@ class CoverageAnalyzer:
 
             self._feature_reader_factory = create_feature_reader
         return self._feature_reader_factory(feature_base_path)
-
-    @staticmethod
-    def _decode_feature_names(raw_names: np.ndarray, feature_count: int) -> list[str]:
-        names = [
-            value.decode("utf-8") if isinstance(value, (bytes, bytearray, np.bytes_)) else str(value)
-            for value in raw_names
-        ]
-        if len(names) != feature_count:
-            return [f"feature_{idx}" for idx in range(feature_count)]
-        return names
-
-    @staticmethod
-    def _find_dataset_group(h5_file: h5py.File) -> h5py.Group | None:
-        if "data" in h5_file and isinstance(h5_file["data"], h5py.Group) and "features" in h5_file["data"]:
-            return h5_file["data"]
-
-        candidate_path: str | None = None
-
-        def visitor(name: str, node: object) -> None:
-            nonlocal candidate_path
-            if candidate_path is not None:
-                return
-            if isinstance(node, h5py.Group) and "features" in node:
-                candidate_path = name
-
-        h5_file.visititems(visitor)
-        if candidate_path is None:
-            return None
-
-        node = h5_file[candidate_path]
-        if isinstance(node, h5py.Group):
-            return node
-        return None
-
-    def _load_feature_dataframe(self, file_path: Path) -> pd.DataFrame:
-        with h5py.File(file_path, "r") as h5_file:
-            dataset_group = self._find_dataset_group(h5_file)
-            if dataset_group is None:
-                raise ValueError(f"Unable to locate features dataset in {file_path}")
-
-            features = dataset_group["features"][:]
-            if features.ndim != 2:
-                raise ValueError(f"Invalid feature shape in {file_path}: {features.shape}")
-
-            raw_names = dataset_group.get("feature_names")
-            if raw_names is None:
-                names = [f"feature_{idx}" for idx in range(features.shape[1])]
-            else:
-                names = self._decode_feature_names(raw_names[:], features.shape[1])
-
-            return pd.DataFrame(features, columns=names)
 
     def compute_symbol_coverage_matrix(
         self,

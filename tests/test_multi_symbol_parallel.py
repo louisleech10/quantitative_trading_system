@@ -116,75 +116,12 @@ def large_registry(tmp_path):
     return registry, data
 
 
-@pytest.fixture()
-def persisted_output(tmp_output_dir, sample_registry):
-    """Persist sample registry and return (output_dir, registry, data)."""
-    from momentum.FeatureEngineering.feature_storage import FeatureStorage
-
-    registry, data_small, data_medium = sample_registry
-    storage = FeatureStorage(base_path=str(tmp_output_dir))
-
-    symbol = "TESTUSDT"
-    config_hash = "abc123"
-    storage.persist_registry_to_parquet(symbol, config_hash, registry)
-
-    output_dir = tmp_output_dir / symbol / config_hash
-    return output_dir, registry, data_small, data_medium, symbol, config_hash
 
 
 # ===========================================================================
 # T5.0a: manifest.json + columns.json.gz written after persist
 # ===========================================================================
 
-class TestT50aManifestWritten:
-    """T5.0a — persist 後 manifest.json + columns.json.gz 存在且正確"""
-
-    def test_manifest_exists(self, persisted_output):
-        output_dir, *_ = persisted_output
-        assert (output_dir / "manifest.json").exists()
-
-    def test_columns_gz_exists(self, persisted_output):
-        output_dir, *_ = persisted_output
-        assert (output_dir / "columns.json.gz").exists()
-
-    def test_manifest_total_features(self, persisted_output):
-        output_dir, registry, data_small, data_medium, *_ = persisted_output
-        with open(output_dir / "manifest.json") as f:
-            manifest = json.load(f)
-        expected_cols = data_small.shape[1] + data_medium.shape[1]
-        assert manifest["total_features"] == expected_cols
-
-    def test_manifest_version(self, persisted_output):
-        output_dir, *_ = persisted_output
-        with open(output_dir / "manifest.json") as f:
-            manifest = json.load(f)
-        assert manifest["version"] == "7.0"
-        assert manifest["dtype"] == "float16"
-
-    def test_columns_gz_size(self, persisted_output):
-        output_dir, *_ = persisted_output
-        gz_path = output_dir / "columns.json.gz"
-        assert gz_path.stat().st_size < 1_000_000  # < 1 MB
-
-    def test_columns_gz_content(self, persisted_output):
-        output_dir, registry, data_small, data_medium, *_ = persisted_output
-        gz_path = output_dir / "columns.json.gz"
-        with gzip.open(gz_path, "rt", encoding="utf-8") as f:
-            columns = json.load(f)
-        expected_count = data_small.shape[1] + data_medium.shape[1]
-        assert len(columns) == expected_count
-
-    def test_manifest_groups_match_parquet(self, persisted_output):
-        output_dir, *_ = persisted_output
-        with open(output_dir / "manifest.json") as f:
-            manifest = json.load(f)
-        for group_id, info in manifest["groups"].items():
-            pq_path = output_dir / info["file"]
-            assert pq_path.exists(), f"Parquet file {info['file']} missing"
-            table = pq.read_table(pq_path)
-            group_columns = [str(column) for column in info.get("columns", [])]
-            assert len(group_columns) == info["column_count"]
-            assert set(group_columns).issubset(set(table.column_names))
 
 
 # ===========================================================================
@@ -194,14 +131,21 @@ class TestT50aManifestWritten:
 class TestT50bFloat16Precision:
     """T5.0b — float16 與 float32 差異 + NaN 保留"""
 
-    def test_relative_diff_within_tolerance(self, persisted_output):
+    def test_relative_diff_within_tolerance(self, tmp_output_dir, sample_registry):
+        """FRAMEPATH Task 2.5：V1 版面寫讀已刪；改以 V2 串流寫入（write_raw_from_registry_stream）寫、load_columns_v2 讀回，驗 float16 精度。"""
         from momentum.FeatureEngineering.feature_reader import FeatureReader
+        from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
-        output_dir, _, data_small, _, symbol, config_hash = persisted_output
-        reader = FeatureReader(str(output_dir.parent.parent))
+        registry, data_small, _ = sample_registry
+        symbol, tf, config_hash = "TESTUSDT", "1h", "abc123"
+        storage = FeatureStorage(base_path=str(tmp_output_dir))
+        storage.write_raw_from_registry_stream(symbol, tf, config_hash, registry)
+
+        reader = FeatureReader(str(tmp_output_dir))
         selected = [f"feat_small_{index}" for index in range(data_small.shape[1])]
-        loaded = reader.load_columns(symbol, config_hash, selected).values.astype(np.float32)
+        loaded = reader.load_columns_v2(symbol, tf, config_hash, selected).values.astype(np.float32)
 
+        assert loaded.shape == data_small.shape
         expected_f16 = data_small.astype(np.float16).astype(np.float32)
         np.testing.assert_allclose(
             loaded,
@@ -211,7 +155,7 @@ class TestT50bFloat16Precision:
         )
 
     def test_nan_preserved(self, tmp_path):
-        """NaN positions must be preserved through float16 round-trip."""
+        """NaN positions must be preserved through float16 round-trip. FRAMEPATH Task 2.5：V1 版面寫入已刪；改走 V2 串流寫入 write_raw_from_registry_stream。"""
         from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
         from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
         from momentum.FeatureEngineering.feature_storage import FeatureStorage
@@ -238,9 +182,9 @@ class TestT50bFloat16Precision:
 
         output_dir = tmp_path / "out"
         storage = FeatureStorage(base_path=str(output_dir))
-        storage.persist_registry_to_parquet("TEST", "h1", registry)
+        raw_dir, _summary = storage.write_raw_from_registry_stream("TEST", "1h", "h1", registry)
 
-        loaded = pq.read_table(output_dir / "TEST" / "h1" / "nan_group.parquet").to_pandas()
+        loaded = pq.read_table(raw_dir / "nan_group.parquet").to_pandas()
         original_nan_mask = np.isnan(data)
         loaded_nan_mask = loaded.isna().values
         np.testing.assert_array_equal(original_nan_mask, loaded_nan_mask)
@@ -254,15 +198,16 @@ class TestT50cMaxGroupSplit:
     """T5.0c — >5000 columns 自動拆分"""
 
     def test_split_creates_parts(self, tmp_path, large_registry):
+        """FRAMEPATH Task 2.5：V1 版面寫入已刪；改驗 V2 串流寫入（共用 _split_large_group）之拆分結果。"""
         from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
         registry, data = large_registry
         output_dir = tmp_path / "split_out"
         storage = FeatureStorage(base_path=str(output_dir))
-        storage.persist_registry_to_parquet("SPLITUSDT", "s1", registry)
+        raw_dir, _summary = storage.write_raw_from_registry_stream("SPLITUSDT", "1h", "s1", registry)
 
-        out = output_dir / "SPLITUSDT" / "s1"
-        with open(out / "manifest.json") as f:
+        out = raw_dir.parent
+        with open(out / "feature_manifest.json") as f:
             manifest = json.load(f)
 
         # Should have 2 parts: 5000 + 3
@@ -270,17 +215,20 @@ class TestT50cMaxGroupSplit:
         group_ids = sorted(manifest["groups"].keys())
         assert "huge_part1" in group_ids[0]
         assert "huge_part2" in group_ids[1]
+        assert (raw_dir / "huge_part1.parquet").exists()
+        assert (raw_dir / "huge_part2.parquet").exists()
 
     def test_split_column_count_correct(self, tmp_path, large_registry):
+        """FRAMEPATH Task 2.5：V1 版面寫入已刪；改驗 V2 串流寫入（共用 _split_large_group）之逐 part 欄數。"""
         from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
         registry, data = large_registry
         output_dir = tmp_path / "split_out2"
         storage = FeatureStorage(base_path=str(output_dir))
-        storage.persist_registry_to_parquet("SPLITUSDT", "s2", registry)
+        raw_dir, _summary = storage.write_raw_from_registry_stream("SPLITUSDT", "1h", "s2", registry)
 
-        out = output_dir / "SPLITUSDT" / "s2"
-        with open(out / "manifest.json") as f:
+        out = raw_dir.parent
+        with open(out / "feature_manifest.json") as f:
             manifest = json.load(f)
 
         part1 = manifest["groups"]["huge_part1"]
@@ -304,73 +252,18 @@ class TestT50cMaxGroupSplit:
 # T5.0d / T5.3a: FeatureReader metadata-only
 # ===========================================================================
 
-class TestT50dReaderMetadata:
-    """T5.0d / T5.3a — list_features() returns correct names"""
-
-    def test_list_features_count(self, persisted_output):
-        from momentum.FeatureEngineering.feature_reader import FeatureReader
-
-        output_dir, _, data_small, data_medium, symbol, config_hash = persisted_output
-        reader = FeatureReader(str(output_dir.parent.parent))
-        features = reader.list_features(symbol, config_hash)
-        expected = data_small.shape[1] + data_medium.shape[1]
-        assert len(features) == expected
-
-    def test_load_manifest(self, persisted_output):
-        from momentum.FeatureEngineering.feature_reader import FeatureReader
-
-        output_dir, *_, symbol, config_hash = persisted_output
-        reader = FeatureReader(str(output_dir.parent.parent))
-        manifest = reader.load_manifest(symbol, config_hash)
-        assert manifest["version"] == "7.0"
-        assert "groups" in manifest
 
 
 # ===========================================================================
 # T5.0e / T5.3b: FeatureReader column projection
 # ===========================================================================
 
-class TestT50eReaderColumnProjection:
-    """T5.0e / T5.3b — load_columns() reads only selected columns"""
-
-    def test_column_projection_values(self, persisted_output):
-        from momentum.FeatureEngineering.feature_reader import FeatureReader
-
-        output_dir, _, data_small, _, symbol, config_hash = persisted_output
-        reader = FeatureReader(str(output_dir.parent.parent))
-
-        # Select first 3 columns from small group
-        selected = [f"feat_small_{i}" for i in range(3)]
-        df = reader.load_columns(symbol, config_hash, selected)
-
-        assert list(df.columns) == selected
-        expected = data_small[:, :3].astype(np.float16).astype(np.float32)
-        np.testing.assert_allclose(
-            df.values.astype(np.float32),
-            expected,
-            atol=np.finfo(np.float16).eps * 10,
-        )
 
 
 # ===========================================================================
 # T5.0f / T5.3c: FeatureReader stream_groups
 # ===========================================================================
 
-class TestT50fReaderStreamGroups:
-    """T5.0f / T5.3c — stream_groups() iterates all groups"""
-
-    def test_total_columns_match(self, persisted_output):
-        from momentum.FeatureEngineering.feature_reader import FeatureReader
-
-        output_dir, _, data_small, data_medium, symbol, config_hash = persisted_output
-        reader = FeatureReader(str(output_dir.parent.parent))
-
-        total_cols = 0
-        for group_id, df in reader.stream_groups(symbol, config_hash):
-            total_cols += df.shape[1]
-
-        expected = data_small.shape[1] + data_medium.shape[1]
-        assert total_cols == expected
 
 
 # ===========================================================================
@@ -570,46 +463,6 @@ class TestT52NoCrosstalk:
 # T5.3d: FeatureReader cross-symbol
 # ===========================================================================
 
-class TestT53dReaderCrossSymbol:
-    """T5.3d — cross-symbol loading with same columns"""
-
-    def test_cross_symbol_basic(self, tmp_path):
-        from momentum.FeatureEngineering.feature_reader import FeatureReader
-
-        # Create 2 symbols with shared column names
-        rng = np.random.default_rng(7)
-        base = tmp_path / "cross"
-        shared_cols = ["feat_a", "feat_b", "feat_c"]
-        for sym in ["SYM1", "SYM2"]:
-            sym_dir = base / sym / "h1"
-            sym_dir.mkdir(parents=True)
-            data = rng.standard_normal((50, 3)).astype(np.float16)
-            table = pa.table({c: data[:, i] for i, c in enumerate(shared_cols)})
-            pq.write_table(table, sym_dir / "group1.parquet", compression="zstd")
-
-            manifest = {
-                "version": "7.0",
-                "symbol": sym,
-                "config_hash": "h1",
-                "total_features": 3,
-                "total_rows": 50,
-                "dtype": "float16",
-                "groups": {"group1": {"file": "group1.parquet", "column_count": 3, "columns": shared_cols}},
-            }
-            with open(sym_dir / "manifest.json", "w") as f:
-                json.dump(manifest, f)
-            with gzip.open(sym_dir / "columns.json.gz", "wt") as f:
-                json.dump(shared_cols, f)
-
-        reader = FeatureReader(str(base))
-        result = reader.load_cross_symbol(["SYM1", "SYM2"], "h1", shared_cols)
-        assert isinstance(result, pd.DataFrame)
-        assert "_symbol" in result.index.names
-        # Should have rows for both symbols
-        symbols_in_result = result.index.get_level_values("_symbol").unique().tolist()
-        assert set(symbols_in_result) == {"SYM1", "SYM2"}
-        # Check columns are the shared ones
-        assert list(result.columns) == shared_cols
 
 
 # ===========================================================================
@@ -639,6 +492,7 @@ class TestT5B3DiskFullMidPersist:
     """T5.B3 — staging directory cleaned up on failure."""
 
     def test_staging_cleanup_on_error(self, tmp_path, sample_registry):
+        """FRAMEPATH Task 2.5：V1 版面寫入（.staging_*）已刪；改驗 V2 串流寫入 write_raw_from_registry_stream 於寫入中途失敗（尚未刪任何來源 .npy，cleanup_intermediate=False）時清除暫存根 .tmp-raw-*，且不安裝 raw／manifest。"""
         from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
         registry, _, _ = sample_registry
@@ -658,13 +512,16 @@ class TestT5B3DiskFullMidPersist:
 
         with patch("momentum.FeatureEngineering.feature_storage.os.replace", side_effect=failing_replace):
             with pytest.raises(OSError, match="No space"):
-                storage.persist_registry_to_parquet("FAILSYM", "f1", registry)
+                storage.write_raw_from_registry_stream("FAILSYM", "1h", "f1", registry, cleanup_intermediate=False)
 
         # Staging directory should have been cleaned up
-        sym_dir = output_dir / "FAILSYM" / "f1"
-        if sym_dir.exists():
-            staging_dirs = [d for d in sym_dir.iterdir() if d.is_dir() and d.name.startswith(".staging_")]
-            assert len(staging_dirs) == 0, "Staging directory should be cleaned up"
+        run_dir = output_dir / "FAILSYM" / "1h" / "f1"
+        assert call_count[0] == 2
+        assert run_dir.exists()
+        staging_dirs = [d for d in run_dir.iterdir() if d.is_dir() and d.name.startswith(".tmp-raw-")]
+        assert len(staging_dirs) == 0, "Staging directory should be cleaned up"
+        assert not (run_dir / "raw").exists()
+        assert not (run_dir / "feature_manifest.json").exists()
 
 
 # ===========================================================================

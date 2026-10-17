@@ -22,30 +22,21 @@ def _write_cgsa_manifest(
     config_hash: str,
     frame: pd.DataFrame,
 ):
-    manifest_dir = tmp_path / "features" / symbol / timeframe / config_hash
-    manifest_dir.mkdir(parents=True)
-    parquet_path = manifest_dir / "features.parquet"
-    frame.to_parquet(parquet_path, index=False)
-    manifest_path = manifest_dir / "feature_manifest.json"
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "symbol": symbol,
-                "primary_tf": timeframe,
-                "config_hash": config_hash,
-                "total_features": len(frame.columns),
-                "groups": [
-                    {
-                        "group_id": f"{timeframe}_L1_{config_hash}",
-                        "parquet_path": str(parquet_path),
-                        "columns": list(frame.columns),
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
+    """以正式 `FeatureStorage.write_raw` 寫 l7_v2 run 並回傳其 `feature_manifest.json`（FRAMEPATH Task 2.6：
+    CGSA registry 清單格式〔groups＝list＋parquet_path〕之瀏覽讀取分支已刪）；位置同前
+    （`features/<symbol>/<timeframe>/<config_hash>/`）、欄名與值同前。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    storage = FeatureStorage(str(tmp_path / "features"))
+    row_index = pd.date_range("2026-01-01", periods=len(frame), freq="h")
+    raw_dir = storage.write_raw(
+        symbol,
+        timeframe,
+        config_hash,
+        {f"{timeframe}_L1_{config_hash}": frame.set_axis(row_index, axis=0)},
+        row_index=row_index,
     )
-    return manifest_path
+    return raw_dir.parent / "feature_manifest.json"
 
 
 def test_batch_quality_uses_real_nan_not_null_count(monkeypatch, tmp_path):

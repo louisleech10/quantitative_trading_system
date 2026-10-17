@@ -298,10 +298,9 @@ class FeatureFactoryService:
             self._persist_task_record(task_id, summary)
             self._write_run_size(summary)
 
-            # Precompute Feature Table stats as soon as generation completes for
-            # legacy HDF5 tasks. CGSA outputs can have 50k-200k columns; full
-            # stats warmup materializes the whole matrix and blocks the UI for
-            # minutes. CGSA Feature Explorer uses manifest/parquet metadata.
+            # CGSA outputs can have 50k-200k columns; full stats warmup materializes
+            # the whole matrix and blocks the UI for minutes. CGSA Feature Explorer
+            # uses manifest/parquet metadata（catalog／data-quality warmup）。
             if str(summary.get("hdf5_path", "")).lower().endswith(".json"):
                 try:
                     context = self._load_task_context(task_id)
@@ -320,7 +319,7 @@ class FeatureFactoryService:
                 except Exception as exc:
                     logger.debug("CGSA catalog warmup start skipped for %s: %s", task_id, exc)
             else:
-                self._start_stats_cache_warmup(task_id, reason="generation_completed")
+                # FRAMEPATH Task 2.3：非 .json（舊 factory h5 已不支援）不再暖 stats 快取；lease 照常釋放
                 if lease_sink:
                     lease = lease_sink.pop()
                     identity = self._run_identity(summary)
@@ -795,7 +794,7 @@ class FeatureFactoryService:
             if feature_count in (None, ""):
                 feature_count = manifest.get("total_features", manifest.get("feature_count"))
             if row_count in (None, ""):
-                row_count = manifest.get("row_count", manifest.get("total_rows"))
+                row_count = manifest.get("row_count")
             if quality_status in (None, ""):
                 quality_status = manifest.get("quality_status", manifest.get("run_status"))
 
@@ -1188,6 +1187,7 @@ class FeatureFactoryService:
         file_path = Path(hdf5_path)
         if not file_path.exists():
             raise FileNotFoundError(f"HDF5 file not found: {hdf5_path}")
+        self._require_manifest_path(file_path)
 
         # 使用固定格式的 task_id，相同 symbol+timeframe 重複呼叫回傳同一個 id（冪等）
         config_hash = self._config_hash_from_path(file_path, symbol, timeframe)
@@ -1297,7 +1297,7 @@ class FeatureFactoryService:
             "datasource_columns": raw_columns,
         }
 
-        generator = self._csv_chunk_generator_from_hdf5(
+        generator = self._csv_chunk_generator(
             context=context,
             selected_columns=selected_columns,
             max_rows=row_count,
@@ -3028,13 +3028,6 @@ class FeatureFactoryService:
                     if cand.exists():
                         first_path = cand
                         break
-        elif isinstance(groups_raw, list):
-            for meta in groups_raw:
-                if isinstance(meta, dict) and meta.get("parquet_path"):
-                    cand = Path(meta["parquet_path"])
-                    if cand.exists():
-                        first_path = cand
-                        break
 
         if first_path is None:
             return [str(i) for i in range(total_rows)]
@@ -4500,16 +4493,12 @@ class FeatureFactoryService:
 
     def _load_task_features(self, task_id: str) -> tuple:
         """Load task features DataFrame, using an in-memory cache to avoid
-        redundant HDF5/Parquet reads across multiple browse/export calls."""
+        redundant Parquet reads across multiple browse/export calls."""
         if task_id in self._df_cache:
             return self._df_cache[task_id]
 
         context = self._load_task_context(task_id)
-
-        if context.get("is_cgsa"):
-            df = self._load_cgsa_features_df(context)
-        else:
-            df = self._load_hdf5_features_df(context)
+        df = self._load_cgsa_features_df(context)
 
         export_meta = {
             "task_id": task_id,
@@ -4670,6 +4659,13 @@ class FeatureFactoryService:
         feature_cache[feature_name] = pvalue
         return pvalue
 
+    @staticmethod
+    def _require_manifest_path(file_path: Path) -> Path:
+        """只接受 CGSA manifest（副檔名 `.json`，大小寫不拘）；其餘（舊 factory h5 等）⇒ ValueError（route 轉 400）。"""
+        if file_path.suffix.lower() != ".json":
+            raise ValueError(f"舊 factory h5 已不支援：{file_path}")
+        return file_path
+
     def _load_task_context(self, task_id: str) -> Dict[str, Any]:
         task_result = self.get_result(task_id)
         if task_result is None:
@@ -4689,61 +4685,18 @@ class FeatureFactoryService:
         if not symbol or not timeframe:
             raise ValueError(f"Missing symbol/timeframe metadata for task: {task_id}")
 
-        # Detect CGSA V7 manifest (manifest.json) vs legacy HDF5 (.h5).
-        is_cgsa = file_path.suffix.lower() == ".json"
-        manifest: Optional[Dict[str, Any]] = None
-        manifest_dir: Optional[Path] = None
-
-        if is_cgsa:
-            try:
-                raw_manifest = json.loads(file_path.read_text(encoding="utf-8"))
-            except (OSError, ValueError) as exc:
-                raise FileNotFoundError(
-                    f"Failed to read CGSA manifest {file_path}: {exc}"
-                ) from exc
-
-            # V7 format: version=="7.0" and groups is a dict.
-            # CGSA registry format: version==None and groups is a list.
-            # When the latter, look for the companion V7 manifest under
-            # data_cache/features/{symbol}/{config_hash}/manifest.json.
-            if raw_manifest.get("version") != "7.0" and isinstance(
-                raw_manifest.get("groups"), list
-            ):
-                config_hash = raw_manifest.get("config_hash")
-                v7_path: Optional[Path] = None
-                if config_hash:
-                    candidate = (
-                        settings.data_cache_path
-                        / "features"
-                        / symbol
-                        / config_hash
-                        / "manifest.json"
-                    )
-                    if candidate.exists():
-                        v7_path = candidate
-                if v7_path is not None:
-                    try:
-                        manifest = json.loads(v7_path.read_text(encoding="utf-8"))
-                        file_path = v7_path
-                        logger.debug(
-                            "Redirected CGSA registry manifest to V7 manifest: %s",
-                            v7_path,
-                        )
-                    except (OSError, ValueError) as exc:
-                        logger.warning(
-                            "Failed to read V7 manifest %s; falling back to registry manifest: %s",
-                            v7_path, exc,
-                        )
-                        manifest = raw_manifest
-                else:
-                    # V7 manifest not yet written or lives elsewhere — keep the
-                    # CGSA registry manifest; _load_cgsa_features_df handles
-                    # the list format via each group's 'parquet_path' field.
-                    manifest = raw_manifest
-            else:
-                manifest = raw_manifest
-
-            manifest_dir = file_path.parent
+        # FRAMEPATH Task 2.3：task 路徑只收 CGSA manifest（.json，大小寫不拘）；舊 factory h5 具名拒絕（route → 400）
+        manifest_path = self._require_manifest_path(file_path)
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise FileNotFoundError(
+                f"Failed to read CGSA manifest {manifest_path}: {exc}"
+            ) from exc
+        # FRAMEPATH Task 2.6：舊 cgsa_work 瀏覽格式（groups 為串列；現無產生者）具名拒絕（route → 400）
+        if isinstance(manifest, dict) and isinstance(manifest.get("groups"), list):
+            raise ValueError(f"舊 cgsa_work 瀏覽格式已不支援：{manifest_path}")
+        manifest_dir = manifest_path.parent
 
         manifest, artifact_kind = self._select_l7_v2_artifact(manifest)
         return {
@@ -4755,7 +4708,7 @@ class FeatureFactoryService:
             "file_path": file_path,
             "group_path": f"{symbol}/{timeframe}",
             "generated_at": datetime.now().isoformat(),
-            "is_cgsa": is_cgsa,
+            "is_cgsa": True,
             "manifest": manifest,
             "manifest_dir": manifest_dir,
             "artifact_kind": artifact_kind,
@@ -4787,47 +4740,11 @@ class FeatureFactoryService:
                 projected["row_index"] = node["row_index"]
         return projected, kind
 
-    def _load_hdf5_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
-        """Materialize a features DataFrame from a legacy single-TF HDF5 file."""
-        file_path = context["file_path"]
-        group_path = context["group_path"]
-        with h5py.File(file_path, "r") as h5_file:
-            if group_path not in h5_file:
-                raise FileNotFoundError(f"Group not found in HDF5: {group_path}")
-            group = h5_file[group_path]
-            if "features" not in group:
-                raise FileNotFoundError(f"features dataset missing: {group_path}/features")
-
-            features = group["features"][:]
-            raw_feature_names = list(group["feature_names"][:]) if "feature_names" in group else []
-            feature_names = [
-                name.decode("utf-8") if isinstance(name, (bytes, bytearray, np.bytes_)) else str(name)
-                for name in raw_feature_names
-            ]
-            if len(feature_names) != features.shape[1]:
-                feature_names = [f"feature_{idx}" for idx in range(features.shape[1])]
-
-            df = pd.DataFrame(features, columns=feature_names)
-
-            timestamps = group["timestamps"][:] if "timestamps" in group else None
-            if timestamps is not None:
-                timestamp_index = pd.to_datetime(timestamps, unit="s", errors="coerce")
-                df.index = timestamp_index
-                df.index.name = "timestamp"
-        return df
-
     def _load_cgsa_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
-        """Materialize a features DataFrame from a CGSA manifest.
+        """Materialize a features DataFrame from a V2（l7_v2）manifest projection.
 
-        Supports three manifest formats:
-        * V7 / raw_v1 (version=="7.0" or "l7_v2", groups is dict): each entry has
-          ``path`` (relative path including subdirectory, e.g. ``raw/file.parquet``)
-          and ``columns``. Created by feature_storage.py. ``path`` is preferred
-          over ``file`` to correctly resolve artifacts inside ``raw/`` / ``processed/``.
-        * CGSA registry (version==None, groups is list): each entry has
-          ``parquet_path`` (absolute) and ``columns``. Created by
-          cgsa_registry.save_state(). Used as fallback when V7 manifest is not
-          yet available (e.g. persistence disabled or in-progress).
+        groups 為 dict：每項以 ``path``（相對 manifest 目錄、含 ``raw/``／``processed/`` 子目錄）優先、``file`` 次之
+        定位 parquet，並帶 ``columns``。舊 cgsa_work 列表格式於 `_load_task_context` 即具名拒絕。
         """
         import pyarrow.parquet as pq  # local import keeps cold-start light
 
@@ -4856,25 +4773,6 @@ class FeatureFactoryService:
                     )
                     continue
                 table = pq.read_table(str(parquet_path))
-                frames.append(table.to_pandas(self_destruct=True))
-        else:
-            # CGSA registry list format: [{"parquet_path": "...", "columns": [...]}]
-            for group_meta in groups_raw:
-                if not isinstance(group_meta, dict):
-                    continue
-                parquet_path_str = group_meta.get("parquet_path")
-                if not parquet_path_str:
-                    continue
-                parquet_path = Path(parquet_path_str)
-                if not parquet_path.exists():
-                    logger.warning(
-                        "CGSA registry parquet missing for task %s: %s",
-                        context["task_id"], parquet_path,
-                    )
-                    continue
-                cols = group_meta.get("columns")
-                read_cols = list(cols) if cols else None
-                table = pq.read_table(str(parquet_path), columns=read_cols)
                 frames.append(table.to_pandas(self_destruct=True))
 
         if not frames:
@@ -4923,16 +4821,6 @@ class FeatureFactoryService:
                 if not relative or manifest_dir is None:
                     continue
                 path = manifest_dir / relative
-                if path.exists():
-                    parquet_paths.append(path)
-        else:
-            for meta in groups_raw:
-                if not isinstance(meta, dict):
-                    continue
-                ppath = meta.get("parquet_path")
-                if not ppath:
-                    continue
-                path = Path(ppath)
                 if path.exists():
                     parquet_paths.append(path)
 
@@ -5226,61 +5114,18 @@ class FeatureFactoryService:
         }
 
     def _load_hdf5_schema(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        if context.get("is_cgsa"):
-            manifest = context.get("manifest") or {}
-            groups_raw = manifest.get("groups")
-            feature_names: List[str] = []
-            if isinstance(groups_raw, dict):
-                # l7_v2 format uses "row_count"; legacy V7 format uses "total_rows"
-                for group_meta in groups_raw.values():
-                    feature_names.extend(group_meta.get("columns") or [])
-                return {
-                    "feature_names": feature_names,
-                    "row_count": int(manifest.get("row_count") or manifest.get("total_rows") or 0),
-                }
-            elif isinstance(groups_raw, list):
-                # CGSA registry list format — read row count from first parquet
-                import pyarrow.parquet as pq
-                total_rows = 0
-                for group_meta in groups_raw:
-                    if not isinstance(group_meta, dict):
-                        continue
-                    feature_names.extend(group_meta.get("columns") or [])
-                    if total_rows == 0:
-                        pp = group_meta.get("parquet_path")
-                        if pp and Path(pp).exists():
-                            try:
-                                pf = pq.ParquetFile(pp)
-                                total_rows = pf.metadata.num_rows
-                            except Exception:
-                                pass
-                return {
-                    "feature_names": feature_names,
-                    "row_count": total_rows,
-                }
-            return {"feature_names": [], "row_count": 0}
-        file_path = context["file_path"]
-        group_path = context["group_path"]
-        with h5py.File(file_path, "r") as h5_file:
-            if group_path not in h5_file:
-                raise FileNotFoundError(f"Group not found in HDF5: {group_path}")
-            group = h5_file[group_path]
-            if "features" not in group:
-                raise FileNotFoundError(f"features dataset missing: {group_path}/features")
-
-            features_ds = group["features"]
-            raw_feature_names = list(group["feature_names"][:]) if "feature_names" in group else []
-            feature_names = [
-                name.decode("utf-8") if isinstance(name, (bytes, bytearray, np.bytes_)) else str(name)
-                for name in raw_feature_names
-            ]
-            if len(feature_names) != features_ds.shape[1]:
-                feature_names = [f"feature_{idx}" for idx in range(features_ds.shape[1])]
-
+        """欄名與列數取自 V2 manifest 投影（l7_v2 之 `row_count`）；名稱沿用舊稱。"""
+        manifest = context.get("manifest") or {}
+        groups_raw = manifest.get("groups")
+        feature_names: List[str] = []
+        if isinstance(groups_raw, dict):
+            for group_meta in groups_raw.values():
+                feature_names.extend(group_meta.get("columns") or [])
             return {
                 "feature_names": feature_names,
-                "row_count": int(features_ds.shape[0]),
+                "row_count": int(manifest.get("row_count") or 0),
             }
+        return {"feature_names": [], "row_count": 0}
 
     def _load_selected_feature_rows(
         self,
@@ -5289,70 +5134,7 @@ class FeatureFactoryService:
         offset: int,
         limit: int,
     ) -> Dict[str, Any]:
-        if context.get("is_cgsa"):
-            return self._load_cgsa_selected_rows(context, selected_features, offset, limit)
-
-        file_path = context["file_path"]
-        group_path = context["group_path"]
-
-        with h5py.File(file_path, "r") as h5_file:
-            if group_path not in h5_file:
-                raise FileNotFoundError(f"Group not found in HDF5: {group_path}")
-
-            group = h5_file[group_path]
-            if "features" not in group:
-                raise FileNotFoundError(f"features dataset missing: {group_path}/features")
-
-            features_ds = group["features"]
-            total_rows = int(features_ds.shape[0])
-
-            raw_feature_names = list(group["feature_names"][:]) if "feature_names" in group else []
-            all_columns = [
-                name.decode("utf-8") if isinstance(name, (bytes, bytearray, np.bytes_)) else str(name)
-                for name in raw_feature_names
-            ]
-            if len(all_columns) != features_ds.shape[1]:
-                all_columns = [f"feature_{idx}" for idx in range(features_ds.shape[1])]
-
-            missing = [name for name in selected_features if name not in set(all_columns)]
-            if missing:
-                raise ValueError(f"Invalid features: {missing}")
-
-            start = min(offset, total_rows)
-            end = min(offset + limit, total_rows)
-
-            column_to_index = {name: idx for idx, name in enumerate(all_columns)}
-            selected_indices = [column_to_index[name] for name in selected_features]
-
-            sorted_pairs = sorted(enumerate(selected_indices), key=lambda item: item[1])
-            sorted_positions = [item[0] for item in sorted_pairs]
-            sorted_indices = [item[1] for item in sorted_pairs]
-
-            chunk_sorted = features_ds[start:end, sorted_indices]
-            reverse_order = np.argsort(sorted_positions)
-            chunk_values = chunk_sorted[:, reverse_order]
-
-            timestamps = []
-            if "timestamps" in group:
-                ts = pd.to_datetime(group["timestamps"][start:end], unit="s", errors="coerce")
-                timestamps = [value.isoformat() if pd.notna(value) else None for value in ts]
-            else:
-                timestamps = [str(idx) for idx in range(start, end)]
-
-            data_rows: List[Dict[str, Any]] = []
-            for row_idx in range(chunk_values.shape[0]):
-                row_payload: Dict[str, Any] = {"timestamp": timestamps[row_idx]}
-                for col_idx, feature_name in enumerate(selected_features):
-                    row_payload[feature_name] = self._safe_float(chunk_values[row_idx, col_idx])
-                data_rows.append(row_payload)
-
-            return {
-                "total_rows": total_rows,
-                "offset": offset,
-                "limit": limit,
-                "features": selected_features,
-                "rows": data_rows,
-            }
+        return self._load_cgsa_selected_rows(context, selected_features, offset, limit)
 
     def _load_cgsa_selected_rows(
         self,
@@ -5426,7 +5208,7 @@ class FeatureFactoryService:
 
         selected_set = set(selected_features)
         column_to_file: Dict[str, Path] = {}
-        total_rows = int(manifest.get("total_rows") or 0)
+        total_rows = 0  # V2 manifest 無列數退回鍵；以讀回之列數為準
 
         if isinstance(groups_raw, dict):
             for group_meta in groups_raw.values():
@@ -5441,22 +5223,6 @@ class FeatureFactoryService:
                 for col in group_meta.get("columns") or []:
                     if col in selected_set and col not in column_to_file:
                         column_to_file[col] = parquet_path
-        else:
-            for group_meta in groups_raw:
-                if not isinstance(group_meta, dict):
-                    continue
-                pp = group_meta.get("parquet_path")
-                if not pp:
-                    continue
-                parquet_path = Path(pp)
-                for col in group_meta.get("columns") or []:
-                    if col in selected_set and col not in column_to_file:
-                        column_to_file[col] = parquet_path
-                if total_rows == 0 and parquet_path.exists():
-                    try:
-                        total_rows = int(pq.ParquetFile(str(parquet_path)).metadata.num_rows)
-                    except Exception:
-                        pass
 
         missing = [name for name in selected_features if name not in column_to_file]
         if missing:
@@ -5716,7 +5482,7 @@ class FeatureFactoryService:
             return [0.0 for _ in counts]
         return [float(value / total) for value in counts]
 
-    def _csv_chunk_generator_from_hdf5(
+    def _csv_chunk_generator(
         self,
         context: Dict[str, Any],
         selected_columns: List[str],
@@ -5786,56 +5552,6 @@ class FeatureFactoryService:
                         [value.isoformat() if pd.notna(value) else "" for value in chunk_df.index],
                         name="timestamp",
                     )
-                buffer = io.StringIO()
-                chunk_df.to_csv(buffer, header=False, index=True)
-                yield buffer.getvalue()
-            return
-
-        file_path = context["file_path"]
-        group_path = context["group_path"]
-
-        with h5py.File(file_path, "r") as h5_file:
-            group = h5_file[group_path]
-            features_ds = group["features"]
-            timestamps_ds = group["timestamps"] if "timestamps" in group else None
-
-            all_columns = list(group["feature_names"][:]) if "feature_names" in group else []
-            normalized_columns = [
-                value.decode("utf-8") if isinstance(value, (bytes, bytearray, np.bytes_)) else str(value)
-                for value in all_columns
-            ]
-            column_to_index = {name: idx for idx, name in enumerate(normalized_columns)}
-            selected_indices = [column_to_index[name] for name in selected_columns]
-            sorted_pairs = sorted(enumerate(selected_indices), key=lambda item: item[1])
-            sorted_positions = [item[0] for item in sorted_pairs]
-            sorted_indices = [item[1] for item in sorted_pairs]
-
-            for start in range(0, max_rows, chunk_size):
-                end = min(start + chunk_size, max_rows)
-                chunk_sorted = features_ds[start:end, sorted_indices]
-                reverse_order = np.argsort(sorted_positions)
-                chunk_values = chunk_sorted[:, reverse_order]
-
-                if timestamps_ds is not None:
-                    ts_chunk = timestamps_ds[start:end]
-                    # Auto-detect unit: feature factory stores Unix seconds (~1.7e9).
-                    # Binance raw ms timestamps would be ~1.7e12.
-                    unit = "ms" if len(ts_chunk) > 0 and ts_chunk[0] > 1e12 else "s"
-                    ts = pd.to_datetime(ts_chunk, unit=unit, errors="coerce")
-                    index = pd.Index(ts, name="timestamp")
-                else:
-                    index = pd.Index(range(start, end), name="timestamp")
-
-                chunk_df = pd.DataFrame(chunk_values, columns=selected_columns, index=index)
-
-                # Prepend raw datasource columns when requested
-                if raw_df is not None and _raw_columns:
-                    try:
-                        raw_chunk = raw_df.reindex(chunk_df.index)[_raw_columns]
-                    except Exception:
-                        raw_chunk = pd.DataFrame(index=chunk_df.index, columns=_raw_columns)
-                    chunk_df = pd.concat([raw_chunk, chunk_df], axis=1)
-
                 buffer = io.StringIO()
                 chunk_df.to_csv(buffer, header=False, index=True)
                 yield buffer.getvalue()

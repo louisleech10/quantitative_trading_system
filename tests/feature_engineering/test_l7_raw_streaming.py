@@ -427,7 +427,9 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
             "l65_mode": "ic_first_pre",
         },
     )
-    storage.persist_registry_to_parquet.side_effect = AssertionError("legacy L7 persist must not run")
+    # FRAMEPATH Task 2.5：V1 版面寫端（舊 L7 persist）已刪 ⇒ 符號不存在，spec Mock 亦不得提供
+    assert not hasattr(FeatureStorage, "persist_registry_to_parquet")
+    assert not hasattr(storage, "persist_registry_to_parquet")
 
     preprocessing = PreprocessingConfig(
         enabled=True,
@@ -482,7 +484,6 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
 
     storage.write_raw_from_registry_stream.assert_called_once()
     assert storage.write_raw_from_registry_stream.call_args.kwargs["row_index"].equals(raw_data.index)
-    storage.persist_registry_to_parquet.assert_not_called()
     # hdf5_path now stores the manifest JSON path (not the raw directory) so
     # that service-layer routing detects the .json suffix and loads CGSA format.
     assert result.hdf5_path == str(raw_path.parent / "feature_manifest.json")

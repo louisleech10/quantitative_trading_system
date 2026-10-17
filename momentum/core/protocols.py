@@ -277,17 +277,6 @@ class IFeatureReader(Protocol):
         """該 artifact_kind 之 sidecar 時間軸（raw 未宣告回 None；processed 未宣告或檔缺 ⇒ 具名錯誤）。"""
         ...
 
-    def list_features(self, symbol: str, config_hash: str) -> List[str]:
-        ...
-
-    def load_columns(
-        self,
-        symbol: str,
-        config_hash: str,
-        columns: List[str],
-    ) -> Any:
-        ...
-
 
 @runtime_checkable
 class IMemoryBudget(Protocol):

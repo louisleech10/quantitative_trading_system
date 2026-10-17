@@ -69,7 +69,8 @@ def _ic_json(root: Path, config_hash: str) -> Dict[str, Any]:
 def test_run_ic_first_signature_has_no_second_engine_inputs() -> None:
     params = inspect.signature(FeatureFactory.run_ic_first).parameters
     assert "raw_data" not in params and "layers" not in params
-    assert "require_raw" in inspect.signature(FeatureFactory.generate_features).parameters
+    # FRAMEPATH Phase 2：舊特徵 h5 快取查詢刪除後 require_raw 為無效參數，自 generate_features 簽章刪除
+    assert "require_raw" not in inspect.signature(FeatureFactory.generate_features).parameters
 
 
 def _floats(scores: Dict[str, Any], keys: List[str]) -> np.ndarray:
@@ -336,23 +337,6 @@ def test_mutation_formal_run_skips_recovery(tmp_path: Path, monkeypatch: pytest.
     assert owned.exists()
 
 
-def _seed_legacy_h5(root: Path, factory: FeatureFactory, config_hash: str) -> None:
-    """模擬使用者機器上既有之 legacy H5 cache（frame 路徑舊 run 所留）：以真實 raw 之少數欄寫一份同 hash 之 H5。"""
-    reader = FeatureReader(str(root))
-    manifest = reader.load_manifest_v2(h.SYMBOL, h.PRIMARY, config_hash, artifact_kind="raw")
-    cols = [c for g in manifest["artifacts"]["raw"]["groups"].values() for c in g.get("columns", [])][:3]
-    frame = reader.load_columns_v2(h.SYMBOL, h.PRIMARY, config_hash, cols)
-    from momentum.FeatureEngineering.feature_factory import FeatureGenerationResult
-
-    from momentum.FeatureEngineering.consumer_gate import COMPLETENESS_FIELD_NAMES
-
-    run_manifest = json.loads((h.run_dir(root, config_hash) / "feature_manifest.json").read_text(encoding="utf-8"))
-    metadata = {"config_hash": config_hash, "run_status": "complete",
-                **{k: run_manifest[k] for k in COMPLETENESS_FIELD_NAMES if k in run_manifest}}
-    legacy = FeatureGenerationResult(features_df=frame, labels_df=pd.DataFrame(index=frame.index),
-                                     metadata=metadata,
-                                     feature_count=len(cols), generation_time=0.0, layer_counts={}, config_used={})
-    FeatureStorage(str(root)).save_factory_output(h.SYMBOL, h.PRIMARY, legacy)
 
 
 def test_cleanup_raw_rerun_regenerates_raw_with_single_lease(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -360,7 +344,6 @@ def test_cleanup_raw_rerun_regenerates_raw_with_single_lease(tmp_path: Path, mon
     root = h.isolated(monkeypatch, tmp_path)
     first = _run(h.make_factory(root), cleanup_raw=False)
     config_hash = str(first.metadata["config_hash"])
-    _seed_legacy_h5(root, h.make_factory(root), config_hash)
     shutil.rmtree(h.run_dir(root, config_hash) / "raw")
     counts = {"acquire": 0, "release": 0}
     real_acquire, real_release = RunLease.acquire, RunLease.release
@@ -381,29 +364,8 @@ def test_cleanup_raw_rerun_regenerates_raw_with_single_lease(tmp_path: Path, mon
     assert counts == {"acquire": 1, "release": 1}
 
 
-def test_require_raw_false_existing_caller_still_hits_h5(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """既有 caller（require_raw 預設 False）於 raw 已清時仍回 H5 命中（行為不變）。"""
-    root = h.isolated(monkeypatch, tmp_path)
-    factory, result = h.generate_s2(root)
-    config_hash = str(result.metadata["config_hash"])
-    _seed_legacy_h5(root, factory, config_hash)
-    shutil.rmtree(h.run_dir(root, config_hash) / "raw")
-    assert factory._try_load_cache(h.SYMBOL, h.PRIMARY, config_hash) is not None
-    assert factory._try_load_cache(h.SYMBOL, h.PRIMARY, config_hash, require_raw=True) is None
 
 
-def test_mutation_require_raw_ignored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：`_try_load_cache` 忽略 require_raw（H5 命中直接回傳）⇒ raw 不存在、IC 失敗。"""
-    root = h.isolated(monkeypatch, tmp_path)
-    first = _run(h.make_factory(root))
-    config_hash = str(first.metadata["config_hash"])
-    _seed_legacy_h5(root, h.make_factory(root), config_hash)
-    shutil.rmtree(h.run_dir(root, config_hash) / "raw")
-    real = FeatureFactory._try_load_cache
-    monkeypatch.setattr(FeatureFactory, "_try_load_cache",
-                        lambda self, s, t, c, require_raw=False: real(self, s, t, c, require_raw=False))
-    with pytest.raises(Exception):
-        _run(h.make_factory(root))
 
 
 def test_boundary_01_generation_failure_raises_named(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -433,19 +395,6 @@ def test_boundary_02_label_outside_window_not_used(tmp_path: Path, monkeypatch: 
     assert np.allclose(_floats(scores, keys), _floats(base_scores, keys), rtol=0, atol=0, equal_nan=True)
 
 
-def test_boundary_03_h5_overwritten_other_hash_misses_not_misused(tmp_path: Path,
-                                                                 monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 邊界③：legacy H5 為 symbol／timeframe 級；寫入另一 hash 後原 hash 查詢未命中（讀取核 hash，不錯用）。"""
-    root = h.isolated(monkeypatch, tmp_path)
-    factory, result_a = h.generate_s2(root)
-    hash_a = str(result_a.metadata["config_hash"])
-    _seed_legacy_h5(root, factory, hash_a)
-    assert factory._try_load_cache(h.SYMBOL, h.PRIMARY, hash_a) is not None
-    _, result_b = h.generate_s2(root, h.s2_payload(rolling_aggregation={"enabled": True, "windows": [5]}))
-    hash_b = str(result_b.metadata["config_hash"])
-    assert hash_b != hash_a
-    _seed_legacy_h5(root, factory, hash_b)
-    assert factory._try_load_cache(h.SYMBOL, h.PRIMARY, hash_a) is None
 
 
 # ---------------------------------------------------------------- Task 2.2 L6.5 失敗語意

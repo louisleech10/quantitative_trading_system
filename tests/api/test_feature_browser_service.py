@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,15 +12,6 @@ from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.factories import create_feature_reader
 
 
-def _write_symbol_feature_h5(path: Path, data: np.ndarray, feature_names: list[str]) -> None:
-    with h5py.File(path, "w") as h5_file:
-        group = h5_file.create_group("data")
-        group.create_dataset("features", data=data)
-        group.create_dataset(
-            "feature_names",
-            data=np.array(feature_names, dtype=object),
-            dtype=h5py.string_dtype(encoding="utf-8"),
-        )
 
 
 @pytest.fixture(scope="module")
@@ -33,15 +23,33 @@ def test_get_coverage_matrix(service: FeatureBrowserService, tmp_path: Path) -> 
     feature_base = tmp_path / "features"
     feature_base.mkdir()
 
-    _write_symbol_feature_h5(
-        feature_base / "BTCUSDT_12h_factory.h5",
-        np.array([[1.0, np.nan], [2.0, 3.0]], dtype=float),
-        ["feature_a", "feature_b"],
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="BTCUSDT",
+        timeframe="12h",
+        config_hash="cfg_cov_matrix",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, 2.0], dtype=np.float32),
+                    "feature_b": np.array([np.nan, 3.0], dtype=np.float32),
+                }
+            )
+        },
     )
-    _write_symbol_feature_h5(
-        feature_base / "ETHUSDT_12h_factory.h5",
-        np.array([[1.0, 2.0], [2.0, 3.0]], dtype=float),
-        ["feature_a", "feature_b"],
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="ETHUSDT",
+        timeframe="12h",
+        config_hash="cfg_cov_matrix",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, 2.0], dtype=np.float32),
+                    "feature_b": np.array([2.0, 3.0], dtype=np.float32),
+                }
+            )
+        },
     )
 
     payload = service.get_coverage_matrix(

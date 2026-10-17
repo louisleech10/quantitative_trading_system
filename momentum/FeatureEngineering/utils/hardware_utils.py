@@ -44,18 +44,6 @@ _CGSA_BUFFER_BY_TIER: Dict[str, int] = {
     "24gb": 32,
     "32gb": 64,
 }
-_L7_WORKERS_BY_TIER: Dict[str, int] = {
-    "8gb": 4,
-    "16gb": 6,
-    "24gb": 8,
-    "32gb": 8,
-}
-_CHUNK_BARS_BY_TIER: Dict[str, Optional[int]] = {
-    "8gb": 50_000,
-    "16gb": 100_000,
-    "24gb": 250_000,
-    "32gb": None,
-}
 
 # Multi-TF parallel workers: each worker spawns a full 6-layer pipeline process.
 # RAM budget: ~2-3 GB per worker baseline; 1h L3 with 1611 cols can balloon to
@@ -215,8 +203,6 @@ def get_tier_config(tier: str) -> Dict[str, Any]:
     return {
         "l65_workers": _WORKERS_BY_TIER.get(tier, _WORKERS_BY_TIER["8gb"]),
         "cgsa_memory_buffer": _CGSA_BUFFER_BY_TIER.get(tier, _CGSA_BUFFER_BY_TIER["8gb"]),
-        "l7_workers": _L7_WORKERS_BY_TIER.get(tier, _L7_WORKERS_BY_TIER["8gb"]),
-        "chunk_bars": _CHUNK_BARS_BY_TIER.get(tier, _CHUNK_BARS_BY_TIER["8gb"]),
         "multi_tf_max_workers": _MULTI_TF_MAX_WORKERS_BY_TIER.get(tier, _MULTI_TF_MAX_WORKERS_BY_TIER["8gb"]),
         "layer3_chunk_size": _LAYER3_CHUNK_SIZE_BY_TIER.get(tier, _LAYER3_CHUNK_SIZE_BY_TIER["8gb"]),
         "l3_persist_mode": _L3_PERSIST_MODE_BY_TIER.get(tier, _L3_PERSIST_MODE_BY_TIER["8gb"]),

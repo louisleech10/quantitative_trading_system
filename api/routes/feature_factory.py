@@ -636,6 +636,9 @@ async def register_hdf5_for_browse(
         return RegisterPathResponse(task_id=task_id, symbol=request.symbol, timeframe=request.timeframe)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        # FRAMEPATH Task 2.3：非 CGSA manifest（舊 factory h5）具名拒絕
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Failed to register HDF5 for browse: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))

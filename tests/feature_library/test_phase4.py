@@ -133,28 +133,8 @@ def test_xgboost_batch_service_has_feature_library() -> None:
     assert hasattr(service, "_feature_library"), "Missing _feature_library attribute"
 
 
-def test_feature_browser_service_has_feature_library() -> None:
-    """FeatureBrowserService should have _feature_library attribute."""
-    from api.services.feature_browser_service import FeatureBrowserService
-
-    service = FeatureBrowserService()
-    assert hasattr(service, "_feature_library"), "Missing _feature_library attribute"
 
 
-def test_feature_browser_load_features_library_prefix() -> None:
-    """_load_features_df should recognize library:symbol:timeframe format."""
-    from unittest.mock import MagicMock
-
-    from api.services.feature_browser_service import FeatureBrowserService
-
-    service = FeatureBrowserService()
-    mock_lib = MagicMock()
-    mock_lib.load.return_value = pd.DataFrame({"feat_a": [1.0, 2.0]})
-    service._feature_library = mock_lib
-
-    result = service._load_features_df("library:BTCUSDT:1h")
-    mock_lib.load.assert_called_once_with("BTCUSDT", "1h")
-    assert len(result) == 2
 
 
 def test_feature_generation_request_has_date_fields() -> None:

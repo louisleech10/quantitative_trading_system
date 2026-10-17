@@ -295,7 +295,7 @@ class ICEngine:
             config_hash=config_hash,
             allow_partial_ic=allow_partial_ic,
         )
-        base_dir = self._resolve_l7_raw_base_dir(run_dir, manifest, config_hash)
+        base_dir = run_dir  # FRAMEPATH Task 2.6：只讀 V2 run 目錄（舊版面轉向已刪）
 
         # ICFIRSTALIGN Task 1.1：群組讀回接 raw sidecar 時間軸（缺 ⇒ 具名錯誤；不得以位置對齊）
         row_index = self._load_raw_row_index(feature_reader, symbol, tf, config_hash)
@@ -677,16 +677,6 @@ class ICEngine:
         if not groups or total_features <= 0:
             raise ICReadError("L7 raw artifact is empty; fail closed")
         return raw_artifact
-
-    @staticmethod
-    def _resolve_l7_raw_base_dir(
-        run_dir: Path,
-        manifest: Dict[str, Any],
-        config_hash: str,
-    ) -> Path:
-        if manifest.get("legacy_format"):
-            return run_dir.parent.parent / config_hash
-        return run_dir
 
     def _iter_l7_raw_group_paths(
         self,

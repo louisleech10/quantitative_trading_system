@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
@@ -152,33 +150,32 @@ def test_browser_reads_partial_with_status(tmp_path: Path) -> None:
     assert not frame.empty
 
 
-def test_cache_gate_partial_unknown_miss_complete_hit(tmp_path: Path) -> None:
+def test_cache_gate_partial_unknown_miss_complete_hit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CGSA resume 閘（FRAMEPATH：承接已刪之舊 factory h5 快取閘意圖）：L7 manifest run_status 為 partial／unknown
+    ⇒ 不 resume；complete ⇒ resume。"""
+    from unittest.mock import patch
+
     factory = create_feature_factory(validate_continuity=False)
-    factory._storage = FeatureStorage(str(tmp_path / "features"))
 
     for status in ("partial", "unknown", "complete"):
         storage, config_hash, _ = _partial_manifest(tmp_path / status, run_status=status)
-        if status != "complete":
-            factory._storage = storage
-        else:
-            factory._storage = storage
+        factory._storage = storage
+        work_dir = tmp_path / status / "cgsa_work"
+        work_dir.mkdir(parents=True)
+        (work_dir / "manifest.json").write_text(
+            json.dumps({"groups": {"g1": {"status": "complete"}}}),
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir))
 
-        metadata = {"config_hash": config_hash, "run_status": status, "quality_status": status}
-        if status == "complete":
-            metadata.update(
-                {
-                    "expected_layers": ["L1", "L2"],
-                    "present_layers": ["L1", "L2"],
-                    "failed_layers": [],
-                    "expected_timeframes": ["1h"],
-                    "present_timeframes": ["1h"],
-                    "failed_timeframes": [],
-                }
-            )
-        cached = SimpleNamespace(metadata=metadata, features_df=pd.DataFrame({"x": [1.0]}))
-        factory._storage.load_factory_output = MagicMock(return_value=cached)  # type: ignore[method-assign]
-
-        result = factory._try_load_cache("BTCUSDT", "1h", config_hash)
+        with patch(
+            "momentum.FeatureEngineering.feature_factory.ColumnGroupRegistry.resume_from_manifest"
+        ) as resume_mock:
+            factory._prepare_cgsa_registry("BTCUSDT", "1h", config_hash=config_hash)
+        result = resume_mock.call_args
         if status == "complete":
             assert result is not None
         else:
@@ -222,78 +219,8 @@ def test_is_run_status_cacheable_matrix() -> None:
         assert is_run_status_cacheable(status) is False
 
 
-def _legacy_reader_fixture(tmp_path: Path) -> tuple[FeatureReader, str]:
-    base_dir = tmp_path / "features"
-    symbol = "LEGACY"
-    config_hash = "cfg_legacy"
-    legacy_dir = base_dir / symbol / config_hash
-    legacy_dir.mkdir(parents=True)
-    frame = pd.DataFrame({"legacy_alpha": [1.0, 2.0, 3.0]})
-    legacy_path = legacy_dir / "legacy_group.parquet"
-    frame.to_parquet(legacy_path, index=False)
-    manifest = {
-        "version": "7.0",
-        "symbol": symbol,
-        "config_hash": config_hash,
-        "total_features": 1,
-        "total_rows": 3,
-        "groups": {
-            "legacy_group": {
-                "file": "legacy_group.parquet",
-                "columns": ["legacy_alpha"],
-                "column_count": 1,
-                "dtype": "float32",
-            }
-        },
-    }
-    (legacy_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-    return FeatureReader(str(base_dir)), config_hash
 
 
-def test_legacy_reader_strict_rejects_ic_and_training(tmp_path: Path) -> None:
-    from momentum.FeatureEngineering.feature_library import FeatureLibrary
-    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
-
-    reader, config_hash = _legacy_reader_fixture(tmp_path)
-    engine = ICEngine({})
-
-    with pytest.raises(TrainingReadError, match="legacy"):
-        reader.load_manifest_v2(
-            "LEGACY",
-            "1h",
-            config_hash,
-            artifact_kind="raw",
-            consumer="strict",
-        )
-
-    with pytest.raises(ICReadError, match="legacy"):
-        engine._validate_l7_raw_manifest(
-            reader.load_manifest_v2(
-                "LEGACY",
-                "1h",
-                config_hash,
-                artifact_kind="raw",
-                consumer="browse",
-            ),
-            symbol="LEGACY",
-            tf="1h",
-            config_hash=config_hash,
-        )
-
-    registry = FeatureRegistry(tmp_path / "registry.json")
-    registry.add(
-        {
-            "symbol": "LEGACY",
-            "timeframe": "1h",
-            "config_hash": config_hash,
-            "feature_count": 1,
-            "row_count": 3,
-            "hdf5_relative_path": "",
-        }
-    )
-    library = FeatureLibrary(registry, FeatureStorage(str(tmp_path / "features")), reader)
-    with pytest.raises(TrainingReadError, match="legacy"):
-        library.load_for_training("LEGACY", "1h")
 
 
 def test_ic_cache_rejects_missing_source_run_status(tmp_path: Path) -> None:
@@ -336,16 +263,6 @@ def test_metadata_complete_without_completeness_is_unknown() -> None:
     assert status == "unknown"
 
 
-def test_try_load_cache_rejects_legacy_complete_without_completeness(tmp_path: Path) -> None:
-    factory = create_feature_factory(validate_continuity=False)
-    storage = FeatureStorage(str(tmp_path / "features"))
-    factory._storage = storage
-    config_hash = "cfg_legacy_complete"
-    metadata = {"config_hash": config_hash, "quality_status": "complete", "run_status": "complete"}
-    cached = SimpleNamespace(metadata=metadata, features_df=pd.DataFrame({"x": [1.0]}))
-    factory._storage.load_factory_output = MagicMock(return_value=cached)  # type: ignore[method-assign]
-
-    assert factory._try_load_cache("BTCUSDT", "1h", config_hash) is None
 
 
 def test_cgsa_skips_resume_when_l7_manifest_missing(

@@ -384,9 +384,8 @@ def approved_base_columns(baseline_columns: Any) -> set:
 
 
 def public_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
-    """公開輸出之全部欄（基礎欄＋平穩化衍生欄）→ {NaN mask hash, float32 值 hash}；frame 路徑（`*_factory.h5`，
-    全部欄同一檔）與 CGSA 路徑（基礎欄 parquet＋`*_L65.parquet` 衍生欄）同式，供 ⑪ 跨路徑比對。
-    值一律轉 float32（兩路徑落盤精度）後比，NaN 以 0 取代。"""
+    """公開輸出之全部欄（基礎欄 parquet＋`*_L65.parquet` 衍生欄）→ {NaN mask hash, float32 值 hash}，供 ⑪ 跨路徑比對。
+    值一律轉 float32（落盤精度）後比，NaN 以 0 取代。"""
     import hashlib
 
     import numpy as np
@@ -399,11 +398,6 @@ def public_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
                 "values": hashlib.sha256(np.where(nan, np.float32(0), arr).tobytes()).hexdigest()}
 
     out: Dict[str, Dict[str, Any]] = {}
-    for h5 in sorted(root.rglob("*_factory.h5")):
-        symbol, timeframe = h5.name[: -len("_factory.h5")].rsplit("_", 1)
-        frame = FeatureStorage(str(h5.parent)).load_factory_output(symbol, timeframe).features_df
-        for name in frame.columns:
-            out[str(name)] = fp(frame[name].to_numpy())
     for p in sorted(root.rglob("*.parquet")):
         if p.name == "timestamps.parquet":
             continue

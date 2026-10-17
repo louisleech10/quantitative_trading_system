@@ -492,33 +492,32 @@ def test_restore_persisted_manifest_uses_full_hash_browse_id(monkeypatch, tmp_pa
 
 
 def test_quality_adapter_computes_from_real_parquet_manifest(monkeypatch, tmp_path):
+    """品質 adapter 經瀏覽路徑讀真 parquet run（FRAMEPATH Task 2.6：CGSA registry 清單格式之瀏覽讀取分支已刪，
+    改以正式 `FeatureStorage.write_raw` 寫 l7_v2 run；位置、欄名與值同前）。"""
     import numpy as np
     import pandas as pd
 
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
     monkeypatch.setattr(feature_service_module.settings, "data_cache_path", tmp_path)
     service = FeatureFactoryService()
-    manifest_dir = tmp_path / "features" / "ETHUSDT" / "1h" / "cfg_adapter"
-    manifest_dir.mkdir(parents=True)
-    parquet_path = manifest_dir / "features.parquet"
-    pd.DataFrame({
-        "feature_a": np.arange(500, dtype=float),
-        "feature_b": np.arange(500, dtype=float) + 1.0,
-    }).to_parquet(parquet_path, index=False)
-    manifest_path = manifest_dir / "feature_manifest.json"
-    manifest_path.write_text(
-        json.dumps({
-            "symbol": "ETHUSDT",
-            "primary_tf": "1h",
-            "config_hash": "cfg_adapter",
-            "total_features": 2,
-            "groups": [{
-                "group_id": "1h_L1_adapter",
-                "parquet_path": str(parquet_path),
-                "columns": ["feature_a", "feature_b"],
-            }],
-        }),
-        encoding="utf-8",
+    row_index = pd.date_range("2026-01-01", periods=500, freq="h")
+    raw_dir = FeatureStorage(str(tmp_path / "features")).write_raw(
+        "ETHUSDT",
+        "1h",
+        "cfg_adapter",
+        {
+            "1h_L1_adapter": pd.DataFrame(
+                {
+                    "feature_a": np.arange(500, dtype=float),
+                    "feature_b": np.arange(500, dtype=float) + 1.0,
+                },
+                index=row_index,
+            )
+        },
+        row_index=row_index,
     )
+    manifest_path = raw_dir.parent / "feature_manifest.json"
 
     result = FeatureFactoryQualityAdapter(service).compute(str(manifest_path))
 

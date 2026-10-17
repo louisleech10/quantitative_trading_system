@@ -131,9 +131,13 @@ def test_browse_distribution_skips_adf_by_default(monkeypatch):
     service._adf_cache = {}
 
     df = pd.DataFrame({"feature_a": np.linspace(0.0, 1.0, 100)})
-    context = {"is_cgsa": False}
+    context = {"is_cgsa": True}
     monkeypatch.setattr(service, "_load_task_context", lambda _task: context)
-    monkeypatch.setattr(service, "_load_task_features", lambda _task: (df, {}))
+    monkeypatch.setattr(
+        service,
+        "_load_cgsa_selected_df",
+        lambda _context, _features: (df, len(df)),
+    )
 
     called = {"adf": 0}
 

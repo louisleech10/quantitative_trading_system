@@ -80,16 +80,14 @@ def test_t217_l65_per_group_matches_legacy(tmp_path: Path):
     )
 
 
-def test_t215_per_group_parquet_duckdb_readable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_t215_per_group_parquet_duckdb_readable(tmp_path: Path):
     """T2.15: per-group parquet should be DuckDB-readable and preserve total columns.
 
-    The L7 compactor (FFACT_L7_COMPACTOR_ENABLED=1 by default) may merge multiple
-    parts into a single parquet for streaming efficiency; this test exercises the
-    *unmerged* per-group writer to verify each group remains DuckDB-readable.
-    Total column count remains the integrity invariant either way.
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet，含 compactor）已刪；改驗 V2 串流寫入
+    write_raw_from_registry_stream 之逐組 parquet（共用 _write_parquet_with_codec）可被 DuckDB 讀取，
+    總欄數守恆仍為完整性不變式。
     """
     duckdb = pytest.importorskip("duckdb")
-    monkeypatch.setenv("FFACT_L7_COMPACTOR_ENABLED", "0")
 
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
     group_a_cols = ("f_a_1", "f_a_2")
@@ -119,15 +117,17 @@ def test_t215_per_group_parquet_duckdb_readable(tmp_path: Path, monkeypatch: pyt
     )
 
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
-    output_paths = storage.persist_registry_to_parquet(
+    raw_dir, _summary = storage.write_raw_from_registry_stream(
         symbol="ETHUSDT",
+        tf="1h",
         config_hash="cfg_hash_001",
         registry=registry,
         cleanup_intermediate=False,
     )
+    output_paths = sorted(str(path) for path in raw_dir.glob("*.parquet"))
 
     assert len(output_paths) == 2
-    expected_parent = tmp_path / "features" / "ETHUSDT" / "cfg_hash_001"
+    expected_parent = tmp_path / "features" / "ETHUSDT" / "1h" / "cfg_hash_001" / "raw"
     assert all(Path(path).parent == expected_parent for path in output_paths)
 
     conn = duckdb.connect(database=":memory:")

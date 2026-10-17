@@ -1,19 +1,9 @@
 import numpy as np
 import pandas as pd
-import h5py
 
 from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
 
 
-def _write_feature_h5(path, data: np.ndarray, feature_names: list[str]) -> None:
-    with h5py.File(path, "w") as h5_file:
-        group = h5_file.create_group("data")
-        group.create_dataset("features", data=data)
-        group.create_dataset(
-            "feature_names",
-            data=np.array(feature_names, dtype=object),
-            dtype=h5py.string_dtype(encoding="utf-8"),
-        )
 
 
 def test_time_coverage_and_effective_start():
@@ -78,33 +68,38 @@ def test_flag_low_coverage_skips_nan():
 
 def test_compute_symbol_coverage_matrix(tmp_path):
     """features x symbols NaN 率矩陣計算正確。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
     analyzer = CoverageAnalyzer()
     base = tmp_path / "features"
     base.mkdir()
 
-    _write_feature_h5(
-        base / "BTCUSDT_12h_factory.h5",
-        np.array(
-            [
-                [1.0, np.nan],
-                [np.nan, np.nan],
-                [3.0, 1.0],
-            ],
-            dtype=float,
-        ),
-        ["feature_a", "feature_b"],
+    storage = FeatureStorage(str(base))
+    storage.write_raw(
+        "BTCUSDT",
+        "12h",
+        "cfg_cov_btc",
+        {
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, np.nan, 3.0], dtype=np.float32),
+                    "feature_b": np.array([np.nan, np.nan, 1.0], dtype=np.float32),
+                }
+            )
+        },
     )
-    _write_feature_h5(
-        base / "ETHUSDT_12h_factory.h5",
-        np.array(
-            [
-                [1.0, 4.0],
-                [2.0, 5.0],
-                [3.0, 6.0],
-            ],
-            dtype=float,
-        ),
-        ["feature_a", "feature_b"],
+    storage.write_raw(
+        "ETHUSDT",
+        "12h",
+        "cfg_cov_eth",
+        {
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+                    "feature_b": np.array([4.0, 5.0, 6.0], dtype=np.float32),
+                }
+            )
+        },
     )
 
     result = analyzer.compute_symbol_coverage_matrix(
@@ -127,15 +122,18 @@ def test_compute_symbol_coverage_matrix(tmp_path):
 
 
 def test_compute_symbol_coverage_matrix_missing_symbol_file(tmp_path):
-    """缺失 Symbol 檔案時，應回傳 100% NaN。"""
+    """缺失 Symbol 之 V2 run 時，應回傳 100% NaN。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
     analyzer = CoverageAnalyzer()
     base = tmp_path / "features"
     base.mkdir()
 
-    _write_feature_h5(
-        base / "BTCUSDT_12h_factory.h5",
-        np.array([[1.0], [2.0], [3.0]], dtype=float),
-        ["feature_a"],
+    FeatureStorage(str(base)).write_raw(
+        "BTCUSDT",
+        "12h",
+        "cfg_cov_btc",
+        {"group_alpha": pd.DataFrame({"feature_a": np.array([1.0, 2.0, 3.0], dtype=np.float32)})},
     )
 
     result = analyzer.compute_symbol_coverage_matrix(

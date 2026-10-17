@@ -30,9 +30,9 @@ def test_get_memory_tier_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_get_tier_config_returns_valid_dict() -> None:
-    """測試 get_tier_config：所有 tier 都應回傳完整設定鍵。"""
+    """測試 get_tier_config：所有 tier 都應回傳完整設定鍵（FRAMEPATH Task 2.7：`l7_workers`、`chunk_bars` 已移除（只由已刪之 V1 寫入讀取），不得再出現）。"""
     expected_keys = {
-        "l65_workers", "cgsa_memory_buffer", "l7_workers", "chunk_bars",
+        "l65_workers", "cgsa_memory_buffer",
         "multi_tf_max_workers", "layer3_chunk_size", "l3_persist_mode",
         "l3_streaming_buffer_cols", "l65_split_threshold", "l2_category_workers",
         "cgsa_shard_bytes", "concurrent_symbols", "l7_zstd_level",
@@ -41,6 +41,8 @@ def test_get_tier_config_returns_valid_dict() -> None:
 
     for tier in ("8gb", "16gb", "24gb", "32gb"):
         assert set(hardware_utils.get_tier_config(tier).keys()) == expected_keys
+        assert "l7_workers" not in hardware_utils.get_tier_config(tier)
+        assert "chunk_bars" not in hardware_utils.get_tier_config(tier)
 
 
 def test_get_tier_config_unknown_tier_fallback() -> None:

@@ -42,7 +42,8 @@ def _tier_config(tier: str, **overrides: object) -> dict:
 
 
 def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    """測試硬體 endpoint 回傳正確 JSON 結構與建議設定。"""
+    """測試硬體 endpoint 回傳正確 JSON 結構與建議設定（FRAMEPATH Task 2.7：L7 並行度 `l7_workers`／
+    `FFACT_L7_WORKERS`／`FFACT_L7_COMPACTOR_ENABLED` 已移除，回應不得再含）。"""
     monkeypatch.setattr(hardware_info_service, "psutil", FakePsutil)
     monkeypatch.setattr(hardware_info_service, "get_memory_tier", lambda: "16gb")
     monkeypatch.setattr(
@@ -52,7 +53,6 @@ def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: p
             tier,
             l65_workers=6,
             cgsa_memory_buffer=0,
-            l7_workers=6,
             chunk_bars=100_000,
         ),
     )
@@ -81,13 +81,13 @@ def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: p
     assert payload["recommended_settings"] == {
         "FFACT_L65_WORKERS": 6,
         "FFACT_CGSA_MEMORY_BUFFER": 0,
-        "FFACT_L7_WORKERS": 6,
-        "FFACT_L7_COMPACTOR_ENABLED": 1,
         "FFACT_MULTI_TF_MAX_WORKERS": 2,
         "FFACT_LAYER3_CHUNK_SIZE": 512,
     }
     assert payload["applied_settings"]["l65_workers"]["value"] == 6
     assert set(payload["tier_table"]) == {"8gb", "16gb", "24gb", "32gb"}
+    assert "l7_workers" not in payload["applied_settings"]
+    assert all("l7_workers" not in tier_config for tier_config in payload["tier_table"].values())
 
 
 def test_hardware_endpoint_tier_matches_util(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

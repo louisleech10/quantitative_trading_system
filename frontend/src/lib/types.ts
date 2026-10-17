@@ -295,6 +295,10 @@ export interface FeatureRegistryEntry {
   feature_count: number;
   row_count: number;
   created_at: number;
+  /**
+   * 欄名沿用舊稱（DTO 不改名）：值為該 run 之 V2 `feature_manifest.json` 路徑；
+   * 舊 registry 列可能為空字串。舊特徵 h5 已不支援（FRAMEPATH）。
+   */
   hdf5_relative_path: string;
 }
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import h5py
 import numpy as np
 import pandas as pd
 from fastapi.testclient import TestClient
@@ -14,30 +13,39 @@ from momentum.FeatureEngineering.feature_storage import FeatureStorage
 client = TestClient(app)
 
 
-def _write_symbol_feature_h5(path: Path, data: np.ndarray, feature_names: list[str]) -> None:
-    with h5py.File(path, "w") as h5_file:
-        group = h5_file.create_group("data")
-        group.create_dataset("features", data=data)
-        group.create_dataset(
-            "feature_names",
-            data=np.array(feature_names, dtype=object),
-            dtype=h5py.string_dtype(encoding="utf-8"),
-        )
 
 
 def test_coverage_matrix_endpoint_200(tmp_path: Path) -> None:
     feature_base = tmp_path / "feature_matrix"
     feature_base.mkdir()
 
-    _write_symbol_feature_h5(
-        feature_base / "BTCUSDT_12h_factory.h5",
-        np.array([[1.0, np.nan], [2.0, 3.0]], dtype=float),
-        ["feature_a", "feature_b"],
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="BTCUSDT",
+        timeframe="12h",
+        config_hash="cfg_route_matrix",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, 2.0], dtype=np.float32),
+                    "feature_b": np.array([np.nan, 3.0], dtype=np.float32),
+                }
+            )
+        },
     )
-    _write_symbol_feature_h5(
-        feature_base / "ETHUSDT_12h_factory.h5",
-        np.array([[1.0, 2.0], [2.0, 3.0]], dtype=float),
-        ["feature_a", "feature_b"],
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="ETHUSDT",
+        timeframe="12h",
+        config_hash="cfg_route_matrix",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, 2.0], dtype=np.float32),
+                    "feature_b": np.array([2.0, 3.0], dtype=np.float32),
+                }
+            )
+        },
     )
 
     response = client.post(
@@ -56,17 +64,13 @@ def test_coverage_matrix_endpoint_200(tmp_path: Path) -> None:
     assert payload["symbols"] == ["BTCUSDT", "ETHUSDT"]
     assert "matrix" in payload
     assert "summary" in payload
+    assert payload["matrix"]["feature_b"]["BTCUSDT"] == 0.5
 
 
 def test_coverage_matrix_requires_at_least_two_symbols(tmp_path: Path) -> None:
     feature_base = tmp_path / "feature_matrix_400"
     feature_base.mkdir()
 
-    _write_symbol_feature_h5(
-        feature_base / "BTCUSDT_12h_factory.h5",
-        np.array([[1.0], [2.0]], dtype=float),
-        ["feature_a"],
-    )
 
     response = client.post(
         "/api/v1/feature-browser/coverage-matrix",

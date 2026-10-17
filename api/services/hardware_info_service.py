@@ -109,7 +109,6 @@ def build_hardware_info(data_cache_path: Path) -> Dict[str, Any]:
     env_keys = {
         "l65_workers": "FFACT_L65_WORKERS",
         "cgsa_memory_buffer": "FFACT_CGSA_MEMORY_BUFFER",
-        "l7_workers": "FFACT_L7_WORKERS",
         "multi_tf_max_workers": "FFACT_MULTI_TF_MAX_WORKERS",
         "layer3_chunk_size": "FFACT_LAYER3_CHUNK_SIZE",
         "l3_persist_mode": "FFACT_L3_PERSIST_MODE",
@@ -138,8 +137,6 @@ def build_hardware_info(data_cache_path: Path) -> Dict[str, Any]:
         "recommended_settings": {
             "FFACT_L65_WORKERS": tier_config["l65_workers"],
             "FFACT_CGSA_MEMORY_BUFFER": tier_config["cgsa_memory_buffer"],
-            "FFACT_L7_WORKERS": tier_config["l7_workers"],
-            "FFACT_L7_COMPACTOR_ENABLED": 1,
             "FFACT_MULTI_TF_MAX_WORKERS": tier_config["multi_tf_max_workers"],
             "FFACT_LAYER3_CHUNK_SIZE": tier_config["layer3_chunk_size"],
         },

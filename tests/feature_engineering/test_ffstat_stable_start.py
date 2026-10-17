@@ -1476,7 +1476,6 @@ def _path_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> Dic
             resumed.append(1)
             return real_resume(work_dir)
 
-        monkeypatch.setattr(FeatureFactory, "_try_load_cache", lambda self, *a, **k: None)
         monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(spy_resume))
         root, _factory, result = h.run_stat(tmp_path, payload, start_date=None, force_regenerate=False)
         assert resumed, "resume 路徑未呼叫 ColumnGroupRegistry.resume_from_manifest"

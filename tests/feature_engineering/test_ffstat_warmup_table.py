@@ -242,8 +242,6 @@ def test_unregistered_indicator_blocked_before_hash_and_cache(tmp_path: Path, mo
     called = {"hash": 0, "cache": 0}
     monkeypatch.setattr(FeatureFactory, "_compute_config_hash",
                         lambda self, *a, **k: called.__setitem__("hash", called["hash"] + 1) or "x")
-    monkeypatch.setattr(FeatureFactory, "_try_load_cache",
-                        lambda self, *a, **k: called.__setitem__("cache", called["cache"] + 1))
     from momentum.FeatureEngineering.config_manager import ConfigManager
 
     payload = h.stat_payload(fracdiff=False, adf=False)

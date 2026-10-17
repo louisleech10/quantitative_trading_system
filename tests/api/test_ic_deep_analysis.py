@@ -138,11 +138,38 @@ def completed_ic_task(
         redirect_patch_set.deactivate(ctx)
 
 
-def test_list_available_features_success(sample_paths: dict[str, str]) -> None:
+def test_list_available_features_success(
+    sample_paths: dict[str, str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """IC `/features/list` 只收 (symbol, timeframe, config_hash)（FRAMEPATH Task 2.6：`features_path`〔舊 `data/` group h5、
+    `parquet:`〕已回 400）。以同一份真實 kline 特徵（`sample_paths["features"]`）經正式 `FeatureStorage.write_raw`
+    寫成 V2 run，承接原「API 列出特徵數與名稱」之驗證。"""
+    import api.services.ic_analysis_service as ic_service_module
+    from momentum.factories import create_feature_reader
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+    from tests.fixtures.ic_api_real_kline import SYMBOL, TIMEFRAME
+
+    feature_base = tmp_path / "features"
+    FeatureStorage(str(feature_base)).write_raw(
+        SYMBOL,
+        TIMEFRAME,
+        "cfg_ic_list_v2",
+        {"group_ic_list": sample_paths["features"].reset_index(drop=True)},
+    )
+
+    def _tmp_feature_reader(*_args: object, **_kwargs: object):
+        return create_feature_reader(str(feature_base))
+
+    monkeypatch.setattr(ic_service_module, "create_feature_reader", _tmp_feature_reader)
+
     response = client.get(
         "/api/v1/ic/features/list",
         params={
-            "features_path": sample_paths["features_path"],
+            "symbol": SYMBOL,
+            "timeframe": TIMEFRAME,
+            "config_hash": "cfg_ic_list_v2",
             "meta_path": sample_paths["meta_path"],
         },
     )
@@ -152,10 +179,25 @@ def test_list_available_features_success(sample_paths: dict[str, str]) -> None:
     assert data["features"][0]["feature_name"] in sample_paths["feature_names"]
 
 
-def test_list_available_features_not_found() -> None:
+def test_list_available_features_not_found(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """三元組指向不存在之 V2 run ⇒ 404（FRAMEPATH Task 2.6：`features_path` 已不收、回 400；「來源不存在 ⇒ 404」改由三元組承接）。"""
+    import api.services.ic_analysis_service as ic_service_module
+    from momentum.factories import create_feature_reader
+
+    empty_base = tmp_path / "features"
+    empty_base.mkdir()
+
+    def _tmp_feature_reader(*_args: object, **_kwargs: object):
+        return create_feature_reader(str(empty_base))
+
+    monkeypatch.setattr(ic_service_module, "create_feature_reader", _tmp_feature_reader)
+
     response = client.get(
         "/api/v1/ic/features/list",
-        params={"features_path": "/tmp/not_exists_features.h5"},
+        params={"symbol": "ETHUSDT", "timeframe": "12h", "config_hash": "cfg_not_exists"},
     )
     assert response.status_code == 404
 

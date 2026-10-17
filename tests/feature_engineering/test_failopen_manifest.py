@@ -364,15 +364,6 @@ def test_status_model() -> None:
     row_index = pd.date_range("2026-01-01", periods=3, freq="h")
     complete_fields = _complete_artifact_fields(row_index)
 
-    legacy_manifest = FeatureReader._adapt_legacy_manifest_v2(
-        manifest={"groups": {}, "total_features": 0, "total_rows": 0},
-        symbol="BTCUSDT",
-        tf="1h",
-        config_hash="legacy_cfg",
-        artifact_kind="raw",
-    )
-    assert FeatureReader.resolve_run_status(legacy_manifest) == "legacy"
-    assert legacy_manifest["quality_status"] == "legacy"
 
     v2_old_no_completeness = {
         "artifacts": {
@@ -418,17 +409,6 @@ def test_merge_quality_status_full_precedence() -> None:
     row_index = pd.date_range("2026-01-01", periods=3, freq="h")
 
     def _artifact(status: str, *, schema_version: str = "raw_v2") -> dict[str, object]:
-        if status == "legacy":
-            return {
-                "complete": True,
-                "schema_version": "legacy_v7",
-                "quality_status": "legacy",
-                **{field: [] for field in COMPLETENESS_FIELD_NAMES if field.endswith("_layers")},
-                "expected_timeframes": ["1h"],
-                "present_timeframes": ["1h"],
-                "failed_timeframes": [],
-                "failure_reasons": [],
-            }
         base = _complete_artifact_fields(row_index, schema_version=schema_version, quality_status=status)
         base["quality_status"] = status
         return base

@@ -104,8 +104,8 @@ def _head_apply_selection_window(features_df: pd.DataFrame, label: pd.Series,
 
 def _head_load_row_index_v2(self: FeatureReader, symbol: str, tf: str, config_hash: str,
                             artifact_kind: str = "raw") -> Optional[pd.DatetimeIndex]:
-    manifest, base_dir, _ = self._resolve_manifest_v2(symbol=symbol, tf=tf, config_hash=config_hash,
-                                                       artifact_kind=artifact_kind)
+    manifest, base_dir = self._resolve_manifest_v2(symbol=symbol, tf=tf, config_hash=config_hash,
+                                                    artifact_kind=artifact_kind)
     row_index = manifest.get("row_index")
     if row_index is None:
         return None

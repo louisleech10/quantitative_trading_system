@@ -23,9 +23,7 @@ logger = get_logger(__name__)
 class FeatureLibrary:
     """Read-only facade for accessing generated features.
 
-    V7: delegates loading to FeatureReader (Parquet-only) when per-group
-    Parquet output is available.  Falls back to legacy HDF5 via
-    FeatureStorage only when no manifest.json exists.
+    只經 FeatureReader 讀 V2 run（feature_manifest.json）；無可讀 V2 run ⇒ FeatureNotFoundError。
     """
 
     def __init__(
@@ -91,7 +89,7 @@ class FeatureLibrary:
     ) -> pd.DataFrame:
         """Load latest features for a symbol/timeframe pair.
 
-        V7: tries FeatureReader (Parquet) first; falls back to legacy HDF5.
+        只讀 V2（FeatureReader）；無可讀 V2 run ⇒ FeatureNotFoundError。
         """
         return self._load_internal(
             symbol,
@@ -202,37 +200,12 @@ class FeatureLibrary:
                         f"V2 artifacts missing for config_hash: {resolved_hash}",
                     ) from None
 
-        if explicit_hash:
-            raise FeatureNotFoundError(
-                symbol,
-                timeframe,
-                f"artifacts missing for config_hash: {resolved_hash}",
-            )
-
-        result = self._storage.load_factory_output(symbol, timeframe)
-        features_df = getattr(result, "features_df", None) if result is not None else None
-        if features_df is None or features_df.empty:
-            raise FeatureNotFoundError(symbol, timeframe, "HDF5 file missing or empty")
-
-        metadata = getattr(result, "metadata", None) or {}
-        if for_training:
-            from momentum.FeatureEngineering.consumer_gate import effective_run_status_from_metadata
-
-            run_status = effective_run_status_from_metadata(metadata)
-            if run_status != "complete" and not (allow_partial_training and run_status == "partial"):
-                raise TrainingReadError(
-                    f"run_status={run_status!r} is not consumable for training "
-                    f"(allow_partial_training={allow_partial_training})"
-                )
-
-        logger.info(
-            "Loaded features for %s/%s: %d rows x %d cols",
+        # FRAMEPATH Task 2.2：只讀 V2；無可讀 V2 run 即 FeatureNotFoundError（舊特徵檔後備已刪）
+        raise FeatureNotFoundError(
             symbol,
             timeframe,
-            len(features_df),
-            len(features_df.columns),
+            f"artifacts missing for config_hash: {resolved_hash}",
         )
-        return features_df
 
     def _attach_row_index(
         self,

@@ -232,12 +232,10 @@ class FeatureFactory:
         persist: bool = True,
         lease_sink: Optional[list] = None,
         batch_id: Optional[str] = None,
-        require_raw: bool = False,
     ) -> FeatureGenerationResult:
         """Run the pipeline while holding the per-run lease.
 
-        `require_raw`（ICFIRSTALIGN Task 2.1）：True ⇒ 快取命中須 raw 成品仍在（否則視同未命中、同一 lease 內續行生成）；
-        既有 caller 預設 False 行為不變。生成結果 metadata 帶本次定案之 `output_window`（Task 2.0；快取命中者沿用其 metadata）。
+        生成結果 metadata 帶本次定案之 `output_window`（ICFIRSTALIGN Task 2.0）。
         """
         config = self._resolve_config(config_override)
         # FFSTAT Task 2.4（R5）：倍數表缺項於設定 hash 與快取查詢之前擋下（run 目錄零寫入）
@@ -300,7 +298,6 @@ class FeatureFactory:
                 end_date,
                 persist,
                 batch_id=batch_id,
-                require_raw=require_raw,
             )
             self._attach_output_window_metadata(result)
             self._attach_memory_route_metadata(result)
@@ -339,16 +336,13 @@ class FeatureFactory:
 
     def _attach_memory_route_metadata(self, result: "FeatureGenerationResult") -> None:
         """生成結果 metadata 帶本次受保護 run 之選路紀錄 `memory_route`（SPEC v35；審碼 b3 r6 codex P2-02）：
-        L2 等單行程換臂、多週期並行→串行與 worker 內換臂（經域目錄交根）。快取命中者不補寫（紀錄屬前一次 run）。"""
-        if getattr(self, "_last_generation_from_cache", False) or not isinstance(getattr(result, "metadata", None), dict):
+        L2 等單行程換臂、多週期並行→串行與 worker 內換臂（經域目錄交根）。"""
+        if not isinstance(getattr(result, "metadata", None), dict):
             return
         result.metadata["memory_route"] = _memory_budget.route_records()
 
     def _attach_output_window_metadata(self, result: "FeatureGenerationResult") -> None:
-        """生成結果 metadata 帶本次定案之 OutputWindow（ICFIRSTALIGN Task 2.0）。快取命中者不以本實例之窗補寫
-        （該窗屬前一次 run，補寫即洩漏狀態）；其 metadata 若無 `output_window` 即維持無。"""
-        if getattr(self, "_last_generation_from_cache", False):
-            return
+        """生成結果 metadata 帶本次定案之 OutputWindow（ICFIRSTALIGN Task 2.0）。"""
         window = getattr(self, "_current_output_window", None)
         if window is None or not isinstance(getattr(result, "metadata", None), dict):
             return
@@ -414,11 +408,10 @@ class FeatureFactory:
         end_date: Optional[str] = None,
         persist: bool = True,
         batch_id: Optional[str] = None,
-        require_raw: bool = False,
     ) -> FeatureGenerationResult:
         """Run the seven-layer pipeline.
 
-        force_regenerate=True skips cache and forces recalculation.
+        force_regenerate=True ⇒ CGSA fresh run（不 resume 既有 work dir manifest）。
         Layer 0 failure stops the pipeline. Layer 1-6 failures return empty DataFrame.
         """
         config = self._resolve_config(config_override)
@@ -452,14 +445,8 @@ class FeatureFactory:
             end_date=end_date,
         )
         self._current_config_hash = config_hash
-        self._last_generation_from_cache = False
-        if not force_regenerate:
-            cached = self._try_load_cache(symbol, timeframe, config_hash, require_raw=require_raw)
-            if cached:
-                self._last_generation_from_cache = True
-                return cached
 
-        # FFSTAT §C 公開域預熱之加倍規則：快取未命中後、任何 registry／落盤之前，以記憶體探測定案預熱深度
+        # FFSTAT §C 公開域預熱之加倍規則：任何 registry／落盤之前，以記憶體探測定案預熱深度
         self._current_output_window = self._resolve_public_window(symbol, timeframe, config, start_date, end_date)
 
         training_tfs = list(dict.fromkeys(config.timeframes.training))
@@ -2817,7 +2804,7 @@ class FeatureFactory:
     ) -> FeatureGenerationResult:
         """IC-first：正式生成（CGSA、多週期、預熱、校準）→ IC → 選欄讀回 → post-IC（Polars 臂）→ processed。
 
-        ICFIRSTALIGN Task 2.0／2.1／2.2／3.2：raw 只由 `generate_features(persist=True, require_raw=True)` 產出，
+        ICFIRSTALIGN Task 2.0／2.1／2.2／3.2：raw 只由 `generate_features(persist=True)` 產出，
         一次 run 由該次生成交出之同一 lease 持有至 IC、processed、cleanup 結束（finally 釋放；呼叫端傳 `lease_sink`
         者改由呼叫端持有並釋放）；不再自取 lease、不自跑校準閘、無記憶體 L1–L6 第二引擎。本次身分（輸出窗、
         config_hash）只取自本次生成結果之 metadata，經 `ic_first_context` 凍結後全程只讀；生成失敗（含 L6.5）⇒
@@ -2851,7 +2838,7 @@ class FeatureFactory:
             try:
                 generation = self.generate_features(
                     symbol, tf, config_override=config.model_dump(by_alias=True),
-                    start_date=ctx.start, end_date=ctx.end, persist=True, lease_sink=sink, require_raw=True,
+                    start_date=ctx.start, end_date=ctx.end, persist=True, lease_sink=sink,
                 )
             except NON_DEGRADABLE_ERRORS:
                 raise
@@ -4149,75 +4136,6 @@ class FeatureFactory:
             config_payload["_probe_l65_gate"] = probe_salt
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
-
-    def _try_load_cache(self, symbol: str, timeframe: str, config_hash: str,
-                        require_raw: bool = False) -> Optional[FeatureGenerationResult]:
-        from momentum.FeatureEngineering.consumer_gate import (
-            effective_run_status_from_metadata,
-            is_run_status_cacheable,
-        )
-        from momentum.FeatureEngineering.feature_storage import resolve_run_status
-
-        try:
-            cached = self._storage.load_factory_output(symbol, timeframe)
-        except Exception as exc:
-            logger.warning("Cache load failed for %s/%s: %s", symbol, timeframe, exc)
-            return None
-        if not cached:
-            return None
-        cached_hash = cached.metadata.get("config_hash") if isinstance(cached.metadata, dict) else None
-        if cached_hash != config_hash:
-            return None
-        metadata = cached.metadata if isinstance(cached.metadata, dict) else {}
-        run_status = effective_run_status_from_metadata(metadata)
-        if not is_run_status_cacheable(run_status):
-            logger.info(
-                "Cache miss for %s/%s [hash=%s]: run_status=%s",
-                symbol,
-                timeframe,
-                config_hash[:8],
-                run_status,
-            )
-            return None
-        manifest_path = (
-            self._storage.feature_run_dir(symbol, timeframe, config_hash)
-            / self._storage.L7_V2_MANIFEST_NAME
-        )
-        if not manifest_path.exists():
-            logger.info(
-                "Cache miss for %s/%s [hash=%s]: L7 manifest missing",
-                symbol,
-                timeframe,
-                config_hash[:8],
-            )
-            return None
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest_status = resolve_run_status(manifest)
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Cache manifest read failed for %s/%s: %s", symbol, timeframe, exc)
-            return None
-        if not is_run_status_cacheable(manifest_status):
-            logger.info(
-                "Cache miss for %s/%s [hash=%s]: manifest run_status=%s",
-                symbol,
-                timeframe,
-                config_hash[:8],
-                manifest_status,
-            )
-            return None
-        if require_raw:
-            # ICFIRSTALIGN Task 2.1：IC-first 需 raw 成品；H5 命中而 raw 不存在（如前次 cleanup_raw）或缺本次
-            # 生成之 output_window ⇒ 視同未命中，於同一 lease 內續行生成（不把 H5 命中當 raw 可用）
-            raw_dir = self._storage.feature_run_dir(symbol, timeframe, config_hash) / "raw"
-            if not raw_dir.exists() or "output_window" not in metadata:
-                logger.info(
-                    "Cache miss for %s/%s [hash=%s]: require_raw（raw=%s, output_window=%s）",
-                    symbol, timeframe, config_hash[:8], raw_dir.exists(), "output_window" in metadata,
-                )
-                return None
-        logger.info("Cache hit for %s/%s [hash=%s]", symbol, timeframe, config_hash[:8])
-        return cached
 
     def _capture_stationarity_decisions(self, preprocessor: FeaturePreprocessor, config: Any = None) -> None:
         """FFSTAT：把 L6.5 前處理器之逐欄決策（鍵＝原生週期＋L6.5 所見欄名）轉為落盤欄名為鍵，

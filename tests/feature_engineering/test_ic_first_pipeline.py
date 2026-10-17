@@ -324,43 +324,6 @@ def test_feature_run_dir_and_manifest_atomicity(tmp_path) -> None:
         reader.load_manifest_v2("TEMP", "1h", "cfg_tmp", artifact_kind="raw")
 
 
-def test_old_parquet_no_metadata(tmp_path) -> None:
-    base_dir = tmp_path / "features"
-    symbol = "LEGACY"
-    config_hash = "cfg_legacy"
-    legacy_dir = base_dir / symbol / config_hash
-    legacy_dir.mkdir(parents=True)
-    frame = pd.DataFrame({"legacy_alpha": np.array([1.0, 2.0, 3.0], dtype=np.float32)})
-    legacy_path = legacy_dir / "legacy_group.parquet"
-    frame.to_parquet(legacy_path, index=False)
-    manifest = {
-        "version": "7.0",
-        "symbol": symbol,
-        "config_hash": config_hash,
-        "total_features": 1,
-        "total_rows": 3,
-        "groups": {
-            "legacy_group": {
-                "file": "legacy_group.parquet",
-                "columns": ["legacy_alpha"],
-                "column_count": 1,
-                "dtype": "float32",
-            }
-        },
-    }
-    (legacy_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-
-    schema_metadata = pq.read_schema(str(legacy_path)).metadata or {}
-    assert b"schema_version" not in schema_metadata
-
-    reader = FeatureReader(str(base_dir))
-    loaded_manifest = reader.load_manifest_v2(symbol, "1h", config_hash, artifact_kind="raw")
-    assert loaded_manifest["legacy_format"] is True
-    loaded = reader.load_columns_v2(symbol, "1h", config_hash, ["legacy_alpha"], artifact_kind="raw")
-    np.testing.assert_allclose(
-        loaded["legacy_alpha"].to_numpy(dtype=np.float32),
-        frame["legacy_alpha"].to_numpy(dtype=np.float32),
-    )
 
 
 def test_ic_selection_stability(tmp_path) -> None:

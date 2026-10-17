@@ -1,17 +1,15 @@
-"""FeatureReader — V7 unified read-only interface for consuming per-group Parquet features.
+"""FeatureReader — 讀取 V2 版面（`<base>/<symbol>/<timeframe>/<config_hash>/feature_manifest.json`）之唯讀介面。
 
-Supports 4 loading modes:
-  1. Metadata-Only  (zero data I/O)
-  2. Column-Projected (read only requested columns)
-  3. Per-Group Streaming (yield groups one at a time for bounded RAM)
-  4. Cross-Symbol (load same columns across multiple symbols)
+讀取模式（皆以 V2 manifest 為準；V2 manifest 不存在 ⇒ FileNotFoundError，不退回舊版面）：
+  1. Metadata-Only（`load_manifest_v2`／`list_features_v2`，零資料 I/O）
+  2. Column-Projected（`load_columns_v2`，只讀所需欄）
+  3. Per-Group Streaming（`stream_groups_v2`，逐組產出以限記憶體）
 
 Design reference: FEATURE_STORAGE_ARCHITECTURE_V7.md §11
 """
 
 from __future__ import annotations
 
-import gzip
 import json
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
@@ -64,8 +62,8 @@ class FeatureReader:
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
     ) -> dict:
-        """Load a complete V2 manifest, falling back to V7 legacy metadata."""
-        manifest, _base_dir, _is_legacy = self._resolve_manifest_v2(
+        """Load a complete V2 manifest（V2 manifest 不存在 ⇒ FileNotFoundError）."""
+        manifest, _base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
             config_hash=config_hash,
@@ -77,7 +75,7 @@ class FeatureReader:
 
     @staticmethod
     def resolve_run_status(manifest: dict) -> str:
-        """解析 run-level quality status（含 legacy / 未遷移 V2 偵測）。"""
+        """解析 run-level quality status（含未遷移 V2 偵測）。"""
         return merge_manifest_run_status(manifest)
 
     def stream_groups_v2(
@@ -91,7 +89,7 @@ class FeatureReader:
         allow_partial: bool = False,
     ) -> Iterator[Tuple[str, pd.DataFrame]]:
         """Yield V2 groups one at a time from raw or processed canonical paths."""
-        manifest, base_dir, is_legacy = self._resolve_manifest_v2(
+        manifest, base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
             config_hash=config_hash,
@@ -99,10 +97,6 @@ class FeatureReader:
             consumer=consumer,
             allow_partial=allow_partial,
         )
-        if is_legacy:
-            yield from self.stream_groups(symbol, config_hash)
-            return
-
         artifact = self._get_v2_artifact(manifest, artifact_kind)
         for group_name, group_info in artifact.get("groups", {}).items():
             path = self._resolve_manifest_relative_path(base_dir, group_info.get("path") or group_info.get("file"))
@@ -125,13 +119,13 @@ class FeatureReader:
         allow_partial: bool = False,
         attach_row_index: bool = False,
     ) -> pd.DataFrame:
-        """Column projection for V2 raw/processed artifacts with legacy fallback.
+        """Column projection for V2 raw/processed artifacts.
 
         `attach_row_index=True`（ICFIRSTALIGN Task 1.2）：回傳以該 artifact_kind 之 sidecar 時間戳為索引；
         sidecar 缺 ⇒ `RowIndexArtifactMissingError`；無符合欄 ⇒ 空 DataFrame 帶長度 0 之 DatetimeIndex。
         預設 False 維持既有 caller 行為（RangeIndex，逐位元組不變）。
         """
-        manifest, base_dir, is_legacy = self._resolve_manifest_v2(
+        manifest, base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
             config_hash=config_hash,
@@ -139,12 +133,6 @@ class FeatureReader:
             consumer=consumer,
             allow_partial=allow_partial,
         )
-        if is_legacy:
-            if attach_row_index:
-                raise RowIndexArtifactMissingError(
-                    f"legacy 成品無時間軸 sidecar（{symbol}/{tf}/{config_hash}）；不得以位置對齊讀回"
-                )
-            return self.load_columns(symbol, config_hash, columns)
         row_index = (
             self._require_row_index(symbol, tf, config_hash, artifact_kind) if attach_row_index else None
         )
@@ -204,7 +192,7 @@ class FeatureReader:
         已宣告之 sidecar 檔缺 ⇒ `RowIndexArtifactMissingError`（ValueError 子類，與既有 caller 相容）；
         列數須與宣告相符。
         """
-        manifest, base_dir, _is_legacy = self._resolve_manifest_v2(
+        manifest, base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
             config_hash=config_hash,
@@ -245,29 +233,6 @@ class FeatureReader:
             )
         return pd.DatetimeIndex(pd.to_datetime(values, unit="s"))
 
-    # ------------------------------------------------------------------
-    # Mode 1: Metadata-Only
-    # ------------------------------------------------------------------
-
-    def load_manifest(self, symbol: str, config_hash: str) -> dict:
-        """Load manifest.json for a symbol/config_hash pair."""
-        path = self._base / symbol / config_hash / "manifest.json"
-        if not path.exists():
-            raise FileNotFoundError(f"manifest.json not found: {path}")
-        return json.loads(path.read_text(encoding="utf-8"))
-
-    def list_features(self, symbol: str, config_hash: str) -> List[str]:
-        """List all feature names without loading data.
-
-        Reads from columns.json.gz when available; falls back to Parquet
-        schema scanning if the compressed file is missing.
-        """
-        gz_path = self._base / symbol / config_hash / "columns.json.gz"
-        if gz_path.exists():
-            with gzip.open(gz_path, "rt", encoding="utf-8") as f:
-                return json.load(f)
-        return self._list_features_from_parquet(symbol, config_hash)
-
     def list_features_v2(
         self,
         symbol: str,
@@ -279,7 +244,7 @@ class FeatureReader:
         allow_partial: bool = False,
     ) -> List[str]:
         """List feature names for a V2 run (symbol/timeframe/config_hash)."""
-        manifest, _base_dir, is_legacy = self._resolve_manifest_v2(
+        manifest, _base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
             config_hash=config_hash,
@@ -287,9 +252,6 @@ class FeatureReader:
             consumer=consumer,
             allow_partial=allow_partial,
         )
-        if is_legacy:
-            return self.list_features(symbol, config_hash)
-
         artifact = self._get_v2_artifact(manifest, artifact_kind)
         columns: List[str] = []
         for group_info in artifact.get("groups", {}).values():
@@ -298,106 +260,8 @@ class FeatureReader:
         return columns
 
     # ------------------------------------------------------------------
-    # Mode 2: Column-Projected
-    # ------------------------------------------------------------------
-
-    def load_columns(
-        self,
-        symbol: str,
-        config_hash: str,
-        columns: List[str],
-    ) -> pd.DataFrame:
-        """Column projection — read only the requested columns."""
-        manifest = self.load_manifest(symbol, config_hash)
-        base_dir = self._base / symbol / config_hash
-
-        # Build a reverse lookup: column_name → group_name for fast matching
-        col_to_group: Dict[str, List[str]] = {}
-        for group_name, group_info in manifest["groups"].items():
-            group_cols = set(group_info.get("columns", []))
-            needed = [c for c in columns if c in group_cols]
-            if needed:
-                col_to_group[group_name] = needed
-
-        if not col_to_group:
-            logger.warning(
-                "No columns matched in any group: %s...",
-                columns[:5],
-            )
-            return pd.DataFrame()
-
-        frames: List[pd.DataFrame] = []
-        for group_name, needed_cols in col_to_group.items():
-            group_info = manifest["groups"][group_name]
-            path = base_dir / group_info["file"]
-            if not path.exists():
-                raise FileNotFoundError(f"Parquet file missing: {path}")
-            table = pq.read_table(str(path), columns=needed_cols)
-            frames.append(table.to_pandas())
-
-        return pd.concat(frames, axis=1) if frames else pd.DataFrame()
-
-    # ------------------------------------------------------------------
-    # Mode 3: Per-Group Streaming
-    # ------------------------------------------------------------------
-
-    def stream_groups(
-        self,
-        symbol: str,
-        config_hash: str,
-    ) -> Iterator[Tuple[str, pd.DataFrame]]:
-        """Yield (group_name, DataFrame) one group at a time."""
-        manifest = self.load_manifest(symbol, config_hash)
-        base_dir = self._base / symbol / config_hash
-
-        for group_name, group_info in manifest["groups"].items():
-            path = base_dir / group_info["file"]
-            if not path.exists():
-                logger.warning("Parquet missing for group %s: %s", group_name, path)
-                continue
-            group_columns = [str(column) for column in group_info.get("columns", [])]
-            table = pq.read_table(str(path), columns=group_columns or None)
-            df = table.to_pandas()
-            yield group_name, df
-            del df, table
-
-    # ------------------------------------------------------------------
-    # Mode 4: Cross-Symbol
-    # ------------------------------------------------------------------
-
-    def load_cross_symbol(
-        self,
-        symbols: List[str],
-        config_hash: str,
-        columns: List[str],
-    ) -> pd.DataFrame:
-        """Load the same columns across multiple symbols → MultiIndex."""
-        frames: List[pd.DataFrame] = []
-        for sym in symbols:
-            df = self.load_columns(sym, config_hash, columns)
-            df["_symbol"] = sym
-            frames.append(df)
-
-        if not frames:
-            return pd.DataFrame()
-        result = pd.concat(frames)
-        return result.set_index("_symbol", append=True)
-
-    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
-    def _list_features_from_parquet(self, symbol: str, config_hash: str) -> List[str]:
-        """Fallback: collect column names by scanning Parquet schemas."""
-        manifest = self.load_manifest(symbol, config_hash)
-        base_dir = self._base / symbol / config_hash
-        all_columns: List[str] = []
-        for group_name, group_info in manifest["groups"].items():
-            path = base_dir / group_info["file"]
-            if path.exists():
-                schema = pq.read_schema(str(path))
-                all_columns.extend(schema.names)
-        return all_columns
 
     def _resolve_manifest_v2(
         self,
@@ -408,36 +272,21 @@ class FeatureReader:
         *,
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
-    ) -> Tuple[dict, Path, bool]:
+    ) -> Tuple[dict, Path]:
+        """讀並驗證 V2 manifest，回傳 (manifest, run_dir)；V2 manifest 不存在 ⇒ FileNotFoundError（不退回舊版面）。"""
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
         manifest_path = run_dir / self.V2_MANIFEST_NAME
-        if manifest_path.exists():
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self._validate_manifest_v2(
-                manifest,
-                artifact_kind,
-                manifest_path,
-                consumer=consumer,
-                allow_partial=allow_partial,
-            )
-            return manifest, run_dir, False
-
-        legacy_manifest = self.load_manifest(symbol, config_hash)
-        legacy_dir = self._base / symbol / config_hash
-        adapted = self._adapt_legacy_manifest_v2(
-            manifest=legacy_manifest,
-            symbol=symbol,
-            tf=tf,
-            config_hash=config_hash,
-            artifact_kind=artifact_kind,
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"V2 feature manifest not found: {manifest_path}")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self._validate_manifest_v2(
+            manifest,
+            artifact_kind,
+            manifest_path,
+            consumer=consumer,
+            allow_partial=allow_partial,
         )
-        if consumer == "strict":
-            assert_consumer_run_status(
-                adapted,
-                consumer=consumer,
-                allow_partial=allow_partial,
-            )
-        return adapted, legacy_dir, True
+        return manifest, run_dir
 
     @staticmethod
     def _validate_manifest_v2(
@@ -474,47 +323,6 @@ class FeatureReader:
         if not isinstance(artifact, dict):
             raise FileNotFoundError(f"V2 artifact not found: {artifact_kind}")
         return artifact
-
-    @staticmethod
-    def _adapt_legacy_manifest_v2(
-        manifest: dict,
-        symbol: str,
-        tf: str,
-        config_hash: str,
-        artifact_kind: str,
-    ) -> dict:
-        groups = manifest.get("groups", {}) if isinstance(manifest, dict) else {}
-        total_features = int(manifest.get("total_features", 0)) if isinstance(manifest, dict) else 0
-        total_rows = int(manifest.get("total_rows", 0)) if isinstance(manifest, dict) else 0
-        artifact = {
-            "complete": True,
-            "schema_version": "legacy_v7",
-            "quality_status": "legacy",
-            "path": ".",
-            "feature_schema_hash": manifest.get("overall_sha", "legacy") if isinstance(manifest, dict) else "legacy",
-            "row_count": total_rows,
-            "time_range": {"start": None, "end": None},
-            "total_features": total_features,
-            "group_count": len(groups),
-            "groups": groups,
-        }
-        return {
-            "version": "l7_v2_legacy_adapter",
-            "complete": True,
-            "legacy_format": True,
-            "symbol": symbol,
-            "tf": tf,
-            "config_hash": config_hash,
-            "schema_version": "legacy_v7",
-            "quality_status": "legacy",
-            "run_status": "legacy",
-            "feature_schema_hash": artifact["feature_schema_hash"],
-            "row_count": total_rows,
-            "time_range": artifact["time_range"],
-            "total_features": total_features,
-            "groups": groups,
-            "artifacts": {artifact_kind: artifact},
-        }
 
     @staticmethod
     def _resolve_manifest_relative_path(base_dir: Path, raw_path: Optional[str]) -> Path:

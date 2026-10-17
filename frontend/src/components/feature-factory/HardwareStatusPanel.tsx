@@ -8,8 +8,6 @@ type TierKey = '8gb' | '16gb' | '24gb' | '32gb';
 interface TierConfig {
   l65_workers: number;
   cgsa_memory_buffer: number;
-  l7_workers: number;
-  chunk_bars: number | null;
   multi_tf_max_workers: number;
   layer3_chunk_size: number;
   l3_persist_mode: string;
@@ -47,8 +45,6 @@ interface HardwareInfo {
   recommended_settings: {
     FFACT_L65_WORKERS: number;
     FFACT_CGSA_MEMORY_BUFFER: number;
-    FFACT_L7_WORKERS: number;
-    FFACT_L7_COMPACTOR_ENABLED: number;
     FFACT_MULTI_TF_MAX_WORKERS: number;
     FFACT_LAYER3_CHUNK_SIZE: number;
   };
@@ -73,7 +69,6 @@ const PARAM_ROWS: Array<{
     desc:
       'Layer 6.5 預處理 ThreadPool worker 數。8GB tier 預設 2（OOM 修正：4 會在 Multi-TF + 大 group 時讓 RSS 衝破 6GB）。可由 FFACT_L65_WORKERS 覆寫。',
   },
-  { key: 'l7_workers', label: 'L7_WORKERS', desc: 'Layer 7 持久化 parquet 寫入並行度。' },
   {
     key: 'cgsa_memory_buffer',
     label: 'CGSA_BUFFER',
@@ -115,17 +110,6 @@ const PARAM_ROWS: Array<{
     highlight: true,
     desc:
       'Layer 2 derived feature 各 category 並行 worker。8GB 必為 1（Multi-TF 同時跑時記憶體會疊加）。',
-  },
-  {
-    key: 'chunk_bars',
-    label: 'Chunk_Bars',
-    desc: '單批處理 K 線數上限；∞ = 全量載入（24/32GB 才安全）。',
-    format: (val) => {
-      if (val == null) return '∞';
-      const numericValue = typeof val === 'number' ? val : Number(val);
-      if (!Number.isFinite(numericValue)) return String(val);
-      return numericValue >= 1000 ? `${numericValue / 1000}K` : String(numericValue);
-    },
   },
 ];
 
@@ -313,7 +297,7 @@ export function HardwareStatusPanel() {
                   })}
                 </div>
                 <div className="text-[10px] text-cyan-100/50">
-                  Compactor=ON（永久啟用）· 設定可由 <code className="font-mono">FFACT_*</code> 環境變數覆寫· 滑鼠移入參數名可查看說明
+                  設定可由 <code className="font-mono">FFACT_*</code> 環境變數覆寫· 滑鼠移入參數名可查看說明
                 </div>
                 <div className="text-[10px] text-amber-200/80 leading-relaxed">
                   ⚠️ 8GB OOM 修正 (2026-04-25)：<code className="font-mono">L65_WORKERS</code> 4→2、<code className="font-mono">L65_Split_Thr</code> 4000→2000。

@@ -1185,10 +1185,6 @@ def test_v7_cgsa_resume_matches_fresh(
         return original_resume(cls, wd)
 
     monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", _counting_resume)
-    monkeypatch.setattr(
-        "momentum.FeatureEngineering.feature_factory.FeatureFactory._try_load_cache",
-        lambda *args, **kwargs: None,
-    )
 
     resume_factory = _make_factory(monkeypatch, tmp_path, feature_root=shared_storage)
     # PRE-RED Task 2.3 觀測：續跑時已完成之 12h 不得重算 L1（checkpoint 真被重用），1h 須計算

@@ -223,7 +223,7 @@ def test_resume_hash_resolver_three_branches(tmp_path: Path) -> None:
     by_path = {"symbol": "BTCUSDT", "timeframe": "12h", "output_paths": [str(manifest)]}
     by_browse = {"symbol": "BTCUSDT", "timeframe": "12h", "output_paths": [],
                  "browse_task_id": "browse_BTCUSDT_12h_cfg_batch2d"}
-    legacy = {"symbol": "BTCUSDT", "timeframe": "12h", "output_paths": ["BTCUSDT_12h_factory.h5"],
+    legacy = {"symbol": "BTCUSDT", "timeframe": "12h", "output_paths": ["BTCUSDT_12h_legacy_output.h5"],
               "browse_task_id": "browse_BTCUSDT_12h"}
     assert FeatureFactoryBatchService._resolve_completed_run_hash(by_path) == "cfg_batch2d"
     assert FeatureFactoryBatchService._completed_manifest_exists(by_path, "cfg_batch2d")
@@ -232,7 +232,7 @@ def test_resume_hash_resolver_three_branches(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_hdf5_completion_releases_then_auto_cleans(
+async def test_manifest_completion_releases_then_auto_cleans(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service = FeatureFactoryService.__new__(FeatureFactoryService)
@@ -242,20 +242,23 @@ async def test_hdf5_completion_releases_then_auto_cleans(
         "current_stage": None, "completed_stages": [], "error": None, "result": None,
     }}
     events: list[str] = []
+    cleaned = threading.Event()
 
     class Lease:
         def release(self) -> None:
             events.append("release")
 
+    def _auto_cleanup(symbol: str, timeframe: str, keep_latest: int) -> None:
+        events.append("cleanup")
+        cleaned.set()
+
     summary = {
-        "hdf5_path": "/tmp/features.h5",
+        "hdf5_path": "/tmp/features/BTCUSDT/12h/cfg_batch2d/feature_manifest.json",
         "metadata": {
             "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": "cfg_batch2d",
         },
     }
-    manager = SimpleNamespace(
-        auto_cleanup=lambda symbol, timeframe, keep_latest: events.append("cleanup")
-    )
+    manager = SimpleNamespace(auto_cleanup=_auto_cleanup)
     monkeypatch.setattr(service, "_resolve_config_override", lambda value: value)
     monkeypatch.setattr(service, "_merge_fail_open_flags", lambda config, flags: config)
     monkeypatch.setattr(
@@ -266,7 +269,9 @@ async def test_hdf5_completion_releases_then_auto_cleans(
     monkeypatch.setattr(service, "_summarize_result", lambda _result: summary)
     monkeypatch.setattr(service, "_persist_task_record", lambda *_args: None)
     monkeypatch.setattr(service, "_write_run_size", lambda *_args: None)
-    monkeypatch.setattr(service, "_start_stats_cache_warmup", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(service, "_load_task_context", lambda _task_id: {})
+    monkeypatch.setattr(service, "_start_cgsa_catalog_warmup", lambda *_args: None)
+    monkeypatch.setattr(service, "_start_data_quality_warmup", lambda *_args: None)
     monkeypatch.setattr(service, "_notify_callbacks", lambda *_args: None)
     monkeypatch.setattr(service, "_lifecycle", lambda: manager)
 
@@ -278,6 +283,7 @@ async def test_hdf5_completion_releases_then_auto_cleans(
         ),
     )
 
+    assert await asyncio.to_thread(cleaned.wait, 5)
     assert events == ["release", "cleanup"]
 
 
@@ -525,7 +531,7 @@ async def test_resume_batch_keeps_legacy_completed_item(
     checkpoint["completed_items"] = [{
         "symbol": "BTCUSDT",
         "timeframe": "12h",
-        "output_paths": ["BTCUSDT_12h_factory.h5"],
+        "output_paths": ["BTCUSDT_12h_legacy_output.h5"],
         "browse_task_id": "browse_BTCUSDT_12h",
     }]
     checkpoint["queued_items"] = []

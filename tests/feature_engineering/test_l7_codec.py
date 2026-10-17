@@ -197,41 +197,6 @@ def test_bss_pyarrow_version_fallback(monkeypatch, tmp_path) -> None:
     np.testing.assert_array_equal(loaded, values)
 
 
-def test_old_parquet_no_metadata(tmp_path) -> None:
-    base_dir = tmp_path / "features"
-    symbol = "LEGACY"
-    config_hash = "cfg_legacy"
-    legacy_dir = base_dir / symbol / config_hash
-    legacy_dir.mkdir(parents=True)
-    frame = pd.DataFrame({"legacy_alpha": np.array([1.0, 2.0, 3.0], dtype=np.float32)})
-    legacy_path = legacy_dir / "legacy_group.parquet"
-    frame.to_parquet(legacy_path, index=False)
-    manifest = {
-        "version": "7.0",
-        "symbol": symbol,
-        "config_hash": config_hash,
-        "total_features": 1,
-        "total_rows": 3,
-        "groups": {
-            "legacy_group": {
-                "file": "legacy_group.parquet",
-                "columns": ["legacy_alpha"],
-                "column_count": 1,
-                "dtype": "float32",
-            }
-        },
-    }
-    (legacy_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
-
-    schema_metadata = pq.read_schema(str(legacy_path)).metadata or {}
-    assert L7_ENCODING_REGISTRY_METADATA_KEY.encode("utf-8") not in schema_metadata
-
-    reader = FeatureReader(str(base_dir))
-    loaded = reader.load_columns_v2(symbol, "1h", config_hash, ["legacy_alpha"], artifact_kind="raw")
-    np.testing.assert_allclose(
-        loaded["legacy_alpha"].to_numpy(dtype=np.float32),
-        frame["legacy_alpha"].to_numpy(dtype=np.float32),
-    )
 
 
 def test_phase2_skip_evidence_manifest(tmp_path) -> None:

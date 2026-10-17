@@ -130,11 +130,6 @@ def get_fracdiff_precision(config_precision: float = 0.02) -> float:
     return precision
 
 
-def is_dstar_legacy_migration_enabled() -> bool:
-    raw = os.getenv("FFACT_DSTAR_CACHE_MIGRATE_LEGACY", "0").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
-
-
 def get_concurrent_symbols_override() -> Optional[int]:
     """Return the optional Feature Factory batch concurrent-symbol override."""
 

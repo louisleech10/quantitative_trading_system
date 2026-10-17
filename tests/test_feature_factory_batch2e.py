@@ -194,7 +194,11 @@ def test_t2b2_l2_without_cross_group_ops_direct_emit(tmp_path, monkeypatch):
 
 
 def test_t2b3_all_nan_group_register_and_persist(tmp_path):
-    """T2.B3: 全 NaN group 應可正常 register + parquet persist。"""
+    """T2.B3: 全 NaN group 應可正常 register + parquet persist。
+
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改走 V2 串流寫入
+    write_raw_from_registry_stream（未開 dead-drop 時全 NaN 欄照常落盤）。
+    """
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
     group = _make_group(
         group_id="1h_L3_nan_group",
@@ -207,15 +211,18 @@ def test_t2b3_all_nan_group_register_and_persist(tmp_path):
     registry.save_data(group, nan_matrix)
 
     storage = FeatureStorage(base_path=str(tmp_path / "features"))
-    paths = storage.persist_registry_to_parquet(
+    raw_dir, _summary = storage.write_raw_from_registry_stream(
         symbol="ETHUSDT",
+        tf="1h",
         config_hash="cfg_nan",
         registry=registry,
         cleanup_intermediate=False,
     )
+    paths = sorted(str(path) for path in raw_dir.glob("*.parquet"))
 
     assert len(paths) == 1
     persisted = pd.read_parquet(paths[0])
+    assert persisted.shape == (4, 2)
     assert persisted.isna().all().all()
 
 
@@ -231,12 +238,12 @@ def test_t2b4_zero_columns_group_not_registered(tmp_path):
 
 
 def test_t2b5_disk_full_raises_ioerror_and_cleans_staging(tmp_path, monkeypatch):
-    """T2.B5: 磁碟空間不足時應拋錯，且 staging 目錄需被清理。"""
-    # Force serial path (n_workers=1) so the monkeypatch in the main process
-    # actually intercepts the parquet write (worker subprocesses don't inherit
-    # patches applied via monkeypatch).
-    monkeypatch.setenv("FFACT_L7_WORKERS", "1")
+    """T2.B5: 磁碟空間不足時應拋錯，且 staging 目錄需被清理。
 
+    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet，含 FFACT_L7_WORKERS 並行）已刪；改驗
+    V2 串流寫入 write_raw_from_registry_stream：parquet 寫入拋 OSError 時錯誤上拋、暫存根 .tmp-raw-* 清除
+    （cleanup_intermediate=False ⇒ 尚未刪來源，不進保留暫存之復原分支），且不安裝 raw／manifest。
+    """
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
     group = _make_group(
         group_id="1h_L3_group_a",
@@ -259,18 +266,22 @@ def test_t2b5_disk_full_raises_ioerror_and_cleans_staging(tmp_path, monkeypatch)
     monkeypatch.setattr(pq_module, "write_table", _raise_no_space)
 
     with pytest.raises(OSError, match="No space left on device"):
-        storage.persist_registry_to_parquet(
+        storage.write_raw_from_registry_stream(
             symbol="ETHUSDT",
+            tf="1h",
             config_hash="cfg_diskfull",
             registry=registry,
             cleanup_intermediate=False,
         )
 
-    output_dir = tmp_path / "features" / "ETHUSDT" / "cfg_diskfull"
+    output_dir = tmp_path / "features" / "ETHUSDT" / "1h" / "cfg_diskfull"
     if output_dir.exists():
         # Final parquet must not appear (the contract that matters: no
         # half-written corrupt output is exposed to consumers).
         assert list(output_dir.glob("*.parquet")) == []
+    assert not (output_dir / "raw").exists()
+    assert not (output_dir / "feature_manifest.json").exists()
+    assert [path for path in output_dir.iterdir() if path.name.startswith(".tmp-raw-")] == []
         # NOTE: staging_ subdir is intentionally PRESERVED on failure
         # (preserve_staging=True in feature_storage.py) so operators can
         # inspect partial results when diagnosing a disk-full crash.
