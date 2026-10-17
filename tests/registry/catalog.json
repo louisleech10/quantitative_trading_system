@@ -769,6 +769,46 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
+  "tests/api/test_feature_name_descriptor.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A12",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_feature_name_descriptor.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/api/test_feature_name_parser.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A12",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_feature_name_parser.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
   "tests/api/test_feature_toggle_routes.py": {
    "claim": [
     "contract"
@@ -3458,6 +3498,28 @@
    "rewrite_targets": [],
    "ticket": "RATIOUNSAFE"
   },
+  "tests/feature_engineering/test_feature_naming_grammar.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A5",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "PROPERTY"
+   ],
+   "path": "tests/feature_engineering/test_feature_naming_grammar.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
   "tests/feature_engineering/test_feature_reader.py": {
    "claim": [
     "contract"
@@ -3629,6 +3691,248 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "FF"
+  },
+  "tests/feature_engineering/test_ffname_atomic_identity.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A6",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_atomic_identity.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_config_hash.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_config_hash.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_consumers.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_consumers.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_dead_code.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A7"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_dead_code.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_derived.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A3",
+    "A6",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_derived.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_freeze_baseline.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A3",
+    "A6",
+    "A7"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_freeze_baseline.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_generation_gate.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A13",
+    "A6",
+    "A9"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_generation_gate.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_refreeze.py": {
+   "claim": [
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A3",
+    "A7"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_refreeze.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_structural_selection.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A6",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_structural_selection.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_suffix_ops.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A6",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_suffix_ops.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_timeframe_tag.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_timeframe_tag.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
+  "tests/feature_engineering/test_ffname_value_invariance.py": {
+   "claim": [
+    "correctness",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A3",
+    "A7",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffname_value_invariance.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
   },
   "tests/feature_engineering/test_ffstat_all_tested.py": {
    "claim": [

@@ -1,0 +1,136 @@
+{
+  "contract": "ffname",
+  "spec": "docs/FFNAME_SPEC.md",
+  "spec_version": "v12",
+  "naming_version": 2,
+  "grammar": {
+    "segment_separator": "_",
+    "intra_segment_separator": "-",
+    "pair_member_separator": "~",
+    "param_token_regex": "^[A-Za-z0-9.]+$",
+    "custom_slug_regex": "^[a-z0-9-]+$",
+    "tsCorr_digest_hex_len": 8
+  },
+  "kinds": ["atomic", "derived", "raw-lag", "rolling", "cross-sectional", "meta", "preprocess", "custom"],
+  "categories": ["trend", "momentum", "volatility", "volume", "cycle", "statistics", "pattern", "price-transform", "entropy", "microstructure", "tail-risk", "raw", "cross-sectional", "meta", "custom"],
+  "spec_valid_names": {
+    "multi_output": "close_1h_trend_BBANDS-Lower_13",
+    "decimal_params": "hlc_12h_volatility_Keltner-Width_20-2.0",
+    "pair_params": "close_12h_momentum_APO_12-26-0~5-30-0_Cross",
+    "pair_param_count_differs": "close_12h_volatility_Keltner-Width_20-2.0~55_Ratio",
+    "no_params": "hlcv_12h_volume_ForceIndex",
+    "close_volume_source": "close-volume_1h_statistics_BETA_13",
+    "raw_lag": "taker-ratio_12h_raw_value_Lag-1",
+    "rolling": "close_1h_trend_T3_144_Kurt-W13",
+    "momentum_op": "close_1h_trend_EMA_8_Momentum-L5",
+    "xsec": "xsec_1h_cross-sectional_beta",
+    "meta": "meta_1h_meta_trend-consensus",
+    "l65_fracdiff": "close_1h_trend_EMA_8_fracdiff",
+    "l65_diff": "close_1h_trend_EMA_8_diff-1",
+    "l65_rank": "close_1h_trend_EMA_8_rank",
+    "l65_gaussian": "close_1h_trend_EMA_8_gaussian",
+    "l65_zscore": "close_1h_trend_EMA_8_zscore-21",
+    "microstructure": "close-quote-volume_1h_microstructure_amihud-illiq_21",
+    "tail_risk": "close_1h_tail-risk_cvar_1pct-21",
+    "pattern_count": "ohlc_12h_pattern_BullishCount_5"
+  },
+  "untagged_names": {
+    "multi_output": "close_trend_BBANDS-Lower_13",
+    "microstructure": "close-quote-volume_microstructure_amihud-illiq_21",
+    "derived_pair": "close_momentum_APO_12-26-0~5-30-0_Cross",
+    "rolling": "close_trend_T3_144_Kurt-W13"
+  },
+  "kind_examples": {
+    "close_1h_custom_ffname-probe": "custom",
+    "taker-ratio_12h_raw_value_Lag-1": "raw-lag",
+    "xsec_1h_cross-sectional_beta": "cross-sectional",
+    "meta_1h_meta_trend-consensus": "meta",
+    "close_1h_trend_EMA_8_zscore-21": "preprocess",
+    "close_1h_trend_T3_144_Kurt-W13_rank": "preprocess",
+    "close_1h_trend_T3_144_Kurt-W13": "rolling",
+    "close_1h_trend_EMA_8_Kurt-W13_Lag-1": "rolling",
+    "close_1h_trend_EMA_8_Momentum-L5": "derived",
+    "close_1h_trend_EMA_8_Lag-1": "derived",
+    "close_1h_trend_BBANDS-Lower_13": "atomic"
+  },
+  "g6_new_lag_globs": ["volume_*_volume_VolumeMA-Ratio_*", "ohlc_*_pattern_BullishCount_*"],
+  "spec_reject_names": {
+    "underscore_in_segment": "taker_ratio_12h_momentum_CMO_13",
+    "unknown_category": "close_1h_bogus-category_EMA_8",
+    "unknown_op": "close_1h_trend_EMA_8_Bogus-Op",
+    "illegal_param_char": "close_1h_trend_EMA_8+1",
+    "empty_segment": "close_1h__EMA_8",
+    "tscorr_missing_digest": "close_1h_trend_EMA_8_TsCorr-W21",
+    "label": "label_binary_5d"
+  },
+  "descriptor": {
+    "row_key": "descriptor",
+    "keys": ["version", "kind", "source", "tf", "category", "indicator", "params", "ops", "display"],
+    "unsupported_marker": "unsupported",
+    "error_key": "error",
+    "vectors_layout": {"top_keys": ["version", "valid", "rejected"], "entry_keys": ["name", "descriptor"]}
+  },
+  "frontend": {
+    "hook_module": "@/lib/featureDescriptor",
+    "hook_name": "useFeatureDescriptor",
+    "resolver_name": "resolveFeatureDescriptor",
+    "map_builder_name": "buildFeatureDescriptorMap",
+    "consumers": [
+      "frontend/src/components/feature-factory/FeatureTable.tsx",
+      "frontend/src/components/feature-factory/FeatureNameSegmentFilter.tsx",
+      "frontend/src/components/feature-factory/FeatureCorrelationHeatmap.tsx",
+      "frontend/src/components/feature-factory/FeatureTimeSeriesChart.tsx",
+      "frontend/src/components/feature-factory/FeatureDistributionChart.tsx"
+    ],
+    "deleted_files": [
+      "frontend/src/lib/featureNameParser.ts",
+      "frontend/src/workers/featureNameParser.worker.ts"
+    ],
+    "static_scan_root": "frontend/src",
+    "static_forbidden": [
+      {"id": "parser_module", "regex": "featureNameParser"},
+      {"id": "parser_fn", "regex": "parseFeatureNameSegments"},
+      {"id": "split_underscore_sq", "regex": "split\\(\\s*'_'\\s*\\)"},
+      {"id": "split_underscore_dq", "regex": "split\\(\\s*\"_\"\\s*\\)"},
+      {"id": "split_underscore_re", "regex": "split\\(\\s*/_/\\s*\\)"},
+      {"id": "prefix_special_case", "regex": "startsWith\\(\\s*['\"](ms|ent|tr|cs|meta)_['\"]\\s*\\)"},
+      {"id": "parts_index_3", "regex": "parts\\[3\\]"}
+    ]
+  },
+  "gate": {
+    "manifest_key": "feature_naming_version",
+    "message_token": "feature_naming_version"
+  },
+  "refreeze": {
+    "receipt": "handoffs/run_receipts/ffname-refreeze.json",
+    "goldens": [
+      "tests/_golden/failopen/baseline.json",
+      "tests/_golden/framepath/cgsa_fingerprint.json",
+      "tests/_golden/batch2d/cgsa_baseline.json",
+      "tests/_golden/batch2d/provenance.json",
+      "tests/_golden/ffstat/baseline.json",
+      "tests/_golden/ffstat/baseline_nostart.json",
+      "tests/_golden/ffstat/baseline_dead_drops.json",
+      "tests/_golden/ffstat/contract.json",
+      "tests/_golden/ffstat/nan_propagation_classes.json",
+      "tests/_golden/probewinsor/baseline.json",
+      "tests/_golden/ratiounsafe/baseline.json",
+      "tests/_golden/ratiounsafe/baseline_after.json",
+      "tests/_golden/ratiounsafe/branch_oracle.json",
+      "tests/_golden/ratiounsafe/contract.json",
+      "tests/_golden/icfirstalign/calibration_baseline.json",
+      "tests/_golden/icfirstalign/l3_default_arm.json",
+      "tests/_golden/icfirstalign/probe_baseline.json",
+      "tests/_golden/icfirstalign/contract.json",
+      "tests/_golden/icpostleak/contract.json",
+      "tests/_golden/fftfmeta/baseline.json",
+      "tests/_golden/v2_ts/g1_baseline_fingerprint.json"
+    ],
+    "full_reference": {"timeframes": ["1h", "12h"], "settings": "沿用既有 reference（SPEC Task 4.3）"}
+  },
+  "dead_code": {
+    "module": "momentum/FeatureEngineering/utils/adf_safe_skip.py",
+    "token": "adf_safe_skip",
+    "allowed_reference": "momentum/FeatureEngineering/feature_config.py"
+  }
+}
