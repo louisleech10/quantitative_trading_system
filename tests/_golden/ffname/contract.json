@@ -1,7 +1,7 @@
 {
   "contract": "ffname",
   "spec": "docs/FFNAME_SPEC.md",
-  "spec_version": "v12",
+  "spec_version": "v13",
   "naming_version": 2,
   "grammar": {
     "segment_separator": "_",
@@ -61,6 +61,7 @@
     "illegal_param_char": "close_1h_trend_EMA_8+1",
     "empty_segment": "close_1h__EMA_8",
     "tscorr_missing_digest": "close_1h_trend_EMA_8_TsCorr-W21",
+    "custom_slug_invalid": "close_1h_custom_Bad-Slug",
     "label": "label_binary_5d"
   },
   "descriptor": {
@@ -68,7 +69,17 @@
     "keys": ["version", "kind", "source", "tf", "category", "indicator", "params", "ops", "display"],
     "unsupported_marker": "unsupported",
     "error_key": "error",
-    "vectors_layout": {"top_keys": ["version", "valid", "rejected"], "entry_keys": ["name", "descriptor"]}
+    "vectors_layout": {"top_keys": ["version", "valid", "rejected"], "entry_keys": ["name", "descriptor"],
+                       "rejected_entry_keys": ["name", "case", "descriptor"]},
+    "encoding": {"params": "list[list[str]]（同 FeatureIdentity.params 逐層轉 list）", "ops": "list[str]", "tf": "str",
+                 "version": "int＝CURRENT_FEATURE_NAMING_VERSION", "display": "非空字串"},
+    "rejection_cases": {
+      "unknown_category": {"name_key": "unknown_category", "exception": "FeatureNameParseError"},
+      "illegal_param_char": {"name_key": "illegal_param_char", "exception": "FeatureNameParseError"},
+      "custom_slug": {"name_key": "custom_slug_invalid", "exception": "FeatureNameParseError"},
+      "tscorr_missing_digest": {"name_key": "tscorr_missing_digest", "exception": "FeatureNameParseError"},
+      "label": {"name_key": "label", "exception": "LabelColumnNotFeatureError"}
+    }
   },
   "frontend": {
     "hook_module": "@/lib/featureDescriptor",
@@ -87,6 +98,15 @@
       "frontend/src/workers/featureNameParser.worker.ts"
     ],
     "static_scan_root": "frontend/src",
+    "semantic_scan": {
+      "note": "審查 r12 CODEX-R12-P1-06（部分採納）：名稱類識別字（變數或屬性鏈末段含 name／feature／column／col）呼叫字串解析方法即違規；原樣顯示與 includes 子字串搜尋允許。indexOf／slice 亦為陣列方法，接收者末段為集合字尾者視為陣列操作不計",
+      "roots": ["frontend/src/components/feature-factory", "frontend/src/store", "frontend/src/hooks"],
+      "receiver_regex": "(name|feature|column|col)",
+      "string_methods": ["split", "match", "replace", "substring", "lastIndexOf"],
+      "ambiguous_methods": ["indexOf", "slice"],
+      "collection_suffix_regex": "(s|List|Options|Array|Set|Map)$",
+      "forbid_new_regexp": true
+    },
     "static_forbidden": [
       {"id": "parser_module", "regex": "featureNameParser"},
       {"id": "parser_fn", "regex": "parseFeatureNameSegments"},

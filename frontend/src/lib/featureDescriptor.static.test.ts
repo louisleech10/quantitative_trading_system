@@ -21,10 +21,39 @@ const CONTRACT = JSON.parse(readFileSync(join(REPO, 'tests/_golden/ffname/contra
     deleted_files: string[];
     static_scan_root: string;
     static_forbidden: { id: string; regex: string }[];
+    semantic_scan: {
+      roots: string[];
+      receiver_regex: string;
+      string_methods: string[];
+      ambiguous_methods: string[];
+      collection_suffix_regex: string;
+      forbid_new_regexp: boolean;
+    };
   };
 };
 const FE = CONTRACT.frontend;
 const PATTERNS = FE.static_forbidden.map((p) => ({ id: p.id, re: new RegExp(p.regex) }));
+const SEM = FE.semantic_scan;
+const RECEIVER_RE = new RegExp(SEM.receiver_regex, 'i');
+const COLLECTION_RE = new RegExp(SEM.collection_suffix_regex);
+const METHODS = [...SEM.string_methods, ...SEM.ambiguous_methods];
+const CALL_RE = new RegExp(`([A-Za-z_$][\\w$]*(?:\\s*\\.\\s*[A-Za-z_$][\\w$]*)*)\\s*\\.\\s*(${METHODS.join('|')})\\s*\\(`, 'g');
+
+/** 名稱類識別字之字串解析呼叫（審查 r12 CODEX-R12-P1-06）；回傳 `id@行號`。 */
+export function scanSemantic(source: string): string[] {
+  const hits: string[] = [];
+  source.split('\n').forEach((line, idx) => {
+    if (SEM.forbid_new_regexp && /new\s+RegExp\s*\(/.test(line)) hits.push(`new_regexp@${idx + 1}`);
+    for (const m of line.matchAll(CALL_RE)) {
+      const receiver = m[1].split('.').map((s) => s.trim()).pop() ?? '';
+      const method = m[2];
+      if (!RECEIVER_RE.test(receiver)) continue;
+      if (SEM.ambiguous_methods.includes(method) && COLLECTION_RE.test(receiver)) continue;
+      hits.push(`${method}:${receiver}@${idx + 1}`);
+    }
+  });
+  return hits;
+}
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -77,6 +106,37 @@ describe('FF-NAME 前端語意解析靜態封閉', () => {
       expect(src, rel).toContain(FE.hook_name);
       expect(src, rel).toContain(FE.hook_module);
     }
+  });
+
+  it('feature-factory 元件、store、hooks 內名稱類識別字之字串解析命中 == 0', () => {
+    const hits: string[] = [];
+    for (const rootRel of SEM.roots) {
+      for (const file of walk(join(REPO, rootRel))) {
+        for (const h of scanSemantic(readFileSync(file, 'utf8'))) hits.push(`${relative(REPO, file)}:${h}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+
+  it('mutation（審查 r12）：name.split(\'-\')、featureName.slice、new RegExp 被偵測；陣列操作與 includes 不誤判', () => {
+    const regressed = [
+      "const indicator = name.split('-')[0];",
+      'const head = featureName.slice(0, 3);',
+      'const m = row.column.match(/x/);',
+      'const re = new RegExp(pattern);',
+    ].join('\n');
+    const hits = scanSemantic(regressed);
+    expect(hits.some((h) => h.startsWith('split:name'))).toBe(true);
+    expect(hits.some((h) => h.startsWith('slice:featureName'))).toBe(true);
+    expect(hits.some((h) => h.startsWith('match:column'))).toBe(true);
+    expect(hits.some((h) => h.startsWith('new_regexp'))).toBe(true);
+    const allowed = [
+      'const preview = features.slice(0, 20);',
+      'const idx = filteredFeatureOptions.indexOf(feature);',
+      'const hit = name.includes(query);',
+      'const label = name;',
+    ].join('\n');
+    expect(scanSemantic(allowed)).toEqual([]);
   });
 
   it('mutation ⑪：恢復 split(\'_\') 或 ms_ 特判之原始碼即被偵測', () => {

@@ -178,9 +178,78 @@ def test_condition_6_lag_inputs_and_new_lag_values_are_shifts(baseline, current)
         k = int(ops_tuple(ident)[-1].split("-")[1])
         base_name = fn.format_feature_name(drop_last_op(ident))
         if fn.parse_feature_name(base_name).category == "raw":
-            continue  # raw 輸入不落盤為特徵欄；其 lag 由 Task 2.4 驗名稱
+            continue  # raw 輸入不落盤為特徵欄 ⇒ 值驗證於下方迴圈以真實 kline 之 raw 欄為 oracle
         frame = reader.load_columns_v2(run["symbol"], run["tf"], run["config_hash"], [col, base_name], artifact_kind="raw")
         np.testing.assert_array_equal(frame[col].to_numpy()[k:], frame[base_name].to_numpy()[:-k])
+    # 審查 r12 CODEX-R12-P1-03：新增 raw lag 欄之值＝真實 kline raw 欄於其週期位移 k（對齊至主週期列時間軸），不得略過
+    raw_cols = [c for c in new_lags if drop_last_op(fn.parse_feature_name(c)).category == "raw"]
+    assert raw_lag_cols_mismatched(current, raw_cols) == []
+
+
+def raw_lag_expected(run: Dict[str, Any], col: str, shift_fn=None) -> Tuple[np.ndarray, Any]:
+    """raw lag 欄之 oracle：真實 kline 之 raw 欄（canonical 對回原始資料鍵）於其週期位移 k，
+    再以 `TimeframeAligner.align_to_primary`（FFNAME 不改對齊）對到主週期 run 之列時間軸。"""
+    import pandas as pd
+
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+    from tests.feature_engineering.ffstat_helpers import kline_frame
+
+    ident = fn.parse_feature_name(col)
+    k = int(ops_tuple(ident)[-1].split("-")[1])
+    raw = kline_frame(run["symbol"], ident.tf)
+    key = next(c for c in raw.columns if fn.canonical_segment(c) == ident.source)
+    shifted = (shift_fn or (lambda s, n: s.shift(n)))(raw[[key]], k)
+    reader = FeatureReader(run["base"])
+    row_index = reader.load_row_index_v2(run["symbol"], run["tf"], run["config_hash"], artifact_kind="raw")
+    aligned = TimeframeAligner.align_to_primary(shifted, ident.tf, pd.Series(row_index), run["tf"])
+    return aligned[key].to_numpy(), row_index
+
+
+def raw_lag_mismatch(reader: FeatureReader, run: Dict[str, Any], col: str, shift_fn=None) -> int:
+    """落盤 raw lag 欄（非 NaN 列）與 oracle（轉為落盤 dtype 後）不等之列數；非 NaN 列數為 0 亦計為不符。"""
+    stored = reader.load_columns_v2(run["symbol"], run["tf"], run["config_hash"], [col], artifact_kind="raw")[col].to_numpy()
+    expected, _ = raw_lag_expected(run, col, shift_fn)
+    expected = expected.astype(stored.dtype)
+    mask = ~np.isnan(stored.astype(np.float64))
+    if not mask.any():
+        return 1
+    return int(np.sum(stored[mask] != expected[mask]))
+
+
+def raw_lag_cols_mismatched(current: Dict[str, Any], raw_cols: List[str], shift_fn=None) -> List[str]:
+    """⑥ 新增 lag 欄中輸入為 raw 者，逐欄與真實 kline oracle 比對；回傳不符之欄。"""
+    run = current["run"]
+    reader = FeatureReader(run["base"])
+    return [c for c in raw_cols if raw_lag_mismatch(reader, run, c, shift_fn) != 0]
+
+
+def test_mutation_raw_lag_off_by_one_is_caught(baseline, current):
+    """§G ⑥（審查 r12）：raw lag 之值錯位一格 ⇒ oracle 比對不等（以位移 k+1 之 oracle 模擬錯位實作）。"""
+    mapping = _mapping(baseline)
+    run = current["run"]
+    reader = FeatureReader(run["base"])
+    raw_lags = [c for c in sorted(_new_lag_cols(current, {mapping[o] for o in baseline["columns"]}))
+                if drop_last_op(fn.parse_feature_name(c)).category == "raw"]
+    raw_lags = raw_lags or [c for c in current["columns"]
+                            if last_op_name(fn.parse_feature_name(c)) == "Lag"
+                            and drop_last_op(fn.parse_feature_name(c)).category == "raw"]
+    assert raw_lags
+    col = raw_lags[0]
+    assert raw_lag_mismatch(reader, run, col) == 0
+    assert raw_lag_mismatch(reader, run, col, shift_fn=lambda s, n: s.shift(n + 1)) > 0
+
+
+def test_receipt_values_recomputed_by_test(baseline, current):
+    """審查 r12 CODEX-R12-P1-02：收據須存在，其自報值由本測試重算後相符（值雜湊不符數、改名清單、欄名長度變化）。"""
+    assert VALUE_RECEIPT.is_file()
+    receipt = json.loads(VALUE_RECEIPT.read_text(encoding="utf-8"))
+    mapping = _mapping(baseline)
+    mismatches = cond2(baseline, current, mapping)
+    renamed = sorted([o, n] for o, n in mapping.items() if o != n)
+    length_change = {o: len(n) - len(o) for o, n in mapping.items()}
+    assert receipt["value_hash_mismatch_count"] == len(mismatches) == 0
+    assert sorted(map(list, receipt["renamed"])) == renamed
+    assert {k: int(v) for k, v in receipt["name_length_change"].items()} == length_change
 
 
 def test_receipt_lists_exceptions_one_by_one(baseline, current):

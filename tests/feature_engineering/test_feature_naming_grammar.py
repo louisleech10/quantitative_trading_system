@@ -132,7 +132,8 @@ def test_roundtrip_all_new_names_from_frozen_parts():
 # ---------------------------------------------------------------- 拒收
 
 @pytest.mark.parametrize("case", ["underscore_in_segment", "unknown_category", "unknown_op",
-                                  "illegal_param_char", "empty_segment", "tscorr_missing_digest"])
+                                  "illegal_param_char", "empty_segment", "tscorr_missing_digest",
+                                  "custom_slug_invalid"])
 def test_rejects_invalid_names(case):
     assert rejects(REJECT[case]), case
 

@@ -195,6 +195,84 @@ def test_ic_engine_row_index_rejects(tmp_path, mode):
 
 
 @pytest.mark.parametrize("mode", MODES)
+def test_ic_engine_compute_from_l7_raw_rejects(tmp_path, mode, monkeypatch):
+    """審查 r12 CODEX-R12-P1-05：`compute_ic_from_l7_raw`（ic_engine.py:334 原直讀 group parquet）於缺鍵／舊版／無法解析
+    之 manifest ⇒ 拒，且拒收前不得直讀任何 run 內 parquet。"""
+    from momentum.Analysis.ic_engine import ICEngine
+
+    base = tmp_path / "features"
+    manifest = _write_run(base)
+    reader = FeatureReader(str(base))
+    row_index = reader.load_row_index_v2(SYMBOL, TF, CFG)
+    label = pd.Series(np.arange(len(row_index), dtype=float), index=row_index, name="label")
+    direct_reads: List[str] = []
+    real_read_parquet = pd.read_parquet
+
+    def spy_read_parquet(path, *a, **k):
+        if str(manifest.parent) in str(path):
+            direct_reads.append(str(path))
+        return real_read_parquet(path, *a, **k)
+
+    monkeypatch.setattr(pd, "read_parquet", spy_read_parquet)
+    with tampered(manifest, mode):
+        assert _rejects(lambda: ICEngine({}).compute_ic_from_l7_raw(SYMBOL, TF, CFG, label, feature_reader=reader))
+    assert direct_reads == []
+
+
+def test_ic_engine_reads_groups_only_via_reader(tmp_path, monkeypatch):
+    """同版 run：`compute_ic_from_l7_raw` 不得以 pd.read_parquet 直讀 run 內 group（不論計算結果如何）。"""
+    from momentum.Analysis.ic_engine import ICEngine
+
+    base = tmp_path / "features"
+    manifest = _write_run(base)
+    reader = FeatureReader(str(base))
+    row_index = reader.load_row_index_v2(SYMBOL, TF, CFG)
+    label = pd.Series(np.arange(len(row_index), dtype=float), index=row_index, name="label")
+    direct_reads: List[str] = []
+    real_read_parquet = pd.read_parquet
+
+    def spy_read_parquet(path, *a, **k):
+        if str(manifest.parent) in str(path):
+            direct_reads.append(str(path))
+        return real_read_parquet(path, *a, **k)
+
+    monkeypatch.setattr(pd, "read_parquet", spy_read_parquet)
+    with contextlib.suppress(Exception):
+        ICEngine({}).compute_ic_from_l7_raw(SYMBOL, TF, CFG, label, feature_reader=reader)
+    assert direct_reads == []
+
+
+def _post_ic_call(tmp_path: Path, base: Path, monkeypatch):
+    """以替身驅動 `FeatureFactory._run_ic_first_post_generation` 至 post-IC selected read（feature_factory.py:2951）：
+    IC 引擎替身直接回傳選出欄，K 線取真實 kline。"""
+    from momentum.factories import create_feature_factory
+    from tests.feature_engineering.fftfmeta_golden_helpers import KLINE_DIR, fast_payload, prepare_env
+
+    prepare_env(monkeypatch, tmp_path)
+    factory = create_feature_factory(cache_dir=KLINE_DIR, validate_continuity=False)
+    config = factory._resolve_config(fast_payload([TF]))
+    kline = real_slice(32)
+    window = {"ingest_start": str(kline.index[0]), "output_start": str(kline.index[0]), "output_end": str(kline.index[-1])}
+    ctx = SimpleNamespace(symbol=SYMBOL, timeframe=TF, config_hash=CFG, output_window=window,
+                          start=window["output_start"], end=window["output_end"], selection_window=None, split_id=None)
+    ic_stub = SimpleNamespace(compute_ic_from_l7_raw=lambda *a, **k: {"selected": list(COLS)})
+    return lambda: factory._run_ic_first_post_generation(
+        ctx, config, SimpleNamespace(feature_count=len(COLS)), label=None, ic_engine=ic_stub,
+        feature_reader=FeatureReader(str(base)), storage=FeatureStorage(str(base)), ic_threshold=None,
+        allow_partial_ic=False, label_horizon="1", cleanup_raw=False, compute_warnings=[], start=0.0, persist=False)
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_feature_factory_post_ic_selected_read_rejects(tmp_path, monkeypatch, mode):
+    """審查 r12 CODEX-R12-P1-05：post-IC selected read（feature_factory.py:2951）經 reader 共同邊界 ⇒ 舊世代拒。"""
+    base = tmp_path / "features"
+    manifest = _write_run(base)
+    call = _post_ic_call(tmp_path, base, monkeypatch)
+    with tampered(manifest, mode):
+        assert _rejects(call)
+
+
+@pytest.mark.parametrize("mode", MODES)
 def test_coverage_analyzer_does_not_load_rejected_run(tmp_path, mode):
     from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
 

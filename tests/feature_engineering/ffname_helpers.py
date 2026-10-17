@@ -20,7 +20,7 @@ CONTRACT_PATH = REPO / "tests" / "_golden" / "ffname" / "contract.json"
 WHITELIST_PATH = REPO / "tests" / "_golden" / "ffname" / "read_whitelist.json"
 BASELINE_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.json"
 VECTORS_PATH = REPO / "tests" / "_golden" / "ffname" / "name_vectors.json"
-FREEZE_SCRIPT = REPO / "handoffs" / "run_receipts" / "ffname_probes" / "freeze_baseline.py"
+FREEZE_SCRIPT = REPO / "scripts" / "ffname_freeze_baseline.py"
 VALUE_RECEIPT = REPO / "handoffs" / "run_receipts" / "ffname-value-invariance.json"
 
 CONTRACT: Dict[str, Any] = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))

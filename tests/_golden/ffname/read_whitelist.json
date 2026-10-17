@@ -76,7 +76,8 @@
     {"path": "scripts/freeze_framepath_baseline.py", "qualname": "_fingerprint", "call": "pq.read_table", "note": "已收案票之凍結腳本讀特徵 parquet——待裁改經 reader 或封存"}
   ],
   "must_migrate_to_reader": [
-    {"path": "momentum/Analysis/ic_engine.py", "qualname": "ICEngine.compute_ic_from_l7_raw", "call": "pd.read_parquet"},
+    {"path": "momentum/Analysis/ic_engine.py", "qualname": "ICEngine.compute_ic_from_l7_raw", "call": "pd.read_parquet", "note": "ic_engine.py:334 直讀 group parquet（SPEC v13；gate 測試 test_ic_engine_compute_from_l7_raw_rejects／test_ic_engine_reads_groups_only_via_reader）"},
+    {"path": "momentum/FeatureEngineering/feature_factory.py", "qualname": "FeatureFactory._run_ic_first_post_generation", "call": "FeatureReader.load_columns_v2", "note": "feature_factory.py:2951 post-IC selected read；現已經 reader，列入以封閉（gate 測試 test_feature_factory_post_ic_selected_read_rejects）"},
     {"path": "momentum/Analysis/ic_filter_orchestrator.py", "qualname": "ICFilterOrchestrator._load_features_hdf5", "call": "h5py.File"},
     {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._build_data_quality_cgsa._scan_one_file", "call": "pq.read_table"},
     {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._read_cgsa_timestamps", "call": "pq.ParquetFile"},

@@ -1,7 +1,9 @@
 """FF-NAME Task 1.2／3.3 — 欄名描述向量與 API 描述（docs/FFNAME_SPEC.md Task 1.2、Task 3.3）。
 
 Task 1.2：`scripts/export_feature_name_vectors.py --check` rc 0；向量含 §G reference 全部新名之解析結果與拒收案例
-（未知 category、非法參數字元、custom slug 碰撞、TsCorr、label）；重產 sha256 相同。邊界：向量檔由腳本產生，手改即本檔紅。
+（未知 category、非法參數字元、custom slug、TsCorr、label）；重產 sha256 相同。邊界：向量檔由腳本產生，手改即本檔紅。
+審查 r12：向量檔每筆以 `parse_feature_name` 重新計算後逐筆相等（拒收以例外類別），契約 `rejection_cases` 每類至少一筆；
+custom slug 類於欄名層以「indicator 不合 slug 字母表」表達（兩定義同 slug 之碰撞屬設定驗證，見 Task 2.2 測試）。
 Task 3.3：描述之唯一供給點＝瀏覽投影 `FeatureFactoryService._project_browse_rows`，`names` 與 `table` 兩種 detail_level
 共用同一投影並一律帶描述；各回傳欄名之 API 之描述 == Task 1.2 向量（含拒收時之錯誤描述）；兩種 detail_level 逐欄相等。
 描述鍵、row 鍵、錯誤鍵與向量版面取自 `tests/_golden/ffname/contract.json`。前端靜態封閉與 vitest 見
@@ -29,7 +31,8 @@ import api.routes.feature_factory as feature_factory_routes
 from api.routes.feature_factory import router as feature_factory_router
 from api.services.feature_factory_service import FeatureFactoryService
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
-from tests.feature_engineering.ffname_helpers import CONTRACT, REPO, VALID, VECTORS_PATH, real_slice
+import momentum.FeatureEngineering.feature_naming as fn
+from tests.feature_engineering.ffname_helpers import CONTRACT, REPO, VALID, VECTORS_PATH, iter_new_names_from_baseline, real_slice
 from tests.feature_engineering.ffstat_helpers import PRIMARY_TF, SYMBOL
 
 DESC = CONTRACT["descriptor"]
@@ -54,6 +57,48 @@ def _vector_mismatches(vectors: Dict[str, Any], detail_level: str = "names") -> 
     return bad
 
 
+def expected_valid_descriptor_fields(name: str) -> Dict[str, Any]:
+    """由 `parse_feature_name` 重新計算之描述欄位（編碼依契約 `descriptor.encoding`；display 另驗非空）。"""
+    ident = fn.parse_feature_name(name)
+    return {"version": fn.CURRENT_FEATURE_NAMING_VERSION, "kind": ident.kind, "source": ident.source, "tf": ident.tf,
+            "category": ident.category, "indicator": ident.indicator,
+            "params": [list(member) for member in ident.params], "ops": list(ident.ops)}
+
+
+def recompute_mismatches(vectors: Dict[str, Any]) -> List[str]:
+    """向量檔逐筆重新計算後之不符項（審查 r12 CODEX-R12-P1-02：不得只比 hash 或數量）：
+    合法名＝描述欄位逐一等於 parser 之身分；拒收名＝parser 實拋例外類別名等於描述之錯誤鍵，且等於該 case 之契約類別；
+    契約 `rejection_cases` 每一類至少一筆。"""
+    bad: List[str] = []
+    for entry in vectors["valid"]:
+        desc = entry["descriptor"]
+        try:
+            expected = expected_valid_descriptor_fields(entry["name"])
+        except fn.FeatureNameParseError as exc:
+            bad.append(f"valid_rejected_by_parser:{entry['name']}:{type(exc).__name__}")
+            continue
+        if {k: desc.get(k) for k in expected} != expected or not str(desc.get("display") or ""):
+            bad.append(f"valid_mismatch:{entry['name']}")
+    cases = DESC["rejection_cases"]
+    seen = set()
+    for entry in vectors["rejected"]:
+        case = entry.get("case")
+        if case not in cases:
+            bad.append(f"unknown_case:{entry['name']}:{case}")
+            continue
+        try:
+            fn.parse_feature_name(entry["name"])
+            bad.append(f"not_rejected:{entry['name']}")
+            continue
+        except fn.FeatureNameParseError as exc:
+            raised = type(exc).__name__
+        if raised != cases[case]["exception"] or entry["descriptor"].get(DESC["error_key"]) != raised:
+            bad.append(f"rejection_class_mismatch:{entry['name']}:{raised}")
+        seen.add(case)
+    bad += [f"missing_case:{c}" for c in sorted(set(cases) - seen)]
+    return bad
+
+
 # ---------------------------------------------------------------- Task 1.2
 
 def test_export_script_check_rc0():
@@ -64,17 +109,41 @@ def test_export_script_check_rc0():
 def test_vectors_layout_and_coverage():
     vectors = _vectors()
     assert list(vectors) == DESC["vectors_layout"]["top_keys"]
+    assert vectors["version"] == fn.CURRENT_FEATURE_NAMING_VERSION
     names_valid = {e["name"] for e in vectors["valid"]}
     names_rejected = {e["name"] for e in vectors["rejected"]}
     assert set(VALID.values()) <= names_valid
+    assert set(iter_new_names_from_baseline()) <= names_valid  # §G reference 全部新名
     assert any("TsCorr-" in n for n in names_valid)
     for entry in vectors["valid"]:
         assert set(entry) == set(DESC["vectors_layout"]["entry_keys"])
         assert set(entry["descriptor"]) == set(DESC["keys"])
     for entry in vectors["rejected"]:
         assert entry["descriptor"].get(DESC["error_key"])
+        assert set(entry) == set(DESC["vectors_layout"]["rejected_entry_keys"])
     assert any(n.startswith("label_") for n in names_rejected)
-    assert len(names_rejected) >= 5  # 未知 category、非法參數字元、custom slug 碰撞、TsCorr 缺 digest、label
+    assert len(names_rejected) >= 5  # 數量只作下限；逐類涵蓋由 test_vectors_recomputed_entry_by_entry 判定
+
+
+def test_vectors_recomputed_entry_by_entry():
+    assert recompute_mismatches(_vectors()) == []
+
+
+def test_mutation_missing_rejection_class_or_copied_descriptor_is_caught():
+    """mutant：刪除某一拒收類別之全部項，或把某合法項之描述換成另一名之描述（複製檔可過 hash 者）⇒ 重算比對翻紅。"""
+    vectors = _vectors()
+    assert recompute_mismatches(vectors) == [] and vectors["version"] == fn.CURRENT_FEATURE_NAMING_VERSION
+    dropped = copy.deepcopy(vectors)
+    victim_case = sorted(DESC["rejection_cases"])[0]
+    dropped["rejected"] = [e for e in dropped["rejected"] if e.get("case") != victim_case]
+    assert f"missing_case:{victim_case}" in recompute_mismatches(dropped)
+    swapped = copy.deepcopy(vectors)
+    if len(swapped["valid"]) >= 2:
+        swapped["valid"][0]["descriptor"] = copy.deepcopy(swapped["valid"][1]["descriptor"])
+        assert f"valid_mismatch:{swapped['valid'][0]['name']}" in recompute_mismatches(swapped)
+    lenient = copy.deepcopy(vectors)
+    lenient["rejected"][0]["descriptor"][DESC["error_key"]] = "Exception"
+    assert any(b.startswith("rejection_class_mismatch:") for b in recompute_mismatches(lenient))
 
 
 def test_vectors_regeneration_is_deterministic(tmp_path):
