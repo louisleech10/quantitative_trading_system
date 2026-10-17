@@ -295,6 +295,9 @@
 - 🔴 **委員名冊（`active_stampers`）中途加回一家後，`gate.sh dispatch --impl-self` 對既有 reconcile 戳記要求新名冊全員**；未曾審該票之家族無戳記 ⇒ 該票無法再領 impl token（PROBEWINSOR 收案後回三家，無影響；他票若中途改名冊須先請新家族補蓋）。只動測試／文件／收據之提交不需 impl token（Governance-Scope 提交）。
 - 🔴 **TESTREG V19 對「既有斷言內之識別字改名」判斷言減少**（PROBEWINSOR r6：`production_py_digest`→`production_digest` 被擋）⇒ 既有斷言原文不動，新增量以另一名稱並追加斷言。
 - 🔴 **受影響測試「改前／改後各一輪」動輒十小時級**：failopen 系列（預處理關＋縮尾預設開＋真實 K 線全史）單檔 1–4.6 小時，PROBEWINSOR 錨點輪 9.5 小時（修正後 `test_failopen_matrix` 4 時 36 分→20 分）。開跑前先估時並報使用者（記憶 feedback-estimate-before-heavy-runs）；分段續跑工具 `handoffs/run_receipts/probewinsor_probes/affected_chunk.sh`（同 HEAD 核對、檔界停、每段 ≤1 時 50 分）。
+- 🔴 **提交訊息內有「passed」類測試宣稱時，claim checker 要 `REF:<路徑>`，冒號後不得有空格**（`REF: <路徑>` 不認，FF-NAME b1 Task 1.1 實犯）。
+- 🔴 **commit-msg 把前端 `frontend/**/*.test.ts` 算成生產檔**：只動前端測試之提交缺 Ticket-Batch 即擋 ⇒ 帶 `Ticket-Batch: small`（FF-NAME TODO 提交實犯）。
+- 🔴 **`handoffs/` 不進版控（`.git/info/exclude`）**：manifest 之驗收落點、凍結腳本、契約檔不得放 `handoffs/`，一律 `scripts/`、`tests/_golden/` 等追蹤路徑（FF-NAME TODO 審查實犯）。
 
 ## 進行中紀錄
 
