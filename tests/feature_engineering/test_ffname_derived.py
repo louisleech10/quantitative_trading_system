@@ -22,6 +22,7 @@ from momentum.FeatureEngineering.atomic.statistics_indicators import StatisticsI
 from momentum.FeatureEngineering.atomic.trend_indicators import TrendIndicatorEngine
 from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
 from tests.feature_engineering.ffname_helpers import (
+    REPO,
     ops_tuple,
     params_str,
     parse_untagged,
@@ -182,6 +183,47 @@ def test_tscorr_name_parses_with_digest(setup):
             digests.add(op.split("-")[1])
         by_target[target] = digests
     assert by_target["volume"].isdisjoint(by_target["close"])
+
+
+def test_binary_signal_multiword_suffix_generates_single_canonical_op(setup):
+    """SPEC v14 Task 1.1／2.3：多字後綴（預設 ADX `Strong_Trend`）經 canonical_segment 成單一 op 段，產出名可 parse。"""
+    kline, l1, specs = setup
+    ops = _ops()
+    ops["binary_signal"] = {"enabled": True, "rules": [{"indicator": "EMA", "condition": "> 0", "name_suffix": "Strong_Trend"}]}
+    out = DerivedOperatorEngine(ops).compute_all(l1, kline, specs)
+    cols = [c for c in out.columns if "BinarySignal" in c]
+    assert cols
+    for c in cols:
+        assert ops_tuple(parse_untagged(c))[-1] == "BinarySignal-Strong-Trend", c
+
+
+def test_binary_signal_rule_suffix_validated_at_config_load():
+    """SPEC v14 Task 2.3：`BinarySignalRule.name_suffix` 經 canonical_segment 後不合字母表 ⇒ 載入時 ValueError；
+    `config/` 內全部既有 `name_suffix` 實值皆通過（與既有使用者設定相容）。"""
+    import yaml
+    from momentum.FeatureEngineering.feature_config import BinarySignalRule
+
+    with pytest.raises(ValueError):
+        BinarySignalRule(indicator="RSI", condition="> 70", name_suffix="Bad Suffix!")
+    with pytest.raises(ValueError):
+        BinarySignalRule(indicator="RSI", condition="> 70", name_suffix="")
+    suffixes = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            if "name_suffix" in node:
+                suffixes.append(node["name_suffix"])
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    for path in sorted((REPO / "config").glob("*.yaml")):
+        walk(yaml.safe_load(path.read_text(encoding="utf-8")))
+    assert "Strong_Trend" in suffixes
+    for suffix in suffixes:
+        BinarySignalRule(indicator="RSI", condition="> 70", name_suffix=suffix)
 
 
 # ---------------------------------------------------------------- mutation

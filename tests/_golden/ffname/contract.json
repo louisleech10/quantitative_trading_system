@@ -1,7 +1,7 @@
 {
   "contract": "ffname",
   "spec": "docs/FFNAME_SPEC.md",
-  "spec_version": "v13",
+  "spec_version": "v15",
   "naming_version": 2,
   "grammar": {
     "segment_separator": "_",
@@ -32,7 +32,8 @@
     "l65_zscore": "close_1h_trend_EMA_8_zscore-21",
     "microstructure": "close-quote-volume_1h_microstructure_amihud-illiq_21",
     "tail_risk": "close_1h_tail-risk_cvar_1pct-21",
-    "pattern_count": "ohlc_12h_pattern_BullishCount_5"
+    "pattern_count": "ohlc_12h_pattern_BullishCount_5",
+    "binary_signal_multiword": "hlc_1h_momentum_ADX_14_BinarySignal-Strong-Trend"
   },
   "untagged_names": {
     "multi_output": "close_trend_BBANDS-Lower_13",
@@ -147,6 +148,15 @@
       "tests/_golden/fftfmeta/baseline.json",
       "tests/_golden/v2_ts/g1_baseline_fingerprint.json"
     ],
+    "golden_value_hash_len": 16,
+    "oracle_classes": ["name_free", "remap_recompute"],
+    "no_column_records": {
+      "tests/_golden/failopen/baseline.json": {"class": "remap_recompute", "reason": "僅群組 npy 與層級雜湊；registry 值雜湊與 merged_L7 名序值雜湊（scripts/freeze_failopen_baseline.py:379-402）含欄名或依欄名排序"},
+      "tests/_golden/ffstat/nan_propagation_classes.json": {"class": "name_free", "reason": "函式 NaN 傳播分類，無特徵欄名"},
+      "tests/_golden/icfirstalign/probe_baseline.json": {"class": "remap_recompute", "reason": "僅計數與 late_names_sha256（欄名清單雜湊）"},
+      "tests/_golden/icfirstalign/contract.json": {"class": "name_free", "reason": "錯誤訊息與預算契約，無特徵欄名"},
+      "tests/_golden/fftfmeta/baseline.json": {"class": "remap_recompute", "reason": "以群組檔名為鍵之 [[col, fingerprint]] 複合雜湊（tests/feature_engineering/fftfmeta_golden_helpers.py:285-286）"}
+    },
     "full_reference": {"timeframes": ["1h", "12h"], "settings": "沿用既有 reference（SPEC Task 4.3）"}
   },
   "dead_code": {

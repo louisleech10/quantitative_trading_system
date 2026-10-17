@@ -57,6 +57,15 @@ def oracle_value_mismatches(rel: str, baseline: Dict[str, Any], mapping: Dict[st
     新 golden 之逐欄值雜湊由本測試以 `golden_value_fingerprints` 重算：①值雜湊多重集合＝baseline 者（與欄名無關）；
     ②baseline 舊欄名可經身分映射者，其新名之值雜湊＝baseline 值雜湊；③新欄名全數可 parse 往返。"""
     old = baseline["golden_values"].get(rel)
+    registered = REFREEZE.get("no_column_records", {}).get(rel)
+    if registered is not None:  # SPEC v15 §G：無逐欄紀錄之 golden 依登記類別分派 oracle
+        if old:
+            return [f"registered_but_has_records:{rel}"]
+        if registered.get("class") == "name_free":
+            return name_free_mismatches(rel, baseline)
+        if registered.get("class") == "remap_recompute":
+            return remap_recompute_mismatches(rel, baseline, mapping)
+        return [f"unknown_oracle_class:{rel}:{registered.get('class')}"]
     if not old:  # 審查 r13 P1-05：oracle 須非空（空 dict 與缺鍵同判）
         return [f"no_oracle:{rel}"]
     new = freeze.golden_value_fingerprints(REPO / rel)
@@ -77,6 +86,59 @@ def oracle_value_mismatches(rel: str, baseline: Dict[str, Any], mapping: Dict[st
                 bad.append(f"name_roundtrip:{rel}:{name}")
         except fn.FeatureNameParseError:
             bad.append(f"name_parse:{rel}:{name}")
+    return bad
+
+
+def name_free_mismatches(rel: str, baseline: Dict[str, Any]) -> List[str]:
+    """SPEC v15 §G `name_free`：檔內無特徵欄名 ⇒ 重凍後位元組不變（現檔 sha256＝baseline `golden_file_sha256`）。"""
+    recorded = (baseline.get("golden_file_sha256") or {}).get(rel)
+    if not recorded:
+        return [f"no_file_sha:{rel}"]
+    return [] if _sha(REPO / rel) == recorded else [f"name_free_bytes_changed:{rel}"]
+
+
+def _pre_change_golden(rel: str, baseline: Dict[str, Any]) -> bytes | None:
+    """改前 golden 位元組：baseline `frozen_at_head` 之該檔（git 物件），且其 sha256 須＝baseline `golden_file_sha256`。"""
+    import subprocess
+
+    head = baseline.get("frozen_at_head")
+    recorded = (baseline.get("golden_file_sha256") or {}).get(rel)
+    if not head or not recorded:
+        return None
+    proc = subprocess.run(["git", "show", f"{head}:{rel}"], cwd=str(REPO), capture_output=True)
+    if proc.returncode != 0 or hashlib.sha256(proc.stdout).hexdigest() != recorded:
+        return None
+    return proc.stdout
+
+
+def _json_at(node: Any, path: str) -> Any:
+    for key in path.split("/"):
+        node = node[int(key)] if isinstance(node, list) else node[key]
+    return node
+
+
+def remap_recompute_mismatches(rel: str, baseline: Dict[str, Any], mapping: Dict[str, str]) -> List[str]:
+    """SPEC v15 §G `remap_recompute`：以 golden 自身雜湊函式對重凍產物重算（新名經 baseline 映射之反函數換回舊名），
+    結果之每一欄位須與改前 golden（`frozen_at_head` 之該檔）對應欄位相等。重算本體＝`freeze.remap_recompute_golden`
+    （Task 4.3 實作；之前拋 NotImplementedError ⇒ 本 oracle 不通過，不得偽綠）。"""
+    old_bytes = _pre_change_golden(rel, baseline)
+    if old_bytes is None:
+        return [f"pre_change_bytes_unavailable:{rel}"]
+    inverse = {new: old for old, new in mapping.items()}
+    try:
+        recomputed = freeze.remap_recompute_golden(REPO / rel, inverse)
+    except NotImplementedError:
+        return [f"remap_recompute_unimplemented:{rel}"]
+    if not recomputed:
+        return [f"remap_recompute_empty:{rel}"]
+    old = json.loads(old_bytes.decode("utf-8"))
+    bad: List[str] = []
+    for path, value in recomputed.items():
+        try:
+            if _json_at(old, path) != value:
+                bad.append(f"remap_value:{rel}:{path}")
+        except (KeyError, IndexError, ValueError, TypeError):
+            bad.append(f"remap_path_missing:{rel}:{path}")
     return bad
 
 
@@ -185,7 +247,8 @@ def test_baseline_oracle_is_anchored_and_immutable():
 def test_mutation_baseline_and_golden_emptied_together_is_caught(monkeypatch):
     """審查 r13 mutant：fingerprint 對 golden 回空、baseline 之 golden_values 亦挖空，收據寫 0 ⇒ 仍拒（no_oracle）。"""
     baseline = copy.deepcopy(_baseline())
-    target = REFREEZE["goldens"][0]
+    # 逐欄 golden（未登記 no_column_records）方以 no_oracle 判；登記者依類別分派（見下兩條測試）
+    target = next(rel for rel in REFREEZE["goldens"] if rel not in REFREEZE.get("no_column_records", {}))
     baseline["golden_values"][target] = {}
     monkeypatch.setattr(freeze, "golden_value_fingerprints", lambda path: {})
     receipt = copy.deepcopy(_receipt())
@@ -204,3 +267,38 @@ def test_mutation_unbound_golden_bytes_detected(monkeypatch, tmp_path):
     real_sha = _sha
     monkeypatch.setattr(sys.modules[__name__], "_sha", lambda p: real_sha(fake) if str(p).endswith(target) else real_sha(p))
     assert f"bytes_unbound:{target}" in refreeze_violations(receipt)
+
+
+def test_name_free_goldens_byte_identical():
+    """SPEC v15 §G `name_free`：重凍後位元組不變（sha256＝baseline `golden_file_sha256`）。"""
+    baseline = _baseline()
+    names = [rel for rel, e in REFREEZE["no_column_records"].items() if e["class"] == "name_free"]
+    assert names
+    assert {rel: name_free_mismatches(rel, baseline) for rel in names} == {rel: [] for rel in names}
+
+
+def test_remap_recompute_oracle_reproduces_pre_change_bytes():
+    """SPEC v15 §G `remap_recompute`：以 golden 自身雜湊函式於反向映射後重算＝改前 golden 對應欄位。
+    重算本體屬 Task 4.3（`remap_recompute_golden`）；之前本測試必紅（remap_recompute_unimplemented），不得偽綠。"""
+    baseline = _baseline()
+    mapping = _mapping(baseline)
+    names = [rel for rel, e in REFREEZE["no_column_records"].items() if e["class"] == "remap_recompute"]
+    assert names
+    assert {rel: remap_recompute_mismatches(rel, baseline, mapping) for rel in names} == {rel: [] for rel in names}
+
+
+def test_mutation_name_free_bytes_changed_is_caught():
+    """mutant：name_free golden 之 baseline 檔案 sha 與現檔不符（等同重凍改了位元組）⇒ name_free_bytes_changed。"""
+    baseline = copy.deepcopy(_baseline())
+    target = next(rel for rel, e in REFREEZE["no_column_records"].items() if e["class"] == "name_free")
+    baseline["golden_file_sha256"][target] = "0" * 64
+    assert name_free_mismatches(target, baseline) == [f"name_free_bytes_changed:{target}"]
+    assert f"name_free_bytes_changed:{target}" in oracle_value_mismatches(target, baseline, _mapping(baseline))
+
+
+def test_mutation_registered_golden_with_records_is_caught():
+    """mutant：登記為無逐欄紀錄之 golden 於 baseline 卻有逐欄紀錄 ⇒ registered_but_has_records（不得混用兩種 oracle）。"""
+    baseline = copy.deepcopy(_baseline())
+    target = sorted(REFREEZE["no_column_records"])[0]
+    baseline["golden_values"][target] = {"x": "0" * int(REFREEZE["golden_value_hash_len"])}
+    assert oracle_value_mismatches(target, baseline, _mapping(baseline)) == [f"registered_but_has_records:{target}"]

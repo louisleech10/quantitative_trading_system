@@ -216,11 +216,11 @@
       "mutation 對照（§V）：①test_ffname_atomic_identity::test_mutation_generator_bypassing_formatter_is_caught ②test_ffname_derived::test_mutation_only_one_arm_canonical_is_caught ③test_ffname_derived::test_mutation_duplicate_value_error_removed_is_caught ④test_ffname_derived::test_mutation_distance_by_display_source_is_caught ⑤test_feature_naming_grammar::test_mutation_parser_accepting_underscore_in_segment_is_caught ⑥test_ffname_derived::test_tscorr_name_parses_with_digest（op 不得含目標原名） ⑦test_ffname_config_hash::test_mutation_salt_removed_is_caught ⑧test_ffname_generation_gate::test_mutation_reader_gate_removed_is_caught／test_mutation_merge_point_gate_removed_is_caught ⑨test_ffname_structural_selection::test_mutation_lag_name_heuristic_is_caught ⑩test_ffname_timeframe_tag::test_mutation_second_tagging_rule_is_caught ⑪frontend/src/lib/featureDescriptor.static.test.ts（mutation ⑪ 案例＋全樹掃描） ⑫test_ffname_value_invariance::test_mutation_string_replace_mapping_breaks_condition_5 ⑬test_ffname_atomic_identity::test_mutation_microstructure_fallback_reuses_main_source_is_caught"
     ],
     "coverage_risk": [
-      "Task 0.1：test_ffname_freeze_baseline（邊界①同名兩組名點、②source None 照實；--check rc 0；baseline 各段齊備且欄皆有零件；golden_values 每檔非空且 fingerprint 數＝golden 欄數；baseline.sha256 錨定且只 1 筆提交）",
+      "Task 0.1：test_ffname_freeze_baseline（邊界①同名兩組名點、②source 不得為 None；--check rc 0；baseline 各段齊備且欄皆有零件；golden_values 逐欄檔非空且 fingerprint 數＝golden 欄數、雜湊長＝契約 golden_value_hash_len，refreeze.no_column_records 所列檔空紀錄＋golden_file_sha256 相符，未登記之空紀錄 --check 失敗〔SPEC v15〕；baseline.sha256 錨定且只 1 筆提交）",
       "Task 1.1：test_feature_naming_grammar（邊界①–④；隨機 1,000 例與 §G 零件新名往返；六類拒收與 label〔LabelColumnNotFeatureError〕；例外階層；frozen dataclass 與 params／ops 型別；kind 機械導出各例；標記前後兩形與互不可替；canonical_segment 冪等；tf 鍵取自 aligner）",
       "Task 1.2：test_feature_name_descriptor（--check rc 0、向量版面與涵蓋含 §G 全部新名、向量逐筆以 parser 重算相等且拒收以例外類別比對、契約 rejection_cases 每類至少一筆、重產 sha256 同；邊界①手改向量即紅；mutation：缺類／複製描述／錯誤類別；匯出器以 parser 替身證明由 parser 產生、讀取正式向量檔即拋錯且指向竄改檔時輸出不變）",
       "Task 2.1／2.2：test_ffname_atomic_identity（邊界①close-volume ②多輸出 ③CDL ④vpin n_buckets ⑤無參數；TA-Lib metadata canonical 與 raw_lookup_key；ent／ms／tr 三處欄名一致；ent／ms／tr 之 source＝輸入元組 canonical 串接〔輸入元組僅 close ⇒ source＝close〕；microstructure 雙資料；custom slug 於設定驗證時拒收且使用者函式 0 次呼叫、合法 slug 正向對照）",
-      "Task 2.3：test_ffname_derived（邊界①兩分支合併 ②close-volume 配對；indicator_specs 帶 raw_lookup_key；配對名結構；重複參數 ValueError；Distance taker-ratio > 0；TsCorr digest）",
+      "Task 2.3：test_ffname_derived（邊界①兩分支合併 ②close-volume 配對；indicator_specs 帶 raw_lookup_key；配對名結構；重複參數 ValueError；Distance taker-ratio > 0；TsCorr digest；BinarySignal 多字後綴成單一 canonical op 段、BinarySignalRule 載入驗證且 config/ 既有 name_suffix 全通過〔SPEC v14〕）",
       "Task 2.4：test_ffname_suffix_ops（邊界①L4 對 L2 lag ②replace 模式無 L6.5 op；全欄往返；L3／L4 raw／L5／L6／L6.5 各類；L3 單元名）",
       "Task 2.5：test_ffname_timeframe_tag（邊界①後段週期 token ②label 不標記；舊標記實作零出現；四處呼叫點用 tag_timeframe）",
       "Task 2.6：test_ffname_value_invariance（§G 條件①–⑦〔①例外只准⑤合併差集與⑥新增 lag、⑥ glob〕、收據存在且值由測試重算相符、收據逐筆列例外、新增 lag 欄完整陣列＝oracle〔含 warmup 前綴、NaN mask、有限值位元相等；raw＝真實 kline raw 欄位移後對齊，非 raw＝攔截之 L4 輸入位移後對齊〕、mutation 前 k 筆改常數／有限列改 NaN、Task 2.5 之欄序／group 結構／平穩化決策鍵經映射一致；邊界①任一不等即 FAIL）",
@@ -230,7 +230,7 @@
       "Task 3.4：test_ffname_generation_gate（邊界①單標的缺鍵 ②統計 parquet 具名排除；reader 五方法×三模式；ICEngine／CoverageAnalyzer／event materialization／FeatureLibrary／ic_analysis 路徑〔canonical run＝特徵根下＋registry 條目；任意 parquet 與無 registry 條目者拒〕；feature_factory_service 三路徑；ICEngine.compute_ic_from_l7_raw〔ic_engine.py:334〕拒且無直讀、同版正向回傳非空結果且經 reader 讀取〔mutation：永遠拒收之閘使正向紅〕；post-IC selected read〔feature_factory.py:2951〕拒、同版正向經 reader 以選出欄讀取且不拋世代閘例外；orchestrator stage0；load_multi、cross-symbol 混世代；xgboost 以替身驅動單元測試＋AST 交集前驗版本；靜態封閉〔scripts/tmp 排除、白名單項實存〕）",
       "Task 4.1：test_ffname_config_hash（hash 含鹽、改前≠改後、重跑相等；舊 run 在場不續跑 spy 0；邊界①force_regenerate 寫新 hash 目錄、舊目錄保留）",
       "Task 4.2：test_ffname_dead_code（只剩 feature_config 拒收、模組與測試刪除、拒收仍拋、過時註解；平穩化決策鍵與值經 Task 0.1 身分映射後＝baseline〔真實 kline reference run〕；邊界①handoffs 不計）",
-      "Task 4.3：test_ffname_refreeze（baseline 錨定不可變〔baseline.sha256〕；值 oracle＝baseline golden_values〔非空且完整，空即 no_oracle〕，新 golden fingerprint 數＝golden 欄數，新 golden 值雜湊由測試重算〔多重集合相等、經映射之欄相等、新名往返〕；收據交叉比對與位元組綁定；全量 reference 欄名由測試重算往返；邊界①值不符即停；mutation：golden 與收據同改仍拒）＋failopen 系列既有測試綠",
+      "Task 4.3：test_ffname_refreeze（baseline 錨定不可變〔baseline.sha256〕；值 oracle＝baseline golden_values〔逐欄檔非空且完整〕；refreeze.no_column_records 所列檔依類別：name_free 位元組不變、remap_recompute 以 golden 自身雜湊函式於反向映射舊名後重算須等於改前位元組〔SPEC v15〕；新 golden fingerprint 數＝golden 欄數，新 golden 值雜湊由測試重算〔多重集合相等、經映射之欄相等、新名往返〕；收據交叉比對與位元組綁定；全量 reference 欄名由測試重算往返；邊界①值不符即停；mutation：golden 與收據同改仍拒）＋failopen 系列既有測試綠",
       "既有行為不得變更：特徵值與 NaN mask、L2 配對（同一對輸入之值）、L4 lag（除 VolumeMA-Ratio／BullishCount 新增 lag 屬缺陷修正）、欄序與 group 結構（經映射）、平穩化決策、IC／訓練讀取（同版 run 回傳不變）、使用者 exclude_patterns 之 fnmatch 語意"
     ],
     "lifecycle": "keep",
@@ -260,7 +260,7 @@
         "expiry": "2026-12-31"
       },
       {
-        "item": "Task 0.1 改前凍結基準 tests/_golden/ffname/baseline.json 與其錨 tests/_golden/ffname/baseline.sha256（b1 首步於改前 HEAD 碼態以 scripts/ffname_freeze_baseline.py 產出，生產碼改動前同一提交；含 golden_values〔每檔非空〕與 golden_column_counts；baseline.sha256 自此不得再有提交——test_ffname_freeze_baseline／test_ffname_refreeze 以 git log 恰 1 筆機檢）",
+        "item": "Task 0.1 改前凍結基準 tests/_golden/ffname/baseline.json 與其錨 tests/_golden/ffname/baseline.sha256（b1 首步於改前 HEAD 碼態以 scripts/ffname_freeze_baseline.py 產出，生產碼改動前同一提交；含 golden_values〔逐欄檔非空、雜湊截契約 golden_value_hash_len〕、golden_column_counts 與 no_column_records 所列檔之 golden_file_sha256；baseline.sha256 自此不得再有提交——test_ffname_freeze_baseline／test_ffname_refreeze 以 git log 恰 1 筆機檢）",
         "reason": "blocked-by",
         "owner": "FFNAME",
         "expiry": "2026-12-31"
