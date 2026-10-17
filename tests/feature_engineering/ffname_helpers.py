@@ -19,6 +19,7 @@ REPO = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = REPO / "tests" / "_golden" / "ffname" / "contract.json"
 WHITELIST_PATH = REPO / "tests" / "_golden" / "ffname" / "read_whitelist.json"
 BASELINE_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.json"
+BASELINE_SHA_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.sha256"
 VECTORS_PATH = REPO / "tests" / "_golden" / "ffname" / "name_vectors.json"
 FREEZE_SCRIPT = REPO / "scripts" / "ffname_freeze_baseline.py"
 VALUE_RECEIPT = REPO / "handoffs" / "run_receipts" / "ffname-value-invariance.json"
@@ -195,6 +196,26 @@ def layer_of_identity(ident: Any) -> str:
     if op in l2:
         return "layer2"
     return "layer1"
+
+
+def baseline_immutability_problems(sha_path: Path = BASELINE_SHA_PATH, baseline_path: Path = BASELINE_PATH) -> List[str]:
+    """審查 r13 P1-05：baseline 不可變——`baseline.sha256` 須存在且等於 baseline.json 之 sha256，
+    且 `git log --format=%H -- tests/_golden/ffname/baseline.sha256` 恰 1 筆（Task 0.1 提交後不得再改）。"""
+    import hashlib
+    import subprocess
+
+    if not sha_path.is_file() or not baseline_path.is_file():
+        return ["missing_baseline_or_sha"]
+    bad: List[str] = []
+    recorded = sha_path.read_text(encoding="utf-8").strip()
+    if recorded != hashlib.sha256(baseline_path.read_bytes()).hexdigest():
+        bad.append("sha_mismatch")
+    rel = str(sha_path.resolve().relative_to(REPO))
+    log = subprocess.run(["git", "log", "--format=%H", "--", rel], cwd=str(REPO), capture_output=True, text=True)
+    commits = [line for line in log.stdout.splitlines() if line.strip()]
+    if log.returncode != 0 or len(commits) != 1:
+        bad.append(f"sha_file_commits:{len(commits)}")
+    return bad
 
 
 def iter_new_names_from_baseline() -> Iterable[str]:

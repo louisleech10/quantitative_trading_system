@@ -200,6 +200,7 @@ def test_ic_engine_compute_from_l7_raw_rejects(tmp_path, mode, monkeypatch):
     之 manifest ⇒ 拒，且拒收前不得直讀任何 run 內 parquet。"""
     from momentum.Analysis.ic_engine import ICEngine
 
+    _with_ic_selection_defaults(monkeypatch)  # 審查 r13：補既有必填之 label_horizon／split_id，使拒收臂確實走到 manifest 讀取
     base = tmp_path / "features"
     manifest = _write_run(base)
     reader = FeatureReader(str(base))
@@ -220,9 +221,11 @@ def test_ic_engine_compute_from_l7_raw_rejects(tmp_path, mode, monkeypatch):
 
 
 def test_ic_engine_reads_groups_only_via_reader(tmp_path, monkeypatch):
-    """同版 run：`compute_ic_from_l7_raw` 不得以 pd.read_parquet 直讀 run 內 group（不論計算結果如何）。"""
+    """同版 run：`compute_ic_from_l7_raw` 正向路徑須成功回傳（審查 r13：不得以 suppress 吞例外），群組只經 FeatureReader 讀取、
+    不以 pd.read_parquet 直讀 run 內 group。"""
     from momentum.Analysis.ic_engine import ICEngine
 
+    _with_ic_selection_defaults(monkeypatch)
     base = tmp_path / "features"
     manifest = _write_run(base)
     reader = FeatureReader(str(base))
@@ -237,9 +240,99 @@ def test_ic_engine_reads_groups_only_via_reader(tmp_path, monkeypatch):
         return real_read_parquet(path, *a, **k)
 
     monkeypatch.setattr(pd, "read_parquet", spy_read_parquet)
-    with contextlib.suppress(Exception):
-        ICEngine({}).compute_ic_from_l7_raw(SYMBOL, TF, CFG, label, feature_reader=reader)
+    reader_reads = _spy_reader_reads(monkeypatch, reader)
+    result = ICEngine({}).compute_ic_from_l7_raw(SYMBOL, TF, CFG, label, feature_reader=reader)
     assert direct_reads == []
+    assert _ic_result_nonempty(result) and sum(reader_reads.values()) >= 1
+
+
+_READER_READ_METHODS = ("load_columns_v2", "stream_groups_v2")
+
+
+def _spy_reader_reads(monkeypatch, reader: FeatureReader) -> Dict[str, int]:
+    """計數 FeatureReader 之群組讀取方法呼叫（實例層包裝；回傳可變計數表）。"""
+    counts = {name: 0 for name in _READER_READ_METHODS}
+    for name in _READER_READ_METHODS:
+        real = getattr(reader, name)
+
+        def wrapped(*a, _real=real, _name=name, **k):
+            counts[_name] += 1
+            return _real(*a, **k)
+
+        monkeypatch.setattr(reader, name, wrapped)
+    return counts
+
+
+def _ic_result_nonempty(result: Any) -> bool:
+    """正向結果：ICSelectionResult、至少讀一個群組、ic_scores 非空且鍵屬本 run 之欄。"""
+    return (result is not None and int(getattr(result, "group_count", 0)) >= 1
+            and bool(getattr(result, "ic_scores", None)) and set(result.ic_scores) <= set(COLS))
+
+
+def _with_ic_selection_defaults(monkeypatch) -> None:
+    """`compute_ic_from_l7_raw` 既有契約要求 label_horizon 與 selection_window／split_id 之一；測試呼叫未帶時補預設，
+    使拒收臂與正向臂確實走到 manifest／群組讀取（審查 r13 發現原呼叫會先因缺 label_horizon 拋 ValueError）。"""
+    from momentum.Analysis.ic_engine import ICEngine
+
+    real = ICEngine.compute_ic_from_l7_raw
+
+    def wrapped(self, symbol, tf, config_hash, label, **kwargs):
+        kwargs.setdefault("label_horizon", "1")
+        if not kwargs.get("selection_window") and not kwargs.get("split_id"):
+            kwargs["split_id"] = "ffname_full_window"
+        return real(self, symbol, tf, config_hash, label, **kwargs)
+
+    monkeypatch.setattr(ICEngine, "compute_ic_from_l7_raw", wrapped)
+
+
+def _ic_same_version_ok(tmp_path: Path, monkeypatch) -> bool:
+    """同版正向是否成立（供 mutation 共用）：回傳非空結果、經 reader 讀取、無直讀；任何例外 ⇒ False。"""
+    from momentum.Analysis.ic_engine import ICEngine
+
+    _with_ic_selection_defaults(monkeypatch)
+    base = tmp_path / "features_positive"
+    _write_run(base)
+    reader = FeatureReader(str(base))
+    row_index = reader.load_row_index_v2(SYMBOL, TF, CFG)
+    label = pd.Series(np.arange(len(row_index), dtype=float), index=row_index, name="label")
+    reads = _spy_reader_reads(monkeypatch, reader)
+    try:
+        result = ICEngine({}).compute_ic_from_l7_raw(SYMBOL, TF, CFG, label, feature_reader=reader)
+    except Exception:  # noqa: BLE001 — mutant 永遠拒收即判為不成立
+        return False
+    return _ic_result_nonempty(result) and sum(reads.values()) >= 1
+
+
+def test_mutation_always_rejecting_gate_breaks_same_version_positive(tmp_path, monkeypatch):
+    """審查 r13 mutant：世代閘永遠拋 FeatureNamingVersionError（fail-closed 假綠）⇒ 同版正向不成立。"""
+    def always_reject(*a, **k):
+        raise fn.FeatureNamingVersionError(f"{GATE_KEY} mutant：永遠拒收")
+
+    assert patch_everywhere(monkeypatch, fn.assert_feature_naming_version, always_reject) >= 1
+    assert _ic_same_version_ok(tmp_path, monkeypatch) is False
+
+
+def test_feature_factory_post_ic_selected_read_same_version_passes(tmp_path, monkeypatch):
+    """審查 r13：post-IC selected read 同版正向——經 reader 以選出欄讀取，且不得拋世代閘例外
+    （其後步驟之其他例外不屬本測試判定範圍，但不得為 FeatureNamingVersionError）。"""
+    base = tmp_path / "features"
+    _write_run(base)
+    call = _post_ic_call(tmp_path, base, monkeypatch)
+    requested: List[List[str]] = []
+    real = FeatureReader.load_columns_v2
+
+    def spy(self, symbol, tf, config_hash, columns, *a, **k):
+        requested.append(list(columns))
+        return real(self, symbol, tf, config_hash, columns, *a, **k)
+
+    monkeypatch.setattr(FeatureReader, "load_columns_v2", spy)
+    try:
+        call()
+        raised = None
+    except Exception as exc:  # noqa: BLE001 — 只判定是否為世代閘例外
+        raised = exc
+    assert raised is None or not chain_has(raised, fn.FeatureNamingVersionError)
+    assert sorted(COLS) in [sorted(r) for r in requested]
 
 
 def _post_ic_call(tmp_path: Path, base: Path, monkeypatch):

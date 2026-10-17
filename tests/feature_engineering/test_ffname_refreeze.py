@@ -20,7 +20,13 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import momentum.FeatureEngineering.feature_naming as fn
-from tests.feature_engineering.ffname_helpers import BASELINE_PATH, CONTRACT, REPO, load_freeze_module
+from tests.feature_engineering.ffname_helpers import (
+    BASELINE_PATH,
+    CONTRACT,
+    REPO,
+    baseline_immutability_problems,
+    load_freeze_module,
+)
 
 REFREEZE = CONTRACT["refreeze"]
 RECEIPT = REPO / REFREEZE["receipt"]
@@ -51,10 +57,14 @@ def oracle_value_mismatches(rel: str, baseline: Dict[str, Any], mapping: Dict[st
     新 golden 之逐欄值雜湊由本測試以 `golden_value_fingerprints` 重算：①值雜湊多重集合＝baseline 者（與欄名無關）；
     ②baseline 舊欄名可經身分映射者，其新名之值雜湊＝baseline 值雜湊；③新欄名全數可 parse 往返。"""
     old = baseline["golden_values"].get(rel)
-    if old is None:
+    if not old:  # 審查 r13 P1-05：oracle 須非空（空 dict 與缺鍵同判）
         return [f"no_oracle:{rel}"]
     new = freeze.golden_value_fingerprints(REPO / rel)
     bad: List[str] = []
+    if len(old) != baseline.get("golden_column_counts", {}).get(rel, -1):
+        bad.append(f"oracle_incomplete:{rel}")
+    if not new or len(new) != len(freeze.golden_columns(REPO / rel)):
+        bad.append(f"fingerprint_incomplete:{rel}")
     if collections.Counter(new.values()) != collections.Counter(old.values()):
         bad.append(f"value_multiset:{rel}")
     for old_name, value_hash in old.items():
@@ -165,6 +175,24 @@ def test_mutation_golden_and_receipt_changed_together_is_caught(monkeypatch):
     violations = refreeze_violations(receipt, baseline)
     assert f"value_changed:{target}" in violations
     assert f"value_multiset:{target}" in violations
+
+
+def test_baseline_oracle_is_anchored_and_immutable():
+    """審查 r13 P1-05：值 oracle 所在之 baseline.json 須等於 Task 0.1 錨定之 sha（baseline.sha256 只有 1 筆提交）。"""
+    assert baseline_immutability_problems() == []
+
+
+def test_mutation_baseline_and_golden_emptied_together_is_caught(monkeypatch):
+    """審查 r13 mutant：fingerprint 對 golden 回空、baseline 之 golden_values 亦挖空，收據寫 0 ⇒ 仍拒（no_oracle）。"""
+    baseline = copy.deepcopy(_baseline())
+    target = REFREEZE["goldens"][0]
+    baseline["golden_values"][target] = {}
+    monkeypatch.setattr(freeze, "golden_value_fingerprints", lambda path: {})
+    receipt = copy.deepcopy(_receipt())
+    for entry in receipt["files"]:
+        entry["value_hash_mismatch"] = 0
+    violations = refreeze_violations(receipt, baseline)
+    assert f"no_oracle:{target}" in violations and f"value_changed:{target}" in violations
 
 
 def test_mutation_unbound_golden_bytes_detected(monkeypatch, tmp_path):

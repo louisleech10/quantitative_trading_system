@@ -50,6 +50,8 @@ def current(tmp_path_factory) -> Dict[str, Any]:
     tmp = tmp_path_factory.mktemp("ffname_value_invariance")
     with pytest.MonkeyPatch.context() as mp:
         prepare_env(mp, tmp, FFACT_MULTI_TF_PARALLEL="0")
+        LAG_INPUT_CAPTURES.clear()
+        install_lag_input_capture(mp)  # 審查 r13：攔截 L4 輸入作為非 raw 新增 lag 欄之完整 oracle
         return freeze.run_reference(tmp, record_parts=False)
 
 
@@ -184,6 +186,9 @@ def test_condition_6_lag_inputs_and_new_lag_values_are_shifts(baseline, current)
     # 審查 r12 CODEX-R12-P1-03：新增 raw lag 欄之值＝真實 kline raw 欄於其週期位移 k（對齊至主週期列時間軸），不得略過
     raw_cols = [c for c in new_lags if drop_last_op(fn.parse_feature_name(c)).category == "raw"]
     assert raw_lag_cols_mismatched(current, raw_cols) == []
+    # 審查 r13：非 raw 新增 lag 欄亦以完整陣列（含前綴與 NaN mask）比對 L4 輸入攔截之 oracle
+    feature_cols = [c for c in new_lags if drop_last_op(fn.parse_feature_name(c)).category != "raw"]
+    assert feature_lag_cols_mismatched(current, feature_cols) == []
 
 
 def raw_lag_expected(run: Dict[str, Any], col: str, shift_fn=None) -> Tuple[np.ndarray, Any]:
@@ -205,15 +210,155 @@ def raw_lag_expected(run: Dict[str, Any], col: str, shift_fn=None) -> Tuple[np.n
     return aligned[key].to_numpy(), row_index
 
 
+def full_array_mismatches(stored: np.ndarray, expected: np.ndarray) -> int:
+    """完整陣列比對（審查 r13 CODEX-R13-P1-02）：含 warmup 前綴之全長；NaN mask 逐列相等；有限值轉為落盤 dtype 後
+    逐列位元相等。回傳不符列數（長度不同 ⇒ 全長計不符；全欄 NaN 且 oracle 亦全 NaN 視為退化 ⇒ 計 1）。"""
+    if stored.shape != expected.shape:
+        return max(len(stored), len(expected), 1)
+    exp = expected.astype(stored.dtype)
+    s_nan = np.isnan(stored.astype(np.float64))
+    e_nan = np.isnan(exp.astype(np.float64))
+    if s_nan.all() and e_nan.all():
+        return 1
+    bad = s_nan != e_nan
+    finite = ~s_nan & ~e_nan
+    as_int = f"u{stored.dtype.itemsize}"
+    bad[finite] = stored[finite].view(as_int) != exp[finite].view(as_int)
+    return int(bad.sum())
+
+
 def raw_lag_mismatch(reader: FeatureReader, run: Dict[str, Any], col: str, shift_fn=None) -> int:
-    """落盤 raw lag 欄（非 NaN 列）與 oracle（轉為落盤 dtype 後）不等之列數；非 NaN 列數為 0 亦計為不符。"""
+    """落盤 raw lag 欄與真實 kline oracle 之完整陣列比對不符列數（含前綴與 NaN mask；審查 r13）。"""
     stored = reader.load_columns_v2(run["symbol"], run["tf"], run["config_hash"], [col], artifact_kind="raw")[col].to_numpy()
     expected, _ = raw_lag_expected(run, col, shift_fn)
-    expected = expected.astype(stored.dtype)
-    mask = ~np.isnan(stored.astype(np.float64))
-    if not mask.any():
-        return 1
-    return int(np.sum(stored[mask] != expected[mask]))
+    return full_array_mismatches(stored, expected)
+
+
+# ---------------------------------------------------------------- 非 raw 新增 lag 欄之完整 oracle（L4 輸入攔截）
+
+LAG_INPUT_CAPTURES: List[Any] = []
+
+
+def _old_heuristic_rejects(name: str) -> bool:
+    """舊 `_is_layer1_or_raw` 之子字串黑名單＋`_W\\d+$`（新增 lag 欄即其誤排除之 L1／raw 欄）。"""
+    tokens = ("_Distance", "_Cross", "_Momentum", "_Ratio", "_BinarySignal", "_SignedStrength", "_TsArgmax", "_TsArgmin",
+              "_TsRank", "_DecayLinear", "_TsCorr", "_Sign", "_Log1p", "_Abs", "_Clip", "_Slope_", "_Std_", "_Mean_",
+              "_Rank_", "_ZScore_", "_Skew_", "_Kurt_", "_Min_", "_Max_", "_Range_", "_Lag_")
+    return any(t in name for t in tokens) or re.search(r"_W\d+$", name) is not None
+
+
+def install_lag_input_capture(mp) -> None:
+    """於 reference run 期間包裝 L4 `LagProcessor.compute_all`，攔截其輸入中「L1 且舊啟發式會排除」之欄（含時間軸），
+    作為非 raw 新增 lag 欄（含 warmup 前綴）之 oracle 來源——與 L4 輸出及命名無關。"""
+    from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
+
+    real = LagProcessor.compute_all
+
+    def wrapped(self, features_df, *a, **k):
+        keep = []
+        for c in features_df.columns:
+            try:
+                ident = fn.parse_feature_name(str(c), tagged=False)
+            except fn.FeatureNameParseError:
+                continue
+            if ident.kind == "atomic" and _old_heuristic_rejects(str(c)):
+                keep.append(c)
+        extra = [c for c in ("timestamp",) if c in features_df.columns]
+        if keep:
+            LAG_INPUT_CAPTURES.append(features_df[keep + extra].copy())
+        return real(self, features_df, *a, **k)
+
+    mp.setattr(LagProcessor, "compute_all", wrapped)
+
+
+def _capture_tf(frame) -> str:
+    import pandas as pd
+
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+    index = frame.index if isinstance(frame.index, pd.DatetimeIndex) else pd.to_datetime(frame["timestamp"], unit="ms")
+    step = float(pd.Series(index).diff().dropna().dt.total_seconds().median())
+    return next(tf for tf in sorted(fn.timeframe_keys()) if TimeframeAligner._timeframe_to_seconds(tf) == step)
+
+
+def feature_lag_expected(run: Dict[str, Any], col: str) -> np.ndarray:
+    """非 raw 新增 lag 欄之完整 oracle：攔截之 L4 輸入（未裁 warmup）於其週期位移 k，再對齊至主週期 run 之列時間軸。"""
+    import pandas as pd
+
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+    ident = fn.parse_feature_name(col)
+    k = int(ops_tuple(ident)[-1].split("-")[1])
+    base_untagged = fn.strip_timeframe_tag(fn.format_feature_name(drop_last_op(ident)))
+    frame = next(f for f in LAG_INPUT_CAPTURES if base_untagged in f.columns and _capture_tf(f) == ident.tf)
+    shifted = frame[[base_untagged]].shift(k)
+    if "timestamp" in frame.columns:
+        shifted["timestamp"] = frame["timestamp"]
+    reader = FeatureReader(run["base"])
+    row_index = reader.load_row_index_v2(run["symbol"], run["tf"], run["config_hash"], artifact_kind="raw")
+    aligned = TimeframeAligner.align_to_primary(shifted, ident.tf, pd.Series(row_index), run["tf"])
+    return aligned[base_untagged].to_numpy()
+
+
+def lag_stored_and_expected(current: Dict[str, Any], col: str) -> Tuple[np.ndarray, np.ndarray]:
+    run = current["run"]
+    reader = FeatureReader(run["base"])
+    stored = reader.load_columns_v2(run["symbol"], run["tf"], run["config_hash"], [col], artifact_kind="raw")[col].to_numpy()
+    if drop_last_op(fn.parse_feature_name(col)).category == "raw":
+        expected, _ = raw_lag_expected(run, col)
+    else:
+        expected = feature_lag_expected(run, col)
+    return stored, expected
+
+
+def feature_lag_cols_mismatched(current: Dict[str, Any], feature_cols: List[str]) -> List[str]:
+    """⑥ 非 raw 新增 lag 欄之完整陣列比對；無 oracle（未攔截到輸入）亦計為不符。"""
+    bad = []
+    for c in feature_cols:
+        try:
+            stored, expected = lag_stored_and_expected(current, c)
+        except StopIteration:
+            bad.append(f"no_oracle:{c}")
+            continue
+        if full_array_mismatches(stored, expected) != 0:
+            bad.append(c)
+    return bad
+
+
+def _first_new_lag(baseline: Dict[str, Any], current: Dict[str, Any]) -> str:
+    mapping = _mapping(baseline)
+    return sorted(_new_lag_cols(current, {mapping[o] for o in baseline["columns"]}))[0]
+
+
+def test_new_lag_full_array_including_prefix_and_nan_mask(baseline, current):
+    """審查 r13：全部新增 lag 欄（raw 與非 raw）之完整陣列＝oracle（含 warmup 前綴、NaN mask、有限值位元相等）。"""
+    mapping = _mapping(baseline)
+    new_lags = sorted(_new_lag_cols(current, {mapping[o] for o in baseline["columns"]}))
+    assert new_lags
+    bad = [c for c in new_lags if full_array_mismatches(*lag_stored_and_expected(current, c)) != 0]
+    assert bad == []
+
+
+def test_mutation_lag_prefix_constant_is_caught(baseline, current):
+    """mutant：新增 lag 欄前 k 筆改常數 ⇒ 完整陣列比對不符。"""
+    col = _first_new_lag(baseline, current)
+    k = int(ops_tuple(fn.parse_feature_name(col))[-1].split("-")[1])
+    stored, expected = lag_stored_and_expected(current, col)
+    assert full_array_mismatches(stored, expected) == 0
+    mutated = stored.copy()
+    mutated[:k] = 0
+    assert full_array_mismatches(mutated, expected) > 0
+
+
+def test_mutation_finite_row_set_nan_is_caught(baseline, current):
+    """mutant：某原為有限值之列改為 NaN ⇒ NaN mask 不符。"""
+    col = _first_new_lag(baseline, current)
+    stored, expected = lag_stored_and_expected(current, col)
+    finite_rows = np.flatnonzero(~np.isnan(stored.astype(np.float64)))
+    assert finite_rows.size > 0 and fn.parse_feature_name(col).ops
+    mutated = stored.copy()
+    mutated[finite_rows[len(finite_rows) // 2]] = np.nan
+    assert full_array_mismatches(mutated, expected) > 0
 
 
 def raw_lag_cols_mismatched(current: Dict[str, Any], raw_cols: List[str], shift_fn=None) -> List[str]:

@@ -28,6 +28,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 BASELINE_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.json"
+# 審查 r13 P1-05：baseline 不可變之錨——Task 0.1 產出 baseline.json 時一併寫其 sha256（單行 hex），Phase 2 起不得再改
+BASELINE_SHA_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.sha256"
 RECEIPT_PATH = REPO / "handoffs" / "run_receipts" / "ffname-value-invariance.json"
 
 
@@ -93,7 +95,12 @@ def derive_mapping(parts: Mapping[str, NamingPart], timeframe_of: Mapping[str, s
 def golden_value_fingerprints(path: Path) -> Dict[str, str]:
     """單一 golden 檔之逐欄值雜湊（欄名 → 值雜湊；與欄名無關之值位元組雜湊）。
     同一函式於 Task 0.1 凍結改前 golden（寫入 baseline `golden_values`）、於 Task 4.3 重算新 golden；
-    各 golden 檔格式之解讀由本函式負責（無逐欄值之檔回傳空 dict）。"""
+    各 golden 檔格式之解讀由本函式負責。審查 r13：每個重凍對象 golden 之結果須非空，且鍵數 == `golden_columns(path)` 之欄數。"""
+    raise NotImplementedError("FFNAME Task 0.1")
+
+
+def golden_columns(path: Path) -> List[str]:
+    """單一 golden 檔所含之特徵欄名清單（與值雜湊分開解讀，供「fingerprint 數 == 欄數」之完整性比對）。"""
     raise NotImplementedError("FFNAME Task 0.1")
 
 
@@ -108,7 +115,8 @@ def run_reference(work_dir: Path, *, record_parts: bool) -> Dict[str, Any]:
 
 
 def freeze(out_path: Path = BASELINE_PATH) -> int:
-    """改前 HEAD 碼態凍結（兩次重跑 baseline sha256 須相同）；baseline 另含 `golden_values`；rc 0 成功。"""
+    """改前 HEAD 碼態凍結（兩次重跑 baseline sha256 須相同）；baseline 另含 `golden_values` 與 `golden_column_counts`；
+    同時寫 `BASELINE_SHA_PATH`（baseline.json 之 sha256）；rc 0 成功。"""
     raise NotImplementedError("FFNAME Task 0.1")
 
 

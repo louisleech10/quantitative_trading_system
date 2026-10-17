@@ -105,7 +105,8 @@
       "string_methods": ["split", "match", "replace", "substring", "lastIndexOf"],
       "ambiguous_methods": ["indexOf", "slice"],
       "collection_suffix_regex": "(s|List|Options|Array|Set|Map)$",
-      "forbid_new_regexp": true
+      "forbid_new_regexp": true,
+      "alias_tracking": "same_file_single_step：同檔 const|let|var X = <含名稱類識別字之表達式> ⇒ X 視同名稱類識別字（審查 r13 P1-04）；跨函式／多步／經中介函式不追蹤（manifest not_executable 由審碼把關）"
     },
     "static_forbidden": [
       {"id": "parser_module", "regex": "featureNameParser"},

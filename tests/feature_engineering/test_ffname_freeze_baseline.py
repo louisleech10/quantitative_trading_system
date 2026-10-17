@@ -13,7 +13,14 @@ import sys
 
 import pytest
 
-from tests.feature_engineering.ffname_helpers import BASELINE_PATH, FREEZE_SCRIPT, REPO, load_freeze_module
+from tests.feature_engineering.ffname_helpers import (
+    BASELINE_PATH,
+    CONTRACT,
+    FREEZE_SCRIPT,
+    REPO,
+    baseline_immutability_problems,
+    load_freeze_module,
+)
 
 freeze = load_freeze_module()
 
@@ -82,6 +89,29 @@ def test_baseline_records_all_sections():
     assert set(data["columns"]) <= recorded
     for col, fp in data["columns"].items():
         assert {"dtype", "shape", "nan_sha256", "value_sha256"} <= set(fp), col
+
+
+def test_baseline_golden_values_nonempty_and_complete():
+    """審查 r13 P1-05：每個重凍對象 golden 之 `golden_values` 非空，且 fingerprint 數 == 該 golden 欄數（凍結當下）。"""
+    data = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    goldens = CONTRACT["refreeze"]["goldens"]
+    assert sorted(data["golden_values"]) == sorted(goldens)
+    empty = [rel for rel in goldens if not data["golden_values"][rel]]
+    count_mismatch = [rel for rel in goldens if len(data["golden_values"][rel]) != data["golden_column_counts"][rel]]
+    assert empty == [] and count_mismatch == []
+
+
+def test_baseline_sha_anchor_immutable():
+    """審查 r13 P1-05：baseline.sha256 等於 baseline.json 之 sha256，且該 sha 檔只有 1 筆提交（Phase 2 起不得改）。"""
+    assert baseline_immutability_problems() == []
+
+
+def test_mutation_baseline_edited_after_anchor_is_caught(tmp_path, monkeypatch):
+    """mutant：baseline.json 於錨定後被改（sha 檔未同步）⇒ sha_mismatch。"""
+    edited = tmp_path / "baseline.json"
+    edited.write_bytes(BASELINE_PATH.read_bytes() + b"\n")
+    monkeypatch.setattr(freeze, "BASELINE_PATH", edited)
+    assert "sha_mismatch" in baseline_immutability_problems(baseline_path=freeze.BASELINE_PATH)
 
 
 def test_mutation_recorder_without_duplicate_check_is_caught(monkeypatch):

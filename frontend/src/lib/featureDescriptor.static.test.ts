@@ -39,15 +39,30 @@ const COLLECTION_RE = new RegExp(SEM.collection_suffix_regex);
 const METHODS = [...SEM.string_methods, ...SEM.ambiguous_methods];
 const CALL_RE = new RegExp(`([A-Za-z_$][\\w$]*(?:\\s*\\.\\s*[A-Za-z_$][\\w$]*)*)\\s*\\.\\s*(${METHODS.join('|')})\\s*\\(`, 'g');
 
-/** 名稱類識別字之字串解析呼叫（審查 r12 CODEX-R12-P1-06）；回傳 `id@行號`。 */
+const ALIAS_DECL_RE = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*([^;\n]+)/g;
+const IDENT_RE = /[A-Za-z_$][\w$]*/g;
+
+/** 同檔單步別名（審查 r13 CODEX-R13-P1-04）：`const|let|var X = <含名稱類識別字之表達式>` ⇒ X 視同名稱類識別字。
+ * 更深之資料流（跨函式、多步、經中介函式）不追蹤，列 manifest not_executable 由審碼把關。 */
+export function nameAliases(source: string): Set<string> {
+  const aliases = new Set<string>();
+  for (const m of source.matchAll(ALIAS_DECL_RE)) {
+    const rhsIdents = m[2].match(IDENT_RE) ?? [];
+    if (rhsIdents.some((id) => RECEIVER_RE.test(id))) aliases.add(m[1]);
+  }
+  return aliases;
+}
+
+/** 名稱類識別字（含同檔單步別名）之字串解析呼叫（審查 r12 CODEX-R12-P1-06、r13 P1-04）；回傳 `id@行號`。 */
 export function scanSemantic(source: string): string[] {
   const hits: string[] = [];
+  const aliases = nameAliases(source);
   source.split('\n').forEach((line, idx) => {
     if (SEM.forbid_new_regexp && /new\s+RegExp\s*\(/.test(line)) hits.push(`new_regexp@${idx + 1}`);
     for (const m of line.matchAll(CALL_RE)) {
       const receiver = m[1].split('.').map((s) => s.trim()).pop() ?? '';
       const method = m[2];
-      if (!RECEIVER_RE.test(receiver)) continue;
+      if (!RECEIVER_RE.test(receiver) && !aliases.has(receiver)) continue;
       if (SEM.ambiguous_methods.includes(method) && COLLECTION_RE.test(receiver)) continue;
       hits.push(`${method}:${receiver}@${idx + 1}`);
     }
@@ -137,6 +152,29 @@ describe('FF-NAME 前端語意解析靜態封閉', () => {
       'const label = name;',
     ].join('\n');
     expect(scanSemantic(allowed)).toEqual([]);
+  });
+
+  it('mutation（審查 r13）：同檔單步別名後之字串解析被偵測；非名稱來源之別名與集合別名不誤判', () => {
+    const aliased = [
+      'const token = featureName;',
+      "const indicator = token.split('-')[0];",
+      'const key = row.column;',
+      'key.match(/trend/);',
+      'let label: string = displayName;',
+      "label.replace('_', ' ');",
+    ].join('\n');
+    const hits = scanSemantic(aliased);
+    expect(hits.some((h) => h.startsWith('split:token'))).toBe(true);
+    expect(hits.some((h) => h.startsWith('match:key'))).toBe(true);
+    expect(hits.some((h) => h.startsWith('replace:label'))).toBe(true);
+    const clean = [
+      'const total = items.length;',
+      "const text = total.toString().split('.');",
+      'const previewItems = features.slice(0, 20);',
+      'const tail = previewItems.slice(1);',
+      'const hit = name.includes(query);',
+    ].join('\n');
+    expect(scanSemantic(clean)).toEqual([]);
   });
 
   it('mutation ⑪：恢復 split(\'_\') 或 ms_ 特判之原始碼即被偵測', () => {

@@ -12,8 +12,11 @@ Task 3.3：描述之唯一供給點＝瀏覽投影 `FeatureFactoryService._proje
 
 from __future__ import annotations
 
+import builtins
 import copy
+import dataclasses
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -32,7 +35,15 @@ from api.routes.feature_factory import router as feature_factory_router
 from api.services.feature_factory_service import FeatureFactoryService
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 import momentum.FeatureEngineering.feature_naming as fn
-from tests.feature_engineering.ffname_helpers import CONTRACT, REPO, VALID, VECTORS_PATH, iter_new_names_from_baseline, real_slice
+from tests.feature_engineering.ffname_helpers import (
+    CONTRACT,
+    REPO,
+    VALID,
+    VECTORS_PATH,
+    iter_new_names_from_baseline,
+    patch_everywhere,
+    real_slice,
+)
 from tests.feature_engineering.ffstat_helpers import PRIMARY_TF, SYMBOL
 
 DESC = CONTRACT["descriptor"]
@@ -144,6 +155,67 @@ def test_mutation_missing_rejection_class_or_copied_descriptor_is_caught():
     lenient = copy.deepcopy(vectors)
     lenient["rejected"][0]["descriptor"][DESC["error_key"]] = "Exception"
     assert any(b.startswith("rejection_class_mismatch:") for b in recompute_mismatches(lenient))
+
+
+def _load_exporter():
+    """以檔案路徑載入匯出腳本（模組名 ffname_export_vectors，供 patch_everywhere 一併替換其綁名）。"""
+    spec = importlib.util.spec_from_file_location("ffname_export_vectors", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["ffname_export_vectors"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_exporter_output_reflects_parser(monkeypatch, tmp_path):
+    """審查 r13 CODEX-R13-P1-01：匯出器須由 parser 產生——把 `parse_feature_name` 換成對某合法名回傳可辨識身分之替身，
+    `build_vectors()` 與 `--out` 產物皆須反映替身結果（讀回既有檔之實作必紅）。"""
+    exporter = _load_exporter()
+    probe = VALID["multi_output"]
+    real = fn.parse_feature_name
+
+    def probe_parse(name, *a, **k):
+        ident = real(name, *a, **k)
+        return dataclasses.replace(ident, indicator="FfnameProbe") if name == probe else ident
+
+    replaced = patch_everywhere(monkeypatch, real, probe_parse, prefixes=("momentum", "api", "ffname_export_vectors"))
+    assert replaced >= 1
+    built = exporter.build_vectors()
+    entry = next(e for e in built["valid"] if e["name"] == probe)
+    assert entry["descriptor"]["indicator"] == "FfnameProbe"
+    out = tmp_path / "vectors.json"
+    assert exporter.write_vectors(out) == 0
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert next(e for e in written["valid"] if e["name"] == probe)["descriptor"]["indicator"] == "FfnameProbe"
+
+
+def test_exporter_does_not_read_committed_vectors(monkeypatch, tmp_path):
+    """審查 r13：匯出器不得讀回已提交向量檔——指向竄改之向量檔時輸出不變，且讀取正式向量檔即拋錯。"""
+    exporter = _load_exporter()
+    clean = exporter.build_vectors()
+    tampered_path = tmp_path / "name_vectors.json"
+    tampered_path.write_text(json.dumps({"version": 0, "valid": [], "rejected": []}), encoding="utf-8")
+    monkeypatch.setattr(exporter, "VECTORS_PATH", tampered_path)
+    real_vectors = VECTORS_PATH.resolve()
+    real_read_text = Path.read_text
+    real_open = builtins.open
+
+    def guarded_read_text(self, *a, **k):
+        if Path(self).resolve() == real_vectors:
+            raise AssertionError("匯出器讀回已提交向量檔")
+        return real_read_text(self, *a, **k)
+
+    def guarded_open(file, *a, **k):
+        if isinstance(file, (str, Path)) and Path(file).resolve() == real_vectors:
+            raise AssertionError("匯出器讀回已提交向量檔")
+        return real_open(file, *a, **k)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+    monkeypatch.setattr(builtins, "open", guarded_open)
+    assert exporter.build_vectors() == clean
+    out = tmp_path / "out.json"
+    assert exporter.write_vectors(out) == 0
+    assert json.loads(real_read_text(out, encoding="utf-8")) == clean
 
 
 def test_vectors_regeneration_is_deterministic(tmp_path):
