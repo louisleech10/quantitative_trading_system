@@ -81,7 +81,6 @@ def test_task23_l1_per_indicator_groups_saved(tmp_path):
 
 def test_task24_l2_per_category_emit_and_registry_save(tmp_path, monkeypatch):
     """Task 2.4: L2 在 CGSA 模式應按 category 計算並寫入 Registry。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
 
     factory = _make_factory()
     factory._current_timeframe = "1h"
@@ -144,7 +143,6 @@ def test_task25_feature_factory_combine_layers_rejects_final_merge():
 
 def test_task25_layer4_forces_layer1_and_raw_in_cgsa(monkeypatch):
     """Task 2.5: CGSA 模式下 L4 應強制使用 layer1_and_raw 快速路徑。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
 
     factory = _make_factory()
     captured: dict[str, int] = {}

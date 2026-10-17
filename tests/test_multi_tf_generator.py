@@ -367,8 +367,8 @@ from tests.feature_engineering import fftfmeta_golden_helpers as fg  # noqa: E40
 
 _TF_KEYS = ("expected_timeframes", "present_timeframes", "failed_timeframes")
 _PATH_ENV = {
-    "cgsa_serial": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
-    "cgsa_parallel": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+    "cgsa_serial": {"FFACT_MULTI_TF_PARALLEL": "0"},
+    "cgsa_parallel": {"FFACT_MULTI_TF_PARALLEL": "1"},
 }
 _CASES = {
     "healthy": (["1h", "12h"], (["1h", "12h"], ["1h", "12h"], []), "complete"),

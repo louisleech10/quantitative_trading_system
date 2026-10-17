@@ -293,7 +293,6 @@ def test_cgsa_disk_precheck_integration_single_tf_path(
 def test_cgsa_disk_precheck_integration_serial_multi_tf_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
     monkeypatch.setenv("FFACT_CGSA_DISK_PRECHECK", "1")
     monkeypatch.setenv("FFACT_CGSA_DISK_RESERVE_GIB", "0")
@@ -306,7 +305,6 @@ def test_cgsa_disk_precheck_integration_serial_multi_tf_path(
 def test_cgsa_disk_precheck_integration_parallel_primary_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1")
     monkeypatch.setenv("FFACT_CGSA_DISK_PRECHECK", "1")
     monkeypatch.setenv("FFACT_CGSA_DISK_RESERVE_GIB", "0")
@@ -319,7 +317,6 @@ def test_cgsa_disk_precheck_integration_parallel_primary_path(
 def test_cgsa_disk_precheck_integration_serial_runs_when_free_sufficient(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
     monkeypatch.setenv("FFACT_CGSA_DISK_PRECHECK", "1")
     monkeypatch.setenv("FFACT_CGSA_DISK_RESERVE_GIB", "0")

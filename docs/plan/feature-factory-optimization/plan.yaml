@@ -55,7 +55,7 @@ pre_mortem:
     - scenario: "CGSA 雙軌 A/B 同時執行 → RAM 翻倍 → OOM"
       likelihood: medium
       impact: high
-      mitigation: "A/B 不同時在記憶體中；legacy 先跑完存 parquet，再跑 CGSA 比對"
+      mitigation: "A/B 不同時在記憶體中；legacy 先跑完存 parquet，再跑 CGSA 比對（FRAMEPATH 已刪 legacy 引擎，此 A/B 不再可行）"
     - scenario: "TA-Lib 非 thread-safe，Task 1.5 ThreadPoolExecutor 導致 segfault (R11)"
       likelihood: high
       impact: high

@@ -96,6 +96,8 @@
 
 ### Phase 2 — 命名世代與跨世代 fail-closed（依賴：Phase 1）
 
+> FRAMEPATH（2026-10-17）：本 SPEC Task 2.1 之 frame 臂、Task 2.2 之 HDF5 世代閘已因 FRAMEPATH 刪除 frame 引擎與舊特徵 h5 讀寫而失去對象，待第 6 步重寫刪除（docs/FRAMEPATH_SPEC.md）。
+
 **Task 2.1 — config hash 加鹽與 manifest 標記**
 - 目標：新世代 run 不得命中舊世代 cache／resume；manifest 宣告世代。　檔案：`feature_factory.py` `_compute_config_hash`；`feature_storage.py` 之 L7 v2 manifest 寫入（`version: "l7_v2"` 同層）。
 - 改法：`config_payload["_feature_naming_version"] = CURRENT_FEATURE_NAMING_VERSION`；manifest 根寫 `feature_naming_version`（IC-first 二次寫入同值保留）；三個 L7 persist 入口一律把 `feature_naming_version` 寫入 `result.metadata`（frame 路徑因而落入 meta.json 與 HDF5 `metadata_json`；r1 codex P1-02）。

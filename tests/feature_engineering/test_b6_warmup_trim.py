@@ -242,7 +242,6 @@ def test_warmup_ingest_range_multitf_primary_ingest_before_start(
     before = _snapshot_production_features()
     _isolate_feature_output(monkeypatch, tmp_path)
     monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
 
     start, end = _date_window(90)
     factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
@@ -270,7 +269,6 @@ def test_warmup_trim_no_leak_row_count_matches_window(
     before = _snapshot_production_features()
     features_root = _isolate_feature_output(monkeypatch, tmp_path)
     monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
 
     start, end = _date_window(90)
     factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
@@ -308,7 +306,6 @@ def test_warmup_insufficient_report_near_dataset_start(
     before = _snapshot_production_features()
     _isolate_feature_output(monkeypatch, tmp_path)
     monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
 
     storage = create_kline_storage_manager(cache_dir=TEST_KLINE_CACHE_DIR)
     df = storage.read_klines("BTCUSDT", "12h", validate_continuity=False)
@@ -491,7 +488,7 @@ def test_warmup_trim_cgsa_raw(
         monkeypatch,
         tmp_path,
         path_name="cgsa_raw",
-        env={"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "1"},
+        env={"FFACT_WARMUP_TRIM": "1"},
         config_override=_minimal_config(),
     )
 
@@ -508,7 +505,6 @@ def test_warmup_trim_multi_tf(
         path_name="multi_tf",
         env={
             "FFACT_WARMUP_TRIM": "1",
-            "FFACT_USE_CGSA": "0",
             "FFACT_MULTI_TF_PARALLEL": "0",
         },
         config_override=_multi_tf_config(),

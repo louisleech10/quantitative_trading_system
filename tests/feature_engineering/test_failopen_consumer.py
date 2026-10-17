@@ -271,7 +271,6 @@ def test_cgsa_skips_resume_when_l7_manifest_missing(
 ) -> None:
     from unittest.mock import patch
 
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     work_dir = tmp_path / "cgsa_work"
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir))
     work_dir.mkdir(parents=True)

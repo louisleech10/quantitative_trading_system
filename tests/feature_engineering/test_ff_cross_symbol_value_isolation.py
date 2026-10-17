@@ -372,7 +372,6 @@ def test_v5_4_runtime_cgsa_paths_are_symbol_scoped(
     tmp_path: Path,
 ) -> None:
     """V5.4：真實 generate_features 的 CGSA runtime path/manifest 隔離 symbol。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa"))
     kline = requires_kline_data(BASELINE_SYMBOL, BASELINE_TIMEFRAME, min_rows=120)
     start, end = kline_window_dates(kline, days=7)

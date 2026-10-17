@@ -645,7 +645,6 @@ class TestBenchmark10SymbolDryrun:
         # ⇒ 走串行臂（同一 `_compute_single` 本體；行程內 executor 之 worker 讀數即整個測試行程，E 判定無意義）
         use_thread_wave(monkeypatch, executor_factory=_InlineProcessPoolExecutor, serial=True)
         monkeypatch.setenv("FFACT_BATCH_NESTED", "0")
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
         monkeypatch.setenv("FFACT_USE_POLARS", "1")
         monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
         monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")

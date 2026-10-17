@@ -45,7 +45,6 @@ def _load_golden(name: str) -> Dict[str, Any]:
 def _apply_batch2d_env(monkeypatch: pytest.MonkeyPatch, *, use_cgsa: bool) -> None:
     for key, value in FREEZE_ENV_DEFAULTS.items():
         monkeypatch.setenv(key, value)
-    monkeypatch.setenv("FFACT_USE_CGSA", "1" if use_cgsa else "0")
 
 
 def _read_d_star_cache_dir(cache_dir: Path) -> Dict[str, float]:

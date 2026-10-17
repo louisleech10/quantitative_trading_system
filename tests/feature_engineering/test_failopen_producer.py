@@ -256,17 +256,14 @@ def test_four_generator_paths_fail_closed_integration(
     )
 
     if generator_path == "legacy":
-        monkeypatch.setenv("FFACT_USE_CGSA", "0")
         factory = StubFactory({"12h": primary_data})
         generator = _build_mtf_generator(factory, config)
     elif generator_path == "cgsa_serial":
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
         monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
         registry = ColumnGroupRegistry(tmp_path / "cgsa_serial")
         factory = _CgsaStubFactory({"12h": primary_data}, registry)
         generator = _build_mtf_generator(factory, config)
     else:
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
         monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1")
         monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
         config = _multi_tf_config(allow_partial_timeframes=allow_partial)

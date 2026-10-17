@@ -561,8 +561,8 @@ def _fail_second_tf_compute(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.parametrize("path_env", [  # frame 臂移除：使用者 2026-09-28 裁定刪除 frame（RM-FRAMEPATH）
-    {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
-    {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+    {"FFACT_MULTI_TF_PARALLEL": "0"},
+    {"FFACT_MULTI_TF_PARALLEL": "1"},
 ], ids=["cgsa_serial", "cgsa_parallel"])
 @pytest.mark.parametrize("injection", ["read", "compute"])
 def test_second_tf_calibration_failure_zero_writes(path_env: Dict[str, str], injection: str, tmp_path: Path,
@@ -582,8 +582,8 @@ def test_second_tf_calibration_failure_zero_writes(path_env: Dict[str, str], inj
 
 
 @pytest.mark.parametrize("path_env", [  # frame 臂移除：使用者 2026-09-28 裁定刪除 frame（RM-FRAMEPATH）
-    {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
-    {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+    {"FFACT_MULTI_TF_PARALLEL": "0"},
+    {"FFACT_MULTI_TF_PARALLEL": "1"},
 ], ids=["cgsa_serial", "cgsa_parallel"])
 def test_second_tf_insufficient_history_column_skipped(path_env: Dict[str, str], tmp_path: Path,
                                                        monkeypatch: pytest.MonkeyPatch) -> None:
@@ -638,7 +638,7 @@ def test_ic_first_ignores_stale_cgsa_registry(tmp_path: Path, monkeypatch: pytes
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
     attr = CONTRACT["factory_decisions_attr"]
-    h.prepare_stat_env(monkeypatch, tmp_path)  # FFACT_USE_CGSA 預設開
+    h.prepare_stat_env(monkeypatch, tmp_path)
     root, factory, _ = h.run_stat(tmp_path, h.stat_payload())
     stale = factory._cgsa_registry
     assert stale is not None, "前提：CGSA 生成後 registry 殘留於 factory"
@@ -718,7 +718,7 @@ def test_ic_first_supplied_layers_unchanged_when_off(tmp_path: Path, monkeypatch
 def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 驗證：resume（第二次同設定 run 經 CGSA 工作目錄續跑）時，前置關卡仍涵蓋 L1–L6 已完成之週期，
     決策與首跑全同；該週期校準讀取錯 ⇒ 零寫入失敗。"""
-    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="1", FFACT_MULTI_TF_PARALLEL="0")
+    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_MULTI_TF_PARALLEL="0")
     _, _, first = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]))
     seen: list = []
     real = FeatureFactory.run_calibration_preflight
@@ -787,10 +787,10 @@ def test_boundary_07_calibration_domain_leaves_no_files(tmp_path: Path, monkeypa
     """Task 2.1 邊界③：校準域不在 registry、resume checkpoint、輸出目錄留檔；暫存目錄於成功後已刪。"""
     prefix = CONTRACT["calibration_tmp_prefix"]
     hashes = {}
-    h.prepare_stat_env(monkeypatch, tmp_path / "on", FFACT_USE_CGSA="1")
+    h.prepare_stat_env(monkeypatch, tmp_path / "on")
     _, _, on = h.run_stat(tmp_path / "on", h.stat_payload())
     hashes["on"] = str(on.metadata["config_hash"])
-    h.prepare_stat_env(monkeypatch, tmp_path / "off", FFACT_USE_CGSA="1")
+    h.prepare_stat_env(monkeypatch, tmp_path / "off")
     _, _, off = h.run_stat(tmp_path / "off", h.stat_payload(fracdiff=False, adf=False))
     hashes["off"] = str(off.metadata["config_hash"])
 
@@ -854,7 +854,7 @@ def test_boundary_08_default_runs_no_column_short(symbol: str, timeframe: str, t
 def test_boundary_09_worker_missing_packet_fails_before_registry(tmp_path: Path,
                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 邊界⑤：多週期 worker 缺其週期之校準封包 ⇒ 於寫 registry 前失敗（零寫入）。"""
-    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="1", FFACT_MULTI_TF_PARALLEL="1")
+    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_MULTI_TF_PARALLEL="1")
     real = FeatureFactory.run_calibration_preflight
 
     def _drop_12h(self, symbol, timeframes, config, output_start):

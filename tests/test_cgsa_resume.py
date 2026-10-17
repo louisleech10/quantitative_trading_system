@@ -128,7 +128,7 @@ def test_cgsa_config_hash_passed_correctly(
     # 其他欄位 ⇒ 改用真實 FactoryConfig（於 monkeypatch 前取得，不 stub check_l1_warmup_coverage／resolve_output_window）
     # FRAMEPATH（SPEC v22 D11.5／v23 D12.2）：生成只走 CGSA，registry 為 None 即於 L1 前具名拒絕
     # （CGSARegistryRequiredError）⇒ 替身改為建立 CGSA registry，使流程走到 L0（stop-after-prepare）；
-    # 舊特徵 h5 快取查詢 `_try_load_cache` 已刪（Task 2.1），其打樁一併移除
+    # 舊特徵 h5 快取查詢已刪（FRAMEPATH Task 2.1），其打樁一併移除
     from momentum.FeatureEngineering.config_manager import ConfigManager
 
     config = ConfigManager().get_merged_config({"timeframes": {"primary": "1h", "training": ["1h"]}})
@@ -515,7 +515,6 @@ def _resume_frames() -> dict:
 
 
 def _generator(factory: object, monkeypatch: pytest.MonkeyPatch, *, parallel: bool, fail_12h_l2: bool) -> tuple:
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1" if parallel else "0")
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
     gen = MultiTFGenerator(factory, _ResumeConfig())
@@ -546,7 +545,6 @@ def _checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, fail_12h_l2:
 def _resume_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, feature_factory: FeatureFactory, work_dir: Path,
                 *, parallel: bool, write_l7: bool = True) -> tuple:
     """第二次 run：經真實 `_prepare_cgsa_registry` 之 resume 閘取得 registry，再走 MultiTF（spy resume 與逐層執行）。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir))
     if write_l7:
         _write_complete_l7_manifest(feature_factory, "BTCUSDT", "1h", _CFG_HASH)
@@ -690,7 +688,7 @@ def test_layer_status_parallel_rollback_clears_entry(monkeypatch: pytest.MonkeyP
     """驗證①：parallel 路徑 12h 群組註冊失敗 rollback ⇒ 該週期無層狀態條目；primary 仍有六層（真實 kline 輕量 run）。"""
     from tests.feature_engineering import fftfmeta_golden_helpers as fg
 
-    fg.prepare_env(monkeypatch, tmp_path, FFACT_USE_CGSA="1", FFACT_MULTI_TF_PARALLEL="1")
+    fg.prepare_env(monkeypatch, tmp_path, FFACT_MULTI_TF_PARALLEL="1")
     install_inprocess_mtf_pool(monkeypatch)
 
     def _fail_register(self, registry, groups_data, tf, *args, **kwargs):

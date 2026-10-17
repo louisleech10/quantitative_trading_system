@@ -425,7 +425,6 @@ def test_real_kline_stream_nan_ratio_matches_written_arrays(
     if not kline_path.is_file():
         pytest.fail(f"missing required real kline cache: {kline_path}")
 
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
     factory = create_feature_factory(

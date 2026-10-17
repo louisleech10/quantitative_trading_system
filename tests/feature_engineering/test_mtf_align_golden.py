@@ -181,7 +181,6 @@ def _run_real_generate(
     use_searchsorted: bool,
     use_cgsa: bool,
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
-    monkeypatch.setenv("FFACT_USE_CGSA", "1" if use_cgsa else "0")
     monkeypatch.setenv("FFACT_USE_SEARCHSORTED", "1" if use_searchsorted else "0")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / f"cgsa_{primary}_{mode.value}_{use_cgsa}_{use_searchsorted}"))

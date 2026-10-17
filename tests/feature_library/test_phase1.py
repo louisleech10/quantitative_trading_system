@@ -39,7 +39,7 @@ def test_save_features_to_hdf5_writes_float32() -> None:
             assert ds.dtype == np.float32, f"Expected float32, got {ds.dtype}"
 
 
-# ── T1-02: load_factory_output returns float32 ──
+# ── T1-02：已隨 FRAMEPATH 刪除舊特徵 h5 讀取而移除 ──
 
 
 

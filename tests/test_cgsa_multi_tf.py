@@ -110,7 +110,6 @@ class TestCombineLayersContextSkip:
 
     def test_layer3_input_not_skipped_in_cgsa(self, monkeypatch):
         """Internal concat for layer3 input MUST still work in CGSA mode."""
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
         from momentum.FeatureEngineering.feature_factory import FeatureFactory
         layer = pd.DataFrame({"x": [1.0, 2.0]})
         result = FeatureFactory._combine_layers([layer], context="layer3_input")
@@ -119,7 +118,6 @@ class TestCombineLayersContextSkip:
 
     def test_layer4_input_not_skipped_in_cgsa(self, monkeypatch):
         """Internal concat for layer4 input MUST still work in CGSA mode."""
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
         from momentum.FeatureEngineering.feature_factory import FeatureFactory
         layer1 = pd.DataFrame({"a": [1.0]})
         layer2 = pd.DataFrame({"b": [2.0]})

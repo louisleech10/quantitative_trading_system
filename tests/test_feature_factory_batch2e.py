@@ -94,7 +94,6 @@ def _make_factory(tmp_path: Path, with_registry: bool = True) -> FeatureFactory:
 
 def test_cgsa_l2_cross_group_operators(tmp_path, monkeypatch):
     """T2.16: CGSA L2 Cross/Ratio 結果應與 legacy 路徑一致。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
 
     layer1 = pd.DataFrame(
         {
@@ -169,7 +168,6 @@ def test_t2b1_l1_single_indicator_runs_normally(tmp_path):
 
 def test_t2b2_l2_without_cross_group_ops_direct_emit(tmp_path, monkeypatch):
     """T2.B2: L2 關閉 Cross/Ratio 時應直接 per-group emit（Momentum）。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
 
     factory = _make_factory(tmp_path=tmp_path, with_registry=True)
     layer1 = pd.DataFrame({"close_trend_EMA_5": [10.0, 12.0, 14.0, 16.0]})

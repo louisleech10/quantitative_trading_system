@@ -122,13 +122,12 @@ API 交互:
 結構化數據: CSV/JSON (搜索結果、案例數據)
 模型存儲: Pickle (XGBoost/LightGBM 模型)
 特徵存儲: |
-  V7 per-group Parquet (L7 特徵矩陣，AsyncParquetCompactor，IC-First 雙路徑)
+  V7 per-group Parquet (L7 特徵矩陣，CGSA 唯一寫入路徑，IC-First 雙路徑)
     L7_raw:       data_cache/features/{SYMBOL}/{TF}/{config_hash}/raw/{group_id}.parquet
     L7_processed: data_cache/features/{SYMBOL}/{TF}/{config_hash}/processed/{group_id}.parquet
     IC 選擇清單:  data_cache/features/{SYMBOL}/{TF}/{config_hash}/ic_selected_features_{SYMBOL}_{TF}.json
     Manifest:     data_cache/features/{SYMBOL}/{TF}/{config_hash}/feature_manifest.json
-  HDF5 legacy (FeatureStorage.save_factory_output，向後相容)
-    legacy:       data_cache/features/{symbol}_{timeframe}_factory.h5
+  （舊特徵 HDF5 版面已於 FRAMEPATH 刪除，讀寫皆不支援）
 優化記錄: SQLite (Optuna Study)
 緩存: 內存緩存 (搜索結果臨時存儲)
 ```
@@ -206,7 +205,6 @@ Data Layer (HDF5 / API / SQLite)
 |--------|------|------|------|------|
 | Data | Binance API | K 線資料 | HDF5 | `data_cache/{SYMBOL}_{timeframe}.h5` |
 | Data | SearchConfig | 搜尋結果 | JSON | `search_results/{task_id}.json` |
-| Feature (legacy) | K 線 HDF5 | 特徵矩陣 | HDF5 | `data_cache/features/{symbol}_{timeframe}_factory.h5` |
 | Feature L7_raw (V7) | K 線 → L6.5_pre winsorize | 全量 winsorized 特徵 | Parquet per-group | `data_cache/features/{SYMBOL}/{TF}/{config_hash}/raw/{group_id}.parquet` |
 | Feature L7_processed (V7) | L7_raw → IC Gate → L6.5_post | IC 篩選後 rank/zscore 特徵 | Parquet per-group | `data_cache/features/{SYMBOL}/{TF}/{config_hash}/processed/{group_id}.parquet` |
 | Feature IC Selection (V7) | L7_raw IC 分析 | 選中特徵清單 + metadata | JSON | `data_cache/features/{SYMBOL}/{TF}/{config_hash}/ic_selected_features_{SYMBOL}_{TF}.json` |

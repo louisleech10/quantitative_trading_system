@@ -1424,13 +1424,13 @@ def test_boundary_24_reference_symbol_origin(tmp_path: Path, monkeypatch: pytest
 # ─────────────────────────────── ⑪ 四條執行路徑
 
 _PATHS = {
-    "cgsa_serial": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
-    "cgsa_parallel": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+    "cgsa_serial": {"FFACT_MULTI_TF_PARALLEL": "0"},
+    "cgsa_parallel": {"FFACT_MULTI_TF_PARALLEL": "1"},
     # 大記憶體機器之記憶體級距（共用 FIXED_ENV 固定 L3 為 streaming ⇒ 改回 auto 由級距決定：24gb＝hybrid、
     # 32gb＝in_memory，並連帶該級距之 L6.5／L7 worker 數與分割門檻）
-    "tier_24gb": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0", "FFACT_MEMORY_TIER": "24gb",
+    "tier_24gb": {"FFACT_MULTI_TF_PARALLEL": "0", "FFACT_MEMORY_TIER": "24gb",
                   "FFACT_L3_PERSIST_MODE": "auto"},
-    "tier_32gb": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0", "FFACT_MEMORY_TIER": "32gb",
+    "tier_32gb": {"FFACT_MULTI_TF_PARALLEL": "0", "FFACT_MEMORY_TIER": "32gb",
                   "FFACT_L3_PERSIST_MODE": "auto"},
 }
 

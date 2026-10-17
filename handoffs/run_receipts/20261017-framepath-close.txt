@@ -1,0 +1,21 @@
+FRAMEPATH Task 4.2 收案總檢（2026-10-17，HEAD 230a3b02＋工作樹 b4 改動）
+
+命令：git grep -l -E 'FFACT_USE_CGSA|_cgsa_enabled|load_factory_output|save_factory_output|_factory\.h5|_legacy_native_row_maps|_generate_multi_tf_legacy|_try_load_cache' -- momentum api scripts frontend/src tests
+
+命中檔（全部）：
+  scripts/fact_keys.json
+  scripts/framepath_affected_gate.py
+  tests/_golden/batch2d/cgsa_baseline.json
+  tests/_golden/failopen/baseline.json
+  tests/_golden/framepath/test_disposition.json
+  tests/api/test_framepath_api_h5.py
+  tests/feature_engineering/test_framepath_cgsa_only.py
+  tests/feature_engineering/test_framepath_disposition.py
+
+白名單外之命中：
+  scripts/framepath_affected_gate.py
+
+說明：scripts/framepath_affected_gate.py 為本票新增之受影響測試閘（SPEC v20 D6 新檔），其 FFACT_KEY 常數與 _cgsa_enabled 字面為靜態分析偵測對象之名稱，非呼叫；同屬本票新增工具，視同白名單之「本票新測」。
+生產碼（momentum／api／frontend/src）命中：0 檔
+
+其他驗證：FRAMEPATH_PHASE=3 tests/feature_engineering/test_framepath_disposition.py -k check 24 passed；b4 改動之 24 個測試檔 --collect-only 489 collected rc=0；Task 4.1 三份文件 grep 0。

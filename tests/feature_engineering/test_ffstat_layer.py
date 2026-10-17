@@ -44,10 +44,10 @@ def test_boundary_01_target_layers_on_both_paths(cgsa: str, tmp_path: Path, monk
     """Task 1.1 邊界①（CGSA 與 frame 兩路徑各一）＋驗證：真實輕量 run 之 fracdiff 目標集合等於 L1∪L2 欄，
     且逐欄決策之層與落盤層一致。層之正解一律由同設定之 CGSA run 落盤群組檔名讀得（frame 路徑不落群組
     parquet；兩路徑欄名相同，主委實跑 2026-09-25）。"""
-    h.prepare_stat_env(monkeypatch, tmp_path / "truth", FFACT_USE_CGSA="1")
+    h.prepare_stat_env(monkeypatch, tmp_path / "truth")
     truth_root, _, _ = h.run_stat(tmp_path / "truth", h.stat_payload(adf=False))
     truth = _layers_from_files(truth_root)
-    h.prepare_stat_env(monkeypatch, tmp_path / "run", FFACT_USE_CGSA=cgsa)
+    h.prepare_stat_env(monkeypatch, tmp_path / "run")
     _, _, result = h.run_stat(tmp_path / "run", h.stat_payload(adf=False))
     dec = h.decisions(result)
     targets = {c for c, d in dec.items() if d["layer"] in h.CONTRACT["fracdiff_target_layers"]}

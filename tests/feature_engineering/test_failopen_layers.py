@@ -136,7 +136,6 @@ def test_required_engine_layer_failed(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_all_engines_failed_l2_serial(monkeypatch: pytest.MonkeyPatch) -> None:
     factory = _make_factory(monkeypatch)
     monkeypatch.setenv("FFACT_USE_POLARS", "0")
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     config = ConfigManager().get_merged_config()
     data = _load_ohlcv().iloc[:128].copy()
     with tempfile.TemporaryDirectory() as tmp:
@@ -317,7 +316,6 @@ def test_zero_copy_spill_preserves_memmap_sharing(monkeypatch: pytest.MonkeyPatc
 def test_l3_streaming_offload_status(monkeypatch: pytest.MonkeyPatch) -> None:
     """L3 CGSA streaming 成功但輸出已 offload → offloaded_to_registry。"""
     factory = _make_factory(monkeypatch)
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_L3_PERSIST_MODE", "streaming")
     config = ConfigManager().get_merged_config()
     data = _load_ohlcv().iloc[:128].copy()

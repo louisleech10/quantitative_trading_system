@@ -339,7 +339,6 @@ def test_matrix_cgsa_tf_failure_rollback_state(
     tmp_path: Path,
 ) -> None:
     """④ CGSA TF 失敗：rollback 後 registry 無該 TF 殘留 group / 檔案。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     start, end = _short_window_dates()
     factory = _make_factory(monkeypatch, tmp_path)
     original_l1 = factory._layer1_atomic_indicators

@@ -1103,7 +1103,6 @@ def test_v7_cgsa_resume_matches_fresh(
     tmp_path: Path,
 ) -> None:
     """[V-7] 真實中途 persist 後，同 storage/work_dir resume == 一次跑完。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
     shared_storage = tmp_path / "shared_features"
     work_dir = tmp_path / "shared_cgsa"
