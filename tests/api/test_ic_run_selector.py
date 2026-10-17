@@ -19,16 +19,22 @@ from momentum.factories import create_feature_library
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
-# 2026-07-06 重凍:現行兩套競爭 12h run(同 symbol+tf、不同 config → feature 不同、row 同 1696),
-# 真實生成於 data_cache/features;取代已不在資料集的舊 1c4b825/90f586。
-HASH_A = "e53e22906c35363757f4cd49d27f973e"
-HASH_B = "f754aad4cc8fe5ccc1532296d6e279ec"
+# TESTREG Task 4.4：原釘本機兩套競爭 12h run（`e53e2290…`／`f754aad4…`，2026-10-03 已刪 ⇒ 恆 skip）
+# ＋凍結基準 `tests/fixtures/ic_run_selector_baseline.json`（數字綁舊 run）。改由共用外掛
+# `tests/fixtures/tmp_feature_runs_plugin.py` 以真實 K 線於 tmp 物化兩套競爭 run：
+# 設定 A（L3 rolling 5／13）與 B（L3 rolling 5），同 symbol＋tf、同日期窗 ⇒ 列數同、特徵集不同；
+# 物化順序 A（BTC/ETH/BCH）→ B（BTC/ETH）⇒ BTC／ETH 12h 之 latest 為 B。期望值由生成當下之
+# 時間軸與落盤 raw 檔之欄名**獨立導出**（不經被測之 `library.load`／registry 選擇）。
+RUN_A, RUN_B = "btc_12h_a", "btc_12h_b"
+#: ML caller（跨標的訓練）之 load_multi 參數（原取自凍結基準之 `ml_caller_load_multi.load_multi_kwargs`）
+LOAD_MULTI_SYMBOLS = ["BTCUSDT", "ETHUSDT"]
+LOAD_MULTI_LATEST = {"BTCUSDT": "btc_12h_b", "ETHUSDT": "eth_12h_b"}
+LOAD_MULTI_ALLOW_PARTIAL = True
 UNREGISTERED_HASH = "11111111111111111111111111111111"
 ORPHAN_HASHES = (
     "4d26a4d46e8f53d9a443a1d65f93f831",
     "5218729ca187e1df263143e649bc5349",
 )
-BASELINE_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "ic_run_selector_baseline.json"
 MINI_REGISTRY_PATH = (
     Path(__file__).resolve().parents[1] / "fixtures" / "ic_run_selector_mini_registry.json"
 )
@@ -39,10 +45,14 @@ def _feature_sha256(columns: list[str]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _load_baseline() -> Dict[str, Any]:
-    if not BASELINE_PATH.exists():
-        pytest.fail(f"baseline missing: {BASELINE_PATH}")
-    return json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+def _raw_feature_columns(run) -> list[str]:
+    """獨立 oracle：run 之 raw parquet 落盤欄名（只讀 schema，不經 `library.load`）。"""
+    import pyarrow.parquet as pq
+
+    names: list[str] = []
+    for p in sorted((run.run_dir / "raw").glob("*.parquet")):
+        names.extend(n for n in pq.read_schema(p).names if not n.startswith("__index_level"))
+    return names
 
 
 @pytest.fixture
@@ -54,16 +64,16 @@ def pinned_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return registry_copy
 
 
-def _require_mini_registry_runs(pinned_registry: Path) -> None:
+@pytest.fixture
+def selector_runs(tmp_feature_run_env) -> Dict[str, Any]:
+    """tmp 物化之 12h 競爭 run 組（registry 為本測試之 tmp 複本，hermetic）。"""
+    runs = tmp_feature_run_env.activate("btc_12h_a", "btc_12h_b", "eth_12h_a", "eth_12h_b", "bch_12h_a")
     library = create_feature_library()
-    for hash_ in (HASH_A, HASH_B):
-        entry = library._registry.get(SYMBOL, TIMEFRAME, hash_)
-        if entry is None:
-            pytest.skip(f"missing registry run {hash_}")
-        # registry 條目存在不代表底層 12h 特徵資料已物化(gitignored;乾淨 checkout 無此資料)。
-        # 未物化時 load() 會 raise;此處改為誠實 skip,避免把「資料未備」誤報為測試失敗。
-        if not library._registry.is_materialized(entry):
-            pytest.skip(f"registry run {hash_} not materialized (12h feature data absent)")
+    for name in (RUN_A, RUN_B):
+        entry = library._registry.get(SYMBOL, TIMEFRAME, runs[name].config_hash)
+        # 前提（原為缺 run 即 skip；現由 fixture 保證，不成立即紅）
+        assert entry is not None and library._registry.is_materialized(entry), f"前提不成立：{name} 未登記或未物化"
+    return runs
 
 
 def _capture_run_metrics(config_hash: Optional[str]) -> Dict[str, Any]:
@@ -93,33 +103,45 @@ def _capture_run_metrics(config_hash: Optional[str]) -> Dict[str, Any]:
 
 @pytest.mark.ic_run_selector
 @pytest.mark.disambig
-def test_disambig_same_tf_different_hash(pinned_registry: Path) -> None:
-    _require_mini_registry_runs(pinned_registry)
-    result_a = _capture_run_metrics(HASH_A)
-    result_b = _capture_run_metrics(HASH_B)
-    assert result_a["run_identity"]["config_hash"] == HASH_A
-    assert result_b["run_identity"]["config_hash"] == HASH_B
+def test_disambig_same_tf_different_hash(selector_runs: Dict[str, Any]) -> None:
+    hash_a, hash_b = selector_runs[RUN_A].config_hash, selector_runs[RUN_B].config_hash
+    result_a = _capture_run_metrics(hash_a)
+    result_b = _capture_run_metrics(hash_b)
+    assert result_a["run_identity"]["config_hash"] == hash_a
+    assert result_b["run_identity"]["config_hash"] == hash_b
     assert result_a["feature_sha256"] != result_b["feature_sha256"]
     assert result_a["row_count"] == result_b["row_count"]
+    # 逐 run 對獨立 oracle（落盤欄名／生成當下時間軸）：消歧須真的載到「該」run
+    for name, got in ((RUN_A, result_a), (RUN_B, result_b)):
+        assert got["feature_sha256"] == _feature_sha256(_raw_feature_columns(selector_runs[name])), name
+        assert got["row_count"] == len(selector_runs[name].index_s), name
 
 
 @pytest.mark.ic_run_selector
 @pytest.mark.backward_compat
-def test_backward_compat_matches_baseline(pinned_registry: Path) -> None:
-    _require_mini_registry_runs(pinned_registry)
-    baseline = _load_baseline()
-    expected = baseline["backward_compat_no_config_hash"]
+def test_backward_compat_matches_baseline(selector_runs: Dict[str, Any]) -> None:
+    """未帶 config_hash ⇒ 選 latest（＝最後生成之 B），身分／特徵集／列數逐項對獨立導出之期望。"""
+    run_b = selector_runs[RUN_B]
+    expected = {
+        "selected_config_hash": run_b.config_hash,
+        "feature_sha256": _feature_sha256(_raw_feature_columns(run_b)),
+        "row_count": len(run_b.index_s),
+    }
     actual = _capture_run_metrics(None)
     for key in ("selected_config_hash", "feature_sha256", "row_count"):
         assert actual[key] == expected[key], f"diff {key}: {actual[key]} != {expected[key]}"
-    assert actual["run_identity"] == expected["run_identity"]
+    assert actual["run_identity"] == {
+        "symbol": SYMBOL, "timeframe": TIMEFRAME, "config_hash": run_b.config_hash,
+        "path": actual["run_identity"]["path"],
+    }
+    assert Path(actual["run_identity"]["path"]).resolve() == run_b.manifest_path.resolve(), (
+        "registry 之 run 路徑未指向 latest run 之 manifest"
+    )
 
 
 @pytest.mark.ic_run_selector
 @pytest.mark.asyncio
-async def test_ml_caller_load_multi_kwargs_match_baseline(pinned_registry: Path) -> None:
-    _require_mini_registry_runs(pinned_registry)
-    baseline = _load_baseline()["ml_caller_load_multi"]
+async def test_ml_caller_load_multi_kwargs_match_baseline(selector_runs: Dict[str, Any]) -> None:
     service = CrossSymbolTrainingService()
     captured: Dict[str, Any] = {}
     original_load_multi = service._feature_library.load_multi
@@ -131,9 +153,9 @@ async def test_ml_caller_load_multi_kwargs_match_baseline(pinned_registry: Path)
 
     service._feature_library.load_multi = spy_load_multi  # type: ignore[method-assign]
 
-    symbols = baseline["load_multi_kwargs"]["symbols"]
-    timeframe = baseline["load_multi_kwargs"]["timeframe"]
-    allow_partial = baseline["load_multi_kwargs"]["kwargs"].get("allow_partial_training", True)
+    symbols = list(LOAD_MULTI_SYMBOLS)
+    timeframe = TIMEFRAME
+    allow_partial = LOAD_MULTI_ALLOW_PARTIAL
 
     with patch.object(service._validator, "run_leave_one_symbol_out", return_value={}):
         try:
@@ -158,8 +180,9 @@ async def test_ml_caller_load_multi_kwargs_match_baseline(pinned_registry: Path)
         for_training=True,
         allow_partial_training=allow_partial,
     )
-    for symbol, expected_count in baseline["per_symbol_row_count"].items():
-        assert len(frames[symbol]) == expected_count
+    # 期望列數＝各標的 latest run 生成當下之時間軸長（獨立導出；原取自凍結基準之 per_symbol_row_count）
+    for symbol, run_name in LOAD_MULTI_LATEST.items():
+        assert len(frames[symbol]) == len(selector_runs[run_name].index_s)
 
 
 @pytest.mark.ic_run_selector

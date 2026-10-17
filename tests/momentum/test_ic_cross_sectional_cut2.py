@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -21,18 +22,7 @@ from momentum.core.contracts import SplitPairLeakageError
 
 XSEC_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BCHUSDT"]
 XSEC_TIMEFRAME = "12h"
-XSEC_HASH = "e53e22906c35363757f4cd49d27f973e"
-XSEC_MINI_REGISTRY = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "ic_run_selector_mini_registry.json"
-)
-
-
-@pytest.fixture
-def xsec_pinned_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    registry_copy = tmp_path / "registry.json"
-    registry_copy.write_text(XSEC_MINI_REGISTRY.read_text(encoding="utf-8"), encoding="utf-8")
-    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(registry_copy))
-    return registry_copy
+KLINE_H5 = Path(__file__).resolve().parents[2] / "data_cache" / "feature_klines" / "kline_cache.h5"
 
 
 def _make_cross_frame(
@@ -238,28 +228,30 @@ def test_cross_sectional_coverage_guard_mutation_disabled_allows_bad_data(
         "per_symbol_coverage"
     ) == {}
 
-
 @pytest.mark.ic_run_selector
-def test_cross_sectional_e2e_real_path_append_and_analyze(
-    xsec_pinned_registry: Path,
-) -> None:
-    """端到端真路徑: load row_index → append labels → analyze_cross_sectional。"""
+def test_cross_sectional_e2e_real_path_append_and_analyze(tmp_feature_run_env) -> None:
+    """端到端真路徑: load row_index → append labels → analyze_cross_sectional。
+
+    TESTREG Task 4.4：原以 mini registry 釘已刪之 `e53e2290…`（BTC/ETH/BCH 12h）。改由共用外掛以真實
+    K 線於 tmp 物化同設定三幣 12h run（同一 config_hash，由 fixture 提供）。標籤覆蓋數之期望改由
+    K 線**獨立**導出（原寫死 `>= 5085`＝1696 列×3 幣－每幣末列無下一根，綁舊 run 之列數）。
+    """
     from momentum.factories import create_feature_library
 
     from api.services.ic_analysis_service import ICAnalysisService
 
+    runs = tmp_feature_run_env.activate("btc_12h_a", "eth_12h_a", "bch_12h_a")
+    xsec_hash = runs["btc_12h_a"].config_hash
     library = create_feature_library()
     for symbol in XSEC_SYMBOLS:
-        if library._registry.get(symbol, XSEC_TIMEFRAME, XSEC_HASH) is None:
-            pytest.skip(f"missing run {symbol}")
+        assert library._registry.get(symbol, XSEC_TIMEFRAME, xsec_hash) is not None, f"前提不成立：缺 {symbol}"
 
     frames: list[pd.DataFrame] = []
     for symbol in XSEC_SYMBOLS:
         row_index = library._reader.load_row_index_v2(
-            symbol, XSEC_TIMEFRAME, XSEC_HASH, artifact_kind="raw"
+            symbol, XSEC_TIMEFRAME, xsec_hash, artifact_kind="raw"
         )
-        if row_index is None:
-            pytest.skip(f"missing row_index {symbol}")
+        assert row_index is not None, f"前提不成立：缺 row_index {symbol}"
         idx = pd.DatetimeIndex(row_index)
         frame = pd.DataFrame(
             {
@@ -275,7 +267,18 @@ def test_cross_sectional_e2e_real_path_append_and_analyze(
     cross_df = pd.concat(frames, axis=0).set_index("_symbol", append=True)
     service = ICAnalysisService()
     labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
-    assert int(labeled["return_1"].notna().sum()) >= 5085
+    # 獨立 oracle：每列 return_1 ＝ log(下一根 close／本根 close)，下一根須存在於 K 線且兩價皆正
+    expected = 0
+    with h5py.File(KLINE_H5, "r") as handle:
+        for frame, symbol in zip(frames, XSEC_SYMBOLS):
+            data = handle[f"{symbol}/{XSEC_TIMEFRAME}/data"][:]
+            close = pd.Series(data["close"].astype(np.float64), index=data["timestamp"].astype(np.int64))
+            ts = frame.index.asi8 // 10**9
+            nxt = close.reindex(ts + 12 * 3600).to_numpy()
+            cur = close.reindex(ts).to_numpy()
+            expected += int(np.sum(np.isfinite(nxt) & np.isfinite(cur) & (nxt > 0) & (cur > 0)))
+    assert expected > 0, "前提不成立：獨立 oracle 無可標記之列"
+    assert int(labeled["return_1"].notna().sum()) == expected
 
     orchestrator = ICFilterOrchestrator(load_ic_config())
     report = orchestrator.analyze_cross_sectional(

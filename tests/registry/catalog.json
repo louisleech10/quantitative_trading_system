@@ -975,8 +975,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r9/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A12",
     "A2",
@@ -991,14 +991,7 @@
    "path": "tests/api/test_gap3_event_analysis_horizon_purge.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values",
-    "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once",
-    "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly",
-    "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed",
-    "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud",
-    "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_timeframe_seconds_identity"
-   ],
+   "rewrite_targets": [],
    "ticket": "GAP3UX"
   },
   "tests/api/test_gap3_event_batch_detail_dims.py": {
@@ -1187,8 +1180,8 @@
     "contract",
     "perf"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A10",
     "A12",
@@ -1203,18 +1196,7 @@
    "path": "tests/api/test_gap3_ic_stop_gate.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_covers_cross_sectional_runs",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_features_file_reads_metadata_only",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
-    "tests/api/test_gap3_ic_stop_gate.py::test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed"
-   ],
+   "rewrite_targets": [],
    "ticket": "GAP3UX"
   },
   "tests/api/test_gap3_import.py": {
@@ -1325,8 +1307,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A12",
     "A2",
@@ -1340,16 +1322,7 @@
    "path": "tests/api/test_gap3_scan_grid.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_receives_its_own_embargo_override",
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_summary_is_populated_from_real_shape",
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_timeout_keeps_partial_results",
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_gets_its_own_analyzer",
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_has_its_own_receipt_hash",
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_infeasible_cell_is_unavailable_without_killing_others",
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_mutation_reused_spec_collapses_hashes",
-    "tests/api/test_gap3_scan_grid.py::test_scan_grid_shape_is_exactly_nine_cells"
-   ],
+   "rewrite_targets": [],
    "ticket": "GAP3"
   },
   "tests/api/test_gap3_source_digest.py": {
@@ -1443,8 +1416,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A1",
     "A12",
@@ -1460,10 +1433,7 @@
    "path": "tests/api/test_ic_analysis_service.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_ic_analysis_service.py::test_analyze_real_run_split_validation_passes_with_real_axis",
-    "tests/api/test_ic_analysis_service.py::test_resolve_run_path_contains_config_hash"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/api/test_ic_deep_analysis.py": {
@@ -1518,8 +1488,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r9/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A12",
     "A13"
@@ -1530,9 +1500,7 @@
    "path": "tests/api/test_ic_list_features.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_ic_list_features.py::test_list_features_v2_matches_load_columns"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/api/test_ic_models.py": {
@@ -1582,8 +1550,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A12",
     "A13",
@@ -1595,11 +1563,7 @@
    "path": "tests/api/test_ic_run_selector.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_ic_run_selector.py::test_backward_compat_matches_baseline",
-    "tests/api/test_ic_run_selector.py::test_disambig_same_tf_different_hash",
-    "tests/api/test_ic_run_selector.py::test_ml_caller_load_multi_kwargs_match_baseline"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/api/test_ic_transform_feature_loading.py": {
@@ -2083,8 +2047,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A1",
     "A11",
@@ -2101,25 +2065,7 @@
    "path": "tests/api/test_splitunify_event_scan_projection.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_splitunify_event_scan_projection.py::test_analyze_event_label_spec_k1_h6_matches_ic",
-    "tests/api/test_splitunify_event_scan_projection.py::test_analyze_ic_train_test_split_off_reason",
-    "tests/api/test_splitunify_event_scan_projection.py::test_analyze_multi_symbol_discloses_exclusion",
-    "tests/api/test_splitunify_event_scan_projection.py::test_analyze_one_event_out_of_range_discloses_event_id",
-    "tests/api/test_splitunify_event_scan_projection.py::test_analyze_with_feature_run_lookahead_blocked",
-    "tests/api/test_splitunify_event_scan_projection.py::test_analyze_with_feature_run_split_ok",
-    "tests/api/test_splitunify_event_scan_projection.py::test_analyze_zero_survivors_is_4xx",
-    "tests/api/test_splitunify_event_scan_projection.py::test_coverage_and_post_trim_drop_lists_are_disjoint",
-    "tests/api/test_splitunify_event_scan_projection.py::test_every_input_event_falls_in_exactly_one_partition",
-    "tests/api/test_splitunify_event_scan_projection.py::test_partition_gate_rejects_malformed_identity",
-    "tests/api/test_splitunify_event_scan_projection.py::test_partition_gate_runs_on_unavailable_branch",
-    "tests/api/test_splitunify_event_scan_projection.py::test_projection_consumes_only_surviving_events",
-    "tests/api/test_splitunify_event_scan_projection.py::test_projection_input_event_ids_equal_allowed_set",
-    "tests/api/test_splitunify_event_scan_projection.py::test_required_real_data_present_or_fail_closed",
-    "tests/api/test_splitunify_event_scan_projection.py::test_route_response_contains_four_new_keys",
-    "tests/api/test_splitunify_event_scan_projection.py::test_scan_calls_shared_resolver_once",
-    "tests/api/test_splitunify_event_scan_projection.py::test_scan_projection_test_segment_matches_ic"
-   ],
+   "rewrite_targets": [],
    "ticket": "SPLITUNIFY"
   },
   "tests/api/test_splitunify_event_study_only.py": {
@@ -2147,8 +2093,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r10/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A1",
     "A12",
@@ -2160,9 +2106,7 @@
    "path": "tests/api/test_splitunify_ic_disposition_wiring.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/api/test_splitunify_ic_disposition_wiring.py::test_ic_main_path_emits_event_disposition_ledger"
-   ],
+   "rewrite_targets": [],
    "ticket": "SPLITUNIFY"
   },
   "tests/api/test_splitunify_route_shared_resolver.py": {
@@ -8042,8 +7986,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A12",
     "A17",
@@ -8057,12 +8001,7 @@
    "path": "tests/momentum/Analysis/test_ic_1eb_b5_golden.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_fast_btc_12h_f754_invariant",
-    "tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_manifest_covers_13_runs",
-    "tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g1_slow_runs_invariant",
-    "tests/momentum/Analysis/test_ic_1eb_b5_golden.py::test_g3_xsec_labels_path_still_raises"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/momentum/Analysis/test_ic_api_real_kline_pit.py": {
@@ -8829,8 +8768,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A11",
     "A12",
@@ -8843,16 +8782,7 @@
    "path": "tests/momentum/Analysis/test_splitunify_canonical_holdout.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_canonical_holdout_disabled_is_named_reason",
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_canonical_holdout_insufficient_rows_is_named_reason",
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_canonical_holdout_matches_ic_build_holdout_split_plan",
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_embargo_is_raised_by_declared_depth",
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_post_trim_index_is_not_raw_kline_universe",
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_resolver_does_not_mutate_caller_config",
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_same_config_hash_across_symbols_requires_symbol_filter",
-    "tests/momentum/Analysis/test_splitunify_canonical_holdout.py::test_symbol_mismatch_is_served_by_run_not_found"
-   ],
+   "rewrite_targets": [],
    "ticket": "SPLITUNIFY"
   },
   "tests/momentum/Analysis/test_splitunify_contract.py": {
@@ -8930,8 +8860,8 @@
    "claim": [
     "contract"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r15/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A11",
     "A12",
@@ -8943,10 +8873,7 @@
    "path": "tests/momentum/Analysis/test_splitunify_stage3_observation.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/Analysis/test_splitunify_stage3_observation.py::test_stage3_observation_populated_on_real_event_run",
-    "tests/momentum/Analysis/test_splitunify_stage3_observation.py::test_stage3_receipt_reset_per_analyze_and_absent_from_report"
-   ],
+   "rewrite_targets": [],
    "ticket": "SPLITUNIFY"
   },
   "tests/momentum/Analysis/test_survivor_contract.py": {
@@ -9828,8 +9755,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r18/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A15",
     "A2",
@@ -10695,8 +10622,8 @@
     "contract",
     "correctness"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r11/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r3/synth.md",
    "guarantee": [
     "A14",
     "A2",
@@ -10711,9 +10638,7 @@
    "path": "tests/momentum/test_ic_cross_sectional_cut2.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/momentum/test_ic_cross_sectional_cut2.py::test_cross_sectional_e2e_real_path_append_and_analyze"
-   ],
+   "rewrite_targets": [],
    "ticket": "IC"
   },
   "tests/momentum/test_ic_decay_log.py": {

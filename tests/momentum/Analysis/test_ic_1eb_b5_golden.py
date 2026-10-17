@@ -39,6 +39,12 @@ from scripts.ic1eb_b5_replay import (  # noqa: E402
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
+#: 凍結基準 `handoffs/ic1eb_baseline` 不存在、所綁 run 已刪 ⇒ 依賴基準之 4 支具名 xfail（strict：基準重凍後必轉 XPASS 紅以提醒拔除）
+_REBASELINE_XFAIL = pytest.mark.xfail(
+    strict=True,
+    reason="IC 1eb 基準待重基準（凍結基準與 run 已刪）；見 白話說明/還沒做的事.md",
+)
+
 
 def _baseline_available() -> bool:
     return (BASELINE_DIR / "baseline_manifest.json").is_file()
@@ -47,7 +53,9 @@ def _baseline_available() -> bool:
 @pytest.fixture(scope="module")
 def baseline_manifest():
     if not _baseline_available():
-        pytest.skip("ic1eb baseline absent (skip-if-absent)")
+        # TESTREG Task 4.4：基準不在 git 且本機已無（綁之 13 個 run 亦於 2026-10-03 刪除）⇒ 原恆 skip。
+        # 改為 fail，由使用者之 4 支以 `xfail(strict=True)` 具名追蹤（基準重產＝重凍 golden，須另行重基準與簽核）。
+        pytest.fail("ic1eb baseline absent：handoffs/ic1eb_baseline 不存在（凍結基準與其 run 已刪）")
     patch_persist_outputs()
     manifest = load_manifest()
     verify_inputs_integrity(manifest)
@@ -61,6 +69,7 @@ def _run_names(manifest: dict) -> list[str]:
 # ── G-1 ──────────────────────────────────────────────────────────────────────
 
 
+@_REBASELINE_XFAIL
 def test_g1_fast_btc_12h_f754_invariant(baseline_manifest) -> None:
     """G-1 快顆：long_BTCUSDT_12h_f754aad4（不掛 slow_stat，PR 常跑）。"""
     entry = baseline_manifest["runs"][FAST_RUN]
@@ -68,6 +77,7 @@ def test_g1_fast_btc_12h_f754_invariant(baseline_manifest) -> None:
     assert_g1_invariant(entry, result)
 
 
+@_REBASELINE_XFAIL
 @pytest.mark.slow_stat
 @pytest.mark.parametrize(
     "run_name",
@@ -82,6 +92,7 @@ def test_g1_slow_runs_invariant(baseline_manifest, run_name: str) -> None:
     assert_g1_invariant(entry, result)
 
 
+@_REBASELINE_XFAIL
 def test_g1_manifest_covers_13_runs(baseline_manifest) -> None:
     names = _run_names(baseline_manifest)
     assert len(names) == 13
@@ -195,6 +206,7 @@ def test_g3_selection_scope_contract_raise() -> None:
         )
 
 
+@_REBASELINE_XFAIL
 def test_g3_xsec_labels_path_still_raises(baseline_manifest) -> None:
     """xsec labels_path 單軸仍 raise；exception_type 對齊 baseline receipt。
 

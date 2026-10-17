@@ -18,8 +18,8 @@ from momentum.Analysis import ic_filter_orchestrator
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
-# 2026-07-06 重凍:改用現行真實 12h run(取代已不在資料集的舊 1c4b825)。
-HASH_A = "e53e22906c35363757f4cd49d27f973e"
+# TESTREG Task 4.4：原寫死之 12h run `e53e2290…`（2026-10-03 已刪）改由共用外掛 tmp 物化（`btc_12h_a`）。
+RUN_A = "btc_12h_a"
 
 
 class _SleepingAnalyzer:
@@ -39,10 +39,14 @@ class _ProgressAnalyzer:
         return {"summary_table": []}
 
 
-def _require_run() -> None:
+def _require_run(env):
+    """物化並啟用 tmp run（registry／特徵根重導至 tmp）；registry 須見得到它（前提不成立即紅，不再 skip）。"""
+    run = env.activate(RUN_A)[RUN_A]
     service = ICAnalysisService()
-    if service._feature_library._registry.get(SYMBOL, TIMEFRAME, HASH_A) is None:
-        pytest.skip(f"missing registry run {HASH_A}")
+    assert service._feature_library._registry.get(SYMBOL, TIMEFRAME, run.config_hash) is not None, (
+        f"前提不成立：tmp registry 無 {run.config_hash}"
+    )
+    return run
 
 
 # 第二刀首項 bug 已修(feature_library.load 貼回 row_index 時間軸,
@@ -56,8 +60,9 @@ def _require_run() -> None:
 # 偽時間軸 → 下方 assert(真時間軸 + 驗證不 raise)FAIL。
 @pytest.mark.ic_persist_redirect
 @pytest.mark.usefixtures("ic_persist_redirect")
-def test_analyze_real_run_split_validation_passes_with_real_axis() -> None:
-    _require_run()
+def test_analyze_real_run_split_validation_passes_with_real_axis(tmp_feature_run_env) -> None:
+    run = _require_run(tmp_feature_run_env)
+    HASH_A = run.config_hash
     service = ICAnalysisService()
     features_path, _meta_path = service._materialize_features_for_ic(SYMBOL, TIMEFRAME, HASH_A)
 
@@ -70,6 +75,10 @@ def test_analyze_real_run_split_validation_passes_with_real_axis() -> None:
         "materialized h5 仍是 arange 偽時間軸——attach 未生效"
     )
     assert int(timestamps[1] - timestamps[0]) == 12 * 3600
+    # 逐值對生成當下之主時間軸（fixture 於生成時獨立擷取，不經載入端）
+    assert np.array_equal(np.asarray(timestamps, dtype=np.int64), run.index_s), (
+        "materialized h5 時間軸與生成當下之主時間軸不符"
+    )
 
     index = pd.DatetimeIndex(pd.to_datetime(timestamps, unit="s"))
     expected_freq = ic_filter_orchestrator._resolve_expected_freq({"timeframe": TIMEFRAME})
@@ -80,8 +89,9 @@ def test_analyze_real_run_split_validation_passes_with_real_axis() -> None:
 @pytest.mark.ic_run_selector
 @pytest.mark.ic_persist_redirect
 @pytest.mark.usefixtures("ic_persist_redirect")
-def test_resolve_run_path_contains_config_hash() -> None:
-    _require_run()
+def test_resolve_run_path_contains_config_hash(tmp_feature_run_env) -> None:
+    run = _require_run(tmp_feature_run_env)
+    HASH_A = run.config_hash
     service = ICAnalysisService()
     entry = service._feature_library._registry.get(SYMBOL, TIMEFRAME, HASH_A)
     assert entry is not None
@@ -189,47 +199,67 @@ async def test_progress_callback_from_to_thread_schedules_on_event_loop() -> Non
 
 XSEC_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BCHUSDT"]
 XSEC_TIMEFRAME = "12h"
-XSEC_HASH = "e53e22906c35363757f4cd49d27f973e"
-XSEC_MINI_REGISTRY = (
-    Path(__file__).resolve().parents[1] / "fixtures" / "ic_run_selector_mini_registry.json"
-)
+# TESTREG Task 4.4：原以 mini registry 釘已刪之 `e53e2290…`（三幣 12h）；改由共用外掛以真實 K 線於 tmp
+# 物化同設定三幣 12h run（`*_12h_a`，同一 config_hash，由 fixture 提供；迄日至 K 線末根）。
+# 綁舊 run 之覆蓋數（`>= 5085`＝1696×3－3）改為 K 線獨立 oracle 之可標記列數（`==`）。
+XSEC_RUNS = ("btc_12h_a", "eth_12h_a", "bch_12h_a")
 
 
 @pytest.fixture
-def xsec_pinned_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    registry_copy = tmp_path / "registry.json"
-    registry_copy.write_text(XSEC_MINI_REGISTRY.read_text(encoding="utf-8"), encoding="utf-8")
-    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(registry_copy))
-    return registry_copy
+def xsec_hash(tmp_feature_run_env) -> str:
+    """tmp 物化三幣 12h run（同一 config_hash）並把 registry／特徵根重導至 tmp；回傳該 hash。"""
+    runs = tmp_feature_run_env.activate(*XSEC_RUNS)
+    hashes = {runs[name].config_hash for name in XSEC_RUNS}
+    assert len(hashes) == 1, f"前提不成立：三幣 12h run 之 config_hash 不一致（{hashes}）"
+    return hashes.pop()
 
 
-def _require_xsec_run(xsec_pinned_registry: Path) -> None:
+def _require_xsec_run(xsec_hash: str) -> None:
+    """前提：三幣皆登記於 tmp registry（原缺即 skip；現由 fixture 保證，不成立即紅）。"""
     from momentum.factories import create_feature_library
 
     library = create_feature_library()
     for symbol in XSEC_SYMBOLS:
-        if library._registry.get(symbol, XSEC_TIMEFRAME, XSEC_HASH) is None:
-            pytest.skip(f"missing registry run {symbol}/{XSEC_HASH}")
+        assert library._registry.get(symbol, XSEC_TIMEFRAME, xsec_hash) is not None, (
+            f"前提不成立：registry 無 {symbol}/{xsec_hash}"
+        )
 
 
-def _build_xsec_cross_index() -> pd.DataFrame:
-    """真 3sym×12h row_index 建 cross MultiIndex frame（輕量，不載 218k 特徵）。"""
+def _build_xsec_cross_index(xsec_hash: str) -> pd.DataFrame:
+    """真 3sym×12h row_index 建 cross MultiIndex frame（輕量，不載特徵值）。"""
     from momentum.factories import create_feature_library
 
     library = create_feature_library()
     frames: list[pd.DataFrame] = []
     for symbol in XSEC_SYMBOLS:
         row_index = library._reader.load_row_index_v2(
-            symbol, XSEC_TIMEFRAME, XSEC_HASH, artifact_kind="raw"
+            symbol, XSEC_TIMEFRAME, xsec_hash, artifact_kind="raw"
         )
-        if row_index is None:
-            pytest.skip(f"missing row_index for {symbol}")
+        assert row_index is not None, f"前提不成立：缺 row_index {symbol}"
         idx = pd.DatetimeIndex(row_index)
         frame = pd.DataFrame({"feat_dummy": np.arange(len(idx), dtype=np.float32)}, index=idx)
         frame.index.name = "timestamp"
         frame["_symbol"] = symbol
         frames.append(frame)
     return pd.concat(frames, axis=0).set_index("_symbol", append=True)
+
+
+def _expected_label_count(cross_df: pd.DataFrame) -> int:
+    """獨立 oracle（直讀 K 線 h5，不經 kline reader／label generator）：可標記列數＝
+    run 列時刻 t 與 t+12h 之 close 皆存在且為正之列數（forward 1 根 log return 有定義）。"""
+    import h5py
+
+    kline = Path(__file__).resolve().parents[2] / "data_cache" / "feature_klines" / "kline_cache.h5"
+    expected = 0
+    with h5py.File(kline, "r") as handle:
+        for symbol in XSEC_SYMBOLS:
+            data = handle[f"{symbol}/{XSEC_TIMEFRAME}/data"][:]
+            close = pd.Series(data["close"].astype(np.float64), index=data["timestamp"].astype(np.int64))
+            ts = cross_df.xs(symbol, level="_symbol").index.asi8 // 10**9
+            cur, nxt = close.reindex(ts).to_numpy(), close.reindex(ts + 12 * 3600).to_numpy()
+            expected += int(np.sum(np.isfinite(cur) & np.isfinite(nxt) & (cur > 0) & (nxt > 0)))
+    return expected
+
 
 
 def _kline_forward_log_oracle(symbol: str, timeframe: str, timestamps: pd.DatetimeIndex) -> pd.Series:
@@ -247,17 +277,17 @@ def _kline_forward_log_oracle(symbol: str, timeframe: str, timestamps: pd.Dateti
 
 @pytest.mark.ic_run_selector
 def test_append_cross_sectional_labels_real_3sym_oracle(
-    xsec_pinned_registry: Path,
+    xsec_hash: str,
 ) -> None:
-    """F1 Golden: 真 3sym×12h return_1 逐幣對 kline oracle，覆蓋率 ≥5085/5088。"""
-    _require_xsec_run(xsec_pinned_registry)
-    cross_df = _build_xsec_cross_index()
+    """F1 Golden: 真 3sym×12h return_1 逐幣對 kline oracle；覆蓋數＝獨立 oracle 之可標記列數（每幣末列為 K 線末根 ⇒ NaN）。"""
+    _require_xsec_run(xsec_hash)
+    cross_df = _build_xsec_cross_index(xsec_hash)
     service = ICAnalysisService()
     labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
 
     total = len(labeled)
     non_nan = int(labeled["return_1"].notna().sum())
-    assert non_nan >= 5085
+    assert non_nan == _expected_label_count(cross_df)
     assert non_nan <= total
 
     for symbol in XSEC_SYMBOLS:
@@ -271,9 +301,11 @@ def test_append_cross_sectional_labels_real_3sym_oracle(
             rtol=1e-5,
             atol=1e-5,
         )
+        # 前提：run 末列即 K 線末根（oracle 於末列無下一根）——否則下一條之「末列 NaN」無鑑別意義
+        assert bool(pd.isna(oracle.iloc[-1])), f"前提不成立：{symbol} run 末列非 K 線末根"
         assert bool(pd.isna(sym_labels.iloc[-1]))
 
-    t0 = labeled.index.get_level_values("timestamp").unique()[500]
+    t0 =labeled.index.get_level_values("timestamp").unique()[500]
     per_sym = {
         s: float(labeled.xs((t0, s), level=["timestamp", "_symbol"])["return_1"].iloc[0])
         for s in XSEC_SYMBOLS
@@ -283,12 +315,12 @@ def test_append_cross_sectional_labels_real_3sym_oracle(
 
 @pytest.mark.ic_run_selector
 def test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise(
-    xsec_pinned_registry: Path,
+    xsec_hash: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """F1 Option B: kline 缺孔 → 該列 label NaN、其餘對齊正確、不 raise。"""
-    _require_xsec_run(xsec_pinned_registry)
-    cross_df = _build_xsec_cross_index()
+    _require_xsec_run(xsec_hash)
+    cross_df = _build_xsec_cross_index(xsec_hash)
     service = ICAnalysisService()
     hole_symbol = XSEC_SYMBOLS[0]
     hole_ts = cross_df.xs(hole_symbol, level="_symbol").index[100]
@@ -353,12 +385,12 @@ def test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise(
 
 @pytest.mark.ic_run_selector
 def test_append_cross_sectional_labels_mutation_rangeindex_regresses(
-    xsec_pinned_registry: Path,
+    xsec_hash: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F1 mutation: 還原 RangeIndex reindex → 覆蓋率回 0/5088（D-4 red-on-break）。"""
-    _require_xsec_run(xsec_pinned_registry)
-    cross_df = _build_xsec_cross_index()
+    """F1 mutation: 還原 RangeIndex reindex → 覆蓋率回 0（D-4 red-on-break）；修正版＝獨立 oracle 之可標記列數。"""
+    _require_xsec_run(xsec_hash)
+    cross_df = _build_xsec_cross_index(xsec_hash)
     service = ICAnalysisService()
     original = service._append_cross_sectional_labels
 
@@ -381,7 +413,9 @@ def test_append_cross_sectional_labels_mutation_rangeindex_regresses(
     labeled = broken_append(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
     assert int(labeled["return_1"].notna().sum()) == 0
     labeled_fixed = original(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
-    assert int(labeled_fixed["return_1"].notna().sum()) >= 5085
+    expected = _expected_label_count(cross_df)
+    assert expected > 0, "前提不成立：獨立 oracle 無可標記之列"
+    assert int(labeled_fixed["return_1"].notna().sum()) == expected
 
 
 def test_cross_sectional_coverage_guard_short_series_all_nan() -> None:

@@ -5,6 +5,8 @@
 🔴 **本檔一律用真實資料**（`data_cache/events/`、`data_cache/features/`、
 `data_cache/feature_klines/kline_cache.h5`）；禁合成 fixture（CLAUDE.md 資料真實性鐵律）。
 資料缺席時 `skip`（本機以外環境沒有 `data_cache/`），**不得**改用假資料讓它變綠。
+FF run（ETHUSDT 1h／12h，含 BOP）由共用外掛 `tests/fixtures/tmp_feature_runs_plugin.py`
+以真實 K 線於 tmp 物化（TESTREG Task 4.4：原寫死之 `4a8a0b37…`／`e53e2290…` 已於 2026-10-03 刪除）。
 
 驗的是什麼：事件對到的那一列特徵，其主週期 K 線之**收盤**不得晚於該事件之 `decision_at_ms`。
 舊實作以 `feature_cutoff_ms`（收盤時刻）當列鍵，而特徵表以**開盤**時刻編索引 ⇒ 選到晚一根、
@@ -23,8 +25,6 @@ from momentum.factories import create_event_sample_pipeline
 
 REPO = Path(__file__).resolve().parents[3]
 BATCH_12H = REPO / "data_cache/events/20260909T130533Z-7f73e4c7.json"
-RUN_1H = REPO / "data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5"
-RUN_12H = REPO / "data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e"
 KLINE = REPO / "data_cache/feature_klines/kline_cache.h5"
 BAR_MS = {"1h": 3_600_000, "12h": 43_200_000}
 
@@ -78,13 +78,14 @@ def _kline_bop(tf: str) -> pd.Series:
     return pd.Series(bop, index=d["timestamp"].astype(np.int64) * 1000)
 
 
-@pytest.mark.parametrize("run_tf,run_dir", [("1h", RUN_1H), ("12h", RUN_12H)])
-def test_selected_row_close_not_after_decision(run_tf: str, run_dir: Path) -> None:
+@pytest.mark.parametrize("run_tf,run_name", [("1h", "eth_1h"), ("12h", "eth_12h_a")], ids=["1h", "12h"])
+def test_selected_row_close_not_after_decision(run_tf: str, run_name: str, tmp_feature_run_env) -> None:
     """`R5-C9` 1.：逐事件，特徵列鍵所屬 K 線之收盤 ≤ `decision_at_ms`；且鍵落在特徵索引內。
 
     對照（防空集合恆成立）：同一批以舊鍵（`feature_cutoff_ms`）計算時，**全部**事件之列收盤晚於決策時點。
     """
-    _require(BATCH_12H, run_dir, KLINE)
+    _require(BATCH_12H, KLINE)
+    run_dir = tmp_feature_run_env.activate(run_name)[run_name].run_dir
     pipe, prepared, tsec, bars = _prepare(run_tf)
     keys = pipe.feature_row_keys(prepared, feature_timeframe=run_tf, timeframe_seconds=tsec, bars_by_tf=bars)
     index_ms = set(int(x) for x in _feature_index_ms(run_dir))
@@ -108,14 +109,15 @@ def test_selected_row_close_not_after_decision(run_tf: str, run_dir: Path) -> No
     )
 
 
-@pytest.mark.parametrize("run_tf,run_dir", [("1h", RUN_1H), ("12h", RUN_12H)])
-def test_selected_row_value_matches_that_kline_bar(run_tf: str, run_dir: Path) -> None:
+@pytest.mark.parametrize("run_tf,run_name", [("1h", "eth_1h"), ("12h", "eth_12h_a")], ids=["1h", "12h"])
+def test_selected_row_value_matches_that_kline_bar(run_tf: str, run_name: str, tmp_feature_run_env) -> None:
     """列以**開盤**時刻編索引之逐值證據：選中列之 BOP＝「開盤＝鍵」那根 kline 之 BOP。
 
     BOP=(close-open)/(high-low) 只依賴當根 ⇒ 可逐值對證。float16 量化使少數列有誤差，
     故以 95% 為門檻並同時要求「對錯一根」之比例為 0（選錯列會整批不符）。
     """
-    _require(BATCH_12H, run_dir, KLINE)
+    _require(BATCH_12H, KLINE)
+    run_dir = tmp_feature_run_env.activate(run_name)[run_name].run_dir
     pipe, prepared, tsec, bars = _prepare(run_tf)
     keys = pipe.feature_row_keys(prepared, feature_timeframe=run_tf, timeframe_seconds=tsec, bars_by_tf=bars)
     ts = _feature_index_ms(run_dir)
@@ -174,15 +176,16 @@ def _prepare_1h_batch(k: int):
     return pipe, prepared, pipe.timeframe_seconds_for(tfs), bars
 
 
-def test_1h_events_12h_run_off_grid_key_is_pit_correct() -> None:
+def test_1h_events_12h_run_off_grid_key_is_pit_correct(tmp_feature_run_env) -> None:
     """`R5-C9` 1.＋Task 10.2 邊界③：1h 事件 × 12h run、決策時點**不在** 12h 網格上。
 
     前置條件（不成立即 fail，擋空心通過）：fixture 中至少一筆 `last_bar_open_ms != decision_at_ms − 12h`。
     """
-    _require(BATCH_1H, RUN_12H, KLINE)
+    _require(BATCH_1H, KLINE)
+    run_12h = tmp_feature_run_env.activate("eth_12h_a")["eth_12h_a"].run_dir
     pipe, prepared, tsec, bars = _prepare_1h_batch(k=5)
     keys = pipe.feature_row_keys(prepared, feature_timeframe="12h", timeframe_seconds=tsec, bars_by_tf=bars)
-    index_ms = set(int(x) for x in _feature_index_ms(RUN_12H))
+    index_ms = set(int(x) for x in _feature_index_ms(run_12h))
     bar = BAR_MS["12h"]
 
     off_grid = 0
@@ -199,14 +202,15 @@ def test_1h_events_12h_run_off_grid_key_is_pit_correct() -> None:
     )
 
 
-def test_1h_events_12h_run_old_key_drops_events_entirely() -> None:
+def test_1h_events_12h_run_old_key_drops_events_entirely(tmp_feature_run_env) -> None:
     """舊鍵（觸發週期之 `feature_cutoff_ms`）在非整點幾何下之失敗型態＝事件**整筆丟棄**。
 
     對照 12h 事件之失敗型態（晚一根仍落在索引內），此處舊鍵多半不落在 12h 索引 ⇒ IC 取不到列。
     """
-    _require(BATCH_1H, RUN_12H, KLINE)
+    _require(BATCH_1H, KLINE)
+    run_12h = tmp_feature_run_env.activate("eth_12h_a")["eth_12h_a"].run_dir
     _pipe, prepared, tsec, bars = _prepare_1h_batch(k=5)
-    index_ms = set(int(x) for x in _feature_index_ms(RUN_12H))
+    index_ms = set(int(x) for x in _feature_index_ms(run_12h))
     old_keys = {
         p.event_id: int(p.feature_cutoff_ms) for p in prepared.per_tf if p.timeframe == "1h"
     }
@@ -216,7 +220,7 @@ def test_1h_events_12h_run_old_key_drops_events_entirely() -> None:
 
 def test_pit_guard_rejects_open_eq_cutoff() -> None:
     """`R5-C9` 5.：收據之開盤等於收盤（非法幾何）⇒ 取鍵當下 raise。"""
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     import dataclasses
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
@@ -237,7 +241,7 @@ def test_pit_guard_rejects_earlier_real_bar_as_key() -> None:
 
     只驗不等式擋不住這種竄改——守衛須驗「開盤＋一根＝收盤」，把列釘回 cutoff 所屬那根。
     """
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     import dataclasses
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
@@ -260,7 +264,7 @@ def test_guard_rejects_coordinated_earlier_bar() -> None:
     """🔴 B10A 閉合輪 `CODEX-R31-P1-01`／`GROK-R31-P2-01`：開盤與收盤**成對**換成更早之真實 bar
     （幾何仍自洽、仍早於決策）須被擋——守衛須以同一支 as-of 實作重算「最後一根」逐值對證。
     """
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     import dataclasses
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
@@ -294,7 +298,7 @@ def test_returned_key_equals_independent_asof_recomputation() -> None:
     🔴 這條擋的是「回傳值被整體位移」——`GROK-R31-P2-01` 實測把回傳改為 `open_ms - bar_ms` 時，
     既有各條（不等式、值對證）**全部仍綠**，因為位移後那列仍是合法且自洽的一列。
     """
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     import numpy as _np
 
     pipe, prepared, tsec, bars = _prepare("1h")
@@ -319,7 +323,7 @@ def test_pit_guard_rejects_cutoff_after_decision() -> None:
     🔴 竄改須**同時**搬開盤，使 ①（開盤＋一根＝收盤）仍成立——否則 ① 先響，② 從未被驗到
     （守衛互相遮蔽；原版只改 `feature_cutoff_ms`，實測拿到的是 `ROWKEY_NOT_SAME_BAR`）。
     """
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     import dataclasses
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
@@ -344,7 +348,7 @@ def test_pit_guard_rejects_cutoff_after_decision() -> None:
 
 def test_missing_feature_tf_row_fail_closed() -> None:
     """`R5-C9` 3.：事件缺該特徵週期之 per-TF 收據 ⇒ fail-closed，訊息含事件與週期。"""
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     import dataclasses
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
@@ -360,7 +364,7 @@ def test_missing_feature_tf_row_fail_closed() -> None:
 
 def test_alignment_loads_union_of_timeframes() -> None:
     """`R5-C9` 3.：12h 事件 × 1h run ⇒ `per_tf` 須含 1h 列（只載觸發週期時取不到鍵）。"""
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     _pipe, prepared, tsec, bars = _prepare("1h")
     tfs = {p.timeframe for p in prepared.per_tf}
     assert {"12h", "1h"} <= tfs, f"per_tf 僅含 {sorted(tfs)}"
@@ -373,7 +377,7 @@ def test_bars_are_required_no_guardless_degraded_path() -> None:
     真實批仍回傳 165 個鍵而不 raise ⇒ 守衛 fail-open。改必填後三種形態都必須拒絕。
     可證偽：把必填改回選填（預設 None）即本條轉紅。
     """
-    _require(BATCH_12H, RUN_1H, KLINE)
+    _require(BATCH_12H, KLINE)  # 守衛／as-of 重算只需事件批＋K 線，不讀特徵 run（TESTREG b5）
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
 
     _pipe, prepared, tsec, _bars = _prepare("1h")

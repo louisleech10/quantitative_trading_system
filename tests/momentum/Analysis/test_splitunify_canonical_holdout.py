@@ -1,7 +1,10 @@
 """SPLITUNIFY `Task 10.4`：canonical 邊界之單一解析入口（真實資料）。
 
-🔴 **本檔一律用真實資料**（`data_cache/features/`、`data_cache/feature_klines/kline_cache.h5`）；
-禁合成 fixture（CLAUDE.md 資料真實性鐵律）。資料缺席時 `skip`。
+🔴 **本檔一律用真實資料**（`data_cache/feature_klines/kline_cache.h5`）；禁合成 fixture
+（CLAUDE.md 資料真實性鐵律）。K 線缺席時 `skip`。
+FF run 由共用外掛 `tests/fixtures/tmp_feature_runs_plugin.py` 以真實 K 線於 tmp 物化
+（TESTREG Task 4.4：原寫死之本機 run `4a8a0b37…` 已於 2026-10-03 刪除）；
+ETHUSDT 與 BCHUSDT 1h 以同設定同日期窗生成 ⇒ 同一 `config_hash` 真實橫跨兩 symbol。
 
 驗的是什麼：邊界只有一條。下沉前比對腳本自己算了一份（`oos_test_size` 寫死 0.2、
 深度抬高之 embargo 沒接上），B10A 審碼兩度被打穿；現在 IC 端與腳本都呼叫同一支。
@@ -15,17 +18,20 @@ import pandas as pd
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
-RUN_1H = REPO / "data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5"
-RUN_12H = REPO / "data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e"
 KLINE = REPO / "data_cache/feature_klines/kline_cache.h5"
 SYM = "ETHUSDT"
-FF_1H = "4a8a0b3726cc906ab3534994605e77f5"
 
 
 def _require(*paths: Path) -> None:
     missing = [str(p) for p in paths if not p.exists()]
     if missing:
         pytest.skip(f"真實資料缺席（不得以合成 fixture 代替）：{missing}")
+
+
+@pytest.fixture
+def run_1h(tmp_feature_run_env):
+    """tmp 物化之 ETHUSDT 1h 真實 run（同 hash 亦見於 BCHUSDT）；本測試期間 run 定位重導至 tmp。"""
+    return tmp_feature_run_env.activate("eth_1h", "bch_1h")["eth_1h"]
 
 
 def _resolver():
@@ -40,13 +46,13 @@ def _cfg():
     return load_ic_config()
 
 
-def test_canonical_holdout_matches_ic_build_holdout_split_plan() -> None:
+def test_canonical_holdout_matches_ic_build_holdout_split_plan(run_1h) -> None:
     """🔴 邊界與 IC 生產端之 `_build_holdout_split_plan` **逐值相等**。
 
     比的是 `test_plan.row_index` 與 `row_time_fingerprint`——不是只比列數。
     鑑別力：把 `oos_test_size` 改一個值即整條轉紅（B10A 實測 0.2→0.3 ⇒ 邊界位移）。
     """
-    _require(RUN_1H, KLINE)
+    _require(KLINE)
     from momentum.Analysis.event_samples.canonical_holdout import load_post_trim_index
     from momentum.Analysis.ic_filter_orchestrator import _build_holdout_split_plan
     from momentum.core.constants import TIMEFRAME_SECONDS
@@ -54,7 +60,7 @@ def test_canonical_holdout_matches_ic_build_holdout_split_plan() -> None:
     resolve, _err = _resolver()
     purge_gap, depth = 156, 144
     got = resolve(
-        ff_run=FF_1H, symbol=SYM, ic_config=_cfg(),
+        ff_run=run_1h.config_hash, symbol=SYM, ic_config=_cfg(),
         purge_gap=purge_gap, lookahead_depth_rows=depth,
     )
     assert got.reason is None, f"真實 run 不應無邊界：{got.reason}"
@@ -62,7 +68,7 @@ def test_canonical_holdout_matches_ic_build_holdout_split_plan() -> None:
     # 獨立重算：直接呼叫生產端建構函式（同一支，但由本測試自己組參數）。
     cfg = _cfg()
     cfg.embargo = max(int(getattr(cfg, "embargo", 0) or 0), depth)
-    index = load_post_trim_index(RUN_1H)
+    index = load_post_trim_index(run_1h.run_dir)
     expect = _build_holdout_split_plan(
         pd.DataFrame(index=index), cfg, SYM,
         pd.Timedelta(seconds=int(TIMEFRAME_SECONDS["1h"])), purge_gap=purge_gap,
@@ -77,46 +83,49 @@ def test_canonical_holdout_matches_ic_build_holdout_split_plan() -> None:
     )
 
 
-def test_embargo_is_raised_by_declared_depth() -> None:
+def test_embargo_is_raised_by_declared_depth(run_1h) -> None:
     """深度抬高 `embargo` 是既有規則（答案窗由 `purge_gap` 承載，兩者相加才是總隔離）。
 
     鑑別力：拿掉抬高 ⇒ `embargo` 退回 config 值、test 段起點前移。
     """
-    _require(RUN_1H, KLINE)
+    _require(KLINE)
     resolve, _err = _resolver()
     base = int(getattr(_cfg(), "embargo", 0) or 0)
     got = resolve(
-        ff_run=FF_1H, symbol=SYM, ic_config=_cfg(),
+        ff_run=run_1h.config_hash, symbol=SYM, ic_config=_cfg(),
         purge_gap=156, lookahead_depth_rows=base + 144,
     )
     assert got.embargo == base + 144, f"embargo 未被深度抬高：{got.embargo}"
 
 
-def test_same_config_hash_across_symbols_requires_symbol_filter() -> None:
-    """🔴 同一 `config_hash` **真的**跨多個 symbol 存在——實測本 run 之雜湊同時見於
-    `BCHUSDT`／`BTCUSDT`／`ETHUSDT`。
+def test_same_config_hash_across_symbols_requires_symbol_filter(run_1h) -> None:
+    """🔴 同一 `config_hash` **真的**跨多個 symbol 存在——同設定同日期窗之 run 之雜湊
+    同時見於 `BCHUSDT`／`ETHUSDT`（tmp 物化；config_hash 不含 symbol）。
 
     ⇒ 不篩 symbol 就會命中多個，取首個即是**拿到別的幣種之 run**（B10A 實際踩過）。
     本條把兩件事一起釘住：①不篩 ⇒ fail-closed（不猜）；②篩了 ⇒ 落在該 symbol 底下。
     鑑別力：把 `resolve_run_dir` 之多命中分支改成 `return hits[0]` 即轉紅。
     """
-    _require(RUN_1H)
+    from momentum.Analysis.event_samples import canonical_holdout
     from momentum.Analysis.event_samples.canonical_holdout import (
         CanonicalHoldoutError,
         resolve_run_dir,
     )
 
-    all_hits = sorted((REPO / "data_cache/features").glob(f"*/*/{FF_1H}"))
-    if len({h.parent.parent.name for h in all_hits}) < 2:
-        pytest.skip("本機該 config_hash 未跨 symbol，本條之前提不成立")
+    # 獨立列舉（不經被測函式）：run 定位根下該 hash 之全部目錄
+    all_hits = sorted(Path(canonical_holdout._FEATURES_DIR).glob(f"*/*/{run_1h.config_hash}"))
+    # 前提（原為環境不符即 skip；現由 fixture 保證，不成立即紅）
+    assert {h.parent.parent.name for h in all_hits} == {"BCHUSDT", "ETHUSDT"}, (
+        f"前提不成立：該 config_hash 未跨兩 symbol（{all_hits}）"
+    )
 
     with pytest.raises(CanonicalHoldoutError) as ei:
-        resolve_run_dir(FF_1H)  # 不給 symbols ⇒ 多命中
+        resolve_run_dir(run_1h.config_hash)  # 不給 symbols ⇒ 多命中
     assert ei.value.reason == "feature_run_ambiguous", (
         f"多命中未 fail-closed：{ei.value.reason}"
     )
     for sym in sorted({h.parent.parent.name for h in all_hits}):
-        got = resolve_run_dir(FF_1H, symbols=[sym])
+        got = resolve_run_dir(run_1h.config_hash, symbols=[sym])
         assert got.parent.parent.name == sym, f"篩 {sym} 卻拿到 {got.parent.parent.name}"
 
 
@@ -129,20 +138,19 @@ def test_missing_run_is_named_error() -> None:
     assert ei.value.reason == "feature_run_not_found"
 
 
-def test_canonical_holdout_disabled_is_named_reason() -> None:
+def test_canonical_holdout_disabled_is_named_reason(run_1h) -> None:
     """🔴 `Task 10.4` 邊界①：切分關閉 ⇒ 具名原因，plans 為 None（不是靜默回空）。"""
-    _require(RUN_1H)
     resolve, _err = _resolver()
     cfg = _cfg()
     cfg.ic_train_test_split = False
-    got = resolve(ff_run=FF_1H, symbol=SYM, ic_config=cfg,
+    got = resolve(ff_run=run_1h.config_hash, symbol=SYM, ic_config=cfg,
                   purge_gap=156, lookahead_depth_rows=144)
     assert got.reason == "canonical_holdout_disabled"
     assert got.train_plan is None and got.test_plan is None
     assert got.feature_index is not None, "關閉切分不代表沒有 post-trim 索引"
 
 
-def test_canonical_holdout_insufficient_rows_is_named_reason() -> None:
+def test_canonical_holdout_insufficient_rows_is_named_reason(run_1h) -> None:
     """🔴 `Task 10.4` 邊界②：`_build_holdout_split_plan` 回 `SkippedResult`
     ⇒ `reason=canonical_holdout_insufficient_rows`，plans 為 None。
 
@@ -153,11 +161,10 @@ def test_canonical_holdout_insufficient_rows_is_named_reason() -> None:
     鑑別力：把「非 tuple ⇒ 具名 reason」那段改成回 `plans=None, reason=None`
     ⇒ 下面兩條 assert 轉紅（靜默回空正是本條要擋的）。
     """
-    _require(RUN_1H)
     resolve, _err = _resolver()
-    index_len = len(_post_trim_index())
+    index_len = len(_post_trim_index(run_1h.run_dir))
     got = resolve(
-        ff_run=FF_1H, symbol=SYM, ic_config=_cfg(),
+        ff_run=run_1h.config_hash, symbol=SYM, ic_config=_cfg(),
         purge_gap=index_len * 2,   # 隔離區比整條索引還長 ⇒ 切不出測試段
         lookahead_depth_rows=0,
     )
@@ -168,10 +175,10 @@ def test_canonical_holdout_insufficient_rows_is_named_reason() -> None:
     assert got.feature_index is not None, "切不出計畫不代表沒有 post-trim 索引"
 
 
-def _post_trim_index():
+def _post_trim_index(run_dir: Path):
     from momentum.factories import create_post_trim_index_loader
 
-    return create_post_trim_index_loader()(RUN_1H)
+    return create_post_trim_index_loader()(run_dir)
 
 
 def test_canonical_holdout_cross_tf_per_tf_has_run_timeframe() -> None:
@@ -188,17 +195,16 @@ def test_canonical_holdout_cross_tf_per_tf_has_run_timeframe() -> None:
     assert bars_timeframes_for(["12h", "4h"], "1h") == ["12h", "1h", "4h"]
 
 
-def test_post_trim_index_is_not_raw_kline_universe() -> None:
+def test_post_trim_index_is_not_raw_kline_universe(run_1h) -> None:
     """post-trim 索引取自 run 之 `timestamps.parquet`，**不是** K 線原始 universe。
 
     兩者在未裁切時逐值相同，裁頭尾之後就位移（`D-002` §D2-3 實測：裁 5 根 ⇒ 位移 2 小時）
     ⇒ 必須共用同一個 universe，不是共用同一條公式。
     """
-    _require(RUN_1H)
     from momentum.Analysis.event_samples.canonical_holdout import load_post_trim_index
 
-    idx = load_post_trim_index(RUN_1H)
-    ts = pd.read_parquet(RUN_1H / "timestamps.parquet")["timestamp"].to_numpy()
+    idx = load_post_trim_index(run_1h.run_dir)
+    ts = pd.read_parquet(run_1h.run_dir / "timestamps.parquet")["timestamp"].to_numpy()
     assert len(idx) == len(ts), "索引長度須等於 run 之 timestamps 列數"
     assert int(idx[0].value // 10**6) == int(ts[0]) * 1000, "首列時刻須逐值相符"
 
@@ -214,7 +220,7 @@ def test_kline_cache_dir_is_feature_klines_not_app_cache() -> None:
     assert FEATURE_KLINE_CACHE_DIR == "data_cache/feature_klines"
 
 
-def test_resolver_does_not_mutate_caller_config() -> None:
+def test_resolver_does_not_mutate_caller_config(run_1h) -> None:
     """🔴 `CODEX-R41-P1-01`：resolver **不得**就地改寫呼叫端之 `ICConfig`。
 
     形態：同一個 config 物件先以較大深度、再以較小深度呼叫。就地改寫時第二次會
@@ -222,17 +228,17 @@ def test_resolver_does_not_mutate_caller_config() -> None:
     （掃描格逐格、retry、換事件批都會踩到）。
     鑑別力：把 `_config_with_embargo` 改回 `ic_config.embargo = raised` 即轉紅。
     """
-    _require(RUN_1H, KLINE)
+    _require(KLINE)
     resolve, _err = _resolver()
     cfg = _cfg()
     before = int(getattr(cfg, "embargo", 0) or 0)
 
-    first = resolve(ff_run=FF_1H, symbol=SYM, ic_config=cfg,
+    first = resolve(ff_run=run_1h.config_hash, symbol=SYM, ic_config=cfg,
                     purge_gap=156, lookahead_depth_rows=before + 5)
     assert int(getattr(cfg, "embargo", 0) or 0) == before, (
         f"呼叫端之 config 被就地改寫：{before} → {getattr(cfg, 'embargo', None)}"
     )
-    second = resolve(ff_run=FF_1H, symbol=SYM, ic_config=cfg,
+    second = resolve(ff_run=run_1h.config_hash, symbol=SYM, ic_config=cfg,
                      purge_gap=156, lookahead_depth_rows=0)
     assert first.embargo == before + 5
     assert second.embargo == before, (
@@ -418,7 +424,7 @@ def test_v1_copy_rejecting_update_kwarg_falls_through_to_dataclass() -> None:
     assert got.embargo == 9 and src.embargo == 2
 
 
-def test_symbol_mismatch_is_served_by_run_not_found() -> None:
+def test_symbol_mismatch_is_served_by_run_not_found(run_1h) -> None:
     """🔴 邊界③之「識別不符」**實際由 `feature_run_not_found` 承擔**，不是 `feature_run_symbol_mismatch`。
 
     `resolve_run_dir` 先以 symbol 篩選；`resolve_canonical_holdout` 傳的正是
@@ -430,15 +436,14 @@ def test_symbol_mismatch_is_served_by_run_not_found() -> None:
     BCHUSDT／BTCUSDT／ETHUSDT 三個幣種，所以「找得到目錄、但不屬於本 symbol」
     這個情境是真的，不是造出來的。
     """
-    _require(RUN_1H)
     from momentum.Analysis.event_samples.canonical_holdout import resolve_run_dir
 
     # 同一 hash 在 ETHUSDT 之下確實存在
-    assert resolve_run_dir(FF_1H, symbols=[SYM]).parent.parent.name == SYM
+    assert resolve_run_dir(run_1h.config_hash, symbols=[SYM]).parent.parent.name == SYM
 
     resolve, err_cls = _resolver()
     with pytest.raises(err_cls) as ei:
-        resolve(ff_run=FF_1H, symbol="NOSUCHUSDT", ic_config=_cfg(),
+        resolve(ff_run=run_1h.config_hash, symbol="NOSUCHUSDT", ic_config=_cfg(),
                 purge_gap=156, lookahead_depth_rows=144)
     assert ei.value.reason == "feature_run_not_found", (
         f"識別不符之具名 reason 改變了（實得 {ei.value.reason!r}）"

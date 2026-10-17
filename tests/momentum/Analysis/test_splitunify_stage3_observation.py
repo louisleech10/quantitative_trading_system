@@ -16,7 +16,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 BATCH = REPO / "data_cache/events/20260909T130533Z-7f73e4c7.json"
-RUN_1H = REPO / "data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5"
 KLINE = REPO / "data_cache/feature_klines/kline_cache.h5"
 CONTRACT = REPO / "momentum/Analysis/contracts/split_unify.json"
 
@@ -35,8 +34,6 @@ def test_stage3_receipt_reset_per_analyze_and_absent_from_report() -> None:
     """
     from momentum.factories import create_ic_analyzer
 
-    import inspect
-
     analyzer = create_ic_analyzer(None)
     # ① 建構期即有安全預設（與 `_binary_label_window_bars` 同慣例）⇒ 消費端不必靠
     #    `getattr(..., default)` 兜底。🔴 既有同類狀態之慣例**本身不一致**
@@ -45,15 +42,36 @@ def test_stage3_receipt_reset_per_analyze_and_absent_from_report() -> None:
     assert analyzer._stage3_event_observation == {}, (
         "建構期預設不是空 dict——消費端會拿到 AttributeError 或殘值"
     )
-    # ② 入口確實歸零（不跑完整 analyze——那需要物化全特徵矩陣、本機記憶體不足）。
-    src = inspect.getsource(type(analyzer).analyze)
-    assert "_stage3_event_observation = {}" in src, (
+
+    # ② 入口確實歸零——以**行為**驗（TESTREG b5：原為原始碼字串比對）：
+    #    先塞入上一次 analyze 之殘值，再呼叫生產 `analyze`；stage0 一進入即以哨兵中止
+    #    （不跑完整 analyze——那需要物化全特徵矩陣、本機記憶體不足），
+    #    此時入口之 analyze-scoped 重置必已執行完畢。
+    class _StopAtStage0(Exception):
+        pass
+
+    seen: dict = {}
+
+    def _stage0_probe(*_args, **_kwargs):
+        # 記下 stage0 開始當下之狀態（＝入口重置之結果），再中止
+        seen["obs"] = analyzer._stage3_event_observation
+        seen["timings"] = analyzer._stage_timings
+        raise _StopAtStage0()
+
+    stale = {"evt-stale": {"observed": "ic_consumed", "feature_row_open_ms": 1}}
+    analyzer._stage3_event_observation = stale
+    analyzer._stage_timings = {"stage5": 99.0}
+    analyzer._stage0_ingestion = _stage0_probe  # 實例屬性遮蔽，只影響本 analyzer
+
+    with pytest.raises(_StopAtStage0):
+        analyzer.analyze("unused_features.h5", "unused_labels.h5")
+
+    assert seen["obs"] == {} and seen["obs"] is not stale, (
         "analyze 入口未把 stage3 觀測收據歸零——掃描格逐格重用同一個 analyzer 時會跨 run 殘留"
     )
-    # ③ 歸零那行須與既有 analyze-scoped 狀態**同一段**（被拆散就會有人只改一邊）。
-    head = src[: src.index("_stage3_event_observation = {}")]
-    assert "_stage_timings = {}" in head, (
-        "歸零位置與既有 analyze-scoped 狀態脫節——應緊鄰同一段，避免只改一邊"
+    # ③ 與既有 analyze-scoped 狀態（`_stage_timings`）於同一入口段一併歸零（被拆散就會有人只改一邊）
+    assert seen["timings"] == {}, (
+        "`_stage_timings` 未於 stage0 前歸零——stage3 收據之歸零與既有 analyze-scoped 狀態脫節"
     )
 
 
@@ -88,16 +106,24 @@ def test_stage3_observation_not_in_report_keys() -> None:
         assert bad not in src, f"觀測收據被寫進報告：{bad}"
 
 
-def test_stage3_observation_populated_on_real_event_run() -> None:
+@pytest.mark.ic_persist_redirect
+@pytest.mark.usefixtures("ic_persist_redirect")
+def test_stage3_observation_populated_on_real_event_run(tmp_feature_run_env) -> None:
     """真實事件 run 之後，收據逐事件齊備且值落在封閉集合內。
 
     本條走 `_run_scan_cell`（生產端入口）而非合成 analyzer——只讀觀測面，不改任何值。
+
+    TESTREG Task 4.4：FF run 改由共用外掛以真實 K 線於 tmp 物化（原寫死之 `4a8a0b37…` 已刪）；
+    run 小 ⇒ 特徵改走生產端 `_materialize_features_for_ic` 全量物化（原為避 7.5 GB raw 之 OOM
+    而以比對腳本之具名子集物化，且該腳本寫入正式 `data_cache/reports`）；
+    寫出經 `ic_persist_redirect` 導入 tmp。
     """
-    _require(BATCH, RUN_1H, KLINE)
+    _require(BATCH, KLINE)
     from api.models.ic_models import ICAnalyzeRequest
     from api.services.ic_analysis_service import ICAnalysisService
     from momentum.factories import create_ic_analyzer, create_kline_storage_manager
 
+    run = tmp_feature_run_env.activate("eth_1h")["eth_1h"]
     b = json.loads(BATCH.read_text())
     decl = b["lookahead_declaration"]["lookahead_bars_declared"]
     trigger_tfs = sorted({str(r["timeframe"]) for r in b["records"]})
@@ -107,7 +133,7 @@ def test_stage3_observation_populated_on_real_event_run() -> None:
         "horizon_bars": int(decl[trigger_tfs[0]]),
         "decision_offset_bars": 0,
     }
-    ff_run = RUN_1H.name
+    ff_run = run.config_hash
     request = ICAnalyzeRequest(
         symbol="ETHUSDT", timeframe="1h", config_hash=ff_run,
         mode="longitudinal", event_import_id=b["import_id"],
@@ -115,15 +141,7 @@ def test_stage3_observation_populated_on_real_event_run() -> None:
     service = ICAnalysisService()
     cfg = service._build_config_override(request)
 
-    # 以與比對腳本相同之具名子集物化（不載全矩陣——本 run raw/ 為 7.5 GB）
-    import sys
-
-    sys.path.insert(0, str(REPO / "scripts"))
-    import splitunify_ic_event_report_diff as D  # type: ignore
-
-    features_path, meta_path = D._materialize_named_subset(
-        service, "ETHUSDT", "1h", ff_run, RUN_1H,
-    )
+    features_path, meta_path = service._materialize_features_for_ic("ETHUSDT", "1h", ff_run)
     analyzer_holder = {}
 
     def _factory(override):
@@ -136,7 +154,7 @@ def test_stage3_observation_populated_on_real_event_run() -> None:
         {"records": tuple(b["records"]), "event_label_spec": spec,
          "lookahead_bars_declared": decl},
         features_path=features_path, meta_path=meta_path,
-        feature_manifest_path=str(RUN_1H / "feature_manifest.json"),
+        feature_manifest_path=str(run.manifest_path),
         labels_path=None,
         kline_reader=create_kline_storage_manager(cache_dir="data_cache/feature_klines"),
         config_override=dict(cfg or {}), original_embargo=0,

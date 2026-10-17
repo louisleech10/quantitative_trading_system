@@ -29,6 +29,18 @@ H12_MS = 43200_000
 T0 = 1704067200000
 
 
+@pytest.fixture
+def bch_features_path(tmp_feature_run_env) -> str:
+    """tmp 物化之 BCHUSDT 1h 真實 run 下之特徵路徑（`_feature_run_dir` 取其父目錄之 manifest）。
+
+    TESTREG Task 4.4：原寫死已刪之 `data_cache/features/BCHUSDT/1h/4a8a0b37…/x.h5`（manifest 無
+    time_range ⇒ coverage 閘 fail-closed 而全紅）。改由共用外掛以真實 K 線物化（日期窗自 K 線起點，
+    涵蓋本檔 `T0 + 100～110 根 12h` 之事件與答案窗）；路徑為絕對路徑，故不依賴 cwd。
+    """
+    run = tmp_feature_run_env.activate("bch_1h")["bch_1h"]
+    return str(run.run_dir / "x.h5")
+
+
 def win(eid: str, *, symbol="ETHUSDT", tf="12h", start: int, end: int) -> WindowRow:
     return WindowRow(
         event_id=eid, symbol=symbol, timeframe=tf,
@@ -203,11 +215,26 @@ def test_event_analysis_horizon_purge_11b_import_id_with_timestamps_is_rejected(
     assert "event_timestamps" in r.text
 
 
-def test_event_analysis_horizon_purge_11c_legacy_timestamps_only_still_accepted(client):
+def test_event_analysis_horizon_purge_11c_legacy_timestamps_only_still_accepted(client, monkeypatch):
     """🔴 **over 向**：legacy 呼叫端只帶 `event_timestamps` ⇒ **不得**被上面兩條誤擋。
 
     這條是「新增一條路徑、不改既有語意」的證據。它不驗分析結果，只驗**沒有在 transport 層被拒**。
+
+    🔴 隔離（TESTREG Task 4.4）：原請求會讓 service 於背景對本機 latest run 跑**真實** IC 分析，
+    寫入正式 `data_cache/reports`（報告／摘要／`ic_ingest_cache`），且背景任務於測試結束後仍在跑
+    （掛 `ic_persist_redirect` 擋不住測試結束後之寫入）。本條不驗分析結果 ⇒ 把 service 入口
+    `start_analysis` 換成**只記錄、不啟動背景分析**之觀測替身（同 `test_gap3_ic_stop_gate.py` 之
+    `spy_start_analysis`）；route 之 transport 驗證與閘門照常執行。
     """
+    from api.services import ic_analysis_service as svc_mod
+
+    calls = []
+
+    async def _record_only(request, **kwargs):
+        calls.append(request)
+        return {"task_id": "horizon-purge-11c-observed", "status": "running"}
+
+    monkeypatch.setattr(svc_mod.ic_analysis_service, "start_analysis", _record_only)
     r = client.post("/api/v1/ic/analyze", json={
         "symbol": "ETHUSDT", "timeframe": "12h", "event_timestamps": [T0],
     })
@@ -239,7 +266,7 @@ def test_event_analysis_horizon_purge_12_import_id_enables_event_filter():
 
 # ── G3-D17（UAT 2026-09-02）：多 symbol 事件批對單一 feature run ⇒ 只餵同 symbol，他 symbol 具名排除 ──
 
-def test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly(monkeypatch):
+def test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly(monkeypatch, bch_features_path):
     """BTCUSDT 與 ETHUSDT 同 t0 之事件、run 為 ETHUSDT ⇒ 只餵 ETH；BTC 計入 `events_excluded_by_symbol`；
     不得再拋「映射到同一個 feature 列」（那是跨 symbol 撞時戳，不是重複事件）。
     over 向：全批都是他 symbol ⇒ loud ValueError（不產空表）。
@@ -276,7 +303,7 @@ def test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly
 
     out = svc.ICAnalysisService._run_event_label_stages(
         _Req(), batch,
-        features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5", meta_path=None,
+        features_path=bch_features_path, meta_path=None,
     )
     assert out["events_excluded_by_symbol"] == {"BTCUSDT": 1}
     # 🔴 v7 `R5-C9`：餵進 IC 的鍵＝特徵列鍵（`last_bar_open_ms`），不是 `feature_cutoff_ms`（收盤時刻）。
@@ -291,13 +318,13 @@ def test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly
     with pytest.raises(ValueError, match="沒有任何 symbol"):
         svc.ICAnalysisService._run_event_label_stages(
             _ReqBtc(), batch,
-            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5", meta_path=None,
+            features_path=bch_features_path, meta_path=None,
         )
 
 
 # ── ⑩(i) single-pass：prepare 只被呼叫一次 ──────────────────────────────────
 
-def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):
+def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch, bch_features_path):
     """⑩(i) 一次五階段編排中 `prepare_analysis_windows` 之 `call_count == 1`。
 
     🔴 hash 是**決定性**的 ⇒ 三個 consumer 各自呼叫一次也會得到相同 hash，
@@ -340,7 +367,7 @@ def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):
 
     out = svc.ICAnalysisService._run_event_label_stages(
         _Req(), batch,
-        features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+        features_path=bch_features_path,
         meta_path=None,
     )
     assert calls["n"] == 1, f"prepare 被呼叫 {calls['n']} 次（須恰 1 次）"
@@ -420,7 +447,7 @@ def test_event_analysis_horizon_purge_r1_missing_import_is_404_not_500(client):
     assert r.status_code == 404, r.text
 
 
-def test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed(monkeypatch):
+def test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed(monkeypatch, bch_features_path):
     """`CODEX-R1-P1-02` 之修法：各 symbol purge 下界**不一致** ⇒ fail-closed，不取 max。
 
     🔴 取 max 折成全域 scalar **正是 §D-3′-a(ii) 明令禁止**的 per-scope 冒充
@@ -475,12 +502,12 @@ def test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed(monkeypa
     with pytest.raises(ValueError, match="purge 下界不一致"):
         svc.ICAnalysisService._run_event_label_stages(
             _Req(), batch,
-            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            features_path=bch_features_path,
             meta_path=None,
         )
 
 
-def test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud(monkeypatch):
+def test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud(monkeypatch, bch_features_path):
     """`CODEX-R1-P1-03`：兩事件映射到**同一個 feature 列** ⇒ raise，不得靜默覆蓋。
 
     🔴 原本這裡是 `ts_map[key] = value`，後到的**靜默蓋掉**先到的——等於默默丟掉一個事件，
@@ -516,7 +543,7 @@ def test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud(monkeypatch):
     with pytest.raises(ValueError, match="映射到同一個 feature 列"):
         svc.ICAnalysisService._run_event_label_stages(
             _Req(), batch,
-            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            features_path=bch_features_path,
             meta_path=None,
         )
 
@@ -617,7 +644,7 @@ def test_event_analysis_horizon_purge_r1_all_alignment_failed_is_loud(monkeypatc
         )
 
 
-def test_event_analysis_horizon_purge_timeframe_seconds_identity(monkeypatch):
+def test_event_analysis_horizon_purge_timeframe_seconds_identity(monkeypatch, bch_features_path):
     """SPEC R26／⑥(d)：purge 與 feature-run gate 收到**同一個** `timeframe_seconds` 物件（`is`）。
 
     🔴 這條是 R1 由 **composer 與 grok 兩家獨立**指出的缺口，而我自己在 brief 的
@@ -669,7 +696,7 @@ def test_event_analysis_horizon_purge_timeframe_seconds_identity(monkeypatch):
                                  "label_return_mode": "close_to_close", "decision_offset_bars": 0},
             "lookahead_bars_declared": {"12h": 0},
         },
-        features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+        features_path=bch_features_path,
         meta_path=None,
     )
     assert "purge" in seen and "gate" in seen, "兩個 consumer 都必須真的被呼叫到"
@@ -769,7 +796,7 @@ def test_event_analysis_horizon_purge_12_decision_at_mapping_k3_vs_k0(monkeypatc
 # `D-001` Task D1.6 — 分析揭露 `event_known_at_decision_values`
 # ══════════════════════════════════════════════════════════════════════════
 
-def test_event_analysis_d16_discloses_event_known_at_decision_values(monkeypatch):
+def test_event_analysis_d16_discloses_event_known_at_decision_values(monkeypatch, bch_features_path):
     """分析揭露 dict 須含 `event_known_at_decision_values`，D2-2 下為 `[False]`。
 
     🔴 **不是恆 [False] 之斷言**：同時釘住「值來自對齊層而非本層寫死」——
@@ -814,7 +841,7 @@ def test_event_analysis_d16_discloses_event_known_at_decision_values(monkeypatch
         }
         out = svc.ICAnalysisService._run_event_label_stages(
             _Req(), batch,
-            features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5",
+            features_path=bch_features_path,
             meta_path=None,
         )
         tag = f"({entry}, {mode})"

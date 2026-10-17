@@ -15,6 +15,8 @@
   ③ 只把**被消費**的事件送進帳（漏掉被剔除者）⇒ 覆蓋率那條 assert 紅。
 
 🔴 真實資料缺席時 `skip`；禁合成 fixture 作為結論依據。
+FF run 由共用外掛 `tests/fixtures/tmp_feature_runs_plugin.py` 以真實 K 線於 tmp 物化
+（TESTREG Task 4.4：原寫死之本機 run `4a8a0b37…` 已於 2026-10-03 刪除）。
 """
 from __future__ import annotations
 
@@ -25,7 +27,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 BATCH = REPO / "data_cache/events/20260909T130533Z-7f73e4c7.json"
-RUN_1H = REPO / "data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5"
 KLINE = REPO / "data_cache/feature_klines/kline_cache.h5"
 CONTRACT = REPO / "momentum/Analysis/contracts/split_unify.json"
 
@@ -36,7 +37,7 @@ def _require(*paths: Path) -> None:
         pytest.skip(f"真實資料缺席（不得以合成 fixture 代替）：{missing}")
 
 
-def _staged():
+def _staged(run):
     from api.models.ic_models import ICAnalyzeRequest
     from api.services.ic_analysis_service import ICAnalysisService
 
@@ -44,7 +45,7 @@ def _staged():
     decl = b["lookahead_declaration"]["lookahead_bars_declared"]
     trigger_tfs = sorted({str(r["timeframe"]) for r in b["records"]})
     request = ICAnalyzeRequest(
-        symbol="ETHUSDT", timeframe="1h", config_hash=RUN_1H.name,
+        symbol="ETHUSDT", timeframe="1h", config_hash=run.config_hash,
         mode="longitudinal", event_import_id=b["import_id"],
     )
     event_batch = {
@@ -62,14 +63,14 @@ def _staged():
     return b, ICAnalysisService._run_event_label_stages(
         request, event_batch,
         features_path=None, meta_path=None,
-        feature_manifest_path=str(RUN_1H / "feature_manifest.json"),
+        feature_manifest_path=str(run.manifest_path),
     )
 
 
-def test_ic_main_path_emits_event_disposition_ledger() -> None:
+def test_ic_main_path_emits_event_disposition_ledger(tmp_feature_run_env) -> None:
     """IC 主路徑之 staged 產物含處置帳，且逐筆值落在契約之封閉集合內。"""
-    _require(BATCH, RUN_1H, KLINE)
-    batch, staged = _staged()
+    _require(BATCH, KLINE)
+    batch, staged = _staged(tmp_feature_run_env.activate("eth_1h")["eth_1h"])
 
     ledger = staged.get("event_disposition_ledger")
     assert ledger, (

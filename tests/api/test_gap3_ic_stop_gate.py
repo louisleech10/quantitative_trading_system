@@ -27,14 +27,9 @@ client = TestClient(app)
 API = "/api/v1/ic"
 REPO = Path(__file__).resolve().parents[2]
 
-#: 量測 receipt 導出之上限所依據的那個 run（218,369 特徵）
-BIG_RUN_CONFIG_HASH = "e53e22906c35363757f4cd49d27f973e"
-
-
-def _registry_entries():
-    """讀本機 registry 原始內容（測試之對照基準；不經任何被測程式碼）。"""
-    return json.loads(
-        (REPO / "data_cache" / "features" / "registry.json").read_text(encoding="utf-8"))
+#: 量測 receipt 導出之上限所依據的那個 run 之特徵數（218,369）。TESTREG Task 4.4：原寫死本機 registry 之
+#: run `e53e2290…`（2026-10-03 已刪）⇒ 改由 `inject_latest_run` 注入受控大 run（hash 由注入回傳，不寫死）。
+BIG_RUN_FEATURES = 218_369
 
 
 @pytest.fixture
@@ -67,14 +62,15 @@ def inject_latest_run(tmp_path):
     registry._path = staged  # noqa: SLF001
     counter = {"n": 0}
 
-    def _inject(symbol: str, feature_count: int, *, timeframe: str = "12h"):
+    def _inject(symbol: str, feature_count: int, *, timeframe: str = "12h", config_hash: str = ""):
         counter["n"] += 1
         manifest = tmp_path / f"m{counter['n']}" / "feature_manifest.json"
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text(json.dumps({"total_features": feature_count}), encoding="utf-8")
         entry = {
             "symbol": symbol, "timeframe": timeframe,
-            "config_hash": f"injected{counter['n']:02d}",
+            # `config_hash` 可指定（同一 hash 跨標的之情境）；未指定則自動唯一
+            "config_hash": config_hash or f"injected{counter['n']:02d}",
             "feature_count": feature_count,
             "hdf5_relative_path": str(manifest),
             "last_generated_at": 1_900_000_000 + counter["n"],
@@ -83,6 +79,7 @@ def inject_latest_run(tmp_path):
         staged.write_text(json.dumps(registry._entries), encoding="utf-8")  # noqa: SLF001
         return entry
 
+    _inject.registry_path = staged  # 新建 `FeatureRegistry()` 之讀取點（測試以 env 指向它）
     yield _inject
     registry._path = original_path  # noqa: SLF001
     registry._entries = original  # noqa: SLF001
@@ -124,15 +121,16 @@ def spy_start_analysis(monkeypatch):
         service._tasks.pop("gap3-stop-gate-observed", None)
 
 
-def test_gap3_ic_feature_cap_rejects_big_run_without_creating_task(spy_start_analysis):
+def test_gap3_ic_feature_cap_rejects_big_run_without_creating_task(spy_start_analysis, inject_latest_run):
     """邊界①：超量 ⇒ 400 且**任務未被建立**，且 `start_analysis` **一次都沒被呼叫**。
 
     🔴 第三個斷言是 `CODEX-R1-P1-03` 之後補的：只驗「任務數不變」時，
     「呼叫了 service、但 service 內部提前失敗」也會綠——那不是閘門擋下的。
     """
+    big = inject_latest_run("BTCUSDT", BIG_RUN_FEATURES)
     before = _task_count()
     r = client.post(f"{API}/analyze", json={
-        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": BIG_RUN_CONFIG_HASH,
+        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": big["config_hash"],
     })
     assert spy_start_analysis == [], "start_analysis 被呼叫了 ⇒ 閘門沒擋在它前面"
     assert r.status_code == 400, r.text
@@ -143,12 +141,13 @@ def test_gap3_ic_feature_cap_rejects_big_run_without_creating_task(spy_start_ana
     assert _task_count() == before, "任務被建立了 ⇒ 檢查沒有擋在 start_analysis 之前"
 
 
-def test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded():
+def test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded(inject_latest_run):
     """reason 字面須與 IC 契約一致（api 層不得自寫）。"""
     from momentum.factories import ic_report_reason
 
+    big = inject_latest_run("BTCUSDT", BIG_RUN_FEATURES)
     r = client.post(f"{API}/analyze", json={
-        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": BIG_RUN_CONFIG_HASH,
+        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": big["config_hash"],
     })
     assert r.json()["detail"]["reason"] == ic_report_reason("analysis_rejected")
 
@@ -193,17 +192,20 @@ def test_gap3_ic_feature_cap_reads_features_path_not_just_hash(spy_start_analysi
     assert spy_start_analysis == [], "任務被啟動了 ⇒ 閘門沒擋住這條路"
 
 
-def test_gap3_ic_feature_cap_covers_cross_sectional_runs(spy_start_analysis):
+def test_gap3_ic_feature_cap_covers_cross_sectional_runs(spy_start_analysis, inject_latest_run):
     """🔴 `CODEX-R2-P1-01`：橫截面請求帶的是 **per-symbol 的一組 run**，也必須被閘門看見。
 
     首版只看單一 `config_hash` ⇒ 兩個各自超標的 run 一起送進來會被整組放行。
     判準＝逐筆解析取**最大值**（任一筆超標即擋整組）。
+    TESTREG Task 4.4：兩筆 run 改由 `inject_latest_run` 注入（小 15／大 218,369；原依賴本機 registry 之已刪 run）。
     """
+    small = inject_latest_run("BTCUSDT", 15)
+    big = inject_latest_run("BTCUSDT", BIG_RUN_FEATURES)
     r = client.post(f"{API}/analyze", json={
         "mode": "cross_sectional", "timeframe": "12h",
         "cross_sectional_runs": [
-            {"symbol": "BTCUSDT", "config_hash": "a6a998593c3c55aa54e5d6fa537114b4"},  # 15
-            {"symbol": "BTCUSDT", "config_hash": BIG_RUN_CONFIG_HASH},                  # 218369
+            {"symbol": "BTCUSDT", "config_hash": small["config_hash"]},  # 15
+            {"symbol": "BTCUSDT", "config_hash": big["config_hash"]},    # 218369
         ],
     })
     assert r.status_code == 400, f"橫截面請求繞過了閘門：{r.text}"
@@ -211,10 +213,12 @@ def test_gap3_ic_feature_cap_covers_cross_sectional_runs(spy_start_analysis):
     assert spy_start_analysis == [], "任務被啟動了 ⇒ 閘門沒擋住橫截面這條路"
 
 
-def test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file(spy_start_analysis):
+def test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file(spy_start_analysis, inject_latest_run, monkeypatch):
     """🔴 `GROK-R2-P2-01`：`features_path` **未必是檔案路徑**（如 `parquet:SYM:<hash>`）。
 
     首版只認檔案 ⇒ `is_file()` 為假就放行，繞過復活。
+    TESTREG Task 4.4：原依賴本機 registry 恰有「同一大 hash 跨多標的」之已刪 run；改為注入受控情境
+    （同一 hash：BTCUSDT 218,369、ETHUSDT 300,000；另注入 BTCUSDT 小 run 15 作顯式小 hash）。
     """
     from momentum.factories import feature_count_from_features_file
 
@@ -223,30 +227,26 @@ def test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file(spy_start_
     #    取別的標的的數字等於把被選 run 的合法小值誤報成大值（false-block）。
     #    故本條現在釘的是「帶 symbol ⇒ 取該標的自己的數字」；
     #    「無 symbol scope ⇒ 跨標的 max」由 `..._identifier_keeps_symbol_scope` 以替身 registry 釘住。
-    import json as _json
-
-    entries = _json.loads(
-        (REPO / "data_cache" / "features" / "registry.json").read_text(encoding="utf-8"))
-    same_hash = [e for e in entries
-                 if str(e.get("config_hash") or "").strip() == BIG_RUN_CONFIG_HASH
-                 and isinstance(e.get("feature_count"), int)]
-    assert same_hash, "本機 registry 無該 hash，無法做正向對照"
-    btc = [e["feature_count"] for e in same_hash if e.get("symbol") == "BTCUSDT"]
-    assert btc, "本機 registry 之該 hash 無 BTCUSDT 筆，無法做 symbol scope 對照"
-    got = feature_count_from_features_file(f"parquet:BTCUSDT:{BIG_RUN_CONFIG_HASH}")
-    assert got == max(btc), f"識別字串未取被選標的自己的數字（得 {got}，應為 {max(btc)}）"
-    assert got > int(settings.ic_analysis_max_features), "本機該 run 未超 cap，無法續驗閘門擋下"
+    shared_hash = "gapcapidentprobe00000000000000ab"
+    inject_latest_run("BTCUSDT", BIG_RUN_FEATURES, config_hash=shared_hash)
+    inject_latest_run("ETHUSDT", 300_000, config_hash=shared_hash)   # 他標的較大 ⇒ 跨標的 max 會誤取它
+    small = inject_latest_run("BTCUSDT", 15)
+    # `feature_count_from_features_file` 對識別字串新建 `FeatureRegistry()` 重讀 ⇒ 指向注入之暫存 registry
+    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(inject_latest_run.registry_path))
+    got = feature_count_from_features_file(f"parquet:BTCUSDT:{shared_hash}")
+    assert got == BIG_RUN_FEATURES, f"識別字串未取被選標的自己的數字（得 {got}，應為 {BIG_RUN_FEATURES}）"
+    assert got > int(settings.ic_analysis_max_features), "該 run 未超 cap，無法續驗閘門擋下"
     # 🔴 **必須顯式帶一個小 `config_hash`**，否則本條測不到它該測的東西：
-    #    R3 之後閘門在「沒帶 hash」時會去解析 latest（本機 BTCUSDT/12h latest 為 161,031 > cap），
+    #    R3 之後閘門在「沒帶 hash」時會去解析 latest（latest 為大 run 時），
     #    於是即使閘門**完全不看** `features_path` 也照樣回 400 ⇒ 這條測試變成無法證偽。
     #    實際被抓到過：`6.1-M3`（閘門不看 features_path）的紅集合因此從兩條縮成一條。
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h",
-        "config_hash": "a6a998593c3c55aa54e5d6fa537114b4",   # 只有 15 個特徵的小 hash
-        "features_path": f"parquet:BTCUSDT:{BIG_RUN_CONFIG_HASH}",
+        "config_hash": small["config_hash"],   # 只有 15 個特徵的小 hash
+        "features_path": f"parquet:BTCUSDT:{shared_hash}",
     })
     assert r.status_code == 400, f"識別字串形式繞過了閘門：{r.text}"
-    assert r.json()["detail"]["feature_count"] == max(btc), "擋下時報的不是識別字串解析出的數字"
+    assert r.json()["detail"]["feature_count"] == BIG_RUN_FEATURES, "擋下時報的不是識別字串解析出的數字"
     assert spy_start_analysis == []
 
 
@@ -455,7 +455,7 @@ def test_gap3_ic_feature_cap_duplicate_symbol_uses_last_hash_like_loader(
 #    對一個「存活至 GAP-6、上線即刪」的過渡止血閘，無限輪 review 的 ROI 為負。
 #    本節補齊矩陣中原本只有單向的六格——**單向的格子正是前五輪缺陷的藏身處**。
 
-def test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed(spy_start_analysis, monkeypatch):
+def test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed(spy_start_analysis, inject_latest_run, monkeypatch):
     """矩陣：longitudinal「hash ＋ path 衝突」之 **over-block** 側。
 
     service 在有 `features_path` 時載入的**就是它**（entry 只用來補 meta），
@@ -466,9 +466,19 @@ def test_gap3_matrix_hash_path_conflict_big_hash_small_path_allowed(spy_start_an
 
     monkeypatch.setattr(factories, "feature_count_from_features_file",
                         lambda p, **_kw: 10 if p else None)
+    big = inject_latest_run("BTCUSDT", BIG_RUN_FEATURES)
+    # 🔴 非空前提（TESTREG Task 4.4）：原寫死之大 hash 已不在 registry ⇒ 解析不出特徵數、閘門恆放行，
+    #    本條變成恆真。先證「同一大 hash 單獨送 ⇒ 被擋」，下方之放行才代表「path 蓋過 hash」。
+    pre = client.post(f"{API}/analyze", json={
+        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": big["config_hash"],
+    })
+    assert pre.status_code == 400 and pre.json()["detail"]["feature_count"] == BIG_RUN_FEATURES, (
+        f"前提不成立：大 hash 單獨送未被擋（{pre.status_code}: {pre.text[:200]}）"
+    )
+    assert spy_start_analysis == [], "前提請求不得抵達 service"
     r = client.post(f"{API}/analyze", json={
         "symbol": "BTCUSDT", "timeframe": "12h",
-        "config_hash": BIG_RUN_CONFIG_HASH,                 # 218,369，遠超 cap
+        "config_hash": big["config_hash"],                  # 218,369，遠超 cap
         "features_path": "/tmp/pretend-small-features.h5",  # 實際會載入的是這個
     })
     assert r.status_code != 400, f"大 hash 蓋過了實際會載入的小 path：{r.text}"
@@ -627,7 +637,7 @@ def test_gap3_matrix_resolver_equals_loader_plan(inject_latest_run, monkeypatch)
         )
 
 
-def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch):
+def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch, tmp_path):
     """🔴 `CODEX-R4-P1-02`：latest 解析**不得只信 registry 的 `feature_count`**。
 
     registry 是產生時寫的中繼資料，會過期／低報；低報時閘門就放行實際超量的 artifact。
@@ -636,14 +646,12 @@ def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch)
     """
     from momentum.factories import feature_count_from_registry_entry
 
-    manifest = None
-    for entry in _registry_entries():
-        rel = str(entry.get("hdf5_relative_path") or "")
-        if rel and (REPO / rel).is_file() and isinstance(entry.get("feature_count"), int):
-            manifest = (rel, entry["feature_count"])
-            break
-    assert manifest, "本機無可用 manifest，無法做正向對照"
-    rel, real_count = manifest
+    # TESTREG Task 4.4：原掃本機 registry 找「恰好存在之 manifest」（環境依賴；釘選 run 刪除後即無對照）
+    # ⇒ 改由本測試現寫 manifest（total_features 為真值），registry 低報值與之明確不同。
+    manifest_file = tmp_path / "run" / "feature_manifest.json"
+    manifest_file.parent.mkdir(parents=True)
+    manifest_file.write_text(json.dumps({"total_features": 218_369}), encoding="utf-8")
+    rel, real_count = str(manifest_file), 218_369
     # registry 低報成 15，manifest 仍是真值 ⇒ 必須取到真值
     got = feature_count_from_registry_entry({"feature_count": 15, "hdf5_relative_path": rel})
     assert got == real_count, f"registry 低報時未由 manifest 糾正（得 {got}，manifest 為 {real_count}）"
@@ -653,7 +661,7 @@ def test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest(monkeypatch)
     assert feature_count_from_registry_entry(None) is None
 
 
-def test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot():
+def test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot(tmp_path_factory):
     """🔴 `CODEX-R4-P1-03`：閘門與 service **必須讀同一份 registry 快照**。
 
     這**不是**極窄的競態（composer R4 之判語，經複驗推翻）：
@@ -676,22 +684,27 @@ def test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot():
         symbols = None
         cross_sectional_runs = None
 
-    # 🔴 判準必須可證偽：注入一筆**只存在於 service 這份記憶體快照**的 entry
-    #    （磁碟上的 registry.json 沒有它）。解析器若改用自己新建的 `FeatureRegistry()`
-    #    重讀磁碟，就看不到它 ⇒ 回 None ⇒ 本條紅。
-    #    manifest 指向一個真實存在的檔案，否則 `is_materialized` 為假、latest 不會選到它。
-    real_manifest = next(
-        (str(e["hdf5_relative_path"]) for e in _registry_entries()
-         if str(e.get("hdf5_relative_path") or "") and (REPO / str(e["hdf5_relative_path"])).is_file()),
-        None,
-    )
-    assert real_manifest, "本機無可用 manifest，無法做正向對照"
+    # 🔴 判準必須可證偽：注入一筆**只存在於 service 這個 registry 實例**的 entry
+    #    （正式 data_cache/features/registry.json 沒有它）。解析器若改用自己新建的 `FeatureRegistry()`
+    #    重讀正式磁碟檔，就看不到它 ⇒ 回 None ⇒ 本條紅。
+    #    TESTREG Task 4.4：`39377e29` 起 service 於每次解析前 `reload_registry()` 重讀**該實例之 `_path`**，
+    #    只改 `_entries` 之注入會被洗掉（本條原紅之根因，同 inject_latest_run 之歸因）⇒ 改為把該實例之
+    #    `_path` 指向暫存 registry（原快照＋注入）；manifest 改由本測試現寫（原依賴本機 registry 恰有可用
+    #    manifest，屬環境依賴），`is_materialized` 為真。
+    tmp_path = tmp_path_factory.mktemp("share_snapshot")
+    real_manifest = tmp_path / "probe" / "feature_manifest.json"
+    real_manifest.parent.mkdir(parents=True)
+    real_manifest.write_text(json.dumps({"total_features": 90_000}), encoding="utf-8")
 
     fake = {"symbol": "GATEPROBE", "timeframe": "12h", "config_hash": "probe",
-            "feature_count": 90_000, "hdf5_relative_path": real_manifest,
+            "feature_count": 90_000, "hdf5_relative_path": str(real_manifest),
             "last_generated_at": 9_999_999_999}
     original = list(registry._entries)  # noqa: SLF001
+    original_path = registry._path  # noqa: SLF001
+    staged = tmp_path / "registry.json"
+    staged.write_text(json.dumps(original + [fake]), encoding="utf-8")
     try:
+        registry._path = staged  # noqa: SLF001
         registry._entries = original + [fake]  # noqa: SLF001
         got = service.resolve_planned_feature_count(_Req())
         assert got is not None, (
@@ -700,6 +713,7 @@ def test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot():
         )
         assert got >= 90_000, f"解析到的不是那筆注入的 entry：{got}"
     finally:
+        registry._path = original_path  # noqa: SLF001
         registry._entries = original  # noqa: SLF001
     # 還原後必須解析不出（證明上面的成功不是來自別處）
     assert service.resolve_planned_feature_count(_Req()) is None
@@ -728,14 +742,15 @@ def test_gap3_ic_feature_cap_identifier_scopes_by_timeframe(monkeypatch):
     assert feature_count_from_features_file("parquet:BTCUSDT:shared") == 90_000
 
 
-def test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action():
+def test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action(inject_latest_run):
     """🔴 使用者裁定（2026-08-27）：錯誤訊息**不得叫使用者去做他沒有介面可做的事**。
 
     原文為「請先縮減特徵數再分析」——本專案沒有任何縮減特徵數的介面，
     那句話把「系統暫時做不到」寫成了「你操作錯了」，是一條死路。
     """
+    big = inject_latest_run("BTCUSDT", BIG_RUN_FEATURES)
     r = client.post(f"{API}/analyze", json={
-        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": BIG_RUN_CONFIG_HASH,
+        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": big["config_hash"],
     })
     assert r.status_code == 400
     message = r.json()["detail"]["message"]
@@ -744,15 +759,25 @@ def test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action():
     assert "GAP-6" in message, "訊息未指出限制何時會取消"
 
 
-def test_gap3_ic_feature_cap_features_file_reads_metadata_only():
-    """檔案側解析**只讀 HDF5 header 之 shape**，不載入矩陣（Task 6.4 之硬性要求）。"""
+def test_gap3_ic_feature_cap_features_file_reads_metadata_only(tmp_path):
+    """檔案側解析**只讀 HDF5 header 之 shape**，不載入矩陣（Task 6.4 之硬性要求）。
+
+    TESTREG Task 4.4：原掃本機 data_cache/features/*.h5 頂層檔、缺即 skip（環境依賴，現行佈局下恆 skip 之虞）。
+    改為 tmp 寫一個巢狀 `features` 資料集：宣告形狀 1,000,000 × 200,000 float32（約 800 GB）但 chunked
+    且從未寫入 ⇒ 檔案只有 header；解析器若載入矩陣須配置約 800 GB（無法在本機完成），只讀 shape 才能毫秒回答。
+    """
+    import h5py
+
     from momentum.factories import feature_count_from_features_file
 
-    sample = sorted((REPO / "data_cache" / "features").glob("*.h5"))
-    if not sample:
-        pytest.skip("本機無特徵檔可做正向對照")
+    sample = [tmp_path / "declared_only.h5"]
+    with h5py.File(sample[0], "w") as handle:
+        handle.create_dataset("ETHUSDT/12h/features", shape=(1_000_000, 200_000), dtype="float32",
+                              chunks=(1024, 1024))
+    assert sample[0].stat().st_size < 1_000_000  # 只有 header（未配置資料區塊）
     count = feature_count_from_features_file(str(sample[0]))
     assert isinstance(count, int) and count > 0, "讀不到欄數 ⇒ 檔案側解析形同虛設"
+    assert count == 200_000
     # 讀不到／不存在一律 None，不猜
     assert feature_count_from_features_file("/no/such/file.h5") is None
     assert feature_count_from_features_file(None) is None
@@ -794,7 +819,7 @@ def test_gap3_ic_feature_cap_value_is_backed_by_measurement_receipt():
         assert diff_pct < 20.0, f"feature_count={count} 之重跑 peak 差 {diff_pct:.1f}% >= 20%"
 
 
-def test_gap3_ic_stop_gate_alive_no_big_matrix_loaded(spy_start_analysis):
+def test_gap3_ic_stop_gate_alive_no_big_matrix_loaded(spy_start_analysis, inject_latest_run):
     """Task 6.4：擋下時**未載入大矩陣**。
 
     🔴 取樣時點綁 6.1 之檢查位置：本測試在**同一個行程**內量請求前後之 footprint。
@@ -808,10 +833,11 @@ def test_gap3_ic_stop_gate_alive_no_big_matrix_loaded(spy_start_analysis):
     def rss_kb() -> int:
         return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
 
+    big = inject_latest_run("BTCUSDT", BIG_RUN_FEATURES)   # 注入只寫 manifest（無矩陣），不影響下方 RSS 對照
     before_tasks = _task_count()
     before = rss_kb()
     r = client.post(f"{API}/analyze", json={
-        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": BIG_RUN_CONFIG_HASH,
+        "symbol": "BTCUSDT", "timeframe": "12h", "config_hash": big["config_hash"],
     })
     after_request = rss_kb()
     assert r.status_code == 400
