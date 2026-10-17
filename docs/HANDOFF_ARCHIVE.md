@@ -512,3 +512,10 @@
 - 2026-10-03：RM-FKPERF → `handoffs/run_receipts/20261003-fkperf-govsuite.json`
 - 2026-09-26：RM-ICFIRSTALIGN → `handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md`
 - 2026-09-26：RM-ICFIRSTALIGN → `handoffs/20260926-icfirstneed-x-consult-r1-claude.md`
+
+## 2026-10-17 交接檔進行中紀錄移出：RM-FRAMEPATH（條目識別碼轉完成；原條目與 RM-TESTSPEED、RM-FULLSCALE 共用，只移出本票各行）
+
+<!-- ENTRY: RM-FRAMEPATH -->
+- 2026-09-28：RM-FRAMEPATH → `handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md`
+- 2026-10-11：RM-FRAMEPATH → `docs/manifests/TESTREG.json`
+- 2026-10-12：RM-FRAMEPATH → `handoffs/reconcile/20261010-testreg-b1-review-r4/synth.md`
