@@ -238,14 +238,31 @@ fi
 #   `testreg.py check --staged`（V01–V20、V22；V21 只於收尾 validate --require-executed 跑）。不跑 pytest、不讀 git 全史。
 #   🔴 grep 須讀完輸入（不用 -q）：本檔 set -o pipefail，-q 命中即退出會使上游 tr 收 SIGPIPE（rc 141），暫存路徑多時
 #   整條管線判為假而跳過檢查（審碼 r1 CODEX-R1-P1-01，10,000 行命中輸入實測重現）。
+#   🔴 2026-10-17 使用者逐字「我要跟業界做法一樣，以後不准有任何一次同樣事情再次發生」：測試之刪除、改名、改寫與斷言
+#   減少（V01、V07、V15、V19、V20）照業界由同提交之 code review 把關——只列清單供審碼、不擋提交；其餘規則照舊擋。
+#   使用者同日逐字「同意小任務也一定要派委員審清單」：清單登記為待審（.testreg/test_change_review/），post-commit
+#   綁 commit sha，pre-push 擋未審者（scripts/test_change_review.sh）。
+_TR_REVIEW_ONLY='^V(01|07|15|19|20) '
+_tr_log="$(mktemp)"
 if git diff --cached --name-only -z | tr '\0' '\n' \
    | grep -E '^tests/.*\.py$|^tests/registry/catalog\.json$|^docs/manifests/[^/]+\.json$|^pytest\.ini$' >/dev/null; then
-  "$py" scripts/testreg.py check --staged
+  "$py" scripts/testreg.py check --staged > "${_tr_log}" 2>&1
   _tr_rc=$?          # 🔴 rc 直接取，禁經 pipe
   if [ "${_tr_rc}" -ne 0 ]; then
-    echo "pre-commit: 🔴 TESTREG 清冊檢查未過（新增／刪除／改名測試檔須同步 catalog；刪改斷言須立碑或附改寫收據）" >&2
-    exit 1
+    _tr_block="$(grep -E -v "${_TR_REVIEW_ONLY}" "${_tr_log}" || true)"
+    _tr_review="$(grep -E "${_TR_REVIEW_ONLY}" "${_tr_log}" || true)"
+    if [ -n "${_tr_block}" ] || [ -z "${_tr_review}" ]; then
+      cat "${_tr_log}" >&2
+      rm -f "${_tr_log}"
+      echo "pre-commit: 🔴 TESTREG 清冊檢查未過（新增測試檔須同步 catalog 等）" >&2
+      exit 1
+    fi
+    printf '%s\n' "${_tr_review}" >&2
+    mkdir -p .testreg/test_change_review
+    printf '%s\n' "${_tr_review}" > ".testreg/test_change_review/tree-$(git write-tree).txt"
+    echo "pre-commit: ℹ️ 上列為本提交之測試刪除／改寫／斷言減少，已登記待審；未經委員審清單前 push 會被擋" >&2
   fi
 fi
+rm -f "${_tr_log}"
 
 exec "$py" "$checker" --staged

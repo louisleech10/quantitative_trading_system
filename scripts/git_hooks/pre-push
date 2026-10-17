@@ -68,6 +68,10 @@ export VG_PUSH_RANGES="${_pp_ranges}" VG_PUSH_LOCALS="${_pp_locals}" VG_PUSH_ALL
 # 🔴 **誠實邊界**：這是**降低防護以換取可用性**的取捨，不是「其實不需要」。
 #   跨平台盲區（BSD/GNU `realpath`、`stat -f %m` vs `-c %Y`）現在**沒有任何東西擋**。
 #   若日後回頭大改治理，應把此段改回 `--no-probe`。
+# 測試刪改未經委員審清單者不得 push（業界「未審不得合併」；使用者 2026-10-17「同意小任務也一定要派委員審清單」）
+if [ -f scripts/test_change_review.sh ] && ! bash scripts/test_change_review.sh check; then
+  exit 1
+fi
 _GC_MODE="--fast"
 echo "pre-push: 委派 scripts/gov_check.sh ${_GC_MODE}（秒級；全套已改為手動關卡，理由見本檔註解）…"
 if ! bash scripts/gov_check.sh "${_GC_MODE}"; then

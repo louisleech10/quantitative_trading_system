@@ -5,6 +5,8 @@
 set -u
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$ROOT" || exit 0
+# 測試刪改待審清單綁 commit sha（scripts/test_change_review.sh；使用者 2026-10-17「同意小任務也一定要派委員審清單」）
+[ -f scripts/test_change_review.sh ] && bash scripts/test_change_review.sh bind || true
 [ -f scripts/ticket_batch_check.sh ] || exit 0
 bash scripts/ticket_batch_check.sh --emit-event HEAD || true
 exit 0
