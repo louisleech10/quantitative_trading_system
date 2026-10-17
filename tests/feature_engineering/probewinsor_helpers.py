@@ -24,7 +24,6 @@ BASELINE_PATH = REPO / "tests" / "_golden" / "probewinsor" / "baseline.json"
 
 FIXED_ENV = {
     "FFACT_LAYER1_PARALLEL": "0",
-    "FFACT_USE_CGSA": "1",
     "FFACT_USE_POLARS": "1",
     "FFACT_L3_PERSIST_MODE": "streaming",
     "FFACT_MULTI_TF_PARALLEL": "0",

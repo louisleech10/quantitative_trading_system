@@ -692,7 +692,7 @@ GATE_CMDS = {
     "bare": (GATE, True),
     "pythonpath_env": ("PYTHONPATH=. " + GATE, True),
     "allowed_options": (GATE + " --out /tmp/x --max-seconds 3600 --timings a --timings b", True),
-    "disallowed_env": ("FFACT_USE_CGSA=0 " + GATE, False),
+    "disallowed_env": ("FFACT_L65_WORKERS=1 " + GATE, False),
     "help": (GATE + " --help", False),
     "plan": (GATE + " --plan", False),
     "out_missing_value": (GATE + " --out", False),
