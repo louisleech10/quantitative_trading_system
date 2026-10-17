@@ -193,17 +193,48 @@ def test_pipeline_all_new_features(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert "validation" in result.metadata
 
 
+def _persisted_raw_values(factory, result) -> pd.DataFrame:
+    """讀回本次 generate 落盤之 raw 群組全部欄位之值（CGSA 之 features_df 只帶索引、不帶欄）。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    symbol, timeframe = _resolve_test_target()
+    reader = FeatureReader(str(factory._storage.base_path))
+    config_hash = str(result.metadata["config_hash"])
+    manifest = reader.load_manifest_v2(symbol, timeframe, config_hash, allow_partial=True)
+    columns = _manifest_columns(manifest)
+    return reader.load_columns_v2(
+        symbol, timeframe, config_hash, columns, allow_partial=True, attach_row_index=True,
+    )
+
+
 def test_pipeline_backward_compatible(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """新引擎（microstructure／entropy／tail_risk）關閉時，既有引擎之產出**決定性且逐值不變**。
+
+    TESTREG b5 改寫：原比對 `result.features_df`，但 CGSA 之 features_df 只有索引
+    （`feature_factory.py` 約 :4006）⇒ 形狀／欄名／值比對恆真。現改為兩次獨立 generate
+    （各自 tmp 落盤根）讀回 **raw 落盤值**逐欄位元組比對，並斷言欄集合非空
+    （開一個既有引擎 `momentum`，防空集合恆成立）。
+    """
     config_a = _base_pipeline_override()
-    config_b = deepcopy(_base_pipeline_override())
+    config_a["atomic_indicators"]["momentum"]["enabled"] = True
+    config_b = deepcopy(config_a)
 
-    result_a, _factory_a, manifest_a = _generate(config_a, tmp_path / "a", monkeypatch)
-    result_b, _factory_b, manifest_b = _generate(config_b, tmp_path / "b", monkeypatch)
+    result_a, factory_a, manifest_a = _generate(config_a, tmp_path / "a", monkeypatch, persist=True)
+    result_b, factory_b, manifest_b = _generate(config_b, tmp_path / "b", monkeypatch, persist=True)
 
-    assert result_a.features_df.shape == result_b.features_df.shape
-    assert list(result_a.features_df.columns) == list(result_b.features_df.columns)
-    pd.testing.assert_frame_equal(result_a.features_df, result_b.features_df)
-    assert _manifest_columns(manifest_a) == _manifest_columns(manifest_b)
+    columns_a = _manifest_columns(manifest_a)
+    assert columns_a, "既有引擎開啟卻無任何產出欄——比對會空集合恆成立"
+    assert columns_a == _manifest_columns(manifest_b)
+    assert not any(col.startswith(("ms_", "ent_", "tr_")) for col in columns_a), (
+        "新引擎關閉卻產出其欄位"
+    )
+    assert str(result_a.metadata["config_hash"]) == str(result_b.metadata["config_hash"])
+
+    values_a = _persisted_raw_values(factory_a, result_a)
+    values_b = _persisted_raw_values(factory_b, result_b)
+    assert len(values_a) > 0 and list(values_a.columns) == list(values_b.columns)
+    assert set(columns_a) <= set(values_a.columns), "落盤讀回之欄集合少於 manifest 宣告"
+    pd.testing.assert_frame_equal(values_a, values_b, check_exact=True)
 
 
 def test_pipeline_partial_engine_failure(

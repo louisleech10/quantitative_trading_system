@@ -32,6 +32,11 @@ EXPECTED_CALLERS = {
     "tests/momentum/Analysis/test_gap2_stage6b_wiring.py",  # GAP-2 stage6b 接線
     "tests/momentum/helpers/ichc_run.py",                  # ICHC 測試 harness（本身會呼叫 analyze）
     "tests/momentum/test_la1_lookahead.py",                # IC-LA1 lookahead
+    # ── 2026-10-18 補登（TESTREG Task 4.4；860724f0／0058e3c6 新增之呼叫端）──
+    "tests/momentum/Analysis/test_evtlabel_isolation_channel.py",  # EVTLABEL 隔離通道
+    "tests/momentum/Analysis/test_icfirstalign_fu2.py",            # ICFIRSTALIGN FU2
+    "tests/momentum/Analysis/test_evtlabel_e2e_realkline.py",      # EVTLABEL 3.10 真實 K 線端到端
+    "tests/momentum/Analysis/test_splitunify_stage3_observation.py",  # SPLITUNIFY stage3 觀測（Task 4.4 同批改寫）
     # ── 原有 ────────────────────────────────────────────────────────────────
     "tests/api/test_ic_run_selector.py",
     "tests/fixtures/gen_ic_run_selector_baseline.py",

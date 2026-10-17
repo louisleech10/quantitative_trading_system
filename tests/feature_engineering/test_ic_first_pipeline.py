@@ -80,21 +80,29 @@ def _ic_fixture(
     symbol: str = "SYNTHETIC",
     tf: str = "1h",
     config_hash: str = "cfg_ic",
+    tail_perturbed: bool = False,
 ) -> Dict[str, Any]:
+    """`tail_perturbed=True`：末 2 列（04:00、05:00）之特徵與 label 改為極端反向值（窗外擾動 MR 用）；前 4 列不變。"""
     storage = FeatureStorage(str(tmp_path / "features"))
     reader = FeatureReader(str(tmp_path / "features"))
     row_index = pd.date_range("2026-01-01", periods=6, freq="h")
+    alpha = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    beta = [1.0, 3.0, 2.0, 5.0, 4.0, 6.0]
+    gamma = [2.0, 1.0, 2.0, 1.0, 2.0, 1.0]
+    label_values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    if tail_perturbed:
+        alpha[4:], beta[4:], gamma[4:], label_values[4:] = [100.0, -100.0], [-50.0, 50.0], [9.0, -9.0], [-10.0, 10.0]
     groups = {
         "group_alpha": pd.DataFrame(
             {
-                "alpha": np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
-                "beta": np.array([1.0, 3.0, 2.0, 5.0, 4.0, 6.0], dtype=np.float32),
+                "alpha": np.array(alpha, dtype=np.float32),
+                "beta": np.array(beta, dtype=np.float32),
             },
             index=row_index,
         ),
         "group_gamma": pd.DataFrame(
             {
-                "gamma": np.array([2.0, 1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32),
+                "gamma": np.array(gamma, dtype=np.float32),
             },
             index=row_index,
         ),
@@ -108,7 +116,7 @@ def _ic_fixture(
         layer_results=_healthy_layer_results(row_index),
     )
     label = pd.Series(
-        np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
+        np.array(label_values, dtype=np.float32),
         name="forward_return",
         index=row_index,  # ICFIRSTALIGN Task 1.1：label 須帶時間戳（與 raw sidecar 同軸）
     )
@@ -328,9 +336,14 @@ def test_feature_run_dir_and_manifest_atomicity(tmp_path) -> None:
 
 def test_ic_selection_stability(tmp_path) -> None:
     fixture = _ic_fixture(tmp_path)
-    engine = ICEngine({"methods": ["spearman"]})
-    legacy_frame = pd.concat(fixture["groups"].values(), axis=1)
-    legacy_scores = engine.compute_ic(legacy_frame, fixture["label"], method="spearman")
+    # TESTREG 4.4：原期望值取自同一 ICEngine.compute_ic（自指）且容差 0.01 過寬；改為獨立 oracle——pandas 平均名次
+    # 之 Pearson（＝含並列之 Spearman），選窗涵蓋夾具全部 6 列；容差 1e-6（float32 輸入）
+    legacy_frame = pd.concat(fixture["groups"].values(), axis=1).astype(np.float64)
+    label_rank = fixture["label"].astype(np.float64).rank()
+    legacy_scores = {
+        name: float(legacy_frame[name].rank().corr(label_rank)) for name in legacy_frame.columns
+    }
+    assert legacy_scores["alpha"] == pytest.approx(1.0)
 
     result = _run_ic_selection(fixture, threshold=0.95)
     payload = _load_selected_payload(result)
@@ -341,11 +354,12 @@ def test_ic_selection_stability(tmp_path) -> None:
     assert payload["frozen_gate_eligible"] is True
     assert result.selected == ["alpha"]
 
+    assert set(result.ic_scores) == set(legacy_scores)
     max_abs_diff = max(
         abs(float(result.ic_scores[name]) - float(legacy_scores[name]))
         for name in legacy_scores
     )
-    assert max_abs_diff <= 0.01
+    assert max_abs_diff <= 1e-6
     assert set(result.selected) == {
         name for name, value in legacy_scores.items() if np.isfinite(value) and abs(value) >= 0.95
     }
@@ -422,6 +436,26 @@ def test_ic_selection_no_oos_leakage(tmp_path) -> None:
             selection_window=dict(_TIME_WINDOW),
             split_id="train_fold_0",
         )
+
+    # TESTREG 4.4：原只驗 metadata 回填，選窗涵蓋夾具全部 6 列 ⇒ 窗外擾動無從被測（名實不符）。補窗外擾動 MR：
+    # 選窗只含前 4 列（00:00–03:00），末 2 列之特徵與 label 改為極端反向值 ⇒ IC 與入選集合逐位元不變
+    inner_window = {"start": "2026-01-01 00:00:00", "end": "2026-01-01 03:00:00"}
+
+    def _ic(fx: Dict[str, Any], window: Dict[str, str]):
+        return engine.compute_ic_from_l7_raw(
+            fx["symbol"], fx["tf"], fx["config_hash"], fx["label"],
+            feature_reader=fx["reader"], ic_threshold=0.95, method="spearman",
+            label_horizon="1_bar_forward_return", selection_window=dict(window), split_id="train_fold_0",
+        )
+
+    clean = _ic_fixture(tmp_path / "clean")
+    perturbed = _ic_fixture(tmp_path / "perturbed", tail_perturbed=True)
+    clean_in, perturbed_in = _ic(clean, inner_window), _ic(perturbed, inner_window)
+    assert clean_in.ic_scores == perturbed_in.ic_scores
+    assert clean_in.selected == perturbed_in.selected == ["alpha"]
+    # 判別力對照：選窗含末 2 列時同一擾動必改變 IC（證此 MR 對窗外洩漏有檢出力）
+    clean_all, perturbed_all = _ic(clean, _TIME_WINDOW), _ic(perturbed, _TIME_WINDOW)
+    assert clean_all.ic_scores != perturbed_all.ic_scores
 
 
 def test_ic_analysis_service_l7_raw_integration(tmp_path) -> None:

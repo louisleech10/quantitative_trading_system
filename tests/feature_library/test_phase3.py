@@ -92,6 +92,9 @@ def test_feature_library_load_success() -> None:
     lib = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)
     df = lib.load("BTC", "1h")
     assert len(df) == 2
+    assert list(df.columns) == ["feat_a"]
+    mock_registry.find_latest_materialized.assert_called_once_with("BTC", "1h")
+    assert mock_reader.load_columns_v2.call_args.args[:4] == ("BTC", "1h", "h", ["feat_a"])
 
 
 def test_feature_library_load_raises_on_missing() -> None:
@@ -99,12 +102,14 @@ def test_feature_library_load_raises_on_missing() -> None:
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
 
     mock_registry = MagicMock()
-    mock_registry.find_latest.return_value = None
+    mock_registry.find_latest_materialized.return_value = None
     mock_storage = MagicMock()
+    mock_reader = MagicMock()
 
-    lib = FeatureLibrary(mock_registry, mock_storage)
-    with pytest.raises(FeatureNotFoundError):
+    lib = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)
+    with pytest.raises(FeatureNotFoundError, match="No materialized registry entry"):
         lib.load("NONEXIST", "1h")
+    mock_reader.load_manifest_v2.assert_not_called()
 
 
 def test_feature_library_load_multi_raises_on_any_missing() -> None:
@@ -129,8 +134,9 @@ def test_feature_library_load_multi_raises_on_any_missing() -> None:
     mock_storage = MagicMock()
 
     lib = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)
-    with pytest.raises(FeatureNotFoundError):
+    with pytest.raises(FeatureNotFoundError, match="No materialized registry entry") as excinfo:
         lib.load_multi(["BTC", "ETH"], "1h")
+    assert excinfo.value.symbol == "ETH"
 
 
 def test_feature_library_ensure_fresh_true() -> None:
@@ -138,11 +144,12 @@ def test_feature_library_ensure_fresh_true() -> None:
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
 
     mock_registry = MagicMock()
-    mock_registry.find_latest.return_value = {"config_hash": "target_hash"}
+    mock_registry.find_latest_materialized.return_value = {"config_hash": "target_hash"}
     mock_storage = MagicMock()
 
     lib = FeatureLibrary(mock_registry, mock_storage)
     assert lib.ensure_fresh("BTC", "1h", "target_hash") is True
+    mock_registry.find_latest_materialized.assert_called_once_with("BTC", "1h")
 
 
 def test_feature_library_ensure_fresh_false_when_stale() -> None:
@@ -150,8 +157,10 @@ def test_feature_library_ensure_fresh_false_when_stale() -> None:
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
 
     mock_registry = MagicMock()
-    mock_registry.find_latest.return_value = {"config_hash": "old_hash"}
+    mock_registry.find_latest_materialized.return_value = {"config_hash": "old_hash"}
     mock_storage = MagicMock()
 
     lib = FeatureLibrary(mock_registry, mock_storage)
     assert lib.ensure_fresh("BTC", "1h", "new_hash") is False
+    # 同一替身下 hash 相符須為 True（排除「恆回 False」之空心綠）
+    assert lib.ensure_fresh("BTC", "1h", "old_hash") is True

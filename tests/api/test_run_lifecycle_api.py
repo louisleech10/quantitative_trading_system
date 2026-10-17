@@ -67,12 +67,33 @@ def _add_run(
     return run_dir
 
 
-def test_lease_sink_holds_until_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _lease_only_factory(base_path: Path, monkeypatch: pytest.MonkeyPatch) -> FeatureFactory:
+    """只走 `generate_features` 之 lease 鏈；生成本體與 lease 之前之前置關卡替身。
+
+    前置關卡（L1 warmup 倍數表、記憶體量測／磁碟後援、平穩化校準）先於 lease 執行且與
+    lease 語意正交（c76a9ecc／d229336e 起加入）⇒ 替身為通過；守護子行程（`start_guard`）
+    比照 test_icfirstalign_batch_domain 之替身。lease 取得、`lease_sink` 交付、釋放全走生產碼。
+    """
+    import momentum.FeatureEngineering.feature_factory as ff_module
+    from momentum.FeatureEngineering import memory_budget as mb
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
     factory = FeatureFactory.__new__(FeatureFactory)
-    factory._storage = SimpleNamespace(base_path=tmp_path / "features")
+    storage = FeatureStorage.__new__(FeatureStorage)
+    storage.base_path = base_path
+    factory._storage = storage
     monkeypatch.setattr(factory, "_resolve_config", lambda _override: object())
+    monkeypatch.setattr(ff_module, "check_l1_warmup_coverage", lambda _config: None)
+    monkeypatch.setattr(factory, "_assert_generation_memory_preconditions", lambda *_a, **_k: None)
+    monkeypatch.setattr(factory, "_stationarity_config_enabled", lambda _config: False)
+    monkeypatch.setattr(mb, "start_guard", lambda *_a, **_k: None)
     monkeypatch.setattr(factory, "_compute_config_hash", lambda *_args, **_kwargs: "cfg_batch2d")
     monkeypatch.setattr(factory, "_generate_features_impl", lambda *_args, **_kwargs: "result")
+    return factory
+
+
+def test_lease_sink_holds_until_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    factory = _lease_only_factory(tmp_path / "features", monkeypatch)
     sink: list = []
     assert factory.generate_features("BTCUSDT", "12h", lease_sink=sink) == "result"
     assert is_run_active(tmp_path / "features" / ".locks", "BTCUSDT", "12h", "cfg_batch2d")
@@ -123,11 +144,7 @@ async def test_generate_warmup_delete_lease_chain(
     monkeypatch.setattr(feature_factory_service, "_tasks", {})
     monkeypatch.setattr(feature_factory_service, "_lock", threading.Lock())
 
-    factory = FeatureFactory.__new__(FeatureFactory)
-    factory._storage = SimpleNamespace(base_path=manager.features_root)
-    monkeypatch.setattr(factory, "_resolve_config", lambda _override: object())
-    monkeypatch.setattr(factory, "_compute_config_hash", lambda *_args, **_kwargs: "cfg_batch2d")
-    monkeypatch.setattr(factory, "_generate_features_impl", lambda *_args, **_kwargs: "result")
+    factory = _lease_only_factory(manager.features_root, monkeypatch)
     sink: list = []
     assert factory.generate_features("BTCUSDT", "12h", lease_sink=sink) == "result"
     with pytest.raises(RunBusyError, match="busy"):

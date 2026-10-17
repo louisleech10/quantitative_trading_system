@@ -486,20 +486,36 @@ def test_edge_case_corrupted_metadata(temp_storage_path, sample_features):
         strategy_params={'strategy_type': params.strategy_type, 'params': params.params}
     )
     
-    # 手動修改 HDF5 檔案 (移除某些屬性)
+    # 損壞前之讀回基準（值比對用）
+    baseline_df, _baseline_names, baseline_meta = storage.load_features_from_hdf5(
+        case_id, symbol, timeframe
+    )
+    assert baseline_meta['strategy_type'] == params.strategy_type
+    assert 'strategy_params' in baseline_meta
+
+    # 手動損壞 HDF5 元數據：實際刪除選填屬性（TESTREG b5：原版開檔後未刪改任何屬性）
+    removed = ('strategy_type', 'strategy_params', 'extraction_time', 'generation_method')
     with h5py.File(file_path, 'a') as f:
-        assert f"{symbol}/{timeframe}" in f
-        # 嘗試讀取缺少某些屬性的情況
-        # (實際上 get 方法會返回 None，不會報錯)
-    
-    # 讀取時應該能容錯處理
+        group = f[f"{symbol}/{timeframe}"]
+        for key in removed:
+            assert key in group.attrs, f"前提不成立：存檔未寫入屬性 {key}"
+            del group.attrs[key]
+    with h5py.File(file_path, 'r') as f:
+        assert not any(k in f[f"{symbol}/{timeframe}"].attrs for k in removed)
+
+    # 讀取時應該能容錯處理：缺失之選填鍵回 None／不出現，特徵值與名稱不受影響
     loaded_df, loaded_names, metadata = storage.load_features_from_hdf5(
         case_id, symbol, timeframe
     )
-    
-    assert loaded_df is not None
+
     assert loaded_names == feature_names
-    
+    assert metadata['strategy_type'] is None
+    assert metadata['extraction_time'] is None
+    assert metadata['generation_method'] is None
+    assert 'strategy_params' not in metadata
+    assert metadata['symbol'] == symbol and metadata['timeframe'] == timeframe
+    pd.testing.assert_frame_equal(loaded_df, baseline_df, check_exact=True)
+
     print("✅ 損壞元數據處理測試通過")
 
 

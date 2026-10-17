@@ -134,6 +134,14 @@ def test_constant_from_train_only() -> None:
 
     assert dirty_removed == clean_removed
 
+    # 反向：訓練段常數、測試段變動 ⇒ 全樣本判定「非常數」，只用訓練段判定才會剔除。
+    #   「以全樣本判常數」之洩漏 mutant 會漏剔 close ⇒ 本段轉紅。
+    train_const = features.copy()
+    train_const.loc[fit_mask, "close"] = 1.0
+    assert train_const["close"].nunique() > 1  # 前提：全樣本非常數
+    _, train_const_removed = preprocessor.remove_constant_features(train_const, fit_mask=fit_mask)
+    assert train_const_removed == ["close"]
+
 
 def test_preprocess_legacy_no_mask_unchanged() -> None:
     """LA-0 B4：legacy unset+None 由「不變」強化為 fail-closed raise。"""

@@ -19,21 +19,10 @@ from tests.fixtures.ic_persist_redirect import (
 )
 
 
-@pytest.mark.parametrize("seam_id", sorted(REQUIRED_SEAM_IDS, key=lambda item: int(item[1:])))
-def test_seam_probe_redirect_only(
-    seam_id: str,
-    redirect_patch_set: RedirectPatchSet,
-    tmp_path: Path,
-) -> None:
-    ctx = redirect_patch_set.activate(tmp_path / seam_id, owner=seam_id)
-    try:
-        seam = redirect_patch_set.resolve_all()[seam_id]
-        outputs = seam.probe(ctx.redirect_root)
-        assert outputs
-        assert all(path.resolve().is_relative_to(ctx.redirect_root) for path in outputs)
-        assert_context_clean(ctx)
-    finally:
-        redirect_patch_set.deactivate(ctx)
+# TESTREG b5：原 `test_seam_probe_redirect_only` 已刪——其 probe 為構造恆真（fixture 之 probe
+# 直接回傳 root 下路徑）、spy 未經手故 assert_context_clean 恆過；同一斷言（probe 落 root 下＋
+# spy 無違規）連同「實呼叫各 seam 生產接點」與撤除 redirect 之對照，已由
+# `test_ic_persist_redirect_isolation.py::test_all_seam_probes_stay_under_root`（S1–S11 參數化）涵蓋。
 
 
 @pytest.mark.parametrize("seam_id", sorted(REQUIRED_SEAM_IDS, key=lambda item: int(item[1:])))

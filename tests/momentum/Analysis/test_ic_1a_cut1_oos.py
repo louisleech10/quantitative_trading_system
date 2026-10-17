@@ -365,13 +365,17 @@ def test_holdout_embargo_delays_test_start() -> None:
 
 
 def test_flag_toggles_path(tmp_path: Path) -> None:
-    features = _real_btc_frame()
+    # TFWINDOW（a17b57e7）起 1h run 之 rolling 視窗依週期換算（預設 252/756/1512 ⇒ warmup 1517 根），
+    # 原 180 根必走 full-sample fallback（applied=False）⇒ on 分支之前提失效。
+    # 改小 rolling 視窗並取 600 根，使 on 分支真的建 holdout（斷言不動）。
+    features = _real_btc_frame(limit=600)
     labels = pd.DataFrame({"return_5": _return_label(features)}, index=features.index)
     features_path, labels_path, meta_path = _write_ic_inputs(tmp_path, features, labels)
+    small_windows = {"rolling_windows": [5], "rolling_stride": 1, "icir": {"window": 5}}
 
     # 預設已 ON（簽核後），off 分支須顯式關閉
     off_orchestrator = ICFilterOrchestrator(
-        ICConfig(ic_train_test_split=False, min_test_rows=20)
+        ICConfig(ic_train_test_split=False, min_test_rows=20, ic_calculation=small_windows)
     )
     off_orchestrator._stage4_ic_calculation = lambda *args, **kwargs: {
         "label_series": labels.iloc[:, 0],
@@ -397,7 +401,7 @@ def test_flag_toggles_path(tmp_path: Path) -> None:
     off_orchestrator._stage7_report = lambda *args, **kwargs: {"metadata": args[1]}
     off_report = off_orchestrator.analyze(str(features_path), str(labels_path), str(meta_path))
 
-    on_orchestrator = ICFilterOrchestrator(ICConfig(min_test_rows=20))
+    on_orchestrator = ICFilterOrchestrator(ICConfig(min_test_rows=20, ic_calculation=small_windows))
     on_orchestrator._stage4_ic_calculation = off_orchestrator._stage4_ic_calculation
     on_orchestrator._stage5_statistical_validation = off_orchestrator._stage5_statistical_validation
     on_orchestrator._stage6_redundancy = off_orchestrator._stage6_redundancy

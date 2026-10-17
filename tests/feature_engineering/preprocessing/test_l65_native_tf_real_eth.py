@@ -499,38 +499,56 @@ class TestEdgeCases:
         """Mixed registry: compact 12h group + non-compact 1h group. Each
         should take the appropriate path; non-compact must be unaffected by
         the flag."""
-        monkeypatch.setenv("FFACT_L65_NATIVE_TF", "1")
         rng = np.random.default_rng(3)
-        # Compact group
         native = rng.standard_normal((100, 1)).astype(np.float32)
         idx_map = np.repeat(np.arange(100, dtype=np.int32), 12)
-        registry = _make_synthetic_compact(
-            tmp_path, native=native, idx_map=idx_map, columns=("c1",),
-            group_id="12h_compact",
-        )
-        # Non-compact group
         plain = rng.standard_normal((1200, 2)).astype(np.float32)
-        plain_group = ColumnGroup(
-            group_id="1h_plain",
-            layer=LayerSource.L1,
-            timeframe="1h",
-            data_source="close",
-            indicator="PLAIN",
-            columns=("p1", "p2"),
-            shape=(1200, 2),
-            dtype="float32",
-        )
-        registry.save_data(plain_group, plain.copy())
 
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
-        )
-        compact_result = registry.load_data("12h_compact")
-        plain_result = registry.load_data("1h_plain")
+        def _run(flag: str, sub: str):
+            monkeypatch.setenv("FFACT_L65_NATIVE_TF", flag)
+            # Compact group
+            registry = _make_synthetic_compact(
+                tmp_path / sub, native=native, idx_map=idx_map, columns=("c1",),
+                group_id="12h_compact",
+            )
+            # Non-compact group
+            plain_group = ColumnGroup(
+                group_id="1h_plain",
+                layer=LayerSource.L1,
+                timeframe="1h",
+                data_source="close",
+                indicator="PLAIN",
+                columns=("p1", "p2"),
+                shape=(1200, 2),
+                dtype="float32",
+            )
+            registry.save_data(plain_group, plain.copy())
+            FeaturePreprocessor(_l65_config()).transform_registry_groups(
+                registry, n_workers=1
+            )
+            return (
+                registry.load_data("12h_compact").copy(),
+                registry.load_data("1h_plain").copy(),
+            )
+
+        compact_result, plain_result = _run("1", "native_on")
+        compact_off, plain_off = _run("0", "native_off")
         assert compact_result.shape == (1200, 1)
         assert plain_result.shape == (1200, 2)
         # Non-compact must remain finite where input was finite.
         assert np.isfinite(plain_result).mean() > 0.5
+        # TESTREG 4.4：原只斷 finite>0.5，未與 flag=0 比對——補 docstring 宣稱之兩項：
+        # ① 非 compact 群組不受 flag 影響（flag 開／關逐位元相同，NaN 位置亦同）
+        np.testing.assert_array_equal(plain_result, plain_off)
+        # ② compact 群組依 flag 走不同路徑（native：同一 native idx 之 primary 列值恆定；flag 關之結果與之不同）
+        for k in range(100):
+            vals = compact_result[k * 12:(k + 1) * 12, 0]
+            finite = vals[np.isfinite(vals)]
+            if finite.size > 1:
+                assert np.all(finite == finite[0]), f"native run idx={k} not step-constant"
+        assert not np.array_equal(compact_result, compact_off, equal_nan=True), (
+            "compact group produced identical output with native flag on/off — native path not taken"
+        )
 
     def test_append_mode_creates_l65_group(self, tmp_path, monkeypatch):
         """In append mode, native path should produce a `_L65` sibling group
@@ -546,16 +564,25 @@ class TestEdgeCases:
         FeaturePreprocessor(_l65_config(mode="append")).transform_registry_groups(
             registry, n_workers=1
         )
-        # Original group should still exist; native path either appends a
-        # `_L65` group or produces no extra columns (winsor/rank/zscore replace
-        # the originals, so append may yield only the originals — accept both).
-        all_ids = [gid for gid, _ in registry.iter_all()]
-        assert "12h_append" in all_ids
+        # TESTREG 4.4：原註解「append 可能不產 _L65、兩者皆可」與生產行為不符——append 模式下 rank／zscore
+        # 之輸出為新欄（`_maybe_run_native_l65_to_sink` 之 new_cols），恆產 `_L65` 兄弟群組；改為強制斷言。
+        groups = dict(registry.iter_all())
+        assert "12h_append" in groups
         original = registry.load_data("12h_append")
         assert original.shape == (1200, 1)
-        # If a _L65 sibling exists, it must be primary-shaped.
-        for gid in all_ids:
-            if gid.startswith("12h_append_L65"):
-                sibling = registry.load_data(gid)
-                assert sibling.shape[0] == 1200
-                assert sibling.dtype == np.float32
+        assert "12h_append_L65" in groups, f"append mode produced no _L65 sibling: {sorted(groups)}"
+        # 欄集合由設定經 native 縮放推得（rank 窗 240→20 不入欄名；zscore 窗 [120, 240]→[10, 20]）
+        assert set(groups["12h_append_L65"].columns) == {
+            "v_rank", "v_zscore_10", "v_rank_zscore_10", "v_zscore_20", "v_rank_zscore_20",
+        }
+        sibling = registry.load_data("12h_append_L65")
+        assert sibling.shape == (1200, 5)
+        assert sibling.dtype == np.float32
+        assert np.isfinite(sibling).any()
+        # primary 形狀之展開＝native 值 forward-fill：同一 native idx 之 12 列逐欄恆定
+        for k in range(100):
+            block = sibling[k * 12:(k + 1) * 12]
+            for c in range(block.shape[1]):
+                finite = block[np.isfinite(block[:, c]), c]
+                if finite.size > 1:
+                    assert np.all(finite == finite[0]), f"_L65 col {c} native idx={k} not step-constant"

@@ -273,16 +273,19 @@ def test_t2b5_disk_full_raises_ioerror_and_cleans_staging(tmp_path, monkeypatch)
         )
 
     output_dir = tmp_path / "features" / "ETHUSDT" / "1h" / "cfg_diskfull"
-    if output_dir.exists():
-        # Final parquet must not appear (the contract that matters: no
-        # half-written corrupt output is exposed to consumers).
-        assert list(output_dir.glob("*.parquet")) == []
+    # TESTREG Task 4.4：run_dir 於寫入前即建立（feature_storage.write_raw_from_registry_stream），
+    # 原 `if output_dir.exists()` 包裹可空真 ⇒ 改為明示存在；舊「staging 刻意保留」註解已過期（V2 串流
+    # 寫入失敗且未刪來源時，finally 清除 .tmp-raw-*），刪除。
+    assert output_dir.is_dir()
+    # Final parquet must not appear (the contract that matters: no
+    # half-written corrupt output is exposed to consumers).
+    assert list(output_dir.glob("*.parquet")) == []
     assert not (output_dir / "raw").exists()
     assert not (output_dir / "feature_manifest.json").exists()
     assert [path for path in output_dir.iterdir() if path.name.startswith(".tmp-raw-")] == []
-        # NOTE: staging_ subdir is intentionally PRESERVED on failure
-        # (preserve_staging=True in feature_storage.py) so operators can
-        # inspect partial results when diagnosing a disk-full crash.
+    # cleanup_intermediate=False ⇒ 來源 .npy 不得被刪（失敗時來源仍可重跑）
+    source_after_failure = registry.load_data("1h_L3_group_a")
+    assert np.array_equal(source_after_failure, np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32))
 
 
 def test_t2b6_same_indicator_different_tf_no_conflict(tmp_path):

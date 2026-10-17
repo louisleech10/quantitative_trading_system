@@ -381,6 +381,49 @@ def test_one_shot_guard_reads_in_fallback_rerun_not_suppress_persist():
     )
     assert "if self._suppress_persist:" not in guard, "guard 又讀回了 _suppress_persist"
 
+    # TESTREG Task 4.4：docstring 宣稱「刻意驗行為」，原本體卻只切原始碼字串比對、上方 _fake_fallback 從未被
+    # 呼叫。補行為驗證：真實 analyze 走到 stage4（只 stub 各 stage 之 I/O 與計算，無切分以略過 holdout 分支），
+    # stage4 回 skipped（rolling warmup 不足）⇒ ①掃描格狀態（suppress=True、不在重跑內）必走 fallback、不 raise；
+    # ②真在 fallback 重跑內（in_rerun=True）必 raise one-shot guard。換成讀 _suppress_persist 之錯旗標 ⇒ ① 紅。
+    from momentum.factories import create_ic_analyzer
+    import pandas as pd
+
+    behavior_index = pd.date_range("2024-01-01", periods=8, freq="12h")
+    behavior_features = pd.DataFrame({"f0": np.arange(8, dtype=float)}, index=behavior_index)
+    behavior_labels = pd.DataFrame({"return_5": np.linspace(-1.0, 1.0, 8)}, index=behavior_index)
+    behavior_label_series = behavior_labels["return_5"]
+    behavior_meta = {"symbol": "ETHUSDT", "timeframe": "12h"}
+
+    analyzer = create_ic_analyzer({"ic_train_test_split": False})
+    analyzer._stage0_ingestion = lambda *a, **kw: (  # type: ignore[method-assign]
+        behavior_features, behavior_labels, dict(behavior_meta), {})
+    analyzer._resolve_stage1_fit = lambda *a, **kw: ("full_sample", None)  # type: ignore[method-assign]
+    analyzer._stage1_preprocessing = lambda df, *a, **kw: (df, {})  # type: ignore[method-assign]
+    analyzer._stage2_label_generation = lambda *a, **kw: (  # type: ignore[method-assign]
+        behavior_label_series, behavior_labels)
+    analyzer._stage3_event_filter = lambda df, label, *a, **kw: (df, label, {})  # type: ignore[method-assign]
+    analyzer._apply_feature_filter = lambda df, meta, *a, **kw: (df, meta, {})  # type: ignore[method-assign]
+    analyzer._stage4_ic_calculation = lambda *a, **kw: {  # type: ignore[method-assign]
+        "status": "skipped", "details": {"min_test_rows": 131, "test_rows": 30}}
+    fallback_calls: list = []
+
+    def _fallback_spy(*args, **kwargs):
+        fallback_calls.append(kwargs.get("reason"))
+        return {"metadata": {}, "analysis_status": "degraded_full_sample"}
+
+    analyzer._run_full_sample_fallback = _fallback_spy  # type: ignore[method-assign]
+
+    analyzer._suppress_persist = True       # 掃描格之狀態
+    analyzer._in_fallback_rerun = False     # 但不在 fallback 重跑內
+    scan_cell_result = analyzer.analyze("features.h5", "labels.h5")
+    assert scan_cell_result == {"metadata": {}, "analysis_status": "degraded_full_sample"}
+    assert fallback_calls == ["rolling_warmup_insufficient"]
+
+    analyzer._in_fallback_rerun = True      # 真的已在 fallback 重跑內 ⇒ 禁遞迴
+    with pytest.raises(RuntimeError, match="one-shot fallback guard"):
+        analyzer.analyze("features.h5", "labels.h5")
+    assert fallback_calls == ["rolling_warmup_insufficient"]
+
 
 @pytest.mark.parametrize(
     "meta, expected",

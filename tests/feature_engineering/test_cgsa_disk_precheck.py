@@ -256,18 +256,49 @@ def _primary_frames() -> pd.DataFrame:
     return pd.DataFrame({"timestamp": [0, 12 * 3600 * 1000], "value": [10.0, 11.0]})
 
 
-def _abort_before_persist(
+def _abort_via_multi_tf_generator(
     factory: _CgsaIntegrationFactory,
     registry: ColumnGroupRegistry,
     monkeypatch: pytest.MonkeyPatch,
+    *,
+    expect_parallel: bool,
 ) -> None:
-    frame = _layer_df(4096, 2048)
-    needed = _needed_for_frame(registry, frame)
-    monkeypatch.setattr(registry, "_disk_free_bytes", lambda _path: needed - 1)
-    factory._current_symbol = "ETHUSDT"
-    factory._current_timeframe = "12h"
-    with pytest.raises(ColumnGroupRegistryError):
-        factory._persist_layer_output_groups(frame, LayerSource.L3, "L3_rolling")
+    """TESTREG 4.4：原 helper 直呼 `_persist_layer_output_groups`、未經 MultiTFGenerator（名稱宣稱之路徑未覆蓋）；
+    改為經 `MultiTFGenerator.generate_multi_tf` 之正式 CGSA 編排，記錄實際進入之分支（串列臂
+    `_process_timeframe_inroot`／並行 `_generate_multi_tf_cgsa_parallel`），並斷言 primary L3 落盤前即被預檢中止。"""
+    from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
+
+    entered: list[str] = []
+    for name in ("_process_timeframe_inroot", "_generate_multi_tf_cgsa_parallel"):
+        original = getattr(MultiTFGenerator, name)
+
+        def _spy(self, *args, _name=name, _original=original, **kwargs):
+            entered.append(_name)
+            return _original(self, *args, **kwargs)
+
+        monkeypatch.setattr(MultiTFGenerator, name, _spy)
+
+    prechecks: list[dict] = []
+    original_precheck = registry._precheck_cgsa_cumulative_disk
+
+    def _spy_precheck(frame, **kwargs):
+        prechecks.append(dict(kwargs))
+        return original_precheck(frame, **kwargs)
+
+    monkeypatch.setattr(registry, "_precheck_cgsa_cumulative_disk", _spy_precheck)
+    monkeypatch.setattr(registry, "_disk_free_bytes", lambda _path: 0)
+
+    with pytest.raises(ColumnGroupRegistryError, match="L3_rolling"):
+        MultiTFGenerator(factory, _MtFConfig()).generate_multi_tf("ETHUSDT")
+
+    if expect_parallel:
+        assert "_generate_multi_tf_cgsa_parallel" in entered
+        assert "_process_timeframe_inroot" not in entered
+    else:
+        assert "_process_timeframe_inroot" in entered
+        assert "_generate_multi_tf_cgsa_parallel" not in entered
+    assert [(c["layer_label"], c["timeframe"]) for c in prechecks] == [("L3_rolling", "12h")]
+    assert not [g for g in registry._groups if "L3" in g], "L3 group persisted despite precheck abort"
 
 
 def test_cgsa_disk_precheck_integration_single_tf_path(
@@ -299,7 +330,7 @@ def test_cgsa_disk_precheck_integration_serial_multi_tf_path(
 
     registry = ColumnGroupRegistry(tmp_path / "serial", memory_buffer_groups=0)
     factory = _CgsaIntegrationFactory({"12h": _primary_frames()}, registry)
-    _abort_before_persist(factory, registry, monkeypatch)
+    _abort_via_multi_tf_generator(factory, registry, monkeypatch, expect_parallel=False)
 
 
 def test_cgsa_disk_precheck_integration_parallel_primary_path(
@@ -311,7 +342,7 @@ def test_cgsa_disk_precheck_integration_parallel_primary_path(
 
     registry = ColumnGroupRegistry(tmp_path / "parallel", memory_buffer_groups=0)
     factory = _CgsaIntegrationFactory({"12h": _primary_frames()}, registry)
-    _abort_before_persist(factory, registry, monkeypatch)
+    _abort_via_multi_tf_generator(factory, registry, monkeypatch, expect_parallel=True)
 
 
 def test_cgsa_disk_precheck_integration_serial_runs_when_free_sufficient(

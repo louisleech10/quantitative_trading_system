@@ -137,6 +137,15 @@ def test_feature_kline_download_chain_values_survive_roundtrip(svc):
     # 連續、無重複、升冪
     ts = df["timestamp"].to_numpy()
     assert np.all(np.diff(ts) == TF_SEC)
+    # TESTREG Task 4.4：docstring 宣稱「讀回＝provider 產出」，原只比欄序／dtype（期望取生產常數，自指）與
+    # 自算 taker_ratio，從未比對值——寫入層錯置同 dtype 欄或值損毀仍綠。補：以同一批原始列重跑真轉換器
+    # 得 provider 產出，與讀回逐欄逐值相等（含 dtype）。
+    provider_frame = provider._convert_to_dataframe(_raw_binance_rows(provider.n_bars)).reset_index(drop=True)
+    readback_frame = df.reset_index(drop=True)
+    assert list(readback_frame.columns) == list(provider_frame.columns)
+    for column in provider_frame.columns:
+        assert readback_frame[column].dtype == provider_frame[column].dtype, column
+        assert np.array_equal(readback_frame[column].to_numpy(), provider_frame[column].to_numpy()), column
 
 
 def test_feature_kline_download_chain_trims_beyond_end_date(svc):

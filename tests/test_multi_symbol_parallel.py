@@ -401,10 +401,55 @@ class TestMultiSymbolReferenceIpcCleanup:
 class TestT52NoCrosstalk:
     """T5.2 — symbol isolation: each worker has independent registry."""
 
-    def test_worker_entry_isolation(self):
-        """_worker_entry is module-level and importable (picklable)."""
+    def test_worker_entry_isolation(self, tmp_path, monkeypatch):
+        """_worker_entry is module-level and importable (picklable).
+
+        TESTREG Task 4.4：原只斷言 callable，未驗類別所宣稱之「每個 worker 有獨立 registry」。補：
+        ①pickle 往返後仍為同一模組層函式（spawn 派工之前提）；②連續兩次呼叫真實 _worker_entry（只 stub 下游
+        generate_features）⇒ 各自建立不同之 factory、registry 與參考快取物件，且第一個標的注入之參考資料
+        不外溢至第二個標的（無跨標的串擾）。
+        """
         from momentum.FeatureEngineering.feature_factory import _worker_entry
         assert callable(_worker_entry)
+
+        import pickle
+        from types import SimpleNamespace
+
+        from momentum.FeatureEngineering import feature_factory as ff_mod
+        from momentum.FeatureEngineering.arrow_ipc_utils import write_reference_data_ipc
+
+        assert pickle.loads(pickle.dumps(_worker_entry)) is _worker_entry
+
+        seen: list = []
+
+        def _stub_generate_features(self, **kwargs):
+            seen.append({
+                "symbol": kwargs["symbol"],
+                "factory": self,
+                "registry": self._registry,
+                "ref_cache": self._reference_data_cache,
+                "ref_keys": sorted(self._reference_data_cache.keys(), key=repr),
+            })
+            return SimpleNamespace(metadata={"symbol": kwargs["symbol"]})
+
+        monkeypatch.setattr(ff_mod.FeatureFactory, "generate_features", _stub_generate_features)
+        ref_df = pd.DataFrame({"close": np.arange(16, dtype=float), "volume": np.ones(16)})
+        ipc_path = write_reference_data_ipc(ref_df, tmp_path, "ETHUSDT")
+        payload = {"timeframes": {"training": ["1h"]}, "cross_sectional": {"reference_symbol": "ETHUSDT"}}
+
+        out_a = ff_mod._worker_entry(symbol="ADAUSDT", config_payload=payload, cache_dir=None,
+                                     ref_ipc_path=str(ipc_path))
+        out_b = ff_mod._worker_entry(symbol="SOLUSDT", config_payload=payload, cache_dir=None,
+                                     ref_ipc_path=None)
+
+        assert out_a == {"symbol": "ADAUSDT"} and out_b == {"symbol": "SOLUSDT"}
+        assert [entry["symbol"] for entry in seen] == ["ADAUSDT", "SOLUSDT"]
+        first, second = seen
+        assert first["factory"] is not second["factory"]
+        assert first["registry"] is not second["registry"]
+        assert first["ref_cache"] is not second["ref_cache"]
+        assert first["ref_keys"] == [("ETHUSDT", "1h", None, None)]
+        assert second["ref_keys"] == []
 
     def test_worker_entry_ref_cache_key_matches_config(self, tmp_path, monkeypatch):
         """Regression (:4109): worker 注入參考資料的 cache key 必須取自
@@ -472,16 +517,77 @@ class TestT52NoCrosstalk:
 class TestT5B1SingleFailure:
     """T5.B1 — one symbol failure doesn't block others."""
 
-    def test_partial_failure(self):
-        """If _worker_entry raises, other symbols should still succeed."""
-        # This is a design-level test; real parallel test requires h5 data.
-        # Verify the interface supports error collection.
+    def test_partial_failure(self, tmp_path, monkeypatch):
+        """If _worker_entry raises, other symbols should still succeed.
+
+        TESTREG Task 4.4：原只驗屬性與簽章。補：呼叫真實 run_multi_symbol（真實預算域排程器），以假 pool
+        於派工當下呼叫模組層 _worker_entry（stub：BADUSDT 拋錯、其餘回傳 metadata）⇒ 失敗標的進 errors、
+        其餘標的照常進 results，回傳 (results, errors)。不讀 kline（參考資料載入 stub 為 None）。
+        """
         from momentum.FeatureEngineering.feature_factory import FeatureFactory
         assert hasattr(FeatureFactory, "run_multi_symbol")
         # run_multi_symbol returns (results, errors) tuple
         import inspect
         sig = inspect.signature(FeatureFactory.run_multi_symbol)
         assert "symbols" in sig.parameters
+
+        import concurrent.futures as cf
+        import tempfile
+
+        from momentum.FeatureEngineering import feature_factory as ff_mod
+
+        def _stub_worker_entry(symbol, config_payload, cache_dir, ref_ipc_path):
+            if symbol == "BADUSDT":
+                raise RuntimeError("injected worker failure for BADUSDT")
+            return {"symbol": symbol}
+
+        class _InlinePool:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def shutdown(self, wait=True):
+                pass
+
+            def submit(self, fn, descriptor, worker_fn, payload, identity):
+                future = cf.Future()
+                try:
+                    future.set_result(ff_mod._worker_entry(**payload))
+                except Exception as exc:  # noqa: BLE001 — 轉交 future，同真實 pool 之語意
+                    future.set_exception(exc)
+                return future
+
+        monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+        monkeypatch.setattr(ff_mod, "_warmup_numba_functions", lambda: None)
+        monkeypatch.setattr(ff_mod, "_worker_entry", _stub_worker_entry)
+        monkeypatch.setattr(cf, "ProcessPoolExecutor", _InlinePool)
+        monkeypatch.setattr(ff_mod.FeatureFactory, "_load_reference_if_available",
+                            lambda self, symbol, config: None)
+        # 排程器准入：固定小 E 與 0 磁碟上界，使任務派入假 pool（本測試不驗估算）
+        monkeypatch.setattr(ff_mod.FeatureFactory, "_estimate_symbol_envelope",
+                            lambda self, symbol, config, end_date=None: 64 * 1024 * 1024)
+        monkeypatch.setattr(ff_mod.FeatureFactory, "_estimate_symbol_disk",
+                            lambda self, symbol, config, end_date=None: 0)
+
+        from momentum.factories import create_feature_factory
+
+        factory = create_feature_factory(cache_dir="data_cache/feature_klines", validate_continuity=False)
+        outcome = factory.run_multi_symbol(
+            ["ADAUSDT", "BADUSDT", "SOLUSDT"],
+            config_override={"timeframes": {"primary": "1h", "training": ["1h"]}},
+            max_workers=2,
+        )
+        results, errors = outcome
+        assert sorted(results) == ["ADAUSDT", "SOLUSDT"]
+        assert results["ADAUSDT"]["symbol"] == "ADAUSDT"
+        assert results["SOLUSDT"]["symbol"] == "SOLUSDT"
+        assert sorted(errors) == ["BADUSDT"]
+        assert "injected worker failure for BADUSDT" in errors["BADUSDT"]
 
 
 # ===========================================================================

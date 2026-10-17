@@ -7,6 +7,13 @@ Phase 6 - 端到端整合測試
 3. 測試混合指標配置（EMA + RSI + MACD）
 4. 驗證模型可重現性
 
+TESTREG Task 4.4 改寫範圍說明：本檔實際只涵蓋「配置 → 特徵提取 → 配置／特徵持久化往返」與動態命名一致性；
+全檔無 XGBoost 訓練或模型保存／載入（上列 1、4 之訓練與模型部分不在本檔驗證範圍）。改寫內容：
+- 讀真實 data_cache/feature_klines（requires_kline_data，缺檔 fail 非 skip），取代非 canonical 之
+  data_cache/kline_cache.h5 h5py 直讀；
+- 配置與特徵之落盤一律寫 tmp_path（原寫入 repo 之 data/test_*.json／.pkl 汙染工作區）；
+- test_3 之「持久化」改為比對讀回之特徵值（原只比兩次重算）。
+
 Author: AI Agent
 Date: 2026-01-11
 """
@@ -18,10 +25,11 @@ sys.path.insert(0, str(project_root))
 
 import pandas as pd
 import numpy as np
-import h5py
 import json
 import pickle
 from datetime import datetime
+
+import pytest
 
 from momentum.FeatureEngineering import FeatureExtractor, StrategyParams
 from momentum.FeatureEngineering.strategy_registry import StrategyRegistry
@@ -34,16 +42,23 @@ from momentum.FeatureEngineering.ml_pipeline_config import (
 )
 
 
+@pytest.fixture
+def sample_data(requires_kline_data):
+    """載入樣本數據：真實 ETHUSDT 1h 前 1000 根（feature_klines）。"""
+    return requires_kline_data("ETHUSDT", "1h", min_rows=1000).head(1000).reset_index(drop=True)
+
+
 def load_sample_data():
-    """載入樣本數據"""
-    hdf5_path = "data_cache/kline_cache.h5"
-    with h5py.File(hdf5_path, 'r') as f:
-        data = f['ETHUSDT/1h/data'][:1000]  # 取前 1000 行
-    df = pd.DataFrame(data)
-    return df
+    """載入樣本數據（`python tests/test_phase6_end_to_end.py` 直接執行時用；pytest 經 sample_data fixture）。"""
+    from momentum.factories import create_kline_storage_manager
+
+    storage = create_kline_storage_manager(cache_dir="data_cache/feature_klines")
+    df = storage.read_klines("ETHUSDT", "1h", validate_continuity=False)
+    return df.head(1000).reset_index(drop=True)
 
 
-def test_1_single_indicator_pipeline():
+@pytest.mark.requires_kline
+def test_1_single_indicator_pipeline(sample_data, tmp_path):
     """測試 1: 單一指標 Pipeline（EMA）"""
     print("\n" + "="*60)
     print("測試 1: 單一指標 Pipeline（EMA）")
@@ -77,7 +92,7 @@ def test_1_single_indicator_pipeline():
     )
     
     # Step 2: 提取特徵
-    df = load_sample_data()
+    df = sample_data
     extractor = FeatureExtractor()
     
     params = StrategyParams(
@@ -96,7 +111,7 @@ def test_1_single_indicator_pipeline():
     assert 'close_ema60_value' in feature_names, "缺少 close_ema60_value"
     
     # Step 4: 保存配置
-    config_path = 'data/test_pipeline_config.json'
+    config_path = str(tmp_path / 'test_pipeline_config.json')
     pipeline_config.to_json(config_path)
     
     # Step 5: 載入配置
@@ -113,7 +128,8 @@ def test_1_single_indicator_pipeline():
     print(f"✅ 測試 1 通過")
 
 
-def test_2_multi_indicator_pipeline():
+@pytest.mark.requires_kline
+def test_2_multi_indicator_pipeline(sample_data, tmp_path):
     """測試 2: 多指標 Pipeline（EMA + RSI + MACD）"""
     print("\n" + "="*60)
     print("測試 2: 多指標 Pipeline（EMA + RSI + MACD）")
@@ -165,7 +181,7 @@ def test_2_multi_indicator_pipeline():
     )
     
     # Step 3: 提取所有指標特徵
-    df = load_sample_data()
+    df = sample_data
     extractor = FeatureExtractor()
     
     all_feature_names = []
@@ -200,7 +216,7 @@ def test_2_multi_indicator_pipeline():
     assert any('macd' in name for name in all_feature_names), "缺少 MACD 特徵"
     
     # Step 6: 保存配置
-    config_path = 'data/test_multi_indicator_config.json'
+    config_path = str(tmp_path / 'test_multi_indicator_config.json')
     pipeline_config.to_json(config_path)
     
     # Step 7: 載入並驗證
@@ -215,14 +231,15 @@ def test_2_multi_indicator_pipeline():
     print(f"✅ 測試 2 通過")
 
 
-def test_3_feature_persistence():
+@pytest.mark.requires_kline
+def test_3_feature_persistence(sample_data, tmp_path):
     """測試 3: 特徵持久化與可重現性"""
     print("\n" + "="*60)
     print("測試 3: 特徵持久化與可重現性")
     print("="*60)
     
     # Step 1: 第一次提取特徵
-    df = load_sample_data()
+    df = sample_data
     extractor = FeatureExtractor()
     
     params = StrategyParams(
@@ -236,7 +253,7 @@ def test_3_feature_persistence():
     )
     
     # Step 2: 保存特徵
-    features_path = 'data/test_features.pkl'
+    features_path = str(tmp_path / 'test_features.pkl')
     with open(features_path, 'wb') as f:
         pickle.dump({
             'features': features_df_1[feature_names_1],
@@ -263,6 +280,10 @@ def test_3_feature_persistence():
     for col in feature_names_1:
         diff = (features_df_1[col] - features_df_2[col]).abs().max()
         assert diff < 1e-10, f"特徵 {col} 的數值不可重現（差異={diff}）"
+
+    # 持久化往返：讀回之特徵值須與落盤前逐值相同（含 NaN 位置；原只比兩次重算，未比讀回值）
+    pd.testing.assert_frame_equal(saved_features, features_df_1[feature_names_1], check_exact=True)
+    assert saved_features.notna().to_numpy().any(), "讀回特徵全 NaN——往返比對空真"
     
     print(f"✅ 特徵名稱可重現")
     print(f"✅ 特徵數值可重現（誤差 < 1e-10）")
@@ -356,9 +377,15 @@ def run_all_tests():
     passed = 0
     failed = 0
     
+    import tempfile
+
     for name, test_func in tests:
         try:
-            test_func()
+            if test_func is test_4_config_validation:
+                test_func()
+            else:
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    test_func(load_sample_data(), Path(tmp_dir))
             passed += 1
         except Exception as e:
             print(f"\n❌ 測試失敗: {name}")

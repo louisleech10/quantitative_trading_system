@@ -92,6 +92,37 @@ def test_cgsa_vs_legacy_numeric_equivalence(tmp_path: Path):
     assert report["layers"]["L3"]["status"] == "passed"
     assert report["structure"]["status"] == "passed"
 
+    # TESTREG 4.4：原只有「容差內擾動判 passed」之正例，無「超容差判 failed」之反例（驗證器全回 passed 亦綠）；
+    # legacy 生成路徑已於 5584102d 刪除，本測試之實際對象為 scripts/validate_cgsa_ab 之 A/B 比對契約 ⇒ 補反例：
+    # 各層各取一欄超出其容差（L1 atol 1e-7、L2 1e-6、L3 skew 1e-4）、NaN 位置不同、少一層（strict）皆須判 failed
+    def _report_with(cgsa_overrides: dict[str, pd.DataFrame], *, drop_layer: str | None = None) -> dict:
+        frames = {"L1": cgsa_l1, "L2": cgsa_l2, "L3": cgsa_l3, **cgsa_overrides}
+        if drop_layer is not None:
+            frames.pop(drop_layer)
+        paths = _write_layer_artifacts(tmp_path / f"neg_{len(list(tmp_path.iterdir()))}", frames)
+        return run_validation(
+            cgsa_layers=paths,
+            legacy_layers=legacy_layers,
+            structural_baseline=structural_baseline,
+            strict_missing_layers=True,
+        )
+
+    bad_l1 = cgsa_l1.copy(deep=True)
+    bad_l1.loc[0, "close_1h_trend_EMA_5"] += 1e-5
+    bad_l2 = cgsa_l2.copy(deep=True)
+    bad_l2.loc[0, "close_1h_momentum_RSI_5_cross"] += 1e-4
+    bad_l3 = cgsa_l3.copy(deep=True)
+    bad_l3.loc[1, "close_1h_trend_EMA_5_skew"] += 1e-2
+    nan_l1 = cgsa_l1.copy(deep=True)
+    nan_l1.loc[0, "close_1h_trend_EMA_5"] = float("nan")
+    for layer, frame in (("L1", bad_l1), ("L2", bad_l2), ("L3", bad_l3), ("L1", nan_l1)):
+        negative = _report_with({layer: frame})
+        assert negative["layers"][layer]["status"] == "failed", (layer, negative["layers"][layer])
+        assert negative["overall_status"] == "failed"
+    missing = _report_with({}, drop_layer="L3")
+    assert missing["layers"]["L3"]["status"] == "failed"
+    assert missing["overall_status"] == "failed"
+
 
 def test_cgsa_no_global_concat(monkeypatch):
     """T2.12（FRAMEPATH Task 1.2 改契約）：CGSA 不做全欄合併——layer7_final 具名拒絕，且不得呼叫 concat_with_memmap。"""

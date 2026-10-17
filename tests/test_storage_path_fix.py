@@ -1,143 +1,118 @@
 """
 測試存儲路徑修復
 驗證批次下載使用統一的存儲路徑，數據不會互相覆蓋
+
+TESTREG b5 改寫：原版全函式無 assert（以 return True／False 表結果，失敗分支仍綠）、
+真連 Binance 網路，且寫入真實 `settings.data_cache_path` 之 ETHUSDT 1h HDF5（非 hermetic、
+會污染應用層 K 線快取）。現改為：
+- 落盤根改 `tmp_path`（同一個 storage 物件同時供下載服務寫入與讀回＝統一路徑）；
+- provider 以 `BinanceProvider` 子類**重播真實 Binance K 線**（唯讀取自
+  `data_cache/feature_klines/kline_cache.h5` 之同時段 bars），不連網、不造假資料；
+- 以 assert 驗兩段時間範圍皆在、總列數逐筆吻合、兩段之值與下載回傳逐值相等（append 合併不覆蓋）。
 """
-import sys
+from __future__ import annotations
+
+from datetime import datetime, timezone
 from pathlib import Path
-import time
 
-# 添加項目路徑
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+import numpy as np
+import pandas as pd
+import pytest
 
-from api.core.config import settings
-from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.DataExtraction.kline_download_service import KlineDownloadService
+from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.DataExtraction.providers.binance_provider import BinanceProvider
-from datetime import datetime
-import logging
 
-# 設置日誌
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+_REAL_KLINE_DIR = Path(__file__).resolve().parents[1] / "data_cache" / "feature_klines"
+_COLUMNS = ["timestamp", "open", "high", "low", "close", "volume", "taker_buy_volume", "taker_ratio"]
 
-def test_unified_storage_path():
-    """測試統一存儲路徑"""
-    
-    logger.info("=" * 80)
-    logger.info("測試場景：批次下載使用統一存儲路徑")
-    logger.info("=" * 80)
-    
-    # 使用配置的路徑創建 storage（模擬 BatchDownloadService 的行為）
-    storage = KlineStorageManager(cache_dir=str(settings.data_cache_path))
-    logger.info(f"📁 Storage 路徑: {storage.hdf5_path}")
-    
+
+class _ReplayBinanceProvider(BinanceProvider):
+    """重播真實 Binance K 線之 provider（不連網）：fetch_klines 回傳真實快取中同時段之 bars。"""
+
+    def __init__(self, recorded: pd.DataFrame) -> None:
+        super().__init__()
+        self._recorded = recorded
+
+    def ping(self) -> bool:  # 不打網路
+        return True
+
+    def fetch_klines(self, symbol, start_time, end_time, timeframe="1h"):
+        start = int(start_time.replace(tzinfo=timezone.utc).timestamp())
+        end = int(end_time.replace(tzinfo=timezone.utc).timestamp())
+        ts = self._recorded["timestamp"]
+        return self._recorded[(ts >= start) & (ts <= end)].reset_index(drop=True).copy()
+
+
+def _recorded_eth_1h() -> pd.DataFrame:
+    if not (_REAL_KLINE_DIR / "kline_cache.h5").exists():
+        pytest.fail(f"真實 K 線快取缺席：{_REAL_KLINE_DIR / 'kline_cache.h5'}")
+    reader = KlineStorageManager(cache_dir=str(_REAL_KLINE_DIR))
+    data = reader.read_klines("ETHUSDT", "1h", validate_continuity=False)
+    assert data is not None and not data.empty
+    return data[_COLUMNS].copy()
+
+
+def test_unified_storage_path(tmp_path: Path):
+    """測試統一存儲路徑：兩段不重疊之下載依序 append 到同一 HDF5，後者不得覆蓋前者。"""
+    storage = KlineStorageManager(cache_dir=str(tmp_path / "data_cache"))
+    assert Path(storage.hdf5_path).resolve().is_relative_to(tmp_path.resolve())
+
     download_service = KlineDownloadService(storage_manager=storage)
-    
-    # 註冊 Binance provider
-    binance_provider = BinanceProvider()
-    download_service.registry.register('binance', binance_provider)
-    
+    assert download_service.storage is storage, "下載服務須寫入同一個 storage（統一路徑）"
+    download_service.registry.register("binance", _ReplayBinanceProvider(_recorded_eth_1h()))
+
     symbol = "ETHUSDT"
     timeframe = "1h"
-    
+
     # 步驟1: 下載範圍1 (2024年5月 - 歷史數據)
-    logger.info("\n步驟1: 下載範圍1 (2024-05-20 to 2024-05-27)")
     df1 = download_service.download_klines(
         symbol=symbol,
         timeframe=timeframe,
         start_time=datetime(2024, 5, 20, 20, 0),
         end_time=datetime(2024, 5, 27, 12, 0),
         source="binance",
-        save_to_storage=True  # 會調用 append_klines
+        save_to_storage=True,  # 會調用 append_klines
     )
-    logger.info(f"✅ 範圍1下載完成: {len(df1)} K-lines")
-    
-    # 檢查 HDF5 數據
+    assert len(df1) > 0, "前提不成立：真實快取無範圍1之 bars"
     check1 = storage.read_klines(symbol, timeframe, validate_continuity=False)
-    if check1 is not None:
-        logger.info(f"📊 HDF5檢查1: {len(check1)} K-lines")
-        logger.info(f"   時間範圍: {datetime.utcfromtimestamp(check1['timestamp'].min())} to {datetime.utcfromtimestamp(check1['timestamp'].max())}")
-    else:
-        logger.error("❌ 範圍1數據未找到")
-        return False
-    
-    time.sleep(0.5)
-    
+    assert check1 is not None and len(check1) == len(df1), "範圍1數據未落盤"
+
     # 步驟2: 下載範圍2 (2025年10月 - 近期數據)
-    logger.info("\n步驟2: 下載範圍2 (2025-10-20 to 2025-10-27)")
     df2 = download_service.download_klines(
         symbol=symbol,
         timeframe=timeframe,
         start_time=datetime(2025, 10, 20, 20, 0),
         end_time=datetime(2025, 10, 27, 12, 0),
         source="binance",
-        save_to_storage=True  # 會調用 append_klines，應該合併而非覆蓋
+        save_to_storage=True,  # 會調用 append_klines，應該合併而非覆蓋
     )
-    logger.info(f"✅ 範圍2下載完成: {len(df2)} K-lines")
-    
-    # 檢查 HDF5 數據（關鍵檢查：應該包含兩個範圍）
-    check2 = storage.read_klines(symbol, timeframe, validate_continuity=False)
-    if check2 is not None:
-        logger.info(f"📊 HDF5檢查2: {len(check2)} K-lines")
-        logger.info(f"   時間範圍: {datetime.utcfromtimestamp(check2['timestamp'].min())} to {datetime.utcfromtimestamp(check2['timestamp'].max())}")
-    else:
-        logger.error("❌ 範圍2數據未找到")
-        return False
-    
-    # 驗證結果
-    logger.info("\n" + "=" * 80)
-    logger.info("驗證結果")
-    logger.info("=" * 80)
-    
-    expected_total = len(df1) + len(df2)
-    actual_total = len(check2)
-    
-    # 檢查是否包含範圍1的數據
-    range1_start = df1['timestamp'].min()
-    range1_end = df1['timestamp'].max()
-    range1_data = check2[(check2['timestamp'] >= range1_start) & (check2['timestamp'] <= range1_end)]
-    has_range1 = len(range1_data) > 0
-    
-    # 檢查是否包含範圍2的數據
-    range2_start = df2['timestamp'].min()
-    range2_end = df2['timestamp'].max()
-    range2_data = check2[(check2['timestamp'] >= range2_start) & (check2['timestamp'] <= range2_end)]
-    has_range2 = len(range2_data) > 0
-    
-    logger.info(f"期望總數: {expected_total} K-lines ({len(df1)} + {len(df2)})")
-    logger.info(f"實際總數: {actual_total} K-lines")
-    logger.info(f"包含範圍1數據: {'✅' if has_range1 else '❌'} ({len(range1_data)} K-lines)")
-    logger.info(f"包含範圍2數據: {'✅' if has_range2 else '❌'} ({len(range2_data)} K-lines)")
-    
-    # 計算合理誤差（考慮下載時間邊界可能有重疊）
-    tolerance = 0.05  # 5% 容錯
-    min_expected = int(expected_total * (1 - tolerance))
-    max_expected = int(expected_total * (1 + tolerance))
-    
-    if has_range1 and has_range2 and min_expected <= actual_total <= max_expected:
-        logger.info("\n🎉 測試通過！")
-        logger.info(f"   ✅ 數據沒有被覆蓋")
-        logger.info(f"   ✅ append_klines 功能正常")
-        logger.info(f"   ✅ 存儲路徑統一: {storage.hdf5_path}")
-        return True
-    else:
-        logger.error("\n❌ 測試失敗！")
-        if not has_range1:
-            logger.error("   ❌ 範圍1數據丟失（被覆蓋）")
-        if not has_range2:
-            logger.error("   ❌ 範圍2數據丟失")
-        if not (min_expected <= actual_total <= max_expected):
-            logger.error(f"   ❌ 數據總量異常: 期望 {expected_total}, 實際 {actual_total}")
-        return False
+    assert len(df2) > 0, "前提不成立：真實快取無範圍2之 bars"
+    assert df1["timestamp"].max() < df2["timestamp"].min(), "前提不成立：兩段範圍重疊"
 
-if __name__ == "__main__":
-    try:
-        success = test_unified_storage_path()
-        sys.exit(0 if success else 1)
-    except Exception as e:
-        logger.error(f"測試異常: {e}", exc_info=True)
-        sys.exit(1)
+    # 關鍵檢查：應該包含兩個範圍
+    check2 = storage.read_klines(symbol, timeframe, validate_continuity=False)
+    assert check2 is not None
+    assert len(check2) == len(df1) + len(df2), (
+        f"數據總量異常: 期望 {len(df1) + len(df2)}（{len(df1)} + {len(df2)}），實際 {len(check2)}"
+    )
+    assert check2["timestamp"].is_monotonic_increasing and check2["timestamp"].is_unique
+
+    for label, expected in (("範圍1", df1), ("範圍2", df2)):
+        got = check2[
+            (check2["timestamp"] >= expected["timestamp"].min())
+            & (check2["timestamp"] <= expected["timestamp"].max())
+        ].reset_index(drop=True)
+        assert len(got) == len(expected), f"{label}數據丟失（被覆蓋）"
+        np.testing.assert_array_equal(
+            got["timestamp"].to_numpy(dtype=np.int64),
+            expected["timestamp"].to_numpy(dtype=np.int64),
+        )
+        for column in ("open", "high", "low", "close", "volume"):
+            np.testing.assert_allclose(
+                got[column].to_numpy(dtype=np.float64),
+                expected[column].to_numpy(dtype=np.float64),
+                rtol=0,
+                atol=0,
+                err_msg=f"{label} {column} 值被改寫",
+            )

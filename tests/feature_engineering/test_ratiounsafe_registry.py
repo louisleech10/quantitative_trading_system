@@ -335,10 +335,20 @@ def test_after_baseline_regression() -> None:
 
 
 def test_boundary_01_failopen_baseline_untouched() -> None:
-    """Task 2.2 邊界①：本票不改 failopen 基準。"""
+    """Task 2.2 邊界①：本票不改 failopen 基準。
+
+    TESTREG 4.4：原以 `git diff --quiet`（工作樹對 index）判定，票期前提已過期——對已提交改動盲，他票重凍 failopen
+    基準之未提交期間則假紅。改為票期歷史檢查：RATIOUNSAFE 錨點（首個票內提交 5da7c12e 之親代）至收案提交
+    3320a609 之間，該基準檔零提交改動。"""
     import subprocess
 
-    rc = subprocess.run(["git", "diff", "--quiet", "--", "tests/_golden/failopen/baseline.json"], cwd=REPO).returncode
+    anchor, close = "5da7c12e^", "3320a609"
+    path = "tests/_golden/failopen/baseline.json"
+    log = subprocess.run(["git", "log", "--format=%h", f"{anchor}..{close}", "--", path],
+                         cwd=REPO, capture_output=True, text=True)
+    assert log.returncode == 0, log.stderr
+    assert log.stdout.strip() == "", f"RATIOUNSAFE 票期內改動了 failopen 基準：{log.stdout.split()}"
+    rc = subprocess.run(["git", "diff", "--quiet", anchor, close, "--", path], cwd=REPO).returncode
     assert rc == 0
 
 

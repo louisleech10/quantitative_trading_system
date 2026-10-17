@@ -61,6 +61,27 @@ def _make_service(tmp_path: Any) -> Any:
     return svc
 
 
+def _record_completed(svc: Any, symbols: List[str], done: List[str], tmp_path: Any) -> Dict[str, Any]:
+    """經生產 `_build_initial_checkpoint` 建佇列，再以生產 `_record_item_result` 逐一記 `done` 為成功完成；回傳 checkpoint。
+    輸出路徑指向 tmp 下之檔（不碰真實 data_cache），browse 登記以替身記錄呼叫；retention 關閉（只測佇列語意）。"""
+    import os
+
+    request = _make_batch_request(symbols, "1h")
+    checkpoint = svc._build_initial_checkpoint("test-batch", request)
+    task = svc._build_task_state("test-batch", request, checkpoint, status="running")
+    registered: List[str] = []
+    svc._browse_registrar = MagicMock()
+    svc._browse_registrar.register.side_effect = lambda s, tf, path: registered.append(s) or f"browse_{s}"
+    with patch.dict(os.environ, {"FFACT_BATCH_RETENTION": "0"}):
+        for symbol in done:
+            svc._record_item_result(
+                task, checkpoint, symbol, "1h", str(tmp_path / f"{symbol}_1h.json"), None, None, 0, 0, 0,
+            )
+    assert registered == list(done)
+    assert task["completed"] == len(done)
+    return checkpoint
+
+
 def _real_kline_symbols(limit: int = 2) -> List[str]:
     """讀取真實 kline cache 內可用 symbol，供 batch smoke 覆蓋 production 資料路徑。"""
     import h5py
@@ -241,13 +262,10 @@ class TestMultiSymbolResume:
         Resume 邏輯：service 在 _record_item_result 中呼叫 _remove_queued_item，
         確保完成的標的不會重複出現在 queued_items 中。
         """
-        # 模擬 resume 後的 checkpoint：BTCUSDT 已完成並從佇列移除
-        checkpoint = {
-            "batch_id": "test-batch",
-            "completed_items": [{"symbol": "BTCUSDT", "timeframe": "1h"}],
-            "failed_items": [],
-            "queued_items": [{"symbol": "ETHUSDT", "timeframe": "1h"}],
-        }
+        # TESTREG 4.4：原於測試內自建 checkpoint 字面後只斷言其自身內容（從未呼叫生產＝空心）；改為經生產
+        # _build_initial_checkpoint 建 BTCUSDT＋ETHUSDT 佇列，再以生產 _record_item_result 記 BTCUSDT 完成
+        svc = _make_service(tmp_path)
+        checkpoint = _record_completed(svc, ["BTCUSDT", "ETHUSDT"], ["BTCUSDT"], tmp_path)
 
         queued_symbols = [item["symbol"] for item in checkpoint["queued_items"]]
         completed_symbols = {item["symbol"] for item in checkpoint["completed_items"]}
@@ -256,30 +274,10 @@ class TestMultiSymbolResume:
         assert "ETHUSDT" in queued_symbols, "未完成的 ETHUSDT 應在 queued_items 中"
         assert "BTCUSDT" in completed_symbols, "BTCUSDT 應記錄在 completed_items"
 
-    def test_failed_symbol_in_queued_for_retry(self, tmp_path):
-        """
-        Given: ETHUSDT/1h 計算失敗，記錄於 failed_items
-        When:  重新 resume（新 checkpoint 中 ETHUSDT 仍在 queued_items）
-        Then:  ETHUSDT 出現在 queued_items 中（可被重試）
-
-        語意：failed_items 只是歷史紀錄，真正決定「是否重試」的是 queued_items。
-        """
-        # 初始 checkpoint：ETHUSDT 失敗，但仍在 queued_items 中等待重試
-        checkpoint = {
-            "batch_id": "test-batch",
-            "completed_items": [],
-            "failed_items": [
-                {
-                    "symbol": "ETHUSDT",
-                    "timeframe": "1h",
-                    "failure_type": "computation_error",
-                }
-            ],
-            "queued_items": [{"symbol": "ETHUSDT", "timeframe": "1h"}],
-        }
-
-        queued_symbols = [item["symbol"] for item in checkpoint["queued_items"]]
-        assert "ETHUSDT" in queued_symbols, "失敗的 ETHUSDT 應仍在 queued_items 中可被重試"
+    # TESTREG 4.4：刪 test_failed_symbol_in_queued_for_retry——只斷言測試內自建之 checkpoint 字面、從未呼叫生產；
+    # 其宣稱之狀態（失敗項同時留在 queued_items 供重試）生產不會產生：_record_item_result 對失敗項亦呼叫
+    # _remove_queued_item（api/services/feature_factory_batch_service.py `_record_item_result`），resume_batch 只重排
+    # completed 中身分不符者。失敗項之記錄由 tests/api/test_icfirstalign_batch_domain.py（worker_failed → failed_items）涵蓋。
 
     def test_remove_queued_item_removes_completed(self, tmp_path):
         """
@@ -552,19 +550,11 @@ class TestBenchmark10SymbolDryrun:
         """
         all_symbols = [f"SYM{i:02d}USDT" for i in range(10)]
 
-        # 模擬執行後的狀態：前 5 個完成，後 5 個仍在佇列
-        completed = [
-            {"symbol": s, "timeframe": "1h"} for s in all_symbols[:5]
-        ]
-        queued = [
-            {"symbol": s, "timeframe": "1h"} for s in all_symbols[5:]
-        ]
-        checkpoint = {
-            "batch_id": "test-resume",
-            "completed_items": completed,
-            "failed_items": [],
-            "queued_items": queued,
-        }
+        # TESTREG 4.4：原於測試內自建 checkpoint 字面（從未呼叫生產＝空心）；改為經生產 _build_initial_checkpoint
+        # 建 10 項佇列，以生產 _record_item_result 記前 5 項完成
+        svc = _make_service(tmp_path)
+        checkpoint = _record_completed(svc, all_symbols, all_symbols[:5], tmp_path)
+        assert [item["symbol"] for item in checkpoint["queued_items"]] == all_symbols[5:]
 
         # completed_items 中的標的不應出現在 queued_items
         queued_symbols = {item["symbol"] for item in checkpoint["queued_items"]}

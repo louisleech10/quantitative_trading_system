@@ -320,6 +320,22 @@ def test_d9_mutation_adhoc_ic_cache_overwrite_must_fail() -> None:
             orch._ic_cache["close_series"], stage4_close_values[0]
         )
 
+    # 真探針：把「analyze 後 ad-hoc 覆寫 cache close」注入主測所用之
+    # `run_production_deep_analysis`，主測之 provenance-by-value 斷言必紅
+    real_run = run_production_deep_analysis
+
+    def _adhoc_overwrite_run(*args: Any, **kwargs: Any):
+        orch_m, report_m, source_m = real_run(*args, **kwargs)
+        cache = orch_m._ic_cache
+        if cache is not None and isinstance(cache.get("close_series"), pd.Series):
+            current = cache["close_series"]
+            cache["close_series"] = pd.Series(np.linspace(1.0, 2.0, len(current)), index=current.index)
+        return orch_m, report_m, source_m
+
+    with patch.object(sys.modules[__name__], "run_production_deep_analysis", _adhoc_overwrite_run):
+        with pytest.raises(AssertionError):
+            test_close_carrier_via_production_stage4_not_ad_hoc_ic_cache()
+
 
 def test_analyzer_real_ols_oracle_dump() -> None:
     """③ analyzer real-OLS oracle：固定種子 dump；獨立 lstsq 驗 alpha/r2/betas/attr。
@@ -427,6 +443,14 @@ def test_b3_mutation_analyzer_hardcoded_alpha_must_fail() -> None:
         assert float(result["alpha"]) == pytest.approx(ind_alpha)
         assert float(result["r_squared"]) == pytest.approx(ind_r2)
 
+    # 真探針：同一 mutant 下走主 oracle 測試，其 alpha 對獨立 lstsq 之斷言必紅
+    # （mutant 之 alpha 在主測寫出 analyzer_oracle.json 之前即被擋，無檔案副作用）
+    with patch.object(
+        FactorExposureAnalyzer, "calculate_factor_attribution", _fake_attr
+    ):
+        with pytest.raises(AssertionError):
+            test_analyzer_real_ols_oracle_dump()
+
 
 def test_bug3_oracle_betas_mutation_must_fail() -> None:
     """Bug3 mutation：patch analyzer 後呼叫主 oracle 測試路徑 → 必須 FAIL。
@@ -508,6 +532,15 @@ def test_b2_mutation_hardcoded_module_summary_must_fail() -> None:
 
     with pytest.raises(AssertionError):
         assert payload["module_summary"] == dict(report.module_summary)
+
+    # 真探針：主測經本模組之 `build_baseline_payload` 名稱取 builder ⇒ 於本模組 namespace 換成 mutant
+    # 後走主測，其等值斷言必紅（原 patch 打在 scripts 模組，主測讀不到，形同虛設）
+    assert dict(report.module_summary) != {"factor_exposure": "completed"}, (
+        "setup: 真實 module_summary 恰等於硬編值時本探針無鑑別力"
+    )
+    with patch.object(sys.modules[__name__], "build_baseline_payload", _mutant_build):
+        with pytest.raises(AssertionError):
+            test_baseline_payload_module_summary_from_report_not_serializer()
 
 
 def test_payload_cache_close_finite_field_present() -> None:

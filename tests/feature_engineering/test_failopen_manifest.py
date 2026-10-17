@@ -757,7 +757,9 @@ def test_mutation_resolve_completeness_ignoring_cross_tf_failures_is_caught(monk
         _assert_non_primary_status_case(LayerStatus.dependency_failed.value)
 
 
-def test_mutation_storage_single_tf_timeframes_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mutation_storage_single_tf_timeframes_is_caught(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """§V mutant ②：storage 改回 [timeframe] ⇒ 健康多週期之週期欄必紅。"""
     real = fs_module.resolve_completeness_meta
 
@@ -766,9 +768,20 @@ def test_mutation_storage_single_tf_timeframes_is_caught(monkeypatch: pytest.Mon
         meta.update({"expected_timeframes": [timeframe], "present_timeframes": [timeframe], "failed_timeframes": []})
         return meta
 
-    monkeypatch.setattr(sys.modules[__name__], "resolve_completeness_meta", _mutant)
-    with pytest.raises(AssertionError):
-        test_resolve_completeness_healthy_multi_tf()
+    with monkeypatch.context() as patch:
+        patch.setattr(sys.modules[__name__], "resolve_completeness_meta", _mutant)
+        with pytest.raises(AssertionError):
+            test_resolve_completeness_healthy_multi_tf()
+
+    # TESTREG 4.4：上段只換本測試模組之別名（證斷言敏感度、不經生產接線），與 docstring「storage 改回」名實不符；
+    # 補 writer 端：只換生產模組 feature_storage 之解析（write_raw 經模組全域呼叫），本模組別名維持真實 ⇒
+    # 落盤 manifest 之週期欄與 canonical 不符，writer 測試必紅
+    with monkeypatch.context() as patch:
+        patch.setattr(fs_module, "resolve_completeness_meta", _mutant)
+        with pytest.raises(AssertionError):
+            test_writer_timeframe_completeness_passes_canonical(tmp_path / "writer_mutant")
+    # 對照：未注入 mutant 時同一 writer 測試通過（mutant 之紅確由注入造成）
+    test_writer_timeframe_completeness_passes_canonical(tmp_path / "writer_real")
 
 
 # --- Task 2.1 ---------------------------------------------------------------

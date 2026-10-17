@@ -67,6 +67,35 @@ def _hash_array(values: np.ndarray) -> tuple[str, str]:
     )
 
 
+def _reference_incomplete_window_mask(values: np.ndarray, window: int) -> np.ndarray:
+    """獨立參考（不呼叫生產 stable_mask）：FF-STAT b4 R6甲「窗未滿遮 NaN」——逐欄自首個有限值起 window−1 列
+    （及其前）設 NaN；全 NaN 欄不變。"""
+    out = np.array(values, copy=True)
+    for col in range(out.shape[1]):
+        finite = np.flatnonzero(np.isfinite(out[:, col]))
+        if finite.size:
+            out[: finite[0] + window - 1, col] = np.nan
+    return out
+
+
+def _validate_winsor(
+    monkeypatch: pytest.MonkeyPatch, window: int | None, *, unmasked: bool
+) -> np.ndarray:
+    """公開驗證器之縮尾輸出；`unmasked=True` 時暫以 no-op 取代窗未滿遮罩（只為比對凍結 golden 之計算本身）。"""
+    from momentum.FeatureEngineering.preprocessing import stable_mask
+
+    frame = _winsor_fixture()
+    result = SimpleNamespace(features_df=frame.copy(), feature_count=frame.shape[1], config_used={})
+    with monkeypatch.context() as patch:
+        if unmasked:
+            patch.setattr(stable_mask, "mask_incomplete_window_inplace", lambda values, _w: values)
+        if window is None:
+            FeatureValidator().validate_factory_output(result)
+        else:
+            FeatureValidator().validate_factory_output(result, winsor_window=window)
+    return result.features_df.to_numpy()
+
+
 def _nan_reference_cases() -> dict[str, np.ndarray]:
     leading = np.arange(50, dtype=np.float64)[:, None]
     leading[:30] = np.nan
@@ -110,18 +139,18 @@ class TestGolden:
             "cross_chunk",
         }
 
-    def test_golden_default_winsor_matches_public_validator(self) -> None:
+    def test_golden_default_winsor_matches_public_validator(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # TESTREG 4.4：d229336e（FF-STAT b4 R6甲）起縮尾於窗未滿之列遮 NaN（設計變更）⇒ 凍結 hash 不再等於最終輸出。
+        # 改為兩段：①遮罩前之縮尾計算仍逐位元等於凍結 golden（計算本身不變）；②最終輸出＝①＋獨立參考遮罩（窗 252）。
         baseline = _load_baseline()
-        frame = _winsor_fixture()
-        result = SimpleNamespace(
-            features_df=frame.copy(),
-            feature_count=frame.shape[1],
-            config_used={},
-        )
-        FeatureValidator().validate_factory_output(result)
-        value_hash, mask_hash = _hash_array(result.features_df.to_numpy())
+        unmasked = _validate_winsor(monkeypatch, None, unmasked=True)
+        value_hash, mask_hash = _hash_array(unmasked)
         assert value_hash == baseline["winsor_default_value_hash"]
         assert mask_hash == baseline["winsor_default_mask_hash"]
+        final = _validate_winsor(monkeypatch, None, unmasked=False)
+        np.testing.assert_array_equal(final, _reference_incomplete_window_mask(unmasked, 252))
 
     def test_golden_max_nan_ratio_matches_head(self) -> None:
         baseline = _load_baseline()
@@ -201,7 +230,13 @@ class TestNanStats:
             ColumnNanAccumulator().update(np.zeros((2, 2), dtype=bool))
 
 
-def _write_n6_case(tmp_path: Path, name: str, values: np.ndarray) -> dict[str, object]:
+def _write_n6_case(
+    tmp_path: Path, name: str, values: np.ndarray, *, quality_gate: dict[str, object] | None = None
+) -> dict[str, object]:
+    """寫一欄經 CGSA 串流；`quality_gate` 給定時一併走生產品質閘（feature_storage.apply_quality_degradation），
+    回傳 summary（含 validation 與 completeness）；否則回傳 validation（原行為）。"""
+    from momentum.core.contracts import LayerExecutionResult, LayerStatus
+
     registry = ColumnGroupRegistry(tmp_path / f"{name}-registry", memory_buffer_groups=0)
     data = values.astype(np.float32, copy=False)[:, None]
     registry.save_data(
@@ -218,6 +253,16 @@ def _write_n6_case(tmp_path: Path, name: str, values: np.ndarray) -> dict[str, o
         data,
     )
     storage = FeatureStorage(str(tmp_path / f"{name}-features"))
+    gate_kwargs: dict[str, object] = {}
+    if quality_gate is not None:
+        healthy = LayerExecutionResult(
+            data=pd.DataFrame(), status=LayerStatus.ok, failed_engines=(), reason=None,
+            configured_engines=1, present_engines=1, required_engines=0, dependency_error=False,
+        )
+        gate_kwargs = {
+            "quality_gate": quality_gate,
+            "layer_results": {f"Layer {idx}": healthy for idx in range(1, 7)},
+        }
     _, summary = storage.write_raw_from_registry_stream(
         symbol="BTCUSDT",
         tf="12h",
@@ -227,8 +272,9 @@ def _write_n6_case(tmp_path: Path, name: str, values: np.ndarray) -> dict[str, o
         n_workers=1,
         cleanup_intermediate=False,
         l65_mode="none",
+        **gate_kwargs,
     )
-    return summary["validation"]
+    return summary if quality_gate is not None else summary["validation"]
 
 
 class TestN6:
@@ -239,34 +285,26 @@ class TestN6:
         # 72 / 400 = 0.18 > BTCUSDT/12h baseline threshold 0.163461...
         mid_hole[164:236] = np.nan
 
-        warmup_validation = _write_n6_case(tmp_path, "warmup", warmup)
-        mid_hole_validation = _write_n6_case(tmp_path, "mid_hole", mid_hole)
+        # TESTREG 4.4：原後半驗 FeatureFactory._apply_runtime_quality_gate，該方法全庫 0 生產呼叫者
+        # （feature_factory.py:3542）⇒ 生產閘壞不紅；改經串流寫入之生產品質閘（feature_storage.py:1215
+        # apply_quality_degradation），門檻＝factory 政策層同源之 BTCUSDT/12h 預設 max_nan_ratio
+        gate = {
+            "max_inf_ratio": 0.0,
+            "max_nan_ratio": FeatureFactory._default_max_nan_ratio("BTCUSDT", "12h"),
+        }
+        assert 72 / 400 > gate["max_nan_ratio"] > 0.0
+        warmup_summary = _write_n6_case(tmp_path, "warmup", warmup, quality_gate=gate)
+        mid_hole_summary = _write_n6_case(tmp_path, "mid_hole", mid_hole, quality_gate=gate)
 
-        assert warmup_validation["nan_ratio"] == 0.0
-        assert mid_hole_validation["nan_ratio"] == pytest.approx(72 / 400)
+        assert warmup_summary["validation"]["nan_ratio"] == 0.0
+        assert mid_hole_summary["validation"]["nan_ratio"] == pytest.approx(72 / 400)
 
-        factory = object.__new__(FeatureFactory)
-        warmup_metadata = {"quality_status": "complete", "run_status": "complete"}
-        mid_hole_metadata = {"quality_status": "complete", "run_status": "complete"}
-        config = {"max_inf_ratio": 0.0, "max_nan_ratio": None}
-        factory._apply_runtime_quality_gate(
-            warmup_metadata,
-            config,
-            "BTCUSDT",
-            "12h",
-            nan_ratio=float(warmup_validation["nan_ratio"]),
-            inf_ratio=0.0,
+        assert warmup_summary["completeness"]["quality_status"] == "complete"
+        assert mid_hole_summary["completeness"]["quality_status"] == "partial"
+        assert any(
+            str(reason).startswith("nan_ratio=")
+            for reason in mid_hole_summary["completeness"]["failure_reasons"]
         )
-        factory._apply_runtime_quality_gate(
-            mid_hole_metadata,
-            config,
-            "BTCUSDT",
-            "12h",
-            nan_ratio=float(mid_hole_validation["nan_ratio"]),
-            inf_ratio=0.0,
-        )
-        assert warmup_metadata["quality_status"] == "complete"
-        assert mid_hole_metadata["quality_status"] == "partial"
 
     def test_n6_missing_summary_key_warns_and_preserves_fallback(
         self, caplog: pytest.LogCaptureFixture
@@ -292,32 +330,48 @@ class TestN3:
             config_used=config_used,
         )
 
-    def test_n3_public_validator_default_and_w100_match_baseline(self) -> None:
+    def test_n3_public_validator_default_and_w100_match_baseline(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # TESTREG 4.4：同 TestGolden——凍結 hash 比遮罩前之計算；最終輸出另比獨立參考遮罩（d229336e 設計變更）
         baseline = _load_baseline()
-        frame = _winsor_fixture()
 
-        default_result = self._result(frame)
-        FeatureValidator().validate_factory_output(default_result)
-        assert _hash_array(default_result.features_df.to_numpy()) == (
+        default_unmasked = _validate_winsor(monkeypatch, None, unmasked=True)
+        assert _hash_array(default_unmasked) == (
             baseline["winsor_default_value_hash"],
             baseline["winsor_default_mask_hash"],
         )
+        np.testing.assert_array_equal(
+            _validate_winsor(monkeypatch, None, unmasked=False),
+            _reference_incomplete_window_mask(default_unmasked, 252),
+        )
 
-        w100_result = self._result(frame)
-        FeatureValidator().validate_factory_output(w100_result, winsor_window=100)
+        w100_unmasked = _validate_winsor(monkeypatch, 100, unmasked=True)
         assert resolve_winsor_min_periods(100) == baseline["winsor_w100_min_periods"]
-        assert _hash_array(w100_result.features_df.to_numpy()) == (
+        assert _hash_array(w100_unmasked) == (
             baseline["winsor_w100_value_hash"],
             baseline["winsor_w100_mask_hash"],
+        )
+        np.testing.assert_array_equal(
+            _validate_winsor(monkeypatch, 100, unmasked=False),
+            _reference_incomplete_window_mask(w100_unmasked, 100),
         )
 
     def test_n3_min_periods_prefix_and_l65_deduplication(self) -> None:
         frame = _winsor_fixture()
-        original_prefix = frame.iloc[:24].to_numpy(copy=True)
         validator = FeatureValidator()
         result = self._result(frame)
         validator.validate_factory_output(result, winsor_window=100)
-        np.testing.assert_equal(result.features_df.iloc[:24].to_numpy(), original_prefix)
+        # TESTREG 4.4：原斷言前 24 列（min_periods 前）保留原值；d229336e（FF-STAT b4 R6甲）起改為窗未滿遮 NaN——
+        # 逐欄自首個有限值起 99 列設 NaN，之後輸入有限處輸出亦有限（不得多遮）、輸入 NaN 處仍為 NaN
+        out = result.features_df.to_numpy()
+        src = frame.to_numpy()
+        for col in range(src.shape[1]):
+            first = int(np.flatnonzero(np.isfinite(src[:, col]))[0])
+            assert np.isnan(out[: first + 99, col]).all(), f"col {col}: 窗未滿之列未遮"
+            tail_src = src[first + 99:, col]
+            tail_out = out[first + 99:, col]
+            np.testing.assert_array_equal(np.isfinite(tail_out), np.isfinite(tail_src))
         assert validator._last_winsorization_count == 1
 
         already_applied = self._result(frame, l65_applied=True)
@@ -328,8 +382,19 @@ class TestN3:
     def test_n3_window_edges(self) -> None:
         assert resolve_winsor_min_periods(1) == 1
         short = pd.DataFrame({"x": [1.0, 100.0, 2.0]})
+        # TESTREG 4.4：d229336e 起窗未滿之列遮 NaN（原期望「窗大於列數 ⇒ 原值不變」之前提已變）：
+        # 窗 100 > 3 列 ⇒ 全遮；窗＝1 ⇒ 不遮且單點分位數夾住自身＝原值；窗＝3 ⇒ 前 2 列遮、末列 2.0 落在 {1,100,2} 之
+        # 1%／99% 分位數內 ⇒ 原值
         output = FeatureValidator().winsorize(short, window=100)
-        np.testing.assert_equal(output.to_numpy(), short.to_numpy())
+        assert np.isnan(output.to_numpy()).all()
+        np.testing.assert_equal(
+            FeatureValidator().winsorize(short, window=1).to_numpy(),
+            short.to_numpy(dtype=np.float32),
+        )
+        np.testing.assert_equal(
+            FeatureValidator().winsorize(short, window=3).to_numpy(),
+            np.array([[np.nan], [np.nan], [2.0]], dtype=np.float32),
+        )
         with pytest.raises(ValueError, match="must be positive"):
             FeatureValidator().winsorize(short, window=0)
 
@@ -467,5 +532,11 @@ def test_real_kline_stream_nan_ratio_matches_written_arrays(
     assert float(validation["nan_ratio"]) == recomputed
 
     threshold = FeatureFactory._default_max_nan_ratio("BTCUSDT", "12h")
-    expected_status = "partial" if recomputed > threshold else "complete"
-    assert result.metadata["quality_status"] == expected_status
+    # TESTREG 4.4：原假設 quality_status 只由 nan_ratio 決定；FFTFMETA／FFSTAT 起降級原因另含 L6.5 失敗、d* 事件、
+    # warmup_insufficient_history（feature_storage.apply_quality_degradation）⇒ 改為：nan 門檻原因出現與否
+    # ＝重算比率是否超過門檻；且狀態與全部降級原因一致（有任一原因 ⇒ partial，無 ⇒ complete）
+    reasons = [str(reason) for reason in result.metadata.get("failure_reasons", [])]
+    nan_reasons = [reason for reason in reasons if reason.startswith("nan_ratio=")]
+    assert bool(nan_reasons) == (recomputed > threshold), (recomputed, threshold, reasons)
+    expected_status = "partial" if reasons else "complete"
+    assert result.metadata["quality_status"] == expected_status, reasons

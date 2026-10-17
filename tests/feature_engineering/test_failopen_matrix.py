@@ -27,6 +27,10 @@ MATRIX_TF = "12h"
 SHORT_WINDOW_DAYS = 21
 FROZEN_DOC = ROOT / "docs/FF_FAILOPEN_FROZEN_TESTS.md"
 BASELINE_COMMIT = "d654237"
+# TESTREG 4.4：V-8 為 FF-FAILOPEN 期間「改既有測試斷言須登記」之義務；原比較終點 HEAD 無界 ⇒ 義務隨任何後續票改測試
+# 而無限增長（2026-10-18 實跑缺列數百、橫跨 api／analysis 等與 fail-open 無關之票），且該治理已由 TESTREG V19
+# 於產出端（寫檔當下）取代。終點凍結於 FF-FAILOPEN 結案提交（e4228777「fail-open 全案結案」）。
+FAILOPEN_CLOSE_COMMIT = "e4228777"
 ASSERTION_RE = re.compile(
     r"^\s*(assert\b|pytest\.raises|with pytest\.raises|assert_frame_equal|assert_series_equal)"
 )
@@ -137,11 +141,11 @@ def _owner_for_line(ranges: list[tuple[int, int, str]], line_no: int) -> str | N
 def _changed_assertion_tests(path: str) -> set[str]:
     old_source = _git_output("show", f"{BASELINE_COMMIT}:{path}")
     # 自基準後已刪除之測試檔（HEAD 無此路徑；如 FRAMEPATH 刪 frame 專屬測試檔）：新側視為空檔 ⇒ 其全部斷言計為變更
-    exists_at_head = bool(_git_output("ls-tree", "--name-only", "HEAD", "--", path).strip())
-    new_source = _git_output("show", f"HEAD:{path}") if exists_at_head else ""
+    exists_at_head = bool(_git_output("ls-tree", "--name-only", FAILOPEN_CLOSE_COMMIT, "--", path).strip())
+    new_source = _git_output("show", f"{FAILOPEN_CLOSE_COMMIT}:{path}") if exists_at_head else ""
     old_ranges, _ = _function_ranges(old_source)
     new_ranges, callers = _function_ranges(new_source)
-    diff = _git_output("diff", "-U0", f"{BASELINE_COMMIT}..HEAD", "--", path)
+    diff = _git_output("diff", "-U0", f"{BASELINE_COMMIT}..{FAILOPEN_CLOSE_COMMIT}", "--", path)
 
     changed: set[str] = set()
     old_line = new_line = 0
@@ -173,7 +177,7 @@ def _changed_assertion_tests(path: str) -> set[str]:
 
 
 def test_v8_frozen_doc_covers_every_existing_assertion_change() -> None:
-    """[V-8] d654237..HEAD 每個既有 test assertion owner 都須列在 frozen doc。"""
+    """[V-8] d654237..FF-FAILOPEN 結案提交，每個既有 test assertion owner 都須列在 frozen doc。"""
     assert FROZEN_DOC.is_file()
     frozen = FROZEN_DOC.read_text(encoding="utf-8")
     wildcard_paths = {
@@ -184,7 +188,10 @@ def test_v8_frozen_doc_covers_every_existing_assertion_change() -> None:
     baseline_files = set(
         _git_output("ls-tree", "-r", "--name-only", BASELINE_COMMIT, "tests/").splitlines()
     )
-    changed_files = _git_output("diff", "--name-only", f"{BASELINE_COMMIT}..HEAD", "--", "tests/")
+    changed_files = _git_output(
+        "diff", "--name-only", f"{BASELINE_COMMIT}..{FAILOPEN_CLOSE_COMMIT}", "--", "tests/"
+    )
+    assert changed_files.strip(), "V-8 範圍內無任何測試變更（範圍設定錯誤）"
 
     missing: list[str] = []
     for path in changed_files.splitlines():
@@ -194,6 +201,33 @@ def test_v8_frozen_doc_covers_every_existing_assertion_change() -> None:
             if path not in wildcard_paths and (path not in frozen or test_name not in frozen):
                 missing.append(f"{path}::{test_name}")
     assert not missing, "frozen doc missing assertion changes:\n" + "\n".join(missing)
+
+
+def _inject_public_domain_trend_failure(monkeypatch: pytest.MonkeyPatch, factory) -> None:
+    """只在公開域（受測 factory 之 L1）令 required trend engine 拋錯。
+
+    TESTREG 4.4：c76a9ecc（FF-STAT b3b）起生成先跑校準域（另一 FeatureFactory 實例、`_calibration_domain=True`），
+    其 L1 失敗依 FFSTAT_SPEC 不可降級、直接拋 CalibrationError（feature_factory.py 校準域 `_run`）⇒ 全域替換
+    `TrendIndicatorEngine.compute_all` 使注入先於公開域觸發，本矩陣 ① 之「公開域整層失敗」從未被測到（前提過期）。
+    改為：只在受測 factory 之 `_layer1_atomic_indicators` 執行期間令 engine 拋錯（校準域實例不受影響）。"""
+    active = {"public_l1": False}
+    original_compute_all = TrendIndicatorEngine.compute_all
+    original_l1 = factory._layer1_atomic_indicators
+
+    def _boom(self, ohlcv):  # noqa: ANN001
+        if active["public_l1"]:
+            raise RuntimeError("injected required trend failure")
+        return original_compute_all(self, ohlcv)
+
+    def _public_l1(self, data, config):  # noqa: ANN001
+        active["public_l1"] = True
+        try:
+            return original_l1(data, config)
+        finally:
+            active["public_l1"] = False
+
+    monkeypatch.setattr(TrendIndicatorEngine, "compute_all", _boom)
+    monkeypatch.setattr(factory, "_layer1_atomic_indicators", types.MethodType(_public_l1, factory))
 
 
 @pytest.fixture
@@ -211,12 +245,7 @@ def test_matrix_whole_layer_failure_fail_closed(
     """① 整層失敗：required engine 例外，預設 fail-closed → raise。"""
     factory = _make_factory(monkeypatch, tmp_path)
     start, end = _short_window_dates()
-
-    def _boom(self, ohlcv):  # noqa: ANN001
-        del self, ohlcv
-        raise RuntimeError("injected required trend failure")
-
-    monkeypatch.setattr(TrendIndicatorEngine, "compute_all", _boom)
+    _inject_public_domain_trend_failure(monkeypatch, factory)
 
     with pytest.raises(RuntimeError, match="Layer 1 failed"):
         factory.generate_features(
@@ -239,12 +268,7 @@ def test_matrix_whole_layer_failure_partial_status(
     """① 整層失敗 + allow_partial_layers：續行並標 partial。"""
     factory = _make_factory(monkeypatch, tmp_path)
     start, end = _short_window_dates()
-
-    def _boom(self, ohlcv):  # noqa: ANN001
-        del self, ohlcv
-        raise RuntimeError("injected required trend failure")
-
-    monkeypatch.setattr(TrendIndicatorEngine, "compute_all", _boom)
+    _inject_public_domain_trend_failure(monkeypatch, factory)
 
     result = factory.generate_features(
         MATRIX_SYMBOL,

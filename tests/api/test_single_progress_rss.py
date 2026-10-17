@@ -52,6 +52,8 @@ def _build_single_service(captured: Dict[str, List[Any]]) -> FeatureFactoryServi
     service._invoke_generation_with_lease_sink = lambda **kwargs: fake_generate(**kwargs)  # type: ignore[method-assign]
     service._summarize_result = lambda result: {"metadata": result.metadata, "hdf5_path": result.hdf5_path}  # type: ignore[method-assign]
     service._persist_task_record = lambda *args, **kwargs: None  # type: ignore[method-assign]
+    # d3463c94 起成功路徑呼叫 _write_run_size：未替身則對真實 data_cache/features 登錄檔取鎖並重寫（含 .bak）
+    service._write_run_size = lambda *args, **kwargs: None  # type: ignore[method-assign]
 
     def capture_notify(task_id: str, payload: Dict[str, Any]) -> None:
         captured.setdefault("notify", []).append(payload)

@@ -157,7 +157,9 @@ def test_analyze_applies_feature_filter_metadata_and_summary_limit(tmp_path: Pat
     n_samples = 120
     n_features = 8
     rng = np.random.default_rng(123)
-    timestamps = np.arange(n_samples, dtype=np.int64) * 12 * 60 * 60
+    # epoch 秒須為可信時刻（2024-01-01 起）：生產 holdout 邊界對 1970 附近之值 fail-closed
+    # （`split_preview` 之 MS_MAGNITUDE_FLOOR 判為單位錯誤），原 0 起算之輸入不合生產契約（TESTREG b5）
+    timestamps = 1_704_067_200 + np.arange(n_samples, dtype=np.int64) * 12 * 60 * 60
     features = pd.DataFrame(
         rng.normal(size=(n_samples, n_features)).astype(np.float32),
         columns=[f"feature_{idx}" for idx in range(n_features)],

@@ -138,21 +138,46 @@ def test_t31a_xsec_p_not_none_matches_kernel_and_separates_iid() -> None:
     assert report["metadata"]["label_horizon"] == 1
 
 
-def test_t31a_iid_mutation_would_fail_separation() -> None:
-    """T-3.1a mutation 可證偽：若 t 等於 i.i.d. 則分離斷言失敗（真紅邏輯）。"""
+def test_t31a_iid_mutation_would_fail_separation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-3.1a mutation 可證偽：把生產 HAC kernel 換成 i.i.d. t，T-3.1a 之分離斷言必轉紅。
+
+    TESTREG b5 改寫：原版以 `mutant_t = iid_t` 自比（未觸及待測碼、恆綠）；現以 monkeypatch
+    注入生產碼（`ic_filter_orchestrator._compute_hac_on_ic_series`）後重跑同一條 analyze 路徑。
+    """
+    import momentum.Analysis.ic_filter_orchestrator as orch_mod
+
     features = _make_xsec_frame(n_timestamps=80, ar_rho=0.9)
-    orch = ICFilterOrchestrator(load_ic_config())
-    report = orch.analyze_cross_sectional(
-        features, config_override={"ic_train_test_split": False}
-    )
-    values = np.asarray(
-        report["rolling_ic_series"]["alpha"]["window_cross_sectional"], dtype=float
-    )
-    iid_t = _iid_t_stat(values)
-    # 模擬 mutation 後 summary 的 t_stat
-    mutant_t = iid_t
+
+    def _run() -> tuple[float, float]:
+        orch = ICFilterOrchestrator(load_ic_config())
+        report = orch.analyze_cross_sectional(
+            features, config_override={"ic_train_test_split": False}
+        )
+        row = {r["feature_name"]: r for r in report["summary_table"]}["alpha"]
+        values = np.asarray(
+            report["rolling_ic_series"]["alpha"]["window_cross_sectional"], dtype=float
+        )
+        return float(row["t_stat"]), _iid_t_stat(values)
+
+    # 對照：正確 kernel 下 HAC t 與 i.i.d. t 可分離（同 T-3.1a 之斷言）
+    hac_t, iid_t = _run()
+    assert np.isfinite(hac_t) and np.isfinite(iid_t)
+    assert not np.isclose(hac_t, iid_t, rtol=1e-3, atol=1e-3)
+
+    original = orch_mod._compute_hac_on_ic_series
+
+    def _iid_kernel(values, horizon, *, maxlags=None):
+        result = dict(original(values, horizon, maxlags=maxlags))
+        result["t_stat"] = _iid_t_stat(values)
+        return result
+
+    monkeypatch.setattr(orch_mod, "_compute_hac_on_ic_series", _iid_kernel)
+    mutant_t, mutant_iid_t = _run()
+    assert mutant_iid_t == pytest.approx(iid_t, rel=0, abs=0), "mutation 不應改變逐期 IC 序列"
+    # mutant 確實生效（summary t 改為 i.i.d. t）⇒ T-3.1a 之分離斷言在此必失敗（真紅）
+    assert mutant_t == pytest.approx(mutant_iid_t, rel=1e-12)
     with pytest.raises(AssertionError):
-        assert not np.isclose(mutant_t, iid_t, rtol=1e-3, atol=1e-3)
+        assert not np.isclose(mutant_t, mutant_iid_t, rtol=1e-3, atol=1e-3)
 
 
 def test_t31b_labels_path_return_5_maxlags_floor() -> None:
@@ -207,8 +232,15 @@ def test_t31b_resolve_on_label_renamed_is_none() -> None:
     assert _resolve_cross_sectional_label_horizon("label") is None
 
 
-def test_t31b_mutation_resolve_after_rename_loses_horizon() -> None:
-    """T-3.1b M-J mutation: 若在改名後對 `_label` 解析，h 丟失→maxlags 不再保 floor4。"""
+def test_t31b_mutation_resolve_after_rename_loses_horizon(monkeypatch: pytest.MonkeyPatch) -> None:
+    """T-3.1b M-J mutation: 若在改名後對 `_label` 解析，h 丟失→maxlags 不再保 floor4。
+
+    TESTREG b5 改寫：原版只在測試內模擬計算（未注入生產碼、`or` 弱斷言）；現以 monkeypatch
+    把生產之 horizon 解析（`ic_filter_orchestrator._resolve_cross_sectional_label_horizon`）
+    改為「吃改名後之 `_label`」重跑同一條 labels_path 路徑，斷 T-3.1b 之斷言真紅。
+    """
+    import momentum.Analysis.ic_filter_orchestrator as orch_mod
+
     n_ts = 48
     symbols = ["BTCUSDT", "ETHUSDT", "BCHUSDT", "LTCUSDT"]
     features = _make_xsec_frame(n_timestamps=n_ts, symbols=symbols, seed=11)
@@ -216,29 +248,51 @@ def test_t31b_mutation_resolve_after_rename_loses_horizon() -> None:
         {"return_5": features["return_1"].to_numpy()},
         index=features.index,
     ).sort_index()
-    orch = ICFilterOrchestrator(load_ic_config())
-    orch._load_labels_hdf5 = lambda _p: labels_df  # type: ignore[method-assign]
     features_no_label = features.drop(columns=["return_1"])
-    report = orch.analyze_cross_sectional(
-        features_no_label,
-        labels_path="dummy.h5",
-        config_override={"ic_train_test_split": False},
-    )
-    correct_maxlags = int(report["metadata"]["significance"]["maxlags"])
 
-    # 模擬 bug：對 `_label` 解析 → h=None → 若再 fallback 1 則 L=auto_bw(<4)
-    wrong_h = _resolve_cross_sectional_label_horizon("_label")
-    assert wrong_h is None
+    def _run() -> dict[str, Any]:
+        orch = ICFilterOrchestrator(load_ic_config())
+        orch._load_labels_hdf5 = lambda _p: labels_df  # type: ignore[method-assign]
+        return orch.analyze_cross_sectional(
+            features_no_label,
+            labels_path="dummy.h5",
+            config_override={"ic_train_test_split": False},
+        )
+
+    # 正確路徑：以原始欄名 return_5 解析 ⇒ h=5、maxlags=max(auto_bw, 4)
+    report = _run()
     values = np.asarray(
         report["rolling_ic_series"]["alpha"]["window_cross_sectional"], dtype=float
     )
     z = values[np.isfinite(values)]
     auto_bw = int(4 * (z.size / 100.0) ** (2.0 / 9.0))
-    wrong_L_if_h1 = max(auto_bw, 0)  # h=1 → floor 0
-    assert wrong_L_if_h1 < 4 or wrong_L_if_h1 < correct_maxlags
-    # 正確路徑必須 ≥4 且 > 錯誤 h=1 路徑
+    assert auto_bw < 4, "前提不成立：n 使 auto_bw ≥ 4，floor 無鑑別力"
+    correct_maxlags = int(report["metadata"]["significance"]["maxlags"])
+    assert report["metadata"]["label_horizon"] == 5
     assert correct_maxlags >= 4
     assert correct_maxlags == max(auto_bw, 4)
+
+    original = orch_mod._resolve_cross_sectional_label_horizon
+
+    # mutant ①：改名後才解析（一律吃 `_label`）⇒ h=None ⇒ p 族全 NaN、floor 斷言轉紅
+    monkeypatch.setattr(
+        orch_mod, "_resolve_cross_sectional_label_horizon", lambda _name: original("_label")
+    )
+    mutant = _run()
+    assert mutant["metadata"]["label_horizon"] is None
+    assert mutant["metadata"]["horizon_unresolved"] is True
+    mutant_maxlags = mutant["metadata"]["significance"]["maxlags"]
+    with pytest.raises((AssertionError, TypeError, ValueError)):
+        assert mutant_maxlags is not None and int(mutant_maxlags) >= 4
+
+    # mutant ②：h 丟失後退回 1 ⇒ maxlags 退回 auto_bw（< 4）⇒ floor 斷言轉紅
+    monkeypatch.setattr(orch_mod, "_resolve_cross_sectional_label_horizon", lambda _name: 1)
+    mutant_h1 = _run()
+    mutant_h1_maxlags = int(mutant_h1["metadata"]["significance"]["maxlags"])
+    assert mutant_h1_maxlags == auto_bw
+    assert mutant_h1_maxlags < correct_maxlags
+    with pytest.raises(AssertionError):
+        assert mutant_h1_maxlags >= 4
 
 
 def test_t31c_horizon_unresolved_p_all_nan() -> None:

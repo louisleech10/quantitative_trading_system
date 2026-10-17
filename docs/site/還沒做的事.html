@@ -89,13 +89,13 @@
 </tr>
 <tr>
 <td><strong>舊版特徵產生器：同資料來源、不同 EMA 參數時欄名相撞</strong>（2026-10-14 TESTREG 第 3 批試改測試時查到）</td>
-<td>型態分析（<code>api/routes/pattern_analysis.py</code> 第 522 行）、XGBoost 批次（<code>api/services/xgboost_batch_service.py</code> 第 525 行）、特徵任務（<code>api/services/feature_task_service.py</code> 第 174 行）走舊產生器。同一資料來源設兩組 EMA 參數時，<code>close_ema_trend_aligned</code> 等幾個欄名不帶參數、兩組同名但數值不同；前兩處合併時「同名就跳過」，第二組的這幾欄被<strong>靜默丟掉</strong>，看起來卻像兩組都有。新的特徵工廠沒有引用這個舊產生器</td>
-<td>不屬 TESTREG 範圍；要另開一張票，插在全票排序哪一步依規定先跟委員評估（TESTREG 第 3 批收批時一併提）</td>
+<td>型態分析（<code>api/routes/pattern_analysis.py</code> 第 522 行）、XGBoost 批次（<code>api/services/xgboost_batch_service.py</code> 第 525 行）、特徵任務（<code>api/services/feature_task_service.py</code> 第 174 行）走舊產生器。同一資料來源設兩組 EMA 參數時，<code>close_ema_trend_aligned</code> 等幾個欄名不帶參數、兩組同名但數值不同；前兩處合併時「同名就跳過」，第二組的這幾欄被<strong>靜默丟掉</strong>，看起來卻像兩組都有。新的特徵工廠沒有引用這個舊產生器 。另：同檔 <code>_should_filter_absolute_features</code> 會看「現在跑的測試名字含不含 <code>test_cross_symbol_features</code>」決定是否過濾絕對價格欄——測試會過是因為程式認出它在被測，正式使用預設不過濾</td>
+<td>不屬 TESTREG 範圍；兩件併一張票（欄名帶參數、拿掉看測試名字的分支），插在全票排序哪一步依規定先跟委員評估。新測試已避開該分支、直接測 <code>relative_only</code></td>
 </tr>
 <tr>
-<td><strong>舊版特徵產生器看「測試名字」決定行為</strong>（2026-10-14 TESTREG 第 3 批試改測試時查到）</td>
-<td><code>momentum/FeatureEngineering/feature_extractor.py</code> 的 <code>_should_filter_absolute_features</code> 除了看設定 <code>relative_only</code>，還會看「現在跑的測試名字裡有沒有 <code>test_cross_symbol_features</code>」，有就自動過濾掉絕對價格欄。所以那支「跨標的特徵都是相對值」的測試會過，是因為程式認出它在被測；正式使用時預設不過濾，會輸出 <code>close_ema5_value</code> 等絕對值欄。用到這個產生器的是型態分析與 XGBoost 批次（同上一列）</td>
-<td>不屬 TESTREG 範圍；要另開一張票（拿掉看測試名字的分支；測試改為明確帶 <code>relative_only</code>），插在全票排序哪一步依規定先跟委員評估（TESTREG 第 3 批收批時與上一列一併提）。新測試已先避開這個分支、直接測 <code>relative_only</code> 的真實行為</td>
+<td><strong>IC 的兩組凍結基準過期、待重基準</strong>（2026-10-18 TESTREG 收尾查到）</td>
+<td>①LA-0 golden：a17b57e7（1h rolling 視窗依週期換算，刻意改動）後 BTC 1h 的對照指標也跟著變，舊歸因表把差異算到 LA-0 頭上——需 before／after 依新視窗重產並重新歸因簽核（<code>test_ic_1a_cut1_golden</code> 兩支、<code>golden_ab</code> 之凍結值比對已標預期失敗）。②IC 1eb 基準：凍結檔不在版控且依賴的 run 已刪（<code>test_ic_1eb_b5_golden</code> 4 支）</td>
+<td>屬 IC 量化正確性之重基準，另開一張；插哪一步依規定先跟委員評估</td>
 </tr>
 <tr>
 <td><strong>滾動彙總遇到重複欄名會直接崩潰</strong>（2026-10-14 TESTREG 第 3 批試改測試時查到）</td>
@@ -154,15 +154,15 @@
 </tr>
 <tr>
 <td>5</td>
-<td><strong>FRAMEPATH</strong>（進行中）</td>
-<td>刪舊引擎與舊特徵 h5 讀取（K 線檔不刪）。<strong>第一批已收尾（10/10）</strong>：舊引擎產生路徑刪除，12 種設定輸出逐位元不變，受影響測試（只跑相關的 277 項）這批造成 0、三家審碼通過。剩第二批（刪舊特徵 h5 讀寫鏈）、第三批（腳本與舊資料）、收案</td>
-<td>依你 10/9 裁定，先插 5a TESTREG，再做第二批</td>
+<td><strong>FRAMEPATH</strong>（✅ 2026-10-17 已收案）</td>
+<td>舊引擎與舊特徵 h5 讀寫已刪淨</td>
+<td>見 <a href="做過什麼.html">做過什麼.md</a></td>
 </tr>
 <tr>
 <td>5a</td>
-<td><strong>TESTREG 測試清冊</strong>（你 10/9 插入；<strong>規格與施工清單皆已核可、已蓋章（10/11）；第 1 批已收批（10/12，審碼四輪、兩家第 4 輪零意見；grok 額度用罄依你選擇暫改兩家）</strong>）</td>
-<td>全部測試檔（現 653 個）建清冊並自動維護：自動記錄結果與耗時、新增測試當下就檢查、有證據才淘汰、全專案測試檢查只能變多不能變少、不准對既有測試加 skip／xfail、只跑相關測試且一定不少跑；另查明 <code>test_failopen_correctness.py</code> 的 V-6 項目為何單項要 1 小時 40 分。分四批做（規格 <code>docs/TESTREG_SPEC.md</code> 第 46 版、施工清單 <code>docs/manifests/TESTREG.json</code>；白話審閱 <code>Archived/TESTREG規格審閱.md</code>、<code>Archived/TESTREG規格v17修正審閱.md</code>、<code>Archived/TESTREG規格v33修正審閱.md</code>）。「每行程式被哪些測試跑到」動態對照表列為先不做（要先累積記錄器資料）。<strong>第 3 批另查到、要在之後處理的</strong>：①特徵工廠測試範圍內有 52 檔受 FRAMEPATH 的總表檢查凍結，它們的改寫要等該檢查修好才能做；②早已不會執行到的舊程式碼裡的空心檢查，直接連程式一起刪；③施工清單階段寫好的驗收測試，之後只能新增不能改（現在沒有機械擋，屬已知缺口）；④有參數的測試，若外掛在收集時偷偷拿掉某幾組參數，事先看原始碼看不出來（要真的執行收集才知道，而提交前檢查不准跑測試）——本專案目前沒有這種外掛，出現時再處理</td>
-<td>第 3 批（分類）；四批做完才回 FRAMEPATH 第二批（開工前先修 FRAMEPATH 那條過嚴的總表檢查，並修它「挑選要跑哪些測試」漏選 2 個被弄壞測試的問題）</td>
+<td><strong>TESTREG 測試清冊</strong>（進行中：收尾）</td>
+<td>依你 10/17「跟業界一樣」改為逐支審碼處置剩下要改寫的 326 個測試（修／刪／標預期失敗並登記生產缺陷／確認沒問題就保留），不再要求每支附機器證明；三批已審碼並推送，最後兩批（受 FRAMEPATH 凍結之特徵工廠測試、依賴已刪資料之測試）處理中</td>
+<td>收完進第 6 步</td>
 </tr>
 <tr>
 <td>6</td>
@@ -179,7 +179,7 @@
 <tr>
 <td>8</td>
 <td><strong>數值轉換版本與精度紀錄</strong></td>
-<td>定好轉換用哪套算法並記錄；量測落盤精度（不改你 9/29「維持自動選」的裁定）</td>
+<td>定好轉換用哪套算法並記錄；量測落盤精度（不改你 9/29「維持自動選」的裁定）。另 10/18 查到：落盤時每欄依「整段資料」選精度，同一欄在較長資料下可能改存較低精度，所以歷史列存下來的數值會受後面資料影響（差在小數末幾位）</td>
 <td>先定，ICPATH、GLOBALH 驗完才不用重驗</td>
 </tr>
 <tr>

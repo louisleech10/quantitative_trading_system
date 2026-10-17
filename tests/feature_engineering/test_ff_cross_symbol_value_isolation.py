@@ -286,9 +286,17 @@ def test_mutation_m5_1_shared_dstar_path_fails_isolation(
 
 def test_mutation_m5_2_reference_cache_static_key_drop_is_detected() -> None:
     """M5.2 靜態輔助：reference cache 若退化成 timeframe-only key，guard 會失敗。"""
+    # TESTREG 4.4：原只斷言一個不存在之字串不在原始碼（未注入任何變異＝非探針）；改為對真實原始碼施以
+    # 「鍵退化為 timeframe-only」之變異，證 test_v5_reference_cache_source_uses_tuple_key_and_effective_ref_symbol
+    # 之 lookup guard 對原碼成立、對變異碼必紅
     source = inspect.getsource(FeatureFactory._load_reference_if_available)
+    guard = "self._reference_data_cache.get((ref_symbol, tf, None, None))"
+    assert guard in source  # 對照：guard 對真實碼成立
+    mutated = source.replace("self._reference_data_cache.get((ref_symbol, tf, None, None))",
+                             "self._reference_data_cache.get(tf)")
+    assert mutated != source  # 變異確實施加
     with pytest.raises(AssertionError):
-        assert "self._reference_data_cache.get(tf)" in source
+        assert guard in mutated
 
 
 @pytest.mark.requires_kline

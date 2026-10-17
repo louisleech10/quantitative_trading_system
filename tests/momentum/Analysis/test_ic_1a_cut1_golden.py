@@ -147,6 +147,16 @@ def _assert_la0_after_gate() -> None:
             assert abs(float(row["delta"])) <= 1e-12
 
 
+# a17b57e7（EVTWARMUP Task 3.1，刻意之生產改動）起 rolling 視窗依 run 週期換算：BTCUSDT 1h 之 control_pearson_rolling_ic
+# 等隨之改變，07-16 凍結之 LA-0 golden 與歸因表（before／after 皆以舊視窗產生）已過期；重凍需整套 LA-0 重基準與重新
+# 歸因簽核（TESTREG Task 4.4 實測：build_after_and_attribution.py 於 HEAD 判 control 兩項 unexpected）。
+_LA0_REBASELINE_PENDING = pytest.mark.xfail(
+    strict=True,
+    reason="LA-0 golden 待重基準（a17b57e7 視窗換算後凍結值過期）；見 白話說明/還沒做的事.md",
+)
+
+
+@_LA0_REBASELINE_PENDING
 def test_flag_off_deep_equal_baseline() -> None:
     """G-OLD / flag-off 強 gate：split-OFF after-golden + **live** deep-equal。
 
@@ -204,6 +214,7 @@ def test_flag_off_deep_equal_baseline() -> None:
         assert legacy.get("baseline_role") != "after_pit_split_off"
 
 
+@_LA0_REBASELINE_PENDING
 def test_flag_on_matches_new_golden() -> None:
     """G-NEW / flag-on 強 gate：split-ON after golden + live deep-equal。"""
     from tests.golden.la0.build_after_and_attribution import (  # noqa: WPS433

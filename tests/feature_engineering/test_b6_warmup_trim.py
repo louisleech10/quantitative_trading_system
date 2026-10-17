@@ -324,10 +324,13 @@ def test_warmup_insufficient_report_near_dataset_start(
         end_date=end,
     )
     meta = result.metadata or {}
-    if "warmup_insufficient" in meta:
-        wi = meta["warmup_insufficient"]
-        assert wi["needed"] > wi["available"]
-        assert wi["affected_bars"] == wi["needed"] - wi["available"]
+    # TESTREG 4.4：原以 if 包住、缺鍵時靜默通過；起始日＝資料首日 ⇒ 起始日前實得 bar 恆為 0（ingest 軸，
+    # feature_factory._apply_warmup_metadata 以 ingest_raw 計），warmup 需求 >0 ⇒ 報告必出現
+    assert "warmup_insufficient" in meta, f"資料首日起算卻未報 warmup_insufficient：{sorted(meta)}"
+    wi = meta["warmup_insufficient"]
+    assert wi["available"] == 0
+    assert wi["needed"] > wi["available"]
+    assert wi["affected_bars"] == wi["needed"] - wi["available"]
     assert meta.get("label_tail_nan_bars") == 21
     assert "cumulative_anchor" in meta
     _assert_data_cache_unchanged(before)
@@ -354,19 +357,8 @@ def test_warmup_quality_gain_position_independent(
         columns = [c for group in manifest["artifacts"]["raw"]["groups"].values() for c in group.get("columns", [])]
         return reader.load_columns_v2("BTCUSDT", "12h", config_hash, columns, allow_partial=True)
 
-    monkeypatch.setenv("FFACT_WARMUP_TRIM", "0")
-    factory_off = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
-    factory_off._storage = FeatureStorage(str(features_root / "off"))
-    res_off = factory_off.generate_features(
-        "BTCUSDT",
-        "12h",
-        config_override=cfg,
-        force_regenerate=True,
-        start_date=start,
-        end_date=end,
-    )
-
-    monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
+    # TESTREG 4.4：FFACT_WARMUP_TRIM 已無生產讀者（FFSTAT v32 預熱恆開；momentum/、api/ grep 0 命中）⇒ 原 off／on
+    # 兩次生成恆等、比較恆真且雙倍成本；刪 off 臂，改為對單次（預熱恆開）輸出強制斷言開頭有效率
     factory_on = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
     factory_on._storage = FeatureStorage(str(features_root / "on"))
     res_on = factory_on.generate_features(
@@ -377,7 +369,6 @@ def test_warmup_quality_gain_position_independent(
         start_date=start,
         end_date=end,
     )
-    off_df = _persisted(features_root / "off", res_off)
     on_df = _persisted(features_root / "on", res_on)
 
     window = factory_on._current_output_window
@@ -388,15 +379,12 @@ def test_warmup_quality_gain_position_independent(
     cols = [c for c in cols if on_df[c].notna().any()]
     assert cols, "no position-independent columns to measure"
     k = min(50, max(1, window.max_warmup_bars // 4))
-    off_sub = off_df[cols].iloc[:k]
     on_sub = on_df[cols].iloc[:k]
-    valid_off = float(off_sub.notna().mean().mean())
     valid_on = float(on_sub.notna().mean().mean())
-    # FFSTAT v32（使用者 2026-09-27 R1「預熱恆開」、刪 FFACT_WARMUP_TRIM）：環境變數不再能關預熱 ⇒ 兩次輸出開頭 k 列
-    # 之有效率相同，且位置無關欄於輸出開頭即全數有效（改前斷言「開啟比關閉多 5%」之前提已不存在）
-    assert valid_off == valid_on, f"FFACT_WARMUP_TRIM 仍影響結果：on={valid_on:.3f} off={valid_off:.3f}"
-    if "warmup_insufficient" not in (res_on.metadata or {}):
-        assert valid_on >= 0.999, f"預熱恆開後輸出開頭仍有空值：on={valid_on:.3f}"
+    # FFSTAT v32（使用者 2026-09-27 R1「預熱恆開」）：位置無關欄於輸出開頭即全數有效。輸出窗＝資料末 120 日，
+    # 起始日前資料遠多於預熱需求 ⇒ 不得報 warmup_insufficient（原以 if 跳過斷言之逃生口移除）
+    assert "warmup_insufficient" not in (res_on.metadata or {}), res_on.metadata.get("warmup_insufficient")
+    assert valid_on >= 0.999, f"預熱恆開後輸出開頭仍有空值：on={valid_on:.3f}"
     _assert_data_cache_unchanged(before)
 
 

@@ -19,40 +19,57 @@ def test_generate_features_accepts_date_range() -> None:
     assert "end_date" in params, "end_date parameter missing"
 
 
+def _layer0_with_frame(df: pd.DataFrame, start_date, end_date) -> pd.DataFrame:
+    """以生產 Layer 0（`FeatureFactory._layer0_data_ingestion`）之起訖裁切處理 df。
+
+    只替身資料來源（adapter registry 回傳 df）；起訖換算與裁切全走生產碼。
+    """
+    from types import SimpleNamespace
+
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
+    class _Registry:
+        def list_all(self):
+            return ["stub"]
+
+        def get(self, _name):
+            return SimpleNamespace(market="crypto")
+
+        def fetch_aligned(self, _symbol, _timeframe, _sources):
+            return df.copy()
+
+    factory = FeatureFactory.__new__(FeatureFactory)
+    factory._adapter_registry = _Registry()
+    config = SimpleNamespace(data_sources=SimpleNamespace(enabled_sources=[], synthetic_sources=[]))
+    return factory._layer0_data_ingestion("BTCUSDT", "1h", config, start_date=start_date, end_date=end_date)
+
+
 def test_date_range_filters_data() -> None:
-    """Date range filtering expression should reduce rows when range is narrow."""
+    """Date range filtering (production Layer 0) should reduce rows when range is narrow."""
     idx = pd.date_range("2024-01-01", periods=100, freq="h")
     df = pd.DataFrame({"close": range(100)}, index=idx.astype("int64") // 10**6)
 
-    start_ts = pd.Timestamp("2024-01-02")
-    end_ts = pd.Timestamp("2024-01-03")
-
-    index_as_datetime = pd.to_datetime(df.index, unit="ms", errors="coerce")
-    filtered = df[(index_as_datetime >= start_ts) & (index_as_datetime <= end_ts)]
+    filtered = _layer0_with_frame(df, "2024-01-02", "2024-01-03")
 
     assert len(filtered) < len(df), "Filtering should reduce rows"
     assert len(filtered) > 0, "Filtering should not remove all rows"
+    # 起訖兩端皆含（2024-01-02 00:00 … 2024-01-03 00:00，逐時 25 根）
+    kept = pd.to_datetime(filtered.index, unit="ms")
+    assert kept.min() == pd.Timestamp("2024-01-02")
+    assert kept.max() == pd.Timestamp("2024-01-03")
+    assert len(filtered) == 25
+    assert filtered["close"].tolist() == list(range(24, 49))
 
 
 def test_date_range_none_no_filtering() -> None:
-    """When start_date/end_date are None, no filtering should happen."""
+    """When start_date/end_date are None, production Layer 0 should not filter."""
     idx = pd.date_range("2024-01-01", periods=50, freq="h")
     df = pd.DataFrame({"close": range(50)}, index=idx.astype("int64") // 10**6)
 
-    start_date = None
-    end_date = None
-
-    filtered = df.copy()
-    if start_date is not None:
-        start_ts = pd.Timestamp(start_date)
-        index_as_datetime = pd.to_datetime(filtered.index, unit="ms", errors="coerce")
-        filtered = filtered[index_as_datetime >= start_ts]
-    if end_date is not None:
-        end_ts = pd.Timestamp(end_date)
-        index_as_datetime = pd.to_datetime(filtered.index, unit="ms", errors="coerce")
-        filtered = filtered[index_as_datetime <= end_ts]
+    filtered = _layer0_with_frame(df, None, None)
 
     assert len(filtered) == 50
+    pd.testing.assert_frame_equal(filtered, df)
 
 
 def test_ic_analysis_service_has_feature_library() -> None:

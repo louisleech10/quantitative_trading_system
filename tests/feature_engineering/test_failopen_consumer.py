@@ -120,7 +120,12 @@ def test_training_rejects_partial(tmp_path: Path) -> None:
             "config_hash": config_hash,
             "feature_count": 1,
             "row_count": 3,
-            "hdf5_relative_path": "",
+            # TESTREG 4.4：FRAMEPATH 後 load_for_training 只取已物化之登記（FeatureRegistry.is_materialized：
+            # hdf5_relative_path 指向存在之 V2 manifest）；原空字串使其於登記查找即拋 FeatureNotFoundError，
+            # partial 閘從未被觸及 ⇒ 指向本測試所寫之 manifest
+            "hdf5_relative_path": str(
+                storage.feature_run_dir("BTCUSDT", "1h", config_hash) / FeatureStorage.L7_V2_MANIFEST_NAME
+            ),
         }
     )
     library = FeatureLibrary(registry, storage, FeatureReader(str(storage.base_path)))

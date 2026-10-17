@@ -74,16 +74,97 @@ def case():
     return feats, y, (idx.asi8 // 10**6).astype("int64")
 
 
-def test_planted_feature_is_perfectly_separable(case):
+_EVENT_CONTEXT = {
+    "event_manifest_hash": "1" * 64, "label_definition_hash": "2" * 64,
+    "decision_time_rule": "t0_open_minus_k_bars", "feature_cutoff_rule": "max_close_le_decision_at",
+    "label_window_rule": "close_to_close:horizon_bars=1", "control_kind": "user_labeled_same_trigger",
+}
+
+
+def _write_pipeline_inputs(tmp_path: Path, case) -> tuple[str, str, str, dict]:
+    """把 `case` 之真實 12h 特徵與 return_1 標籤寫成 IC 管線輸入（features／labels h5＋meta）。
+
+    末根之 forward return 未定義 ⇒ 特徵與標籤末列皆 NaN（stage0 對齊契約：尾端 NaN 數＝lag）。
+    事件＝每一根已知 forward return 之 12h 根；0/1＝同一 2% 門檻（與 label 規則同源）。
+    """
+    import json
+
+    import h5py
+
+    feats, y, ms = case
+    bars = _bars()
+    sec = (bars.index.asi8 // 10**9).astype("int64")
+    planted_full = np.append(feats["feat_planted"].to_numpy(), np.nan)
+    noise_full = np.append(feats["feat_noise"].to_numpy(), np.nan)
+    str_dtype = h5py.string_dtype(encoding="utf-8")
+    fp, lp, mp = tmp_path / "features.h5", tmp_path / "labels.h5", tmp_path / "meta.json"
+    with h5py.File(fp, "w") as f:
+        g = f.create_group(f"{SYMBOL}/12h")
+        g.create_dataset("features", data=np.column_stack([planted_full, noise_full]))
+        g.create_dataset("timestamps", data=sec)
+        g.create_dataset("feature_names", data=np.array(["feat_planted", "feat_noise"], dtype=object),
+                         dtype=str_dtype)
+    with h5py.File(lp, "w") as f:
+        g = f.create_group(f"{SYMBOL}/12h")
+        g.create_dataset("labels", data=planted_full.reshape(-1, 1))
+        g.create_dataset("timestamps", data=sec)
+        g.create_dataset("label_names", data=np.array(["return_1"], dtype=object), dtype=str_dtype)
+    meta = {n: {"name": n, "category": "price", "layer": 1} for n in ("feat_planted", "feat_noise")}
+    meta.update({"symbol": SYMBOL, "timeframe": "12h"})
+    mp.write_text(json.dumps(meta), encoding="utf-8")
+    kwargs = {
+        "event_timestamps": [int(t) for t in ms],
+        "event_label_values": {int(t): float(v) for t, v in zip(ms, feats["feat_planted"].to_numpy())},
+        "event_label_owners": {int(t): f"e{i}" for i, t in enumerate(ms)},
+        "event_binary_labels": {int(t): int(v) for t, v in zip(ms, y)},
+        "label_mode_requested": "imported_binary",
+        "event_label_binary_meta": {"import_id": "evtlabel-e2e-realkline", "label_origin_values": ["0", "1"]},
+        "event_context": dict(_EVENT_CONTEXT),
+    }
+    return str(fp), str(lp), str(mp), kwargs
+
+
+@pytest.mark.ic_persist_redirect
+@pytest.mark.usefixtures("ic_persist_redirect")
+def test_planted_feature_is_perfectly_separable(case, tmp_path):
     """🔴 承重 oracle：與 label 規則**同源**的特徵 ⇒ AUC 恰為 1。
 
+    除單元層 `mann_whitney_table` 外，另經 `ICFilterOrchestrator.analyze` 之 imported_binary 路徑
+    （stage0 ingestion → stage3 0/1 綁定 → stage5 binary 統計與門檻 → report）：植入特徵之
+    auc／rank_biserial 須恰為 1、binary_status＝ok，且列入通過清單；雜訊特徵不得通過。
     管線任何一段把訊號弄丟或錯位，這條就紅。
     """
+    from momentum.Analysis.ic_config_schema import load_ic_config
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
     feats, y, _ = case
     tbl = mann_whitney_table(feats, y, min_class_n=10)
     assert tbl.loc["feat_planted", "auc"] == pytest.approx(1.0, abs=1e-12)
     assert tbl.loc["feat_planted", "rank_biserial"] == pytest.approx(1.0, abs=1e-12)
     assert tbl.loc["feat_planted", "status"] == "ok"
+
+    fp, lp, mp, kwargs = _write_pipeline_inputs(tmp_path, case)
+    report = ICFilterOrchestrator(load_ic_config()).analyze(
+        fp, lp, mp, config_override={"event_filter": {"enabled": True}}, **kwargs,
+    )
+    event_filter = report["metadata"]["event_filter"]
+    assert event_filter["label_mode"]["effective"] == "imported_binary"
+    assert event_filter["label_source"] == "imported_binary_label"
+    rows = {r["feature_name"]: r for r in report["summary_table"]}
+    planted = rows["feat_planted"]
+    assert planted["auc"] == pytest.approx(1.0, abs=1e-12)
+    assert planted["rank_biserial"] == pytest.approx(1.0, abs=1e-12)
+    assert planted["binary_status"] == "ok"
+    # stage5 通過＝未出現在任何剔除鍵（binary 模式下「略過」之報酬版門檻鍵不算剔除）
+    s5 = report["filter_log"]["stage5_thresholds"]
+    removed = {
+        name
+        for key, names in s5["removed_features"].items()
+        if not key.endswith("_skipped_binary_mode") and key != "icir_skipped_event_path"
+        for name in names
+    }
+    assert "feat_planted" not in removed
+    assert s5["output_features"]["count"] == len({"feat_planted", "feat_noise"} - removed)
 
 
 def test_noise_feature_is_not_separable(case):

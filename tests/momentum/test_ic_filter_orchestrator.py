@@ -971,13 +971,19 @@ def test_stage3_event_filter_uses_raw_data():
 
 
 def test_stage4_ic_calculation_with_kline_reader():
-    """IC 計算含 decay/regime 分支。"""
+    """IC 計算含 decay/regime 分支。
+
+    TESTREG b5：原輸入之特徵／label 為 RangeIndex（視為 1970 epoch 秒）、K 線為 2024 日線，
+    兩者無任一時刻重疊 ⇒ ICFIRSTALIGN 之 close carrier 守衛依契約 fail-closed
+    （`CloseCarrierInvalidError`）。改為特徵、label、K 線共用同一條 12h 時間軸（與 metadata
+    timeframe 一致），並補 close carrier 對齊與 decay horizon 之實質斷言。
+    """
+    timeline = pd.date_range("2024-01-01", periods=120, freq="12h")
+    close_values = np.linspace(1.0, 2.0, 120)
+
     class _DummyReader:
         def read_klines(self, _symbol, _timeframe):
-            return pd.DataFrame(
-                {"close": np.linspace(1.0, 2.0, 120)},
-                index=pd.date_range("2024-01-01", periods=120, freq="D"),
-            )
+            return pd.DataFrame({"close": close_values}, index=timeline)
 
     config_data = load_ic_config().model_dump(by_alias=True)
     config_data["ic_calculation"]["rolling_windows"] = [5]
@@ -995,11 +1001,13 @@ def test_stage4_ic_calculation_with_kline_reader():
     )
     config = ICConfig.model_validate(config_data)
     orchestrator = ICFilterOrchestrator(config)
+    rng = np.random.default_rng(20240101)
     features_df = pd.DataFrame(
-        np.random.randn(120, 2).astype(np.float32),
+        rng.normal(size=(120, 2)).astype(np.float32),
         columns=["f1", "f2"],
+        index=timeline,
     )
-    label = pd.Series(np.random.randn(120).astype(np.float32))
+    label = pd.Series(rng.normal(size=120).astype(np.float32), index=timeline)
 
     results = orchestrator._stage4_ic_calculation(
         features_df,
@@ -1011,6 +1019,15 @@ def test_stage4_ic_calculation_with_kline_reader():
 
     assert "ic_decay" in results
     assert "grouped_ic" in results
+    # close carrier：依同一 UTC 時刻取 K 線 close，索引保持特徵時間軸、值逐點相符
+    close_series = results["close_series"]
+    assert close_series.index.equals(features_df.index)
+    np.testing.assert_array_equal(close_series.to_numpy(dtype=np.float64), close_values)
+    # decay 分支：每個特徵皆按設定之 horizons 產出有限 IC
+    assert set(results["ic_decay"]) == {"f1", "f2"}
+    for feature, decay in results["ic_decay"].items():
+        assert list(decay["horizons"]) == [1, 2], feature
+        assert len(decay["ic_values"]) == 2 and np.all(np.isfinite(decay["ic_values"])), feature
 
 
 def test_select_label_series_single_and_fallback():

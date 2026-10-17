@@ -94,7 +94,9 @@ def _write_meta_json(path: Path, feature_names: list[str]) -> None:
 
 def _make_sample_dataset(n_samples: int, n_features: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     rng = np.random.default_rng(42)
-    timestamps = np.arange(n_samples, dtype=np.int64) * 12 * 60 * 60
+    # epoch 秒須為可信時刻（2024-01-01 起）：生產 holdout 邊界對 1970 附近之值 fail-closed
+    # （`split_preview` 之 MS_MAGNITUDE_FLOOR 判為單位錯誤），原 0 起算之輸入不合生產契約（TESTREG b5）
+    timestamps = 1_704_067_200 + np.arange(n_samples, dtype=np.int64) * 12 * 60 * 60
     features = pd.DataFrame(
         rng.normal(size=(n_samples, n_features)).astype(np.float32),
         columns=[f"feature_{i}" for i in range(n_features)],
@@ -135,8 +137,12 @@ class TestICGatekeeperE2E:
         assert result["metadata"]["total_features_output"] <= 8
         assert len(result["summary_table"]) > 0
 
-    def test_refilter_uses_cache(self, tmp_path: Path) -> None:
-        """refilter 不重算 IC。"""
+    def test_refilter_uses_cache(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """refilter 不重算 IC。
+
+        TESTREG b5 改寫：原唯一斷言為小資料 elapsed<1.0（重算也遠低於 1 秒 ⇒ 與宣稱不符）；
+        現以 spy 計數 ICEngine 之 IC 計算方法：analyze 期間 >0（spy 接線有效），refilter 期間 ==0。
+        """
         features, labels = _make_sample_dataset(n_samples=120, n_features=6)
 
         features_path = tmp_path / "features.h5"
@@ -151,18 +157,42 @@ class TestICGatekeeperE2E:
                 "thresholds": _lenient_thresholds()
             }
         )
+
+        calls: dict[str, int] = {}
+        engine = analyzer._ic_engine
+        for name in (
+            "compute_ic",
+            "compute_rolling_ic",
+            "compute_icir",
+            "compute_ic_autocorrelation",
+            "compute_ic_decay",
+            "compute_grouped_ic",
+        ):
+            original = getattr(engine, name)
+
+            def _spy(*args, _n=name, _orig=original, **kwargs):
+                calls[_n] = calls.get(_n, 0) + 1
+                return _orig(*args, **kwargs)
+
+            monkeypatch.setattr(engine, name, _spy)
+
         analyzer.analyze(
             features_path=str(features_path),
             labels_path=str(labels_path),
             meta_path=str(meta_path),
         )
+        assert calls.get("compute_ic", 0) > 0, f"spy 未接上 analyze 之 IC 計算路徑：{calls}"
+        calls.clear()
 
         start = time.perf_counter()
         report = analyzer.refilter({"icir_min": -1.0})
         elapsed = time.perf_counter() - start
 
+        assert calls == {}, f"refilter 重算了 IC：{calls}"
         assert elapsed < 1.0
         assert "summary_table" in report
+        assert len(report["summary_table"]) > 0
+
 
     def test_event_mode_with_query(self, tmp_path: Path) -> None:
         """Event Mode: Query String 過濾。"""

@@ -41,15 +41,17 @@ def _layers_from_files(root: Path) -> Dict[str, str]:
 
 @pytest.mark.parametrize("cgsa", ["1"], ids=["cgsa"])  # frame 臂移除：使用者 2026-09-28 裁定刪除 frame（RM-FRAMEPATH）
 def test_boundary_01_target_layers_on_both_paths(cgsa: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 1.1 邊界①（CGSA 與 frame 兩路徑各一）＋驗證：真實輕量 run 之 fracdiff 目標集合等於 L1∪L2 欄，
-    且逐欄決策之層與落盤層一致。層之正解一律由同設定之 CGSA run 落盤群組檔名讀得（frame 路徑不落群組
-    parquet；兩路徑欄名相同，主委實跑 2026-09-25）。"""
-    h.prepare_stat_env(monkeypatch, tmp_path / "truth")
-    truth_root, _, _ = h.run_stat(tmp_path / "truth", h.stat_payload(adf=False))
-    truth = _layers_from_files(truth_root)
+    """Task 1.1 邊界①＋驗證：真實輕量 CGSA run 之 fracdiff 目標集合等於 L1∪L2 欄，且逐欄決策之層與落盤層一致。
+    層之正解由本次 run 落盤群組檔名讀得（測試端觀測）。
+
+    TESTREG 4.4：frame 臂已於 FRAMEPATH 刪除，原 docstring「CGSA 與 frame 兩路徑各一」名實不符；原另跑一次同設定
+    之 CGSA 生成取正解（兩次相同生成＝重複成本）⇒ 改讀本次 run 自身落盤（決策層來自前處理器之層對照、落盤層來自
+    群組檔名，兩通道不同；斷言不變）。nodeid 保留以免目錄漂移。"""
     h.prepare_stat_env(monkeypatch, tmp_path / "run")
-    _, _, result = h.run_stat(tmp_path / "run", h.stat_payload(adf=False))
+    run_root, _, result = h.run_stat(tmp_path / "run", h.stat_payload(adf=False))
+    truth = _layers_from_files(run_root)
     dec = h.decisions(result)
+    assert dec, "本次 run 無平穩化決策（測試前提）"
     targets = {c for c, d in dec.items() if d["layer"] in h.CONTRACT["fracdiff_target_layers"]}
     assert targets == {c for c, layer in truth.items() if layer in h.CONTRACT["fracdiff_target_layers"]}
     assert all(dec[c]["layer"] == truth[c] for c in dec if c in truth)

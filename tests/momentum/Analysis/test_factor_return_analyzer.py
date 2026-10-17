@@ -335,6 +335,30 @@ def test_mutation_key() -> None:
     assert rm.get("sharpe") is None  # 舊鍵不存在 → null
     assert rm.get("sharpe_ratio") is not None
 
+    # 正例：生產 reporter 讀 sharpe_ratio ⇒ summary 帶值
+    cols_ok = reporter._build_deep_summary_columns("f1", deep_payload)
+    assert cols_ok["factor_return_sharpe"] == pytest.approx(1.2)
+
+    # 變異：risk_metrics 只有舊鍵 sharpe ⇒ 生產 reporter 不得誤讀，summary sharpe 須為 null
+    legacy_payload = {
+        "factor_returns": {
+            "status": "ok",
+            "value": {
+                "schema_version": "fr_full_v1",
+                "features": {
+                    "f1": {
+                        "long_short_mean_return": 0.01,
+                        "risk_metrics": {"sharpe": 1.2, "max_drawdown": -0.05},
+                    }
+                },
+            },
+            "reason": None,
+        }
+    }
+    cols_legacy = reporter._build_deep_summary_columns("f1", legacy_payload)
+    assert cols_legacy["factor_return_sharpe"] is None
+    assert cols_legacy["factor_return_max_drawdown"] == pytest.approx(-0.05)
+
 
 def test_compute_batch_ok_union_schema() -> None:
     """F0.2: compute_batch 回 §U ok union 頂層 schema_version+warmup_periods."""

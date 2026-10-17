@@ -109,13 +109,18 @@ def test_cgsa_force_fresh_skips_existing_manifest(
     (work_dir / "manifest.json").write_text(json.dumps({"groups": []}), encoding="utf-8")
     resume_mock = Mock(return_value=ColumnGroupRegistry(work_dir=work_dir))
     monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", resume_mock)
+    # TESTREG Task 4.4：寫入完整 L7 manifest，使 resume 閘本會放行——唯有 force_fresh 分支能使其不走 resume
+    # （原版未寫 L7 manifest，resume 閘先拒，force_fresh 分支從未被執行，改壞亦綠）
+    _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "1234567890abcdef")
     feature_factory._cgsa_force_fresh = True
 
     registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "1234567890abcdef")
 
     assert registry is not None
+    assert registry is not resume_mock.return_value
     assert registry.work_dir == work_dir
     assert resume_mock.call_count == 0
+    assert list(registry.iter_all()) == []
 
 
 def test_cgsa_config_hash_passed_correctly(
@@ -164,6 +169,7 @@ def test_cgsa_corrupt_manifest_fallback(
     feature_factory: FeatureFactory,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """測試損壞 manifest：應 fallback 為新 Registry，不得拋例外。"""
     monkeypatch.chdir(tmp_path)
@@ -171,11 +177,17 @@ def test_cgsa_corrupt_manifest_fallback(
     work_dir = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_deadbeef").resolve()
     work_dir.mkdir(parents=True, exist_ok=True)
     (work_dir / "manifest.json").write_text("{", encoding="utf-8")
+    # TESTREG Task 4.4：寫入完整 L7 manifest 使 resume 閘放行，流程方能抵達損壞 manifest 之後備分支
+    _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "deadbeefcafefeed")
+    caplog.set_level(logging.WARNING)
 
     registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "deadbeefcafefeed")
 
     assert registry is not None
     assert registry.work_dir == work_dir
+    assert list(registry.iter_all()) == []
+    fallback_logged = any("Corrupt manifest" in record.getMessage() for record in caplog.records)
+    assert fallback_logged
 
 
 def test_cgsa_empty_config_hash(
@@ -227,6 +239,7 @@ def test_cgsa_empty_manifest_json(
     feature_factory: FeatureFactory,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """測試空 manifest.json：應 fallback 為新 Registry。"""
     monkeypatch.chdir(tmp_path)
@@ -234,11 +247,17 @@ def test_cgsa_empty_manifest_json(
     work_dir = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_a1b2c3d4").resolve()
     work_dir.mkdir(parents=True, exist_ok=True)
     (work_dir / "manifest.json").write_text("", encoding="utf-8")
+    # TESTREG Task 4.4：寫入完整 L7 manifest 使 resume 閘放行，流程方能抵達空 manifest 之後備分支
+    _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "a1b2c3d4ef567890")
+    caplog.set_level(logging.WARNING)
 
     registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "a1b2c3d4ef567890")
 
     assert registry is not None
     assert registry.work_dir == work_dir
+    assert list(registry.iter_all()) == []
+    fallback_logged = any("Corrupt manifest" in record.getMessage() for record in caplog.records)
+    assert fallback_logged
 
 
 def test_cgsa_missing_npy_files_in_manifest(
@@ -263,14 +282,33 @@ def test_cgsa_missing_npy_files_in_manifest(
                 "shape": [10, 1],
                 "dtype": "float32",
                 "npy_path": "missing.npy",
-            }
+            },
+            {
+                "group_id": "1h_L1_trend_SMA",
+                "layer": "L1",
+                "timeframe": "1h",
+                "data_source": "close",
+                "indicator": "SMA",
+                "columns": ["close_1h_trend_SMA_5"],
+                "shape": [10, 1],
+                "dtype": "float32",
+                "npy_path": "present.npy",
+            },
         ]
     }
     (work_dir / "manifest.json").write_text(json.dumps(manifest_payload), encoding="utf-8")
+    # TESTREG Task 4.4：補一個 .npy 實存之 group，並寫入完整 L7 manifest 使 resume 閘放行——
+    # 原版 resume 閘先拒、從未走到 resume_from_manifest，「跳過缺失 group」從未被驗
+    import numpy as np
+
+    np.save(work_dir / "present.npy", np.zeros((10, 1), dtype=np.float32))
+    _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "ffeeddcc99887766")
 
     registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "ffeeddcc99887766")
 
     assert registry is not None
+    assert sorted(group_id for group_id, _group in registry.iter_all()) == ["1h_L1_trend_SMA"]
+    assert registry.all_column_names() == ["close_1h_trend_SMA_5"]
 
 
 # ──────────────────────────────────────────────────────────────────

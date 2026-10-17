@@ -133,6 +133,13 @@ class TestPolarsL2VsPandasL2:
                     err_msg=f"Numerical mismatch in column '{col}'"
                 )
 
+        # TESTREG Task 4.4：「全量數值等價」須兩臂欄集合相同（原只比交集，任一臂多／少欄不會紅）
+        only_pandas = sorted(set(pandas_result.columns) - set(polars_result.columns))
+        only_polars = sorted(set(polars_result.columns) - set(pandas_result.columns))
+        assert only_pandas == [] and only_polars == [], (
+            f"Column set mismatch: pandas-only={only_pandas[:10]}, polars-only={only_polars[:10]}"
+        )
+
 
 # ─── T4.2: test_polars_l65_vs_pandas_l65 ────────────────────────────────────
 
@@ -525,65 +532,24 @@ class TestPolarsAdapter:
 # ─── Real H5 integration test ────────────────────────────────────────────────
 
 class TestPolarsRealH5:
-    """使用真實 h5 資料的整合測試"""
+    """使用真實 h5 資料的整合測試
 
-    KLINE_PATH = "/Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5"
+    TESTREG Task 4.4：原寫死絕對路徑讀非 canonical 之 data_cache/kline_cache.h5、缺檔 pytest.skip（違 A17）
+    ⇒ 改讀 canonical data_cache/feature_klines（requires_kline_data，缺檔 fail）；FFACT_USE_POLARS 改以
+    monkeypatch 設定（原 os.environ.pop 會清掉呼叫前既有值）。
+    """
 
     @pytest.fixture
-    def real_kline_data(self):
+    def real_kline_data(self, requires_kline_data):
         """載入真實 ETHUSDT 1h K-line 資料"""
-        import h5py
-
-        if not os.path.exists(self.KLINE_PATH):
-            pytest.skip("Kline cache not available")
-
-        try:
-            with h5py.File(self.KLINE_PATH, "r") as f:
-                # Try common group patterns
-                for key in ["ETHUSDT/1h", "ETHUSDT_1h", "ETHUSDT"]:
-                    if key in f:
-                        group = f[key]
-                        if "data" in group:
-                            data = group["data"][:]
-                            break
-                        if "klines" in group:
-                            data = group["klines"][:]
-                            break
-                        if hasattr(group, "shape"):
-                            data = group[:]
-                            break
-                else:
-                    available = list(f.keys())
-                    pytest.skip(f"No ETHUSDT data found. Available: {available[:5]}")
-        except Exception as e:
-            pytest.skip(f"Cannot read kline h5: {e}")
-
-        # Build DataFrame — handle structured array (named fields) or 2D array
-        if data.dtype.names:
-            # Structured array with named fields
-            df = pd.DataFrame({
-                "open": data["open"].astype(np.float64),
-                "high": data["high"].astype(np.float64),
-                "low": data["low"].astype(np.float64),
-                "close": data["close"].astype(np.float64),
-                "volume": data["volume"].astype(np.float64),
-            })
-            if "timestamp" in data.dtype.names:
-                df.index = pd.to_datetime(data["timestamp"].astype(np.int64), unit="ms")
-        elif data.ndim == 2 and data.shape[1] >= 5:
-            df = pd.DataFrame({
-                "open": data[:, 1].astype(np.float64),
-                "high": data[:, 2].astype(np.float64),
-                "low": data[:, 3].astype(np.float64),
-                "close": data[:, 4].astype(np.float64),
-                "volume": data[:, 5].astype(np.float64) if data.shape[1] > 5 else np.ones(len(data)),
-            })
-            if data.shape[1] > 0:
-                timestamps = pd.to_datetime(data[:, 0].astype(np.int64), unit="ms")
-                df.index = timestamps
-        else:
-            pytest.skip("Unexpected data shape in kline h5")
-
+        raw = requires_kline_data("ETHUSDT", "1h", min_rows=1000)
+        df = pd.DataFrame({
+            "open": raw["open"].to_numpy(dtype=np.float64),
+            "high": raw["high"].to_numpy(dtype=np.float64),
+            "low": raw["low"].to_numpy(dtype=np.float64),
+            "close": raw["close"].to_numpy(dtype=np.float64),
+            "volume": raw["volume"].to_numpy(dtype=np.float64),
+        }, index=pd.to_datetime(raw["timestamp"].to_numpy(dtype=np.int64), unit="s"))
         return df
 
     def test_polars_l2_with_real_data(self, real_kline_data):
@@ -628,7 +594,28 @@ class TestPolarsRealH5:
         ratio_pd = polars_to_pandas(ratio_result, index=df.index)
         assert not np.any(np.isinf(ratio_pd.values[~np.isnan(ratio_pd.values)]))
 
-    def test_polars_l65_with_real_data(self, real_kline_data):
+        # TESTREG Task 4.4：原只驗形狀與無 inf；補逐值比對獨立 numpy 公式。分母近零守衛之因果尺度窗
+        # （DEFAULT_DENOM_SCALE_WINDOW 列）未滿者 fail-closed 為 NaN ⇒ 前 window−1 列（動量另加 lag 列）期望 NaN；
+        # 其後真實價格 EMA 遠離 0、近零遮罩不觸發 ⇒ 期望＝A/B 與 (x[t]−x[t−n])/x[t−n]。
+        from momentum.FeatureEngineering.utils.numeric_guards import DEFAULT_DENOM_SCALE_WINDOW
+
+        warm = DEFAULT_DENOM_SCALE_WINDOW - 1
+        ema5_ref = layer1["close_trend_EMA_5"].to_numpy(dtype=np.float64)
+        ema20_ref = layer1["close_trend_EMA_20"].to_numpy(dtype=np.float64)
+        ema50_ref = layer1["close_trend_EMA_50"].to_numpy(dtype=np.float64)
+        ratio_got = ratio_pd[["EMA_5_20_Ratio", "EMA_5_50_Ratio"]].to_numpy(dtype=np.float64)
+        assert np.isnan(ratio_got[:warm]).all()
+        np.testing.assert_allclose(ratio_got[warm:, 0], ema5_ref[warm:] / ema20_ref[warm:], rtol=1e-6)
+        np.testing.assert_allclose(ratio_got[warm:, 1], ema5_ref[warm:] / ema50_ref[warm:], rtol=1e-6)
+        momentum_got = polars_to_pandas(momentum_result, index=df.index)
+        for lag, name in ((1, "EMA_5_Mom_L1"), (5, "EMA_5_Mom_L5")):
+            mom_got = momentum_got[name].to_numpy(dtype=np.float64)
+            start = warm + lag
+            mom_expected = (ema5_ref[start:] - ema5_ref[start - lag:-lag]) / ema5_ref[start - lag:-lag]
+            assert np.isnan(mom_got[:start]).all()
+            np.testing.assert_allclose(mom_got[start:], mom_expected, rtol=1e-4, atol=1e-7)
+
+    def test_polars_l65_with_real_data(self, real_kline_data, monkeypatch):
         """測試 Polars L6.5 path 在真實資料上正常運行"""
         from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
@@ -651,18 +638,12 @@ class TestPolarsRealH5:
         }
 
         # Pandas path
-        os.environ["FFACT_USE_POLARS"] = "0"
-        try:
-            pd_result = FeaturePreprocessor(config).transform(features.copy())
-        finally:
-            os.environ.pop("FFACT_USE_POLARS", None)
+        monkeypatch.setenv("FFACT_USE_POLARS", "0")
+        pd_result = FeaturePreprocessor(config).transform(features.copy())
 
         # Polars path
-        os.environ["FFACT_USE_POLARS"] = "1"
-        try:
-            pl_result = FeaturePreprocessor(config).transform(features.copy())
-        finally:
-            os.environ.pop("FFACT_USE_POLARS", None)
+        monkeypatch.setenv("FFACT_USE_POLARS", "1")
+        pl_result = FeaturePreprocessor(config).transform(features.copy())
 
         assert pd_result.shape == pl_result.shape
 
@@ -688,3 +669,12 @@ class TestPolarsRealH5:
                     atol=5e-4, rtol=0,
                     err_msg=f"Numerical mismatch in '{col}' with real data"
                 )
+
+        # TESTREG Task 4.4：兩臂欄名與順序一致，且比對非空真（每欄皆有足量兩臂皆有效之列）
+        pd_columns = list(pd_result.columns)
+        pl_columns = list(pl_result.columns)
+        assert pd_columns == pl_columns
+        mutually_valid_counts = [
+            int((pd_result[c].notna() & pl_result[c].notna()).sum()) for c in pd_columns
+        ]
+        assert len(mutually_valid_counts) == 3 and min(mutually_valid_counts) > 900

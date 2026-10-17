@@ -245,6 +245,21 @@ def test_open_minus_no_future_leak_for_lower_tf():
         alignment_mode=AlignmentMode.OPEN_MINUS,
     )
     assert TimeframeAligner.validate_no_future_leak(aligned, primary_ts)
+    # TESTREG Task 4.4：validate_no_future_leak 讀 align_to_primary 自寫之 attrs、只比 open≤open（自指 oracle）
+    # ⇒ 補手算期望：OPEN_MINUS 決策於主週期開盤；1h 來源列 11h／12h／24h 之收盤為 12h／13h／25h。
+    # 主週期 12h 開盤 ⇒ 只有 11h 列已收盤（值 11）；24h 開盤 ⇒ 11h、12h 已收盤，取最新 12h 列（值 12）；
+    # 24h 列（25h 收盤）不得被取用。
+    expected_open_minus = [11, 12]
+    assert aligned["feature"].tolist() == expected_open_minus
+    # 生產 CGSA 對齊所用之 build_asof_index_map（multi_tf_generator）同一期望
+    idx_map = TimeframeAligner.build_asof_index_map(
+        np.array([12 * 3600, 24 * 3600], dtype=np.int64),
+        np.array([11 * 3600, 12 * 3600, 24 * 3600], dtype=np.int64),
+        source_dur_ns=3600 * 1_000_000_000,
+        primary_dur_ns=12 * 3600 * 1_000_000_000,
+        mode="open_minus",
+    )
+    assert idx_map.tolist() == [0, 1]
 
 
 def test_close_time_mode_keeps_same_open_bar_for_lower_tf():

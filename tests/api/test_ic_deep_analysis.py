@@ -748,24 +748,17 @@ def test_mutation_m7_allow_override_key(monkeypatch: pytest.MonkeyPatch) -> None
     """M7:若允許 config_override.net_ic_analysis → 雙入口拒測應紅。"""
     from api.models import ic_models as models_mod
 
+    # TESTREG Task 4.4：原版注入 noop 後直接呼叫該 noop 驗其不拋＝只驗替身自身（恆綠）。
+    # 改為：注入 noop（DeepAnalysisRequest／ICAnalyzeRequest 之 model validator 於呼叫時以模組全域解析此名）
+    # 後重跑原斷言 test_config_override_net_ic_rejected 之真路徑（HTTP 路由＋Pydantic）⇒ 原斷言必紅。
     monkeypatch.setattr(
         models_mod,
         "_reject_net_ic_analysis_in_config_override",
         lambda *_a, **_k: None,
     )
 
-    with pytest.raises(AssertionError):
-        raised = False
-        try:
-            # 直接呼叫 reject 函式(已 noop)
-            models_mod._reject_net_ic_analysis_in_config_override(
-                {"net_ic_analysis": {"cost_bps": 5}}
-            )
-            # 好後不 raise = 變異成功;oracle 要求必須 raise
-            raise_happened = False
-        except ValueError:
-            raise_happened = True
-        assert raise_happened, "config_override.net_ic_analysis must be rejected"
+    with pytest.raises((AssertionError, pytest.fail.Exception)):
+        test_config_override_net_ic_rejected()
 
 
 def test_mutation_m10_api_drop_validator(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -778,17 +771,15 @@ def test_mutation_m10_api_drop_validator(monkeypatch: pytest.MonkeyPatch) -> Non
         cost_enabled: bool = False
         cost_bps: Optional[float] = None
 
-    import api.models.ic_models as models_mod
+    # TESTREG Task 4.4：原版換成寬鬆類別後直接驗該寬鬆類別不拋＝只驗替身自身（恆綠）。
+    # 改為：把原斷言 test_cost_bps_range_422 單元層所用之 NetICAnalysisRequest（本測試模組全域）換成卸掉域檢
+    # 之寬鬆類別，重跑原斷言 ⇒ 其 `pytest.raises(ValidationError)` 必 DID NOT RAISE（紅）。
+    # 具名邊界：HTTP 層之 DeepAnalysisRequest 欄位型別於類別建立時已綁定原類別，模組屬性替換不影響路由，
+    # 故本探針只證原斷言之單元層能殺「卸域檢」mutant。
+    monkeypatch.setitem(globals(), "NetICAnalysisRequest", _LooseNetIC)
 
-    monkeypatch.setattr(models_mod, "NetICAnalysisRequest", _LooseNetIC)
-
-    with pytest.raises(AssertionError):
-        raised = False
-        try:
-            models_mod.NetICAnalysisRequest(cost_enabled=True, cost_bps=0.0)
-        except Exception:
-            raised = True
-        assert raised, "cost_bps=0 must raise at API NetICAnalysisRequest"
+    with pytest.raises((AssertionError, pytest.fail.Exception)):
+        test_cost_bps_range_422()
 
 
 def test_mutation_m4_drop_cost_passthrough(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -805,17 +796,11 @@ def test_mutation_m4_drop_cost_passthrough(monkeypatch: pytest.MonkeyPatch) -> N
         return out
 
     monkeypatch.setattr(ICAnalysisService, "_build_deep_module_override", drop_cost)
-    svc = ICAnalysisService()
-    from api.models.ic_models import DeepAnalysisModules
-
-    req = DeepAnalysisRequest(
-        modules=DeepAnalysisModules(**_net_ic_only_modules()),
-        net_ic=NetICAnalysisRequest(cost_enabled=True, cost_bps=7.0),
-    )
-    override = svc._build_deep_module_override(req)
-    with pytest.raises(AssertionError):
-        assert override["net_ic_analysis"].get("cost_bps") == 7.0
-        assert override["net_ic_analysis"].get("cost_enabled") is True
+    # TESTREG Task 4.4：原版對包裝後之輸出自行斷言（只驗替身抹掉了 cost）。改為重跑原斷言
+    # test_build_deep_module_override_typed_last（經 svc._build_deep_module_override 真路徑）⇒ 必紅
+    # （cost 欄缺失時原斷言以下標取值拋 KeyError，或值不符拋 AssertionError，皆為原測試失敗）。
+    with pytest.raises((AssertionError, KeyError)):
+        test_build_deep_module_override_typed_last()
 
 
 # ---------------------------------------------------------------------------

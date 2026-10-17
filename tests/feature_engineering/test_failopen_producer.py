@@ -247,7 +247,8 @@ def test_four_generator_paths_fail_closed_integration(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """四條 multi-TF 編排路徑：缺 lower TF / pipeline 失敗時預設 fail-closed，partial flag 則續行。"""
+    """三條 multi-TF CGSA 編排路徑（串列、並行之 primary、並行之 worker）：缺 lower TF / pipeline 失敗時預設
+    fail-closed，partial flag 則續行。（TESTREG 4.4：原「四條」含 legacy，legacy 多週期已於 FRAMEPATH 刪除。）"""
     primary_data = _primary_only_frames()
     config = _MtFConfig(allow_partial_timeframes=allow_partial)
     inject_primary_failure = generator_path == "cgsa_parallel_primary" and not allow_partial
@@ -255,10 +256,7 @@ def test_four_generator_paths_fail_closed_integration(
         generator_path == "cgsa_parallel_worker" or allow_partial
     )
 
-    if generator_path == "legacy":
-        factory = StubFactory({"12h": primary_data})
-        generator = _build_mtf_generator(factory, config)
-    elif generator_path == "cgsa_serial":
+    if generator_path == "cgsa_serial":
         monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
         registry = ColumnGroupRegistry(tmp_path / "cgsa_serial")
         factory = _CgsaStubFactory({"12h": primary_data}, registry)
@@ -304,48 +302,44 @@ def test_four_generator_paths_fail_closed_integration(
     assert "1h" in result.metadata["failed_timeframes"]
 
 
-def test_inf_threshold_marks_partial_and_warmup_nan_is_allowed() -> None:
+def _production_quality_gate(config, *, nan_ratio: float, inf_ratio: float) -> dict:
+    """生產品質閘：factory 政策層門檻（`_resolve_quality_thresholds`）＋ `apply_quality_degradation`，經
+    `_final_completeness`（persist=False 之生產呼叫點；writer 路徑以同一組函式形成）。
+
+    TESTREG 4.4：原測 `FeatureFactory._apply_runtime_quality_gate`，該方法全庫 0 生產呼叫者 ⇒ 生產閘壞不紅。"""
     factory = create_feature_factory(validate_continuity=False)
+    factory.layer_results = {
+        f"Layer {idx}": LayerExecutionResult(
+            data=pd.DataFrame(), status=LayerStatus.ok, failed_engines=(), reason=None,
+            configured_engines=1, present_engines=1, required_engines=0, dependency_error=False,
+        )
+        for idx in range(1, 7)
+    }
+    return factory._final_completeness(
+        config, "BTCUSDT", "12h", nan_ratio=nan_ratio, inf_ratio=inf_ratio, preprocessing_applied=None,
+    )
+
+
+def test_inf_threshold_marks_partial_and_warmup_nan_is_allowed() -> None:
     config = _config()
-    metadata = {"quality_status": "complete", "run_status": "complete", "failure_reasons": []}
-
-    factory._apply_runtime_quality_gate(
-        metadata,
-        config,
-        "BTCUSDT",
-        "12h",
-        nan_ratio=0.10,
-        inf_ratio=0.001,
-    )
+    metadata = _production_quality_gate(config, nan_ratio=0.10, inf_ratio=0.001)
     assert metadata["quality_status"] == "partial"
+    assert metadata["run_status"] == "partial"
+    assert any(str(r).startswith("inf_ratio=") for r in metadata["failure_reasons"])
 
-    warmup = {"quality_status": "complete", "run_status": "complete", "failure_reasons": []}
-    factory._apply_runtime_quality_gate(
-        warmup,
-        config,
-        "BTCUSDT",
-        "12h",
-        nan_ratio=0.10,
-        inf_ratio=0.0,
-    )
+    # nan_ratio 0.10 低於 BTCUSDT/12h 預設門檻（健康 run artifact）且無 inf ⇒ 不降級
+    warmup = _production_quality_gate(config, nan_ratio=0.10, inf_ratio=0.0)
     assert warmup["quality_status"] == "complete"
+    assert warmup["failure_reasons"] == []
 
 
 def test_nan_threshold_marks_partial() -> None:
-    factory = create_feature_factory(validate_continuity=False)
     config = _config(max_nan_ratio=0.01)
-    metadata = {"quality_status": "complete", "run_status": "complete", "failure_reasons": []}
-
-    factory._apply_runtime_quality_gate(
-        metadata,
-        config,
-        "BTCUSDT",
-        "12h",
-        nan_ratio=0.10,
-        inf_ratio=0.0,
-    )
+    metadata = _production_quality_gate(config, nan_ratio=0.10, inf_ratio=0.0)
 
     assert metadata["quality_status"] == "partial"
+    assert any(str(r).startswith("nan_ratio=") for r in metadata["failure_reasons"])
+    assert metadata["quality_thresholds"]["max_nan_ratio"] == 0.01
 
 
 def test_runtime_partial_flags_do_not_change_config_hash() -> None:

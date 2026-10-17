@@ -195,15 +195,87 @@ def _assert_columns_byte_equal(left: pd.DataFrame, right: pd.DataFrame) -> None:
             )
 
 
+_STORAGE_DTYPES = (np.dtype(np.float16), np.dtype(np.float32))
+
+
+def _assert_prefix_values_byte_equal(left: pd.DataFrame, right: pd.DataFrame, columns: list[str]) -> None:
+    """兩次落盤 raw 之同名欄於共同前綴逐位元相等（NaN 位置亦同）。
+
+    TESTREG 4.4（主委實跑 heavy_a.log）：落盤 dtype 由 feature_storage `_select_parquet_storage_array` 依整欄 float16
+    往返誤差逐欄選定（2026-09-29 dtype 裁定之設計；歷史列精度受後段資料影響另登記 NUMVIEW 票）⇒ 同一欄全窗可能存
+    float32、截尾窗存 float16。dtype 只准 float16／float32；兩窗 dtype 不同時把 float32 一側轉成 float16（＝生產
+    float16 分支之同一轉換 `source.astype(np.float16)`）後逐位元比對；dtype 相同者直接逐位元。不用浮點容差。"""
+    assert left.index.equals(right.index)
+    assert columns, "no columns to compare"
+    for column in columns:
+        lvals = left[column].to_numpy()
+        rvals = right[column].to_numpy()
+        assert lvals.dtype in _STORAGE_DTYPES and rvals.dtype in _STORAGE_DTYPES, (column, lvals.dtype, rvals.dtype)
+        if lvals.dtype != rvals.dtype:
+            with np.errstate(all="ignore"):
+                lvals = lvals.astype(np.float16)
+                rvals = rvals.astype(np.float16)
+        lnan = np.isnan(lvals)
+        rnan = np.isnan(rvals)
+        assert np.array_equal(lnan, rnan), column
+        finite = ~lnan
+        if finite.any():
+            assert np.array_equal(lvals[finite].view(np.uint8), rvals[finite].view(np.uint8)), column
+
+
+def _common_columns_with_explained_difference(full: pd.DataFrame, truncated: pd.DataFrame,
+                                              full_result, truncated_result) -> list[str]:
+    """全窗／截尾窗之欄交集（依全窗順序）；差集欄須由另一窗之剔除紀錄解釋。
+
+    TESTREG 4.4（主委實跑：全窗多 38 欄、順序亦異）：L3／L7 死欄判定依該次產出之整段資料（使用者 2026-10-02 裁定之
+    設計）⇒ 兩窗欄集合可不同。只在一窗出現之欄須列於另一窗 `result.metadata["column_set_reasons"]`（FFSTAT §C
+    Task 2.3 ⑦：本次 L3／L7 死欄過濾剔除之欄 → 原因，以公開欄名為鍵）；交集須非空且占兩窗欄數之絕大多數（≥95%）。"""
+    full_cols, trunc_cols = set(full.columns), set(truncated.columns)
+    common = full_cols & trunc_cols
+    assert common, "全窗與截尾窗無共同欄"
+    assert len(common) >= 0.95 * max(len(full_cols), len(trunc_cols)), (
+        len(common), len(full_cols), len(trunc_cols))
+    full_reasons = dict(full_result.metadata.get("column_set_reasons") or {})
+    trunc_reasons = dict(truncated_result.metadata.get("column_set_reasons") or {})
+    unexplained = {
+        "full_only_not_dropped_in_truncated": sorted(c for c in full_cols - trunc_cols if c not in trunc_reasons),
+        "truncated_only_not_dropped_in_full": sorted(c for c in trunc_cols - full_cols if c not in full_reasons),
+    }
+    assert not any(unexplained.values()), unexplained
+    return [c for c in full.columns if c in common]
+
+
+def _persisted_frame(factory, result, symbol: str, timeframe: str) -> pd.DataFrame:
+    """本次生成落盤之 raw 全欄（帶 sidecar 時間戳索引）。
+
+    TESTREG 4.4：CGSA 之 `result.features_df` 只帶索引不帶欄（feature_factory.py `_layer7_raw_from_cgsa_pipeline`）
+    ⇒ 以其比值為 0 欄恆過（委員 b3 claude_G1 摘要 1）；同 test_ff_cross_symbol_value_isolation 改讀落盤 raw。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    reader = FeatureReader(str(factory._storage.base_path))
+    config_hash = str(result.metadata["config_hash"])
+    manifest = reader.load_manifest_v2(symbol, timeframe, config_hash, allow_partial=True)
+    columns = [c for group in manifest["artifacts"]["raw"]["groups"].values() for c in group.get("columns", [])]
+    assert columns, f"persisted raw has no columns: {symbol}/{timeframe}/{config_hash}"
+    frame = reader.load_columns_v2(
+        symbol, timeframe, config_hash, columns, allow_partial=True, attach_row_index=True,
+    )
+    assert frame.shape[1] == len(columns) and len(frame) > 0, (frame.shape, len(columns))
+    return frame
+
+
 def _warmup_cutoff_row(frame: pd.DataFrame) -> int:
-    """首個全欄非 NaN 列（含）之後視為可比較區間。"""
+    """可比較區間起點＝各「有有效值之欄」首個有效值位置之最大者（含）。
+
+    TESTREG 4.4：原為「首個全欄非 NaN 列」——對空欄表恆 0；改讀落盤 raw 後 CGSA 保留之全 NaN 死欄／間歇 NaN 欄會使
+    其恆無全欄有效列而落入 skip。全 NaN 欄不參與起點但仍逐欄比 NaN 位置（`_assert_columns_byte_equal`）。"""
     if frame.empty:
         return 0
-    non_nan = ~frame.isna().to_numpy()
-    full_rows = np.all(non_nan, axis=1)
-    if not full_rows.any():
+    finite = np.isfinite(frame.to_numpy(dtype=np.float64))
+    live = finite.any(axis=0)
+    if not live.any():
         return len(frame)
-    return int(np.flatnonzero(full_rows)[0])
+    return int(np.argmax(finite[:, live], axis=0).max())
 
 
 def _artifact_data_file_map(artifacts: dict) -> dict[str, str]:
@@ -435,36 +507,42 @@ def test_v5_prefix_no_leakage_after_warmup(
         pd.Timestamp(full_end, tz="UTC") - pd.Timedelta(days=PREFIX_TRUNCATE_DAYS)
     ).strftime("%Y-%m-%d")
 
-    full = factory.generate_features(
+    # TESTREG 4.4：值改由各自落盤之 raw 讀回（features_df 只帶索引），兩次生成各用獨立 storage
+    factory = _make_factory(monkeypatch, tmp_path, feature_root=tmp_path / "features_full")
+    full_result = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
         config_override=_fast_config_payload(),
         force_regenerate=True,
         start_date=full_start,
         end_date=full_end,
-        persist=False,
-    ).features_df
+        persist=True,
+    )
+    full = _persisted_frame(factory, full_result, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
 
-    factory = _make_factory(monkeypatch, tmp_path)
-    truncated = factory.generate_features(
+    factory = _make_factory(monkeypatch, tmp_path, feature_root=tmp_path / "features_trunc")
+    truncated_result = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
         config_override=_fast_config_payload(),
         force_regenerate=True,
         start_date=trunc_start,
         end_date=trunc_end,
-        persist=False,
-    ).features_df
+        persist=True,
+    )
+    truncated = _persisted_frame(factory, truncated_result, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
 
     common_index = truncated.index.intersection(full.index)
     assert len(common_index) > 0
-    full_slice = full.loc[common_index]
-    trunc_slice = truncated.loc[common_index]
+    assert len(common_index) < len(full.index), "截尾視窗未短於全視窗（前綴比較不成立）"
+    columns = _common_columns_with_explained_difference(full, truncated, full_result, truncated_result)
+    full_slice = full.loc[common_index, columns]
+    trunc_slice = truncated.loc[common_index, columns]
     cutoff = max(_warmup_cutoff_row(full_slice), _warmup_cutoff_row(trunc_slice))
-    if cutoff >= len(common_index):
-        pytest.skip("no post-warmup rows in prefix window")
+    # 無可比較列＝本測試空心，不得 skip（B3）
+    assert cutoff < len(common_index), "no post-warmup rows in prefix window"
     comparable = common_index[cutoff:]
-    _assert_columns_byte_equal(full_slice.loc[comparable], trunc_slice.loc[comparable])
+    _assert_prefix_values_byte_equal(full_slice.loc[comparable], trunc_slice.loc[comparable], columns)
 
 
 @pytest.mark.requires_kline
@@ -473,7 +551,8 @@ def test_v5_l5_cross_sectional_prefix_no_leakage(
     tmp_path: Path,
 ) -> None:
     """[V-5] L5 enabled（ETH→BTC reference）：截尾視窗 warmup 後 prefix byte 級一致。"""
-    factory = _make_factory(monkeypatch, tmp_path)
+    # TESTREG 4.4：值改由各自落盤之 raw 讀回（features_df 只帶索引），兩次生成各用獨立 storage
+    factory = _make_factory(monkeypatch, tmp_path, feature_root=tmp_path / "features_full")
     full_start, full_end = _short_window_dates(PREFIX_WINDOW_DAYS, ETH_SYMBOL, ETH_TIMEFRAME)
     trunc_end = (
         pd.Timestamp(full_end, tz="UTC") - pd.Timedelta(days=PREFIX_TRUNCATE_DAYS)
@@ -487,13 +566,13 @@ def test_v5_l5_cross_sectional_prefix_no_leakage(
         force_regenerate=True,
         start_date=full_start,
         end_date=full_end,
-        persist=False,
+        persist=True,
     )
-    full = full_result.features_df
+    full = _persisted_frame(factory, full_result, ETH_SYMBOL, ETH_TIMEFRAME)
     assert factory.layer_results["Layer 5"].status.value == "ok"
     assert not factory.layer_results["Layer 5"].data.empty
 
-    factory = _make_factory(monkeypatch, tmp_path)
+    factory = _make_factory(monkeypatch, tmp_path, feature_root=tmp_path / "features_trunc")
     truncated_result = factory.generate_features(
         ETH_SYMBOL,
         ETH_TIMEFRAME,
@@ -501,21 +580,23 @@ def test_v5_l5_cross_sectional_prefix_no_leakage(
         force_regenerate=True,
         start_date=full_start,
         end_date=trunc_end,
-        persist=False,
+        persist=True,
     )
-    truncated = truncated_result.features_df
+    truncated = _persisted_frame(factory, truncated_result, ETH_SYMBOL, ETH_TIMEFRAME)
     assert factory.layer_results["Layer 5"].status.value == "ok"
     assert not factory.layer_results["Layer 5"].data.empty
 
     common_index = truncated.index.intersection(full.index)
     assert len(common_index) > 0
-    full_slice = full.loc[common_index]
-    trunc_slice = truncated.loc[common_index]
+    assert len(common_index) < len(full.index), "截尾視窗未短於全視窗（前綴比較不成立）"
+    columns = _common_columns_with_explained_difference(full, truncated, full_result, truncated_result)
+    full_slice = full.loc[common_index, columns]
+    trunc_slice = truncated.loc[common_index, columns]
     cutoff = max(_warmup_cutoff_row(full_slice), _warmup_cutoff_row(trunc_slice))
-    if cutoff >= len(common_index):
-        pytest.skip("no post-warmup rows in L5 prefix window")
+    # 無可比較列＝本測試空心，不得 skip（B3）
+    assert cutoff < len(common_index), "no post-warmup rows in L5 prefix window"
     comparable = common_index[cutoff:]
-    _assert_columns_byte_equal(full_slice.loc[comparable], trunc_slice.loc[comparable])
+    _assert_prefix_values_byte_equal(full_slice.loc[comparable], trunc_slice.loc[comparable], columns)
 
 
 def _decision_mode(alignment_mode: AlignmentMode) -> str:
@@ -985,9 +1066,10 @@ def _run_symbol_hash(
         force_regenerate=True,
         start_date=start,
         end_date=end,
-        persist=False,
+        persist=True,
     )
-    return _hash_dataframe_canonical(result.features_df)
+    # TESTREG 4.4：hash 改對落盤 raw 之值（features_df 只帶索引 ⇒ 原 hash 只含索引）
+    return _hash_dataframe_canonical(_persisted_frame(factory, result, symbol, BASELINE_TIMEFRAME))
 
 
 @pytest.mark.requires_kline
@@ -998,9 +1080,11 @@ def test_v7_cross_symbol_isolation(
     """[V-7] 單跑 BTC vs 接著跑 ETH：BTC hash 不變（新 factory 補充）。"""
     btc_alone = _run_symbol_hash(monkeypatch, tmp_path / "btc_alone", "BTCUSDT")
     _run_symbol_hash(monkeypatch, tmp_path / "btc_then_eth", "BTCUSDT")
-    _run_symbol_hash(monkeypatch, tmp_path / "btc_then_eth", "ETHUSDT")
+    eth = _run_symbol_hash(monkeypatch, tmp_path / "btc_then_eth", "ETHUSDT")
     btc_after = _run_symbol_hash(monkeypatch, tmp_path / "btc_after_eth", "BTCUSDT")
     assert btc_alone == btc_after
+    # 判別力：值 hash 須能分辨兩標的（只含索引時兩者同軸恆等）
+    assert eth != btc_alone
 
 
 @pytest.mark.requires_kline
@@ -1020,18 +1104,24 @@ def test_v7_cross_symbol_same_factory_no_cache_pollution(
         force_regenerate=True,
         start_date=start,
         end_date=end,
-        persist=False,
+        persist=True,
     )
-    btc_hash_first = _hash_dataframe_canonical(btc_first.features_df)
+    # TESTREG 4.4：hash 改對落盤 raw 之值（features_df 只帶索引）；同 factory 同 storage ⇒ 每次生成後立即讀回
+    btc_hash_first = _hash_dataframe_canonical(
+        _persisted_frame(factory, btc_first, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
+    )
 
-    factory.generate_features(
+    eth_result = factory.generate_features(
         ETH_SYMBOL,
         BASELINE_TIMEFRAME,
         config_override=config,
         force_regenerate=True,
         start_date=start,
         end_date=end,
-        persist=False,
+        persist=True,
+    )
+    eth_hash = _hash_dataframe_canonical(
+        _persisted_frame(factory, eth_result, ETH_SYMBOL, BASELINE_TIMEFRAME)
     )
 
     btc_second = factory.generate_features(
@@ -1041,10 +1131,13 @@ def test_v7_cross_symbol_same_factory_no_cache_pollution(
         force_regenerate=True,
         start_date=start,
         end_date=end,
-        persist=False,
+        persist=True,
     )
-    btc_hash_second = _hash_dataframe_canonical(btc_second.features_df)
+    btc_hash_second = _hash_dataframe_canonical(
+        _persisted_frame(factory, btc_second, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
+    )
     assert btc_hash_first == btc_hash_second
+    assert eth_hash != btc_hash_first  # 判別力：值 hash 須能分辨兩標的
 
 
 @pytest.mark.requires_kline
@@ -1065,6 +1158,7 @@ def test_v7_symbol_order_permutation_invariant(
     }
     assert hashes_a["BTCUSDT"] == hashes_b["BTCUSDT"]
     assert hashes_a["ETHUSDT"] == hashes_b["ETHUSDT"]
+    assert hashes_a["BTCUSDT"] != hashes_a["ETHUSDT"]  # TESTREG 4.4 判別力：值 hash 須能分辨兩標的
 
 
 @pytest.mark.requires_kline
@@ -1072,10 +1166,27 @@ def test_v7_cache_cold_hot_identical(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """[V-7] force_regenerate=True vs cache 命中：讀回 hash 一致。"""
+    """[V-7] force_regenerate=True vs 非強制重跑（快取路徑）：讀回 hash 一致。
+
+    TESTREG 4.4：原「熱」經 `_try_load_cache` 讀 factory.h5，CGSA 從不寫該檔 ⇒ 快取從不命中，且 hash 只含索引
+    （features_df 不帶欄）。現行非強制重跑之唯一快取入口＝`_prepare_cgsa_registry` →
+    `ColumnGroupRegistry.resume_from_manifest`（閘：L7 manifest 為 complete）。主委實跑（heavy_a.log）證：完整 run 之
+    L7 串流落盤以 `cleanup_intermediate=True` 釋放 L1–L6 中間儲存（feature_factory.py `_layer7_raw_from_cgsa_pipeline`
+    → feature_storage `release_storage`），續用時 `resume_from_manifest` 略過缺 shard 之群組 ⇒ 各週期依設計重算一次
+    （完整 run 後無可重用之 checkpoint；「中途中斷後續跑」之跳層由 test_v7_cgsa_resume_matches_fresh 涵蓋）。故本測試
+    驗：熱跑確經續用入口、公開域各週期 L1 恰算一次（不重複、不因殘留舊群組而跳算），兩次落盤 raw 之值 hash 逐位元相同。
+    用多週期設定（續用跳層只存在於多週期編排）。"""
+    monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
     factory = _make_factory(monkeypatch, tmp_path)
-    start, end = _short_window_dates(28)
-    config = _fast_config_payload()
+    start, end = _short_window_dates(14)
+    config = _multi_tf_payload()
+    # 同 test_v7_cgsa_resume_matches_fresh：精簡 L1 使種子品質 complete（續用閘只認 complete）
+    config["atomic_indicators"] = {
+        "trend": {"enabled": True, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}},
+                                                  {"name": "SMA", "params": {"timeperiod": 13}}]},
+        **{c: {"enabled": False} for c in ("momentum", "volatility", "volume", "cycle", "pattern", "statistics",
+                                           "microstructure", "entropy", "tail_risk")},
+    }
     cold = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
@@ -1085,6 +1196,29 @@ def test_v7_cache_cold_hot_identical(
         end_date=end,
         persist=True,
     )
+    cold_hash = _hash_dataframe_canonical(
+        _persisted_frame(factory, cold, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
+    )
+    assert cold.metadata.get("quality_status") == "complete", cold.metadata.get("failure_reasons")
+
+    resume_hits = {"count": 0}
+    original_resume = ColumnGroupRegistry.resume_from_manifest.__func__
+
+    @classmethod
+    def _counting_resume(cls, wd: Path) -> ColumnGroupRegistry:
+        resume_hits["count"] += 1
+        return original_resume(cls, wd)
+
+    monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", _counting_resume)
+    l1_calls = {BASELINE_TIMEFRAME: 0, ETH_TIMEFRAME: 0}
+    original_l1 = factory._layer1_atomic_indicators
+
+    def _counting_l1(self, data, factory_config):  # noqa: ANN001
+        tf = str(getattr(self, "_current_timeframe", ""))
+        l1_calls[tf] = l1_calls.get(tf, 0) + 1
+        return original_l1(data, factory_config)
+
+    factory._layer1_atomic_indicators = types.MethodType(_counting_l1, factory)
     hot = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
@@ -1094,7 +1228,13 @@ def test_v7_cache_cold_hot_identical(
         end_date=end,
         persist=True,
     )
-    assert _hash_dataframe_canonical(cold.features_df) == _hash_dataframe_canonical(hot.features_df)
+    assert resume_hits["count"] >= 1, "熱跑未經 CGSA 續用入口（快取路徑未觸及）"
+    # 校準域 L1 於另一 FeatureFactory 實例執行、不計入；公開域各週期恰算一次
+    assert l1_calls == {BASELINE_TIMEFRAME: 1, ETH_TIMEFRAME: 1}, f"熱跑公開域 L1 呼叫次數異常：{l1_calls}"
+    hot_hash = _hash_dataframe_canonical(
+        _persisted_frame(factory, hot, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
+    )
+    assert cold_hash == hot_hash
 
 
 @pytest.mark.requires_kline
@@ -1131,7 +1271,10 @@ def test_v7_cgsa_resume_matches_fresh(
         end_date=end,
         persist=True,
     )
-    oneshot_hash = _hash_dataframe_canonical(oneshot.features_df)
+    # TESTREG 4.4：hash 改對落盤 raw 之值（features_df 只帶索引）；共用 storage ⇒ 種子生成後立即讀回
+    oneshot_hash = _hash_dataframe_canonical(
+        _persisted_frame(seed_factory, oneshot, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
+    )
     assert seed_factory._cgsa_registry is not None
     oneshot_group_hash = _freeze_baseline_module()._sha256_json(
         sorted(seed_factory._cgsa_registry._groups)
@@ -1209,7 +1352,9 @@ def test_v7_cgsa_resume_matches_fresh(
     assert resume_hits["count"] >= 1, "CGSA resume_from_manifest was not invoked"
     assert l1_calls[BASELINE_TIMEFRAME] == 0, f"續跑重算了已完成之 12h L1：{l1_calls}"
     assert l1_calls[ETH_TIMEFRAME] >= 1, f"續跑未計算 1h L1：{l1_calls}"
-    assert _hash_dataframe_canonical(resumed.features_df) == oneshot_hash
+    assert _hash_dataframe_canonical(
+        _persisted_frame(resume_factory, resumed, BASELINE_SYMBOL, BASELINE_TIMEFRAME)
+    ) == oneshot_hash
     assert resume_factory._cgsa_registry is not None
     resumed_group_hash = _freeze_baseline_module()._sha256_json(
         sorted(resume_factory._cgsa_registry._groups)
