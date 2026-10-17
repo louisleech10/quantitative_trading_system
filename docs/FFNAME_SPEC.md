@@ -1,7 +1,7 @@
 # FF-NAME：特徵欄名單一文法、具型身分與單一 formatter／parser，並以命名世代防跨世代混用 — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 6 步；研究輪 `handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md`；偵察設計諮詢 r1 `handoffs/reconcile/20260924-ffname-x-consult-r1/synth.md`（21 條全處置，D-1～D-9）；事實盤點 `handoffs/run_receipts/ffname_probes/recon_facts_20261018.md`　|　日期：2026-10-18　|　對應 TODO：`docs/manifests/FFNAME.json`（本 SPEC 定案後依 TODO_GENERATION_PROMPT 產出）
-> 版本：v7（全面重寫：v6 之 `layer1_only` 已由 FF-STAT 刪、frame 世代閘因 FRAMEPATH 失去對象、名稱平穩化白名單已失效；改依諮詢 r1 D-1～D-9）。v1–v6 之審查沿革見 `handoffs/reconcile/20260924-ffname-x-review-r{1..5}/synth.md`。
+> 版本：v8（修訂審查 r6 處置 `handoffs/reconcile/20260924-ffname-x-review-r6/synth.md`：source 依實際輸入逐欄決定、世代閘移至 FeatureReader V2 讀取共同邊界並列全 direct 呼叫者、前端只消費 API 描述不再解析語意）；v7（全面重寫：v6 之 `layer1_only` 已由 FF-STAT 刪、frame 世代閘因 FRAMEPATH 失去對象、名稱平穩化白名單已失效；改依諮詢 r1 D-1～D-9）。v1–v6 之審查沿革見 `handoffs/reconcile/20260924-ffname-x-review-r{1..5}/synth.md`。
 
 ## §RISK 風險分級
 - **大小**：大（命中 a、b、c、d）。
@@ -66,8 +66,8 @@
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：不得在其他模組另寫組名或解析邏輯。
 
-**Task 1.2 — 跨端向量**
-- 目標：前端解碼器對證來源。　檔案：`scripts/export_feature_name_vectors.py`、`frontend/src/lib/__fixtures__/feature_name_vectors.json`。
+**Task 1.2 — 描述向量**
+- 目標：API 欄名描述（Task 3.3）之契約對證來源（前端不另解析語意）。　檔案：`scripts/export_feature_name_vectors.py`、`tests/_golden/ffname/name_vectors.json`。
 - **驗證**：`venv/bin/python scripts/export_feature_name_vectors.py --check` rc 0——向量含 §G reference 全部新名之解析結果與拒收案例（未知 category、非法參數字元、custom slug 碰撞、TsCorr、label）；重產之 sha256 相同。
 - **邊界**：向量檔由腳本產生，手改即 Task 3.3 測試紅。
 - **存活至**：永久。　**覆蓋風險**：無。
@@ -85,8 +85,8 @@
 
 **Task 2.2 — 自製 atomic、entropy、microstructure、tail-risk**
 - 目標：一處定義身分。　檔案：`atomic/volatility_indicators.py`、`atomic/volume_indicators.py`、`atomic/pattern_indicators.py`、`atomic/entropy_indicators.py`、`atomic/microstructure_indicators.py`、`atomic/tail_risk_indicators.py`、`atomic/custom_indicators.py`。
-- 改法：每指標一個身分常數，compute、輸出點（`l1op` 鍵）、`get_feature_metadata` 三處共用；indicator 詞與欄名一致（`Keltner-Width`、`Donchian-Width`、`VolumeMA-Ratio`、`ForceIndex`〔補參數〕、`BullishCount`〔`W5`→params `5`〕、`shannon`、`apen`、`sampen`、`hurst`、`fractal-dim`、`perm`、`amihud-illiq`、`kyle-lambda`、`roll-spread`、`cs-spread`、`ofi-raw`、`ofi-zscore`、`large-trade-ratio`、`vpin`、`vpin-zscore`、`cvar`〔params `1pct-21`〕、`rv-up`、`rv-down`、`rsj`、`ud-vol-ratio`、`gpr`、`jb`、`mdd`）；source：microstructure＝`ohlcv`、tail-risk＝`close-return`、entropy＝實際輸入（預設 `close-return`）；custom＝category `custom`、indicator＝slug（`[a-z0-9-]+`，不合或兩定義同 slug 即 run 級拒收）。
-- **驗證**：`pytest tests/feature_engineering/test_ffname_atomic_identity.py`——每指標 compute、輸出點、metadata 三處欄名 == 同一身分 format；custom 同 slug 兩定義 ⇒ 拒收；§G ②④。
+- 改法：每指標一個身分常數，compute、輸出點（`l1op` 鍵）、`get_feature_metadata` 三處共用；indicator 詞與欄名一致（`Keltner-Width`、`Donchian-Width`、`VolumeMA-Ratio`、`ForceIndex`〔補參數〕、`BullishCount`〔`W5`→params `5`〕、`shannon`、`apen`、`sampen`、`hurst`、`fractal-dim`、`perm`、`amihud-illiq`、`kyle-lambda`、`roll-spread`、`cs-spread`、`ofi-raw`、`ofi-zscore`、`large-trade-ratio`、`vpin`、`vpin-zscore`、`cvar`〔params `1pct-21`〕、`rv-up`、`rv-down`、`rsj`、`ud-vol-ratio`、`gpr`、`jb`、`mdd`）；source＝該輸出**實際使用之輸入資料鍵**依輸出點契約之順序經 canonical 後以 `-` 串接（取自 `l1op.point` 之輸入元組，例 microstructure Amihud 有 `quote_volume` 時 `close-quote-volume`、退回分支時 `close-volume`；OFI 有 `taker_ratio` 時 `taker-ratio`、否則 `taker-buy-volume-volume`；tail-risk MDD＝`close`、報酬類＝`close-return`；entropy＝實際輸入），分支改變輸入即改變欄名，同一欄名不得代表不同輸入；custom＝category `custom`、indicator＝slug（`[a-z0-9-]+`，不合或兩定義同 slug 即 run 級拒收）。
+- **驗證**：`pytest tests/feature_engineering/test_ffname_atomic_identity.py`——每指標 compute、輸出點、metadata 三處欄名 == 同一身分 format；以真實 kline 之「含 `quote_volume`／`taker_ratio`」與「不含」兩份資料各生成 microstructure，同一指標之欄名不同且各自 source == 輸出點輸入元組之 canonical 串接；custom 同 slug 兩定義 ⇒ 拒收；§G ②④。
 - **邊界**：①vpin 輸出點契約參數 `n_buckets` 與 metadata 一致；②無參數指標。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：不改指標計算。
@@ -138,15 +138,15 @@
 - 不可做：不得以新名之子字串補丁維持舊啟發式。
 
 **Task 3.3 — API 描述與前端**
-- 目標：前端不自行推語意。　檔案：API 回應加欄名描述（由 Python parser 即時算出，不落盤）之 `api/models/*` 與對應 route；`frontend/src/lib/featureNameParser.ts`（依文法重寫、刪 `ms_`／`ent_`／`tr_` 特判）、`components/feature-factory/FeatureNameSegmentFilter.tsx`、`FeatureCorrelationHeatmap.tsx`（shortLabel、`startsWith('ms_')`）、`ExportButtons.tsx:257`。
-- **驗證**：`frontend/src/lib/featureNameParser.test.ts`（vitest）讀 Task 1.2 向量逐筆全等（含拒收）；`cd frontend && npm run build` rc 0。
-- **邊界**：未知 category 顯式顯示 unsupported，不 fallback other。
+- 目標：欄名語意只由 Python parser 決定，前端只消費描述。　檔案：凡回傳特徵欄名清單之 API 一併回傳版本化欄名描述（kind、source、tf、category、indicator、params、ops、display；由 Python parser 於請求時算出、不落盤）之 `api/models/*` 與對應 route；前端 `frontend/src/lib/featureNameParser.ts` 之語意解析刪除，改為讀描述之型別與 adapter；`workers/featureNameParser.worker.ts`、`components/feature-factory/FeatureNameSegmentFilter.tsx`、`FeatureCorrelationHeatmap.tsx`（shortLabel、`startsWith('ms_')`）、`ExportButtons.tsx:257` 改讀描述。
+- **驗證**：`pytest tests/api/test_feature_name_descriptor.py`——各回傳欄名之 API 之描述 == Task 1.2 向量（含拒收時之錯誤描述）；`grep -rn "split('_')\|startsWith('ms_')\|parts\[3\]" frontend/src` 對欄名語意之命中 == 0；`frontend/src/lib/featureDescriptor.test.ts`（vitest）以 API 描述樣本驗元件只讀描述欄位；`cd frontend && npm run build` rc 0。
+- **邊界**：描述版本不符或未知 kind ⇒ 前端顯示 unsupported，不 fallback other。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：不得手寫第二套語意啟發式。
 
 **Task 3.4 — 命名世代閘**
-- 目標：全部特徵矩陣入口拒混世代。　檔案：`feature_naming.py`（`assert_single_feature_naming_version`）、`feature_library.py`（`_load_internal`、`load_multi`）、`api/services/ic_analysis_service.py`（路徑載入）、`api/services/cross_symbol_training_service.py`、`api/services/xgboost_batch_service.py`（交集前）。
-- **驗證**：`pytest tests/feature_engineering/test_ffname_generation_gate.py`——缺鍵、舊版、無法解析、兩標的版本不一 ⇒ 拒（訊息含重生指引）；同版通過且回傳 == 改前；五個入口各一例。
+- 目標：全部特徵矩陣讀取拒舊世代、多標的合併拒混世代。　檔案：`feature_naming.py`（`assert_feature_naming_version`、`assert_single_feature_naming_version`）；**共同邊界** `momentum/FeatureEngineering/feature_reader.py` 之 `load_manifest_v2`、`load_columns_v2`、`load_row_index_v2`（缺鍵、舊版、無法解析即拒）——涵蓋 direct 呼叫者 `momentum/Analysis/ic_engine.py:255,283,769`、`momentum/Analysis/coverage_analyzer.py:112,157,422`、`momentum/Analysis/event_samples/feature_materialization.py:80-81`、`feature_factory.py:2951`（post-IC 讀取自身新 run）與 `feature_library.py`；不經 reader 之 `api/services/ic_analysis_service.py` 路徑載入另加同一檢查；多標的合併點 `feature_library.load_multi`、`api/services/cross_symbol_training_service.py`、`api/services/xgboost_batch_service.py`（交集前）再驗版本一致。
+- **驗證**：`pytest tests/feature_engineering/test_ffname_generation_gate.py`——reader 三方法與上列每個 direct 呼叫者（ICEngine、CoverageAnalyzer、event materialization、feature_library、ic_analysis_service 路徑載入）各一例：缺鍵、舊版、無法解析 ⇒ 拒（訊息含重生指引）、同版通過且回傳 == 改前；三個多標的合併點各一例兩標的版本不一 ⇒ 拒；`grep -rn "\.load_manifest_v2(\|\.load_columns_v2(\|\.load_row_index_v2(" momentum api` 之呼叫者皆在本測試清單內（清單外新增呼叫者即紅）。
 - **邊界**：①單標的缺鍵亦拒；②非特徵矩陣之快取（統計 parquet）具名排除。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：不得自動改名或別名救回。
@@ -175,7 +175,7 @@
 - 不可做：不得以重凍掩蓋數值差異。
 
 ## §V 驗證策略與邊界測試目錄
-- **mutation**（各須使具名測試紅）：①某產生端繞過 formatter；②L2 只 canonical 一臂；③移除重複參數 ValueError；④Distance 改回以顯示 source 查 raw；⑤parser 接受底線入段；⑥TsCorr 改回內嵌全名；⑦移除版本鹽；⑧移除任一入口之世代閘；⑨lag 改回欄名啟發式；⑩保留第二套週期標記；⑪前端保留 `ms_` 特判；⑫§G 映射改為字串 replace（⑤通過條件必紅）。
+- **mutation**（各須使具名測試紅）：①某產生端繞過 formatter；②L2 只 canonical 一臂；③移除重複參數 ValueError；④Distance 改回以顯示 source 查 raw；⑤parser 接受底線入段；⑥TsCorr 改回內嵌全名；⑦移除版本鹽；⑧移除 reader 共同邊界或任一合併點之世代閘；⑨lag 改回欄名啟發式；⑩保留第二套週期標記；⑪前端恢復自行解析欄名語意（`split('_')` 或 `ms_` 特判）；⑬microstructure 退回分支沿用主分支 source（Task 2.2 雙資料測試必紅）；⑫§G 映射改為字串 replace（⑤通過條件必紅）。
 - 測試層級：單元（Task 1.1、2.x 單元、3.x）、真實 kline 輕量 run（§G、Task 2.6、4.3）、vitest（Task 3.3）。
 - 防假綠：既有 `test_feature_naming.py`、`test_ratiounsafe_*` 之斷言只可經本票改寫（測試刪改清單交審碼）。
 
