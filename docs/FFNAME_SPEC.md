@@ -1,7 +1,7 @@
 # FF-NAME：特徵欄名單一文法、具型身分與單一 formatter／parser，並以命名世代防跨世代混用 — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 6 步；研究輪 `handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md`；偵察設計諮詢 r1 `handoffs/reconcile/20260924-ffname-x-consult-r1/synth.md`（21 條全處置，D-1～D-9）；事實盤點 `handoffs/run_receipts/ffname_probes/recon_facts_20261018.md`　|　日期：2026-10-18　|　對應 TODO：`docs/manifests/FFNAME.json`（本 SPEC 定案後依 TODO_GENERATION_PROMPT 產出）
-> 版本：v13（TODO 產生時發現之 12 處未定介面定案：FeatureIdentity 形態與 kind 導出、例外型別、標記前後兩形、契約落點、tail-risk／entropy source 依輸入元組、custom slug 拒收時點、§G ①⑥ 一致、indicator_specs 帶 raw_lookup_key、canonical run 判定、ic_engine:334 改經 reader、scripts/tmp 具名排除、xgboost 合併點驗法、平穩化決策比對基準）；v12（修訂審查 r10 處置 `handoffs/reconcile/20260924-ffname-x-review-r10/synth.md`：靜態封閉範圍擴及 `scripts/`、`scripts/analyze_problem_features.py` 改用 parser 與 reader）；v11（修訂審查 r9 處置 `handoffs/reconcile/20260924-ffname-x-review-r9/synth.md`：IC stage0 之 h5 載入納入 canonical run 規則、靜態白名單擴及 HDF5 讀取；前端「語意解析」範圍明定並以靜態掃描封閉）；v10（修訂審查 r8 處置 `handoffs/reconcile/20260924-ffname-x-review-r8/synth.md`：改規則式封閉——凡接受特徵檔路徑者先解析為 canonical run 經 reader、移除任意路徑退路；前端描述唯一供給點為瀏覽投影兩種 detail_level，所有元件經共享 map 查詢）；v9（修訂審查 r7 處置 `handoffs/reconcile/20260924-ffname-x-review-r7/synth.md`：世代閘改為 reader 內單一 manifest 解析邊界＋特徵 parquet 只准經 reader 開啟之靜態封閉檢查；前端描述資料流端到端列明、刪前端 parser 與 worker）；v8（修訂審查 r6 處置 `handoffs/reconcile/20260924-ffname-x-review-r6/synth.md`：source 依實際輸入逐欄決定、世代閘移至 FeatureReader V2 讀取共同邊界並列全 direct 呼叫者、前端只消費 API 描述不再解析語意）；v7（全面重寫：v6 之 `layer1_only` 已由 FF-STAT 刪、frame 世代閘因 FRAMEPATH 失去對象、名稱平穩化白名單已失效；改依諮詢 r1 D-1～D-9）。v1–v6 之審查沿革見 `handoffs/reconcile/20260924-ffname-x-review-r{1..5}/synth.md`。
+> 版本：v14（Task 0.1 實作時發現之碼／規格矛盾定案：BinarySignal 後綴多字（預設 `Strong_Trend`）、L6.5 append 後綴可達集合、SignedStrength 不可由設定開啟、§G 零件 source 依輸入元組、TsCorr digest 之目標形、無逐欄紀錄之重凍 golden 之 oracle、baseline 體積、Task 0.1 腳本路徑）；v13（TODO 產生時發現之 12 處未定介面定案：FeatureIdentity 形態與 kind 導出、例外型別、標記前後兩形、契約落點、tail-risk／entropy source 依輸入元組、custom slug 拒收時點、§G ①⑥ 一致、indicator_specs 帶 raw_lookup_key、canonical run 判定、ic_engine:334 改經 reader、scripts/tmp 具名排除、xgboost 合併點驗法、平穩化決策比對基準）；v12（修訂審查 r10 處置 `handoffs/reconcile/20260924-ffname-x-review-r10/synth.md`：靜態封閉範圍擴及 `scripts/`、`scripts/analyze_problem_features.py` 改用 parser 與 reader）；v11（修訂審查 r9 處置 `handoffs/reconcile/20260924-ffname-x-review-r9/synth.md`：IC stage0 之 h5 載入納入 canonical run 規則、靜態白名單擴及 HDF5 讀取；前端「語意解析」範圍明定並以靜態掃描封閉）；v10（修訂審查 r8 處置 `handoffs/reconcile/20260924-ffname-x-review-r8/synth.md`：改規則式封閉——凡接受特徵檔路徑者先解析為 canonical run 經 reader、移除任意路徑退路；前端描述唯一供給點為瀏覽投影兩種 detail_level，所有元件經共享 map 查詢）；v9（修訂審查 r7 處置 `handoffs/reconcile/20260924-ffname-x-review-r7/synth.md`：世代閘改為 reader 內單一 manifest 解析邊界＋特徵 parquet 只准經 reader 開啟之靜態封閉檢查；前端描述資料流端到端列明、刪前端 parser 與 worker）；v8（修訂審查 r6 處置 `handoffs/reconcile/20260924-ffname-x-review-r6/synth.md`：source 依實際輸入逐欄決定、世代閘移至 FeatureReader V2 讀取共同邊界並列全 direct 呼叫者、前端只消費 API 描述不再解析語意）；v7（全面重寫：v6 之 `layer1_only` 已由 FF-STAT 刪、frame 世代閘因 FRAMEPATH 失去對象、名稱平穩化白名單已失效；改依諮詢 r1 D-1～D-9）。v1–v6 之審查沿革見 `handoffs/reconcile/20260924-ffname-x-review-r{1..5}/synth.md`。
 
 ## §RISK 風險分級
 - **大小**：大（命中 a、b、c、d）。
@@ -32,7 +32,8 @@
 
 ## §G Golden / Baseline
 - **feature/kline 條件**：適用。真實 `data_cache/feature_klines/kline_cache.h5`；禁合成 fixture。
-- **reference 設定**：涵蓋全部產生端——TA-Lib 六引擎（含多輸出、多參數、`close-volume` 來源）、自製 volatility／volume／pattern、entropy、microstructure、tail-risk、L2（Cross、Ratio 與全部單欄算子含 TsCorr、Distance、BinarySignal）、L3、L4（`layer1_and_raw`，含 `taker_ratio`、`quote_volume`、`taker_buy_volume` raw 欄）、L6 meta、L6.5 append 模式（`fracdiff`、`diff-k`、`rank`、`gaussian`、`zscore-w` 後綴）；多週期 `["1h","12h"]`；CGSA 序列模式（`FFACT_MULTI_TF_PARALLEL=0`）。L5 cross-sectional 另以三標的小窗 run 涵蓋。
+- **reference 設定**：涵蓋全部產生端——TA-Lib 六引擎（含多輸出、多參數、`close-volume` 來源）、自製 volatility／volume／pattern、entropy、microstructure、tail-risk、L2（Cross、Ratio 與全部可由設定開啟之單欄算子含 TsCorr、Distance、BinarySignal；BinarySignal 規則含 `config/scan_config.yaml` 預設之多字後綴 `Strong_Trend`）、L3、L4（`layer1_and_raw`，含 `taker_ratio`、`quote_volume`、`taker_buy_volume` raw 欄）、L6 meta、L6.5 append 模式（現行生產路徑可達之後綴僅 `fracdiff`、`diff-k`：生成端 `_build_l7_raw_preprocessing_config` 關閉 rank／gaussian／zscore，post-IC 與 API 之轉換設定強制 replace 模式不加後綴；`rank`、`gaussian`、`zscore-w` 之文法由 Task 1.1 單元與 Task 1.2 向量涵蓋，post-IC 組名點仍包裝，出現即錄）；多週期 `["1h","12h"]`；CGSA 序列模式（`FFACT_MULTI_TF_PARALLEL=0`）。L5 cross-sectional 另以三標的小窗 run 涵蓋。
+- **重凍 golden 之值 oracle（v14）**：契約 `refreeze.goldens` 每檔於凍結時記逐欄值雜湊（`golden_values`；雜湊取 sha256 前 16 個十六進位字元，以控制 baseline 體積於 GitHub 50MB 警示線下；主 run 逐欄四雜湊仍為完整 sha256）。檔內無逐欄紀錄者登記於契約 `refreeze.no_column_records`（檔 → 版面類別與理由），baseline 改記該檔 sha256 與可對證之免欄名子雜湊：類別 `name_free`（檔內無特徵欄名，如函式分類、錯誤訊息契約）⇒ Task 4.3 須位元組不變，否則停；類別 `group_values`（如 failopen 之群組 npy 雜湊）⇒ 不含欄名之值雜湊部分須全等，只准含名之層級雜湊變；類別 `name_hash_only`（雜湊本身含欄名且檔內無值紀錄，如 fftfmeta 以群組檔名為鍵之雜湊、icfirstalign 探針之 `late_names_sha256`）⇒ 改前於凍結時另以同一產生路徑錄其欄名清單，Task 4.3 以映射後清單重算之雜湊須等於重凍檔之雜湊，值不變性由主 run 逐欄四雜湊承擔。
 - **凍結（改前，現行 HEAD）**：存 `tests/_golden/ffname/baseline.json`：逐欄（舊名為鍵）dtype、shape、NaN mask sha256、值 sha256，與**組名零件**——凍結腳本於 recon A1–A12 所列每個組名點包裝，記 `(舊名, kind, source, raw_lookup_key, category, indicator, params, ops, tf)`；manifest 任一欄無對應零件紀錄 ⇒ 凍結失敗（封閉涵蓋）。另記 L2 配對簽名集合 `(fast L1 舊名, slow L1 舊名, op)`、L4 lag 輸入集合、欄序、group_id 集合、平穩化決策鍵集合。
 - **舊名→新名映射**：由錄得零件以新 formatter 推導；禁字串清單與全欄 `replace`。
 - **通過條件**：①映射後欄集合相等（例外只准⑤之 L2 合併差集與⑥之新增 lag 欄，兩者逐筆列入收據）；②每欄四雜湊全等；③改名數 > 0；④新 run 全部欄名 `parse` 成功且 `format(parse(n)) == n`；⑤L2 配對簽名集合經映射後相等，差集只准為「同 canonical 身分之舊兩分支重複」且逐筆列入收據；⑥L4 lag 輸入集合＝新 run 之 L1 群組欄＋raw 欄（`volume_*_volume_VolumeMA-Ratio_*`、`ohlc_*_pattern_BullishCount_*` 由此新增 lag，屬缺陷修正，新增欄逐筆列入收據並驗其值＝輸入位移）；⑦manifest `feature_naming_version == CURRENT`。任一不等列欄名與 diff＝FAIL。
@@ -43,9 +44,9 @@
 ### Phase 0 — 凍結與基線（依賴：無）
 
 **Task 0.1 — 改前凍結**
-- 目標：依 §G 凍結 baseline 與組名零件。　檔案：`handoffs/run_receipts/ffname_probes/freeze_baseline.py`（隔離同 `fftfmeta_golden_helpers.prepare_env`）、`tests/_golden/ffname/baseline.json`。
-- **驗證**：`venv/bin/python handoffs/run_receipts/ffname_probes/freeze_baseline.py --check` rc 0——manifest 全部欄皆有零件紀錄（無紀錄欄數 == 0）；L2 配對簽名、lag 輸入集合、欄序、group_id、平穩化決策鍵均已記；重跑凍結兩次之 baseline.json sha256 相同。
-- **邊界**：①同名欄出自兩個組名點 ⇒ 凍結失敗並列出；②零件中 source 為 None（microstructure、tail-risk 現況）照實記錄。
+- 目標：依 §G 凍結 baseline 與組名零件。　檔案：`scripts/ffname_freeze_baseline.py`（隔離同 `fftfmeta_golden_helpers.prepare_env`）、`tests/_golden/ffname/baseline.json`、`baseline.sha256`。
+- **驗證**：`venv/bin/python scripts/ffname_freeze_baseline.py --check` rc 0——manifest 全部欄皆有零件紀錄（無紀錄欄數 == 0）；L2 配對簽名、lag 輸入集合、欄序、group_id、平穩化決策鍵均已記；重跑凍結兩次之 baseline.json sha256 相同。
+- **邊界**：①同名欄出自兩個組名點 ⇒ 凍結失敗並列出；②零件 source 依 v13 之輸入元組規則取自組名點之實際輸入（microstructure、entropy、tail-risk 由輸出點輸入元組 canonical 以 `-` 連接；自製 volatility／volume／pattern 沿用現行來源標籤 `hlc`／`hlcv`／`ohlc`），不得為 None；輸入元組列有而資料缺之鍵（如 `trades`）照列，值之 NaN 由主 run 逐欄雜湊記錄。③raw lag 輸入以 `(tf, "raw", 資料鍵)` 記錄。
 - **存活至**：Task 4.3 完成後保留（golden）。　**覆蓋風險**：無。
 - 不可做：不改生產碼；不寫正式 `data_cache`。
 
@@ -58,7 +59,7 @@
   - `FeatureIdentity`（kind ∈ atomic、derived、raw-lag、rolling、cross-sectional、meta、preprocess、custom；source、tf、category、indicator、params、ops）。
   - `category` 封閉集合：trend、momentum、volatility、volume、cycle、statistics、pattern、price-transform、entropy、microstructure、tail-risk、raw、cross-sectional、meta、custom。
   - params 單段：token 以 `-` 串，token 字母表 `[A-Za-z0-9.]+`；L2 配對雙成員以 `~` 分隔（`12-26-0~5-30-0`）。
-  - op 每步一段：名稱與參數以 `-` 串（`Cross`、`Ratio`、`Distance`、`Momentum-L5`、`Kurt-W13`、`Lag-1`、`TsCorr-<digest8>-W21`、`fracdiff`、`diff-1`、`rank`、`gaussian`、`zscore-21`）；op 名稱集合封閉（由產生端註冊）。
+  - op 每步一段：名稱與參數以 `-` 串（`Cross`、`Ratio`、`Distance`、`Momentum-L5`、`Kurt-W13`、`Lag-1`、`TsCorr-<digest8>-W21`、`fracdiff`、`diff-1`、`rank`、`gaussian`、`zscore-21`、`BinarySignal-<後綴>`）；op 名稱集合封閉（由產生端註冊）。`<digest8>`＝目標欄**未標記形**之 `format_feature_name` 字串（UTF-8）之 sha256 前 8 個十六進位字元（生成期間無週期段，凍結與 Task 2.3 同一定義）。BinarySignal 後綴＝規則 `name_suffix` 經 `canonical_segment`，字母表 `[A-Za-z0-9.]+(-[A-Za-z0-9.]+)*`（容多字，如 `Strong_Trend`→`BinarySignal-Strong-Trend`）；後綴不合字母表 ⇒ 設定載入時 ValueError（Task 2.3），不於生成時猜。
   - `canonical_segment(x)`（`_`→`-`、冪等）、`format_feature_name(identity)`、`parse_feature_name(name)`（不合文法或未知 category／op ⇒ `FeatureNameParseError`，不猜）、`tag_timeframe`（唯一實作：第 2 段）、`strip_timeframe_tag`、`CURRENT_FEATURE_NAMING_VERSION: int = 2`。
   - `label_*` 不屬特徵文法：`parse_feature_name` 對其拋具名例外，另以 `is_label_column` 判定。
   - **介面定案（v13）**：`FeatureIdentity` 為 frozen dataclass；`params: tuple[tuple[str, ...], ...]`（外層為配對成員，單一指標恰一個成員；空 tuple 表無參數段）；`ops: tuple[str, ...]`（每元素為一個 op 段之完整字面）。`kind` 由身分機械導出：category＝custom ⇒ custom；raw ⇒ raw-lag；cross-sectional ⇒ cross-sectional；meta ⇒ meta；否則 ops 末段屬 L6.5 op 集合 ⇒ preprocess、任一 op 屬 L3 op 集合 ⇒ rolling、ops 非空 ⇒ derived、其餘 ⇒ atomic。例外型別：`FeatureNameParseError(ValueError)`；label ⇒ `LabelColumnNotFeatureError(FeatureNameParseError)`；世代閘 ⇒ `FeatureNamingVersionError(RuntimeError)`，訊息含 `feature_naming_version` 與重生指引。
@@ -96,7 +97,7 @@
 
 **Task 2.3 — L2 衍生層**
 - 目標：兩分支同一身分、配對保真。　檔案：`operators/derived_operators.py`。
-- 改法：`indicator_specs`（`feature_factory.py:4383-4445`，記憶體內）每筆帶 `raw_lookup_key`；`_build_feature_info` 兩分支皆產 canonical `FeatureIdentity`（分支二改用 `parse_feature_name`）；配對分組鍵＝`(source, category, indicator)` canonical；同家族同參數或 canonical 鍵撞兩個不同 `raw_lookup_key` ⇒ ValueError（列兩員）；配對欄名＝基底身分＋params `fast~slow`＋op；Distance 以 `raw_lookup_key` 查 raw；BinarySignal 比對 canonical indicator；TsCorr op 嵌目標身分 `format` 之 sha256 前 8 碼。
+- 改法：`indicator_specs`（`feature_factory.py:4383-4445`，記憶體內）每筆帶 `raw_lookup_key`；`_build_feature_info` 兩分支皆產 canonical `FeatureIdentity`（分支二改用 `parse_feature_name`）；配對分組鍵＝`(source, category, indicator)` canonical；同家族同參數或 canonical 鍵撞兩個不同 `raw_lookup_key` ⇒ ValueError（列兩員）；配對欄名＝基底身分＋params `fast~slow`＋op；Distance 以 `raw_lookup_key` 查 raw；BinarySignal 比對 canonical indicator，後綴經 `canonical_segment` 成單一 op 段，`BinarySignalRule.name_suffix` 不合 Task 1.1 字母表 ⇒ 設定載入時 ValueError；TsCorr op 嵌目標欄未標記形 `format` 之 sha256 前 8 碼（Task 1.1 定義）。
 - **驗證**：`pytest tests/feature_engineering/test_ffname_derived.py`——兩分支同家族合併、重複參數 ValueError、Distance 對 `taker-ratio` 來源產欄數 > 0（今日 0）、TsCorr 名 `parse` 成功；§G ⑤。
 - **邊界**：①同家族不同參數兩分支合併後配對＝單分支給全部參數；②`close-volume` 來源配對。
 - **存活至**：永久。　**覆蓋風險**：無。
@@ -172,7 +173,7 @@
 
 **Task 4.3 — golden 重凍與全量 reference**
 - 目標：一次重凍。　檔案：事實盤點 §E 所列 `tests/_golden/{failopen,framepath,batch2d,ffstat,probewinsor,ratiounsafe,icfirstalign,icpostleak,fftfmeta,v2_ts}/*`。
-- **驗證**：每檔重凍收據附「值雜湊不變、只欄名與名雜湊變」之對照；全量 reference（ETHUSDT 1h＋12h，設定沿用既有 reference）100% `parse` 往返；failopen 系列測試綠。
+- **驗證**：每檔重凍收據附「值雜湊不變、只欄名與名雜湊變」之對照（逐欄檔以 baseline `golden_values` 為 oracle；`refreeze.no_column_records` 所列檔依 §G 之 `name_free`／`group_values`／`name_hash_only` 類別判定）；全量 reference（ETHUSDT 1h＋12h，設定沿用既有 reference）100% `parse` 往返；failopen 系列測試綠。
 - **邊界**：重凍前之值雜湊若有任一不同 ⇒ 停、回 Phase 2。
 - **存活至**：永久。　**覆蓋風險**：重凍等於換基準——收據逐檔逐欄比對值雜湊防止夾帶數值變更。
 - 不可做：不得以重凍掩蓋數值差異。
@@ -188,4 +189,6 @@
 ## §N N/A 登記與殘留
 - 殘留：舊產生器 `FeatureNamingConfig.make_feature_name`（`feature_config.py:593-619`，型態分析／XGBoost 批次用，不在 FF 管線）— `為何現在不做: blocked-by:已登記之舊產生器修正票（白話說明/還沒做的事.md「舊版特徵產生器」列：欄名不帶參數與看測試名字兩缺陷），命名統一併入該票`；登記處：`白話說明/還沒做的事.md`。
 - 殘留：使用者已存之 IC `include_pattern`／lag `exclude_patterns` 含舊名者改名後不再命中 — `為何現在不做: user-ruling:2026-08-05 面向未來不溯及既往`；登記處：白話說明。
+- 殘留：L2 `SignedStrength` 算子無法由設定開啟（`OperatorConfig`（`feature_config.py:389-397`）無 `signed_strength` 欄位、pydantic 預設捨棄未知鍵，`feature_factory.py:1598` 之開關恆為空）— `為何現在不做: blocked-by:本票為行為不變型重構（§G ②欄集合與逐欄雜湊全等），開放新算子即改變特徵集合，須另開票經數據正確性簽核`；文法保留 `SignedStrength` op 段；登記處：`白話說明/還沒做的事.md`。
+- N/A：L6.5 append 模式之 `rank`／`gaussian`／`zscore-w` 後綴於現行生產路徑不可達（reference 設定段註明）；文法保留，非殘留（無使用者可觸及之產出）。
 - N/A：EVENTSCAN 欄名 allowlist — 生產碼未實作（事實盤點 B11），隨第 15 步 EVENTSCAN 以新文法實作。
