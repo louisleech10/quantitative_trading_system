@@ -159,7 +159,7 @@ def _wrap_layer_method(factory, method_name: str, profiler: LayerProfiler, tf_la
 def main() -> None:
     # Feature flag snapshot
     flag_names = [
-        "FFACT_USE_SEARCHSORTED", "FFACT_USE_CGSA", "FFACT_USE_NUMBA_ROLLING",
+        "FFACT_USE_SEARCHSORTED", "FFACT_USE_NUMBA_ROLLING",
         "FFACT_USE_POLARS", "FFACT_LAYER1_PARALLEL", "FFACT_L3_STREAMING",
         "FFACT_L65_CHUNK_SIZE", "MAX_L2_ESTIMATED_COLS",
     ]
@@ -211,7 +211,6 @@ def main() -> None:
         "_layer4_lag_features",
         "_layer5_cross_sectional",
         "_layer6_meta_features",
-        "_layer6_5_preprocessing",
     ]
 
     # Save originals
@@ -252,20 +251,6 @@ def main() -> None:
             current_tf_label[0] = value
 
     factory.__class__.__setattr__ = _tracked_setattr
-
-    # Also wrap _layer7_validate_and_persist
-    orig_l7 = factory._layer7_validate_and_persist
-    @functools.wraps(orig_l7)
-    def wrapped_l7(*args, **kwargs):
-        layer_key = f"{current_tf_label[0]}/_layer7_validate_and_persist"
-        profiler.start(layer_key)
-        result = orig_l7(*args, **kwargs)
-        profiler.end(layer_key)
-        rec = profiler.records[layer_key]
-        print(f"  [{current_tf_label[0]}] _layer7_validate_and_persist: "
-              f"{rec['elapsed_s']:.2f}s, RSS={rec['rss_after_mb']:.0f} MB")
-        return result
-    factory._layer7_validate_and_persist = wrapped_l7
 
     # Also wrap _spill_to_memmap
     orig_spill = factory._spill_to_memmap
@@ -385,7 +370,6 @@ def main() -> None:
         "feature_flags": flag_snapshot,
         "code_defaults": {
             "FFACT_USE_SEARCHSORTED": "1",
-            "FFACT_USE_CGSA": "1",
             "FFACT_USE_NUMBA_ROLLING": "1",
             "FFACT_USE_POLARS": "1",
             "FFACT_L3_STREAMING": "1",

@@ -128,13 +128,6 @@ def _base_override() -> Dict[str, Any]:
     }
 
 
-def _tagged_map(factory: Any, column_layer_map: Dict[str, str]) -> Dict[str, str]:
-    empty = pd.DataFrame(columns=list(column_layer_map))
-    tagged_columns = factory._apply_timeframe_tag(empty, TIMEFRAME).columns
-    return {
-        str(tagged): column_layer_map[raw]
-        for raw, tagged in zip(column_layer_map, tagged_columns)
-    }
 
 
 def _manifest_columns(manifest: Dict[str, Any]) -> list[str]:
@@ -190,7 +183,6 @@ def _metadata(config: Any, config_hash: str, cache_dir: Path) -> Dict[str, Any]:
         "config": config.model_dump(by_alias=True),
         "config_hash": config_hash,
         "environment": {
-            "FFACT_USE_CGSA": os.getenv("FFACT_USE_CGSA"),
             "FFACT_L65_WORKERS": os.getenv("FFACT_L65_WORKERS"),
             "FFACT_MEMORY_TIER_GB": os.getenv("FFACT_MEMORY_TIER_GB"),
             "FFACT_ADF_ENGINE": os.getenv("FFACT_ADF_ENGINE"),
@@ -214,43 +206,6 @@ def _metadata(config: Any, config_hash: str, cache_dir: Path) -> Dict[str, Any]:
     }
 
 
-def _run_control(temp_root: Path) -> tuple[Dict[str, Any], Dict[str, str]]:
-    from momentum.FeatureEngineering.feature_storage import FeatureStorage
-    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
-    from momentum.factories import create_feature_factory
-
-    os.environ["FFACT_USE_CGSA"] = "0"
-    feature_dir = temp_root / "control" / "features"
-    cache_dir = temp_root / "control" / "d_star"
-    FeaturePreprocessor._d_star_cache_dir = staticmethod(lambda: cache_dir)
-    factory = create_feature_factory(
-        cache_dir=str(KLINE_PATH.parent), validate_continuity=False
-    )
-    factory._storage = FeatureStorage(str(feature_dir))
-    override = _base_override()
-    override["preprocessing"] = {"fractional_differencing": {"enabled": False}}
-    config = factory._resolve_config(override)
-    result = factory.generate_features(
-        SYMBOL,
-        TIMEFRAME,
-        config_override=override,
-        force_regenerate=True,
-        start_date=START_DATE,
-        end_date=END_DATE,
-        persist=True,
-    )
-    if result.features_df.empty:
-        raise RuntimeError("non-CGSA control returned an empty features_df")
-    column_layer_map = dict(factory._column_layer_map or {})
-    if not column_layer_map:
-        raise RuntimeError("non-CGSA control provenance map is empty")
-    tagged_map = _tagged_map(factory, column_layer_map)
-    payload = {
-        "metadata": _metadata(config, str(result.metadata["config_hash"]), cache_dir),
-        "manifest_columns": [str(column) for column in result.features_df.columns],
-        "frame": canonical_frame(result.features_df),
-    }
-    return payload, tagged_map
 
 
 def _run_cgsa(temp_root: Path) -> tuple[Dict[str, Any], Dict[str, str]]:
@@ -259,7 +214,6 @@ def _run_cgsa(temp_root: Path) -> tuple[Dict[str, Any], Dict[str, str]]:
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
     from momentum.factories import create_feature_factory
 
-    os.environ["FFACT_USE_CGSA"] = "1"
     work_dir = temp_root / "cgsa" / "registry"
     feature_dir = temp_root / "cgsa" / "features"
     cache_dir = temp_root / "cgsa" / "d_star"
@@ -310,9 +264,6 @@ def _phase_env(phase: str) -> Dict[str, str]:
     env = os.environ.copy()
     for key, value in FREEZE_ENV_DEFAULTS.items():
         env.setdefault(key, value)
-    env["FFACT_USE_CGSA"] = "1" if phase == "cgsa" else "0"
-    if phase != "cgsa":
-        env.pop("FFACT_CGSA_WORK_DIR", None)
     return env
 
 
@@ -325,9 +276,7 @@ def _run_phase(phase: str, out_path: Path) -> None:
     _apply_freeze_env()
     with tempfile.TemporaryDirectory(prefix=f"batch2d_{phase}_") as temp_dir:
         temp_root = Path(temp_dir)
-        if phase == "control":
-            payload, provenance = _run_control(temp_root)
-        elif phase == "cgsa":
+        if phase == "cgsa":
             payload, provenance = _run_cgsa(temp_root)
         else:
             raise ValueError(f"unknown phase: {phase}")
@@ -346,7 +295,7 @@ def main() -> None:
     import subprocess
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phase", choices=["control", "cgsa"])
+    parser.add_argument("--phase", choices=["cgsa"])
     parser.add_argument("--out")
     args = parser.parse_args()
 
@@ -355,11 +304,11 @@ def main() -> None:
         _run_phase(args.phase, Path(args.out))
         return
 
-    # Orchestrator：每 phase 一個乾淨子程序，再合併。
+    # Orchestrator：CGSA phase 於乾淨子程序生成。
     with tempfile.TemporaryDirectory(prefix="batch2d_freeze_") as temp_dir:
         temp_root = Path(temp_dir)
         results: Dict[str, Dict[str, Any]] = {}
-        for phase in ("control", "cgsa"):
+        for phase in ("cgsa",):
             out_path = temp_root / f"{phase}.json"
             subprocess.run(
                 [sys.executable, str(Path(__file__).resolve()),
@@ -369,29 +318,8 @@ def main() -> None:
             )
             results[phase] = json.loads(out_path.read_text(encoding="utf-8"))
 
-    control = results["control"]["payload"]
-    frame_provenance = results["control"]["provenance"]
     cgsa = results["cgsa"]["payload"]
-    cgsa_provenance = results["cgsa"]["provenance"]
-
-    common_columns = sorted(set(frame_provenance) & set(cgsa_provenance))
-    mismatches = {
-        column: {"frame": frame_provenance[column], "cgsa": cgsa_provenance[column]}
-        for column in common_columns
-        if frame_provenance[column] != cgsa_provenance[column]
-    }
-    if mismatches:
-        raise AssertionError(f"frame/CGSA provenance mismatch: {mismatches}")
-
-    provenance = {
-        "frame_column_to_layer": frame_provenance,
-        "cgsa_column_to_layer": cgsa_provenance,
-        "common_column_count": len(common_columns),
-        "same_layer_for_common_columns": True,
-    }
-    _write_json(GOLDEN_DIR / "control.json", control)
     _write_json(GOLDEN_DIR / "cgsa_baseline.json", cgsa)
-    _write_json(GOLDEN_DIR / "provenance.json", provenance)
 
 
 if __name__ == "__main__":

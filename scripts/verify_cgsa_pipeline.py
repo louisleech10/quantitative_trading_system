@@ -6,7 +6,6 @@ Validates: CGSA registry populated, per-group alignment, L6.5, L7 persist.
 from __future__ import annotations
 
 import gc
-import os
 import sys
 import time
 from pathlib import Path
@@ -18,7 +17,6 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Ensure CGSA is enabled
-os.environ.setdefault("FFACT_USE_CGSA", "1")
 
 from momentum.core.logging import get_logger
 from momentum.factories import create_feature_factory
@@ -70,7 +68,6 @@ def main() -> None:
     print(f"CGSA Pipeline Verification")
     print(f"Symbol: {SYMBOL}")
     print(f"Training TFs: {training_tfs}")
-    print(f"FFACT_USE_CGSA={os.environ.get('FFACT_USE_CGSA', 'unset')}")
     print(f"RSS before: {rss_before / (1024**2):.1f} MB")
     print(f"{'='*60}\n")
 

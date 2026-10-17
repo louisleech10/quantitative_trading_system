@@ -284,7 +284,6 @@ def main() -> None:
     features_root.mkdir(parents=True, exist_ok=True)
     cgsa_root.mkdir(parents=True, exist_ok=True)
 
-    os.environ["FFACT_USE_CGSA"] = "1"
     os.environ["FFACT_L65_NATIVE_TF"] = "1"
     os.environ["FFACT_MULTI_TF_COMPACT_ALIGNMENT"] = "1"
     os.environ["FFACT_MULTI_TF_PARALLEL"] = "0"

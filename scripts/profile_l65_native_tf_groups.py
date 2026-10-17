@@ -378,7 +378,6 @@ def _build_registry(
     features_dir.mkdir(parents=True, exist_ok=True)
 
     os.environ["FFACT_CGSA_WORK_DIR"] = str(cgsa_dir)
-    os.environ["FFACT_USE_CGSA"] = "1"
     os.environ["FFACT_MULTI_TF_PARALLEL"] = "0"
     os.environ["FFACT_L65_NATIVE_TF"] = "1"
     os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = "1"

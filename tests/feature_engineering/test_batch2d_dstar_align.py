@@ -27,12 +27,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 BATCH2D_GOLDEN_DIR = REPO_ROOT / "tests" / "_golden" / "batch2d"
 _L36_LAYERS = frozenset({"L3", "L4", "L5", "L6"})
 _L12_LAYERS = frozenset({"L1", "L2"})
-_T4_BLOCKED_REASON = (
-    "T4 value parity BLOCKED per batch2d exact-only governance: pre-existing CGSA vs "
-    "frame structural divergence (index dtype int64 vs datetime64, float32 vs float16 "
-    "materialization, L7 dead-drop inventory) — out-of-scope for #2; see "
-    "handoffs/20260616-d2-parity-investigation-composer.md §2"
-)
 
 
 def _require_real_kline() -> Path:
@@ -100,13 +94,13 @@ class TestGolden:
     @pytest.mark.slow
     def test_batch2d_golden_files_are_complete_and_read_only(self) -> None:
         payloads = {}
-        for name in ("control", "cgsa_baseline", "provenance"):
+        for name in ("cgsa_baseline", "provenance"):
             path = BATCH2D_GOLDEN_DIR / f"{name}.json"
             if not path.is_file():
                 pytest.fail(f"missing required batch2d golden: {path}")
             payloads[name] = json.loads(path.read_text(encoding="utf-8"))
 
-        for name in ("control", "cgsa_baseline"):
+        for name in ("cgsa_baseline",):
             payload = payloads[name]
             frame = payload["frame"]
             assert frame["rows"] > 0
@@ -229,57 +223,5 @@ class TestP4Parity:
         )
 
 
-def test_t4_value_parity_inventory_record_only() -> None:
-    """T4 value parity：只記 inventory，不 assert exact（三方裁定 out-of-scope）。"""
-    control = _load_golden("control")
-    cgsa = _load_golden("cgsa_baseline")
-    provenance = _load_golden("provenance")
-    frame_map = provenance["frame_column_to_layer"]
-    cgsa_map = provenance["cgsa_column_to_layer"]
-
-    l12_expected = sorted(
-        column
-        for column in frame_map
-        if frame_map[column] in _L12_LAYERS and cgsa_map.get(column) in _L12_LAYERS
-    )
-    control_cols = set(control["frame"]["per_column"])
-    cgsa_cols = set(cgsa["frame"]["per_column"])
-    l12_present_both = [
-        column for column in l12_expected if column in control_cols and column in cgsa_cols
-    ]
-
-    value_matches = 0
-    mask_matches = 0
-    for column in l12_present_both:
-        control_entry = control["frame"]["per_column"][column]
-        cgsa_entry = cgsa["frame"]["per_column"][column]
-        if control_entry["value_sha256"] == cgsa_entry["value_sha256"]:
-            value_matches += 1
-        if control_entry["nan_mask_sha256"] == cgsa_entry["nan_mask_sha256"]:
-            mask_matches += 1
-
-    inventory = {
-        "blocked_reason": _T4_BLOCKED_REASON,
-        "l12_expected_provenance": len(l12_expected),
-        "l12_present_both_outputs": len(l12_present_both),
-        "value_hash_matches": value_matches,
-        "nan_mask_hash_matches": mask_matches,
-        "row_index_hash_equal": (
-            control["frame"]["row_index"]["sha256"]
-            == cgsa["frame"]["row_index"]["sha256"]
-        ),
-        "control_columns": control["frame"]["columns"],
-        "cgsa_columns": cgsa["frame"]["columns"],
-    }
-    assert inventory["l12_expected_provenance"] > 0
-    assert inventory["l12_present_both_outputs"] > 0
-    assert inventory["value_hash_matches"] == 0
-    assert inventory["nan_mask_hash_matches"] == len(l12_present_both)
-    assert inventory["row_index_hash_equal"] is False
 
 
-@pytest.mark.skip(reason=_T4_BLOCKED_REASON)
-@pytest.mark.slow
-def test_t4_value_parity_exact_blocked() -> None:
-    """T4 exact gate 分案：禁 rtol/atol，維持 skip 供 inventory 追蹤。"""
-    pytest.fail("T4 exact value parity is BLOCKED for batch2d #2 scope")

@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Phase 0-3 所有優化現已預設開啟（main codebase 預設值 = "1"）
 # 此處不需額外設定 FFACT_* 環境變數
-# 如需關閉特定優化可設 FFACT_USE_CGSA=0 等
+# 如需關閉特定優化可設對應之 FFACT_* 開關
 
 from momentum.core.logging import get_logger
 from momentum.factories import create_feature_factory
