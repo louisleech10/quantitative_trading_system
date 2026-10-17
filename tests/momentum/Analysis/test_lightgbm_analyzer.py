@@ -243,6 +243,29 @@ def test_validate_oot_error_and_severe_branch(synthetic_training_data):
     severe = analyzer.validate_oot(X.iloc[:60], y[:60], cv_auc_mean=0.99)
     assert severe.gap_status in {"warning", "severe", "good"}
 
+    # 上式 cv=0.99 之分支取決於樣本內 AUC，不保證觸發 severe（名稱宣稱 severe 分支）。
+    # 故先取同一 OOT 片段之 oot_auc（cv_auc_mean=None ⇒ good、無 gap），再以已知 gap 驅動三分支：
+    # gap=cv-oot；<0.05 good、<0.08 warning、其餘 severe（lightgbm_analyzer.validate_oot）。
+    X_oot, y_oot = X.iloc[:60], y[:60]
+    assert len(np.unique(y_oot)) == 2, "前提：OOT 片段須含兩類，否則走單類 warning 分支"
+    base = analyzer.validate_oot(X_oot, y_oot, cv_auc_mean=None)
+    assert base.oot_auc is not None and base.cv_oot_gap is None and base.gap_status == "good"
+    oot_auc = base.oot_auc
+    assert severe.oot_auc == pytest.approx(oot_auc)
+    assert severe.cv_oot_gap == pytest.approx(0.99 - oot_auc)
+
+    severe = analyzer.validate_oot(X_oot, y_oot, cv_auc_mean=oot_auc + 0.1)
+    assert severe.gap_status == "severe"
+    assert severe.oot_auc == pytest.approx(oot_auc)
+    assert severe.cv_oot_gap == pytest.approx(0.1)
+    assert severe.cv_oot_gap >= 0.08
+    assert severe.n_samples == 60
+
+    warning = analyzer.validate_oot(X_oot, y_oot, cv_auc_mean=oot_auc + 0.065)
+    assert warning.gap_status == "warning"
+    good = analyzer.validate_oot(X_oot, y_oot, cv_auc_mean=oot_auc + 0.02)
+    assert good.gap_status == "good"
+
 
 def test_feature_importance_invalid_method_and_length_mismatch(trained_lightgbm):
     with pytest.raises(ValueError):

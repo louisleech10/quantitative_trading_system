@@ -193,13 +193,27 @@ def test_legacy_register_rejects_non_whitelisted_file(tmp_path: Path) -> None:
 
 
 def test_legacy_register_rejects_missing_whitelisted_file(tmp_path: Path) -> None:
-    missing = REPO_ROOT / "handoffs" / "20260702-FF-ALIGN-ORACLE-FACTS.md"
+    """白名單內之正確相對路徑、但 cwd 下無該檔 ⇒ 走「legacy 檔不存在」分支（非白名單分支）rc1，且不寫 audit。
+
+    cwd 設為不含該檔之 tmp 目錄（腳本 venv／REPO_ROOT 由腳本位置推導，不受 cwd 影響），
+    使本測與工作樹中 handoffs/ 檔是否存在無關。
+    """
+    work = tmp_path / "work"
+    work.mkdir()
+    rel = "handoffs/20260702-FF-ALIGN-ORACLE-FACTS.md"
+    assert not (work / rel).exists()
+    gate_dir = tmp_path / "gate"
     proc = subprocess.run(
-        ["bash", str(LEGACY_REGISTER), str(missing.with_name("20260702-FF-ALIGN-ORACLE-FACTS.md.missing"))],
-        cwd=REPO_ROOT,
+        ["bash", str(LEGACY_REGISTER), rel],
+        cwd=work,
         capture_output=True,
         text=True,
         check=False,
-        env=dict(os.environ, GATE_DIR_OVERRIDE=str(tmp_path / "gate")),
+        env=dict(os.environ, GATE_DIR_OVERRIDE=str(gate_dir)),
     )
     assert proc.returncode == 1
+    output = proc.stdout + proc.stderr
+    assert f"legacy 檔不存在:{rel}" in output, output
+    assert "whitelist" not in output and "白名單" not in output, "不得落入非白名單分支"
+    audit = gate_dir / "audit.log"
+    assert not audit.exists() or audit.read_text(encoding="utf-8") == "", "拒收時不得寫入 committee_output 事件"

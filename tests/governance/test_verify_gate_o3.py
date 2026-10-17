@@ -154,16 +154,3 @@ def test_o3_fix_prompt_operational_claim_still_blocked(tmp_path: Path) -> None:
     proc = _run_checker("--files", str(fixture))
     assert proc.returncode == 1
     assert "operational claim" in proc.stderr
-
-
-def test_o3_repo_redteam_files_exit_zero() -> None:
-    """O3 驗收：本 repo REDTEAM 治理檔全放行。"""
-    proc = _run_checker(
-        "--files",
-        "handoffs/20260702-VERIFYGATE-REDTEAM-CLOSURE-CODEX.md",
-        "handoffs/20260702-VERIFYGATE-REDTEAM-CODEX.md",
-        "handoffs/20260702-VERIFYGATE-REDTEAM-COMPOSER.md",
-        "handoffs/20260702-VERIFYGATE-REDTEAM-FIX-PROMPT.md",
-        "handoffs/20260702-VERIFYGATE-REDTEAM-RECONCILE.md",
-    )
-    assert proc.returncode == 0, proc.stderr

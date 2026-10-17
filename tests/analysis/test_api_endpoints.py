@@ -482,12 +482,27 @@ class TestCORSAndHeaders:
 
     def test_cors_headers_if_enabled(self):
         """測試 CORS headers（如果啟用）"""
-        response = client.options("/api/v1/signal-analysis/density")
+        # CORS 由 api/core/middleware.py 以 settings.allowed_origins 啟用
+        from api.core.config import settings
+        allowed = settings.allowed_origins[0]
+        request_headers = {
+            "Origin": allowed,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        }
 
-        # 如果啟用了 CORS，應該有對應 headers
-        # 這取決於 main.py 的配置
-        print(f"✅ CORS check: status={response.status_code}, "
-              f"headers={response.headers.get('access-control-allow-origin', 'N/A')}")
+        # 允許的來源：預檢 200 且回傳該來源
+        response = client.options("/api/v1/signal-analysis/density", headers=request_headers)
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == allowed
+
+        # 對照組：未列入白名單的來源不得被允許
+        evil = client.options(
+            "/api/v1/signal-analysis/density",
+            headers={**request_headers, "Origin": "http://evil.example.com"},
+        )
+        assert evil.headers.get("access-control-allow-origin") != "http://evil.example.com"
+        assert evil.headers.get("access-control-allow-origin") != "*"
 
 
 class TestEndpointTags:

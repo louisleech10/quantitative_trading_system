@@ -97,7 +97,9 @@ def test_empty_baseline_is_strictest_not_skip(tmp_path: Path) -> None:
     empty = tmp_path / "b.txt"
     empty.write_text("# 只有註解\n#\n", encoding="utf-8")
     assert m.load_baseline(empty) == set()
-    assert _observed_keys(m) - m.load_baseline(empty) == _observed_keys(m)
+    observed = _observed_keys(m)
+    assert observed, "現樹應有既有債；若為 0 表示 scanner 空轉，下一行會恆成立而失去意義"
+    assert observed - m.load_baseline(empty) == observed
 
 
 def test_key_is_line_number_independent() -> None:

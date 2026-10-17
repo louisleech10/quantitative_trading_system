@@ -808,6 +808,15 @@ def test_e3_ticket_union_is_covered_by_sot():
     missing = sorted(union - rows)
     assert not missing, f"E3 union 有票不在票 SoT（漏收）：{missing}（第三方可重跑）"
 
+    # 🔴 非空洞對照：現樹 union 可能為空（活缺口節已退場、backlog 僅剩 B3R），
+    #    空集合下上面斷言恆成立 ⇒ 另證「涵蓋檢查會抓到漏收」且「抽取器能抽到真實 SoT 票」。
+    assert rows, "票 SoT 不得為空"
+    real_ticket = sorted(rows)[0]
+    assert real_ticket in _tok(f"缺口：票 {real_ticket} 尚未修"), "抽取器抽不到真實 SoT 票號"
+    fabricated = "ZZZ-NOT-IN-SOT"
+    assert fabricated not in rows
+    assert sorted({real_ticket, fabricated} - rows) == [fabricated], "漏收檢測失效"
+
 
 def test_e1_e2_batch_ids_match_key_rows():
     """SPEC §E1／§E2：第 0 批（GOVB0 TODO §B 表）＋ B3R ＋ 第 1 批（W′ TSV）。"""

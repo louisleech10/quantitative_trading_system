@@ -30,12 +30,21 @@ class _Dummy:
 
 
 def test_decorator_records_and_accumulates():
+    # 後兩次各實際耗時 ≥ 0.05s（time.sleep 不短於請求值）；生產碼每次累加後 round(…, 3)，
+    # 每次至多損 0.0005 ⇒ 每次累加後值至少增 0.049。若改成覆蓋，值 ≈ 單次耗時（~0.05），
+    # 第三次後不可能 ≥ 第二次值 + 0.049（≈0.099），必紅。
     d = _Dummy()
     assert d.work() == "ok"
     first = d._stage_timings["stageX"]
     assert first >= 0.0
-    d.work()
+    d.work(seconds=0.05)
     assert d._stage_timings["stageX"] >= first, "同名 stage 第二次呼叫必須累加，不得覆蓋"
+    mid = d._stage_timings["stageX"]
+    assert mid >= first + 0.049, "同名 stage 第二次呼叫必須累加，不得覆蓋"
+    d.work(seconds=0.05)
+    second = d._stage_timings["stageX"]
+    assert second >= mid + 0.049, "同名 stage 第三次呼叫必須累加，不得覆蓋"
+    assert second >= 0.098, "同名 stage 多次呼叫必須累加，不得覆蓋"
 
 
 def test_decorator_records_even_when_stage_raises():

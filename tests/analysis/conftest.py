@@ -68,7 +68,14 @@ def real_ethusdt_data(kline_storage):
         pd.DataFrame: ETHUSDT/1h K線數據，包含所有必需列
     """
     try:
-        df = kline_storage.load_kline_data("ETHUSDT", "1h")
+        # 生產碼無 load_kline_data（已改 read_klines）；真實 ETHUSDT/1h 含兩處缺口，
+        # 故取「最長連續段」(不補值、不造資料)，並以 timestamp(秒) 建 DatetimeIndex。
+        raw = kline_storage.read_klines("ETHUSDT", "1h", validate_continuity=False)
+        if raw is None or len(raw) == 0:
+            pytest.skip("ETHUSDT/1h 無資料")
+        seg_id = (raw["timestamp"].diff() != 3600).cumsum()
+        df = raw[seg_id == seg_id.value_counts().idxmax()].copy()
+        df.index = pd.to_datetime(df["timestamp"], unit="s")
 
         # 驗證數據完整性
         required_cols = ['close', 'open', 'high', 'low', 'volume',
@@ -258,14 +265,15 @@ def performance_test_cases(real_ethusdt_data):
     Returns:
         Dict[str, List[CaseRecord]]: 各 500 個正反例（共 1000 個）
     """
-    if len(real_ethusdt_data) < 2000:
+    # 真實 ETHUSDT/1h 最長連續段僅約 1440 根：需 >=1300 才能湊出約 1000 案例
+    if len(real_ethusdt_data) < 1300:
         pytest.skip(f"Insufficient data for performance test: {len(real_ethusdt_data)} bars")
 
     start_idx = 300
     end_idx = len(real_ethusdt_data) - 100
 
     # 每隔 2 根選一個案例（生成大量案例）
-    step = max(2, (end_idx - start_idx) // 1000)
+    step = max(1, (end_idx - start_idx) // 1000)
     indices = range(start_idx, end_idx, step)[:1000]  # 限制最多 1000 個
 
     positive_cases = []

@@ -16,10 +16,10 @@ from typing import Dict, List
 
 from momentum.Analysis.signal_density_analyzer import SignalDensityAnalyzer
 from api.models.case_models import CaseRecord
+from momentum.core.contracts import SignalDensityResponse  # 分析器實際回傳之核心契約型別
 from api.models.training_window_config import (
     TrainingWindowConfig,
     StrategyConfig,
-    SignalDensityResponse
 )
 
 
@@ -249,8 +249,13 @@ class TestScalability:
         times = []
 
         for count in case_counts:
-            positive_subset = performance_test_cases["positive"][:count//2]
-            negative_subset = performance_test_cases["negative"][:count//2]
+            # 取樣均勻分佈於整段真實資料（前 N 個案例是相鄰 K 線，可能整段無信號 → 權重 0）
+            pos_all = performance_test_cases["positive"]
+            neg_all = performance_test_cases["negative"]
+            pos_idx = np.linspace(0, len(pos_all) - 1, count // 2).astype(int)
+            neg_idx = np.linspace(0, len(neg_all) - 1, count // 2).astype(int)
+            positive_subset = [pos_all[i] for i in pos_idx]
+            negative_subset = [neg_all[i] for i in neg_idx]
 
             start = time.time()
 
@@ -307,23 +312,6 @@ class TestScalability:
             gc.collect()
 
         print(f"✅ 內存效率測試完成（無崩潰）")
-
-
-class TestConcurrentPerformance:
-    """測試並發性能（如果需要）"""
-
-    @pytest.mark.slow
-    @pytest.mark.skip(reason="Concurrent execution not yet implemented")
-    def test_concurrent_analysis(
-        self,
-        signal_analyzer,
-        performance_test_cases,
-        sample_strategy_config,
-        sample_training_window_config
-    ):
-        """測試並發分析（未來優化）"""
-        # 預留：未來如果實作並發分析，在這裡測試
-        pass
 
 
 class TestPerformanceRegression:

@@ -78,23 +78,26 @@ def test_net_ic_cost_validator() -> None:
 
 
 def test_mutation_m10_config_drop_validator(monkeypatch: pytest.MonkeyPatch) -> None:
-    """M10 config 層:拿掉 cost_bps 域檢 → 0 應拒卻被接受 → 好測試紅。"""
-    from typing import Optional
+    """M10 config 層:拿掉 cost_bps 域檢 → 0 應拒卻被接受 → 好測試紅。
 
-    from pydantic import BaseModel, Field
+    變異體以生產 ``NetICAnalysisConfig.model_fields`` 重建（欄位與預設隨生產同步），
+    只剝除 field/model validator；再讓真正的 ``test_net_ic_cost_validator`` 跑在
+    變異 schema 上，須以 ``pytest.raises`` 未觸發之 Failed 失敗——證明原測試會紅。
+    """
+    from pydantic import create_model
 
-    class _LooseNetICAnalysisConfig(BaseModel):
-        """模擬刪除 field/model validator 後的 schema。"""
-
-        enabled: bool = True
-        cost_enabled: bool = False
-        cost_bps: Optional[float] = None
-        participation_rate: float = Field(default=0.01)
+    raised = False
+    real_cls = NetICAnalysisConfig
+    loose_cls = create_model(
+        "_LooseNetICAnalysisConfig",
+        **{name: (field.annotation, field) for name, field in real_cls.model_fields.items()},
+    )
 
     import tests.phase24.test_deep_analysis_config as this_mod
 
-    monkeypatch.setattr(this_mod, "NetICAnalysisConfig", _LooseNetICAnalysisConfig)
+    monkeypatch.setattr(this_mod, "NetICAnalysisConfig", loose_cls)
 
+    # 前提：變異體確實接受 cost_bps=0（validator 已剝除）
     with pytest.raises(AssertionError):
         raised = False
         try:
@@ -102,6 +105,17 @@ def test_mutation_m10_config_drop_validator(monkeypatch: pytest.MonkeyPatch) -> 
         except ValueError:
             raised = True
         assert raised, "cost_bps=0 must raise ValueError at config layer"
+    # 前提：變異體欄位集合與生產一致（只差 validator）
+    assert set(loose_cls.model_fields) == set(real_cls.model_fields)
+
+    # 核心：真正的守護測試跑在變異 schema 上必紅
+    with pytest.raises(pytest.fail.Exception):
+        this_mod.test_net_ic_cost_validator()
+
+    # 對照：還原生產 schema 後同一測試通過（排除測試本身恆紅）
+    monkeypatch.undo()
+    assert this_mod.NetICAnalysisConfig is real_cls
+    this_mod.test_net_ic_cost_validator()
 
 
 def test_long_short_quantile_overlap_rejected():

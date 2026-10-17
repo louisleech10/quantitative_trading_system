@@ -203,8 +203,19 @@ class TestPresetApply:
         assert "applyPreset" in self.hook
 
     def test_hook_preset_calls_post(self):
-        """applyPreset 使用 POST 呼叫 presets endpoint"""
-        assert re.search(r"presets/|preset", self.hook)
+        """applyPreset 使用 POST 呼叫 /config/presets/{name}，且該端點在後端路由表以 POST 存在"""
+        m = re.search(
+            r"requestJson<[\s\S]*?>\(\s*`/config/presets/\$\{encodeURIComponent\(presetName\)\}`\s*,\s*\{\s*method:\s*'POST'\s*\}",
+            self.hook,
+        )
+        assert m, "applyPreset 未以 POST 呼叫 /config/presets/{presetName}"
+
+        from api.routes.feature_factory import router
+
+        post_paths = {
+            r.path for r in router.routes if "POST" in getattr(r, "methods", set())
+        }
+        assert "/api/v1/features/config/presets/{preset_name}" in post_paths
 
 
 # ===========================================================
@@ -291,12 +302,20 @@ class TestConfigIOButtons:
         self.content = _read(COMP / "ConfigIOButtons.tsx")
 
     def test_export_functionality(self):
-        """有 JSON 下載（export）邏輯"""
-        assert re.search(r"download|export|JSON\.stringify", self.content)
+        """匯出：JSON.stringify(config) 包成 application/json Blob，經 createObjectURL 下載並 revoke"""
+        assert "JSON.stringify(config" in self.content
+        assert "new Blob(" in self.content and "application/json" in self.content
+        assert "URL.createObjectURL" in self.content
+        assert "link.download" in self.content
+        assert "URL.revokeObjectURL" in self.content
 
     def test_import_functionality(self):
-        """有檔案上傳（import）邏輯"""
-        assert re.search(r'type="file"|FileReader|import|upload', self.content)
+        """匯入：file input（.json）→ FileReader 讀文字 → JSON.parse → 通過驗證才呼叫 onImport"""
+        assert re.search(r'type="file"[\s\S]*?accept="\.json"', self.content)
+        assert "new FileReader()" in self.content and "readAsText(" in self.content
+        parse_at = self.content.index("JSON.parse(")
+        import_at = self.content.index("onImport(parsed")
+        assert parse_at < import_at, "onImport 必須在 JSON.parse 之後"
 
     def test_validation_on_import(self):
         """匯入時驗證 config 結構"""

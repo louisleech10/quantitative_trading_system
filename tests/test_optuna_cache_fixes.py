@@ -84,15 +84,21 @@ class TestMemoryAutoDetection:
     
     def test_detect_memory_uses_half_available(self):
         """測試使用系統可用記憶體的 50%"""
-        import psutil
+        from types import SimpleNamespace
         from momentum.Analysis.indicator_cache import _detect_memory_limit_mb
-        
-        available_mb = psutil.virtual_memory().available / (1024 * 1024)
-        detected_mb = _detect_memory_limit_mb()
-        
-        # 允許小範圍誤差（記憶體會波動）
-        expected = available_mb * 0.5
-        assert abs(detected_mb - expected) < 100  # 100MB 誤差範圍
+
+        def _avail(mb):
+            return lambda: SimpleNamespace(available=int(mb * 1024 * 1024))
+
+        # 以固定的「可用記憶體」驗證公式（不隨機器當下記憶體波動）
+        with patch('psutil.virtual_memory', _avail(4096)):
+            assert _detect_memory_limit_mb() == pytest.approx(2048.0)  # 50%
+        # 下限 512MB
+        with patch('psutil.virtual_memory', _avail(100)):
+            assert _detect_memory_limit_mb() == 512.0
+        # 上限 8GB
+        with patch('psutil.virtual_memory', _avail(100 * 1024)):
+            assert _detect_memory_limit_mb() == 8192.0
     
     def test_detect_memory_fallback_on_error(self):
         """測試 psutil 異常時的 fallback"""
@@ -150,42 +156,32 @@ class TestDynamicPeriodCollection:
     
     def test_collect_periods_from_config(self):
         """測試從 strategies.yaml 收集可快取週期"""
-        import yaml
-        from pathlib import Path
-        
-        config_path = Path('config/strategies.yaml')
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        
-        strategies = config.get('strategies', {})
-        periods_to_cache = set()
-        
-        # 模擬 parameter_ranges
-        mock_ranges = {
-            'ema_short_range': (5, 10),
-            'ema_mid_range': (20, 30),
-            'ema_long_range': (50, 70),
-        }
-        
-        strategy_config = strategies.get('three_line', {})
-        parameters = strategy_config.get('parameters', [])
-        
-        for param in parameters:
-            if not param.get('is_cacheable', False):
-                continue
-            
-            param_name = param.get('name')
-            range_attr_name = f"ema_{param_name.replace('_period', '')}_range"
-            
-            if range_attr_name in mock_ranges:
-                min_val, max_val = mock_ranges[range_attr_name]
-                periods_to_cache.update(range(min_val, max_val + 1))
-        
-        # 驗證收集到的週期
-        assert 5 in periods_to_cache  # short_period min
-        assert 10 in periods_to_cache  # short_period max
-        assert 20 in periods_to_cache  # mid_period min
-        assert 70 in periods_to_cache  # long_period max
+        import logging
+        from types import SimpleNamespace
+
+        from momentum.Optimization.optuna_optimizer import OptunaOptimizer
+
+        # 只需 parameter_ranges／logger 兩個屬性；繞過建構子（其需要 case 資料與執行緒池）
+        opt = object.__new__(OptunaOptimizer)
+        opt.logger = logging.getLogger("test_collect_periods")
+        opt.parameter_ranges = SimpleNamespace(
+            strategy_logics=['three_line'],
+            ema_short_range=(5, 10),
+            ema_mid_range=(20, 30),
+            ema_long_range=(50, 70),
+        )
+
+        periods = opt._collect_cacheable_periods_from_config()
+
+        # 生產函式讀 config/strategies.yaml 之 is_cacheable int 參數，對應 parameter_ranges 之三段範圍
+        expected = set(range(5, 11)) | set(range(20, 31)) | set(range(50, 71))
+        assert periods == expected
+
+        # 換一組範圍：結果隨 parameter_ranges 改變（非寫死常數；單點範圍亦被收集）
+        opt.parameter_ranges.ema_short_range = (7, 8)
+        opt.parameter_ranges.ema_mid_range = (15, 15)
+        opt.parameter_ranges.ema_long_range = (40, 41)
+        assert opt._collect_cacheable_periods_from_config() == {7, 8, 15, 40, 41}
 
 
 class TestConcurrencySafety:

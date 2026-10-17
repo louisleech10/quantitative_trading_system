@@ -8,7 +8,7 @@ Date: 2026-01-10
 """
 
 import pytest
-import asyncio
+import time
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -57,8 +57,10 @@ def test_feature_extraction_api():
             break
         elif status_data['status'] == 'failed':
             pytest.fail(f"任務失敗: {status_data['error']}")
-        
-        asyncio.sleep(1)
+
+        time.sleep(1)  # 原為未 await 的 asyncio.sleep(1)（不會真的等待）
+    else:
+        pytest.fail("任務 60 秒內未完成")
 
 
 def test_feature_task_status_api():

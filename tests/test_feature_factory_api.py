@@ -24,8 +24,19 @@ def test_feature_factory_preview():
     assert "breakdown" in data
 
 
-def test_feature_factory_generate():
-    """測試 Feature Factory generate 端點"""
+def test_feature_factory_generate(monkeypatch):
+    """測試 Feature Factory generate 端點（替身 _run_task，避免真實全量生成）"""
+    from api.services.feature_factory_service import feature_factory_service
+
+    seen = {}
+
+    async def _fake_run_task(task_id, request):
+        seen["task_id"] = task_id
+        seen["symbol"] = request.symbol
+        seen["timeframe"] = request.timeframe
+
+    monkeypatch.setattr(feature_factory_service, "_run_task", _fake_run_task)
+
     response = client.post(
         "/api/v1/features/generate",
         json={"symbol": "BTCUSDT", "timeframe": "12h"},
@@ -34,6 +45,11 @@ def test_feature_factory_generate():
     data = response.json()
     assert "task_id" in data
     assert data["status"] == "running"
+    # 任務已登記，且請求內容原樣交給背景執行者
+    assert data["task_id"] in feature_factory_service._tasks
+    assert seen["task_id"] == data["task_id"]
+    assert seen["symbol"] == "BTCUSDT"
+    assert seen["timeframe"] == "12h"
 
 
 def test_feature_factory_task_not_found():

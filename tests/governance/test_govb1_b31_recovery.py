@@ -96,15 +96,21 @@ def test_format_failed_does_not_become_failed() -> None:
 def test_debt_clear_success_guard_not_relaxed() -> None:
     """🔴 不可做：不得放寬 `debt_clear` 只接受 `success` 的守衛（三值契約凍結）。"""
     s = (REPO_ROOT / "scripts" / "debt_clear.sh").read_text(encoding="utf-8")
-    assert "format-failed" not in s.split("abandon_kind")[0] or True  # 存在性不強制
-    # 守衛本身：debt_clear 不得把 format-failed 當成可銷帳
-    assert "success" in s
-    got = subprocess.run(
-        ["git", "diff", "--stat", "HEAD", "--", "scripts/debt_clear.sh"],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
-    )
-    assert got.returncode == 0
-    assert got.stdout.strip() == "", f"本批不得改 debt_clear.sh:\n{got.stdout}"
+    # 現行契約（SPLITUNIFY b9 r37 後）：format-failed 有出口但**不是無條件**——
+    # 守衛本身：debt_clear 不得把 format-failed 當成可銷帳（除非下列條件全成立）。
+    # ① 非 success／verdict_rejected／format-failed／failed 之任何狀態 → 一律「須 success」拒絕
+    assert 'elif rec.get("result_state") != "success":' in s
+    assert "（須 success）" in s
+    # ② format-failed 出口須有「其後同 round 重新 register-output」否則 exit 1
+    i = s.index('rec.get("result_state") in ("verdict_rejected", "format-failed", "failed")')
+    block = s[i:s.index('elif rec.get("result_state") != "success":', i)]
+    assert "if not rr:" in block and "sys.exit(1)" in block.split("if not rr:", 1)[1].split("if state in", 1)[0]
+    # ③ 且該產出檔須實跑 completeness_check --single 通過（rc≠0 → exit 1）；格式不合不得靠重新登記繞過
+    assert '"--single", out_abs' in block
+    assert "if chk.returncode != 0:" in block
+    assert "sys.exit(1)" in block.split("if chk.returncode != 0:", 1)[1].split("if state ==", 1)[0]
+    # ④ failed（CLI 非零退出）再加終結標記檢查
+    assert '"VERDICT:", "STATUS: DONE"' in block
 
 
 # ---------------------------------------------------------------------------

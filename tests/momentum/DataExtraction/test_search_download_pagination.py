@@ -283,33 +283,63 @@ def test_symbol_search_does_not_block_event_loop():
         loop.close()
 
 
-def test_process_pool_results_are_awaited_not_blocking():
-    """④：結果收集期間事件迴圈仍可排程（wrap_future＋as_completed 的行為驗證）。"""
+def test_process_pool_results_are_awaited_not_blocking(tmp_path, monkeypatch):
+    """④：結果收集期間事件迴圈仍可排程（wrap_future＋as_completed 的行為驗證）。
+
+    驅動**真** `search_cases_parallel`（同 ⑨：模組綁定之 `ProcessPoolExecutor` 換成
+    `ThreadPoolExecutor`、stub 慢 worker），ticker 與之並行；於搜尋**完成當下**取樣 ticks。
+    production 若改回同步 `concurrent.futures.as_completed`／`future.result()`，worker 睡眠期間
+    事件迴圈被鎖死，完成當下之 ticks 趨近 0 ⇒ 紅。
+    """
     from concurrent.futures import ThreadPoolExecutor
+    from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+
+    monkeypatch.chdir(tmp_path)
+    engine = CaseSearchEngine(data_loader=_RejectOnDownloadLoader(), enable_parallel=True,
+                              num_workers=2)
+    parallel = engine.parallel_engine
+    assert parallel is not None
+    monkeypatch.setattr(pse, "ProcessPoolExecutor", ThreadPoolExecutor)
+
+    worker_sleep_s = 0.4
+
+    def _slow_worker(chunk, config, chunk_idx, total_chunks, log_path=None):
+        time.sleep(worker_sleep_s)
+        return {"success_results": [{"symbol": s} for s in chunk], "failed_records": [],
+                "retry_stats": {"total_retries": 0, "successful_retries": 0, "failed_retries": 0}}
+
+    monkeypatch.setattr(pse, "_process_chunk_worker", _slow_worker)
+    symbols = ["AAAUSDT", "BBBUSDT", "CCCUSDT", "DDDUSDT"]
 
     async def scenario():
         ticks = 0
-        ex = ThreadPoolExecutor(max_workers=2)
+
+        async def ticker():
+            nonlocal ticks
+            while True:
+                await asyncio.sleep(0.02)
+                ticks += 1
+
+        task = asyncio.ensure_future(ticker())
         try:
-            futures = [ex.submit(time.sleep, 0.25) for _ in range(2)]
-
-            async def ticker():
-                nonlocal ticks
-                for _ in range(15):
-                    await asyncio.sleep(0.02)
-                    ticks += 1
-
-            task = asyncio.ensure_future(ticker())
-            for fut in asyncio.as_completed([asyncio.wrap_future(f) for f in futures]):
-                await fut
-            await task
+            results = await parallel.search_cases_parallel(
+                config=_real_config(), symbols=symbols, save_results=False,
+            )
+            ticks_at_completion = ticks          # 完成當下取樣（不先跑滿 ticker）
         finally:
-            await asyncio.to_thread(ex.shutdown, True)
-        return ticks
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        return ticks_at_completion, results
 
     loop = asyncio.new_event_loop()
     try:
-        assert loop.run_until_complete(scenario()) >= 8
+        ticks_at_completion, results = loop.run_until_complete(scenario())
+        # 0.4s 睡眠／0.02s 一拍 ⇒ 未阻塞時約 20 拍；阻塞時趨近 0
+        assert ticks_at_completion >= 8
+        assert sorted(r["symbol"] for r in results) == symbols, "真 search_cases_parallel 未收齊各 chunk 結果"
     finally:
         loop.close()
 

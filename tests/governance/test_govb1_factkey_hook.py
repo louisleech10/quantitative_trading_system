@@ -23,6 +23,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -58,6 +59,7 @@ _DEPS = (
     "audit_append.sh",
     "audit_events.json",
     "governance_families.json",   # DOCROT2 Task 1.3：committee-roster 之 rows_source 來源
+    "test_change_review.sh",      # pre-push 第一道（TESTREG）：缺檔 ⇒ fail-closed 拒 push
 )
 
 _GIT_ENV = {
@@ -165,7 +167,11 @@ def test_pre_push_is_not_modified_by_this_task():
     assert "fact_key" not in body and "factkey" not in body, (
         "pre-push 出現 fact-key 字樣 ⇒ 掛載點被改到 pre-push，違反 Task 2.2 不可做"
     )
-    assert "gov_check.sh --no-probe" in body, "pre-push 仍須委派 gov_check.sh --no-probe"
+    # 現行契約（2026-08-14 使用者裁定）：pre-push 以 `_GC_MODE="--fast"` 委派 gov_check.sh（秒級）；
+    # 原斷言「gov_check.sh --no-probe」僅靠註解字面通過，實際委派的是 --fast。
+    code = "\n".join(ln for ln in body.splitlines() if not ln.lstrip().startswith("#"))
+    assert '_GC_MODE="--fast"' in code, "pre-push 須以 --fast 委派 gov_check.sh"
+    assert 'bash scripts/gov_check.sh "${_GC_MODE}"' in code, "pre-push 未委派 gov_check.sh"
 
 
 # --------------------------------------------------------------------------
@@ -173,12 +179,44 @@ def test_pre_push_is_not_modified_by_this_task():
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="fixture tests/governance/fixtures/govb1/factkey_clean 之宿主檔為 fact_keys.json 之投影，2026-09-11 fact_keys 多次變更後已過期"
-                         "（第 3 段 FACTKEY DRIFT，非 1a/1c 引起；pre-existing）。須以 gen_fact_key_blocks --write 在 fixture repo 再生後解除 skip——"
-                         "登記於 HANDOFF 殘留，非 VERDICTGATE B3 範圍。")
 def test_t22_clean_host_rc_zero(tmp_path):
     root = _mk_repo(tmp_path)
-    _install_host(root, CLEAN)
+    # clean fixture 的區塊內容是 fact_keys.json 的投影，fact_keys 每次變更（含新增宿主檔）即過期
+    # （曾因此被標 skip）。改為把 fact_keys.json 登記之全部宿主檔從真 repo 複製進 tmp repo：
+    # 真 repo 的 `gen_fact_key_blocks.sh --check` 須為綠（見 test_generator_wiring_survives_in_real_repo），
+    # 故複本「與 SoT 同步」是構造保證；漂移對照組仍由 factkey_drifted 提供。
+    reg = json.loads((REPO / "scripts" / "fact_keys.json").read_text(encoding="utf-8"))
+    targets = set()
+    for v in reg.values():
+        if isinstance(v, dict) and "target" in v:
+            t = v["target"]
+            targets.update(t if isinstance(t, list) else [t])
+    assert targets, "fact_keys.json 無任何 target"
+    for rel in sorted(targets):
+        src = REPO / rel
+        assert src.is_file(), f"宿主檔不存在: {src}"
+        dst = root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+    # 區塊內 receipt 欄指向的證據檔（宣稱實跑則須有物可查）也從真 repo 補進來；
+    # 逐輪依生成器 fail-closed 訊息補檔，直到不再缺（有上限，避免無窮迴圈）。
+    missing_re = re.compile(r"(?:receipt 指向不存在之檔|mechanism_scope 所列宿主不存在)：(\S+) →")
+    for _ in range(8):
+        probe = subprocess.run(
+            ["bash", "scripts/gen_fact_key_blocks.sh", "--check"],
+            cwd=str(root), env={k: v for k, v in os.environ.items() if k != "GOVB1_FACTKEY_ROOT"},
+            capture_output=True, text=True,
+        )
+        need = sorted(set(missing_re.findall(probe.stderr + probe.stdout)))
+        if not need:
+            break
+        for rel in need:
+            src = REPO / rel
+            assert src.is_file(), f"真 repo 也缺 receipt 檔（真 repo 的 --check 應為綠）: {rel}"
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, root / rel)
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "hosts")
     r = _run_gov(root, "--no-probe")
     assert "事實單一來源" in r.stdout, f"第 3 段未執行:\n{r.stdout}"
     assert r.returncode == 0, f"clean 應 rc=0，實得 {r.returncode}\n{r.stdout}\n{r.stderr}"
@@ -248,26 +286,38 @@ def test_fast_mode_contract_is_unchanged(tmp_path):
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.skip(reason="2026-08-14 使用者裁定 pre-push 只跑 --fast（秒級），第 3 段改為手動關卡（CLAUDE.md／pre-push 檔頭）；"
-                         "本斷言自該日起即與契約相反（紅），2026-09-11 VERDICTGATE B3 補跑時發現，依現行契約標 skip 而非改寬。")
 def test_pre_push_delegation_reaches_factkey_segment(tmp_path):
+    """pre-push 委派鏈（現行契約，2026-08-14 使用者裁定）：pre-push 只委派 `gov_check.sh --fast`
+    （秒級），**不**走到第 3 段 fact-key；第 3 段改為手動 `--no-probe` 關卡。
+    （原斷言「委派鏈走到第 3 段」自該日起與契約相反；此處改驗現行契約，並以手動關卡對照其仍有效。）
+    """
     root = _mk_repo(tmp_path)
     _install_host(root, CLEAN)
     r = _run_prepush(root)
-    assert "委派" in r.stdout, f"pre-push 未委派:\n{r.stdout}"
-    assert "事實單一來源" in r.stdout, f"委派鏈未走到第 3 段:\n{r.stdout}"
+    assert "委派" in r.stdout and "--fast" in r.stdout, f"pre-push 未委派 --fast:\n{r.stdout}"
+    assert "事實單一來源" not in r.stdout, f"pre-push --fast 不應走到第 3 段:\n{r.stdout}"
+    assert "放行 push" in r.stdout
     assert r.returncode == 0, f"clean 下 pre-push 應放行:\n{r.stdout}\n{r.stderr}"
+    # 對照：同一個 repo 的手動關卡（--no-probe）確實含第 3 段
+    m = _run_gov(root, "--no-probe")
+    assert "事實單一來源" in m.stdout, f"手動關卡未執行第 3 段:\n{m.stdout}"
 
 
-@pytest.mark.skip(reason="同上：pre-push --fast 不含第 3 段（2026-08-14 使用者裁定），fact-key 漂移改由手動 --no-probe 與 PostToolUse factkey_write_guard 擋；"
-                         "test_t22_drifted_host_rc_nonzero 仍驗 --no-probe 路徑之拒絕。")
 def test_pre_push_rejects_on_factkey_drift(tmp_path):
-    """真正的 push 前路徑：宿主檔漂移 ⇒ 拒 push。"""
+    """現行契約（2026-08-14）：宿主檔漂移**不**由 pre-push 擋（--fast 不含第 3 段），
+    改由手動 `--no-probe` 與 PostToolUse factkey_write_guard 擋。
+
+    本測試固定這個誠實邊界：pre-push 放行、手動關卡拒絕——兩者同時成立，
+    任一方被悄悄改掉（pre-push 偷加慢閘、或手動關卡失效）都會轉紅。
+    """
     root = _mk_repo(tmp_path)
     _install_host(root, DRIFTED)
     r = _run_prepush(root)
-    assert r.returncode != 0, f"漂移竟允許 push:\n{r.stdout}\n{r.stderr}"
-    assert "拒 push" in r.stderr, r.stderr
+    assert r.returncode == 0, f"pre-push 現行契約不含 fact-key 漂移檢查:\n{r.stdout}\n{r.stderr}"
+    assert "事實單一來源" not in r.stdout
+    m = _run_gov(root, "--no-probe")
+    assert m.returncode != 0, f"手動關卡對漂移宿主檔必須拒絕:\n{m.stdout}"
+    assert "FACTKEY DRIFT" in m.stderr
 
 
 def test_pre_push_escape_hatch_still_documented_and_working(tmp_path):

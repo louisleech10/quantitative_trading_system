@@ -1,165 +1,107 @@
 """
-測試 XGBoost Batch 分析 - JSON 序列化修復驗證
+XGBoost Batch 任務狀態端點 - JSON 序列化修復驗證（TestClient 版，不需 run_api.py）
 
-測試場景：
-1. 啟動批量分析任務
-2. 輪詢任務狀態（模擬前端行為）
-3. 驗證返回的 JSON 可以正確序列化（不會有 numpy.int64 錯誤）
+回歸情境：批量分析任務結果含 numpy.int64／float64／ndarray／NaN／Inf，
+輪詢端點（/pattern-analysis/xgboost/batch/task/{id}、/pattern-analysis/batch/task/{id}）
+必須回 200 且 body 為合法 JSON、數值為原生型別（舊 bug：numpy.int64 無法序列化 ⇒ 前端輪詢無限迴圈）。
 
-執行方式：
-    python test_xgboost_json_fix.py
+batch service 以替身取代（不重訓），任務結果直接塞入 numpy 型別。
 """
 
-import sys
-import time
-import requests
-from pathlib import Path
+from __future__ import annotations
 
-# 加入專案路徑
-project_root = Path(__file__).parent
-sys.path.insert(0, str(project_root))
+import json
 
-from api.core.logging import get_logger
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
 
-logger = get_logger(__name__)
+from api.main import app
+from api.routes import pattern_analysis as pa_route
 
-API_BASE = "http://localhost:8000/api/v1"
+TASK_ID = "task-json-fix"
 
 
-def test_batch_xgboost_json():
-    """測試批量 XGBoost 分析的 JSON 序列化"""
-    
-    logger.info("=" * 80)
-    logger.info("測試 5: XGBoost Batch JSON 序列化修復")
-    logger.info("=" * 80)
-    
-    # Step 1: 啟動批量分析
-    logger.info("\n📤 Step 1: 發送批量分析請求...")
-    
-    payload = {
-        "symbol": "ETHUSDT",
-        "timeframe": "1h",
-        "lookback_bars": 200,
-        "indicators": [
-            {
-                "indicator": "ema_three_line",
-                "data_source": "close",
-                "params": {
-                    "ema_short": 5,
-                    "ema_mid": 13,
-                    "ema_long": 34,
-                    "volume_threshold": 0.0
-                }
-            }
-        ],
-        "cv_folds": 5,
-        "xgboost_params": {
-            "max_depth": 5,
-            "learning_rate": 0.1,
-            "n_estimators": 100
+class _FakeBatchService:
+    def __init__(self, task):
+        self._task = task
+
+    def get_task_status(self, task_id):
+        return self._task if task_id == TASK_ID else None
+
+
+def _numpy_task():
+    return {
+        "task_id": TASK_ID,
+        "status": "completed",
+        "progress": np.float64(100.0),
+        "current_step": "done",
+        "result": {
+            "total_cases": np.int64(120),
+            "valid_cases": np.int64(100),
+            "positive_cases": np.int64(60),
+            "negative_cases": np.int64(40),
+            "features_generated": np.int32(35),
+            "feature_ids": np.array([1, 2, 3], dtype=np.int64),
+            "model_performance": {
+                "train_auc_score": np.float64(0.91),
+                "cv_auc_mean": np.float32(0.75),
+            },
         },
-        "top_n_rules": 10,
-        "min_support": 10
     }
-    
-    try:
-        response = requests.post(
-            f"{API_BASE}/pattern-analysis/xgboost/batch/start",
-            json=payload,
-            timeout=30
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        task_id = data.get('task_id')
-        logger.info(f"✅ 任務已啟動: {task_id}")
-        
-    except Exception as e:
-        logger.error(f"❌ 啟動任務失敗: {e}")
-        return False
-    
-    # Step 2: 輪詢任務狀態（模擬前端行為）
-    logger.info("\n🔄 Step 2: 輪詢任務狀態（最多 10 次，每次間隔 2 秒）...")
-    
-    max_polls = 10
-    poll_interval = 2
-    
-    for i in range(max_polls):
-        time.sleep(poll_interval)
-        
-        try:
-            response = requests.get(
-                f"{API_BASE}/pattern-analysis/xgboost/batch/task/{task_id}",
-                timeout=10
-            )
-            
-            # 檢查狀態碼
-            if response.status_code != 200:
-                logger.error(f"❌ Poll {i+1}: HTTP {response.status_code}")
-                logger.error(f"Response: {response.text[:500]}")
-                return False
-            
-            # 嘗試解析 JSON
-            task_status = response.json()
-            
-            status = task_status.get('status', 'unknown')
-            progress = task_status.get('progress', 0)
-            current_step = task_status.get('current_step', 'N/A')
-            
-            logger.info(
-                f"✅ Poll {i+1}: status={status}, progress={progress}%, "
-                f"step={current_step}"
-            )
-            
-            # 如果完成或失敗，停止輪詢
-            if status == 'completed':
-                logger.info("\n🎉 任務完成！")
-                
-                # 檢查結果資料
-                result = task_status.get('result')
-                if result:
-                    logger.info(f"  - 總案例: {result.get('total_cases')}")
-                    logger.info(f"  - 有效案例: {result.get('valid_cases')}")
-                    logger.info(f"  - 正例: {result.get('positive_cases')}")
-                    logger.info(f"  - 反例: {result.get('negative_cases')}")
-                    logger.info(f"  - 特徵數: {result.get('features_generated')}")
-                    
-                    # 檢查是否有 numpy 類型（這些應該都被轉換了）
-                    perf = result.get('model_performance', {})
-                    logger.info(f"  - Train AUC: {perf.get('train_auc_score')}")
-                    logger.info(f"  - CV AUC: {perf.get('cv_auc_mean')}")
-                
-                return True
-            
-            elif status == 'failed':
-                logger.error(f"❌ 任務失敗: {task_status.get('error')}")
-                return False
-            
-        except requests.exceptions.JSONDecodeError as e:
-            logger.error(f"❌ Poll {i+1}: JSON 解析失敗 - {e}")
-            logger.error(f"Response text: {response.text[:500]}")
-            return False
-        
-        except Exception as e:
-            logger.error(f"❌ Poll {i+1}: 未預期的錯誤 - {e}")
-            return False
-    
-    logger.warning("⏰ 達到最大輪詢次數，任務仍在執行中")
-    return True  # 不算失敗，只是還沒完成
 
 
-if __name__ == "__main__":
-    print("\n" + "=" * 80)
-    print("XGBoost Batch JSON 序列化修復測試")
-    print("=" * 80)
-    
-    success = test_batch_xgboost_json()
-    
-    print("\n" + "=" * 80)
-    if success:
-        print("✅ 測試通過 - JSON 序列化正常，沒有無限迴圈")
-    else:
-        print("❌ 測試失敗 - 請檢查日誌")
-    print("=" * 80 + "\n")
-    
-    sys.exit(0 if success else 1)
+@pytest.fixture
+def client(monkeypatch):
+    monkeypatch.setattr(pa_route, "get_xgboost_batch_service", lambda: _FakeBatchService(_numpy_task()))
+    return TestClient(app)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="生產缺陷：convert_numpy_types 對 np.float64 的 NaN/Inf 直接 float() 回傳而未轉 None（json_serializer.py:23-24），端點 500；見 白話說明/還沒做的事.md",
+)
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_batch_xgboost_json_numpy_nan_inf_become_null(monkeypatch, bad):
+    """np.float64 的 NaN／Inf（如 CV AUC 算不出）經端點後應為 null，而非 500。"""
+    task = _numpy_task()
+    task["result"]["model_performance"]["cv_auc_bad"] = np.float64(bad)
+    monkeypatch.setattr(pa_route, "get_xgboost_batch_service", lambda: _FakeBatchService(task))
+    resp = TestClient(app).get(f"/api/v1/pattern-analysis/xgboost/batch/task/{TASK_ID}")
+    assert resp.status_code == 200
+    assert resp.json()["result"]["model_performance"]["cv_auc_bad"] is None
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        f"/api/v1/pattern-analysis/xgboost/batch/task/{TASK_ID}",
+        f"/api/v1/pattern-analysis/batch/task/{TASK_ID}",
+    ],
+)
+def test_batch_xgboost_json(client, path):
+    """含 numpy 型別／NaN／Inf 之任務結果經端點後為合法 JSON 且數值守恆。"""
+    resp = client.get(path)
+    assert resp.status_code == 200
+    # 嚴格 JSON（不允許 NaN／Infinity 字面值）
+    body = json.loads(resp.text, parse_constant=lambda c: pytest.fail(f"非法 JSON 常數 {c}"))
+
+    assert body["status"] == "completed"
+    assert body["progress"] == 100.0
+    result = body["result"]
+    assert result["total_cases"] == 120
+    assert result["valid_cases"] == 100
+    assert result["positive_cases"] == 60
+    assert result["negative_cases"] == 40
+    assert result["positive_cases"] + result["negative_cases"] == result["valid_cases"]
+    assert result["features_generated"] == 35
+    assert result["feature_ids"] == [1, 2, 3]
+    perf = result["model_performance"]
+    assert perf["train_auc_score"] == pytest.approx(0.91)
+    assert perf["cv_auc_mean"] == pytest.approx(0.75)
+
+
+def test_batch_xgboost_task_not_found(client):
+    """不存在之任務回 404。"""
+    assert client.get("/api/v1/pattern-analysis/xgboost/batch/task/nonexistent").status_code == 404
+    assert client.get("/api/v1/pattern-analysis/batch/task/nonexistent").status_code == 404

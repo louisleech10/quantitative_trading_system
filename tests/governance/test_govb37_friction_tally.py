@@ -374,7 +374,7 @@ def test_colon_inside_string_is_not_a_separator(tmp_path):
 # --------------------------------------------------------------------------
 
 _CMD_FILES = [
-    REPO / "白話說明" / "接下來要做什麼.md",
+    REPO / "白話說明" / "Archived" / "接下來要做什麼.md",
     REPO / "handoffs" / "20260801-GOV-AMEND-BACKLOG.md",
 ]
 _CANONICAL = [

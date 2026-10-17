@@ -30,26 +30,97 @@ def test_timeframe_seconds_for_still_fails_closed_on_unknown():
         pipeline.timeframe_seconds_for(["12h", "3weeks"])
 
 
-def test_service_includes_analysis_timeframe_in_the_injected_map():
-    """service 端：注入的 map 必須涵蓋 `request.timeframe`。
+from momentum.Analysis.event_samples.pipeline import EventSamplePipeline as _EventSamplePipeline
 
-    🔴 驗**實際建構出來的鍵集**，不是掃原始碼——後者擋不住「寫了但沒傳」。
+_REAL_ISOLATION_TERMS_ROWS = _EventSamplePipeline.isolation_terms_rows
+_H12_MS = 43_200_000
+_T0 = 1704067200000
+
+
+class _Stop(Exception):
+    """攔截哨：取得中途值後中止五階段（不需特徵 run 目錄）。"""
+
+
+def _run_stages_until_isolation(monkeypatch, analysis_tf: str):
+    """以真實 ETHUSDT 12h/1h kline 跑 `_run_event_label_stages` 至隔離換算為止。
+
+    只替換兩個與本主題無關之環節：特徵 run 涵蓋閘（需磁碟上之 run manifest，與 timeframe 換算無關）
+    與 isolation 之後的流程（以哨兵中止）；timeframe 鍵集建構／bars 載入／窗換算皆為真實碼。
+    回傳 (bars_from_kline_cache 收到之 timeframes, 注入之 timeframe_seconds, EventIsolationRows)。
     """
-    import inspect
+    from types import SimpleNamespace
 
     from api.services import ic_analysis_service as svc
+    from momentum.Analysis.event_samples import pipeline as pipeline_mod
+    from tests.momentum.event_samples.helpers import load_bars, make_event
 
-    src = inspect.getsource(svc.ICAnalysisService._run_event_label_stages)
-    # 建構清單必須是「事件 tf ∪ 分析 tf」，不能只有事件 tf
-    assert "tf_inputs" in src and "timeframe_seconds_for(tf_inputs)" in src, (
-        "timeframe_seconds 又只用事件批宣告的 tf 建構了"
+    bars = load_bars("ETHUSDT", ("12h", "1h"))
+    seen = {}
+
+    def fake_bars(symbols, timeframes, **kw):
+        seen["bars_tfs"] = list(timeframes)
+        return bars
+
+    real_iso = _REAL_ISOLATION_TERMS_ROWS  # 模組載入時取得（避免同測內二次 patch 取到哨兵）
+
+    def iso(*a, **kw):
+        seen["ts"] = dict(kw["timeframe_seconds"])
+        seen["iso"] = real_iso(*a, **kw)
+        raise _Stop()
+
+    monkeypatch.setattr(pipeline_mod.EventSamplePipeline, "bars_from_kline_cache", staticmethod(fake_bars))
+    monkeypatch.setattr(pipeline_mod.EventSamplePipeline, "isolation_terms_rows", staticmethod(iso))
+    monkeypatch.setattr(
+        svc, "check_feature_run_coverage",
+        lambda **kw: SimpleNamespace(evaluated=False, covered_event_ids=frozenset()),
     )
-    assert "timeframe_seconds_for(timeframes)" not in src
+    records = [
+        make_event(0, t0=_T0 + 100 * _H12_MS, label=1, direction="long"),
+        make_event(1, t0=_T0 + 110 * _H12_MS, label=0, direction="long"),
+    ]
+    batch = {
+        "records": records,
+        "event_label_spec": {"horizon_bars": 2, "entry_price_semantic": "trigger_close",
+                             "label_return_mode": "close_to_close", "decision_offset_bars": 0},
+        "lookahead_bars_declared": {"12h": 0},
+    }
+
+    class _Req:
+        event_import_id = "imp-xtf"
+        event_timestamps = None
+        timeframe = analysis_tf
+
+    with pytest.raises(_Stop):
+        svc.ICAnalysisService._run_event_label_stages(
+            _Req(), batch,
+            features_path="data_cache/features/ETHUSDT/1h/x/x.h5", meta_path=None,
+        )
+    return seen["bars_tfs"], seen["ts"], seen["iso"]
 
 
-def test_purge_rows_conversion_is_duration_based():
-    """同一段 purge 時間，在細週期上就是更多列——這是本修法成立的理由。"""
-    purge_ms = 12 * 3600 * 1000          # 一根 12h
-    for tf, seconds, expected_rows in (("12h", 12 * 3600, 1), ("1h", 3600, 12)):
-        rows = -(-int(purge_ms) // (int(seconds) * 1000))   # 同 service 之 ceil division
-        assert rows == expected_rows, f"{tf} 換算錯誤"
+def test_service_includes_analysis_timeframe_in_the_injected_map(monkeypatch):
+    """service 端：注入的 map 必須涵蓋 `request.timeframe`。
+
+    🔴 驗**實際建構出來的鍵集**（真實跑 `_run_event_label_stages`），不掃原始碼——
+    後者擋不住「寫了但沒傳」。對照：分析 tf 即事件 tf 時鍵集不含多餘 tf。
+    """
+    bars_tfs, ts_map, _ = _run_stages_until_isolation(monkeypatch, "1h")
+    assert ts_map == {"12h": 12 * 3600, "1h": 3600}      # 事件 tf ∪ 分析 tf
+    assert bars_tfs == ["12h", "1h"]                      # bars 同樣載入兩個 tf
+
+    bars_tfs_same, ts_same, _ = _run_stages_until_isolation(monkeypatch, "12h")
+    assert ts_same == {"12h": 12 * 3600}
+    assert bars_tfs_same == ["12h"]
+
+
+def test_purge_rows_conversion_is_duration_based(monkeypatch):
+    """同一段 purge 時間，在細週期上就是更多列——這是本修法成立的理由。
+
+    真實跑五階段至 isolation：同一批 12h 事件（horizon 2 根 12h＝24h 窗），
+    以 12h 特徵 run 分析得 2 列、以 1h 特徵 run 分析得 24 列（×12）。
+    """
+    _, _, iso_12h = _run_stages_until_isolation(monkeypatch, "12h")
+    _, _, iso_1h = _run_stages_until_isolation(monkeypatch, "1h")
+    assert iso_12h.label_window_rows == 2
+    assert iso_1h.label_window_rows == 24
+    assert iso_1h.label_window_rows == 12 * iso_12h.label_window_rows

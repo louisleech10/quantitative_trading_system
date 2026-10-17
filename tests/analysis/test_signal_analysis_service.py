@@ -21,6 +21,22 @@ from api.models.training_window_config import (
 )
 
 
+def _service_with_cases(monkeypatch, cases_by_label):
+    """服務單例 + 以真實 ETHUSDT 案例（CaseRecord）替換案例查詢（測後由 monkeypatch 還原）。"""
+    by_id = {
+        c.case_id: c
+        for c in cases_by_label["positive"] + cases_by_label["negative"]
+    }
+
+    class _CaseLookup:
+        def get_case(self, case_id):
+            return by_id.get(case_id)
+
+    service = SignalAnalysisService()
+    monkeypatch.setattr(service, "case_storage", _CaseLookup())
+    return service
+
+
 class TestServiceInitialization:
     """測試服務初始化和單例模式"""
 
@@ -53,12 +69,13 @@ class TestAnalyzeSignalDensity:
     @pytest.mark.asyncio
     async def test_analyze_minimal_cases(
         self,
+        monkeypatch,
         minimal_test_cases,
         sample_strategy_config,
         sample_training_window_config
     ):
         """測試最小案例集分析"""
-        service = SignalAnalysisService()
+        service = _service_with_cases(monkeypatch, minimal_test_cases)
 
         request = SignalDensityRequest(
             strategy_config=sample_strategy_config,
@@ -67,12 +84,21 @@ class TestAnalyzeSignalDensity:
             negative_cases=[c.case_id for c in minimal_test_cases["negative"]]
         )
 
-        # 由於沒有實際將案例存入 CaseStorage，需要 mock
-        # 這裡我們直接測試服務邏輯（繞過 case loading）
-        # 或者使用 mock_case_storage fixture
+        result = await service.analyze_signal_density(request)
 
-        # NOTE: 此測試需要實際的案例存儲，先標記為需要改進
-        print("✅ Service method structure validated")
+        assert result.positive_sample_size == len(minimal_test_cases["positive"])
+        assert result.negative_sample_size == len(minimal_test_cases["negative"])
+        assert 0.0 <= result.positive_avg_density <= 1.0
+        assert 0.0 <= result.negative_avg_density <= 1.0
+        assert result.separation == pytest.approx(
+            result.positive_avg_density - result.negative_avg_density
+        )
+        case_keys = [k for k in result.case_level_densities if not k.startswith("__")]
+        assert sorted(case_keys) == sorted(
+            c.case_id for c in minimal_test_cases["positive"] + minimal_test_cases["negative"]
+        )
+
+        print("✅ Service analyze_signal_density end-to-end validated")
 
     @pytest.mark.asyncio
     async def test_analyze_with_validation(self):
@@ -173,19 +199,26 @@ class TestPreviewTrainingWindow:
     @pytest.mark.asyncio
     async def test_preview_basic(
         self,
+        monkeypatch,
         minimal_test_cases,
         sample_training_window_config
     ):
         """測試基本預覽功能"""
-        service = SignalAnalysisService()
+        service = _service_with_cases(monkeypatch, minimal_test_cases)
 
-        case_id = minimal_test_cases["positive"][0].case_id
+        case = minimal_test_cases["positive"][0]
+        info = await service.preview_training_window(
+            case.case_id, sample_training_window_config
+        )
 
-        # 由於需要實際案例存儲，這裡僅驗證方法存在
-        # 實際測試需要 mock_case_storage
-        assert hasattr(service, 'preview_training_window')
+        assert info["case_id"] == case.case_id
+        assert info["symbol"] == case.symbol
+        assert 0 < info["actual_bars"] <= sample_training_window_config.lookback_bars
+        # 無 look-ahead：預覽窗口最後一根嚴格早於 TO
+        assert info["timestamp_range"]["start"] < info["timestamp_range"]["end"]
+        assert info["timestamp_range"]["end"] < case.timestamp
 
-        print("✅ Preview method exists")
+        print("✅ Preview returns window info without look-ahead")
 
     @pytest.mark.asyncio
     async def test_preview_nonexistent_case(self, sample_training_window_config):
@@ -275,13 +308,14 @@ class TestPerformanceMonitoring:
     @pytest.mark.asyncio
     async def test_execution_time_logged(
         self,
+        monkeypatch,
         minimal_test_cases,
         sample_strategy_config,
         sample_training_window_config,
         caplog
     ):
         """測試執行時間是否記錄"""
-        service = SignalAnalysisService()
+        service = _service_with_cases(monkeypatch, minimal_test_cases)
 
         request = SignalDensityRequest(
             strategy_config=sample_strategy_config,
@@ -290,15 +324,19 @@ class TestPerformanceMonitoring:
             negative_cases=[c.case_id for c in minimal_test_cases["negative"]]
         )
 
-        try:
+        import logging
+        with caplog.at_level(logging.INFO, logger=service.logger.name):
             await service.analyze_signal_density(request)
-        except HTTPException:
-            # 案例未實際存儲，預期失敗
-            pass
 
-        # 檢查日誌中是否有性能記錄（如果實作了日誌）
-        # NOTE: 需要實際運行才能驗證
-        print("✅ Performance monitoring structure validated")
+        # 完成日誌須含耗時（秒）
+        done = [
+            r.getMessage() for r in caplog.records
+            if "信號密度分析完成" in r.getMessage() and "耗時=" in r.getMessage()
+        ]
+        assert len(done) == 1
+        assert "耗時=" in done[0] and done[0].rstrip().endswith("秒")
+
+        print("✅ Execution time logged")
 
 
 class TestIntegrationWithRealComponents:
@@ -357,13 +395,22 @@ class TestValidationMethods:
             negative_cases=["case2"]
         )
 
-        try:
-            service._validate_request(valid_request)
-            print("✅ Valid indicator passed validation")
-        except Exception as e:
-            # 可能因其他原因失敗（如參數驗證），但不應該是"未註冊"錯誤
-            assert "未註冊的指標" not in str(e)
-            print(f"✅ Validation ran (error: {e})")
+        # 完整有效請求必須無例外通過（不再吞例外）
+        assert service._validate_request(valid_request) is None
+
+        # 對照組：未註冊指標必須被拒絕，證明驗證確實有跑
+        invalid_request = valid_request.model_copy(update={
+            "strategy_config": StrategyConfig(
+                data_source="close",
+                indicator_type="invalid_indicator",
+                strategy_logic="three_line",
+                params={"short_period": 20, "mid_period": 60, "long_period": 120}
+            )
+        })
+        with pytest.raises(ValueError, match="未註冊的指標"):
+            service._validate_request(invalid_request)
+
+        print("✅ Valid indicator passed validation; invalid rejected")
 
     def test_validate_data_source(self):
         """測試數據源驗證"""
@@ -387,14 +434,22 @@ class TestValidationMethods:
             negative_cases=["case2"]
         )
 
-        try:
-            service._validate_request(valid_request)
-            print("✅ Valid data source passed validation")
-        except ValueError as e:
-            if "無效的數據源" in str(e):
-                pytest.fail("Should accept valid data source 'close'")
-            # 其他錯誤（如參數驗證）可以接受
-            print(f"✅ Validation ran (error: {e})")
+        # 完整有效請求必須無例外通過（不再吞例外）
+        assert service._validate_request(valid_request) is None
+
+        # 對照組：無效數據源必須被拒絕
+        invalid_request = valid_request.model_copy(update={
+            "strategy_config": StrategyConfig(
+                data_source="invalid_source",
+                indicator_type="ema",
+                strategy_logic="three_line",
+                params={"short_period": 20, "mid_period": 60, "long_period": 120}
+            )
+        })
+        with pytest.raises(ValueError, match="無效的data_source"):
+            service._validate_request(invalid_request)
+
+        print("✅ Valid data source passed validation; invalid rejected")
 
     def test_validate_strategy_params(self):
         """測試策略參數驗證"""
