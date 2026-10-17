@@ -3173,8 +3173,8 @@
     "contract",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r1/synth.md",
    "guarantee": [
     "A13",
     "A17",
@@ -3188,10 +3188,7 @@
    "path": "tests/feature_engineering/test_batch2d_dstar_align.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/test_batch2d_dstar_align.py::test_t4_value_parity_exact_blocked",
-    "tests/feature_engineering/test_batch2d_dstar_align.py::test_t4_value_parity_inventory_record_only"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/test_cascade_blacklist.py": {
@@ -3384,7 +3381,6 @@
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [
-    "tests/feature_engineering/test_failopen_consumer.py::test_legacy_reader_strict_rejects_ic_and_training",
     "tests/feature_engineering/test_failopen_consumer.py::test_training_rejects_partial"
    ],
    "ticket": "FAIL-OPEN"

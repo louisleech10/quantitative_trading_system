@@ -1760,18 +1760,12 @@ def frozen_file_errors(recorded: Dict[str, str], paths: Sequence[str], reader=cu
 DISPOSITION_VIEW_REL = "handoffs/run_receipts/20261008-framepath-disposition-view.md"
 
 
-def test_check_0_disposition_view_bound_to_table():
-    """審查 r30 CODEX-R30-P1-03：逐項閱讀視圖（衍生物）入版控、其 sha256 記於 manifest，且首段所記來源 JSON
-    sha256 等於現行處置表（視圖與權威表不同步 ⇒ 紅）。"""
-    view = current_bytes(DISPOSITION_VIEW_REL)
-    assert view is not None
-    assert manifest_contract_shas().get(DISPOSITION_VIEW_REL) == sha256_bytes(view)
-    table_sha = sha256_bytes(current_bytes(DISPOSITION_REL) or b"")
-    assert f"sha256 `{table_sha}`" in view.decode("utf-8").split("\n", 4)[2]
-
-
-def test_check_0_frozen_acceptance_tests_unchanged():
-    assert frozen_file_errors(manifest_contract_shas(), FROZEN_CONTRACT_FILES) == []
+# FRAMEPATH 收案（ec89a695）後退役（TESTREG SPEC v53 Task 4.4 子批①；遷移期驗證於遷移完成後移除）：
+# 以錨點位元組／AST 約束治理檔與錨點以來歷史之真實 repo 檢查——test_check_0_disposition_view_bound_to_table、
+# test_check_0_frozen_since_approval_anchor、test_check_0_history_freeze_order、test_check_1_collect_difference、
+# test_check_2_per_file_expected、test_check_3_rewrite_keeps_assertions、test_check_0_frozen_acceptance_tests_unchanged
+# （凍結驗收檔位元組）。收案時 check_2 綠之紀錄：handoffs/run_receipts/testreg_probes/b5/check2_head.log。
+# 其判定函式與 mutation 測試保留。
 
 
 # 審查 r28 CODEX-R28-P1-01：manifest 之 contract_sha256 由 manifest 自我宣告，首個生產碼提交前可整批同步改寫
@@ -1814,13 +1808,6 @@ def approval_errors(anchor: Optional[str], production_changed: bool, paths: Sequ
 def _git_show_bytes(commit: str, path: str) -> Optional[bytes]:
     proc = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=REPO, capture_output=True)
     return proc.stdout if proc.returncode == 0 else None
-
-
-def test_check_0_frozen_since_approval_anchor():
-    lines = (REPO / AUDIT_REL).read_text(encoding="utf-8", errors="replace").splitlines()
-    prod_changed = any("__pycache__/" not in p for p in
-                       _git("diff", "--name-only", HEAD_SHORT, "--", *PRODUCTION_ROOTS).decode().splitlines() if p)
-    assert approval_errors(approval_anchor(lines), prod_changed, APPROVAL_FROZEN, _git_show_bytes) == []
 
 
 def test_mutation_self_consistent_rewrite_after_approval_is_red():
@@ -1926,10 +1913,6 @@ def git_commits_after_anchor() -> List[Tuple[str, Set[str]]]:
     return commits
 
 
-def test_check_0_history_freeze_order():
-    assert history_errors(git_commits_after_anchor(), (*FROZEN_CONTRACT_FILES, MANIFEST_REL)) == []
-
-
 # 審查 r43 CODEX-R43-P1-01：D2 准生產碼前重凍，但既有格之 fingerprint 與語意 receipt 不得被改寫（只准新增格）；
 # receipt 中隨每次執行之暫存路徑不同之鍵不比
 BASELINE_RUN_PATH_KEYS = frozenset({"kline_copy", "legacy_kline_dir", "child_env"})
@@ -2023,11 +2006,6 @@ def test_mutation_hollowed_v1_fixture_is_red():
     assert frozen_file_errors(recorded, [path], lambda p: gzip.compress(b"[]")) != []
 
 
-def test_check_1_collect_difference(ctx):
-    current = collect_nodeids(collect_files(ctx["disp"]))
-    assert check_1(ctx["disp"], ctx["phase"], current) == []
-
-
 def test_nodeid_table_equals_head_collect(ctx):
     disp = ctx["disp"]
     assert check_table_vs_head(disp, collect_at_commit(disp["head_commit"], disp["collect"]["files"])) == []
@@ -2040,16 +2018,6 @@ def test_mutation_nodeid_table_row_dropped_with_op_ids_is_red():
     dropped = {"nodeids": [r for r in full["nodeids"] if not r["nodeid"].startswith("u.py")]}
     assert check_table_vs_head(full, head) == []
     assert check_table_vs_head(dropped, head) != []
-
-
-def test_check_2_per_file_expected(ctx):
-    # SPEC v22 D11.2：check_2 預設以本 repo 之 foreign_only_paths()／他票改過之路徑判定（見 check_2 docstring）
-    assert check_2(ctx["disp"], ctx["phase"], ctx["head"]) == []
-    assert rebase_history_errors(ctx["disp"]) == []
-
-
-def test_check_3_rewrite_keeps_assertions(ctx):
-    assert check_3(ctx["disp"], 3, ctx["head"]) == []
 
 
 def test_check_4_internal_consistency_and_excerpts(ctx):
@@ -3648,24 +3616,9 @@ def test_git_path_output_not_escaped():
     assert not [p for p in paths if p.startswith('"') or re.search(r"\\[0-7]{3}", p)]
 
 
-def test_check_5_new_and_ignored_files(ctx):
-    assert check_5(ctx["disp"], ctx["phase"], git_added_and_untracked(), git_ignored()) == []
-
-
-def test_check_6_fact_keys_rows(ctx):
-    # SPEC v22 D11.3：取代「錨點與現行整份比對」——工作樹段比 HEAD→工作樹（下行），另逐本票提交比 commit^→commit
-    head_doc = _json_at(REPO, "HEAD", FACT_KEYS_REL)
-    assert check_6(ctx["disp"], ctx["phase"], head_doc, load_json(FACT_KEYS_REL)) == []
-    assert check_6_revisions(ctx["disp"], ctx["phase"], fact_key_revisions()) == []
-
-
-def test_check_7_changed_paths_in_scope(ctx):
-    assert check_7(ctx["disp"], git_changed_paths()) == []
-    # 活文件登記表：同 ⑥ 之逐提交歸屬（SPEC v22 D11.1／D11.3 同構）——工作樹段比 HEAD→工作樹（下行），另逐本票提交比
-    # commit^→commit；他票登記自身 SPEC 列（PROBEWINSOR、TESTREG）不計
-    head_doc = _json_at(REPO, "HEAD", LIVE_DOC_REGISTRY_REL)
-    assert check_7_live_doc(head_doc, load_json(LIVE_DOC_REGISTRY_REL)) == []
-    assert check_7_live_doc_revisions(ticket_revisions(LIVE_DOC_REGISTRY_REL)) == []
+# FRAMEPATH 收案後退役（TESTREG SPEC v53 Task 4.4 子批①）：⑤⑥⑦ 對真實 repo 工作樹與錨點以來改動之檢查——
+# test_check_5_new_and_ignored_files、test_check_6_fact_keys_rows、test_check_7_changed_paths_in_scope
+# （工作樹任一未提交改動即判為本票越界，收案後會擋所有他票之進行中工作）。判定函式與 mutation 測試保留。
 
 
 def test_mutation_live_doc_registry_foreign_row_is_red():
