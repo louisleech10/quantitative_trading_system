@@ -2702,25 +2702,6 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
-  "tests/feature_engineering/preprocessing/test_d_star_legacy_migration_audit.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
-   "guarantee": [
-    "A1",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/feature_engineering/preprocessing/test_d_star_legacy_migration_audit.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "unknown"
-  },
   "tests/feature_engineering/preprocessing/test_d_star_stale_invalidation.py": {
    "claim": [
     "contract"
@@ -4307,25 +4288,6 @@
     "tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_disk_backing_platform_only",
     "tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_recovery_ignores_abort_receipt"
    ],
-   "ticket": "ICFIRSTALIGN"
-  },
-  "tests/feature_engineering/test_icfirstalign_preic_diff.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r5/synth.md",
-   "guarantee": [
-    "A3",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/feature_engineering/test_icfirstalign_preic_diff.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
    "ticket": "ICFIRSTALIGN"
   },
   "tests/feature_engineering/test_icfirstalign_timeaxis.py": {
@@ -11965,25 +11927,6 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
-  "tests/performance/test_l7_persist_perf.py": {
-   "claim": [
-    "perf"
-   ],
-   "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
-   "guarantee": [
-    "A10"
-   ],
-   "oracle": [
-    "EXACT",
-    "SMOKE"
-   ],
-   "path": "tests/performance/test_l7_persist_perf.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "BATCH4"
-  },
   "tests/performance/test_memory_pressure.py": {
    "claim": [
     "smoke"
@@ -13504,27 +13447,6 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "unknown"
-  },
-  "tests/test_l7_parallel_persist.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r7/synth.md",
-   "guarantee": [
-    "A10",
-    "A13",
-    "A6",
-    "A9"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/test_l7_parallel_persist.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "BATCH4"
   },
   "tests/test_label_generator.py": {
    "claim": [
