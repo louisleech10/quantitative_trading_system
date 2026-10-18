@@ -94,7 +94,7 @@
 </tr>
 <tr>
 <td><strong>IC 的兩組凍結基準過期、待重基準</strong>（2026-10-18 TESTREG 收尾查到）</td>
-<td>①LA-0 golden：a17b57e7（1h rolling 視窗依週期換算，刻意改動）後 BTC 1h 的對照指標也跟著變，舊歸因表把差異算到 LA-0 頭上——需 before／after 依新視窗重產並重新歸因簽核（<code>test_ic_1a_cut1_golden</code> 兩支、<code>golden_ab</code> 之凍結值比對已標預期失敗）。②IC 1eb 基準：凍結檔不在版控且依賴的 run 已刪（<code>test_ic_1eb_b5_golden</code> 4 支）</td>
+<td>①LA-0 golden：a17b57e7（1h rolling 視窗依週期換算，刻意改動）後 BTC 1h 的對照指標也跟著變，舊歸因表把差異算到 LA-0 頭上——需 before／after 依新視窗重產並重新歸因簽核（<code>test_ic_1a_cut1_golden</code> 兩支、<code>golden_ab</code> 之凍結值比對已標預期失敗）。②IC 1eb 基準：凍結檔不在版控且依賴的 run 已刪（<code>test_ic_1eb_b5_golden</code> 4 支）③FF-NAME 替 10 個 IC 測試輸入檔補了命名版本標記（資料不變），比對輸入檔整檔雜湊的兩處期望值隨之過期，重基準時一併更新</td>
 <td>屬 IC 量化正確性之重基準，另開一張；插哪一步依規定先跟委員評估</td>
 </tr>
 <tr>
