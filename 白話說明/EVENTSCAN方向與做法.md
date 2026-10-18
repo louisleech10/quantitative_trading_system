@@ -5,6 +5,7 @@
 > 你裁定「先把流程改完再回來」——流程優化已於 2026-09-23 了結：TODO 改格式做完（[TODO優化結論.md](TODO優化結論.md)），其餘改法你裁定不做（[Archived/SPEC與TODO流程優化.md](Archived/SPEC與TODO流程優化.md)）。
 > **何時復工等你決定**（你說會另開 session），復工時先用新格式產出本票的清單檔。
 > **下面的方向與做法不變**。
+> 2026-10-18 補記：FF-NAME 第 3 批已把事件樣本讀特徵（`momentum/Analysis/event_samples/`）改經統一讀取器，舊命名世代的特徵 run 會被拒收；復工重選 reference 時須用 FF-NAME 之後新產生的 run（第 15 步本來就排在 FF-NAME 之後）。
 >
 > **這份是給你看的方向說明，不是規格。** 你看過同意，我才去寫規格。
 >
