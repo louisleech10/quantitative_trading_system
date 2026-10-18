@@ -175,6 +175,11 @@ No hardcoded symbols, prices, or metrics.
 ### Logging & Error Classification
 `get_logger(__name__)`；hot loop 不 log。Retryable: rate_limit/timeout；Non-retryable: invalid_symbol/logic/data format.
 
+### 意見處置：先判斷，較好者勝（2026-10-18 使用者定）
+適用**所有**委員輪（審查／諮詢／戳記／審碼）、子代理回報與**使用者本人**之討論。使用者原話：「如果你的是比較好的話，就不該採納吧」「包含跟我的討論都一樣要套用」。
+- 收斂檔處置欄：照其修法做＝`採納`；問題成立但修法改用主委版本＝`部分採納`（寫明主委修法與為何較好，下輪原提出方確認）；問題不成立或現行已較好＝`駁回`附碼證；下一步本來就做之時機問題＝`延後→Task N.N`。禁一律標採納。
+- 對使用者：使用者提的做法，判斷有更好者須直說理由與代價、不默默照做；使用者聽完仍定案則照辦（裁定權在使用者）。
+
 ### Validate Assumptions Before Acting（實測 > 假設）
 1. 明確說出假設 2. 最便宜驗證（grep/讀檔/載入資料）3. 先驗證再 code 4. 證據推翻計劃→停下更新。出處與事故敘事見 `docs/SCAR_LEDGER.md`。
 
