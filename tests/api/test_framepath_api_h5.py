@@ -307,6 +307,26 @@ async def test_boundary_23_manifest_inside_root_without_registry_entry_rejected(
     assert await _register_rejected_400(client, monkeypatch, service, manifest)
 
 
+@pytest.mark.parametrize("env_registry", [False, True])
+def test_browse_resolver_and_lifecycle_share_registry(monkeypatch, tmp_path, env_registry):
+    """FF-NAME 第 3 批審查 r2 CODEX-R2-P1-01：瀏覽 resolver（`create_feature_library(feature_root=)`）與 run lifecycle
+    （`create_run_lifecycle_manager(features_root=)`）對同一設定根必用同一 registry 檔——有無 `FFACT_FEATURE_REGISTRY_PATH`
+    兩種模式皆然（生成端 `FeatureRegistry()` 亦依該變數）。"""
+    from momentum.factories import create_feature_library, create_run_lifecycle_manager
+
+    root = tmp_path / "features"
+    root.mkdir()
+    if env_registry:
+        monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(tmp_path / "external_registry.json"))
+        expected = (tmp_path / "external_registry.json").resolve()
+    else:
+        monkeypatch.delenv("FFACT_FEATURE_REGISTRY_PATH", raising=False)
+        expected = (root / "registry.json").resolve()
+    library_path = Path(create_feature_library(feature_root=root)._registry._path).resolve()
+    lifecycle_path = Path(create_run_lifecycle_manager(features_root=root).registry._path).resolve()
+    assert library_path == lifecycle_path == expected
+
+
 ROUTES_PATH = REPO / "api" / "routes" / "feature_factory.py"
 
 

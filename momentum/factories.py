@@ -441,14 +441,24 @@ def estimate_symbol_disk(
     return factory._estimate_symbol_disk(symbol, config, end_date=end_date)
 
 
+def registry_for_feature_root(feature_root: Path) -> "FeatureRegistry":
+    """設定特徵根所對應之 registry（單一規則；FF-NAME 第 3 批審查 r2）：`FFACT_FEATURE_REGISTRY_PATH` 有設時用之
+    （與生成端 `FeatureRegistry()` 同源），否則 `<root>/registry.json`。瀏覽 resolver 與 run lifecycle 共用。"""
+    import os
+
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    if os.getenv("FFACT_FEATURE_REGISTRY_PATH", "").strip():
+        return FeatureRegistry()
+    return FeatureRegistry(Path(feature_root) / "registry.json")
+
+
 def create_feature_library(feature_root: Optional[Path] = None) -> "FeatureLibrary":
     """Create a FeatureLibrary instance with V7 FeatureReader.
 
     `feature_root`（FF-NAME Task 3.4 審查 r1）：呼叫端之設定特徵根（如 api `settings.data_cache_path/features`）；
     給定時 storage／reader 以之為根，registry 取 `FFACT_FEATURE_REGISTRY_PATH`（有設時）否則 `<root>/registry.json`
-    （同 `create_run_lifecycle_manager`）。未給定 ⇒ 既有預設（相對 cwd 之 data_cache/features）。"""
-    import os
-
+    （同 `create_run_lifecycle_manager`，皆經 `registry_for_feature_root`）。未給定 ⇒ 既有預設（相對 cwd 之 data_cache/features）。"""
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
     from momentum.FeatureEngineering.feature_reader import FeatureReader
     from momentum.FeatureEngineering.feature_registry import FeatureRegistry
@@ -458,8 +468,7 @@ def create_feature_library(feature_root: Optional[Path] = None) -> "FeatureLibra
         registry = FeatureRegistry()
         storage = FeatureStorage()
     else:
-        env_registry = os.getenv("FFACT_FEATURE_REGISTRY_PATH", "").strip()
-        registry = FeatureRegistry() if env_registry else FeatureRegistry(Path(feature_root) / "registry.json")
+        registry = registry_for_feature_root(Path(feature_root))
         storage = FeatureStorage(str(feature_root))
     reader = FeatureReader(str(storage.base_path))
     return FeatureLibrary(registry, storage, feature_reader=reader)
@@ -891,7 +900,7 @@ def create_run_lifecycle_manager(
 
     resolved_features = Path(features_root or "data_cache/features")
     resolved_cgsa = Path(cgsa_root or "data_cache/cgsa_work")
-    resolved_registry = registry or FeatureRegistry(resolved_features / "registry.json")
+    resolved_registry = registry or registry_for_feature_root(resolved_features)
     return RunLifecycleManager(
         features_root=resolved_features,
         cgsa_root=resolved_cgsa,

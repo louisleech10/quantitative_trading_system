@@ -393,7 +393,7 @@ def ratio_unsafe_category(column: str) -> Optional[str]:
 # ---------------------------------------------------------------- 命名世代閘（FF-NAME Task 3.4）
 
 FEATURE_NAMING_VERSION_KEY = "feature_naming_version"
-_REGENERATION_HINT = "請以現行 Feature Factory 重新生成該 run（舊命名世代不遷移、不別名，使用者 2026-10-02）"
+_REGENERATION_HINT = "請以現行 Feature Factory 重新生成該 run（舊命名世代之產物不支援讀取，開發階段以重產取代遷移）"
 
 
 def _manifest_naming_version(manifest: object) -> object:

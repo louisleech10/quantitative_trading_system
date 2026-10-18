@@ -94,6 +94,16 @@ def test_la1_replay_does_not_parse_names(monkeypatch):
     assert opaque["summary_table"], "la1 重放無結果（比對空集合不足以證明）"
 
 
+def test_every_committed_ic_input_h5_carries_version_and_note():
+    """審查 r2 CODEX-R2-P2-02：全部版控 IC 測試固定輸入 h5 皆帶命名世代與標註（漏一檔即紅）。"""
+    import subprocess
+
+    files = subprocess.run(["git", "ls-files", "tests/golden/*/inputs/*.h5"], cwd=str(REPO), capture_output=True,
+                           text=True, check=True).stdout.split()
+    assert len(files) == 10
+    assert [rel for rel in files if not _naming_noted(REPO / rel)] == []
+
+
 def test_mutation_parse_call_in_ic_path_is_caught(monkeypatch):
     """反例：若 IC 路徑解讀欄名（以於 stage0 讀檔後呼叫 parser 模擬），替身必拋 ⇒ 重放失敗。"""
     import momentum.Analysis.ic_filter_orchestrator as orch_mod
