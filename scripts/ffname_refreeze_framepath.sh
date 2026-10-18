@@ -3,7 +3,8 @@
 # 可續跑：新／舊紀錄檔已存在且可解析即跳過；每步前查委員輪與磁碟。
 #
 # 用法：WT=<改前 worktree（c9737729）> OUT=<輸出目錄> bash scripts/ffname_refreeze_framepath.sh
-# 選項：CELLS="C1,C2"（預設全 12 格）、DRY_RUN=1
+# 選項：DRY_RUN=1。審查 r2（codex P1-01）：一律全 12 格（契約 refreeze.framepath_cells），不接受子集；
+#   設了 CELLS／FFNAME_CELLS ⇒ 拒跑；k2 與收據亦要求 12 格齊全，缺格即失敗、不出部分彙總。
 # 預估：golden 內各格 memory.seconds 加總 1225.6 秒（約 20 分）／側；改前側另加紀錄器約 +10–20%（推論）⇒ 兩側合計約 45–50 分。
 set -u
 set -o pipefail
@@ -17,7 +18,9 @@ GOLDEN="tests/_golden/framepath/cgsa_fingerprint.json"
 LOG="$OUT/runner.log"
 mkdir -p "$OUT/records"
 export PYTHONHASHSEED=0
-[ -n "${CELLS:-}" ] && export FFNAME_CELLS="$CELLS"
+if [ -n "${CELLS:-}" ] || [ -n "${FFNAME_CELLS:-}" ]; then
+  echo "framepath 須跑全 12 格（契約 framepath_cells），不接受 CELLS／FFNAME_CELLS 子集" >&2; exit 2
+fi
 
 EXPECTED="$("$PY" -c "import json; print(json.load(open('$ROOT/tests/_golden/ffname/contract.json'))['refreeze']['pre_change_commit'])")"
 [ "$(git -C "$WT" rev-parse HEAD)" = "$EXPECTED" ] || { echo "WT 非契約 pre_change_commit $EXPECTED" >&2; exit 2; }

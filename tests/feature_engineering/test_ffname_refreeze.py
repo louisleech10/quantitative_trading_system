@@ -99,19 +99,89 @@ def test_receipt_shape():
     assert {e["path"]: e["class"] for e in receipt["files"]} == {rel: d["class"] for rel, d in DISP.items()}
 
 
+_COLLECT_CACHE: Dict[tuple, List[str]] = {}
+
+
+def _collect(consumers: List[str]) -> List[str]:
+    """契約 consumers 經 `pytest --collect-only` 展開之 nodeid 全集（與收據工具同法、獨立重算）。"""
+    key = tuple(consumers)
+    if key not in _COLLECT_CACHE:
+        import sys
+
+        proc = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-qq", "-o", "log_cli=false",
+                               "-p", "no:cacheprovider", *consumers], cwd=str(REPO), capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stdout[-500:]
+        _COLLECT_CACHE[key] = sorted({ln.strip() for ln in proc.stdout.splitlines() if "::" in ln and not ln.startswith(" ")})
+    return _COLLECT_CACHE[key]
+
+
+def consumer_run_problems(rel: str, run: Optional[Dict[str, Any]], expected: Optional[List[str]] = None) -> List[str]:
+    """審查 r1 P1-04／r2 P1-02：實際執行之 nodeid 集合＝契約 consumers 展開集合、total＝passed+failed+skipped、
+    failed==0、非空；consumers 欄須逐字等於契約。"""
+    consumers = DISP[rel]["consumers"]
+    expected = _collect(consumers) if expected is None else expected
+    if not run:
+        return [f"consumer_run_missing:{rel}"]
+    bad: List[str] = []
+    executed = run.get("executed") or {}
+    if not isinstance(executed, dict) or not executed:
+        bad.append(f"consumer_nodeids_empty:{rel}")
+    if list(run.get("consumers") or []) != list(consumers):
+        bad.append(f"consumer_set_not_contract:{rel}")
+    if set(executed) != set(expected):
+        bad.append(f"consumer_nodeids_mismatch:{rel}")
+    counts = [run.get(k) for k in ("passed", "failed", "skipped")]
+    if not all(isinstance(x, int) for x in counts) or run.get("total") != sum(counts) or run.get("total") != len(executed):
+        bad.append(f"consumer_counts_inconsistent:{rel}")
+    elif run["failed"] != 0 or any(v in ("failed", "error") for v in executed.values()):
+        bad.append(f"consumer_red:{rel}")
+    elif run["passed"] <= 0:
+        bad.append(f"consumer_nothing_passed:{rel}")
+    return bad
+
+
 def receipt_consumer_problems(receipt: Dict[str, Any]) -> List[str]:
-    """審查 r1（codex P1-04）：每個處置之消費測試結果須存在、數字化，且 failed == 0（K0 紅即不得過）。"""
     bad: List[str] = []
     for e in receipt["files"]:
-        run = e.get("consumer_run") or {}
         if e.get("decision") == "pre_existing_drift" and not e.get("value_hash_mismatch") and \
                 _sha((REPO / e["path"]).read_bytes()) == _sha(_blob(e["path"]) or b""):
             continue  # SPEC v22：既有漂移（golden 位元組不動）之消費測試紅歸登記之既有漂移，由 K2 判定另驗
-        if not isinstance(run.get("passed"), int) or not isinstance(run.get("failed"), int):
-            bad.append(f"consumer_run_missing:{e['path']}")
-        elif run["failed"] != 0 or run["passed"] <= 0:
-            bad.append(f"consumer_red:{e['path']}")
+        bad += consumer_run_problems(e["path"], e.get("consumer_run"))
     return bad
+
+
+def _a_green_k0_run() -> tuple:
+    receipt = _receipt()
+    for e in receipt["files"]:
+        if e["class"] == "K0" and not consumer_run_problems(e["path"], e.get("consumer_run")):
+            return e["path"], copy.deepcopy(e["consumer_run"])
+    raise AssertionError("無可用之綠 K0 消費紀錄")
+
+
+def test_mutation_consumer_wrong_nodeid_caught():
+    """審查 r2 mutant：執行紀錄之某 nodeid 換成契約外之 nodeid（計數不變）⇒ consumer_nodeids_mismatch。"""
+    rel, run = _a_green_k0_run()
+    first = sorted(run["executed"])[0]
+    run["executed"]["tests/feature_engineering/test_not_a_consumer.py::test_x"] = run["executed"].pop(first)
+    assert f"consumer_nodeids_mismatch:{rel}" in consumer_run_problems(rel, run)
+
+
+def test_mutation_consumer_empty_nodeids_caught():
+    rel, run = _a_green_k0_run()
+    run["executed"] = {}
+    bad = consumer_run_problems(rel, run)
+    assert f"consumer_nodeids_empty:{rel}" in bad and f"consumer_nodeids_mismatch:{rel}" in bad
+
+
+def test_mutation_consumer_missing_nodeid_caught():
+    """審查 r2 mutant：少跑一條契約 consumer（計數同步減少）⇒ consumer_nodeids_mismatch。"""
+    rel, run = _a_green_k0_run()
+    expected = _collect(DISP[rel]["consumers"])
+    run["executed"].pop(sorted(run["executed"])[0])
+    run["passed"] -= 1
+    run["total"] -= 1
+    assert f"consumer_nodeids_mismatch:{rel}" in consumer_run_problems(rel, run, expected) or \
+        f"consumer_nodeids_empty:{rel}" in consumer_run_problems(rel, run, expected)
 
 
 def test_receipt_every_consumer_green():
@@ -119,10 +189,15 @@ def test_receipt_every_consumer_green():
 
 
 def test_mutation_receipt_k0_consumer_red_caught():
+    """mutant：K0 消費紀錄之一條 nodeid 改為 failed（計數同步）⇒ consumer_red（K0 紅即不得過）。"""
+    rel, run = _a_green_k0_run()
+    first = sorted(run["executed"])[0]
+    run["executed"][first] = "failed"
+    run["passed"] -= 1
+    run["failed"] += 1
     receipt = copy.deepcopy(_receipt())
-    k0 = next(e for e in receipt["files"] if e["class"] == "K0")
-    k0["consumer_run"] = {"passed": 1, "failed": 1}
-    assert f"consumer_red:{k0['path']}" in receipt_consumer_problems(receipt)
+    next(e for e in receipt["files"] if e["path"] == rel)["consumer_run"] = run
+    assert f"consumer_red:{rel}" in receipt_consumer_problems(receipt)
 
 
 @pytest.mark.parametrize("rel", _of("INVENTORY"))
@@ -464,6 +539,12 @@ def k2_problems(rel: str, entry: Optional[Dict[str, Any]] = None, new_sidecar: O
         return [f"pending:{rel}"]
     if "units" in entry:  # failopen（逐單元全窗）、framepath（逐格）：每單元獨立判定
         bad = []
+        # 審查 r2（codex P1-01）：單元集合須恰等於契約清單（framepath 全 12 格、failopen 全 6 單元），缺或多即紅
+        expected_units = REFREEZE["framepath_cells"] if DISP[rel].get("recipe") == "framepath" else \
+            REFREEZE["failopen_units"]
+        got_units = [str(u.get("unit")) for u in entry["units"]]
+        if sorted(got_units) != sorted(expected_units) or len(set(got_units)) != len(got_units):
+            bad.append(f"units_not_contract_set:{rel}:{sorted(set(expected_units) ^ set(got_units))}")
         for unit in entry["units"]:
             bad += [f"{unit.get('unit')}:{b}" for b in _k2_one(rel, unit, None) if not b.startswith("bytes_unbound")]
         if entry.get("new_sha256") != _sha((REPO / rel).read_bytes()):
@@ -534,6 +615,20 @@ def _k2_one(rel: str, entry: Dict[str, Any], new_sidecar: Optional[Dict[str, Any
 @pytest.mark.parametrize("rel", _of("K2"))
 def test_k2_sidecar_per_name_equal(rel):
     assert k2_problems(rel) == []
+
+
+def test_mutation_k2_framepath_missing_cell_caught():
+    """審查 r2（codex P1-01）mutant：framepath 收據少一格（其餘格全綠）⇒ units_not_contract_set（不得以部分彙總過關）。"""
+    rel = "tests/_golden/framepath/cgsa_fingerprint.json"
+    cells = list(REFREEZE["framepath_cells"])
+    assert len(cells) == 12
+    fake_unit = {"unit": None, "decision": "refrozen", "value_hash_mismatch": 0}
+    entry = {"path": rel, "class": "K2", "units": [dict(fake_unit, unit=c) for c in cells[:-1]], "value_hash_mismatch": 0,
+             "new_sha256": _sha((REPO / rel).read_bytes())}
+    bad = k2_problems(rel, entry)
+    assert any(b.startswith(f"units_not_contract_set:{rel}") and cells[-1] in b for b in bad)
+    entry["units"].append(dict(fake_unit, unit=cells[-1]))
+    assert not any(b.startswith(f"units_not_contract_set:{rel}") for b in k2_problems(rel, entry))
 
 
 def test_mutation_k2_drift_claim_with_mismatch_caught():

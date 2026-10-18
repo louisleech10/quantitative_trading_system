@@ -336,7 +336,8 @@ def _recipe_fftfmeta(mp: Any, work: Path) -> Dict[str, Any]:
     return {"references": refs, "symbol": g.SYMBOL, "window": list(g.WINDOW)}
 
 
-FAILOPEN_UNITS = ("BTCUSDT/12h", "ETHUSDT/12h", "BTCUSDT/1h", "ETHUSDT/1h", "BTCUSDT/multi", "ETHUSDT/multi")
+FAILOPEN_UNITS = tuple(json.loads((Path(__file__).resolve().parents[1] / "tests" / "_golden" / "ffname" /
+                                   "contract.json").read_text(encoding="utf-8"))["refreeze"]["failopen_units"])
 
 
 def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
@@ -1215,6 +1216,12 @@ def _k2_framepath(rel: str, old_record: Mapping[str, Any], new_record: Mapping[s
     raw = path.read_bytes()
     doc = json.loads(raw.decode("utf-8"))
     fmt = _detect_format(raw, doc)
+    # 審查 r2（codex P1-01）：新舊兩側皆須恰為契約之全 12 格，缺格或多格即失敗（不出部分彙總、不寫 golden）
+    expected_cells = set(_contract_refreeze()["framepath_cells"])
+    for side, rec in (("改前", old_record), ("現行", new_record)):
+        got = set(rec["sidecar"]["cells"])
+        if got != expected_cells:
+            raise SystemExit(f"framepath K2：{side}紀錄之格 {sorted(got)} != 契約 framepath_cells {sorted(expected_cells)}")
     units: List[Dict[str, Any]] = []
     for cell in sorted(old_record["sidecar"]["cells"]):
         if cell not in new_record["sidecar"]["cells"]:
@@ -1280,6 +1287,102 @@ def k2(rel: str, old_path: Path, new_path: Path, dry: bool = False) -> int:
     return 2 if entry["decision"] == "fail" else 0
 
 
+# ================================================================ 消費測試（審查 r2 codex P1-02：執行之 nodeid 綁定契約）
+
+CONSUMERS_PATH = MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_consumers.json"
+
+
+def collect_nodeids(consumers: Sequence[str]) -> List[str]:
+    """契約 consumers（nodeid 或測試檔）經 `pytest --collect-only` 展開之 nodeid 全集（排序）；收集失敗 ⇒ 例外。"""
+    proc = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-qq", "-o", "log_cli=false",
+                           "-p", "no:cacheprovider", *consumers], cwd=str(MAIN_REPO), capture_output=True, text=True)
+    ids = sorted({line.strip() for line in proc.stdout.splitlines() if "::" in line and not line.startswith(" ")})
+    if proc.returncode != 0 or not ids:
+        raise SystemExit(f"collect 失敗 rc={proc.returncode}：{consumers}\n{proc.stdout[-800:]}{proc.stderr[-800:]}")
+    return ids
+
+
+def _junit_outcomes(xml_path: Path, expected: Sequence[str]) -> Dict[str, str]:
+    """junitxml → {nodeid: passed|failed|skipped|error}；以 expected 之 (classname, name) 反查 nodeid，查無者以 `?` 前綴記。"""
+    import xml.etree.ElementTree as ET
+
+    lookup: Dict[Tuple[str, str], str] = {}
+    for nid in expected:
+        path, _, rest = nid.partition("::")
+        parts = rest.split("::")
+        classname = ".".join([path[:-3].replace("/", ".")] + parts[:-1])
+        lookup[(classname, parts[-1])] = nid
+    out: Dict[str, str] = {}
+    for case in ET.parse(xml_path).getroot().iter("testcase"):
+        key = (case.get("classname", ""), case.get("name", ""))
+        tags = {child.tag for child in case}
+        outcome = "failed" if "failure" in tags else "error" if "error" in tags else "skipped" if "skipped" in tags \
+            else "passed"
+        out[lookup.get(key, f"?{key[0]}::{key[1]}")] = outcome
+    return out
+
+
+def run_consumers(rels: Optional[Sequence[str]], log_dir: Path) -> int:
+    """逐處置跑契約 consumers（同一 consumers 集合只跑一次），把「預期 nodeid 全集、實際執行之 nodeid 與結果、計數」寫入
+    消費測試收據。不給 rels ⇒ 全部非 pending 處置（failopen／framepath 於其重型跑後再以 --only 補跑）。"""
+    contract = _contract_refreeze()
+    doc = json.loads(CONSUMERS_PATH.read_text(encoding="utf-8")) if CONSUMERS_PATH.is_file() else {}
+    targets = list(rels) if rels else sorted(contract["dispositions"])
+    cache: Dict[Tuple[str, ...], Dict[str, Any]] = {}
+    log_dir.mkdir(parents=True, exist_ok=True)
+    for rel in targets:
+        consumers = tuple(contract["dispositions"][rel]["consumers"])
+        if consumers not in cache:
+            expected = collect_nodeids(consumers)
+            xml = log_dir / f"consumers_{len(cache)}.xml"
+            started = time.time()
+            proc = subprocess.run([sys.executable, "-m", "pytest", *expected, "-q", "-o", "log_cli=false",
+                                   "-p", "no:cacheprovider", f"--junitxml={xml}"], cwd=str(MAIN_REPO),
+                                  capture_output=True, text=True)
+            (log_dir / f"consumers_{len(cache)}.log").write_text(proc.stdout[-20000:] + proc.stderr[-5000:],
+                                                                 encoding="utf-8")
+            executed = _junit_outcomes(xml, expected) if xml.is_file() else {}
+            counts = {k: sum(1 for v in executed.values() if v == k) for k in ("passed", "failed", "skipped", "error")}
+            cache[consumers] = {"consumers": list(consumers), "expected_nodeids": expected, "executed": executed,
+                                "passed": counts["passed"], "failed": counts["failed"] + counts["error"],
+                                "skipped": counts["skipped"], "total": len(executed), "pytest_rc": proc.returncode,
+                                "seconds": round(time.time() - started, 1)}
+        doc[rel] = cache[consumers]
+        r = cache[consumers]
+        print(f"[ffname-refreeze consumers] {rel}: 執行 {r['total']}／預期 {len(r['expected_nodeids'])}、"
+              f"過 {r['passed']}、紅 {r['failed']}、略 {r['skipped']}（rc={r['pytest_rc']}）")
+    doc["_doc"] = ("FF-NAME Task 4.3（SPEC v22）各 golden 消費測試實跑：expected_nodeids＝契約 consumers 經 collect 展開、"
+                   "executed＝junitxml 之實際 nodeid 與結果；收據之門＝執行集合＝預期集合、total＝passed+failed+skipped、"
+                   "failed==0、非空（審查 r2 codex P1-02）。")
+    CONSUMERS_PATH.write_text(json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    return 0
+
+
+def consumer_gate_problems(rel: str, consumers: Sequence[str], run: Optional[Mapping[str, Any]],
+                           expected: Sequence[str]) -> List[str]:
+    """消費測試門：實際執行之 nodeid 集合＝契約 consumers 展開之集合、total＝passed+failed+skipped、failed==0、非空。"""
+    if not run:
+        return [f"consumer_run_missing:{rel}"]
+    bad: List[str] = []
+    executed = run.get("executed") or {}
+    if not isinstance(executed, dict) or not executed:
+        bad.append(f"consumer_nodeids_empty:{rel}")
+    if list(run.get("consumers") or []) != list(consumers):
+        bad.append(f"consumer_set_not_contract:{rel}")
+    if set(executed) != set(expected):
+        bad.append(f"consumer_nodeids_mismatch:{rel}:{len(set(expected) - set(executed))}缺／"
+                   f"{len(set(executed) - set(expected))}多")
+    passed, failed, skipped = (run.get(k) for k in ("passed", "failed", "skipped"))
+    if not all(isinstance(x, int) for x in (passed, failed, skipped)) or run.get("total") != passed + failed + skipped \
+            or run.get("total") != len(executed):
+        bad.append(f"consumer_counts_inconsistent:{rel}")
+    elif failed != 0 or any(v in ("failed", "error") for v in executed.values()):
+        bad.append(f"consumer_red:{rel}")
+    elif passed <= 0:
+        bad.append(f"consumer_nothing_passed:{rel}")
+    return bad
+
+
 # ================================================================ 收據（主樹）
 
 
@@ -1288,14 +1391,19 @@ def _blob(rel: str, head: str) -> Optional[bytes]:
     return proc.stdout if proc.returncode == 0 else None
 
 
-def _k2_units_summary(units: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """逐單元（failopen 單元／framepath 格）彙總：每單元決策須屬 refrozen／pre_existing_drift 且依名不符 0。"""
+def _k2_units_summary(units: List[Dict[str, Any]], expected_units: Sequence[str]) -> Dict[str, Any]:
+    """逐單元（failopen 單元／framepath 格）彙總：單元集合須恰等於契約清單（審查 r2：缺即失敗）；每單元決策須屬
+    refrozen／pre_existing_drift 且依名不符 0、改前紀錄出自 pre_change_commit。"""
     expected = _pre_change_commit()
     bad_units = [u.get("unit") for u in units
                  if u.get("decision") not in ("refrozen", "pre_existing_drift") or u.get("value_hash_mismatch")
                  or u.get("dry_run") or u.get("old_head") != expected]
+    got = {str(u.get("unit")) for u in units}
+    missing_units = sorted(set(expected_units) - got)
+    extra_units = sorted(got - set(expected_units))
     return {"units": units, "value_hash_mismatch": sum(int(u.get("value_hash_mismatch") or 0) for u in units)
-            + len(bad_units), "bad_units": bad_units,
+            + len(bad_units) + len(missing_units) + len(extra_units), "bad_units": bad_units,
+            "missing_units": missing_units, "extra_units": extra_units,
             "decisions": {str(u.get("unit")): u.get("decision") for u in units},
             "g6_new_lag": sorted({c for u in units for c in u.get("g6_new_lag") or []})}
 
@@ -1328,6 +1436,7 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
     baseline = json.loads((MAIN_REPO / "tests/_golden/ffname/baseline.json").read_text(encoding="utf-8"))
     head = baseline["frozen_at_head"]
     consumers = json.loads(consumers_path.read_text(encoding="utf-8")) if consumers_path else {}
+    expected_cache: Dict[Tuple[str, ...], List[str]] = {}
     files: List[Dict[str, Any]] = []
     ok = True
     for rel, disp in sorted(contract["dispositions"].items()):
@@ -1359,19 +1468,20 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
             else:
                 entry.update({"status": "pending", "value_hash_mismatch": 1})
         elif cls == "K2" and disp.get("recipe") == "failopen":
-            unit_files = [K2_DIR / f"{_slug(rel)}__{u.replace('/', '-')}.json" for u in FAILOPEN_UNITS]
+            fo_units = list(contract["failopen_units"])
+            unit_files = [K2_DIR / f"{_slug(rel)}__{u.replace('/', '-')}.json" for u in fo_units]
             if all(p.is_file() for p in unit_files):
                 units = [json.loads(p.read_text(encoding="utf-8")) for p in unit_files]
-                entry.update(_k2_units_summary(units))
+                entry.update(_k2_units_summary(units, fo_units))
             else:
                 entry.update({"status": "pending", "value_hash_mismatch": 1,
-                              "units_done": [u for u, p in zip(FAILOPEN_UNITS, unit_files) if p.is_file()]})
+                              "units_done": [u for u, p in zip(fo_units, unit_files) if p.is_file()]})
         elif cls == "K2":
             kp = K2_DIR / f"{_slug(rel)}.json"
             if kp.is_file():
                 k = json.loads(kp.read_text(encoding="utf-8"))
-                if "units" in k:  # framepath：逐格
-                    entry.update(_k2_units_summary(k["units"]))
+                if "units" in k:  # framepath：逐格（須恰為契約之全 12 格）
+                    entry.update(_k2_units_summary(k["units"], contract["framepath_cells"]))
                 else:
                     entry.update({key: k.get(key) for key in (
                         "recipe", "unit", "old_head", "old_pre_change_verified", "new_head", "old_sidecar", "new_sidecar",
@@ -1412,16 +1522,18 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
         if entry["value_hash_mismatch"]:
             ok = False
         # 審查 r1（codex P1-04）：消費測試結果須數字化且 failed == 0（K0 紅亦不得產生成功收據）
-        run = entry["consumer_run"] or {}
         if entry.get("decision") == "pre_existing_drift" and not entry.get("value_hash_mismatch"):
             # SPEC v22：既有漂移之消費測試紅歸登記之既有漂移（依名不符 0、改前碼不重現、golden 位元組不動）
             entry["consumer_gate"] = "pre_existing_drift_registered"
-        elif not isinstance(run.get("passed"), int) or not isinstance(run.get("failed"), int) or run["failed"] != 0 \
-                or run["passed"] <= 0:
-            entry["consumer_gate"] = "fail"
-            ok = False
         else:
-            entry["consumer_gate"] = "pass"
+            key = tuple(disp["consumers"])
+            if key not in expected_cache:
+                expected_cache[key] = collect_nodeids(disp["consumers"])
+            problems = consumer_gate_problems(rel, disp["consumers"], entry["consumer_run"], expected_cache[key])
+            entry["consumer_gate"] = "pass" if not problems else "fail"
+            entry["consumer_gate_problems"] = problems
+            if problems:
+                ok = False
         files.append(entry)
     salt = json.loads(salt_path.read_text(encoding="utf-8"))
     salt_entries = []
@@ -1491,6 +1603,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     k2p.add_argument("--old", required=True)
     k2p.add_argument("--new", required=True)
     k2p.add_argument("--dry", action="store_true", help="只比對、不寫 golden（改前 golden 本身與改前碼不符時用）")
+    cp = sub.add_parser("consumers", help="跑契約 consumers 並記實際執行之 nodeid（審查 r2）")
+    cp.add_argument("--only", nargs="*", default=None, help="只跑這些 golden（預設全部處置）")
+    cp.add_argument("--log-dir", required=True, help="junitxml 與 log 落點（版控外）")
     rp = sub.add_parser("receipt")
     rp.add_argument("--salt-proof", required=True)
     rp.add_argument("--consumers", default=None)
@@ -1507,6 +1622,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return write_mapping(args.golden, Path(args.record))
     if args.cmd == "k2":
         return k2(args.golden, Path(args.old), Path(args.new), dry=args.dry)
+    if args.cmd == "consumers":
+        return run_consumers(args.only, Path(args.log_dir))
     if args.cmd == "receipt":
         return write_receipt(Path(args.salt_proof), Path(args.consumers) if args.consumers else None,
                              Path(args.full_reference) if args.full_reference else None)
