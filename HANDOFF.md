@@ -6,6 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
+| 04-019 | HP-FFNAME | 進行中 | docs/FFNAME_SPEC.md | 全票排序第 6 步：SPEC v16＋TODO manifest docs/manifests/FFNAME.json 經審查 r15（無逐欄紀錄之重凍 golden 改 name_free／remap_recompute 兩類）、r16（重算路徑集合封閉）與戳記 R2 三家 APPROVED（handoffs/reconcile/20260924-ffname-x-review-r16/synth.md）。第 1 批（Phase 0–1）已提交：45b18859（Task 1.1 文法／身分／formatter／parser）、c9737729（Task 0.1 改前凍結基準 baseline.json＋sha 錨、Task 1.2 描述向量與 feature_descriptor、BinarySignal 多字後綴）。下一步：第 1 批審碼（三家）→ 推送 → 第 2 批 Phase 2 產生端遷移。 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -26,6 +27,7 @@
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 全票排序第 15 步、一次做完（docs/TICKET_ORDER.md；使用者 2026-10-02 定）：於 FF-NAME、ICPATH、FFSTORE 後以新 run 重選 reference 一次。以下為停手時紀錄——🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀 |
 | 04-007 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 全票排序第 7 步（docs/TICKET_ORDER.md）：本票改寫為 PRE-PROV——逐欄 d 之收集已由 FF-STAT 完成、K-1 `search_error_default` 已失效（d* 搜尋失敗保原值），剩 run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態、失敗群組、轉換臂別，IC 讀取保留 manifest；SPEC 於 FF-NAME 後重寫；輸出增量須使用者核可。以下為舊紀錄——使用者 2026-09-23 睡前排序「FKPERF 收完→FF-TFMETA→FF-NAME→FFDSTAR 依序做完」⇒ 復工。停手前 R2 十三條待閉合；2026-09-24 R3 兩家（codex blocked 兩 P1＋一 P2、composer proceed 兩 P2）五條全採納修入 SPEC（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md 已銷帳）：K-1 來源加 `search_error_default`、K-2 原因碼樣式封閉、Phase 1 依賴 FF-NAME、Task 1.1 驗證③。R4 待 FF-NAME 規格重寫定案後一併複查；輸出大小仍須實作後帶數字請使用者核可 |
 | 04-010 | HP-TESTSPEED | 停手 | HANDOFF.md | 2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。「各運算路徑取代表之快速版」經全票排序諮詢與使用者 2026-10-02 拍板作廢（與 2026-09-29「不挑代表、不接受專項專用」衝突；docs/TICKET_ORDER.md）；本票不再排程 |
+| 04-019 | HP-FFNAME | 進行中 | docs/FFNAME_SPEC.md | 全票排序第 6 步：SPEC v16＋TODO manifest docs/manifests/FFNAME.json 經審查 r15（無逐欄紀錄之重凍 golden 改 name_free／remap_recompute 兩類）、r16（重算路徑集合封閉）與戳記 R2 三家 APPROVED（handoffs/reconcile/20260924-ffname-x-review-r16/synth.md）。第 1 批（Phase 0–1）已提交：45b18859（Task 1.1 文法／身分／formatter／parser）、c9737729（Task 0.1 改前凍結基準 baseline.json＋sha 錨、Task 1.2 描述向量與 feature_descriptor、BinarySignal 多字後綴）。下一步：第 1 批審碼（三家）→ 推送 → 第 2 批 Phase 2 產生端遷移。 |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
