@@ -190,9 +190,13 @@ def test_register_browse_id_uses_full_hash(tmp_path: Path) -> None:
     manifest = tmp_path / "features" / "BTCUSDT" / "12h" / "cfg_batch2d" / "feature_manifest.json"
     manifest.parent.mkdir(parents=True)
     manifest.write_text('{"config_hash":"cfg_batch2d"}')
+    # FF-NAME Task 3.4（v19）：登錄須 canonical run（設定特徵根下＋registry 條目）
+    FeatureRegistry(tmp_path / "features" / "registry.json").add(
+        {"symbol": "BTCUSDT", "timeframe": "12h", "config_hash": "cfg_batch2d", "hdf5_relative_path": str(manifest)})
     service = FeatureFactoryService.__new__(FeatureFactoryService)
     service._tasks = {}
     service._lock = threading.Lock()
+    service._browse_feature_root = lambda: tmp_path / "features"
     task_id = service.register_hdf5_for_browse("BTCUSDT", "12h", str(manifest))
     assert task_id == "browse_BTCUSDT_12h_cfg_batch2d"
 

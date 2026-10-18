@@ -340,6 +340,8 @@ def _browse(run: Dict[str, Any], monkeypatch: pytest.MonkeyPatch):
 
     service = FeatureFactoryService.__new__(FeatureFactoryService)
     manifest_path = run["run_dir"] / "feature_manifest.json"
+    # FF-NAME Task 3.4（v19）：設定特徵根＝本 run 之寫入根（正式生成已登記 registry；正式值為 settings）
+    service._browse_feature_root = lambda: Path(run["run_dir"]).parents[2]
     monkeypatch.setattr(service, "get_result", lambda task_id: {
         "hdf5_path": str(manifest_path),
         "metadata": {"symbol": h.SYMBOL, "timeframe": h.PRIMARY, "config_hash": run["config_hash"]}})
@@ -372,6 +374,7 @@ def test_mutation_browse_reads_mixed_root(fresh_s2: Dict[str, Any], monkeypatch:
     _write_processed(fresh_s2, groups, axis)
     monkeypatch.setattr(FeatureFactoryService, "_select_l7_v2_artifact", classmethod(lambda cls, m: (m, "raw")))
     service = FeatureFactoryService.__new__(FeatureFactoryService)
+    service._browse_feature_root = lambda: Path(fresh_s2["run_dir"]).parents[2]  # FF-NAME 3.4 v19：設定特徵根
     monkeypatch.setattr(service, "get_result", lambda task_id: {
         "hdf5_path": str(fresh_s2["run_dir"] / "feature_manifest.json"),
         "metadata": {"symbol": h.SYMBOL, "timeframe": h.PRIMARY}})

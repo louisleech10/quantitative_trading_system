@@ -12,6 +12,7 @@ import api.services.feature_factory_service as feature_service_module
 from api.services.feature_factory_batch_adapters import FeatureFactoryQualityAdapter
 from api.services.feature_factory_service import FeatureFactoryService
 from tests.api.conftest import MockQualityComputer
+from tests.feature_engineering.ffname_helpers import register_canonical_run
 
 
 def _write_cgsa_manifest(
@@ -36,7 +37,7 @@ def _write_cgsa_manifest(
         {f"{timeframe}_L1_{config_hash}": frame.set_axis(row_index, axis=0)},
         row_index=row_index,
     )
-    return raw_dir.parent / "feature_manifest.json"
+    return register_canonical_run(raw_dir.parent / "feature_manifest.json")  # FF-NAME 3.4 v19：canonical＝設定根下＋registry 條目
 
 
 def test_batch_quality_uses_real_nan_not_null_count(monkeypatch, tmp_path):

@@ -19,6 +19,7 @@ from api.services.feature_export_service import FeatureExportService
 from api.services.feature_factory_service import FeatureFactoryService, feature_factory_service
 import api.services.feature_factory_service as feature_service_module
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from tests.feature_engineering.ffname_helpers import register_canonical_run
 
 
 @pytest.fixture
@@ -191,9 +192,11 @@ def _build_cgsa_v2_service(tmp_path):
         )
     }
     raw_dir = storage.write_raw("BTCUSDT", "1h", "cfg_ts", groups, row_index=row_index)
+    register_canonical_run(raw_dir.parent / "feature_manifest.json")  # FF-NAME 3.4 v19：canonical＝設定根下＋registry 條目
     service = FeatureFactoryService.__new__(FeatureFactoryService)
     service._lock = threading.Lock()
     service._df_cache = {}
+    service._browse_feature_root = lambda: tmp_path / "features"  # 瀏覽之設定特徵根（正式值為 settings）
     service._tasks = {
         "task-ts": {
             "task_id": "task-ts",
@@ -270,9 +273,11 @@ def _build_date_subset_cgsa_service(
         groups,
         row_index=row_index if with_row_index else None,
     )
+    register_canonical_run(raw_dir.parent / "feature_manifest.json")  # FF-NAME 3.4 v19：canonical＝設定根下＋registry 條目
     service = FeatureFactoryService.__new__(FeatureFactoryService)
     service._lock = threading.Lock()
     service._df_cache = {}
+    service._browse_feature_root = lambda: tmp_path / "features"  # 瀏覽之設定特徵根（正式值為 settings）
     service._tasks = {
         f"task-{config_hash}": {
             "task_id": f"task-{config_hash}",

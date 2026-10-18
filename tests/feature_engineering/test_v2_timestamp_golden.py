@@ -85,7 +85,12 @@ def _load_g1_baseline() -> Dict[str, Any]:
 
 
 def _build_service_for_run(run_dir: Path) -> FeatureFactoryService:
+    # FF-NAME Task 3.4（v19）：瀏覽之 run 須為 canonical（設定特徵根下＋registry 條目）；設定根＝本 run 之寫入根
+    from tests.feature_engineering.ffname_helpers import register_canonical_run
+
+    register_canonical_run(run_dir / "feature_manifest.json")
     service = FeatureFactoryService.__new__(FeatureFactoryService)
+    service._browse_feature_root = lambda: run_dir.parents[2]
     service._lock = threading.Lock()
     service._df_cache = {}
     service._tasks = {

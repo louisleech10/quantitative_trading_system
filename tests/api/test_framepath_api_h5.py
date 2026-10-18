@@ -164,11 +164,14 @@ def test_mutation_library_h5_fallback_restored_is_detected(monkeypatch, tmp_path
 
 # ---------------------------------------------------------------- Task 2.3
 
-def _service_with_tasks(tasks: Dict[str, Dict[str, Any]]) -> FeatureFactoryService:
-    """正式建構子（browse 路由依賴之各快取屬性齊備），只替換任務表。"""
+def _service_with_tasks(tasks: Dict[str, Dict[str, Any]], feature_root: Path | None = None) -> FeatureFactoryService:
+    """正式建構子（browse 路由依賴之各快取屬性齊備），只替換任務表。`feature_root`：瀏覽之設定特徵根
+    （FF-NAME Task 3.4 v19：canonical run＝設定特徵根下且 registry 有條目；正式值為 settings 之 data_cache/features）。"""
     service = FeatureFactoryService()
     with service._lock:
         service._tasks = tasks
+    if feature_root is not None:
+        service._browse_feature_root = lambda: Path(feature_root)
     return service
 
 
@@ -179,14 +182,19 @@ def _task(hdf5_path: str, config_hash: str = "cfg_framepath") -> Dict[str, Any]:
         "generation_time": 1.0, "layer_counts": {}}}
 
 
-def _cgsa_run(tmp_path: Path) -> Path:
-    """API 讀取／schema 單元 fixture：以正式 write_raw 寫合成小表之 V2 run（非 CGSA 生成正確性證據）。"""
+def _cgsa_run(tmp_path: Path, *, register: bool = True) -> Path:
+    """API 讀取／schema 單元 fixture：以正式 write_raw 寫合成小表之 V2 run（非 CGSA 生成正確性證據）；
+    `register`：於 `<root>/registry.json` 登記（FF-NAME Task 3.4 v19：canonical run 須 registry 有條目）。"""
     storage = FeatureStorage(str(tmp_path / "features"))
     row_index = pd.date_range("2026-04-01", periods=4, freq="h")
     groups = {"g": pd.DataFrame({"feat_a": np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
                                  "feat_b": np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float32)}, index=row_index)}
     raw_dir = storage.write_raw(SYMBOL, PRIMARY_TF, "cfg_framepath", groups, row_index=row_index)
-    return raw_dir.parent / "feature_manifest.json"
+    manifest = raw_dir.parent / "feature_manifest.json"
+    if register:
+        FeatureRegistry(tmp_path / "features" / "registry.json").add(
+            {"symbol": SYMBOL, "timeframe": PRIMARY_TF, "config_hash": "cfg_framepath", "hdf5_relative_path": str(manifest)})
+    return manifest
 
 
 @pytest.fixture
@@ -233,7 +241,7 @@ async def test_boundary_08_task_context_h5_routes_are_400(client, monkeypatch, t
 @pytest.mark.asyncio
 async def test_boundary_09_cgsa_manifest_routes_are_200(client, monkeypatch, tmp_path):
     manifest = _cgsa_run(tmp_path)
-    service = _service_with_tasks({"task-v2": _task(str(manifest))})
+    service = _service_with_tasks({"task-v2": _task(str(manifest))}, feature_root=tmp_path / "features")
     monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
     feats = await client.get("/api/v1/features/browse/task-v2/features?detail_level=names")
     assert feats.status_code == 200 and "feat_a" in feats.text
@@ -257,7 +265,7 @@ async def test_boundary_11_uppercase_json_suffix_treated_as_manifest(client, mon
     manifest = _cgsa_run(tmp_path)
     upper = manifest.with_name("feature_manifest.JSON")
     upper.write_bytes(manifest.read_bytes())
-    service = _service_with_tasks({})
+    service = _service_with_tasks({}, feature_root=tmp_path / "features")
     task_id = service.register_hdf5_for_browse(SYMBOL, PRIMARY_TF, str(upper))
     assert task_id.startswith(f"browse_{SYMBOL}_{PRIMARY_TF}_")
     context = service._load_task_context(task_id)
@@ -265,6 +273,38 @@ async def test_boundary_11_uppercase_json_suffix_treated_as_manifest(client, mon
     monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
     feats = await client.get(f"/api/v1/features/browse/{task_id}/features?detail_level=names")
     assert feats.status_code == 200 and "feat_a" in feats.text
+
+
+async def _register_rejected_400(client, monkeypatch, service: FeatureFactoryService, manifest: Path) -> bool:
+    """登錄 API 對非 canonical run ⇒ 400 且具名（含 canonical 字樣），不建立虛擬任務；task context 亦拒（不讀特徵檔）。"""
+    monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
+    resp = await client.post("/api/v1/features/browse/register",
+                             json={"symbol": SYMBOL, "timeframe": PRIMARY_TF, "hdf5_path": str(manifest)})
+    with service._lock:
+        service._tasks = {"task-direct": _task(str(manifest))}
+    try:
+        service._load_task_context("task-direct")
+        context_rejected = False
+    except ValueError as exc:
+        context_rejected = "canonical" in str(exc)
+    return resp.status_code == 400 and "canonical" in resp.text and context_rejected
+
+
+@pytest.mark.asyncio
+async def test_boundary_22_manifest_outside_configured_root_rejected(client, monkeypatch, tmp_path):
+    """FF-NAME Task 3.4（v19，審查 r1 CODEX-R1-P1-01）：現行世代、已於自身 registry 登記之 run，但位於設定特徵根之外
+    ⇒ 登錄與 task context 皆具名拒（reader 根不得由輸入路徑推導）。"""
+    manifest = _cgsa_run(tmp_path / "outside")
+    service = _service_with_tasks({}, feature_root=tmp_path / "configured" / "features")
+    assert await _register_rejected_400(client, monkeypatch, service, manifest)
+
+
+@pytest.mark.asyncio
+async def test_boundary_23_manifest_inside_root_without_registry_entry_rejected(client, monkeypatch, tmp_path):
+    """FF-NAME Task 3.4（v19，審查 r1 CODEX-R1-P1-01）：設定特徵根下佈局正確、現行世代，但 registry 無條目 ⇒ 具名拒。"""
+    manifest = _cgsa_run(tmp_path, register=False)
+    service = _service_with_tasks({}, feature_root=tmp_path / "features")
+    assert await _register_rejected_400(client, monkeypatch, service, manifest)
 
 
 ROUTES_PATH = REPO / "api" / "routes" / "feature_factory.py"
@@ -635,7 +675,7 @@ def v2_routes_all_served(results: dict) -> list:
 @pytest.mark.asyncio
 async def test_boundary_19_v2_manifest_served_by_all_browse_routes(client, monkeypatch, tmp_path):
     """Task 2.6 底線：有效 V2 run 之 task 於全部 11 個 browse／export 讀者照常 200（舊格式拒絕不得誤傷 V2）。"""
-    service = _service_with_tasks({"task-v2": _task(str(_cgsa_run(tmp_path)))})
+    service = _service_with_tasks({"task-v2": _task(str(_cgsa_run(tmp_path)))}, feature_root=tmp_path / "features")
     monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
     assert v2_routes_all_served(await _route_results(client, "task-v2", V2_BROWSE_ROUTES)) == []
 
@@ -662,7 +702,8 @@ async def test_mutation_cgsa_work_list_format_branch_restored_is_detected(client
     """還原列表格式讀取（舊 manifest 之 task 照讀出資料、不拒絕；以導向一個可讀 V2 run 模擬錨點碼態讀出資料）
     ⇒ 驗收判定翻轉為 False。"""
     service = _service_with_tasks({"task-cgsa-work": _task(str(_cgsa_work_list_manifest(tmp_path))),
-                                   "task-v2": _task(str(_cgsa_run(tmp_path)))})
+                                   "task-v2": _task(str(_cgsa_run(tmp_path)))},
+                                  feature_root=tmp_path / "features")
     monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
     original = service._load_task_context
     monkeypatch.setattr(service, "_load_task_context",

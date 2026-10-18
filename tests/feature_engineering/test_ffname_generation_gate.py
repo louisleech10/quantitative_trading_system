@@ -538,10 +538,16 @@ def test_orchestrator_stage0_same_version_handoff_passes_and_equals_ungated(tmp_
 
 # ---------------------------------------------------------------- feature_factory_service
 
-def _service(manifest: Path):
+def _service(manifest: Path, feature_root: Path, *, register: bool = True):
+    """瀏覽服務：設定特徵根＝`feature_root`（正式值為 settings 之 data_cache/features）；`register` ⇒ run 登記於
+    `<root>/registry.json`（v19：canonical run＝設定特徵根下且 registry 有條目）。"""
     from api.services.feature_factory_service import FeatureFactoryService
 
+    if register:
+        FeatureRegistry(Path(feature_root) / "registry.json").add(
+            {"symbol": SYMBOL, "timeframe": TF, "config_hash": CFG, "hdf5_relative_path": str(manifest)})
     service = FeatureFactoryService()
+    service._browse_feature_root = lambda: Path(feature_root)
     with service._lock:
         service._tasks = {"t": {"status": "completed", "result": {
             "hdf5_path": str(manifest), "metadata": {"symbol": SYMBOL, "timeframe": TF, "config_hash": CFG},
@@ -549,14 +555,45 @@ def _service(manifest: Path):
     return service
 
 
+def _browse_calls(service) -> Dict[str, Callable[[], Any]]:
+    return {
+        "browse_features": lambda: service.browse_features("t", 0, 10, None, "asc", None, None, None, "names"),
+        "browse_feature_data": lambda: service.browse_feature_data("t", [COLS[0]], 0, 10),
+        "browse_correlation": lambda: service.browse_correlation("t", COLS, "pearson"),
+    }
+
+
 @pytest.mark.parametrize("mode", MODES)
 def test_feature_factory_service_paths_reject(tmp_path, mode):
     manifest = _write_run(tmp_path / "features")
-    service = _service(manifest)
+    service = _service(manifest, tmp_path / "features")
+    assert isinstance(service.browse_feature_data("t", [COLS[0]], 0, 10), dict)  # 同版 canonical run 正向
     with tampered(manifest, mode):
-        assert _rejects(lambda: service.browse_features("t", 0, 10, None, "asc", None, None, None, "names"))
-        assert _rejects(lambda: service.browse_feature_data("t", [COLS[0]], 0, 10))
-        assert _rejects(lambda: service.browse_correlation("t", COLS, "pearson"))
+        for name, call in _browse_calls(service).items():
+            assert _rejects(call), name
+
+
+def _non_canonical_browse_rejected(call: Callable[[], Any]) -> bool:
+    """非 canonical run ⇒ 具名拒（訊息含 canonical），於產生任何 DataFrame 之前（不回傳結果）。"""
+    try:
+        call()
+    except Exception as exc:  # noqa: BLE001
+        return isinstance(exc, ValueError) and "canonical" in str(exc)
+    return False
+
+
+@pytest.mark.parametrize("case", ["outside_root", "no_registry_entry"])
+def test_feature_factory_service_non_canonical_run_rejected(tmp_path, case):
+    """v19（審查 r1 CODEX-R1-P1-01）：瀏覽之 run 位於設定特徵根外、或根內但 registry 無條目 ⇒ 瀏覽、選欄、相關矩陣
+    路徑皆具名拒（reader 根不得由輸入路徑推導）。"""
+    if case == "outside_root":
+        manifest = _write_run(tmp_path / "outside" / "features")
+        service = _service(manifest, tmp_path / "configured" / "features")
+    else:
+        manifest = _write_run(tmp_path / "features")
+        service = _service(manifest, tmp_path / "features", register=False)
+    for name, call in _browse_calls(service).items():
+        assert _non_canonical_browse_rejected(call), (case, name)
 
 
 # ---------------------------------------------------------------- 多標的合併點

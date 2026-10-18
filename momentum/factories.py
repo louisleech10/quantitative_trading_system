@@ -441,15 +441,26 @@ def estimate_symbol_disk(
     return factory._estimate_symbol_disk(symbol, config, end_date=end_date)
 
 
-def create_feature_library() -> "FeatureLibrary":
-    """Create a FeatureLibrary instance with V7 FeatureReader."""
+def create_feature_library(feature_root: Optional[Path] = None) -> "FeatureLibrary":
+    """Create a FeatureLibrary instance with V7 FeatureReader.
+
+    `feature_root`（FF-NAME Task 3.4 審查 r1）：呼叫端之設定特徵根（如 api `settings.data_cache_path/features`）；
+    給定時 storage／reader 以之為根，registry 取 `FFACT_FEATURE_REGISTRY_PATH`（有設時）否則 `<root>/registry.json`
+    （同 `create_run_lifecycle_manager`）。未給定 ⇒ 既有預設（相對 cwd 之 data_cache/features）。"""
+    import os
+
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
     from momentum.FeatureEngineering.feature_reader import FeatureReader
     from momentum.FeatureEngineering.feature_registry import FeatureRegistry
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
-    registry = FeatureRegistry()
-    storage = FeatureStorage()
+    if feature_root is None:
+        registry = FeatureRegistry()
+        storage = FeatureStorage()
+    else:
+        env_registry = os.getenv("FFACT_FEATURE_REGISTRY_PATH", "").strip()
+        registry = FeatureRegistry() if env_registry else FeatureRegistry(Path(feature_root) / "registry.json")
+        storage = FeatureStorage(str(feature_root))
     reader = FeatureReader(str(storage.base_path))
     return FeatureLibrary(registry, storage, feature_reader=reader)
 

@@ -71,7 +71,7 @@
     {"path": "momentum/FeatureEngineering/feature_storage.py", "qualname": "FeatureStorage.load_features_from_hdf5", "call": "h5py.File", "purpose": "case 特徵 h5（舊產生器 FeatureNamingConfig 之 case 儲存，寫入端 save_features_to_hdf5 同列；非 FF run、無 manifest；命名統一屬 SPEC §N 舊產生器殘留）"},
     {"path": "scripts/validate_cgsa_ab.py", "qualname": "_load_dataframe", "call": "pd.read_parquet", "purpose": "CGSA A/B 驗證工具讀層對照 JSON 所列之外部匯出比對檔（parquet／csv／pkl；非 FF run 版面）"}
   ],
-  "classification_note": "SPEC v13 Task 3.4 之 9 處待分類（實作第 3 批定案，交審碼裁）：讀特徵 run 矩陣（含 timestamps／row index）者改經 FeatureReader；非特徵 run 矩陣者列入 entries 並註明用途；IC 交接 h5 之讀取（SPEC v18）列入 entries，purpose 標「IC 交接 h5，經 feature_naming_version 屬性閘」，且該讀取函式須呼叫 assert_h5_feature_naming_version（靜態測試檢查）",
+  "classification_note": "SPEC v13 Task 3.4 之 9 處待分類與原 must_migrate_to_reader 14 處（審查 r1 GROK-R1-P3-01 併入本表）之處置紀錄：讀特徵 run 矩陣（含 timestamps／row index）者改經 FeatureReader；非特徵 run 矩陣者列入 entries 並註明用途；IC 交接 h5 之讀取（SPEC v18）列入 entries，purpose 標「IC 交接 h5，經 feature_naming_version 屬性閘」，且該讀取函式須呼叫 assert_h5_feature_naming_version（靜態測試檢查）",
   "classification": [
     {"path": "momentum/Analysis/event_samples/canonical_holdout.py", "qualname": "load_post_trim_index", "call": "pd.read_parquet", "decision": "migrated", "note": "改經 FeatureReader.load_row_index_v2"},
     {"path": "momentum/FeatureEngineering/core/column_group_registry.py", "qualname": "ColumnGroupRegistry._load_group_frame_for_materialize", "call": "pd.read_parquet", "decision": "whitelisted"},
@@ -81,22 +81,20 @@
     {"path": "scripts/register_v8_golden_lite.py", "qualname": "main", "call": "pd.read_parquet", "decision": "migrated", "note": "改以 canonical run 經 FeatureReader.stream_groups_v2"},
     {"path": "scripts/validate_cgsa_ab.py", "qualname": "_load_dataframe", "call": "pd.read_parquet", "decision": "whitelisted"},
     {"path": "scripts/ic1eb_b5_replay.py", "qualname": "_load_h5_features", "call": "h5py.File", "decision": "whitelisted_attr_gate", "note": "SPEC v18：IC 交接 h5 讀取前經 assert_h5_feature_naming_version"},
-    {"path": "scripts/freeze_framepath_baseline.py", "qualname": "_fingerprint", "call": "pq.read_table", "decision": "migrated", "note": "run 內 parquet 改經 FeatureReader.open_run_v2 之 run 檢視（含時間軸 sidecar）"}
-  ],
-  "must_migrate_to_reader": [
-    {"path": "momentum/Analysis/ic_engine.py", "qualname": "ICEngine.compute_ic_from_l7_raw", "call": "pd.read_parquet", "note": "ic_engine.py:334 直讀 group parquet（SPEC v13；gate 測試 test_ic_engine_compute_from_l7_raw_rejects／test_ic_engine_reads_groups_only_via_reader）"},
-    {"path": "momentum/FeatureEngineering/feature_factory.py", "qualname": "FeatureFactory._run_ic_first_post_generation", "call": "FeatureReader.load_columns_v2", "note": "feature_factory.py:2951 post-IC selected read；現已經 reader，列入以封閉（gate 測試 test_feature_factory_post_ic_selected_read_rejects）"},
-    {"path": "momentum/Analysis/ic_filter_orchestrator.py", "qualname": "ICFilterOrchestrator._load_features_hdf5", "call": "h5py.File"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._build_data_quality_cgsa._scan_one_file", "call": "pq.read_table"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._read_cgsa_timestamps", "call": "pq.ParquetFile"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._read_cgsa_timestamps", "call": "pq.read_table"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_features_df", "call": "pq.read_table"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_summary_fast._read_one_footer", "call": "pq.ParquetFile"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_columns_subset", "call": "pq.read_table"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_selected_df._read_one", "call": "pq.read_table"},
-    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_selected_df", "call": "pq.read_table"},
-    {"path": "api/services/ic_analysis_service.py", "qualname": "ICAnalysisService._load_features_for_transforms", "call": "pd.read_hdf"},
-    {"path": "api/services/ic_analysis_service.py", "qualname": "ICAnalysisService._load_features_for_transforms", "call": "pd.read_parquet"},
-    {"path": "scripts/analyze_problem_features.py", "qualname": "scan_file", "call": "pq.read_table"}
+    {"path": "scripts/freeze_framepath_baseline.py", "qualname": "_fingerprint", "call": "pq.read_table", "decision": "migrated", "note": "run 內 parquet 改經 FeatureReader.open_run_v2 之 run 檢視（含時間軸 sidecar）"},
+    {"path": "momentum/Analysis/ic_engine.py", "qualname": "ICEngine.compute_ic_from_l7_raw", "call": "pd.read_parquet", "decision": "migrated", "note": "ic_engine.py:334 直讀 group parquet（SPEC v13；gate 測試 test_ic_engine_compute_from_l7_raw_rejects／test_ic_engine_reads_groups_only_via_reader）"},
+    {"path": "momentum/FeatureEngineering/feature_factory.py", "qualname": "FeatureFactory._run_ic_first_post_generation", "call": "FeatureReader.load_columns_v2", "decision": "migrated", "note": "feature_factory.py:2951 post-IC selected read；現已經 reader，列入以封閉（gate 測試 test_feature_factory_post_ic_selected_read_rejects）"},
+    {"path": "momentum/Analysis/ic_filter_orchestrator.py", "qualname": "ICFilterOrchestrator._load_features_hdf5", "call": "h5py.File", "decision": "whitelisted_attr_gate", "note": "SPEC v18：IC 交接 h5，讀取前經 assert_h5_feature_naming_version"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._build_data_quality_cgsa._scan_one_file", "call": "pq.read_table", "decision": "migrated"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._read_cgsa_timestamps", "call": "pq.ParquetFile", "decision": "migrated"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._read_cgsa_timestamps", "call": "pq.read_table", "decision": "migrated"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_features_df", "call": "pq.read_table", "decision": "migrated"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_summary_fast._read_one_footer", "call": "pq.ParquetFile", "decision": "migrated"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_columns_subset", "call": "pq.read_table", "decision": "migrated"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_selected_df._read_one", "call": "pq.read_table", "decision": "migrated"},
+    {"path": "api/services/feature_factory_service.py", "qualname": "FeatureFactoryService._load_cgsa_selected_df", "call": "pq.read_table", "decision": "migrated"},
+    {"path": "api/services/ic_analysis_service.py", "qualname": "ICAnalysisService._load_features_for_transforms", "call": "pd.read_hdf", "decision": "migrated"},
+    {"path": "api/services/ic_analysis_service.py", "qualname": "ICAnalysisService._load_features_for_transforms", "call": "pd.read_parquet", "decision": "migrated"},
+    {"path": "scripts/analyze_problem_features.py", "qualname": "scan_file", "call": "pq.read_table", "decision": "migrated"}
   ]
 }

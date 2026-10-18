@@ -239,6 +239,23 @@ def write_canonical_run(base: Path, frame: Any, symbol: str, timeframe: str, con
     return FeatureLibrary(registry, storage, feature_reader=FeatureReader(str(base))), manifest
 
 
+def register_canonical_run(manifest: Path, registry_path: Path | None = None) -> Path:
+    """把以正式 writer 寫於 `<root>/<symbol>/<tf>/<config_hash>/feature_manifest.json` 之 run 登記於 registry
+    （預設 `<root>/registry.json`，同正式生成之預設位置）——FF-NAME Task 3.4（v19）：canonical run＝設定特徵根下
+    且 registry 有條目。回傳 manifest。"""
+    import os
+
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    run_dir = Path(manifest).parent
+    root = run_dir.parents[2]
+    env_registry = os.getenv("FFACT_FEATURE_REGISTRY_PATH", "").strip()  # 同 create_feature_library(feature_root=…)
+    FeatureRegistry(registry_path or (Path(env_registry) if env_registry else root / "registry.json")).add({
+        "symbol": run_dir.parent.parent.name, "timeframe": run_dir.parent.name, "config_hash": run_dir.name,
+        "hdf5_relative_path": str(manifest)})
+    return Path(manifest)
+
+
 def iter_new_names_from_baseline() -> Iterable[str]:
     """§G 零件以新 formatter 推導之全部新名（需 Task 0.1 baseline.json）。"""
     freeze = load_freeze_module()

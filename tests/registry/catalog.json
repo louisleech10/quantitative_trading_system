@@ -11075,6 +11075,25 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
+  "tests/momentum/test_ic_golden_inputs_names_opaque.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/test_ic_golden_inputs_names_opaque.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFNAME"
+  },
   "tests/momentum/test_ic_phase0_golden.py": {
    "claim": [
     "regression"

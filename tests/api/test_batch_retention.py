@@ -151,6 +151,9 @@ def _compute_success(
         json.dumps({"symbol": symbol, "primary_tf": timeframe, "config_hash": "cfg_batch_ret"}),
         encoding="utf-8",
     )
+    # 正式生成於落盤後登記 registry（feature_factory 之 registry.add）；FF-NAME Task 3.4 v19 之瀏覽登錄須 registry 條目
+    FeatureRegistry(base / "features" / "registry.json").add(
+        {"symbol": symbol, "timeframe": timeframe, "config_hash": "cfg_batch_ret", "hdf5_relative_path": str(manifest)})
     return str(manifest)
 
 

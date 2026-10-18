@@ -518,6 +518,9 @@ def test_quality_adapter_computes_from_real_parquet_manifest(monkeypatch, tmp_pa
         row_index=row_index,
     )
     manifest_path = raw_dir.parent / "feature_manifest.json"
+    from tests.feature_engineering.ffname_helpers import register_canonical_run
+
+    register_canonical_run(manifest_path)  # FF-NAME 3.4 v19：canonical＝設定根下＋registry 條目
 
     result = FeatureFactoryQualityAdapter(service).compute(str(manifest_path))
 

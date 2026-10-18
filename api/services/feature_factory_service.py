@@ -1193,9 +1193,12 @@ class FeatureFactoryService:
         if not file_path.exists():
             raise FileNotFoundError(f"HDF5 file not found: {hdf5_path}")
         self._require_manifest_path(file_path)
+        # FF-NAME Task 3.4（v19，審查 r1 CODEX-R1-P1-01）：登錄前即以設定特徵根＋registry 判定 canonical run；
+        # 根外或 registry 無條目 ⇒ 具名 ValueError（route → 400），不建立虛擬任務
+        run, _library = self._resolve_browse_run(file_path, str(symbol), str(timeframe))
 
         # 使用固定格式的 task_id，相同 symbol+timeframe 重複呼叫回傳同一個 id（冪等）
-        config_hash = self._config_hash_from_path(file_path, symbol, timeframe)
+        config_hash = run.config_hash
         task_id = f"browse_{symbol}_{timeframe}_{config_hash}"
         result = {
             "hdf5_path": str(hdf5_path),
@@ -4733,35 +4736,48 @@ class FeatureFactoryService:
         return run_view
 
     @staticmethod
-    def _open_task_run_view(manifest_path: Path, symbol: str, timeframe: str) -> Any:
-        """task 之 manifest 路徑 → 已過命名世代閘之 run 檢視（`FeatureReader.open_run_v2`）。
+    def _browse_feature_root() -> Path:
+        """瀏覽端之設定特徵根（與 `_lifecycle` 同一來源）；canonical run 一律以此為根判定，不由輸入路徑推導。"""
+        return settings.data_cache_path / "features"
 
-        路徑須為 `<root>/<symbol>/<timeframe>/<config_hash>/feature_manifest.json` 且 symbol／timeframe 與 task
-        metadata 一致（否則 ValueError，route → 400）；manifest 不可讀或非 JSON ⇒ FileNotFoundError；命名世代
-        缺失／過舊／無法解析 ⇒ `FeatureNamingVersionError` 原樣上拋。"""
-        from momentum.factories import create_feature_reader
+    def _resolve_browse_run(self, manifest_path: Path, symbol: str, timeframe: str) -> Tuple[Any, Any]:
+        """FF-NAME Task 3.4（v19，審查 r1 CODEX-R1-P1-01）：task／登錄之 manifest 路徑 → (CanonicalRun, FeatureLibrary)。
 
-        run_dir = manifest_path.parent
-        if (
-            manifest_path.name.lower() != "feature_manifest.json"
-            or len(run_dir.parents) < 3
-            or run_dir.parent.name != timeframe
-            or run_dir.parent.parent.name != symbol
-        ):
+        經工廠建立之 FeatureLibrary（設定特徵根＋registry）之 `resolve_canonical_run` 判定：須位於設定特徵根下
+        `<symbol>/<timeframe>/<config_hash>/feature_manifest.json`（檔名大小寫不拘）且 registry 有條目，並與 task 之
+        symbol／timeframe 一致；否則具名 ValueError（route → 400），於讀任何特徵檔之前。"""
+        from momentum.factories import create_feature_library
+
+        library = create_feature_library(feature_root=self._browse_feature_root())
+        target = manifest_path.parent if manifest_path.name.lower() == "feature_manifest.json" else manifest_path
+        try:
+            run = library.resolve_canonical_run(target)
+        except ValueError as exc:
             # FRAMEPATH Task 2.6：舊 cgsa_work 列表格式維持具名拒絕訊息（只辨識格式、不讀任何特徵檔）
             try:
                 legacy = json.loads(manifest_path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 legacy = None
             if isinstance(legacy, dict) and isinstance(legacy.get("groups"), list):
-                raise ValueError(f"舊 cgsa_work 瀏覽格式已不支援：{manifest_path}")
+                raise ValueError(f"舊 cgsa_work 瀏覽格式已不支援：{manifest_path}") from exc
+            raise ValueError(f"瀏覽之 manifest 非 canonical run（設定特徵根＋registry 條目）：{exc}") from exc
+        if run.symbol != symbol or run.timeframe != timeframe:
             raise ValueError(
-                f"task manifest 非 canonical run 佈局 <root>/{symbol}/{timeframe}/<config_hash>/feature_manifest.json："
-                f"{manifest_path}"
+                f"瀏覽之 canonical run ({run.symbol}, {run.timeframe}) 與 task ({symbol}, {timeframe}) 不一致：{manifest_path}"
             )
-        reader = create_feature_reader(str(run_dir.parents[2]))
+        return run, library
+
+    def _open_task_run_view(self, manifest_path: Path, symbol: str, timeframe: str) -> Any:
+        """task 之 manifest 路徑 → 已過命名世代閘之 run 檢視（`FeatureReader.open_run_v2`）。
+
+        canonical 判定見 `_resolve_browse_run`（設定特徵根＋registry；reader 根＝設定特徵根，不由輸入路徑推導）；
+        manifest 不可讀或非 JSON ⇒ FileNotFoundError；命名世代缺失／過舊／無法解析 ⇒ `FeatureNamingVersionError` 原樣上拋。"""
+        from momentum.factories import create_feature_reader
+
+        run, _library = self._resolve_browse_run(manifest_path, symbol, timeframe)
+        reader = create_feature_reader(str(run.feature_root))
         try:
-            return reader.open_run_v2(symbol, timeframe, run_dir.name)
+            return reader.open_run_v2(run.symbol, run.timeframe, run.config_hash)
         except (OSError, json.JSONDecodeError) as exc:
             raise FileNotFoundError(f"Failed to read CGSA manifest {manifest_path}: {exc}") from exc
 

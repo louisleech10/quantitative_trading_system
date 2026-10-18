@@ -254,11 +254,19 @@ def _run_manifest(tmp_path: Path) -> Path:
     names = [VALID["multi_output"], VALID["microstructure"], VALID["xsec"]]
     groups = {"g": pd.DataFrame({n: kline["close"].to_numpy(dtype=np.float32) for n in names}, index=kline.index)}
     raw_dir = storage.write_raw(SYMBOL, PRIMARY_TF, "cfg_ffname", groups, row_index=pd.DatetimeIndex(kline.index))
-    return raw_dir.parent / "feature_manifest.json"
+    manifest = raw_dir.parent / "feature_manifest.json"
+    # FF-NAME Task 3.4（v19）：canonical run＝設定特徵根下且 registry 有條目 ⇒ 登記於 <root>/registry.json
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    FeatureRegistry(tmp_path / "features" / "registry.json").add(
+        {"symbol": SYMBOL, "timeframe": PRIMARY_TF, "config_hash": "cfg_ffname", "hdf5_relative_path": str(manifest)})
+    return manifest
 
 
 def _service(manifest: Path) -> FeatureFactoryService:
     service = FeatureFactoryService()
+    feature_root = manifest.parents[3]  # 測試之設定特徵根（＝_run_manifest 之 FeatureStorage 根；正式值為 settings）
+    service._browse_feature_root = lambda: feature_root
     with service._lock:
         service._tasks = {"task-ffname": {"status": "completed", "result": {
             "hdf5_path": str(manifest),
