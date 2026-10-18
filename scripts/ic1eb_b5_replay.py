@@ -125,7 +125,10 @@ async def run_longitudinal(
 def _load_h5_features(path: Path, symbol: str, timeframe: str) -> pd.DataFrame:
     import h5py
 
+    from momentum.factories import assert_h5_feature_naming_version
+
     with h5py.File(path, "r") as file:
+        assert_h5_feature_naming_version(file.attrs, path)  # FF-NAME Task 3.4（v18）：IC 交接 h5 命名世代閘
         group = file[f"{symbol}/{timeframe}"]
         matrix = group["features"][:]
         names = [

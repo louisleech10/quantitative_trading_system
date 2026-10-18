@@ -42,19 +42,20 @@ class TestCDLPatternNames:
 
 class TestExpandBlacklist:
     def test_CDL_PATTERN_ALL_matches_all_cdl_columns(self) -> None:
+        # FF-NAME Task 3.2：比對 parse 後之 indicator（欄名為 FF-NAME 文法）
         cols = [
-            "close_CDLDOJI_1h",
-            "close_CDLHAMMER_12h",
-            "close_CDL3LINESTRIKE_1h",
-            "close_EMA_20_1h",
-            "close_RSI_14_1h",
+            "ohlc_1h_pattern_CDLDOJI",
+            "ohlc_12h_pattern_CDLHAMMER",
+            "ohlc_1h_pattern_CDL3LINESTRIKE",
+            "close_1h_trend_EMA_20",
+            "close_1h_momentum_RSI_14",
         ]
         matched = expand_blacklist_patterns(["CDL_PATTERN_ALL"], cols)
-        assert "close_CDLDOJI_1h" in matched
-        assert "close_CDLHAMMER_12h" in matched
-        assert "close_CDL3LINESTRIKE_1h" in matched
-        assert "close_EMA_20_1h" not in matched
-        assert "close_RSI_14_1h" not in matched
+        assert "ohlc_1h_pattern_CDLDOJI" in matched
+        assert "ohlc_12h_pattern_CDLHAMMER" in matched
+        assert "ohlc_1h_pattern_CDL3LINESTRIKE" in matched
+        assert "close_1h_trend_EMA_20" not in matched
+        assert "close_1h_momentum_RSI_14" not in matched
 
     def test_HT_DCPHASE_matches_all_variants(self) -> None:
         # 真實命名用 hyphen：close_12h_cycle_HT-DCPHASE
@@ -73,27 +74,27 @@ class TestExpandBlacklist:
         assert "close_12h_cycle_HT-SINE-LeadSine" not in matched
 
     def test_CDL_derived_features_also_match(self) -> None:
-        # L2/L3 衍生：CDL_DOJI_Distance_..., rolling_W21_Mean_CDLHAMMER_...
+        # L2/L3 衍生（FF-NAME 文法：身分之 indicator 不變、後接 op 段）
         cols = [
-            "close_EMA_20_1h_Distance_CDLDOJI_1h",
-            "close_CDLHAMMER_12h_rolling_W21_Mean_1h",
-            "close_EMA_20_1h",
+            "ohlc_1h_pattern_CDLDOJI_Distance",
+            "ohlc_12h_pattern_CDLHAMMER_Mean-W21",
+            "close_1h_trend_EMA_20",
         ]
         matched = expand_blacklist_patterns(["CDL_PATTERN_ALL"], cols)
-        assert "close_EMA_20_1h_Distance_CDLDOJI_1h" in matched
-        assert "close_CDLHAMMER_12h_rolling_W21_Mean_1h" in matched
-        assert "close_EMA_20_1h" not in matched
+        assert "ohlc_1h_pattern_CDLDOJI_Distance" in matched
+        assert "ohlc_12h_pattern_CDLHAMMER_Mean-W21" in matched
+        assert "close_1h_trend_EMA_20" not in matched
 
     def test_HT_DCPHASE_derived_features_also_match(self) -> None:
-        # 真實衍生命名（catalog 確認）：close_12h_cycle_HT-DCPHASE_Momentum_L3
+        # 衍生命名（FF-NAME 文法）：close_12h_cycle_HT-DCPHASE_Momentum-L3
         cols = [
-            "close_12h_cycle_HT-DCPHASE_Momentum_L3",
-            "close_12h_cycle_HT-DCPHASE_rolling_W21_Mean",
+            "close_12h_cycle_HT-DCPHASE_Momentum-L3",
+            "close_12h_cycle_HT-DCPHASE_Mean-W21",
             "close_12h_trend_EMA_5",
         ]
         matched = expand_blacklist_patterns(["HT-DCPHASE"], cols)
-        assert "close_12h_cycle_HT-DCPHASE_Momentum_L3" in matched
-        assert "close_12h_cycle_HT-DCPHASE_rolling_W21_Mean" in matched
+        assert "close_12h_cycle_HT-DCPHASE_Momentum-L3" in matched
+        assert "close_12h_cycle_HT-DCPHASE_Mean-W21" in matched
         assert "close_12h_trend_EMA_5" not in matched
 
     def test_both_patterns_together(self) -> None:
@@ -110,7 +111,7 @@ class TestExpandBlacklist:
         })
 
     def test_empty_patterns_returns_empty(self) -> None:
-        cols = ["close_CDLDOJI_1h", "close_EMA_20_1h"]
+        cols = ["ohlc_1h_pattern_CDLDOJI", "close_1h_trend_EMA_20"]
         assert expand_blacklist_patterns([], cols) == frozenset()
 
     def test_empty_columns_returns_empty(self) -> None:
@@ -119,23 +120,23 @@ class TestExpandBlacklist:
     def test_both_empty_returns_empty(self) -> None:
         assert expand_blacklist_patterns([], []) == frozenset()
 
-    def test_custom_substring_pattern(self) -> None:
-        # 非 alias 走通用 substring
-        cols = ["close_MyIndicator_1h", "close_EMA_20_1h"]
-        matched = expand_blacklist_patterns(["_MyIndicator_"], cols)
-        assert "close_MyIndicator_1h" in matched
-        assert "close_EMA_20_1h" not in matched
+    def test_custom_indicator_pattern_exact(self) -> None:
+        # FF-NAME Task 3.2：非 alias 之 pattern 比對 parse 後之 indicator（精確相等，不走子字串：ATR 不命中 NATR）
+        cols = ["hlc_1h_volatility_ATR_14", "hlc_1h_volatility_NATR_14", "close_1h_trend_EMA_20"]
+        matched = expand_blacklist_patterns(["ATR"], cols)
+        assert matched == frozenset({"hlc_1h_volatility_ATR_14"})
 
     def test_returns_frozenset_of_str(self) -> None:
-        cols = ["close_CDLDOJI_1h"]
+        cols = ["ohlc_1h_pattern_CDLDOJI"]
         matched = expand_blacklist_patterns(["CDL_PATTERN_ALL"], cols)
         assert isinstance(matched, frozenset)
+        assert matched == frozenset(cols)
         for c in matched:
             assert isinstance(c, str)
 
     def test_skips_empty_string_pattern(self) -> None:
         # 空字串 pattern 應被忽略（避免命中所有欄位）
-        cols = ["close_EMA_20_1h", "close_RSI_14_1h"]
+        cols = ["close_1h_trend_EMA_20", "close_1h_momentum_RSI_14"]
         assert expand_blacklist_patterns([""], cols) == frozenset()
         assert expand_blacklist_patterns(["", None], cols) == frozenset()  # type: ignore[list-item]
 
@@ -246,14 +247,14 @@ class TestSafetyContract:
 
 class TestEdgeCases:
     def test_unicode_column_names(self) -> None:
-        cols = ["前綴_CDLDOJI_1h", "正常_EMA_20_1h", "💀_RSI_14_1h"]
+        # FF-NAME Task 3.2：不合文法之欄名（含非 ASCII）不命中、不拋錯；合文法之 CDL 欄照常命中
+        cols = ["前綴_CDLDOJI_1h", "正常_EMA_20_1h", "💀_RSI_14_1h", "ohlc_1h_pattern_CDLDOJI"]
         matched = expand_blacklist_patterns(["CDL_PATTERN_ALL"], cols)
-        assert "前綴_CDLDOJI_1h" in matched
-        assert "正常_EMA_20_1h" not in matched
-        assert "💀_RSI_14_1h" not in matched
+        assert matched == frozenset({"ohlc_1h_pattern_CDLDOJI"})
 
     def test_column_name_with_underscores_and_digits(self) -> None:
-        cols = ["xxx_CDLDOJI_1h_W21", "y_z_CDL2CROWS_99_1h"]
+        # 帶參數段與 op 段（含數字）之 CDL 衍生欄皆以 indicator 命中
+        cols = ["ohlc_1h_pattern_CDLDOJI_Mean-W21", "ohlc_12h_pattern_CDL2CROWS_Lag-99"]
         matched = expand_blacklist_patterns(["CDL_PATTERN_ALL"], cols)
         assert matched == frozenset(cols)
 

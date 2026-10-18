@@ -24,112 +24,70 @@ Outputs three artifacts under <task_dir>/problem_analysis_<timestamp>/:
 Usage:
     PYTHONPATH=. venv/bin/python scripts/analyze_problem_features.py \\
         --task-dir data_cache/features/ETHUSDT/1h/c4403c2493edaf57e33d058336ace686
+
+FF-NAME Task 3.1／3.4：欄名語意一律 `parse_feature_name`；`--task-dir` 須為 canonical run（特徵根下
+`<symbol>/<timeframe>/<config_hash>/` 且 registry 有條目），群組只經 FeatureReader 讀取（含命名世代閘）。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
-import re
 import sys
 import time
-from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-import pyarrow.compute as pc
-import pyarrow.parquet as pq
+
+from momentum.factories import create_feature_library, create_feature_reader
+from momentum.FeatureEngineering.feature_naming import FeatureNameParseError, parse_feature_name
 
 
 HIGH_NAN_THRESHOLD = 0.05  # matches _DATA_QUALITY_HIGH_NAN_THRESHOLD
 
-# Filename pattern in L7_raw: {timeframe}_{layer}_{family}.parquet
-# e.g. 12h_L1_large_trade_ratio.parquet, 1h_L3_ms_amihud_illiq.parquet
-FNAME_RE = re.compile(r"^(?P<tf>[^_]+)_(?P<layer>L[0-9]+(?:_[0-9]+)?)_(?P<family>.+)\.parquet$")
 
-# Source prefix from column names: ms_/ent_/tr_/ta_/wq_/ti_/taker-ratio_/...
-SOURCE_RE = re.compile(r"^([a-z][a-z0-9-]*?)_")
-
-
-def parse_filename(fname: str) -> tuple[str, str, str]:
-    m = FNAME_RE.match(fname)
-    if not m:
-        return ("?", "?", fname.replace(".parquet", ""))
-    return (m["tf"], m["layer"], m["family"])
+def parse_group_id(group_id: str) -> tuple[str, str, str]:
+    """群組 id `{timeframe}_{layer}_{family}`（manifest 之群組鍵，非特徵欄名）→ (tf, layer, family)。"""
+    parts = str(group_id).split("_", 2)
+    if len(parts) < 3:
+        return ("?", "?", str(group_id))
+    return (parts[0], parts[1], parts[2])
 
 
 def parse_source(col_name: str) -> str:
-    """Extract source prefix from column name (e.g. 'ms_', 'ent_', 'taker-ratio_')."""
-    m = SOURCE_RE.match(col_name)
-    return m.group(1) if m else "?"
+    """欄之 source 段（`parse_feature_name`）；不合文法 ⇒ '?'。"""
+    try:
+        return parse_feature_name(col_name).source
+    except FeatureNameParseError:
+        return "?"
 
 
 def parse_base_indicator(col_name: str) -> str:
-    """Strip leading source_timeframe_ prefix, return first non-numeric token group.
-
-    Examples:
-      ms_12h_large_trade_ratio_13                    -> large_trade_ratio
-      ms_1h_amihud_illiq_55_Skew_W34                 -> amihud_illiq
-      taker-ratio_1h_trend_MIDPOINT_89_Skew_W3       -> trend_MIDPOINT
-      ent_12h_sampen_55_Kurt_W144                    -> sampen
-      ta_1h_HT_TRENDMODE                             -> HT_TRENDMODE
-    """
-    parts = col_name.split("_")
-    if len(parts) < 2:
+    """欄之 `<category>/<indicator>`（`parse_feature_name`）；不合文法 ⇒ 原欄名。"""
+    try:
+        identity = parse_feature_name(col_name)
+    except FeatureNameParseError:
         return col_name
-    # Drop source + timeframe (first two tokens) when timeframe present.
-    # Detect timeframe by '1h','12h','4h','1d' shape.
-    if len(parts) >= 2 and re.match(r"^[0-9]+[hdm]$", parts[1]):
-        parts = parts[2:]
-    else:
-        parts = parts[1:]
-    if not parts:
-        return col_name
-    # Take tokens until we hit a numeric param.
-    out = []
-    for tok in parts:
-        if re.match(r"^-?[0-9]+(\.[0-9]+)?$", tok):
-            break
-        # Stop also at aggregator tokens like Skew/Kurt/Mean/Std/Min/Max/Sum/Last/Count
-        # and rolling window markers like W3/W34/W144 etc.
-        if tok in ("Skew", "Kurt", "Mean", "Std", "Min", "Max", "Sum", "Last", "Count", "Median", "First"):
-            break
-        if re.match(r"^W[0-9]+$", tok):
-            break
-        out.append(tok)
-    return "_".join(out) if out else parts[0]
+    return f"{identity.category}/{identity.indicator}"
 
 
-def scan_file(path: Path) -> list[dict]:
-    """Scan one parquet file. Returns one dict per column.
+def scan_frame(frame: pd.DataFrame) -> list[dict]:
+    """Scan one feature group (DataFrame read via FeatureReader). Returns one dict per column.
 
     Per-column dict:
       name, total_rows, nan_count, nan_ratio,
       first_valid, last_valid, mid_hole_count, trailing_length, leading_length,
       all_nan
     """
-    table = pq.read_table(str(path))
-    T = table.num_rows
+    T = len(frame)
     out: list[dict] = []
     if T == 0:
         return out
 
-    for j in range(table.num_columns):
-        col_name = table.column_names[j]
-        arr = table.column(j)
-
-        # IEEE-754 NaN + Arrow null detection (parquet metadata is unreliable
-        # because CGSA writes NaN as a float value without setting the
-        # validity bit — same justification as the CGSA fast-path in the
-        # backend).
-        try:
-            mask = pc.or_kleene(pc.is_null(arr), pc.is_nan(arr)).to_numpy(zero_copy_only=False)
-        except Exception:
-            # Non-float column (string/bool): fall back to is_null only.
-            mask = pc.is_null(arr).to_numpy(zero_copy_only=False)
+    for col_name in frame.columns:
+        # IEEE-754 NaN + null detection（parquet metadata 之 null_count 不計 NaN 位元型樣）
+        mask = frame[col_name].isna().to_numpy()
 
         nan_count = int(mask.sum())
         notna = ~mask
@@ -187,18 +145,22 @@ def main():
     args = parser.parse_args()
 
     task_dir = Path(args.task_dir).resolve()
-    raw_dir = task_dir / "raw"
-    if not raw_dir.exists():
-        print(f"ERROR: raw/ not found under {task_dir}", file=sys.stderr)
+    library = create_feature_library()
+    try:
+        run = library.resolve_canonical_run(task_dir)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
+    reader = create_feature_reader(str(run.feature_root))
+    group_names = list(reader.load_run_manifest_v2(run.symbol, run.timeframe, run.config_hash)
+                       .get("artifacts", {}).get("raw", {}).get("groups", {}))
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_dir = Path(args.out_dir) if args.out_dir else task_dir / f"problem_analysis_{ts}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    parquet_files = sorted(raw_dir.glob("*.parquet"))
     print(f"[scan] task_dir={task_dir}")
-    print(f"[scan] {len(parquet_files)} parquet files to scan")
+    print(f"[scan] {len(group_names)} raw groups to scan")
     print(f"[scan] output: {out_dir}")
 
     # ---- pass 1: scan every column ----
@@ -206,24 +168,25 @@ def main():
     t0 = time.monotonic()
     last_log = t0
 
-    for i, path in enumerate(parquet_files, 1):
-        tf, layer, family = parse_filename(path.name)
-        try:
-            file_rows = scan_file(path)
-        except Exception as exc:
-            print(f"[warn] failed to scan {path.name}: {exc}", file=sys.stderr)
-            continue
-        for row in file_rows:
+    def _warn_unreadable(group: str, path: Path, exc: Exception) -> None:
+        print(f"[warn] failed to scan {group} ({path.name}): {exc}", file=sys.stderr)
+
+    groups = reader.stream_groups_v2(run.symbol, run.timeframe, run.config_hash, artifact_kind="raw",
+                                     sort_groups=True, on_read_error=_warn_unreadable)
+    for i, (group_id, frame) in enumerate(groups, 1):
+        tf, layer, family = parse_group_id(group_id)
+        for row in scan_frame(frame):
             row["timeframe_file"] = tf
             row["layer_file"] = layer
             row["family_file"] = family
             all_rows.append(row)
+        del frame
 
         now = time.monotonic()
-        if i == 1 or i == len(parquet_files) or (now - last_log) > 10:
+        if i == 1 or i == len(group_names) or (now - last_log) > 10:
             elapsed = now - t0
-            pct = i / len(parquet_files) * 100
-            print(f"[scan] {i}/{len(parquet_files)} ({pct:.1f}%), {len(all_rows):,} cols, {elapsed:.1f}s")
+            pct = i / max(len(group_names), 1) * 100
+            print(f"[scan] {i}/{len(group_names)} ({pct:.1f}%), {len(all_rows):,} cols, {elapsed:.1f}s")
             last_log = now
 
     print(f"[scan] complete: {len(all_rows):,} columns in {time.monotonic()-t0:.1f}s")
@@ -242,7 +205,7 @@ def main():
     # ---- summary ----
     summary: dict = {}
     summary["task_dir"] = str(task_dir)
-    summary["scanned_files"] = len(parquet_files)
+    summary["scanned_files"] = len(group_names)
     summary["total_features"] = len(df)
     summary["total_rows"] = int(df["total_rows"].iloc[0]) if len(df) else 0
 

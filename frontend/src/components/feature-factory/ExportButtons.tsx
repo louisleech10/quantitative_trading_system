@@ -19,6 +19,9 @@ const API_PREFIX = '/api/v1/features';
 
 export default function ExportButtons({ config, taskId, symbol, timeframe }: ExportButtonsProps) {
   const { featureList, currentTask } = useFeatureFactoryStore();
+  // 示例欄位取自該 task 已載入之欄名清單前三個（原樣欄名，不內嵌任何命名世代之硬編碼欄名）
+  const taskFeatureNames = useFeatureFactoryStore((state) => (taskId ? state.explorerFeatureNamesByTask[taskId] : undefined));
+  const sampleFeatureNames = taskFeatureNames ? taskFeatureNames.slice(0, 3) : [];
   const [csvColumns, setCsvColumns] = useState('all');
   const [csvMaxRows, setCsvMaxRows] = useState('all');
   const [includeMetadataHeader, setIncludeMetadataHeader] = useState(true);
@@ -254,7 +257,7 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
             className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-100"
           >
             <option value="all">欄位：全部</option>
-            <option value="ms_amihud_illiq_21,ent_shannon_close_return_21,tr_cvar_5pct_21">欄位：示例三欄</option>
+            {sampleFeatureNames.length === 3 && <option value={sampleFeatureNames.join(',')}>欄位：示例三欄</option>}
           </select>
           <select
             value={csvMaxRows}

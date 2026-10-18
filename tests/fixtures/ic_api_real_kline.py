@@ -13,6 +13,7 @@ import pytest
 
 from momentum.core.contracts import AlignmentSpec, validate_alignment
 from momentum.factories import create_kline_storage_manager
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
 
 
 SYMBOL = "ETHUSDT"
@@ -38,6 +39,7 @@ FEATURE_NAMES = [
 def _write_h5(path: Path, key: str, values: np.ndarray, timestamps: np.ndarray, names: list[str]) -> None:
     """以 IC reader 使用的 flat data/ group schema 寫入。"""
     with h5py.File(path, "w") as handle:
+        _stamp_ic_handoff(handle.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = handle.create_group("data")
         group.create_dataset(key, data=values, compression="gzip")
         group.create_dataset("timestamps", data=timestamps, compression="gzip")

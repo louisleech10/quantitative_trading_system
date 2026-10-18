@@ -21,7 +21,7 @@ from tests.feature_engineering import ffstat_helpers as h
 
 REPO = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads((REPO / "tests/_golden/ratiounsafe/contract.json").read_text(encoding="utf-8"))
-TAGGED_UNSAFE = ["ohlc_12h_pattern_CDLDOJI", "ohlc_4h_pattern_CDLENGULFING", "ohlc_12h_pattern_CDLDOJI_Lag_5"]
+TAGGED_UNSAFE = ["ohlc_12h_pattern_CDLDOJI", "ohlc_4h_pattern_CDLENGULFING", "ohlc_12h_pattern_CDLDOJI_Lag-5"]  # FF-NAME 文法之 op 段
 UNTAGGED_UNSAFE = ["ohlc_pattern_CDLDOJI", "ohlc_pattern_CDLENGULFING"]
 SAFE = ["close_12h_trend_EMA_8", "close_trend_SMA_13"]
 

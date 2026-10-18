@@ -10,6 +10,7 @@ import pytest
 from momentum.Analysis.ic_config_schema import FeatureFilterSchema, load_ic_config
 from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
 from momentum.core.exceptions import InvalidInputError
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
 
 pytestmark = [
     pytest.mark.ic_persist_redirect,
@@ -24,6 +25,7 @@ def _orchestrator() -> ICFilterOrchestrator:
 def _write_features_h5(path: Path, features_df: pd.DataFrame) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = file.create_group("BTCUSDT/12h")
         group.create_dataset("features", data=features_df.to_numpy(dtype=np.float32))
         group.create_dataset("timestamps", data=features_df.index.to_numpy(dtype=np.int64))

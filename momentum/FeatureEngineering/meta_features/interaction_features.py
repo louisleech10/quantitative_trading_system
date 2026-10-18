@@ -19,9 +19,20 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name
+from momentum.FeatureEngineering.feature_naming import (
+    IdentitySpec,
+    build_identity,
+    find_identity_column,
+    format_feature_name,
+)
 
 logger = get_logger(__name__)
+
+# FF-NAME Task 3.2：L1 輸入以身分精確比對（同 consensus_features）
+_EMA_FAST = (IdentitySpec("EMA", ("8",), "close"), IdentitySpec("EMA", ("8",)))
+_EMA_SLOW = (IdentitySpec("EMA", ("21",), "close"), IdentitySpec("EMA", ("21",)))
+_RSI = (IdentitySpec("RSI", ("14",)), IdentitySpec("RSI"))
+_ATR = (IdentitySpec("ATR", ("14",)), IdentitySpec("ATR"))
 
 # FF-NAME Task 2.4：L6 meta 欄名＝`meta_meta_<indicator>`（未標記形；落盤 `meta_<tf>_meta_<indicator>`）
 _TREND_MOMENTUM = format_feature_name(build_identity("meta", "meta", "trend-momentum"))
@@ -37,9 +48,9 @@ class InteractionFeatureEngine:
         index = raw.index if not raw.empty else layer1.index
         frames: list[pd.Series] = []
 
-        ema_fast = self._find_column(layer1, ["close_trend_EMA_8", "EMA_8"])
-        ema_slow = self._find_column(layer1, ["close_trend_EMA_21", "EMA_21"])
-        rsi = self._find_column(layer1, ["RSI_14", "RSI"])
+        ema_fast = self._find_column(layer1, _EMA_FAST)
+        ema_slow = self._find_column(layer1, _EMA_SLOW)
+        rsi = self._find_column(layer1, _RSI)
 
         if ema_fast is not None and ema_slow is not None and rsi is not None:
             trend_strength = (ema_fast - ema_slow) / ema_slow.replace(0, np.nan)
@@ -48,7 +59,7 @@ class InteractionFeatureEngine:
             interaction.name = _TREND_MOMENTUM
             frames.append(interaction)
 
-        atr = self._find_column(layer1, ["ATR_14", "ATR"])
+        atr = self._find_column(layer1, _ATR)
         if atr is not None and "close" in raw.columns:
             direction = np.sign(raw["close"].pct_change())
             volatility_direction = atr * direction
@@ -68,12 +79,7 @@ class InteractionFeatureEngine:
         return pd.concat(frames, axis=1)
 
     @staticmethod
-    def _find_column(df: pd.DataFrame, candidates: Iterable[str]) -> Optional[pd.Series]:
-        for candidate in candidates:
-            if candidate in df.columns:
-                return df[candidate]
-        for candidate in candidates:
-            matches = [col for col in df.columns if candidate in col]
-            if matches:
-                return df[matches[0]]
-        return None
+    def _find_column(df: pd.DataFrame, candidates: Iterable[IdentitySpec]) -> Optional[pd.Series]:
+        """依身分條件之優先序取第一個相符之 L1 欄（FF-NAME Task 3.2；不以子字串比對）。"""
+        column = find_identity_column(df.columns, candidates)
+        return None if column is None else df[column]

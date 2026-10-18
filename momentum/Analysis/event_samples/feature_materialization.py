@@ -73,8 +73,8 @@ def materialize_features_at_decision(
         )
         ch = res.metadata["config_hash"]
         config_hashes[f"{symbol}:{tf}"] = ch
-        art = reader._get_v2_artifact(reader._resolve_manifest_v2(symbol=symbol, tf=tf, config_hash=ch, artifact_kind="raw")[0], "raw")
-        cols = sorted({c for gi in art.get("groups", {}).values() for c in gi.get("columns", [])})
+        # FF-NAME Task 3.4：欄清單與矩陣皆經 FeatureReader 公開方法（manifest 共同邊界含命名世代閘）
+        cols = sorted(set(reader.list_features_v2(symbol, tf, ch, artifact_kind="raw")))
         if not cols:
             raise ValueError(f"materialize: {symbol}/{tf} 無特徵欄（config_override={feature_config.get('config_override')}）")
         df = reader.load_columns_v2(symbol, tf, ch, cols, "raw")

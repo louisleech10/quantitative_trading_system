@@ -322,7 +322,9 @@ class ICEngine:
         from momentum.factories import get_memory_budget  # R2：跨域經 factory 取 IMemoryBudget（呼叫時解析）
 
         budget = get_memory_budget()
-        for group_name, parquet_path in self._iter_l7_raw_group_paths(base_dir, raw_artifact):
+        self._iter_l7_raw_group_paths(base_dir, raw_artifact)  # 群組路徑安全預檢（不讀檔；不安全／缺路徑 ⇒ ICReadError）
+
+        def _before_group_read(group_name: str, _group_info: Dict[str, Any]) -> None:
             # ICFIRSTALIGN Task 4.2：群組讀回前之配置前預算判定（讀檔＋轉型；受保護 run 外為單行程模式）
             budget.check_estimate(
                 "IC.group_read",
@@ -330,14 +332,18 @@ class ICEngine:
                  "group_cols": len((groups_meta.get(group_name) or {}).get("columns") or [])},
                 label=f"IC.group_read:{group_name}",
             )
-            try:
-                group_df = pd.read_parquet(parquet_path)
-            except Exception as exc:
-                if not allow_partial_ic:
-                    raise ICReadError(f"Failed to read L7 raw group {group_name}: {parquet_path}") from exc
-                skipped_groups.append(str(parquet_path))
-                logger.warning("[IC-First] skipped corrupted group: %s", parquet_path)
-                continue
+
+        def _on_group_read_error(group_name: str, parquet_path: Path, exc: Exception) -> None:
+            if not allow_partial_ic:
+                raise ICReadError(f"Failed to read L7 raw group {group_name}: {parquet_path}") from exc
+            skipped_groups.append(str(parquet_path))
+            logger.warning("[IC-First] skipped corrupted group: %s", parquet_path)
+
+        # FF-NAME Task 3.4：群組只經 FeatureReader 讀取（manifest 共同邊界含命名世代閘）；依群組名排序同改前
+        for group_name, group_df in feature_reader.stream_groups_v2(
+            symbol, tf, config_hash, artifact_kind="raw", consumer="strict", allow_partial=allow_partial_ic,
+            sort_groups=True, before_read=_before_group_read, on_read_error=_on_group_read_error,
+        ):
             group_df = self._attach_row_index(group_df, row_index)
 
             try:

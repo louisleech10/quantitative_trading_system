@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from api.services import ic_analysis_service as svc_mod
 from momentum.factories import resolve_run_feature_count
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
 
 client = TestClient(app)
 API = "/api/v1/ic"
@@ -192,6 +193,7 @@ def test_gap3_ic_progress_fields_hermetic_implicit_latest_and_full_analysis_task
 
     features_h5 = tmp_path / "features.h5"
     with _h5py_pf.File(str(features_h5), "w") as handle:
+        _stamp_ic_handoff(handle.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         handle.create_dataset("features", data=[[0.0] * 77] * 3)
     monkeypatch.setattr(service, "_start_background_coroutine", lambda factory: None)
 

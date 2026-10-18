@@ -83,6 +83,7 @@ def test_feature_library_load_success() -> None:
 
     mock_reader = MagicMock()
     mock_reader.load_manifest_v2.return_value = {"run_status": "complete"}
+    mock_reader.load_run_manifest_v2.return_value = {"run_status": "complete", "feature_naming_version": 2}  # FF-NAME 3.4
     mock_reader.list_features_v2.return_value = ["feat_a"]
     mock_reader.load_columns_v2.return_value = pd.DataFrame({"feat_a": [1.0, 2.0]})
     mock_reader.load_row_index_v2.return_value = None
@@ -127,6 +128,7 @@ def test_feature_library_load_multi_raises_on_any_missing() -> None:
 
     mock_reader = MagicMock()
     mock_reader.load_manifest_v2.return_value = {"run_status": "complete"}
+    mock_reader.load_run_manifest_v2.return_value = {"run_status": "complete", "feature_naming_version": 2}  # FF-NAME 3.4
     mock_reader.list_features_v2.return_value = ["f"]
     mock_reader.load_columns_v2.return_value = pd.DataFrame({"f": [1.0]})
     mock_reader.load_row_index_v2.return_value = None

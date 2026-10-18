@@ -15,6 +15,7 @@ from api.models.feature_factory_models import (
     BatchQualityResponse,
     BatchResumeResponse,
     BatchTaskStatusResponse,
+    BrowseFeaturesResponse,
     BatchToggleRequest,
     FeatureGenerateRequest,
     FeaturePreviewRequest,
@@ -653,7 +654,13 @@ async def list_available_browse_tasks():
 
 
 
-@router.get("/browse/{task_id}/features")
+# FF-NAME Task 3.3：回應型別以 BrowseFeaturesResponse 宣告於 OpenAPI；不做逐列 runtime 驗證（names 等級可達數十萬列，
+# 實測 10 萬列之 pydantic 驗證＋序列化約 1.9 秒，倍於描述計算本身）
+@router.get(
+    "/browse/{task_id}/features",
+    response_model=None,
+    responses={200: {"model": BrowseFeaturesResponse, "description": "features 每列帶 descriptor（FF-NAME Task 3.3）"}},
+)
 async def browse_features(
     task_id: str,
     offset: int = Query(0, ge=0),

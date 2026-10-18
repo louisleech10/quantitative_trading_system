@@ -32,6 +32,7 @@ import {
 } from '@/lib/types';
 import { normalizeWarmupInsufficient } from '@/lib/warmupInsufficient';
 import { httpErrorMessage } from '@/lib/httpError';
+import { buildFeatureDescriptorMap, type FeatureDescriptorMap, type FeatureDescriptorSourceRow } from '@/lib/featureDescriptorMap';
 
 type BatchConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
 type BatchPayload = Partial<BatchTaskStatus> & Record<string, unknown>;
@@ -72,6 +73,9 @@ interface FeatureFactoryState {
   // Complete feature-name catalog per task. Shared by all explorer tabs so
   // segment filters show the same complete options everywhere.
   explorerFeatureNamesByTask: Record<string, string[]>;
+  // FF-NAME Task 3.3：共享欄名描述 map（欄名為鍵，描述由後端 parser 供給）；元件一律經 useFeatureDescriptor 查，
+  // 查無即 unsupported，前端不解析欄名字串。
+  featureDescriptorMapByTask: Record<string, FeatureDescriptorMap>;
   // Per-task L7 validation summary cache. Persisted to localStorage so the
   // KPI cards survive page reloads when browsing historical tasks.
   validationSummaryByTask: Record<string, FeatureValidationSummary>;
@@ -157,7 +161,8 @@ interface FeatureFactoryState {
   clearExplorerSummaryForTask: (taskId: string) => void;
   pushExplorerRecentTask: (taskId: string) => void;
   removeExplorerRecentTask: (taskId: string) => void;
-  setExplorerFeatureNamesForTask: (taskId: string, featureNames: string[]) => void;
+  setExplorerFeatureNamesForTask: (taskId: string, rows: ReadonlyArray<FeatureDescriptorSourceRow>) => void;
+  mergeFeatureDescriptorsForTask: (taskId: string, rows: ReadonlyArray<FeatureDescriptorSourceRow>) => void;
   setValidationSummaryForTask: (taskId: string, summary: FeatureValidationSummary) => void;
   setBatchTask: (task: BatchTaskStatus | null) => void;
   applyBatchEvent: (payload: BatchPayload) => void;
@@ -524,6 +529,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   explorerSummary: null,
   explorerSummaryByTask: {},
   explorerFeatureNamesByTask: {},
+  featureDescriptorMapByTask: {},
   validationSummaryByTask:
     typeof window !== 'undefined'
       ? (() => {
@@ -920,16 +926,32 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       delete summaries[taskId];
       const featureNames = { ...state.explorerFeatureNamesByTask };
       delete featureNames[taskId];
+      const descriptorMaps = { ...state.featureDescriptorMapByTask };
+      delete descriptorMaps[taskId];
       const validationSummaries = { ...state.validationSummaryByTask };
       delete validationSummaries[taskId];
       try {
         window.localStorage.setItem('ff:validationSummaryByTask', JSON.stringify(validationSummaries));
       } catch { /* ignore */ }
-      return { explorerRecentTasks: next, explorerSummaryByTask: summaries, explorerFeatureNamesByTask: featureNames, validationSummaryByTask: validationSummaries };
+      return { explorerRecentTasks: next, explorerSummaryByTask: summaries, explorerFeatureNamesByTask: featureNames, featureDescriptorMapByTask: descriptorMaps, validationSummaryByTask: validationSummaries };
     }),
-  setExplorerFeatureNamesForTask: (taskId, featureNames) =>
+  setExplorerFeatureNamesForTask: (taskId, rows) =>
     set((state) => ({
-      explorerFeatureNamesByTask: { ...state.explorerFeatureNamesByTask, [taskId]: featureNames },
+      explorerFeatureNamesByTask: {
+        ...state.explorerFeatureNamesByTask,
+        [taskId]: rows.map((row) => row.name).filter((name) => typeof name === 'string' && name.length > 0),
+      },
+      featureDescriptorMapByTask: {
+        ...state.featureDescriptorMapByTask,
+        [taskId]: buildFeatureDescriptorMap(rows, state.featureDescriptorMapByTask[taskId]),
+      },
+    })),
+  mergeFeatureDescriptorsForTask: (taskId, rows) =>
+    set((state) => ({
+      featureDescriptorMapByTask: {
+        ...state.featureDescriptorMapByTask,
+        [taskId]: buildFeatureDescriptorMap(rows, state.featureDescriptorMapByTask[taskId]),
+      },
     })),
   setValidationSummaryForTask: (taskId, summary) =>
     set((state) => {

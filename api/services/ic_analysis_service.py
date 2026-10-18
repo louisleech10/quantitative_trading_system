@@ -28,6 +28,8 @@ from api.models.ic_models import (
     ICResultV2Response,
 )
 from momentum.factories import (
+    assert_h5_feature_naming_version,
+    stamp_h5_feature_naming_version,
     create_feature_library,
     create_feature_preprocessor,
     create_feature_reader,
@@ -36,6 +38,7 @@ from momentum.factories import (
     create_ic_reporter,
     create_kline_storage_manager,
     create_post_ic_transform_config,
+    feature_naming_version_error_type,
     ratio_unsafe_category,
     resolve_run_feature_count,
     sanitize_factor_returns,
@@ -2960,18 +2963,15 @@ class ICAnalysisService:
         features_path: Optional[str],
         config_hash: Optional[str] = None,
     ):
-        """Load feature DataFrame from FeatureLibrary (symbol/timeframe) or HDF5 path."""
-        import pandas as pd
+        """Load feature DataFrame from FeatureLibrary（symbol/timeframe 或 canonical run 之特徵路徑）。
 
+        FF-NAME Task 3.4：`features_path` 一律先解析為 canonical run（特徵根下 `<symbol>/<timeframe>/<config_hash>/`
+        或其 manifest，且 registry 有條目）再經 FeatureLibrary／FeatureReader 載入；任意 `.parquet`／`.h5` 路徑
+        退路已移除（解析失敗即於產生任何 DataFrame 前拒收）。命名世代不符之例外原樣上拋，不轉為後備。
+        """
         if features_path:
-            p = Path(features_path)
-            if not p.exists():
-                raise FileNotFoundError(f"Features path not found: {features_path}")
-            if features_path.endswith(".h5") or features_path.endswith(".hdf5"):
-                return pd.read_hdf(features_path)
-            if features_path.endswith(".parquet"):
-                return pd.read_parquet(features_path)
-            raise ValueError(f"Unsupported features file format: {features_path}")
+            self._feature_library.reload_registry()
+            return self._feature_library.load_canonical_path(features_path)
 
         if symbol and timeframe:
             try:
@@ -2981,7 +2981,9 @@ class ICAnalysisService:
                     config_hash=config_hash,
                 )
             except Exception as exc:
-                logger.warning("[apply_transforms] FeatureLibrary.load failed: %s; trying path fallback", exc)
+                if isinstance(exc, feature_naming_version_error_type()):
+                    raise
+                logger.warning("[apply_transforms] FeatureLibrary.load failed: %s", exc)
 
         raise ValueError(
             "Cannot load features: no symbol/timeframe or features_path stored in task. "
@@ -3289,7 +3291,7 @@ class ICAnalysisService:
         h5_path = cache_dir / f"{safe_key}.h5"
         meta_path = cache_dir / f"{safe_key}_meta.json"
 
-        if not h5_path.exists():
+        if not h5_path.exists() or not self._ic_handoff_h5_current(h5_path):
             self._write_features_h5(h5_path, symbol, timeframe, features_df)
         if not meta_path.exists():
             meta_payload = self._build_ic_metadata_from_run(
@@ -3303,6 +3305,19 @@ class ICAnalysisService:
                 encoding="utf-8",
             )
         return str(h5_path.resolve()), str(meta_path.resolve())
+
+    @staticmethod
+    def _ic_handoff_h5_current(path: Path) -> bool:
+        """既有 IC 交接 h5 快取是否帶現行命名世代（FF-NAME Task 3.4 v18；缺／舊 ⇒ False，呼叫端以已過閘之
+        FeatureLibrary 資料重寫，不沿用舊世代快取）。只讀根屬性，不讀矩陣。"""
+        try:
+            with h5py.File(str(path), "r") as handle:
+                assert_h5_feature_naming_version(handle.attrs, path)
+        except feature_naming_version_error_type():
+            return False
+        except OSError:
+            return False
+        return True
 
     @staticmethod
     def _write_features_h5(
@@ -3321,6 +3336,8 @@ class ICAnalysisService:
             timestamps = np.arange(len(features_df), dtype=np.int64)
 
         with h5py.File(path, "w") as file:
+            # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性＝寫入資料之命名世代（資料來自已過世代閘之 FeatureLibrary）
+            stamp_h5_feature_naming_version(file.attrs)
             group = file.create_group(group_key)
             group.create_dataset(
                 "features",

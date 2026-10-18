@@ -188,7 +188,7 @@ def test_registry_list_by_timeframe(tmp_path: Path):
 
 
 def test_registry_all_column_names_order(tmp_path: Path):
-    """T2.8: all_column_names() 應符合 Canonical Column Order。"""
+    """T2.8: all_column_names() 應符合 Canonical Column Order（FF-NAME Task 3.1：排序鍵由 parse 之身分導出，欄名為文法形）。"""
     registry = ColumnGroupRegistry(work_dir=tmp_path)
 
     group_l2_12h = _make_group(
@@ -198,8 +198,8 @@ def test_registry_all_column_names_order(tmp_path: Path):
         data_source="close",
         indicator="RSI",
         columns=(
-            "close_12h_momentum_RSI_21_ratio",
-            "close_12h_momentum_RSI_5_ratio",
+            "close_12h_momentum_RSI_21_Distance",
+            "close_12h_momentum_RSI_5_Distance",
         ),
         shape=(10, 2),
     )
@@ -210,8 +210,8 @@ def test_registry_all_column_names_order(tmp_path: Path):
         data_source="close",
         indicator="EMA",
         columns=(
-            "close_1h_trend_EMA_21_std",
-            "close_1h_trend_EMA_5_mean",
+            "close_1h_trend_EMA_21_Std-W3",
+            "close_1h_trend_EMA_5_Mean-W3",
         ),
         shape=(10, 2),
     )
@@ -234,10 +234,10 @@ def test_registry_all_column_names_order(tmp_path: Path):
 
     assert registry.all_column_names() == [
         "close_1h_trend_ADX_14",
-        "close_1h_trend_EMA_5_mean",
-        "close_1h_trend_EMA_21_std",
-        "close_12h_momentum_RSI_5_ratio",
-        "close_12h_momentum_RSI_21_ratio",
+        "close_1h_trend_EMA_5_Mean-W3",
+        "close_1h_trend_EMA_21_Std-W3",
+        "close_12h_momentum_RSI_5_Distance",
+        "close_12h_momentum_RSI_21_Distance",
         "label_next_1h",
     ]
 

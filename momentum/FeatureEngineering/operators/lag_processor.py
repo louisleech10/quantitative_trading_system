@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Mapping, Optional
 import fnmatch
 import re
 
@@ -45,7 +45,13 @@ class LagProcessor:
             "FFACT_LAYER4_FAST_PATH_MAX_COLS", 200_000
         )
 
-    def compute_all(self, features_df: pd.DataFrame) -> pd.DataFrame:
+    def compute_all(
+        self,
+        features_df: pd.DataFrame,
+        column_layers: Optional[Mapping[str, str]] = None,
+    ) -> pd.DataFrame:
+        """`column_layers`：欄 → 來源層（`"raw"`＝K 線資料鍵、`"L1"`＝L1 群組欄…；FF-NAME Task 3.2），
+        `apply_to="layer1_and_raw"` 時必填（以層別選欄，不讀欄名）。"""
         if not self._enabled or features_df.empty:
             return pd.DataFrame(index=features_df.index)
 
@@ -57,7 +63,7 @@ class LagProcessor:
         )
         lag_steps = self._normalize_lags(lag_steps)
 
-        columns = self._select_columns(features_df.columns)
+        columns = self._select_columns(features_df.columns, column_layers)
         if not columns or not lag_steps:
             return pd.DataFrame(index=features_df.index)
 
@@ -98,7 +104,12 @@ class LagProcessor:
     def _apply_lag(self, data: pd.DataFrame, lag: int) -> pd.DataFrame:
         return data.shift(lag)
 
-    def _select_columns(self, columns: List[str]) -> List[str]:
+    def _select_columns(self, columns: List[str], column_layers: Optional[Mapping[str, str]] = None) -> List[str]:
+        if self._apply_to == "layer1_and_raw" and column_layers is None:
+            raise ValueError(
+                "lag_features.apply_to='layer1_and_raw' 須由呼叫端提供欄之來源層（column_layers）；"
+                "不以欄名推斷層別（FF-NAME Task 3.2）"
+            )
         selected = []
         for col in columns:
             if self._is_excluded(col):
@@ -107,7 +118,7 @@ class LagProcessor:
                 selected.append(col)
                 continue
             if self._apply_to == "layer1_and_raw":
-                if self._is_layer1_or_raw(col):
+                if self._is_layer1_or_raw(str(col), column_layers):
                     selected.append(col)
                 continue
             if isinstance(self._apply_to, list):
@@ -136,11 +147,12 @@ class LagProcessor:
         except FeatureNameParseError:
             return None
 
-    def _is_layer1_or_raw(self, col: str) -> bool:
-        """`layer1_and_raw` 之選欄（FF-NAME §G ⑥）：由身分判層——L1（kind＝atomic）或 raw 資料鍵（非特徵文法）。
-        取代改前之欄名子字串黑名單（該黑名單誤排除 `VolumeMA_Ratio`、`BullishCount_W5` 等 L1 欄）。"""
-        identity = self._identity_or_none(col)
-        return identity is None or identity.kind == "atomic"
+    _LAYER1_OR_RAW = frozenset({"L1", "raw"})
+
+    def _is_layer1_or_raw(self, col: str, column_layers: Mapping[str, str]) -> bool:
+        """`layer1_and_raw` 之選欄（FF-NAME Task 3.2、§G ⑥）：讀呼叫端提供之來源層（L1 群組欄或 raw 資料鍵），
+        不讀欄名子字串或身分推層；取代改前之欄名黑名單（該黑名單誤排除 `VolumeMA_Ratio`、`BullishCount_W5`）。"""
+        return column_layers.get(col) in self._LAYER1_OR_RAW
 
     def _lag_name(self, col: str, lag: int) -> str:
         """L4 欄名（FF-NAME Task 2.4）：特徵欄＝身分＋op `Lag-<k>`；raw 資料鍵＝`<canonical raw>_raw_value_Lag-<k>`。"""

@@ -297,10 +297,9 @@ export default function FeatureExplorer({
     })
       .then((payload) => {
         if (!active) return;
-        const names = payload.features
-          .map((item) => item.name)
-          .filter((name): name is string => typeof name === 'string' && name.length > 0);
-        setExplorerFeatureNamesForTask(taskId, names);
+        // FF-NAME Task 3.3：連同後端描述一併進共享 map（names 與 table 兩種 detail_level 共用同一投影）
+        const rows = payload.features.filter((item) => typeof item.name === 'string' && item.name.length > 0);
+        setExplorerFeatureNamesForTask(taskId, rows);
       })
       .catch(() => {});
 

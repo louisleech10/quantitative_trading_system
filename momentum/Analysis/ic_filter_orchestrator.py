@@ -5819,7 +5819,11 @@ class ICFilterOrchestrator:
         if not Path(features_path).exists():
             raise FileNotFoundError(f"features_path not found: {features_path}")
 
+        from momentum.factories import assert_h5_feature_naming_version
+
         with h5py.File(features_path, "r") as file:
+            # FF-NAME Task 3.4（v18）：IC 交接 h5 於產生任何 DataFrame 前過命名世代閘（缺屬性／舊版 ⇒ 拒）
+            assert_h5_feature_naming_version(file.attrs, features_path)
             group = self._select_first_group(file)
             if group is None:
                 raise InvalidInputError("HDF5 has no groups")

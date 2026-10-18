@@ -390,8 +390,7 @@ def _registry_columns(manifest_path: Path, columns: Dict[str, Dict[str, str]]) -
 
 def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[str, Any]:
     """§G baseline 內容（落盤者讀 L7 V2 parquet 與 manifest；C7 無落盤 ⇒ 回傳結果與 completeness metadata）。"""
-    import pyarrow.parquet as pq
-
+    from momentum.factories import create_feature_reader
     from momentum.FeatureEngineering.feature_storage import COMPLETENESS_FIELD_NAMES, FeatureStorage
 
     md = dict(result.metadata)
@@ -401,9 +400,21 @@ def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[s
     time_parts: List[str] = []
     manifests: Dict[str, Any] = {}
     root = Path(root)
+    views: Dict[Path, Any] = {}
+
+    def _run_view(path: Path) -> Any:
+        """FF-NAME Task 3.4：run 內 parquet 只經 FeatureReader 之 run 檢視（含命名世代閘）讀取；不屬任何 run 者即停。"""
+        run_dir = next((d for d in path.parents if (d / FeatureStorage.L7_V2_MANIFEST_NAME).is_file()), None)
+        if run_dir is None or len(run_dir.parents) < 3:
+            raise FramepathBaselineError(f"{path} 不屬任何 V2 run（無 {FeatureStorage.L7_V2_MANIFEST_NAME}）")
+        if run_dir not in views:
+            reader = create_feature_reader(str(run_dir.parents[2]))
+            views[run_dir] = reader.open_run_v2(run_dir.parent.parent.name, run_dir.parent.name, run_dir.name)
+        return views[run_dir]
+
     for p in sorted(root.rglob("*.parquet")) if root.exists() else []:
         rel = str(p.relative_to(root))
-        table = pq.read_table(p)
+        table = _run_view(p).read_table(p)
         if p.name == "timestamps.parquet":
             time_parts.append(rel + ":" + "|".join(
                 hashlib.sha256(table.column(n).to_numpy(zero_copy_only=False).tobytes()).hexdigest()

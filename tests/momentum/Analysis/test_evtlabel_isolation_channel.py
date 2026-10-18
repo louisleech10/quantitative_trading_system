@@ -19,6 +19,7 @@ from momentum.Analysis.ic_filter_orchestrator import (
     _reject_isolation_in_config_override,
 )
 from momentum.core.contracts import EventIsolationRows
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
 
 
 def _features(n: int) -> pd.DataFrame:
@@ -109,6 +110,7 @@ def _write_ic_inputs(tmp_path, features_df: pd.DataFrame, labels_df: pd.DataFram
     meta_path = tmp_path / "meta.json"
     str_dtype = h5py.string_dtype(encoding="utf-8")
     with h5py.File(features_path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = file.create_group("BTCUSDT/1h")
         group.create_dataset("features", data=features_df.to_numpy(dtype=np.float32))
         group.create_dataset("timestamps", data=features_df.index.to_numpy(dtype=np.int64))

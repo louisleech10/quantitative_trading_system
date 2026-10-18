@@ -482,9 +482,13 @@ def degraded_task_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from api.routes.ic_analysis import router
     from api.services.ic_analysis_service import ic_analysis_service
 
-    features_path = tmp_path / "features_for_transforms.h5"
-    df = pd.DataFrame({"feat_a": [1.0, 2.0, 3.0, 4.0, 5.0]})
-    df.to_hdf(str(features_path), key="features", mode="w")
+    # FF-NAME Task 3.4：apply-transforms 之特徵路徑須為 canonical run（正式 write_raw＋registry；值取真實 kline）
+    from tests.feature_engineering.ffname_helpers import real_slice, write_canonical_run
+
+    kline = real_slice(5, symbol="BTCUSDT", timeframe="1h")
+    df = pd.DataFrame({"feat_a": kline["close"].to_numpy(dtype=float)},
+                      index=pd.DatetimeIndex(kline.index).tz_convert("UTC").tz_localize(None))
+    library, features_path = write_canonical_run(tmp_path / "features", df, "BTCUSDT", "1h", "cfg_la1_degraded")
 
     report = _degraded_report()
     analyzer = _FakeAnalyzer(df)
@@ -496,6 +500,8 @@ def degraded_task_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     original_tasks = dict(ic_analysis_service._tasks)
     original_last = ic_analysis_service._last_task_id
     original_callbacks = dict(ic_analysis_service._callbacks)
+    original_library = ic_analysis_service._feature_library
+    ic_analysis_service._feature_library = library
 
     ic_analysis_service._tasks = {
         _TASK_ID: {
@@ -531,6 +537,7 @@ def degraded_task_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         ic_analysis_service._tasks = original_tasks
         ic_analysis_service._last_task_id = original_last
         ic_analysis_service._callbacks = original_callbacks
+        ic_analysis_service._feature_library = original_library
 
 
 def test_b3_enum01_read_points_fail_closed_reporter_route_service(

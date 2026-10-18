@@ -459,7 +459,7 @@ def test_phase2_l6_dependency_domain_excludes_layer2_runtime():
 
 
 def test_phase2_column_ordering_confirmation(tmp_path):
-    """附加確認: all_column_names() 應維持 Canonical Column Ordering。"""
+    """附加確認: all_column_names() 應維持 Canonical Column Ordering（FF-NAME Task 3.1：排序鍵由 parse 之身分導出，欄名為文法形）。"""
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
 
     registry.register(
@@ -467,7 +467,7 @@ def test_phase2_column_ordering_confirmation(tmp_path):
             group_id="12h_L3_trend_EMA_close",
             layer=LayerSource.L3,
             timeframe="12h",
-            columns=("close_12h_trend_EMA_5_mean",),
+            columns=("close_12h_trend_EMA_5_Mean-W3",),
             indicator="EMA",
             data_source="close",
         )
@@ -477,7 +477,7 @@ def test_phase2_column_ordering_confirmation(tmp_path):
             group_id="1h_L3_trend_EMA_close",
             layer=LayerSource.L3,
             timeframe="1h",
-            columns=("close_1h_trend_EMA_21_std", "close_1h_trend_EMA_5_mean"),
+            columns=("close_1h_trend_EMA_21_Std-W3", "close_1h_trend_EMA_5_Mean-W3"),
             indicator="EMA",
             data_source="close",
         )
@@ -487,7 +487,7 @@ def test_phase2_column_ordering_confirmation(tmp_path):
             group_id="1h_L2_Ratio",
             layer=LayerSource.L2,
             timeframe="1h",
-            columns=("close_1h_momentum_RSI_5_ratio",),
+            columns=("close_1h_momentum_RSI_5_Distance",),
             indicator="Ratio",
             data_source="derived",
         )
@@ -505,9 +505,9 @@ def test_phase2_column_ordering_confirmation(tmp_path):
 
     assert registry.all_column_names() == [
         "close_1h_trend_ADX_14",
-        "close_1h_momentum_RSI_5_ratio",
-        "close_1h_trend_EMA_5_mean",
-        "close_1h_trend_EMA_21_std",
-        "close_12h_trend_EMA_5_mean",
+        "close_1h_momentum_RSI_5_Distance",
+        "close_1h_trend_EMA_5_Mean-W3",
+        "close_1h_trend_EMA_21_Std-W3",
+        "close_12h_trend_EMA_5_Mean-W3",
         "label_next_1h",
     ]

@@ -3,7 +3,7 @@ Consensus meta features — Layer 6 Sub-engines A~D.
 
 設計說明：
   本模組計算四種「共識型」元特徵，將 Layer 1 多個指標整合為單一訊號。
-  所有指標名稱均為 hardcode，透過 _find_column() 模糊比對 Layer 1 DataFrame 欄位。
+  所有指標均為 hardcode 之身分條件（IdentitySpec），透過 _find_column() 以欄名身分精確比對 Layer 1 DataFrame 欄位。
   若 scan_config.yaml 未啟用對應指標，該計算會優雅略過（回傳空 Series）。
 
 選用指標根據（為何是這幾個）：
@@ -25,8 +25,24 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name
+from momentum.FeatureEngineering.feature_naming import (
+    IdentitySpec,
+    build_identity,
+    find_identity_column,
+    format_feature_name,
+)
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
+
+# FF-NAME Task 3.2：L1 輸入以身分精確比對（indicator 相等、第一參數成員相等、可選 source；依序取第一個相符者）
+_EMA_FAST = (IdentitySpec("EMA", ("8",), "close"), IdentitySpec("EMA", ("8",)))
+_EMA_SLOW = (IdentitySpec("EMA", ("21",), "close"), IdentitySpec("EMA", ("21",)))
+_MACD_HIST = (IdentitySpec("MACD-Hist"),)
+_ADX_14 = (IdentitySpec("ADX", ("14",)),)
+_RSI = (IdentitySpec("RSI", ("14",)), IdentitySpec("RSI"))
+_CCI = (IdentitySpec("CCI", ("14",)), IdentitySpec("CCI"))
+_STOCH_SLOWK = (IdentitySpec("STOCH-slowk"),)
+_ATR_14 = (IdentitySpec("ATR", ("14",)),)
+_ATR_55 = (IdentitySpec("ATR", ("55",)),)
 
 # FF-NAME Task 2.4：L6 meta 欄名＝`meta_meta_<indicator>`（未標記形；落盤 `meta_<tf>_meta_<indicator>`）
 _TREND_CONSENSUS = format_feature_name(build_identity("meta", "meta", "trend-consensus"))
@@ -54,10 +70,10 @@ class ConsensusFeatureEngine:
         if layer1.empty:
             return pd.Series(index=index, name=_TREND_CONSENSUS, dtype=float)
 
-        ema_fast = self._find_column(layer1, ["close_trend_EMA_8", "EMA_8"])
-        ema_slow = self._find_column(layer1, ["close_trend_EMA_21", "EMA_21"])
-        macd_hist = self._find_column(layer1, ["MACD-Hist", "MACD_Hist"])
-        adx = self._find_column(layer1, ["ADX_14"])
+        ema_fast = self._find_column(layer1, _EMA_FAST)
+        ema_slow = self._find_column(layer1, _EMA_SLOW)
+        macd_hist = self._find_column(layer1, _MACD_HIST)
+        adx = self._find_column(layer1, _ADX_14)
 
         signals: list[pd.Series] = []
         if ema_fast is not None and ema_slow is not None:
@@ -81,9 +97,9 @@ class ConsensusFeatureEngine:
         if layer1.empty:
             return pd.Series(index=index, name=_MOMENTUM_DIVERGENCE, dtype=float)
 
-        rsi = self._find_column(layer1, ["RSI_14", "RSI"])
-        cci = self._find_column(layer1, ["CCI_14", "CCI"])
-        stoch = self._find_column(layer1, ["STOCH-slowk", "STOCH_slowk", "STOCH"])
+        rsi = self._find_column(layer1, _RSI)
+        cci = self._find_column(layer1, _CCI)
+        stoch = self._find_column(layer1, _STOCH_SLOWK)
 
         series_list = [s for s in [rsi, cci, stoch] if s is not None]
         if len(series_list) < 2:
@@ -115,8 +131,8 @@ class ConsensusFeatureEngine:
         if layer1.empty:
             return pd.Series(index=index, name=_VOLATILITY_REGIME, dtype=float)
 
-        atr_fast = self._find_column(layer1, ["ATR_14"])
-        atr_slow = self._find_column(layer1, ["ATR_55"])
+        atr_fast = self._find_column(layer1, _ATR_14)
+        atr_slow = self._find_column(layer1, _ATR_55)
         if atr_fast is None or atr_slow is None:
             return pd.Series(index=index, name=_VOLATILITY_REGIME, dtype=float)
 
@@ -125,12 +141,7 @@ class ConsensusFeatureEngine:
         return regime
 
     @staticmethod
-    def _find_column(df: pd.DataFrame, candidates: Iterable[str]) -> Optional[pd.Series]:
-        for candidate in candidates:
-            if candidate in df.columns:
-                return df[candidate]
-        for candidate in candidates:
-            matches = [col for col in df.columns if candidate in col]
-            if matches:
-                return df[matches[0]]
-        return None
+    def _find_column(df: pd.DataFrame, candidates: Iterable[IdentitySpec]) -> Optional[pd.Series]:
+        """依身分條件之優先序取第一個相符之 L1 欄（FF-NAME Task 3.2；不以子字串比對）。"""
+        column = find_identity_column(df.columns, candidates)
+        return None if column is None else df[column]

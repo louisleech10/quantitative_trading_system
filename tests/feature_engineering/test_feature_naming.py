@@ -24,7 +24,7 @@ CONTRACT = json.loads((REPO / "tests/_golden/ratiounsafe/contract.json").read_te
 def _pattern_names() -> List[str]:
     cmap = TALibWrapper._CATEGORY_MAP
     l1 = [f"ohlc_pattern_{TALibWrapper.normalize_indicator_name(i)}" for i in cmap["pattern"]]
-    return l1 + [f"{c}_BinarySignal" for c in l1] + [f"{c}_Lag_5" for c in l1]
+    return l1 + [f"{c}_BinarySignal" for c in l1] + [f"{c}_Lag-5" for c in l1]  # FF-NAME 文法之 op 段
 
 
 def _other_names() -> List[str]:
@@ -105,10 +105,19 @@ def test_boundary_03_invalid_timeframe_raises(bad: str) -> None:
         fn.tag_timeframe("close_trend_EMA_8", bad)
 
 
-def test_mutation_strip_identity_breaks_tagged_detection(monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：`strip_timeframe_tag` 恆回原值 ⇒ 帶標記 pattern 名不再被判（共同核心經 strip）。"""
+def test_mutation_untagged_only_parse_breaks_tagged_detection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：共同核心之解析恆以未標記形解析（不辨識週期標記）⇒ 帶標記 pattern 名不再被判
+    （FF-NAME Task 3.1：共同核心改經 `parse_either_form`，原 `strip_timeframe_tag` mutant 之同義版）。"""
     assert fn.is_ratio_unsafe_column("ohlc_12h_pattern_CDLDOJI") is True
-    monkeypatch.setattr(fn, "strip_timeframe_tag", lambda column: column)
+    real_parse = fn.parse_feature_name
+
+    def _untagged_only(column: str):
+        try:
+            return real_parse(str(column), tagged=False)
+        except fn.FeatureNameParseError:
+            return None
+
+    monkeypatch.setattr(fn, "parse_either_form", _untagged_only)
     assert fn.is_ratio_unsafe_column("ohlc_12h_pattern_CDLDOJI") is False
 
 

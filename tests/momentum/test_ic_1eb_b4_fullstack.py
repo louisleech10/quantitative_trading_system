@@ -28,6 +28,7 @@ from momentum.Analysis.ic_filter_orchestrator import (
 )
 from momentum.Analysis.ic_reporter import ICReporter
 from momentum.Analysis.statistical_validator import apply_fdr
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -144,6 +145,7 @@ def _tier_payload(
 def _write_features_h5(path: Path, features_df: pd.DataFrame) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = file.create_group("BTCUSDT/12h")
         group.create_dataset(
             "features",

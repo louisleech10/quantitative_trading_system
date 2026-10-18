@@ -25,6 +25,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
+
 from momentum.Analysis.binary_discrimination import block_ids_for_events, mann_whitney_table
 from momentum.core.contracts import (
     AlignmentViolationError,
@@ -99,6 +101,7 @@ def _write_pipeline_inputs(tmp_path: Path, case) -> tuple[str, str, str, dict]:
     str_dtype = h5py.string_dtype(encoding="utf-8")
     fp, lp, mp = tmp_path / "features.h5", tmp_path / "labels.h5", tmp_path / "meta.json"
     with h5py.File(fp, "w") as f:
+        _stamp_ic_handoff(f.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         g = f.create_group(f"{SYMBOL}/12h")
         g.create_dataset("features", data=np.column_stack([planted_full, noise_full]))
         g.create_dataset("timestamps", data=sec)

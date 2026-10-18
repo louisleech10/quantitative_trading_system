@@ -6,7 +6,7 @@ Pydantic models for Feature Factory endpoints.
 import re
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from api.core.logging import get_logger
 from momentum.FeatureEngineering.feature_config import SUPPORTED_TIMEFRAMES
@@ -146,6 +146,43 @@ class RunInfo(BaseModel):
     warmup_insufficient_count: Optional[int] = None
     #: 未填起始日且開平穩化：每欄前 N 個穩定值保留供校準、不輸出
     calibration_rows_withheld: Optional[bool] = None
+
+
+class FeatureDescriptor(BaseModel):
+    """欄名之版本化描述（FF-NAME Task 3.3；由 `feature_naming.feature_descriptor` 於請求時算出、不落盤）。
+
+    合法名：version／kind／source／tf／category／indicator／params／ops／display；不合文法：
+    version／kind＝"unsupported"／error（例外類別名）／display（前端 fail-closed）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int
+    kind: str
+    display: str
+    source: Optional[str] = None
+    tf: Optional[str] = None
+    category: Optional[str] = None
+    indicator: Optional[str] = None
+    params: Optional[List[List[str]]] = None
+    ops: Optional[List[str]] = None
+    error: Optional[str] = None
+
+
+class BrowseFeatureRow(BaseModel):
+    """瀏覽投影之一列（`names`／`table`／`full` 共用；其餘統計欄依 detail_level 而定）。"""
+
+    model_config = ConfigDict(extra="allow")
+
+    name: str
+    descriptor: FeatureDescriptor
+
+
+class BrowseFeaturesResponse(BaseModel):
+    """`GET /browse/{task_id}/features` 回應（features 每列必帶 descriptor）。"""
+
+    model_config = ConfigDict(extra="allow")
+
+    features: List[BrowseFeatureRow]
 
 
 class EnsureBrowseResponse(BaseModel):

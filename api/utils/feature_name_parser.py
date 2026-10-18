@@ -1,68 +1,50 @@
-"""Feature name parsing utilities.
+"""Feature name parsing utilities（FF-NAME Task 3.1）.
 
-Stateless helpers for inferring category, pipeline layer, and difficulty
-level from 7-segment feature names.  Extracted from
-``FeatureExportService`` to eliminate cross-service coupling (Rule 4).
+欄名語意一律由 `parse_feature_name`（`momentum/FeatureEngineering/feature_naming.py`，經 `momentum.factories`
+取用）決定；本模組只把身分投影為 API 之 category／layer／level，不保留任何子字串或正則啟發式。
+
+非特徵名具名回傳、不落入 other：`label_*` ⇒ `label`；其餘不合文法者（raw kline 欄、舊世代欄名等）⇒
+`unsupported`（fail-closed，不猜）。
 """
 
 from __future__ import annotations
 
-import re
-from typing import Dict
+from typing import Any, Dict, Optional, Tuple
+
+from momentum.factories import feature_layer_of, feature_name_errors, parse_feature_name
 
 # ── Constants ────────────────────────────────────────────────
 
 LEVEL_CATEGORY_MAP: Dict[str, list] = {
     "L1_basic": ["trend", "momentum", "volatility", "volume"],
-    "L2_intermediate": ["statistics", "cycle", "pattern", "tail_risk"],
+    "L2_intermediate": ["statistics", "cycle", "pattern", "tail-risk"],
     "L3_advanced": ["microstructure", "entropy"],
 }
 
-# Compiled once at module level — matches any Layer 2 derived-operator suffix.
-_LAYER2_RE = re.compile(
-    r"_(Cross|Ratio|Distance|SignedStrength|Sign|Log1p|Abs|Clip)$"
-    r"|_Momentum_L\d+$"
-    r"|_(TsArgmax|TsArgmin|TsRank|DecayLinear)_W\d+$"
-    r"|_TsCorr_.+_W\d+$"
-    r"|_BinarySignal"
-)
+LABEL_CATEGORY = "label"
+LABEL_LAYER = "label"
+UNSUPPORTED = "unsupported"
+
+
+def _identity(feature_name: str) -> Tuple[Optional[Any], Optional[str]]:
+    """欄名 → (身分, None)；label ⇒ (None, "label")；不合文法 ⇒ (None, "unsupported")。"""
+    parse_error, label_error = feature_name_errors()
+    try:
+        return parse_feature_name(str(feature_name)), None
+    except label_error:
+        return None, LABEL_CATEGORY
+    except parse_error:
+        return None, UNSUPPORTED
 
 
 # ── Public API ───────────────────────────────────────────────
 
 def infer_category(feature_name: str) -> str:
-    """Infer high-level feature category from the name prefix/infix."""
-    if feature_name.startswith("ms_"):
-        return "microstructure"
-    if feature_name.startswith("ent_"):
-        return "entropy"
-    if feature_name.startswith("tr_"):
-        return "tail_risk"
-    if (
-        feature_name.startswith("close_trend_")
-        or feature_name.startswith("volume_trend_")
-        or "_trend_" in feature_name
-    ):
-        return "trend"
-    if "_momentum_" in feature_name:
-        return "momentum"
-    if "_volatility_" in feature_name:
-        return "volatility"
-    if "_volume_" in feature_name:
-        return "volume"
-    if "_cycle_" in feature_name:
-        return "cycle"
-    if "_pattern_" in feature_name:
-        return "pattern"
-    if (
-        "_statistics_" in feature_name
-        or "_stats_" in feature_name
-        or "_stat_" in feature_name
-    ):
-        return "statistics"
-    if feature_name.startswith("meta_"):
-        return "meta"
-    return "other"
+    """欄名之 category＝`parse_feature_name(name).category`；label ⇒ `label`；不合文法 ⇒ `unsupported`。"""
+    identity, named = _identity(feature_name)
+    if identity is None:
+        return str(named)
+    return str(identity.category)
 
 
 def infer_level(category: str) -> str:
@@ -74,32 +56,8 @@ def infer_level(category: str) -> str:
 
 
 def infer_layer(feature_name: str) -> str:
-    """Determine the pipeline layer that produced this feature.
-
-    Detection order reflects pipeline depth — outermost transform wins.
-    """
-    # Layer 6.5: preprocessing — _rank/_gaussian/_zscore_{n}
-    if feature_name.endswith("_rank") or feature_name.endswith("_gaussian"):
-        return "layer6_5"
-    if re.search(r"_zscore_\d+$", feature_name):
-        return "layer6_5"
-    # Layer 6: meta features
-    if feature_name.startswith("meta_"):
-        return "layer6"
-    # Layer 5: cross-sectional features
-    if feature_name.startswith("cs_"):
-        return "layer5"
-    # Layer 4: lag — suffix _Lag_{n}
-    if "_Lag_" in feature_name:
-        return "layer4"
-    # Layer 3: rolling aggregation — suffix _{Agg}_W{n}
-    if re.search(
-        r"_(Mean|Std|Min|Max|Range|Slope|Rank|ZScore|Skew|Kurt)_W\d+$",
-        feature_name,
-    ):
-        return "layer3"
-    # Layer 2: derived operators
-    if _LAYER2_RE.search(feature_name):
-        return "layer2"
-    # Layer 1: atomic indicators (fallback)
-    return "layer1"
+    """欄名之管線層由身分之最外層 op 導出（`feature_naming.feature_layer`）；label ⇒ `label`；不合文法 ⇒ `unsupported`。"""
+    identity, named = _identity(feature_name)
+    if identity is None:
+        return LABEL_LAYER if named == LABEL_CATEGORY else UNSUPPORTED
+    return feature_layer_of(identity)

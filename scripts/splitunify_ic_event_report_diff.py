@@ -66,6 +66,21 @@ _FEATURES_DIR = REPO / "data_cache/features"
 _SUBSET_EXTRA = 25
 
 
+def _feature_reader():
+    """特徵根 `_FEATURES_DIR` 之 FeatureReader（FF-NAME Task 3.4：run 內檔案只經它讀取）。"""
+    from momentum.factories import create_feature_reader
+
+    return create_feature_reader(str(_FEATURES_DIR))
+
+
+def _run_post_trim_index(reader, symbol: str, run_tf: str, ff_run: str):
+    """run 之 raw 時間軸（`load_row_index_v2`）；未宣告 ⇒ SystemExit（不猜）。"""
+    index = reader.load_row_index_v2(symbol, run_tf, ff_run, artifact_kind="raw")
+    if index is None:
+        raise SystemExit(f"ERROR: FF run {symbol}/{run_tf}/{ff_run} 未宣告時間軸 sidecar")
+    return index
+
+
 def _materialize_named_subset(service, symbol: str, run_tf: str, ff_run: str, run_dir: Path):
     """以**生產端** `_write_features_h5`／`_build_ic_metadata_from_run` 物化一組**具名子集**。
 
@@ -78,21 +93,24 @@ def _materialize_named_subset(service, symbol: str, run_tf: str, ff_run: str, ru
     """
     import pandas as _pd
 
-    ts = _pd.read_parquet(run_dir / "timestamps.parquet")["timestamp"].to_numpy()
-    index = _pd.to_datetime(ts.astype("int64") * 1000, unit="ms")
+    # FF-NAME Task 3.4：時間軸與群組欄只經 FeatureReader（manifest 共同邊界含命名世代閘）
+    reader = _feature_reader()
+    index = _run_post_trim_index(reader, symbol, run_tf, ff_run)
+    groups = reader.load_run_manifest_v2(symbol, run_tf, ff_run).get("artifacts", {}).get("raw", {}).get("groups", {})
     names: List[str] = list(_IC_FEATURES)
-    for p in sorted((run_dir / "raw").glob("*_L1_*.parquet")):
+    for gid in sorted(g for g in groups if "_L1_" in g):
         if len(names) >= len(_IC_FEATURES) + _SUBSET_EXTRA:
             break
-        if p.stem not in names:
-            names.append(p.stem)
-    cols: Dict[str, Any] = {}
+        if gid not in names:
+            names.append(gid)
+    first_col: Dict[str, str] = {}
     for n in names:
-        f = run_dir / "raw" / f"{n}.parquet"
-        if not f.is_file():
-            raise SystemExit(f"ERROR: 子集缺特徵 parquet {f}（不得靜默略過）")
-        c = _pd.read_parquet(f)
-        cols[n] = c[c.columns[0]].to_numpy().astype(np.float64)
+        group_cols = list((groups.get(n) or {}).get("columns") or [])
+        if not group_cols:
+            raise SystemExit(f"ERROR: 子集缺特徵群組 {n}（{run_dir}；不得靜默略過）")
+        first_col[n] = str(group_cols[0])
+    frame = reader.load_columns_v2(symbol, run_tf, ff_run, list(first_col.values()), artifact_kind="raw")
+    cols: Dict[str, Any] = {n: frame[c].to_numpy().astype(np.float64) for n, c in first_col.items()}
     feats = _pd.DataFrame(cols, index=index)
 
     from api.services.ic_analysis_service import ICAnalysisService
@@ -365,8 +383,7 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
     iso_window = int(staged["label_window_rows"])
     iso_depth = int(staged["lookahead_depth_rows"])
 
-    ts = pd.read_parquet(run_dir / "timestamps.parquet")["timestamp"].to_numpy().astype(np.int64) * 1000
-    feat_index = pd.to_datetime(ts, unit="ms")
+    feat_index = pd.DatetimeIndex(_run_post_trim_index(_feature_reader(), symbol, run_tf, ff_run))
     # 🔴 B10A 閉合輪 `CODEX-R31-P1-02`：邊界**不得**在腳本內自算（原本寫死 oos_test_size=0.2，
     #    生產端 builder 被改也不會紅）。改為呼叫**生產端**之 `_build_holdout_split_plan`，
     #    切分參數取自生產端之 `load_ic_config`（含 `config_override`），embargo 由 service

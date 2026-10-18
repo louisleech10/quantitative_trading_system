@@ -16,6 +16,8 @@ from typing import Iterable
 
 import pandas as pd
 
+from momentum.FeatureEngineering.feature_naming import canonical_segment, parse_either_form
+
 
 # ─── TA-Lib 全部 61 個 CDL Pattern 指標名稱（來自 scan_config.yaml pattern 段）
 CDL_PATTERN_NAMES: frozenset[str] = frozenset({
@@ -83,25 +85,19 @@ CDL_PATTERN_NAMES: frozenset[str] = frozenset({
 })
 
 
-def _matches_cdl_pattern_all(column_name: str) -> bool:
-    """Column name 是否含任一 CDL pattern 名稱？"""
-    for cdl in CDL_PATTERN_NAMES:
-        if cdl in column_name:
-            return True
-    return False
+CDL_PATTERN_ALL = "CDL_PATTERN_ALL"
 
 
 def expand_blacklist_patterns(
     patterns: Iterable[str],
     columns: Iterable[str],
 ) -> frozenset[str]:
-    """展開 pattern aliases 到實際命中 columns 中的具體欄位名稱集合。
+    """展開黑名單 pattern 到實際命中 columns 中的具體欄位名稱集合（FF-NAME Task 3.2：比對 parse 後之 indicator）。
 
-    支援的 alias：
-        - 'CDL_PATTERN_ALL'：命中任何含 CDL_PATTERN_NAMES 中名稱的欄位
-        - 'HT_DCPHASE'：命中任何含 'HT_DCPHASE' substring 的欄位
-
-    其他 pattern 走通用 substring match。
+    - 'CDL_PATTERN_ALL'：欄之 indicator 屬 `CDL_PATTERN_NAMES`
+    - 其他 pattern（如 'HT-DCPHASE'）：欄之 indicator 等於 `canonical_segment(pattern)`（精確相等；
+      `ATR` 不命中 `NATR`）
+    皆不論該欄之 op（L1 欄與其下游衍生欄同被攔）；不合特徵文法之欄（raw 資料鍵、label）不命中。
 
     Args:
         patterns: 黑名單 pattern 列表
@@ -117,17 +113,14 @@ def expand_blacklist_patterns(
     if not pattern_list:
         return frozenset()
 
+    targets = {canonical_segment(p) for p in pattern_list if p != CDL_PATTERN_ALL}
+    if CDL_PATTERN_ALL in pattern_list:
+        targets |= CDL_PATTERN_NAMES
     matched: set[str] = set()
-    for pat in pattern_list:
-        if pat == "CDL_PATTERN_ALL":
-            for col in cols_list:
-                if _matches_cdl_pattern_all(col):
-                    matched.add(col)
-        else:
-            # 通用 substring match（涵蓋 'HT_DCPHASE' 與使用者自訂 pattern）
-            for col in cols_list:
-                if pat in col:
-                    matched.add(col)
+    for col in cols_list:
+        identity = parse_either_form(col)
+        if identity is not None and identity.indicator in targets:
+            matched.add(col)
     return frozenset(matched)
 
 

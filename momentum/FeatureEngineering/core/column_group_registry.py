@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Tuple
 
@@ -27,10 +28,17 @@ except ImportError:
 
         return _decorator
 
+from momentum.FeatureEngineering import feature_naming as _naming
 from momentum.FeatureEngineering.core.column_group import AlignmentMeta, ColumnGroup, LayerSource, ShardMeta
 from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+@lru_cache(maxsize=1 << 17)
+def _column_identity(column: str) -> Optional["_naming.FeatureIdentity"]:
+    """欄序鍵之身分（FF-NAME Task 3.1；`parse_either_form`，同一欄於排序時只解析一次）。"""
+    return _naming.parse_either_form(str(column))
 
 
 def normalize_npy_persistence_float32(path: Path) -> None:
@@ -80,15 +88,8 @@ class ColumnGroupRegistry:
         LayerSource.L6: 5,
         LayerSource.L65: 6,
     }
-    _CATEGORY_ORDER = {
-        "entropy": 0,
-        "microstructure": 1,
-        "momentum": 2,
-        "tail_risk": 3,
-        "trend": 4,
-        "volatility": 5,
-        "volume": 6,
-    }
+    # FF-NAME Task 3.1：category 之封閉集合取自 `feature_naming.FEATURE_CATEGORIES`（字母序；新增 category 不需改此處）
+    _CATEGORY_ORDER = {category: index for index, category in enumerate(sorted(_naming.FEATURE_CATEGORIES))}
     _AGGREGATOR_ORDER = {
         "kurt": 0,
         "max": 1,
@@ -102,7 +103,6 @@ class ColumnGroupRegistry:
         "zscore": 9,
     }
     _TIMEFRAME_REGEX = re.compile(r"^(\d+)([mhdw])$")
-    _NUMBER_REGEX = re.compile(r"(?<!\d)(\d+)(?!\d)")
 
     def __init__(self, work_dir: Path, memory_buffer_groups: int = 0):
         self._groups: dict[str, ColumnGroup] = {}
@@ -1872,7 +1872,7 @@ class ColumnGroupRegistry:
         source_value = group.data_source.lower()
         window_value = self._extract_window(column)
         aggregator_key, aggregator_value = self._extract_aggregator(column)
-        label_last = 1 if column.startswith("label_") else 0
+        label_last = 1 if _naming.is_label_column(column) else 0
 
         return (
             label_last,
@@ -1889,32 +1889,36 @@ class ColumnGroupRegistry:
         )
 
     def _extract_category(self, group: ColumnGroup, column: str) -> tuple[int, str]:
-        tokens = [token.lower() for token in column.split("_")]
-        group_tokens = [token.lower() for token in group.group_id.split("_")]
-
-        for token in tokens + group_tokens:
-            if token in self._CATEGORY_ORDER:
-                return self._CATEGORY_ORDER[token], token
-
-        return len(self._CATEGORY_ORDER) + 1, ""
+        """FF-NAME Task 3.1：category＝`parse_feature_name` 之身分（完整形或未標記形）；label、不合文法 ⇒ 無 category
+        （排序置後），不以底線切 token 或群組名猜。"""
+        identity = _column_identity(column)
+        if identity is None or identity.category not in self._CATEGORY_ORDER:
+            return len(self._CATEGORY_ORDER) + 1, ""
+        return self._CATEGORY_ORDER[identity.category], identity.category
 
     def _extract_aggregator(self, column: str) -> tuple[int, str]:
-        tokens = [token.lower() for token in column.split("_")]
-        for token in tokens:
-            if token in self._AGGREGATOR_ORDER:
-                return self._AGGREGATOR_ORDER[token], token
-
+        """身分 ops 中第一個 L3 滾動彙總 op（小寫）；無 ⇒ 排序置後。"""
+        identity = _column_identity(column)
+        for op in identity.ops if identity is not None else ():
+            name = op.partition("-")[0]
+            if name in _naming.L3_OPS and name.lower() in self._AGGREGATOR_ORDER:
+                return self._AGGREGATOR_ORDER[name.lower()], name.lower()
         return len(self._AGGREGATOR_ORDER) + 1, ""
 
     def _extract_window(self, column: str) -> int:
-        matches = self._NUMBER_REGEX.findall(column)
-        if not matches:
+        """身分之數值（params 之整數 token 與 op 之 `W<n>`／`L<n>`／整數參數；TsCorr digest 除外）中最後一個；無 ⇒ 10**9。"""
+        identity = _column_identity(column)
+        if identity is None:
             return 10**9
-
-        try:
-            return int(matches[-1])
-        except ValueError:
-            return 10**9
+        numbers = [int(token) for member in identity.params for token in member if token.isdigit()]
+        for op in identity.ops:
+            name, _, arg = op.partition("-")
+            for piece in arg.split("-") if arg else ():
+                if piece[:1] in {"W", "L"} and piece[1:].isdigit():
+                    numbers.append(int(piece[1:]))
+                elif piece.isdigit() and name != "TsCorr":
+                    numbers.append(int(piece))
+        return numbers[-1] if numbers else 10**9
 
     def _timeframe_sort_key(self, timeframe: str) -> tuple[int, str]:
         match = self._TIMEFRAME_REGEX.match(timeframe)

@@ -16,6 +16,7 @@ from momentum.Analysis.ic_filter_orchestrator import (
 )
 from momentum.core.contracts import AlignmentReport, AlignmentViolationError
 from momentum.core.exceptions import InsufficientDataError, InvalidInputError
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
 
 
 def _write_features_h5(
@@ -23,6 +24,7 @@ def _write_features_h5(
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = file.create_group("BTCUSDT/12h")
         group.create_dataset(
             "features",
@@ -1134,19 +1136,22 @@ def test_load_features_hdf5_edge_cases(tmp_path: Path):
     orchestrator = ICFilterOrchestrator(load_ic_config())
 
     empty_path = tmp_path / "empty.h5"
-    with h5py.File(empty_path, "w"):
+    with h5py.File(empty_path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         pass
     with pytest.raises(InvalidInputError):
         orchestrator._load_features_hdf5(str(empty_path))
 
     missing_features_path = tmp_path / "missing_features.h5"
     with h5py.File(missing_features_path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         file.create_group("group")
     with pytest.raises(InvalidInputError):
         orchestrator._load_features_hdf5(str(missing_features_path))
 
     no_timestamp_path = tmp_path / "no_timestamp.h5"
     with h5py.File(no_timestamp_path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = file.create_group("group")
         group.create_dataset("features", data=np.random.randn(3, 2))
     features_df, metadata = orchestrator._load_features_hdf5(str(no_timestamp_path))
@@ -1156,6 +1161,7 @@ def test_load_features_hdf5_edge_cases(tmp_path: Path):
 
     bad_meta_path = tmp_path / "bad_meta.h5"
     with h5py.File(bad_meta_path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = file.create_group("group")
         group.create_dataset("features", data=np.random.randn(3, 1))
         group.attrs["metadata_json"] = "{bad json"

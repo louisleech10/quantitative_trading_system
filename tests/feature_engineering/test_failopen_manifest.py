@@ -16,6 +16,7 @@ import pytest
 
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.factories import create_feature_factory
+from momentum.FeatureEngineering import feature_naming as _feature_naming
 from momentum.FeatureEngineering.feature_reader import FeatureReader
 from momentum.FeatureEngineering.feature_storage import (
     COMPLETENESS_FIELD_NAMES,
@@ -102,6 +103,8 @@ def _write_disk_manifest(run_dir: Path, artifacts: dict[str, dict]) -> None:
         "tf": "1h",
         "config_hash": run_dir.name,
         "artifacts": artifacts,
+        # FF-NAME Task 3.4：正式 writer 於 manifest 根必寫命名世代（reader 共同邊界拒缺鍵）
+        "feature_naming_version": _feature_naming.CURRENT_FEATURE_NAMING_VERSION,
     }
     (run_dir / FeatureStorage.L7_V2_MANIFEST_NAME).write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2),

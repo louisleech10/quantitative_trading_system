@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Optional, List
+from typing import TYPE_CHECKING, Any, Dict, Optional, List, Tuple
 
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.DataExtraction.kline_download_service import KlineDownloadService
@@ -265,6 +265,63 @@ def ratio_unsafe_category(feature_name: str) -> Optional[str]:
     from momentum.FeatureEngineering import feature_naming as _naming
 
     return _naming.ratio_unsafe_category(str(feature_name))
+
+
+def parse_feature_name(feature_name: str, tagged: bool = True) -> Any:
+    """FF-NAME §C：`api/` 取用欄名 parser 之唯一入口（委由 `feature_naming.parse_feature_name`，以模組屬性呼叫）。
+    不合文法 ⇒ `FeatureNameParseError`；`label_*` ⇒ `LabelColumnNotFeatureError`。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    return _naming.parse_feature_name(str(feature_name), tagged=tagged)
+
+
+def feature_name_errors() -> Tuple[type, type]:
+    """`(FeatureNameParseError, LabelColumnNotFeatureError)`（api 端具名捕捉用）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    return _naming.FeatureNameParseError, _naming.LabelColumnNotFeatureError
+
+
+def feature_naming_version_error_type() -> type:
+    """`FeatureNamingVersionError`（FF-NAME Task 3.4；api 端具名捕捉、原樣上拋用）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    return _naming.FeatureNamingVersionError
+
+
+def assert_h5_feature_naming_version(attrs: Any, path: Any = "") -> int:
+    """FF-NAME Task 3.4（v18）：IC 交接 h5 讀取前之命名世代閘（委由 `feature_naming`，以模組屬性呼叫）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    return _naming.assert_h5_feature_naming_version(attrs, path)
+
+
+def stamp_h5_feature_naming_version(attrs: Any) -> None:
+    """FF-NAME Task 3.4（v18）：IC 交接 h5 寫出端根屬性 `feature_naming_version`（委由 `feature_naming`）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    _naming.stamp_h5_feature_naming_version(attrs)
+
+
+def feature_layer_of(identity: Any) -> str:
+    """身分 → 管線層（`feature_naming.feature_layer`；FF-NAME Task 3.1）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    return _naming.feature_layer(identity)
+
+
+def feature_descriptor(feature_name: str) -> Dict[str, Any]:
+    """FF-NAME Task 3.3：API 欄名描述之唯一來源（委由 `feature_naming.feature_descriptor`）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    return _naming.feature_descriptor(str(feature_name))
+
+
+def assert_single_feature_naming_version(manifests: Dict[str, Any]) -> int:
+    """FF-NAME Task 3.4：多標的合併點之命名世代一致性檢查（委由 `feature_naming`，以模組屬性呼叫）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
+
+    return _naming.assert_single_feature_naming_version(manifests)
 
 
 def create_feature_factory(
@@ -1037,10 +1094,14 @@ def feature_count_from_features_file(
         by_token = [e for e in chosen if str(e.get("symbol") or "").strip() in tokens]
         chosen = by_token or chosen
         return max(feature_count_from_registry_entry(e) or 0 for e in chosen) or None
+    from momentum.FeatureEngineering import feature_naming as _naming
+
     try:
         import h5py
 
         with h5py.File(str(path), "r") as handle:
+            # FF-NAME Task 3.4（v18）：IC 交接 h5 先過命名世代閘（缺屬性／舊版 ⇒ 拒，不吞為「量不出」）
+            assert_h5_feature_naming_version(handle.attrs, path)
             found: List[int] = []
 
             def visit(_name: str, obj) -> None:
@@ -1050,6 +1111,8 @@ def feature_count_from_features_file(
 
             handle.visititems(visit)
         return max(found) if found else None
+    except _naming.FeatureNamingVersionError:
+        raise
     except Exception:  # noqa: BLE001 — 讀不到就當作解析不出來，不讓量測工具的問題變成閘門的問題
         return None
 

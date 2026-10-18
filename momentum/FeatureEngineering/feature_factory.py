@@ -2119,8 +2119,11 @@ class FeatureFactory:
                 present_engines=0,
             )
         processor = LagProcessor(config)
+        # FF-NAME Task 3.2：lag 輸入以來源層選欄（raw 資料鍵＋L1 群組欄），不讀欄名
+        column_layers = {str(c): "raw" for c in data.columns}
+        column_layers.update({str(c): "L1" for c in layer1.columns})
         try:
-            result = processor.compute_all(base)
+            result = processor.compute_all(base, column_layers=column_layers)
         except Exception as exc:
             logger.error("[L4] compute_all failed: %s", exc, exc_info=True)
             return self._build_layer_result(

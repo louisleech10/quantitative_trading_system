@@ -11,13 +11,15 @@ Design reference: FEATURE_STORAGE_ARCHITECTURE_V7.md §11
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Tuple
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from momentum.FeatureEngineering import feature_naming
 from momentum.FeatureEngineering.consumer_gate import (
     ConsumerPolicy,
     assert_consumer_run_status,
@@ -35,6 +37,113 @@ from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError, RowI
 from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+V2_MANIFEST_NAME = "feature_manifest.json"
+
+
+class NonCanonicalFeaturePathError(ValueError):
+    """特徵檔路徑無法解析為 canonical run（FF-NAME Task 3.4）：於產生任何 DataFrame 之前拒收。"""
+
+
+@dataclass(frozen=True)
+class CanonicalRun:
+    """canonical run＝特徵根下 `<symbol>/<timeframe>/<config_hash>/` 且 registry 有對應條目（SPEC v13 Task 3.4）。"""
+
+    feature_root: Path
+    symbol: str
+    timeframe: str
+    config_hash: str
+
+    @property
+    def run_dir(self) -> Path:
+        return self.feature_root / self.symbol / self.timeframe / self.config_hash
+
+    @property
+    def manifest_path(self) -> Path:
+        return self.run_dir / V2_MANIFEST_NAME
+
+
+def resolve_canonical_run(
+    path: Any,
+    *,
+    feature_root: Any,
+    registry_get: Callable[[str, str, str], Optional[Mapping[str, Any]]],
+) -> CanonicalRun:
+    """特徵檔路徑 → `CanonicalRun`；只接受 run 目錄或其 `feature_manifest.json`，且須位於 `feature_root` 下恰三層
+    （symbol／timeframe／config_hash）並於 registry 有條目；否則 `NonCanonicalFeaturePathError`。
+    純路徑判定：不開啟任何特徵檔（任意 `.parquet`／`.h5` 一律拒收，無退路）。"""
+    if path is None or not str(path).strip():
+        raise NonCanonicalFeaturePathError("特徵路徑為空，無法解析為 canonical run")
+    candidate = Path(str(path)).expanduser()
+    if candidate.name == V2_MANIFEST_NAME:
+        run_dir = candidate.parent
+    elif candidate.is_dir():
+        run_dir = candidate
+    else:
+        raise NonCanonicalFeaturePathError(
+            f"特徵路徑 {candidate} 非 canonical run（只接受 <symbol>/<timeframe>/<config_hash>/ 或其 "
+            f"{V2_MANIFEST_NAME}；任意 .parquet／.h5 不接受）")
+    root = Path(str(feature_root)).expanduser().resolve()
+    try:
+        relative = run_dir.resolve().relative_to(root)
+    except ValueError:
+        raise NonCanonicalFeaturePathError(f"特徵路徑 {candidate} 不在特徵根 {root} 下") from None
+    if len(relative.parts) != 3:
+        raise NonCanonicalFeaturePathError(
+            f"特徵路徑 {candidate} 相對特徵根之層數 {len(relative.parts)} ≠ 3（<symbol>/<timeframe>/<config_hash>）")
+    symbol, timeframe, config_hash = relative.parts
+    if registry_get(symbol, timeframe, config_hash) is None:
+        raise NonCanonicalFeaturePathError(
+            f"特徵路徑 {candidate} 之 ({symbol}, {timeframe}, {config_hash}) 於 registry 無條目，非 canonical run")
+    return CanonicalRun(feature_root=root, symbol=symbol, timeframe=timeframe, config_hash=config_hash)
+
+
+class FeatureRunView:
+    """單一 run 之已驗證 manifest 與其群組 parquet 之讀取（FF-NAME Task 3.4）。
+
+    只能由 `FeatureReader.open_run_v2` 建立（manifest 已過命名世代閘）；瀏覽端以此讀群組之欄、footer 與 schema，
+    不另開任何 run 內檔案。路徑只接受本 run manifest 所列之群組檔與時間軸 sidecar。"""
+
+    def __init__(self, manifest: dict, run_dir: Path) -> None:
+        self.manifest = manifest
+        self.run_dir = Path(run_dir)
+        self._allowed: set = set()
+        row_indexes = [manifest.get("row_index")]
+        for artifact in (manifest.get("artifacts") or {}).values():
+            if not isinstance(artifact, dict):
+                continue
+            row_indexes.append(artifact.get("row_index"))
+            for info in (artifact.get("groups") or {}).values():
+                if isinstance(info, dict) and (info.get("path") or info.get("file")):
+                    resolved = FeatureReader._resolve_manifest_relative_path(self.run_dir, info.get("path") or info.get("file"))
+                    self._allowed.add(resolved)
+        for row_index in row_indexes:  # 時間軸 sidecar（raw 根軸與 processed 自身軸）亦屬本 run 之檔
+            if isinstance(row_index, dict) and row_index.get("path"):
+                self._allowed.add(FeatureReader._resolve_manifest_relative_path(self.run_dir, row_index.get("path")))
+
+    def group_path(self, relative: Optional[str]) -> Path:
+        """manifest 群組之相對路徑 → run 內絕對路徑（不安全路徑 ⇒ ValueError）。"""
+        return FeatureReader._resolve_manifest_relative_path(self.run_dir, relative)
+
+    def _require_member(self, path: Any) -> Path:
+        resolved = Path(str(path))
+        if resolved not in self._allowed:
+            raise ValueError(f"{resolved} 非本 run（{self.run_dir}）manifest 所列之群組檔")
+        return resolved
+
+    def read_table(self, path: Any, columns: Optional[List[str]] = None) -> pa.Table:
+        """讀群組 parquet（可選欄），L7 編碼解碼同 `load_columns_v2`。"""
+        member = self._require_member(path)
+        return FeatureReader._decode_l7_encoded_table(pq.read_table(str(member), columns=columns))
+
+    def read_footer(self, path: Any) -> Tuple[pa.Schema, Any]:
+        """群組 parquet 之 (arrow schema, FileMetaData)（只讀 footer，不解碼資料）。"""
+        handle = pq.ParquetFile(str(self._require_member(path)))
+        return handle.schema_arrow, handle.metadata
+
+    def read_metadata(self, path: Any) -> Any:
+        """群組 parquet 之 FileMetaData（含 key-value metadata）。"""
+        return pq.read_metadata(str(self._require_member(path)))
 
 
 class FeatureReader:
@@ -87,8 +196,16 @@ class FeatureReader:
         *,
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
+        sort_groups: bool = False,
+        before_read: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        on_read_error: Optional[Callable[[str, Path, Exception], None]] = None,
     ) -> Iterator[Tuple[str, pd.DataFrame]]:
-        """Yield V2 groups one at a time from raw or processed canonical paths."""
+        """Yield V2 groups one at a time from raw or processed canonical paths.
+
+        `sort_groups`：依群組名排序（預設 manifest 順序）。`before_read(group, info)`：每組讀檔前呼叫（呼叫端之
+        配置前預算判定）。`on_read_error(group, path, exc)`：給定時，讀檔失敗（含檔缺）交由它處置並略過該組
+        （它可自行拋出）；未給定 ⇒ 原樣拋出。
+        """
         manifest, base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
@@ -98,14 +215,26 @@ class FeatureReader:
             allow_partial=allow_partial,
         )
         artifact = self._get_v2_artifact(manifest, artifact_kind)
-        for group_name, group_info in artifact.get("groups", {}).items():
+        groups = artifact.get("groups", {}) or {}
+        names = sorted(groups) if sort_groups else list(groups)
+        for group_name in names:
+            group_info = groups[group_name]
             path = self._resolve_manifest_relative_path(base_dir, group_info.get("path") or group_info.get("file"))
-            if not path.exists():
-                raise FileNotFoundError(f"Parquet file missing: {path}")
-            table = self._decode_l7_encoded_table(pq.read_table(str(path)))
-            dataframe = table.to_pandas()
-            yield group_name, dataframe
-            del dataframe
+            if before_read is not None:
+                before_read(group_name, group_info)
+            try:
+                if not path.exists():
+                    raise FileNotFoundError(f"Parquet file missing: {path}")
+                table = self._decode_l7_encoded_table(pq.read_table(str(path)))
+                box = [table.to_pandas()]
+                del table
+            except Exception as exc:
+                if on_read_error is None:
+                    raise
+                on_read_error(group_name, path, exc)
+                continue
+            # 產出後本產生器不再持有該組之 DataFrame／Arrow 表（呼叫端釋放即回收，峰值記憶體不因串流而倍增）
+            yield group_name, box.pop()
 
     def load_columns_v2(
         self,
@@ -275,10 +404,8 @@ class FeatureReader:
     ) -> Tuple[dict, Path]:
         """讀並驗證 V2 manifest，回傳 (manifest, run_dir)；V2 manifest 不存在 ⇒ FileNotFoundError（不退回舊版面）。"""
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
+        manifest = self._parse_manifest_file(run_dir / self.V2_MANIFEST_NAME)
         manifest_path = run_dir / self.V2_MANIFEST_NAME
-        if not manifest_path.exists():
-            raise FileNotFoundError(f"V2 feature manifest not found: {manifest_path}")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self._validate_manifest_v2(
             manifest,
             artifact_kind,
@@ -287,6 +414,30 @@ class FeatureReader:
             allow_partial=allow_partial,
         )
         return manifest, run_dir
+
+    @staticmethod
+    def _parse_manifest_file(manifest_path: Path) -> dict:
+        """全部 V2 讀取之單一 manifest 解析邊界（FF-NAME Task 3.4）：檔不存在 ⇒ FileNotFoundError；
+        `feature_naming_version` 缺鍵、舊版／未知版、無法解析 ⇒ `FeatureNamingVersionError`（不自動改名、不別名）。"""
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"V2 feature manifest not found: {manifest_path}")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        feature_naming.assert_feature_naming_version(manifest, where=str(manifest_path))
+        return manifest
+
+    def load_run_manifest_v2(self, symbol: str, tf: str, config_hash: str) -> dict:
+        """只過命名世代閘之 manifest（不驗 artifact 完整度與 consumer 政策；多標的合併點之版本一致性檢查、
+        瀏覽端 run 檢視用）。"""
+        manifest_path = self.feature_run_dir(symbol, tf, config_hash) / self.V2_MANIFEST_NAME
+        manifest = self._parse_manifest_file(manifest_path)
+        if not isinstance(manifest, dict):
+            raise ValueError(f"Invalid V2 manifest: {manifest_path}")
+        return manifest
+
+    def open_run_v2(self, symbol: str, tf: str, config_hash: str) -> FeatureRunView:
+        """已過命名世代閘之 run 檢視（瀏覽端用；不驗 artifact 完整度與 consumer 政策，與既有瀏覽語意同）。"""
+        manifest = self.load_run_manifest_v2(symbol, tf, config_hash)
+        return FeatureRunView(manifest, self.feature_run_dir(symbol, tf, config_hash))
 
     @staticmethod
     def _validate_manifest_v2(

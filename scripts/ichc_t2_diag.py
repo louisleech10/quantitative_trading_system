@@ -9,7 +9,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from tests.momentum.helpers.ichc_run import fixture_paths  # noqa: E402
 
 h5, _ = fixture_paths()
+from momentum.factories import assert_h5_feature_naming_version  # noqa: E402
+
 with h5py.File(h5, "r") as handle:
+    assert_h5_feature_naming_version(handle.attrs, h5)  # FF-NAME Task 3.4（v18）：IC 交接 h5 命名世代閘
     ts = handle["ETHUSDT/12h/timestamps"][:5]
 print("raw int64 head:", ts.tolist())
 print("as unit=s:", pd.to_datetime(ts, unit="s")[:3].tolist())

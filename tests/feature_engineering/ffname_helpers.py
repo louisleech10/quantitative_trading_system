@@ -218,6 +218,27 @@ def baseline_immutability_problems(sha_path: Path = BASELINE_SHA_PATH, baseline_
     return bad
 
 
+def write_canonical_run(base: Path, frame: Any, symbol: str, timeframe: str, config_hash: str) -> Tuple[Any, Path]:
+    """以正式 `FeatureStorage.write_raw` 寫一個 canonical V2 run（單一群組、欄＝`frame` 之欄、時間軸＝`frame.index`），
+    並登記於 `base/registry.json`；回傳 (FeatureLibrary, manifest 路徑)。供「特徵路徑須為 canonical run」之既有
+    服務測試替換任意 parquet／h5 路徑（FF-NAME Task 3.4）；值與時間軸取自呼叫端（真實 kline）。"""
+    import pandas as pd
+
+    from momentum.FeatureEngineering.feature_library import FeatureLibrary
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    storage = FeatureStorage(str(base))
+    raw_dir = storage.write_raw(symbol, timeframe, config_hash, {"g": frame.reset_index(drop=True)},
+                                row_index=pd.DatetimeIndex(frame.index))
+    manifest = raw_dir.parent / "feature_manifest.json"
+    registry = FeatureRegistry(Path(base) / "registry.json")
+    registry.add({"symbol": symbol, "timeframe": timeframe, "config_hash": config_hash,
+                  "hdf5_relative_path": str(manifest)})
+    return FeatureLibrary(registry, storage, feature_reader=FeatureReader(str(base))), manifest
+
+
 def iter_new_names_from_baseline() -> Iterable[str]:
     """§G 零件以新 formatter 推導之全部新名（需 Task 0.1 baseline.json）。"""
     freeze = load_freeze_module()

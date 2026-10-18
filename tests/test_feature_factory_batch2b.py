@@ -155,7 +155,8 @@ def test_task25_layer4_forces_layer1_and_raw_in_cgsa(monkeypatch):
         def __init__(self, _config) -> None:
             pass
 
-        def compute_all(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        def compute_all(self, features_df: pd.DataFrame, column_layers=None) -> pd.DataFrame:
+            # FF-NAME Task 3.2：L4 呼叫端傳入來源層（raw／L1）
             return pd.DataFrame(index=features_df.index)
 
     monkeypatch.setattr(factory, "_combine_layers", _fake_combine)

@@ -83,8 +83,6 @@
       "scripts/analyze_problem_features.py",
       "scripts/freeze_batch2d_baseline.py",
       "frontend/src/lib/types.ts",
-      "frontend/src/lib/featureNameParser.ts",
-      "frontend/src/workers/featureNameParser.worker.ts",
       "frontend/src/store/featureFactoryStore.ts",
       "frontend/src/hooks/useFeatureFactory.ts",
       "frontend/src/components/feature-factory/FeatureExplorer.tsx",

@@ -22,7 +22,11 @@ import numpy as np
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FEATURES_DIR = REPO_ROOT / "data_cache" / "features" / "ETHUSDT" / "9e5c8a65c9cbd773a778e8c99ca634ec"
+# FF-NAME Task 3.4：canonical run（特徵根下 <symbol>/<timeframe>/<config_hash>/），只經 FeatureReader 讀取
+FEATURES_ROOT = REPO_ROOT / "data_cache" / "features"
+RUN_SYMBOL = "ETHUSDT"
+RUN_TIMEFRAME = "1h"
+RUN_CONFIG_HASH = "9e5c8a65c9cbd773a778e8c99ca634ec"
 BASELINE_REGISTRY_DIR = REPO_ROOT / "results" / "full_golden_baseline"
 
 # v8fix6 已知 runtime metrics（來自 results/benchmark_run_v8fix6.log）
@@ -55,13 +59,19 @@ def column_sha256(series: pd.Series) -> str:
 
 def main() -> int:
     args = _parse_args()
-    if not FEATURES_DIR.is_dir():
-        print(f"[FAIL] features dir not found: {FEATURES_DIR}")
-        return 1
+    # FF-NAME Task 3.4：run 之群組只經 FeatureReader 讀取（canonical run＋命名世代閘；舊版面／舊世代 run 拒收）
+    from momentum.factories import create_feature_reader
 
-    parquet_files = sorted(FEATURES_DIR.glob("*.parquet"))
+    reader = create_feature_reader(str(FEATURES_ROOT))
+    try:
+        manifest_groups = reader.load_run_manifest_v2(RUN_SYMBOL, RUN_TIMEFRAME, RUN_CONFIG_HASH) \
+            .get("artifacts", {}).get("raw", {}).get("groups", {})
+    except FileNotFoundError as exc:
+        print(f"[FAIL] canonical run not found: {exc}")
+        return 1
+    parquet_files = sorted(manifest_groups)
     if not parquet_files:
-        print(f"[FAIL] no parquet files in {FEATURES_DIR}")
+        print(f"[FAIL] no raw groups in {RUN_SYMBOL}/{RUN_TIMEFRAME}/{RUN_CONFIG_HASH}")
         return 1
 
     print(f"[Info] 共 {len(parquet_files)} 個 parquet groups，開始計算 column-level sha256...")
@@ -70,11 +80,10 @@ def main() -> int:
     col_checksums: dict[str, str] = {}
     rows_seen: set[int] = set()
 
-    for idx, pq in enumerate(parquet_files, 1):
-        df = pd.read_parquet(pq)
+    groups = reader.stream_groups_v2(RUN_SYMBOL, RUN_TIMEFRAME, RUN_CONFIG_HASH, artifact_kind="raw", sort_groups=True)
+    for idx, (group_key, df) in enumerate(groups, 1):
         rows_seen.add(int(df.shape[0]))
-        # group_key = parquet stem（含 TF prefix），避免跨 TF 同欄名衝突
-        group_key = pq.stem
+        # group_key = 群組 id（含 TF prefix），避免跨 TF 同欄名衝突
         for col in df.columns:
             full_name = f"{group_key}::{col}"
             feature_names.append(full_name)

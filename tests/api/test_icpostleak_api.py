@@ -20,6 +20,7 @@ import pytest
 from momentum.FeatureEngineering.feature_config import PreprocessingConfig
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as h
+from tests.feature_engineering.ffname_helpers import write_canonical_run
 
 REPO = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads((REPO / "tests/_golden/icpostleak/contract.json").read_text(encoding="utf-8"))
@@ -47,15 +48,19 @@ def _run(tmp_path: Path, frame: pd.DataFrame, steps: List[str], selected: Option
          zscore_windows: Optional[List[int]] = None, tag: str = "t") -> Dict:
     """註冊假任務並經真服務路徑跑；回傳 {"result": 回應 dict, "frame": 落盤 DataFrame}。"""
     svc = _service()
-    path = tmp_path / f"feat_{tag}.parquet"
-    frame.to_parquet(path)
+    # FF-NAME Task 3.4：特徵路徑須為 canonical run（正式 write_raw＋registry 條目），任意 parquet 退路已移除
+    k = CONTRACT["kline"]
+    library, path = write_canonical_run(tmp_path / f"features_{tag}", frame, k["symbol"], k["timeframe"], f"cfg_{tag}")
     tid = f"icpostleak_{tag}"
     svc._tasks[tid] = {"req_features_path": str(path), "result": {"analysis_status": "ok_oos", "oos_guarantees": True}}
+    original_library = svc._feature_library
+    svc._feature_library = library
     try:
         result = svc._apply_transforms_sync(tid, list(selected or frame.columns), "rank" in steps, "zscore" in steps,
                                             "gaussian" in steps, RANK_W, list(zscore_windows or Z_WINDOWS))
     finally:
         svc._tasks.pop(tid, None)
+        svc._feature_library = original_library
     return {"result": result, "frame": pd.read_hdf(result["output_path"], key="features")}
 
 

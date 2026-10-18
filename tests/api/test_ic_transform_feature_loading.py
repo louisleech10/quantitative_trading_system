@@ -11,22 +11,37 @@ from api.services.ic_analysis_service import ICAnalysisService
 
 
 def test_explicit_path_takes_priority_over_library(tmp_path) -> None:
-    """明確 path 與 run selector 並存時固定讀 path。"""
-    expected = pd.DataFrame({"alpha": [1.0, None, 3.0]})
-    features_path = tmp_path / "features.parquet"
-    expected.to_parquet(features_path)
+    """明確 path 與 run selector 並存時固定讀 path（FF-NAME Task 3.4：path 須為 canonical run，經 library 以 path
+    解析出之 run 載入，不用 selector 之 symbol／timeframe／config_hash）。"""
+    from tests.feature_engineering.ffname_helpers import real_slice, write_canonical_run
+    from tests.feature_engineering.ffstat_helpers import PRIMARY_TF, SYMBOL
+
+    kline = real_slice(16)
+    # V2 時間軸 sidecar 讀回為 naive UTC（epoch 秒）
+    expected = pd.DataFrame({"alpha": kline["close"].to_numpy(dtype=float)},
+                            index=pd.DatetimeIndex(kline.index).tz_convert("UTC").tz_localize(None))
+    expected.index.name = "timestamp"
+    library, features_path = write_canonical_run(tmp_path / "features", expected, SYMBOL, PRIMARY_TF, "path-hash")
+    calls = []
+    real_load = library.load
+
+    def spy_load(symbol, timeframe, **kwargs):
+        calls.append((symbol, timeframe, kwargs.get("config_hash")))
+        return real_load(symbol, timeframe, **kwargs)
+
+    library.load = spy_load
     service = ICAnalysisService()
-    service._feature_library = MagicMock()
+    service._feature_library = library
 
     actual = service._load_features_for_transforms(
-        "BTCUSDT",
+        "ETHUSDT",
         "12h",
         str(features_path),
         config_hash="pinned-hash",
     )
 
-    pd.testing.assert_frame_equal(actual, expected, check_exact=True, check_dtype=True)
-    service._feature_library.load.assert_not_called()
+    pd.testing.assert_frame_equal(actual, expected, check_exact=True, check_dtype=True, check_freq=False)
+    assert calls == [(SYMBOL, PRIMARY_TF, "path-hash")]
 
 
 def test_library_load_receives_pinned_config_hash() -> None:

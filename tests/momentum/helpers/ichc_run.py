@@ -92,8 +92,11 @@ def feature_index(n: Optional[int] = None):
     import h5py
     import pandas as pd
 
+    from momentum.factories import assert_h5_feature_naming_version
+
     h5, _ = fixture_paths()
     with h5py.File(h5, "r") as handle:
+        assert_h5_feature_naming_version(handle.attrs, h5)  # FF-NAME Task 3.4（v18）：IC 交接 h5 命名世代閘
         ts = handle["ETHUSDT/12h/timestamps"][:]
     idx = pd.to_datetime(ts, unit="s")
     if n is None:

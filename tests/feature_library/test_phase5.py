@@ -107,6 +107,7 @@ def test_load_multi_returns_dict_keyed_by_symbol() -> None:
     values = {"h_SYM1": 1.0, "h_SYM2": 2.0}
     mock_reader = MagicMock()
     mock_reader.load_manifest_v2.return_value = {"run_status": "complete"}
+    mock_reader.load_run_manifest_v2.return_value = {"run_status": "complete", "feature_naming_version": 2}  # FF-NAME 3.4
     mock_reader.list_features_v2.return_value = ["f"]
     mock_reader.load_columns_v2.side_effect = (
         lambda symbol, timeframe, config_hash, columns, **_kw: pd.DataFrame({"f": [values[config_hash]]})

@@ -40,7 +40,12 @@ from api.utils.warmup_contract import (
     warmup_insufficient_items_from_completed,
 )
 from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
-from momentum.factories import create_feature_factory, create_feature_factory_mcp, create_run_lifecycle_manager
+from momentum.factories import (
+    create_feature_factory,
+    create_feature_factory_mcp,
+    create_run_lifecycle_manager,
+    feature_descriptor,
+)
 from momentum.FeatureEngineering.run_locks import RunBusyError, is_run_active
 from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir
 
@@ -1617,13 +1622,19 @@ class FeatureFactoryService:
             "features": page_rows,
         }
 
+    # FF-NAME Task 3.3：瀏覽列之欄名描述鍵（契約 `tests/_golden/ffname/contract.json` descriptor.row_key）
+    _DESCRIPTOR_ROW_KEY = "descriptor"
+
     @staticmethod
     def _project_browse_rows(rows: List[Dict[str, Any]], detail_level: str) -> List[Dict[str, Any]]:
+        """瀏覽投影（欄名描述之唯一供給點，FF-NAME Task 3.3）：每列一律帶 `descriptor`＝`feature_descriptor(name)`
+        （Python parser 於請求時算出、不落盤；不合文法 ⇒ unsupported 描述），`names`／`table`／`full` 共用。"""
+        key = FeatureFactoryService._DESCRIPTOR_ROW_KEY
         if detail_level == "full":
-            return rows
+            return [{**row, key: feature_descriptor(str(row.get("name")))} for row in rows]
 
         if detail_level == "names":
-            return [{"name": row.get("name")} for row in rows]
+            return [{"name": row.get("name"), key: feature_descriptor(str(row.get("name")))} for row in rows]
 
         # table: only return columns currently required by Feature Table.
         keys = {
@@ -1644,7 +1655,9 @@ class FeatureFactoryService:
         }
         projected: List[Dict[str, Any]] = []
         for row in rows:
-            projected.append({k: row.get(k) for k in keys})
+            item = {k: row.get(k) for k in keys}
+            item[key] = feature_descriptor(str(row.get("name")))
+            projected.append(item)
         return projected
 
     def _browse_cgsa_catalog_features(
@@ -2183,7 +2196,6 @@ class FeatureFactoryService:
             # P0-C: yield while a user-facing tab is actively waiting on a browse_*.
             while self._warmup_should_yield():
                 time.sleep(0.5)
-            import pyarrow.parquet as _pq_w
             if not isinstance(group_meta, dict):
                 return 0
             manifest_dir: Optional[Path] = context.get("manifest_dir")
@@ -2202,7 +2214,7 @@ class FeatureFactoryService:
             if not cols:
                 return 0
             try:
-                table = _pq_w.read_table(str(parquet_path), columns=cols)
+                table = self._require_run_view(context).read_table(parquet_path, columns=cols)
                 df = table.to_pandas(self_destruct=True)
                 numeric = df.replace([np.inf, -np.inf], np.nan).astype("float64", copy=False)
                 new_df = self._compute_feature_stats_fast(numeric, self._cgsa_stats_q_sample)
@@ -2497,7 +2509,7 @@ class FeatureFactoryService:
                     return {"features": [], "timestamps": [], "matrix": [], "nan_ratios": []}
 
                 # Read only the selected columns — avoids full DataFrame load
-                selected_df = self._load_cgsa_columns_subset(column_to_path, selected)
+                selected_df = self._load_cgsa_columns_subset(column_to_path, selected, self._require_run_view(context))
                 if selected_df.empty:
                     return {"features": [], "timestamps": [], "matrix": [], "nan_ratios": []}
 
@@ -2661,10 +2673,10 @@ class FeatureFactoryService:
         through Arrow's NumPy converter (skipping the pandas DataFrame copy)
         to roughly halve scan time on wide CGSA tasks.
         """
-        import pyarrow.parquet as pq
         import pyarrow.compute as pc
         import time
 
+        run_view = self._require_run_view(context)
         total_rows: int = int(fast["total_rows"])
         columns: List[str] = list(fast["columns"])
         column_to_path: Dict[str, Path] = fast["column_to_path"]
@@ -2692,7 +2704,7 @@ class FeatureFactoryService:
         # dq_v1 block (e.g. produced by an older writer) triggers fallback to
         # the parallel scan below — never wrong stats.
         dq_v1_hit, dq_v1_partials = self._try_load_dq_v1(
-            list(path_to_cols.keys()), total_rows,
+            list(path_to_cols.keys()), total_rows, run_view,
         )
         if dq_v1_hit:
             cols_seen: set = set()
@@ -2759,7 +2771,7 @@ class FeatureFactoryService:
             for start in range(0, len(cols_in_path), batch_cols):
                 batch = cols_in_path[start:start + batch_cols]
                 try:
-                    table = pq.read_table(str(path), columns=batch)
+                    table = run_view.read_table(path, columns=batch)
                 except Exception as exc:
                     logger.warning("browse_data_quality: failed to read %s: %s", path, exc)
                     continue
@@ -2892,6 +2904,7 @@ class FeatureFactoryService:
         self,
         paths: List[Path],
         total_rows: int,
+        run_view: Any,
     ) -> tuple:
         """Attempt to load packed per-column DQ stats from parquet schema metadata.
 
@@ -2902,13 +2915,12 @@ class FeatureFactoryService:
         Reads run in parallel — each parquet footer is small (KB) so the
         wall-clock cost is dominated by FS round trips.
         """
-        import pyarrow.parquet as pq
         import struct
         from concurrent.futures import ThreadPoolExecutor as _TPE
 
         def _one(path: Path) -> Optional[Dict[str, Any]]:
             try:
-                meta = pq.read_metadata(str(path))
+                meta = run_view.read_metadata(path)  # FF-NAME Task 3.4：footer 亦只經 FeatureReader 之 run 檢視
             except Exception:
                 return None
             kv = meta.metadata or {}
@@ -3012,8 +3024,7 @@ class FeatureFactoryService:
         Falls back to positional indices when no recognizable timestamp column
         is found. Reads at most one column to stay cheap on 450k-column tasks.
         """
-        import pyarrow.parquet as pq
-
+        run_view = self._require_run_view(context)
         manifest = context.get("manifest") or {}
         manifest_dir: Optional[Path] = context.get("manifest_dir")
         groups_raw = manifest.get("groups")
@@ -3033,8 +3044,8 @@ class FeatureFactoryService:
             return [str(i) for i in range(total_rows)]
 
         try:
-            pf = pq.ParquetFile(str(first_path))
-            schema_names = pf.schema_arrow.names
+            schema_arrow, _footer = run_view.read_footer(first_path)
+            schema_names = schema_arrow.names
         except Exception:
             return [str(i) for i in range(total_rows)]
 
@@ -3043,7 +3054,7 @@ class FeatureFactoryService:
             return [str(i) for i in range(total_rows)]
 
         try:
-            table = pq.read_table(str(first_path), columns=[ts_candidates[0]])
+            table = run_view.read_table(first_path, columns=[ts_candidates[0]])
             series = table.column(0).to_pandas()
             if pd.api.types.is_datetime64_any_dtype(series):
                 return [ts.isoformat() if hasattr(ts, "isoformat") else str(ts) for ts in series.tolist()]
@@ -4687,16 +4698,14 @@ class FeatureFactoryService:
 
         # FRAMEPATH Task 2.3：task 路徑只收 CGSA manifest（.json，大小寫不拘）；舊 factory h5 具名拒絕（route → 400）
         manifest_path = self._require_manifest_path(file_path)
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            raise FileNotFoundError(
-                f"Failed to read CGSA manifest {manifest_path}: {exc}"
-            ) from exc
+        # FF-NAME Task 3.4：manifest 須位於 canonical 佈局 `<root>/<symbol>/<timeframe>/<config_hash>/`，且只經
+        # FeatureReader 之共同邊界讀取（含命名世代閘；不符即拒，任何 DataFrame 產生之前）
+        run_view = self._open_task_run_view(manifest_path, str(symbol), str(timeframe))
+        manifest = run_view.manifest
         # FRAMEPATH Task 2.6：舊 cgsa_work 瀏覽格式（groups 為串列；現無產生者）具名拒絕（route → 400）
         if isinstance(manifest, dict) and isinstance(manifest.get("groups"), list):
             raise ValueError(f"舊 cgsa_work 瀏覽格式已不支援：{manifest_path}")
-        manifest_dir = manifest_path.parent
+        manifest_dir = run_view.run_dir
 
         manifest, artifact_kind = self._select_l7_v2_artifact(manifest)
         return {
@@ -4712,7 +4721,49 @@ class FeatureFactoryService:
             "manifest": manifest,
             "manifest_dir": manifest_dir,
             "artifact_kind": artifact_kind,
+            "run_view": run_view,
         }
+
+    @staticmethod
+    def _require_run_view(context: Dict[str, Any]) -> Any:
+        """context 之 run 檢視（`_load_task_context` 建立；特徵 parquet 只經它開啟，FF-NAME Task 3.4）。"""
+        run_view = context.get("run_view")
+        if run_view is None:
+            raise ValueError("CGSA context 缺 run_view：特徵 parquet 只准經 FeatureReader 開啟（請經 _load_task_context）")
+        return run_view
+
+    @staticmethod
+    def _open_task_run_view(manifest_path: Path, symbol: str, timeframe: str) -> Any:
+        """task 之 manifest 路徑 → 已過命名世代閘之 run 檢視（`FeatureReader.open_run_v2`）。
+
+        路徑須為 `<root>/<symbol>/<timeframe>/<config_hash>/feature_manifest.json` 且 symbol／timeframe 與 task
+        metadata 一致（否則 ValueError，route → 400）；manifest 不可讀或非 JSON ⇒ FileNotFoundError；命名世代
+        缺失／過舊／無法解析 ⇒ `FeatureNamingVersionError` 原樣上拋。"""
+        from momentum.factories import create_feature_reader
+
+        run_dir = manifest_path.parent
+        if (
+            manifest_path.name.lower() != "feature_manifest.json"
+            or len(run_dir.parents) < 3
+            or run_dir.parent.name != timeframe
+            or run_dir.parent.parent.name != symbol
+        ):
+            # FRAMEPATH Task 2.6：舊 cgsa_work 列表格式維持具名拒絕訊息（只辨識格式、不讀任何特徵檔）
+            try:
+                legacy = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                legacy = None
+            if isinstance(legacy, dict) and isinstance(legacy.get("groups"), list):
+                raise ValueError(f"舊 cgsa_work 瀏覽格式已不支援：{manifest_path}")
+            raise ValueError(
+                f"task manifest 非 canonical run 佈局 <root>/{symbol}/{timeframe}/<config_hash>/feature_manifest.json："
+                f"{manifest_path}"
+            )
+        reader = create_feature_reader(str(run_dir.parents[2]))
+        try:
+            return reader.open_run_v2(symbol, timeframe, run_dir.name)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise FileNotFoundError(f"Failed to read CGSA manifest {manifest_path}: {exc}") from exc
 
     _L7_V2_ARTIFACT_FIELDS = (
         "groups", "group_count", "row_count", "time_range", "schema_version", "feature_schema_hash", "total_features",
@@ -4746,8 +4797,7 @@ class FeatureFactoryService:
         groups 為 dict：每項以 ``path``（相對 manifest 目錄、含 ``raw/``／``processed/`` 子目錄）優先、``file`` 次之
         定位 parquet，並帶 ``columns``。舊 cgsa_work 列表格式於 `_load_task_context` 即具名拒絕。
         """
-        import pyarrow.parquet as pq  # local import keeps cold-start light
-
+        run_view = self._require_run_view(context)
         manifest = context.get("manifest") or {}
         manifest_dir: Optional[Path] = context.get("manifest_dir")
         groups_raw = manifest.get("groups")
@@ -4772,7 +4822,7 @@ class FeatureFactoryService:
                         context["task_id"], parquet_path,
                     )
                     continue
-                table = pq.read_table(str(parquet_path))
+                table = run_view.read_table(parquet_path)
                 frames.append(table.to_pandas(self_destruct=True))
 
         if not frames:
@@ -4804,8 +4854,7 @@ class FeatureFactoryService:
         missing column-level statistic triggers fallback so we never report
         wrong nan_ratios.
         """
-        import pyarrow.parquet as pq  # local import keeps cold-start light
-
+        run_view = self._require_run_view(context)
         manifest = context.get("manifest") or {}
         manifest_dir: Optional[Path] = context.get("manifest_dir")
         groups_raw = manifest.get("groups")
@@ -4842,14 +4891,13 @@ class FeatureFactoryService:
 
         def _read_one_footer(path: Path) -> Optional[Dict[str, Any]]:
             try:
-                pf = pq.ParquetFile(str(path))
+                schema_arrow, meta = run_view.read_footer(path)
             except Exception as exc:
                 logger.warning("Failed to read parquet metadata %s: %s", path, exc)
                 return None
-            meta = pf.metadata
             if meta is None:
                 return None
-            file_columns = pf.schema_arrow.names
+            file_columns = schema_arrow.names
             n_rg = meta.num_row_groups
             per_col: Dict[str, Dict[str, Any]] = {}
             for col_idx, col in enumerate(file_columns):
@@ -4962,15 +5010,14 @@ class FeatureFactoryService:
         self,
         column_to_path: Dict[str, Path],
         columns: List[str],
+        run_view: Any,
     ) -> pd.DataFrame:
-        """Read just the requested columns from CGSA parquet files.
+        """Read just the requested columns from CGSA parquet files（經 `run_view`，FF-NAME Task 3.4）.
 
         Used by the fast browse_summary path for sample-based stationarity
         tests and capped correlation checks. Avoids materializing the full
         feature matrix.
         """
-        import pyarrow.parquet as pq
-
         by_path: Dict[Path, List[str]] = {}
         for col in columns:
             path = column_to_path.get(col)
@@ -4981,7 +5028,7 @@ class FeatureFactoryService:
         frames: List[pd.DataFrame] = []
         for path, cols in by_path.items():
             try:
-                table = pq.read_table(str(path), columns=cols)
+                table = run_view.read_table(path, columns=cols)
                 frames.append(table.to_pandas(self_destruct=True))
             except Exception as exc:
                 logger.warning("Failed to load CGSA subset from %s: %s", path, exc)
@@ -5051,7 +5098,7 @@ class FeatureFactoryService:
         high_corr_pairs_count: Optional[int] = None
         if 0 < len(columns) <= HIGH_CORR_SAMPLE_LIMIT:
             try:
-                subset_df = self._load_cgsa_columns_subset(column_to_path, columns)
+                subset_df = self._load_cgsa_columns_subset(column_to_path, columns, self._require_run_view(context))
                 numeric_df = subset_df.select_dtypes(include=["number"])
                 if numeric_df.shape[1]:
                     corr_abs = numeric_df.corr().abs()
@@ -5064,7 +5111,7 @@ class FeatureFactoryService:
 
         sample_columns = columns[: min(100, len(columns))]
         try:
-            adf_df = self._load_cgsa_columns_subset(column_to_path, sample_columns)
+            adf_df = self._load_cgsa_columns_subset(column_to_path, sample_columns, self._require_run_view(context))
             stationary_ratio = self._estimate_stationary_ratio_from_subset(adf_df)
         except Exception as exc:
             logger.warning("Stationarity sample failed for task %s: %s", task_id, exc)
@@ -5196,9 +5243,8 @@ class FeatureFactoryService:
         context: Dict[str, Any],
         selected_features: List[str],
     ) -> tuple[pd.DataFrame, int]:
-        """Load only selected CGSA feature columns from parquet."""
-        import pyarrow.parquet as pq
-
+        """Load only selected CGSA feature columns from parquet（經 run 檢視，FF-NAME Task 3.4）."""
+        run_view = self._require_run_view(context)
         task_id = context["task_id"]
         manifest = context.get("manifest") or {}
         manifest_dir: Optional[Path] = context.get("manifest_dir")
@@ -5239,13 +5285,13 @@ class FeatureFactoryService:
 
             def _read_one(args: tuple) -> pd.DataFrame:
                 _path, _cols = args
-                return pq.read_table(str(_path), columns=_cols).to_pandas(self_destruct=True)
+                return run_view.read_table(_path, columns=_cols).to_pandas(self_destruct=True)
 
             with ThreadPoolExecutor(max_workers=min(4, len(file_to_cols))) as _pool:
                 partial_frames = list(_pool.map(_read_one, file_to_cols.items()))
         else:
             for parquet_path, cols in file_to_cols.items():
-                table = pq.read_table(str(parquet_path), columns=cols)
+                table = run_view.read_table(parquet_path, columns=cols)
                 partial_frames.append(table.to_pandas(self_destruct=True))
 
         if not partial_frames:

@@ -1,7 +1,8 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BrowseFeatureItem } from '@/lib/types';
+import { BrowseFeatureItem, type ResolvedFeatureDescriptor } from '@/lib/types';
+import { useFeatureDescriptor } from '@/lib/featureDescriptor';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
@@ -54,6 +55,8 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     (state) => state.explorerSummaryByTask[taskId]?.stats_warmup,
   );
   const setExplorerSummaryForTask = useFeatureFactoryStore((state) => state.setExplorerSummaryForTask);
+  // FF-NAME Task 3.3：欄名語意一律經共享描述 map 查（查無即 unsupported），不解析欄名字串
+  const { resolve: resolveDescriptor, ingest: ingestDescriptors } = useFeatureDescriptor(taskId);
 
   // All features loaded once from the server (up to 5000)
   const [allRows, setAllRows] = useState<BrowseFeatureItem[]>([]);
@@ -288,6 +291,11 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       .finally(() => setServerSortLoading(false));
   }, [serverSortLoading, serverSortRows.length, taskId, sortBy, sortOrder, category, level, browseFeatures]);
 
+  // table 回應之列自帶描述：併入共享 map（與 names 回應同一投影，逐欄相等）
+  useEffect(() => { if (allRows.length > 0) ingestDescriptors(allRows); }, [allRows, ingestDescriptors]);
+  useEffect(() => { if (serverSearchRows.length > 0) ingestDescriptors(serverSearchRows); }, [serverSearchRows, ingestDescriptors]);
+  useEffect(() => { if (serverSortRows.length > 0) ingestDescriptors(serverSortRows); }, [serverSortRows, ingestDescriptors]);
+
   const featureNames = useMemo(
     () => (sharedFeatureNames && sharedFeatureNames.length > 0 ? sharedFeatureNames : allRows.map((row) => row.name)),
     [allRows, sharedFeatureNames]
@@ -477,6 +485,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
 
       {isSegmentFilterOpen && (
         <FeatureNameSegmentFilter
+          taskId={taskId}
           features={featureNames}
           onFilteredFeaturesChange={setSegmentFilteredNames}
         />
@@ -539,6 +548,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
                 <FeatureTableRow
                   key={row.name}
                   row={row}
+                  resolved={resolveDescriptor(row.name)}
                   checked={selectedSet.has(row.name)}
                   onToggle={toggleSelect}
                   onOpenDistribution={openDistribution}
@@ -615,6 +625,7 @@ function getSortableMetric(item: BrowseFeatureItem, sortBy: string): number {
 
 interface FeatureTableRowProps {
   row: BrowseFeatureItem;
+  resolved: ResolvedFeatureDescriptor;
   checked: boolean;
   onToggle: (name: string) => void;
   onOpenDistribution: (name: string) => void;
@@ -622,6 +633,7 @@ interface FeatureTableRowProps {
 
 const FeatureTableRow = memo(function FeatureTableRow({
   row,
+  resolved,
   checked,
   onToggle,
   onOpenDistribution,
@@ -636,9 +648,14 @@ const FeatureTableRow = memo(function FeatureTableRow({
         />
       </td>
       <td className="px-2 py-2">
-        <button className="text-cyan-300 hover:underline" onClick={() => onOpenDistribution(row.name)}>
-          {row.name}
+        <button className="text-cyan-300 hover:underline" title={row.name} onClick={() => onOpenDistribution(row.name)}>
+          {resolved.display}
         </button>
+        {resolved.status === 'unsupported' && (
+          <span className="ml-2 text-[10px] text-rose-300 border border-rose-300/30 rounded px-1" title={`描述無效：${resolved.reason}`}>
+            unsupported
+          </span>
+        )}
       </td>
       <td className="px-2 py-2">{row.category}</td>
       <td className="px-2 py-2">{row.level}</td>

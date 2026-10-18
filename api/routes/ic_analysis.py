@@ -73,8 +73,14 @@ def _reject_when_over_feature_cap(request, *, entrypoint: str = "analyze") -> No
     #    且此處每次 `FeatureRegistry()` 重讀磁碟，而 service 的 registry 在行程啟動時就讀好。
     #    兩份邏輯、兩份快照 ⇒ 四輪 review 抓到四種不同步（少一味＝該擋沒擋；多一味＝誤擋）。
     #    現在由「決定要載入什麼的人」回答「它有多大」，鏡像成為結構性質而非人工維護的副本。
-    feature_count = ic_analysis_service.resolve_planned_feature_count(
-        request, entrypoint=entrypoint)
+    from momentum.factories import feature_naming_version_error_type
+
+    try:
+        feature_count = ic_analysis_service.resolve_planned_feature_count(
+            request, entrypoint=entrypoint)
+    except feature_naming_version_error_type() as exc:
+        # FF-NAME Task 3.4（v18）：重放之 IC 交接 h5 缺／舊 feature_naming_version ⇒ 啟動前拒收（含重生指引）
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if feature_count is None:
         return
     cap = int(settings.ic_analysis_max_features)

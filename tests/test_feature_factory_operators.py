@@ -190,7 +190,10 @@ def test_lag_processor_layer1_and_raw():
 
     config = ConfigManager().get_merged_config()
     processor = LagProcessor(config)
-    lagged = processor.compute_all(base)
+    # FF-NAME Task 3.2：layer1_and_raw 以呼叫端提供之來源層選欄（不讀欄名）
+    column_layers = {"close": "raw", "close_trend_EMA_21_Slope-W5": "L3"}
+    column_layers.update({str(c): "L1" for c in ema_21.columns})
+    lagged = processor.compute_all(base, column_layers=column_layers)
 
     lag_steps = ParameterGenerator.generate_lag_sequence(
         config.global_settings.sequence_length,

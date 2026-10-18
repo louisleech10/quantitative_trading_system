@@ -39,6 +39,8 @@ from momentum.FeatureEngineering.consumer_gate import (
     intersect_columns_without_masking,
 )
 from momentum.factories import (
+    assert_single_feature_naming_version,
+    feature_naming_version_error_type,
     create_binance_provider,
     create_bootstrap_estimator,
     create_cross_symbol_validator,
@@ -445,7 +447,13 @@ class XGBoostBatchService:
             # 字典：symbol -> 該標的的特徵 DataFrame
             all_symbol_features = {}
             shared_feature_names = None  # 第一個標的的特徵名稱（應該所有標的相同）
-            
+
+            # FF-NAME Task 3.4：多標的欄交集（合併點）之前，各標的 FeatureLibrary run 之命名世代須一致；
+            # 混世代或任一舊世代 ⇒ FeatureNamingVersionError（不改用即時計算後備）
+            merge_manifests = self._feature_library.load_manifests_for_merge(list(all_kline_data), timeframe)
+            if merge_manifests:
+                assert_single_feature_naming_version(merge_manifests)
+
             for sym, kline_df in all_kline_data.items():
                 self.logger.info(f"開始為 {sym} 計算特徵...")
 
@@ -504,6 +512,8 @@ class XGBoostBatchService:
                 except FeatureNotFoundError:
                     self.logger.info("FeatureLibrary 無資料，改用即時計算 %s/%s", sym, timeframe)
                 except Exception as exc:
+                    if isinstance(exc, feature_naming_version_error_type()):
+                        raise
                     self.logger.warning(
                         "FeatureLibrary 載入失敗，改用即時計算 %s/%s: %s",
                         sym,

@@ -276,11 +276,15 @@ def _run_dir_with_timestamps(tmp_path, *, symbol="ETHUSDT", tf="1h", values=None
     欄名與單位與生產一致（`timestamp`＝epoch 秒），故走的是同一條讀取路徑。
     """
     d = tmp_path / "data_cache/features" / symbol / tf / ("f" * 32)
-    d.mkdir(parents=True)
-    if values is not None:
-        pd.DataFrame({"timestamp": np.array(values, dtype=np.int64)}).to_parquet(
-            d / "timestamps.parquet",
-        )
+    if values is None:
+        d.mkdir(parents=True)
+        return d
+    # FF-NAME Task 3.4：時間軸只經 FeatureReader 讀 ⇒ run 以正式 write_raw 寫（manifest 帶命名世代與時間軸 sidecar）
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    index = pd.DatetimeIndex(pd.to_datetime(np.array(values, dtype=np.int64), unit="s"))
+    frame = pd.DataFrame({"close_1h_trend_EMA_8": np.arange(len(index), dtype=np.float64)})
+    FeatureStorage(str(tmp_path / "data_cache/features")).write_raw(symbol, tf, d.name, {"g": frame}, row_index=index)
     return d
 
 

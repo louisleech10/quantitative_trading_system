@@ -21,6 +21,14 @@ import pytest
 from api.services.feature_factory_service import FeatureFactoryService
 
 
+def _run_view_for(path: Path):
+    """FF-NAME Task 3.4：run 內 parquet 只經 FeatureReader 之 run 檢視開啟；單元測試以該檔為唯一群組之檢視。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureRunView
+
+    manifest = {"artifacts": {"raw": {"groups": {"g": {"path": path.name}}}}}
+    return FeatureRunView(manifest, path.parent)
+
+
 def _make_service() -> FeatureFactoryService:
     service = FeatureFactoryService.__new__(FeatureFactoryService)
     service._browse_inflight = {}
@@ -227,7 +235,7 @@ def test_try_load_dq_v1_roundtrip_writes_and_reads(tmp_path):
     )
 
     service = _make_service()
-    hit, partials = service._try_load_dq_v1([out], total_rows=rows)
+    hit, partials = service._try_load_dq_v1([out], total_rows=rows, run_view=_run_view_for(out))
     assert hit is True
     assert len(partials) == 1
     col_map = {c: (n, fv, lv) for (c, n, fv, lv) in partials[0]["col_stats"]}
@@ -245,7 +253,7 @@ def test_try_load_dq_v1_misses_when_metadata_absent(tmp_path):
     _write_parquet_with_codec(table, out, float32_cols=["c0"], schema_metadata=None)
 
     service = _make_service()
-    hit, partials = service._try_load_dq_v1([out], total_rows=5)
+    hit, partials = service._try_load_dq_v1([out], total_rows=5, run_view=_run_view_for(out))
     assert hit is False
     assert partials == []
 
@@ -267,5 +275,5 @@ def test_try_load_dq_v1_misses_on_row_count_mismatch(tmp_path):
 
     service = _make_service()
     # Caller claims total_rows=99 → mismatch → safe fallback.
-    hit, partials = service._try_load_dq_v1([out], total_rows=99)
+    hit, partials = service._try_load_dq_v1([out], total_rows=99, run_view=_run_view_for(out))
     assert hit is False

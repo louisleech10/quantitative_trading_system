@@ -19,6 +19,7 @@ import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { exportChartToPNG } from '@/lib/exportUtils';
 import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
+import { useFeatureDescriptor } from '@/lib/featureDescriptor';
 
 interface FeatureDistributionChartProps {
   taskId: string;
@@ -66,6 +67,8 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
   const { explorerSelectedFeature, setExplorerActiveTab } = useFeatureFactoryStore();
   const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
   const { browseDistribution, browseFeatures } = useFeatureFactory();
+  // FF-NAME Task 3.3：欄名顯示一律經共享描述 map（查無即 unsupported）
+  const { resolve: resolveDescriptor, ingest: ingestDescriptors } = useFeatureDescriptor(taskId);
   const [feature, setFeature] = useState<string>('');
   const [featureOptions, setFeatureOptions] = useState<string[]>([]);
   const [filteredFeatureOptions, setFilteredFeatureOptions] = useState<string[]>([]);
@@ -98,6 +101,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
     browseFeatures(taskId, { offset: 0, limit: FEATURE_NAME_LIMIT, sortBy: 'name', sortOrder: 'asc', detailLevel: 'names' })
       .then((resp) => {
         if (!active) return;
+        ingestDescriptors(resp.features);
         const options = resp.features.map((item) => item.name);
         setFeatureOptions(options);
         setFeature(explorerSelectedFeature || options[0] || '');
@@ -110,7 +114,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId, explorerSelectedFeature, sharedFeatureNames]);
+  }, [browseFeatures, taskId, explorerSelectedFeature, sharedFeatureNames, ingestDescriptors]);
 
   // 建立 O(1) 查找 Set，取代 .includes() 的 O(n) 掃描
   const filteredFeatureSet = useMemo(
@@ -259,7 +263,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
         </button>
       </div>
 
-      <FeatureNameSegmentFilter features={featureOptions} onFilteredFeaturesChange={setFilteredFeatureOptions} />
+      <FeatureNameSegmentFilter taskId={taskId} features={featureOptions} onFilteredFeaturesChange={setFilteredFeatureOptions} />
       <div className="flex gap-3 min-w-0">
         <div className="w-72 shrink-0">
           {/* Virtual list：只渲染可見範圍內的項目，大幅避免大量 DOM 節點造成卡頓 */}
@@ -294,7 +298,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
                           feature === name ? 'bg-indigo-400/20 text-indigo-200' : 'text-slate-300 hover:bg-white/5'
                         }`}
                       >
-                        {name}
+                        {resolveDescriptor(name).display}
                       </button>
                     ))}
                   </div>

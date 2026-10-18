@@ -1,47 +1,79 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FeatureSegmentKey, FeatureSegments, parseFeatureNameSegments } from '@/lib/featureNameParser';
+import { useEffect, useMemo, useState } from 'react';
+import { useFeatureDescriptor } from '@/lib/featureDescriptor';
+import type { FeatureDescriptor } from '@/lib/types';
 
+/**
+ * 命名段落篩選（FF-NAME Task 3.3）：段落值一律取自後端描述（經共享 map），
+ * 不解析欄名字串；map 查無或版本／kind 不符之欄名歸 unsupported，不參與段落選項。
+ */
 interface FeatureNameSegmentFilterProps {
+  /** 共享描述 map 所屬 task。 */
+  taskId: string;
+  /** 欄名清單（原樣；語意一律經 hook 查 map）。 */
   features: string[];
+  /** 篩選結果：回傳欄名。 */
   onFilteredFeaturesChange: (features: string[]) => void;
 }
 
 type SelectMode = 'single' | 'multi';
 
+type FeatureSegmentKey = 'kind' | 'source' | 'timeframe' | 'category' | 'indicator' | 'params' | 'operator';
+
 interface ParsedFeatureItem {
   name: string;
-  segments: FeatureSegments;
+  /** 描述有效（status ok）才有段落值；unsupported 為 null。 */
+  segments: Record<FeatureSegmentKey, string[]> | null;
+  /** params 文字搜尋用之扁平字串（取自描述 params，非欄名）。 */
+  paramsText: string;
 }
 
 const SEGMENT_DEFS: Array<{ key: FeatureSegmentKey; label: string }> = [
+  { key: 'kind', label: 'Kind' },
   { key: 'source', label: 'Source' },
   { key: 'timeframe', label: 'Timeframe' },
   { key: 'category', label: 'Category' },
   { key: 'indicator', label: 'Indicator' },
   { key: 'params', label: 'Params' },
   { key: 'operator', label: 'Operator' },
-  { key: 'opParams', label: 'Op Params' },
-  { key: 'window', label: 'Window' },
-  { key: 'suffix', label: 'Suffix' },
 ];
 
 function buildSegmentMap<T>(factory: () => T): Record<FeatureSegmentKey, T> {
   return {
+    kind: factory(),
     source: factory(),
     timeframe: factory(),
     category: factory(),
     indicator: factory(),
     params: factory(),
     operator: factory(),
-    opParams: factory(),
-    window: factory(),
-    suffix: factory(),
   };
 }
 
-export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesChange }: FeatureNameSegmentFilterProps) {
+function nonEmpty(value: string | undefined): string[] {
+  return value ? [value] : [];
+}
+
+function segmentsOf(d: FeatureDescriptor): Record<FeatureSegmentKey, string[]> {
+  return {
+    kind: nonEmpty(d.kind),
+    source: nonEmpty(d.source),
+    timeframe: nonEmpty(d.tf),
+    category: nonEmpty(d.category),
+    indicator: nonEmpty(d.indicator),
+    params: [],
+    operator: (d.ops ?? []).filter((op) => op.length > 0),
+  };
+}
+
+function paramsTextOf(d: FeatureDescriptor): string {
+  const layers = Array.isArray(d.params) ? d.params : [];
+  return layers.map((layer) => (Array.isArray(layer) ? layer.join('-') : String(layer))).join('~');
+}
+
+export default function FeatureNameSegmentFilter({ taskId, features, onFilteredFeaturesChange }: FeatureNameSegmentFilterProps) {
+  const { resolve } = useFeatureDescriptor(taskId);
   const [freeText, setFreeText] = useState('');
   const [selected, setSelected] = useState<Record<FeatureSegmentKey, string[]>>(
     buildSegmentMap<string[]>(() => []),
@@ -54,92 +86,25 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
   );
   const [indicatorSearch, setIndicatorSearch] = useState('');
   const [paramsSearch, setParamsSearch] = useState('');
-  const parseCacheRef = useRef(new Map<string, ReturnType<typeof parseFeatureNameSegments>>());
-  const workerRef = useRef<Worker | null>(null);
-  const [parsed, setParsed] = useState<ParsedFeatureItem[]>([]);
 
-  useEffect(() => {
-    let active = true;
-    const cache = parseCacheRef.current;
-    const missing: string[] = [];
+  const parsed = useMemo<ParsedFeatureItem[]>(
+    () =>
+      features.map((itemName) => {
+        const result = resolve(itemName);
+        if (result.status !== 'ok') return { name: itemName, segments: null, paramsText: '' };
+        return { name: itemName, segments: segmentsOf(result.descriptor), paramsText: paramsTextOf(result.descriptor) };
+      }),
+    [features, resolve],
+  );
 
-    for (const name of features) {
-      if (!cache.has(name)) {
-        missing.push(name);
-      }
-    }
-
-    const projectFromCache = () => {
-      if (!active) return;
-      const projected: ParsedFeatureItem[] = features
-        .map((name) => {
-          const segments = cache.get(name);
-          return segments ? { name, segments } : null;
-        })
-        .filter((item): item is ParsedFeatureItem => item !== null);
-      setParsed(projected);
-    };
-
-    if (missing.length === 0) {
-      projectFromCache();
-      return () => {
-        active = false;
-      };
-    }
-
-    const parseSynchronously = () => {
-      for (const name of missing) {
-        cache.set(name, parseFeatureNameSegments(name));
-      }
-      projectFromCache();
-    };
-
-    const WORKER_THRESHOLD = 200;
-    if (missing.length < WORKER_THRESHOLD || typeof Worker === 'undefined') {
-      parseSynchronously();
-      return () => {
-        active = false;
-      };
-    }
-
-    try {
-      if (!workerRef.current) {
-        workerRef.current = new Worker(new URL('../../workers/featureNameParser.worker.ts', import.meta.url));
-      }
-
-      workerRef.current.onmessage = (event: MessageEvent<ParsedFeatureItem[]>) => {
-        const payload = Array.isArray(event.data) ? event.data : [];
-        for (const item of payload) {
-          cache.set(item.name, item.segments);
-        }
-        projectFromCache();
-      };
-
-      workerRef.current.postMessage(missing);
-    } catch {
-      // Fallback for environments where Worker URL bundling is unavailable.
-      parseSynchronously();
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [features]);
-
-  useEffect(() => {
-    return () => {
-      workerRef.current?.terminate();
-      workerRef.current = null;
-    };
-  }, []);
+  const unsupportedCount = useMemo(() => parsed.filter((item) => item.segments === null).length, [parsed]);
 
   const optionsBySegment = useMemo(() => {
     const sets = buildSegmentMap<Set<string>>(() => new Set<string>());
     for (const item of parsed) {
+      if (!item.segments) continue;
       for (const seg of SEGMENT_DEFS) {
-        const value = item.segments[seg.key];
-        if (!value) continue;
-        sets[seg.key].add(value);
+        for (const value of item.segments[seg.key]) sets[seg.key].add(value);
       }
     }
 
@@ -161,9 +126,14 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
           if (seg.key === 'params') continue; // params uses text search instead
           const picked = selected[seg.key];
           if (picked.length === 0) continue;
-          if (!picked.includes(item.segments[seg.key])) return false;
+          // unsupported（無有效描述）於任一段落選取時一律排除，不猜測其段落
+          if (!item.segments) return false;
+          if (!item.segments[seg.key].some((v) => picked.includes(v))) return false;
         }
-        if (paramsLower && !item.segments.params.toLowerCase().includes(paramsLower)) return false;
+        if (paramsLower) {
+          if (!item.segments) return false;
+          if (!item.paramsText.toLowerCase().includes(paramsLower)) return false;
+        }
         return true;
       })
       .map((item) => item.name);
@@ -289,7 +259,7 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
                   <input
                     value={paramsSearch}
                     onChange={(e) => setParamsSearch(e.target.value)}
-                    placeholder="輸入參數關鍵字（如 10_100）..."
+                    placeholder="輸入參數關鍵字（如 10-100）..."
                     className="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
                   />
                 ) : (
@@ -355,7 +325,10 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
         })}
       </div>
 
-      <div className="text-[11px] text-slate-400">篩選後特徵數：{filtered.length.toLocaleString()}</div>
+      <div className="text-[11px] text-slate-400">
+        篩選後特徵數：{filtered.length.toLocaleString()}
+        {unsupportedCount > 0 && `（輸入中有 ${unsupportedCount.toLocaleString()} 個欄名 unsupported：無有效描述，不參與段落篩選）`}
+      </div>
       </div>}
     </div>
   );

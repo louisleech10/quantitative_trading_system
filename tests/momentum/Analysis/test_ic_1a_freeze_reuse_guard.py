@@ -9,6 +9,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import pytest
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # FF-NAME 3.4 v18
 
 from api.services.ic_analysis_service import ICAnalysisService
 
@@ -60,6 +61,7 @@ def _write_pair(module: ModuleType, input_dir: Path) -> tuple[Path, Path]:
     meta_path = input_dir / f"{module.SYMBOL}_{module.TIMEFRAME}_{module.CONFIG_HASH}_top2_meta.json"
     input_dir.mkdir(parents=True)
     with h5py.File(h5_path, "w") as handle:
+        _stamp_ic_handoff(handle.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = handle.create_group(f"{module.SYMBOL}/{module.TIMEFRAME}")
         group.create_dataset("features", data=np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32))
         group.create_dataset("timestamps", data=np.arange(2, dtype=np.int64))

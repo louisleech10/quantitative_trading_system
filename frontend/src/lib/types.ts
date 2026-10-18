@@ -779,8 +779,31 @@ export interface FeatureSummary {
   };
 }
 
+/**
+ * FF-NAME Task 3.3：後端 Python parser 算出之版本化欄名描述（不落盤）。
+ * 欄名非法時 kind 為 'unsupported' 並帶 error；前端不得自行解析欄名。
+ */
+export interface FeatureDescriptor {
+  version: number;
+  kind: string;
+  source?: string;
+  tf?: string;
+  category?: string;
+  indicator?: string;
+  params?: string[][];
+  ops?: string[];
+  display: string;
+  error?: string;
+}
+
+/** 經共享 map 查詢之結果；查無／版本不符／未知 kind ⇒ unsupported（fail-closed）。 */
+export type ResolvedFeatureDescriptor =
+  | { status: 'ok'; descriptor: FeatureDescriptor; display: string }
+  | { status: 'unsupported'; reason: string; display: string };
+
 export interface BrowseFeatureItem {
   name: string;
+  descriptor?: FeatureDescriptor | null;
   category: string;
   level: 'L1' | 'L2' | 'L3';
   layer: string;

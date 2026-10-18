@@ -55,6 +55,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from momentum.Analysis.long_short_analyzer import LongShortAnalyzer  # noqa: E402
+from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version as _stamp_ic_handoff  # noqa: E402  FF-NAME 3.4 v18
 from momentum.factories import (  # noqa: E402
     create_ic_analyzer,
     create_kline_storage_manager,
@@ -378,6 +379,7 @@ def _write_features_h5(
         timestamps = np.arange(len(features_df), dtype=np.int64)
 
     with h5py.File(path, "w") as file:
+        _stamp_ic_handoff(file.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性，同正式寫出端之函式
         group = file.create_group(group_key)
         group.create_dataset(
             "features",

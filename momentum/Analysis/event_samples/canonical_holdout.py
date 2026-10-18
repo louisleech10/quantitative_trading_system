@@ -119,18 +119,32 @@ def load_post_trim_index(run_dir: Path) -> pd.Index:
     🔴 索引是 post-trim 的——EVTALIGN 期間對齊把特徵頭尾裁掉之後的 universe，
     不是 K 線原始 universe（`D-002` §D2-3：裁頭尾各 5 根即位移 2 小時）。
     """
-    ts_path = run_dir / "timestamps.parquet"
-    if not ts_path.is_file():
+    # FF-NAME Task 3.4：run 之時間軸 sidecar 只經 FeatureReader 讀取（manifest 共同邊界含命名世代閘；
+    # 舊世代 run ⇒ FeatureNamingVersionError 原樣上拋）。run 目錄＝<特徵根>/<symbol>/<timeframe>/<config_hash>。
+    from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError
+    from momentum.factories import create_feature_reader
+
+    run_dir = Path(run_dir)
+    reader = create_feature_reader(str(run_dir.parents[2]))
+    try:
+        row_index = reader.load_row_index_v2(
+            run_dir.parent.parent.name, run_dir.parent.name, run_dir.name, artifact_kind="raw",
+        )
+    except (FileNotFoundError, RowIndexArtifactMissingError) as exc:
         raise CanonicalHoldoutError(
             "feature_run_missing_timestamps",
-            f"FF run 缺 {ts_path}——post-trim 索引無從建立（fail-closed）",
+            f"FF run {run_dir} 缺 manifest 或時間軸 sidecar——post-trim 索引無從建立（fail-closed）：{exc}",
+        ) from exc
+    if row_index is None:
+        raise CanonicalHoldoutError(
+            "feature_run_missing_timestamps",
+            f"FF run {run_dir} 之 manifest 未宣告時間軸 sidecar——post-trim 索引無從建立（fail-closed）",
         )
-    ts = pd.read_parquet(ts_path)["timestamp"].to_numpy().astype(np.int64) * 1000
-    if ts.size == 0:
+    if len(row_index) == 0:
         raise CanonicalHoldoutError(
             "feature_run_empty_index", f"FF run {run_dir.name} 之 post-trim 索引為空（fail-closed）",
         )
-    return pd.to_datetime(ts, unit="ms")
+    return pd.DatetimeIndex(row_index)
 
 
 def bars_timeframes_for(

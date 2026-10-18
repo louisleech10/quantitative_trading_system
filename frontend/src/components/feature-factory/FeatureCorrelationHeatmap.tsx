@@ -5,7 +5,8 @@ import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { exportChartToPNG } from '@/lib/exportUtils';
 import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
-import type { VifRow } from '@/lib/types';
+import { useFeatureDescriptor } from '@/lib/featureDescriptor';
+import type { ResolvedFeatureDescriptor, VifRow } from '@/lib/types';
 
 interface FeatureCorrelationHeatmapProps {
   taskId: string;
@@ -38,15 +39,17 @@ const getRdBuColor = (value: number): { bg: string; textColor: string } => {
   return { bg: `rgb(${r},${g},${b})`, textColor };
 };
 
-/** 依本系統 7-segment 命名慣例產生短標籤 */
-const shortLabel = (name: string, full = false): string => {
-  if (full) return name;
-  const parts = name.split('_');
-  if (parts.length <= 4) return name;
-  const indicator = parts[3] ?? parts[2];
-  const tail = parts.slice(-2).join('_');
-  if (tail.startsWith(indicator)) return tail;
-  return `${indicator}_…_${tail}`;
+/**
+ * 短標籤：取自後端描述（FF-NAME Task 3.3，經共享 map 查得），不解析欄名字串。
+ * full 或描述無效（unsupported）⇒ 原樣顯示欄名。
+ */
+const shortLabelOf = (resolved: ResolvedFeatureDescriptor, name: string, full = false): string => {
+  if (full || resolved.status !== 'ok') return name;
+  const d = resolved.descriptor;
+  const paramText = (d.params ?? []).map((layer) => layer.join('-')).join('~');
+  const opText = (d.ops ?? []).join('·');
+  const label = [d.indicator, paramText, opText].filter((seg) => seg && seg.length > 0).join(' ');
+  return label || resolved.display;
 };
 
 /** 三種相關係數的特性說明 */
@@ -100,6 +103,9 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
   const { explorerSelectedFeatures, setExplorerSelectedFeatures } = useFeatureFactoryStore();
   const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
   const { browseCorrelation, browseFeatures, browseVif } = useFeatureFactory();
+  // FF-NAME Task 3.3：標籤與類別篩選一律經共享描述 map（查無即 unsupported）
+  const { resolve: resolveDescriptor, ingest: ingestDescriptors } = useFeatureDescriptor(taskId);
+  const shortLabel = (name: string, full = false): string => shortLabelOf(resolveDescriptor(name), name, full);
   const [method, setMethod] = useState<'pearson' | 'spearman' | 'kendall'>('spearman');
   const [available, setAvailable] = useState<string[]>([]);
   const [filteredAvailable, setFilteredAvailable] = useState<string[]>([]);
@@ -124,6 +130,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
     browseFeatures(taskId, { offset: 0, limit: FEATURE_NAME_LIMIT, sortBy: 'name', sortOrder: 'asc', detailLevel: 'names' })
       .then((resp) => {
         if (!active) return;
+        ingestDescriptors(resp.features);
         setAvailable(resp.features.map((item) => item.name));
       })
       .catch(() => {
@@ -134,7 +141,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId, sharedFeatureNames]);
+  }, [browseFeatures, taskId, sharedFeatureNames, ingestDescriptors]);
 
   const selected = useMemo(() => Array.from(new Set(explorerSelectedFeatures)).slice(0, 50), [explorerSelectedFeatures]);
 
@@ -228,7 +235,10 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
         <div className="text-sm text-slate-300">Correlation Heatmap（最多 50）</div>
         <button
           onClick={() => {
-            const picks = filteredAvailable.filter((name) => name.startsWith('ms_')).slice(0, 50);
+            const picks = filteredAvailable.filter((name) => {
+              const resolved = resolveDescriptor(name);
+              return resolved.status === 'ok' && resolved.descriptor.category === 'microstructure';
+            }).slice(0, 50);
             setExplorerSelectedFeatures(picks);
           }}
           className="text-xs px-2 py-1 rounded border border-white/10 text-slate-200 hover:bg-white/5"
@@ -361,7 +371,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
       )}
 
       {/* ── 特徵名稱篩選 ── */}
-      <FeatureNameSegmentFilter features={available} onFilteredFeaturesChange={setFilteredAvailable} />
+      <FeatureNameSegmentFilter taskId={taskId} features={available} onFilteredFeaturesChange={setFilteredAvailable} />
       <div className="flex gap-3 min-w-0">
         <div className="w-72 shrink-0">
           {/* ── 特徵選取標籤 ── */}

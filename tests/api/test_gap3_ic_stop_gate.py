@@ -771,13 +771,24 @@ def test_gap3_ic_feature_cap_features_file_reads_metadata_only(tmp_path):
     from momentum.factories import feature_count_from_features_file
 
     sample = [tmp_path / "declared_only.h5"]
+    from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version
+
     with h5py.File(sample[0], "w") as handle:
+        stamp_h5_feature_naming_version(handle.attrs)  # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性（正式寫出端同一函式）
         handle.create_dataset("ETHUSDT/12h/features", shape=(1_000_000, 200_000), dtype="float32",
                               chunks=(1024, 1024))
     assert sample[0].stat().st_size < 1_000_000  # 只有 header（未配置資料區塊）
     count = feature_count_from_features_file(str(sample[0]))
     assert isinstance(count, int) and count > 0, "讀不到欄數 ⇒ 檔案側解析形同虛設"
     assert count == 200_000
+    # FF-NAME Task 3.4（v18）：缺 feature_naming_version 根屬性之交接 h5 ⇒ 拒（不吞為「量不出」而放行）
+    from momentum.FeatureEngineering.feature_naming import FeatureNamingVersionError
+
+    unstamped = tmp_path / "unstamped.h5"
+    with h5py.File(unstamped, "w") as handle:
+        handle.create_dataset("ETHUSDT/12h/features", shape=(10, 3), dtype="float32")
+    with pytest.raises(FeatureNamingVersionError, match="feature_naming_version"):
+        feature_count_from_features_file(str(unstamped))
     # 讀不到／不存在一律 None，不猜
     assert feature_count_from_features_file("/no/such/file.h5") is None
     assert feature_count_from_features_file(None) is None

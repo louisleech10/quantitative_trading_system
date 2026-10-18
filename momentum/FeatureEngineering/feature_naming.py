@@ -317,12 +317,158 @@ def strip_timeframe_tag(column: str) -> str:
     return name
 
 
-def ratio_unsafe_category(column: str) -> Optional[str]:
-    """共同核心：去標記後 `split("_", 2)[1]` 屬 `RATIO_UNSAFE_CATEGORIES` 則回之，否則 None。"""
-    parts = strip_timeframe_tag(column).split("_", 2)
-    if len(parts) >= 2 and parts[1] in RATIO_UNSAFE_CATEGORIES:
-        return parts[1]
+def parse_either_form(column: str) -> Optional[FeatureIdentity]:
+    """完整形或未標記形欄名 → 身分；形態依第 2 段是否屬週期鍵機械判定（未標記形之第 2 段為 category，與週期鍵
+    不相交）。`label_*`、不合文法 ⇒ None（呼叫端自行具名處理，不猜）。"""
+    name = str(column)
+    if is_label_column(name):
+        return None
+    parts = name.split("_", 2)
+    tagged = len(parts) >= 2 and parts[1] in timeframe_keys()
+    try:
+        return parse_feature_name(name, tagged=tagged)
+    except FeatureNameParseError:
+        return None
+
+
+@dataclasses.dataclass(frozen=True)
+class IdentitySpec:
+    """結構化選欄之身分條件（FF-NAME Task 3.2）：indicator 精確相等；`params` 給定時第一個參數成員須相等；
+    `source` 給定時 source 須相等；只取無 op 之原子欄（L1）。"""
+
+    indicator: str
+    params: Optional[Tuple[str, ...]] = None
+    source: Optional[str] = None
+
+    def matches(self, identity: FeatureIdentity) -> bool:
+        if identity.ops or identity.indicator != self.indicator:
+            return False
+        if self.source is not None and identity.source != self.source:
+            return False
+        if self.params is not None and (not identity.params or tuple(identity.params[0]) != tuple(self.params)):
+            return False
+        return True
+
+
+def find_identity_column(columns: Iterable[object], specs: Iterable[IdentitySpec]) -> Optional[object]:
+    """依 `specs` 之優先序回第一個身分相符之欄（同一 spec 內依欄序取第一個）；皆無 ⇒ None。
+    欄名以 `parse_either_form` 解析（完整形或未標記形）；不以子字串比對（`ATR`／`14` 不命中 `NATR`／`144`）。"""
+    parsed = [(col, parse_either_form(str(col))) for col in columns]
+    for spec in specs:
+        for col, identity in parsed:
+            if identity is not None and spec.matches(identity):
+                return col
     return None
+
+
+def feature_layer(identity: FeatureIdentity) -> str:
+    """管線層由身分導出（FF-NAME Task 3.1；最外層 op 決定）：L6.5 op ⇒ `layer6_5`；category `meta` ⇒ `layer6`、
+    `cross-sectional` ⇒ `layer5`；`Lag` ⇒ `layer4`；L3 滾動彙總 ⇒ `layer3`；其餘 op ⇒ `layer2`；無 op ⇒ `layer1`。"""
+    names = [_op_name(op) for op in identity.ops]
+    last = names[-1] if names else ""
+    if last in L65_OPS:
+        return "layer6_5"
+    if identity.category == "meta":
+        return "layer6"
+    if identity.category == "cross-sectional":
+        return "layer5"
+    if last == "Lag":
+        return "layer4"
+    if last in L3_OPS:
+        return "layer3"
+    if names:
+        return "layer2"
+    return "layer1"
+
+
+def ratio_unsafe_category(column: str) -> Optional[str]:
+    """共同核心（FF-NAME Task 3.1）：`parse` 後之 category 屬 `RATIO_UNSAFE_CATEGORIES` 則回之；label、不合文法或
+    非該類 ⇒ None（完整形與未標記形皆可；不以子字串或位置切段判定）。"""
+    identity = parse_either_form(column)
+    if identity is not None and identity.category in RATIO_UNSAFE_CATEGORIES:
+        return identity.category
+    return None
+
+
+# ---------------------------------------------------------------- 命名世代閘（FF-NAME Task 3.4）
+
+FEATURE_NAMING_VERSION_KEY = "feature_naming_version"
+_REGENERATION_HINT = "請以現行 Feature Factory 重新生成該 run（舊命名世代不遷移、不別名，使用者 2026-10-02）"
+
+
+def _manifest_naming_version(manifest: object) -> object:
+    if not isinstance(manifest, dict):
+        return None
+    return manifest.get(FEATURE_NAMING_VERSION_KEY)
+
+
+def assert_feature_naming_version(manifest: object, *, where: str = "") -> int:
+    """manifest 之 `feature_naming_version` 須存在、為整數且等於 `CURRENT_FEATURE_NAMING_VERSION`；
+    缺鍵、舊版／未知版、無法解析 ⇒ `FeatureNamingVersionError`（訊息含鍵名與重生指引）。"""
+    label = f"（{where}）" if where else ""
+    if not isinstance(manifest, dict) or FEATURE_NAMING_VERSION_KEY not in manifest:
+        raise FeatureNamingVersionError(
+            f"特徵 manifest 缺 {FEATURE_NAMING_VERSION_KEY}{label}；預期 {CURRENT_FEATURE_NAMING_VERSION}。{_REGENERATION_HINT}")
+    raw = manifest[FEATURE_NAMING_VERSION_KEY]
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise FeatureNamingVersionError(
+            f"特徵 manifest 之 {FEATURE_NAMING_VERSION_KEY}={raw!r} 無法解析{label}；預期整數 "
+            f"{CURRENT_FEATURE_NAMING_VERSION}。{_REGENERATION_HINT}")
+    if raw != CURRENT_FEATURE_NAMING_VERSION:
+        raise FeatureNamingVersionError(
+            f"特徵 manifest 之 {FEATURE_NAMING_VERSION_KEY}={raw} 與現行 {CURRENT_FEATURE_NAMING_VERSION} 不符{label}。"
+            f"{_REGENERATION_HINT}")
+    return raw
+
+
+def _normalize_h5_attr(value: object) -> object:
+    """h5 屬性值 → JSON 等價值（numpy 整數 ⇒ int；bytes ⇒ str；numpy bool 保持 bool 以便拒收）。"""
+    try:
+        import numpy as np
+    except ImportError:  # pragma: no cover - numpy 為必要依賴
+        return value
+    if isinstance(value, (np.bool_, bool)):
+        return bool(value)
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, (bytes, np.bytes_)):
+        return bytes(value).decode("utf-8", errors="replace")
+    return value
+
+
+def assert_h5_feature_naming_version(attrs: object, path: object = "") -> int:
+    """IC 交接 h5（SPEC v18 Task 3.4）之命名世代閘：根屬性 `feature_naming_version` 須存在、為整數且等於
+    `CURRENT_FEATURE_NAMING_VERSION`；缺屬性、舊版／未知版、無法解析 ⇒ `FeatureNamingVersionError`（訊息含鍵名與
+    重生指引）。讀取端須於產生任何 DataFrame 前呼叫（`attrs`＝`h5py.File(...).attrs` 或等價對映）。"""
+    try:
+        present = FEATURE_NAMING_VERSION_KEY in attrs  # type: ignore[operator]
+    except TypeError:
+        present = False
+    probe = {FEATURE_NAMING_VERSION_KEY: _normalize_h5_attr(attrs[FEATURE_NAMING_VERSION_KEY])} if present else {}  # type: ignore[index]
+    return assert_feature_naming_version(probe, where=f"IC 交接 h5 {path}" if path else "IC 交接 h5")
+
+
+def stamp_h5_feature_naming_version(attrs: object, version: int = CURRENT_FEATURE_NAMING_VERSION) -> None:
+    """IC 交接 h5 寫出端：於根屬性寫 `feature_naming_version`（＝寫入時資料之世代；資料來自已過世代閘之
+    FeatureLibrary ⇒ 預設現行版）。"""
+    attrs[FEATURE_NAMING_VERSION_KEY] = int(version)  # type: ignore[index]
+
+
+def assert_single_feature_naming_version(manifests: "dict[str, object]") -> int:
+    """多標的合併點：各 manifest 之 `feature_naming_version` 須一致且皆通過 `assert_feature_naming_version`；
+    混世代 ⇒ `FeatureNamingVersionError`（訊息列各標的之版本值）。`manifests` 以標的（或 run 鍵）為鍵。"""
+    if not manifests:
+        raise FeatureNamingVersionError(f"多標的合併點未取得任何 manifest，無法驗 {FEATURE_NAMING_VERSION_KEY}")
+    versions = {str(key): _manifest_naming_version(m) for key, m in manifests.items()}
+    distinct = {repr(v) for v in versions.values()}
+    if len(distinct) > 1:
+        detail = "、".join(f"{k}={v!r}" for k, v in sorted(versions.items()))
+        raise FeatureNamingVersionError(
+            f"多標的合併之 {FEATURE_NAMING_VERSION_KEY} 不一致（{detail}）；不得混合命名世代。{_REGENERATION_HINT}")
+    result = CURRENT_FEATURE_NAMING_VERSION
+    for key, manifest in manifests.items():
+        result = assert_feature_naming_version(manifest, where=str(key))
+    return result
 
 
 def is_ratio_unsafe_column(column: str) -> bool:

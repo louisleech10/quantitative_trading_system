@@ -18,6 +18,7 @@ import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { exportChartToPNG } from '@/lib/exportUtils';
 import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
+import { useFeatureDescriptor } from '@/lib/featureDescriptor';
 
 interface FeatureTimeSeriesChartProps {
   taskId: string;
@@ -60,6 +61,8 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
   const { explorerSelectedFeatures, explorerSelectedFeature, setExplorerSelectedFeatures } = useFeatureFactoryStore();
   const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
   const { browseData, browseFeatures } = useFeatureFactory();
+  // FF-NAME Task 3.3：欄名顯示一律經共享描述 map（查無即 unsupported）
+  const { resolve: resolveDescriptor, ingest: ingestDescriptors } = useFeatureDescriptor(taskId);
   const [options, setOptions] = useState<string[]>([]);
   const [filteredOptions, setFilteredOptions] = useState<string[]>([]);
   const [rows, setRows] = useState<Array<Record<string, string | number | null>>>([]);
@@ -91,6 +94,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     browseFeatures(taskId, { offset: 0, limit: FEATURE_NAME_LIMIT, sortBy: 'name', sortOrder: 'asc', detailLevel: 'names' })
       .then((resp) => {
         if (!active) return;
+        ingestDescriptors(resp.features);
         setOptions(resp.features.map((item) => item.name));
       })
       .catch(() => {
@@ -101,7 +105,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId, sharedFeatureNames]);
+  }, [browseFeatures, taskId, sharedFeatureNames, ingestDescriptors]);
 
   const selected = useMemo(() => {
     const uniq = Array.from(new Set(explorerSelectedFeatures)).slice(0, 5);
@@ -470,7 +474,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
         </button>
       </div>
 
-      <FeatureNameSegmentFilter features={options} onFilteredFeaturesChange={setFilteredOptions} />
+      <FeatureNameSegmentFilter taskId={taskId} features={options} onFilteredFeaturesChange={setFilteredOptions} />
       <div className="flex gap-3 min-w-0">
         <div className="w-72 shrink-0">
           <div className="max-h-[540px] overflow-y-auto rounded border border-white/5 bg-black/20 py-1">
@@ -484,7 +488,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
                   title={name}
                   className="w-full text-left truncate text-xs px-2 py-1 rounded bg-cyan-400/20 text-cyan-200"
                 >
-                  {name} ✕
+                  {resolveDescriptor(name).display} ✕
                 </button>
               ))}
             {/* 篩選後的選項（前 500）*/}
@@ -499,7 +503,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
                     active ? 'bg-cyan-400/20 text-cyan-200' : 'text-slate-300 hover:bg-white/5'
                   }`}
                 >
-                  {name}
+                  {resolveDescriptor(name).display}
                 </button>
               );
             })}

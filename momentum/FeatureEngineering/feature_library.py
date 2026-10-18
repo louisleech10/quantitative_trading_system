@@ -13,7 +13,8 @@ from momentum.FeatureEngineering.consumer_gate import (
     assert_consumer_run_status,
     assert_required_columns_present,
 )
-from momentum.FeatureEngineering.feature_reader import FeatureReader
+from momentum.FeatureEngineering import feature_naming
+from momentum.FeatureEngineering.feature_reader import CanonicalRun, FeatureReader, resolve_canonical_run
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
@@ -243,16 +244,24 @@ class FeatureLibrary:
         allow_partial_training: bool = False,
         feature_columns: Optional[List[str]] = None,
     ) -> Dict[str, pd.DataFrame]:
-        """Load features for multiple symbols. Raises if any symbol is missing."""
-        loaded: Dict[str, pd.DataFrame] = {}
+        """Load features for multiple symbols. Raises if any symbol is missing.
+
+        FF-NAME Task 3.4：載入任何矩陣前，各標的 manifest（經 reader 共同邊界）之命名世代須一致
+        （`assert_single_feature_naming_version`），混世代 ⇒ `FeatureNamingVersionError`。
+        """
         for symbol in symbols:
-            symbol_hash = (config_hashes or {}).get(symbol)
             if config_hashes is not None and symbol not in config_hashes:
                 logger.warning(
                     "config_hashes missing symbol %s/%s; falling back to find_latest",
                     symbol,
                     timeframe,
                 )
+        manifests = self.load_manifests_for_merge(symbols, timeframe, config_hashes=config_hashes)
+        if manifests:
+            feature_naming.assert_single_feature_naming_version(manifests)
+        loaded: Dict[str, pd.DataFrame] = {}
+        for symbol in symbols:
+            symbol_hash = (config_hashes or {}).get(symbol)
             loaded[symbol] = self.load(
                 symbol,
                 timeframe,
@@ -263,6 +272,56 @@ class FeatureLibrary:
         if feature_columns:
             assert_required_columns_present(loaded, feature_columns, error_type=TrainingReadError)
         return loaded
+
+    def load_manifests_for_merge(
+        self,
+        symbols: List[str],
+        timeframe: str,
+        *,
+        config_hashes: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Dict[str, Any]]:
+        """多標的合併點之 manifest 蒐集（FF-NAME Task 3.4）：每標的依 `load` 同一解析規則取 run，經 reader 共同
+        邊界讀 manifest（只過命名世代閘，不讀矩陣；consumer 政策仍由後續 `load` 判定）。無 registry 條目或 V2 檔缺
+        之標的略過——其錯誤由後續 `load` 以原有例外拋出；回傳 {symbol: manifest} 供
+        `assert_single_feature_naming_version`。"""
+        manifests: Dict[str, Dict[str, Any]] = {}
+        for symbol in symbols:
+            symbol_hash = (config_hashes or {}).get(symbol)
+            entry = (
+                self._registry.get(symbol, timeframe, symbol_hash)
+                if symbol_hash
+                else self._registry.find_latest_materialized(symbol, timeframe)
+            )
+            resolved_hash = (entry or {}).get("config_hash", "")
+            if not resolved_hash:
+                continue
+            try:
+                manifests[symbol] = self._reader.load_run_manifest_v2(symbol, timeframe, resolved_hash)
+            except FileNotFoundError:
+                continue
+        return manifests
+
+    def resolve_canonical_run(self, path: Any) -> CanonicalRun:
+        """特徵檔路徑 → canonical run（特徵根＝本 library 之 storage 根；registry 須有條目）；否則
+        `NonCanonicalFeaturePathError`（不開啟任何檔，FF-NAME Task 3.4）。"""
+        return resolve_canonical_run(path, feature_root=self._storage.base_path, registry_get=self._registry.get)
+
+    def load_canonical_path(
+        self,
+        path: Any,
+        *,
+        for_training: bool = False,
+        allow_partial_training: bool = False,
+    ) -> pd.DataFrame:
+        """以特徵檔路徑載入：先解析為 canonical run 再經 `load`（任意 `.parquet`／`.h5` 一律拒收）。"""
+        run = self.resolve_canonical_run(path)
+        return self.load(
+            run.symbol,
+            run.timeframe,
+            config_hash=run.config_hash,
+            for_training=for_training,
+            allow_partial_training=allow_partial_training,
+        )
 
     def ensure_fresh(self, symbol: str, timeframe: str, current_config_hash: str) -> bool:
         """Return whether latest cached entry matches given config hash."""
