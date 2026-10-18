@@ -128,7 +128,9 @@ def test_baseline_records_all_sections():
 def test_baseline_golden_values_nonempty_and_complete():
     """審查 r13 P1-05：每個重凍對象 golden 之 `golden_values` 非空，且 fingerprint 數 == 該 golden 欄數（凍結當下）。"""
     data = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
-    goldens = CONTRACT["refreeze"]["goldens"]
+    # SPEC v21：不可變 baseline 之範圍＝refreeze.baseline_goldens（refreeze.goldens 只列實際重凍者，為其子集）
+    goldens = CONTRACT["refreeze"]["baseline_goldens"]
+    assert set(CONTRACT["refreeze"]["goldens"]) <= set(goldens)
     assert sorted(data["golden_values"]) == sorted(goldens)
     # SPEC v15 §G：逐欄 golden（未登記 no_column_records）須非空、數＝欄數
     empty = [rel for rel in goldens
@@ -141,13 +143,18 @@ def test_baseline_golden_values_nonempty_and_complete():
     bad_len = [name for name in goldens if name not in registered
                and any(len(h) != hash_len for h in data["golden_values"][name].values())]
     assert bad_len == []
-    # 登記之無逐欄紀錄 golden：空紀錄、欄數 0、類別屬 oracle_classes、理由非空、檔案 sha256＝現檔
+    # 登記之無逐欄紀錄 golden：空紀錄、欄數 0、類別屬 oracle_classes、理由非空、檔案 sha256＝baseline frozen_at_head 之該檔
+    # （SPEC v21：重凍後磁碟上之 K2 golden 依處置改變；基準之錨為凍結點之 git 物件）
+    import subprocess
+
     assert set(registered) <= set(goldens)
     assert sorted(data["golden_file_sha256"]) == sorted(registered)
     for name, entry in registered.items():
         assert data["golden_values"][name] == {} and data["golden_column_counts"][name] == 0, name
         assert entry["class"] in CONTRACT["refreeze"]["oracle_classes"] and str(entry["reason"]).strip(), name
-        assert data["golden_file_sha256"][name] == hashlib.sha256((REPO / name).read_bytes()).hexdigest(), name
+        blob = subprocess.run(["git", "show", f"{data['frozen_at_head']}:{name}"], cwd=str(REPO), capture_output=True)
+        assert blob.returncode == 0, name
+        assert data["golden_file_sha256"][name] == hashlib.sha256(blob.stdout).hexdigest(), name
 
 
 def test_mutation_unregistered_empty_golden_fails_check(monkeypatch):
