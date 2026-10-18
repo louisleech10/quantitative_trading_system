@@ -89,11 +89,37 @@ def _idents(cols: List[str]):
 
 # ---------------------------------------------------------------- 邊界
 
-def test_boundary_01_lag_on_l2_columns(append_cols):
-    hits = [c for c, ident in _idents(append_cols)
-            if len(ops_tuple(ident)) >= 2 and ops_tuple(ident)[-2] in {"Cross"} and last_op_name(ident) == "Lag"]
+def test_boundary_01_lag_on_l2_columns():
+    """邊界①：L4 對 L2 欄之 lag（`apply_to=all`）。SPEC v17 Task 2.4：CGSA 生成路徑強制 `layer1_and_raw`（§N 殘留），
+    此組合只於 `LagProcessor` 單元層驗命名（真實 kline 切片；L1→L2 Cross→L4）；值另驗＝輸入位移 k 列。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
+    from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
+
+    kline = real_slice(400)
+    l1 = TrendIndicatorEngine(CategoryConfig(indicators=[{"name": "EMA", "periods": [5, 21]}]).model_dump(),
+                              ["close"]).compute_all(kline)
+    off = {"enabled": False}
+    l2 = DerivedOperatorEngine({"cross": {"enabled": True}, "ratio": off, "distance": off, "momentum": off,
+                                "binary_signal": off, "signed_strength": off, "worldquant": off}).compute_all(l1, kline)
+    assert list(l2.columns)
+    config = create_feature_factory()._resolve_config(
+        {"lag_features": {"enabled": True, "apply_to": "all"}, "global": {"lag_strategy": "custom", "custom_lags": [1, 3]}})
+    out = LagProcessor(config).compute_all(l2)
+    hits = [c for c in out.columns
+            if len(ops_tuple(parse_untagged(c))) >= 2 and ops_tuple(parse_untagged(c))[-2] == "Cross"
+            and last_op_name(parse_untagged(c)) == "Lag"]
     assert hits, "apply_to=all 下無 L2 欄之 lag"
-    assert all(roundtrip_ok(c) for c in hits)
+    assert len(hits) == 2 * len(l2.columns)
+    for c in hits:
+        full = fn.tag_timeframe(c, TF)
+        assert roundtrip_ok(full)
+        ident = parse_untagged(c)
+        k = int(ops_tuple(ident)[-1].split("-")[1])
+        base = fn.format_feature_name(fn.FeatureIdentity(source=ident.source, tf=None, category=ident.category,
+                                                         indicator=ident.indicator, params=ident.params,
+                                                         ops=ident.ops[:-1]))
+        pd.testing.assert_series_equal(out[c], l2[base].shift(k), check_names=False)
 
 
 def test_boundary_02_replace_mode_has_no_transform_op(append_cols, replace_cols):
@@ -139,10 +165,38 @@ def test_l6_meta(append_cols):
 
 
 def test_append_mode_transform_ops(append_cols):
+    """SPEC v17 Task 2.4 邊界②：生成路徑之 append 只可達 `fracdiff`／`diff-k`（rank／gaussian／zscore 由生成端關閉）；
+    `rank`／`gaussian`／`zscore-w` 之命名改於 `FeaturePreprocessor` 單元層驗（見下）。"""
     ops = {ops_tuple(ident)[-1] for _c, ident in _idents(append_cols) if last_op_name(ident) in L65_OPS}
-    names = {op.split("-")[0] for op in ops}
-    assert {"rank", "gaussian", "zscore"} <= names
-    assert all(re.match(r"^(fracdiff|diff-\d+|rank|gaussian|zscore-\d+)$", op) for op in ops)
+    assert ops
+    assert all(re.match(r"^(fracdiff|diff-\d+)$", op) for op in ops), sorted(ops)
+
+
+def test_append_mode_rank_gaussian_zscore_unit_names():
+    """SPEC v17 Task 2.4 邊界②：append 模式之 `rank`／`gaussian`／`zscore-w` 於 `FeaturePreprocessor` 單元層驗命名
+    （真實 kline 切片之 L1 欄）：每個輸入欄恰各多一欄、op 段字面正確、標記後往返。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    kline = real_slice(400)
+    l1 = TrendIndicatorEngine(CategoryConfig(indicators=[{"name": "EMA", "periods": [5, 13]}]).model_dump(),
+                              ["close"]).compute_all(kline)
+    pre = FeaturePreprocessor({
+        "mode": "append",
+        "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
+        "gaussian_normalize": {"enabled": True, "apply_to": "all"},
+        "adaptive_zscore": {"enabled": True, "windows": [21], "apply_to": "all"},
+    })
+    out = pre.transform(l1)
+    added = [str(c) for c in out.columns if c not in l1.columns]
+    # append 各步作用於前一步之全部欄（既有行為）⇒ 每個輸入欄得 (rank, gaussian, zscore-21) 依管線順序之全部非空子序列
+    import itertools
+
+    steps = ("rank", "gaussian", "zscore-21")
+    chains = [combo for r in range(1, len(steps) + 1) for combo in itertools.combinations(steps, r)]
+    assert sorted(added) == sorted("_".join((c,) + combo) for c in l1.columns for combo in chains)
+    for c in added:
+        assert last_op_name(parse_untagged(c)) in {"rank", "gaussian", "zscore"}
+        assert roundtrip_ok(fn.tag_timeframe(c, TF))
 
 
 # ---------------------------------------------------------------- 單元：L3 名稱（真實 kline 切片）

@@ -13,6 +13,7 @@ v13：引擎輸出為未標記形，以 `parse_feature_name(name, tagged=False)`
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Dict, Iterable, List
 
 import pandas as pd
@@ -54,8 +55,18 @@ def _canonical_join(keys: Iterable[str]) -> str:
     return "-".join(fn.canonical_segment(k) for k in keys)
 
 
+def _no_mavp_trend_config() -> Dict:
+    """預設 trend 全部指標扣 MAVP 之明確設定（SPEC v17 §N 殘留：預設 `CategoryConfig` 之 MAVP 於穩定遮罩登記缺
+    `period_keys` 而拋 `StableMaskError`，改前即紅、另開修正票）；其餘指標（含多輸出 BBANDS）與預設相同。"""
+    from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+
+    names = [spec.name for spec in TALibWrapper.list_indicators("trend") if spec.name != "MAVP"]
+    return CategoryConfig(indicators=[{"name": n} for n in names]).model_dump()
+
+
 def _talib_engine(cls, sources: List[str]):
-    return cls(CategoryConfig().model_dump(), sources)
+    config = _no_mavp_trend_config() if cls is TrendIndicatorEngine else CategoryConfig().model_dump()
+    return cls(config, sources)
 
 
 # ---------------------------------------------------------------- Task 2.1 邊界
@@ -138,7 +149,10 @@ def test_boundary_05_no_param_indicator(kline):
     assert len(ofi_raw) == 1
     ident = parse_untagged(ofi_raw[0])
     assert params_str(ident) == ""
-    assert fn.format_feature_name(ident) == fn.tag_timeframe(ofi_raw[0], TF)
+    assert fn.format_feature_name(ident) == ofi_raw[0]  # 未標記形對未標記形
+    tagged = fn.tag_timeframe(ofi_raw[0], TF)
+    assert fn.format_feature_name(dataclasses.replace(ident, tf=TF)) == tagged  # 標記形對標記形
+    assert fn.parse_feature_name(tagged) == dataclasses.replace(ident, tf=TF)
 
 
 # ---------------------------------------------------------------- Task 2.2 驗證

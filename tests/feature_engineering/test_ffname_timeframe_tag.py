@@ -51,7 +51,8 @@ def test_boundary_02_label_not_tagged():
 
 
 def test_old_tagger_zero_occurrences():
-    proc = subprocess.run(["grep", "-rn", _OLD_TAGGER, "momentum", "api", "scripts", "tests"],
+    # SPEC v17 Task 2.5：他票凍結 golden 之字面不屬程式碼 ⇒ 排除 `_golden` 目錄
+    proc = subprocess.run(["grep", "-rn", _OLD_TAGGER, "momentum", "api", "scripts", "tests", "--exclude-dir=_golden"],
                           cwd=str(REPO), capture_output=True, text=True)
     assert proc.returncode == 1 and proc.stdout == "", proc.stdout[:2000]
     assert not hasattr(FeatureFactory, _OLD_TAGGER)
