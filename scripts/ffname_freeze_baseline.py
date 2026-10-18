@@ -1539,12 +1539,33 @@ def _pre_change_golden_bytes(rel: str, baseline: Mapping[str, Any]) -> Optional[
     return proc.stdout if proc.returncode == 0 else None
 
 
+def full_reference_window() -> Tuple[str, str]:
+    """SPEC v22：全量 reference 窗＝契約標的之主週期 kline 最後一根之日期往前 `window_months` 個月（由資料導出）。"""
+    import h5py
+    import numpy as np
+    import pandas as pd
+
+    from tests.feature_engineering.fftfmeta_golden_helpers import KLINE_DIR, PRIMARY_TF
+
+    spec = _contract()["refreeze"]["full_reference"]
+    with h5py.File(Path(KLINE_DIR) / "kline_cache.h5", "r") as f:
+        ts = np.asarray(f[f"/{spec['symbol']}/{PRIMARY_TF}/data"]["timestamp"], dtype=np.int64)
+    end = pd.Timestamp(int(ts.max()), unit="s").normalize()
+    start = end - pd.DateOffset(months=int(spec["window_months"]))
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
 def run_full_reference(work_dir: Path, symbol: str, start: Optional[str], end: Optional[str]) -> Dict[str, Any]:
-    """全量 reference（Task 4.3）：reference `main` 設定（週期取契約 `refreeze.full_reference.timeframes`）於 `symbol`
-    跑 IC-first 正式路徑；回傳 raw＋processed 全部欄名。寫入隔離同 `fftfmeta_golden_helpers.prepare_env`（由呼叫端設）。"""
+    """全量 reference（Task 4.3／SPEC v22）：reference `main` 設定、契約之標的與週期、3 個月窗（`full_reference_window`），
+    跑 IC-first 正式路徑；回傳 raw＋processed 全部欄名。標的或窗與契約不符 ⇒ 拒跑（審查 r1 codex P1-03）。
+    寫入隔離同 `fftfmeta_golden_helpers.prepare_env`（由呼叫端設）。"""
     from tests.feature_engineering.fftfmeta_golden_helpers import PRIMARY_TF
 
-    timeframes = list(_contract()["refreeze"]["full_reference"]["timeframes"])
+    spec = _contract()["refreeze"]["full_reference"]
+    expected = full_reference_window()
+    if symbol != spec["symbol"] or (start, end) != expected:
+        raise FreezeError(f"全量 reference 須為 {spec['symbol']}、窗 {expected}（實得 {symbol}、{(start, end)}）")
+    timeframes = list(spec["timeframes"])
     payload = json.loads(json.dumps(reference_payloads()["main"]))
     primary = PRIMARY_TF if PRIMARY_TF in timeframes else timeframes[0]
     payload["timeframes"] = {**payload["timeframes"], "primary": primary, "training": timeframes}
@@ -1810,9 +1831,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         help="改後碼態跑 reference 並寫 Task 2.6 收據（handoffs/run_receipts/ffname-value-invariance.json）")
     parser.add_argument("--full-reference-only", metavar="OUT_JSON", default=None,
                         help="Task 4.3：只跑全量 reference，欄名清單寫入 OUT_JSON（供 scripts/ffname_refreeze.py receipt 沿用）")
-    parser.add_argument("--full-ref-symbol", default="ETHUSDT", help="全量 reference 標的（SPEC Task 4.3：ETHUSDT）")
-    parser.add_argument("--full-ref-start", default=None, help="全量 reference 起日（預設 None＝kline 全史）")
-    parser.add_argument("--full-ref-end", default=None)
     args = parser.parse_args(argv)
     if args.value_receipt:
         return write_value_receipt()
@@ -1825,7 +1843,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         with tempfile.TemporaryDirectory(prefix="ffname_full_reference_") as tmp:
             with pytest.MonkeyPatch.context() as mp:
                 prepare_env(mp, Path(tmp), FFACT_MULTI_TF_PARALLEL="0")
-                info = run_full_reference(Path(tmp) / "run", args.full_ref_symbol, args.full_ref_start, args.full_ref_end)
+                # SPEC v22：標的與窗只取自契約與資料（不接受命令列覆寫）
+                start, end = full_reference_window()
+                info = run_full_reference(Path(tmp) / "run", _contract()["refreeze"]["full_reference"]["symbol"],
+                                          start, end)
         info["elapsed_seconds"] = round(time.time() - started, 1)
         Path(args.full_reference_only).write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         print(f"[ffname-full-reference] {len(info['columns'])} 欄、{info['elapsed_seconds']}s → {args.full_reference_only}")

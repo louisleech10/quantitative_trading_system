@@ -41,6 +41,25 @@ MAPS_DIR = MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_maps"
 SIDECAR_DIR = Path(os.environ.get("FFNAME_SIDECAR_DIR") or (MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_sidecars"))
 RECORD_SCHEMA = "ffname-refreeze-record-v1"
 MAP_SCHEMA = "ffname-refreeze-map-v1"
+CONTRACT_PATH = MAIN_REPO / "tests" / "_golden" / "ffname" / "contract.json"
+PRE_CHANGE_CODE_ROOTS = ("momentum", "api", "config", "scripts", "tests")
+
+
+def _contract_refreeze() -> Dict[str, Any]:
+    return json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))["refreeze"]
+
+
+def _pre_change_commit() -> str:
+    return str(_contract_refreeze()["pre_change_commit"])
+
+
+def _require_pre_change_record(record_doc: Mapping[str, Any], label: str) -> None:
+    """SPEC v22：K1 映射與 K2 舊側只收改前碼態（契約 pre_change_commit）之紀錄器紀錄，否則拒收。"""
+    expected = _pre_change_commit()
+    if not record_doc.get("instrumented") or record_doc.get("head") != expected \
+            or record_doc.get("pre_change_verified") is not True:
+        raise SystemExit(f"{label}：改前紀錄非出自 {expected[:12]}（head={str(record_doc.get('head'))[:12]}、"
+                         f"instrumented={record_doc.get('instrumented')}、verified={record_doc.get('pre_change_verified')}）")
 
 
 def _slug(rel: str) -> str:
@@ -321,12 +340,12 @@ FAILOPEN_UNITS = ("BTCUSDT/12h", "ETHUSDT/12h", "BTCUSDT/1h", "ETHUSDT/1h", "BTC
 
 
 def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
-    """failopen 單一單元（環境變數 `FFNAME_FAILOPEN_UNIT`＝`<SYM>/<TF>` 或 `<SYM>/multi`）：以該 golden 原產生函式
+    """failopen 單一單元（環境變數 `FFNAME_UNIT`＝`<SYM>/<TF>` 或 `<SYM>/multi`）：以該 golden 原產生函式
     （`freeze_failopen_baseline._single_tf_record`／`_multi_tf_record`，全窗）跑一次，並包裝其雜湊函式錄逐欄 sidecar
     （registry 全群組表、l1_direct、merged_L7；值指紋與欄名分開，供依名逐欄比對）。回傳該單元之 golden 紀錄。"""
     import numpy as np
 
-    unit = os.environ.get("FFNAME_FAILOPEN_UNIT", "")
+    unit = os.environ.get("FFNAME_UNIT", "")
     symbol, _, kind = unit.partition("/")
     frz = _load(_tree() / "scripts" / "freeze_failopen_baseline.py", "ffname_rf_failopen")
     for name, value in frz.FIXED_ENV.items():
@@ -391,7 +410,7 @@ def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
     elif kind:
         record = frz._single_tf_record(symbol, kind, temp_root)
     else:
-        raise SystemExit("FFNAME_FAILOPEN_UNIT 未設定")
+        raise SystemExit("FFNAME_UNIT 未設定")
     import pandas as pd
 
     shift: Dict[str, bool] = {}
@@ -403,8 +422,51 @@ def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
     return {"unit": unit, "unit_record": record, "tables": tables, "conflicts": conflicts, "g6_shift": shift}
 
 
+def _recipe_framepath(mp: Any, work: Path) -> Dict[str, Any]:
+    """framepath（SPEC v22 K2）：12 格於同一程序內以 `freeze_framepath_baseline.generate_cell` 逐格跑（同 run_cell 之
+    子行程內容、不含記憶體取樣），錄各格 fingerprint（含逐欄 dtype／nan／inf／values 雜湊）；⑥ 新增 lag 欄（現行碼）
+    以該格公開輸出之值驗位移。環境變數 `FFNAME_CELLS`（逗號分隔）可限縮格（預設全 12 格）。同一程序跑完全部格 ⇒
+    組名零件為各格聯集（平行格 C6 之 worker 欄名由同設定之序列格 C3 涵蓋，查無者由 mapping fail-closed）。"""
+    fb = _load(_tree() / "scripts" / "freeze_framepath_baseline.py", "ffname_rf_framepath")
+    from tests.feature_engineering import ffstat_helpers as fh
+
+    wanted = [c for c in (os.environ.get("FFNAME_CELLS") or "").split(",") if c] or list(fb.CELLS)
+    cells: Dict[str, Any] = {}
+    for cell in wanted:
+        cell_dir = work / "framepath" / cell
+        out = fb.generate_cell(cell, cell_dir)
+        fp = out["fingerprint"]
+        names = list((fp.get("columns") or {}).keys())
+        g6_names = [n for n in names if "_Lag-" in n]
+        shift: Dict[str, bool] = {}
+        if g6_names:
+            import pandas as pd
+
+            bases = {n.rsplit("_Lag-", 1)[0] for n in g6_names}
+            values = fh.base_column_values(cell_dir / "features", set(g6_names) | bases)
+            frame = pd.DataFrame({k: v for k, v in values.items()}) if values else pd.DataFrame()
+            shift = _g6_shift_checks(frame) if not frame.empty else {}
+        # time_index_sha256 之輸入含 timestamps.parquet 之相對路徑（路徑段含 config hash 目錄，受 Task 4.1 鹽影響）⇒
+        # 另錄去路徑之時間值摘要（逐檔逐欄值 sha256，依去 hash 段之相對路徑排序），供名無關比對
+        import pyarrow.parquet as pq
+
+        time_values = []
+        froot = cell_dir / "features"
+        for p in sorted(froot.rglob("timestamps.parquet")) if froot.exists() else []:
+            parts = list(p.relative_to(froot).parts)
+            if len(parts) >= 3:
+                parts[2] = "<config_hash>"
+            table = pq.read_table(p)
+            time_values.append(["/".join(parts), [hashlib.sha256(table.column(n).to_numpy(zero_copy_only=False).tobytes())
+                                                 .hexdigest() for n in table.column_names]])
+        cells[cell] = {"fingerprint": fp, "receipt": out.get("receipt"), "g6_shift": shift,
+                       "time_values": sorted(time_values)}
+    return {"cells": cells}
+
+
 RECIPES: Dict[str, Callable[[Any, Path], Dict[str, Any]]] = {
     "failopen": _recipe_failopen,
+    "framepath": _recipe_framepath,
     "icfa_l3": _recipe_icfa_l3,
     "icfa_calibration": _recipe_icfa_calibration,
     "icfa_worker": _recipe_icfa_worker,
@@ -429,6 +491,16 @@ def record(recipe: str, out: Path, instrument: bool) -> int:
     if recipe not in RECIPES:
         raise SystemExit(f"未知 recipe {recipe!r}；可選 {sorted(RECIPES)}")
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(_tree()), capture_output=True, text=True).stdout.strip()
+    pre_change = None
+    if instrument:
+        # SPEC v22 重凍前提：改前紀錄須出自契約 pre_change_commit 之碼態，且產生碼無本地改動（未追蹤之快取不計）
+        pre_change = _pre_change_commit()
+        status = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no", "--", *PRE_CHANGE_CODE_ROOTS],
+                                cwd=str(_tree()), capture_output=True, text=True).stdout.splitlines()
+        # 版控內之 numba 編譯快取（__pycache__/*.nbi|*.nbc）每次執行即改寫，非產生碼；其餘任何本地改動即拒收
+        dirty = "\n".join(line for line in status if "/__pycache__/" not in line)
+        if head != pre_change or dirty:
+            raise SystemExit(f"改前紀錄須出自 {pre_change[:12]} 之乾淨碼態：HEAD={head[:12]}、本地改動={dirty[:200]!r}")
     frz = _load(_tree() / "scripts" / "ffname_freeze_baseline.py", "ffname_rf_freeze") if instrument else None
     inst = frz._Instrument() if instrument else None
     started = time.time()
@@ -442,6 +514,8 @@ def record(recipe: str, out: Path, instrument: bool) -> int:
         sidecar = RECIPES[recipe](mp, work)
     payload: Dict[str, Any] = {"schema_version": RECORD_SCHEMA, "recipe": recipe, "tree": str(_tree()), "head": head,
                                "instrumented": bool(instrument), "elapsed_seconds": round(time.time() - started, 1),
+                               "pre_change_verified": bool(instrument) and head == pre_change,
+                               "unit": os.environ.get("FFNAME_UNIT") or None,
                                "sidecar": sidecar, "work_dir": str(work)}
     if inst is not None:
         payload["parts"] = inst.rec.to_json()
@@ -610,6 +684,7 @@ def _collect_path(node: Any, pattern: Sequence[str]) -> List[str]:
 
 def write_mapping(rel: str, record_path: Path) -> int:
     record_doc = json.loads(record_path.read_text(encoding="utf-8"))
+    _require_pre_change_record(record_doc, f"mapping {rel}")
     doc = json.loads((MAIN_REPO / rel).read_text(encoding="utf-8"))
     old = golden_old_names(rel, doc)
     mapping, missing, ambiguous = build_mapping(record_doc, old)
@@ -633,6 +708,7 @@ def write_mapping_list(label: str, record_path: Path, source: Path, pattern: Seq
     """非 golden 之舊名來源（如 FF-STAT 欄集合差異收據、死欄 golden）之映射：來源檔不改（使用者核可紀錄之 sha 不動），
     由讀取端依本映射換名。查無 ⇒ 失敗。"""
     record_doc = json.loads(record_path.read_text(encoding="utf-8"))
+    _require_pre_change_record(record_doc, f"mapping-list {label}")
     doc = json.loads(source.read_text(encoding="utf-8"))
     old = set(_collect_path(doc, pattern))
     mapping, missing, ambiguous = build_mapping(record_doc, old)
@@ -838,6 +914,13 @@ def rekey(rel: str, salt_path: Optional[Path], record_path: Optional[Path], map_
         salt = json.loads(salt_path.read_text(encoding="utf-8"))["probewinsor"] if salt_path else None
         fixed = _hash_fix_probewinsor(doc, old_doc, sidecar, mapping, salt)
     # 殘留：換名後任何字串葉／鍵仍為「會改名之舊名」⇒ 失敗
+    # 審查 r1（codex）：未能以改前輸入重算之名雜湊欄位一律 fail-closed，除非契約 `refreeze.rekey_exceptions[rel]`
+    # 逐欄列名並附理由（且另由測試靜態證明無消費測試讀之）
+    exceptions = (_contract_refreeze().get("rekey_exceptions") or {}).get(rel) or {}
+    unlisted = [f.split(":")[0] for f in fixed if f.endswith("NOT_RECOMPUTED")
+                and f"cells/{f.split(':')[0]}" not in exceptions and f.split(":")[0] not in exceptions]
+    if unlisted:
+        raise SystemExit(f"{rel}: {len(unlisted)} 個名雜湊欄位無法以改前輸入重算且未列契約例外：{unlisted[:10]}")
     leftovers = sorted({v for _p, v in _iter_strings(doc) if v in mapping and mapping[v] != v})
     if leftovers:
         raise SystemExit(f"{rel}: 換名後殘留舊名 {len(leftovers)}：{leftovers[:10]}")
@@ -926,8 +1009,20 @@ def _rel_or_abs(path: Path) -> str:
         return str(path.resolve())
 
 
-def _normalize_sidecar(recipe: str, sidecar: Mapping[str, Any]) -> Dict[str, Any]:
+_FRAMEPATH_SCALARS = ("row_count", "run_status", "completeness")  # time_index_sha256 含路徑（鹽）⇒ 改比 time_values
+
+
+def _normalize_sidecar(recipe: str, sidecar: Mapping[str, Any], unit: Optional[str] = None) -> Dict[str, Any]:
     """K2 sidecar 正規化：{columns: 名 → 逐欄紀錄（值指紋，名無關）, scalars: 名無關之計數／窗}。"""
+    if recipe == "framepath":
+        fp = sidecar["cells"][unit]["fingerprint"]
+        cols: Dict[str, Any] = {}
+        for name, rec in (fp.get("columns") or {}).items():
+            cols.setdefault(name, {})["columns"] = rec
+        for name, rec in ((fp.get("result_columns") or {}).get("columns") or {}).items():
+            cols.setdefault(name, {})["result_columns"] = rec
+        return {"columns": cols, "scalars": {**{k: fp.get(k) for k in _FRAMEPATH_SCALARS},
+                                             "time_values": sidecar["cells"][unit].get("time_values")}}
     if recipe == "ratiounsafe_after":
         g = sidecar["golden_like"]
         cols: Dict[str, Any] = {}
@@ -1009,36 +1104,70 @@ def _golden_from_new(rel: str, recipe: str, new_record: Mapping[str, Any]) -> st
     raise SystemExit(f"K2 golden 組裝未支援 recipe {recipe!r}")
 
 
-def _g6_shift_verify(recipe: str, new_record: Mapping[str, Any], g6: Sequence[str]) -> Optional[bool]:
-    """⑥ 新增 lag 欄之位移：新跑於關閉縮尾（前處理關）之同設定 run 上驗 值＝基底位移 k（recipe 錄於 sidecar）。"""
-    if not g6:
-        return None
-    checks = new_record["sidecar"].get("g6_shift") or {}
-    return bool(checks) and all(checks.get(c) is True for c in g6)
+def _pre_change_doc(rel: str) -> Any:
+    """改前 golden（baseline `frozen_at_head` 之 git 物件）。"""
+    head = json.loads((MAIN_REPO / "tests/_golden/ffname/baseline.json").read_text(encoding="utf-8"))["frozen_at_head"]
+    blob = _blob(rel, head)
+    if blob is None:
+        raise SystemExit(f"{rel}：取不到改前 golden（{head}）")
+    return json.loads(blob.decode("utf-8"))
 
 
-def k2(rel: str, old_path: Path, new_path: Path, dry: bool = False) -> int:
-    import copy as _copy  # noqa: F401
+_FAILOPEN_PREMISE_KEYS = ("layers", "final_L7", "l1_direct", "merged_L7", "group_set_sha256", "feature_count",
+                          "config_hash")
 
-    old_record = json.loads(old_path.read_text(encoding="utf-8"))
-    new_record = json.loads(new_path.read_text(encoding="utf-8"))
-    recipe = old_record["recipe"]
-    if new_record["recipe"] != recipe or not old_record.get("instrumented"):
-        raise SystemExit("K2：新舊紀錄 recipe 不同或改前紀錄未掛紀錄器")
-    old_sc, new_sc = _normalize_sidecar(recipe, old_record["sidecar"]), _normalize_sidecar(recipe, new_record["sidecar"])
-    tag = _slug(rel)
+
+def _canon_hashes(node: Any) -> Any:
+    """彙總紀錄中與重現判定相關之雜湊／計數（剔除 perf 等牆鐘值）。"""
+    if isinstance(node, dict):
+        return {k: _canon_hashes(v) for k, v in node.items() if k not in ("perf", "storage")}
+    return node
+
+
+def _premise(rel: str, recipe: str, old_record: Mapping[str, Any], unit: Optional[str] = None) -> Tuple[bool, str]:
+    """SPEC v22 重凍前提之一：改前碼（c9737729）以該 golden 自身設定重跑能重現改前 golden。回傳（是否重現, 說明）。"""
+    old = _pre_change_doc(rel)
+    sc = old_record["sidecar"]
+    if recipe == "ratiounsafe_after":
+        ok = sc["golden_like"] == old
+        return ok, "golden_like == 改前檔" if ok else "golden_like != 改前檔"
+    if recipe == "icfa_probe":
+        frz_doc = json.loads(_golden_from_new(rel, recipe, old_record))
+        diff = [m for m in ("jia", "yi") if frz_doc[m] != old[m]]
+        return not diff, f"改前碼組出之探針紀錄與改前檔不等之模式 {diff}"
+    if recipe == "fftfmeta":
+        keys = ("group_files_sha256", "group_count", "groups", "manifest_stripped_sha256", "task_stripped_sha256")
+        diff = [f"{ref}/{k}" for ref, body in sc["references"].items() for k in keys
+                if body["fingerprint"].get(k) != old["references"][ref].get(k)]
+        return not diff, f"改前碼重跑與改前檔不等 {len(diff)} 項：{diff[:6]}"
     if recipe == "failopen":
-        if old_record["sidecar"]["unit"] != new_record["sidecar"]["unit"]:
-            raise SystemExit("failopen K2：新舊紀錄單元不同")
-        tag = f"{tag}__{old_record['sidecar']['unit'].replace('/', '-')}"
+        symbol, _, kind = str(unit).partition("/")
+        want = old["multi_tf"][symbol] if kind == "multi" else old["single_tf"][symbol][kind]
+        got = sc["unit_record"]
+        diff = [k for k in _FAILOPEN_PREMISE_KEYS if k in want and _canon_hashes(got.get(k)) != _canon_hashes(want.get(k))]
+        return not diff, f"改前碼重跑與改前檔不等之欄位 {diff}"
+    if recipe == "framepath":
+        want = old["cells"][unit]["fingerprint"]
+        got = sc["cells"][unit]["fingerprint"]
+        diff = [k for k in sorted(set(want) | set(got)) if want.get(k) != got.get(k)]
+        return not diff, f"改前碼重跑與改前檔 fingerprint 不等之項 {diff}"
+    raise SystemExit(f"重凍前提未支援 recipe {recipe!r}")
+
+
+def _k2_compare_unit(rel: str, recipe: str, tag: str, old_sc: Dict[str, Any], new_sc: Dict[str, Any],
+                     old_record: Mapping[str, Any], new_record: Mapping[str, Any],
+                     shift_checks: Mapping[str, bool], unit: Optional[str]) -> Dict[str, Any]:
+    """單一 golden（或單元）之依名逐欄比對＋前提判定；回傳 entry（決策：refrozen 候選／pre_existing_drift／fail）。"""
     SIDECAR_DIR.mkdir(parents=True, exist_ok=True)
     old_sc_path, new_sc_path = SIDECAR_DIR / f"{tag}.old.json", SIDECAR_DIR / f"{tag}.new.json"
     for p, doc, rec in ((old_sc_path, old_sc, old_record), (new_sc_path, new_sc, new_record)):
         p.write_text(json.dumps({**doc, "head": rec["head"], "tree": rec["tree"], "recipe": recipe},
                                 ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
     mapping, missing, ambiguous = build_mapping(old_record, set(old_sc["columns"]))
-    map_doc = {"schema_version": MAP_SCHEMA, "golden": rel, "recipe": recipe, "source_head": old_record["head"],
-               "source_tree": old_record["tree"], "source_sha256": hashlib.sha256(old_sc_path.read_bytes()).hexdigest(),
+    map_doc = {"schema_version": MAP_SCHEMA, "golden": rel, "unit": unit, "recipe": recipe,
+               "source_head": old_record["head"], "source_tree": old_record["tree"],
+               "pre_change_verified": old_record.get("pre_change_verified") is True,
+               "source_sha256": hashlib.sha256(old_sc_path.read_bytes()).hexdigest(),
                "old_name_count": len(old_sc["columns"]), "mapped": len(mapping),
                "renamed": sum(1 for a, b in mapping.items() if a != b), "missing": missing, "ambiguous": ambiguous,
                "mapping": mapping}
@@ -1046,8 +1175,7 @@ def k2(rel: str, old_path: Path, new_path: Path, dry: bool = False) -> int:
     map_path = MAPS_DIR / f"{tag}.json"
     map_path.write_text(json.dumps(map_doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     result = k2_compare(old_sc["columns"], new_sc["columns"], mapping, fields=())
-    # 逐欄紀錄整筆相等（fields 空 ⇒ 比整筆）
-    mismatches = [m for m in result["mismatches"]]
+    mismatches = list(result["mismatches"])
     for old_name, rec in old_sc["columns"].items():
         new = mapping.get(old_name)
         if new is not None and new in new_sc["columns"] and new_sc["columns"][new] != rec:
@@ -1057,31 +1185,99 @@ def k2(rel: str, old_path: Path, new_path: Path, dry: bool = False) -> int:
     if missing or ambiguous:
         mismatches.append(f"map_unmapped:{len(missing)}/{len(ambiguous)}")
     g6 = result["g6_new_lag"]
-    shift_ok = _g6_shift_verify(recipe, new_record, g6)
-    entry = {"path": rel, "class": "K2", "recipe": recipe, "old_head": old_record["head"], "new_head": new_record["head"],
-             "old_sidecar": _rel_or_abs(old_sc_path), "new_sidecar": _rel_or_abs(new_sc_path),
-             "map": str(map_path.relative_to(MAIN_REPO)), "compared": result["compared"],
-             "value_hash_mismatch": len(mismatches), "mismatches": mismatches[:200], "g6_new_lag": g6,
-             "g6_shift_verified": shift_ok if g6 else None,
-             "old_elapsed_seconds": old_record.get("elapsed_seconds"), "new_elapsed_seconds": new_record.get("elapsed_seconds")}
-    if dry:
-        entry["refrozen"] = False
-        entry["dry_run"] = True
-    elif not mismatches and (not g6 or shift_ok):
-        text = _golden_from_new(rel, recipe, new_record)
-        (MAIN_REPO / rel).write_text(text, encoding="utf-8")
-        entry["refrozen"] = True
+    shift_ok = (bool(shift_checks) and all(shift_checks.get(c) is True for c in g6)) if g6 else None
+    reproduced, detail = _premise(rel, recipe, old_record, unit)
+    if mismatches or (g6 and not shift_ok):
+        decision = "fail"
+    elif reproduced:
+        decision = "refrozen"
     else:
-        entry["refrozen"] = False
-    entry["new_sha256"] = hashlib.sha256((MAIN_REPO / rel).read_bytes()).hexdigest()
+        decision = "pre_existing_drift"
+    return {"path": rel, "unit": unit, "class": "K2", "recipe": recipe, "old_head": old_record["head"],
+            "old_pre_change_verified": old_record.get("pre_change_verified") is True, "new_head": new_record["head"],
+            "old_sidecar": _rel_or_abs(old_sc_path), "new_sidecar": _rel_or_abs(new_sc_path),
+            "map": str(map_path.relative_to(MAIN_REPO)), "compared": result["compared"],
+            "value_hash_mismatch": len(mismatches), "mismatches": mismatches[:200], "g6_new_lag": g6,
+            "g6_shift_verified": shift_ok, "pre_change_reproduced": reproduced, "premise_detail": detail,
+            "decision": decision, "old_elapsed_seconds": old_record.get("elapsed_seconds"),
+            "new_elapsed_seconds": new_record.get("elapsed_seconds")}
+
+
+def _write_k2_entry(tag: str, entry: Mapping[str, Any]) -> None:
     K2_DIR.mkdir(parents=True, exist_ok=True)
     (K2_DIR / f"{tag}.json").write_text(json.dumps(entry, ensure_ascii=False, indent=1, sort_keys=True) + "\n",
-                                               encoding="utf-8")
-    print(f"[ffname-refreeze k2] {rel}: 比對 {result['compared']} 欄、不符 {len(mismatches)}、⑥ 新 lag {len(g6)}"
-          f"（位移 {'已驗' if shift_ok else ('—' if not g6 else '未驗')}）、重凍 {entry['refrozen']}")
-    if mismatches:
-        print(f"  不符例：{mismatches[:8]}")
-    return 0 if entry["refrozen"] else 1
+                                        encoding="utf-8")
+
+
+def _k2_framepath(rel: str, old_record: Mapping[str, Any], new_record: Mapping[str, Any], dry: bool) -> int:
+    """framepath（v22 K2）：12 格逐格依名比對＋前提判定；符合前提之格只換該格 fingerprint，其餘位元組不動。"""
+    path = MAIN_REPO / rel
+    raw = path.read_bytes()
+    doc = json.loads(raw.decode("utf-8"))
+    fmt = _detect_format(raw, doc)
+    units: List[Dict[str, Any]] = []
+    for cell in sorted(old_record["sidecar"]["cells"]):
+        if cell not in new_record["sidecar"]["cells"]:
+            raise SystemExit(f"framepath：新碼紀錄缺格 {cell}")
+        old_sc = _normalize_sidecar("framepath", old_record["sidecar"], cell)
+        new_sc = _normalize_sidecar("framepath", new_record["sidecar"], cell)
+        shift = (new_record["sidecar"]["cells"][cell].get("g6_shift") or {})
+        entry = _k2_compare_unit(rel, "framepath", f"{_slug(rel)}__{cell}", old_sc, new_sc, old_record, new_record,
+                                 shift, cell)
+        if entry["decision"] == "refrozen" and not dry:
+            doc["cells"][cell]["fingerprint"] = new_record["sidecar"]["cells"][cell]["fingerprint"]
+        entry["refrozen"] = entry["decision"] == "refrozen" and not dry
+        units.append(entry)
+    if any(u["refrozen"] for u in units):
+        path.write_text(json.dumps(doc, ensure_ascii=False, indent=fmt["indent"], sort_keys=fmt["sort_keys"]) + fmt["tail"],
+                        encoding="utf-8")
+    new_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    for u in units:
+        u["new_sha256"] = new_sha
+    agg = {"path": rel, "class": "K2", "recipe": "framepath", "units": units, "dry_run": dry, "new_sha256": new_sha,
+           "value_hash_mismatch": sum(u["value_hash_mismatch"] for u in units),
+           "g6_new_lag": sorted({c for u in units for c in u["g6_new_lag"]})}
+    _write_k2_entry(_slug(rel), agg)
+    for u in units:
+        print(f"[ffname-refreeze k2] framepath {u['unit']}: 比對 {u['compared']}、不符 {u['value_hash_mismatch']}、"
+              f"改前重現 {u['pre_change_reproduced']} ⇒ {u['decision']}")
+    return 0 if all(u["decision"] != "fail" for u in units) else 2
+
+
+def k2(rel: str, old_path: Path, new_path: Path, dry: bool = False) -> int:
+    """K2：依名逐欄比對＋SPEC v22 重凍前提。rc：0＝refrozen 或 pre_existing_drift（皆不符 0）；2＝不符或 ⑥ 未驗（不寫）。"""
+    old_record = json.loads(old_path.read_text(encoding="utf-8"))
+    new_record = json.loads(new_path.read_text(encoding="utf-8"))
+    recipe = old_record["recipe"]
+    if new_record["recipe"] != recipe:
+        raise SystemExit("K2：新舊紀錄 recipe 不同")
+    _require_pre_change_record(old_record, f"k2 {rel}")
+    if new_record.get("instrumented"):
+        raise SystemExit("K2：新碼紀錄不應掛紀錄器（--no-instrument）")
+    if recipe == "framepath":
+        return _k2_framepath(rel, old_record, new_record, dry)
+    old_sc, new_sc = _normalize_sidecar(recipe, old_record["sidecar"]), _normalize_sidecar(recipe, new_record["sidecar"])
+    tag = _slug(rel)
+    unit = None
+    if recipe == "failopen":
+        unit = old_record["sidecar"]["unit"]
+        if unit != new_record["sidecar"]["unit"]:
+            raise SystemExit("failopen K2：新舊紀錄單元不同")
+        tag = f"{tag}__{unit.replace('/', '-')}"
+    entry = _k2_compare_unit(rel, recipe, tag, old_sc, new_sc, old_record, new_record,
+                             new_record["sidecar"].get("g6_shift") or {}, unit)
+    if entry["decision"] == "refrozen" and not dry:
+        (MAIN_REPO / rel).write_text(_golden_from_new(rel, recipe, new_record), encoding="utf-8")
+    entry["refrozen"] = entry["decision"] == "refrozen" and not dry
+    entry["dry_run"] = dry
+    entry["new_sha256"] = hashlib.sha256((MAIN_REPO / rel).read_bytes()).hexdigest()
+    _write_k2_entry(tag, entry)
+    print(f"[ffname-refreeze k2] {rel}{'' if unit is None else ' ' + unit}: 比對 {entry['compared']} 欄、"
+          f"不符 {entry['value_hash_mismatch']}、⑥ 新 lag {len(entry['g6_new_lag'])}（位移 {entry['g6_shift_verified']}）、"
+          f"改前重現 {entry['pre_change_reproduced']} ⇒ {entry['decision']}{'（dry）' if dry else ''}")
+    if entry["mismatches"]:
+        print(f"  不符例：{entry['mismatches'][:8]}")
+    return 2 if entry["decision"] == "fail" else 0
 
 
 # ================================================================ 收據（主樹）
@@ -1092,9 +1288,42 @@ def _blob(rel: str, head: str) -> Optional[bytes]:
     return proc.stdout if proc.returncode == 0 else None
 
 
+def _k2_units_summary(units: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """逐單元（failopen 單元／framepath 格）彙總：每單元決策須屬 refrozen／pre_existing_drift 且依名不符 0。"""
+    expected = _pre_change_commit()
+    bad_units = [u.get("unit") for u in units
+                 if u.get("decision") not in ("refrozen", "pre_existing_drift") or u.get("value_hash_mismatch")
+                 or u.get("dry_run") or u.get("old_head") != expected]
+    return {"units": units, "value_hash_mismatch": sum(int(u.get("value_hash_mismatch") or 0) for u in units)
+            + len(bad_units), "bad_units": bad_units,
+            "decisions": {str(u.get("unit")): u.get("decision") for u in units},
+            "g6_new_lag": sorted({c for u in units for c in u.get("g6_new_lag") or []})}
+
+
+def full_reference_spec_problems(full: Mapping[str, Any], spec: Mapping[str, Any]) -> List[str]:
+    """審查 r1（codex P1-03）：ETHUSDT、1h＋12h、3 個月窗（跨度須在契約容差內）。"""
+    import pandas as pd
+
+    bad: List[str] = []
+    if full.get("symbol") != spec["symbol"]:
+        bad.append("symbol")
+    if sorted(full.get("timeframes") or []) != sorted(spec["timeframes"]):
+        bad.append("timeframes")
+    window = list(full.get("window") or [None, None])
+    if len(window) != 2 or not all(window):
+        bad.append("window_missing")
+    else:
+        days = (pd.Timestamp(window[1]) - pd.Timestamp(window[0])).days
+        lo, hi = spec["window_tolerance_days"]
+        if not lo <= days <= hi:
+            bad.append(f"window_span:{days}")
+    return bad
+
+
 def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path: Optional[Path]) -> int:
-    """v21 收據：每檔記類別、映射來源、換名數、值位元組不變證據（K1／K3）或 sidecar 依名逐欄比對（K2）、⑥ 清單、
-    鹽差去鹽重算、消費測試結果；全量 reference 往返。缺項（如 failopen K2、全量 reference 未跑）⇒ exit_code 1。"""
+    """v22 收據：每檔記類別、映射來源、換名數、值位元組不變證據（K1／K3）或 sidecar 依名逐欄比對＋重凍前提決策（K2）、
+    ⑥ 清單、函式清冊重產（INVENTORY）、鹽差去鹽重算、消費測試結果；全量 reference 往返。
+    缺項（failopen／framepath K2、全量 reference 未跑）或任一消費測試紅 ⇒ exit_code 1。"""
     contract = json.loads((MAIN_REPO / "tests/_golden/ffname/contract.json").read_text(encoding="utf-8"))["refreeze"]
     baseline = json.loads((MAIN_REPO / "tests/_golden/ffname/baseline.json").read_text(encoding="utf-8"))
     head = baseline["frozen_at_head"]
@@ -1122,20 +1351,18 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
                               "renamed_columns": m["renamed"], "missing": len(m["missing"]),
                               "l65_suffix_derived": m.get("l65_suffix_derived", 0),
                               "hash_fields_recomputed": r["hash_fields_recomputed"],
+                              "rekey_exceptions": sorted(p for p in (contract.get("rekey_exceptions") or {}).get(rel, {})
+                                                         if not p.startswith("_")),
                               "value_bytes_unchanged": r["new_sha256"] == entry["new_sha256"],
-                              "value_hash_mismatch": 0 if r["new_sha256"] == entry["new_sha256"] and not m["missing"] else 1})
+                              "value_hash_mismatch": 0 if r["new_sha256"] == entry["new_sha256"] and not m["missing"]
+                              and m["source_head"] == contract["pre_change_commit"] else 1})
             else:
                 entry.update({"status": "pending", "value_hash_mismatch": 1})
         elif cls == "K2" and disp.get("recipe") == "failopen":
             unit_files = [K2_DIR / f"{_slug(rel)}__{u.replace('/', '-')}.json" for u in FAILOPEN_UNITS]
             if all(p.is_file() for p in unit_files):
                 units = [json.loads(p.read_text(encoding="utf-8")) for p in unit_files]
-                entry.update({"units": units, "value_hash_mismatch": sum(u["value_hash_mismatch"] for u in units),
-                              "g6_new_lag": sorted({c for u in units for c in u["g6_new_lag"]}),
-                              "g6_shift_verified": all(u["g6_shift_verified"] in (True, None) for u in units),
-                              "refrozen": all(u["refrozen"] for u in units)})
-                if not entry["refrozen"]:
-                    entry["value_hash_mismatch"] = max(1, entry["value_hash_mismatch"])
+                entry.update(_k2_units_summary(units))
             else:
                 entry.update({"status": "pending", "value_hash_mismatch": 1,
                               "units_done": [u for u, p in zip(FAILOPEN_UNITS, unit_files) if p.is_file()]})
@@ -1143,16 +1370,31 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
             kp = K2_DIR / f"{_slug(rel)}.json"
             if kp.is_file():
                 k = json.loads(kp.read_text(encoding="utf-8"))
-                entry.update({key: k[key] for key in ("recipe", "old_head", "new_head", "old_sidecar", "new_sidecar", "map",
-                                                    "compared", "value_hash_mismatch", "mismatches", "g6_new_lag",
-                                                    "g6_shift_verified", "refrozen", "old_elapsed_seconds",
-                                                    "new_elapsed_seconds")})
+                if "units" in k:  # framepath：逐格
+                    entry.update(_k2_units_summary(k["units"]))
+                else:
+                    entry.update({key: k.get(key) for key in (
+                        "recipe", "unit", "old_head", "old_pre_change_verified", "new_head", "old_sidecar", "new_sidecar",
+                        "map", "compared", "value_hash_mismatch", "mismatches", "g6_new_lag", "g6_shift_verified",
+                        "pre_change_reproduced", "premise_detail", "decision", "refrozen", "dry_run",
+                        "old_elapsed_seconds", "new_elapsed_seconds")})
+                    if k.get("decision") not in contract["k2_decisions"] or k.get("dry_run") or \
+                            k.get("old_head") != contract["pre_change_commit"]:
+                        entry["value_hash_mismatch"] = max(1, entry.get("value_hash_mismatch") or 0)
                 if k["new_sha256"] != entry["new_sha256"]:
-                    entry["value_hash_mismatch"] = max(1, entry["value_hash_mismatch"])
+                    entry["value_hash_mismatch"] = max(1, entry.get("value_hash_mismatch") or 0)
                     entry["bytes_unbound"] = True
-                if not k.get("refrozen"):
-                    entry["status"] = "not_refrozen"  # 如 fftfmeta：改前 golden 不能由改前碼重現（既有漂移），只做 dry 比對
-                    ok = False
+            else:
+                entry.update({"status": "pending", "value_hash_mismatch": 1})
+        elif cls == "INVENTORY":
+            ip = MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_inventory.json"
+            if ip.is_file():
+                inv = json.loads(ip.read_text(encoding="utf-8"))
+                entry.update({"regenerated": inv.get("regenerated") is True, "generator": disp.get("generator"),
+                              "added_functions": inv.get("added_functions") or {},
+                              "removed_functions": inv.get("removed_functions") or [],
+                              "value_hash_mismatch": 0 if inv.get("regenerated") is True
+                              and inv.get("new_sha256") == entry["new_sha256"] else 1})
             else:
                 entry.update({"status": "pending", "value_hash_mismatch": 1})
         elif cls == "K3":
@@ -1169,6 +1411,17 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
             entry.update({"k3_renames": renames, "value_bytes_unchanged": exact, "value_hash_mismatch": 0 if exact else 1})
         if entry["value_hash_mismatch"]:
             ok = False
+        # 審查 r1（codex P1-04）：消費測試結果須數字化且 failed == 0（K0 紅亦不得產生成功收據）
+        run = entry["consumer_run"] or {}
+        if entry.get("decision") == "pre_existing_drift" and not entry.get("value_hash_mismatch"):
+            # SPEC v22：既有漂移之消費測試紅歸登記之既有漂移（依名不符 0、改前碼不重現、golden 位元組不動）
+            entry["consumer_gate"] = "pre_existing_drift_registered"
+        elif not isinstance(run.get("passed"), int) or not isinstance(run.get("failed"), int) or run["failed"] != 0 \
+                or run["passed"] <= 0:
+            entry["consumer_gate"] = "fail"
+            ok = False
+        else:
+            entry["consumer_gate"] = "pass"
         files.append(entry)
     salt = json.loads(salt_path.read_text(encoding="utf-8"))
     salt_entries = []
@@ -1187,12 +1440,16 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
         sys.path.insert(0, str(MAIN_REPO))
         frz = _freeze_mod()
         full = frz.full_reference_record(json.loads(full_ref_path.read_text(encoding="utf-8")))
-        ok = ok and full["parse_failures"] == 0 and full["roundtrip_failures"] == 0 and full["total_columns"] > 0
+        problems = full_reference_spec_problems(full, contract["full_reference"])
+        full["spec_problems"] = problems
+        ok = ok and not problems and full["parse_failures"] == 0 and full["roundtrip_failures"] == 0 \
+            and full["total_columns"] > 0
     else:
         full = {"status": "pending", "timeframes": contract["full_reference"]["timeframes"], "total_columns": 0,
                 "parse_failures": None, "roundtrip_failures": None, "columns": []}
         ok = False
-    receipt = {"schema_version": "ffname-refreeze-v21", "spec": "docs/FFNAME_SPEC.md v21 §G、Task 4.3",
+    spec_version = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))["spec_version"]
+    receipt = {"schema_version": contract["receipt_schema"], "spec": f"docs/FFNAME_SPEC.md {spec_version} §G、Task 4.3",
                "command": "venv/bin/python scripts/ffname_refreeze.py receipt", "exit_code": 0 if ok else 1,
                "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(MAIN_REPO), capture_output=True,
                                       text=True).stdout.strip(),

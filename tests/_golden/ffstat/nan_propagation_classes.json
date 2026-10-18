@@ -177,11 +177,6 @@
       "class": "propagating",
       "evidence": "derived_operators.py:782-975 選欄與索引去重（原值搬移，NaN 位置不變）"
     },
-    "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._format_params": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "derived_operators.py:185-902 欄名解析／配對清單／參數（不產值）"
-    },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._get_section": {
       "propagates_nan": false,
       "class": "helper",
@@ -2081,6 +2076,51 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "tf_aligner.py:22 對齊輸出暫存 memmap 之配置（建於映射根；不寫值）"
+    },
+    "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._binary_rule_matches": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "derived_operators.py:995-1000 BinarySignal 規則比對 canonical indicator（布林判定，不產值；FF-NAME Task 2.3）"
+    },
+    "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._pair_column_name": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "derived_operators.py:353-358 配對欄名格式化（format_feature_name；不產值；FF-NAME Task 2.3）"
+    },
+    "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._pair_families": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "derived_operators.py:320-340 依 canonical 身分分組之配對清單（不讀值；FF-NAME Task 2.3，取代原 _format_params 之欄名參數組裝職責）"
+    },
+    "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._raw_key": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "derived_operators.py:984-992 Distance 之 raw 查找鍵（只比欄名，不產值；FF-NAME Task 2.3）"
+    },
+    "momentum.FeatureEngineering.operators.lag_processor:LagProcessor._identity_or_none": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "lag_processor.py:143-148 欄名 parse 為身分或 None（不產值；FF-NAME Task 2.4）"
+    },
+    "momentum.FeatureEngineering.operators.lag_processor:LagProcessor._lag_name": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "lag_processor.py:157-164 L4 欄名格式化（不產值；FF-NAME Task 2.4）"
+    },
+    "momentum.FeatureEngineering.operators.lag_processor:LagProcessor._with_lag_names": {
+      "propagates_nan": true,
+      "class": "propagating",
+      "evidence": "lag_processor.py:166-168 set_axis 只改欄名、值原樣搬移（取代改前 add_suffix；NaN 原樣傳遞）"
+    },
+    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._l3_name": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "rolling_aggregator.py:1099-1101 L3 欄名加 op 段（append_op_segments；不產值；FF-NAME Task 2.4）"
+    },
+    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._with_l3_op": {
+      "propagates_nan": true,
+      "class": "propagating",
+      "evidence": "rolling_aggregator.py:1104-1106 set_axis 只改欄名、值原樣搬移（取代改前 add_suffix；NaN 原樣傳遞）"
     }
   }
 }

@@ -271,11 +271,46 @@ def _is_unsafe(col: str) -> bool:
     return fn.is_ratio_unsafe_column(col)
 
 
-def _without_g6(got: dict, before_names: set) -> dict:
+def _s1_record_with_frame(monkeypatch: pytest.MonkeyPatch, arm: str, preprocessing: bool):
+    """同一 run 之 S1 紀錄與其落盤表（包裝 `freeze.record` 取得 frame；值不變）。"""
+    captured: Dict[str, pd.DataFrame] = {}
+    real = freeze.record
+
+    def record(frame, nbytes):
+        captured["frame"] = frame
+        return real(frame, nbytes)
+
+    monkeypatch.setattr(freeze, "record", record)
+    got = freeze.s1_record(arm, preprocessing)
+    return got, captured["frame"]
+
+
+def _g6_shift_violations(frame: pd.DataFrame, cols: List[str]) -> List[str]:
+    """§G ⑥ 位移 oracle（同一 run）：每個剔除之新增 lag 欄＝其基底欄（去末 op）位移 k，NaN 對 NaN。"""
+    import dataclasses
+
+    bad = []
+    for col in cols:
+        ident = fn.parse_feature_name(col)
+        base = fn.format_feature_name(dataclasses.replace(ident, ops=tuple(ident.ops[:-1])))
+        k = int(str(ident.ops[-1]).split("-", 1)[1])
+        if base not in frame.columns or col not in frame.columns:
+            bad.append(f"{col}:base_missing")
+            continue
+        a = frame[col].to_numpy(dtype=np.float64)
+        b = frame[base].shift(k).to_numpy(dtype=np.float64)
+        if not np.array_equal(a, b, equal_nan=True):
+            bad.append(f"{col}:not_shift_of_{base}")
+    return bad
+
+
+def _without_g6(got: dict, before_names: set, frame: pd.DataFrame) -> dict:
     """FF-NAME SPEC v21 §G ⑥：改前快照（K1）無 ⑥ 新增 lag 欄（改前欄名啟發式漏加 lag 之 raw 衍生欄）。新 run 之欄中
-    不在改前名單者，須全屬 ⑥ 新增 lag 才剔除（逐筆列於斷言訊息）；其餘照原斷言比對。"""
+    不在改前名單者，須全屬 ⑥ 新增 lag 才剔除，且（審查 r1 codex P1-06）每欄於同一 run 驗值＝基底欄位移 k；其餘照原斷言比對。"""
     extra = sorted(c for c in got["names"] if c not in before_names)
     g6 = [c for c in extra if is_g6_new_lag(c)]
+    bad = _g6_shift_violations(frame, g6)
+    assert not bad, bad[:10]
     names = [c for c in got["names"] if c not in set(g6)]
     import hashlib
 
@@ -284,21 +319,41 @@ def _without_g6(got: dict, before_names: set) -> dict:
             "g6_new_lag": g6}
 
 
-def test_g_s1_off_conservation(before: dict) -> None:
+def test_mutation_g6_wrong_lag_value_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """審查 r1 mutant：新增 lag 欄之值不是基底位移（改成位移 k+1）⇒ ⑥ 位移 oracle 必紅；同表另插一個值錯誤之 Lag-999 亦紅。"""
+    got, frame = _s1_record_with_frame(monkeypatch, "off", True)
+    g6 = sorted(c for c in got["names"] if is_g6_new_lag(c))
+    assert g6 and _g6_shift_violations(frame, g6) == []
+    tampered = frame.copy()
+    ident = fn.parse_feature_name(g6[0])
+    import dataclasses
+
+    base = fn.format_feature_name(dataclasses.replace(ident, ops=tuple(ident.ops[:-1])))
+    k = int(str(ident.ops[-1]).split("-", 1)[1])
+    tampered[g6[0]] = tampered[base].shift(k + 1)
+    bogus = fn.format_feature_name(dataclasses.replace(ident, ops=tuple(ident.ops[:-1]) + ("Lag-999",)))
+    tampered[bogus] = 1.0
+    bad = _g6_shift_violations(tampered, [g6[0], bogus])
+    assert any(b.startswith(g6[0]) for b in bad) and any(b.startswith(bogus) for b in bad)
+
+
+def test_g_s1_off_conservation(before: dict, monkeypatch: pytest.MonkeyPatch) -> None:
     """§G ①②③：S1-off（dead-drop 關）名稱集合／欄數／列數不變；非 ratio-unsafe 欄逐欄值與 NaN mask 不變；
     ratio-unsafe 欄＝前處理關之原值。"""
     b, raw = before["s1_off"], before["s1_off_preprocessing_disabled"]
-    got = _without_g6(freeze.s1_record("off", True), set(b["names"]))
+    rec, frame = _s1_record_with_frame(monkeypatch, "off", True)
+    got = _without_g6(rec, set(b["names"]), frame)
     assert (got["names_sha256"], got["n_columns"], got["n_rows"]) == (b["names_sha256"], b["n_columns"], b["n_rows"])
     for col, dig in got["columns"].items():
         want = raw["columns"][col] if _is_unsafe(col) else b["columns"][col]
         assert dig == want, col
 
 
-def test_g_s1_on_column_set_and_values(before: dict) -> None:
+def test_g_s1_on_column_set_and_values(before: dict, monkeypatch: pytest.MonkeyPatch) -> None:
     """§G ④⑤：S1-on 非 ratio-unsafe 欄名稱與值不變；新增欄＝改前被剔除且原值不死之 ratio-unsafe 欄；刪減為空。"""
     b, raw = before["s1_on"], before["s1_on_preprocessing_disabled"]
-    got = _without_g6(freeze.s1_record("on", True), set(b["names"]) | set(raw["names"]))
+    rec, frame = _s1_record_with_frame(monkeypatch, "on", True)
+    got = _without_g6(rec, set(b["names"]) | set(raw["names"]), frame)
     got_names, before_names = set(got["names"]), set(b["names"])
     assert {c for c in got_names if not _is_unsafe(c)} == {c for c in before_names if not _is_unsafe(c)}
     for col in got_names:
@@ -375,6 +430,11 @@ def test_boundary_02_after_baseline_not_written_before_branch_tests_pass() -> No
     # FF-NAME SPEC v21 §G ⑥：改後基準（現行碼重產）含 ⑥ 新增 lag 欄，改前快照（K1）無之 ⇒ 只此類可不在改前紀錄
     missing = [c for c in after["s1_off"]["columns"] if _is_unsafe(c) and c not in raw]
     assert all(is_g6_new_lag(c) for c in missing), [c for c in missing if not is_g6_new_lag(c)]
+    # 審查 r1（codex P1-06）：剔除之 ⑥ 欄須為改後基準重凍時已驗位移者（K2 收據：同設定、前處理關之 run 值＝基底位移 k）
+    k2 = json.loads((REPO / "handoffs/run_receipts/ffname_refreeze_k2/ratiounsafe__baseline_after.json").read_text(
+        encoding="utf-8"))
+    assert k2.get("g6_shift_verified") is True and set(missing) <= set(k2.get("g6_new_lag") or []), \
+        sorted(set(missing) - set(k2.get("g6_new_lag") or []))
     for col, dig in after["s1_off"]["columns"].items():
         if _is_unsafe(col) and col not in missing:
             assert dig == raw[col], col

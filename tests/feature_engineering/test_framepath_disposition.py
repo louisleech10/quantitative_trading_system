@@ -1918,9 +1918,55 @@ def git_commits_after_anchor() -> List[Tuple[str, Set[str]]]:
 BASELINE_RUN_PATH_KEYS = frozenset({"kline_copy", "legacy_kline_dir", "child_env"})
 
 
-def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]]) -> List[str]:
+FFNAME_RECEIPT_REL = "handoffs/run_receipts/ffname-refreeze.json"
+# time_index_sha256 之輸入含 timestamps.parquet 之相對路徑（含 config hash 目錄，受命名世代鹽影響）⇒ 屬名／鹽衍生，
+# 其時間值由 FF-NAME K2 收據之去路徑 time_values 比對證明不變（scripts/ffname_refreeze.py framepath recipe）
+_FFNAME_FP_SCALARS = ("row_count", "run_status", "completeness", "failure_reasons", "path_receipt")
+
+
+def ffname_framepath_approvals() -> Dict[str, Dict[str, str]]:
+    """FF-NAME SPEC v22：收據 framepath 段核可（決策 refrozen）之格 → 該格之改前→現行欄名映射（改前 worktree 紀錄器）。"""
+    path = REPO / FFNAME_RECEIPT_REL
+    if not path.is_file():
+        return {}
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    entry = next((e for e in receipt.get("files", []) if e.get("path") == BASELINE_REL), None) or {}
+    out: Dict[str, Dict[str, str]] = {}
+    for unit in entry.get("units") or []:
+        if unit.get("decision") == "refrozen" and not unit.get("value_hash_mismatch"):
+            out[str(unit["unit"])] = json.loads((REPO / unit["map"]).read_text(encoding="utf-8"))["mapping"]
+    return out
+
+
+def _ffname_rekeyed_cell_errors(cell: str, old_fp: Dict[str, Any], new_fp: Dict[str, Any],
+                                mapping: Dict[str, str]) -> List[str]:
+    """核可格之改寫只准「鍵名換名＋名衍生雜湊」：逐欄值紀錄（columns、result_columns.columns）經映射逐筆相等、
+    多出之欄須為 FF-NAME §G ⑥ 新增 lag；其餘名無關項（列數、時間軸、完整性等）逐項相等。"""
+    from tests.feature_engineering.ffname_helpers import is_g6_new_lag
+
+    errs: List[str] = []
+    for key in ("columns", "result_columns"):
+        old_cols = (old_fp.get(key) or {}) if key == "columns" else ((old_fp.get(key) or {}).get("columns") or {})
+        new_cols = (new_fp.get(key) or {}) if key == "columns" else ((new_fp.get(key) or {}).get("columns") or {})
+        seen = set()
+        for name, rec in old_cols.items():
+            new = mapping.get(name)
+            if new is None or new_cols.get(new) != rec:
+                errs.append(f"⓪ 格 {cell} {key}／{name}：逐欄值經 FF-NAME 映射不等或查無")
+            seen.add(new)
+        errs += [f"⓪ 格 {cell} {key}／{n}：多出之欄非 ⑥ 新增 lag" for n in set(new_cols) - seen if not is_g6_new_lag(n)]
+    errs += [f"⓪ 格 {cell} {k}：名無關項改變" for k in _FFNAME_FP_SCALARS if old_fp.get(k) != new_fp.get(k)]
+    return errs
+
+
+def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
+                            approvals: Optional[Dict[str, Dict[str, str]]] = None) -> List[str]:
     """基準各版本（依時間序之 (版本名, 基準 JSON)）之承續：後版須含前版每一格，且該格 fingerprint 逐項相等、
-    receipt 除 `BASELINE_RUN_PATH_KEYS` 外相等、`code_anchor` 不變；只准新增格（memory 屬量測值不比）。"""
+    receipt 除 `BASELINE_RUN_PATH_KEYS` 外相等、`code_anchor` 不變；只准新增格（memory 屬量測值不比）。
+    FF-NAME SPEC v22：既有格之逐欄值不變；鍵名與名衍生雜湊（column_names_sha256、manifest_sha256、
+    stationarity_decisions_sha256、column_count、result_columns.names_sha256）只在收據 framepath 段核可之格可更新
+    （`approvals`；預設讀收據）。"""
+    approvals = ffname_framepath_approvals() if approvals is None else approvals
     errs: List[str] = []
     for (prev_name, prev), (name, cur) in zip(versions, versions[1:]):
         if prev.get("code_anchor") != cur.get("code_anchor"):
@@ -1931,7 +1977,11 @@ def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]]) -> L
                 errs.append(f"⓪ 基準 {name} 刪除了既有格 {cell}")
                 continue
             if new.get("fingerprint") != old.get("fingerprint"):
-                errs.append(f"⓪ 基準 {name} 改寫了既有格 {cell} 之 fingerprint")
+                if cell in approvals:
+                    errs += _ffname_rekeyed_cell_errors(cell, old.get("fingerprint") or {}, new.get("fingerprint") or {},
+                                                        approvals[cell])
+                else:
+                    errs.append(f"⓪ 基準 {name} 改寫了既有格 {cell} 之 fingerprint")
             strip = lambda r: {k: v for k, v in (r or {}).items() if k not in BASELINE_RUN_PATH_KEYS}  # noqa: E731
             if strip(new.get("receipt")) != strip(old.get("receipt")):
                 errs.append(f"⓪ 基準 {name} 改寫了既有格 {cell} 之 receipt")
@@ -1970,6 +2020,28 @@ def test_mutation_baseline_lineage_rewrites_are_red():
     assert baseline_lineage_errors([("v1", v1), ("v2", semantic)]) != []
     moved = dict(added, code_anchor="b")
     assert baseline_lineage_errors([("v1", v1), ("v2", moved)]) != []
+
+
+def test_ffname_approved_rekey_lineage_rule():
+    """FF-NAME SPEC v22 規則：核可格可換鍵與名衍生雜湊；逐欄值變更、非 ⑥ 多出欄、名無關項變更或未核可格之改寫仍紅。"""
+    fp = {"run_status": "complete", "row_count": 3, "column_names_sha256": "a", "manifest_sha256": "m",
+          "columns": {"close_trend_EMA_8_Kurt_W5": {"values": "v"}}}
+    v1 = {"code_anchor": "a", "cells": {"C1": {"fingerprint": fp, "receipt": {}}}}
+    renamed = {**fp, "column_names_sha256": "b", "manifest_sha256": "n",
+               "columns": {"close_1h_trend_EMA_8_Kurt-W5": {"values": "v"}}}
+    v2 = {"code_anchor": "a", "cells": {"C1": {"fingerprint": renamed, "receipt": {}}}}
+    approval = {"C1": {"close_trend_EMA_8_Kurt_W5": "close_1h_trend_EMA_8_Kurt-W5"}}
+    assert baseline_lineage_errors([("v1", v1), ("v2", v2)], approvals=approval) == []
+    assert baseline_lineage_errors([("v1", v1), ("v2", v2)], approvals={}) != []          # 未核可
+    bad_value = json.loads(json.dumps(v2))
+    bad_value["cells"]["C1"]["fingerprint"]["columns"]["close_1h_trend_EMA_8_Kurt-W5"]["values"] = "w"
+    assert baseline_lineage_errors([("v1", v1), ("v2", bad_value)], approvals=approval) != []
+    extra = json.loads(json.dumps(v2))
+    extra["cells"]["C1"]["fingerprint"]["columns"]["close_1h_trend_SMA_8"] = {"values": "x"}
+    assert baseline_lineage_errors([("v1", v1), ("v2", extra)], approvals=approval) != []
+    rows = json.loads(json.dumps(v2))
+    rows["cells"]["C1"]["fingerprint"]["row_count"] = 4
+    assert baseline_lineage_errors([("v1", v1), ("v2", rows)], approvals=approval) != []
 
 
 def test_mutation_history_freeze_order_violations_are_red():

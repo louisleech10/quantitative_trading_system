@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# FF-NAME Task 4.3：failopen K2 全窗新舊碼對證（SPEC v21 §G K2；使用者 2026-10-18 選「比完整的」）。
+# FF-NAME Task 4.3：failopen K2 全窗新舊碼對證（SPEC v22 §G K2＋重凍前提；使用者 2026-10-18 選「比完整的」）。
 # 可續跑：每個（單元 × 新／舊）之紀錄檔已存在且可解析即跳過；每步前查委員輪與磁碟；逐步記牆鐘。
+# 每單元 k2 之決策：refrozen（依名不符 0 且改前碼重現改前 golden ⇒ 合併入 golden）、pre_existing_drift（依名不符 0
+# 但改前碼不重現 ⇒ golden 該單元不動、登記既有漂移）、fail（依名不符或 ⑥ 未驗 ⇒ rc 2，本腳本立即停）。
 #
 # 用法（主樹根目錄執行；須先備好改前 worktree）：
 #   WT=<改前 worktree 路徑（c9737729）> OUT=<版控外輸出目錄> bash scripts/ffname_refreeze_failopen.sh
@@ -11,6 +13,7 @@
 #   BTCUSDT/multi ≈ 36 分、ETHUSDT/multi ≈ 40–82 分（golden 值為舊碼 81 分；BTC multi 曾由 81 分降至 36 分）
 #   每側約 105–150 分，新舊兩側合計約 3.5–5 小時；全程串行，不與委員輪並行。
 set -u
+set -o pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$ROOT/venv/bin/python"
@@ -24,7 +27,8 @@ mkdir -p "$OUT/records" "$OUT/sidecars"
 export FFNAME_SIDECAR_DIR="$OUT/sidecars"
 export PYTHONHASHSEED=0
 
-[ "$(git -C "$WT" rev-parse --short=8 HEAD)" = "c9737729" ] || { echo "WT 非 c9737729" >&2; exit 2; }
+EXPECTED="$("$PY" -c "import json; print(json.load(open('$ROOT/tests/_golden/ffname/contract.json'))['refreeze']['pre_change_commit'])")"
+[ "$(git -C "$WT" rev-parse HEAD)" = "$EXPECTED" ] || { echo "WT 非契約 pre_change_commit $EXPECTED" >&2; exit 2; }
 [ -e "$WT/data_cache/feature_klines" ] || { echo "WT 缺 data_cache/feature_klines（以 symlink 指向主樹，唯讀使用）" >&2; exit 2; }
 
 guard() {
@@ -45,10 +49,10 @@ step() {  # step <unit> <side old|new>
   guard
   t0=$(date +%s)
   if [ "$side" = "old" ]; then
-    FFNAME_FAILOPEN_UNIT="$unit" "$PY" "$ROOT/scripts/ffname_refreeze.py" record --recipe failopen --tree "$WT" \
+    FFNAME_UNIT="$unit" "$PY" "$ROOT/scripts/ffname_refreeze.py" record --recipe failopen --tree "$WT" \
       --out "$out" > "$OUT/records/failopen.$tag.$side.log" 2>&1
   else
-    FFNAME_FAILOPEN_UNIT="$unit" "$PY" "$ROOT/scripts/ffname_refreeze.py" record --recipe failopen --no-instrument \
+    FFNAME_UNIT="$unit" "$PY" "$ROOT/scripts/ffname_refreeze.py" record --recipe failopen --no-instrument \
       --out "$out" > "$OUT/records/failopen.$tag.$side.log" 2>&1
   fi
   rc=$?
@@ -62,7 +66,17 @@ for unit in $UNITS; do
   tag="$(echo "$unit" | tr '/' '-')"
   if [ "$DRY_RUN" != "1" ]; then
     "$PY" "$ROOT/scripts/ffname_refreeze.py" k2 --golden "$GOLDEN" \
-      --old "$OUT/records/failopen.$tag.old.json" --new "$OUT/records/failopen.$tag.new.json" 2>&1 | tail -3 | tee -a "$LOG"
+      --old "$OUT/records/failopen.$tag.old.json" --new "$OUT/records/failopen.$tag.new.json" \
+      > "$OUT/records/failopen.$tag.k2.log" 2>&1
+    rc=$?
+    tail -3 "$OUT/records/failopen.$tag.k2.log" | tee -a "$LOG"
+    if [ "$rc" -ne 0 ]; then
+      echo "[STOP] $unit k2 rc=$rc（依名不符或 ⑥ 未驗；詳 $OUT/records/failopen.$tag.k2.log）" | tee -a "$LOG"
+      exit "$rc"
+    fi
   fi
 done
-echo "全部單元完成；接著：venv/bin/python scripts/ffname_refreeze.py receipt --salt-proof <鹽差證明> --consumers <消費測試結果> --full-reference <全量 reference>" | tee -a "$LOG"
+if [ "$DRY_RUN" != "1" ]; then
+  echo "全部單元 k2 完成（每單元決策見 handoffs/run_receipts/ffname_refreeze_k2/failopen__baseline__*.json：refrozen 或 pre_existing_drift）" | tee -a "$LOG"
+  echo "接著：venv/bin/python scripts/ffname_refreeze.py receipt --salt-proof handoffs/run_receipts/ffname_refreeze_maps/salt_proof.json --consumers handoffs/run_receipts/ffname_refreeze_consumers.json --full-reference <全量 reference JSON>" | tee -a "$LOG"
+fi

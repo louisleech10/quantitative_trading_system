@@ -144,8 +144,11 @@ def test_failed_group_makes_stationarity_incomplete() -> None:
     from momentum.factories import create_feature_factory
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import StationarityIncompleteError
 
+    from momentum.FeatureEngineering.preprocessing._d_star_cache import PreprocessingContext
+
     factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
-    pre = FeaturePreprocessor({"adf_differencing": {"enabled": True}})
+    # FF-NAME：決策鍵經 `tag_timeframe`（週期須為合法鍵，未知週期 fail-closed）；正式路徑一律帶 run 之週期脈絡
+    pre = FeaturePreprocessor({"adf_differencing": {"enabled": True}}, context=PreprocessingContext(timeframe=h.PRIMARY_TF))
     pre._failed_groups.append("1h_L1_trend_EMA")
     pre._record_decision("close_trend_EMA_5", adf_pvalue=0.5)
     with pytest.raises(StationarityIncompleteError):
