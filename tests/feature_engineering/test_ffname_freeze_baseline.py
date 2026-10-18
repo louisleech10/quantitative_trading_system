@@ -130,7 +130,8 @@ def test_baseline_golden_values_nonempty_and_complete():
     data = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     # SPEC v21：不可變 baseline 之範圍＝refreeze.baseline_goldens（refreeze.goldens 只列實際重凍者，為其子集）
     goldens = CONTRACT["refreeze"]["baseline_goldens"]
-    assert set(CONTRACT["refreeze"]["goldens"]) <= set(goldens)
+    outside = {rel for rel, d in CONTRACT["refreeze"]["dispositions"].items() if d.get("outside_baseline")}
+    assert set(CONTRACT["refreeze"]["goldens"]) - outside <= set(goldens)  # baseline 範圍外者只准契約明示（v22 漏列補登）
     assert sorted(data["golden_values"]) == sorted(goldens)
     # SPEC v15 §G：逐欄 golden（未登記 no_column_records）須非空、數＝欄數
     empty = [rel for rel in goldens

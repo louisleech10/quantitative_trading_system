@@ -1,7 +1,7 @@
 {
   "contract": "ffname",
   "spec": "docs/FFNAME_SPEC.md",
-  "spec_version": "v21",
+  "spec_version": "v22",
   "naming_version": 2,
   "grammar": {
     "segment_separator": "_",
@@ -162,27 +162,45 @@
       "tests/_golden/icfirstalign/l3_default_arm.json",
       "tests/_golden/icfirstalign/probe_baseline.json",
       "tests/_golden/icfirstalign/worker_counts.json",
-      "tests/_golden/fftfmeta/baseline.json"
+      "tests/_golden/fftfmeta/baseline.json",
+      "tests/_golden/ffstat/nan_propagation_classes.json"
     ],
-    "classes": ["K0", "K1", "K2", "K3"],
+    "classes": ["K0", "K1", "K2", "K3", "INVENTORY"],
+    "receipt_schema": "ffname-refreeze-v22",
+    "pre_change_commit": "c97377299ca9dabfebbc0e229e4eed7e3d4dbc1b",
+    "pre_change_commit_note": "SPEC v22 重凍前提之改前碼態；與 baseline 凍結點 dfd5d7db 之產生端碼相同（兩者間只改 feature_naming.py 之 parser）。K1／K2 改前紀錄須來自此提交且 worktree 之 momentum／api／config／scripts／tests 無本地改動，否則拒收。",
+    "k2_decisions": ["refrozen", "pre_existing_drift"],
+    "rekey_exceptions": {
+      "tests/_golden/probewinsor/baseline.json": {
+        "_reason": "錨點 820e8f14（PROBEWINSOR 修正前）之『總開關關＋縮尾開』（off.w1）格行為與改前碼態 c9737729（修正後）依設計不同 ⇒ 該格之名衍生雜湊輸入無法由改前碼重現，不能換名重算；值保留改前位元組（舊命名世代之雜湊）。無任何消費測試讀之（test_ffname_refreeze 以 AST 靜態掃描 test_probewinsor.py 之 baseline 取格證明）；e1h_nostart.off.w1 不在此列（可重算、由 boundary_06 讀）。",
+        "cells/e12h.off.w1/probe_late_sha256": "off.w1 錨點行為差異", "cells/e12h.off.w1/first_finite_sha256": "off.w1 錨點行為差異",
+        "cells/e12h.off.w1/stable_start_sha256": "off.w1 錨點行為差異", "cells/e12h_dd.off.w1/probe_late_sha256": "off.w1 錨點行為差異",
+        "cells/e12h_dd.off.w1/first_finite_sha256": "off.w1 錨點行為差異", "cells/e12h_dd.off.w1/stable_start_sha256": "off.w1 錨點行為差異",
+        "cells/e1h.off.w1/probe_late_sha256": "off.w1 錨點行為差異", "cells/e1h.off.w1/first_finite_sha256": "off.w1 錨點行為差異",
+        "cells/e1h.off.w1/stable_start_sha256": "off.w1 錨點行為差異", "cells/e1h12h.off.w1/first_finite_sha256": "off.w1 錨點行為差異",
+        "cells/e1h12h_st.off.w1/first_finite_sha256": "off.w1 錨點行為差異", "cells/e1h_l45.off.w1/first_finite_sha256": "off.w1 錨點行為差異",
+        "cells/e1h_st.off.w1/probe_late_sha256": "off.w1 錨點行為差異", "cells/e1h_st.off.w1/first_finite_sha256": "off.w1 錨點行為差異",
+        "cells/e1h_st.off.w1/stable_start_sha256": "off.w1 錨點行為差異", "cells/s1h.off.w1/first_finite_sha256": "off.w1 錨點行為差異"
+      }
+    },
     "dispositions": {
       "tests/_golden/batch2d/cgsa_baseline.json": {"class": "K0", "reason": "legacy 刻意舊基準：消費測試只查自洽與「新 run 之 canonical_sha256 不等於凍結值」（test_batch2d_dstar_align.py:211），改名不使其紅", "consumers": ["tests/feature_engineering/test_batch2d_dstar_align.py::TestGolden::test_batch2d_golden_files_are_complete_and_read_only", "tests/feature_engineering/test_batch2d_dstar_align.py::TestP4Parity::test_cgsa_baseline_runs_ic_first_not_legacy_frozen"]},
       "tests/_golden/batch2d/provenance.json": {"class": "K0", "reason": "frame 時代之欄→層對照，無產生器；只被自洽測試讀", "consumers": ["tests/feature_engineering/test_batch2d_dstar_align.py::TestGolden::test_batch2d_golden_files_are_complete_and_read_only"]},
       "tests/_golden/ffstat/contract.json": {"class": "K0", "reason": "手寫契約；唯一欄名為設定拒收之範例（必拒收，與命名無關）", "consumers": ["tests/feature_engineering/test_ffstat_apply_to.py::test_stationarity_apply_to_rejects_non_closed_values"]},
       "tests/_golden/ffstat/baseline_dead_drops.json": {"class": "K0", "reason": "改前提交（5a148b8e）之死欄統計；消費測試只用舊提交事實；收據產生器之查鍵改名感知另處理（stable_start_receipts）", "consumers": ["tests/feature_engineering/test_ffstat_stable_start.py::test_warmup_restored_evidence_frozen_from_prebase", "tests/feature_engineering/test_ffstat_stable_start.py::test_warmup_restored_classification_causal"]},
-      "tests/_golden/ffstat/nan_propagation_classes.json": {"class": "K0", "reason": "函式 NaN 傳播分類（AST），無特徵欄名", "consumers": ["tests/feature_engineering/test_ffstat_stable_start.py::test_nan_propagation_inventory_complete"]},
+      "tests/_golden/ffstat/nan_propagation_classes.json": {"class": "INVENTORY", "reason": "SPEC v22：非欄名 golden；FF-NAME 新增／刪除生產函式使函式清冊與 AST 閉包不符 ⇒ 以 stable_start_receipts.py inventory 重產並為新函式逐一分類（分類交審碼），不歸 K0", "consumers": ["tests/feature_engineering/test_ffstat_stable_start.py::test_nan_propagation_inventory_complete"], "generator": "venv/bin/python handoffs/run_receipts/ffstat_probes/stable_start_receipts.py inventory"},
       "tests/_golden/icfirstalign/contract.json": {"class": "K0", "reason": "錯誤訊息、預算與分支契約，無特徵欄名", "consumers": ["tests/feature_engineering/test_icfirstalign_domain.py", "tests/feature_engineering/test_icfirstalign_icfirst.py", "tests/feature_engineering/test_icfirstalign_context.py", "tests/feature_engineering/test_icfirstalign_timeaxis.py", "tests/momentum/Analysis/test_icfirstalign_cache.py"]},
       "tests/_golden/icpostleak/contract.json": {"class": "K0", "reason": "手寫契約；測試用 kline close／volume 與自造欄名，l1_features 未被讀", "consumers": ["tests/api/test_icpostleak_api.py", "tests/api/test_ratiounsafe_ic_page.py"]},
       "tests/_golden/v2_ts/g1_baseline_fingerprint.json": {"class": "K0", "reason": "合成欄 a、b 直寫 storage，不經 factory 命名", "consumers": ["tests/feature_engineering/test_v2_timestamp_golden.py::test_g1_g2_feature_parquet_and_manifest_allowlist_unchanged"]},
       "tests/_golden/ratiounsafe/contract.json": {"class": "K0", "reason": "手寫契約；tagging_cases 驗週期標記純函式、branch_columns 為測試自造輸入名", "consumers": ["tests/feature_engineering/test_feature_naming.py", "tests/feature_engineering/test_ratiounsafe_wiring.py", "tests/api/test_ratiounsafe_ic_page.py"]},
-      "tests/_golden/ffstat/baseline.json": {"class": "K1", "reason": "FF-STAT 動工前快照；消費測試以新 run 依欄名對舊值比", "consumers": ["tests/feature_engineering/test_ffstat_golden.py", "tests/feature_engineering/test_ffstat_all_tested.py"], "recipe": "ffstat_baseline"},
+      "tests/_golden/ffstat/baseline.json": {"class": "K1", "reason": "FF-STAT 動工前快照；消費測試以新 run 依欄名對舊值比", "consumers": ["tests/feature_engineering/test_ffstat_golden.py::test_golden_baseline_frozen_before_change", "tests/feature_engineering/test_ffstat_golden.py::test_golden_base_names_and_rows_equal", "tests/feature_engineering/test_ffstat_golden.py::test_golden_receipt_change_report", "tests/feature_engineering/test_ffstat_golden.py::test_boundary_21_both_off_identical_to_baseline_base", "tests/feature_engineering/test_ffstat_all_tested.py::test_every_column_entering_step_has_pvalue", "tests/feature_engineering/test_ffstat_all_tested.py::test_boundary_03_formerly_name_exempt_columns_are_tested", "tests/feature_engineering/test_ffstat_all_tested.py::test_boundary_04_adf_apply_to_all_tests_each_column", "tests/feature_engineering/test_ffstat_all_tested.py::test_mutation_name_exemption_reinstated_is_caught", "tests/feature_engineering/test_ffstat_calibration.py::test_every_column_calibrated_before_output_start"], "recipe": "ffstat_baseline"},
       "tests/_golden/ffstat/baseline_nostart.json": {"class": "K1", "reason": "改前提交（5a148b8e）無起始日全史分塊雜湊；消費測試以新 run 依欄名取欄比", "consumers": ["tests/feature_engineering/test_ffstat_stable_start.py::test_no_start_stationarity_off_stable_values_unchanged", "tests/feature_engineering/test_ffstat_golden.py::test_golden_base_values_unchanged_after_stable_start"], "recipe": "ffstat_nostart"},
       "tests/_golden/probewinsor/baseline.json": {"class": "K1", "reason": "錨點 820e8f14 快照；boundary_02／03／04／06 以新 run 依欄名比；config_hash 另依鹽差", "consumers": ["tests/feature_engineering/test_probewinsor.py"], "recipe": "probewinsor", "name_hash_fields": ["cells/*/probe_late_sha256", "cells/*/first_finite_sha256", "cells/*/stable_start_sha256", "cells/*/config_hash"]},
       "tests/_golden/ratiounsafe/baseline.json": {"class": "K1", "reason": "RATIOUNSAFE 動工前（before）快照；消費測試以新 run 依欄名比", "consumers": ["tests/feature_engineering/test_ratiounsafe_registry.py::test_g_s1_off_conservation", "tests/feature_engineering/test_ratiounsafe_registry.py::test_g_s1_on_column_set_and_values", "tests/feature_engineering/test_ratiounsafe_registry.py::test_multi_tf_names_unchanged", "tests/feature_engineering/test_ratiounsafe_registry.py::test_boundary_02_after_baseline_not_written_before_branch_tests_pass"], "recipe": "ratiounsafe_before", "name_hash_fields": ["*/names_sha256"]},
       "tests/_golden/icfirstalign/calibration_baseline.json": {"class": "K1", "reason": "HEAD 甲之校準封包；消費測試以新封包 deep-equal（名為鍵）", "consumers": ["tests/feature_engineering/test_icfirstalign_calibration_domain.py"], "recipe": "icfa_calibration", "name_hash_fields": ["*/*/*/column_set_digest"]},
       "tests/_golden/icfirstalign/l3_default_arm.json": {"class": "K1", "reason": "HEAD 預設 L3 臂逐欄位元組；消費測試整份 dict 相等（名為鍵）", "consumers": ["tests/feature_engineering/test_icfirstalign_l3_arms.py::test_default_arm_l3_groups_bytes_equal_head"], "recipe": "icfa_l3"},
       "tests/_golden/icfirstalign/worker_counts.json": {"class": "K1", "outside_baseline": true, "reason": "第 4 批實跑 K0 消費測試時發現（事實盤點 §E 漏列、Task 0.1 baseline 範圍外）：groups_sha256 為群組欄名清單之雜湊；改前 worktree 錄群組欄名經映射換名後以 golden 自身函式（worker_record）重算，群組切分未變", "consumers": ["tests/feature_engineering/test_icfirstalign_domain.py::test_worker_last_holder_and_metadata_conserved"], "recipe": "icfa_worker", "name_hash_fields": ["worker/groups_sha256"]},
-      "tests/_golden/framepath/cgsa_fingerprint.json": {"class": "K1", "reason": "code_anchor 6e07e0ad 快照；test_cell_matches_frozen_baseline 以新 run 依欄名比；既有格 lineage 規則改為「值不變、鍵依映射換名」", "consumers": ["tests/feature_engineering/test_framepath_invariance.py", "tests/feature_engineering/test_framepath_disposition.py::test_check_0_baseline_existing_cells_preserved"], "recipe": "framepath"},
+      "tests/_golden/framepath/cgsa_fingerprint.json": {"class": "K2", "reason": "SPEC v22：compare_cell 比 manifest_sha256（含命名世代鹽之 config_hash、新根鍵 feature_naming_version、⑧ 分群），只換鍵不能重現 ⇒ 改前碼與現行碼各跑 12 格錄逐欄 sidecar、依名比對，符合重凍前提之格重凍該格 fingerprint；既有格規則改為「逐欄值不變；鍵名與名衍生雜湊依收據 framepath 段核可者可更新」", "consumers": ["tests/feature_engineering/test_framepath_invariance.py", "tests/feature_engineering/test_framepath_disposition.py::test_check_0_baseline_existing_cells_preserved"], "recipe": "framepath"},
       "tests/_golden/failopen/baseline.json": {"class": "K2", "reason": "只有依欄序之彙總雜湊；新舊碼全窗 sidecar 依名逐欄比對（使用者 2026-10-18 選定）", "consumers": ["tests/feature_engineering/test_failopen_correctness.py", "tests/feature_engineering/test_failopen_contract.py::test_l1_baseline_hash_matches_frozen", "tests/feature_engineering/test_failopen_layers.py", "tests/feature_engineering/test_failopen_golden.py::test_baseline_frozen"], "recipe": "failopen"},
       "tests/_golden/fftfmeta/baseline.json": {"class": "K2", "reason": "以群組檔名為鍵之 [[col, fingerprint]] 複合雜湊與 manifest／task 雜湊", "consumers": ["tests/feature_engineering/test_fftfmeta_golden.py"], "recipe": "fftfmeta"},
       "tests/_golden/icfirstalign/probe_baseline.json": {"class": "K2", "reason": "late 名單雜湊與首個有限值名序雜湊；產生腳本於現行碼不可執行，以消費測試之 run 路徑產生", "consumers": ["tests/feature_engineering/test_icfirstalign_calibration_domain.py"], "recipe": "icfa_probe"},
@@ -202,7 +220,9 @@
       "tests/_golden/icfirstalign/contract.json": {"class": "name_free", "reason": "錯誤訊息與預算契約，無特徵欄名"},
       "tests/_golden/fftfmeta/baseline.json": {"class": "remap_recompute", "reason": "以群組檔名為鍵之 [[col, fingerprint]] 複合雜湊（tests/feature_engineering/fftfmeta_golden_helpers.py:285-286）"}
     },
-    "full_reference": {"timeframes": ["1h", "12h"], "settings": "沿用既有 reference（SPEC Task 4.3）"}
+    "full_reference": {"symbol": "ETHUSDT", "timeframes": ["1h", "12h"], "window_months": 3, "window_tolerance_days": [89, 93],
+                       "window_rule": "SPEC v22：end＝該標的主週期 kline 最後一根之日期、start＝end 往前 3 個月（由資料導出，不寫死日期）；收據記實際 start／end",
+                       "settings": "沿用既有 reference main 設定（SPEC Task 4.3）"}
   },
   "dead_code": {
     "module": "momentum/FeatureEngineering/utils/adf_safe_skip.py",
