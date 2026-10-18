@@ -68,11 +68,23 @@ def _lag_inputs(manifest: Dict[str, Any]) -> Set[str]:
     return {_strip_last_op(c) for c in cols if last_op_name(fn.parse_feature_name(c)) == "Lag"}
 
 
+def _cascade_blacklisted(columns: Set[str]) -> Set[str]:
+    """本 run 設定之生產 cascade 黑名單（`nan_strategy.categorical_blacklist` 經生產 `expand_blacklist_patterns` 展開；
+    SPEC v17 §G ⑥：L4 前即剔除，改前即如此）。"""
+    config = create_feature_factory(cache_dir=KLINE_DIR, validate_continuity=False)._resolve_config(_lag_payload())
+    patterns = list(config.nan_strategy.categorical_blacklist or [])
+    assert patterns, "本 run 設定之 cascade 黑名單為空（§G ⑥ 之扣除前提不成立）"
+    return set(cascade.expand_blacklist_patterns(patterns, sorted(columns)))
+
+
 def _expected_inputs(manifest: Dict[str, Any], lag_inputs: Set[str]) -> Set[str]:
+    """§G ⑥（v17）：L1 群組欄扣除 cascade 黑名單＋raw 欄。"""
     groups = manifest_group_columns(manifest)
     l1 = {c for gid, cols in groups.items() if group_layer(gid) == "L1" for c in cols}
+    blacklisted = _cascade_blacklisted(l1)
+    assert blacklisted, "L1 群組欄中無 cascade 黑名單欄（本 run 設定含 pattern／cycle，扣除面不得為空）"
     raw = {c for c in lag_inputs if fn.parse_feature_name(c).category == "raw"}
-    return l1 | raw
+    return (l1 - blacklisted) | raw
 
 
 def _lag_inputs_ok(selected: Set[str], expected: Set[str]) -> bool:
@@ -138,11 +150,32 @@ def _old_heuristic(col: str) -> bool:
     return not any(t in col for t in tokens) and re.search(r"_W\d+$", col) is None
 
 
+def _inverse_baseline_mapping() -> Dict[str, str]:
+    """新名（標記後）→ 舊名：§G 零件以新 formatter 推導之映射（tests/_golden/ffname/baseline.json）之反函數
+    （同 test_ffname_value_invariance）。舊啟發式只認得舊名之 `_Ratio`、`_W5` 等字樣，故須套在舊名上。"""
+    import json
+
+    from tests.feature_engineering.ffname_helpers import BASELINE_PATH, load_freeze_module
+
+    freeze = load_freeze_module()
+    data = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    parts = {row["old_name"]: freeze.NamingPart(**{**row, "params": tuple(tuple(m) for m in (row.get("params") or ())),
+                                                   "ops": tuple(row.get("ops") or ())})
+             for row in data["parts"]}
+    mapping = freeze.derive_mapping(parts, {k: p.tf for k, p in parts.items()})
+    return {new: old for old, new in mapping.items()}
+
+
 def test_mutation_lag_name_heuristic_is_caught(lag_run):
-    """§V mutation ⑨：lag 改回欄名啟發式（子字串黑名單＋`_W\\d+$`）⇒ VolumeMA-Ratio／BullishCount 落選，集合不等。"""
+    """§V mutation ⑨：lag 改回欄名啟發式（子字串黑名單＋`_W\\d+$`，套在經 baseline 反映射取回之舊名上）⇒
+    VolumeMA-Ratio／BullishCount 落選，集合不等。"""
     selected = _lag_inputs(lag_run)
     expected = _expected_inputs(lag_run, selected)
-    heuristic = {c for c in expected if _old_heuristic(fn.strip_timeframe_tag(c))}
+    inverse = _inverse_baseline_mapping()
+    mapped = {c: inverse[c] for c in expected if c in inverse}
+    rejected_by_old = {c for c, old in mapped.items() if not _old_heuristic(fn.strip_timeframe_tag(old))}
+    assert any(fnmatch.fnmatch(c, g) for c in rejected_by_old for g in G6_GLOBS), sorted(rejected_by_old)[:10]
+    heuristic = {c for c in expected if c not in rejected_by_old}
     assert _lag_inputs_ok(heuristic, expected) is False
 
 

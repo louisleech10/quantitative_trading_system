@@ -58,9 +58,16 @@ def _write_run(base: Path, symbol: str = SYMBOL, cfg: str = CFG) -> Path:
     storage = FeatureStorage(str(base))
     kline = real_slice(32, symbol=symbol)
     frame = pd.DataFrame({c: kline["close"].to_numpy(dtype=np.float32) for c in COLS}, index=kline.index)
-    raw_dir = storage.write_raw(symbol, TF, cfg, {"g": frame}, row_index=pd.DatetimeIndex(kline.index))
+    # 正式 writer 路徑帶全層健康之 layer_results ⇒ run_status=complete（嚴格 consumer 可讀；與正式生成同一完整度推導）
+    from tests.feature_engineering.test_failopen_manifest import _healthy_layer_results
+
+    index = pd.DatetimeIndex(kline.index)
+    raw_dir = storage.write_raw(symbol, TF, cfg, {"g": frame}, row_index=index,
+                                layer_results=_healthy_layer_results(index))
     manifest = raw_dir.parent / "feature_manifest.json"
-    assert json.loads(manifest.read_text(encoding="utf-8")).get(GATE_KEY) == fn.CURRENT_FEATURE_NAMING_VERSION
+    written = json.loads(manifest.read_text(encoding="utf-8"))
+    assert written.get(GATE_KEY) == fn.CURRENT_FEATURE_NAMING_VERSION
+    assert written.get("run_status") == "complete", written.get("run_status")
     return manifest
 
 
@@ -293,10 +300,11 @@ def _ic_same_version_ok(tmp_path: Path, monkeypatch) -> bool:
     base = tmp_path / "features_positive"
     _write_run(base)
     reader = FeatureReader(str(base))
-    row_index = reader.load_row_index_v2(SYMBOL, TF, CFG)
-    label = pd.Series(np.arange(len(row_index), dtype=float), index=row_index, name="label")
     reads = _spy_reader_reads(monkeypatch, reader)
     try:
+        # 時間軸讀取亦屬 reader 共同邊界（亦過世代閘）⇒ 置於 try 內，永遠拒收之 mutant 於此即判不成立
+        row_index = reader.load_row_index_v2(SYMBOL, TF, CFG)
+        label = pd.Series(np.arange(len(row_index), dtype=float), index=row_index, name="label")
         result = ICEngine({}).compute_ic_from_l7_raw(SYMBOL, TF, CFG, label, feature_reader=reader)
     except Exception:  # noqa: BLE001 — mutant 永遠拒收即判為不成立
         return False
@@ -454,27 +462,78 @@ def test_ic_analysis_canonical_layout_without_registry_entry_rejected(tmp_path):
     assert _non_canonical_rejected(service, str(manifest))
 
 
-def test_orchestrator_stage0_non_canonical_h5_rejected(tmp_path, monkeypatch):
+def _write_handoff_h5(path: Path, symbol: str = SYMBOL) -> pd.DataFrame:
+    """以正式寫出端 `ICAnalysisService._write_features_h5` 寫 IC 交接 h5（根屬性帶現行命名世代）；值取真實 kline。"""
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    kline = real_slice(32, symbol=symbol)
+    frame = pd.DataFrame({c: kline["close"].to_numpy(dtype=np.float32) for c in COLS}, index=kline.index)
+    ICAnalysisService._write_features_h5(path, symbol, TF, frame)
+    with h5py.File(path, "r") as f:
+        assert int(f.attrs[GATE_KEY]) == fn.CURRENT_FEATURE_NAMING_VERSION
+    return frame
+
+
+@contextlib.contextmanager
+def tampered_h5(path: Path, mode: str) -> Iterator[None]:
+    """IC 交接 h5 根屬性竄改（缺／舊／無法解析），離開時還原。"""
+    with h5py.File(path, "a") as f:
+        original = f.attrs.get(GATE_KEY)
+        if mode == "missing":
+            del f.attrs[GATE_KEY]
+        elif mode == "old":
+            f.attrs[GATE_KEY] = fn.CURRENT_FEATURE_NAMING_VERSION - 1
+        elif mode == "unparsable":
+            f.attrs[GATE_KEY] = "two"
+    try:
+        yield
+    finally:
+        with h5py.File(path, "a") as f:
+            f.attrs[GATE_KEY] = original
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_orchestrator_stage0_h5_without_naming_version_rejected(tmp_path, monkeypatch, mode):
+    """SPEC v18：stage0 讀 IC 交接 h5 缺 `feature_naming_version` 屬性、舊版或無法解析 ⇒ 拒（例外鏈含
+    FeatureNamingVersionError、訊息含鍵名），且於讀任何群組／產生 DataFrame 之前（群組選取未被呼叫）。"""
     import momentum.Analysis.ic_filter_orchestrator as orch_mod
     from momentum.Analysis.ic_config_schema import ICConfig
 
-    kline = real_slice(32)
-    h5 = tmp_path / "loose_features.h5"
+    h5 = tmp_path / "handoff_features.h5"
     labels = tmp_path / "labels.h5"
-    for path in (h5, labels):
-        with h5py.File(path, "w") as f:
-            f.create_dataset(f"{SYMBOL}/{TF}/close", data=kline["close"].to_numpy())
-    opened: List[str] = []
-    real_file = h5py.File
+    _write_handoff_h5(h5)
+    _write_handoff_h5(labels)
+    selected: List[str] = []
+    real_select = orch_mod.ICFilterOrchestrator._select_first_group
 
-    def spy(path, *a, **k):
-        opened.append(str(path))
-        return real_file(path, *a, **k)
+    def spy_select(self, file):
+        selected.append(str(file.filename))
+        return real_select(self, file)
 
-    monkeypatch.setattr(orch_mod.h5py, "File", spy)
-    with pytest.raises(Exception):
-        orch_mod.ICFilterOrchestrator(ICConfig())._stage0_ingestion(str(h5), str(labels), None)
-    assert str(h5) not in opened
+    monkeypatch.setattr(orch_mod.ICFilterOrchestrator, "_select_first_group", spy_select)
+    orchestrator = orch_mod.ICFilterOrchestrator(ICConfig())
+    with tampered_h5(h5, mode):
+        assert _rejects(lambda: orchestrator._stage0_ingestion(str(h5), str(labels), None))
+    assert str(h5) not in selected
+
+
+def test_orchestrator_stage0_same_version_handoff_passes_and_equals_ungated(tmp_path, monkeypatch):
+    """SPEC v18：同版交接 h5 通過，且讀回 == 無閘時（閘不改值）；閘改 no-op 時舊版檔即被讀入（閘為拒收之因）。"""
+    import momentum.Analysis.ic_filter_orchestrator as orch_mod
+    from momentum.Analysis.ic_config_schema import ICConfig
+
+    h5 = tmp_path / "handoff_features.h5"
+    frame = _write_handoff_h5(h5)
+    orchestrator = orch_mod.ICFilterOrchestrator(ICConfig())
+    gated, gated_meta = orchestrator._load_features_hdf5(str(h5))
+    assert list(gated.columns) == COLS and len(gated) == len(frame)
+    np.testing.assert_array_equal(gated.to_numpy(), frame.to_numpy())
+    assert patch_everywhere(monkeypatch, fn.assert_h5_feature_naming_version, lambda *a, **k: None) >= 1
+    ungated, ungated_meta = orchestrator._load_features_hdf5(str(h5))
+    pd.testing.assert_frame_equal(gated, ungated)
+    assert gated_meta == ungated_meta
+    with tampered_h5(h5, "old"):
+        assert isinstance(orchestrator._load_features_hdf5(str(h5))[0], pd.DataFrame)
 
 
 # ---------------------------------------------------------------- feature_factory_service
@@ -586,6 +645,50 @@ def test_static_reads_only_reader_or_whitelist():
     offenders = [hit for hit in _scan_reads(wl["scan_roots"])
                  if hit[0] != wl["reader_module"] and hit not in allowed and not hit[0].startswith(excluded)]
     assert offenders == [], offenders[:30]
+    assert _attr_gate_missing(wl) == []
+
+
+def _qualname_node(tree: ast.AST, qualname: str) -> ast.AST:
+    """`<module>` ⇒ 模組本身；否則依 `A.B.c` 逐層找類別／函式定義。"""
+    if qualname == "<module>":
+        return tree
+    node: ast.AST = tree
+    for part in qualname.split("."):
+        node = next(ch for ch in ast.iter_child_nodes(node)
+                    if isinstance(ch, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and ch.name == part)
+    return node
+
+
+def _attr_gate_missing(wl: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """SPEC v18：purpose 為「IC 交接 h5…屬性閘」之白名單讀取，其函式本體須呼叫屬性閘函式；缺者列出。"""
+    gate = wl["h5_attr_gate"]
+    missing: List[Tuple[str, str]] = []
+    entries = [e for e in wl["entries"] if e["purpose"] == gate["purpose"]]
+    assert entries, "白名單無 IC 交接 h5 屬性閘條目"
+    for e in entries:
+        node = _qualname_node(ast.parse((REPO / e["path"]).read_text(encoding="utf-8")), e["qualname"])
+        calls = {(n.func.attr if isinstance(n.func, ast.Attribute) else getattr(n.func, "id", ""))
+                 for n in ast.walk(node) if isinstance(n, ast.Call)}
+        if gate["function"] not in calls:
+            missing.append((e["path"], e["qualname"]))
+    return missing
+
+
+def test_mutation_attr_gate_call_removed_is_caught(tmp_path, monkeypatch):
+    """mutant：某 IC 交接 h5 讀取函式移除屬性閘呼叫 ⇒ `_attr_gate_missing` 列出之（以改寫後之來源副本驗）。"""
+    wl = json.loads(WHITELIST_PATH.read_text(encoding="utf-8"))
+    assert _attr_gate_missing(wl) == []
+    target = next(e for e in wl["entries"] if e["purpose"] == wl["h5_attr_gate"]["purpose"]
+                  and e["path"] == "momentum/Analysis/ic_filter_orchestrator.py")
+    src = (REPO / target["path"]).read_text(encoding="utf-8")
+    mutated = src.replace(f"{wl['h5_attr_gate']['function']}(file.attrs, features_path)", "None")
+    assert mutated != src
+    copy_root = tmp_path / "repo"
+    (copy_root / target["path"]).parent.mkdir(parents=True)
+    (copy_root / target["path"]).write_text(mutated, encoding="utf-8")
+    wl_mut = {**wl, "entries": [target]}
+    monkeypatch.setitem(globals(), "REPO", copy_root)
+    assert _attr_gate_missing(wl_mut) == [(target["path"], target["qualname"])]
 
 
 def test_whitelist_entries_are_live_and_scripts_tmp_excluded():
