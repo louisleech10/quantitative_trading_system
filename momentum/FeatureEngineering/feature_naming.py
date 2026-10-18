@@ -30,7 +30,7 @@ _OP_ARGS = {
     "Cross": None, "Ratio": None,
     # L2 單欄
     "Distance": None, "SignedStrength": None, "Sign": None, "Log1p": None, "Abs": None, "Clip": None,
-    "Momentum": r"L[0-9]+", "BinarySignal": r"[A-Za-z0-9.]+", "TsArgmax": _W, "TsArgmin": _W, "TsRank": _W,
+    "Momentum": r"L[0-9]+", "BinarySignal": r"[A-Za-z0-9.]+(?:-[A-Za-z0-9.]+)*", "TsArgmax": _W, "TsArgmin": _W, "TsRank": _W,
     "DecayLinear": _W, "TsCorr": r"[0-9a-f]{8}-" + _W,
     # L3 滾動彙總（`rolling_aggregator._format_agg_label`）
     "Slope": _W, "Std": _W, "Mean": _W, "Rank": _W, "ZScore": _W, "Skew": _W, "Kurt": _W, "Min": _W, "Max": _W,
@@ -184,6 +184,26 @@ def format_feature_name(identity: FeatureIdentity) -> str:
     name = "_".join(segs)
     parse_feature_name(name, tagged=identity.tf is not None)  # 產出端即驗文法（不合即拋，不落盤不合文法之名）
     return name
+
+
+UNSUPPORTED_KIND = "unsupported"
+
+
+def feature_descriptor(name: str) -> dict:
+    """欄名 → 版本化描述（FF-NAME Task 1.2／3.3 之單一來源；API 與向量匯出器共用）。
+
+    合法名：`{version, kind, source, tf, category, indicator, params, ops, display}`（params 逐層轉 list）；
+    不合文法：`{version, kind: "unsupported", error: <例外類別名>, display}`（fail-closed，不猜）。
+    """
+    text = str(name)
+    try:
+        ident = parse_feature_name(text)
+    except FeatureNameParseError as exc:
+        return {"version": CURRENT_FEATURE_NAMING_VERSION, "kind": UNSUPPORTED_KIND, "error": type(exc).__name__,
+                "display": text}
+    return {"version": CURRENT_FEATURE_NAMING_VERSION, "kind": ident.kind, "source": ident.source, "tf": ident.tf,
+            "category": ident.category, "indicator": ident.indicator,
+            "params": [list(member) for member in ident.params], "ops": list(ident.ops), "display": text}
 
 
 # RATIOUNSAFE Task 1.1：ratio-unsafe 類別之單一常數（`derived_operators`、`rolling_aggregator`、`feature_preprocessor` re-export 同一物件）
