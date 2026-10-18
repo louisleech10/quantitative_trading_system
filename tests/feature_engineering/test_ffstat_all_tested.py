@@ -82,8 +82,20 @@ def test_adf_safe_skip_config_section_rejected() -> None:
 
 
 def test_mutation_name_exemption_reinstated_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """§V mutant ①：判定退回欄名子字串免檢（名字免檢之欄不進 ADF）⇒ 邊界①必紅。"""
-    from momentum.FeatureEngineering.utils.adf_safe_skip import is_safe_skip
+    """§V mutant ①：判定退回欄名子字串免檢（名字免檢之欄不進 ADF）⇒ 邊界①必紅。
+    FFNAME Task 4.2 刪除死碼模組後，免檢子字串清單內嵌於本 mutant（逐字取自原模組之 ADF_SAFE_SKIP_PATTERNS）。"""
+    patterns = (
+        "_RSI_", "_ADX_", "_ADXR_", "_DX_", "_WILLR_", "_MFI_", "AROON-aroonup", "AROON-aroondown", "_AROONOSC_",
+        "_ULTOSC_", "STOCH-slowk", "STOCH-slowd", "STOCHF-fastk", "STOCHF-fastd", "STOCHRSI-fastk", "STOCHRSI-fastd",
+        "_BOP", "_CORREL_", "Correl-CloseVolume", "_CMO_", "LINEARREG-ANGLE", "PLUS-DI", "MINUS-DI", "_NATR_",
+        "_MOM_", "_ROC_", "_ROCP_", "_ROCR_", "_ROCR100_", "_TRIX_", "MACD-Line", "MACD-Signal", "MACD-Hist",
+        "MACDEXT-Line", "MACDEXT-Signal", "MACDEXT-Hist", "MACDFIX-Line", "MACDFIX-Signal", "MACDFIX-Hist", "_APO_",
+        "_PPO_", "HT-TRENDMODE", "HT-SINE", "_Cross", "_BinarySignal_", "_Sign_", "_TsRank_", "_TsArgMax_",
+        "_TsArgMin_", "_TsCorr_",
+    )
+
+    def is_safe_skip(column: str) -> bool:
+        return any(p in column for p in patterns)
 
     real = FeaturePreprocessor._get_non_stationary_columns
 

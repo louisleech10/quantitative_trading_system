@@ -597,10 +597,16 @@ def test_no_start_stationarity_off_stable_values_unchanged(tmp_path: Path, monke
     stable = result.metadata[CONTRACT["stable_start_receipt_key"]]
     # v50（審查 r33）：L3 mean／std／zscore／skew／kurt 改為逐窗精確計算，改前基準之該類值帶增量實作之缺陷（常數窗
     # std 非零、值依起算點而異）⇒ 不與改前基準逐位元組比，改由 ⑨′ 以 float64 逐窗 oracle 驗；其餘欄照常比
-    import re
+    # FF-NAME v21：判定改依欄名文法（末 op 為 L3 彙總 `<Agg>-W<k>`），不依舊世代底線字面（換鍵後之基準為新世代名）
+    import momentum.FeatureEngineering.feature_naming as fnm
 
-    v50_changed = re.compile(r"_(Mean|Std|ZScore|Skew|Kurt)_W\d+$")
-    exempt = set(baseline.get("chain_has_class_2_or_3", [])) | {c for c in baseline["columns"] if v50_changed.search(c)}
+    def v50_changed(name: str) -> bool:
+        ops = fnm.parse_feature_name(name).ops
+        return bool(ops) and str(ops[-1]).split("-W")[0] in {"Mean", "Std", "ZScore", "Skew", "Kurt"} \
+            and str(ops[-1]).rsplit("-W", 1)[-1].isdigit()
+
+    exempt = set(baseline.get("chain_has_class_2_or_3", [])) | {c for c in baseline["columns"] if v50_changed(c)}
+    assert any(v50_changed(c) for c in baseline["columns"]), "v50 豁免類欄於基準中應存在（文法判定失效即紅）"
     compared = 0
     for column, blocks in baseline["columns"].items():
         series = _public_column(root, column)

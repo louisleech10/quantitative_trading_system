@@ -46,6 +46,7 @@ from momentum.FeatureEngineering.meta_features.interaction_features import Inter
 from momentum.FeatureEngineering.meta_features.time_features import TimeFeatureEngine
 from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
 from momentum.FeatureEngineering.feature_naming import (
+    CURRENT_FEATURE_NAMING_VERSION,
     build_identity,
     format_feature_name,
     parse_feature_name,
@@ -4133,6 +4134,8 @@ class FeatureFactory:
         # Explicitly include timeframe kwarg in hash to ensure 12h/1h results never share cache.
         config_payload["_timeframe"] = timeframe
         config_payload["_mtf_align_version"] = CURRENT_MTF_ALIGN_VERSION
+        # FFNAME Task 4.1：欄名命名世代納入快取鍵 ⇒ 舊命名世代之 run 目錄不被新碼命中續跑（舊目錄不刪）
+        config_payload["_feature_naming_version"] = CURRENT_FEATURE_NAMING_VERSION
         # FFSTAT Task 2.3 ⑨：預熱政策（逐欄穩定點）與倍數表內容皆改變輸出值 ⇒ 納入快取鍵（改前快取一律未命中）
         config_payload["_warmup_policy"] = _stable_mask.WARMUP_POLICY
         config_payload["_warmup_table_sha256"] = _warmup_lookup.table_sha256()

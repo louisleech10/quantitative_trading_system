@@ -330,6 +330,7 @@ def all_nan_base_columns() -> set:
     import numpy as np
 
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    _assert_current_naming_generation(baseline["base"])
     out = set()
     for name, fp in baseline["base"].items():
         if fp["nan_mask"] == hashlib.sha256(np.ones(tuple(fp["shape"]), dtype=bool).tobytes()).hexdigest():
@@ -372,6 +373,35 @@ def base_column_values(root: Path, names: Any) -> Dict[str, Any]:
     return out
 
 
+def _assert_current_naming_generation(names: Any) -> None:
+    """FF-NAME SPEC v21 §G 連動：基準欄名須為現行命名世代（全數 `format(parse(n)) == n`）。舊世代之基準與新 run 之欄名
+    交集為空時，依名之豁免（全 NaN 欄）或期望集合會靜默失效——改為立即失敗。"""
+    import momentum.FeatureEngineering.feature_naming as fn
+
+    bad = []
+    for name in names:
+        try:
+            if fn.format_feature_name(fn.parse_feature_name(str(name))) != str(name):
+                bad.append(str(name))
+        except fn.FeatureNameParseError:
+            bad.append(str(name))
+    assert not bad, f"FF-STAT 基準欄名非現行命名世代（{len(bad)} 欄，例 {sorted(bad)[:3]}）：須依 FF-NAME K1 換鍵"
+
+
+def _ffname_delta_mapping(delta_path: Path) -> Dict[str, str]:
+    """FF-NAME SPEC v21 §G 連動：欄集合差異收據（使用者核可紀錄之 sha 綁定其原內容，不改檔）之舊名依改前 worktree
+    紀錄器映射換名；映射檔須綁定該收據之 sha256，且涵蓋全部名（查無 ⇒ 失敗）。"""
+    import hashlib
+
+    path = Path(__file__).resolve().parents[2] / "handoffs" / "run_receipts" / "ffname_refreeze_maps" / \
+        "ffstat__column_set_delta.json"
+    assert path.is_file(), f"缺 FF-NAME 欄集合差異映射 {path.name}"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert doc["source_sha256"] == hashlib.sha256(delta_path.read_bytes()).hexdigest(), "映射未綁定該 delta 收據"
+    assert not doc["missing"] and not doc["ambiguous"], "FF-NAME 欄集合差異映射有查無／歧義"
+    return dict(doc["mapping"])
+
+
 def approved_base_columns(baseline_columns: Any) -> set:
     """§G ①（v33／v34／v49）：改後基礎欄集合之期望＝改前基準欄集合＋經使用者核可之欄集合差異（最新 delta 收據之
     `added` 加入、`removed` 移除）。核可紀錄之 delta sha256 須等於 delta 收據（不等或非空而無核可 ⇒ 斷言失敗），
@@ -387,7 +417,11 @@ def approved_base_columns(baseline_columns: Any) -> set:
         approvals = sorted(rr.glob("*-ffstat-column-set-approval.json"))
         assert approvals, "delta 非空而無使用者核可紀錄"
         assert json.loads(approvals[-1].read_text(encoding="utf-8"))["delta_sha256"] == digest
-    return (set(baseline_columns) | set(delta["added"])) - set(delta["removed"])
+    _assert_current_naming_generation(baseline_columns)
+    mapping = _ffname_delta_mapping(deltas[-1])
+    added = {mapping[n] for n in delta["added"]}
+    removed = {mapping[n] for n in delta["removed"]}
+    return (set(baseline_columns) | added) - removed
 
 
 def public_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:

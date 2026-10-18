@@ -4,18 +4,18 @@
    "domain_calls": [
     {
      "columns": 161,
-     "first_finite_sha256": "b9ba3bf23931f2c3f07c940b4649d57c7af6ff908d425b7e9d22a086a02b207d",
+     "first_finite_sha256": "734b6487bdc60ce3e41861da004505e448ce30ed15854d7201250bba98ca4e15",
      "rows": 994,
      "timeframe": "12h"
     },
     {
      "columns": 161,
-     "first_finite_sha256": "a7f2333541585b3e0b425602da5127f3f45234e1958d88305f9aacc65f8164ba",
+     "first_finite_sha256": "d0d13bdfc98c4376f375e3f1137e443a1a0ec144181321ceb1954d67845bb478",
      "rows": 11926,
      "timeframe": "1h"
     }
    ],
-   "late_names_sha256": "58ebe6e31d1b982943fd565c0743aff5d64ee02b5940b64f39d17cdd6dda3351",
+   "late_names_sha256": "21e714b1ce46327e76fda796bd27aba8106b64b4513e7ac7644b399e0fc065e5",
    "rounds": [
     {
      "depth": 878,
@@ -34,12 +34,12 @@
    "domain_calls": [
     {
      "columns": 8806,
-     "first_finite_sha256": "26e3a59dfb67b13fe0f419a333ee89762c9569a7e508e1c109be8b9c6ac87587",
+     "first_finite_sha256": "4bfbec417ba96189fd99ea1833e9480867710098332bc4f01d348327aba24590",
      "rows": 1641,
      "timeframe": "12h"
     }
    ],
-   "late_names_sha256": "03e031d7ccdfb34f1f1caaed1c9ab6822ac4798670e35ec8251d3272e3b98465",
+   "late_names_sha256": "d291a24f85b8346152786a7f95ef086c4b648c2f8879f35f351e71f18725ca1d",
    "rounds": [
     {
      "depth": 3317,
@@ -79,18 +79,18 @@
    "domain_calls": [
     {
      "columns": 161,
-     "first_finite_sha256": "b9ba3bf23931f2c3f07c940b4649d57c7af6ff908d425b7e9d22a086a02b207d",
+     "first_finite_sha256": "734b6487bdc60ce3e41861da004505e448ce30ed15854d7201250bba98ca4e15",
      "rows": 994,
      "timeframe": "12h"
     },
     {
      "columns": 161,
-     "first_finite_sha256": "a7f2333541585b3e0b425602da5127f3f45234e1958d88305f9aacc65f8164ba",
+     "first_finite_sha256": "d0d13bdfc98c4376f375e3f1137e443a1a0ec144181321ceb1954d67845bb478",
      "rows": 11926,
      "timeframe": "1h"
     }
    ],
-   "late_names_sha256": "58ebe6e31d1b982943fd565c0743aff5d64ee02b5940b64f39d17cdd6dda3351",
+   "late_names_sha256": "21e714b1ce46327e76fda796bd27aba8106b64b4513e7ac7644b399e0fc065e5",
    "rounds": [
     {
      "depth": 878,
@@ -109,12 +109,12 @@
    "domain_calls": [
     {
      "columns": 8806,
-     "first_finite_sha256": "26e3a59dfb67b13fe0f419a333ee89762c9569a7e508e1c109be8b9c6ac87587",
+     "first_finite_sha256": "4bfbec417ba96189fd99ea1833e9480867710098332bc4f01d348327aba24590",
      "rows": 1641,
      "timeframe": "12h"
     }
    ],
-   "late_names_sha256": "03e031d7ccdfb34f1f1caaed1c9ab6822ac4798670e35ec8251d3272e3b98465",
+   "late_names_sha256": "d291a24f85b8346152786a7f95ef086c4b648c2f8879f35f351e71f18725ca1d",
    "rounds": [
     {
      "depth": 3317,

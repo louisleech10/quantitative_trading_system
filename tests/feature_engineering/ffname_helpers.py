@@ -52,6 +52,23 @@ def naming() -> ModuleType:
     return fn
 
 
+def is_g6_new_lag(name: str) -> bool:
+    """§G ⑥ 新增 lag 欄（SPEC v21：K1 消費測試依 ⑥ 例外處理）：欄名 parse 之末 op 為 `Lag-k`，且去末 op 之基底
+    （標記形）符合契約 `g6_new_lag_globs`（改前因欄名啟發式未加 lag 之 raw 衍生欄）。不可 parse 者不屬之。"""
+    import dataclasses
+    import fnmatch
+
+    fn = naming()
+    try:
+        ident = fn.parse_feature_name(name)
+    except fn.FeatureNameParseError:
+        return False
+    if not ident.ops or not str(ident.ops[-1]).startswith("Lag-"):
+        return False
+    base = fn.format_feature_name(dataclasses.replace(ident, ops=tuple(ident.ops[:-1])))
+    return any(fnmatch.fnmatchcase(base, glob) for glob in G6_GLOBS)
+
+
 def params_str(ident: Any) -> str:
     """身分之 params 段字串形（SPEC v13：`params: tuple[tuple[str, ...], ...]`，外層為配對成員；空 tuple 表無參數段）。"""
     return "~".join("-".join(member) for member in ident.params)

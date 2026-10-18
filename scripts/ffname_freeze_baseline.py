@@ -14,11 +14,11 @@
   ⇒ 凍結失敗（封閉涵蓋）；同名欄出自兩個組名點 ⇒ 凍結失敗並列出。
 - 逐欄（舊名為鍵）記 dtype、shape、NaN mask sha256、值 sha256（值經 `FeatureReader` 讀回）；另記 L2 配對簽名集合、
   L4 lag 輸入集合、欄序、group 結構、平穩化決策（鍵與值）。
-- 另記 Task 4.3 重凍對象 golden（`tests/_golden/ffname/contract.json` 之 `refreeze.goldens`）之改前逐欄值雜湊
-  （`golden_values`：golden 路徑 → {舊欄名 → 值雜湊前 `refreeze.golden_value_hash_len` 碼}），作為重凍之不可變值 oracle
-  （審查 r12 CODEX-R12-P1-04）；檔內無逐欄紀錄而登記於 `refreeze.no_column_records` 者改記檔案 sha256
-  （`golden_file_sha256`；SPEC v15 §G「重凍 golden 之值 oracle」：`name_free` 須位元組不變、`remap_recompute` 以 golden 自身
-  雜湊函式於反向映射後重算，見 `remap_recompute_golden`）；未登記而無逐欄紀錄 ⇒ `--check` 失敗。
+- 另記 Task 4.3 範圍 golden（`tests/_golden/ffname/contract.json` 之 `refreeze.baseline_goldens`）之改前逐欄值雜湊
+  （`golden_values`：golden 路徑 → {舊欄名 → 值雜湊前 `refreeze.golden_value_hash_len` 碼}）；檔內無逐欄紀錄而登記於
+  `refreeze.no_column_records` 者改記檔案 sha256（`golden_file_sha256`）；未登記而無逐欄紀錄 ⇒ `--check` 失敗。
+  SPEC v21：Task 4.3 之判定改依契約 `refreeze.dispositions`（K0–K3，工具 `scripts/ffname_refreeze.py`）；
+  本段只為不可變基準之完整性（`--check` 以 baseline `frozen_at_head` 之該檔比對 `golden_file_sha256`）。
 - 舊名→新名映射由零件以新 formatter 推導（`derive_new_name`）；禁字串清單與全欄 replace。
 
 零件之約定（SPEC v15）：
@@ -1516,14 +1516,58 @@ def golden_file_sha256(path: Path) -> str:
     return _sha(Path(path).read_bytes())
 
 
-def remap_recompute_golden(path: Path, inverse_mapping: Mapping[str, str]) -> Dict[str, Any]:
-    """`remap_recompute` 類 golden 之值 oracle（SPEC v15 §G；實作屬 Task 4.3）：以該 golden **自身之雜湊函式**對重凍後之
-    產物重算——計算前把每個新欄名（含群組檔名、路徑等含名鍵）以 `inverse_mapping`（新名 → 舊名）換回舊名；映射例外
-    （§G ⑤ L2 合併差集、⑥ 新增 lag 欄）於重算前剔除並列入收據。回傳 {golden 內欄位路徑（`/` 連接）→ 重算值}，由呼叫端
-    與改前 golden（baseline `frozen_at_head` 之該檔、sha256＝baseline `golden_file_sha256`）之對應欄位逐一比對位元組相等。
+def _baseline_goldens() -> List[str]:
+    """不可變 baseline 之 golden 範圍（契約 `refreeze.baseline_goldens`；SPEC v21 起 `refreeze.goldens` 只列實際重凍者）。"""
+    refreeze = _contract()["refreeze"]
+    return list(refreeze.get("baseline_goldens") or refreeze["goldens"])
 
-    Task 4.3 前尚無重凍產物可重算 ⇒ 一律拋 NotImplementedError（不得以空結果偽綠）。"""
-    raise NotImplementedError(f"FFNAME Task 4.3：remap_recompute oracle 尚未實作（{_golden_rel(Path(path))}）")
+
+def _blob_sha256(head: Optional[str], rel: str) -> Optional[str]:
+    """baseline `frozen_at_head` 之該檔 sha256（git 物件；重凍後磁碟上之檔可變，基準比對以凍結點為準）。"""
+    if not head:
+        return None
+    proc = subprocess.run(["git", "show", f"{head}:{rel}"], cwd=str(REPO), capture_output=True)
+    return _sha(proc.stdout) if proc.returncode == 0 else None
+
+
+def _pre_change_golden_bytes(rel: str, baseline: Mapping[str, Any]) -> Optional[bytes]:
+    """改前 golden 位元組：baseline `frozen_at_head` 之該檔（git 物件）。"""
+    head = baseline.get("frozen_at_head")
+    if not head:
+        return None
+    proc = subprocess.run(["git", "show", f"{head}:{rel}"], cwd=str(REPO), capture_output=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def run_full_reference(work_dir: Path, symbol: str, start: Optional[str], end: Optional[str]) -> Dict[str, Any]:
+    """全量 reference（Task 4.3）：reference `main` 設定（週期取契約 `refreeze.full_reference.timeframes`）於 `symbol`
+    跑 IC-first 正式路徑；回傳 raw＋processed 全部欄名。寫入隔離同 `fftfmeta_golden_helpers.prepare_env`（由呼叫端設）。"""
+    from tests.feature_engineering.fftfmeta_golden_helpers import PRIMARY_TF
+
+    timeframes = list(_contract()["refreeze"]["full_reference"]["timeframes"])
+    payload = json.loads(json.dumps(reference_payloads()["main"]))
+    primary = PRIMARY_TF if PRIMARY_TF in timeframes else timeframes[0]
+    payload["timeframes"] = {**payload["timeframes"], "primary": primary, "training": timeframes}
+    root, _factory, result = _generate_ic_first(Path(work_dir), payload, symbol, primary, (start, end))
+    config_hash = str(result.metadata["config_hash"])
+    manifest, raw = _read_run(root, symbol, primary, config_hash)
+    _pm, processed = _read_run(root, symbol, primary, config_hash, "processed")
+    return {"symbol": symbol, "timeframes": timeframes, "window": [start, end],
+            "feature_naming_version": manifest.get("feature_naming_version"),
+            "columns": sorted(set(raw) | set(processed))}
+
+
+def full_reference_record(info: Mapping[str, Any]) -> Dict[str, Any]:
+    fn = _naming()
+    parse_failures = roundtrip_failures = 0
+    for name in info["columns"]:
+        try:
+            if fn.format_feature_name(fn.parse_feature_name(name)) != name:
+                roundtrip_failures += 1
+        except fn.FeatureNameParseError:
+            parse_failures += 1
+    return {**dict(info), "total_columns": len(info["columns"]), "parse_failures": parse_failures,
+            "roundtrip_failures": roundtrip_failures}
 
 
 def golden_columns(path: Path) -> List[str]:
@@ -1543,7 +1587,7 @@ def _golden_sections() -> Tuple[Dict[str, Dict[str, str]], Dict[str, int], Dict[
     counts: Dict[str, int] = {}
     file_sha: Dict[str, str] = {}
     unregistered_empty: List[str] = []
-    for rel in _contract()["refreeze"]["goldens"]:
+    for rel in _baseline_goldens():
         path = REPO / rel
         values[rel] = golden_value_fingerprints(path)
         counts[rel] = len(golden_columns(path))
@@ -1645,10 +1689,11 @@ def freeze(out_path: Path = BASELINE_PATH) -> int:
 
 def _golden_problems(data: Mapping[str, Any]) -> List[str]:
     """golden 值 oracle 段之檢查（SPEC v15 §G）：逐欄 golden 須非空、fingerprint 數＝欄數、雜湊長＝契約 hash_len；
-    無逐欄紀錄者須登記於 no_column_records（類別屬 oracle_classes、理由非空），且 golden_file_sha256 等於磁碟上該檔。"""
+    無逐欄紀錄者須登記於 no_column_records（類別屬 oracle_classes、理由非空），且 golden_file_sha256 等於 baseline
+    `frozen_at_head` 之該檔（SPEC v21：重凍後磁碟上之檔依 K0–K3 改變，基準之錨為凍結點）。"""
     problems: List[str] = []
     refreeze = _contract()["refreeze"]
-    goldens = refreeze["goldens"]
+    goldens = _baseline_goldens()
     classes = set(refreeze.get("oracle_classes") or ())
     registered = no_column_records()
     hash_len = golden_value_hash_len()
@@ -1671,8 +1716,9 @@ def _golden_problems(data: Mapping[str, Any]) -> List[str]:
                 problems.append(f"golden {rel}：no_column_records 缺理由")
             if values or golden_counts[rel] != 0:
                 problems.append(f"golden {rel} 登記為無逐欄紀錄，baseline 卻有 {len(values)} 筆／欄數 {golden_counts[rel]}")
-            if file_sha.get(rel) != golden_file_sha256(REPO / rel):
-                problems.append(f"golden {rel}：golden_file_sha256 != 磁碟上該檔之 sha256")
+            anchored = _blob_sha256(data.get("frozen_at_head"), rel)
+            if anchored is None or file_sha.get(rel) != anchored:
+                problems.append(f"golden {rel}：golden_file_sha256 != baseline frozen_at_head 之該檔 sha256")
             continue
         if not values:
             problems.append(f"golden {rel} 無逐欄紀錄且未登記 refreeze.no_column_records")
@@ -1762,9 +1808,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--out", default=str(BASELINE_PATH))
     parser.add_argument("--value-receipt", action="store_true",
                         help="改後碼態跑 reference 並寫 Task 2.6 收據（handoffs/run_receipts/ffname-value-invariance.json）")
+    parser.add_argument("--full-reference-only", metavar="OUT_JSON", default=None,
+                        help="Task 4.3：只跑全量 reference，欄名清單寫入 OUT_JSON（供 scripts/ffname_refreeze.py receipt 沿用）")
+    parser.add_argument("--full-ref-symbol", default="ETHUSDT", help="全量 reference 標的（SPEC Task 4.3：ETHUSDT）")
+    parser.add_argument("--full-ref-start", default=None, help="全量 reference 起日（預設 None＝kline 全史）")
+    parser.add_argument("--full-ref-end", default=None)
     args = parser.parse_args(argv)
     if args.value_receipt:
         return write_value_receipt()
+    if args.full_reference_only:
+        import pytest
+
+        from tests.feature_engineering.fftfmeta_golden_helpers import prepare_env
+
+        started = time.time()
+        with tempfile.TemporaryDirectory(prefix="ffname_full_reference_") as tmp:
+            with pytest.MonkeyPatch.context() as mp:
+                prepare_env(mp, Path(tmp), FFACT_MULTI_TF_PARALLEL="0")
+                info = run_full_reference(Path(tmp) / "run", args.full_ref_symbol, args.full_ref_start, args.full_ref_end)
+        info["elapsed_seconds"] = round(time.time() - started, 1)
+        Path(args.full_reference_only).write_text(json.dumps(info, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"[ffname-full-reference] {len(info['columns'])} 欄、{info['elapsed_seconds']}s → {args.full_reference_only}")
+        return 0
     if args.check:
         return check(Path(args.out))
     return freeze(Path(args.out))

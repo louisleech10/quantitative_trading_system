@@ -24,6 +24,7 @@ import pytest
 from momentum.FeatureEngineering import feature_naming as fn
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as h
+from tests.feature_engineering.ffname_helpers import is_g6_new_lag
 
 REPO = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads((REPO / "tests/_golden/ratiounsafe/contract.json").read_text(encoding="utf-8"))
@@ -270,11 +271,24 @@ def _is_unsafe(col: str) -> bool:
     return fn.is_ratio_unsafe_column(col)
 
 
+def _without_g6(got: dict, before_names: set) -> dict:
+    """FF-NAME SPEC v21 §G ⑥：改前快照（K1）無 ⑥ 新增 lag 欄（改前欄名啟發式漏加 lag 之 raw 衍生欄）。新 run 之欄中
+    不在改前名單者，須全屬 ⑥ 新增 lag 才剔除（逐筆列於斷言訊息）；其餘照原斷言比對。"""
+    extra = sorted(c for c in got["names"] if c not in before_names)
+    g6 = [c for c in extra if is_g6_new_lag(c)]
+    names = [c for c in got["names"] if c not in set(g6)]
+    import hashlib
+
+    return {**got, "names": names, "names_sha256": hashlib.sha256("\n".join(names).encode("utf-8")).hexdigest(),
+            "n_columns": len(names), "columns": {c: d for c, d in got["columns"].items() if c not in set(g6)},
+            "g6_new_lag": g6}
+
+
 def test_g_s1_off_conservation(before: dict) -> None:
     """§G ①②③：S1-off（dead-drop 關）名稱集合／欄數／列數不變；非 ratio-unsafe 欄逐欄值與 NaN mask 不變；
     ratio-unsafe 欄＝前處理關之原值。"""
-    got = freeze.s1_record("off", True)
     b, raw = before["s1_off"], before["s1_off_preprocessing_disabled"]
+    got = _without_g6(freeze.s1_record("off", True), set(b["names"]))
     assert (got["names_sha256"], got["n_columns"], got["n_rows"]) == (b["names_sha256"], b["n_columns"], b["n_rows"])
     for col, dig in got["columns"].items():
         want = raw["columns"][col] if _is_unsafe(col) else b["columns"][col]
@@ -283,8 +297,8 @@ def test_g_s1_off_conservation(before: dict) -> None:
 
 def test_g_s1_on_column_set_and_values(before: dict) -> None:
     """§G ④⑤：S1-on 非 ratio-unsafe 欄名稱與值不變；新增欄＝改前被剔除且原值不死之 ratio-unsafe 欄；刪減為空。"""
-    got = freeze.s1_record("on", True)
     b, raw = before["s1_on"], before["s1_on_preprocessing_disabled"]
+    got = _without_g6(freeze.s1_record("on", True), set(b["names"]) | set(raw["names"]))
     got_names, before_names = set(got["names"]), set(b["names"])
     assert {c for c in got_names if not _is_unsafe(c)} == {c for c in before_names if not _is_unsafe(c)}
     for col in got_names:
@@ -358,8 +372,11 @@ def test_boundary_02_after_baseline_not_written_before_branch_tests_pass() -> No
     before_ = json.loads((REPO / "tests/_golden/ratiounsafe/baseline.json").read_text(encoding="utf-8"))
     assert after["stage"] == "after"
     raw = before_["s1_off_preprocessing_disabled"]["columns"]
+    # FF-NAME SPEC v21 §G ⑥：改後基準（現行碼重產）含 ⑥ 新增 lag 欄，改前快照（K1）無之 ⇒ 只此類可不在改前紀錄
+    missing = [c for c in after["s1_off"]["columns"] if _is_unsafe(c) and c not in raw]
+    assert all(is_g6_new_lag(c) for c in missing), [c for c in missing if not is_g6_new_lag(c)]
     for col, dig in after["s1_off"]["columns"].items():
-        if _is_unsafe(col):
+        if _is_unsafe(col) and col not in missing:
             assert dig == raw[col], col
 
 
