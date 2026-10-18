@@ -619,7 +619,7 @@ def _tagged_key(key: str) -> str:
     if "/" not in key:
         return key
     gid, col = key.split("/", 1)
-    return fn.tag_timeframe(col, gid.split("_", 1)[0])
+    return fn.tag_timeframe(col, gid.lstrip("@").split("_", 1)[0])
 
 
 def _refreeze_tool() -> Any:
@@ -660,6 +660,31 @@ def test_framepath_group_key_mapping_and_lag_check():
             ngid, ncol = new_key.split("/", 1)
             fn.parse_feature_name(ncol, tagged=False)
             assert ngid == tool.framepath_new_group_id(gid, ncol), old_key
+
+
+def test_failopen_untagged_key_lag_check():
+    """failopen registry 之欄為未標記名：①群組鍵 `<gid>/<未標記欄>` 以群組週期標記後判 ⑥（多週期單元各鍵週期取自其群組）；
+    ②非群組之未標記鍵只在給定單週期單元週期時標記後判，不給即 unparseable（不猜週期）；③真不能 parse 者 fail-closed。"""
+    tool = _refreeze_tool()
+    assert tool._lag_shift_ok({}, "12h_L4_lag/ohlc_pattern_BearishCount_13_Lag-1") is None
+    assert tool._lag_shift_ok({}, "@12h/ohlc_pattern_BearishCount_13_Lag-1") is None                # failopen 週期鍵
+    assert tool.split_group_key("@12h/close_trend_EMA_8") == ("@12h", "close_trend_EMA_8")
+    mapped, _miss, _amb = tool.build_key_mapping(
+        {"parts": [], "tagged_index": [], "post_ic": []}, [])  # 空集合不崩
+    assert mapped == {}
+    assert tool._lag_shift_ok({}, "1h_L4_lag/volume_volume_VolumeMA-Ratio_20_Lag-3") is None
+    assert tool._lag_shift_ok({}, "ohlc_pattern_BearishCount_13_Lag-1") == "unparseable"          # 未給週期：不猜
+    assert tool._lag_shift_ok({}, "ohlc_pattern_BearishCount_13_Lag-1", "12h") is None           # 單週期單元
+    assert tool._lag_shift_ok({}, "close_trend_EMA_8_Lag-1", "12h").startswith("base_not_g6")
+    assert tool._lag_shift_ok({}, "not a feature name", "12h") == "unparseable"
+    assert tool._lag_shift_ok({}, "ohlc_12h_pattern_BearishCount_13_Lag-1") is None              # 已標記形照常
+    # k2_compare：多出之未標記 ⑥ 欄於單週期單元判為 g6、於未給週期時判為不符（不偽綠）
+    new_cols = {"12h_L1_x/close_trend_EMA_8": {"v": 1}, "ohlc_pattern_BearishCount_13_Lag-1": {"v": 2}}
+    mapping = {"12h_L1_x/close_trend_EMA_8": "12h_L1_x/close_trend_EMA_8"}
+    old_cols = {"12h_L1_x/close_trend_EMA_8": {"v": 1}}
+    assert tool.k2_compare(old_cols, new_cols, mapping, fields=(), unit_tf="12h")["g6_new_lag"] == \
+        ["ohlc_pattern_BearishCount_13_Lag-1"]
+    assert any("unparseable" in m for m in tool.k2_compare(old_cols, new_cols, mapping, fields=())["mismatches"])
 
 
 @pytest.mark.parametrize("rel", _of("K2"))

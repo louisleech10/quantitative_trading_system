@@ -366,22 +366,33 @@ def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
         base = col.rsplit("_Lag-", 1)[0] if "_Lag-" in col else col
         return any(fnmatch.fnmatchcase(base, g) for g in globs)
 
+    from momentum.FeatureEngineering import feature_naming as _fnm
+
     def hash_registry(registry: Any, groups: Any, index: Any, row_slice: Any = None, native_rows: Any = None):
+        """registry 群組欄為未標記名 ⇒ sidecar 鍵＝`@<週期>/<未標記欄>`（週期取自該群組之 timeframe，不猜；不帶 group_id——
+        L3／L4 等群組依欄數切塊，⑥ 新增欄會移動切塊邊界，群組歸屬非欄身分）。⑥ 判定以群組週期標記後之名（契約 glob 為
+        標記形）；⑥ 位移以未切公開窗之原生時間軸驗（公開窗前 k 列之 lag 取自預熱列）。"""
         groups = list(groups)
         out = real_reg(registry, groups, index, row_slice, native_rows)
         dest = tables[state["table"]]
         for group in groups:
-            data = np.asarray(registry.load_data_native(group.group_id))
-            if row_slice is not None:
-                data = data[row_slice]
+            native = np.asarray(registry.load_data_native(group.group_id))
+            data = native[row_slice] if row_slice is not None else native
+            tf = str(group.timeframe)
             for i, col in enumerate(group.columns):
+                key = f"@{tf}/{col}"
                 fp = _per_column_fp(data[:, i])
-                if str(col) in dest and dest[str(col)] != fp:
-                    conflicts.append(f"{state['table']}:{col}")
-                dest[str(col)] = fp
-                # ⑥ 位移 oracle：registry 之 L1／L4 為 L6.5（縮尾）前之值 ⇒ 可直接驗 lag＝基底位移
-                if state["table"] == "registry" and keep_for_g6(str(col)):
-                    g6_arrays[str(col)] = np.array(data[:, i], dtype=np.float64)
+                if key in dest and dest[key] != fp:
+                    conflicts.append(f"{state['table']}:{key}")
+                dest[key] = fp
+                # ⑥ 位移 oracle：registry 之 L1／L4 為 L6.5（縮尾）前之值 ⇒ 可直接驗 lag＝基底位移（原生時間軸）
+                if state["table"] == "registry":
+                    try:
+                        tagged = _fnm.tag_timeframe(str(col), tf)
+                    except Exception:  # noqa: BLE001  改前碼態之標記函式不收之名不屬 ⑥（⑥ 只在現行碼出現）
+                        continue
+                    if keep_for_g6(tagged):
+                        g6_arrays[key] = (tf, tagged, np.array(native[:, i], dtype=np.float64))
         return out
 
     def hash_l7(feature_base: Path, sym: str, timeframe: str, config_hash: str, index: Any):
@@ -401,9 +412,31 @@ def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
         finally:
             state["table"] = "registry"
 
+    real_all_groups = frz._all_registry_groups
+
+    def all_registry_groups(registry: Any) -> Any:
+        """多週期單元之 record 不雜湊 registry（只雜湊 merged L7，且其次週期欄已對齊至主週期時間軸）⇒ ⑥ 位移 oracle 於
+        record 列舉 registry 群組時（工作目錄刪除前）取各群組原生時間軸之值；鍵＝以群組週期標記之名（＝merged L7 欄名）。"""
+        groups = real_all_groups(registry)
+        if kind == "multi":
+            for group in groups:
+                tf = str(group.timeframe)
+                native = None
+                for i, col in enumerate(group.columns):
+                    try:
+                        tagged = _fnm.tag_timeframe(str(col), tf)
+                    except Exception:  # noqa: BLE001
+                        continue
+                    if keep_for_g6(tagged):
+                        if native is None:
+                            native = np.asarray(registry.load_data_native(group.group_id))
+                        g6_arrays[tagged] = (tf, tagged, np.array(native[:, i], dtype=np.float64))
+        return groups
+
     mp.setattr(frz, "_hash_registry_table", hash_registry)
     mp.setattr(frz, "_hash_l7_parquet_table", hash_l7)
     mp.setattr(frz, "_l1_direct_record", l1_direct)
+    mp.setattr(frz, "_all_registry_groups", all_registry_groups)
     temp_root = work / "failopen"
     temp_root.mkdir(parents=True, exist_ok=True)
     if kind == "multi":
@@ -415,11 +448,13 @@ def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
     import pandas as pd
 
     shift: Dict[str, bool] = {}
-    by_len: Dict[Tuple[str, int], Dict[str, Any]] = {}
-    for col, arr in g6_arrays.items():  # 同週期（第 2 段）且同列數者同表（多週期 registry 為各自原生時間軸）
-        by_len.setdefault((col.split("_")[1] if "_" in col else "", len(arr)), {})[col] = arr
-    for frame_cols in by_len.values():
-        shift.update(_g6_shift_checks(pd.DataFrame(frame_cols)))
+    by_tf: Dict[Tuple[str, int], Dict[str, Tuple[str, Any]]] = {}
+    for key, (tf, tagged, arr) in g6_arrays.items():  # 同週期且同列數者同表（多週期 registry 為各自原生時間軸）
+        by_tf.setdefault((tf, len(arr)), {})[tagged] = (key, arr)
+    for entries in by_tf.values():
+        checks = _g6_shift_checks(pd.DataFrame({tagged: arr for tagged, (_key, arr) in entries.items()}))
+        for tagged, ok in checks.items():
+            shift[entries[tagged][0]] = ok  # 以 sidecar 鍵記
     return {"unit": unit, "unit_record": record, "tables": tables, "conflicts": conflicts, "g6_shift": shift}
 
 
@@ -956,8 +991,9 @@ def _iter_strings(node: Any) -> Iterable[Tuple[str, str]]:
 
 
 def split_group_key(key: str) -> Tuple[Optional[str], str]:
-    """sidecar 欄鍵之兩形：落盤欄名（標記形，如 `close_1h_trend_EMA_8`）或 registry 群組鍵
-    `<group_id>/<未標記欄名>`（framepath persist=False 之格，如 C7）。回傳（group_id 或 None, 欄名）。"""
+    """sidecar 欄鍵之三形：落盤欄名（標記形，如 `close_1h_trend_EMA_8`）、registry 群組鍵 `<group_id>/<未標記欄名>`
+    （framepath persist=False 之格，如 C7）、或週期鍵 `@<週期>/<未標記欄名>`（failopen registry；週期取自群組）。
+    回傳（前綴或 None, 欄名）。"""
     if "/" in key:
         gid, col = key.split("/", 1)
         return gid, col
@@ -970,7 +1006,7 @@ def tagged_column_of_key(key: str) -> str:
     import momentum.FeatureEngineering.feature_naming as fn
 
     gid, col = split_group_key(key)
-    return col if gid is None else fn.tag_timeframe(col, gid.split("_", 1)[0])
+    return col if gid is None else fn.tag_timeframe(col, gid.lstrip("@").split("_", 1)[0])
 
 
 def framepath_new_group_id(old_gid: str, new_col_untagged: str) -> str:
@@ -997,16 +1033,20 @@ def build_key_mapping(record_doc: Mapping[str, Any], keys: Iterable[str]) -> Tup
         gid, col = split_group_key(k)
         if gid is None or col not in mapping:
             continue
-        out[k] = f"{framepath_new_group_id(gid, mapping[col])}/{mapping[col]}"
+        # `@<週期>` 前綴（failopen）不涉群組 ⇒ 原樣；群組前綴（framepath）依 §G ⑧ 導出新 group_id
+        prefix = gid if gid.startswith("@") else framepath_new_group_id(gid, mapping[col])
+        out[k] = f"{prefix}/{mapping[col]}"
     news = list(out.values())
     if len(set(news)) != len(news):
         raise SystemExit(f"欄鍵映射非單射：{sorted({n for n in news if news.count(n) > 1})[:10]}")
     return out, missing, ambiguous
 
 
-def _lag_shift_ok(new_cols: Mapping[str, Any], name: str) -> Optional[str]:
+def _lag_shift_ok(new_cols: Mapping[str, Any], name: str, unit_tf: Optional[str] = None) -> Optional[str]:
     """⑥ 新增 lag 欄之形狀檢查：須 parse 為 `<基底>` 加 `Lag-k`，基底屬契約 `g6_new_lag_globs`。值位移另由
-    recipe 以實際 run 讀值驗（sidecar 只有雜湊）。群組鍵 `<gid>/<未標記欄>` 先以群組週期標記後再判（glob 為標記形）。"""
+    recipe 以實際 run 讀值驗（sidecar 只有雜湊）。群組鍵 `<gid>/<未標記欄>` 先以群組週期標記後再判（glob 為標記形）；
+    非群組鍵而為未標記形者，只在呼叫端給定單元週期（單週期單元之週期，`unit_tf`）時以之標記——不猜週期；
+    兩者皆不能 parse ⇒ unparseable（fail-closed）。"""
     sys.path.insert(0, str(MAIN_REPO))
     import fnmatch
 
@@ -1016,7 +1056,13 @@ def _lag_shift_ok(new_cols: Mapping[str, Any], name: str) -> Optional[str]:
     try:
         ident = fn.parse_feature_name(tagged_column_of_key(name))
     except fn.FeatureNameParseError:
-        return "unparseable"
+        if unit_tf is None or split_group_key(name)[0] is not None:
+            return "unparseable"
+        try:
+            fn.parse_feature_name(name, tagged=False)
+            ident = fn.parse_feature_name(fn.tag_timeframe(name, unit_tf))
+        except (fn.FeatureNameParseError, ValueError):
+            return "unparseable"
     if not ident.ops or not str(ident.ops[-1]).startswith("Lag-"):
         return "not_lag"
     base = fn.format_feature_name(type(ident)(**{**ident.__dict__, "ops": tuple(ident.ops[:-1])}))
@@ -1026,8 +1072,9 @@ def _lag_shift_ok(new_cols: Mapping[str, Any], name: str) -> Optional[str]:
 
 
 def k2_compare(old_cols: Mapping[str, Any], new_cols: Mapping[str, Any], mapping: Mapping[str, str],
-               fields: Sequence[str]) -> Dict[str, Any]:
-    """依名逐欄：舊名經映射對新名，指定欄位全等；多出之新欄須為 ⑥ 新增 lag；缺漏即不符。"""
+               fields: Sequence[str], unit_tf: Optional[str] = None) -> Dict[str, Any]:
+    """依名逐欄：舊名經映射對新名，指定欄位全等；多出之新欄須為 ⑥ 新增 lag；缺漏即不符。
+    `unit_tf`：單週期單元之週期（供未標記之非群組鍵標記後判 ⑥；多週期單元不給）。"""
     mismatches: List[str] = []
     missing_map = sorted(n for n in old_cols if n not in mapping)
     mapped_new = {}
@@ -1046,7 +1093,7 @@ def k2_compare(old_cols: Mapping[str, Any], new_cols: Mapping[str, Any], mapping
     extra = sorted(set(new_cols) - set(mapped_new))
     g6, bad_extra = [], []
     for name in extra:
-        problem = _lag_shift_ok(new_cols, name)
+        problem = _lag_shift_ok(new_cols, name, unit_tf)
         (bad_extra if problem else g6).append(name if not problem else f"{name}:{problem}")
     return {"compared": len(mapped_new), "mismatches": mismatches + [f"unmapped_old:{n}" for n in missing_map]
             + [f"extra_new:{n}" for n in bad_extra], "g6_new_lag": g6}
@@ -1216,7 +1263,7 @@ def _k2_compare_unit(rel: str, recipe: str, tag: str, old_sc: Dict[str, Any], ne
     for p, doc, rec in ((old_sc_path, old_sc, old_record), (new_sc_path, new_sc, new_record)):
         p.write_text(json.dumps({**doc, "head": rec["head"], "tree": rec["tree"], "recipe": recipe},
                                 ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
-    mapping, missing, ambiguous = (build_key_mapping(old_record, old_sc["columns"]) if recipe == "framepath"
+    mapping, missing, ambiguous = (build_key_mapping(old_record, old_sc["columns"]) if recipe in ("framepath", "failopen")
                                    else build_mapping(old_record, set(old_sc["columns"])))
     map_doc = {"schema_version": MAP_SCHEMA, "golden": rel, "unit": unit, "recipe": recipe,
                "source_head": old_record["head"], "source_tree": old_record["tree"],
@@ -1228,7 +1275,10 @@ def _k2_compare_unit(rel: str, recipe: str, tag: str, old_sc: Dict[str, Any], ne
     MAPS_DIR.mkdir(parents=True, exist_ok=True)
     map_path = MAPS_DIR / f"{tag}.json"
     map_path.write_text(json.dumps(map_doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    result = k2_compare(old_sc["columns"], new_sc["columns"], mapping, fields=())
+    unit_tf = None
+    if recipe == "failopen" and unit and not str(unit).endswith("/multi"):
+        unit_tf = str(unit).split("/", 1)[1]  # 單週期單元之週期（取自單元名，非推測）
+    result = k2_compare(old_sc["columns"], new_sc["columns"], mapping, fields=(), unit_tf=unit_tf)
     mismatches = list(result["mismatches"])
     for old_name, rec in old_sc["columns"].items():
         new = mapping.get(old_name)

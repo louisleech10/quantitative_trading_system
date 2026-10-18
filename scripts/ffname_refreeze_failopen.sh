@@ -44,7 +44,7 @@ step() {  # step <unit> <side old|new>
   local unit="$1" side="$2" tag out t0 rc
   tag="$(echo "$unit" | tr '/' '-')"
   out="$OUT/records/failopen.$tag.$side.json"
-  if valid "$out"; then echo "[skip] $unit $side（已存在）" | tee -a "$LOG"; return 0; fi
+  if valid "$out"; then echo "[skip] ${unit} ${side}（已存在）" | tee -a "$LOG"; return 0; fi
   if [ "$DRY_RUN" = "1" ]; then echo "[dry] $unit $side → $out"; return 0; fi
   guard
   t0=$(date +%s)
@@ -71,7 +71,7 @@ for unit in $UNITS; do
     rc=$?
     tail -3 "$OUT/records/failopen.$tag.k2.log" | tee -a "$LOG"
     if [ "$rc" -ne 0 ]; then
-      echo "[STOP] $unit k2 rc=$rc（依名不符或 ⑥ 未驗；詳 $OUT/records/failopen.$tag.k2.log）" | tee -a "$LOG"
+      echo "[STOP] ${unit} k2 rc=${rc}（依名不符或 ⑥ 未驗；詳 ${OUT}/records/failopen.${tag}.k2.log）" | tee -a "$LOG"
       exit "$rc"
     fi
   fi
