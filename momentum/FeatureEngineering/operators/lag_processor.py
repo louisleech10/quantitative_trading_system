@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 import fnmatch
 import re
 
@@ -10,6 +11,13 @@ import pandas as pd
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.feature_config import FactoryConfig
+from momentum.FeatureEngineering.feature_naming import (
+    FeatureIdentity,
+    FeatureNameParseError,
+    format_feature_name,
+    parse_feature_name,
+    raw_value_identity,
+)
 
 
 logger = get_logger(__name__)
@@ -60,7 +68,7 @@ class LagProcessor:
             # Fast path (P1.4): one shift per lag, single outer concat.
             # ``copy=False`` keeps memory flat; output columns are immutable.
             frames: List[pd.DataFrame] = [
-                selected_df.shift(lag).add_suffix(f"_Lag_{lag}") for lag in lag_steps
+                self._with_lag_names(selected_df.shift(lag), lag) for lag in lag_steps
             ]
             return pd.concat(frames, axis=1, copy=False)
 
@@ -76,7 +84,7 @@ class LagProcessor:
                 lag_frames: List[pd.DataFrame] = []
                 for lag in lag_subset:
                     lagged = self._apply_lag(chunk_df, lag)
-                    lag_frames.append(lagged.add_suffix(f"_Lag_{lag}"))
+                    lag_frames.append(self._with_lag_names(lagged, lag))
                 if lag_frames:
                     chunk_frames.append(pd.concat(lag_frames, axis=1, copy=False))
 
@@ -120,40 +128,32 @@ class LagProcessor:
                 return True
         return False
 
+    @staticmethod
+    def _identity_or_none(col: str) -> Optional[FeatureIdentity]:
+        """生成期間之未標記形欄名 → 身分；不合特徵文法（raw kline 資料鍵，如 `taker_ratio`、`avg-price`）⇒ None。"""
+        try:
+            return parse_feature_name(str(col), tagged=False)
+        except FeatureNameParseError:
+            return None
+
     def _is_layer1_or_raw(self, col: str) -> bool:
-        operator_tokens = [
-            "_Distance",
-            "_Cross",
-            "_Momentum",
-            "_Ratio",
-            "_BinarySignal",
-            "_SignedStrength",
-            "_TsArgmax",
-            "_TsArgmin",
-            "_TsRank",
-            "_DecayLinear",
-            "_TsCorr",
-            "_Sign",
-            "_Log1p",
-            "_Abs",
-            "_Clip",
-            "_Slope_",
-            "_Std_",
-            "_Mean_",
-            "_Rank_",
-            "_ZScore_",
-            "_Skew_",
-            "_Kurt_",
-            "_Min_",
-            "_Max_",
-            "_Range_",
-            "_Lag_",
-        ]
-        if any(token in col for token in operator_tokens):
-            return False
-        if re.search(r"_W\d+$", col):
-            return False
-        return True
+        """`layer1_and_raw` 之選欄（FF-NAME §G ⑥）：由身分判層——L1（kind＝atomic）或 raw 資料鍵（非特徵文法）。
+        取代改前之欄名子字串黑名單（該黑名單誤排除 `VolumeMA_Ratio`、`BullishCount_W5` 等 L1 欄）。"""
+        identity = self._identity_or_none(col)
+        return identity is None or identity.kind == "atomic"
+
+    def _lag_name(self, col: str, lag: int) -> str:
+        """L4 欄名（FF-NAME Task 2.4）：特徵欄＝身分＋op `Lag-<k>`；raw 資料鍵＝`<canonical raw>_raw_value_Lag-<k>`。"""
+        op = f"Lag-{int(lag)}"
+        identity = self._identity_or_none(col)
+        if identity is None:
+            raw = raw_value_identity(str(col))
+            return format_feature_name(dataclasses.replace(raw, ops=(op,)))
+        return format_feature_name(dataclasses.replace(identity, ops=tuple(identity.ops) + (op,)))
+
+    def _with_lag_names(self, frame: pd.DataFrame, lag: int) -> pd.DataFrame:
+        """整表欄名加 L4 lag op（取代改前之 `add_suffix("_Lag_<k>")`；不改值）。"""
+        return frame.set_axis([self._lag_name(str(c), lag) for c in frame.columns], axis=1)
 
     def _normalize_lags(self, lags: List[int]) -> List[int]:
         normalized = sorted({int(lag) for lag in lags if lag >= 1})

@@ -34,8 +34,15 @@ from __future__ import annotations
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name
 
 logger = get_logger(__name__)
+
+# FF-NAME Task 2.4：L6 meta 欄名＝`meta_meta_<indicator>`（未標記形；落盤 `meta_<tf>_meta_<indicator>`）
+_HOUR_OF_DAY = format_feature_name(build_identity("meta", "meta", "time-hour-of-day"))
+_DAY_OF_WEEK = format_feature_name(build_identity("meta", "meta", "time-day-of-week"))
+_IS_WEEKEND = format_feature_name(build_identity("meta", "meta", "time-is-weekend"))
+_MONTH_OF_YEAR = format_feature_name(build_identity("meta", "meta", "time-month-of-year"))
 
 
 class TimeFeatureEngine:
@@ -51,8 +58,8 @@ class TimeFeatureEngine:
         else:
             dt = pd.to_datetime(timestamps, unit="ms", errors="coerce")
         result = pd.DataFrame(index=timestamps.index)
-        result["meta_Time_HourOfDay"] = dt.dt.hour
-        result["meta_Time_DayOfWeek"] = dt.dt.dayofweek
-        result["meta_Time_IsWeekend"] = (dt.dt.dayofweek >= 5).astype(int)
-        result["meta_Time_MonthOfYear"] = dt.dt.month
+        result[_HOUR_OF_DAY] = dt.dt.hour
+        result[_DAY_OF_WEEK] = dt.dt.dayofweek
+        result[_IS_WEEKEND] = (dt.dt.dayofweek >= 5).astype(int)
+        result[_MONTH_OF_YEAR] = dt.dt.month
         return result

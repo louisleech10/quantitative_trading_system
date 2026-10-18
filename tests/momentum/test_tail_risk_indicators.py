@@ -5,6 +5,22 @@ import pandas as pd
 import pytest
 
 from momentum.FeatureEngineering.atomic.tail_risk_indicators import TailRiskIndicatorEngine
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name, parse_feature_name
+
+
+def _name(indicator: str, *params: object) -> str:
+    """FF-NAME 文法之 tail-risk 欄名（未標記形；輸入元組 `("close",)` ⇒ source `close`）。"""
+    return format_feature_name(build_identity("close", "tail-risk", indicator, params))
+
+
+def _sel(out: pd.DataFrame, indicator: str, first_param: str | None = None) -> pd.DataFrame:
+    """取 indicator（與首個參數 token）相符之欄，保持輸出欄序（取代改前之欄名前綴 `tr_<indicator>_` 篩選）。"""
+    keep = []
+    for c in out.columns:
+        ident = parse_feature_name(c, tagged=False)
+        if ident.indicator == indicator and (first_param is None or ident.params[0][0] == first_param):
+            keep.append(c)
+    return out[keep]
 
 
 def _make_data(n: int = 300) -> pd.DataFrame:
@@ -27,33 +43,33 @@ def _engine(**override) -> TailRiskIndicatorEngine:
 def test_tail_risk_compute_all_feature_count_and_prefix() -> None:
     out = _engine().compute_all(_make_data())
     assert out.shape[1] == 26
-    assert all(col.startswith("tr_") for col in out.columns)
+    assert all(parse_feature_name(col, tagged=False).category == "tail-risk" for col in out.columns)
 
 
 def test_tail_risk_metadata_complete() -> None:
     metadata = _engine().get_feature_metadata()
     assert len(metadata) == 26
-    assert "tr_mdd_100" in metadata
+    assert _name("mdd", 100) in metadata
 
 
 def test_tail_risk_insufficient_data() -> None:
     out = _engine().compute_all(_make_data(15))
-    assert out["tr_cvar_1pct_100"].isna().all()
+    assert out[_name("cvar", "1pct", 100)].isna().all()
 
 
 def test_tail_risk_zero_returns() -> None:
     data = _make_data()
     data["close"] = 100.0
     out = _engine().compute_all(data)
-    assert (out.filter(like="tr_cvar_").fillna(0.0) == 0.0).all().all()
-    assert (out.filter(like="tr_mdd_").fillna(0.0) == 0.0).all().all()
+    assert (_sel(out, "cvar").fillna(0.0) == 0.0).all().all()
+    assert (_sel(out, "mdd").fillna(0.0) == 0.0).all().all()
 
 
 def test_tail_risk_one_sided() -> None:
     data = _make_data()
     data["close"] = np.arange(len(data), dtype=float) + 100.0
     out = _engine().compute_all(data)
-    gpr = out.filter(like="tr_gpr_")
+    gpr = _sel(out, "gpr")
     assert (gpr.dropna() <= 100.0).all().all()
 
 
@@ -63,14 +79,14 @@ def test_tail_risk_rare_negative() -> None:
     close[150] = close[149] * 0.95
     data["close"] = close
     out = _engine().compute_all(data)
-    assert out.filter(like="tr_cvar_5pct_").notna().any().any()
+    assert _sel(out, "cvar", "5pct").notna().any().any()
 
 
 def test_udvr_zero_downside() -> None:
     data = _make_data()
     data["close"] = np.linspace(100, 130, len(data))
     out = _engine().compute_all(data)
-    assert out.filter(like="tr_ud_vol_ratio_").isna().any().any()
+    assert _sel(out, "ud-vol-ratio").isna().any().any()
 
 
 def test_tail_risk_extreme() -> None:
@@ -97,21 +113,21 @@ def test_mdd_monotonic_up() -> None:
     data = _make_data()
     data["close"] = np.linspace(100, 150, len(data))
     out = _engine().compute_all(data)
-    assert (out.filter(like="tr_mdd_").fillna(0.0) == 0.0).all().all()
+    assert (_sel(out, "mdd").fillna(0.0) == 0.0).all().all()
 
 
 def test_mdd_monotonic_down() -> None:
     data = _make_data()
     data["close"] = np.linspace(150, 100, len(data))
     out = _engine().compute_all(data)
-    assert out.filter(like="tr_mdd_").iloc[-1].max() > 0.0
+    assert _sel(out, "mdd").iloc[-1].max() > 0.0
 
 
 def test_mdd_invalid_price() -> None:
     data = _make_data()
     data.loc[30, "close"] = 0.0
     out = _engine().compute_all(data)
-    assert out.filter(like="tr_mdd_").isna().any().any()
+    assert _sel(out, "mdd").isna().any().any()
 
 
 def test_tail_risk_one_sided_gpr_is_nan_not_capped() -> None:
@@ -120,8 +136,8 @@ def test_tail_risk_one_sided_gpr_is_nan_not_capped() -> None:
     data = _make_data()
     data["close"] = np.arange(len(data), dtype=float) + 100.0
     out = _engine().compute_all(data)
-    gpr = out.filter(like="tr_gpr_").to_numpy()
-    rv_up = out.filter(like="tr_rv_up_").iloc[60:].to_numpy()
+    gpr = _sel(out, "gpr").to_numpy()
+    rv_up = _sel(out, "rv-up").iloc[60:].to_numpy()
     assert np.isnan(gpr).all() and np.isfinite(rv_up).all() and (rv_up > 0).all(), \
         (np.nanmax(gpr) if np.isfinite(gpr).any() else "all-nan", rv_up.min())
 
@@ -132,9 +148,9 @@ def test_udvr_zero_downside_is_nan_after_warmup() -> None:
     data = _make_data()
     data["close"] = np.linspace(100, 130, len(data))
     out = _engine().compute_all(data)
-    udvr_after = out.filter(like="tr_ud_vol_ratio_").iloc[60:].to_numpy()
-    rv_down_after = out.filter(like="tr_rv_down_").iloc[60:].to_numpy()
-    rv_up_after = out.filter(like="tr_rv_up_").iloc[60:].to_numpy()
+    udvr_after = _sel(out, "ud-vol-ratio").iloc[60:].to_numpy()
+    rv_down_after = _sel(out, "rv-down").iloc[60:].to_numpy()
+    rv_up_after = _sel(out, "rv-up").iloc[60:].to_numpy()
     assert np.isnan(udvr_after).all() and (rv_down_after == 0.0).all() and (rv_up_after > 0).all(), \
         np.nanmax(np.abs(udvr_after)) if np.isfinite(udvr_after).any() else "all-nan"
 
@@ -142,10 +158,10 @@ def test_udvr_zero_downside_is_nan_after_warmup() -> None:
 def test_mdd_invalid_price_masks_that_row_only_and_keeps_prior_rows() -> None:
     """第 250 列 close＝0（各窗暖機皆已過）：該列每個 tr_mdd_* 須為 NaN；
     第 249 列（窗未含壞價，因果上不受影響）須非 NaN 且與未改動資料逐值相同。"""
-    base = _engine().compute_all(_make_data()).filter(like="tr_mdd_")
+    base = _sel(_engine().compute_all(_make_data()), "mdd")
     data = _make_data()
     data.loc[250, "close"] = 0.0
-    out = _engine().compute_all(data).filter(like="tr_mdd_")
+    out = _sel(_engine().compute_all(data), "mdd")
     assert out.iloc[250].isna().all() and out.iloc[249].notna().all() \
         and np.allclose(out.iloc[249].to_numpy(), base.iloc[249].to_numpy(), rtol=0, atol=1e-15), \
         (out.iloc[249:252].to_dict(), base.iloc[249].to_dict())
@@ -174,14 +190,14 @@ def test_tail_risk_extreme_matches_independent_numpy_oracle() -> None:
     cvar_cols, cvar_exp = [], []
     for alpha, tag in ((0.01, 1), (0.05, 5)):
         for w in (21, 55, 100):
-            cvar_cols.append(f"tr_cvar_{tag}pct_{w}")
+            cvar_cols.append(_name("cvar", f"{tag}pct", w))
             cvar_exp.append(_roll(w, lambda x, a=alpha: x[x <= np.quantile(x, a)].mean()))
     cvar_got = out[cvar_cols].to_numpy()
     assert np.allclose(cvar_got, np.column_stack(cvar_exp), rtol=1e-12, atol=1e-14, equal_nan=True), "CVaR 不符"
 
     rv_cols, rv_exp = [], []
     for w in (13, 21, 55):
-        rv_cols += [f"tr_rv_up_{w}", f"tr_rv_down_{w}"]
+        rv_cols += [_name("rv-up", w), _name("rv-down", w)]
         rv_exp += [_roll(w, lambda x: np.sqrt((x[x > 0] ** 2).sum())),
                    _roll(w, lambda x: np.sqrt((x[x < 0] ** 2).sum()))]
     rv_got = out[rv_cols].to_numpy()
@@ -197,7 +213,7 @@ def test_tail_risk_extreme_matches_independent_numpy_oracle() -> None:
         for i in range(2 * w - 2, n):
             mdd[i] = abs(dd[i - w + 1:i + 1].min())
         mdd_exp.append(mdd)
-    mdd_got = out[["tr_mdd_21", "tr_mdd_55", "tr_mdd_100"]].to_numpy()
+    mdd_got = out[[_name("mdd", 21), _name("mdd", 55), _name("mdd", 100)]].to_numpy()
     mdd_ref = np.column_stack(mdd_exp)
     got_ok = ~np.isnan(mdd_got)  # 穩定遮罩（warmup 表）可比自然暖機多遮數列；只驗「有值處必相符、不得無中生有」
     assert not (got_ok & np.isnan(mdd_ref)).any() and got_ok.sum(axis=0).min() >= 98 \
@@ -218,7 +234,7 @@ def test_tail_risk_many_nans_never_emits_values_from_missing_prefix() -> None:
     for i in range(234, len(c)):
         win = r[i - 12:i + 1]
         exp_down[i] = np.sqrt((win[win < 0] ** 2).sum())
-    got_down = out["tr_rv_down_13"].to_numpy()
-    assert out.iloc[:222].isna().all().all() and out["tr_rv_up_13"].first_valid_index() == 234 \
+    got_down = out[_name("rv-down", 13)].to_numpy()
+    assert out.iloc[:222].isna().all().all() and out[_name("rv-up", 13)].first_valid_index() == 234 \
         and np.allclose(got_down, exp_down, rtol=1e-9, atol=1e-7, equal_nan=True), \
-        (out.iloc[:222].notna().sum().loc[lambda s: s > 0].to_dict(), out["tr_rv_up_13"].first_valid_index())
+        (out.iloc[:222].notna().sum().loc[lambda s: s > 0].to_dict(), out[_name("rv-up", 13)].first_valid_index())

@@ -12,7 +12,7 @@ from __future__ import annotations
 import dataclasses
 import re
 from functools import lru_cache
-from typing import FrozenSet, Optional, Tuple
+from typing import FrozenSet, Iterable, Optional, Tuple
 
 # FF-NAME Task 1.1：命名世代（config hash 鹽與 manifest 鍵之唯一來源；manifest 無此鍵者視為 1）
 CURRENT_FEATURE_NAMING_VERSION: int = 2
@@ -184,6 +184,78 @@ def format_feature_name(identity: FeatureIdentity) -> str:
     name = "_".join(segs)
     parse_feature_name(name, tagged=identity.tf is not None)  # 產出端即驗文法（不合即拋，不落盤不合文法之名）
     return name
+
+
+# ---------------------------------------------------------------- 產生端共用之身分建構（FF-NAME Phase 2）
+
+
+def source_from_inputs(inputs: Iterable[str]) -> str:
+    """輸出點輸入元組 → source 段：依輸出點契約之順序逐鍵 `canonical_segment` 後以 `-` 串接（SPEC Task 2.2；
+    例 `("close", "quote_volume")` ⇒ `close-quote-volume`）。空元組 ⇒ ValueError（source 不得為空）。"""
+    keys = [canonical_segment(k) for k in inputs]
+    if not keys:
+        raise ValueError("source_from_inputs：輸入元組為空，無法決定 source")
+    return "-".join(keys)
+
+
+def build_identity(source: str, category: str, indicator: str, params: Iterable[object] = (),
+                   timeframe: Optional[str] = None) -> FeatureIdentity:
+    """產生端身分常數之建構（自製 atomic、entropy、microstructure、tail-risk、custom、L5、L6 共用）：source／category／
+    indicator 經 `canonical_segment`；`params` 之值以 `str` 成單一成員之 token（空 ⇒ 無參數段）。"""
+    tokens = tuple(str(v) for v in params)
+    return FeatureIdentity(source=canonical_segment(source), tf=timeframe, category=canonical_segment(category),
+                           indicator=canonical_segment(indicator), params=(tokens,) if tokens else ())
+
+
+def raw_value_identity(raw_key: str, timeframe: Optional[str] = None) -> FeatureIdentity:
+    """raw kline 欄之身分 `<canonical raw>_<tf>_raw_value`（L4 raw lag 輸入與 TsCorr 目標；SPEC Task 2.4）。"""
+    return FeatureIdentity(source=canonical_segment(raw_key), tf=timeframe, category="raw", indicator="value")
+
+
+def tscorr_op(corr_with: str, window: int) -> str:
+    """TsCorr op 段：`TsCorr-<digest8>-W<w>`；digest＝目標 raw 欄未標記形身分之 `format_feature_name` 字串
+    （UTF-8）sha256 前 8 碼（SPEC Task 1.1／2.3；與 Task 0.1 凍結同一定義）。"""
+    import hashlib
+
+    target = format_feature_name(raw_value_identity(corr_with))
+    return f"TsCorr-{hashlib.sha256(target.encode('utf-8')).hexdigest()[:8]}-W{int(window)}"
+
+
+def binary_signal_op(name_suffix: Optional[str]) -> str:
+    """BinarySignal op 段：後綴經 `canonical_segment` 成單一段（`Strong_Trend`→`BinarySignal-Strong-Trend`）；
+    無後綴 ⇒ `BinarySignal`；後綴不合字母表 ⇒ `FeatureNameParseError`（ValueError 子類，設定載入時即拋）。"""
+    if name_suffix is None:
+        return "BinarySignal"
+    suffix = canonical_segment(name_suffix)
+    if not re.fullmatch(_OP_ARGS["BinarySignal"], suffix):
+        raise FeatureNameParseError(f"BinarySignal 後綴 {name_suffix!r} 經 canonical 後 {suffix!r} 不合 [A-Za-z0-9.]+(-…)*")
+    return f"BinarySignal-{suffix}"
+
+
+def is_valid_custom_slug(slug: str) -> bool:
+    """custom 指標 slug 是否合 `[a-z0-9-]+`（SPEC Task 2.2）。"""
+    return _CUSTOM_SLUG_RE.fullmatch(str(slug)) is not None
+
+
+def custom_output_indicator(slug: str, output_key: str, single_output: bool) -> str:
+    """custom 輸出欄之 indicator 段：單一輸出＝定義 slug；多輸出＝`<slug>-<canonical 輸出鍵>`。
+    不合 `[a-z0-9-]+` ⇒ ValueError（設定驗證時即拋，於呼叫任何使用者函式之前；SPEC Task 2.2）。"""
+    indicator = str(slug) if single_output else f"{slug}-{canonical_segment(output_key)}"
+    if not is_valid_custom_slug(indicator):
+        raise ValueError(f"custom 指標 slug {indicator!r}（定義 {slug!r}、輸出 {output_key!r}）不合 [a-z0-9-]+")
+    return indicator
+
+
+def append_op_segments(name: str, *ops: str) -> str:
+    """熱路徑之 op 段追加（L3 滾動彙總每次可達 10^5 欄）：文法之 op 段以 `_` 接於既有欄名之後；不逐欄重跑 parser。
+    呼叫端保證 `name` 為合法欄名、`ops` 由封閉 op 名與數值參數組成；落盤前之文法驗收由 Task 2.6／3.x 測試把關。"""
+    return "_".join([str(name), *map(str, ops)])
+
+
+def with_ops(name: str, *ops: str, tagged: bool = False) -> str:
+    """於既有欄名之身分後追加 op 段（L2 單欄算子與 L4 用；經 parser 與 formatter 驗文法，不做字串拼接）。"""
+    identity = parse_feature_name(name, tagged=tagged)
+    return format_feature_name(dataclasses.replace(identity, ops=tuple(identity.ops) + tuple(ops)))
 
 
 UNSUPPORTED_KIND = "unsupported"

@@ -56,6 +56,7 @@ from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
 from momentum.FeatureEngineering.utils.winsor_params import resolve_winsor_min_periods
 from momentum.FeatureEngineering.feature_naming import (
     RATIO_UNSAFE_CATEGORIES,
+    append_op_segments,
     is_ratio_unsafe_column,
 )
 from momentum.core.config import (
@@ -301,7 +302,7 @@ class FeaturePreprocessor:
         derived = self._frac_diff_ffd(
             pd.Series(base), float(d_star), threshold=weight_threshold, max_width=max_lag,
         ).to_numpy(dtype=np.float64)
-        name = tagged_column_name(f"{column}_fracdiff", timeframe)
+        name = tagged_column_name(append_op_segments(column, "fracdiff"), timeframe)
         with self._decisions_lock:
             self._derived_calibration[(timeframe, name)] = derived[np.isfinite(derived)]
 
@@ -378,7 +379,7 @@ class FeaturePreprocessor:
         self._record_decision(column, n=int(n), calibration_rows=[int(first), int(last)])
         return calibration
 
-    _DERIVED_SUFFIX_RE = re.compile(r"(?:_fracdiff|_diff\d+)+$")
+    _DERIVED_SUFFIX_RE = re.compile(r"(?:_fracdiff|_diff-\d+)+$")
 
     def _mask_no_start_rows(self, frame: pd.DataFrame, timeframe: Optional[str] = None) -> pd.DataFrame:
         """逐欄校準模式：各欄（含其平穩化衍生欄 `_fracdiff`／`_diffK`）之校準列於輸出設 NaN（v32 §C 未填起始日）。
@@ -3481,7 +3482,7 @@ class FeaturePreprocessor:
         if mode == "replace":
             result[column] = fracdiff_series
         else:
-            result[f"{column}_fracdiff"] = fracdiff_series
+            result[append_op_segments(column, "fracdiff")] = fracdiff_series
 
     def _resolve_slowpath_n_jobs(self) -> int:
         try:
@@ -3896,7 +3897,7 @@ class FeaturePreprocessor:
             if self.mode == "replace":
                 result[column] = full_working
             else:
-                result[f"{column}_diff{chosen_diff}"] = full_working
+                result[append_op_segments(column, f"diff-{chosen_diff}")] = full_working
 
         if skipped_high_nan:
             logger.warning(
@@ -3945,7 +3946,7 @@ class FeaturePreprocessor:
         if self.mode == "replace":
             result.loc[:, columns] = ranked_df
         else:
-            ranked_df = ranked_df.rename(columns={column: f"{column}_rank" for column in columns})
+            ranked_df = ranked_df.rename(columns={column: append_op_segments(column, "rank") for column in columns})
             result = pd.concat([result, ranked_df], axis=1)
 
         return result
@@ -4047,7 +4048,7 @@ class FeaturePreprocessor:
         if self.mode == "replace":
             result.loc[:, columns] = gaussian_df
         else:
-            gaussian_df = gaussian_df.rename(columns={column: f"{column}_gaussian" for column in columns})
+            gaussian_df = gaussian_df.rename(columns={column: append_op_segments(column, "gaussian") for column in columns})
             result = pd.concat([result, gaussian_df], axis=1)
 
         return result
@@ -4103,7 +4104,8 @@ class FeaturePreprocessor:
                     index=selected.index,
                     columns=columns,
                 )
-                zscore = zscore.rename(columns={column: f"{column}_zscore_{window_int}" for column in columns})
+                zscore = zscore.rename(columns={column: append_op_segments(column, f"zscore-{window_int}")
+                                                for column in columns})
                 append_frames.append(zscore)
 
             if append_frames:

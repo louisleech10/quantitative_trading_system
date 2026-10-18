@@ -141,7 +141,7 @@ def _manifest_columns(manifest: Dict[str, Any]) -> list[str]:
 
 def _registry_layer_map(factory: Any) -> Dict[str, str]:
     from momentum.FeatureEngineering.core.column_group import LayerSource
-    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+    from momentum.FeatureEngineering.feature_naming import tag_timeframe
 
     layer_sources = (
         LayerSource.L1,
@@ -154,12 +154,12 @@ def _registry_layer_map(factory: Any) -> Dict[str, str]:
     registry = factory._cgsa_registry
     if registry is None:
         raise RuntimeError("CGSA registry missing after baseline generation")
-    tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
+    # FF-NAME Task 2.5：週期標記唯一實作 feature_naming.tag_timeframe（只看第 2 段）
     layer_map: Dict[str, str] = {}
     for layer_source in layer_sources:
         for group in registry.list_by_layer(layer_source):
             tagged = [
-                factory._timeframe_tagged_name(column, TIMEFRAME, tf_keys)
+                tag_timeframe(column, TIMEFRAME)
                 for column in group.columns
             ]
             for column in tagged:

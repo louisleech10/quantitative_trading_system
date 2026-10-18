@@ -41,7 +41,7 @@ def test_preprocess_all_nan_column() -> None:
     )
     out = pre.transform(df)
     assert out["f1_rank"].isna().all()
-    assert out["f1_zscore_10"].isna().all()
+    assert out["f1_zscore-10"].isna().all()
 
 
 def test_preprocess_constant_column() -> None:
@@ -58,7 +58,7 @@ def test_preprocess_constant_column() -> None:
     out = pre.transform(df)
     assert np.isclose(out["f1_rank"].dropna().iloc[-1], 0.5)
     assert np.isclose(out["f1_gaussian"].dropna().iloc[-1], 0.0)
-    assert np.isclose(out["f1_zscore_20"].dropna().iloc[-1], 0.0)
+    assert np.isclose(out["f1_zscore-20"].dropna().iloc[-1], 0.0)
 
 
 def test_adf_nan_heavy() -> None:
@@ -82,7 +82,7 @@ def test_adf_nan_heavy() -> None:
     # 仍以校準值檢定（有 p 值），且產出之差分欄與決策紀錄之階數一致
     assert isinstance(record["adf_pvalue"], float)
     order = int(record["adf_differenced"] or 0)
-    assert [k for k in (1, 2) if f"f1_diff{k}" in out.columns] == ([order] if order else [])
+    assert [k for k in (1, 2) if f"f1_diff-{k}" in out.columns] == ([order] if order else [])  # FF-NAME：`diff-<k>`
 
 
 def test_gaussian_boundary() -> None:
@@ -120,8 +120,8 @@ def test_winsor_then_zscore() -> None:
         }
     )
     out = pre.transform(df)
-    assert np.isfinite(out["f1_zscore_20"].fillna(0.0).to_numpy()).all()
-    z = out["f1_zscore_20"]
+    assert np.isfinite(out["f1_zscore-20"].fillna(0.0).to_numpy()).all()
+    z = out["f1_zscore-20"]
     assert z.notna().sum() > 0
     # 縮尾先於 zscore：極端值 1000 已被截（不再原樣進 zscore）
     assert out["f1"].iloc[-1] < 1000.0
@@ -182,7 +182,7 @@ def test_preprocess_append_mode() -> None:
     out = pre.transform(df)
     assert out.shape[1] > df.shape[1]
     assert any(col.endswith("_rank") for col in out.columns)
-    assert any("_zscore_" in col for col in out.columns)
+    assert any("_zscore-" in col for col in out.columns)  # FF-NAME：L6.5 op 段 `zscore-<w>`
 
 
 def test_preprocess_performance() -> None:
@@ -279,8 +279,8 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
     attach_unit_calibration(pre, df)  # FFSTAT b3b：校準值只取封包（以 fixture 本身建，僅驗數值行為）
     out = pre.transform(df)
     assert "L1_f2_fracdiff" in out.columns
-    assert "L1_f2_diff1" not in out.columns
-    assert "L1_f2_diff2" not in out.columns
+    assert "L1_f2_diff-1" not in out.columns  # FF-NAME：L6.5 op 段 `diff-<k>`
+    assert "L1_f2_diff-2" not in out.columns
 
 
 def test_transform_fixed_order(monkeypatch: pytest.MonkeyPatch) -> None:

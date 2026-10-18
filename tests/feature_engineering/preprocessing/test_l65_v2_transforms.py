@@ -538,7 +538,7 @@ def test_zscore_append_mode_preserves_legacy_suffix_order() -> None:
     for window in windows:
         expected_window = _expected_zscore(frame, window=window)
         expected_window = expected_window.rename(
-            columns={column: f"{column}_zscore_{window}" for column in frame.columns}
+            columns={column: f"{column}_zscore-{window}" for column in frame.columns}  # FF-NAME：op 段 `zscore-<w>`
         )
         expected_frames.append(expected_window)
     expected = pd.concat([expected] + expected_frames, axis=1)

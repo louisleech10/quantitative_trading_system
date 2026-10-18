@@ -5,6 +5,17 @@ import pandas as pd
 import pytest
 
 from momentum.FeatureEngineering.atomic.entropy_indicators import EntropyIndicatorEngine
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name, parse_feature_name
+
+
+def _name(indicator: str, window: int, source: str = "close") -> str:
+    """FF-NAME 文法之 entropy 欄名（未標記形；`close_return` 之輸入為 close ⇒ source `close`）。"""
+    return format_feature_name(build_identity(source, "entropy", indicator, (window,)))
+
+
+def _by_indicator(out: pd.DataFrame, indicator: str) -> pd.DataFrame:
+    """取 indicator 相符之欄（取代改前之欄名前綴 `ent_<indicator>_` 篩選）。"""
+    return out[[c for c in out.columns if parse_feature_name(c, tagged=False).indicator == indicator]]
 
 
 def _make_data(n: int = 300) -> pd.DataFrame:
@@ -35,25 +46,25 @@ def _engine(**override) -> EntropyIndicatorEngine:
 def test_entropy_compute_all_feature_count_and_prefix() -> None:
     out = _engine().compute_all(_make_data())
     assert out.shape[1] == 15
-    assert all(col.startswith("ent_") for col in out.columns)
+    assert all(parse_feature_name(col, tagged=False).category == "entropy" for col in out.columns)
 
 
 def test_entropy_metadata_complete() -> None:
     metadata = _engine().get_feature_metadata()
     assert len(metadata) == 15
-    assert "ent_perm_100" in metadata
+    assert _name("perm", 100) in metadata
 
 
 def test_entropy_insufficient_data() -> None:
     out = _engine().compute_all(_make_data(30))
-    assert out["ent_hurst_200"].isna().all()
+    assert out[_name("hurst", 200)].isna().all()
 
 
 def test_entropy_constant_returns() -> None:
     data = _make_data()
     data["close"] = 100.0
     out = _engine().compute_all(data)
-    shannon = out.filter(like="ent_shannon_").dropna()
+    shannon = _by_indicator(out, "shannon").dropna()
     assert not shannon.empty
     assert (shannon == 0.0).all().all()
 
@@ -62,7 +73,7 @@ def test_entropy_zero_variance() -> None:
     data = _make_data()
     data["close"] = 100.0
     out = _engine().compute_all(data)
-    assert out.filter(like="ent_apen_").notna().any().any()
+    assert _by_indicator(out, "apen").notna().any().any()
 
 
 def test_entropy_many_nans() -> None:
@@ -84,7 +95,7 @@ def test_hurst_low_r_squared() -> None:
     data = _make_data()
     data["close"] = np.random.uniform(99.9, 100.1, len(data))
     out = _engine().compute_all(data)
-    assert out["ent_hurst_55"].isna().any()
+    assert out[_name("hurst", 55)].isna().any()
 
 
 def test_entropy_missing_column() -> None:
@@ -94,14 +105,14 @@ def test_entropy_missing_column() -> None:
 
 def test_perm_entropy_m_exceeds_window() -> None:
     out = _engine(perm_m=10, perm_windows=[5]).compute_all(_make_data())
-    assert out["ent_perm_5"].isna().all()
+    assert out[_name("perm", 5)].isna().all()
 
 
 def test_perm_entropy_constant_values() -> None:
     data = _make_data()
     data["close"] = 100.0
     out = _engine().compute_all(data)
-    perm = out.filter(like="ent_perm_").dropna()
+    perm = _by_indicator(out, "perm").dropna()
     assert not perm.empty
     assert (perm == 0.0).all().all()
 
@@ -153,7 +164,7 @@ def test_hurst_low_r_squared_matches_independent_rs_oracle() -> None:
 
     data = _make_data()
     data["close"] = np.random.uniform(99.9, 100.1, len(data))
-    prod = _engine().compute_all(data)["ent_hurst_55"].to_numpy()
+    prod = _engine().compute_all(data)[_name("hurst", 55)].to_numpy()
     ret = data["close"].astype(float).pct_change().to_numpy()
     w = 55
     orc = np.full(len(ret), np.nan)

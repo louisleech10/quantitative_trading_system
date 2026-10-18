@@ -202,5 +202,6 @@ def test_frame_path_taggers_untouched() -> None:
 
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
 
-    for fn_obj in (FeatureFactory._timeframe_tagged_name,):
-        assert "feature_naming" not in inspect.getsource(fn_obj)
+    # FF-NAME Task 2.5：factory 之單欄標記器已刪（標記唯一實作 feature_naming.tag_timeframe）⇒ 不得復活第二套
+    assert not hasattr(FeatureFactory, "_timeframe_" + "tagged_name")
+    assert "def tag_timeframe" not in inspect.getsource(FeatureFactory)

@@ -63,46 +63,15 @@ class StatisticsIndicatorEngine:
         params_list: List[Dict],
         sources: List[str],
     ) -> Dict[str, Dict]:
-        spec = TALibWrapper.get_indicator_spec(name)
-        if spec.computed_in_adapter:
-            return {}
-
-        source_labels = sources if spec.input_type == "single" else [spec.input_type]
-        metadata: Dict[str, Dict] = {}
-        for params in params_list or [{}]:
-            param_str = TALibWrapper._format_params(name, params)
-            for source_label in source_labels:
-                for idx in range(len(spec.output_names)):
-                    name_suffix = spec.output_names[idx] if len(spec.output_names) > idx else str(idx)
-                    if len(spec.output_names) == 1:
-                        indicator_name = spec.name
-                    else:
-                        indicator_name = (
-                            spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
-                        )
-                    normalized_source = TALibWrapper.normalize_source_label(source_label)
-                    normalized_indicator = TALibWrapper.normalize_indicator_name(indicator_name)
-                    parts = [normalized_source, spec.category, normalized_indicator]
-                    if param_str:
-                        parts.append(param_str)
-                    col_name = "_".join(parts)
-                    metadata[col_name] = {
-                        "layer": "layer1",
-                        "category": spec.category,
-                        "indicator": indicator_name,
-                        "source": source_label,
-                        "params": params,
-                        "description": f"{indicator_name} computed from {source_label}",
-                    }
-                    if name in ("Beta_CloseVolume", "Correl_CloseVolume"):
-                        metadata[col_name]["variant"] = "non_standard_close_volume"
-                        metadata[col_name]["standard_talib"] = (
-                            "BETA" if name == "Beta_CloseVolume" else "CORREL"
-                        )
-                        metadata[col_name]["description"] = (
-                            f"Non-standard close-volume {metadata[col_name]['standard_talib']} "
-                            f"(not TA-Lib canonical high/low)"
-                        )
+        """FF-NAME Task 2.1：委派 `TALibWrapper.build_metadata_entries`（共用身分建構）；close-volume 變體另加註。"""
+        metadata = TALibWrapper.build_metadata_entries(name, params_list, sources)
+        if name in ("Beta_CloseVolume", "Correl_CloseVolume"):
+            for entry in metadata.values():
+                entry["variant"] = "non_standard_close_volume"
+                entry["standard_talib"] = "BETA" if name == "Beta_CloseVolume" else "CORREL"
+                entry["description"] = (
+                    f"Non-standard close-volume {entry['standard_talib']} (not TA-Lib canonical high/low)"
+                )
         return metadata
 
     def _resolve_params(self, name: str, indicator_def: Dict) -> List[Dict]:

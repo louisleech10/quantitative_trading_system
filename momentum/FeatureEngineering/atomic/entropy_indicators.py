@@ -10,9 +10,20 @@ from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.compute_guard import resolve_fail_open
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name, source_from_inputs
 
 
 logger = get_logger(__name__)
+
+# FF-NAME Task 2.2：倍數表條目 → 欄名 indicator 詞（compute、輸出點、metadata 三處共用之身分常數）
+_ENT_INDICATOR: Dict[str, str] = {
+    "ENT_SHANNON": "shannon",
+    "ENT_APEN": "apen",
+    "ENT_SAMPEN": "sampen",
+    "ENT_FRACTAL_DIM": "fractal-dim",
+    "ENT_HURST": "hurst",
+    "ENT_PERM": "perm",
+}
 
 try:
     from numba import jit
@@ -86,22 +97,43 @@ class EntropyIndicatorEngine:
 
         return l1op.mask_engine_frame("entropy", pd.concat(frames, axis=1), self._output_points(), data)
 
+    @staticmethod
+    def _inputs_of(source_key: str) -> tuple:
+        """輸出點輸入元組：`close_return` 由 close 算出 ⇒ `("close",)`；其餘＝該資料鍵。"""
+        return ("close",) if source_key == "close_return" else (str(source_key),)
+
+    def _col(self, entry: str, window: int, source_key: str = "close_return") -> str:
+        """FF-NAME Task 2.2：entropy 欄名＝身分常數之 `format_feature_name`（compute、輸出點、metadata 三處共用）；
+        source＝輸出點輸入元組之 canonical 串接，「報酬」語意由 indicator 表達。"""
+        identity = build_identity(source_from_inputs(self._inputs_of(source_key)), "entropy", _ENT_INDICATOR[entry],
+                                  (window,))
+        return format_feature_name(identity)
+
     def _output_points(self) -> Dict[str, Dict]:
-        """FF-STAT Task 2.3：逐輸出欄之參數契約（SPEC §C v38）；close_return 之輸入為 close。"""
+        """FF-STAT Task 2.3：逐輸出欄之參數契約（SPEC §C v38）；close_return 之輸入為 close。
+        FF-NAME：同一欄名不得代表兩個輸出點（例 apply_to 同含 `close` 與 `close_return`）⇒ ValueError。"""
         p = l1op.point
-        points: Dict[str, Dict] = {}
+        entries = []
         for source in self.apply_to:
-            inputs = ("close",) if source == "close_return" else (source,)
+            inputs = self._inputs_of(source)
             for w in self.shannon_windows:
-                points[f"ent_shannon_{source}_{w}"] = p("ENT_SHANNON", {"window": w}, inputs)
+                entries.append((self._col("ENT_SHANNON", w, source), p("ENT_SHANNON", {"window": w}, inputs), source))
         for w in self.windows:
-            points[f"ent_apen_{w}"] = p("ENT_APEN", {"window": w}, ("close",))
-            points[f"ent_sampen_{w}"] = p("ENT_SAMPEN", {"window": w}, ("close",))
-            points[f"ent_fractal_dim_{w}"] = p("ENT_FRACTAL_DIM", {"window": w}, ("close",))
+            entries.append((self._col("ENT_APEN", w), p("ENT_APEN", {"window": w}, ("close",)), "ENT_APEN"))
+            entries.append((self._col("ENT_SAMPEN", w), p("ENT_SAMPEN", {"window": w}, ("close",)), "ENT_SAMPEN"))
+            entries.append((self._col("ENT_FRACTAL_DIM", w), p("ENT_FRACTAL_DIM", {"window": w}, ("close",)),
+                            "ENT_FRACTAL_DIM"))
         for w in self.hurst_windows:
-            points[f"ent_hurst_{w}"] = p("ENT_HURST", {"window": w}, ("close",))
+            entries.append((self._col("ENT_HURST", w), p("ENT_HURST", {"window": w}, ("close",)), "ENT_HURST"))
         for w in self.perm_windows:
-            points[f"ent_perm_{w}"] = p("ENT_PERM", {"window": w}, ("close",))
+            entries.append((self._col("ENT_PERM", w), p("ENT_PERM", {"window": w}, ("close",)), "ENT_PERM"))
+        points: Dict[str, Dict] = {}
+        owners: Dict[str, str] = {}
+        for name, point, owner in entries:
+            if owners.get(name, owner) != owner:
+                raise ValueError(f"entropy 輸出欄名 {name!r} 對應兩個不同輸入（{owners[name]!r} 與 {owner!r}），同一欄名不得代表不同輸入")
+            owners[name] = owner
+            points[name] = point
         return points
 
     def get_feature_metadata(self) -> Dict[str, Dict]:
@@ -109,18 +141,19 @@ class EntropyIndicatorEngine:
 
         for source in self.apply_to:
             for window in self.shannon_windows:
-                metadata[f"ent_shannon_{source}_{window}"] = self._meta("shannon", source, {"window": window})
+                metadata[self._col("ENT_SHANNON", window, source)] = self._meta("ENT_SHANNON", source, {"window": window})
 
         for window in self.windows:
-            metadata[f"ent_apen_{window}"] = self._meta("approximate_entropy", "close_return", {"window": window})
-            metadata[f"ent_sampen_{window}"] = self._meta("sample_entropy", "close_return", {"window": window})
-            metadata[f"ent_fractal_dim_{window}"] = self._meta("fractal_dimension", "close_return", {"window": window})
+            metadata[self._col("ENT_APEN", window)] = self._meta("ENT_APEN", "close_return", {"window": window})
+            metadata[self._col("ENT_SAMPEN", window)] = self._meta("ENT_SAMPEN", "close_return", {"window": window})
+            metadata[self._col("ENT_FRACTAL_DIM", window)] = self._meta("ENT_FRACTAL_DIM", "close_return",
+                                                                        {"window": window})
 
         for window in self.hurst_windows:
-            metadata[f"ent_hurst_{window}"] = self._meta("hurst", "close_return", {"window": window})
+            metadata[self._col("ENT_HURST", window)] = self._meta("ENT_HURST", "close_return", {"window": window})
 
         for window in self.perm_windows:
-            metadata[f"ent_perm_{window}"] = self._meta("permutation_entropy", "close_return", {"window": window})
+            metadata[self._col("ENT_PERM", window)] = self._meta("ENT_PERM", "close_return", {"window": window})
 
         return metadata
 
@@ -137,14 +170,18 @@ class EntropyIndicatorEngine:
                 )
         return warns
 
-    def _meta(self, indicator: str, source: str, params: Dict) -> Dict:
+    def _meta(self, entry: str, source_key: str, params: Dict) -> Dict:
+        """metadata：source／indicator 為身分之 canonical 詞；`raw_lookup_key`＝直接取值之 raw 資料鍵
+        （`close_return` 為由 close 衍生之報酬序列、非 raw 欄 ⇒ None；與改前 Distance 查 raw 之結果一致）。"""
+        source = source_from_inputs(self._inputs_of(source_key))
         return {
             "layer": "layer1",
             "category": "entropy",
-            "indicator": indicator,
+            "indicator": _ENT_INDICATOR[entry],
             "source": source,
+            "raw_lookup_key": None if source_key == "close_return" else str(source_key),
             "params": params,
-            "description": f"{indicator} entropy feature",
+            "description": f"{_ENT_INDICATOR[entry]} entropy feature",
         }
 
     def _resolve_series(self, data: pd.DataFrame, source: str) -> pd.Series:
@@ -157,7 +194,7 @@ class EntropyIndicatorEngine:
     def _compute_shannon_entropy(self, series: pd.Series, source_name: str) -> pd.DataFrame:
         output: Dict[str, pd.Series] = {}
         for window in self.shannon_windows:
-            output[f"ent_shannon_{source_name}_{window}"] = series.rolling(window).apply(
+            output[self._col("ENT_SHANNON", window, source_name)] = series.rolling(window).apply(
                 lambda values: self._shannon_of_array(values, self.n_bins), raw=True
             )
         return pd.DataFrame(output, index=series.index)
@@ -165,7 +202,7 @@ class EntropyIndicatorEngine:
     def _compute_approximate_entropy(self, series: pd.Series) -> pd.DataFrame:
         output: Dict[str, pd.Series] = {}
         for window in self.windows:
-            output[f"ent_apen_{window}"] = series.rolling(window).apply(
+            output[self._col("ENT_APEN", window)] = series.rolling(window).apply(
                 lambda values: self._approximate_entropy(values, self.apen_m, self.apen_r_ratio), raw=True
             )
         return pd.DataFrame(output, index=series.index)
@@ -173,7 +210,7 @@ class EntropyIndicatorEngine:
     def _compute_sample_entropy(self, series: pd.Series) -> pd.DataFrame:
         output: Dict[str, pd.Series] = {}
         for window in self.windows:
-            output[f"ent_sampen_{window}"] = series.rolling(window).apply(
+            output[self._col("ENT_SAMPEN", window)] = series.rolling(window).apply(
                 lambda values: self._sample_entropy(values, self.apen_m, self.apen_r_ratio), raw=True
             )
         return pd.DataFrame(output, index=series.index)
@@ -181,7 +218,7 @@ class EntropyIndicatorEngine:
     def _compute_hurst(self, series: pd.Series) -> pd.DataFrame:
         output: Dict[str, pd.Series] = {}
         for window in self.hurst_windows:
-            output[f"ent_hurst_{window}"] = series.rolling(window).apply(
+            output[self._col("ENT_HURST", window)] = series.rolling(window).apply(
                 self._hurst_rs, raw=True
             )
         return pd.DataFrame(output, index=series.index)
@@ -189,7 +226,7 @@ class EntropyIndicatorEngine:
     def _compute_fractal_dimension(self, series: pd.Series) -> pd.DataFrame:
         output: Dict[str, pd.Series] = {}
         for window in self.windows:
-            output[f"ent_fractal_dim_{window}"] = series.rolling(window).apply(
+            output[self._col("ENT_FRACTAL_DIM", window)] = series.rolling(window).apply(
                 self._higuchi_fractal_dimension, raw=True
             )
         return pd.DataFrame(output, index=series.index)
@@ -197,7 +234,7 @@ class EntropyIndicatorEngine:
     def _compute_permutation_entropy(self, series: pd.Series) -> pd.DataFrame:
         output: Dict[str, pd.Series] = {}
         for window in self.perm_windows:
-            output[f"ent_perm_{window}"] = series.rolling(window).apply(
+            output[self._col("ENT_PERM", window)] = series.rolling(window).apply(
                 lambda values: self._perm_entropy(values, self.perm_m), raw=True
             )
         return pd.DataFrame(output, index=series.index)

@@ -8,9 +8,23 @@ import pandas as pd
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name, source_from_inputs
 
 
 logger = get_logger(__name__)
+
+# FF-NAME Task 2.2：輸出點輸入元組與倍數表條目 → 欄名 indicator 詞（三處共用之身分常數）
+_TR_INPUTS = ("close",)
+_TR_INDICATOR: Dict[str, str] = {
+    "TR_CVAR": "cvar",
+    "TR_RV_UP": "rv-up",
+    "TR_RV_DOWN": "rv-down",
+    "TR_RSJ": "rsj",
+    "TR_UD_VOL_RATIO": "ud-vol-ratio",
+    "TR_GPR": "gpr",
+    "TR_JB": "jb",
+    "TR_MDD": "mdd",
+}
 
 
 class TailRiskIndicatorEngine:
@@ -72,18 +86,18 @@ class TailRiskIndicatorEngine:
         for alpha in self.cvar_alphas:
             alpha_name = int(round(float(alpha) * 100))
             for w in self.windows:
-                points[f"tr_cvar_{alpha_name}pct_{w}"] = p("TR_CVAR", {"alpha": alpha, "window": w}, close)
+                points[self._col("TR_CVAR", f"{alpha_name}pct", w)] = p("TR_CVAR", {"alpha": alpha, "window": w}, close)
         for w in self.rv_windows:
-            points[f"tr_rv_up_{w}"] = p("TR_RV_UP", {"window": w}, close)
-            points[f"tr_rv_down_{w}"] = p("TR_RV_DOWN", {"window": w}, close)
-            points[f"tr_rsj_{w}"] = p("TR_RSJ", {"window": w}, close)
-            points[f"tr_ud_vol_ratio_{w}"] = p("TR_UD_VOL_RATIO", {"window": w}, close)
+            points[self._col("TR_RV_UP", w)] = p("TR_RV_UP", {"window": w}, close)
+            points[self._col("TR_RV_DOWN", w)] = p("TR_RV_DOWN", {"window": w}, close)
+            points[self._col("TR_RSJ", w)] = p("TR_RSJ", {"window": w}, close)
+            points[self._col("TR_UD_VOL_RATIO", w)] = p("TR_UD_VOL_RATIO", {"window": w}, close)
         for w in self.windows:
-            points[f"tr_gpr_{w}"] = p("TR_GPR", {"window": w}, close)
+            points[self._col("TR_GPR", w)] = p("TR_GPR", {"window": w}, close)
         for w in (55, 100):
-            points[f"tr_jb_{w}"] = p("TR_JB", {"window": w}, close)
+            points[self._col("TR_JB", w)] = p("TR_JB", {"window": w}, close)
         for w in self.mdd_windows:
-            points[f"tr_mdd_{w}"] = p("TR_MDD", {"window": w}, close)
+            points[self._col("TR_MDD", w)] = p("TR_MDD", {"window": w}, close)
         return points
 
     def get_feature_metadata(self) -> Dict[str, Dict]:
@@ -92,24 +106,24 @@ class TailRiskIndicatorEngine:
         for alpha in self.cvar_alphas:
             alpha_name = int(round(float(alpha) * 100))
             for window in self.windows:
-                metadata[f"tr_cvar_{alpha_name}pct_{window}"] = self._meta(
-                    "cvar", {"alpha": alpha, "window": window}
+                metadata[self._col("TR_CVAR", f"{alpha_name}pct", window)] = self._meta(
+                    "TR_CVAR", {"alpha": alpha, "window": window}
                 )
 
         for window in self.rv_windows:
-            metadata[f"tr_rv_up_{window}"] = self._meta("rv_up", {"window": window})
-            metadata[f"tr_rv_down_{window}"] = self._meta("rv_down", {"window": window})
-            metadata[f"tr_rsj_{window}"] = self._meta("rsj", {"window": window})
-            metadata[f"tr_ud_vol_ratio_{window}"] = self._meta("ud_vol_ratio", {"window": window})
+            metadata[self._col("TR_RV_UP", window)] = self._meta("TR_RV_UP", {"window": window})
+            metadata[self._col("TR_RV_DOWN", window)] = self._meta("TR_RV_DOWN", {"window": window})
+            metadata[self._col("TR_RSJ", window)] = self._meta("TR_RSJ", {"window": window})
+            metadata[self._col("TR_UD_VOL_RATIO", window)] = self._meta("TR_UD_VOL_RATIO", {"window": window})
 
         for window in self.windows:
-            metadata[f"tr_gpr_{window}"] = self._meta("gpr", {"window": window})
+            metadata[self._col("TR_GPR", window)] = self._meta("TR_GPR", {"window": window})
 
         for window in [55, 100]:
-            metadata[f"tr_jb_{window}"] = self._meta("jarque_bera", {"window": window})
+            metadata[self._col("TR_JB", window)] = self._meta("TR_JB", {"window": window})
 
         for window in self.mdd_windows:
-            metadata[f"tr_mdd_{window}"] = self._meta("max_drawdown", {"window": window})
+            metadata[self._col("TR_MDD", window)] = self._meta("TR_MDD", {"window": window})
 
         return metadata
 
@@ -119,11 +133,23 @@ class TailRiskIndicatorEngine:
             return ["尾部風險：缺少 close 欄位，整個引擎已跳過"]
         return []
 
-    def _meta(self, indicator: str, params: Dict) -> Dict:
+    @staticmethod
+    def _col(entry: str, *params: object) -> str:
+        """FF-NAME Task 2.2：tail-risk 欄名＝身分常數之 `format_feature_name`（compute、輸出點、metadata 共用）；
+        輸入元組恆為 `("close",)` ⇒ source＝`close`，「報酬」語意由 indicator 表達。"""
+        return format_feature_name(build_identity(source_from_inputs(_TR_INPUTS), "tail-risk", _TR_INDICATOR[entry],
+                                                  params))
+
+    def _meta(self, entry: str, params: Dict) -> Dict:
+        """metadata：source／indicator 為身分之 canonical 詞；輸出為報酬衍生量、無直接取值之 raw 鍵 ⇒
+        `raw_lookup_key` 為 None（與改前 metadata 無 source 之 Distance 結果一致）。"""
+        indicator = _TR_INDICATOR[entry]
         return {
             "layer": "layer1",
-            "category": "tail_risk",
+            "category": "tail-risk",
             "indicator": indicator,
+            "source": source_from_inputs(_TR_INPUTS),
+            "raw_lookup_key": None,
             "params": params,
             "description": f"{indicator} tail risk feature",
         }
@@ -141,7 +167,7 @@ class TailRiskIndicatorEngine:
                     raw=True,
                 )
                 cvar = cvar.where(var.notna(), np.nan)
-                output[f"tr_cvar_{alpha_name}pct_{window}"] = cvar
+                output[self._col("TR_CVAR", f"{alpha_name}pct", window)] = cvar
         return pd.DataFrame(output, index=returns.index)
 
     def _compute_rv_decomposition(self, returns: pd.Series) -> pd.DataFrame:
@@ -151,9 +177,9 @@ class TailRiskIndicatorEngine:
         for window in self.rv_windows:
             rv_up = rv_up_map[window]
             rv_down = rv_down_map[window]
-            output[f"tr_rv_up_{window}"] = rv_up
-            output[f"tr_rv_down_{window}"] = rv_down
-            output[f"tr_rsj_{window}"] = rv_up - rv_down
+            output[self._col("TR_RV_UP", window)] = rv_up
+            output[self._col("TR_RV_DOWN", window)] = rv_down
+            output[self._col("TR_RSJ", window)] = rv_up - rv_down
 
         return pd.DataFrame(output, index=returns.index)
 
@@ -163,7 +189,7 @@ class TailRiskIndicatorEngine:
         for window in self.rv_windows:
             rv_up = rv_up_map[window]
             rv_down = rv_down_map[window]
-            output[f"tr_ud_vol_ratio_{window}"] = rv_up / rv_down.replace(0.0, np.nan)
+            output[self._col("TR_UD_VOL_RATIO", window)] = rv_up / rv_down.replace(0.0, np.nan)
         return pd.DataFrame(output, index=returns.index)
 
     def _compute_rv_components(self, returns: pd.Series) -> Dict[int, pd.Series]:
@@ -187,7 +213,7 @@ class TailRiskIndicatorEngine:
             gain_sum = gains.rolling(window).sum()
             loss_sum = losses.rolling(window).sum()
             gpr = gain_sum / loss_sum.replace(0.0, np.nan)
-            output[f"tr_gpr_{window}"] = gpr.clip(lower=0.0, upper=100.0)
+            output[self._col("TR_GPR", window)] = gpr.clip(lower=0.0, upper=100.0)
 
         return pd.DataFrame(output, index=returns.index)
 
@@ -197,7 +223,7 @@ class TailRiskIndicatorEngine:
             skew = returns.rolling(window).skew()
             kurt = returns.rolling(window).kurt()
             jb = (window / 6.0) * (skew.pow(2) + (kurt.pow(2) / 4.0))
-            output[f"tr_jb_{window}"] = jb
+            output[self._col("TR_JB", window)] = jb
         return pd.DataFrame(output, index=returns.index)
 
     def _compute_max_drawdown(self, close: pd.Series) -> pd.DataFrame:
@@ -212,6 +238,6 @@ class TailRiskIndicatorEngine:
             mdd = drawdown.rolling(window).min().abs()
             if invalid_price.any():
                 mdd = mdd.where(~invalid_price, np.nan)
-            output[f"tr_mdd_{window}"] = mdd
+            output[self._col("TR_MDD", window)] = mdd
 
         return pd.DataFrame(output, index=close.index)

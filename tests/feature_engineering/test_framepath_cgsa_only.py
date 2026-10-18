@@ -5,8 +5,8 @@
   `_combine_layers(` 呼叫 context 為白名單字面；`FFACT_USE_CGSA` 生產碼零讀取、殘留 `=0` 無作用；`persist=False`
   走 CGSA 且 completeness 照寫；L3 `in_memory` 非串流分支保留。
 - Task 1.3：legacy 多週期與 frame 列對應之符號於 momentum 零出現；`set_no_start_calibration()` 無參數；
-  legacy tagger `MultiTFGenerator._apply_timeframe_tag` 整刪（SPEC v16 A2；審查 r28 CODEX-R28-P2-01），單欄週期標記保留
-  `_timeframe_tagged_name` 規則。
+  legacy tagger `MultiTFGenerator._apply_timeframe_tag` 整刪（SPEC v16 A2；審查 r28 CODEX-R28-P2-01），單欄週期標記
+  唯一實作 `feature_naming.tag_timeframe`（FF-NAME Task 2.5 已刪 factory 之第二套標記）。
 - Task 1.4：三檔之「零引用且非公開入口、且非 HEAD 既有死碼、且未具名保留」之 def 數 == 0。
 
 真實 kline（`data_cache/feature_klines/kline_cache.h5`）之生成案例沿用 `ffstat_helpers` 輕量設定，單組串行。
@@ -261,10 +261,13 @@ def test_boundary_14_frame_timeframe_taggers_removed():
     """`MultiTFGenerator._apply_timeframe_tag` 刪 registry 為 None 側後只剩原樣回傳、且 HEAD 兩處呼叫
     （multi_tf_generator.py:1568 legacy、feature_factory.py:4492 frame L7）皆隨 frame 碼刪除 ⇒ 零生產呼叫者，
     依 Task 1.4 整刪；`FeatureFactory._apply_timeframe_tag`（frame L7 專用）同。CGSA 標記走
-    `feature_naming.tag_timeframe`／`FeatureFactory._timeframe_tagged_name`（§C 保留）。"""
+    `feature_naming.tag_timeframe`（FF-NAME Task 2.5：factory 之第二套單欄標記函式已刪，標記唯一實作）。"""
+    import momentum.FeatureEngineering.feature_naming as fn
+
     assert not hasattr(MultiTFGenerator, "_apply_timeframe_tag")
     assert not hasattr(FeatureFactory, "_apply_timeframe_tag")
-    assert hasattr(FeatureFactory, "_timeframe_tagged_name")
+    assert not hasattr(FeatureFactory, "_timeframe_" + "tagged_name")  # 舊名以拼接取得（零出現驗收）
+    assert callable(fn.tag_timeframe)
 
 
 # ---------------------------------------------------------------- Task 1.4 死碼掃除

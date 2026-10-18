@@ -10,9 +10,25 @@ from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic import warmup_lookup
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+from momentum.FeatureEngineering.feature_naming import (
+    FeatureIdentity,
+    build_identity,
+    format_feature_name,
+    parse_feature_name,
+)
 
 
 logger = get_logger(__name__)
+
+
+# FF-NAME Task 2.2：同引擎衍生欄之身分常數（compute、輸出點、metadata 共用；來源標籤沿用 `ohlc`）
+def _count_identity(indicator: str, window: int) -> FeatureIdentity:
+    """BullishCount／BearishCount（窗長為 params 段，改前 `W5` 形）。"""
+    return build_identity("ohlc", "pattern", indicator, (window,))
+
+
+def _consensus_identity() -> FeatureIdentity:
+    return build_identity("ohlc", "pattern", "Consensus")
 
 
 class PatternIndicatorEngine:
@@ -47,7 +63,7 @@ class PatternIndicatorEngine:
 
         freq_df = self.compute_pattern_frequency(pattern_df)
         consensus = self.compute_pattern_consensus(pattern_df)
-        consensus_df = pd.DataFrame({"ohlc_pattern_Consensus": consensus}, index=data.index)
+        consensus_df = pd.DataFrame({format_feature_name(_consensus_identity()): consensus}, index=data.index)
         freq_df, consensus_df = self._mask_derived(data, pattern_df, freq_df, consensus_df)
 
         return pd.concat([pattern_df, freq_df, consensus_df], axis=1)
@@ -62,7 +78,7 @@ class PatternIndicatorEngine:
         origin = l1op.origin_of([data[c].to_numpy(dtype=float) for c in ("open", "high", "low", "close")])
         freq = {}
         for column in freq_df.columns:
-            window = int(str(column).rsplit("_W", 1)[1])
+            window = int(parse_feature_name(str(column), tagged=False).params[0][0])
             freq[column] = l1op.mask_output("pattern", warmup_lookup.PATTERN_ENTRY, str(column), freq_df[column].to_numpy(),
                                             {"window": window}, origin=origin, upstream=upstream, window=window,
                                             upstream_k=upstream_k)[0]
@@ -91,8 +107,8 @@ class PatternIndicatorEngine:
             frames.append(
                 pd.DataFrame(
                     {
-                        f"ohlc_pattern_BullishCount_W{window}": bullish_count,
-                        f"ohlc_pattern_BearishCount_W{window}": bearish_count,
+                        format_feature_name(_count_identity("BullishCount", window)): bullish_count,
+                        format_feature_name(_count_identity("BearishCount", window)): bearish_count,
                     },
                     index=pattern_df.index,
                 )
@@ -119,55 +135,26 @@ class PatternIndicatorEngine:
         return metadata
 
     def _build_metadata_entries(self, name: str) -> Dict[str, Dict]:
-        spec = TALibWrapper.get_indicator_spec(name)
-        if spec.computed_in_adapter:
-            return {}
-
-        source_label = spec.input_type
-        metadata: Dict[str, Dict] = {}
-        for idx in range(len(spec.output_names)):
-            name_suffix = spec.output_names[idx] if len(spec.output_names) > idx else str(idx)
-            if len(spec.output_names) == 1:
-                indicator_name = spec.name
-            else:
-                indicator_name = spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
-            col_name = "_".join([source_label, spec.category, indicator_name])
-            metadata[col_name] = {
-                "layer": "layer1",
-                "category": spec.category,
-                "indicator": indicator_name,
-                "source": source_label,
-                "params": {},
-                "description": f"{indicator_name} pattern signal",
-            }
+        """FF-NAME Task 2.1：CDL 欄委派 `TALibWrapper.build_metadata_entries`（無參數；來源標籤 `ohlc`）。"""
+        metadata = TALibWrapper.build_metadata_entries(name, [{}], [], description="pattern signal from")
         return metadata
 
     def _build_derived_metadata(self) -> Dict[str, Dict]:
+        """同引擎衍生欄之 metadata：鍵與 compute 同一身分常數（FF-NAME Task 2.2；`W5`→params `5`）。"""
         metadata: Dict[str, Dict] = {}
+        entries = []
         for window in [5, 13, 21]:
-            metadata[f"ohlc_pattern_BullishCount_W{window}"] = {
+            entries.append((_count_identity("BullishCount", window), {"window": window}, "Rolling bullish pattern count"))
+            entries.append((_count_identity("BearishCount", window), {"window": window}, "Rolling bearish pattern count"))
+        entries.append((_consensus_identity(), {}, "Average pattern direction"))
+        for identity, params, description in entries:
+            metadata[format_feature_name(identity)] = {
                 "layer": "layer1",
-                "category": "pattern",
-                "indicator": "BullishCount",
-                "source": "ohlc",
-                "params": {"window": window},
-                "description": "Rolling bullish pattern count",
+                "category": identity.category,
+                "indicator": identity.indicator,
+                "source": identity.source,
+                "raw_lookup_key": None,
+                "params": params,
+                "description": description,
             }
-            metadata[f"ohlc_pattern_BearishCount_W{window}"] = {
-                "layer": "layer1",
-                "category": "pattern",
-                "indicator": "BearishCount",
-                "source": "ohlc",
-                "params": {"window": window},
-                "description": "Rolling bearish pattern count",
-            }
-
-        metadata["ohlc_pattern_Consensus"] = {
-            "layer": "layer1",
-            "category": "pattern",
-            "indicator": "Consensus",
-            "source": "ohlc",
-            "params": {},
-            "description": "Average pattern direction",
-        }
         return metadata

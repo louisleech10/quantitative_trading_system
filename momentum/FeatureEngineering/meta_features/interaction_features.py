@@ -19,8 +19,14 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name
 
 logger = get_logger(__name__)
+
+# FF-NAME Task 2.4：L6 meta 欄名＝`meta_meta_<indicator>`（未標記形；落盤 `meta_<tf>_meta_<indicator>`）
+_TREND_MOMENTUM = format_feature_name(build_identity("meta", "meta", "trend-momentum"))
+_VOLATILITY_DIRECTION = format_feature_name(build_identity("meta", "meta", "volatility-direction"))
+_VOLUME_PRICE_CHANGE = format_feature_name(build_identity("meta", "meta", "volume-price-change"))
 
 
 class InteractionFeatureEngine:
@@ -39,21 +45,21 @@ class InteractionFeatureEngine:
             trend_strength = (ema_fast - ema_slow) / ema_slow.replace(0, np.nan)
             momentum_strength = (rsi - 50.0) / 50.0
             interaction = trend_strength * momentum_strength
-            interaction.name = "meta_Trend_Momentum"
+            interaction.name = _TREND_MOMENTUM
             frames.append(interaction)
 
         atr = self._find_column(layer1, ["ATR_14", "ATR"])
         if atr is not None and "close" in raw.columns:
             direction = np.sign(raw["close"].pct_change())
             volatility_direction = atr * direction
-            volatility_direction.name = "meta_Volatility_Direction"
+            volatility_direction.name = _VOLATILITY_DIRECTION
             frames.append(volatility_direction)
 
         if "close" in raw.columns and "volume" in raw.columns:
             price_change = raw["close"].pct_change()
             volume_change = raw["volume"].pct_change()
             interaction = price_change * volume_change
-            interaction.name = "meta_Volume_PriceChange"
+            interaction.name = _VOLUME_PRICE_CHANGE
             frames.append(interaction)
 
         if not frames:

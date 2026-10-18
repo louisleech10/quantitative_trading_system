@@ -45,6 +45,13 @@ from momentum.FeatureEngineering.meta_features.consensus_features import Consens
 from momentum.FeatureEngineering.meta_features.interaction_features import InteractionFeatureEngine
 from momentum.FeatureEngineering.meta_features.time_features import TimeFeatureEngine
 from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
+from momentum.FeatureEngineering.feature_naming import (
+    build_identity,
+    format_feature_name,
+    parse_feature_name,
+    strip_timeframe_tag,
+    tag_timeframe,
+)
 from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
 from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
 from momentum.FeatureEngineering.cross_sectional.relative_strength import RelativeStrengthProcessor
@@ -1285,20 +1292,16 @@ class FeatureFactory:
         column_name: str,
         category_hint: str,
     ) -> tuple[str, str, str]:
-        parts = column_name.split("_")
-        if len(parts) < 3:
-            return "unknown", category_hint, column_name
+        """L1 欄之 (source, category, indicator)＝`parse_feature_name(name, tagged=False)` 之身分（FF-NAME Task 2.5；
+        不合文法即拋 `FeatureNameParseError`，不猜）。group_id＝`{tf}_L1_{category}_{indicator}`。"""
+        identity = parse_feature_name(str(column_name), tagged=False)
+        return identity.source, identity.category, identity.indicator
 
-        source = parts[0]
-        category = parts[1] if parts[1] else category_hint
-        indicator_tokens: List[str] = []
-        for token in parts[2:]:
-            if cls._is_numeric_token(token):
-                break
-            indicator_tokens.append(token)
-
-        indicator = "_".join(indicator_tokens) if indicator_tokens else parts[2]
-        return source, category, indicator
+    @staticmethod
+    def _xsec_column(feature: str) -> str:
+        """L5 cross-sectional 欄名＝`xsec_cross-sectional_<indicator>`（未標記形；FF-NAME Task 2.4；
+        `relative_price`→`relative-price` 等經 canonical）。"""
+        return format_feature_name(build_identity("xsec", "cross-sectional", feature))
 
     def _next_available_group_id(self, base_group_id: str) -> str:
         if self._cgsa_registry is None:
@@ -2229,7 +2232,7 @@ class FeatureFactory:
         features = config.cross_sectional.features
         if aligned.empty:
             configured = [
-                f"cs_{name}" for name in ("relative_price", "beta", "idiosyncratic_momentum")
+                self._xsec_column(name) for name in ("relative_price", "beta", "idiosyncratic_momentum")
                 if name in features and features[name].enabled
             ]
             if getattr(self, "_calibration_domain", False) and configured:
@@ -2252,15 +2255,16 @@ class FeatureFactory:
 
         frames: List[pd.Series] = []
         if "relative_price" in features and features["relative_price"].enabled:
-            frames.append(processor.compute_relative_price(symbol_close, btc_close).rename("cs_relative_price"))
+            frames.append(processor.compute_relative_price(symbol_close, btc_close).rename(
+                self._xsec_column("relative_price")))
         if "beta" in features and features["beta"].enabled:
             beta = processor.compute_beta(symbol_returns, btc_returns)
-            frames.append(beta.rename("cs_beta"))
+            frames.append(beta.rename(self._xsec_column("beta")))
         if "idiosyncratic_momentum" in features and features["idiosyncratic_momentum"].enabled:
             beta = processor.compute_beta(symbol_returns, btc_returns)
             frames.append(
                 processor.compute_idiosyncratic_momentum(symbol_returns, btc_returns, beta).rename(
-                    "cs_idiosyncratic_momentum"
+                    self._xsec_column("idiosyncratic_momentum")
                 )
             )
 
@@ -3631,14 +3635,14 @@ class FeatureFactory:
             **dict(l7_dead_reasons or {}),
         }
         # 2026-09-30 §G⑦ v54 實跑：L3 剔除點之欄名尚未加週期標記（`taker-ratio_momentum_…`），公開欄名已加
-        # （`taker-ratio_1h_momentum_…`）⇒ 以公開欄名為鍵（同 `_apply_timeframe_tag` 規則，已標記者不動）。
+        # （`taker-ratio_1h_momentum_…`）⇒ 以公開欄名為鍵。FF-NAME Task 2.5：標記一律 `feature_naming.tag_timeframe`
+        # （只看第 2 段）；已為完整形（第 2 段屬週期鍵，`strip_timeframe_tag` 可剝）者不動。
         timeframe = getattr(self, "_current_timeframe", None)
         if timeframe:
-            from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
-
-            tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
-            column_set_reasons = {self._timeframe_tagged_name(str(k), str(timeframe), tf_keys): v
-                                  for k, v in raw_reasons.items()}
+            column_set_reasons = {
+                (str(k) if strip_timeframe_tag(str(k)) != str(k) else tag_timeframe(str(k), str(timeframe))): v
+                for k, v in raw_reasons.items()
+            }
         else:
             column_set_reasons = {str(k): v for k, v in raw_reasons.items()}
         meta: Dict[str, Any] = {
@@ -4155,12 +4159,10 @@ class FeatureFactory:
         raw = preprocessor.stationarity_decisions()
         if not raw:
             return
-        from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
-
-        tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
         merged: Dict[str, Dict[str, Any]] = dict(getattr(self, "last_stationarity_decisions", None) or {})
         for (timeframe, column), record in raw.items():
-            name = self._timeframe_tagged_name(column, timeframe, tf_keys) if timeframe else column
+            # FF-NAME Task 2.5：單一標記實作 `feature_naming.tag_timeframe`（只看第 2 段；label 不標）
+            name = tag_timeframe(column, timeframe) if timeframe else column
             merged[name] = record
         self.last_stationarity_decisions = merged
 
@@ -4215,17 +4217,6 @@ class FeatureFactory:
             "stationarity_summary": summary,
             **calibration,
         }
-
-    @staticmethod
-    def _timeframe_tagged_name(column: str, timeframe: str, tf_keys: set) -> str:
-        """單欄名加週期標記（與 `_apply_timeframe_tag` 同規則：第二段已為任一週期則不動）。"""
-        if column.startswith("label_"):
-            return column
-        parts = column.split("_")
-        if len(parts) < 2 or any(p in tf_keys for p in parts[1:]):
-            return column
-        return "_".join([parts[0], timeframe] + parts[1:])
-
 
     _COMBINE_CONTEXTS = frozenset({"layer3_input", "layer4_input"})
 
@@ -4381,6 +4372,9 @@ class FeatureFactory:
         return pd.to_datetime(index_series, errors="coerce")
 
     def _build_indicator_specs(self, layer1: pd.DataFrame, config: "FactoryConfig") -> Dict[str, Dict]:
+        """L2 用之記憶體內身分表（欄名 → source／category／indicator／params／`raw_lookup_key`；FF-NAME Task 2.3）。
+        microstructure 之欄名依資料分支（是否含 quote_volume／taker_ratio）而定 ⇒ 取全部分支之 metadata 聯集
+        （各分支欄名互異，只有實際出現在 L1 之欄會被選用）。"""
         sources = self._select_single_series_sources(config)
         metadata: Dict[str, Dict] = {}
 
@@ -4408,7 +4402,8 @@ class FeatureFactory:
         if config.atomic_indicators.microstructure.enabled:
             try:
                 engine = MicrostructureIndicatorEngine(config.atomic_indicators.microstructure.model_dump(), sources)
-                metadata.update(engine.get_feature_metadata())
+                for branch_columns in ([], ["quote_volume"], ["taker_ratio"], ["quote_volume", "taker_ratio"]):
+                    metadata.update(engine.get_feature_metadata(pd.DataFrame(columns=branch_columns)))
             except Exception as exc:
                 logger.warning("Microstructure metadata build failed: %s", exc)
         if config.atomic_indicators.entropy.enabled:
@@ -4441,6 +4436,8 @@ class FeatureFactory:
                 "category": info.get("category"),
                 "indicator": info.get("indicator"),
                 "params": params_list,
+                # FF-NAME Task 2.3：原始 raw 鍵（Distance 查 raw 之唯一依據；無則 None）
+                "raw_lookup_key": info.get("raw_lookup_key"),
             }
         return indicator_specs
 

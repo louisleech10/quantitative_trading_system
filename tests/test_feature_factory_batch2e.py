@@ -188,7 +188,7 @@ def test_t2b2_l2_without_cross_group_ops_direct_emit(tmp_path, monkeypatch):
     group_ids = [g.group_id for g in factory._cgsa_registry.list_by_layer(LayerSource.L2)]
     assert group_ids == ["1h_L2_Momentum"]
     assert not result.empty
-    assert all("_Momentum_" in col for col in result.columns)
+    assert all("_Momentum-L" in col for col in result.columns)  # FF-NAME：op 段 `Momentum-L<k>`
 
 
 def test_t2b3_all_nan_group_register_and_persist(tmp_path):

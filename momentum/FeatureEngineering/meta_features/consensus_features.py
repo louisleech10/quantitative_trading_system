@@ -25,7 +25,14 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
+
+# FF-NAME Task 2.4：L6 meta 欄名＝`meta_meta_<indicator>`（未標記形；落盤 `meta_<tf>_meta_<indicator>`）
+_TREND_CONSENSUS = format_feature_name(build_identity("meta", "meta", "trend-consensus"))
+_MOMENTUM_DIVERGENCE = format_feature_name(build_identity("meta", "meta", "momentum-divergence"))
+_VOLUME_PRICE_DIVERGENCE = format_feature_name(build_identity("meta", "meta", "volume-price-divergence"))
+_VOLATILITY_REGIME = format_feature_name(build_identity("meta", "meta", "volatility-regime"))
 
 
 def _prefix_masked(output: pd.Series, inputs: Iterable[pd.Series]) -> pd.Series:
@@ -45,7 +52,7 @@ class ConsensusFeatureEngine:
         """mean(sign(EMA_8 > EMA_21), sign(MACD_Hist > 0), sign(ADX > 25))"""
         index = layer1.index
         if layer1.empty:
-            return pd.Series(index=index, name="meta_Trend_Consensus", dtype=float)
+            return pd.Series(index=index, name=_TREND_CONSENSUS, dtype=float)
 
         ema_fast = self._find_column(layer1, ["close_trend_EMA_8", "EMA_8"])
         ema_slow = self._find_column(layer1, ["close_trend_EMA_21", "EMA_21"])
@@ -61,10 +68,10 @@ class ConsensusFeatureEngine:
             signals.append(pd.Series(np.where(adx > 25, 1.0, 0.0), index=index))
 
         if not signals:
-            return pd.Series(index=index, name="meta_Trend_Consensus", dtype=float)
+            return pd.Series(index=index, name=_TREND_CONSENSUS, dtype=float)
 
         consensus = pd.concat(signals, axis=1).mean(axis=1, skipna=True)
-        consensus.name = "meta_Trend_Consensus"
+        consensus.name = _TREND_CONSENSUS
         inputs = [s for s in (ema_fast, ema_slow, macd_hist, adx) if s is not None]
         return _prefix_masked(consensus, inputs)
 
@@ -72,7 +79,7 @@ class ConsensusFeatureEngine:
         """std(RSI_rank, CCI_rank, STOCH_rank)"""
         index = layer1.index
         if layer1.empty:
-            return pd.Series(index=index, name="meta_Momentum_Divergence", dtype=float)
+            return pd.Series(index=index, name=_MOMENTUM_DIVERGENCE, dtype=float)
 
         rsi = self._find_column(layer1, ["RSI_14", "RSI"])
         cci = self._find_column(layer1, ["CCI_14", "CCI"])
@@ -80,41 +87,41 @@ class ConsensusFeatureEngine:
 
         series_list = [s for s in [rsi, cci, stoch] if s is not None]
         if len(series_list) < 2:
-            return pd.Series(index=index, name="meta_Momentum_Divergence", dtype=float)
+            return pd.Series(index=index, name=_MOMENTUM_DIVERGENCE, dtype=float)
 
         stacked = pd.concat(series_list, axis=1)
         ranked = stacked.rank(axis=1, pct=True)
         divergence = ranked.std(axis=1, ddof=0)
-        divergence.name = "meta_Momentum_Divergence"
+        divergence.name = _MOMENTUM_DIVERGENCE
         return _prefix_masked(divergence, series_list)
 
     def compute_volume_price_divergence(self, layer1: pd.DataFrame, raw: pd.DataFrame) -> pd.Series:
         """sign(Price_Change) != sign(Volume_Change)"""
         index = raw.index if not raw.empty else layer1.index
         if raw.empty or "close" not in raw.columns or "volume" not in raw.columns:
-            return pd.Series(index=index, name="meta_VolumePrice_Divergence", dtype=float)
+            return pd.Series(index=index, name=_VOLUME_PRICE_DIVERGENCE, dtype=float)
 
         price_change = raw["close"].pct_change()
         volume_change = raw["volume"].pct_change()
         sign_price = np.sign(price_change)
         sign_volume = np.sign(volume_change)
         divergence = (sign_price * sign_volume < 0).astype(float)
-        divergence.name = "meta_VolumePrice_Divergence"
+        divergence.name = _VOLUME_PRICE_DIVERGENCE
         return _prefix_masked(divergence, [price_change, volume_change])
 
     def compute_volatility_regime(self, layer1: pd.DataFrame) -> pd.Series:
         """ATR_14 / ATR_55"""
         index = layer1.index
         if layer1.empty:
-            return pd.Series(index=index, name="meta_Volatility_Regime", dtype=float)
+            return pd.Series(index=index, name=_VOLATILITY_REGIME, dtype=float)
 
         atr_fast = self._find_column(layer1, ["ATR_14"])
         atr_slow = self._find_column(layer1, ["ATR_55"])
         if atr_fast is None or atr_slow is None:
-            return pd.Series(index=index, name="meta_Volatility_Regime", dtype=float)
+            return pd.Series(index=index, name=_VOLATILITY_REGIME, dtype=float)
 
         regime = atr_fast / atr_slow.replace(0, np.nan)
-        regime.name = "meta_Volatility_Regime"
+        regime.name = _VOLATILITY_REGIME
         return regime
 
     @staticmethod

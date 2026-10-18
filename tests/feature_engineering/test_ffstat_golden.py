@@ -163,9 +163,10 @@ def test_dual_public_columns_reads_l65_files(tmp_path: Path) -> None:
     assert names == {"base_x", "base_x_fracdiff"}
 
 
-def test_column_set_reasons_keyed_by_public_timeframe_tagged_names() -> None:
+def test_column_set_reasons_keyed_by_public_tagged_names() -> None:
     """§G⑦ v54（2026-09-30 主委實跑 1h／12h：8／21 欄 `no_recorded_reason`）：L3 死欄過濾點之欄名尚未加週期標記，
-    `column_set_reasons` 須以公開欄名（加週期標記、已標記者不動）為鍵；DeadDropSpy 同規則。拿掉標記轉換 ⇒ 紅。"""
+    `column_set_reasons` 須以公開欄名（加週期標記、已標記者不動）為鍵；DeadDropSpy 同規則。拿掉標記轉換 ⇒ 紅。
+    （FF-NAME Task 2.5：標記走唯一實作 `feature_naming.tag_timeframe`，不再經 factory 之靜態標記函式。）"""
     from types import SimpleNamespace
 
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
@@ -174,7 +175,6 @@ def test_column_set_reasons_keyed_by_public_timeframe_tagged_names() -> None:
         _public_warmup_probe=[], _current_output_window=None, _current_timeframe="1h",
         _last_l3_aggregator=SimpleNamespace(dead_reasons={"taker-ratio_momentum_STOCHRSI-fastd_14-3-3-0_Max_W233": "constant"}),
         _l7_dead_reasons={"close_1h_momentum_RSI_14_Min_W21": "stable_samples_below_min"},
-        _timeframe_tagged_name=FeatureFactory._timeframe_tagged_name,
         _start_dependent_columns=lambda cols: [],
     )
     meta = FeatureFactory._stable_start_metadata(stub, {}, [], {"volume_momentum_MFI_14_Range_W34": "constant"})
@@ -189,30 +189,34 @@ def test_column_set_reasons_keyed_by_public_timeframe_tagged_names() -> None:
 
 
 def test_timeframe_tag_single_name_matches_frame_rule_and_idempotent() -> None:
-    """v55（審查 r39 codex P2-07）：`column_set_reasons` 之單欄標記（`_timeframe_tagged_name`）規則：未標記者於第二段
-    插入週期、`label_` 不標、任一後段已為週期者不動，且已標記者再標不變（含自訂引擎欄名、欄名後段含週期字樣者）。
-    （FRAMEPATH：整表標記 `FeatureFactory._apply_timeframe_tag` 與多週期 legacy 標記已刪，原「單欄＝整表」比對改為
-    對單欄規則之逐值斷言。）"""
-    from momentum.FeatureEngineering.feature_factory import FeatureFactory
-    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+    """v55（審查 r39 codex P2-07）：`column_set_reasons` 之單欄標記規則：未標記者於第二段插入週期、`label_` 不標、
+    已標記者（第 2 段屬週期鍵）不動，且再標不變（含自訂引擎欄名、欄名後段含週期字樣者）。
+    （FRAMEPATH：整表標記已刪；FF-NAME Task 2.5：factory 之第二套靜態標記函式已刪，規則唯一實作＝
+    `feature_naming.tag_timeframe`（只看第 2 段），已標記判定＝`strip_timeframe_tag`。欄名改用 FF-NAME 文法：
+    改前之底線來源 `taker_ratio_…` 已不合文法（來源段不得含 `_`），其「週期段在後方不重複加標記」改以
+    合文法之已標記名 `taker-ratio_1h_…` 斷言；週期字樣在後段（`…_Momentum-L1h`、`…_EMA_1h`）只看第 2 段。）"""
+    from momentum.FeatureEngineering.feature_naming import strip_timeframe_tag, tag_timeframe
 
-    tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
-    names = ["close_trend_EMA_144_Kurt_W13", "taker-ratio_momentum_STOCHRSI-fastd_14-3-3-0_Max_W233",
-             "ent_shannon_close_21", "tr_cvar_5pct_55", "ms_amihud_illiq_21", "meta_consensus_score",
-             "close_momentum_RSI_14_Momentum_L1h", "hl_1h_momentum_AROON-aroonup_21_Min_W89", "label_fwd_ret_4",
-             "taker_ratio_momentum_RSI_14", "taker_ratio_1h_momentum_RSI_14"]
+    def public(name: str, tf: str) -> str:
+        return name if strip_timeframe_tag(name) != name else tag_timeframe(name, tf)
+
+    names = ["close_trend_EMA_144_Kurt-W13", "taker-ratio_momentum_STOCHRSI-fastd_14-3-3-0_Max-W233",
+             "close_entropy_shannon_21", "close_tail-risk_cvar_5pct-55", "close-quote-volume_microstructure_amihud-illiq_21",
+             "meta_meta_consensus-score", "close_momentum_RSI_14_Momentum-L1h", "hl_1h_momentum_AROON-aroonup_21_Min-W89",
+             "label_fwd_ret_4", "taker-ratio_momentum_RSI_14", "taker-ratio_1h_momentum_RSI_14", "close_trend_EMA_1h"]
 
     for tf in ("1h", "12h", "1d"):
-        single = [FeatureFactory._timeframe_tagged_name(n, tf, tf_keys) for n in names]
-        assert single[names.index("close_trend_EMA_144_Kurt_W13")] == f"close_{tf}_trend_EMA_144_Kurt_W13"
-        assert single[names.index("meta_consensus_score")] == f"meta_{tf}_consensus_score"
+        single = [public(n, tf) for n in names]
+        assert single[names.index("close_trend_EMA_144_Kurt-W13")] == f"close_{tf}_trend_EMA_144_Kurt-W13"
+        assert single[names.index("meta_meta_consensus-score")] == f"meta_{tf}_meta_consensus-score"
         assert single[names.index("label_fwd_ret_4")] == "label_fwd_ret_4"
-        assert single[names.index("hl_1h_momentum_AROON-aroonup_21_Min_W89")] == \
-            "hl_1h_momentum_AROON-aroonup_21_Min_W89"
-        assert [FeatureFactory._timeframe_tagged_name(n, tf, tf_keys) for n in single] == single  # 冪等
-        # r40 codex P2-01：底線來源且週期段在後方者不重複加標記
-        assert FeatureFactory._timeframe_tagged_name("taker_ratio_1h_momentum_RSI_14", tf, tf_keys) == \
-            "taker_ratio_1h_momentum_RSI_14"
+        assert single[names.index("hl_1h_momentum_AROON-aroonup_21_Min-W89")] == \
+            "hl_1h_momentum_AROON-aroonup_21_Min-W89"
+        assert single[names.index("close_momentum_RSI_14_Momentum-L1h")] == f"close_{tf}_momentum_RSI_14_Momentum-L1h"
+        assert single[names.index("close_trend_EMA_1h")] == f"close_{tf}_trend_EMA_1h"  # 只看第 2 段
+        assert [public(n, tf) for n in single] == single  # 冪等
+        # r40 codex P2-01：已標記者（週期段在第 2 段）不重複加標記
+        assert public("taker-ratio_1h_momentum_RSI_14", tf) == "taker-ratio_1h_momentum_RSI_14"
 
 
 def test_replay_dead_reason_reproduces_pure_function() -> None:
@@ -359,7 +363,7 @@ def test_golden_derived_consistent_with_decisions(baseline: Dict[str, Any], on_r
     dec = h.decisions(on_run["result"])
     for col, d in dec.items():
         assert (f"{col}_fracdiff" in derived) == bool(d["fracdiff"]), col
-        order = next((k for k in (1, 2) if f"{col}_diff{k}" in derived), 0)
+        order = next((k for k in (1, 2) if f"{col}_diff-{k}" in derived), 0)
         assert order == int(d["adf_differenced"] or 0), col
     # 摘要（契約 metadata_keys.summary）須與逐欄資料重新計數一致（r18 codex P2-05）
     summary = on_run["result"].metadata[h.META["summary"]]
@@ -372,8 +376,8 @@ def test_golden_derived_consistent_with_decisions(baseline: Dict[str, Any], on_r
     assert summary["tested"] == len(dec) - len(untested)
     assert all(explain & set(d["events"]) for d in untested.values()), untested
     assert summary["fracdiff"] == sum(1 for d in dec.values() if d["fracdiff"])
-    assert summary["adf_diff_1"] == sum(1 for c in dec if f"{c}_diff1" in derived)
-    assert summary["adf_diff_2"] == sum(1 for c in dec if f"{c}_diff2" in derived)
+    assert summary["adf_diff_1"] == sum(1 for c in dec if f"{c}_diff-1" in derived)
+    assert summary["adf_diff_2"] == sum(1 for c in dec if f"{c}_diff-2" in derived)
     for key, event in (("search_failed", "search_failed"), ("cache_read_failed", "cache_read_failed"),
                        ("cache_write_failed", "cache_write_failed"),
                        ("calibration_insufficient", "calibration_insufficient")):

@@ -11,9 +11,32 @@ from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+from momentum.FeatureEngineering.feature_naming import FeatureIdentity, build_identity, format_feature_name
 
 
 logger = get_logger(__name__)
+
+
+# FF-NAME Task 2.2：自製 volume 欄之身分常數（compute、輸出點、metadata 三處共用）
+def _vwap_identity(window: int) -> FeatureIdentity:
+    return build_identity("hlcv", "volume", "VWAP", (window,))
+
+
+def _volume_ma_ratio_identity(window: int) -> FeatureIdentity:
+    return build_identity("volume", "volume", "VolumeMA-Ratio", (window,))
+
+
+def _force_index_identity(ema_period: int) -> FeatureIdentity:
+    """ForceIndex 補參數段（EMA 期數；改前欄名無參數而 metadata 有 timeperiod）。"""
+    return build_identity("hlcv", "volume", "ForceIndex", (ema_period,))
+
+
+def _klinger_identity(fast: int, slow: int) -> FeatureIdentity:
+    return build_identity("hlcv", "volume", "Klinger", (fast, slow))
+
+
+def _eom_identity(window: int) -> FeatureIdentity:
+    return build_identity("hlcv", "volume", "EOM", (window,))
 
 
 class VolumeIndicatorEngine:
@@ -91,91 +114,36 @@ class VolumeIndicatorEngine:
         params_list: List[Dict],
         sources: List[str],
     ) -> Dict[str, Dict]:
-        spec = TALibWrapper.get_indicator_spec(name)
-        if spec.computed_in_adapter:
-            return {}
-
-        source_labels = sources if spec.input_type == "single" else [spec.input_type]
-        metadata: Dict[str, Dict] = {}
-        for params in params_list or [{}]:
-            param_str = TALibWrapper._format_params(name, params)
-            for source_label in source_labels:
-                for idx in range(len(spec.output_names)):
-                    name_suffix = spec.output_names[idx] if len(spec.output_names) > idx else str(idx)
-                    if len(spec.output_names) == 1:
-                        indicator_name = spec.name
-                    else:
-                        indicator_name = (
-                            spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
-                        )
-                    normalized_source = TALibWrapper.normalize_source_label(source_label)
-                    normalized_indicator = TALibWrapper.normalize_indicator_name(indicator_name)
-                    parts = [normalized_source, spec.category, normalized_indicator]
-                    if param_str:
-                        parts.append(param_str)
-                    col_name = "_".join(parts)
-                    metadata[col_name] = {
-                        "layer": "layer1",
-                        "category": spec.category,
-                        "indicator": indicator_name,
-                        "source": source_label,
-                        "params": params,
-                        "description": f"{indicator_name} computed from {source_label}",
-                    }
-        return metadata
+        """FF-NAME Task 2.1：委派 `TALibWrapper.build_metadata_entries`（共用身分建構）。"""
+        return TALibWrapper.build_metadata_entries(name, params_list, sources)
 
     def _build_derived_metadata(self) -> Dict[str, Dict]:
+        """自製欄之 metadata：鍵與 compute／輸出點同一身分常數（FF-NAME Task 2.2）。
+
+        `raw_lookup_key`：只有 VolumeMA-Ratio 直接取單一 raw 鍵 `volume`；其餘來源標籤 `hlcv` 非 raw 鍵。"""
+        fast, slow = 34, 55
+        entries = (
+            (_vwap_identity(20), None, {"timeperiod": 20}, {}, "Volume weighted average price"),
+            (_volume_ma_ratio_identity(20), "volume", {"timeperiod": 20}, {}, "Volume to moving average ratio"),
+            (_force_index_identity(13), None, {"timeperiod": 13}, {},
+             "Elder Force Index canonical (EMA13 of close change × volume)"),
+            (_klinger_identity(fast, slow), None, {"fast": fast, "slow": slow}, {},
+             "Klinger Volume Oscillator canonical (trend-aware VF, EMA34−EMA55)"),
+            (_eom_identity(14), None, {"timeperiod": 14}, {"variant": "simplified"},
+             "Simplified ease of movement (no 1e8 scale factor)"),
+        )
         metadata: Dict[str, Dict] = {}
-        vwap_window = 20
-        metadata[f"hlcv_volume_VWAP_{vwap_window}"] = {
-            "layer": "layer1",
-            "category": "volume",
-            "indicator": "VWAP",
-            "source": "hlcv",
-            "params": {"timeperiod": vwap_window},
-            "description": "Volume weighted average price",
-        }
-
-        ma_window = 20
-        metadata[f"volume_volume_VolumeMA_Ratio_{ma_window}"] = {
-            "layer": "layer1",
-            "category": "volume",
-            "indicator": "VolumeMA_Ratio",
-            "source": "volume",
-            "params": {"timeperiod": ma_window},
-            "description": "Volume to moving average ratio",
-        }
-
-        metadata["hlcv_volume_ForceIndex"] = {
-            "layer": "layer1",
-            "category": "volume",
-            "indicator": "ForceIndex",
-            "source": "hlcv",
-            "params": {"timeperiod": 13},
-            "description": "Elder Force Index canonical (EMA13 of close change × volume)",
-        }
-
-        fast = 34
-        slow = 55
-        metadata[f"hlcv_volume_Klinger_{fast}_{slow}"] = {
-            "layer": "layer1",
-            "category": "volume",
-            "indicator": "Klinger",
-            "source": "hlcv",
-            "params": {"fast": fast, "slow": slow},
-            "description": "Klinger Volume Oscillator canonical (trend-aware VF, EMA34−EMA55)",
-        }
-
-        eom_window = 14
-        metadata[f"hlcv_volume_EOM_{eom_window}"] = {
-            "layer": "layer1",
-            "category": "volume",
-            "indicator": "EOM",
-            "source": "hlcv",
-            "params": {"timeperiod": eom_window},
-            "variant": "simplified",
-            "description": "Simplified ease of movement (no 1e8 scale factor)",
-        }
+        for identity, raw_key, params, extra, description in entries:
+            metadata[format_feature_name(identity)] = {
+                "layer": "layer1",
+                "category": identity.category,
+                "indicator": identity.indicator,
+                "source": identity.source,
+                "raw_lookup_key": raw_key,
+                "params": params,
+                **extra,
+                "description": description,
+            }
         return metadata
 
     def _resolve_params(self, name: str, indicator_def: Dict) -> List[Dict]:
@@ -217,7 +185,7 @@ class VolumeIndicatorEngine:
         volume = data["volume"].replace(0, np.nan)
         vwap = (price * volume).rolling(window).sum() / volume.rolling(window).sum()
         return pd.DataFrame(
-            {f"hlcv_volume_VWAP_{window}": vwap},
+            {format_feature_name(_vwap_identity(window)): vwap},
             index=data.index,
         )
 
@@ -227,7 +195,7 @@ class VolumeIndicatorEngine:
         volume_ma = data["volume"].rolling(window).mean()
         ratio = data["volume"] / volume_ma.replace(0, np.nan)
         return pd.DataFrame(
-            {f"volume_volume_VolumeMA_Ratio_{window}": ratio},
+            {format_feature_name(_volume_ma_ratio_identity(window)): ratio},
             index=data.index,
         )
 
@@ -240,7 +208,7 @@ class VolumeIndicatorEngine:
         raw = close.diff() * volume
         smoothed = talib.EMA(raw.values, timeperiod=ema_period)
         return pd.DataFrame(
-            {"hlcv_volume_ForceIndex": pd.Series(smoothed, index=data.index)},
+            {format_feature_name(_force_index_identity(ema_period)): pd.Series(smoothed, index=data.index)},
             index=data.index,
         )
 
@@ -277,7 +245,7 @@ class VolumeIndicatorEngine:
         ema_slow = talib.EMA(vf.astype(float), timeperiod=slow)
         kvo = ema_fast - ema_slow
         return pd.DataFrame(
-            {f"hlcv_volume_Klinger_{fast}_{slow}": pd.Series(kvo, index=data.index)},
+            {format_feature_name(_klinger_identity(fast, slow)): pd.Series(kvo, index=data.index)},
             index=data.index,
         )
 
@@ -290,6 +258,6 @@ class VolumeIndicatorEngine:
         box_ratio = (data["high"] - data["low"]) / data["volume"].replace(0, np.nan)
         eom = (mid_move * box_ratio).rolling(window).mean()
         return pd.DataFrame(
-            {f"hlcv_volume_EOM_{window}": eom},
+            {format_feature_name(_eom_identity(window)): eom},
             index=data.index,
         )

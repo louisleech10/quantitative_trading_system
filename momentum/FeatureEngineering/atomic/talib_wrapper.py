@@ -9,6 +9,7 @@ import talib
 from talib import abstract
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.feature_naming import FeatureIdentity, canonical_segment, format_feature_name
 
 logger = get_logger(__name__)
 
@@ -38,13 +39,78 @@ class TALibWrapper:
 
     @staticmethod
     def normalize_source_label(source_label: str) -> str:
-        """Normalize source segment: use '-' inside segment, keep '_' for segment boundaries."""
-        return str(source_label).replace("_", "-")
+        """來源段正規化：委派 `feature_naming.canonical_segment`（FF-NAME Task 2.1）。"""
+        return canonical_segment(source_label)
 
     @staticmethod
     def normalize_indicator_name(indicator_name: str) -> str:
-        """Normalize indicator segment: use '-' inside segment, keep '_' for segment boundaries."""
-        return str(indicator_name).replace("_", "-")
+        """指標段正規化：委派 `feature_naming.canonical_segment`（FF-NAME Task 2.1）。"""
+        return canonical_segment(indicator_name)
+
+    @staticmethod
+    def output_indicator_name(spec: "IndicatorSpec", output_index: int) -> str:
+        """第 `output_index` 個輸出之指標詞（產生端原始詞，如 `BBANDS_Upper`；單輸出即指標名）。"""
+        name_suffix = spec.output_names[output_index] if len(spec.output_names) > output_index else str(output_index)
+        if len(spec.output_names) == 1:
+            return spec.name
+        return spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
+
+    @classmethod
+    def source_label_for(cls, spec: "IndicatorSpec", data_source: str) -> str:
+        """欄之來源標籤（產生端原始詞）：單序列指標＝資料鍵；多輸入指標＝輸入型（`hlc`、`close_volume` 等）。"""
+        return data_source if spec.input_type == "single" else spec.input_type
+
+    @classmethod
+    def build_l1_identity(
+        cls,
+        spec: "IndicatorSpec",
+        source: str,
+        output_index: int = 0,
+        params: Optional[Dict] = None,
+    ) -> FeatureIdentity:
+        """TA-Lib L1 欄之身分（FF-NAME Task 2.1 共用身分建構；欄名與 metadata 鍵皆由其 `format_feature_name`）。
+
+        `source` 為來源標籤（單序列指標之資料鍵或多輸入型）；source／category／indicator 經 `canonical_segment`；
+        params 為 `_format_params` 之 token（以 `-` 串之值，單一成員；無參數 ⇒ 空）。"""
+        param_str = cls._format_params(spec.name, params or {})
+        tokens = tuple(param_str.split(cls.PARAM_VALUE_DELIMITER)) if param_str else ()
+        return FeatureIdentity(
+            source=canonical_segment(source),
+            tf=None,
+            category=canonical_segment(spec.category),
+            indicator=canonical_segment(cls.output_indicator_name(spec, output_index)),
+            params=(tokens,) if tokens else (),
+        )
+
+    @classmethod
+    def build_metadata_entries(
+        cls,
+        name: str,
+        params_list: List[Dict],
+        sources: List[str],
+        description: str = "computed from",
+    ) -> Dict[str, Dict]:
+        """七引擎共用之 TA-Lib metadata（FF-NAME Task 2.1）：鍵＝`format_feature_name(build_l1_identity(...))`；
+        source／indicator 為 canonical，另存 `raw_lookup_key`（單序列指標之原始 kline 鍵；多輸入型為 None）。"""
+        spec = cls.get_indicator_spec(name)
+        if spec.computed_in_adapter:
+            return {}
+        source_labels = sources if spec.input_type == "single" else [spec.input_type]
+        metadata: Dict[str, Dict] = {}
+        for params in params_list or [{}]:
+            for source_label in source_labels:
+                for idx in range(len(spec.output_names)):
+                    identity = cls.build_l1_identity(spec, source_label, idx, params)
+                    metadata[format_feature_name(identity)] = {
+                        "layer": "layer1",
+                        "category": identity.category,
+                        "indicator": identity.indicator,
+                        "source": identity.source,
+                        "raw_lookup_key": source_label if spec.input_type == "single" else None,
+                        "params": params,
+                        "description": f"{identity.indicator} {description} {source_label}",
+                    }
+        return metadata
 
     _CATEGORY_MAP = {
         "trend": [
@@ -486,7 +552,6 @@ class TALibWrapper:
             arrays = (output,)
 
         frames = []
-        param_str = cls._format_params(spec.name, params)
         if mask_inputs is not None:
             # FF-STAT Task 2.3：TA-Lib L1 輸出點（多輸出指標之各欄共用本次呼叫之參數字典）
             from momentum.FeatureEngineering.atomic import l1_output_points as l1op
@@ -495,17 +560,7 @@ class TALibWrapper:
             # 別名（Beta_CloseVolume 等）查其 TA-Lib 函式之條目：同一計算、同一收斂行為
             table_name = l1op.table_indicator(spec.talib_func, spec.category)
         for idx, array in enumerate(arrays):
-            name_suffix = spec.output_names[idx] if len(spec.output_names) > idx else str(idx)
-            if len(spec.output_names) == 1:
-                indicator_name = spec.name
-            else:
-                indicator_name = spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
-            normalized_source = cls.normalize_source_label(source_label)
-            normalized_indicator = cls.normalize_indicator_name(indicator_name)
-            parts = [normalized_source, spec.category, normalized_indicator]
-            if param_str:
-                parts.append(param_str)
-            col_name = "_".join(parts)
+            col_name = format_feature_name(cls.build_l1_identity(spec, source_label, idx, params))
             if mask_inputs is not None:
                 array, _k = l1op.mask_output("talib", table_name, col_name, array, params, origin=origin)
             frames.append(pd.Series(array, index=index, name=col_name))

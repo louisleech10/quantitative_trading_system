@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Literal, Union
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_serializer, model_validator
 
+from momentum.FeatureEngineering.feature_naming import binary_signal_op, custom_output_indicator, is_valid_custom_slug
+
 
 class GlobalSettings(BaseModel):
     sequence_length: int = 100
@@ -362,6 +364,13 @@ class BinarySignalRule(BaseModel):
     name_suffix: str
     enabled: bool = True
 
+    @field_validator("name_suffix")
+    @classmethod
+    def _suffix_is_single_op_segment(cls, value: str) -> str:
+        """FF-NAME Task 2.3：後綴經 `canonical_segment` 須合 BinarySignal op 參數字母表（不合 ⇒ 載入時 ValueError）。"""
+        binary_signal_op(value)
+        return value
+
 
 class BinarySignalToggle(OperatorToggle):
     """Binary signal operator 配置（含 per-rule 控制）"""
@@ -506,6 +515,26 @@ class CustomIndicatorDef(BaseModel):
     outputs: Dict[str, CustomIndicatorOutput]
     model_config = ConfigDict(extra="allow")
 
+    @field_validator("name")
+    @classmethod
+    def _name_is_slug(cls, value: str) -> str:
+        """FF-NAME Task 2.2：custom 指標名即欄名 indicator 之 slug（`[a-z0-9-]+`），不合即於設定驗證時拒收。"""
+        if not is_valid_custom_slug(value):
+            raise ValueError(f"custom 指標名 {value!r} 不合 slug 規則 [a-z0-9-]+（FF-NAME：欄名 indicator 段）")
+        return value
+
+    @model_validator(mode="after")
+    def _output_indicators_valid(self) -> "CustomIndicatorDef":
+        """多輸出之 indicator（`<slug>-<輸出鍵>`）亦須合 slug 規則且互不重複。"""
+        seen: Dict[str, str] = {}
+        single = len(self.outputs) == 1
+        for key in self.outputs:
+            indicator = custom_output_indicator(self.name, key, single)
+            if indicator in seen:
+                raise ValueError(f"custom 指標 {self.name!r} 之輸出 {seen[indicator]!r} 與 {key!r} 撞同一 slug {indicator!r}")
+            seen[indicator] = key
+        return self
+
 
 class ValidationResult(BaseModel):
     is_valid: bool
@@ -588,6 +617,15 @@ class FactoryConfig(BaseModel):
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
     nan_strategy: NanStrategyConfig = Field(default_factory=NanStrategyConfig)
     model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    @model_validator(mode="after")
+    def _custom_slugs_unique(self) -> "FactoryConfig":
+        """FF-NAME Task 2.2：兩個 custom 定義同 slug ⇒ run 級拒收（設定驗證時、呼叫任何使用者函式之前）。"""
+        names = [item.name for item in self.custom_indicators or []]
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        if dupes:
+            raise ValueError(f"custom 指標 slug 重複：{dupes}（兩個定義不得同 slug；FF-NAME 欄名 indicator 段）")
+        return self
 
 
 class FeatureNamingConfig:

@@ -440,14 +440,14 @@ class DeadDropSpy:
         self.dropped: Dict[str, Dict[str, Any]] = {}
 
     def _public_name(self, name: str) -> str:
-        """過濾點欄名 → 公開欄名（L3 過濾點尚未加週期標記；同生產 `_timeframe_tagged_name`，已標記者不動）。"""
+        """過濾點欄名 → 公開欄名（L3 過濾點尚未加週期標記；同生產 `column_set_reasons`：唯一標記實作
+        `feature_naming.tag_timeframe`，已為完整形（第 2 段屬週期鍵）者不動——FF-NAME Task 2.5）。"""
         if not self.timeframe:
             return str(name)
-        from momentum.FeatureEngineering.feature_factory import FeatureFactory
-        from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+        from momentum.FeatureEngineering.feature_naming import strip_timeframe_tag, tag_timeframe
 
-        return FeatureFactory._timeframe_tagged_name(str(name), self.timeframe,
-                                                     set(TimeframeAligner._timeframe_seconds_keys()))
+        text = str(name)
+        return text if strip_timeframe_tag(text) != text else tag_timeframe(text, self.timeframe)
 
     def record(self, site: str, names: List[str], matrix: Any, dead: Any, params: Dict[str, Any]) -> None:
         import numpy as np

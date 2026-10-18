@@ -11,6 +11,7 @@ from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
 from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
 from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
+from momentum.FeatureEngineering.feature_naming import tscorr_op
 
 
 TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
@@ -59,11 +60,11 @@ def test_derived_operators_distance_cross_ratio_momentum_binary():
     derived = engine.compute_all(layer1, raw)
 
     distance_col = "close_trend_EMA_21_Distance"
-    cross_col = "close_trend_EMA_8_40_Cross"
-    ratio_col = "close_trend_EMA_8_40_Ratio"
-    momentum_col = "close_momentum_RSI_14_Momentum_L3"
-    binary_overbought = "close_momentum_RSI_14_BinarySignal_Overbought"
-    binary_oversold = "close_momentum_RSI_14_BinarySignal_Oversold"
+    cross_col = "close_trend_EMA_8~40_Cross"  # FF-NAME：配對雙成員以 `~` 分隔
+    ratio_col = "close_trend_EMA_8~40_Ratio"
+    momentum_col = "close_momentum_RSI_14_Momentum-L3"
+    binary_overbought = "close_momentum_RSI_14_BinarySignal-Overbought"
+    binary_oversold = "close_momentum_RSI_14_BinarySignal-Oversold"
 
     assert distance_col in derived.columns
     assert cross_col in derived.columns
@@ -106,9 +107,9 @@ def test_rolling_aggregator_slope_rank_zscore():
     agg = RollingAggregator({"windows": [5], "aggregators": ["slope", "rank", "zscore"]})
     rolled = agg.compute_all(features)
 
-    slope_col = "close_Slope_W5"
-    rank_col = "close_Rank_W5"
-    zscore_col = "close_ZScore_W5"
+    slope_col = "close_Slope-W5"  # FF-NAME：L3 op 段 `<Agg>-W<w>`
+    rank_col = "close_Rank-W5"
+    zscore_col = "close_ZScore-W5"
 
     assert slope_col in rolled.columns
     assert rank_col in rolled.columns
@@ -152,7 +153,7 @@ def test_rolling_aggregator_handles_duplicate_columns():
     rolled = agg.compute_all(features)
 
     assert rolled.shape[1] >= 2
-    assert all(col == "dup_Slope_W5" for col in rolled.columns)
+    assert all(col == "dup_Slope-W5" for col in rolled.columns)
     assert np.isfinite(rolled.iloc[-1, 0])
     assert np.isfinite(rolled.iloc[-1, 1])
 
@@ -185,7 +186,7 @@ def test_lag_processor_layer1_and_raw():
     ema_21 = TALibWrapper.compute("EMA", raw, {"timeperiod": 21}, "close")
 
     base = pd.concat([raw[["close"]], ema_21], axis=1)
-    base["close_trend_EMA_21_Slope_W5"] = raw["close"].rolling(5).mean()
+    base["close_trend_EMA_21_Slope-W5"] = raw["close"].rolling(5).mean()  # FF-NAME 文法之 L3 欄
 
     config = ConfigManager().get_merged_config()
     processor = LagProcessor(config)
@@ -201,11 +202,11 @@ def test_lag_processor_layer1_and_raw():
         max_lag = max(1, int(config.global_settings.sequence_length * config.global_settings.max_lag_ratio))
         lag_steps = sorted(set(lag_steps + [lag for lag in [1, 2, 3] if lag <= max_lag]))
 
-    assert any(col.startswith("close_Lag_") for col in lagged.columns)
-    assert not any("Slope_W5_Lag" in col for col in lagged.columns)
+    assert any(col.startswith("close_raw_value_Lag-") for col in lagged.columns)  # FF-NAME：raw lag 身分
+    assert not any("Slope-W5_Lag" in col for col in lagged.columns)
 
     lag = lag_steps[0]
-    lag_col = f"close_Lag_{lag}"
+    lag_col = f"close_raw_value_Lag-{lag}"
     assert lag_col in lagged.columns
     idx = max(lag + 1, 10)
     assert np.isclose(lagged[lag_col].iloc[idx], raw["close"].iloc[idx - lag], equal_nan=True)
@@ -278,7 +279,7 @@ def test_derived_worldquant_tscorr_handles_duplicate_corr_index():
     )
     derived = engine.compute_all(layer1, raw_data)
 
-    corr_col = "close_momentum_RSI_3_TsCorr_close_W2"
+    corr_col = f"close_momentum_RSI_3_{tscorr_op('close', 2)}"  # FF-NAME：TsCorr 嵌目標摘要
     assert corr_col in derived.columns
     assert derived.index.equals(layer1.index)
     assert derived[corr_col].notna().sum() >= 1

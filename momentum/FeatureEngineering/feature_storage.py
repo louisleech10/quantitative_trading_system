@@ -860,13 +860,8 @@ class FeatureStorage:
             safe_group_id = self._safe_path_segment(str(group_id), "group_id")
             columns_list = [str(column) for column in columns]
 
-            # Multi-TF column tf-tagging.
-            # CGSA mode skips _apply_timeframe_tag (multi_tf_generator.py) so 1h and
-            # 12h groups both produce identical column names (e.g. "close_trend_EMA_20").
-            # When IC engine calls ic_scores.update(group_ic) across groups the later
-            # TF silently overwrites the earlier one — resulting in "only 1h" output and
-            # no tf markers in feature names.  Fix: insert the group's tf as the 2nd
-            # name segment (matching legacy _apply_timeframe_tag format):
+            # Multi-TF column tf-tagging（FF-NAME Task 2.5）：registry 欄名為生成期間之未標記形，
+            # 落盤時以群組週期插入第 2 段（唯一實作 feature_naming.tag_timeframe）：
             #   "close_trend_EMA_20"  →  "close_1h_trend_EMA_20"  (group 1h_L1_trend_EMA)
             #   "close_trend_EMA_20"  →  "close_12h_trend_EMA_20" (group 12h_L1_trend_EMA)
             _gid_tf = str(group_id).split("_", 1)[0]  # e.g. "1h", "12h", "4h", "1w"
@@ -1958,6 +1953,8 @@ class FeatureStorage:
         manifest["schema_version"] = schema_version
         manifest["feature_schema_hash"] = feature_schema_hash
         manifest["total_features"] = total_features
+        # FF-NAME §G ⑦（Task 2.6 通過條件；世代閘讀取端為 Task 3.4）：本 run 欄名之命名世代
+        manifest["feature_naming_version"] = feature_naming.CURRENT_FEATURE_NAMING_VERSION
         manifest["groups"] = group_manifest
         if artifact_kind == "processed":
             # ICFIRSTALIGN Task 1.3：processed 之時間軸、列數、時間範圍只寫入其 artifact 節點；

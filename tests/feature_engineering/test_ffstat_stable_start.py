@@ -1089,13 +1089,13 @@ def test_warmup_late_only_counts_probe_late_columns() -> None:
         "b_1h_kurt": "2026-01-01T16:00:00+00:00",       # 資料所致 ⇒ 不計
         "c_1h_ok": "2025-12-31T00:00:00+00:00",         # 不晚
         "a_1h_x_fracdiff": "2026-01-02T00:00:00+00:00",  # 基礎欄探測晚到 ⇒ 計
-        "c_1h_ok_diff1": "2026-01-01T03:00:00+00:00",   # 基礎欄不晚 ⇒ 晚到來自平穩化窗寬 ⇒ 計
+        "c_1h_ok_diff-1": "2026-01-01T03:00:00+00:00",   # 基礎欄不晚 ⇒ 晚到來自平穩化窗寬 ⇒ 計
         "b_1h_kurt_fracdiff": "2026-01-02T00:00:00+00:00",  # 基礎欄資料所致晚到 ⇒ 不計
         "d_1h_dead": None,
     }
-    assert warmup_late_columns(stable, start, frozenset({"a_1h_x"})) == ["a_1h_x", "a_1h_x_fracdiff", "c_1h_ok_diff1"]
+    assert warmup_late_columns(stable, start, frozenset({"a_1h_x"})) == ["a_1h_x", "a_1h_x_fracdiff", "c_1h_ok_diff-1"]
     assert warmup_late_columns(stable, start, None) == sorted(
-        ["a_1h_x", "b_1h_kurt", "a_1h_x_fracdiff", "c_1h_ok_diff1", "b_1h_kurt_fracdiff"])
+        ["a_1h_x", "b_1h_kurt", "a_1h_x_fracdiff", "c_1h_ok_diff-1", "b_1h_kurt_fracdiff"])
     assert warmup_late_columns(stable, None, frozenset({"a_1h_x"})) == []
 
 

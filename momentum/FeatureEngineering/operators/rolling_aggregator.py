@@ -15,6 +15,7 @@ from momentum.FeatureEngineering import memory_budget as _memory_budget
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 from momentum.FeatureEngineering.feature_naming import (
     RATIO_UNSAFE_CATEGORIES,
+    append_op_segments,
     is_ratio_unsafe_column,
 )
 
@@ -321,7 +322,7 @@ class RollingAggregator:
                     else:
                         continue
 
-                    chunk_result = result.add_suffix(f"_{agg_label}_W{window}")
+                    chunk_result = self._with_l3_op(result, agg_label, window)
                     if not chunk_result.empty:
                         step_frames.append(chunk_result)
 
@@ -459,7 +460,7 @@ class RollingAggregator:
                     else:
                         continue
 
-                    chunk_result = result.add_suffix(f"_{agg_label}_W{window}")
+                    chunk_result = self._with_l3_op(result, agg_label, window)
                     if not chunk_result.empty:
                         step_frames.append(chunk_result)
 
@@ -571,7 +572,7 @@ class RollingAggregator:
 
                     filtered_results = self._batch_variance_filter(
                         window_results,
-                        names={a: f"{col_name}_{self._format_agg_label(a)}_W{window}" for a in window_results},
+                        names={a: self._l3_name(col_name, self._format_agg_label(a), window) for a in window_results},
                     )
 
                     for agg_name in valid_aggs:
@@ -581,7 +582,7 @@ class RollingAggregator:
                             continue
 
                         chunk_results[step_key].append(filtered_results[agg_name])
-                        chunk_names[step_key].append(f"{col_name}_{self._format_agg_label(agg_name)}_W{window}")
+                        chunk_names[step_key].append(self._l3_name(col_name, self._format_agg_label(agg_name), window))
 
             for step_key in step_keys:
                 if not chunk_results[step_key]:
@@ -728,7 +729,7 @@ class RollingAggregator:
         else:
             return pd.DataFrame(index=data.index)
 
-        return result.add_suffix(f"_{agg_label}_W{window}")
+        return self._with_l3_op(result, agg_label, window)
 
     @staticmethod
     def _compute_slope_vectorized(data: pd.DataFrame, window: int) -> pd.DataFrame:
@@ -889,7 +890,7 @@ class RollingAggregator:
             for agg_name in valid_aggs:
                 agg_label = self._format_agg_label(agg_name)
                 for window in self._windows:
-                    suffix = f"_{agg_label}_W{window}"
+                    suffix = f"_{agg_label}-W{window}"
                     selected_cols = [name for name in chunk_result.columns if name.endswith(suffix)]
                     if selected_cols:
                         bucket[(agg_name, window)].append(chunk_result[selected_cols])
@@ -953,7 +954,7 @@ class RollingAggregator:
                 result = self._compute_slope_vectorized(data, window)
             else:
                 continue
-            frames.append(result.add_suffix(f"_{agg_label}_W{window}"))
+            frames.append(self._with_l3_op(result, agg_label, window))
 
         if not frames:
             return pd.DataFrame(index=data.index)
@@ -1022,7 +1023,7 @@ class RollingAggregator:
                 else:
                     continue
 
-                result_map[agg_name].append(result.add_suffix(f"_{agg_label}_W{window}"))
+                result_map[agg_name].append(self._with_l3_op(result, agg_label, window))
 
         frames: List[pd.DataFrame] = []
         for agg_name in valid_aggs:
@@ -1093,6 +1094,16 @@ class RollingAggregator:
         except re.error:
             return [col for col in candidates if self._apply_to in col]
         return [col for col in candidates if pattern.search(col)]
+
+    @staticmethod
+    def _l3_name(column: str, agg_label: str, window: int) -> str:
+        """FF-NAME Task 2.4：L3 欄名＝輸入身分＋op 段 `<Agg>-W<w>`（經 `feature_naming.append_op_segments`）。"""
+        return append_op_segments(column, f"{agg_label}-W{window}")
+
+    @classmethod
+    def _with_l3_op(cls, frame: pd.DataFrame, agg_label: str, window: int) -> pd.DataFrame:
+        """整表之欄名加 L3 op 段（取代改前之 `add_suffix("_<Agg>_W<w>")`；不改值）。"""
+        return frame.set_axis([cls._l3_name(str(c), agg_label, window) for c in frame.columns], axis=1)
 
     def _format_agg_label(self, agg_name: str) -> str:
         mapping = {

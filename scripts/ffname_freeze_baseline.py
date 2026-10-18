@@ -276,7 +276,8 @@ class _Instrument:
     def __init__(self) -> None:
         self.rec = PartRecorder()
         self.tag_calls: Dict[Tuple[str, str], str] = {}  # (tf, 未標記名) → 標記名（A11 feature_naming.tag_timeframe）
-        self.tag2_calls: Dict[Tuple[str, str], str] = {}  # (tf, 名) → 標記名（A11 FeatureFactory._timeframe_tagged_name）
+        # (tf, 名) → 標記名（A11 改前之第二套標記實作；FF-NAME Task 2.5 已刪除，改後碼態恆為空）
+        self.tag2_calls: Dict[Tuple[str, str], str] = {}
         self.pairs: Dict[str, Tuple[str, str, str]] = {}  # L2 配對欄（未標記）→ (fast, slow, op)
         self.lags: Dict[str, str] = {}  # L4 lag 欄（未標記）→ 輸入欄（未標記）
         self.saved_groups: Dict[int, Dict[str, Tuple[str, str, Tuple[str, ...]]]] = {}  # A12：registry → gid → (layer, tf, cols)
@@ -717,15 +718,8 @@ class _Instrument:
             return out
 
         mp.setattr(feature_naming, "tag_timeframe", tag_timeframe)
-
-        orig_tag2 = FeatureFactory.__dict__["_timeframe_tagged_name"].__func__
-
-        def _timeframe_tagged_name(column, timeframe, tf_keys):
-            out = orig_tag2(column, timeframe, tf_keys)
-            inst.tag2_calls[(str(timeframe), str(column))] = out
-            return out
-
-        mp.setattr(FeatureFactory, "_timeframe_tagged_name", staticmethod(_timeframe_tagged_name))
+        # 改前之第二套標記（FeatureFactory 之靜態標記函式）已於 FF-NAME Task 2.5 刪除；baseline 已於改前凍結
+        # （其 tag_disagreements 為空），改後碼態不再包裝。
 
         # A12（CGSA 群組：group_id 與欄）
         orig_save = ColumnGroupRegistry.save_data
@@ -1053,6 +1047,85 @@ def _collect_main(inst: _Instrument, root: Path, factory: Any, result: Any, spec
     }
 
 
+def _is_l5_column(name: str) -> bool:
+    """L5 cross-sectional 欄：改前 `cs_` 前綴；改後碼態以 parser 判 category（FF-NAME Task 2.4）。"""
+    if str(name).startswith("cs_"):
+        return True
+    fn = _naming()
+    try:
+        return fn.parse_feature_name(str(name)).category == "cross-sectional"
+    except fn.FeatureNameParseError:
+        return False
+
+
+class _Observer:
+    """改後碼態（`record_parts=False`）之結構觀測（FF-NAME Task 2.6）：L2 配對規格、L4 lag 輸入、CGSA 群組。
+    只包裝、不改產生端行為；名稱一律為改後產生端之實際欄名（不經零件推導），供 §G ⑤⑥ 與欄序／群組比對。"""
+
+    def __init__(self) -> None:
+        self.pairs: Dict[str, Tuple[str, str, str]] = {}  # L2 配對欄（未標記）→ (fast, slow, op)
+        self.lags: Dict[str, Tuple[str, bool]] = {}  # L4 lag 欄（未標記）→ (輸入欄或 raw 資料鍵, 是否 raw)
+        self.saved_groups: Dict[int, Dict[str, Tuple[str, str, Tuple[str, ...]]]] = {}
+
+    def install(self, mp: Any) -> None:
+        from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+        from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
+        from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
+
+        obs = self
+        orig_pair = DerivedOperatorEngine._apply_pair_operator
+
+        def _apply_pair_operator(self, layer1_df, feature_info, operator_name):
+            out = orig_pair(self, layer1_df, feature_info, operator_name)
+            for fast, slow, column in self._collect_pair_specs(layer1_df, feature_info, operator_name):
+                obs.pairs[str(column)] = (str(fast), str(slow), str(operator_name))
+            return out
+
+        mp.setattr(DerivedOperatorEngine, "_apply_pair_operator", _apply_pair_operator)
+
+        orig_lag_name = LagProcessor._lag_name
+
+        def _lag_name(self, col, lag):
+            out = orig_lag_name(self, col, lag)
+            obs.lags[str(out)] = (str(col), self._identity_or_none(col) is None)
+            return out
+
+        mp.setattr(LagProcessor, "_lag_name", _lag_name)
+
+        orig_save = ColumnGroupRegistry.save_data
+
+        def save_data(self, group, data):
+            out = orig_save(self, group, data)
+            layer = getattr(group.layer, "value", group.layer)
+            obs.saved_groups.setdefault(id(self), {})[str(group.group_id)] = (
+                str(layer), str(group.timeframe), tuple(map(str, group.columns)))
+            return out
+
+        mp.setattr(ColumnGroupRegistry, "save_data", save_data)
+
+    def structure(self, factory: Any) -> Dict[str, Any]:
+        """`l2_pairs`（`[fast, slow, op]`，標記後新名）與 `l4_lag_inputs`（標記後新名；raw 輸入為
+        `<canonical raw>_<tf>_raw_value`）。"""
+        from momentum.FeatureEngineering import feature_naming as fn
+
+        registry = getattr(factory, "_cgsa_registry", None)
+        saved = self.saved_groups.get(id(registry)) if registry is not None else None
+        if not saved:
+            raise FreezeError("改後 run 之 CGSA registry 群組未錄得")
+        pairs: Set[Tuple[str, str, str]] = set()
+        lag_inputs: Set[str] = set()
+        for _gid, (layer, tf, cols) in saved.items():
+            for column in cols:
+                if layer == "L2" and column in self.pairs:
+                    fast, slow, op = self.pairs[column]
+                    pairs.add((fn.tag_timeframe(fast, tf), fn.tag_timeframe(slow, tf), op))
+                if layer == "L4" and column in self.lags:
+                    source, is_raw = self.lags[column]
+                    lag_inputs.add(fn.format_feature_name(fn.raw_value_identity(source, tf)) if is_raw
+                                   else fn.tag_timeframe(source, tf))
+        return {"l2_pairs": [list(p) for p in sorted(pairs)], "l4_lag_inputs": sorted(lag_inputs)}
+
+
 def run_reference(work_dir: Path, *, record_parts: bool) -> Dict[str, Any]:
     """跑 reference（真實 kline）並回傳 fingerprint：
     `columns`（名 → {dtype, shape, nan_sha256, value_sha256}）、`column_order`、`group_ids`、`groups`（group_id → 欄名清單）、
@@ -1075,8 +1148,11 @@ def run_reference(work_dir: Path, *, record_parts: bool) -> Dict[str, Any]:
     main_dir.mkdir(parents=True, exist_ok=True)
     with pytest.MonkeyPatch.context() as mp:
         prepare_stat_env(mp, main_dir)
+        observer = _Observer()
         if record_parts:
             inst.install(mp)
+        else:
+            observer.install(mp)
         root, factory, result = _generate_ic_first(main_dir, payloads["main"], spec["symbol"], spec["primary_tf"],
                                                    spec["window"])
         info = _collect_main(inst, root, factory, result, spec) if record_parts else None
@@ -1084,9 +1160,14 @@ def run_reference(work_dir: Path, *, record_parts: bool) -> Dict[str, Any]:
             config_hash = str(result.metadata["config_hash"])
             manifest, columns = _read_run(root, spec["symbol"], spec["primary_tf"], config_hash)
             _pm, processed_columns = _read_run(root, spec["symbol"], spec["primary_tf"], config_hash, "processed")
-            info = {"columns": columns, "manifest_groups": _manifest_groups(manifest),
+            manifest_groups = _manifest_groups(manifest)
+            decisions = dict(result.metadata.get("stationarity_decisions") or {})
+            info = {"columns": columns, "manifest_groups": manifest_groups,
+                    "column_order": [c for cols in manifest_groups.values() for c in cols],
                     "processed": {"columns": processed_columns},
-                    "manifest": manifest, "stationarity_decisions": dict(result.metadata.get("stationarity_decisions") or {}),
+                    "manifest": manifest, "stationarity_decisions": decisions,
+                    "stationarity_keys": sorted(decisions),
+                    **observer.structure(factory),
                     "run": {"base": str(root), "symbol": spec["symbol"], "tf": spec["primary_tf"],
                             "config_hash": config_hash}}
 
@@ -1108,7 +1189,7 @@ def run_reference(work_dir: Path, *, record_parts: bool) -> Dict[str, Any]:
             config_hash = str(result.metadata["config_hash"])
             manifest, columns = _read_run(root, symbol, xs["timeframe"], config_hash)
             groups = _manifest_groups(manifest)
-            if not any(c.startswith("cs_") for cols in groups.values() for c in cols):
+            if not any(_is_l5_column(c) for cols in groups.values() for c in cols):
                 raise FreezeError(f"L5 run {symbol} 無 cs_ 欄（L5 未涵蓋）")
             if record_parts:
                 parts, missing = _tagged_parts(inst, [(c, _group_tf(g)) for g, cols in groups.items() for c in cols])
@@ -1134,6 +1215,158 @@ def run_reference(work_dir: Path, *, record_parts: bool) -> Dict[str, Any]:
         info["parts"] = final.to_json()
         info["anomalies"] = sorted(set(inst.anomalies))
     return info
+
+
+# ---------------------------------------------------------------- Task 2.6 收據（改後碼態）
+
+_FP_KEYS = ("dtype", "shape", "nan_sha256", "value_sha256")
+
+
+def _baseline_mapping(baseline: Mapping[str, Any]) -> Dict[str, str]:
+    parts = {row["old_name"]: _part_from_row(row) for row in baseline["parts"]}
+    return derive_mapping(parts, {k: p.tf for k, p in parts.items()})
+
+
+def value_invariance_receipt(baseline: Mapping[str, Any], current: Mapping[str, Any], *, command: str) -> Dict[str, Any]:
+    """§G 通過條件之收據（Task 2.6）：改名差集、L2 合併差集、L4 新增 lag 欄、欄名長度變化、值雜湊不符數；
+    各值由 `test_ffname_value_invariance` 以同一定義重算比對（收據只供審閱，不作 oracle）。"""
+    from collections import Counter
+
+    fn = _naming()
+    mapping = _baseline_mapping(baseline)
+    mismatches = [f"{old}->{mapping[old]}" for old, fp in baseline["columns"].items()
+                  if current["columns"].get(mapping[old]) is None
+                  or any(fp[k] != current["columns"][mapping[old]][k] for k in _FP_KEYS)]
+    mapped = {mapping[o] for o in baseline["columns"]}
+    groups = current["manifest_groups"]
+    l1 = {c for gid, cols in groups.items() if str(gid).split("_")[1:2] == ["L1"] for c in cols}
+    new_lags: List[str] = []
+    for column in current["columns"]:
+        if column in mapped:
+            continue
+        ident = fn.parse_feature_name(column)
+        if not ident.ops or ident.ops[-1].split("-")[0] != "Lag":
+            continue
+        base = fn.parse_feature_name(fn.format_feature_name(dataclasses.replace(ident, ops=tuple(ident.ops[:-1]))))
+        if fn.format_feature_name(base) in l1 or base.category == "raw":
+            new_lags.append(column)
+    signatures = [(mapping[r["fast"]], mapping[r["slow"]], r["op"]) for r in baseline["l2_pairs"]]
+    merged = sorted(sig for sig, n in Counter(signatures).items() if n > 1)
+    current_pairs = {tuple(x) for x in current["l2_pairs"]}
+    return {
+        "schema_version": "ffname-value-invariance-v1",
+        "spec": "docs/FFNAME_SPEC.md v16 §G、Task 2.6",
+        "command": command,
+        "exit_code": 0 if not mismatches else 1,
+        "head": _head_commit(),
+        "baseline_sha256": _sha(BASELINE_PATH.read_bytes()),
+        "value_hash_mismatch_count": len(mismatches),
+        "value_hash_mismatches": mismatches[:200],
+        "renamed": sorted([o, n] for o, n in mapping.items() if o != n),
+        "renamed_count": sum(1 for o, n in mapping.items() if o != n),
+        "l2_merged": [list(s) for s in merged],
+        "l2_pair_symmetric_difference": sorted(map(list, set(signatures) ^ current_pairs)),
+        "l4_new_lag": sorted(new_lags),
+        "name_length_change": {o: len(n) - len(o) for o, n in mapping.items()},
+        "column_count": {"baseline": len(baseline["columns"]), "current": len(current["columns"])},
+        "column_set_extra": sorted(set(current["columns"]) - mapped - set(new_lags)),
+        "column_set_missing": sorted(mapped - set(current["columns"])),
+        "unparseable_current_names": sorted(c for c in current["columns"] if not _roundtrips(c)),
+        "manifest_feature_naming_version": (current.get("manifest") or {}).get("feature_naming_version"),
+        "l1_group_merges": _group_merges(baseline, current, mapping, set(new_lags)),
+        "stationarity_new_lag_keys": sorted(set(current["stationarity_keys"])
+                                            - {mapping[k] for k in baseline["stationarity_keys"]}),
+        "diagnostics": _structure_diagnostics(baseline, current, mapping, set(new_lags), l1),
+    }
+
+
+def _group_merges(baseline: Mapping[str, Any], current: Mapping[str, Any], mapping: Mapping[str, str],
+                  new_lags: Set[str]) -> Dict[str, List[str]]:
+    """SPEC v17 §G ⑧：含多個舊 manifest 群組之新群組（新 group_id → 排序後之舊 group_id）；舊群組成員經映射。
+    每個舊群組須恰落入一個新群組，否則 FreezeError。"""
+    owner = {c: gid for gid, cols in current["manifest_groups"].items() for c in cols if c not in new_lags}
+    merges: Dict[str, List[str]] = {}
+    for old_gid, cols in baseline["manifest_groups"].items():
+        targets = {owner.get(mapping[c]) for c in cols}
+        if len(targets) != 1 or None in targets:
+            raise FreezeError(f"舊群組 {old_gid} 未恰落入一個新群組：{sorted(t for t in targets if t)}")
+        merges.setdefault(targets.pop(), []).append(old_gid)
+    return {new: sorted(olds) for new, olds in sorted(merges.items()) if len(olds) > 1}
+
+
+def _structure_diagnostics(baseline: Mapping[str, Any], current: Mapping[str, Any], mapping: Mapping[str, str],
+                           new_lags: Set[str], l1: Set[str]) -> Dict[str, Any]:
+    """欄序、群組結構、平穩化決策鍵、L4 lag 輸入之經映射比對（審閱用診斷；判定由驗收測試為之）。"""
+    fn = _naming()
+    old_order = [mapping[o] for o in baseline["column_order"]]
+    new_order = [c for c in current["column_order"] if c not in new_lags]
+    first_diff = next((i for i, (a, b) in enumerate(zip(old_order, new_order)) if a != b), None)
+    old_groups = {frozenset(mapping[c] for c in cols) for cols in baseline["groups"].values()}
+    new_groups = {frozenset(c for c in cols if c not in new_lags) for cols in current["manifest_groups"].values()}
+    old_groups.discard(frozenset())
+    new_groups.discard(frozenset())
+    raw_inputs = {i for i in current["l4_lag_inputs"] if fn.parse_feature_name(i).category == "raw"}
+    lag_input_diff = sorted(set(current["l4_lag_inputs"]) ^ (l1 | raw_inputs))
+    return {
+        "column_order_equal": old_order == new_order,
+        "column_order_same_multiset": sorted(old_order) == sorted(new_order),
+        "column_order_first_diff_index": first_diff,
+        "column_order_first_diff": ([old_order[first_diff], new_order[first_diff]] if first_diff is not None else None),
+        "group_partition_only_baseline": sorted(sorted(g) for g in old_groups - new_groups),
+        "group_partition_only_current": sorted(sorted(g) for g in new_groups - old_groups),
+        # 同為 manifest 群組之比對（baseline `groups` 取自 registry save_data、不含 L6.5 `_L65` 群組；manifest 含之）
+        "manifest_group_partition_only_baseline": sorted(
+            sorted(g) for g in ({frozenset(mapping[c] for c in cols) for cols in baseline["manifest_groups"].values()}
+                                - new_groups)),
+        "manifest_group_partition_only_current": sorted(
+            sorted(g) for g in (new_groups
+                                - {frozenset(mapping[c] for c in cols) for cols in baseline["manifest_groups"].values()})),
+        "manifest_group_id_count": {"baseline": len(baseline["manifest_groups"]),
+                                    "current": len(current["manifest_groups"])},
+        "stationarity_keys_equal": {mapping[k] for k in baseline["stationarity_keys"]} == set(current["stationarity_keys"]),
+        "stationarity_keys_only_baseline": sorted({mapping[k] for k in baseline["stationarity_keys"]}
+                                                  - set(current["stationarity_keys"])),
+        "stationarity_keys_only_current": sorted(set(current["stationarity_keys"])
+                                                 - {mapping[k] for k in baseline["stationarity_keys"]}),
+        "stationarity_decision_value_diffs": sorted(
+            mapping[k] for k, v in baseline["stationarity_decisions"].items()
+            if mapping[k] in current["stationarity_decisions"]
+            and _canonical_json(v) != _canonical_json(json.loads(_canonical_json(current["stationarity_decisions"][mapping[k]]).decode("utf-8")))),
+        "l4_lag_inputs_vs_l1_plus_raw_symmetric_difference": lag_input_diff,
+    }
+
+
+def _roundtrips(name: str) -> bool:
+    fn = _naming()
+    try:
+        return fn.format_feature_name(fn.parse_feature_name(name)) == name
+    except fn.FeatureNameParseError:
+        return False
+
+
+def write_value_receipt(out_path: Path = RECEIPT_PATH) -> int:
+    """改後碼態跑一次 reference（隔離同 `fftfmeta_golden_helpers.prepare_env`，CGSA 序列），寫 Task 2.6 收據；
+    值雜湊不符數 == 0 ⇒ rc 0。"""
+    import pytest
+
+    from tests.feature_engineering.fftfmeta_golden_helpers import prepare_env
+
+    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    started = time.time()
+    with tempfile.TemporaryDirectory(prefix="ffname_value_receipt_") as tmp:
+        with pytest.MonkeyPatch.context() as mp:
+            prepare_env(mp, Path(tmp), FFACT_MULTI_TF_PARALLEL="0")
+            current = run_reference(Path(tmp) / "run", record_parts=False)
+        receipt = value_invariance_receipt(
+            baseline, current, command="venv/bin/python scripts/ffname_freeze_baseline.py --value-receipt")
+    receipt["elapsed_seconds"] = round(time.time() - started, 1)
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"[ffname-receipt] {_golden_rel(out_path)}：值雜湊不符 {receipt['value_hash_mismatch_count']}、"
+          f"改名 {receipt['renamed_count']}、新增 lag {len(receipt['l4_new_lag'])}、"
+          f"欄集合多出 {len(receipt['column_set_extra'])}／缺 {len(receipt['column_set_missing'])}")
+    return int(receipt["exit_code"])
 
 
 # ---------------------------------------------------------------- golden 之逐欄值指紋
@@ -1527,7 +1760,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="只驗既有 baseline.json")
     parser.add_argument("--out", default=str(BASELINE_PATH))
+    parser.add_argument("--value-receipt", action="store_true",
+                        help="改後碼態跑 reference 並寫 Task 2.6 收據（handoffs/run_receipts/ffname-value-invariance.json）")
     args = parser.parse_args(argv)
+    if args.value_receipt:
+        return write_value_receipt()
     if args.check:
         return check(Path(args.out))
     return freeze(Path(args.out))

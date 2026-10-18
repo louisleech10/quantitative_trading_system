@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -9,9 +9,23 @@ from scipy.stats import norm
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
+from momentum.FeatureEngineering.feature_naming import build_identity, format_feature_name, source_from_inputs
 
 
 logger = get_logger(__name__)
+
+# FF-NAME Task 2.2：倍數表條目 → 欄名 indicator 詞（compute、輸出點、metadata 三處共用之身分常數）
+_MS_INDICATOR: Dict[str, str] = {
+    "MS_AMIHUD_ILLIQ": "amihud-illiq",
+    "MS_KYLE_LAMBDA": "kyle-lambda",
+    "MS_ROLL_SPREAD": "roll-spread",
+    "MS_CS_SPREAD": "cs-spread",
+    "MS_OFI_RAW": "ofi-raw",
+    "MS_OFI_ZSCORE": "ofi-zscore",
+    "MS_LARGE_TRADE_RATIO": "large-trade-ratio",
+    "MS_VPIN": "vpin",
+    "MS_VPIN_ZSCORE": "vpin-zscore",
+}
 
 
 # ── Float32-safe ratio cap ──────────────────────────────────────────
@@ -66,6 +80,7 @@ class MicrostructureIndicatorEngine:
         self.kyle_lambda_windows = self._config.get("kyle_lambda_windows", [13, 21, 55])
         self.vpin_n_buckets = self._config.get("vpin_n_buckets", [30, 50])
         self.vpin_zscore_windows = self._config.get("vpin_zscore_windows", [21, 55])
+        self._seen_columns: Optional[Tuple[str, ...]] = None  # 最近一次輸出點所見之資料欄（metadata 分支依此）
 
     def compute_all(self, data: pd.DataFrame) -> pd.DataFrame:
         frames: List[pd.DataFrame] = []
@@ -91,53 +106,91 @@ class MicrostructureIndicatorEngine:
             return pd.DataFrame(index=data.index)
         return l1op.mask_engine_frame("microstructure", pd.concat(frames, axis=1), self._output_points(data), data)
 
+    @staticmethod
+    def _branch_inputs(columns: Iterable[str]) -> Dict[str, Tuple[str, ...]]:
+        """各輸出之實際輸入資料鍵（依輸出點契約順序；分支依資料是否含 `quote_volume`／`taker_ratio`）。
+        FF-NAME Task 2.2：source＝此元組之 canonical 串接 ⇒ 分支改變輸入即改變欄名。"""
+        cols = set(map(str, columns))
+        volume_in = ("quote_volume",) if "quote_volume" in cols else ("close", "volume")
+        ofi_in = ("taker_ratio",) if "taker_ratio" in cols else ("taker_buy_volume", "volume")
+        return {
+            "MS_AMIHUD_ILLIQ": tuple(dict.fromkeys(("close",) + volume_in)),
+            "MS_OFI_RAW": ofi_in,
+            "MS_OFI_ZSCORE": ofi_in,
+            "MS_KYLE_LAMBDA": ("close", "volume"),
+            "MS_ROLL_SPREAD": ("close",),
+            "MS_LARGE_TRADE_RATIO": tuple(dict.fromkeys(("trades",) + volume_in)),
+            "MS_CS_SPREAD": ("high", "low"),
+            "MS_VPIN": ("close", "volume"),
+            "MS_VPIN_ZSCORE": ("close", "volume"),
+        }
+
+    def _col(self, entry: str, columns: Iterable[str], *params: object) -> str:
+        """FF-NAME Task 2.2：microstructure 欄名＝身分常數之 `format_feature_name`（compute、輸出點、metadata 共用）。"""
+        inputs = self._branch_inputs(columns)[entry]
+        return format_feature_name(build_identity(source_from_inputs(inputs), "microstructure", _MS_INDICATOR[entry],
+                                                  params))
+
     def _output_points(self, data: pd.DataFrame) -> Dict[str, Dict]:
         """FF-STAT Task 2.3：逐輸出欄之參數契約（完整遞移週期集合；SPEC §C v38／v39）。"""
         p = l1op.point
-        volume_in = ("quote_volume",) if "quote_volume" in data.columns else ("close", "volume")
-        ofi_in = ("taker_ratio",) if "taker_ratio" in data.columns else ("taker_buy_volume", "volume")
+        columns = list(data.columns)
+        self._seen_columns = tuple(map(str, columns))
+        inputs = self._branch_inputs(columns)
         sigma_window = max(self.vpin_n_buckets)
-        points: Dict[str, Dict] = {"ms_ofi_raw": p("MS_OFI_RAW", {}, ofi_in)}
+        ofi_raw = self._col("MS_OFI_RAW", columns)
+        points: Dict[str, Dict] = {ofi_raw: p("MS_OFI_RAW", {}, inputs["MS_OFI_RAW"])}
         for w in self.windows:
-            points[f"ms_amihud_illiq_{w}"] = p("MS_AMIHUD_ILLIQ", {"window": w}, ("close",) + volume_in)
-            points[f"ms_ofi_zscore_{w}"] = p("MS_OFI_ZSCORE", {"window": w}, ofi_in, upstream=("ms_ofi_raw",), window=w)
+            points[self._col("MS_AMIHUD_ILLIQ", columns, w)] = p("MS_AMIHUD_ILLIQ", {"window": w},
+                                                                 inputs["MS_AMIHUD_ILLIQ"])
+            points[self._col("MS_OFI_ZSCORE", columns, w)] = p("MS_OFI_ZSCORE", {"window": w}, inputs["MS_OFI_ZSCORE"],
+                                                               upstream=(ofi_raw,), window=w)
         for w in self.kyle_lambda_windows:
-            points[f"ms_kyle_lambda_{w}"] = p("MS_KYLE_LAMBDA", {"window": w}, ("close", "volume"))
-            points[f"ms_roll_spread_{w}"] = p("MS_ROLL_SPREAD", {"window": w}, ("close",))
-            points[f"ms_large_trade_ratio_{w}"] = p("MS_LARGE_TRADE_RATIO", {"window": w}, ("trades",) + volume_in)
+            points[self._col("MS_KYLE_LAMBDA", columns, w)] = p("MS_KYLE_LAMBDA", {"window": w},
+                                                                inputs["MS_KYLE_LAMBDA"])
+            points[self._col("MS_ROLL_SPREAD", columns, w)] = p("MS_ROLL_SPREAD", {"window": w},
+                                                                inputs["MS_ROLL_SPREAD"])
+            points[self._col("MS_LARGE_TRADE_RATIO", columns, w)] = p("MS_LARGE_TRADE_RATIO", {"window": w},
+                                                                      inputs["MS_LARGE_TRADE_RATIO"])
         for w in self.cs_spread_smooth:
-            points[f"ms_cs_spread_{w}"] = p("MS_CS_SPREAD", {"window": w}, ("high", "low"))
+            points[self._col("MS_CS_SPREAD", columns, w)] = p("MS_CS_SPREAD", {"window": w}, inputs["MS_CS_SPREAD"])
         for b in self.vpin_n_buckets:
-            points[f"ms_vpin_{b}"] = p("MS_VPIN", {"n_buckets": b, "sigma_window": sigma_window}, ("close", "volume"))
-        base = f"ms_vpin_{self.vpin_n_buckets[0]}"
+            points[self._col("MS_VPIN", columns, b)] = p("MS_VPIN", {"n_buckets": b, "sigma_window": sigma_window},
+                                                         inputs["MS_VPIN"])
+        base = self._col("MS_VPIN", columns, self.vpin_n_buckets[0])
         for w in self.vpin_zscore_windows:
-            points[f"ms_vpin_zscore_{w}"] = p("MS_VPIN_ZSCORE", {"window": w}, ("close", "volume"),
-                                             upstream=(base,), window=w)
+            points[self._col("MS_VPIN_ZSCORE", columns, w)] = p("MS_VPIN_ZSCORE", {"window": w},
+                                                                inputs["MS_VPIN_ZSCORE"], upstream=(base,), window=w)
         return points
 
-    def get_feature_metadata(self) -> Dict[str, Dict]:
-        metadata: Dict[str, Dict] = {}
-
+    def get_feature_metadata(self, data: Optional[pd.DataFrame] = None) -> Dict[str, Dict]:
+        """metadata 之鍵＝輸出點同一身分。分支依 `data` 之欄（未給則取最近一次輸出點所見之欄；皆無則視為含
+        `quote_volume`／`taker_ratio` 之主分支）。microstructure 輸出為多輸入或價格差分衍生量，無單一直接取值之
+        raw 鍵 ⇒ `raw_lookup_key` 一律 None（與改前 metadata 無 source 之 Distance 結果一致）。"""
+        if data is not None:
+            columns: Iterable[str] = list(data.columns)
+        elif getattr(self, "_seen_columns", None) is not None:
+            columns = self._seen_columns
+        else:
+            columns = ("quote_volume", "taker_ratio")
+        entries = []
         for window in self.windows:
-            metadata[f"ms_amihud_illiq_{window}"] = self._meta("amihud", {"window": window})
-            metadata[f"ms_ofi_zscore_{window}"] = self._meta("ofi_zscore", {"window": window})
-
+            entries.append(("MS_AMIHUD_ILLIQ", (window,), {"window": window}))
+            entries.append(("MS_OFI_ZSCORE", (window,), {"window": window}))
         for window in self.kyle_lambda_windows:
-            metadata[f"ms_kyle_lambda_{window}"] = self._meta("kyle_lambda", {"window": window})
-            metadata[f"ms_roll_spread_{window}"] = self._meta("roll_spread", {"window": window})
-            metadata[f"ms_large_trade_ratio_{window}"] = self._meta("large_trade_ratio", {"window": window})
-
+            entries.append(("MS_KYLE_LAMBDA", (window,), {"window": window}))
+            entries.append(("MS_ROLL_SPREAD", (window,), {"window": window}))
+            entries.append(("MS_LARGE_TRADE_RATIO", (window,), {"window": window}))
         for window in self.cs_spread_smooth:
-            metadata[f"ms_cs_spread_{window}"] = self._meta("cs_spread", {"window": window})
-
+            entries.append(("MS_CS_SPREAD", (window,), {"window": window}))
         for bucket in self.vpin_n_buckets:
-            metadata[f"ms_vpin_{bucket}"] = self._meta("vpin", {"window": bucket})
-
+            entries.append(("MS_VPIN", (bucket,), {"n_buckets": bucket}))
         for window in self.vpin_zscore_windows:
-            metadata[f"ms_vpin_zscore_{window}"] = self._meta("vpin_zscore", {"window": window})
-
-        metadata["ms_ofi_raw"] = self._meta("ofi_raw", {})
-        return metadata
+            entries.append(("MS_VPIN_ZSCORE", (window,), {"window": window}))
+        entries.append(("MS_OFI_RAW", (), {}))
+        inputs = self._branch_inputs(columns)
+        return {self._col(entry, columns, *values): self._meta(entry, inputs[entry], params)
+                for entry, values, params in entries}
 
     def get_data_warnings(self, data: pd.DataFrame) -> List[str]:
         """回傳此引擎在給定資料上可能遇到的缺欄位警告。"""
@@ -166,11 +219,14 @@ class MicrostructureIndicatorEngine:
             )
         return warns
 
-    def _meta(self, indicator: str, params: Dict) -> Dict:
+    def _meta(self, entry: str, inputs: Tuple[str, ...], params: Dict) -> Dict:
+        indicator = _MS_INDICATOR[entry]
         return {
             "layer": "layer1",
             "category": "microstructure",
             "indicator": indicator,
+            "source": source_from_inputs(inputs),
+            "raw_lookup_key": None,
             "params": params,
             "description": f"{indicator} microstructure feature",
         }
@@ -186,7 +242,7 @@ class MicrostructureIndicatorEngine:
 
         ratio = _safe_ratio(returns, quote_volume)
         return pd.DataFrame(
-            {f"ms_amihud_illiq_{window}": ratio.rolling(window).mean() for window in self.windows},
+            {self._col("MS_AMIHUD_ILLIQ", data.columns, window): ratio.rolling(window).mean() for window in self.windows},
             index=data.index,
         )
 
@@ -202,7 +258,7 @@ class MicrostructureIndicatorEngine:
             cov = price_change.rolling(window).cov(signed_volume)
             var = signed_volume.rolling(window).var()
             value = _safe_ratio(cov, var).fillna(0.0)
-            output[f"ms_kyle_lambda_{window}"] = value
+            output[self._col("MS_KYLE_LAMBDA", data.columns, window)] = value
 
         return pd.DataFrame(output, index=data.index)
 
@@ -214,7 +270,7 @@ class MicrostructureIndicatorEngine:
         for window in self.kyle_lambda_windows:
             autocov = dp.rolling(window).cov(lag_dp)
             spread = 2.0 * np.sqrt((-autocov).clip(lower=0.0))
-            output[f"ms_roll_spread_{window}"] = spread.fillna(0.0)
+            output[self._col("MS_ROLL_SPREAD", data.columns, window)] = spread.fillna(0.0)
 
         return pd.DataFrame(output, index=data.index)
 
@@ -235,7 +291,7 @@ class MicrostructureIndicatorEngine:
 
         output: Dict[str, pd.Series] = {}
         for window in self.cs_spread_smooth:
-            output[f"ms_cs_spread_{window}"] = spread_raw.rolling(window).mean().fillna(0.0)
+            output[self._col("MS_CS_SPREAD", data.columns, window)] = spread_raw.rolling(window).mean().fillna(0.0)
 
         return pd.DataFrame(output, index=data.index)
 
@@ -247,12 +303,12 @@ class MicrostructureIndicatorEngine:
             taker_ratio = data["taker_buy_volume"].astype(float) / data["volume"].replace(0.0, np.nan)
 
         ofi_raw = (2.0 * taker_ratio - 1.0).replace([np.inf, -np.inf], np.nan)
-        output: Dict[str, pd.Series] = {"ms_ofi_raw": ofi_raw}
+        output: Dict[str, pd.Series] = {self._col("MS_OFI_RAW", data.columns): ofi_raw}
 
         for window in self.windows:
             mean = ofi_raw.rolling(window).mean()
             std = ofi_raw.rolling(window).std()
-            output[f"ms_ofi_zscore_{window}"] = _safe_ratio(ofi_raw - mean, std)
+            output[self._col("MS_OFI_ZSCORE", data.columns, window)] = _safe_ratio(ofi_raw - mean, std)
 
         return pd.DataFrame(output, index=data.index)
 
@@ -265,7 +321,8 @@ class MicrostructureIndicatorEngine:
         if "trades" not in data.columns:
             logger.warning("trades missing, large trade ratio set to NaN")
             return pd.DataFrame(
-                {f"ms_large_trade_ratio_{window}": pd.Series(np.nan, index=data.index) for window in self.kyle_lambda_windows},
+                {self._col("MS_LARGE_TRADE_RATIO", data.columns, window): pd.Series(np.nan, index=data.index)
+                 for window in self.kyle_lambda_windows},
                 index=data.index,
             )
 
@@ -276,7 +333,7 @@ class MicrostructureIndicatorEngine:
         output: Dict[str, pd.Series] = {}
         for window in self.kyle_lambda_windows:
             baseline = avg_trade_size.rolling(window).median()
-            output[f"ms_large_trade_ratio_{window}"] = _safe_ratio(
+            output[self._col("MS_LARGE_TRADE_RATIO", data.columns, window)] = _safe_ratio(
                 avg_trade_size, baseline
             )
 
@@ -303,13 +360,13 @@ class MicrostructureIndicatorEngine:
             vpin = _safe_ratio(imbalance, vol_sum)
             if sigma.eq(0.0).all():
                 vpin = pd.Series(0.0, index=data.index)
-            output[f"ms_vpin_{window}"] = vpin
+            output[self._col("MS_VPIN", data.columns, window)] = vpin
 
         for window in self.vpin_zscore_windows:
             base_window = self.vpin_n_buckets[0]
-            base_vpin = output[f"ms_vpin_{base_window}"]
+            base_vpin = output[self._col("MS_VPIN", data.columns, base_window)]
             mean = base_vpin.rolling(window).mean()
             std = base_vpin.rolling(window).std()
-            output[f"ms_vpin_zscore_{window}"] = _safe_ratio(base_vpin - mean, std)
+            output[self._col("MS_VPIN_ZSCORE", data.columns, window)] = _safe_ratio(base_vpin - mean, std)
 
         return pd.DataFrame(output, index=data.index)

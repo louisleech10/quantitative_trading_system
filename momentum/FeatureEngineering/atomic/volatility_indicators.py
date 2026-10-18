@@ -10,9 +10,27 @@ from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+from momentum.FeatureEngineering.feature_naming import FeatureIdentity, build_identity, format_feature_name
 
 
 logger = get_logger(__name__)
+
+
+# FF-NAME Task 2.2：自製 volatility 欄之身分常數（compute、輸出點、metadata 三處共用；來源標籤沿用 `hlc`）
+def _keltner_identity(window: int, multiplier: float) -> FeatureIdentity:
+    return build_identity("hlc", "volatility", "Keltner-Width", (window, multiplier))
+
+
+def _donchian_identity(window: int) -> FeatureIdentity:
+    return build_identity("hlc", "volatility", "Donchian-Width", (window,))
+
+
+def _parkinson_identity(window: int) -> FeatureIdentity:
+    return build_identity("hlc", "volatility", "Parkinson", (window,))
+
+
+def _garman_klass_identity(window: int) -> FeatureIdentity:
+    return build_identity("hlc", "volatility", "GarmanKlass", (window,))
 
 
 class VolatilityIndicatorEngine:
@@ -87,76 +105,32 @@ class VolatilityIndicatorEngine:
         params_list: List[Dict],
         sources: List[str],
     ) -> Dict[str, Dict]:
-        spec = TALibWrapper.get_indicator_spec(name)
-        if spec.computed_in_adapter:
-            return {}
-
-        source_labels = sources if spec.input_type == "single" else [spec.input_type]
-        metadata: Dict[str, Dict] = {}
-        for params in params_list or [{}]:
-            param_str = TALibWrapper._format_params(name, params)
-            for source_label in source_labels:
-                for idx in range(len(spec.output_names)):
-                    name_suffix = spec.output_names[idx] if len(spec.output_names) > idx else str(idx)
-                    if len(spec.output_names) == 1:
-                        indicator_name = spec.name
-                    else:
-                        indicator_name = (
-                            spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
-                        )
-                    normalized_source = TALibWrapper.normalize_source_label(source_label)
-                    normalized_indicator = TALibWrapper.normalize_indicator_name(indicator_name)
-                    parts = [normalized_source, spec.category, normalized_indicator]
-                    if param_str:
-                        parts.append(param_str)
-                    col_name = "_".join(parts)
-                    metadata[col_name] = {
-                        "layer": "layer1",
-                        "category": spec.category,
-                        "indicator": indicator_name,
-                        "source": source_label,
-                        "params": params,
-                        "description": f"{indicator_name} computed from {source_label}",
-                    }
-        return metadata
+        """FF-NAME Task 2.1：委派 `TALibWrapper.build_metadata_entries`（共用身分建構）。"""
+        return TALibWrapper.build_metadata_entries(name, params_list, sources)
 
     def _build_derived_metadata(self) -> Dict[str, Dict]:
-        metadata: Dict[str, Dict] = {}
+        """自製欄之 metadata：鍵與 compute／輸出點同一身分常數（FF-NAME Task 2.2）；來源標籤 `hlc` 非 raw 鍵。"""
         window = 20
         multiplier = 2.0
-        metadata[f"hlc_volatility_Keltner_Width_{window}_{multiplier}"] = {
-            "layer": "layer1",
-            "category": "volatility",
-            "indicator": "Keltner_Width",
-            "source": "hlc",
-            "params": {"timeperiod": window, "multiplier": multiplier},
-            "description": "Keltner channel width",
+        entries = (
+            (_keltner_identity(window, multiplier), {"timeperiod": window, "multiplier": multiplier},
+             "Keltner channel width"),
+            (_donchian_identity(window), {"timeperiod": window}, "Donchian channel width"),
+            (_parkinson_identity(window), {"timeperiod": window}, "Parkinson volatility estimator"),
+            (_garman_klass_identity(window), {"timeperiod": window}, "Garman-Klass volatility estimator"),
+        )
+        return {
+            format_feature_name(identity): {
+                "layer": "layer1",
+                "category": identity.category,
+                "indicator": identity.indicator,
+                "source": identity.source,
+                "raw_lookup_key": None,
+                "params": params,
+                "description": description,
+            }
+            for identity, params, description in entries
         }
-        metadata[f"hlc_volatility_Donchian_Width_{window}"] = {
-            "layer": "layer1",
-            "category": "volatility",
-            "indicator": "Donchian_Width",
-            "source": "hlc",
-            "params": {"timeperiod": window},
-            "description": "Donchian channel width",
-        }
-        metadata[f"hlc_volatility_Parkinson_{window}"] = {
-            "layer": "layer1",
-            "category": "volatility",
-            "indicator": "Parkinson",
-            "source": "hlc",
-            "params": {"timeperiod": window},
-            "description": "Parkinson volatility estimator",
-        }
-        metadata[f"hlc_volatility_GarmanKlass_{window}"] = {
-            "layer": "layer1",
-            "category": "volatility",
-            "indicator": "GarmanKlass",
-            "source": "hlc",
-            "params": {"timeperiod": window},
-            "description": "Garman-Klass volatility estimator",
-        }
-        return metadata
 
     def _resolve_params(self, name: str, indicator_def: Dict) -> List[Dict]:
         period_range = indicator_def.get("period_range") if indicator_def else None
@@ -204,7 +178,7 @@ class VolatilityIndicatorEngine:
 
         return pd.DataFrame(
             {
-                f"hlc_volatility_Keltner_Width_{window}_{multiplier}": width,
+                format_feature_name(_keltner_identity(window, multiplier)): width,
             },
             index=data.index,
         )
@@ -218,7 +192,7 @@ class VolatilityIndicatorEngine:
         mid = (high + low) / 2.0
         width = (high - low) / mid.replace(0, np.nan)
         return pd.DataFrame(
-            {f"hlc_volatility_Donchian_Width_{window}": width},
+            {format_feature_name(_donchian_identity(window)): width},
             index=data.index,
         )
 
@@ -231,7 +205,7 @@ class VolatilityIndicatorEngine:
         variance = (log_hl ** 2).rolling(window).mean() * factor
         sigma = np.sqrt(variance)
         return pd.DataFrame(
-            {f"hlc_volatility_Parkinson_{window}": sigma},
+            {format_feature_name(_parkinson_identity(window)): sigma},
             index=data.index,
         )
 
@@ -244,6 +218,6 @@ class VolatilityIndicatorEngine:
         variance = 0.5 * (log_hl ** 2) - (2.0 * np.log(2.0) - 1.0) * (log_co ** 2)
         sigma = np.sqrt(variance.rolling(window).mean())
         return pd.DataFrame(
-            {f"hlc_volatility_GarmanKlass_{window}": sigma},
+            {format_feature_name(_garman_klass_identity(window)): sigma},
             index=data.index,
         )

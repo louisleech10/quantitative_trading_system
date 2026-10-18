@@ -449,7 +449,7 @@ def stable_start_from_frame(frame: pd.DataFrame) -> Dict[str, Optional[str]]:
     return stable_start_from_first_rows(rows, frame.index)
 
 
-_STATIONARIZED_SUFFIX = re.compile(r"^(?P<base>.+)_(?:fracdiff|diff\d+)$")
+_STATIONARIZED_SUFFIX = re.compile(r"^(?P<base>.+)_(?:fracdiff|diff-\d+)$")  # FF-NAME Task 2.4：L6.5 op 段
 
 
 def warmup_late_columns(stable_start: Mapping[str, Optional[str]], output_start: Optional[str],

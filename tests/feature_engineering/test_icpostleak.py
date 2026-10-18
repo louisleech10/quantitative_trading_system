@@ -272,7 +272,7 @@ def test_phase1_append_mode_each_window_masked(branch: str, tmp_path: Path, monk
     by_window = FeaturePreprocessor(_config(["zscore"], "append"))._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8,
                                                                                        mode="append")
     for window in Z_WINDOWS:
-        cols = [f"{c}_zscore_{window}" for c in frame.columns]
+        cols = [f"{c}_zscore-{window}" for c in frame.columns]  # FF-NAME：op 段 `zscore-<w>`
         assert all(c in got.columns for c in cols), (window, list(got.columns))
         want = _oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window)
         if branch == "polars":
@@ -294,7 +294,7 @@ def test_phase1_registry_chunked_append_masked(tmp_path: Path, monkeypatch: pyte
     by_window = FeaturePreprocessor(_config(cfg["steps"], "append"))._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8,
                                                                                          mode="append")
     for window in Z_WINDOWS:
-        cols = [f"{c}_zscore_{window}" for c in frame.columns]
+        cols = [f"{c}_zscore-{window}" for c in frame.columns]  # FF-NAME：op 段 `zscore-<w>`
         assert all(c in got.columns for c in cols), (window, list(got.columns))
         want = _f32(_oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window))  # sink 出口 float32
         assert np.array_equal(got[cols].to_numpy(dtype=np.float64), want, equal_nan=True), window
@@ -482,7 +482,7 @@ def test_mutation_append_masks_first_window_only_is_caught(tmp_path: Path, monke
     monkeypatch.setattr(stable_mask, "mask_incomplete_window_by_input_2d", _first_window_only)
     frame = _real_frame()
     got = _run_branch(monkeypatch, tmp_path, "legacy", ["zscore"], frame, mode="append")
-    cols = [c for c in got.columns if str(c).endswith(f"_zscore_{Z_WINDOWS[1]}")]
+    cols = [c for c in got.columns if str(c).endswith(f"_zscore-{Z_WINDOWS[1]}")]
     inputs = _first_finite(frame.to_numpy(dtype=np.float64))
     assert _first_finite(got[cols].to_numpy(dtype=np.float64)) != [f + Z_WINDOWS[1] - 1 for f in inputs]
 

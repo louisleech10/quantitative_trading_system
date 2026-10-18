@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -24,15 +24,33 @@ logger = get_logger(__name__)
 # Single source of truth＝`feature_naming.RATIO_UNSAFE_CATEGORIES`（RATIOUNSAFE Task 1.1）；本模組 re-export 同一物件，
 # rolling_aggregator 與 feature_preprocessor 經 `feature_naming.is_ratio_unsafe_column` 於 L3／L6.5 判定。
 from momentum.FeatureEngineering.feature_naming import RATIO_UNSAFE_CATEGORIES  # noqa: E402
+from momentum.FeatureEngineering.feature_naming import (  # noqa: E402
+    FeatureIdentity,
+    binary_signal_op,
+    canonical_segment,
+    format_feature_name,
+    parse_feature_name,
+    tscorr_op,
+    with_ops,
+)
 
 
 @dataclass
 class FeatureInfo:
+    """L2 輸入欄之身分（FF-NAME Task 2.3）：source／category／indicator 一律 canonical（兩分支同一身分）；
+    `params` 為數值參數（配對用）；`raw_lookup_key` 為產生端記憶體內之原始 raw 鍵（Distance 查 raw 用；無則 None）；
+    `param_tokens` 為欄名身分之參數 token（配對欄名之成員）。"""
+
     name: str
     source: str
     category: Optional[str]
     indicator: Optional[str]
     params: List[float]
+    raw_lookup_key: Optional[str] = None
+    param_tokens: Tuple[str, ...] = ()
+    # 分支一（產生端 metadata 有紀錄）＝True：raw 查找只用 `raw_lookup_key`（None 即不適用 Distance）；
+    # 分支二（無 indicator_specs 條目）＝False：無產生端紀錄，以 raw 欄之 canonical 與 source 相等者為查找鍵
+    raw_lookup_key_known: bool = True
 
 
 class DerivedOperatorEngine:
@@ -228,7 +246,7 @@ class DerivedOperatorEngine:
             if col not in layer1_df.columns:
                 continue
             for lag in lags:
-                output_name = f"{col}_Momentum_L{lag}"
+                output_name = with_ops(col, f"Momentum-L{int(lag)}")
                 specs.append((col, int(lag), output_name))
         return specs
 
@@ -250,7 +268,8 @@ class DerivedOperatorEngine:
                 continue
             if not self._matches_apply_to(info, apply_to):
                 continue
-            if info.source not in raw_data.columns:
+            raw_key = self._raw_key(info, raw_data.columns)
+            if raw_key is None:
                 continue
             if col not in layer1_df.columns:
                 continue
@@ -258,7 +277,8 @@ class DerivedOperatorEngine:
             # Rewritten as: price/indicator - 1, but we use ratio form here
             # Actually (price - indicator) / indicator = price/indicator - 1
             # We store as (source_col, indicator_col, output_name) for the ratio adapter
-            pairs.append((info.source, col, f"{col}_Distance"))
+            # FF-NAME Task 2.3：raw 一律以產生端之 raw_lookup_key 查（不以顯示用 canonical source 查）
+            pairs.append((raw_key, col, with_ops(col, "Distance")))
         return pairs
 
     def _collect_pair_specs(
@@ -268,14 +288,7 @@ class DerivedOperatorEngine:
         operator_name: str,
     ) -> List[tuple]:
         """Collect (col_a, col_b, output_name) for pair-based operators."""
-        grouped: Dict[tuple, List["FeatureInfo"]] = {}
-        for info in feature_info.values():
-            if info.category in RATIO_UNSAFE_CATEGORIES:
-                continue
-            if not info.params or len(info.params) != 1:
-                continue
-            key = (info.source, info.category, info.indicator)
-            grouped.setdefault(key, []).append(info)
+        grouped = self._pair_families(feature_info)
 
         specs: List[tuple] = []
         for key, infos in grouped.items():
@@ -300,14 +313,49 @@ class DerivedOperatorEngine:
                     slow = param_to_info[slow_param]
                     if fast.name not in layer1_df.columns or slow.name not in layer1_df.columns:
                         continue
-                    param_str = self._format_params([x, slow_param])
-                    col_name = (
-                        f"{fast.source}_{fast.category}_{fast.indicator}"
-                        f"_{param_str}_{operator_name}"
-                    )
-                    specs.append((fast.name, slow.name, col_name))
+                    specs.append((fast.name, slow.name, self._pair_column_name(key, fast, slow, operator_name)))
 
         return specs
+
+    def _pair_families(self, feature_info: Dict[str, "FeatureInfo"]) -> Dict[tuple, List["FeatureInfo"]]:
+        """配對家族（FF-NAME Task 2.3）：分組鍵＝canonical `(source, category, indicator)`（兩分支同一身分即合併）。
+        同家族同參數之兩欄、或同 canonical 鍵撞兩個不同 `raw_lookup_key` ⇒ ValueError（列兩員）；
+        不改 `_PAIR_MULTIPLIERS` 與配對規則本身。"""
+        grouped: Dict[tuple, List["FeatureInfo"]] = {}
+        for info in feature_info.values():
+            if info.category in RATIO_UNSAFE_CATEGORIES:
+                continue
+            if not info.params or len(info.params) != 1:
+                continue
+            key = (info.source, info.category, info.indicator)
+            grouped.setdefault(key, []).append(info)
+        for key, infos in grouped.items():
+            by_param: Dict[float, "FeatureInfo"] = {}
+            by_raw: Dict[str, "FeatureInfo"] = {}
+            for info in infos:
+                other = by_param.get(info.params[0])
+                if other is not None:
+                    raise ValueError(
+                        f"L2 配對家族 {key} 同參數 {info.params[0]} 出現兩欄：{other.name!r} 與 {info.name!r}"
+                    )
+                by_param[info.params[0]] = info
+                if info.raw_lookup_key is not None:
+                    clash = next((v for k, v in by_raw.items() if k != info.raw_lookup_key), None)
+                    if clash is not None:
+                        raise ValueError(
+                            f"L2 配對家族 {key} 之 canonical 鍵撞兩個不同 raw_lookup_key："
+                            f"{clash.name!r}（{clash.raw_lookup_key!r}）與 {info.name!r}（{info.raw_lookup_key!r}）"
+                        )
+                    by_raw.setdefault(info.raw_lookup_key, info)
+        return grouped
+
+    @staticmethod
+    def _pair_column_name(key: tuple, fast: "FeatureInfo", slow: "FeatureInfo", operator_name: str) -> str:
+        """配對欄名＝基底身分（canonical 分組鍵）＋params `fast~slow`（兩員各自之參數 token）＋op（FF-NAME Task 2.3）。"""
+        source, category, indicator = key
+        identity = FeatureIdentity(source=source, tf=None, category=category, indicator=indicator,
+                                   params=(fast.param_tokens, slow.param_tokens), ops=(operator_name,))
+        return format_feature_name(identity)
 
     def output_column_counts(
         self,
@@ -336,13 +384,11 @@ class DerivedOperatorEngine:
             counts[_key("distance")] = sum(
                 1 for col, info in feature_info.items()
                 if info.category not in RATIO_UNSAFE_CATEGORIES and self._matches_apply_to(info, apply_to)
-                and info.source in raw_set
+                and self._raw_key(info, raw_set) is not None
             )
-        grouped: Dict[tuple, List[float]] = {}
-        for info in feature_info.values():
-            if info.category in RATIO_UNSAFE_CATEGORIES or not info.params or len(info.params) != 1:
-                continue
-            grouped.setdefault((info.source, info.category, info.indicator), []).append(info.params[0])
+        grouped: Dict[tuple, List[float]] = {
+            key: [info.params[0] for info in infos] for key, infos in self._pair_families(feature_info).items()
+        }
         pairs = 0
         for params in grouped.values():
             seen: set = set()
@@ -367,8 +413,7 @@ class DerivedOperatorEngine:
                 indicator = rule.get("indicator")
                 if not indicator or not rule.get("condition"):
                     continue
-                total += sum(1 for info in feature_info.values() if info.indicator
-                             and (info.indicator == indicator or info.indicator.startswith(f"{indicator}_")))
+                total += sum(1 for info in feature_info.values() if self._binary_rule_matches(info, indicator))
             counts[_key("binary_signal")] = total
         signed_cfg = self._get_section("signed_strength")
         if signed_cfg.get("enabled", False) and _key("signed_strength"):
@@ -481,7 +526,7 @@ class DerivedOperatorEngine:
             shifted = series.shift(lag)
             denom = safe_denominator(shifted)
             momentum = (series - shifted) / denom
-            frames.append(momentum.rename(f"{name_prefix}_Momentum_L{lag}"))
+            frames.append(momentum.rename(with_ops(name_prefix, f"Momentum-L{int(lag)}")))
         if not frames:
             return pd.DataFrame(index=series.index)
         return pd.concat(frames, axis=1)
@@ -560,12 +605,14 @@ class DerivedOperatorEngine:
                 continue
             if not self._matches_apply_to(info, apply_to):
                 continue
-            if info.source not in raw_data.columns:
+            # FF-NAME Task 2.3：以產生端記憶體內之 raw_lookup_key 查 raw（canonical source 只供顯示與分組）
+            raw_key = self._raw_key(info, raw_data.columns)
+            if raw_key is None:
                 continue
             series = self._select_feature_series(layer1_df, col)
-            price = raw_data[info.source]
+            price = raw_data[raw_key]
             distance = self.compute_distance(price, series, col)
-            frames.append(distance.rename(f"{col}_Distance"))
+            frames.append(distance.rename(with_ops(col, "Distance")))
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
         return pd.concat(frames, axis=1)
@@ -588,14 +635,7 @@ class DerivedOperatorEngine:
         nearest available param that satisfies the threshold.  This ensures meaningful
         signal gap (e.g. EMA_5 vs EMA_20, not EMA_5 vs EMA_8).
         """
-        grouped: Dict[tuple, List[FeatureInfo]] = {}
-        for info in feature_info.values():
-            if info.category in RATIO_UNSAFE_CATEGORIES:
-                continue
-            if not info.params or len(info.params) != 1:
-                continue
-            key = (info.source, info.category, info.indicator)
-            grouped.setdefault(key, []).append(info)
+        grouped = self._pair_families(feature_info)
 
         frames: List[pd.Series] = []
         for key, infos in grouped.items():
@@ -625,12 +665,7 @@ class DerivedOperatorEngine:
                         series = self.compute_cross(fast_series, slow_series, fast.name)
                     else:
                         series = self.compute_ratio(fast_series, slow_series, fast.name)
-                    param_str = self._format_params([x, slow_param])
-                    col_name = (
-                        f"{fast.source}_{fast.category}_{fast.indicator}"
-                        f"_{param_str}_{operator_name}"
-                    )
-                    frames.append(series.rename(col_name))
+                    frames.append(series.rename(self._pair_column_name(key, fast, slow, operator_name)))
 
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
@@ -654,15 +689,16 @@ class DerivedOperatorEngine:
             return pd.DataFrame(index=layer1_df.index)
 
         selected = self._build_selected_frame(layer1_df, selected_cols)
+        names = {(col, lag): with_ops(col, f"Momentum-L{lag}") for col in selected_cols for lag in lags}
         frames: List[pd.DataFrame] = []
         for lag in lags:
             shifted = selected.shift(lag)
             denom = safe_denominator(shifted)
             momentum = (selected - shifted) / denom
-            momentum.columns = [f"{col}_Momentum_L{lag}" for col in selected_cols]
+            momentum.columns = [names[(col, lag)] for col in selected_cols]
             frames.append(momentum)
         result = pd.concat(frames, axis=1)
-        expected_cols = [f"{col}_Momentum_L{lag}" for col in selected_cols for lag in lags]
+        expected_cols = [names[(col, lag)] for col in selected_cols for lag in lags]
         return result.loc[:, expected_cols]
 
     def _apply_binary_signal(
@@ -679,15 +715,13 @@ class DerivedOperatorEngine:
             suffix = rule.get("name_suffix")
             if not indicator or not condition:
                 continue
+            op = binary_signal_op(suffix if suffix else None)
             for col, info in feature_info.items():
-                if not info.indicator:
-                    continue
-                if info.indicator != indicator and not info.indicator.startswith(f"{indicator}_"):
+                if not self._binary_rule_matches(info, indicator):
                     continue
                 feature_series = self._select_feature_series(layer1_df, col)
                 series = self.compute_binary_signal(feature_series, condition, col)
-                name_suffix = f"_{suffix}" if suffix else ""
-                frames.append(series.rename(f"{col}_BinarySignal{name_suffix}"))
+                frames.append(series.rename(with_ops(col, op)))
 
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
@@ -708,7 +742,7 @@ class DerivedOperatorEngine:
                 continue
             feature_series = self._select_feature_series(layer1_df, col)
             series = self.transform_sign(feature_series) * self.transform_abs(feature_series)
-            frames.append(series.rename(f"{col}_SignedStrength"))
+            frames.append(series.rename(with_ops(col, "SignedStrength")))
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
         return pd.concat(frames, axis=1)
@@ -745,6 +779,14 @@ class DerivedOperatorEngine:
             return pd.DataFrame(index=layer1_df.index)
 
         selected = self._build_selected_frame(layer1_df, selected_cols)
+        name_cache: Dict[tuple, str] = {}
+
+        def wq_name(col: str, op: str) -> str:
+            """FF-NAME Task 2.3：WorldQuant 輸出欄名＝輸入身分＋op 段（TsCorr 嵌目標摘要，不嵌原名）。"""
+            key = (col, op)
+            if key not in name_cache:
+                name_cache[key] = with_ops(col, op)
+            return name_cache[key]
 
         # P4.2: Numba fast path for ts_argmax/ts_argmin
         # Replaces pandas rolling.apply (Python callbacks ~12s per (op,window) at 800 cols)
@@ -774,7 +816,7 @@ class DerivedOperatorEngine:
                     argmax_df = pd.DataFrame(argmax_arr, index=selected.index)
                 else:
                     argmax_df = rolling.apply(np.argmax, raw=True)
-                argmax_df.columns = [f"{col}_TsArgmax_W{window}" for col in selected_cols]
+                argmax_df.columns = [wq_name(col, f"TsArgmax-W{window}") for col in selected_cols]
                 frames.append(argmax_df)
 
             if "ts_argmin" in operator_set:
@@ -783,13 +825,13 @@ class DerivedOperatorEngine:
                     argmin_df = pd.DataFrame(argmin_arr, index=selected.index)
                 else:
                     argmin_df = rolling.apply(np.argmin, raw=True)
-                argmin_df.columns = [f"{col}_TsArgmin_W{window}" for col in selected_cols]
+                argmin_df.columns = [wq_name(col, f"TsArgmin-W{window}") for col in selected_cols]
                 frames.append(argmin_df)
 
             if "ts_rank" in operator_set:
                 # rolling.rank keeps pandas rank(method='average', pct=True) semantics.
                 rank_df = rolling.rank(method="average", pct=True)
-                rank_df.columns = [f"{col}_TsRank_W{window}" for col in selected_cols]
+                rank_df.columns = [wq_name(col, f"TsRank-W{window}") for col in selected_cols]
                 frames.append(rank_df)
 
             if "decay_linear" in operator_set:
@@ -800,34 +842,34 @@ class DerivedOperatorEngine:
                     return float(np.dot(arr, _weights))
 
                 decay_df = rolling.apply(_decay_fn, raw=True)
-                decay_df.columns = [f"{col}_DecayLinear_W{window}" for col in selected_cols]
+                decay_df.columns = [wq_name(col, f"DecayLinear-W{window}") for col in selected_cols]
                 frames.append(decay_df)
 
             if has_corr and corr_with is not None:
                 corr_ref_source = self._deduplicate_index(raw_data[corr_with], f"raw:{corr_with}")
                 corr_ref = corr_ref_source.reindex(selected.index)
                 corr_df = rolling.corr(corr_ref)
-                corr_df.columns = [f"{col}_TsCorr_{corr_with}_W{window}" for col in selected_cols]
+                corr_df.columns = [wq_name(col, tscorr_op(corr_with, window)) for col in selected_cols]
                 frames.append(corr_df)
 
         if "sign" in transform_set:
             sign_df = np.sign(selected)
-            sign_df.columns = [f"{col}_Sign" for col in selected_cols]
+            sign_df.columns = [wq_name(col, "Sign") for col in selected_cols]
             frames.append(sign_df)
 
         if "log1p" in transform_set:
             log1p_df = np.log1p(np.abs(selected)) * np.sign(selected)
-            log1p_df.columns = [f"{col}_Log1p" for col in selected_cols]
+            log1p_df.columns = [wq_name(col, "Log1p") for col in selected_cols]
             frames.append(log1p_df)
 
         if "abs" in transform_set:
             abs_df = np.abs(selected)
-            abs_df.columns = [f"{col}_Abs" for col in selected_cols]
+            abs_df.columns = [wq_name(col, "Abs") for col in selected_cols]
             frames.append(abs_df)
 
         if "clip" in transform_set:
             clip_df = selected.clip(lower=lower, upper=upper)
-            clip_df.columns = [f"{col}_Clip" for col in selected_cols]
+            clip_df.columns = [wq_name(col, "Clip") for col in selected_cols]
             frames.append(clip_df)
 
         if not frames:
@@ -838,24 +880,24 @@ class DerivedOperatorEngine:
         for col in selected_cols:
             for window in windows:
                 if "ts_argmax" in operator_set:
-                    expected_cols.append(f"{col}_TsArgmax_W{window}")
+                    expected_cols.append(wq_name(col, f"TsArgmax-W{window}"))
                 if "ts_argmin" in operator_set:
-                    expected_cols.append(f"{col}_TsArgmin_W{window}")
+                    expected_cols.append(wq_name(col, f"TsArgmin-W{window}"))
                 if "ts_rank" in operator_set:
-                    expected_cols.append(f"{col}_TsRank_W{window}")
+                    expected_cols.append(wq_name(col, f"TsRank-W{window}"))
                 if "decay_linear" in operator_set:
-                    expected_cols.append(f"{col}_DecayLinear_W{window}")
+                    expected_cols.append(wq_name(col, f"DecayLinear-W{window}"))
                 if has_corr and corr_with is not None:
-                    expected_cols.append(f"{col}_TsCorr_{corr_with}_W{window}")
+                    expected_cols.append(wq_name(col, tscorr_op(corr_with, window)))
 
             if "sign" in transform_set:
-                expected_cols.append(f"{col}_Sign")
+                expected_cols.append(wq_name(col, "Sign"))
             if "log1p" in transform_set:
-                expected_cols.append(f"{col}_Log1p")
+                expected_cols.append(wq_name(col, "Log1p"))
             if "abs" in transform_set:
-                expected_cols.append(f"{col}_Abs")
+                expected_cols.append(wq_name(col, "Abs"))
             if "clip" in transform_set:
-                expected_cols.append(f"{col}_Clip")
+                expected_cols.append(wq_name(col, "Clip"))
 
         return result.loc[:, expected_cols]
 
@@ -891,6 +933,9 @@ class DerivedOperatorEngine:
         columns: Iterable[str],
         indicator_specs: Optional[Dict[str, Dict]],
     ) -> Dict[str, FeatureInfo]:
+        """L2 輸入欄身分（FF-NAME Task 2.3）：分支一（`indicator_specs` 有條目）以 spec 之值經 `canonical_segment`、
+        分支二以 `parse_feature_name(name, tagged=False)`——兩分支產同一 canonical 身分；raw 查找鍵只取 spec 之
+        `raw_lookup_key`（分支二無產生端紀錄 ⇒ None）。"""
         info_map: Dict[str, FeatureInfo] = {}
         for name in columns:
             if indicator_specs and name in indicator_specs:
@@ -902,33 +947,57 @@ class DerivedOperatorEngine:
                     params = self._coerce_params(raw_params.values())
                 else:
                     params = self._coerce_params(raw_params)
+                parsed = self._parse_feature_name(name)
+                source = spec.get("source")
+                category = spec.get("category")
+                indicator = spec.get("indicator")
                 info_map[name] = FeatureInfo(
                     name=name,
-                    source=spec.get("source", ""),
-                    category=spec.get("category"),
-                    indicator=spec.get("indicator"),
+                    source=canonical_segment(source) if source else parsed.source,
+                    category=canonical_segment(category) if category else parsed.category,
+                    indicator=canonical_segment(indicator) if indicator else parsed.indicator,
                     params=params,
+                    raw_lookup_key=spec.get("raw_lookup_key"),
+                    param_tokens=parsed.param_tokens,
                 )
                 continue
             info_map[name] = self._parse_feature_name(name)
         return info_map
 
     def _parse_feature_name(self, name: str) -> FeatureInfo:
-        parts = name.split("_")
-        source = parts[0] if parts else name
-        category = parts[1] if len(parts) > 1 else None
-        remainder = parts[2:] if len(parts) > 2 else []
+        """分支二：生成期間之未標記形欄名經 `parse_feature_name(tagged=False)` 還原身分（不合文法即拋，不猜）。
+        數值參數＝單一成員 params 之可轉數值 token（配對只用單一數值參數者，與改前規則同）。"""
+        identity = parse_feature_name(name, tagged=False)
+        tokens = identity.params[0] if len(identity.params) == 1 else ()
+        values: List[float] = []
+        for token in tokens:
+            if not self._is_number(token):
+                values = []
+                break
+            values.append(float(token))
+        return FeatureInfo(name=name, source=identity.source, category=identity.category,
+                           indicator=identity.indicator, params=values, raw_lookup_key=None,
+                           raw_lookup_key_known=False,
+                           param_tokens=tuple(tokens))
 
-        param_tokens: List[float] = []
-        while remainder and self._is_number(remainder[-1]):
-            token = remainder.pop()
-            value = float(token)
-            if value.is_integer():
-                value = int(value)
-            param_tokens.insert(0, float(value))
+    @staticmethod
+    def _raw_key(info: FeatureInfo, raw_columns: Iterable[str]) -> Optional[str]:
+        """Distance 之 raw 查找鍵（FF-NAME Task 2.3）：分支一一律用產生端記憶體內之 `raw_lookup_key`（不以顯示用
+        canonical source 查）；分支二（無產生端紀錄）以 canonical 等於 source 之唯一 raw 欄為鍵（改前分支二以解析出之
+        source 字面查 raw，`taker-ratio` 對不上 `taker_ratio` 而靜默略過）。查無 ⇒ None。"""
+        columns = [str(c) for c in raw_columns]
+        if info.raw_lookup_key_known:
+            return info.raw_lookup_key if info.raw_lookup_key is not None and info.raw_lookup_key in columns else None
+        matches = [c for c in columns if canonical_segment(c) == info.source]
+        return matches[0] if len(matches) == 1 else None
 
-        indicator = "_".join(remainder) if remainder else None
-        return FeatureInfo(name=name, source=source, category=category, indicator=indicator, params=param_tokens)
+    @staticmethod
+    def _binary_rule_matches(info: FeatureInfo, rule_indicator: str) -> bool:
+        """BinarySignal 規則比對 canonical indicator（`BBANDS` 命中 `BBANDS-Upper` 等多輸出；FF-NAME Task 2.3）。"""
+        if not info.indicator:
+            return False
+        target = canonical_segment(rule_indicator)
+        return info.indicator == target or info.indicator.startswith(f"{target}-")
 
     def _matches_apply_to(self, info: FeatureInfo, apply_to: str | List[str]) -> bool:
         if apply_to == "all" or apply_to is None:
@@ -937,8 +1006,8 @@ class DerivedOperatorEngine:
             return any(self._match_token(info, token) for token in apply_to)
         if isinstance(apply_to, str):
             if apply_to.startswith("all_"):
-                return info.category == apply_to.replace("all_", "")
-            if info.category and apply_to == info.category:
+                return info.category == canonical_segment(apply_to.replace("all_", ""))
+            if info.category and canonical_segment(apply_to) == info.category:
                 return True
             try:
                 return re.search(apply_to, info.name) is not None

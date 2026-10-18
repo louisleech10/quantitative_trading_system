@@ -45,6 +45,28 @@ def _mask_declared(name: str, result: pd.DataFrame, outputs: Dict, data: pd.Data
     return pd.DataFrame(masked, index=result.index)
 
 
+def _custom_column_names(definition: Dict) -> Dict[str, str]:
+    """FF-NAME Task 2.2：custom 輸出欄 → 文法欄名 `<source>_custom_<slug>`（category `custom`、indicator＝定義 slug；
+    多輸出為 `<slug>-<canonical 輸出鍵>`）。source＝宣告之 `data_sources` 依序 canonical 串接；未宣告 ⇒ `ohlcv`
+    （引擎傳入之資料框即 OHLCV 等全部 kline 欄）。slug 已於設定驗證時檢查。"""
+    from momentum.FeatureEngineering.feature_naming import (
+        build_identity,
+        custom_output_indicator,
+        format_feature_name,
+        source_from_inputs,
+    )
+
+    outputs = dict(definition.get("outputs") or {})
+    declared = definition.get("data_sources") or ["ohlcv"]
+    source = source_from_inputs(declared)
+    single = len(outputs) == 1
+    return {
+        str(key): format_feature_name(build_identity(source, "custom",
+                                                     custom_output_indicator(definition["name"], str(key), single)))
+        for key in outputs
+    }
+
+
 class CustomIndicatorEngine:
     """User-defined indicators loaded by module/function."""
 
@@ -65,7 +87,8 @@ class CustomIndicatorEngine:
             if isinstance(result, pd.Series):
                 result = result.to_frame(name=name)
             _check_declared_outputs(name, result, definition.get("outputs"))
-            frames.append(_mask_declared(name, result, definition["outputs"], data))
+            masked = _mask_declared(name, result, definition["outputs"], data)
+            frames.append(masked.rename(columns=_custom_column_names(definition)))
 
         if not frames:
             return pd.DataFrame(index=data.index)
