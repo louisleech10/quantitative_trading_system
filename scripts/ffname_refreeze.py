@@ -955,16 +955,68 @@ def _iter_strings(node: Any) -> Iterable[Tuple[str, str]]:
 # ================================================================ k2（主樹）
 
 
+def split_group_key(key: str) -> Tuple[Optional[str], str]:
+    """sidecar 欄鍵之兩形：落盤欄名（標記形，如 `close_1h_trend_EMA_8`）或 registry 群組鍵
+    `<group_id>/<未標記欄名>`（framepath persist=False 之格，如 C7）。回傳（group_id 或 None, 欄名）。"""
+    if "/" in key:
+        gid, col = key.split("/", 1)
+        return gid, col
+    return None, key
+
+
+def tagged_column_of_key(key: str) -> str:
+    """欄鍵之標記形欄名：群組鍵以 group_id 之週期（第 1 段）經 `feature_naming.tag_timeframe` 標記其未標記欄名。"""
+    sys.path.insert(0, str(MAIN_REPO))
+    import momentum.FeatureEngineering.feature_naming as fn
+
+    gid, col = split_group_key(key)
+    return col if gid is None else fn.tag_timeframe(col, gid.split("_", 1)[0])
+
+
+def framepath_new_group_id(old_gid: str, new_col_untagged: str) -> str:
+    """§G ⑧：L1 群組 id＝`{tf}_L1_{category}_{indicator}`（取自新欄名之身分）；其餘層之群組 id 不因命名改變。"""
+    sys.path.insert(0, str(MAIN_REPO))
+    import momentum.FeatureEngineering.feature_naming as fn
+
+    tf, layer = old_gid.split("_")[:2]
+    if layer != "L1":
+        return old_gid
+    ident = fn.parse_feature_name(new_col_untagged, tagged=False)
+    return f"{tf}_L1_{ident.category}_{ident.indicator}"
+
+
+def build_key_mapping(record_doc: Mapping[str, Any], keys: Iterable[str]) -> Tuple[Dict[str, str], List[str], List[str]]:
+    """sidecar 欄鍵之舊→新映射：落盤欄名經紀錄器映射；群組鍵 `<gid>/<未標記欄>` 之欄經紀錄器映射（未標記形）、
+    群組 id 依 §G ⑧ 規則由新欄身分導出。查無／歧義同 build_mapping。"""
+    keys = list(keys)
+    plain = [k for k in keys if split_group_key(k)[0] is None]
+    cols = {split_group_key(k)[1] for k in keys if split_group_key(k)[0] is not None}
+    mapping, missing, ambiguous = build_mapping(record_doc, set(plain) | cols)
+    out = {k: mapping[k] for k in plain if k in mapping}
+    for k in keys:
+        gid, col = split_group_key(k)
+        if gid is None or col not in mapping:
+            continue
+        out[k] = f"{framepath_new_group_id(gid, mapping[col])}/{mapping[col]}"
+    news = list(out.values())
+    if len(set(news)) != len(news):
+        raise SystemExit(f"欄鍵映射非單射：{sorted({n for n in news if news.count(n) > 1})[:10]}")
+    return out, missing, ambiguous
+
+
 def _lag_shift_ok(new_cols: Mapping[str, Any], name: str) -> Optional[str]:
     """⑥ 新增 lag 欄之形狀檢查：須 parse 為 `<基底>` 加 `Lag-k`，基底屬契約 `g6_new_lag_globs`。值位移另由
-    `k2_shift_verify` 以實際 run 讀值驗（sidecar 只有雜湊）。"""
+    recipe 以實際 run 讀值驗（sidecar 只有雜湊）。群組鍵 `<gid>/<未標記欄>` 先以群組週期標記後再判（glob 為標記形）。"""
     sys.path.insert(0, str(MAIN_REPO))
     import fnmatch
 
     import momentum.FeatureEngineering.feature_naming as fn
 
     contract = json.loads((MAIN_REPO / "tests/_golden/ffname/contract.json").read_text(encoding="utf-8"))
-    ident = fn.parse_feature_name(name)
+    try:
+        ident = fn.parse_feature_name(tagged_column_of_key(name))
+    except fn.FeatureNameParseError:
+        return "unparseable"
     if not ident.ops or not str(ident.ops[-1]).startswith("Lag-"):
         return "not_lag"
     base = fn.format_feature_name(type(ident)(**{**ident.__dict__, "ops": tuple(ident.ops[:-1])}))
@@ -1164,7 +1216,8 @@ def _k2_compare_unit(rel: str, recipe: str, tag: str, old_sc: Dict[str, Any], ne
     for p, doc, rec in ((old_sc_path, old_sc, old_record), (new_sc_path, new_sc, new_record)):
         p.write_text(json.dumps({**doc, "head": rec["head"], "tree": rec["tree"], "recipe": recipe},
                                 ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
-    mapping, missing, ambiguous = build_mapping(old_record, set(old_sc["columns"]))
+    mapping, missing, ambiguous = (build_key_mapping(old_record, old_sc["columns"]) if recipe == "framepath"
+                                   else build_mapping(old_record, set(old_sc["columns"])))
     map_doc = {"schema_version": MAP_SCHEMA, "golden": rel, "unit": unit, "recipe": recipe,
                "source_head": old_record["head"], "source_tree": old_record["tree"],
                "pre_change_verified": old_record.get("pre_change_verified") is True,

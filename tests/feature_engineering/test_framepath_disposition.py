@@ -1921,7 +1921,21 @@ BASELINE_RUN_PATH_KEYS = frozenset({"kline_copy", "legacy_kline_dir", "child_env
 FFNAME_RECEIPT_REL = "handoffs/run_receipts/ffname-refreeze.json"
 # time_index_sha256 之輸入含 timestamps.parquet 之相對路徑（含 config hash 目錄，受命名世代鹽影響）⇒ 屬名／鹽衍生，
 # 其時間值由 FF-NAME K2 收據之去路徑 time_values 比對證明不變（scripts/ffname_refreeze.py framepath recipe）
-_FFNAME_FP_SCALARS = ("row_count", "run_status", "completeness", "failure_reasons", "path_receipt")
+_FFNAME_FP_SCALARS = ("row_count", "run_status", "completeness", "failure_reasons")
+
+
+def _ffname_path_receipt_norm(receipt: Any) -> Any:
+    """path_receipt 之名／鹽衍生部分正規化：manifests 路徑之 config hash 段（受命名世代鹽影響）以佔位取代；
+    dstar_cache_hits 之 sha256 為命中欄名清單之雜湊（名衍生）⇒ 只比 count。其餘鍵原樣比。"""
+    if not isinstance(receipt, dict):
+        return receipt
+    out = dict(receipt)
+    if isinstance(out.get("manifests"), list):
+        out["manifests"] = ["/".join(p if i != 2 else "<config_hash>" for i, p in enumerate(str(m).split("/")))
+                            for m in out["manifests"]]
+    if isinstance(out.get("dstar_cache_hits"), dict):
+        out["dstar_cache_hits"] = {"count": out["dstar_cache_hits"].get("count")}
+    return out
 
 
 def ffname_framepath_approvals() -> Dict[str, Dict[str, str]]:
@@ -1956,6 +1970,8 @@ def _ffname_rekeyed_cell_errors(cell: str, old_fp: Dict[str, Any], new_fp: Dict[
             seen.add(new)
         errs += [f"⓪ 格 {cell} {key}／{n}：多出之欄非 ⑥ 新增 lag" for n in set(new_cols) - seen if not is_g6_new_lag(n)]
     errs += [f"⓪ 格 {cell} {k}：名無關項改變" for k in _FFNAME_FP_SCALARS if old_fp.get(k) != new_fp.get(k)]
+    if _ffname_path_receipt_norm(old_fp.get("path_receipt")) != _ffname_path_receipt_norm(new_fp.get("path_receipt")):
+        errs.append(f"⓪ 格 {cell} path_receipt：去除 config hash 段與命中欄名雜湊後仍改變")
     return errs
 
 

@@ -572,7 +572,9 @@ def _k2_one(rel: str, entry: Dict[str, Any], new_sidecar: Optional[Dict[str, Any
     if old_sc.get("scalars") != new_sc.get("scalars"):
         bad.append(f"scalars:{rel}")
     old_cols, new_cols = old_sc["columns"], new_sc["columns"]
-    if not old_cols:
+    refused_cell = (entry.get("unit") is not None and DISP[rel].get("recipe") == "framepath" and not old_cols
+                    and not new_cols and old_sc.get("scalars") == new_sc.get("scalars"))
+    if not old_cols and not refused_cell:  # framepath 拒跑格（如 C9）兩側皆無欄且名無關項相等 ⇒ 允許
         bad.append(f"empty_sidecar:{rel}")
     seen = set()
     for old_name, rec in old_cols.items():
@@ -584,8 +586,8 @@ def _k2_one(rel: str, entry: Dict[str, Any], new_sidecar: Optional[Dict[str, Any
         if new_cols.get(new_name) != rec:
             bad.append(f"column:{rel}:{old_name}")
     extra = sorted(set(new_cols) - seen)
-    bad += [f"extra_not_g6:{rel}:{c}" for c in extra if not is_g6_new_lag(c)]
-    g6 = sorted(c for c in extra if is_g6_new_lag(c))
+    bad += [f"extra_not_g6:{rel}:{c}" for c in extra if not is_g6_new_lag(_tagged_key(c))]
+    g6 = sorted(c for c in extra if is_g6_new_lag(_tagged_key(c)))
     if g6 != sorted(entry.get("g6_new_lag") or []):
         bad.append(f"g6_list_disagrees:{rel}")
     if g6 and entry.get("g6_shift_verified") is not True:
@@ -610,6 +612,54 @@ def _k2_one(rel: str, entry: Dict[str, Any], new_sidecar: Optional[Dict[str, Any
     if entry.get("new_sha256") != _sha((REPO / rel).read_bytes()):
         bad.append(f"bytes_unbound:{rel}")
     return bad
+
+
+def _tagged_key(key: str) -> str:
+    """framepath 群組鍵 `<group_id>/<未標記欄>` ⇒ 以群組週期標記之欄名；落盤欄名原樣。"""
+    if "/" not in key:
+        return key
+    gid, col = key.split("/", 1)
+    return fn.tag_timeframe(col, gid.split("_", 1)[0])
+
+
+def _refreeze_tool() -> Any:
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location("ffname_refreeze_tool", REPO / "scripts" / "ffname_refreeze.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["ffname_refreeze_tool"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_framepath_group_key_mapping_and_lag_check():
+    """framepath persist=False 格（C7）之欄鍵為 `<group_id>/<未標記欄>`：①欄經紀錄器映射（未標記形）、L1 群組 id 依 §G ⑧
+    由新欄身分導出、非 L1 群組 id 不變；②⑥ 檢查先以群組週期標記再判（群組鍵不得因 parse 失敗而崩）。"""
+    tool = _refreeze_tool()
+    assert tool.split_group_key("1h_L1_trend_BBANDS-Lower/close_trend_BBANDS-Lower_13") == \
+        ("1h_L1_trend_BBANDS-Lower", "close_trend_BBANDS-Lower_13")
+    assert tool.split_group_key("close_1h_trend_EMA_8") == (None, "close_1h_trend_EMA_8")
+    assert tool.framepath_new_group_id("1h_L1_trend_BBANDS-Lower", "close_trend_BBANDS-Lower_13") == \
+        "1h_L1_trend_BBANDS-Lower"
+    assert tool.framepath_new_group_id("12h_L1_pattern_BullishCount_W5", "ohlc_pattern_BullishCount_5") == \
+        "12h_L1_pattern_BullishCount"  # ⑧：改前逐窗拆群 ⇒ 改後單一群
+    assert tool.framepath_new_group_id("1h_L3_rolling_W13_Kurt_1", "close_trend_EMA_8_Kurt-W13") == "1h_L3_rolling_W13_Kurt_1"
+    assert tool.tagged_column_of_key("1h_L4_lag/ohlc_pattern_BullishCount_5_Lag-1") == "ohlc_1h_pattern_BullishCount_5_Lag-1"
+    assert tool._lag_shift_ok({}, "1h_L4_lag/ohlc_pattern_BullishCount_5_Lag-1") is None  # ⑥ 新增 lag（群組鍵）
+    assert tool._lag_shift_ok({}, "1h_L4_lag/close_trend_EMA_8_Lag-1").startswith("base_not_g6")
+    assert tool._lag_shift_ok({}, "1h_L1_trend_EMA/close_trend_EMA_8") == "not_lag"
+    # 實跑映射：C7 之每個舊群組鍵 ⇒ 新群組鍵，群組 id 合規則、欄名＝未標記新名
+    map_path = MAPS_DIR / "framepath__cgsa_fingerprint__C7.json"
+    if map_path.is_file():
+        mapping = json.loads(map_path.read_text(encoding="utf-8"))["mapping"]
+        comp = {k: v for k, v in mapping.items() if "/" in k}
+        assert comp
+        for old_key, new_key in comp.items():
+            gid, col = old_key.split("/", 1)
+            ngid, ncol = new_key.split("/", 1)
+            fn.parse_feature_name(ncol, tagged=False)
+            assert ngid == tool.framepath_new_group_id(gid, ncol), old_key
 
 
 @pytest.mark.parametrize("rel", _of("K2"))
