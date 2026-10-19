@@ -519,3 +519,10 @@
 - 2026-09-28：RM-FRAMEPATH → `handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md`
 - 2026-10-11：RM-FRAMEPATH → `docs/manifests/TESTREG.json`
 - 2026-10-12：RM-FRAMEPATH → `handoffs/reconcile/20261010-testreg-b1-review-r4/synth.md`
+
+<!-- ENTRY: RM-FFNAME -->
+- 2026-09-22：RM-FFNAME → `docs/FFDEFECT_DECISION.md`
+- 2026-09-24：RM-FFNAME → `docs/FFNAME_SPEC.md`
+- 2026-09-24：RM-FFNAME → `handoffs/reconcile/20260924-ffname-x-review-r5/synth.md`
+- 2026-09-24：RM-FFNAME → `handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md`
+- 2026-10-19：RM-FFNAME → `handoffs/reconcile/20260924-ffname-b4-review-r4/synth.md`
