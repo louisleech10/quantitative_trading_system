@@ -68,7 +68,10 @@ def _make_registry(tmp_path: Path) -> ColumnGroupRegistry:
 
 def _collect_output_columns(raw_dir: Path) -> set[str]:
     cols: set[str] = set()
-    for pq_file in raw_dir.glob("*.parquet"):
+    from tests.feature_engineering import preprov_helpers as ph
+
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+    for pq_file in ph.declared_group_files(raw_dir.parent, raw_dir.name):
         cols.update(pq.read_schema(pq_file).names)
     return cols
 

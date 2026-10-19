@@ -1,3 +1,4 @@
+import fnmatch
 import json
 import logging
 from pathlib import Path
@@ -600,8 +601,15 @@ def test_raw_streaming_sharded_per_cell_equivalence_with_legacy_concat(
     sharded_dir = tmp_path / "sharded_out" / "S" / "1h" / "cfg" / "raw"
     single_dir = tmp_path / "single_out" / "S" / "1h" / "cfg" / "raw"
 
-    sharded_files = sorted(sharded_dir.glob("g*.parquet"))
-    single_files = sorted(single_dir.glob("g*.parquet"))
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），再以同一檔名樣式篩
+    from tests.feature_engineering import preprov_helpers as ph
+
+    def _declared(raw_dir: Path, pattern: str) -> list:
+        return sorted(p for p in ph.declared_group_files(raw_dir.parent, raw_dir.name)
+                      if fnmatch.fnmatchcase(p.name, pattern))
+
+    sharded_files = _declared(sharded_dir, "g*.parquet")
+    single_files = _declared(single_dir, "g*.parquet")
     assert len(sharded_files) >= 1 and len(single_files) >= 1
 
     sharded_dfs = [pq.read_table(p).to_pandas() for p in sharded_files]
@@ -649,7 +657,11 @@ def test_raw_streaming_passthrough_mode_c_sharded_per_cell_equivalence(
         assert not path.exists()
 
     # Re-read parquet parts and confirm per-cell match (allowing float16 storage roundtrip).
-    parquet_files = sorted(raw_dir.glob("passthrough_g*.parquet"))
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），再以同一檔名樣式篩
+    from tests.feature_engineering import preprov_helpers as ph
+
+    parquet_files = sorted(p for p in ph.declared_group_files(Path(raw_dir).parent, Path(raw_dir).name)
+                           if fnmatch.fnmatchcase(p.name, "passthrough_g*.parquet"))
     assert len(parquet_files) == len(shard_paths)
     dfs = [pq.read_table(p).to_pandas() for p in parquet_files]
     full = pd.concat(dfs, axis=1)

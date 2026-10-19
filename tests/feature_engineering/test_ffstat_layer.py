@@ -14,6 +14,7 @@ import pytest
 
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as h
+from tests.feature_engineering import preprov_helpers as ph
 
 _PRE_CONFIG = {"fractional_differencing": {"enabled": True, "apply_to": "non_stationary"},
                "adf_differencing": {"enabled": False},
@@ -28,7 +29,7 @@ def _layers_from_files(root: Path) -> Dict[str, str]:
 
     pattern = re.compile(r"^[0-9]+[mhdw]_(L[0-9]+)_")
     out: Dict[str, str] = {}
-    for p in sorted(root.rglob("*.parquet")):
+    for p in ph.declared_feature_files_under(root):  # FFDSTAR Task 1.6：依 manifest 宣告取檔
         match = pattern.match(p.name)
         if match is None or p.name.endswith("_L65.parquet"):
             continue

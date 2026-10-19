@@ -41,7 +41,10 @@ def _make_registry(tmp_path: Path, groups: Dict[str, np.ndarray]) -> ColumnGroup
 
 def _feature_fingerprint(run_dir: Path) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
-    for path in sorted((run_dir / "raw").glob("*.parquet")):
+    from tests.feature_engineering import preprov_helpers as ph
+
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+    for path in sorted(ph.declared_group_files(run_dir, "raw")):
         table = pq.read_table(path)
         df = table.to_pandas()
         columns = [str(column) for column in df.columns]

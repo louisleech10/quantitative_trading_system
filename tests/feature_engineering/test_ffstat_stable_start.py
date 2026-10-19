@@ -20,6 +20,7 @@ import pytest
 
 from momentum.FeatureEngineering.preprocessing import stable_mask as sm
 from tests.feature_engineering import ffstat_helpers as h
+from tests.feature_engineering import preprov_helpers as ph
 
 CONTRACT = h.CONTRACT
 REPO = Path(__file__).resolve().parents[2]
@@ -659,7 +660,7 @@ def _column_index(root: Path) -> Dict[str, Path]:
     key = str(root.resolve())
     if key not in _COLUMN_INDEX:
         index: Dict[str, Path] = {}
-        for p in sorted(root.rglob("*.parquet")):
+        for p in ph.declared_feature_files_under(root):  # FFDSTAR Task 1.6：依 manifest 宣告取檔
             if p.name == "timestamps.parquet":
                 continue
             for n in pq.read_schema(p).names:

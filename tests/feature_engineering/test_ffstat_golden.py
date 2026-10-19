@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import json
 from pathlib import Path
 from typing import Any, Dict
@@ -14,6 +15,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from tests.feature_engineering import ffstat_helpers as h
+from tests.feature_engineering import preprov_helpers as ph
 from tests.feature_engineering.ffstat_helpers import base_fingerprints, column_fingerprint  # noqa: F401  與凍結腳本同一定義
 
 _SKIP = ("timestamp", "__index_level_0__", "index")
@@ -21,7 +23,20 @@ _REPO = Path(__file__).resolve().parents[2]
 
 
 def derived_names(root: Path) -> set:
-    return {n for p in root.rglob("*_L65.parquet") for n in pq.ParquetFile(p).schema_arrow.names if n not in _SKIP}
+    # FFDSTAR Task 1.6：衍生群組檔取自 manifest 宣告（`declared_feature_files_under`），再以同一檔名樣式篩
+    return {n for p in ph.declared_feature_files_under(root) if fnmatch.fnmatchcase(p.name, "*_L65.parquet")
+            for n in pq.ParquetFile(p).schema_arrow.names if n not in _SKIP}
+
+
+def _undeclare_group_file(path: Path) -> None:
+    """mutant 刪整個群組檔時，同步自所屬 run 之 manifest 移除該群組宣告（使 B′ 為「該群組不存在」之一致產出；
+    依 manifest 宣告讀取者對「宣告而缺檔」會拋 FileNotFoundError，非本 mutant 所驗之欄集合差異）。"""
+    run_dir = next(q for q in path.parents if (q / ph.MANIFEST_NAME).is_file())
+    manifest = ph.load_manifest(run_dir)
+    for node in (manifest.get("artifacts") or {}).values():
+        groups = node.get("groups") or {}
+        node["groups"] = {k: v for k, v in groups.items() if (run_dir / str(v.get("path"))) != path}
+    (run_dir / ph.MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 @pytest.fixture(scope="module")
@@ -246,7 +261,7 @@ def _drop_one_public_column(root: Path) -> None:
     """mutant：刪 B′ 某 parquet 之一個非時間欄（改寫該檔）。"""
     import pyarrow.parquet as pq
 
-    for p in sorted(root.rglob("*.parquet")):
+    for p in ph.declared_feature_files_under(root):  # FFDSTAR Task 1.6：依 manifest 宣告挑群組檔
         if p.name == "timestamps.parquet":
             continue
         table = pq.read_table(p)
@@ -263,7 +278,7 @@ def _add_one_public_column(root: Path) -> None:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    p = next(q for q in sorted(root.rglob("*.parquet")) if q.name != "timestamps.parquet")
+    p = next(q for q in ph.declared_feature_files_under(root) if q.name != "timestamps.parquet")  # Task 1.6
     table = pq.read_table(p)
     pq.write_table(table.append_column("ffstat_mutant_extra", pa.array(np.zeros(table.num_rows))), p)
 
@@ -283,7 +298,7 @@ def _drop_rsi14_public_column(root: Path) -> None:
     """刪 B′ 已落盤之第一個 `_RSI_14` 公開欄（1d 小設定下其 L1 上游於 B′ 有效列 > 0 而 < 500）。"""
     import pyarrow.parquet as pq
 
-    for p in sorted(root.rglob("*.parquet")):
+    for p in ph.declared_feature_files_under(root):  # FFDSTAR Task 1.6：依 manifest 宣告挑群組檔
         if p.name == "timestamps.parquet":
             continue
         table = pq.read_table(p)
@@ -291,6 +306,7 @@ def _drop_rsi14_public_column(root: Path) -> None:
         if names:
             if len(table.column_names) == 1:
                 p.unlink()
+                _undeclare_group_file(p)
             else:
                 pq.write_table(table.drop([names[0]]), p)
             return

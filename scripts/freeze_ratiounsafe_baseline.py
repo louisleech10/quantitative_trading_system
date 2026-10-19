@@ -71,7 +71,10 @@ def generate_raw(payload: dict, symbol: str, timeframe: str, days: int):
         reader = FeatureReader(str(Path(tmp, "features")))
         parts = [df for _, df in reader.stream_groups_v2(symbol, timeframe, run_dir.name, "raw", allow_partial=True)]
         frame = pd.concat(parts, axis=1) if parts else pd.DataFrame()
-        nbytes = sum(p.stat().st_size for p in run_dir.rglob("*.parquet"))
+        # FFDSTAR Task 1.6：特徵位元組只計 manifest 宣告之特徵檔（群組檔＋row index），不以檔名掃描 run 目錄
+        from scripts._manifest_listing import declared_feature_files_of_run
+
+        nbytes = sum(p.stat().st_size for p in declared_feature_files_of_run(run_dir))
     return frame, nbytes
 
 

@@ -216,7 +216,10 @@ def test_t2b3_all_nan_group_register_and_persist(tmp_path):
         registry=registry,
         cleanup_intermediate=False,
     )
-    paths = sorted(str(path) for path in raw_dir.glob("*.parquet"))
+    from tests.feature_engineering import preprov_helpers as ph
+
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+    paths = sorted(str(path) for path in ph.declared_group_files(raw_dir.parent, raw_dir.name))
 
     assert len(paths) == 1
     persisted = pd.read_parquet(paths[0])

@@ -278,7 +278,11 @@ def _column_fingerprint(column: Any) -> Dict[str, Any]:
 
 def fingerprint(artifacts: GenerationArtifacts) -> Dict[str, Any]:
     """群組檔名集合、每群組之逐欄四 hash 摘要、去除允許路徑之 canonical JSON sha256、允許路徑實值。"""
-    group_files = sorted(p.name for p in artifacts.raw_dir.glob("*.parquet"))
+    # FFDSTAR Task 1.6：群組檔依 run manifest 之 raw 宣告（`declared_group_files`），不以檔名掃描 run 目錄。
+    # 延遲匯入：preprov_helpers 於模組層匯入本檔（循環）
+    from tests.feature_engineering import preprov_helpers as ph
+
+    group_files = sorted(p.name for p in ph.declared_group_files(artifacts.raw_dir.parent, artifacts.raw_dir.name))
     groups: Dict[str, str] = {}
     for name in group_files:
         table = pq.read_table(artifacts.raw_dir / name)

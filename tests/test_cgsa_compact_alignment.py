@@ -266,7 +266,10 @@ def test_l7_raw_stream_passthrough_compact_matches_dense_alignment(tmp_path: Pat
         l65_mode="none",
     )
 
-    parquet_files = sorted(raw_path.glob("*.parquet"))
+    from tests.feature_engineering import preprov_helpers as ph
+
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+    parquet_files = sorted(ph.declared_group_files(raw_path.parent, raw_path.name))
     assert parquet_files
     frame = pd.concat([pd.read_parquet(path) for path in parquet_files], axis=1)
     expected = MultiTFGenerator._align_group_array(source, idx_map.astype(np.int64), n_primary=len(idx_map))

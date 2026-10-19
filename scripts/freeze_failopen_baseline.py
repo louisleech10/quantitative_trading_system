@@ -257,7 +257,11 @@ def _hash_registry_table(
 
 
 def _artifact_hashes(work_dir: Path) -> dict[str, Any]:
-    files = sorted(path for path in work_dir.rglob("*") if path.is_file())
+    # FFDSTAR Task 1.6：快照檔集合依 manifest 宣告（`declared_feature_files_snapshot`：CGSA registry 工作目錄＝registry
+    # manifest 宣告檔＋manifest；feature run＝宣告特徵檔＋manifest＋具名附屬檔），有未宣告檔即拋錯；不以目錄全部檔代替
+    from scripts._manifest_listing import declared_feature_files_snapshot
+
+    files = declared_feature_files_snapshot(work_dir)
     entries = [
         {
             "path": str(path.relative_to(work_dir)),
@@ -417,12 +421,15 @@ def _hash_l7_parquet_table(
 
 def _combined_artifact_hashes(*work_dirs: Path) -> dict[str, Any]:
     """合併多個產物目錄的檔案 hash(registry work_dir + L7 run dir)。"""
+    # FFDSTAR Task 1.6：各目錄之快照檔集合依 manifest 宣告（同 `_artifact_hashes`），不以目錄全部檔代替
+    from scripts._manifest_listing import declared_feature_files_snapshot
+
     entries: list[dict[str, Any]] = []
     for work_dir in work_dirs:
         if not work_dir.exists():
             continue
         root_label = work_dir.name
-        for path in sorted(p for p in work_dir.rglob("*") if p.is_file()):
+        for path in declared_feature_files_snapshot(work_dir):
             entries.append(
                 {
                     "root": root_label,

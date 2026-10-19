@@ -124,7 +124,10 @@ def test_t215_per_group_parquet_duckdb_readable(tmp_path: Path):
         registry=registry,
         cleanup_intermediate=False,
     )
-    output_paths = sorted(str(path) for path in raw_dir.glob("*.parquet"))
+    from tests.feature_engineering import preprov_helpers as ph
+
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+    output_paths = sorted(str(path) for path in ph.declared_group_files(raw_dir.parent, raw_dir.name))
 
     assert len(output_paths) == 2
     expected_parent = tmp_path / "features" / "ETHUSDT" / "1h" / "cfg_hash_001" / "raw"

@@ -522,7 +522,11 @@ def test_real_kline_stream_nan_ratio_matches_written_arrays(
     assert "nan_ratio" in validation
     abnormal = 0
     total = 0
-    parquet_paths = sorted(Path(result.metadata["raw_path"]).rglob("*.parquet"))
+    # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+    from tests.feature_engineering import preprov_helpers as ph
+
+    raw_path = Path(result.metadata["raw_path"])
+    parquet_paths = sorted(ph.declared_group_files(raw_path.parent, raw_path.name))
     assert parquet_paths
     for parquet_path in parquet_paths:
         values = pd.read_parquet(parquet_path).to_numpy()

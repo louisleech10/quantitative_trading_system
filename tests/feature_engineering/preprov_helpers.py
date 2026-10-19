@@ -663,6 +663,40 @@ def declared_group_files(run_dir: Path, artifact_kind: str = "raw") -> List[Path
     return [p for p in declared_feature_files(run_dir, artifact_kind) if p.resolve() != skip]
 
 
+def declared_feature_files_of_run(run_dir: Path) -> List[Path]:
+    """Task 1.6：run 內全部 artifact 之宣告特徵檔（`declared_feature_files` 之聯集；路徑升冪、去重）。
+
+    artifact 目錄已整個回收者（IC-first `cleanup_raw` 刪 `raw/`，manifest 仍留該節點）：其群組檔不復存在，只列其仍在之
+    row index 宣告（raw 之 row index＝run 根 `timestamps.parquet`，回收後仍在）。"""
+    run_dir = Path(run_dir)
+    manifest = load_manifest(run_dir)
+    out = set()
+    for kind, node in (manifest.get("artifacts") or {}).items():
+        art_dir = run_dir / _safe_rel((node or {}).get("path") or kind)
+        if art_dir.is_dir():
+            out.update(declared_feature_files(run_dir, kind))
+            continue
+        ri = row_index_rel(manifest, kind)
+        if ri is not None and (run_dir / ri).is_file():
+            out.add(run_dir / ri)
+    return sorted(out)
+
+
+def feature_run_dirs(root: Path) -> List[Path]:
+    """features 根（或 run 目錄本身）下全部 V2 run 目錄（以 manifest 定位；不列舉特徵檔）。"""
+    root = Path(root)
+    if (root / MANIFEST_NAME).is_file():
+        return [root]
+    if not root.exists():
+        return []
+    return sorted(m.parent for m in root.rglob(MANIFEST_NAME))
+
+
+def declared_feature_files_under(root: Path) -> List[Path]:
+    """Task 1.6：features 根下全部 run 之宣告特徵檔（路徑升冪；取代舊 `sorted(root.rglob("*.parquet"))`）。"""
+    return sorted({p for run_dir in feature_run_dirs(root) for p in declared_feature_files_of_run(run_dir)})
+
+
 def _sha_file(path: Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -904,15 +938,19 @@ def snapshot_run(run_dir: Path, artifact_kind: str, row_index_relpath: str) -> R
 
 
 def _strict_readable(handle: RunHandle, artifact_kind: str) -> bool:
-    """`FeatureReader.load_manifest_v2(..., consumer="strict")` 讀得為完整 ⇒ True；具名拒讀 ⇒ False。"""
-    from momentum.FeatureEngineering import run_provenance as rp
+    """`FeatureReader.load_manifest_v2(..., consumer="strict")` 讀得為完整 ⇒ True；具名拒讀 ⇒ False。
+    紀錄錯誤以類別 MRO 之名稱 `ProvenanceError` 判定，不匯入被測模組 run_provenance（oracle 獨立性，test_preprov_helpers 驗證 04）。"""
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
     try:
         FeatureReader(str(handle.features_root)).load_manifest_v2(handle.symbol, handle.tf, handle.config_hash,
                                                                    artifact_kind, consumer="strict")
-    except _STRICT_REFUSALS + (rp.ProvenanceError,):
+    except _STRICT_REFUSALS:
         return False
+    except Exception as exc:
+        if any(cls.__name__ == "ProvenanceError" for cls in type(exc).__mro__):
+            return False
+        raise
     return True
 
 

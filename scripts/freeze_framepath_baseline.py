@@ -412,7 +412,11 @@ def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[s
             views[run_dir] = reader.open_run_v2(run_dir.parent.parent.name, run_dir.parent.name, run_dir.name)
         return views[run_dir]
 
-    for p in sorted(root.rglob("*.parquet")) if root.exists() else []:
+    # FFDSTAR Task 1.6：特徵檔集合依各 run manifest 宣告（群組檔＋row index；路徑升冪＝舊 `sorted(rglob("*.parquet"))`
+    # 之序），不以檔名掃描 run 目錄
+    from scripts._manifest_listing import declared_feature_files_under
+
+    for p in declared_feature_files_under(root) if root.exists() else []:
         rel = str(p.relative_to(root))
         table = _run_view(p).read_table(p)
         if p.name == "timestamps.parquet":

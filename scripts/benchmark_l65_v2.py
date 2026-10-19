@@ -112,8 +112,11 @@ def _streaming_schema_checks(features_root: Path) -> Dict[str, Any]:
         summary["checksum"] = hashlib.sha256(b"").hexdigest()
         return summary
 
+    from scripts._manifest_listing import declared_feature_files_under
+
     hasher = hashlib.sha256()
-    parquet_paths = sorted(features_root.rglob("*.parquet"))
+    # FFDSTAR Task 1.6：特徵檔依各 run manifest 宣告（群組檔＋row index；路徑升冪），不以檔名掃描 run 目錄
+    parquet_paths = declared_feature_files_under(features_root)
     try:
         import pyarrow.parquet as pq
     except Exception:

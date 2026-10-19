@@ -183,8 +183,11 @@ def canonical_raw_dir_digests(raw_dir: Any) -> Dict[str, Any]:
     """
     from pathlib import Path
 
+    from tests.feature_engineering import preprov_helpers as ph
+
     raw_path = Path(raw_dir)
-    files = sorted(p for p in raw_path.glob("*.parquet") if p.name != "timestamps.parquet")
+    # FFDSTAR Task 1.6：群組檔依所屬 run 之 manifest 宣告（`declared_group_files`；row index 不屬群組檔）
+    files = sorted(ph.declared_group_files(raw_path.parent, raw_path.name))
     if not files:
         raise RuntimeError(f"no raw parquet files in {raw_path}")
 

@@ -6,6 +6,7 @@ d* 快取目錄一律隔離於 tmp。實作前應為紅。
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import shutil
@@ -21,6 +22,7 @@ from momentum.FeatureEngineering.preprocessing import _slow_path_parallel as spp
 from momentum.FeatureEngineering.preprocessing._d_star_cache import DStarCache, PreprocessingContext
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as h
+from tests.feature_engineering import preprov_helpers as ph
 
 EV = h.EVENTS
 API = h.CONTRACT["dstar_cache_api"]
@@ -34,7 +36,9 @@ def _cache(ctx: PreprocessingContext, cache_dir: Path) -> DStarCache:
 
 
 def _derived(root: Path) -> List[str]:
-    return [n for p in root.rglob("*_L65.parquet") for n in pq.ParquetFile(p).schema_arrow.names]
+    # FFDSTAR Task 1.6：衍生群組檔取自 manifest 宣告（`declared_feature_files_under`），再以同一檔名樣式篩
+    return [n for p in ph.declared_feature_files_under(root) if fnmatch.fnmatchcase(p.name, "*_L65.parquet")
+            for n in pq.ParquetFile(p).schema_arrow.names]
 
 
 def _failed_columns(result: Any, event: str) -> List[str]:

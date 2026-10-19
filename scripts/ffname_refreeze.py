@@ -92,6 +92,14 @@ def _load(path: Path, name: str) -> Any:
     return module
 
 
+def _manifest_listing() -> Any:
+    """FFDSTAR Task 1.6：依 manifest 宣告列 run 檔之 scripts 端模組（`scripts/_manifest_listing.py`）。自本工具所在目錄
+    載入（列檔屬工具、非受測碼；`_use_cwd_tree` 已把本目錄自 sys.path 移除，且改前 worktree 可能無此檔）。"""
+    if "ffname_rf_listing" not in sys.modules:
+        _load(Path(__file__).resolve().parent / "_manifest_listing.py", "ffname_rf_listing")
+    return sys.modules["ffname_rf_listing"]
+
+
 def _per_column_fp(values: Any) -> Dict[str, str]:
     """K2 逐欄 sidecar 指紋：dtype、NaN mask sha256、值 sha256（NaN 置 0 之 little-endian 位元組）。"""
     import numpy as np
@@ -327,7 +335,8 @@ def _recipe_fftfmeta(mp: Any, work: Path) -> Dict[str, Any]:
         payload = base["references"][name]["payload"]
         art = g.run(root / "features", payload, *g.WINDOW)
         columns: Dict[str, Any] = {}
-        for path in sorted(art.raw_dir.glob("*.parquet")):
+        # FFDSTAR Task 1.6：raw 群組檔依 run manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+        for path in sorted(_manifest_listing().declared_group_files(art.raw_dir.parent, art.raw_dir.name)):
             table = pq.read_table(path)
             for col in table.column_names:
                 fp = g._column_fingerprint(table.column(col))
@@ -583,7 +592,9 @@ def _recipe_framepath(mp: Any, work: Path) -> Dict[str, Any]:
 
         time_values = []
         froot = cell_dir / "features"
-        for p in sorted(froot.rglob("timestamps.parquet")) if froot.exists() else []:
+        # FFDSTAR Task 1.6：時間軸檔取自各 run manifest 宣告之特徵檔（`declared_feature_files_under`），再以同一檔名篩
+        declared = _manifest_listing().declared_feature_files_under(froot) if froot.exists() else []
+        for p in [q for q in declared if q.name == "timestamps.parquet"]:
             parts = list(p.relative_to(froot).parts)
             if len(parts) >= 3:
                 parts[2] = "<config_hash>"

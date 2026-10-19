@@ -58,12 +58,27 @@ def sys_tmp(tmp_path: Path) -> Path:
     return tmp_path / "sys_tmp"
 
 
+def _declared_feature_files_under(root: Path) -> List[Path]:
+    """FFDSTAR Task 1.6：root 下全部 run 之 manifest 宣告特徵檔（`preprov_helpers.declared_feature_files_under`，路徑升冪）；
+    不以檔名掃描 run 目錄。延遲匯入：preprov_helpers 於模組層匯入本檔（循環）。"""
+    from tests.feature_engineering import preprov_helpers as ph
+
+    return ph.declared_feature_files_under(root)
+
+
+def _declared_files_matching(root: Path, pattern: str) -> List[Path]:
+    """宣告特徵檔中檔名符合 `pattern`（fnmatch，大小寫敏感；同舊 `rglob(pattern)` 之檔名比對）者。"""
+    import fnmatch
+
+    return [p for p in _declared_feature_files_under(root) if fnmatch.fnmatchcase(p.name, pattern)]
+
+
 def first_output_timestamp(root: Path):
     """落盤基礎欄之第一列時間（讀任一基礎欄 parquet 之 timestamp 欄或 index）。"""
     import pandas as pd
     import pyarrow.parquet as pq
 
-    for p in sorted(root.rglob("*.parquet")):
+    for p in _declared_feature_files_under(root):
         if p.name.endswith("_L65.parquet"):
             continue
         frame = pq.read_table(p).to_pandas()
@@ -205,7 +220,7 @@ def derived_fingerprints(root: Path) -> Dict[str, str]:
     import pyarrow.parquet as pq
 
     out: Dict[str, str] = {}
-    for p in sorted(root.rglob("*_L65.parquet")):
+    for p in _declared_files_matching(root, "*_L65.parquet"):
         table = pq.read_table(p)
         for n in table.column_names:
             if n in ("timestamp", "__index_level_0__", "index"):
@@ -230,7 +245,12 @@ def raw_artifact_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
     import pyarrow.parquet as pq
 
     out: Dict[str, Dict[str, Any]] = {}
-    for p in sorted(root.rglob("raw/*.parquet")):
+    from tests.feature_engineering import preprov_helpers as ph  # 延遲匯入：preprov_helpers 於模組層匯入本檔
+
+    # FFDSTAR Task 1.6：raw 群組檔一律依各 run manifest 之 raw 宣告（`declared_group_files`）；raw 目錄已回收之 run 無 raw 群組
+    raw_groups = sorted(p for run_dir in ph.feature_run_dirs(root) if (run_dir / "raw").is_dir()
+                        for p in ph.declared_group_files(run_dir, "raw"))
+    for p in raw_groups:
         if any(part.startswith(".tmp-raw-") for part in p.parts):
             continue
         table = pq.read_table(p)
@@ -343,7 +363,7 @@ def base_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
     import pyarrow.parquet as pq
 
     out: Dict[str, Dict[str, Any]] = {}
-    for p in sorted(root.rglob("*.parquet")):
+    for p in _declared_feature_files_under(root):
         if p.name.endswith("_L65.parquet"):
             continue
         table = pq.read_table(p)
@@ -360,7 +380,7 @@ def base_column_values(root: Path, names: Any) -> Dict[str, Any]:
 
     wanted = set(names)
     out: Dict[str, Any] = {}
-    for p in sorted(root.rglob("*.parquet")):
+    for p in _declared_feature_files_under(root):
         if p.name.endswith("_L65.parquet") or p.name == "timestamps.parquet" or not wanted:
             continue
         cols = [n for n in pq.read_schema(p).names if n in wanted]
@@ -439,7 +459,7 @@ def public_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
                 "values": hashlib.sha256(np.where(nan, np.float32(0), arr).tobytes()).hexdigest()}
 
     out: Dict[str, Dict[str, Any]] = {}
-    for p in sorted(root.rglob("*.parquet")):
+    for p in _declared_feature_files_under(root):
         if p.name == "timestamps.parquet":
             continue
         table = pq.read_table(p)
@@ -574,7 +594,7 @@ def dual_public_columns(root: Path):
     import pandas as pd
     import pyarrow.parquet as pq
 
-    for p in sorted(root.rglob("*.parquet")):
+    for p in _declared_feature_files_under(root):
         if p.name == "timestamps.parquet":
             continue
         frame = pq.read_table(p).to_pandas()

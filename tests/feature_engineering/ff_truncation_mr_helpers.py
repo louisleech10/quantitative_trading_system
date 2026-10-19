@@ -391,9 +391,12 @@ def _run_generation(
 
 
 def _iter_raw_parquet_frames(raw_dir: Path) -> Iterator[Tuple[str, pd.DataFrame]]:
-    for path in sorted(raw_dir.glob("*.parquet")):
-        if path.name == "timestamps.parquet":
-            continue
+    # FFDSTAR Task 1.6：群組檔依所屬 run 之 manifest 宣告（`declared_group_files`；row index 不屬群組檔）。
+    # 延遲匯入：preprov_helpers 經 fftfmeta_golden_helpers 於模組層匯入本檔（循環）
+    from tests.feature_engineering import preprov_helpers as ph
+
+    raw_dir = Path(raw_dir)
+    for path in sorted(ph.declared_group_files(raw_dir.parent, raw_dir.name)):
         yield path.name, pd.read_parquet(path)
 
 

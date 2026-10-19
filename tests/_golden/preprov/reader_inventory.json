@@ -20,6 +20,33 @@
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
   {
+   "path": "scripts/_manifest_listing.py",
+   "qualname": "_guard_no_undeclared",
+   "call": "base.rglob('*')",
+   "occurrence": 0,
+   "line": 133,
+   "class": "unrelated",
+   "reason": "非特徵讀取：未宣告檔守衛（Task 1.6），刻意列舉快照目錄全部實體檔以偵出 manifest 未宣告者並拋錯；列出之檔一律取自宣告"
+  },
+  {
+   "path": "scripts/_manifest_listing.py",
+   "qualname": "declared_feature_files",
+   "call": "art_dir.rglob('*.parquet')",
+   "occurrence": 0,
+   "line": 80,
+   "class": "unrelated",
+   "reason": "非特徵讀取：未宣告檔守衛（同 tests/feature_engineering/preprov_helpers.declared_feature_files），刻意列舉 artifact 目錄實體 parquet 以偵出 manifest 未宣告者"
+  },
+  {
+   "path": "scripts/_manifest_listing.py",
+   "qualname": "feature_run_dirs",
+   "call": "root.rglob(MANIFEST_NAME)",
+   "occurrence": 0,
+   "line": 121,
+   "class": "unrelated",
+   "reason": "非特徵讀取：列舉 feature_manifest.json 定位 run 目錄，特徵檔再依各 manifest 宣告導出"
+  },
+  {
    "path": "scripts/b7_l65_threadpool_microbench.py",
    "qualname": "_snapshot_data_cache",
    "call": "root.rglob('*')",
@@ -963,6 +990,15 @@
    "line": 570,
    "class": "unrelated",
    "reason": "非特徵讀取：未宣告檔守衛，刻意列舉 artifact 目錄實體 parquet 以偵出 manifest 未宣告者"
+  },
+  {
+   "path": "tests/feature_engineering/preprov_helpers.py",
+   "qualname": "feature_run_dirs",
+   "call": "root.rglob(MANIFEST_NAME)",
+   "occurrence": 0,
+   "line": 692,
+   "class": "unrelated",
+   "reason": "非特徵讀取：列舉 feature_manifest.json 定位 run 目錄，特徵檔再依各 manifest 宣告導出（declared_feature_files_of_run）"
   },
   {
    "path": "tests/feature_engineering/preprov_helpers.py",

@@ -49,8 +49,11 @@ def _raw_feature_columns(run) -> list[str]:
     """獨立 oracle：run 之 raw parquet 落盤欄名（只讀 schema，不經 `library.load`）。"""
     import pyarrow.parquet as pq
 
+    from tests.feature_engineering import preprov_helpers as ph
+
     names: list[str] = []
-    for p in sorted((run.run_dir / "raw").glob("*.parquet")):
+    # FFDSTAR Task 1.6：raw 群組檔依 manifest 宣告（`declared_group_files`），不以檔名掃描 run 目錄
+    for p in sorted(ph.declared_group_files(run.run_dir, "raw")):
         names.extend(n for n in pq.read_schema(p).names if not n.startswith("__index_level"))
     return names
 
