@@ -434,10 +434,10 @@
       [
         "260",
         "RM-FFDSTAR",
-        "FFDSTAR 每個 FF run 自帶 d* 收據（可追溯性，中票）",
+        "PRE-PROV（FFDSTAR）每次特徵產出之逐欄執行紀錄與 IC 讀取身分（大票）",
         "進行中",
         "docs/FFDSTAR_SPEC.md",
-        "全票排序第 7 步（docs/TICKET_ORDER.md）：改寫為 PRE-PROV（run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態、失敗群組、轉換臂別；IC 讀取保留 manifest、ingest cache 依身分鍵失效）；逐欄 d 之收集已由 FF-STAT 完成、K-1 `search_error_default` 已失效；輸出增量須使用者核可。以下為沿革——起因＝EVENTSCAN R5 追查時發現共用之 d* 快取檔跨 run 覆寫。🔴 **使用者 2026-09-21 裁定「先確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」**⇒ 已先跑唯讀定性輪（handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md）：主委原判之四型中，**兩型經委員以本 run 實跑判為設計意圖、一型因主委配對錯誤而不成立**，僅 provenance 一項為真缺陷。該裁定直接擋下一次針對非缺陷的修改。⇒ 本票範圍限縮為單一議題：共用 d* 快取跨 run 覆寫、無 per-column 收據 ⇒ 無法追溯任一 run 當下所用之 d*。SPEC v1 已寫（RISK-HIT: none，不改任何數值只加收據）。🔴 **否決點**：本票會讓每個 run 多產一個檔，CLAUDE.md 明訂輸出大小不得未經核可變更 ⇒ 須實作後量出絕對位元組與佔比、**帶數字請使用者核可才能交付**；否決即整票回退。技術選擇（落點／覆蓋率／既有 7 個共用檔處置）依既有裁定交委員會。2026-09-24 依使用者排序（FKPERF → FF-TFMETA → FF-NAME → FFDSTAR）復工：r3 修入（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md）——K-1 來源加 `search_error_default`、K-2 原因碼須合 `^[a-z][a-z0-9_]*$`、Phase 1 依賴 FF-NAME 實作完成。🔴 d* 搜尋例外之行為將由 RM-FFSTAT 改為 fail-closed，本票收據欄位須隨之對齊。下一步：FF-NAME 定案後 R4。"
+        "2026-10-19 開工：偵察諮詢 r4（主委獨立版＋codex、composer，handoffs/reconcile/20260921-ffdstar-x-consult-r4/synth.md 已銷帳）三方一致——逐欄決策與 d* 已收集但 manifest 先寫、決策後擷取故從未落盤；步驟旗標為設定回顯；IC ingest 快取以設定身分為鍵、同 config_hash 重生後讀舊值（資料正確性缺陷，本票修）。使用者核可存法（逐欄紀錄另存 run 內 zstd parquet、manifest 只放摘要與指紋，全特徵 run 估約 +1.3 MB；收據 handoffs/run_receipts/20261019-preprov-output-size-approval.json）。SPEC v2 全文重寫（docs/FFDSTAR_SPEC.md），TODO manifest docs/manifests/FFDSTAR.json 撰寫中，之後送 SPEC＋TODO 審查 r5。以下為先前紀錄——全票排序第 7 步（docs/TICKET_ORDER.md）：改寫為 PRE-PROV（run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態、失敗群組、轉換臂別；IC 讀取保留 manifest、ingest cache 依身分鍵失效）；逐欄 d 之收集已由 FF-STAT 完成、K-1 `search_error_default` 已失效；輸出增量須使用者核可。以下為沿革——起因＝EVENTSCAN R5 追查時發現共用之 d* 快取檔跨 run 覆寫。🔴 **使用者 2026-09-21 裁定「先確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」**⇒ 已先跑唯讀定性輪（handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md）：主委原判之四型中，**兩型經委員以本 run 實跑判為設計意圖、一型因主委配對錯誤而不成立**，僅 provenance 一項為真缺陷。該裁定直接擋下一次針對非缺陷的修改。⇒ 本票範圍限縮為單一議題：共用 d* 快取跨 run 覆寫、無 per-column 收據 ⇒ 無法追溯任一 run 當下所用之 d*。SPEC v1 已寫（RISK-HIT: none，不改任何數值只加收據）。🔴 **否決點**：本票會讓每個 run 多產一個檔，CLAUDE.md 明訂輸出大小不得未經核可變更 ⇒ 須實作後量出絕對位元組與佔比、**帶數字請使用者核可才能交付**；否決即整票回退。技術選擇（落點／覆蓋率／既有 7 個共用檔處置）依既有裁定交委員會。2026-09-24 依使用者排序（FKPERF → FF-TFMETA → FF-NAME → FFDSTAR）復工：r3 修入（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md）——K-1 來源加 `search_error_default`、K-2 原因碼須合 `^[a-z][a-z0-9_]*$`、Phase 1 依賴 FF-NAME 實作完成。🔴 d* 搜尋例外之行為將由 RM-FFSTAT 改為 fail-closed，本票收據欄位須隨之對齊。下一步：FF-NAME 定案後 R4。"
       ],
       [
         "320",
@@ -1366,63 +1366,45 @@
     "rows": [
       [
         "010",
-        "`applied`",
-        "布林",
-        "本次 run 該欄是否實際套用 fracdiff"
+        "紀錄檔落點",
+        "run 目錄內 `provenance/` 子目錄；raw 與 processed 各一檔（檔名定義於契約 JSON）",
+        "不放 `raw/` 內——IC-first 於 processed 落盤後刪整個 raw（`feature_factory.py:2997-3004`）；不放共用目錄——須與 run 同生命週期"
       ],
       [
         "020",
-        "`d`",
-        "浮點；`applied` 為真時**必填**，為假時**必須缺席**",
-        "本次實際使用之分數階；缺席與 `null` 語意不同，須以缺席表達"
+        "紀錄檔格式",
+        "zstd 壓縮 parquet，每個輸出欄一列（寬表：各步驟一欄）",
+        "使用者 2026-10-19 核可之存法（準確、檔小、讀快）；全特徵 run 估約 +1.3 MB"
       ],
       [
         "030",
-        "`source`",
-        "`cache_hit` ｜ `search` ｜ `search_error_default`；`applied` 為真時必填",
-        "`d` 之來源＝命中既有快取、本次重新搜尋，或**搜尋拋例外後現行碼以 `d=1.0` 套用**（`feature_preprocessor.py:3035-3060` 之 `except Exception` 分支；R3 codex P1-02）——本票只如實記錄此分支，不改其行為；該分支是否應 fail-closed 屬平穩化處理之數值正確性，交另案研究"
+        "manifest 新鍵",
+        "每個 artifact 節點之 `content_sha256` 與 `provenance` 物件（鍵定義於契約 JSON）",
+        "manifest 只放路徑、sha256、列數、契約版本、各步驟各狀態計數、群組表；不內嵌逐欄紀錄"
       ],
       [
         "040",
-        "`reason`",
-        "封閉集合，見 `ffdstar-skip-reasons`；`applied` 為假時必填",
-        "未套用之原因"
+        "提交點",
+        "manifest 合併為唯一提交點；安裝前先使舊 raw 節點不完整",
+        "任一步失敗 ⇒ run 失敗、不可被讀為完整"
       ],
       [
         "050",
-        "頂層 `symbol`／`timeframe`／`config_hash`",
-        "字串",
-        "run 之身分；`config_hash` 為本票解決 owner mismatch 之關鍵欄"
+        "內容身分 `content_sha256`",
+        "排序之（相對路徑、欄名、列數、dtype、檔案 sha256）＋ row index 檔 sha256 之 sha256",
+        "與 `config_hash`（設定）、`feature_schema_hash`（欄集合）正交，三者不得互相代替；紀錄檔 sha256 不入內容身分"
       ],
       [
         "060",
-        "頂層 `row_count`／`time_range`",
-        "整數／物件",
-        "與 run 對齊；與既有共用快取之同名欄語意相同"
+        "run 身分物件",
+        "鍵定義於契約 JSON；自同一次 manifest 解析取得",
+        "IC ingest 快取、交接 h5 `metadata_json`、IC-first JSON 快取、報告、倖存者、API 結果共用；缺 `content_sha256` 之舊 run 標 `legacy`、快取不沿用"
       ],
       [
         "070",
-        "頂層 `fracdiff_hash`",
-        "字串",
-        "fracdiff 參數雜湊；與既有快取檔名所用者同源"
-      ],
-      [
-        "072",
-        "頂層 `execution_outcome`",
-        "`ran` ｜ `skipped_no_statsmodels` ｜ `skipped_disabled` ｜ `skipped_no_target_columns`",
-        "🔴 **空 `entries` 有多種成因**，只看 entries 無法區分「沒跑」與「跑了但零欄」；本欄為唯一區分點（R2 委員指出 K-1 原無此欄）"
-      ],
-      [
-        "074",
-        "`source` 與「重跑 byte 級相同」之相容性",
-        "重跑之 byte 級比對**排除 `source` 欄**；其餘欄須逐位元組相同",
-        "🔴 首次 `search`、次次 `cache_hit` 時 `source` 本來就會變（R2 委員指出兩條規定互斥）；`source` 記的是「這次怎麼取得」，不是 run 之身分"
-      ],
-      [
-        "080",
-        "落點",
-        "`data_cache/feature_preprocessing/`，檔名為 `dstar_receipt_<symbol>_<timeframe>_<config_hash>.json`。🔴 **不得**以 `d_star_` 為前綴——`tests/feature_engineering/test_batch2d_dstar_align.py:59` 與 `:104` 對該目錄之 `d_star_*.json` glob 斷言**恰一檔**，同前綴即打破它（R2 委員實查、主委複核）",
-        "🔴 **不得**落在 run 目錄——會使既有 failopen 檔案集合比對轉紅（見 SPEC §A 裁定 1）"
+        "讀取端驗證",
+        "宣告檔存在、路徑在 run 內、紀錄檔 sha256 相符",
+        "不在每次讀取重算特徵檔雜湊（慢閘）"
       ]
     ]
   },
@@ -1437,18 +1419,23 @@
     "rows": [
       [
         "010",
-        "（待實作時以碼證補齊）",
-        "🔴 本表之值集合**不得由主委憑印象填寫**——SPEC 初稿曾杜撰四個不存在的分支名，經 R1 兩家以碼證推翻。實作 Task 1.1 之第一步即為列出 `_apply_fractional_differencing` 之實際離開路徑，逐一對應後回填本表；回填前本表僅此一列"
+        "值集唯一來源",
+        "各步驟狀態、群組轉換臂與回退、終態之封閉值集只定義於 `momentum/FeatureEngineering/contracts/run_provenance.json`（SPEC Task 1.1）；本表與測試不另列舉"
       ],
       [
         "020",
-        "回填之機械約束",
-        "🔴 **只有值符合 `^[a-z][a-z0-9_]*$` 之列才是原因碼**（R3 codex P1-01：原寫法使本表之說明列〔如本列之值〕亦可被當成合法 reason 寫入而通過）。Task 1.1 驗證③：收據中每筆 `applied=false` 之 `reason` 須逐字命中本表中**值合此樣式之列**；回填前本表無任何此樣式之值 ⇒ 任何 `applied=false` 之筆皆使驗證③轉紅，**回填前實作不可能通過驗收**"
+        "值樣式",
+        "每個值合 `^[a-z][a-z0-9_]*$`；說明文字不得作值"
       ],
       [
         "030",
-        "🔴 唯一之 column universe（R2 委員指出原文未定義）",
-        "「進入 `_apply_fractional_differencing` 之欄」歧義（df input／numeric columns／layer-filtered targets／selected columns 四者不同）。**定義為**：該函式**實際迭代過**之欄，亦即 `columns` 變數在 `_select_columns` 與 `_filter_fracdiff_target_columns` 之後、`nan_rates` 過濾之前的內容；其後之 `eligible_columns` 與 `skipped_high_nan` 皆為其子集"
+        "值之碼證",
+        "每個值附 `_sources`（至少一個 `path:line` 實際離開點）；無離開點之值不得存在，每個離開點須有對應值；驗收未產出之值須列於契約 `_unreachable` 並附碼證理由"
+      ],
+      [
+        "040",
+        "紀錄母體",
+        "逐欄紀錄之輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄（逐名、無重複）；平穩化決策欄非空之列 ＝ 本 run 實際進入平穩化步驟之輸入欄"
       ]
     ]
   },
@@ -1864,9 +1851,9 @@
       [
         "040",
         "HP-FFDSTAR",
-        "未開工",
+        "進行中",
         "docs/FFDSTAR_SPEC.md",
-        "🔴 **下一個開工（新 session）**：前置第 6 步 FF-NAME 已於 2026-10-19 收案（fd1efed3），本票 SPEC 須依 FF-STAT／FF-NAME 後現況重寫（欄名已為 v2 文法、manifest 已帶 feature_naming_version、reader 單一 manifest 邊界）；開工時先量輸出增量並請使用者核可（docs/TICKET_ORDER.md「到該票時再問：PRE-PROV 輸出增量」）。全票排序第 7 步（docs/TICKET_ORDER.md）：本票改寫為 PRE-PROV——逐欄 d 之收集已由 FF-STAT 完成、K-1 `search_error_default` 已失效（d* 搜尋失敗保原值），剩 run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態、失敗群組、轉換臂別，IC 讀取保留 manifest；SPEC 於 FF-NAME 後重寫；輸出增量須使用者核可。以下為舊紀錄——使用者 2026-09-23 睡前排序「FKPERF 收完→FF-TFMETA→FF-NAME→FFDSTAR 依序做完」⇒ 復工。停手前 R2 十三條待閉合；2026-09-24 R3 兩家（codex blocked 兩 P1＋一 P2、composer proceed 兩 P2）五條全採納修入 SPEC（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md 已銷帳）：K-1 來源加 `search_error_default`、K-2 原因碼樣式封閉、Phase 1 依賴 FF-NAME、Task 1.1 驗證③。R4 待 FF-NAME 規格重寫定案後一併複查；輸出大小仍須實作後帶數字請使用者核可"
+        "2026-10-19 開工（全票排序第 7 步 PRE-PROV）：偵察諮詢 r4 已銷帳（handoffs/reconcile/20260921-ffdstar-x-consult-r4/synth.md）；使用者核可輸出存法（handoffs/run_receipts/20261019-preprov-output-size-approval.json）；SPEC v2 全文重寫完成（docs/FFDSTAR_SPEC.md）；生產空殼 momentum/FeatureEngineering/run_provenance.py 與契約骨架 momentum/FeatureEngineering/contracts/run_provenance.json 已建；驗收測試與 TODO manifest docs/manifests/FFDSTAR.json 撰寫中 ⇒ 下一步送 SPEC＋TODO 對抗審查 r5（session 20260921-ffdstar-x-review-r5，task-id 日期前綴沿用本票首日 20260921）。以下為開工前紀錄——前置第 6 步 FF-NAME 已於 2026-10-19 收案（fd1efed3），本票 SPEC 須依 FF-STAT／FF-NAME 後現況重寫（欄名已為 v2 文法、manifest 已帶 feature_naming_version、reader 單一 manifest 邊界）；開工時先量輸出增量並請使用者核可（docs/TICKET_ORDER.md「到該票時再問：PRE-PROV 輸出增量」）。全票排序第 7 步（docs/TICKET_ORDER.md）：本票改寫為 PRE-PROV——逐欄 d 之收集已由 FF-STAT 完成、K-1 `search_error_default` 已失效（d* 搜尋失敗保原值），剩 run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態、失敗群組、轉換臂別，IC 讀取保留 manifest；SPEC 於 FF-NAME 後重寫；輸出增量須使用者核可。以下為舊紀錄——使用者 2026-09-23 睡前排序「FKPERF 收完→FF-TFMETA→FF-NAME→FFDSTAR 依序做完」⇒ 復工。停手前 R2 十三條待閉合；2026-09-24 R3 兩家（codex blocked 兩 P1＋一 P2、composer proceed 兩 P2）五條全採納修入 SPEC（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md 已銷帳）：K-1 來源加 `search_error_default`、K-2 原因碼樣式封閉、Phase 1 依賴 FF-NAME、Task 1.1 驗證③。R4 待 FF-NAME 規格重寫定案後一併複查；輸出大小仍須實作後帶數字請使用者核可"
       ],
       [
         "042",

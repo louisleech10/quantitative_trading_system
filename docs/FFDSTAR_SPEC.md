@@ -1,302 +1,216 @@
-# FFDSTAR — 每個 FF run 自帶 `d*` 收據（可追溯性） — SPEC
+# FFDSTAR（PRE-PROV）— 每次特徵產出之逐欄執行紀錄與 IC 讀取身分 — SPEC
 
-> 來源診斷：`handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`（定性輪）　|　日期：2026-09-21　|　對應 TODO：`docs/FFDSTAR_TODO.md`（本 SPEC 凍結後生成）
->
-> **要解的問題（一句話）**：事後查不到某個 FF run 當時用了什麼 `d*`。
-
----
+> 來源：偵察 r4 收斂檔 `handoffs/reconcile/20260921-ffdstar-x-consult-r4/synth.md`（主委獨立版 `handoffs/20260921-ffdstar-x-consult-r4-claude.md`）；範圍權威 `docs/TICKET_ORDER.md` 第 7 列　|　日期：2026-10-19　|　對應 TODO：`docs/manifests/FFDSTAR.json`
+> 版本：v2（2026-10-19；FF-STAT、FF-NAME 收案後依現況全文重寫，落點、紀錄範圍與 fact-key 內容皆以本版為準；先前版本之定性與輪次見 `handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`、`20260921-ffdstar-x-review-r2`、`20260924-ffdstar-x-review-r3`）。
 
 ## §RISK 風險分級
-
-- **大小**：中。動單一模組（Feature Factory 預處理層）＋其既有 caller。
-- **命中高風險原則**：無。
-  - 不命中 (a)：**不改任何數值**。本票只新增一份「這次實際用了什麼」的收據，
-    特徵值、欄集合、`d*` 的選法與套用邏輯皆不動。
-  - 不命中 (b)：改動限於 `momentum/FeatureEngineering/preprocessing/`；不跨 `api/`／`frontend/`。
-  - 不命中 (c)：單一 Phase 可獨立回退。
-  - 不命中 (d)：不影響 ML／回測路徑之任何輸入值。
-- RISK-HIT: none
-- 🔴 **膨脹升級訊號（命中任一即當場升級為大任務、退回重走）**：
-  ① 需要改 `feature_manifest.json` 之 schema（那是契約改動）；
-  ② 需要改 `_find_min_d`／`_frac_diff_ffd`／`_get_non_stationary_columns` 任一之行為；
-  ③ 新增之檔使既有 golden 或輸出大小斷言轉紅。
-
----
+- **大小**：大（`docs/TICKET_ORDER.md` 標中；依 CLAUDE.md 判準命中 (a)(b)(d)，以大任務管線執行）。
+- **命中高風險原則**：(a) 資料品質——IC ingest 快取以設定身分為鍵、有檔即沿用 ⇒ 同 config_hash 重生後 IC 分析非本次 run 之特徵值；紀錄若與實際執行不符即為假證據；(b) 跨模組共用路徑——`momentum/FeatureEngineering/{feature_storage,feature_factory,feature_reader,feature_library}.py`、`preprocessing/feature_preprocessor.py`、`momentum/Analysis/{ic_engine,ic_filter_orchestrator,survivor_contract}.py`、`api/services/ic_analysis_service.py`；(d) ML 正確性——IC 選欄所據之特徵值身分。
+- RISK-HIT: a,b,d
+- 命中 (a)(d) ⇒ §G 必填、adversarial review 必跑。
 
 ## §A 假設與待使用者確認
-
-### 已驗證事實
-
-- FACT-RECEIPT: `sed -n '327,331p' momentum/FeatureEngineering/preprocessing/_d_star_cache.py` → 印出
-  `return cache_dir / f"d_star_{symbol}_{timeframe}_{fhash}.json"`
-  ⇒ **檔名只含 symbol／timeframe／fracdiff 參數雜湊，不含 run 識別碼**（Claude 實跑 2026-09-21）
-- FACT-RECEIPT: `ls -la data_cache/feature_preprocessing/d_star_*.json` → 印出 7 個檔，
-  `ETHUSDT/1h` **僅一個**（`d_star_ETHUSDT_1h_dcc154ced6b6.json`，最後寫入 `Sep 9 20:45`）
-  ⇒ 同一 symbol×timeframe 之全部 run 共用一檔，後寫覆蓋（Claude 實跑 2026-09-21）
-- FACT-RECEIPT: `jq -r '.row_count'` 該檔 → 印出 `10441`；而 run `4a8a0b37…` 之列數為 `20352`
-  ⇒ 現存內容屬另一 run，reference run 當時之 `d*` **已不可得**（Claude 實跑 2026-09-21）
-- FACT-RECEIPT: `find data_cache -name "d_star_*.json"` 之結果全部位於
-  `data_cache/feature_preprocessing/`，**run 目錄內 0 個**（Claude 實跑 2026-09-21）
-- FACT-RECEIPT: `jq -r '.entries | length'` 該檔 → 印出 `148`，而 reference run 之欄數為 `437,110`
-  ⇒ 收據之覆蓋率遠低於欄數（Claude 實跑 2026-09-21）
-
-### 定性輪之結論（本票範圍之唯一依據）
-
-`handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`：兩家逐型判定——
-**① 有紀錄且有套用＝設計意圖；② 有紀錄但 `d` 不符＝不成立（主委配對錯誤）；
-③ 無紀錄但有套用＝缺陷（provenance）；④ 有紀錄但未套用＝設計意圖；
-⑤ `row_count` 與 run 列數不同＝缺陷（provenance）。**
-
-⇒ **本票只處理 ③⑤ 這一件事：可追溯性。** 不碰 ①④ 之設計、不重開 ②。
-
-🔴 **數值正確性不在本票範圍且未被質疑**：快取有數值指紋校驗
-（`_d_star_cache.py::get_by_value_fingerprint`），值對不上即 miss 重算 ⇒
-一個 run 不會誤用另一 run 的 `d*`。**壞的是紀錄，不是計算。**
-
-### 🔴 待使用者確認（否決點，未確認前不得**交付**）
-
-**本票會讓每個 FF run 多產出一個檔**，而 CLAUDE.md 明訂
-「**Never** … change output size without user approval」。
-
-⇒ **唯一需要使用者裁示的是輸出增量本身，且必須帶著實測數字去問**
-（技術類選擇不問使用者，依既有裁定交委員會——結果見下「委員會已裁定之技術選擇」）。
-⇒ 因此順序為：Task 1.1／1.2 實作 → Task 1.3 量出絕對位元組與佔比 → **帶數字請使用者核可** → 交付。
-**未取得核可前不得宣告本票完工**；使用者否決即整票回退（§R）。
-
-`待確認：無`（實作前無待決；輸出增量之核可屬**交付前**關卡，非實作前關卡）
-
-### 委員會已裁定之技術選擇（R1 收斂，不再是待決）
-
-1. **落點＝`data_cache/feature_preprocessing/`，檔名含 `config_hash`。**
-   🔴 **決定性理由（composer 實查）**：若落在 run 目錄，既有
-   `tests/feature_engineering/test_failopen_correctness.py:348::test_v3_multi_tf_btc_matches_frozen_baseline`
-   會把新 JSON 當資料檔而使檔案集合比對轉紅 ⇒ **直接命中 §RISK 升級訊號③**。
-   選共用目錄則 run 目錄之檔案集合**逐位元組不變**，該測試維持綠。
-2. **覆蓋率＝全部進入判定之欄，各帶 `applied` 與 `reason`／`source`。**
-   理由（codex）：只記已套用者**解決不了型③**——不在收據內的欄有兩種可能
-   （未進 fracdiff／進了但沒記），無法區分等於沒做。
-3. **既有 7 個共用檔＝保留原狀不動**（面向未來不溯及既往，2026-08-05 使用者定死）。
-4. **本票套用 `fact_keys` 生成區塊**（codex `P2-07`）：主委原判「值很少故不套用」不成立——
-   可觀測之值已含四類原因碼、`source` 值集、收據頂層欄位、落點路徑、三條升級訊號。
-
-### 🔴 唯一之閘序（本 SPEC 內先前三處互斥宣告，以本段為準）
-
-R1 兩家各自指出 §A／Phase 1／Task 1.2 對「何時可開工」給了互斥條件。**統一為**：
-
-```
-Task 1.1（收集，不落檔）  → 可立即開工，不需任何裁示
-Task 1.2（落檔）          → 可立即開工（落點與覆蓋率已由上述裁定確定）
-Task 1.3（量測輸出增量）  → 依賴 1.2
-使用者核可輸出增量        → 交付前關卡，非實作前關卡
-```
-
-**沒有任何 Task 以「等使用者裁示」為開工條件。** 使用者之核可只擋**交付**。
-
-### 已確認結果（2026-09-21 使用者裁定，逐條見下）
-- `2026-09-21 使用者裁定：先確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉` → 定性輪已跑完
-- `2026-09-21 使用者裁定：同意做「每個 run 自帶 d* 收據」`
-
----
-
-## §K 本 SPEC 註冊之 fact-key
-
-> 下列區塊由 `scripts/fact_keys.json` 生成，**禁手改**。改值＝改該檔後跑
-> `bash scripts/gen_fact_key_blocks.sh --write`。TODO 與測試引用同一值時掛同一區塊，不得手打。
-> （採用理由：R1 之 codex `P2-07` 推翻主委「值很少故不套用」之判斷。）
-
-### K-1 收據 schema
-
-<!-- BEGIN GENERATED: ffdstar-receipt-schema -->
-| 序 | 欄 | 型別／值集 | 說明 |
-|---|---|---|---|
-| 010 | `applied` | 布林 | 本次 run 該欄是否實際套用 fracdiff |
-| 020 | `d` | 浮點；`applied` 為真時**必填**，為假時**必須缺席** | 本次實際使用之分數階；缺席與 `null` 語意不同，須以缺席表達 |
-| 030 | `source` | `cache_hit` ｜ `search` ｜ `search_error_default`；`applied` 為真時必填 | `d` 之來源＝命中既有快取、本次重新搜尋，或**搜尋拋例外後現行碼以 `d=1.0` 套用**（`feature_preprocessor.py:3035-3060` 之 `except Exception` 分支；R3 codex P1-02）——本票只如實記錄此分支，不改其行為；該分支是否應 fail-closed 屬平穩化處理之數值正確性，交另案研究 |
-| 040 | `reason` | 封閉集合，見 `ffdstar-skip-reasons`；`applied` 為假時必填 | 未套用之原因 |
-| 050 | 頂層 `symbol`／`timeframe`／`config_hash` | 字串 | run 之身分；`config_hash` 為本票解決 owner mismatch 之關鍵欄 |
-| 060 | 頂層 `row_count`／`time_range` | 整數／物件 | 與 run 對齊；與既有共用快取之同名欄語意相同 |
-| 070 | 頂層 `fracdiff_hash` | 字串 | fracdiff 參數雜湊；與既有快取檔名所用者同源 |
-| 072 | 頂層 `execution_outcome` | `ran` ｜ `skipped_no_statsmodels` ｜ `skipped_disabled` ｜ `skipped_no_target_columns` | 🔴 **空 `entries` 有多種成因**，只看 entries 無法區分「沒跑」與「跑了但零欄」；本欄為唯一區分點（R2 委員指出 K-1 原無此欄） |
-| 074 | `source` 與「重跑 byte 級相同」之相容性 | 重跑之 byte 級比對**排除 `source` 欄**；其餘欄須逐位元組相同 | 🔴 首次 `search`、次次 `cache_hit` 時 `source` 本來就會變（R2 委員指出兩條規定互斥）；`source` 記的是「這次怎麼取得」，不是 run 之身分 |
-| 080 | 落點 | `data_cache/feature_preprocessing/`，檔名為 `dstar_receipt_<symbol>_<timeframe>_<config_hash>.json`。🔴 **不得**以 `d_star_` 為前綴——`tests/feature_engineering/test_batch2d_dstar_align.py:59` 與 `:104` 對該目錄之 `d_star_*.json` glob 斷言**恰一檔**，同前綴即打破它（R2 委員實查、主委複核） | 🔴 **不得**落在 run 目錄——會使既有 failopen 檔案集合比對轉紅（見 SPEC §A 裁定 1） |
-<!-- END GENERATED: ffdstar-receipt-schema -->
-
-### K-2 未套用原因碼（待實作以碼證回填）
-
-<!-- BEGIN GENERATED: ffdstar-skip-reasons -->
-| 序 | 值 | 語意 |
-|---|---|---|
-| 010 | （待實作時以碼證補齊） | 🔴 本表之值集合**不得由主委憑印象填寫**——SPEC 初稿曾杜撰四個不存在的分支名，經 R1 兩家以碼證推翻。實作 Task 1.1 之第一步即為列出 `_apply_fractional_differencing` 之實際離開路徑，逐一對應後回填本表；回填前本表僅此一列 |
-| 020 | 回填之機械約束 | 🔴 **只有值符合 `^[a-z][a-z0-9_]*$` 之列才是原因碼**（R3 codex P1-01：原寫法使本表之說明列〔如本列之值〕亦可被當成合法 reason 寫入而通過）。Task 1.1 驗證③：收據中每筆 `applied=false` 之 `reason` 須逐字命中本表中**值合此樣式之列**；回填前本表無任何此樣式之值 ⇒ 任何 `applied=false` 之筆皆使驗證③轉紅，**回填前實作不可能通過驗收** |
-| 030 | 🔴 唯一之 column universe（R2 委員指出原文未定義） | 「進入 `_apply_fractional_differencing` 之欄」歧義（df input／numeric columns／layer-filtered targets／selected columns 四者不同）。**定義為**：該函式**實際迭代過**之欄，亦即 `columns` 變數在 `_select_columns` 與 `_filter_fracdiff_target_columns` 之後、`nan_rates` 過濾之前的內容；其後之 `eligible_columns` 與 `skipped_high_nan` 皆為其子集 |
-<!-- END GENERATED: ffdstar-skip-reasons -->
-
----
+- **已驗證事實**（FACT-RECEIPT 10 條）：
+  - 逐欄決策已收集、從未落盤。FACT-RECEIPT: `sed -n 3880,3922p momentum/FeatureEngineering/feature_factory.py` → 印出 `raw_path, stream_summary = self._storage.write_raw_from_registry_stream(` 於 `:3880`，`self._capture_stationarity_decisions(preprocessor, config)` 於 `:3922`（writer 返回之後）（主委 實跑 2026-10-19）
+  - writer 於 manifest 合併前已持有前處理器。FACT-RECEIPT: `sed -n 1212,1225p momentum/FeatureEngineering/feature_storage.py` → 印出 `preprocessor.stationarity_failure_reasons()` 於 manifest 合併前，與註解 `（§C 不新增 manifest 鍵）`（主委 實跑 2026-10-19）
+  - 合併以覆寫為之。FACT-RECEIPT: `sed -n 516,529p momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → 印出 `self._decisions[key] = record`；`sed -n 4170,4180p momentum/FeatureEngineering/feature_factory.py` → 印出 `merged[name] = record`（主委 實跑 2026-10-19）
+  - raw 安裝先於 manifest 合併，來源已刪之晚期失敗保留新 raw。FACT-RECEIPT: `sed -n 1232,1300p momentum/FeatureEngineering/feature_storage.py` → 印出 `os.replace(temp_artifact_dir, final_artifact_dir)` 後才 `self._atomic_merge_feature_manifest_v2(`，例外分支 `preserve_temp = source_deleted`（主委 實跑 2026-10-19）
+  - IC-first 落 processed 後刪整個 raw。FACT-RECEIPT: `sed -n 2995,3004p momentum/FeatureEngineering/feature_factory.py` → 印出 `if cleanup_raw and raw_path.exists():` … `_ic_shutil.rmtree(raw_path)`（主委 實跑 2026-10-19）
+  - IC ingest 快取鍵與沿用條件。FACT-RECEIPT: `sed -n 3287,3306p api/services/ic_analysis_service.py` → 印出 `safe_key = f"{symbol}_{timeframe}_{hash_key}"`、`if not h5_path.exists() or not self._ic_handoff_h5_current(h5_path):`、`if not meta_path.exists():`（主委 實跑 2026-10-19）
+  - IC-first JSON 快取身分無值身分。FACT-RECEIPT: `sed -n 39,50p momentum/Analysis/ic_engine.py` → 印出 `CACHE_IDENTITY_FIELDS` 十欄（symbol、tf、config_hash、method、label_horizon、selection_window_start、selection_window_end、split_id、feature_axis_sha256、label_sha256）（主委 實跑 2026-10-19）
+  - 生產寫入點只有兩個。FACT-RECEIPT: `git ls-files -z momentum api | xargs -0 grep -nE '\.write_raw\(|\.write_processed\(|write_raw_from_registry_stream\('` → 印出 `feature_factory.py:2986` `storage.write_processed(`、`feature_factory.py:3880`、定義 `feature_storage.py:738`；`write_raw`（`feature_storage.py:704`）無生產呼叫者（主委 實跑 2026-10-19）
+  - 倖存者契約之 provenance 鍵封閉。FACT-RECEIPT: `jq -c '.provenance_keys.additional_properties' momentum/Analysis/contracts/ic_survivor_contract.json` → 印出 `false`（主委 實跑 2026-10-19）
+  - 輸出增量實測（BTCUSDT/12h 全特徵 run：204,150 欄、L1＋L2 決策欄 43,536、247 群組、run 590 MB、manifest 58,947,580 B）。FACT-RECEIPT: `venv/bin/python <scratchpad>/preprov_size.py data_cache/features/BTCUSDT/12h/0729db3a2de860b6c7d01be16ca22d22/feature_manifest.json` → 印出 `A_inline_decisions_indent2 16347513`、`A_inline_winsor_per_column_indent2 17405793`、`B_sidecar_decisions_parquet_zstd 610310`、`B_sidecar_winsor_per_column_parquet_zstd 662945`、`A_inline_group_status_indent2 37712`、`read_seconds_parquet_decisions 0.0268`、`read_seconds_manifest_json_now 0.225`（主委 實跑 2026-10-19；收據 `handoffs/run_receipts/20261019-preprov-output-size-approval.json`）
+- **待確認**：無
+- **已確認結果**：2026-10-19 使用者核可輸出增量之存法標準（逐字「我期望的是記錄的數據是準確，檔案盡可能小，讀取盡可能快且精準，但我不知道哪個比較好」）⇒ 逐欄紀錄另存 run 目錄內壓縮 parquet、manifest 只放摘要與指紋（估約 +1.3 MB／全特徵 run，+0.2%）；實作後以真實生成重量，明顯超出估算須再報（Task 3.2）。2026-08-05 使用者定：修正只考慮以後、不回溯舊資料。2026-10-02 使用者定：開發期資料皆可重新產生、不需相容或遷移（`docs/TICKET_ORDER.md:9`）。
 
 ## §C 約束
+- 解耦 7 條：紀錄收集、序列化、身分解析置 `momentum/`；`api/` 只經 `momentum` 公開函式取身分，不自組；不新增服務互相 import。
+- 不可違反原則：**不改任何特徵值、NaN 遮罩、欄集合、欄順序、dtype、`config_hash`、`feature_schema_hash`**；不弱化 NaN／inf 閘；不放寬既有測試斷言；不得寫死加密貨幣／24h／UTC 假設（紀錄之時間欄沿用既有 UTC 表示，不新增時間單位假設）。
+- **契約單一真相源**：逐欄紀錄之欄位、各步驟狀態值集、群組轉換臂值集、manifest `provenance` 物件與 run 身分物件之鍵，一律定義於 `momentum/FeatureEngineering/contracts/run_provenance.json`；本 SPEC 與測試只 pointer，不另列舉。
+- **推翻既有約定**：`feature_storage.py:1224-1225` 之「§C 不新增 manifest 鍵」於本票失效（新增鍵為本票目的），該註解同步刪除。
+- **嚴禁慢閘**：寫入端之雜湊於寫檔當下計算；讀取端只驗宣告檔存在、路徑在 run 內（stat 級）與紀錄檔 sha256（約 1 MB）；不在每次讀取重算特徵檔雜湊。
+- **刻意可見差異（全部設定）**：
+  - D1 run 目錄新增 `provenance/` 子目錄：raw 紀錄檔一個；IC-first 另有 processed 紀錄檔一個（檔名見契約）。
+  - D2 manifest 每個 artifact 節點新增 `content_sha256` 與 `provenance` 物件（鍵見契約）；`generation_metadata` 原有鍵不刪不改（`raw_artifact_applied` 等保留為設定紀錄，不作執行證據）。
+  - D3 前處理決策合併遇同鍵且值不逐項相同 ⇒ 拋錯使 run 失敗（改前後寫勝）。
+  - D4 raw 安裝前先將舊 manifest 之 raw 節點標為不完整；任何失敗後該 run 不可被讀為完整。
+  - D5 IC：ingest 快取（h5 與 `_meta.json`）以 run 身分驗證、不符或缺鍵即重建；交接 h5 寫 `metadata_json`（含 run 身分）；IC-first JSON 快取身分加 `content_sha256`；IC 報告 metadata、倖存者 provenance、API 結果帶同一 run 身分物件（倖存者契約版本 +1）。
+  - D6 無新鍵之舊 run／舊快取：特徵讀取不受影響；IC 快取一律不沿用（重建）；紀錄讀取回具名「無紀錄」錯誤。
+- 範圍外：臂／算法 fingerprint 入不可變身分（第 8 步 NUMVIEW）；縮尾唯一責任端（第 9 步）；FFSTORE 快照版本（第 14 步）；FF 生成提速（使用者 2026-10-11 延後）。
 
-- 解耦 7 條：本票改動全在 `momentum/`，不得 import `api/`。
-- **不得改變任何特徵數值**、欄集合、欄順序、dtype。
-- **不得改 `feature_manifest.json` 之 schema**（命中即升級為大任務，見 §RISK）。
-- 不得改 `_find_min_d`／`_frac_diff_ffd`／`_get_non_stationary_columns` 之行為。
-- 既有共用快取之讀寫行為**保持不變**——本票只**額外**寫一份收據，不取代快取。
-- 驗證一律用真實 run（以 `data_cache/features/ETHUSDT/1h/<config_hash>/feature_manifest.json` 定位）；禁合成 fixture。
-
----
+## §G Golden / Baseline
+- **feature/kline 條件**：適用。驗收一律用真實 `data_cache/feature_klines/kline_cache.h5`；禁合成 fixture。
+- **值不變之承接**：既有凍結之值指紋（`tests/_golden/{failopen,framepath,ffstat,ffname,icfirstalign,probewinsor,ratiounsafe}` 中之逐欄值／NaN 遮罩／dtype／欄集合指紋）修改前後**逐位元相同**；任一值指紋改變 ⇒ FAIL，不得重凍。
+- **結構凍結之重凍**：凡比對 run 目錄檔案集合、manifest 全文或其鍵集合之凍結項，因 D1／D2 必變；只准重凍「新增之 `provenance/` 檔與 manifest 新鍵」，重凍收據逐項列出差異路徑且證明其餘逐位元相同（`scripts/ffname_refreeze.py` 同式之改前／改後雙 worktree 記錄）。
+- **讀取方式先行**：凍結腳本與測試輔助凡以檔名掃描 run 目錄取特徵者（至少 `scripts/freeze_failopen_baseline.py:260,425`、`scripts/freeze_framepath_baseline.py:415`、`tests/feature_engineering/ffstat_helpers.py:66,233,346,363,442,577`；Task 1.6 以 grep 窮舉），先改為依 manifest 宣告之群組讀取，於**改前碼態**重算其值指紋等於現行凍結值，再套 Phase 1 生產改動。
+- **改前基準**：Phase 1 動工前 HEAD 之真實 kline 短窗格（§V 格子）完整生成之公開值指紋（逐欄 float32 值 sha256＋NaN 遮罩 sha256＋dtype＋欄名集合 sha256，同 `tests/feature_engineering/ffstat_helpers.py` 之 `public_fingerprints` 式），存 `tests/_golden/preprov/pre_change_fingerprints.json`；改後同格逐位元相同（atol=0、rtol=0；紀錄不改任何值，不設容差）。
 
 ## §P Phase 與依賴
+> 執行序＝ Task 1.1 → 1.6 → 1.2 → 1.3 → 1.4 → 1.5 → 2.1 → 2.2 → 2.3 → 2.4 → 3.1 → 3.2（1.6 讀取方式先行，見 §G）。自檢：無 forward dependency。
 
-> 🔴 **本 Phase 表之執行順序＝ Task 1.1 → 1.2 → 1.3**（列序即執行序）。
-> 自檢已做：無 forward dependency。
+### Phase 1 — 特徵工廠端逐欄紀錄（依賴：無；FF-NAME 已收案）
 
-### Phase 1 — 收據落檔（依賴：**FF-NAME 實作完成**——收據之 `config_hash` 與逐欄鍵皆依 FF-NAME 之命名世代與欄名；於 FF-NAME 前實作即鎖在舊世代、須重做驗收〔R3 codex P2-03／composer P2-02〕。三項技術選擇已由 R1 收斂裁定，見 §A）
-
-**Task 1.1 — 在預處理層收集「本次實際套用之 `d`」**
-- 目標：讓一次 run 結束時，手上有一份「欄 → 實際用的 `d` ／ 未套用及其原因」。
-- 檔案：`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`
-  （`_apply_fractional_differencing_serial` 與 `_apply_fractional_differencing_parallel` 兩條路徑，
-  以及 `_apply_fractional_differencing` 之 eligible／skip 分支）。
-- 既有 caller／影響面：三條路徑之既有回傳值與副作用**不得改變**。
-  🔴 **不得比照 `self._fracdiff_processed_columns` 之生命週期**（R1 兩家指出）：該屬性於
-  `feature_preprocessor.py:2471` 與 `:2484` 被重設，**其內容是最後一次 transform 的殘局**，
-  不是整個 run 的清單；且其型別為 `set[str]`（`:150`），**不帶 `d` 值**。
-  ⇒ 收據容器須為 **run 層級、不被 per-transform 重設**之累加結構。
-  🔴 **「掛在 parent 實例上」不夠**（R2 兩家指出，主委實跑對證）：生產路徑對 compact-aligned group
-  會另建 **sibling `FeaturePreprocessor`**（`feature_preprocessor.py:813` 與 `:979` 之 `native_pp`），
-  於其上跑 `_transform_single` 後**丟棄該實例**。只累加在 parent 上會**漏記這些欄**。
-  ⇒ 本 Task 須定義**明確之 owner／merge 契約**：sibling 之累加結果須在丟棄前併回 owner；
-  併入時鍵衝突即 fail-closed（不得後寫覆蓋——那正是本票要消滅的形態）。
-  **驗證須含一條走 sibling 路徑（`feature_preprocessor.py:813`）之 `pytest` 案例**，
-  斷言該路徑之欄亦出現在收據中；否則該契約無人守。
-- 改法：**第一步是盤出實際分支**——R1 兩家指出本 SPEC 初稿所列之「四個既有分支」
-  （`applied`／`skipped_not_selected`／`skipped_high_nan`／`skipped_filtered`）**在碼上不存在**，
-  是主委未經查證的杜撰。
-  ⇒ 本 SPEC **只定義收據必須涵蓋之語意**，不指定分支名：
-  **每一個進入 `_apply_fractional_differencing` 之欄，收據須有且恰有一筆**，
-  含 `applied`（布林）、`d`（`applied` 為真時必填）、`source`（`d` 從何而來）、
-  `reason`（`applied` 為假時必填）。值集合見 §K 之生成區塊。
-  實作時須先以碼證列出實際的離開路徑，再逐一對應到上述語意；**新增任何判斷分支即為違規**。
-- **驗證**（`pytest`，兩層）：
-  ① **窮盡性**：收據之欄集合 `==` 進入該函式之欄集合（逐欄，非計數）；
-  任一欄缺席或重複即 FAIL。此條不依賴任何既有屬性，只依賴函式之輸入。
-  ② **`d` 值正確性**：🔴 **不得**以 `_fracdiff_processed_columns` 核對——它沒有 `d` 值（見上）。
-  改用**獨立重算**：取收據之 `d`，以 `_frac_diff_ffd` 重跑該欄，與落檔值比對
-  （相關性 `>= 0.9999`；此即主委 2026-09-21 追查時實際用過的 oracle）。
-  ③ **原因碼封閉**（R3 composer P2-01：原只寫在 K-2 表，Task 段漏列）：每筆 `applied=false` 之 `reason` 須逐字命中 `ffdstar-skip-reasons` 中值符合 `^[a-z][a-z0-9_]*$` 之列；`applied=true` 之 `source` 須屬 `ffdstar-receipt-schema` 030 之三值。
-  **mutation**：把任一離開路徑之記錄拿掉，須使①轉紅；把收據之 `d` 改寫成固定值，須使②轉紅；把某筆 `reason` 寫成 K-2 表之說明文字，須使③轉紅。
-  指令：`pytest tests/feature_engineering/preprocessing/test_d_star_receipt.py -q`
-  （🔴 測試樹依既有 `test_d_star_*.py` 之所在，非主委初稿所寫之 `tests/momentum/...`）
-- **邊界**：① fracdiff 整段被 early return（`HAS_STATSMODELS` 為 false）⇒ 收據為空且須可區分
-  「沒跑」與「跑了但零欄」；② `eligible_columns` 為空；③ parallel 路徑之多 worker 結果合併後
-  不得有重複鍵，重複即 fail-closed。
-- **存活至**：Phase 1 完工後保留（Task 1.2 消費它）。
+**Task 1.1 — 離開路徑盤點與契約 JSON**
+- 目標：以碼證列出 L6.5（raw-sink、in-place、native 子實例、post-IC）每一步驟之每條實際離開路徑，定稿紀錄契約。　檔案：新建 `momentum/FeatureEngineering/contracts/run_provenance.json`；盤點對象 `feature_preprocessor.py` 之 `transform_registry_groups_to_sink`、`_transform_single*`、`_apply_fractional_differencing*`、ADF 差分、縮尾、rank、zscore、gaussian、ratio-unsafe passthrough、native 成功／回退、`transform_selected`；`feature_storage.py` 之 dead-drop；`feature_factory.py` 之失敗群組。　既有 caller／影響面：新建，無 caller。
+- 改法：契約含——逐欄紀錄欄位與型別（輸出欄名、原生週期、層、群組 id、各步驟狀態、平穩化決策欄、事件、終態）；各步驟狀態封閉值集（每值附 `_sources`：至少一個 `path:line` 離開點）；群組轉換臂與回退值集；manifest `provenance` 物件鍵；run 身分物件鍵；紀錄檔相對路徑。值樣式 `^[a-z][a-z0-9_]*$`。**不得杜撰無離開點之值；每個離開點須有對應值。**
+- **驗證**：`pytest tests/feature_engineering/test_preprov_contract.py` 全綠，其中：①契約每個狀態值之 `_sources` 每個 `path:line` 指向非註解非空行；②契約值皆合樣式；③Task 3.1 驗收格之實際紀錄中出現之值集合 ⊆ 契約值集，且契約中每個值至少被一格或一條單元案例產出（未產出之值須於契約 `_unreachable` 具名並附碼證理由）。mutation：契約刪一個實際會出現之值 ⇒ ③紅。
+- **邊界**：①statsmodels 不可用之 fracdiff 早退；②目標層外之欄（fracdiff 不涵蓋）；③平穩化關閉時 fracdiff／ADF 之狀態值與平穩化決策欄全 null。
+- **存活至**：本票交付後保留（契約為唯一真相源）。
 - **覆蓋風險**：無。
-- 不可做：不得改動任何既有分支之條件；不得在此 Task 落檔。
+- 不可做：不得新增任何轉換判斷分支；不得改任何步驟之條件。
 
-**Task 1.2 — 落檔為收據**
-- 目標：把 Task 1.1 收集到的東西寫成一份檔。
-- 檔案：`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`（落檔呼叫點）；
-  新增 `momentum/FeatureEngineering/preprocessing/_dstar_receipt.py`（序列化）。
-- 既有 caller／影響面：落檔為**新增副作用**。落點與覆蓋率**已由 R1 收斂裁定**（見 §A），
-  本 Task **無待決、可立即開工**。
-- 改法：以既有 `DStarCache.flush_atomic` 之同型原子寫入（temp ＋ `os.replace`），
-  落於 `data_cache/feature_preprocessing/`，檔名含 `config_hash`。
-  內容含 `symbol`／`timeframe`／`config_hash`／`row_count`／`time_range`／
-  `fracdiff_hash`／逐欄記錄。**欄名一律用落檔當下之欄名**（不做任何正規化——
-  共用快取之鍵不帶週期前綴正是本票要解的可追溯性問題之一部分）。
-- **驗證**（`pytest`）：跑一個小 run 後，收據之 `config_hash` `==` 該 run 之 `config_hash`；
-  收據逐欄之 `d` 以 Task 1.1 驗證② 之獨立重算 oracle 核對（**不得**用
-  `_fracdiff_processed_columns`，它沒有 `d` 值）；同一 run 連跑兩次，收據 byte 級相同。
-  另**斷言 run 目錄之檔案集合與改動前逐項相同**——此條直接對應 `§RISK` 升級訊號③。
-  **mutation**：把 `config_hash` 改為寫入 `symbol`，須使第一條斷言轉紅；
-  把落點改回 run 目錄，須使「run 目錄檔案集合不變」之斷言轉紅。
-  指令：`pytest tests/feature_engineering/preprocessing/test_d_star_receipt.py -q`
-- **邊界**：① 落點目錄不存在 ⇒ 建立而非失敗；
-  ② 🔴 **寫入失敗 ⇒ 整個 run 判失敗（fail-closed）**。
-  R1 兩家一致指出：降級為 `logger.warning` 會再產出一個「成功但沒有 per-run `d*` 紀錄」的 run，
-  **正是本票要消滅的型③**，且與 CLAUDE.md「擬合參數（逐字含 `d*`）必須持久化才能上線」鐵律衝突。
-  主委初稿之「收據是診斷物不是產物」不成立——它是本票要新增之 provenance 產物。
-  🔴 **fail-closed 不會從既有之原子寫入接縫自然得到**（R2 委員指出）：既有 cache flush 會吞例外，
-  L6.5 之 wrapper 亦可能把新 writer 之例外吃掉。⇒ 本 Task 須**明確指定一個會把例外往上傳的接縫**
-  （實作時以碼證指出該位置與其例外傳播行為），並加一條 `pytest`：注入寫入失敗（例如唯讀目錄）
-  後，**該 run 之對外結果為失敗**；若僅記 log 而 run 仍成功即 FAIL。
-  ③ 同一 run 重跑 ⇒ 覆寫自己的收據（同 `config_hash`，不涉跨 run 覆蓋）；
-  byte 級比對之範圍見 `ffdstar-receipt-schema` 074（排除 `source` 欄）。
+**Task 1.6 — 測試輔助與凍結腳本改依 manifest 宣告讀取（先於生產改動）**
+- 目標：消除「以檔名掃描 run 目錄當特徵」之讀法，使新增紀錄檔不被誤讀。　檔案：`git ls-files -z tests scripts | xargs -0 grep -nE 'rglob\(|glob\('` 命中且作用於特徵 run 目錄者（至少 §G 所列）；新增 `tests/feature_engineering/preprov_helpers.py`（依 manifest 列群組檔之單一函式）。　既有 caller／影響面：各凍結腳本與其測試、`ffstat_helpers` 之全部呼叫者。
+- 改法：特徵檔集合一律自 manifest artifact 節點之 `groups[*].path` 與 row index 宣告導出；凍結腳本之「run 目錄全部檔」雜湊改為「manifest 宣告檔＋manifest 本身」；未宣告檔出現於 run 目錄 ⇒ 輔助函式拋錯（不靜默忽略）。
+- **驗證**：於**改前生產碼態**對既有凍結項重算值指紋，逐項等於現行凍結值（不重凍）；`pytest` 逐檔明列受影響之凍結測試全綠。mutation：輔助函式改回 `rglob("*.parquet")` 且 run 目錄放入一個非宣告 parquet ⇒ 新增之 `test_preprov_helpers.py` 案例紅。
+- **邊界**：①processed artifact 之群組與 `processed_timestamps.parquet`；②IC-first 已刪 raw 之 run（只剩 processed）；③多週期 run 之群組。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：Task 3.1 之結構重凍會再動凍結檔之結構項，值指紋項不動。
+- 不可做：不得重凍任何值指紋；不得以「排除特定檔名」代替依 manifest 讀取。
+
+**Task 1.2 — 前處理器之逐欄執行狀態收集**
+- 目標：run 層級累加每個輸入欄之各步驟實際狀態、平穩化決策、群組轉換臂與回退、失敗群組。　檔案：`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`（Task 1.1 盤出之全部離開點；`_record_decision`、`_merge_decisions_from`、`failed_groups`）；`momentum/FeatureEngineering/feature_factory.py` 之 `_capture_stationarity_decisions`。　既有 caller／影響面：`stationarity_decisions()`、`stationarity_failure_reasons()` 之回傳格式不變（FF-STAT 呼叫者不受影響）。
+- 改法：新增 run 層級之執行紀錄容器（不被 per-transform 重設；鍵＝(原生週期, L6.5 所見欄名)）；各離開點以契約值記狀態，成功亦記；平穩化關閉時亦記縮尾等步驟狀態；native 子實例之紀錄於丟棄前併回 owner；native 失敗回退記回退值於群組臂；ratio-unsafe passthrough 記終態；`_merge_decisions_from` 與 `_capture_stationarity_decisions` 改為同鍵且值不逐項相同即拋 `ProvenanceConflictError`（逐項相同則冪等）。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_collect.py` 全綠：①單元（真實 kline 短窗之群組）每個輸入欄恰一筆、各步驟狀態皆屬契約；②native 成功與回退各一案，回退案之欄狀態來自回退路徑且群組臂為回退值；③衝突案拋 `ProvenanceConflictError`。mutation：刪任一離開點之紀錄呼叫 ⇒ ①紅；`_merge_decisions_from` 改回覆寫 ⇒ ③紅；縮尾成功不記 ⇒ ①紅。
+- **邊界**：①群組全為 ratio-unsafe；②`eligible_columns` 為空；③parallel fracdiff 多 worker 結果合併（重複鍵拒收）；④append 模式衍生欄（`_fracdiff`／`_diff1`／`_diff2`）以父欄關聯記終態。
+- **存活至**：本票交付後保留（Task 1.3／1.4 消費）。
+- **覆蓋風險**：無。
+- 不可做：不得改任何步驟之條件與數值；不得以 log 解析取得狀態。
+
+**Task 1.3 — raw 紀錄檔、內容身分與 manifest（單一提交點）**
+- 目標：writer 於安裝前寫紀錄檔與內容身分，manifest 合併為唯一提交點。　檔案：`momentum/FeatureEngineering/feature_storage.py` 之 `write_raw_from_registry_stream`、`_atomic_merge_feature_manifest_v2`、`_build_feature_manifest_v2`；新建 `momentum/FeatureEngineering/run_provenance.py`（序列化、內容身分、讀取驗證之純函式）。　既有 caller／影響面：`feature_factory.py:3880`；多標的 worker 與批次經同一 writer。
+- 改法：①群組 part id 寫入 `group_manifest` 前碰撞即拋錯；②自前處理器紀錄＋dead-drop 結果＋群組 manifest 組逐欄紀錄表，窮盡性檢查（列之輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄，逐名、無重複）不過即拋錯；③每個群組檔與 row index 檔寫畢時計 sha256，組 `content_sha256`（契約定義之排序組成：相對路徑、欄名、列數、dtype、檔案 sha256、row index sha256）；④紀錄檔以 zstd parquet 寫入暫存 `provenance/` 並計其 sha256；⑤安裝前將舊 manifest 之 raw 節點標為不完整（原子寫）；⑥安裝 raw 與紀錄檔；⑦manifest 合併寫入 `content_sha256` 與 `provenance` 物件（含路徑、sha256、列數、契約版本、各步驟各狀態計數、群組表：臂、狀態、失敗原因）。任一步失敗 ⇒ 例外上拋、run 失敗。刪 `:1224-1225` 之舊註解。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_writer.py` 全綠：①真實短窗生成後紀錄檔存在、sha256 等於 manifest 宣告；②窮盡性逐名；③`content_sha256` 以獨立實作（測試內自讀檔計算）重算相等；④注入紀錄檔寫入失敗（唯讀目錄）⇒ 生成失敗、manifest 無完整 raw 節點；⑤注入 manifest 合併失敗於安裝後 ⇒ run 不可被 `consumer="strict"` 讀為完整；⑥part id 碰撞案拋錯。mutation：`content_sha256` 漏 row index ⇒ 只改時間軸之案③紅；紀錄檔寫入改為吞例外 ⇒ ④紅；略過⑤ ⇒ ⑤紅。
+- **邊界**：①dead-drop 開啟且有被剔欄；②多週期 run（同名不同週期之輸出欄以落盤名區分）；③多標的 worker 路徑；④平穩化關閉。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
-- 不可做：不得改既有共用快取之讀寫；不得因寫收據而改變 run 之任何既有輸出。
+- 不可做：不得改群組檔內容與命名；不得把紀錄檔列入 manifest 特徵群組。
 
-**Task 1.3 — 輸出面影響之量測與揭露**
-- 目標：把「多產一個檔」這件事量出來，交使用者驗收。
-- 檔案：無產品碼改動；新增量測腳本與收據。
-- 既有 caller／影響面：無。
-- 改法：對一個真實 run 量測收據檔之位元組大小與其佔該 run 總輸出之比例，寫入 run receipt。
-- **驗證**（`pytest` 或腳本 rc=0）：量測輸出含絕對位元組數與百分比兩者；
-  既有 golden 與輸出大小斷言**全部維持綠**（若有任一轉紅，即命中 §RISK 之升級訊號③）。
-  指令：`bash scripts/restore_golden_inventory.sh` 後跑既有 FF golden 測試逐檔明列路徑。
-- **邊界**：① run 目錄本身很小時百分比失真 ⇒ 須同時報絕對值；② 多 symbol 時逐 symbol 報。
+**Task 1.4 — processed 紀錄檔（post-IC）**
+- 目標：IC-first 之 post-IC 轉換同樣記逐欄狀態與臂。　檔案：`feature_preprocessor.py` 之 `transform_selected`；`feature_storage.py` 之 `write_processed`；`feature_factory.py:2986`。　既有 caller／影響面：`run_ic_first`。
+- 改法：`transform_selected` 之 post-IC 前處理器沿用 Task 1.2 容器，回傳紀錄；`write_processed` 同 Task 1.3 ①–⑦ 之 processed 版（紀錄檔另一檔名、`content_sha256` 含 `processed_timestamps.parquet`）。processed 節點不覆寫 raw 節點之 `provenance`；raw 被刪後 raw 紀錄檔仍保留（位於 `provenance/`）。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_processed.py` 全綠：①真實短窗 IC-first 後 processed 紀錄逐選欄恰一筆、臂＝`polars`；②`cleanup_raw` 後 raw 紀錄檔仍在且 sha256 符合 manifest；③IC 選擇為空時 processed 紀錄為零列且狀態可區分「零選欄」。mutation：raw 紀錄檔改放 `raw/` 內 ⇒ ②紅。
+- **邊界**：①選欄全不在 raw；②gaussian 開啟。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無。
+- 不可做：不得改 post-IC 轉換之數值或臂選擇。
+
+**Task 1.5 — 紀錄讀取函式**
+- 目標：提供唯一之紀錄讀取入口供下游（第 9、11 步）使用。　檔案：`momentum/FeatureEngineering/feature_reader.py`（新增 `load_provenance_v2(symbol, tf, config_hash, artifact_kind)`，經 `_parse_manifest_file` 之單一 manifest 邊界）；`run_provenance.py`。　既有 caller／影響面：新建，無 caller。
+- 改法：讀 manifest 宣告之紀錄檔、驗存在、路徑在 run 內、sha256 相符、契約版本相符，回 DataFrame；無 `provenance` 物件之舊 run 拋 `ProvenanceMissingError`；不符拋 `ProvenanceIntegrityError`。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_reader.py` 全綠：正常讀回與寫入表逐位元相同；竄改紀錄檔一位元組 ⇒ `ProvenanceIntegrityError`；舊 run ⇒ `ProvenanceMissingError`；路徑含 `..` ⇒ 拒讀。mutation：略過 sha256 比對 ⇒ 竄改案紅。
+- **邊界**：①processed 與 raw 兩種 artifact；②raw 已刪之 run 讀 raw 紀錄。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無。
+- 不可做：讀取端不得重算特徵檔雜湊（慢閘）。
+
+### Phase 2 — IC 讀取保留 run 身分、快取依身分失效（依賴：Task 1.3）
+
+**Task 2.1 — run 身分物件**
+- 目標：IC 自同一次 manifest 解析取得 run 身分並隨資料傳遞。　檔案：`run_provenance.py`（`resolve_run_identity(manifest, artifact_kind)`）；`momentum/FeatureEngineering/feature_library.py`（`load` 新增回傳身分之入口，舊回傳形態保留給既有 caller）。　既有 caller／影響面：`api/services/ic_analysis_service.py` 之 `_materialize_features_for_ic`。
+- 改法：身分鍵依契約（symbol、tf、config_hash、feature_schema_hash、feature_naming_version、artifact_kind、content_sha256、provenance_sha256）；缺 `content_sha256` 之舊 run 身分標 `legacy`。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_identity.py` 全綠：身分取值與 manifest 逐鍵相等；同一次 `load` 內 manifest 解析次數不因本 Task 增加（以計數 monkeypatch 斷言）。mutation：身分改取第二次解析之 manifest 且其間 manifest 被替換 ⇒ 不一致案紅。
+- **邊界**：①`config_hash` 未指定（latest 解析後才定身分）；②舊 run。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無。
+- 不可做：`api/` 不得自組身分。
+
+**Task 2.2 — ingest 快取依身分失效**
+- 目標：IC ingest h5 與 `_meta.json` 只在身分相符時沿用。　檔案：`api/services/ic_analysis_service.py` 之 `_materialize_features_for_ic`、`_ic_handoff_h5_current`、`_write_features_h5`。　既有 caller／影響面：IC 分析服務全部入口。
+- 改法：h5 根屬性寫 `metadata_json`（含 run 身分）；沿用條件＝h5 與 `_meta.json` 皆帶與本次相同之身分且命名世代現行；否則兩者一併重寫；身分為 `legacy` ⇒ 不沿用。快取檔名保留可讀前綴，`latest` 一律以解析後身分判定。
+- **驗證**：`pytest tests/api/test_preprov_ingest_cache.py` 全綠：①同身分第二次呼叫沿用（不重寫，以 mtime 與寫入計數斷言）；②真實短窗 run 重生而值改變（隔離資料副本中改一根 K 線）⇒ h5 與 meta 皆重寫且 orchestrator 讀得之 `metadata_json` 身分為新值；③舊格式快取（無身分屬性）⇒ 重寫。mutation：沿用條件拿掉 `content_sha256` ⇒ ②紅；只重寫 h5 不重寫 meta ⇒ ②紅。
+- **邊界**：①快取目錄不存在；②h5 損毀（OSError）⇒ 重寫。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無。
+- 不可做：不得以 mtime 或檔案大小代替身分。
+
+**Task 2.3 — IC-first JSON 快取身分**
+- 目標：`ic_selected_features_*.json` 之沿用須值身分相符。　檔案：`momentum/Analysis/ic_engine.py` 之 `CACHE_IDENTITY_FIELDS`、`_request_identity`、`_build_data_fingerprint`。　既有 caller／影響面：`compute_ic_from_l7_raw`。
+- 改法：身分欄加 `content_sha256`（自 manifest raw 節點取，raw 已刪時 manifest 仍在）；缺即拒用；`_build_data_fingerprint` 之 `source_checksum` 來源改為 `content_sha256`（manifest 無 `source_checksum` 鍵）。
+- **驗證**：`pytest tests/momentum/Analysis/test_preprov_ic_cache.py` 全綠：同身分沿用；`content_sha256` 不同 ⇒ 拒用並拋既有 `ICCacheRawUnavailableError`；舊 JSON 無該欄 ⇒ 拒用。既有 `tests/momentum/Analysis/test_icfirstalign_cache.py` 全綠（斷言不放寬）。mutation：自 `CACHE_IDENTITY_FIELDS` 移除新欄 ⇒ 不同身分案紅。
+- **邊界**：①raw 已刪且 manifest raw 節點無 `content_sha256`；②threshold 不同而其餘相同（仍沿用）。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無。
+- 不可做：不得放寬既有十欄之任一欄。
+
+**Task 2.4 — IC 輸出帶 run 身分**
+- 目標：報告、倖存者、API 結果可追溯讀到之 run。　檔案：`momentum/Analysis/ic_filter_orchestrator.py`（報告 metadata、倖存者 provenance 組裝）；`momentum/Analysis/contracts/ic_survivor_contract.json`（`provenance_keys` 加 `ff_run_identity`、`version` +1）；`momentum/Analysis/survivor_contract.py`；`api/services/ic_analysis_service.py`（結果透傳）。　既有 caller／影響面：倖存者讀取端（`docs/IC_QUANT_GAP_REGISTRY.md` 所列消費者）須接受新版本。
+- 改法：同一 run 身分物件寫入報告 metadata 與倖存者 provenance；倖存者 `config_hash`（IC 設定雜湊）語意不變。
+- **驗證**：`pytest tests/momentum/Analysis/test_preprov_survivor_identity.py` 全綠：真實短窗 IC 分析之報告與倖存者 `ff_run_identity` 等於 Task 2.1 身分；倖存者契約驗證器拒收缺該鍵之新版本輸出；既有倖存者契約測試全綠。mutation：倖存者改寫入 ingest 快取檔之舊身分 ⇒ 身分相等案紅。
+- **邊界**：①事件型路徑（`_run_event_label_stages`）同樣帶身分；②IC 選擇為空。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無。
+- 不可做：不得改倖存者既有鍵之語意。
+
+### Phase 3 — 真實資料驗收與輸出重量（依賴：Phase 1、2）
+
+**Task 3.1 — 整合驗收與結構重凍**
+- 目標：真實 kline 全格驗紀錄與實際執行一致、值不變、IC 快取正確失效。　檔案：`tests/feature_engineering/test_preprov_acceptance.py`；`tests/_golden/preprov/`；結構重凍之凍結檔（Task 1.6 所列）。　既有 caller／影響面：凍結檔之結構項。
+- 改法：§V 格子逐格單行程串行跑；值指紋對 `tests/_golden/preprov/pre_change_fingerprints.json` 逐位元比；結構凍結項依 §G 重凍並出差異收據。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_acceptance.py` 全綠（§V oracle ①–⑥）；受影響凍結測試全綠；重凍收據列出之差異路徑只含 `provenance/` 與 manifest 新鍵。
+- **邊界**：見 §V 邊界目錄。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無。
+- 不可做：不得重凍值指紋；不得以合成 fixture 代替真實 kline。
+
+**Task 3.2 — 輸出增量重量**
+- 目標：以真實生成量紀錄檔與 manifest 增量，與核可估算對照。　檔案：`tests/_golden/preprov/output_size.json`；量測腳本 `scripts/preprov_output_size.py`。　既有 caller／影響面：無。
+- 改法：對 Task 3.1 各格及一個全特徵設定之 run（若本機可跑；否則以 Task 3.1 最大格外推並明示）量紀錄檔位元組、manifest 增量、讀取時間。
+- **驗證**：腳本 rc=0，收據含逐格絕對位元組、佔 run 百分比、讀取秒數；全特徵 run 紀錄檔合計 > 2.6 MB（估算兩倍）⇒ 主委白話報使用者再核可。
+- **邊界**：①小 run 百分比失真 ⇒ 同報絕對值；②多標的逐標的報。
 - **存活至**：本票交付後保留為收據。
 - **覆蓋風險**：無。
-- 不可做：不得以「檔很小所以不用問」略過 §A 之否決點。
-
----
+- 不可做：不得以「檔很小」略過與核可估算之對照。
 
 ## §V 驗證策略與邊界測試目錄
-
-- **mutation 條件**：`RISK-HIT: none` ⇒ 不強制。但本 SPEC 仍於 Task 1.1／1.2 各指定一條
-  可證偽之 mutation，因為兩者皆宣稱「記錄與實際一致」，該宣稱若無 mutation 即為空殼。
-- **測試層級**：單元（收集與序列化）＋ 整合（跑一個小 run 後讀收據）；
-  可獨立 `pytest tests/feature_engineering/preprocessing/` 跑，不需 `run_api.py`。
-- **防假綠**：
-  1. 「收據與實際一致」不得以「讀自己剛寫的檔」自證——須以 **Task 1.1 驗證② 之獨立重算 oracle**
-     （取收據之 `d`、以 `_frac_diff_ffd` 重跑該欄、與落檔值比對）核對。
-     🔴 **不得**以 `_fracdiff_processed_columns` 為 oracle——它是不帶值之 `set[str]`，核對不了 `d`
-     （R1 指出；R2 指出本節仍留著該錯誤指涉，屬「只修被點名處」之復發）。
-  2. 既有測試斷言一律 diff，不得放寬。**特別列名**：
-     `tests/feature_engineering/test_batch2d_dstar_align.py`（該目錄 `d_star_*.json` 恰一檔）與
-     `tests/feature_engineering/test_failopen_correctness.py`（run 目錄檔案集合）**皆須維持綠**。
-  3. 用真實 run，禁合成 fixture。
-- **邊界目錄**：✔ 空輸入（`columns` 為空）／✔ 並行與 sibling 實例之合併重複鍵／
-  ✔ **寫入失敗 fail-closed**（🔴 非「降級」——R1 已推翻降級寫法，本節字面同步更正）；
-  ✗ 大尺度浮點（本票不算任何數值）／✗ 並發寫（單 run 單寫者）。
-
----
+- **格子**（真實 kline、短窗、逐格單行程串行）：單週期 1h；12h＋1h 多週期；多標的 worker（兩標的）；平穩化開＋縮尾開；平穩化關＋縮尾開；前處理總開關關；含 ratio-unsafe 群組；dead-drop 開啟；IC-first（含 `cleanup_raw`）。
+- **oracle**（皆不讀紀錄自證）：①窮盡性——紀錄輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄，逐名；②`d` 獨立重算——取紀錄之 `d` 以 `_frac_diff_ffd` 對同校準前史＋公開段重算，與落盤值依 schema dtype 逐位元相等；③縮尾狀態——`applied` 之欄以同參數獨立縮尾重算等於落盤值，`ratio_unsafe` 終態之欄落盤值等於 L6.5 前值，縮尾關閉格無任何 `applied`；④內容身分——測試內自讀檔獨立重算 `content_sha256` 相等；⑤IC 快取——同身分沿用、值改變之重生必重建且報告身分為新值；⑥值不變——公開值指紋與改前基準逐位元相同。
+- **mutation**（各 Task 已列者彙總，Task 3.1 以 monkeypatch 對真實格重跑）：刪縮尾成功紀錄；`d` 寫固定值；回退路徑不記；子實例併回改覆寫；略過 dead-drop 終態；紀錄檔列入特徵群組；`content_sha256` 漏 row index；ingest 沿用條件拿掉身分；IC-first 快取身分移除新欄；紀錄寫入吞例外。每個 mutant 須由對應 oracle 轉紅。
+- **測試層級**：單元＋真實 kline 整合＋凍結對照；可 `pytest tests/feature_engineering/...` 獨立跑，不需 `run_api.py`。
+- **防假綠**：既有測試斷言 diff 不放寬；測試刪改依 2026-10-17 裁定登記審清單。
+- **估時**（本機 8 GB）：每格短窗生成約 1–5 分鐘（PROBEWINSOR 同型格實測量級），全格約 30–60 分鐘；超過 30 分鐘之跑開跑前列格數×估時報使用者。
+- **邊界目錄**：空 DF（零選欄）✔ Task 1.4／全 NaN 欄 ✔ Task 1.2 邊界③／重複鍵 ✔ Task 1.2、1.3／寫入失敗與晚期失敗 ✔ Task 1.3／竄改與路徑逃逸 ✔ Task 1.5／舊 run 與舊快取 ✔ Task 1.5、2.2、2.3／並發寫：單 run 單寫者（既有 manifest 鎖），✗。
 
 ## §R 回退
-
-- 單一 Phase，可整體 `git revert`。
-- 收據落檔為純新增副作用：不啟用即完全回退，既有 run 之輸出逐位元組不變。
-- 若 Task 1.3 量出之輸出增幅使使用者否決 ⇒ 整票回退，不留半套。
-
----
+- 每 Phase 獨立 commit、可單獨 revert；Phase 2 revert 後 IC 回到現行快取行為（含現存缺陷）；Phase 1 revert 後新 run 無紀錄，既有讀取不受影響（D6）。
+- 值指紋任一改變 ⇒ 不合併。
 
 ## §N N/A 登記與殘留
 
 ### N/A
-
-- **§G Golden／Baseline**：N/A — 本票不改任何數值、不碰特徵計算路徑；
-  「行為不變」由**既有** FF golden 測試承接（Task 1.3 明列其須維持綠）。
-  🔴 若實作中發現任何既有 golden 轉紅，即為命中 §RISK 升級訊號③，當場停工重新分類。
+- 無。
 
 ### 殘留
+- **FFDSTAR-R1 既有 7 個共用 d* 快取檔之來源 run 不明** — `為何現在不做: user-ruling:2026-08-05 使用者定死「修正只考慮以後，不把舊錯誤包回來」`；觸發：使用者要求回溯查證某既有 run 之 d*；登記處：本 SPEC §N。本票之後新 run 之 d* 以 run 內紀錄為準，共用快取只作快取。
+- **FFDSTAR-R2 `/api/v1/features/generate` 回之 `task_id` 於任務查詢端點查無** — `為何現在不做: needs-research:API 任務登記路徑是否為既知設計（屬 api/ 任務登記，與本票之 run 紀錄與 IC 身分無資料依賴）`；觸發：下一次動 `api/services/feature_factory_service.py` 之任務登記或前端依賴該端點時；登記處：本 SPEC §N。
+- FFDSTAR-R3（決策 148 欄對 L1＋L2 候選）：由 Task 3.1 oracle ① 直接回答，於本票收案時關閉，不再列殘留。
 
-- **FFDSTAR-R1 既有 7 個共用快取檔之來源 run 不明**
-  — `為何現在不做: user-ruling:2026-08-05 使用者定死「修正只考慮以後，不把舊錯誤包回來」`；
-  觸發：使用者要求回溯查證某個既有 run 之 `d*` 時；登記處：本 SPEC §N（ROADMAP 只放票列 `RM-FFDSTAR` 之 pointer，不重複列殘留識別碼）。
-  🔴 **誠實邊界**：本票**救不回過去**。reference run（特徵落檔 `Jul 4 15:35`）當時之 `d*`
-  已被 `Sep 9 20:45` 之另一 run 覆寫，除重跑外無法取得。
-- **FFDSTAR-R2 `/api/v1/features/generate` 回之 `task_id` 於 `/task/{task_id}` 查不到**
-  — `為何現在不做: blocked-by:本票範圍限於預處理層之可追溯性，該缺陷在 api/ 之任務登記路徑，
-  屬不同模組且需獨立定性（是否為已知設計）`；
-  觸發：**已觸發**，2026-09-21 主委跑 FF 重跑時實遇（三個候選狀態端點皆 404，生成本身正常）；
-  登記處：本 SPEC §N（ROADMAP 只放票列 `RM-FFDSTAR` 之 pointer，不重複列殘留識別碼）。
-- **FFDSTAR-R3 收據覆蓋率與欄數之落差**
-  🔴 **本輪已先拆掉一半**（R1 composer 指出「不實作也能拆」，主委照做）：
-  FACT-RECEIPT: FF 重跑之 L6.5 日誌逐字印出
-  `fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2']`（Claude 實跑 2026-09-21）
-  ⇒ **L3 以上之欄從不進入 fracdiff**，437,110 不是候選母體；候選僅 L1＋L2
-  （同次 run 之 L2 完成量為 44,827 欄）。
-  ⇒ 剩下待答的只有「L1＋L2 候選中，被 ADF 判為非平穩者是否恰為 148」。
-  — `為何現在不做: needs-research:上述剩餘問題須以真實 run 之逐欄判定計數回答，
-  而該計數正是 Task 1.1 之產出；在其上線前無獨立來源`；
-  觸發：Task 1.1 完工並跑過一次真實 run 後；登記處：本 SPEC §N（ROADMAP 只放票列 `RM-FFDSTAR` 之 pointer，不重複列殘留識別碼）。
+## §K 本 SPEC 註冊之 fact-key
+
+> 下列區塊由 `scripts/fact_keys.json` 生成，禁手改。逐欄紀錄欄位與值集之唯一真相源為契約 JSON，以下只列落點與身分之定案。
+
+### K-1 紀錄落點與身分
+
+<!-- BEGIN GENERATED: ffdstar-receipt-schema -->
+| 序 | 欄 | 型別／值集 | 說明 |
+|---|---|---|---|
+| 010 | 紀錄檔落點 | run 目錄內 `provenance/` 子目錄；raw 與 processed 各一檔（檔名定義於契約 JSON） | 不放 `raw/` 內——IC-first 於 processed 落盤後刪整個 raw（`feature_factory.py:2997-3004`）；不放共用目錄——須與 run 同生命週期 |
+| 020 | 紀錄檔格式 | zstd 壓縮 parquet，每個輸出欄一列（寬表：各步驟一欄） | 使用者 2026-10-19 核可之存法（準確、檔小、讀快）；全特徵 run 估約 +1.3 MB |
+| 030 | manifest 新鍵 | 每個 artifact 節點之 `content_sha256` 與 `provenance` 物件（鍵定義於契約 JSON） | manifest 只放路徑、sha256、列數、契約版本、各步驟各狀態計數、群組表；不內嵌逐欄紀錄 |
+| 040 | 提交點 | manifest 合併為唯一提交點；安裝前先使舊 raw 節點不完整 | 任一步失敗 ⇒ run 失敗、不可被讀為完整 |
+| 050 | 內容身分 `content_sha256` | 排序之（相對路徑、欄名、列數、dtype、檔案 sha256）＋ row index 檔 sha256 之 sha256 | 與 `config_hash`（設定）、`feature_schema_hash`（欄集合）正交，三者不得互相代替；紀錄檔 sha256 不入內容身分 |
+| 060 | run 身分物件 | 鍵定義於契約 JSON；自同一次 manifest 解析取得 | IC ingest 快取、交接 h5 `metadata_json`、IC-first JSON 快取、報告、倖存者、API 結果共用；缺 `content_sha256` 之舊 run 標 `legacy`、快取不沿用 |
+| 070 | 讀取端驗證 | 宣告檔存在、路徑在 run 內、紀錄檔 sha256 相符 | 不在每次讀取重算特徵檔雜湊（慢閘） |
+<!-- END GENERATED: ffdstar-receipt-schema -->
+
+### K-2 值集來源與約束
+
+<!-- BEGIN GENERATED: ffdstar-skip-reasons -->
+| 序 | 值 | 語意 |
+|---|---|---|
+| 010 | 值集唯一來源 | 各步驟狀態、群組轉換臂與回退、終態之封閉值集只定義於 `momentum/FeatureEngineering/contracts/run_provenance.json`（SPEC Task 1.1）；本表與測試不另列舉 |
+| 020 | 值樣式 | 每個值合 `^[a-z][a-z0-9_]*$`；說明文字不得作值 |
+| 030 | 值之碼證 | 每個值附 `_sources`（至少一個 `path:line` 實際離開點）；無離開點之值不得存在，每個離開點須有對應值；驗收未產出之值須列於契約 `_unreachable` 並附碼證理由 |
+| 040 | 紀錄母體 | 逐欄紀錄之輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄（逐名、無重複）；平穩化決策欄非空之列 ＝ 本 run 實際進入平穩化步驟之輸入欄 |
+<!-- END GENERATED: ffdstar-skip-reasons -->

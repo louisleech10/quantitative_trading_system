@@ -17,45 +17,21 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>TESTREG 第 3 批（全票排序第 5a 步）</strong>：特徵工廠相關的 149 個測試檔，逐檔判定該留、該改、還是該淘汰，再實際去改。<strong>特徵工廠等正式計算程式沒有動</strong>；改的是測試清冊工具（<code>scripts/testreg.py</code>）、清冊本身和規則。</p>
-<p>你 10/13 睡前交代「依序做，有問題你跟委員共識決定」，所以期間的取捨都由我和三家委員（codex、composer、grok）共識決定，做完寫給你看。</p>
-<p><strong>此刻</strong>：第一小批 17 個測試檔已正式改好、三家審查通過（10/14 收批）。下一步是第二小批，開跑前先估時間。</p>
+<p><strong>PRE-PROV（全票排序第 7 步，舊名 FFDSTAR）</strong>：讓每次產生特徵時，都存下一份「每一欄實際做了哪些處理」的紀錄，並修好 IC 分析讀到舊資料的問題。前一張 FF-NAME 已於 10/19 收案。</p>
+<p><strong>此刻</strong>：規格已依 FF-STAT、FF-NAME 之後的現況重寫完成，驗收測試正在撰寫中。寫完後連同規格一起送兩家委員（codex、composer）做對抗式審查。<strong>正式程式還沒動</strong>（只新增了一個空殼檔，裡面的函式都還不能用）。</p>
 <ul>
-<li><strong>你 10/14 的裁定</strong>：「不要摳細節」「照主流軟體業界和量化金融的做法」。所以：
+<li><strong>為什麼要做</strong>：
 <ul>
-<li>改測試的規則停在第 52 版，不再改版；</li>
-<li>委員審查改成一般公司的程式碼審查，只看專案裡真的會發生的錯；</li>
-<li>量化正確性照舊從嚴（偷看未來、資料正確、算對沒有）。</li>
+<li>每一欄的平穩化判斷和分數差分階數（d*），程式其實早就算好了。但說明檔先寫完、之後才去收集這些結果，所以從來沒有存下來。</li>
+<li>縮尾（去掉極端值）實際有沒有做、走了哪條計算路徑、哪些群組失敗，現在也都沒有紀錄。目前的說明檔只寫「設定上開了什麼」，不是「實際做了什麼」。</li>
 </ul>
 </li>
-<li><strong>第一小批改了什麼</strong>：舊測試一字不動，每檔都另外加了真的會抓錯的新測試。每支新測試都實際把正式程式改壞驗過，確認新測試抓得到、舊測試抓不到。例如：
-<ul>
-<li>跨週期對齊改用自己推導的正確答案比對，不再拿正式程式自己當標準；</li>
-<li>縮尾的「不偷看未來」檢查，改到真的有數值的列上做，原本檢查的列全是空值。</li>
+<li><strong>偵察時另外查到一個資料正確性的錯</strong>：IC 分析會把特徵資料快取起來重用，但快取只認「設定編號」。同一組設定重新產生特徵之後，IC 仍會讀到舊的快取資料。本票一併修：改成依「資料內容的指紋」判斷，內容一變就重讀。</li>
+<li><strong>你 10/19 核可的存法</strong>：逐欄紀錄另存一個壓縮表格檔，說明檔只放摘要和指紋。以最大的真實產出（BTC 12 小時全特徵，20.4 萬欄）實測估算，每個產出約多 1.3MB（約 +0.2%）；全部寫進說明檔則要多約 34MB。做完會用真實產出重量一次，若超過估算兩倍會再問你。</li>
+<li><strong>我自己判斷錯、已更正的一處</strong>：我原本想把紀錄檔放在特徵資料夾裡，跟特徵一起存入。查到 IC 流程做完會刪掉整個特徵資料夾，紀錄會跟著消失，所以改採委員的做法，另放一個獨立資料夾。</li>
 </ul>
-</li>
-<li><strong>2 檔改為保留</strong>：它們的舊測試只驗說明文件的字或第三方套件的行為，沒碰到正式程式，照業界常規保留，已登記。</li>
-</ul>
-<p><strong>🔴 試改時發現兩個正式程式的錯（要另開票，已登記在 <a href="還沒做的事.html">還沒做的事.md</a>）</strong>：</p>
-<ol>
-<li>舊版特徵產生器在同一資料來源、不同 EMA 參數時，有幾欄名字相同、數值不同，型態分析和 XGBoost 批次會靜默丟掉第二組的這幾欄。</li>
-<li>舊版特徵產生器會看「現在跑的測試叫什麼名字」來決定要不要過濾掉絕對價格欄：那支測試會過，是因為程式認出它在被測，正式使用時不會過濾。</li>
-</ol>
-<p><strong>10/14 已完成的</strong>：</p>
-<ol>
-<li>分類做完：149 檔的判定已寫進清冊（留 86、改 63、擬淘汰 14 支函式）。</li>
-<li>「本來就壞的測試改寫證明」（第 44–46 版）三家蓋章、已放進正式程式。說明已封存：<code>Archived/TESTREG規格v44修正審閱.md</code>。</li>
-<li>「分小批跑」與「成效報告」兩個工具做完、已提交，驗收全過。</li>
-</ol>
-<p><strong>這一批先前查到的事（用真實資料實跑過）</strong>：</p>
-<ol>
-<li><strong>有 33 個測試在改動前就已經失敗、以前沒登記</strong>，每一個都找到是哪一次修改弄壞的。其中 17 個同因（共用輔助程式沒給週期），只改那一處就全好（實測過），但它在 FRAMEPATH 凍結範圍裡，要等 FRAMEPATH 修好那條檢查才能提交。</li>
-<li><strong>FRAMEPATH 第一批（10/10）弄壞了 2 個測試，但它「挑選要跑哪些測試」的步驟漏掉了它們。</strong> 這套挑選方式要先修好，FRAMEPATH 第二批才能用。</li>
-<li><strong>很多特徵工廠測試其實在比對空表</strong>：生成程式現在只回傳時間、不回傳特徵值，所以拿它比對數值的測試永遠會過。要改成讀實際存下來的資料再比。</li>
-<li><strong>你 10/12 問的「粗接細」（主 1 小時＋12 小時）</strong>：三家同意加上、不取代原本的「細接粗」。用真實資料試跑過，獨立寫的檢查程式和正式程式逐列一致。</li>
-</ol>
 <h2 id="做到哪">做到哪</h2>
-<p><strong>TESTREG 全部項目</strong>（規格 <code>docs/TESTREG_SPEC.md</code> 的「§P Phase 與依賴」：Phase 1 第 55 行起、Phase 2 第 96 行、Phase 3 第 129 行、Phase 4 第 153 行；施工清單 <code>docs/manifests/TESTREG.json</code>）：</p>
+<p><strong>PRE-PROV 全部項目</strong>（規格 <code>docs/FFDSTAR_SPEC.md</code> 的「§P Phase 與依賴」：Phase 1 第 52 行起、Phase 2 第 108 行、Phase 3 第 146 行；施工清單 <code>docs/manifests/FFDSTAR.json</code>，撰寫中）：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -69,95 +45,117 @@
 <tbody>
 <tr>
 <td>準備</td>
-<td>規格、施工清單</td>
-<td>定做法、寫規格與 11 個驗收檔</td>
-<td>✅ 完成</td>
+<td>偵察、量輸出增量</td>
+<td>主委和兩家委員各自查現況；量多存紀錄會多佔多少空間</td>
+<td>✅ 完成（10/19）</td>
 <td>—</td>
 </tr>
 <tr>
-<td>第 1 批</td>
-<td>1.1–1.5</td>
-<td>清冊規則、653 檔登記、自動記錄、標記、寫檔當下檢查</td>
-<td>✅ 已收批（10/12）</td>
+<td>準備</td>
+<td>規格重寫</td>
+<td>依現況重寫規格（舊版的存放位置和欄位都已不適用）</td>
+<td>✅ 草稿完成（10/19）</td>
+<td>送委員審查</td>
+</tr>
+<tr>
+<td>準備</td>
+<td>施工清單與驗收測試</td>
+<td>先寫好「做對了會過、做錯了會紅」的測試</td>
+<td>🔨 撰寫中</td>
+<td>寫完連同規格送審</td>
+</tr>
+<tr>
+<td>Phase 1</td>
+<td>1.1</td>
+<td>逐一查出每個處理步驟實際會走到的每條出口，定出紀錄能寫哪些值</td>
+<td>⏳ 未開始</td>
 <td>—</td>
 </tr>
 <tr>
-<td>第 2 批</td>
-<td>2.1–2.4</td>
-<td>待複查訊號、挑選器、接上 FRAMEPATH、查 V-6 為何慢</td>
-<td>✅ 已收批（10/12）</td>
+<td>Phase 1</td>
+<td>1.6</td>
+<td>測試和凍結工具改成「照說明檔列的檔案讀」，避免新紀錄檔被誤當成特徵</td>
+<td>⏳ 未開始</td>
 <td>—</td>
 </tr>
 <tr>
-<td>插入</td>
-<td>PROBEWINSOR</td>
-<td>修「關掉預處理時，預熱探測仍縮尾」</td>
-<td>✅ 已收案（10/13）</td>
+<td>Phase 1</td>
+<td>1.2</td>
+<td>在計算過程中逐欄記下每一步實際做了什麼（成功也記）</td>
+<td>⏳ 未開始</td>
 <td>—</td>
 </tr>
 <tr>
-<td>第 3 批</td>
-<td>3.0 改寫證明規則</td>
-<td>讓特殊情況的測試也有合法改法</td>
-<td>✅ 第 52 版定案，三家蓋章、已放進正式程式（10/14）</td>
+<td>Phase 1</td>
+<td>1.3</td>
+<td>存紀錄檔、算資料內容指紋、寫入說明檔；任何一步失敗就整次產出失敗</td>
+<td>⏳ 未開始</td>
 <td>—</td>
 </tr>
 <tr>
-<td>第 3 批</td>
-<td>3.1 分類</td>
-<td>特徵工廠相關 149 檔（<code>tests/feature_engineering/</code> 全部 98 檔＋根目錄 <code>tests/</code> 下用到特徵工廠的 50 檔＋<code>tests/momentum/feature_engineering/</code> 1 檔），三家逐檔判定</td>
-<td>✅ 判定完成並寫進清冊（10/14）</td>
+<td>Phase 1</td>
+<td>1.4</td>
+<td>IC 選完特徵後的第二段處理也記紀錄</td>
+<td>⏳ 未開始</td>
 <td>—</td>
 </tr>
 <tr>
-<td>第 3 批</td>
-<td>3.2 實際改測試</td>
-<td>依判定改測試、淘汰，每批最多 20 檔</td>
-<td>🔨 第一小批 17 檔已收批（10/14）；2 檔改為保留；第二小批準備中</td>
-<td>要改的 63 檔中，39 檔不受 FRAMEPATH 凍結（另 24 檔要等它修好）；39 檔裡 7 檔沒有耗時紀錄，開跑前先逐檔量</td>
+<td>Phase 1</td>
+<td>1.5</td>
+<td>提供讀紀錄的單一入口，內容被改過就拒讀</td>
+<td>⏳ 未開始</td>
+<td>—</td>
 </tr>
 <tr>
-<td>第 3 批</td>
-<td>3.3 成效報告</td>
-<td>省了多少時間、淘汰了什麼</td>
-<td>🔨 報告工具已完成（10/14）</td>
-<td>等 3.2 做完再產報告</td>
+<td>Phase 2</td>
+<td>2.1</td>
+<td>IC 讀資料時一併拿到「讀的是哪一次產出」</td>
+<td>⏳ 未開始</td>
+<td>—</td>
 </tr>
 <tr>
-<td>第 4 批</td>
-<td>4.1–4.3</td>
-<td>其餘全部測試檔照同樣方法做，收案</td>
+<td>Phase 2</td>
+<td>2.2</td>
+<td>IC 快取改成依資料內容指紋判斷要不要重讀</td>
+<td>⏳ 未開始</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Phase 2</td>
+<td>2.3</td>
+<td>IC 另一個分數快取也加上資料內容指紋</td>
+<td>⏳ 未開始</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Phase 2</td>
+<td>2.4</td>
+<td>IC 報告和存活特徵清單寫明用的是哪一次產出</td>
+<td>⏳ 未開始</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Phase 3</td>
+<td>3.1</td>
+<td>用真實 K 線跑一組情境，逐項驗紀錄和實際一致、特徵值完全沒變</td>
+<td>⏳ 未開始</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Phase 3</td>
+<td>3.2</td>
+<td>用真實產出重量紀錄檔大小，對照你核可的估算</td>
 <td>⏳ 未開始</td>
 <td>—</td>
 </tr>
 </tbody>
 </table></div>
-<p>全部做完才回 FRAMEPATH 第二批。</p>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<ol>
-<li><strong>推送</strong>：10/14 已全部推上 GitHub，之後每次提交即推。</li>
-<li><strong>暫存清理</strong>（權限不讓我刪）：
-<ul>
-<li>暫存工作目錄共 6 個，在 <code>/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/9fa03a2f-8653-4b8d-a632-cc80fa7b1e68/scratchpad/</code> 下：<code>wt_bis</code>、<code>wt_5584102d</code>、<code>wt_5584102d_1</code>、<code>wt_impl</code>、<code>wt_prof</code>、<code>wt_b3</code>。
-<ul>
-<li>前 5 個現在就可刪，例如：<code>git worktree remove --force /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/9fa03a2f-8653-4b8d-a632-cc80fa7b1e68/scratchpad/wt_bis</code>，其餘同法。</li>
-<li><code>wt_b3</code>、<code>wt_v50</code> 也已可刪（第一小批已正式提交）。</li>
-</ul>
-</li>
-<li>另有先前留下的：
-<ul>
-<li><code>data_cache/cgsa_work</code> 中 10/12 晚上之後的暫存目錄；</li>
-<li><code>handoffs/run_receipts/probewinsor_probes/run_five.sh</code>。</li>
-</ul>
-</li>
-<li>兩位委員違規在 <code>handoffs/run_receipts/testreg_probes/b3/</code> 留了暫存檔，可刪：<code>rm handoffs/run_receipts/testreg_probes/b3/_g1_31_41_scope.txt handoffs/run_receipts/testreg_probes/b3/_g1_31_41_grok_compare.tsv</code>。</li>
-</ul>
-</li>
-</ol>
+<p>不用。存法你 10/19 已核可；技術取捨由我和委員共識決定。</p>
 <h2 id="卡住嗎">卡住嗎</h2>
 <p>沒有。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>第二小批：先量 7 個沒有耗時紀錄的檔（部分用真實 K 線），估好總時數再開跑。上面兩個正式程式的錯另開票。</p>
+<p>驗收測試寫完 → 規格＋施工清單送兩家委員對抗式審查 → 修到收斂後開始 Phase 1。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
