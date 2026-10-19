@@ -154,11 +154,11 @@
       "既有倖存者契約消費者（factor_combiner、marginal_ic、ic_reporter）讀新版本之相容性於 b3 以其既有測試驗證；前端 types.ts 之倖存者型別無 provenance 欄，不受影響"
     ],
     "coverage_risk": [
-      "Task 1.1：test_preprov_contract.py（驗證①②③、邊界 01–03、mutation 3：刪觀測值、source 指註解行、source 指無關可執行行）",
-      "Task 1.6：test_preprov_helpers.py（驗證 01、02a 清冊完整、02 feature_run 已改依 manifest、03–04、邊界 01–03、mutation 3：rglob 列舉、清冊刪 feature_run 條目、植入清冊外呼叫點）；清冊 tests/_golden/preprov/reader_inventory.json",
-      "Task 1.2：test_preprov_collect.py（驗證 01–03、邊界 01–04、mutation 3）",
+      "Task 1.1：test_preprov_contract.py（驗證①②③、01b 出處範圍＝SPEC 寫入路徑＋紀錄函式判準、04 回退值集與 manifest fallback 為清單、邊界 01–03、mutation 5：刪觀測值、source 指註解行、source 指無關可執行行、source 指他域同字面行〔ic_engine.py return \"applied\"〕、fallback 改單值／改群組臂值）",
+      "Task 1.6：test_preprov_helpers.py（驗證 01、02a 清冊完整、02 feature_run 已改依 manifest、02b 凍結基準 2609aa1f 之 feature_run 條目不得改標、03–04、邊界 01–03、mutation 4：rglob 列舉、清冊刪 feature_run 條目、植入清冊外呼叫點、benchmark_l65_v2 rglob 條目改標 unrelated）；清冊 tests/_golden/preprov/reader_inventory.json",
+      "Task 1.2：test_preprov_collect.py（驗證 01–03、02b native 回退記於回退清單、04 d* 搜尋鏈 ProvenanceError 上拋、05 parallel→serial 回退紀錄等於純串行、06 ADF 例外記事件不改行為、07 總開關關閉全步驟記總開關關閉值、邊界 01–04、mutation 7：縮尾不記、刪離開點、合併改覆寫、d* 搜尋吞 ProvenanceError、回退保留失敗嘗試紀錄、ADF 例外不記事件、總開關關閉記他值）",
       "Task 1.3：test_preprov_writer.py（驗證 01–06 與 03b、05b〔來源未刪／已刪〕、邊界 01–04、mutation 3：漏 row index、吞例外、時間軸直寫不回復）",
-      "Task 1.4：test_preprov_processed.py（驗證 01–04〔04＝⑤b processed 版〕、邊界 01–02、mutation 2：raw 紀錄放 raw/、processed 時間軸直寫不回復）",
+      "Task 1.4：test_preprov_processed.py（驗證 01–05〔04＝⑤b processed 版；05＝母體為 IC 選欄全集〕、邊界 01–04〔03 選欄不在 raw、04 ratio-unsafe 選欄〕、mutation 3：raw 紀錄放 raw/、processed 時間軸直寫不回復、漏記不在 raw／ratio-unsafe 選欄或兩類同終態）",
       "Task 1.5：test_preprov_reader.py（驗證 01–05、邊界 01–02、mutation：略過 sha256）；Task 3.2 邊界③：量測腳本缺指標／缺紀錄檔／metadata 不可讀 ⇒ rc=1",
       "Task 2.1：test_preprov_identity.py（驗證 3、邊界 01–02、mutation 1）",
       "Task 2.2：test_preprov_ingest_cache.py（驗證①②③、邊界 04–05、mutation 2）",

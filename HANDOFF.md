@@ -308,6 +308,7 @@
 - 🔴 **`tests/momentum/test_ic_golden_inputs_names_opaque.py` 結束不清暫存**（2026-10-19 查到）：每跑一次在系統暫存留 `ffname_opaque_la1_*`（約 2MB）——待修（改用 pytest `tmp_path`；小任務，修後派委員審清單）。
 - 🔴 **FF-NAME 重凍工具 `scripts/ffname_refreeze.py`／`ffname_refreeze_{failopen,framepath}.sh`**：日後若需再重凍 golden，以改前 worktree（不同於 c9737729 時須改契約 `pre_change_commit`）跑 record → k2 → consumers → receipt；消費測試只改單一測試檔時用 `consumers --rerun-nodeids --merge`（生產碼變動即拒合併），勿整組重跑。
 - 🔴 **委員自己的唯讀 jq `select(...)` 會在其所屬輪開債期間被 gate_check 判為派工而擋**（2026-10-19 FFDSTAR r6：codex 兩次停在同一條 jq，依 brief 停手、未交件）；該輪已有結果即不得 `collection-failed` 棄置，只能同輪重派（間隔 ≥600 秒、上限 6 次）。⇒ 新 brief 之唯讀段一律加一句：「需 jq `select`／複雜 rg 時寫成 `/tmp` 腳本再 `bash` 執行（gate 誤判之既知避法，非繞過）」。
+- 🔴 **委員交件被 cx_run 記為 success 者（非戳記輪）一律不得改動，連只移 STATUS 行亦不可**：debt_clear 比對 success 時之 sha（`scripts/debt_clear.sh:661-692` 只對戳記輪放行重登）；「改檔後 register-output」只適用 verdict_rejected／format-failed 者。2026-10-19 r6 誤改後還原原位元組才銷帳。
 - 🔴 **監看子代理完成勿 grep 交接檔中之 `SubagentHandback`**：該字串存在於工具定義、恆命中 ⇒ 改以「交接檔連續 N 分鐘無成長且無 pytest 程序」判定。
 
 ## 進行中紀錄

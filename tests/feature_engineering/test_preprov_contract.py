@@ -23,6 +23,18 @@ pytestmark = pytest.mark.requires_kline
 
 _SOURCE_RE = re.compile(r"^(?P<path>[^:\s]+):(?P<line>\d+)$")
 _PREPROCESSOR = "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py"
+#: SPEC Task 1.1 驗證①：`_sources` 之檔須位於特徵工廠寫入路徑（目錄項以 `/` 結尾＝其下任意檔；檔案項＝逐字相等）。
+#: 契約 `source_scope` 須等於本集合（防契約自行放寬範圍）。
+SPEC_SOURCE_SCOPE = frozenset({
+    "momentum/FeatureEngineering/preprocessing/",
+    "momentum/FeatureEngineering/feature_storage.py",
+    "momentum/FeatureEngineering/feature_factory.py",
+})
+#: CODEX-R6-P2-01 之反例檔：他域含同字面之行（`ICEngine.set_timeframe` 回傳 "applied"，錨點 :167）
+_FOREIGN_SAME_LITERAL = "momentum/Analysis/ic_engine.py"
+#: 紀錄函式之判準（唯一定義處）：被呼叫者末段名稱（`f(...)` 之 `f`、`x.f(...)` 之 `f`）含 "record"
+#: （如 `_record_execution`、`_record_decision`、`record_*`）
+RECORDING_CALLEE_RE = re.compile(r"record")
 
 
 @pytest.fixture(scope="module")
@@ -74,11 +86,45 @@ def _parsed(target: Path) -> ast.AST:
     return _AST_CACHE[key]
 
 
+def recording_callee(call: ast.Call) -> Optional[str]:
+    """呼叫之被呼叫者末段名稱符合 `RECORDING_CALLEE_RE` ⇒ 該名稱；否則 None。"""
+    func = call.func
+    name = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else None
+    return name if name is not None and RECORDING_CALLEE_RE.search(name) else None
+
+
+def statement_record_call(stmt: Optional[ast.stmt]) -> Optional[ast.Call]:
+    """陳述式本身即一個紀錄函式呼叫（`f(...)`、`x = f(...)`、`x: T = f(...)`、`return f(...)`）⇒ 該呼叫；否則 None
+    （複合陳述式之標頭、其他陳述式、巢狀於其他運算式內之紀錄呼叫皆不算）。"""
+    value = stmt.value if isinstance(stmt, (ast.Expr, ast.Assign, ast.AnnAssign, ast.Return)) else None
+    return value if isinstance(value, ast.Call) and recording_callee(value) is not None else None
+
+
+def record_call_literals(call: ast.Call) -> Set[str]:
+    """紀錄呼叫之實參（位置與關鍵字引數之值，含其子運算式如條件運算式）中之字串字面集合。"""
+    out: Set[str] = set()
+    for arg in list(call.args) + [kw.value for kw in call.keywords]:
+        for node in ast.walk(arg):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                out.add(node.value)
+    return out
+
+
+def in_source_scope(rel: str, scope: Any) -> bool:
+    """`rel`（repo 相對 POSIX 路徑）屬 `scope`：目錄項（`/` 結尾）為其下任意檔，檔案項逐字相等。"""
+    return any(rel.startswith(str(s)) if str(s).endswith("/") else rel == str(s) for s in scope or ())
+
+
 def source_violations(spec: Mapping[str, Any]) -> List[str]:
-    """① 每個值集非空；每值恰有 `_sources`（非空清單）；每個 `path:line` 指向 repo 內存在之檔之非註解非空行，且該行
-    （或其所屬之單一 AST 陳述式；複合陳述式只取標頭）含該值之字串字面（記錄呼叫之實參；`ast.Constant` 逐字相等）——
-    指向無關可執行行即紅（CODEX-R5-P2-02）；`_sources` 不得有值集外之鍵。"""
+    """① 每個值集非空；每值恰有 `_sources`（非空清單）；每個 `path:line` 指向 repo 內存在之檔之非註解非空行；該檔屬契約
+    `source_scope`（特徵工廠寫入路徑；CODEX-R6-P2-01）；該行所屬之單一 AST 陳述式本身為對紀錄函式之呼叫
+    （`RECORDING_CALLEE_RE`），且其實參含該值之字串字面（`ast.Constant` 逐字相等）——指向無關可執行行
+    （CODEX-R5-P2-02）、或他域含同字面之行（例 `momentum/Analysis/ic_engine.py:167` 回傳 "applied"）即紅；
+    `_sources` 不得有值集外之鍵。"""
     out: List[str] = []
+    scope = list(spec.get("source_scope") or [])
+    if not scope:
+        out.append("契約無 source_scope ⇒ 出處範圍未定")
     for path in ph.enum_paths(spec):
         node = ph.enum_node(path, spec)
         values, sources = list(node["values"]), dict(node["_sources"])
@@ -106,12 +152,16 @@ def source_violations(spec: Mapping[str, Any]) -> List[str]:
                 if not text or text.startswith("#"):
                     out.append(f"{path}.{value}: {ref} 為空行或註解行")
                     continue
+                if not in_source_scope(m["path"], scope):
+                    out.append(f"{path}.{value}: {ref} 不在契約 source_scope（特徵工廠寫入路徑）內")
                 if not target.suffix == ".py":
                     out.append(f"{path}.{value}: {ref} 非 Python 原始碼（無法驗字串字面）")
                     continue
-                stmt = _innermost_statement(_parsed(target), n)
-                if stmt is None or value not in _statement_string_literals(stmt):
-                    out.append(f"{path}.{value}: {ref} 之陳述式不含該值之字串字面")
+                call = statement_record_call(_innermost_statement(_parsed(target), n))
+                if call is None:
+                    out.append(f"{path}.{value}: {ref} 之陳述式非紀錄函式呼叫（被呼叫者名須合 {RECORDING_CALLEE_RE.pattern!r}）")
+                if call is None or value not in record_call_literals(call):
+                    out.append(f"{path}.{value}: {ref} 之陳述式之紀錄呼叫實參不含該值之字串字面")
     return out
 
 
@@ -156,11 +206,30 @@ def observed_from_table(table: Any, spec: Mapping[str, Any]) -> Dict[str, Set[st
 
 
 def observed_from_groups(groups: Mapping[str, Mapping[str, Any]]) -> Dict[str, Set[str]]:
-    out: Dict[str, Set[str]] = {"group_arm_values": set(), "group_status_values": set()}
+    """群組表之觀測值：`arm`→群組臂值集、`status`→群組狀態值集、`fallback`（清單；契約 `fallback_values._doc`）之
+    每個元素→回退值集（非清單之舊形亦逐值收入，其型別另由 `manifest_fallback_violations` 判紅）。"""
+    out: Dict[str, Set[str]] = {"group_arm_values": set(), "group_status_values": set(), "fallback_values": set()}
     for info in groups.values():
-        for key, path in (("arm", "group_arm_values"), ("fallback", "group_arm_values"), ("status", "group_status_values")):
+        for key, path in (("arm", "group_arm_values"), ("status", "group_status_values")):
             if info.get(key) is not None:
                 out[path].add(str(info[key]))
+        fallback = info.get("fallback")
+        for item in (fallback if isinstance(fallback, list) else [] if fallback is None else [fallback]):
+            out["fallback_values"].add(str(item))
+    return out
+
+
+def manifest_fallback_violations(groups: Mapping[str, Mapping[str, Any]], spec: Mapping[str, Any]) -> List[str]:
+    """manifest 群組表之 `fallback`（契約 `manifest_group_keys`）須存在且為清單（可多重、依發生序；無回退＝空清單），
+    元素皆屬契約 `fallback_values`（SPEC v3 盤點輸入③）。"""
+    allowed = set(ph.contract_values("fallback_values", spec))
+    out: List[str] = []
+    for gid, info in groups.items():
+        fallback = info.get("fallback", "<缺鍵>")
+        if not isinstance(fallback, list):
+            out.append(f"{gid}: fallback 非清單：{fallback!r}")
+            continue
+        out.extend(f"{gid}: fallback 元素 {item!r} 不屬 fallback_values" for item in fallback if item not in allowed)
     return out
 
 
@@ -251,6 +320,37 @@ def test_verification_03_observed_values_subset_and_covered(runs: ph.RunCache, m
     merge(observed, observed_from_records(statsmodels_unavailable_records(runs, monkeypatch), spec))
     assert sum(len(v) for v in observed.values()) > 0, "未觀測到任何值 ⇒ ③ 空轉"
     assert coverage_violations(spec, observed) == []
+
+
+def test_verification_01b_source_scope_is_spec_scope() -> None:
+    """① 之出處範圍：契約 `source_scope` 恰為 SPEC Task 1.1 驗證①所列之特徵工廠寫入路徑（不得放寬或縮窄）；
+    紀錄函式判準命中既有紀錄函式名、不命中無關函式名（判準本身非空轉）。"""
+    spec = ph.contract()
+    assert set(spec["source_scope"]) == SPEC_SOURCE_SCOPE
+    assert len(spec["source_scope"]) == len(SPEC_SOURCE_SCOPE)
+    assert in_source_scope(_PREPROCESSOR, spec["source_scope"])
+    assert not in_source_scope(_FOREIGN_SAME_LITERAL, spec["source_scope"])
+    hits = [recording_callee(ast.parse(src, mode="eval").body) for src in
+            ("self._record_execution(c, 'x')", "_record_decision(c)", "record_group_arm(g, 'x')", "logger.info('x')")]
+    assert hits == ["_record_execution", "_record_decision", "record_group_arm", None]
+
+
+def test_verification_04_fallback_value_set_and_manifest_fallback_is_list(runs: ph.RunCache) -> None:
+    """SPEC v3 盤點輸入③：契約另設回退值集 `fallback_values`（與其他值集同受 ①②③ 檢查：已列入 `enum_paths`），
+    manifest 群組之 `fallback` 為該值集之值之清單（可多重、依發生序）；native 回退變體至少一群組帶非空回退清單。"""
+    spec = ph.contract()
+    assert "fallback_values" in ph.enum_paths(spec)
+    assert "fallback" in spec["manifest_group_keys"]
+    assert "清單" in str(spec["fallback_values"].get("_doc", ""))
+    assert ph.contract_values("fallback_values", spec), "回退值集為空（Task 1.1 待填）"
+    for cell in ("h1_stat_on", "h12h1_native_fallback"):
+        groups = ph.provenance_pointer(runs.get(cell).run_dir, "raw")["groups"]
+        assert groups, cell
+        assert manifest_fallback_violations(groups, spec) == [], cell
+    fb_groups = ph.provenance_pointer(runs.get("h12h1_native_fallback").run_dir, "raw")["groups"]
+    assert any(info["fallback"] for info in fb_groups.values()), "native 回退變體無任何群組帶回退 ⇒ 空轉"
+    pre = ph.observation(runs.get("h12h1_native_fallback")).l65_preprocessor
+    assert manifest_fallback_violations(ph.preprocessor_groups(pre), spec) == []
 
 
 # ---------------------------------------------------------------------------------------------- 邊界
@@ -344,15 +444,16 @@ def _violations_of(path: str, value: str, violations: List[str]) -> List[str]:
 
 
 def _literal_anchor(rel: str) -> Tuple[str, int]:
-    """檔內第一個「單一簡單陳述式含合樣式之字串字面」之 (字面, 行號)（契約尚無值時之正對照錨點）。"""
+    """檔內第一個「陳述式本身為紀錄函式呼叫、且其實參含合樣式之字串字面」之 (字面, 行號)（契約尚無值時之正對照錨點；
+    ① 只認紀錄函式呼叫，故正對照亦須為之。只驗 oracle 機制，字面不必是契約值）。"""
     tree = ast.parse((ph.REPO / rel).read_text(encoding="utf-8"))
     pattern = re.compile(r"^[a-z][a-z0-9_]*$")
-    for node in sorted((n for n in ast.walk(tree) if isinstance(n, (ast.Assign, ast.Expr, ast.Return))),
-                       key=lambda n: n.lineno):
-        literals = sorted(s for s in _statement_string_literals(node) if pattern.fullmatch(s))
-        if literals and not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)):
+    for node in sorted((n for n in ast.walk(tree) if isinstance(n, ast.stmt)), key=lambda n: n.lineno):
+        call = statement_record_call(node)
+        literals = sorted(s for s in record_call_literals(call) if pattern.fullmatch(s)) if call is not None else []
+        if literals:
             return literals[0], node.lineno
-    raise AssertionError(f"{rel} 無可作正對照之字串字面")
+    raise AssertionError(f"{rel} 無「紀錄函式呼叫且實參含合樣式字面」之陳述式可作正對照")
 
 
 def _unrelated_executable_line(rel: str, value: str) -> int:
@@ -394,3 +495,57 @@ def test_mutation_source_pointing_to_unrelated_executable_line_is_caught(monkeyp
     caught = _violations_of(path, value, source_violations(rp.load_contract()))
     assert any("不含該值之字串字面" in v for v in caught), caught
     assert not any("註解行" in v for v in caught), caught
+
+
+def _foreign_same_literal_line(rel: str, value: str) -> int:
+    """他域檔中第一個「`return <value 之字串字面>`」陳述式之行號（CODEX-R6-P2-01 反例：`ICEngine.set_timeframe` 回傳
+    "applied"，審查時錨點 :167；以 AST 定位，行號漂移不影響）。"""
+    tree = _parsed(ph.REPO / rel)
+    for node in sorted((n for n in ast.walk(tree) if isinstance(n, ast.Return)), key=lambda n: n.lineno):
+        if isinstance(node.value, ast.Constant) and node.value.value == value:
+            return node.lineno
+    raise AssertionError(f"{rel} 無 return {value!r} 之陳述式 ⇒ 反例不存在")
+
+
+def test_mutation_source_pointing_to_other_domain_same_literal_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R6-P2-01）：`winsorization` 之 SPEC 點名值 `applied` 之 `_sources` 改指
+    `momentum/Analysis/ic_engine.py` 中 `return "applied"` 之行 ⇒ ① 轉紅，紅因含「不在 source_scope」與「非紀錄函式
+    呼叫」。反證非空轉：該行之陳述式確含該值字面（舊之「陳述式含值字面」判準會放行）。正對照：契約之真實出處無違規。"""
+    spec = ph.contract()
+    path, value, _where = ph.SPEC_NAMED_VALUES["winsor_applied"]
+    good = list(ph.enum_node(path, spec)["_sources"].get(value) or [])
+    assert good, f"契約 {path}.{value} 尚無 _sources（Task 1.1 待填）⇒ 無正對照"
+    assert _violations_of(path, value, source_violations(spec)) == [], "正對照不成立 ⇒ mutation 空轉"
+    line = _foreign_same_literal_line(_FOREIGN_SAME_LITERAL, value)
+    stmt = _innermost_statement(_parsed(ph.REPO / _FOREIGN_SAME_LITERAL), line)
+    assert stmt is not None and value in _statement_string_literals(stmt), "反例行不含該值字面 ⇒ mutation 空轉"
+    mutant = copy.deepcopy(spec)
+    node = ph.enum_node(path, mutant)
+    node["_sources"][value] = [f"{_FOREIGN_SAME_LITERAL}:{line}"]
+    monkeypatch.setattr(rp, "load_contract", lambda: mutant)
+    caught = _violations_of(path, value, source_violations(rp.load_contract()))
+    assert any("source_scope" in v for v in caught), caught
+    assert any("非紀錄函式呼叫" in v for v in caught), caught
+    assert not any("註解行" in v or "檔不存在" in v for v in caught), caught
+
+
+def test_mutation_manifest_group_fallback_scalar_is_caught(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（SPEC v3 盤點輸入③）：manifest 紀錄指標之群組回退清單改為單值（舊形）、或元素改為群組臂值（以
+    monkeypatch 換入改壞之指標讀取）⇒ `manifest_fallback_violations` 轉紅。正對照：native 回退變體之真實群組表無違規。"""
+    spec = ph.contract()
+    run_dir = runs.get("h12h1_native_fallback").run_dir
+    pointer = copy.deepcopy(ph.provenance_pointer(run_dir, "raw"))
+    assert manifest_fallback_violations(pointer["groups"], spec) == [], "正對照不成立 ⇒ mutation 空轉"
+    gid = next(g for g, info in pointer["groups"].items() if info.get("fallback"))
+    scalar = copy.deepcopy(pointer)
+    scalar["groups"][gid]["fallback"] = scalar["groups"][gid]["fallback"][0]
+    monkeypatch.setattr(ph, "provenance_pointer", lambda _run_dir, _kind: copy.deepcopy(scalar))
+    assert any(v.startswith(f"{gid}: fallback 非清單")
+               for v in manifest_fallback_violations(ph.provenance_pointer(run_dir, "raw")["groups"], spec))
+    foreign = sorted(set(ph.contract_values("group_arm_values", spec)) - set(ph.contract_values("fallback_values", spec)))
+    assert foreign, "群組臂值集與回退值集無差集 ⇒ 第二 mutant 無對象"
+    as_arm = copy.deepcopy(pointer)
+    as_arm["groups"][gid]["fallback"] = [foreign[0]]
+    monkeypatch.setattr(ph, "provenance_pointer", lambda _run_dir, _kind: copy.deepcopy(as_arm))
+    assert any("不屬 fallback_values" in v
+               for v in manifest_fallback_violations(ph.provenance_pointer(run_dir, "raw")["groups"], spec))

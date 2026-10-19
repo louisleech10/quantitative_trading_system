@@ -43,6 +43,11 @@ _MODULE_NAME_SCANS = {"glob": frozenset({"glob", "iglob"}), "os": _OS_SCANS}
 
 InventoryKey = Tuple[str, str, str, int]
 
+#: 清冊凍結基準（SPEC Task 1.6；CODEX-R6-P2-02）：本票 TODO 提交之清冊。既有 `feature_run` 條目只准因呼叫點消失
+#: （改依 manifest）而離開清冊，不得改標為 `unrelated`。
+FROZEN_INVENTORY_COMMIT = "2609aa1f"
+FROZEN_INVENTORY_RELPATH = "tests/_golden/preprov/reader_inventory.json"
+
 
 # ---------------------------------------------------------------------------------------------- 掃描點清冊（AST）
 
@@ -169,6 +174,32 @@ def feature_run_offenders(scanned: Sequence[Mapping[str, Any]], inventory: Mappi
     return out
 
 
+def load_frozen_inventory() -> Dict[str, Any]:
+    """凍結基準清冊（`git show <FROZEN_INVENTORY_COMMIT>:<清冊路徑>`；讀 git 物件，不受工作區改動影響）。"""
+    proc = subprocess.run(["git", "show", f"{FROZEN_INVENTORY_COMMIT}:{FROZEN_INVENTORY_RELPATH}"], cwd=str(ph.REPO),
+                          check=True, capture_output=True)
+    return json.loads(proc.stdout.decode("utf-8"))
+
+
+def frozen_feature_run_violations(frozen: Mapping[str, Any], inventory: Mapping[str, Any],
+                                  scanned: Sequence[Mapping[str, Any]]) -> List[str]:
+    """凍結規則（不依賴現行清冊之分類標籤自證）：凍結基準中每個 `feature_run` 條目——仍在現行清冊者其分類須仍為
+    `feature_run`（改標即紅）；已離開現行清冊者其呼叫點須已自 AST 掃描消失（只准因改依 manifest 而離開）。"""
+    current = {inventory_key(e): e for e in inventory.get("entries") or []}
+    live = {inventory_key(s) for s in scanned}
+    out: List[str] = []
+    for entry in frozen.get("entries") or []:
+        if entry.get("class") != "feature_run":
+            continue
+        key = inventory_key(entry)
+        if key in current:
+            if current[key].get("class") != "feature_run":
+                out.append(f"凍結 feature_run 條目被改標為 {current[key].get('class')!r}：{key}")
+        elif key in live:
+            out.append(f"凍結 feature_run 條目離開清冊而呼叫點仍在：{key}")
+    return out
+
+
 def feature_run_files_not_manifest_driven(inventory: Mapping[str, Any]) -> List[str]:
     """含 `feature_run` 條目之檔中，未改經 `declared_feature_files`／`declared_group_files` 依 manifest 宣告讀取者。"""
     files = sorted({str(e["path"]) for e in inventory.get("entries") or [] if e.get("class") == "feature_run"})
@@ -241,6 +272,14 @@ def test_verification_02_section_g_readers_are_manifest_driven() -> None:
     missing = feature_run_files_not_manifest_driven(load_inventory())
     assert missing == []
     assert any(e.get("class") == "feature_run" for e in load_inventory()["entries"]), "清冊無 feature_run 條目 ⇒ 空轉"
+
+
+def test_verification_02b_frozen_feature_run_entries_not_relabelled() -> None:
+    """凍結基準（CODEX-R6-P2-02）：以 `2609aa1f` 之清冊為基準，其每個 `feature_run` 條目仍在現行清冊者分類仍為
+    `feature_run`；離開清冊者其呼叫點已不存在（只准因改依 manifest 而離開）。新條目之分類由審碼審，不在此判。"""
+    frozen = load_frozen_inventory()
+    assert any(e.get("class") == "feature_run" for e in frozen["entries"]), "凍結基準無 feature_run 條目 ⇒ 空轉"
+    assert frozen_feature_run_violations(frozen, load_inventory(), scan_repo()) == []
 
 
 def test_verification_03_undeclared_or_missing_files_raise(runs: ph.RunCache, tmp_path: Path) -> None:
@@ -352,3 +391,33 @@ def test_mutation_scanner_detects_planted_call_site(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(sys.modules[__name__], "scan_repo", lambda: list(real_scan()) + planted)
     violations = [v for v in inventory_completeness_violations(scan_repo(), load_inventory()) if v not in baseline]
     assert sum(v.startswith("清冊外之掃描呼叫點") and "_planted_reader.py" in v for v in violations) == len(planted)
+
+
+#: CODEX-R6-P2-02 反例之清冊鍵（`scripts/benchmark_l65_v2.py:116` 附近；凍結基準中該檔唯一之 feature_run 條目）
+_RELABEL_VICTIM: InventoryKey = ("scripts/benchmark_l65_v2.py", "_streaming_schema_checks",
+                                 "features_root.rglob('*.parquet')", 0)
+
+
+def test_mutation_inventory_feature_run_relabelled_unrelated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（SPEC Task 1.6；CODEX-R6-P2-02）：清冊載入點改回「`scripts/benchmark_l65_v2.py` 之
+    `_streaming_schema_checks` rglob 條目改標為 `unrelated`」之複本（呼叫點仍在）⇒ 凍結規則 oracle 轉紅，且紅因為
+    「被改標」。反證非空轉：同一 mutant 下既有之 `inventory_completeness_violations` 與
+    `feature_run_files_not_manifest_driven` 皆不因此新增違規（該 reader 自兩集合消失＝原攻擊面）。"""
+    frozen = load_frozen_inventory()
+    victim = next(e for e in frozen["entries"] if inventory_key(e) == _RELABEL_VICTIM)
+    assert victim["class"] == "feature_run"
+    inventory = load_inventory()
+    scanned = list(scan_repo())
+    if _RELABEL_VICTIM not in {inventory_key(s) for s in scanned}:  # Task 1.6 改寫後呼叫點已消失：模擬改標者保留呼叫點
+        scanned.append({k: victim[k] for k in ("path", "qualname", "call", "occurrence", "line")})
+    mutant = copy.deepcopy(inventory)
+    entries = [e for e in mutant["entries"] if inventory_key(e) != _RELABEL_VICTIM]
+    entries.append(dict(victim, **{"class": "unrelated", "reason": "mutant：改標以避開 feature_run 檢查"}))
+    mutant["entries"] = entries
+    baseline_frozen = frozen_feature_run_violations(frozen, inventory, scanned)
+    baseline_complete = inventory_completeness_violations(scanned, inventory)
+    monkeypatch.setattr(sys.modules[__name__], "load_inventory", lambda: copy.deepcopy(mutant))
+    caught = [v for v in frozen_feature_run_violations(frozen, load_inventory(), scanned) if v not in baseline_frozen]
+    assert any("被改標" in v and _RELABEL_VICTIM[2] in v for v in caught), caught
+    assert not [v for v in inventory_completeness_violations(scanned, load_inventory()) if v not in baseline_complete]
+    assert _RELABEL_VICTIM[0] not in feature_run_files_not_manifest_driven(load_inventory())

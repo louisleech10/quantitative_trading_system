@@ -1,7 +1,7 @@
 # FFDSTAR（PRE-PROV）— 每次特徵產出之逐欄執行紀錄與 IC 讀取身分 — SPEC
 
 > 來源：偵察 r4 收斂檔 `handoffs/reconcile/20260921-ffdstar-x-consult-r4/synth.md`（主委獨立版 `handoffs/20260921-ffdstar-x-consult-r4-claude.md`）；範圍權威 `docs/TICKET_ORDER.md` 第 7 列　|　日期：2026-10-19　|　對應 TODO：`docs/manifests/FFDSTAR.json`
-> 版本：v2（2026-10-19；FF-STAT、FF-NAME 收案後依現況全文重寫，落點、紀錄範圍與 fact-key 內容皆以本版為準；先前版本之定性與輪次見 `handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`、`20260921-ffdstar-x-review-r2`、`20260924-ffdstar-x-review-r3`）。
+> 版本：v3（2026-10-19；審查 r5／r6 修訂與 Task 1.1 盤點草稿所揭缺口併入，處置見 `handoffs/reconcile/20260921-ffdstar-x-review-r5/synth.md`、`20260921-ffdstar-x-review-r6/synth.md`）。v2（2026-10-19；FF-STAT、FF-NAME 收案後依現況全文重寫，落點、紀錄範圍與 fact-key 內容皆以本版為準；先前版本之定性與輪次見 `handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`、`20260921-ffdstar-x-review-r2`、`20260924-ffdstar-x-review-r3`）。
 
 ## §RISK 風險分級
 - **大小**：大（`docs/TICKET_ORDER.md` 標中；依 CLAUDE.md 判準命中 (a)(b)(d)，以大任務管線執行）。
@@ -54,17 +54,18 @@
 **Task 1.1 — 離開路徑盤點與契約 JSON**
 - 目標：以碼證列出 L6.5（raw-sink、in-place、native 子實例、post-IC）每一步驟之每條實際離開路徑，定稿紀錄契約。　檔案：新建 `momentum/FeatureEngineering/contracts/run_provenance.json`；盤點對象 `feature_preprocessor.py` 之 `transform_registry_groups_to_sink`、`_transform_single*`、`_apply_fractional_differencing*`、ADF 差分、縮尾、rank、zscore、gaussian、ratio-unsafe passthrough、native 成功／回退、`transform_selected`；`feature_storage.py` 之 dead-drop；`feature_factory.py` 之失敗群組。　既有 caller／影響面：新建，無 caller。
 - 改法：契約含——逐欄紀錄欄位與型別（輸出欄名、原生週期、層、群組 id、各步驟狀態、平穩化決策欄、事件、終態）；各步驟狀態封閉值集（每值附 `_sources`：至少一個 `path:line` 離開點）；群組轉換臂與回退值集；manifest `provenance` 物件鍵；run 身分物件鍵；紀錄檔相對路徑。值樣式 `^[a-z][a-z0-9_]*$`。**不得杜撰無離開點之值；每個離開點須有對應值。**
-- **驗證**：`pytest tests/feature_engineering/test_preprov_contract.py` 全綠，其中：①契約每個狀態值之 `_sources` 每個 `path:line` 指向非註解非空行，且該行（或其所屬之單一陳述式）含該值之字串字面（記錄呼叫之實參）——指向無關可執行行即紅；②契約值皆合樣式；③Task 3.1 驗收格之實際紀錄中出現之值集合 ⊆ 契約值集，且契約中每個值至少被一格或一條單元案例產出（未產出之值須於契約 `_unreachable` 具名並附碼證理由）。mutation：契約刪一個實際會出現之值 ⇒ ③紅。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_contract.py` 全綠，其中：①契約每個狀態值之 `_sources` 每個 `path:line` 須位於特徵工廠寫入路徑之檔（`momentum/FeatureEngineering/preprocessing/` 下、`feature_storage.py`、`feature_factory.py`），且該行所屬之單一陳述式為對紀錄函式之呼叫、實參含該值之字串字面——指向無關可執行行、或他域含同字面之行（例 `momentum/Analysis/ic_engine.py:167` 回傳 `"applied"`）即紅；②契約值皆合樣式；③Task 3.1 驗收格之實際紀錄中出現之值集合 ⊆ 契約值集，且契約中每個值至少被一格或一條單元案例產出（未產出之值須於契約 `_unreachable` 具名並附碼證理由）。mutation：契約刪一個實際會出現之值 ⇒ ③紅。
 - **邊界**：①statsmodels 不可用之 fracdiff 早退；②目標層外之欄（fracdiff 不涵蓋）；③平穩化關閉時平穩化決策欄全 null，fracdiff／ADF 之步驟狀態各為契約中表示「關閉」之值（步驟狀態欄不得為 null）。
-- **契約補充**：SPEC 驗收中具名之 `applied`（縮尾）、`ratio_unsafe`（終態）、`polars`（post-IC 群組臂）須存在於契約對應值集（測試先斷言其存在）；`_unreachable` 形為 `{<值>: {"reason": <文字>, "_sources": [<path:line>, …]}}`；`content_sha256` 項之 `dtype` 為該檔各欄 Arrow 型別去重排序後以 `|` 連接之字串。
+- **契約補充**：SPEC 驗收中具名之 `applied`（縮尾）、`ratio_unsafe`（終態）、`polars`（post-IC 群組臂）須存在於契約對應值集（測試先斷言其存在）；`_unreachable` 形為 `{<值>: {"reason": <文字>, "_sources": [<path:line>, …]}}`；`content_sha256` 項之 `dtype` 為該檔各欄 Arrow 型別去重排序後以 `|` 連接之字串；SPEC 以語意指稱之值（總開關關閉之步驟狀態、ADF 檢定例外之事件）由契約 `named_values` 給出其字面（Task 1.1 填入，測試經之查值、不寫死字面）。
 - **存活至**：本票交付後保留（契約為唯一真相源）。
 - **覆蓋風險**：無。
-- 不可做：不得新增任何轉換判斷分支；不得改任何步驟之條件。
+- **盤點輸入**：草稿 `handoffs/run_receipts/20261019-ffdstar-task11-inventory-draft.md`（HEAD 2609aa1f 唯讀盤點，約 120 個錨點）；實作以碼為準重核。草稿揭示之定案：①總開關關閉（不建前處理器）⇒ writer 對全部欄全部步驟記「總開關關閉」之值；raw 路徑強制關之 rank／zscore／gaussian 與 post-IC 強制關之縮尾／fracdiff／ADF 記「關閉」之值（使用者原設定已在 `preprocessing_config_enabled`）；②in-place 路徑（`transform_registry_groups` 及其子路徑）無生產呼叫者 ⇒ 只在該路徑可產生之值列 `_unreachable`；③群組回退可多重（native 回退與 fracdiff parallel→serial 回退可同群發生）⇒ 契約另設回退值集，manifest 群組之 `fallback` 為清單；④numba 快速核心對整個陣列同式套用、無逐欄跳過分支 ⇒ 快速臂之逐欄狀態於其呼叫點依群組記錄（ratio-unsafe 遮罩欄除外），週期由呼叫端傳入；⑤`_transform_single` optimized 分支於記錄脈絡設定前返回（`feature_preprocessor.py:2957` 附近）⇒ 脈絡須於分支前設定。
+- 不可做：不得改任何步驟之條件與數值。只為記錄而補之 `else`／`for…else` 分支（不改條件、不改數值、不改控制流去向）允許，視為記錄點而非轉換判斷分支。
 
 **Task 1.6 — 測試輔助與凍結腳本改依 manifest 宣告讀取（先於生產改動）**
 - 目標：消除「以檔名掃描 run 目錄當特徵」之讀法，使新增紀錄檔不被誤讀。　檔案：`git ls-files -z tests scripts | xargs -0 grep -nE 'rglob\(|glob\('` 命中且作用於特徵 run 目錄者（至少 §G 所列）；新增 `tests/feature_engineering/preprov_helpers.py`（依 manifest 列群組檔之單一函式）。　既有 caller／影響面：各凍結腳本與其測試、`ffstat_helpers` 之全部呼叫者。
 - 改法：特徵檔集合一律自 manifest artifact 節點之 `groups[*].path` 與 row index 宣告導出；凍結腳本之「run 目錄全部檔」雜湊改為「manifest 宣告檔＋manifest 本身」；未宣告檔出現於 run 目錄 ⇒ 輔助函式拋錯（不靜默忽略）。
-- **驗證**：於**改前生產碼態**對既有凍結項重算值指紋，逐項等於現行凍結值（不重凍）；`pytest` 逐檔明列受影響之凍結測試全綠。掃描點清冊 `tests/_golden/preprov/reader_inventory.json` 列 `tests/`、`scripts/` 受版控 .py 中全部 `glob(`／`rglob(`／`iterdir(`／`os.listdir(`／`os.walk(` 呼叫點（`path:line`），每點分類 `feature_run`（以檔名列舉 run 目錄並把所得檔當特徵讀取、指紋、計數或改寫者，須改依 manifest）或 `unrelated`（附一句理由；含只做位元組快照、殘檔／版面斷言、尋找 manifest 或 run 目錄、量測大小者——其中位元組快照之變動由 §G 結構重凍承接）；清冊鍵為（路徑、所在函式限定名、呼叫文字、出現序），行號僅供參考；測試以 AST 重掃，清冊外之新呼叫點、或 `feature_run` 類仍以檔名掃描者即紅。mutation：輔助函式改回 `rglob("*.parquet")` 且 run 目錄放入一個非宣告 parquet ⇒ 新增之 `test_preprov_helpers.py` 案例紅；自清冊刪一個 `feature_run` 點 ⇒ 紅。
+- **驗證**：於**改前生產碼態**對既有凍結項重算值指紋，逐項等於現行凍結值（不重凍）；`pytest` 逐檔明列受影響之凍結測試全綠。掃描點清冊 `tests/_golden/preprov/reader_inventory.json` 列 `tests/`、`scripts/` 受版控 .py 中全部 `glob(`／`rglob(`／`iterdir(`／`os.listdir(`／`os.walk(` 呼叫點（`path:line`），每點分類 `feature_run`（以檔名列舉 run 目錄並把所得檔當特徵讀取、指紋、計數或改寫者，須改依 manifest）或 `unrelated`（附一句理由；含只做位元組快照、殘檔／版面斷言、尋找 manifest 或 run 目錄、量測大小者——其中位元組快照之變動由 §G 結構重凍承接）；清冊鍵為（路徑、所在函式限定名、呼叫文字、出現序），行號僅供參考；測試以 AST 重掃，清冊外之新呼叫點、或 `feature_run` 類仍以檔名掃描者即紅；另以本票 TODO 提交 `2609aa1f` 之清冊為凍結基準：既有 `feature_run` 條目只准因呼叫點消失（改依 manifest）而離開清冊，不得改標為 `unrelated`（改標即紅；新條目之分類於審碼時審）。mutation：輔助函式改回 `rglob("*.parquet")` 且 run 目錄放入一個非宣告 parquet ⇒ 新增之 `test_preprov_helpers.py` 案例紅；自清冊刪一個 `feature_run` 點 ⇒ 紅。
 - **邊界**：①processed artifact 之群組與 `processed_timestamps.parquet`；②IC-first 已刪 raw 之 run（只剩 processed）；③多週期 run 之群組。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：Task 3.1 之結構重凍會再動凍結檔之結構項，值指紋項不動。
@@ -72,7 +73,7 @@
 
 **Task 1.2 — 前處理器之逐欄執行狀態收集**
 - 目標：run 層級累加每個輸入欄之各步驟實際狀態、平穩化決策、群組轉換臂與回退、失敗群組。　檔案：`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`（Task 1.1 盤出之全部離開點；`_record_decision`、`_merge_decisions_from`、`failed_groups`）；`momentum/FeatureEngineering/feature_factory.py` 之 `_capture_stationarity_decisions`。　既有 caller／影響面：`stationarity_decisions()`、`stationarity_failure_reasons()` 之回傳格式不變（FF-STAT 呼叫者不受影響）。
-- 改法：新增 run 層級之執行紀錄容器（不被 per-transform 重設；鍵＝(原生週期, L6.5 所見欄名)）；各離開點以契約值記狀態，成功亦記；平穩化關閉時亦記縮尾等步驟狀態；native 子實例之紀錄於丟棄前併回 owner；native 失敗回退記回退值於群組臂；ratio-unsafe passthrough 記終態；`_merge_decisions_from` 與 `_capture_stationarity_decisions` 改為同鍵且值不逐項相同即拋 `ProvenanceConflictError`（逐項相同則冪等）。公開存取：`FeaturePreprocessor.execution_records() -> Dict[Tuple[str, str], Dict[str, Any]]`（逐欄）與 `execution_groups() -> Dict[str, Dict[str, Any]]`（逐群組臂、回退、狀態、失敗原因）。`ProvenanceError` 系列加入 `NON_DEGRADABLE_ERRORS`（`feature_preprocessor.py:107-111`）——parallel→serial 回退之 `except Exception`（`:3780` 附近）等降級分支不得吞下。
+- 改法：新增 run 層級之執行紀錄容器（不被 per-transform 重設；鍵＝(原生週期, L6.5 所見欄名)）；各離開點以契約值記狀態，成功亦記；平穩化關閉時亦記縮尾等步驟狀態；native 子實例之紀錄於丟棄前併回 owner；native 失敗回退記回退值於群組臂；ratio-unsafe passthrough 記終態；`_merge_decisions_from` 與 `_capture_stationarity_decisions` 改為同鍵且值不逐項相同即拋 `ProvenanceConflictError`（逐項相同則冪等）。公開存取：`FeaturePreprocessor.execution_records() -> Dict[Tuple[str, str], Dict[str, Any]]`（逐欄）與 `execution_groups() -> Dict[str, Dict[str, Any]]`（逐群組臂、回退、狀態、失敗原因）。`ProvenanceError` 系列加入 `NON_DEGRADABLE_ERRORS`（`feature_preprocessor.py:107-111`）；現行未重拋該集合之降級分支——包住 `_find_min_d` 之 `except Exception`（`:3543` 附近，否則紀錄錯誤會被轉成 d* 搜尋失敗而續跑）與 parallel→serial 回退（`:3780` 附近）——補「屬該集合即重拋」。parallel→serial 回退時，失敗嘗試已寫入之該批紀錄先整批撤回再由 serial 重記（紀錄以嘗試為單位，避免同鍵不同值誤觸衝突）。`_get_non_stationary_columns`（`:4137` 附近）為 fracdiff 與 ADF 共用 ⇒ 加步驟參數以分別記錄。ADF 檢定拋例外時現行碼以 p=1.0 續行（`:3472` 附近、`_slow_path_parallel.py:119` 附近）⇒ 只記事件與狀態、不改行為（見 §N FFDSTAR-R3）。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_collect.py` 全綠：①單元（真實 kline 短窗之群組）每個輸入欄恰一筆、各步驟狀態皆屬契約；②native 成功與回退各一案，回退案之欄狀態來自回退路徑且群組臂為回退值；③衝突案拋 `ProvenanceConflictError`。mutation：刪任一離開點之紀錄呼叫 ⇒ ①紅；`_merge_decisions_from` 改回覆寫 ⇒ ③紅；縮尾成功不記 ⇒ ①紅。
 - **邊界**：①群組全為 ratio-unsafe；②`eligible_columns` 為空；③parallel fracdiff 多 worker 結果合併（重複鍵拒收）；④append 模式衍生欄（`_fracdiff`／`_diff1`／`_diff2`）以父欄關聯記終態。
 - **存活至**：本票交付後保留（Task 1.3／1.4 消費）。
@@ -90,7 +91,7 @@
 
 **Task 1.4 — processed 紀錄檔（post-IC）**
 - 目標：IC-first 之 post-IC 轉換同樣記逐欄狀態與臂。　檔案：`feature_preprocessor.py` 之 `transform_selected`；`feature_storage.py` 之 `write_processed`；`feature_factory.py:2986`。　既有 caller／影響面：`run_ic_first`。
-- 改法：`transform_selected` 之 post-IC 前處理器沿用 Task 1.2 容器；回傳形態不變，紀錄經呼叫者實例之 `last_post_ic_execution()`（回 `execution_records()`／`execution_groups()` 同形之二元組）取得；`write_processed` 新增必填關鍵字參數 `execution`（該二元組），同 Task 1.3 ①–⑦ 之 processed 版（含 `processed_timestamps.parquet`〔現行 `feature_storage.py:1400-1405` 安裝前直接寫入〕納入同一暫存、備份與回復；驗證另含 Task 1.3 ⑤b 之 processed 版）；零選欄時紀錄為零列，manifest processed 節點 `provenance.summary.selected_columns == 0` 以區分「零選欄」與「未寫紀錄」（紀錄檔另一檔名、`content_sha256` 含 `processed_timestamps.parquet`）。processed 節點不覆寫 raw 節點之 `provenance`；raw 被刪後 raw 紀錄檔仍保留（位於 `provenance/`）。
+- 改法：`transform_selected` 之 post-IC 前處理器沿用 Task 1.2 容器；回傳形態不變，紀錄經呼叫者實例之 `last_post_ic_execution()`（回 `execution_records()`／`execution_groups()` 同形之二元組）取得；`write_processed` 新增必填關鍵字參數 `execution`（該二元組），同 Task 1.3 ①–⑦ 之 processed 版（含 `processed_timestamps.parquet`〔現行 `feature_storage.py:1400-1405` 安裝前直接寫入〕納入同一暫存、備份與回復；驗證另含 Task 1.3 ⑤b 之 processed 版）；零選欄時紀錄為零列，manifest processed 節點 `provenance.summary.selected_columns == 0` 以區分「零選欄」與「未寫紀錄」。processed 紀錄之母體＝IC 選欄全集：寫入 processed 之欄記終態「已寫出」；選欄不在 raw（`feature_preprocessor.py:683` 附近）與入口剔除之 ratio-unsafe 欄（`:585` 附近）各記其終態，窮盡性＝processed 群組欄聯集 ∪ 上述兩類欄 ＝ 選欄全集（紀錄檔另一檔名、`content_sha256` 含 `processed_timestamps.parquet`）。processed 節點不覆寫 raw 節點之 `provenance`；raw 被刪後 raw 紀錄檔仍保留（位於 `provenance/`）。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_processed.py` 全綠：①真實短窗 IC-first 後 processed 紀錄逐選欄恰一筆、臂＝`polars`；②`cleanup_raw` 後 raw 紀錄檔仍在且 sha256 符合 manifest；③IC 選擇為空時 processed 紀錄為零列且狀態可區分「零選欄」。mutation：raw 紀錄檔改放 `raw/` 內 ⇒ ②紅。
 - **邊界**：①選欄全不在 raw；②gaussian 開啟。
 - **存活至**：本票交付後保留。
@@ -185,7 +186,9 @@
 ### 殘留
 - **FFDSTAR-R1 既有 7 個共用 d* 快取檔之來源 run 不明** — `為何現在不做: user-ruling:2026-08-05 使用者定死「修正只考慮以後，不把舊錯誤包回來」`；觸發：使用者要求回溯查證某既有 run 之 d*；登記處：本 SPEC §N。本票之後新 run 之 d* 以 run 內紀錄為準，共用快取只作快取。
 - **FFDSTAR-R2 `/api/v1/features/generate` 回之 `task_id` 於任務查詢端點查無** — `為何現在不做: needs-research:API 任務登記路徑是否為既知設計（屬 api/ 任務登記，與本票之 run 紀錄與 IC 身分無資料依賴）`；觸發：下一次動 `api/services/feature_factory_service.py` 之任務登記或前端依賴該端點時；登記處：本 SPEC §N。
-- FFDSTAR-R3（決策 148 欄對 L1＋L2 候選）：由 Task 3.1 oracle ① 直接回答，於本票收案時關閉，不再列殘留。
+- 舊編號之「決策 148 欄對 L1＋L2 候選」：由 Task 3.1 oracle ① 直接回答，於本票收案時關閉，不再列殘留。
+- **FFDSTAR-R3 ADF 檢定拋例外時以 p=1.0 視為非平穩續行**（`feature_preprocessor.py:3472` 附近、`_slow_path_parallel.py:119` 附近）— `為何現在不做: needs-research:該行為改為 fail-closed 或保留屬平穩化判定之數值政策（改之即改輸出值，違本票不改值之約束），須以真實資料量測例外發生率後定`；本票先使其可見（逐欄事件與狀態）；觸發：Task 3.1 驗收格或任一真實 run 紀錄出現該事件；登記處：本 SPEC §N。
+- **FFDSTAR-R4 快速臂與 pandas 臂之邊界行為不一致**（zscore 窗清單為空時快速臂以 100 照做、未知縮尾 method 快速臂當 quantile 而 legacy 臂拋錯；盤點草稿所揭）— `為何現在不做: blocked-by:全票排序第 8 步 NUMVIEW（post-IC 正式臂政策：統一或具名保留，docs/TICKET_ORDER.md:42）`；本票只記實際所走之臂；觸發：NUMVIEW 開工；登記處：本 SPEC §N。
 
 ## §K 本 SPEC 註冊之 fact-key
 

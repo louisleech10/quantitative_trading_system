@@ -57,9 +57,20 @@ FIXED_ENV: Dict[str, str] = {
 
 #: SPEC 正文以字面點名之值（鍵 → (契約值集路徑, 字面, SPEC 出處)）；使用前以 `spec_named` 斷言屬於契約值集
 SPEC_NAMED_VALUES: Dict[str, Tuple[str, str, str]] = {
-    "winsor_applied": ("step_status_values.winsorization", "applied", "docs/FFDSTAR_SPEC.md:168 §V oracle ③"),
-    "terminal_ratio_unsafe": ("terminal_values", "ratio_unsafe", "docs/FFDSTAR_SPEC.md:168 §V oracle ③"),
-    "post_ic_arm_polars": ("group_arm_values", "polars", "docs/FFDSTAR_SPEC.md:93 Task 1.4 驗證①"),
+    "winsor_applied": ("step_status_values.winsorization", "applied", "docs/FFDSTAR_SPEC.md:170 §V oracle ③"),
+    "terminal_ratio_unsafe": ("terminal_values", "ratio_unsafe", "docs/FFDSTAR_SPEC.md:170 §V oracle ③"),
+    "post_ic_arm_polars": ("group_arm_values", "polars", "docs/FFDSTAR_SPEC.md:95 Task 1.4 驗證①"),
+}
+
+#: SPEC 以語意點名而未給字面之值（鍵 → (契約 `named_values` 物件之鍵, 須屬之值集, SPEC 出處)）。
+#: 契約約定（Task 1.1 填入）：`named_values` 為 {語意鍵: 值字面}；「須屬之值集」＝`steps`（屬每個步驟狀態值集）、
+#: 值集路徑（屬該值集），或 None（事件值，只驗 `value_pattern`）。契約未填 ⇒ `contract_named` 拋 AssertionError
+#: （依賴之驗收於 Task 1.1 前必紅，設計如此）。
+CONTRACT_NAMED_VALUES: Dict[str, Tuple[str, Optional[str], str]] = {
+    # 前處理總開關關閉（不建前處理器）⇒ writer 對全部欄全部步驟記之值
+    "preprocessing_master_off": ("preprocessing_master_off", "steps", "docs/FFDSTAR_SPEC.md:62 盤點輸入①"),
+    # ADF 檢定拋例外（現行以 p=1.0 續行）⇒ 逐欄紀錄 `events` 中之事件值
+    "adf_test_error_event": ("adf_test_error_event", None, "docs/FFDSTAR_SPEC.md:76 Task 1.2 改法；§N FFDSTAR-R3"),
 }
 
 #: 平穩化決策欄（契約 record_columns 之子集；SPEC Task 1.1 邊界③、§K K-2 040）
@@ -76,10 +87,10 @@ def contract() -> Dict[str, Any]:
 
 
 def enum_paths(spec: Optional[Mapping[str, Any]] = None) -> List[str]:
-    """契約全部封閉值集之路徑（各步驟狀態、終態、d* 來源、群組臂、群組狀態）。"""
+    """契約全部封閉值集之路徑（各步驟狀態、終態、d* 來源、群組臂、群組狀態、群組回退）。"""
     spec = spec or contract()
     return [f"step_status_values.{s}" for s in spec["steps"]] + [
-        "terminal_values", "dstar_source_values", "group_arm_values", "group_status_values"]
+        "terminal_values", "dstar_source_values", "group_arm_values", "group_status_values", "fallback_values"]
 
 
 def enum_node(path: str, spec: Optional[Mapping[str, Any]] = None) -> Mapping[str, Any]:
@@ -106,6 +117,24 @@ def spec_named(key: str, spec: Optional[Mapping[str, Any]] = None) -> str:
     path, value, where = SPEC_NAMED_VALUES[key]
     values = contract_values(path, spec)
     assert value in values, f"SPEC 點名之值 {value!r}（{where}）不在契約 {path}：{values}"
+    return value
+
+
+def contract_named(key: str, spec: Optional[Mapping[str, Any]] = None) -> str:
+    """SPEC 以語意點名之值，自契約 `named_values` 讀出（不在測試寫死字面）。契約缺該鍵、值不合樣式或不屬應屬之值集
+    ⇒ AssertionError（Task 1.1 未填契約前必紅）。"""
+    import re
+
+    named_key, member_of, where = CONTRACT_NAMED_VALUES[key]
+    spec = spec or contract()
+    named = dict(spec.get("named_values") or {})
+    assert named_key in named, f"契約缺 named_values.{named_key}（{where}；Task 1.1 待填）"
+    value = str(named[named_key])
+    assert re.fullmatch(str(spec["value_pattern"]), value), f"named_values.{named_key}={value!r} 不合 value_pattern"
+    paths = ([f"step_status_values.{s}" for s in spec["steps"]] if member_of == "steps"
+             else [] if member_of is None else [member_of])
+    for path in paths:
+        assert value in contract_values(path, spec), f"named_values.{named_key}={value!r} 不在契約 {path}"
     return value
 
 
@@ -598,10 +627,9 @@ _ARROW_DTYPE = {"halffloat": "float16", "float": "float32", "double": "float64"}
 
 
 def _file_dtype_summary(schema: Any, columns: Sequence[str]) -> str:
-    kinds = {_ARROW_DTYPE.get(str(schema.field(c).type), str(schema.field(c).type)) for c in columns}
-    if not kinds:
-        return "float16"
-    return next(iter(kinds)) if len(kinds) == 1 else "mixed"
+    """契約 `content_sha256.dtype_doc`（SPEC v3 Task 1.1 契約補充）：該檔各特徵欄（同 entry 之 `columns`）之 Arrow 型別
+    字串去重、升冪排序後以 `|` 連接（不做 float16 等別名轉換、不以 "mixed" 代替）。"""
+    return "|".join(sorted({str(schema.field(c).type) for c in columns}))
 
 
 def independent_content_sha256(run_dir: Path, artifact_kind: str) -> str:
@@ -610,8 +638,7 @@ def independent_content_sha256(run_dir: Path, artifact_kind: str) -> str:
     entries＝每個宣告群組檔之 [相對路徑, 檔內特徵欄名（檔內順序）, 列數, dtype 摘要, 檔案 sha256]，依相對路徑升冪；
     payload＝{"entries": [...], "row_index_sha256": <row index 檔 sha256>}；以
     json.dumps(sort_keys=True, separators=(',', ':'), ensure_ascii=False) 之 UTF-8 位元組取 sha256。紀錄檔不入。
-    dtype 摘要＝檔內各特徵欄之 arrow 型別（halffloat→float16、float→float32、double→float64，其餘取型別字面）
-    單一則該值、多種則 "mixed"（同 `FeatureStorage._summarize_storage_dtype` 之語彙）。"""
+    dtype 摘要＝契約 `content_sha256.dtype_doc`：檔內各特徵欄之 Arrow 型別字串去重、升冪排序後以 `|` 連接。"""
     run_dir = Path(run_dir)
     manifest = load_manifest(run_dir)
     entries: List[List[Any]] = []
@@ -964,6 +991,13 @@ def preprocessor_groups(preprocessor: Any) -> Dict[str, Dict[str, Any]]:
     return dict(preprocessor.execution_groups())
 
 
+def post_ic_execution(preprocessor: Any) -> Tuple[Dict[Tuple[str, str], Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """post-IC 轉換之紀錄（SPEC Task 1.4：呼叫 `transform_selected` 之實例之 `last_post_ic_execution()`，回
+    (`execution_records()` 同形, `execution_groups()` 同形)）。唯一假設點。"""
+    records, groups = preprocessor.last_post_ic_execution()
+    return dict(records), dict(groups)
+
+
 def real_feature_frame(handle: RunHandle, max_columns: int = 12, *, layer: Optional[str] = None) -> Tuple[pd.DataFrame, Dict[str, str]]:
     """自真實 run 之宣告 raw 群組檔取若干特徵欄為 DataFrame（UTC DatetimeIndex；欄名去週期標記＝L6.5 所見名）；
     回傳 (frame, {欄: 層})。供前處理器單元案例使用（值為真實生成之特徵，非合成）。"""
@@ -999,8 +1033,10 @@ __all__ = [
     "copy_kline_with_one_bar_changed", "declared_feature_files", "declared_group_files",
     "independent_content_sha256", "value_fingerprints", "provenance_table", "provenance_file", "provenance_pointer",
     "contract", "contract_values", "enum_paths", "record_enum_columns", "spec_named", "SPEC_NAMED_VALUES",
+    "contract_named", "CONTRACT_NAMED_VALUES",
     "STATIONARITY_DECISION_COLUMNS", "independent_winsorize", "bitwise_equal", "as_stored", "stored_columns",
-    "group_columns", "preprocessor_records", "preprocessor_groups", "real_feature_frame", "load_manifest",
+    "group_columns", "preprocessor_records", "preprocessor_groups", "post_ic_execution", "real_feature_frame",
+    "load_manifest",
     "sha256_file", "row_index_rel", "output_name", "l65_input_by_output", "apply_row_slice",
     "PRE_CHANGE_FINGERPRINTS_PATH", "OUTPUT_SIZE_PATH", "GOLDEN_DIR", "CONTRACT_PATH", "WINDOW", "KLINE_DIR", "REPO",
 ]

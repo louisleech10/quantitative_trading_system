@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Set
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -44,6 +44,74 @@ def _raw_groups(handle: ph.RunHandle) -> Dict[str, pd.DataFrame]:
         frame = pq.read_table(str(handle.run_dir / info["path"])).to_pandas()
         out[gid] = frame.drop(columns=[c for c in frame.columns if c in ph.NON_FEATURE_COLUMNS]).set_axis(index)
     return out
+
+
+def processed_population_violations(names: Sequence[str], terminal_of: Mapping[str, Any], selected: Iterable[str],
+                                    processed_cols: Iterable[str], absent: Iterable[str],
+                                    ratio_unsafe: Iterable[str], spec: Mapping[str, Any]) -> List[str]:
+    """oracle（SPEC v3 Task 1.4）：processed 紀錄之母體＝IC 選欄全集——逐選欄恰一筆；窮盡性＝processed 群組欄聯集 ∪ 選欄
+    不在 raw 之欄 ∪ 入口剔除之 ratio-unsafe 欄 ＝ 選欄全集（三類互斥；各類由紀錄以外之事實導出）；三類各記其終態
+    （類內單一值、類間互異、皆屬契約 `terminal_values`）。"""
+    out: List[str] = []
+    selected, processed = set(selected), set(processed_cols)
+    absent, ratio_unsafe = set(absent), set(ratio_unsafe)
+    if len(names) != len(set(names)):
+        out.append("processed 紀錄有重複欄")
+    if set(names) != selected:
+        out.append(f"紀錄母體 ≠ 選欄全集：多 {sorted(set(names) - selected)[:3]}、缺 {sorted(selected - set(names))[:3]}")
+    classes = {"已寫出 processed": processed, "選欄不在 raw": absent, "入口剔除 ratio-unsafe": ratio_unsafe}
+    if processed | absent | ratio_unsafe != selected:
+        out.append("processed 群組欄 ∪ 不在 raw ∪ ratio-unsafe ≠ 選欄全集")
+    if (processed & absent) or (processed & ratio_unsafe) or (absent & ratio_unsafe):
+        out.append("三類欄有交集")
+    terminals = set(ph.contract_values("terminal_values", spec))
+    seen: Dict[str, Set[str]] = {}
+    for label, cols in classes.items():
+        values = {str(terminal_of.get(c)) for c in cols if c in terminal_of}
+        if cols and len(values) != 1:
+            out.append(f"{label}：終態非單一值 {sorted(values)}")
+        out.extend(f"{label}：終態 {v!r} 不屬契約" for v in sorted(values - terminals))
+        seen[label] = values
+    labels = [k for k in classes if classes[k]]
+    for i, a in enumerate(labels):
+        for b in labels[i + 1:]:
+            if seen[a] & seen[b]:
+                out.append(f"{a} 與 {b} 終態相同 {sorted(seen[a] & seen[b])}（未各記其終態）")
+    return out
+
+
+def post_ic_unit(runs: ph.RunCache, *, n_absent: int, with_ratio_unsafe: bool) -> Dict[str, Any]:
+    """post-IC 單元：真實 run（`ratio_unsafe` 格：raw 含 ratio-unsafe 群組）之宣告 raw 群組 → `transform_selected`
+    （polars 臂）；選欄＝3 個真實非 ratio-unsafe 欄 ＋ `n_absent` 個不在 raw 之欄名 ＋（`with_ratio_unsafe`）1 個真實
+    ratio-unsafe 欄。紀錄經 `last_post_ic_execution()`（`ph.post_ic_execution`）取得；欄名＝紀錄鍵之 L6.5 所見名（post-IC
+    所見即選欄之落盤名）。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.feature_naming import is_ratio_unsafe_column
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    handle = runs.get("ratio_unsafe")
+    groups = _raw_groups(handle)
+    raw_cols = [c for frame in groups.values() for c in frame.columns]
+    safe = [c for c in raw_cols if not is_ratio_unsafe_column(c)][:3]
+    unsafe = [c for c in raw_cols if is_ratio_unsafe_column(c)][:1] if with_ratio_unsafe else []
+    assert len(safe) == 3 and (unsafe or not with_ratio_unsafe), "真實 run 缺所需之欄 ⇒ 前提不成立"
+    absent = [f"{c}_absent" for c in safe[:n_absent]]
+    assert not set(absent) & set(raw_cols)
+    selected = safe + absent + unsafe
+    factory = create_feature_factory(cache_dir=ph.KLINE_DIR, validate_continuity=False)
+    config = factory._resolve_config(copy.deepcopy(ph.CELLS["ic_first"]["payload"]))
+    pre = FeaturePreprocessor(config.preprocessing.model_dump())
+    processed = pre.transform_selected(selected, groups, config.preprocessing, arm="polars")
+    records, exec_groups = ph.post_ic_execution(pre)
+    return {"pre": pre, "selected": selected, "absent": absent, "ratio_unsafe": unsafe, "records": records,
+            "groups": exec_groups, "processed_cols": [str(c) for f in processed.values() for c in f.columns]}
+
+
+def unit_population_violations(unit: Mapping[str, Any], spec: Mapping[str, Any]) -> List[str]:
+    names = [key[1] for key in unit["records"]]
+    terminal_of = {key[1]: rec.get("terminal") for key, rec in unit["records"].items()}
+    return processed_population_violations(names, terminal_of, unit["selected"], unit["processed_cols"],
+                                           unit["absent"], unit["ratio_unsafe"], spec)
 
 
 # ---------------------------------------------------------------------------------------------- 驗證
@@ -100,6 +168,28 @@ def test_verification_04_rerun_rowindex_failure_restores_or_failcloses(
     assert ph.rerun_failure_violations(outcome) == []
 
 
+def test_verification_05_processed_population_is_ic_selected_set(runs: ph.RunCache) -> None:
+    """SPEC v3 Task 1.4：真實短窗 IC-first 之 processed 紀錄母體＝IC 選欄全集（逐選欄恰一筆）；窮盡性＝processed 群組欄
+    聯集 ∪ 選欄不在 raw（依 manifest raw 群組宣告之欄導出）∪ 選欄中 ratio-unsafe 欄 ＝ 選欄全集，三類各記其終態。"""
+    from momentum.FeatureEngineering.feature_naming import is_ratio_unsafe_column
+
+    spec = ph.contract()
+    handle = runs.get("ic_first")
+    selected = [str(c) for c in ph.observation(handle).result_metadata["selected_features"]]
+    assert selected, "IC 選欄為空 ⇒ 空轉"
+    table = ph.provenance_table(handle.run_dir, "processed")
+    raw_node = ph.load_manifest(handle.run_dir)["artifacts"]["raw"]
+    raw_cols = {str(c) for info in raw_node["groups"].values() for c in info.get("columns") or []}
+    assert raw_cols, "manifest raw 群組無欄宣告 ⇒ 無法導出「不在 raw」"
+    absent = {c for c in selected if c not in raw_cols}
+    unsafe = {c for c in selected if c in raw_cols and is_ratio_unsafe_column(c)}
+    names = [str(n) for n in table["output_column"]]
+    terminal_of = dict(zip(names, table["terminal"]))
+    assert processed_population_violations(names, terminal_of, selected, ph.group_columns(handle.run_dir, "processed"),
+                                           absent, unsafe, spec) == []
+    assert ph.provenance_pointer(handle.run_dir, "processed")["row_count"] == len(set(selected))
+
+
 # ---------------------------------------------------------------------------------------------- 邊界
 
 def test_boundary_01_selected_columns_absent_from_raw(runs: ph.RunCache) -> None:
@@ -132,6 +222,27 @@ def test_boundary_02_gaussian_on(runs: ph.RunCache) -> None:
     assert not on_status & off_status
 
 
+def test_boundary_03_selected_column_missing_from_raw_has_terminal_record(runs: ph.RunCache) -> None:
+    """SPEC v3 Task 1.4（`feature_preprocessor.py:683` 附近）：選欄不在 raw ⇒ 該欄仍有恰一筆紀錄、記其專屬終態；窮盡性
+    ＝processed 群組欄 ∪ 不在 raw 之欄 ＝ 選欄全集。"""
+    spec = ph.contract()
+    unit = post_ic_unit(runs, n_absent=2, with_ratio_unsafe=False)
+    assert unit["absent"] and unit["processed_cols"]
+    assert unit_population_violations(unit, spec) == []
+    assert {key[1] for key in unit["records"]} >= set(unit["absent"])
+
+
+def test_boundary_04_ratio_unsafe_selected_column_has_terminal_record(runs: ph.RunCache) -> None:
+    """SPEC v3 Task 1.4（`feature_preprocessor.py:585` 附近）：選欄含 ratio-unsafe 欄（post-IC 入口剔除）⇒ 該欄仍有恰一筆
+    紀錄、記其專屬終態（不同於已寫出與不在 raw）；窮盡性＝processed 群組欄 ∪ 不在 raw ∪ ratio-unsafe ＝ 選欄全集。"""
+    spec = ph.contract()
+    unit = post_ic_unit(runs, n_absent=1, with_ratio_unsafe=True)
+    assert unit["ratio_unsafe"] and unit["absent"] and unit["processed_cols"]
+    assert not set(unit["ratio_unsafe"]) & set(unit["processed_cols"]), "ratio-unsafe 選欄被寫入 processed ⇒ 前提不成立"
+    assert unit_population_violations(unit, spec) == []
+    assert {key[1] for key in unit["records"]} >= set(unit["ratio_unsafe"])
+
+
 # ---------------------------------------------------------------------------------------------- mutation
 
 def test_mutation_raw_record_inside_raw_dir(tmp_path_factory: pytest.TempPathFactory,
@@ -157,3 +268,36 @@ def test_mutation_processed_rowindex_direct_write_without_restore(tmp_path_facto
     assert outcome.new_axis_on_disk
     violations = ph.rerun_failure_violations(outcome)
     assert any("錯配" in v for v in violations), violations
+
+
+def test_mutation_missing_or_ratio_unsafe_selected_not_recorded(runs: ph.RunCache,
+                                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（SPEC v3 Task 1.4）：post-IC 紀錄漏記「選欄不在 raw」與「入口剔除 ratio-unsafe」之欄（只記已寫出者＝改前
+    之母體）、或兩類記成同一終態 ⇒ 母體／窮盡性 oracle 轉紅。正對照：未改壞時無違規。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    spec = ph.contract()
+    unit = post_ic_unit(runs, n_absent=1, with_ratio_unsafe=True)
+    assert unit_population_violations(unit, spec) == []
+    dropped = set(unit["absent"]) | set(unit["ratio_unsafe"])
+    original = FeaturePreprocessor.last_post_ic_execution
+
+    def written_only(self: Any) -> Any:
+        records, groups = original(self)
+        return {k: v for k, v in dict(records).items() if k[1] not in dropped}, groups
+
+    monkeypatch.setattr(FeaturePreprocessor, "last_post_ic_execution", written_only)
+    mutant = dict(unit, records=ph.post_ic_execution(unit["pre"])[0])
+    assert any("母體" in v for v in unit_population_violations(mutant, spec))
+
+    def merged_terminal(self: Any) -> Any:
+        records, groups = original(self)
+        records = {k: dict(v) for k, v in dict(records).items()}
+        absent_key = next(k for k in records if k[1] in set(unit["absent"]))
+        unsafe_key = next(k for k in records if k[1] in set(unit["ratio_unsafe"]))
+        records[unsafe_key]["terminal"] = records[absent_key]["terminal"]
+        return records, groups
+
+    monkeypatch.setattr(FeaturePreprocessor, "last_post_ic_execution", merged_terminal)
+    mutant = dict(unit, records=ph.post_ic_execution(unit["pre"])[0])
+    assert any("未各記其終態" in v for v in unit_population_violations(mutant, spec))

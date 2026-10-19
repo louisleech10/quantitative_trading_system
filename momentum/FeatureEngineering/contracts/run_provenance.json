@@ -43,6 +43,13 @@
   "dstar_source_values": {"values": [], "_sources": {}},
   "group_arm_values": {"values": [], "_sources": {}},
   "group_status_values": {"values": [], "_sources": {}},
+  "fallback_values": {"values": [], "_sources": {}, "_doc": "群組回退事件值集；manifest 群組之 fallback 為此集合之值之清單（可多重，依發生序）"},
+  "named_values": {
+    "_doc": "SPEC 以語意指稱、測試需查得其值之具名值；Task 1.1 盤點後填入對應值集中之值（null＝未填，依賴測試必紅）",
+    "preprocessing_master_off": null,
+    "adf_test_error_event": null
+  },
+  "source_scope": ["momentum/FeatureEngineering/preprocessing/", "momentum/FeatureEngineering/feature_storage.py", "momentum/FeatureEngineering/feature_factory.py"],
   "_unreachable_doc": "形為 {<值>: {\"reason\": <文字>, \"_sources\": [<path:line>, ...]}}；驗收未產出之值須列此並附碼證",
   "_unreachable": {},
   "required_members": {"winsorization": ["applied"], "terminal_values": ["ratio_unsafe"], "group_arm_values": ["polars"]},
