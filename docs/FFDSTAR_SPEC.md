@@ -55,7 +55,8 @@
 - 目標：以碼證列出 L6.5（raw-sink、in-place、native 子實例、post-IC）每一步驟之每條實際離開路徑，定稿紀錄契約。　檔案：新建 `momentum/FeatureEngineering/contracts/run_provenance.json`；盤點對象 `feature_preprocessor.py` 之 `transform_registry_groups_to_sink`、`_transform_single*`、`_apply_fractional_differencing*`、ADF 差分、縮尾、rank、zscore、gaussian、ratio-unsafe passthrough、native 成功／回退、`transform_selected`；`feature_storage.py` 之 dead-drop；`feature_factory.py` 之失敗群組。　既有 caller／影響面：新建，無 caller。
 - 改法：契約含——逐欄紀錄欄位與型別（輸出欄名、原生週期、層、群組 id、各步驟狀態、平穩化決策欄、事件、終態）；各步驟狀態封閉值集（每值附 `_sources`：至少一個 `path:line` 離開點）；群組轉換臂與回退值集；manifest `provenance` 物件鍵；run 身分物件鍵；紀錄檔相對路徑。值樣式 `^[a-z][a-z0-9_]*$`。**不得杜撰無離開點之值；每個離開點須有對應值。**
 - **驗證**：`pytest tests/feature_engineering/test_preprov_contract.py` 全綠，其中：①契約每個狀態值之 `_sources` 每個 `path:line` 指向非註解非空行；②契約值皆合樣式；③Task 3.1 驗收格之實際紀錄中出現之值集合 ⊆ 契約值集，且契約中每個值至少被一格或一條單元案例產出（未產出之值須於契約 `_unreachable` 具名並附碼證理由）。mutation：契約刪一個實際會出現之值 ⇒ ③紅。
-- **邊界**：①statsmodels 不可用之 fracdiff 早退；②目標層外之欄（fracdiff 不涵蓋）；③平穩化關閉時 fracdiff／ADF 之狀態值與平穩化決策欄全 null。
+- **邊界**：①statsmodels 不可用之 fracdiff 早退；②目標層外之欄（fracdiff 不涵蓋）；③平穩化關閉時平穩化決策欄全 null，fracdiff／ADF 之步驟狀態各為契約中表示「關閉」之值（步驟狀態欄不得為 null）。
+- **契約補充**：SPEC 驗收中具名之 `applied`（縮尾）、`ratio_unsafe`（終態）、`polars`（post-IC 群組臂）須存在於契約對應值集（測試先斷言其存在）；`_unreachable` 形為 `{<值>: {"reason": <文字>, "_sources": [<path:line>, …]}}`；`content_sha256` 項之 `dtype` 為該檔各欄 Arrow 型別去重排序後以 `|` 連接之字串。
 - **存活至**：本票交付後保留（契約為唯一真相源）。
 - **覆蓋風險**：無。
 - 不可做：不得新增任何轉換判斷分支；不得改任何步驟之條件。
@@ -71,7 +72,7 @@
 
 **Task 1.2 — 前處理器之逐欄執行狀態收集**
 - 目標：run 層級累加每個輸入欄之各步驟實際狀態、平穩化決策、群組轉換臂與回退、失敗群組。　檔案：`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`（Task 1.1 盤出之全部離開點；`_record_decision`、`_merge_decisions_from`、`failed_groups`）；`momentum/FeatureEngineering/feature_factory.py` 之 `_capture_stationarity_decisions`。　既有 caller／影響面：`stationarity_decisions()`、`stationarity_failure_reasons()` 之回傳格式不變（FF-STAT 呼叫者不受影響）。
-- 改法：新增 run 層級之執行紀錄容器（不被 per-transform 重設；鍵＝(原生週期, L6.5 所見欄名)）；各離開點以契約值記狀態，成功亦記；平穩化關閉時亦記縮尾等步驟狀態；native 子實例之紀錄於丟棄前併回 owner；native 失敗回退記回退值於群組臂；ratio-unsafe passthrough 記終態；`_merge_decisions_from` 與 `_capture_stationarity_decisions` 改為同鍵且值不逐項相同即拋 `ProvenanceConflictError`（逐項相同則冪等）。
+- 改法：新增 run 層級之執行紀錄容器（不被 per-transform 重設；鍵＝(原生週期, L6.5 所見欄名)）；各離開點以契約值記狀態，成功亦記；平穩化關閉時亦記縮尾等步驟狀態；native 子實例之紀錄於丟棄前併回 owner；native 失敗回退記回退值於群組臂；ratio-unsafe passthrough 記終態；`_merge_decisions_from` 與 `_capture_stationarity_decisions` 改為同鍵且值不逐項相同即拋 `ProvenanceConflictError`（逐項相同則冪等）。公開存取：`FeaturePreprocessor.execution_records() -> Dict[Tuple[str, str], Dict[str, Any]]`（逐欄）與 `execution_groups() -> Dict[str, Dict[str, Any]]`（逐群組臂、回退、狀態、失敗原因）。`ProvenanceError` 系列加入 `NON_DEGRADABLE_ERRORS`（`feature_preprocessor.py:107-111`）——parallel→serial 回退之 `except Exception`（`:3780` 附近）等降級分支不得吞下。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_collect.py` 全綠：①單元（真實 kline 短窗之群組）每個輸入欄恰一筆、各步驟狀態皆屬契約；②native 成功與回退各一案，回退案之欄狀態來自回退路徑且群組臂為回退值；③衝突案拋 `ProvenanceConflictError`。mutation：刪任一離開點之紀錄呼叫 ⇒ ①紅；`_merge_decisions_from` 改回覆寫 ⇒ ③紅；縮尾成功不記 ⇒ ①紅。
 - **邊界**：①群組全為 ratio-unsafe；②`eligible_columns` 為空；③parallel fracdiff 多 worker 結果合併（重複鍵拒收）；④append 模式衍生欄（`_fracdiff`／`_diff1`／`_diff2`）以父欄關聯記終態。
 - **存活至**：本票交付後保留（Task 1.3／1.4 消費）。
@@ -80,7 +81,7 @@
 
 **Task 1.3 — raw 紀錄檔、內容身分與 manifest（單一提交點）**
 - 目標：writer 於安裝前寫紀錄檔與內容身分，manifest 合併為唯一提交點。　檔案：`momentum/FeatureEngineering/feature_storage.py` 之 `write_raw_from_registry_stream`、`_atomic_merge_feature_manifest_v2`、`_build_feature_manifest_v2`；新建 `momentum/FeatureEngineering/run_provenance.py`（序列化、內容身分、讀取驗證之純函式）。　既有 caller／影響面：`feature_factory.py:3880`；多標的 worker 與批次經同一 writer。
-- 改法：①群組 part id 寫入 `group_manifest` 前碰撞即拋錯；②自前處理器紀錄＋dead-drop 結果＋群組 manifest 組逐欄紀錄表，窮盡性檢查（列之輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄，逐名、無重複）不過即拋錯；③每個群組檔與 row index 檔寫畢時計 sha256，組 `content_sha256`（契約定義之排序組成：相對路徑、欄名、列數、dtype、檔案 sha256、row index sha256）；④紀錄檔以 zstd parquet 寫入暫存 `provenance/` 並計其 sha256；⑤安裝前將舊 manifest 之 raw 節點標為不完整（原子寫）；⑥安裝 raw 與紀錄檔；⑦manifest 合併寫入 `content_sha256` 與 `provenance` 物件（含路徑、sha256、列數、契約版本、各步驟各狀態計數、群組表：臂、狀態、失敗原因）。任一步失敗 ⇒ 例外上拋、run 失敗。刪 `:1224-1225` 之舊註解。
+- 改法：①群組 part id 寫入 `group_manifest` 前碰撞即拋錯；②自前處理器紀錄＋dead-drop 結果＋群組 manifest 組逐欄紀錄表，窮盡性檢查（列之輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄，逐名、無重複）不過即拋錯；③每個群組檔與 row index 檔寫畢時計 sha256，組 `content_sha256`（契約定義之排序組成：相對路徑、欄名、列數、dtype、檔案 sha256、row index sha256）；④紀錄檔以 zstd parquet 寫入暫存 `provenance/` 並計其 sha256；⑤安裝前將舊 manifest 之 raw 節點標為不完整（原子寫）；⑥安裝 raw 與紀錄檔；⑦manifest 合併寫入 `content_sha256` 與 `provenance` 物件（含路徑、sha256、列數、契約版本、各步驟各狀態計數、群組表：臂、狀態、失敗原因）。任一步失敗 ⇒ 例外上拋、run 失敗。例外型別：檔案寫入失敗以原例外（如 `OSError`）上拋不包裝；part id 碰撞與紀錄鍵重複拋 `ProvenanceConflictError`；窮盡性不符拋 `ProvenanceExhaustivenessError`。刪 `:1224-1225` 之舊註解。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_writer.py` 全綠：①真實短窗生成後紀錄檔存在、sha256 等於 manifest 宣告；②窮盡性逐名；③`content_sha256` 以獨立實作（測試內自讀檔計算）重算相等；④注入紀錄檔寫入失敗（唯讀目錄）⇒ 生成失敗、manifest 無完整 raw 節點；⑤注入 manifest 合併失敗於安裝後 ⇒ run 不可被 `consumer="strict"` 讀為完整；⑥part id 碰撞案拋錯。mutation：`content_sha256` 漏 row index ⇒ 只改時間軸之案③紅；紀錄檔寫入改為吞例外 ⇒ ④紅；略過⑤ ⇒ ⑤紅。
 - **邊界**：①dead-drop 開啟且有被剔欄；②多週期 run（同名不同週期之輸出欄以落盤名區分）；③多標的 worker 路徑；④平穩化關閉。
 - **存活至**：本票交付後保留。
@@ -89,7 +90,7 @@
 
 **Task 1.4 — processed 紀錄檔（post-IC）**
 - 目標：IC-first 之 post-IC 轉換同樣記逐欄狀態與臂。　檔案：`feature_preprocessor.py` 之 `transform_selected`；`feature_storage.py` 之 `write_processed`；`feature_factory.py:2986`。　既有 caller／影響面：`run_ic_first`。
-- 改法：`transform_selected` 之 post-IC 前處理器沿用 Task 1.2 容器，回傳紀錄；`write_processed` 同 Task 1.3 ①–⑦ 之 processed 版（紀錄檔另一檔名、`content_sha256` 含 `processed_timestamps.parquet`）。processed 節點不覆寫 raw 節點之 `provenance`；raw 被刪後 raw 紀錄檔仍保留（位於 `provenance/`）。
+- 改法：`transform_selected` 之 post-IC 前處理器沿用 Task 1.2 容器；回傳形態不變，紀錄經呼叫者實例之 `last_post_ic_execution()`（回 `execution_records()`／`execution_groups()` 同形之二元組）取得；`write_processed` 新增必填關鍵字參數 `execution`（該二元組），同 Task 1.3 ①–⑦ 之 processed 版；零選欄時紀錄為零列，manifest processed 節點 `provenance.summary.selected_columns == 0` 以區分「零選欄」與「未寫紀錄」（紀錄檔另一檔名、`content_sha256` 含 `processed_timestamps.parquet`）。processed 節點不覆寫 raw 節點之 `provenance`；raw 被刪後 raw 紀錄檔仍保留（位於 `provenance/`）。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_processed.py` 全綠：①真實短窗 IC-first 後 processed 紀錄逐選欄恰一筆、臂＝`polars`；②`cleanup_raw` 後 raw 紀錄檔仍在且 sha256 符合 manifest；③IC 選擇為空時 processed 紀錄為零列且狀態可區分「零選欄」。mutation：raw 紀錄檔改放 `raw/` 內 ⇒ ②紅。
 - **邊界**：①選欄全不在 raw；②gaussian 開啟。
 - **存活至**：本票交付後保留。
@@ -108,8 +109,8 @@
 ### Phase 2 — IC 讀取保留 run 身分、快取依身分失效（依賴：Task 1.3）
 
 **Task 2.1 — run 身分物件**
-- 目標：IC 自同一次 manifest 解析取得 run 身分並隨資料傳遞。　檔案：`run_provenance.py`（`resolve_run_identity(manifest, artifact_kind)`）；`momentum/FeatureEngineering/feature_library.py`（`load` 新增回傳身分之入口，舊回傳形態保留給既有 caller）。　既有 caller／影響面：`api/services/ic_analysis_service.py` 之 `_materialize_features_for_ic`。
-- 改法：身分鍵依契約（symbol、tf、config_hash、feature_schema_hash、feature_naming_version、artifact_kind、content_sha256、provenance_sha256）；缺 `content_sha256` 之舊 run 身分標 `legacy`。
+- 目標：IC 自同一次 manifest 解析取得 run 身分並隨資料傳遞。　檔案：`run_provenance.py`（`resolve_run_identity(manifest, artifact_kind)`）；`momentum/FeatureEngineering/feature_library.py`（新增 `load_with_identity(symbol, timeframe, config_hash=None, **同 load 之參數) -> Tuple[pd.DataFrame, RunIdentity]`；`load` 回傳形態不變，給既有 caller）。　既有 caller／影響面：`api/services/ic_analysis_service.py` 之 `_materialize_features_for_ic`。
+- 改法：身分鍵依契約（symbol、tf、config_hash、feature_schema_hash、feature_naming_version、artifact_kind、content_sha256、provenance_sha256）；`feature_schema_hash` 取該 artifact 節點之值，節點無則取 manifest 頂層；缺 `content_sha256` 之舊 run 身分標 `legacy`。身分物件在一切輸出中之鍵名統一為 `ff_run_identity`。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_identity.py` 全綠：身分取值與 manifest 逐鍵相等；同一次 `load` 內 manifest 解析次數不因本 Task 增加（以計數 monkeypatch 斷言）。mutation：身分改取第二次解析之 manifest 且其間 manifest 被替換 ⇒ 不一致案紅。
 - **邊界**：①`config_hash` 未指定（latest 解析後才定身分）；②舊 run。
 - **存活至**：本票交付後保留。
@@ -118,7 +119,7 @@
 
 **Task 2.2 — ingest 快取依身分失效**
 - 目標：IC ingest h5 與 `_meta.json` 只在身分相符時沿用。　檔案：`api/services/ic_analysis_service.py` 之 `_materialize_features_for_ic`、`_ic_handoff_h5_current`、`_write_features_h5`。　既有 caller／影響面：IC 分析服務全部入口。
-- 改法：h5 根屬性寫 `metadata_json`（含 run 身分）；沿用條件＝h5 與 `_meta.json` 皆帶與本次相同之身分且命名世代現行；否則兩者一併重寫；身分為 `legacy` ⇒ 不沿用。快取檔名保留可讀前綴，`latest` 一律以解析後身分判定。
+- 改法：交接 h5 於 orchestrator 讀取之同一位置（`ic_filter_orchestrator.py:5848` 讀 `group.attrs["metadata_json"]`，寫入端寫於該 group 屬性）寫 `metadata_json`，其內 `ff_run_identity` 為 run 身分；`_meta.json` 同鍵；沿用條件＝h5 與 `_meta.json` 皆帶與本次相同之身分且命名世代現行；否則兩者一併重寫；身分為 `legacy` ⇒ 不沿用。快取檔名保留可讀前綴，`latest` 一律以解析後身分判定。呼叫端自帶 `features_path`（`_write_ic_meta_json`，`ic_analysis_service.py:3355`）之路徑非讀自特徵產出，`ff_run_identity` 寫 `null` 並於報告標示來源為外部檔，不得冒充 run 身分。
 - **驗證**：`pytest tests/api/test_preprov_ingest_cache.py` 全綠：①同身分第二次呼叫沿用（不重寫，以 mtime 與寫入計數斷言）；②真實短窗 run 重生而值改變（隔離資料副本中改一根 K 線）⇒ h5 與 meta 皆重寫且 orchestrator 讀得之 `metadata_json` 身分為新值；③舊格式快取（無身分屬性）⇒ 重寫。mutation：沿用條件拿掉 `content_sha256` ⇒ ②紅；只重寫 h5 不重寫 meta ⇒ ②紅。
 - **邊界**：①快取目錄不存在；②h5 損毀（OSError）⇒ 重寫。
 - **存活至**：本票交付後保留。
@@ -136,7 +137,7 @@
 
 **Task 2.4 — IC 輸出帶 run 身分**
 - 目標：報告、倖存者、API 結果可追溯讀到之 run。　檔案：`momentum/Analysis/ic_filter_orchestrator.py`（報告 metadata、倖存者 provenance 組裝）；`momentum/Analysis/contracts/ic_survivor_contract.json`（`provenance_keys` 加 `ff_run_identity`、`version` +1）；`momentum/Analysis/survivor_contract.py`；`api/services/ic_analysis_service.py`（結果透傳）。　既有 caller／影響面：倖存者讀取端（`docs/IC_QUANT_GAP_REGISTRY.md` 所列消費者）須接受新版本。
-- 改法：同一 run 身分物件寫入報告 metadata 與倖存者 provenance；倖存者 `config_hash`（IC 設定雜湊）語意不變。
+- 改法：同一 run 身分物件寫入報告 metadata 與倖存者 provenance；倖存者 `config_hash`（IC 設定雜湊）語意不變。契約版本 +1 之連動：`survivor_contract.py:281` 之舊版訊息判斷改讀契約版本常數而非字面 2；既有斷言版本為 2 之測試（`tests/momentum/Analysis/test_survivor_contract.py:56,176,190,617`）改斷言新版本（測試改動依 2026-10-17 裁定登記審清單）；`build_survivor_output` 之新參數須為必填，其呼叫者（orchestrator 與既有測試之 `_build_kwargs`）同步。
 - **驗證**：`pytest tests/momentum/Analysis/test_preprov_survivor_identity.py` 全綠：真實短窗 IC 分析之報告與倖存者 `ff_run_identity` 等於 Task 2.1 身分；倖存者契約驗證器拒收缺該鍵之新版本輸出；既有倖存者契約測試全綠。mutation：倖存者改寫入 ingest 快取檔之舊身分 ⇒ 身分相等案紅。
 - **邊界**：①事件型路徑（`_run_event_label_stages`）同樣帶身分；②IC 選擇為空。
 - **存活至**：本票交付後保留。
@@ -148,7 +149,7 @@
 **Task 3.1 — 整合驗收與結構重凍**
 - 目標：真實 kline 全格驗紀錄與實際執行一致、值不變、IC 快取正確失效。　檔案：`tests/feature_engineering/test_preprov_acceptance.py`；`tests/_golden/preprov/`；結構重凍之凍結檔（Task 1.6 所列）。　既有 caller／影響面：凍結檔之結構項。
 - 改法：§V 格子逐格單行程串行跑；值指紋對 `tests/_golden/preprov/pre_change_fingerprints.json` 逐位元比；結構凍結項依 §G 重凍並出差異收據。
-- **驗證**：`pytest tests/feature_engineering/test_preprov_acceptance.py` 全綠（§V oracle ①–⑥）；受影響凍結測試全綠；重凍收據列出之差異路徑只含 `provenance/` 與 manifest 新鍵。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_acceptance.py` 全綠（§V oracle ①–⑥）；受影響凍結測試全綠；重凍收據 `tests/_golden/preprov/refreeze_receipt.json` 列出之差異路徑只含 `provenance/` 與 manifest 新鍵（測試斷言之）。
 - **邊界**：見 §V 邊界目錄。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
@@ -164,13 +165,13 @@
 - 不可做：不得以「檔很小」略過與核可估算之對照。
 
 ## §V 驗證策略與邊界測試目錄
-- **格子**（真實 kline、短窗、逐格單行程串行）：單週期 1h；12h＋1h 多週期；多標的 worker（兩標的）；平穩化開＋縮尾開；平穩化關＋縮尾開；前處理總開關關；含 ratio-unsafe 群組；dead-drop 開啟；IC-first（含 `cleanup_raw`）。
+- **格子**（真實 kline、短窗、逐格單行程串行）：單週期 1h；1h 主＋12h 訓練週期（使 native-tf 子實例路徑實際執行）；多標的 worker（兩標的；worker 不帶起訖日、全史、平穩化關，只驗 oracle ①④⑥——平穩化與縮尾 oracle ②③ 由單標的格承擔，writer 與前處理器為同一實作）；平穩化開＋縮尾開；平穩化關＋縮尾開；前處理總開關關；含 ratio-unsafe 群組；dead-drop 開啟；IC-first（含 `cleanup_raw`）。
 - **oracle**（皆不讀紀錄自證）：①窮盡性——紀錄輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄，逐名；②`d` 獨立重算——取紀錄之 `d` 以 `_frac_diff_ffd` 對同校準前史＋公開段重算，與落盤值依 schema dtype 逐位元相等；③縮尾狀態——`applied` 之欄以同參數獨立縮尾重算等於落盤值，`ratio_unsafe` 終態之欄落盤值等於 L6.5 前值，縮尾關閉格無任何 `applied`；④內容身分——測試內自讀檔獨立重算 `content_sha256` 相等；⑤IC 快取——同身分沿用、值改變之重生必重建且報告身分為新值；⑥值不變——公開值指紋與改前基準逐位元相同。
 - **mutation**（各 Task 已列者彙總，Task 3.1 以 monkeypatch 對真實格重跑）：刪縮尾成功紀錄；`d` 寫固定值；回退路徑不記；子實例併回改覆寫；略過 dead-drop 終態；紀錄檔列入特徵群組；`content_sha256` 漏 row index；ingest 沿用條件拿掉身分；IC-first 快取身分移除新欄；紀錄寫入吞例外。每個 mutant 須由對應 oracle 轉紅。
 - **測試層級**：單元＋真實 kline 整合＋凍結對照；可 `pytest tests/feature_engineering/...` 獨立跑，不需 `run_api.py`。
 - **防假綠**：既有測試斷言 diff 不放寬；測試刪改依 2026-10-17 裁定登記審清單。
 - **估時**（本機 8 GB）：每格短窗生成約 1–5 分鐘（PROBEWINSOR 同型格實測量級），全格約 30–60 分鐘；超過 30 分鐘之跑開跑前列格數×估時報使用者。
-- **邊界目錄**：空 DF（零選欄）✔ Task 1.4／全 NaN 欄 ✔ Task 1.2 邊界③／重複鍵 ✔ Task 1.2、1.3／寫入失敗與晚期失敗 ✔ Task 1.3／竄改與路徑逃逸 ✔ Task 1.5／舊 run 與舊快取 ✔ Task 1.5、2.2、2.3／並發寫：單 run 單寫者（既有 manifest 鎖），✗。
+- **邊界目錄**：空 DF（零選欄）✔ Task 1.4／全 NaN 欄 ✔ Task 1.2 邊界②／重複鍵 ✔ Task 1.2、1.3／寫入失敗與晚期失敗 ✔ Task 1.3／竄改與路徑逃逸 ✔ Task 1.5／舊 run 與舊快取 ✔ Task 1.5、2.2、2.3／並發寫：單 run 單寫者（既有 manifest 鎖），✗。
 
 ## §R 回退
 - 每 Phase 獨立 commit、可單獨 revert；Phase 2 revert 後 IC 回到現行快取行為（含現存缺陷）；Phase 1 revert 後新 run 無紀錄，既有讀取不受影響（D6）。

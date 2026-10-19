@@ -1916,6 +1916,27 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
+  "tests/api/test_preprov_ingest_cache.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_preprov_ingest_cache.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
   "tests/api/test_probewinsor_batch_resume.py": {
    "claim": [
     "correctness",
@@ -4605,6 +4626,174 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "NUMERIC"
+  },
+  "tests/feature_engineering/test_preprov_acceptance.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_acceptance.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/feature_engineering/test_preprov_collect.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_collect.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/feature_engineering/test_preprov_contract.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_contract.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/feature_engineering/test_preprov_helpers.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_helpers.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/feature_engineering/test_preprov_identity.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_identity.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/feature_engineering/test_preprov_processed.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_processed.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/feature_engineering/test_preprov_reader.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_reader.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/feature_engineering/test_preprov_writer.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_writer.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
   },
   "tests/feature_engineering/test_probewinsor.py": {
    "claim": [
@@ -8980,6 +9169,48 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "PA-CUMSUM"
+  },
+  "tests/momentum/Analysis/test_preprov_ic_cache.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_preprov_ic_cache.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
+  "tests/momentum/Analysis/test_preprov_survivor_identity.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A12",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_preprov_survivor_identity.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
   },
   "tests/momentum/Analysis/test_probability_calibrator.py": {
    "claim": [

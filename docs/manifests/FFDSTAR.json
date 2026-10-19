@@ -1,0 +1,166 @@
+{
+  "spec_path": "docs/FFDSTAR_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [
+    "momentum/FeatureEngineering/run_provenance.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_preprov_contract.py",
+    "tests/feature_engineering/test_preprov_helpers.py",
+    "tests/feature_engineering/test_preprov_collect.py",
+    "tests/feature_engineering/test_preprov_writer.py",
+    "tests/feature_engineering/test_preprov_processed.py",
+    "tests/feature_engineering/test_preprov_reader.py",
+    "tests/feature_engineering/test_preprov_identity.py",
+    "tests/api/test_preprov_ingest_cache.py",
+    "tests/momentum/Analysis/test_preprov_ic_cache.py",
+    "tests/momentum/Analysis/test_preprov_survivor_identity.py",
+    "tests/feature_engineering/test_preprov_acceptance.py"
+  ],
+  "script_acceptance": [
+    "tests/feature_engineering/preprov_helpers.py",
+    "scripts/preprov_output_size.py"
+  ],
+  "contract_jsons": [
+    "momentum/FeatureEngineering/contracts/run_provenance.json"
+  ],
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "HANDOFF.md",
+      "api/services/ic_analysis_service.py",
+      "docs/FFDSTAR_SPEC.md",
+      "docs/ROADMAP.md",
+      "docs/manifests/FFDSTAR.json",
+      "momentum/Analysis/contracts/ic_survivor_contract.json",
+      "momentum/Analysis/ic_engine.py",
+      "momentum/Analysis/ic_filter_orchestrator.py",
+      "momentum/Analysis/survivor_contract.py",
+      "momentum/FeatureEngineering/contracts/run_provenance.json",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/feature_library.py",
+      "momentum/FeatureEngineering/feature_reader.py",
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/run_provenance.py",
+      "scripts/fact_keys.json",
+      "scripts/freeze_failopen_baseline.py",
+      "scripts/freeze_framepath_baseline.py",
+      "scripts/preprov_output_size.py",
+      "tests/api/test_preprov_ingest_cache.py",
+      "tests/feature_engineering/ffstat_helpers.py",
+      "tests/feature_engineering/preprov_helpers.py",
+      "tests/feature_engineering/test_preprov_acceptance.py",
+      "tests/feature_engineering/test_preprov_collect.py",
+      "tests/feature_engineering/test_preprov_contract.py",
+      "tests/feature_engineering/test_preprov_helpers.py",
+      "tests/feature_engineering/test_preprov_identity.py",
+      "tests/feature_engineering/test_preprov_processed.py",
+      "tests/feature_engineering/test_preprov_reader.py",
+      "tests/feature_engineering/test_preprov_writer.py",
+      "tests/momentum/Analysis/test_preprov_ic_cache.py",
+      "tests/momentum/Analysis/test_preprov_survivor_identity.py",
+      "tests/momentum/Analysis/test_survivor_contract.py",
+      "tests/registry/catalog.json"
+    ],
+    "callers_now": [
+      "api/services/ic_analysis_service.py",
+      "api/services/xgboost_batch_service.py",
+      "momentum/Analysis/factor_combiner.py",
+      "momentum/Analysis/ic_reporter.py",
+      "momentum/Analysis/marginal_ic.py",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/factories.py",
+      "scripts/freeze_failopen_baseline.py",
+      "scripts/freeze_framepath_baseline.py",
+      "scripts/ffname_refreeze.py",
+      "tests/feature_engineering/ffstat_helpers.py"
+    ],
+    "callers_later": [
+      "tests/_golden/preprov/pre_change_fingerprints.json",
+      "tests/_golden/preprov/refreeze_receipt.json",
+      "tests/_golden/preprov/output_size.json"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_preprov_contract.py tests/feature_engineering/test_preprov_helpers.py tests/feature_engineering/test_preprov_collect.py tests/feature_engineering/test_preprov_writer.py tests/feature_engineering/test_preprov_processed.py tests/feature_engineering/test_preprov_reader.py tests/feature_engineering/test_preprov_identity.py tests/api/test_preprov_ingest_cache.py tests/momentum/Analysis/test_preprov_ic_cache.py tests/momentum/Analysis/test_preprov_survivor_identity.py tests/feature_engineering/test_preprov_acceptance.py",
+    "forbidden": [
+      {
+        "rule": "不得改任何特徵值、NaN 遮罩、欄集合、欄順序、dtype、config_hash、feature_schema_hash（SPEC §C；不擅改輸出大小，增量以使用者 2026-10-19 核可之存法為限）",
+        "observable": true
+      },
+      {
+        "rule": "不得改 L6.5 任何步驟之條件、演算法、臂選擇；不得新增轉換判斷分支（紀錄只觀測實際離開路徑）",
+        "observable": true
+      },
+      {
+        "rule": "不得以設定回顯（raw_artifact_applied 等）或 log 解析冒充實際執行狀態",
+        "observable": true
+      },
+      {
+        "rule": "紀錄或摘要之寫入失敗不得被吞下（不得降級為 warning）；ProvenanceError 不得被 parallel→serial 等降級分支吞下",
+        "observable": true
+      },
+      {
+        "rule": "不得重凍任何值指紋；結構重凍只限 provenance/ 檔與 manifest 新鍵",
+        "observable": true
+      },
+      {
+        "rule": "不得以排除特定檔名代替依 manifest 宣告讀取；不得把紀錄檔列入 manifest 特徵群組",
+        "observable": true
+      },
+      {
+        "rule": "讀取端不得每次重算特徵檔雜湊（慢閘）；不得以 mtime 或檔案大小代替內容身分",
+        "observable": true
+      },
+      {
+        "rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail；倖存者契約版本測試只改版本字面",
+        "observable": true
+      },
+      {
+        "rule": "不得以合成 fixture 代替真實 kline（data_cache/feature_klines/kline_cache.h5）；測試與探針不得寫入正式 data_cache",
+        "observable": true
+      },
+      {
+        "rule": "momentum/ 不得 import api/（解耦 R1）；api/ 只經 momentum 公開函式取 run 身分、不自組（R2／R3）；服務不互相 import（R4）",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "分批：b1＝Task 1.1（契約盤點）＋Task 1.6（測試輔助與凍結腳本改依 manifest；於改前生產碼態重算值指紋等於現行凍結值）；b2＝Task 1.2＋1.3＋1.5（前處理器紀錄、writer 單一提交點、紀錄讀取）並於 b2 動生產碼前凍結 tests/_golden/preprov/pre_change_fingerprints.json；b3＝Task 1.4＋Phase 2（processed 紀錄、IC 身分與快取）；b4＝Phase 3（整合驗收、結構重凍、輸出重量）",
+      "受影響既有測試（依改動符號 grep，逐檔明列；重型真實生成者逐節點單行程串行、開跑前估時）：tests/feature_engineering/test_failopen_manifest.py tests/feature_engineering/test_failopen_consumer.py tests/feature_engineering/test_l7_raw_streaming.py tests/feature_engineering/test_cgsa_dead_drop_stream.py tests/feature_engineering/test_ffstat_dstar_failure.py tests/feature_engineering/test_ffstat_layer.py tests/feature_engineering/test_ffstat_all_tested.py tests/feature_engineering/test_ffname_value_invariance.py tests/feature_engineering/test_ffname_generation_gate.py tests/feature_engineering/test_framepath_invariance.py tests/feature_engineering/test_ic_first_pipeline.py tests/feature_engineering/test_icfirstalign_timeaxis.py tests/feature_engineering/test_ratiounsafe_registry.py tests/feature_engineering/test_v2_timestamp_golden.py tests/momentum/test_feature_storage.py tests/momentum/test_feature_preprocessor.py tests/momentum/Analysis/test_icfirstalign_cache.py tests/momentum/Analysis/test_survivor_contract.py tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_marginal_ic.py tests/momentum/Analysis/test_factor_combiner.py tests/momentum/Analysis/test_event_label_mode_contract.py tests/momentum/Analysis/test_gap2_stage6b_wiring.py tests/api/test_ic_analysis_service.py tests/feature_library/test_phase3.py tests/feature_library/test_phase4.py tests/feature_library/test_phase5.py tests/test_multi_symbol_parallel.py tests/test_l65_parallel.py",
+      "驗收測試之實作假設（委員審查時核對）：生產碼經模組屬性呼叫 run_provenance 之函式、load_contract 於呼叫時讀契約；紀錄檔以 pyarrow.parquet.write_table 寫入、路徑含 provenance；h12h1_multi 格為 1h 主＋12h 訓練週期；multi_symbol 格只驗 oracle ①④⑥",
+      "真實資料重測試單組串行；不與委員輪並行；開跑前磁碟 ≥30GB；超過 30 分鐘之跑先列格數×估時報使用者；IC 端測試 chdir 至 tmp 並 symlink config，不寫正式 data_cache/reports",
+      "既有倖存者契約消費者（factor_combiner、marginal_ic、ic_reporter）讀新版本之相容性於 b3 以其既有測試驗證；前端 types.ts 之倖存者型別無 provenance 欄，不受影響"
+    ],
+    "coverage_risk": [
+      "Task 1.1：test_preprov_contract.py（驗證①②③、邊界 01–03、mutation 2）",
+      "Task 1.6：test_preprov_helpers.py（驗證 01–04、邊界 01–03、mutation：rglob 列舉）",
+      "Task 1.2：test_preprov_collect.py（驗證 01–03、邊界 01–04、mutation 3）",
+      "Task 1.3：test_preprov_writer.py（驗證 01–06 與 03b、邊界 01–04、mutation 2）",
+      "Task 1.4：test_preprov_processed.py（驗證 01–03、邊界 01–02、mutation：raw 紀錄放 raw/）",
+      "Task 1.5：test_preprov_reader.py（驗證 01–05、邊界 01–02、mutation：略過 sha256）",
+      "Task 2.1：test_preprov_identity.py（驗證 3、邊界 01–02、mutation 1）",
+      "Task 2.2：test_preprov_ingest_cache.py（驗證①②③、邊界 04–05、mutation 2）",
+      "Task 2.3：test_preprov_ic_cache.py（驗證、邊界 01–02、mutation 1）",
+      "Task 2.4：test_preprov_survivor_identity.py（驗證、邊界 01–02、mutation 1）",
+      "Task 3.1：test_preprov_acceptance.py（oracle 01–06 逐格參數化、06b、mutation 6）",
+      "Task 3.2：scripts/preprov_output_size.py（收據 tests/_golden/preprov/output_size.json）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "FFDSTAR-R2 /api/v1/features/generate 之 task_id 於任務查詢端點查無（SPEC §N）",
+        "reason": "needs-research",
+        "owner": "FFDSTAR",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "FFDSTAR-R1 既有 7 個共用 d* 快取檔之來源 run 不明（SPEC §N）",
+        "reason": "user-ruling",
+        "owner": "FFDSTAR",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

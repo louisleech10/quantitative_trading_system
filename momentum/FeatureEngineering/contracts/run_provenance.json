@@ -1,0 +1,57 @@
+{
+  "_doc": "docs/FFDSTAR_SPEC.md 之逐欄執行紀錄與 run 身分契約（單一真相源）。各 values 由 Task 1.1 以碼證盤出實際離開路徑後填入，每值附 _sources（path:line）；未填前 values 為空，依賴之驗收測試必紅（設計如此）。",
+  "version": 1,
+  "value_pattern": "^[a-z][a-z0-9_]*$",
+  "files": {
+    "raw": "provenance/raw_columns.parquet",
+    "processed": "provenance/processed_columns.parquet"
+  },
+  "parquet_compression": "zstd",
+  "record_columns": {
+    "output_column": {"type": "str", "nullable": false, "_doc": "落盤欄名（FF-NAME v2 文法；tag_timeframe 後）；每列唯一"},
+    "native_timeframe": {"type": "str", "nullable": false},
+    "layer": {"type": "str", "nullable": true},
+    "group_id": {"type": "str", "nullable": true, "_doc": "dead-drop 欄為來源群組 id；無群組者 null"},
+    "terminal": {"type": "enum:terminal_values", "nullable": false},
+    "parent_column": {"type": "str", "nullable": true, "_doc": "append 模式衍生欄之父欄落盤名；其餘 null"},
+    "winsorization": {"type": "enum:step_status_values.winsorization", "nullable": false},
+    "fractional_differencing": {"type": "enum:step_status_values.fractional_differencing", "nullable": false},
+    "adf_differencing": {"type": "enum:step_status_values.adf_differencing", "nullable": false},
+    "rank_transform": {"type": "enum:step_status_values.rank_transform", "nullable": false},
+    "adaptive_zscore": {"type": "enum:step_status_values.adaptive_zscore", "nullable": false},
+    "gaussian_normalize": {"type": "enum:step_status_values.gaussian_normalize", "nullable": false},
+    "adf_pvalue": {"type": "float64", "nullable": true},
+    "n": {"type": "int64", "nullable": true},
+    "calibration_start": {"type": "str", "nullable": true, "_doc": "UTC ISO 8601，同 stable_start 表示"},
+    "calibration_end": {"type": "str", "nullable": true},
+    "fracdiff": {"type": "bool", "nullable": true},
+    "d": {"type": "float64", "nullable": true},
+    "adf_differenced": {"type": "int64", "nullable": true},
+    "dstar_source": {"type": "enum:dstar_source_values", "nullable": true},
+    "events": {"type": "list<str>", "nullable": false}
+  },
+  "steps": ["winsorization", "fractional_differencing", "adf_differencing", "rank_transform", "adaptive_zscore", "gaussian_normalize"],
+  "step_status_values": {
+    "winsorization": {"values": [], "_sources": {}},
+    "fractional_differencing": {"values": [], "_sources": {}},
+    "adf_differencing": {"values": [], "_sources": {}},
+    "rank_transform": {"values": [], "_sources": {}},
+    "adaptive_zscore": {"values": [], "_sources": {}},
+    "gaussian_normalize": {"values": [], "_sources": {}}
+  },
+  "terminal_values": {"values": [], "_sources": {}},
+  "dstar_source_values": {"values": [], "_sources": {}},
+  "group_arm_values": {"values": [], "_sources": {}},
+  "group_status_values": {"values": [], "_sources": {}},
+  "_unreachable_doc": "形為 {<值>: {\"reason\": <文字>, \"_sources\": [<path:line>, ...]}}；驗收未產出之值須列此並附碼證",
+  "_unreachable": {},
+  "required_members": {"winsorization": ["applied"], "terminal_values": ["ratio_unsafe"], "group_arm_values": ["polars"]},
+  "manifest_provenance_keys": ["path", "sha256", "row_count", "contract_version", "summary", "groups"],
+  "manifest_group_keys": ["arm", "fallback", "status", "failure_reason"],
+  "content_sha256": {
+    "_doc": "entries 依 relative_path 升冪；每項序列化為 [relative_path, columns, row_count, dtype, file_sha256]；整體 payload＝{\"entries\": [...], \"row_index_sha256\": <hex>}，以 json.dumps(sort_keys=True, separators=(',', ':'), ensure_ascii=False) 之 UTF-8 位元組取 sha256。紀錄檔不入。",
+    "entry_fields": ["relative_path", "columns", "row_count", "dtype", "file_sha256"],
+    "dtype_doc": "該檔各欄 Arrow 型別字串去重、升冪排序後以 | 連接"
+  },
+  "run_identity_keys": ["symbol", "tf", "config_hash", "feature_schema_hash", "feature_naming_version", "artifact_kind", "content_sha256", "provenance_sha256"]
+}
