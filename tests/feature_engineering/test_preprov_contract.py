@@ -7,9 +7,11 @@
 
 from __future__ import annotations
 
+import ast
 import copy
 import re
-from typing import Any, Dict, List, Mapping, Set, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
 
 import pytest
 
@@ -30,9 +32,52 @@ def runs(tmp_path_factory: pytest.TempPathFactory) -> ph.RunCache:
 
 # ---------------------------------------------------------------------------------------------- oracle（純函式）
 
+_STMT_LIST_FIELDS = ("body", "orelse", "finalbody", "handlers", "cases")
+
+
+def _innermost_statement(tree: ast.AST, line: int) -> Optional[ast.stmt]:
+    """涵蓋 `line` 之最內層陳述式（其子陳述式皆不涵蓋該行者）；無 ⇒ None。"""
+    best: Optional[ast.stmt] = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.stmt) and node.lineno <= line <= (node.end_lineno or node.lineno):
+            if best is None or (node.lineno, -(node.end_lineno or node.lineno)) >= (
+                    best.lineno, -(best.end_lineno or best.lineno)):
+                best = node
+    return best
+
+
+def _statement_string_literals(stmt: ast.stmt) -> Set[str]:
+    """陳述式本身（複合陳述式只取標頭：排除 body／orelse／finalbody／handlers／cases 之子陳述式）之字串字面集合。"""
+    out: Set[str] = set()
+    stack: List[ast.AST] = []
+    for field, value in ast.iter_fields(stmt):
+        if field in _STMT_LIST_FIELDS:
+            continue
+        stack.extend(value if isinstance(value, list) else [value])
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, ast.AST):
+            continue
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            out.add(node.value)
+        stack.extend(ast.iter_child_nodes(node))
+    return out
+
+
+_AST_CACHE: Dict[str, ast.AST] = {}
+
+
+def _parsed(target: Path) -> ast.AST:
+    key = str(target)
+    if key not in _AST_CACHE:
+        _AST_CACHE[key] = ast.parse(target.read_text(encoding="utf-8"))
+    return _AST_CACHE[key]
+
+
 def source_violations(spec: Mapping[str, Any]) -> List[str]:
-    """① 每個值集非空；每值恰有 `_sources`（非空清單）；每個 `path:line` 指向 repo 內存在之檔之非註解非空行；
-    `_sources` 不得有值集外之鍵。"""
+    """① 每個值集非空；每值恰有 `_sources`（非空清單）；每個 `path:line` 指向 repo 內存在之檔之非註解非空行，且該行
+    （或其所屬之單一 AST 陳述式；複合陳述式只取標頭）含該值之字串字面（記錄呼叫之實參；`ast.Constant` 逐字相等）——
+    指向無關可執行行即紅（CODEX-R5-P2-02）；`_sources` 不得有值集外之鍵。"""
     out: List[str] = []
     for path in ph.enum_paths(spec):
         node = ph.enum_node(path, spec)
@@ -60,6 +105,13 @@ def source_violations(spec: Mapping[str, Any]) -> List[str]:
                 text = lines[n - 1].strip() if 1 <= n <= len(lines) else ""
                 if not text or text.startswith("#"):
                     out.append(f"{path}.{value}: {ref} 為空行或註解行")
+                    continue
+                if not target.suffix == ".py":
+                    out.append(f"{path}.{value}: {ref} 非 Python 原始碼（無法驗字串字面）")
+                    continue
+                stmt = _innermost_statement(_parsed(target), n)
+                if stmt is None or value not in _statement_string_literals(stmt):
+                    out.append(f"{path}.{value}: {ref} 之陳述式不含該值之字串字面")
     return out
 
 
@@ -170,7 +222,8 @@ def test_verification_00_load_contract_is_the_file() -> None:
 
 
 def test_verification_01_sources_point_to_code_lines() -> None:
-    """① 每個狀態值之 `_sources` 之每個 `path:line` 指向非註解非空行（且值集非空）。"""
+    """① 每個狀態值之 `_sources` 之每個 `path:line` 指向非註解非空行，且該行（或其所屬之單一陳述式）含該值之字串字面
+    （且值集非空）。"""
     assert source_violations(ph.contract()) == []
 
 
@@ -284,3 +337,60 @@ def test_mutation_source_pointing_to_comment_line_is_caught(monkeypatch: pytest.
     node["_sources"] = {v: [f"{_PREPROCESSOR}:{comment}"] for v in node["values"]}
     monkeypatch.setattr(rp, "load_contract", lambda: mutant)
     assert any("註解行" in v for v in source_violations(rp.load_contract()))
+
+
+def _violations_of(path: str, value: str, violations: List[str]) -> List[str]:
+    return [v for v in violations if v.startswith(f"{path}.{value}:")]
+
+
+def _literal_anchor(rel: str) -> Tuple[str, int]:
+    """檔內第一個「單一簡單陳述式含合樣式之字串字面」之 (字面, 行號)（契約尚無值時之正對照錨點）。"""
+    tree = ast.parse((ph.REPO / rel).read_text(encoding="utf-8"))
+    pattern = re.compile(r"^[a-z][a-z0-9_]*$")
+    for node in sorted((n for n in ast.walk(tree) if isinstance(n, (ast.Assign, ast.Expr, ast.Return))),
+                       key=lambda n: n.lineno):
+        literals = sorted(s for s in _statement_string_literals(node) if pattern.fullmatch(s))
+        if literals and not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)):
+            return literals[0], node.lineno
+    raise AssertionError(f"{rel} 無可作正對照之字串字面")
+
+
+def _unrelated_executable_line(rel: str, value: str) -> int:
+    """同檔中一個無關之可執行行：第一個 import 陳述式（非註解非空、且其陳述式不含 `value` 之字串字面）。"""
+    tree = ast.parse((ph.REPO / rel).read_text(encoding="utf-8"))
+    for node in sorted((n for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom))),
+                       key=lambda n: n.lineno):
+        if value not in _statement_string_literals(node):
+            return node.lineno
+    raise AssertionError(f"{rel} 無 import 陳述式可作無關可執行行")
+
+
+def test_mutation_source_pointing_to_unrelated_executable_line_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R5-P2-02）：某值之 `_sources` 改指同檔無關可執行行（import 陳述式；非註解非空）⇒ ① 之 oracle 轉紅，
+    且紅因為「陳述式不含該值之字串字面」而非註解／空行檢查。正對照：改前之 source（契約有值者取契約實值與其第一個
+    source；契約尚無值則取檔內實存字串字面之行）於該值集路徑下無任何違規。"""
+    spec = ph.contract()
+    filled = [(p, v) for p in ph.enum_paths(spec) for v in ph.contract_values(p, spec)]
+    mutant = copy.deepcopy(spec)
+    if filled:
+        path, value = filled[0]
+        good = str(ph.enum_node(path, spec)["_sources"][value][0])
+        rel, line = good.rsplit(":", 1)
+        node = ph.enum_node(path, mutant)
+        node["_sources"][value] = [good]
+    else:
+        rel = _PREPROCESSOR
+        path = ph.enum_paths(mutant)[0]
+        value, anchor = _literal_anchor(rel)
+        line = str(anchor)
+        node = ph.enum_node(path, mutant)
+        node["values"] = [value]
+        node["_sources"] = {value: [f"{rel}:{line}"]}
+    assert _violations_of(path, value, source_violations(mutant)) == [], "正對照不成立 ⇒ mutation 空轉"
+    bad = _unrelated_executable_line(rel, value)
+    assert str(bad) != line
+    node["_sources"][value] = [f"{rel}:{bad}"]
+    monkeypatch.setattr(rp, "load_contract", lambda: mutant)
+    caught = _violations_of(path, value, source_violations(rp.load_contract()))
+    assert any("不含該值之字串字面" in v for v in caught), caught
+    assert not any("註解行" in v for v in caught), caught

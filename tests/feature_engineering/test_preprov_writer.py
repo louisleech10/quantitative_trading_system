@@ -193,6 +193,20 @@ def test_verification_05_merge_failure_after_install_not_readable_complete(
                                                                  consumer="strict")
 
 
+@pytest.mark.parametrize("retain_source", [True, False], ids=["source_retained", "source_deleted"])
+def test_verification_05b_rerun_rowindex_failure_restores_or_failcloses(
+        tmp_path_factory: pytest.TempPathFactory, retain_source: bool) -> None:
+    """⑤b（CODEX-R5-P1-01）：既有完整 run A 以同設定重跑（kline 複本改一根、row index 平移一根），於新 row index 寫出後、
+    raw 之 `_atomic_merge_feature_manifest_v2` 前注入 `OSError` ⇒ raw/、`timestamps.parquet`、manifest 三者逐位元組回復為
+    run A，或 run 不可被 `consumer="strict"` 讀為完整；且明確不得出現「舊 raw 位元組＋新時間軸」。來源未刪（回復分支，
+    SPEC ⑥）與來源已刪（生產預設，fail-closed 分支）各一案。"""
+    outcome = ph.rerun_with_injected_failure(tmp_path_factory.mktemp("preprov_writer_rerun"), "raw",
+                                             retain_source=retain_source)
+    assert outcome.before.artifact_files and outcome.before.row_index and outcome.before.manifest
+    assert not (outcome.new_axis_on_disk and outcome.after.artifact_files == outcome.before.artifact_files)
+    assert ph.rerun_failure_violations(outcome) == []
+
+
 def test_verification_06_part_id_collision_raises(tmp_path_factory: pytest.TempPathFactory,
                                                   monkeypatch: pytest.MonkeyPatch) -> None:
     """⑥ 群組 part id 寫入 `group_manifest` 前碰撞 ⇒ 拋錯（不得覆寫）；生成失敗、無完整 raw 節點。"""
@@ -296,3 +310,19 @@ def test_mutation_record_write_swallows_exception(tmp_path_factory: pytest.TempP
     root = tmp_path_factory.mktemp("preprov_writer_swallow")
     ph.generate_short_run(root, "h1_stat_off")
     assert raw_complete_nodes(root) != []
+
+
+def test_mutation_rowindex_direct_write_without_restore(tmp_path_factory: pytest.TempPathFactory,
+                                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R5-P1-01）：寫入端改為新時間軸直寫 run 根之 `timestamps.parquet`、不備份不回復（改前碼之行為；
+    monkeypatch 寫入端入口於失敗後直寫）⇒ ⑤b 之 oracle 轉紅，且紅因為「舊 raw＋新時間軸」錯配。取來源未刪之回復分支
+    （來源已刪分支不回復 raw，直寫與正確行為等價、無從區分）。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    monkeypatch.setattr(FeatureStorage, "write_raw_from_registry_stream",
+                        ph.legacy_direct_axis_writer(FeatureStorage.write_raw_from_registry_stream, "timestamps.parquet"))
+    outcome = ph.rerun_with_injected_failure(tmp_path_factory.mktemp("preprov_writer_rerun_mutant"), "raw",
+                                             retain_source=True)
+    assert outcome.new_axis_on_disk
+    violations = ph.rerun_failure_violations(outcome)
+    assert any("錯配" in v for v in violations), violations

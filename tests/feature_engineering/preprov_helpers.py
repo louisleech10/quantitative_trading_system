@@ -31,6 +31,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, 
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
@@ -764,6 +765,189 @@ def l65_input_by_output(obs: Observation, *, primary_only: Optional[str] = None)
 def apply_row_slice(values: np.ndarray, obs: Observation) -> np.ndarray:
     row_slice = obs.raw_writer.get("row_slice")
     return np.asarray(values)[row_slice] if row_slice is not None else np.asarray(values)
+
+
+# ---------------------------------------------------------------------------------------------- 重跑失敗之回復 oracle（Task 1.3 ⑤b、Task 1.4 之 processed 版）
+
+#: artifact → 寫入端公開入口（重跑時於入口平移 row index；不依賴寫入端內部函式名）
+_WRITER_ENTRY: Dict[str, str] = {"raw": "write_raw_from_registry_stream", "processed": "write_processed"}
+#: artifact → 重跑所用之格（raw：單週期平穩化關；processed：IC-first 含 cleanup_raw）
+RERUN_CELL: Dict[str, str] = {"raw": "h1_stat_off", "processed": "ic_first"}
+_STRICT_REFUSALS: Tuple[type, ...] = (ValueError, FileNotFoundError)
+
+
+@dataclasses.dataclass(frozen=True)
+class RunSnapshot:
+    """run 之 artifact 狀態（逐檔 sha256；位元組相同 ⇔ sha256 相同）。
+
+    `artifact_files`＝artifact 目錄下全部檔（含未宣告檔；相對 run 目錄 → sha256）；`row_index`＝宣告之 row index 檔
+    sha256（不存在 ⇒ None）；`manifest`＝raw 取 manifest 檔全文 sha256，processed 取 manifest `artifacts.processed`
+    節點正規化 JSON 之 sha256（processed 重跑時 raw 先合法重寫 manifest 之 raw 部分，故只比 processed 節點）。"""
+
+    artifact_files: Tuple[Tuple[str, str], ...]
+    row_index: Optional[str]
+    manifest: Optional[str]
+
+
+@dataclasses.dataclass(frozen=True)
+class RerunOutcome:
+    before: RunSnapshot
+    after: RunSnapshot
+    generation_failed: bool
+    injected: Tuple[str, ...]       # 注入點實際觸發時之 config_hash（應恰一個、等於 run A）
+    expected_config_hash: str
+    strict_readable_after: bool
+    new_axis_on_disk: bool          # 宣告 row index 路徑之檔解碼後＝重跑之新時間軸
+
+
+def snapshot_run(run_dir: Path, artifact_kind: str, row_index_relpath: str) -> RunSnapshot:
+    """位元組快照（非特徵讀取：須含未宣告檔，故列舉 artifact 目錄全部檔；只算 sha256、不解析內容）。"""
+    run_dir = Path(run_dir)
+    files: List[Tuple[str, str]] = []
+    art = run_dir / artifact_kind
+    if art.is_dir():
+        for path in sorted(art.rglob("*")):
+            if path.is_file():
+                files.append((str(path.relative_to(run_dir)), _sha_file(path)))
+    ri = run_dir / row_index_relpath
+    manifest_path = run_dir / MANIFEST_NAME
+    manifest_sha: Optional[str] = None
+    if manifest_path.is_file():
+        if artifact_kind == "raw":
+            manifest_sha = _sha_file(manifest_path)
+        else:
+            node = (json.loads(manifest_path.read_text(encoding="utf-8")).get("artifacts") or {}).get(artifact_kind)
+            blob = json.dumps(node, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            manifest_sha = hashlib.sha256(blob).hexdigest()
+    return RunSnapshot(artifact_files=tuple(files), row_index=_sha_file(ri) if ri.is_file() else None,
+                       manifest=manifest_sha)
+
+
+def _strict_readable(handle: RunHandle, artifact_kind: str) -> bool:
+    """`FeatureReader.load_manifest_v2(..., consumer="strict")` 讀得為完整 ⇒ True；具名拒讀 ⇒ False。"""
+    from momentum.FeatureEngineering import run_provenance as rp
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    try:
+        FeatureReader(str(handle.features_root)).load_manifest_v2(handle.symbol, handle.tf, handle.config_hash,
+                                                                   artifact_kind, consumer="strict")
+    except _STRICT_REFUSALS + (rp.ProvenanceError,):
+        return False
+    return True
+
+
+def _axis_seconds(path: Path) -> Optional[np.ndarray]:
+    if not Path(path).is_file():
+        return None
+    return np.asarray(pq.read_table(str(path)).column("timestamp").to_numpy(), dtype=np.int64)
+
+
+def legacy_direct_axis_writer(orig_entry: Any, row_index_filename: str) -> Any:
+    """mutation 用之改壞寫入端入口（包住 `orig_entry`）：寫入端失敗後把本次收到之 `row_index`（新時間軸）以 epoch 秒直寫
+    run 根之 `row_index_filename`、不備份不回復，再原樣上拋（改前碼 `feature_storage.py:1138-1142`／`:1400-1405` 之行為）。
+    由 mutation 測試以 `monkeypatch.setattr(FeatureStorage, <入口>, ...)` 安裝；`rerun_with_injected_failure` 之平移包裝
+    疊於其外，故此處收到者即平移後之新時間軸。"""
+
+    def entry(self: Any, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return orig_entry(self, *args, **kwargs)
+        except Exception:
+            names = ("symbol", "tf", "config_hash")
+            ident = [kwargs[n] if n in kwargs else args[i] for i, n in enumerate(names)]
+            row_index = kwargs["row_index"]
+            seconds = (np.asarray(row_index.view("int64"), dtype=np.int64) // 1_000_000_000).astype(np.int64)
+            pq.write_table(pa.table({"timestamp": pa.array(seconds, type=pa.int64())}),
+                           str(self.feature_run_dir(*ident) / row_index_filename))
+            raise
+
+    return entry
+
+
+def rerun_with_injected_failure(root: Path, artifact_kind: str, *, retain_source: bool = False) -> RerunOutcome:
+    """Task 1.3 ⑤b（processed 版同 Task 1.4）：先完整生成 run A，再以同設定重跑（強制重生）並於「新 row index 寫出後、
+    `_atomic_merge_feature_manifest_v2`（該 artifact 之提交合併）前」注入 `OSError`。
+
+    重跑使新舊可區分：①kline 複本改 run A 時間軸中段一根之 close（值改變、config_hash 不變 ⇒ 同 run 目錄、新特徵檔位元組
+    不同）；②於寫入端公開入口把 `row_index` 整體平移一根（新時間軸）。包裝於呼叫當下之 `FeatureStorage` 入口之外
+    （mutation 測試先以 `legacy_direct_axis_writer` 安裝改壞入口者，即包於其外）。
+
+    `retain_source`（只 raw）：寫入端入口改傳 `cleanup_intermediate=False`，使來源 npy 不刪 ⇒ 走 SPEC Task 1.3 ⑥「來源未刪
+    ⇒ 三者自備份回復」之分支；False＝生產預設（來源已刪 ⇒ 不回復、manifest 維持不完整）。processed 無來源刪除，恆為回復分支。"""
+    if retain_source and artifact_kind != "raw":
+        raise ValueError("retain_source 只適用 raw（processed 無來源刪除）")
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    root = Path(root)
+    cell = RERUN_CELL[artifact_kind]
+    first = generate_short_run(root, cell)
+    if not _strict_readable(first, artifact_kind):
+        raise RuntimeError(f"前提不成立：run A 之 {artifact_kind} 不可被 strict 讀為完整")
+    rel = row_index_rel(load_manifest(first.run_dir), artifact_kind)
+    if rel is None:
+        raise RuntimeError(f"前提不成立：run A 之 {artifact_kind} 無 row index 宣告")
+    axis = _axis_seconds(first.run_dir / rel)
+    if axis is None or len(axis) < 3:
+        raise RuntimeError("前提不成立：run A 之 row index 少於 3 列（無法平移／改值）")
+    before = snapshot_run(first.run_dir, artifact_kind, rel)
+    when = str(pd.Timestamp(int(axis[len(axis) // 2]), unit="s", tz="UTC"))
+    kline = copy_kline_with_one_bar_changed(root / "kline_changed", symbol=first.symbol, tf=first.tf, when=when)
+
+    shifted: Dict[str, np.ndarray] = {}
+    injected: List[str] = []
+    entry_name = _WRITER_ENTRY[artifact_kind]
+    orig_entry = getattr(FeatureStorage, entry_name)
+    orig_merge = FeatureStorage._atomic_merge_feature_manifest_v2
+
+    def entry(self: Any, *args: Any, **kwargs: Any) -> Any:
+        row_index = kwargs.get("row_index")
+        if row_index is None or len(row_index) < 2:
+            raise RuntimeError(f"前提不成立：{entry_name} 未收到可平移之 row_index")
+        new_axis = row_index + (row_index[1] - row_index[0])
+        shifted["seconds"] = (np.asarray(new_axis.view("int64"), dtype=np.int64) // 1_000_000_000).astype(np.int64)
+        kwargs["row_index"] = new_axis
+        if retain_source:
+            kwargs["cleanup_intermediate"] = False
+        return orig_entry(self, *args, **kwargs)
+
+    def merge(self: Any, run_dir: Path, *args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("artifact_kind") == artifact_kind and kwargs.get("group_manifest") is not None:
+            injected.append(str(kwargs.get("config_hash")))
+            raise OSError(f"injected {artifact_kind} manifest merge failure after new row index written")
+        return orig_merge(self, run_dir, *args, **kwargs)
+
+    mp = pytest.MonkeyPatch()
+    failed = False
+    try:
+        mp.setattr(FeatureStorage, entry_name, entry)
+        mp.setattr(FeatureStorage, "_atomic_merge_feature_manifest_v2", merge)
+        generate_short_run(root, cell, kline_path=kline)
+    except Exception:  # noqa: BLE001 — 注入之失敗預期使生成失敗；是否確由注入點觸發另以 injected 斷言
+        failed = True
+    finally:
+        mp.undo()
+    on_disk = _axis_seconds(first.run_dir / rel)
+    new_axis_on_disk = bool(on_disk is not None and "seconds" in shifted
+                            and np.array_equal(on_disk, shifted["seconds"]))
+    return RerunOutcome(before=before, after=snapshot_run(first.run_dir, artifact_kind, rel), generation_failed=failed,
+                        injected=tuple(injected), expected_config_hash=first.config_hash,
+                        strict_readable_after=_strict_readable(first, artifact_kind),
+                        new_axis_on_disk=new_axis_on_disk)
+
+
+def rerun_failure_violations(outcome: RerunOutcome) -> List[str]:
+    """oracle（SPEC Task 1.3 ⑤b）：重跑失敗後須「artifact 目錄、row index、manifest 三者逐位元組回復為 run A」或「run 不可被
+    strict 讀為完整」；且無論何者，**不得**出現「舊特徵檔（位元組＝run A）＋新時間軸」。注入未到達 ⇒ 不成立（防空轉）。"""
+    out: List[str] = []
+    if not outcome.generation_failed:
+        out.append("注入失敗而生成照常成功")
+    if list(outcome.injected) != [outcome.expected_config_hash]:
+        out.append(f"注入點未恰觸發一次於 run A 之提交合併：{list(outcome.injected)}")
+    restored = outcome.after == outcome.before
+    if not restored and outcome.strict_readable_after:
+        out.append("未逐位元組回復為 run A，且 run 仍可被 strict 讀為完整")
+    if outcome.new_axis_on_disk and outcome.after.artifact_files == outcome.before.artifact_files:
+        out.append("舊特徵檔（位元組＝run A）＋新時間軸（錯配）")
+    return out
 
 
 # ---------------------------------------------------------------------------------------------- 前處理器紀錄存取（單一假設點）

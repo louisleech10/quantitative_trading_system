@@ -54,7 +54,7 @@
 **Task 1.1 — 離開路徑盤點與契約 JSON**
 - 目標：以碼證列出 L6.5（raw-sink、in-place、native 子實例、post-IC）每一步驟之每條實際離開路徑，定稿紀錄契約。　檔案：新建 `momentum/FeatureEngineering/contracts/run_provenance.json`；盤點對象 `feature_preprocessor.py` 之 `transform_registry_groups_to_sink`、`_transform_single*`、`_apply_fractional_differencing*`、ADF 差分、縮尾、rank、zscore、gaussian、ratio-unsafe passthrough、native 成功／回退、`transform_selected`；`feature_storage.py` 之 dead-drop；`feature_factory.py` 之失敗群組。　既有 caller／影響面：新建，無 caller。
 - 改法：契約含——逐欄紀錄欄位與型別（輸出欄名、原生週期、層、群組 id、各步驟狀態、平穩化決策欄、事件、終態）；各步驟狀態封閉值集（每值附 `_sources`：至少一個 `path:line` 離開點）；群組轉換臂與回退值集；manifest `provenance` 物件鍵；run 身分物件鍵；紀錄檔相對路徑。值樣式 `^[a-z][a-z0-9_]*$`。**不得杜撰無離開點之值；每個離開點須有對應值。**
-- **驗證**：`pytest tests/feature_engineering/test_preprov_contract.py` 全綠，其中：①契約每個狀態值之 `_sources` 每個 `path:line` 指向非註解非空行；②契約值皆合樣式；③Task 3.1 驗收格之實際紀錄中出現之值集合 ⊆ 契約值集，且契約中每個值至少被一格或一條單元案例產出（未產出之值須於契約 `_unreachable` 具名並附碼證理由）。mutation：契約刪一個實際會出現之值 ⇒ ③紅。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_contract.py` 全綠，其中：①契約每個狀態值之 `_sources` 每個 `path:line` 指向非註解非空行，且該行（或其所屬之單一陳述式）含該值之字串字面（記錄呼叫之實參）——指向無關可執行行即紅；②契約值皆合樣式；③Task 3.1 驗收格之實際紀錄中出現之值集合 ⊆ 契約值集，且契約中每個值至少被一格或一條單元案例產出（未產出之值須於契約 `_unreachable` 具名並附碼證理由）。mutation：契約刪一個實際會出現之值 ⇒ ③紅。
 - **邊界**：①statsmodels 不可用之 fracdiff 早退；②目標層外之欄（fracdiff 不涵蓋）；③平穩化關閉時平穩化決策欄全 null，fracdiff／ADF 之步驟狀態各為契約中表示「關閉」之值（步驟狀態欄不得為 null）。
 - **契約補充**：SPEC 驗收中具名之 `applied`（縮尾）、`ratio_unsafe`（終態）、`polars`（post-IC 群組臂）須存在於契約對應值集（測試先斷言其存在）；`_unreachable` 形為 `{<值>: {"reason": <文字>, "_sources": [<path:line>, …]}}`；`content_sha256` 項之 `dtype` 為該檔各欄 Arrow 型別去重排序後以 `|` 連接之字串。
 - **存活至**：本票交付後保留（契約為唯一真相源）。
@@ -64,7 +64,7 @@
 **Task 1.6 — 測試輔助與凍結腳本改依 manifest 宣告讀取（先於生產改動）**
 - 目標：消除「以檔名掃描 run 目錄當特徵」之讀法，使新增紀錄檔不被誤讀。　檔案：`git ls-files -z tests scripts | xargs -0 grep -nE 'rglob\(|glob\('` 命中且作用於特徵 run 目錄者（至少 §G 所列）；新增 `tests/feature_engineering/preprov_helpers.py`（依 manifest 列群組檔之單一函式）。　既有 caller／影響面：各凍結腳本與其測試、`ffstat_helpers` 之全部呼叫者。
 - 改法：特徵檔集合一律自 manifest artifact 節點之 `groups[*].path` 與 row index 宣告導出；凍結腳本之「run 目錄全部檔」雜湊改為「manifest 宣告檔＋manifest 本身」；未宣告檔出現於 run 目錄 ⇒ 輔助函式拋錯（不靜默忽略）。
-- **驗證**：於**改前生產碼態**對既有凍結項重算值指紋，逐項等於現行凍結值（不重凍）；`pytest` 逐檔明列受影響之凍結測試全綠。mutation：輔助函式改回 `rglob("*.parquet")` 且 run 目錄放入一個非宣告 parquet ⇒ 新增之 `test_preprov_helpers.py` 案例紅。
+- **驗證**：於**改前生產碼態**對既有凍結項重算值指紋，逐項等於現行凍結值（不重凍）；`pytest` 逐檔明列受影響之凍結測試全綠。掃描點清冊 `tests/_golden/preprov/reader_inventory.json` 列 `tests/`、`scripts/` 受版控 .py 中全部 `glob(`／`rglob(`／`iterdir(`／`os.listdir(`／`os.walk(` 呼叫點（`path:line`），每點分類 `feature_run`（以檔名列舉 run 目錄並把所得檔當特徵讀取、指紋、計數或改寫者，須改依 manifest）或 `unrelated`（附一句理由；含只做位元組快照、殘檔／版面斷言、尋找 manifest 或 run 目錄、量測大小者——其中位元組快照之變動由 §G 結構重凍承接）；清冊鍵為（路徑、所在函式限定名、呼叫文字、出現序），行號僅供參考；測試以 AST 重掃，清冊外之新呼叫點、或 `feature_run` 類仍以檔名掃描者即紅。mutation：輔助函式改回 `rglob("*.parquet")` 且 run 目錄放入一個非宣告 parquet ⇒ 新增之 `test_preprov_helpers.py` 案例紅；自清冊刪一個 `feature_run` 點 ⇒ 紅。
 - **邊界**：①processed artifact 之群組與 `processed_timestamps.parquet`；②IC-first 已刪 raw 之 run（只剩 processed）；③多週期 run 之群組。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：Task 3.1 之結構重凍會再動凍結檔之結構項，值指紋項不動。
@@ -81,8 +81,8 @@
 
 **Task 1.3 — raw 紀錄檔、內容身分與 manifest（單一提交點）**
 - 目標：writer 於安裝前寫紀錄檔與內容身分，manifest 合併為唯一提交點。　檔案：`momentum/FeatureEngineering/feature_storage.py` 之 `write_raw_from_registry_stream`、`_atomic_merge_feature_manifest_v2`、`_build_feature_manifest_v2`；新建 `momentum/FeatureEngineering/run_provenance.py`（序列化、內容身分、讀取驗證之純函式）。　既有 caller／影響面：`feature_factory.py:3880`；多標的 worker 與批次經同一 writer。
-- 改法：①群組 part id 寫入 `group_manifest` 前碰撞即拋錯；②自前處理器紀錄＋dead-drop 結果＋群組 manifest 組逐欄紀錄表，窮盡性檢查（列之輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄，逐名、無重複）不過即拋錯；③每個群組檔與 row index 檔寫畢時計 sha256，組 `content_sha256`（契約定義之排序組成：相對路徑、欄名、列數、dtype、檔案 sha256、row index sha256）；④紀錄檔以 zstd parquet 寫入暫存 `provenance/` 並計其 sha256；⑤安裝前將舊 manifest 之 raw 節點標為不完整（原子寫）；⑥安裝 raw 與紀錄檔；⑦manifest 合併寫入 `content_sha256` 與 `provenance` 物件（含路徑、sha256、列數、契約版本、各步驟各狀態計數、群組表：臂、狀態、失敗原因）。任一步失敗 ⇒ 例外上拋、run 失敗。例外型別：檔案寫入失敗以原例外（如 `OSError`）上拋不包裝；part id 碰撞與紀錄鍵重複拋 `ProvenanceConflictError`；窮盡性不符拋 `ProvenanceExhaustivenessError`。刪 `:1224-1225` 之舊註解。
-- **驗證**：`pytest tests/feature_engineering/test_preprov_writer.py` 全綠：①真實短窗生成後紀錄檔存在、sha256 等於 manifest 宣告；②窮盡性逐名；③`content_sha256` 以獨立實作（測試內自讀檔計算）重算相等；④注入紀錄檔寫入失敗（唯讀目錄）⇒ 生成失敗、manifest 無完整 raw 節點；⑤注入 manifest 合併失敗於安裝後 ⇒ run 不可被 `consumer="strict"` 讀為完整；⑥part id 碰撞案拋錯。mutation：`content_sha256` 漏 row index ⇒ 只改時間軸之案③紅；紀錄檔寫入改為吞例外 ⇒ ④紅；略過⑤ ⇒ ⑤紅。
+- 改法：①群組 part id 寫入 `group_manifest` 前碰撞即拋錯；②自前處理器紀錄＋dead-drop 結果＋群組 manifest 組逐欄紀錄表，窮盡性檢查（列之輸出欄名集合 ＝ manifest 群組欄聯集 ∪ dead-drop 欄，逐名、無重複）不過即拋錯；③每個群組檔與 row index 檔寫畢時計 sha256，組 `content_sha256`（契約定義之排序組成：相對路徑、欄名、列數、dtype、檔案 sha256、row index sha256）；④紀錄檔以 zstd parquet 寫入暫存 `provenance/` 並計其 sha256；row index 檔（`timestamps.parquet`；現行 `feature_storage.py:1138-1142` 於安裝前直接寫入 run 根）改為同樣先寫入暫存根；⑤對 run 根之任何寫入前，先將舊 manifest 之 raw 節點標為不完整（原子寫）；⑥安裝 raw、row index 檔與紀錄檔（各自先將舊檔移為備份），任一失敗且來源未刪 ⇒ 三者皆自備份回復並回復舊 manifest 節點；來源已刪 ⇒ 不回復、manifest 維持不完整（fail-closed）；⑦manifest 合併寫入 `content_sha256` 與 `provenance` 物件（含路徑、sha256、列數、契約版本、各步驟各狀態計數、群組表：臂、狀態、失敗原因）。任一步失敗 ⇒ 例外上拋、run 失敗。例外型別：檔案寫入失敗以原例外（如 `OSError`）上拋不包裝；part id 碰撞與紀錄鍵重複拋 `ProvenanceConflictError`；窮盡性不符拋 `ProvenanceExhaustivenessError`。刪 `:1224-1225` 之舊註解。
+- **驗證**：`pytest tests/feature_engineering/test_preprov_writer.py` 全綠：①真實短窗生成後紀錄檔存在、sha256 等於 manifest 宣告；②窮盡性逐名；③`content_sha256` 以獨立實作（測試內自讀檔計算）重算相等；④注入紀錄檔寫入失敗（唯讀目錄）⇒ 生成失敗、manifest 無完整 raw 節點；⑤注入 manifest 合併失敗於安裝後 ⇒ run 不可被 `consumer="strict"` 讀為完整；⑤b 既有完整 run 重跑，於新 row index 寫出後、manifest 合併前注入 `OSError` ⇒ 舊 raw、舊 row index、舊 manifest 三者逐位元組回復，或 run 不可被讀為完整（不得出現舊特徵＋新時間軸）；⑥part id 碰撞案拋錯。mutation：`content_sha256` 漏 row index ⇒ 只改時間軸之案③紅；紀錄檔寫入改為吞例外 ⇒ ④紅；略過⑤ ⇒ ⑤紅。
 - **邊界**：①dead-drop 開啟且有被剔欄；②多週期 run（同名不同週期之輸出欄以落盤名區分）；③多標的 worker 路徑；④平穩化關閉。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
@@ -90,7 +90,7 @@
 
 **Task 1.4 — processed 紀錄檔（post-IC）**
 - 目標：IC-first 之 post-IC 轉換同樣記逐欄狀態與臂。　檔案：`feature_preprocessor.py` 之 `transform_selected`；`feature_storage.py` 之 `write_processed`；`feature_factory.py:2986`。　既有 caller／影響面：`run_ic_first`。
-- 改法：`transform_selected` 之 post-IC 前處理器沿用 Task 1.2 容器；回傳形態不變，紀錄經呼叫者實例之 `last_post_ic_execution()`（回 `execution_records()`／`execution_groups()` 同形之二元組）取得；`write_processed` 新增必填關鍵字參數 `execution`（該二元組），同 Task 1.3 ①–⑦ 之 processed 版；零選欄時紀錄為零列，manifest processed 節點 `provenance.summary.selected_columns == 0` 以區分「零選欄」與「未寫紀錄」（紀錄檔另一檔名、`content_sha256` 含 `processed_timestamps.parquet`）。processed 節點不覆寫 raw 節點之 `provenance`；raw 被刪後 raw 紀錄檔仍保留（位於 `provenance/`）。
+- 改法：`transform_selected` 之 post-IC 前處理器沿用 Task 1.2 容器；回傳形態不變，紀錄經呼叫者實例之 `last_post_ic_execution()`（回 `execution_records()`／`execution_groups()` 同形之二元組）取得；`write_processed` 新增必填關鍵字參數 `execution`（該二元組），同 Task 1.3 ①–⑦ 之 processed 版（含 `processed_timestamps.parquet`〔現行 `feature_storage.py:1400-1405` 安裝前直接寫入〕納入同一暫存、備份與回復；驗證另含 Task 1.3 ⑤b 之 processed 版）；零選欄時紀錄為零列，manifest processed 節點 `provenance.summary.selected_columns == 0` 以區分「零選欄」與「未寫紀錄」（紀錄檔另一檔名、`content_sha256` 含 `processed_timestamps.parquet`）。processed 節點不覆寫 raw 節點之 `provenance`；raw 被刪後 raw 紀錄檔仍保留（位於 `provenance/`）。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_processed.py` 全綠：①真實短窗 IC-first 後 processed 紀錄逐選欄恰一筆、臂＝`polars`；②`cleanup_raw` 後 raw 紀錄檔仍在且 sha256 符合 manifest；③IC 選擇為空時 processed 紀錄為零列且狀態可區分「零選欄」。mutation：raw 紀錄檔改放 `raw/` 內 ⇒ ②紅。
 - **邊界**：①選欄全不在 raw；②gaussian 開啟。
 - **存活至**：本票交付後保留。
@@ -159,7 +159,7 @@
 - 目標：以真實生成量紀錄檔與 manifest 增量，與核可估算對照。　檔案：`tests/_golden/preprov/output_size.json`；量測腳本 `scripts/preprov_output_size.py`。　既有 caller／影響面：無。
 - 改法：對 Task 3.1 各格及一個全特徵設定之 run（若本機可跑；否則以 Task 3.1 最大格外推並明示）量紀錄檔位元組、manifest 增量、讀取時間。
 - **驗證**：腳本 rc=0，收據含逐格絕對位元組、佔 run 百分比、讀取秒數；全特徵 run 紀錄檔合計 > 2.6 MB（估算兩倍）⇒ 主委白話報使用者再核可。
-- **邊界**：①小 run 百分比失真 ⇒ 同報絕對值；②多標的逐標的報。
+- **邊界**：①小 run 百分比失真 ⇒ 同報絕對值；②多標的逐標的報；③任一 artifact 缺 `provenance` 指標、紀錄檔不存在或 parquet metadata 不可讀 ⇒ 寫錯誤收據並 rc=1，不以 0 累計。
 - **存活至**：本票交付後保留為收據。
 - **覆蓋風險**：無。
 - 不可做：不得以「檔很小」略過與核可估算之對照。

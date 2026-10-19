@@ -159,6 +159,55 @@ def test_boundary_02_raw_deleted_run_reads_raw_record(runs: ph.RunCache) -> None
                                   check_exact=True)
 
 
+def _output_size_module() -> Any:
+    """`scripts/preprov_output_size.py`（Task 3.2 量測腳本；scripts 非套件，以檔案路徑載入）。"""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("preprov_output_size", ph.REPO / "scripts" / "preprov_output_size.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _manifest_and_records_copy(handle: ph.RunHandle, tmp_path: Path) -> Path:
+    """真實 run 之 manifest 與其宣告之紀錄檔複本（不複製特徵檔；量測腳本只讀 manifest 與紀錄檔）。"""
+    run_dir = tmp_path / "run_copy"
+    run_dir.mkdir()
+    shutil.copy2(handle.run_dir / ph.MANIFEST_NAME, run_dir / ph.MANIFEST_NAME)
+    for node in ph.load_manifest(handle.run_dir)["artifacts"].values():
+        rel = Path(str(node["provenance"]["path"]))
+        (run_dir / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(handle.run_dir / rel, run_dir / rel)
+    return run_dir
+
+
+@pytest.mark.parametrize("breakage", ["missing_pointer", "missing_record", "unreadable_metadata"])
+def test_output_size_script_fails_closed_on_broken_provenance(runs: ph.RunCache, tmp_path: Path, breakage: str) -> None:
+    """Task 3.2 邊界③（CODEX-R5-P2-04）：`--full-run-dir` 之 run 任一 artifact 缺 `provenance` 指標／紀錄檔不存在／parquet
+    metadata 不可讀 ⇒ `main` 回 1、收據 `exit_code`＝1 且含 error、無 `full_feature_run`（不以 0 位元組累計）。
+    正對照：同一複本破壞前 `measure_run` 成立且紀錄位元組合計 > 0。"""
+    module = _output_size_module()
+    run_dir = _manifest_and_records_copy(runs.get("h1_stat_on"), tmp_path)
+    measured = module.measure_run(run_dir)
+    assert measured["record_bytes_total"] > 0 and set(measured["artifacts"]) == {"raw"}
+    record = run_dir / ph.provenance_pointer(run_dir, "raw")["path"]
+    if breakage == "missing_pointer":
+        _edit_manifest(run_dir, lambda m: m["artifacts"]["raw"].pop("provenance"))
+    elif breakage == "missing_record":
+        record.unlink()
+    else:
+        record.write_bytes(b"not a parquet file")
+    with pytest.raises(module.MeasurementError):
+        module.measure_run(run_dir)
+    out = tmp_path / "output_size.json"
+    assert module.main(["--full-run-dir", str(run_dir), "--out", str(out)]) == 1
+    receipt = json.loads(out.read_text(encoding="utf-8"))
+    assert receipt["exit_code"] == 1 and "MeasurementError" in receipt["error"]
+    assert "full_feature_run" not in receipt and "needs_user_reapproval" not in receipt
+    assert receipt["cells"] == {}
+
+
 # ---------------------------------------------------------------------------------------------- mutation
 
 def test_mutation_skip_sha_check(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

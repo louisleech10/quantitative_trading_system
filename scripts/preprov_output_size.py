@@ -10,7 +10,9 @@
 用法：
   venv/bin/python scripts/preprov_output_size.py [--cells h1_stat_on ...] [--work-root DIR]
       [--full-run-dir DATA_CACHE_RUN_DIR] [--full-feature-columns 204150] [--out tests/_golden/preprov/output_size.json]
-rc：0＝量測完成並寫出收據（是否超出估算看收據旗標，不以 rc 表示）；1＝量測失敗（收據仍寫出，含錯誤）。
+rc：0＝量測完成並寫出收據（是否超出估算看收據旗標，不以 rc 表示）；1＝量測失敗（收據仍寫出，含錯誤）——含任一
+artifact 缺 `provenance` 指標、紀錄檔不存在、parquet metadata 不可讀（邊界③；不以 0 位元組累計）。`--full-run-dir`
+先於各格生成量測，其不成立即 rc=1。
 """
 
 from __future__ import annotations
@@ -66,37 +68,57 @@ def _read_seconds(path: Path) -> float:
     return round(statistics.median(samples), 6)
 
 
+class MeasurementError(RuntimeError):
+    """量測不成立（SPEC Task 3.2 邊界③）：artifact 缺 `provenance` 指標、紀錄檔不存在或 parquet metadata 不可讀。
+    不得以 0 位元組累計；`main` 寫錯誤收據並回 rc=1。"""
+
+
 def measure_run(run_dir: Path) -> Dict[str, Any]:
-    """單一 run 目錄：每個帶紀錄指標之 artifact 之量測（只讀 manifest 宣告之紀錄檔路徑）。"""
+    """單一 run 目錄：每個 artifact 之紀錄檔量測（只讀 manifest 宣告之紀錄檔路徑）。
+
+    任一 artifact 缺 `provenance` 物件或其 `path`、紀錄檔不存在、parquet metadata 不可讀 ⇒ `MeasurementError`
+    （CODEX-R5-P2-04：不得記 error 後以 0 累計而 rc=0）；manifest 無任何 artifact ⇒ 同。"""
     import pyarrow.parquet as pq
 
     run_dir = Path(run_dir)
     manifest_path = run_dir / "feature_manifest.json"
+    if not manifest_path.is_file():
+        raise MeasurementError(f"run 無 manifest：{manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    artifacts = manifest.get("artifacts") or {}
+    if not isinstance(artifacts, dict) or not artifacts:
+        raise MeasurementError(f"manifest 無任何 artifact 節點：{manifest_path}")
     run_bytes = _dir_bytes(run_dir)
     out: Dict[str, Any] = {"run_dir_name": run_dir.name, "run_bytes": run_bytes, **_manifest_delta_bytes(manifest_path),
                            "artifacts": {}}
-    for kind, node in (manifest.get("artifacts") or {}).items():
+    for kind, node in artifacts.items():
         pointer = node.get("provenance") if isinstance(node, dict) else None
-        if not isinstance(pointer, dict):
-            out["artifacts"][kind] = {"error": "manifest 節點無 provenance 物件"}
-            continue
+        if not isinstance(pointer, dict) or not pointer.get("path"):
+            raise MeasurementError(f"{run_dir.name}/{kind}：manifest 節點無 provenance 指標（或缺 path）")
         record = run_dir / str(pointer["path"])
+        if not record.is_file():
+            raise MeasurementError(f"{run_dir.name}/{kind}：紀錄檔不存在 {pointer['path']}")
+        try:
+            rows = int(pq.ParquetFile(str(record)).metadata.num_rows)
+        except Exception as exc:  # noqa: BLE001 — 任何解析失敗皆為量測不成立（具名改拋）
+            raise MeasurementError(f"{run_dir.name}/{kind}：紀錄檔 parquet metadata 不可讀 "
+                                   f"{pointer['path']}：{type(exc).__name__}: {exc}") from exc
         size = int(record.stat().st_size)
         out["artifacts"][kind] = {
             "record_bytes": size,
-            "record_rows": int(pq.ParquetFile(str(record)).metadata.num_rows),
+            "record_rows": rows,
             "record_percent_of_run": round(100.0 * size / run_bytes, 4) if run_bytes else None,
             "read_seconds": _read_seconds(record),
         }
-    out["record_bytes_total"] = sum(a.get("record_bytes", 0) for a in out["artifacts"].values())
+    out["record_bytes_total"] = sum(int(a["record_bytes"]) for a in out["artifacts"].values())
     return out
 
 
-def full_run_entry(cells: Dict[str, Any], full_run_dir: Optional[Path], full_columns: int) -> Dict[str, Any]:
-    """全特徵 run：實測（給定目錄）或以最大格（紀錄列數最多者）之每列位元組外推。"""
+def full_run_entry(cells: Dict[str, Any], full_run_dir: Optional[Path], full_columns: int,
+                   measured: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """全特徵 run：實測（給定目錄；`measured` 為已量之結果則沿用）或以最大格（紀錄列數最多者）之每列位元組外推。"""
     if full_run_dir is not None:
-        measured = measure_run(full_run_dir)
+        measured = measured if measured is not None else measure_run(full_run_dir)
         total = int(measured["record_bytes_total"])
         return {"extrapolated": False, "source": str(full_run_dir), "record_bytes_total": total, "measured": measured}
     best = None
@@ -141,6 +163,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         unknown = sorted(set(cells) - set(ph.CELLS))
         if unknown:
             raise ValueError(f"未知之格：{unknown}")
+        full_run_dir = Path(args.full_run_dir) if args.full_run_dir else None
+        # 全特徵 run 先量（不需生成）：其 manifest／紀錄檔不成立 ⇒ 立即 MeasurementError、rc=1，不先耗時生成各格
+        full_measured = measure_run(full_run_dir) if full_run_dir is not None else None
         work_root = Path(args.work_root) if args.work_root else Path(tempfile.mkdtemp(prefix="preprov_size_"))
         receipt["work_root"] = str(work_root)
         cache = ph.RunCache(work_root)
@@ -152,8 +177,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 entry = measure_run(handle.run_dir)
                 entry["generation_seconds"] = round(time.perf_counter() - t0, 2)
                 receipt["cells"][cell][symbol] = entry
-        full = full_run_entry(receipt["cells"], Path(args.full_run_dir) if args.full_run_dir else None,
-                              args.full_feature_columns)
+        full = full_run_entry(receipt["cells"], full_run_dir, args.full_feature_columns, measured=full_measured)
         receipt["full_feature_run"] = full
         receipt["needs_user_reapproval"] = bool(full["record_bytes_total"] > REAPPROVAL_THRESHOLD_BYTES)
         receipt["vs_approved_estimate_ratio"] = round(full["record_bytes_total"] / APPROVED_ESTIMATE_BYTES, 4)

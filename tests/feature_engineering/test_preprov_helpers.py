@@ -1,16 +1,21 @@
 """FFDSTAR Task 1.6（docs/FFDSTAR_SPEC.md §G「讀取方式先行」）：測試輔助與凍結腳本改依 manifest 宣告讀取。
 
-受測物：`tests/feature_engineering/preprov_helpers.declared_feature_files`（依 manifest 列群組檔之單一函式）與 §G
-所列之凍結腳本／測試輔助之讀法。真實 kline 短窗 run（同模組同格只生成一次）；run 目錄之竄改一律在 tmp 複本上做。
+受測物：`tests/feature_engineering/preprov_helpers.declared_feature_files`（依 manifest 列群組檔之單一函式）與
+`tests/`、`scripts/` 全部掃描型呼叫點之讀法——以清冊 `tests/_golden/preprov/reader_inventory.json`（AST 重掃對證；
+CODEX-R5-P2-03）取代手寫三檔清單。真實 kline 短窗 run（同模組同格只生成一次）；run 目錄之竄改一律在 tmp 複本上做。
 實作前應為紅；不得以 skip／xfail 暫避。
 """
 
 from __future__ import annotations
 
 import ast
+import copy
+import json
 import shutil
+import subprocess
+import sys
 from pathlib import Path
-from typing import Callable, List
+from typing import Any, Callable, Dict, List, Mapping, Sequence, Tuple
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -20,13 +25,159 @@ from tests.feature_engineering import preprov_helpers as ph
 
 pytestmark = pytest.mark.requires_kline
 
-#: §G 列名之「以檔名掃描 run 目錄取特徵」讀法所在檔（至少；Task 1.6 以 grep 窮舉後可增列）
+#: §G 具名之「以檔名掃描 run 目錄取特徵」讀法所在檔（清冊之下限：每檔至少一個 `feature_run` 條目）
 SECTION_G_READERS = (
     "scripts/freeze_failopen_baseline.py",
     "scripts/freeze_framepath_baseline.py",
     "tests/feature_engineering/ffstat_helpers.py",
 )
-_SCAN_PATTERNS = {"*", "*.parquet", "raw/*.parquet", "**/*.parquet"}
+#: 掃描點清冊（SPEC Task 1.6 驗證；CODEX-R5-P2-03）
+READER_INVENTORY_PATH: Path = ph.GOLDEN_DIR / "reader_inventory.json"
+INVENTORY_CLASSES = ("feature_run", "unrelated")
+SCAN_ROOTS = ("tests", "scripts")
+#: 掃描型呼叫：屬性呼叫 `<任意>.glob(`／`.rglob(`／`.iglob(`／`.iterdir(`；`os.listdir(`／`os.walk(`／`os.scandir(`；
+#: 以 `from glob import glob` 等引入之裸名呼叫（SPEC grep `rglob\(|glob\(` 之字面亦命中 `iglob(`；`scandir` 為 `listdir` 之等效）
+_ATTR_SCANS = frozenset({"glob", "rglob", "iglob", "iterdir"})
+_OS_SCANS = frozenset({"listdir", "walk", "scandir"})
+_MODULE_NAME_SCANS = {"glob": frozenset({"glob", "iglob"}), "os": _OS_SCANS}
+
+InventoryKey = Tuple[str, str, str, int]
+
+
+# ---------------------------------------------------------------------------------------------- 掃描點清冊（AST）
+
+def _tracked_py_files() -> List[str]:
+    """`tests/`、`scripts/` 下受版控之 .py（`git ls-files`；相對 repo 根、POSIX 分隔）。"""
+    proc = subprocess.run(["git", "ls-files", "-z", "--", *SCAN_ROOTS], cwd=str(ph.REPO), check=True,
+                          capture_output=True)
+    return sorted(p for p in proc.stdout.decode("utf-8").split("\0") if p.endswith(".py"))
+
+
+def _scan_targets(tree: ast.AST) -> Dict[str, str]:
+    """檔內以 `from glob|os import <掃描函式> [as 別名]` 引入之裸名 → 原函式名。"""
+    out: Dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module in _MODULE_NAME_SCANS:
+            for alias in node.names:
+                if alias.name in _MODULE_NAME_SCANS[node.module]:
+                    out[alias.asname or alias.name] = alias.name
+    return out
+
+
+def _is_scan_call(node: ast.Call, bare: Mapping[str, str]) -> bool:
+    func = node.func
+    if isinstance(func, ast.Attribute):
+        if func.attr in _ATTR_SCANS:
+            return True
+        return func.attr in _OS_SCANS and isinstance(func.value, ast.Name) and func.value.id == "os"
+    return isinstance(func, ast.Name) and func.id in bare
+
+
+def scan_source(rel: str, source: str) -> List[Dict[str, Any]]:
+    """單檔 AST 掃描：每個掃描型呼叫一筆 {path, qualname, call, occurrence, line}。
+
+    鍵＝(path, 所屬函式／類別之 qualname〔模組層為 `<module>`〕, `ast.unparse` 之呼叫字面, 同鍵出現序)；行號僅供參考
+    （行號漂移不影響鍵）。"""
+    tree = ast.parse(source)
+    bare = _scan_targets(tree)
+    found: List[Tuple[int, int, str, str]] = []
+
+    def walk(node: ast.AST, scope: Tuple[str, ...]) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            # 裝飾器、預設值、基底類別於外層作用域求值；本體屬內層 qualname
+            header: List[ast.AST] = list(node.decorator_list)
+            if isinstance(node, ast.ClassDef):
+                header += list(node.bases) + list(node.keywords)
+            else:
+                header += [node.args] + ([node.returns] if node.returns is not None else [])
+            for sub in header:
+                walk(sub, scope)
+            for stmt in node.body:
+                walk(stmt, scope + (node.name,))
+            return
+        if isinstance(node, ast.Call) and _is_scan_call(node, bare):
+            found.append((node.lineno, node.col_offset, ".".join(scope) or "<module>", ast.unparse(node)))
+        for child in ast.iter_child_nodes(node):
+            walk(child, scope)
+
+    walk(tree, ())
+    seen: Dict[Tuple[str, str], int] = {}
+    out: List[Dict[str, Any]] = []
+    for line, _col, qualname, call in sorted(found):
+        occurrence = seen.get((qualname, call), 0)
+        seen[(qualname, call)] = occurrence + 1
+        out.append({"path": rel, "qualname": qualname, "call": call, "occurrence": occurrence, "line": line})
+    return out
+
+
+def scan_repo() -> List[Dict[str, Any]]:
+    """`tests/`、`scripts/` 受版控 .py 之全部掃描型呼叫點。"""
+    out: List[Dict[str, Any]] = []
+    for rel in _tracked_py_files():
+        path = ph.REPO / rel
+        if path.is_file():
+            out.extend(scan_source(rel, path.read_text(encoding="utf-8")))
+    return out
+
+
+def inventory_key(entry: Mapping[str, Any]) -> InventoryKey:
+    return (str(entry["path"]), str(entry["qualname"]), str(entry["call"]), int(entry["occurrence"]))
+
+
+def load_inventory() -> Dict[str, Any]:
+    return json.loads(READER_INVENTORY_PATH.read_text(encoding="utf-8"))
+
+
+def inventory_completeness_violations(scanned: Sequence[Mapping[str, Any]], inventory: Mapping[str, Any]) -> List[str]:
+    """清冊完整性：條目格式（分類∈封閉集、理由非空、鍵唯一）；掃描所得之每個呼叫點皆在清冊；`unrelated` 條目之呼叫點
+    仍存在（防清冊陳舊）；§G 具名檔各至少一個 `feature_run` 條目。`feature_run` 條目之呼叫點消失＝已改依 manifest（合法）。"""
+    out: List[str] = []
+    entries = list(inventory.get("entries") or [])
+    keys: Dict[InventoryKey, Mapping[str, Any]] = {}
+    for entry in entries:
+        key = inventory_key(entry)
+        if key in keys:
+            out.append(f"清冊鍵重複：{key}")
+        keys[key] = entry
+        if entry.get("class") not in INVENTORY_CLASSES:
+            out.append(f"清冊分類不屬 {INVENTORY_CLASSES}：{key} → {entry.get('class')!r}")
+        if not str(entry.get("reason") or "").strip():
+            out.append(f"清冊條目無理由：{key}")
+    live = {inventory_key(s): s for s in scanned}
+    for key in sorted(set(live) - set(keys)):
+        out.append(f"清冊外之掃描呼叫點：{key[0]}:{live[key]['line']} {key[1]} {key[2]}")
+    for key in sorted(set(keys) - set(live)):
+        if keys[key].get("class") == "unrelated":
+            out.append(f"清冊陳舊（unrelated 呼叫點已不存在）：{key}")
+    for rel in SECTION_G_READERS:
+        if not any(k[0] == rel and e.get("class") == "feature_run" for k, e in keys.items()):
+            out.append(f"§G 具名檔無 feature_run 條目：{rel}")
+    return out
+
+
+def feature_run_offenders(scanned: Sequence[Mapping[str, Any]], inventory: Mapping[str, Any]) -> Dict[str, List[str]]:
+    """Task 1.6：{檔: 仍存在之 `feature_run` 呼叫點}（仍以檔名掃描 run 目錄取特徵；呼叫點消失＝已改依 manifest）。"""
+    live = {inventory_key(s): s for s in scanned}
+    out: Dict[str, List[str]] = {}
+    for entry in inventory.get("entries") or []:
+        if entry.get("class") != "feature_run":
+            continue
+        key = inventory_key(entry)
+        hits = out.setdefault(key[0], [])
+        if key in live:
+            hits.append(f"{live[key]['line']}:{key[1]}:{key[2]}")
+    return out
+
+
+def feature_run_files_not_manifest_driven(inventory: Mapping[str, Any]) -> List[str]:
+    """含 `feature_run` 條目之檔中，未改經 `declared_feature_files`／`declared_group_files` 依 manifest 宣告讀取者。"""
+    files = sorted({str(e["path"]) for e in inventory.get("entries") or [] if e.get("class") == "feature_run"})
+    out: List[str] = []
+    for rel in files:
+        text = (ph.REPO / rel).read_text(encoding="utf-8") if (ph.REPO / rel).is_file() else ""
+        if not ("declared_feature_files" in text or "declared_group_files" in text):
+            out.append(rel)
+    return out
 
 
 @pytest.fixture(scope="module")
@@ -58,18 +209,6 @@ def rejects_undeclared(listing: Callable[..., List[Path]], run_dir: Path) -> boo
     return planted not in [Path(p) for p in files]
 
 
-def scan_calls(path: Path) -> List[str]:
-    """檔內 `.rglob(...)`／`.glob(...)` 以掃描型樣式字面呼叫者（行號:樣式）。"""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    out: List[str] = []
-    for node in ast.walk(tree):
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                and node.func.attr in ("rglob", "glob") and node.args
-                and isinstance(node.args[0], ast.Constant) and node.args[0].value in _SCAN_PATTERNS):
-            out.append(f"{node.lineno}:{node.func.attr}({node.args[0].value!r})")
-    return out
-
-
 # ---------------------------------------------------------------------------------------------- 驗證
 
 def test_verification_01_declared_listing_matches_artifact_files_on_clean_run(runs: ph.RunCache) -> None:
@@ -85,14 +224,23 @@ def test_verification_01_declared_listing_matches_artifact_files_on_clean_run(ru
     assert row_index in ph.declared_feature_files(handle.run_dir, "raw")
 
 
+def test_verification_02a_reader_inventory_complete() -> None:
+    """掃描點清冊 `tests/_golden/preprov/reader_inventory.json` 完整（CODEX-R5-P2-03）：`tests/`、`scripts/` 受版控 .py 之
+    全部 `glob(`／`rglob(`／`iglob(`／`iterdir(`／`os.listdir(`／`os.walk(`／`os.scandir(` 呼叫點（AST 重掃）皆在清冊、
+    分類∈{feature_run, unrelated} 且附理由；unrelated 條目不陳舊；§G 具名檔各至少一個 feature_run 條目。"""
+    scanned = scan_repo()
+    assert scanned, "AST 掃描無任何呼叫點 ⇒ 掃描器空轉"
+    assert inventory_completeness_violations(scanned, load_inventory()) == []
+
+
 def test_verification_02_section_g_readers_are_manifest_driven() -> None:
-    """§G 所列凍結腳本與測試輔助不得再以檔名掃描 run 目錄取特徵（rglob／glob 之掃描型樣式為 0），且改經
-    `declared_feature_files` 依 manifest 宣告讀取（不得以「排除特定檔名」代替）。"""
-    offenders = {rel: scan_calls(ph.REPO / rel) for rel in SECTION_G_READERS}
+    """清冊中 `feature_run` 類呼叫點不得再存在（不得以檔名掃描 run 目錄取特徵），所在檔改經 `declared_feature_files`／
+    `declared_group_files` 依 manifest 宣告讀取（不得以「排除特定檔名」代替）。Task 1.6 實作前為紅。"""
+    offenders = feature_run_offenders(scan_repo(), load_inventory())
     assert {k: v for k, v in offenders.items() if v} == {}
-    missing = [rel for rel in SECTION_G_READERS
-               if "declared_feature_files" not in (ph.REPO / rel).read_text(encoding="utf-8")]
+    missing = feature_run_files_not_manifest_driven(load_inventory())
     assert missing == []
+    assert any(e.get("class") == "feature_run" for e in load_inventory()["entries"]), "清冊無 feature_run 條目 ⇒ 空轉"
 
 
 def test_verification_03_undeclared_or_missing_files_raise(runs: ph.RunCache, tmp_path: Path) -> None:
@@ -168,3 +316,39 @@ def test_mutation_rglob_listing_accepts_undeclared_parquet(runs: ph.RunCache, mo
 
     monkeypatch.setattr(ph, "declared_feature_files", rglob_listing)
     assert not rejects_undeclared(ph.declared_feature_files, run_dir)
+
+
+def test_mutation_inventory_missing_feature_run_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（SPEC Task 1.6；CODEX-R5-P2-03）：清冊載入點改回刪去一個 `feature_run` 條目之複本 ⇒ 完整性 oracle 轉紅，且紅因
+    為該呼叫點成為「清冊外之掃描呼叫點」。該呼叫點若已因 Task 1.6 改寫而消失，以其鍵模擬仍存在（oracle 對任何活呼叫點皆須擋）。"""
+    inventory = load_inventory()
+    scanned = scan_repo()
+    victim = next(e for e in inventory["entries"] if e["class"] == "feature_run")
+    key = inventory_key(victim)
+    if key not in {inventory_key(s) for s in scanned}:
+        scanned = list(scanned) + [{k: victim[k] for k in ("path", "qualname", "call", "occurrence", "line")}]
+    baseline = inventory_completeness_violations(scanned, inventory)
+    mutant = copy.deepcopy(inventory)
+    mutant["entries"] = [e for e in mutant["entries"] if inventory_key(e) != key]
+    monkeypatch.setattr(sys.modules[__name__], "load_inventory", lambda: mutant)
+    caught = [v for v in inventory_completeness_violations(scanned, load_inventory()) if v not in baseline]
+    assert any(v.startswith("清冊外之掃描呼叫點") and key[2] in v for v in caught), caught
+
+
+def test_mutation_scanner_detects_planted_call_site(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：掃描結果改為多一個清冊外之檔（植入呼叫點）⇒ 完整性 oracle 轉紅；並驗掃描器對屬性／`os.`／裸名引入
+    三種寫法皆命中（防掃描器漏型）。"""
+    source = ("import os\nfrom glob import glob as g\nfrom pathlib import Path\n\n"
+              "def planted(run_dir):\n    a = sorted(Path(run_dir).rglob('*.parquet'))\n"
+              "    b = os.listdir(run_dir)\n    c = [p for p in Path(run_dir).iterdir()]\n"
+              "    d = g(str(run_dir) + '/*')\n    e = list(os.walk(run_dir))\n    return a, b, c, d, e\n")
+    planted = scan_source("tests/feature_engineering/_planted_reader.py", source)
+    assert [p["call"] for p in planted] == ["Path(run_dir).rglob('*.parquet')", "os.listdir(run_dir)",
+                                            "Path(run_dir).iterdir()", "g(str(run_dir) + '/*')", "os.walk(run_dir)"]
+    assert all(p["qualname"] == "planted" for p in planted)
+    baseline = inventory_completeness_violations(scan_repo(), load_inventory())
+    assert not any("_planted_reader.py" in v for v in baseline)
+    real_scan = scan_repo
+    monkeypatch.setattr(sys.modules[__name__], "scan_repo", lambda: list(real_scan()) + planted)
+    violations = [v for v in inventory_completeness_violations(scan_repo(), load_inventory()) if v not in baseline]
+    assert sum(v.startswith("清冊外之掃描呼叫點") and "_planted_reader.py" in v for v in violations) == len(planted)

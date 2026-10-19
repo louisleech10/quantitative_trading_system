@@ -88,6 +88,18 @@ def test_verification_03_empty_selection_zero_rows(runs: ph.RunCache) -> None:
     assert node["provenance"]["row_count"] == 0
 
 
+def test_verification_04_rerun_rowindex_failure_restores_or_failcloses(
+        tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Task 1.3 ⑤b 之 processed 版（CODEX-R5-P1-01）：既有完整 IC-first run A 以同設定重跑（kline 複本改一根、processed
+    row index 平移一根），於新 `processed_timestamps.parquet` 寫出後、processed 之 `_atomic_merge_feature_manifest_v2` 前
+    注入 `OSError` ⇒ processed/、`processed_timestamps.parquet`、manifest processed 節點三者逐位元組回復為 run A，或 processed
+    不可被 `consumer="strict"` 讀為完整；且明確不得出現「舊 processed 位元組＋新時間軸」。"""
+    outcome = ph.rerun_with_injected_failure(tmp_path_factory.mktemp("preprov_processed_rerun"), "processed")
+    assert outcome.before.artifact_files and outcome.before.row_index and outcome.before.manifest
+    assert not (outcome.new_axis_on_disk and outcome.after.artifact_files == outcome.before.artifact_files)
+    assert ph.rerun_failure_violations(outcome) == []
+
+
 # ---------------------------------------------------------------------------------------------- 邊界
 
 def test_boundary_01_selected_columns_absent_from_raw(runs: ph.RunCache) -> None:
@@ -131,3 +143,17 @@ def test_mutation_raw_record_inside_raw_dir(tmp_path_factory: pytest.TempPathFac
     monkeypatch.setattr(rp, "load_contract", lambda: copy.deepcopy(mutant))
     handle = ph.generate_short_run(tmp_path_factory.mktemp("preprov_processed_mutant"), "ic_first")
     assert not raw_record_survives(handle)
+
+
+def test_mutation_processed_rowindex_direct_write_without_restore(tmp_path_factory: pytest.TempPathFactory,
+                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R5-P1-01）：`write_processed` 改為新時間軸直寫 run 根之 `processed_timestamps.parquet`、不備份不回復
+    （改前碼之行為；monkeypatch 入口於失敗後直寫）⇒ 驗證④之 oracle 轉紅，且紅因為「舊 processed＋新時間軸」錯配。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    monkeypatch.setattr(FeatureStorage, "write_processed",
+                        ph.legacy_direct_axis_writer(FeatureStorage.write_processed, "processed_timestamps.parquet"))
+    outcome = ph.rerun_with_injected_failure(tmp_path_factory.mktemp("preprov_processed_rerun_mutant"), "processed")
+    assert outcome.new_axis_on_disk
+    violations = ph.rerun_failure_violations(outcome)
+    assert any("錯配" in v for v in violations), violations
