@@ -201,12 +201,17 @@ class FeatureReader:
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
         manifest = self._parse_manifest_file(run_dir / self.V2_MANIFEST_NAME)
         artifact = self._get_v2_artifact(manifest, artifact_kind)
+        # 審碼 b2 r1 CODEX-R1-P1-01：writer 標為不完整（manifest 或該 artifact 節點 complete=False）之 run 不得讀出紀錄
+        if manifest.get("complete") is False or artifact.get("complete") is not True:
+            raise run_provenance.ProvenanceIntegrityError(
+                f"V2 artifact {artifact_kind!r} 未標完整，拒讀紀錄：{run_dir / self.V2_MANIFEST_NAME}"
+            )
         pointer = artifact.get("provenance")
         if pointer is None:
             raise run_provenance.ProvenanceMissingError(
                 f"V2 artifact {artifact_kind!r} 無 provenance 物件（舊 run）：{run_dir / self.V2_MANIFEST_NAME}"
             )
-        return run_provenance.read_provenance_table(run_dir, pointer)
+        return run_provenance.read_provenance_table(run_dir, pointer, artifact_kind=artifact_kind)
 
     @staticmethod
     def resolve_run_status(manifest: dict) -> str:

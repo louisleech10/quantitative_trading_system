@@ -217,3 +217,83 @@ def test_mutation_skip_sha_check(runs: ph.RunCache, monkeypatch: pytest.MonkeyPa
     assert tamper_detected(handle, tmp_path / "real")
     monkeypatch.setattr(rp, "file_sha256", lambda path: declared)
     assert not tamper_detected(handle, tmp_path / "mutant")
+
+
+# ---------------------------------------------------------------------------------------------- 審碼 b2 r1 增補
+
+def _pointer_redirected_to_feature_group(handle: ph.RunHandle, tmp_path: Path) -> Tuple[Path, Path]:
+    """tmp 複本：把 raw 之 provenance 指標改指一個 manifest 宣告之特徵群組 parquet，並把 sha256／列數改成該檔之實值
+    （使只驗雜湊與列數之讀取端無從察覺）。"""
+    root, run_dir = _copy(handle, tmp_path)
+    group = ph.declared_group_files(run_dir, "raw")[0]
+    rel = str(group.relative_to(run_dir))
+    rows = int(pq.ParquetFile(str(group)).metadata.num_rows)
+    sha = rp.file_sha256(group)
+
+    def edit(manifest: Any) -> None:
+        pointer = manifest["artifacts"]["raw"]["provenance"]
+        pointer.update({"path": rel, "sha256": sha, "row_count": rows})
+
+    _edit_manifest(run_dir, edit)
+    return root, run_dir
+
+
+def test_verification_06_incomplete_artifact_refused(runs: ph.RunCache, tmp_path: Path) -> None:
+    """審碼 b2 r1 CODEX-R1-P1-01：writer 標為不完整（artifact 節點或 manifest 根 complete=False）之 run 拒讀紀錄。"""
+    handle = runs.get("h1_stat_on")
+    for scope in ("artifact", "root"):
+        root, run_dir = _copy(handle, tmp_path / scope)
+        if scope == "artifact":
+            _edit_manifest(run_dir, lambda m: m["artifacts"]["raw"].__setitem__("complete", False))
+        else:
+            _edit_manifest(run_dir, lambda m: m.__setitem__("complete", False))
+        with pytest.raises(rp.ProvenanceIntegrityError):
+            _load(handle, "raw", root)
+    # 正對照：未改之複本可讀
+    root, _ = _copy(handle, tmp_path / "control")
+    assert len(_load(handle, "raw", root)) > 0
+
+
+def test_verification_07_pointer_to_feature_group_refused(runs: ph.RunCache, tmp_path: Path) -> None:
+    """審碼 b2 r1 CODEX-R1-P1-02：指標改指特徵群組檔（雜湊與列數皆相符）⇒ 路徑非契約紀錄檔名，拒讀。"""
+    root, _ = _pointer_redirected_to_feature_group(runs.get("h1_stat_on"), tmp_path)
+    with pytest.raises(rp.ProvenanceIntegrityError):
+        _load(runs.get("h1_stat_on"), "raw", root)
+
+
+def test_mutation_reader_ignores_completeness(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch,
+                                             tmp_path: Path) -> None:
+    """mutation：讀取端不看 complete 旗標（artifact 節點恆回完整）⇒ 驗證 06 之不完整案被讀出。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    handle = runs.get("h1_stat_on")
+    root, run_dir = _copy(handle, tmp_path)
+    _edit_manifest(run_dir, lambda m: m["artifacts"]["raw"].__setitem__("complete", False))
+    orig = FeatureReader._get_v2_artifact  # staticmethod：以類別屬性取得即為普通函式
+
+    def always_complete(manifest: Any, artifact_kind: str) -> Any:
+        node = dict(orig(manifest, artifact_kind))
+        node["complete"] = True
+        return node
+
+    monkeypatch.setattr(FeatureReader, "_get_v2_artifact", staticmethod(always_complete))
+    assert len(_load(handle, "raw", root)) > 0
+
+
+def test_mutation_reader_accepts_any_declared_path(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch,
+                                                  tmp_path: Path) -> None:
+    """mutation：契約紀錄檔名放寬為任意群組檔且欄位不驗（以改壞之契約替身）⇒ 驗證 07 之改指案被讀出。"""
+    handle = runs.get("h1_stat_on")
+    root, run_dir = _pointer_redirected_to_feature_group(handle, tmp_path)
+    redirected = ph.provenance_pointer(run_dir, "raw")["path"]
+    real = rp.load_contract()
+    group_columns = pq.ParquetFile(str(run_dir / redirected)).schema_arrow.names
+
+    def loose_contract() -> Any:
+        contract = dict(real)
+        contract["files"] = {**real["files"], "raw": redirected}
+        contract["record_columns"] = {name: {} for name in group_columns}
+        return contract
+
+    monkeypatch.setattr(rp, "load_contract", loose_contract)
+    assert len(_load(handle, "raw", root)) > 0

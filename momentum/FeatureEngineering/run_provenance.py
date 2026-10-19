@@ -506,13 +506,19 @@ def write_provenance_table(
                              groups=normalize_groups(groups, contract))
 
 
-def read_provenance_table(run_dir: Path, pointer: Mapping[str, Any]) -> pd.DataFrame:
-    """依 manifest 宣告讀紀錄檔：存在、路徑在 run 內、sha256 與契約版本相符，否則拋
-    `ProvenanceIntegrityError`；不重算特徵檔雜湊（SPEC Task 1.5）。"""
+def read_provenance_table(run_dir: Path, pointer: Mapping[str, Any], *,
+                          artifact_kind: Optional[str] = None) -> pd.DataFrame:
+    """依 manifest 宣告讀紀錄檔：存在、路徑在 run 內、路徑等於契約之紀錄檔名、sha256、列數、契約版本與紀錄欄位
+    皆相符，否則拋 `ProvenanceIntegrityError`；不重算特徵檔雜湊（SPEC Task 1.5）。`artifact_kind` 給定時路徑須恰為
+    契約 `files[artifact_kind]`，未給時須屬契約 `files` 之值（審碼 b2 r1 CODEX-R1-P1-02：指標改指特徵群組檔即拒）。"""
     contract = load_contract()
     if not isinstance(pointer, Mapping) or any(key not in pointer for key in contract["manifest_provenance_keys"]):
         raise ProvenanceIntegrityError(f"provenance 物件缺鍵（契約 {contract['manifest_provenance_keys']}）")
     raw = str(pointer.get("path") or "")
+    allowed = ({str(contract["files"][artifact_kind])} if artifact_kind is not None
+               else {str(v) for v in contract["files"].values()})
+    if raw not in allowed:
+        raise ProvenanceIntegrityError(f"紀錄檔路徑 {raw!r} 不屬契約紀錄檔名 {sorted(allowed)}")
     relative = Path(raw)
     if not raw or relative.is_absolute() or ".." in relative.parts:
         raise ProvenanceIntegrityError(f"紀錄檔路徑不安全：{raw!r}")
@@ -530,6 +536,11 @@ def read_provenance_table(run_dir: Path, pointer: Mapping[str, Any]) -> pd.DataF
     table = pq.read_table(str(target))
     if int(table.num_rows) != int(pointer.get("row_count", -1)):
         raise ProvenanceIntegrityError(f"紀錄檔列數 {table.num_rows} ≠ manifest 宣告 {pointer.get('row_count')!r}")
+    expected_columns = set(contract["record_columns"])
+    if set(table.column_names) != expected_columns:
+        raise ProvenanceIntegrityError(
+            f"紀錄檔欄位 ≠ 契約 record_columns：多 {sorted(set(table.column_names) - expected_columns)}、"
+            f"缺 {sorted(expected_columns - set(table.column_names))}")
     return table.to_pandas()
 
 

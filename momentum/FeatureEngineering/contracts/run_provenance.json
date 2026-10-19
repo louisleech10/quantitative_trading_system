@@ -870,7 +870,7 @@
     "failure_reason"
   ],
   "content_sha256": {
-    "_doc": "entries 依 relative_path 升冪；每項序列化為 [relative_path, columns, row_count, dtype, file_sha256]；整體 payload＝{\"entries\": [...], \"row_index_sha256\": <hex>}，以 json.dumps(sort_keys=True, separators=(',', ':'), ensure_ascii=False) 之 UTF-8 位元組取 sha256。紀錄檔不入。",
+    "_doc": "entries 依 relative_path 升冪；每項序列化為 [relative_path, columns, row_count, dtype, file_sha256]；整體 payload＝{\"entries\": [...], \"row_index_sha256\": <hex 或 null>}，以 json.dumps(sort_keys=True, separators=(',', ':'), ensure_ascii=False) 之 UTF-8 位元組取 sha256。紀錄檔不入。row_index_sha256 為 null 只在該 artifact 無 row index 檔時（writer 未收到 row_index；生產呼叫端 feature_factory 一律傳入，故只見於直接呼叫 writer 之單元情境），序列化為 JSON null（審碼 b2 r1 CODEX-R1-P2-03）。",
     "entry_fields": [
       "relative_path",
       "columns",
