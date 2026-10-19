@@ -35,6 +35,8 @@ _FOREIGN_SAME_LITERAL = "momentum/Analysis/ic_engine.py"
 #: 紀錄函式之判準（唯一定義處）：被呼叫者末段名稱（`f(...)` 之 `f`、`x.f(...)` 之 `f`）含 "record"
 #: （如 `_record_execution`、`_record_decision`、`record_*`）
 RECORDING_CALLEE_RE = re.compile(r"record")
+#: 單元案例之校準長度 N（同 test_preprov_collect.UNIT_CALIBRATION_BARS；短窗 < v58 日內預設 1000）
+UNIT_CALIBRATION_BARS = 100
 
 
 @pytest.fixture(scope="module")
@@ -274,7 +276,10 @@ def statsmodels_unavailable_records(runs: ph.RunCache, monkeypatch: pytest.Monke
     handle = runs.get("h1_stat_off")
     frame, layers = ph.real_feature_frame(handle, 6, layer="L1")
     factory = create_feature_factory(cache_dir=ph.KLINE_DIR, validate_continuity=False)
-    config = factory._resolve_config(copy.deepcopy(ph.CELLS["h1_stat_on"]["payload"])).preprocessing.model_dump()
+    payload = copy.deepcopy(ph.CELLS["h1_stat_on"]["payload"])
+    # 單元前處理器以短窗 frame 本身為校準前史（約 720 列 < FFSTAT v58 日內預設 1000）⇒ 明示校準長度 N
+    payload["preprocessing"]["calibration_bars"] = UNIT_CALIBRATION_BARS
+    config = factory._resolve_config(payload).preprocessing.model_dump()
     monkeypatch.setattr(fpm, "HAS_STATSMODELS", False)
     pre = fpm.FeaturePreprocessor(config, column_layer_map=layers)
     fsh.attach_unit_calibration(pre, frame)
@@ -317,6 +322,9 @@ def test_verification_03_observed_values_subset_and_covered(runs: ph.RunCache, m
                 merge(observed, observed_from_groups(ph.preprocessor_groups(pre)))
     merge(observed, observed_from_run(runs.get("h12h1_native_fallback"), spec))
     merge(observed, observed_from_run(runs.get("ic_first_empty"), spec))
+    # SPEC v4 §V replace 格之 shard 串流臂：分片目標壓小之 replace 變體（`ph.VARIANTS["h1_replace_sharded"]`）之群組表
+    merge(observed, observed_from_groups(ph.preprocessor_groups(
+        ph.observation(runs.get("h1_replace_sharded")).l65_preprocessor)))
     merge(observed, observed_from_records(statsmodels_unavailable_records(runs, monkeypatch), spec))
     assert sum(len(v) for v in observed.values()) > 0, "未觀測到任何值 ⇒ ③ 空轉"
     assert coverage_violations(spec, observed) == []

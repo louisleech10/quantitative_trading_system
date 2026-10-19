@@ -1,5 +1,5 @@
 {
-  "_doc": "docs/FFDSTAR_SPEC.md 之逐欄執行紀錄與 run 身分契約（單一真相源）。各 values 由 Task 1.1 以碼證盤出實際離開路徑後填入，每值附 _sources（path:line）；未填前 values 為空，依賴之驗收測試必紅（設計如此）。",
+  "_doc": "docs/FFDSTAR_SPEC.md 之逐欄執行紀錄與 run 身分契約（單一真相源）。各 values 由 Task 1.1 以碼證盤出實際離開路徑後填入，每值附 _sources（path:line，皆為寫入路徑內之紀錄函式呼叫且實參含該值字面）；§V 驗收格未產出之值列於 _unreachable 並附碼證理由。",
   "version": 1,
   "value_pattern": "^[a-z][a-z0-9_]*$",
   "files": {
@@ -8,57 +8,886 @@
   },
   "parquet_compression": "zstd",
   "record_columns": {
-    "output_column": {"type": "str", "nullable": false, "_doc": "落盤欄名（FF-NAME v2 文法；tag_timeframe 後）；每列唯一"},
-    "native_timeframe": {"type": "str", "nullable": false},
-    "layer": {"type": "str", "nullable": true},
-    "group_id": {"type": "str", "nullable": true, "_doc": "dead-drop 欄為來源群組 id；無群組者 null"},
-    "terminal": {"type": "enum:terminal_values", "nullable": false},
-    "parent_column": {"type": "str", "nullable": true, "_doc": "append 模式衍生欄之父欄落盤名；其餘 null"},
-    "winsorization": {"type": "enum:step_status_values.winsorization", "nullable": false},
-    "fractional_differencing": {"type": "enum:step_status_values.fractional_differencing", "nullable": false},
-    "adf_differencing": {"type": "enum:step_status_values.adf_differencing", "nullable": false},
-    "rank_transform": {"type": "enum:step_status_values.rank_transform", "nullable": false},
-    "adaptive_zscore": {"type": "enum:step_status_values.adaptive_zscore", "nullable": false},
-    "gaussian_normalize": {"type": "enum:step_status_values.gaussian_normalize", "nullable": false},
-    "adf_pvalue": {"type": "float64", "nullable": true},
-    "n": {"type": "int64", "nullable": true},
-    "calibration_start": {"type": "str", "nullable": true, "_doc": "UTC ISO 8601，同 stable_start 表示"},
-    "calibration_end": {"type": "str", "nullable": true},
-    "fracdiff": {"type": "bool", "nullable": true},
-    "d": {"type": "float64", "nullable": true},
-    "adf_differenced": {"type": "int64", "nullable": true},
-    "dstar_source": {"type": "enum:dstar_source_values", "nullable": true},
-    "events": {"type": "list<str>", "nullable": false}
+    "output_column": {
+      "type": "str",
+      "nullable": false,
+      "_doc": "落盤欄名（FF-NAME v2 文法；tag_timeframe 後）；每列唯一"
+    },
+    "native_timeframe": {
+      "type": "str",
+      "nullable": false
+    },
+    "layer": {
+      "type": "str",
+      "nullable": true
+    },
+    "group_id": {
+      "type": "str",
+      "nullable": true,
+      "_doc": "dead-drop 欄為來源群組 id；無群組者 null"
+    },
+    "terminal": {
+      "type": "enum:terminal_values",
+      "nullable": false
+    },
+    "parent_column": {
+      "type": "str",
+      "nullable": true,
+      "_doc": "append 模式衍生欄之父欄落盤名；其餘 null"
+    },
+    "winsorization": {
+      "type": "enum:step_status_values.winsorization",
+      "nullable": false
+    },
+    "fractional_differencing": {
+      "type": "enum:step_status_values.fractional_differencing",
+      "nullable": false
+    },
+    "adf_differencing": {
+      "type": "enum:step_status_values.adf_differencing",
+      "nullable": false
+    },
+    "rank_transform": {
+      "type": "enum:step_status_values.rank_transform",
+      "nullable": false
+    },
+    "adaptive_zscore": {
+      "type": "enum:step_status_values.adaptive_zscore",
+      "nullable": false
+    },
+    "gaussian_normalize": {
+      "type": "enum:step_status_values.gaussian_normalize",
+      "nullable": false
+    },
+    "adf_pvalue": {
+      "type": "float64",
+      "nullable": true
+    },
+    "n": {
+      "type": "int64",
+      "nullable": true
+    },
+    "calibration_start": {
+      "type": "str",
+      "nullable": true,
+      "_doc": "UTC ISO 8601，同 stable_start 表示"
+    },
+    "calibration_end": {
+      "type": "str",
+      "nullable": true
+    },
+    "fracdiff": {
+      "type": "bool",
+      "nullable": true
+    },
+    "d": {
+      "type": "float64",
+      "nullable": true
+    },
+    "adf_differenced": {
+      "type": "int64",
+      "nullable": true
+    },
+    "dstar_source": {
+      "type": "enum:dstar_source_values",
+      "nullable": true
+    },
+    "events": {
+      "type": "list<str>",
+      "nullable": false
+    }
   },
-  "steps": ["winsorization", "fractional_differencing", "adf_differencing", "rank_transform", "adaptive_zscore", "gaussian_normalize"],
+  "steps": [
+    "winsorization",
+    "fractional_differencing",
+    "adf_differencing",
+    "rank_transform",
+    "adaptive_zscore",
+    "gaussian_normalize"
+  ],
   "step_status_values": {
-    "winsorization": {"values": [], "_sources": {}},
-    "fractional_differencing": {"values": [], "_sources": {}},
-    "adf_differencing": {"values": [], "_sources": {}},
-    "rank_transform": {"values": [], "_sources": {}},
-    "adaptive_zscore": {"values": [], "_sources": {}},
-    "gaussian_normalize": {"values": [], "_sources": {}}
+    "winsorization": {
+      "values": [
+        "applied",
+        "not_selected",
+        "disabled",
+        "ratio_unsafe_skip",
+        "preprocessing_master_off",
+        "source_missing"
+      ],
+      "_sources": {
+        "applied": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3279",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3485",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3673"
+        ],
+        "not_selected": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3247",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3279",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3485",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3673"
+        ],
+        "disabled": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3247",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3279",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3417",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3485"
+        ],
+        "ratio_unsafe_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1055",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2585",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2622"
+        ],
+        "preprocessing_master_off": [
+          "momentum/FeatureEngineering/feature_storage.py:1121"
+        ],
+        "source_missing": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968"
+        ]
+      }
+    },
+    "fractional_differencing": {
+      "values": [
+        "applied",
+        "search_failed",
+        "stationary_skip",
+        "insufficient_history",
+        "not_target_layer",
+        "not_selected",
+        "no_statsmodels",
+        "disabled",
+        "ratio_unsafe_skip",
+        "preprocessing_master_off",
+        "source_missing"
+      ],
+      "_sources": {
+        "applied": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4059",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4174"
+        ],
+        "search_failed": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4038",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4148"
+        ],
+        "stationary_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4728",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4772"
+        ],
+        "insufficient_history": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4342",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4728",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4738",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4746"
+        ],
+        "not_target_layer": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4212",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4232"
+        ],
+        "not_selected": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4223"
+        ],
+        "no_statsmodels": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4197",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4700"
+        ],
+        "disabled": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3248",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3282",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3425",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3488"
+        ],
+        "ratio_unsafe_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1055",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2585",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2622"
+        ],
+        "preprocessing_master_off": [
+          "momentum/FeatureEngineering/feature_storage.py:1121"
+        ],
+        "source_missing": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968"
+        ]
+      }
+    },
+    "adf_differencing": {
+      "values": [
+        "applied",
+        "stationary_skip",
+        "insufficient_history",
+        "insufficient_after_diff",
+        "max_diff_exhausted",
+        "superseded_by_fracdiff",
+        "skipped_dstar_failed",
+        "not_target_layer",
+        "not_selected",
+        "no_statsmodels",
+        "disabled",
+        "ratio_unsafe_skip",
+        "preprocessing_master_off",
+        "source_missing"
+      ],
+      "_sources": {
+        "applied": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4434"
+        ],
+        "stationary_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4434",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4728",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4772"
+        ],
+        "insufficient_history": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4412",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4422",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4728",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4738",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4746"
+        ],
+        "insufficient_after_diff": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4424"
+        ],
+        "max_diff_exhausted": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4442"
+        ],
+        "superseded_by_fracdiff": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4393"
+        ],
+        "skipped_dstar_failed": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4395"
+        ],
+        "not_target_layer": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599"
+        ],
+        "not_selected": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4378"
+        ],
+        "no_statsmodels": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4368",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4700"
+        ],
+        "disabled": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3249",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3283",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3430",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3511"
+        ],
+        "ratio_unsafe_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1055",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2585",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2622"
+        ],
+        "preprocessing_master_off": [
+          "momentum/FeatureEngineering/feature_storage.py:1121"
+        ],
+        "source_missing": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968"
+        ]
+      }
+    },
+    "rank_transform": {
+      "values": [
+        "applied",
+        "not_selected",
+        "disabled",
+        "ratio_unsafe_skip",
+        "preprocessing_master_off",
+        "source_missing"
+      ],
+      "_sources": {
+        "applied": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3295",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3519",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4480"
+        ],
+        "not_selected": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3250",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3295",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3519",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4480"
+        ],
+        "disabled": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3250",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3286",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3435",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3531"
+        ],
+        "ratio_unsafe_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1055",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2585",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2622"
+        ],
+        "preprocessing_master_off": [
+          "momentum/FeatureEngineering/feature_storage.py:1121"
+        ],
+        "source_missing": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968"
+        ]
+      }
+    },
+    "adaptive_zscore": {
+      "values": [
+        "applied",
+        "not_selected",
+        "no_windows",
+        "disabled",
+        "ratio_unsafe_skip",
+        "preprocessing_master_off",
+        "source_missing"
+      ],
+      "_sources": {
+        "applied": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3349",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3550",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4616"
+        ],
+        "not_selected": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3252",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3349",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3550",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3562",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4616"
+        ],
+        "no_windows": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3349",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4616"
+        ],
+        "disabled": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3252",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3339",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3445",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3564"
+        ],
+        "ratio_unsafe_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1055",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2585",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2622"
+        ],
+        "preprocessing_master_off": [
+          "momentum/FeatureEngineering/feature_storage.py:1121"
+        ],
+        "source_missing": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968"
+        ]
+      }
+    },
+    "gaussian_normalize": {
+      "values": [
+        "applied",
+        "not_selected",
+        "no_scipy",
+        "disabled",
+        "ratio_unsafe_skip",
+        "preprocessing_master_off",
+        "source_missing"
+      ],
+      "_sources": {
+        "applied": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3316",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4575"
+        ],
+        "not_selected": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3251",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3316",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4575"
+        ],
+        "no_scipy": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3335",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4566"
+        ],
+        "disabled": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3251",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3306",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3440",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3539"
+        ],
+        "ratio_unsafe_skip": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1055",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2585",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2622"
+        ],
+        "preprocessing_master_off": [
+          "momentum/FeatureEngineering/feature_storage.py:1121"
+        ],
+        "source_missing": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968"
+        ]
+      }
+    }
   },
-  "terminal_values": {"values": [], "_sources": {}},
-  "dstar_source_values": {"values": [], "_sources": {}},
-  "group_arm_values": {"values": [], "_sources": {}},
-  "group_status_values": {"values": [], "_sources": {}},
-  "fallback_values": {"values": [], "_sources": {}, "_doc": "群組回退事件值集；manifest 群組之 fallback 為此集合之值之清單（可多重，依發生序）"},
+  "terminal_values": {
+    "values": [
+      "written",
+      "ratio_unsafe",
+      "dead_dropped",
+      "ratio_unsafe_dropped",
+      "missing_from_raw"
+    ],
+    "_sources": {
+      "written": [
+        "momentum/FeatureEngineering/feature_storage.py:1059",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:962"
+      ],
+      "ratio_unsafe": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1055",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2585",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2622"
+      ],
+      "dead_dropped": [
+        "momentum/FeatureEngineering/feature_storage.py:947"
+      ],
+      "ratio_unsafe_dropped": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861"
+      ],
+      "missing_from_raw": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968"
+      ]
+    }
+  },
+  "dstar_source_values": {
+    "values": [
+      "search",
+      "cache"
+    ],
+    "_sources": {
+      "search": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4059",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4174"
+      ],
+      "cache": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4059",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4174"
+      ]
+    }
+  },
+  "group_arm_values": {
+    "values": [
+      "native_tf",
+      "pandas_legacy",
+      "pandas_optimized",
+      "slow_chunked",
+      "numba_fast",
+      "numba_shard",
+      "numba_split",
+      "polars",
+      "pandas_chunked",
+      "no_preprocessing"
+    ],
+    "_sources": {
+      "native_tf": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1268",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1823"
+      ],
+      "pandas_legacy": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2716",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2781"
+      ],
+      "pandas_optimized": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2712",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2774"
+      ],
+      "slow_chunked": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1303",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2393"
+      ],
+      "numba_fast": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2706",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2769"
+      ],
+      "numba_shard": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1318"
+      ],
+      "numba_split": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2133"
+      ],
+      "polars": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
+      ],
+      "pandas_chunked": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:885"
+      ],
+      "no_preprocessing": [
+        "momentum/FeatureEngineering/feature_storage.py:1125"
+      ]
+    }
+  },
+  "group_status_values": {
+    "values": [
+      "ok",
+      "ratio_unsafe_passthrough",
+      "all_dead_dropped",
+      "empty_output",
+      "failed"
+    ],
+    "_sources": {
+      "ok": [
+        "momentum/FeatureEngineering/feature_storage.py:1125",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:961",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1268",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1343",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1823",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2236",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2395",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2683"
+      ],
+      "ratio_unsafe_passthrough": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1057",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2592",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2626"
+      ],
+      "all_dead_dropped": [
+        "momentum/FeatureEngineering/feature_storage.py:1195"
+      ],
+      "empty_output": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:961"
+      ],
+      "failed": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2021",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2243",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2297"
+      ]
+    }
+  },
+  "fallback_values": {
+    "values": [
+      "native_ineligible",
+      "native_row_mismatch",
+      "native_no_idx_map",
+      "native_failed",
+      "native_no_columns",
+      "fracdiff_serial_fallback"
+    ],
+    "_sources": {
+      "native_ineligible": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1515",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1700"
+      ],
+      "native_row_mismatch": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1527",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1712"
+      ],
+      "native_no_idx_map": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1532",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1717"
+      ],
+      "native_failed": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1569",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1748"
+      ],
+      "native_no_columns": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1581",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1761"
+      ],
+      "fracdiff_serial_fallback": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4313"
+      ]
+    },
+    "_doc": "群組回退事件值集；manifest 群組之 fallback 為此集合之值之清單（可多重，依發生序）"
+  },
   "named_values": {
     "_doc": "SPEC 以語意指稱、測試需查得其值之具名值；Task 1.1 盤點後填入對應值集中之值（null＝未填，依賴測試必紅）",
-    "preprocessing_master_off": null,
-    "adf_test_error_event": null
+    "preprocessing_master_off": "preprocessing_master_off",
+    "adf_test_error_event": "adf_test_error"
   },
-  "source_scope": ["momentum/FeatureEngineering/preprocessing/", "momentum/FeatureEngineering/feature_storage.py", "momentum/FeatureEngineering/feature_factory.py"],
+  "source_scope": [
+    "momentum/FeatureEngineering/preprocessing/",
+    "momentum/FeatureEngineering/feature_storage.py",
+    "momentum/FeatureEngineering/feature_factory.py"
+  ],
   "_unreachable_doc": "形為 {<值>: {\"reason\": <文字>, \"_sources\": [<path:line>, ...]}}；驗收未產出之值須列此並附碼證",
-  "_unreachable": {},
-  "required_members": {"winsorization": ["applied"], "terminal_values": ["ratio_unsafe"], "group_arm_values": ["polars"]},
-  "manifest_provenance_keys": ["path", "sha256", "row_count", "contract_version", "summary", "groups"],
-  "manifest_group_keys": ["arm", "fallback", "status", "failure_reason"],
+  "_unreachable": {
+    "step_status_values.winsorization.not_selected": {
+      "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3247",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:996"
+      ]
+    },
+    "step_status_values.winsorization.source_missing": {
+      "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
+      ]
+    },
+    "step_status_values.fractional_differencing.not_selected": {
+      "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4223",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:996"
+      ]
+    },
+    "step_status_values.fractional_differencing.source_missing": {
+      "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
+      ]
+    },
+    "step_status_values.adf_differencing.not_selected": {
+      "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4378",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:996"
+      ]
+    },
+    "step_status_values.adf_differencing.source_missing": {
+      "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
+      ]
+    },
+    "step_status_values.rank_transform.not_selected": {
+      "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3250",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:996"
+      ]
+    },
+    "step_status_values.rank_transform.source_missing": {
+      "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
+      ]
+    },
+    "step_status_values.adaptive_zscore.not_selected": {
+      "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3252",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:996"
+      ]
+    },
+    "step_status_values.adaptive_zscore.source_missing": {
+      "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
+      ]
+    },
+    "step_status_values.gaussian_normalize.not_selected": {
+      "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3251",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:996"
+      ]
+    },
+    "step_status_values.gaussian_normalize.source_missing": {
+      "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
+      ]
+    },
+    "step_status_values.rank_transform.applied": {
+      "reason": "raw 路徑強制關閉 rank／zscore／gaussian；§V 各格之使用者設定亦關閉之（post-IC 沿用使用者開關）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+        "momentum/FeatureEngineering/feature_factory.py:3146"
+      ]
+    },
+    "step_status_values.adaptive_zscore.applied": {
+      "reason": "raw 路徑強制關閉 rank／zscore／gaussian；§V 各格之使用者設定亦關閉之（post-IC 沿用使用者開關）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+        "momentum/FeatureEngineering/feature_factory.py:3146"
+      ]
+    },
+    "step_status_values.gaussian_normalize.applied": {
+      "reason": "raw 路徑強制關閉 rank／zscore／gaussian；§V 各格之使用者設定亦關閉之（post-IC 沿用使用者開關）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+        "momentum/FeatureEngineering/feature_factory.py:3146"
+      ]
+    },
+    "step_status_values.adaptive_zscore.no_windows": {
+      "reason": "zscore 窗清單預設 [100, 252]，§V 各格未改且 zscore 關閉",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4616",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1429"
+      ]
+    },
+    "step_status_values.gaussian_normalize.no_scipy": {
+      "reason": "驗收環境 scipy 可匯入",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:139"
+      ]
+    },
+    "step_status_values.fractional_differencing.search_failed": {
+      "reason": "d* 搜尋例外為資料／數值異常之出口；§V 短窗真實資料皆搜尋成功",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4148"
+      ]
+    },
+    "step_status_values.adf_differencing.insufficient_after_diff": {
+      "reason": "差分後有效值 < 20 只在校準長度 N 近 20 時可達；§V 之 N 依週期預設（1h＝1000、12h＝500）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4424"
+      ]
+    },
+    "step_status_values.adf_differencing.max_diff_exhausted": {
+      "reason": "ADF 差分候選（non_stationary 且未 fracdiff 者）於 §V 資料皆在 max_diff 內平穩",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4442"
+      ]
+    },
+    "step_status_values.adf_differencing.skipped_dstar_failed": {
+      "reason": "只在 d* 搜尋失敗之欄出現；§V 無 d* 搜尋失敗（見 fractional_differencing.search_failed）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4395"
+      ]
+    },
+    "terminal_values.missing_from_raw": {
+      "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:968",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
+      ]
+    },
+    "terminal_values.ratio_unsafe_dropped": {
+      "reason": "post-IC 入口剔除 ratio-unsafe 欄；§V 之 IC-first 格未開 pattern ⇒ 選欄無 ratio-unsafe（raw 路徑不經 transform 入口）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:861"
+      ]
+    },
+    "group_arm_values.numba_split": {
+      "reason": "numba_split 只屬 in-place 路徑 `transform_registry_groups`（無生產呼叫者；raw 串流路徑不經）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2133",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1036"
+      ]
+    },
+    "group_arm_values.pandas_optimized": {
+      "reason": "optimized 臂需 replace 模式且 fracdiff／ADF 皆關；raw 串流路徑之 replace 群組只在 fracdiff／ADF 迫使慢路徑時才離開快速臂（`can_use_numba_fast`＝replace），兩條件互斥 ⇒ raw 路徑結構上不可達；post-IC 於 IC-first 固定 Polars 臂",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2773",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1399",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3092",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+      ]
+    },
+    "group_arm_values.pandas_chunked": {
+      "reason": "只在 post-IC 非 Polars 臂且選欄數 > FFACT_L65_CHUNK_SIZE；IC-first 固定 Polars 臂",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:885",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:884"
+      ]
+    },
+    "group_arm_values.slow_chunked": {
+      "reason": "只在群組欄數 > split_threshold；§V 短窗精簡設定之群組皆未超過",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1303",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1194"
+      ]
+    },
+    "group_status_values.failed": {
+      "reason": "群組失敗容忍只屬 in-place 路徑（transform_registry_groups 無生產呼叫者）；raw 串流路徑任一群組例外即整個 run 失敗",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2021",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1036"
+      ]
+    },
+    "group_status_values.empty_output": {
+      "reason": "post-IC 群組轉換後為空只在其選欄全為 ratio-unsafe；§V 之 IC-first 格未開 pattern",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:961"
+      ]
+    },
+    "fallback_values.fracdiff_serial_fallback": {
+      "reason": "parallel fracdiff 例外之降級出口；§V 各格無例外（由變體 h12h1_native_fallback_parallel_fail 注入驗之）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4313"
+      ]
+    },
+    "fallback_values.native_ineligible": {
+      "reason": "§V 多週期格之 compact-aligned 群組皆合 native 條件（列數 ≥ N）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1515"
+      ]
+    },
+    "fallback_values.native_failed": {
+      "reason": "native 子實例轉換例外之降級出口；§V 無例外",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1569"
+      ]
+    },
+    "fallback_values.native_no_columns": {
+      "reason": "ratio-unsafe 切片不剔原欄 ⇒ native 輸出恆含原欄（防禦出口）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1581"
+      ]
+    },
+    "fallback_values.native_no_idx_map": {
+      "reason": "compact-aligned 群組之 registry 恆存對齊映射（防禦出口）",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1532"
+      ]
+    }
+  },
+  "required_members": {
+    "winsorization": [
+      "applied"
+    ],
+    "terminal_values": [
+      "ratio_unsafe"
+    ],
+    "group_arm_values": [
+      "polars"
+    ]
+  },
+  "manifest_provenance_keys": [
+    "path",
+    "sha256",
+    "row_count",
+    "contract_version",
+    "summary",
+    "groups"
+  ],
+  "manifest_group_keys": [
+    "arm",
+    "fallback",
+    "status",
+    "failure_reason"
+  ],
   "content_sha256": {
     "_doc": "entries 依 relative_path 升冪；每項序列化為 [relative_path, columns, row_count, dtype, file_sha256]；整體 payload＝{\"entries\": [...], \"row_index_sha256\": <hex>}，以 json.dumps(sort_keys=True, separators=(',', ':'), ensure_ascii=False) 之 UTF-8 位元組取 sha256。紀錄檔不入。",
-    "entry_fields": ["relative_path", "columns", "row_count", "dtype", "file_sha256"],
+    "entry_fields": [
+      "relative_path",
+      "columns",
+      "row_count",
+      "dtype",
+      "file_sha256"
+    ],
     "dtype_doc": "該檔各欄 Arrow 型別字串去重、升冪排序後以 | 連接"
   },
-  "run_identity_keys": ["symbol", "tf", "config_hash", "feature_schema_hash", "feature_naming_version", "artifact_kind", "content_sha256", "provenance_sha256"]
+  "run_identity_keys": [
+    "symbol",
+    "tf",
+    "config_hash",
+    "feature_schema_hash",
+    "feature_naming_version",
+    "artifact_kind",
+    "content_sha256",
+    "provenance_sha256"
+  ]
 }

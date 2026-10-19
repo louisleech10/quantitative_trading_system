@@ -56,19 +56,40 @@ def record_violations(records: Mapping[Key, Mapping[str, Any]], inputs: Sequence
     return out
 
 
-def _preprocessor_config(cell: str) -> Dict[str, Any]:
+#: 單元案例之校準長度 N：單元前處理器以短窗 frame 本身為校準前史（`attach_unit_calibration`），短窗約 720 列 < FFSTAT
+#: v58 日內預設 1000 ⇒ 以設定 `preprocessing.calibration_bars` 明示（生產之唯一決定處 `resolve_calibration_bars`）
+UNIT_CALIBRATION_BARS = 100
+
+
+def _preprocessor_config(cell: str, *, mode: Optional[str] = None) -> Dict[str, Any]:
+    """該格 payload 之前處理設定（經生產設定解析）＋ 明示校準長度 `UNIT_CALIBRATION_BARS`；`mode` 給定時覆寫前處理 mode。"""
     from momentum.factories import create_feature_factory
 
+    payload = copy.deepcopy(ph.CELLS[cell]["payload"])
+    payload["preprocessing"]["calibration_bars"] = UNIT_CALIBRATION_BARS
+    if mode is not None:
+        payload["preprocessing"]["mode"] = mode
     factory = create_feature_factory(cache_dir=ph.KLINE_DIR, validate_continuity=False)
-    return factory._resolve_config(copy.deepcopy(ph.CELLS[cell]["payload"])).preprocessing.model_dump()
+    return factory._resolve_config(payload).preprocessing.model_dump()
 
 
-def _unit_preprocessor(runs: ph.RunCache, *, nan_history: bool) -> Tuple[Any, Any]:
-    """真實 run（h1_stat_off）之 L1 特徵欄 ＋ 平穩化開啟之前處理器；`nan_history` ⇒ 校準前史全無有效值。"""
+def _unit_context() -> Any:
+    """單元前處理器之脈絡：帶標的與週期（d* 快取只在兩者皆已知時啟用，`DStarCache.is_enabled`）。"""
+    from momentum.FeatureEngineering.preprocessing._d_star_cache import PreprocessingContext
+
+    return PreprocessingContext(symbol=fsh.SYMBOL, timeframe=fsh.PRIMARY_TF)
+
+
+def _unit_preprocessor(runs: ph.RunCache, *, nan_history: bool, mode: Optional[str] = None,
+                       context: Any = None) -> Tuple[Any, Any]:
+    """真實 run（h1_stat_off）之 L1 特徵欄 ＋ 平穩化開啟之前處理器；`nan_history` ⇒ 校準前史全無有效值；`mode` 給定時
+    覆寫前處理 mode（預設沿用格設定＝append）；`context` None ⇒ 無標的脈絡（d* 快取停用，不寫專案 data_cache），
+    只有 d* 快取已導向隔離目錄者（`_isolated_unit_preprocessor`）才帶 `_unit_context()`。"""
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
     frame, layers = ph.real_feature_frame(runs.get("h1_stat_off"), 6, layer="L1")
-    pre = FeaturePreprocessor(_preprocessor_config("h1_stat_on"), column_layer_map=layers)
+    pre = FeaturePreprocessor(_preprocessor_config("h1_stat_on", mode=mode), context=context,
+                              column_layer_map=layers)
     history = frame.copy()
     if nan_history:
         history.loc[:, :] = np.nan
@@ -91,7 +112,7 @@ def _real_decision(runs: ph.RunCache) -> Tuple[Key, Dict[str, Any], Dict[str, An
 
 
 def _isolated_unit_preprocessor(runs: ph.RunCache, mp: pytest.MonkeyPatch, cache_dir: Path, *,
-                                n_jobs: int) -> Tuple[Any, Any]:
+                                n_jobs: int, mode: Optional[str] = None) -> Tuple[Any, Any]:
     """`_unit_preprocessor`（真實 L1 欄、平穩化開）＋ d* 快取導向新目錄 `cache_dir`（必未命中；不寫專案 data_cache）＋
     固定 slow path worker 數（1＝純串行；>1＝parallel 臂）。"""
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
@@ -100,7 +121,7 @@ def _isolated_unit_preprocessor(runs: ph.RunCache, mp: pytest.MonkeyPatch, cache
     cache_dir.mkdir(parents=True, exist_ok=False)
     mp.setattr(FeaturePreprocessor, "_d_star_cache_dir", staticmethod(lambda: cache_dir))
     mp.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self: n_jobs)
-    return _unit_preprocessor(runs, nan_history=False)
+    return _unit_preprocessor(runs, nan_history=False, mode=mode, context=_unit_context())
 
 
 def _unit_inputs(frame: Any) -> List[Key]:
@@ -162,36 +183,53 @@ def dstar_error_violations(outcome: Mapping[str, Any]) -> List[str]:
 
 # ---------------------------------------------------------------------------------------------- (b) parallel→serial 回退
 
-def fracdiff_fallback_run(runs: ph.RunCache, cache_dir: Path, *, fail_parallel: bool) -> Dict[str, Any]:
+def _rewritten_columns(attempt_frame: Any, original: Any) -> Set[str]:
+    """失敗嘗試之資料框中、值已不同於原始輸入之欄（就地改寫之證據）。"""
+    out: Set[str] = set()
+    for column in original.columns:
+        if column in attempt_frame.columns and not np.array_equal(
+                np.asarray(attempt_frame[column], dtype=np.float64), np.asarray(original[column], dtype=np.float64),
+                equal_nan=True):
+            out.add(str(column))
+    return out
+
+
+def fracdiff_fallback_run(runs: ph.RunCache, cache_dir: Path, *, fail_parallel: bool, mode: Optional[str] = None,
+                          serial_on_failed_frame: bool = False) -> Dict[str, Any]:
     """`fail_parallel`：parallel 臂（2 worker）於第一欄之決策已記為 fracdiff 套用之後、下一欄註冊衍生校準時注入一般
-    （可降級）例外 ⇒ 生產既有之 parallel→serial 回退；另記失敗當下已記錄之欄（touched）與串行嘗試中 d* 快取命中之欄。
-    False ⇒ 純串行（1 worker）對照。皆用新 d* 快取目錄。回傳 {"pre", "output", "inputs", "touched", "serial_hits",
-    "fired", "serial_after_failure"}。"""
+    （可降級）例外 ⇒ 生產既有之 parallel→serial 回退；另記失敗當下已記錄之欄（touched）、串行嘗試中 d* 快取命中之欄、
+    失敗嘗試之資料框中已被就地改寫之欄（rewritten；replace 模式之雙重差分前提）。False ⇒ 純串行（1 worker）對照。
+    皆用新 d* 快取目錄。`mode` 給定時覆寫前處理 mode。`serial_on_failed_frame`（mutation 用）：串行回退改吃失敗之
+    parallel 嘗試已就地改寫之資料框（＝SPEC v4 修正前之行為）。回傳 {"pre", "output", "inputs", "touched",
+    "serial_hits", "fired", "serial_after_failure", "rewritten", "mode"}。"""
     from momentum.FeatureEngineering.preprocessing._d_star_cache import DStarCache
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
     state: Dict[str, Any] = {"in_parallel": False, "in_serial": False, "fired": False, "touched": set(),
-                             "serial_hits": set(), "serial_after_failure": False}
+                             "serial_hits": set(), "serial_after_failure": False, "attempt_frame": None,
+                             "rewritten": set()}
     with pytest.MonkeyPatch.context() as mp:
-        pre, frame = _isolated_unit_preprocessor(runs, mp, cache_dir, n_jobs=2 if fail_parallel else 1)
+        pre, frame = _isolated_unit_preprocessor(runs, mp, cache_dir, n_jobs=2 if fail_parallel else 1, mode=mode)
         if fail_parallel:
             orig_parallel = FeaturePreprocessor._apply_fractional_differencing_parallel
             orig_serial = FeaturePreprocessor._apply_fractional_differencing_serial
             orig_register = FeaturePreprocessor._register_derived_calibration
             orig_get = DStarCache.get
 
-            def parallel(self: Any, *args: Any, **kwargs: Any) -> Any:
-                state["in_parallel"] = True
+            def parallel(self: Any, result: Any, *args: Any, **kwargs: Any) -> Any:
+                state["in_parallel"], state["attempt_frame"] = True, result
                 try:
-                    return orig_parallel(self, *args, **kwargs)
+                    return orig_parallel(self, result, *args, **kwargs)
                 finally:
                     state["in_parallel"] = False
 
-            def serial(self: Any, *args: Any, **kwargs: Any) -> Any:
+            def serial(self: Any, result: Any, *args: Any, **kwargs: Any) -> Any:
                 state["in_serial"] = True
                 state["serial_after_failure"] = bool(state["fired"])
+                if serial_on_failed_frame and state["fired"]:
+                    result = state["attempt_frame"]
                 try:
-                    return orig_serial(self, *args, **kwargs)
+                    return orig_serial(self, result, *args, **kwargs)
                 finally:
                     state["in_serial"] = False
 
@@ -200,6 +238,7 @@ def fracdiff_fallback_run(runs: ph.RunCache, cache_dir: Path, *, fail_parallel: 
                     done = {k for k, v in self.stationarity_decisions().items() if v.get("fracdiff") is True}
                     if done:
                         state["fired"], state["touched"] = True, set(done)
+                        state["rewritten"] = _rewritten_columns(state["attempt_frame"], frame)
                         raise RuntimeError("injected parallel fracdiff failure after some columns recorded")
                 return orig_register(self, column, d_star, max_lag=max_lag, weight_threshold=weight_threshold)
 
@@ -216,7 +255,8 @@ def fracdiff_fallback_run(runs: ph.RunCache, cache_dir: Path, *, fail_parallel: 
         output = pre.transform(frame)
     return {"pre": pre, "output": output, "inputs": _unit_inputs(frame), "touched": set(state["touched"]),
             "serial_hits": set(state["serial_hits"]), "fired": bool(state["fired"]),
-            "serial_after_failure": bool(state["serial_after_failure"])}
+            "serial_after_failure": bool(state["serial_after_failure"]), "rewritten": set(state["rewritten"]),
+            "mode": str(pre.mode)}
 
 
 def fallback_record_violations(final: Mapping[Key, Mapping[str, Any]], reference: Mapping[Key, Mapping[str, Any]],
@@ -241,6 +281,24 @@ def fallback_record_violations(final: Mapping[Key, Mapping[str, Any]], reference
                 out.append(f"{key}: dstar_source 為失敗嘗試之殘留（串行嘗試實為快取命中）")
         elif got != want:
             out.append(f"{key}: 回退後紀錄 ≠ 純串行")
+    return out
+
+
+def replace_fallback_violations(run: Mapping[str, Any], reference: Mapping[str, Any]) -> List[str]:
+    """oracle（SPEC Task 1.2 v4 🔴：parallel→serial 回退之 serial 自該批原始輸入重跑）：replace 模式、parallel 嘗試於已
+    就地改寫部分欄後失敗 ⇒ 回退之輸出逐位元等於純串行（`check_exact`）。前提（防空轉）：兩者皆 replace 模式；確實回退；
+    失敗當下 parallel 嘗試之資料框已有欄被就地改寫（否則雙重差分不可能發生，oracle 無對象）。"""
+    out: List[str] = []
+    if run["mode"] != "replace" or reference["mode"] != "replace":
+        out.append(f"非 replace 模式：{run['mode']!r}／{reference['mode']!r}")
+    if not run["fired"] or not run["serial_after_failure"]:
+        out.append("未發生 parallel 失敗後之 serial 回退 ⇒ 空轉")
+    if not run["rewritten"]:
+        out.append("失敗當下 parallel 嘗試未就地改寫任何欄 ⇒ 雙重差分前提不成立（空轉）")
+    try:
+        pd.testing.assert_frame_equal(run["output"], reference["output"], check_exact=True)
+    except AssertionError as exc:
+        out.append(f"輸出值 ≠ 純串行：{str(exc).splitlines()[0]}")
     return out
 
 
@@ -426,6 +484,36 @@ def master_off_violations(table: pd.DataFrame, spec: Mapping[str, Any], value: s
         bad = table.loc[table[step].astype(str) != value, "output_column"].tolist()
         if bad:
             out.append(f"{step}: {len(bad)} 欄非總開關關閉值（例 {bad[:3]}）")
+    return out
+
+
+# ---------------------------------------------------------------------------------------------- (f) shard 串流臂
+
+def shard_arm_violations(groups: Mapping[str, Mapping[str, Any]], obs: ph.Observation, shard_arm: str) -> List[str]:
+    """oracle（SPEC v4 §V replace 格）：觀測器實際見到進入 shard 串流路徑且分片數 > 1 之每個群組，其群組表之臂皆為
+    契約之 shard 串流臂值；無任何多分片群組 ⇒ 空轉（違規）。觀測來源為生產函式呼叫本身，非紀錄。"""
+    out: List[str] = []
+    multi = sorted(g for g, n in obs.shard_streams.items() if n > 1)
+    if not multi:
+        out.append("無多分片群組經 shard 串流路徑 ⇒ 空轉")
+    for gid in multi:
+        arm = (groups.get(gid) or {}).get("arm")
+        if arm != shard_arm:
+            out.append(f"{gid}: arm={arm!r} ≠ shard 串流臂 {shard_arm!r}（分片數 {obs.shard_streams[gid]}）")
+    return out
+
+
+def fingerprint_diff(got: Mapping[str, Any], want: Mapping[str, Any]) -> List[str]:
+    """兩 run 之公開值指紋（`ph.value_fingerprints`）逐欄差異：欄集合不同或任一欄 dtype／NaN 遮罩／值雜湊不同。"""
+    out: List[str] = []
+    if got["column_set_sha256"] != want["column_set_sha256"]:
+        g, w = set(got["columns"]), set(want["columns"])
+        out.append(f"欄集合不同：多 {sorted(g - w)[:3]}、缺 {sorted(w - g)[:3]}")
+    for name in sorted(set(got["columns"]) & set(want["columns"])):
+        if got["columns"][name] != want["columns"][name]:
+            out.append(f"{name}: 指紋不同")
+    if not got["columns"]:
+        out.append("無任何欄 ⇒ 空轉")
     return out
 
 
@@ -628,6 +716,18 @@ def test_verification_05_parallel_fallback_serial_records_equal_pure_serial(runs
                                       ph.preprocessor_records(reference["pre"]), fallback, spec) == []
 
 
+def test_verification_05b_replace_mode_fallback_serial_from_original_input(runs: ph.RunCache, tmp_path: Path) -> None:
+    """SPEC Task 1.2 v4 🔴（既有雙重差分缺陷之修正）：replace 模式（生產預設）下 parallel fracdiff 於已就地寫回部分欄後
+    失敗 ⇒ 回退之 serial 自該批原始輸入重跑：輸出逐位元等於純串行（`check_exact`），紀錄亦等於純串行對照（同驗證 05
+    之 oracle）。真實 kline 短窗 run 之 L1 特徵欄。"""
+    spec = ph.contract()
+    fallback = fracdiff_fallback_run(runs, tmp_path / "fallback", fail_parallel=True, mode="replace")
+    reference = fracdiff_fallback_run(runs, tmp_path / "serial", fail_parallel=False, mode="replace")
+    assert replace_fallback_violations(fallback, reference) == []
+    assert fallback_record_violations(ph.preprocessor_records(fallback["pre"]),
+                                      ph.preprocessor_records(reference["pre"]), fallback, spec) == []
+
+
 def test_verification_06_adf_exception_event_without_behavior_change(runs: ph.RunCache, tmp_path: Path) -> None:
     """SPEC Task 1.2、§N FFDSTAR-R3：statsmodels ADF 拋例外（現行以 p=1.0 續行）⇒ 進入檢定之欄之紀錄 `events` 含契約
     `named_values.adf_test_error_event`；輸出值與平穩化決策等於 `adfuller` 回 p=1.0 之對照（只記、不改行為）；各步驟狀態
@@ -670,6 +770,24 @@ def test_verification_07_master_switch_off_every_step_master_off_value(runs: ph.
     assert master_off_violations(table, spec, value) == []
     off = ph.provenance_table(runs.get("h1_stat_off").run_dir, "raw")
     assert not (set(off["fractional_differencing"].astype(str)) & {value}), "平穩化關（總開關開）亦記總開關關閉值"
+
+
+def test_verification_08_sharded_replace_records_numba_shard_and_values_equal_unsharded(runs: ph.RunCache) -> None:
+    """SPEC v4 §V replace 格之 shard 串流臂實際產出：分片目標壓小之 replace 生成（`h1_replace_sharded`，前提＝至少一個
+    多分片群組經 shard 串流路徑）⇒ (a) 該等群組之臂為契約 shard 串流臂值；(b) 每個 L6.5 輸入欄恰一筆紀錄、各步驟
+    狀態屬契約（同 ①）；(c) 特徵值與未分片之 `h1_replace_stat_on` 逐位元相同（分片不得改值）。"""
+    spec = ph.contract()
+    shard_arm = ph.spec_named("shard_stream_arm", spec)
+    sharded = runs.get("h1_replace_sharded")
+    obs = ph.observation(sharded)
+    pre = obs.l65_preprocessor
+    assert shard_arm_violations(ph.preprocessor_groups(pre), obs, shard_arm) == []
+    inputs = l65_input_keys(obs)
+    assert inputs, "h1_replace_sharded：無 L6.5 輸入 ⇒ ① 空轉"
+    assert record_violations(ph.preprocessor_records(pre), inputs, spec) == []
+    reference = runs.get("h1_replace_stat_on")
+    assert not ph.observation(reference).shard_streams, "參考格亦經 shard 串流 ⇒ 未分片對照不成立"
+    assert fingerprint_diff(ph.value_fingerprints(sharded.run_dir), ph.value_fingerprints(reference.run_dir)) == []
 
 
 # ---------------------------------------------------------------------------------------------- 邊界
@@ -856,6 +974,24 @@ def test_mutation_fallback_keeps_failed_attempt_record(runs: ph.RunCache, monkey
     assert any("殘留" in v for v in violations), violations
 
 
+def test_mutation_replace_fallback_serial_reuses_rewritten_frame(runs: ph.RunCache, tmp_path: Path) -> None:
+    """mutation（SPEC Task 1.2 v4 🔴）：serial 回退改回沿用失敗之 parallel 嘗試已就地改寫之資料框（修正前之行為：replace
+    模式下已寫回之欄被分數差分兩次）⇒ 驗證 05b 之 oracle 轉紅（輸出值 ≠ 純串行）。正對照：未改壞時無違規。"""
+    reference = fracdiff_fallback_run(runs, tmp_path / "serial", fail_parallel=False, mode="replace")
+    good = fracdiff_fallback_run(runs, tmp_path / "good", fail_parallel=True, mode="replace")
+    assert replace_fallback_violations(good, reference) == []
+    mutant = fracdiff_fallback_run(runs, tmp_path / "mutant", fail_parallel=True, mode="replace",
+                                   serial_on_failed_frame=True)
+    violations = replace_fallback_violations(mutant, reference)
+    assert any(v.startswith("輸出值 ≠ 純串行") for v in violations), violations
+    assert not any("空轉" in v or "非 replace" in v for v in violations), violations
+    # 前提：改壞版本由生產前處理器跑出、且紀錄仍完整（紅燈來自數值錯而非紀錄缺漏）
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    assert isinstance(mutant["pre"], FeaturePreprocessor)
+    assert set(ph.preprocessor_records(mutant["pre"])) == set(ph.preprocessor_records(reference["pre"]))
+
+
 def test_mutation_adf_exception_event_not_recorded(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch,
                                                    tmp_path: Path) -> None:
     """mutation（SPEC Task 1.2、§N FFDSTAR-R3）：ADF 例外不記事件（紀錄 `events` 去掉該事件值）⇒ 驗證 06 之 oracle 轉紅。"""
@@ -954,3 +1090,26 @@ def test_mutation_master_off_step_recorded_as_other_value(runs: ph.RunCache, mon
     monkeypatch.setattr(ph, "provenance_table", lambda _run_dir, _kind: mutated.copy())
     violations = master_off_violations(ph.provenance_table(run_dir, "raw"), spec, value)
     assert any(v.startswith(f"{step}: 1 欄") for v in violations), violations
+
+
+def test_mutation_sharded_arm_recorded_as_fast(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch,
+                                               tmp_path: Path) -> None:
+    """mutation：shard 串流路徑之群組臂紀錄呼叫改記快速臂（`_record_group(arm=<shard 臂>)` 於生成期間被換成
+    `arm=<快速臂>`）⇒ 驗證 08 (a) 之 oracle 轉紅。另起根真實重生（不經模組倉）；正對照：未改壞之倉內 run 無違規。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    spec = ph.contract()
+    shard_arm = ph.spec_named("shard_stream_arm", spec)
+    fast_arm = ph.spec_named("numba_fast_arm", spec)
+    good = ph.observation(runs.get("h1_replace_sharded"))
+    assert shard_arm_violations(ph.preprocessor_groups(good.l65_preprocessor), good, shard_arm) == []
+    original = FeaturePreprocessor._record_group
+
+    def mutant(self: Any, group_id: Optional[str] = None, *, arm: Optional[str] = None, **kwargs: Any) -> None:
+        return original(self, group_id, arm=(fast_arm if arm == shard_arm else arm), **kwargs)
+
+    monkeypatch.setattr(FeaturePreprocessor, "_record_group", mutant)
+    handle = ph.generate_short_run(tmp_path, "h1_replace_sharded")
+    obs = ph.observation(handle)
+    violations = shard_arm_violations(ph.preprocessor_groups(obs.l65_preprocessor), obs, shard_arm)
+    assert any(f"arm={fast_arm!r}" in v for v in violations), violations

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
@@ -104,7 +105,13 @@ class ParallelSlowPath:
             raise
 
 
+#: FFDSTAR Task 1.2、§N FFDSTAR-R3：當次 worker 欄之 statsmodels ADF 例外（例外類別名清單；執行緒區域，
+#: 由 `process_fracdiff_column_values` 設定，不改 `_statsmodels_adf_pvalue` 簽名）
+_ADF_ERRORS = threading.local()
+
+
 def _statsmodels_adf_pvalue(values: np.ndarray, sample_size: int) -> float:
+    """statsmodels 檢定拋例外時以 p=1.0 續行（行為不變）；例外類別名附加至當次欄之 `_ADF_ERRORS.errors` 供主程序記事件。"""
     from statsmodels.tsa.stattools import adfuller
 
     clean_values = np.asarray(values, dtype=np.float64)
@@ -116,13 +123,30 @@ def _statsmodels_adf_pvalue(values: np.ndarray, sample_size: int) -> float:
         return float(adf_pvalue_fast(sample, sample_size=sample_size)[0])
     try:
         return float(adfuller(sample, autolag="AIC")[1])
-    except Exception:
+    except Exception as error:
+        errors = getattr(_ADF_ERRORS, "errors", None)
+        if errors is not None:
+            errors.append(type(error).__name__)
         return 1.0
 
 
 def process_fracdiff_column_values(values: np.ndarray, column_metadata: Dict[str, Any]) -> SlowPathResult:
-    """Compute one column's d_star and FracDiff values using only ndarray + metadata."""
+    """Compute one column's d_star and FracDiff values using only ndarray + metadata.
 
+    FFDSTAR Task 1.2、§N FFDSTAR-R3：結果另帶 `adf_error`（本欄 d* 搜尋中 statsmodels ADF 曾拋例外而以 p=1.0 續行），
+    由主程序併為該欄之事件；數值行為不變。"""
+    adf_errors: List[str] = []
+    previous = getattr(_ADF_ERRORS, "errors", None)
+    _ADF_ERRORS.errors = adf_errors
+    try:
+        result = _process_fracdiff_column_values(values, column_metadata)
+    finally:
+        _ADF_ERRORS.errors = previous
+    result["adf_error"] = bool(adf_errors)
+    return result
+
+
+def _process_fracdiff_column_values(values: np.ndarray, column_metadata: Dict[str, Any]) -> SlowPathResult:
     column = str(column_metadata.get("column", ""))
     weight_threshold = float(column_metadata.get("weight_threshold", 1e-5))
     max_lag = int(column_metadata.get("max_lag", 0))

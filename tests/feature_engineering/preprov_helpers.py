@@ -60,6 +60,9 @@ SPEC_NAMED_VALUES: Dict[str, Tuple[str, str, str]] = {
     "winsor_applied": ("step_status_values.winsorization", "applied", "docs/FFDSTAR_SPEC.md:170 §V oracle ③"),
     "terminal_ratio_unsafe": ("terminal_values", "ratio_unsafe", "docs/FFDSTAR_SPEC.md:170 §V oracle ③"),
     "post_ic_arm_polars": ("group_arm_values", "polars", "docs/FFDSTAR_SPEC.md:95 Task 1.4 驗證①"),
+    # SPEC v4 §V replace 格：「numba 快速臂、shard 串流」須於驗收實際產出
+    "shard_stream_arm": ("group_arm_values", "numba_shard", "docs/FFDSTAR_SPEC.md:169 §V replace 格"),
+    "numba_fast_arm": ("group_arm_values", "numba_fast", "docs/FFDSTAR_SPEC.md:169 §V replace 格"),
 }
 
 #: SPEC 以語意點名而未給字面之值（鍵 → (契約 `named_values` 物件之鍵, 須屬之值集, SPEC 出處)）。
@@ -169,6 +172,13 @@ def _gaussian(payload: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
+def _replace(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """前處理 mode 改為生產預設 replace（`feature_config.py` `mode: str = "replace"`；SPEC §V 格子 🔴：replace 才走 numba
+    快速臂、shard 串流等路徑）。"""
+    payload["preprocessing"]["mode"] = "replace"
+    return payload
+
+
 #: §V 格子（逐格單行程串行）。值＝生成路徑、主週期、payload（config_override）、輸出窗與額外環境。
 #: `h12h1_multi` 主週期取 1h（training 1h＋12h）：12h 群組對 1h 主軸為 compact-aligned ⇒ 走 native-tf 路徑，
 #: Task 1.2 驗證②（native 成功／回退）方有可觀測之對象（同 `fftfmeta_golden_helpers.MULTI_TFS` 先例）。
@@ -190,6 +200,12 @@ CELLS: Dict[str, Dict[str, Any]] = {
     "ic_first": {"path": "ic_first", "primary": "1h", "window": WINDOW, "env": dict(fsh.IC_FIRST_OFF_ENV),
                  "ic_threshold": 0.0, "cleanup_raw": True,
                  "payload": _stat(["1h"], fracdiff=False, adf=False)},
+    # SPEC v4 §V replace 格（生產預設 mode）：1h 單週期平穩化開＋縮尾開（`fast_payload` 縮尾開）
+    "h1_replace_stat_on": {"path": "generate", "primary": "1h", "window": WINDOW,
+                           "payload": _replace(_stat(["1h"], fracdiff=True, adf=True))},
+    # SPEC v4 §V replace 格：1h 主＋12h 訓練週期（同 h12h1_multi，平穩化開；12h 群組走 native-tf 路徑）
+    "h12h1_replace": {"path": "generate", "primary": "1h", "window": WINDOW,
+                      "payload": _replace(_stat(["1h", "12h"], fracdiff=True, adf=True))},
 }
 
 #: 單一 Task 邊界專用之變體（不屬 §V 全格）；`workdir` 指定者與該格共用同一 features 根（同 run 目錄重生）。
@@ -210,6 +226,12 @@ VARIANTS: Dict[str, Dict[str, Any]] = {
     "h12h1_native_fallback_parallel_fail": {**CELLS["h12h1_multi"],
                                             "payload": _stat(["1h", "12h"], fracdiff=True, adf=True),
                                             "native_fallback": True, "parallel_fail": True},
+    # SPEC v4 §V replace 格之 shard 串流臂：同 h1_replace_stat_on，但本次生成內 CGSA 分片目標
+    # （`hardware_utils.get_cgsa_shard_bytes`，生產下限 32 MiB）壓為 64 KiB ⇒ 真實短窗之寬群組（每欄約數 KB）被切成
+    # 多分片，raw 串流走 `_stream_sharded_group_to_sink`。分片目標非設定項（不入 config_hash），值須與未分片之
+    # h1_replace_stat_on 逐位元相同（驗證 08）
+    "h1_replace_sharded": {**CELLS["h1_replace_stat_on"], "payload": _replace(_stat(["1h"], fracdiff=True, adf=True)),
+                           "shard_bytes": 64 * 1024},
 }
 
 
@@ -246,11 +268,16 @@ class Observation:
     raw_writer: Dict[str, Any] = dataclasses.field(default_factory=dict)
     l65_inputs: Dict[str, Tuple[List[str], np.ndarray, str, str]] = dataclasses.field(default_factory=dict)
     fracdiff: Dict[Tuple[str, str], Dict[str, Any]] = dataclasses.field(default_factory=dict)
+    #: replace 模式下被平穩化步驟（fracdiff／ADF 差分）就地改值之輸入欄：{(原生週期, L6.5 所見欄名): 步驟方法名}；
+    #: 以步驟前後值直接比對而得（非紀錄）。append 模式恆空（原欄不改、另增衍生欄）
+    replaced: Dict[Tuple[str, str], str] = dataclasses.field(default_factory=dict)
     l7_dropped: Dict[str, str] = dataclasses.field(default_factory=dict)
     native_groups: Dict[str, bool] = dataclasses.field(default_factory=dict)
     native_shortened: Set[str] = dataclasses.field(default_factory=set)
     #: parallel_fail 變體：群組 id → 該群組於 owner 轉換中被注入失敗之 parallel fracdiff 嘗試次數（依實際發生計數）
     parallel_failures: Dict[str, int] = dataclasses.field(default_factory=dict)
+    #: 進入 shard 串流路徑（`_stream_sharded_group_to_sink`）之群組 id → 進入時該群組之分片數（依實際呼叫記錄）
+    shard_streams: Dict[str, int] = dataclasses.field(default_factory=dict)
     post_ic: List[Tuple[Any, List[str]]] = dataclasses.field(default_factory=list)
     ic_calls: List[Tuple[Tuple[Any, ...], Dict[str, Any]]] = dataclasses.field(default_factory=list)
     result_metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -390,6 +417,14 @@ def _install_observers(mp: pytest.MonkeyPatch, obs: Observation, *, native_fallb
 
     mp.setattr(FeaturePreprocessor, "_maybe_run_native_l65_to_sink", native)
 
+    orig_sharded = FeaturePreprocessor._stream_sharded_group_to_sink
+
+    def sharded(self: Any, registry: Any, group: Any, *args: Any, **kwargs: Any) -> Any:
+        obs.shard_streams[str(getattr(group, "group_id"))] = len(tuple(getattr(group, "shards", ()) or ()))
+        return orig_sharded(self, registry, group, *args, **kwargs)
+
+    mp.setattr(FeaturePreprocessor, "_stream_sharded_group_to_sink", sharded)
+
     pending: Dict[Tuple[int, str], np.ndarray] = {}
     lock = threading.Lock()
     orig_assign = FeaturePreprocessor.__dict__["_assign_fracdiff_result"].__func__
@@ -414,6 +449,26 @@ def _install_observers(mp: pytest.MonkeyPatch, obs: Observation, *, native_fallb
         return orig_register(self, column, d_star, max_lag=max_lag, weight_threshold=weight_threshold)
 
     mp.setattr(FeaturePreprocessor, "_register_derived_calibration", register)
+
+    def watch_replacement(name: str) -> None:
+        """平穩化步驟（DataFrame 入出）前後逐欄比值：輸出中同名欄之值（NaN 視為相同）不同於輸入者記為就地改值。"""
+        orig_step = getattr(FeaturePreprocessor, name)
+
+        def step(self: Any, df: pd.DataFrame, *args: Any, **kwargs: Any) -> Any:
+            out = orig_step(self, df, *args, **kwargs)
+            if isinstance(out, pd.DataFrame):
+                for column in df.columns:
+                    if column in out.columns and not np.array_equal(
+                            np.asarray(df[column], dtype=np.float64), np.asarray(out[column], dtype=np.float64),
+                            equal_nan=True):
+                        with lock:
+                            obs.replaced[(str(self._decision_timeframe_for(str(column))), str(column))] = name
+            return out
+
+        mp.setattr(FeaturePreprocessor, name, step)
+
+    for name in ("_apply_fractional_differencing", "_apply_adf_differencing"):
+        watch_replacement(name)
 
     orig_mask = dff.dead_column_mask
 
@@ -457,6 +512,16 @@ def _install_observers(mp: pytest.MonkeyPatch, obs: Observation, *, native_fallb
 
     if parallel_fail:
         _install_parallel_failure(mp, obs)
+
+
+def _install_shard_target(mp: pytest.MonkeyPatch, shard_bytes: int) -> None:
+    """shard 變體：CGSA 分片目標改為 `shard_bytes`（繞過生產下限 32 MiB）。`ColumnGroupRegistry._compute_shard_slices`
+    於呼叫時才自 `hardware_utils` 取 `get_cgsa_shard_bytes`（惰性 import）⇒ 換模組屬性即生效；由本次生成之
+    MonkeyPatch 安裝、生成結束即還原（不外溢至其他格）。"""
+    from momentum.FeatureEngineering.utils import hardware_utils
+
+    target = int(shard_bytes)
+    mp.setattr(hardware_utils, "get_cgsa_shard_bytes", lambda: target)
 
 
 def _dispatch(spec: Mapping[str, Any], symbol: str, kline_dir: str, features_root: Path,
@@ -516,12 +581,17 @@ def _check_preconditions(cell: str, spec: Mapping[str, Any], handles: Mapping[st
     if cell == "ratio_unsafe" and not any(
             cols and all(is_ratio_unsafe_column(c) for c in cols) for cols, _a, _t, _l in obs.l65_inputs.values()):
         raise RuntimeError("ratio_unsafe 格前提不成立：無全為 ratio-unsafe 欄之 L6.5 群組")
-    if cell == "h12h1_multi" and not any(obs.native_groups.values()):
-        raise RuntimeError("h12h1_multi 格前提不成立：無任何群組走 native-tf 路徑成功")
+    if cell in ("h12h1_multi", "h12h1_replace") and not any(obs.native_groups.values()):
+        raise RuntimeError(f"{cell} 格前提不成立：無任何群組走 native-tf 路徑成功")
+    expected_mode = str((spec["payload"].get("preprocessing") or {}).get("mode", ""))
+    if expected_mode == "replace" and (obs.l65_preprocessor is None or str(obs.l65_preprocessor.mode) != "replace"):
+        raise RuntimeError(f"{cell} 格前提不成立：L6.5 前處理器非 replace 模式")
     if spec.get("native_fallback") and not obs.native_shortened:
         raise RuntimeError("native 回退變體前提不成立：未經 native 載入（無回退對象）")
     if spec.get("parallel_fail") and not obs.parallel_failures:
         raise RuntimeError("parallel 失敗變體前提不成立：無任何群組選入 parallel fracdiff 臂（無注入對象）")
+    if spec.get("shard_bytes") and not any(n > 1 for n in obs.shard_streams.values()):
+        raise RuntimeError(f"{cell} 格前提不成立：無任何多分片群組經 shard 串流路徑（shard_streams={obs.shard_streams}）")
     if spec["path"] == "ic_first":
         for handle in handles.values():
             if spec.get("cleanup_raw") and (handle.run_dir / "raw").exists():
@@ -541,6 +611,8 @@ def _generate(root: Path, cell: str, symbol: str, kline_path: Optional[Path]) ->
         features_root = _isolate(mp, work, spec)
         _install_observers(mp, obs, native_fallback=bool(spec.get("native_fallback")),
                            parallel_fail=bool(spec.get("parallel_fail")))
+        if spec.get("shard_bytes"):
+            _install_shard_target(mp, int(spec["shard_bytes"]))
         produced = _dispatch(spec, symbol, kline_dir, features_root, obs)
     finally:
         mp.undo()

@@ -87,6 +87,7 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     StationarityIncompleteError,
     StationarityProvenanceError,
 )
+from momentum.FeatureEngineering.run_provenance import ProvenanceConflictError
 from momentum.FeatureEngineering.utils.nan_stats import abnormal_nan_count
 from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 from momentum.FeatureEngineering.feature_config import l65_enabled
@@ -4169,6 +4170,10 @@ class FeatureFactory:
         for (timeframe, column), record in raw.items():
             # FF-NAME Task 2.5：單一標記實作 `feature_naming.tag_timeframe`（只看第 2 段；label 不標）
             name = tag_timeframe(column, timeframe) if timeframe else column
+            # FFDSTAR Task 1.2：同落盤名而值不逐項相同 ⇒ 拒收（改前後寫勝）；逐項相同則冪等
+            existing = merged.get(name)
+            if existing is not None and not FeaturePreprocessor._provenance_equal(existing, record):
+                raise ProvenanceConflictError(f"平穩化決策 {name} 與同 run 既有紀錄不逐項相同")
             merged[name] = record
         self.last_stationarity_decisions = merged
 

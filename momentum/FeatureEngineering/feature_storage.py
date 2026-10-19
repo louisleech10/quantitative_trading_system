@@ -30,6 +30,7 @@ except ImportError:
     pq = None
 
 from momentum.FeatureEngineering import feature_naming
+from momentum.FeatureEngineering import run_provenance as _rp
 from momentum.core.config import get_l7_codec_upgrade_enabled
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.icfirstalign_errors import RowIndexLengthMismatchError
@@ -795,6 +796,11 @@ class FeatureStorage:
         backup_dir: Optional[Path] = None
         artifact_installed = False
         preserve_temp = False
+        # FFDSTAR Task 1.3 ⑤⑥：manifest 標記與回復、run 根檔（row index、紀錄檔）之安裝與備份
+        manifest_marked = False
+        manifest_before: Optional[bytes] = None
+        install_backup_root: Optional[Path] = None
+        installed_files: List[Tuple[str, bool]] = []
 
         group_manifest: Dict[str, Dict[str, Any]] = {}
         parquet_path_map: Dict[str, str] = {}
@@ -844,6 +850,16 @@ class FeatureStorage:
 
         nan_accumulators: Dict[str, ColumnNanAccumulator] = {}
         dead_drop_reasons: Dict[str, str] = {}  # FFSTAT Task 2.3 ⑦：L7 串流剔除欄 → 原因
+        # FFDSTAR Task 1.3：寫入端之逐欄紀錄素材（落盤名 → 終態／來源群組／dead-drop 事件）、群組檔內容身分項、
+        # 前處理總開關關閉時之逐欄紀錄與群組表
+        prov_terminals: Dict[str, str] = {}
+        prov_column_group: Dict[str, str] = {}
+        prov_column_keys: Dict[str, Tuple[str, str]] = {}
+        prov_dropped: Dict[str, str] = {}
+        prov_events: Dict[str, List[str]] = {}
+        prov_master_off: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        prov_groups: Dict[str, Dict[str, Any]] = {}
+        content_entries: List[_rp.ContentEntry] = []
 
         def _write_group(
             group_id: str,
@@ -867,8 +883,13 @@ class FeatureStorage:
             _gid_tf = str(group_id).split("_", 1)[0]  # e.g. "1h", "12h", "4h", "1w"
             # RATIOUNSAFE Task 1.3：合法週期＝feature_naming.timeframe_keys()（含 1w；不寫死後綴規則）；
             # 標記規則單一真相源 feature_naming.tag_timeframe（群組週期身分、冪等、label_ 不標）
+            _l65_names = list(columns_list)
             if _gid_tf in feature_naming.timeframe_keys():
                 columns_list = [feature_naming.tag_timeframe(_c, _gid_tf) for _c in columns_list]
+            # FFDSTAR Task 1.3：落盤名 → 來源群組、(來源群組, L6.5 所見欄名)（含其後被 dead-drop 者；紀錄對應之唯一權威）
+            for _c, _l65 in zip(columns_list, _l65_names):
+                prov_column_group[_c] = str(source_group_id)
+                prov_column_keys[_c] = (str(source_group_id), _l65)
 
             array = _coerce_persistence_array(data)
             if row_slice is not None:
@@ -920,6 +941,10 @@ class FeatureStorage:
                     )
                     for _i, _reason in zip(_drop_idx, np.asarray(_dec.reason, dtype=object)):
                         dead_drop_reasons[str(columns_list[_i])] = str(_reason or "constant")
+                        prov_dropped[str(columns_list[_i])] = str(source_group_id)
+                        prov_events.setdefault(str(columns_list[_i]), []).append(str(_reason or "constant"))
+                    # FFDSTAR Task 1.3：dead-drop 欄之終態（寫入端唯一離開點）
+                    _rp.record_terminal(prov_terminals, [str(columns_list[_i]) for _i in _drop_idx], "dead_dropped")
                     _keep = ~_dmask
                     dead_dropped_cols += int(_dmask.sum())
                     dead_affected_groups += 1
@@ -962,6 +987,12 @@ class FeatureStorage:
             written_part_ids: List[str] = []
             for part_id, part_cols, part_data in parts:
                 safe_part_id = self._safe_path_segment(str(part_id), "part_id")
+                if safe_part_id in group_manifest:
+                    # FFDSTAR Task 1.3 ①：part id 碰撞於寫入 group_manifest（及覆寫其 parquet）前拒收
+                    raise _rp.ProvenanceConflictError(
+                        f"L7_raw part id 碰撞：{safe_part_id}（來源群組 {source_group_id}；既有來源 "
+                        f"{group_manifest[safe_part_id].get('source_group_id')}）"
+                    )
                 part_data = _coerce_persistence_array(part_data)
                 (
                     arrays,
@@ -1021,6 +1052,11 @@ class FeatureStorage:
                     "dtype_counts": dict(column_dtype_counts),
                     "float32_columns": list(float32_cols),
                 }
+                # FFDSTAR Task 1.3 ③：群組檔寫畢當下計其內容身分項（檔案 sha256＋footer 之 Arrow 型別）
+                content_entries.append(_rp.content_entry_for_file(
+                    output_path, str(Path("raw") / output_path.name), list(part_cols), int(array.shape[0]),
+                ))
+                _rp.record_terminal(prov_terminals, [str(c) for c in part_cols], "written")
                 all_columns.extend(part_cols)
                 written_part_ids.append(safe_part_id)
                 del arrays, table
@@ -1078,6 +1114,15 @@ class FeatureStorage:
                     group_columns = list(group.columns)
                     source_disk = getattr(group, "disk_path", None)
                     shards = getattr(group, "shards", ()) or ()
+                    # FFDSTAR Task 1.1 盤點①：總開關關閉（不建前處理器）⇒ 寫入端對全部欄全部步驟記總開關關閉之值；
+                    # 鍵之週期＝群組之原生週期（同前處理器紀錄鍵；落盤名之對應由 `_write_group` 之對照決定）
+                    _mode_c_tf = str(getattr(group, "timeframe", "") or str(source_group_id).split("_", 1)[0])
+                    _mode_c_layer = getattr(getattr(group, "layer", None), "value", getattr(group, "layer", None))
+                    _rp.record_all_steps(prov_master_off, [(_mode_c_tf, str(c)) for c in group_columns],
+                                         "preprocessing_master_off",
+                                         layer=None if _mode_c_layer is None else str(_mode_c_layer),
+                                         group_id=str(source_group_id))
+                    _rp.record_group(prov_groups, str(source_group_id), arm="no_preprocessing", status="ok")
                     if shards:
                         n_shards = len(shards)
                         for shard_pos, (shard_meta, shard_arr, shard_cols) in enumerate(
@@ -1135,11 +1180,43 @@ class FeatureStorage:
                 ordered_group_manifest,
             )
             resolved_row_count = int(row_count or 0)
+
+            # FFDSTAR Task 1.3 ②：前處理器紀錄（總開關關閉則寫入端紀錄）＋ dead-drop ＋群組 manifest 組逐欄紀錄表；
+            # 窮盡性（落盤欄聯集 ∪ dead-drop 欄，逐名、無重複）不符即拋
+            if preprocessor is not None:
+                prov_records = preprocessor.execution_records()
+                prov_group_table: Dict[str, Dict[str, Any]] = preprocessor.execution_groups()
+            else:
+                prov_records = prov_master_off
+                prov_group_table = {}
+            _rp.merge_groups(prov_group_table, prov_groups)
+            written_sources = {str(info.get("source_group_id")) for info in ordered_group_manifest.values()}
+            for _gid in sorted(set(prov_dropped.values()) - written_sources):
+                _rp.record_group(prov_group_table, _gid, status="all_dead_dropped", override_status=True)
+            provenance_table = _rp.build_provenance_table(
+                prov_records,
+                output_columns=list(all_columns),
+                column_group=dict(prov_column_group),
+                dropped_columns=dict(prov_dropped),
+                terminals=dict(prov_terminals),
+                events=dict(prov_events),
+                column_keys=dict(prov_column_keys),
+            )
+            _rp.check_exhaustive(provenance_table, all_columns, prov_dropped)
+
+            # FFDSTAR Task 1.3 ④：row index 檔（`timestamps.parquet`）改寫入暫存根（不再於安裝前直寫 run 根）
             row_index_manifest = self._write_row_index_artifact(
-                run_dir=run_dir,
+                run_dir=temp_root,
                 row_index=row_index,
                 row_count=resolved_row_count,
             )
+            # FFDSTAR Task 1.3 ③：內容身分＝群組檔組成項（寫檔當下所計）＋ row index 檔 sha256
+            row_index_sha256 = (
+                _rp.file_sha256(temp_root / str(row_index_manifest["path"])) if row_index_manifest is not None else None
+            )
+            content_sha256 = _rp.compute_content_sha256(content_entries, row_index_sha256)
+            # FFDSTAR Task 1.3 ④：紀錄檔以 zstd parquet 寫入暫存 `provenance/`（失敗上拋）
+            provenance_pointer = _rp.write_provenance_table(provenance_table, temp_root, "raw", prov_group_table)
             resolved_time_range = time_range or {"start": None, "end": None}
             coverage = float(non_nan_values / total_values) if total_values else 0.0
             inf_ratio = float(total_inf / total_values) if total_values else 0.0
@@ -1221,20 +1298,28 @@ class FeatureStorage:
                         else ()
                     ) + ((f"{WARMUP_INSUFFICIENT_EVENT}:{len(warmup_late)}",) if warmup_late else ()),
                 )
-            # manifest 只收既有鍵（completeness 六欄＋quality_status＋failure_reasons）；
-            # quality_thresholds／run_status 等降級細節只經 summary 回給 factory（§C 不新增 manifest 鍵）
+            # completeness 六欄＋quality_status＋failure_reasons；quality_thresholds／run_status 等降級細節只經 summary
+            # 回給 factory。FFDSTAR Task 1.3 ⑦：raw 節點另新增 `content_sha256` 與 `provenance` 物件（合併時寫入）
             manifest_completeness = {
                 key: completeness_meta[key]
                 for key in COMPLETENESS_FIELD_NAMES + ("quality_status", "failure_reasons")
                 if key in completeness_meta
             }
 
+            # FFDSTAR Task 1.3 ⑤：對 run 根之任何寫入前，先將舊 manifest 之 raw 節點標為不完整（原子寫；回復用原位元組）
+            manifest_before = self._mark_manifest_artifact_incomplete_v2(run_dir, "raw")
+            manifest_marked = True
+
+            # ⑥ 安裝 raw、row index 檔與紀錄檔（各自先將舊檔移為備份）
             if final_artifact_dir.exists():
                 backup_dir = run_dir / f".previous-raw-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
                 os.replace(final_artifact_dir, backup_dir)
 
             os.replace(temp_artifact_dir, final_artifact_dir)
             artifact_installed = True
+            install_backup_root = run_dir / f".previous-raw-files-{uuid.uuid4().hex}"
+            self._install_staged_run_files(temp_root, run_dir, install_backup_root, installed_files)
+            # ⑦ manifest 合併為唯一提交點
             self._atomic_merge_feature_manifest_v2(
                 run_dir,
                 symbol=symbol,
@@ -1251,10 +1336,14 @@ class FeatureStorage:
                 extra_metadata=stream_metadata,
                 row_index=row_index_manifest,
                 completeness_meta=manifest_completeness,
+                content_sha256=content_sha256,
+                provenance=provenance_pointer.to_manifest(),
             )
 
             if backup_dir is not None and backup_dir.exists():
                 shutil.rmtree(backup_dir)
+            if install_backup_root is not None and install_backup_root.exists():
+                shutil.rmtree(install_backup_root)
 
             for source_group_id, first_part_id in first_part_by_source_group.items():
                 parquet_path_map[source_group_id] = str((final_artifact_dir / f"{first_part_id}.parquet").resolve())
@@ -1302,6 +1391,14 @@ class FeatureStorage:
                 shutil.rmtree(final_artifact_dir)
             if backup_dir is not None and backup_dir.exists() and not source_deleted:
                 os.replace(backup_dir, final_artifact_dir)
+            # FFDSTAR Task 1.3 ⑥：來源未刪 ⇒ row index 檔與紀錄檔自備份回復、manifest 回復為原位元組；來源已刪 ⇒
+            # 不回復、manifest 維持不完整（fail-closed）
+            if manifest_marked:
+                if not source_deleted:
+                    self._restore_staged_run_files(run_dir, install_backup_root, installed_files)
+                    self._restore_manifest_v2_bytes(run_dir, manifest_before)
+                else:
+                    self._mark_manifest_artifact_incomplete_v2(run_dir, "raw")
             raise
         finally:
             if temp_root.exists() and not preserve_temp:
@@ -1827,6 +1924,76 @@ class FeatureStorage:
         finally:
             thread_lock.release()
 
+    def _mark_manifest_artifact_incomplete_v2(self, run_dir: Path, artifact_kind: str) -> Optional[bytes]:
+        """FFDSTAR Task 1.3 ⑤（§C D4）：將既有 manifest 之 run 與該 artifact 節點標為不完整（鎖內原子寫）；回傳標記前
+        之原位元組供回復（無 manifest ⇒ None、不建檔）。"""
+        with self._manifest_v2_lock(run_dir):
+            manifest_path = run_dir / self.L7_V2_MANIFEST_NAME
+            if not manifest_path.exists():
+                return None
+            original = manifest_path.read_bytes()
+            manifest = json.loads(original.decode("utf-8"))
+            if not isinstance(manifest, dict):
+                raise ValueError(f"Invalid feature manifest: {manifest_path}")
+            manifest["complete"] = False
+            node = (manifest.get("artifacts") or {}).get(artifact_kind)
+            if isinstance(node, dict):
+                node["complete"] = False
+            self._write_feature_manifest_v2_unlocked(run_dir, manifest)
+            return original
+
+    def _restore_manifest_v2_bytes(self, run_dir: Path, original: Optional[bytes]) -> None:
+        """回復 manifest 為標記前之原位元組（鎖內原子替換）；標記前無 manifest 而現有者 ⇒ 標為不完整（fail-closed）。"""
+        if original is None:
+            self._mark_manifest_artifact_incomplete_v2(run_dir, "raw")
+            return
+        with self._manifest_v2_lock(run_dir):
+            manifest_path = run_dir / self.L7_V2_MANIFEST_NAME
+            temp_path = run_dir / f"{self.L7_V2_MANIFEST_NAME}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+            temp_path.write_bytes(original)
+            os.replace(temp_path, manifest_path)
+
+    @staticmethod
+    def _install_staged_run_files(
+        staging_root: Path,
+        run_dir: Path,
+        backup_root: Path,
+        installed: List[Tuple[str, bool]],
+    ) -> None:
+        """FFDSTAR Task 1.3 ⑥：暫存根中之 run 根檔（row index、`provenance/` 紀錄檔；artifact 目錄已先安裝）逐檔安裝：
+        既有之同名檔先移至 `backup_root` 同相對路徑，再以 `os.replace` 換入。`installed` 依序記 (相對路徑, 是否有舊檔)，
+        於移動之前登記，供失敗時回復。"""
+        staged = sorted(path for path in Path(staging_root).rglob("*") if path.is_file())
+        for source in staged:
+            relative = source.relative_to(staging_root)
+            target = Path(run_dir) / relative
+            had_previous = target.exists()
+            installed.append((str(relative), had_previous))
+            if had_previous:
+                backup = Path(backup_root) / relative
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(target, backup)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(source, target)
+
+    @staticmethod
+    def _restore_staged_run_files(
+        run_dir: Path,
+        backup_root: Optional[Path],
+        installed: List[Tuple[str, bool]],
+    ) -> None:
+        """`_install_staged_run_files` 之回復：有舊檔者自備份換回，原無者刪除新裝之檔；最後刪備份根。"""
+        for relative, had_previous in reversed(list(installed)):
+            target = Path(run_dir) / relative
+            backup = None if backup_root is None else Path(backup_root) / relative
+            if had_previous:
+                if backup is not None and backup.exists():
+                    os.replace(backup, target)
+            elif target.exists():
+                target.unlink()
+        if backup_root is not None and Path(backup_root).exists():
+            shutil.rmtree(backup_root)
+
     def _atomic_merge_feature_manifest_v2(
         self,
         run_dir: Path,
@@ -1847,8 +2014,12 @@ class FeatureStorage:
         completeness_meta: Optional[Dict[str, Any]] = None,
         preserve_root_completeness: bool = False,
         post_ic_arm: Optional[str] = None,
+        content_sha256: Optional[str] = None,
+        provenance: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Locked read-modify-write so raw/processed writers cannot clobber each other."""
+        """Locked read-modify-write so raw/processed writers cannot clobber each other.
+
+        FFDSTAR Task 1.3 ⑦：`content_sha256`／`provenance`（給定者）寫入該 artifact 節點；本合併為 run 之唯一提交點。"""
         with self._manifest_v2_lock(run_dir):
             existing_manifest = self._load_feature_manifest_v2_if_exists(run_dir)
             manifest = self._build_feature_manifest_v2(
@@ -1869,6 +2040,8 @@ class FeatureStorage:
                 completeness_meta=completeness_meta,
                 preserve_root_completeness=preserve_root_completeness,
                 post_ic_arm=post_ic_arm,
+                content_sha256=content_sha256,
+                provenance=provenance,
             )
             self._write_feature_manifest_v2_unlocked(run_dir, manifest)
             return manifest
@@ -1893,6 +2066,8 @@ class FeatureStorage:
         completeness_meta: Optional[Dict[str, Any]] = None,
         preserve_root_completeness: bool = False,
         post_ic_arm: Optional[str] = None,
+        content_sha256: Optional[str] = None,
+        provenance: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         if existing_manifest:
             for key, expected in (("symbol", symbol), ("tf", tf), ("config_hash", config_hash)):
@@ -1940,6 +2115,10 @@ class FeatureStorage:
             artifact_manifest["metadata"] = dict(extra_metadata)
         if post_ic_arm is not None:  # ICFIRSTALIGN Task 3.2：processed 節點記 post-IC 臂名
             artifact_manifest["post_ic_arm"] = str(post_ic_arm)
+        if content_sha256 is not None:  # FFDSTAR Task 1.3 ⑦（§C D2）：run 內容身分
+            artifact_manifest["content_sha256"] = str(content_sha256)
+        if provenance is not None:  # FFDSTAR Task 1.3 ⑦：紀錄檔指標（鍵見契約 manifest_provenance_keys）
+            artifact_manifest["provenance"] = dict(provenance)
         manifest = existing_manifest or {
             "version": "l7_v2",
             "symbol": symbol,

@@ -27,9 +27,12 @@ pytestmark = pytest.mark.requires_kline
 
 CELL_SYMBOLS: List[Tuple[str, str]] = [(c, s) for c in ph.CELLS for s in ph.cell_symbols(c)]
 #: ② 適用格：平穩化開啟且單行程（觀測器可見）；只檢主週期群組（native 群組之列映射另經 idx_map，不在本 oracle）
-D_CELLS = ["h1_stat_on", "h12h1_multi"]
-#: ③ 適用格：單行程（worker 格之 L6.5 前值於子行程，觀測器不可見）；IC-first 之 raw 已刪
-WINSOR_CELLS = ["h1_stat_on", "h1_stat_off", "h1_pp_off", "h12h1_multi", "ratio_unsafe", "dead_drop"]
+#: replace 格（SPEC v4 §V）：fracdiff 輸入由觀測器於寫回前擷取（＝轉換前之值），故 ② 同樣適用
+D_CELLS = ["h1_stat_on", "h12h1_multi", "h1_replace_stat_on", "h12h1_replace"]
+#: ③ 適用格：單行程（worker 格之 L6.5 前值於子行程，觀測器不可見）；IC-first 之 raw 已刪。replace 格中被平穩化步驟
+#: 就地改值之欄（觀測器 `replaced`，以步驟前後值比對而得）落盤值已非縮尾值 ⇒ 不入 ③（fracdiff 者由 ② 驗）
+WINSOR_CELLS = ["h1_stat_on", "h1_stat_off", "h1_pp_off", "h12h1_multi", "ratio_unsafe", "dead_drop",
+                "h1_replace_stat_on", "h12h1_replace"]
 _PRE_WINDOW_BAR = "2025-12-31 12:00:00"  # 輸出窗（WINDOW）前之一根 1h：只改特徵值、不改 label（label 只用窗內 close）
 
 
@@ -118,10 +121,13 @@ def winsor_violations(handle: ph.RunHandle, table: pd.DataFrame = None) -> Tuple
     if pre is None or not pre.winsor_config.get("enabled", True):
         return ([f"縮尾未執行之格出現 applied：{sorted(table.index[is_applied])[:3]}"] if is_applied.any() else []), 0, 0
     inputs = ph.l65_input_by_output(obs, primary_only=handle.tf)
+    replaced = {ph.output_name(c, tf) for tf, c in obs.replaced}  # replace 模式：縮尾後又被平穩化步驟就地改值之欄
     out: List[str] = []
+    if replaced and str(pre.mode) != "replace":
+        out.append(f"非 replace 模式而輸入欄被平穩化步驟就地改值：{sorted(replaced)[:3]}")
     n_applied = n_unsafe = 0
     for name in sorted(table.index[is_applied]):
-        if table.loc[name, "native_timeframe"] != handle.tf or name in obs.l7_dropped:
+        if table.loc[name, "native_timeframe"] != handle.tf or name in obs.l7_dropped or name in replaced:
             continue
         if name not in inputs:
             out.append(f"{name}: applied 但非 L6.5 輸入")

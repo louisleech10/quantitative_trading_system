@@ -4,6 +4,7 @@
   1. Metadata-Only（`load_manifest_v2`／`list_features_v2`，零資料 I/O）
   2. Column-Projected（`load_columns_v2`，只讀所需欄）
   3. Per-Group Streaming（`stream_groups_v2`，逐組產出以限記憶體）
+  4. 逐欄執行紀錄（`load_provenance_v2`，FFDSTAR Task 1.5；只讀紀錄檔並驗 sha256，不讀特徵檔）
 
 Design reference: FEATURE_STORAGE_ARCHITECTURE_V7.md §11
 """
@@ -181,6 +182,31 @@ class FeatureReader:
             allow_partial=allow_partial,
         )
         return manifest
+
+    def load_provenance_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> pd.DataFrame:
+        """FFDSTAR Task 1.5：唯一之逐欄執行紀錄讀取入口（經 `_parse_manifest_file` 之單一 manifest 邊界）。
+
+        依 manifest 該 artifact 節點之 `provenance` 物件讀紀錄檔：驗宣告檔存在、路徑在 run 內、sha256 與契約版本相符，
+        回 DataFrame。artifact 節點不存在 ⇒ FileNotFoundError；無 `provenance` 物件之舊 run ⇒ `ProvenanceMissingError`；
+        不符 ⇒ `ProvenanceIntegrityError`。只讀紀錄檔本身，不重算特徵檔雜湊（§C 嚴禁慢閘）；raw 已回收之 run 亦可讀
+        （紀錄檔位於 `provenance/`）。"""
+        from momentum.FeatureEngineering import run_provenance
+
+        run_dir = self.feature_run_dir(symbol, tf, config_hash)
+        manifest = self._parse_manifest_file(run_dir / self.V2_MANIFEST_NAME)
+        artifact = self._get_v2_artifact(manifest, artifact_kind)
+        pointer = artifact.get("provenance")
+        if pointer is None:
+            raise run_provenance.ProvenanceMissingError(
+                f"V2 artifact {artifact_kind!r} 無 provenance 物件（舊 run）：{run_dir / self.V2_MANIFEST_NAME}"
+            )
+        return run_provenance.read_provenance_table(run_dir, pointer)
 
     @staticmethod
     def resolve_run_status(manifest: dict) -> str:

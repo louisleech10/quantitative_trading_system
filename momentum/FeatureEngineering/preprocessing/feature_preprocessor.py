@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import gc
+import json
 import os
 import re
 import threading
 import time
 import warnings
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import psutil
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (
+    TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union,
+)
 
 import numpy as np
 import pandas as pd
@@ -52,6 +57,8 @@ from momentum.FeatureEngineering.preprocessing._numba_transforms import (
     _rolling_rank_numba,
     rolling_quantile_2d,
 )
+from momentum.FeatureEngineering import run_provenance as _run_provenance
+from momentum.FeatureEngineering.run_provenance import ProvenanceConflictError, ProvenanceError
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
 from momentum.FeatureEngineering.utils.winsor_params import resolve_winsor_min_periods
 from momentum.FeatureEngineering.feature_naming import (
@@ -108,7 +115,22 @@ NON_DEGRADABLE_ERRORS = (
     StationarityProvenanceError, CalibrationError,
     # ICFIRSTALIGN Task 4.2：記憶體預算之具名錯誤與量測不可得——不得降級（L6.5、IC-first 生成皆原樣上拋）
     _memory_budget_errors.GenerationMemoryBudgetExceeded, _memory_budget_errors.MemoryMeasurementUnavailable,
+    # FFDSTAR Task 1.2：逐欄執行紀錄之錯誤（衝突、窮盡性、完整性）——紀錄與實際執行不符即假證據，不得降級續跑
+    ProvenanceError,
 )
+
+# FFDSTAR Task 1.2：逐欄執行紀錄之步驟名（契約 `run_provenance.json` 之 `steps`；狀態值於各離開點之紀錄呼叫以字面帶入）
+STEP_WINSOR = "winsorization"
+STEP_FRACDIFF = "fractional_differencing"
+STEP_ADF = "adf_differencing"
+STEP_RANK = "rank_transform"
+STEP_ZSCORE = "adaptive_zscore"
+STEP_GAUSSIAN = "gaussian_normalize"
+EXECUTION_STEPS: Tuple[str, ...] = (STEP_WINSOR, STEP_FRACDIFF, STEP_ADF, STEP_RANK, STEP_ZSCORE, STEP_GAUSSIAN)
+# FFDSTAR Task 1.2、§N FFDSTAR-R3：statsmodels ADF 檢定拋例外（現行以 p=1.0 續行）之逐欄事件（契約 named_values）
+EVENT_ADF_TEST_ERROR = "adf_test_error"
+# 當次 ADF 檢定之例外紀錄回呼（`FeaturePreprocessor._adf_error_context` 設定；執行緒區域）
+_ADF_ERROR_TLS = threading.local()
 
 
 try:
@@ -206,6 +228,16 @@ class FeaturePreprocessor:
         self._no_start_calibration = False
         self._no_start_rows: Dict[Tuple[str, str], Tuple[int, int]] = {}
         self._no_start_values: Dict[Tuple[str, str], np.ndarray] = {}
+        # FFDSTAR Task 1.2：run 層級之逐欄執行紀錄（不被 per-transform 重設；鍵＝(原生週期, L6.5 所見欄名)）與群組表
+        # （臂、回退清單、狀態、失敗原因）；與 `_decisions` 共用 `_decisions_lock`。群組脈絡（群組 id、週期、層）放
+        # 執行緒區域（`_execution_group_scope`），各離開點據以記錄
+        self._exec_records: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        self._exec_groups: Dict[str, Dict[str, Any]] = {}
+        self._exec_tls = threading.local()
+        # post-IC（`transform_selected`）之紀錄：(execution_records 同形, execution_groups 同形)；Task 1.4 消費
+        self._last_post_ic_execution: Optional[
+            Tuple[Dict[Tuple[str, str], Dict[str, Any]], Dict[str, Dict[str, Any]]]
+        ] = None
 
     # ---------------------------------------------------------------- FFSTAT 校準封包（Task 2.1）
 
@@ -513,9 +545,233 @@ class FeaturePreprocessor:
         """本實例 registry 轉換中失敗而被容忍之群組 id。"""
         return list(self._failed_groups)
 
+    # ---------------------------------------------------------------- FFDSTAR 逐欄執行紀錄（Task 1.2）
+
+    @contextlib.contextmanager
+    def _execution_group_scope(
+        self, group_id: str, timeframe: Optional[str] = None, layer: Optional[str] = None,
+    ) -> Iterator[None]:
+        """當次群組之紀錄脈絡（群組 id、原生週期、層；執行緒區域、可巢狀）。只供紀錄，不參與任何轉換判定。"""
+        tls = self._exec_tls
+        saved = getattr(tls, "group", None)
+        tls.group = (str(group_id), None if not timeframe else str(timeframe), None if not layer else str(layer))
+        try:
+            yield
+        finally:
+            tls.group = saved
+
+    def _group_execution_scope(self, group: object) -> Any:
+        """registry 群組之紀錄脈絡（群組 id、群組週期、群組層）。"""
+        return self._execution_group_scope(
+            str(getattr(group, "group_id")), self._group_timeframe(group), self._group_layer_name(group),
+        )
+
+    def _set_execution_scope(self, group: Optional[object]) -> None:
+        """逐群組迴圈用：直接設定（或以 None 清除）當次群組之紀錄脈絡。"""
+        self._exec_tls.group = None if group is None else (
+            str(getattr(group, "group_id")), self._group_timeframe(group), self._group_layer_name(group),
+        )
+
+    def _execution_scope_group(self) -> Optional[Tuple[str, Optional[str], Optional[str]]]:
+        return getattr(self._exec_tls, "group", None)
+
+    def _execution_key_timeframe(self, column: str) -> str:
+        """紀錄鍵之原生週期：決策脈絡（`_transform_single` 所設）之週期 → 群組脈絡之週期 → `_decision_timeframe_for`。"""
+        timeframe = getattr(self._decision_tls, "timeframe", None)
+        if timeframe:
+            return str(timeframe)
+        scope = self._execution_scope_group()
+        if scope is not None and scope[1]:
+            return str(scope[1])
+        return self._decision_timeframe_for(str(column))
+
+    def _execution_layer(self, column: str) -> Optional[str]:
+        layer = getattr(self._decision_tls, "layer", None)
+        if not layer:
+            scope = self._execution_scope_group()
+            layer = scope[2] if scope is not None else None
+        if not layer and self._column_layer_map is not None:
+            layer = self._column_layer_map.get(column)
+        return None if not layer else str(layer)
+
+    @staticmethod
+    def _set_execution_field(record: Dict[str, Any], key: Tuple[str, str], field: str, value: Any) -> None:
+        """同一嘗試內同鍵同欄位只准同值（冪等）；異值 ⇒ `ProvenanceConflictError`（紀錄以嘗試為單位，回退先撤回）。"""
+        previous = record.get(field)
+        if previous is not None and previous != value:
+            raise ProvenanceConflictError(f"{key} 之 {field} 紀錄衝突：{previous!r} ≠ {value!r}")
+        record[field] = value
+
+    def _store_execution(
+        self,
+        column: str,
+        *,
+        steps: Mapping[str, str],
+        terminal: Optional[str] = None,
+        dstar_source: Optional[str] = None,
+        event: Optional[str] = None,
+    ) -> None:
+        key = (self._execution_key_timeframe(column), str(column))
+        scope = self._execution_scope_group()
+        with self._decisions_lock:
+            record = self._exec_records.get(key)
+            if record is None:
+                record = _run_provenance.new_execution_record(
+                    key[0], self._execution_layer(str(column)), None if scope is None else scope[0],
+                )
+                self._exec_records[key] = record
+            for step, value in steps.items():
+                self._set_execution_field(record, key, step, str(value))
+            if terminal is not None:
+                self._set_execution_field(record, key, "terminal", str(terminal))
+            if dstar_source is not None:
+                self._set_execution_field(record, key, "dstar_source", str(dstar_source))
+            if event is not None:
+                record["events"] = sorted(set(record.get("events") or []) | {str(event)})
+
+    def _record_execution(
+        self, columns: Iterable[Any], step: str, value: str, *, dstar_source: Optional[str] = None,
+    ) -> None:
+        """轉換脈絡內（`_transform_single` 等設定輸入欄集合者）一步驟之逐欄實際狀態。脈絡外（如校準前置之縮尾）不記；
+        append 模式衍生欄（非本次輸入欄）不記，由寫入端以父欄關聯。"""
+        input_columns = getattr(self._decision_tls, "input_columns", None)
+        if input_columns is None:
+            return
+        for column in columns:
+            name = str(column)
+            if name in input_columns:
+                self._store_execution(name, steps={step: value}, dstar_source=dstar_source)
+
+    def _record_selection(
+        self, columns: Iterable[Any], selected: Iterable[Any], step: str, selected_value: str, other_value: str,
+    ) -> None:
+        """一步驟之 apply_to 選取：被選欄記 `selected_value`、其餘輸入欄記 `other_value`（不重算選取）。"""
+        chosen = {str(c) for c in selected}
+        names = [str(c) for c in columns]
+        self._record_execution([c for c in names if c in chosen], step, selected_value)
+        self._record_execution([c for c in names if c not in chosen], step, other_value)
+
+    def _record_input_execution(
+        self, columns: Iterable[Any], value: Optional[str] = None, *, terminal: Optional[str] = None,
+        **step_values: str,
+    ) -> None:
+        """呼叫端確知為本次輸入欄者（ratio-unsafe 切片、快速臂、post-IC 入口剔除與缺欄）：不經輸入欄集合過濾。
+        `value` 給定 ⇒ 六步驟皆記該值；否則依 `step_values`（步驟名 → 值）。"""
+        steps = {step: value for step in EXECUTION_STEPS} if value is not None else dict(step_values)
+        for column in columns:
+            self._store_execution(str(column), steps=steps, terminal=terminal)
+
+    def _record_execution_event(self, column: Any, event: str) -> None:
+        """一欄之執行事件（不改狀態）；轉換脈絡內只記本次輸入欄。"""
+        input_columns = getattr(self._decision_tls, "input_columns", None)
+        if input_columns is not None and str(column) not in input_columns:
+            return
+        self._store_execution(str(column), steps={}, event=event)
+
+    def _record_group(
+        self,
+        group_id: Optional[str] = None,
+        *,
+        arm: Optional[str] = None,
+        status: Optional[str] = None,
+        fallback: Optional[str] = None,
+        failure_reason: Optional[str] = None,
+    ) -> None:
+        """群組表一列（臂／狀態先寫者為準、回退依發生序附加）；`group_id` None ⇒ 當次群組脈絡，無脈絡則不記。"""
+        if group_id is None:
+            scope = self._execution_scope_group()
+            if scope is None:
+                return
+            group_id = scope[0]
+        with self._decisions_lock:
+            _run_provenance.record_group(self._exec_groups, str(group_id), arm=arm, status=status,
+                                         fallback=fallback, failure_reason=failure_reason)
+
+    def _execution_checkpoint(self, columns: Iterable[Any]) -> Dict[str, Dict[Tuple[str, str], Any]]:
+        """一次嘗試之紀錄起點（逐欄執行紀錄與平穩化決策之快照；回退時整批撤回用）。"""
+        names = [str(c) for c in columns]
+        with self._decisions_lock:
+            return {
+                "exec": {key: copy.deepcopy(self._exec_records.get(key))
+                         for key in ((self._execution_key_timeframe(c), c) for c in names)},
+                "decisions": {key: copy.deepcopy(self._decisions.get(key))
+                              for key in ((self._decision_timeframe_for(c), c) for c in names)},
+            }
+
+    def _fracdiff_attempt_state(self) -> Dict[str, Any]:
+        """一次 fracdiff 嘗試前之衍生狀態快照（d* 失敗欄、已 fracdiff 欄、append 模式衍生欄校準值）；parallel 嘗試失敗而
+        回退 serial 時還原，使 serial 自原始狀態重跑（失敗嘗試之殘留不得影響其後 ADF 差分之判定）。"""
+        with self._decisions_lock:
+            return {"failed": set(self._dstar_failed_columns), "processed": set(self._fracdiff_processed_columns),
+                    "derived": dict(self._derived_calibration)}
+
+    def _restore_fracdiff_attempt_state(self, state: Mapping[str, Any]) -> None:
+        with self._decisions_lock:
+            for store, saved in ((self._dstar_failed_columns, state["failed"]),
+                                 (self._fracdiff_processed_columns, state["processed"]),
+                                 (self._derived_calibration, state["derived"])):
+                store.clear()
+                store.update(saved)
+
+    def _rollback_execution(self, checkpoint: Mapping[str, Mapping[Tuple[str, str], Any]]) -> None:
+        """撤回失敗嘗試已寫入之紀錄（回到 `_execution_checkpoint` 之狀態），由下一次嘗試重記（SPEC Task 1.2）。"""
+        with self._decisions_lock:
+            for store, saved in ((self._exec_records, checkpoint["exec"]), (self._decisions, checkpoint["decisions"])):
+                for key, value in saved.items():
+                    if value is None:
+                        store.pop(key, None)
+                    else:
+                        store[key] = copy.deepcopy(value)
+
+    @staticmethod
+    def _provenance_equal(left: Any, right: Any) -> bool:
+        """紀錄逐項相同（NaN 視為相同；序列化比對）。"""
+        return json.dumps(left, sort_keys=True, default=str) == json.dumps(right, sort_keys=True, default=str)
+
+    def execution_records(self) -> Dict[Tuple[str, str], Dict[str, Any]]:
+        """run 層級逐欄執行紀錄（含併入之 native-tf 子實例）：{(原生週期, L6.5 所見欄名): 紀錄}；紀錄之鍵＝契約
+        `record_columns` 去 `output_column`。平穩化決策欄取自同鍵之決策紀錄（未進入平穩化步驟者為 null）。"""
+        with self._decisions_lock:
+            out: Dict[Tuple[str, str], Dict[str, Any]] = {}
+            for key, record in self._exec_records.items():
+                row = dict(record, events=list(record.get("events") or []))
+                decision = self._decisions.get(key)
+                if decision is not None:
+                    adf_differenced = decision.get("adf_differenced")
+                    row.update({
+                        "adf_pvalue": decision.get("adf_pvalue"),
+                        "n": decision.get("n"),
+                        "calibration_start": decision.get("calibration_start"),
+                        "calibration_end": decision.get("calibration_end"),
+                        "fracdiff": bool(decision.get("fracdiff")),
+                        "d": decision.get("d"),
+                        "adf_differenced": None if adf_differenced is None else int(adf_differenced),
+                    })
+                    row["events"] = sorted(set(row["events"]) | set(decision.get("events") or []))
+                out[key] = row
+            return out
+
+    def execution_groups(self) -> Dict[str, Dict[str, Any]]:
+        """群組表：{群組 id: {arm, fallback（依發生序之清單）, status, failure_reason}}。"""
+        with self._decisions_lock:
+            return {gid: dict(info, fallback=list(info.get("fallback") or []))
+                    for gid, info in self._exec_groups.items()}
+
+    def last_post_ic_execution(
+        self,
+    ) -> Tuple[Dict[Tuple[str, str], Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+        """最近一次 `transform_selected` 之 post-IC 紀錄（`execution_records()`／`execution_groups()` 同形之二元組）；
+        未呼叫過 ⇒ 兩者皆空。"""
+        if self._last_post_ic_execution is None:
+            return {}, {}
+        records, groups = self._last_post_ic_execution
+        return copy.deepcopy(records), copy.deepcopy(groups)
+
     def _merge_decisions_from(self, other: "FeaturePreprocessor", idx_map: Optional[np.ndarray] = None) -> None:
         """併回 native-tf 子實例之決策；逐欄校準模式之校準列（子實例之原生列）以對齊映射換成主週期列
-        （`calibration_rows`＝映射至原生校準列之主週期列範圍；原值另存 `calibration_rows_native`）。"""
+        （`calibration_rows`＝映射至原生校準列之主週期列範圍；原值另存 `calibration_rows_native`）。
+        FFDSTAR Task 1.2：同鍵而值不逐項相同 ⇒ `ProvenanceConflictError`（改前後寫勝）；逐項相同則冪等。子實例之逐欄
+        執行紀錄與群組表（回退依序接續）一併併回。"""
         for key, value in other.stationarity_decisions().items():
             record = dict(value)
             native_rows = record.get("calibration_rows")
@@ -525,7 +781,20 @@ class FeaturePreprocessor:
                 record["calibration_rows_native"] = list(native_rows)
                 record["calibration_rows"] = [int(hit[0]), int(hit[-1])] if hit.size else None
             with self._decisions_lock:
+                existing = self._decisions.get(key)
+                if existing is not None and not self._provenance_equal(existing, record):
+                    raise ProvenanceConflictError(f"併回之決策 {key} 與既有紀錄不逐項相同")
                 self._decisions[key] = record
+        with other._decisions_lock:
+            child_records = copy.deepcopy(other._exec_records)
+            child_groups = copy.deepcopy(other._exec_groups)
+        with self._decisions_lock:
+            for key, record in child_records.items():
+                existing = self._exec_records.get(key)
+                if existing is not None and not self._provenance_equal(existing, record):
+                    raise ProvenanceConflictError(f"併回之執行紀錄 {key} 與既有紀錄不逐項相同")
+                self._exec_records[key] = record
+            _run_provenance.merge_groups(self._exec_groups, child_groups)
 
     def _rolling_window(self) -> int:
         window = int(self.winsor_config.get("window", self.rank_config.get("window", 252)))
@@ -588,6 +857,8 @@ class FeaturePreprocessor:
                 "[L6.5] dropping %d ratio-unsafe columns (categories=%s) at preprocessor entry",
                 len(unsafe), sorted(RATIO_UNSAFE_CATEGORIES),
             )
+            # FFDSTAR Task 1.2／1.4：入口剔除之 ratio-unsafe 欄（不轉換、不輸出）各記其終態
+            self._record_input_execution(unsafe, "ratio_unsafe_skip", terminal="ratio_unsafe_dropped")
             features_df = features_df.drop(columns=unsafe)
             if features_df.empty:
                 return pd.DataFrame(index=features_df.index)
@@ -606,11 +877,15 @@ class FeaturePreprocessor:
         if use_polars and not self.fracdiff_config.get("enabled", False):
             # Polars path: fracdiff not supported in Polars (requires scipy/statsmodels)
             # FFSTAT Task 2.3 ④：ADF 差分之逐欄校準列同樣遮罩
-            return self._mask_no_start_rows(self._transform_single_polars(features_df))
+            self._record_group(arm="polars")
+            with self._decision_context(features_df.columns):
+                return self._mask_no_start_rows(self._transform_single_polars(features_df))
 
         if chunk_size > 0 and num_cols > chunk_size:
+            self._record_group(arm="pandas_chunked")
             return self._transform_chunked(features_df, chunk_size)
 
+        self._record_group(arm="pandas_optimized" if self._can_use_optimized_dataframe_path() else "pandas_legacy")
         return self._transform_single(features_df)
 
     def transform_selected(
@@ -624,7 +899,11 @@ class FeaturePreprocessor:
 
         `arm`（ICFIRSTALIGN Task 3.2）：None ⇒ 依環境（既有 caller 行為不變）；"polars" ⇒ 固定 Polars 正式臂，
         polars 不可用 ⇒ `PostICArmUnavailableError`。
+
+        FFDSTAR Task 1.2／1.4：post-IC 前處理器沿用逐欄執行紀錄容器；回傳形態不變，紀錄（選欄全集：已寫出、入口剔除之
+        ratio-unsafe、不在 raw 者各記其終態）經本實例 `last_post_ic_execution()` 取得，不併入本實例之紀錄。
         """
+        self._last_post_ic_execution = None
         if arm is not None:
             if arm != "polars":
                 raise ValueError(f"未知之 post-IC 臂：{arm!r}（只支援 'polars'）")
@@ -636,6 +915,7 @@ class FeaturePreprocessor:
         selected_columns = [str(feature) for feature in selected]
         if not selected_columns:
             logger.warning("[IC-First] post_ic received empty IC selection")
+            self._last_post_ic_execution = ({}, {})
             return {}
 
         if groups is None:
@@ -676,11 +956,17 @@ class FeaturePreprocessor:
                 label=f"PostIC.transform_selected:{group_id}",
             )
             selected_frame = group_df.loc[:, available_columns].copy()
-            transformed = post_ic_preprocessor.transform(selected_frame)
+            with post_ic_preprocessor._execution_group_scope(str(group_id)):
+                transformed = post_ic_preprocessor.transform(selected_frame)
+                post_ic_preprocessor._record_group(status="ok" if not transformed.empty else "empty_output")
+                post_ic_preprocessor._record_input_execution(list(transformed.columns), terminal="written")
             if not transformed.empty:
                 processed_groups[str(group_id)] = transformed
 
         if missing_columns:
+            # 選欄不在任何 raw 群組 ⇒ 不轉換、不輸出，各記其終態（逐選欄恰一筆）
+            post_ic_preprocessor._record_input_execution(sorted(missing_columns), "source_missing",
+                                                         terminal="missing_from_raw")
             logger.warning(
                 "[IC-First] post_ic skipped %d selected features missing from L7_raw",
                 len(missing_columns),
@@ -688,6 +974,8 @@ class FeaturePreprocessor:
         if not processed_groups:
             logger.warning("[IC-First] post_ic produced no processed groups")
 
+        self._last_post_ic_execution = (post_ic_preprocessor.execution_records(),
+                                        post_ic_preprocessor.execution_groups())
         return processed_groups
 
     def _build_post_ic_transform_config(
@@ -762,6 +1050,11 @@ class FeaturePreprocessor:
         all_unsafe = [g for g in groups
                       if all(is_ratio_unsafe_column(str(c)) for c in getattr(g, "columns", ()))]
         if all_unsafe:
+            for group in all_unsafe:  # FFDSTAR Task 1.2：原值即輸出之群組與其欄
+                with self._group_execution_scope(group):
+                    self._record_input_execution(list(getattr(group, "columns")), "ratio_unsafe_skip",
+                                                 terminal="ratio_unsafe")
+                    self._record_group(status="ratio_unsafe_passthrough")
             skip_ids = {str(getattr(g, "group_id")) for g in all_unsafe}
             groups = [g for g in groups if str(getattr(g, "group_id")) not in skip_ids]
             logger.info("[L6.5] ratio-unsafe passthrough: %d group(s) left untouched", len(all_unsafe))
@@ -959,6 +1252,9 @@ class FeaturePreprocessor:
                 and bool(transform_context.get("can_use_numba_fast", False))
             )
 
+            # FFDSTAR Task 1.2：本群組之紀錄脈絡（群組 id、週期、層；只供紀錄；迴圈結束後還原）
+            self._set_execution_scope(group)
+
             # Native-resolution L6.5 path for compact-aligned groups: compute
             # transforms on source rows then forward-fill to primary rows.
             # Avoids step-function bias in fracdiff/distribution stats.
@@ -969,6 +1265,7 @@ class FeaturePreprocessor:
             )
             if native_outputs is not None:
                 outputs_written = native_outputs
+                self._record_group(group_id, arm="native_tf", status="ok")
                 completed += 1
                 tasks_done += max(estimated_tasks, outputs_written, 1)
                 last_group_label = f"{group_id} (native-tf, parts={outputs_written})"
@@ -1003,6 +1300,7 @@ class FeaturePreprocessor:
 
             if is_chunked:
                 source_disk_path = getattr(group, "disk_path", None)
+                self._record_group(group_id, arm="slow_chunked")
                 outputs_written = self._stream_single_group_chunked_to_sink(
                     registry,
                     group,
@@ -1017,6 +1315,7 @@ class FeaturePreprocessor:
                 # produce identical results per shard as on the concat.
                 # We delete the source shard `.npy` immediately after sink
                 # acknowledges the parquet part is durable.
+                self._record_group(group_id, arm="numba_shard")
                 outputs_written = self._stream_sharded_group_to_sink(
                     registry,
                     group,
@@ -1041,6 +1340,7 @@ class FeaturePreprocessor:
                     )
                 outputs_written = len(outputs)
                 del outputs
+            self._record_group(group_id, status="ok")
             completed += 1
             tasks_done += max(estimated_tasks, outputs_written, 1)
             if is_chunked:
@@ -1076,6 +1376,7 @@ class FeaturePreprocessor:
 
             gc.collect()
 
+        self._set_execution_scope(None)
         logger.info(
             "[L6.5] raw-sink complete: %d/%d groups in %.2fs rss=%dMB",
             completed,
@@ -1210,6 +1511,8 @@ class FeaturePreprocessor:
                 primary_tf,
                 source_n_rows,
             )
+            # FFDSTAR Task 1.2：native 回退（原因字串含不合值樣式之字元 ⇒ 入 failure_reason 自由文字）
+            self._record_group(group_id, fallback="native_ineligible", failure_reason=str(reason))
             return None
 
         # Load native (source-resolution) data and idx_map.
@@ -1221,9 +1524,12 @@ class FeaturePreprocessor:
                 source_n_rows,
                 native_arr.shape[0],
             )
+            self._record_group(group_id, fallback="native_row_mismatch",
+                               failure_reason=f"expected={source_n_rows} got={native_arr.shape[0]}")
             return None
         idx_map = registry.get_alignment_idx_map(group_id)
         if idx_map is None:
+            self._record_group(group_id, fallback="native_no_idx_map")
             return None
 
         # Build per-group context with source-tf cache key isolation.
@@ -1245,11 +1551,13 @@ class FeaturePreprocessor:
 
         native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
         try:
-            processed_df = native_pp._transform_single_passthrough(
-                native_df,
-                source_layer=self._group_layer_name(group),
-                source_timeframe=self._group_timeframe(group),
-            )
+            # FFDSTAR Task 1.2：子實例之紀錄以同一群組脈絡記錄，成功時併回 owner、回退時隨子實例丟棄（嘗試為單位）
+            with native_pp._group_execution_scope(group):
+                processed_df = native_pp._transform_single_passthrough(
+                    native_df,
+                    source_layer=self._group_layer_name(group),
+                    source_timeframe=self._group_timeframe(group),
+                )
         except Exception as exc:  # noqa: BLE001
             if isinstance(exc, NON_DEGRADABLE_ERRORS):
                 raise  # FFSTAT：平穩化來源缺漏不可以 native-tf 回退吞下
@@ -1258,6 +1566,7 @@ class FeaturePreprocessor:
                 group_id,
                 exc,
             )
+            self._record_group(group_id, fallback="native_failed", failure_reason=f"{type(exc).__name__}: {exc}")
             return None
         finally:
             del native_df, native_arr
@@ -1269,6 +1578,7 @@ class FeaturePreprocessor:
                 "[L6.5] native-tf transform produced no original columns for group=%s, falling back",
                 group_id,
             )
+            self._record_group(group_id, fallback="native_no_columns")
             return None
 
         source_disk_path = getattr(group, "disk_path", None)
@@ -1387,6 +1697,7 @@ class FeaturePreprocessor:
                 primary_tf,
                 source_n_rows,
             )
+            self._record_group(group_id, fallback="native_ineligible", failure_reason=str(reason))
             return False
 
         native_arr = np.asarray(registry.load_data_native(group_id), dtype=np.float32)
@@ -1398,9 +1709,12 @@ class FeaturePreprocessor:
                 source_n_rows,
                 native_arr.shape[0],
             )
+            self._record_group(group_id, fallback="native_row_mismatch",
+                               failure_reason=f"expected={source_n_rows} got={native_arr.shape[0]}")
             return False
         idx_map = registry.get_alignment_idx_map(group_id)
         if idx_map is None:
+            self._record_group(group_id, fallback="native_no_idx_map")
             return False
 
         native_ctx = _dc_replace(
@@ -1416,11 +1730,12 @@ class FeaturePreprocessor:
 
         native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
         try:
-            processed_df = native_pp._transform_single_passthrough(
-                native_df,
-                source_layer=self._group_layer_name(group),
-                source_timeframe=self._group_timeframe(group),
-            )
+            with native_pp._group_execution_scope(group):
+                processed_df = native_pp._transform_single_passthrough(
+                    native_df,
+                    source_layer=self._group_layer_name(group),
+                    source_timeframe=self._group_timeframe(group),
+                )
         except Exception as exc:  # noqa: BLE001
             if isinstance(exc, NON_DEGRADABLE_ERRORS):
                 raise  # FFSTAT：平穩化來源缺漏不可以 native-tf 回退吞下
@@ -1430,6 +1745,7 @@ class FeaturePreprocessor:
                 group_id,
                 exc,
             )
+            self._record_group(group_id, fallback="native_failed", failure_reason=f"{type(exc).__name__}: {exc}")
             return False
         finally:
             del native_df, native_arr
@@ -1442,6 +1758,7 @@ class FeaturePreprocessor:
                 "falling back",
                 group_id,
             )
+            self._record_group(group_id, fallback="native_no_columns")
             return False
 
         orig_native = processed_df[original_cols_present].to_numpy(
@@ -1503,6 +1820,7 @@ class FeaturePreprocessor:
             primary_n_rows,
         )
         self._merge_decisions_from(native_pp, idx_map)  # FFSTAT：native-tf 子實例之決策併回（校準列換主週期列）
+        self._record_group(group_id, arm="native_tf", status="ok")
         return True
 
     def _warmup_numba_if_needed(self) -> None:
@@ -1700,6 +2018,7 @@ class FeaturePreprocessor:
                 if isinstance(error, NON_DEGRADABLE_ERRORS):
                     raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
                 self._failed_groups.append(str(gid))
+                self._record_group(str(gid), status="failed", failure_reason=f"{type(error).__name__}: {error}")
                 failed += 1
                 logger.error(
                     "[L6.5] Failed group %s: %s",
@@ -1811,6 +2130,7 @@ class FeaturePreprocessor:
                 ]
                 # Load array once; sub-tasks share read-only views.
                 group_array = np.asarray(registry.load_data(group.group_id), dtype=np.float32)
+                self._record_group(str(group.group_id), arm="numba_split")
                 split_meta[group.group_id] = {
                     "group": group,
                     "array": group_array,
@@ -1882,7 +2202,7 @@ class FeaturePreprocessor:
                 group_array = info["array"]
                 for (start, end) in info["slices"]:
                     slice_view = group_array[:, start:end]
-                    fut = pool.submit(self._transform_array_slice, slice_view, transform_context,
+                    fut = pool.submit(self._transform_array_slice_scoped, info["group"], slice_view, transform_context,
                                       list(getattr(info["group"], "columns"))[start:end])
                     futures[fut] = ("slice", info["group"], (start, end))
 
@@ -1913,12 +2233,14 @@ class FeaturePreprocessor:
                             del meta["results"]
                             del meta["array"]
                             split_completed_groups.add(gid)
+                            self._record_group(str(gid), status="ok")
                             completed += 1
                             last_group_label = f"{gid} (split→merged)"
                 except Exception as error:
                     if isinstance(error, NON_DEGRADABLE_ERRORS):
                         raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
                     self._failed_groups.append(str(gid))
+                    self._record_group(str(gid), status="failed", failure_reason=f"{type(error).__name__}: {error}")
                     failed += 1
                     logger.error(
                         "[L6.5] Failed group %s (%s): %s",
@@ -1972,6 +2294,7 @@ class FeaturePreprocessor:
                 if isinstance(error, NON_DEGRADABLE_ERRORS):
                     raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
                 self._failed_groups.append(str(gid))
+                self._record_group(str(gid), status="failed", failure_reason=f"{type(error).__name__}: {error}")
                 failed += 1
                 logger.error(
                     "[L6.5] Failed slow-chunked group %s: %s",
@@ -2064,16 +2387,26 @@ class FeaturePreprocessor:
 
         Handles both "replace" mode (same column count) and "append" mode (adds _fracdiff etc).
         """
+        # FFDSTAR Task 1.2：本群組之紀錄脈絡
+        with self._group_execution_scope(group):
+            if not self._maybe_run_native_l65_inplace(registry, group):
+                self._record_group(str(getattr(group, "group_id")), arm="slow_chunked")
+                self._transform_single_group_chunked_core(registry, group, chunk_size)
+            self._record_group(str(getattr(group, "group_id")), status="ok")
+
+    def _transform_single_group_chunked_core(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        chunk_size: int,
+    ) -> None:
         from momentum.FeatureEngineering.core.column_group import (
             ColumnGroup as _CG,
             LayerSource as _LS,
         )
 
         # Native-resolution L6.5 path for compact-aligned groups bypasses
-        # column chunking entirely (native rows are already small).
-        if self._maybe_run_native_l65_inplace(registry, group):
-            return
-
+        # column chunking entirely (native rows are already small)——於外層 `_transform_single_group_chunked` 先試。
         group_id = getattr(group, "group_id")
         col_names = list(getattr(group, "columns"))
         n_cols = len(col_names)
@@ -2246,13 +2579,33 @@ class FeaturePreprocessor:
         """RATIOUNSAFE Task 2.1：呼叫點切片——只把非 ratio-unsafe 欄送入無欄名之 `_registry_fast_transform`，
         ratio-unsafe 欄原值拼回（欄序不變）。無 ratio-unsafe 欄 ⇒ 行為與改前逐位元組相同。"""
         unsafe = np.fromiter((is_ratio_unsafe_column(str(c)) for c in columns), dtype=bool, count=len(columns))
+        self._record_fast_arm_steps([c for c, u in zip(columns, unsafe) if not u], transform_context)
         if not unsafe.any():
             return self._registry_fast_transform(group_array, transform_context)
+        self._record_input_execution([c for c, u in zip(columns, unsafe) if u], "ratio_unsafe_skip",
+                                     terminal="ratio_unsafe")
         out = np.array(group_array, dtype=np.float32, copy=True)
         if (~unsafe).any():
             safe_in = np.ascontiguousarray(np.asarray(group_array)[:, ~unsafe])
             out[:, ~unsafe] = np.asarray(self._registry_fast_transform(safe_in, transform_context), dtype=np.float32)
+        else:
+            self._record_group(status="ratio_unsafe_passthrough")
         return out
+
+    def _record_fast_arm_steps(self, columns: Sequence[Any], transform_context: Dict[str, object]) -> None:
+        """快速 numba 臂之逐欄狀態（FFDSTAR 盤點④：核心對整個陣列同式套用、無逐欄跳過分支 ⇒ 依呼叫參數記錄）。
+        fracdiff／ADF 於本臂恆不執行：開啟而路由至快速臂 ⇒ 群組層非目標層（`_group_requires_slow_transform`）。"""
+        do_gaussian = bool(transform_context.get("do_gaussian", False))
+        self._record_input_execution(
+            columns,
+            winsorization="applied" if bool(transform_context.get("do_winsorize", True)) else "disabled",
+            fractional_differencing="not_target_layer" if bool(transform_context.get("do_fracdiff", False))
+            else "disabled",
+            adf_differencing="not_target_layer" if bool(transform_context.get("do_adf", False)) else "disabled",
+            rank_transform="applied" if bool(transform_context.get("do_rank", False)) else "disabled",
+            gaussian_normalize=("applied" if HAS_SCIPY else "no_scipy") if do_gaussian else "disabled",
+            adaptive_zscore="applied" if bool(transform_context.get("do_zscore", False)) else "disabled",
+        )
 
     def _apply_dataframe_passthrough(
         self,
@@ -2265,8 +2618,12 @@ class FeaturePreprocessor:
         unsafe = {c for c in frame.columns if is_ratio_unsafe_column(str(c))}
         if not unsafe:
             return transform(frame)
+        # FFDSTAR Task 1.2：ratio-unsafe 欄原值通過（不轉換、落盤）之逐欄狀態與終態
+        self._record_input_execution([c for c in frame.columns if c in unsafe], "ratio_unsafe_skip",
+                                     terminal="ratio_unsafe")
         safe = [c for c in frame.columns if c not in unsafe]
         if not safe:
+            self._record_group(status="ratio_unsafe_passthrough")
             return frame.copy()
         processed = transform(frame[safe])
         originals = [c for c in frame.columns if c in unsafe or c in processed.columns]
@@ -2302,6 +2659,17 @@ class FeaturePreprocessor:
         # RATIOUNSAFE Task 2.1：切片欄名由呼叫端給，於此依欄名切出非 ratio-unsafe 子矩陣
         return self._registry_fast_transform_passthrough(array_slice, columns, transform_context)
 
+    def _transform_array_slice_scoped(
+        self,
+        group: object,
+        array_slice: np.ndarray,
+        transform_context: Dict[str, object],
+        columns: Optional[Sequence[str]] = None,
+    ) -> np.ndarray:
+        """`_transform_array_slice` 於該群組之紀錄脈絡內執行（執行緒池之子任務；只供紀錄）。"""
+        with self._group_execution_scope(group):
+            return self._transform_array_slice(array_slice, transform_context, columns)
+
     def _transform_single_group(
         self,
         registry: "ColumnGroupRegistry",
@@ -2309,7 +2677,17 @@ class FeaturePreprocessor:
         transform_context: Dict[str, object],
     ) -> None:
         """Transform a single registry group in-place."""
+        # FFDSTAR Task 1.2：本群組之紀錄脈絡（in-place 路徑可於執行緒池內執行；執行緒區域）
+        with self._group_execution_scope(group):
+            self._transform_single_group_core(registry, group, transform_context)
+            self._record_group(str(getattr(group, "group_id")), status="ok")
 
+    def _transform_single_group_core(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        transform_context: Dict[str, object],
+    ) -> None:
         from momentum.FeatureEngineering.core.column_group import ColumnGroup as _CG, LayerSource as _LS
 
         # Native-resolution L6.5 path for compact-aligned groups: compute on
@@ -2325,14 +2703,17 @@ class FeaturePreprocessor:
 
         if use_fast and not requires_slow:
             # ICPOSTLEAK Task 1.1：registry 快速路徑單一實作（正式順序＋各步遮罩）
+            self._record_group(str(group_id), arm="numba_fast")
             processed_array = self._registry_fast_transform_passthrough(group_array, list(getattr(group, "columns")), transform_context)
             registry.overwrite_data(group_id, processed_array)
             return
 
         if self._can_use_optimized_dataframe_path():
+            self._record_group(str(group_id), arm="pandas_optimized")
             self._transform_single_group_optimized(registry, group, group_array)
             return
 
+        self._record_group(str(group_id), arm="pandas_legacy")
         is_append = self.mode == "append"
         group_df = pd.DataFrame(group_array, columns=list(getattr(group, "columns")), copy=False)
         processed_df = self._transform_single_passthrough(
@@ -2385,16 +2766,19 @@ class FeaturePreprocessor:
 
         if use_fast and not requires_slow:
             # ICPOSTLEAK Task 1.1：registry 快速路徑單一實作（正式順序＋各步遮罩）
+            self._record_group(group_id, arm="numba_fast")
             processed_array = self._registry_fast_transform_passthrough(group_array, list(getattr(group, "columns")), transform_context)
             return [(group_id, columns, np.asarray(processed_array, dtype=np.float32))]
 
         if self._can_use_optimized_dataframe_path():
+            self._record_group(group_id, arm="pandas_optimized")
             group_df = pd.DataFrame(group_array, columns=columns, copy=False)
             processed_df = self._apply_dataframe_passthrough(group_df, self._transform_single_optimized_df)
             return [(group_id, list(processed_df.columns), processed_df.to_numpy(dtype=np.float32, copy=False))]
 
         is_append = self.mode == "append"
         group_df = pd.DataFrame(group_array, columns=columns, copy=False)
+        self._record_group(group_id, arm="pandas_legacy")
         processed_df = self._transform_single_passthrough(
             group_df,
             source_layer=self._group_layer_name(group),
@@ -2854,9 +3238,23 @@ class FeaturePreprocessor:
 
     def _transform_single_optimized_df(self, features_df: pd.DataFrame) -> pd.DataFrame:
         """Single-copy replace-mode transform path for non-FracDiff/ADF L6.5 work."""
+        # FFDSTAR Task 1.2：本臂亦可由 registry 群組直接呼叫（未經 `_transform_single`）⇒ 於此設紀錄脈絡（巢狀時沿用外層）
+        with self._decision_context(features_df.columns):
+            return self._transform_single_optimized_df_core(features_df)
 
+    def _record_optimized_noop(self, columns: Sequence[Any]) -> None:
+        """optimized 臂無任何工作欄（各步驟之 apply_to 皆未選）之逐欄狀態（fracdiff／ADF 為本臂前提之關閉）。"""
+        self._record_execution(columns, STEP_WINSOR, "not_selected" if self.winsor_config.get("enabled", True) else "disabled")
+        self._record_execution(columns, STEP_FRACDIFF, "disabled")
+        self._record_execution(columns, STEP_ADF, "disabled")
+        self._record_execution(columns, STEP_RANK, "not_selected" if self.rank_config.get("enabled", False) else "disabled")
+        self._record_execution(columns, STEP_GAUSSIAN, "not_selected" if self.gaussian_config.get("enabled", False) else "disabled")
+        self._record_execution(columns, STEP_ZSCORE, "not_selected" if self.zscore_config.get("enabled", False) else "disabled")
+
+    def _transform_single_optimized_df_core(self, features_df: pd.DataFrame) -> pd.DataFrame:
         working_columns = self._optimized_replace_columns(features_df)
         if not working_columns:
+            self._record_optimized_noop(list(features_df.columns))
             return features_df.copy()
 
         working_values = features_df.loc[:, working_columns].to_numpy(
@@ -2877,7 +3275,15 @@ class FeaturePreprocessor:
             working_values[:, winsor_positions] = self._winsorize_2d_legacy_equivalent(
                 working_values[:, winsor_positions]
             )
+        winsor_on = bool(self.winsor_config.get("enabled", True))
+        self._record_selection(features_df.columns, [working_columns[p] for p in winsor_positions] if winsor_on else [],
+                               STEP_WINSOR, "applied", "not_selected" if winsor_on else "disabled")
+        # optimized 臂之前提＝fracdiff 與 ADF 皆關（`_can_use_optimized_dataframe_path`）
+        self._record_execution(features_df.columns, STEP_FRACDIFF, "disabled")
+        self._record_execution(features_df.columns, STEP_ADF, "disabled")
 
+        if not self.rank_config.get("enabled", False):
+            self._record_execution(features_df.columns, STEP_RANK, "disabled")
         if self.rank_config.get("enabled", False):
             rank_positions = self._column_positions(
                 working_columns,
@@ -2886,6 +3292,8 @@ class FeaturePreprocessor:
                     self.rank_config.get("apply_to", "all"),
                 ),
             )
+            self._record_selection(features_df.columns, [working_columns[p] for p in rank_positions],
+                                   STEP_RANK, "applied", "not_selected")
             if rank_positions:
                 rank_window = int(self.rank_config.get("window", 252))
                 rank_input = working_values[:, rank_positions]
@@ -2894,6 +3302,8 @@ class FeaturePreprocessor:
                     self._rolling_rank_2d_v2(rank_input, rank_window), rank_input, rank_window
                 )
 
+        if not self.gaussian_config.get("enabled", False):
+            self._record_execution(features_df.columns, STEP_GAUSSIAN, "disabled")
         if self.gaussian_config.get("enabled", False):
             if HAS_SCIPY:
                 gaussian_positions = self._column_positions(
@@ -2903,6 +3313,8 @@ class FeaturePreprocessor:
                         self.gaussian_config.get("apply_to", "all"),
                     ),
                 )
+                self._record_selection(features_df.columns, [working_columns[p] for p in gaussian_positions],
+                                       STEP_GAUSSIAN, "applied", "not_selected")
                 if gaussian_positions:
                     clip_range = self.gaussian_config.get("clip_range", [0.001, 0.999])
                     gaussian_input = working_values[:, gaussian_positions]
@@ -2920,8 +3332,11 @@ class FeaturePreprocessor:
                         gaussian_window,
                     )
             else:
+                self._record_execution(features_df.columns, STEP_GAUSSIAN, "no_scipy")
                 logger.warning("Gaussian normalization skipped: scipy unavailable")
 
+        if not self.zscore_config.get("enabled", False):
+            self._record_execution(features_df.columns, STEP_ZSCORE, "disabled")
         if self.zscore_config.get("enabled", False):
             zscore_positions = self._column_positions(
                 working_columns,
@@ -2930,6 +3345,10 @@ class FeaturePreprocessor:
                     self.zscore_config.get("apply_to", "all"),
                 ),
             )
+            # 窗清單為空 ⇒ `_rolling_zscore_2d` 回原值（不做 zscore）
+            self._record_selection(features_df.columns, [working_columns[p] for p in zscore_positions], STEP_ZSCORE,
+                                   "applied" if self.zscore_config.get("windows", [100, 252]) else "no_windows",
+                                   "not_selected")
             if zscore_positions:
                 windows = [int(window) for window in self.zscore_config.get("windows", [100, 252])]
                 epsilon = float(self.zscore_config.get("epsilon", 1e-8))
@@ -2954,20 +3373,29 @@ class FeaturePreprocessor:
         """Original transform logic applied to a full DataFrame."""
         self._fracdiff_processed_columns = set()
         self._dstar_failed_columns = set()
-        if self._can_use_optimized_dataframe_path():
-            return self._transform_single_optimized_df(features_df)
+        # FFSTAT：決策紀錄之當次脈絡（群組之原生週期與層、本次輸入欄集合）；FFDSTAR Task 1.1 盤點⑤：脈絡須於
+        # optimized 分支之前設定（該分支不經平穩化判定，脈絡只供逐欄執行紀錄之鍵）
+        with self._decision_context(features_df.columns, source_timeframe, source_layer):
+            if self._can_use_optimized_dataframe_path():
+                return self._transform_single_optimized_df(features_df)
+            # FFSTAT Task 2.3 ④：逐欄校準模式之校準列於本次轉換之列空間遮為 NaN（對齊至主週期之前）
+            return self._mask_no_start_rows(
+                self._transform_single_legacy(features_df, source_layer=source_layer), self._decision_tls.timeframe
+            )
 
-        # FFSTAT：決策紀錄之當次脈絡（群組之原生週期與層、本次輸入欄集合）
+    @contextlib.contextmanager
+    def _decision_context(
+        self, columns: Iterable[Any], source_timeframe: Optional[str] = None, source_layer: Optional[str] = None,
+    ) -> Iterator[None]:
+        """決策與執行紀錄之當次脈絡（執行緒區域）：週期＝群組週期或沿用外層、層＝群組層或沿用外層、輸入欄集合＝本次
+        輸入欄。只影響紀錄之鍵與過濾，不參與任何轉換判定。"""
         tls = self._decision_tls
         saved = (getattr(tls, "timeframe", None), getattr(tls, "layer", None), getattr(tls, "input_columns", None))
         tls.timeframe = source_timeframe or saved[0]
         tls.layer = source_layer if source_layer else saved[1]
-        tls.input_columns = frozenset(str(c) for c in features_df.columns)
+        tls.input_columns = frozenset(str(c) for c in columns)
         try:
-            # FFSTAT Task 2.3 ④：逐欄校準模式之校準列於本次轉換之列空間遮為 NaN（對齊至主週期之前）
-            return self._mask_no_start_rows(
-                self._transform_single_legacy(features_df, source_layer=source_layer), tls.timeframe
-            )
+            yield
         finally:
             tls.timeframe, tls.layer, tls.input_columns = saved
 
@@ -2980,27 +3408,41 @@ class FeaturePreprocessor:
         transformed = features_df.copy()
         self._fracdiff_processed_columns = set()
         self._dstar_failed_columns = set()
+        # FFDSTAR Task 1.2：各步驟關閉之欄狀態於 else 分支記錄（只記錄，不改條件與數值）；開啟者於各步驟函式內記
+        columns = list(features_df.columns)
 
         if self.winsor_config.get("enabled", True):  # FFSTAT r34：縮尾開關須生效（見 `_transform_single_optimized_df`）
             transformed = self._apply_winsorization(transformed)
+        else:
+            self._record_execution(columns, STEP_WINSOR, "disabled")
 
         if self.fracdiff_config.get("enabled", False):
             transformed = self._apply_fractional_differencing(
                 transformed,
                 source_layer=source_layer,
             )
+        else:
+            self._record_execution(columns, STEP_FRACDIFF, "disabled")
 
         if self.adf_config.get("enabled", False):
             transformed = self._apply_adf_differencing(transformed)
+        else:
+            self._record_execution(columns, STEP_ADF, "disabled")
 
         if self.rank_config.get("enabled", False):
             transformed = self._apply_rank_transform(transformed)
+        else:
+            self._record_execution(columns, STEP_RANK, "disabled")
 
         if self.gaussian_config.get("enabled", False):
             transformed = self._apply_gaussian_normalize(transformed)
+        else:
+            self._record_execution(columns, STEP_GAUSSIAN, "disabled")
 
         if self.zscore_config.get("enabled", False):
             transformed = self._apply_adaptive_zscore(transformed)
+        else:
+            self._record_execution(columns, STEP_ZSCORE, "disabled")
 
         return transformed
 
@@ -3034,10 +3476,16 @@ class FeaturePreprocessor:
         )
 
         pl_df = pandas_to_polars(features_df)
+        input_columns = list(features_df.columns)
 
         # Winsorization
         winsor_apply_to = self.winsor_config.get("apply_to", "all")
         winsor_columns = self._select_columns(features_df, winsor_apply_to)
+        winsor_on = bool(self.winsor_config.get("enabled", True))
+        self._record_selection(input_columns, winsor_columns if winsor_on else [], STEP_WINSOR, "applied",
+                               "not_selected" if winsor_on else "disabled")
+        # Polars 臂之前提＝fracdiff 關（`transform`）
+        self._record_execution(input_columns, STEP_FRACDIFF, "disabled")
         if winsor_columns and self.winsor_config.get("enabled", True):  # FFSTAT r34：縮尾開關須生效
             method = self.winsor_config.get("method", "sigma")
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
@@ -3059,6 +3507,8 @@ class FeaturePreprocessor:
             pd_temp = polars_to_pandas(pl_df, index=features_df.index)
             pd_temp = self._apply_adf_differencing(pd_temp)
             pl_df = pandas_to_polars(pd_temp)
+        else:
+            self._record_execution(input_columns, STEP_ADF, "disabled")
 
         # Rank transform (polars 1.x: map_batches + scipy, numerically equiv. to pandas)
         if self.rank_config.get("enabled", False):
@@ -3066,6 +3516,7 @@ class FeaturePreprocessor:
             rank_columns = self._select_columns(features_df, rank_apply_to)
             rank_window = int(self.rank_config.get("window", 252))
             if rank_columns and self.mode == "replace":
+                self._record_selection(input_columns, rank_columns, STEP_RANK, "applied", "not_selected")
                 rank_input = polars_to_pandas(pl_df, index=features_df.index)[rank_columns].to_numpy(dtype=np.float64)
                 pl_df = polars_l65_rank_transform(
                     pl_df, columns=rank_columns, window=rank_window
@@ -3076,12 +3527,16 @@ class FeaturePreprocessor:
                 pd_temp = polars_to_pandas(pl_df, index=features_df.index)
                 pd_temp = self._apply_rank_transform(pd_temp)
                 pl_df = pandas_to_polars(pd_temp)
+        else:
+            self._record_execution(input_columns, STEP_RANK, "disabled")
 
         # Gaussian normalize (pandas fallback — requires scipy erfinv)
         if self.gaussian_config.get("enabled", False):
             pd_temp = polars_to_pandas(pl_df, index=features_df.index)
             pd_temp = self._apply_gaussian_normalize(pd_temp)
             pl_df = pandas_to_polars(pd_temp)
+        else:
+            self._record_execution(input_columns, STEP_GAUSSIAN, "disabled")
 
         # Adaptive z-score
         if self.zscore_config.get("enabled", False):
@@ -3091,6 +3546,8 @@ class FeaturePreprocessor:
             epsilon = float(self.zscore_config.get("epsilon", 1e-8))
             primary_window = int(windows[0]) if windows else 100
             if zscore_columns and self.mode == "replace":
+                # Polars 臂窗清單為空時以 100 照做（臂間不一致見 SPEC §N FFDSTAR-R4；只記實際所走）
+                self._record_selection(input_columns, zscore_columns, STEP_ZSCORE, "applied", "not_selected")
                 zscore_input = polars_to_pandas(pl_df, index=features_df.index)[zscore_columns].to_numpy(dtype=np.float64)
                 pl_df = polars_l65_adaptive_zscore(
                     pl_df, columns=zscore_columns, window=primary_window, epsilon=epsilon
@@ -3101,6 +3558,10 @@ class FeaturePreprocessor:
                 pd_temp = polars_to_pandas(pl_df, index=features_df.index)
                 pd_temp = self._apply_adaptive_zscore(pd_temp)
                 pl_df = pandas_to_polars(pd_temp)
+            else:
+                self._record_execution(input_columns, STEP_ZSCORE, "not_selected")
+        else:
+            self._record_execution(input_columns, STEP_ZSCORE, "disabled")
 
         result = polars_to_pandas(pl_df, index=features_df.index)
         return result
@@ -3208,6 +3669,8 @@ class FeaturePreprocessor:
         apply_to = self.winsor_config.get("apply_to", "all")
         columns = self._select_columns(df, apply_to)
         method = self.winsor_config.get("method", "sigma")
+        # FFDSTAR Task 1.2：轉換脈絡內才記（校準前置等脈絡外之呼叫不記）
+        self._record_selection(df.columns, columns, STEP_WINSOR, "applied", "not_selected")
 
         if not columns:
             return df
@@ -3470,7 +3933,32 @@ class FeaturePreprocessor:
         try:
             return float(adfuller(pd.Series(clean_values).head(sample_size), autolag="AIC")[1])
         except Exception:
+            # FFDSTAR Task 1.2、§N FFDSTAR-R3：檢定例外之紀錄回呼（`_adf_error_context` 所設；行為不變，仍以 p=1.0 續行）
+            on_error = getattr(_ADF_ERROR_TLS, "callback", None)
+            if on_error is not None:
+                on_error()
             return 1.0
+
+    @contextlib.contextmanager
+    def _adf_error_context(self, column: Any) -> Iterator[None]:
+        """當次 ADF 檢定所屬之欄（執行緒區域；不改 `_adf_pvalue_for_values` 簽名）：檢定例外時記該欄之事件。"""
+        previous = getattr(_ADF_ERROR_TLS, "callback", None)
+        _ADF_ERROR_TLS.callback = lambda: self._record_execution_event(column, EVENT_ADF_TEST_ERROR)
+        try:
+            yield
+        finally:
+            _ADF_ERROR_TLS.callback = previous
+
+    @contextlib.contextmanager
+    def _stationarity_step_context(self, step: str) -> Iterator[None]:
+        """fracdiff／ADF 共用之 non_stationary 判定之呼叫步驟（執行緒區域之步驟參數；只供紀錄，不影響選取）。"""
+        tls = self._decision_tls
+        previous = getattr(tls, "stationarity_step", None)
+        tls.stationarity_step = step
+        try:
+            yield
+        finally:
+            tls.stationarity_step = previous
 
     @staticmethod
     def _assign_fracdiff_result(
@@ -3541,10 +4029,13 @@ class FeaturePreprocessor:
                         max_lag=max_lag,
                     )
                 except Exception as exc:
+                    if isinstance(exc, NON_DEGRADABLE_ERRORS):
+                        raise  # FFDSTAR Task 1.2：d* 搜尋鏈內之紀錄錯誤、校準錯誤不得轉為搜尋失敗續跑
                     logger.warning("FracDiff d* search failed for %s: %s; keeping original values", column, exc)
                     self._dstar_failed_columns.add(column)
                     self._record_decision(str(column), fracdiff=False, d=None, adf_differenced=False,
                                           events=events + [EVENT_DSTAR_SEARCH_FAILED])
+                    self._record_execution([column], STEP_FRACDIFF, "search_failed")
                     continue
                 if cache is not None:
                     try:
@@ -3565,6 +4056,8 @@ class FeaturePreprocessor:
             self._fracdiff_processed_columns.add(column)
             self._record_decision(str(column), fracdiff=True, d=float(d_star),
                                   dstar_cache_hit=bool(cached_d_star is not None), events=events)
+            self._record_execution([column], STEP_FRACDIFF, "applied",
+                                   dstar_source="cache" if cached_d_star is not None else "search")
 
         return result
 
@@ -3630,10 +4123,19 @@ class FeaturePreprocessor:
             items.append((col_arr, metadata))
 
         outputs = ParallelSlowPath(n_jobs).map(items, process_fracdiff_column_values)
+        # FFDSTAR Task 1.2 邊界③：多 worker 結果合併——同一欄之結果只准一份（重複鍵拒收，不得後寫勝）
+        output_counts = Counter(str(output["column"]) for output in outputs)
+        duplicated = sorted(c for c, count in output_counts.items() if count > 1)
+        if duplicated:
+            raise ProvenanceConflictError(f"parallel fracdiff 之 worker 結果有重複欄（拒收）：{duplicated[:5]}")
         failed_columns: List[str] = []
         for output in outputs:
             column = str(output["column"])
             duplicate_columns = duplicate_columns_by_rep.get(column, [column])
+            if output.get("adf_error"):
+                # §N FFDSTAR-R3：worker 內 statsmodels ADF 例外（以 p=1.0 續行）之事件併回 owner 紀錄
+                for target_column in duplicate_columns:
+                    self._record_execution_event(target_column, EVENT_ADF_TEST_ERROR)
             # Task 3.1：先判 worker status 再套用／寫快取——搜尋失敗之欄保原值、不寫快取、排除於 ADF 差分
             if output.get("status") != "ok":
                 failed_columns.extend(duplicate_columns)
@@ -3643,6 +4145,7 @@ class FeaturePreprocessor:
                         str(target_column), fracdiff=False, d=None, adf_differenced=False,
                         events=column_events.get(target_column, []) + [EVENT_DSTAR_SEARCH_FAILED],
                     )
+                    self._record_execution([target_column], STEP_FRACDIFF, "search_failed")
                 continue
             d_star = float(output["d_star"])
             fracdiff_values = np.asarray(output["fracdiff_values"], dtype=np.float64)
@@ -3667,6 +4170,9 @@ class FeaturePreprocessor:
                         events.append(EVENT_DSTAR_WRITE_FAILED)
                 self._record_decision(str(target_column), fracdiff=True, d=d_star,
                                       dstar_cache_hit=bool(output.get("cache_hit", False)), events=events)
+                # 去重之欄共用代表欄之 d*（同值同快取狀態），其來源同代表欄
+                self._record_execution([target_column], STEP_FRACDIFF, "applied",
+                                       dstar_source="cache" if bool(output.get("cache_hit", False)) else "search")
 
         if failed_columns:
             logger.warning(
@@ -3688,6 +4194,7 @@ class FeaturePreprocessor:
         source_layer: Optional[str] = None,
     ) -> pd.DataFrame:
         if not HAS_STATSMODELS:
+            self._record_execution(df.columns, STEP_FRACDIFF, "no_statsmodels")
             logger.warning("Fractional differencing skipped: statsmodels unavailable")
             return df
 
@@ -3701,16 +4208,29 @@ class FeaturePreprocessor:
                 numeric_columns,
                 source_layer=source_layer,
             )
+            target_set = set(target_columns)
+            self._record_execution([c for c in numeric_columns if c not in target_set], STEP_FRACDIFF,
+                                   "not_target_layer")
             if not target_columns:
                 return df
             selection_df = df.loc[:, target_columns]
 
-        columns = self._select_columns(selection_df, apply_to)
+        # apply_to＝non_stationary：平穩／前史不足之欄於 `_get_non_stationary_columns` 依步驟記錄
+        with self._stationarity_step_context(STEP_FRACDIFF):
+            columns = self._select_columns(selection_df, apply_to)
+        if apply_to != "non_stationary":
+            selected_set = set(columns)
+            self._record_execution([c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])
+                                    and c not in selected_set], STEP_FRACDIFF, "not_selected")
         if apply_to != "non_stationary" and columns:
+            selected_columns = list(columns)
             columns = self._filter_fracdiff_target_columns(
                 columns,
                 source_layer=source_layer,
             )
+            layer_set = set(columns)
+            self._record_execution([c for c in selected_columns if c not in layer_set], STEP_FRACDIFF,
+                                   "not_target_layer")
         if not columns:
             return df
 
@@ -3759,6 +4279,9 @@ class FeaturePreprocessor:
         if eligible_columns:
             slowpath_n_jobs = self._resolve_slowpath_n_jobs()
             if slowpath_n_jobs > 1 and len(eligible_columns) > 1:
+                # FFDSTAR Task 1.2：紀錄以嘗試為單位——parallel 嘗試失敗而回退 serial 時，先撤回該嘗試已寫之紀錄
+                attempt = self._execution_checkpoint(eligible_columns)
+                attempt_state = self._fracdiff_attempt_state()
                 try:
                     result = self._apply_fractional_differencing_parallel(
                         result,
@@ -3778,13 +4301,20 @@ class FeaturePreprocessor:
                     )
                     raise
                 except Exception as exc:
+                    if isinstance(exc, NON_DEGRADABLE_ERRORS):
+                        raise  # FFDSTAR Task 1.2：紀錄錯誤、校準錯誤等不可降級為串行重跑
                     logger.error(
                         "[L6.5] joblib slow path failed, fallback to serial chunked slow path: %s",
                         exc,
                         exc_info=True,
                     )
+                    self._rollback_execution(attempt)
+                    self._restore_fracdiff_attempt_state(attempt_state)
+                    self._record_group(fallback="fracdiff_serial_fallback", failure_reason=f"{type(exc).__name__}: {exc}")
+                    # FFDSTAR Task 1.2（v4）：失敗之 parallel 嘗試已就地改寫 `result`（replace 模式下已寫回之欄為差分後值）
+                    # ⇒ serial 自該批原始輸入重跑（`df` 未被改寫），否則該等欄被分數差分兩次
                     result = self._apply_fractional_differencing_serial(
-                        result,
+                        df.copy(),
                         eligible_columns,
                         cache=cache,
                         adf_threshold=adf_threshold,
@@ -3809,6 +4339,7 @@ class FeaturePreprocessor:
             # 校準與公開皆全無有效值之欄：無值可判定亦無值可轉換，以未檢定事件明示
             for column in skipped_high_nan:
                 self._record_untested(str(column))
+                self._record_execution([column], STEP_FRACDIFF, "insufficient_history")
             logger.warning(
                 "FracDiff skipped for %d columns with no finite values (calibration and public). Sample: %s",
                 len(skipped_high_nan),
@@ -3834,11 +4365,18 @@ class FeaturePreprocessor:
 
     def _apply_adf_differencing(self, df: pd.DataFrame) -> pd.DataFrame:
         if not HAS_STATSMODELS:
+            self._record_execution(df.columns, STEP_ADF, "no_statsmodels")
             logger.warning("ADF differencing skipped: statsmodels unavailable")
             return df
 
         apply_to = self.adf_config.get("apply_to", "non_stationary")
-        columns = self._select_columns(df, apply_to)
+        # apply_to＝non_stationary：平穩／前史不足之欄於 `_get_non_stationary_columns` 依步驟記錄
+        with self._stationarity_step_context(STEP_ADF):
+            columns = self._select_columns(df, apply_to)
+        if apply_to != "non_stationary":
+            selected_set = set(columns)
+            self._record_execution([c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])
+                                    and c not in selected_set], STEP_ADF, "not_selected")
         if not columns:
             return df
 
@@ -3852,6 +4390,10 @@ class FeaturePreprocessor:
             # d* 搜尋失敗之欄保原值，同輪不得改走 ADF 差分（Task 3.1 出口②）
             if column not in self._fracdiff_processed_columns and column not in self._dstar_failed_columns
         ]
+        self._record_execution([c for c in columns if c in self._fracdiff_processed_columns], STEP_ADF,
+                               "superseded_by_fracdiff")
+        self._record_execution([c for c in columns if c not in self._fracdiff_processed_columns
+                                and c in self._dstar_failed_columns], STEP_ADF, "skipped_dstar_failed")
         if not candidate_columns:
             return result
 
@@ -3867,6 +4409,7 @@ class FeaturePreprocessor:
             if decision_source.empty:
                 skipped_high_nan.append(column)
                 self._record_untested(str(column))
+                self._record_execution([column], STEP_ADF, "insufficient_history")
                 continue
             decision_working = decision_source.copy()
             full_working = series.copy()
@@ -3876,19 +4419,27 @@ class FeaturePreprocessor:
                 if len(clean) < 20:
                     if diff_order == 0:
                         self._record_untested(str(column))
+                        self._record_execution([column], STEP_ADF, "insufficient_history")
+                    else:
+                        self._record_execution([column], STEP_ADF, "insufficient_after_diff")
                     break
                 sample = clean.head(sample_size)
-                pvalue = self._adf_pvalue_for_values(sample.to_numpy(dtype=np.float64), sample_size=sample_size)
+                with self._adf_error_context(column):
+                    pvalue = self._adf_pvalue_for_values(sample.to_numpy(dtype=np.float64), sample_size=sample_size)
                 if diff_order == 0:
                     self._record_adf_test(str(column), sample, pvalue)
 
                 if pvalue <= threshold:
                     chosen_diff = diff_order
+                    self._record_execution([column], STEP_ADF, "applied" if diff_order else "stationary_skip")
                     break
 
                 if diff_order < max_diff:
                     decision_working = decision_working.diff()
                     full_working = full_working.diff()
+            else:
+                # 差分階數用盡仍非平穩 ⇒ 保原值（只記錄之 for…else，不改控制流）
+                self._record_execution([column], STEP_ADF, "max_diff_exhausted")
 
             self._record_decision(str(column), adf_differenced=int(chosen_diff))
             if chosen_diff == 0:
@@ -3926,6 +4477,7 @@ class FeaturePreprocessor:
         apply_to = self.rank_config.get("apply_to", "all")
         columns = self._select_columns(df, apply_to)
         window = int(self.rank_config.get("window", 252))
+        self._record_selection(df.columns, columns, STEP_RANK, "applied", "not_selected")
 
         if not columns:
             return df
@@ -4011,6 +4563,7 @@ class FeaturePreprocessor:
 
     def _apply_gaussian_normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         if not HAS_SCIPY:
+            self._record_execution(df.columns, STEP_GAUSSIAN, "no_scipy")
             logger.warning("Gaussian normalization skipped: scipy unavailable")
             return df
 
@@ -4019,6 +4572,7 @@ class FeaturePreprocessor:
         clip_range = self.gaussian_config.get("clip_range", [0.001, 0.999])
         lower = float(clip_range[0])
         upper = float(clip_range[1])
+        self._record_selection(df.columns, columns, STEP_GAUSSIAN, "applied", "not_selected")
 
         if not columns:
             return df
@@ -4058,6 +4612,8 @@ class FeaturePreprocessor:
         columns = self._select_columns(df, apply_to)
         windows = self.zscore_config.get("windows", [100, 252])
         epsilon = float(self.zscore_config.get("epsilon", 1e-8))
+        # 窗清單為空 ⇒ replace 回原值、append 無輸出（不做 zscore）
+        self._record_selection(df.columns, columns, STEP_ZSCORE, "applied" if windows else "no_windows", "not_selected")
 
         if not columns:
             return df
@@ -4135,7 +4691,13 @@ class FeaturePreprocessor:
             return numeric_columns
 
     def _get_non_stationary_columns(self, df: pd.DataFrame) -> List[str]:
+        """FFDSTAR Task 1.2：fracdiff 與 ADF 共用本判定 ⇒ 呼叫之步驟由 `_stationarity_step_context` 帶入（執行緒區域之
+        步驟參數；不改既有簽名），未入選（平穩、前史不足）之欄依該步驟記其狀態；入選欄之狀態由該步驟其後之離開點記錄。
+        無步驟脈絡（其他步驟之 apply_to）⇒ 不記。"""
+        step: Optional[str] = getattr(self._decision_tls, "stationarity_step", None)
         if not HAS_STATSMODELS:
+            if step is not None:
+                self._record_execution(df.columns, step, "no_statsmodels")
             return []
 
         threshold = float(self.adf_config.get("adf_threshold", self.fracdiff_config.get("adf_threshold", 0.05)))
@@ -4161,6 +4723,10 @@ class FeaturePreprocessor:
                 self._record_cached_test(str(column), self._adf_pvalue_by_cache_key.get(cache_key))
                 if cached:
                     non_stationary.append(column)
+                elif step is not None:
+                    # 同實例先前判定（未檢定 ⇒ 前史不足；有 p 值 ⇒ 平穩）之沿用
+                    self._record_execution([column], step, "insufficient_history"
+                                           if self._adf_pvalue_by_cache_key.get(cache_key) is None else "stationary_skip")
                 continue
 
             if len(decision_series) == 0:
@@ -4168,12 +4734,16 @@ class FeaturePreprocessor:
                 self._non_stationary_cache.set(cache_key, False)
                 self._adf_pvalue_by_cache_key[cache_key] = None
                 self._record_untested(str(column))
+                if step is not None:
+                    self._record_execution([column], step, "insufficient_history")
                 continue
 
             if float(decision_series.isna().mean()) > 0.5:
                 self._non_stationary_cache.set(cache_key, False)
                 self._adf_pvalue_by_cache_key[cache_key] = None
                 self._record_untested(str(column))
+                if step is not None:
+                    self._record_execution([column], step, "insufficient_history")
                 continue
 
             series = decision_series.dropna()
@@ -4186,10 +4756,11 @@ class FeaturePreprocessor:
                 continue
 
             sample = series.head(sample_size)
-            pvalue = self._adf_pvalue_for_values(
-                sample.to_numpy(dtype=np.float64),
-                sample_size=sample_size,
-            )
+            with self._adf_error_context(column):
+                pvalue = self._adf_pvalue_for_values(
+                    sample.to_numpy(dtype=np.float64),
+                    sample_size=sample_size,
+                )
             self._adf_pvalue_by_cache_key[cache_key] = float(pvalue)
             self._record_adf_test(str(column), sample, pvalue)
 
@@ -4197,6 +4768,8 @@ class FeaturePreprocessor:
             self._non_stationary_cache.set(cache_key, is_non_stationary)
             if is_non_stationary:
                 non_stationary.append(column)
+            elif step is not None:
+                self._record_execution([column], step, "stationary_skip")
 
         return non_stationary
 
@@ -4319,7 +4892,9 @@ class FeaturePreprocessor:
             clean_values = clean_values[np.isfinite(clean_values)]
             if clean_values.size < 20:
                 return 1.0
-            return self._adf_pvalue_for_values(clean_values, sample_size=stationarity_n)  # FFSTAT Task 2.2：d* 內層同一 N（原寫死 500）
+            # FFSTAT Task 2.2：d* 內層同一 N（原寫死 500）；FFDSTAR：檢定例外記於本欄
+            with self._adf_error_context(series.name):
+                return self._adf_pvalue_for_values(clean_values, sample_size=stationarity_n)
 
         def _full_search() -> float:
             return find_min_d_full_bisection(
