@@ -306,6 +306,112 @@ def adf_error_violations(err: Mapping[str, Any], ref: Mapping[str, Any], err_rec
     return out
 
 
+def adf_exception_parallel_run(runs: ph.RunCache, cache_dir: Path, *, adf_raises: bool) -> Dict[str, Any]:
+    """`adf_exception_run` 之 parallel 版（審查 r7 CODEX-R7-P2-01；SPEC Task 1.2 之 `_slow_path_parallel.py:119` 附近）。
+
+    機制（為何 monkeypatch 到得了 worker）：生產 `ParallelSlowPath.map` 以 joblib loky 起子行程，子行程內之
+    monkeypatch 不生效；故將 `ParallelSlowPath.map`（既有假設點，同邊界③）換為同簽名之 joblib `threading` backend
+    版——仍為 `n_jobs`（＝2）個並行 worker、仍呼叫生產傳入之 `process_fracdiff_column_values`、輸入同生產
+    （`np.float64` 陣列＋metadata 副本），只是 worker 與主程序同一行程。worker 內 ADF 取 `adfuller` 之方式為呼叫當下
+    `from statsmodels.tsa.stattools import adfuller`（`_slow_path_parallel.py:108`）⇒ 換 `statsmodels.tsa.stattools`
+    模組屬性即可到達；另以 `raising=False` 同換 `_slow_path_parallel.adfuller`（實作若改為模組層 import 亦到達）。
+    假 `adfuller` 只在 worker 執行緒內（thread-local 帶 metadata 之欄名）注入：`adf_raises` ⇒ 拋例外；否則 ⇒ 回
+    p=1.0（對照）；主程序之 ADF（`feature_preprocessor` 模組層綁定之 `adfuller`）不受影響，故 owner 紀錄中之 ADF 例外
+    事件只可能來自 worker 結果之併回。關 fast ADF、新 d* 快取目錄（worker 必實跑 d* 搜尋）。
+
+    回傳 {"pre", "output", "tested"(worker 內進入 ADF 檢定之 (週期, 欄)), "adf_calls", "parallel_calls",
+    "serial_calls", "map_jobs", "items", "eligible", "worker_threads", "main_thread"}。"""
+    import threading
+
+    from joblib import Parallel, delayed
+    from statsmodels.tsa import stattools
+
+    from momentum.FeatureEngineering.preprocessing import _slow_path_parallel as spp
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    local = threading.local()
+    real_adfuller = stattools.adfuller
+    state: Dict[str, Any] = {"tested": [], "worker_threads": set(), "map_jobs": [], "items": [], "eligible": [],
+                             "parallel_calls": 0, "serial_calls": 0}
+
+    def fake_adfuller(*args: Any, **kwargs: Any) -> Any:
+        column = getattr(local, "column", None)
+        if column is None:  # 非 worker 執行緒 ⇒ 原樣
+            return real_adfuller(*args, **kwargs)
+        state["tested"].append(column)
+        if adf_raises:
+            raise ValueError("injected worker statsmodels adfuller failure")
+        return (0.0, 1.0)
+
+    def threaded_map(self: Any, items: Any, worker_function: Any) -> Any:
+        state["map_jobs"].append(int(self.n_jobs))
+        state["items"].extend(str(metadata.get("column", "")) for _values, metadata in items)
+        if not items:
+            return []
+
+        def run(values: Any, metadata: Dict[str, Any]) -> Any:
+            local.column = str(metadata.get("column", ""))
+            state["worker_threads"].add(threading.get_ident())
+            try:
+                return worker_function(values, metadata)
+            finally:
+                local.column = None
+
+        return list(Parallel(n_jobs=self.n_jobs, backend="threading")(
+            delayed(run)(np.asarray(values, dtype=np.float64), dict(metadata)) for values, metadata in items))
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("FFACT_USE_FAST_ADF", "0")
+        pre, frame = _isolated_unit_preprocessor(runs, mp, cache_dir, n_jobs=2)
+        orig_parallel = FeaturePreprocessor._apply_fractional_differencing_parallel
+        orig_serial = FeaturePreprocessor._apply_fractional_differencing_serial
+
+        def parallel(self: Any, result: Any, eligible_columns: Any, *args: Any, **kwargs: Any) -> Any:
+            state["parallel_calls"] += 1
+            state["eligible"].extend(str(c) for c in eligible_columns)
+            return orig_parallel(self, result, eligible_columns, *args, **kwargs)
+
+        def serial(self: Any, *args: Any, **kwargs: Any) -> Any:
+            state["serial_calls"] += 1
+            return orig_serial(self, *args, **kwargs)
+
+        mp.setattr(stattools, "adfuller", fake_adfuller)
+        mp.setattr(spp, "adfuller", fake_adfuller, raising=False)
+        mp.setattr(spp.ParallelSlowPath, "map", threaded_map)
+        mp.setattr(FeaturePreprocessor, "_apply_fractional_differencing_parallel", parallel)
+        mp.setattr(FeaturePreprocessor, "_apply_fractional_differencing_serial", serial)
+        output = pre.transform(frame)
+    tested = sorted({(str(pre._decision_timeframe_for(c)), c) for c in state["tested"]})
+    return {"pre": pre, "output": output, "tested": tested, "adf_calls": len(state["tested"]),
+            "parallel_calls": state["parallel_calls"], "serial_calls": state["serial_calls"],
+            "map_jobs": list(state["map_jobs"]), "items": list(state["items"]), "eligible": list(state["eligible"]),
+            "worker_threads": set(state["worker_threads"]), "main_thread": threading.get_ident()}
+
+
+def parallel_path_violations(run: Mapping[str, Any]) -> List[str]:
+    """前提（parallel 路徑確實被走到）：生產選 parallel 臂（`_apply_fractional_differencing_parallel` 被呼叫）且未回退
+    串行；map 之 worker 數 ≥2、派出 ≥2 欄且派出欄＝可轉換欄（無去重代表欄 ⇒ 受檢鍵即事件應落之鍵）；至少一個 worker
+    在非主執行緒；worker 內確有 ADF 檢定且受檢欄皆屬派出欄。"""
+    out: List[str] = []
+    if not run["parallel_calls"]:
+        out.append("未選 parallel fracdiff 臂")
+    if run["serial_calls"]:
+        out.append("發生串行（回退或未走 parallel）⇒ 未驗 parallel worker 路徑")
+    if not run["map_jobs"] or min(run["map_jobs"]) < 2:
+        out.append(f"slow path worker 數 <2：{run['map_jobs']}")
+    if len(run["items"]) < 2:
+        out.append(f"派入 worker 之欄 <2：{run['items']}")
+    if sorted(run["items"]) != sorted(run["eligible"]):
+        out.append("派入 worker 之欄 ≠ 可轉換欄（有去重代表欄 ⇒ 事件落點不唯一）")
+    if not (run["worker_threads"] - {run["main_thread"]}):
+        out.append("worker 全在主執行緒 ⇒ 非並行")
+    if not run["tested"]:
+        out.append("worker 內無 ADF 檢定 ⇒ 空轉")
+    if {c for _tf, c in run["tested"]} - set(run["items"]):
+        out.append("受檢欄不屬派入 worker 之欄")
+    return out
+
+
 # ---------------------------------------------------------------------------------------------- (d) 前處理總開關關閉
 
 def master_off_violations(table: pd.DataFrame, spec: Mapping[str, Any], value: str) -> List[str]:
@@ -321,6 +427,76 @@ def master_off_violations(table: pd.DataFrame, spec: Mapping[str, Any], value: s
         if bad:
             out.append(f"{step}: {len(bad)} 欄非總開關關閉值（例 {bad[:3]}）")
     return out
+
+
+# ---------------------------------------------------------------------------------------------- (e) 群組 fallback 多重有序
+
+def native_only_fallback(groups: Mapping[str, Mapping[str, Any]], shortened: Set[str]) -> Tuple[Optional[str], List[str]]:
+    """參考格 `h12h1_native_fallback`（只有 native 回退、無注入之 parallel 失敗）：每個 native 回退群組之 `fallback`
+    恰為一個元素之 list、全格同值 ⇒ 回 (native 回退值, 違規)；值不唯一 ⇒ (None, 違規)。"""
+    out: List[str] = []
+    seqs = {g: (groups.get(g) or {}).get("fallback") for g in sorted(shortened)}
+    if not seqs:
+        out.append("參考格無 native 回退群組 ⇒ 無法導出 native 回退值")
+    bad = {g: s for g, s in seqs.items() if not (isinstance(s, list) and len(s) == 1)}
+    if bad:
+        out.append(f"只經 native 回退之群組 fallback 非恰一元素之清單：{bad}")
+    values = {s[0] for s in seqs.values() if isinstance(s, list) and len(s) == 1}
+    if len(values) != 1:
+        out.append(f"native 回退值不唯一：{sorted(map(str, values))}")
+    return (next(iter(values)) if len(values) == 1 else None), out
+
+
+def ordered_fallback_violations(groups: Mapping[str, Mapping[str, Any]], obs: ph.Observation,
+                                native_value: Optional[str], spec: Mapping[str, Any]) -> List[str]:
+    """oracle（契約 `fallback_values._doc`「可多重，依發生序」；審查 r7 CODEX-R7-P2-02）：
+
+    - 只經 parallel→serial 回退之群組（非 compact-aligned ⇒ 不可能有 native 回退）之 `fallback` ＝ [s]×(該群組實際注入
+      失敗次數)，全格同一 s（導出 fracdiff 串行回退值；不在測試寫死字面）；
+    - native 回退值 n（參考格導出）≠ s，兩者皆屬契約 `fallback_values`；
+    - 每個 native 回退群組之 `fallback` 逐項等於依發生序之 [n] ＋ [s]×(該群組實際 parallel 失敗次數)——native 回退於
+      `_maybe_run_native_l65_to_sink`（列數不符即 return None）先發生，其後同群組於 owner 之轉換才進 fracdiff；
+      長度＝實際發生次數（不多不少、不去重）。"""
+    out: List[str] = []
+    fallbacks = set(ph.contract_values("fallback_values", spec))
+    shortened, failures, aligned = set(obs.native_shortened), dict(obs.parallel_failures), set(obs.native_groups)
+    serial_only = sorted(g for g in failures if g not in aligned)
+    if not serial_only:
+        out.append("無只經 parallel→serial 回退之群組 ⇒ 無法導出其回退值")
+    values = {v for g in serial_only for v in list((groups.get(g) or {}).get("fallback") or [])}
+    if len(values) != 1:
+        out.append(f"只經 parallel→serial 回退之群組之回退值不唯一：{sorted(map(str, values))}")
+    serial_value = next(iter(values)) if len(values) == 1 else None
+    for gid in serial_only:
+        got = (groups.get(gid) or {}).get("fallback")
+        if serial_value is not None and got != [serial_value] * failures[gid]:
+            out.append(f"{gid}: 只經 {failures[gid]} 次 parallel→serial 回退而 fallback={got!r}")
+    if native_value is None or serial_value is None:
+        return out
+    if native_value == serial_value:
+        out.append(f"native 回退值與 fracdiff 串行回退值相同（{native_value!r}）⇒ 無從區分發生序")
+    out.extend(f"回退值 {v!r} 不屬契約 fallback_values" for v in (native_value, serial_value) if v not in fallbacks)
+    if not shortened & set(failures):
+        out.append("無群組同時經 native 回退與 parallel→serial 回退 ⇒ 空轉")
+    for gid in sorted(shortened):
+        want = [native_value] + [serial_value] * failures.get(gid, 0)
+        got = (groups.get(gid) or {}).get("fallback")
+        if got != want:
+            out.append(f"{gid}: fallback={got!r} ≠ 依發生序 {want!r}")
+    return out
+
+
+def _mutant_group_accessor(target: Any, transform: Any) -> Any:
+    """只對 `target` 實例以改壞之群組表包住生產之 `execution_groups`（參考格之實例不受影響）。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    original = FeaturePreprocessor.execution_groups
+
+    def accessor(self: Any) -> Any:
+        groups = dict(original(self))
+        return transform(groups) if self is target else groups
+
+    return accessor
 
 
 # ---------------------------------------------------------------------------------------------- 驗證
@@ -402,6 +578,37 @@ def test_verification_02b_native_fallback_recorded_as_fallback_list(runs: ph.Run
     assert record_violations(ph.preprocessor_records(fb_obs.l65_preprocessor), l65_input_keys(fb_obs), spec) == []
 
 
+def _ordered_fallback_inputs(runs: ph.RunCache) -> Tuple[Optional[str], ph.Observation, List[str]]:
+    """(參考格導出之 native 回退值, 雙回退變體之觀測, 同時經兩種回退之群組)；參考格違規即 AssertionError。"""
+    ref = ph.observation(runs.get("h12h1_native_fallback"))
+    native_value, ref_violations = native_only_fallback(ph.preprocessor_groups(ref.l65_preprocessor),
+                                                        set(ref.native_shortened))
+    assert ref_violations == [], ref_violations
+    obs = ph.observation(runs.get("h12h1_native_fallback_parallel_fail"))
+    both = sorted(set(obs.native_shortened) & set(obs.parallel_failures))
+    assert both, ("前提不成立：無 12h 群組於 native 回退後 ≥2 欄進入 fracdiff 而選入 parallel 臂（注入對象）："
+                  f"native 回退 {sorted(obs.native_shortened)}、parallel 失敗 {obs.parallel_failures}")
+    return native_value, obs, both
+
+
+def test_verification_02c_group_fallback_list_ordered_by_occurrence(runs: ph.RunCache) -> None:
+    """契約 `fallback_values._doc`「可多重，依發生序」（審查 r7 CODEX-R7-P2-02）：同一群組依序經歷 native 回退與
+    fracdiff parallel→serial 回退 ⇒ 群組 `fallback` 逐項等於 [native 回退值] ＋ [串行回退值]×實際 parallel 失敗次數
+    （順序、長度、重複皆依實際發生）。
+
+    構造（同一真實群組，非兩個獨立實例）：變體 `h12h1_native_fallback_parallel_fail`＝`h12h1_native_fallback`（native
+    載入少一列 ⇒ `_maybe_run_native_l65_to_sink` 於 `feature_preprocessor.py:1219` 附近 return None）＋ slow path worker 數
+    固定 2、owner 每次 parallel fracdiff 嘗試於入口注入一般例外（⇒ 生產既有之 parallel→serial 回退，`:3780` 附近）。
+    回退之 12h 群組隨即於 owner 之 aligned 路徑轉換、進 fracdiff ⇒ 兩事件於同群組依序發生。可行性前提（該群組於真實
+    短窗有 ≥2 欄可轉換，生產方選 parallel 臂）以前提斷言驗證；兩回退值皆自實際紀錄導出（native 值取只回退 native 之
+    參考格、串行值取只經 parallel 失敗之 1h 群組），不在測試寫死字面。各欄仍恰一筆紀錄。"""
+    spec = ph.contract()
+    native_value, obs, _both = _ordered_fallback_inputs(runs)
+    groups = ph.preprocessor_groups(obs.l65_preprocessor)
+    assert ordered_fallback_violations(groups, obs, native_value, spec) == []
+    assert record_violations(ph.preprocessor_records(obs.l65_preprocessor), l65_input_keys(obs), spec) == []
+
+
 def test_verification_04_dstar_search_provenance_error_propagates(runs: ph.RunCache, tmp_path: Path) -> None:
     """SPEC Task 1.2 改法：d* 搜尋鏈內（`_find_min_d` → 校準查找之紀錄點）拋出之 `ProvenanceConflictError` 原樣上拋，不被
     包住 `_find_min_d` 之 `except Exception`（`feature_preprocessor.py:3543` 附近）轉為 d* 搜尋失敗紀錄而續跑。"""
@@ -431,6 +638,23 @@ def test_verification_06_adf_exception_event_without_behavior_change(runs: ph.Ru
     ref = adf_exception_run(runs, tmp_path / "adf_ref", adf_raises=False)
     err_records, ref_records = ph.preprocessor_records(err["pre"]), ph.preprocessor_records(ref["pre"])
     assert err["tested"] and err["tested"] == ref["tested"]
+    assert adf_error_violations(err, ref, err_records, ref_records, event) == []
+    assert record_violations(err_records, list(err_records), spec) == []
+
+
+def test_verification_06b_parallel_adf_exception_event_merged_to_owner(runs: ph.RunCache, tmp_path: Path) -> None:
+    """SPEC Task 1.2（`_slow_path_parallel.py:119` 附近）、§N FFDSTAR-R3（審查 r7 CODEX-R7-P2-01）：parallel fracdiff
+    worker 內 statsmodels ADF 拋例外（現行以 p=1.0 續行）⇒ worker 內受檢欄之 owner 紀錄 `events` 含契約
+    `named_values.adf_test_error_event`（worker 事件併回 owner），未受檢欄與 p=1.0 對照不含；輸出值與平穩化決策
+    （events 外）逐項等於 worker 內 `adfuller` 回 p=1.0 之對照。機制（worker 同行程之 threading backend、只於 worker
+    執行緒注入）見 `adf_exception_parallel_run`；前提斷言證 parallel 路徑確實被走到（未回退串行、≥2 worker、非主執行緒）。"""
+    spec = ph.contract()
+    event = ph.contract_named("adf_test_error_event", spec)
+    err = adf_exception_parallel_run(runs, tmp_path / "padf_err", adf_raises=True)
+    ref = adf_exception_parallel_run(runs, tmp_path / "padf_ref", adf_raises=False)
+    assert parallel_path_violations(err) == [] and parallel_path_violations(ref) == []
+    assert err["tested"] == ref["tested"]
+    err_records, ref_records = ph.preprocessor_records(err["pre"]), ph.preprocessor_records(ref["pre"])
     assert adf_error_violations(err, ref, err_records, ref_records, event) == []
     assert record_violations(err_records, list(err_records), spec) == []
 
@@ -650,6 +874,68 @@ def test_mutation_adf_exception_event_not_recorded(runs: ph.RunCache, monkeypatc
     monkeypatch.setattr(FeaturePreprocessor, "execution_records", _mutant_accessor(drop_event))
     violations = adf_error_violations(err, ref, ph.preprocessor_records(err["pre"]), ref_records, event)
     assert any("ADF 例外而紀錄無事件" in v for v in violations), violations
+
+
+def test_mutation_parallel_adf_worker_event_dropped(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch,
+                                                    tmp_path: Path) -> None:
+    """mutation（審查 r7 CODEX-R7-P2-01）：parallel worker 之 ADF 例外事件未併回 owner（worker 受檢欄之紀錄 `events`
+    去掉該事件值＝現行 worker 只回 p=1.0 之效果）⇒ 驗證 06b 之 oracle 轉紅。正對照：未改壞時無違規。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    spec = ph.contract()
+    event = ph.contract_named("adf_test_error_event", spec)
+    err = adf_exception_parallel_run(runs, tmp_path / "padf_err", adf_raises=True)
+    ref = adf_exception_parallel_run(runs, tmp_path / "padf_ref", adf_raises=False)
+    assert parallel_path_violations(err) == []
+    ref_records = ph.preprocessor_records(ref["pre"])
+    assert adf_error_violations(err, ref, ph.preprocessor_records(err["pre"]), ref_records, event) == []
+    worker_tested = set(err["tested"])
+
+    def drop_worker_event(records: Dict[Key, Dict[str, Any]]) -> Dict[Key, Dict[str, Any]]:
+        return {k: (dict(r, events=[e for e in (r.get("events") or []) if e != event]) if k in worker_tested else r)
+                for k, r in records.items()}
+
+    monkeypatch.setattr(FeaturePreprocessor, "execution_records", _mutant_accessor(drop_worker_event))
+    violations = adf_error_violations(err, ref, ph.preprocessor_records(err["pre"]), ref_records, event)
+    assert any("ADF 例外而紀錄無事件" in v for v in violations), violations
+
+
+def test_mutation_group_fallback_second_event_dropped(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（審查 r7 CODEX-R7-P2-02）：同時經兩種回退之群組之 `fallback` 刪去第二個事件（fracdiff 串行回退）⇒
+    驗證 02c 之 oracle 轉紅。正對照：未改壞時無違規。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    spec = ph.contract()
+    native_value, obs, both = _ordered_fallback_inputs(runs)
+    pre = obs.l65_preprocessor
+    assert ordered_fallback_violations(ph.preprocessor_groups(pre), obs, native_value, spec) == []
+
+    def drop_second(groups: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        return {g: (dict(v, fallback=list(v["fallback"])[:1] + list(v["fallback"])[2:]) if g in both else v)
+                for g, v in groups.items()}
+
+    monkeypatch.setattr(FeaturePreprocessor, "execution_groups", _mutant_group_accessor(pre, drop_second))
+    violations = ordered_fallback_violations(ph.preprocessor_groups(pre), obs, native_value, spec)
+    assert any(v.startswith(f"{both[0]}: fallback=") and "依發生序" in v for v in violations), violations
+
+
+def test_mutation_group_fallback_order_swapped(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（審查 r7 CODEX-R7-P2-02）：同時經兩種回退之群組之 `fallback` 順序顛倒（串行回退在前、native 在後）⇒
+    驗證 02c 之 oracle 轉紅。正對照：未改壞時無違規。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    spec = ph.contract()
+    native_value, obs, both = _ordered_fallback_inputs(runs)
+    pre = obs.l65_preprocessor
+    assert ordered_fallback_violations(ph.preprocessor_groups(pre), obs, native_value, spec) == []
+
+    def swap(groups: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        return {g: (dict(v, fallback=list(reversed(list(v["fallback"])))) if g in both else v)
+                for g, v in groups.items()}
+
+    monkeypatch.setattr(FeaturePreprocessor, "execution_groups", _mutant_group_accessor(pre, swap))
+    violations = ordered_fallback_violations(ph.preprocessor_groups(pre), obs, native_value, spec)
+    assert any(v.startswith(f"{both[0]}: fallback=") and "依發生序" in v for v in violations), violations
 
 
 def test_mutation_master_off_step_recorded_as_other_value(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch) -> None:

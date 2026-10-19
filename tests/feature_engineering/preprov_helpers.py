@@ -204,6 +204,12 @@ VARIANTS: Dict[str, Dict[str, Any]] = {
     # Task 1.2 驗證②：h12h1_multi 之 native 回退案（native 載入少一列 ⇒ 生產既有之 row mismatch 回退分支）
     "h12h1_native_fallback": {**CELLS["h12h1_multi"], "payload": _stat(["1h", "12h"], fracdiff=True, adf=True),
                               "native_fallback": True},
+    # Task 1.2 群組 fallback 多重有序（審查 r7 CODEX-R7-P2-02）：同 h12h1_native_fallback（native 載入少一列 ⇒ native
+    # 回退）＋ slow path worker 數固定 2、且 owner 每次 parallel fracdiff 嘗試於入口注入一般例外 ⇒ 生產既有之
+    # parallel→serial 回退；同一 12h 群組依序經歷兩種回退（native 先、fracdiff 串行後）
+    "h12h1_native_fallback_parallel_fail": {**CELLS["h12h1_multi"],
+                                            "payload": _stat(["1h", "12h"], fracdiff=True, adf=True),
+                                            "native_fallback": True, "parallel_fail": True},
 }
 
 
@@ -243,6 +249,8 @@ class Observation:
     l7_dropped: Dict[str, str] = dataclasses.field(default_factory=dict)
     native_groups: Dict[str, bool] = dataclasses.field(default_factory=dict)
     native_shortened: Set[str] = dataclasses.field(default_factory=set)
+    #: parallel_fail 變體：群組 id → 該群組於 owner 轉換中被注入失敗之 parallel fracdiff 嘗試次數（依實際發生計數）
+    parallel_failures: Dict[str, int] = dataclasses.field(default_factory=dict)
     post_ic: List[Tuple[Any, List[str]]] = dataclasses.field(default_factory=list)
     ic_calls: List[Tuple[Tuple[Any, ...], Dict[str, Any]]] = dataclasses.field(default_factory=list)
     result_metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -294,8 +302,47 @@ def _isolate(mp: pytest.MonkeyPatch, work: Path, spec: Mapping[str, Any]) -> Pat
     return work / "data_cache" / "features" if worker else work / "features"
 
 
-def _install_observers(mp: pytest.MonkeyPatch, obs: Observation, *, native_fallback: bool) -> None:
-    """觀測器：只記錄、原樣轉呼叫生產函式（不改任何回傳值；native 回退變體除外）。"""
+def _install_parallel_failure(mp: pytest.MonkeyPatch, obs: Observation) -> None:
+    """parallel_fail 變體：slow path worker 數固定 2；owner 之群組轉換入口（單群組／分塊／分片三條路徑，皆以
+    (registry, group, ...) 為前兩參數）記當前群組 id；`_apply_fractional_differencing_parallel` 於群組轉換內被呼叫
+    （＝生產已依 n_jobs>1 且 ≥2 欄可轉換而選 parallel 臂）⇒ 計該群組失敗次數並於入口拋一般（可降級）例外，由生產既有
+    之 except 分支回退串行（`feature_preprocessor.py:3780` 附近）。入口即拋 ⇒ 失敗嘗試未寫任何紀錄（撤回語意由驗證 05
+    另驗）。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    stack: List[str] = []
+    mp.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self: 2)
+
+    def tracked(name: str) -> None:
+        orig = getattr(FeaturePreprocessor, name)
+
+        def wrapped(self: Any, *args: Any, **kwargs: Any) -> Any:
+            group = args[1] if len(args) > 1 else kwargs["group"]
+            stack.append(str(getattr(group, "group_id")))
+            try:
+                return orig(self, *args, **kwargs)
+            finally:
+                stack.pop()
+
+        mp.setattr(FeaturePreprocessor, name, wrapped)
+
+    for name in ("_transform_single_group_to_arrays", "_stream_single_group_chunked_to_sink",
+                 "_stream_sharded_group_to_sink"):
+        tracked(name)
+    orig_parallel = FeaturePreprocessor._apply_fractional_differencing_parallel
+
+    def failing_parallel(self: Any, *args: Any, **kwargs: Any) -> Any:
+        if not stack:
+            return orig_parallel(self, *args, **kwargs)
+        obs.parallel_failures[stack[-1]] = obs.parallel_failures.get(stack[-1], 0) + 1
+        raise RuntimeError(f"injected parallel fracdiff failure in group {stack[-1]}")
+
+    mp.setattr(FeaturePreprocessor, "_apply_fractional_differencing_parallel", failing_parallel)
+
+
+def _install_observers(mp: pytest.MonkeyPatch, obs: Observation, *, native_fallback: bool,
+                       parallel_fail: bool = False) -> None:
+    """觀測器：只記錄、原樣轉呼叫生產函式（不改任何回傳值；native 回退與 parallel 失敗變體除外）。"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
@@ -408,6 +455,9 @@ def _install_observers(mp: pytest.MonkeyPatch, obs: Observation, *, native_fallb
 
         mp.setattr(ColumnGroupRegistry, "load_data_native", short_native)
 
+    if parallel_fail:
+        _install_parallel_failure(mp, obs)
+
 
 def _dispatch(spec: Mapping[str, Any], symbol: str, kline_dir: str, features_root: Path,
               obs: Observation) -> Dict[str, Tuple[str, str]]:
@@ -470,6 +520,8 @@ def _check_preconditions(cell: str, spec: Mapping[str, Any], handles: Mapping[st
         raise RuntimeError("h12h1_multi 格前提不成立：無任何群組走 native-tf 路徑成功")
     if spec.get("native_fallback") and not obs.native_shortened:
         raise RuntimeError("native 回退變體前提不成立：未經 native 載入（無回退對象）")
+    if spec.get("parallel_fail") and not obs.parallel_failures:
+        raise RuntimeError("parallel 失敗變體前提不成立：無任何群組選入 parallel fracdiff 臂（無注入對象）")
     if spec["path"] == "ic_first":
         for handle in handles.values():
             if spec.get("cleanup_raw") and (handle.run_dir / "raw").exists():
@@ -487,7 +539,8 @@ def _generate(root: Path, cell: str, symbol: str, kline_path: Optional[Path]) ->
     mp = pytest.MonkeyPatch()
     try:
         features_root = _isolate(mp, work, spec)
-        _install_observers(mp, obs, native_fallback=bool(spec.get("native_fallback")))
+        _install_observers(mp, obs, native_fallback=bool(spec.get("native_fallback")),
+                           parallel_fail=bool(spec.get("parallel_fail")))
         produced = _dispatch(spec, symbol, kline_dir, features_root, obs)
     finally:
         mp.undo()
