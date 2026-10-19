@@ -171,7 +171,9 @@
     "pre_change_commit_note": "SPEC v22 重凍前提之改前碼態；與 baseline 凍結點 dfd5d7db 之產生端碼相同（兩者間只改 feature_naming.py 之 parser）。K1／K2 改前紀錄須來自此提交且 worktree 之 momentum／api／config／scripts／tests 無本地改動，否則拒收。",
     "k2_decisions": ["refrozen", "pre_existing_drift"],
     "framepath_cells": ["C1", "C2", "C3", "C4-streaming", "C4-hybrid", "C5", "C6", "C7", "C8", "C9", "C10", "C11"],
-    "failopen_units": ["BTCUSDT/12h", "ETHUSDT/12h", "BTCUSDT/1h", "ETHUSDT/1h", "BTCUSDT/multi", "ETHUSDT/multi"],
+    "failopen_units": ["BTCUSDT/12h", "ETHUSDT/12h", "BTCUSDT/1h", "ETHUSDT/1h", "BTCUSDT/multi"],
+    "failopen_units_k0": ["ETHUSDT/multi"],
+    "failopen_units_k0_reason": "結構檢查以外無消費測試比對值；且改前即 config_hash 過期（主控 2026-10-19 裁定，待最終委員審查確認：唯一讀 multi_tf[ETHUSDT] 者為 test_failopen_golden.py::test_baseline_frozen，只驗結構／perf 鍵；依 SPEC v21 K0 邏輯——消費測試不以新 run 依名比對值 ⇒ 不重凍）。該單元 golden 位元組保持改前碼態 pre_change_commit 之值，k2 拒跑。",
     "rekey_exceptions": {
       "tests/_golden/probewinsor/baseline.json": {
         "_reason": "錨點 820e8f14（PROBEWINSOR 修正前）之『總開關關＋縮尾開』（off.w1）格行為與改前碼態 c9737729（修正後）依設計不同 ⇒ 該格之名衍生雜湊輸入無法由改前碼重現，不能換名重算；值保留改前位元組（舊命名世代之雜湊）。無任何消費測試讀之（test_ffname_refreeze 以 AST 靜態掃描 test_probewinsor.py 之 baseline 取格證明）；e1h_nostart.off.w1 不在此列（可重算、由 boundary_06 讀）。",

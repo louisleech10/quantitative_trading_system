@@ -491,7 +491,7 @@ def test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor(
         _assert_columns_byte_equal(direct, typed)
 
     assert direct_l3.shape[1] == MTF_12H_L3_SURVIVOR_COUNT
-    assert "close_trend_MIDPOINT_233_ZScore_W3" in direct_l3.columns
+    assert "close_trend_MIDPOINT_233_ZScore-W3" in direct_l3.columns  # FF-NAME v2 文法（op 參數以 `-` 連接）
 
 
 @pytest.mark.requires_kline

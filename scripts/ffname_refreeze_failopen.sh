@@ -6,7 +6,7 @@
 #
 # 用法（主樹根目錄執行；須先備好改前 worktree）：
 #   WT=<改前 worktree 路徑（c9737729）> OUT=<版控外輸出目錄> bash scripts/ffname_refreeze_failopen.sh
-# 選項：UNITS="BTCUSDT/12h ETHUSDT/12h"（預設全 6 單元）、DRY_RUN=1（只印步驟與預估，不執行）
+# 選項：UNITS="BTCUSDT/12h ETHUSDT/12h"（預設＝契約 failopen_units）、DRY_RUN=1（只印步驟與預估，不執行）
 #
 # 預估（golden 內 perf.generation_wall_seconds＋hash；改前碼另加紀錄器與逐欄 sidecar 約 +10–20%，推論）：
 #   BTCUSDT/12h ≈ 2 分、ETHUSDT/12h ≈ 2 分、BTCUSDT/1h ≈ 7 分、ETHUSDT/1h ≈ 14 分、
@@ -19,7 +19,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PY="$ROOT/venv/bin/python"
 WT="${WT:?須設 WT＝改前 worktree（git worktree add --detach <path> c9737729）}"
 OUT="${OUT:?須設 OUT＝版控外輸出目錄（sidecar 每份數十 MB）}"
-UNITS="${UNITS:-BTCUSDT/12h ETHUSDT/12h BTCUSDT/1h ETHUSDT/1h BTCUSDT/multi ETHUSDT/multi}"
+# 預設＝契約 failopen_units（重凍對證之單元；failopen_units_k0 之單元不跑、golden 位元組保持改前）
+UNITS="${UNITS:-$("$PY" -c "import json; print(' '.join(json.load(open('$ROOT/tests/_golden/ffname/contract.json'))['refreeze']['failopen_units']))")}"
 DRY_RUN="${DRY_RUN:-0}"
 GOLDEN="tests/_golden/failopen/baseline.json"
 LOG="$OUT/runner.log"
@@ -51,6 +52,9 @@ step() {  # step <unit> <side old|new>
   if [ "$side" = "old" ]; then
     FFNAME_UNIT="$unit" "$PY" "$ROOT/scripts/ffname_refreeze.py" record --recipe failopen --tree "$WT" \
       --out "$out" > "$OUT/records/failopen.$tag.$side.log" 2>&1
+  elif [ "$side" = "noprobe" ] || [ "$side" = "noprobe_control" ]; then  # 探針等價證明用：現行碼不掛探針
+    FFNAME_NO_PROBE=1 FFNAME_UNIT="$unit" "$PY" "$ROOT/scripts/ffname_refreeze.py" record --recipe failopen \
+      --no-instrument --out "$out" > "$OUT/records/failopen.$tag.$side.log" 2>&1
   else
     FFNAME_UNIT="$unit" "$PY" "$ROOT/scripts/ffname_refreeze.py" record --recipe failopen --no-instrument \
       --out "$out" > "$OUT/records/failopen.$tag.$side.log" 2>&1
@@ -64,6 +68,25 @@ for unit in $UNITS; do
   step "$unit" old
   step "$unit" new
   tag="$(echo "$unit" | tr '/' '-')"
+  # 委員會 r3 (a)：multi 單元之 ⑥ 位移值來自串流寫出入口之唯讀探針 ⇒ 另跑兩份不掛探針之現行碼紀錄（noprobe 與
+  # noprobe_control），先產「探針不改生產輸出」證明（k2 對 multi 單元要求此證明 equal，否則 fail）：掛 vs 不掛探針
+  # 資料檔位元組全等、.json 中介檔遮罩逐次變動欄後全等；兩份不掛探針間之 .json 差證明該類差非探針所致。
+  if [ "${unit##*/}" = "multi" ]; then
+    step "$unit" noprobe
+    step "$unit" noprobe_control
+  fi
+  if [ "$DRY_RUN" != "1" ] && [ "${unit##*/}" = "multi" ]; then
+    "$PY" "$ROOT/scripts/ffname_refreeze.py" probe-equiv --with-probe "$OUT/records/failopen.$tag.new.json" \
+      --without-probe "$OUT/records/failopen.${tag}.noprobe.json" \
+      --control "$OUT/records/failopen.${tag}.noprobe_control.json" \
+      > "$OUT/records/failopen.${tag}.probe_equiv.log" 2>&1
+    rc=$?
+    tail -2 "$OUT/records/failopen.${tag}.probe_equiv.log" | tee -a "$LOG"
+    if [ "$rc" -ne 0 ]; then
+      echo "[STOP] ${unit} 探針等價 rc=${rc}（詳 ${OUT}/records/failopen.${tag}.probe_equiv.log）" | tee -a "$LOG"
+      exit "$rc"
+    fi
+  fi
   if [ "$DRY_RUN" != "1" ]; then
     "$PY" "$ROOT/scripts/ffname_refreeze.py" k2 --golden "$GOLDEN" \
       --old "$OUT/records/failopen.$tag.old.json" --new "$OUT/records/failopen.$tag.new.json" \

@@ -2992,26 +2992,6 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
-  "tests/feature_engineering/test_adf_safe_skip.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r4/synth.md",
-   "guarantee": [
-    "A3",
-    "A5",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/feature_engineering/test_adf_safe_skip.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "NAN-STRATEGY"
-  },
   "tests/feature_engineering/test_b6_warmup_trim.py": {
    "claim": [
     "contract"

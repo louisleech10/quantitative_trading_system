@@ -551,6 +551,11 @@ def k2_problems(rel: str, entry: Optional[Dict[str, Any]] = None, new_sidecar: O
             bad.append(f"bytes_unbound:{rel}")
         if entry.get("value_hash_mismatch", 1) != 0:
             bad.append(f"receipt_mismatch:{rel}")
+        if DISP[rel].get("recipe") == "failopen":  # 單元級 K0（主控 2026-10-19 裁定）：獨立重算＋收據一致
+            bad += failopen_k0_problems(rel)
+            claimed = sorted((u.get("unit"), u.get("unchanged")) for u in entry.get("k0_units") or [])
+            if claimed != sorted((u, True) for u in REFREEZE.get("failopen_units_k0") or []):
+                bad.append(f"k0_receipt_disagrees:{rel}")
         if not any(u.get("decision") == "refrozen" for u in entry["units"]) and \
                 entry.get("new_sha256") != _sha(_blob(rel) or b""):
             bad.append(f"bytes_changed_without_refreeze:{rel}")
@@ -592,6 +597,8 @@ def _k2_one(rel: str, entry: Dict[str, Any], new_sidecar: Optional[Dict[str, Any
         bad.append(f"g6_list_disagrees:{rel}")
     if g6 and entry.get("g6_shift_verified") is not True:
         bad.append(f"g6_shift_unverified:{rel}")
+    if str(entry.get("unit") or "").endswith("/multi") and DISP[rel].get("recipe") == "failopen":
+        bad += [f"{p}:{rel}" for p in _probe_equivalence_problems(entry.get("probe_equivalence"))]
     if entry.get("value_hash_mismatch", 1) != 0 or bad:
         bad.append(f"receipt_mismatch:{rel}")
     # 審查 r1：改前紀錄須出自契約 pre_change_commit
@@ -612,6 +619,213 @@ def _k2_one(rel: str, entry: Dict[str, Any], new_sidecar: Optional[Dict[str, Any
     if entry.get("new_sha256") != _sha((REPO / rel).read_bytes()):
         bad.append(f"bytes_unbound:{rel}")
     return bad
+
+
+def _failopen_node(doc: Dict[str, Any], unit: str) -> Any:
+    symbol, _, kind = unit.partition("/")
+    if kind == "multi":
+        return (doc.get("multi_tf") or {}).get(symbol)
+    return ((doc.get("single_tf") or {}).get(symbol) or {}).get(kind)
+
+
+def failopen_k0_problems(rel: str, doc: Optional[Dict[str, Any]] = None) -> List[str]:
+    """契約 failopen_units_k0 之單元：現檔該單元節點（正規 JSON）＝改前碼態 pre_change_commit 之 golden 同節點，且未登記
+    unit_commits（未經重凍）。獨立以 git show 讀改前 golden，不信收據。"""
+    if doc is None:
+        doc = json.loads((REPO / rel).read_text(encoding="utf-8"))
+    pre = json.loads(subprocess.run(["git", "-C", str(REPO), "show", f"{REFREEZE['pre_change_commit']}:{rel}"],
+                                    check=True, capture_output=True, text=True).stdout)
+    bad = []
+    for unit in REFREEZE.get("failopen_units_k0") or []:
+        now, before = _failopen_node(doc, unit), _failopen_node(pre, unit)
+        if now is None or json.dumps(now, sort_keys=True) != json.dumps(before, sort_keys=True):
+            bad.append(f"k0_unit_changed:{unit}")
+        if unit in ((doc.get("environment") or {}).get("unit_commits") or {}):
+            bad.append(f"k0_unit_refrozen:{unit}")
+    return bad
+
+
+def test_failopen_units_partition_contract():
+    """failopen_units（重凍對證）與 failopen_units_k0（單元級 K0）互斥，聯集恰為 golden 之全部單元；K0 須附理由。"""
+    rel = "tests/_golden/failopen/baseline.json"
+    doc = json.loads((REPO / rel).read_text(encoding="utf-8"))
+    all_units = {f"{s}/multi" for s in doc["multi_tf"]} | {f"{s}/{tf}" for s, tfs in doc["single_tf"].items() for tf in tfs}
+    k2_units, k0_units = set(REFREEZE["failopen_units"]), set(REFREEZE.get("failopen_units_k0") or [])
+    assert not (k2_units & k0_units)
+    assert k2_units | k0_units == all_units
+    assert len(REFREEZE["failopen_units"]) == len(k2_units)
+    if k0_units:
+        assert str(REFREEZE.get("failopen_units_k0_reason") or "").strip()
+
+
+def test_failopen_k0_units_bytes_unchanged():
+    assert failopen_k0_problems("tests/_golden/failopen/baseline.json") == []
+
+
+def test_mutation_failopen_k0_unit_altered_caught():
+    """K0 單元節點任一值被改（如重凍寫入）或被登記 unit_commits ⇒ 紅；工具端判定同。"""
+    rel = "tests/_golden/failopen/baseline.json"
+    doc = json.loads((REPO / rel).read_text(encoding="utf-8"))
+    units = REFREEZE.get("failopen_units_k0") or []
+    if not units:
+        pytest.skip("契約無 failopen_units_k0")
+    tool = _refreeze_tool()
+    for unit in units:
+        bad = copy.deepcopy(doc)
+        node = _failopen_node(bad, unit)
+        node["config_hash"] = "0" * len(str(node.get("config_hash") or "x"))
+        assert f"k0_unit_changed:{unit}" in failopen_k0_problems(rel, bad)
+        assert not next(u for u in tool.failopen_k0_status(rel, bad) if u["unit"] == unit)["unchanged"]
+        bad2 = copy.deepcopy(doc)
+        bad2["environment"].setdefault("unit_commits", {})[unit] = "deadbeef"
+        assert f"k0_unit_refrozen:{unit}" in failopen_k0_problems(rel, bad2)
+        assert not next(u for u in tool.failopen_k0_status(rel, bad2) if u["unit"] == unit)["unchanged"]
+    assert all(u["unchanged"] for u in tool.failopen_k0_status(rel, doc))
+
+
+def _consumer_reruns() -> List[Any]:
+    doc = json.loads((REPO / "handoffs/run_receipts/ffname_refreeze_consumers.json").read_text(encoding="utf-8"))
+    return [(rel, run) for rel, run in doc.items() if isinstance(run, dict) and run.get("rerun")]
+
+
+def test_consumer_rerun_merge_provenance_and_state():
+    """補跑合併（consumers --rerun-nodeids --merge）：狀態閘於收據所錄之證據上重判為空；逐 nodeid 出處涵蓋執行集合恰一次，
+    補跑 nodeid 出自補跑 log 目錄、其餘出自先前 log 目錄；補跑之 nodeid 皆在其所屬測試檔內；HEAD 自先前 run 起未動。"""
+    tool = _refreeze_tool()
+    for rel, run in _consumer_reruns():
+        rr = run["rerun"]
+        allowed = sorted({n.split("::", 1)[0] for n in rr["nodeids"]})
+        assert tool.rerun_state_problems(rr["state"], allowed) == []
+        assert rr["state"]["head_moves_since_prior"] == [] and rr["state"]["head_now"]
+        assert set(rr["provenance"]) == set(run["executed"])
+        for nodeid, prov in rr["provenance"].items():
+            if nodeid in rr["nodeids"]:
+                assert prov == {"source": "rerun", "log_dir": rr["log_dir"]}
+            else:
+                assert prov == {"source": "prior", "log_dir": rr["prior_log_dir"]}
+        assert rr["pytest_rc"] == 0
+
+
+def test_mutation_consumer_rerun_merge_refused():
+    """狀態閘變異：生產碼（momentum/ 等）於兩次 run 間變動 ⇒ 拒合併；非補跑 nodeid 所在之測試檔變動 ⇒ 拒；HEAD 移動 ⇒ 拒；
+    本工具被消費測試引用時其變動亦拒；收據所錄之真實狀態 ⇒ 不拒。"""
+    tool = _refreeze_tool()
+    reruns = _consumer_reruns()
+    if not reruns:
+        pytest.skip("收據無補跑合併")
+    for _rel, run in reruns:
+        rr = run["rerun"]
+        allowed = sorted({n.split("::", 1)[0] for n in rr["nodeids"]})
+        state = rr["state"]
+        assert tool.rerun_state_problems(state, allowed) == []
+        cases = (
+            ({**state, "code_changed": list(state["code_changed"]) + ["momentum/FeatureEngineering/feature_factory.py"]},
+             "production_changed:momentum/FeatureEngineering/feature_factory.py"),
+            ({**state, "code_changed": list(state["code_changed"]) + ["momentum/FeatureEngineering/"]},
+             "production_changed:momentum/FeatureEngineering/"),
+            ({**state, "tests_changed": list(state["tests_changed"]) + ["tests/feature_engineering/test_failopen_layers.py"]},
+             "test_changed:tests/feature_engineering/test_failopen_layers.py"),
+            ({**state, "head_moves_since_prior": ["0" * 40]}, "head_moved:"),
+            ({**state, "runner_referenced_by": ["tests/feature_engineering/test_failopen_golden.py"],
+              "code_changed": ["scripts/ffname_refreeze.py"]}, "production_changed:scripts/ffname_refreeze.py"),
+        )
+        for bad_state, expect in cases:
+            assert any(p.startswith(expect) for p in tool.rerun_state_problems(bad_state, allowed)), expect
+
+
+_PROBE_VOLATILE = {"created_at", "updated_at"}
+
+
+def _probe_equivalence_problems(check: Optional[Dict[str, Any]], proof: Optional[Dict[str, Any]] = None) -> List[str]:
+    """委員會 r3 (a)：failopen multi 之 ⑥ 位移值取自串流寫出入口之唯讀探針 ⇒ k2 條目須帶探針檢查（本紀錄探針有效、無錯），
+    且引用之等價證明須（獨立重判各計數與歸類，不信 equal 自報）：
+    主比對（掛 vs 不掛探針，同單元全窗）：unit_record（除 perf）同、逐欄 sidecar 同、資料檔逐檔位元組同；位元組差只准
+    `.json` 中介檔且遮罩逐次變動欄（created_at／updated_at／本 run 暫存路徑）後內容相等，被遮罩欄於兩 run 確有不同值；
+    對照比對（兩份皆不掛探針）：資料檔與逐欄亦全等，且主比對之 .json 差檔在對照比對中同樣出現（非探針所致）。"""
+    if not isinstance(check, dict):
+        return ["probe_check_missing"]
+    bad: List[str] = []
+    if check.get("problems"):
+        bad.append("probe_check_problems")
+    calls = check.get("probe_calls") or []
+    if not calls or any(c.get("errors") for c in calls) or not all(int(c.get("captured", 0)) > 0 for c in calls):
+        bad.append("probe_not_effective")
+    if proof is None:
+        try:
+            proof = json.loads((REPO / str(check.get("receipt"))).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return bad + ["probe_proof_unavailable"]
+    if proof.get("schema_version") != "ffname-probe-equivalence-v3" or proof.get("problems") or proof.get("equal") is not True:
+        bad.append("probe_proof_not_equal")
+    main, control = proof.get("main") or {}, proof.get("control") or {}
+    for name, part in (("main", main), ("control", control)):
+        if part.get("unit_record_differs") or part.get("sidecar_tables_differ") or part.get("data_files_differ") \
+                or part.get("json_differ_after_mask"):
+            bad.append(f"probe_proof_not_equal:{name}")
+        diffs = list(part.get("json_differ_masked_equal") or []) + list(part.get("json_differ_no_mask") or [])
+        if any(not str(k).endswith(".json") for k in diffs):
+            bad.append(f"probe_proof_data_file_diff:{name}")
+        if int(part.get("artifact_files_byte_equal", -1)) + len(diffs) != int(part.get("artifact_files_compared", -2)) \
+                or int(part.get("artifact_files_compared", 0)) <= 0 \
+                or not (part.get("sidecar_columns_compared") or {}).get("merged_L7"):
+            bad.append(f"probe_proof_counts:{name}")
+        if part.get("unit") != check.get("proof_unit"):
+            bad.append(f"probe_proof_unit:{name}")
+    if main.get("json_differ_no_mask"):
+        bad.append("probe_proof_main_without_mask")
+    if (main.get("a") or {}).get("probe_installed") is not True or (main.get("b") or {}).get("probe_installed") is not False \
+            or (control.get("a") or {}).get("probe_installed") is True or (control.get("b") or {}).get("probe_installed") is not False:
+        bad.append("probe_proof_flags")
+    seen_without_probe = {str(k).split("/", 1)[1] for k in list(control.get("json_differ_masked_equal") or [])
+                          + list(control.get("json_differ_no_mask") or []) + list(control.get("json_differ_after_mask") or {})}
+    if any(str(k).split("/", 1)[1] not in seen_without_probe for k in main.get("json_differ_masked_equal") or []):
+        bad.append("probe_proof_unexplained_diff")
+    for k in main.get("json_differ_masked_equal") or []:
+        vol = (main.get("volatile_values") or {}).get(k) or {}
+        keys = set((vol.get("a") or {})) | set((vol.get("b") or {}))
+        if not (keys - {"run_prefix_strings"}) <= _PROBE_VOLATILE:
+            bad.append(f"probe_proof_volatile_keys:{k}")
+        prefixes = vol.get("run_prefix") or [None, None]
+        if (vol.get("a") or {}) == (vol.get("b") or {}) and prefixes[0] == prefixes[1]:
+            bad.append(f"probe_proof_masked_without_change:{k}")
+    if not (proof.get("with_probe") or {}).get("probe_calls") or proof.get("unit") != check.get("proof_unit"):
+        bad.append("probe_proof_unit")
+    return bad
+
+
+def test_mutation_probe_equivalence_tamper_caught():
+    """探針等價證明竄改（藏資料檔差、sidecar 差、改計數、把資料檔列為 .json 差、主比對 .json 差在對照中未見、遮罩欄
+    無變化、探針未擷取）⇒ 各自紅；收據之真實證明 ⇒ 綠。"""
+    entry = next((e for e in _receipt()["files"] if e["path"] == "tests/_golden/failopen/baseline.json"), None)
+    units = [u for u in (entry or {}).get("units", []) if str(u.get("unit")).endswith("/multi")]
+    if not units or not units[0].get("probe_equivalence"):
+        pytest.fail("failopen multi 單元 k2 條目缺 probe_equivalence（委員會 r3 (a) 要求）")
+    check = units[0]["probe_equivalence"]
+    proof = json.loads((REPO / check["receipt"]).read_text(encoding="utf-8"))
+    assert _probe_equivalence_problems(check, proof) == []
+    first_json = (proof["main"].get("json_differ_masked_equal") or ["x/none.json"])[0]
+    for mutate, expect in (
+        (lambda p: p["main"].update(data_files_differ=["x/raw/a.parquet"]), "probe_proof_not_equal:main"),
+        (lambda p: p["control"].update(sidecar_tables_differ={"merged_L7": 1}), "probe_proof_not_equal:control"),
+        (lambda p: p["main"].update(artifact_files_byte_equal=p["main"]["artifact_files_byte_equal"] - 1),
+         "probe_proof_counts:main"),
+        (lambda p: p["main"].update(json_differ_masked_equal=p["main"]["json_differ_masked_equal"] + ["x/raw/b.parquet"],
+                                    artifact_files_byte_equal=p["main"]["artifact_files_byte_equal"] - 1),
+         "probe_proof_data_file_diff:main"),
+        (lambda p: p["control"].update(json_differ_masked_equal=[], json_differ_no_mask=[], json_differ_after_mask={}),
+         "probe_proof_unexplained_diff"),
+        (lambda p: p["main"]["volatile_values"].update({first_json: {"a": {"created_at": ["1"]}, "b": {"created_at": ["1"]},
+                                                                     "run_prefix": ["/r", "/r"]}}),
+         f"probe_proof_masked_without_change:{first_json}"),
+        (lambda p: p["main"]["volatile_values"].update({first_json: {"a": {"groups": ["1"]}, "b": {"groups": ["2"]},
+                                                                     "run_prefix": ["/r", "/s"]}}),
+         f"probe_proof_volatile_keys:{first_json}"),
+        (lambda p: p["main"]["b"].update(probe_installed=True), "probe_proof_flags"),
+    ):
+        bad_proof = copy.deepcopy(proof)
+        mutate(bad_proof)
+        assert expect in _probe_equivalence_problems(check, bad_proof)
+    assert "probe_not_effective" in _probe_equivalence_problems({**check, "probe_calls": [{"captured": 0, "errors": []}]}, proof)
 
 
 def _tagged_key(key: str) -> str:

@@ -340,6 +340,36 @@ FAILOPEN_UNITS = tuple(json.loads((Path(__file__).resolve().parents[1] / "tests"
                                    "contract.json").read_text(encoding="utf-8"))["refreeze"]["failopen_units"])
 
 
+def _failopen_unit_node(doc: Mapping[str, Any], unit: str) -> Any:
+    """failopen golden 中單元之節點：`SYM/multi` → multi_tf[SYM]；`SYM/<tf>` → single_tf[SYM][tf]（缺即 None）。"""
+    symbol, _, kind = unit.partition("/")
+    if kind == "multi":
+        return (doc.get("multi_tf") or {}).get(symbol)
+    return ((doc.get("single_tf") or {}).get(symbol) or {}).get(kind)
+
+
+def failopen_k0_status(rel: str, doc: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
+    """單元級 K0（契約 failopen_units_k0）：現檔該單元節點之正規 JSON 雜湊＝改前碼態（pre_change_commit）golden 之同節點，
+    且 environment.unit_commits 不得登記該單元（未經重凍）。`doc` 可傳入（變異測試用），預設讀現檔。"""
+    contract = _contract_refreeze()
+    if doc is None:
+        doc = json.loads((MAIN_REPO / rel).read_text(encoding="utf-8"))
+    pre = json.loads(subprocess.run(["git", "-C", str(MAIN_REPO), "show", f"{contract['pre_change_commit']}:{rel}"],
+                                    check=True, capture_output=True, text=True).stdout)
+
+    def canon(node: Any) -> Optional[str]:
+        return None if node is None else hashlib.sha256(
+            json.dumps(node, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+    out = []
+    for unit in contract.get("failopen_units_k0") or []:
+        now, before = canon(_failopen_unit_node(doc, unit)), canon(_failopen_unit_node(pre, unit))
+        committed = unit in ((doc.get("environment") or {}).get("unit_commits") or {})
+        out.append({"unit": unit, "node_sha256": now, "pre_change_node_sha256": before, "unit_commit_recorded": committed,
+                    "unchanged": now is not None and now == before and not committed})
+    return out
+
+
 def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
     """failopen 單一單元（環境變數 `FFNAME_UNIT`＝`<SYM>/<TF>` 或 `<SYM>/multi`）：以該 golden 原產生函式
     （`freeze_failopen_baseline._single_tf_record`／`_multi_tf_record`，全窗）跑一次，並包裝其雜湊函式錄逐欄 sidecar
@@ -412,31 +442,94 @@ def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
         finally:
             state["table"] = "registry"
 
-    real_all_groups = frz._all_registry_groups
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
-    def all_registry_groups(registry: Any) -> Any:
-        """多週期單元之 record 不雜湊 registry（只雜湊 merged L7，且其次週期欄已對齊至主週期時間軸）⇒ ⑥ 位移 oracle 於
-        record 列舉 registry 群組時（工作目錄刪除前）取各群組原生時間軸之值；鍵＝以群組週期標記之名（＝merged L7 欄名）。"""
-        groups = real_all_groups(registry)
+    real_stream_write = FeatureStorage.write_raw_from_registry_stream
+    probe_calls: List[Dict[str, Any]] = []
+
+    def stream_write_probe(self: Any, symbol: str, tf: str, config_hash: str, registry: Any, *args: Any, **kwargs: Any):
+        """委員會 r3 選項 (a)：唯讀探針——於 `write_raw_from_registry_stream` 入口、呼叫原函式之前，讀 registry 各群組之
+        原生時間軸值（L6.5 縮尾前；串流寫出後群組資料即釋放），只取 ⑥ 相關欄（基底與新增 lag，依群組週期標記判定）；
+        不改寫入順序、不改任何值、不改參數，之後原樣呼叫原函式。鍵＝以群組週期標記之名（＝merged L7 欄名）。"""
         if kind == "multi":
-            for group in groups:
-                tf = str(group.timeframe)
+            seen, errors = 0, []
+            for _gid, group in registry.iter_all():
+                gtf = str(group.timeframe)
                 native = None
                 for i, col in enumerate(group.columns):
                     try:
-                        tagged = _fnm.tag_timeframe(str(col), tf)
-                    except Exception:  # noqa: BLE001
+                        tagged = _fnm.tag_timeframe(str(col), gtf)
+                    except Exception:  # noqa: BLE001  改前碼態之標記函式不收之名不屬 ⑥
                         continue
                     if keep_for_g6(tagged):
                         if native is None:
-                            native = np.asarray(registry.load_data_native(group.group_id))
-                        g6_arrays[tagged] = (tf, tagged, np.array(native[:, i], dtype=np.float64))
-        return groups
+                            try:
+                                native = np.array(registry.load_data_native(group.group_id), copy=True)
+                            except Exception as exc:  # noqa: BLE001  探針不得改變生產流程：錄錯、不拋；缺值由位移檢查 fail-closed
+                                errors.append(f"{group.group_id}: {type(exc).__name__}: {exc}")
+                                break
+                        g6_arrays[tagged] = (gtf, tagged, np.array(native[:, i], dtype=np.float64))
+                        seen += 1
+            probe_calls.append({"symbol": symbol, "tf": tf, "captured": seen, "errors": errors})
+        return real_stream_write(self, symbol, tf, config_hash, registry, *args, **kwargs)
+
+    real_artifacts = frz._combined_artifact_hashes
+    json_masked: Dict[str, Any] = {}
+    run_prefixes = sorted({str(work), str(Path(work).resolve())}, key=len, reverse=True)
+
+    volatile_keys = ("created_at", "updated_at")
+
+    def mask_json(value: Any, seen: Dict[str, Any]) -> Any:
+        """逐次變動欄遮罩：時戳鍵（created_at／updated_at）→ 佔位；含本 run 暫存目錄之字串 → `<RUN>` 前綴。
+        被遮罩之原值另錄於 `seen`（時戳鍵之相異原值、含暫存路徑之字串數），供證明「被排除者確為逐次變動」。"""
+        if isinstance(value, dict):
+            out = {}
+            for k, v in value.items():
+                if k in volatile_keys:
+                    seen.setdefault(k, set()).add(json.dumps(v, sort_keys=True))
+                    out[k] = "<TS>"
+                else:
+                    out[k] = mask_json(v, seen)
+            return out
+        if isinstance(value, list):
+            return [mask_json(v, seen) for v in value]
+        if isinstance(value, str):
+            for prefix in run_prefixes:
+                if prefix in value:
+                    seen["run_prefix_strings"] = seen.get("run_prefix_strings", 0) + 1
+                    value = value.replace(prefix, "<RUN>")
+        return value
+
+    def combined_artifacts(*work_dirs: Path) -> Dict[str, Any]:
+        """原函式原樣回傳；另於檔案尚存時，對各 `.json` 產物錄遮罩後內容之雜湊（整體＋頂層鍵逐鍵），供探針等價證明
+        區分「逐次變動欄（時戳／暫存路徑）」與「實質內容」。不改回傳值。"""
+        out = real_artifacts(*work_dirs)
+        for wd in work_dirs:
+            if not Path(wd).exists():
+                continue
+            for p in sorted(Path(wd).rglob("*.json")):
+                seen: Dict[str, Any] = {}
+                key = f"{Path(wd).name}/{p.relative_to(wd)}"
+                try:
+                    doc = mask_json(json.loads(p.read_text(encoding="utf-8")), seen)
+                except (OSError, ValueError) as exc:  # 錄錯不拋（不得因證明輔助資料毀掉整次 run）；比對端視為無遮罩紀錄
+                    json_masked[key] = {"sha256": None, "error": f"{type(exc).__name__}: {exc}"}
+                    continue
+                json_masked[key] = {
+                    "sha256": hashlib.sha256(json.dumps(doc, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest(),
+                    "top_keys": {k: hashlib.sha256(json.dumps(v, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+                                 for k, v in (doc.items() if isinstance(doc, dict) else [])},
+                    "volatile": {k: (sorted(v) if isinstance(v, set) else v) for k, v in seen.items()},
+                    "run_prefix": run_prefixes[0]}
+        return out
 
     mp.setattr(frz, "_hash_registry_table", hash_registry)
     mp.setattr(frz, "_hash_l7_parquet_table", hash_l7)
     mp.setattr(frz, "_l1_direct_record", l1_direct)
-    mp.setattr(frz, "_all_registry_groups", all_registry_groups)
+    mp.setattr(frz, "_combined_artifact_hashes", combined_artifacts)
+    probe_installed = kind == "multi" and os.environ.get("FFNAME_NO_PROBE") != "1"
+    if probe_installed:  # FFNAME_NO_PROBE=1：只供探針等價證明之「不掛探針」對照 run（k2 拒收）
+        mp.setattr(FeatureStorage, "write_raw_from_registry_stream", stream_write_probe)
     temp_root = work / "failopen"
     temp_root.mkdir(parents=True, exist_ok=True)
     if kind == "multi":
@@ -455,7 +548,9 @@ def _recipe_failopen(mp: Any, work: Path) -> Dict[str, Any]:
         checks = _g6_shift_checks(pd.DataFrame({tagged: arr for tagged, (_key, arr) in entries.items()}))
         for tagged, ok in checks.items():
             shift[entries[tagged][0]] = ok  # 以 sidecar 鍵記
-    return {"unit": unit, "unit_record": record, "tables": tables, "conflicts": conflicts, "g6_shift": shift}
+    return {"unit": unit, "unit_record": record, "tables": tables, "conflicts": conflicts, "g6_shift": shift,
+            "stream_write_probe": probe_calls if probe_installed else None, "probe_installed": probe_installed,
+            "json_masked": json_masked}
 
 
 def _recipe_framepath(mp: Any, work: Path) -> Dict[str, Any]:
@@ -1109,6 +1204,182 @@ def _rel_or_abs(path: Path) -> str:
         return str(path.resolve())
 
 
+PROBE_EQUIV_PATH = K2_DIR / "failopen__probe_equivalence.json"
+PROBE_EQUIV_SCHEMA = "ffname-probe-equivalence-v3"
+
+
+def _artifact_index(record: Mapping[str, Any]) -> Dict[str, Tuple[str, int]]:
+    """unit_record.artifacts 之逐檔 {root/path: (sha256, size)}（root 為 config_hash 目錄名或 registry；同一單元兩次 run 同）。"""
+    files = record["sidecar"]["unit_record"]["artifacts"]["files"]
+    return {f"{f.get('root')}/{f['path']}": (str(f["sha256"]), int(f["size"])) for f in files}
+
+
+def _strip_run_dir(value: Any) -> Any:
+    """merged_L7_source 之絕對路徑含每次 run 之暫存目錄 ⇒ 只留 `failopen/` 之後之相對段（其餘欄位原樣）。"""
+    if isinstance(value, str) and "/failopen/" in value:
+        return value.split("/failopen/", 1)[1]
+    return value
+
+
+def _prod_objects(head: str) -> Dict[str, str]:
+    """生產碼物件（momentum/ 樹＋failopen golden 原產生腳本）；兩紀錄 HEAD 可不同（其間只提交工具／golden），物件須同。"""
+    out = {}
+    for spec in ("momentum", "scripts/freeze_failopen_baseline.py"):
+        out[spec] = subprocess.run(["git", "-C", str(MAIN_REPO), "rev-parse", f"{head}:{spec}"], check=True,
+                                   capture_output=True, text=True).stdout.strip()
+    return out
+
+
+def _record_compare(a_path: Path, b_path: Path) -> Dict[str, Any]:
+    """同單元兩份 failopen 紀錄之生產輸出比對（不涉探針判定）：① unit_record 除 perf（牆鐘／RSS）外全等
+    （merged_L7_source 之 run 暫存目錄前綴除外）；② 逐欄 sidecar 表（merged_L7／registry／l1_direct 逐欄值指紋）全等；
+    ③ artifacts 逐檔 sha256＋大小：資料檔（非 .json）之差一律列 data_differ；.json 中介檔之差依兩側遮罩內容雜湊
+    （時戳鍵 created_at／updated_at、本 run 暫存目錄前綴）分 masked_equal／masked_differ（附頂層鍵差）／no_mask。"""
+    a = json.loads(a_path.read_text(encoding="utf-8"))
+    b = json.loads(b_path.read_text(encoding="utf-8"))
+    problems: List[str] = []
+    if a["sidecar"]["unit"] != b["sidecar"]["unit"]:
+        problems.append("unit_differs")
+    prod_a, prod_b = _prod_objects(a["head"]), _prod_objects(b["head"])
+    if prod_a != prod_b or a["tree"] != b["tree"]:
+        problems.append(f"production_code_differs:{prod_a}!={prod_b}")
+
+    def core(rec: Mapping[str, Any]) -> Dict[str, Any]:
+        ur = dict(rec["sidecar"]["unit_record"])
+        ur.pop("perf", None)
+        ur.pop("artifacts", None)
+        ur["merged_L7_source"] = {k: _strip_run_dir(v) for k, v in (ur.get("merged_L7_source") or {}).items()}
+        return ur
+
+    ca, cb = core(a), core(b)
+    record_diff = sorted(k for k in set(ca) | set(cb) if ca.get(k) != cb.get(k))
+    if record_diff:
+        problems.append(f"unit_record_differs:{record_diff}")
+    table_diff: Dict[str, int] = {}
+    for name in sorted(set(a["sidecar"]["tables"]) | set(b["sidecar"]["tables"])):
+        ta, tb = a["sidecar"]["tables"].get(name, {}), b["sidecar"]["tables"].get(name, {})
+        n = sum(1 for key in set(ta) | set(tb) if ta.get(key) != tb.get(key))
+        if n:
+            table_diff[name] = n
+    if table_diff:
+        problems.append(f"sidecar_tables_differ:{table_diff}")
+    if a["sidecar"].get("conflicts") != b["sidecar"].get("conflicts"):
+        problems.append("conflicts_differ")
+    ia, ib = _artifact_index(a), _artifact_index(b)
+    if set(ia) != set(ib):
+        problems.append(f"artifact_file_set_differs:{sorted(set(ia) ^ set(ib))[:20]}")
+    differing = sorted(k for k in set(ia) & set(ib) if ia[k] != ib[k])
+    ja, jb = a["sidecar"].get("json_masked") or {}, b["sidecar"].get("json_masked") or {}
+    data_differ, masked_equal, no_mask = [], [], []
+    masked_differ: Dict[str, List[str]] = {}
+    for k in differing:
+        if not k.endswith(".json"):
+            data_differ.append(k)
+        elif ja.get(k, {}).get("sha256") and jb.get(k, {}).get("sha256"):
+            if ja[k]["sha256"] == jb[k]["sha256"]:
+                masked_equal.append(k)
+            else:
+                masked_differ[k] = sorted(t for t in set(ja[k]["top_keys"]) | set(jb[k]["top_keys"])
+                                          if ja[k]["top_keys"].get(t) != jb[k]["top_keys"].get(t))
+        else:
+            no_mask.append(k)
+    if data_differ:
+        problems.append(f"data_files_differ:{data_differ[:20]}")
+    if masked_differ:
+        problems.append(f"json_differ_after_mask:{masked_differ}")
+    volatile = {k: {"a": ja[k].get("volatile"), "b": jb[k].get("volatile"),
+                    "run_prefix": [ja[k].get("run_prefix"), jb[k].get("run_prefix")]} for k in masked_equal}
+    return {"a": {"record": str(a_path), "sha256": hashlib.sha256(a_path.read_bytes()).hexdigest(), "head": a["head"],
+                  "probe_installed": a["sidecar"].get("probe_installed"), "elapsed_seconds": a.get("elapsed_seconds")},
+            "b": {"record": str(b_path), "sha256": hashlib.sha256(b_path.read_bytes()).hexdigest(), "head": b["head"],
+                  "probe_installed": b["sidecar"].get("probe_installed"), "elapsed_seconds": b.get("elapsed_seconds")},
+            "unit": a["sidecar"]["unit"], "production_objects": prod_a,
+            "unit_record_fields_compared": sorted(ca), "unit_record_differs": record_diff,
+            "sidecar_columns_compared": {n: len(t) for n, t in a["sidecar"]["tables"].items()},
+            "sidecar_tables_differ": table_diff,
+            "artifact_files_compared": len(set(ia) & set(ib)),
+            "artifact_files_byte_equal": len(set(ia) & set(ib)) - len(differing),
+            "data_files_differ": data_differ, "json_differ_masked_equal": masked_equal,
+            "json_differ_after_mask": masked_differ, "json_differ_no_mask": no_mask, "volatile_values": volatile,
+            "artifact_aggregate_sha256": {"a": a["sidecar"]["unit_record"]["artifacts"].get("aggregate_sha256"),
+                                          "b": b["sidecar"]["unit_record"]["artifacts"].get("aggregate_sha256")},
+            "problems": problems}
+
+
+PROBE_VOLATILE_FIELDS = ("created_at", "updated_at", "<run temp dir prefix in strings>")
+
+
+def probe_equivalence(with_path: Path, without_path: Path, control_path: Path) -> Dict[str, Any]:
+    """委員會 r3 選項 (a) 之「探針不改生產輸出」證明（同單元、同生產碼、全窗）：
+    主比對＝掛探針 vs 不掛探針（`FFNAME_NO_PROBE=1`，兩側皆錄 .json 遮罩內容）：unit_record／逐欄 sidecar／全部資料檔
+    位元組須全等；.json 中介檔之位元組差須遮罩後全等（只差 PROBE_VOLATILE_FIELDS）。
+    對照比對＝另一份不掛探針之 run vs 主比對之不掛探針側（兩份皆無探針）：其 .json 位元組差之檔須涵蓋主比對之 .json
+    差檔（＝這些檔在完全不掛探針時亦逐次不同，非探針所致），且資料檔位元組亦全等。另列被遮罩欄於各 run 之原值
+    （時戳相異、暫存路徑相異），證明被排除者確為逐次變動欄。"""
+    main = _record_compare(with_path, without_path)
+    control = _record_compare(control_path, without_path)
+    w = json.loads(with_path.read_text(encoding="utf-8"))
+    calls = w["sidecar"].get("stream_write_probe") or []
+    problems = [f"main:{p}" for p in main["problems"]]
+    if not calls or any(c.get("errors") for c in calls) or not all(int(c.get("captured", 0)) > 0 for c in calls):
+        problems.append(f"probe_not_effective:{calls}")
+    if main["a"]["probe_installed"] is not True or main["b"]["probe_installed"] is not False:
+        problems.append("main_pair_probe_flags")
+    if main["json_differ_no_mask"]:
+        problems.append(f"main:json_without_mask:{main['json_differ_no_mask']}")
+    if control["b"]["probe_installed"] is not False or control["a"]["probe_installed"] is True:
+        problems.append("control_pair_has_probe")
+    if control["data_files_differ"] or control["unit_record_differs"] or control["sidecar_tables_differ"]:
+        problems.append("control:no_probe_runs_differ_beyond_json")
+    control_json = {k.split("/", 1)[1] for k in control["json_differ_masked_equal"] + control["json_differ_no_mask"]
+                    + list(control["json_differ_after_mask"])}
+    not_in_control = [k for k in main["json_differ_masked_equal"] if k.split("/", 1)[1] not in control_json]
+    if not_in_control:
+        problems.append(f"json_diff_not_seen_without_probe:{not_in_control}")
+    for k, v in main["volatile_values"].items():
+        if v["a"] == v["b"] and v["run_prefix"][0] == v["run_prefix"][1]:
+            problems.append(f"masked_but_no_volatile_change:{k}")
+    return {"schema_version": PROBE_EQUIV_SCHEMA, "unit": main["unit"], "volatile_fields": list(PROBE_VOLATILE_FIELDS),
+            "with_probe": {**main["a"], "probe_calls": calls}, "main": main, "control": control,
+            "json_files_only_volatile_diff": main["json_differ_masked_equal"], "problems": problems,
+            "equal": not problems}
+
+
+def write_probe_equivalence(with_path: Path, without_path: Path, control_path: Path) -> int:
+    doc = probe_equivalence(with_path, without_path, control_path)
+    K2_DIR.mkdir(parents=True, exist_ok=True)
+    PROBE_EQUIV_PATH.write_text(json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    for part in ("main", "control"):
+        d = doc[part]
+        print(f"[ffname-refreeze probe-equiv] {doc['unit']} {part}: unit_record 欄 {len(d['unit_record_fields_compared'])}"
+              f"（差 {d['unit_record_differs']}）、sidecar 欄 {d['sidecar_columns_compared']}（差 {d['sidecar_tables_differ']}）、"
+              f"artifacts {d['artifact_files_byte_equal']}/{d['artifact_files_compared']} 位元組同、資料檔差 {d['data_files_differ']}、"
+              f".json 遮罩後同 {d['json_differ_masked_equal']}、遮罩後仍差 {d['json_differ_after_mask']}、無遮罩紀錄 {d['json_differ_no_mask']}")
+    print(f"[ffname-refreeze probe-equiv] equal={doc['equal']}；問題 {doc['problems']}")
+    return 0 if doc["equal"] else 2
+
+
+def _probe_check(new_path: Path, new_record: Mapping[str, Any]) -> Dict[str, Any]:
+    """multi 單元之 ⑥ 位移值來自探針 ⇒ 須：本紀錄之探針有效（captured>0、errors 空），且探針等價證明存在且 equal；
+    證明單元本身須為同一紀錄（sha256 同）。缺任一 ⇒ problems 非空（k2 判 fail）。"""
+    problems: List[str] = []
+    calls = new_record["sidecar"].get("stream_write_probe") or []
+    if not calls or any(c.get("errors") for c in calls) or not all(int(c.get("captured", 0)) > 0 for c in calls):
+        problems.append(f"probe_not_effective:{calls}")
+    proof: Dict[str, Any] = {}
+    if not PROBE_EQUIV_PATH.exists():
+        problems.append("probe_equivalence_missing")
+    else:
+        proof = json.loads(PROBE_EQUIV_PATH.read_text(encoding="utf-8"))
+        if proof.get("schema_version") != PROBE_EQUIV_SCHEMA or proof.get("equal") is not True:
+            problems.append("probe_equivalence_not_equal")
+        if proof.get("unit") == new_record["sidecar"]["unit"] and \
+                proof.get("with_probe", {}).get("sha256") != hashlib.sha256(new_path.read_bytes()).hexdigest():
+            problems.append("probe_equivalence_record_mismatch")
+    return {"receipt": _rel_or_abs(PROBE_EQUIV_PATH), "proof_unit": proof.get("unit"), "proof_equal": proof.get("equal"),
+            "probe_calls": calls, "problems": problems}
+
+
 _FRAMEPATH_SCALARS = ("row_count", "run_status", "completeness")  # time_index_sha256 含路徑（鹽）⇒ 改比 time_values
 
 
@@ -1364,6 +1635,9 @@ def k2(rel: str, old_path: Path, new_path: Path, dry: bool = False) -> int:
     _require_pre_change_record(old_record, f"k2 {rel}")
     if new_record.get("instrumented"):
         raise SystemExit("K2：新碼紀錄不應掛紀錄器（--no-instrument）")
+    if recipe == "failopen" and str(new_record["sidecar"].get("unit", "")).endswith("/multi") \
+            and new_record["sidecar"].get("probe_installed") is False:
+        raise SystemExit("K2：multi 現行紀錄未掛探針（FFNAME_NO_PROBE=1），⑥ 位移無從驗")
     if recipe == "framepath":
         return _k2_framepath(rel, old_record, new_record, dry)
     old_sc, new_sc = _normalize_sidecar(recipe, old_record["sidecar"]), _normalize_sidecar(recipe, new_record["sidecar"])
@@ -1373,9 +1647,18 @@ def k2(rel: str, old_path: Path, new_path: Path, dry: bool = False) -> int:
         unit = old_record["sidecar"]["unit"]
         if unit != new_record["sidecar"]["unit"]:
             raise SystemExit("failopen K2：新舊紀錄單元不同")
+        if unit in (_contract_refreeze().get("failopen_units_k0") or []):
+            raise SystemExit(f"failopen K2：{unit} 屬契約 failopen_units_k0（單元級 K0，golden 位元組保持改前），不跑 k2")
+        if unit not in _contract_refreeze()["failopen_units"]:
+            raise SystemExit(f"failopen K2：{unit} 不在契約 failopen_units")
         tag = f"{tag}__{unit.replace('/', '-')}"
     entry = _k2_compare_unit(rel, recipe, tag, old_sc, new_sc, old_record, new_record,
                              new_record["sidecar"].get("g6_shift") or {}, unit)
+    if recipe == "failopen" and str(unit).endswith("/multi"):
+        entry["probe_equivalence"] = _probe_check(new_path, new_record)
+        if entry["probe_equivalence"]["problems"]:
+            entry["decision"] = "fail"
+            entry["mismatches"] = list(entry["mismatches"]) + [f"probe:{p}" for p in entry["probe_equivalence"]["problems"]]
     if entry["decision"] == "refrozen" and not dry:
         (MAIN_REPO / rel).write_text(_golden_from_new(rel, recipe, new_record), encoding="utf-8")
     entry["refrozen"] = entry["decision"] == "refrozen" and not dry
@@ -1459,6 +1742,192 @@ def run_consumers(rels: Optional[Sequence[str]], log_dir: Path) -> int:
                    "failed==0、非空（審查 r2 codex P1-02）。")
     CONSUMERS_PATH.write_text(json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     return 0
+
+
+RERUN_CODE_DIRS = ("momentum", "api", "scripts", "config")
+RERUN_RUNNER_SELF = "scripts/ffname_refreeze.py"  # 本工具＝跑 pytest／寫收據之外殼，非消費測試之輸入（另以靜態掃描證明）
+
+
+def _iso_to_epoch(stamp: str) -> float:
+    from datetime import datetime
+
+    return datetime.fromisoformat(stamp).timestamp()
+
+
+def _junit_start(xml_path: Path) -> float:
+    """junitxml 之 testsuite 起始時刻（pytest 寫入帶時區之 ISO 時戳）。"""
+    import xml.etree.ElementTree as ET
+
+    root = ET.parse(xml_path).getroot()
+    suite = root if root.tag == "testsuite" else root.find("testsuite")
+    return _iso_to_epoch(str(suite.get("timestamp")))
+
+
+def _git_head_moves_since(since: float) -> List[str]:
+    out = subprocess.run(["git", "-C", str(MAIN_REPO), "reflog", "--date=unix", "--format=%H %gd"], check=True,
+                         capture_output=True, text=True).stdout.split("\n")
+    moves = []
+    for line in out:
+        parts = line.split()
+        if len(parts) == 2 and "@{" in parts[1]:
+            ts = float(parts[1].split("@{", 1)[1].rstrip("}"))
+            if ts > since:
+                moves.append(parts[0])
+    return moves
+
+
+def _changed_since(since: float) -> Dict[str, List[str]]:
+    """自 `since` 起有變動之檔（mtime 嚴格晚於 since）：code＝RERUN_CODE_DIRS 下之檔，另列「目錄 mtime 變而其內無任何
+    since 後新生（birthtime）之項」之目錄（＝有項目被刪；編輯器原子改寫會新生 inode，已由該檔本身列出）；tests＝tests/
+    下之檔。`__pycache__`（位元組碼／numba 快取，非原始碼）不計。"""
+    code, tests = [], []
+    for top, bucket, with_dirs in [(d, code, True) for d in RERUN_CODE_DIRS] + [("tests", tests, False)]:
+        base = MAIN_REPO / top
+        if not base.exists():
+            continue
+        for dirpath, dirnames, filenames in os.walk(base):
+            all_entries = list(dirnames) + list(filenames)
+            dirnames[:] = [d for d in dirnames if d != "__pycache__" and not d.startswith(".pytest_cache")]
+            rel_dir = str(Path(dirpath).relative_to(MAIN_REPO))
+            if with_dirs and os.stat(dirpath).st_mtime > since:
+                born = []
+                for e in all_entries:
+                    try:
+                        st = os.lstat(Path(dirpath) / e)
+                    except OSError:
+                        continue
+                    if getattr(st, "st_birthtime", st.st_ctime) > since:
+                        born.append(e)
+                if not born:
+                    bucket.append(rel_dir + "/")
+            for name in filenames:
+                p = Path(dirpath) / name
+                try:
+                    if p.stat().st_mtime > since:
+                        bucket.append(str(p.relative_to(MAIN_REPO)))
+                except OSError:
+                    continue
+    return {"code": sorted(code), "tests": sorted(tests)}
+
+
+def _clean_at_head(path: str) -> bool:
+    proc = subprocess.run(["git", "-C", str(MAIN_REPO), "status", "--porcelain", "--", path], capture_output=True, text=True)
+    return proc.returncode == 0 and not proc.stdout.strip()
+
+
+def _runner_not_imported_by(consumer_files: Sequence[str]) -> List[str]:
+    """本工具未被消費測試檔引用（靜態掃描：檔內無 `ffname_refreeze` 字樣）；回傳引用者清單（空＝未引用）。"""
+    hits = []
+    for rel in consumer_files:
+        p = MAIN_REPO / rel
+        if p.is_file() and "ffname_refreeze" in p.read_text(encoding="utf-8"):
+            hits.append(rel)
+    return hits
+
+
+def rerun_state_problems(state: Mapping[str, Any], allowed_test_files: Sequence[str]) -> List[str]:
+    """補跑合併之狀態閘（純函式，供變異測試）：`state`＝先前 run 起始時刻至今之變動證據。拒合併條件：
+    ① HEAD 自先前 run 起始後有移動；② RERUN_CODE_DIRS 下任一檔／目錄有變動（本工具自身除外，且須未被消費測試引用）；
+    ③ tests/ 下有變動之檔不屬補跑 nodeid 所在測試檔——除非為非 .py 產物且與 HEAD 位元組同（如 golden inventory 還原）。"""
+    bad: List[str] = []
+    if state.get("head_moves_since_prior"):
+        bad.append(f"head_moved:{state['head_moves_since_prior']}")
+    if state.get("head_prior") != state.get("head_now"):
+        bad.append("head_differs")
+    for path in state.get("code_changed") or []:
+        if path == RERUN_RUNNER_SELF and not state.get("runner_referenced_by"):
+            continue
+        bad.append(f"production_changed:{path}")
+    clean = set(state.get("tests_changed_clean_non_py") or [])
+    for path in state.get("tests_changed") or []:
+        if path in allowed_test_files or path in clean:
+            continue
+        bad.append(f"test_changed:{path}")
+    return bad
+
+
+def rerun_consumers_merge(nodeids: Sequence[str], log_dir: Path, prior_log_dir: Path) -> int:
+    """只補跑給定 nodeid，結果併入消費測試收據（主控 2026-10-19 裁定；使用者 2026-10-16「跑過的結果不准全部重跑」）。
+    fail-closed：先前 run 之 junitxml（prior_log_dir）須與收據之 executed 一致；自先前 run 起始至今 HEAD 未動、生產碼
+    （momentum/ api/ scripts/ config/，本工具自身除外）無任何變動、tests/ 只動了補跑 nodeid 所在檔；合併後執行集合仍＝
+    契約展開集合。逐 nodeid 記出處（先前 log 目錄／補跑 log 目錄）。"""
+    contract = _contract_refreeze()
+    doc = json.loads(CONSUMERS_PATH.read_text(encoding="utf-8"))
+    rels = [rel for rel, run in doc.items() if rel != "_doc" and isinstance(run, dict)
+            and set(nodeids) <= set(run.get("expected_nodeids") or [])]
+    if not rels:
+        raise SystemExit("rerun：給定 nodeid 不全屬任何已記錄之消費測試集合")
+    test_files = sorted({n.split("::", 1)[0] for n in nodeids})
+    # 先前 run 出處：找 executed 集合完全相同之 junitxml
+    prior_xml = None
+    for xml in sorted(prior_log_dir.glob("consumers_*.xml")):
+        if set(_junit_outcomes(xml, doc[rels[0]]["expected_nodeids"])) == set(doc[rels[0]]["executed"]):
+            if _junit_outcomes(xml, doc[rels[0]]["expected_nodeids"]) == doc[rels[0]]["executed"]:
+                prior_xml = xml
+                break
+    if prior_xml is None:
+        raise SystemExit(f"rerun：{prior_log_dir} 無與收據 executed 完全一致之 junitxml（先前出處無法核對）")
+    prior_start = _junit_start(prior_xml)
+    head_now = subprocess.run(["git", "-C", str(MAIN_REPO), "rev-parse", "HEAD"], check=True, capture_output=True,
+                              text=True).stdout.strip()
+    changed = _changed_since(prior_start)
+    consumer_files = sorted({n.split("::", 1)[0] for rel in rels for n in doc[rel]["expected_nodeids"]})
+    state = {"method": "mtime_since_prior_junit_start", "prior_junit": str(prior_xml), "prior_start_epoch": prior_start,
+             "head_prior": head_now if not _git_head_moves_since(prior_start) else None, "head_now": head_now,
+             "head_moves_since_prior": _git_head_moves_since(prior_start),
+             "head_trees": {d: subprocess.run(["git", "-C", str(MAIN_REPO), "rev-parse", f"HEAD:{d}"], capture_output=True,
+                                              text=True).stdout.strip() for d in RERUN_CODE_DIRS},
+             "code_changed": changed["code"], "tests_changed": changed["tests"],
+             "tests_changed_clean_non_py": [p for p in changed["tests"] if not p.endswith(".py") and _clean_at_head(p)],
+             "runner_referenced_by": _runner_not_imported_by(consumer_files),
+             "code_dirty_vs_head_sha256": {}}
+    porcelain = subprocess.run(["git", "-C", str(MAIN_REPO), "status", "--porcelain", "--untracked-files=all", "--",
+                                *RERUN_CODE_DIRS], capture_output=True, text=True).stdout.splitlines()
+    for line in porcelain:
+        path = line[3:].strip().strip('"')
+        if "__pycache__" in path:
+            continue
+        p = MAIN_REPO / path
+        state["code_dirty_vs_head_sha256"][path] = hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "<deleted>"
+    problems = rerun_state_problems(state, test_files)
+    if problems:
+        print(f"[ffname-refreeze consumers --merge] 拒合併：{problems}")
+        return 2
+    log_dir.mkdir(parents=True, exist_ok=True)
+    xml = log_dir / "rerun.xml"
+    started = time.time()
+    proc = subprocess.run([sys.executable, "-m", "pytest", *nodeids, "-q", "-o", "log_cli=false", "-p", "no:cacheprovider",
+                           f"--junitxml={xml}"], cwd=str(MAIN_REPO), capture_output=True, text=True)
+    (log_dir / "rerun.log").write_text(proc.stdout[-20000:] + proc.stderr[-5000:], encoding="utf-8")
+    fresh = _junit_outcomes(xml, list(nodeids)) if xml.is_file() else {}
+    if set(fresh) != set(nodeids):
+        print(f"[ffname-refreeze consumers --merge] 補跑執行集合不符：缺 {sorted(set(nodeids) - set(fresh))}")
+        return 2
+    for rel in rels:
+        run = doc[rel]
+        expected_now = collect_nodeids(contract["dispositions"][rel]["consumers"])
+        if sorted(expected_now) != sorted(run["expected_nodeids"]):
+            print(f"[ffname-refreeze consumers --merge] {rel}：契約展開集合已變（{len(expected_now)} vs {len(run['expected_nodeids'])}），拒合併")
+            return 2
+        executed = dict(run["executed"])
+        executed.update(fresh)
+        if set(executed) != set(expected_now):
+            print(f"[ffname-refreeze consumers --merge] {rel}：合併後執行集合≠契約展開集合，拒合併")
+            return 2
+        counts = {k: sum(1 for v in executed.values() if v == k) for k in ("passed", "failed", "skipped", "error")}
+        provenance = {n: {"source": "rerun" if n in fresh else "prior",
+                          "log_dir": str(log_dir if n in fresh else prior_log_dir)} for n in sorted(executed)}
+        doc[rel] = {**run, "executed": executed, "passed": counts["passed"], "failed": counts["failed"] + counts["error"],
+                    "skipped": counts["skipped"], "total": len(executed),
+                    "rerun": {"nodeids": list(nodeids), "pytest_rc": proc.returncode,
+                              "seconds": round(time.time() - started, 1), "log_dir": str(log_dir),
+                              "prior_log_dir": str(prior_log_dir), "prior_pytest_rc": run.get("pytest_rc"),
+                              "state": state, "provenance": provenance}}
+        r = doc[rel]
+        print(f"[ffname-refreeze consumers --merge] {rel}：補跑 {len(fresh)}（{fresh}）；合併後 執行 {r['total']}、過 {r['passed']}、"
+              f"紅 {r['failed']}、略 {r['skipped']}")
+    CONSUMERS_PATH.write_text(json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    return 0 if proc.returncode == 0 else 1
 
 
 def consumer_gate_problems(rel: str, consumers: Sequence[str], run: Optional[Mapping[str, Any]],
@@ -1579,6 +2048,14 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
             else:
                 entry.update({"status": "pending", "value_hash_mismatch": 1,
                               "units_done": [u for u, p in zip(fo_units, unit_files) if p.is_file()]})
+            # 主控 2026-10-19 裁定：failopen_units_k0 之單元為單元級 K0——golden 該單元節點須與改前碼態位元組同
+            k0 = failopen_k0_status(rel)
+            entry["k0_units"] = k0
+            entry["k0_units_reason"] = contract.get("failopen_units_k0_reason")
+            bad_k0 = [u["unit"] for u in k0 if not u["unchanged"]]
+            if bad_k0:
+                entry["value_hash_mismatch"] = int(entry.get("value_hash_mismatch") or 0) + len(bad_k0)
+                entry["bad_k0_units"] = bad_k0
         elif cls == "K2":
             kp = K2_DIR / f"{_slug(rel)}.json"
             if kp.is_file():
@@ -1706,9 +2183,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     k2p.add_argument("--old", required=True)
     k2p.add_argument("--new", required=True)
     k2p.add_argument("--dry", action="store_true", help="只比對、不寫 golden（改前 golden 本身與改前碼不符時用）")
+    pe = sub.add_parser("probe-equiv", help="委員會 r3 (a)：探針不改生產輸出之證明（掛 vs 不掛探針同單元紀錄比）")
+    pe.add_argument("--with-probe", required=True)
+    pe.add_argument("--without-probe", required=True)
+    pe.add_argument("--control", required=True, help="另一份不掛探針之同單元紀錄（辨逐次變動之 .json 檔）")
     cp = sub.add_parser("consumers", help="跑契約 consumers 並記實際執行之 nodeid（審查 r2）")
     cp.add_argument("--only", nargs="*", default=None, help="只跑這些 golden（預設全部處置）")
     cp.add_argument("--log-dir", required=True, help="junitxml 與 log 落點（版控外）")
+    cp.add_argument("--rerun-nodeids", nargs="+", default=None, help="只補跑這些 nodeid（須配 --merge 與 --prior-log-dir）")
+    cp.add_argument("--merge", action="store_true", help="補跑結果併入既有消費測試收據（狀態閘 fail-closed）")
+    cp.add_argument("--prior-log-dir", default=None, help="先前全集 run 之 log 目錄（核對出處與起始時刻）")
     rp = sub.add_parser("receipt")
     rp.add_argument("--salt-proof", required=True)
     rp.add_argument("--consumers", default=None)
@@ -1725,7 +2209,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return write_mapping(args.golden, Path(args.record))
     if args.cmd == "k2":
         return k2(args.golden, Path(args.old), Path(args.new), dry=args.dry)
+    if args.cmd == "probe-equiv":
+        return write_probe_equivalence(Path(args.with_probe), Path(args.without_probe), Path(args.control))
     if args.cmd == "consumers":
+        if args.rerun_nodeids or args.merge:
+            if not (args.rerun_nodeids and args.merge and args.prior_log_dir):
+                raise SystemExit("補跑須同時給 --rerun-nodeids、--merge、--prior-log-dir")
+            return rerun_consumers_merge(args.rerun_nodeids, Path(args.log_dir), Path(args.prior_log_dir))
         return run_consumers(args.only, Path(args.log_dir))
     if args.cmd == "receipt":
         return write_receipt(Path(args.salt_proof), Path(args.consumers) if args.consumers else None,
