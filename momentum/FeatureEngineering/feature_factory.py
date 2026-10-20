@@ -87,7 +87,7 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     StationarityIncompleteError,
     StationarityProvenanceError,
 )
-from momentum.FeatureEngineering.run_provenance import ProvenanceConflictError
+from momentum.FeatureEngineering.run_provenance import ProvenanceConflictError, ProvenanceExhaustivenessError
 from momentum.FeatureEngineering.utils.nan_stats import abnormal_nan_count
 from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 from momentum.FeatureEngineering.feature_config import l65_enabled
@@ -2984,6 +2984,14 @@ class FeatureFactory:
         del raw_selected_groups
         gc.collect()
 
+        # FFDSTAR Task 1.4：post-IC 紀錄（母體須恰為 IC 選欄全集；不符 ⇒ 拒寫 processed）
+        post_ic_execution = preprocessor.last_post_ic_execution()
+        recorded = {str(key[1]) for key in post_ic_execution[0]}
+        if recorded != {str(name) for name in selected_features}:
+            raise ProvenanceExhaustivenessError(
+                f"post-IC 紀錄母體 ≠ IC 選欄全集：多 {sorted(recorded - set(map(str, selected_features)))[:3]}、"
+                f"缺 {sorted(set(map(str, selected_features)) - recorded)[:3]}"
+            )
         processed_path = storage.write_processed(
             symbol,
             tf,
@@ -2992,6 +3000,7 @@ class FeatureFactory:
             row_index=self._processed_row_index(processed_groups),
             layer_results=self.layer_results,
             post_ic_arm=ctx.post_ic_arm,
+            execution=post_ic_execution,
         )
 
         # IC-First raw/ cleanup：raw/ 只供 IC 閘；processed/ 落盤後即可回收（IC 選欄與分數保留於回傳 metadata）

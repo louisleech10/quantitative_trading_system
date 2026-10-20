@@ -18,6 +18,7 @@ from momentum.FeatureEngineering.feature_factory import FeatureFactory
 from momentum.FeatureEngineering.feature_reader import FeatureReader
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.processed_execution_helpers import direct_write_execution
 
 
 
@@ -206,7 +207,8 @@ def test_ic_empty_selection(tmp_path) -> None:
     storage = FeatureStorage(str(tmp_path / "features"))
     reader = FeatureReader(str(tmp_path / "features"))
     storage.write_processed("SYNTHETIC", "1h", "cfg_empty_selection", processed_groups,
-                            row_index=pd.DatetimeIndex([]))  # ICFIRSTALIGN Task 1.3：row_index 必填
+                            row_index=pd.DatetimeIndex([]),  # ICFIRSTALIGN Task 1.3：row_index 必填
+                            execution=preprocessor.last_post_ic_execution())  # FFDSTAR Task 1.4：execution 必填
     manifest = reader.load_manifest_v2(
         "SYNTHETIC",
         "1h",
@@ -242,7 +244,8 @@ def test_l7_schema_version_metadata(tmp_path) -> None:
 
     raw_dir = storage.write_raw(symbol, tf, config_hash, raw_groups)
     processed_dir = storage.write_processed(symbol, tf, config_hash, processed_groups,  # ICFIRSTALIGN Task 1.3
-                                            row_index=pd.date_range("2024-01-01", periods=3, freq="h"))
+                                            row_index=pd.date_range("2024-01-01", periods=3, freq="h"),
+                                            execution=direct_write_execution(processed_groups))  # FFDSTAR Task 1.4
 
     assert raw_dir == tmp_path / "features" / symbol / tf / config_hash / "raw"
     assert processed_dir == tmp_path / "features" / symbol / tf / config_hash / "processed"
@@ -312,7 +315,8 @@ def test_feature_run_dir_and_manifest_atomicity(tmp_path) -> None:
         storage.write_raw(symbol, tf, "cfg_empty_raw", {})
 
     processed_dir = storage.write_processed(symbol, tf, "cfg_empty_processed", {},
-                                            row_index=pd.DatetimeIndex([]))  # ICFIRSTALIGN Task 1.3
+                                            row_index=pd.DatetimeIndex([]),  # ICFIRSTALIGN Task 1.3
+                                            execution=direct_write_execution({}))  # FFDSTAR Task 1.4
     assert processed_dir.exists()
     processed_manifest = reader.load_manifest_v2(
         symbol,

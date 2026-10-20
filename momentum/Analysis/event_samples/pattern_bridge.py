@@ -24,10 +24,12 @@ from momentum.core.logging import get_logger
 from momentum.Analysis.event_samples.tables import _common_constraint_block, binary_discrimination_table
 from momentum.Analysis.event_samples.types import EventManifest, EventSplitPlan
 from momentum.Analysis.pattern_extractor import PatternExtractor, PatternSplitRequiredError
+from momentum.Analysis.survivor_contract import load_survivor_contract
 
 logger = get_logger(__name__)
 
-SURVIVOR_SCHEMA_VERSION_REQUIRED = 2
+# FFDSTAR Task 2.4：倖存者讀取端接受現行契約版本（讀契約常數，不寫死字面；v3 起 provenance 帶 ff_run_identity）
+SURVIVOR_SCHEMA_VERSION_REQUIRED = int(load_survivor_contract()["version"])
 
 
 @dataclass(frozen=True)

@@ -2435,3 +2435,13 @@ def tag_model_performance_scopes(performance: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
     return out
+
+
+# ---------------------------------------------------------------------------------------------- FFDSTAR run 身分鍵名
+#: 特徵 run 身分物件（`momentum.FeatureEngineering.run_provenance.RunIdentity.to_dict()`；鍵見其契約
+#: `run_identity_keys`）於一切輸出中之鍵名：IC 交接 h5 `metadata_json`、ingest `_meta.json`、IC 報告 metadata、
+#: 倖存者 provenance、API 結果（docs/FFDSTAR_SPEC.md Task 2.1／2.2／2.4、§C D5）。
+FF_RUN_IDENTITY_KEY = "ff_run_identity"
+#: 身分來源標示之鍵名與「呼叫端自帶特徵檔（非讀自特徵產出，身分為 null）」之值（SPEC Task 2.2）。
+FF_RUN_IDENTITY_SOURCE_KEY = "ff_run_identity_source"
+FF_RUN_IDENTITY_SOURCE_EXTERNAL = "external_features_path"

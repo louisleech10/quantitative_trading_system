@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -14,6 +14,8 @@ from momentum.FeatureEngineering.consumer_gate import (
     assert_required_columns_present,
 )
 from momentum.FeatureEngineering import feature_naming
+from momentum.FeatureEngineering import run_provenance
+from momentum.FeatureEngineering.run_provenance import RunIdentity
 from momentum.FeatureEngineering.feature_reader import CanonicalRun, FeatureReader, resolve_canonical_run
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
@@ -92,13 +94,37 @@ class FeatureLibrary:
 
         只讀 V2（FeatureReader）；無可讀 V2 run ⇒ FeatureNotFoundError。
         """
-        return self._load_internal(
+        features_df, _manifest = self._load_internal(
             symbol,
             timeframe,
             config_hash=config_hash,
             for_training=for_training,
             allow_partial_training=allow_partial_training,
         )
+        return features_df
+
+    def load_with_identity(
+        self,
+        symbol: str,
+        timeframe: str,
+        *,
+        config_hash: Optional[str] = None,
+        for_training: bool = False,
+        allow_partial_training: bool = False,
+    ) -> Tuple[pd.DataFrame, RunIdentity]:
+        """FFDSTAR Task 2.1：同 `load`（參數與 DataFrame 逐位元相同），另回 run 身分。
+
+        身分取自本次讀取據以判定可讀與 consumer 政策之**同一次** manifest 解析（`load_manifest_v2` 所回者），不另解析；
+        `config_hash` 未指定 ⇒ 先依 registry 解析 latest，身分之 `config_hash` 為解析後之真值。舊 run（無
+        `content_sha256`）⇒ 身分 `legacy`（呼叫端快取不得沿用）。"""
+        features_df, manifest = self._load_internal(
+            symbol,
+            timeframe,
+            config_hash=config_hash,
+            for_training=for_training,
+            allow_partial_training=allow_partial_training,
+        )
+        return features_df, run_provenance.resolve_run_identity(manifest, "raw")
 
     def load_for_training(
         self,
@@ -108,12 +134,13 @@ class FeatureLibrary:
         allow_partial_training: bool = False,
     ) -> pd.DataFrame:
         """Strict consumer load for ML/training paths."""
-        return self._load_internal(
+        features_df, _manifest = self._load_internal(
             symbol,
             timeframe,
             for_training=True,
             allow_partial_training=allow_partial_training,
         )
+        return features_df
 
     def _load_internal(
         self,
@@ -123,7 +150,8 @@ class FeatureLibrary:
         config_hash: Optional[str] = None,
         for_training: bool,
         allow_partial_training: bool,
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """回 (特徵, 本次讀取之 manifest)；manifest 為 `load_manifest_v2` 之同一次解析（FFDSTAR Task 2.1 身分來源）。"""
         if config_hash:
             entry = self._registry.get(symbol, timeframe, config_hash)
             if entry is None:
@@ -192,7 +220,7 @@ class FeatureLibrary:
                             len(features_df.columns),
                             manifest.get("run_status", manifest.get("quality_status")),
                         )
-                        return features_df
+                        return features_df, manifest
             except FileNotFoundError:
                 if explicit_hash:
                     raise FeatureNotFoundError(

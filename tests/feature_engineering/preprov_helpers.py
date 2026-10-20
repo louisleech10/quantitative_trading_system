@@ -172,6 +172,16 @@ def _gaussian(payload: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
+def _post_ic_defaults(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """移除 rank_transform／adaptive_zscore 之明示關閉，改由生產預設決定（`feature_config.py`
+    `RankTransformConfig.enabled`／`AdaptiveZScoreConfig.enabled` 預設 True；post-IC 沿用使用者開關、未設時預設開，
+    見 `feature_preprocessor.py` `_build_post_ic_transform_config`）。gaussian 仍為預設關（不改其鍵）。
+    raw 路徑於 IC-first 強制關閉三者，故只影響 post-IC 之 processed。"""
+    for step in ("rank_transform", "adaptive_zscore"):
+        payload["preprocessing"].pop(step, None)
+    return payload
+
+
 def _replace(payload: Dict[str, Any]) -> Dict[str, Any]:
     """前處理 mode 改為生產預設 replace（`feature_config.py` `mode: str = "replace"`；SPEC §V 格子 🔴：replace 才走 numba
     快速臂、shard 串流等路徑）。"""
@@ -200,6 +210,11 @@ CELLS: Dict[str, Dict[str, Any]] = {
     "ic_first": {"path": "ic_first", "primary": "1h", "window": WINDOW, "env": dict(fsh.IC_FIRST_OFF_ENV),
                  "ic_threshold": 0.0, "cleanup_raw": True,
                  "payload": _stat(["1h"], fracdiff=False, adf=False)},
+    # SPEC v4 §V 生產預設原則（同 replace 格）：IC-first 之 post-IC rank／zscore 依生產預設開啟（不明示關閉），
+    # gaussian 預設關；其餘同 ic_first（`ic_first` 格明示關閉 rank／zscore ⇒ 未涵蓋生產預設之 post-IC 路徑）
+    "ic_first_default": {"path": "ic_first", "primary": "1h", "window": WINDOW, "env": dict(fsh.IC_FIRST_OFF_ENV),
+                         "ic_threshold": 0.0, "cleanup_raw": True,
+                         "payload": _post_ic_defaults(_stat(["1h"], fracdiff=False, adf=False))},
     # SPEC v4 §V replace 格（生產預設 mode）：1h 單週期平穩化開＋縮尾開（`fast_payload` 縮尾開）
     "h1_replace_stat_on": {"path": "generate", "primary": "1h", "window": WINDOW,
                            "payload": _replace(_stat(["1h"], fracdiff=True, adf=True))},

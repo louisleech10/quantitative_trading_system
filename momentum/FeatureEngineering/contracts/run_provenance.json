@@ -698,29 +698,8 @@
         "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:942"
       ]
     },
-    "step_status_values.rank_transform.applied": {
-      "reason": "raw 路徑強制關閉 rank／zscore／gaussian；§V 各格之使用者設定亦關閉之（post-IC 沿用使用者開關）",
-      "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
-        "momentum/FeatureEngineering/feature_factory.py:3146"
-      ]
-    },
-    "step_status_values.adaptive_zscore.applied": {
-      "reason": "raw 路徑強制關閉 rank／zscore／gaussian；§V 各格之使用者設定亦關閉之（post-IC 沿用使用者開關）",
-      "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
-        "momentum/FeatureEngineering/feature_factory.py:3146"
-      ]
-    },
-    "step_status_values.gaussian_normalize.applied": {
-      "reason": "raw 路徑強制關閉 rank／zscore／gaussian；§V 各格之使用者設定亦關閉之（post-IC 沿用使用者開關）",
-      "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2599",
-        "momentum/FeatureEngineering/feature_factory.py:3146"
-      ]
-    },
     "step_status_values.adaptive_zscore.no_windows": {
-      "reason": "zscore 窗清單預設 [100, 252]，§V 各格未改且 zscore 關閉",
+      "reason": "zscore 窗清單預設 [100, 252]，§V 各格未改；zscore 開啟之格（ic_first_default 之 post-IC）走 Polars 臂，該臂只記 applied／not_selected（窗清單為空時以 100 照做，SPEC §N FFDSTAR-R4）",
       "_sources": [
         "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4616",
         "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1429"

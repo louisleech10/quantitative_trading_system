@@ -48,7 +48,11 @@ CACHE_IDENTITY_FIELDS = (
     "split_id",
     "feature_axis_sha256",
     "label_sha256",
+    # FFDSTAR Task 2.3（§C D5）：特徵值身分＝manifest raw 節點之 `content_sha256`（raw 已刪時 manifest 仍在）；缺即拒用
+    "content_sha256",
 )
+#: 請求身分中值為 None 即拒用（不可得 ⇒ 身分不完整）之欄
+_IDENTITY_FIELDS_REQUIRED_NON_NULL = ("feature_axis_sha256", "content_sha256")
 
 
 def _utc_epoch_ns(index: Any) -> np.ndarray:
@@ -255,10 +259,18 @@ class ICEngine:
                 axis_for_identity = feature_reader.load_row_index_v2(symbol, tf, config_hash, artifact_kind="raw")
             except (RowIndexArtifactMissingError, ValueError):
                 axis_for_identity = None  # 特徵軸不可得 ⇒ 身分不完整 ⇒ 拒用
+            # FFDSTAR Task 2.3：值身分取自 manifest raw 節點（raw 目錄已刪而 manifest 仍在；只讀 manifest、不讀群組檔）
+            try:
+                raw_node = (feature_reader.load_manifest_v2(
+                    symbol, tf, config_hash, artifact_kind="raw", consumer="browse",
+                ).get("artifacts") or {}).get("raw") or {}
+                content_for_identity = raw_node.get("content_sha256")
+            except (FileNotFoundError, ValueError):
+                content_for_identity = None  # manifest／raw 節點不可得 ⇒ 身分不完整 ⇒ 拒用
             request_identity = self._request_identity(
                 symbol=symbol, tf=tf, config_hash=config_hash, method=resolved_method,
                 label_horizon=label_horizon, selection_window=selection_window, split_id=split_id,
-                row_index=axis_for_identity, label=label,
+                row_index=axis_for_identity, label=label, content_sha256=content_for_identity,
             )
             cache_result = self._try_reuse_cached_ic_scores(
                 selected_path=selected_path,
@@ -311,7 +323,7 @@ class ICEngine:
         data_fingerprint.update(self._request_identity(
             symbol=symbol, tf=tf, config_hash=config_hash, method=resolved_method,
             label_horizon=label_horizon, selection_window=selection_window, split_id=split_id,
-            row_index=row_index, label=label,
+            row_index=row_index, label=label, content_sha256=raw_artifact.get("content_sha256"),
         ))
 
         ic_scores: Dict[str, float] = {}
@@ -752,8 +764,10 @@ class ICEngine:
         split_id: Optional[str],
         row_index: Optional[pd.DatetimeIndex],
         label: pd.Series,
+        content_sha256: Optional[str],
     ) -> Dict[str, Any]:
-        """本次請求之計算身分（Task 1.4）：選窗起訖正規化為 UTC epoch 秒；特徵軸與 label 以指紋表示。"""
+        """本次請求之計算身分（Task 1.4）：選窗起訖正規化為 UTC epoch 秒；特徵軸與 label 以指紋表示。
+        FFDSTAR Task 2.3：`content_sha256`＝manifest raw 節點之 run 內容身分（缺 ⇒ None，沿用時拒用）。"""
         window = selection_window or {}
         return {
             "symbol": symbol,
@@ -766,6 +780,7 @@ class ICEngine:
             "split_id": split_id,
             "feature_axis_sha256": _axis_fingerprint(row_index),
             "label_sha256": label_fingerprint(label),
+            "content_sha256": None if content_sha256 is None else str(content_sha256),
         }
 
     @staticmethod
@@ -852,10 +867,9 @@ class ICEngine:
         raw_artifact: Dict[str, Any],
         ic_params: Dict[str, Any],
     ) -> Dict[str, Any]:
-        source_info = manifest.get("source")
-        source_checksum = manifest.get("source_checksum") or manifest.get("data_source_checksum")
-        if not source_checksum and isinstance(source_info, dict):
-            source_checksum = source_info.get("checksum")
+        # FFDSTAR Task 2.3：`source_checksum` 來源＝manifest raw 節點之 `content_sha256`（manifest 無 `source_checksum` 鍵；
+        # 改前讀不存在之鍵恆為 None）
+        source_checksum = raw_artifact.get("content_sha256")
         hdf5_metadata = manifest.get("hdf5_metadata") or manifest.get("source_metadata")
         source_run_status = effective_run_status(manifest)
         fingerprint: Dict[str, Any] = {
@@ -947,8 +961,8 @@ class ICEngine:
             if field not in fp or field not in request_identity:
                 logger.warning("[IC-First] cache fingerprint lacks identity field %s — raw/ required", field)
                 return None
-            if request_identity[field] is None and field == "feature_axis_sha256":
-                logger.warning("[IC-First] feature axis unavailable — raw/ required")
+            if request_identity[field] is None and field in _IDENTITY_FIELDS_REQUIRED_NON_NULL:
+                logger.warning("[IC-First] identity field %s unavailable — raw/ required", field)
                 return None
             if fp[field] != request_identity[field]:
                 logger.warning("[IC-First] cache identity mismatch on %s — raw/ required", field)

@@ -20,6 +20,7 @@ from momentum.FeatureEngineering.feature_storage import (
     encode_zscore_as_int16,
     write_phase2_skip_evidence,
 )
+from tests.feature_engineering.processed_execution_helpers import direct_write_execution
 
 
 def _max_abs_diff(left: np.ndarray, right: np.ndarray) -> float:
@@ -80,7 +81,8 @@ def test_mixed_encoding_metadata_roundtrip(monkeypatch, tmp_path) -> None:
 
     # ICFIRSTALIGN Task 1.3：row_index 必填（本測試只驗 codec，軸值不影響斷言）
     processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_codec", {"selected": frame},
-                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"))
+                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"),
+                                            execution=direct_write_execution({"selected": frame}))  # FFDSTAR Task 1.4
 
     schema = pq.read_schema(str(processed_dir / "selected.parquet"))
     registry = json.loads(schema.metadata[L7_ENCODING_REGISTRY_METADATA_KEY.encode("utf-8")])
@@ -116,7 +118,8 @@ def test_codec_upgrade_disabled_fallback(monkeypatch, tmp_path) -> None:
     )
 
     processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_disabled", {"selected": frame},
-                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"))
+                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"),
+                                            execution=direct_write_execution({"selected": frame}))  # FFDSTAR Task 1.4
 
     schema = pq.read_schema(str(processed_dir / "selected.parquet"))
     metadata = schema.metadata or {}
@@ -153,7 +156,8 @@ def test_zscore_overflow_fallback_float32(monkeypatch, tmp_path) -> None:
     )
 
     processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_overflow", {"selected": frame},
-                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"))
+                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"),
+                                            execution=direct_write_execution({"selected": frame}))  # FFDSTAR Task 1.4
 
     schema = pq.read_schema(str(processed_dir / "selected.parquet"))
     metadata = schema.metadata or {}

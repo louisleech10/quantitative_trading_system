@@ -321,7 +321,10 @@ def test_verification_03_observed_values_subset_and_covered(runs: ph.RunCache, m
                 merge(observed, observed_from_records(ph.preprocessor_records(pre), spec))
                 merge(observed, observed_from_groups(ph.preprocessor_groups(pre)))
     merge(observed, observed_from_run(runs.get("h12h1_native_fallback"), spec))
-    merge(observed, observed_from_run(runs.get("ic_first_empty"), spec))
+    # ic_first_empty（Task 1.4 驗證③）；post-IC gaussian 開啟之變體 ic_first_gaussian（Task 1.4 邊界②）：processed 紀錄
+    # 產出 `gaussian_normalize.applied`（gaussian 生產預設關，故不入 §V 全格）
+    for variant in ("ic_first_empty", "ic_first_gaussian"):
+        merge(observed, observed_from_run(runs.get(variant), spec))
     # SPEC v4 §V replace 格之 shard 串流臂：分片目標壓小之 replace 變體（`ph.VARIANTS["h1_replace_sharded"]`）之群組表
     merge(observed, observed_from_groups(ph.preprocessor_groups(
         ph.observation(runs.get("h1_replace_sharded")).l65_preprocessor)))

@@ -43,11 +43,18 @@ from momentum.factories import (
     resolve_run_feature_count,
     sanitize_factor_returns,
 )
-from momentum.core.contracts import ICResult
+from momentum.core.contracts import (
+    FF_RUN_IDENTITY_KEY,
+    FF_RUN_IDENTITY_SOURCE_EXTERNAL,
+    FF_RUN_IDENTITY_SOURCE_KEY,
+    ICResult,
+)
 from momentum.core.exceptions import AnalysisCancelled
 
 
 logger = get_logger("api.ic_analysis_service")
+#: ingest `_meta.json` 缺 `ff_run_identity`／不可讀時之哨兵（必不等於任何身分 ⇒ 快取不沿用；FFDSTAR Task 2.2）
+_MISSING_IDENTITY = object()
 
 
 class ResultRevisionMismatch(Exception):
@@ -3278,12 +3285,18 @@ class ICAnalysisService:
         timeframe: str,
         config_hash: Optional[str],
     ) -> tuple[str, str]:
-        """透過 FeatureLibrary 載入特徵並 materialize 成 orchestrator 可讀的 HDF5。"""
-        features_df = self._feature_library.load(
+        """透過 FeatureLibrary 載入特徵並 materialize 成 orchestrator 可讀的 HDF5。
+
+        FFDSTAR Task 2.2（§C D5）：run 身分一律經 `FeatureLibrary.load_with_identity`（與載入同一次 manifest 解析）取得，
+        本服務不自組。交接 h5 之 `metadata_json`（orchestrator 讀取之群組屬性）與 `_meta.json` 皆帶 `ff_run_identity`；
+        沿用條件＝兩者皆帶與本次相同之身分且命名世代現行，否則兩者一併重寫；身分為 legacy（舊 run）⇒ 一律重寫。
+        快取檔名保留可讀前綴（`latest` 之沿用與否以解析後之身分判定，不以檔名判定）。"""
+        features_df, run_identity = self._feature_library.load_with_identity(
             symbol,
             timeframe,
             config_hash=config_hash,
         )
+        identity = run_identity.to_dict()
         cache_dir = Path("data_cache/reports/ic_ingest_cache")
         cache_dir.mkdir(parents=True, exist_ok=True)
         hash_key = config_hash or "latest"
@@ -3291,15 +3304,22 @@ class ICAnalysisService:
         h5_path = cache_dir / f"{safe_key}.h5"
         meta_path = cache_dir / f"{safe_key}_meta.json"
 
-        if not h5_path.exists() or not self._ic_handoff_h5_current(h5_path):
-            self._write_features_h5(h5_path, symbol, timeframe, features_df)
-        if not meta_path.exists():
+        reusable = (
+            not run_identity.legacy
+            and h5_path.exists()
+            and meta_path.exists()
+            and self._ic_handoff_h5_current(h5_path, group_key=f"{symbol}/{timeframe}", run_identity=identity)
+            and self._ic_meta_json_identity(meta_path) == identity
+        )
+        if not reusable:
+            self._write_features_h5(h5_path, symbol, timeframe, features_df, run_identity=identity)
             meta_payload = self._build_ic_metadata_from_run(
                 symbol,
                 timeframe,
                 config_hash,
                 list(features_df.columns),
             )
+            meta_payload[FF_RUN_IDENTITY_KEY] = identity
             meta_path.write_text(
                 json.dumps(meta_payload, ensure_ascii=False),
                 encoding="utf-8",
@@ -3307,15 +3327,46 @@ class ICAnalysisService:
         return str(h5_path.resolve()), str(meta_path.resolve())
 
     @staticmethod
-    def _ic_handoff_h5_current(path: Path) -> bool:
+    def _ic_meta_json_identity(meta_path: Path) -> Any:
+        """`_meta.json` 所帶之 `ff_run_identity`；檔不可讀、非物件或缺鍵 ⇒ 回唯一哨兵（必不等於任何身分 ⇒ 不沿用）。"""
+        try:
+            payload = json.loads(Path(meta_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return _MISSING_IDENTITY
+        if not isinstance(payload, dict) or FF_RUN_IDENTITY_KEY not in payload:
+            return _MISSING_IDENTITY
+        return payload[FF_RUN_IDENTITY_KEY]
+
+    @staticmethod
+    def _ic_handoff_h5_current(
+        path: Path,
+        *,
+        group_key: Optional[str] = None,
+        run_identity: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """既有 IC 交接 h5 快取是否帶現行命名世代（FF-NAME Task 3.4 v18；缺／舊 ⇒ False，呼叫端以已過閘之
-        FeatureLibrary 資料重寫，不沿用舊世代快取）。只讀根屬性，不讀矩陣。"""
+        FeatureLibrary 資料重寫，不沿用舊世代快取）。只讀屬性，不讀矩陣。
+
+        FFDSTAR Task 2.2：`run_identity` 給定 ⇒ 另須 `group_key` 群組之 `metadata_json` 屬性（orchestrator 讀取之同一
+        位置）所帶 `ff_run_identity` 逐鍵等於之；缺群組、缺屬性、不可解析或不等 ⇒ False。"""
         try:
             with h5py.File(str(path), "r") as handle:
                 assert_h5_feature_naming_version(handle.attrs, path)
+                if run_identity is not None:
+                    group = handle.get(group_key) if group_key else None
+                    if not isinstance(group, h5py.Group):
+                        return False
+                    raw = group.attrs.get("metadata_json")
+                    if raw is None:
+                        return False
+                    metadata = json.loads(raw.decode("utf-8") if isinstance(raw, bytes) else str(raw))
+                    if not isinstance(metadata, dict) or FF_RUN_IDENTITY_KEY not in metadata:
+                        return False
+                    if metadata[FF_RUN_IDENTITY_KEY] != dict(run_identity):
+                        return False
         except feature_naming_version_error_type():
             return False
-        except OSError:
+        except (OSError, ValueError):
             return False
         return True
 
@@ -3325,8 +3376,13 @@ class ICAnalysisService:
         symbol: str,
         timeframe: str,
         features_df: pd.DataFrame,
+        *,
+        run_identity: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """將 DataFrame 寫入 IC orchestrator 可讀的 HDF5 格式。"""
+        """將 DataFrame 寫入 IC orchestrator 可讀的 HDF5 格式。
+
+        FFDSTAR Task 2.2：`run_identity` 給定 ⇒ 於資料群組（orchestrator `_load_features_hdf5` 讀
+        `group.attrs["metadata_json"]` 之同一位置）寫 `metadata_json`＝`{"ff_run_identity": 身分}`。"""
         path.parent.mkdir(parents=True, exist_ok=True)
         group_key = f"{symbol}/{timeframe}"
         index_values = features_df.index
@@ -3351,6 +3407,10 @@ class ICAnalysisService:
                 data=np.array(features_df.columns.tolist(), dtype=object),
                 dtype=str_dtype,
             )
+            if run_identity is not None:
+                group.attrs["metadata_json"] = json.dumps(
+                    {FF_RUN_IDENTITY_KEY: dict(run_identity)}, ensure_ascii=False, sort_keys=True,
+                )
 
     def _write_ic_meta_json(
         self,
@@ -3359,7 +3419,10 @@ class ICAnalysisService:
         config_hash: Optional[str],
         feature_names: Optional[List[str]] = None,
     ) -> str:
-        """寫入 IC 分析用的 metadata JSON（symbol/timeframe 供 label 生成）。"""
+        """寫入 IC 分析用的 metadata JSON（symbol/timeframe 供 label 生成）。
+
+        FFDSTAR Task 2.2：本路徑之特徵檔為呼叫端自帶之 `features_path`（非讀自特徵產出）⇒ `ff_run_identity` 寫 null、
+        `ff_run_identity_source` 標示外部檔，不冒充 run 身分（報告 metadata 承此兩鍵）。"""
         cache_dir = Path("data_cache/reports/ic_ingest_cache")
         cache_dir.mkdir(parents=True, exist_ok=True)
         hash_key = config_hash or "latest"
@@ -3371,6 +3434,8 @@ class ICAnalysisService:
             config_hash,
             feature_names or [],
         )
+        meta_payload[FF_RUN_IDENTITY_KEY] = None
+        meta_payload[FF_RUN_IDENTITY_SOURCE_KEY] = FF_RUN_IDENTITY_SOURCE_EXTERNAL
         meta_path.write_text(
             json.dumps(meta_payload, ensure_ascii=False),
             encoding="utf-8",

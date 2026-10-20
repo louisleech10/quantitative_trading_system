@@ -148,7 +148,7 @@ def test_binary_provenance_survives_producer_payload_into_consumer():
         config_hash="c" * 8, features_source_hash="f" * 64, features_path=None, labels_content_hash="l" * 64,
         symbol="ETHUSDT", timeframe="12h", case_id="ic_gatekeeper", generated_at="2026-10-14T00:00:00Z",
         fit_mode="full_sample", pit_stats_version=None, ic_method="spearman", label_horizon=2,
-        label_return_type="log", report_ref="ic_report_ic_gatekeeper.json",
+        label_return_type="log", report_ref="ic_report_ic_gatekeeper.json", ff_run_identity=None,
     )
     lb = payload["sample_scope"]["event"]["label_binary"]
     assert set(lb) == {"import_id", "n_pos", "n_neg", "label_origin_values"} and lb == label_binary_in

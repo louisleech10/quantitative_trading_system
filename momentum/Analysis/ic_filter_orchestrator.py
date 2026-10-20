@@ -68,6 +68,7 @@ from momentum.core.exceptions import (
 from momentum.core.icfirstalign_errors import CloseCarrierInvalidError
 from momentum.core.logging import get_logger
 from momentum.core.contracts import (
+    FF_RUN_IDENTITY_KEY,
     EventIsolationRows,
     ORACLE_RETURN_KINDS,
     AlignmentSpec,
@@ -408,6 +409,32 @@ def _memory_pressure(baseline: Optional[dict]) -> Optional[dict]:
         "swap_used_bytes": now["swap_used"], "swap_growth_bytes": int(max(swap_growth, 0)),
         "reason": "rss_exceeds_physical" if rss_over else "swap_growth",
     }
+
+
+def _split_ff_run_identity(
+    meta: Optional[dict], features_meta: Optional[dict],
+) -> tuple[dict, bool, Optional[dict]]:
+    """FFDSTAR Task 2.4：stage0 解析特徵 run 身分（`ff_run_identity`），回 (去除該鍵之 metadata, 是否帶有, 身分)。
+
+    身分自 metadata 移出、另行保存：`_meta.json` 之逐特徵項亦為 dict，身分若留在 metadata 會被當成一個特徵之 metadata
+    （`_filter_feature_metadata` 等）而改變 IC 之類別判定；移出後 metadata 與改前逐鍵相同，IC 數值不變。身分由
+    `_build_report_metadata` 寫回報告 metadata，倖存者 provenance 取報告 metadata 之同一物件。
+
+    來源：交接 h5 資料群組之 `metadata_json`（與本次載入之特徵矩陣同檔）與 `_meta.json`。兩者皆未帶 ⇒ 不帶（報告不新增
+    鍵）；`_meta.json` 明示為 null（呼叫端自帶特徵檔，SPEC Task 2.2）⇒ null，不以 h5 內之身分冒充；兩者皆帶非 null
+    而不相等 ⇒ `InvalidInputError`（快取錯配，fail-closed）；其餘取帶有者。不改呼叫端物件。"""
+    out = dict(meta) if isinstance(meta, dict) else {}
+    in_h5 = isinstance(features_meta, dict) and FF_RUN_IDENTITY_KEY in features_meta
+    in_meta = FF_RUN_IDENTITY_KEY in out
+    meta_value = out.pop(FF_RUN_IDENTITY_KEY, None)
+    if not in_h5 and not in_meta:
+        return out, False, None
+    h5_value = features_meta.get(FF_RUN_IDENTITY_KEY) if in_h5 else None
+    if in_meta and meta_value is None:
+        return out, True, None
+    if in_h5 and in_meta and h5_value is not None and h5_value != meta_value:
+        raise InvalidInputError("交接 h5 之 ff_run_identity 與 _meta.json 不一致（快取錯配；拒用）")
+    return out, True, deepcopy(meta_value if in_meta else h5_value)
 
 
 def _intersect_features_with_kline_period(
@@ -3389,6 +3416,8 @@ class ICFilterOrchestrator:
         meta = self._load_meta_json(meta_path)
         if features_meta and not meta:
             meta = features_meta
+        # FFDSTAR Task 2.4：身分移出 metadata 另存（analyze-scoped；每次 analyze 必經 stage0 重設）
+        meta, self._ff_run_identity_present, self._ff_run_identity = _split_ff_run_identity(meta, features_meta)
 
         # EVTALIGN Task 3.1：feature ∩ K 線期間（系統自己對齊；裁掉的根數揭露）。
         # 在切分計畫之前做 ⇒ split／purge 都建立在實際分析區間上。
@@ -5423,6 +5452,9 @@ class ICFilterOrchestrator:
             meta["selection_mode"] = selection_mode
         if alpha_source is not None:
             meta["alpha_source"] = alpha_source
+        if getattr(self, "_ff_run_identity_present", False):
+            # FFDSTAR Task 2.4：stage0 解析之特徵 run 身分（倖存者 provenance 取此同一物件）
+            meta[FF_RUN_IDENTITY_KEY] = deepcopy(getattr(self, "_ff_run_identity", None))
         return meta
 
     @staticmethod
@@ -5783,6 +5815,8 @@ class ICFilterOrchestrator:
             label_horizon=int(split_ctx["effective_horizon"]) if split_ctx.get("effective_horizon") is not None else None,
             label_return_type=str((self._current_config or self._config).labels.return_type),
             report_ref=report_ref,
+            # FFDSTAR Task 2.4：與報告 metadata 同一 run 身分物件（stage0 自交接 h5／_meta.json 解析；無 ⇒ null）
+            ff_run_identity=deepcopy(report_meta.get(FF_RUN_IDENTITY_KEY)),
         )
         validate_survivor_output(payload, report_meta=report_meta, report_ref_path=report_json_path)
         output_dir = str(Path(report_json_path).parent) if report_json_path else "data_cache/reports"

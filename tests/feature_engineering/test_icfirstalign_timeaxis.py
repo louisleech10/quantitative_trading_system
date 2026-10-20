@@ -24,6 +24,7 @@ from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError, RowI
 from momentum.FeatureEngineering.feature_reader import FeatureReader
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from tests.feature_engineering import icfirstalign_helpers as h
+from tests.feature_engineering.processed_execution_helpers import direct_write_execution
 
 pytestmark = pytest.mark.timeout(600)
 
@@ -305,7 +306,8 @@ def _processed_groups(run: Dict[str, Any], drop_head: int = 0) -> Tuple[Dict[str
 
 
 def _write_processed(run: Dict[str, Any], groups: Dict[str, pd.DataFrame], axis: pd.DatetimeIndex) -> None:
-    FeatureStorage(str(run["root"])).write_processed(h.SYMBOL, h.PRIMARY, run["config_hash"], groups, row_index=axis)
+    FeatureStorage(str(run["root"])).write_processed(h.SYMBOL, h.PRIMARY, run["config_hash"], groups, row_index=axis,
+                                                     execution=direct_write_execution(groups, h.PRIMARY))  # FFDSTAR Task 1.4
 
 
 def _root_fields(run: Dict[str, Any]) -> Dict[str, Any]:

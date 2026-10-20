@@ -109,10 +109,17 @@ class RunIdentity:
 
     @property
     def legacy(self) -> bool:
-        raise NotImplementedError("FFDSTAR Task 2.1")
+        """舊 run（artifact 節點無 `content_sha256`；§C D6）⇒ True：IC 快取一律不沿用。"""
+        return self.content_sha256 is None
 
     def to_dict(self) -> Dict[str, Any]:
-        raise NotImplementedError("FFDSTAR Task 2.1")
+        """身分物件（鍵與順序＝契約 `run_identity_keys`；一切輸出中之鍵名為 `ff_run_identity`）。
+        本型別欄位集合須恰等於契約鍵集，否則拋 `ProvenanceError`（契約為唯一真相源，不得靜默增減）。"""
+        values = dataclasses.asdict(self)
+        keys = list(load_contract()["run_identity_keys"])
+        if set(keys) != set(values):
+            raise ProvenanceError(f"RunIdentity 欄位 {sorted(values)} ≠ 契約 run_identity_keys {sorted(keys)}")
+        return {key: values[key] for key in keys}
 
 
 # ---------------------------------------------------------------------------------------------- 契約
@@ -363,6 +370,40 @@ def build_provenance_table(
     return pd.DataFrame(rows, columns=columns)
 
 
+def build_post_ic_table(
+    records: Mapping[Tuple[str, str], Mapping[str, Any]],
+    *,
+    column_group: Mapping[str, str],
+) -> pd.DataFrame:
+    """processed（post-IC）逐欄紀錄表（SPEC Task 1.4）：母體＝紀錄鍵之欄名全集（＝IC 選欄全集；post-IC 所見欄名即
+    raw 落盤名，故落盤名＝紀錄欄名，不經 `tag_timeframe`）。`column_group`＝processed 落盤欄名 → processed 群組 id。
+
+    窮盡性：processed 群組欄聯集 ⊆ 紀錄欄名（post-IC 不產衍生欄，不做父欄關聯）；紀錄欄名＝processed 群組欄聯集 ∪
+    未寫出者（選欄不在 raw、入口剔除之 ratio-unsafe 等，各記其終態），逐名、無重複；已寫出與未寫出兩類之終態值不得
+    相交（未各記其終態 ⇒ 拒收）。任一不符 ⇒ 具名例外（fail-closed）。"""
+    names_by_record: Dict[str, Tuple[str, str]] = {}
+    column_keys: Dict[str, Tuple[str, str]] = {}
+    for key, record in records.items():
+        column = str(key[1])
+        if column in names_by_record:
+            raise ProvenanceConflictError(f"post-IC 紀錄鍵 {key} 與 {names_by_record[column]} 之欄名相同：{column}")
+        names_by_record[column] = (str(key[0]), column)
+        column_keys[column] = (str(record.get("group_id")), column)
+    output_columns = [str(c) for c in column_group]
+    missing = sorted(set(output_columns) - set(names_by_record))
+    if missing:
+        raise ProvenanceExhaustivenessError(f"processed 落盤欄無 post-IC 紀錄（例 {missing[:3]}）")
+    table = build_provenance_table(records, output_columns=output_columns, column_group=dict(column_group),
+                                   dropped_columns={}, column_keys=column_keys)
+    not_written = sorted(set(names_by_record) - set(output_columns))
+    check_exhaustive(table, output_columns, not_written)
+    terminal_of = dict(zip((str(n) for n in table["output_column"]), (str(t) for t in table["terminal"])))
+    overlap = {terminal_of[c] for c in output_columns} & {terminal_of[c] for c in not_written}
+    if overlap:
+        raise ProvenanceExhaustivenessError(f"已寫出與未寫出之選欄終態相同 {sorted(overlap)}（未各記其終態）")
+    return table
+
+
 def check_exhaustive(
     table: pd.DataFrame,
     manifest_columns: Iterable[str],
@@ -493,16 +534,23 @@ def write_provenance_table(
     staging_dir: Path,
     artifact_kind: str,
     groups: Mapping[str, Mapping[str, Any]],
+    summary_extra: Optional[Mapping[str, Any]] = None,
 ) -> ProvenancePointer:
     """以 zstd parquet 寫紀錄檔至暫存 `provenance/`，回 manifest 用之指標（SPEC Task 1.3 ④、1.4）。
-    寫入失敗一律上拋（不得吞例外）。"""
+    寫入失敗一律上拋（不得吞例外）。`summary_extra`：併入摘要之額外鍵（processed 之 `selected_columns`，
+    SPEC Task 1.4；與既有摘要鍵同名 ⇒ `ProvenanceConflictError`）。"""
     contract = load_contract()
     relative = str(contract["files"][artifact_kind])
     target = Path(staging_dir) / relative
     target.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(_to_arrow(table, contract), str(target), compression=str(contract["parquet_compression"]))
+    summary = summarize_table(table, contract)
+    for key, value in dict(summary_extra or {}).items():
+        if key in summary:
+            raise ProvenanceConflictError(f"摘要鍵 {key!r} 與既有摘要鍵衝突")
+        summary[str(key)] = value
     return ProvenancePointer(path=relative, sha256=file_sha256(target), row_count=int(len(table)),
-                             contract_version=int(contract["version"]), summary=summarize_table(table, contract),
+                             contract_version=int(contract["version"]), summary=summary,
                              groups=normalize_groups(groups, contract))
 
 
@@ -545,5 +593,27 @@ def read_provenance_table(run_dir: Path, pointer: Mapping[str, Any], *,
 
 
 def resolve_run_identity(manifest: Mapping[str, Any], artifact_kind: str) -> RunIdentity:
-    """自同一次 manifest 解析取 run 身分（SPEC Task 2.1）。"""
-    raise NotImplementedError("FFDSTAR Task 2.1")
+    """自同一次 manifest 解析（呼叫端傳入其解析所得之 dict，本函式不讀檔）取 run 身分（SPEC Task 2.1）。
+
+    `feature_schema_hash` 取該 artifact 節點之值，節點無此鍵則取 manifest 頂層；`content_sha256` 與
+    `provenance_sha256`（節點 `provenance.sha256`）缺 ⇒ None（舊 run，`legacy`）。artifact 節點不存在 ⇒
+    `ProvenanceMissingError`。"""
+    if not isinstance(manifest, Mapping):
+        raise ProvenanceIntegrityError(f"manifest 非物件：{type(manifest).__name__}")
+    node = (manifest.get("artifacts") or {}).get(str(artifact_kind))
+    if not isinstance(node, Mapping):
+        raise ProvenanceMissingError(f"manifest 無 artifact 節點 {artifact_kind!r}")
+    pointer = node.get("provenance")
+    content = node.get("content_sha256")
+    provenance_sha256 = pointer.get("sha256") if isinstance(pointer, Mapping) else None
+    return RunIdentity(
+        symbol=manifest.get("symbol"),
+        tf=manifest.get("tf"),
+        config_hash=manifest.get("config_hash"),
+        feature_schema_hash=(node["feature_schema_hash"] if "feature_schema_hash" in node
+                             else manifest.get("feature_schema_hash")),
+        feature_naming_version=manifest.get("feature_naming_version"),
+        artifact_kind=str(artifact_kind),
+        content_sha256=None if content is None else str(content),
+        provenance_sha256=None if provenance_sha256 is None else str(provenance_sha256),
+    )

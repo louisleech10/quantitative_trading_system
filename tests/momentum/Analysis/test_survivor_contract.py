@@ -53,7 +53,7 @@ def test_load_top_level_keys_exact():
     }
     assert set(contract.keys()) == expected
     assert sc.SURVIVOR_CONTRACT_TOP_KEYS == frozenset(expected)
-    assert contract["version"] == 2  # GAP-3 Task B2.4 升版（v1→v2：event 物件擴六鍵）
+    assert contract["version"] == 3  # GAP-3 Task B2.4 升版（v1→v2：event 物件擴六鍵）；FFDSTAR Task 2.4 升版（v2→v3：provenance 加 ff_run_identity）
 
 
 # ---------------------------------------------------------------- ② capability_status_ref
@@ -173,7 +173,7 @@ def test_mutation_missing_top_key_raises(tmp_path):
     """
     copy = tmp_path / "ic_survivor_contract.json"
     shutil.copy(sc.SURVIVOR_CONTRACT_PATH, copy)
-    assert sc.load_survivor_contract(copy)["version"] == 2  # 基線綠
+    assert sc.load_survivor_contract(copy)["version"] == 3  # 基線綠
     data = json.loads(copy.read_text(encoding="utf-8"))
     del data["sample_scope_kind_values"]
     copy.write_text(json.dumps(data), encoding="utf-8")
@@ -187,7 +187,7 @@ def test_load_returns_copy_not_shared_singleton():
     a["version"] = 999
     a["reasons"]["marginal_ic"].append("tampered")
     b = sc.load_survivor_contract()
-    assert b["version"] == 2
+    assert b["version"] == 3
     assert "tampered" not in b["reasons"]["marginal_ic"]
     assert a is not b
 
@@ -242,7 +242,7 @@ def _build_kwargs(*, event=None, fallback=False, root="ok_oos", extra=("z",)):
         split_context={"train_plan": train_plan, "test_plan": test_plan}, config_hash="c" * 8, features_source_hash="f" * 64,
         features_path="/tmp/x.h5", labels_content_hash="l" * 64, symbol="ETHUSDT", timeframe="12h", case_id="ic_gatekeeper",
         generated_at="2026-08-19T00:00:00Z", fit_mode="train", pit_stats_version="v1", ic_method="spearman",
-        label_horizon=12, label_return_type="log", report_ref="ic_report_ic_gatekeeper.json",
+        label_horizon=12, label_return_type="log", report_ref="ic_report_ic_gatekeeper.json", ff_run_identity=None,
     ), test_plan
 
 
@@ -614,7 +614,7 @@ def test_v2_event_keyset_and_nulls_when_no_context():
     c = sc.load_survivor_contract()
     assert set(_V2_KEYS) <= set(c["event_definition_keys"]["keys"])
     payload = sc.build_survivor_output(**_event_kwargs())
-    assert payload["schema_version"] == 2 and payload["sample_scope"]["kind"] == "event"
+    assert payload["schema_version"] == 3 and payload["sample_scope"]["kind"] == "event"
     assert all(payload["sample_scope"]["event"][k] is None for k in _V2_KEYS)  # GAP-2 語意不變：全 null
     sc.validate_survivor_output(payload)
 
@@ -701,7 +701,7 @@ def test_v1_payload_explicitly_rejected_no_silent_coerce():
     payload["schema_version"] = 1
     with pytest.raises(ContractValidationError, match="legacy"):
         sc.validate_survivor_output(payload)
-    payload["schema_version"] = 3
+    payload["schema_version"] = 4  # FFDSTAR Task 2.4：現行契約為 v3，未來版本＝4
     with pytest.raises(ContractValidationError, match="schema_version"):
         sc.validate_survivor_output(payload)
 
@@ -769,7 +769,7 @@ def _build_event_kwargs(*, with_masks=True, mask_len=None, marginal=True):
         features_path="/tmp/x.h5", labels_content_hash="l" * 64, symbol="ETHUSDT", timeframe="12h",
         case_id="ic_gatekeeper", generated_at="2026-08-25T00:00:00Z", fit_mode="train",
         pit_stats_version="v1", ic_method="spearman", label_horizon=12, label_return_type="log",
-        report_ref="ic_report_ic_gatekeeper.json",
+        report_ref="ic_report_ic_gatekeeper.json", ff_run_identity=None,
     )
 
 

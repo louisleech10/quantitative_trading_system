@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "_doc": "GAP-2 倖存因子輸出契約＋邊際 IC 節契約單一真相源（docs/GAP2_MARGINAL_IC_TODO.md Task 1.0）。所有新欄位名／枚舉值／reason 字面只住本檔；SPEC／TODO／程式／測試不得複列，程式以 survivor_contract.load_survivor_contract() 讀取。消費端義務：(a) `sample_scope.kind=event` 之倖存者只得於事件樣本訓練；(b) 消費端須同時讀 `oos_guarantees`／`independent_oos_validation`／`oos_semantics`／`analysis_status` 四欄，禁只憑 `oos_guarantees` 判 OOS。event canonical 序列化：timestamps → int64 epoch ms UTC → sorted unique → JSON 陣列無空白（`json.dumps(list, separators=(\",\",\":\"))`）→ sha256；query 模式 `definition_hash=sha256(query.strip().encode(\"utf-8\"))`、`timestamps_hash=null`；無事件 ⇒ 兩者 null。capability_status 不在此重新定義，以 capability_status_ref 指向 IC report 契約（執行期 dereference，失敗即 raise）。每個 *_keys 物件層皆 additional_properties:false（未列鍵即非法）。type 值集：str|int|float|bool|list|object|null。",
   "capability_status_ref": "momentum/Analysis/contracts/ic_report_contract.json#capability_status",
   "reasons": {
@@ -460,7 +460,7 @@
     }
   },
   "provenance_keys": {
-    "_doc": "provenance 物件；producer 固定 ic_filter_orchestrator；contract_version＝本檔 version。",
+    "_doc": "provenance 物件；producer 固定 ic_filter_orchestrator；contract_version＝本檔 version。ff_run_identity（v3，FFDSTAR Task 2.4／docs/FFDSTAR_SPEC.md §C D5）＝IC 所讀特徵 run 之身分物件（鍵見 momentum/FeatureEngineering/contracts/run_provenance.json 之 run_identity_keys），與報告 metadata.ff_run_identity 同一物件；null＝特徵檔為呼叫端自帶（非讀自特徵產出，報告 metadata.ff_run_identity_source 標示）或來源未帶身分；與 config_hash（IC 設定雜湊）語意正交。",
     "additional_properties": false,
     "keys": {
       "config_hash": {
@@ -527,6 +527,11 @@
         "type": "str",
         "required": true,
         "nullable": false
+      },
+      "ff_run_identity": {
+        "type": "object",
+        "required": true,
+        "nullable": true
       }
     }
   },

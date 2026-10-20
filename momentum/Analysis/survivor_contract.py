@@ -278,9 +278,14 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
     c = load_survivor_contract()
     sec = c["marginal_ic_section_keys"]
     _check_object(payload, c["survivor_file_keys"], "survivor_file")
-    if payload["schema_version"] == 1 and c["version"] == 2:
-        # GAP-3 Task B2.4：v1 舊檔顯式版本判別——拒收（不 silent coerce；需讀舊檔請以 v1 契約獨立工具處理）
-        raise ContractValidationError("legacy survivor payload schema_version=1 rejected by v2 contract (no silent coerce; regenerate under v2)")
+    sv = payload["schema_version"]
+    if isinstance(sv, int) and not isinstance(sv, bool) and sv < c["version"]:
+        # GAP-3 Task B2.4：舊版檔顯式版本判別——拒收（不 silent coerce；需讀舊檔請以舊版契約獨立工具處理）。
+        # FFDSTAR Task 2.4：版本讀契約常數（不寫死字面），v3 起 v1／v2 檔皆屬舊版
+        raise ContractValidationError(
+            f"legacy survivor payload schema_version={sv} rejected by v{c['version']} contract "
+            f"(no silent coerce; regenerate under v{c['version']})"
+        )
     if payload["schema_version"] != c["version"]:
         raise ContractValidationError(f"schema_version {payload['schema_version']!r} != contract version {c['version']!r}")
 
@@ -475,6 +480,7 @@ def build_survivor_output(
     label_horizon: Optional[int],
     label_return_type: Optional[str],
     report_ref: str,
+    ff_run_identity: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """純組裝（不寫檔、不 log）：依契約鍵集組出 ``ic_survivors_{case_id}.json`` payload。
 
@@ -486,6 +492,8 @@ def build_survivor_output(
     - 無 split（fallback）⇒ ``split_context["full_index"]`` 必傳（row_identity 用真實 index；禁 arange 冒充）。
     - ``survivors[]`` IC 快照自 ``summary_by_feature[name]``（``ic_mean``／``icir``／``p_value_adj``／``pass_class``；缺欄 ⇒ null）；
       marginal 欄自 ``marginal_ic_result.per_feature[name]``（loo 視角；不可算 ⇒ null）。
+    - ``provenance.ff_run_identity``（FFDSTAR Task 2.4，必填參數）＝IC 所讀特徵 run 之身分物件（與報告 metadata 同一物件；
+      None ⇒ null：特徵檔為呼叫端自帶或來源未帶身分）；與 ``config_hash``（IC 設定雜湊）語意正交。
     """
     from momentum.core.contracts import canonical_idx_hash  # 既有原語
 
@@ -680,6 +688,7 @@ def build_survivor_output(
         "producer": "ic_filter_orchestrator",
         "contract_version": int(c["version"]),
         "algorithm_version": c["algorithm_version"],
+        "ff_run_identity": copy.deepcopy(dict(ff_run_identity)) if ff_run_identity is not None else None,
     }
 
     # ---- survivors[] ----
