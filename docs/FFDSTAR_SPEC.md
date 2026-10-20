@@ -42,7 +42,7 @@
 ## §G Golden / Baseline
 - **feature/kline 條件**：適用。驗收一律用真實 `data_cache/feature_klines/kline_cache.h5`；禁合成 fixture。
 - **值不變之承接**：既有凍結之值指紋（`tests/_golden/{failopen,framepath,ffstat,ffname,icfirstalign,probewinsor,ratiounsafe}` 中之逐欄值／NaN 遮罩／dtype／欄集合指紋）修改前後**逐位元相同**；任一值指紋改變 ⇒ FAIL，不得重凍。
-- **結構凍結之重凍**：凡比對 run 目錄檔案集合、manifest 全文或其鍵集合之凍結項，因 D1／D2 必變；只准重凍「新增之 `provenance/` 檔與 manifest 新鍵」，重凍收據逐項列出差異路徑且證明其餘逐位元相同（`scripts/ffname_refreeze.py` 同式之改前／改後雙 worktree 記錄）。
+- **結構凍結之重凍**：凡比對 run 目錄檔案集合、manifest 全文或其鍵集合之凍結項，因 D1／D2 必變；只准重凍「新增之 `provenance/` 檔與 manifest 新鍵」，重凍收據逐項列出差異路徑且證明其餘逐位元相同。**證法（第 4 批盤點後定案）**：於同一次改後之真實 run，把 manifest 之新鍵（各 artifact 節點之 `content_sha256`、`provenance`）與 `provenance/` 路徑剝除後依原凍結算法重算，須逐位元等於現行凍結值（現行凍結值出自改前碼）；相等 ⇒ 其餘部分逐位元不變得證，才以含新鍵之值重凍；不等 ⇒ 不重凍、停下歸因。此法取代改前／改後雙 worktree 重跑（凍結值只存雜湊、需真實生成，雙 worktree 使生成成本加倍而證明力相同）；工具 `scripts/preprov_refreeze.py`，收據 `tests/_golden/preprov/refreeze_receipt.json`。受影響項（盤點 `handoffs/run_receipts/20261020-ffdstar-b4-plan.md`）：failopen BTC multi_tf 產物清單、framepath 10 格 `manifest_sha256`，及其下游 FF-NAME 重凍收據綁定與 framepath 歷史格檢查；fftfmeta 之 `manifest_stripped_sha256` 為 FF-NAME 收案時已登記之既有漂移，不重凍、只核對新鍵為其唯一新差異。
 - **讀取方式先行**：凍結腳本與測試輔助凡以檔名掃描 run 目錄取特徵者（至少 `scripts/freeze_failopen_baseline.py:260,425`、`scripts/freeze_framepath_baseline.py:415`、`tests/feature_engineering/ffstat_helpers.py:66,233,346,363,442,577`；Task 1.6 以 grep 窮舉），先改為依 manifest 宣告之群組讀取，於**改前碼態**重算其值指紋等於現行凍結值，再套 Phase 1 生產改動。
 - **改前基準**：Phase 1 動工前 HEAD 之真實 kline 短窗格（§V 格子）完整生成之公開值指紋（逐欄 float32 值 sha256＋NaN 遮罩 sha256＋dtype＋欄名集合 sha256，同 `tests/feature_engineering/ffstat_helpers.py` 之 `public_fingerprints` 式），存 `tests/_golden/preprov/pre_change_fingerprints.json`；改後同格逐位元相同（atol=0、rtol=0；紀錄不改任何值，不設容差）。
 
