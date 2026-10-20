@@ -6,6 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
+| 04-020 | HP-NUMVIEW | 進行中 | docs/TICKET_ORDER.md | 2026-10-20 開工：規模判定大（命中數值 a、跨模組 b、IC 正確性 d）⇒ 完整管線；主委獨立偵察版 handoffs/20261020-numview-x-consult-r1-claude.md（重點：IC 頁第三步未鎖臂依環境分派、FFDSTAR-R4 兩項可觸發且漏列、ICPOSTLEAK 收據 10-02 產出已過期須以 HEAD 重量、預設 rank＋zscore 之 Polars 差達 0.0975、多週期／memmap／有損 codec 三處精度分岔未列範圍、臂不在 RunIdentity 與 config_hash）；偵察諮詢 r1 三家各自獨立版執行中（brief handoffs/20261020-NUMVIEW-X-CONSULT-R1-BRIEF.md）。以下為開工前紀錄——全票排序第 8 步（前置第 7 步 PRE-PROV 已於 2026-10-20 收案）：post-IC 正式轉換臂政策（統一或具名保留，含 PRE-PROV §N R4 快速臂與 pandas 臂邊界不一致）、ICPOSTLEAK §N 各分支 zscore 核心差研究、來源→計算→float32→codec→讀回之誤差與比較翻轉量測（不重議 2026-09-29 dtype 裁定）、臂／設定／算法 fingerprint 入不可變 run／view 身分；範圍細項見 RM-NUMVIEW 與 docs/TICKET_ORDER.md:42。開工先稽核 HANDOFF 與偵察（主委獨立版＋三家）。委員名冊三家（codex＋composer＋grok） |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -25,7 +26,7 @@
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 全票排序第 15 步、一次做完（docs/TICKET_ORDER.md；使用者 2026-10-02 定）：於 FF-NAME、ICPATH、FFSTORE 後以新 run 重選 reference 一次。以下為停手時紀錄——🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀 |
 | 04-010 | HP-TESTSPEED | 停手 | HANDOFF.md | 2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。「各運算路徑取代表之快速版」經全票排序諮詢與使用者 2026-10-02 拍板作廢（與 2026-09-29「不挑代表、不接受專項專用」衝突；docs/TICKET_ORDER.md）；本票不再排程 |
-| 04-020 | HP-NUMVIEW | 未開工 | docs/TICKET_ORDER.md | 全票排序第 8 步（前置第 7 步 PRE-PROV 已於 2026-10-20 收案）：post-IC 正式轉換臂政策（統一或具名保留，含 PRE-PROV §N R4 快速臂與 pandas 臂邊界不一致）、ICPOSTLEAK §N 各分支 zscore 核心差研究、來源→計算→float32→codec→讀回之誤差與比較翻轉量測（不重議 2026-09-29 dtype 裁定）、臂／設定／算法 fingerprint 入不可變 run／view 身分；範圍細項見 RM-NUMVIEW 與 docs/TICKET_ORDER.md:42。開工先稽核 HANDOFF 與偵察（主委獨立版＋三家）。委員名冊三家（codex＋composer＋grok） |
+| 04-020 | HP-NUMVIEW | 進行中 | docs/TICKET_ORDER.md | 2026-10-20 開工：規模判定大（命中數值 a、跨模組 b、IC 正確性 d）⇒ 完整管線；主委獨立偵察版 handoffs/20261020-numview-x-consult-r1-claude.md（重點：IC 頁第三步未鎖臂依環境分派、FFDSTAR-R4 兩項可觸發且漏列、ICPOSTLEAK 收據 10-02 產出已過期須以 HEAD 重量、預設 rank＋zscore 之 Polars 差達 0.0975、多週期／memmap／有損 codec 三處精度分岔未列範圍、臂不在 RunIdentity 與 config_hash）；偵察諮詢 r1 三家各自獨立版執行中（brief handoffs/20261020-NUMVIEW-X-CONSULT-R1-BRIEF.md）。以下為開工前紀錄——全票排序第 8 步（前置第 7 步 PRE-PROV 已於 2026-10-20 收案）：post-IC 正式轉換臂政策（統一或具名保留，含 PRE-PROV §N R4 快速臂與 pandas 臂邊界不一致）、ICPOSTLEAK §N 各分支 zscore 核心差研究、來源→計算→float32→codec→讀回之誤差與比較翻轉量測（不重議 2026-09-29 dtype 裁定）、臂／設定／算法 fingerprint 入不可變 run／view 身分；範圍細項見 RM-NUMVIEW 與 docs/TICKET_ORDER.md:42。開工先稽核 HANDOFF 與偵察（主委獨立版＋三家）。委員名冊三家（codex＋composer＋grok） |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
