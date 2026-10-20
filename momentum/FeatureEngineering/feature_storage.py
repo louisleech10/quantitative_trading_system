@@ -2032,19 +2032,31 @@ class FeatureStorage:
     ) -> None:
         """FFDSTAR Task 1.3 ⑥：暫存根中之 run 根檔（row index、`provenance/` 紀錄檔；artifact 目錄已先安裝）逐檔安裝：
         既有之同名檔先移至 `backup_root` 同相對路徑，再以 `os.replace` 換入。`installed` 依序記 (相對路徑, 是否有舊檔)，
-        於移動之前登記，供失敗時回復。"""
+        於移動之前登記，供失敗時回復。安裝時新建之 run 根下目錄（如首次之 `provenance/`）亦以 (目錄相對路徑, False)
+        先於其內檔登記；任一檔安裝失敗 ⇒ 先移除本次新建且仍為空之目錄再上拋（不回復分支亦不殘留空目錄，b4 邊界⑤）。"""
         staged = sorted(path for path in Path(staging_root).rglob("*") if path.is_file())
-        for source in staged:
-            relative = source.relative_to(staging_root)
-            target = Path(run_dir) / relative
-            had_previous = target.exists()
-            installed.append((str(relative), had_previous))
-            if had_previous:
-                backup = Path(backup_root) / relative
-                backup.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(target, backup)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            os.replace(source, target)
+        created_dirs: List[Path] = []
+        try:
+            for source in staged:
+                relative = source.relative_to(staging_root)
+                target = Path(run_dir) / relative
+                had_previous = target.exists()
+                for parent_rel in reversed(list(relative.parents)[:-1]):
+                    if not (Path(run_dir) / parent_rel).exists():
+                        installed.append((str(parent_rel), False))
+                        created_dirs.append(Path(run_dir) / parent_rel)
+                installed.append((str(relative), had_previous))
+                if had_previous:
+                    backup = Path(backup_root) / relative
+                    backup.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(target, backup)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(source, target)
+        except Exception:
+            for directory in reversed(created_dirs):
+                if directory.is_dir() and not any(directory.iterdir()):
+                    directory.rmdir()
+            raise
 
     @staticmethod
     def _restore_staged_run_files(
@@ -2052,13 +2064,17 @@ class FeatureStorage:
         backup_root: Optional[Path],
         installed: List[Tuple[str, bool]],
     ) -> None:
-        """`_install_staged_run_files` 之回復：有舊檔者自備份換回，原無者刪除新裝之檔；最後刪備份根。"""
+        """`_install_staged_run_files` 之回復：有舊檔者自備份換回，原無者刪除新裝之檔；安裝時新建之目錄（登記於其內檔
+        之前，逆序時於檔之後處理）若已空即移除；最後刪備份根。"""
         for relative, had_previous in reversed(list(installed)):
             target = Path(run_dir) / relative
             backup = None if backup_root is None else Path(backup_root) / relative
             if had_previous:
                 if backup is not None and backup.exists():
                     os.replace(backup, target)
+            elif target.is_dir():
+                if not any(target.iterdir()):
+                    target.rmdir()
             elif target.exists():
                 target.unlink()
         if backup_root is not None and Path(backup_root).exists():

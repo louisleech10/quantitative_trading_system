@@ -1975,14 +1975,50 @@ def _ffname_rekeyed_cell_errors(cell: str, old_fp: Dict[str, Any], new_fp: Dict[
     return errs
 
 
+PREPROV_RECEIPT_REL = "tests/_golden/preprov/refreeze_receipt.json"
+
+
+def preprov_framepath_approvals() -> Dict[str, Tuple[str, str]]:
+    """FFDSTAR／PRE-PROV §G 證法：結構重凍收據 framepath 段（已寫入、exit_code 0）中 equal 且剝除重算＝凍結值之格 →
+    (frozen_before, new_value)；差異路徑須只在 manifest artifact 節點新鍵（`content_sha256`／`provenance`），否則該格不核可。"""
+    path = REPO / PREPROV_RECEIPT_REL
+    if not path.is_file():
+        return {}
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    section = next((f for f in receipt.get("files") or [] if f.get("path") == BASELINE_REL), None) or {}
+    if section.get("written") is not True or section.get("exit_code") != 0:
+        return {}
+
+    def structural(p: str) -> bool:
+        segs = str(p).split("#", 1)[-1].split(".")
+        return "#" in str(p) and len(segs) == 3 and segs[0] == "artifacts" and segs[2] in ("content_sha256", "provenance")
+
+    return {str(i["item"]): (i["frozen_before"], i["new_value"]) for i in section.get("items") or []
+            if i.get("equal") is True and i.get("stripped_recomputed") == i.get("frozen_before")
+            and all(structural(p) for p in i.get("diff_paths") or [])}
+
+
+def _preprov_structural_only(old_fp: Dict[str, Any], new_fp: Dict[str, Any],
+                             approval: Optional[Tuple[str, str]]) -> bool:
+    """fingerprint 之差異恰只有 `manifest_sha256`，且舊→新恰為收據核可之 (frozen_before, new_value)。"""
+    if approval is None:
+        return False
+    keys = {k for k in set(old_fp) | set(new_fp) if old_fp.get(k) != new_fp.get(k)}
+    return keys == {"manifest_sha256"} and (old_fp.get("manifest_sha256"), new_fp.get("manifest_sha256")) == approval
+
+
 def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
-                            approvals: Optional[Dict[str, Dict[str, str]]] = None) -> List[str]:
+                            approvals: Optional[Dict[str, Dict[str, str]]] = None,
+                            preprov: Optional[Dict[str, Tuple[str, str]]] = None) -> List[str]:
     """基準各版本（依時間序之 (版本名, 基準 JSON)）之承續：後版須含前版每一格，且該格 fingerprint 逐項相等、
     receipt 除 `BASELINE_RUN_PATH_KEYS` 外相等、`code_anchor` 不變；只准新增格（memory 屬量測值不比）。
     FF-NAME SPEC v22：既有格之逐欄值不變；鍵名與名衍生雜湊（column_names_sha256、manifest_sha256、
     stationarity_decisions_sha256、column_count、result_columns.names_sha256）只在收據 framepath 段核可之格可更新
-    （`approvals`；預設讀收據）。"""
+    （`approvals`；預設讀收據）。
+    FFDSTAR／PRE-PROV §G：結構重凍只改 `manifest_sha256`，且舊→新恰為重凍收據核可之值（`preprov`；預設讀
+    `tests/_golden/preprov/refreeze_receipt.json`）；其他任一項同時改變即不屬之。"""
     approvals = ffname_framepath_approvals() if approvals is None else approvals
+    preprov = preprov_framepath_approvals() if preprov is None else preprov
     errs: List[str] = []
     for (prev_name, prev), (name, cur) in zip(versions, versions[1:]):
         if prev.get("code_anchor") != cur.get("code_anchor"):
@@ -1993,7 +2029,9 @@ def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
                 errs.append(f"⓪ 基準 {name} 刪除了既有格 {cell}")
                 continue
             if new.get("fingerprint") != old.get("fingerprint"):
-                if cell in approvals:
+                if _preprov_structural_only(old.get("fingerprint") or {}, new.get("fingerprint") or {}, preprov.get(cell)):
+                    pass
+                elif cell in approvals:
                     errs += _ffname_rekeyed_cell_errors(cell, old.get("fingerprint") or {}, new.get("fingerprint") or {},
                                                         approvals[cell])
                 else:
@@ -2058,6 +2096,23 @@ def test_ffname_approved_rekey_lineage_rule():
     rows = json.loads(json.dumps(v2))
     rows["cells"]["C1"]["fingerprint"]["row_count"] = 4
     assert baseline_lineage_errors([("v1", v1), ("v2", rows)], approvals=approval) != []
+
+
+def test_preprov_structural_refreeze_lineage_rule():
+    """FFDSTAR／PRE-PROV §G：只改 `manifest_sha256` 且舊→新恰為重凍收據核可值 ⇒ 承續合法；未核可、核可值不符、或同時改其他
+    項（值、列數）⇒ 仍紅（不放寬值項）。"""
+    fp = {"run_status": "complete", "row_count": 3, "manifest_sha256": "m", "columns": {"x": {"values": "v"}}}
+    v1 = {"code_anchor": "a", "cells": {"C1": {"fingerprint": fp, "receipt": {}}}}
+    v2 = {"code_anchor": "a", "cells": {"C1": {"fingerprint": dict(fp, manifest_sha256="n"), "receipt": {}}}}
+    ok = {"C1": ("m", "n")}
+    assert baseline_lineage_errors([("v1", v1), ("v2", v2)], approvals={}, preprov=ok) == []
+    assert baseline_lineage_errors([("v1", v1), ("v2", v2)], approvals={}, preprov={}) != []
+    assert baseline_lineage_errors([("v1", v1), ("v2", v2)], approvals={}, preprov={"C1": ("m", "z")}) != []
+    assert baseline_lineage_errors([("v1", v1), ("v2", v2)], approvals={}, preprov={"C2": ("m", "n")}) != []
+    for key, value in (("row_count", 4), ("columns", {"x": {"values": "w"}})):
+        bad = json.loads(json.dumps(v2))
+        bad["cells"]["C1"]["fingerprint"][key] = value
+        assert baseline_lineage_errors([("v1", v1), ("v2", bad)], approvals={}, preprov=ok) != []
 
 
 def test_mutation_history_freeze_order_violations_are_red():

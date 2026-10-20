@@ -7,6 +7,8 @@ scripts/ 端之單一列檔入口（scripts 不 import tests/）：凍結腳本�
 與 `tests/feature_engineering/preprov_helpers.declared_feature_files` 同語意（同一宣告來源、同一錯誤條件）：
 - 特徵檔集合只自 manifest（`feature_manifest.json`）artifact 節點之 `groups[*].path` 與 row index 宣告導出；
 - 宣告檔缺 ⇒ FileNotFoundError；artifact 目錄下有未宣告之 parquet ⇒ ValueError（不靜默忽略）。
+- run 快照（`declared_run_snapshot_files`）另含 manifest 各 artifact 節點 `provenance.path` 宣告之紀錄檔（FFDSTAR b4 F；
+  只認宣告，舊 run 無宣告 ⇒ 快照檔集合不變；`provenance/` 下未宣告之檔仍由未宣告檔守衛拋錯）。
 
 不 import 生產讀取端（`momentum.FeatureEngineering.feature_reader`）之理由：生產讀取端無「列 run 內宣告檔」之公開 API
 （`stream_groups_v2` 等只回讀出之資料、且需 symbol／tf／config_hash 而非任意目錄），且凍結腳本之列檔須於改前／改後
@@ -25,6 +27,8 @@ from typing import Any, Dict, List, Mapping, Optional
 
 MANIFEST_NAME = "feature_manifest.json"
 REGISTRY_MANIFEST_NAME = "manifest.json"
+#: FFDSTAR Task 1.3／1.4：逐欄紀錄檔所在之 run 根子目錄（契約 `run_provenance.json` 之 `files` 皆在其下）
+PROVENANCE_DIR = "provenance"
 
 #: feature run 目錄內「非 manifest 宣告、但現行生產碼確實寫入」之附屬檔（快照雜湊須含之以重現既有凍結值）。
 #: 檔名 → 理由；只在實際存在時列入（不存在不報錯）。新增項須附生產碼出處。
@@ -135,11 +139,37 @@ def _guard_no_undeclared(base: Path, listed: List[Path], what: str) -> None:
         raise ValueError(f"{what} 有未宣告之檔：{undeclared[:5]}")
 
 
+def declared_provenance_files(run_dir: Path) -> List[Path]:
+    """manifest 各 artifact 節點之 `provenance.path`（FFDSTAR Task 1.3／1.4 紀錄檔指標）所宣告之紀錄檔（路徑升冪、去重）。
+
+    只認宣告（不掃 `provenance/`）：節點無 `provenance` 物件（改前碼態之舊 run）⇒ 不列入，快照檔集合與改前逐位元相同；
+    宣告路徑不安全或不在 run 根 `provenance/` 下 ⇒ ValueError；宣告檔不存在 ⇒ FileNotFoundError。紀錄檔非特徵，
+    不入 `declared_feature_files*`。"""
+    run_dir = Path(run_dir)
+    out = set()
+    for kind, node in (load_manifest(run_dir).get("artifacts") or {}).items():
+        pointer = (node or {}).get("provenance") if isinstance(node, dict) else None
+        if pointer is None:
+            continue
+        if not isinstance(pointer, dict):
+            raise ValueError(f"artifact {kind!r} 之 provenance 非物件：{pointer!r}")
+        rel = Path(_safe_rel(pointer.get("path")))
+        if len(rel.parts) < 2 or rel.parts[0] != PROVENANCE_DIR:
+            raise ValueError(f"artifact {kind!r} 之紀錄檔宣告路徑不在 {PROVENANCE_DIR}/ 下：{pointer.get('path')!r}")
+        out.add(run_dir / rel)
+    missing = sorted(str(p) for p in out if not p.is_file())
+    if missing:
+        raise FileNotFoundError(f"manifest 宣告之紀錄檔不存在：{missing[:5]}")
+    return sorted(out)
+
+
 def declared_run_snapshot_files(run_dir: Path) -> List[Path]:
-    """feature run 目錄之快照檔集合＝宣告特徵檔（`declared_feature_files_of_run`）＋manifest 本身＋實際存在之
-    `RUN_DIR_ALLOWED_EXTRAS`（逐項附理由）；run 目錄有其他實體檔 ⇒ ValueError。路徑升冪。"""
+    """feature run 目錄之快照檔集合＝宣告特徵檔（`declared_feature_files_of_run`）＋manifest 宣告之紀錄檔
+    （`declared_provenance_files`；舊 run 無宣告 ⇒ 無）＋manifest 本身＋實際存在之 `RUN_DIR_ALLOWED_EXTRAS`
+    （逐項附理由）；run 目錄有其他實體檔（含未宣告之 `provenance/` 檔）⇒ ValueError。路徑升冪。"""
     run_dir = Path(run_dir)
     files = set(declared_feature_files_of_run(run_dir))
+    files.update(declared_provenance_files(run_dir))
     files.add(run_dir / MANIFEST_NAME)
     files.update(run_dir / name for name in RUN_DIR_ALLOWED_EXTRAS if (run_dir / name).is_file())
     listed = sorted(files)

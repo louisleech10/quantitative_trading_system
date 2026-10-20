@@ -547,7 +547,7 @@ def k2_problems(rel: str, entry: Optional[Dict[str, Any]] = None, new_sidecar: O
             bad.append(f"units_not_contract_set:{rel}:{sorted(set(expected_units) ^ set(got_units))}")
         for unit in entry["units"]:
             bad += [f"{unit.get('unit')}:{b}" for b in _k2_one(rel, unit, None) if not b.startswith("bytes_unbound")]
-        if entry.get("new_sha256") != _sha((REPO / rel).read_bytes()):
+        if not bytes_bound(rel, entry.get("new_sha256")):
             bad.append(f"bytes_unbound:{rel}")
         if entry.get("value_hash_mismatch", 1) != 0:
             bad.append(f"receipt_mismatch:{rel}")
@@ -616,9 +616,125 @@ def _k2_one(rel: str, entry: Dict[str, Any], new_sidecar: Optional[Dict[str, Any
             bad.append(f"drift_but_bytes_changed:{rel}")
     else:
         bad.append(f"decision_invalid:{rel}:{decision}")
-    if entry.get("new_sha256") != _sha((REPO / rel).read_bytes()):
+    if not bytes_bound(rel, entry.get("new_sha256")):
         bad.append(f"bytes_unbound:{rel}")
     return bad
+
+
+# ---------------------------------------------------------------- FFDSTAR／PRE-PROV 後繼結構重凍（docs/FFDSTAR_SPEC.md §G 證法）
+
+PREPROV_RECEIPT = REPO / "tests" / "_golden" / "preprov" / "refreeze_receipt.json"
+#: §G 剝除之 manifest artifact 節點新鍵；failopen 快照中位元組含時間戳之 manifest 檔名
+PREPROV_KEYS = ("content_sha256", "provenance")
+PREPROV_MANIFEST_BASENAMES = frozenset({"feature_manifest.json", "manifest.json"})
+
+
+def bytes_bound(rel: str, bound_sha: Optional[str]) -> bool:
+    """現檔位元組綁定 FF-NAME 收據：sha256＝收據 `new_sha256`，或其唯一後繼為 PRE-PROV 結構重凍（`preprov_followon_problems`
+    為空）。值項之比對（K2 sidecar 依名逐欄）不因此放寬。"""
+    return _sha((REPO / rel).read_bytes()) == bound_sha or preprov_followon_problems(rel, bound_sha) == []
+
+
+def _preprov_aggregate(files: List[Dict[str, Any]]) -> str:
+    """failopen 產物清單之 aggregate（獨立重算；同凍結檔之定義：sort_keys、(",", ":")、ensure_ascii）。"""
+    blob = json.dumps(files, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return _sha(blob)
+
+
+def _preprov_structural_problems(rel: str, old: Dict[str, Any], new: Dict[str, Any],
+                                 items: List[Dict[str, Any]]) -> List[str]:
+    """舊（FF-NAME 綁定之位元組）→ 新（現檔）之差異只在 PRE-PROV 結構欄，且每處改動恰為收據該項之 frozen_before → new_value。
+    framepath：只各格 `fingerprint.manifest_sha256`；failopen：只收據列名單元之 `artifacts`，且新清單＝舊清單＋`provenance/`
+    項，共有項中非 manifest 檔之 size／sha256 不變，新 aggregate 依清單獨立重算相符。"""
+    recipe = DISP.get(rel, {}).get("recipe")
+    by_item = {str(i.get("item")): i for i in items}
+    o, n = copy.deepcopy(old), copy.deepcopy(new)
+    bad: List[str] = []
+    if recipe == "framepath":
+        for doc in (o, n):
+            for node in (doc.get("cells") or {}).values():
+                (node.get("fingerprint") or {}).pop("manifest_sha256", None)
+        for cell, node in (new.get("cells") or {}).items():
+            before = (((old.get("cells") or {}).get(cell) or {}).get("fingerprint") or {}).get("manifest_sha256")
+            after = (node.get("fingerprint") or {}).get("manifest_sha256")
+            item = by_item.get(cell) or {}
+            if before != after and (item.get("frozen_before"), item.get("stripped_recomputed"),
+                                    item.get("new_value")) != (before, before, after):
+                bad.append(f"preprov_unjustified:{cell}")
+    elif recipe == "failopen":
+        for unit, item in by_item.items():
+            symbol = unit.split("/")[0]
+            for doc in (o, n):
+                ((doc.get("multi_tf") or {}).get(symbol) or {}).pop("artifacts", None)
+            oa = ((old.get("multi_tf") or {}).get(symbol) or {}).get("artifacts") or {}
+            na = ((new.get("multi_tf") or {}).get(symbol) or {}).get("artifacts") or {}
+            summary = lambda a: {"file_count": a.get("file_count"), "aggregate_sha256": a.get("aggregate_sha256")}  # noqa: E731
+            if summary(oa) != item.get("frozen_before") or summary(na) != item.get("new_value"):
+                bad.append(f"preprov_unjustified:{unit}")
+            files = na.get("files") or []
+            if na.get("file_count") != len(files) or na.get("aggregate_sha256") != _preprov_aggregate(files):
+                bad.append(f"preprov_aggregate_inconsistent:{unit}")
+            ow = {(e.get("root"), e["path"]): e for e in oa.get("files") or []}
+            nw = {(e.get("root"), e["path"]): e for e in files}
+            if set(ow) - set(nw):
+                bad.append(f"preprov_files_removed:{unit}")
+            if any(Path(p).parts[:1] != ("provenance",) for _r, p in set(nw) - set(ow)):
+                bad.append(f"preprov_non_provenance_added:{unit}")
+            if any((ow[k].get("size"), ow[k].get("sha256")) != (nw[k].get("size"), nw[k].get("sha256"))
+                   for k in set(ow) & set(nw) if Path(k[1]).name not in PREPROV_MANIFEST_BASENAMES):
+                bad.append(f"preprov_data_bytes_changed:{unit}")
+    else:
+        return [f"preprov_not_affected:{rel}"]
+    if o != n:
+        bad.append(f"preprov_non_structural_change:{rel}")
+    return bad
+
+
+def _preprov_diff_path_ok(recipe: Optional[str], path: str) -> bool:
+    if recipe == "framepath":
+        segs = path.split("#", 1)[-1].split(".")
+        return "#" in path and len(segs) == 3 and segs[0] == "artifacts" and segs[2] in PREPROV_KEYS
+    parts = Path(path).parts
+    return len(parts) >= 2 and (parts[1] == "provenance" or parts[-1] in PREPROV_MANIFEST_BASENAMES)
+
+
+def preprov_followon_problems(rel: str, bound_sha: Optional[str], *, receipt: Optional[Dict[str, Any]] = None,
+                              current: Optional[bytes] = None, base: Optional[bytes] = None) -> List[str]:
+    """FFDSTAR／PRE-PROV §G：現檔不等於 FF-NAME 綁定位元組時，唯一可接受之來由＝PRE-PROV 結構重凍收據
+    （`tests/_golden/preprov/refreeze_receipt.json`）該檔段：已寫入、exit_code 0、`sha256_before`＝FF-NAME 綁定、
+    `sha256_after`＝現檔、`base_commit` 之該檔 sha256＝`sha256_before`；每項 equal（剝除後＝凍結值）、差異路徑只在新鍵／
+    `provenance/`；且獨立比對舊新兩版，改動只在結構欄、恰為收據所列（`_preprov_structural_problems`）。
+    `receipt`／`current`／`base` 供變異測試注入，預設讀收據、現檔與 `git show <base_commit>:<rel>`。"""
+    if receipt is None:
+        if not PREPROV_RECEIPT.is_file():
+            return ["preprov_receipt_missing"]
+        receipt = json.loads(PREPROV_RECEIPT.read_text(encoding="utf-8"))
+    section = next((f for f in receipt.get("files") or [] if f.get("path") == rel), None)
+    if section is None:
+        return [f"preprov_section_missing:{rel}"]
+    current = (REPO / rel).read_bytes() if current is None else current
+    if base is None:
+        proc = subprocess.run(["git", "show", f"{section.get('base_commit')}:{rel}"], cwd=str(REPO), capture_output=True)
+        base = proc.stdout if proc.returncode == 0 else b""
+    bad: List[str] = []
+    if receipt.get("schema_version") != 1:
+        bad.append("preprov_schema")
+    if section.get("written") is not True or section.get("exit_code") != 0:
+        bad.append(f"preprov_not_written:{rel}")
+    if not bound_sha or section.get("sha256_before") != bound_sha or _sha(base) != bound_sha:
+        bad.append(f"preprov_before_not_ffname_bound:{rel}")
+    if section.get("sha256_after") != _sha(current):
+        bad.append(f"preprov_after_not_current:{rel}")
+    items = section.get("items") or []
+    if not items or any(i.get("equal") is not True for i in items):
+        bad.append(f"preprov_item_not_equal:{rel}")
+    recipe = DISP.get(rel, {}).get("recipe")
+    bad += [f"preprov_diff_path:{p}" for i in items for p in i.get("diff_paths") or []
+            if not _preprov_diff_path_ok(recipe, str(p))]
+    if bad:
+        return bad
+    return _preprov_structural_problems(rel, json.loads(base.decode("utf-8")), json.loads(current.decode("utf-8")),
+                                        items)
 
 
 def _failopen_node(doc: Dict[str, Any], unit: str) -> Any:
@@ -940,6 +1056,96 @@ def test_mutation_k2_swapped_values_caught():
     a, b = sorted(cols)[0], names[0]
     cols[a], cols[b] = cols[b], cols[a]
     assert any(p.startswith(f"column:{entry['path']}:") for p in k2_problems(entry["path"], entry, new_sidecar=new_sc))
+
+
+def _preprov_case(rel: str, mutate: Any, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """以現檔（FF-NAME 綁定之位元組）為舊版、`mutate(新版 dict)` 為新版，組 PRE-PROV 收據段（變異測試用）。"""
+    base = (REPO / rel).read_bytes()
+    new = json.loads(base.decode("utf-8"))
+    mutate(new)
+    current = json.dumps(new, indent=1).encode("utf-8")
+    section = {"path": rel, "command": "test", "exit_code": 0, "base_commit": "HEAD", "sha256_before": _sha(base),
+               "sha256_after": _sha(current), "written": True, "items": items}
+    return {"receipt": {"schema_version": 1, "files": [section]}, "current": current, "base": base,
+            "bound": _sha(base), "section": section}
+
+
+def _framepath_preprov_case(extra: Any = None, **item_over: Any) -> Dict[str, Any]:
+    rel = "tests/_golden/framepath/cgsa_fingerprint.json"
+    old = json.loads((REPO / rel).read_text(encoding="utf-8"))["cells"]["C1"]["fingerprint"]["manifest_sha256"]
+    item = {"item": "C1", "frozen_before": old, "stripped_recomputed": old, "equal": True, "new_value": "f" * 64,
+            "diff_paths": ["BTCUSDT/1h/h/feature_manifest.json#artifacts.raw.provenance",
+                           "BTCUSDT/1h/h/feature_manifest.json#artifacts.raw.content_sha256"]}
+    item.update(item_over)
+
+    def mutate(doc: Dict[str, Any]) -> None:
+        doc["cells"]["C1"]["fingerprint"]["manifest_sha256"] = "f" * 64
+        if extra is not None:
+            extra(doc)
+
+    return _preprov_case(rel, mutate, [item])
+
+
+def _preprov_problems(case: Dict[str, Any], rel: str) -> List[str]:
+    return preprov_followon_problems(rel, case["bound"], receipt=case["receipt"], current=case["current"],
+                                     base=case["base"])
+
+
+def test_preprov_followon_framepath_rule():
+    """FFDSTAR／PRE-PROV §G：framepath 只改收據核可格之 `manifest_sha256`（frozen_before＝剝除重算＝舊值、new_value＝新值、
+    差異路徑只在新鍵）⇒ 接受；其餘任一不符 ⇒ 拒（不放寬值項）。"""
+    rel = "tests/_golden/framepath/cgsa_fingerprint.json"
+    assert _preprov_problems(_framepath_preprov_case(), rel) == []
+    values = lambda d: d["cells"]["C1"]["fingerprint"].__setitem__("row_count", -1)  # noqa: E731
+    assert f"preprov_non_structural_change:{rel}" in _preprov_problems(_framepath_preprov_case(values), rel)
+    other_cell = lambda d: d["cells"]["C2"]["fingerprint"].__setitem__("manifest_sha256", "e" * 64)  # noqa: E731
+    assert "preprov_unjustified:C2" in _preprov_problems(_framepath_preprov_case(other_cell), rel)
+    assert f"preprov_item_not_equal:{rel}" in _preprov_problems(_framepath_preprov_case(equal=False), rel)
+    assert "preprov_unjustified:C1" in _preprov_problems(_framepath_preprov_case(stripped_recomputed="0" * 64), rel)
+    assert "preprov_unjustified:C1" in _preprov_problems(_framepath_preprov_case(new_value="0" * 64), rel)
+    bad_path = "BTCUSDT/1h/h/feature_manifest.json#generation_metadata.x"
+    assert f"preprov_diff_path:{bad_path}" in _preprov_problems(_framepath_preprov_case(diff_paths=[bad_path]), rel)
+    case = _framepath_preprov_case()
+    assert f"preprov_before_not_ffname_bound:{rel}" in preprov_followon_problems(
+        rel, "0" * 64, receipt=case["receipt"], current=case["current"], base=case["base"])
+    case["section"]["written"] = False
+    assert f"preprov_not_written:{rel}" in _preprov_problems(case, rel)
+
+
+def _failopen_preprov_case(extra: Any = None) -> Dict[str, Any]:
+    rel = "tests/_golden/failopen/baseline.json"
+    old = json.loads((REPO / rel).read_text(encoding="utf-8"))["multi_tf"]["BTCUSDT"]["artifacts"]
+    files = copy.deepcopy(old["files"])
+    root = next(e["root"] for e in files if e["path"] == "feature_manifest.json")
+    for entry in files:
+        if entry["path"] == "feature_manifest.json":
+            entry["sha256"], entry["size"] = "a" * 64, entry["size"] + 10
+    files.append({"root": root, "path": "provenance/raw_columns.parquet", "size": 1, "sha256": "b" * 64})
+    files.sort(key=lambda e: (e["root"], e["path"]))
+    if extra is not None:
+        extra(files)
+    new_art = {"files": files, "file_count": len(files), "aggregate_sha256": _preprov_aggregate(files)}
+    summary = lambda a: {"file_count": a["file_count"], "aggregate_sha256": a["aggregate_sha256"]}  # noqa: E731
+    item = {"item": "BTCUSDT/multi", "comparison": "entrywise", "frozen_before": summary(old),
+            "stripped_recomputed": summary(old), "equal": True, "new_value": summary(new_art),
+            "diff_paths": [f"{root}/feature_manifest.json", f"{root}/provenance/raw_columns.parquet"]}
+    return _preprov_case(rel, lambda d: d["multi_tf"]["BTCUSDT"].__setitem__("artifacts", new_art), [item])
+
+
+def test_preprov_followon_failopen_rule():
+    """FFDSTAR／PRE-PROV §G：failopen BTC multi 產物清單只多 `provenance/` 項、manifest 位元組可變、其餘項 size／sha256 不變
+    ⇒ 接受；資料檔位元組變、新增非紀錄檔、刪檔 ⇒ 拒。"""
+    rel = "tests/_golden/failopen/baseline.json"
+    assert _preprov_problems(_failopen_preprov_case(), rel) == []
+
+    def data_changed(files: List[Dict[str, Any]]) -> None:
+        next(e for e in files if e["path"].endswith(".parquet") and "provenance" not in e["path"])["sha256"] = "c" * 64
+
+    assert "preprov_data_bytes_changed:BTCUSDT/multi" in _preprov_problems(_failopen_preprov_case(data_changed), rel)
+    added = lambda f: f.append({"root": f[0]["root"], "path": "raw/extra.parquet", "size": 1, "sha256": "d" * 64})  # noqa: E731
+    assert "preprov_non_provenance_added:BTCUSDT/multi" in _preprov_problems(_failopen_preprov_case(added), rel)
+    removed = lambda f: f.remove(next(e for e in f if e["path"].endswith(".npy")))  # noqa: E731
+    assert "preprov_files_removed:BTCUSDT/multi" in _preprov_problems(_failopen_preprov_case(removed), rel)
 
 
 # ================================================================ 鹽差

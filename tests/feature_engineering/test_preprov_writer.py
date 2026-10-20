@@ -279,6 +279,57 @@ def test_boundary_04_stationarity_off(runs: ph.RunCache) -> None:
     assert table["winsorization"].notna().all()
 
 
+def _empty_provenance_dirs(root: Path) -> List[str]:
+    """root 下名為 `provenance` 之空目錄（安裝失敗後不得殘留）。"""
+    return sorted(str(p) for p in Path(root).rglob("provenance") if p.is_dir() and not any(p.iterdir()))
+
+
+@pytest.mark.parametrize("retain_source", [False, True], ids=["source_deleted", "source_retained"])
+def test_boundary_05_provenance_install_failure_leaves_no_empty_dir(
+        tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch, retain_source: bool) -> None:
+    """邊界⑤（b4 盤點 §5 順帶發現）：新 run 之紀錄檔自暫存根安裝至 run 根（`_install_staged_run_files` 之 `os.replace`）
+    失敗 ⇒ 生成失敗、run 根不殘留安裝時新建之空 `provenance/` 目錄，且 run 不可被 `consumer="strict"` 讀為完整。
+    來源已刪（生產預設，不回復分支）與來源未刪（回復分支）各一案；注入點須恰觸發一次（防空轉）。"""
+    import os
+
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    root = tmp_path_factory.mktemp("preprov_writer_prov_install")
+    real_replace = os.replace
+    injected: List[str] = []
+    idents: List[tuple] = []
+
+    def replace(src: Any, dst: Any, *args: Any, **kwargs: Any) -> Any:
+        source = Path(str(src))
+        if source.parent.name == "provenance" and source.parent.parent.name.startswith(".tmp-raw-"):
+            injected.append(str(dst))
+            raise OSError(f"injected provenance install failure: {dst}")
+        return real_replace(src, dst, *args, **kwargs)
+
+    real_entry = FeatureStorage.write_raw_from_registry_stream
+
+    def entry(self: Any, symbol: str, tf: str, config_hash: str, *args: Any, **kwargs: Any) -> Any:
+        idents.append((Path(self.base_path), symbol, tf, config_hash, self.feature_run_dir(symbol, tf, config_hash)))
+        if retain_source:
+            kwargs["cleanup_intermediate"] = False
+        return real_entry(self, symbol, tf, config_hash, *args, **kwargs)
+
+    monkeypatch.setattr(FeatureStorage, "write_raw_from_registry_stream", entry)
+    monkeypatch.setattr(os, "replace", replace)
+    with pytest.raises(Exception):
+        ph.generate_short_run(root, "h1_stat_off")
+    monkeypatch.undo()
+    assert len(injected) == 1, injected
+    assert len(idents) == 1, idents
+    base, symbol, tf, config_hash, run_dir = idents[0]
+    assert not (run_dir / "provenance").exists(), "安裝失敗後 run 根殘留安裝時新建之 provenance/"
+    assert _empty_provenance_dirs(root) == []
+    assert raw_complete_nodes(root) == []
+    with pytest.raises((ValueError, FileNotFoundError, rp.ProvenanceError)):
+        FeatureReader(str(base)).load_manifest_v2(symbol, tf, config_hash, "raw", consumer="strict")
+
+
 # ---------------------------------------------------------------------------------------------- mutation
 
 def test_mutation_content_sha_without_row_index(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch,

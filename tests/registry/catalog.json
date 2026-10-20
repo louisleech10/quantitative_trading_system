@@ -4774,6 +4774,27 @@
    "rewrite_targets": [],
    "ticket": "FFDSTAR"
   },
+  "tests/feature_engineering/test_preprov_refreeze.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_preprov_refreeze.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFDSTAR"
+  },
   "tests/feature_engineering/test_preprov_writer.py": {
    "claim": [
     "contract",

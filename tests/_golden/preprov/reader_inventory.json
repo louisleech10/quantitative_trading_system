@@ -1613,6 +1613,24 @@
    "reason": "非特徵讀取：列舉 manifest 檔判 raw 節點完整性，不列舉特徵檔"
   },
   {
+   "path": "tests/feature_engineering/test_preprov_writer.py",
+   "qualname": "_empty_provenance_dirs",
+   "call": "Path(root).rglob('provenance')",
+   "occurrence": 0,
+   "line": 284,
+   "class": "unrelated",
+   "reason": "非特徵讀取：殘留／佈局斷言（b4 邊界⑤），列舉名為 provenance 之目錄判是否為空，不讀任何檔內容"
+  },
+  {
+   "path": "tests/feature_engineering/test_preprov_writer.py",
+   "qualname": "_empty_provenance_dirs",
+   "call": "p.iterdir()",
+   "occurrence": 0,
+   "line": 284,
+   "class": "unrelated",
+   "reason": "非特徵讀取：殘留／佈局斷言（b4 邊界⑤），只判 provenance 目錄是否為空"
+  },
+  {
    "path": "tests/feature_engineering/test_probewinsor.py",
    "qualname": "test_boundary_10e_isolated_links_only_tracked_config",
    "call": "(work / 'config').iterdir()",
