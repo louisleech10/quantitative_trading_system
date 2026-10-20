@@ -526,3 +526,24 @@
 - 2026-09-24：RM-FFNAME → `handoffs/reconcile/20260924-ffname-x-review-r5/synth.md`
 - 2026-09-24：RM-FFNAME → `handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md`
 - 2026-10-19：RM-FFNAME → `handoffs/reconcile/20260924-ffname-b4-review-r4/synth.md`
+
+## 2026-10-20 交接檔進行中紀錄移出：RM-FFDSTAR（PRE-PROV 收案；原條目之一與 RM-SEARCH2EVENT、RM-EVENTSCAN 共用，只移出本票各行）
+
+<!-- ENTRY: RM-FFDSTAR -->
+- 2026-09-21：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`
+- 2026-09-21：RM-FFDSTAR → `docs/FFDSTAR_SPEC.md`
+- 2026-09-21：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-review-r2/synth.md`
+- 2026-09-24：RM-FFDSTAR → `handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md`
+- 2026-10-19：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-consult-r4/synth.md`
+- 2026-10-19：v2 → `docs/FFDSTAR_SPEC.md`
+- 2026-10-19：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-review-r5/synth.md`
+- 2026-10-19：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-review-r6/synth.md`
+- 2026-10-19：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-review-r7/synth.md`
+- 2026-10-19：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-stamp-r8/synth.md`
+- 2026-10-20：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-b1-stamp-r2/synth.md`
+- 2026-10-20：v4 → `docs/FFDSTAR_SPEC.md`
+- 2026-10-20：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-b2-stamp-r3/synth.md`
+- 2026-10-20：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-b3-stamp-r2/synth.md`
+- 2026-10-20：RM-FFDSTAR → `handoffs/run_receipts/20261020-ffdstar-b4-plan.md`
+- 2026-10-20：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-stamp-r9/synth.md`
+- 2026-10-20：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-b4-review-r1/synth.md`

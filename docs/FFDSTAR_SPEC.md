@@ -189,6 +189,9 @@
 - 舊編號之「決策 148 欄對 L1＋L2 候選」：由 Task 3.1 oracle ① 直接回答，於本票收案時關閉，不再列殘留。
 - **FFDSTAR-R3 ADF 檢定拋例外時以 p=1.0 視為非平穩續行**（`feature_preprocessor.py:3472` 附近、`_slow_path_parallel.py:119` 附近）— `為何現在不做: needs-research:該行為改為 fail-closed 或保留屬平穩化判定之數值政策（改之即改輸出值，違本票不改值之約束），須以真實資料量測例外發生率後定`；本票先使其可見（逐欄事件與狀態）；觸發：Task 3.1 驗收格或任一真實 run 紀錄出現該事件；登記處：本 SPEC §N。
 - **FFDSTAR-R4 快速臂與 pandas 臂之邊界行為不一致**（zscore 窗清單為空時快速臂以 100 照做、未知縮尾 method 快速臂當 quantile 而 legacy 臂拋錯；盤點草稿所揭）— `為何現在不做: blocked-by:全票排序第 8 步 NUMVIEW（post-IC 正式臂政策：統一或具名保留，docs/TICKET_ORDER.md:42）`；本票只記實際所走之臂；觸發：NUMVIEW 開工；登記處：本 SPEC §N。
+- **FFDSTAR-R5 `tests/feature_engineering/test_ffname_refreeze.py::test_k2_sidecar_per_name_equal[failopen]` 恆紅**（`k2_artifacts_unavailable`：FF-NAME 依名比對之 sidecar 存於 FF-NAME session 之 scratchpad，已刪；本票改動前即紅、無 `bytes_unbound`，第 4 批審碼 r1 三家判非本票 blocking）— `為何現在不做: needs-research:該檢查依賴不入版控之暫存 sidecar，修法（以精簡依名摘要入版控或重產 sidecar；後者需 FF-NAME 新舊碼全窗對證約 3.5–5 小時）須先定，屬 FF-NAME 驗收設計而非本票紀錄功能`；觸發：下一次動 failopen 凍結或 FF-NAME 依名比對工具時；登記處：本 SPEC §N、白話說明/還沒做的事.md。
+- **FFDSTAR-R6 多週期 run 之 manifest `generation_metadata` 無 `column_set_reasons`**（單週期由 `feature_factory._stable_start_metadata` 寫入；多週期 failopen 實跑之診斷收據 handoffs/run_receipts/ffdstar_b4_failopen_diag/README.md）— `為何現在不做: needs-research:FFSTAT §C 欄集合差異收據於多週期是否應合併各週期剔除原因屬 FF-STAT 範圍；本票之逐欄終態與 dead-drop 已由紀錄檔與群組表涵蓋，不依賴該鍵`；觸發：多週期 run 之欄集合差異收據被消費或 FF-STAT 相關票開工；登記處：本 SPEC §N、白話說明/還沒做的事.md。
+- R3 觸發核對（2026-10-20）：三次全特徵 BTCUSDT 12h run（含兩次平穩化開）之紀錄檔皆無 `adf_test_error` 事件，未觸發。
 
 ## §K 本 SPEC 註冊之 fact-key
 

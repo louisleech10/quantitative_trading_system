@@ -152,34 +152,10 @@
 <td>小修，現在就會影響 IC 頁</td>
 </tr>
 <tr>
-<td>4</td>
-<td><strong>ICFIRSTALIGN 剩下的部分</strong>（✅ 2026-10-08 已收案）</td>
-<td>「IC 選完特徵再轉換」這條路改走正式引擎、修好時間軸；另修好以前會把記憶體撐爆的設定（現在靠搬到硬碟撐住、跑得完）</td>
-<td>見 <a href="做過什麼.html">做過什麼.md</a></td>
-</tr>
-<tr>
-<td>5</td>
-<td><strong>FRAMEPATH</strong>（✅ 2026-10-17 已收案）</td>
-<td>舊引擎與舊特徵 h5 讀寫已刪淨</td>
-<td>見 <a href="做過什麼.html">做過什麼.md</a></td>
-</tr>
-<tr>
-<td>5a</td>
-<td><strong>TESTREG 測試清冊</strong>（✅ 2026-10-18 已收案）</td>
-<td>依你 10/17「跟業界一樣」逐支審碼處置 326 個測試，三家審碼閉合</td>
-<td>見 <a href="做過什麼.html">做過什麼.md</a></td>
-</tr>
-<tr>
-<td>6</td>
-<td><strong>FF-NAME</strong>（✅ 2026-10-19 已收案）</td>
-<td>欄名全面統一，數值逐欄驗證不變</td>
-<td>見 <a href="做過什麼.html">做過什麼.md</a></td>
-</tr>
-<tr>
-<td>7</td>
-<td><strong>處理紀錄寫進產物</strong>（原 FFDSTAR）</td>
-<td>每次產出記下每欄實際做了哪些處理、用了哪個 d*</td>
-<td>IC 要靠它判斷「這欄實際有沒有處理」；會多一點輸出，屆時量好大小請你同意</td>
+<td>4–7</td>
+<td>✅ 已收案：ICFIRSTALIGN（10/08）、FRAMEPATH（10/17）、TESTREG 測試清冊（10/18）、FF-NAME（10/19）、處理紀錄寫進產物 PRE-PROV（10/20）</td>
+<td>各做了什麼見 <a href="做過什麼.html">做過什麼.md</a></td>
+<td>—</td>
 </tr>
 <tr>
 <td>8</td>
@@ -346,6 +322,8 @@
 在已補過的檔再刪函式。環境註記：在權限受限的沙盒（例如委員的執行環境）裡讀不到系統記憶體用量，特徵工廠的記憶體保護會依設計拒跑，
 相關測試在那裡會出錯；在你的電腦上正常。③<code>tests/test_append_fix.py</code>、<code>tests/test_kline_storage.py</code> 的舊測試每跑一次會真的連 Binance 寫本機 K 線快取（真實資料、
 不進 git），新補的測試已改寫暫存目錄。</p>
+<p><strong>PRE-PROV 留下兩條</strong>（SPEC <code>docs/FFDSTAR_SPEC.md</code> §N R5、R6；三家判不擋收案）：①一支 failopen 依名比對測試恆紅（比對檔在已清掉的暫存區，不代表數值錯；存摘要進版控或重跑約 3.5–5 小時比對，下次動 failopen 凍結時定）；
+②多週期說明檔缺「淘汰原因」段（單週期才有，屬 FF-STAT；本票紀錄檔已逐欄記下）。</p>
 <p><strong>治理線</strong>：兩條治理工作線已於 2026-08-14 由你裁定不再擴建，故本清單不列（狀態見 <code>docs/ROADMAP.md</code> 生成區塊）。</p>
 <hr />
 <h2 id="五這份怎麼維護">五、這份怎麼維護</h2>
