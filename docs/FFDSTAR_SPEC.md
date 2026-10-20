@@ -111,7 +111,7 @@
 
 **Task 2.1 — run 身分物件**
 - 目標：IC 自同一次 manifest 解析取得 run 身分並隨資料傳遞。　檔案：`run_provenance.py`（`resolve_run_identity(manifest, artifact_kind)`）；`momentum/FeatureEngineering/feature_library.py`（新增 `load_with_identity(symbol, timeframe, config_hash=None, **同 load 之參數) -> Tuple[pd.DataFrame, RunIdentity]`；`load` 回傳形態不變，給既有 caller）。　既有 caller／影響面：`api/services/ic_analysis_service.py` 之 `_materialize_features_for_ic`。
-- 改法：身分鍵依契約（symbol、tf、config_hash、feature_schema_hash、feature_naming_version、artifact_kind、content_sha256、provenance_sha256）；`feature_schema_hash` 取該 artifact 節點之值，節點無則取 manifest 頂層；缺 `content_sha256` 之舊 run 身分標 `legacy`。身分物件在一切輸出中之鍵名統一為 `ff_run_identity`。
+- 改法：身分鍵依契約（symbol、tf、config_hash、feature_schema_hash、feature_naming_version、artifact_kind、content_sha256、provenance_sha256）；`feature_schema_hash` 取該 artifact 節點之值，節點無則取 manifest 頂層；**讀取一致性（第 3 批審碼 r1 增修）**：`load_with_identity`（及其共用之內部載入）全程只解析一次 manifest，欄位清單、群組檔讀取與 row index 讀取皆以該次解析之 manifest 與 run 目錄為準（不再各自重解析）；讀取結束時以 manifest 檔位元組 sha256 與起始時比對（單一確認點、比內容），不同即拋錯拒讀（讀取期間同 run 被重生或替換），不得以任一份身分標記另一份資料；缺 `content_sha256` 之舊 run 身分標 `legacy`。身分物件在一切輸出中之鍵名統一為 `ff_run_identity`。
 - **驗證**：`pytest tests/feature_engineering/test_preprov_identity.py` 全綠：身分取值與 manifest 逐鍵相等；同一次 `load` 內 manifest 解析次數不因本 Task 增加（以計數 monkeypatch 斷言）。mutation：身分改取第二次解析之 manifest 且其間 manifest 被替換 ⇒ 不一致案紅。
 - **邊界**：①`config_hash` 未指定（latest 解析後才定身分）；②舊 run。
 - **存活至**：本票交付後保留。

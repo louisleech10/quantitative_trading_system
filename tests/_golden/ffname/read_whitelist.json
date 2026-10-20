@@ -10,6 +10,12 @@
   "match_key": "(path, qualname, call)；qualname＝外層類別／函式以 . 串接，模組層為 <module>；同鍵多處呼叫共用一筆",
   "entries": [
     {"path": "momentum/Analysis/event_samples/bars_source.py", "qualname": "load_bars_from_kline_cache", "call": "h5py.File", "purpose": "K 線"},
+    {"path": "momentum/FeatureEngineering/run_provenance.py", "qualname": "read_provenance_table", "call": "pq.read_table", "purpose": "逐欄執行紀錄檔（非特徵；唯一呼叫者 FeatureReader.load_provenance_v2，經單一 manifest 邊界取指標並驗 sha256／契約檔名與欄位；FFDSTAR Task 1.5）"},
+    {"path": "scripts/preprov_output_size.py", "qualname": "_read_seconds", "call": "pq.read_table", "purpose": "輸出量測：紀錄檔讀取秒數（非特徵；FFDSTAR Task 3.2）"},
+    {"path": "scripts/preprov_output_size.py", "qualname": "measure_run", "call": "pq.ParquetFile", "purpose": "輸出量測：紀錄檔 parquet metadata 列數（非特徵；FFDSTAR Task 3.2）"},
+    {"path": "scripts/ffname_refreeze.py", "qualname": "_recipe_fftfmeta", "call": "pq.read_table", "purpose": "golden 重凍工具：依 manifest 宣告列檔後逐群組檔讀值（需逐檔對照，非經 FeatureReader；FF-NAME 重凍、FFDSTAR Task 1.6 改依 manifest 列檔）"},
+    {"path": "scripts/ffname_refreeze.py", "qualname": "_recipe_framepath", "call": "pq.read_table", "purpose": "golden 重凍工具：依 manifest 宣告列檔後逐群組檔讀值（需逐檔對照，非經 FeatureReader；FF-NAME 重凍、FFDSTAR Task 1.6 改依 manifest 列檔）"},
+    {"path": "scripts/ffname_freeze_baseline.py", "qualname": "full_reference_window", "call": "h5py.File", "purpose": "K 線"},
     {"path": "momentum/Analysis/ic_filter_orchestrator.py", "qualname": "ICFilterOrchestrator._load_labels_hdf5", "call": "h5py.File", "purpose": "標籤"},
     {"path": "momentum/Analysis/ic_reporter.py", "qualname": "gate_hdf5_analysis_status_attr", "call": "h5py.File", "purpose": "IC 產出 h5 之狀態屬性（非特徵 run）"},
     {"path": "momentum/Analysis/ic_reporter.py", "qualname": "assert_filtered_export_fresh", "call": "h5py.File", "purpose": "IC 產出 h5 之新鮮度屬性（非特徵 run）"},

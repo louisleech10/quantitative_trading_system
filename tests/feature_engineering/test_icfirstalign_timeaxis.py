@@ -423,8 +423,10 @@ def test_boundary_03_raw_sidecar_format_unchanged(fresh_s2: Dict[str, Any]) -> N
 
 def test_write_processed_requires_row_index(fresh_s2: Dict[str, Any]) -> None:
     groups, _ = _processed_groups(fresh_s2)
+    # FFDSTAR b3 審碼 r1 CODEX-R1-P2-02：補齊非目標之必填 `execution`，使本測試只因缺 `row_index` 而 TypeError
     with pytest.raises(TypeError):
-        FeatureStorage(str(fresh_s2["root"])).write_processed(h.SYMBOL, h.PRIMARY, fresh_s2["config_hash"], groups)
+        FeatureStorage(str(fresh_s2["root"])).write_processed(h.SYMBOL, h.PRIMARY, fresh_s2["config_hash"], groups,
+                                                              execution=direct_write_execution(groups, h.PRIMARY))
 
 
 def test_mutation_processed_overwrites_root_time_range(fresh_s2: Dict[str, Any],

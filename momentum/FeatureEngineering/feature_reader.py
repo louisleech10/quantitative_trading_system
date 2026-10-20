@@ -11,6 +11,7 @@ Design reference: FEATURE_STORAGE_ARCHITECTURE_V7.md §11
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,7 @@ from momentum.FeatureEngineering.feature_storage import (
     decode_zscore_from_int16,
     resolve_run_status as merge_manifest_run_status,
 )
+from momentum.FeatureEngineering.run_provenance import ProvenanceError
 from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError, RowIndexLengthMismatchError
 from momentum.core.logging import get_logger
 
@@ -44,6 +46,26 @@ V2_MANIFEST_NAME = "feature_manifest.json"
 
 class NonCanonicalFeaturePathError(ValueError):
     """特徵檔路徑無法解析為 canonical run（FF-NAME Task 3.4）：於產生任何 DataFrame 之前拒收。"""
+
+
+class ManifestChangedDuringReadError(ProvenanceError):
+    """讀取期間 manifest 檔位元組改變（同 run 被重生或替換）⇒ 拒讀，不重試（FFDSTAR Task 2.1 讀取一致性）。
+
+    屬 run 身分／紀錄錯誤族（`ProvenanceError`，RuntimeError 子類）：讀出之資料無法保證與所回身分屬同一 run。"""
+
+
+@dataclass(frozen=True)
+class ManifestSnapshot:
+    """單次讀取所據之 manifest 解析（FFDSTAR Task 2.1 讀取一致性）。
+
+    `manifest` 與 `sha256` 出自同一次讀入之位元組（先讀位元組、算 sha256、再以同一份位元組解析）；
+    `run_dir` 為群組檔與時間軸 sidecar 之相對路徑基準。讀取結束時以 `FeatureReader._confirm_manifest_unchanged`
+    比對檔案現行位元組之 sha256（單一確認點）。"""
+
+    manifest: dict
+    run_dir: Path
+    manifest_path: Path
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -171,8 +193,11 @@ class FeatureReader:
         *,
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
+        _snapshot: Optional[ManifestSnapshot] = None,
     ) -> dict:
-        """Load a complete V2 manifest（V2 manifest 不存在 ⇒ FileNotFoundError）."""
+        """Load a complete V2 manifest（V2 manifest 不存在 ⇒ FileNotFoundError）.
+
+        `_snapshot`（內部；FFDSTAR Task 2.1 讀取一致性）：給定 ⇒ 不重解析，以該次解析驗證後回之（見 `_resolve_manifest_v2`）。"""
         manifest, _base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
@@ -180,6 +205,7 @@ class FeatureReader:
             artifact_kind=artifact_kind,
             consumer=consumer,
             allow_partial=allow_partial,
+            snapshot=_snapshot,
         )
         return manifest
 
@@ -278,12 +304,14 @@ class FeatureReader:
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
         attach_row_index: bool = False,
+        _snapshot: Optional[ManifestSnapshot] = None,
     ) -> pd.DataFrame:
         """Column projection for V2 raw/processed artifacts.
 
         `attach_row_index=True`（ICFIRSTALIGN Task 1.2）：回傳以該 artifact_kind 之 sidecar 時間戳為索引；
         sidecar 缺 ⇒ `RowIndexArtifactMissingError`；無符合欄 ⇒ 空 DataFrame 帶長度 0 之 DatetimeIndex。
         預設 False 維持既有 caller 行為（RangeIndex，逐位元組不變）。
+        `_snapshot`（內部；FFDSTAR Task 2.1 讀取一致性）：給定 ⇒ 群組檔與時間軸皆依該次解析讀取、不重解析 manifest。
         """
         manifest, base_dir = self._resolve_manifest_v2(
             symbol=symbol,
@@ -292,11 +320,37 @@ class FeatureReader:
             artifact_kind=artifact_kind,
             consumer=consumer,
             allow_partial=allow_partial,
+            snapshot=_snapshot,
         )
         row_index = (
-            self._require_row_index(symbol, tf, config_hash, artifact_kind) if attach_row_index else None
+            self._require_row_index(symbol, tf, config_hash, artifact_kind, snapshot=_snapshot)
+            if attach_row_index
+            else None
         )
 
+        projected = self._load_columns_from_manifest(manifest, base_dir, columns, artifact_kind)
+        if projected is None:
+            return pd.DataFrame(index=pd.DatetimeIndex([])) if attach_row_index else pd.DataFrame()
+        result = projected
+        if row_index is None:
+            return result
+        if len(result) != len(row_index):
+            raise RowIndexLengthMismatchError(
+                f"選欄讀回列數 {len(result)} 與 {artifact_kind} sidecar 列數 {len(row_index)} 不符"
+            )
+        return result.set_axis(row_index, axis=0)
+
+    def _load_columns_from_manifest(
+        self,
+        manifest: dict,
+        run_dir: Path,
+        columns: List[str],
+        artifact_kind: str = "raw",
+    ) -> Optional[pd.DataFrame]:
+        """以已解析之 manifest 與 run 目錄做欄投影（不重解析 manifest；FFDSTAR Task 2.1 讀取一致性）。
+
+        回 RangeIndex 之 DataFrame；無任何群組含所請之欄 ⇒ 記 warning 並回 None（空結果之形態由呼叫端決定）。
+        群組檔缺 ⇒ FileNotFoundError。呼叫端須已以該 manifest 過完整度／consumer 政策（`_validate_manifest_v2`）。"""
         artifact = self._get_v2_artifact(manifest, artifact_kind)
         col_to_group: Dict[str, List[str]] = {}
         for group_name, group_info in artifact.get("groups", {}).items():
@@ -307,30 +361,34 @@ class FeatureReader:
 
         if not col_to_group:
             logger.warning("No V2 columns matched in any group: %s...", columns[:5])
-            return pd.DataFrame(index=pd.DatetimeIndex([])) if attach_row_index else pd.DataFrame()
+            return None
 
         frames: List[pd.DataFrame] = []
         for group_name, needed_cols in col_to_group.items():
             group_info = artifact["groups"][group_name]
-            path = self._resolve_manifest_relative_path(base_dir, group_info.get("path") or group_info.get("file"))
+            path = self._resolve_manifest_relative_path(run_dir, group_info.get("path") or group_info.get("file"))
             if not path.exists():
                 raise FileNotFoundError(f"Parquet file missing: {path}")
             table = pq.read_table(str(path), columns=needed_cols)
             table = self._decode_l7_encoded_table(table)
             frames.append(table.to_pandas())
 
-        result = pd.concat(frames, axis=1) if frames else pd.DataFrame()
-        if row_index is None:
-            return result
-        if len(result) != len(row_index):
-            raise RowIndexLengthMismatchError(
-                f"選欄讀回列數 {len(result)} 與 {artifact_kind} sidecar 列數 {len(row_index)} 不符"
-            )
-        return result.set_axis(row_index, axis=0)
+        return pd.concat(frames, axis=1)
 
-    def _require_row_index(self, symbol: str, tf: str, config_hash: str, artifact_kind: str) -> pd.DatetimeIndex:
-        """嚴格讀回時間軸：未宣告或檔案缺 ⇒ `RowIndexArtifactMissingError`（經 `load_row_index_v2`，供 mutant 替換）。"""
-        row_index = self.load_row_index_v2(symbol, tf, config_hash, artifact_kind=artifact_kind)
+    def _require_row_index(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str,
+        *,
+        snapshot: Optional[ManifestSnapshot] = None,
+    ) -> pd.DatetimeIndex:
+        """嚴格讀回時間軸：未宣告或檔案缺 ⇒ `RowIndexArtifactMissingError`（經 `load_row_index_v2`，供 mutant 替換）。
+
+        `snapshot` 只在給定時轉交（未給定之呼叫形態與改前逐字相同，供固定簽名之 mutant 替換）。"""
+        extra: Dict[str, Any] = {} if snapshot is None else {"_snapshot": snapshot}
+        row_index = self.load_row_index_v2(symbol, tf, config_hash, artifact_kind=artifact_kind, **extra)
         if row_index is None:
             raise RowIndexArtifactMissingError(
                 f"{artifact_kind} 成品未宣告時間軸 sidecar（{symbol}/{tf}/{config_hash}）"
@@ -343,6 +401,8 @@ class FeatureReader:
         tf: str,
         config_hash: str,
         artifact_kind: str = "raw",
+        *,
+        _snapshot: Optional[ManifestSnapshot] = None,
     ) -> Optional[pd.DatetimeIndex]:
         """Load the persisted V2 timestamp axis of the given artifact kind.
 
@@ -351,13 +411,31 @@ class FeatureReader:
         未宣告即 `RowIndexArtifactMissingError`，不得退回根軸。
         已宣告之 sidecar 檔缺 ⇒ `RowIndexArtifactMissingError`（ValueError 子類，與既有 caller 相容）；
         列數須與宣告相符。
+        `_snapshot`（內部；FFDSTAR Task 2.1 讀取一致性）：給定 ⇒ 依該次解析讀取、不重解析 manifest。
         """
         manifest, base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
             config_hash=config_hash,
             artifact_kind=artifact_kind,
+            snapshot=_snapshot,
         )
+        return self._load_row_index_from_manifest(manifest, base_dir, symbol, tf, config_hash, artifact_kind)
+
+    def _load_row_index_from_manifest(
+        self,
+        manifest: dict,
+        run_dir: Path,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> Optional[pd.DatetimeIndex]:
+        """以已解析之 manifest 與 run 目錄讀時間軸（不重解析 manifest；FFDSTAR Task 2.1 讀取一致性）。
+
+        語意同 `load_row_index_v2`（raw 未宣告 ⇒ None；processed 未宣告 ⇒ `RowIndexArtifactMissingError`；
+        宣告之檔缺 ⇒ `RowIndexArtifactMissingError`；列數須與宣告相符）；`symbol`／`tf`／`config_hash` 只用於錯誤訊息。"""
+        base_dir = run_dir
         if artifact_kind == "processed":
             node = (manifest.get("artifacts") or {}).get("processed") or {}
             row_index = node.get("row_index")
@@ -402,8 +480,11 @@ class FeatureReader:
         *,
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
+        _snapshot: Optional[ManifestSnapshot] = None,
     ) -> List[str]:
-        """List feature names for a V2 run (symbol/timeframe/config_hash)."""
+        """List feature names for a V2 run (symbol/timeframe/config_hash).
+
+        `_snapshot`（內部；FFDSTAR Task 2.1 讀取一致性）：給定 ⇒ 依該次解析列名、不重解析 manifest。"""
         manifest, _base_dir = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
@@ -411,8 +492,14 @@ class FeatureReader:
             artifact_kind=artifact_kind,
             consumer=consumer,
             allow_partial=allow_partial,
+            snapshot=_snapshot,
         )
-        artifact = self._get_v2_artifact(manifest, artifact_kind)
+        return self._list_features_from_manifest(manifest, artifact_kind)
+
+    @staticmethod
+    def _list_features_from_manifest(manifest: dict, artifact_kind: str = "raw") -> List[str]:
+        """以已解析之 manifest 列該 artifact 之特徵名（不重解析 manifest；FFDSTAR Task 2.1 讀取一致性）。"""
+        artifact = FeatureReader._get_v2_artifact(manifest, artifact_kind)
         columns: List[str] = []
         for group_info in artifact.get("groups", {}).values():
             if isinstance(group_info, dict):
@@ -432,11 +519,59 @@ class FeatureReader:
         *,
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
+        snapshot: Optional[ManifestSnapshot] = None,
     ) -> Tuple[dict, Path]:
-        """讀並驗證 V2 manifest，回傳 (manifest, run_dir)；V2 manifest 不存在 ⇒ FileNotFoundError（不退回舊版面）。"""
+        """讀並驗證 V2 manifest，回傳 (manifest, run_dir)；V2 manifest 不存在 ⇒ FileNotFoundError（不退回舊版面）。
+
+        `snapshot`（FFDSTAR Task 2.1 讀取一致性）：給定時不重解析，改以該次解析之 manifest 跑**同一套**完整度／consumer
+        政策驗證（與重解析時逐項相同之檢查與錯誤）；snapshot 之 run 目錄須等於本次 (symbol, tf, config_hash) 之 run
+        目錄，否則 ValueError（防以他 run 之解析讀本 run）。"""
+        if snapshot is None:
+            snapshot = self._resolve_manifest_snapshot_v2(
+                symbol,
+                tf,
+                config_hash,
+                artifact_kind,
+                consumer=consumer,
+                allow_partial=allow_partial,
+            )
+            return snapshot.manifest, snapshot.run_dir
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
-        manifest = self._parse_manifest_file(run_dir / self.V2_MANIFEST_NAME)
+        if Path(snapshot.run_dir) != run_dir:
+            raise ValueError(
+                f"manifest snapshot 之 run 目錄 {snapshot.run_dir} ≠ 本次讀取之 run 目錄 {run_dir}"
+            )
+        self._validate_manifest_v2(
+            snapshot.manifest,
+            artifact_kind,
+            snapshot.manifest_path,
+            consumer=consumer,
+            allow_partial=allow_partial,
+        )
+        return snapshot.manifest, snapshot.run_dir
+
+    def _resolve_manifest_snapshot_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+        *,
+        consumer: ConsumerPolicy = "browse",
+        allow_partial: bool = False,
+    ) -> ManifestSnapshot:
+        """讀並驗證 V2 manifest 一次，回 `ManifestSnapshot`（FFDSTAR Task 2.1 讀取一致性之單次解析）。
+
+        先讀 manifest 檔位元組、算 sha256，再以**同一份位元組**經 `_parse_manifest_file`（單一解析邊界，含命名世代閘）
+        解析——不另開檔算雜湊；之後以與 `_resolve_manifest_v2` 相同之完整度／consumer 政策驗證。
+        V2 manifest 不存在 ⇒ FileNotFoundError（不退回舊版面）。"""
+        run_dir = self.feature_run_dir(symbol, tf, config_hash)
         manifest_path = run_dir / self.V2_MANIFEST_NAME
+        if not manifest_path.exists():
+            raise FileNotFoundError(f"V2 feature manifest not found: {manifest_path}")
+        raw = manifest_path.read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        manifest = self._parse_manifest_file(manifest_path, raw=raw)
         self._validate_manifest_v2(
             manifest,
             artifact_kind,
@@ -444,15 +579,37 @@ class FeatureReader:
             consumer=consumer,
             allow_partial=allow_partial,
         )
-        return manifest, run_dir
+        return ManifestSnapshot(manifest=manifest, run_dir=run_dir, manifest_path=manifest_path, sha256=digest)
 
     @staticmethod
-    def _parse_manifest_file(manifest_path: Path) -> dict:
+    def _confirm_manifest_unchanged(snapshot: ManifestSnapshot) -> None:
+        """讀取結束之單一確認點：重讀 manifest 檔位元組比 sha256；不同（含檔已不存在）⇒ `ManifestChangedDuringReadError`。
+
+        只比內容（不比 mtime）、不重試；不解析（不計入 `_parse_manifest_file` 次數）。"""
+        try:
+            current = hashlib.sha256(snapshot.manifest_path.read_bytes()).hexdigest()
+        except FileNotFoundError:
+            raise ManifestChangedDuringReadError(
+                f"讀取期間 manifest 已不存在（run 被重生或刪除），拒讀：{snapshot.manifest_path}"
+            ) from None
+        if current != snapshot.sha256:
+            raise ManifestChangedDuringReadError(
+                f"讀取期間 manifest 內容改變（sha256 {snapshot.sha256} → {current}；同 run 被重生或替換），"
+                f"拒讀：{snapshot.manifest_path}"
+            )
+
+    @staticmethod
+    def _parse_manifest_file(manifest_path: Path, *, raw: Optional[bytes] = None) -> dict:
         """全部 V2 讀取之單一 manifest 解析邊界（FF-NAME Task 3.4）：檔不存在 ⇒ FileNotFoundError；
-        `feature_naming_version` 缺鍵、舊版／未知版、無法解析 ⇒ `FeatureNamingVersionError`（不自動改名、不別名）。"""
-        if not manifest_path.exists():
-            raise FileNotFoundError(f"V2 feature manifest not found: {manifest_path}")
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        `feature_naming_version` 缺鍵、舊版／未知版、無法解析 ⇒ `FeatureNamingVersionError`（不自動改名、不別名）。
+
+        `raw`（FFDSTAR Task 2.1）：呼叫端已讀入之 manifest 位元組；給定時解析該份位元組、不再開檔（使解析內容與呼叫端
+        所算之 sha256 出自同一份位元組）。"""
+        if raw is None:
+            if not manifest_path.exists():
+                raise FileNotFoundError(f"V2 feature manifest not found: {manifest_path}")
+            raw = manifest_path.read_bytes()
+        manifest = json.loads(raw.decode("utf-8"))
         feature_naming.assert_feature_naming_version(manifest, where=str(manifest_path))
         return manifest
 

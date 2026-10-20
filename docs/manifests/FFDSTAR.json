@@ -56,6 +56,7 @@
       "scripts/freeze_framepath_baseline.py",
       "scripts/freeze_ratiounsafe_baseline.py",
       "scripts/preprov_output_size.py",
+      "tests/_golden/ffname/read_whitelist.json",
       "tests/_golden/preprov/pre_change_fingerprints.json",
       "tests/_golden/preprov/reader_inventory.json",
       "tests/api/test_ic_run_selector.py",

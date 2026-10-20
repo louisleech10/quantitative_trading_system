@@ -16,7 +16,12 @@ from momentum.FeatureEngineering.consumer_gate import (
 from momentum.FeatureEngineering import feature_naming
 from momentum.FeatureEngineering import run_provenance
 from momentum.FeatureEngineering.run_provenance import RunIdentity
-from momentum.FeatureEngineering.feature_reader import CanonicalRun, FeatureReader, resolve_canonical_run
+from momentum.FeatureEngineering.feature_reader import (
+    CanonicalRun,
+    FeatureReader,
+    ManifestSnapshot,
+    resolve_canonical_run,
+)
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
@@ -92,7 +97,8 @@ class FeatureLibrary:
     ) -> pd.DataFrame:
         """Load latest features for a symbol/timeframe pair.
 
-        只讀 V2（FeatureReader）；無可讀 V2 run ⇒ FeatureNotFoundError。
+        只讀 V2（FeatureReader）；無可讀 V2 run ⇒ FeatureNotFoundError；讀取期間 manifest 被替換 ⇒
+        `ManifestChangedDuringReadError`（FFDSTAR Task 2.1 讀取一致性）。
         """
         features_df, _manifest = self._load_internal(
             symbol,
@@ -114,7 +120,9 @@ class FeatureLibrary:
     ) -> Tuple[pd.DataFrame, RunIdentity]:
         """FFDSTAR Task 2.1：同 `load`（參數與 DataFrame 逐位元相同），另回 run 身分。
 
-        身分取自本次讀取據以判定可讀與 consumer 政策之**同一次** manifest 解析（`load_manifest_v2` 所回者），不另解析；
+        身分取自本次讀取之**唯一一次** manifest 解析（欄位清單、群組檔、時間軸皆依該次解析讀取），不另解析；
+        讀取結束時 manifest 位元組 sha256 與解析時不同（讀取期間同 run 被重生或替換）⇒
+        `ManifestChangedDuringReadError`（不重試，不以任一份身分標記另一份資料）。
         `config_hash` 未指定 ⇒ 先依 registry 解析 latest，身分之 `config_hash` 為解析後之真值。舊 run（無
         `content_sha256`）⇒ 身分 `legacy`（呼叫端快取不得沿用）。"""
         features_df, manifest = self._load_internal(
@@ -151,7 +159,8 @@ class FeatureLibrary:
         for_training: bool,
         allow_partial_training: bool,
     ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """回 (特徵, 本次讀取之 manifest)；manifest 為 `load_manifest_v2` 之同一次解析（FFDSTAR Task 2.1 身分來源）。"""
+        """回 (特徵, 本次讀取之 manifest)；manifest 為本次讀取唯一一次解析（FFDSTAR Task 2.1 身分來源與讀取一致性：
+        欄位、群組檔、時間軸皆依此解析；結束時比對 manifest 位元組 sha256，不同 ⇒ `ManifestChangedDuringReadError`）。"""
         if config_hash:
             entry = self._registry.get(symbol, timeframe, config_hash)
             if entry is None:
@@ -174,6 +183,16 @@ class FeatureLibrary:
 
         if resolved_hash:
             try:
+                # FFDSTAR Task 2.1 讀取一致性：全程只解析一次 manifest（完整度／consumer 政策／命名世代閘皆於此次判定），
+                # 欄位清單、群組檔與時間軸皆以該次解析之 manifest 與 run 目錄讀取；結束時比對 manifest 位元組 sha256。
+                snapshot = self._reader._resolve_manifest_snapshot_v2(
+                    symbol,
+                    timeframe,
+                    resolved_hash,
+                    artifact_kind="raw",
+                    consumer="strict" if for_training else "browse",
+                    allow_partial=allow_partial_training,
+                )
                 manifest = self._reader.load_manifest_v2(
                     symbol,
                     timeframe,
@@ -181,6 +200,7 @@ class FeatureLibrary:
                     artifact_kind="raw",
                     consumer="strict" if for_training else "browse",
                     allow_partial=allow_partial_training,
+                    _snapshot=snapshot,
                 )
                 columns = self._reader.list_features_v2(
                     symbol,
@@ -189,6 +209,7 @@ class FeatureLibrary:
                     artifact_kind="raw",
                     consumer="strict" if for_training else "browse",
                     allow_partial=allow_partial_training,
+                    _snapshot=snapshot,
                 )
                 if columns:
                     features_df = self._reader.load_columns_v2(
@@ -199,6 +220,7 @@ class FeatureLibrary:
                         artifact_kind="raw",
                         consumer="strict" if for_training else "browse",
                         allow_partial=allow_partial_training,
+                        _snapshot=snapshot,
                     )
                     if not features_df.empty:
                         if for_training:
@@ -209,8 +231,10 @@ class FeatureLibrary:
                                 error_type=TrainingReadError,
                             )
                         self._attach_row_index(
-                            symbol, timeframe, resolved_hash, features_df
+                            symbol, timeframe, resolved_hash, features_df, snapshot=snapshot
                         )
+                        # 單一確認點：讀取期間同 run 被重生或替換 ⇒ ManifestChangedDuringReadError（不重試）
+                        self._reader._confirm_manifest_unchanged(snapshot)
                         logger.info(
                             "Loaded features via FeatureReader for %s/%s: %d rows x %d cols "
                             "(run_status=%s)",
@@ -242,15 +266,19 @@ class FeatureLibrary:
         timeframe: str,
         config_hash: str,
         df: pd.DataFrame,
+        *,
+        snapshot: Optional[ManifestSnapshot] = None,
     ) -> None:
         """貼回 V2 持久化的主時間軸(row_index sidecar)。
 
         鏡像 ``feature_factory_service._attach_cgsa_row_index``:manifest 無
         ``row_index``(舊 run)→ no-op 維持原 index;長度不符 → 拒絕靜默貼錯位。
-        只改 ``df.index``,不動任何特徵值/欄位/列數。
+        只改 ``df.index``,不動任何特徵值/欄位/列數。`snapshot`(FFDSTAR Task 2.1 讀取一致性):給定 ⇒
+        時間軸依本次讀取之同一次 manifest 解析讀取(不重解析);只在給定時轉交。
         """
+        extra: Dict[str, Any] = {} if snapshot is None else {"_snapshot": snapshot}
         row_index = self._reader.load_row_index_v2(
-            symbol, timeframe, config_hash, artifact_kind="raw"
+            symbol, timeframe, config_hash, artifact_kind="raw", **extra
         )
         if row_index is None:
             return
