@@ -1,0 +1,223 @@
+{
+ "schema_version": 1,
+ "spec": "docs/FFDSTAR_SPEC.md §G 證法、Task 3.1",
+ "stripped_keys": [
+  "content_sha256",
+  "provenance"
+ ],
+ "files": [
+  {
+   "path": "tests/_golden/failopen/baseline.json",
+   "command": "scripts/preprov_refreeze.py failopen",
+   "exit_code": 0,
+   "base_commit": "574c2126e5b52338d85f4374eb90caef2d7ee10f",
+   "sha256_before": "081425b6ef8ccc070c7d87728d7fecb696f44023b31e127506bae4b97eff5a8d",
+   "sha256_after": "c65c2fb2c0ff30afff9007c15299bbceeff293df7e4f8879992a55dc19cb451e",
+   "written": true,
+   "items": [
+    {
+     "item": "BTCUSDT/multi",
+     "field": "multi_tf.BTCUSDT.artifacts",
+     "comparison": "entrywise",
+     "frozen_before": {
+      "file_count": 503,
+      "aggregate_sha256": "63afe430d648cdf3dffc120589e2106109f2e4ce2eb84e35322d3e033ff41b7d"
+     },
+     "stripped_recomputed": {
+      "file_count": 503,
+      "aggregate_sha256": "c4436e4a7ca9a03d306976e31e4b08e6e2ea9d1a37b57d7f78ab4784cc32d9d6"
+     },
+     "equal": true,
+     "new_value": {
+      "file_count": 504,
+      "aggregate_sha256": "dc4e16606f37b0b8e80f5ffb3d701490cca7736bd3862c2b89ad60cddb2cce64"
+     },
+     "changed": true,
+     "diff_paths": [
+      "ef2855c7e69f2fdba558ce1cde4dfaab/feature_manifest.json",
+      "ef2855c7e69f2fdba558ce1cde4dfaab/provenance/raw_columns.parquet",
+      "registry/manifest.json"
+     ],
+     "manifest_bytes_unverifiable": [
+      "ef2855c7e69f2fdba558ce1cde4dfaab/feature_manifest.json",
+      "registry/manifest.json"
+     ],
+     "other_diffs": []
+    }
+   ]
+  },
+  {
+   "path": "tests/_golden/framepath/cgsa_fingerprint.json",
+   "command": "scripts/preprov_refreeze.py framepath",
+   "exit_code": 0,
+   "base_commit": "90c666e2592fe500e5fe53fce782743a4911df9c",
+   "sha256_before": "f8886357958a0d397a10ec7e9d563ae4105b6f2dbb3e468415e0ce7e28d94194",
+   "sha256_after": "89500377c62d2b9ee2adb8d4e24a5bbd75928360048be36258a38b0938a0b0b0",
+   "written": true,
+   "items": [
+    {
+     "item": "C1",
+     "field": "cells.C1.fingerprint.manifest_sha256",
+     "frozen_before": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "stripped_recomputed": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "equal": true,
+     "new_value": "4d237e0ea4c92a49ec4e0626e98c4c63199241edcae7efafbb07c9ca182aaa13",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C2",
+     "field": "cells.C2.fingerprint.manifest_sha256",
+     "frozen_before": "7802d476aed35fcee3e0dfed53d56b993f8cc56be1dc97588543ceb13d3232b5",
+     "stripped_recomputed": "7802d476aed35fcee3e0dfed53d56b993f8cc56be1dc97588543ceb13d3232b5",
+     "equal": true,
+     "new_value": "f6722c9686c08f19e627177a38cce8db02daf8c50139b7dee5a9fb936e8add06",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/41a5154a853beb1c8cecc8310b7ee2fe/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/41a5154a853beb1c8cecc8310b7ee2fe/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C3",
+     "field": "cells.C3.fingerprint.manifest_sha256",
+     "frozen_before": "fdc355b7095ee291d3b7963692617a9b10fb90f3f27989ce1f3a9985551b2c38",
+     "stripped_recomputed": "fdc355b7095ee291d3b7963692617a9b10fb90f3f27989ce1f3a9985551b2c38",
+     "equal": true,
+     "new_value": "bd0763158fbdc3f8f64b4b018561dc1d711885a391750e375b3a06f0c72de476",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/4c92c6f073ea298419f89b07cf1af21c/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/4c92c6f073ea298419f89b07cf1af21c/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C4-streaming",
+     "field": "cells.C4-streaming.fingerprint.manifest_sha256",
+     "frozen_before": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "stripped_recomputed": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "equal": true,
+     "new_value": "4d237e0ea4c92a49ec4e0626e98c4c63199241edcae7efafbb07c9ca182aaa13",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C4-hybrid",
+     "field": "cells.C4-hybrid.fingerprint.manifest_sha256",
+     "frozen_before": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "stripped_recomputed": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "equal": true,
+     "new_value": "4d237e0ea4c92a49ec4e0626e98c4c63199241edcae7efafbb07c9ca182aaa13",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C5",
+     "field": "cells.C5.fingerprint.manifest_sha256",
+     "frozen_before": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "stripped_recomputed": "54068f0f6cc2d6703dc3216515807dfd1e445f09455edd952e7ed1509c958c20",
+     "equal": true,
+     "new_value": "8d10a18318b04ecf7b1be30af5f06fa170718a6cdac3812d6b9387466fd2e6a2",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C6",
+     "field": "cells.C6.fingerprint.manifest_sha256",
+     "frozen_before": "fdc355b7095ee291d3b7963692617a9b10fb90f3f27989ce1f3a9985551b2c38",
+     "stripped_recomputed": "fdc355b7095ee291d3b7963692617a9b10fb90f3f27989ce1f3a9985551b2c38",
+     "equal": true,
+     "new_value": "bd0763158fbdc3f8f64b4b018561dc1d711885a391750e375b3a06f0c72de476",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/4c92c6f073ea298419f89b07cf1af21c/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/4c92c6f073ea298419f89b07cf1af21c/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C7",
+     "field": "cells.C7.fingerprint.manifest_sha256",
+     "frozen_before": "c9c6a20ac9880370e509e6c34cf7091dfeb82d80255743f8d11687b333ea49de",
+     "stripped_recomputed": "c9c6a20ac9880370e509e6c34cf7091dfeb82d80255743f8d11687b333ea49de",
+     "equal": true,
+     "new_value": "c9c6a20ac9880370e509e6c34cf7091dfeb82d80255743f8d11687b333ea49de",
+     "changed": false,
+     "diff_paths": [],
+     "other_diffs": []
+    },
+    {
+     "item": "C8",
+     "field": "cells.C8.fingerprint.manifest_sha256",
+     "frozen_before": "800a8883c001214f05edd17a171a7d5a0a9cea26541f9500c3008e1a9f9669f1",
+     "stripped_recomputed": "800a8883c001214f05edd17a171a7d5a0a9cea26541f9500c3008e1a9f9669f1",
+     "equal": true,
+     "new_value": "842d277e33c459b0f862ab86cc01861165238e7327de5092648f0b9c65a6b178",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/f829b8644785cfe63f641269a1672c75/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C9",
+     "field": "cells.C9.fingerprint.manifest_sha256",
+     "frozen_before": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+     "stripped_recomputed": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+     "equal": true,
+     "new_value": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+     "changed": false,
+     "diff_paths": [],
+     "other_diffs": []
+    },
+    {
+     "item": "C10",
+     "field": "cells.C10.fingerprint.manifest_sha256",
+     "frozen_before": "e83c2cb011beb27c5b21ca112ec553319b4c5f50c76d8b49ca31b8f1fc425c6c",
+     "stripped_recomputed": "e83c2cb011beb27c5b21ca112ec553319b4c5f50c76d8b49ca31b8f1fc425c6c",
+     "equal": true,
+     "new_value": "08cd56ce88c6e6c8a7a61f6a4f7e9f33da5e24c1b8616fc686f5c635d8f7ab56",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/3966132cfa0bc8bd4fe8b5e6a9699f65/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/3966132cfa0bc8bd4fe8b5e6a9699f65/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    },
+    {
+     "item": "C11",
+     "field": "cells.C11.fingerprint.manifest_sha256",
+     "frozen_before": "aa30c5a2c3d968f16beea379c385b71998fb4510f101cf8e911e3ba3fcaf7336",
+     "stripped_recomputed": "aa30c5a2c3d968f16beea379c385b71998fb4510f101cf8e911e3ba3fcaf7336",
+     "equal": true,
+     "new_value": "477aff7af439c3887ca631208c5f3647c2234b9ad9088d5b93d99d1155607699",
+     "changed": true,
+     "diff_paths": [
+      "BTCUSDT/1h/91b97b4f16aeaf2ee916e87bd01b77a2/feature_manifest.json#artifacts.raw.content_sha256",
+      "BTCUSDT/1h/91b97b4f16aeaf2ee916e87bd01b77a2/feature_manifest.json#artifacts.raw.provenance"
+     ],
+     "other_diffs": []
+    }
+   ]
+  }
+ ]
+}

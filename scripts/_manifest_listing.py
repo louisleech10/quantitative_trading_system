@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Set
 
 MANIFEST_NAME = "feature_manifest.json"
 REGISTRY_MANIFEST_NAME = "manifest.json"
@@ -184,11 +184,32 @@ def _registry_file(work_dir: Path, name: Any) -> Path:
     return work_dir / text
 
 
-def declared_registry_files(work_dir: Path) -> List[Path]:
+#: 紀錄檔群組表（manifest `artifacts.*.provenance.groups`）之「整組全死」狀態值（契約 `run_provenance.json` 群組狀態集合之一）
+ALL_DEAD_GROUP_STATUS = "all_dead_dropped"
+
+
+def all_dead_groups_of_run(run_dir: Path) -> Set[str]:
+    """feature run manifest 各 artifact 節點 `provenance.groups` 中狀態為整組全死之來源群組 id（寫入端唯一紀錄：
+    `feature_storage` 整組全 dead ⇒ 不寫 parquet、源頭仍清理，並以此狀態記於紀錄群組表）。節點無 `provenance` ⇒ 不貢獻。"""
+    out: Set[str] = set()
+    for kind, node in (load_manifest(Path(run_dir)).get("artifacts") or {}).items():
+        groups = ((node or {}).get("provenance") or {}).get("groups") if isinstance(node, dict) else None
+        if groups is None:
+            continue
+        if not isinstance(groups, dict):
+            raise ValueError(f"artifact {kind!r} 之 provenance.groups 非物件：{type(groups).__name__}")
+        out.update(str(gid) for gid, row in groups.items()
+                   if isinstance(row, dict) and row.get("status") == ALL_DEAD_GROUP_STATUS)
+    return out
+
+
+def declared_registry_files(work_dir: Path, released_groups: Optional[Set[str]] = None) -> List[Path]:
     """CGSA registry 工作目錄之快照檔集合＝registry `manifest.json` 本身＋其宣告檔（各群組 `npy_path`、`shards[*].file`、
-    `alignment.idx_map_path`）中實際存在者。宣告檔缺而該群組未綁 `parquet_path`（即未經 L7 落盤釋放）⇒ FileNotFoundError；
-    工作目錄有未宣告之實體檔 ⇒ ValueError。路徑升冪。"""
+    `alignment.idx_map_path`）中實際存在者。宣告檔缺時只認兩種釋放：該群組已綁 `parquet_path`（經 L7 落盤後釋放），或
+    群組 id 在 `released_groups`（同一次 L7 run 紀錄為整組全死之群組，見 `all_dead_groups_of_run`）；其餘 ⇒
+    FileNotFoundError；工作目錄有未宣告之實體檔 ⇒ ValueError。路徑升冪。"""
     work_dir = Path(work_dir)
+    released = set(released_groups or ())
     manifest_path = work_dir / REGISTRY_MANIFEST_NAME
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     files = {manifest_path}
@@ -196,13 +217,14 @@ def declared_registry_files(work_dir: Path) -> List[Path]:
     for group in manifest.get("groups") or []:
         names = [group.get("npy_path")] + [s.get("file") for s in group.get("shards") or []]
         names.append((group.get("alignment") or {}).get("idx_map_path"))
+        all_dead = str(group.get("group_id")) in released
         for name in names:
             if name is None:
                 continue
             path = _registry_file(work_dir, name)
             if path.is_file():
                 files.add(path)
-            elif not group.get("parquet_path"):
+            elif not group.get("parquet_path") and not all_dead:
                 missing.append(str(path))
     if missing:
         raise FileNotFoundError(f"registry manifest 宣告之檔不存在（且未經 L7 釋放）：{sorted(set(missing))[:5]}")
@@ -211,12 +233,13 @@ def declared_registry_files(work_dir: Path) -> List[Path]:
     return listed
 
 
-def declared_feature_files_snapshot(work_dir: Path) -> List[Path]:
+def declared_feature_files_snapshot(work_dir: Path, released_groups: Optional[Set[str]] = None) -> List[Path]:
     """凍結腳本之產物快照檔集合（取代「目錄全部檔」）：feature run 目錄（有 `feature_manifest.json`）⇒
-    `declared_run_snapshot_files`；CGSA registry 工作目錄（有 `manifest.json`）⇒ `declared_registry_files`；皆無 ⇒ FileNotFoundError。"""
+    `declared_run_snapshot_files`；CGSA registry 工作目錄（有 `manifest.json`）⇒ `declared_registry_files`（`released_groups`
+    ＝同一次 L7 run 之整組全死群組）；皆無 ⇒ FileNotFoundError。"""
     work_dir = Path(work_dir)
     if (work_dir / MANIFEST_NAME).is_file():
         return declared_run_snapshot_files(work_dir)
     if (work_dir / REGISTRY_MANIFEST_NAME).is_file():
-        return declared_registry_files(work_dir)
+        return declared_registry_files(work_dir, released_groups)
     raise FileNotFoundError(f"{work_dir} 無 {MANIFEST_NAME} 亦無 {REGISTRY_MANIFEST_NAME}：無宣告可依")

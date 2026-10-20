@@ -290,3 +290,77 @@ def test_failopen_artifact_hashes_include_declared_provenance(tmp_path: Path) ->
     run = _run_dir(tmp_path)
     paths = [e["path"] for e in fo._artifact_hashes(run)["files"]]
     assert "provenance/raw_columns.parquet" in paths
+
+# ------------------------------------------------------------------------- registry 工作目錄：整組全死之源頭釋放（b4 failopen 實跑）
+
+def _registry_dir(tmp_path: Path, groups: Dict[str, Dict[str, Any]]) -> Path:
+    """registry 工作目錄：`groups`＝group_id → {npy（是否留檔）, parquet_path}。"""
+    work = tmp_path / "registry"
+    work.mkdir(parents=True)
+    payload = []
+    for gid, spec in groups.items():
+        npy = f"{gid}.npy"
+        if spec.get("npy", True):
+            (work / npy).write_bytes(b"n")
+        payload.append({"group_id": gid, "columns": ["c"], "npy_path": npy, "shards": [],
+                        "alignment": None, "parquet_path": spec.get("parquet_path")})
+    (work / ml.REGISTRY_MANIFEST_NAME).write_text(json.dumps({"groups": payload}), encoding="utf-8")
+    return work
+
+
+def _set_prov_groups(run: Path, groups: Dict[str, str]) -> None:
+    """於 `_run_dir` 之 raw 節點紀錄指標寫入群組表（group_id → status）。"""
+    manifest = json.loads((run / ml.MANIFEST_NAME).read_text(encoding="utf-8"))
+    manifest["artifacts"]["raw"]["provenance"]["groups"] = {
+        gid: {"arm": "native_tf", "fallback": [], "status": status, "failure_reason": None}
+        for gid, status in groups.items()
+    }
+    (run / ml.MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_registry_all_dead_group_release_accepted(tmp_path: Path) -> None:
+    """整組全死群組（同 run 紀錄群組表狀態 all_dead_dropped）⇒ 源頭 npy 缺而未綁 parquet 仍屬合法釋放。"""
+    work = _registry_dir(tmp_path, {"12h_L1_pattern_A": {"npy": False}, "12h_L1_pattern_B": {}})
+    rels = [p.name for p in ml.declared_registry_files(work, {"12h_L1_pattern_A"})]
+    assert rels == sorted([ml.REGISTRY_MANIFEST_NAME, "12h_L1_pattern_B.npy"])
+
+
+def test_registry_missing_npy_not_released_raises(tmp_path: Path) -> None:
+    """缺檔群組不在整組全死集合（他群組在、空集合、未給）⇒ 仍 FileNotFoundError（不放寬其他缺檔）。"""
+    work = _registry_dir(tmp_path, {"12h_L1_pattern_A": {"npy": False}})
+    for released in ({"12h_L1_pattern_B"}, set(), None):
+        with pytest.raises(FileNotFoundError):
+            ml.declared_registry_files(work, released)
+
+
+def test_registry_parquet_bound_release_unchanged(tmp_path: Path) -> None:
+    """已綁 parquet_path 之群組（L7 落盤後釋放）缺 npy 照舊合法，與整組全死集合無關。"""
+    work = _registry_dir(tmp_path, {"1h_L1_trend_EMA": {"npy": False, "parquet_path": "/x/raw/g.parquet"}})
+    assert [p.name for p in ml.declared_registry_files(work)] == [ml.REGISTRY_MANIFEST_NAME]
+
+
+def test_all_dead_groups_of_run_reads_only_all_dead_status(tmp_path: Path) -> None:
+    """只取狀態恰為 all_dead_dropped 之群組；無紀錄指標之舊 run ⇒ 空集合；群組表非物件 ⇒ ValueError。"""
+    run = _run_dir(tmp_path / "a")
+    _set_prov_groups(run, {"g1": "all_dead_dropped", "g2": "ok", "g3": "ratio_unsafe_passthrough"})
+    assert ml.all_dead_groups_of_run(run) == {"g1"}
+    assert ml.all_dead_groups_of_run(_run_dir(tmp_path / "b", pointer=None, prov_file=False)) == set()
+    bad = _run_dir(tmp_path / "c")
+    manifest = json.loads((bad / ml.MANIFEST_NAME).read_text(encoding="utf-8"))
+    manifest["artifacts"]["raw"]["provenance"]["groups"] = ["g1"]
+    (bad / ml.MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError):
+        ml.all_dead_groups_of_run(bad)
+
+
+def test_combined_hashes_use_l7_run_all_dead_groups(tmp_path: Path) -> None:
+    """failopen 多週期快照：registry 之整組全死缺檔以同組 L7 run 紀錄群組表認定（實跑反例之回歸：多週期 run 之
+    generation_metadata 無 column_set_reasons，唯一來源為紀錄群組表）。"""
+    work = _registry_dir(tmp_path / "w", {"12h_L1_pattern_A": {"npy": False}})
+    run = _run_dir(tmp_path / "r")
+    _set_prov_groups(run, {"12h_L1_pattern_A": "all_dead_dropped"})
+    paths = [e["path"] for e in fo._combined_artifact_hashes(work, run)["files"]]
+    assert ml.REGISTRY_MANIFEST_NAME in paths and "provenance/raw_columns.parquet" in paths
+    _set_prov_groups(run, {"12h_L1_pattern_A": "ok"})
+    with pytest.raises(FileNotFoundError):
+        fo._combined_artifact_hashes(work, run)

@@ -422,14 +422,23 @@ def _hash_l7_parquet_table(
 def _combined_artifact_hashes(*work_dirs: Path) -> dict[str, Any]:
     """合併多個產物目錄的檔案 hash(registry work_dir + L7 run dir)。"""
     # FFDSTAR Task 1.6：各目錄之快照檔集合依 manifest 宣告（同 `_artifact_hashes`），不以目錄全部檔代替
-    from scripts._manifest_listing import declared_feature_files_snapshot
+    from scripts._manifest_listing import (
+        MANIFEST_NAME,
+        all_dead_groups_of_run,
+        declared_feature_files_snapshot,
+    )
 
+    # 整組全死之 registry 群組不寫 parquet 而源頭已清理：以同組 L7 run 紀錄群組表之整組全死群組認定其釋放（不放寬其他缺檔）
+    released_groups: set[str] = set()
+    for work_dir in work_dirs:
+        if (work_dir / MANIFEST_NAME).is_file():
+            released_groups |= all_dead_groups_of_run(work_dir)
     entries: list[dict[str, Any]] = []
     for work_dir in work_dirs:
         if not work_dir.exists():
             continue
         root_label = work_dir.name
-        for path in declared_feature_files_snapshot(work_dir):
+        for path in declared_feature_files_snapshot(work_dir, released_groups):
             entries.append(
                 {
                     "root": root_label,

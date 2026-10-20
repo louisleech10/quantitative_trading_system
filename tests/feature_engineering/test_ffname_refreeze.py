@@ -1058,9 +1058,21 @@ def test_mutation_k2_swapped_values_caught():
     assert any(p.startswith(f"column:{entry['path']}:") for p in k2_problems(entry["path"], entry, new_sidecar=new_sc))
 
 
+def _ffname_bound_bytes(rel: str) -> bytes:
+    """FF-NAME 綁定之位元組：PRE-PROV 重凍收據已寫該檔段 ⇒ `git show <base_commit>:<rel>`（重凍前版）；否則現檔。
+    變異測試之「舊版」須取此，不得取重凍後之現檔（否則現檔已含紀錄檔項，合成之新版會被誤判為改資料）。"""
+    if PREPROV_RECEIPT.is_file():
+        receipt = json.loads(PREPROV_RECEIPT.read_text(encoding="utf-8"))
+        section = next((f for f in receipt.get("files") or [] if f.get("path") == rel and f.get("written") is True), None)
+        if section is not None:
+            return subprocess.run(["git", "show", f"{section['base_commit']}:{rel}"], cwd=str(REPO),
+                                  capture_output=True, check=True).stdout
+    return (REPO / rel).read_bytes()
+
+
 def _preprov_case(rel: str, mutate: Any, items: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """以現檔（FF-NAME 綁定之位元組）為舊版、`mutate(新版 dict)` 為新版，組 PRE-PROV 收據段（變異測試用）。"""
-    base = (REPO / rel).read_bytes()
+    """以 FF-NAME 綁定之位元組（`_ffname_bound_bytes`）為舊版、`mutate(新版 dict)` 為新版，組 PRE-PROV 收據段（變異測試用）。"""
+    base = _ffname_bound_bytes(rel)
     new = json.loads(base.decode("utf-8"))
     mutate(new)
     current = json.dumps(new, indent=1).encode("utf-8")
@@ -1072,7 +1084,7 @@ def _preprov_case(rel: str, mutate: Any, items: List[Dict[str, Any]]) -> Dict[st
 
 def _framepath_preprov_case(extra: Any = None, **item_over: Any) -> Dict[str, Any]:
     rel = "tests/_golden/framepath/cgsa_fingerprint.json"
-    old = json.loads((REPO / rel).read_text(encoding="utf-8"))["cells"]["C1"]["fingerprint"]["manifest_sha256"]
+    old = json.loads(_ffname_bound_bytes(rel).decode("utf-8"))["cells"]["C1"]["fingerprint"]["manifest_sha256"]
     item = {"item": "C1", "frozen_before": old, "stripped_recomputed": old, "equal": True, "new_value": "f" * 64,
             "diff_paths": ["BTCUSDT/1h/h/feature_manifest.json#artifacts.raw.provenance",
                            "BTCUSDT/1h/h/feature_manifest.json#artifacts.raw.content_sha256"]}
@@ -1114,7 +1126,7 @@ def test_preprov_followon_framepath_rule():
 
 def _failopen_preprov_case(extra: Any = None) -> Dict[str, Any]:
     rel = "tests/_golden/failopen/baseline.json"
-    old = json.loads((REPO / rel).read_text(encoding="utf-8"))["multi_tf"]["BTCUSDT"]["artifacts"]
+    old = json.loads(_ffname_bound_bytes(rel).decode("utf-8"))["multi_tf"]["BTCUSDT"]["artifacts"]
     files = copy.deepcopy(old["files"])
     root = next(e["root"] for e in files if e["path"] == "feature_manifest.json")
     for entry in files:

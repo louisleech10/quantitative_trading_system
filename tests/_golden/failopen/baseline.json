@@ -45,8 +45,8 @@
   "multi_tf": {
     "BTCUSDT": {
       "artifacts": {
-        "aggregate_sha256": "63afe430d648cdf3dffc120589e2106109f2e4ce2eb84e35322d3e033ff41b7d",
-        "file_count": 503,
+        "aggregate_sha256": "dc4e16606f37b0b8e80f5ffb3d701490cca7736bd3862c2b89ad60cddb2cce64",
+        "file_count": 504,
         "files": [
           {
             "path": ".align_12h_to_1h_open_minus.npy",
@@ -57,20 +57,26 @@
           {
             "path": "manifest.json",
             "root": "registry",
-            "sha256": "0cfb0a1845bf6d5bc76b726dcfe89c3e4c74b96ec03698fb0f8560371188d20d",
-            "size": 8982611
+            "sha256": "9112ed00c7e63380eedcaed84751964c1bced4c8b2b0e55750ee3d3014eb7c09",
+            "size": 8977342
           },
           {
             "path": "feature_manifest.json",
             "root": "ef2855c7e69f2fdba558ce1cde4dfaab",
-            "sha256": "66c742afc205e8e33037317d92c9b1b9620d59a1c9312fa07e14adca1c619916",
-            "size": 50782378
+            "sha256": "b18d4e03fd08bb0b3a0158b445ab415c01f6a864faa6a799520a739e74e9baf1",
+            "size": 50879127
           },
           {
             "path": "feature_manifest.json.lock",
             "root": "ef2855c7e69f2fdba558ce1cde4dfaab",
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "size": 0
+          },
+          {
+            "path": "provenance/raw_columns.parquet",
+            "root": "ef2855c7e69f2fdba558ce1cde4dfaab",
+            "sha256": "20087baaf14508ee8efbaffe4f66bc96a3ed861fb529cf1f8927cf5f3a52bf4a",
+            "size": 484150
           },
           {
             "path": "raw/12h_L1_cycle_HT-DCPERIOD.parquet",
