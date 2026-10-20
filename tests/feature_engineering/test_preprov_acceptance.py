@@ -129,6 +129,15 @@ def winsor_violations(handle: ph.RunHandle, table: pd.DataFrame = None) -> Tuple
     for name in sorted(table.index[is_applied]):
         if table.loc[name, "native_timeframe"] != handle.tf or name in obs.l7_dropped or name in replaced:
             continue
+        parent = table.loc[name, "parent_column"]
+        if isinstance(parent, str) and parent:
+            # append 模式衍生欄（SPEC Task 1.2 邊界④）：步驟狀態承父欄，其值為父欄縮尾後再平穩化，不得以本欄獨立縮尾重算；
+            # 改驗父欄存在於紀錄且狀態相同（父欄本身之重算由其自身列承擔）
+            if parent not in table.index:
+                out.append(f"{name}: 衍生欄之父欄 {parent} 不在紀錄")
+            elif table.loc[parent, "winsorization"] != table.loc[name, "winsorization"]:
+                out.append(f"{name}: 衍生欄縮尾狀態不等於父欄 {parent}")
+            continue
         if name not in inputs:
             out.append(f"{name}: applied 但非 L6.5 輸入")
             continue
@@ -302,11 +311,15 @@ def test_mutation_winsor_success_record_removed(tmp_path_factory: pytest.TempPat
 
 def test_mutation_dead_drop_terminal_skipped(tmp_path_factory: pytest.TempPathFactory,
                                              monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutation：略過 dead-drop 終態（被剔欄不入紀錄）⇒ ① 轉紅。"""
+    """mutation：略過 dead-drop 終態（被剔欄不入紀錄）⇒ 兩層各自轉紅：生產端窮盡性檢查（`check_exhaustive`）於生成時拋錯；
+    將該檢查換為無作用後，測試端 oracle ① 獨立轉紅（證 oracle 不依賴生產端自檢）。"""
     def skip_dead(table: pd.DataFrame, kw: Mapping[str, Any]) -> pd.DataFrame:
         return table[~table["output_column"].isin(set(kw.get("dropped_columns") or {}))].reset_index(drop=True)
 
     monkeypatch.setattr(rp, "build_provenance_table", _mutant_table(skip_dead))
+    with pytest.raises(rp.ProvenanceExhaustivenessError):
+        ph.generate_short_run(tmp_path_factory.mktemp("preprov_mut_dd_guard"), "dead_drop")
+    monkeypatch.setattr(rp, "check_exhaustive", lambda *args, **kwargs: None)
     handle = ph.generate_short_run(tmp_path_factory.mktemp("preprov_mut_dd"), "dead_drop")
     assert exhaustive_violations(handle, "raw", ph.observation(handle).l7_dropped) != []
 
