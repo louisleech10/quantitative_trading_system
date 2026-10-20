@@ -1,0 +1,258 @@
+{
+  "approved_estimate_bytes": 1300000,
+  "cells": {
+    "dead_drop": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.002286,
+            "record_bytes": 23931,
+            "record_percent_of_run": 0.3142,
+            "record_rows": 3700
+          }
+        },
+        "generation_seconds": 27.6,
+        "manifest_bytes": 1076701,
+        "manifest_delta_bytes": 21794,
+        "record_bytes_total": 23931,
+        "run_bytes": 7615297,
+        "run_dir_name": "828fe3af586339e666b16db67de74817"
+      }
+    },
+    "h12h1_multi": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.005144,
+            "record_bytes": 117150,
+            "record_percent_of_run": 0.9959,
+            "record_rows": 8323
+          }
+        },
+        "generation_seconds": 357.47,
+        "manifest_bytes": 2385792,
+        "manifest_delta_bytes": 16219,
+        "record_bytes_total": 117150,
+        "run_bytes": 11762785,
+        "run_dir_name": "4c92c6f073ea298419f89b07cf1af21c"
+      }
+    },
+    "h12h1_replace": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.003856,
+            "record_bytes": 71908,
+            "record_percent_of_run": 0.6907,
+            "record_rows": 7184
+          }
+        },
+        "generation_seconds": 262.97,
+        "manifest_bytes": 1940467,
+        "manifest_delta_bytes": 16195,
+        "record_bytes_total": 71908,
+        "run_bytes": 10410479,
+        "run_dir_name": "4f69c58d63a6d3df5bb43de2c888812e"
+      }
+    },
+    "h1_pp_off": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.001036,
+            "record_bytes": 22395,
+            "record_percent_of_run": 0.2999,
+            "record_rows": 3632
+          }
+        },
+        "generation_seconds": 6.93,
+        "manifest_bytes": 1015237,
+        "manifest_delta_bytes": 8756,
+        "record_bytes_total": 22395,
+        "run_bytes": 7466982,
+        "run_dir_name": "bfb1e1277c77aa1fbf106611d56b50ed"
+      }
+    },
+    "h1_replace_stat_on": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.000854,
+            "record_bytes": 29576,
+            "record_percent_of_run": 0.3948,
+            "record_rows": 3632
+          }
+        },
+        "generation_seconds": 61.11,
+        "manifest_bytes": 1014791,
+        "manifest_delta_bytes": 8632,
+        "record_bytes_total": 29576,
+        "run_bytes": 7491884,
+        "run_dir_name": "d03a365eee71b4f0f336c12ab1b0d920"
+      }
+    },
+    "h1_stat_off": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.002791,
+            "record_bytes": 21910,
+            "record_percent_of_run": 0.2924,
+            "record_rows": 3632
+          }
+        },
+        "generation_seconds": 23.34,
+        "manifest_bytes": 1015063,
+        "manifest_delta_bytes": 8530,
+        "record_bytes_total": 21910,
+        "run_bytes": 7492240,
+        "run_dir_name": "41a5154a853beb1c8cecc8310b7ee2fe"
+      }
+    },
+    "h1_stat_on": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.001088,
+            "record_bytes": 56591,
+            "record_percent_of_run": 0.7306,
+            "record_rows": 3729
+          }
+        },
+        "generation_seconds": 89.48,
+        "manifest_bytes": 1067528,
+        "manifest_delta_bytes": 8727,
+        "record_bytes_total": 56591,
+        "run_bytes": 7745323,
+        "run_dir_name": "f829b8644785cfe63f641269a1672c75"
+      }
+    },
+    "ic_first": {
+      "BTCUSDT": {
+        "artifacts": {
+          "processed": {
+            "read_seconds": 0.00087,
+            "record_bytes": 20847,
+            "record_percent_of_run": 0.2078,
+            "record_rows": 3624
+          },
+          "raw": {
+            "read_seconds": 0.001033,
+            "record_bytes": 21910,
+            "record_percent_of_run": 0.2184,
+            "record_rows": 3632
+          }
+        },
+        "generation_seconds": 30.28,
+        "manifest_bytes": 1126779,
+        "manifest_delta_bytes": 9687,
+        "record_bytes_total": 42757,
+        "run_bytes": 10032503,
+        "run_dir_name": "41a5154a853beb1c8cecc8310b7ee2fe"
+      }
+    },
+    "ic_first_default": {
+      "BTCUSDT": {
+        "artifacts": {
+          "processed": {
+            "read_seconds": 0.000694,
+            "record_bytes": 20837,
+            "record_percent_of_run": 0.2309,
+            "record_rows": 3624
+          },
+          "raw": {
+            "read_seconds": 0.000823,
+            "record_bytes": 21910,
+            "record_percent_of_run": 0.2427,
+            "record_rows": 3632
+          }
+        },
+        "generation_seconds": 196.61,
+        "manifest_bytes": 1126785,
+        "manifest_delta_bytes": 9685,
+        "record_bytes_total": 42747,
+        "run_bytes": 9026005,
+        "run_dir_name": "70cc1a0511772d38378efa528502e0f9"
+      }
+    },
+    "multi_symbol": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.001121,
+            "record_bytes": 7129,
+            "record_percent_of_run": 1.0437,
+            "record_rows": 161
+          }
+        },
+        "generation_seconds": 11.67,
+        "manifest_bytes": 83786,
+        "manifest_delta_bytes": 5753,
+        "record_bytes_total": 7129,
+        "run_bytes": 683074,
+        "run_dir_name": "59e62264eab480e3d7147325b1b70db7"
+      },
+      "ETHUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.000661,
+            "record_bytes": 7129,
+            "record_percent_of_run": 1.3854,
+            "record_rows": 161
+          }
+        },
+        "generation_seconds": 0.01,
+        "manifest_bytes": 77330,
+        "manifest_delta_bytes": 5753,
+        "record_bytes_total": 7129,
+        "run_bytes": 514587,
+        "run_dir_name": "59e62264eab480e3d7147325b1b70db7"
+      }
+    },
+    "ratio_unsafe": {
+      "BTCUSDT": {
+        "artifacts": {
+          "raw": {
+            "read_seconds": 0.002243,
+            "record_bytes": 23736,
+            "record_percent_of_run": 0.3088,
+            "record_rows": 3700
+          }
+        },
+        "generation_seconds": 28.09,
+        "manifest_bytes": 1110516,
+        "manifest_delta_bytes": 21962,
+        "record_bytes_total": 23736,
+        "run_bytes": 7687153,
+        "run_dir_name": "858e3dc1e15791b388f0e50ec2761812"
+      }
+    }
+  },
+  "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python scripts/preprov_output_size.py --full-run-dir /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/04fd3c82-0003-4937-8e8b-cfed1c292e22/scratchpad/preprov_full/features/BTCUSDT/12h/50378ecf62ab78e55d5a3f8da9e6d9d7 --work-root /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/04fd3c82-0003-4937-8e8b-cfed1c292e22/scratchpad/size_work",
+  "exit_code": 0,
+  "full_feature_run": {
+    "extrapolated": false,
+    "measured": {
+      "artifacts": {
+        "raw": {
+          "read_seconds": 0.009104,
+          "record_bytes": 545868,
+          "record_percent_of_run": 0.0999,
+          "record_rows": 207566
+        }
+      },
+      "manifest_bytes": 80037672,
+      "manifest_delta_bytes": 49441,
+      "record_bytes_total": 545868,
+      "run_bytes": 546411116,
+      "run_dir_name": "50378ecf62ab78e55d5a3f8da9e6d9d7"
+    },
+    "record_bytes_total": 545868,
+    "source": "/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/04fd3c82-0003-4937-8e8b-cfed1c292e22/scratchpad/preprov_full/features/BTCUSDT/12h/50378ecf62ab78e55d5a3f8da9e6d9d7"
+  },
+  "needs_user_reapproval": false,
+  "reapproval_threshold_bytes": 2600000,
+  "schema_version": 1,
+  "vs_approved_estimate_ratio": 0.4199,
+  "work_root": "/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/04fd3c82-0003-4937-8e8b-cfed1c292e22/scratchpad/size_work"
+}
