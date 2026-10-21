@@ -293,7 +293,7 @@
 </table></div>
 <hr />
 <h2 id="四技術殘留你不會看到我自己追">四、技術殘留（你不會看到，我自己追）</h2>
-<p><strong>ICPOSTLEAK</strong>：各轉換分支之 z 分數算法精度不同（IC 頁實際用的 Polars 分支與標準算法差約 0.00005；只在特徵工廠大資料路徑出現的 registry 分支差到 0.04，但那條路現在不會被走到）。已量好數字，排序第 8 步決定統一或具名保留。</p>
+<p><strong>ICPOSTLEAK</strong>：各轉換分支之 z 分數算法精度不同（10/02 舊量測：Polars 分支單做標準化差約 0.00005、排名＋標準化差到 0.0975；registry 分支差到 0.04，但那條路現在不會被走到）。第 8 步 NUMVIEW 依你 10/21 方向處理：IC 後轉換固定 Polars 並改高精度計算（先報實測差距再改）。<strong>NUMVIEW 另留兩條</strong>（你 10/21 同意另處理）：①特徵產生階段收斂成一套算法（要先量 Polars 在 8GB 下分組處理的可行性與速度，另開票）；②「只影響怎麼跑」的設定（CPU 數、分批大小）目前全部記進產出身分，日後常改執行設定再個別排除（程式結構論證＋少量實測）。</p>
 <p><strong>SPLITUNIFY</strong>：<code>R-4</code> 另開接線票／<code>SU-RESID-1</code>,<code>4</code>,<code>5</code>,<code>9A-UI</code>,<code>C5-TARGETS</code>,<code>V8-ATTEST</code>,
 <code>PAUSED-NO-RESULT</code>,<code>COMMITTEE-MODEL-EVIDENCE</code> 八條皆為待觸發。</p>
 <p><strong>GAP-3</strong>：20 條殘留，其中 5 條你在畫面上看得到（已併入第一節）；
