@@ -15,8 +15,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
-#: 估時收據須涵蓋之跑別（Task 0.5 之 G1–G3 與 Phase 1 全部生成；`_estimate_gate.require` 之 run_kind 值）
-RUN_KINDS = ("freeze_baseline", "postic_branchdiff", "precision_chain", "l2_arm_matrix")
+#: 估時收據須涵蓋之跑別（`_estimate_gate.require` 之 run_kind 值）：Task 0.5 之 G1–G3 與 Phase 1 全部生成；
+#: 另 Phase 2–4 驗收重產（R15-A）——每個以真實生成驗收之單位一個跑別（依各測試檔實際之生成呼叫盤點）：
+#:   regen_t21＝Task 2.1 ④（test_numview_policy.py，格 A BTCUSDT 1h）；regen_t22＝Task 2.2 G1（tests/api/test_numview_ic_page.py，
+#:   全部格 A）；regen_t3_core＝Task 3.1–3.3（test_numview_core.py 三 Task 共用模組範圍格倉、同批 b4 一次跑，全部格 A＋B＋
+#:   PRE-PROV `ic_first_default`）；regen_t34＝Task 3.4（IC 頁鎖臂 G1，全部格 A＋PRE-PROV `ic_first_empty`）；
+#:   regen_t42＝Task 4.2（test_numview_identity.py，PRE-PROV `h1_stat_off`、`ic_first`）；regen_t43＝Task 4.3 ③（PRE-PROV
+#:   `h1_pp_off` 兩次）；regen_section_g＝§G Phase 0／2／4 全格不變式（test_numview_acceptance.py，全部格 A＋B＋沿用基準
+#:   PRE-PROV 全部格）。收據每跑別：cells（格 id）、preprov_cells（PRE-PROV 格名）、single_cell_seconds、extrapolated_total_seconds。
+RUN_KINDS = ("freeze_baseline", "postic_branchdiff", "precision_chain", "l2_arm_matrix",
+             "regen_t21", "regen_t22", "regen_t3_core", "regen_t34", "regen_t42", "regen_t43", "regen_section_g")
 #: 磁碟下限（GB；SPEC §C 重型跑紀律）
 MIN_FREE_DISK_GB = 30
 

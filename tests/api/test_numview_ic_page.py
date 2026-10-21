@@ -42,7 +42,7 @@ Polars 不可用 ⇒ `PostICArmUnavailableError`）。故 Task 2.2 之測試讀�
   `run_provenance.resolve_run_identity`（`FeatureLibrary.load_with_identity` 既有實作）。
 - IC 任務報告身分位置：`task_info["result"]["metadata"]["ff_run_identity"]`（既有報告 metadata 鍵）；報告缺 metadata 或身分為
   null ⇒ 依設計選擇⑦建議拒收，型別 `ICViewIdentityMismatchError`（本檔假設；設計選擇⑦待委員審）。
-- `scripts/numview_freeze_baseline.py:generate_cell(root: Path, cell: Mapping, *, env=None) -> preprov_helpers.RunHandle`（`cell`＝全票唯一格描述子 `{id, kind, symbol, timeframes}`；本檔取 `.run_dir`）；
+- `scripts/numview_freeze_baseline.py:generate_cell(root: Path, cell: Mapping, *, run_kind: str, env=None) -> preprov_helpers.RunHandle`（`cell`＝全票唯一格描述子 `{id, kind, symbol, timeframes}`；本檔取 `.run_dir`）；
   §G 凍結檔為全票唯一正規形（`test_numview_baseline.py` 檔頭：`cells.<格>.{kind, symbol, timeframes, ic_first_selected,
   g1_source_env, g1.<臂>.{env, actual_arm, fingerprint}, …}`），本檔經 `_cell_view` 轉為內部檢視。
 - 收據：`handoffs/run_receipts/*-numview-pandas-arm-callers.json` ＝ {"functions": [{"name": 函式名（可含類別前綴）,
@@ -124,6 +124,12 @@ def contract_state() -> str:
     if "arm_policy" in entry:
         return ENV_STATE
     raise AssertionError(f"契約 post_ic_entries.{ENTRY} 既無 arm_policy 亦無 arm_ref：{entry!r}")
+
+
+def g1_regen_kind() -> str:
+    """G1 格重產之估時跑別（SPEC Task 0.4、R15-A）：Phase 2（依環境）⇒ `regen_t22`（Task 2.2，批 b3）；鎖臂後 ⇒
+    `regen_t34`（Task 3.4，批 b4）。兩批各重產一次，故估時分列。"""
+    return "regen_t34" if contract_state() == LOCKED_STATE else "regen_t22"
 
 
 def locked_arm() -> str:
@@ -448,6 +454,7 @@ class G1Lab:
         if cell_id not in self._sources:
             g1 = _g1(cell_id)
             run_dir = Path(_freeze_module().generate_cell(self.root / f"gen_{cell_id}", _descriptor(cell_id),
+                                                          run_kind=g1_regen_kind(),
                                                           env=dict(g1["source_env"])).run_dir)
             self._sources[cell_id] = _source_of(run_dir, _library_for(run_dir, self.root / f"registry_{cell_id}.json"))
         return self._sources[cell_id]

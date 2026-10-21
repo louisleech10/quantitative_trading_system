@@ -48,7 +48,7 @@ Task 5.1 含 `0.00005` 而無「單步」之文字 ⇒ 措辭檢查紅。mutatio
 - Task 1.3 收據：`exit_code, criteria_sha256, cells[].{cell_id, kind, symbol, timeframes, l1_dtypes[], common_cols,
   only_returned[], only_category[], nan_mask_diff, f64diff, f32diff, max_abs, max_rel, errors[].{category, error}}`；
   有錯誤之格 `f32diff` 為 None；`l2_arm_matrix.compare_l2_arms` 回 docstring 所列鍵。
-- `scripts/numview_freeze_baseline.freeze_cell(cell: Mapping, work_root: Path, *, arms: Sequence[str]) -> Dict`：以現行碼依凍結檔
+- `scripts/numview_freeze_baseline.freeze_cell(cell: Mapping, work_root: Path, *, arms: Sequence[str], run_kind: str) -> Dict`：以現行碼依凍結檔
   之格紀錄重生該格，回與凍結檔同形之 `{"g1": {臂: {env, actual_arm, fingerprint}}, "g2": {...}, "g3": {...}}`，G1 只跑 `arms`。
 - 決定紀錄 `decisions.json`：`{"decisions": {鍵: {choice, changes_public_output, user_ruling{date, quote},
   implemented_commit, changed_targets[].{group(g1|g2|g3|legacy), cell?, copy?, columns?}}}}`；`implemented_commit` 為 HEAD 祖先才豁免。
@@ -853,7 +853,7 @@ class _Regen:
         if cell_id not in self._cache:
             arms = sorted((record.get("g1") or {}).keys())
             self._cache[cell_id] = freeze_script().freeze_cell(record, self.root / re.sub(r"[^A-Za-z0-9_.-]", "_", cell_id),
-                                                               arms=arms)
+                                                               arms=arms, run_kind="regen_section_g")
         return self._cache[cell_id]
 
 

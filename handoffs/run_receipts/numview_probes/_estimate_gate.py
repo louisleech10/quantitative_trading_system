@@ -2,7 +2,10 @@
 
 `scripts/numview_freeze_baseline.py` 與本目錄每個呼叫生成入口之探針，於主入口內、任何生成呼叫之前呼叫
 `require(run_kind, cells)`：估時收據（`handoffs/run_receipts/<date>-numview-estimate.json`）不存在、無
-`reported_at`（主委白話報使用者後寫入）、或所請格不在收據該跑別之格清單 ⇒ 拋 `EstimateGateError`（不只 log）。
+`reported_at`（主委白話報使用者後寫入）、或所請格不在收據該跑別之格清單（`cells` 格 id ∪ `preprov_cells` PRE-PROV 格名）
+⇒ 拋 `EstimateGateError`（不只 log）。Phase 2–4 驗收重產（R15-A）同受此閘：`numview_freeze_baseline.generate_cell`／
+`freeze_cell` 以 `regen_*` 跑別呼叫。測試直接經 `preprov_helpers` 生成之 PRE-PROV 格只由估時收據之 `preprov_cells`
+涵蓋檢查（Task 0.4 ①）約束，執行期不經本閘（見 manifest not_executable）。
 
 本檔為 TODO 階段空殼（Task 0.4 實作）。
 """

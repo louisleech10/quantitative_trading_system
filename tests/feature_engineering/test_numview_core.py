@@ -46,7 +46,7 @@ winsor_dtype_retained（格 A raw 對凍結逐位元＋sigma 分支回傳 float6
 oracle 輔助函式為注入點。重型 mutation 一律只對第一個列舉格（偵測力證明；全格由正向驗證涵蓋）。
 
 **測試接縫（實作須提供；名稱與簽名為本檔假設，見報告）**：
-- `scripts/numview_freeze_baseline.py`：`generate_cell(root, cell, *, env=None) -> preprov_helpers.RunHandle`
+- `scripts/numview_freeze_baseline.py`：`generate_cell(root, cell, *, run_kind, env=None) -> preprov_helpers.RunHandle`
   （`cell`＝全票唯一格描述子 `{id, kind, symbol, timeframes}`；格 A／B 之真實生成，同行程、隔離寫入、
   raw 與 processed 皆保留；與凍結腳本同一實作，故重生逐位元可比；`env` 覆寫生成環境）、
   `ic_page_output(handle, work) -> (DataFrame, dict)`（以 `ApplyTransformsRequest` 預設請求對該格 IC-first 選欄跑 IC 頁
@@ -731,7 +731,8 @@ def _generate(root: Path, kind: str, cell: Mapping[str, Any], *, env: Optional[M
         _install_spies(mp, run)
         for patch in patches:
             patch(mp, run)
-        run.handle = _freeze().generate_cell(work, {**dict(cell), "kind": kind}, env=dict(env) if env else None)
+        run.handle = _freeze().generate_cell(work, {**dict(cell), "kind": kind}, run_kind="regen_t3_core",
+                                             env=dict(env) if env else None)
     finally:
         mp.undo()
     return run

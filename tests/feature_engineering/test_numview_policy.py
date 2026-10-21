@@ -21,7 +21,7 @@ mutation：恢復 Polars 之 `else 100` 並繞過驗證 ⇒ ①Polars 案翻轉�
 （非 sigma 一律 quantile）⇒ ②快速核心案翻轉；驗證器只掛 pydantic 不掛 `__init__` ⇒ ①③dict 案翻轉。
 
 測試接縫（實作須提供；名稱為本檔之假設，見回報）：
-- `scripts/numview_freeze_baseline.py:generate_cell(root: Path, cell: Mapping, *, env=None) -> preprov_helpers.RunHandle`（`cell`＝全票唯一格描述子 `{id, kind, symbol, timeframes}`，本檔取 `.run_dir`）：
+- `scripts/numview_freeze_baseline.py:generate_cell(root: Path, cell: Mapping, *, run_kind: str, env=None) -> preprov_helpers.RunHandle`（`cell`＝全票唯一格描述子 `{id, kind, symbol, timeframes}`，本檔取 `.run_dir`）：
   以凍結時同一生成程序於 `root` 下重生該格、回傳 run 目錄（`<features_root>/<symbol>/<tf>/<config_hash>`）。
 - §G 凍結檔 `tests/_golden/numview/pre_change_fingerprints.json` 為全票唯一正規形（`test_numview_baseline.py` 檔頭）：
   `{"cells": {格id: {"kind": "A"|"B", "symbol", "timeframes": [...], "ic_first_selected": [...], "g1_source_env": {...},
@@ -394,7 +394,8 @@ class CellLab:
         key = (cell_id, tuple(sorted((str(k), str(v)) for k, v in env.items())))
         if key not in self._runs:
             work = self.root / f"{cell_id}_{len(self._runs)}"
-            run_dir = Path(_freeze_module().generate_cell(work, _descriptor(cell_id), env=dict(env)).run_dir)
+            run_dir = Path(_freeze_module().generate_cell(work, _descriptor(cell_id), run_kind="regen_t21",
+                                                          env=dict(env)).run_dir)
             assert (run_dir / "feature_manifest.json").is_file(), f"重生之 run 無 manifest：{run_dir}"
             self._runs[key] = run_dir
         return self._runs[key]

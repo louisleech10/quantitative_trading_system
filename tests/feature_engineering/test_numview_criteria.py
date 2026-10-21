@@ -18,13 +18,16 @@ mutation（Task 0.3）：判準檔改一字 ⇒ ②③紅；收據改寫 `criter
 
 驗證（Task 0.4，名稱含 estimate）：①估時收據（`_estimate_gate.ESTIMATE_RECEIPT_GLOB`，恰一份）具 `reported_at`、格清單
 （自 `kline_cache.h5` 獨立列舉比對，不缺格）、逐跑別格清單／單格秒數／外推總秒數、省時作法，跑別涵蓋 `estimate.RUN_KINDS`
-（凍結跑別之 G1 四臂〔臂集＝契約 `post_ic_arm_values`〕／G2／G3，與 Phase 1 全部生成）；格 C 之 12h 基準可引
+（凍結跑別之 G1 四臂〔臂集＝契約 `post_ic_arm_values`〕／G2／G3、Phase 1 全部生成，與 Phase 2–4 驗收重產之
+`regen_*` 跑別〔`REGEN_REQUIREMENTS`；R15-A〕，後者另以 `preprov_cells` 列測試直接生成之 PRE-PROV 格）；格 C 之 12h 基準可引
 `handoffs/run_receipts/20261020-preprov-fullrun-size.md`，其餘 tf 各實測；②`_estimate_gate.require` 於收據缺、`reported_at`
 缺、格不在清單三案各拋 `EstimateGateError`（另以清單內之格為正對照）；③AST：`scripts/numview_freeze_baseline.py` 與
 `handoffs/run_receipts/numview_probes/` 下每個呼叫生成入口之腳本（SPEC Task 1.1–1.3 點名之三探針一律須呼叫；`estimate.py`
 為估時器本身、`_estimate_gate.py` 為閘本身，豁免），於其 `main` 之頂層敘述呼叫 `require(<跑別>, …)`，且行序早於 `main`
-內任何（直接或經本模組函式間接之）生成呼叫。
-mutation（Task 0.4）：凍結腳本刪前置呼叫 ⇒ ③紅；`require` 改只 log ⇒ ②紅。
+內任何（直接或經本模組函式間接之）生成呼叫；另（R15-A）凍結腳本之 `generate_cell` 以必填 `run_kind` 接收跑別、首個陳述式級
+呼叫為 `require(run_kind, …)`，`freeze_cell` 之生成一律經 `generate_cell(..., run_kind=run_kind)`。
+mutation（Task 0.4）：凍結腳本刪前置呼叫 ⇒ ③紅；`require` 改只 log ⇒ ②紅；`generate_cell` 刪 `require` ⇒ R15-A 閘紅；
+收據缺任一 `regen_*` 跑別 ⇒ ①紅。
 邊界（Task 0.4）：07 格 C 單格實測逾機器上限 ⇒ 該 tf 之格 C 全列 blocked-by 硬體、無逐格耗時；08 磁碟 < 30 GB ⇒
 `estimate.main` rc=1、輸出列所需空間、未啟動任何生成、未寫收據。
 
@@ -155,6 +158,26 @@ MANDATED_GATED_SCRIPTS: Dict[Path, str] = {
     PROBES_DIR / "l2_arm_matrix.py": "l2_arm_matrix",
 }
 GATE_EXEMPT = frozenset({PROBES_DIR / "estimate.py", PROBES_DIR / "_estimate_gate.py"})
+#: Phase 2–4 驗收重產之跑別（SPEC Task 0.4 驗證①、R15-A）→ 須涵蓋之格：`cells` 之格類（"A"／"AB"／"" 無）或
+#: "A:BTCUSDT:1h"（單一格 A），`preprov` 為測試直接經 `preprov_helpers` 生成之 PRE-PROV 格名（"*legacy*"＝沿用基準
+#: `tests/_golden/preprov/pre_change_fingerprints.json` 之全部格）。來源（各測試檔實際之生成呼叫）：
+#:   regen_t21 ← test_numview_policy.py `CellLab`（④，格 A BTCUSDT 1h）；regen_t22 ← tests/api/test_numview_ic_page.py `G1Lab`
+#:   （契約 arm_policy 狀態）；regen_t3_core ← test_numview_core.py `_Runs`／`_generate`（Task 3.1–3.3 共用）＋`ic_first_default`；
+#:   regen_t34 ← `G1Lab`（契約 arm_ref 狀態）＋邊界 38 之 `ic_first_empty`；regen_t42 ← test_numview_identity.py
+#:   `CELL`／`IC_FIRST_CELL`；regen_t43 ← tests/api/test_numview_ic_page.py `REGEN_CELL`；regen_section_g ←
+#:   test_numview_acceptance.py `_Regen`（freeze_cell）＋`legacy_runs`。
+REGEN_REQUIREMENTS: Dict[str, Dict[str, Any]] = {
+    "regen_t21": {"cells": "A:BTCUSDT:1h", "preprov": ()},
+    "regen_t22": {"cells": "A", "preprov": ()},
+    "regen_t3_core": {"cells": "AB", "preprov": ("ic_first_default",)},
+    "regen_t34": {"cells": "A", "preprov": ("ic_first_empty",)},
+    "regen_t42": {"cells": "", "preprov": ("h1_stat_off", "ic_first")},
+    "regen_t43": {"cells": "", "preprov": ("h1_pp_off",)},
+    "regen_section_g": {"cells": "AB", "preprov": ("*legacy*",)},
+}
+#: 凍結腳本中受估時前置閘之生成函式（R15-A）：`generate_cell` 首個陳述式級呼叫須為 `require(run_kind, …)`；
+#: `freeze_cell` 之生成一律經 `generate_cell(..., run_kind=run_kind)`
+CELL_GATED_FUNCTIONS = ("generate_cell", "freeze_cell")
 
 
 # ---------------------------------------------------------------------------------------------- 讀取接縫
@@ -687,6 +710,39 @@ def _single_tf(cell: Mapping[str, Any]) -> Optional[str]:
     return str(tfs[0]) if isinstance(tfs, list) and len(tfs) == 1 else None
 
 
+def regen_required_cells(spec: str, index: Mapping[str, Tuple[str, Mapping[str, Any]]],
+                         ids: Mapping[str, Set[str]]) -> Set[str]:
+    """`REGEN_REQUIREMENTS[*]["cells"]` → 須涵蓋之格 id：""＝無；"A"／"AB"＝該格類全部；"A:<symbol>:<tf>"＝該單一格 A
+    （收據中須恰一格，否則以不存在之佔位 id 使涵蓋檢查紅）。"""
+    if not spec:
+        return set()
+    if ":" in spec:
+        cat, symbol, tf = spec.split(":")
+        hits = {i for i, (c, cell) in index.items() if c == cat and cell.get("symbol") == symbol
+                and _single_tf(cell) == tf}
+        return hits if len(hits) == 1 else {f"<{spec} 須恰一格，實得 {len(hits)}>"}
+    return set().union(*(ids.get(cat, set()) for cat in spec))
+
+
+def regen_required_preprov(names: Sequence[str]) -> Set[str]:
+    """`REGEN_REQUIREMENTS[*]["preprov"]` → 須涵蓋之 PRE-PROV 格名；"*legacy*"＝沿用基準之全部格（讀檔，不寫死）。"""
+    out: Set[str] = set()
+    for name in names:
+        if name == "*legacy*":
+            legacy = json.loads((REPO / "tests/_golden/preprov/pre_change_fingerprints.json").read_text(encoding="utf-8"))
+            out |= set(legacy["cells"])
+        else:
+            out.add(name)
+    return out
+
+
+def known_preprov_cells() -> Set[str]:
+    """PRE-PROV 之合法格名（`preprov_helpers.CELLS` ∪ `VARIANTS`）。"""
+    from tests.feature_engineering import preprov_helpers as ph
+
+    return set(ph.CELLS) | set(ph.VARIANTS)
+
+
 def _cell_index(receipt: Mapping[str, Any]) -> Dict[str, Tuple[str, Mapping[str, Any]]]:
     """格 id → （格類, 格物件）。"""
     out: Dict[str, Tuple[str, Mapping[str, Any]]] = {}
@@ -727,18 +783,31 @@ def estimate_receipt_violations(receipt: Mapping[str, Any], kline: Mapping[str, 
         "freeze_baseline": ids["A"] | ids["B"], "postic_branchdiff": ids["A"] | ids["B"],
         "precision_chain": ids["A"] | ids["B"] | ids["C"], "l2_arm_matrix": ids["A"] | ids["B"],
     }
+    required_preprov: Dict[str, Set[str]] = {}
+    for kind, req in REGEN_REQUIREMENTS.items():
+        if kind not in ESTIMATOR.RUN_KINDS:
+            out.append(f"estimate.RUN_KINDS 缺 Phase 2–4 驗收重產跑別 {kind}（R15-A）")
+        required_cover[kind] = regen_required_cells(req["cells"], index, ids)
+        required_preprov[kind] = regen_required_preprov(req["preprov"])
     for kind in ESTIMATOR.RUN_KINDS:
         node = run_kinds.get(kind)
         if not isinstance(node, Mapping):
             out.append(f"run_kinds 缺跑別 {kind}")
             continue
         listed = set(node.get("cells") or [])
-        if not listed or not listed <= set(index):
+        preprov_listed = set(node.get("preprov_cells") or [])
+        if (not listed and not preprov_listed) or not listed <= set(index):
             out.append(f"{kind}：cells 為空或含未列舉之格")
         missing = required_cover.get(kind, set()) - listed
         if missing:
             out.append(f"{kind}：未涵蓋 {len(missing)} 格（不得以縮減格降低總估時）")
-        categories = {index[i][0] for i in listed if i in index}
+        missing_preprov = required_preprov.get(kind, set()) - preprov_listed
+        if missing_preprov:
+            out.append(f"{kind}：未涵蓋 PRE-PROV 格 {sorted(missing_preprov)}")
+        unknown_preprov = preprov_listed - known_preprov_cells()
+        if unknown_preprov:
+            out.append(f"{kind}：preprov_cells 含未知格 {sorted(unknown_preprov)}")
+        categories = {index[i][0] for i in listed if i in index} | ({"preprov"} if preprov_listed else set())
         per_cat = node.get("single_cell_seconds") or {}
         for cat in categories:
             if not _positive_number(per_cat.get(cat)):
@@ -931,6 +1000,61 @@ def gate_call_violations() -> List[str]:
     return out
 
 
+def _kwonly_without_default(fn: ast.FunctionDef, name: str) -> bool:
+    for arg, default in zip(fn.args.kwonlyargs, fn.args.kw_defaults):
+        if arg.arg == name:
+            return default is None
+    return False
+
+
+def cell_gate_violations(path: Path = FREEZE_SCRIPT) -> List[str]:
+    """R15-A：凍結腳本之 `generate_cell` 以必填關鍵字 `run_kind` 接收跑別，其首個陳述式級呼叫為 `require(run_kind, …)`，
+    且任何生成呼叫皆晚於之（函式內須有生成呼叫，否則判未實作）；`freeze_cell` 亦以必填 `run_kind` 接收，其生成一律為
+    `generate_cell(..., run_kind=run_kind)`（無其他生成入口）。AST 秒級。"""
+    rel = _rel(path)
+    tree = ast.parse(_read_text(path), filename=rel)
+    funcs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    out: List[str] = []
+    for name in CELL_GATED_FUNCTIONS:
+        if name not in funcs:
+            out.append(f"{rel}：缺函式 {name}")
+            continue
+        if not _kwonly_without_default(funcs[name], "run_kind"):
+            out.append(f"{rel}：{name} 須以無預設之關鍵字參數 run_kind 接收估時跑別")
+    if out:
+        return out
+    gen = funcs["generate_cell"]
+    calls = [c for c in ast.walk(gen) if isinstance(c, ast.Call)]
+    gen_lines = sorted(c.lineno for c in calls if _is_generation_call(c) and _call_name(c) != "generate_cell")
+    first_call = None
+    for stmt in gen.body:
+        if isinstance(stmt, (ast.Expr, ast.Assign, ast.AnnAssign)) and isinstance(stmt.value, ast.Call):
+            first_call = stmt.value
+            break
+        if not (isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant)):
+            break
+    if first_call is None or not _is_require_call(first_call):
+        out.append(f"{rel}：generate_cell 之首個陳述式級呼叫非 _estimate_gate.require")
+    else:
+        arg0 = first_call.args[0] if first_call.args else None
+        if not (isinstance(arg0, ast.Name) and arg0.id == "run_kind"):
+            out.append(f"{rel}：generate_cell 之 require 首參數須為 run_kind（原樣傳遞呼叫端跑別）")
+        if gen_lines and gen_lines[0] <= first_call.lineno:
+            out.append(f"{rel}：generate_cell 之生成呼叫（第 {gen_lines[0]} 行）早於 require")
+    if not gen_lines:
+        out.append(f"{rel}：generate_cell 未見任何生成呼叫（未實作或生成入口未被辨識）")
+    frz = funcs["freeze_cell"]
+    frz_gen = [c for c in ast.walk(frz) if isinstance(c, ast.Call) and _is_generation_call(c)]
+    if not frz_gen:
+        out.append(f"{rel}：freeze_cell 未見生成呼叫（須經 generate_cell）")
+    for call in frz_gen:
+        kw = {k.arg: k.value for k in call.keywords}
+        if _call_name(call) != "generate_cell" or not (isinstance(kw.get("run_kind"), ast.Name)
+                                                       and kw["run_kind"].id == "run_kind"):
+            out.append(f"{rel}：freeze_cell 第 {call.lineno} 行之生成未經 generate_cell(..., run_kind=run_kind)")
+    return out
+
+
 class _DropRequire(ast.NodeTransformer):
     def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
         self.generic_visit(node)
@@ -1027,6 +1151,17 @@ def test_estimate_gate_require_raises_in_three_cases(tmp_path: Path) -> None:
 def test_estimate_gate_called_before_generation_in_heavy_scripts() -> None:
     """Task 0.4 ③：凍結腳本與每個生成型探針於 `main` 頂層、任何生成呼叫之前呼叫 `require(<跑別>, …)`。"""
     assert gate_call_violations() == []
+
+
+def test_estimate_gate_called_first_in_generate_cell() -> None:
+    """Task 0.4 改法（R15-A）：Phase 2–4 驗收重產之唯一生成接縫 `generate_cell`（與經之之 `freeze_cell`）以必填
+    `run_kind` 接收跑別，首個陳述式級呼叫為 `require(run_kind, …)`、先於任何生成呼叫。"""
+    assert cell_gate_violations() == []
+
+
+def test_estimate_regen_run_kinds_registered() -> None:
+    """Task 0.4 驗證①（R15-A）：`estimate.RUN_KINDS` 含 Phase 2–4 驗收重產之全部跑別（`REGEN_REQUIREMENTS`）。"""
+    assert set(REGEN_REQUIREMENTS) <= set(ESTIMATOR.RUN_KINDS), sorted(set(REGEN_REQUIREMENTS) - set(ESTIMATOR.RUN_KINDS))
 
 
 # ---------------------------------------------------------------------------------------------- 邊界
@@ -1244,6 +1379,35 @@ def test_mutation_estimate_freeze_script_without_gate_call(monkeypatch: pytest.M
     monkeypatch.setattr(sys.modules[__name__], "_read_text", stripped)
     violations = gate_call_violations()
     assert any(v.startswith(f"{_rel(FREEZE_SCRIPT)}：") for v in violations), violations
+
+
+def test_mutation_estimate_generate_cell_without_gate_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（R15-A）：`generate_cell` 刪去 `require` 敘述（以 `_read_text` 接縫餵入 AST 移除後之原始碼）⇒ 前置閘檢查翻紅。"""
+    assert cell_gate_violations() == []
+    original = _read_text
+
+    def stripped(path: Path) -> str:
+        text = original(path)
+        if Path(path) != FREEZE_SCRIPT:
+            return text
+        return ast.unparse(ast.fix_missing_locations(_DropRequire().visit(ast.parse(text))))
+
+    monkeypatch.setattr(sys.modules[__name__], "_read_text", stripped)
+    violations = cell_gate_violations()
+    assert any("generate_cell 之首個陳述式級呼叫非" in v for v in violations), violations
+
+
+@pytest.mark.parametrize("kind", sorted(REGEN_REQUIREMENTS))
+def test_mutation_estimate_receipt_missing_regen_kind(kind: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（R15-A）：估時收據缺任一 Phase 2–4 驗收重產跑別 ⇒ ①翻紅（總估時不得漏列驗收重產）。"""
+    receipt = _load_receipt(_estimate_receipt_path())
+    kline = _kline_index()
+    assert estimate_receipt_violations(receipt, kline) == []
+    mutated = copy.deepcopy(receipt)
+    mutated["run_kinds"].pop(kind)
+    monkeypatch.setattr(sys.modules[__name__], "_load_receipt", lambda _path: copy.deepcopy(mutated))
+    violations = estimate_receipt_violations(_load_receipt(_estimate_receipt_path()), kline)
+    assert f"run_kinds 缺跑別 {kind}" in violations, violations
 
 
 def test_mutation_estimate_require_log_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
