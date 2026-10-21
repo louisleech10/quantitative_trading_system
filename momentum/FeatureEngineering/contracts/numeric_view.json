@@ -1,0 +1,54 @@
+{
+  "_doc": "docs/NUMVIEW_SPEC.md 之數值政策、選擇子分類、fingerprint 與 view 身分契約（單一真相源，SPEC §C）。TODO 階段骨架：各段之值由 Task 0.1（政策、臂、可達性、選擇子分類〔Task 0.2〕）、Task 3.2（processed_codec_mapping，限 D-CODEC 改案）、Task 4.1（fingerprint 段、auto_resolutions、config_hash 鹽）、Task 4.2（run_identity_new_keys、manifest_keys、cgsa_work_identity）、Task 4.3（ic_page_*）以碼證盤出後填入；每值附 _sources（path:line，該行須含被引用之字面：dict 形 _sources {值: [path:line…]} 之引用字面＝該值；list 形 _sources 之引用字面＝同物件之 _literal，缺則為該物件之鍵名）。未填前值為空，依賴之驗收測試必紅（設計如此）。以 _ 起首之鍵為說明，不屬值集。",
+  "version": 1,
+  "value_pattern": "^[a-z][a-z0-9_]*$",
+  "post_ic_entries": {
+    "_doc": "每入口一鍵（至少 ic_first、ic_page_apply_transforms）：{\"arm\": <post_ic_arm_values 之一>} 或 {\"arm_ref\": <另一入口鍵>} 或 {\"arm_policy\": <依環境解析之政策值>}，皆附 \"_sources\": [path:line]。Task 3.4 前 ic_page_apply_transforms 為 arm_policy；Task 3.4 改寫為 arm_ref=ic_first（使用者 2026-10-21 方向裁定）。"
+  },
+  "post_ic_arm_values": {"values": [], "_sources": {}},
+  "post_ic_arm_reachability": {
+    "_doc": "每個 post_ic_arm_values 之臂一鍵：{\"condition\": <條件名>, \"min_selected_columns\": <int，選欄數（ratio-unsafe 剔除後）≥ 此值方可達>, \"_sources\": [path:line]}；pandas_chunked 之條件須表「chunk_size > 0 且選欄數 > chunk_size」（feature_preprocessor.py transform 分派；R3-D），其 min_selected_columns 須為 2。"
+  },
+  "processed_codec_mapping": {
+    "_doc": "Task 3.2 D-CODEC 改案才填：逐欄 post-IC 紀錄之（rank_transform、adaptive_zscore、gaussian_normalize）步驟狀態組合 → 編碼型別之映射表、異常結果值集、身分綁定欄、mapping_sha256 正規化規則與 manifest 鍵名（R3-B、R4-B）。",
+    "mapping": [],
+    "outcome_values": {"values": [], "_sources": {}},
+    "binding_keys": [],
+    "normalization": {},
+    "manifest_key": null
+  },
+  "cgsa_work_identity": {
+    "_doc": "CGSA 工作目錄身分檔名與鍵（symbol、tf、完整 config_hash、完整 algorithm_id；D7、R3-A）；未認證換臂標記檔名與內容鍵（換臂點、群組、所選臂、時間；R6-A）。Task 4.2 填。",
+    "identity_file": null,
+    "identity_keys": [],
+    "marker_file": null,
+    "marker_keys": [],
+    "_sources": {}
+  },
+  "auto_resolutions": {
+    "_doc": "硬體自動解析項（解析函式、path:line、輸入來源、類別）；執行期換臂點清單與其認證證據；事後路由身分鍵名、組成與空值摘要；不可解析之 auto 情境之具名錯誤名（R5-B）。Task 4.1 填。",
+    "items": {},
+    "route_switch_points": {},
+    "route_identity_key": null,
+    "route_identity_empty": null,
+    "unresolved_error": null
+  },
+  "research_arms": {"_doc": "研究臂與不可達理由（承 ICPOSTLEAK §N；D-RESEARCH 依 Task 1.5）。", "values": [], "_sources": {}, "_unreachable": {}},
+  "zscore_windows_policy": {"_doc": "zscore 啟用時窗清單之規則（非空、皆正整數；D3）。Task 0.1 填。", "rules": [], "_sources": {}},
+  "winsor_method_values": {"_doc": "縮尾 method 封閉值集（區分大小寫；C3）。Task 0.1 填。", "values": [], "_sources": {}},
+  "winsor_method_missing_key": {"_doc": "dict 入口縮尾啟用而缺 method 鍵之處置（設計選擇③；Task 2.1）。", "value": null, "_sources": []},
+  "selectors": {
+    "_doc": "每個 FFACT_* 鍵（momentum/、api/ 全部字串常值；Task 0.2 AST 盤點）一鍵：{\"class\": <selector_classes.values 之一>, \"parser\": <解析器名>, \"reason\": <讀取點用途>, \"_sources\": [path:line]}。本票除 output_only 五鍵外一律 value_affecting；不設 non_value（使用者 2026-10-21 方向裁定）。"
+  },
+  "selector_classes": {"_doc": "選擇子類別值集；output_only_keys 為封閉清單（增列須改 SPEC；Task 0.2）。", "values": [], "output_only_keys": []},
+  "capability_flags": {"_doc": "非環境能力旗標（Polars、numba、scipy、statsmodels 可用性）。", "values": [], "_sources": {}},
+  "library_versions": {"_doc": "數值相關函式庫（設計選擇②：入 algorithm_id、不入 config_hash 鹽）。", "values": []},
+  "algorithm_versions": {"_doc": "算法版本常數（決定紀錄與 Phase 3 改案 +1）。"},
+  "fingerprint_sections": {"_doc": "fingerprint 各段之鍵（Task 4.1）。", "values": []},
+  "config_hash_salt": {"_doc": "config_hash 鹽鍵名與排除段（設計選擇①：排除函式庫版本段）。", "key": null, "exclude_sections": []},
+  "run_identity_new_keys": [],
+  "manifest_keys": {"_doc": "manifest 頂層與 artifact 節點新增鍵（fingerprint、algorithm_id、路由身分、observed_arms；D2）。"},
+  "ic_page_output_attrs": {"_doc": "IC 頁輸出 h5 屬性鍵（實際臂、ff_run_identity〔Task 2.2〕；view_id、algorithm_id〔Task 4.3〕）。"},
+  "ic_page_response_keys": {"_doc": "ApplyTransformsResponse 新增選填鍵（同上分期）。"},
+  "ic_page_view_identity": {"_doc": "view_id 之組成（run 身分、轉換設定、臂、algorithm_id、有序 kept_cols）與正規化規則（R7-A）。", "components": [], "normalization": {}}
+}

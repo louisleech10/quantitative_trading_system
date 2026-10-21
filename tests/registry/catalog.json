@@ -1852,6 +1852,27 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
+  "tests/api/test_numview_ic_page.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A12",
+    "A13"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_numview_ic_page.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
   "tests/api/test_optimization_output_service.py": {
    "claim": [
     "contract",
@@ -4626,6 +4647,204 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "NUMERIC"
+  },
+  "tests/feature_engineering/test_numview_acceptance.py": {
+   "claim": [
+    "correctness",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A15",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_baseline.py": {
+   "claim": [
+    "correctness",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A19"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_baseline.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_cgsa_workdir.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A9"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_cgsa_workdir.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_contract.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_contract.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_core.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A15",
+    "A5"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/feature_engineering/test_numview_core.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_criteria.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A12",
+    "A4"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_fingerprints.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_fingerprints.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_identity.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13",
+    "A9"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_identity.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_policy.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_policy.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
+  "tests/feature_engineering/test_numview_selectors.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A13"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_numview_selectors.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
   },
   "tests/feature_engineering/test_preprov_acceptance.py": {
    "claim": [
