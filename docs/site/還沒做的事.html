@@ -123,6 +123,11 @@
 <td>你 2026-10-22 定「主檔另開票」；插哪一步依規定先跟委員評估</td>
 </tr>
 <tr>
+<td><strong>🔴 全特徵跑 IC-first 在 8GB 機器上跑不完</strong>（2026-10-22 NUMVIEW 實測）</td>
+<td>BTC 1h 生產預設全特徵 20.9 萬欄，IC 預設門檻留下 13.7 萬欄（66%，幾乎沒篩），接著對 13.7 萬欄做 IC 後轉換（Polars）時記憶體耗盡、交換空間用到 9GB、78 分鐘無進度。另 Polars 轉換實測比 pandas 慢 11–15 倍（<code>handoffs/run_receipts/20261022-numview-icpage-arm-timing.json</code>）。與先前登記之「IC 缺粗篩／精篩、全量會爆記憶體」同一件事，現有實測數字</td>
+<td>不屬 NUMVIEW 範圍（NUMVIEW 全特徵格改只產特徵、不跑 IC）；IC 粗篩／精篩票開工時以此為驗收情境；插哪一步依規定先跟委員評估</td>
+</tr>
+<tr>
 <td><strong>🔴 IC 對齊 K 線時列數相同就直接按位置對上</strong>（2026-10-22 補 12h 影響盤點時查到）</td>
 <td><code>momentum/Analysis/ic_engine.py</code> 第 1489–1497 行：特徵與 K 線列數相同時直接把 K 線的時間索引按位置套給特徵，不核對時間；列數不同時改用時間對齊，卻讓按年份、按市況拆分的 IC 整段變空值。前者在兩邊列數剛好相同但時間範圍不同時會錯位，屬 IC 正確性問題</td>
 <td>不屬 NUMVIEW 範圍；要另開修正票並查清是否已影響既有結果，插哪一步依規定先跟委員評估</td>
@@ -241,8 +246,7 @@
 <li><strong>它解什麼</strong>：同一個值被抄到多處、改一處漏多處；值打錯但格式合法。<strong>不解</strong>：架構對不對、零件怎麼接、為什麼這樣設計、同一份檔內前後矛盾</li>
 <li><strong>有沒有效怎麼看</strong>：before 已記（每輪 1.00 條文件同步類問題，見
 <code>handoffs/run_receipts/20260921-eventscan-b-baseline.json</code>），做完用同一支指標比</li>
-<li><strong>已知的洞</strong>：<code>docs/</code> 不在手寫偵測範圍內 ⇒ 貼了標記的格會同步，但在 SPEC 別的段落
-手打同一個值不會被擋。補洞代價還沒查</li>
+<li><strong>已知的洞</strong>：<code>docs/</code> 不在手寫偵測範圍內 ⇒ 貼了標記的格會同步，但在 SPEC 別的段落手打同一個值不會被擋。補洞代價還沒查</li>
 </ul>
 <hr />
 <h2 id="三待觸發條件沒到就不做不是拖延">三、待觸發（條件沒到就不做，不是拖延）</h2>
