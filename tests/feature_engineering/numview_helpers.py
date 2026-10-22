@@ -582,6 +582,28 @@ def regen_core_kind(patched: bool) -> str:
     return regen_batch_kind("regen_t3_core")
 
 
+def frozen_cells_without_kind(cells: Mapping[str, Any], kind: str) -> Dict[str, Any]:
+    """凍結檔 `cells` 去除格類 `kind` 之格（保序；非物件之項保留，由呼叫端之斷言判）。無斷言。"""
+    return {k: v for k, v in cells.items() if not (isinstance(v, Mapping) and v.get("kind") == kind)}
+
+
+def criteria_freeze_group(name: str) -> List[str]:
+    """現行判準 `cell_rules.freeze_groups.<name>` 之格 id（舊版無 ⇒ 空清單）。無斷言。"""
+    groups = (json.loads(current_criteria_path().read_text(encoding="utf-8")).get("cell_rules") or {}).get("freeze_groups")
+    return [str(x) for x in (groups or {}).get(name) or []] if isinstance(groups, dict) else []
+
+
+def precision_segments(cell_id: str, default: Sequence[str]) -> List[str]:
+    """精度鏈該格須具之段（判準 `run_coverage.precision_chain` 之讀取列 `segments`；審查 r8 GROK-R8-P1-01：只生成之格 C 無 S5）；
+    判準無此欄（舊版）⇒ `default`。無斷言。"""
+    coverage = json.loads(current_criteria_path().read_text(encoding="utf-8")).get("run_coverage")
+    runs = ((coverage or {}).get("precision_chain") or {}).get("runs") if isinstance(coverage, dict) else None
+    for r in runs or []:
+        if str(r.get("cell")) == str(cell_id) and not r.get("generations") and isinstance(r.get("segments"), list):
+            return [str(s) for s in r["segments"]]
+    return list(default)
+
+
 def _main(argv: Sequence[str]) -> int:
     if list(argv) == ["core-selector"]:
         print(core_selector())

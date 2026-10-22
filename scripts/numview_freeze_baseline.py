@@ -12,7 +12,10 @@
 啟動即呼叫 `handoffs/run_receipts/numview_probes/_estimate_gate.require("freeze_baseline", cells)`（在任何生成呼叫之前）；
 格 A／B 逐格單行程串行；生成之 run 目錄保留至 Phase 1 結束（供 Task 1.1–1.3 讀取）。FeatureFactory 之連續性設定依判準檔
 `cell_rules.continuity`（同估時器 `estimate.continuity_plan`／`window_gap_violations`）：來源全序列無缺口 ⇒ 生產設定
-`validate_continuity=True`；有缺口（長歷史檔 12h 於生成窗外）⇒ False＋生成窗內零缺口判定，窗內缺口 ⇒ 該格 failed（data_gap）。Task 1.3 之 L2 兩臂 spy 掛於
+`validate_continuity=True`；有缺口（長歷史檔 12h 於生成窗外）⇒ False＋生成窗內零缺口判定，窗內缺口 ⇒ 該格 failed（data_gap）。
+每格之生成一律於子行程入口 `_child` 內執行、main 以 `_watchdog.run_watched` 啟動之（AST 驗收 test_heavy_scripts_run_generation_children_under_watchdog；預設開、無旗標；`handoffs/run_receipts/numview_probes/_watchdog.py`，門檻＝判準檔
+`cell_rules.watchdog`：log 停滯、swap 逾門檻、牆鐘逾 3× 預期或固定上限）；卡住 ⇒ 終止、記 stalled、停止後續格、rc≠0、不寫凍結檔。
+格 C（判準 v4）只走 `generate_features`，不經 IC-first、不凍 G1，其 raw／processed 屬 G3。Task 1.3 之 L2 兩臂 spy 掛於
 凍結之生成（格 A_BTCUSDT_1h 兩個 FFACT_USE_POLARS 生成、格 B／C／A_BTCUSDT_12h 之預設生成），l2_arm_matrix 讀其紀錄、
 不另生成（判準檔 run_coverage.l2_arm_matrix）。
 輸出：`tests/_golden/numview/pre_change_fingerprints.json`；收據 `handoffs/run_receipts/<date>-numview-freeze-baseline.json`

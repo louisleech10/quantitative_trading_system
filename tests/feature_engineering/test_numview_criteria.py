@@ -67,6 +67,7 @@ import copy
 import datetime as dt
 import hashlib
 import importlib.util
+import inspect
 import json
 import math
 import re
@@ -2707,3 +2708,224 @@ def test_mutation_estimate_unlisted_core_patched_generation(monkeypatch: pytest.
              "    run = _generate(tmp_path, 'B', _cells('B')[0], patches=[lambda mp, run: None])\n")
     monkeypatch.setattr(sys.modules[__name__], "_read_core_source", lambda: CORE_TEST_PATH.read_text(encoding="utf-8") + extra)
     assert any("未列估時" in v for v in mutant_rows_violations(_load_criteria(), _read_core_source()))
+
+
+# ---------------------------------------------------------------------------------------------- 卡住偵測（使用者 2026-10-22；判準 v4 cell_rules.watchdog）
+# 秒級：以極小門檻與不寫 log／持續寫 log 之假子行程驗三條件；不生成特徵。
+
+_SILENT_CHILD = [sys.executable, "-c", "import time; time.sleep(20)"]
+_CHATTY_CHILD = [sys.executable, "-u", "-c", "import time\nfor i in range(400):\n    print(i, flush=True); time.sleep(0.05)"]
+
+
+def _fast_config(**overrides: Any) -> Any:
+    wd = ESTIMATOR.watchdog_module()
+    base = {"check_interval_seconds": 0.05, "log_stall_seconds": 0.4, "swap_used_percent": 50,
+            "swap_consecutive_checks": 2, "wall_multiple_of_expected": 3.0, "wall_ceiling_seconds": 30.0}
+    return wd.WatchdogConfig(**{**base, **overrides})
+
+
+def test_watchdog_thresholds_come_from_criteria_and_estimator_uses_it() -> None:
+    """門檻唯一來源＝判準 `cell_rules.watchdog`（封閉物件）；估時器之子行程實測經 `_watchdog.run_watched`（預設開）。"""
+    wd = ESTIMATOR.watchdog_module()
+    config = wd.load_config(_load_criteria())
+    node = _load_criteria()["cell_rules"]["watchdog"]
+    assert all(getattr(config, k) == node[k] for k in wd.WATCHDOG_KEYS)
+    assert "run_watched" in inspect.getsource(ESTIMATOR._run_target)
+    assert wd.ENABLED is True
+
+
+def test_watchdog_silent_child_stalled(tmp_path: Path) -> None:
+    """(a) 子行程 log 未增長逾門檻 ⇒ stalled（理由具名 log）並終止子行程。"""
+    wd = ESTIMATOR.watchdog_module()
+    result = wd.run_watched(_SILENT_CHILD, log_path=tmp_path / "silent.log", config=_fast_config(), probe_swap=lambda: 0.0)
+    assert result.status == wd.STALLED and "log" in result.reason, result
+    assert result.wall_seconds < 15
+
+
+def test_watchdog_wall_cap_stalled(tmp_path: Path) -> None:
+    """(c) 持續寫 log 但牆鐘逾上限（有預期 ⇒ 3×預期；此處預期 0.2 秒 ⇒ 上限 0.6 秒）⇒ stalled（理由具名牆鐘）。"""
+    wd = ESTIMATOR.watchdog_module()
+    result = wd.run_watched(_CHATTY_CHILD, log_path=tmp_path / "wall.log", config=_fast_config(log_stall_seconds=30.0),
+                            expected_seconds=0.2, probe_swap=lambda: 0.0)
+    assert result.status == wd.STALLED and "牆鐘" in result.reason, result
+
+
+def test_watchdog_swap_over_threshold_stalled(tmp_path: Path) -> None:
+    """(b) swap 使用比例（注入）> 門檻連續 2 次 ⇒ stalled（理由具名 swap）；子行程持續寫 log、牆鐘未逾。"""
+    wd = ESTIMATOR.watchdog_module()
+    result = wd.run_watched(_CHATTY_CHILD, log_path=tmp_path / "swap.log", config=_fast_config(log_stall_seconds=30.0),
+                            probe_swap=lambda: 0.9)
+    assert result.status == wd.STALLED and "swap" in result.reason, result
+
+
+def test_watchdog_normal_child_exits(tmp_path: Path) -> None:
+    """對照：正常結束之子行程 ⇒ exited、rc 0（不誤殺）。"""
+    wd = ESTIMATOR.watchdog_module()
+    result = wd.run_watched([sys.executable, "-c", "print('ok')"], log_path=tmp_path / "ok.log", config=_fast_config(),
+                            probe_swap=lambda: 0.0)
+    assert result.status == wd.EXITED and result.returncode == 0, result
+
+
+def test_watchdog_swap_probe_parses_platform_source() -> None:
+    """swap 探測回 None 或 [0, 1] 之比例（macOS sysctl vm.swapusage／Linux /proc/meminfo；讀不到 ⇒ None 不計）。"""
+    frac = ESTIMATOR.watchdog_module().swap_used_fraction()
+    assert frac is None or 0.0 <= frac <= 1.0, frac
+
+
+def test_mutation_watchdog_disabled_stall_undetected(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """mutation：關閉卡住偵測（`_watchdog.ENABLED=False`）⇒ 不寫 log 之子行程不再被判 stalled（偵測案紅）。子行程 1.5 秒後自行
+    結束以免測試掛住。"""
+    wd = ESTIMATOR.watchdog_module()
+    child = [sys.executable, "-c", "import time; time.sleep(1.5)"]
+    assert wd.run_watched(child, log_path=tmp_path / "a.log", config=_fast_config(),
+                          probe_swap=lambda: 0.0).status == wd.STALLED
+    monkeypatch.setattr(wd, "ENABLED", False)
+    assert wd.run_watched(child, log_path=tmp_path / "b.log", config=_fast_config(),
+                          probe_swap=lambda: 0.0).status != wd.STALLED
+
+
+def test_estimate_stalled_target_fails_fast_without_receipt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """估時器 fail-fast：某目標之子行程判 stalled ⇒ 停止後續目標、rc≠0、不寫收據（實測以注入之 stalled 結果代替，不生成）。"""
+    wd = ESTIMATOR.watchdog_module()
+    calls: List[str] = []
+
+    def fake_run(target: Mapping[str, Any], *a: Any, **k: Any) -> Dict[str, Any]:
+        calls.append(str(target["target"]))
+        return {"target": target["target"], "category": target["category"], "status": wd.STALLED,
+                "error": "卡住偵測終止：注入", "child_wall_seconds": 1.0}
+
+    monkeypatch.setattr(ESTIMATOR, "_run_target", fake_run)
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    rc = ESTIMATOR.main(["--work-root", str(tmp_path / "work"), "--receipts-dir", str(receipts),
+                         "--targets", "A_BTCUSDT_1h,A_BTCUSDT_4h", "--remeasure"])
+    assert rc != 0
+    assert calls == ["A_BTCUSDT_1h"], calls
+    assert not list(receipts.glob("*-numview-estimate.json"))
+
+
+@pytest.mark.parametrize("mutant", ["c_claims_s5", "ic_first_cell_drops_s5", "segments_missing"])
+def test_mutation_estimate_precision_segments_follow_generation_entry(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（審查 r8 GROK-R8-P1-01）：精度鏈讀取列之 segments——只生成之格 C 宣稱 S5／IC-first 之格缺 S5／缺 segments 欄
+    ⇒ 估時器 `coverage_violations` 紅；未變異時為零違規（對照；判準 v4：C＝S0–S4、A／B＝S0–S5）。"""
+    criteria = copy.deepcopy(_load_criteria())
+    monkeypatch.setattr(ESTIMATOR, "load_criteria", lambda *_a, **_k: criteria)
+    assert ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria()) == []
+    reads = {r["cell"]: r for r in criteria["run_coverage"]["precision_chain"]["runs"] if not r.get("generations")}
+    if mutant == "c_claims_s5":
+        reads["C_BTCUSDT_1h"]["segments"] = ["S0", "S1", "S2", "S3", "S4", "S5"]
+    elif mutant == "ic_first_cell_drops_s5":
+        reads["A_BTCUSDT_1h"]["segments"] = ["S0", "S1", "S2", "S3", "S4"]
+    else:
+        reads["B_BTCUSDT_1h_4h"].pop("segments")
+    assert any("precision_chain" in v for v in ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria()))
+
+
+# ---------------------------------------------------------------------------------------------- 重型腳本之卡住偵測接線（審查 r8 CODEX-R8-P1-02）
+# 凍結腳本與每支 SPEC 點名之生成型探針：生成一律於子行程（模組函式 `_child`，由 main 以子行程啟動）內執行，且 main 啟動該
+# 子行程一律經 `_watchdog.run_watched`（判準 cell_rules.watchdog）。AST、秒級；未實作前為紅。
+
+WATCHDOG_CHILD_ENTRY = "_child"
+
+
+def watchdog_wiring_violations_for(rel: str, source: str) -> List[str]:
+    """單一腳本：①具子行程入口 `_child`；② main 之呼叫閉包（不進入 `_child`）無任何生成呼叫（main 不在本行程生成；與 `_child`
+    共用之 helper 亦計入，不以差集抵消——審查 r9 CODEX-R9-P1-01）；③ 同閉包含 `run_watched` 呼叫且其引數引用 `__file__`
+    （子行程經卡住偵測啟動本腳本），並於同閉包呼叫 `_child`（子行程分派入口，比照 estimate.py）；④ 生成呼叫只出現於 `_child`
+    之呼叫閉包。不含 assert。"""
+    tree = ast.parse(source, filename=rel)
+    funcs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    if "main" not in funcs:
+        return [f"{rel}：無主入口 main"]
+    out: List[str] = []
+    if WATCHDOG_CHILD_ENTRY not in funcs:
+        out.append(f"{rel}：無子行程入口 {WATCHDOG_CHILD_ENTRY}（生成須於受監看之子行程內執行）")
+
+    def closure(start: str, skip: Set[str]) -> Set[str]:
+        seen, stack = set(), [start]
+        while stack:
+            name = stack.pop()
+            if name in seen or name in skip or name not in funcs:
+                continue
+            seen.add(name)
+            stack += [c.func.id for c in ast.walk(funcs[name]) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)]
+        return seen
+
+    main_side = closure("main", {WATCHDOG_CHILD_ENTRY})
+    child_side = closure(WATCHDOG_CHILD_ENTRY, set()) if WATCHDOG_CHILD_ENTRY in funcs else set()
+    calls_in = lambda names: [c for n in names for c in ast.walk(funcs[n]) if isinstance(c, ast.Call)]  # noqa: E731
+    direct = sorted({f"{_call_name(c)}@{c.lineno}" for c in calls_in(main_side) if _is_generation_call(c)})
+    if direct:
+        out.append(f"{rel}：main 之呼叫閉包於本行程生成（未經受監看子行程）：{direct[:3]}")
+    watched = [c for c in calls_in(main_side) if _call_name(c) == "run_watched"]
+    if not watched:
+        out.append(f"{rel}：main 之呼叫閉包未經 _watchdog.run_watched 啟動生成子行程")
+    elif not any(isinstance(n, ast.Name) and n.id == "__file__" for c in watched for a in c.args for n in ast.walk(a)):
+        out.append(f"{rel}：run_watched 之子行程命令未指向本腳本（引數未引用 __file__）")
+    if WATCHDOG_CHILD_ENTRY in funcs and not any(_call_name(c) == WATCHDOG_CHILD_ENTRY for c in calls_in(main_side)):
+        out.append(f"{rel}：main 未分派子行程入口 {WATCHDOG_CHILD_ENTRY}（子行程命令無從到達生成入口）")
+    stray = sorted({f"{_call_name(c)}@{c.lineno}" for c in calls_in(set(funcs) - child_side - {"main"})
+                    if _is_generation_call(c)} - {d for d in direct})
+    if stray and not child_side:
+        out.append(f"{rel}：生成呼叫 {stray[:3]} 不在任何受監看之子行程入口內")
+    return out
+
+
+def watchdog_wiring_violations() -> List[str]:
+    out: List[str] = []
+    for path in MANDATED_GATED_SCRIPTS:
+        out += watchdog_wiring_violations_for(_rel(path), _read_text(path))
+    return out
+
+
+def test_heavy_scripts_run_generation_children_under_watchdog() -> None:
+    """凍結腳本與生成型探針（postic_branchdiff、precision_chain、l2_arm_matrix）之生成子行程一律經 `_watchdog.run_watched`
+    （預設開；判準 cell_rules.watchdog）。未實作（空殼 NotImplementedError）前為紅。"""
+    assert watchdog_wiring_violations() == []
+
+
+_WIRED_SOURCE = '''
+def _generate(spec_path):
+    return generate_features(spec_path)
+
+
+def _child(spec_path):
+    return _generate(spec_path)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    if args.measure_one:
+        return _child(args.measure_one)
+    require("freeze_baseline", ["A"])
+    result = _watchdog.run_watched([sys.executable, str(Path(__file__).resolve()), "--measure-one", "s.json"],
+                                   log_path="l", config=None)
+    return 0
+'''
+
+
+@pytest.mark.parametrize("mutant", ["direct_generation_in_main", "no_run_watched", "no_child_entry",
+                                    "shared_helper_generation_in_main", "watched_cmd_not_this_script",
+                                    "main_never_dispatches_child"])
+def test_mutation_heavy_script_generation_bypasses_watchdog(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R8-P1-02、CODEX-R9-P1-01）：main 於本行程直接生成／main 未經 run_watched／無子行程入口／main 呼叫與
+    `_child` 共用之生成 helper／run_watched 命令不指向本腳本／main 不分派 `_child` ⇒ 接線檢查紅；合規樣本為綠（對照）。
+    樣本經 `_read_text` 注入（不改真實腳本）。"""
+    target = next(iter(MANDATED_GATED_SCRIPTS))
+    monkeypatch.setattr(sys.modules[__name__], "_read_text", lambda path: _WIRED_SOURCE)
+    assert watchdog_wiring_violations_for(_rel(target), _read_text(target)) == []
+    if mutant == "direct_generation_in_main":
+        bad = _WIRED_SOURCE.replace('    return 0\n', '    generate_features("in-process")\n    return 0\n')
+    elif mutant == "no_run_watched":
+        bad = _WIRED_SOURCE.replace("_watchdog.run_watched(", "subprocess_run(")
+    elif mutant == "shared_helper_generation_in_main":
+        bad = _WIRED_SOURCE.replace('    return 0\n', '    _generate("in-process")\n    return 0\n')
+    elif mutant == "watched_cmd_not_this_script":
+        bad = _WIRED_SOURCE.replace("str(Path(__file__).resolve())", '"other.py"')
+    elif mutant == "main_never_dispatches_child":
+        bad = _WIRED_SOURCE.replace("        return _child(args.measure_one)\n", "        return 0\n")
+    else:
+        bad = _WIRED_SOURCE.replace("def _child(spec_path):", "def _worker(spec_path):")
+    assert bad != _WIRED_SOURCE
+    monkeypatch.setattr(sys.modules[__name__], "_read_text", lambda path: bad)
+    assert watchdog_wiring_violations_for(_rel(target), _read_text(target)) != []

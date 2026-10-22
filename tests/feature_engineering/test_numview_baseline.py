@@ -349,7 +349,7 @@ def g1_violations() -> List[str]:
     expected_unreachable: set = set()
     for cell_id, record in freeze["cells"].items():
         kind = str(record["kind"])
-        if kind == "B":
+        if kind == "B" or cell_id in nh.criteria_freeze_group("G3"):  # 判準 v4：G3＝格 B 與全特徵格 C 之 raw／processed
             g3 = record.get("g3") or {}
             for artifact in ("raw", "processed"):
                 if not isinstance(g3.get(artifact), Mapping) or "columns" not in g3[artifact]:

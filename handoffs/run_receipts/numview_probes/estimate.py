@@ -877,9 +877,28 @@ def _child(spec_path: Path) -> int:
     return 0 if result["status"] == "measured" else 3
 
 
+_WATCHDOG_MODULE: Optional[Any] = None
+
+
+def watchdog_module() -> Any:
+    """同目錄之 `_watchdog`（卡住偵測；以檔案路徑載入、同行程單例，測試以 monkeypatch 其屬性）。"""
+    global _WATCHDOG_MODULE
+    if _WATCHDOG_MODULE is None:
+        spec = importlib.util.spec_from_file_location("numview_watchdog", Path(__file__).resolve().with_name("_watchdog.py"))
+        if spec is None or spec.loader is None:
+            raise EstimateError("無法載入 _watchdog.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules.setdefault("numview_watchdog", module)
+        spec.loader.exec_module(module)
+        _WATCHDOG_MODULE = module
+    return _WATCHDOG_MODULE
+
+
 def _run_target(target: Mapping[str, Any], work_root: Path, kline_path: Path,
-                timeout: Optional[float]) -> Dict[str, Any]:
-    """於獨立子行程實測單一目標；量畢刪其工作目錄。子行程被系統終止（負 rc）⇒ 記 killed。"""
+                timeout: Optional[float], expected_seconds: Optional[float] = None) -> Dict[str, Any]:
+    """於獨立子行程實測單一目標；量畢刪其工作目錄。子行程被系統終止（負 rc）⇒ 記 killed。子行程一律經卡住偵測
+    （`_watchdog.run_watched`，門檻＝判準檔 cell_rules.watchdog；預設開、無旗標）：卡住 ⇒ 終止並記 `stalled`＋理由。
+    `timeout`（舊參數）若給定則與牆鐘上限取小。"""
     safe = str(target["target"]).replace(":", "_").replace("*", "_")
     work = work_root / f"measure_{safe}"
     if work.exists():
@@ -890,23 +909,27 @@ def _run_target(target: Mapping[str, Any], work_root: Path, kline_path: Path,
     spec_path = work / "spec.json"
     spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
     log_path = work_root / f"measure_{safe}.log"
-    started = time.perf_counter()
-    with open(log_path, "w", encoding="utf-8") as log:
-        try:
-            proc = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--measure-one", str(spec_path)],
-                                  cwd=str(REPO), stdout=log, stderr=subprocess.STDOUT, timeout=timeout)
-            rc = proc.returncode
-        except subprocess.TimeoutExpired:
-            rc = None
-    wall = time.perf_counter() - started
+    wd = watchdog_module()
+    config = wd.load_config(load_criteria())
+    if timeout:
+        config = wd.WatchdogConfig(**{**config.__dict__, "wall_ceiling_seconds": min(config.wall_ceiling_seconds, timeout)})
+    watched = wd.run_watched([sys.executable, str(Path(__file__).resolve()), "--measure-one", str(spec_path)],
+                             log_path=log_path, config=config, expected_seconds=expected_seconds, cwd=str(REPO))
+    wall = watched.wall_seconds
+    rc = watched.returncode
     result_path = work / "result.json"
-    if result_path.is_file():
+    if watched.status == wd.STALLED:
+        result = {"target": target["target"], "category": target["category"], "status": wd.STALLED,
+                  "error": f"卡住偵測終止：{watched.reason}（見 {log_path}）"}
+    elif result_path.is_file():
         result = json.loads(result_path.read_text(encoding="utf-8"))
     elif rc is None:
         result = {"target": target["target"], "category": target["category"], "status": "timeout"}
     else:
         result = {"target": target["target"], "category": target["category"],
                   "status": "killed" if rc < 0 else "failed", "error": f"子行程 rc={rc}（無結果檔；見 {log_path}）"}
+    if target["category"] in CELL_CATEGORIES:  # 無結果檔之終止亦記生成入口（快取重用判定不得把他入口之終止當本入口結果）
+        result.setdefault("entry", generation_entry(target["category"], load_criteria()))
     result["child_wall_seconds"] = wall
     result["log"] = str(log_path)
     shutil.rmtree(work, ignore_errors=True)
@@ -1004,6 +1027,22 @@ def coverage_violations(criteria: Mapping[str, Any]) -> List[str]:
         if n > 1:
             out.append(f"同碼態重複轉換：碼態 {state} 之生成身分 {ident} 之 IC 頁各臂輸出計算 {n} 次")
     out += path_registry_violations(criteria, plan)
+    # ⑧ 精度鏈段集合（審查 r8 GROK-R8-P1-01）：讀取列之 segments ⊇ S0–S4、⊆ S0–S5；S5（IC 選欄）∈ segments ⇔ 該格類之
+    # 生成入口為 run_ic_first（只 generate_features 之格 C 不得宣稱 S5）
+    closed_kind = {str(c["id"]): str(c["kind"]) for c in criteria["cell_rules"]["cell_list"]["cells"]}
+    for r in plan.get("precision_chain", {}).get("runs") or []:
+        if r.get("generations"):
+            continue
+        segs = r.get("segments")
+        if not isinstance(segs, list):
+            out.append(f"precision_chain：格 {r.get('cell')} 之讀取列缺 segments")
+            continue
+        if not {"S0", "S1", "S2", "S3", "S4"} <= set(segs) <= {"S0", "S1", "S2", "S3", "S4", "S5"}:
+            out.append(f"precision_chain：格 {r.get('cell')} 之 segments {segs} 須含 S0–S4、不出 S0–S5")
+        kind = closed_kind.get(str(r.get("cell")))
+        ic_first = kind is not None and generation_entry(kind, criteria) == "run_ic_first"
+        if ("S5" in segs) != ic_first:
+            out.append(f"precision_chain：格 {r.get('cell')} 之 S5 宣稱 {('S5' in segs)} ≠ 生成入口是否 IC-first（{ic_first}）")
     for kind, node in plan.items():
         for r in node["runs"]:
             if r.get("reads_transforms"):
@@ -1477,10 +1516,24 @@ def pre_history_table(cells: Mapping[str, List[Dict[str, Any]]], criteria: Mappi
 # ---------------------------------------------------------------------------------------------- 主入口
 
 def cached_entry(m: Mapping[str, Any]) -> str:
-    """快取實測之生成入口：有記錄者取之；舊快取未記 ⇒ 依當時實作推定（格 A／B＝run_ic_first、格 C＝generate_features）。"""
+    """快取實測之生成入口：有記錄者取之；舊快取未記 ⇒ 依當時實作推定（格 A／B＝run_ic_first、格 C＝generate_features）——
+    只限 measured／blocked；其餘狀態（killed／stalled／failed）未記入口 ⇒ "unknown"（不得把他入口之終止當本入口結果）。"""
     if m.get("entry"):
         return str(m["entry"])
+    if m.get("status") not in ("measured", "blocked"):
+        return "unknown"
     return "generate_features" if m.get("category") == "C" else "run_ic_first"
+
+
+def expected_seconds(measurements: Mapping[str, Mapping[str, Any]], key: str, category: str) -> Optional[float]:
+    """卡住偵測之預期單格秒數：同目標之既有實測秒數；否則同格類已實測之最大秒數；皆無 ⇒ None（用固定上限）。"""
+    own = (measurements.get(key) or {}).get("seconds")
+    if isinstance(own, (int, float)) and own > 0:
+        return float(own)
+    peers = [float(m["seconds"]) for m in measurements.values() if isinstance(m, Mapping)
+             and m.get("category") == category and m.get("status") == "measured"
+             and isinstance(m.get("seconds"), (int, float))]
+    return max(peers) if peers else None
 
 
 def migrate_cache(measurements: Mapping[str, Mapping[str, Any]],
@@ -1611,14 +1664,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     and (cached.get("output_window") != window or cached.get("kline_source") != records
                          or cached_entry(cached) != generation_entry(target["category"], criteria)):
                 measurements.pop(key, None)  # 舊區間、舊來源資料集或舊生成入口（如格 C 改經 IC-first）⇒ 依現行判準重量
+            if cached.get("status") in ("killed", "stalled") \
+                    and cached_entry(cached) != generation_entry(target["category"], criteria):
+                measurements.pop(key, None)  # 他入口（或未記入口）之終止不代表本入口 ⇒ 重量（判準 v4：格 C 改回 generate_features）
         if key in measurements and measurements[key].get("status") in ("measured", "blocked", "killed") \
                 and not args.remeasure:
             continue
         print(f"[estimate] 實測 {key} …", flush=True)
-        result = _run_target(target, work_root, kline_path, args.timeout_seconds)
+        result = _run_target(target, work_root, kline_path, args.timeout_seconds,
+                             expected_seconds=expected_seconds(measurements, key, target["category"]))
         measurements[key] = result
         cache_path.write_text(json.dumps(measurements, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"[estimate] {key}: {result.get('status')} {result.get('seconds', '')}", flush=True)
+        if result.get("status") == watchdog_module().STALLED:
+            # 卡住偵測（預設開）：fail-fast——停止後續目標、印單行摘要、rc≠0、不寫收據
+            print(f"[watchdog] {key}: stalled（{result.get('error')}；{result.get('child_wall_seconds', 0):.0f} 秒）"
+                  "— 停止後續目標，不寫收據", file=sys.stderr, flush=True)
+            return 3
     failed = {k: m for k, m in measurements.items() if not measurement_accepted(m)}
     if failed:
         print(f"實測失敗：{json.dumps(failed, ensure_ascii=False)[:2000]}", file=sys.stderr)

@@ -581,7 +581,7 @@ def precision_completeness_violations() -> List[str]:
         rows.setdefault((str(row["segment"]), str(row["cell_id"])), []).append(row)
     for cell in cells.values():
         cid = str(cell["cell_id"])
-        for seg in SEGMENTS:
+        for seg in nh.precision_segments(cid, SEGMENTS):  # 判準 v4：只生成之格 C 無 S5（GROK-R8-P1-01）
             got = rows.get((seg, cid), [])
             if not got:
                 out.append(f"{cid}/{seg}: 無列")
@@ -670,7 +670,12 @@ def test_boundary_18_blocked_cell_c_all_segments_blocked() -> None:
         assert cell["status"] in ("measured", "blocked"), cell
         got = rows.get(str(cell["cell_id"]), [])
         if cell["status"] == "blocked":
-            assert {str(r["segment"]) for r in got} == set(SEGMENTS), cell["cell_id"]
+            # 判準 v4：只生成之格 C 之段集合依判準 segments（S0–S4，審查 r9 GROK-R9-P1-01）；其餘格仍為全段
+            if list(nh.precision_segments(str(cell["cell_id"]), SEGMENTS)) != list(SEGMENTS):
+                assert {str(r["segment"]) for r in got} == set(nh.precision_segments(str(cell["cell_id"]), SEGMENTS)), \
+                    cell["cell_id"]
+            else:
+                assert {str(r["segment"]) for r in got} == set(SEGMENTS), cell["cell_id"]
             for r in got:
                 assert r["status"] == "blocked" and r.get("max_abs") is None and r.get("max_rel") is None, r
         else:
@@ -1150,3 +1155,61 @@ def test_mutation_plain_doc_literal_without_single_step_turns_red(monkeypatch: p
     monkeypatch.setattr(THIS, "read_text", lambda path: mutated if Path(path) == PLAIN_DOC_PATH else original(path))
     violations = single_step_violations()
     assert any("變體" in v for v in violations), violations
+
+
+# ---------------------------------------------------------------------------------------------- 精度鏈段集合依判準（審查 r8 GROK-R8-P1-01）
+
+def _synthetic_precision_receipt(drop_c_s5: bool = True) -> Dict[str, Any]:
+    """精度鏈收據之結構樣本（判準 precision_chain 之格；每格一欄 `x`，依判準 segments 逐段列；格 C 只生成 ⇒ 無 S5 列）。"""
+    cells, rows = [], []
+    for key in sorted(nh.criteria_run_cell_keys("precision_chain")):
+        cid = _cell_id_of(key)
+        cells.append({"cell_id": cid, "kind": key[0], "symbol": key[1], "timeframes": list(key[2]), "status": "measured",
+                      "columns": ["x"]})
+        for seg in SEGMENTS:
+            if seg == "S5" and key[0] == "C" and drop_c_s5:
+                continue
+            rows.append({"cell_id": cid, "segment": seg, "column": "x"})
+    return {"cells": cells, "rows": rows}
+
+
+def _cell_id_of(key: CellKey) -> str:
+    return f"{key[0]}_{key[1]}_{'_'.join(key[2])}"
+
+
+def test_precision_completeness_generate_only_cell_without_s5(monkeypatch: pytest.MonkeyPatch) -> None:
+    """判準 v4：只生成之格 C 之精度鏈只具 S0–S4（無 S5 IC 選欄）——依 SPEC 不產 C／S5 列之收據通過段×格完整檢查；
+    mutation：段集合改回一律要求 S5（忽略判準 segments）⇒ 紅。"""
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: _synthetic_precision_receipt())
+    assert precision_completeness_violations() == []
+    monkeypatch.setattr(nh, "precision_segments", lambda cid, default: list(default))
+    assert any("C_BTCUSDT_1h/S5" in v for v in precision_completeness_violations())
+
+
+@pytest.mark.parametrize("mutant", [None, "c_blocked_claims_s5", "c_blocked_missing_s4"])
+def test_boundary_18_blocked_generate_only_cell_segments_follow_criteria(mutant: Optional[str],
+                                                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    """邊界③（審查 r9 GROK-R9-P1-01）：格 C blocked 之收據只具 S0–S4 blocked 列（判準 v4 segments）⇒ 邊界③通過；
+    mutation：C blocked 列多 S5／缺 S4 ⇒ 紅。收據為合成列（只測段集合契約，不含數值）。"""
+    receipt = _synthetic_precision_receipt(drop_c_s5=True)
+    for cell in receipt["cells"]:
+        if cell["kind"] == "C":
+            cell["status"] = "blocked"
+    for row in receipt["rows"]:
+        if row["cell_id"].startswith("C_"):
+            row.update(status="blocked", max_abs=None, max_rel=None)
+        else:
+            row["status"] = "measured"
+    c_id = next(c["cell_id"] for c in receipt["cells"] if c["kind"] == "C")
+    if mutant == "c_blocked_claims_s5":
+        receipt["rows"].append({"cell_id": c_id, "segment": "S5", "column": "x", "status": "blocked",
+                                "max_abs": None, "max_rel": None})
+    elif mutant == "c_blocked_missing_s4":
+        receipt["rows"] = [r for r in receipt["rows"] if not (r["cell_id"] == c_id and r["segment"] == "S4")]
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: receipt)
+    monkeypatch.setattr(THIS, "enumerate_keys", lambda kinds: {cell_key(c) for c in receipt["cells"] if c["kind"] in kinds})
+    if mutant is None:
+        test_boundary_18_blocked_cell_c_all_segments_blocked()
+    else:
+        with pytest.raises(AssertionError):
+            test_boundary_18_blocked_cell_c_all_segments_blocked()

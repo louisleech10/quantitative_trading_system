@@ -231,7 +231,7 @@ def _frozen_view(doc: Mapping[str, Any]) -> Dict[str, Any]:
     cells = doc.get("cells")
     assert isinstance(cells, Mapping) and cells, "§G 凍結檔無 cells"
     view: Dict[str, Dict[str, Any]] = {}
-    for cell_id, cell in cells.items():
+    for cell_id, cell in nh.frozen_cells_without_kind(cells, "C").items():  # 判準 v4：格 C 之 FF 輸出由 §G 驗
         assert isinstance(cell, Mapping) and cell.get("kind") in ("A", "B"), f"凍結格 {cell_id} 缺 kind"
         node: Dict[str, Any] = {}
         g2 = cell.get("g2") or {}

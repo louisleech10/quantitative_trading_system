@@ -1,6 +1,6 @@
 {
-  "_doc": "NUMVIEW 事前登記判準與決定紀錄 schema（docs/NUMVIEW_SPEC.md Task 0.3、設計選擇⑥、R2-D）。於 Phase 1 任何量測收據產出前凍結；提交後不得修改（只准於任何收據產出前以 preregistered_criteria_v2.json 取代並刪本檔）。數值門檻只來自 threshold_kinds 所列四類（exact 集合比較、NaN 遮罩 exact、IC 正負號、float32 ulp），不自訂 atol／rtol。每份 handoffs/run_receipts/*-numview-*.json 記本檔位元組之 sha256 為 criteria_sha256。v2（2026-10-22，取代 v1、v1 同提交刪除；SPEC Task 0.3 邊界①，於任何收據提交前）：估時實測 A:12h 與 B 之生成皆為 run_status=partial（failure_reasons 只含 calibration_insufficient_history、warmup_insufficient_history），v1 之根數門檻（min_history_bars）把資料前史不足之格誤判為足夠；v2 改以該格生成之完整度為前史不足之權威判定（根數門檻降為前置篩、不降任何門檻），並定格 B 之訓練週期排除前史不足之週期；另依使用者 2026-10-22 裁定，一切格（含格 C）之生成一律用足夠區間（輸出段＋所需前史，見 cell_rules.window_rule），不跑全史；同日裁定 12h 改讀長歷史檔（主檔不動，見 cell_rules.kline_source）。其餘段與 v1 逐字相同。v3（2026-10-22，取代 v2、v2 同提交刪除；於任何 Phase 1 收據提交前）：使用者裁定量測設計＝路徑覆蓋、非重複（「不是說要同樣的測試重複做，是有什麼邊界條件或情境或程式碼的邏輯之類沒測到，重複做同樣的事幹嘛？」）——格之列舉由「全部 symbol×tf」改為 cell_rules.cell_list 之封閉清單（每格寫明其獨有覆蓋路徑 covers），各跑別之重型跑寫明其獨有覆蓋（run_coverage）；無獨有路徑者不跑。其餘規則（前史判定、區間、來源、決定規則、material）與 v2 逐字相同。",
-  "version": 3,
+  "_doc": "NUMVIEW 事前登記判準與決定紀錄 schema（docs/NUMVIEW_SPEC.md Task 0.3、設計選擇⑥、R2-D）。於 Phase 1 任何量測收據產出前凍結；提交後不得修改（只准於任何收據產出前以 preregistered_criteria_v2.json 取代並刪本檔）。數值門檻只來自 threshold_kinds 所列四類（exact 集合比較、NaN 遮罩 exact、IC 正負號、float32 ulp），不自訂 atol／rtol。每份 handoffs/run_receipts/*-numview-*.json 記本檔位元組之 sha256 為 criteria_sha256。v2（2026-10-22，取代 v1、v1 同提交刪除；SPEC Task 0.3 邊界①，於任何收據提交前）：估時實測 A:12h 與 B 之生成皆為 run_status=partial（failure_reasons 只含 calibration_insufficient_history、warmup_insufficient_history），v1 之根數門檻（min_history_bars）把資料前史不足之格誤判為足夠；v2 改以該格生成之完整度為前史不足之權威判定（根數門檻降為前置篩、不降任何門檻），並定格 B 之訓練週期排除前史不足之週期；另依使用者 2026-10-22 裁定，一切格（含格 C）之生成一律用足夠區間（輸出段＋所需前史，見 cell_rules.window_rule），不跑全史；同日裁定 12h 改讀長歷史檔（主檔不動，見 cell_rules.kline_source）。其餘段與 v1 逐字相同。v3（2026-10-22，取代 v2、v2 同提交刪除；於任何 Phase 1 收據提交前）：使用者裁定量測設計＝路徑覆蓋、非重複（「不是說要同樣的測試重複做，是有什麼邊界條件或情境或程式碼的邏輯之類沒測到，重複做同樣的事幹嘛？」）——格之列舉由「全部 symbol×tf」改為 cell_rules.cell_list 之封閉清單（每格寫明其獨有覆蓋路徑 covers），各跑別之重型跑寫明其獨有覆蓋（run_coverage）；無獨有路徑者不跑。其餘規則（前史判定、區間、來源、決定規則、material）與 v2 逐字相同。｜v4（2026-10-22，於任何量測收據提交前以 preregistered_criteria_v4.json 取代 v3）：格 C 之 IC-first 實測於全特徵、預設門檻選 137,351／209,053 欄，post-IC Polars 轉換耗盡 8 GB（swap 9 GB）78 分鐘無進度遭終止；post-IC 程式路徑與欄數無關（pandas_chunked 已由 A 格 2.5–3.2k 選欄＞chunk 2000 涵蓋），故該階段只增規模、無獨有路徑——格 C 改只走 generate_features，自 G1、分支差、效能基準移除；效能基準輸入＝A 格最大選欄（實測 A_BTCUSDT_1h 3193 欄）；增卡住偵測門檻 cell_rules.watchdog 與 scale_note。",
+  "version": 4,
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -24,7 +24,7 @@
         "type": "string"
       },
       "version": {
-        "const": 3
+        "const": 4
       },
       "schema": {
         "type": "object"
@@ -491,6 +491,13 @@
             }
           }
         }
+      },
+      "scale_note": {
+        "type": "object",
+        "required": [
+          "finding",
+          "scope"
+        ]
       }
     },
     "$defs": {
@@ -616,7 +623,7 @@
     "categories": {
       "A": "封閉清單 cell_list 中 kind=A 之格：單週期短窗（timeframes 恰一項）；設定＝cell_definitions.A。",
       "B": "封閉清單 cell_list 中 kind=B 之格：多週期（timeframes 依週期長度升冪，首項＝主週期）；訓練週期依 b_membership（記於 training_timeframes）；設定＝cell_definitions.B。",
-      "C": "封閉清單 cell_list 中 kind=C 之格：生產預設全特徵設定於足夠區間（window_rule）；經 IC-first 生成以供 G1／分支差／效能之選欄（cell_definitions.C.generation）；本機不可跑（記憶體守護具名終止）者 blocked-by 硬體（SPEC Task 0.4 邊界①）。"
+      "C": "封閉清單 cell_list 中 kind=C 之格：生產預設全特徵設定於足夠區間（window_rule）；只走 generate_features（v4：不經 IC-first，不入 G1／分支差／效能基準；G3 raw／processed、精度鏈 S0–S4、L2 兩臂、§G Phase 2／4）；本機不可跑（記憶體守護具名終止）者 blocked-by 硬體（SPEC Task 0.4 邊界①）。"
     },
     "timeframe_order": "週期長度以 pandas.Timedelta(週期字面) 解析之秒數升冪；不可解析之週期字面 ⇒ 列舉拒收（不猜測）。",
     "insufficient_history": {
@@ -744,24 +751,24 @@
           "timeframes": [
             "1h"
           ],
-          "covers": "生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）"
+          "covers": "生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）"
         }
       ]
     },
     "freeze_groups": {
-      "_doc": "Task 0.5 凍結組（格 id）：G1＝IC 頁第三步各可達臂份；G2＝raw 依臂（FFACT_USE_POLARS 0／1）；G3＝多週期 raw 與 processed。",
+      "_doc": "Task 0.5 凍結組（格 id）：G1＝IC 頁第三步各可達臂份（A 格）；G2＝raw 依臂（FFACT_USE_POLARS 0／1）；G3＝raw 與 processed（多週期格 B、全特徵格 C）。",
       "G1": [
         "A_BTCUSDT_1h",
         "A_BTCUSDT_4h",
         "A_BTCUSDT_12h",
-        "A_SOLUSDT_1h",
-        "C_BTCUSDT_1h"
+        "A_SOLUSDT_1h"
       ],
       "G2": [
         "A_BTCUSDT_1h"
       ],
       "G3": [
-        "B_BTCUSDT_1h_4h"
+        "B_BTCUSDT_1h_4h",
+        "C_BTCUSDT_1h"
       ]
     },
     "batch_cache": {
@@ -787,6 +794,16 @@
     "continuity": {
       "rule": "生成（凍結、Phase 1、Phase 2–4 重生、估時實測）之 FeatureFactory 以生產連續性設定建構（momentum/factories.py:create_feature_factory 預設 validate_continuity=True；生產入口 api/services/feature_factory_service.py:75、feature_factory_batch_service.py:375／1487）。該驗證於讀全序列時進行（adapter_registry.fetch_aligned 不帶時間範圍 → kline_storage.read_klines:1112），生成窗切片在其後；故格之來源序列有缺口者（現況：長歷史檔 BTCUSDT 12h 於 2018-02-08 缺 1 根，位於生成窗〔ingest 起點 2020-07-05〕外），生產設定必拒讀 ⇒ 該格以 validate_continuity=False 建構，並強制生成窗內零缺口判定（窗＝輸出段起點〔生成前〕與定案 ingest 起點〔生成後〕至序列終點；同 KlineStorageManager._validate_continuity 之相鄰差判定）；窗內任一缺口 ⇒ 該格 failed（data_gap），不得以含缺口之生成冒充。逐格記 validate_continuity、series_gaps、window_start、window_gaps。",
       "production_validate_continuity": true
+    },
+    "watchdog": {
+      "_doc": "重型子行程卡住偵測（預設開、無旗標；handoffs/run_receipts/numview_probes/_watchdog.py；估時器、凍結腳本與生成型探針共用）：每 check_interval_seconds 檢查一次，任一成立即終止子行程、記 stalled 並 fail-fast（停止後續目標、rc≠0、不寫收據）——(a) 子行程 log 檔 log_stall_seconds 秒未增長；(b) 系統 swap 使用百分比 > swap_used_percent 連續 swap_consecutive_checks 次（macOS sysctl vm.swapusage／Linux /proc/meminfo）；(c) 牆鐘逾 wall_multiple_of_expected × 預期單格秒數（無預期 ⇒ wall_ceiling_seconds）。使用者 2026-10-22：「每次都問了你才看，浪費那麼多時間，監看有什麼用」。",
+      "check_interval_seconds": 30,
+      "log_stall_seconds": 600,
+      "swap_consecutive_checks": 2,
+      "wall_multiple_of_expected": 3,
+      "wall_ceiling_seconds": 5400,
+      "swap_used_percent": 50,
+      "_basis": "log_stall_seconds 600 之依據：正常全特徵生成（C_BTCUSDT_1h，卡住前）之 log 最大行間隔實測 324 秒（2026-10-22；FF 逐層／heartbeat 行），低於門檻；該 log 只在 post-IC 卡住後停止。"
     }
   },
   "cell_definitions": {
@@ -1034,7 +1051,7 @@
       }
     },
     "C": {
-      "_doc": "生產預設全特徵（FeatureFactory 設定解析之生產預設設定檔，SPEC 所稱 FactoryConfig() 預設）；只覆寫週期；生成區間依 cell_rules.window_rule（輸出段＝最後 output_bars 根＋所需前史；不跑全史）。v3：經 IC-first 生成（同格 A／B 之 generation），供 G1 IC 頁、Task 1.1 分支差與效能基準之選欄。",
+      "_doc": "生產預設全特徵（FeatureFactory 設定解析之生產預設設定檔，SPEC 所稱 FactoryConfig() 預設）；只覆寫週期；生成區間依 cell_rules.window_rule（輸出段＝最後 output_bars 根＋所需前史；不跑全史）。v3：經 IC-first 生成（同格 A／B 之 generation），供 G1 IC 頁、Task 1.1 分支差與效能基準之選欄。｜v4：生成入口＝generate_features（生產預設全特徵；不走 IC-first，見 scale_note）",
       "config_override": {},
       "output_bars": 500,
       "timeframes_rule": {
@@ -1042,15 +1059,7 @@
         "training": "timeframes"
       },
       "generation": {
-        "entry": "run_ic_first",
-        "ic_engine_config": {
-          "methods": [
-            "spearman"
-          ]
-        },
-        "ic_threshold": null,
-        "label_horizon": "1_bar_forward_return",
-        "cleanup_raw": false
+        "entry": "generate_features"
       }
     }
   },
@@ -1301,7 +1310,7 @@
             ],
             "rule": "Task 3.4 落地前，主委以 Task 1.1 效能基準收據（handoffs/run_receipts/<date>-numview-perf-benchmark.json，各臂三次中位、含 Polars 慢因剖析）與各臂誤差數字白話重新呈報使用者；re_presentation.date 不早於該收據之首次提交日、quote＝使用者回覆逐字（非空）、perf_benchmark_receipt＝該收據路徑（須存在且已提交）、confirmed_choice＝使用者回覆所示之選擇且等於本筆 choice；2026-10-21 之 user_ruling 照舊保留。使用者改選他臂 ⇒ 先修訂 SPEC，本筆不得記 lock。",
             "receipt_content": {
-              "rule": "所據效能基準收據之內容（審查 r6 CODEX-R6-P1-04；numview_helpers.perf_benchmark_receipt_violations）：inputs 恰涵蓋 run_coverage.perf_benchmark 之格（C 格選欄全集、A:BTCUSDT:1h 選欄），每輸入之臂＝契約 post_ic_arm_values ∪ {polars_float64}；可達臂恰 3 次正牆鐘秒數且 median_seconds＝其中位數，不可達臂具理由；polars_profile 含逐步驟耗時（steps 非空）與 rank_udf_per_column_python_loop（bool）。缺任一 ⇒ 重新呈報不成立。",
+              "rule": "所據效能基準收據之內容（審查 r6 CODEX-R6-P1-04；numview_helpers.perf_benchmark_receipt_violations）：inputs 恰涵蓋 run_coverage.perf_benchmark 之格（v4：A 格最大選欄＝A_BTCUSDT_1h），每輸入之臂＝契約 post_ic_arm_values ∪ {polars_float64}；可達臂恰 3 次正牆鐘秒數且 median_seconds＝其中位數，不可達臂具理由；polars_profile 含逐步驟耗時（steps 非空）與 rank_udf_per_column_python_loop（bool）。缺任一 ⇒ 重新呈報不成立。",
               "runs": 3,
               "candidate_arm": "polars_float64"
             }
@@ -2070,9 +2079,9 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "Task 0.5 G1＋全特徵 raw／processed：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
+          "covers": "Task 0.5 G3 全特徵 raw／processed：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
           "generations": 1,
-          "transform_passes": 1,
+          "transform_passes": 0,
           "env": {},
           "feeds": [
             "l2_arm_matrix"
@@ -2119,15 +2128,6 @@
         {
           "cell": "A_SOLUSDT_1h",
           "covers": "Task 1.1 分支差與 IC 翻轉（各臂＋polars_float64 對 numpy float64 oracle、七組合；同臂排名算一次供含排名組合共用）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
-          "generations": 0,
-          "transform_passes": 0,
-          "branchdiff": true,
-          "env": {},
-          "source": "freeze_baseline"
-        },
-        {
-          "cell": "C_BTCUSDT_1h",
-          "covers": "Task 1.1 分支差與 IC 翻轉（各臂＋polars_float64 對 numpy float64 oracle、七組合；同臂排名算一次供含排名組合共用）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）",
           "generations": 0,
           "transform_passes": 0,
           "branchdiff": true,
@@ -2212,7 +2212,15 @@
           "generations": 0,
           "transform_passes": 0,
           "env": {},
-          "source": "freeze_baseline"
+          "source": "freeze_baseline",
+          "segments": [
+            "S0",
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5"
+          ]
         },
         {
           "cell": "B_BTCUSDT_1h_4h",
@@ -2220,19 +2228,35 @@
           "generations": 0,
           "transform_passes": 0,
           "env": {},
-          "source": "freeze_baseline"
+          "source": "freeze_baseline",
+          "segments": [
+            "S0",
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5"
+          ]
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "Task 1.2 S1–S5 檢查點於全特徵（讀 Task 0.5 之 C run：落盤 dtype 自動選、codec 於全特徵族）",
+          "covers": "Task 1.2 S0–S4 檢查點於全特徵（只生成、不經 IC 選欄 ⇒ 無 S5）（讀 Task 0.5 之 C run：落盤 dtype 自動選、codec 於全特徵族）",
           "generations": 0,
           "transform_passes": 0,
           "env": {},
-          "source": "freeze_baseline"
+          "source": "freeze_baseline",
+          "segments": [
+            "S0",
+            "S1",
+            "S2",
+            "S3",
+            "S4"
+          ]
         }
       ],
       "preprov": {},
-      "code_state": "s0"
+      "code_state": "s0",
+      "segments_doc": "讀取列之 segments＝該格須具之精度鏈段（S0–S4 逐欄、S5＝IC 選欄）；S5 ∈ segments ⇔ 該格類之生成入口為 run_ic_first（審查 r8 GROK-R8-P1-01：格 C 只 generate_features ⇒ S0–S4）。"
     },
     "l2_arm_matrix": {
       "code_state": "s0",
@@ -2278,7 +2302,7 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "Task 1.3 L2 兩臂讀凍結 G1 之預設生成：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）",
+          "covers": "Task 1.3 L2 兩臂讀凍結 G3 之預設生成：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
@@ -2310,16 +2334,7 @@
       "runs": [
         {
           "cell": "A_BTCUSDT_1h",
-          "covers": "獨立效能基準：A 格選欄之各臂＋polars_float64 同輸入各三次取中位（D-ICPAGE-ARM／D-POSTIC 報告）",
-          "generations": 0,
-          "transform_passes": 0,
-          "perf": true,
-          "env": {},
-          "source": "freeze_baseline"
-        },
-        {
-          "cell": "C_BTCUSDT_1h",
-          "covers": "獨立效能基準：C 格選欄全集之各臂＋polars_float64 同輸入各三次取中位，含 Polars 慢因剖析（rank UDF）",
+          "covers": "獨立效能基準：A 格最大選欄（實測 A_BTCUSDT_1h 3193 欄，A 格中最大；格 C 之全特徵 IC-first 規模無獨有路徑，v4 移除）之各臂＋polars_float64 同輸入各三次取中位，含 Polars 慢因剖析（rank UDF 是否逐欄 Python 迴圈）",
           "generations": 0,
           "transform_passes": 0,
           "perf": true,
@@ -2431,12 +2446,11 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "b3 共用生成（Phase 2 碼態）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "covers": "b3 共用生成（Phase 2 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 1,
-          "transform_passes": 1,
+          "transform_passes": 0,
           "feeds": [
-            "regen_t22",
             "regen_section_g"
           ],
           "covers_ids": [
@@ -2560,21 +2574,6 @@
           "covers_ids": [
             "mtf.single_training_timeframe_equivalence"
           ]
-        },
-        {
-          "cell": "C_BTCUSDT_1h",
-          "covers": "b4 共用生成（Phase 3 碼態）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
-          "env": {},
-          "generations": 1,
-          "transform_passes": 1,
-          "feeds": [
-            "regen_t3_core",
-            "regen_t34"
-          ],
-          "covers_ids": [
-            "cell.full_features_production_default",
-            "storage.l7_dtype_and_codec_full_features"
-          ]
         }
       ]
     },
@@ -2686,10 +2685,10 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "b5 共用生成（Phase 4 碼態）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "covers": "b5 共用生成（Phase 4 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 1,
-          "transform_passes": 1,
+          "transform_passes": 0,
           "feeds": [
             "regen_section_g"
           ],
@@ -2768,15 +2767,6 @@
           "transform_passes": 0,
           "source": "regen_b3",
           "reads_transforms": true
-        },
-        {
-          "cell": "C_BTCUSDT_1h",
-          "covers": "Task 2.2 G1 記臂與值不變（讀 b3 共用生成）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）",
-          "env": {},
-          "generations": 0,
-          "transform_passes": 0,
-          "source": "regen_b3",
-          "reads_transforms": true
         }
       ]
     },
@@ -2823,14 +2813,6 @@
         {
           "cell": "B_BTCUSDT_1h_4h",
           "covers": "Task 3.1–3.3 正式核心處置（讀 b4 共用生成）：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
-          "env": {},
-          "generations": 0,
-          "transform_passes": 0,
-          "source": "regen_b4"
-        },
-        {
-          "cell": "C_BTCUSDT_1h",
-          "covers": "Task 3.1–3.3 正式核心處置（讀 b4 共用生成）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
@@ -2895,15 +2877,6 @@
         {
           "cell": "A_SOLUSDT_1h",
           "covers": "Task 3.4 IC 頁鎖臂 G1（讀 b4 共用生成）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
-          "env": {},
-          "generations": 0,
-          "transform_passes": 0,
-          "source": "regen_b4",
-          "reads_transforms": true
-        },
-        {
-          "cell": "C_BTCUSDT_1h",
-          "covers": "Task 3.4 IC 頁鎖臂 G1（讀 b4 共用生成）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
@@ -2996,12 +2969,11 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "§G Phase 2 全格不變式 G1（讀 b3 共用生成）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）",
+          "covers": "§G Phase 2 全格不變式 G3（全特徵 raw／processed）（讀 b3 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
-          "source": "regen_b3",
-          "reads_transforms": true
+          "source": "regen_b3"
         },
         {
           "cell": "A_BTCUSDT_1h",
@@ -3059,12 +3031,11 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "§G Phase 4 全格不變式 G1（讀 b5 共用生成）：生產預設全特徵（特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵；IC-first 選欄供 G1／分支差／效能）",
+          "covers": "§G Phase 4 全格不變式 G3（全特徵 raw／processed）（讀 b5 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
-          "source": "regen_b5",
-          "reads_transforms": true
+          "source": "regen_b5"
         }
       ]
     },
@@ -3389,5 +3360,17 @@
         ]
       }
     ]
+  },
+  "scale_note": {
+    "finding": "生產 IC-first（run_ic_first）於全特徵（FactoryConfig 預設，209,053 欄）、預設 IC 門檻選 137,351 欄時，post-IC Polars 轉換於 8 GB 機器不可完成（2026-10-22 實測：swap 9 GB、78 分鐘無 log 進度，遭終止）。",
+    "scope": "產品發現，屬 NUMVIEW 範圍外（post-IC 程式路徑與欄數無關；本票只量路徑，不量此規模）；須另開票處理。",
+    "measured": {
+      "selected_columns": 137351,
+      "total_columns": 209053,
+      "ram_gb": 8,
+      "swap_used_gb": 9,
+      "no_progress_minutes": 78,
+      "date": "2026-10-22"
+    }
   }
 }
