@@ -123,7 +123,7 @@ def load_estimate_receipt() -> Dict[str, Any]:
 
 
 def load_criteria() -> Dict[str, Any]:
-    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在） ⇒ 讀現行判準；v1 現行時沿原斷言
+    if nh.criteria_replaced():  # 判準檔已以 vN 取代（SPEC Task 0.3 邊界①：判準檔恰一存在） ⇒ 讀現行判準；v1 現行時沿原斷言
         return json.loads(nh.current_criteria_path().read_text(encoding="utf-8"))
     assert nh.CRITERIA_PATH.is_file(), f"判準檔不存在：{nh.CRITERIA_PATH}（Task 0.3 未執行）"
     return json.loads(nh.CRITERIA_PATH.read_text(encoding="utf-8"))
@@ -182,8 +182,50 @@ def tf_seconds(tf: str) -> float:
         raise AssertionError(f"無法解析週期 {tf!r}：{exc}") from exc
 
 
+def _source_bar_count(source: Path, symbol: str, tf: str) -> int:
+    """`<source>` 之 `<symbol>/<tf>/data` 根數（h5py 唯讀）；缺 ⇒ RuntimeError。不含 assert（不被 TESTREG 展開為呼叫端
+    測試之斷言元素）。"""
+    import h5py
+
+    if not source.is_file():
+        raise RuntimeError(f"K 線來源不存在：{source}")
+    with h5py.File(source, "r") as handle:
+        if symbol not in handle or tf not in handle[symbol] or "data" not in handle[symbol][tf]:
+            raise RuntimeError(f"{source} 缺 {symbol}/{tf}/data")
+        return int(handle[symbol][tf]["data"].shape[0])
+
+
+def closed_enumeration(criteria: Mapping[str, Any]) -> Dict[CellKey, Dict[str, Any]]:
+    """判準 v3 起之封閉路徑覆蓋清單（`cell_rules.cell_list.cells`，取代「全部 symbol×tf／每個 symbol」列舉；測試端獨立
+    實作）：{(kind, symbol, timeframes): {bar_counts, blocked, threshold}}。根數取自格之單一來源＝主週期（最細週期）依
+    `cell_rules.kline_source.by_timeframe` 對映之檔（多週期格之訓練週期同讀該檔）；未列週期 ⇒ RuntimeError（拒收不猜）；
+    `blocked`＝任一週期根數 < 格類 `min_history_bars`（前置篩；格類無門檻〔C〕⇒ False，前史不足由 run 完整度判定）。
+    不含 assert。"""
+    rules = criteria["cell_rules"]
+    by_tf = rules["kline_source"]["by_timeframe"]
+    defs = criteria["cell_definitions"]
+    out: Dict[CellKey, Dict[str, Any]] = {}
+    for cell in rules["cell_list"]["cells"]:
+        kind, symbol = str(cell["kind"]), str(cell["symbol"])
+        group = tuple(sorted((str(t) for t in cell["timeframes"]), key=tf_seconds))
+        if not group or group[0] not in by_tf:
+            raise RuntimeError(f"{cell.get('id')}: 主週期 {group[:1]} 不在 kline_source.by_timeframe")
+        source = nh.REPO / str(by_tf[group[0]])
+        counts = {tf: _source_bar_count(source, symbol, tf) for tf in group}
+        threshold = defs[kind].get("min_history_bars")
+        key = (kind, symbol, group)
+        if key in out:
+            raise RuntimeError(f"封閉清單格重複：{key}")
+        out[key] = {"bar_counts": counts, "threshold": threshold,
+                    "blocked": isinstance(threshold, int) and any(n < threshold for n in counts.values())}
+    return out
+
+
 def enumerate_cells(criteria: Mapping[str, Any]) -> Dict[CellKey, Dict[str, Any]]:
-    """判準檔列舉規則（測試端獨立實作）：{(kind, symbol, timeframes): {bar_counts, blocked}}。"""
+    """判準檔列舉規則（測試端獨立實作）：{(kind, symbol, timeframes): {bar_counts, blocked}}。判準 v3 起改為封閉路徑覆蓋
+    清單（`closed_enumeration`）；舊版判準沿原列舉。"""
+    if nh.criteria_cell_list() is not None:  # 判準 v3 起：封閉清單（SPEC Task 0.5 ②）
+        return closed_enumeration(criteria)
     defs = criteria["cell_definitions"]
     inventory = kline_inventory()
     out: Dict[CellKey, Dict[str, Any]] = {}
@@ -440,7 +482,7 @@ def test_freeze_receipt_fields_and_criteria_hash() -> None:
     assert re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("head"))), receipt.get("head")
     assert freeze.get("head") == receipt["head"]
     assert receipt.get("exit_code") == 0
-    if not nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在） ⇒ v2 現行時改於下方對現行判準比對
+    if not nh.criteria_replaced():  # 判準檔已以 vN 取代（SPEC Task 0.3 邊界①：判準檔恰一存在） ⇒ 取代後改於下方對現行判準比對
         assert receipt.get("criteria_sha256") == hashlib.sha256(nh.CRITERIA_PATH.read_bytes()).hexdigest()
     assert isinstance(receipt.get("library_versions"), Mapping) and receipt["library_versions"]
     frozen = [r for r in receipt["cells"] if r.get("status") == "frozen"]
@@ -448,7 +490,7 @@ def test_freeze_receipt_fields_and_criteria_hash() -> None:
     for record in frozen:
         assert isinstance(record.get("seconds"), (int, float)) and record["seconds"] > 0, record.get("cell_id")
         assert isinstance(record.get("peak_rss_bytes"), int) and record["peak_rss_bytes"] > 0, record.get("cell_id")
-    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）
+    if nh.criteria_replaced():  # 判準檔已以 vN 取代（SPEC Task 0.3 邊界①：判準檔恰一存在）
         assert receipt.get("criteria_sha256") == hashlib.sha256(nh.current_criteria_path().read_bytes()).hexdigest()
 
 
@@ -461,7 +503,7 @@ def test_boundary_09_insufficient_history_cell_blocked_with_bar_counts() -> None
     沿原「根數 < 門檻 ⇔ blocked」斷言（前置篩）。"""
     expected = enumerate_cells(load_criteria())
     receipt_cells = _receipt_cells(load_freeze_receipt())
-    if not nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在） ⇒ v2 現行時改於迴圈後對現行判準比對
+    if not nh.criteria_replaced():  # 判準檔已以 vN 取代（SPEC Task 0.3 邊界①：判準檔恰一存在） ⇒ 取代後改於迴圈後對現行判準比對
         assert load_freeze_receipt().get("criteria_sha256") == hashlib.sha256(nh.CRITERIA_PATH.read_bytes()).hexdigest()
     evaluated = 0
     for key, exp in expected.items():
@@ -477,7 +519,7 @@ def test_boundary_09_insufficient_history_cell_blocked_with_bar_counts() -> None
             assert record.get("reason"), key
         evaluated += 1
     assert evaluated >= 1
-    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）
+    if nh.criteria_replaced():  # 判準檔已以 vN 取代（SPEC Task 0.3 邊界①：判準檔恰一存在）
         assert freeze_receipt_criteria_sha256() == hashlib.sha256(nh.current_criteria_path().read_bytes()).hexdigest()
 
 

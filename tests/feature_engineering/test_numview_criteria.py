@@ -87,7 +87,16 @@ from tests.feature_engineering import numview_helpers as nh
 
 REPO = nh.REPO
 CRITERIA_V1: Path = nh.CRITERIA_PATH
-CRITERIA_V2: Path = nh.GOLDEN_DIR / "preregistered_criteria_v2.json"
+#: 判準 v2 之檔名（歷史；判準 v3 起之取代規則以 vN 泛化）
+CRITERIA_V2_NAME = "preregistered_criteria_v2.json"
+_PRESENT_CRITERIA = sorted(p for p in nh.GOLDEN_DIR.glob("preregistered_criteria*.json") if p.is_file())
+#: 現行之取代版判準（vN，N≥2；邊界 05「v2 現行」分支之 v2 泛化為現行取代版）；無取代版 ⇒ v2 檔名
+CRITERIA_V2: Path = (_PRESENT_CRITERIA[0] if len(_PRESENT_CRITERIA) == 1 and _PRESENT_CRITERIA[0] != CRITERIA_V1
+                     else nh.GOLDEN_DIR / CRITERIA_V2_NAME)
+#: 判準檔名樣式（v1＝preregistered_criteria.json，其後 preregistered_criteria_v<N>.json；判準 v3 起之取代規則）
+CRITERIA_GLOB = "preregistered_criteria*.json"
+#: 估時收據（Task 0.4）：綁現行判準之 sha256、判準變動即須重估（`_estimate_gate`）——非「判準凍結後不得再改」所指之量測收據
+ESTIMATE_RECEIPT_SUFFIX = "-numview-estimate.json"
 RECEIPT_GLOB = "*-numview-*.json"
 PROBES_DIR: Path = REPO / "handoffs" / "run_receipts" / "numview_probes"
 FREEZE_SCRIPT: Path = REPO / "scripts" / "numview_freeze_baseline.py"
@@ -196,7 +205,11 @@ def _strict_json(text: str) -> Any:
 
 
 def _criteria_path() -> Path:
-    """現行判準檔名：v2 存在即 v2，否則 v1（邊界 05）。"""
+    """現行判準檔名：`preregistered_criteria*.json`（v1、v2、v3…）恰一存在者（邊界 05：vN→vN+1 取代並刪舊檔）；非恰一 ⇒
+    沿原規則（v2 存在即 v2，否則 v1；其後之讀取斷言即紅）。"""
+    present = sorted(p for p in nh.GOLDEN_DIR.glob(CRITERIA_GLOB) if p.is_file())
+    if len(present) == 1:
+        return present[0]
     return CRITERIA_V2 if CRITERIA_V2.is_file() else CRITERIA_V1
 
 
@@ -421,18 +434,33 @@ def receipt_violations() -> List[str]:
     return out
 
 
+def _measurement_receipt_paths() -> List[Path]:
+    """「判準凍結後不得再改」所指之收據：全部 *-numview-*.json 除估時收據（估時收據綁現行判準之 sha256，判準以 vN+1 取代時
+    須重估，本即不約束判準；③ 之 sha 相符與提交序仍涵蓋之）。"""
+    return [p for p in _receipt_paths() if not p.name.endswith(ESTIMATE_RECEIPT_SUFFIX)]
+
+
+def _criteria_name_paths() -> List[Path]:
+    """判準檔之全部版本檔名（工作樹現存者∪git 歷史中曾出現者；樣式 `preregistered_criteria*.json`）。"""
+    names = {p.name for p in nh.GOLDEN_DIR.glob(CRITERIA_GLOB)} | {CRITERIA_V1.name, CRITERIA_V2_NAME, CRITERIA_V2.name}
+    out = _git("log", "--all", "--format=", "--name-only", "--", _rel(nh.GOLDEN_DIR))
+    if out.returncode == 0:
+        names |= {Path(n).name for n in out.stdout.decode().split() if re.fullmatch(r"preregistered_criteria.*\.json", Path(n).name)}
+    return [nh.GOLDEN_DIR / n for n in sorted(names)]
+
+
 def _first_receipt_commits() -> List[str]:
-    commits = [_git_commits(_rel(p)) for p in _receipt_paths()]
+    commits = [_git_commits(_rel(p)) for p in _measurement_receipt_paths()]
     return [c[-1] for c in commits if c]
 
 
 def criteria_after_receipt_violations() -> List[str]:
-    """收據產出後判準檔（v1、v2 兩檔名）不得再有提交：每筆觸及判準檔之提交皆為每份收據首次提交之嚴格祖先。"""
+    """收據產出後判準檔（全部版本檔名）不得再有提交：每筆觸及判準檔之提交皆為每份量測收據（估時收據除外）首次提交之嚴格祖先。"""
     firsts = _first_receipt_commits()
-    if not firsts or len(firsts) != len(_receipt_paths()):
+    if not firsts or len(firsts) != len(_measurement_receipt_paths()):
         return ["無收據或有收據未提交（無從判定先後）"]
     out: List[str] = []
-    for path in (CRITERIA_V1, CRITERIA_V2):
+    for path in _criteria_name_paths():
         for commit in _git_commits(_rel(path)):
             late = [f for f in firsts if not _strictly_before(commit, f)]
             if late:
@@ -625,7 +653,30 @@ def icpage_violations(decisions: Mapping[str, Any]) -> List[str]:
         out.append(f"d_icpage_arm：缺 {ICPAGE_RULING_DATE} user_ruling")
     elif ruling.get("quote") != list(ICPAGE_RULING_QUOTE):
         out.append("d_icpage_arm：user_ruling.quote ≠ SPEC §A 所引兩句")
+    out += re_presentation_violations(r)
     return out
+
+
+def _repo_file_exists(rel: str) -> bool:
+    return (REPO / rel).is_file()
+
+
+def _perf_receipt_first_commit_date(rel: str) -> Optional[str]:
+    """效能基準收據之首次提交日（委由 `numview_helpers.perf_receipt_first_commit_date`；mutation 以 monkeypatch 換之）。"""
+    return nh.perf_receipt_first_commit_date(rel)
+
+
+def re_presentation_violations(record: Mapping[str, Any]) -> List[str]:
+    """⑦（SPEC v17 §A 重新呈報條件、Task 1.5 ⑦、Task 3.4 施工前提）：委由 `numview_helpers.re_presentation_violations`
+    （與 b4 IC 頁閘同一判定），收據存在與提交日經本模組可注入之查詢函式。不含 assert。"""
+    return nh.re_presentation_violations(record, exists=lambda rel: _repo_file_exists(rel),
+                                         committed_date=lambda rel: _perf_receipt_first_commit_date(rel),
+                                         load=lambda rel: _load_perf_receipt(rel))
+
+
+def _load_perf_receipt(rel: str) -> Any:
+    """效能基準收據內容（mutation 以 monkeypatch 換之）。"""
+    return json.loads((REPO / rel).read_text(encoding="utf-8"))
 
 
 def postic_violations(decisions: Mapping[str, Any]) -> List[str]:
@@ -763,6 +814,8 @@ def _cell_index(receipt: Mapping[str, Any]) -> Dict[str, Tuple[str, Mapping[str,
 
 
 def estimate_receipt_violations(receipt: Mapping[str, Any], kline: Mapping[str, List[str]]) -> List[str]:
+    if nh.criteria_cell_list() is not None:  # 判準 v3 起：封閉格清單（路徑覆蓋）
+        return closed_estimate_receipt_violations(receipt, kline)
     out: List[str] = []
     try:
         dt.datetime.fromisoformat(str(receipt.get("reported_at")))
@@ -1220,7 +1273,10 @@ def test_estimate_regen_run_kinds_registered() -> None:
 def test_boundary_05_criteria_change_only_via_v2_before_receipts() -> None:
     """邊界①（SPEC Task 0.3）：判準須改 ⇒ 只准於任何收據產出前以新檔名 `preregistered_criteria_v2.json` 取代並刪舊檔。
     斷言：兩檔名恰一存在；v1 現行 ⇒ v2 無任何歷史；v2 現行 ⇒ v1 不在 HEAD、v2 恰一提交，且 v1／v2 每筆提交皆早於每份收據之
-    首次提交（收據之判定範圍同③：全部 *-numview-*.json）。"""
+    首次提交（收據之判定範圍同③：全部 *-numview-*.json）。現行判準為 v3 起（vN，N≥3）⇒ 本案之 v1→v2 規則已無對象，委由
+    `test_boundary_05_vn_replacement_rule`（vN→vN+1：舊版檔不在 HEAD、現行版恰一提交、早於量測收據）判定。"""
+    if nh.criteria_version() > 2:
+        return
     v1, v2 = CRITERIA_V1.is_file(), CRITERIA_V2.is_file()
     assert v1 != v2, f"判準檔須恰一存在（v1={v1}、v2={v2}）"
     if v1:
@@ -1518,8 +1574,30 @@ def history_classification_violations(estimator: ModuleType) -> List[str]:
     return out
 
 
+def _full_candidate_b_descriptor() -> Dict[str, Any]:
+    """主檔第一個 symbol 之全部週期（依長度升冪）之格 B 候選描述子（成員規則之單元輸入）。無斷言。"""
+    symbol, tfs = next(iter(_kline_index().items()))
+    ordered = sorted(tfs, key=ESTIMATOR.tf_seconds)
+    return {"id": ESTIMATOR.cell_id("B", symbol, ordered), "kind": "B", "symbol": symbol, "timeframes": ordered}
+
+
+def _closed_symbol_timeframes(cells: Sequence[Mapping[str, Any]]) -> List[Tuple[str, List[str]]]:
+    """格描述子 → (symbol, timeframes)。無斷言。"""
+    return [(str(c["symbol"]), [str(t) for t in c["timeframes"]]) for c in cells]
+
+
+def _closed_ids(kind: str) -> Set[str]:
+    """判準封閉清單中某格類之格 id。無斷言。"""
+    return {str(c["id"]) for c in (nh.criteria_cell_list() or []) if c["kind"] == kind}
+
+
+def _closed_timeframe(cell_id_: str) -> str:
+    """判準封閉清單中某格之主週期。無斷言。"""
+    return next(str(c["timeframes"][0]) for c in (nh.criteria_cell_list() or []) if c["id"] == cell_id_)
+
+
 def _b_descriptor() -> Mapping[str, Any]:
-    cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)["B"]
+    cells = [_full_candidate_b_descriptor()]  # 判準 v3 封閉清單之格 B 只兩週期 ⇒ 成員規則單元改用主檔全週期之候選描述子
     assert cells and len(cells[0]["timeframes"]) >= 3, "前提：真實 kline 之格 B 須具 ≥3 候選週期（本案需排除一週期後仍 ≥2）"
     return cells[0]
 
@@ -1622,12 +1700,12 @@ def test_estimate_receipt_lists_history_blocked_cells_outside_extrapolation() ->
     src_inv = ESTIMATOR.source_inventory(inventory, criteria)  # 根數取各週期之來源檔（判準 kline_source）
     tfs = sorted({tf for t in inventory.values() for tf in t}, key=ESTIMATOR.tf_seconds)
     blocked_tf = tfs[-1]
-    probe_symbol = next(s for s, t in inventory.items() if blocked_tf in t)
+    probe_symbol = next(s for s, t in _closed_symbol_timeframes(cells["A"]) if blocked_tf in t)
     measurements = _synthetic_measurements(inventory, cells)
     event = sorted(criteria["cell_rules"]["insufficient_history"]["known_events"])[0]
     output_bars = int(criteria["cell_definitions"]["A"]["output_bars"])
     # 受測格之定案所需前史設為「恰使根數不多於受測格者不足」（靜態判定之邊界；判準 window_rule）
-    measurements[f"A:{blocked_tf}"] = {"target": f"A:{blocked_tf}", "category": "A", "status": "blocked",
+    measurements[ESTIMATOR.cell_id("A", probe_symbol, [blocked_tf])] = {"target": f"A:{blocked_tf}", "category": "A", "status": "blocked",
                                        "blocked_by": "history", "symbol": probe_symbol,
                                        "cell_id": ESTIMATOR.cell_id("A", probe_symbol, [blocked_tf]),
                                        "source_path": str(ESTIMATOR.kline_source(blocked_tf, criteria)),
@@ -1666,12 +1744,17 @@ def _synthetic_measurements(inventory: Mapping[str, Mapping[str, int]], cells: M
         record: Dict[str, Any] = {"target": target["target"], "category": target["category"], "status": "measured",
                                   "seconds": 1.0, "peak_rss_bytes": 1}
         cell = target.get("cell")
+        if cell is not None:
+            record["arm_seconds"] = {arm: 1.0 for arm in nv.load_contract()["post_ic_arm_values"]["values"]}
+            record["branch_seconds"] = {b: 1.0 for b in _icpostleak_registry_branches()}
+            record["training_timeframes"] = list(cell["timeframes"])
         if cell is not None and target["category"] in ("A", "C"):
             tf = cell["timeframes"][0]
             record.update(cell_id=cell["id"], symbol=cell["symbol"],
                           source_path=str(ESTIMATOR.kline_source(tf, criteria)),
                           bar_counts={tf: src_inv[cell["symbol"]][tf]},
-                          pre_history={"required_pre_history_bars": 0})
+                          pre_history={"required_pre_history_bars": 0,
+                                       "ingest_floor": ESTIMATOR.cell_window(cell, criteria)[0]})
         if target["category"] in ("A", "B"):
             record["arm_seconds"] = {arm: 1.0 for arm in nv.load_contract()["post_ic_arm_values"]["values"]}
         out[target["target"]] = record
@@ -1686,10 +1769,10 @@ def cell_c_history_violations(estimator: ModuleType) -> List[str]:
     inventory = estimator.kline_inventory(nh.KLINE_PATH)
     cells = estimator.enumerate_cells(nh.KLINE_PATH)
     measurements = _synthetic_measurements(inventory, cells)
-    c_keys = sorted(k for k in measurements if k.startswith("C:"))
+    c_keys = sorted(k for k in measurements if k in _closed_ids("C"))
     assert c_keys, "前提：須有實測之格 C 目標"
     key = c_keys[0]
-    tf = key.split(":", 1)[1]
+    tf = _closed_timeframe(key)
     probe_symbol = next(c["symbol"] for c in cells["C"] if c["timeframes"] == [tf])
     event = sorted(criteria["cell_rules"]["insufficient_history"]["known_events"])[0]
     src_inv = estimator.source_inventory(inventory, criteria)
@@ -1717,8 +1800,10 @@ def cell_c_history_violations(estimator: ModuleType) -> List[str]:
     for name, node in receipt["run_kinds"].items():
         if expected & set(node["per_cell_seconds"]):
             out.append(f"{name}：前史 blocked 之格 C 入外推")
-    if set((receipt["run_kinds"]["precision_chain"].get("blocked_attempt_seconds") or {})) != expected:
-        out.append("precision_chain 之嘗試秒數未逐格涵蓋前史 blocked 之格 C")
+    if set((receipt["run_kinds"]["freeze_baseline"].get("blocked_attempt_seconds") or {})) != expected:
+        out.append("freeze_baseline 之嘗試秒數未涵蓋前史 blocked 之格 C（判準 v3：前史 blocked 之格於凍結生成至判定）")
+    if any(node.get("blocked_attempt_seconds") for name, node in receipt["run_kinds"].items() if name != "freeze_baseline"):
+        out.append("嘗試秒數誤計入凍結以外之跑別")
     base = receipt["cell_c_baseline"].get(tf) or {}
     if base.get("blocked_by") == "hardware" or base.get("history_blocked") is not True:
         out.append(f"cell_c_baseline.{tf} 未依 blocked_by 走前史路徑：{base}")
@@ -1761,10 +1846,11 @@ def final_warmup_violations(estimator: ModuleType) -> List[str]:
     from momentum.factories import create_feature_factory
 
     criteria = _load_criteria()
-    cells = estimator.enumerate_cells(nh.KLINE_PATH)
+    symbol, tfs = next(iter(_kline_index().items()))  # 加倍案之格 C 描述子：真實主檔第一個 symbol 之各週期（不限封閉清單）
+    candidates = [{"id": estimator.cell_id("C", symbol, [tf]), "kind": "C", "symbol": symbol, "timeframes": [tf]} for tf in tfs]
     factory = create_feature_factory(cache_dir=str(nh.KLINE_PATH.parent), validate_continuity=False)
     chosen = None
-    for cell in cells["C"]:  # 選格只依初值與可得前史之算術（不依受測之加倍處理）
+    for cell in candidates:  # 選格只依初值與可得前史之算術（不依受測之加倍處理）
         config = factory._resolve_config(estimator.cell_payload(cell, criteria))
         initial = estimator.pre_history_requirement(cell, criteria, config)
         doubled_need = 2 * initial["d0_bars"] + initial["calibration_bars_primary"]
@@ -1890,3 +1976,734 @@ def test_mutation_estimate_kline_source_reads_main_file(monkeypatch: pytest.Monk
     monkeypatch.setattr(ESTIMATOR, "kline_source", lambda tf, criteria: nh.KLINE_PATH)
     monkeypatch.setattr(ESTIMATOR, "_DATASET_RECORDS", {})
     assert kline_source_violations(ESTIMATOR) != []
+
+
+# ---------------------------------------------------------------------------------------------- 判準 v3（追加）：路徑覆蓋之封閉格清單
+# 使用者 2026-10-22 裁定量測設計＝路徑覆蓋、非重複；格＝判準 `cell_rules.cell_list`（每格之獨有覆蓋 covers），各跑別之重型跑＝
+# 判準 `run_coverage`（(格, covers) 唯一）。以下皆讀判準與 git／檔名，不生成。
+
+def _closed_cells() -> List[Dict[str, Any]]:
+    cells = nh.criteria_cell_list()
+    return list(cells or [])
+
+
+def _closed_descriptor(cell: Mapping[str, Any]) -> Tuple[str, str, str, Tuple[str, ...]]:
+    return (str(cell["id"]), str(cell["kind"]), str(cell["symbol"]), tuple(str(t) for t in cell["timeframes"]))
+
+
+def _present_criteria_files() -> List[Path]:
+    """工作樹現存之判準版本檔（`preregistered_criteria*.json`）。不含 assert。"""
+    return sorted(p for p in nh.GOLDEN_DIR.glob(CRITERIA_GLOB) if p.is_file())
+
+
+def vn_replacement_violations() -> List[str]:
+    """判準 vN（N≥2）取代之流程規則（SPEC Task 0.3 邊界①，判準 v3 起之 vN→vN+1）：判準檔名恰一存在；其餘版本檔不在 HEAD；
+    現行版恰一提交；全部版本之提交皆早於每份量測收據（估時收據除外）之首次提交（尚無量測收據 ⇒ 無對象）。不含 assert。"""
+    out: List[str] = []
+    present = _present_criteria_files()
+    if len(present) != 1:
+        return [f"判準檔須恰一存在，實得 {[p.name for p in present]}"]
+    current = present[0]
+    for path in _criteria_name_paths():
+        if path != current and _git("cat-file", "-e", f"HEAD:{_rel(path)}").returncode == 0:
+            out.append(f"舊版判準 {path.name} 仍在 HEAD（須刪舊檔）")
+    log = _git("log", "--format=%H", "--", _rel(current))
+    if log.returncode != 0 or len(log.stdout.decode().split()) != 1:
+        out.append(f"{current.name} 之提交數 ≠ 1")
+    if _measurement_receipt_paths():
+        out += criteria_after_receipt_violations()
+    return out
+
+
+def closed_estimate_receipt_violations(receipt: Mapping[str, Any], kline: Mapping[str, List[str]]) -> List[str]:
+    """判準 v3 之估時收據檢查（取代「全部 symbol×tf」列舉之涵蓋檢查）：格＝封閉清單；每跑別之格與 runs（格, covers）涵蓋判準
+    run_coverage；Phase 2–4 驗收重產跑別另涵蓋 `REGEN_REQUIREMENTS`（於封閉清單之格）；PRE-PROV 格涵蓋；凍結組＝判準
+    freeze_groups、G1 臂集＝契約；格 C 基準逐封閉清單之格 C 週期；省法清單。"""
+    out: List[str] = []
+    try:
+        dt.datetime.fromisoformat(str(receipt.get("reported_at")))
+    except ValueError:
+        out.append("reported_at 缺或非 ISO-8601（主委白話報告後寫入）")
+    cells = receipt.get("cells")
+    if not isinstance(cells, Mapping) or set(cells) != set(CELL_CATEGORIES):
+        return out + [f"cells 須恰含格類 {CELL_CATEGORIES}"]
+    got = {_closed_descriptor(c) for kind in CELL_CATEGORIES for c in cells[kind] or [] if isinstance(c, Mapping)}
+    want = {_closed_descriptor(c) for c in _closed_cells()}
+    if got != want:
+        out.append(f"cells ≠ 判準封閉清單：缺 {sorted(want - got)[:3]} 多 {sorted(got - want)[:3]}")
+    for descriptor in want:
+        if any(tf not in kline.get(descriptor[2], []) for tf in descriptor[3]):
+            out.append(f"封閉清單之格 {descriptor[0]} 不在主檔列舉")
+    index = _cell_index(receipt)
+    ids = {c: {i for i, (cat, _) in index.items() if cat == c} for c in CELL_CATEGORIES}
+    criteria = json.loads(nh.current_criteria_path().read_text(encoding="utf-8"))
+    coverage = criteria.get("run_coverage") or {}
+    run_kinds = receipt.get("run_kinds")
+    if not isinstance(run_kinds, Mapping):
+        return out + ["run_kinds 缺"]
+    for kind in ESTIMATOR.RUN_KINDS:
+        node = run_kinds.get(kind)
+        plan = coverage.get(kind)
+        if not isinstance(node, Mapping):
+            out.append(f"run_kinds 缺跑別 {kind}")
+            continue
+        if not isinstance(plan, Mapping):
+            out.append(f"判準 run_coverage 缺跑別 {kind}")
+            continue
+        listed = set(node.get("cells") or [])
+        preprov_listed = set(node.get("preprov_cells") or [])
+        want_cells = {str(r["cell"]) for r in plan.get("runs") or []}
+        if kind in REGEN_REQUIREMENTS:
+            want_cells |= regen_required_cells(REGEN_REQUIREMENTS[kind]["cells"], index, ids)
+        if (not listed and not preprov_listed) or not listed <= set(index):
+            out.append(f"{kind}：cells 為空或含未列舉之格")
+        if want_cells - listed:
+            out.append(f"{kind}：未涵蓋 {sorted(want_cells - listed)[:3]}")
+        want_runs = {(str(r["cell"]), str(r["covers"])) for r in plan.get("runs") or []}
+        got_runs = {(str(r.get("cell")), str(r.get("covers"))) for r in node.get("runs") or [] if isinstance(r, Mapping)
+                    and isinstance(r.get("seconds"), (int, float)) and r["seconds"] >= 0}
+        if want_runs - got_runs:
+            out.append(f"{kind}：runs 未逐一列（格, 獨有覆蓋, 外推秒數）：缺 {len(want_runs - got_runs)} 筆")
+        want_preprov = regen_required_preprov(REGEN_REQUIREMENTS[kind]["preprov"]) if kind in REGEN_REQUIREMENTS else set()
+        want_preprov |= regen_required_preprov(list((plan.get("preprov") or {}).keys()))
+        if want_preprov - preprov_listed:
+            out.append(f"{kind}：未涵蓋 PRE-PROV 格 {sorted(want_preprov - preprov_listed)}")
+        if preprov_listed - known_preprov_cells():
+            out.append(f"{kind}：preprov_cells 含未知格 {sorted(preprov_listed - known_preprov_cells())}")
+        # 須有正單格秒數之格類：本跑別中有重型 run（生成／轉換／分支差／效能）且該格未 blocked（收據 run 列無 skipped）者
+        heavy = {index[str(r.get("cell"))][0] for r in node.get("runs") or [] if isinstance(r, Mapping)
+                 and str(r.get("cell")) in index and not r.get("skipped")
+                 and (r.get("generations") or r.get("transform_passes") or r.get("branchdiff") or r.get("perf"))}
+        # PRE-PROV 生成只記於生成型跑別（檢查型跑別以 0 次列其所讀格名，不計秒數）
+        heavy |= {"preprov"} if any(int(n) for n in (node.get("preprov_generations") or {}).values()) else set()
+        per_cat = node.get("single_cell_seconds") or {}
+        for cat in heavy:
+            if not _positive_number(per_cat.get(cat)):
+                out.append(f"{kind}：缺格類 {cat} 之單格實測秒數")
+        if heavy and not _positive_number(node.get("extrapolated_total_seconds")):
+            out.append(f"{kind}：缺外推總秒數")
+    groups = (run_kinds.get("freeze_baseline") or {}).get("groups") or {}
+    want_groups = criteria["cell_rules"]["freeze_groups"]
+    arms = set(nv.load_contract()["post_ic_arm_values"]["values"])
+    for name in ("G1", "G2", "G3"):
+        if set((groups.get(name) or {}).get("cells") or []) != set(want_groups[name]):
+            out.append(f"freeze_baseline.groups.{name} ≠ 判準 freeze_groups")
+    if set((groups.get("G1") or {}).get("arms") or []) != arms or not arms:
+        out.append("freeze_baseline.groups.G1 之臂集 ≠ 契約 post_ic_arm_values")
+    savings = receipt.get("savings")
+    if not isinstance(savings, list) or not savings or not all(
+            isinstance(s, Mapping) and str(s.get("method", "")).strip()
+            and isinstance(s.get("saved_seconds"), (int, float)) and not isinstance(s.get("saved_seconds"), bool)
+            and s["saved_seconds"] >= 0 for s in savings):
+        out.append("savings 須為非空之 {method, saved_seconds≥0} 清單")
+    c_tfs = {str(c["timeframes"][0]) for c in _closed_cells() if c["kind"] == "C"}
+    baseline = receipt.get("cell_c_baseline")
+    if not isinstance(baseline, Mapping) or set(baseline) != c_tfs:
+        out.append(f"cell_c_baseline 須逐封閉清單之格 C 週期一項：{sorted(c_tfs)}")
+    else:
+        for tf, node in baseline.items():
+            if not isinstance(node, Mapping):
+                out.append(f"cell_c_baseline.{tf}：非物件")
+            elif node.get("blocked_by") != BLOCKED_BY_HARDWARE and not (
+                    node.get("source") == "measured" and _positive_number(node.get("seconds"))
+                    and _positive_number(node.get("peak_rss_bytes"))):
+                out.append(f"cell_c_baseline.{tf}：須實測或標 blocked_by=hardware")
+    # 審查 r6 CODEX-R6-P1-05：任一列之轉換成本缺實測臂／分支（不代補）⇒ 估時無效、不得寫 reported_at
+    bad_rows = [f"{k}:{r.get('cell')}" for k, node in run_kinds.items() if isinstance(node, Mapping)
+                for r in node.get("runs") or [] if isinstance(r, Mapping) and r.get("incomplete")]
+    if bad_rows or receipt.get("incomplete"):
+        out.append(f"估時不完整（轉換成本缺實測、不代補）：{sorted(set(bad_rows) | set(receipt.get('incomplete') or []))[:5]}")
+    # 判準檔 cell_rules.continuity：逐格連續性紀錄；來源全序列無缺口 ⇒ 生產設定（True）；生成窗內零缺口
+    production = criteria["cell_rules"]["continuity"]["production_validate_continuity"]
+    continuity = receipt.get("continuity")
+    if not isinstance(continuity, Mapping) or set(continuity) != {str(c["id"]) for c in _closed_cells()}:
+        out.append("continuity 須逐封閉清單之格一項")
+    else:
+        for cid, rec in continuity.items():
+            gaps = rec.get("series_gaps") if isinstance(rec, Mapping) else None
+            if not isinstance(gaps, Mapping):
+                out.append(f"continuity.{cid}：缺 series_gaps")
+                continue
+            if not any(gaps.values()) and rec.get("validate_continuity") is not production:
+                out.append(f"continuity.{cid}：來源無缺口而未用生產連續性設定 {production}")
+            if rec.get("window_gaps"):
+                out.append(f"continuity.{cid}：生成窗內有缺口 {rec.get('window_gaps')}")
+    return out
+
+
+def closed_list_violations(estimator: ModuleType) -> List[str]:
+    """估時器之格＝判準封閉清單（`enumerate_cells`）；實測目標＝封閉清單之格（鍵＝格 id）＋判準涉及之 PRE-PROV 格。"""
+    want = {_closed_descriptor(c) for c in _closed_cells()}
+    if not want:
+        return ["判準無封閉格清單（cell_rules.cell_list.cells）"]
+    cells = estimator.enumerate_cells(nh.KLINE_PATH)
+    got = {_closed_descriptor(c) for kind in CELL_CATEGORIES for c in cells[kind]}
+    out: List[str] = []
+    if got != want:
+        out.append(f"enumerate_cells ≠ 判準封閉清單：缺 {sorted(want - got)[:3]} 多 {sorted(got - want)[:3]}")
+    targets = [t["target"] for t in estimator.measurement_targets(cells, estimator.kline_inventory(nh.KLINE_PATH))
+               if t["category"] in CELL_CATEGORIES]
+    if sorted(targets) != sorted(d[0] for d in want):
+        out.append(f"實測目標 ≠ 封閉清單之格：{sorted(targets)}")
+    return out
+
+
+def test_estimate_cells_equal_criteria_closed_list() -> None:
+    """判準 v3：估時器之格與實測目標＝判準封閉清單（路徑覆蓋），不再列舉全部 symbol×tf。"""
+    assert closed_list_violations(ESTIMATOR) == []
+
+
+def test_mutation_estimate_cells_full_enumeration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：估時器回到「全部 symbol×tf」列舉（忽略封閉清單）⇒ 檢查翻紅。"""
+    assert closed_list_violations(ESTIMATOR) == []
+
+    def full(kline_path: Path) -> Dict[str, List[Dict[str, Any]]]:
+        out: Dict[str, List[Dict[str, Any]]] = {k: [] for k in CELL_CATEGORIES}
+        for symbol, tfs in _kline_index().items():
+            for tf in tfs:
+                for kind in ("A", "C"):
+                    out[kind].append({"id": ESTIMATOR.cell_id(kind, symbol, [tf]), "kind": kind, "symbol": symbol,
+                                      "timeframes": [tf]})
+        return out
+
+    monkeypatch.setattr(ESTIMATOR, "enumerate_cells", full)
+    assert closed_list_violations(ESTIMATOR) != []
+
+
+def test_estimate_run_coverage_unique_paths() -> None:
+    """判準 v3 `run_coverage`：每個重型跑別之每個 run 皆具非空之獨有覆蓋（covers）、格屬封閉清單、(格, covers) 全票唯一；
+    封閉清單每格具非空 covers；每格至少被一個跑別覆蓋。"""
+    criteria = _load_criteria()
+    assert ESTIMATOR.coverage_violations(criteria) == []
+    closed = _closed_cells()
+    assert closed and all(str(c.get("covers") or "").strip() for c in closed)
+    used = {str(r["cell"]) for node in criteria["run_coverage"].values() if isinstance(node, Mapping)
+            for r in node.get("runs") or []}
+    assert {str(c["id"]) for c in closed} <= used, sorted({str(c["id"]) for c in closed} - used)
+    heavy = [k for k in ESTIMATOR.RUN_KINDS if any(r.get("generations") for r in criteria["run_coverage"][k]["runs"])]
+    assert heavy and all(all(str(r.get("covers") or "").strip() for r in criteria["run_coverage"][k]["runs"]) for k in heavy)
+
+
+@pytest.mark.parametrize("mutant", ["duplicate_run", "empty_covers", "cell_outside_list"])
+def test_mutation_estimate_run_coverage_duplicate_path(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：同一路徑重複跑（複製一個 run 至另一跑別）／covers 為空／格不在封閉清單 ⇒ 路徑覆蓋檢查翻紅（變異經
+    估時器之判準讀取入口 `load_criteria` 注入）。"""
+    criteria = copy.deepcopy(_load_criteria())
+    monkeypatch.setattr(ESTIMATOR, "load_criteria", lambda *_a, **_k: criteria)
+    assert ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria()) == []
+    runs = criteria["run_coverage"]["freeze_baseline"]["runs"]
+    if mutant == "duplicate_run":
+        criteria["run_coverage"]["regen_t21"]["runs"].append(copy.deepcopy(runs[0]))
+        expect = "重複路徑"
+    elif mutant == "empty_covers":
+        runs[0]["covers"] = "  "
+        expect = "缺 covers"
+    else:
+        runs[0]["cell"] = "A_NUMVIEWMUTANT_1h"
+        expect = "不在封閉清單"
+    violations = ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria())
+    assert any(expect in v for v in violations), violations
+
+
+# 判準 `run_coverage` 之「同一碼態每個生成身分只生成一次」（使用者 2026-10-22 路徑覆蓋裁定；判準檔 cell_rules.batch_cache）：
+# 測試端獨立帳（不呼叫估時器），與估時器 `coverage_violations` 互為對照。
+
+def _generation_ledger_violations(criteria: Mapping[str, Any]) -> List[str]:
+    """獨立重算：生成型跑別（code_state）內每個生成身分 (格, env, 變體) 於同碼態合計至多 1 次；檢查型跑別（reads_from）不生成；
+    每個 generations＝0 之 run 所讀之生成存在於其 source 跑別且同碼態；批次跑別（b3／b4／b5）之每個生成至少被一個檢查型跑別
+    之 run 讀取。不含 assert。"""
+    coverage = {k: v for k, v in (criteria.get("run_coverage") or {}).items() if isinstance(v, Mapping)}
+    out: List[str] = []
+
+    def ident(r: Mapping[str, Any]) -> Tuple[str, str, str]:
+        return (str(r.get("cell")), json.dumps({str(k): str(v) for k, v in dict(r.get("env") or {}).items()},
+                                               sort_keys=True), str(r.get("variant") or ""))
+
+    count: Dict[Tuple[str, Tuple[str, str, str]], int] = {}
+    owner: Dict[Tuple[str, Tuple[str, str, str]], Set[str]] = {}
+    transforms: Dict[Tuple[str, Tuple[str, str, str]], int] = {}
+    for kind, node in coverage.items():
+        for r in node.get("runs") or []:
+            gens = int(r.get("generations") or 0)
+            tp = int(r.get("transform_passes") or 0)
+            if gens and node.get("reads_from"):
+                out.append(f"{kind} 為檢查型卻生成 {r.get('cell')}")
+            if tp and node.get("reads_from"):
+                out.append(f"{kind} 為檢查型卻自行轉換 {r.get('cell')}")
+            if node.get("code_state"):
+                key = (str(node["code_state"]), ident(r))
+                if gens:
+                    count[key] = count.get(key, 0) + gens
+                    owner.setdefault(key, set()).add(kind)
+                if tp:
+                    transforms[key] = transforms.get(key, 0) + tp
+    out += [f"碼態 {s} 之 {i} 生成 {n} 次" for (s, i), n in count.items() if n > 1]
+    out += [f"碼態 {s} 之 {i} 轉換 {n} 次" for (s, i), n in transforms.items() if n > 1]
+    for kind, node in coverage.items():
+        for r in node.get("runs") or []:
+            if r.get("reads_transforms"):
+                state = (coverage.get(str(r.get("source"))) or {}).get("code_state")
+                if (str(state), ident(r)) not in transforms:
+                    out.append(f"{kind} 讀 {r.get('source')} 之 {ident(r)} 轉換不存在")
+    read: Set[Tuple[str, Tuple[str, str, str]]] = set()
+    for kind, node in coverage.items():
+        for r in node.get("runs") or []:
+            if int(r.get("generations") or 0):
+                continue
+            source = str(r.get("source"))
+            state = (coverage.get(source) or {}).get("code_state")
+            if node.get("code_state") and state != node.get("code_state"):
+                out.append(f"{kind} 讀 {source} 跨碼態")
+            if source not in owner.get((str(state), ident(r)), set()):
+                out.append(f"{kind} 讀 {source} 之 {ident(r)} 無對應生成")
+            if node.get("reads_from"):
+                read.add((str(state), ident(r)))
+    for (state, i), kinds in owner.items():
+        if state in ("b3", "b4", "b5") and (state, i) not in read:
+            out.append(f"批次 {sorted(kinds)} 之 {i} 無檢查讀取")
+    return out
+
+
+def test_estimate_run_coverage_one_generation_per_code_state() -> None:
+    """判準 run_coverage：同一碼態內每個生成身分只生成一次——Task 1.3 L2 不重生凍結已生成之 (格, 環境)（只生成凍結所無之環境）；
+    Phase 2–4 每批每 (格, 環境, 變體) 一次、檢查型跑別只讀批次生成、無檢查讀取之重生不存在；格 C 每碼態每環境至多一次，且
+    Phase 2–4 之批次只在該批有檢查讀 C 時生成 C。估時器檢查與測試端獨立帳一致為零違規。"""
+    criteria = _load_criteria()
+    assert _generation_ledger_violations(criteria) == []
+    assert ESTIMATOR.coverage_violations(criteria) == []
+    coverage = criteria["run_coverage"]
+    freeze_ids = {(r["cell"], json.dumps(r.get("env") or {}, sort_keys=True)) for r in coverage["freeze_baseline"]["runs"]}
+    l2_gen = [(r["cell"], json.dumps(r.get("env") or {}, sort_keys=True)) for r in coverage["l2_arm_matrix"]["runs"]
+              if r.get("generations")]
+    assert not set(l2_gen) & freeze_ids, sorted(set(l2_gen) & freeze_ids)
+    c_ids = {str(c["id"]) for c in _closed_cells() if c.get("kind") == "C"}
+    for kind, node in coverage.items():
+        if not isinstance(node, Mapping) or node.get("code_state") not in ("b3", "b4", "b5"):
+            continue
+        for r in node["runs"]:
+            if r["cell"] in c_ids and r.get("generations"):
+                readers = [k for k in r.get("feeds") or []
+                           if any(x.get("source") == kind and x["cell"] == r["cell"] for x in coverage[k]["runs"])]
+                assert readers, f"{kind} 生成格 C 而該批無檢查讀取"
+
+
+@pytest.mark.parametrize("mutant", ["l2_regenerates_freeze", "batch_duplicate_c", "check_generates",
+                                    "unread_batch_generation", "reader_without_generation", "reader_outside_reads_from",
+                                    "check_recomputes_transform", "batch_duplicate_transform", "reader_without_transform"])
+def test_mutation_estimate_duplicate_generation_per_code_state(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（路徑覆蓋：同碼態每生成身分一次）：L2 重生凍結已生成之格／同批重複生成格 C／檢查型跑別自行生成／批次生成無
+    檢查讀取／檢查讀取不存在之生成／檢查讀 reads_from 以外之批次 ⇒ 估時器 `coverage_violations` 翻紅（變異經 `load_criteria`
+    注入）；前兩案與檢查型生成另由測試端獨立帳翻紅。"""
+    criteria = copy.deepcopy(_load_criteria())
+    monkeypatch.setattr(ESTIMATOR, "load_criteria", lambda *_a, **_k: criteria)
+    assert ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria()) == []
+    cov = criteria["run_coverage"]
+    ledger_red = True
+    if mutant == "l2_regenerates_freeze":
+        row = next(r for r in cov["l2_arm_matrix"]["runs"] if not r.get("generations") and not r.get("env"))
+        row["generations"] = 1
+        row.pop("source", None)
+        expect = "同碼態重複生成"
+    elif mutant == "batch_duplicate_c":
+        row = copy.deepcopy(next(r for r in cov["regen_b3"]["runs"] if r["cell"].startswith("C_")))
+        row["covers"] = row["covers"] + "（變異：同批再生成一次）"
+        cov["regen_b3"]["runs"].append(row)
+        expect = "同碼態重複生成"
+    elif mutant == "check_generates":
+        cov["regen_t22"]["runs"][0]["generations"] = 1
+        expect = "檢查型跑別不得生成"
+    elif mutant == "unread_batch_generation":
+        cov["regen_b5"]["runs"].append({"cell": "A_BTCUSDT_4h", "covers": "變異：無檢查讀取之重生", "generations": 1,
+                                        "transform_passes": 0, "env": {"FFACT_USE_POLARS": "0"},
+                                        "feeds": ["regen_section_g"]})
+        expect = "無檢查讀取"
+    elif mutant == "reader_without_generation":
+        row = next(r for r in cov["regen_section_g"]["runs"] if r["cell"].startswith("C_"))
+        row["env"] = {"FFACT_USE_POLARS": "0"}
+        expect = "無對應生成"
+    elif mutant == "check_recomputes_transform":  # t22 自行再算 b3 已算之 IC 頁各臂輸出
+        cov["regen_t22"]["runs"][0]["transform_passes"] = 1
+        expect = "檢查型跑別不得自行轉換"
+    elif mutant == "batch_duplicate_transform":  # 同碼態同身分之轉換算兩次
+        next(r for r in cov["regen_b3"]["runs"] if r.get("transform_passes"))["transform_passes"] = 2
+        expect = "同碼態重複轉換"
+    elif mutant == "reader_without_transform":  # 批次生成列不算轉換，檢查卻宣稱讀其轉換
+        reader = next(r for r in cov["regen_section_g"]["runs"] if r.get("reads_transforms") and r["source"] == "regen_b5")
+        next(r for r in cov["regen_b5"]["runs"] if r["cell"] == reader["cell"] and not r.get("env"))["transform_passes"] = 0
+        expect = "無轉換"
+    else:
+        cov["regen_t34"]["runs"][0]["source"] = "regen_b3"
+        expect = "不在 reads_from"
+        ledger_red = False
+    violations = ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria())
+    assert any(expect in v for v in violations), violations
+    if ledger_red:
+        assert _generation_ledger_violations(criteria) != []
+
+
+def test_estimate_receipt_closed_list_checker_discriminates() -> None:
+    """判準 v3 之估時收據檢查（閘邏輯單元；實測秒數為結構佔位）：依判準組裝之收據無違規；刪一個 run（獨有路徑漏估）、
+    格清單多一格（非封閉清單）各翻紅。"""
+    criteria = _load_criteria()
+    inventory = ESTIMATOR.kline_inventory(nh.KLINE_PATH)
+    cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)
+    body = ESTIMATOR.build_receipt(cells, inventory, criteria, _synthetic_measurements(inventory, cells),
+                                   nv.load_contract()["post_ic_arm_values"]["values"])
+    receipt = json.loads(json.dumps({"reported_at": "2026-10-22T00:00:00+08:00", "cells": cells, **body}))
+    assert closed_estimate_receipt_violations(receipt, _kline_index()) == []
+    dropped = copy.deepcopy(receipt)
+    dropped["run_kinds"]["precision_chain"]["runs"].pop(0)
+    assert any("runs 未逐一列" in v for v in closed_estimate_receipt_violations(dropped, _kline_index()))
+    extra = copy.deepcopy(receipt)
+    extra["cells"]["A"].append({"id": "A_ETHUSDT_1h", "kind": "A", "symbol": "ETHUSDT", "timeframes": ["1h"]})
+    assert any("≠ 判準封閉清單" in v for v in closed_estimate_receipt_violations(extra, _kline_index()))
+    # 判準檔 cell_rules.continuity：來源無缺口之格未用生產連續性設定／生成窗內有缺口 ⇒ 紅
+    clean = next(cid for cid, rec in receipt["continuity"].items() if not any(rec["series_gaps"].values()))
+    loosened = copy.deepcopy(receipt)
+    loosened["continuity"][clean]["validate_continuity"] = False
+    assert any("未用生產連續性設定" in v for v in closed_estimate_receipt_violations(loosened, _kline_index()))
+    gapped = copy.deepcopy(receipt)
+    gapped["continuity"][clean]["window_gaps"] = ["1h：變異缺口"]
+    assert any("生成窗內有缺口" in v for v in closed_estimate_receipt_violations(gapped, _kline_index()))
+
+
+def test_boundary_05_vn_replacement_rule() -> None:
+    """邊界①（判準 v3 起之 vN→vN+1）：`vn_replacement_violations` 對現行判準（v1／v2 不在工作樹時）判定；且以工作樹臨時多放
+    一個版本檔之情形（不寫檔：monkeypatch 讀取）判「須恰一存在」。只在 vN（N≥3）現行時有對象。"""
+    present = sorted(p.name for p in nh.GOLDEN_DIR.glob(CRITERIA_GLOB) if p.is_file())
+    assert len(present) == 1, present
+    if present[0] in (CRITERIA_V1.name, CRITERIA_V2_NAME):
+        return
+    assert vn_replacement_violations() == []
+
+
+def test_mutation_vn_replacement_two_versions_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    """變異：工作樹同時存在兩個判準版本檔（不寫檔：monkeypatch `_present_criteria_files` 多回一個舊版檔名）⇒ 判「須恰一
+    存在」；對照：未變異 ⇒ 不出此條。"""
+    real = _present_criteria_files()
+    assert not any("須恰一存在" in v for v in vn_replacement_violations())
+    stale = nh.GOLDEN_DIR / "preregistered_criteria_v0.json"
+    monkeypatch.setattr(sys.modules[__name__], "_present_criteria_files", lambda: real + [stale])
+    assert any("須恰一存在" in v for v in vn_replacement_violations())
+
+
+# ---------------------------------------------------------------------------------------------- Task 1.5 ⑦ D-ICPAGE-ARM 重新呈報
+# 決定紀錄（decisions.json）於 Task 1.5 才產出；以下以合 schema 之單筆紀錄驗判準 schema 與 `icpage_violations` 之⑦（秒級、不讀
+# 決定紀錄檔），效能基準收據之存在與提交日經可注入之查詢函式。
+
+_FAKE_PERF_RECEIPT = "handoffs/run_receipts/20261030-numview-perf-benchmark.json"
+
+
+def _icpage_record_schema(criteria: Mapping[str, Any]) -> Dict[str, Any]:
+    ds = criteria["decisions_schema"]
+    return {"$schema": ds["$schema"], "$defs": ds["$defs"], **ds["properties"]["decisions"]["properties"]["d_icpage_arm"]}
+
+
+def _valid_icpage_record() -> Dict[str, Any]:
+    return {"label": "D-ICPAGE-ARM", "triggered": True, "choice": ICPAGE_LOCK, "changes_public_output": True,
+            "changes_feature_stage": False, "evidence": [{"receipt": _FAKE_PERF_RECEIPT, "rows_key": "speed", "row": 0}],
+            "user_ruling": {"date": ICPAGE_RULING_DATE, "quote": list(ICPAGE_RULING_QUOTE)},
+            "re_presentation": {"date": "2026-10-31", "quote": ["維持鎖 Polars"], "perf_benchmark_receipt": _FAKE_PERF_RECEIPT,
+                                "confirmed_choice": ICPAGE_LOCK}}
+
+
+def test_icpage_re_presentation_schema_and_checker_accept_valid_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    """⑦：合規之 D-ICPAGE-ARM 紀錄（具 re_presentation，日期不早於效能基準收據之提交）過判準 schema 與 `icpage_violations`。"""
+    monkeypatch.setattr(sys.modules[__name__], "_repo_file_exists", lambda rel: rel == _FAKE_PERF_RECEIPT)
+    monkeypatch.setattr(sys.modules[__name__], "_perf_receipt_first_commit_date", lambda rel: "2026-10-30")
+    monkeypatch.setattr(sys.modules[__name__], "_load_perf_receipt", lambda rel: _valid_perf_receipt())
+    record = _valid_icpage_record()
+    assert _schema_errors(_icpage_record_schema(_load_criteria()), record) == []
+    assert icpage_violations({"decisions": {"d_icpage_arm": record}}) == []
+
+
+@pytest.mark.parametrize("mutant", ["deleted", "date_before_receipt", "receipt_uncommitted", "receipt_missing",
+                                    "empty_quote", "wrong_receipt_path", "choice_mismatch"])
+def test_mutation_icpage_re_presentation_invalid(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（Task 1.5 ⑦、SPEC v17 §A）：刪 re_presentation／日期早於效能基準收據之提交／收據未提交／收據不存在／原話空／
+    收據路徑非效能基準收據／confirmed_choice ≠ choice ⇒ `icpage_violations` 紅；刪除與欄位形態錯另由判準 schema 紅。"""
+    committed: Optional[str] = "2026-10-30"
+    exists = True
+    record = _valid_icpage_record()
+    rp = record["re_presentation"]
+    schema_red = False
+    if mutant == "deleted":
+        del record["re_presentation"]
+        schema_red = True
+    elif mutant == "date_before_receipt":
+        rp["date"] = "2026-10-29"
+    elif mutant == "receipt_uncommitted":
+        committed = None
+    elif mutant == "receipt_missing":
+        exists = False
+    elif mutant == "empty_quote":
+        rp["quote"] = []
+        schema_red = True
+    elif mutant == "wrong_receipt_path":
+        rp["perf_benchmark_receipt"] = "handoffs/run_receipts/20261030-numview-postic-branchdiff.json"
+        schema_red = True
+    else:
+        rp["confirmed_choice"] = "retain"
+    monkeypatch.setattr(sys.modules[__name__], "_repo_file_exists", lambda rel: exists and rel.endswith("perf-benchmark.json"))
+    monkeypatch.setattr(sys.modules[__name__], "_perf_receipt_first_commit_date", lambda rel: committed)
+    monkeypatch.setattr(sys.modules[__name__], "_load_perf_receipt", lambda rel: _valid_perf_receipt())
+    assert icpage_violations({"decisions": {"d_icpage_arm": record}}) != []
+    if schema_red:
+        assert _schema_errors(_icpage_record_schema(_load_criteria()), record) != []
+
+
+# ---------------------------------------------------------------------------------------------- 封閉路徑登錄（審查 r5 CODEX-R5-P1-03）
+# 重型生成之獨有覆蓋以判準檔 path_registry 之 id 機械判定（covers 文字只作人讀說明）；測試端獨立帳與估時器
+# `coverage_violations`（⑦ path_registry_violations）互為對照。
+
+def _path_registry_ledger_violations(criteria: Mapping[str, Any]) -> List[str]:
+    """獨立重算：(a) 同碼態一 id 至多一個生成宣稱（distinct_by 所列 env／variant 兩兩相異者除外）；(b) 每個登錄 id 至少一個
+    生成宣稱；(c) 錨點 path:line 解析至存在之非空行；生成列 covers_ids 非空且 ⊆ 登錄。不含 assert。"""
+    paths = (criteria.get("path_registry") or {}).get("paths") or []
+    reg = {str(p.get("id")): p for p in paths}
+    out: List[str] = [] if len(reg) == len(paths) and paths else ["登錄為空或 id 重複"]
+    for pid, entry in reg.items():
+        for anchor in entry.get("code_anchors") or [""]:
+            rel, _, line = str(anchor).rpartition(":")
+            target = REPO / rel
+            text = target.read_text(encoding="utf-8", errors="replace").splitlines() if rel and target.is_file() else []
+            if not line.isdigit() or not (1 <= int(line) <= len(text)) or not text[int(line) - 1].strip():
+                out.append(f"{pid} 錨點 {anchor} 不解析")
+    seen: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
+    for kind, node in (criteria.get("run_coverage") or {}).items():
+        if not isinstance(node, Mapping) or not node.get("code_state"):
+            continue
+        for r in node.get("runs") or []:
+            if not int(r.get("generations") or 0):
+                continue
+            ids = list(r.get("covers_ids") or [])
+            if not ids or not set(ids) <= set(reg):
+                out.append(f"{kind} {r.get('cell')} covers_ids {ids} 空或含未登錄")
+            env = json.dumps({str(k): str(v) for k, v in dict(r.get("env") or {}).items()}, sort_keys=True)
+            for pid in ids:
+                seen.setdefault((str(node["code_state"]), pid), []).append((env, str(r.get("variant") or "")))
+    for (state, pid), who in seen.items():
+        dims = list((reg.get(pid) or {}).get("distinct_by") or [])
+        proj = [tuple(e if d == "env" else v for d in dims) for e, v in who]
+        if len(who) > 1 and (not dims or len(set(proj)) != len(proj)):
+            out.append(f"碼態 {state} 之 {pid} 重複宣稱 {len(who)} 次")
+    out += [f"{pid} 無生成宣稱" for pid in reg if not any(p == pid for (_, p) in seen)]
+    return out
+
+
+def test_estimate_path_registry_closed_and_complete() -> None:
+    """判準 path_registry：每個生成列具 covers_ids ⊆ 登錄；同碼態一路徑至多一個生成宣稱（distinct_by 例外）；每個登錄路徑至少
+    一個生成宣稱；錨點解析至存在之非空行。估時器檢查與測試端獨立帳一致為零違規。"""
+    criteria = _load_criteria()
+    assert _path_registry_ledger_violations(criteria) == []
+    assert ESTIMATOR.coverage_violations(criteria) == []
+    assert len(criteria["path_registry"]["paths"]) >= len(_closed_cells())
+
+
+@pytest.mark.parametrize("mutant", ["reworded_duplicate_same_id", "registry_id_unclaimed", "anchor_missing_line",
+                                    "generation_without_covers_ids"])
+def test_mutation_estimate_path_registry(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R5-P1-03）：以新措辭重複同一路徑 id（同碼態、非 distinct_by 維度）／登錄 id 無生成宣稱／錨點指向不存在
+    之行／生成列缺 covers_ids ⇒ 估時器 `coverage_violations` 與測試端獨立帳皆紅（變異經 `load_criteria` 注入）。"""
+    criteria = copy.deepcopy(_load_criteria())
+    monkeypatch.setattr(ESTIMATOR, "load_criteria", lambda *_a, **_k: criteria)
+    assert ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria()) == []
+    cov = criteria["run_coverage"]
+    if mutant == "reworded_duplicate_same_id":
+        src = next(r for r in cov["freeze_baseline"]["runs"] if r["cell"] == "A_BTCUSDT_4h")
+        cov["l2_arm_matrix"]["runs"].append({**copy.deepcopy(src), "env": {"FFACT_USE_POLARS": "0"},
+                                             "covers": "變異：同一週期換算路徑之另一種說法", "transform_passes": 0})
+        expect = "同碼態重複路徑"
+    elif mutant == "registry_id_unclaimed":
+        criteria["path_registry"]["paths"].append({"id": "mutant.unclaimed", "description": "變異",
+                                                    "code_anchors": ["momentum/factories.py:327"]})
+        expect = "無任何生成宣稱"
+    elif mutant == "anchor_missing_line":
+        criteria["path_registry"]["paths"][0]["code_anchors"] = ["momentum/factories.py:999999"]
+        expect = "不解析至存在之非空行"
+    else:
+        next(r for r in cov["regen_b4"]["runs"] if r.get("variant"))["covers_ids"] = []
+        expect = "缺 covers_ids"
+    violations = ESTIMATOR.coverage_violations(ESTIMATOR.load_criteria())
+    assert any(expect in v for v in violations), violations
+    assert _path_registry_ledger_violations(criteria) != []
+
+
+# ---------------------------------------------------------------------------------------------- 效能基準收據內容（審查 r6 CODEX-R6-P1-04）
+
+def _valid_perf_receipt() -> Dict[str, Any]:
+    """合 SPEC Task 1.1「效能基準」之收據樣本（結構；秒數為佔位）：判準 perf_benchmark 之每格一輸入、契約臂＋polars_float64
+    各三次與中位數、Polars 慢因剖析。"""
+    arms = list(nv.load_contract()["post_ic_arm_values"]["values"]) + [nh.PERF_CANDIDATE_ARM]
+    return {"inputs": [{"cell": cid, "arms": {arm: {"reachable": True, "runs_seconds": [3.0, 1.0, 2.0], "median_seconds": 2.0}
+                                              for arm in arms}}
+                       for cid in nh.criteria_run_cells("perf_benchmark")],
+            "polars_profile": {"steps": [{"step": "rank_udf", "seconds": 80.0}, {"step": "zscore", "seconds": 5.0}],
+                               "rank_udf_per_column_python_loop": True}}
+
+
+def test_perf_benchmark_receipt_checker_accepts_valid_receipt() -> None:
+    """效能基準收據之內容檢查（D-ICPAGE-ARM 重新呈報所據）：合 SPEC 之樣本無違規。"""
+    assert nh.perf_benchmark_receipt_violations(_valid_perf_receipt()) == []
+
+
+@pytest.mark.parametrize("mutant", ["single_run", "missing_arm", "missing_profiling", "missing_input", "median_wrong",
+                                    "unreachable_without_reason"])
+def test_mutation_icpage_re_presentation_perf_receipt_content(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R6-P1-04）：重新呈報所據之效能基準收據只一次牆鐘／缺一臂／缺 Polars 慢因剖析／缺一個輸入格／中位數
+    不符／不可達臂無理由 ⇒ `icpage_violations`（⑦，經 re_presentation）紅；未變異時同紀錄為綠（對照）。"""
+    monkeypatch.setattr(sys.modules[__name__], "_repo_file_exists", lambda rel: rel == _FAKE_PERF_RECEIPT)
+    monkeypatch.setattr(sys.modules[__name__], "_perf_receipt_first_commit_date", lambda rel: "2026-10-30")
+    receipt = _valid_perf_receipt()
+    monkeypatch.setattr(sys.modules[__name__], "_load_perf_receipt", lambda rel: receipt)
+    decisions = {"decisions": {"d_icpage_arm": _valid_icpage_record()}}
+    assert icpage_violations(decisions) == []
+    first = receipt["inputs"][0]["arms"]
+    if mutant == "single_run":
+        first[nh.PERF_CANDIDATE_ARM] = {"reachable": True, "runs_seconds": [2.0], "median_seconds": 2.0}
+    elif mutant == "missing_arm":
+        first.pop(sorted(first)[0])
+    elif mutant == "missing_profiling":
+        receipt.pop("polars_profile")
+    elif mutant == "missing_input":
+        receipt["inputs"].pop()
+    elif mutant == "median_wrong":
+        first[nh.PERF_CANDIDATE_ARM]["median_seconds"] = 3.0
+    else:
+        first[nh.PERF_CANDIDATE_ARM] = {"reachable": False, "unreachable_reason": " "}
+    assert any("效能基準收據" in v for v in icpage_violations(decisions))
+
+
+# ---------------------------------------------------------------------------------------------- 轉換成本缺實測不代補（審查 r6 CODEX-R6-P1-05）
+
+def _icpostleak_registry_branches() -> List[str]:
+    """ICPOSTLEAK 契約之非 IC 頁臂分支（registry 系；估時器 `branch_seconds` 之鍵）。不含 assert。"""
+    contract = json.loads((REPO / "tests" / "_golden" / "icpostleak" / "contract.json").read_text(encoding="utf-8"))
+    return [b for b in contract["branches"] if b not in ESTIMATOR.BRANCH_ARM]
+
+
+@pytest.mark.parametrize("mutant", ["drop_contract_arm", "drop_registry_branch", "drop_candidate_proxy_arm"])
+def test_mutation_estimate_missing_arm_invalidates_receipt(mutant: str) -> None:
+    """mutation：某格之實測缺一個契約臂／缺一個 registry 系分支／缺候選臂之代理臂（polars）⇒ 估時器不以中位數／最大值代補：
+    該列標 incomplete、收據列入 `incomplete`，估時收據檢查拒收；未變異時同收據無此違規（對照）。"""
+    criteria = _load_criteria()
+    inventory = ESTIMATOR.kline_inventory(nh.KLINE_PATH)
+    cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)
+    arms = nv.load_contract()["post_ic_arm_values"]["values"]
+
+    def receipt_for(measurements: Mapping[str, Any]) -> Dict[str, Any]:
+        body = ESTIMATOR.build_receipt(cells, inventory, criteria, measurements, arms)
+        return json.loads(json.dumps({"reported_at": "2026-10-22T00:00:00+08:00", "cells": cells, **body}))
+
+    measurements = _synthetic_measurements(inventory, cells)
+    assert not any("估時不完整" in v for v in closed_estimate_receipt_violations(receipt_for(measurements), _kline_index()))
+    target = measurements["A_BTCUSDT_1h"]
+    if mutant == "drop_contract_arm":
+        target["arm_seconds"].pop("pandas_legacy")
+    elif mutant == "drop_registry_branch":
+        target["branch_seconds"].pop(_icpostleak_registry_branches()[0])
+    else:
+        target["arm_seconds"].pop(ESTIMATOR.CANDIDATE_BRANCH_ARM)
+    mutated = receipt_for(measurements)
+    assert any(item.endswith(":A_BTCUSDT_1h") for item in mutated["incomplete"]), mutated["incomplete"]
+    assert any("估時不完整" in v for v in closed_estimate_receipt_violations(mutated, _kline_index()))
+    # 成本函式本身亦不代補：缺臂 ⇒ perf／branchdiff 回 None（registry 分支缺只影響 branchdiff）
+    if mutant == "drop_registry_branch":
+        assert ESTIMATOR.branchdiff_seconds(target["arm_seconds"], target["branch_seconds"]) is None
+    else:
+        assert ESTIMATOR.perf_seconds(target["arm_seconds"], list(arms)) is None
+
+
+# ---------------------------------------------------------------------------------------------- 批次快取鍵（審查 r6 CODEX-R6-P1-01）
+
+def test_regen_cache_key_binds_datasets_and_seam_state() -> None:
+    """批次共用生成快取鍵之組成含格描述子、env、產品碼態、生成接縫碼態與格之 K 線資料集紀錄；每格之資料集 sha256 等於估時器
+    `dataset_record`（同一定義：dtype 描述＋C 連續位元組），來源依判準 kline_source。"""
+    criteria = _load_criteria()
+    for cell in _closed_cells():
+        payload = nh.regen_cache_key_payload(cell)
+        assert set(payload) == {"cell", "env", "code_state", "seam_state", "datasets"}, sorted(payload)
+        source = ESTIMATOR.cell_source(cell, criteria)
+        for tf in cell["timeframes"]:
+            want = ESTIMATOR.dataset_record(source, cell["symbol"], tf)["dataset_sha256"]
+            assert payload["datasets"][tf]["dataset_sha256"] == want, (cell["id"], tf)
+
+
+@pytest.mark.parametrize("mutant", ["dataset_changed", "seam_file_changed", "code_state_changed", "env_changed"])
+def test_mutation_regen_cache_key_miss_on_dataset_or_seam_change(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（CODEX-R6-P1-01）：格之 K 線資料集改變／生成接縫檔（凍結腳本）改變／產品碼態改變／env 改變 ⇒ 快取鍵改變
+    （不命中、須重生）；未變異時同格同 env 之鍵不變（對照）。"""
+    cell = next(c for c in _closed_cells() if c["id"] == "A_BTCUSDT_12h")
+    base = nh.regen_cache_key(cell)
+    assert nh.regen_cache_key(cell) == base
+    env = None
+    if mutant == "dataset_changed":
+        monkeypatch.setattr(nh, "kline_dataset_sha256", lambda *a, **k: "0" * 64)
+    elif mutant == "seam_file_changed":
+        real = nh._read_bytes
+        monkeypatch.setattr(nh, "_read_bytes", lambda p: real(p) + (b"\n# mutant" if Path(p).name == "numview_freeze_baseline.py"
+                                                                      else b""))
+    elif mutant == "code_state_changed":
+        monkeypatch.setattr(nh, "code_state_sha256", lambda: "f" * 64)
+    else:
+        env = {"FFACT_USE_POLARS": "0"}
+    assert nh.regen_cache_key(cell, env) != base
+
+
+# ---------------------------------------------------------------------------------------------- b4 mutant 生成之估時（審查 r6 CODEX-R6-P1-02）
+
+CORE_TEST_PATH = REPO / "tests" / "feature_engineering" / "test_numview_core.py"
+
+
+def _read_core_source() -> str:
+    return CORE_TEST_PATH.read_text(encoding="utf-8")
+
+
+def core_patched_generation_tests(source: str) -> Set[str]:
+    """`test_numview_core.py` 中以 patch（mutant／故障注入）真實生成之測試：其本體呼叫 `_generate(..., patches=...)`（AST）。
+    不含 assert。"""
+    out: Set[str] = set()
+    for fn in ast.parse(source).body:
+        if isinstance(fn, ast.FunctionDef) and fn.name.startswith("test_"):
+            for node in ast.walk(fn):
+                if (isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_generate"
+                        and any(k.arg == "patches" for k in node.keywords)):
+                    out.add(fn.name)
+    return out
+
+
+def mutant_rows_violations(criteria: Mapping[str, Any], source: str) -> List[str]:
+    """判準 `run_coverage.regen_b4_mutants` 之列＝核心測試之 patch 生成測試（逐支一列，`mutation_test` 指名）；每列 generations≥1、
+    covers_ids 為 `mutation.*`。不含 assert。"""
+    rows = (criteria.get("run_coverage") or {}).get("regen_b4_mutants", {}).get("runs") or []
+    listed = {str(r.get("mutation_test", "")).rpartition("::")[2] for r in rows}
+    want = core_patched_generation_tests(source)
+    out = [f"核心 patch 生成測試未列估時：{sorted(want - listed)}"] if want - listed else []
+    out += [f"估時列之 mutation_test 不存在：{sorted(listed - want)}"] if listed - want else []
+    for r in rows:
+        if not int(r.get("generations") or 0) or not all(str(i).startswith("mutation.") for i in r.get("covers_ids") or [""]):
+            out.append(f"{r.get('variant')}：generations／covers_ids 不合")
+    return out
+
+
+def test_estimate_b4_mutant_generations_listed_and_costed() -> None:
+    """b4 之 mutant／故障注入生成逐支列於 `regen_b4_mutants`（＝核心測試 AST 列舉之 patch 生成，最壞情形全部決定分支），且估時
+    收據逐列計秒（>0）並載 `mutation_test`。"""
+    criteria = _load_criteria()
+    assert mutant_rows_violations(criteria, _read_core_source()) == []
+    inventory = ESTIMATOR.kline_inventory(nh.KLINE_PATH)
+    cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)
+    body = ESTIMATOR.build_receipt(cells, inventory, criteria, _synthetic_measurements(inventory, cells),
+                                   nv.load_contract()["post_ic_arm_values"]["values"])
+    rows = body["run_kinds"]["regen_b4_mutants"]["runs"]
+    assert rows and all(r["seconds"] > 0 and r.get("mutation_test") for r in rows), rows
+    assert body["run_kinds"]["regen_b4_mutants"]["extrapolated_total_seconds"] > 0
+
+
+def test_mutation_estimate_unlisted_core_patched_generation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：核心測試新增一支 patch 生成測試而判準未列 ⇒ 檢查紅（經 `_read_core_source` 注入）。"""
+    assert mutant_rows_violations(_load_criteria(), _read_core_source()) == []
+    extra = ("\n\ndef test_mutation_numview_unlisted(tmp_path):\n"
+             "    run = _generate(tmp_path, 'B', _cells('B')[0], patches=[lambda mp, run: None])\n")
+    monkeypatch.setattr(sys.modules[__name__], "_read_core_source", lambda: CORE_TEST_PATH.read_text(encoding="utf-8") + extra)
+    assert any("未列估時" in v for v in mutant_rows_violations(_load_criteria(), _read_core_source()))

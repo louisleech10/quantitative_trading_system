@@ -394,7 +394,10 @@ class CellLab:
         key = (cell_id, tuple(sorted((str(k), str(v)) for k, v in env.items())))
         if key not in self._runs:
             work = self.root / f"{cell_id}_{len(self._runs)}"
-            run_dir = Path(_freeze_module().generate_cell(work, _descriptor(cell_id), run_kind="regen_t21",
+            # 批次共用生成（判準檔 cell_rules.batch_cache）：root＝共用快取根、跑別＝本檢查所讀之批次（b3）；`work` 只作
+            # 舊判準（無 reads_from）之隔離根
+            run_dir = Path(_freeze_module().generate_cell(nh.regen_root(work), _descriptor(cell_id),
+                                                          run_kind=nh.regen_batch_kind("regen_t21"),
                                                           env=dict(env)).run_dir)
             assert (run_dir / "feature_manifest.json").is_file(), f"重生之 run 無 manifest：{run_dir}"
             self._runs[key] = run_dir

@@ -161,7 +161,7 @@ def load_freeze() -> Dict[str, Any]:
 
 
 def load_criteria() -> Dict[str, Any]:
-    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）⇒ 讀現行判準；v1 現行時沿原斷言
+    if nh.criteria_replaced():  # 判準檔已以 vN 取代（SPEC Task 0.3 邊界①：判準檔恰一存在）⇒ 讀現行判準；v1 現行時沿原斷言
         return _json(nh.current_criteria_path())
     return _json(nh.CRITERIA_PATH)
 
@@ -175,7 +175,7 @@ def read_text(path: Path) -> str:
 
 
 def criteria_sha256() -> str:
-    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）⇒ 讀現行判準；v1 現行時沿原斷言
+    if nh.criteria_replaced():  # 判準檔已以 vN 取代（SPEC Task 0.3 邊界①：判準檔恰一存在）⇒ 讀現行判準；v1 現行時沿原斷言
         current = nh.current_criteria_path()
         assert current.is_file(), f"判準檔不存在：{current}"
         return hashlib.sha256(current.read_bytes()).hexdigest()
@@ -213,7 +213,10 @@ def tf_seconds(tf: str) -> float:
 
 
 def enumerate_keys(kinds: Sequence[str]) -> Set[CellKey]:
-    """格 A＝每個 symbol×tf；格 B＝每個具 ≥2 週期之 symbol（週期依長度升冪）；格 C＝每個 symbol×tf。"""
+    """格 A＝每個 symbol×tf；格 B＝每個具 ≥2 週期之 symbol（週期依長度升冪）；格 C＝每個 symbol×tf。判準 v3 起改為判準檔
+    封閉路徑覆蓋清單中屬 `kinds` 之格（SPEC §C、Task 0.5 ②）。"""
+    if nh.criteria_cell_list() is not None:  # 判準 v3 起：封閉清單取代全部 symbol×tf 列舉
+        return nh.criteria_cell_keys(kinds)
     out: Set[CellKey] = set()
     for symbol, tfs in kline_inventory().items():
         for kind in kinds:
@@ -282,7 +285,8 @@ def _entry_key(entry: Mapping[str, Any]) -> Tuple[str, str]:
 
 
 def branchdiff_rows_violations() -> List[str]:
-    """列數＝格數×分支數×7、每 (格, 輸入, 分支, 組合) 恰一列；格涵蓋：輸入 (i)＝每個 symbol×tf、輸入 (ii)＝凍結檔全部格。"""
+    """列數＝格數×分支數×7、每 (格, 輸入, 分支, 組合) 恰一列；格涵蓋：輸入 (i)＝每個 symbol×tf、輸入 (ii)＝凍結檔全部格。
+    判準 v3 起（SPEC Task 1.1 v17）：輸入 (i)＝封閉清單格 A 之 symbol×tf、輸入 (ii)＝判準 `run_coverage.postic_branchdiff` 之格。"""
     receipt = load_receipt("postic-branchdiff")
     branches, combos = expected_branches(), combo_names()
     out: List[str] = []
@@ -293,11 +297,13 @@ def branchdiff_rows_violations() -> List[str]:
     if len(keys) != len(set(keys)) or not keys:
         out.append("cells 重複或為空")
     inv_i = {(str(c["symbol"]), tuple(c["timeframes"])) for c in cells if c["input"] == "i"}
-    want_i = {(s, (tf,)) for s, tfs in kline_inventory().items() for tf in tfs}
+    want_i = (nh.criteria_symbol_timeframes("A") if nh.criteria_cell_list() is not None
+              else {(s, (tf,)) for s, tfs in kline_inventory().items() for tf in tfs})
     if inv_i != want_i:
         out.append(f"輸入 (i) 涵蓋 ≠ 每個 symbol×tf：缺 {sorted(want_i - inv_i)[:5]}")
     inv_ii = {cell_key(c) for c in cells if c["input"] == "ii"}
-    want_ii = {cell_key(r) for r in load_freeze()["cells"].values()}
+    want_ii = (nh.criteria_run_cell_keys("postic_branchdiff") if nh.criteria_cell_list() is not None
+               else {cell_key(r) for r in load_freeze()["cells"].values()})
     if inv_ii != want_ii:
         out.append(f"輸入 (ii) 涵蓋 ≠ 凍結格：缺 {sorted(want_ii - inv_ii)[:5]} 多 {sorted(inv_ii - want_ii)[:5]}")
     rows = receipt["rows"]
@@ -561,11 +567,13 @@ def test_mutation_ic_material_tau_lt_1_flips_boundary_15(monkeypatch: pytest.Mon
 # ============================================================================================== Task 1.2
 
 def precision_completeness_violations() -> List[str]:
-    """段 × 格完整：格涵蓋＝格 A∪B∪C 列舉；measured 格之 S0–S4 逐欄列之欄集合＝該格欄、S5 ≥1 列；blocked 格每段 ≥1 列。"""
+    """段 × 格完整：格涵蓋＝格 A∪B∪C 列舉；measured 格之 S0–S4 逐欄列之欄集合＝該格欄、S5 ≥1 列；blocked 格每段 ≥1 列。
+    判準 v3 起：格涵蓋＝判準 `run_coverage.precision_chain` 之格（變體宿主格＋格 B＋格 C）。"""
     receipt = load_receipt("precision-chain")
     out: List[str] = []
     cells = {cell_key(c): c for c in receipt["cells"]}
-    want = enumerate_keys(("A", "B", "C"))
+    want = (nh.criteria_run_cell_keys("precision_chain") if nh.criteria_cell_list() is not None
+            else enumerate_keys(("A", "B", "C")))
     if set(cells) != want:
         out.append(f"格涵蓋 ≠ A∪B∪C：缺 {sorted(want - set(cells))[:5]} 多 {sorted(set(cells) - want)[:5]}")
     rows: Dict[Tuple[str, str], List[Mapping[str, Any]]] = {}
@@ -706,10 +714,14 @@ def test_l2_matrix_receipt_rc_and_criteria() -> None:
 
 
 def test_l2_matrix_cells_equal_a_plus_b() -> None:
-    """Task 1.3 驗證：格數＝格 A＋格 B 全部（列舉自 kline_cache.h5）。"""
+    """Task 1.3 驗證：格數＝格 A＋格 B 全部（列舉自 kline_cache.h5）。判準 v3 起：格＝判準 `run_coverage.l2_arm_matrix`
+    之格（`A:BTCUSDT:1h`、格 B、格 C，另 `A:BTCUSDT:12h` 重現 freeze-baselines）。"""
     cells = [cell_key(c) for c in load_receipt("l2-arm-matrix")["cells"]]
     assert len(cells) == len(set(cells))
-    assert set(cells) == enumerate_keys(("A", "B"))
+    if nh.criteria_cell_list() is not None:  # 判準 v3 起：封閉清單之跑別涵蓋
+        assert set(cells) == nh.criteria_run_cell_keys("l2_arm_matrix")
+    else:
+        assert set(cells) == enumerate_keys(("A", "B"))
 
 
 def test_l2_matrix_btc_12h_reproduces_freeze_baselines() -> None:
@@ -858,8 +870,10 @@ class _Regen:
     def get(self, cell_id: str, record: Mapping[str, Any]) -> Dict[str, Any]:
         if cell_id not in self._cache:
             arms = sorted((record.get("g1") or {}).keys())
-            self._cache[cell_id] = freeze_script().freeze_cell(record, self.root / re.sub(r"[^A-Za-z0-9_.-]", "_", cell_id),
-                                                               arms=arms, run_kind="regen_section_g")
+            # 批次共用生成（判準檔 cell_rules.batch_cache）：root＝共用快取根、跑別＝§G 所讀之批次（舊判準 ⇒ 本倉隔離根）
+            self._cache[cell_id] = freeze_script().freeze_cell(
+                record, nh.regen_root(self.root / re.sub(r"[^A-Za-z0-9_.-]", "_", cell_id)),
+                arms=arms, run_kind=nh.regen_batch_kind("regen_section_g"))
         return self._cache[cell_id]
 
 

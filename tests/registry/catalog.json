@@ -4827,6 +4827,29 @@
    "rewrite_targets": [],
    "ticket": "NUMVIEW"
   },
+  "tests/feature_engineering/test_numview_reference.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A3",
+    "A5",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "PROPERTY",
+    "TOLERANCE"
+   ],
+   "path": "tests/feature_engineering/test_numview_reference.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NUMVIEW"
+  },
   "tests/feature_engineering/test_numview_selectors.py": {
    "claim": [
     "contract"

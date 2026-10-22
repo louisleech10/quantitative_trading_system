@@ -4,7 +4,8 @@
 `require(run_kind, cells)`：估時收據（`handoffs/run_receipts/<date>-numview-estimate.json`）不存在、無
 `reported_at`（主委白話報使用者後寫入）、或所請格不在收據該跑別之格清單（`cells` 格 id ∪ `preprov_cells` PRE-PROV 格名）
 ⇒ 拋 `EstimateGateError`（不只 log）。Phase 2–4 驗收重產（R15-A）同受此閘：`numview_freeze_baseline.generate_cell`／
-`freeze_cell` 以 `regen_*` 跑別呼叫。測試直接經 `preprov_helpers` 生成之 PRE-PROV 格只由估時收據之 `preprov_cells`
+`freeze_cell` 以批次生成跑別（`regen_b3`／`regen_b4`／`regen_b5`；每批碼態內每個生成身分只生成一次，見判準檔
+`cell_rules.batch_cache`）呼叫。測試直接經 `preprov_helpers` 生成之 PRE-PROV 格只由估時收據之 `preprov_cells`
 涵蓋檢查（Task 0.4 ①）約束，執行期不經本閘（見 manifest not_executable）。
 
 已實作（NUMVIEW b1，Task 0.4）。
@@ -62,21 +63,23 @@ def _reported_at(receipt: Mapping[str, Any]) -> datetime:
 #: 取代並刪 v1）。現行判準＝兩者中恰一存在者；兩者皆在或皆無 ⇒ 不可判定（拒跑）。
 CRITERIA_DIR: Path = REPO / "tests" / "_golden" / "numview"
 CRITERIA_V1_NAME = "preregistered_criteria.json"
-CRITERIA_V2_NAME = "preregistered_criteria_v2.json"
+#: 判準檔名樣式：v1＝`preregistered_criteria.json`，其後每版＝`preregistered_criteria_v<N>.json`（vN→vN+1 只准於任何
+#: Phase 1 收據提交前取代並刪舊檔；SPEC Task 0.3 邊界①）
+CRITERIA_GLOB = "preregistered_criteria*.json"
 
 
 class CriteriaResolutionError(EstimateGateError):
-    """現行判準檔不可判定（v1／v2 皆在或皆無）。"""
+    """現行判準檔不可判定（判準檔名樣式之檔非恰一）。"""
 
 
 def resolve_criteria_path(criteria_dir: Optional[Path] = None) -> Path:
-    """現行事前登記判準檔：v1／v2 恰一存在者（同 `tests/feature_engineering/test_numview_criteria.py` 之 `_criteria_path`
-    與邊界 05 之「兩檔名恰一存在」）；否則 `CriteriaResolutionError`。估時器、凍結腳本與探針一律經本函式取判準路徑。"""
+    """現行事前登記判準檔：`preregistered_criteria*.json`（v1、v2、v3…）恰一存在者；否則 `CriteriaResolutionError`。
+    估時器、凍結腳本與探針一律經本函式取判準路徑（同 `numview_helpers.current_criteria_path`）。"""
     directory = Path(criteria_dir) if criteria_dir is not None else Path(CRITERIA_DIR)
-    present = [directory / name for name in (CRITERIA_V1_NAME, CRITERIA_V2_NAME) if (directory / name).is_file()]
+    present = sorted(p for p in directory.glob(CRITERIA_GLOB) if p.is_file())
     if len(present) != 1:
         raise CriteriaResolutionError(
-            f"判準檔須 {CRITERIA_V1_NAME}／{CRITERIA_V2_NAME} 恰一存在於 {directory}，實得 {[p.name for p in present]}")
+            f"判準檔（{CRITERIA_GLOB}）須恰一存在於 {directory}，實得 {[p.name for p in present]}")
     return present[0]
 
 

@@ -128,8 +128,9 @@ def contract_state() -> str:
 
 def g1_regen_kind() -> str:
     """G1 格重產之估時跑別（SPEC Task 0.4、R15-A）：Phase 2（依環境）⇒ `regen_t22`（Task 2.2，批 b3）；鎖臂後 ⇒
-    `regen_t34`（Task 3.4，批 b4）。兩批各重產一次，故估時分列。"""
-    return "regen_t34" if contract_state() == LOCKED_STATE else "regen_t22"
+    `regen_t34`（Task 3.4，批 b4）。兩批各重產一次，故估時分列。判準具批次共用生成時回其所讀之批次跑別（b3／b4；
+    判準檔 cell_rules.batch_cache：同批碼態內每格每環境只生成一次、全部檢查共用）。"""
+    return nh.regen_batch_kind("regen_t34" if contract_state() == LOCKED_STATE else "regen_t22")
 
 
 def locked_arm() -> str:
@@ -453,7 +454,9 @@ class G1Lab:
     def source(self, cell_id: str) -> Source:
         if cell_id not in self._sources:
             g1 = _g1(cell_id)
-            run_dir = Path(_freeze_module().generate_cell(self.root / f"gen_{cell_id}", _descriptor(cell_id),
+            # 批次共用生成（判準檔 cell_rules.batch_cache）：root＝共用快取根（舊判準 ⇒ 本倉隔離根）
+            run_dir = Path(_freeze_module().generate_cell(nh.regen_root(self.root / f"gen_{cell_id}"),
+                                                          _descriptor(cell_id),
                                                           run_kind=g1_regen_kind(),
                                                           env=dict(g1["source_env"])).run_dir)
             self._sources[cell_id] = _source_of(run_dir, _library_for(run_dir, self.root / f"registry_{cell_id}.json"))
@@ -865,6 +868,24 @@ def test_icpage_arm_locked_decision_record_user_ruling() -> None:
         assert sentence in text, sentence
     choice = nh.decision("d_icpage_arm")
     assert isinstance(choice, str) and choice
+
+
+def test_icpage_arm_locked_decision_record_re_presentation() -> None:
+    """Task 3.4 施工前提／⑥（SPEC v17 §A 重新呈報條件、Task 1.5 ⑦）：決定紀錄 `d_icpage_arm` 具 `re_presentation`——日期不早於
+    Task 1.1 效能基準收據之首次提交、使用者回覆逐字、所據收據存在且已提交、`confirmed_choice`＝`choice`＝鎖臂（同
+    `numview_helpers.re_presentation_violations`，與 Task 1.5 ⑦ 同一判定）。缺或不合 ⇒ 本批（b4）不得施工。"""
+    record = _decision_record("d_icpage_arm")
+    assert nh.re_presentation_violations(record) == []
+    assert record["choice"] == record["re_presentation"]["confirmed_choice"]
+
+
+def test_mutation_icpage_arm_locked_re_presentation_deleted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：決定紀錄 `d_icpage_arm` 刪 `re_presentation`（保留鎖臂、改公開輸出與 2026-10-21 user_ruling；經本檔決定紀錄
+    讀取入口 `_decision_record` 注入）⇒ b4 閘之判定紅。"""
+    record = {"choice": "lock", "changes_public_output": True,
+              "user_ruling": {"date": RULING_DATE, "quote": list(RULING_QUOTES)}}
+    monkeypatch.setattr(sys.modules[__name__], "_decision_record", lambda key: dict(record))
+    assert any("缺 re_presentation" in v for v in nh.re_presentation_violations(_decision_record("d_icpage_arm")))
 
 
 def _pandas_arm_callers_receipt() -> Dict[str, Any]:

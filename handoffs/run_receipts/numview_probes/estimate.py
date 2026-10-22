@@ -1,30 +1,29 @@
 """NUMVIEW 量測格清單與估時（docs/NUMVIEW_SPEC.md Task 0.4，R2-B、R15-A；先於一切重型跑）。
 
-自 `data_cache/feature_klines/kline_cache.h5` 列舉 symbol×tf（不寫死清單）：格 A＝每個 symbol×tf 單週期短窗、
-格 B＝每個具 ≥2 週期之 symbol 之多週期格（描述子 timeframes＝全部候選週期；實際訓練週期依判準檔 `cell_rules.b_membership`
-排除格 A 判前史不足之週期）、格 C＝生產預設全特徵於每個 symbol×tf。一切格之生成區間＝輸出段（主週期最後 output_bars 根）＋所需前史（判準檔 `cell_rules.window_rule`：D₀＋N_cal），不跑全史；逐格之所需／可得前史記於收據 `pre_history`。格之生成定義（設定覆寫、輸出段根數、前史判定、
-IC-first 參數）一律讀現行事前登記判準檔（`_estimate_gate.resolve_criteria_path()`：v1／v2 恰一存在者）之 `cell_rules`／
-`cell_definitions`（本檔不另寫設定）。
+量測設計＝路徑覆蓋（使用者 2026-10-22 裁定）：格＝現行事前登記判準檔（`_estimate_gate.resolve_criteria_path()`：
+`preregistered_criteria*.json` 恰一存在者）之封閉清單 `cell_rules.cell_list`（每格寫明其獨有覆蓋路徑 covers）；各跑別之
+重型跑＝判準檔 `run_coverage`（每個 run：格、獨有覆蓋、環境、生成次數、轉換次數；同一路徑不重複跑；同一碼態內每個生成身分
+〔格, 環境, 變體〕只生成一次——Phase 1 讀凍結之生成〔含 Task 1.3 L2 spy〕、Phase 2–4 每批〔regen_b3／b4／b5〕之生成由該批
+全部驗收檢查跑別〔regen_t21…regen_section_g，本身不生成〕共用；`coverage_violations`）。本檔不另寫格或次數。
+格之生成定義（設定覆寫、輸出段根數、前史判定、IC-first 參數、K 線來源）一律讀判準檔之 `cell_rules`／`cell_definitions`。
+一切格之生成區間＝輸出段（主週期於其來源序列之最後 output_bars 根）＋所需前史（`cell_rules.window_rule`），不跑全史；
+K 線來源依週期（`cell_rules.kline_source`），逐格記來源與資料集 sha256。
 
-實測：各類先實測一格之耗時與峰值記憶體——格 A 逐週期一格、格 B 一格（訓練週期依該 symbol 之格 A 實測判定）、格 C 逐週期
-一格（12h 引 `handoffs/run_receipts/20261020-preprov-fullrun-size.md` 之 run A 列——全史 run，為足夠區間 run 之上界；4h／1h 以足夠區間各實測；快取中舊區間之結果自動重量）、PRE-PROV 格逐格（Phase 2–4
-驗收測試直接經 `preprov_helpers` 生成之格）。每次實測於獨立子行程、隔離目錄（設定檔連結、CGSA 工作目錄、registry、
-d* 快取、tempdir 皆導向該目錄；不寫 `data_cache/`）執行，量畢即刪該目錄。格 A／B 之實測另以生成內擷取之 post-IC
-輸入，於每個可達臂（契約 `post_ic_arm_reachability`）各計一次 IC 頁預設請求之轉換秒數，供轉換型跑別外推。
-前史不足（判準檔 `cell_rules.insufficient_history`）：生成之 run 為 partial 且 failure_reasons 全為 `*_insufficient_history`
-⇒ 該格 blocked（history），記事件欄數與根數；其他非 complete ⇒ failed（不寫收據）。估時器以逐週期格 A 之判定預測同週期
-根數不多於受測格之全部格 A（前史更少者不會更足），blocked 格不入外推，但凍結（freeze_baseline）須生成至判定，其嘗試秒數
-另列並計入該跑別。
+實測：封閉清單之每格各實測一次（目標鍵＝格 id）與 PRE-PROV 格逐格；每次實測於獨立子行程、隔離目錄（設定檔連結、CGSA
+工作目錄、registry、d* 快取、tempdir 皆導向該目錄；不寫 `data_cache/`）執行，量畢即刪該目錄。IC-first 之格另以生成內擷取之
+post-IC 輸入，於每個可達臂（契約 `post_ic_arm_reachability`）各計一次 IC 頁預設請求之轉換秒數。快取：輸出段、資料集紀錄與
+生成入口皆同現行判準之實測可重用（舊快取鍵改以其 cell_id 為鍵）。前史不足（`cell_rules.insufficient_history`）：生成之 run
+只因 `*_insufficient_history` 而 partial ⇒ 該格 blocked（history），不入外推，其嘗試秒數計入凍結。
 
-外推：逐跑別（`RUN_KINDS`）以 `RUN_PLAN` 之每格生成次數／轉換次數（逐項註明來源）× 該格類與週期之實測單格秒數，
-列格清單、PRE-PROV 格、單格秒數、逐格秒數、外推總秒數；另列不降驗證之省法與 blocked 格。
+外推：逐跑別之每個 run＝生成次數 × 該格實測生成秒數＋轉換次數 × 該格各臂轉換秒數之和（Task 1.1 分支差：同臂排名算一次、
+非排名組合以最快臂計；效能基準：各臂＋候選臂各三次＋Polars 剖析一次）；收據逐跑別列格、獨有覆蓋、外推秒數與省法。
 邊界：磁碟 < 30 GB ⇒ rc=1 並列所需空間，先於任何生成（②）；格 C 單格實測逾機器上限（記憶體守護具名終止或子行程被
-系統終止）⇒ 該週期之格 C 全列 blocked-by 硬體、不再逐格試（①）。`reported_at` 由主委白話報告後寫入，本腳本不寫。
+系統終止）⇒ blocked-by 硬體（①）。`reported_at` 由主委白話報告後寫入，本腳本不寫。
 
 用法（repo 根目錄）：
-  venv/bin/python handoffs/run_receipts/numview_probes/estimate.py --dry-run          # 只列格與實測目標，不生成
-  venv/bin/python handoffs/run_receipts/numview_probes/estimate.py --targets A:12h      # 只實測指定目標（結果入快取）
-  venv/bin/python handoffs/run_receipts/numview_probes/estimate.py                      # 實測全部未快取目標並寫收據
+  venv/bin/python handoffs/run_receipts/numview_probes/estimate.py --dry-run                 # 列格、目標、可重用之快取，不生成
+  venv/bin/python handoffs/run_receipts/numview_probes/estimate.py --targets A_SOLUSDT_1h      # 只實測指定目標（結果入快取）
+  venv/bin/python handoffs/run_receipts/numview_probes/estimate.py                             # 實測全部未快取目標並寫收據
 實測結果快取於 `--work-root`/measurements.json（可分次跑；`--remeasure` 重量）。收據：
 `handoffs/run_receipts/<date>-numview-estimate.json`（已存在估時收據 ⇒ 拒寫 rc=2，避免兩份）。
 """
@@ -48,16 +47,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
-#: 估時收據須涵蓋之跑別（`_estimate_gate.require` 之 run_kind 值）：Task 0.5 之 G1–G3 與 Phase 1 全部生成；
-#: 另 Phase 2–4 驗收重產（R15-A）——每個以真實生成驗收之單位一個跑別（依各測試檔實際之生成呼叫盤點）：
-#:   regen_t21＝Task 2.1 ④（test_numview_policy.py，格 A BTCUSDT 1h）；regen_t22＝Task 2.2 G1（tests/api/test_numview_ic_page.py，
-#:   全部格 A）；regen_t3_core＝Task 3.1–3.3（test_numview_core.py 三 Task 共用模組範圍格倉、同批 b4 一次跑，全部格 A＋B＋
-#:   PRE-PROV `ic_first_default`）；regen_t34＝Task 3.4（IC 頁鎖臂 G1，全部格 A＋PRE-PROV `ic_first_empty`）；
-#:   regen_t42＝Task 4.2（test_numview_identity.py，PRE-PROV `h1_stat_off`、`ic_first`）；regen_t43＝Task 4.3 ③（PRE-PROV
-#:   `h1_pp_off` 兩次）；regen_section_g＝§G Phase 0／2／4 全格不變式（test_numview_acceptance.py，全部格 A＋B＋沿用基準
-#:   PRE-PROV 全部格）。收據每跑別：cells（格 id）、preprov_cells（PRE-PROV 格名）、single_cell_seconds、extrapolated_total_seconds。
+#: 估時收據須涵蓋之跑別（`_estimate_gate.require` 之 run_kind 值）。v3 起各跑別之格與其獨有覆蓋路徑、生成次數一律讀判準檔
+#: `run_coverage`（路徑覆蓋；使用者 2026-10-22 裁定），本檔不另寫格或次數：Task 0.5（freeze_baseline）、Phase 1（postic_branchdiff、
+#: precision_chain、l2_arm_matrix）、獨立效能基準（perf_benchmark）、Phase 2–4 批次共用生成（regen_b3／b4／b5：每批碼態內
+#: 每個生成身分只生成一次）與讀批次生成之驗收檢查跑別（regen_t21…regen_section_g；R15-A，本身不生成）。
 RUN_KINDS = ("freeze_baseline", "postic_branchdiff", "precision_chain", "l2_arm_matrix",
-             "regen_t21", "regen_t22", "regen_t3_core", "regen_t34", "regen_t42", "regen_t43", "regen_section_g")
+             "regen_t21", "regen_t22", "regen_t3_core", "regen_t34", "regen_t42", "regen_t43", "regen_section_g",
+             "perf_benchmark", "regen_b3", "regen_b4", "regen_b5", "regen_b4_mutants")
+#: 生成型跑別之碼態（判準檔 run_coverage.<跑別>.code_state）合法值：s0＝Phase 0–1（產品碼未改）；b3／b4／b5＝各批；b4_mutant＝b4 之 mutant／故障注入（patch 後之產品碼）
+CODE_STATES = ("s0", "b3", "b4", "b5", "b4_mutant")
 #: 磁碟下限（GB；SPEC §C 重型跑紀律）
 MIN_FREE_DISK_GB = 30
 
@@ -75,8 +73,6 @@ FULLRUN_PEAK_HEADER = "峰值 RSS GiB"
 #: 估時收據檔名與檔名樣式（與 `_estimate_gate.ESTIMATE_RECEIPT_GLOB` 同）
 RECEIPT_NAME = "{date}-numview-estimate.json"
 RECEIPT_GLOB = "*-numview-estimate.json"
-#: Task 2.1 ④ 之單一驗收格（SPEC Task 2.1 驗證④「真實 kline 格 A 之 BTCUSDT 1h」）
-REGEN_T21_CELL: Tuple[str, str] = ("BTCUSDT", "1h")
 #: SPEC §G G1 各臂份之環境設定（`pandas_chunked` 之 chunk 值於實測時依選欄數取「選欄數 − 1」）
 G1_ARM_ENV: Dict[str, Dict[str, str]] = {
     "polars": {"FFACT_USE_POLARS": "1"},
@@ -90,55 +86,8 @@ PREPROV = "preprov"
 LEGACY_ALL = "*legacy*"
 BLOCKED_BY_HARDWARE = "hardware"
 BLOCKED_BY_HISTORY = "history"
-#: 前史 blocked 之格須生成至判定（嘗試秒數）之跑別：格 A／B 於凍結、格 C 於 Task 1.2（precision_chain）
-ATTEMPT_RUN_KIND = {"A": "freeze_baseline", "B": "freeze_baseline", "C": "precision_chain"}
-
-#: 跑別 → 外推計畫。`cells`：格類（"A"／"AB"／"ABC"）、"t21"（REGEN_T21_CELL 單格）或 ""；`generations`：每格生成次數
-#: （一次＝一次 `generate_cell` 等價之 IC-first 生成，格 C＝一次全史生成）；`transform_passes`：每格「每個可達臂各一次
-#: IC 頁預設轉換」之次數；`branchdiff`：Task 1.1 之轉換量（ICPOSTLEAK 分支∪候選臂 × 七組合，另速度量測可達臂∪候選臂 × 3
-#: 次）；`preprov`：PRE-PROV 格 → 生成次數（"*legacy*"＝沿用基準全部格）。`basis` 為盤點來源。
-RUN_PLAN: Dict[str, Dict[str, Any]] = {
-    "freeze_baseline": {
-        "cells": "AB", "generations": {"A": 2, "B": 1}, "transform_passes": {"A": 1}, "preprov": {},
-        "basis": "SPEC Task 0.5／§G：格 A 之 G2 於 FFACT_USE_POLARS 0／1 各生成一次（G1 以其中來源 run 跑各可達臂之 IC 頁轉換"
-                 "一次）；格 B 之 G3 生成一次。前史不足（判準檔 cell_rules.insufficient_history）之格須生成至判定、不入"
-                 "外推，其嘗試秒數另列 blocked_attempt_seconds 並計入本跑別。"},
-    "postic_branchdiff": {
-        "cells": "AB", "generations": {}, "branchdiff": True, "preprov": {},
-        "basis": "SPEC Task 1.1：讀 Task 0.5 保留之 run（不重生）；每格 ICPOSTLEAK 分支∪候選臂 × 七組合各轉換一次，另速度量測"
-                 "可達臂∪候選臂各三次；輸入 (i) 為 3000 根之秒級輸入，併入同格計。"},
-    "precision_chain": {
-        "cells": "ABC", "generations": {"A": 3, "B": 3, "C": 2}, "preprov": {},
-        "basis": "SPEC Task 1.2：格 A／B 另需 S0 float64 鏈變體、memmap 另一支、尾端延伸各一輪生成（S1–S5 於 Task 0.5 之 run 擷取）；"
-                 "格 C 生產生成一次＋S0 float64 鏈變體一次。"},
-    "l2_arm_matrix": {
-        "cells": "AB", "generations": {"A": 2, "B": 2}, "preprov": {},
-        "basis": "SPEC Task 1.3：每格於 FFACT_USE_POLARS 1（兩臂比對）與 0（pandas 臂同表）各生成一次（上界；實際只算至 L2）。"},
-    "regen_t21": {
-        "cells": "t21", "generations": {"A": 3}, "preprov": {},
-        "basis": "test_numview_policy.py CellLab：同（格, 生成環境）一次；G1 polars／pandas_optimized／pandas_legacy 三環境"
-                 "（G2 之 0／1 與前兩者同環境）。"},
-    "regen_t22": {
-        "cells": "A", "generations": {"A": 1}, "transform_passes": {"A": 1}, "preprov": {},
-        "basis": "tests/api/test_numview_ic_page.py G1Lab：每格以 g1_source_env 重生一次、每（格, 臂份）IC 頁一次。"},
-    "regen_t3_core": {
-        "cells": "AB", "generations": {"A": 1, "B": 1}, "transform_passes": {"A": 1}, "preprov": {"ic_first_default": 1},
-        "basis": "test_numview_core.py _Runs：同（格類, 格）一次；另 PRE-PROV ic_first_default。重型 mutation 只對第一格另生成，"
-                 "計入 savings 之反向說明（未外推）。"},
-    "regen_t34": {
-        "cells": "A", "generations": {"A": 1}, "transform_passes": {"A": 1}, "preprov": {"ic_first_empty": 1},
-        "basis": "tests/api/test_numview_ic_page.py G1Lab（鎖臂狀態）＋邊界 38 之 PRE-PROV ic_first_empty。"},
-    "regen_t42": {
-        "cells": "", "generations": {}, "preprov": {"h1_stat_off": 10, "ic_first": 1},
-        "basis": "test_numview_identity.py `_gen`：h1_stat_off 共 10 次（基準、FFACT_USE_POLARS=0、未認證／已認證換臂、三組中止"
-                 "後重跑各兩次）、ic_first 一次。"},
-    "regen_t43": {
-        "cells": "", "generations": {}, "preprov": {"h1_pp_off": 2},
-        "basis": "tests/api/test_numview_ic_page.py Regenerated：h1_pp_off 原始與改一根 K 線各生成一次。"},
-    "regen_section_g": {
-        "cells": "AB", "generations": {"A": 2, "B": 1}, "transform_passes": {"A": 1}, "preprov": {LEGACY_ALL: 1},
-        "basis": "test_numview_acceptance.py _Regen.freeze_cell（同凍結：格 A 兩次、格 B 一次、G1 各臂一次）＋沿用基準 PRE-PROV 全部格。"},
-}
+#: 前史 blocked 之格（封閉清單之格各自實測）須生成至判定，其嘗試秒數計入凍結（freeze_baseline）一次；其餘跑別不生成該格
+ATTEMPT_RUN_KIND = "freeze_baseline"
 
 
 class EstimateError(RuntimeError):
@@ -181,10 +130,22 @@ def cell_id(kind: str, symbol: str, timeframes: Sequence[str]) -> str:
 
 
 def enumerate_cells(kline_path: Path) -> Dict[str, List[Dict[str, Any]]]:
-    """自 kline 檔列舉格 A／B／C（鍵 `A`／`B`／`C`）；格描述子＝{id, kind, symbol, timeframes}（全票唯一形：A／C 之
-    timeframes 恰一項；B 依週期長度升冪、首項＝主週期）。不寫死 symbol 與週期；B 只列具 ≥2 週期之 symbol。"""
+    """格（鍵 `A`／`B`／`C`）；格描述子＝{id, kind, symbol, timeframes}（全票唯一形）。v3 起＝現行判準檔
+    `cell_rules.cell_list.cells` 之封閉清單（路徑覆蓋；每格之 symbol×tf 須存在於主檔列舉 `kline_path`，否則 EstimateError）；
+    判準無封閉清單（v1／v2）⇒ 舊列舉（A／C＝每個 symbol×tf、B＝每個具 ≥2 週期之 symbol）。"""
     inventory = kline_inventory(Path(kline_path))
     out: Dict[str, List[Dict[str, Any]]] = {kind: [] for kind in CELL_CATEGORIES}
+    closed = ((load_criteria().get("cell_rules") or {}).get("cell_list") or {}).get("cells")
+    if isinstance(closed, list):
+        for entry in closed:
+            kind, symbol, tfs = str(entry["kind"]), str(entry["symbol"]), [str(t) for t in entry["timeframes"]]
+            missing = [tf for tf in tfs if tf not in inventory.get(symbol, {})]
+            if missing:
+                raise EstimateError(f"封閉清單之格 {entry['id']} 之 {symbol}×{missing} 不在主檔列舉")
+            if str(entry["id"]) != cell_id(kind, symbol, tfs):
+                raise EstimateError(f"封閉清單之格 id {entry['id']!r} ≠ 格描述子導出之 {cell_id(kind, symbol, tfs)!r}")
+            out[kind].append({"id": str(entry["id"]), "kind": kind, "symbol": symbol, "timeframes": tfs})
+        return out
     for symbol, tfs in inventory.items():
         ordered = list(tfs)
         for kind in ("A", "C"):
@@ -271,6 +232,62 @@ def dataset_record(source: Path, symbol: str, tf: str) -> Dict[str, Any]:
                                  "series_start": pd.Timestamp(int(stamps[0]), unit=unit, tz="UTC").isoformat(),
                                  "series_end": pd.Timestamp(int(stamps[-1]), unit=unit, tz="UTC").isoformat()}
     return dict(_DATASET_RECORDS[key])
+
+
+#: 生產之 K 線連續性設定：生產端 FeatureFactory 一律以 `momentum/factories.py:create_feature_factory` 之預設
+#: `validate_continuity=True` 建構（`api/services/feature_factory_service.py:75`、`api/services/feature_factory_batch_service.py:375`／
+#: `:1487`）；該驗證於 `adapter_registry.fetch_aligned`（不帶時間範圍）→ `CryptoSpotAdapter.fetch` → `KlineStorageManager.read_klines`
+#: 對**全序列**零容忍檢查（`kline_storage.py:1112-1113`），生成窗之切片在其後（`feature_factory._layer0_data_ingestion`）。
+PRODUCTION_VALIDATE_CONTINUITY = True
+
+
+def series_gaps(source: Path, symbol: str, tf: str) -> List[Dict[str, Any]]:
+    """`<source>` 之 `<symbol>/<tf>` 時間戳缺口（相鄰差 ≠ 週期秒數；同 `KlineStorageManager._validate_continuity` 之判定）：
+    [{after, before, after_ts, before_ts, missing_bars}]。"""
+    import h5py
+    import numpy as np
+    import pandas as pd
+    from momentum.core.constants import TIMEFRAME_SECONDS
+
+    with h5py.File(str(source), "r") as handle:
+        stamps = np.asarray(handle[symbol][tf]["data"]["timestamp"][()], dtype=np.int64)
+    unit = 1000 if stamps.size and int(stamps[-1]) > 10 ** 12 else 1
+    seconds = stamps // unit
+    step = int(TIMEFRAME_SECONDS[tf])
+    out: List[Dict[str, Any]] = []
+    for i in np.nonzero(np.diff(seconds) != step)[0]:
+        a, b = int(seconds[i]), int(seconds[i + 1])
+        out.append({"after": pd.Timestamp(a, unit="s", tz="UTC").isoformat(),
+                    "before": pd.Timestamp(b, unit="s", tz="UTC").isoformat(),
+                    "after_ts": a, "before_ts": b, "missing_bars": int((b - a) // step - 1)})
+    return out
+
+
+def continuity_plan(cell: Mapping[str, Any], criteria: Mapping[str, Any],
+                    training_timeframes: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+    """格之連續性設定（判準檔 cell_rules.continuity）：格之單一來源中各訓練週期全序列無缺口 ⇒ 生產設定
+    （`validate_continuity=True`）；有缺口 ⇒ 生產設定之全序列驗證必拒讀（缺口在生成窗外亦然），該格改以 False 建構，並
+    強制窗內零缺口判定（`window_gap_violations`）。回 {validate_continuity, production_setting, series_gaps, reason?}。"""
+    src = cell_source(cell, criteria)
+    gaps = {str(tf): series_gaps(src, str(cell["symbol"]), str(tf))
+            for tf in (training_timeframes or cell["timeframes"])}
+    clean = not any(gaps.values())
+    out: Dict[str, Any] = {"production_setting": PRODUCTION_VALIDATE_CONTINUITY,
+                           "validate_continuity": PRODUCTION_VALIDATE_CONTINUITY if clean else False,
+                           "series_gaps": {tf: g for tf, g in gaps.items() if g}}
+    if not clean:
+        out["reason"] = ("來源全序列有缺口：生產設定之全序列連續性驗證（fetch_aligned 不帶時間範圍）必拒讀；改以 False 建構，"
+                         "並以窗內零缺口判定（定案 ingest 起點至輸出終點）取代——窗內任一缺口 ⇒ failed（data_gap）")
+    return out
+
+
+def window_gap_violations(plan: Mapping[str, Any], window_start: Optional[str]) -> List[str]:
+    """生成窗（`window_start` 起至序列終點）內之缺口；`window_start` 為 None（窗未知）⇒ 全序列缺口皆計（fail-closed）。"""
+    import pandas as pd
+
+    floor = None if window_start is None else int(pd.Timestamp(window_start).timestamp())
+    return [f"{tf}：{g['after']}→{g['before']} 缺 {g['missing_bars']} 根" for tf, gaps in (plan.get("series_gaps") or {}).items()
+            for g in gaps if floor is None or int(g["before_ts"]) > floor]
 
 
 def cell_kline_records(cell: Mapping[str, Any], criteria: Mapping[str, Any],
@@ -471,11 +488,11 @@ def _first_symbol_with(inventory: Mapping[str, Mapping[str, int]], tf: Optional[
     raise EstimateError(f"無任何 symbol 具週期 {tf}")
 
 
-def preprov_needed() -> List[str]:
-    """RUN_PLAN 涉及之 PRE-PROV 格名（"*legacy*" 展開為沿用基準之全部格；讀檔不寫死）。"""
+def preprov_needed(criteria: Optional[Mapping[str, Any]] = None) -> List[str]:
+    """判準 run_coverage 涉及之 PRE-PROV 格名（"*legacy*" 展開為沿用基準之全部格；讀檔不寫死）。"""
     names: Set[str] = set()
-    for plan in RUN_PLAN.values():
-        for name in plan.get("preprov") or {}:
+    for node in run_plan(criteria if criteria is not None else load_criteria()).values():
+        for name in node.get("preprov") or {}:
             if name == LEGACY_ALL:
                 names |= set(load_json(LEGACY_BASELINE_PATH)["cells"])
             else:
@@ -492,26 +509,15 @@ def fullrun_receipt_applicable(criteria: Optional[Mapping[str, Any]] = None) -> 
 
 
 def measurement_targets(cells: Mapping[str, List[Dict[str, Any]]], inventory: Mapping[str, Mapping[str, int]],
-                        symbol: Optional[str], criteria: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
-    """實測目標：格 A 逐週期一格、格 B 一格、格 C 逐週期一格（全史收據可用時 FULLRUN_SIZE_TF 引收據、不實測）、PRE-PROV 逐格。"""
-    use_fullrun = fullrun_receipt_applicable(criteria)
+                        symbol: Optional[str] = None, criteria: Optional[Mapping[str, Any]] = None) -> List[Dict[str, Any]]:
+    """實測目標（路徑覆蓋）：封閉清單之每格一個（目標鍵＝格 id；格 B 排在其訓練週期之格 A 之後）、PRE-PROV 逐格。
+    `symbol`／`inventory` 為舊列舉之相容參數（封閉清單已定 symbol，不再挑）。"""
+    criteria = criteria if criteria is not None else load_criteria()
     targets: List[Dict[str, Any]] = []
-    tfs = sorted({tf for tfs_ in inventory.values() for tf in tfs_}, key=tf_seconds)
-    for tf in tfs:
-        sym = _first_symbol_with(inventory, tf, symbol)
-        cell = next(c for c in cells["A"] if c["symbol"] == sym and c["timeframes"] == [tf])
-        targets.append({"target": f"A:{tf}", "category": "A", "cell": cell})
-    if cells["B"]:
-        sym = symbol if symbol is not None and any(c["symbol"] == symbol for c in cells["B"]) else cells["B"][0]["symbol"]
-        cell = next(c for c in cells["B"] if c["symbol"] == sym)
-        targets.append({"target": "B", "category": "B", "cell": cell})
-    for tf in tfs:
-        if tf == FULLRUN_SIZE_TF and use_fullrun:
-            continue
-        sym = _first_symbol_with(inventory, tf, symbol)
-        cell = next(c for c in cells["C"] if c["symbol"] == sym and c["timeframes"] == [tf])
-        targets.append({"target": f"C:{tf}", "category": "C", "cell": cell})
-    for name in preprov_needed():
+    for kind in ("A", "B", "C"):
+        for cell in cells[kind]:
+            targets.append({"target": cell["id"], "category": kind, "cell": cell})
+    for name in preprov_needed(criteria):
         targets.append({"target": f"preprov:{name}", "category": PREPROV, "preprov_cell": name})
     return targets
 
@@ -624,7 +630,55 @@ def _time_ic_page_arms(selected: Sequence[str], groups: Mapping[str, Any]) -> Di
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
-    return {"selected_count": len(kept), "arm_seconds": seconds}
+    return {"selected_count": len(kept), "arm_seconds": seconds,
+            "branch_seconds": _time_registry_branches(frame.loc[:, kept], config)}
+
+
+def _time_registry_branches(frame: Any, config: Any) -> Dict[str, float]:
+    """ICPOSTLEAK 契約之 registry 系分支（非 IC 頁臂者）各計一次完整轉換秒數（同 `test_icpostleak._run_branch` 之入口：
+    ColumnGroupRegistry 存一群組後呼叫 `transform_registry_groups`／`_to_sink`；env／分片位元組／n_workers 依契約）。審查 r6
+    CODEX-R6-P1-05：branchdiff 估時不得以臂中位數代補這些分支。"""
+    import numpy as np
+
+    from momentum.factories import create_column_group_registry, create_feature_preprocessor
+    from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
+    from momentum.FeatureEngineering.utils import hardware_utils
+
+    branches = load_json(ICPOSTLEAK_CONTRACT_PATH)["branches"]
+    out: Dict[str, float] = {}
+    if frame.shape[1] == 0:
+        return out
+    for name, spec in branches.items():
+        if name in BRANCH_ARM:
+            continue
+        saved = {key: os.environ.get(key) for key in spec.get("env", {})}
+        real_shard = hardware_utils.get_cgsa_shard_bytes
+        work = Path(tempfile.mkdtemp(prefix=f"numview_branch_{name}_"))
+        try:
+            os.environ.update({k: str(v) for k, v in spec.get("env", {}).items()})
+            if "patch_shard_bytes" in spec:
+                hardware_utils.get_cgsa_shard_bytes = lambda: int(spec["patch_shard_bytes"])  # type: ignore[assignment]
+            pre = create_feature_preprocessor(config.model_dump())
+            registry = create_column_group_registry(work)
+            group = ColumnGroup(group_id="1h_L1_numview_estimate", layer=LayerSource.L1, timeframe="1h",
+                                data_source="close", indicator="NUMVIEW", columns=tuple(str(c) for c in frame.columns),
+                                shape=(0, 0), dtype="float32", disk_path=None)
+            registry.save_data(group, frame.to_numpy(dtype=np.float32))
+            started = time.perf_counter()
+            if spec["entry"] == "transform_registry_groups":
+                pre.transform_registry_groups(registry, n_workers=int(spec.get("n_workers", 1)))
+            else:
+                pre.transform_registry_groups_to_sink(registry, lambda *a, **k: None, n_workers=1)
+            out[name] = time.perf_counter() - started
+        finally:
+            hardware_utils.get_cgsa_shard_bytes = real_shard  # type: ignore[assignment]
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+            shutil.rmtree(work, ignore_errors=True)
+    return out
 
 
 class _WindowCapture:
@@ -658,6 +712,17 @@ class _WindowCapture:
         return final_warmup_bars(self.window, getattr(self.factory, "_public_warmup_probe", None))
 
 
+def _with_window_continuity(out: Dict[str, Any], continuity: Mapping[str, Any]) -> Dict[str, Any]:
+    """生成後之窗內零缺口判定（判準檔 cell_rules.continuity）：窗＝定案 ingest 起點（`pre_history.ingest_floor`；未知 ⇒
+    全序列）至序列終點；窗內有缺口 ⇒ EstimateError（data_gap，不得以含缺口之生成冒充）。紀錄寫入 `continuity`。"""
+    floor = (out.get("pre_history") or {}).get("ingest_floor") if isinstance(out.get("pre_history"), Mapping) else None
+    inside = window_gap_violations(continuity, floor)
+    out["continuity"] = {**dict(continuity), "window_start": floor, "window_gaps": inside}
+    if inside:
+        raise EstimateError(f"{out.get('cell_id')}：生成窗內有 K 線缺口（data_gap）：{inside}")
+    return out
+
+
 def _measure_ic_first_cell(spec: Mapping[str, Any], work: Path) -> Dict[str, Any]:
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.factories import create_feature_factory
@@ -674,7 +739,10 @@ def _measure_ic_first_cell(spec: Mapping[str, Any], work: Path) -> Dict[str, Any
     payload = cell_payload(cell, criteria, training)
     source = cell_source(cell, criteria)  # 判準檔 kline_source：單一 cache_dir 讀全部訓練週期
     start, end = cell_window(cell, criteria)
-    factory = create_feature_factory(cache_dir=str(source.parent), validate_continuity=False)
+    continuity = continuity_plan(cell, criteria, list(payload["timeframes"]["training"]))
+    if window_gap_violations(continuity, start):
+        raise EstimateError(f"{cell['id']}：輸出段內有 K 線缺口（data_gap）：{window_gap_violations(continuity, start)}")
+    factory = create_feature_factory(cache_dir=str(source.parent), validate_continuity=continuity["validate_continuity"])
     factory._storage = FeatureStorage(str(features_root))
     config = factory._resolve_config(payload)
     captured: Dict[str, Any] = {}
@@ -693,7 +761,7 @@ def _measure_ic_first_cell(spec: Mapping[str, Any], work: Path) -> Dict[str, Any
     def with_pre_history(out: Dict[str, Any]) -> Dict[str, Any]:
         out["pre_history"] = pre_history_requirement(cell, criteria, config, source, training,
                                                      final_warmup=window_capture.final())
-        return out
+        return _with_window_continuity(out, continuity)
 
     base: Dict[str, Any] = {"cell_id": cell["id"], "output_window": [start, end], "symbol": cell["symbol"],
                             "source_path": str(source), "kline_source": cell_kline_records(cell, criteria, training),
@@ -732,17 +800,20 @@ def _measure_full_cell(spec: Mapping[str, Any], work: Path) -> Dict[str, Any]:
     cell = spec["cell"]
     features_root = _isolate(work, {})
     source = cell_source(cell, criteria)
-    factory = create_feature_factory(cache_dir=str(source.parent), validate_continuity=False)
-    factory._storage = FeatureStorage(str(features_root))
     payload = cell_payload(cell, criteria)
     start, end = cell_window(cell, criteria)
+    continuity = continuity_plan(cell, criteria)
+    if window_gap_violations(continuity, start):
+        raise EstimateError(f"{cell['id']}：輸出段內有 K 線缺口（data_gap）：{window_gap_violations(continuity, start)}")
+    factory = create_feature_factory(cache_dir=str(source.parent), validate_continuity=continuity["validate_continuity"])
+    factory._storage = FeatureStorage(str(features_root))
     resolved = factory._resolve_config(payload)
     window_capture = _WindowCapture(factory)
 
     def with_pre_history(out: Dict[str, Any]) -> Dict[str, Any]:
         out["pre_history"] = pre_history_requirement(cell, criteria, resolved, source,
                                                      final_warmup=window_capture.final())
-        return out
+        return _with_window_continuity(out, continuity)
 
     base = {"cell_id": cell["id"], "output_window": [start, end], "symbol": cell["symbol"],
             "source_path": str(source), "kline_source": cell_kline_records(cell, criteria),
@@ -782,9 +853,12 @@ def _child(spec_path: Path) -> int:
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     work = Path(spec["work"])
     result: Dict[str, Any] = {"target": spec["target"], "category": spec["category"]}
+    if spec["category"] in CELL_CATEGORIES:
+        result["entry"] = generation_entry(spec["category"], load_criteria())
     started = time.perf_counter()
     try:
-        if spec["category"] in ("A", "B"):
+        entry = generation_entry(spec["category"], load_criteria()) if spec["category"] in CELL_CATEGORIES else None
+        if entry == "run_ic_first":
             result.update(_measure_ic_first_cell(spec, work))
         elif spec["category"] == "C":
             result.update(_measure_full_cell(spec, work))
@@ -841,29 +915,268 @@ def _run_target(target: Mapping[str, Any], work_root: Path, kline_path: Path,
 
 # ---------------------------------------------------------------------------------------------- 外推
 
-def _plan_cells(plan: Mapping[str, Any], cells: Mapping[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-    spec = plan["cells"]
-    if spec == "t21":
-        hits = [c for c in cells["A"] if (c["symbol"], c["timeframes"][0]) == REGEN_T21_CELL]
-        if len(hits) != 1:
-            raise EstimateError(f"Task 2.1 ④ 之格 {REGEN_T21_CELL} 於 kline 列舉中須恰一格，實得 {len(hits)}")
-        return hits
-    return [c for kind in spec for c in cells[kind]]
+def generation_entry(kind: str, criteria: Mapping[str, Any]) -> str:
+    """格類之生成入口（判準檔 cell_definitions.<格類>.generation.entry；無 generation ⇒ generate_features）。"""
+    generation = criteria["cell_definitions"][str(kind)].get("generation") or {}
+    return str(generation.get("entry") or "generate_features")
 
 
-def _plan_preprov(plan: Mapping[str, Any]) -> Dict[str, int]:
+def run_plan(criteria: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """各跑別之 runs 與 PRE-PROV（判準檔 run_coverage；v3 起必有）。缺段或缺跑別 ⇒ EstimateError。"""
+    coverage = criteria.get("run_coverage")
+    if not isinstance(coverage, Mapping):
+        raise EstimateError("判準檔缺 run_coverage（v3 起；路徑覆蓋之跑別計畫）")
+    out: Dict[str, Dict[str, Any]] = {}
+    for kind in RUN_KINDS:
+        node = coverage.get(kind)
+        if not isinstance(node, Mapping):
+            raise EstimateError(f"判準檔 run_coverage 缺跑別 {kind}")
+        out[kind] = {"runs": [dict(r) for r in node.get("runs") or []], "preprov": dict(node.get("preprov") or {}),
+                     "code_state": node.get("code_state"), "reads_from": list(node.get("reads_from") or []),
+                     "preprov_feeds": dict(node.get("preprov_feeds") or {})}
+    return out
+
+
+def generation_identity(r: Mapping[str, Any]) -> Tuple[str, str, str]:
+    """生成身分 (格 id, env 正規化 JSON, 變體)：同一碼態內至多生成一次（判準檔 cell_rules.batch_cache）。"""
+    env = json.dumps({str(k): str(v) for k, v in dict(r.get("env") or {}).items()}, sort_keys=True)
+    return (str(r.get("cell")), env, str(r.get("variant") or ""))
+
+
+def coverage_violations(criteria: Mapping[str, Any]) -> List[str]:
+    """路徑覆蓋之結構檢查（判準檔 run_coverage._doc）：
+    ① 每個 run 之 covers 非空、格屬封閉清單、generations／transform_passes 為非負整數；(格, covers) 於全部跑別唯一。
+    ② 生成型跑別（有 code_state）之碼態屬 CODE_STATES；同一碼態內每個生成身分 (格, env, 變體) 合計至多生成一次
+       （跨跑別亦然：Phase 1 不得重生凍結已生成者、Phase 2–4 每批每身分一次）。
+    ③ generations＝0 之 run 須具 source，且 source 跑別與本跑別同碼態（檢查型跑別：source ∈ reads_from）並確有同身分之生成。
+    ④ 檢查型跑別（有 reads_from）不生成（runs 之 generations 皆 0、PRE-PROV 次數皆 0）。
+    ⑤ 批次跑別（碼態 b3／b4／b5）之每個生成 feeds 非空、每個 feeds 之檢查跑別確有讀取該生成之 run（無檢查讀取之重生）；
+       PRE-PROV 生成之 preprov_feeds 亦然（所列檢查跑別之 preprov 列有該格名）。"""
+    out: List[str] = []
+    closed = {str(c["id"]) for c in ((criteria.get("cell_rules") or {}).get("cell_list") or {}).get("cells") or []}
+    if not closed:
+        return ["判準檔無封閉格清單（cell_rules.cell_list.cells）"]
+    plan = run_plan(criteria)
+    seen: Dict[Tuple[str, str], str] = {}
+    generated: Dict[Tuple[str, Tuple[str, str, str]], List[str]] = {}
+    for kind, node in plan.items():
+        state = node["code_state"]
+        if state is None and not node["reads_from"]:
+            out.append(f"{kind}：須具 code_state（生成型）或 reads_from（檢查型）")
+        if state is not None and state not in CODE_STATES:
+            out.append(f"{kind}：code_state {state!r} 不屬 {CODE_STATES}")
+        for r in node["runs"]:
+            cell, covers = str(r.get("cell")), str(r.get("covers") or "").strip()
+            if cell not in closed:
+                out.append(f"{kind}：格 {cell} 不在封閉清單")
+            if not covers:
+                out.append(f"{kind}：格 {cell} 之 run 缺 covers（獨有覆蓋路徑）")
+            for fld in ("generations", "transform_passes"):
+                v = r.get(fld, 0)
+                if not isinstance(v, int) or isinstance(v, bool) or v < 0:
+                    out.append(f"{kind}：格 {cell} 之 {fld}={v!r} 非非負整數")
+            key = (cell, covers)
+            if key in seen:
+                out.append(f"重複路徑：格 {cell} 之「{covers[:40]}」同見於 {seen[key]} 與 {kind}")
+            seen.setdefault(key, kind)
+            gens = r.get("generations", 0)
+            if isinstance(gens, int) and gens > 0:
+                if node["reads_from"]:
+                    out.append(f"{kind}：檢查型跑別不得生成（格 {cell}；應讀批次共用生成）")
+                if state is not None:
+                    generated.setdefault((state, generation_identity(r)), []).extend([kind] * gens)
+    for (state, ident), kinds in generated.items():
+        if len(kinds) > 1:
+            out.append(f"同碼態重複生成：碼態 {state} 之生成身分 {ident} 生成 {len(kinds)} 次（{kinds}）")
+    # ⑥ 轉換（IC 頁各臂輸出）：只記於生成型跑別、同碼態每生成身分至多 1 次；檢查型跑別不自行轉換，以 reads_transforms 讀
+    transformed: Dict[Tuple[str, Tuple[str, str, str]], int] = {}
+    for kind, node in plan.items():
+        for r in node["runs"]:
+            tp = r.get("transform_passes", 0)
+            if not isinstance(tp, int) or tp <= 0:
+                continue
+            if node["reads_from"]:
+                out.append(f"{kind}：檢查型跑別不得自行轉換（格 {r.get('cell')}；應以 reads_transforms 讀批次生成之轉換）")
+            elif node["code_state"] is not None:
+                key = (str(node["code_state"]), generation_identity(r))
+                transformed[key] = transformed.get(key, 0) + tp
+    for (state, ident), n in transformed.items():
+        if n > 1:
+            out.append(f"同碼態重複轉換：碼態 {state} 之生成身分 {ident} 之 IC 頁各臂輸出計算 {n} 次")
+    out += path_registry_violations(criteria, plan)
+    for kind, node in plan.items():
+        for r in node["runs"]:
+            if r.get("reads_transforms"):
+                src = plan.get(str(r.get("source"))) or {}
+                if (str(src.get("code_state")), generation_identity(r)) not in transformed:
+                    out.append(f"{kind}：格 {r.get('cell')} 讀 {r.get('source')} 之轉換，但該碼態該身分無轉換")
+    for kind, node in plan.items():
+        if node["reads_from"] and any(int(n) for n in node["preprov"].values()):
+            out.append(f"{kind}：檢查型跑別之 PRE-PROV 次數須為 0（生成記於批次跑別）")
+        for r in node["runs"]:
+            if r.get("generations"):
+                continue
+            source = r.get("source")
+            if source not in plan:
+                out.append(f"{kind}：格 {r.get('cell')} 之讀取 run 無 source（或 source 非跑別）")
+                continue
+            if node["reads_from"] and source not in node["reads_from"]:
+                out.append(f"{kind}：格 {r.get('cell')} 之 source {source} 不在 reads_from")
+            src_state = plan[source]["code_state"]
+            if node["code_state"] is not None and src_state != node["code_state"]:
+                out.append(f"{kind}：格 {r.get('cell')} 讀 {source}（碼態 {src_state}）≠ 本跑別碼態 {node['code_state']}")
+            if (src_state, generation_identity(r)) not in generated or source not in generated[(src_state, generation_identity(r))]:
+                out.append(f"{kind}：格 {r.get('cell')} 讀 {source} 之生成身分 {generation_identity(r)} 無對應生成")
+    for kind, node in plan.items():
+        if node["code_state"] not in ("b3", "b4", "b5"):
+            continue
+        for r in node["runs"]:
+            if not r.get("generations"):
+                continue
+            feeds = list(r.get("feeds") or [])
+            if not feeds:
+                out.append(f"{kind}：格 {r.get('cell')} 之批次生成無 feeds（無檢查讀取之重生須刪）")
+            for check in feeds:
+                readers = [x for x in (plan.get(check) or {}).get("runs") or []
+                           if x.get("source") == kind and generation_identity(x) == generation_identity(r)]
+                if not readers:
+                    out.append(f"{kind}：格 {r.get('cell')} 之生成 feeds {check}，但 {check} 無讀取該生成之 run（無檢查讀取之重生）")
+        for name, count in node["preprov"].items():
+            if not int(count):
+                continue
+            feeds = list(node["preprov_feeds"].get(name) or [])
+            if not feeds:
+                out.append(f"{kind}：PRE-PROV {name} 之批次生成無 preprov_feeds")
+            for check in feeds:
+                if name not in ((plan.get(check) or {}).get("preprov") or {}):
+                    out.append(f"{kind}：PRE-PROV {name} feeds {check}，但 {check} 之 preprov 未列該格（無檢查讀取）")
+    return out
+
+
+def path_registry_violations(criteria: Mapping[str, Any], plan: Mapping[str, Mapping[str, Any]]) -> List[str]:
+    """⑦ 封閉路徑登錄（判準檔 path_registry；審查 r5 CODEX-R5-P1-03）：(a) 同一碼態內一個路徑 id 至多由一個生成列宣稱，除非
+    登錄之 distinct_by（env／variant）於各宣稱者間兩兩相異；(b) 每個登錄 id 至少被一個生成列宣稱（完整性）；(c) 每個
+    code_anchor（repo 相對 path:line）解析至存在之非空行；另：每個生成列（generations≥1、具 code_state）covers_ids 非空且
+    ⊆ 登錄、登錄 id 唯一。covers 文字不參與判定。"""
+    registry = (criteria.get("path_registry") or {}).get("paths")
+    if not isinstance(registry, list) or not registry:
+        return ["判準檔缺 path_registry.paths（封閉路徑登錄）"]
+    out: List[str] = []
+    entries: Dict[str, Mapping[str, Any]] = {}
+    for entry in registry:
+        pid = str(entry.get("id") or "")
+        if not pid or pid in entries:
+            out.append(f"path_registry：id {pid!r} 空或重複")
+            continue
+        entries[pid] = entry
+        anchors = entry.get("code_anchors") or []
+        if not anchors:
+            out.append(f"path_registry：{pid} 無 code_anchors")
+        for anchor in anchors:
+            match = re.fullmatch(r"(.+):(\d+)", str(anchor))
+            path = REPO / match.group(1) if match else None
+            if match is None or path is None or not path.is_file():
+                out.append(f"path_registry：{pid} 之錨點 {anchor} 檔案不存在或格式非 path:line")
+                continue
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            line = int(match.group(2))
+            if not (1 <= line <= len(lines)) or not lines[line - 1].strip():
+                out.append(f"path_registry：{pid} 之錨點 {anchor} 不解析至存在之非空行（檔長 {len(lines)}）")
+    claims: Dict[Tuple[str, str], List[Tuple[str, Tuple[str, str, str]]]] = {}
+    for kind, node in plan.items():
+        if node.get("code_state") is None:
+            continue
+        for r in node["runs"]:
+            if not isinstance(r.get("generations"), int) or r["generations"] <= 0:
+                continue
+            ids = list(r.get("covers_ids") or [])
+            if not ids:
+                out.append(f"{kind}：格 {r.get('cell')} 之生成列缺 covers_ids（無登錄之獨有路徑 ⇒ 不得生成）")
+            for pid in ids:
+                if pid not in entries:
+                    out.append(f"{kind}：格 {r.get('cell')} 之 covers_ids 含未登錄之 {pid}")
+                    continue
+                claims.setdefault((str(node["code_state"]), pid), []).append((kind, generation_identity(r)))
+    for (state, pid), who in claims.items():
+        if len(who) < 2:
+            continue
+        dims = list(entries[pid].get("distinct_by") or [])
+        projections = [tuple(ident[1] if d == "env" else ident[2] for d in dims) for _, ident in who]
+        if not dims or len(set(projections)) != len(projections):
+            out.append(f"同碼態重複路徑：碼態 {state} 之路徑 {pid} 由 {len(who)} 個生成宣稱（{[k for k, _ in who]}；"
+                       f"distinct_by={dims}）")
+    claimed = {pid for (_, pid) in claims}
+    for pid in entries:
+        if pid not in claimed:
+            out.append(f"path_registry：{pid} 無任何生成宣稱（完整性）")
+    return out
+
+
+def _plan_preprov(node: Mapping[str, Any]) -> Dict[str, int]:
     out: Dict[str, int] = {}
-    for name, count in (plan.get("preprov") or {}).items():
+    for name, count in (node.get("preprov") or {}).items():
         names = sorted(load_json(LEGACY_BASELINE_PATH)["cells"]) if name == LEGACY_ALL else [name]
         for item in names:
             out[item] = out.get(item, 0) + int(count)
     return out
 
 
-def _branchdiff_units(n_reachable_arms: int) -> int:
-    """Task 1.1 每格之轉換次數：（ICPOSTLEAK 分支數＋候選臂）× 組合數＋速度量測（可達臂＋候選臂）× 3。"""
+#: ICPOSTLEAK 分支 → 其實測秒數來源：IC 頁臂分支讀 `arm_seconds`；其餘（registry 系）分支讀 `branch_seconds`
+#: （`_time_registry_branches` 實測）。缺任一 ⇒ 估時無效（審查 r6 CODEX-R6-P1-05：不以中位數／最大值代補）。
+BRANCH_ARM = {"polars": "polars", "optimized": "pandas_optimized", "legacy": "pandas_legacy"}
+#: 候選臂 polars_float64 尚未實作（Task 3.1）：其成本以 polars 臂實測為**計畫成本代理**（收據標 `planned_cost_proxies`，
+#: 不標為實測）；polars 臂缺 ⇒ 估時無效
+CANDIDATE_BRANCH_ARM = "polars"
+
+
+def required_arms(selected_count: Optional[int]) -> List[str]:
+    """依契約 `post_ic_arm_reachability.<臂>.min_selected_columns` 須實測之 IC 頁臂；選欄數未知 ⇒ 全部契約臂（fail-closed）。"""
+    contract = load_json(REPO / "momentum" / "FeatureEngineering" / "contracts" / "numeric_view.json")
+    arms = list(contract["post_ic_arm_values"]["values"])
+    if selected_count is None:
+        return arms
+    reach = contract["post_ic_arm_reachability"]
+    return [a for a in arms if int(selected_count) >= int(reach[a]["min_selected_columns"])]
+
+
+def cost_missing(arms: Mapping[str, float], branch_seconds: Optional[Mapping[str, float]], need_arms: Sequence[str], *,
+                 branchdiff: bool) -> List[str]:
+    """轉換成本所需而未實測者：`need_arms` 中缺於 `arms` 之臂、候選臂代理（polars）缺；`branchdiff` 時另 registry 系分支缺於
+    `branch_seconds`。"""
+    missing = [f"arm:{a}" for a in need_arms if a not in arms]
+    if CANDIDATE_BRANCH_ARM not in arms and f"arm:{CANDIDATE_BRANCH_ARM}" not in missing:
+        missing.append(f"arm:{CANDIDATE_BRANCH_ARM}")
+    if branchdiff:
+        contract = load_json(ICPOSTLEAK_CONTRACT_PATH)
+        missing += [f"branch:{b}" for b in contract["branches"] if b not in BRANCH_ARM
+                    and b not in (branch_seconds or {})]
+        missing += [f"arm:{BRANCH_ARM[b]}" for b in contract["branches"] if b in BRANCH_ARM
+                    and BRANCH_ARM[b] not in arms and f"arm:{BRANCH_ARM[b]}" not in missing]
+    return missing
+
+
+def branchdiff_seconds(arms: Mapping[str, float], branch_seconds: Optional[Mapping[str, float]] = None) -> Optional[float]:
+    """Task 1.1 單格之轉換秒數（同臂排名算一次供含排名之組合共用；設計 2026-10-22）：每個分支（ICPOSTLEAK 分支∪候選臂）
+    一次完整轉換（含排名，取該分支之實測秒數）＋（組合數 − 1）次非排名轉換（以實測最快者之一次完整轉換為上界）。任一分支
+    無實測（`cost_missing`）⇒ None（不代補）。"""
+    if cost_missing(arms, branch_seconds, list(BRANCH_ARM.values()), branchdiff=True):
+        return None
     contract = load_json(ICPOSTLEAK_CONTRACT_PATH)
-    return (len(contract["branches"]) + 1) * len(contract["combos"]) + (n_reachable_arms + 1) * 3
+    full_of = {b: float(arms[BRANCH_ARM[b]]) if b in BRANCH_ARM else float((branch_seconds or {})[b])
+               for b in contract["branches"]}
+    full_of["polars_float64"] = float(arms[CANDIDATE_BRANCH_ARM])
+    fastest = min(full_of.values())
+    return sum(full + (len(contract["combos"]) - 1) * fastest for full in full_of.values())
+
+
+def perf_seconds(arms: Mapping[str, float], need_arms: Optional[Sequence[str]] = None) -> Optional[float]:
+    """獨立效能基準單格秒數：各可達臂＋候選臂（以 polars 實測為計畫成本代理）同輸入各三次，另 Polars 慢因剖析一次。
+    須實測之臂（`need_arms`；None ⇒ 全部契約臂）任一缺 ⇒ None（不代補）。"""
+    need = list(need_arms if need_arms is not None else required_arms(None))
+    if cost_missing(arms, None, need, branchdiff=False):
+        return None
+    polars = float(arms[CANDIDATE_BRANCH_ARM])
+    return 3 * (sum(float(arms[a]) for a in need) + polars) + polars
 
 
 def measurement_accepted(m: Mapping[str, Any]) -> bool:
@@ -899,7 +1212,11 @@ def history_verdict(kind: str, symbol: str, tf: str, count: int, inventory: Mapp
     ⇒ 根數比較（blocked 且根數 ≤ 受測格 ⇒ True；complete 且根數 ≥ 受測格 ⇒ False）。其餘 ⇒ None（未知，不猜測）。"""
     if criteria is not None and kind == "A" and int(count) < int(criteria["cell_definitions"]["A"]["min_history_bars"]):
         return True
-    m = measurements.get(f"{kind}:{tf}") or {}
+    # 受測格：同（格類, symbol, tf）之格（v3 封閉清單之格鍵＝格 id）；無則取同格類同週期而具所需前史之他格實測（靜態判定）
+    m = measurements.get(cell_id(kind, symbol, [tf])) or measurements.get(f"{kind}:{tf}") or next(
+        (x for x in measurements.values() if isinstance(x, Mapping) and x.get("category") == kind
+         and list(x.get("training_timeframes") or [tf]) == [tf] and str(x.get("cell_id", "")).endswith(f"_{tf}")
+         and isinstance(x.get("pre_history"), Mapping)), {})
     status_blocked = m.get("status") == "blocked" and m.get("blocked_by") == BLOCKED_BY_HISTORY
     if not (status_blocked or m.get("status") == "measured"):
         return None
@@ -937,199 +1254,193 @@ def predicted_a_history(symbol: str, inventory: Mapping[str, Mapping[str, int]],
 def build_receipt(cells: Mapping[str, List[Dict[str, Any]]], inventory: Mapping[str, Mapping[str, int]],
                   criteria: Mapping[str, Any], measurements: Mapping[str, Mapping[str, Any]],
                   contract_arms: Sequence[str]) -> Dict[str, Any]:
-    """依實測快取與 RUN_PLAN 組估時收據（不含 `reported_at`）。`inventory`＝主檔列舉（symbol×tf 集合）；根數一律改取各週期
-    來源檔（判準檔 kline_source）。"""
+    """依實測快取與判準 run_coverage 組估時收據（不含 `reported_at`）。封閉清單之每格各自實測（目標鍵＝格 id）；跑別之每個 run
+    列（格, 獨有覆蓋, 生成次數, 轉換次數, 外推秒數）；格類之單格秒數＝該跑別內該格類之最大逐格秒數。`inventory`＝主檔列舉；
+    根數一律取各週期來源檔（判準檔 kline_source）。"""
     main_inventory = inventory
     inventory = source_inventory(main_inventory, criteria)
-    gen_seconds: Dict[Tuple[str, str], float] = {}
-    arm_seconds: Dict[Tuple[str, str], Dict[str, float]] = {}
-    cost_basis: Dict[str, str] = {}
-    for key, m in measurements.items():
-        if (m.get("status") == "blocked" and m.get("blocked_by") == BLOCKED_BY_HISTORY and not m.get("predicted")
-                and m.get("category") in ("A", "B", "C")):
-            # 受測格判前史不足而同週期他格（前史較長者）預測足夠：其單格成本以受測格生成至判定之秒數計（生成全程已跑，
-            # 只於讀取時判 partial；逐格記 cost_basis，不另猜測）
-            slot = (m["category"], "*") if m["category"] == "B" else (m["category"], key.split(":", 1)[1])
-            seconds = m.get("attempt_seconds") or m.get("child_wall_seconds")
-            if seconds and slot not in gen_seconds:
-                gen_seconds[slot] = float(seconds)
-                cost_basis[key] = "attempt_seconds_of_history_blocked_probe"
-            continue
-        if m.get("status") != "measured":
-            continue
-        if m["category"] in ("A", "C"):
-            tf = key.split(":", 1)[1]
-            gen_seconds[(m["category"], tf)] = float(m["seconds"])
-            if m["category"] == "A":
-                arm_seconds[("A", tf)] = dict(m.get("arm_seconds") or {})
-        elif m["category"] == "B":
-            gen_seconds[("B", "*")] = float(m["seconds"])
-            arm_seconds[("B", "*")] = dict(m.get("arm_seconds") or {})
+    plan = run_plan(criteria)
+    closed = {c["id"]: c for kind in CELL_CATEGORIES for c in cells[kind]}
 
+    def meas(cid: str) -> Mapping[str, Any]:
+        return measurements.get(cid) or {}
+
+    # 前史（判準檔 insufficient_history／b_membership）：前置篩、各格實測判定；格 B 依同 symbol 格 A 判定定訓練週期
+    history: List[Dict[str, Any]] = []
+    attempt_seconds: Dict[str, float] = {}
+    b_records: Dict[str, Any] = {}
+    for cid, cell in closed.items():
+        m = meas(cid)
+        if cell["kind"] == "A":
+            pre = history_blocked(cell, inventory, criteria)
+            if pre is not None:
+                history.append({**pre, "source": "prefilter"})
+                continue
+        if cell["kind"] == "B":
+            src = cell_source(cell, criteria)
+            b_inv = {cell["symbol"]: {tf: n for tf, n in kline_inventory(src)[cell["symbol"]].items()
+                                      if tf in cell["timeframes"]}}
+            membership = b_membership(cell, predicted_a_history(cell["symbol"], b_inv, measurements, criteria, src),
+                                      criteria)
+            b_records[cid] = {**membership, "source": "estimate_measured_a_cells"}
+            if membership["status"] == "blocked":
+                history.append({"cell": cid, "blocked_by": BLOCKED_BY_HISTORY, "reason": membership["reason"],
+                                "bar_counts": {tf: int(b_inv[cell["symbol"]][tf]) for tf in cell["timeframes"]},
+                                "source": "b_membership"})
+                continue
+        if m.get("status") == "blocked" and m.get("blocked_by") == BLOCKED_BY_HISTORY:
+            history.append({"cell": cid, "blocked_by": BLOCKED_BY_HISTORY,
+                            "bar_counts": dict(m.get("bar_counts") or {}),
+                            "reason_counts": dict(m.get("reason_counts") or {}),
+                            "reason": "本格實測之 run 只因前史不足而 partial（判準檔 cell_rules.insufficient_history）",
+                            "source": f"estimate_measured:{cid}"})
+            attempt_seconds[cid] = float(m.get("attempt_seconds") or m.get("child_wall_seconds") or 0.0)
+    history_ids = {h["cell"] for h in history}
+
+    # 格 C 基準（硬體 blocked 走邊界①；前史 blocked 以實測至判定之秒數）
     baseline: Dict[str, Any] = {}
     blocked: List[Dict[str, Any]] = []
-    all_tfs = sorted({tf for tfs in inventory.values() for tf in tfs}, key=tf_seconds)
-    for tf in all_tfs:
-        if tf == FULLRUN_SIZE_TF and fullrun_receipt_applicable(criteria):
-            baseline[tf] = {**fullrun_baseline(),
-                            "basis": "全史 run 之實測，為足夠區間 run（輸出段＋所需前史 ⊆ 全史）之上界；"
-                                     "該週期前史若被資料起點截斷，由 Task 1.2 生成之前史判定決定 blocked"}
-            gen_seconds[("C", tf)] = baseline[tf]["seconds"]
-            continue
-        m = measurements.get(f"C:{tf}") or {}
+    for cell in cells["C"]:
+        tf = cell["timeframes"][0]
+        m = meas(cell["id"])
         if m.get("status") == "measured":
             baseline[tf] = {"seconds": float(m["seconds"]), "peak_rss_bytes": int(m["peak_rss_bytes"]), "source": "measured"}
         elif m.get("status") == "blocked" and m.get("blocked_by") == BLOCKED_BY_HISTORY:
-            # 前史不足之格 C（判準檔 cell_rules.insufficient_history）：實測至判定之秒數為該格之實測成本；不入硬體路徑
             baseline[tf] = {"seconds": float(m.get("attempt_seconds") or m.get("child_wall_seconds") or 0.0),
                             "peak_rss_bytes": int(m.get("peak_rss_bytes") or 0), "source": "measured",
                             "history_blocked": True, "reason_counts": dict(m.get("reason_counts") or {})}
         elif m.get("status") in ("blocked", "killed"):
-            reason = f"格 C 單格實測（{m.get('target')}）逾機器上限：{m.get('status')} {m.get('error', '')}".strip()
+            reason = f"格 C 單格實測（{cell['id']}）逾機器上限：{m.get('status')} {m.get('error', '')}".strip()
             baseline[tf] = {"blocked_by": BLOCKED_BY_HARDWARE, "reason": reason}
-            for cell in cells["C"]:
-                if cell["timeframes"] == [tf]:
-                    blocked.append({"cell": cell["id"], "blocked_by": BLOCKED_BY_HARDWARE, "reason": reason})
+            blocked.append({"cell": cell["id"], "blocked_by": BLOCKED_BY_HARDWARE, "reason": reason})
         else:
-            raise EstimateError(f"格 C {tf} 無實測結果（{m.get('status')}）")
+            raise EstimateError(f"格 C {cell['id']} 無實測結果（{m.get('status')}）")
     blocked_c = {b["cell"] for b in blocked}
-    # 前史不足（判準檔 cell_rules.insufficient_history／b_membership）：格 A 依前置篩或同週期單格實測預測；格 B 依同 symbol
-    # 之格 A 判定決定訓練週期，主週期不足或剩不足兩週期 ⇒ blocked；格 B 自身實測 blocked（history）⇒ 同訓練週期且根數不多
-    # 於受測格者 blocked。blocked 格不入外推；凍結須生成至判定之格（A 經實測判定者）另計嘗試秒數。
-    history: List[Dict[str, Any]] = []
-    attempt_seconds: Dict[str, float] = {}
-    for cell in cells["C"]:
-        tf = cell["timeframes"][0]
-        probe = measurements.get(f"C:{tf}") or {}
-        if history_verdict("C", cell["symbol"], tf, int(inventory[cell["symbol"]][tf]), inventory, measurements,
-                           criteria) is True:
-            history.append({"cell": cell["id"], "blocked_by": BLOCKED_BY_HISTORY,
-                            "bar_counts": {tf: int(inventory[cell["symbol"]][tf])},
-                            "reason_counts": dict(probe.get("reason_counts") or {}),
-                            "reason": "同週期格 C 單格實測判前史不足（本格或依其定案所需前史之靜態判定；判準檔 window_rule）",
-                            "source": f"estimate_probe:C:{tf}"})
-            attempt_seconds[cell["id"]] = float(probe.get("attempt_seconds") or probe.get("child_wall_seconds") or 0.0)
-    for cell in cells["A"]:
-        pre = history_blocked(cell, inventory, criteria)
-        if pre is not None:
-            history.append({**pre, "source": "prefilter"})
-            continue
-        tf = cell["timeframes"][0]
-        verdict = predicted_a_history(cell["symbol"], inventory, measurements, criteria).get(tf)
-        if verdict is None:
-            raise EstimateError(f"{cell['id']}：無從判定前史（週期 {tf} 之格 A 單格實測缺或不適用）")
-        if verdict:
-            probe = measurements[f"A:{tf}"]
-            history.append({"cell": cell["id"], "blocked_by": BLOCKED_BY_HISTORY,
-                            "bar_counts": {tf: int(inventory[cell["symbol"]][tf])},
-                            "reason_counts": dict(probe.get("reason_counts") or {}),
-                            "reason": f"同週期格 A 單格實測（{probe.get('symbol', '?')}）判前史不足，本格依其判定或其定案所需"
-                                      "前史之靜態判定（判準檔 cell_rules.insufficient_history／window_rule）",
-                            "source": f"estimate_probe:A:{tf}"})
-            attempt_seconds[cell["id"]] = float(probe.get("attempt_seconds") or probe.get("child_wall_seconds") or 0.0)
-    b_records: Dict[str, Any] = {}
-    b_probe = measurements.get("B") or {}
-    b_sources: Dict[str, Dict[str, Dict[str, int]]] = {}
-    for cell in cells["B"]:
-        src = cell_source(cell, criteria)  # 格 B 單一來源＝主週期之來源（kline_source.multi_timeframe）
-        if str(src) not in b_sources:
-            b_sources[str(src)] = kline_inventory(src)
-        b_inv = {cell["symbol"]: {tf: n for tf, n in b_sources[str(src)][cell["symbol"]].items() if tf in cell["timeframes"]}}
-        membership = b_membership(cell, predicted_a_history(cell["symbol"], b_inv, measurements, criteria, src), criteria)
-        b_records[cell["id"]] = {**membership, "source": "estimate_probe_prediction"}
-        if membership["status"] == "blocked":
-            history.append({"cell": cell["id"], "blocked_by": BLOCKED_BY_HISTORY,
-                            "bar_counts": {tf: int(b_inv[cell["symbol"]][tf]) for tf in cell["timeframes"]},
-                            "reason": membership["reason"], "source": "b_membership"})
-            continue
-        if (b_probe.get("status") == "blocked" and b_probe.get("blocked_by") == BLOCKED_BY_HISTORY
-                and b_probe.get("training_timeframes") == membership["training_timeframes"]
-                and all(int(b_inv[cell["symbol"]][tf]) <= int((b_probe.get("bar_counts") or {}).get(tf, -1))
-                        for tf in membership["training_timeframes"])):
-            history.append({"cell": cell["id"], "blocked_by": BLOCKED_BY_HISTORY,
-                            "bar_counts": {tf: int(b_inv[cell["symbol"]][tf]) for tf in membership["training_timeframes"]},
-                            "reason_counts": dict(b_probe.get("reason_counts") or {}),
-                            "reason": "格 B 單格實測之 run 只因前史不足而 partial（同訓練週期、根數不多於受測格）",
-                            "source": "estimate_probe:B"})
-            attempt_seconds[cell["id"]] = float(b_probe.get("attempt_seconds") or b_probe.get("child_wall_seconds") or 0.0)
-        elif b_probe.get("status") == "measured":
-            b_records[cell["id"]]["cost_basis_training_timeframes"] = b_probe.get("training_timeframes")
-    history_ids = {h["cell"] for h in history}  # 前史 blocked 另列 history_blocked；blocked 只放硬體（邊界①語意）
-
-    def gen_cost(cell: Mapping[str, Any]) -> float:
-        kind = cell["kind"]
-        key = (kind, "*") if kind == "B" else (kind, cell["timeframes"][0])
-        if key not in gen_seconds:
-            raise EstimateError(f"無格類 {kind} 週期 {key[1]} 之實測秒數")
-        return gen_seconds[key]
-
-    def arms_of(cell: Mapping[str, Any]) -> Dict[str, float]:
-        key = ("B", "*") if cell["kind"] == "B" else ("A", cell["timeframes"][0])
-        return arm_seconds.get(key) or {}
 
     preprov_seconds = {key.split(":", 1)[1]: float(m["seconds"]) for key, m in measurements.items()
                        if m.get("category") == PREPROV and m.get("status") == "measured"}
+    incomplete: List[str] = []
     run_kinds: Dict[str, Any] = {}
     grand_total = 0.0
     for kind_name in RUN_KINDS:
-        plan = RUN_PLAN[kind_name]
-        listed = _plan_cells(plan, cells)
+        node_plan = plan[kind_name]
+        runs_out: List[Dict[str, Any]] = []
         per_cell: Dict[str, float] = {}
-        for cell in listed:
-            if cell["id"] in blocked_c or cell["id"] in history_ids:
+        for r in node_plan["runs"]:
+            cid = str(r["cell"])
+            row = {"cell": cid, "covers": r.get("covers"), "generations": int(r.get("generations", 0)),
+                   "transform_passes": int(r.get("transform_passes", 0))}
+            row["env"] = dict(r.get("env") or {})
+            for extra in ("variant", "branchdiff", "perf", "source", "feeds", "covers_ids", "mutation_test", "decision_branch"):
+                if r.get(extra):
+                    row[extra] = r[extra]
+            if cid in history_ids or cid in blocked_c:
+                row.update(seconds=0.0, skipped="blocked")
+                runs_out.append(row)
                 continue
-            cost = float(plan.get("generations", {}).get(cell["kind"], 0)) * gen_cost(cell)
-            arms = arms_of(cell)
-            passes = float((plan.get("transform_passes") or {}).get(cell["kind"], 0))
-            cost += passes * sum(arms.values())
-            if plan.get("branchdiff"):
-                mean_arm = (sum(arms.values()) / len(arms)) if arms else 0.0
-                cost += _branchdiff_units(len(arms)) * mean_arm
-            per_cell[cell["id"]] = cost
-        preprov = _plan_preprov(plan)
+            m = meas(cid)
+            arms = dict(m.get("arm_seconds") or {})
+            seconds = 0.0
+            if row["generations"]:
+                if m.get("status") != "measured":
+                    raise EstimateError(f"{kind_name}：格 {cid} 無實測生成秒數")
+                seconds += row["generations"] * float(m["seconds"])
+            needs_arms = row["transform_passes"] or r.get("branchdiff") or r.get("perf")
+            need = required_arms(m.get("selected_count"))
+            branch_secs = dict(m.get("branch_seconds") or {})
+            missing = (cost_missing(arms, branch_secs, need, branchdiff=bool(r.get("branchdiff"))) if needs_arms else [])
+            if missing:
+                # 審查 r6 CODEX-R6-P1-05：缺任一須實測之臂／分支 ⇒ 該列估時無效（不以中位數／最大值代補），收據列入 incomplete，
+                # 收據檢查拒收（不得寫 reported_at）
+                incomplete.append(f"{kind_name}:{cid}")
+                row["incomplete"] = f"轉換成本未實測：{missing}（不代補；估時無效）"
+                row["missing_cost_inputs"] = missing
+            elif needs_arms:
+                if row["transform_passes"]:
+                    seconds += row["transform_passes"] * sum(float(arms[a]) for a in need)
+                if r.get("branchdiff"):
+                    seconds += branchdiff_seconds(arms, branch_secs) or 0.0
+                if r.get("perf"):
+                    seconds += perf_seconds(arms, need) or 0.0
+                if r.get("branchdiff") or r.get("perf"):
+                    row["planned_cost_proxies"] = {"polars_float64": CANDIDATE_BRANCH_ARM}
+            row["seconds"] = seconds
+            runs_out.append(row)
+            per_cell[cid] = per_cell.get(cid, 0.0) + seconds
+        preprov = _plan_preprov(node_plan)
         per_preprov: Dict[str, float] = {}
         for name, count in preprov.items():
             if name not in preprov_seconds:
                 raise EstimateError(f"PRE-PROV 格 {name} 無實測秒數")
             per_preprov[name] = count * preprov_seconds[name]
         single: Dict[str, float] = {}
-        for cell in listed:
-            if cell["id"] in per_cell:
-                single[cell["kind"]] = max(single.get(cell["kind"], 0.0), per_cell[cell["id"]])
+        for cid, seconds in per_cell.items():
+            if seconds > 0:
+                kind = closed[cid]["kind"]
+                single[kind] = max(single.get(kind, 0.0), seconds)
         if per_preprov:
             single[PREPROV] = max(per_preprov.values())
-        # 須逐格生成至前史判定（不得預設跳過）之跑別：格 A／B＝凍結（freeze_baseline）、格 C＝precision_chain（Task 1.2
-        # 之格 C 生成）；經單格實測判定 blocked 之格各計一次嘗試秒數
-        attempts = {c["id"]: attempt_seconds[c["id"]] for c in listed if c["id"] in attempt_seconds
-                    and kind_name == ATTEMPT_RUN_KIND[c["kind"]]}
+        attempts = ({cid: attempt_seconds[cid] for cid in sorted(attempt_seconds)}
+                    if kind_name == ATTEMPT_RUN_KIND else {})
         total = sum(per_cell.values()) + sum(per_preprov.values()) + sum(attempts.values())
         grand_total += total
         node: Dict[str, Any] = {
-            "cells": [c["id"] for c in listed], "preprov_cells": sorted(preprov),
-            "single_cell_seconds": single, "per_cell_seconds": per_cell, "preprov_seconds": per_preprov,
-            "extrapolated_total_seconds": total, "generations_per_cell": dict(plan.get("generations") or {}),
-            "transform_passes_per_cell": dict(plan.get("transform_passes") or {}),
-            "preprov_generations": preprov, "basis": plan["basis"],
+            "cells": list(dict.fromkeys(str(r["cell"]) for r in node_plan["runs"])), "preprov_cells": sorted(preprov),
+            "code_state": node_plan["code_state"], "reads_from": node_plan["reads_from"],
+            "runs": runs_out, "single_cell_seconds": single, "per_cell_seconds": per_cell,
+            "preprov_seconds": per_preprov, "extrapolated_total_seconds": total, "preprov_generations": preprov,
+            "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）",
         }
         if attempts:
             node["blocked_attempt_seconds"] = attempts
         if kind_name == "freeze_baseline":
-            node["groups"] = {"G1": {"cells": [c["id"] for c in cells["A"]], "arms": list(contract_arms)},
-                              "G2": {"cells": [c["id"] for c in cells["A"]]},
-                              "G3": {"cells": [c["id"] for c in cells["B"]]}}
+            groups = criteria["cell_rules"]["freeze_groups"]
+            node["groups"] = {"G1": {"cells": list(groups["G1"]), "arms": list(contract_arms)},
+                              "G2": {"cells": list(groups["G2"])}, "G3": {"cells": list(groups["G3"])}}
         run_kinds[kind_name] = node
 
-    ab_once = sum(gen_cost(c) for kind in ("A", "B") for c in cells[kind] if c["id"] not in history_ids)
+    host_runs = [r for r in plan["precision_chain"]["runs"] if r.get("variant")]
+    host_gen = {r["cell"]: float(meas(r["cell"]).get("seconds") or 0.0) for r in host_runs}
+    other_a = [c["id"] for c in cells["A"] if c["id"] not in host_gen]
     savings = [
-        {"method": "Task 0.5 凍結之 run 保留至 Phase 1 結束，Task 1.1–1.3 讀之（postic_branchdiff 不重生；"
-                   "precision_chain 之 S1–S5 於同一生成擷取）", "saved_seconds": ab_once * 2},
-        {"method": f"格 C {FULLRUN_SIZE_TF} 單格基準沿用 PRE-PROV 全特徵 run 收據（產品碼未變）",
-         "saved_seconds": float(baseline.get(FULLRUN_SIZE_TF, {}).get("seconds", 0.0))},
-        {"method": "同（格, 生成環境）於單一測試模組內只生成一次（G1Lab／CellLab／_Runs 快取；G1 各臂份共用來源 run）",
-         "saved_seconds": sum(gen_cost(c) * max(0, len(arms_of(c)) - 1) for c in cells["A"] if c["id"] not in history_ids)},
+        {"method": "路徑覆蓋：Phase 1 變體只在宿主格各重生一次（不於每格重複）",
+         "saved_seconds": sum(len(other_a) * host_gen[r["cell"]] for r in host_runs)},
+        {"method": "Task 1.1 同臂排名算一次供含排名之組合共用（只改量測程式、不減組合）",
+         "saved_seconds": sum(max(0.0, (sum(dict(meas(r["cell"]).get("arm_seconds") or {}).values())
+                                       - min(dict(meas(r["cell"]).get("arm_seconds") or {"_": 0.0}).values())))
+                              for r in plan["postic_branchdiff"]["runs"])},
+        {"method": "Phase 1 讀 Task 0.5 之 run（generations＝0 之 run 不重生；含 Task 1.3 L2 spy 掛於凍結生成）",
+         "saved_seconds": sum(float(meas(r["cell"]).get("seconds") or 0.0)
+                              for kind in ("precision_chain", "postic_branchdiff", "perf_benchmark", "l2_arm_matrix")
+                              for r in plan[kind]["runs"] if not r.get("generations"))},
+        {"method": "Phase 2–4 每批碼態內每個生成身分只生成一次，該批全部驗收檢查共用（判準檔 cell_rules.batch_cache）",
+         "saved_seconds": sum(float(meas(r["cell"]).get("seconds") or 0.0)
+                              for kind, node in plan.items() if node["reads_from"]
+                              for r in node["runs"])
+                          - sum(int(r.get("generations") or 0) * float(meas(r["cell"]).get("seconds") or 0.0)
+                                for kind, node in plan.items() if node["code_state"] in ("b3", "b4", "b5")
+                                for r in node["runs"])},
+        {"method": "IC 頁各臂輸出每碼態每生成身分算一次（存於共用快取），讀其之檢查（reads_transforms）不各自重算",
+         "saved_seconds": max(0.0, sum(sum(dict(meas(r["cell"]).get("arm_seconds") or {}).values())
+                                       for kind, node in plan.items() if node["reads_from"]
+                                       for r in node["runs"] if r.get("reads_transforms"))
+                              - sum(int(r.get("transform_passes") or 0) * sum(dict(meas(r["cell"]).get("arm_seconds") or {}).values())
+                                    for kind, node in plan.items() if node["code_state"] in ("b3", "b4", "b5")
+                                    for r in node["runs"]))},
     ]
+    continuity: Dict[str, Any] = {}
+    for cid, cell in closed.items():
+        training = (b_records.get(cid) or {}).get("training_timeframes") or cell["timeframes"]
+        plan_c = continuity_plan(cell, criteria, list(training))
+        floor = (meas(cid).get("pre_history") or {}).get("ingest_floor") if isinstance(meas(cid).get("pre_history"),
+                                                                                       Mapping) else None
+        if cid in history_ids or cid in blocked_c:  # 不生成之格（blocked）無生成窗可判
+            continuity[cid] = {**plan_c, "window_start": None, "window_gaps": [], "window_check": "skipped_blocked"}
+            continue
+        continuity[cid] = {**plan_c, "window_start": floor, "window_gaps": window_gap_violations(plan_c, floor)}
     return {"run_kinds": run_kinds, "cell_c_baseline": baseline, "blocked": blocked, "history_blocked": history,
-            "savings": savings, "b_membership": b_records, "cost_basis": cost_basis,
+            "continuity": continuity,
+            "savings": savings, "b_membership": b_records, "incomplete": incomplete,
             "total_extrapolated_seconds": grand_total}
 
 
@@ -1141,7 +1452,7 @@ def pre_history_table(cells: Mapping[str, List[Dict[str, Any]]], criteria: Mappi
     之預熱深度（`warmup_basis=final`）；其餘以初值 D₀ 計並標 `initial_d0_lower_bound`（下界，不外推加倍）。"""
     from momentum.factories import create_feature_factory
 
-    factory = create_feature_factory(cache_dir=str(Path(kline_path).parent), validate_continuity=False)
+    factory = create_feature_factory(cache_dir=str(Path(kline_path).parent))  # 只解析設定、不讀 K 線
     resolved: Dict[Tuple[str, Tuple[str, ...]], Any] = {}
     out: Dict[str, Any] = {}
     for kind in CELL_CATEGORIES:
@@ -1164,6 +1475,44 @@ def pre_history_table(cells: Mapping[str, List[Dict[str, Any]]], criteria: Mappi
 
 
 # ---------------------------------------------------------------------------------------------- 主入口
+
+def cached_entry(m: Mapping[str, Any]) -> str:
+    """快取實測之生成入口：有記錄者取之；舊快取未記 ⇒ 依當時實作推定（格 A／B＝run_ic_first、格 C＝generate_features）。"""
+    if m.get("entry"):
+        return str(m["entry"])
+    return "generate_features" if m.get("category") == "C" else "run_ic_first"
+
+
+def migrate_cache(measurements: Mapping[str, Mapping[str, Any]],
+                  cells: Mapping[str, List[Dict[str, Any]]]) -> Dict[str, Dict[str, Any]]:
+    """舊快取鍵（`A:<tf>`、`B`、`C:<tf>`）改以其記錄之 `cell_id` 為鍵（v3 目標鍵＝格 id）；舊格 B（候選週期描述子）之訓練週期
+    等於封閉清單某格 B 之 timeframes 者改歸該格。只改鍵、不改內容（重用與否另由 `cache_reusable` 判）。"""
+    closed_b = {tuple(c["timeframes"]): c["id"] for c in cells.get("B", [])}
+    out: Dict[str, Dict[str, Any]] = {}
+    for key, m in measurements.items():
+        new_key = key
+        cid = m.get("cell_id") if isinstance(m, Mapping) else None
+        if cid:
+            new_key = str(cid)
+            if m.get("category") == "B" and cid not in {c["id"] for c in cells.get("B", [])}:
+                new_key = closed_b.get(tuple(m.get("training_timeframes") or ()), new_key)
+        if new_key in out and new_key != key:
+            continue
+        out[new_key] = dict(m, migrated_from=key) if new_key != key else dict(m)
+    return out
+
+
+def cache_reusable(target: Mapping[str, Any], cached: Optional[Mapping[str, Any]], criteria: Mapping[str, Any]) -> bool:
+    """快取實測可重用：狀態 measured／blocked（非預測）、輸出段與資料集紀錄同現行判準、生成入口同判準；PRE-PROV 格 measured 即可。"""
+    if not cached or cached.get("status") not in ("measured", "blocked", "killed") or cached.get("predicted"):
+        return False
+    if target["category"] == PREPROV:
+        return cached.get("status") == "measured"
+    training = cached.get("training_timeframes") if target["category"] == "B" else None
+    return (cached.get("output_window") == list(cell_window(target["cell"], criteria))
+            and cached.get("kline_source") == cell_kline_records(target["cell"], criteria, training)
+            and cached_entry(cached) == generation_entry(target["category"], criteria))
+
 
 def _parse(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="NUMVIEW 量測格估時（SPEC Task 0.4）")
@@ -1215,9 +1564,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     else:
         selected = targets
     if args.dry_run:
-        print(json.dumps({"cells": {k: len(v) for k, v in cells.items()},
+        cache_file = Path(args.work_root) / "measurements.json"
+        cached = migrate_cache(json.loads(cache_file.read_text(encoding="utf-8")), cells) if cache_file.is_file() else {}
+        reusable = [t["target"] for t in targets if cache_reusable(t, cached.get(t["target"]), criteria)]
+        print(json.dumps({"criteria": criteria_path().name, "cells": {k: [c["id"] for c in v] for k, v in cells.items()},
                           "targets": [t["target"] for t in targets],
-                          "would_measure": [t["target"] for t in selected]}, ensure_ascii=False, indent=2))
+                          "reusable_from_cache": reusable,
+                          "would_measure": [t["target"] for t in selected if t["target"] not in reusable]},
+                         ensure_ascii=False, indent=2))
         return 0
     receipts_dir = Path(args.receipts_dir) if args.receipts_dir else Path(RECEIPTS_DIR)
     existing = sorted(receipts_dir.glob(RECEIPT_GLOB))
@@ -1228,8 +1582,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     cache_path = work_root / "measurements.json"
     measurements: Dict[str, Dict[str, Any]] = json.loads(cache_path.read_text(encoding="utf-8")) \
         if cache_path.is_file() else {}
-    blocked_c_tfs: Set[str] = {k.split(":", 1)[1] for k, m in measurements.items()
-                               if k.startswith("C:") and m.get("status") in ("blocked", "killed")}
+    measurements = migrate_cache(measurements, cells)
     for target in selected:
         key = target["target"]
         if target["category"] == "B":
@@ -1255,12 +1608,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             cached = measurements.get(key) or {}
             if cached.get("status") in ("measured", "blocked") and cached.get("blocked_by") != BLOCKED_BY_HARDWARE \
                     and not cached.get("predicted") \
-                    and (cached.get("output_window") != window or cached.get("kline_source") != records):
-                measurements.pop(key, None)  # 快取為舊區間或舊來源資料集（kline_source 紀錄不同）⇒ 依現行判準重量
+                    and (cached.get("output_window") != window or cached.get("kline_source") != records
+                         or cached_entry(cached) != generation_entry(target["category"], criteria)):
+                measurements.pop(key, None)  # 舊區間、舊來源資料集或舊生成入口（如格 C 改經 IC-first）⇒ 依現行判準重量
         if key in measurements and measurements[key].get("status") in ("measured", "blocked", "killed") \
                 and not args.remeasure:
-            continue
-        if target["category"] == "C" and key.split(":", 1)[1] in blocked_c_tfs:
             continue
         print(f"[estimate] 實測 {key} …", flush=True)
         result = _run_target(target, work_root, kline_path, args.timeout_seconds)

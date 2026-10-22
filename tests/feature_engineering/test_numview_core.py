@@ -731,7 +731,10 @@ def _generate(root: Path, kind: str, cell: Mapping[str, Any], *, env: Optional[M
         _install_spies(mp, run)
         for patch in patches:
             patch(mp, run)
-        run.handle = _freeze().generate_cell(work, {**dict(cell), "kind": kind}, run_kind="regen_t3_core",
+        # 無 mutant patch ⇒ 批次共用生成（判準檔 cell_rules.batch_cache；root＝共用快取根、跑別＝b4）；含 patch ⇒ 另一碼態，
+        # 一律用本測試之暫存根（不讀寫共用快取）
+        run.handle = _freeze().generate_cell(work if patches else nh.regen_root(work),
+                                             {**dict(cell), "kind": kind}, run_kind=nh.regen_core_kind(bool(patches)),
                                              env=dict(env) if env else None)
     finally:
         mp.undo()
