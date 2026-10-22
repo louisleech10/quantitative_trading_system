@@ -6,6 +6,8 @@
 **規範權威**：7 條解耦規則的 canonical 唯一權威 = `CLAUDE.md` §The 7 Decoupling Rules（Rule 5=Config 單一來源、Rule 6=測試不依賴 run_api.py；singleton/callback 屬獨立 named invariant Rule 8/9）。他檔如有出入以 CLAUDE.md 為準。
 **結束前(必執行)**:寫交接到 `handoffs/<YYYYMMDD>-<task-id>.md`(append-only,≤30 行:正在做/待辦/阻塞/本次決策/踩坑提醒);根 `HANDOFF.md` 由 Claude 維護,執行端不得改寫
 
+**🔴 審查時必查（使用者 2026-10-22 定，全專案）**：凡 SPEC／TODO／估時含重型跑或大規模測試，每個重型跑須寫明其獨有覆蓋之程式路徑／邊界／情境；同一路徑在更多幣種、週期、組合上重複，或以「幣種×週期×組合×算法」相乘決定規模者 ⇒ 列 P1，要求主委說明為何違反軟體與量化業界做法；未附實測而宣稱較快／較準者 ⇒ 要求實測。細則見 `templates/COMMITTEE_FINDING_TEMPLATE.md` 首節。
+
 ---
 
 ## 執行任務時（被 Claude 以 `cursor-agent` headless 派工的合約）

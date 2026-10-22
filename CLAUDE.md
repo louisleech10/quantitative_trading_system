@@ -183,6 +183,9 @@ No hardcoded symbols, prices, or metrics.
 ### Validate Assumptions Before Acting（實測 > 假設）
 1. 明確說出假設 2. 最便宜驗證（grep/讀檔/載入資料）3. 先驗證再 code 4. 證據推翻計劃→停下更新。出處與事故敘事見 `docs/SCAR_LEDGER.md`。
 
+#### 測試／量測設計＝路徑覆蓋，不是重複（2026-10-22 使用者定，全專案）
+「不挑代表」「嚴謹只能多不能少」＝覆蓋所有程式路徑、邊界、情境，**不是**同一測試在更多幣種／週期／組合上重複。設計任何重型跑前先列要覆蓋之路徑清單，每條配最少之真實資料格，每個重型跑寫明其獨有覆蓋路徑；結果確實隨資料而變之研究才加第二個性質不同之資料集。正確性＝精確 oracle 單元測試、回歸＝固定代表基準組、效能＝獨立基準測試。未實測不得宣稱較快／較準。委員每輪依 `templates/COMMITTEE_FINDING_TEMPLATE.md` 首節審此項，違反即列 P1 要求說明為何違反業界做法。
+
 #### 驗證保真度鐵律（2026-06-05 定死）
 1. §A 涉及型別/形狀/單位須附實跑 receipt 2. 「測真實路徑」finding 不得降級 NON-BLOCKING（除非測試已存在並通過）3. 回歸禁 sanitized fixture（byte-faithful 或真實 ingestion）。事故敘事見 `docs/SCAR_LEDGER.md`。
 
