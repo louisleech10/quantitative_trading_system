@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-22T16:55:15.946449+00:00",
+  "head": "f4e73ee848681d8a01f7a90b334a42eda8d117bb",
+  "command": "venv/bin/python handoffs/run_receipts/numview_probes/reference_proof.py",
+  "criteria_sha256": "f94c22b68509d19fe6ec88078bb0d86d2bde04774df44c83dedee758cc10abc6",
+  "reference_sha256": "6f490c7bd76363ed4373591bb968c0083084c50d39008c16b0199080f9ce12a2",
+  "inputs": {
+    "kline": "data_cache/feature_klines/kline_cache.h5",
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "proof_b_rows": 240,
+    "proof_b_columns": [
+      "close",
+      "volume"
+    ],
+    "proof_b_l1_column": "close_momentum_RSI_14",
+    "proof_b_l1_source": "tests/_golden/icpostleak/contract.json",
+    "proof_d_rows": 120,
+    "window": 20,
+    "epsilon": 1e-08
+  },
+  "thresholds": {
+    "relative": 1e-12,
+    "near_zero_cutoff": 1e-12,
+    "near_zero_abs": 1e-24,
+    "precisions": [
+      50,
+      100
+    ],
+    "min_agreeing_digits": 40
+  },
+  "proofs": {
+    "a_hand_cases": [],
+    "b_third_party_real_kline": [],
+    "b_third_party_real_l1": [],
+    "c_properties": [],
+    "d_arbitrary_precision": [],
+    "d_near_zero_and_mixed": [],
+    "d_independent_decimal_oracle": [],
+    "chain_order_and_anchor": [],
+    "imports": []
+  },
+  "proof_d": {
+    "max_relative_error": 2.240125594716645e-16,
+    "near_zero_count": 1,
+    "near_zero_max_abs_error": 0.0,
+    "min_agreeing_digits": 49,
+    "precisions": [
+      50,
+      100
+    ],
+    "value_types": [
+      "Decimal"
+    ]
+  },
+  "proof_d_boundary_near_zero_mixed": {
+    "max_relative_error": 2.8493082531990487e-16,
+    "near_zero_count": 1,
+    "near_zero_max_abs_error": 0.0,
+    "min_agreeing_digits": 49,
+    "precisions": [
+      50,
+      100
+    ],
+    "value_types": [
+      "Decimal"
+    ]
+  },
+  "all_passed": true,
+  "exit_code": 0
+}
