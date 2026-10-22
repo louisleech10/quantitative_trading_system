@@ -1470,3 +1470,423 @@ def test_mutation_estimate_require_log_only(monkeypatch: pytest.MonkeyPatch, tmp
     violations = gate_require_violations(GATE, tmp_path / "mutant")
     assert len(violations) == 3 and all(v.endswith("未拋錯（前置閘失效）") for v in violations), violations
     assert len(logged) == 4
+
+
+# ---------------------------------------------------------------------------------------------- 判準 v2：前史不足之權威判定（追加）
+#
+# 判準檔 v2 `cell_rules.insufficient_history`（權威＝生成之完整度：run_status＝partial 且 failure_reasons 非空、每條皆合
+# `reason_pattern` ⇒ blocked〔history〕；其餘非 complete ⇒ failed）與 `cell_rules.b_membership`（格 B 訓練週期排除格 A
+# 判前史不足之週期，主週期不足或剩不足兩週期 ⇒ blocked）。受測＝`estimate.classify_run_completeness`／`b_membership`／
+# `build_receipt`、`_estimate_gate.resolve_criteria_path`。manifest 案為完整度欄位之閘邏輯單元（非特徵資料）；事件名取自
+# 判準檔 `known_events`，不另寫字面。
+
+#: 判準 v2 新增之前史判定段鍵（結構，非值集）
+HISTORY_RULE_KEYS = ("authoritative", "reason_pattern", "known_events", "prefilter", "allow_partial")
+
+
+def _history_rule() -> Mapping[str, Any]:
+    return _load_criteria()["cell_rules"]["insufficient_history"]
+
+
+def history_classification_violations(estimator: ModuleType) -> List[str]:
+    """`classify_run_completeness` 對下列案之判定：complete ⇒ complete；partial 而原因全為前史事件 ⇒ blocked（history、
+    事件欄數加總）；partial 而混入任一其他原因、partial 而原因為空、非 partial 之未完成 ⇒ failed（fail-closed）。"""
+    criteria = _load_criteria()
+    events = sorted(criteria["cell_rules"]["insufficient_history"]["known_events"])
+    history_only = [f"{events[0]}:7", f"{events[-1]}:5", f"{events[0]}:2"]
+    cases: List[Tuple[str, Dict[str, Any], str]] = [
+        ("complete", {"run_status": "complete", "failure_reasons": []}, "complete"),
+        ("history_only", {"run_status": "partial", "failure_reasons": history_only}, "blocked"),
+        ("mixed_reason", {"run_status": "partial", "failure_reasons": [history_only[0], "L6.5:preprocessing_failed"]},
+         "failed"),
+        ("quality_ratio", {"run_status": "partial", "failure_reasons": [history_only[0], "nan_ratio=1>max_nan_ratio=0"]},
+         "failed"),
+        ("empty_reasons", {"run_status": "partial", "failure_reasons": []}, "failed"),
+        ("failed_status", {"run_status": "failed", "failure_reasons": history_only}, "failed"),
+        ("unknown_status", {"failure_reasons": history_only}, "failed"),
+    ]
+    out: List[str] = []
+    for label, manifest, want in cases:
+        got = estimator.classify_run_completeness(manifest, criteria)
+        if got.get("status") != want:
+            out.append(f"{label}：判定 {got.get('status')!r} ≠ {want!r}")
+        if want == "blocked":
+            expected = {events[0]: 9, events[-1]: 5} if events[0] != events[-1] else {events[0]: 14}
+            if got.get("blocked_by") != "history" or got.get("reason_counts") != expected:
+                out.append(f"{label}：blocked_by／reason_counts {got.get('blocked_by')!r}／{got.get('reason_counts')!r}"
+                           f" ≠ history／{expected}")
+    return out
+
+
+def _b_descriptor() -> Mapping[str, Any]:
+    cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)["B"]
+    assert cells and len(cells[0]["timeframes"]) >= 3, "前提：真實 kline 之格 B 須具 ≥3 候選週期（本案需排除一週期後仍 ≥2）"
+    return cells[0]
+
+
+def b_membership_violations(estimator: ModuleType) -> List[str]:
+    """格 B 訓練週期：非主週期之格 A 判前史不足 ⇒ 排除、其餘照列且主週期起首；主週期不足 ⇒ blocked；剩不足 min_timeframes
+    ⇒ blocked；任一週期判定未知 ⇒ 拋錯（不猜測）。"""
+    criteria = _load_criteria()
+    cell = _b_descriptor()
+    tfs = list(cell["timeframes"])
+    out: List[str] = []
+    one_out = estimator.b_membership(cell, {tf: tf == tfs[-1] for tf in tfs}, criteria)
+    if one_out.get("status") != "ok" or one_out.get("training_timeframes") != tfs[:-1]:
+        out.append(f"排除最長週期：{one_out}")
+    main_out = estimator.b_membership(cell, {tf: tf == tfs[0] for tf in tfs}, criteria)
+    if main_out.get("status") != "blocked":
+        out.append(f"主週期不足未 blocked：{main_out}")
+    few = estimator.b_membership(cell, {tf: tf != tfs[0] for tf in tfs}, criteria)
+    if few.get("status") != "blocked":
+        out.append(f"只剩主週期未 blocked：{few}")
+    try:
+        estimator.b_membership(cell, {tf: (None if tf == tfs[1] else False) for tf in tfs}, criteria)
+    except estimator.EstimateError:
+        pass
+    else:
+        out.append("判定未知之週期未拋錯")
+    return out
+
+
+def test_estimate_criteria_history_rule_registered() -> None:
+    """判準 v2：前史判定以生成完整度為權威（`authoritative=run_completeness`）、不以 allow_partial 讀取、不降門檻；
+    `reason_pattern` 可編譯且涵蓋 `known_events` 全部事件而不涵蓋其他已知降級原因；`b_membership` 至少兩週期。"""
+    rule = _history_rule()
+    assert all(k in rule for k in HISTORY_RULE_KEYS), sorted(set(HISTORY_RULE_KEYS) - set(rule))
+    assert rule["authoritative"] == "run_completeness" and rule["allow_partial"] is False
+    assert rule["lower_threshold_allowed"] is False
+    pattern = re.compile(rule["reason_pattern"])
+    assert rule["known_events"] and all(pattern.fullmatch(f"{event}:3") for event in rule["known_events"])
+    assert not any(pattern.fullmatch(r) for r in ("L6.5:preprocessing_failed", "timeframe:1h", "nan_ratio=1>max_nan_ratio=0"))
+    assert int(_load_criteria()["cell_rules"]["b_membership"]["min_timeframes"]) >= 2
+
+
+def test_estimate_classify_history_only_partial_as_blocked() -> None:
+    """`classify_run_completeness`：只因前史事件而 partial ⇒ blocked（history），其餘未完成 ⇒ failed。"""
+    assert history_classification_violations(ESTIMATOR) == []
+
+
+def test_mutation_estimate_classify_any_partial_as_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：判定改為「任何 partial 皆 blocked」（混入他種原因亦放行）⇒ 檢查翻紅（mixed／quality／empty 三案）。"""
+    assert history_classification_violations(ESTIMATOR) == []
+    real = ESTIMATOR.classify_run_completeness
+
+    def lax(manifest: Mapping[str, Any], criteria: Mapping[str, Any]) -> Dict[str, Any]:
+        if manifest.get("run_status") == "partial":
+            return {"status": "blocked", "blocked_by": "history", "reason_counts": {}}
+        return real(manifest, criteria)
+
+    monkeypatch.setattr(ESTIMATOR, "classify_run_completeness", lax)
+    labels = {v.split("：", 1)[0] for v in history_classification_violations(ESTIMATOR)}
+    assert {"mixed_reason", "quality_ratio", "empty_reasons"} <= labels, labels
+
+
+def test_estimate_b_membership_excludes_history_blocked_timeframes() -> None:
+    """`b_membership`（判準 v2 `cell_rules.b_membership`）於真實 kline 之格 B 描述子。"""
+    assert b_membership_violations(ESTIMATOR) == []
+
+
+def test_mutation_estimate_b_membership_keeps_blocked_timeframe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：格 B 不排除前史不足週期（訓練週期恆為全部候選）⇒ 檢查翻紅。"""
+    assert b_membership_violations(ESTIMATOR) == []
+    monkeypatch.setattr(ESTIMATOR, "b_membership",
+                        lambda cell, status, criteria: {"status": "ok", "training_timeframes": list(cell["timeframes"])})
+    assert b_membership_violations(ESTIMATOR) != []
+
+
+def test_estimate_gate_resolves_exactly_one_criteria_file(tmp_path: Path) -> None:
+    """`_estimate_gate.resolve_criteria_path`：v1／v2 恰一存在 ⇒ 回該檔；皆無或皆在 ⇒ 拋 `EstimateGateError`（不可判定）。
+    現行判準（`_criteria_path()`）＝閘之解析結果。"""
+    assert Path(GATE.resolve_criteria_path()).resolve() == _criteria_path().resolve()
+    for present in ((), (CRITERIA_V1.name,), (CRITERIA_V2.name,), (CRITERIA_V1.name, CRITERIA_V2.name)):
+        d = tmp_path / ("_".join(present) or "none")
+        d.mkdir()
+        for name in present:
+            (d / name).write_text("{}", encoding="utf-8")
+        if len(present) == 1:
+            assert GATE.resolve_criteria_path(d) == d / present[0]
+        else:
+            with pytest.raises(GATE.EstimateGateError):
+                GATE.resolve_criteria_path(d)
+
+
+def test_estimate_receipt_lists_history_blocked_cells_outside_extrapolation() -> None:
+    """估時收據之組裝（`build_receipt`，閘邏輯單元；實測秒數為結構佔位）：某週期格 A 單格實測 blocked（history）⇒ 該週期
+    根數不多於受測格之全部格 A 列於 `history_blocked`（history、附事件欄數與根數；`blocked` 只放硬體）、不在任何跑別之 per_cell_seconds、其嘗試秒數只計入
+    freeze_baseline；格 B 訓練週期排除該週期；收據仍通過估時收據檢查（格清單完整）。"""
+    criteria = _load_criteria()
+    kline = _kline_index()
+    inventory = ESTIMATOR.kline_inventory(nh.KLINE_PATH)
+    cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)
+    src_inv = ESTIMATOR.source_inventory(inventory, criteria)  # 根數取各週期之來源檔（判準 kline_source）
+    tfs = sorted({tf for t in inventory.values() for tf in t}, key=ESTIMATOR.tf_seconds)
+    blocked_tf = tfs[-1]
+    probe_symbol = next(s for s, t in inventory.items() if blocked_tf in t)
+    measurements = _synthetic_measurements(inventory, cells)
+    event = sorted(criteria["cell_rules"]["insufficient_history"]["known_events"])[0]
+    output_bars = int(criteria["cell_definitions"]["A"]["output_bars"])
+    # 受測格之定案所需前史設為「恰使根數不多於受測格者不足」（靜態判定之邊界；判準 window_rule）
+    measurements[f"A:{blocked_tf}"] = {"target": f"A:{blocked_tf}", "category": "A", "status": "blocked",
+                                       "blocked_by": "history", "symbol": probe_symbol,
+                                       "cell_id": ESTIMATOR.cell_id("A", probe_symbol, [blocked_tf]),
+                                       "source_path": str(ESTIMATOR.kline_source(blocked_tf, criteria)),
+                                       "bar_counts": {blocked_tf: src_inv[probe_symbol][blocked_tf]},
+                                       "pre_history": {"required_pre_history_bars":
+                                                       src_inv[probe_symbol][blocked_tf] - output_bars + 1},
+                                       "reason_counts": {event: 1}, "attempt_seconds": 2.0}
+    body = ESTIMATOR.build_receipt(cells, inventory, criteria, measurements,
+                                   nv.load_contract()["post_ic_arm_values"]["values"])
+    receipt = json.loads(json.dumps({"reported_at": "2026-10-22T00:00:00+08:00", "cells": cells, **body}))
+    expected = {c["id"] for c in cells["A"] if c["timeframes"] == [blocked_tf]
+                and src_inv[c["symbol"]][blocked_tf] <= src_inv[probe_symbol][blocked_tf]}
+    listed = {b["cell"] for b in receipt["history_blocked"] if b.get("blocked_by") == "history"}
+    assert not any(b.get("blocked_by") == "history" for b in receipt["blocked"]), "前史 blocked 不得列入硬體 blocked"
+    assert expected and expected <= listed, sorted(expected - listed)
+    assert all(b.get("reason_counts") for b in receipt["history_blocked"] if b["cell"] in expected)
+    for name, node in receipt["run_kinds"].items():
+        assert not (expected & set(node["per_cell_seconds"])), name
+        assert set(node.get("blocked_attempt_seconds") or {}) <= (expected if name == "freeze_baseline" else set()), name
+    assert set(receipt["run_kinds"]["freeze_baseline"]["blocked_attempt_seconds"]) == expected
+    assert all(blocked_tf not in m["training_timeframes"] for m in receipt["b_membership"].values()
+               if m["status"] == "ok")
+    assert estimate_receipt_violations(receipt, kline) == []
+
+
+# ---------------------------------------------------------------------------------------------- 審碼 b1 r3（追加）：格 C 前史
+# blocked 之路由（CODEX-R3-P1-01）、所需前史以定案預熱深度計（CODEX-R3-P1-02）。皆為收據組裝與純函式之閘邏輯單元（不生成）。
+
+def _synthetic_measurements(inventory: Mapping[str, Mapping[str, int]], cells: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """全部實測目標之結構佔位（秒數非量測值；只驗組裝邏輯）：受測格帶 cell_id、來源檔、來源根數，所需前史 0（他格靜態判定
+    皆足夠）。"""
+    criteria = _load_criteria()
+    src_inv = ESTIMATOR.source_inventory(inventory, criteria)
+    out: Dict[str, Dict[str, Any]] = {}
+    for target in ESTIMATOR.measurement_targets(cells, inventory, None, criteria):
+        record: Dict[str, Any] = {"target": target["target"], "category": target["category"], "status": "measured",
+                                  "seconds": 1.0, "peak_rss_bytes": 1}
+        cell = target.get("cell")
+        if cell is not None and target["category"] in ("A", "C"):
+            tf = cell["timeframes"][0]
+            record.update(cell_id=cell["id"], symbol=cell["symbol"],
+                          source_path=str(ESTIMATOR.kline_source(tf, criteria)),
+                          bar_counts={tf: src_inv[cell["symbol"]][tf]},
+                          pre_history={"required_pre_history_bars": 0})
+        if target["category"] in ("A", "B"):
+            record["arm_seconds"] = {arm: 1.0 for arm in nv.load_contract()["post_ic_arm_values"]["values"]}
+        out[target["target"]] = record
+    return out
+
+
+def cell_c_history_violations(estimator: ModuleType) -> List[str]:
+    """某週期格 C 單格實測 blocked（blocked_by=history）⇒ 實測結果可接受（`measurement_accepted`）；該週期根數不多於受測格之
+    全部格 C 列於 `history_blocked`、不在硬體 `blocked`、不在任何 per_cell_seconds；其嘗試秒數只計入 precision_chain；
+    `cell_c_baseline` 該週期記為實測（history_blocked）；收據通過估時收據檢查與邊界 07 之格 C 阻擋檢查。"""
+    criteria = _load_criteria()
+    inventory = estimator.kline_inventory(nh.KLINE_PATH)
+    cells = estimator.enumerate_cells(nh.KLINE_PATH)
+    measurements = _synthetic_measurements(inventory, cells)
+    c_keys = sorted(k for k in measurements if k.startswith("C:"))
+    assert c_keys, "前提：須有實測之格 C 目標"
+    key = c_keys[0]
+    tf = key.split(":", 1)[1]
+    probe_symbol = next(c["symbol"] for c in cells["C"] if c["timeframes"] == [tf])
+    event = sorted(criteria["cell_rules"]["insufficient_history"]["known_events"])[0]
+    src_inv = estimator.source_inventory(inventory, criteria)
+    output_bars = int(criteria["cell_definitions"]["C"]["output_bars"])
+    measurements[key] = {"target": key, "category": "C", "status": "blocked", "blocked_by": "history",
+                         "symbol": probe_symbol, "cell_id": estimator.cell_id("C", probe_symbol, [tf]),
+                         "source_path": str(estimator.kline_source(tf, criteria)),
+                         "bar_counts": {tf: src_inv[probe_symbol][tf]},
+                         "pre_history": {"required_pre_history_bars": src_inv[probe_symbol][tf] - output_bars + 1},
+                         "reason_counts": {event: 1}, "attempt_seconds": 3.0, "peak_rss_bytes": 7}
+    out: List[str] = []
+    if not estimator.measurement_accepted(measurements[key]):
+        out.append("measurement_accepted 拒收格 C 之前史 blocked")
+        return out
+    body = estimator.build_receipt(cells, inventory, criteria, measurements,
+                                   nv.load_contract()["post_ic_arm_values"]["values"])
+    receipt = json.loads(json.dumps({"reported_at": "2026-10-22T00:00:00+08:00", "cells": cells, **body}))
+    expected = {c["id"] for c in cells["C"] if c["timeframes"] == [tf]
+                and src_inv[c["symbol"]][tf] <= src_inv[probe_symbol][tf]}
+    hist = {b["cell"] for b in receipt.get("history_blocked") or [] if b.get("blocked_by") == "history"}
+    if not expected <= hist:
+        out.append(f"history_blocked 缺格 C {sorted(expected - hist)[:3]}")
+    if expected & {b.get("cell") for b in receipt.get("blocked") or []}:
+        out.append("前史 blocked 之格 C 誤入硬體 blocked")
+    for name, node in receipt["run_kinds"].items():
+        if expected & set(node["per_cell_seconds"]):
+            out.append(f"{name}：前史 blocked 之格 C 入外推")
+    if set((receipt["run_kinds"]["precision_chain"].get("blocked_attempt_seconds") or {})) != expected:
+        out.append("precision_chain 之嘗試秒數未逐格涵蓋前史 blocked 之格 C")
+    base = receipt["cell_c_baseline"].get(tf) or {}
+    if base.get("blocked_by") == "hardware" or base.get("history_blocked") is not True:
+        out.append(f"cell_c_baseline.{tf} 未依 blocked_by 走前史路徑：{base}")
+    out += [f"估時收據檢查：{v}" for v in estimate_receipt_violations(receipt, _kline_index())]
+    out += [f"格 C 阻擋檢查：{v}" for v in cell_c_blocked_violations(receipt)]
+    return out
+
+
+def test_estimate_cell_c_history_blocked_routed_by_blocked_by() -> None:
+    """審碼 b1 r3 CODEX-R3-P1-01：格 C 之前史 blocked 依 `blocked_by` 走前史路徑（非硬體路徑）。"""
+    assert cell_c_history_violations(ESTIMATOR) == []
+
+
+def test_mutation_estimate_cell_c_history_rejected_as_hardware_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：`measurement_accepted` 回到「格 C 只接受硬體 blocked」⇒ 檢查翻紅。"""
+    assert cell_c_history_violations(ESTIMATOR) == []
+
+    def legacy(m: Mapping[str, Any]) -> bool:
+        if m.get("status") == "measured":
+            return True
+        if m.get("category") == "C" and m.get("status") in ("blocked", "killed"):
+            return m.get("blocked_by", "hardware") == "hardware"
+        return m.get("category") in ("A", "B") and m.get("status") == "blocked" and m.get("blocked_by") == "history"
+
+    monkeypatch.setattr(ESTIMATOR, "measurement_accepted", legacy)
+    assert "measurement_accepted 拒收格 C 之前史 blocked" in cell_c_history_violations(ESTIMATOR)
+
+
+def final_warmup_violations(estimator: ModuleType) -> List[str]:
+    """所需前史以定案預熱深度計（加倍規則；判準 v2 window_rule）：定案深度取 metadata `output_window.max_warmup_bars`，
+    其次加倍探測末輪；給定定案深度（模擬一次加倍＝2×D₀）⇒ required＝定案＋N_cal、basis＝final、clipped／ingest_floor 依之；
+    未給 ⇒ 以 D₀ 計並標 initial_d0_lower_bound。以真實 kline 之格 C（可得前史介於 D₀ 與 2×D₀ 間者）驗 clipped 翻轉。"""
+    out: List[str] = []
+    if estimator.final_warmup_bars({"max_warmup_bars": 7}, [{"depth": 3}]) != 7:
+        out.append("final_warmup_bars 未優先取 metadata")
+    if estimator.final_warmup_bars(None, [{"depth": 3}, {"depth": 6}]) != 6:
+        out.append("final_warmup_bars 未取探測末輪")
+    if estimator.final_warmup_bars(None, []) is not None:
+        out.append("final_warmup_bars 無來源時須為 None")
+    from momentum.factories import create_feature_factory
+
+    criteria = _load_criteria()
+    cells = estimator.enumerate_cells(nh.KLINE_PATH)
+    factory = create_feature_factory(cache_dir=str(nh.KLINE_PATH.parent), validate_continuity=False)
+    chosen = None
+    for cell in cells["C"]:  # 選格只依初值與可得前史之算術（不依受測之加倍處理）
+        config = factory._resolve_config(estimator.cell_payload(cell, criteria))
+        initial = estimator.pre_history_requirement(cell, criteria, config)
+        doubled_need = 2 * initial["d0_bars"] + initial["calibration_bars_primary"]
+        if not initial["clipped"] and initial["available_pre_history_bars"] < doubled_need:
+            chosen = (cell, config, initial)
+            break
+    if chosen is None:
+        return out + ["前提：真實 kline 無「D₀ 不截斷而 2×D₀ 截斷」之格 C（無從構造加倍案）"]
+    cell, config, initial = chosen
+    doubled = estimator.pre_history_requirement(cell, criteria, config, final_warmup=2 * initial["d0_bars"])
+    if initial["warmup_basis"] != "initial_d0_lower_bound" or initial["final_warmup_bars"] is not None:
+        out.append(f"未給定案深度而 basis／final 非下界：{initial}")
+    if doubled["warmup_basis"] != "final" or doubled["final_warmup_bars"] != 2 * initial["d0_bars"]:
+        out.append(f"定案深度未記錄：{doubled}")
+    want = 2 * initial["d0_bars"] + initial["calibration_bars_primary"]
+    if doubled["required_pre_history_bars"] != want:
+        out.append(f"required {doubled['required_pre_history_bars']} ≠ 定案＋N_cal {want}")
+    if doubled["clipped"] is not True or doubled["ingest_floor"] > initial["ingest_floor"]:
+        out.append("加倍後 clipped／ingest_floor 未隨定案深度更新")
+    return out
+
+
+def test_estimate_pre_history_uses_final_warmup_depth() -> None:
+    """審碼 b1 r3 CODEX-R3-P1-02：所需前史以生成定案之預熱深度計，未實測者標 D₀ 下界。"""
+    assert final_warmup_violations(ESTIMATOR) == []
+
+
+def test_mutation_estimate_pre_history_ignores_doubling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：所需前史忽略定案深度（恆以 D₀ 計）⇒ 加倍案翻紅。"""
+    assert final_warmup_violations(ESTIMATOR) == []
+    real = ESTIMATOR.pre_history_requirement
+
+    def d0_only(cell, criteria, resolved_config, kline_path=None, training_timeframes=None, final_warmup=None):  # type: ignore[no-untyped-def]
+        return real(cell, criteria, resolved_config, kline_path, training_timeframes)
+
+    monkeypatch.setattr(ESTIMATOR, "pre_history_requirement", d0_only)
+    violations = final_warmup_violations(ESTIMATOR)
+    assert any(v.startswith(("定案深度未記錄", "required", "加倍後")) for v in violations), violations
+
+
+# ---------------------------------------------------------------------------------------------- 判準 v2 kline_source（追加）：
+# 依週期之 K 線來源（使用者 2026-10-22：12h 讀長歷史檔、主檔不動）。只讀 h5 鍵與資料集（不生成）。
+
+def _independent_dataset_sha256(path: Path, symbol: str, tf: str) -> str:
+    """測試端獨立重算（判準 kline_source.dataset_sha256 之定義）：dtype 描述＋C 連續位元組之 sha256。"""
+    with h5py.File(str(path), "r") as handle:
+        arr = handle[symbol][tf]["data"][()]
+    digest = hashlib.sha256()
+    digest.update(str(arr.dtype.descr).encode("utf-8"))
+    digest.update(np.ascontiguousarray(arr).tobytes())
+    return digest.hexdigest()
+
+
+def kline_source_violations(estimator: ModuleType) -> List[str]:
+    """判準 `cell_rules.kline_source`：①主檔列舉之每個週期皆有封閉對映；未列之週期拒收。②單週期格之來源＝其週期之對映
+    檔；多週期格 B 之來源＝其主週期之來源（單一 cache_dir）。③輸出段之終點＝來源序列之末根（依來源之 series_end）。④逐格
+    資料集紀錄之 sha256 等於測試端獨立重算、根數等於來源檔該資料集長度。全部以判準檔對映為準（不寫死檔名）。"""
+    criteria = _load_criteria()
+    rule = criteria["cell_rules"]["kline_source"]
+    mapping = rule["by_timeframe"]
+    out: List[str] = []
+    kline = _kline_index()
+    missing = sorted({tf for tfs in kline.values() for tf in tfs} - set(mapping))
+    if missing:
+        out.append(f"kline_source 缺週期 {missing}")
+    try:
+        estimator.kline_source("numview_unlisted_tf", criteria)
+        out.append("未列之週期未拒收")
+    except estimator.EstimateError:
+        pass
+    cells = estimator.enumerate_cells(nh.KLINE_PATH)
+    for kind in ("A", "C"):
+        for cell in cells[kind]:
+            tf = cell["timeframes"][0]
+            want = (REPO / mapping[tf]).resolve()
+            got = Path(estimator.cell_source(cell, criteria)).resolve()
+            if got != want:
+                out.append(f"{cell['id']}：來源 {got} ≠ 判準對映 {want}")
+                break
+    for cell in cells["B"]:
+        if Path(estimator.cell_source(cell, criteria)).resolve() != (REPO / mapping[cell["timeframes"][0]]).resolve():
+            out.append(f"{cell['id']}：格 B 來源 ≠ 主週期之來源")
+            break
+    sample = [c for c in cells["A"] if c["symbol"] == cells["A"][0]["symbol"]]
+    for cell in sample:
+        tf = cell["timeframes"][0]
+        src = REPO / mapping[tf]
+        record = estimator.cell_kline_records(cell, criteria)[tf]
+        if record.get("source") != mapping[tf]:
+            out.append(f"{cell['id']}：紀錄之 source {record.get('source')!r} ≠ {mapping[tf]!r}")
+        if record.get("dataset_sha256") != _independent_dataset_sha256(src, cell["symbol"], tf):
+            out.append(f"{cell['id']}：dataset_sha256 ≠ 獨立重算")
+        with h5py.File(str(src), "r") as handle:
+            n = int(handle[cell["symbol"]][tf]["data"].shape[0])
+        if record.get("bar_count") != n:
+            out.append(f"{cell['id']}：bar_count {record.get('bar_count')} ≠ 來源 {n}")
+        if estimator.cell_window(cell, criteria)[1] != record.get("series_end"):
+            out.append(f"{cell['id']}：輸出段終點 ≠ 來源序列末根 {record.get('series_end')}")
+    return out
+
+
+def test_estimate_kline_source_rule_per_timeframe() -> None:
+    """判準 v2 `cell_rules.kline_source`：依週期之來源檔、格 B 單一來源、輸出段依來源序列、逐格資料集 sha256。"""
+    assert kline_source_violations(ESTIMATOR) == []
+
+
+def test_estimate_kline_source_long_history_differs_from_main() -> None:
+    """前提與鑑別力：判準對映中有週期之來源不同於主檔（長歷史），且該週期之格之輸出段終點與資料集 sha256 皆異於主檔同週期
+    （若相同則 mutation 無從鑑別）。"""
+    criteria = _load_criteria()
+    mapping = criteria["cell_rules"]["kline_source"]["by_timeframe"]
+    main_rel = criteria["cell_rules"]["enumerate_from"]
+    long_tfs = sorted(tf for tf, src in mapping.items() if src != main_rel)
+    assert long_tfs, "判準對映無任何週期讀長歷史檔"
+    cell = next(c for c in ESTIMATOR.enumerate_cells(nh.KLINE_PATH)["A"] if c["timeframes"] == [long_tfs[0]])
+    record = ESTIMATOR.cell_kline_records(cell, criteria)[long_tfs[0]]
+    assert record["dataset_sha256"] != _independent_dataset_sha256(nh.KLINE_PATH, cell["symbol"], long_tfs[0])
+
+
+def test_mutation_estimate_kline_source_reads_main_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：來源一律讀主檔（忽略判準對映）⇒ 長歷史週期之格來源／sha256／輸出段終點檢查翻紅。"""
+    assert kline_source_violations(ESTIMATOR) == []
+    monkeypatch.setattr(ESTIMATOR, "kline_source", lambda tf, criteria: nh.KLINE_PATH)
+    monkeypatch.setattr(ESTIMATOR, "_DATASET_RECORDS", {})
+    assert kline_source_violations(ESTIMATOR) != []

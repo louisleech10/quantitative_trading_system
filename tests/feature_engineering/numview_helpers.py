@@ -30,7 +30,10 @@ import pandas as pd
 REPO: Path = Path(__file__).resolve().parents[2]
 GOLDEN_DIR: Path = REPO / "tests" / "_golden" / "numview"
 PRE_CHANGE_FINGERPRINTS_PATH: Path = GOLDEN_DIR / "pre_change_fingerprints.json"
+#: 判準檔 v1 之檔名路徑（`test_numview_criteria.CRITERIA_V1` 即此；不代表現行判準——現行判準一律經
+#: `current_criteria_path()`：v1／v2 恰一存在者，SPEC Task 0.3 邊界①）
 CRITERIA_PATH: Path = GOLDEN_DIR / "preregistered_criteria.json"
+CRITERIA_V2_PATH: Path = GOLDEN_DIR / "preregistered_criteria_v2.json"
 DECISIONS_PATH: Path = GOLDEN_DIR / "decisions.json"
 REFREEZE_RECEIPT_PATH: Path = GOLDEN_DIR / "refreeze_receipt.json"
 LEGACY_BASELINE_PATH: Path = REPO / "tests" / "_golden" / "preprov" / "pre_change_fingerprints.json"
@@ -51,6 +54,15 @@ CORE_DECISION_KEYS = ("d_postic", "d_mtf", "d_memmap", "d_winsor_dtype", "d_code
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def current_criteria_path() -> Path:
+    """現行事前登記判準檔：`CRITERIA_PATH`（v1）與 `CRITERIA_V2_PATH`（v2）恰一存在者；皆在或皆無 ⇒ RuntimeError
+    （同 `test_numview_criteria._criteria_path` 與邊界 05 之「兩檔名恰一存在」）。刻意不用 assert：本函式被測試呼叫，
+    無斷言即不被 TESTREG 展開為測試之斷言元素（不擾動既有斷言之正規化序號）。"""
+    if CRITERIA_PATH.is_file() == CRITERIA_V2_PATH.is_file():
+        raise RuntimeError(f"判準檔 v1／v2 須恰一存在（v1={CRITERIA_PATH.is_file()}、v2={CRITERIA_V2_PATH.is_file()}）")
+    return CRITERIA_V2_PATH if CRITERIA_V2_PATH.is_file() else CRITERIA_PATH
 
 
 def values_native_sha256(values: np.ndarray) -> str:

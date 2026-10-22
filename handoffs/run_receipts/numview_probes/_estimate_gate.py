@@ -58,8 +58,37 @@ def _reported_at(receipt: Mapping[str, Any]) -> datetime:
         raise EstimateGateError(f"估時收據 reported_at 非 ISO-8601：{raw!r}") from exc
 
 
-#: 事前登記判準檔（Task 0.3）；估時收據之 `criteria_sha256` 須等於其現行位元組之 sha256
-CRITERIA_PATH: Path = REPO / "tests" / "_golden" / "numview" / "preregistered_criteria.json"
+#: 事前登記判準檔（Task 0.3）之兩個合法檔名：v1 與其唯一取代檔 v2（SPEC Task 0.3 邊界①：只准於任何收據產出前以 v2
+#: 取代並刪 v1）。現行判準＝兩者中恰一存在者；兩者皆在或皆無 ⇒ 不可判定（拒跑）。
+CRITERIA_DIR: Path = REPO / "tests" / "_golden" / "numview"
+CRITERIA_V1_NAME = "preregistered_criteria.json"
+CRITERIA_V2_NAME = "preregistered_criteria_v2.json"
+
+
+class CriteriaResolutionError(EstimateGateError):
+    """現行判準檔不可判定（v1／v2 皆在或皆無）。"""
+
+
+def resolve_criteria_path(criteria_dir: Optional[Path] = None) -> Path:
+    """現行事前登記判準檔：v1／v2 恰一存在者（同 `tests/feature_engineering/test_numview_criteria.py` 之 `_criteria_path`
+    與邊界 05 之「兩檔名恰一存在」）；否則 `CriteriaResolutionError`。估時器、凍結腳本與探針一律經本函式取判準路徑。"""
+    directory = Path(criteria_dir) if criteria_dir is not None else Path(CRITERIA_DIR)
+    present = [directory / name for name in (CRITERIA_V1_NAME, CRITERIA_V2_NAME) if (directory / name).is_file()]
+    if len(present) != 1:
+        raise CriteriaResolutionError(
+            f"判準檔須 {CRITERIA_V1_NAME}／{CRITERIA_V2_NAME} 恰一存在於 {directory}，實得 {[p.name for p in present]}")
+    return present[0]
+
+
+def _import_time_criteria_path() -> Path:
+    try:
+        return resolve_criteria_path()
+    except CriteriaResolutionError:
+        return Path(CRITERIA_DIR) / CRITERIA_V1_NAME  # 匯入不失敗；`_require_current_criteria` 執行期再嚴格判定
+
+
+#: 匯入時解析之現行判準檔（估時收據之 `criteria_sha256` 須等於其現行位元組之 sha256）
+CRITERIA_PATH: Path = _import_time_criteria_path()
 
 
 def _require_current_criteria(receipt: Mapping[str, Any]) -> None:
@@ -70,6 +99,7 @@ def _require_current_criteria(receipt: Mapping[str, Any]) -> None:
     recorded = receipt.get("criteria_sha256")
     if not isinstance(recorded, str) or not recorded:
         raise EstimateGateError("估時收據缺 criteria_sha256；拒跑")
+    resolve_criteria_path(Path(CRITERIA_PATH).parent)  # v1／v2 恰一存在（不可判定 ⇒ 拒跑）
     try:
         current = hashlib.sha256(Path(CRITERIA_PATH).read_bytes()).hexdigest()
     except OSError as exc:

@@ -1,6 +1,6 @@
 {
-  "_doc": "NUMVIEW 事前登記判準與決定紀錄 schema（docs/NUMVIEW_SPEC.md Task 0.3、設計選擇⑥、R2-D）。於 Phase 1 任何量測收據產出前凍結；提交後不得修改（只准於任何收據產出前以 preregistered_criteria_v2.json 取代並刪本檔）。數值門檻只來自 threshold_kinds 所列四類（exact 集合比較、NaN 遮罩 exact、IC 正負號、float32 ulp），不自訂 atol／rtol。每份 handoffs/run_receipts/*-numview-*.json 記本檔位元組之 sha256 為 criteria_sha256。",
-  "version": 1,
+  "_doc": "NUMVIEW 事前登記判準與決定紀錄 schema（docs/NUMVIEW_SPEC.md Task 0.3、設計選擇⑥、R2-D）。於 Phase 1 任何量測收據產出前凍結；提交後不得修改（只准於任何收據產出前以 preregistered_criteria_v2.json 取代並刪本檔）。數值門檻只來自 threshold_kinds 所列四類（exact 集合比較、NaN 遮罩 exact、IC 正負號、float32 ulp），不自訂 atol／rtol。每份 handoffs/run_receipts/*-numview-*.json 記本檔位元組之 sha256 為 criteria_sha256。v2（2026-10-22，取代 v1、v1 同提交刪除；SPEC Task 0.3 邊界①，於任何收據提交前）：估時實測 A:12h 與 B 之生成皆為 run_status=partial（failure_reasons 只含 calibration_insufficient_history、warmup_insufficient_history），v1 之根數門檻（min_history_bars）把資料前史不足之格誤判為足夠；v2 改以該格生成之完整度為前史不足之權威判定（根數門檻降為前置篩、不降任何門檻），並定格 B 之訓練週期排除前史不足之週期；另依使用者 2026-10-22 裁定，一切格（含格 C）之生成一律用足夠區間（輸出段＋所需前史，見 cell_rules.window_rule），不跑全史；同日裁定 12h 改讀長歷史檔（主檔不動，見 cell_rules.kline_source）。其餘段與 v1 逐字相同。",
+  "version": 2,
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -22,7 +22,7 @@
         "type": "string"
       },
       "version": {
-        "const": 1
+        "const": 2
       },
       "schema": {
         "type": "object"
@@ -34,7 +34,10 @@
           "output_bars",
           "insufficient_history",
           "categories",
-          "timeframe_order"
+          "timeframe_order",
+          "b_membership",
+          "window_rule",
+          "kline_source"
         ],
         "properties": {
           "enumerate_from": {
@@ -49,9 +52,14 @@
             "type": "object",
             "required": [
               "rule",
+              "authoritative",
+              "reason_pattern",
+              "known_events",
+              "prefilter",
               "blocked_by",
               "record",
-              "lower_threshold_allowed"
+              "lower_threshold_allowed",
+              "allow_partial"
             ],
             "properties": {
               "blocked_by": {
@@ -66,6 +74,23 @@
               },
               "lower_threshold_allowed": {
                 "const": false
+              },
+              "authoritative": {
+                "const": "run_completeness"
+              },
+              "reason_pattern": {
+                "type": "string",
+                "format": "regex"
+              },
+              "known_events": {
+                "type": "object",
+                "minProperties": 1
+              },
+              "prefilter": {
+                "type": "string"
+              },
+              "allow_partial": {
+                "const": false
               }
             }
           },
@@ -79,6 +104,85 @@
           },
           "timeframe_order": {
             "type": "string"
+          },
+          "b_membership": {
+            "type": "object",
+            "required": [
+              "rule",
+              "main",
+              "include_other_timeframe_if",
+              "min_timeframes",
+              "record_key",
+              "a_status_source"
+            ],
+            "properties": {
+              "min_timeframes": {
+                "type": "integer",
+                "minimum": 2
+              },
+              "record_key": {
+                "const": "training_timeframes"
+              },
+              "a_status_source": {
+                "type": "object",
+                "required": [
+                  "freeze",
+                  "estimate",
+                  "regen"
+                ]
+              }
+            }
+          },
+          "window_rule": {
+            "type": "object",
+            "required": [
+              "rule",
+              "output_bars_source",
+              "d0_source",
+              "calibration_source",
+              "calibration_applies_when",
+              "clipped_outcome",
+              "record",
+              "full_history_allowed",
+              "final_depth_source"
+            ],
+            "properties": {
+              "full_history_allowed": {
+                "const": false
+              },
+              "record": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
+          },
+          "kline_source": {
+            "type": "object",
+            "required": [
+              "rule",
+              "by_timeframe",
+              "unlisted_timeframe",
+              "multi_timeframe",
+              "output_window_series",
+              "record",
+              "dataset_sha256"
+            ],
+            "properties": {
+              "by_timeframe": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "kline_cache\\.h5$"
+                }
+              },
+              "unlisted_timeframe": {
+                "const": "reject"
+              },
+              "multi_timeframe": {
+                "const": "single_source_of_main_timeframe"
+              }
+            }
           }
         }
       },
@@ -100,15 +204,16 @@
             "type": "object",
             "required": [
               "config_override",
-              "output_window",
+              "output_bars",
               "timeframes_rule"
             ],
             "properties": {
               "config_override": {
                 "type": "object"
               },
-              "output_window": {
-                "const": "full_history"
+              "output_bars": {
+                "type": "integer",
+                "minimum": 1
               },
               "timeframes_rule": {
                 "type": "object"
@@ -404,18 +509,78 @@
     "output_bars": 500,
     "categories": {
       "A": "每個 symbol×tf 一格：單週期短窗（timeframes 恰一項）；設定＝cell_definitions.A。",
-      "B": "每個具 ≥2 週期之 symbol 一格：timeframes＝該 symbol 全部週期依週期長度升冪，首項（最細）＝主週期、全部＝訓練週期；設定＝cell_definitions.B。",
-      "C": "每個 symbol×tf 一格：生產預設全特徵設定（config_override 之外全取生產預設設定檔）於全史；本機不可跑（記憶體守護具名終止）者該 tf 全列 blocked-by 硬體（SPEC Task 0.4 邊界①）。"
+      "B": "每個具 ≥2 週期之 symbol 一格：格描述子 timeframes＝該 symbol 全部週期依週期長度升冪（候選週期；首項＝最細＝主週期），實際訓練週期依 b_membership 決定（記於 training_timeframes）；設定＝cell_definitions.B。",
+      "C": "每個 symbol×tf 一格：生產預設全特徵設定（config_override 之外全取生產預設設定檔）於足夠區間（cell_rules.window_rule；輸出段＝最後 output_bars 根，不跑全史）；本機不可跑（記憶體守護具名終止）者該 tf 全列 blocked-by 硬體（SPEC Task 0.4 邊界①）。"
     },
     "timeframe_order": "週期長度以 pandas.Timedelta(週期字面) 解析之秒數升冪；不可解析之週期字面 ⇒ 列舉拒收（不猜測）。",
     "insufficient_history": {
-      "rule": "格 A／B：任一所涉週期於 kline_cache.h5 之根數 < cell_definitions.<格類>.min_history_bars ⇒ 該格 blocked（history），記各週期根數與理由，不降門檻、不以較短窗冒充同格。輸出段＝主週期最後 output_bars 根（起點＝倒數第 output_bars 根之時間戳、終點＝最後一根之時間戳）；min_history_bars＝output_bars＋平穩化校準長度 N 之最大預設值（momentum/FeatureEngineering/feature_config.py CALIBRATION_BARS_INTRADAY_DEFAULT＝1000，日內週期之預設；一日以上之預設 500 較小，取大者使任一週期皆可校準）。",
+      "rule": "格 A／B／C 之前史不足判定（前置篩只適用格 A／B）。權威判定＝該格生成之完整度：生成之 run manifest run_status＝partial、failure_reasons 非空且每一條皆合 reason_pattern（`<事件>:<欄數>`，事件以 _insufficient_history 結尾）⇒ 該格 blocked（history），記 reason_counts（事件→欄數）與 bar_counts；run_status 非 complete 而有任一條不合 reason_pattern（或 failure_reasons 為空）⇒ failed（fail-closed，停下歸因，不得記為 blocked）。前置篩（不生成）：任一所涉週期於 kline_cache.h5 之根數 < cell_definitions.<格類>.min_history_bars ⇒ 同判 blocked（history）。不降門檻、不以 allow_partial 讀取 partial run、不以較短窗或縮小設定冒充同格。輸出段＝主週期最後 output_bars 根（起點＝倒數第 output_bars 根之時間戳、終點＝最後一根之時間戳）；min_history_bars＝output_bars＋平穩化校準長度 N 之最大預設值（momentum/FeatureEngineering/feature_config.py CALIBRATION_BARS_INTRADAY_DEFAULT＝1000），只為必要條件（指標暖機另需前史，故根數足夠之格仍可能經權威判定為 blocked）。",
+      "authoritative": "run_completeness",
+      "reason_pattern": "^[a-z][a-z0-9_]*_insufficient_history:[0-9]+$",
+      "known_events": {
+        "calibration_insufficient_history": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py EVENT_CALIBRATION_INSUFFICIENT（起始日前有效值不足校準長度 N 之欄）",
+        "warmup_insufficient_history": "momentum/FeatureEngineering/warmup_window.py WARMUP_INSUFFICIENT_EVENT（首個有效值晚於輸出起點之欄）"
+      },
+      "prefilter": "bar_count_below_min_history_bars",
       "blocked_by": "history",
       "record": [
         "bar_counts",
+        "reason_counts",
         "reason"
       ],
-      "lower_threshold_allowed": false
+      "lower_threshold_allowed": false,
+      "allow_partial": false
+    },
+    "b_membership": {
+      "rule": "格 B 之訓練週期＝主週期（候選之最細週期）＋其餘候選週期中「同 symbol×tf 之格 A 未判前史不足（history）」者，依週期長度升冪；主週期之格 A 判前史不足、或訓練週期少於 min_timeframes ⇒ 該格 B blocked（history，原因記被排除之週期與其格 A 判定）。格 B 自身之生成亦適用 insufficient_history 權威判定。格 B 之全部候選週期讀自其主週期之來源檔（cell_rules.kline_source.multi_timeframe），前史判定亦以該來源之序列為準：格 A 之同週期來源與之相同者沿用格 A 判定；不同者以 window_rule 對該來源之靜態判定（所需前史取同週期格 A 之定案值，無則 D₀ 下界），格 B 自身生成仍受 insufficient_history 權威判定。",
+      "main": "finest_candidate_timeframe",
+      "include_other_timeframe_if": "a_cell_not_history_blocked",
+      "min_timeframes": 2,
+      "record_key": "training_timeframes",
+      "a_status_source": {
+        "freeze": "同一凍結 run 中該 symbol×tf 之格 A 判定（凍結腳本先生成全部格 A、後生成格 B；判定記於凍結收據）",
+        "estimate": "估時器逐週期之格 A 單格實測：同來源之本格取其判定；他格與他來源依 window_rule 之靜態判定（可得前史 < 受測格定案之所需前史 ⇒ 不足）；舊快取無所需前史者，同來源且根數不多於／不少於受測格者沿其判定，其餘未知",
+        "regen": "凍結檔該格之 training_timeframes（Phase 2–4 驗收重產不重判）"
+      }
+    },
+    "window_rule": {
+      "rule": "一切格（A／B／C）之生成區間＝輸出段＋所需前史，不跑全史。輸出段＝主週期於其來源序列（cell_rules.kline_source）之最後 output_bars 根（起點＝倒數第 output_bars 根之時間戳、終點＝最後一根之時間戳；終點依 symbol 而異，逐格記錄）；生成之 start_date／end_date＝輸出段起點／終點（FeatureFactory 之 start_date 為公開輸出起點，載入起點由同一預熱估計式〔D₀、加倍規則〕與校準前史自行導出，不另傳）。所需前史（主週期根數）required_pre_history_bars＝D＋N_cal：D＝生成定案之預熱深度（FeatureFactory 公開域加倍規則後之 OutputWindow.max_warmup_bars，記為 final_warmup_bars；實測之格取該 run 之定案值），初值 D₀＝warmup_window.estimate_max_warmup_bars(已解析設定, 主週期, 訓練週期)（記為 d0_bars）；未實測之格以 D₀ 計並標 warmup_basis＝initial_d0_lower_bound（加倍只會加深，故 required 為下界、clipped 可能低估）；N_cal＝平穩化（分數差分或 ADF 差分）開啟時，各訓練週期之校準長度 feature_config.resolve_calibration_bars(週期, preprocessing.calibration_bars, preprocessing.calibration_bars_by_timeframe) 換成主週期根數（ceil(N × 週期秒數 ÷ 主週期秒數)）之最大者，關閉時為 0。載入下界 ingest_floor＝max(資料起點, 輸出段起點 − required_pre_history_bars 根)；可得前史 available_pre_history_bars＝來源序列中輸出段起點前之主週期根數。available < required（前史被資料起點截斷）⇒ 不降門檻、不縮輸出段、照常生成，由 insufficient_history 之權威判定決定（只因前史不足而 partial ⇒ blocked）。各格之 D₀、N_cal、required、available、clipped 由估時收據與凍結收據逐格記錄（公式於此，不逐週期寫死數字）。",
+      "output_bars_source": "cell_rules.output_bars",
+      "d0_source": "momentum/FeatureEngineering/warmup_window.py estimate_max_warmup_bars",
+      "calibration_source": "momentum/FeatureEngineering/feature_config.py resolve_calibration_bars（CALIBRATION_BARS_INTRADAY_DEFAULT／CALIBRATION_BARS_DAILY_DEFAULT）",
+      "calibration_applies_when": "preprocessing_stationarity_enabled",
+      "clipped_outcome": "generate_and_classify_by_insufficient_history",
+      "record": [
+        "d0_bars",
+        "final_warmup_bars",
+        "warmup_basis",
+        "calibration_bars_primary",
+        "required_pre_history_bars",
+        "available_pre_history_bars",
+        "clipped",
+        "ingest_floor"
+      ],
+      "full_history_allowed": false,
+      "final_depth_source": "momentum/FeatureEngineering/feature_factory.py _resolve_public_window（加倍規則）→ 生成結果 metadata output_window.max_warmup_bars（_attach_output_window_metadata）"
+    },
+    "kline_source": {
+      "rule": "K 線來源依週期之封閉對映（by_timeframe；未列之週期 ⇒ 拒收，不猜測）。使用者 2026-10-22 裁定：12h 真實長歷史放入長歷史檔，主檔不動（避免主檔改動使既有 golden／基準連帶變動；主檔延長另開票）。格之列舉（symbol×tf 集合）仍取自 cell_rules.enumerate_from（主檔）；每個 symbol×tf 須存在於其來源檔。格之單一來源＝主週期之來源：FeatureFactory 之一次生成以單一 cache_dir 讀全部訓練週期（feature_factory._layer0_data_ingestion 經單一 adapter registry），故多週期格 B 之訓練週期一律讀自其主週期之來源檔（該檔之週期序列），不混用來源——混用即非任何生產 run 之資料路徑；格 B 之候選週期於該來源判前史（cell_rules.b_membership）。輸出段＝主週期於其來源序列之最後 output_bars 根；來源序列之終點依 symbol 而異（長歷史檔各 symbol 終點不同），屬可接受，逐格記錄於收據。每格記錄所用資料集：來源檔、`<symbol>/<tf>/data` 資料集之 sha256（dtype 描述＋C 連續位元組；非整檔雜湊，以免他 symbol／週期之變動牽連）、根數、序列首末時間戳——日後資料變動可由紀錄比對偵出。單週期格之 cache_dir 依週期取來源之先例：tests/_golden/ffstat/contract.json dual_start.timeframes。",
+      "by_timeframe": {
+        "1h": "data_cache/feature_klines/kline_cache.h5",
+        "4h": "data_cache/feature_klines/kline_cache.h5",
+        "12h": "data_cache/feature_klines_longhist/kline_cache.h5"
+      },
+      "unlisted_timeframe": "reject",
+      "multi_timeframe": "single_source_of_main_timeframe",
+      "output_window_series": "main_timeframe_series_in_its_source",
+      "record": [
+        "source",
+        "dataset_sha256",
+        "bar_count",
+        "series_start",
+        "series_end"
+      ],
+      "dataset_sha256": "sha256(str(dtype.descr) ‖ C-contiguous bytes of <symbol>/<tf>/data)"
     }
   },
   "cell_definitions": {
@@ -546,7 +711,7 @@
       "output_bars": 500,
       "timeframes_rule": {
         "primary": "timeframes[0]",
-        "training": "timeframes"
+        "training": "training_timeframes（cell_rules.b_membership）"
       },
       "generation": {
         "entry": "run_ic_first",
@@ -663,9 +828,9 @@
       }
     },
     "C": {
-      "_doc": "生產預設全特徵（FeatureFactory 設定解析之生產預設設定檔，SPEC 所稱 FactoryConfig() 預設）；只覆寫週期；全史、無起訖日。",
+      "_doc": "生產預設全特徵（FeatureFactory 設定解析之生產預設設定檔，SPEC 所稱 FactoryConfig() 預設）；只覆寫週期；生成區間依 cell_rules.window_rule（輸出段＝最後 output_bars 根＋所需前史；不跑全史）。",
       "config_override": {},
-      "output_window": "full_history",
+      "output_bars": 500,
       "timeframes_rule": {
         "primary": "timeframes[0]",
         "training": "timeframes"

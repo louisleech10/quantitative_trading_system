@@ -161,6 +161,8 @@ def load_freeze() -> Dict[str, Any]:
 
 
 def load_criteria() -> Dict[str, Any]:
+    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）⇒ 讀現行判準；v1 現行時沿原斷言
+        return _json(nh.current_criteria_path())
     return _json(nh.CRITERIA_PATH)
 
 
@@ -173,6 +175,10 @@ def read_text(path: Path) -> str:
 
 
 def criteria_sha256() -> str:
+    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）⇒ 讀現行判準；v1 現行時沿原斷言
+        current = nh.current_criteria_path()
+        assert current.is_file(), f"判準檔不存在：{current}"
+        return hashlib.sha256(current.read_bytes()).hexdigest()
     assert nh.CRITERIA_PATH.is_file(), f"判準檔不存在：{nh.CRITERIA_PATH}"
     return hashlib.sha256(nh.CRITERIA_PATH.read_bytes()).hexdigest()
 

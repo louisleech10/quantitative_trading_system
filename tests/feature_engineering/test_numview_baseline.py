@@ -123,12 +123,36 @@ def load_estimate_receipt() -> Dict[str, Any]:
 
 
 def load_criteria() -> Dict[str, Any]:
+    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在） ⇒ 讀現行判準；v1 現行時沿原斷言
+        return json.loads(nh.current_criteria_path().read_text(encoding="utf-8"))
     assert nh.CRITERIA_PATH.is_file(), f"判準檔不存在：{nh.CRITERIA_PATH}（Task 0.3 未執行）"
     return json.loads(nh.CRITERIA_PATH.read_text(encoding="utf-8"))
 
 
 def load_contract() -> Dict[str, Any]:
     return nv.load_contract()
+
+
+def freeze_receipt_criteria_sha256() -> Any:
+    """凍結收據所記 `criteria_sha256`（不含 assert：收據恰一份之檢查由 `load_freeze_receipt` 於呼叫端先行；本函式只取值，
+    不被展開為呼叫端測試之斷言元素）。"""
+    paths = sorted(nh.RECEIPTS_DIR.glob(FREEZE_RECEIPT_GLOB))
+    if len(paths) != 1:
+        raise RuntimeError(f"{FREEZE_RECEIPT_GLOB} 須恰一份，實得 {[p.name for p in paths]}")
+    return json.loads(paths[0].read_text(encoding="utf-8")).get("criteria_sha256")
+
+
+def run_history_blocked(record: Mapping[str, Any]) -> bool:
+    """判準 v2 `cell_rules.insufficient_history` 之權威判定（測試端依現行判準重算，不讀收據結論）：收據該格所記
+    `reason_counts` 非空、每項為正整數欄數且 `<事件>:<欄數>` 皆合 `reason_pattern`（生成之 run 只因前史不足而 partial）
+    ⇒ True；判準無此規則（v1）⇒ False。不含 assert（不被展開為呼叫端測試之斷言元素）。"""
+    rule = json.loads(nh.current_criteria_path().read_text(encoding="utf-8"))["cell_rules"]["insufficient_history"]
+    counts = record.get("reason_counts")
+    if "reason_pattern" not in rule or not isinstance(counts, Mapping) or not counts:
+        return False
+    pattern = re.compile(str(rule["reason_pattern"]))
+    return all(isinstance(n, int) and not isinstance(n, bool) and n > 0 and pattern.fullmatch(f"{event}:{n}") is not None
+               for event, n in counts.items())
 
 
 # ---------------------------------------------------------------------------------------------- 獨立列舉與重算
@@ -416,34 +440,45 @@ def test_freeze_receipt_fields_and_criteria_hash() -> None:
     assert re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("head"))), receipt.get("head")
     assert freeze.get("head") == receipt["head"]
     assert receipt.get("exit_code") == 0
-    assert receipt.get("criteria_sha256") == hashlib.sha256(nh.CRITERIA_PATH.read_bytes()).hexdigest()
+    if not nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在） ⇒ v2 現行時改於下方對現行判準比對
+        assert receipt.get("criteria_sha256") == hashlib.sha256(nh.CRITERIA_PATH.read_bytes()).hexdigest()
     assert isinstance(receipt.get("library_versions"), Mapping) and receipt["library_versions"]
     frozen = [r for r in receipt["cells"] if r.get("status") == "frozen"]
     assert frozen, "收據無任何 frozen 格"
     for record in frozen:
         assert isinstance(record.get("seconds"), (int, float)) and record["seconds"] > 0, record.get("cell_id")
         assert isinstance(record.get("peak_rss_bytes"), int) and record["peak_rss_bytes"] > 0, record.get("cell_id")
+    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）
+        assert receipt.get("criteria_sha256") == hashlib.sha256(nh.current_criteria_path().read_bytes()).hexdigest()
 
 
 # ---------------------------------------------------------------------------------------------- 邊界
 
 def test_boundary_09_insufficient_history_cell_blocked_with_bar_counts() -> None:
     """邊界①（SPEC Task 0.5）：前史不足之格依判準標 blocked（history）、記根數、不降門檻——對列舉之每格驗「根數 < 門檻
-    ⇔ blocked-by history」，且所記根數等於 kline_cache.h5 實際根數。"""
+    ⇔ blocked-by history」，且所記根數等於 kline_cache.h5 實際根數。判準 v2：另一 blocked 來源為權威之 run 完整度判定
+    （`run_history_blocked`：收據所記 reason_counts 全合 reason_pattern）——該判定成立之格須為 blocked-by history；不成立者
+    沿原「根數 < 門檻 ⇔ blocked」斷言（前置篩）。"""
     expected = enumerate_cells(load_criteria())
     receipt_cells = _receipt_cells(load_freeze_receipt())
-    assert load_freeze_receipt().get("criteria_sha256") == hashlib.sha256(nh.CRITERIA_PATH.read_bytes()).hexdigest()
+    if not nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在） ⇒ v2 現行時改於迴圈後對現行判準比對
+        assert load_freeze_receipt().get("criteria_sha256") == hashlib.sha256(nh.CRITERIA_PATH.read_bytes()).hexdigest()
     evaluated = 0
     for key, exp in expected.items():
         record = receipt_cells.get(key)
         assert record is not None, f"{key}: 收據缺格"
         history_blocked = record.get("status") == "blocked" and record.get("blocked_by") == "history"
-        assert history_blocked == exp["blocked"], f"{key}: 根數 {exp['bar_counts']} 對門檻 {exp['threshold']} 之 blocked 判定不符"
+        if not run_history_blocked(record):
+            assert history_blocked == exp["blocked"], f"{key}: 根數 {exp['bar_counts']} 對門檻 {exp['threshold']} 之 blocked 判定不符"
+        else:
+            assert history_blocked, f"{key}: run 完整度判定前史不足（reason_counts）而未標 blocked-by history"
         if history_blocked:
             assert {str(k): int(v) for k, v in record["bar_counts"].items()} == exp["bar_counts"], key
             assert record.get("reason"), key
         evaluated += 1
     assert evaluated >= 1
+    if nh.CRITERIA_V2_PATH.is_file():  # 判準檔 v2（SPEC Task 0.3 邊界①：v1／v2 恰一存在）
+        assert freeze_receipt_criteria_sha256() == hashlib.sha256(nh.current_criteria_path().read_bytes()).hexdigest()
 
 
 def test_boundary_10_memory_guard_blocked_by_hardware_listed_fullscale() -> None:
