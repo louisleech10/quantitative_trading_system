@@ -1,0 +1,1555 @@
+{
+  "_doc": "NUMVIEW 事前登記判準與決定紀錄 schema（docs/NUMVIEW_SPEC.md Task 0.3、設計選擇⑥、R2-D）。於 Phase 1 任何量測收據產出前凍結；提交後不得修改（只准於任何收據產出前以 preregistered_criteria_v2.json 取代並刪本檔）。數值門檻只來自 threshold_kinds 所列四類（exact 集合比較、NaN 遮罩 exact、IC 正負號、float32 ulp），不自訂 atol／rtol。每份 handoffs/run_receipts/*-numview-*.json 記本檔位元組之 sha256 為 criteria_sha256。",
+  "version": 1,
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": [
+      "version",
+      "schema",
+      "cell_rules",
+      "cell_definitions",
+      "comparison_outputs",
+      "material",
+      "decision_rules",
+      "decisions_schema",
+      "threshold_kinds",
+      "ulp_rule"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "_doc": {
+        "type": "string"
+      },
+      "version": {
+        "const": 1
+      },
+      "schema": {
+        "type": "object"
+      },
+      "cell_rules": {
+        "type": "object",
+        "required": [
+          "enumerate_from",
+          "output_bars",
+          "insufficient_history",
+          "categories",
+          "timeframe_order"
+        ],
+        "properties": {
+          "enumerate_from": {
+            "type": "string",
+            "pattern": "kline_cache\\.h5$"
+          },
+          "output_bars": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "insufficient_history": {
+            "type": "object",
+            "required": [
+              "rule",
+              "blocked_by",
+              "record",
+              "lower_threshold_allowed"
+            ],
+            "properties": {
+              "blocked_by": {
+                "const": "history"
+              },
+              "record": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "lower_threshold_allowed": {
+                "const": false
+              }
+            }
+          },
+          "categories": {
+            "type": "object",
+            "required": [
+              "A",
+              "B",
+              "C"
+            ]
+          },
+          "timeframe_order": {
+            "type": "string"
+          }
+        }
+      },
+      "cell_definitions": {
+        "type": "object",
+        "required": [
+          "A",
+          "B",
+          "C"
+        ],
+        "properties": {
+          "A": {
+            "$ref": "#/$defs/short_window_cell"
+          },
+          "B": {
+            "$ref": "#/$defs/short_window_cell"
+          },
+          "C": {
+            "type": "object",
+            "required": [
+              "config_override",
+              "output_window",
+              "timeframes_rule"
+            ],
+            "properties": {
+              "config_override": {
+                "type": "object"
+              },
+              "output_window": {
+                "const": "full_history"
+              },
+              "timeframes_rule": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "comparison_outputs": {
+        "type": "object",
+        "minProperties": 1,
+        "patternProperties": {
+          "^[a-z][a-z0-9_]*$": {
+            "type": "object",
+            "required": [
+              "task",
+              "reference",
+              "variant",
+              "receipt",
+              "rows_key",
+              "columns"
+            ],
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              },
+              "receipt": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "rows_key": {
+                "type": "string"
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "uniqueItems": true
+              },
+              "report_only": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "material": {
+        "type": "object",
+        "required": [
+          "components",
+          "tau_b",
+          "non_finite_statistic_verdict",
+          "component_threshold_kinds",
+          "applicability",
+          "zero_selected_columns",
+          "report_only"
+        ],
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "tau_b": {
+            "type": "object",
+            "required": [
+              "pairs",
+              "undefined_verdict",
+              "undefined_cases"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "pairs": {
+                "const": "both_finite"
+              },
+              "undefined_verdict": {
+                "const": "material"
+              },
+              "undefined_cases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            }
+          },
+          "non_finite_statistic_verdict": {
+            "const": "material"
+          },
+          "component_threshold_kinds": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": [
+                "exact_set",
+                "nan_mask_exact",
+                "ic_sign",
+                "float32_ulp"
+              ]
+            }
+          }
+        }
+      },
+      "decision_rules": {
+        "type": "object",
+        "required": [
+          "d_icpage_arm",
+          "d_postic",
+          "d_mtf",
+          "d_memmap",
+          "d_winsor_dtype",
+          "d_codec",
+          "d_l2",
+          "d_research"
+        ],
+        "additionalProperties": false,
+        "patternProperties": {
+          "^d_[a-z0-9_]+$": {
+            "$ref": "#/$defs/decision_rule"
+          }
+        }
+      },
+      "decisions_schema": {
+        "type": "object"
+      },
+      "threshold_kinds": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "enum": [
+            "exact_set",
+            "nan_mask_exact",
+            "ic_sign",
+            "float32_ulp"
+          ]
+        }
+      },
+      "ulp_rule": {
+        "type": "object",
+        "required": [
+          "expression",
+          "threshold_kind",
+          "required_oracle_cases"
+        ],
+        "properties": {
+          "threshold_kind": {
+            "const": "float32_ulp"
+          }
+        }
+      },
+      "comparison_outputs_doc": {
+        "type": "string"
+      },
+      "decision_rules_doc": {
+        "type": "string"
+      }
+    },
+    "$defs": {
+      "short_window_cell": {
+        "type": "object",
+        "required": [
+          "min_history_bars",
+          "output_bars",
+          "config_override",
+          "timeframes_rule",
+          "generation"
+        ],
+        "properties": {
+          "min_history_bars": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "output_bars": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "config_override": {
+            "type": "object",
+            "not": {
+              "required": [
+                "preset"
+              ]
+            }
+          },
+          "timeframes_rule": {
+            "type": "object"
+          },
+          "generation": {
+            "type": "object",
+            "required": [
+              "entry",
+              "ic_engine_config",
+              "ic_threshold",
+              "label_horizon",
+              "cleanup_raw"
+            ]
+          }
+        }
+      },
+      "decision_rule": {
+        "type": "object",
+        "required": [
+          "label",
+          "trigger",
+          "choices",
+          "candidate_conditions"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "always",
+                  "any_true",
+                  "any_nonzero"
+                ]
+              },
+              "receipt": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "rows_key": {
+                "type": "string"
+              },
+              "where": {
+                "type": "object"
+              },
+              "field": {
+                "type": "string"
+              }
+            },
+            "if": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "any_true",
+                    "any_nonzero"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "kind",
+                "receipt",
+                "rows_key",
+                "where",
+                "field"
+              ]
+            }
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "candidate_conditions": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "cell_rules": {
+    "_doc": "量測格定義規則（SPEC Task 0.4／0.5、§V 格子、設計選擇⑧）：一律自 kline_cache.h5 列舉 symbol×tf，不寫死 symbol、週期、24h 或 UTC；窗以根數定義。",
+    "enumerate_from": "data_cache/feature_klines/kline_cache.h5",
+    "output_bars": 500,
+    "categories": {
+      "A": "每個 symbol×tf 一格：單週期短窗（timeframes 恰一項）；設定＝cell_definitions.A。",
+      "B": "每個具 ≥2 週期之 symbol 一格：timeframes＝該 symbol 全部週期依週期長度升冪，首項（最細）＝主週期、全部＝訓練週期；設定＝cell_definitions.B。",
+      "C": "每個 symbol×tf 一格：生產預設全特徵設定（config_override 之外全取生產預設設定檔）於全史；本機不可跑（記憶體守護具名終止）者該 tf 全列 blocked-by 硬體（SPEC Task 0.4 邊界①）。"
+    },
+    "timeframe_order": "週期長度以 pandas.Timedelta(週期字面) 解析之秒數升冪；不可解析之週期字面 ⇒ 列舉拒收（不猜測）。",
+    "insufficient_history": {
+      "rule": "格 A／B：任一所涉週期於 kline_cache.h5 之根數 < cell_definitions.<格類>.min_history_bars ⇒ 該格 blocked（history），記各週期根數與理由，不降門檻、不以較短窗冒充同格。輸出段＝主週期最後 output_bars 根（起點＝倒數第 output_bars 根之時間戳、終點＝最後一根之時間戳）；min_history_bars＝output_bars＋平穩化校準長度 N 之最大預設值（momentum/FeatureEngineering/feature_config.py CALIBRATION_BARS_INTRADAY_DEFAULT＝1000，日內週期之預設；一日以上之預設 500 較小，取大者使任一週期皆可校準）。",
+      "blocked_by": "history",
+      "record": [
+        "bar_counts",
+        "reason"
+      ],
+      "lower_threshold_allowed": false
+    }
+  },
+  "cell_definitions": {
+    "_doc": "格之生成定義（凍結腳本 generate_cell、估時器單格實測、Phase 1 探針共用同一定義）。config_override＝傳給 FeatureFactory 設定解析之覆寫（未列之鍵取生產預設設定檔）；timeframes 之 primary／training 由格描述子依 timeframes_rule 填入。A／B 之設定＝PRE-PROV replace 格同型之輕量真實設定（tests/feature_engineering/preprov_helpers.py h1_replace_stat_on：mode=replace、分數差分與 ADF 差分開、縮尾開），post-IC rank／zscore 依生產預設（不明示關閉，同 PRE-PROV ic_first_default），gaussian 預設關。",
+    "A": {
+      "min_history_bars": 1500,
+      "output_bars": 500,
+      "timeframes_rule": {
+        "primary": "timeframes[0]",
+        "training": "timeframes"
+      },
+      "generation": {
+        "entry": "run_ic_first",
+        "ic_engine_config": {
+          "methods": [
+            "spearman"
+          ]
+        },
+        "ic_threshold": null,
+        "label_horizon": "1_bar_forward_return",
+        "cleanup_raw": false
+      },
+      "config_override": {
+        "atomic_indicators": {
+          "cycle": {
+            "enabled": false
+          },
+          "entropy": {
+            "enabled": false
+          },
+          "microstructure": {
+            "enabled": false
+          },
+          "momentum": {
+            "enabled": false
+          },
+          "pattern": {
+            "enabled": false
+          },
+          "statistics": {
+            "enabled": false
+          },
+          "tail_risk": {
+            "enabled": false
+          },
+          "trend": {
+            "enabled": true
+          },
+          "volatility": {
+            "enabled": false
+          },
+          "volume": {
+            "enabled": false
+          }
+        },
+        "cross_sectional": {
+          "enabled": false
+        },
+        "data_sources": {
+          "enabled_sources": [
+            "close"
+          ],
+          "synthetic_sources": []
+        },
+        "lag_features": {
+          "enabled": false
+        },
+        "max_nan_ratio": 1.0,
+        "nan_strategy": {
+          "l7_dead_feature_drop": {
+            "enabled": false
+          }
+        },
+        "operators": {
+          "binary_signal": {
+            "enabled": false
+          },
+          "cross": {
+            "enabled": true
+          },
+          "distance": {
+            "enabled": false
+          },
+          "enabled": true,
+          "momentum": {
+            "enabled": false
+          },
+          "ratio": {
+            "enabled": true
+          },
+          "worldquant": {
+            "enabled": false
+          }
+        },
+        "preprocessing": {
+          "adf_differencing": {
+            "apply_to": "non_stationary",
+            "enabled": true
+          },
+          "causal_preprocessing": true,
+          "enabled": true,
+          "fractional_differencing": {
+            "apply_to": "non_stationary",
+            "enabled": true
+          },
+          "gaussian_normalize": {
+            "enabled": false
+          },
+          "mode": "replace",
+          "winsorization": {
+            "enabled": true
+          }
+        },
+        "rolling_aggregation": {
+          "enabled": true,
+          "windows": [
+            5,
+            13
+          ]
+        },
+        "timeframes": {
+          "alignment_mode": "open_minus"
+        }
+      }
+    },
+    "B": {
+      "min_history_bars": 1500,
+      "output_bars": 500,
+      "timeframes_rule": {
+        "primary": "timeframes[0]",
+        "training": "timeframes"
+      },
+      "generation": {
+        "entry": "run_ic_first",
+        "ic_engine_config": {
+          "methods": [
+            "spearman"
+          ]
+        },
+        "ic_threshold": null,
+        "label_horizon": "1_bar_forward_return",
+        "cleanup_raw": false
+      },
+      "config_override": {
+        "atomic_indicators": {
+          "cycle": {
+            "enabled": false
+          },
+          "entropy": {
+            "enabled": false
+          },
+          "microstructure": {
+            "enabled": false
+          },
+          "momentum": {
+            "enabled": false
+          },
+          "pattern": {
+            "enabled": false
+          },
+          "statistics": {
+            "enabled": false
+          },
+          "tail_risk": {
+            "enabled": false
+          },
+          "trend": {
+            "enabled": true
+          },
+          "volatility": {
+            "enabled": false
+          },
+          "volume": {
+            "enabled": false
+          }
+        },
+        "cross_sectional": {
+          "enabled": false
+        },
+        "data_sources": {
+          "enabled_sources": [
+            "close"
+          ],
+          "synthetic_sources": []
+        },
+        "lag_features": {
+          "enabled": false
+        },
+        "max_nan_ratio": 1.0,
+        "nan_strategy": {
+          "l7_dead_feature_drop": {
+            "enabled": false
+          }
+        },
+        "operators": {
+          "binary_signal": {
+            "enabled": false
+          },
+          "cross": {
+            "enabled": true
+          },
+          "distance": {
+            "enabled": false
+          },
+          "enabled": true,
+          "momentum": {
+            "enabled": false
+          },
+          "ratio": {
+            "enabled": true
+          },
+          "worldquant": {
+            "enabled": false
+          }
+        },
+        "preprocessing": {
+          "adf_differencing": {
+            "apply_to": "non_stationary",
+            "enabled": true
+          },
+          "causal_preprocessing": true,
+          "enabled": true,
+          "fractional_differencing": {
+            "apply_to": "non_stationary",
+            "enabled": true
+          },
+          "gaussian_normalize": {
+            "enabled": false
+          },
+          "mode": "replace",
+          "winsorization": {
+            "enabled": true
+          }
+        },
+        "rolling_aggregation": {
+          "enabled": true,
+          "windows": [
+            5,
+            13
+          ]
+        },
+        "timeframes": {
+          "alignment_mode": "open_minus"
+        }
+      }
+    },
+    "C": {
+      "_doc": "生產預設全特徵（FeatureFactory 設定解析之生產預設設定檔，SPEC 所稱 FactoryConfig() 預設）；只覆寫週期；全史、無起訖日。",
+      "config_override": {},
+      "output_window": "full_history",
+      "timeframes_rule": {
+        "primary": "timeframes[0]",
+        "training": "timeframes"
+      }
+    }
+  },
+  "comparison_outputs_doc": "各比較對（參照 vs 變體）之收據輸出欄；columns 為收據列須具之欄，report_only 之欄只報告、不參與任何判定。",
+  "comparison_outputs": {
+    "postic_branch_vs_float64_oracle": {
+      "task": "1.1",
+      "reference": "numpy_float64_oracle",
+      "variant": "post_ic_branch",
+      "receipt": "postic_branchdiff",
+      "rows_key": "rows",
+      "columns": [
+        "cell_id",
+        "input",
+        "branch",
+        "combo",
+        "columns",
+        "max_abs",
+        "p99_abs",
+        "max_rel",
+        "near_zero_cells",
+        "near_zero_max_abs",
+        "nan_mask_diff",
+        "sign_flips",
+        "tau_b",
+        "material",
+        "material_reason"
+      ],
+      "report_only": [
+        "max_abs",
+        "p99_abs",
+        "max_rel",
+        "near_zero_cells",
+        "near_zero_max_abs",
+        "delta_ic_in_standard_errors"
+      ]
+    },
+    "postic_branch_vs_legacy": {
+      "task": "1.1",
+      "reference": "pandas_legacy_branch",
+      "variant": "post_ic_branch",
+      "receipt": "postic_branchdiff",
+      "rows_key": "legacy_rows",
+      "columns": [
+        "cell_id",
+        "input",
+        "branch",
+        "combo",
+        "max_abs",
+        "p99_abs",
+        "max_rel",
+        "nan_mask_diff"
+      ],
+      "report_only": [
+        "max_abs",
+        "p99_abs",
+        "max_rel"
+      ]
+    },
+    "postic_arm_speed": {
+      "task": "1.1",
+      "reference": "same_cell_same_input",
+      "variant": "post_ic_arm",
+      "receipt": "postic_branchdiff",
+      "rows_key": "speed",
+      "columns": [
+        "cell_id",
+        "input",
+        "arm",
+        "seconds",
+        "median_seconds"
+      ],
+      "report_only": [
+        "seconds",
+        "median_seconds"
+      ]
+    },
+    "precision_checkpoint_vs_float64_chain": {
+      "task": "1.2",
+      "reference": "s0_float64_chain",
+      "variant": "checkpoint_s1_to_s5",
+      "receipt": "precision_chain",
+      "rows_key": "rows",
+      "columns": [
+        "segment",
+        "cell_id",
+        "column",
+        "status",
+        "max_abs",
+        "max_rel",
+        "nan_mask_diff",
+        "all_nan",
+        "float16_ok",
+        "survivor_set_change",
+        "material"
+      ],
+      "report_only": [
+        "max_abs",
+        "max_rel"
+      ]
+    },
+    "precision_fork": {
+      "task": "1.2",
+      "reference": "fork_reference_branch",
+      "variant": "fork_variant_branch",
+      "receipt": "precision_chain",
+      "rows_key": "forks",
+      "forks": {
+        "mtf_layer_dtype": "參照＝同欄單週期 run（層出口 float32）；變體＝多週期 run（層間保留 float64）",
+        "memmap_merge_dtype": "參照＝memmap 門檻設極大（門檻下支，保原 dtype）；變體＝門檻設 0（memmap 支，float32）",
+        "winsor_sigma_dtype": "參照＝pandas sigma 縮尾回傳 float64 之後續 fracdiff／ADF；變體＝同值轉 float32 後之後續 fracdiff／ADF"
+      },
+      "columns": [
+        "fork",
+        "cell_id",
+        "column",
+        "nan_mask_diff",
+        "sign_flips",
+        "survivor_set_change",
+        "max_abs",
+        "max_rel",
+        "material"
+      ],
+      "report_only": [
+        "max_abs",
+        "max_rel"
+      ]
+    },
+    "codec_checks": {
+      "task": "1.2",
+      "reference": "lossless_or_transform_record",
+      "variant": "codec_readback_or_name_inference",
+      "receipt": "precision_chain",
+      "rows_key": "codec_checks",
+      "checks": {
+        "name_inference": "欄名含 rank／zscore／gaussian 字面而非該轉換產物（或反之）之欄數（名稱推斷誤判）",
+        "raw_bss_lossless": "raw BYTE_STREAM_SPLIT 開／關讀回逐位元不等之欄數（無損宣稱之反例）"
+      },
+      "columns": [
+        "check",
+        "cell_id",
+        "nonconforming_columns"
+      ]
+    },
+    "precision_extension": {
+      "task": "1.2",
+      "reference": "same_start_original_end",
+      "variant": "same_start_extended_end",
+      "receipt": "precision_chain",
+      "rows_key": "extension",
+      "columns": [
+        "cell_id",
+        "downgraded_columns",
+        "new_evidence"
+      ]
+    },
+    "l2_returned_vs_category": {
+      "task": "1.3",
+      "reference": "compute_category",
+      "variant": "compute_all_polars",
+      "receipt": "l2_arm_matrix",
+      "rows_key": "cells",
+      "columns": [
+        "cell_id",
+        "kind",
+        "l1_dtypes",
+        "common_cols",
+        "only_returned",
+        "only_category",
+        "nan_mask_diff",
+        "f64diff",
+        "f32diff",
+        "max_abs",
+        "max_rel",
+        "errors"
+      ],
+      "report_only": [
+        "max_abs",
+        "max_rel",
+        "f64diff"
+      ]
+    }
+  },
+  "material": {
+    "_doc": "設計選擇⑥＋R2-D：任一 NaN 遮罩差、任一 IC 正負號翻轉、IC 選欄倖存者集合任一進出、或（比較後無 IC 選欄步驟者，即 post-IC 輸出之比較）逐欄 IC 排序 Kendall τ-b < 1 或 τ-b 未定義 ⇒ material。τ-b 只對參照與變體 IC 皆有限之欄對計算；全 ties、全 NaN、有效對數 < 2 ⇒ τ-b 為 NaN ⇒ material（fail-closed），不得以 NaN < 1 為假判為未翻轉；一切以比較式判定之統計量結果非有限 ⇒ material。material 只觸發決定點，不自動改碼。",
+    "components": [
+      "nan_mask_diff",
+      "ic_sign_flip",
+      "survivor_set_change",
+      "tau_b_below_1"
+    ],
+    "component_threshold_kinds": {
+      "nan_mask_diff": "nan_mask_exact",
+      "ic_sign_flip": "ic_sign",
+      "survivor_set_change": "exact_set",
+      "tau_b_below_1": "exact_set"
+    },
+    "applicability": {
+      "nan_mask_diff": "all_comparisons",
+      "ic_sign_flip": "all_comparisons_with_ic",
+      "survivor_set_change": "comparisons_followed_by_ic_selection",
+      "tau_b_below_1": "post_ic_comparisons_without_selection_step"
+    },
+    "zero_selected_columns": "not_material_and_tau_b_not_computed",
+    "tau_b": {
+      "pairs": "both_finite",
+      "undefined_verdict": "material",
+      "undefined_cases": [
+        "all_ties",
+        "all_nan",
+        "fewer_than_2_pairs"
+      ]
+    },
+    "non_finite_statistic_verdict": "material",
+    "report_only": [
+      "delta_ic_in_standard_errors"
+    ]
+  },
+  "decision_rules_doc": "每個決定點：觸發條件（自所引收據列機械重算；fail-closed：欄缺、非 bool、非有限 ⇒ 觸發）→ 候選處置 → 候選須另滿足之條件。凡改特徵階段或公開輸出值之處置皆須使用者白話閘確認（user_ruling），量測觸發不自動改碼；2026-09-29 落盤 dtype 裁定不在任何決定之選項中。",
+  "decision_rules": {
+    "d_icpage_arm": {
+      "label": "D-ICPAGE-ARM",
+      "trigger": {
+        "kind": "always"
+      },
+      "choices": [
+        "lock"
+      ],
+      "candidate_conditions": {
+        "lock": {
+          "arm_source": "post_ic_entries.ic_first",
+          "changes_public_output": true,
+          "requires_user_ruling": true,
+          "user_ruling_date": "2026-10-21",
+          "report_only": [
+            "task_1_1_arm_vs_float64_diffs",
+            "task_1_1_ic_flips",
+            "task_1_1_arm_wall_seconds",
+            "g1_arm_copies_pairwise_equality"
+          ]
+        }
+      }
+    },
+    "d_postic": {
+      "label": "D-POSTIC",
+      "trigger": {
+        "kind": "any_true",
+        "receipt": "postic_branchdiff",
+        "rows_key": "rows",
+        "where": {
+          "branch": "polars"
+        },
+        "field": "material"
+      },
+      "choices": [
+        "polars_float64",
+        "retain"
+      ],
+      "candidate_conditions": {
+        "polars_float64": {
+          "requires_user_ruling": true,
+          "changes_public_output": true,
+          "candidate_rows": {
+            "receipt": "postic_branchdiff",
+            "rows_key": "rows",
+            "where": {
+              "branch": "polars_float64"
+            }
+          },
+          "candidate_must": {
+            "nan_mask_diff": "all_zero",
+            "material": "all_false",
+            "intermediate_dtypes": "all_float64"
+          },
+          "threshold_kind": "nan_mask_exact"
+        },
+        "retain": {
+          "requires_user_ruling": false,
+          "pin": "section_g_values_native_bitwise"
+        }
+      }
+    },
+    "d_mtf": {
+      "label": "D-MTF",
+      "trigger": {
+        "kind": "any_true",
+        "receipt": "precision_chain",
+        "rows_key": "forks",
+        "where": {
+          "fork": "mtf_layer_dtype"
+        },
+        "field": "material"
+      },
+      "choices": [
+        "unify",
+        "retain"
+      ],
+      "candidate_conditions": {
+        "unify": {
+          "requires_user_ruling": true,
+          "changes_feature_stage": true,
+          "oracle": [
+            "single_vs_multi_tf_same_column_bitwise",
+            "independent_float64_within_1_ulp"
+          ],
+          "threshold_kind": "float32_ulp"
+        },
+        "retain": {
+          "requires_user_ruling": false,
+          "pin": "section_g_values_native_bitwise"
+        }
+      }
+    },
+    "d_memmap": {
+      "label": "D-MEMMAP",
+      "trigger": {
+        "kind": "any_true",
+        "receipt": "precision_chain",
+        "rows_key": "forks",
+        "where": {
+          "fork": "memmap_merge_dtype"
+        },
+        "field": "material"
+      },
+      "choices": [
+        "decouple",
+        "retain"
+      ],
+      "candidate_conditions": {
+        "decouple": {
+          "requires_user_ruling": true,
+          "changes_feature_stage": true,
+          "oracle": [
+            "forced_branches_bitwise_equal"
+          ]
+        },
+        "retain": {
+          "requires_user_ruling": false,
+          "pin": "section_g_values_native_bitwise"
+        }
+      }
+    },
+    "d_winsor_dtype": {
+      "label": "D-WINSOR-DTYPE",
+      "trigger": {
+        "kind": "any_true",
+        "receipt": "precision_chain",
+        "rows_key": "forks",
+        "where": {
+          "fork": "winsor_sigma_dtype"
+        },
+        "field": "material"
+      },
+      "choices": [
+        "unify",
+        "retain"
+      ],
+      "candidate_conditions": {
+        "unify": {
+          "requires_user_ruling": true,
+          "changes_feature_stage": true,
+          "oracle": [
+            "sigma_quantile_same_return_dtype",
+            "fracdiff_independent_within_1_ulp"
+          ],
+          "threshold_kind": "float32_ulp"
+        },
+        "retain": {
+          "requires_user_ruling": false,
+          "pin": "section_g_values_native_bitwise"
+        }
+      }
+    },
+    "d_codec": {
+      "label": "D-CODEC",
+      "trigger": {
+        "kind": "any_nonzero",
+        "receipt": "precision_chain",
+        "rows_key": "codec_checks",
+        "where": {},
+        "field": "nonconforming_columns"
+      },
+      "choices": [
+        "provenance",
+        "retain"
+      ],
+      "halt": {
+        "requires": {
+          "rows_key": "codec_checks",
+          "where": {
+            "check": "raw_bss_lossless"
+          },
+          "field": "nonconforming_columns",
+          "condition": "any_nonzero"
+        },
+        "verdict": "lossless_violation_stop_and_attribute",
+        "note": "raw BYTE_STREAM_SPLIT 讀回逐位元不等＝無損宣稱之反例（SPEC Task 1.2 驗證 lossless_violation）：此時不得記錄任何 choice，Task 1.5 停下歸因；provenance 與 retain 之 requires_all 皆要求 raw_bss_lossless 全為 0，故兩者於此情況皆不成立（fail-closed）"
+      },
+      "candidate_conditions": {
+        "provenance": {
+          "requires_all": [
+            {
+              "rows_key": "codec_checks",
+              "where": {
+                "check": "name_inference"
+              },
+              "field": "nonconforming_columns",
+              "condition": "any_nonzero"
+            },
+            {
+              "rows_key": "codec_checks",
+              "where": {
+                "check": "raw_bss_lossless"
+              },
+              "field": "nonconforming_columns",
+              "condition": "all_zero"
+            }
+          ],
+          "requires_user_ruling": true,
+          "changes_public_output": true,
+          "anomaly_encoding": "float32_lossless"
+        },
+        "retain": {
+          "requires_all": [
+            {
+              "rows_key": "codec_checks",
+              "where": {},
+              "field": "nonconforming_columns",
+              "condition": "all_zero"
+            }
+          ],
+          "requires_user_ruling": false,
+          "pin": "section_g_values_native_bitwise",
+          "register_in_identity": true
+        }
+      },
+      "excluded_options": [
+        "remove_lossy_encoding_changes_output_size_needs_separate_user_approval_and_spec_revision"
+      ]
+    },
+    "d_l2": {
+      "label": "D-L2",
+      "trigger": {
+        "kind": "any_nonzero",
+        "receipt": "l2_arm_matrix",
+        "rows_key": "cells",
+        "where": {
+          "kind": "B"
+        },
+        "field": "f32diff"
+      },
+      "choices": [
+        "unify",
+        "retain"
+      ],
+      "candidate_conditions": {
+        "unify": {
+          "requires": {
+            "rows_key": "cells",
+            "where": {
+              "kind": "B"
+            },
+            "field": "f32diff",
+            "condition": "any_nonzero"
+          },
+          "requires_user_ruling": true,
+          "changes_feature_stage": true,
+          "oracle": [
+            "l5_l6_from_public_l2_bitwise"
+          ]
+        },
+        "retain": {
+          "requires": {
+            "rows_key": "cells",
+            "where": {
+              "kind": "B"
+            },
+            "field": "f32diff",
+            "condition": "all_zero"
+          },
+          "requires_user_ruling": false,
+          "pin": "section_g_values_native_bitwise",
+          "register": "contract_named_cells_with_nonzero_f32diff"
+        }
+      }
+    },
+    "d_research": {
+      "label": "D-RESEARCH",
+      "trigger": {
+        "kind": "any_true",
+        "receipt": "postic_branchdiff",
+        "rows_key": "rows",
+        "where": {
+          "branch": "registry"
+        },
+        "field": "material"
+      },
+      "choices": [
+        "retain",
+        "unify"
+      ],
+      "candidate_conditions": {
+        "retain": {
+          "requires_user_ruling": false,
+          "register": "contract_research_arms_with_unreachable_reason_and_measured_diff"
+        },
+        "unify": {
+          "requires_user_ruling": true,
+          "changes_feature_stage": true,
+          "oracle": [
+            "registry_zscore_vs_independent_float64_within_1_ulp"
+          ],
+          "threshold_kind": "float32_ulp",
+          "cost_report": [
+            "memory_ratio",
+            "wall_time_ratio"
+          ]
+        }
+      }
+    }
+  },
+  "ulp_rule": {
+    "_doc": "Phase 3 改核心分支之 oracle（SPEC §G 通過條件、R2-C）：逐格 1 ulp；取絕對值（負數之 np.spacing 為負）；NaN 遮罩 exact；測試須含正、負、零三類 oracle 值與 NaN 遮罩案。保留分支一律 values_native 逐位元相等，不得以量測上界作通過條件（R6-B）。",
+    "expression": "np.abs(out - np.float32(oracle)) <= np.abs(np.spacing(np.float32(oracle)))",
+    "threshold_kind": "float32_ulp",
+    "required_oracle_cases": [
+      "positive",
+      "negative",
+      "zero",
+      "nan_mask"
+    ]
+  },
+  "threshold_kinds": [
+    "exact_set",
+    "nan_mask_exact",
+    "ic_sign",
+    "float32_ulp"
+  ],
+  "decisions_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": [
+      "criteria_sha256",
+      "decisions",
+      "measurement_limitations"
+    ],
+    "properties": {
+      "criteria_sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "decisions": {
+        "type": "object",
+        "required": [
+          "d_icpage_arm",
+          "d_postic",
+          "d_mtf",
+          "d_memmap",
+          "d_winsor_dtype",
+          "d_codec",
+          "d_l2",
+          "d_research"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "d_icpage_arm": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "required": [
+                  "user_ruling"
+                ],
+                "properties": {
+                  "label": {
+                    "const": "D-ICPAGE-ARM"
+                  },
+                  "choice": {
+                    "const": "lock"
+                  },
+                  "changes_public_output": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          },
+          "d_postic": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "properties": {
+                  "label": {
+                    "const": "D-POSTIC"
+                  },
+                  "choice": {
+                    "enum": [
+                      "polars_float64",
+                      "retain"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "d_mtf": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "properties": {
+                  "label": {
+                    "const": "D-MTF"
+                  },
+                  "choice": {
+                    "enum": [
+                      "unify",
+                      "retain"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "d_memmap": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "properties": {
+                  "label": {
+                    "const": "D-MEMMAP"
+                  },
+                  "choice": {
+                    "enum": [
+                      "decouple",
+                      "retain"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "d_winsor_dtype": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "properties": {
+                  "label": {
+                    "const": "D-WINSOR-DTYPE"
+                  },
+                  "choice": {
+                    "enum": [
+                      "unify",
+                      "retain"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "d_codec": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "properties": {
+                  "label": {
+                    "const": "D-CODEC"
+                  },
+                  "choice": {
+                    "enum": [
+                      "provenance",
+                      "retain"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "d_l2": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "properties": {
+                  "label": {
+                    "const": "D-L2"
+                  },
+                  "choice": {
+                    "enum": [
+                      "unify",
+                      "retain"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "d_research": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/record"
+              },
+              {
+                "properties": {
+                  "label": {
+                    "const": "D-RESEARCH"
+                  },
+                  "choice": {
+                    "enum": [
+                      "retain",
+                      "unify"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "measurement_limitations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "description"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "enum": [
+                "criteria_defect",
+                "unforeseen_situation"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "$defs": {
+      "record": {
+        "type": "object",
+        "required": [
+          "label",
+          "triggered",
+          "choice",
+          "changes_public_output",
+          "changes_feature_stage",
+          "evidence"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "triggered": {
+            "type": "boolean"
+          },
+          "choice": {
+            "type": "string"
+          },
+          "changes_public_output": {
+            "type": "boolean"
+          },
+          "changes_feature_stage": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "receipt",
+                "rows_key",
+                "row"
+              ],
+              "properties": {
+                "receipt": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rows_key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "row": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "user_ruling": {
+            "type": "object",
+            "required": [
+              "date",
+              "quote"
+            ],
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "quote": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "report": {
+            "type": "object"
+          },
+          "committee_split": {
+            "type": "boolean"
+          },
+          "split_resolution": {
+            "enum": [
+              "evidence",
+              "stricter_with_residual"
+            ]
+          },
+          "residual_id": {
+            "type": "string",
+            "pattern": "^NUMVIEW-R\\d+$"
+          },
+          "implemented_commit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "changed_targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "group"
+              ],
+              "properties": {
+                "group": {
+                  "enum": [
+                    "g1",
+                    "g2",
+                    "g3",
+                    "legacy"
+                  ]
+                }
+              }
+            }
+          },
+          "approved_limits": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

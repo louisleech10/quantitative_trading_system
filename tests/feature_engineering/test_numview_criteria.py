@@ -265,9 +265,18 @@ def _schema_errors(schema: Mapping[str, Any], instance: Any) -> List[str]:
 
 
 def _kline_index() -> Dict[str, List[str]]:
-    """真實 `kline_cache.h5` 之 symbol → tf 清單（只讀鍵名；不寫死清單）。"""
+    """真實 `kline_cache.h5` 之 symbol → tf 清單（只讀鍵名；不寫死清單）；只計含 `data` 資料集之週期，
+    無週期之頂層鍵（如 `_metadata`）不算 symbol（同 `test_numview_baseline.kline_inventory`）。"""
+    out: Dict[str, List[str]] = {}
     with h5py.File(nh.KLINE_PATH, "r") as f:
-        return {str(s): sorted(str(tf) for tf in f[s].keys()) for s in sorted(f.keys())}
+        for s in sorted(f.keys()):
+            group = f[s]
+            if not hasattr(group, "keys"):
+                continue
+            tfs = sorted(str(tf) for tf in group.keys() if hasattr(group[tf], "keys") and "data" in group[tf])
+            if tfs:
+                out[str(s)] = tfs
+    return out
 
 
 # ---------------------------------------------------------------------------------------------- Task 0.3 ① schema
@@ -773,7 +782,8 @@ def estimate_receipt_violations(receipt: Mapping[str, Any], kline: Mapping[str, 
     if c_pairs != pairs:
         out.append(f"格 C ≠ kline 之 symbol×tf：缺 {sorted(pairs - c_pairs)[:3]}、多 {sorted(c_pairs - pairs)[:3]}")
     b_map = {c.get("symbol"): sorted(c.get("timeframes") or []) for c in cells["B"] if isinstance(c, Mapping)}
-    if b_map != {s: sorted(tfs) for s, tfs in kline.items()} or len(cells["B"]) != len(kline):
+    multi = {s: sorted(tfs) for s, tfs in kline.items() if len(tfs) >= 2}  # 格 B 只對有 ≥2 週期之 symbol
+    if b_map != multi or len(cells["B"]) != len(multi):
         out.append("格 B ≠ 每個 symbol 一格且含其全部週期")
     ids = {c: {i for i, (cat, _) in index.items() if cat == c} for c in CELL_CATEGORIES}
     run_kinds = receipt.get("run_kinds")
@@ -882,11 +892,39 @@ def cell_c_blocked_violations(receipt: Mapping[str, Any]) -> List[str]:
     return out
 
 
+def _current_criteria_sha(gate: ModuleType) -> str:
+    """估時前置閘所綁之現行判準檔 sha256（`_estimate_gate.CRITERIA_PATH`）。"""
+    return hashlib.sha256(Path(gate.CRITERIA_PATH).read_bytes()).hexdigest()
+
+
+def stale_criteria_violations(gate: ModuleType, tmp_path: Path) -> List[str]:
+    """估時收據須綁現行判準（審碼 b1 r1）：`criteria_sha256` 缺、或不等於現行判準檔 ⇒ 各拋 `EstimateGateError`。"""
+    kind, cell, name = "freeze_baseline", "numview_cell_listed", "20261021-numview-estimate.json"
+    base = {"reported_at": "2026-10-21T00:00:00+08:00", "run_kinds": {kind: {"cells": [cell]}}}
+    out: List[str] = []
+    for i, (label, receipt) in enumerate([("criteria_sha256 缺", base),
+                                          ("criteria_sha256 不等於現行判準檔", {**base, "criteria_sha256": "0" * 64})]):
+        rdir = tmp_path / f"stale{i}"
+        rdir.mkdir(parents=True)
+        (rdir / name).write_text(json.dumps(receipt), encoding="utf-8")
+        try:
+            gate.require(kind, [cell], receipts_dir=rdir)
+        except gate.EstimateGateError:
+            continue
+        except Exception as exc:  # noqa: BLE001 — 錯誤型別不符亦屬違規
+            out.append(f"{label}：拋 {type(exc).__name__} 而非 EstimateGateError")
+            continue
+        out.append(f"{label}：未拋錯（判準綁定失效）")
+    return out
+
+
 def gate_require_violations(gate: ModuleType, tmp_path: Path) -> List[str]:
-    """②：收據缺／`reported_at` 缺／格不在清單 ⇒ 各拋 `EstimateGateError`；清單內之格 ⇒ 不拋（正對照）。"""
+    """②：收據缺／`reported_at` 缺／格不在清單 ⇒ 各拋 `EstimateGateError`；清單內之格且綁現行判準 ⇒ 不拋（正對照）。
+    （判準綁定之兩案見 `stale_criteria_violations`。）"""
     in_list, not_in_list, kind = "numview_cell_listed", "numview_cell_unlisted", "freeze_baseline"
     name = "20261021-numview-estimate.json"
-    base = {"reported_at": "2026-10-21T00:00:00+08:00", "run_kinds": {kind: {"cells": [in_list]}}}
+    base = {"reported_at": "2026-10-21T00:00:00+08:00", "criteria_sha256": _current_criteria_sha(gate),
+            "run_kinds": {kind: {"cells": [in_list]}}}
     cases: List[Tuple[str, Optional[Dict[str, Any]], str]] = [
         ("收據不存在", None, in_list),
         ("reported_at 缺", {k: v for k, v in base.items() if k != "reported_at"}, in_list),
@@ -1146,6 +1184,19 @@ def test_estimate_receipt_fields_and_coverage() -> None:
 def test_estimate_gate_require_raises_in_three_cases(tmp_path: Path) -> None:
     """Task 0.4 ②：`_estimate_gate.require` 於收據缺、`reported_at` 缺、格不在清單三案各拋 `EstimateGateError`。"""
     assert gate_require_violations(GATE, tmp_path) == []
+
+
+def test_estimate_gate_rejects_receipt_not_bound_to_current_criteria(tmp_path: Path) -> None:
+    """審碼 b1 r1：估時收據之 `criteria_sha256` 缺或不等於現行判準檔 ⇒ `require` 拋 `EstimateGateError`。"""
+    assert stale_criteria_violations(GATE, tmp_path) == []
+
+
+def test_mutation_estimate_gate_without_criteria_binding(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """mutation：拿掉 `_estimate_gate` 之判準綁定 ⇒ 判準綁定兩案皆未拋錯。"""
+    assert stale_criteria_violations(GATE, tmp_path / "real") == []
+    monkeypatch.setattr(GATE, "_require_current_criteria", lambda receipt: None)
+    violations = stale_criteria_violations(GATE, tmp_path / "mutant")
+    assert len(violations) == 2 and all(v.endswith("未拋錯（判準綁定失效）") for v in violations), violations
 
 
 def test_estimate_gate_called_before_generation_in_heavy_scripts() -> None:

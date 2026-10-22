@@ -6,15 +6,30 @@
 IC 頁第三步之 view 身分。值集、鍵名與正規化規則一律取自契約，本模組不另列舉（SPEC §C、Task 0.1「不可做」）。
 `api/` 只經本模組與 `momentum.factories` 取用，不自組身分、不自判臂（SPEC §C 解耦）。
 
-本檔為 TODO 階段空殼：函式體一律 `raise NotImplementedError("<Task ID>")`，由對應 Task 實作。
+已實作：`load_contract`、`post_ic_arm`（Task 0.1，NUMVIEW b1）。其餘函式體仍 `raise NotImplementedError("<Task ID>")`，由對應 Task 實作。
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
 CONTRACT_PATH: Path = Path(__file__).resolve().parent / "contracts" / "numeric_view.json"
+
+#: 契約之必要段名（SPEC Task 0.1「改法」所列段落之結構名，非值集；值一律讀契約）
+REQUIRED_SECTIONS = (
+    "version", "value_pattern",
+    "post_ic_entries", "post_ic_arm_values", "post_ic_arm_reachability", "processed_codec_mapping",
+    "cgsa_work_identity", "auto_resolutions", "research_arms", "zscore_windows_policy", "winsor_method_values",
+    "winsor_method_missing_key", "selectors", "selector_classes", "capability_flags", "library_versions",
+    "algorithm_versions", "fingerprint_sections", "config_hash_salt", "run_identity_new_keys", "manifest_keys",
+    "ic_page_output_attrs", "ic_page_response_keys", "ic_page_view_identity",
+)
+#: 入口之臂政策欄（恰一；SPEC Task 0.1／3.4）
+_ENTRY_ARM = "arm"
+_ENTRY_ARM_REF = "arm_ref"
+_ENTRY_ARM_POLICY = "arm_policy"
 
 
 class NumericPolicyError(ValueError):
@@ -35,15 +50,57 @@ class ICViewIdentityMismatchError(RuntimeError):
 
 
 def load_contract() -> Dict[str, Any]:
-    """讀契約 JSON（每次讀檔、不快取）；SPEC Task 0.1 所列必要段任一缺 ⇒ `NumericPolicyError`（邊界①，不回預設）。"""
-    raise NotImplementedError("NUMVIEW Task 0.1")
+    """讀契約 JSON（每次讀檔、不快取）；SPEC Task 0.1 所列必要段任一缺 ⇒ `NumericPolicyError`（邊界①，不回預設）。
+
+    路徑於呼叫時讀模組屬性 `CONTRACT_PATH`（測試接縫）。檔不存在、非 JSON 或頂層非物件亦拋 `NumericPolicyError`。"""
+    path = Path(CONTRACT_PATH)
+    try:
+        contract = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise NumericPolicyError(f"NUMVIEW 契約不存在：{path}") from exc
+    except json.JSONDecodeError as exc:
+        raise NumericPolicyError(f"NUMVIEW 契約非合法 JSON：{path}：{exc}") from exc
+    if not isinstance(contract, dict):
+        raise NumericPolicyError(f"NUMVIEW 契約頂層須為物件：{path}")
+    missing = [section for section in REQUIRED_SECTIONS if section not in contract]
+    if missing:
+        raise NumericPolicyError(f"NUMVIEW 契約缺必要段 {missing}：{path}")
+    return contract
 
 
 def post_ic_arm(entry: str) -> str:
     """post-IC 入口（契約 `post_ic_entries` 之鍵，如 `ic_first`、`ic_page_apply_transforms`）之正式臂；
     `arm_ref` 型入口解析至被引用入口之臂（Task 3.4 起 IC 頁引用 `ic_first`）。未知入口 ⇒ `NumericPolicyError`。
-    SPEC Task 0.1（`ic_first_context.POST_IC_ARM` 於 Task 2.2 起改讀本函式）。"""
-    raise NotImplementedError("NUMVIEW Task 0.1")
+    SPEC Task 0.1（`ic_first_context.POST_IC_ARM` 於 Task 2.2 起改讀本函式）。
+
+    `arm_policy` 型入口（依環境解析、無固定正式臂；Task 3.4 前之 IC 頁）⇒ `NumericPolicyError`（不以政策值冒充臂）。
+    臂值不屬契約 `post_ic_arm_values`、入口臂政策欄非恰一、或 `arm_ref` 循環 ⇒ `NumericPolicyError`。"""
+    contract = load_contract()
+    entries = {k: v for k, v in contract["post_ic_entries"].items() if not str(k).startswith("_")}
+    arms = list(contract["post_ic_arm_values"].get("values") or [])
+    seen: list = []
+    name = str(entry)
+    while True:
+        if name not in entries:
+            raise NumericPolicyError(f"post-IC 入口未登記於契約 post_ic_entries：{name!r}")
+        if name in seen:
+            raise NumericPolicyError(f"post-IC 入口 arm_ref 循環：{seen + [name]}")
+        seen.append(name)
+        node = entries[name]
+        fields = [f for f in (_ENTRY_ARM, _ENTRY_ARM_REF, _ENTRY_ARM_POLICY) if isinstance(node, Mapping) and f in node]
+        if len(fields) != 1:
+            raise NumericPolicyError(f"post_ic_entries.{name} 之臂政策欄須恰一，實得 {fields}")
+        field = fields[0]
+        if field == _ENTRY_ARM_REF:
+            name = str(node[_ENTRY_ARM_REF])
+            continue
+        if field == _ENTRY_ARM_POLICY:
+            raise NumericPolicyError(
+                f"post_ic_entries.{name} 為依環境解析之政策（{node[_ENTRY_ARM_POLICY]!r}），無固定正式臂")
+        arm = str(node[_ENTRY_ARM])
+        if arm not in arms:
+            raise NumericPolicyError(f"post_ic_entries.{name}.arm={arm!r} 不屬契約 post_ic_arm_values")
+        return arm
 
 
 def validate_preprocessing_policy(config: Mapping[str, Any]) -> None:

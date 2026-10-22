@@ -52,7 +52,7 @@ import pytest
 
 from momentum.FeatureEngineering import memory_budget as mb
 from momentum.FeatureEngineering import numeric_view as nv
-from momentum.FeatureEngineering.feature_config import FactoryConfig
+from momentum.FeatureEngineering.feature_config import PreprocessingConfig
 from momentum.FeatureEngineering.feature_factory import FeatureFactory
 
 REPO = Path(__file__).resolve().parents[2]
@@ -342,8 +342,9 @@ class RecordingMapping(abc.Mapping):
 
 
 def _preprocessing_config() -> Dict[str, Any]:
-    """真實生產預設前處理設定（`FactoryConfig().preprocessing.model_dump()`）。"""
-    return FactoryConfig().preprocessing.model_dump()
+    """真實生產預設前處理設定（`FactoryConfig.preprocessing` 之 default_factory＝`PreprocessingConfig()`，
+    `feature_config.py:617`；`FactoryConfig()` 有必填欄位不能無參數建構）。"""
+    return PreprocessingConfig().model_dump()
 
 
 def record_resolver_reads() -> Tuple[Set[str], Set[str]]:

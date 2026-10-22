@@ -3,16 +3,118 @@
   "version": 1,
   "value_pattern": "^[a-z][a-z0-9_]*$",
   "post_ic_entries": {
-    "_doc": "每入口一鍵（至少 ic_first、ic_page_apply_transforms）：{\"arm\": <post_ic_arm_values 之一>} 或 {\"arm_ref\": <另一入口鍵>} 或 {\"arm_policy\": <依環境解析之政策值>}，皆附 \"_sources\": [path:line]。Task 3.4 前 ic_page_apply_transforms 為 arm_policy；Task 3.4 改寫為 arm_ref=ic_first（使用者 2026-10-21 方向裁定）。"
+    "_doc": "每入口一鍵（至少 ic_first、ic_page_apply_transforms）：{\"arm\": <post_ic_arm_values 之一>} 或 {\"arm_ref\": <另一入口鍵>} 或 {\"arm_policy\": <依環境解析之政策值>}，皆附 \"_sources\": [path:line]。Task 3.4 前 ic_page_apply_transforms 為 arm_policy；Task 3.4 改寫為 arm_ref=ic_first（使用者 2026-10-21 方向裁定）。",
+    "ic_first": {
+      "arm": "polars",
+      "_sources": {
+        "POST_IC_ARM = \"polars\"": [
+          "momentum/FeatureEngineering/ic_first_context.py:29"
+        ],
+        "arm=ctx.post_ic_arm,": [
+          "momentum/FeatureEngineering/feature_factory.py:2982"
+        ],
+        "if arm != \"polars\":": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:908"
+        ]
+      }
+    },
+    "ic_page_apply_transforms": {
+      "_doc": "Task 3.4 前：IC 頁第三步呼叫 transform_selected 不傳 arm ⇒ transform 依環境（FFACT_USE_POLARS、Polars 可用性、FFACT_L65_OPTIMIZATION_PROFILE、FFACT_L65_CHUNK_SIZE 與選欄數）解析臂。Task 3.4 改寫為 arm_ref=ic_first。",
+      "arm_policy": "env_resolved",
+      "_sources": {
+        "transformed = preprocessor.transform_selected(kept_cols, {\"ic_page\": df}, config=transform_config)": [
+          "api/services/ic_analysis_service.py:2899"
+        ],
+        "use_polars = True if getattr(self, \"_forced_arm\", None) == \"polars\" else polars_enabled()": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:872"
+        ],
+        "if enabled and not _check_polars_available():": [
+          "momentum/FeatureEngineering/polars_adapter.py:91"
+        ]
+      }
+    }
   },
-  "post_ic_arm_values": {"values": [], "_sources": {}},
+  "post_ic_arm_values": {
+    "_doc": "post-IC 轉換（`FeaturePreprocessor.transform` 分派）現行可達之臂；⊆ run_provenance.json group_arm_values.values。順序＝SPEC §G G1 之臂份順序。",
+    "values": [
+      "polars",
+      "pandas_optimized",
+      "pandas_legacy",
+      "pandas_chunked"
+    ],
+    "_sources": {
+      "polars": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
+      ],
+      "pandas_optimized": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+      ],
+      "pandas_legacy": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+      ],
+      "pandas_chunked": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:885"
+      ]
+    }
+  },
   "post_ic_arm_reachability": {
-    "_doc": "每個 post_ic_arm_values 之臂一鍵：{\"condition\": <條件名>, \"min_selected_columns\": <int，選欄數（ratio-unsafe 剔除後）≥ 此值方可達>, \"_sources\": [path:line]}；pandas_chunked 之條件須表「chunk_size > 0 且選欄數 > chunk_size」（feature_preprocessor.py transform 分派；R3-D），其 min_selected_columns 須為 2。"
+    "_doc": "每個 post_ic_arm_values 之臂一鍵：{\"condition\": <條件名>, \"min_selected_columns\": <int，選欄數（ratio-unsafe 剔除後）≥ 此值方可達>, \"_sources\": [path:line]}；pandas_chunked 之條件須表「chunk_size > 0 且選欄數 > chunk_size」（feature_preprocessor.py transform 分派；R3-D），其 min_selected_columns 須為 2。",
+    "polars": {
+      "condition": "selected_nonempty",
+      "min_selected_columns": 1,
+      "_sources": {
+        "if not selected_columns:": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:916"
+        ],
+        "self._record_group(arm=\"polars\")": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
+        ]
+      }
+    },
+    "pandas_optimized": {
+      "condition": "selected_nonempty",
+      "min_selected_columns": 1,
+      "_sources": {
+        "if not selected_columns:": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:916"
+        ],
+        "\"pandas_optimized\"": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+        ]
+      }
+    },
+    "pandas_legacy": {
+      "condition": "selected_nonempty",
+      "min_selected_columns": 1,
+      "_sources": {
+        "if not selected_columns:": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:916"
+        ],
+        "\"pandas_legacy\"": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+        ]
+      }
+    },
+    "pandas_chunked": {
+      "condition": "chunk_size_positive_and_selected_gt_chunk",
+      "min_selected_columns": 2,
+      "_sources": {
+        "chunk_size > 0 and num_cols > chunk_size": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:884"
+        ],
+        "return max(size, 0)": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:842"
+        ]
+      }
+    }
   },
   "processed_codec_mapping": {
     "_doc": "Task 3.2 D-CODEC 改案才填：逐欄 post-IC 紀錄之（rank_transform、adaptive_zscore、gaussian_normalize）步驟狀態組合 → 編碼型別之映射表、異常結果值集、身分綁定欄、mapping_sha256 正規化規則與 manifest 鍵名（R3-B、R4-B）。",
     "mapping": [],
-    "outcome_values": {"values": [], "_sources": {}},
+    "outcome_values": {
+      "values": [],
+      "_sources": {}
+    },
     "binding_keys": [],
     "normalization": {},
     "manifest_key": null
@@ -33,22 +135,732 @@
     "route_identity_empty": null,
     "unresolved_error": null
   },
-  "research_arms": {"_doc": "研究臂與不可達理由（承 ICPOSTLEAK §N；D-RESEARCH 依 Task 1.5）。", "values": [], "_sources": {}, "_unreachable": {}},
-  "zscore_windows_policy": {"_doc": "zscore 啟用時窗清單之規則（非空、皆正整數；D3）。Task 0.1 填。", "rules": [], "_sources": {}},
-  "winsor_method_values": {"_doc": "縮尾 method 封閉值集（區分大小寫；C3）。Task 0.1 填。", "values": [], "_sources": {}},
-  "winsor_method_missing_key": {"_doc": "dict 入口縮尾啟用而缺 method 鍵之處置（設計選擇③；Task 2.1）。", "value": null, "_sources": []},
-  "selectors": {
-    "_doc": "每個 FFACT_* 鍵（momentum/、api/ 全部字串常值；Task 0.2 AST 盤點）一鍵：{\"class\": <selector_classes.values 之一>, \"parser\": <解析器名>, \"reason\": <讀取點用途>, \"_sources\": [path:line]}。本票除 output_only 五鍵外一律 value_affecting；不設 non_value（使用者 2026-10-21 方向裁定）。"
+  "research_arms": {
+    "_doc": "研究臂與不可達理由（承 ICPOSTLEAK §N；D-RESEARCH 依 Task 1.5）。",
+    "values": [
+      "registry",
+      "registry_parallel_split",
+      "registry_sink",
+      "registry_sink_sharded"
+    ],
+    "_sources": {
+      "registry": [
+        "tests/_golden/icpostleak/contract.json:108"
+      ],
+      "registry_parallel_split": [
+        "tests/_golden/icpostleak/contract.json:123"
+      ],
+      "registry_sink": [
+        "tests/_golden/icpostleak/contract.json:112"
+      ],
+      "registry_sink_sharded": [
+        "tests/_golden/icpostleak/contract.json:117"
+      ]
+    },
+    "_unreachable": {
+      "registry": {
+        "reason": "registry 帶 rank／zscore／gaussian 經現行分派不可達：pre-IC 與 L7 raw 設定強制關閉三者、帶選欄之 post-IC 無生產呼叫者（ICPOSTLEAK §N 第一條）；處置依 D-RESEARCH（Task 1.5）。",
+        "evidence": "docs/ICPOSTLEAK_SPEC.md:99"
+      },
+      "registry_parallel_split": {
+        "reason": "registry 帶 rank／zscore／gaussian 經現行分派不可達：pre-IC 與 L7 raw 設定強制關閉三者、帶選欄之 post-IC 無生產呼叫者（ICPOSTLEAK §N 第一條）；處置依 D-RESEARCH（Task 1.5）。",
+        "evidence": "docs/ICPOSTLEAK_SPEC.md:99"
+      },
+      "registry_sink": {
+        "reason": "registry 帶 rank／zscore／gaussian 經現行分派不可達：pre-IC 與 L7 raw 設定強制關閉三者、帶選欄之 post-IC 無生產呼叫者（ICPOSTLEAK §N 第一條）；處置依 D-RESEARCH（Task 1.5）。",
+        "evidence": "docs/ICPOSTLEAK_SPEC.md:99"
+      },
+      "registry_sink_sharded": {
+        "reason": "registry 帶 rank／zscore／gaussian 經現行分派不可達：pre-IC 與 L7 raw 設定強制關閉三者、帶選欄之 post-IC 無生產呼叫者（ICPOSTLEAK §N 第一條）；處置依 D-RESEARCH（Task 1.5）。",
+        "evidence": "docs/ICPOSTLEAK_SPEC.md:99"
+      }
+    }
   },
-  "selector_classes": {"_doc": "選擇子類別值集；output_only_keys 為封閉清單（增列須改 SPEC；Task 0.2）。", "values": [], "output_only_keys": []},
-  "capability_flags": {"_doc": "非環境能力旗標（Polars、numba、scipy、statsmodels 可用性）。", "values": [], "_sources": {}},
-  "library_versions": {"_doc": "數值相關函式庫（設計選擇②：入 algorithm_id、不入 config_hash 鹽）。", "values": []},
-  "algorithm_versions": {"_doc": "算法版本常數（決定紀錄與 Phase 3 改案 +1）。"},
-  "fingerprint_sections": {"_doc": "fingerprint 各段之鍵（Task 4.1）。", "values": []},
-  "config_hash_salt": {"_doc": "config_hash 鹽鍵名與排除段（設計選擇①：排除函式庫版本段）。", "key": null, "exclude_sections": []},
+  "zscore_windows_policy": {
+    "_doc": "zscore 啟用時窗清單之規則（非空、皆正整數；D3）。Task 0.1 填。 現行各臂對空窗之處置不一致（_sources 為不一致之處；Task 2.1 改為臂分派前拒收）。",
+    "rules": [
+      "non_empty_when_enabled",
+      "each_positive_int"
+    ],
+    "_sources": {
+      "else 100": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1443",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3547"
+      ],
+      "no_windows": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3350",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4616"
+      ],
+      "if not normalized_windows:": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3215"
+      ],
+      "windows: List[int]": [
+        "momentum/FeatureEngineering/feature_config.py:298"
+      ],
+      "zscore_windows: List[int]": [
+        "api/models/ic_models.py:421"
+      ]
+    }
+  },
+  "winsor_method_values": {
+    "_doc": "縮尾 method 封閉值集（區分大小寫；C3）。Task 0.1 填。",
+    "values": [
+      "quantile",
+      "sigma"
+    ],
+    "_sources": {
+      "quantile": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3178",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3700",
+        "momentum/FeatureEngineering/polars_adapter.py:419",
+        "momentum/FeatureEngineering/polars_adapter.py:451",
+        "momentum/FeatureEngineering/feature_config.py:169"
+      ],
+      "sigma": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3162",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3681",
+        "momentum/FeatureEngineering/polars_adapter.py:415",
+        "momentum/FeatureEngineering/polars_adapter.py:441",
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:436"
+      ]
+    }
+  },
+  "winsor_method_missing_key": {
+    "_doc": "dict 入口縮尾啟用而缺 method 鍵之處置（設計選擇③；Task 2.1）。 定稿 reject：dict 入口縮尾啟用而缺 method 鍵 ⇒ NumericPolicyError；pydantic 路徑由 WinsorConfig 預設填值（唯一預設來源）。_sources 為現行各臂缺鍵預設不一致之處（快速臂 quantile、pandas／polars 臂 sigma）。",
+    "value": "reject",
+    "_literal": "get(\"method\"",
+    "_sources": [
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1427",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3160",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3490",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3671"
+    ]
+  },
+  "selectors": {
+    "_doc": "每個 FFACT_* 鍵（momentum/、api/ 全部字串常值；Task 0.2 AST 盤點）一鍵：{\"class\": <selector_classes.values 之一>, \"parser\": <解析器名>, \"reason\": <讀取點用途>, \"_sources\": [path:line]}。本票除 output_only 五鍵外一律 value_affecting；不設 non_value（使用者 2026-10-21 方向裁定）。 _sources＝該鍵於 momentum/、api/ 之全部字串常值位置（memory_budget 之 SELECTORS／SELECTOR_DEFAULTS／NON_ARM_FFACT_KEYS 登記表除外，除非為唯一位置）；parser 為讀取點之解析語意名（Task 4.1 以解析器實作對應）。",
+    "FFACT_API_LOG_PATH": {
+      "class": "output_only",
+      "parser": "path",
+      "reason": "批次子行程之 API 日誌輸出路徑（父行程暫設、子行程讀以寫日誌）；只決定日誌寫到哪裡（output_only）。",
+      "_sources": [
+        "api/services/feature_factory_batch_service.py:585",
+        "api/services/feature_factory_batch_service.py:594",
+        "api/services/feature_factory_batch_service.py:613",
+        "api/services/feature_factory_batch_service.py:615",
+        "api/services/feature_factory_batch_service.py:1441"
+      ]
+    },
+    "FFACT_BATCH_DISK_RESERVE_GIB": {
+      "class": "value_affecting",
+      "parser": "nonnegative_float",
+      "reason": "批次 retention 磁碟保留下限（GiB；未設取 tier 預設）；資源閘，決定批次是否續跑。",
+      "_sources": [
+        "api/services/feature_factory_batch_service.py:2101"
+      ]
+    },
+    "FFACT_BATCH_NESTED": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "批次安全模式（n_jobs=1、symbol 序列 wave）；父行程暫設給巢狀批次。",
+      "_sources": [
+        "momentum/core/config.py:171",
+        "momentum/core/config.py:291",
+        "momentum/core/config.py:293",
+        "momentum/core/config.py:295",
+        "momentum/core/config.py:301",
+        "momentum/core/config.py:303"
+      ]
+    },
+    "FFACT_BATCH_RETENTION": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "批次跑完逐項 retain／discard 開關（預設開）；決定批次產物保留行為。",
+      "_sources": [
+        "api/services/feature_factory_batch_service.py:1715"
+      ]
+    },
+    "FFACT_BATCH_SYMBOL_CONCURRENCY": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "外層批次 symbol 並行數（父 wave 注入子行程）；影響子行程並行預算。",
+      "_sources": [
+        "api/services/feature_factory_batch_service.py:586",
+        "api/services/feature_factory_batch_service.py:595",
+        "api/services/feature_factory_batch_service.py:617",
+        "api/services/feature_factory_batch_service.py:619",
+        "momentum/core/config.py:178"
+      ]
+    },
+    "FFACT_CGSA_DISK_PRECHECK": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "CGSA 磁碟預檢開關（預設開）。",
+      "_sources": [
+        "momentum/FeatureEngineering/feature_factory.py:1138"
+      ]
+    },
+    "FFACT_CGSA_DISK_RESERVE_GIB": {
+      "class": "value_affecting",
+      "parser": "nonnegative_float",
+      "reason": "CGSA registry 磁碟保留量（GiB）；與守護保留取大者。",
+      "_sources": [
+        "momentum/FeatureEngineering/core/column_group_registry.py:993"
+      ]
+    },
+    "FFACT_CGSA_MEMORY_BUFFER": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "CGSA registry 記憶體緩衝群組數（未設取 tier 導出值）；api 硬體資訊頁顯示其有效值。",
+      "_sources": [
+        "api/services/hardware_info_service.py:111",
+        "api/services/hardware_info_service.py:139",
+        "momentum/FeatureEngineering/feature_factory.py:1261"
+      ]
+    },
+    "FFACT_CGSA_PIPELINE_PER_LAYER": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "CGSA 逐層管線開關（預設關）。",
+      "_sources": [
+        "momentum/FeatureEngineering/utils/hardware_utils.py:352"
+      ]
+    },
+    "FFACT_CGSA_SHARD_BYTES": {
+      "class": "value_affecting",
+      "parser": "auto_or_positive_int",
+      "reason": "CGSA 分片目標位元組（auto＝tier 導出）；決定群組分片與 raw 串流路徑。",
+      "_sources": [
+        "api/services/hardware_info_service.py:118",
+        "momentum/FeatureEngineering/utils/hardware_utils.py:327"
+      ]
+    },
+    "FFACT_CGSA_WORK_DIR": {
+      "class": "output_only",
+      "parser": "path",
+      "reason": "CGSA 工作目錄根（D7 葉路徑由身分導出；根入鹽即循環，SPEC Task 0.2）；只決定輸出寫到哪裡（output_only）。",
+      "_sources": [
+        "momentum/FeatureEngineering/feature_factory.py:338",
+        "momentum/FeatureEngineering/feature_factory.py:1176",
+        "momentum/FeatureEngineering/run_lifecycle.py:137",
+        "momentum/FeatureEngineering/run_lifecycle.py:365",
+        "momentum/FeatureEngineering/run_lifecycle.py:397"
+      ]
+    },
+    "FFACT_CHILD_METRICS_PATH": {
+      "class": "output_only",
+      "parser": "path",
+      "reason": "批次子行程 metrics 輸出路徑（父行程暫設、子行程寫）；只決定紀錄寫到哪裡（output_only）。",
+      "_sources": [
+        "api/services/feature_factory_batch_service.py:583",
+        "api/services/feature_factory_batch_service.py:592",
+        "api/services/feature_factory_batch_service.py:605",
+        "api/services/feature_factory_batch_service.py:607",
+        "api/services/feature_factory_batch_service.py:1451"
+      ]
+    },
+    "FFACT_CONCURRENT_SYMBOLS_OVERRIDE": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "Feature Factory 批次並行 symbol 數覆寫。",
+      "_sources": [
+        "momentum/core/config.py:136"
+      ]
+    },
+    "FFACT_FEATURE_REGISTRY_PATH": {
+      "class": "value_affecting",
+      "parser": "path",
+      "reason": "特徵 registry 檔路徑；所指檔內容可影響特徵定義（SPEC Task 0.2：非 output_only）。",
+      "_sources": [
+        "momentum/FeatureEngineering/feature_registry.py:39",
+        "momentum/factories.py:451"
+      ]
+    },
+    "FFACT_FRACDIFF_APPLY_TO_LAYERS": {
+      "class": "value_affecting",
+      "parser": "layer_list",
+      "reason": "分數差分套用之層清單（未設依 L6.5 profile：optimized L1,L2／legacy）。",
+      "_sources": [
+        "momentum/core/config.py:78"
+      ]
+    },
+    "FFACT_FRACDIFF_PRECISION_OVERRIDE": {
+      "class": "value_affecting",
+      "parser": "positive_float",
+      "reason": "分數差分權重精度覆寫（非正或非數值 ⇒ warning 後忽略）。",
+      "_sources": [
+        "momentum/core/config.py:94"
+      ]
+    },
+    "FFACT_L2_CATEGORY_WORKERS": {
+      "class": "value_affecting",
+      "parser": "selector_auto_or_positive_int",
+      "reason": "L2 類別並行 workers（memory_budget 選擇子；auto＝tier 導出）。",
+      "_sources": [
+        "api/services/hardware_info_service.py:117",
+        "momentum/FeatureEngineering/utils/hardware_utils.py:286"
+      ]
+    },
+    "FFACT_L3_MULTI_WINDOW": {
+      "class": "value_affecting",
+      "parser": "selector_flag",
+      "reason": "L3 rolling 多窗核心開關（memory_budget 選擇子）。",
+      "_sources": [
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:204"
+      ]
+    },
+    "FFACT_L3_PERSIST_MODE": {
+      "class": "value_affecting",
+      "parser": "selector_enum",
+      "reason": "L3 落盤模式 auto／streaming／hybrid／in_memory（memory_budget 選擇子）；api 硬體資訊頁只顯示其有效值。",
+      "_sources": [
+        "api/services/hardware_info_service.py:114",
+        "momentum/FeatureEngineering/utils/hardware_utils.py:251"
+      ]
+    },
+    "FFACT_L3_STREAMING": {
+      "class": "value_affecting",
+      "parser": "selector_flag",
+      "reason": "L3 串流開關（memory_budget 選擇子）；api 舊路徑環境覆寫寫給子行程（SPEC Task 0.2 邊界②）。",
+      "_sources": [
+        "api/services/feature_factory_service.py:598",
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:137"
+      ]
+    },
+    "FFACT_L3_STREAMING_BUFFER_COLS": {
+      "class": "value_affecting",
+      "parser": "auto_or_positive_int",
+      "reason": "L3 persister 緩衝欄數（auto＝tier 導出）。",
+      "_sources": [
+        "api/services/hardware_info_service.py:115",
+        "momentum/FeatureEngineering/utils/hardware_utils.py:259"
+      ]
+    },
+    "FFACT_L65_CHUNK_SIZE": {
+      "class": "value_affecting",
+      "parser": "nonnegative_int",
+      "reason": "L6.5／post-IC transform 之欄 chunk（0＝停用）；選欄數 > chunk 時走 pandas_chunked 臂（feature_preprocessor transform 分派）。",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:837"
+      ]
+    },
+    "FFACT_L65_NATIVE_TF": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "L6.5 native-tf 路徑開關（預設開；關 ⇒ 舊 expand-then-transform）。",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py:53"
+      ]
+    },
+    "FFACT_L65_OPTIMIZATION_PROFILE": {
+      "class": "value_affecting",
+      "parser": "enum_text",
+      "reason": "L6.5 profile optimized／legacy（非法值 warning 後退 optimized）；決定 pandas 臂與分數差分預設層。",
+      "_sources": [
+        "momentum/core/config.py:25"
+      ]
+    },
+    "FFACT_L65_RAW_SINK_LARGEST_FIRST": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "L6.5 raw sink 由大群組先處理之排程開關（預設開）。",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1887"
+      ]
+    },
+    "FFACT_L65_SLOWPATH_PARALLEL": {
+      "class": "value_affecting",
+      "parser": "bool_text_or_auto",
+      "reason": "L6.5 slow-path joblib 平行；未設依實體 RAM ≥ 12 GB 自動判定（硬體自動解析，Task 4.1）。",
+      "_sources": [
+        "momentum/core/config.py:202"
+      ]
+    },
+    "FFACT_L65_SPLIT_THRESHOLD": {
+      "class": "value_affecting",
+      "parser": "auto_or_positive_int",
+      "reason": "L6.5 大群組切片並行門檻（auto＝tier 導出）。",
+      "_sources": [
+        "api/services/hardware_info_service.py:116",
+        "momentum/FeatureEngineering/utils/hardware_utils.py:274"
+      ]
+    },
+    "FFACT_L65_WORKERS": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "L6.5 workers（未設取 tier 導出值）；api 硬體資訊頁顯示其有效值。",
+      "_sources": [
+        "api/services/hardware_info_service.py:110",
+        "api/services/hardware_info_service.py:138",
+        "momentum/FeatureEngineering/feature_factory.py:3871"
+      ]
+    },
+    "FFACT_L7_CODEC_UPGRADE": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "L7 codec 升級開關（預設關；開 ⇒ processed 有損 int16／uint16 編碼與 raw BYTE_STREAM_SPLIT）。",
+      "_sources": [
+        "momentum/core/config.py:39"
+      ]
+    },
+    "FFACT_L7_DISK_SAFETY_FACTOR": {
+      "class": "value_affecting",
+      "parser": "positive_float",
+      "reason": "L7 寫入前磁碟需求安全係數（預設 1.5）。",
+      "_sources": [
+        "momentum/FeatureEngineering/feature_storage.py:2749"
+      ]
+    },
+    "FFACT_L7_MIN_FREE_GIB": {
+      "class": "value_affecting",
+      "parser": "nonnegative_float",
+      "reason": "L7 寫入前最低可用磁碟（GiB；預設 2.0）。",
+      "_sources": [
+        "momentum/FeatureEngineering/feature_storage.py:2762"
+      ]
+    },
+    "FFACT_L7_ZSTD_LEVEL": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "L7 串流 zstd 壓縮等級（未設取 tier 導出值）。",
+      "_sources": [
+        "momentum/FeatureEngineering/feature_storage.py:843"
+      ]
+    },
+    "FFACT_LAYER1_MAX_WORKERS": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "L1 平行之實際 workers（預設 4）。",
+      "_sources": [
+        "momentum/FeatureEngineering/feature_factory.py:1129"
+      ]
+    },
+    "FFACT_LAYER1_PARALLEL": {
+      "class": "value_affecting",
+      "parser": "selector_flag",
+      "reason": "L1 平行開關（memory_budget 選擇子）；api 舊路徑環境覆寫寫給子行程（SPEC Task 0.2 邊界②）。",
+      "_sources": [
+        "api/services/feature_factory_service.py:594",
+        "momentum/FeatureEngineering/feature_factory.py:1125"
+      ]
+    },
+    "FFACT_LAYER3_CHUNK_SIZE": {
+      "class": "value_affecting",
+      "parser": "auto_or_nonnegative_int",
+      "reason": "L3 欄 chunk（auto＝tier 導出；0＝不切）；api 舊路徑環境覆寫寫給子行程、硬體資訊頁顯示。",
+      "_sources": [
+        "api/services/feature_factory_service.py:595",
+        "api/services/hardware_info_service.py:113",
+        "api/services/hardware_info_service.py:141",
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:1134"
+      ]
+    },
+    "FFACT_LAYER4_CHUNK_SIZE": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "L4 lag 欄 chunk（預設 200）；api 舊路徑環境覆寫寫給子行程（SPEC Task 0.2 邊界②）。",
+      "_sources": [
+        "api/services/feature_factory_service.py:596",
+        "momentum/FeatureEngineering/operators/lag_processor.py:37"
+      ]
+    },
+    "FFACT_LAYER4_FAST_PATH_MAX_COLS": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "L4 lag 單次 concat 快路徑之欄數上限（預設 200000）。",
+      "_sources": [
+        "momentum/FeatureEngineering/operators/lag_processor.py:45"
+      ]
+    },
+    "FFACT_LAYER4_LAG_BATCH_SIZE": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "L4 lag 批次大小（預設 8）；api 舊路徑環境覆寫寫給子行程（SPEC Task 0.2 邊界②）。",
+      "_sources": [
+        "api/services/feature_factory_service.py:597",
+        "momentum/FeatureEngineering/operators/lag_processor.py:38"
+      ]
+    },
+    "FFACT_LAYER_METRICS_PATH": {
+      "class": "output_only",
+      "parser": "path",
+      "reason": "批次子行程逐層 metrics 輸出路徑（父行程暫設、子行程寫）；只決定紀錄寫到哪裡（output_only）。",
+      "_sources": [
+        "api/services/feature_factory_batch_service.py:584",
+        "api/services/feature_factory_batch_service.py:593",
+        "api/services/feature_factory_batch_service.py:609",
+        "api/services/feature_factory_batch_service.py:611",
+        "api/services/feature_factory_batch_service.py:1452"
+      ]
+    },
+    "FFACT_MEMMAP_COPY_BLOCK_ROWS": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "memmap 合併複製區塊列數（預設 1024）。",
+      "_sources": [
+        "momentum/FeatureEngineering/memmap_utils.py:48"
+      ]
+    },
+    "FFACT_MEMORY_BUDGET_BYTES": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "記憶體預算位元組（memory_budget BUDGET_BYTES_ENV）；驅動執行期換臂。",
+      "_sources": [
+        "momentum/FeatureEngineering/memory_budget.py:202"
+      ]
+    },
+    "FFACT_MEMORY_BUDGET_RATIO": {
+      "class": "value_affecting",
+      "parser": "positive_float",
+      "reason": "記憶體預算比例（memory_budget BUDGET_RATIO_ENV）；驅動執行期換臂。",
+      "_sources": [
+        "momentum/FeatureEngineering/memory_budget.py:201"
+      ]
+    },
+    "FFACT_MEMORY_TIER": {
+      "class": "value_affecting",
+      "parser": "selector_enum",
+      "reason": "記憶體 tier auto／8gb／16gb／24gb／32gb（memory_budget 選擇子；auto 依實體 RAM 解析，Task 4.1）。",
+      "_sources": [
+        "momentum/FeatureEngineering/utils/hardware_utils.py:182"
+      ]
+    },
+    "FFACT_MERGE_CHUNK_SIZE": {
+      "class": "value_affecting",
+      "parser": "nonnegative_int",
+      "reason": "多週期對齊 merge chunk（0＝停用；預設 5000）。",
+      "_sources": [
+        "momentum/FeatureEngineering/timeframe/tf_aligner.py:294"
+      ]
+    },
+    "FFACT_MULTI_TF_ALIGN_BLOCK_ROWS": {
+      "class": "value_affecting",
+      "parser": "positive_int",
+      "reason": "多週期對齊區塊列數（預設 1024）。",
+      "_sources": [
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1302"
+      ]
+    },
+    "FFACT_MULTI_TF_COMPACT_ALIGNMENT": {
+      "class": "value_affecting",
+      "parser": "selector_flag",
+      "reason": "多週期 compact 對齊開關（memory_budget 選擇子）。",
+      "_sources": [
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1343"
+      ]
+    },
+    "FFACT_MULTI_TF_KEEP_WORKER_NPY": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "多週期 worker 中間 npy 保留（除錯；預設關）。",
+      "_sources": [
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1337"
+      ]
+    },
+    "FFACT_MULTI_TF_MAX_WORKERS": {
+      "class": "value_affecting",
+      "parser": "selector_auto_or_positive_int",
+      "reason": "多週期 max workers（memory_budget 選擇子；auto＝tier 導出）；api 硬體資訊頁顯示。",
+      "_sources": [
+        "api/services/hardware_info_service.py:112",
+        "api/services/hardware_info_service.py:140",
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:574"
+      ]
+    },
+    "FFACT_MULTI_TF_PARALLEL": {
+      "class": "value_affecting",
+      "parser": "selector_flag",
+      "reason": "多週期平行開關（memory_budget 選擇子）。",
+      "_sources": [
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1707"
+      ]
+    },
+    "FFACT_NEW_COMPUTE_DUALRUN_SAMPLE_RATE": {
+      "class": "value_affecting",
+      "parser": "unit_interval_float",
+      "reason": "api 新舊計算路徑雙跑抽樣率（夾於 0–1）。",
+      "_sources": [
+        "api/services/feature_factory_service.py:580"
+      ]
+    },
+    "FFACT_NEW_COMPUTE_PATH": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "api 特徵生成新計算路徑開關（預設關；關 ⇒ 子行程套舊路徑環境覆寫）。",
+      "_sources": [
+        "api/services/feature_factory_service.py:563"
+      ]
+    },
+    "FFACT_PARALLEL_BUDGET": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "批次平行 worker 預算開關（預設關 ⇒ 子行程 n_jobs=1）。",
+      "_sources": [
+        "momentum/core/config.py:164"
+      ]
+    },
+    "FFACT_RAM_GATE_MIN_GB": {
+      "class": "value_affecting",
+      "parser": "positive_float",
+      "reason": "批次 RAM 閘門檻（GB；未設依並行 tier）。",
+      "_sources": [
+        "api/services/feature_factory_batch_service.py:906"
+      ]
+    },
+    "FFACT_ROLLING_QUANTILE_KERNEL": {
+      "class": "value_affecting",
+      "parser": "enum_text",
+      "reason": "rolling quantile 核心 sliding（預設）／legacy；縮尾 quantile 之快速核心選擇。",
+      "_sources": [
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:330"
+      ]
+    },
+    "FFACT_USE_FAST_ADF": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "Numba Fast ADF 開關（預設開；關 ⇒ statsmodels ADF）。",
+      "_sources": [
+        "momentum/core/config.py:241"
+      ]
+    },
+    "FFACT_USE_NUMBA_ROLLING": {
+      "class": "value_affecting",
+      "parser": "selector_flag",
+      "reason": "L3 numba rolling 開關（memory_budget 選擇子）。",
+      "_sources": [
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:203"
+      ]
+    },
+    "FFACT_USE_POLARS": {
+      "class": "value_affecting",
+      "parser": "selector_flag",
+      "reason": "Polars 臂開關（memory_budget 選擇子；Polars 不可用時有效值為關）；決定 L2 與依環境之 post-IC 臂。",
+      "_sources": [
+        "momentum/FeatureEngineering/polars_adapter.py:90"
+      ]
+    },
+    "FFACT_USE_SEARCHSORTED": {
+      "class": "value_affecting",
+      "parser": "bool_text",
+      "reason": "多週期對齊 searchsorted 路徑開關（預設開）。",
+      "_sources": [
+        "momentum/FeatureEngineering/timeframe/tf_aligner.py:72"
+      ]
+    },
+    "FFACT_UVICORN_ACCESS_LOG": {
+      "class": "output_only",
+      "parser": "bool_text",
+      "reason": "uvicorn 存取紀錄開關（api/main.py）；只決定是否寫紀錄（output_only）。",
+      "_sources": [
+        "api/main.py:400"
+      ]
+    }
+  },
+  "selector_classes": {
+    "_doc": "選擇子類別值集；output_only_keys 為封閉清單（增列須改 SPEC；Task 0.2）。 允許類別恰三（SPEC Task 4.4 邊界①）：value_affecting；output_only（只限 output_only_keys 五鍵，SPEC Task 0.2 封閉清單）；certified_equal（只限既有 FeatureFactory.L2_ROUTE_CERTIFIED 機制所登錄者，現為空集合）。本票不設 non_value。",
+    "values": [
+      "value_affecting",
+      "output_only",
+      "certified_equal"
+    ],
+    "output_only_keys": [
+      "FFACT_CGSA_WORK_DIR",
+      "FFACT_API_LOG_PATH",
+      "FFACT_CHILD_METRICS_PATH",
+      "FFACT_LAYER_METRICS_PATH",
+      "FFACT_UVICORN_ACCESS_LOG"
+    ]
+  },
+  "capability_flags": {
+    "_doc": "非環境能力旗標（Polars、numba、scipy、statsmodels 可用性）。",
+    "values": [
+      "polars_available",
+      "numba_available",
+      "scipy_available",
+      "statsmodels_available"
+    ],
+    "_sources": {
+      "def _check_polars_available": [
+        "momentum/FeatureEngineering/polars_adapter.py:68"
+      ],
+      "_HAS_NUMBA = True": [
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:20"
+      ],
+      "HAS_SCIPY = True": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:139"
+      ],
+      "HAS_STATSMODELS = True": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:157"
+      ]
+    }
+  },
+  "library_versions": {
+    "_doc": "數值相關函式庫（設計選擇②：入 algorithm_id、不入 config_hash 鹽）。",
+    "values": [
+      "numpy",
+      "pandas",
+      "polars",
+      "numba",
+      "scipy",
+      "pyarrow",
+      "bottleneck",
+      "statsmodels",
+      "talib"
+    ],
+    "_sources": {
+      "numpy": [
+        "requirements.txt:41"
+      ],
+      "pandas": [
+        "requirements.txt:48"
+      ],
+      "polars": [
+        "requirements.txt:52"
+      ],
+      "numba": [
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:17"
+      ],
+      "scipy": [
+        "requirements.txt:46"
+      ],
+      "pyarrow": [
+        "requirements.txt:56"
+      ],
+      "bottleneck": [
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:112"
+      ],
+      "statsmodels": [
+        "requirements.txt:85"
+      ],
+      "talib": [
+        "momentum/FeatureEngineering/atomic/talib_wrapper.py:8"
+      ]
+    }
+  },
+  "algorithm_versions": {
+    "_doc": "算法版本常數（決定紀錄與 Phase 3 改案 +1）。"
+  },
+  "fingerprint_sections": {
+    "_doc": "fingerprint 各段之鍵（Task 4.1）。",
+    "values": []
+  },
+  "config_hash_salt": {
+    "_doc": "config_hash 鹽鍵名與排除段（設計選擇①：排除函式庫版本段）。",
+    "key": null,
+    "exclude_sections": []
+  },
   "run_identity_new_keys": [],
-  "manifest_keys": {"_doc": "manifest 頂層與 artifact 節點新增鍵（fingerprint、algorithm_id、路由身分、observed_arms；D2）。"},
-  "ic_page_output_attrs": {"_doc": "IC 頁輸出 h5 屬性鍵（實際臂、ff_run_identity〔Task 2.2〕；view_id、algorithm_id〔Task 4.3〕）。"},
-  "ic_page_response_keys": {"_doc": "ApplyTransformsResponse 新增選填鍵（同上分期）。"},
-  "ic_page_view_identity": {"_doc": "view_id 之組成（run 身分、轉換設定、臂、algorithm_id、有序 kept_cols）與正規化規則（R7-A）。", "components": [], "normalization": {}}
+  "manifest_keys": {
+    "_doc": "manifest 頂層與 artifact 節點新增鍵（fingerprint、algorithm_id、路由身分、observed_arms；D2）。"
+  },
+  "ic_page_output_attrs": {
+    "_doc": "IC 頁輸出 h5 屬性鍵（實際臂、ff_run_identity〔Task 2.2〕；view_id、algorithm_id〔Task 4.3〕）。"
+  },
+  "ic_page_response_keys": {
+    "_doc": "ApplyTransformsResponse 新增選填鍵（同上分期）。"
+  },
+  "ic_page_view_identity": {
+    "_doc": "view_id 之組成（run 身分、轉換設定、臂、algorithm_id、有序 kept_cols）與正規化規則（R7-A）。",
+    "components": [],
+    "normalization": {}
+  }
 }
