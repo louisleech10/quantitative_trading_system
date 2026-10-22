@@ -126,7 +126,7 @@
       "tests/feature_engineering/test_icfirstalign_memory.py"
     ],
     "callers_later": [
-      "tests/_golden/numview/preregistered_criteria_v4.json",
+      "tests/_golden/numview/preregistered_criteria_v5.json",
       "tests/_golden/numview/pre_change_fingerprints.json",
       "tests/_golden/numview/decisions.json",
       "tests/_golden/numview/refreeze_receipt.json"

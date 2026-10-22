@@ -931,6 +931,8 @@ def _run_target(target: Mapping[str, Any], work_root: Path, kline_path: Path,
     if target["category"] in CELL_CATEGORIES:  # 無結果檔之終止亦記生成入口（快取重用判定不得把他入口之終止當本入口結果）
         result.setdefault("entry", generation_entry(target["category"], load_criteria()))
     result["child_wall_seconds"] = wall
+    result["swap_growth_max_mb"] = watched.swap_growth_max_mb  # 卡住偵測 swap 門檻之實測依據（判準 v5）
+    result["swap_growth_threshold_mb"] = watched.swap_growth_threshold_mb
     result["log"] = str(log_path)
     shutil.rmtree(work, ignore_errors=True)
     return result

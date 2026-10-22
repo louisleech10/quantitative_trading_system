@@ -1235,6 +1235,46 @@ def test_estimate_receipt_fields_and_coverage() -> None:
     assert estimate_receipt_violations(receipt, _kline_index()) == []
 
 
+def swap_calibration_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """判準 `cell_rules.watchdog._basis` 校準規則（審碼 r12 CODEX-R12-P1-01）：收據中正常完成（measured）之格，最重之
+    格 C 必記 `swap_growth_max_mb` 與 `swap_growth_threshold_mb`；凡記有者其最大增長須 < 門檻之半（否則 Phase 1 前須以
+    vN→vN+1 調整比例）。不含 assert。"""
+    out: List[str] = []
+    for key, m in sorted((receipt.get("measurements") or {}).items()):
+        if not isinstance(m, Mapping) or m.get("status") != "measured":
+            continue
+        grow, cap = m.get("swap_growth_max_mb"), m.get("swap_growth_threshold_mb")
+        if grow is None or cap is None:
+            if m.get("category") == "C":
+                out.append(f"{key}：最重之格 C 未記 swap_growth_max_mb／swap_growth_threshold_mb（未經 v5 正常跑校準）")
+            continue
+        if float(grow) >= 0.5 * float(cap):
+            out.append(f"{key}：swap 增長 {float(grow):.0f} MB ≥ 門檻 {float(cap):.0f} MB 之半 ⇒ Phase 1 前須調整比例")
+    return out
+
+
+def test_estimate_receipt_swap_growth_calibrated() -> None:
+    """Task 0.4：現行估時收據之卡住偵測 swap 門檻已以正常跑校準（見 `swap_calibration_violations`）。收據未依現行判準
+    重產前為紅。"""
+    assert swap_calibration_violations(_load_receipt(_estimate_receipt_path())) == []
+
+
+@pytest.mark.parametrize("mutant", [None, "c_missing_fields", "growth_over_half", "non_c_missing_ok"])
+def test_mutation_swap_calibration(mutant: Optional[str]) -> None:
+    """mutation：C 格缺 swap 欄 ⇒ 紅；任一格增長 ≥ 門檻之半 ⇒ 紅；非 C 格缺欄（沿用舊快取）⇒ 不紅；合規收據 ⇒ 綠。"""
+    receipt = {"measurements": {
+        "C_BTCUSDT_1h": {"category": "C", "status": "measured", "swap_growth_max_mb": 500.0, "swap_growth_threshold_mb": 4096.0},
+        "A_BTCUSDT_1h": {"category": "A", "status": "measured", "swap_growth_max_mb": 10.0, "swap_growth_threshold_mb": 4096.0},
+        "B_BTCUSDT_1h_4h": {"category": "B", "status": "stalled"}}}
+    if mutant == "c_missing_fields":
+        del receipt["measurements"]["C_BTCUSDT_1h"]["swap_growth_max_mb"]
+    elif mutant == "growth_over_half":
+        receipt["measurements"]["A_BTCUSDT_1h"]["swap_growth_max_mb"] = 2048.0
+    elif mutant == "non_c_missing_ok":
+        del receipt["measurements"]["A_BTCUSDT_1h"]["swap_growth_threshold_mb"]
+    assert (swap_calibration_violations(receipt) != []) is (mutant in ("c_missing_fields", "growth_over_half"))
+
+
 def test_estimate_gate_require_raises_in_three_cases(tmp_path: Path) -> None:
     """Task 0.4 ②：`_estimate_gate.require` 於收據缺、`reported_at` 缺、格不在清單三案各拋 `EstimateGateError`。"""
     assert gate_require_violations(GATE, tmp_path) == []
@@ -2710,7 +2750,7 @@ def test_mutation_estimate_unlisted_core_patched_generation(monkeypatch: pytest.
     assert any("未列估時" in v for v in mutant_rows_violations(_load_criteria(), _read_core_source()))
 
 
-# ---------------------------------------------------------------------------------------------- 卡住偵測（使用者 2026-10-22；判準 v4 cell_rules.watchdog）
+# ---------------------------------------------------------------------------------------------- 卡住偵測（使用者 2026-10-22；判準 v5 cell_rules.watchdog）
 # 秒級：以極小門檻與不寫 log／持續寫 log 之假子行程驗三條件；不生成特徵。
 
 _SILENT_CHILD = [sys.executable, "-c", "import time; time.sleep(20)"]
@@ -2719,7 +2759,7 @@ _CHATTY_CHILD = [sys.executable, "-u", "-c", "import time\nfor i in range(400):\
 
 def _fast_config(**overrides: Any) -> Any:
     wd = ESTIMATOR.watchdog_module()
-    base = {"check_interval_seconds": 0.05, "log_stall_seconds": 0.4, "swap_used_percent": 50,
+    base = {"check_interval_seconds": 0.05, "log_stall_seconds": 0.4, "swap_growth_fraction_of_ram": 0.125,
             "swap_consecutive_checks": 2, "wall_multiple_of_expected": 3.0, "wall_ceiling_seconds": 30.0}
     return wd.WatchdogConfig(**{**base, **overrides})
 
@@ -2751,11 +2791,88 @@ def test_watchdog_wall_cap_stalled(tmp_path: Path) -> None:
 
 
 def test_watchdog_swap_over_threshold_stalled(tmp_path: Path) -> None:
-    """(b) swap 使用比例（注入）> 門檻連續 2 次 ⇒ stalled（理由具名 swap）；子行程持續寫 log、牆鐘未逾。"""
+    """(b) swap 已用量（注入，MB）自啟動基線增長 > 門檻連續 2 次 ⇒ stalled（理由具名 swap）；子行程持續寫 log、牆鐘未逾。"""
     wd = ESTIMATOR.watchdog_module()
+    readings = iter([6000.0] + [9000.0] * 100000)
     result = wd.run_watched(_CHATTY_CHILD, log_path=tmp_path / "swap.log", config=_fast_config(log_stall_seconds=30.0),
-                            probe_swap=lambda: 0.9)
+                            probe_swap=lambda: next(readings), probe_ram=lambda: 8000.0)
     assert result.status == wd.STALLED and "swap" in result.reason, result
+    assert result.swap_growth_threshold_mb == 1000.0 and result.swap_growth_max_mb == 3000.0, result
+
+
+def test_watchdog_high_preexisting_swap_not_stalled(tmp_path: Path) -> None:
+    """回歸（2026-10-22 判準 v4 誤殺）：系統既有 swap 高（注入恆 7000 MB，相當 8 GB 之 85%）而本跑未增長 ⇒ 不判 stalled、正常
+    結束；`swap_growth_max_mb` 記 0。"""
+    wd = ESTIMATOR.watchdog_module()
+    result = wd.run_watched([sys.executable, "-c", "import time; print('a', flush=True); time.sleep(0.2); print('b')"],
+                            log_path=tmp_path / "hi.log", config=_fast_config(), probe_swap=lambda: 7000.0,
+                            probe_ram=lambda: 8000.0)
+    assert result.status == wd.EXITED and result.returncode == 0, result
+    assert result.swap_growth_max_mb == 0.0, result
+
+
+_SHORT_CHATTY_CHILD = [sys.executable, "-u", "-c", "import time\nfor i in range(8):\n    print(i, flush=True); time.sleep(0.05)"]
+
+
+@pytest.mark.parametrize("ram_mb, expect_stalled", [(8000.0, True), (32000.0, False)])
+def test_watchdog_swap_threshold_scales_with_physical_memory(tmp_path: Path, ram_mb: float, expect_stalled: bool) -> None:
+    """跨記憶體級距（CLAUDE.md Optimization Priority 1）：同一 swap 增長 3000 MB，實體 8000 MB（門檻 1000）⇒ stalled；
+    實體 32000 MB（門檻 4000）⇒ 正常結束。"""
+    wd = ESTIMATOR.watchdog_module()
+    readings = iter([6000.0] + [9000.0] * 100000)
+    result = wd.run_watched(_SHORT_CHATTY_CHILD, log_path=tmp_path / "tier.log", config=_fast_config(log_stall_seconds=30.0),
+                            probe_swap=lambda: next(readings), probe_ram=lambda: ram_mb)
+    assert (result.status == wd.STALLED) is expect_stalled, result
+    assert result.swap_growth_threshold_mb == 0.125 * ram_mb, result
+
+
+def test_watchdog_physical_memory_unreadable_skips_swap_condition(tmp_path: Path) -> None:
+    """實體記憶體讀不到 ⇒ 本跑不判 swap 條件（門檻 None）：swap 大增仍不以 swap 終止，子行程正常結束；(a)(c) 另有測試。"""
+    wd = ESTIMATOR.watchdog_module()
+    readings = iter([6000.0] + [9000.0] * 100000)
+    result = wd.run_watched(_SHORT_CHATTY_CHILD, log_path=tmp_path / "noram.log", config=_fast_config(log_stall_seconds=30.0),
+                            probe_swap=lambda: next(readings), probe_ram=lambda: None)
+    assert result.status == wd.EXITED and result.swap_growth_threshold_mb is None, result
+
+
+class _FakeCompleted:
+    def __init__(self, stdout: str) -> None:
+        self.stdout = stdout
+
+
+class _FakePath:
+    text: Optional[str] = None
+
+    def __init__(self, *_a: Any) -> None:
+        pass
+
+    def read_text(self, encoding: str = "utf-8") -> str:
+        if _FakePath.text is None:
+            raise OSError("unreadable")
+        return _FakePath.text
+
+
+@pytest.mark.parametrize("system, source, want_swap, want_ram", [
+    ("Darwin", {"vm.swapusage": "total = 8192.00M  used = 6955.44M  free = 1236.56M  (encrypted)\n",
+                "hw.memsize": "8589934592\n"}, 6955.44, 8192.0),
+    ("Darwin", {"vm.swapusage": "garbage\n", "hw.memsize": "n/a\n"}, None, None),
+    ("Linux", "MemTotal:       16384000 kB\nSwapTotal:       4194304 kB\nSwapFree:        1048576 kB\n", 3072.0, 16000.0),
+    ("Linux", None, None, None),
+    ("Linux", "MemTotal: x\n", None, None),
+])
+def test_watchdog_platform_probes_parse_fixed_samples(monkeypatch: pytest.MonkeyPatch, system: str, source: Any,
+                                                      want_swap: Optional[float], want_ram: Optional[float]) -> None:
+    """swap 已用量與實體記憶體探測之平台解析（固定樣本，不讀本機）：macOS `sysctl -n vm.swapusage`／`hw.memsize`、Linux
+    `/proc/meminfo`；格式不符或讀不到 ⇒ None（該次不計）。"""
+    wd = ESTIMATOR.watchdog_module()
+    monkeypatch.setattr(wd.platform, "system", lambda: system)
+    if system == "Darwin":
+        monkeypatch.setattr(wd.subprocess, "run", lambda cmd, **k: _FakeCompleted(source[cmd[-1]]))
+    else:
+        monkeypatch.setattr(_FakePath, "text", source)
+        monkeypatch.setattr(wd, "Path", _FakePath)
+    assert wd.swap_used_mb() == want_swap
+    assert wd.physical_memory_mb() == want_ram
 
 
 def test_watchdog_normal_child_exits(tmp_path: Path) -> None:

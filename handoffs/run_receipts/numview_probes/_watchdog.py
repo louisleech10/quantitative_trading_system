@@ -2,8 +2,9 @@
 浪費那麼多時間，監看有什麼用」）。
 
 `run_watched` 啟動子行程並每 `check_interval_seconds` 檢查一次，任一成立即終止子行程、回 `stalled`（附理由）：
-(a) 子行程之 log 檔 `log_stall_seconds` 秒未增長；(b) 系統 swap 使用百分比 > `swap_used_percent` 連續 `swap_consecutive_checks`
-次（macOS `sysctl vm.swapusage`、Linux `/proc/meminfo`；讀不到 ⇒ 該次不計）；(c) 牆鐘逾 `wall_multiple_of_expected` × 預期
+(a) 子行程之 log 檔 `log_stall_seconds` 秒未增長；(b) 系統 swap 已用量自子行程啟動時之基線增長 > `swap_growth_fraction_of_ram` × 實體
+記憶體（MB；跨記憶體級距同一規則）連續 `swap_consecutive_checks` 次（macOS `sysctl vm.swapusage`、Linux `/proc/meminfo`；讀不到 ⇒ 該次不計；基線讀不到 ⇒ 以首次讀到者
+為基線；實體記憶體讀不到 ⇒ 本跑不判 swap 條件，(a)(c) 照判。系統既有 swap 不計——判準 v4 之使用比例條件於系統既有 85% swap 時 60 秒即誤殺，見判準 `_basis`）；(c) 牆鐘逾 `wall_multiple_of_expected` × 預期
 單格秒數（有預期時），否則逾 `wall_ceiling_seconds`。門檻唯一來源＝現行判準檔 `cell_rules.watchdog`（`load_config`），不另寫。
 
 使用者：估時器 `estimate._run_target`（現行）；凍結腳本 `scripts/numview_freeze_baseline.py` 與生成型探針實作時同用本模組
@@ -24,7 +25,7 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 ENABLED = True
 STALLED = "stalled"
 EXITED = "exited"
-WATCHDOG_KEYS = ("check_interval_seconds", "log_stall_seconds", "swap_used_percent", "swap_consecutive_checks",
+WATCHDOG_KEYS = ("check_interval_seconds", "log_stall_seconds", "swap_growth_fraction_of_ram", "swap_consecutive_checks",
                  "wall_multiple_of_expected", "wall_ceiling_seconds")
 
 
@@ -32,7 +33,7 @@ WATCHDOG_KEYS = ("check_interval_seconds", "log_stall_seconds", "swap_used_perce
 class WatchdogConfig:
     check_interval_seconds: float
     log_stall_seconds: float
-    swap_used_percent: float
+    swap_growth_fraction_of_ram: float
     swap_consecutive_checks: int
     wall_multiple_of_expected: float
     wall_ceiling_seconds: float
@@ -44,6 +45,8 @@ class WatchResult:
     returncode: Optional[int]
     reason: Optional[str]
     wall_seconds: float
+    swap_growth_max_mb: Optional[float] = None  # 本跑觀測到之最大 swap 增長（MB；門檻校準依據）
+    swap_growth_threshold_mb: Optional[float] = None  # 本跑之 swap 增長門檻（MB；實體記憶體讀不到 ⇒ None）
 
 
 def load_config(criteria: Mapping[str, Any]) -> WatchdogConfig:
@@ -55,6 +58,33 @@ def load_config(criteria: Mapping[str, Any]) -> WatchdogConfig:
     if keys != set(WATCHDOG_KEYS):
         raise ValueError(f"cell_rules.watchdog 之鍵 {sorted(keys)} ≠ {sorted(WATCHDOG_KEYS)}")
     return WatchdogConfig(**{k: node[k] for k in WATCHDOG_KEYS})
+
+
+def swap_used_mb() -> Optional[float]:
+    """系統 swap 已用量（MB）；讀不到 ⇒ None（該次檢查不計）。"""
+    try:
+        if platform.system() == "Darwin":
+            text = subprocess.run(["sysctl", "-n", "vm.swapusage"], capture_output=True, text=True, timeout=5).stdout
+            used = re.search(r"used\s*=\s*([\d.]+)M", text)
+            return float(used.group(1)) if used else None
+        info = Path("/proc/meminfo").read_text(encoding="utf-8")
+        total_kb = int(re.search(r"SwapTotal:\s+(\d+)", info).group(1))  # type: ignore[union-attr]
+        free_kb = int(re.search(r"SwapFree:\s+(\d+)", info).group(1))  # type: ignore[union-attr]
+        return (total_kb - free_kb) / 1024.0
+    except (OSError, ValueError, AttributeError, subprocess.SubprocessError):
+        return None
+
+
+def physical_memory_mb() -> Optional[float]:
+    """實體記憶體（MB；macOS `sysctl -n hw.memsize`、Linux `/proc/meminfo` MemTotal）；讀不到 ⇒ None。"""
+    try:
+        if platform.system() == "Darwin":
+            text = subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, timeout=5).stdout
+            return int(text.strip()) / (1024.0 * 1024.0) if text.strip().isdigit() else None
+        info = Path("/proc/meminfo").read_text(encoding="utf-8")
+        return int(re.search(r"MemTotal:\s+(\d+)", info).group(1)) / 1024.0  # type: ignore[union-attr]
+    except (OSError, ValueError, AttributeError, subprocess.SubprocessError):
+        return None
 
 
 def swap_used_fraction() -> Optional[float]:
@@ -91,10 +121,17 @@ def _terminate(proc: "subprocess.Popen[Any]") -> Optional[int]:
 
 def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, expected_seconds: Optional[float] = None,
                 cwd: Optional[str] = None, env: Optional[Mapping[str, str]] = None,
-                probe_swap: Callable[[], Optional[float]] = swap_used_fraction,
+                probe_swap: Callable[[], Optional[float]] = swap_used_mb,
+                probe_ram: Callable[[], Optional[float]] = physical_memory_mb,
                 clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep) -> WatchResult:
-    """啟動 `cmd`（stdout／stderr 寫入 `log_path`），依 `config` 監看；卡住 ⇒ 終止並回 STALLED＋理由，否則回 EXITED＋rc。"""
+    """啟動 `cmd`（stdout／stderr 寫入 `log_path`），依 `config` 監看；卡住 ⇒ 終止並回 STALLED＋理由，否則回 EXITED＋rc。
+    `probe_swap` 回系統 swap 已用量（MB）；啟動前讀一次為基線，之後只計增長。門檻＝`swap_growth_fraction_of_ram` ×
+    `probe_ram()`（MB）；後者讀不到 ⇒ 本跑不判 swap 條件。"""
     log_path = Path(log_path)
+    baseline = probe_swap()
+    ram = probe_ram()
+    threshold = None if ram is None else config.swap_growth_fraction_of_ram * ram
+    growth_max: Optional[float] = None
     started = clock()
     with open(log_path, "w", encoding="utf-8") as log:
         proc = subprocess.Popen(list(cmd), cwd=cwd, env=dict(env) if env is not None else None,
@@ -104,7 +141,7 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
         while True:
             rc = proc.poll()
             if rc is not None:
-                return WatchResult(EXITED, rc, None, clock() - started)
+                return WatchResult(EXITED, rc, None, clock() - started, growth_max, threshold)
             sleep(config.check_interval_seconds)
             if not ENABLED:
                 continue
@@ -115,16 +152,21 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
             reason = None
             if now - last_growth >= config.log_stall_seconds:
                 reason = f"log 檔 {now - last_growth:.0f} 秒未增長（門檻 {config.log_stall_seconds:.0f} 秒）"
-            frac = probe_swap()
-            swap_hits = swap_hits + 1 if frac is not None and frac * 100 > config.swap_used_percent else 0
+            used = probe_swap()
+            if used is not None and baseline is None:
+                baseline = used
+            growth = None if used is None or baseline is None else used - baseline
+            if growth is not None:
+                growth_max = growth if growth_max is None else max(growth_max, growth)
+            swap_hits = swap_hits + 1 if growth is not None and threshold is not None and growth > threshold else 0
             if reason is None and swap_hits >= config.swap_consecutive_checks:
-                reason = (f"swap 使用 {frac:.0%} > {config.swap_used_percent}% 連續 {swap_hits} 次"
-                          if frac is not None else "swap 使用逾門檻")
+                reason = (f"swap 自啟動增長 {growth:.0f} MB > 門檻 {threshold:.0f} MB 連續 {swap_hits} 次"
+                          if growth is not None and threshold is not None else "swap 增長逾門檻")
             if reason is None and now - started >= cap:
                 reason = f"牆鐘 {now - started:.0f} 秒逾上限 {cap:.0f} 秒"
             if reason is not None and proc.poll() is None:
                 rc = _terminate(proc)
-                return WatchResult(STALLED, rc, reason, clock() - started)
+                return WatchResult(STALLED, rc, reason, clock() - started, growth_max, threshold)
 
 
 def summary_line(target: str, result: WatchResult) -> str:
