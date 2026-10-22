@@ -1541,7 +1541,8 @@ def expected_seconds(measurements: Mapping[str, Mapping[str, Any]], key: str, ca
 def migrate_cache(measurements: Mapping[str, Mapping[str, Any]],
                   cells: Mapping[str, List[Dict[str, Any]]]) -> Dict[str, Dict[str, Any]]:
     """舊快取鍵（`A:<tf>`、`B`、`C:<tf>`）改以其記錄之 `cell_id` 為鍵（v3 目標鍵＝格 id）；舊格 B（候選週期描述子）之訓練週期
-    等於封閉清單某格 B 之 timeframes 者改歸該格。只改鍵、不改內容（重用與否另由 `cache_reusable` 判）。"""
+    等於封閉清單某格 B 之 timeframes 者改歸該格，並同步內層 `cell_id`＝新鍵（原值記 `migrated_cell_id`；否則以 cell_id 對接之
+    前史表等會對不到——審碼 r13 CODEX-R13-P1-01）。其餘內容不改（重用與否另由 `cache_reusable` 判）。"""
     closed_b = {tuple(c["timeframes"]): c["id"] for c in cells.get("B", [])}
     out: Dict[str, Dict[str, Any]] = {}
     for key, m in measurements.items():
@@ -1553,7 +1554,10 @@ def migrate_cache(measurements: Mapping[str, Mapping[str, Any]],
                 new_key = closed_b.get(tuple(m.get("training_timeframes") or ()), new_key)
         if new_key in out and new_key != key:
             continue
-        out[new_key] = dict(m, migrated_from=key) if new_key != key else dict(m)
+        row = dict(m, migrated_from=key) if new_key != key else dict(m)
+        if cid and new_key != str(cid):
+            row.update(cell_id=new_key, migrated_cell_id=str(cid))
+        out[new_key] = row
     return out
 
 
@@ -1691,6 +1695,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if missing:
         print(f"尚有未實測之目標 {missing}（已存快取 {cache_path}）；全部實測後再跑一次以寫收據", file=sys.stderr)
         return 1
+    target_keys = {t["target"] for t in targets}  # 收據只收現行目標之實測；快取殘留之舊格（不在現行目標）隔離於 legacy_measurements
+    legacy = {k: v for k, v in measurements.items() if k not in target_keys}
+    measurements = {k: v for k, v in measurements.items() if k in target_keys}
     body = build_receipt(cells, inventory, criteria, measurements, contract_arms)
     body["pre_history"] = pre_history_table(cells, criteria, kline_path, body["b_membership"], measurements)
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip()
@@ -1710,6 +1717,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "library_versions": versions,
         "cells": cells,
         "measurements": measurements,
+        "legacy_measurements": legacy,
         **body,
     }
     receipts_dir.mkdir(parents=True, exist_ok=True)

@@ -4,7 +4,8 @@
 `run_watched` 啟動子行程並每 `check_interval_seconds` 檢查一次，任一成立即終止子行程、回 `stalled`（附理由）：
 (a) 子行程之 log 檔 `log_stall_seconds` 秒未增長；(b) 系統 swap 已用量自子行程啟動時之基線增長 > `swap_growth_fraction_of_ram` × 實體
 記憶體（MB；跨記憶體級距同一規則）連續 `swap_consecutive_checks` 次（macOS `sysctl vm.swapusage`、Linux `/proc/meminfo`；讀不到 ⇒ 該次不計；基線讀不到 ⇒ 以首次讀到者
-為基線；實體記憶體讀不到 ⇒ 本跑不判 swap 條件，(a)(c) 照判。系統既有 swap 不計——判準 v4 之使用比例條件於系統既有 85% swap 時 60 秒即誤殺，見判準 `_basis`）；(c) 牆鐘逾 `wall_multiple_of_expected` × 預期
+為基線；實體記憶體讀不到 ⇒ 本跑不判 swap 條件，(a)(c) 照判；`swap_growth_fraction_of_ram` 為 None ⇒ 停用 swap 條件、只記錄
+增長——判準 v6 現行即停用：8 GB 機上正常全特徵生成之 swap 增長與卡住同量級，見判準 `_basis`）。系統既有 swap 不計——判準 v4 之使用比例條件於系統既有 85% swap 時 60 秒即誤殺，見判準 `_basis`）；(c) 牆鐘逾 `wall_multiple_of_expected` × 預期
 單格秒數（有預期時），否則逾 `wall_ceiling_seconds`。門檻唯一來源＝現行判準檔 `cell_rules.watchdog`（`load_config`），不另寫。
 
 使用者：估時器 `estimate._run_target`（現行）；凍結腳本 `scripts/numview_freeze_baseline.py` 與生成型探針實作時同用本模組
@@ -33,7 +34,7 @@ WATCHDOG_KEYS = ("check_interval_seconds", "log_stall_seconds", "swap_growth_fra
 class WatchdogConfig:
     check_interval_seconds: float
     log_stall_seconds: float
-    swap_growth_fraction_of_ram: float
+    swap_growth_fraction_of_ram: Optional[float]  # None ⇒ 停用 swap 終止條件（只記錄）
     swap_consecutive_checks: int
     wall_multiple_of_expected: float
     wall_ceiling_seconds: float
@@ -130,7 +131,8 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
     log_path = Path(log_path)
     baseline = probe_swap()
     ram = probe_ram()
-    threshold = None if ram is None else config.swap_growth_fraction_of_ram * ram
+    frac = config.swap_growth_fraction_of_ram
+    threshold = None if ram is None or frac is None else frac * ram
     growth_max: Optional[float] = None
     started = clock()
     with open(log_path, "w", encoding="utf-8") as log:

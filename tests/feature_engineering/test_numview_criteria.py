@@ -1240,17 +1240,66 @@ def swap_calibration_violations(receipt: Mapping[str, Any]) -> List[str]:
     格 C 必記 `swap_growth_max_mb` 與 `swap_growth_threshold_mb`；凡記有者其最大增長須 < 門檻之半（否則 Phase 1 前須以
     vN→vN+1 調整比例）。不含 assert。"""
     out: List[str] = []
+    current = {str(c.get("id")) for cells in (receipt.get("cells") or {}).values() if isinstance(cells, list)
+               for c in cells if isinstance(c, Mapping)}  # 現行判準格清單；快取殘留之舊格（如 v3 前之 C 4h／12h）不計
     for key, m in sorted((receipt.get("measurements") or {}).items()):
-        if not isinstance(m, Mapping) or m.get("status") != "measured":
+        if not isinstance(m, Mapping) or m.get("status") != "measured" or (current and key not in current):
             continue
         grow, cap = m.get("swap_growth_max_mb"), m.get("swap_growth_threshold_mb")
-        if grow is None or cap is None:
+        if grow is None:
             if m.get("category") == "C":
-                out.append(f"{key}：最重之格 C 未記 swap_growth_max_mb／swap_growth_threshold_mb（未經 v5 正常跑校準）")
+                out.append(f"{key}：最重之格 C 未記 swap_growth_max_mb（未經現行判準正常跑記錄）")
+            continue
+        if cap is None:  # 判準 v6：swap 終止條件停用（比例 null）⇒ 只記錄、不比門檻
             continue
         if float(grow) >= 0.5 * float(cap):
             out.append(f"{key}：swap 增長 {float(grow):.0f} MB ≥ 門檻 {float(cap):.0f} MB 之半 ⇒ Phase 1 前須調整比例")
     return out
+
+
+def measurement_identity_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """收據實測列之身分（審碼 r13 CODEX-R13-P1-01）：格類（A／B／C）之列，外層鍵＝內層 `cell_id`＝現行格清單之 id；不在現行格清單之
+    格類列不得出現在 `measurements`（舊格只准在 `legacy_measurements`）。不含 assert。"""
+    current = {str(c.get("id")) for cells in (receipt.get("cells") or {}).values() if isinstance(cells, list)
+               for c in cells if isinstance(c, Mapping)}
+    out: List[str] = []
+    for key, m in sorted((receipt.get("measurements") or {}).items()):
+        if not isinstance(m, Mapping) or m.get("category") not in ("A", "B", "C"):
+            continue
+        if key not in current:
+            out.append(f"{key}：格類實測列不在現行格清單（應隔離於 legacy_measurements）")
+        if str(m.get("cell_id")) != key:
+            out.append(f"{key}：內層 cell_id={m.get('cell_id')!r} ≠ 外層鍵（前史表等以 cell_id 對接會對不到）")
+    return out
+
+
+def test_estimate_receipt_measurement_identity() -> None:
+    """Task 0.4：現行估時收據之格類實測列身分一致且只含現行格（見 `measurement_identity_violations`）。"""
+    assert measurement_identity_violations(_load_receipt(_estimate_receipt_path())) == []
+
+
+@pytest.mark.parametrize("mutant", [None, "nested_id_stale", "legacy_cell_in_measurements", "preprov_ignored"])
+def test_mutation_measurement_identity(mutant: Optional[str]) -> None:
+    """mutation：內層 cell_id 為舊 id ⇒ 紅；現行清單外之格類列混入 measurements ⇒ 紅；非格類（preprov）列不受此檢查 ⇒ 不紅。"""
+    receipt: Dict[str, Any] = {"cells": {"B": [{"id": "B_BTCUSDT_1h_4h"}], "C": [{"id": "C_BTCUSDT_1h"}]},
+                               "measurements": {"B_BTCUSDT_1h_4h": {"category": "B", "cell_id": "B_BTCUSDT_1h_4h"},
+                                                "C_BTCUSDT_1h": {"category": "C", "cell_id": "C_BTCUSDT_1h"}}}
+    if mutant == "nested_id_stale":
+        receipt["measurements"]["B_BTCUSDT_1h_4h"]["cell_id"] = "B_BTCUSDT_1h_4h_12h"
+    elif mutant == "legacy_cell_in_measurements":
+        receipt["measurements"]["C_BTCUSDT_4h"] = {"category": "C", "cell_id": "C_BTCUSDT_4h"}
+    elif mutant == "preprov_ignored":
+        receipt["measurements"]["preprov:h1_stat_on"] = {"category": "preprov", "cell_id": None}
+    assert (measurement_identity_violations(receipt) != []) is (mutant in ("nested_id_stale", "legacy_cell_in_measurements"))
+
+
+def test_migrate_cache_rewrites_nested_cell_id_for_rehomed_b() -> None:
+    """估時器 `migrate_cache`：舊格 B（三週期 id）依訓練週期改歸現行格 B 時，內層 cell_id 同步為新鍵、原值記 migrated_cell_id。"""
+    cells = {"B": [{"id": "B_BTCUSDT_1h_4h", "timeframes": ["1h", "4h"]}]}
+    old = {"B": {"category": "B", "cell_id": "B_BTCUSDT_1h_4h_12h", "training_timeframes": ["1h", "4h"]}}
+    row = ESTIMATOR.migrate_cache(old, cells)["B_BTCUSDT_1h_4h"]
+    assert row["cell_id"] == "B_BTCUSDT_1h_4h" and row["migrated_cell_id"] == "B_BTCUSDT_1h_4h_12h", row
+    assert row["migrated_from"] == "B", row
 
 
 def test_estimate_receipt_swap_growth_calibrated() -> None:
@@ -2750,7 +2799,7 @@ def test_mutation_estimate_unlisted_core_patched_generation(monkeypatch: pytest.
     assert any("未列估時" in v for v in mutant_rows_violations(_load_criteria(), _read_core_source()))
 
 
-# ---------------------------------------------------------------------------------------------- 卡住偵測（使用者 2026-10-22；判準 v5 cell_rules.watchdog）
+# ---------------------------------------------------------------------------------------------- 卡住偵測（使用者 2026-10-22；判準 v6 cell_rules.watchdog）
 # 秒級：以極小門檻與不寫 log／持續寫 log 之假子行程驗三條件；不生成特徵。
 
 _SILENT_CHILD = [sys.executable, "-c", "import time; time.sleep(20)"]
@@ -2824,6 +2873,19 @@ def test_watchdog_swap_threshold_scales_with_physical_memory(tmp_path: Path, ram
                             probe_swap=lambda: next(readings), probe_ram=lambda: ram_mb)
     assert (result.status == wd.STALLED) is expect_stalled, result
     assert result.swap_growth_threshold_mb == 0.125 * ram_mb, result
+
+
+def test_watchdog_swap_condition_disabled_records_growth_only(tmp_path: Path) -> None:
+    """判準 v6：`swap_growth_fraction_of_ram`＝None ⇒ swap 大增（注入 6000→9000 MB）不終止、門檻 None，仍記
+    `swap_growth_max_mb`＝3000；現行判準確為停用。"""
+    wd = ESTIMATOR.watchdog_module()
+    assert wd.load_config(_load_criteria()).swap_growth_fraction_of_ram is None
+    readings = iter([6000.0] + [9000.0] * 100000)
+    result = wd.run_watched(_SHORT_CHATTY_CHILD, log_path=tmp_path / "off.log",
+                            config=_fast_config(log_stall_seconds=30.0, swap_growth_fraction_of_ram=None),
+                            probe_swap=lambda: next(readings), probe_ram=lambda: 8000.0)
+    assert result.status == wd.EXITED and result.swap_growth_threshold_mb is None, result
+    assert result.swap_growth_max_mb == 3000.0, result
 
 
 def test_watchdog_physical_memory_unreadable_skips_swap_condition(tmp_path: Path) -> None:
