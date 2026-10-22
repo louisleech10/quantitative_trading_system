@@ -123,9 +123,9 @@
 <td>你 2026-10-22 定「主檔另開票」；插哪一步依規定先跟委員評估</td>
 </tr>
 <tr>
-<td><strong>🔴 全特徵跑 IC-first 在 8GB 機器上跑不完</strong>（2026-10-22 NUMVIEW 實測）</td>
-<td>BTC 1h 生產預設全特徵 20.9 萬欄，IC 預設門檻留下 13.7 萬欄（66%，幾乎沒篩），接著對 13.7 萬欄做 IC 後轉換（Polars）時記憶體耗盡、交換空間用到 9GB、78 分鐘無進度。另 Polars 轉換實測比 pandas 慢 11–15 倍（<code>handoffs/run_receipts/20261022-numview-icpage-arm-timing.json</code>）。與先前登記之「IC 缺粗篩／精篩、全量會爆記憶體」同一件事，現有實測數字</td>
-<td>不屬 NUMVIEW 範圍（NUMVIEW 全特徵格改只產特徵、不跑 IC）；IC 粗篩／精篩票開工時以此為驗收情境；插哪一步依規定先跟委員評估</td>
+<td><strong>🔴 IC-first 管線「IC 後轉換」對大量選中欄會卡死</strong>（2026-10-22 NUMVIEW 實測）</td>
+<td>BTC 1h 生產預設全特徵 20.9 萬欄：產生 18 分、IC 篩選 5 分皆正常完成；IC 預設門檻留下 13.7 萬欄（66%，幾乎沒篩），接著 IC-first 對這 13.7 萬欄做排名／標準化（Polars）時記憶體耗盡、交換空間 9GB、78 分鐘無進度。<strong>IC 本身沒問題</strong>；IC 頁第三步只轉換你選的欄，不受影響；IC-first 管線目前無正式呼叫端。成因兩件：IC 缺粗篩／精篩（7 月已登記）、Polars 轉換實測比 pandas 慢 11–15 倍（<code>handoffs/run_receipts/20261022-numview-icpage-arm-timing.json</code>）</td>
+<td>不屬 NUMVIEW 範圍（NUMVIEW 全特徵格改只產特徵）；Polars 慢因由 NUMVIEW 第 1 段效能測試查明；粗篩／精篩票開工時以此為驗收情境；插哪一步依規定先跟委員評估</td>
 </tr>
 <tr>
 <td><strong>🔴 IC 對齊 K 線時列數相同就直接按位置對上</strong>（2026-10-22 補 12h 影響盤點時查到）</td>
