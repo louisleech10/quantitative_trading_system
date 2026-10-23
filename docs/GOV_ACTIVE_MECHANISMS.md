@@ -79,6 +79,7 @@
 | `reconcile_cluster_attribution_check.sh` | 常態檢查 | reconcile_build  |
 | `reconcile_stamps_check.sh` | 常態檢查 | gate  |
 | `review_quorum_check.sh` | 常態檢查 | gate  |
+| `self_verify_check.sh` | 常態檢查 | PostToolUse,Stop  |
 | `session_name_check.sh` | 常態檢查 | committee_run  |
 | `spec_fourway_check.sh` | 常態檢查 | 未掛 |
 | `spec_v_task_ref_check.sh` | 常態檢查 | narrow_check_router  |
