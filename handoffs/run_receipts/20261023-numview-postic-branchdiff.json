@@ -12567,7 +12567,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12600,7 +12602,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.073961918960595e-05,
-      "ic_delta_over_se_max": 0.0016496610746499817
+      "ic_delta_over_se_max": 0.0016496610746499817,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12633,7 +12637,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12666,7 +12672,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5794246981524823e-05,
-      "ic_delta_over_se_max": 0.000809830665601485
+      "ic_delta_over_se_max": 0.000809830665601485,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12699,7 +12707,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12732,7 +12742,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3734603529769185e-06,
-      "ic_delta_over_se_max": 7.0502811674859e-05
+      "ic_delta_over_se_max": 7.0502811674859e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12765,7 +12777,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 7.684126199832692e-07,
-      "ic_delta_over_se_max": 3.762868819145608e-05
+      "ic_delta_over_se_max": 3.762868819145608e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12798,7 +12812,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12831,7 +12847,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.073961918960595e-05,
-      "ic_delta_over_se_max": 0.0016496610746499817
+      "ic_delta_over_se_max": 0.0016496610746499817,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12864,7 +12882,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12897,7 +12917,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5794246981524823e-05,
-      "ic_delta_over_se_max": 0.000809830665601485
+      "ic_delta_over_se_max": 0.000809830665601485,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12930,7 +12952,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12963,7 +12987,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3734603529769185e-06,
-      "ic_delta_over_se_max": 7.0502811674859e-05
+      "ic_delta_over_se_max": 7.0502811674859e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -12996,7 +13022,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 7.684126199832692e-07,
-      "ic_delta_over_se_max": 3.762868819145608e-05
+      "ic_delta_over_se_max": 3.762868819145608e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13029,7 +13057,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13062,7 +13092,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.073961918960595e-05,
-      "ic_delta_over_se_max": 0.0016496610746499817
+      "ic_delta_over_se_max": 0.0016496610746499817,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13095,7 +13127,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13128,7 +13162,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5794246981524823e-05,
-      "ic_delta_over_se_max": 0.000809830665601485
+      "ic_delta_over_se_max": 0.000809830665601485,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13161,7 +13197,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13194,7 +13232,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3734603529769185e-06,
-      "ic_delta_over_se_max": 7.0502811674859e-05
+      "ic_delta_over_se_max": 7.0502811674859e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13227,7 +13267,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 7.684126199832692e-07,
-      "ic_delta_over_se_max": 3.762868819145608e-05
+      "ic_delta_over_se_max": 3.762868819145608e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13260,7 +13302,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13293,7 +13337,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.073961918960595e-05,
-      "ic_delta_over_se_max": 0.0016496610746499817
+      "ic_delta_over_se_max": 0.0016496610746499817,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13326,7 +13372,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.767350909094987e-07,
-      "ic_delta_over_se_max": 4.579210124853776e-05
+      "ic_delta_over_se_max": 4.579210124853776e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13359,7 +13407,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5794246981524823e-05,
-      "ic_delta_over_se_max": 0.000809830665601485
+      "ic_delta_over_se_max": 0.000809830665601485,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13392,7 +13442,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13425,7 +13477,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3734603529769185e-06,
-      "ic_delta_over_se_max": 7.0502811674859e-05
+      "ic_delta_over_se_max": 7.0502811674859e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:1h",
@@ -13458,7 +13512,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 7.684126199832692e-07,
-      "ic_delta_over_se_max": 3.762868819145608e-05
+      "ic_delta_over_se_max": 3.762868819145608e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:1h",
@@ -14499,7 +14555,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:1h",
@@ -14536,7 +14594,9 @@
       "material": true,
       "material_reason": "ic_sign_flip=1;tau_b_below_1=0.9971873893848997",
       "ic_abs_delta_max": 0.10160124938822362,
-      "ic_delta_over_se_max": 1.2064479917062192
+      "ic_delta_over_se_max": 1.2064479917062192,
+      "registry_definition_cells": 399,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:1h",
@@ -14573,7 +14633,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:1h",
@@ -14610,7 +14672,9 @@
       "material": true,
       "material_reason": "nan_mask_diff=1;ic_sign_flip=4;tau_b_below_1=0.997693105072156",
       "ic_abs_delta_max": 0.4086271120269358,
-      "ic_delta_over_se_max": 1.7336580113455278
+      "ic_delta_over_se_max": 1.7336580113455278,
+      "registry_definition_cells": 65,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:1h",
@@ -14643,7 +14707,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:1h",
@@ -14680,7 +14746,9 @@
       "material": true,
       "material_reason": "nan_mask_diff=1;ic_sign_flip=2;tau_b_below_1=0.997740831810633",
       "ic_abs_delta_max": 0.4086271120269358,
-      "ic_delta_over_se_max": 1.7336580113455278
+      "ic_delta_over_se_max": 1.7336580113455278,
+      "registry_definition_cells": 65,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:1h",
@@ -14713,7 +14781,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15670,7 +15740,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15703,7 +15775,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.4578110682488682e-06,
-      "ic_delta_over_se_max": 7.823435152694531e-05
+      "ic_delta_over_se_max": 7.823435152694531e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15736,7 +15810,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15769,7 +15845,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.8014341544593205e-05,
-      "ic_delta_over_se_max": 0.001436401044379198
+      "ic_delta_over_se_max": 0.001436401044379198,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15802,7 +15880,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15835,7 +15915,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5558013164856943e-06,
-      "ic_delta_over_se_max": 7.98627837941908e-05
+      "ic_delta_over_se_max": 7.98627837941908e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15868,7 +15950,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.4718695131129703e-07,
-      "ic_delta_over_se_max": 1.205400774849626e-05
+      "ic_delta_over_se_max": 1.205400774849626e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15901,7 +15985,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15934,7 +16020,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.4578110682488682e-06,
-      "ic_delta_over_se_max": 7.823435152694531e-05
+      "ic_delta_over_se_max": 7.823435152694531e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -15967,7 +16055,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16000,7 +16090,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.8014341544593205e-05,
-      "ic_delta_over_se_max": 0.001436401044379198
+      "ic_delta_over_se_max": 0.001436401044379198,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16033,7 +16125,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16066,7 +16160,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5558013164856943e-06,
-      "ic_delta_over_se_max": 7.98627837941908e-05
+      "ic_delta_over_se_max": 7.98627837941908e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16099,7 +16195,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.4718695131129703e-07,
-      "ic_delta_over_se_max": 1.205400774849626e-05
+      "ic_delta_over_se_max": 1.205400774849626e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16132,7 +16230,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16165,7 +16265,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.4578110682488682e-06,
-      "ic_delta_over_se_max": 7.823435152694531e-05
+      "ic_delta_over_se_max": 7.823435152694531e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16198,7 +16300,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16231,7 +16335,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.8014341544593205e-05,
-      "ic_delta_over_se_max": 0.001436401044379198
+      "ic_delta_over_se_max": 0.001436401044379198,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16264,7 +16370,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16297,7 +16405,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5558013164856943e-06,
-      "ic_delta_over_se_max": 7.98627837941908e-05
+      "ic_delta_over_se_max": 7.98627837941908e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16330,7 +16440,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.4718695131129703e-07,
-      "ic_delta_over_se_max": 1.205400774849626e-05
+      "ic_delta_over_se_max": 1.205400774849626e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16363,7 +16475,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16396,7 +16510,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.4578110682488682e-06,
-      "ic_delta_over_se_max": 7.823435152694531e-05
+      "ic_delta_over_se_max": 7.823435152694531e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16429,7 +16545,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16462,7 +16580,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.8014341544593205e-05,
-      "ic_delta_over_se_max": 0.001436401044379198
+      "ic_delta_over_se_max": 0.001436401044379198,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16495,7 +16615,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16528,7 +16650,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5558013164856943e-06,
-      "ic_delta_over_se_max": 7.98627837941908e-05
+      "ic_delta_over_se_max": 7.98627837941908e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:4h",
@@ -16561,7 +16685,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.4718695131129703e-07,
-      "ic_delta_over_se_max": 1.205400774849626e-05
+      "ic_delta_over_se_max": 1.205400774849626e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:4h",
@@ -17566,7 +17692,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:4h",
@@ -17603,7 +17731,9 @@
       "material": true,
       "material_reason": "ic_sign_flip=2;tau_b_below_1=0.9947015311308488",
       "ic_abs_delta_max": 0.11190655333435834,
-      "ic_delta_over_se_max": 1.2360482817671088
+      "ic_delta_over_se_max": 1.2360482817671088,
+      "registry_definition_cells": 689,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:4h",
@@ -17636,7 +17766,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:4h",
@@ -17673,7 +17805,9 @@
       "material": true,
       "material_reason": "nan_mask_diff=8;tau_b_below_1=0.9990552334472471",
       "ic_abs_delta_max": 0.06727997476447982,
-      "ic_delta_over_se_max": 0.5748403563725845
+      "ic_delta_over_se_max": 0.5748403563725845,
+      "registry_definition_cells": 202,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:4h",
@@ -17706,7 +17840,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:4h",
@@ -17743,7 +17879,9 @@
       "material": true,
       "material_reason": "nan_mask_diff=8;ic_sign_flip=1;tau_b_below_1=0.9990069849208515",
       "ic_abs_delta_max": 0.06807846719829654,
-      "ic_delta_over_se_max": 0.5816626787177223
+      "ic_delta_over_se_max": 0.5816626787177223,
+      "registry_definition_cells": 202,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:4h",
@@ -17776,7 +17914,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18733,7 +18873,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18766,7 +18908,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.013613647113449e-06,
-      "ic_delta_over_se_max": 0.00043154630190408126
+      "ic_delta_over_se_max": 0.00043154630190408126,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18799,7 +18943,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18832,7 +18978,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.593695279157939e-05,
-      "ic_delta_over_se_max": 0.0008171477311935878
+      "ic_delta_over_se_max": 0.0008171477311935878,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18865,7 +19013,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18898,7 +19048,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.291731781671469e-06,
-      "ic_delta_over_se_max": 0.00011795185266504742
+      "ic_delta_over_se_max": 0.00011795185266504742,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18931,7 +19083,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3961847162083374e-06,
-      "ic_delta_over_se_max": 6.544847652521272e-05
+      "ic_delta_over_se_max": 6.544847652521272e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18964,7 +19118,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -18997,7 +19153,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.013613647113449e-06,
-      "ic_delta_over_se_max": 0.00043154630190408126
+      "ic_delta_over_se_max": 0.00043154630190408126,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19030,7 +19188,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19063,7 +19223,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.593695279157939e-05,
-      "ic_delta_over_se_max": 0.0008171477311935878
+      "ic_delta_over_se_max": 0.0008171477311935878,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19096,7 +19258,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19129,7 +19293,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.291731781671469e-06,
-      "ic_delta_over_se_max": 0.00011795185266504742
+      "ic_delta_over_se_max": 0.00011795185266504742,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19162,7 +19328,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3961847162083374e-06,
-      "ic_delta_over_se_max": 6.544847652521272e-05
+      "ic_delta_over_se_max": 6.544847652521272e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19195,7 +19363,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19228,7 +19398,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.013613647113449e-06,
-      "ic_delta_over_se_max": 0.00043154630190408126
+      "ic_delta_over_se_max": 0.00043154630190408126,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19261,7 +19433,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19294,7 +19468,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.593695279157939e-05,
-      "ic_delta_over_se_max": 0.0008171477311935878
+      "ic_delta_over_se_max": 0.0008171477311935878,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19327,7 +19503,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19360,7 +19538,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.291731781671469e-06,
-      "ic_delta_over_se_max": 0.00011795185266504742
+      "ic_delta_over_se_max": 0.00011795185266504742,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19393,7 +19573,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3961847162083374e-06,
-      "ic_delta_over_se_max": 6.544847652521272e-05
+      "ic_delta_over_se_max": 6.544847652521272e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19426,7 +19608,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19459,7 +19643,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 8.013613647113449e-06,
-      "ic_delta_over_se_max": 0.00043154630190408126
+      "ic_delta_over_se_max": 0.00043154630190408126,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19492,7 +19678,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19525,7 +19713,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.593695279157939e-05,
-      "ic_delta_over_se_max": 0.0008171477311935878
+      "ic_delta_over_se_max": 0.0008171477311935878,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19558,7 +19748,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19591,7 +19783,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.291731781671469e-06,
-      "ic_delta_over_se_max": 0.00011795185266504742
+      "ic_delta_over_se_max": 0.00011795185266504742,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:BTCUSDT:12h",
@@ -19624,7 +19818,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3961847162083374e-06,
-      "ic_delta_over_se_max": 6.544847652521272e-05
+      "ic_delta_over_se_max": 6.544847652521272e-05,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:12h",
@@ -20665,7 +20861,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:12h",
@@ -20702,7 +20900,9 @@
       "material": true,
       "material_reason": "ic_sign_flip=5;tau_b_below_1=0.9947818976644732",
       "ic_abs_delta_max": 0.19969704640630115,
-      "ic_delta_over_se_max": 1.6345907723365585
+      "ic_delta_over_se_max": 1.6345907723365585,
+      "registry_definition_cells": 614,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:12h",
@@ -20739,7 +20939,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:12h",
@@ -20776,7 +20978,9 @@
       "material": true,
       "material_reason": "tau_b_below_1=0.9985932797448814",
       "ic_abs_delta_max": 0.15901080447308377,
-      "ic_delta_over_se_max": 0.9271843516432035
+      "ic_delta_over_se_max": 0.9271843516432035,
+      "registry_definition_cells": 92,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:12h",
@@ -20809,7 +21013,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:12h",
@@ -20846,7 +21052,9 @@
       "material": true,
       "material_reason": "ic_sign_flip=1;tau_b_below_1=0.9983337700091077",
       "ic_abs_delta_max": 0.1810123323569646,
-      "ic_delta_over_se_max": 1.0554742023472101
+      "ic_delta_over_se_max": 1.0554742023472101,
+      "registry_definition_cells": 92,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:BTCUSDT:12h",
@@ -20879,7 +21087,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -21836,7 +22046,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -21869,7 +22081,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.564288594239823e-06,
-      "ic_delta_over_se_max": 0.00017821442971199114
+      "ic_delta_over_se_max": 0.00017821442971199114,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -21902,7 +22116,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -21935,7 +22151,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 9.77596207784974e-06,
-      "ic_delta_over_se_max": 0.0005012504797259801
+      "ic_delta_over_se_max": 0.0005012504797259801,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -21968,7 +22186,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5269935819434144e-05,
-      "ic_delta_over_se_max": 0.0007608964738026395
+      "ic_delta_over_se_max": 0.0007608964738026395,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22001,7 +22221,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.549820205009941e-06,
-      "ic_delta_over_se_max": 0.00013073890741373994
+      "ic_delta_over_se_max": 0.00013073890741373994,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22034,7 +22256,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3844052181223587e-05,
-      "ic_delta_over_se_max": 0.0006759527715889008
+      "ic_delta_over_se_max": 0.0006759527715889008,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22067,7 +22291,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22100,7 +22326,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.564288594239823e-06,
-      "ic_delta_over_se_max": 0.00017821442971199114
+      "ic_delta_over_se_max": 0.00017821442971199114,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22133,7 +22361,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22166,7 +22396,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 9.77596207784974e-06,
-      "ic_delta_over_se_max": 0.0005012504797259801
+      "ic_delta_over_se_max": 0.0005012504797259801,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22199,7 +22431,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5269935819434144e-05,
-      "ic_delta_over_se_max": 0.0007608964738026395
+      "ic_delta_over_se_max": 0.0007608964738026395,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22232,7 +22466,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.549820205009941e-06,
-      "ic_delta_over_se_max": 0.00013073890741373994
+      "ic_delta_over_se_max": 0.00013073890741373994,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22265,7 +22501,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3844052181223587e-05,
-      "ic_delta_over_se_max": 0.0006759527715889008
+      "ic_delta_over_se_max": 0.0006759527715889008,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22298,7 +22536,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22331,7 +22571,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.564288594239823e-06,
-      "ic_delta_over_se_max": 0.00017821442971199114
+      "ic_delta_over_se_max": 0.00017821442971199114,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22364,7 +22606,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22397,7 +22641,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 9.77596207784974e-06,
-      "ic_delta_over_se_max": 0.0005012504797259801
+      "ic_delta_over_se_max": 0.0005012504797259801,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22430,7 +22676,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5269935819434144e-05,
-      "ic_delta_over_se_max": 0.0007608964738026395
+      "ic_delta_over_se_max": 0.0007608964738026395,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22463,7 +22711,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.549820205009941e-06,
-      "ic_delta_over_se_max": 0.00013073890741373994
+      "ic_delta_over_se_max": 0.00013073890741373994,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22496,7 +22746,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3844052181223587e-05,
-      "ic_delta_over_se_max": 0.0006759527715889008
+      "ic_delta_over_se_max": 0.0006759527715889008,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22529,7 +22781,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22562,7 +22816,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 3.564288594239823e-06,
-      "ic_delta_over_se_max": 0.00017821442971199114
+      "ic_delta_over_se_max": 0.00017821442971199114,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22595,7 +22851,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 6.387476499294942e-06,
-      "ic_delta_over_se_max": 0.00033398623681734176
+      "ic_delta_over_se_max": 0.00033398623681734176,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22628,7 +22886,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 9.77596207784974e-06,
-      "ic_delta_over_se_max": 0.0005012504797259801
+      "ic_delta_over_se_max": 0.0005012504797259801,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22661,7 +22921,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.5269935819434144e-05,
-      "ic_delta_over_se_max": 0.0007608964738026395
+      "ic_delta_over_se_max": 0.0007608964738026395,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22694,7 +22956,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 2.549820205009941e-06,
-      "ic_delta_over_se_max": 0.00013073890741373994
+      "ic_delta_over_se_max": 0.00013073890741373994,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "i:SOLUSDT:1h",
@@ -22727,7 +22991,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 1.3844052181223587e-05,
-      "ic_delta_over_se_max": 0.0006759527715889008
+      "ic_delta_over_se_max": 0.0006759527715889008,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:SOLUSDT:1h",
@@ -23768,7 +24034,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:SOLUSDT:1h",
@@ -23805,7 +24073,9 @@
       "material": true,
       "material_reason": "ic_sign_flip=6;tau_b_below_1=0.9924427761118443",
       "ic_abs_delta_max": 0.20336599785522286,
-      "ic_delta_over_se_max": 1.85275241571641
+      "ic_delta_over_se_max": 1.85275241571641,
+      "registry_definition_cells": 1331,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:SOLUSDT:1h",
@@ -23842,7 +24112,9 @@
       "material": false,
       "material_reason": "none",
       "ic_abs_delta_max": 0.0,
-      "ic_delta_over_se_max": 0.0
+      "ic_delta_over_se_max": 0.0,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:SOLUSDT:1h",
@@ -23879,7 +24151,9 @@
       "material": true,
       "material_reason": "ic_sign_flip=1;tau_b_below_1=0.9988074892661951",
       "ic_abs_delta_max": 0.049821469251004113,
-      "ic_delta_over_se_max": 0.3342125759524822
+      "ic_delta_over_se_max": 0.3342125759524822,
+      "registry_definition_cells": 30,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:SOLUSDT:1h",
@@ -23912,7 +24186,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:SOLUSDT:1h",
@@ -23949,7 +24225,9 @@
       "material": true,
       "material_reason": "ic_sign_flip=1;tau_b_below_1=0.9993364072510832",
       "ic_abs_delta_max": 0.05074178773490314,
-      "ic_delta_over_se_max": 0.3403862600253255
+      "ic_delta_over_se_max": 0.3403862600253255,
+      "registry_definition_cells": 30,
+      "registry_definition_nonzero": 0
     },
     {
       "cell_id": "ii:A:SOLUSDT:1h",
@@ -23982,7 +24260,9 @@
       "material": false,
       "material_reason": "identical_all_nan",
       "ic_abs_delta_max": null,
-      "ic_delta_over_se_max": null
+      "ic_delta_over_se_max": null,
+      "registry_definition_cells": 0,
+      "registry_definition_nonzero": 0
     }
   ],
   "label_provenance": [
@@ -28007,6 +28287,36 @@
         "nan_mask_diff",
         "definition_cells",
         "definition"
+      ],
+      "verified_rows": 140
+    },
+    {
+      "at": "2026-10-23T11:12:51.611297+00:00",
+      "command": "venv/bin/python handoffs/run_receipts/numview_probes/postic_branchdiff.py --reclassify",
+      "head": "5aca479d37c58ee1d2def1de703a9aa4ecd45b3f",
+      "reason": "registry 系分支之 zscore 最少有效值數約定（numba 路徑 _rolling_min_periods(窗)，參照與 pandas／Polars 為 2）屬 SPEC Task 0.6 定義差異，原收據計入浮點誤差欄；只重算 registry 系列之定義差異相關欄",
+      "rows_updated": 140,
+      "invariant_fields_verified": [
+        "all_cells",
+        "finite_cells",
+        "tau_b",
+        "sign_flips",
+        "material",
+        "material_reason",
+        "ic_abs_delta_max",
+        "ic_delta_over_se_max"
+      ],
+      "updated_fields": [
+        "max_abs",
+        "p99_abs",
+        "max_rel",
+        "near_zero_cells",
+        "near_zero_max_abs",
+        "nan_mask_diff",
+        "definition_cells",
+        "definition",
+        "registry_definition_cells",
+        "registry_definition_nonzero"
       ],
       "verified_rows": 140
     }

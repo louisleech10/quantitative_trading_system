@@ -573,6 +573,52 @@ def test_postic_branchdiff_definition_conventions_listed() -> None:
     assert strict >= 1, "registry 系無任一列多出 zscore 最少有效值數之定義差異格（未重分類？）"
 
 
+def test_postic_branchdiff_registry_definition_cells_causally_zero() -> None:
+    """審碼 b2 r6 CODEX-R6-P1-01：registry 系列之 zscore 最少有效值數定義差異格，逐格核對 registry 輸出確為該約定之 0
+    （`registry_definition_nonzero`＝0；每列具 `registry_definition_cells`）；且至少一列有此類格（防空轉）。門檻錯置（多列有效值
+    數 ≥ 該路徑最少值數之格）⇒ 格內輸出非 0 ⇒ 紅。"""
+    receipt = load_receipt("postic-branchdiff")
+    registry = {b for b, spec in icpostleak_contract()["branches"].items() if spec["entry"] != "transform"}
+    rows = [r for r in receipt["rows"] if str(r["branch"]) in registry and int(r["columns"]) >= 1]
+    assert rows
+    for row in rows:
+        assert isinstance(row.get("registry_definition_cells"), int), row
+        assert row.get("registry_definition_nonzero") == 0, row
+    assert any(int(r["registry_definition_cells"]) > 0 for r in rows)
+
+
+@pytest.mark.parametrize("threshold_shift", [0, 5, -5])
+def test_registry_definition_audit_detects_threshold_misplacement(tmp_path: Path, threshold_shift: int) -> None:
+    """審碼 b2 r6 CODEX-R6-P1-01（可證偽）：真實 BTCUSDT 1h 對數報酬 500 根、以固定步距挖空使 zscore 窗內有效值數遍歷 20–100；
+    registry_sink zscore 實際輸出對參照之 registry 定義差異格——門檻＝產品 `_rolling_min_periods`（shift 0）⇒ 格數 > 0 且格內
+    輸出非 0 之數＝0；門檻多 5 ⇒ 格內含 registry 已計 z 之格（非 0）；門檻少 5 ⇒ 漏列：格外存在 registry 輸出 0 而參照非 0 之格。"""
+    bd = probe("postic_branchdiff")
+    ret = real_log_returns()[-500:].copy()
+    keep = np.zeros(ret.size, dtype=bool)
+    keep[::5] = True  # 窗 100 內約 20 個有效值（< 25）；第 300 列起全留 ⇒ 有效值數自 20 升至 100，跨 20、25、30
+    keep[300:] = True
+    ret[~keep] = np.nan
+    frame = pd.DataFrame({"x": ret}, index=pd.date_range("2024-01-01", periods=ret.size, freq="h", tz="UTC"))
+    out = bd.run_branch("registry_sink", ["zscore"], frame, "1h", tmp_path)
+    z_w = int(icpostleak_contract()["zscore_windows"][0])
+    base = bd._registry_zscore_min_valid(z_w)
+    original = bd._registry_zscore_min_valid
+    try:
+        bd._registry_zscore_min_valid = lambda w: base + threshold_shift
+        ref, _, reg = bd._reference_column((ret.astype(np.float64), int(icpostleak_contract()["rank_window"]), 252, z_w))["zscore"]
+    finally:
+        bd._registry_zscore_min_valid = original
+    audit = bd.registry_definition_audit(reg[:, None], out)
+    leaked = int(np.count_nonzero(~reg & np.isfinite(ref) & (out[:, 0] == 0.0) & (ref != 0.0)))
+    if threshold_shift == 0:
+        assert audit["registry_definition_cells"] > 0 and audit["registry_definition_nonzero"] == 0 and leaked == 0, \
+            (audit, leaked)
+    elif threshold_shift > 0:
+        assert audit["registry_definition_nonzero"] > 0, audit
+    else:
+        assert leaked > 0, (audit, leaked)
+
+
 def test_perf_benchmark_receipt_rc_criteria_and_content() -> None:
     """Task 1.1 驗證（效能基準）：`*-numview-perf-benchmark.json` rc=0、`criteria_sha256` 相符；內容合
     `numview_helpers.perf_benchmark_receipt_violations`（判準 `run_coverage.perf_benchmark` 之格、契約臂＋候選臂、可達臂三次

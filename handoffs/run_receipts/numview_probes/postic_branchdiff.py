@@ -817,6 +817,15 @@ def reference_outputs(values: np.ndarray, gauss_w: int,
             for name in names}
 
 
+def registry_definition_audit(registry_definition: np.ndarray, output: np.ndarray) -> Dict[str, int]:
+    """registry 定義差異格之逐格因果核對（審碼 b2 r6 CODEX-R6-P1-01）：該約定下 registry 快速路徑於此等格必輸出 0（標準差
+    NaN ⇒ 0），故格內輸出非 0 之數須為 0——門檻錯置（多列或少列）即現形，不靠格數關係推定。"""
+    cells = np.asarray(registry_definition, dtype=bool)
+    out = np.asarray(output, dtype=np.float64)
+    return {"registry_definition_cells": int(cells.sum()),
+            "registry_definition_nonzero": int(np.count_nonzero(cells & ~(out == 0.0)))}
+
+
 def definition_conventions() -> Dict[str, Any]:
     """收據 `definition_conventions`：各臂約定與參照不同處（SPEC Task 0.6 定義差異；格級差之浮點誤差欄扣除之）。"""
     z_w = int(icpostleak_contract()["zscore_windows"][0])
@@ -1057,6 +1066,8 @@ def run_unit(cell: Mapping[str, Any], input_kind: str, work: Path, *, max_cols: 
                     if is_registry_branch(branch):
                         definition = definition | registry_definition
                     row = diff_row(ref_values, definition, out, ic_ref[name], label, columns)
+                    if is_registry_branch(branch):
+                        row.update(registry_definition_audit(registry_definition, out))
                 else:
                     row = {**cell_diff(np.empty((len(frame), 0)), np.empty((len(frame), 0))), "definition_cells": 0,
                            "tau_b": None, "sign_flips": 0, "material": False, "material_reason": "zero_columns"}
@@ -1117,7 +1128,7 @@ RECLASSIFY_INVARIANT_FIELDS = ("all_cells", "finite_cells", "tau_b", "sign_flips
                                "ic_abs_delta_max", "ic_delta_over_se_max")
 #: 重分類時依新定義差異格重算之列欄
 RECLASSIFY_UPDATED_FIELDS = ("max_abs", "p99_abs", "max_rel", "near_zero_cells", "near_zero_max_abs", "nan_mask_diff",
-                             "definition_cells", "definition")
+                             "definition_cells", "definition", "registry_definition_cells", "registry_definition_nonzero")
 
 
 def run_reclassify_unit(cell: Mapping[str, Any], cell_entry: Mapping[str, Any], old_rows: Sequence[Mapping[str, Any]],
@@ -1149,6 +1160,11 @@ def run_reclassify_unit(cell: Mapping[str, Any], cell_entry: Mapping[str, Any], 
                 ref_values, definition, registry_definition = reference[name]
                 new = diff_row(ref_values, definition | registry_definition, out, ic_ref[name], label,
                                int(cell_entry["columns"]))
+                new.update(registry_definition_audit(registry_definition, out))
+                if new["registry_definition_nonzero"]:
+                    mismatches.append({"cell_id": cell_entry["cell_id"], "branch": branch, "combo": name,
+                                       "fields": ["registry_definition_nonzero"],
+                                       "registry_definition_nonzero": new["registry_definition_nonzero"]})
                 before = dict(old[(branch, name)])
                 bad = [f for f in RECLASSIFY_INVARIANT_FIELDS if json.dumps(new.get(f), sort_keys=True, default=str)
                        != json.dumps(before.get(f), sort_keys=True, default=str)]
