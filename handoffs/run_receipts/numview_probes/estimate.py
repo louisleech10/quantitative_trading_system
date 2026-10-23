@@ -76,8 +76,10 @@ RECEIPT_GLOB = "*-numview-estimate.json"
 #: SPEC §G G1 各臂份之環境設定（`pandas_chunked` 之 chunk 值於實測時依選欄數取「選欄數 − 1」）
 G1_ARM_ENV: Dict[str, Dict[str, str]] = {
     "polars": {"FFACT_USE_POLARS": "1"},
-    "pandas_optimized": {"FFACT_USE_POLARS": "0"},
-    "pandas_legacy": {"FFACT_USE_POLARS": "0", "FFACT_L65_OPTIMIZATION_PROFILE": "legacy"},
+    # chunk 未設時預設 2000（feature_preprocessor.py:837-842），選欄 > 2000 即走 chunked ⇒ optimized／legacy 以 chunk 關閉方可達
+    # （同凍結腳本 G1_ARM_ENV；審碼 r21 CODEX-R21-P1-02）
+    "pandas_optimized": {"FFACT_USE_POLARS": "0", "FFACT_L65_CHUNK_SIZE": "0"},
+    "pandas_legacy": {"FFACT_USE_POLARS": "0", "FFACT_L65_OPTIMIZATION_PROFILE": "legacy", "FFACT_L65_CHUNK_SIZE": "0"},
     "pandas_chunked": {"FFACT_USE_POLARS": "0"},
 }
 CHUNK_ENV = "FFACT_L65_CHUNK_SIZE"

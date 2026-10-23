@@ -1,6 +1,6 @@
 {
   "_doc": "NUMVIEW 事前登記判準與決定紀錄 schema（docs/NUMVIEW_SPEC.md Task 0.3、設計選擇⑥、R2-D）。於 Phase 1 任何量測收據產出前凍結；提交後不得修改（只准於任何 Phase 1 收據提交前以 vN→vN+1 置換：新檔 preregistered_criteria_v<N+1>.json 取代並刪本檔，同提交完成）。數值門檻只來自 threshold_kinds 所列四類（exact 集合比較、NaN 遮罩 exact、IC 正負號、float32 ulp），不自訂 atol／rtol。每份 handoffs/run_receipts/*-numview-*.json 記本檔位元組之 sha256 為 criteria_sha256。v2（2026-10-22，取代 v1、v1 同提交刪除；SPEC Task 0.3 邊界①，於任何收據提交前）：估時實測 A:12h 與 B 之生成皆為 run_status=partial（failure_reasons 只含 calibration_insufficient_history、warmup_insufficient_history），v1 之根數門檻（min_history_bars）把資料前史不足之格誤判為足夠；v2 改以該格生成之完整度為前史不足之權威判定（根數門檻降為前置篩、不降任何門檻），並定格 B 之訓練週期排除前史不足之週期；另依使用者 2026-10-22 裁定，一切格（含格 C）之生成一律用足夠區間（輸出段＋所需前史，見 cell_rules.window_rule），不跑全史；同日裁定 12h 改讀長歷史檔（主檔不動，見 cell_rules.kline_source）。其餘段與 v1 逐字相同。v3（2026-10-22，取代 v2、v2 同提交刪除；於任何 Phase 1 收據提交前）：使用者裁定量測設計＝路徑覆蓋、非重複（「不是說要同樣的測試重複做，是有什麼邊界條件或情境或程式碼的邏輯之類沒測到，重複做同樣的事幹嘛？」）——格之列舉由「全部 symbol×tf」改為 cell_rules.cell_list 之封閉清單（每格寫明其獨有覆蓋路徑 covers），各跑別之重型跑寫明其獨有覆蓋（run_coverage）；無獨有路徑者不跑。其餘規則（前史判定、區間、來源、決定規則、material）與 v2 逐字相同。｜v4（2026-10-22，於任何量測收據提交前以 preregistered_criteria_v4.json 取代 v3）：格 C 之 IC-first 實測於全特徵、預設門檻選 137,351／209,053 欄，post-IC Polars 轉換耗盡 8 GB（swap 9 GB）78 分鐘無進度遭終止；post-IC 程式路徑與欄數無關（pandas_chunked 已由 A 格 2.5–3.2k 選欄＞chunk 2000 涵蓋），故該階段只增規模、無獨有路徑——格 C 改只走 generate_features，自 G1、分支差、效能基準移除；效能基準輸入＝A 格最大選欄（實測 A_BTCUSDT_1h 3193 欄）；增卡住偵測門檻 cell_rules.watchdog 與 scale_note。",
-  "version": 6,
+  "version": 7,
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -24,7 +24,7 @@
         "type": "string"
       },
       "version": {
-        "const": 6
+        "const": 7
       },
       "schema": {
         "type": "object"
@@ -623,7 +623,7 @@
     "categories": {
       "A": "封閉清單 cell_list 中 kind=A 之格：單週期短窗（timeframes 恰一項）；設定＝cell_definitions.A。",
       "B": "封閉清單 cell_list 中 kind=B 之格：多週期（timeframes 依週期長度升冪，首項＝主週期）；訓練週期依 b_membership（記於 training_timeframes）；設定＝cell_definitions.B。",
-      "C": "封閉清單 cell_list 中 kind=C 之格：生產預設全特徵設定於足夠區間（window_rule）；只走 generate_features（v4：不經 IC-first，不入 G1／分支差／效能基準；G3 raw／processed、精度鏈 S0–S4、L2 兩臂、§G Phase 2／4）；本機不可跑（記憶體守護具名終止）者 blocked-by 硬體（SPEC Task 0.4 邊界①）。"
+      "C": "封閉清單 cell_list 中 kind=C 之格：生產預設全特徵設定於足夠區間（window_rule）；只走 generate_features（v4：不經 IC-first，不入 G1／分支差／效能基準；G3 raw（C 不落 processed；凍結腳本 G3_ARTIFACTS）、精度鏈 S0–S4、L2 兩臂、§G Phase 2／4）；本機不可跑（記憶體守護具名終止）者 blocked-by 硬體（SPEC Task 0.4 邊界①）。"
     },
     "timeframe_order": "週期長度以 pandas.Timedelta(週期字面) 解析之秒數升冪；不可解析之週期字面 ⇒ 列舉拒收（不猜測）。",
     "insufficient_history": {
@@ -751,12 +751,12 @@
           "timeframes": [
             "1h"
           ],
-          "covers": "生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）"
+          "covers": "生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）"
         }
       ]
     },
     "freeze_groups": {
-      "_doc": "Task 0.5 凍結組（格 id）：G1＝IC 頁第三步各可達臂份（A 格）；G2＝raw 依臂（FFACT_USE_POLARS 0／1）；G3＝raw 與 processed（多週期格 B、全特徵格 C）。",
+      "_doc": "Task 0.5 凍結組（格 id）：G1＝IC 頁第三步各可達臂份（A 格）；G2＝raw 依臂（FFACT_USE_POLARS 0／1）；G3＝多週期格 B 之 raw 與 processed、全特徵格 C 之 raw（C 以生產預設設定生成、不產 L6.5 processed；2026-10-23 正式凍結實測其 manifest artifacts＝[\"raw\"]）。判準 v7 修 v6 誤寫 C 含 processed 之字面（本說明、cell_kinds.C、run_coverage 三處 G3 covers）並將 storage 路徑更名為 storage.l7_dtype_autoselect_full_features、移除 processed codec 推斷錨點（該推斷只於 FFACT_L7_CODEC_UPGRADE=1 執行，歸 precision.codec_upgrade）；組成員不變。",
       "G1": [
         "A_BTCUSDT_1h",
         "A_BTCUSDT_4h",
@@ -2079,7 +2079,7 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "Task 0.5 G3 全特徵 raw／processed：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
+          "covers": "Task 0.5 G3 全特徵 raw；C 不落 processed：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
           "generations": 1,
           "transform_passes": 0,
           "env": {},
@@ -2088,7 +2088,7 @@
           ],
           "covers_ids": [
             "cell.full_features_production_default",
-            "storage.l7_dtype_and_codec_full_features",
+            "storage.l7_dtype_autoselect_full_features",
             "l2.two_arm_full_feature_categories"
           ]
         }
@@ -2302,7 +2302,7 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "Task 1.3 L2 兩臂讀凍結 G3 之預設生成：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "covers": "Task 1.3 L2 兩臂讀凍結 G3 之預設生成：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
@@ -2446,7 +2446,7 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "b3 共用生成（Phase 2 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "covers": "b3 共用生成（Phase 2 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 1,
           "transform_passes": 0,
@@ -2455,7 +2455,7 @@
           ],
           "covers_ids": [
             "cell.full_features_production_default",
-            "storage.l7_dtype_and_codec_full_features"
+            "storage.l7_dtype_autoselect_full_features"
           ]
         }
       ]
@@ -2685,7 +2685,7 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "b5 共用生成（Phase 4 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "covers": "b5 共用生成（Phase 4 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 1,
           "transform_passes": 0,
@@ -2694,7 +2694,7 @@
           ],
           "covers_ids": [
             "cell.full_features_production_default",
-            "storage.l7_dtype_and_codec_full_features"
+            "storage.l7_dtype_autoselect_full_features"
           ]
         }
       ]
@@ -2969,7 +2969,7 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "§G Phase 2 全格不變式 G3（全特徵 raw／processed）（讀 b3 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "covers": "§G Phase 2 全格不變式 G3（全特徵 raw；C 不落 processed）（讀 b3 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
@@ -3031,7 +3031,7 @@
         },
         {
           "cell": "C_BTCUSDT_1h",
-          "covers": "§G Phase 4 全格不變式 G3（全特徵 raw／processed）（讀 b5 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選、codec、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "covers": "§G Phase 4 全格不變式 G3（全特徵 raw；C 不落 processed）（讀 b5 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
           "env": {},
           "generations": 0,
           "transform_passes": 0,
@@ -3191,11 +3191,10 @@
         ]
       },
       {
-        "id": "storage.l7_dtype_and_codec_full_features",
-        "description": "全特徵之落盤 dtype 自動選（float16 安全判定）與 processed codec 推斷",
+        "id": "storage.l7_dtype_autoselect_full_features",
+        "description": "全特徵之落盤 dtype 自動選（float16 安全判定）；processed 有損 codec 推斷只於 FFACT_L7_CODEC_UPGRADE=1 執行（預設 0），歸 precision.codec_upgrade（precision_chain 變體 codec_upgrade_on），不歸本路徑",
         "code_anchors": [
-          "momentum/FeatureEngineering/feature_storage.py:2524",
-          "momentum/FeatureEngineering/feature_storage.py:1905"
+          "momentum/FeatureEngineering/feature_storage.py:2524"
         ]
       },
       {

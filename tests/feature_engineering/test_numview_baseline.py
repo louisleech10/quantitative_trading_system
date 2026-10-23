@@ -326,8 +326,12 @@ def env_violations(arm: str, env: Mapping[str, Any], selected_count: int) -> Lis
         out.append(f"{arm}: {ENV_USE_POLARS} 須為 0")
     if arm == SPEC_ARM_LEGACY and env.get(ENV_PROFILE) != "legacy":
         out.append(f"{arm}: {ENV_PROFILE} 須為 legacy")
-    if arm == SPEC_ARM_OPTIMIZED and (env.get(ENV_PROFILE) == "legacy" or ENV_CHUNK in env):
-        out.append(f"{arm}: 不得設 legacy profile 或 chunk 值")
+    # chunk 未設時預設 2000，選欄 > 2000 即走 chunked（feature_preprocessor.py:837-842、884-886）⇒ optimized／legacy 之
+    # chunk 只准未設或 0（關閉）；未設而選欄 > 2000 者由實際臂 ≠ 標示臂之檢查擋下
+    if arm == SPEC_ARM_OPTIMIZED and (env.get(ENV_PROFILE) == "legacy" or env.get(ENV_CHUNK, "0") != "0"):
+        out.append(f"{arm}: 不得設 legacy profile 或非 0 之 chunk 值")
+    if arm == SPEC_ARM_LEGACY and env.get(ENV_CHUNK, "0") != "0":
+        out.append(f"{arm}: 不得設非 0 之 chunk 值")
     if arm == SPEC_ARM_CHUNKED:
         raw = env.get(ENV_CHUNK)
         if raw is None or not re.fullmatch(r"[0-9]+", raw) or not 1 <= int(raw) < selected_count:
@@ -351,7 +355,8 @@ def g1_violations() -> List[str]:
         kind = str(record["kind"])
         if kind == "B" or cell_id in nh.criteria_freeze_group("G3"):  # 判準 v4：G3＝格 B 與全特徵格 C 之 raw／processed
             g3 = record.get("g3") or {}
-            for artifact in ("raw", "processed"):
+            # 全特徵格 C 以生產預設生成、不產 processed（SPEC Task 0.5「C 格只生成並凍結 raw 值指紋」）⇒ 只要求 raw
+            for artifact in (("raw",) if kind == "C" else ("raw", "processed")):
                 if not isinstance(g3.get(artifact), Mapping) or "columns" not in g3[artifact]:
                     out.append(f"{cell_id}: G3 缺 {artifact} 份")
             continue
@@ -387,12 +392,15 @@ def g1_violations() -> List[str]:
                 out.append(f"{cell_id}/{arm}: arm_unreachable 條件名 {entry.get('condition')!r} ≠ 契約 {condition!r}")
             if entry.get("selected_count") != n:
                 out.append(f"{cell_id}/{arm}: arm_unreachable 選欄數 {entry.get('selected_count')!r} ≠ 重算 {n}")
-        g2 = dict(record.get("g2") or {})
-        if set(g2) != {"0", "1"}:
-            out.append(f"{cell_id}: G2 臂份 {sorted(g2)} ≠ FFACT_USE_POLARS 0／1")
-        for value, copy_ in g2.items():
-            if str((copy_.get("env") or {}).get(ENV_USE_POLARS)) != value or "columns" not in (copy_.get("fingerprint") or {}):
-                out.append(f"{cell_id}: G2 份 {value} 環境或指紋不符")
+        # 判準 v3 起 G2 只於 `cell_rules.freeze_groups.G2` 之格（路徑覆蓋：FFACT_USE_POLARS 0／1 之 raw 分岔一格即覆蓋）；
+        # 舊判準無凍結組 ⇒ 沿原「每個格 A」
+        if not nh.criteria_freeze_group("G2") or cell_id in nh.criteria_freeze_group("G2"):
+            g2 = dict(record.get("g2") or {})
+            if set(g2) != {"0", "1"}:
+                out.append(f"{cell_id}: G2 臂份 {sorted(g2)} ≠ FFACT_USE_POLARS 0／1")
+            for value, copy_ in g2.items():
+                if str((copy_.get("env") or {}).get(ENV_USE_POLARS)) != value or "columns" not in (copy_.get("fingerprint") or {}):
+                    out.append(f"{cell_id}: G2 份 {value} 環境或指紋不符")
     stray = set(unreachable) - expected_unreachable
     if stray:
         out.append(f"arm_unreachable 含非預期條目：{sorted(stray)[:5]}")
@@ -590,9 +598,12 @@ def test_boundary_12_zero_selected_all_g1_unreachable_g2_g3_frozen() -> None:
     evaluated = 0
     for cell_id, record in load_freeze()["cells"].items():
         evaluated += 1
-        if record["kind"] == "B":
+        if record["kind"] == "B" or cell_id in nh.criteria_freeze_group("G3"):  # 判準 v4：G3＝格 B 與全特徵格 C
             g3 = record.get("g3") or {}
-            assert {"raw", "processed"} <= set(g3), f"{cell_id}: G3 須照凍 raw／processed"
+            if record["kind"] == "C":  # 全特徵格 C 只凍 raw（SPEC Task 0.5）
+                assert {"raw"} <= set(g3), f"{cell_id}: G3 須照凍 raw"
+            else:
+                assert {"raw", "processed"} <= set(g3), f"{cell_id}: G3 須照凍 raw／processed"
             continue
         n = len(kept_columns(record["ic_first_selected"]))
         if n == 0:
@@ -600,7 +611,8 @@ def test_boundary_12_zero_selected_all_g1_unreachable_g2_g3_frozen() -> None:
             for arm in arms:
                 entry = unreachable.get((str(cell_id), arm))
                 assert entry is not None and entry.get("selected_count") == 0, f"{cell_id}/{arm}"
-            assert set((record.get("g2") or {}).keys()) == {"0", "1"}, f"{cell_id}: G2 須照凍兩份"
+            if not nh.criteria_freeze_group("G2") or cell_id in nh.criteria_freeze_group("G2"):  # 判準 v3：G2 凍結組
+                assert set((record.get("g2") or {}).keys()) == {"0", "1"}, f"{cell_id}: G2 須照凍兩份"
     assert evaluated >= 1
 
 

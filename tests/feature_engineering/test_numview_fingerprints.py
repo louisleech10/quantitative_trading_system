@@ -355,3 +355,68 @@ def test_mutation_bitwise_diff_on_float32_values_flips_native_case(monkeypatch: 
     monkeypatch.setattr(nh, "bitwise_diff", _float32_values_bitwise_diff)
     violations = native_bytes_case_violations()
     assert any("bitwise_diff 未判不等" in v for v in violations), violations
+
+
+# ---------------------------------------------------------------------------------------------- 群組粒度（SPEC §G：全特徵格 C）
+
+def _two_group_run(tmp_path: Any, mutate: str = "") -> Any:
+    """以正式 `FeatureStorage.write_raw` 寫兩群組之 run（欄取自真實 kline 末 400 根，float64）；`mutate` 改壞一處後回 run 目錄。"""
+    from pathlib import Path
+
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    k = _kline().iloc[-400:]
+    g1 = k[["open", "high"]].astype(np.float64).reset_index(drop=True)
+    g2 = k[["low", "close", "volume"]].astype(np.float64).reset_index(drop=True)
+    if mutate == "value":
+        g2.loc[100, "close"] = g2.loc[100, "close"] + 1.0
+    elif mutate == "subfloat32":
+        g2.loc[100, "close"] = g2.loc[100, "close"] + 2.0 ** -30 * abs(g2.loc[100, "close"])
+    elif mutate == "order":
+        g2 = g2[["close", "low", "volume"]]
+    elif mutate == "rename":
+        g2 = g2.rename(columns={"volume": "volume_x"})
+    elif mutate == "nan_inserted":
+        g2.loc[5, "low"] = np.nan
+    elif mutate == "dtype":
+        g2["close"] = g2["close"].astype(np.float32)
+    storage = FeatureStorage(str(Path(tmp_path) / mutate if mutate else Path(tmp_path) / "base"))
+    raw_dir = storage.write_raw("BTCUSDT", "1h", f"cfg_{mutate or 'base'}", {"ga": g1, "gb": g2},
+                                row_index=pd.DatetimeIndex(k.index))
+    return raw_dir.parent
+
+
+@pytest.mark.parametrize("mutate, key, changed_group", [
+    ("value", "values", "gb"), ("value", "values_native", "gb"), ("subfloat32", "values_native", "gb"),
+    ("order", "table:column_order_sha256", None), ("rename", "table:column_set_sha256", None),
+    ("nan_inserted", "nan", "gb"), ("dtype", "dtype", "gb"),
+])
+def test_group_fingerprints_falsifiable(tmp_path: Any, mutate: str, key: str, changed_group: Any) -> None:
+    """群組粒度值指紋（`numview_helpers.group_fingerprints`）可證偽：群組內一值 +1、小於 float32 解析度之 float64 差、欄序、
+    欄名、插入 NaN、dtype float64→float32 ⇒ 對應群組或表層雜湊改變；未改之群組逐鍵不變；`bitwise_diff` 指出差異。"""
+    base = nh.group_fingerprints(_two_group_run(tmp_path), "raw")
+    after = nh.group_fingerprints(_two_group_run(tmp_path, mutate), "raw")
+    assert base["granularity"] == "group" and base["column_count"] == 5
+    assert set(base["columns"]) == set(after["columns"]) and len(base["columns"]) == 2
+    if key.startswith("table:"):
+        table_key = key.split(":", 1)[1]
+        assert base[table_key] != after[table_key], mutate
+    else:
+        group = next(g for g in base["columns"] if changed_group in g)
+        assert base["columns"][group][key] != after["columns"][group][key], (mutate, key)
+        other = next(g for g in base["columns"] if changed_group not in g)
+        assert base["columns"][other] == after["columns"][other], "未改之群組須逐鍵不變"
+    assert nh.bitwise_diff(base, after) != [], mutate
+    if mutate == "subfloat32":
+        group = next(g for g in base["columns"] if "gb" in g)
+        assert base["columns"][group]["values"] == after["columns"][group]["values"], "float32 值須相同（差小於其解析度）"
+
+
+def test_group_fingerprints_identical_rewrite_equal(tmp_path: Any) -> None:
+    """對照：同值重寫兩次 ⇒ 群組粒度值指紋逐鍵相同、`bitwise_diff` 為空。"""
+    from pathlib import Path
+
+    a = nh.group_fingerprints(_two_group_run(Path(tmp_path) / "a"), "raw")
+    b = nh.group_fingerprints(_two_group_run(Path(tmp_path) / "b"), "raw")
+    assert a["columns"] == b["columns"] and a["column_order_sha256"] == b["column_order_sha256"]
+    assert nh.bitwise_diff(a, b) == []

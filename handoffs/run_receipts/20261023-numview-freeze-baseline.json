@@ -1,0 +1,2737 @@
+{
+  "schema_version": 1,
+  "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+  "started_at": "2026-10-23T01:58:16.558314+00:00",
+  "finished_at": "2026-10-23T01:58:18.124364+00:00",
+  "exit_code": 0,
+  "command": "venv/bin/python scripts/numview_freeze_baseline.py",
+  "criteria_sha256": "880c1ba641325cefaef83d992efa5c0c469b44587674417697d8f6f81503160d",
+  "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
+  "library_versions": {
+    "numpy": "1.26.4",
+    "pandas": "2.3.2",
+    "polars": "1.36.1",
+    "numba": "0.60.0",
+    "scipy": "1.13.1",
+    "pyarrow": "21.0.0",
+    "bottleneck": "1.5.0",
+    "statsmodels": "0.14.6",
+    "talib": "0.6.5"
+  },
+  "cells": [
+    {
+      "cell_id": "A_BTCUSDT_1h",
+      "kind": "A",
+      "symbol": "BTCUSDT",
+      "timeframes": [
+        "1h"
+      ],
+      "status": "frozen",
+      "blocked_by": null,
+      "reason": null,
+      "reason_counts": null,
+      "bar_counts": {
+        "1h": 20352
+      },
+      "seconds": 414.60353029099997,
+      "peak_rss_bytes": 1012318208,
+      "swap_growth_max_mb": 0.0
+    },
+    {
+      "cell_id": "A_BTCUSDT_4h",
+      "kind": "A",
+      "symbol": "BTCUSDT",
+      "timeframes": [
+        "4h"
+      ],
+      "status": "frozen",
+      "blocked_by": null,
+      "reason": null,
+      "reason_counts": null,
+      "bar_counts": {
+        "4h": 5088
+      },
+      "seconds": 249.747326042,
+      "peak_rss_bytes": 753958912,
+      "swap_growth_max_mb": 0.0
+    },
+    {
+      "cell_id": "A_BTCUSDT_12h",
+      "kind": "A",
+      "symbol": "BTCUSDT",
+      "timeframes": [
+        "12h"
+      ],
+      "status": "frozen",
+      "blocked_by": null,
+      "reason": null,
+      "reason_counts": null,
+      "bar_counts": {
+        "12h": 6656
+      },
+      "seconds": 239.550945875,
+      "peak_rss_bytes": 813596672,
+      "swap_growth_max_mb": 0.0
+    },
+    {
+      "cell_id": "A_SOLUSDT_1h",
+      "kind": "A",
+      "symbol": "SOLUSDT",
+      "timeframes": [
+        "1h"
+      ],
+      "status": "frozen",
+      "blocked_by": null,
+      "reason": null,
+      "reason_counts": null,
+      "bar_counts": {
+        "1h": 20352
+      },
+      "seconds": 264.73982058300004,
+      "peak_rss_bytes": 865730560,
+      "swap_growth_max_mb": -16.0
+    },
+    {
+      "cell_id": "B_BTCUSDT_1h_4h",
+      "kind": "B",
+      "symbol": "BTCUSDT",
+      "timeframes": [
+        "1h",
+        "4h"
+      ],
+      "status": "frozen",
+      "blocked_by": null,
+      "reason": null,
+      "reason_counts": null,
+      "bar_counts": {
+        "1h": 20352,
+        "4h": 5088
+      },
+      "seconds": 387.78331349999996,
+      "peak_rss_bytes": 957874176,
+      "swap_growth_max_mb": 0.0
+    },
+    {
+      "cell_id": "C_BTCUSDT_1h",
+      "kind": "C",
+      "symbol": "BTCUSDT",
+      "timeframes": [
+        "1h"
+      ],
+      "status": "frozen",
+      "blocked_by": null,
+      "reason": null,
+      "reason_counts": null,
+      "bar_counts": {
+        "1h": 20352
+      },
+      "seconds": 1150.7328235419998,
+      "peak_rss_bytes": 3949297664,
+      "swap_growth_max_mb": 2816.5699999999997
+    }
+  ],
+  "arm_unreachable": [],
+  "residuals": [],
+  "fingerprint_granularity": {
+    "group": [
+      "C"
+    ]
+  },
+  "l2_capture": {
+    "A_BTCUSDT_1h": {
+      "default": [
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 4050,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.3899328750000004
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 8100,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.6438945829999998
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 3855,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.3591282910000011
+        },
+        {
+          "schema": 1,
+          "domain": "main",
+          "rows": 3855,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.32667433399999624
+        }
+      ],
+      "FFACT_USE_POLARS=0": [
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 4050,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "pandas",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.3361107499999889
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 8100,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "pandas",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.6399218340000061
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 3855,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "pandas",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.36490904200002205
+        },
+        {
+          "schema": 1,
+          "domain": "main",
+          "rows": 3855,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "pandas",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.31661479199999576
+        }
+      ]
+    },
+    "A_BTCUSDT_12h": {
+      "default": [
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 4050,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.39264241700000024
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 6156,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.5025470419999998
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 3855,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.36604570800000147
+        },
+        {
+          "schema": 1,
+          "domain": "main",
+          "rows": 3855,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.32403512500000176
+        }
+      ]
+    },
+    "B_BTCUSDT_1h_4h": {
+      "default": [
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 4050,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.3432568339999995
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 8100,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.6293132910000008
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 4963,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.403607375
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 12256,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.9363394160000027
+        },
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 3064,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 0,
+          "f32diff": 0,
+          "max_abs": 0.0,
+          "max_rel": 0.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.2620743749999974
+        },
+        {
+          "schema": 1,
+          "domain": "main",
+          "rows": 12256,
+          "l1_cols": 147,
+          "l1_dtypes": [
+            "float64"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 536,
+          "returned_dtypes": [
+            "float32"
+          ],
+          "common_cols": 536,
+          "only_category": [],
+          "nan_mask_diff": 0,
+          "f64diff": 6025810,
+          "f32diff": 3969919,
+          "max_abs": 0.0078125,
+          "max_rel": 1.0,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Cross": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 2958021,
+              "f32diff": 2916207,
+              "max_abs": 0.0078125,
+              "max_rel": 1.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 268,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 3067789,
+              "f32diff": 1053712,
+              "max_abs": 1.7756115933131866e-07,
+              "max_rel": 1.7591466872167123e-07,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 0.919615499999999
+        }
+      ]
+    },
+    "C_BTCUSDT_1h": {
+      "default": [
+        {
+          "schema": 1,
+          "domain": "calibration",
+          "rows": 4662,
+          "l1_cols": 1611,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 44827,
+          "returned_dtypes": [
+            "float32",
+            "float64"
+          ],
+          "common_cols": 44827,
+          "only_category": [
+            "close_cycle_HT-DCPHASE_Abs",
+            "close_cycle_HT-DCPHASE_Clip",
+            "close_cycle_HT-DCPHASE_DecayLinear-W13",
+            "close_cycle_HT-DCPHASE_DecayLinear-W21",
+            "close_cycle_HT-DCPHASE_DecayLinear-W5",
+            "close_cycle_HT-DCPHASE_Log1p",
+            "close_cycle_HT-DCPHASE_Momentum-L13",
+            "close_cycle_HT-DCPHASE_Momentum-L144",
+            "close_cycle_HT-DCPHASE_Momentum-L21",
+            "close_cycle_HT-DCPHASE_Momentum-L233",
+            "close_cycle_HT-DCPHASE_Momentum-L3",
+            "close_cycle_HT-DCPHASE_Momentum-L34",
+            "close_cycle_HT-DCPHASE_Momentum-L5",
+            "close_cycle_HT-DCPHASE_Momentum-L55",
+            "close_cycle_HT-DCPHASE_Momentum-L8",
+            "close_cycle_HT-DCPHASE_Momentum-L89",
+            "close_cycle_HT-DCPHASE_Sign",
+            "close_cycle_HT-DCPHASE_TsArgmax-W13",
+            "close_cycle_HT-DCPHASE_TsArgmax-W21",
+            "close_cycle_HT-DCPHASE_TsArgmax-W5",
+            "close_cycle_HT-DCPHASE_TsArgmin-W13",
+            "close_cycle_HT-DCPHASE_TsArgmin-W21",
+            "close_cycle_HT-DCPHASE_TsArgmin-W5",
+            "close_cycle_HT-DCPHASE_TsRank-W13",
+            "close_cycle_HT-DCPHASE_TsRank-W21",
+            "close_cycle_HT-DCPHASE_TsRank-W5",
+            "taker-ratio_cycle_HT-DCPHASE_Abs",
+            "taker-ratio_cycle_HT-DCPHASE_Clip",
+            "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W13",
+            "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W21",
+            "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W5",
+            "taker-ratio_cycle_HT-DCPHASE_Log1p",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L13",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L144",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L21",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L233",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L3",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L34",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L5",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L55",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L8",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L89",
+            "taker-ratio_cycle_HT-DCPHASE_Sign",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W13",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W21",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W5",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W13",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W21",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W5",
+            "taker-ratio_cycle_HT-DCPHASE_TsRank-W13",
+            "taker-ratio_cycle_HT-DCPHASE_TsRank-W21",
+            "taker-ratio_cycle_HT-DCPHASE_TsRank-W5",
+            "volume_cycle_HT-DCPHASE_Abs",
+            "volume_cycle_HT-DCPHASE_Clip",
+            "volume_cycle_HT-DCPHASE_DecayLinear-W13",
+            "volume_cycle_HT-DCPHASE_DecayLinear-W21",
+            "volume_cycle_HT-DCPHASE_DecayLinear-W5",
+            "volume_cycle_HT-DCPHASE_Log1p",
+            "volume_cycle_HT-DCPHASE_Momentum-L13",
+            "volume_cycle_HT-DCPHASE_Momentum-L144",
+            "volume_cycle_HT-DCPHASE_Momentum-L21",
+            "volume_cycle_HT-DCPHASE_Momentum-L233",
+            "volume_cycle_HT-DCPHASE_Momentum-L3",
+            "volume_cycle_HT-DCPHASE_Momentum-L34",
+            "volume_cycle_HT-DCPHASE_Momentum-L5",
+            "volume_cycle_HT-DCPHASE_Momentum-L55",
+            "volume_cycle_HT-DCPHASE_Momentum-L8",
+            "volume_cycle_HT-DCPHASE_Momentum-L89",
+            "volume_cycle_HT-DCPHASE_Sign",
+            "volume_cycle_HT-DCPHASE_TsArgmax-W13",
+            "volume_cycle_HT-DCPHASE_TsArgmax-W21",
+            "volume_cycle_HT-DCPHASE_TsArgmax-W5",
+            "volume_cycle_HT-DCPHASE_TsArgmin-W13",
+            "volume_cycle_HT-DCPHASE_TsArgmin-W21",
+            "volume_cycle_HT-DCPHASE_TsArgmin-W5",
+            "volume_cycle_HT-DCPHASE_TsRank-W13",
+            "volume_cycle_HT-DCPHASE_TsRank-W21",
+            "volume_cycle_HT-DCPHASE_TsRank-W5"
+          ],
+          "nan_mask_diff": 0,
+          "f64diff": 43394,
+          "f32diff": 43394,
+          "max_abs": 0.00048828125,
+          "max_rel": 1.1920704427802611e-07,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Distance": {
+              "common_cols": 408,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 43394,
+              "f32diff": 43394,
+              "max_abs": 0.00048828125,
+              "max_rel": 1.1920704427802611e-07,
+              "row_mismatch": null
+            },
+            "Cross": {
+              "common_cols": 2125,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 2125,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Momentum": {
+              "common_cols": 15400,
+              "only_category": [
+                "close_cycle_HT-DCPHASE_Momentum-L13",
+                "close_cycle_HT-DCPHASE_Momentum-L144",
+                "close_cycle_HT-DCPHASE_Momentum-L21",
+                "close_cycle_HT-DCPHASE_Momentum-L233",
+                "close_cycle_HT-DCPHASE_Momentum-L3",
+                "close_cycle_HT-DCPHASE_Momentum-L34",
+                "close_cycle_HT-DCPHASE_Momentum-L5",
+                "close_cycle_HT-DCPHASE_Momentum-L55",
+                "close_cycle_HT-DCPHASE_Momentum-L8",
+                "close_cycle_HT-DCPHASE_Momentum-L89",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L13",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L144",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L21",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L233",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L3",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L34",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L5",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L55",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L8",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L89",
+                "volume_cycle_HT-DCPHASE_Momentum-L13",
+                "volume_cycle_HT-DCPHASE_Momentum-L144",
+                "volume_cycle_HT-DCPHASE_Momentum-L21",
+                "volume_cycle_HT-DCPHASE_Momentum-L233",
+                "volume_cycle_HT-DCPHASE_Momentum-L3",
+                "volume_cycle_HT-DCPHASE_Momentum-L34",
+                "volume_cycle_HT-DCPHASE_Momentum-L5",
+                "volume_cycle_HT-DCPHASE_Momentum-L55",
+                "volume_cycle_HT-DCPHASE_Momentum-L8",
+                "volume_cycle_HT-DCPHASE_Momentum-L89"
+              ],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "BinarySignal": {
+              "common_cols": 129,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "WorldQuant": {
+              "common_cols": 24640,
+              "only_category": [
+                "close_cycle_HT-DCPHASE_Abs",
+                "close_cycle_HT-DCPHASE_Clip",
+                "close_cycle_HT-DCPHASE_DecayLinear-W13",
+                "close_cycle_HT-DCPHASE_DecayLinear-W21",
+                "close_cycle_HT-DCPHASE_DecayLinear-W5",
+                "close_cycle_HT-DCPHASE_Log1p",
+                "close_cycle_HT-DCPHASE_Sign",
+                "close_cycle_HT-DCPHASE_TsArgmax-W13",
+                "close_cycle_HT-DCPHASE_TsArgmax-W21",
+                "close_cycle_HT-DCPHASE_TsArgmax-W5",
+                "close_cycle_HT-DCPHASE_TsArgmin-W13",
+                "close_cycle_HT-DCPHASE_TsArgmin-W21",
+                "close_cycle_HT-DCPHASE_TsArgmin-W5",
+                "close_cycle_HT-DCPHASE_TsRank-W13",
+                "close_cycle_HT-DCPHASE_TsRank-W21",
+                "close_cycle_HT-DCPHASE_TsRank-W5",
+                "taker-ratio_cycle_HT-DCPHASE_Abs",
+                "taker-ratio_cycle_HT-DCPHASE_Clip",
+                "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W13",
+                "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W21",
+                "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W5",
+                "taker-ratio_cycle_HT-DCPHASE_Log1p",
+                "taker-ratio_cycle_HT-DCPHASE_Sign",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W13",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W21",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W5",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W13",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W21",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W5",
+                "taker-ratio_cycle_HT-DCPHASE_TsRank-W13",
+                "taker-ratio_cycle_HT-DCPHASE_TsRank-W21",
+                "taker-ratio_cycle_HT-DCPHASE_TsRank-W5",
+                "volume_cycle_HT-DCPHASE_Abs",
+                "volume_cycle_HT-DCPHASE_Clip",
+                "volume_cycle_HT-DCPHASE_DecayLinear-W13",
+                "volume_cycle_HT-DCPHASE_DecayLinear-W21",
+                "volume_cycle_HT-DCPHASE_DecayLinear-W5",
+                "volume_cycle_HT-DCPHASE_Log1p",
+                "volume_cycle_HT-DCPHASE_Sign",
+                "volume_cycle_HT-DCPHASE_TsArgmax-W13",
+                "volume_cycle_HT-DCPHASE_TsArgmax-W21",
+                "volume_cycle_HT-DCPHASE_TsArgmax-W5",
+                "volume_cycle_HT-DCPHASE_TsArgmin-W13",
+                "volume_cycle_HT-DCPHASE_TsArgmin-W21",
+                "volume_cycle_HT-DCPHASE_TsArgmin-W5",
+                "volume_cycle_HT-DCPHASE_TsRank-W13",
+                "volume_cycle_HT-DCPHASE_TsRank-W21",
+                "volume_cycle_HT-DCPHASE_TsRank-W5"
+              ],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 51.10882683300001
+        },
+        {
+          "schema": 1,
+          "domain": "main",
+          "rows": 4662,
+          "l1_cols": 1611,
+          "l1_dtypes": [
+            "float32"
+          ],
+          "returned_arm": "polars",
+          "returned_cols": 44827,
+          "returned_dtypes": [
+            "float32",
+            "float64"
+          ],
+          "common_cols": 44827,
+          "only_category": [
+            "close_cycle_HT-DCPHASE_Abs",
+            "close_cycle_HT-DCPHASE_Clip",
+            "close_cycle_HT-DCPHASE_DecayLinear-W13",
+            "close_cycle_HT-DCPHASE_DecayLinear-W21",
+            "close_cycle_HT-DCPHASE_DecayLinear-W5",
+            "close_cycle_HT-DCPHASE_Log1p",
+            "close_cycle_HT-DCPHASE_Momentum-L13",
+            "close_cycle_HT-DCPHASE_Momentum-L144",
+            "close_cycle_HT-DCPHASE_Momentum-L21",
+            "close_cycle_HT-DCPHASE_Momentum-L233",
+            "close_cycle_HT-DCPHASE_Momentum-L3",
+            "close_cycle_HT-DCPHASE_Momentum-L34",
+            "close_cycle_HT-DCPHASE_Momentum-L5",
+            "close_cycle_HT-DCPHASE_Momentum-L55",
+            "close_cycle_HT-DCPHASE_Momentum-L8",
+            "close_cycle_HT-DCPHASE_Momentum-L89",
+            "close_cycle_HT-DCPHASE_Sign",
+            "close_cycle_HT-DCPHASE_TsArgmax-W13",
+            "close_cycle_HT-DCPHASE_TsArgmax-W21",
+            "close_cycle_HT-DCPHASE_TsArgmax-W5",
+            "close_cycle_HT-DCPHASE_TsArgmin-W13",
+            "close_cycle_HT-DCPHASE_TsArgmin-W21",
+            "close_cycle_HT-DCPHASE_TsArgmin-W5",
+            "close_cycle_HT-DCPHASE_TsRank-W13",
+            "close_cycle_HT-DCPHASE_TsRank-W21",
+            "close_cycle_HT-DCPHASE_TsRank-W5",
+            "taker-ratio_cycle_HT-DCPHASE_Abs",
+            "taker-ratio_cycle_HT-DCPHASE_Clip",
+            "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W13",
+            "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W21",
+            "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W5",
+            "taker-ratio_cycle_HT-DCPHASE_Log1p",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L13",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L144",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L21",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L233",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L3",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L34",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L5",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L55",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L8",
+            "taker-ratio_cycle_HT-DCPHASE_Momentum-L89",
+            "taker-ratio_cycle_HT-DCPHASE_Sign",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W13",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W21",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W5",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W13",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W21",
+            "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W5",
+            "taker-ratio_cycle_HT-DCPHASE_TsRank-W13",
+            "taker-ratio_cycle_HT-DCPHASE_TsRank-W21",
+            "taker-ratio_cycle_HT-DCPHASE_TsRank-W5",
+            "volume_cycle_HT-DCPHASE_Abs",
+            "volume_cycle_HT-DCPHASE_Clip",
+            "volume_cycle_HT-DCPHASE_DecayLinear-W13",
+            "volume_cycle_HT-DCPHASE_DecayLinear-W21",
+            "volume_cycle_HT-DCPHASE_DecayLinear-W5",
+            "volume_cycle_HT-DCPHASE_Log1p",
+            "volume_cycle_HT-DCPHASE_Momentum-L13",
+            "volume_cycle_HT-DCPHASE_Momentum-L144",
+            "volume_cycle_HT-DCPHASE_Momentum-L21",
+            "volume_cycle_HT-DCPHASE_Momentum-L233",
+            "volume_cycle_HT-DCPHASE_Momentum-L3",
+            "volume_cycle_HT-DCPHASE_Momentum-L34",
+            "volume_cycle_HT-DCPHASE_Momentum-L5",
+            "volume_cycle_HT-DCPHASE_Momentum-L55",
+            "volume_cycle_HT-DCPHASE_Momentum-L8",
+            "volume_cycle_HT-DCPHASE_Momentum-L89",
+            "volume_cycle_HT-DCPHASE_Sign",
+            "volume_cycle_HT-DCPHASE_TsArgmax-W13",
+            "volume_cycle_HT-DCPHASE_TsArgmax-W21",
+            "volume_cycle_HT-DCPHASE_TsArgmax-W5",
+            "volume_cycle_HT-DCPHASE_TsArgmin-W13",
+            "volume_cycle_HT-DCPHASE_TsArgmin-W21",
+            "volume_cycle_HT-DCPHASE_TsArgmin-W5",
+            "volume_cycle_HT-DCPHASE_TsRank-W13",
+            "volume_cycle_HT-DCPHASE_TsRank-W21",
+            "volume_cycle_HT-DCPHASE_TsRank-W5"
+          ],
+          "nan_mask_diff": 0,
+          "f64diff": 43394,
+          "f32diff": 43394,
+          "max_abs": 0.00048828125,
+          "max_rel": 1.1920704427802611e-07,
+          "row_mismatch": [],
+          "only_returned": [],
+          "per_category": {
+            "Distance": {
+              "common_cols": 408,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 43394,
+              "f32diff": 43394,
+              "max_abs": 0.00048828125,
+              "max_rel": 1.1920704427802611e-07,
+              "row_mismatch": null
+            },
+            "Cross": {
+              "common_cols": 2125,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Ratio": {
+              "common_cols": 2125,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "Momentum": {
+              "common_cols": 15400,
+              "only_category": [
+                "close_cycle_HT-DCPHASE_Momentum-L13",
+                "close_cycle_HT-DCPHASE_Momentum-L144",
+                "close_cycle_HT-DCPHASE_Momentum-L21",
+                "close_cycle_HT-DCPHASE_Momentum-L233",
+                "close_cycle_HT-DCPHASE_Momentum-L3",
+                "close_cycle_HT-DCPHASE_Momentum-L34",
+                "close_cycle_HT-DCPHASE_Momentum-L5",
+                "close_cycle_HT-DCPHASE_Momentum-L55",
+                "close_cycle_HT-DCPHASE_Momentum-L8",
+                "close_cycle_HT-DCPHASE_Momentum-L89",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L13",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L144",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L21",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L233",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L3",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L34",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L5",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L55",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L8",
+                "taker-ratio_cycle_HT-DCPHASE_Momentum-L89",
+                "volume_cycle_HT-DCPHASE_Momentum-L13",
+                "volume_cycle_HT-DCPHASE_Momentum-L144",
+                "volume_cycle_HT-DCPHASE_Momentum-L21",
+                "volume_cycle_HT-DCPHASE_Momentum-L233",
+                "volume_cycle_HT-DCPHASE_Momentum-L3",
+                "volume_cycle_HT-DCPHASE_Momentum-L34",
+                "volume_cycle_HT-DCPHASE_Momentum-L5",
+                "volume_cycle_HT-DCPHASE_Momentum-L55",
+                "volume_cycle_HT-DCPHASE_Momentum-L8",
+                "volume_cycle_HT-DCPHASE_Momentum-L89"
+              ],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "BinarySignal": {
+              "common_cols": 129,
+              "only_category": [],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            },
+            "WorldQuant": {
+              "common_cols": 24640,
+              "only_category": [
+                "close_cycle_HT-DCPHASE_Abs",
+                "close_cycle_HT-DCPHASE_Clip",
+                "close_cycle_HT-DCPHASE_DecayLinear-W13",
+                "close_cycle_HT-DCPHASE_DecayLinear-W21",
+                "close_cycle_HT-DCPHASE_DecayLinear-W5",
+                "close_cycle_HT-DCPHASE_Log1p",
+                "close_cycle_HT-DCPHASE_Sign",
+                "close_cycle_HT-DCPHASE_TsArgmax-W13",
+                "close_cycle_HT-DCPHASE_TsArgmax-W21",
+                "close_cycle_HT-DCPHASE_TsArgmax-W5",
+                "close_cycle_HT-DCPHASE_TsArgmin-W13",
+                "close_cycle_HT-DCPHASE_TsArgmin-W21",
+                "close_cycle_HT-DCPHASE_TsArgmin-W5",
+                "close_cycle_HT-DCPHASE_TsRank-W13",
+                "close_cycle_HT-DCPHASE_TsRank-W21",
+                "close_cycle_HT-DCPHASE_TsRank-W5",
+                "taker-ratio_cycle_HT-DCPHASE_Abs",
+                "taker-ratio_cycle_HT-DCPHASE_Clip",
+                "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W13",
+                "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W21",
+                "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W5",
+                "taker-ratio_cycle_HT-DCPHASE_Log1p",
+                "taker-ratio_cycle_HT-DCPHASE_Sign",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W13",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W21",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W5",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W13",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W21",
+                "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W5",
+                "taker-ratio_cycle_HT-DCPHASE_TsRank-W13",
+                "taker-ratio_cycle_HT-DCPHASE_TsRank-W21",
+                "taker-ratio_cycle_HT-DCPHASE_TsRank-W5",
+                "volume_cycle_HT-DCPHASE_Abs",
+                "volume_cycle_HT-DCPHASE_Clip",
+                "volume_cycle_HT-DCPHASE_DecayLinear-W13",
+                "volume_cycle_HT-DCPHASE_DecayLinear-W21",
+                "volume_cycle_HT-DCPHASE_DecayLinear-W5",
+                "volume_cycle_HT-DCPHASE_Log1p",
+                "volume_cycle_HT-DCPHASE_Sign",
+                "volume_cycle_HT-DCPHASE_TsArgmax-W13",
+                "volume_cycle_HT-DCPHASE_TsArgmax-W21",
+                "volume_cycle_HT-DCPHASE_TsArgmax-W5",
+                "volume_cycle_HT-DCPHASE_TsArgmin-W13",
+                "volume_cycle_HT-DCPHASE_TsArgmin-W21",
+                "volume_cycle_HT-DCPHASE_TsArgmin-W5",
+                "volume_cycle_HT-DCPHASE_TsRank-W13",
+                "volume_cycle_HT-DCPHASE_TsRank-W21",
+                "volume_cycle_HT-DCPHASE_TsRank-W5"
+              ],
+              "nan_mask_diff": 0,
+              "f64diff": 0,
+              "f32diff": 0,
+              "max_abs": 0.0,
+              "max_rel": 0.0,
+              "row_mismatch": null
+            }
+          },
+          "category_errors": {},
+          "compare_seconds": 52.076594458000045
+        }
+      ]
+    }
+  },
+  "identity": {
+    "A_BTCUSDT_1h": {
+      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+      "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
+      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "cell": {
+        "id": "A_BTCUSDT_1h",
+        "kind": "A",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "1h"
+        ]
+      },
+      "criteria_cell_sha256": "00ce4ed5ae69f8e94545cfba35a86345e8a042628e63aecf2d400ad112077646",
+      "generation_inputs_sha256": "2d67d35d6da46792835f1c5dc94b73e64cf2ef99c0c706f1b752dc4844589faa",
+      "datasets": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c"
+        }
+      }
+    },
+    "A_BTCUSDT_4h": {
+      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+      "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
+      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "cell": {
+        "id": "A_BTCUSDT_4h",
+        "kind": "A",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "4h"
+        ]
+      },
+      "criteria_cell_sha256": "b5583125a2041a29fed4bb60d9a2d1c478d720be640caa37f51979de81f157b6",
+      "generation_inputs_sha256": "b7f5598cbfd0e887ab983931829c8b95d76e52970acaa7eec9f728939262c846",
+      "datasets": {
+        "4h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "e598f5cb914a7f94fde6b1b844751bb26707fd1c67c6f8b0b575834e2e706cf2"
+        }
+      }
+    },
+    "A_BTCUSDT_12h": {
+      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+      "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
+      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "cell": {
+        "id": "A_BTCUSDT_12h",
+        "kind": "A",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "12h"
+        ]
+      },
+      "criteria_cell_sha256": "b5583125a2041a29fed4bb60d9a2d1c478d720be640caa37f51979de81f157b6",
+      "generation_inputs_sha256": "a26157dda15e6e5edd95f4e4c3f68cd56818e91d8ec410686105cd30a3e3bb91",
+      "datasets": {
+        "12h": {
+          "source": "data_cache/feature_klines_longhist/kline_cache.h5",
+          "dataset_sha256": "d2af6da527b6eaa3e3c1057568bc805752b9b82b56829bd4e025627064c966c5"
+        }
+      }
+    },
+    "A_SOLUSDT_1h": {
+      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+      "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
+      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "cell": {
+        "id": "A_SOLUSDT_1h",
+        "kind": "A",
+        "symbol": "SOLUSDT",
+        "timeframes": [
+          "1h"
+        ]
+      },
+      "criteria_cell_sha256": "b5583125a2041a29fed4bb60d9a2d1c478d720be640caa37f51979de81f157b6",
+      "generation_inputs_sha256": "2d67d35d6da46792835f1c5dc94b73e64cf2ef99c0c706f1b752dc4844589faa",
+      "datasets": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "213fef2d0c2a9694a2b9cd4b0991e08e5db05c1ebc0a4098230d0955c312603d"
+        }
+      }
+    },
+    "B_BTCUSDT_1h_4h": {
+      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+      "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
+      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "cell": {
+        "id": "B_BTCUSDT_1h_4h",
+        "kind": "B",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "1h",
+          "4h"
+        ]
+      },
+      "criteria_cell_sha256": "a18fd8065ecdd1d00d03ad66fb9e3408b3d3598dc07ef643786820d7675b062d",
+      "generation_inputs_sha256": "ec6230f7b93e99bf0e869f135ec742b644f2dcf9f0b4d889a1f0577013e7ae34",
+      "datasets": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c"
+        },
+        "4h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "e598f5cb914a7f94fde6b1b844751bb26707fd1c67c6f8b0b575834e2e706cf2"
+        }
+      }
+    },
+    "C_BTCUSDT_1h": {
+      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+      "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
+      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "cell": {
+        "id": "C_BTCUSDT_1h",
+        "kind": "C",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "1h"
+        ]
+      },
+      "criteria_cell_sha256": "d457f2a2ba76b793ffb3d9509562ecf8b71bd113dce965c2be7b0205abddfbcf",
+      "generation_inputs_sha256": "a87b2b7fb6dae041ad327e74b965cd97ed4d882b6f421d947568a8411efdd1db",
+      "datasets": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c"
+        }
+      }
+    }
+  },
+  "identity_backfilled": {
+    "A_BTCUSDT_1h": {
+      "at": "2026-10-23T01:58:11.467379+00:00",
+      "basis": {
+        "head_equals_freeze_receipt": true,
+        "product_code_clean": true,
+        "results_after_head_commit": true,
+        "other_seam_files_unchanged_since_run1": true,
+        "run1_reconstruction_intact": true,
+        "run2_reconstruction_intact": true
+      },
+      "head_commit_time": 1792689226,
+      "changed_keys": [
+        "seam_state_sha256"
+      ],
+      "seam_evidence": {
+        "run": "run1",
+        "started_at": "2026-10-22T23:23:53Z",
+        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      },
+      "generation_inputs_check": {
+        "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
+        "A_BTCUSDT_1h__default": []
+      },
+      "ambient_evidence": {
+        "launcher_cleared_env": [],
+        "claude_settings_env": {},
+        "settings_mtime_before_run1": true
+      },
+      "memory_tier_log": [
+        "8gb"
+      ],
+      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+      "hardware_evidence": {
+        "memory_tier": "child log（memory_tier_log）",
+        "physical_memory_bytes": "推定（未於跑時記錄）",
+        "cpu_count": "推定（未於跑時記錄）",
+        "machine": "推定（未於跑時記錄）",
+        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+      },
+      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "previous": {
+        "at": "2026-10-23T01:45:17.924713+00:00",
+        "basis": {
+          "head_equals_freeze_receipt": true,
+          "product_code_clean": true,
+          "results_after_head_commit": true,
+          "other_seam_files_unchanged_since_run1": true,
+          "run1_reconstruction_intact": true,
+          "run2_reconstruction_intact": true
+        },
+        "head_commit_time": 1792689226,
+        "changed_keys": [
+          "generation_inputs_sha256",
+          "seam_state_sha256"
+        ],
+        "seam_evidence": {
+          "run": "run1",
+          "started_at": "2026-10-22T23:23:53Z",
+          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        },
+        "generation_inputs_check": {
+          "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
+          "A_BTCUSDT_1h__default": []
+        },
+        "ambient_evidence": {
+          "launcher_cleared_env": [],
+          "claude_settings_env": {},
+          "settings_mtime_before_run1": true
+        },
+        "memory_tier_log": [
+          "8gb"
+        ],
+        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+        "hardware_evidence": {
+          "memory_tier": "child log（memory_tier_log）",
+          "physical_memory_bytes": "推定（未於跑時記錄）",
+          "cpu_count": "推定（未於跑時記錄）",
+          "machine": "推定（未於跑時記錄）",
+          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+        },
+        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "previous": {
+          "at": "2026-10-23T01:30:33.359229+00:00",
+          "basis": {
+            "head_equals_freeze_receipt": true,
+            "product_code_clean": true,
+            "results_after_head_commit": true,
+            "other_seam_files_unchanged_since_run1": true,
+            "run1_reconstruction_intact": true,
+            "run2_reconstruction_intact": true
+          },
+          "head_commit_time": 1792689226,
+          "changed_keys": [
+            "generation_inputs_sha256",
+            "seam_state_sha256"
+          ],
+          "seam_evidence": {
+            "run": "run1",
+            "started_at": "2026-10-22T23:23:53Z",
+            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+          },
+          "generation_inputs_check": {
+            "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
+            "A_BTCUSDT_1h__default": []
+          },
+          "ambient_evidence": {
+            "launcher_ffact_env": [],
+            "claude_settings_env": {},
+            "settings_mtime_before_run1": true
+          },
+          "memory_tier_log": [
+            "8gb"
+          ],
+          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "previous": {
+            "at": "2026-10-23T01:12:55.675385+00:00",
+            "basis": {
+              "head_equals_freeze_receipt": true,
+              "product_code_clean": true,
+              "results_after_head_commit": true,
+              "other_seam_files_unchanged_since_run1": true,
+              "run1_reconstruction_intact": true,
+              "run2_reconstruction_intact": true
+            },
+            "head_commit_time": 1792689226,
+            "changed_keys": [
+              "generation_inputs_sha256",
+              "seam_state_sha256"
+            ],
+            "seam_evidence": {
+              "run": "run1",
+              "started_at": "2026-10-22T23:23:53Z",
+              "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+              "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+              "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+            },
+            "generation_inputs_check": {
+              "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
+              "A_BTCUSDT_1h__default": []
+            },
+            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "previous": {
+              "at": "2026-10-23T00:58:45.670866+00:00",
+              "basis": {
+                "head_equals_freeze_receipt": true,
+                "product_code_clean": true,
+                "results_after_head_commit": true,
+                "other_seam_files_unchanged_since_run1": true,
+                "run1_reconstruction_intact": true,
+                "run2_reconstruction_intact": true
+              },
+              "head_commit_time": 1792689226,
+              "changed_keys": [
+                "criteria_cell_sha256",
+                "seam_state_sha256"
+              ],
+              "seam_evidence": {
+                "run": "run1",
+                "started_at": "2026-10-22T23:23:53Z",
+                "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+              },
+              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "previous": {
+                "at": "2026-10-23T00:40:29.043607+00:00",
+                "basis": {
+                  "head_equals_freeze_receipt": true,
+                  "product_code_clean": true,
+                  "results_after_head_commit": true
+                },
+                "head_commit_time": 1792689226,
+                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+              }
+            }
+          }
+        }
+      }
+    },
+    "A_BTCUSDT_4h": {
+      "at": "2026-10-23T01:58:11.467379+00:00",
+      "basis": {
+        "head_equals_freeze_receipt": true,
+        "product_code_clean": true,
+        "results_after_head_commit": true,
+        "other_seam_files_unchanged_since_run1": true,
+        "run1_reconstruction_intact": true,
+        "run2_reconstruction_intact": true
+      },
+      "head_commit_time": 1792689226,
+      "changed_keys": [
+        "seam_state_sha256"
+      ],
+      "seam_evidence": {
+        "run": "run1",
+        "started_at": "2026-10-22T23:23:53Z",
+        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      },
+      "generation_inputs_check": {
+        "A_BTCUSDT_4h__default": []
+      },
+      "ambient_evidence": {
+        "launcher_cleared_env": [],
+        "claude_settings_env": {},
+        "settings_mtime_before_run1": true
+      },
+      "memory_tier_log": [
+        "8gb"
+      ],
+      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+      "hardware_evidence": {
+        "memory_tier": "child log（memory_tier_log）",
+        "physical_memory_bytes": "推定（未於跑時記錄）",
+        "cpu_count": "推定（未於跑時記錄）",
+        "machine": "推定（未於跑時記錄）",
+        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+      },
+      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "previous": {
+        "at": "2026-10-23T01:45:17.924713+00:00",
+        "basis": {
+          "head_equals_freeze_receipt": true,
+          "product_code_clean": true,
+          "results_after_head_commit": true,
+          "other_seam_files_unchanged_since_run1": true,
+          "run1_reconstruction_intact": true,
+          "run2_reconstruction_intact": true
+        },
+        "head_commit_time": 1792689226,
+        "changed_keys": [
+          "generation_inputs_sha256",
+          "seam_state_sha256"
+        ],
+        "seam_evidence": {
+          "run": "run1",
+          "started_at": "2026-10-22T23:23:53Z",
+          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        },
+        "generation_inputs_check": {
+          "A_BTCUSDT_4h__default": []
+        },
+        "ambient_evidence": {
+          "launcher_cleared_env": [],
+          "claude_settings_env": {},
+          "settings_mtime_before_run1": true
+        },
+        "memory_tier_log": [
+          "8gb"
+        ],
+        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+        "hardware_evidence": {
+          "memory_tier": "child log（memory_tier_log）",
+          "physical_memory_bytes": "推定（未於跑時記錄）",
+          "cpu_count": "推定（未於跑時記錄）",
+          "machine": "推定（未於跑時記錄）",
+          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+        },
+        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "previous": {
+          "at": "2026-10-23T01:30:33.359229+00:00",
+          "basis": {
+            "head_equals_freeze_receipt": true,
+            "product_code_clean": true,
+            "results_after_head_commit": true,
+            "other_seam_files_unchanged_since_run1": true,
+            "run1_reconstruction_intact": true,
+            "run2_reconstruction_intact": true
+          },
+          "head_commit_time": 1792689226,
+          "changed_keys": [
+            "generation_inputs_sha256",
+            "seam_state_sha256"
+          ],
+          "seam_evidence": {
+            "run": "run1",
+            "started_at": "2026-10-22T23:23:53Z",
+            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+          },
+          "generation_inputs_check": {
+            "A_BTCUSDT_4h__default": []
+          },
+          "ambient_evidence": {
+            "launcher_ffact_env": [],
+            "claude_settings_env": {},
+            "settings_mtime_before_run1": true
+          },
+          "memory_tier_log": [
+            "8gb"
+          ],
+          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "previous": {
+            "at": "2026-10-23T01:12:55.675385+00:00",
+            "basis": {
+              "head_equals_freeze_receipt": true,
+              "product_code_clean": true,
+              "results_after_head_commit": true,
+              "other_seam_files_unchanged_since_run1": true,
+              "run1_reconstruction_intact": true,
+              "run2_reconstruction_intact": true
+            },
+            "head_commit_time": 1792689226,
+            "changed_keys": [
+              "generation_inputs_sha256",
+              "seam_state_sha256"
+            ],
+            "seam_evidence": {
+              "run": "run1",
+              "started_at": "2026-10-22T23:23:53Z",
+              "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+              "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+              "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+            },
+            "generation_inputs_check": {
+              "A_BTCUSDT_4h__default": []
+            },
+            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "previous": {
+              "at": "2026-10-23T00:58:45.670866+00:00",
+              "basis": {
+                "head_equals_freeze_receipt": true,
+                "product_code_clean": true,
+                "results_after_head_commit": true,
+                "other_seam_files_unchanged_since_run1": true,
+                "run1_reconstruction_intact": true,
+                "run2_reconstruction_intact": true
+              },
+              "head_commit_time": 1792689226,
+              "changed_keys": [
+                "criteria_cell_sha256",
+                "seam_state_sha256"
+              ],
+              "seam_evidence": {
+                "run": "run1",
+                "started_at": "2026-10-22T23:23:53Z",
+                "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+              },
+              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "previous": {
+                "at": "2026-10-23T00:40:29.043607+00:00",
+                "basis": {
+                  "head_equals_freeze_receipt": true,
+                  "product_code_clean": true,
+                  "results_after_head_commit": true
+                },
+                "head_commit_time": 1792689226,
+                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+              }
+            }
+          }
+        }
+      }
+    },
+    "A_BTCUSDT_12h": {
+      "at": "2026-10-23T01:58:11.467379+00:00",
+      "basis": {
+        "head_equals_freeze_receipt": true,
+        "product_code_clean": true,
+        "results_after_head_commit": true,
+        "other_seam_files_unchanged_since_run1": true,
+        "run1_reconstruction_intact": true,
+        "run2_reconstruction_intact": true
+      },
+      "head_commit_time": 1792689226,
+      "changed_keys": [
+        "seam_state_sha256"
+      ],
+      "seam_evidence": {
+        "run": "run1",
+        "started_at": "2026-10-22T23:23:53Z",
+        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      },
+      "generation_inputs_check": {
+        "A_BTCUSDT_12h__default": []
+      },
+      "ambient_evidence": {
+        "launcher_cleared_env": [],
+        "claude_settings_env": {},
+        "settings_mtime_before_run1": true
+      },
+      "memory_tier_log": [
+        "8gb"
+      ],
+      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+      "hardware_evidence": {
+        "memory_tier": "child log（memory_tier_log）",
+        "physical_memory_bytes": "推定（未於跑時記錄）",
+        "cpu_count": "推定（未於跑時記錄）",
+        "machine": "推定（未於跑時記錄）",
+        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+      },
+      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "previous": {
+        "at": "2026-10-23T01:45:17.924713+00:00",
+        "basis": {
+          "head_equals_freeze_receipt": true,
+          "product_code_clean": true,
+          "results_after_head_commit": true,
+          "other_seam_files_unchanged_since_run1": true,
+          "run1_reconstruction_intact": true,
+          "run2_reconstruction_intact": true
+        },
+        "head_commit_time": 1792689226,
+        "changed_keys": [
+          "generation_inputs_sha256",
+          "seam_state_sha256"
+        ],
+        "seam_evidence": {
+          "run": "run1",
+          "started_at": "2026-10-22T23:23:53Z",
+          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        },
+        "generation_inputs_check": {
+          "A_BTCUSDT_12h__default": []
+        },
+        "ambient_evidence": {
+          "launcher_cleared_env": [],
+          "claude_settings_env": {},
+          "settings_mtime_before_run1": true
+        },
+        "memory_tier_log": [
+          "8gb"
+        ],
+        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+        "hardware_evidence": {
+          "memory_tier": "child log（memory_tier_log）",
+          "physical_memory_bytes": "推定（未於跑時記錄）",
+          "cpu_count": "推定（未於跑時記錄）",
+          "machine": "推定（未於跑時記錄）",
+          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+        },
+        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "previous": {
+          "at": "2026-10-23T01:30:33.359229+00:00",
+          "basis": {
+            "head_equals_freeze_receipt": true,
+            "product_code_clean": true,
+            "results_after_head_commit": true,
+            "other_seam_files_unchanged_since_run1": true,
+            "run1_reconstruction_intact": true,
+            "run2_reconstruction_intact": true
+          },
+          "head_commit_time": 1792689226,
+          "changed_keys": [
+            "generation_inputs_sha256",
+            "seam_state_sha256"
+          ],
+          "seam_evidence": {
+            "run": "run1",
+            "started_at": "2026-10-22T23:23:53Z",
+            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+          },
+          "generation_inputs_check": {
+            "A_BTCUSDT_12h__default": []
+          },
+          "ambient_evidence": {
+            "launcher_ffact_env": [],
+            "claude_settings_env": {},
+            "settings_mtime_before_run1": true
+          },
+          "memory_tier_log": [
+            "8gb"
+          ],
+          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "previous": {
+            "at": "2026-10-23T01:12:55.675385+00:00",
+            "basis": {
+              "head_equals_freeze_receipt": true,
+              "product_code_clean": true,
+              "results_after_head_commit": true,
+              "other_seam_files_unchanged_since_run1": true,
+              "run1_reconstruction_intact": true,
+              "run2_reconstruction_intact": true
+            },
+            "head_commit_time": 1792689226,
+            "changed_keys": [
+              "generation_inputs_sha256",
+              "seam_state_sha256"
+            ],
+            "seam_evidence": {
+              "run": "run1",
+              "started_at": "2026-10-22T23:23:53Z",
+              "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+              "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+              "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+            },
+            "generation_inputs_check": {
+              "A_BTCUSDT_12h__default": []
+            },
+            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "previous": {
+              "at": "2026-10-23T00:58:45.670866+00:00",
+              "basis": {
+                "head_equals_freeze_receipt": true,
+                "product_code_clean": true,
+                "results_after_head_commit": true,
+                "other_seam_files_unchanged_since_run1": true,
+                "run1_reconstruction_intact": true,
+                "run2_reconstruction_intact": true
+              },
+              "head_commit_time": 1792689226,
+              "changed_keys": [
+                "criteria_cell_sha256",
+                "seam_state_sha256"
+              ],
+              "seam_evidence": {
+                "run": "run1",
+                "started_at": "2026-10-22T23:23:53Z",
+                "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+              },
+              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "previous": {
+                "at": "2026-10-23T00:40:29.043607+00:00",
+                "basis": {
+                  "head_equals_freeze_receipt": true,
+                  "product_code_clean": true,
+                  "results_after_head_commit": true
+                },
+                "head_commit_time": 1792689226,
+                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+              }
+            }
+          }
+        }
+      }
+    },
+    "A_SOLUSDT_1h": {
+      "at": "2026-10-23T01:58:11.467379+00:00",
+      "basis": {
+        "head_equals_freeze_receipt": true,
+        "product_code_clean": true,
+        "results_after_head_commit": true,
+        "other_seam_files_unchanged_since_run1": true,
+        "run1_reconstruction_intact": true,
+        "run2_reconstruction_intact": true
+      },
+      "head_commit_time": 1792689226,
+      "changed_keys": [
+        "seam_state_sha256"
+      ],
+      "seam_evidence": {
+        "run": "run1",
+        "started_at": "2026-10-22T23:23:53Z",
+        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      },
+      "generation_inputs_check": {
+        "A_SOLUSDT_1h__default": []
+      },
+      "ambient_evidence": {
+        "launcher_cleared_env": [],
+        "claude_settings_env": {},
+        "settings_mtime_before_run1": true
+      },
+      "memory_tier_log": [
+        "8gb"
+      ],
+      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+      "hardware_evidence": {
+        "memory_tier": "child log（memory_tier_log）",
+        "physical_memory_bytes": "推定（未於跑時記錄）",
+        "cpu_count": "推定（未於跑時記錄）",
+        "machine": "推定（未於跑時記錄）",
+        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+      },
+      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "previous": {
+        "at": "2026-10-23T01:45:17.924713+00:00",
+        "basis": {
+          "head_equals_freeze_receipt": true,
+          "product_code_clean": true,
+          "results_after_head_commit": true,
+          "other_seam_files_unchanged_since_run1": true,
+          "run1_reconstruction_intact": true,
+          "run2_reconstruction_intact": true
+        },
+        "head_commit_time": 1792689226,
+        "changed_keys": [
+          "generation_inputs_sha256",
+          "seam_state_sha256"
+        ],
+        "seam_evidence": {
+          "run": "run1",
+          "started_at": "2026-10-22T23:23:53Z",
+          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        },
+        "generation_inputs_check": {
+          "A_SOLUSDT_1h__default": []
+        },
+        "ambient_evidence": {
+          "launcher_cleared_env": [],
+          "claude_settings_env": {},
+          "settings_mtime_before_run1": true
+        },
+        "memory_tier_log": [
+          "8gb"
+        ],
+        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+        "hardware_evidence": {
+          "memory_tier": "child log（memory_tier_log）",
+          "physical_memory_bytes": "推定（未於跑時記錄）",
+          "cpu_count": "推定（未於跑時記錄）",
+          "machine": "推定（未於跑時記錄）",
+          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+        },
+        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "previous": {
+          "at": "2026-10-23T01:30:33.359229+00:00",
+          "basis": {
+            "head_equals_freeze_receipt": true,
+            "product_code_clean": true,
+            "results_after_head_commit": true,
+            "other_seam_files_unchanged_since_run1": true,
+            "run1_reconstruction_intact": true,
+            "run2_reconstruction_intact": true
+          },
+          "head_commit_time": 1792689226,
+          "changed_keys": [
+            "generation_inputs_sha256",
+            "seam_state_sha256"
+          ],
+          "seam_evidence": {
+            "run": "run1",
+            "started_at": "2026-10-22T23:23:53Z",
+            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+          },
+          "generation_inputs_check": {
+            "A_SOLUSDT_1h__default": []
+          },
+          "ambient_evidence": {
+            "launcher_ffact_env": [],
+            "claude_settings_env": {},
+            "settings_mtime_before_run1": true
+          },
+          "memory_tier_log": [
+            "8gb"
+          ],
+          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "previous": {
+            "at": "2026-10-23T01:12:55.675385+00:00",
+            "basis": {
+              "head_equals_freeze_receipt": true,
+              "product_code_clean": true,
+              "results_after_head_commit": true,
+              "other_seam_files_unchanged_since_run1": true,
+              "run1_reconstruction_intact": true,
+              "run2_reconstruction_intact": true
+            },
+            "head_commit_time": 1792689226,
+            "changed_keys": [
+              "generation_inputs_sha256",
+              "seam_state_sha256"
+            ],
+            "seam_evidence": {
+              "run": "run1",
+              "started_at": "2026-10-22T23:23:53Z",
+              "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+              "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+              "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+            },
+            "generation_inputs_check": {
+              "A_SOLUSDT_1h__default": []
+            },
+            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "previous": {
+              "at": "2026-10-23T00:58:45.670866+00:00",
+              "basis": {
+                "head_equals_freeze_receipt": true,
+                "product_code_clean": true,
+                "results_after_head_commit": true,
+                "other_seam_files_unchanged_since_run1": true,
+                "run1_reconstruction_intact": true,
+                "run2_reconstruction_intact": true
+              },
+              "head_commit_time": 1792689226,
+              "changed_keys": [
+                "criteria_cell_sha256",
+                "seam_state_sha256"
+              ],
+              "seam_evidence": {
+                "run": "run1",
+                "started_at": "2026-10-22T23:23:53Z",
+                "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+              },
+              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "previous": {
+                "at": "2026-10-23T00:40:29.043607+00:00",
+                "basis": {
+                  "head_equals_freeze_receipt": true,
+                  "product_code_clean": true,
+                  "results_after_head_commit": true
+                },
+                "head_commit_time": 1792689226,
+                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+              }
+            }
+          }
+        }
+      }
+    },
+    "B_BTCUSDT_1h_4h": {
+      "at": "2026-10-23T01:58:11.467379+00:00",
+      "basis": {
+        "head_equals_freeze_receipt": true,
+        "product_code_clean": true,
+        "results_after_head_commit": true,
+        "other_seam_files_unchanged_since_run1": true,
+        "run1_reconstruction_intact": true,
+        "run2_reconstruction_intact": true
+      },
+      "head_commit_time": 1792689226,
+      "changed_keys": [
+        "seam_state_sha256"
+      ],
+      "seam_evidence": {
+        "run": "run1",
+        "started_at": "2026-10-22T23:23:53Z",
+        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      },
+      "generation_inputs_check": {
+        "B_BTCUSDT_1h_4h__default": []
+      },
+      "ambient_evidence": {
+        "launcher_cleared_env": [],
+        "claude_settings_env": {},
+        "settings_mtime_before_run1": true
+      },
+      "memory_tier_log": [
+        "8gb"
+      ],
+      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+      "hardware_evidence": {
+        "memory_tier": "child log（memory_tier_log）",
+        "physical_memory_bytes": "推定（未於跑時記錄）",
+        "cpu_count": "推定（未於跑時記錄）",
+        "machine": "推定（未於跑時記錄）",
+        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+      },
+      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "previous": {
+        "at": "2026-10-23T01:45:17.924713+00:00",
+        "basis": {
+          "head_equals_freeze_receipt": true,
+          "product_code_clean": true,
+          "results_after_head_commit": true,
+          "other_seam_files_unchanged_since_run1": true,
+          "run1_reconstruction_intact": true,
+          "run2_reconstruction_intact": true
+        },
+        "head_commit_time": 1792689226,
+        "changed_keys": [
+          "generation_inputs_sha256",
+          "seam_state_sha256"
+        ],
+        "seam_evidence": {
+          "run": "run1",
+          "started_at": "2026-10-22T23:23:53Z",
+          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        },
+        "generation_inputs_check": {
+          "B_BTCUSDT_1h_4h__default": []
+        },
+        "ambient_evidence": {
+          "launcher_cleared_env": [],
+          "claude_settings_env": {},
+          "settings_mtime_before_run1": true
+        },
+        "memory_tier_log": [
+          "8gb"
+        ],
+        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+        "hardware_evidence": {
+          "memory_tier": "child log（memory_tier_log）",
+          "physical_memory_bytes": "推定（未於跑時記錄）",
+          "cpu_count": "推定（未於跑時記錄）",
+          "machine": "推定（未於跑時記錄）",
+          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+        },
+        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "previous": {
+          "at": "2026-10-23T01:30:33.359229+00:00",
+          "basis": {
+            "head_equals_freeze_receipt": true,
+            "product_code_clean": true,
+            "results_after_head_commit": true,
+            "other_seam_files_unchanged_since_run1": true,
+            "run1_reconstruction_intact": true,
+            "run2_reconstruction_intact": true
+          },
+          "head_commit_time": 1792689226,
+          "changed_keys": [
+            "generation_inputs_sha256",
+            "seam_state_sha256"
+          ],
+          "seam_evidence": {
+            "run": "run1",
+            "started_at": "2026-10-22T23:23:53Z",
+            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+          },
+          "generation_inputs_check": {
+            "B_BTCUSDT_1h_4h__default": []
+          },
+          "ambient_evidence": {
+            "launcher_ffact_env": [],
+            "claude_settings_env": {},
+            "settings_mtime_before_run1": true
+          },
+          "memory_tier_log": [
+            "8gb"
+          ],
+          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "previous": {
+            "at": "2026-10-23T01:12:55.675385+00:00",
+            "basis": {
+              "head_equals_freeze_receipt": true,
+              "product_code_clean": true,
+              "results_after_head_commit": true,
+              "other_seam_files_unchanged_since_run1": true,
+              "run1_reconstruction_intact": true,
+              "run2_reconstruction_intact": true
+            },
+            "head_commit_time": 1792689226,
+            "changed_keys": [
+              "generation_inputs_sha256",
+              "seam_state_sha256"
+            ],
+            "seam_evidence": {
+              "run": "run1",
+              "started_at": "2026-10-22T23:23:53Z",
+              "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+              "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+              "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+            },
+            "generation_inputs_check": {
+              "B_BTCUSDT_1h_4h__default": []
+            },
+            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "previous": {
+              "at": "2026-10-23T00:58:45.670866+00:00",
+              "basis": {
+                "head_equals_freeze_receipt": true,
+                "product_code_clean": true,
+                "results_after_head_commit": true,
+                "other_seam_files_unchanged_since_run1": true,
+                "run1_reconstruction_intact": true,
+                "run2_reconstruction_intact": true
+              },
+              "head_commit_time": 1792689226,
+              "changed_keys": [
+                "criteria_cell_sha256",
+                "seam_state_sha256"
+              ],
+              "seam_evidence": {
+                "run": "run1",
+                "started_at": "2026-10-22T23:23:53Z",
+                "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+              },
+              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "previous": {
+                "at": "2026-10-23T00:40:29.043607+00:00",
+                "basis": {
+                  "head_equals_freeze_receipt": true,
+                  "product_code_clean": true,
+                  "results_after_head_commit": true
+                },
+                "head_commit_time": 1792689226,
+                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+              }
+            }
+          }
+        }
+      }
+    },
+    "C_BTCUSDT_1h": {
+      "at": "2026-10-23T01:58:11.467379+00:00",
+      "basis": {
+        "head_equals_freeze_receipt": true,
+        "product_code_clean": true,
+        "results_after_head_commit": true,
+        "other_seam_files_unchanged_since_run1": true,
+        "run1_reconstruction_intact": true,
+        "run2_reconstruction_intact": true
+      },
+      "head_commit_time": 1792689226,
+      "changed_keys": [
+        "seam_state_sha256"
+      ],
+      "seam_evidence": {
+        "run": "run2",
+        "started_at": "2026-10-23T00:11:43Z",
+        "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+        "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+      },
+      "generation_inputs_check": {
+        "C_BTCUSDT_1h__default": []
+      },
+      "ambient_evidence": {
+        "launcher_cleared_env": [],
+        "claude_settings_env": {},
+        "settings_mtime_before_run1": true
+      },
+      "memory_tier_log": [
+        "8gb"
+      ],
+      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+      "hardware_evidence": {
+        "memory_tier": "child log（memory_tier_log）",
+        "physical_memory_bytes": "推定（未於跑時記錄）",
+        "cpu_count": "推定（未於跑時記錄）",
+        "machine": "推定（未於跑時記錄）",
+        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+      },
+      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "previous": {
+        "at": "2026-10-23T01:45:17.924713+00:00",
+        "basis": {
+          "head_equals_freeze_receipt": true,
+          "product_code_clean": true,
+          "results_after_head_commit": true,
+          "other_seam_files_unchanged_since_run1": true,
+          "run1_reconstruction_intact": true,
+          "run2_reconstruction_intact": true
+        },
+        "head_commit_time": 1792689226,
+        "changed_keys": [
+          "generation_inputs_sha256",
+          "seam_state_sha256"
+        ],
+        "seam_evidence": {
+          "run": "run2",
+          "started_at": "2026-10-23T00:11:43Z",
+          "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+          "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+        },
+        "generation_inputs_check": {
+          "C_BTCUSDT_1h__default": []
+        },
+        "ambient_evidence": {
+          "launcher_cleared_env": [],
+          "claude_settings_env": {},
+          "settings_mtime_before_run1": true
+        },
+        "memory_tier_log": [
+          "8gb"
+        ],
+        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+        "hardware_evidence": {
+          "memory_tier": "child log（memory_tier_log）",
+          "physical_memory_bytes": "推定（未於跑時記錄）",
+          "cpu_count": "推定（未於跑時記錄）",
+          "machine": "推定（未於跑時記錄）",
+          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+        },
+        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "previous": {
+          "at": "2026-10-23T01:30:33.359229+00:00",
+          "basis": {
+            "head_equals_freeze_receipt": true,
+            "product_code_clean": true,
+            "results_after_head_commit": true,
+            "other_seam_files_unchanged_since_run1": true,
+            "run1_reconstruction_intact": true,
+            "run2_reconstruction_intact": true
+          },
+          "head_commit_time": 1792689226,
+          "changed_keys": [
+            "generation_inputs_sha256",
+            "seam_state_sha256"
+          ],
+          "seam_evidence": {
+            "run": "run2",
+            "started_at": "2026-10-23T00:11:43Z",
+            "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+            "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+          },
+          "generation_inputs_check": {
+            "C_BTCUSDT_1h__default": []
+          },
+          "ambient_evidence": {
+            "launcher_ffact_env": [],
+            "claude_settings_env": {},
+            "settings_mtime_before_run1": true
+          },
+          "memory_tier_log": [
+            "8gb"
+          ],
+          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "previous": {
+            "at": "2026-10-23T01:12:55.675385+00:00",
+            "basis": {
+              "head_equals_freeze_receipt": true,
+              "product_code_clean": true,
+              "results_after_head_commit": true,
+              "other_seam_files_unchanged_since_run1": true,
+              "run1_reconstruction_intact": true,
+              "run2_reconstruction_intact": true
+            },
+            "head_commit_time": 1792689226,
+            "changed_keys": [
+              "generation_inputs_sha256",
+              "seam_state_sha256"
+            ],
+            "seam_evidence": {
+              "run": "run2",
+              "started_at": "2026-10-23T00:11:43Z",
+              "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+              "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+              "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+            },
+            "generation_inputs_check": {
+              "C_BTCUSDT_1h__default": []
+            },
+            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "previous": {
+              "at": "2026-10-23T00:58:45.670866+00:00",
+              "basis": {
+                "head_equals_freeze_receipt": true,
+                "product_code_clean": true,
+                "results_after_head_commit": true,
+                "other_seam_files_unchanged_since_run1": true,
+                "run1_reconstruction_intact": true,
+                "run2_reconstruction_intact": true
+              },
+              "head_commit_time": 1792689226,
+              "changed_keys": [
+                "criteria_cell_sha256",
+                "seam_state_sha256"
+              ],
+              "seam_evidence": {
+                "run": "run2",
+                "started_at": "2026-10-23T00:11:43Z",
+                "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+                "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+                "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+              },
+              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "previous": {
+                "at": "2026-10-23T00:40:29.043607+00:00",
+                "basis": {
+                  "head_equals_freeze_receipt": true,
+                  "product_code_clean": true,
+                  "results_after_head_commit": true
+                },
+                "head_commit_time": 1792689226,
+                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

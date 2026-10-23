@@ -604,6 +604,47 @@ def precision_segments(cell_id: str, default: Sequence[str]) -> List[str]:
     return list(default)
 
 
+#: 群組粒度值指紋之格類（SPEC §G：全特徵格 C 約 20.9 萬欄，逐欄指紋實測每欄 355 bytes ⇒ raw＋processed 約 148 MB，逾版控單檔上限）
+GROUP_GRANULARITY_KINDS = ("C",)
+
+
+def group_fingerprints(run_dir: Path, artifact_kind: str = "raw") -> Dict[str, Any]:
+    """大格之 §G 值指紋（群組粒度；SPEC §G）：以 manifest 宣告之群組檔為單位，每群組之 `dtype`／`nan`／`values`／
+    `values_native` 為該群組各欄（依檔內欄序）之欄名與逐欄同定義位元組（`fingerprints` 之 float32 NaN 遮罩、NaN→0 之
+    float32 值、`values_native_sha256`）串接之 sha256；表層 `column_set_sha256`／`column_order_sha256` 同 `fingerprints`。
+    鍵與 `bitwise_diff` 相容（`columns` 之鍵為群組檔相對路徑）；任一欄之值、NaN、dtype、欄名或欄序改變 ⇒ 所屬群組或表層
+    雜湊改變。無斷言。"""
+    import pyarrow.parquet as pq
+
+    from tests.feature_engineering import preprov_helpers as ph
+
+    groups: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    for path in ph.declared_group_files(Path(run_dir), artifact_kind):
+        table = pq.read_table(str(path))
+        digests = {key: hashlib.sha256() for key in ("dtype", "nan", "values", "values_native")}
+        names: List[str] = []
+        for name in table.column_names:
+            if name in ph.NON_FEATURE_COLUMNS:
+                continue
+            native = np.asarray(table.column(name).to_numpy(zero_copy_only=False))
+            label = str(name).encode("utf-8") + b"\x00"
+            arr = np.asarray(native, dtype=np.float32)
+            nan = np.isnan(arr)
+            digests["dtype"].update(label + str(table.schema.field(name).type).encode("utf-8") + b"\n")
+            digests["nan"].update(label + np.packbits(nan).tobytes())
+            digests["values"].update(label + np.where(nan, np.float32(0), arr).tobytes())
+            digests["values_native"].update(label + bytes.fromhex(values_native_sha256(native)))
+            names.append(str(name))
+        rel = str(Path(path).resolve().relative_to(Path(run_dir).resolve()))
+        groups[rel] = {**{key: d.hexdigest() for key, d in digests.items()}, "column_count": len(names)}
+        order += names
+    if len(order) != len(set(order)):
+        raise AssertionError(f"{run_dir}/{artifact_kind}：宣告群組間有重複欄")
+    return {"columns": groups, "granularity": "group", "column_count": len(order),
+            "column_set_sha256": _column_set_sha256(order), "column_order_sha256": column_order_sha256(order)}
+
+
 def _main(argv: Sequence[str]) -> int:
     if list(argv) == ["core-selector"]:
         print(core_selector())

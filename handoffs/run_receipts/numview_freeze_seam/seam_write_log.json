@@ -1,0 +1,53 @@
+{
+  "transcript": "/Users/louis/.claude/projects/-Users-louis-Desktop-quantitative-trading-system/04fd3c82-0003-4937-8e8b-cfed1c292e22.jsonl",
+  "since": "2026-10-22T23:23:53Z",
+  "backdating_calls": [],
+  "seam_edit_calls": [],
+  "files": {
+    "tests/feature_engineering/numview_helpers.py": {
+      "sha256": "79c590f15733d56efe3df886b505532533bfe6ba0cae5540ed05ff94a352ff15",
+      "mtime": "2026-10-22T22:56:06.014065+00:00",
+      "mtime_before_run1": true
+    },
+    "tests/feature_engineering/preprov_helpers.py": {
+      "sha256": "73c03af893b6df08d8ac57c8df15689636ede4c138fe50e9b04c702127c5935e",
+      "mtime": "2026-10-20T04:00:49.923478+00:00",
+      "mtime_before_run1": true
+    },
+    "handoffs/run_receipts/numview_probes/_estimate_gate.py": {
+      "sha256": "29426028f384b49a330a565be5a771f1a59964ac121aef1122327f0de1436522",
+      "mtime": "2026-10-22T10:33:24.997339+00:00",
+      "mtime_before_run1": true
+    },
+    "handoffs/run_receipts/numview_probes/_watchdog.py": {
+      "sha256": "afd572b7a8cf2c3480afbac5cca0fb70687dbe28648efa86918077332a1d38f5",
+      "mtime": "2026-10-22T15:21:23.707570+00:00",
+      "mtime_before_run1": true
+    },
+    "handoffs/run_receipts/numview_probes/estimate.py": {
+      "sha256": "44e8f99d0b9e440fe5ec77b4f2da7eb17a944def9c48ece68a36b8ad8ff5651f",
+      "mtime": "2026-10-22T23:05:51.039802+00:00",
+      "mtime_before_run1": true
+    },
+    "handoffs/run_receipts/numview_probes/l2_arm_matrix.py": {
+      "sha256": "290dc2b768d2ce097f9f11d10c01da7cb6af77427a10f9a45738212ca75c67c3",
+      "mtime": "2026-10-22T23:15:35.481541+00:00",
+      "mtime_before_run1": true
+    },
+    "handoffs/run_receipts/numview_probes/postic_branchdiff.py": {
+      "sha256": "ff371335777f44810f6ed73c26cf4897cc05b3a737f8ce990bf6bc9ac7a0ceba",
+      "mtime": "2026-10-22T00:41:47.409756+00:00",
+      "mtime_before_run1": true
+    },
+    "handoffs/run_receipts/numview_probes/precision_chain.py": {
+      "sha256": "232c217d50c12f1158277d09161dbabc3d3a6c52413652b127e3b314c5e7c1bd",
+      "mtime": "2026-10-21T04:17:26.722647+00:00",
+      "mtime_before_run1": true
+    },
+    "handoffs/run_receipts/numview_probes/reference_proof.py": {
+      "sha256": "65f3f2eb939d0e1bb30e2aaa5af7c8de10d2a7e34d4903363f302e21aad68626",
+      "mtime": "2026-10-22T16:43:26.169170+00:00",
+      "mtime_before_run1": true
+    }
+  }
+}

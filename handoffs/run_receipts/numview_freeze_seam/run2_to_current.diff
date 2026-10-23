@@ -1,0 +1,296 @@
+--- run2/scripts/numview_freeze_baseline.py
++++ current/scripts/numview_freeze_baseline.py
+@@ -6,8 +6,8 @@
+   （`=0`＋`FFACT_L65_OPTIMIZATION_PROFILE=legacy`）、`pandas_chunked`（`=0`＋`FFACT_L65_CHUNK_SIZE` 小於選欄數之合法
+   正整數）；每份記 `last_post_ic_execution()` 所報實際臂，須等於標示臂，否則 rc≠0。可達條件依契約
+   `post_ic_arm_reachability` 逐格判定；不可達之臂不凍結、收據記 `arm_unreachable`（臂名＋條件名＋實際選欄數）。
+-- G2 判準檔 `cell_rules.freeze_groups.G2` 之格之 L6.5 raw 於 `FFACT_USE_POLARS` 0／1 各一份；G3（`freeze_groups.G3`：格 B
+-  與全特徵格 C）之 raw 與 processed。
++- G2 判準檔 `cell_rules.freeze_groups.G2` 之格之 L6.5 raw 於 `FFACT_USE_POLARS` 0／1 各一份；G3（`freeze_groups.G3`）依
++  `G3_ARTIFACTS`：格 B 之 raw 與 processed、全特徵格 C 之 raw（C 以生產預設生成、不產 processed）。
+ - 值指紋一律經 `tests/feature_engineering/numview_helpers.py`（`fingerprints`／`frame_fingerprints`；格類屬
+   `GROUP_GRANULARITY_KINDS`〔全特徵格 C〕者以 `group_fingerprints` 群組粒度，SPEC §G）。
+ 
+@@ -16,8 +16,9 @@
+ `cell_rules.continuity`（同估時器 `estimate.continuity_plan`／`window_gap_violations`）：來源全序列無缺口 ⇒ 生產設定
+ `validate_continuity=True`；有缺口（長歷史檔 12h 於生成窗外）⇒ False＋生成窗內零缺口判定，窗內缺口 ⇒ 該格 failed（data_gap）。
+ 每格之生成一律於子行程入口 `_child` 內執行、main 以 `_watchdog.run_watched` 啟動之（AST 驗收 test_heavy_scripts_run_generation_children_under_watchdog；預設開、無旗標；`handoffs/run_receipts/numview_probes/_watchdog.py`，門檻＝判準檔
+-`cell_rules.watchdog`：log 停滯、swap 逾門檻、牆鐘逾 3× 預期或固定上限）；卡住 ⇒ 終止、記 stalled、停止後續格、rc≠0、不寫凍結檔。
+-格 C（判準 v4）只走 `generate_features`，不經 IC-first、不凍 G1，其 raw／processed 屬 G3。Task 1.3 之 L2 兩臂 spy 掛於
++`cell_rules.watchdog`：log 停滯、牆鐘逾 3× 預期或固定上限；判準 v6 起 swap 增長只記錄、不終止）；卡住 ⇒ 終止、記 stalled、
++停止後續格、rc≠0、不寫凍結檔。
++格 C（判準 v4）只走 `generate_features`，不經 IC-first、不凍 G1，其 raw 屬 G3。Task 1.3 之 L2 兩臂 spy 掛於
+ 凍結之生成（格 A_BTCUSDT_1h 兩個 FFACT_USE_POLARS 生成、格 B／C／A_BTCUSDT_12h 之預設生成），l2_arm_matrix 讀其紀錄、
+ 不另生成（判準檔 run_coverage.l2_arm_matrix）。
+ 輸出：`tests/_golden/numview/pre_change_fingerprints.json`；收據 `handoffs/run_receipts/<date>-numview-freeze-baseline.json`
+@@ -181,31 +182,77 @@
+     return handle
+ 
+ 
++#: 凍結之生成與 IC 頁第三步進入時清除之環境變數（審碼 r27 CODEX-R27-P1-01、r28 CODEX-R28-P1-01）：前綴類（`FFACT_*` 選擇子、
++#: `ICFA_*` 記憶體模擬與讀數、`FF_*` 正確性模式、`QTS_*` 抽取開關）與具名類（執行緒數、K 線目錄覆寫）。產品碼讀取之環境變數
++#: 須屬清除類或 `ENV_NOT_CLEARED`（`test_freeze_cleared_env_covers_product_env_reads` 掃 momentum／api 機械檢查）。
++CLEARED_ENV_PREFIXES: Tuple[str, ...] = ("FFACT_", "ICFA_", "FF_", "QTS_", "NUMBA_", "POLARS_", "OMP_", "MKL_",
++                                         "OPENBLAS_")
++#: 審碼 r29 CODEX-R29-P1-01：`PYTEST_CURRENT_TEST` 改變抽取之絕對值特徵過濾（`feature_extractor.py:494-495`），Phase 2–4 於
++#: pytest 內重生時存在 ⇒ 清除
++CLEARED_ENV_NAMES: Tuple[str, ...] = ("KLINE_STORAGE_DIR", "LEGACY_KLINE_CACHE_DIR", "PYTEST_CURRENT_TEST")
++#: 產品碼讀取而不清除之環境變數：理由
++ENV_NOT_CLEARED: Dict[str, str] = {"BINANCE_API_KEY": "交易所憑證，離線生成不連線", "BINANCE_SECRET_KEY": "交易所憑證，離線生成不連線"}
++#: 產品碼中鍵名不可由 AST 解析之環境存取點（`路徑::函式`）：理由（審碼 r29；機械測試要求恰為此集合）
++ENV_UNRESOLVED_SITES: Dict[str, str] = {
++    "api/services/feature_factory_batch_service.py::_restore_batch_thread_env":
++        "只寫回快照之舊值（鍵＝`_BATCH_THREAD_ENV_KEYS` 之快照），不讀值決策；批次服務不在凍結路徑",
++    "api/services/feature_factory_service.py::_temporary_environ":
++        "寫入 API 請求覆寫並於離開時還原；鍵由請求之 env_overrides 決定，凍結不經此服務（生成經 `_isolated` 直呼 factory）",
++}
++
++
++def _cleared_env_keys() -> List[str]:
++    """環境中現有之清除類鍵（`CLEARED_ENV_PREFIXES`／`CLEARED_ENV_NAMES`）。"""
++    return sorted(key for key in os.environ if key.startswith(CLEARED_ENV_PREFIXES) or key in CLEARED_ENV_NAMES)
++
++
++@contextlib.contextmanager
++def _clean_env(env: Mapping[str, str]) -> Iterator[Dict[str, str]]:
++    """清除全部清除類鍵後套 `env`；結束時清除區塊內留下之清除類鍵並還原進入前之值。"""
++    saved = {key: os.environ[key] for key in _cleared_env_keys()}
++    applied = {str(k): str(v) for k, v in env.items()}
++    for key in _cleared_env_keys():
++        os.environ.pop(key, None)
++    os.environ.update(applied)
++    try:
++        yield applied
++    finally:
++        for key in _cleared_env_keys():
++            os.environ.pop(key, None)
++        os.environ.update(saved)
++
++
++def _hardware() -> Dict[str, Any]:
++    """硬體自動解析值（審碼 r27 CODEX-R27-P1-01、r28 CODEX-R28-P1-02）：清除類鍵清除後之記憶體級距
++    （`hardware_utils.get_memory_tier`）、實體記憶體（`memory_budget.physical_memory_bytes`，記憶體預算之來源）、CPU 數與機型。"""
++    import platform
++
++    from momentum.FeatureEngineering import memory_budget
++    from momentum.FeatureEngineering.utils import hardware_utils
++
++    with _clean_env({}):
++        return {"memory_tier": hardware_utils.get_memory_tier(),
++                "physical_memory_bytes": int(memory_budget.physical_memory_bytes()), "cpu_count": os.cpu_count(),
++                "machine": platform.machine()}
++
++
+ @contextlib.contextmanager
+ def _isolated(work: Path, env: Mapping[str, str]) -> Iterator[Path]:
+     """本生成之寫入隔離（估時器 `_isolate` 之同一語意：設定檔連結、registry、CGSA 工作目錄、cwd、tempdir、d* 快取導向
+-    `work`）；生成環境＝清除 `ARM_ENV_KEYS` 後套 `env`（空＝生產預設）。結束還原環境變數、cwd、tempdir、d* 快取目錄
+-    （同行程內呼叫〔Phase 2–4 驗收〕不污染呼叫端）。回傳 features 根。"""
++    `work`）；生成環境＝清除全部清除類鍵（`_clean_env`；審碼 r27–r28：環境殘留之影響值變數不得進入生成）後套 `env`（空＝
++    生產預設）。結束還原環境變數、cwd、tempdir、d* 快取目錄（同行程內呼叫〔Phase 2–4 驗收〕不污染呼叫端）。回傳 features 根。"""
+     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+ 
+-    keys = set(ARM_ENV_KEYS) | {"FFACT_FEATURE_REGISTRY_PATH", "FFACT_CGSA_WORK_DIR"} | {str(k) for k in env}
+-    saved_env = {key: os.environ.get(key) for key in keys}
+     saved_cwd, saved_tmp = os.getcwd(), tempfile.tempdir
+     saved_dstar = FeaturePreprocessor.__dict__.get("_d_star_cache_dir")
+-    for key in ARM_ENV_KEYS:
+-        os.environ.pop(key, None)
+-    try:
+-        yield _estimator()._isolate(Path(work), {str(k): str(v) for k, v in env.items()})
+-    finally:
+-        os.chdir(saved_cwd)
+-        tempfile.tempdir = saved_tmp
+-        if saved_dstar is not None:
+-            FeaturePreprocessor._d_star_cache_dir = saved_dstar
+-        for key, value in saved_env.items():
+-            if value is None:
+-                os.environ.pop(key, None)
+-            else:
+-                os.environ[key] = value
++    with _clean_env(env) as applied:
++        try:
++            yield _estimator()._isolate(Path(work), applied)
++        finally:
++            os.chdir(saved_cwd)
++            tempfile.tempdir = saved_tmp
++            if saved_dstar is not None:
++                FeaturePreprocessor._d_star_cache_dir = saved_dstar
+ 
+ 
+ def generate_cell_run(work: Path, cell: Mapping[str, Any], env: Mapping[str, str], *,
+@@ -237,7 +284,10 @@
+         raise est.EstimateError(f"{cell['id']}：輸出段內有 K 線缺口（data_gap）：{gaps}")
+     side: Dict[str, Any] = {"cell": dict(cell), "env": dict(env), "entry": entry, "symbol": symbol, "primary_tf": primary,
+                             "training_timeframes": training, "output_window": [start, end], "source": str(source),
+-                            "continuity": continuity, "config_override": definition.get("config_override")}
++                            "continuity": continuity, "config_override": definition.get("config_override"),
++                            "payload_sha256": hashlib.sha256(json.dumps(payload, sort_keys=True, default=str,
++                                                                        ensure_ascii=False).encode("utf-8")).hexdigest(),
++                            "hardware": _hardware()}
+     captured: Dict[str, Any] = {}
+     real_ts = FeaturePreprocessor.transform_selected
+ 
+@@ -249,6 +299,7 @@
+     capture = _l2().L2Capture() if observe_l2 else contextlib.nullcontext()
+     started = time.perf_counter()
+     with _isolated(work, env) as features_root:
++        side["effective_cleared_env"] = {key: os.environ[key] for key in _cleared_env_keys()}
+         factory = create_feature_factory(cache_dir=str(source.parent), validate_continuity=continuity["validate_continuity"])
+         factory._storage = FeatureStorage(str(features_root))
+         FeaturePreprocessor.transform_selected = spy_ts  # type: ignore[assignment]
+@@ -352,30 +403,30 @@
+ 
+ @contextlib.contextmanager
+ def _arm_env(arm: Optional[str], selected_count: int) -> Iterator[Dict[str, str]]:
+-    """post-IC 臂之環境（SPEC §G G1）；`pandas_chunked` 之 chunk＝選欄數 − 1（小於選欄數之最大合法正整數）。None ⇒ 不改。"""
+-    saved = {key: os.environ.get(key) for key in ARM_ENV_KEYS}
+-    env: Dict[str, str] = {}
+-    if arm is not None:
+-        env = dict(G1_ARM_ENV[arm])
+-        if arm == "pandas_chunked":
+-            env[CHUNK_ENV] = str(max(1, int(selected_count) - 1))
+-        for key in ARM_ENV_KEYS:
+-            os.environ.pop(key, None)
+-        os.environ.update(env)
+-    try:
+-        yield env
+-    finally:
+-        for key, value in saved.items():
+-            if value is None:
+-                os.environ.pop(key, None)
+-            else:
+-                os.environ[key] = value
++    """post-IC 臂之環境（SPEC §G G1）；`pandas_chunked` 之 chunk＝選欄數 − 1（小於選欄數之最大合法正整數）。None ⇒ 不改。
++    臂環境＝清除全部清除類鍵（`_clean_env`；審碼 r27–r28）後套該臂之 `G1_ARM_ENV`；結束還原。"""
++    if arm is None:
++        yield {}
++        return
++    env = dict(G1_ARM_ENV[arm])
++    if arm == "pandas_chunked":
++        env[CHUNK_ENV] = str(max(1, int(selected_count) - 1))
++    with _clean_env(env) as applied:
++        yield applied
+ 
+ 
+ def _ic_page_run(handle: Any, work: Path) -> Tuple[Any, Dict[str, Any], List[str]]:
++    """IC 頁第三步之一切入口（G1 之 `_g1_parts`、公開 `ic_page_output`）：保留呼叫端所設之臂鍵（`ARM_ENV_KEYS`），清除
++    其餘清除類鍵（`_clean_env`；審碼 r28 CODEX-R28-P1-01：公開入口亦不受環境殘留影響、快取鍵＝臂鍵即完整）後執行
++    `_ic_page_run_in_env`。"""
++    with _clean_env({key: os.environ[key] for key in ARM_ENV_KEYS if key in os.environ}):
++        return _ic_page_run_in_env(handle, work)
++
++
++def _ic_page_run_in_env(handle: Any, work: Path) -> Tuple[Any, Dict[str, Any], List[str]]:
+     """IC 頁第三步（`_apply_transforms_sync`，`ApplyTransformsRequest` 預設請求、該格 IC-first 選欄；cwd 隔離於 `work`）；
+     回（h5 讀回之 DataFrame, 回應 dict, 實際執行臂〔`last_post_ic_execution` 群組表之臂，去重排序〕）。批次快取之 run
+-    （`regen_batch_root()` 之下）每 (臂環境) 只算一次、存於該生成之工作目錄。"""
++    （`regen_batch_root()` 之下）每 (臂環境) 只算一次、存於該生成之工作目錄。只經 `_ic_page_run` 呼叫。"""
+     import pandas as pd
+ 
+     from api.models.ic_models import ApplyTransformsRequest
+@@ -523,6 +574,58 @@
+         return {str(tf): int(handle[str(cell["symbol"])][str(tf)]["data"].shape[0]) for tf in cell["timeframes"]}
+ 
+ 
++#: 結果身分所涵蓋之判準規則（決定生成者；不含說明字面）
++IDENTITY_RULE_KEYS = ("kline_source", "window_rule", "continuity", "insufficient_history")
++
++
++def generation_inputs(cell: Mapping[str, Any]) -> Dict[str, Any]:
++    """格之生成輸入（審碼 r26 CODEX-R26-P1-01、r27 CODEX-R27-P1-01）：以 `generate_cell_run` 同一組估時器函式導出之入口、
++    訓練週期（格 B 讀估時收據 `b_membership`）、設定覆寫、K 線來源、輸出段與連續性設定，及硬體自動解析值（`_hardware`）；
++    sidecar 記其中各鍵（payload 記 `payload_sha256`），補記時逐鍵對證。環境變數不入：生成與 IC 頁第三步一律清除全部清除類鍵
++    （`_clean_env`）後只套明示環境（`G1_ARM_ENV`／`G2_ENVS` 等，屬接縫碼態）。"""
++    est = _estimator()
++    criteria = _criteria()
++    training = _training_timeframes(cell)
++    start, end = est.cell_window(cell, criteria)
++    return {"entry": est.generation_entry(str(cell["kind"]), criteria), "training_timeframes": training,
++            "payload": est.cell_payload(cell, criteria, training), "source": str(est.cell_source(cell, criteria)),
++            "output_window": [start, end], "continuity": est.continuity_plan(cell, criteria, training),
++            "config_override": criteria["cell_definitions"][str(cell["kind"])].get("config_override"),
++            "hardware": _hardware()}
++
++
++def result_identity(cell: Mapping[str, Any]) -> Dict[str, Any]:
++    """每格凍結結果之身分（審碼 r24 CODEX-R24-P1-01、r25 CODEX-R25-P1-01／GROK-R25-P1-01）：HEAD、產品碼態
++    （`numview_helpers.code_state_sha256`）、生成接縫碼態（`numview_helpers.seam_state_sha256`：本腳本〔含 `G1_ARM_ENV`／
++    `G2_ENVS`／`G3_ARTIFACTS` 等凍結政策〕、值指紋助手與探針檔之位元組）、格描述子、判準之該格類定義、`IDENTITY_RULE_KEYS`
++    規則與該格之凍結組成員（`freeze_groups` 各組是否含本格）之 sha256（說明字面 `_doc`／`_basis` 不計）、生成輸入
++    （`generation_inputs`，含估時收據導出之訓練週期；r26 CODEX-R26-P1-01）之 sha256、格之 K 線資料集紀錄。沿用既有結果須與
++    現行身分逐鍵相等。"""
++    criteria = _criteria()
++
++    def strip(node: Any) -> Any:
++        if isinstance(node, Mapping):
++            return {k: strip(v) for k, v in sorted(node.items()) if not str(k).startswith("_")}
++        if isinstance(node, list):
++            return [strip(v) for v in node]
++        return node
++
++    rules = {key: strip(criteria["cell_rules"].get(key)) for key in IDENTITY_RULE_KEYS}
++    definition = strip(criteria["cell_definitions"][str(cell["kind"])])
++    groups = {name: str(cell["id"]) in members
++              for name, members in sorted(strip(criteria["cell_rules"]["freeze_groups"]).items())}
++    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip()
++    return {"head": head, "code_state_sha256": nh.code_state_sha256(), "seam_state_sha256": nh.seam_state_sha256(),
++            "cell": {"id": str(cell["id"]), "kind": str(cell["kind"]), "symbol": str(cell["symbol"]),
++                     "timeframes": [str(t) for t in cell["timeframes"]]},
++            "criteria_cell_sha256": hashlib.sha256(json.dumps({"definition": definition, "rules": rules,
++                                                               "freeze_groups": groups}, sort_keys=True,
++                                                              ensure_ascii=False).encode("utf-8")).hexdigest(),
++            "generation_inputs_sha256": hashlib.sha256(json.dumps(generation_inputs(cell), sort_keys=True, default=str,
++                                                                  ensure_ascii=False).encode("utf-8")).hexdigest(),
++            "datasets": nh.cell_dataset_records(cell)}
++
++
+ def freeze_one(cell: Mapping[str, Any], work_root: Path) -> Dict[str, Any]:
+     """凍結一格（子行程內）：生成（G2 格另生成 pandas 環境）、G1／G2／G3 值指紋、L2 擷取；回每格結果
+     {cell_id, status, blocked_by, reason, reason_counts, bar_counts, seconds, peak_rss_bytes, record, arm_unreachable,
+@@ -532,7 +635,7 @@
+     started = time.perf_counter()
+     result: Dict[str, Any] = {"cell_id": cell_id, "kind": kind, "symbol": cell["symbol"], "timeframes": cell["timeframes"],
+                               "bar_counts": _bar_counts(cell), "blocked_by": None, "reason": None,
+-                              "arm_unreachable": [], "l2_capture": {}}
++                              "arm_unreachable": [], "l2_capture": {}, "identity": result_identity(cell)}
+     _log(f"{cell_id}：生成開始（env 預設）")
+     handle = generate_cell(work_root, cell, run_kind=RUN_KIND, env={}, observe_l2={} in l2_envs)
+     side = _sidecar(Path(handle.work))
+@@ -626,10 +729,12 @@
+         result_path = cell_dir / RESULT_NAME
+         if result_path.is_file() and not fresh:
+             done = json.loads(result_path.read_text(encoding="utf-8"))
+-            if done.get("status") in ("frozen", "blocked"):
+-                print(f"[freeze] {cell['id']}：沿用既有結果（{done['status']}）", flush=True)
++            current = result_identity(cell)
++            if done.get("status") in ("frozen", "blocked") and done.get("identity") == current:
++                print(f"[freeze] {cell['id']}：沿用既有結果（{done['status']}；身分相符）", flush=True)
+                 results.append(done)
+                 continue
++            print(f"[freeze] {cell['id']}：既有結果身分不符或狀態非 frozen／blocked ⇒ 重凍", flush=True)
+         cell_dir.mkdir(parents=True, exist_ok=True)
+         spec_path = cell_dir / "spec.json"
+         spec_path.write_text(json.dumps({"cell": dict(cell), "work_root": str(work_root),
+@@ -709,7 +814,10 @@
+                "criteria_sha256": hashlib.sha256(criteria_path.read_bytes()).hexdigest(),
+                "code_state_sha256": nh.code_state_sha256(), "library_versions": _library_versions(), "cells": receipt_cells, "arm_unreachable": unreachable,
+                "residuals": residuals, "fingerprint_granularity": {"group": list(nh.GROUP_GRANULARITY_KINDS)},
+-               "l2_capture": {str(r["cell_id"]): r.get("l2_capture") for r in results if r.get("l2_capture")}}
++               "l2_capture": {str(r["cell_id"]): r.get("l2_capture") for r in results if r.get("l2_capture")},
++               "identity": {str(r["cell_id"]): r.get("identity") for r in results},
++               "identity_backfilled": {str(r["cell_id"]): r["identity_backfilled"] for r in results
++                                       if r.get("identity_backfilled")}}
+     out = RECEIPTS_DIR / FREEZE_RECEIPT_NAME.format(date=datetime.now().strftime("%Y%m%d"))
+     out.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
+     print(f"[freeze] 凍結檔 {nh.PRE_CHANGE_FINGERPRINTS_PATH.relative_to(REPO)}；收據 {out.relative_to(REPO)}", flush=True)
+@@ -731,7 +839,8 @@
+     started_at = datetime.now(timezone.utc).isoformat()
+     work_root = Path(args.work_root)
+     work_root.mkdir(parents=True, exist_ok=True)
+-    rc, results = _run_cells(cells, work_root, args.fresh)
++    with _clean_env({}):  # 子行程繼承已清除之環境（函式庫於 import 時讀之 NUMBA_*／POLARS_* 等亦乾淨；審碼 r29）
++        rc, results = _run_cells(cells, work_root, args.fresh)
+     if rc != 0:
+         return rc
+     return _write_outputs(cells, results, started_at)

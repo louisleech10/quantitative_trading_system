@@ -70,6 +70,7 @@ import importlib.util
 import inspect
 import json
 import math
+import os
 import re
 import subprocess
 import sys
@@ -1345,6 +1346,345 @@ def test_mutation_estimate_gate_without_criteria_binding(monkeypatch: pytest.Mon
 def test_estimate_gate_called_before_generation_in_heavy_scripts() -> None:
     """Task 0.4 ③：凍結腳本與每個生成型探針於 `main` 頂層、任何生成呼叫之前呼叫 `require(<跑別>, …)`。"""
     assert gate_call_violations() == []
+
+
+def _freeze_script_module() -> Any:
+    spec = importlib.util.spec_from_file_location("numview_freeze_under_criteria_test", FREEZE_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize("mutant", [None, "no_manifest", "group_file_deleted", "status_partial", "no_config_hash",
+                                    "manifest_partial", "manifest_identity_mismatch", "stale_explicit_complete"])
+def test_generate_cell_cache_hit_requires_complete_run(tmp_path: Path, mutant: Optional[str]) -> None:
+    """批次快取命中（審碼 r21 CODEX-R21-P1-01、r22 CODEX-R22-P1-01）：sidecar complete＋config_hash、manifest 有效狀態
+    complete 且身分（symbol／tf／config_hash）＝sidecar、宣告群組檔皆在 ⇒ 命中；缺 manifest／刪一群組檔／sidecar 狀態非
+    complete／無 config_hash／manifest 狀態 partial／manifest 身分不符 ⇒ 不命中（呼叫端重生）。run 以正式
+    `FeatureStorage.write_raw` 寫真實 kline 欄，manifest 之 run 狀態以正式 `update_manifest` 標 complete。"""
+    import pandas as pd
+
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+    from tests.feature_engineering import ffstat_helpers as fsh
+    from tests.feature_engineering import preprov_helpers as ph
+
+    frz = _freeze_script_module()
+    work = tmp_path / "work"
+    k = fsh.kline_frame().iloc[-200:]
+    raw_dir = FeatureStorage(str(work / "features")).write_raw(
+        "BTCUSDT", "1h", "cfg_cache", {"ga": k[["open", "close"]].astype(float).reset_index(drop=True)},
+        row_index=pd.DatetimeIndex(k.index))
+    side = {"symbol": "BTCUSDT", "primary_tf": "1h", "config_hash": "cfg_cache", "status": "complete"}
+    if mutant == "status_partial":
+        side["status"] = "partial"
+    elif mutant == "no_config_hash":
+        side["config_hash"] = None
+    (work / frz.SIDECAR).write_text(json.dumps(side), encoding="utf-8")
+    run_dir = raw_dir.parent
+    manifest_path = run_dir / "feature_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.update(run_status="partial" if mutant == "manifest_partial" else "complete",
+                    complete=mutant not in ("manifest_partial", "stale_explicit_complete"), failure_reasons=[],
+                    tf="4h" if mutant == "manifest_identity_mismatch" else "1h")
+    # 審碼 r23 CODEX-R23-P1-01：writer 不完整窗口——根與 raw artifact 之 complete 標記為 False 而 explicit run_status 仍 complete
+    manifest["artifacts"]["raw"]["complete"] = mutant != "stale_explicit_complete"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    if mutant == "group_file_deleted":
+        ph.declared_group_files(run_dir, "raw")[0].unlink()
+    elif mutant == "no_manifest":
+        (run_dir / "feature_manifest.json").unlink()
+    assert frz._cache_complete(work) is (mutant is None), mutant
+
+
+@pytest.mark.parametrize("mutant", [None, "freeze_groups_doc_only", "g3_artifacts_policy", "helper_seam",
+                                    "freeze_group_membership", "b_training_timeframes", "output_window",
+                                    "hardware_tier"])
+def test_result_identity_binds_seam_and_freeze_groups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                      mutant: Optional[str]) -> None:
+    """凍結結果身分（審碼 r25 CODEX-R25-P1-01／GROK-R25-P1-01、r26 CODEX-R26-P1-01）：接縫檔（凍結腳本之 `G3_ARTIFACTS`
+    政策、值指紋助手）、該格之凍結組成員、或生成輸入（格 B 之訓練週期〔估時收據 `b_membership`〕、輸出段）一改 ⇒ 身分不等
+    （不沿用舊結果）；只改說明字面 `_doc` ⇒ 身分相等。接縫檔複製至暫存根、只改複本。"""
+    frz = _freeze_script_module()
+    for pattern in nh.SEAM_GLOBS:
+        for path in REPO.glob(pattern):
+            target = tmp_path / path.relative_to(REPO)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(path.read_bytes())
+    criteria = frz._criteria()
+    monkeypatch.setattr(nh, "REPO", tmp_path)
+    monkeypatch.setattr(nh, "code_state_sha256", lambda: "code")
+    monkeypatch.setattr(nh, "cell_dataset_records", lambda cell: {"tf": "data"})
+    monkeypatch.setattr(frz, "_criteria", lambda: criteria)
+    cell = next(c for c in frz._cells() if c["kind"] == ("B" if mutant == "b_training_timeframes" else "C"))
+    before = frz.result_identity(cell)
+    mutated = copy.deepcopy(criteria)
+    if mutant == "b_training_timeframes":
+        training = frz._training_timeframes(cell)
+        assert len(training) >= 2, training
+        monkeypatch.setattr(frz, "_training_timeframes", lambda c: training[:1])
+    elif mutant == "output_window":
+        est = frz._estimator()
+        window = est.cell_window
+        monkeypatch.setattr(est, "cell_window", lambda c, crit: (window(c, crit)[0], "2000-01-01"))
+    elif mutant == "hardware_tier":
+        hardware = frz._hardware()
+        monkeypatch.setattr(frz, "_hardware", lambda: {**hardware, "memory_tier": hardware["memory_tier"] + "_other"})
+    if mutant == "freeze_groups_doc_only":
+        mutated["cell_rules"]["freeze_groups"]["_doc"] = "說明字面改動"
+    elif mutant == "freeze_group_membership":
+        mutated["cell_rules"]["freeze_groups"]["G3"].remove(cell["id"])
+    elif mutant == "g3_artifacts_policy":
+        script = tmp_path / "scripts" / "numview_freeze_baseline.py"
+        text = script.read_text(encoding="utf-8")
+        policy = '"C": ("raw",)}'
+        assert text.count(policy) == 1
+        script.write_text(text.replace(policy, '"C": ("raw", "processed")}'), encoding="utf-8")
+    elif mutant == "helper_seam":
+        helper = tmp_path / "tests" / "feature_engineering" / "numview_helpers.py"
+        helper.write_text(helper.read_text(encoding="utf-8") + "\n# 改動\n", encoding="utf-8")
+    monkeypatch.setattr(frz, "_criteria", lambda: mutated)
+    after = frz.result_identity(cell)
+    assert (after == before) is (mutant in (None, "freeze_groups_doc_only")), (mutant, before, after)
+
+
+@pytest.mark.parametrize("context", ["generation", "ic_page_arm", "ic_page_entry"])
+def test_freeze_contexts_clear_ambient_ffact_selectors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                       context: str) -> None:
+    """審碼 r27 CODEX-R27-P1-01、r28 CODEX-R28-P1-01：環境殘留之影響值變數（契約 `selectors` 例 `FFACT_L65_NATIVE_TF`、
+    `FFACT_ROLLING_QUANTILE_KERNEL`；`ICFA_PHYSICAL_BYTES`、`QTS_RELATIVE_ONLY`、`NUMBA_NUM_THREADS`）於生成隔離
+    （`_isolated`）、IC 頁臂環境（`_arm_env`）與公開 IC 頁入口（`ic_page_output` → `_ic_page_run`；只保留呼叫端之臂鍵）內一律
+    清除，只剩明示環境；離開後原樣還原。"""
+    frz = _freeze_script_module()
+    ambient = {"FFACT_L65_NATIVE_TF": "0", "FFACT_ROLLING_QUANTILE_KERNEL": "legacy", "FFACT_USE_POLARS": "0",
+               "ICFA_PHYSICAL_BYTES": "1024", "QTS_RELATIVE_ONLY": "1", "NUMBA_NUM_THREADS": "1"}
+    for key, value in ambient.items():
+        monkeypatch.setenv(key, value)
+    if context == "generation":
+        explicit = {"FFACT_USE_POLARS": "1"}
+        with frz._isolated(tmp_path / "work", explicit):
+            inside = {key: os.environ[key] for key in frz._cleared_env_keys()}
+        assert {k: v for k, v in inside.items() if k in ambient or k in explicit} == explicit, inside
+    elif context == "ic_page_arm":
+        with frz._arm_env("polars", 10) as explicit:
+            inside = {key: os.environ[key] for key in frz._cleared_env_keys()}
+        assert inside == explicit, inside
+    else:
+        seen: Dict[str, str] = {}
+
+        def capture(handle: Any, work: Path) -> Tuple[Any, Dict[str, Any], List[str]]:
+            seen.update({key: os.environ[key] for key in frz._cleared_env_keys()})
+            return None, {}, []
+
+        monkeypatch.setattr(frz, "_ic_page_run_in_env", capture)
+        frz.ic_page_output(None, tmp_path)
+        assert seen == {"FFACT_USE_POLARS": "0"}, seen
+    assert {key: os.environ.get(key) for key in ambient} == ambient
+
+
+def _str_set(node: ast.AST) -> Optional[Set[str]]:
+    """字串字面或字串字面之 tuple／list／set ⇒ 字串集合；其他 ⇒ None。"""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return {node.value}
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        out: Set[str] = set()
+        for elt in node.elts:
+            got = _str_set(elt)
+            if got is None:
+                return None
+            out |= got
+        return out
+    return None
+
+
+def _env_scan(sources: Mapping[str, str]) -> Tuple[Set[str], Set[str]]:
+    """AST 盤點環境存取（審碼 r29 CODEX-R29-P1-01）：`os.environ`／`environ` 之 `get`／`setdefault`／`pop`／下標／`in`、
+    `os.getenv`。鍵之解析：字串字面；本模組或類層級字串常數；迴圈／推導式遍歷之字面集合（tuple／list／dict 之鍵或值，含
+    `.items()`／`.keys()`／`.values()`）；函式參數 ⇒ 全部呼叫點之該引數（遞迴同規則，呼叫點零個或任一不可解析 ⇒ 不可解析）。
+    其他形式（整體迭代 `os.environ.items()`、`dict(os.environ)`、整份傳入子行程、動態名稱）一律記為不可解析之存取點
+    `路徑::函式`。回（可解析之名稱集合, 不可解析之存取點集合）。`sources`＝{repo 相對路徑: 原始碼}。"""
+    trees = {rel: ast.parse(text) for rel, text in sources.items()}
+    parents_of = {rel: {child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+                  for rel, tree in trees.items()}
+
+    def chain(node: ast.AST, rel: str) -> List[ast.AST]:
+        parents, out = parents_of[rel], []
+        while node in parents:
+            node = parents[node]
+            out.append(node)
+        return out[::-1]
+
+    consts: Dict[Tuple[str, str], Set[str]] = {}
+    attr_consts: Dict[str, Set[str]] = {}
+    colls: Dict[str, Dict[str, Set[str]]] = {}
+    calls: Dict[str, List[Tuple[ast.Call, str]]] = {}
+    for rel, tree in trees.items():
+        top = set(tree.body)
+        for cls in (n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)):
+            top |= set(cls.body)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                fn = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", None)
+                if fn:
+                    calls.setdefault(fn, []).append((node, rel))
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)) or node.value is None:
+                continue
+            for target in (node.targets if isinstance(node, ast.Assign) else [node.target]):
+                name = target.id if isinstance(target, ast.Name) else getattr(target, "attr", None)
+                if name is None:
+                    continue
+                value = node.value
+                if isinstance(value, ast.Constant):
+                    if node in top and isinstance(value.value, str):
+                        consts.setdefault((rel, name), set()).add(value.value)
+                        attr_consts.setdefault(name, set()).add(value.value)
+                elif _str_set(value) is not None:
+                    colls.setdefault(name, {}).setdefault("elts", set()).update(_str_set(value) or set())
+                elif isinstance(value, ast.Dict):
+                    keys = [_str_set(k) if k is not None else None for k in value.keys]
+                    vals = [_str_set(v) for v in value.values]
+                    if keys and all(k is not None for k in keys):
+                        colls.setdefault(name, {}).setdefault("keys", set()).update(*keys)
+                    if vals and all(v is not None for v in vals):
+                        colls.setdefault(name, {}).setdefault("values", set()).update(*vals)
+
+    def resolve(expr: ast.AST, scope: Sequence[ast.AST], rel: str, depth: int = 0) -> Optional[Set[str]]:
+        if depth > 4:
+            return None
+        if isinstance(expr, ast.Constant):
+            return _str_set(expr)
+        if isinstance(expr, ast.Attribute):
+            return set(attr_consts[expr.attr]) if expr.attr in attr_consts else None
+        if not isinstance(expr, ast.Name):
+            return None
+        for node in reversed(scope):
+            if isinstance(node, (ast.For, ast.AsyncFor)):
+                generators = [(node.target, node.iter)]
+            elif isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+                generators = [(g.target, g.iter) for g in node.generators]
+            else:
+                continue
+            for target, iterable in generators:
+                parts = [target] if isinstance(target, ast.Name) else list(getattr(target, "elts", []))
+                for index, part in enumerate(parts):
+                    if not (isinstance(part, ast.Name) and part.id == expr.id):
+                        continue
+                    base, section = iterable, ("elts" if isinstance(target, ast.Name) else
+                                               ("keys" if index == 0 else "values"))
+                    if isinstance(iterable, ast.Call) and isinstance(iterable.func, ast.Attribute):
+                        base = iterable.func.value
+                        section = {"items": "keys" if index == 0 else "values", "keys": "keys",
+                                   "values": "values"}.get(iterable.func.attr, section)
+                    elif isinstance(target, ast.Name):
+                        bname = iterable.id if isinstance(iterable, ast.Name) else getattr(iterable, "attr", "")
+                        section = "elts" if "elts" in colls.get(bname, {}) else "keys"
+                    bname = base.id if isinstance(base, ast.Name) else getattr(base, "attr", None)
+                    got = colls.get(bname or "", {}).get(section)
+                    return set(got) if got else None
+        for node in reversed(scope):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            params = [a.arg for a in node.args.args]
+            if expr.id not in params:
+                continue
+            position, method = params.index(expr.id), bool(params) and params[0] in ("self", "cls")
+            sites = calls.get(node.name, [])
+            if not sites:
+                return None
+            out: Set[str] = set()
+            for call, caller in sites:
+                arg = next((kw.value for kw in call.keywords if kw.arg == expr.id), None)
+                if arg is None:
+                    i = position - (1 if method and isinstance(call.func, ast.Attribute) else 0)
+                    arg = call.args[i] if 0 <= i < len(call.args) else None
+                got = resolve(arg, chain(call, caller), caller, depth + 1) if arg is not None else None
+                if got is None:
+                    return None
+                out |= got
+            return out
+        return set(consts[(rel, expr.id)]) if (rel, expr.id) in consts else None
+
+    names: Set[str] = set()
+    unresolved: Set[str] = set()
+    for rel, tree in trees.items():
+        parents = parents_of[rel]
+        # 別名表（審碼 r30 CODEX-R30-P1-01）：本模組任一處之 `import os [as X]`、`from os import environ [as X]`、
+        # `from os import getenv [as X]` 所綁定之名稱
+        os_names, environ_names, getenv_names = {"os"}, {"environ"}, set()
+        for imp in ast.walk(tree):
+            if isinstance(imp, ast.Import):
+                os_names |= {a.asname or a.name for a in imp.names if a.name == "os"}
+            elif isinstance(imp, ast.ImportFrom) and imp.module == "os":
+                environ_names |= {a.asname or a.name for a in imp.names if a.name == "environ"}
+                getenv_names |= {a.asname or a.name for a in imp.names if a.name == "getenv"}
+        for node in ast.walk(tree):
+            key: Optional[ast.AST] = None
+            is_env = ((isinstance(node, ast.Attribute) and node.attr == "environ" and isinstance(node.value, ast.Name)
+                       and node.value.id in os_names) or (isinstance(node, ast.Name) and node.id in environ_names))
+            is_getenv = isinstance(node, ast.Call) and (
+                (isinstance(node.func, ast.Attribute) and node.func.attr == "getenv" and isinstance(node.func.value, ast.Name)
+                 and node.func.value.id in os_names) or (isinstance(node.func, ast.Name) and node.func.id in getenv_names))
+            if is_env:
+                parent = parents.get(node)
+                if isinstance(parent, ast.Attribute) and parent.attr in ("get", "setdefault", "pop"):
+                    call = parents.get(parent)
+                    key = call.args[0] if isinstance(call, ast.Call) and call.args else None
+                elif isinstance(parent, ast.Subscript):
+                    key = parent.slice
+                elif isinstance(parent, ast.Compare) and parent.comparators and parent.comparators[0] is node:
+                    key = parent.left
+            elif not is_getenv:
+                continue
+            else:
+                key = node.args[0] if node.args else None
+            got = resolve(key, chain(node, rel), rel) if key is not None else None
+            if got is None:
+                func = next((a.name for a in reversed(chain(node, rel))
+                             if isinstance(a, (ast.FunctionDef, ast.AsyncFunctionDef))), "<module>")
+                unresolved.add(f"{rel}::{func}")
+            else:
+                names |= got
+    return names, unresolved
+
+
+def _product_sources() -> Dict[str, str]:
+    return {str(p.relative_to(REPO)): p.read_text(encoding="utf-8", errors="replace")
+            for root in ("momentum", "api") for p in sorted((REPO / root).rglob("*.py"))}
+
+
+def test_freeze_cleared_env_covers_product_env_reads() -> None:
+    """審碼 r28 CODEX-R28-P1-01、r29 CODEX-R29-P1-01：產品碼（momentum／api）之每個環境存取，其可解析之名稱須屬凍結腳本
+    之清除類（`CLEARED_ENV_PREFIXES`／`CLEARED_ENV_NAMES`）或具名不清除（`ENV_NOT_CLEARED`，附理由）；不可解析之存取點須恰為
+    `ENV_UNRESOLVED_SITES`（附理由；不多不少）。新增未分類名稱或未登錄之動態／整體存取 ⇒ 紅。"""
+    frz = _freeze_script_module()
+    names, unresolved = _env_scan(_product_sources())
+    assert {"ICFA_PHYSICAL_BYTES", "QTS_RELATIVE_ONLY", "FF_CORRECTNESS_MODE", "PYTEST_CURRENT_TEST",
+            "FFACT_LAYER4_CHUNK_SIZE", "POLARS_MAX_THREADS"} <= names, "掃描未涵蓋已知讀取（掃描失效）"
+    unclassified = sorted(n for n in names if not (n.startswith(frz.CLEARED_ENV_PREFIXES) or n in frz.CLEARED_ENV_NAMES
+                                                   or n in frz.ENV_NOT_CLEARED))
+    assert unclassified == [], unclassified
+    assert sorted(unresolved) == sorted(frz.ENV_UNRESOLVED_SITES), (sorted(unresolved), sorted(frz.ENV_UNRESOLVED_SITES))
+    assert all(isinstance(v, str) and v for v in {**frz.ENV_NOT_CLEARED, **frz.ENV_UNRESOLVED_SITES}.values())
+
+
+@pytest.mark.parametrize("mutant", ["dynamic_getenv", "bulk_items", "bulk_dict", "literal_unclassified", "alias_os",
+                                    "alias_environ", "alias_getenv"])
+def test_mutation_env_scan_reports_new_access(mutant: str) -> None:
+    """審碼 r29 CODEX-R29-P1-01 、r30 CODEX-R30-P1-01 之 MUTATION：單一注入模組（自足）含動態名稱 `os.getenv(NAME)`、整體迭代
+    `os.environ.items()`、`dict(os.environ)`、或未分類之字面讀取 ⇒ 掃描報出（不可解析存取點或未分類名稱）。"""
+    frz = _freeze_script_module()
+    body = {"dynamic_getenv": "import os\ndef f(n):\n    return os.getenv(n)\ndef g():\n    return f(compute())\n",
+            "bulk_items": "import os\ndef f():\n    return list(os.environ.items())\n",
+            "bulk_dict": "import os\ndef f():\n    return dict(os.environ)\n",
+            "literal_unclassified": "import os\ndef f():\n    return os.environ.get('NUMVIEW_SCAN_PROBE_X')\n",
+            "alias_os": "import os as _os\ndef f():\n    return _os.environ.get('NUMVIEW_SCAN_PROBE_X')\n",
+            "alias_environ": "from os import environ as _env\ndef f():\n    return _env['NUMVIEW_SCAN_PROBE_X']\n",
+            "alias_getenv": "from os import getenv as _ge\ndef f():\n    return _ge('NUMVIEW_SCAN_PROBE_X')\n"}[mutant]
+    names, unresolved = _env_scan({"momentum/_numview_scan_probe.py": body})  # 注入模組自足（函式與呼叫點皆在其內）
+    unclassified = {n for n in names if not (n.startswith(frz.CLEARED_ENV_PREFIXES) or n in frz.CLEARED_ENV_NAMES
+                                             or n in frz.ENV_NOT_CLEARED)}
+    assert (unresolved - set(frz.ENV_UNRESOLVED_SITES)) or unclassified, mutant
 
 
 def test_estimate_gate_called_first_in_generate_cell() -> None:

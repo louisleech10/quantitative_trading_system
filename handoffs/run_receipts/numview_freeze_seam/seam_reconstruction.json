@@ -1,0 +1,27 @@
+{
+  "current_seam_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+  "runs": {
+    "run1": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h",
+        "B_BTCUSDT_1h_4h"
+      ],
+      "seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+      "freeze_script_sha256": "a44cc10745ca6514bf6874616f44050814c5cd2ecae07da6a2b0d33440e57dac",
+      "diff_lines": 210,
+      "started_at": "2026-10-22T23:23:53Z"
+    },
+    "run2": {
+      "cells": [
+        "C_BTCUSDT_1h"
+      ],
+      "seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+      "freeze_script_sha256": "ffe24197a2633f91840d9cd672ebf08deb6321a2a2d568f081e264a9bc376962",
+      "diff_lines": 203,
+      "started_at": "2026-10-23T00:11:43Z"
+    }
+  }
+}

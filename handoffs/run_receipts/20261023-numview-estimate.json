@@ -1,0 +1,2506 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-23T00:59:11.378637+00:00",
+  "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+  "command": "python handoffs/run_receipts/numview_probes/estimate.py",
+  "criteria_sha256": "880c1ba641325cefaef83d992efa5c0c469b44587674417697d8f6f81503160d",
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
+    "python": "3.9.6"
+  },
+  "library_versions": {
+    "numpy": "1.26.4",
+    "pandas": "2.3.2",
+    "polars": "1.36.1",
+    "numba": "0.60.0",
+    "scipy": "1.13.1",
+    "pyarrow": "21.0.0",
+    "bottleneck": "1.5.0",
+    "statsmodels": "0.14.6",
+    "talib": "0.6.5"
+  },
+  "cells": {
+    "A": [
+      {
+        "id": "A_BTCUSDT_1h",
+        "kind": "A",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "1h"
+        ]
+      },
+      {
+        "id": "A_BTCUSDT_4h",
+        "kind": "A",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "4h"
+        ]
+      },
+      {
+        "id": "A_BTCUSDT_12h",
+        "kind": "A",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "12h"
+        ]
+      },
+      {
+        "id": "A_SOLUSDT_1h",
+        "kind": "A",
+        "symbol": "SOLUSDT",
+        "timeframes": [
+          "1h"
+        ]
+      }
+    ],
+    "B": [
+      {
+        "id": "B_BTCUSDT_1h_4h",
+        "kind": "B",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "1h",
+          "4h"
+        ]
+      }
+    ],
+    "C": [
+      {
+        "id": "C_BTCUSDT_1h",
+        "kind": "C",
+        "symbol": "BTCUSDT",
+        "timeframes": [
+          "1h"
+        ]
+      }
+    ]
+  },
+  "measurements": {
+    "A_BTCUSDT_12h": {
+      "target": "A_BTCUSDT_12h",
+      "category": "A",
+      "entry": "run_ic_first",
+      "cell_id": "A_BTCUSDT_12h",
+      "output_window": [
+        "2026-01-20T12:00:00+00:00",
+        "2026-09-27T00:00:00+00:00"
+      ],
+      "symbol": "BTCUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines_longhist/kline_cache.h5",
+      "kline_source": {
+        "12h": {
+          "source": "data_cache/feature_klines_longhist/kline_cache.h5",
+          "dataset_sha256": "d2af6da527b6eaa3e3c1057568bc805752b9b82b56829bd4e025627064c966c5",
+          "bar_count": 6656,
+          "series_start": "2017-08-17T00:00:00+00:00",
+          "series_end": "2026-09-27T00:00:00+00:00"
+        }
+      },
+      "training_timeframes": [
+        "12h"
+      ],
+      "bar_counts": {
+        "12h": 6656
+      },
+      "seconds": 149.57813429200002,
+      "selected_count": 2539,
+      "arm_seconds": {
+        "polars": 71.21197562500001,
+        "pandas_optimized": 4.836479666999992,
+        "pandas_legacy": 4.624637041999989,
+        "pandas_chunked": 5.182537959000001
+      },
+      "branch_seconds": {
+        "registry": 0.5341525000000047,
+        "registry_sink": 0.49859050000000593,
+        "registry_sink_sharded": 67.91188333400001,
+        "registry_parallel_split": 0.6227684169999748
+      },
+      "pre_history": {
+        "d0_bars": 3050,
+        "final_warmup_bars": 3050,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 1000,
+        "required_pre_history_bars": 4050,
+        "available_pre_history_bars": 6156,
+        "clipped": false,
+        "ingest_floor": "2020-07-05T12:00:00+00:00"
+      },
+      "continuity": {
+        "production_setting": true,
+        "validate_continuity": false,
+        "series_gaps": {
+          "12h": [
+            {
+              "after": "2018-02-08T00:00:00+00:00",
+              "before": "2018-02-09T00:00:00+00:00",
+              "after_ts": 1518048000,
+              "before_ts": 1518134400,
+              "missing_bars": 1
+            }
+          ]
+        },
+        "reason": "來源全序列有缺口：生產設定之全序列連續性驗證（fetch_aligned 不帶時間範圍）必拒讀；改以 False 建構，並以窗內零缺口判定（定案 ingest 起點至輸出終點）取代——窗內任一缺口 ⇒ failed（data_gap）",
+        "window_start": "2020-07-05T12:00:00+00:00",
+        "window_gaps": []
+      },
+      "status": "measured",
+      "peak_rss_bytes": 680083456,
+      "child_wall_seconds": 308.78457616700007,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_A_BTCUSDT_12h.log"
+    },
+    "A_BTCUSDT_1h": {
+      "target": "A_BTCUSDT_1h",
+      "category": "A",
+      "entry": "run_ic_first",
+      "cell_id": "A_BTCUSDT_1h",
+      "output_window": [
+        "2026-04-07T04:00:00+00:00",
+        "2026-04-27T23:00:00+00:00"
+      ],
+      "symbol": "BTCUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5",
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        }
+      },
+      "training_timeframes": [
+        "1h"
+      ],
+      "bar_counts": {
+        "1h": 20352
+      },
+      "seconds": 157.22779275,
+      "selected_count": 3193,
+      "arm_seconds": {
+        "polars": 93.169326708,
+        "pandas_optimized": 7.307225749999986,
+        "pandas_legacy": 6.980570582999974,
+        "pandas_chunked": 10.71236074999996
+      },
+      "branch_seconds": {
+        "registry": 0.8249654589999977,
+        "registry_sink": 0.7162618339999653,
+        "registry_sink_sharded": 90.33702616700003,
+        "registry_parallel_split": 0.7882562080000071
+      },
+      "pre_history": {
+        "d0_bars": 3050,
+        "final_warmup_bars": 3050,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 1000,
+        "required_pre_history_bars": 4050,
+        "available_pre_history_bars": 19852,
+        "clipped": false,
+        "ingest_floor": "2025-10-20T10:00:00+00:00"
+      },
+      "continuity": {
+        "production_setting": true,
+        "validate_continuity": true,
+        "series_gaps": {},
+        "window_start": "2025-10-20T10:00:00+00:00",
+        "window_gaps": []
+      },
+      "status": "measured",
+      "peak_rss_bytes": 570245120,
+      "child_wall_seconds": 372.450916042,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_A_BTCUSDT_1h.log"
+    },
+    "A_BTCUSDT_4h": {
+      "target": "A_BTCUSDT_4h",
+      "category": "A",
+      "entry": "run_ic_first",
+      "cell_id": "A_BTCUSDT_4h",
+      "output_window": [
+        "2026-02-03T16:00:00+00:00",
+        "2026-04-27T20:00:00+00:00"
+      ],
+      "symbol": "BTCUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5",
+      "kline_source": {
+        "4h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "e598f5cb914a7f94fde6b1b844751bb26707fd1c67c6f8b0b575834e2e706cf2",
+          "bar_count": 5088,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T20:00:00+00:00"
+        }
+      },
+      "training_timeframes": [
+        "4h"
+      ],
+      "bar_counts": {
+        "4h": 5088
+      },
+      "seconds": 170.317977875,
+      "selected_count": 2709,
+      "arm_seconds": {
+        "polars": 76.54049337499998,
+        "pandas_optimized": 5.9485531249999894,
+        "pandas_legacy": 5.612927917000036,
+        "pandas_chunked": 6.615724457999988
+      },
+      "branch_seconds": {
+        "registry": 0.5845946249999656,
+        "registry_sink": 0.5286586249999914,
+        "registry_sink_sharded": 71.87859350000002,
+        "registry_parallel_split": 0.657314083000017
+      },
+      "pre_history": {
+        "d0_bars": 3050,
+        "final_warmup_bars": 3050,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 1000,
+        "required_pre_history_bars": 4050,
+        "available_pre_history_bars": 4588,
+        "clipped": false,
+        "ingest_floor": "2024-03-30T16:00:00+00:00"
+      },
+      "continuity": {
+        "production_setting": true,
+        "validate_continuity": true,
+        "series_gaps": {},
+        "window_start": "2024-03-30T16:00:00+00:00",
+        "window_gaps": []
+      },
+      "status": "measured",
+      "peak_rss_bytes": 585089024,
+      "child_wall_seconds": 342.52754187500005,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_A_BTCUSDT_4h.log"
+    },
+    "B_BTCUSDT_1h_4h": {
+      "target": "B",
+      "category": "B",
+      "cell_id": "B_BTCUSDT_1h_4h",
+      "output_window": [
+        "2026-04-07T04:00:00+00:00",
+        "2026-04-27T23:00:00+00:00"
+      ],
+      "symbol": "BTCUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5",
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        },
+        "4h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "e598f5cb914a7f94fde6b1b844751bb26707fd1c67c6f8b0b575834e2e706cf2",
+          "bar_count": 5088,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T20:00:00+00:00"
+        }
+      },
+      "training_timeframes": [
+        "1h",
+        "4h"
+      ],
+      "bar_counts": {
+        "1h": 20352,
+        "4h": 5088
+      },
+      "seconds": 379.733112333,
+      "selected_count": 5943,
+      "arm_seconds": {
+        "polars": 168.09499583299993,
+        "pandas_optimized": 16.044521625000016,
+        "pandas_legacy": 14.758105417000024,
+        "pandas_chunked": 21.236928250000005
+      },
+      "pre_history": {
+        "d0_bars": 10688,
+        "final_warmup_bars": 10688,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 4000,
+        "required_pre_history_bars": 14688,
+        "available_pre_history_bars": 19852,
+        "clipped": false,
+        "ingest_floor": "2024-08-03T04:00:00+00:00"
+      },
+      "status": "measured",
+      "peak_rss_bytes": 841973760,
+      "child_wall_seconds": 603.1521553750001,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_B.log",
+      "migrated_from": "B",
+      "migrated_cell_id": "B_BTCUSDT_1h_4h_12h"
+    },
+    "preprov:dead_drop": {
+      "target": "preprov:dead_drop",
+      "category": "preprov",
+      "seconds": 22.582237458,
+      "status": "measured",
+      "peak_rss_bytes": 595689472,
+      "child_wall_seconds": 24.768596041,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_dead_drop.log"
+    },
+    "preprov:h12h1_multi": {
+      "target": "preprov:h12h1_multi",
+      "category": "preprov",
+      "seconds": 219.58243654199998,
+      "status": "measured",
+      "peak_rss_bytes": 1286979584,
+      "child_wall_seconds": 221.84075295899999,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_h12h1_multi.log"
+    },
+    "preprov:h12h1_replace": {
+      "target": "preprov:h12h1_replace",
+      "category": "preprov",
+      "seconds": 180.05502704100002,
+      "status": "measured",
+      "peak_rss_bytes": 1117650944,
+      "child_wall_seconds": 182.54452700000002,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_h12h1_replace.log"
+    },
+    "preprov:h1_pp_off": {
+      "target": "preprov:h1_pp_off",
+      "category": "preprov",
+      "seconds": 6.9384197919999995,
+      "status": "measured",
+      "peak_rss_bytes": 499220480,
+      "child_wall_seconds": 9.672127959000022,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_h1_pp_off.log"
+    },
+    "preprov:h1_replace_stat_on": {
+      "target": "preprov:h1_replace_stat_on",
+      "category": "preprov",
+      "seconds": 48.350049166000005,
+      "status": "measured",
+      "peak_rss_bytes": 901234688,
+      "child_wall_seconds": 50.378598124999996,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_h1_replace_stat_on.log"
+    },
+    "preprov:h1_stat_off": {
+      "target": "preprov:h1_stat_off",
+      "category": "preprov",
+      "seconds": 17.795039542,
+      "status": "measured",
+      "peak_rss_bytes": 619446272,
+      "child_wall_seconds": 19.971789833000003,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_h1_stat_off.log"
+    },
+    "preprov:h1_stat_on": {
+      "target": "preprov:h1_stat_on",
+      "category": "preprov",
+      "seconds": 88.583544792,
+      "status": "measured",
+      "peak_rss_bytes": 927924224,
+      "child_wall_seconds": 90.59685054199997,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_h1_stat_on.log"
+    },
+    "preprov:ic_first": {
+      "target": "preprov:ic_first",
+      "category": "preprov",
+      "seconds": 24.952143,
+      "status": "measured",
+      "peak_rss_bytes": 748519424,
+      "child_wall_seconds": 27.306731416999924,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_ic_first.log"
+    },
+    "preprov:ic_first_default": {
+      "target": "preprov:ic_first_default",
+      "category": "preprov",
+      "seconds": 178.004033166,
+      "status": "measured",
+      "peak_rss_bytes": 723566592,
+      "child_wall_seconds": 180.18509670800006,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_ic_first_default.log"
+    },
+    "preprov:ic_first_empty": {
+      "target": "preprov:ic_first_empty",
+      "category": "preprov",
+      "seconds": 24.125749374999998,
+      "status": "measured",
+      "peak_rss_bytes": 650887168,
+      "child_wall_seconds": 26.407235291000006,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_ic_first_empty.log"
+    },
+    "preprov:multi_symbol": {
+      "target": "preprov:multi_symbol",
+      "category": "preprov",
+      "seconds": 8.022870084000001,
+      "status": "measured",
+      "peak_rss_bytes": 340328448,
+      "child_wall_seconds": 10.212328707999973,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_multi_symbol.log"
+    },
+    "preprov:ratio_unsafe": {
+      "target": "preprov:ratio_unsafe",
+      "category": "preprov",
+      "seconds": 22.377774208,
+      "status": "measured",
+      "peak_rss_bytes": 604225536,
+      "child_wall_seconds": 24.33317999999997,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_preprov_ratio_unsafe.log"
+    },
+    "A_SOLUSDT_1h": {
+      "target": "A_SOLUSDT_1h",
+      "category": "A",
+      "entry": "run_ic_first",
+      "cell_id": "A_SOLUSDT_1h",
+      "output_window": [
+        "2026-04-07T04:00:00+00:00",
+        "2026-04-27T23:00:00+00:00"
+      ],
+      "symbol": "SOLUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5",
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "213fef2d0c2a9694a2b9cd4b0991e08e5db05c1ebc0a4098230d0955c312603d",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        }
+      },
+      "training_timeframes": [
+        "1h"
+      ],
+      "bar_counts": {
+        "1h": 20352
+      },
+      "seconds": 147.60525133299998,
+      "selected_count": 3029,
+      "arm_seconds": {
+        "polars": 85.511772667,
+        "pandas_optimized": 9.234250166999999,
+        "pandas_legacy": 8.765931249999994,
+        "pandas_chunked": 10.666708
+      },
+      "branch_seconds": {
+        "registry": 0.6165397919999691,
+        "registry_sink": 0.6411388330000136,
+        "registry_sink_sharded": 80.65929875,
+        "registry_parallel_split": 0.7331618329999969
+      },
+      "pre_history": {
+        "d0_bars": 3050,
+        "final_warmup_bars": 3050,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 1000,
+        "required_pre_history_bars": 4050,
+        "available_pre_history_bars": 19852,
+        "clipped": false,
+        "ingest_floor": "2025-10-20T10:00:00+00:00"
+      },
+      "continuity": {
+        "production_setting": true,
+        "validate_continuity": true,
+        "series_gaps": {},
+        "window_start": "2025-10-20T10:00:00+00:00",
+        "window_gaps": []
+      },
+      "status": "measured",
+      "peak_rss_bytes": 578781184,
+      "child_wall_seconds": 348.33124358300006,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_A_SOLUSDT_1h.log"
+    },
+    "C_BTCUSDT_1h": {
+      "target": "C_BTCUSDT_1h",
+      "category": "C",
+      "entry": "generate_features",
+      "cell_id": "C_BTCUSDT_1h",
+      "output_window": [
+        "2026-04-07T04:00:00+00:00",
+        "2026-04-27T23:00:00+00:00"
+      ],
+      "symbol": "BTCUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5",
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        }
+      },
+      "bar_counts": {
+        "1h": 20352
+      },
+      "seconds": 1043.9095515,
+      "pre_history": {
+        "d0_bars": 3784,
+        "final_warmup_bars": 3784,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 0,
+        "required_pre_history_bars": 3784,
+        "available_pre_history_bars": 19852,
+        "clipped": false,
+        "ingest_floor": "2025-10-31T12:00:00+00:00"
+      },
+      "continuity": {
+        "production_setting": true,
+        "validate_continuity": true,
+        "series_gaps": {},
+        "window_start": "2025-10-31T12:00:00+00:00",
+        "window_gaps": []
+      },
+      "status": "measured",
+      "peak_rss_bytes": 3671736320,
+      "child_wall_seconds": 1050.714796083,
+      "swap_growth_max_mb": 3799.0600000000004,
+      "swap_growth_threshold_mb": null,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_C_BTCUSDT_1h.log"
+    }
+  },
+  "legacy_measurements": {
+    "C_BTCUSDT_4h": {
+      "target": "C:4h",
+      "category": "C",
+      "cell_id": "C_BTCUSDT_4h",
+      "output_window": [
+        "2026-02-03T16:00:00+00:00",
+        "2026-04-27T20:00:00+00:00"
+      ],
+      "symbol": "BTCUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5",
+      "kline_source": {
+        "4h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "e598f5cb914a7f94fde6b1b844751bb26707fd1c67c6f8b0b575834e2e706cf2",
+          "bar_count": 5088,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T20:00:00+00:00"
+        }
+      },
+      "bar_counts": {
+        "4h": 5088
+      },
+      "seconds": 1045.549910125,
+      "pre_history": {
+        "d0_bars": 3784,
+        "final_warmup_bars": 3784,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 0,
+        "required_pre_history_bars": 3784,
+        "available_pre_history_bars": 4588,
+        "clipped": false,
+        "ingest_floor": "2024-05-14T00:00:00+00:00"
+      },
+      "status": "measured",
+      "peak_rss_bytes": 2671689728,
+      "child_wall_seconds": 1049.008872292,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_C_4h.log",
+      "migrated_from": "C:4h"
+    },
+    "C_BTCUSDT_12h": {
+      "target": "C:12h",
+      "category": "C",
+      "cell_id": "C_BTCUSDT_12h",
+      "output_window": [
+        "2026-01-20T12:00:00+00:00",
+        "2026-09-27T00:00:00+00:00"
+      ],
+      "symbol": "BTCUSDT",
+      "source_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines_longhist/kline_cache.h5",
+      "kline_source": {
+        "12h": {
+          "source": "data_cache/feature_klines_longhist/kline_cache.h5",
+          "dataset_sha256": "d2af6da527b6eaa3e3c1057568bc805752b9b82b56829bd4e025627064c966c5",
+          "bar_count": 6656,
+          "series_start": "2017-08-17T00:00:00+00:00",
+          "series_end": "2026-09-27T00:00:00+00:00"
+        }
+      },
+      "bar_counts": {
+        "12h": 6656
+      },
+      "seconds": 1044.974630375,
+      "pre_history": {
+        "d0_bars": 3784,
+        "final_warmup_bars": 3784,
+        "warmup_basis": "final",
+        "calibration_bars_primary": 0,
+        "required_pre_history_bars": 3784,
+        "available_pre_history_bars": 6156,
+        "clipped": false,
+        "ingest_floor": "2020-11-15T12:00:00+00:00"
+      },
+      "status": "measured",
+      "peak_rss_bytes": 2656796672,
+      "child_wall_seconds": 1048.749677708,
+      "log": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/numview-estimate/measure_C_12h.log",
+      "migrated_from": "C:12h"
+    }
+  },
+  "run_kinds": {
+    "freeze_baseline": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h",
+        "B_BTCUSDT_1h_4h",
+        "C_BTCUSDT_1h"
+      ],
+      "preprov_cells": [],
+      "code_state": "s0",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 0.5 G1 IC 頁四臂份＋G2 raw（FFACT_USE_POLARS=1）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "l2_arm_matrix"
+          ],
+          "covers_ids": [
+            "cell.single_tf_1h_main_source",
+            "freeze.g1_ic_page_four_arms",
+            "freeze.g2_raw_by_use_polars",
+            "l2.two_arm_single_tf"
+          ],
+          "seconds": 275.3972765409999
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 0.5 G2 raw 依臂之另一臂（FFACT_USE_POLARS=0：L2／L6.5 之 pandas 臂）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "feeds": [
+            "l2_arm_matrix"
+          ],
+          "covers_ids": [
+            "freeze.g2_raw_by_use_polars",
+            "l2.pandas_arm_single_tf"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "Task 0.5 G1：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "covers_ids": [
+            "cell.single_tf_4h_window_calibration"
+          ],
+          "seconds": 265.03567675
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "Task 0.5 G1：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "l2_arm_matrix"
+          ],
+          "covers_ids": [
+            "cell.single_tf_12h_longhist_source",
+            "data.out_of_window_series_gap",
+            "l2.zero_diff_repro_12h"
+          ],
+          "seconds": 235.433764585
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "Task 0.5 G1：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "covers_ids": [
+            "cell.second_dataset_data_dependent_ic"
+          ],
+          "seconds": 261.783913417
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "Task 0.5 G3：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "feeds": [
+            "l2_arm_matrix"
+          ],
+          "covers_ids": [
+            "cell.multi_tf_float64_layers",
+            "freeze.g3_multi_tf_raw_processed",
+            "l2.two_arm_multi_tf_float64_l1"
+          ],
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "Task 0.5 G3 全特徵 raw；C 不落 processed：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）；同次生成掛 Task 1.3 L2 兩臂 spy（l2_arm_matrix 讀此生成、不另生成）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "feeds": [
+            "l2_arm_matrix"
+          ],
+          "covers_ids": [
+            "cell.full_features_production_default",
+            "storage.l7_dtype_autoselect_full_features",
+            "l2.two_arm_full_feature_categories"
+          ],
+          "seconds": 1043.9095515
+        }
+      ],
+      "single_cell_seconds": {
+        "A": 432.6250692909999,
+        "B": 379.733112333,
+        "C": 1043.9095515
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 432.6250692909999,
+        "A_BTCUSDT_4h": 265.03567675,
+        "A_BTCUSDT_12h": 235.433764585,
+        "A_SOLUSDT_1h": 261.783913417,
+        "B_BTCUSDT_1h_4h": 379.733112333,
+        "C_BTCUSDT_1h": 1043.9095515
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 2618.521087876,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）",
+      "groups": {
+        "G1": {
+          "cells": [
+            "A_BTCUSDT_1h",
+            "A_BTCUSDT_4h",
+            "A_BTCUSDT_12h",
+            "A_SOLUSDT_1h"
+          ],
+          "arms": [
+            "polars",
+            "pandas_optimized",
+            "pandas_legacy",
+            "pandas_chunked"
+          ]
+        },
+        "G2": {
+          "cells": [
+            "A_BTCUSDT_1h"
+          ]
+        },
+        "G3": {
+          "cells": [
+            "B_BTCUSDT_1h_4h",
+            "C_BTCUSDT_1h"
+          ]
+        }
+      }
+    },
+    "postic_branchdiff": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h"
+      ],
+      "preprov_cells": [],
+      "code_state": "s0",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.1 分支差與 IC 翻轉（各臂＋polars_float64 對 numpy float64 oracle、七組合；同臂排名算一次供含排名組合共用）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "branchdiff": true,
+          "source": "freeze_baseline",
+          "planned_cost_proxies": {
+            "polars_float64": "polars"
+          },
+          "seconds": 327.6735274489983
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "Task 1.1 分支差與 IC 翻轉（各臂＋polars_float64 對 numpy float64 oracle、七組合；同臂排名算一次供含排名組合共用）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "branchdiff": true,
+          "source": "freeze_baseline",
+          "planned_cost_proxies": {
+            "polars_float64": "polars"
+          },
+          "seconds": 263.6672426249996
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "Task 1.1 分支差與 IC 翻轉（各臂＋polars_float64 對 numpy float64 oracle、七組合；同臂排名算一次供含排名組合共用）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "branchdiff": true,
+          "source": "freeze_baseline",
+          "planned_cost_proxies": {
+            "polars_float64": "polars"
+          },
+          "seconds": 245.38480671000028
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "Task 1.1 分支差與 IC 翻轉（各臂＋polars_float64 對 numpy float64 oracle、七組合；同臂排名算一次供含排名組合共用）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "branchdiff": true,
+          "source": "freeze_baseline",
+          "planned_cost_proxies": {
+            "polars_float64": "polars"
+          },
+          "seconds": 301.2677759749985
+        }
+      ],
+      "single_cell_seconds": {
+        "A": 327.6735274489983
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 327.6735274489983,
+        "A_BTCUSDT_4h": 263.6672426249996,
+        "A_BTCUSDT_12h": 245.38480671000028,
+        "A_SOLUSDT_1h": 301.2677759749985
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 1137.9933527589965,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "precision_chain": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "B_BTCUSDT_1h_4h",
+        "C_BTCUSDT_1h"
+      ],
+      "preprov_cells": [],
+      "code_state": "s0",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.2 變體 S0：float64 鏈（單週期 preserve_dtype=True）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "s0_float64_chain",
+          "covers_ids": [
+            "precision.s0_float64_chain"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.2 變體：memmap 門檻強制為 0（memmap 支、float32 合併）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "memmap_forced_low",
+          "covers_ids": [
+            "precision.memmap_branch"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.2 變體：memmap 門檻強制為極大（門檻下支、保原 dtype 合併）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "memmap_forced_high",
+          "covers_ids": [
+            "precision.memmap_branch"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.2 變體：FFACT_L7_CODEC_UPGRADE=1（raw BYTE_STREAM_SPLIT 讀回與 processed 有損 int16／uint16 同一開關，一次生成兩路皆走）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "codec_upgrade_on",
+          "covers_ids": [
+            "precision.codec_upgrade"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.2 變體：同起點尾端延伸 N 根（落盤 dtype 只升不降、歷史列讀回值）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "tail_extension",
+          "covers_ids": [
+            "precision.tail_extension_dtype_monotone"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.2 變體：pandas sigma 縮尾回傳 dtype 分岔（平穩化開、縮尾 method=sigma）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "winsor_sigma_dtype",
+          "covers_ids": [
+            "precision.winsor_sigma_dtype_branch"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.2 S1–S5 檢查點（讀 Task 0.5 之 run）：單週期 1h",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "Task 1.2 多週期 float64 層間 vs 單週期 float32 分岔（讀 Task 0.5 之 B 與 A run）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "Task 1.2 S0–S4 檢查點於全特徵（只生成、不經 IC 選欄 ⇒ 無 S5）（讀 Task 0.5 之 C run：落盤 dtype 自動選、codec 於全特徵族）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        }
+      ],
+      "single_cell_seconds": {
+        "A": 943.3667564999998
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 943.3667564999998,
+        "B_BTCUSDT_1h_4h": 0.0,
+        "C_BTCUSDT_1h": 0.0
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 943.3667564999998,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "l2_arm_matrix": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "B_BTCUSDT_1h_4h",
+        "C_BTCUSDT_1h",
+        "A_BTCUSDT_12h"
+      ],
+      "preprov_cells": [],
+      "code_state": "s0",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.3 L2 兩臂（Polars 回傳表 vs compute_category）讀凍結 G1／G2 之預設生成：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 1.3 L2 pandas 臂（FFACT_USE_POLARS=0）讀凍結 G2 之另一臂生成：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "Task 1.3 L2 兩臂讀凍結 G3 之預設生成：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "Task 1.3 L2 pandas 臂於多週期（FFACT_USE_POLARS=0；凍結無此環境之生成，唯一新增）：多週期 L1 float64 與訓練週期合併在 pandas L2 臂之路徑",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "covers_ids": [
+            "l2.pandas_arm_multi_tf"
+          ],
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "Task 1.3 L2 兩臂讀凍結 G3 之預設生成：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "Task 1.3 L2 pandas 臂於全特徵（FFACT_USE_POLARS=0；凍結無此環境之生成，唯一新增）：compute_category 於格 A 設定所無之特徵族",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "covers_ids": [
+            "l2.pandas_arm_full_features"
+          ],
+          "seconds": 1043.9095515
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "Task 1.3 既有零差重現：BTCUSDT 12h 之兩臂 f32diff（handoffs/run_receipts/20261004-icfirstalign-freeze-baselines.json f32diff=0；不符即停）讀凍結之預設生成",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "freeze_baseline",
+          "seconds": 0.0
+        }
+      ],
+      "single_cell_seconds": {
+        "B": 379.733112333,
+        "C": 1043.9095515
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 0.0,
+        "B_BTCUSDT_1h_4h": 379.733112333,
+        "C_BTCUSDT_1h": 1043.9095515,
+        "A_BTCUSDT_12h": 0.0
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 1423.642663833,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_t21": {
+      "cells": [
+        "A_BTCUSDT_1h"
+      ],
+      "preprov_cells": [],
+      "code_state": null,
+      "reads_from": [
+        "regen_b3"
+      ],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 2.1 ④ 合法設定：G1 三臂同環境重算（讀 b3 共用生成）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 2.1 ④ registry 快速臂：G2 FFACT_USE_POLARS=0 份 raw 逐位元（讀 b3 共用生成）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "source": "regen_b3",
+          "seconds": 0.0
+        }
+      ],
+      "single_cell_seconds": {},
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 0.0
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 0.0,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_t22": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h"
+      ],
+      "preprov_cells": [],
+      "code_state": null,
+      "reads_from": [
+        "regen_b3"
+      ],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 2.2 G1 記臂與值不變（讀 b3 共用生成）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "Task 2.2 G1 記臂與值不變（讀 b3 共用生成）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "Task 2.2 G1 記臂與值不變（讀 b3 共用生成）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "Task 2.2 G1 記臂與值不變（讀 b3 共用生成）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        }
+      ],
+      "single_cell_seconds": {},
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 0.0,
+        "A_BTCUSDT_4h": 0.0,
+        "A_BTCUSDT_12h": 0.0,
+        "A_SOLUSDT_1h": 0.0
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 0.0,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_t3_core": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h",
+        "B_BTCUSDT_1h_4h"
+      ],
+      "preprov_cells": [
+        "ic_first_default"
+      ],
+      "code_state": null,
+      "reads_from": [
+        "regen_b4"
+      ],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 3.1–3.3 正式核心處置（讀 b4 共用生成）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "Task 3.1–3.3 正式核心處置（讀 b4 共用生成）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "Task 3.1–3.3 正式核心處置（讀 b4 共用生成）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "Task 3.1–3.3 正式核心處置（讀 b4 共用生成）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "Task 3.1–3.3 正式核心處置（讀 b4 共用生成）：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 3.3 核心邊界 36：FFACT_USE_POLARS=0 L2 只走 pandas 臂（讀 b4 共用生成）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "Task 3.2 核心邊界 31：單一訓練週期之多週期格對單週期格逐位元（讀 b4 共用生成）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "single_training_timeframe",
+          "source": "regen_b4",
+          "seconds": 0.0
+        }
+      ],
+      "single_cell_seconds": {
+        "preprov": 0.0
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 0.0,
+        "A_BTCUSDT_4h": 0.0,
+        "A_BTCUSDT_12h": 0.0,
+        "A_SOLUSDT_1h": 0.0,
+        "B_BTCUSDT_1h_4h": 0.0
+      },
+      "preprov_seconds": {
+        "ic_first_default": 0.0
+      },
+      "extrapolated_total_seconds": 0.0,
+      "preprov_generations": {
+        "ic_first_default": 0
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_t34": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h"
+      ],
+      "preprov_cells": [
+        "ic_first_empty"
+      ],
+      "code_state": null,
+      "reads_from": [
+        "regen_b4"
+      ],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "Task 3.4 IC 頁鎖臂 G1（讀 b4 共用生成）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "Task 3.4 IC 頁鎖臂 G1（讀 b4 共用生成）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "Task 3.4 IC 頁鎖臂 G1（讀 b4 共用生成）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "Task 3.4 IC 頁鎖臂 G1（讀 b4 共用生成）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b4",
+          "seconds": 0.0
+        }
+      ],
+      "single_cell_seconds": {
+        "preprov": 0.0
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 0.0,
+        "A_BTCUSDT_4h": 0.0,
+        "A_BTCUSDT_12h": 0.0,
+        "A_SOLUSDT_1h": 0.0
+      },
+      "preprov_seconds": {
+        "ic_first_empty": 0.0
+      },
+      "extrapolated_total_seconds": 0.0,
+      "preprov_generations": {
+        "ic_first_empty": 0
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_t42": {
+      "cells": [],
+      "preprov_cells": [
+        "h1_stat_off",
+        "ic_first"
+      ],
+      "code_state": null,
+      "reads_from": [
+        "regen_b5"
+      ],
+      "runs": [],
+      "single_cell_seconds": {
+        "preprov": 0.0
+      },
+      "per_cell_seconds": {},
+      "preprov_seconds": {
+        "h1_stat_off": 0.0,
+        "ic_first": 0.0
+      },
+      "extrapolated_total_seconds": 0.0,
+      "preprov_generations": {
+        "h1_stat_off": 0,
+        "ic_first": 0
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_t43": {
+      "cells": [],
+      "preprov_cells": [
+        "h1_pp_off"
+      ],
+      "code_state": null,
+      "reads_from": [
+        "regen_b5"
+      ],
+      "runs": [],
+      "single_cell_seconds": {
+        "preprov": 0.0
+      },
+      "per_cell_seconds": {},
+      "preprov_seconds": {
+        "h1_pp_off": 0.0
+      },
+      "extrapolated_total_seconds": 0.0,
+      "preprov_generations": {
+        "h1_pp_off": 0
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_section_g": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h",
+        "B_BTCUSDT_1h_4h",
+        "C_BTCUSDT_1h"
+      ],
+      "preprov_cells": [
+        "dead_drop",
+        "h12h1_multi",
+        "h12h1_replace",
+        "h1_pp_off",
+        "h1_replace_stat_on",
+        "h1_stat_off",
+        "h1_stat_on",
+        "ic_first",
+        "ic_first_default",
+        "multi_symbol",
+        "ratio_unsafe"
+      ],
+      "code_state": null,
+      "reads_from": [
+        "regen_b3",
+        "regen_b5"
+      ],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "§G Phase 2 全格不變式 G1（讀 b3 共用生成）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "§G Phase 2 全格不變式 G1（讀 b3 共用生成）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "§G Phase 2 全格不變式 G1（讀 b3 共用生成）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "§G Phase 2 全格不變式 G1（讀 b3 共用生成）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "§G Phase 2 全格不變式 G2 另一臂（FFACT_USE_POLARS=0；讀 b3 共用生成）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "§G Phase 2 全格不變式 G3（讀 b3 共用生成）：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "§G Phase 2 全格不變式 G3（全特徵 raw；C 不落 processed）（讀 b3 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b3",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "§G Phase 4 全格不變式 G1（讀 b5 共用生成）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b5",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "§G Phase 4 全格不變式 G1（讀 b5 共用生成）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b5",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "§G Phase 4 全格不變式 G1（讀 b5 共用生成）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b5",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "§G Phase 4 全格不變式 G1（讀 b5 共用生成）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b5",
+          "seconds": 0.0
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "§G Phase 4 全格不變式 G2 另一臂（FFACT_USE_POLARS=0；讀 b5 共用生成）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "source": "regen_b5",
+          "seconds": 0.0
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "§G Phase 4 全格不變式 G3（讀 b5 共用生成）：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b5",
+          "seconds": 0.0
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "§G Phase 4 全格不變式 G3（全特徵 raw；C 不落 processed）（讀 b5 共用生成）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "source": "regen_b5",
+          "seconds": 0.0
+        }
+      ],
+      "single_cell_seconds": {
+        "preprov": 0.0
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 0.0,
+        "A_BTCUSDT_4h": 0.0,
+        "A_BTCUSDT_12h": 0.0,
+        "A_SOLUSDT_1h": 0.0,
+        "B_BTCUSDT_1h_4h": 0.0,
+        "C_BTCUSDT_1h": 0.0
+      },
+      "preprov_seconds": {
+        "dead_drop": 0.0,
+        "h12h1_multi": 0.0,
+        "h12h1_replace": 0.0,
+        "h1_pp_off": 0.0,
+        "h1_replace_stat_on": 0.0,
+        "h1_stat_off": 0.0,
+        "h1_stat_on": 0.0,
+        "ic_first": 0.0,
+        "ic_first_default": 0.0,
+        "multi_symbol": 0.0,
+        "ratio_unsafe": 0.0
+      },
+      "extrapolated_total_seconds": 0.0,
+      "preprov_generations": {
+        "dead_drop": 0,
+        "h12h1_multi": 0,
+        "h12h1_replace": 0,
+        "h1_pp_off": 0,
+        "h1_replace_stat_on": 0,
+        "h1_stat_off": 0,
+        "h1_stat_on": 0,
+        "ic_first": 0,
+        "ic_first_default": 0,
+        "multi_symbol": 0,
+        "ratio_unsafe": 0
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "perf_benchmark": {
+      "cells": [
+        "A_BTCUSDT_1h"
+      ],
+      "preprov_cells": [],
+      "code_state": "s0",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "獨立效能基準：A 格最大選欄（實測 A_BTCUSDT_1h 3193 欄，A 格中最大；格 C 之全特徵 IC-first 規模無獨有路徑，v4 移除）之各臂＋polars_float64 同輸入各三次取中位，含 Polars 慢因剖析（rank UDF 是否逐欄 Python 迴圈）",
+          "generations": 0,
+          "transform_passes": 0,
+          "env": {},
+          "perf": true,
+          "source": "freeze_baseline",
+          "planned_cost_proxies": {
+            "polars_float64": "polars"
+          },
+          "seconds": 727.1857582049997
+        }
+      ],
+      "single_cell_seconds": {
+        "A": 727.1857582049997
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 727.1857582049997
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 727.1857582049997,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_b3": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h",
+        "B_BTCUSDT_1h_4h",
+        "C_BTCUSDT_1h"
+      ],
+      "preprov_cells": [
+        "dead_drop",
+        "h12h1_multi",
+        "h12h1_replace",
+        "h1_pp_off",
+        "h1_replace_stat_on",
+        "h1_stat_off",
+        "h1_stat_on",
+        "ic_first",
+        "ic_first_default",
+        "multi_symbol",
+        "ratio_unsafe"
+      ],
+      "code_state": "b3",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "b3 共用生成（Phase 2 碼態）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t21",
+            "regen_t22",
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.single_tf_1h_main_source"
+          ],
+          "seconds": 275.3972765409999
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "b3 共用生成（Phase 2 碼態）G2 另一臂（FFACT_USE_POLARS=0）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "feeds": [
+            "regen_t21",
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "freeze.g2_raw_by_use_polars"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "b3 共用生成（Phase 2 碼態）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t22",
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.single_tf_4h_window_calibration"
+          ],
+          "seconds": 265.03567675
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "b3 共用生成（Phase 2 碼態）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t22",
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.single_tf_12h_longhist_source",
+            "data.out_of_window_series_gap"
+          ],
+          "seconds": 235.433764585
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "b3 共用生成（Phase 2 碼態）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t22",
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.second_dataset_data_dependent_ic"
+          ],
+          "seconds": 261.783913417
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "b3 共用生成（Phase 2 碼態）：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.multi_tf_float64_layers",
+            "freeze.g3_multi_tf_raw_processed"
+          ],
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "b3 共用生成（Phase 2 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.full_features_production_default",
+            "storage.l7_dtype_autoselect_full_features"
+          ],
+          "seconds": 1043.9095515
+        }
+      ],
+      "single_cell_seconds": {
+        "A": 432.6250692909999,
+        "B": 379.733112333,
+        "C": 1043.9095515,
+        "preprov": 219.58243654199998
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 432.6250692909999,
+        "A_BTCUSDT_4h": 265.03567675,
+        "A_BTCUSDT_12h": 235.433764585,
+        "A_SOLUSDT_1h": 261.783913417,
+        "B_BTCUSDT_1h_4h": 379.733112333,
+        "C_BTCUSDT_1h": 1043.9095515
+      },
+      "preprov_seconds": {
+        "dead_drop": 22.582237458,
+        "h12h1_multi": 219.58243654199998,
+        "h12h1_replace": 180.05502704100002,
+        "h1_pp_off": 6.9384197919999995,
+        "h1_replace_stat_on": 48.350049166000005,
+        "h1_stat_off": 17.795039542,
+        "h1_stat_on": 88.583544792,
+        "ic_first": 24.952143,
+        "ic_first_default": 178.004033166,
+        "multi_symbol": 8.022870084000001,
+        "ratio_unsafe": 22.377774208
+      },
+      "extrapolated_total_seconds": 3435.764662667,
+      "preprov_generations": {
+        "dead_drop": 1,
+        "h12h1_multi": 1,
+        "h12h1_replace": 1,
+        "h1_pp_off": 1,
+        "h1_replace_stat_on": 1,
+        "h1_stat_off": 1,
+        "h1_stat_on": 1,
+        "ic_first": 1,
+        "ic_first_default": 1,
+        "multi_symbol": 1,
+        "ratio_unsafe": 1
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_b4": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h",
+        "B_BTCUSDT_1h_4h"
+      ],
+      "preprov_cells": [
+        "ic_first_default",
+        "ic_first_empty"
+      ],
+      "code_state": "b4",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "b4 共用生成（Phase 3 碼態）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t3_core",
+            "regen_t34"
+          ],
+          "covers_ids": [
+            "cell.single_tf_1h_main_source"
+          ],
+          "seconds": 275.3972765409999
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "b4 共用生成（Phase 3 碼態）FFACT_USE_POLARS=0（核心邊界 36：L2 只走 pandas 臂）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "feeds": [
+            "regen_t3_core"
+          ],
+          "covers_ids": [
+            "l2.pandas_arm_single_tf"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "b4 共用生成（Phase 3 碼態）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t3_core",
+            "regen_t34"
+          ],
+          "covers_ids": [
+            "cell.single_tf_4h_window_calibration"
+          ],
+          "seconds": 265.03567675
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "b4 共用生成（Phase 3 碼態）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t3_core",
+            "regen_t34"
+          ],
+          "covers_ids": [
+            "cell.single_tf_12h_longhist_source",
+            "data.out_of_window_series_gap"
+          ],
+          "seconds": 235.433764585
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "b4 共用生成（Phase 3 碼態）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_t3_core",
+            "regen_t34"
+          ],
+          "covers_ids": [
+            "cell.second_dataset_data_dependent_ic"
+          ],
+          "seconds": 261.783913417
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "b4 共用生成（Phase 3 碼態）：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "feeds": [
+            "regen_t3_core"
+          ],
+          "covers_ids": [
+            "cell.multi_tf_float64_layers",
+            "freeze.g3_multi_tf_raw_processed"
+          ],
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "b4 共用生成（Phase 3 碼態）單一訓練週期變體（核心邊界 31：多週期格只剩主週期 ⇒ 對單週期格逐位元）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "single_training_timeframe",
+          "feeds": [
+            "regen_t3_core"
+          ],
+          "covers_ids": [
+            "mtf.single_training_timeframe_equivalence"
+          ],
+          "seconds": 379.733112333
+        }
+      ],
+      "single_cell_seconds": {
+        "A": 432.6250692909999,
+        "B": 759.466224666,
+        "preprov": 178.004033166
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 432.6250692909999,
+        "A_BTCUSDT_4h": 265.03567675,
+        "A_BTCUSDT_12h": 235.433764585,
+        "A_SOLUSDT_1h": 261.783913417,
+        "B_BTCUSDT_1h_4h": 759.466224666
+      },
+      "preprov_seconds": {
+        "ic_first_default": 178.004033166,
+        "ic_first_empty": 24.125749374999998
+      },
+      "extrapolated_total_seconds": 2156.47443125,
+      "preprov_generations": {
+        "ic_first_default": 1,
+        "ic_first_empty": 1
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_b5": {
+      "cells": [
+        "A_BTCUSDT_1h",
+        "A_BTCUSDT_4h",
+        "A_BTCUSDT_12h",
+        "A_SOLUSDT_1h",
+        "B_BTCUSDT_1h_4h",
+        "C_BTCUSDT_1h"
+      ],
+      "preprov_cells": [
+        "dead_drop",
+        "h12h1_multi",
+        "h12h1_replace",
+        "h1_pp_off",
+        "h1_replace_stat_on",
+        "h1_stat_off",
+        "h1_stat_on",
+        "ic_first",
+        "ic_first_default",
+        "multi_symbol",
+        "ratio_unsafe"
+      ],
+      "code_state": "b5",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "b5 共用生成（Phase 4 碼態）：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.single_tf_1h_main_source"
+          ],
+          "seconds": 275.3972765409999
+        },
+        {
+          "cell": "A_BTCUSDT_4h",
+          "covers": "b5 共用生成（Phase 4 碼態）：單週期 4h：週期換算之窗長與校準根數換算（非 1h 主週期之單週期路徑）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.single_tf_4h_window_calibration"
+          ],
+          "seconds": 265.03567675
+        },
+        {
+          "cell": "A_BTCUSDT_12h",
+          "covers": "b5 共用生成（Phase 4 碼態）：單週期 12h、長歷史檔來源（per-tf K 線來源路徑，cell_rules.kline_source）；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.single_tf_12h_longhist_source",
+            "data.out_of_window_series_gap"
+          ],
+          "seconds": 235.433764585
+        },
+        {
+          "cell": "A_SOLUSDT_1h",
+          "covers": "b5 共用生成（Phase 4 碼態）：影響研究第二資料集（性質不同：波動較高——主檔 1h 對數報酬標準差約 BTCUSDT 之 1.8 倍；與 BTCUSDT 同起訖同根數，不涵蓋短歷史路徑）；只用於結果隨資料而變之 IC 翻轉／選欄研究與 IC 頁 G1；IC 頁各臂輸出於本生成算一次、存於共用快取（同鍵），讀此生成之檢查共用",
+          "generations": 1,
+          "transform_passes": 1,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.second_dataset_data_dependent_ic"
+          ],
+          "seconds": 261.783913417
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "b5 共用生成（Phase 4 碼態）G2 另一臂（FFACT_USE_POLARS=0）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {
+            "FFACT_USE_POLARS": "0"
+          },
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "freeze.g2_raw_by_use_polars"
+          ],
+          "seconds": 157.22779275
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "b5 共用生成（Phase 4 碼態）：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.multi_tf_float64_layers",
+            "freeze.g3_multi_tf_raw_processed"
+          ],
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "covers": "b5 共用生成（Phase 4 碼態）：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "feeds": [
+            "regen_section_g"
+          ],
+          "covers_ids": [
+            "cell.full_features_production_default",
+            "storage.l7_dtype_autoselect_full_features"
+          ],
+          "seconds": 1043.9095515
+        }
+      ],
+      "single_cell_seconds": {
+        "A": 432.6250692909999,
+        "B": 379.733112333,
+        "C": 1043.9095515,
+        "preprov": 219.58243654199998
+      },
+      "per_cell_seconds": {
+        "A_BTCUSDT_1h": 432.6250692909999,
+        "A_BTCUSDT_4h": 265.03567675,
+        "A_BTCUSDT_12h": 235.433764585,
+        "A_SOLUSDT_1h": 261.783913417,
+        "B_BTCUSDT_1h_4h": 379.733112333,
+        "C_BTCUSDT_1h": 1043.9095515
+      },
+      "preprov_seconds": {
+        "dead_drop": 22.582237458,
+        "h12h1_multi": 219.58243654199998,
+        "h12h1_replace": 180.05502704100002,
+        "h1_pp_off": 20.815259376,
+        "h1_replace_stat_on": 48.350049166000005,
+        "h1_stat_off": 195.74543496200002,
+        "h1_stat_on": 88.583544792,
+        "ic_first": 49.904286,
+        "ic_first_default": 178.004033166,
+        "multi_symbol": 8.022870084000001,
+        "ratio_unsafe": 22.377774208
+      },
+      "extrapolated_total_seconds": 3652.544040671,
+      "preprov_generations": {
+        "dead_drop": 1,
+        "h12h1_multi": 1,
+        "h12h1_replace": 1,
+        "h1_pp_off": 3,
+        "h1_replace_stat_on": 1,
+        "h1_stat_off": 11,
+        "h1_stat_on": 1,
+        "ic_first": 2,
+        "ic_first_default": 1,
+        "multi_symbol": 1,
+        "ratio_unsafe": 1
+      },
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    },
+    "regen_b4_mutants": {
+      "cells": [
+        "B_BTCUSDT_1h_4h",
+        "A_BTCUSDT_1h"
+      ],
+      "preprov_cells": [],
+      "code_state": "b4_mutant",
+      "reads_from": [],
+      "runs": [
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "D-MTF 統一案 mutant：_execute_layer1_6 恢復 preserve_dtype=True ⇒ 多週期出口 dtype 案紅",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "mut_mtf_preserve_dtype_restored",
+          "covers_ids": [
+            "mutation.mut_mtf_preserve_dtype_restored"
+          ],
+          "mutation_test": "tests/feature_engineering/test_numview_core.py::test_mutation_mtf_dtype_preserve_dtype_restored_breaks_exit_dtype",
+          "decision_branch": "d_mtf=unify",
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "D-MTF 保留案 mutant：保留分支下強制 preserve_dtype=False ⇒ 逐位元案紅",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "mut_mtf_retained_float32_exit",
+          "covers_ids": [
+            "mutation.mut_mtf_retained_float32_exit"
+          ],
+          "mutation_test": "tests/feature_engineering/test_numview_core.py::test_mutation_mtf_retained_float32_exit_breaks_bitwise",
+          "decision_branch": "d_mtf=retain",
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "D-MEMMAP 保留案 mutant：合併 dtype 脫鉤一律 float32 ⇒ L3／L4 逐位元案紅",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "mut_memmap_retained_decoupled",
+          "covers_ids": [
+            "mutation.mut_memmap_retained_decoupled"
+          ],
+          "mutation_test": "tests/feature_engineering/test_numview_core.py::test_mutation_memmap_retained_decoupled_breaks_bitwise",
+          "decision_branch": "d_memmap=retain",
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "D-L2 統一案 mutant：L5／L6 改回吃另一臂 ⇒ 多週期格紅",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "mut_l2_unified_l5_other_arm",
+          "covers_ids": [
+            "mutation.mut_l2_unified_l5_other_arm"
+          ],
+          "mutation_test": "tests/feature_engineering/test_numview_core.py::test_mutation_l2_unified_l5_back_to_other_arm_breaks_multi_tf",
+          "decision_branch": "d_l2=unify",
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "covers": "D-L2 保留案 mutant：L5／L6 改吃公開落盤值來源 ⇒ L5／L6 逐位元案紅（對象＝契約具名第一個非零格；估時取最壞情形＝格 B）",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "mut_l2_named_l5_l6_public_source",
+          "covers_ids": [
+            "mutation.mut_l2_named_l5_l6_public_source"
+          ],
+          "mutation_test": "tests/feature_engineering/test_numview_core.py::test_mutation_l2_named_l5_l6_public_source_breaks_bitwise",
+          "decision_branch": "d_l2=retain",
+          "seconds": 379.733112333
+        },
+        {
+          "cell": "A_BTCUSDT_1h",
+          "covers": "核心邊界 35 故障注入：compute_all_polars 拋錯 ⇒ 具名 Layer 2 失敗或 L5／L6 與公開 L2 一致",
+          "generations": 1,
+          "transform_passes": 0,
+          "env": {},
+          "variant": "fault_l2_polars_failure",
+          "covers_ids": [
+            "mutation.fault_l2_polars_failure"
+          ],
+          "mutation_test": "tests/feature_engineering/test_numview_core.py::test_boundary_35_core_always_l2_polars_failure_fallback_consistent",
+          "decision_branch": "core_always",
+          "seconds": 157.22779275
+        }
+      ],
+      "single_cell_seconds": {
+        "B": 1898.665561665,
+        "A": 157.22779275
+      },
+      "per_cell_seconds": {
+        "B_BTCUSDT_1h_4h": 1898.665561665,
+        "A_BTCUSDT_1h": 157.22779275
+      },
+      "preprov_seconds": {},
+      "extrapolated_total_seconds": 2055.893354415,
+      "preprov_generations": {},
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+    }
+  },
+  "cell_c_baseline": {
+    "1h": {
+      "seconds": 1043.9095515,
+      "peak_rss_bytes": 3671736320,
+      "source": "measured"
+    }
+  },
+  "blocked": [],
+  "history_blocked": [],
+  "continuity": {
+    "A_BTCUSDT_1h": {
+      "production_setting": true,
+      "validate_continuity": true,
+      "series_gaps": {},
+      "window_start": "2025-10-20T10:00:00+00:00",
+      "window_gaps": []
+    },
+    "A_BTCUSDT_4h": {
+      "production_setting": true,
+      "validate_continuity": true,
+      "series_gaps": {},
+      "window_start": "2024-03-30T16:00:00+00:00",
+      "window_gaps": []
+    },
+    "A_BTCUSDT_12h": {
+      "production_setting": true,
+      "validate_continuity": false,
+      "series_gaps": {
+        "12h": [
+          {
+            "after": "2018-02-08T00:00:00+00:00",
+            "before": "2018-02-09T00:00:00+00:00",
+            "after_ts": 1518048000,
+            "before_ts": 1518134400,
+            "missing_bars": 1
+          }
+        ]
+      },
+      "reason": "來源全序列有缺口：生產設定之全序列連續性驗證（fetch_aligned 不帶時間範圍）必拒讀；改以 False 建構，並以窗內零缺口判定（定案 ingest 起點至輸出終點）取代——窗內任一缺口 ⇒ failed（data_gap）",
+      "window_start": "2020-07-05T12:00:00+00:00",
+      "window_gaps": []
+    },
+    "A_SOLUSDT_1h": {
+      "production_setting": true,
+      "validate_continuity": true,
+      "series_gaps": {},
+      "window_start": "2025-10-20T10:00:00+00:00",
+      "window_gaps": []
+    },
+    "B_BTCUSDT_1h_4h": {
+      "production_setting": true,
+      "validate_continuity": true,
+      "series_gaps": {},
+      "window_start": "2024-08-03T04:00:00+00:00",
+      "window_gaps": []
+    },
+    "C_BTCUSDT_1h": {
+      "production_setting": true,
+      "validate_continuity": true,
+      "series_gaps": {},
+      "window_start": "2025-10-31T12:00:00+00:00",
+      "window_gaps": []
+    }
+  },
+  "savings": [
+    {
+      "method": "路徑覆蓋：Phase 1 變體只在宿主格各重生一次（不於每格重複）",
+      "saved_seconds": 2830.1002694999997
+    },
+    {
+      "method": "Task 1.1 同臂排名算一次供含排名之組合共用（只改量測程式、不減組合）",
+      "saved_seconds": 386.9374082509999
+    },
+    {
+      "method": "Phase 1 讀 Task 0.5 之 run（generations＝0 之 run 不重生；含 Task 1.3 L2 spy 掛於凍結生成）",
+      "saved_seconds": 4250.503789208
+    },
+    {
+      "method": "Phase 2–4 每批碼態內每個生成身分只生成一次，該批全部驗收檢查共用（判準檔 cell_rules.batch_cache）",
+      "saved_seconds": 1563.9138980000007
+    },
+    {
+      "method": "IC 頁各臂輸出每碼態每生成身分算一次（存於共用快取），讀其之檢查（reads_transforms）不各自重算",
+      "saved_seconds": 531.090958834
+    }
+  ],
+  "b_membership": {
+    "B_BTCUSDT_1h_4h": {
+      "candidate_timeframes": [
+        "1h",
+        "4h"
+      ],
+      "training_timeframes": [
+        "1h",
+        "4h"
+      ],
+      "excluded_timeframes": [],
+      "status": "ok",
+      "source": "estimate_measured_a_cells"
+    }
+  },
+  "incomplete": [],
+  "total_extrapolated_seconds": 18151.386108175997,
+  "pre_history": {
+    "A_BTCUSDT_1h": {
+      "d0_bars": 3050,
+      "final_warmup_bars": 3050,
+      "warmup_basis": "final",
+      "calibration_bars_primary": 1000,
+      "required_pre_history_bars": 4050,
+      "available_pre_history_bars": 19852,
+      "clipped": false,
+      "ingest_floor": "2025-10-20T10:00:00+00:00",
+      "training_timeframes": [
+        "1h"
+      ],
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        }
+      }
+    },
+    "A_BTCUSDT_4h": {
+      "d0_bars": 3050,
+      "final_warmup_bars": 3050,
+      "warmup_basis": "final",
+      "calibration_bars_primary": 1000,
+      "required_pre_history_bars": 4050,
+      "available_pre_history_bars": 4588,
+      "clipped": false,
+      "ingest_floor": "2024-03-30T16:00:00+00:00",
+      "training_timeframes": [
+        "4h"
+      ],
+      "kline_source": {
+        "4h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "e598f5cb914a7f94fde6b1b844751bb26707fd1c67c6f8b0b575834e2e706cf2",
+          "bar_count": 5088,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T20:00:00+00:00"
+        }
+      }
+    },
+    "A_BTCUSDT_12h": {
+      "d0_bars": 3050,
+      "final_warmup_bars": 3050,
+      "warmup_basis": "final",
+      "calibration_bars_primary": 1000,
+      "required_pre_history_bars": 4050,
+      "available_pre_history_bars": 6156,
+      "clipped": false,
+      "ingest_floor": "2020-07-05T12:00:00+00:00",
+      "training_timeframes": [
+        "12h"
+      ],
+      "kline_source": {
+        "12h": {
+          "source": "data_cache/feature_klines_longhist/kline_cache.h5",
+          "dataset_sha256": "d2af6da527b6eaa3e3c1057568bc805752b9b82b56829bd4e025627064c966c5",
+          "bar_count": 6656,
+          "series_start": "2017-08-17T00:00:00+00:00",
+          "series_end": "2026-09-27T00:00:00+00:00"
+        }
+      }
+    },
+    "A_SOLUSDT_1h": {
+      "d0_bars": 3050,
+      "final_warmup_bars": 3050,
+      "warmup_basis": "final",
+      "calibration_bars_primary": 1000,
+      "required_pre_history_bars": 4050,
+      "available_pre_history_bars": 19852,
+      "clipped": false,
+      "ingest_floor": "2025-10-20T10:00:00+00:00",
+      "training_timeframes": [
+        "1h"
+      ],
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "213fef2d0c2a9694a2b9cd4b0991e08e5db05c1ebc0a4098230d0955c312603d",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        }
+      }
+    },
+    "B_BTCUSDT_1h_4h": {
+      "d0_bars": 10688,
+      "final_warmup_bars": 10688,
+      "warmup_basis": "final",
+      "calibration_bars_primary": 4000,
+      "required_pre_history_bars": 14688,
+      "available_pre_history_bars": 19852,
+      "clipped": false,
+      "ingest_floor": "2024-08-03T04:00:00+00:00",
+      "training_timeframes": [
+        "1h",
+        "4h"
+      ],
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        },
+        "4h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "e598f5cb914a7f94fde6b1b844751bb26707fd1c67c6f8b0b575834e2e706cf2",
+          "bar_count": 5088,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T20:00:00+00:00"
+        }
+      }
+    },
+    "C_BTCUSDT_1h": {
+      "d0_bars": 3784,
+      "final_warmup_bars": 3784,
+      "warmup_basis": "final",
+      "calibration_bars_primary": 0,
+      "required_pre_history_bars": 3784,
+      "available_pre_history_bars": 19852,
+      "clipped": false,
+      "ingest_floor": "2025-10-31T12:00:00+00:00",
+      "training_timeframes": [
+        "1h"
+      ],
+      "kline_source": {
+        "1h": {
+          "source": "data_cache/feature_klines/kline_cache.h5",
+          "dataset_sha256": "0b4afad0bdec595c7b014779f871961e98893a322fc5f16b882888e302c8241c",
+          "bar_count": 20352,
+          "series_start": "2024-01-01T00:00:00+00:00",
+          "series_end": "2026-04-27T23:00:00+00:00"
+        }
+      }
+    }
+  },
+  "reported_at": "2026-10-22T22:36:04.217434+00:00",
+  "reported_note": "使用者 2026-10-23 於對話中同意總時數約 5.0 小時（外推 18151 秒）後回覆「已經刪除。你開始做」；判準 v6→v7 只改說明字面（freeze_groups._doc、格 C 不含 processed、storage 路徑更名與錨點），估時內容（總秒數逐位相同）不變，沿用該同意"
+}
