@@ -746,12 +746,30 @@ def _constant_rows(u: np.ndarray, window: int, min_count: int) -> np.ndarray:
     return out
 
 
-def _reference_column(args: Tuple[np.ndarray, int, int, int]) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
-    """單欄之七組合參照輸出與定義差異格（共用 rank、gaussian 中間結果；順序 rank→gaussian→zscore）。"""
+def _valid_counts(u: np.ndarray, window: int) -> np.ndarray:
+    """列 t 之窗 [t−w+1, t] 內有限值個數。"""
+    cum = np.concatenate([[0], np.cumsum(np.isfinite(u).astype(np.int64))])
+    t = np.arange(u.size)
+    return cum[t + 1] - cum[np.maximum(0, t - window + 1)]
+
+
+def _registry_zscore_min_valid(window: int) -> int:
+    """registry 快速路徑 zscore 之最少有效值數（產品 `_numba_transforms._rolling_min_periods`，`transform_array_fast` 之
+    zscore 以之為 `_rolling_mean_std` 之 min_periods；不足 ⇒ 標準差 NaN ⇒ 輸出 0）。"""
+    from momentum.FeatureEngineering.preprocessing._numba_transforms import _rolling_min_periods
+
+    return int(_rolling_min_periods(int(window)))
+
+
+def _reference_column(args: Tuple[np.ndarray, int, int, int]) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """單欄之七組合參照輸出、定義差異格（全臂：常數窗約定）與 registry 系另一定義差異格（zscore 步窗內有效值數介於 2 與
+    registry 快速路徑最少有效值數之間：參照與 pandas／Polars 臂計 z，該路徑輸出 0；SPEC Task 0.6 定義差異；NUMVIEW 1.1
+    收據審查後查出）；共用 rank、gaussian 中間結果；順序 rank→gaussian→zscore。"""
     from tests.feature_engineering import numview_reference as ref
 
     x, rank_w, gauss_w, z_w = args
     mp_r, mp_g = ref.min_periods_for(rank_w), ref.min_periods_for(gauss_w)
+    reg_min = _registry_zscore_min_valid(z_w)
 
     def rank(u: np.ndarray, d: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         out = ref.mask_incomplete_window(ref.rolling_rank(u, rank_w, mp_r), u, rank_w)
@@ -761,20 +779,27 @@ def _reference_column(args: Tuple[np.ndarray, int, int, int]) -> Dict[str, Tuple
         out = ref.mask_incomplete_window(ref.gaussian(u, gauss_w, mp_g), u, gauss_w)
         return out, (_constant_rows(u, gauss_w, mp_g) | _windowed_any(d, gauss_w)) & np.isfinite(out)
 
-    def zscore(u: np.ndarray, d: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def zscore(u: np.ndarray, d: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         out = ref.mask_incomplete_window(ref.rolling_zscore_incremental(u, z_w, EPSILON), u, z_w)
-        return out, (_constant_rows(u, z_w, 2) | _windowed_any(d, z_w)) & np.isfinite(out)
+        counts = _valid_counts(u, z_w)
+        registry = np.isfinite(out) & (counts >= 2) & (counts < reg_min)
+        return out, (_constant_rows(u, z_w, 2) | _windowed_any(d, z_w)) & np.isfinite(out), registry
+
+    def plain(pair: Tuple[np.ndarray, np.ndarray]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        return pair[0], pair[1], np.zeros(pair[0].size, dtype=bool)
 
     none = np.zeros(x.size, dtype=bool)
     r = rank(x, none)
     g = gauss(x, none)
     gr = gauss(*r)
-    return {"rank": r, "zscore": zscore(x, none), "gaussian": g, "rank+zscore": zscore(*r), "rank+gaussian": gr,
-            "zscore+gaussian": zscore(*g), "rank+zscore+gaussian": zscore(*gr)}
+    return {"rank": plain(r), "zscore": zscore(x, none), "gaussian": plain(g), "rank+zscore": zscore(*r),
+            "rank+gaussian": plain(gr), "zscore+gaussian": zscore(*g), "rank+zscore+gaussian": zscore(*gr)}
 
 
-def reference_outputs(values: np.ndarray, gauss_w: int, workers: int) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
-    """七組合參照（n×c）與定義差異格（n×c bool）；窗取 ICPOSTLEAK 契約（zscore 主窗＝清單第一個），gaussian 窗＝`gauss_w`。"""
+def reference_outputs(values: np.ndarray, gauss_w: int,
+                      workers: int) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """七組合參照（n×c）、定義差異格（n×c bool，全臂）與 registry 系另一定義差異格（n×c bool）；窗取 ICPOSTLEAK 契約
+    （zscore 主窗＝清單第一個），gaussian 窗＝`gauss_w`。"""
     import multiprocessing
 
     contract = icpostleak_contract()
@@ -787,9 +812,30 @@ def reference_outputs(values: np.ndarray, gauss_w: int, workers: int) -> Dict[st
         results = [_reference_column(job) for job in jobs]
     names = [combo_name(c) for c in combos()]
     n = values.shape[0]
-    return {name: (np.column_stack([r[name][0] for r in results]) if results else np.empty((n, 0)),
-                   np.column_stack([r[name][1] for r in results]) if results else np.empty((n, 0), dtype=bool))
+    return {name: tuple(np.column_stack([r[name][k] for r in results]) if results
+                        else np.empty((n, 0), dtype=np.float64 if k == 0 else bool) for k in range(3))
             for name in names}
+
+
+def definition_conventions() -> Dict[str, Any]:
+    """收據 `definition_conventions`：各臂約定與參照不同處（SPEC Task 0.6 定義差異；格級差之浮點誤差欄扣除之）。"""
+    z_w = int(icpostleak_contract()["zscore_windows"][0])
+    return {
+        "constant_window": {
+            "reference": "窗內有效值逐一相等", "pandas": "rolling.std(ddof=0) == 0.0（feature_preprocessor.py:4471）",
+            "polars": "窗內有效值逐一相等（polars_adapter.py:500）", "numba": "窗內有效值逐一相等（_numba_transforms.py:73）"},
+        "zscore_min_valid": {
+            "reference": "窗內有效值 ≥ 2 計 z（numview_reference.rolling_zscore）",
+            "pandas": "rolling(min_periods=1)，1 個時標準差 NaN ⇒ 0（feature_preprocessor.py:3225）",
+            "polars": "rolling_std(min_samples=1)，標準差 null ⇒ 0（polars_adapter.py:597）",
+            "numba": f"_rolling_mean_std(min_periods=_rolling_min_periods(窗))＝{_registry_zscore_min_valid(z_w)}（窗 {z_w}），"
+                     "不足 ⇒ 標準差 NaN ⇒ 0（_numba_transforms.py:469-487）；只 registry 系分支，列之 definition 含之"},
+    }
+
+
+def is_registry_branch(branch: str) -> bool:
+    """registry 系分支（ICPOSTLEAK 契約 entry 非 `transform`：經 registry 快速路徑）。"""
+    return branch != CANDIDATE_ARM and icpostleak_contract()["branches"][branch]["entry"] != "transform"
 
 
 # ---------------------------------------------------------------------------------------------- IC 與列
@@ -991,7 +1037,7 @@ def run_unit(cell: Mapping[str, Any], input_kind: str, work: Path, *, max_cols: 
     reference = reference_outputs(frame.to_numpy(dtype=np.float64), gauss_w, workers) if columns else {}
     reference_seconds = time.perf_counter() - t0
     _log(f"{cell_id}：參照 {reference_seconds:.1f} 秒")
-    ic_ref = {name: spearman_ic(ref_values, label) for name, (ref_values, _) in reference.items()}
+    ic_ref = {name: spearman_ic(ref_values, label) for name, (ref_values, _, _) in reference.items()}
     rows: List[Dict[str, Any]] = []
     sink_routes: List[Dict[str, Any]] = []
     sink_runs: List[Dict[str, Any]] = []
@@ -1007,7 +1053,9 @@ def run_unit(cell: Mapping[str, Any], input_kind: str, work: Path, *, max_cols: 
             for name, out in branch_outputs(branch, frame, tf, Path(tmp), points=points, routes_by_combo=routes_by_combo,
                                             check_shared=check_shared, shared_checks=shared_checks, unit=unit):
                 if columns:
-                    ref_values, definition = reference[name]
+                    ref_values, definition, registry_definition = reference[name]
+                    if is_registry_branch(branch):
+                        definition = definition | registry_definition
                     row = diff_row(ref_values, definition, out, ic_ref[name], label, columns)
                 else:
                     row = {**cell_diff(np.empty((len(frame), 0)), np.empty((len(frame), 0))), "definition_cells": 0,
@@ -1064,6 +1112,54 @@ def run_unit(cell: Mapping[str, Any], input_kind: str, work: Path, *, max_cols: 
                        "branch_seconds": branch_seconds}}
 
 
+#: 重分類時須與原收據逐值相同之列欄（證輸出未變：只隨定義差異格改變者以外之全部欄）
+RECLASSIFY_INVARIANT_FIELDS = ("all_cells", "finite_cells", "tau_b", "sign_flips", "material", "material_reason",
+                               "ic_abs_delta_max", "ic_delta_over_se_max")
+#: 重分類時依新定義差異格重算之列欄
+RECLASSIFY_UPDATED_FIELDS = ("max_abs", "p99_abs", "max_rel", "near_zero_cells", "near_zero_max_abs", "nan_mask_diff",
+                             "definition_cells", "definition")
+
+
+def run_reclassify_unit(cell: Mapping[str, Any], cell_entry: Mapping[str, Any], old_rows: Sequence[Mapping[str, Any]],
+                        work: Path, *, workers: int) -> Dict[str, Any]:
+    """registry 系分支列之定義差異重分類（zscore 最少有效值數約定）：重算參照與該輸入之 registry 系分支輸出，列欄中
+    `RECLASSIFY_INVARIANT_FIELDS` 須與原收據逐值相同（證輸出未變、不須全量重跑），`RECLASSIFY_UPDATED_FIELDS` 依新定義差異格
+    重算。回 {rows: 更新後之 registry 系列, verified: 逐值相同之列數, mismatches: 不同之列與欄}。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    criteria = _criteria()
+    input_kind = str(cell_entry["input"])
+    tf = str(cell["timeframes"][0])
+    data = input_i(cell, criteria) if input_kind == "i" else input_ii(cell, criteria)
+    frame = data["frame"]
+    if int(frame.shape[1]) != int(cell_entry["columns"]):
+        raise RuntimeError(f"{cell_entry['cell_id']}：欄數 {frame.shape[1]} ≠ 收據 {cell_entry['columns']}")
+    label = label_from_close(data["close"])
+    gauss_w = int(FeaturePreprocessor(icpostleak_config(["gaussian"]))._rolling_window())
+    reference = reference_outputs(frame.to_numpy(dtype=np.float64), gauss_w, workers)
+    ic_ref = {name: spearman_ic(ref_values, label) for name, (ref_values, _, _) in reference.items()}
+    old = {(str(r["branch"]), str(r["combo"])): r for r in old_rows}
+    rows: List[Dict[str, Any]] = []
+    mismatches: List[Dict[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="numview_bd_reclass_", dir=str(work)) as tmp:
+        for branch in [b for b in branches_for_input(input_kind, criteria) if is_registry_branch(b)]:
+            for name, out in branch_outputs(branch, frame, tf, Path(tmp), points=[], routes_by_combo={},
+                                            check_shared=False, shared_checks=[], unit=(str(cell_entry["cell_id"]),
+                                                                                         input_kind)):
+                ref_values, definition, registry_definition = reference[name]
+                new = diff_row(ref_values, definition | registry_definition, out, ic_ref[name], label,
+                               int(cell_entry["columns"]))
+                before = dict(old[(branch, name)])
+                bad = [f for f in RECLASSIFY_INVARIANT_FIELDS if json.dumps(new.get(f), sort_keys=True, default=str)
+                       != json.dumps(before.get(f), sort_keys=True, default=str)]
+                if bad:
+                    mismatches.append({"cell_id": cell_entry["cell_id"], "branch": branch, "combo": name, "fields": bad})
+                before.update({f: new.get(f) for f in RECLASSIFY_UPDATED_FIELDS})
+                rows.append(before)
+                _log(f"{cell_entry['cell_id']}：重分類 {branch} {name}（定義差異格 {new['definition_cells']}）")
+    return {"rows": rows, "verified": len(rows) - len(mismatches), "mismatches": mismatches}
+
+
 def run_perf_unit(cell: Mapping[str, Any], work: Path, *, max_cols: Optional[int]) -> Dict[str, Any]:
     """獨立效能基準（判準 `run_coverage.perf_benchmark` 之格、輸入 (ii)）：各可達臂＋候選臂三次、Polars 慢因剖析。"""
     from momentum.FeatureEngineering import numeric_view
@@ -1101,6 +1197,8 @@ def _branchdiff_cells(criteria: Mapping[str, Any], run_kind: str) -> List[Dict[s
 def _parse(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="NUMVIEW Task 1.1 post-IC 分支差與效能基準")
     parser.add_argument("--perf", action="store_true", help="獨立效能基準（寫 perf-benchmark 收據）")
+    parser.add_argument("--reclassify", action="store_true",
+                        help="既有 postic-branchdiff 收據之 registry 系列定義差異重分類（不全量重跑；就地更新收據）")
     parser.add_argument("--cells", default=None, help="只跑之格 id（逗號分隔；試跑用，須同給 --out）")
     parser.add_argument("--inputs", default="i,ii", help="只跑之輸入（試跑用，須同給 --out）")
     parser.add_argument("--max-cols", type=int, default=None, help="每格最多欄數（試跑用，須同給 --out）")
@@ -1119,6 +1217,8 @@ def _child(spec_path: Path) -> int:
     work.mkdir(parents=True, exist_ok=True)
     if spec["mode"] == "perf":
         result = run_perf_unit(spec["cell"], work, max_cols=spec["max_cols"])
+    elif spec["mode"] == "reclassify":
+        result = run_reclassify_unit(spec["cell"], spec["cell_entry"], spec["old_rows"], work, workers=int(spec["workers"]))
     else:
         result = run_unit(spec["cell"], spec["input"], work, max_cols=spec["max_cols"], workers=int(spec["workers"]),
                           with_speed=bool(spec["with_speed"]))
@@ -1152,6 +1252,53 @@ def _run_units(specs: List[Dict[str, Any]], inline: bool) -> List[Dict[str, Any]
     return results
 
 
+def reclassify(args: argparse.Namespace) -> int:
+    """`--reclassify`：讀現有 `*-numview-postic-branchdiff.json`（恰一份），逐 (格, 輸入) 子行程重算 registry 系列之定義
+    差異分類（`run_reclassify_unit`）；任一列之不變欄與原收據不同 ⇒ 不寫回、rc 3。通過 ⇒ 就地替換該等列、更新
+    `definition_conventions`、追加 `reclassification` 紀錄（原 `generated_at`、`checks`、`exit_code` 不變）。"""
+    hits = sorted(RECEIPTS_DIR.glob("*-numview-postic-branchdiff.json"))
+    if len(hits) != 1:
+        print(f"[branchdiff] postic-branchdiff 收據須恰一份，實得 {[p.name for p in hits]}", file=sys.stderr)
+        return 2
+    path = hits[0]
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    if receipt.get("criteria_sha256") != _criteria_sha256():
+        print("[branchdiff] 收據之 criteria_sha256 ≠ 現行判準", file=sys.stderr)
+        return 2
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    work = Path(args.work_root) / f"reclassify_{stamp}"
+    specs = []
+    for entry in receipt["cells"]:
+        tf = str(entry["timeframes"][0])
+        cell = {"id": f"{entry['kind']}_{entry['symbol']}_{tf}", "kind": str(entry["kind"]), "symbol": str(entry["symbol"]),
+                "timeframes": [tf]}
+        old_rows = [r for r in receipt["rows"] if (r["cell_id"], r["input"]) == (entry["cell_id"], entry["input"])
+                    and is_registry_branch(str(r["branch"]))]
+        specs.append({"label": f"reclassify:{entry['cell_id']}", "mode": "reclassify", "cell": cell, "cell_entry": entry,
+                      "old_rows": old_rows, "workers": args.workers, "work": str(work / entry["cell_id"].replace(":", "_")),
+                      "result_path": str(work / "_results" / f"{entry['cell_id'].replace(':', '_')}.json")})
+    with _freeze()._clean_env({}):
+        results = _run_units(specs, args.inline)
+    mismatches = [m for r in results for m in r["mismatches"]]
+    if mismatches:
+        print(f"[branchdiff] 重分類不變欄不符 {len(mismatches)} 列（首列 {mismatches[0]}）⇒ 不寫回", file=sys.stderr)
+        return 3
+    updated = {(r["cell_id"], r["input"], r["branch"], r["combo"]): r for res in results for r in res["rows"]}
+    receipt["rows"] = [updated.get((r["cell_id"], r["input"], r["branch"], r["combo"]), r) for r in receipt["rows"]]
+    receipt["definition_conventions"] = definition_conventions()
+    receipt.setdefault("reclassification", []).append({
+        "at": datetime.now(timezone.utc).isoformat(),
+        "command": "venv/bin/python handoffs/run_receipts/numview_probes/postic_branchdiff.py --reclassify",
+        "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip(),
+        "reason": "registry 系分支之 zscore 最少有效值數約定（numba 路徑 _rolling_min_periods(窗)，參照與 pandas／Polars 為 2）"
+                  "屬 SPEC Task 0.6 定義差異，原收據計入浮點誤差欄；只重算 registry 系列之定義差異相關欄",
+        "rows_updated": len(updated), "invariant_fields_verified": list(RECLASSIFY_INVARIANT_FIELDS),
+        "updated_fields": list(RECLASSIFY_UPDATED_FIELDS), "verified_rows": sum(r["verified"] for r in results)})
+    path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
+    _log(f"重分類完成：{len(updated)} 列（不變欄逐值相同）；收據 {path}")
+    return 0
+
+
 def _common_header(command: Sequence[str]) -> Dict[str, Any]:
     return {"schema_version": 1, "generated_at": datetime.now(timezone.utc).isoformat(),
             "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip(),
@@ -1166,6 +1313,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _parse(argv)
     if args.child:
         return _child(Path(args.child))
+    if args.reclassify:
+        return reclassify(args)
     trial = bool(args.cells or args.max_cols is not None or args.no_speed or args.inputs != "i,ii")
     if trial and not args.out:
         print("[branchdiff] 試跑旗標須同給 --out（不得寫正式收據）", file=sys.stderr)
@@ -1226,9 +1375,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    "branches": sorted(set(icpostleak_contract()["branches"]) | {CANDIDATE_ARM}),
                    **merged, "sink_routes_summary": {"production_shard_bytes": production_shard_bytes,
                                                      "input_ii_group_bytes": max(ii_bytes) if ii_bytes else 0},
-                   "definition_conventions": {"constant_window": {
-                       "reference": "窗內有效值逐一相等", "pandas": "rolling.std(ddof=0) == 0.0（feature_preprocessor.py:4471）",
-                       "polars": "窗內有效值逐一相等（polars_adapter.py:500）", "numba": "窗內有效值逐一相等（_numba_transforms.py:73）"}},
+                   "definition_conventions": definition_conventions(),
                    "timings": timings}
         icpl = icpostleak_contract()["kline"]
         checks = {

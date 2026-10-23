@@ -549,6 +549,30 @@ def test_postic_branchdiff_reproduces_legacy_optimized_zero_diff() -> None:
         assert r["diff_cells"] == 0 and r["nan_mask_diff"] == 0 and r["max_abs_diff"] == 0.0, r
 
 
+def test_postic_branchdiff_definition_conventions_listed() -> None:
+    """SPEC Task 0.6（定義差異須另列，不混入浮點誤差）：收據 `definition_conventions` 列常數窗與 zscore 最少有效值數兩項；
+    registry 系分支（ICPOSTLEAK 契約 entry 非 transform）之列，其定義差異格數不少於同 (格, 輸入, 組合) 之非 registry 分支
+    （registry 系另含 zscore 最少有效值數之格）。"""
+    receipt = load_receipt("postic-branchdiff")
+    assert {"constant_window", "zscore_min_valid"} <= set(receipt.get("definition_conventions") or {})
+    branches = icpostleak_contract()["branches"]
+    registry = {b for b, spec in branches.items() if spec["entry"] != "transform"}
+    by_key: Dict[Tuple[str, str, str], Dict[str, int]] = {}
+    for row in receipt["rows"]:
+        by_key.setdefault((str(row["cell_id"]), str(row["input"]), str(row["combo"])), {})[str(row["branch"])] = \
+            int(row.get("definition_cells") or 0)
+    checked = strict = 0
+    for key, cells in by_key.items():
+        plain = [v for b, v in cells.items() if b not in registry]
+        for b, v in cells.items():
+            if b in registry and plain:
+                assert v >= max(plain), (key, b, v, plain)
+                checked += 1
+                strict += int(v > max(plain))
+    assert checked >= 1
+    assert strict >= 1, "registry 系無任一列多出 zscore 最少有效值數之定義差異格（未重分類？）"
+
+
 def test_perf_benchmark_receipt_rc_criteria_and_content() -> None:
     """Task 1.1 驗證（效能基準）：`*-numview-perf-benchmark.json` rc=0、`criteria_sha256` 相符；內容合
     `numview_helpers.perf_benchmark_receipt_violations`（判準 `run_coverage.perf_benchmark` 之格、契約臂＋候選臂、可達臂三次
