@@ -906,7 +906,10 @@
           "covers_ids": [
             "precision.memmap_branch"
           ],
-          "seconds": 157.22779275
+          "seconds": 196.08818458300001,
+          "measured_lag_on": true,
+          "trial_status": "complete",
+          "seconds_basis": "Task 1.2 試跑實測（設定覆寫 lag_features.enabled=true；SPEC v37 細則⑦）"
         },
         {
           "cell": "A_BTCUSDT_1h",
@@ -918,7 +921,10 @@
           "covers_ids": [
             "precision.memmap_branch"
           ],
-          "seconds": 157.22779275
+          "seconds": 197.517087958,
+          "measured_lag_on": true,
+          "trial_status": "complete",
+          "seconds_basis": "Task 1.2 試跑實測（設定覆寫 lag_features.enabled=true；SPEC v37 細則⑦）"
         },
         {
           "cell": "A_BTCUSDT_1h",
@@ -988,14 +994,58 @@
         "A": 943.3667564999998
       },
       "per_cell_seconds": {
-        "A_BTCUSDT_1h": 943.3667564999998,
-        "B_BTCUSDT_1h_4h": 0.0,
-        "C_BTCUSDT_1h": 0.0
+        "A_BTCUSDT_1h": 1022.5164435409997,
+        "B_BTCUSDT_1h_4h": 379.733112333,
+        "C_BTCUSDT_1h": 1043.9095515
       },
       "preprov_seconds": {},
-      "extrapolated_total_seconds": 943.3667564999998,
+      "extrapolated_total_seconds": 2446.1591073739996,
       "preprov_generations": {},
-      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）"
+      "basis": "判準檔 run_coverage（路徑覆蓋；每個 run 之 covers 為其獨有覆蓋路徑）",
+      "addenda": [
+        {
+          "cell": "B_BTCUSDT_1h_4h",
+          "variant": "b_production_spy",
+          "generations": 1,
+          "covers": "Task 1.2 B 格生產重生（FFACT_MULTI_TF_PARALLEL=0 串列以供 spy）：S0 層間 float64 與 S1／S2 擷取",
+          "covers_ids": [
+            "cell.multi_tf_float64_layers"
+          ],
+          "unique_output": [
+            "S0",
+            "S1",
+            "S2"
+          ],
+          "code_evidence": [
+            "momentum/FeatureEngineering/feature_factory.py:667",
+            "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:429",
+            "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1233"
+          ],
+          "seconds": 379.733112333,
+          "seconds_basis": "measurements.B_BTCUSDT_1h_4h.seconds"
+        },
+        {
+          "cell": "C_BTCUSDT_1h",
+          "variant": "c_preserve_dtype",
+          "generations": 1,
+          "covers": "Task 1.2 C 格 preserve_dtype=True 重生（含 L2 Polars 臂抬升）：全特徵 float64 層間鏈之 S0 與該 run 讀回",
+          "covers_ids": [
+            "cell.full_features_production_default",
+            "precision.s0_float64_chain"
+          ],
+          "unique_output": [
+            "S0",
+            "S3"
+          ],
+          "code_evidence": [
+            "momentum/FeatureEngineering/feature_factory.py:673",
+            "momentum/FeatureEngineering/feature_factory.py:727",
+            "momentum/FeatureEngineering/polars_adapter.py:96"
+          ],
+          "seconds": 1043.9095515,
+          "seconds_basis": "measurements.C_BTCUSDT_1h.seconds"
+        }
+      ]
     },
     "l2_arm_matrix": {
       "cells": [
@@ -2358,7 +2408,7 @@
     }
   },
   "incomplete": [],
-  "total_extrapolated_seconds": 18151.386108175997,
+  "total_extrapolated_seconds": 19654.178459049996,
   "pre_history": {
     "A_BTCUSDT_1h": {
       "d0_bars": 3050,
@@ -2501,6 +2551,23 @@
       }
     }
   },
-  "reported_at": "2026-10-22T22:36:04.217434+00:00",
-  "reported_note": "使用者 2026-10-23 於對話中同意總時數約 5.0 小時（外推 18151 秒）後回覆「已經刪除。你開始做」；判準 v6→v7 只改說明字面、v7→v8 只增 Task 1.1 收據結構定義（branches_by_input、label_provenance〔規格審查 r22 增窗起訖、列數欄與獨立重算規則〕、sink_routes）、v8→v9 只增 material.identical_all_nan（參照與變體皆全 NaN ⇒ 非 material），估時內容（總秒數逐位相同）不變，沿用該同意"
+  "reported_note": "使用者 2026-10-23 於對話中同意總時數約 5.0 小時（外推 18151 秒）後回覆「已經刪除。你開始做」；判準 v6→v7 只改說明字面、v7→v8 只增 Task 1.1 收據結構定義（branches_by_input、label_provenance〔規格審查 r22 增窗起訖、列數欄與獨立重算規則〕、sink_routes）、v8→v9 只增 material.identical_all_nan（參照與變體皆全 NaN ⇒ 非 material），估時內容（總秒數逐位相同）不變，沿用該同意",
+  "revisions": [
+    {
+      "at": "2026-10-23T18:08:47.533418+00:00",
+      "kind": "precision_addenda",
+      "reason": "SPEC v37：Task 1.2 B／C 增列重生與 memmap 兩變體開 lag 實測秒數（判準 run_coverage 不改）",
+      "previous_reported_at": "2026-10-22T22:36:04.217434+00:00",
+      "precision_chain_total_before": 943.3667564999998,
+      "precision_chain_total_after": 2446.1591073739996,
+      "lag_on_seconds": {
+        "memmap_forced_low": 196.08818458300001,
+        "memmap_forced_high": 197.517087958
+      },
+      "lag_on_status": {
+        "memmap_forced_low": "complete",
+        "memmap_forced_high": "complete"
+      }
+    }
+  ]
 }
