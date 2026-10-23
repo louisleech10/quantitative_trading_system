@@ -64,7 +64,7 @@
 </tr>
 <tr>
 <td><strong>「IC 篩完 → 正規化 → 交給訓練」這半段沒接通</strong></td>
-<td>IC First 當初的用意是：Rank／Zscore／Gaussian 對幾萬欄算太久，所以只對 IC 選中的欄做。現況是「IC 前不算」這半已生效；IC First 這條路 2026-10-08 起改走正式引擎、真實資料不再報錯（ICFIRSTALIGN 已收案）。還沒有的是「選中的欄正規化後交給訓練」：IC First 入口沒有正式呼叫端，IC 頁「套用轉換」的輸出也沒人讀。（IC 頁偷看未來、窗沒湊滿就出值這兩件，已由 ICPOSTLEAK 修好）</td>
+<td>IC First 當初的用意是：Rank／Zscore／Gaussian 對幾萬欄算太久，所以只對 IC 選中的欄做。現況是「IC 前不算」這半已生效；IC First 這條路 2026-10-08 起改走正式引擎、真實資料不再報錯（ICFIRSTALIGN 已收案）。還沒有的是「選中的欄正規化後交給訓練」：IC First 入口沒有正式呼叫端，IC 頁「套用轉換」的輸出也沒人讀。另外 IC First 選欄只看「IC 絕對值 ≥ 0.02」一道門檻（<code>momentum/Analysis/ic_engine.py:237</code>、<code>:859</code>），沒有 IC 頁那套 p 值＋FDR；資料少時（例如 500 筆）純隨機就有約六成五的欄會過，接訓練前應改成和 IC 頁同一套檢定（2026-10-22 查出、10-23 補記）。（IC 頁偷看未來、窗沒湊滿就出值這兩件，已由 ICPOSTLEAK 修好）</td>
 <td>等訓練（ML）開票：訓練該吃哪份資料、從哪接，要在那張票定（同第 9 步縮尾重複的「ML 該吃哪份資料」）；IC First 入口你 2026-09-26 裁定不刪；不要把三種轉換搬回 IC 之前（會回到全量生成太慢）</td>
 </tr>
 <tr>
