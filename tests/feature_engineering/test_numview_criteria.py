@@ -3808,3 +3808,173 @@ def test_mutation_heavy_script_generation_bypasses_watchdog(mutant: str, monkeyp
     assert bad != _WIRED_SOURCE
     monkeypatch.setattr(sys.modules[__name__], "_read_text", lambda path: bad)
     assert watchdog_wiring_violations_for(_rel(target), _read_text(target)) != []
+
+
+# ---------------------------------------------------------------------------------------------- Task 1.2 增列（SPEC v36–v37）
+
+#: SPEC v37 驗證段：`PRECISION_ADDENDA` 之期望值（字面鎖定；估時收據 `run_kinds.precision_chain.addenda` 之唯一期望來源）
+PRECISION_ADDENDA_EXPECTED: Tuple[Dict[str, Any], ...] = (
+    {"cell": "B_BTCUSDT_1h_4h", "variant": "b_production_spy", "generations": 1,
+     "covers_ids": ["cell.multi_tf_float64_layers"], "unique_output": ["S0", "S1", "S2"]},
+    {"cell": "C_BTCUSDT_1h", "variant": "c_preserve_dtype", "generations": 1,
+     "covers_ids": ["cell.full_features_production_default", "precision.s0_float64_chain"],
+     "unique_output": ["S0", "S3"]},
+)
+#: 各增列須含之已登錄路徑 id（SPEC v37 驗證段）
+PRECISION_ADDENDA_REQUIRED_IDS: Dict[str, Set[str]] = {
+    "b_production_spy": {"cell.multi_tf_float64_layers"},
+    "c_preserve_dtype": {"cell.full_features_production_default", "precision.s0_float64_chain"},
+}
+
+
+def precision_addenda_violations(receipt: Mapping[str, Any], criteria: Mapping[str, Any]) -> List[str]:
+    """估時收據之 Task 1.2 增列檢查（SPEC v37 驗證段；與 `closed_estimate_receipt_violations` 並列）：列數＝期望列數、
+    (格, 變體) 唯一且集合恰等於期望；每列 `generations`＝1；`covers_ids` 非空、⊆ 判準 `path_registry`、含該變體之必要 id，
+    且 (格, id 集合) 異於判準 `run_coverage` 任一生成列；`unique_output` 為封閉段列表且恰等於期望；秒數為正、計入
+    `per_cell_seconds` 與跑別總秒數。"""
+    out: List[str] = []
+    node = ((receipt.get("run_kinds") or {}).get("precision_chain") or {})
+    addenda = node.get("addenda")
+    if not isinstance(addenda, list):
+        return ["precision_chain.addenda 缺"]
+    expected = {(e["cell"], e["variant"]): e for e in PRECISION_ADDENDA_EXPECTED}
+    keys = [(str(a.get("cell")), str(a.get("variant"))) for a in addenda]
+    if len(addenda) != len(expected):
+        out.append(f"addenda 列數 {len(addenda)} ≠ {len(expected)}")
+    if len(keys) != len(set(keys)):
+        out.append(f"addenda (格, 變體) 重複：{keys}")
+    if set(keys) != set(expected):
+        out.append(f"addenda (格, 變體) 集合 {sorted(set(keys))} ≠ 期望 {sorted(expected)}")
+    registry = {str(p["id"]) for p in (criteria.get("path_registry") or {}).get("paths") or []}
+    generated = {(str(r["cell"]), frozenset(str(i) for i in r.get("covers_ids") or []))
+                 for kind in (criteria.get("run_coverage") or {}).values() if isinstance(kind, Mapping)
+                 for r in kind.get("runs") or [] if r.get("generations")}
+    runs_by_cell: Dict[str, float] = {}
+    for r in node.get("runs") or []:
+        runs_by_cell[str(r.get("cell"))] = runs_by_cell.get(str(r.get("cell")), 0.0) + float(r.get("seconds") or 0.0)
+    for a in addenda:
+        key = (str(a.get("cell")), str(a.get("variant")))
+        want = expected.get(key)
+        if type(a.get("generations")) is not int or a.get("generations") != 1:  # 審碼 r15：True＝＝1 不得通過
+            out.append(f"{key}：generations ≠ 1")
+        ids = [str(i) for i in a.get("covers_ids") or []]
+        if not ids or not set(ids) <= registry:
+            out.append(f"{key}：covers_ids 空或含未登錄 id {sorted(set(ids) - registry)}")
+        if not PRECISION_ADDENDA_REQUIRED_IDS.get(key[1], set()) <= set(ids):
+            out.append(f"{key}：covers_ids 缺必要 id {sorted(PRECISION_ADDENDA_REQUIRED_IDS.get(key[1], set()) - set(ids))}")
+        if (key[0], frozenset(ids)) in generated:
+            out.append(f"{key}：(格, covers_ids) 與判準 run_coverage 生成列相同")
+        unique = a.get("unique_output")
+        if not isinstance(unique, list) or not unique or not set(unique) <= {"S0", "S1", "S2", "S3", "S4", "S5"} \
+                or (want is not None and unique != want["unique_output"]):
+            out.append(f"{key}：unique_output {unique!r} 非封閉段列表或 ≠ 期望")
+        if not _positive_number(a.get("seconds")):
+            out.append(f"{key}：seconds 非正")
+        else:  # 審碼 r15：秒數＝generations × 估時收據該格 measurements 實測秒數
+            meas = (receipt.get("measurements") or {}).get(key[0]) or {}
+            measured = meas.get("seconds")
+            # 審碼 r16：實測須 measured 且正；增列秒數恰等於 generations × 實測（不用絕對容差）
+            if meas.get("status") != "measured" or not _positive_number(measured) \
+                    or float(a["seconds"]) != int(a.get("generations") or 0) * float(measured):
+                out.append(f"{key}：seconds 未綁 measurements.{key[0]}.seconds")
+        if not str(a.get("covers") or "").strip():  # 審碼 r8：獨有覆蓋之敘述與碼證不得缺
+            out.append(f"{key}：covers 空")
+        evidence = a.get("code_evidence")
+        if not isinstance(evidence, list) or not evidence:
+            out.append(f"{key}：code_evidence 空")
+        else:
+            for anchor in evidence:
+                m = re.fullmatch(r"(.+):(\d+)", str(anchor))
+                path = REPO / m.group(1) if m else None
+                lines = path.read_text(encoding="utf-8").splitlines() if path is not None and path.is_file() else []
+                if m is None or not (1 <= int(m.group(2)) <= len(lines)) or not lines[int(m.group(2)) - 1].strip():
+                    out.append(f"{key}：code_evidence {anchor} 不解析至存在之非空行")
+    per_cell = node.get("per_cell_seconds") or {}
+    for a in addenda:
+        cid = str(a.get("cell"))
+        want_cell = runs_by_cell.get(cid, 0.0) + sum(float(x.get("seconds") or 0.0) for x in addenda
+                                                       if str(x.get("cell")) == cid)
+        if not math.isclose(float(per_cell.get(cid) or 0.0), want_cell, rel_tol=1e-12, abs_tol=1e-9):
+            out.append(f"{cid}：per_cell_seconds {per_cell.get(cid)} 未計入增列（應 {want_cell}）")
+    total = sum(float(v) for v in per_cell.values()) + sum(float(v) for v in (node.get("preprov_seconds") or {}).values())
+    if not math.isclose(float(node.get("extrapolated_total_seconds") or 0.0), total, rel_tol=1e-12, abs_tol=1e-9):
+        out.append(f"precision_chain.extrapolated_total_seconds ≠ 各格合計 {total}")
+    return out
+
+
+def _applied_estimate_receipt() -> Dict[str, Any]:
+    """以現行估時收據套用增列（兩 memmap 列之開 lag 秒數以合成值代入；只驗結構，不作成本）。"""
+    receipt = json.loads(_estimate_receipt_path().read_text(encoding="utf-8"))
+    return ESTIMATOR.apply_precision_addenda(receipt, {"memmap_forced_low": 200.0, "memmap_forced_high": 190.0},
+                                            dict.fromkeys(ESTIMATOR.PRECISION_LAG_ON_VARIANTS, "complete"))
+
+
+def test_precision_addenda_constant_locked() -> None:
+    """SPEC v37 驗證段：`estimate.PRECISION_ADDENDA` 之格、變體、generations、covers_ids、unique_output 逐鍵等於字面期望。"""
+    got = [{k: e[k] for k in ("cell", "variant", "generations", "covers_ids", "unique_output")}
+           for e in ESTIMATOR.PRECISION_ADDENDA]
+    assert got == [dict(e) for e in PRECISION_ADDENDA_EXPECTED]
+
+
+def test_precision_addenda_violations_clean_on_applied_receipt() -> None:
+    """增列套用後之估時收據通過增列檢查；兩 memmap 列標 `measured_lag_on`、`reported_at` 已移除（須重報）。"""
+    applied = _applied_estimate_receipt()
+    assert precision_addenda_violations(applied, _load_criteria()) == []
+    lag_rows = [r for r in applied["run_kinds"]["precision_chain"]["runs"]
+                if r.get("variant") in ESTIMATOR.PRECISION_LAG_ON_VARIANTS]
+    assert len(lag_rows) == 2 and all(r.get("measured_lag_on") is True for r in lag_rows)
+    assert "reported_at" not in applied
+
+
+@pytest.mark.parametrize("mutant", ["drop_b", "duplicate_c", "c_seconds_not_counted", "c_unregistered_id",
+                                    "b_ids_equal_run_coverage_row", "b_unique_output_string", "missing_addenda",
+                                    "covers_and_evidence_dropped", "evidence_bad_anchor", "generations_bool",
+                                    "seconds_unbound", "measurement_blocked"])
+def test_mutation_precision_addenda_violations(mutant: str) -> None:
+    """SPEC v37 驗證段之 mutation：刪 B 列、重複一份 C 列（集合不變）、C 列秒數不計入總數、C 列 covers_ids 改未登錄 id、
+    B 列 covers_ids 改為與判準某生成列相同之 (格, id 集合)、B 列 unique_output 改字串、addenda 缺 ⇒ 各翻紅。"""
+    applied = _applied_estimate_receipt()
+    criteria = _load_criteria()
+    node = applied["run_kinds"]["precision_chain"]
+    rows = {a["variant"]: a for a in node["addenda"]}
+    if mutant == "drop_b":
+        node["addenda"] = [a for a in node["addenda"] if a["variant"] != "b_production_spy"]
+    elif mutant == "duplicate_c":
+        node["addenda"].append(copy.deepcopy(rows["c_preserve_dtype"]))
+    elif mutant == "c_seconds_not_counted":
+        node["per_cell_seconds"]["C_BTCUSDT_1h"] -= rows["c_preserve_dtype"]["seconds"]
+    elif mutant == "c_unregistered_id":
+        rows["c_preserve_dtype"]["covers_ids"] = ["precision.not_registered_mutant"]
+    elif mutant == "b_ids_equal_run_coverage_row":
+        freeze_b = next(r for r in criteria["run_coverage"]["freeze_baseline"]["runs"]
+                        if str(r["cell"]) == "B_BTCUSDT_1h_4h" and r.get("generations"))
+        rows["b_production_spy"]["covers_ids"] = list(freeze_b["covers_ids"])
+    elif mutant == "b_unique_output_string":
+        rows["b_production_spy"]["unique_output"] = "ok"
+    elif mutant == "covers_and_evidence_dropped":
+        for a in node["addenda"]:
+            a.pop("covers", None)
+            a.pop("code_evidence", None)
+    elif mutant == "evidence_bad_anchor":
+        rows["c_preserve_dtype"]["code_evidence"] = ["momentum/FeatureEngineering/feature_factory.py:99999999"]
+    elif mutant == "generations_bool":  # 審碼 r15
+        rows["b_production_spy"]["generations"] = True
+    elif mutant == "seconds_unbound":  # 審碼 r15：秒數改值並同步兩層總數
+        rows["b_production_spy"]["seconds"] += 1.0
+        node["per_cell_seconds"]["B_BTCUSDT_1h_4h"] += 1.0
+        node["extrapolated_total_seconds"] += 1.0
+    elif mutant == "measurement_blocked":  # 審碼 r16：實測非 measured
+        applied["measurements"]["B_BTCUSDT_1h_4h"]["status"] = "blocked"
+    else:
+        node.pop("addenda")
+    assert precision_addenda_violations(applied, criteria) != []
+
+
+def test_precision_formal_readiness_blocks_until_addenda() -> None:
+    """SPEC §V（r37 X37-A）：正式跑前置——現行估時收據（無 addenda、memmap 列未標 measured_lag_on）⇒ 精度鏈探針之
+    `formal_readiness_violations` 非空（A 亦受擋）；增列套用後 ⇒ 空。"""
+    probe = _load_probe("precision_chain")
+    current = json.loads(_estimate_receipt_path().read_text(encoding="utf-8"))
+    if (current.get("run_kinds") or {}).get("precision_chain", {}).get("addenda") is None:
+        assert probe.formal_readiness_violations(current) != []
+    assert probe.formal_readiness_violations(_applied_estimate_receipt()) == []

@@ -1016,7 +1016,10 @@ def test_mutation_ic_material_tau_lt_1_flips_boundary_15(monkeypatch: pytest.Mon
 # ============================================================================================== Task 1.2
 
 def precision_completeness_violations() -> List[str]:
-    """段 × 格完整：格涵蓋＝格 A∪B∪C 列舉；measured 格之 S0–S4 逐欄列之欄集合＝該格欄、S5 ≥1 列；blocked 格每段 ≥1 列。
+    """段 × 格完整：格涵蓋＝格 A∪B∪C 列舉；blocked 格每段 ≥1 列；measured 格之 S0–S4 依格類分支（SPEC v37 驗證段）——
+    逐欄格：該段逐欄列之欄集合＝該格該段欄（`columns_by_segment`，缺則 `columns`）；群組粒度格（`numview_helpers.
+    GROUP_GRANULARITY_KINDS`）：該段有期望群組（`expected_groups`）者，每 (`source_run`, 群組) 恰一列、群組集合恰等、每列
+    `columns_in_group` 等於期望、欄數合計等於期望合計；無期望群組之段（掛點同 A 不量）須具列。S5 ≥1 列。
     判準 v3 起：格涵蓋＝判準 `run_coverage.precision_chain` 之格（變體宿主格＋格 B＋格 C）。"""
     receipt = load_receipt("precision-chain")
     out: List[str] = []
@@ -1035,9 +1038,28 @@ def precision_completeness_violations() -> List[str]:
             if not got:
                 out.append(f"{cid}/{seg}: 無列")
                 continue
-            if cell["status"] == "measured" and seg in PER_COLUMN_SEGMENTS:
+            if cell["status"] != "measured" or seg not in PER_COLUMN_SEGMENTS:
+                continue
+            if str(cell["kind"]) in nh.GROUP_GRANULARITY_KINDS:
+                expected = (cell.get("expected_groups") or {}).get(seg)
+                if expected is None:
+                    continue
+                keys = [(str(r.get("source_run")), str(r.get("group"))) for r in got]
+                if len(keys) != len(set(keys)):
+                    out.append(f"{cid}/{seg}: (source_run, 群組) 重複")
+                groups = [str(r.get("group")) for r in got]
+                if sorted(groups) != sorted(expected):
+                    out.append(f"{cid}/{seg}: 群組集合 ≠ 期望（缺 {sorted(set(expected) - set(groups))[:3]} 多 "
+                               f"{sorted(set(groups) - set(expected))[:3]}）")
+                for r in got:
+                    if str(r.get("group")) in expected and r.get("columns_in_group") != int(expected[str(r["group"])]):
+                        out.append(f"{cid}/{seg}: 群組 {r.get('group')} 欄數 {r.get('columns_in_group')} ≠ 期望")
+                if sum(int(r.get("columns_in_group") or 0) for r in got) != sum(int(v) for v in expected.values()):
+                    out.append(f"{cid}/{seg}: 群組欄數合計 ≠ 期望合計")
+            else:
                 names = [str(r["column"]) for r in got]
-                if not cell["columns"] or sorted(names) != sorted(str(c) for c in cell["columns"]):
+                expected_cols = (cell.get("columns_by_segment") or {}).get(seg, cell["columns"])
+                if not expected_cols or sorted(names) != sorted(str(c) for c in expected_cols):
                     out.append(f"{cid}/{seg}: 逐欄列之欄集合 ≠ 該格欄")
     return out
 
@@ -1056,9 +1078,13 @@ def test_precision_chain_s4_raw_bss_lossless_flag() -> None:
     """Task 1.2 驗證：S4 raw BYTE_STREAM_SPLIT 讀回逐位元相等之檢查於每個 measured 格皆有紀錄；任一不等 ⇔
     `lossless_violation` 為 True。"""
     receipt = load_receipt("precision-chain")
-    entries = {str(e["cell_id"]): bool(e["bitwise_equal"]) for e in receipt["s4_raw_bss"]}
+    status = {str(e["cell_id"]): str(e.get("status") or "measured") for e in receipt["s4_raw_bss"]}
+    entries = {str(e["cell_id"]): bool(e["bitwise_equal"]) for e in receipt["s4_raw_bss"]
+               if str(e.get("status") or "measured") == "measured"}
     measured = {str(c["cell_id"]) for c in receipt["cells"] if c["status"] == "measured"}
-    assert measured and measured <= set(entries), sorted(measured - set(entries))[:5]
+    assert measured and measured <= set(status), sorted(measured - set(status))[:5]
+    # SPEC v37 細則②：codec 只於 A 格開關量測；B／C 記 codec_off、不入無損判定
+    assert entries and all(status[c] in ("measured", "codec_off") for c in measured), status
     assert receipt["lossless_violation"] is (not all(entries.values()))
 
 
@@ -1613,12 +1639,18 @@ def _synthetic_precision_receipt(drop_c_s5: bool = True) -> Dict[str, Any]:
     cells, rows = [], []
     for key in sorted(nh.criteria_run_cell_keys("precision_chain")):
         cid = _cell_id_of(key)
+        grouped = key[0] in nh.GROUP_GRANULARITY_KINDS  # SPEC v37 細則①：格 C 逐群組列
         cells.append({"cell_id": cid, "kind": key[0], "symbol": key[1], "timeframes": list(key[2]), "status": "measured",
-                      "columns": ["x"]})
+                      "columns": ["x"], "granularity": "group" if grouped else "column",
+                      "expected_groups": {"S0": {"g": 1}, "S3": {"g": 1}, "S4": {"g": 1}} if grouped else None})
         for seg in SEGMENTS:
             if seg == "S5" and key[0] == "C" and drop_c_s5:
                 continue
-            rows.append({"cell_id": cid, "segment": seg, "column": "x"})
+            if grouped:
+                rows.append({"cell_id": cid, "segment": seg, "group": "g" if seg in ("S0", "S3", "S4") else "*",
+                             "columns_in_group": 1 if seg in ("S0", "S3", "S4") else None, "source_run": "r"})
+            else:
+                rows.append({"cell_id": cid, "segment": seg, "column": "x"})
     return {"cells": cells, "rows": rows}
 
 
@@ -1662,3 +1694,382 @@ def test_boundary_18_blocked_generate_only_cell_segments_follow_criteria(mutant:
     else:
         with pytest.raises(AssertionError):
             test_boundary_18_blocked_cell_c_all_segments_blocked()
+
+
+# ---------------------------------------------------------------------------------------------- Task 1.2 身分表與增列兌現（SPEC v37）
+
+#: SPEC v37 驗證段：各 `source_run` 之 `observed_settings` 期望（字面鎖定；探針 `VARIANT_SETTINGS`）
+_A_BASE_SETTINGS: Dict[str, Any] = {"preserve_dtype": [False], "l2_polars_lift": False,
+                                    "memmap_threshold_bytes": [500_000_000], "memmap_branch": ["concat"],
+                                    "spill_triggered": False, "lag_enabled": [False], "codec_upgrade": False,
+                                    "winsor_method": ["quantile"], "stationarity": ["fracdiff+adf"], "end_offset_bars": 0,
+                                    "multi_tf_parallel_calls": 0}
+VARIANT_SETTINGS_EXPECTED: Dict[str, Dict[str, Any]] = {
+    "s0_float64_chain": {**_A_BASE_SETTINGS, "preserve_dtype": [True], "l2_polars_lift": True},
+    "memmap_forced_low": {**_A_BASE_SETTINGS, "memmap_threshold_bytes": [0], "memmap_branch": ["memmap"],
+                          "lag_enabled": [True]},
+    "memmap_forced_high": {**_A_BASE_SETTINGS, "memmap_threshold_bytes": [10 ** 18], "lag_enabled": [True]},
+    "codec_upgrade_on": {**_A_BASE_SETTINGS, "codec_upgrade": True},
+    "tail_extension": {**_A_BASE_SETTINGS, "end_offset_bars": 100},
+    "winsor_sigma_dtype": {**_A_BASE_SETTINGS, "winsor_method": ["sigma"]},
+    "b_production_spy": {"preserve_dtype": [True], "l2_polars_lift": False, "spill_triggered": False,
+                         "lag_enabled": [False], "codec_upgrade": False, "winsor_method": ["quantile"],
+                         "stationarity": ["fracdiff+adf"], "end_offset_bars": 0, "multi_tf_parallel_calls": 0},
+    "c_preserve_dtype": {"preserve_dtype": [True], "l2_polars_lift": True, "spill_triggered": False,
+                         "lag_enabled": [True], "codec_upgrade": False, "end_offset_bars": 0,
+                         "multi_tf_parallel_calls": 0},
+}
+
+
+def test_precision_variant_settings_locked() -> None:
+    """SPEC v37 驗證段：探針 `VARIANT_SETTINGS` 逐鍵等於字面期望（含 memmap 兩變體開 lag、C／S0 變體 preserve 與 L2
+    Polars 抬升、B 並行分派 0 次）。"""
+    assert probe("precision_chain").VARIANT_SETTINGS == VARIANT_SETTINGS_EXPECTED
+
+
+def precision_runs_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """SPEC v37 驗證段之身分表：每個統計列之 `source_run` 為 `runs` 之鍵且格相符；每個生成型 `source_run` 之
+    `observed_settings` 逐鍵等於 `VARIANT_SETTINGS`（探針 `settings_violations` 之同一判定）；`generation_inputs_sha256`
+    以同一程序獨立重算相等；run 目錄仍在時 `feature_manifest.json` sha256 自目錄重算相等；資料集與兩碼態等於同格凍結
+    run 之身分。"""
+    pc = probe("precision_chain")
+    out: List[str] = []
+    runs = receipt.get("runs") or {}
+    for row in receipt.get("rows") or []:
+        src = row.get("source_run")
+        if src is None:
+            # 審碼 r8：只 blocked 列（生成未成或等價不成立，無可指之 run）得無 source_run；其餘缺即違規
+            if row.get("status") != "blocked":
+                out.append(f"{row.get('cell_id')}/{row.get('segment')}：非 blocked 列缺 source_run")
+            continue
+        if src not in runs:
+            out.append(f"{row.get('cell_id')}/{row.get('segment')}：source_run {src} 不在身分表")
+        elif str(runs[src].get("cell_id")) != str(row.get("cell_id")):
+            out.append(f"{row.get('cell_id')}/{row.get('segment')}：source_run {src} 之格 {runs[src].get('cell_id')} 不符")
+    # 審碼 r12：身分表中每個生成型 run 皆須有觀測設定與窗（以身分表為準，不以觀測表自身之鍵為準）
+    generated = [n for n in runs if n in pc.RUN_SPECS]
+    for name in sorted(set(generated) | set(receipt.get("observed_settings") or {})):
+        observed = (receipt.get("observed_settings") or {}).get(name)
+        window = (receipt.get("windows") or {}).get(name)
+        if observed is None or window is None:
+            out.append(f"{name}：缺 observed_settings 或 window")
+            continue
+        out += pc.settings_violations(name, observed, window[1])
+    freeze_names = dict(pc.FREEZE_RUN_NAMES)
+    for name, ident in runs.items():
+        if ident.get("variant") != name:  # 審碼 r12：身分表鍵＝其 variant（不得重新標籤）
+            out.append(f"{name}：身分表 variant {ident.get('variant')!r} ≠ 鍵")
+        want = hashlib.sha256(json.dumps(pc.variant_generation_inputs(name), sort_keys=True, default=str,
+                                         ensure_ascii=False).encode("utf-8")).hexdigest()
+        if ident.get("generation_inputs_sha256") != want:
+            out.append(f"{name}：generation_inputs_sha256 與獨立重算不等")
+        run_dir = REPO / str(ident.get("run_dir"))
+        if (run_dir / "feature_manifest.json").is_file():
+            if hashlib.sha256((run_dir / "feature_manifest.json").read_bytes()).hexdigest() != ident.get(
+                    "feature_manifest_sha256"):
+                out.append(f"{name}：feature_manifest sha256 與目錄不符")
+        frozen = runs.get(freeze_names.get(str(ident.get("cell_id")), ""))
+        if frozen is not None:
+            # 產品碼態與資料集須等於凍結（同一生產計算之前提）；接縫碼態含本票探針與估時器位元組，本批改之 ⇒ 不要求相等，
+            # 生產等價另由落盤逐位元相等證明（SPEC v38）
+            for key in ("datasets", "code_state_sha256"):
+                if ident.get(key) != frozen.get(key):
+                    out.append(f"{name}：{key} 與凍結 {ident.get('cell_id')} 不同")
+            if not ident.get("seam_state_sha256"):
+                out.append(f"{name}：缺 seam_state_sha256")
+    return out
+
+
+#: SPEC v37 比對定義之各 (格, 段) 來源：{段: (允許之 source_run 集合, reference_run)}（審碼 r11：不得以同格他 run 冒充）
+EXPECTED_PRECISION_SOURCES: Dict[str, Dict[str, Tuple[Set[str], Optional[str]]]] = {
+    "A_BTCUSDT_1h": {"S0": ({"s0_float64_chain"}, "s0_float64_chain"), "S1": ({"codec_upgrade_on"}, "s0_float64_chain"),
+                     "S2": ({"codec_upgrade_on"}, "s0_float64_chain"), "S3": ({"freeze_A"}, "s0_float64_chain"),
+                     "S4": ({"codec_upgrade_on"}, "freeze_A"),
+                     "S5": ({"codec_upgrade_on", "freeze_A"}, "s0_float64_chain")},
+    "B_BTCUSDT_1h_4h": {"S0": ({"b_production_spy"}, "b_production_spy"), "S1": ({"b_production_spy"}, None),
+                        "S2": ({"b_production_spy"}, None), "S3": ({"freeze_B"}, "b_production_spy"),
+                        "S4": ({"freeze_B"}, None), "S5": ({"b_production_spy"}, "b_production_spy")},
+    "C_BTCUSDT_1h": {"S0": ({"c_preserve_dtype"}, "c_preserve_dtype"), "S1": ({"freeze_C"}, None),
+                     "S2": ({"freeze_C"}, None), "S3": ({"freeze_C"}, "c_preserve_dtype"), "S4": ({"freeze_C"}, None)},
+}
+
+
+def precision_source_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """審碼 r11：每個非 blocked 統計列之 `source_run`／`reference_run` 須等於 `EXPECTED_PRECISION_SOURCES` 該 (格, 段)。"""
+    out: List[str] = []
+    for row in receipt.get("rows") or []:
+        if row.get("status") == "blocked":
+            continue
+        want = EXPECTED_PRECISION_SOURCES.get(str(row.get("cell_id")), {}).get(str(row.get("segment")))
+        if want is None:
+            out.append(f"{row.get('cell_id')}/{row.get('segment')}：無期望來源")
+            continue
+        if row.get("source_run") not in want[0] or row.get("reference_run") != want[1]:
+            out.append(f"{row.get('cell_id')}/{row.get('segment')}：來源 ({row.get('source_run')}, {row.get('reference_run')}) "
+                       f"≠ 期望 ({sorted(want[0])}, {want[1]})")
+    return out
+
+
+def precision_addenda_fulfillment_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """SPEC v37：每個 `estimate.PRECISION_ADDENDA` 列之 `unique_output` 每一段於該格具該變體之非 blocked 統計列，且該變體
+    於該段之角色合乎 `EXPECTED_PRECISION_SOURCES`（`source_run` 或該段定義之 `reference_run`；審碼 r11：不得任取一欄位）。"""
+    out: List[str] = []
+    for spec in probe("estimate").PRECISION_ADDENDA:
+        for seg in spec["unique_output"]:
+            want = EXPECTED_PRECISION_SOURCES.get(spec["cell"], {}).get(seg)
+            role = "source_run" if want and spec["variant"] in want[0] else (
+                "reference_run" if want and want[1] == spec["variant"] else None)
+            hits = [r for r in receipt.get("rows") or [] if role and str(r.get("cell_id")) == spec["cell"]
+                    and str(r.get("segment")) == seg and r.get("status") != "blocked" and r.get(role) == spec["variant"]]
+            if not hits:
+                out.append(f"{spec['cell']}/{seg}：無 {spec['variant']}（{role}）之統計列")
+    return out
+
+
+def test_precision_chain_runs_identity_and_settings() -> None:
+    """Task 1.2 驗證（SPEC v37）：身分表、觀測設定、生成輸入與 manifest 雜湊、資料集與碼態。"""
+    assert precision_runs_violations(load_receipt("precision-chain")) == []
+
+
+def test_precision_chain_addenda_fulfilled() -> None:
+    """Task 1.2 驗證（SPEC v37）：B／C 增列之 `unique_output` 各段於量測收據兌現。"""
+    assert precision_addenda_fulfillment_violations(load_receipt("precision-chain")) == []
+
+
+def test_precision_chain_s5_replay_oracle() -> None:
+    """SPEC v36 S5：重演程序算凍結讀回之 `ic_scores` 與凍結 json 逐值相等（收據 checks 之 oracle 為 True）。"""
+    checks = load_receipt("precision-chain")["checks"]
+    assert checks.get("A_BTCUSDT_1h.s5_replay_oracle") is True, checks
+
+
+@pytest.mark.parametrize("mutant", ["source_run_unknown", "settings_preserve_false", "generation_inputs_swapped"])
+def test_mutation_precision_runs_identity(mutant: str) -> None:
+    """mutation（SPEC v37 驗證段）：統計列 `source_run` 不在身分表、C 增列觀測 `preserve_dtype` 含 False、身分表
+    `generation_inputs_sha256` 換為他 run 之值 ⇒ 各翻紅。"""
+    receipt = copy.deepcopy(load_receipt("precision-chain"))
+    if mutant == "source_run_unknown":
+        next(r for r in receipt["rows"] if r.get("source_run"))["source_run"] = "mutant_run"
+    elif mutant == "settings_preserve_false":
+        receipt["observed_settings"]["c_preserve_dtype"]["preserve_dtype"] = [False, True]
+    else:
+        receipt["runs"]["b_production_spy"]["generation_inputs_sha256"] = \
+            receipt["runs"]["codec_upgrade_on"]["generation_inputs_sha256"]
+    assert precision_runs_violations(receipt) != []
+
+
+def test_mutation_precision_group_rows_swapped_turns_completeness_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（SPEC v37 細則①）：群組粒度格刪一群組列並複製另一群組列使欄數合計不變 ⇒ 段×格完整檢查紅。"""
+    receipt = _synthetic_precision_receipt()
+    c_cell = next(c for c in receipt["cells"] if c["kind"] in nh.GROUP_GRANULARITY_KINDS)
+    c_cell["expected_groups"]["S3"] = {"g": 1, "h": 1}
+    receipt["rows"].append({"cell_id": c_cell["cell_id"], "segment": "S3", "group": "h", "columns_in_group": 1,
+                            "source_run": "r"})
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(receipt))
+    assert precision_completeness_violations() == []
+    mutated = copy.deepcopy(receipt)
+    mutated["rows"] = [r for r in mutated["rows"] if not (r["cell_id"] == c_cell["cell_id"] and r["segment"] == "S3"
+                                                          and r.get("group") == "h")]
+    mutated["rows"].append({"cell_id": c_cell["cell_id"], "segment": "S3", "group": "g", "columns_in_group": 1,
+                            "source_run": "r2"})
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(mutated))
+    assert any("S3" in v for v in precision_completeness_violations())
+
+
+# ---------------------------------------------------------------------------------------------- Task 1.2 審碼 r8 之單元（不依賴收據）
+
+def test_precision_bitwise_is_native_dtype_strict() -> None:
+    """審碼 r8：生產等價與 raw BSS 之逐位元比較為原生（不同 dtype 一律不等；同 dtype 同值才等；NaN 遮罩須同）。"""
+    bitwise = probe("precision_chain")._bitwise
+    assert bitwise(np.array([1.5], dtype=np.float32), np.array([1.5], dtype=np.float32)) is True
+    assert bitwise(np.array([1.5], dtype=np.float32), np.array([1.5], dtype=np.float64)) is False
+    assert bitwise(np.array([1.5, np.nan], dtype=np.float16), np.array([1.5, 0.0], dtype=np.float16)) is False
+    assert bitwise(np.array([1.0], dtype=np.float32), np.array([np.nextafter(np.float32(1.0), np.float32(2.0))],
+                                                               dtype=np.float32)) is False
+
+
+COMPLETE = {"memmap_forced_low": "complete", "memmap_forced_high": "complete"}  # 開 lag 試跑 run 狀態（審碼 r17）
+
+
+def test_precision_formal_readiness_requires_both_lag_rows() -> None:
+    """審碼 r8：正式跑前置——兩 memmap 列缺任一、重複或未標 `measured_lag_on` ⇒ 違規。"""
+    pc, est = probe("precision_chain"), probe("estimate")
+    addenda = [{**a, "seconds": 100.0} for a in est.PRECISION_ADDENDA]  # 完整增列列（審碼 r11 之結構檢查）
+    meas = {a["cell"]: {"seconds": 100.0, "status": "measured"} for a in est.PRECISION_ADDENDA}  # 增列秒數之實測來源（審碼 r15–r16）
+    good = [{"cell": "A_BTCUSDT_1h", "variant": v, "measured_lag_on": True, "trial_status": "complete", "seconds": 200.0}
+            for v in est.PRECISION_LAG_ON_VARIANTS]
+    ok = {"run_kinds": {"precision_chain": {"addenda": addenda, "runs": good}}, "measurements": meas}
+    assert pc.formal_readiness_violations(ok) == []
+    for runs in ([], good[:1], good + good[:1], [dict(good[0], measured_lag_on=False), good[1]],
+                 [dict(good[0], trial_status="blocked"), good[1]],  # 審碼 r17：秒數出自非完成之試跑 run
+                 [{k: v for k, v in good[0].items() if k != "trial_status"}, good[1]]):
+        receipt = {"run_kinds": {"precision_chain": {"addenda": addenda, "runs": runs}}, "measurements": meas}
+        assert pc.formal_readiness_violations(receipt) != [], runs
+
+
+def test_precision_unindexed_groups_detected(tmp_path: Path) -> None:
+    """審碼 r8：對不上時間軸之 registry 群組（`S1_unindexed`）被列出（比對據以 fail-closed）。"""
+    pc = probe("precision_chain")
+    (tmp_path / "capture.json").write_text(json.dumps({"entries": [
+        {"segment": "S1", "key": "g1", "rows": 500, "columns": ["a"]},
+        {"segment": "S1_unindexed", "key": "g2", "rows": 3855, "columns": ["b"]}]}), encoding="utf-8")
+    assert pc.unindexed_groups(str(tmp_path)) == ["g2"]
+
+
+def test_precision_runs_violations_flags_missing_source_run() -> None:
+    """審碼 r8：非 blocked 之統計列缺 `source_run` ⇒ 違規；blocked 列得無。"""
+    receipt = {"rows": [{"cell_id": "C_BTCUSDT_1h", "segment": "S4", "status": "codec_off"}], "runs": {},
+               "observed_settings": {}, "windows": {}}
+    assert any("缺 source_run" in v for v in precision_runs_violations(receipt))
+    receipt["rows"][0]["status"] = "blocked"
+    assert precision_runs_violations(receipt) == []
+
+
+def test_precision_checkpoint_stats_inf_vs_nan_not_all_nan() -> None:
+    """審碼 r9：inf 對 NaN 為非有限類別不同 ⇒ 計入 `nan_mask_diff`、非 all_nan；兩邊皆 NaN 才 all_nan。"""
+    stats = probe("precision_chain").checkpoint_stats
+    got = stats(np.array([np.inf]), np.array([np.nan]))
+    assert got["all_nan"] is False and got["nan_mask_diff"] == 1, got
+    assert stats(np.array([-np.inf, 1.0]), np.array([np.inf, 1.0]))["nan_mask_diff"] == 1
+    assert stats(np.array([np.nan]), np.array([np.nan]))["all_nan"] is True
+
+
+def test_precision_group_rows_partial_reference_not_measured() -> None:
+    """審碼 r9：群組內任一欄缺參照 ⇒ 群組列非 measured（`partial_no_reference`），不得被同群其他欄掩蓋。"""
+    pc = probe("precision_chain")
+    rows = pc.column_rows("S0", "C_BTCUSDT_1h", {"a": np.array([1.0]), "b": np.array([2.0])}, {"a": np.array([1.0])},
+                          source_run="v", reference_run="r")
+    grouped = pc.group_rows(rows, {"a": "g", "b": "g"}, "S0", "C_BTCUSDT_1h", "v", "r")
+    assert len(grouped) == 1 and grouped[0]["status"] == "partial_no_reference" and grouped[0]["no_reference_columns"] == 1
+
+
+def test_precision_formal_readiness_rejects_wrong_cell_and_bad_seconds() -> None:
+    """審碼 r9：memmap 列之格非 A 宿主格、或秒數非有限正數 ⇒ 正式跑前置違規；估時增列套用拒非正秒數。"""
+    pc, est = probe("precision_chain"), probe("estimate")
+    addenda = [{**a, "seconds": 100.0} for a in est.PRECISION_ADDENDA]  # 完整增列列（審碼 r11 之結構檢查）
+    meas = {a["cell"]: {"seconds": 100.0, "status": "measured"} for a in est.PRECISION_ADDENDA}  # 增列秒數之實測來源（審碼 r15–r16）
+    base = [{"cell": "A_BTCUSDT_1h", "variant": v, "measured_lag_on": True, "trial_status": "complete", "seconds": 200.0}
+            for v in est.PRECISION_LAG_ON_VARIANTS]
+    assert pc.formal_readiness_violations({"run_kinds": {"precision_chain": {"addenda": addenda, "runs": base}}, "measurements": meas}) == []
+    for mutate in ({"cell": "C_BTCUSDT_1h"}, {"seconds": 0.0}, {"seconds": -1.0}, {"seconds": float("nan")}):
+        runs = [dict(base[0], **mutate), base[1]]
+        assert pc.formal_readiness_violations({"run_kinds": {"precision_chain": {"addenda": addenda, "runs": runs}}, "measurements": meas}), mutate
+    receipt = json.loads(sorted(nh.RECEIPTS_DIR.glob("*-numview-estimate.json"))[0].read_text(encoding="utf-8"))
+    with pytest.raises(est.EstimateError):
+        est.apply_precision_addenda(receipt, {"memmap_forced_low": -1.0, "memmap_forced_high": 0.0}, COMPLETE)
+    with pytest.raises(est.EstimateError):  # 審碼 r10：JSON 布林 true 不得當 1 秒
+        est.apply_precision_addenda(receipt, {"memmap_forced_low": True, "memmap_forced_high": 200.0}, COMPLETE)
+    for status in ({**COMPLETE, "memmap_forced_low": "blocked"}, {"memmap_forced_high": "complete"}):  # 審碼 r17
+        with pytest.raises(est.EstimateError):
+            est.apply_precision_addenda(receipt, {"memmap_forced_low": 200.0, "memmap_forced_high": 190.0}, status)
+
+
+def test_precision_chain_row_sources_match_definition() -> None:
+    """Task 1.2 驗證（審碼 r11）：每個非 blocked 統計列之來源等於 SPEC v37 比對定義。"""
+    assert precision_source_violations(load_receipt("precision-chain")) == []
+
+
+def test_mutation_precision_row_source_swapped() -> None:
+    """審碼 r11 之 mutation：A／S0 列之 `source_run` 換成同格他 run、或增列變體只放 `reference_run` ⇒ 來源檢查或兌現檢查紅
+    （合成列，不依賴收據）。"""
+    good = {"cell_id": "A_BTCUSDT_1h", "segment": "S0", "status": "measured", "source_run": "s0_float64_chain",
+            "reference_run": "s0_float64_chain"}
+    assert precision_source_violations({"rows": [good]}) == []
+    assert precision_source_violations({"rows": [dict(good, source_run="codec_upgrade_on")]}) != []
+    b_row = {"cell_id": "B_BTCUSDT_1h_4h", "segment": "S1", "status": "reference_is_production", "source_run": None,
+             "reference_run": "b_production_spy"}
+    assert any("B_BTCUSDT_1h_4h/S1" in v for v in precision_addenda_fulfillment_violations({"rows": [b_row]}))
+
+
+def test_precision_l2_lift_observed_not_declared() -> None:
+    """審碼 r11：`observed_settings.l2_polars_lift` 為實際觀測（抬升函式被呼叫次數 > 0），非取自變體宣告。"""
+    pc = probe("precision_chain")
+    obs = pc.Observer.__new__(pc.Observer)
+    pc.Observer.__init__(obs, pc.Capture.__new__(pc.Capture), {"lift_l2": True})
+    assert obs.settings()["l2_polars_lift"] is False
+    obs.l2_lift_calls = 3
+    assert obs.settings()["l2_polars_lift"] is True
+
+
+@pytest.mark.parametrize("mutant", ["observed_settings_dropped", "variant_relabelled"])
+def test_mutation_precision_runs_identity_r12(mutant: str) -> None:
+    """審碼 r12 之 mutation：刪一個生成 run 之 `observed_settings`、身分表某鍵之 `variant` 改為他名 ⇒ 身分檢查紅。"""
+    receipt = copy.deepcopy(load_receipt("precision-chain"))
+    if mutant == "observed_settings_dropped":
+        receipt["observed_settings"].pop("b_production_spy")
+    else:
+        receipt["runs"]["b_production_spy"]["variant"] = "codec_upgrade_on"
+    assert precision_runs_violations(receipt) != []
+
+
+def test_precision_chain_c_columns_closed_against_provenance() -> None:
+    """Task 1.2 驗證（審碼 r12）：C 之 registry 擷取欄集合等於 provenance、讀回欄差只由死欄剔除解釋；A 之 S5 重演等於同次
+    生產呼叫（收據 checks）。"""
+    checks = load_receipt("precision-chain")["checks"]
+    for key in ("C_BTCUSDT_1h.c_s0_columns_equal_provenance", "C_BTCUSDT_1h.c_readback_columns_explained",
+                "A_BTCUSDT_1h.s5_replay_matches_production_run"):
+        assert checks.get(key) is True, (key, checks.get(key))
+
+
+def test_precision_provenance_duplicate_rows_rejected(tmp_path: Path) -> None:
+    """審碼 r13：raw provenance 欄名重複 ⇒ `raw_provenance_terminals` 拋錯（不得壓成單鍵後通過閉合）。"""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    pc = probe("precision_chain")
+    (tmp_path / "provenance").mkdir()
+    table = pa.table({"output_column": ["a", "b"], "terminal": ["written", "written"]})
+    pq.write_table(table, str(tmp_path / "provenance" / "raw_columns.parquet"))
+    assert pc.raw_provenance_terminals(tmp_path) == {"a": "written", "b": "written"}
+    pq.write_table(pa.table({"output_column": ["a", "a"], "terminal": ["written", "dead_dropped"]}),
+                   str(tmp_path / "provenance" / "raw_columns.parquet"))
+    with pytest.raises(RuntimeError, match="重複"):
+        pc.raw_provenance_terminals(tmp_path)
+
+
+def test_precision_blocked_run_not_production_equivalent() -> None:
+    """審碼 r13：status 非 complete 之 run 不得判生產等價——以凍結 B run 本身充當 `b_production_spy`（讀回必逐位元相等），
+    只把 status 設為 blocked ⇒ `b_production_equivalent` 為 False。"""
+    pc = probe("precision_chain")
+    fake = {"run_dir": str(pc._freeze_run_dir(pc.B_CELL)), "capture_dir": None, "status": "blocked",
+            "settings_violations": []}
+    out = pc.compare_b({"b_production_spy": fake}, {})
+    assert out["checks"]["b_production_equivalent"] is False
+    fake["status"] = "complete"
+    assert pc.compare_b({"b_production_spy": fake}, {})["checks"]["b_production_equivalent"] is True
+
+
+def test_precision_blocked_run_not_production_equivalent_a_and_c() -> None:
+    """審碼 r14：A 之生產等價與 C 之 measured 路徑亦要求 status＝complete——以凍結 A run 充當 `codec_upgrade_on`
+    （讀回必逐位元相等）：blocked ⇒ `a_production_equivalent` False、complete ⇒ True；C 之 `c_preserve_dtype` 為 failed
+    ⇒ C 各段 blocked（以凍結 C run 充當，不讀擷取）。"""
+    pc = probe("precision_chain")
+    fake_a = {"run_dir": str(pc._freeze_run_dir(pc.HOST_CELL)), "capture_dir": None, "status": "blocked",
+              "settings_violations": [], "raw_fallbacks": [], "processed_fallbacks": []}
+    assert pc.compare_a({"codec_upgrade_on": fake_a})["checks"]["a_production_equivalent"] is False
+    fake_a["status"] = "complete"
+    assert pc.compare_a({"codec_upgrade_on": fake_a})["checks"]["a_production_equivalent"] is True
+    fake_c = {"run_dir": str(pc._freeze_run_dir(pc.C_CELL)), "capture_dir": None, "status": "failed",
+              "settings_violations": []}
+    rows = pc.compare_c({"c_preserve_dtype": fake_c})["rows"]
+    assert rows and {r["status"] for r in rows} == {"blocked"}
+
+
+@pytest.mark.parametrize("mutant", ["generations_bool", "seconds_unbound", "measurement_blocked", "measurement_zero"])
+def test_precision_formal_readiness_addenda_type_and_binding(mutant: str) -> None:
+    """審碼 r15–r16：正式跑前置——增列 `generations` 為布林、秒數脫離估時收據 `measurements` 實測值、該實測非 measured、
+    或實測秒數為 0（增列秒數取極小正值）⇒ 違規。"""
+    pc, est = probe("precision_chain"), probe("estimate")
+    receipt = json.loads(sorted(nh.RECEIPTS_DIR.glob("*-numview-estimate.json"))[0].read_text(encoding="utf-8"))
+    applied = est.apply_precision_addenda(receipt, {"memmap_forced_low": 200.0, "memmap_forced_high": 190.0}, COMPLETE)
+    assert pc.formal_readiness_violations(applied) == []
+    row = next(a for a in applied["run_kinds"]["precision_chain"]["addenda"] if a["variant"] == "b_production_spy")
+    if mutant == "generations_bool":
+        row["generations"] = True
+    elif mutant == "seconds_unbound":
+        row["seconds"] += 1.0
+    elif mutant == "measurement_blocked":
+        applied["measurements"]["B_BTCUSDT_1h_4h"]["status"] = "blocked"
+    else:
+        applied["measurements"]["B_BTCUSDT_1h_4h"]["seconds"] = 0.0
+        row["seconds"] = 1e-10
+    assert pc.formal_readiness_violations(applied) != []

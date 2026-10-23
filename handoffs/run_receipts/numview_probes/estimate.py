@@ -35,6 +35,7 @@ import hashlib
 import importlib
 import importlib.util
 import json
+import math
 import os
 import platform
 import re
@@ -58,6 +59,24 @@ RUN_KINDS = ("freeze_baseline", "postic_branchdiff", "precision_chain", "l2_arm_
 CODE_STATES = ("s0", "b3", "b4", "b5", "b4_mutant")
 #: 磁碟下限（GB；SPEC §C 重型跑紀律）
 MIN_FREE_DISK_GB = 30
+#: Task 1.2 精度鏈之增列重生（SPEC v36–v37；判準 v9 `run_coverage` 之外，記於估時收據 `run_kinds.precision_chain.addenda`；
+#: 期望列之唯一來源，窄測試字面鎖定）。`unique_output`＝該次重生取得、凍結產物無法提供之段。
+PRECISION_ADDENDA: Tuple[Dict[str, Any], ...] = (
+    {"cell": "B_BTCUSDT_1h_4h", "variant": "b_production_spy", "generations": 1,
+     "covers": "Task 1.2 B 格生產重生（FFACT_MULTI_TF_PARALLEL=0 串列以供 spy）：S0 層間 float64 與 S1／S2 擷取",
+     "covers_ids": ["cell.multi_tf_float64_layers"], "unique_output": ["S0", "S1", "S2"],
+     "code_evidence": ["momentum/FeatureEngineering/feature_factory.py:667",
+                       "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:429",
+                       "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1233"]},
+    {"cell": "C_BTCUSDT_1h", "variant": "c_preserve_dtype", "generations": 1,
+     "covers": "Task 1.2 C 格 preserve_dtype=True 重生（含 L2 Polars 臂抬升）：全特徵 float64 層間鏈之 S0 與該 run 讀回",
+     "covers_ids": ["cell.full_features_production_default", "precision.s0_float64_chain"], "unique_output": ["S0", "S3"],
+     "code_evidence": ["momentum/FeatureEngineering/feature_factory.py:673",
+                       "momentum/FeatureEngineering/feature_factory.py:727",
+                       "momentum/FeatureEngineering/polars_adapter.py:96"]},
+)
+#: SPEC v37 細則⑦：開 lag 後須實測秒數之判準變體
+PRECISION_LAG_ON_VARIANTS: Tuple[str, ...] = ("memmap_forced_low", "memmap_forced_high")
 
 REPO: Path = Path(__file__).resolve().parents[3]
 RECEIPTS_DIR: Path = REPO / "handoffs" / "run_receipts"
@@ -1575,8 +1594,66 @@ def cache_reusable(target: Mapping[str, Any], cached: Optional[Mapping[str, Any]
             and cached_entry(cached) == generation_entry(target["category"], criteria))
 
 
+def apply_precision_addenda(receipt: Mapping[str, Any], lag_on_seconds: Mapping[str, float],
+                            lag_on_status: Mapping[str, Any]) -> Dict[str, Any]:
+    """Task 1.2 估時收據增列（SPEC v37 §V、細則⑦）：`precision_chain` 之兩 memmap 列改為開 lag 試跑實測秒數並標
+    `measured_lag_on`（該試跑 run 之狀態須為 complete，標 `trial_status`；審碼 r17）；依 `PRECISION_ADDENDA` 產生 `addenda`（秒數＝生成次數 × 該格 `measurements` 實測秒數）；重算該跑別
+    之 `per_cell_seconds`／`extrapolated_total_seconds` 與收據 `total_extrapolated_seconds`；移除 `reported_at`（須重報
+    使用者後由主委寫入）並追加 `revisions` 紀錄。不重量任何格、不改判準 `run_coverage` 列。"""
+    import copy as _copy
+
+    out = _copy.deepcopy(dict(receipt))
+    node = out["run_kinds"]["precision_chain"]
+    missing = [v for v in PRECISION_LAG_ON_VARIANTS if v not in lag_on_seconds]
+    if missing:
+        raise EstimateError(f"缺開 lag 實測秒數：{missing}")
+    bad = {v: lag_on_seconds[v] for v in PRECISION_LAG_ON_VARIANTS
+           if isinstance(lag_on_seconds[v], bool)  # bool 為 int 子類（審碼 r10）
+           or not (isinstance(lag_on_seconds[v], (int, float)) and math.isfinite(lag_on_seconds[v]) and lag_on_seconds[v] > 0)}
+    if bad:
+        raise EstimateError(f"開 lag 實測秒數須為有限正數：{bad}")
+    not_complete = {v: lag_on_status.get(v) for v in PRECISION_LAG_ON_VARIANTS if lag_on_status.get(v) != "complete"}
+    if not_complete:  # 審碼 r17：blocked／failed／缺狀態之 run 不給秒數（細則⑦）
+        raise EstimateError(f"開 lag 試跑 run 須為 complete：{not_complete}")
+    for variant in PRECISION_LAG_ON_VARIANTS:  # 判準變體列各恰一列（缺列或重複不得靜默略過）
+        count = sum(1 for row in node["runs"] if row.get("variant") == variant)
+        if count != 1:
+            raise EstimateError(f"precision_chain.runs 之 {variant} 須恰一列，實得 {count}")
+    for row in node["runs"]:
+        if row.get("variant") in PRECISION_LAG_ON_VARIANTS:
+            row["seconds"] = float(lag_on_seconds[row["variant"]]) * int(row.get("generations") or 1)
+            row["measured_lag_on"] = True
+            row["trial_status"] = "complete"
+            row["seconds_basis"] = "Task 1.2 試跑實測（設定覆寫 lag_features.enabled=true；SPEC v37 細則⑦）"
+    addenda = []
+    for spec in PRECISION_ADDENDA:
+        m = (out.get("measurements") or {}).get(spec["cell"]) or {}
+        if m.get("status") != "measured":
+            raise EstimateError(f"增列格 {spec['cell']} 無實測生成秒數")
+        addenda.append({**_copy.deepcopy(spec), "seconds": int(spec["generations"]) * float(m["seconds"]),
+                        "seconds_basis": f"measurements.{spec['cell']}.seconds"})
+    node["addenda"] = addenda
+    per_cell: Dict[str, float] = {}
+    for row in list(node["runs"]) + addenda:
+        per_cell[str(row["cell"])] = per_cell.get(str(row["cell"]), 0.0) + float(row.get("seconds") or 0.0)
+    old_total = float(node.get("extrapolated_total_seconds") or 0.0)
+    node["per_cell_seconds"] = per_cell
+    node["extrapolated_total_seconds"] = sum(per_cell.values()) + sum((node.get("preprov_seconds") or {}).values())
+    out["total_extrapolated_seconds"] = float(out["total_extrapolated_seconds"]) - old_total + node["extrapolated_total_seconds"]
+    previous = out.pop("reported_at", None)
+    out.setdefault("revisions", []).append({
+        "at": datetime.now(timezone.utc).isoformat(), "kind": "precision_addenda",
+        "reason": "SPEC v37：Task 1.2 B／C 增列重生與 memmap 兩變體開 lag 實測秒數（判準 run_coverage 不改）",
+        "previous_reported_at": previous, "precision_chain_total_before": old_total,
+        "precision_chain_total_after": node["extrapolated_total_seconds"], "lag_on_seconds": dict(lag_on_seconds),
+        "lag_on_status": {v: lag_on_status.get(v) for v in PRECISION_LAG_ON_VARIANTS}})
+    return out
+
+
 def _parse(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="NUMVIEW 量測格估時（SPEC Task 0.4）")
+    parser.add_argument("--apply-precision-addenda", default=None,
+                        help="Task 1.2 增列：讀精度鏈試跑收據（--no-compare 之 timings）就地更新估時收據，不重量")
     parser.add_argument("--kline", default=str(KLINE_PATH))
     parser.add_argument("--receipts-dir", default=None, help="收據目錄（預設 RECEIPTS_DIR）")
     parser.add_argument("--work-root", default=str(Path(tempfile.gettempdir()) / "numview-estimate"),
@@ -1595,6 +1672,28 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _parse(argv)
     if args.measure_one:
         return _child(Path(args.measure_one))
+    if args.apply_precision_addenda:
+        receipts_dir = Path(args.receipts_dir) if args.receipts_dir else RECEIPTS_DIR
+        hits = sorted(receipts_dir.glob(RECEIPT_GLOB))
+        if len(hits) != 1:
+            print(f"估時收據須恰一份，實得 {[p.name for p in hits]}", file=sys.stderr)
+            return 2
+        trial = json.loads(Path(args.apply_precision_addenda).read_text(encoding="utf-8"))
+        # 不在此轉型（審碼 r11：float(True)＝1.0 會繞過 `apply_precision_addenda` 之型別檢查）
+        timings = {k: v for k, v in (trial.get("timings") or {}).items() if k in PRECISION_LAG_ON_VARIANTS}
+        if any((trial.get("settings_violations") or {}).get(k) for k in timings):
+            print(f"試跑之觀測設定不符：{trial.get('settings_violations')}", file=sys.stderr)
+            return 2
+        status = {k: (trial.get("run_status") or {}).get(k) for k in PRECISION_LAG_ON_VARIANTS}  # 審碼 r17
+        try:
+            updated = apply_precision_addenda(json.loads(hits[0].read_text(encoding="utf-8")), timings, status)
+        except EstimateError as exc:
+            print(f"增列不可套用：{exc}", file=sys.stderr)
+            return 2
+        hits[0].write_text(json.dumps(updated, ensure_ascii=False, indent=2, default=str) + "\n", encoding="utf-8")
+        print(f"估時收據已更新：precision_chain {updated['run_kinds']['precision_chain']['extrapolated_total_seconds']:.1f} 秒；"
+              f"總 {updated['total_extrapolated_seconds']:.1f} 秒；reported_at 已移除，待重報使用者")
+        return 0
     work_root = Path(args.work_root)
     free = min(disk_free_gb(REPO), disk_free_gb(work_root if work_root.exists() else work_root.parent))
     if free < MIN_FREE_DISK_GB:
