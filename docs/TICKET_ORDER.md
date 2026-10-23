@@ -25,7 +25,8 @@
 
 ## 使用者裁定（2026-10-23，插入一步）
 - 起因（新碼證）：NUMVIEW Task 1.1 正式量測（收據 `handoffs/run_receipts/20261023-numview-postic-branchdiff.json`，提交 659234a5；收據審查 b2 r4–r5 三家收斂）——特徵生成之 L6.5 registry 快速路徑（`numba_fast`）①以 float32 計 zscore（`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2566`、`momentum/FeatureEngineering/preprocessing/_numba_transforms.py:433`、`:469-485`），對未先排名之價格級欄相消失真（例參照 2.72、該路徑 15.80）；②zscore 之最少有效值數＝`_rolling_min_periods(zscore_window)`（窗 100 ⇒ 25），不足即填 0，與 pandas／Polars 臂及參考定義（2 個）不同。主委讀碼：生產預設先排名再標準化（`RankTransformConfig.enabled`＝True），①於預設下不發生；讀 processed 者為特徵工廠報告匯出、統計、相關性、VIF（`api/services/feature_factory_service.py` `_load_task_features`）；IC-first 讀 raw 不受影響（影響範圍來自讀碼，未以正式生成實證）。
-- 裁定（選項逐字）：「現在就開票修」（選項說明：「NUMVIEW 暫停，先把加速路徑改成 float64、統一「至少幾個值」的規則」）——新增第 8a 步 L65FASTZ，NUMVIEW 暫停至其收案後續做。
+- 裁定（選項逐字）：「現在就開票修」（選項說明：「NUMVIEW 暫停，先把加速路徑改成 float64、統一「至少幾個值」的規則」）——曾新增第 8a 步 L65FASTZ。
+- 🔴 **同日更正與改裁定**：上述影響說明有誤（主委未查證即稱 processed 經此路徑）。查碼：該快速路徑於生產只用於 raw 寫出（`momentum/FeatureEngineering/feature_storage.py:1103`），且 raw 之 L6.5 設定關閉排名、標準化、gaussian（`momentum/FeatureEngineering/feature_factory.py:3155-3157`）⇒ ①②於現行生產流程無觸及；processed 由 IC-first 選欄後之 `transform_selected` 產生（`feature_factory.py:2985-3000`），不經此路徑。實際暴露只一處：縮尾選 sigma 法（前端可選，`frontend/src/components/feature-factory/PreprocessingPanel.tsx:308`；預設 quantile，`feature_config.py:169`）時，界線之均值／標準差以 float32 經 bottleneck 計（`_numba_transforms.py:438`、`:126-133`），真實價格級欄實測標準差 1.33（float64 為 7.73），會寫進 raw。使用者重新選擇（選項逐字）：「併入第 9 步、NUMVIEW 繼續（Recommended）」——取消第 8a 步；快速路徑均值／標準差改高精度（含 sigma 縮尾）與 zscore 最少有效值數規則併入第 9 步「縮尾重複」；NUMVIEW 照常續做。
 
 ## 委員諮詢依新碼證之註記（2026-10-13，使用者離線委派共識決）
 - 新碼證：①FRAMEPATH 處置驗證器檢查②（`tests/feature_engineering/test_framepath_disposition.py` 之 `check_2`）以凍結提交比對其治理檔之位元組、不排除他票提交，TESTREG 第 3 批範圍 149 檔中 52 檔屬之；②FRAMEPATH b1（`5584102d`）造成之兩支紅未被其受影響測試閘選入（一支以不變性信封略過、一支未選入），推翻 TESTREG 諮詢 r2 方案甲之前提。收斂檔 `handoffs/reconcile/20261010-testreg-x-consult-r3/synth.md`（三家一致）。
@@ -44,8 +45,7 @@
 | 6 | FF-NAME（大） | Task 0＝SPEC 重寫（刪 layer1_only、ADF 白名單、frame 世代閘）；造名全面改三段式（衍生層、單指標層、`ms_`／`tr_`／`ent_`、L4 lag）、週期標記器統一、單一名稱解析器、前後端解析、命名世代鹽、刪 `adf_safe_skip` 死碼；failopen 基準於此重凍一次 | 5 |
 | 7 | PRE-PROV＝FFDSTAR 改寫（中） | run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態（含縮尾、成功亦寫）、失敗群組、轉換臂別；IC 讀取保留 manifest、ingest cache 依身分鍵失效 | 6 |
 | 8 | NUMVIEW（中～大） | post-IC 正式臂政策（統一或具名保留）＋各分支 zscore 核心研究（ICPOSTLEAK §N）＋來源→計算→float32→實際 codec→讀回之誤差與比較翻轉量測（不重議 2026-09-29 dtype 裁定）＋臂／設定／算法 fingerprint 入不可變 run／view 身分；若改正式核心，實修與兩路 oracle 於此步完成 | 7 |
-| 8a | L65FASTZ（大；2026-10-23 使用者裁定插入，NUMVIEW Task 1.1 收據後暫停 NUMVIEW 先做） | L6.5 registry 快速路徑（numba）之 zscore 精度與規則：計算改 float64（落盤 dtype 照 2026-09-29 裁定）、zscore 最少有效值數與其他臂及參考定義一致；改值之實際差距先報使用者再落地；影響盤點以真實生成實證（processed 之消費者：報告匯出、統計、相關性、VIF） | 8（Task 1.1 收據） |
-| 9 | 縮尾重複（中～大） | 依逐欄實際證據定唯一責任端；IC 端開關接後端；算法檢驗 | 7、8 |
+| 9 | 縮尾重複（中～大） | 依逐欄實際證據定唯一責任端；IC 端開關接後端；算法檢驗；2026-10-23 併入：L6.5 registry 快速路徑之滾動均值／標準差改高精度計算（含 sigma 縮尾界線；落盤 dtype 照 2026-09-29 裁定）、zscore 最少有效值數與其他臂及參考定義一致（改值之實際差距先報使用者） | 7、8 |
 | 10 | GLOBALH 前置包（中～大） | 因子擇時夏普 √h、深度報酬時鐘與年化（不寫死 365×24）、ICIR 重疊窗查證、有效 N helper、horizon 子字串選欄修正（`ic_filter_orchestrator.py` `str(default_horizon) in name`）、IC 結果列結構一次定（模式／k／h／切分／選拔角色）＋倖存者契約一次遷移、研究試驗帳、Spearman 理由文件 | 8 |
 | 11 | ICPATH（大） | 兩路盤點與區分、平穩化標記排除／警告、多標的同名一致、全域樣本數警示、邊際 IC 事件型驗收 | 9、10 |
 | 12 | GLOBALH（大） | 每 h 完整跑、主線 h 指定、purge 取所選 h 最大、列標 h／k 可篩、IC 頁報酬量法 h 預覽 | 11 |
