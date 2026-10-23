@@ -748,3 +748,76 @@ def test_boundary_outputs_keep_full_length() -> None:
         assert len(out) == 10
     short = _real_slice(10)["close"]
     assert len(module.post_ic_chain(short, rank_window=20, gaussian_window=None, zscore_windows=[20])) == 10
+
+
+# ---------------------------------------------------------------------------------------------- 增量 zscore（SPEC Task 1.1）
+
+def _bitwise_violations(name: str, got: Sequence[float], want: Sequence[float]) -> List[str]:
+    """`got` 對 `want` 逐列逐位元相同（長度、NaN 遮罩、有限值之 float64 位元）；不含 assert。"""
+    a = np.asarray(got, dtype=np.float64)
+    b = np.asarray(want, dtype=np.float64)
+    if a.shape != b.shape:
+        return [f"{name}：長度 {a.shape} ≠ oracle {b.shape}"]
+    out: List[str] = []
+    if not np.array_equal(np.isnan(a), np.isnan(b)):
+        out.append(f"{name}：NaN 遮罩不同 {np.flatnonzero(np.isnan(a) != np.isnan(b))[:5].tolist()}")
+    both = ~np.isnan(a) & ~np.isnan(b)
+    diff = np.flatnonzero(a[both].view(np.int64) != b[both].view(np.int64))
+    if diff.size:
+        out.append(f"{name}：{diff.size} 列位元不同（首列 {np.flatnonzero(both)[diff[0]]}）")
+    return out
+
+
+#: 增量 zscore 路徑矩陣（SPEC Task 1.1 條件）：(案名, 輸入, 窗, ε)
+INCREMENTAL_PATHS: List[Tuple[str, List[float], int, float]] = [
+    ("finite_first_removal", [1.0, 2.0, 4.0, 8.0, 16.0, 3.0, 5.0], 3, 1e-8),
+    ("current_nan", [1.0, 2.0, NAN, 4.0, 5.0, 6.0], 3, 1e-8),
+    ("removed_nan", [1.0, NAN, 3.0, 4.0, 5.0, 6.0, 7.0], 3, 1e-8),
+    ("valid_count_below_2", [NAN, NAN, 5.0, NAN, NAN, NAN, 7.0], 3, 1e-8),
+    ("zero_variance", [4.0, 4.0, 4.0, 4.0, 5.0, 4.0, 4.0], 3, 1e-8),
+    ("epsilon_zero", [1.0, 2.0, 4.0, 8.0, 16.0, 3.0, 5.0], 3, 0.0),
+    ("epsilon_nonzero", [1.0, 2.0, 4.0, 8.0, 16.0, 3.0, 5.0], 3, 1.0),
+    ("window_longer_than_input", [1.0, 2.0, 4.0, 8.0, 16.0, 3.0, 5.0], 20, 1e-8),
+]
+
+
+def incremental_zscore_violations(module: Any) -> List[str]:
+    """`rolling_zscore_incremental` 對 oracle `rolling_zscore` 逐位元相同：路徑矩陣、真實 BTCUSDT 1h 末 240 根之 close／volume
+    （窗 3、20）、鏈（rank→gaussian→zscore 後之錨點；zscore 窗清單取第一窗）；±inf 具名拒收。不含 assert。"""
+    out: List[str] = []
+    for name, x, window, eps in INCREMENTAL_PATHS:
+        out += _bitwise_violations(name, module.rolling_zscore_incremental(x, window, eps),
+                                   module.rolling_zscore(x, window, eps))
+    real = _real_slice(240)
+    for col in ("close", "volume"):
+        for window in (3, 20):
+            out += _bitwise_violations(f"real_{col}_w{window}", module.rolling_zscore_incremental(real[col], window, 1e-8),
+                                       module.rolling_zscore(real[col], window, 1e-8))
+    x = real["close"]
+    cur = module.mask_incomplete_window(module.rolling_rank(x, 20, module.min_periods_for(20)), x, 20)
+    cur = module.mask_incomplete_window(module.gaussian(cur, 20, module.min_periods_for(20)), cur, 20)
+    want = module.mask_incomplete_window(module.rolling_zscore(cur, 20, 1e-8), cur, 20)
+    out += _bitwise_violations("chain_rank_gaussian_zscore_first_window",
+                               module.post_ic_chain(x, rank_window=20, gaussian_window=20, zscore_windows=[20, 50]), want)
+    for bad in ([1.0, np.inf, 2.0], [1.0, -np.inf, 2.0]):
+        try:
+            module.rolling_zscore_incremental(bad, 3, 1e-8)
+            out.append(f"±inf 未拒收：{bad}")
+        except module.NonFiniteInputError:
+            pass
+    return out
+
+
+def test_incremental_zscore_bitwise_equals_window_recompute_oracle() -> None:
+    """SPEC Task 1.1（b2 諮詢 B2C1-D／B2C2-C）：增量精確有理數和之 zscore 對逐窗重算版（oracle，原樣保留）逐列逐位元相同、
+    長度與 NaN 遮罩相同——路徑：正常有限窗與第一次移出、當前值 NaN、移出值 NaN、有效值數 < 2、零變異、ε 為 0 與非 0、窗長
+    大於列數、真實 BTCUSDT 1h 尺度（close 約 1e5、volume）、rank／gaussian 後之鏈錨點與 zscore 窗清單取第一窗、±inf 拒收。"""
+    assert incremental_zscore_violations(ref()) == []
+
+
+def test_mutation_incremental_zscore_removal_not_subtracted_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：出窗之有效值未自 Σ 扣除（`_slide_out` 改 no-op）⇒ 增量對 oracle 之比對紅。"""
+    module = ref()
+    assert incremental_zscore_violations(module) == []
+    monkeypatch.setattr(module, "_slide_out", lambda sums, value: None)
+    assert any("finite_first_removal" in v for v in incremental_zscore_violations(module))

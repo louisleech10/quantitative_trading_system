@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-23T05:52:53.964040+00:00",
-  "head": "e83856a08bc446167acf8ae685198080da45aafa",
+  "generated_at": "2026-10-23T06:48:59.707948+00:00",
+  "head": "d8fa993f41cdf45cfde2f069b38fe41bb585c82e",
   "command": "venv/bin/python handoffs/run_receipts/numview_probes/reference_proof.py",
-  "criteria_sha256": "e45dbf76b5a8ebdc5acf7d3a47e6a49eafe8a6affa8217a319a8ce8c5999d75f",
-  "reference_sha256": "6f490c7bd76363ed4373591bb968c0083084c50d39008c16b0199080f9ce12a2",
+  "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
+  "reference_sha256": "d3453c20b1b2d3f0be929c76a84a5616e1b6603422f4d589dbf5560874545d9e",
   "inputs": {
     "kline": "data_cache/feature_klines/kline_cache.h5",
     "symbol": "BTCUSDT",

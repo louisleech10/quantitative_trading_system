@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-23T05:53:25.695572+00:00",
-  "head": "e83856a08bc446167acf8ae685198080da45aafa",
+  "generated_at": "2026-10-23T06:49:06.857520+00:00",
+  "head": "d8fa993f41cdf45cfde2f069b38fe41bb585c82e",
   "command": "venv/bin/python handoffs/run_receipts/numview_probes/b2_ic_scale_probe.py 200",
   "exit_code": 0,
-  "criteria_sha256": "e45dbf76b5a8ebdc5acf7d3a47e6a49eafe8a6affa8217a319a8ce8c5999d75f",
+  "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
   "cell": "A_BTCUSDT_1h",
   "input": "ii",
   "columns": 200,
@@ -19,7 +19,7 @@
     ],
     "gaussian": false
   },
-  "reference_seconds": 29.075,
+  "reference_seconds": 4.533,
   "n_eff": {
     "min": 149,
     "median": 149.0,
@@ -31,7 +31,7 @@
       "actual_arm": [
         "polars"
       ],
-      "seconds": 5.606,
+      "seconds": 5.601,
       "cell_diff": {
         "max_abs": 0.00011450740282548111,
         "p99_abs": 4.317231187128678e-06,
@@ -62,7 +62,7 @@
       "actual_arm": [
         "pandas_optimized"
       ],
-      "seconds": 0.265,
+      "seconds": 0.275,
       "cell_diff": {
         "max_abs": 3.023425554271597e-05,
         "p99_abs": 7.701853996699842e-07,

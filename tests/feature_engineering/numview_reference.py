@@ -149,6 +149,53 @@ def rolling_zscore(x: Sequence[float], window: int, epsilon: float = DEFAULT_EPS
     return out
 
 
+def _slide_in(sums: List[Any], value: float) -> None:
+    """有效值 `value` 進窗：`sums`＝[有效值數, Σx, Σx²]（Σ 為 `Fraction`，精確）。"""
+    v = Fraction(value)
+    sums[0] += 1
+    sums[1] += v
+    sums[2] += v * v
+
+
+def _slide_out(sums: List[Any], value: float) -> None:
+    """有效值 `value` 出窗（`_slide_in` 之逆；mutation「移出值未扣除」以 monkeypatch 本函式為 no-op）。"""
+    v = Fraction(value)
+    sums[0] -= 1
+    sums[1] -= v
+    sums[2] -= v * v
+
+
+def rolling_zscore_incremental(x: Sequence[float], window: int, epsilon: float = DEFAULT_EPSILON) -> np.ndarray:
+    """`rolling_zscore` 之增量計算安排（SPEC Task 1.1；b2 諮詢 B2C1-D／B2C2-C）：窗內有效值之有效值數、Σx、Σx² 以 `Fraction`
+    隨窗滑動增減，平均＝Σx／n、變異＝(Σx² − (Σx)²／n)／(n − ddof)——有理數上與逐窗重算之 `_exact_moments` 恰相等，故轉
+    float64 後逐位元相同；約定（常數窗、ddof、ε 位置、NaN、±inf 拒收）一律讀同一組模組常數。`rolling_zscore` 為其 oracle。"""
+    arr = _as_input(x)
+    window = int(window)
+    out = np.full(arr.shape[0], np.nan, dtype=np.float64)
+    sums: List[Any] = [0, Fraction(0), Fraction(0)]
+    for t in range(arr.shape[0]):
+        value = float(arr[t])
+        if not math.isnan(value):
+            _slide_in(sums, value)
+        if t - window >= 0 and not math.isnan(float(arr[t - window])):
+            _slide_out(sums, float(arr[t - window]))
+        if math.isnan(value):
+            continue
+        n, total, total_sq = sums
+        if n < 2:
+            out[t] = CONSTANT_WINDOW_ZSCORE
+            continue
+        mean = total / n
+        var = (total_sq - total * total / n) / (n - ZSCORE_DDOF)
+        if var == 0:
+            out[t] = CONSTANT_WINDOW_ZSCORE
+            continue
+        dev = float(Fraction(value) - mean)
+        denom = math.sqrt(float(var)) + epsilon if EPSILON_IN_DENOMINATOR else math.sqrt(float(var) + epsilon)
+        out[t] = dev / denom
+    return out
+
+
 def mask_incomplete_window(output: Sequence[float], step_input: Sequence[float], window: int) -> np.ndarray:
     """窗未滿遮罩（錨點＝步驟輸入；`[0, f + window − 1 + MASK_OFFSET)` 設 NaN；全無有限值 ⇒ 全 NaN）。"""
     out = _as_input(output).copy()
@@ -164,7 +211,7 @@ def post_ic_chain(x: Sequence[float], *, rank_window: Optional[int], gaussian_wi
                   zscore_windows: Optional[Sequence[int]], epsilon: float = DEFAULT_EPSILON) -> np.ndarray:
     """ICPOSTLEAK 正式順序 rank → gaussian → zscore（None ⇒ 該步關）；每步輸出以該步之步驟輸入為錨點遮罩。rank 與 gaussian 之
     `min_periods` 依 `min_periods_for`（生產端同用該窗之 `_rolling_min_periods`）；zscore 主窗＝窗清單之第一個，空清單 ⇒
-    ValueError（fail-closed）。"""
+    ValueError（fail-closed）。zscore 以 `rolling_zscore_incremental` 計（與 `rolling_zscore` 逐位元相同；SPEC Task 1.1）。"""
     cur = _as_input(x).copy()
     if rank_window is not None:
         step_input = cur
@@ -179,7 +226,7 @@ def post_ic_chain(x: Sequence[float], *, rank_window: Optional[int], gaussian_wi
         if not windows:
             raise ValueError("zscore_windows 為空清單（fail-closed）")
         step_input = cur
-        cur = mask_incomplete_window(rolling_zscore(step_input, windows[0], epsilon), step_input, windows[0])
+        cur = mask_incomplete_window(rolling_zscore_incremental(step_input, windows[0], epsilon), step_input, windows[0])
     return cur
 
 

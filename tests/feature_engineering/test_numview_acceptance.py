@@ -549,6 +549,15 @@ def test_postic_branchdiff_reproduces_legacy_optimized_zero_diff() -> None:
         assert r["diff_cells"] == 0 and r["nan_mask_diff"] == 0 and r["max_abs_diff"] == 0.0, r
 
 
+def test_perf_benchmark_receipt_rc_criteria_and_content() -> None:
+    """Task 1.1 驗證（效能基準）：`*-numview-perf-benchmark.json` rc=0、`criteria_sha256` 相符；內容合
+    `numview_helpers.perf_benchmark_receipt_violations`（判準 `run_coverage.perf_benchmark` 之格、契約臂＋候選臂、可達臂三次
+    牆鐘與中位數、Polars 慢因剖析之逐步驟耗時與 rank UDF 是否逐欄 Python 迴圈；缺即紅）。"""
+    receipt = load_receipt("perf-benchmark")
+    assert _receipt_common_violations(receipt) == []
+    assert nh.perf_benchmark_receipt_violations(receipt) == []
+
+
 def test_postic_branchdiff_label_provenance_matches_production() -> None:
     """Task 1.1（判準 v8 `label_provenance`，規格審查 r18 X18-B）：每個 (格, 輸入) 之標籤出處齊備且與生產讀取逐值相等。"""
     assert label_provenance_violations() == []
@@ -705,6 +714,66 @@ def test_postic_branchdiff_candidate_intermediate_dtypes_float64() -> None:
     assert checked >= 1
 
 
+#: 候選臂數值保真自檢點（審碼 b2 r1 CODEX-R1-P1-01／GROK-R1-P1-01、P1-02；`postic_branchdiff._candidate_fidelity`）
+CANDIDATE_FIDELITY_POINTS = ("fidelity_roundtrip", "fidelity_mask", "fidelity_gaussian_rank", "fidelity_zscore")
+
+
+def test_postic_branchdiff_candidate_value_fidelity_points() -> None:
+    """Task 1.1（R10-A／R11-A；審碼 b2 r1）：候選臂每個有欄之格皆具三個數值保真自檢點且皆 float64（dtype 字串不足以證
+    全程 Float64：出口轉換與 gaussian 內部 rank 曾於字串仍為 Float64 時把值截為 float32）。"""
+    receipt = load_receipt("postic-branchdiff")
+    points: Dict[Tuple[str, str], Dict[str, str]] = {}
+    for entry in receipt.get("candidate_intermediate_dtypes") or []:
+        points.setdefault(_entry_key(entry), {})[str(entry["point"])] = str(entry["dtype"])
+    checked = 0
+    for cell in receipt["cells"]:
+        if int(cell["columns"]) < 1:
+            continue
+        got = points.get(_entry_key(cell), {})
+        assert {p: got.get(p) for p in CANDIDATE_FIDELITY_POINTS} == {p: "float64" for p in CANDIDATE_FIDELITY_POINTS}, \
+            (_entry_key(cell), got)
+        checked += 1
+    assert checked >= 1
+
+
+@pytest.mark.parametrize("mutant", [None, "to_pandas_float32", "gaussian_rank_float32", "zscore_float32"])
+def test_candidate_fidelity_self_test_detects_float32_paths(monkeypatch: pytest.MonkeyPatch, mutant: Optional[str]) -> None:
+    """`postic_branchdiff._candidate_fidelity` 可證偽：完整候選改動下四點皆 float64；還原產品 `polars_to_pandas`（轉
+    float32）⇒ 往返與遮罩兩點記 float32；gaussian 內部 rank 改回產品 float32 版 ⇒ gaussian rank 點記 float32；zscore 於
+    Float32 計算 ⇒ zscore 點記 float32（審碼 b2 r2）。"""
+    from momentum.FeatureEngineering import polars_adapter as pa
+    from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fpm
+
+    bd = probe("postic_branchdiff")
+    real_to_pandas = pa.polars_to_pandas
+    real_rank = fpm._rolling_rank_numba
+    bd._install_candidate(monkeypatch, [])
+    if mutant == "to_pandas_float32":
+        monkeypatch.setattr(pa, "polars_to_pandas", real_to_pandas)
+    elif mutant == "gaussian_rank_float32":
+        monkeypatch.setattr(bd, "_rolling_rank_2d_float64",
+                            lambda a, w, m: real_rank(np.asarray(a, dtype=np.float64), int(w), int(m)))
+    elif mutant == "zscore_float32":
+        import polars as pl
+
+        installed = pa.polars_l65_adaptive_zscore
+        monkeypatch.setattr(pa, "polars_l65_adaptive_zscore", lambda df, columns, window=100, epsilon=1e-8: installed(
+            df.with_columns([pl.col(c).cast(pl.Float32) for c in columns]), columns=columns, window=window,
+            epsilon=epsilon))
+    got: List[Tuple[str, str]] = []
+    bd._candidate_fidelity(got)
+    verdict = dict(got)
+    assert set(verdict) == set(CANDIDATE_FIDELITY_POINTS), verdict
+    if mutant is None:
+        assert set(verdict.values()) == {"float64"}, verdict
+    elif mutant == "to_pandas_float32":
+        assert verdict["fidelity_roundtrip"] == verdict["fidelity_mask"] == "float32", verdict
+    elif mutant == "gaussian_rank_float32":
+        assert verdict["fidelity_gaussian_rank"] == "float32", verdict
+    else:
+        assert verdict["fidelity_zscore"] == "float32", verdict
+
+
 # ---------------------------------------------------------------------------------------------- 真實向量
 
 _REAL: Dict[str, Any] = {}
@@ -848,6 +917,11 @@ def test_boundary_15_undefined_tau_b_is_material(case: str) -> None:
     assert boundary15_violations(case) == []
     for row in load_receipt("postic-branchdiff")["rows"]:
         if int(row["columns"]) >= 1 and _is_nan_or_none(row.get("tau_b")):
+            if (row.get("material_reason") == "identical_all_nan" and row.get("finite_cells") == 0
+                    and row.get("nan_mask_diff") == 0 and (row.get("all_cells") or {}).get("nan_mask_diff") == 0):
+                # 判準 v9 `material.identical_all_nan`（SPEC Task 1.1 邊界④）：參照與變體皆全 NaN ⇒ 非 material
+                assert row["material"] is False, row
+                continue
             assert row["material"] is True and row.get("material_reason"), row
 
 

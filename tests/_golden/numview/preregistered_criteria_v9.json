@@ -1,6 +1,6 @@
 {
   "_doc": "NUMVIEW 事前登記判準與決定紀錄 schema（docs/NUMVIEW_SPEC.md Task 0.3、設計選擇⑥、R2-D）。於 Phase 1 任何量測收據產出前凍結；提交後不得修改（只准於任何 Phase 1 收據提交前以 vN→vN+1 置換：新檔 preregistered_criteria_v<N+1>.json 取代並刪本檔，同提交完成）。數值門檻只來自 threshold_kinds 所列四類（exact 集合比較、NaN 遮罩 exact、IC 正負號、float32 ulp），不自訂 atol／rtol。每份 handoffs/run_receipts/*-numview-*.json 記本檔位元組之 sha256 為 criteria_sha256。v2（2026-10-22，取代 v1、v1 同提交刪除；SPEC Task 0.3 邊界①，於任何收據提交前）：估時實測 A:12h 與 B 之生成皆為 run_status=partial（failure_reasons 只含 calibration_insufficient_history、warmup_insufficient_history），v1 之根數門檻（min_history_bars）把資料前史不足之格誤判為足夠；v2 改以該格生成之完整度為前史不足之權威判定（根數門檻降為前置篩、不降任何門檻），並定格 B 之訓練週期排除前史不足之週期；另依使用者 2026-10-22 裁定，一切格（含格 C）之生成一律用足夠區間（輸出段＋所需前史，見 cell_rules.window_rule），不跑全史；同日裁定 12h 改讀長歷史檔（主檔不動，見 cell_rules.kline_source）。其餘段與 v1 逐字相同。v3（2026-10-22，取代 v2、v2 同提交刪除；於任何 Phase 1 收據提交前）：使用者裁定量測設計＝路徑覆蓋、非重複（「不是說要同樣的測試重複做，是有什麼邊界條件或情境或程式碼的邏輯之類沒測到，重複做同樣的事幹嘛？」）——格之列舉由「全部 symbol×tf」改為 cell_rules.cell_list 之封閉清單（每格寫明其獨有覆蓋路徑 covers），各跑別之重型跑寫明其獨有覆蓋（run_coverage）；無獨有路徑者不跑。其餘規則（前史判定、區間、來源、決定規則、material）與 v2 逐字相同。｜v4（2026-10-22，於任何量測收據提交前以 preregistered_criteria_v4.json 取代 v3）：格 C 之 IC-first 實測於全特徵、預設門檻選 137,351／209,053 欄，post-IC Polars 轉換耗盡 8 GB（swap 9 GB）78 分鐘無進度遭終止；post-IC 程式路徑與欄數無關（pandas_chunked 已由 A 格 2.5–3.2k 選欄＞chunk 2000 涵蓋），故該階段只增規模、無獨有路徑——格 C 改只走 generate_features，自 G1、分支差、效能基準移除；效能基準輸入＝A 格最大選欄（實測 A_BTCUSDT_1h 3193 欄）；增卡住偵測門檻 cell_rules.watchdog 與 scale_note。",
-  "version": 8,
+  "version": 9,
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
@@ -24,7 +24,7 @@
         "type": "string"
       },
       "version": {
-        "const": 8
+        "const": 9
       },
       "schema": {
         "type": "object"
@@ -370,6 +370,9 @@
           },
           "non_finite_statistic_verdict": {
             "const": "material"
+          },
+          "identical_all_nan": {
+            "const": "not_material_and_tau_b_not_computed"
           },
           "component_threshold_kinds": {
             "type": "object",
@@ -1339,6 +1342,8 @@
       "tau_b_below_1": "post_ic_comparisons_without_selection_step"
     },
     "zero_selected_columns": "not_material_and_tau_b_not_computed",
+    "identical_all_nan": "not_material_and_tau_b_not_computed",
+    "identical_all_nan_doc": "判準 v9（Task 1.1 試跑實證：輸入 (ii) 之輸出段 500 列＜rank 252 接 gaussian 252 之鏈暖機 502 列，rank+gaussian 與 rank+zscore+gaussian 二組合之參照與各臂輸出皆全 NaN）：參照與變體輸出皆無任一有限格（兩者逐位元相同、NaN 遮罩差 0）⇒ 非 material、τ-b 不計，列記 material_reason＝identical_all_nan、finite_cells＝0；只要任一邊有有限格即依其餘規則判（含 τ-b 未定義 ⇒ material）。",
     "tau_b": {
       "pairs": "both_finite",
       "undefined_verdict": "material",

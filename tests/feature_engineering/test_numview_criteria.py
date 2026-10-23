@@ -1214,6 +1214,32 @@ def test_material_judge_agrees_with_task11_probe_judge() -> None:
         assert bool(BRANCHDIFF.ic_material(a, b)["material"]) is want, name
 
 
+def test_material_identical_all_nan_v9_and_probe_row_verdict() -> None:
+    """判準 v9（SPEC Task 1.1 邊界④）：`material.identical_all_nan`＝`not_material_and_tau_b_not_computed`；探針 `diff_row`
+    對參照與變體皆全 NaN 判非 material（`material_reason`＝identical_all_nan、`finite_cells`＝0）。反例（標籤取真實 BTCUSDT 1h
+    末 500 根之 `pct_change().shift(-1)`）：參照全 NaN 而變體有一有限格 ⇒ material（NaN 遮罩差）；兩邊有有限格而逐欄 IC 未定義
+    （常數輸出）⇒ material（邊界③不受本條影響）。"""
+    import h5py
+
+    criteria = _load_criteria()
+    assert int(criteria["version"]) >= 9
+    assert criteria["material"].get("identical_all_nan") == "not_material_and_tau_b_not_computed"
+    with h5py.File(nh.KLINE_PATH, "r") as handle:
+        close = np.asarray(handle["BTCUSDT"]["1h"]["data"]["close"][-500:], dtype=np.float64)
+    label = np.append(close[1:] / close[:-1] - 1.0, np.nan)  # ＝ pct_change().shift(-1)
+    empty = np.full((500, 3), np.nan)
+    no_def = np.zeros((500, 3), dtype=bool)
+    same = BRANCHDIFF.diff_row(empty, no_def, empty.copy(), np.full(3, np.nan), label, 3)
+    assert (same["material"], same["material_reason"], same["finite_cells"]) == (False, "identical_all_nan", 0), same
+    one = empty.copy()
+    one[-2, 0] = 0.5
+    leaked = BRANCHDIFF.diff_row(empty, no_def, one, np.full(3, np.nan), label, 3)
+    assert leaked["material"] is True and leaked["nan_mask_diff"] == 1, leaked
+    const = np.full((500, 3), 0.25)
+    undefined = BRANCHDIFF.diff_row(const, no_def, const.copy(), BRANCHDIFF.spearman_ic(const, label), label, 3)
+    assert undefined["material"] is True and "tau_b_undefined" in undefined["material_reason"], undefined
+
+
 # ---------------------------------------------------------------------------------------------- 驗證（Task 1.5）
 
 def test_decision_records_one_per_point_and_match_schema() -> None:
