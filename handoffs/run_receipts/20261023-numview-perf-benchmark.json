@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-23T09:20:58.599296+00:00",
+  "head": "90af1c5cec0a2b6d2a3c6c0a3f9325c40daae0e5",
+  "command": "venv/bin/python handoffs/run_receipts/numview_probes/postic_branchdiff.py --perf",
+  "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
+  "exit_code": 0,
+  "inputs": [
+    {
+      "cell": "A_BTCUSDT_1h",
+      "input": "ii",
+      "columns": 3193,
+      "rows": 500,
+      "arms": {
+        "polars": {
+          "reachable": true,
+          "runs_seconds": [
+            88.4702,
+            88.7606,
+            88.7234
+          ],
+          "median_seconds": 88.7234,
+          "actual_arms": [
+            "polars"
+          ]
+        },
+        "pandas_optimized": {
+          "reachable": true,
+          "runs_seconds": [
+            1.227,
+            1.1921,
+            1.198
+          ],
+          "median_seconds": 1.198,
+          "actual_arms": [
+            "pandas_optimized"
+          ]
+        },
+        "pandas_legacy": {
+          "reachable": true,
+          "runs_seconds": [
+            1.1491,
+            1.1086,
+            1.144
+          ],
+          "median_seconds": 1.144,
+          "actual_arms": [
+            "pandas_legacy"
+          ]
+        },
+        "pandas_chunked": {
+          "reachable": true,
+          "runs_seconds": [
+            1.3051,
+            1.2685,
+            1.2602
+          ],
+          "median_seconds": 1.2685,
+          "actual_arms": [
+            "pandas_chunked"
+          ]
+        },
+        "polars_float64": {
+          "reachable": true,
+          "runs_seconds": [
+            88.8312,
+            88.6168,
+            88.5705
+          ],
+          "median_seconds": 88.6168,
+          "actual_arms": [
+            "polars"
+          ]
+        }
+      }
+    }
+  ],
+  "polars_profile": {
+    "steps": [
+      {
+        "step": "_polars_mask_columns",
+        "seconds": 0.5498
+      },
+      {
+        "step": "pandas_to_polars",
+        "seconds": 0.132
+      },
+      {
+        "step": "polars_l65_adaptive_zscore",
+        "seconds": 0.7023
+      },
+      {
+        "step": "polars_l65_rank_transform",
+        "seconds": 87.1048
+      },
+      {
+        "step": "polars_to_pandas",
+        "seconds": 0.0602
+      }
+    ],
+    "rank_udf_per_column_python_loop": true,
+    "total_seconds": 88.6578,
+    "step_seconds": {
+      "_polars_mask_columns": 0.5498,
+      "pandas_to_polars": 0.132,
+      "polars_l65_adaptive_zscore": 0.7023,
+      "polars_l65_rank_transform": 87.1048,
+      "polars_to_pandas": 0.0602
+    },
+    "rank_udf": {
+      "calls": 3193,
+      "columns": 3193,
+      "rows_per_call": [
+        500
+      ],
+      "cumulative_call_seconds": 691.0761,
+      "rank_step_share_of_total": 0.9825,
+      "per_column_python_loop": true
+    }
+  },
+  "format_violations": [],
+  "checks": {
+    "format_ok": true,
+    "actual_arm_matches": true
+  }
+}
