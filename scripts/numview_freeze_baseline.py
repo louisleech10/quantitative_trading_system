@@ -595,12 +595,13 @@ def generation_inputs(cell: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def result_identity(cell: Mapping[str, Any]) -> Dict[str, Any]:
-    """每格凍結結果之身分（審碼 r24 CODEX-R24-P1-01、r25 CODEX-R25-P1-01／GROK-R25-P1-01）：HEAD、產品碼態
+    """每格凍結結果之身分（審碼 r24 CODEX-R24-P1-01、r25 CODEX-R25-P1-01／GROK-R25-P1-01）：產品碼態
     （`numview_helpers.code_state_sha256`）、生成接縫碼態（`numview_helpers.seam_state_sha256`：本腳本〔含 `G1_ARM_ENV`／
-    `G2_ENVS`／`G3_ARTIFACTS` 等凍結政策〕、值指紋助手與探針檔之位元組）、格描述子、判準之該格類定義、`IDENTITY_RULE_KEYS`
-    規則與該格之凍結組成員（`freeze_groups` 各組是否含本格）之 sha256（說明字面 `_doc`／`_basis` 不計）、生成輸入
-    （`generation_inputs`，含估時收據導出之訓練週期；r26 CODEX-R26-P1-01）之 sha256、格之 K 線資料集紀錄。沿用既有結果須與
-    現行身分逐鍵相等。"""
+    `G2_ENVS`／`G3_ARTIFACTS` 等凍結政策〕、值指紋助手與凍結載入之探針檔之位元組）、格描述子、判準之該格類定義、
+    `IDENTITY_RULE_KEYS` 規則與該格之凍結組成員（`freeze_groups` 各組是否含本格）之 sha256（說明字面 `_doc`／`_basis` 不計）、
+    生成輸入（`generation_inputs`，含估時收據導出之訓練週期；r26 CODEX-R26-P1-01）之 sha256、格之 K 線資料集紀錄。沿用既有
+    結果須與現行身分逐鍵相等。規格審查 r18 後不含 HEAD：決定數值之碼已由產品碼態與接縫碼態逐位元涵蓋，HEAD 另因只改文件／
+    測試之提交而變、會使沿用誤失效；生成時之 HEAD 另記於結果 `generation_head`，收據與凍結檔之 `head` 取自之。"""
     criteria = _criteria()
 
     def strip(node: Any) -> Any:
@@ -614,8 +615,7 @@ def result_identity(cell: Mapping[str, Any]) -> Dict[str, Any]:
     definition = strip(criteria["cell_definitions"][str(cell["kind"])])
     groups = {name: str(cell["id"]) in members
               for name, members in sorted(strip(criteria["cell_rules"]["freeze_groups"]).items())}
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip()
-    return {"head": head, "code_state_sha256": nh.code_state_sha256(), "seam_state_sha256": nh.seam_state_sha256(),
+    return {"code_state_sha256": nh.code_state_sha256(), "seam_state_sha256": nh.seam_state_sha256(),
             "cell": {"id": str(cell["id"]), "kind": str(cell["kind"]), "symbol": str(cell["symbol"]),
                      "timeframes": [str(t) for t in cell["timeframes"]]},
             "criteria_cell_sha256": hashlib.sha256(json.dumps({"definition": definition, "rules": rules,
@@ -635,7 +635,9 @@ def freeze_one(cell: Mapping[str, Any], work_root: Path) -> Dict[str, Any]:
     started = time.perf_counter()
     result: Dict[str, Any] = {"cell_id": cell_id, "kind": kind, "symbol": cell["symbol"], "timeframes": cell["timeframes"],
                               "bar_counts": _bar_counts(cell), "blocked_by": None, "reason": None,
-                              "arm_unreachable": [], "l2_capture": {}, "identity": result_identity(cell)}
+                              "arm_unreachable": [], "l2_capture": {}, "identity": result_identity(cell),
+                              "generation_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO),
+                                                                capture_output=True, text=True).stdout.strip()}
     _log(f"{cell_id}：生成開始（env 預設）")
     handle = generate_cell(work_root, cell, run_kind=RUN_KIND, env={}, observe_l2={} in l2_envs)
     side = _sidecar(Path(handle.work))
@@ -780,8 +782,13 @@ def _library_versions() -> Dict[str, Optional[str]]:
 
 
 def _write_outputs(cells: Sequence[Mapping[str, Any]], results: Sequence[Mapping[str, Any]], started_at: str) -> int:
-    """凍結檔與收據；任一 G1 份之實際臂 ≠ 標示臂 ⇒ rc≠0、不寫。"""
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip()
+    """凍結檔與收據；任一 G1 份之實際臂 ≠ 標示臂 ⇒ rc≠0、不寫。`head`＝各格結果之生成時 HEAD（`generation_head`，須全格
+    一致；不一致或缺 ⇒ rc≠0、不寫），不取重寫當下之 HEAD（規格審查 r18：沿用結果重寫收據時不得把 head 改成後來之提交）。"""
+    heads = {str(r.get("generation_head") or "") for r in results}
+    if len(heads) != 1 or "" in heads:
+        print(f"[freeze] 各格生成時 HEAD 不一致或缺：{sorted(heads)}", file=sys.stderr, flush=True)
+        return 5
+    head = heads.pop()
     freeze_cells: Dict[str, Any] = {}
     receipt_cells: List[Dict[str, Any]] = []
     unreachable: List[Dict[str, Any]] = []

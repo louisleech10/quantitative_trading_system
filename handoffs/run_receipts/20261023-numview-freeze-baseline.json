@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
-  "started_at": "2026-10-23T01:58:16.558314+00:00",
-  "finished_at": "2026-10-23T01:58:18.124364+00:00",
+  "started_at": "2026-10-23T05:52:50.364631+00:00",
+  "finished_at": "2026-10-23T05:52:51.541482+00:00",
   "exit_code": 0,
   "command": "venv/bin/python scripts/numview_freeze_baseline.py",
-  "criteria_sha256": "880c1ba641325cefaef83d992efa5c0c469b44587674417697d8f6f81503160d",
+  "criteria_sha256": "e45dbf76b5a8ebdc5acf7d3a47e6a49eafe8a6affa8217a319a8ce8c5999d75f",
   "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
   "library_versions": {
     "numpy": "1.26.4",
@@ -1499,9 +1499,8 @@
   },
   "identity": {
     "A_BTCUSDT_1h": {
-      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
       "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
-      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "seam_state_sha256": "6d69daf0f919095e97f7986ccce4ef0bc182c522b1317741cbb68eef5ba65df5",
       "cell": {
         "id": "A_BTCUSDT_1h",
         "kind": "A",
@@ -1520,9 +1519,8 @@
       }
     },
     "A_BTCUSDT_4h": {
-      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
       "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
-      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "seam_state_sha256": "6d69daf0f919095e97f7986ccce4ef0bc182c522b1317741cbb68eef5ba65df5",
       "cell": {
         "id": "A_BTCUSDT_4h",
         "kind": "A",
@@ -1541,9 +1539,8 @@
       }
     },
     "A_BTCUSDT_12h": {
-      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
       "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
-      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "seam_state_sha256": "6d69daf0f919095e97f7986ccce4ef0bc182c522b1317741cbb68eef5ba65df5",
       "cell": {
         "id": "A_BTCUSDT_12h",
         "kind": "A",
@@ -1562,9 +1559,8 @@
       }
     },
     "A_SOLUSDT_1h": {
-      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
       "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
-      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "seam_state_sha256": "6d69daf0f919095e97f7986ccce4ef0bc182c522b1317741cbb68eef5ba65df5",
       "cell": {
         "id": "A_SOLUSDT_1h",
         "kind": "A",
@@ -1583,9 +1579,8 @@
       }
     },
     "B_BTCUSDT_1h_4h": {
-      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
       "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
-      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "seam_state_sha256": "6d69daf0f919095e97f7986ccce4ef0bc182c522b1317741cbb68eef5ba65df5",
       "cell": {
         "id": "B_BTCUSDT_1h_4h",
         "kind": "B",
@@ -1609,9 +1604,8 @@
       }
     },
     "C_BTCUSDT_1h": {
-      "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
       "code_state_sha256": "a44507e5a71c3df048bbc0b71f8bd21943bb9fdc4f81cce8b178089c129a9510",
-      "seam_state_sha256": "d216e9351367f419504b71a583f41e54f1339c7b066afaec8f25e3f50a82dea2",
+      "seam_state_sha256": "6d69daf0f919095e97f7986ccce4ef0bc182c522b1317741cbb68eef5ba65df5",
       "cell": {
         "id": "C_BTCUSDT_1h",
         "kind": "C",
@@ -1632,129 +1626,57 @@
   },
   "identity_backfilled": {
     "A_BTCUSDT_1h": {
-      "at": "2026-10-23T01:58:11.467379+00:00",
+      "at": "2026-10-23T05:15:04.521298+00:00",
       "basis": {
-        "head_equals_freeze_receipt": true,
+        "product_unchanged_since_freeze_head": true,
         "product_code_clean": true,
-        "results_after_head_commit": true,
-        "other_seam_files_unchanged_since_run1": true,
-        "run1_reconstruction_intact": true,
-        "run2_reconstruction_intact": true
+        "seam_changes_only_helpers_and_freeze_script": true,
+        "new_seam_files_committed_before_run1_and_clean": true
       },
-      "head_commit_time": 1792689226,
       "changed_keys": [
         "seam_state_sha256"
       ],
-      "seam_evidence": {
-        "run": "run1",
-        "started_at": "2026-10-22T23:23:53Z",
-        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r20_seam_diff.diff",
+      "new_seam_files_last_commit": {
+        "scripts/ffname_freeze_baseline.py": "2026-10-19T00:27:33+08:00"
       },
-      "generation_inputs_check": {
-        "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
-        "A_BTCUSDT_1h__default": []
-      },
-      "ambient_evidence": {
-        "launcher_cleared_env": [],
-        "claude_settings_env": {},
-        "settings_mtime_before_run1": true
-      },
-      "memory_tier_log": [
-        "8gb"
-      ],
-      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-      "hardware_evidence": {
-        "memory_tier": "child log（memory_tier_log）",
-        "physical_memory_bytes": "推定（未於跑時記錄）",
-        "cpu_count": "推定（未於跑時記錄）",
-        "machine": "推定（未於跑時記錄）",
-        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-      },
-      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "note": "規格審查 r20（CODEX-R20-P1-02）：接縫閉包納入動態載入點目標（SEAM_GLOBS 14 檔），新增 scripts/ffname_freeze_baseline.py（tests/feature_engineering/ffname_helpers.py:41 load_freeze_module 所載）；該檔工作樹對 HEAD 無差異、最後提交早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；SEAM_GLOBS 定義之改動不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
       "previous": {
-        "at": "2026-10-23T01:45:17.924713+00:00",
+        "at": "2026-10-23T04:48:04.598415+00:00",
         "basis": {
-          "head_equals_freeze_receipt": true,
+          "product_unchanged_since_freeze_head": true,
           "product_code_clean": true,
-          "results_after_head_commit": true,
-          "other_seam_files_unchanged_since_run1": true,
-          "run1_reconstruction_intact": true,
-          "run2_reconstruction_intact": true
+          "seam_changes_only_helpers_and_freeze_script": true,
+          "new_seam_files_committed_before_run1_and_clean": true
         },
-        "head_commit_time": 1792689226,
         "changed_keys": [
-          "generation_inputs_sha256",
           "seam_state_sha256"
         ],
-        "seam_evidence": {
-          "run": "run1",
-          "started_at": "2026-10-22T23:23:53Z",
-          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r19_seam_diff.diff",
+        "new_seam_files_last_commit": {
+          "tests/feature_engineering/ff_truncation_mr_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/ffname_helpers.py": "2026-10-18T23:12:54+08:00",
+          "tests/feature_engineering/ffstat_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/fftfmeta_golden_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/icfirstalign_helpers.py": "2026-10-04T22:26:30+08:00",
+          "tests/feature_engineering/probewinsor_helpers.py": "2026-10-17T21:51:33+08:00"
         },
-        "generation_inputs_check": {
-          "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
-          "A_BTCUSDT_1h__default": []
-        },
-        "ambient_evidence": {
-          "launcher_cleared_env": [],
-          "claude_settings_env": {},
-          "settings_mtime_before_run1": true
-        },
-        "memory_tier_log": [
-          "8gb"
-        ],
-        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-        "hardware_evidence": {
-          "memory_tier": "child log（memory_tier_log）",
-          "physical_memory_bytes": "推定（未於跑時記錄）",
-          "cpu_count": "推定（未於跑時記錄）",
-          "machine": "推定（未於跑時記錄）",
-          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-        },
-        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "note": "規格審查 r19：接縫改為凍結之非產品碼載入閉包（SEAM_GLOBS 明列 13 檔）。新增之 6 個 tests/feature_engineering 輔助模組工作樹對 HEAD 無差異、最後提交皆早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；本次 SEAM_GLOBS 定義之改動與 r18 之身分／收據 head 記錄方式改動皆不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
         "previous": {
-          "at": "2026-10-23T01:30:33.359229+00:00",
+          "at": "2026-10-23T04:31:43.857924+00:00",
           "basis": {
-            "head_equals_freeze_receipt": true,
+            "product_unchanged_since_freeze_head": true,
             "product_code_clean": true,
-            "results_after_head_commit": true,
-            "other_seam_files_unchanged_since_run1": true,
-            "run1_reconstruction_intact": true,
-            "run2_reconstruction_intact": true
+            "seam_changes_only_helpers_and_freeze_script": true
           },
-          "head_commit_time": 1792689226,
           "changed_keys": [
-            "generation_inputs_sha256",
+            "head",
             "seam_state_sha256"
           ],
-          "seam_evidence": {
-            "run": "run1",
-            "started_at": "2026-10-22T23:23:53Z",
-            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
-          },
-          "generation_inputs_check": {
-            "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
-            "A_BTCUSDT_1h__default": []
-          },
-          "ambient_evidence": {
-            "launcher_ffact_env": [],
-            "claude_settings_env": {},
-            "settings_mtime_before_run1": true
-          },
-          "memory_tier_log": [
-            "8gb"
-          ],
-          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r18_seam_diff.diff",
+          "note": "規格審查 r18：身分移除 head（產品碼由 code_state_sha256、接縫由 seam_state_sha256 逐位元涵蓋；head 另因只改文件／測試之提交而變），生成時 HEAD 移記 generation_head；接縫收窄為凍結載入之閉包（SEAM_GLOBS 明列 7 檔）。本次接縫改動只在 SEAM_GLOBS 定義與身分／收據 head 之記錄方式，不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
           "previous": {
-            "at": "2026-10-23T01:12:55.675385+00:00",
+            "at": "2026-10-23T01:58:11.467379+00:00",
             "basis": {
               "head_equals_freeze_receipt": true,
               "product_code_clean": true,
@@ -1765,7 +1687,6 @@
             },
             "head_commit_time": 1792689226,
             "changed_keys": [
-              "generation_inputs_sha256",
               "seam_state_sha256"
             ],
             "seam_evidence": {
@@ -1779,9 +1700,26 @@
               "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
               "A_BTCUSDT_1h__default": []
             },
-            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "ambient_evidence": {
+              "launcher_cleared_env": [],
+              "claude_settings_env": {},
+              "settings_mtime_before_run1": true
+            },
+            "memory_tier_log": [
+              "8gb"
+            ],
+            "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+            "hardware_evidence": {
+              "memory_tier": "child log（memory_tier_log）",
+              "physical_memory_bytes": "推定（未於跑時記錄）",
+              "cpu_count": "推定（未於跑時記錄）",
+              "machine": "推定（未於跑時記錄）",
+              "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+            },
+            "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+            "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
             "previous": {
-              "at": "2026-10-23T00:58:45.670866+00:00",
+              "at": "2026-10-23T01:45:17.924713+00:00",
               "basis": {
                 "head_equals_freeze_receipt": true,
                 "product_code_clean": true,
@@ -1792,7 +1730,7 @@
               },
               "head_commit_time": 1792689226,
               "changed_keys": [
-                "criteria_cell_sha256",
+                "generation_inputs_sha256",
                 "seam_state_sha256"
               ],
               "seam_evidence": {
@@ -1802,16 +1740,125 @@
                 "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
                 "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
               },
-              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "generation_inputs_check": {
+                "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
+                "A_BTCUSDT_1h__default": []
+              },
+              "ambient_evidence": {
+                "launcher_cleared_env": [],
+                "claude_settings_env": {},
+                "settings_mtime_before_run1": true
+              },
+              "memory_tier_log": [
+                "8gb"
+              ],
+              "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+              "hardware_evidence": {
+                "memory_tier": "child log（memory_tier_log）",
+                "physical_memory_bytes": "推定（未於跑時記錄）",
+                "cpu_count": "推定（未於跑時記錄）",
+                "machine": "推定（未於跑時記錄）",
+                "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+              },
+              "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+              "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
               "previous": {
-                "at": "2026-10-23T00:40:29.043607+00:00",
+                "at": "2026-10-23T01:30:33.359229+00:00",
                 "basis": {
                   "head_equals_freeze_receipt": true,
                   "product_code_clean": true,
-                  "results_after_head_commit": true
+                  "results_after_head_commit": true,
+                  "other_seam_files_unchanged_since_run1": true,
+                  "run1_reconstruction_intact": true,
+                  "run2_reconstruction_intact": true
                 },
                 "head_commit_time": 1792689226,
-                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                "changed_keys": [
+                  "generation_inputs_sha256",
+                  "seam_state_sha256"
+                ],
+                "seam_evidence": {
+                  "run": "run1",
+                  "started_at": "2026-10-22T23:23:53Z",
+                  "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                  "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                  "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                },
+                "generation_inputs_check": {
+                  "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
+                  "A_BTCUSDT_1h__default": []
+                },
+                "ambient_evidence": {
+                  "launcher_ffact_env": [],
+                  "claude_settings_env": {},
+                  "settings_mtime_before_run1": true
+                },
+                "memory_tier_log": [
+                  "8gb"
+                ],
+                "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                "previous": {
+                  "at": "2026-10-23T01:12:55.675385+00:00",
+                  "basis": {
+                    "head_equals_freeze_receipt": true,
+                    "product_code_clean": true,
+                    "results_after_head_commit": true,
+                    "other_seam_files_unchanged_since_run1": true,
+                    "run1_reconstruction_intact": true,
+                    "run2_reconstruction_intact": true
+                  },
+                  "head_commit_time": 1792689226,
+                  "changed_keys": [
+                    "generation_inputs_sha256",
+                    "seam_state_sha256"
+                  ],
+                  "seam_evidence": {
+                    "run": "run1",
+                    "started_at": "2026-10-22T23:23:53Z",
+                    "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                    "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                    "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                  },
+                  "generation_inputs_check": {
+                    "A_BTCUSDT_1h__FFACT_USE_POLARS-0": [],
+                    "A_BTCUSDT_1h__default": []
+                  },
+                  "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                  "previous": {
+                    "at": "2026-10-23T00:58:45.670866+00:00",
+                    "basis": {
+                      "head_equals_freeze_receipt": true,
+                      "product_code_clean": true,
+                      "results_after_head_commit": true,
+                      "other_seam_files_unchanged_since_run1": true,
+                      "run1_reconstruction_intact": true,
+                      "run2_reconstruction_intact": true
+                    },
+                    "head_commit_time": 1792689226,
+                    "changed_keys": [
+                      "criteria_cell_sha256",
+                      "seam_state_sha256"
+                    ],
+                    "seam_evidence": {
+                      "run": "run1",
+                      "started_at": "2026-10-22T23:23:53Z",
+                      "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                      "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                      "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                    },
+                    "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                    "previous": {
+                      "at": "2026-10-23T00:40:29.043607+00:00",
+                      "basis": {
+                        "head_equals_freeze_receipt": true,
+                        "product_code_clean": true,
+                        "results_after_head_commit": true
+                      },
+                      "head_commit_time": 1792689226,
+                      "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                    }
+                  }
+                }
               }
             }
           }
@@ -1819,126 +1866,57 @@
       }
     },
     "A_BTCUSDT_4h": {
-      "at": "2026-10-23T01:58:11.467379+00:00",
+      "at": "2026-10-23T05:15:04.521298+00:00",
       "basis": {
-        "head_equals_freeze_receipt": true,
+        "product_unchanged_since_freeze_head": true,
         "product_code_clean": true,
-        "results_after_head_commit": true,
-        "other_seam_files_unchanged_since_run1": true,
-        "run1_reconstruction_intact": true,
-        "run2_reconstruction_intact": true
+        "seam_changes_only_helpers_and_freeze_script": true,
+        "new_seam_files_committed_before_run1_and_clean": true
       },
-      "head_commit_time": 1792689226,
       "changed_keys": [
         "seam_state_sha256"
       ],
-      "seam_evidence": {
-        "run": "run1",
-        "started_at": "2026-10-22T23:23:53Z",
-        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r20_seam_diff.diff",
+      "new_seam_files_last_commit": {
+        "scripts/ffname_freeze_baseline.py": "2026-10-19T00:27:33+08:00"
       },
-      "generation_inputs_check": {
-        "A_BTCUSDT_4h__default": []
-      },
-      "ambient_evidence": {
-        "launcher_cleared_env": [],
-        "claude_settings_env": {},
-        "settings_mtime_before_run1": true
-      },
-      "memory_tier_log": [
-        "8gb"
-      ],
-      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-      "hardware_evidence": {
-        "memory_tier": "child log（memory_tier_log）",
-        "physical_memory_bytes": "推定（未於跑時記錄）",
-        "cpu_count": "推定（未於跑時記錄）",
-        "machine": "推定（未於跑時記錄）",
-        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-      },
-      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "note": "規格審查 r20（CODEX-R20-P1-02）：接縫閉包納入動態載入點目標（SEAM_GLOBS 14 檔），新增 scripts/ffname_freeze_baseline.py（tests/feature_engineering/ffname_helpers.py:41 load_freeze_module 所載）；該檔工作樹對 HEAD 無差異、最後提交早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；SEAM_GLOBS 定義之改動不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
       "previous": {
-        "at": "2026-10-23T01:45:17.924713+00:00",
+        "at": "2026-10-23T04:48:04.598415+00:00",
         "basis": {
-          "head_equals_freeze_receipt": true,
+          "product_unchanged_since_freeze_head": true,
           "product_code_clean": true,
-          "results_after_head_commit": true,
-          "other_seam_files_unchanged_since_run1": true,
-          "run1_reconstruction_intact": true,
-          "run2_reconstruction_intact": true
+          "seam_changes_only_helpers_and_freeze_script": true,
+          "new_seam_files_committed_before_run1_and_clean": true
         },
-        "head_commit_time": 1792689226,
         "changed_keys": [
-          "generation_inputs_sha256",
           "seam_state_sha256"
         ],
-        "seam_evidence": {
-          "run": "run1",
-          "started_at": "2026-10-22T23:23:53Z",
-          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r19_seam_diff.diff",
+        "new_seam_files_last_commit": {
+          "tests/feature_engineering/ff_truncation_mr_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/ffname_helpers.py": "2026-10-18T23:12:54+08:00",
+          "tests/feature_engineering/ffstat_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/fftfmeta_golden_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/icfirstalign_helpers.py": "2026-10-04T22:26:30+08:00",
+          "tests/feature_engineering/probewinsor_helpers.py": "2026-10-17T21:51:33+08:00"
         },
-        "generation_inputs_check": {
-          "A_BTCUSDT_4h__default": []
-        },
-        "ambient_evidence": {
-          "launcher_cleared_env": [],
-          "claude_settings_env": {},
-          "settings_mtime_before_run1": true
-        },
-        "memory_tier_log": [
-          "8gb"
-        ],
-        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-        "hardware_evidence": {
-          "memory_tier": "child log（memory_tier_log）",
-          "physical_memory_bytes": "推定（未於跑時記錄）",
-          "cpu_count": "推定（未於跑時記錄）",
-          "machine": "推定（未於跑時記錄）",
-          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-        },
-        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "note": "規格審查 r19：接縫改為凍結之非產品碼載入閉包（SEAM_GLOBS 明列 13 檔）。新增之 6 個 tests/feature_engineering 輔助模組工作樹對 HEAD 無差異、最後提交皆早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；本次 SEAM_GLOBS 定義之改動與 r18 之身分／收據 head 記錄方式改動皆不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
         "previous": {
-          "at": "2026-10-23T01:30:33.359229+00:00",
+          "at": "2026-10-23T04:31:43.857924+00:00",
           "basis": {
-            "head_equals_freeze_receipt": true,
+            "product_unchanged_since_freeze_head": true,
             "product_code_clean": true,
-            "results_after_head_commit": true,
-            "other_seam_files_unchanged_since_run1": true,
-            "run1_reconstruction_intact": true,
-            "run2_reconstruction_intact": true
+            "seam_changes_only_helpers_and_freeze_script": true
           },
-          "head_commit_time": 1792689226,
           "changed_keys": [
-            "generation_inputs_sha256",
+            "head",
             "seam_state_sha256"
           ],
-          "seam_evidence": {
-            "run": "run1",
-            "started_at": "2026-10-22T23:23:53Z",
-            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
-          },
-          "generation_inputs_check": {
-            "A_BTCUSDT_4h__default": []
-          },
-          "ambient_evidence": {
-            "launcher_ffact_env": [],
-            "claude_settings_env": {},
-            "settings_mtime_before_run1": true
-          },
-          "memory_tier_log": [
-            "8gb"
-          ],
-          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r18_seam_diff.diff",
+          "note": "規格審查 r18：身分移除 head（產品碼由 code_state_sha256、接縫由 seam_state_sha256 逐位元涵蓋；head 另因只改文件／測試之提交而變），生成時 HEAD 移記 generation_head；接縫收窄為凍結載入之閉包（SEAM_GLOBS 明列 7 檔）。本次接縫改動只在 SEAM_GLOBS 定義與身分／收據 head 之記錄方式，不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
           "previous": {
-            "at": "2026-10-23T01:12:55.675385+00:00",
+            "at": "2026-10-23T01:58:11.467379+00:00",
             "basis": {
               "head_equals_freeze_receipt": true,
               "product_code_clean": true,
@@ -1949,7 +1927,6 @@
             },
             "head_commit_time": 1792689226,
             "changed_keys": [
-              "generation_inputs_sha256",
               "seam_state_sha256"
             ],
             "seam_evidence": {
@@ -1962,9 +1939,26 @@
             "generation_inputs_check": {
               "A_BTCUSDT_4h__default": []
             },
-            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "ambient_evidence": {
+              "launcher_cleared_env": [],
+              "claude_settings_env": {},
+              "settings_mtime_before_run1": true
+            },
+            "memory_tier_log": [
+              "8gb"
+            ],
+            "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+            "hardware_evidence": {
+              "memory_tier": "child log（memory_tier_log）",
+              "physical_memory_bytes": "推定（未於跑時記錄）",
+              "cpu_count": "推定（未於跑時記錄）",
+              "machine": "推定（未於跑時記錄）",
+              "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+            },
+            "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+            "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
             "previous": {
-              "at": "2026-10-23T00:58:45.670866+00:00",
+              "at": "2026-10-23T01:45:17.924713+00:00",
               "basis": {
                 "head_equals_freeze_receipt": true,
                 "product_code_clean": true,
@@ -1975,7 +1969,7 @@
               },
               "head_commit_time": 1792689226,
               "changed_keys": [
-                "criteria_cell_sha256",
+                "generation_inputs_sha256",
                 "seam_state_sha256"
               ],
               "seam_evidence": {
@@ -1985,16 +1979,122 @@
                 "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
                 "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
               },
-              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "generation_inputs_check": {
+                "A_BTCUSDT_4h__default": []
+              },
+              "ambient_evidence": {
+                "launcher_cleared_env": [],
+                "claude_settings_env": {},
+                "settings_mtime_before_run1": true
+              },
+              "memory_tier_log": [
+                "8gb"
+              ],
+              "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+              "hardware_evidence": {
+                "memory_tier": "child log（memory_tier_log）",
+                "physical_memory_bytes": "推定（未於跑時記錄）",
+                "cpu_count": "推定（未於跑時記錄）",
+                "machine": "推定（未於跑時記錄）",
+                "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+              },
+              "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+              "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
               "previous": {
-                "at": "2026-10-23T00:40:29.043607+00:00",
+                "at": "2026-10-23T01:30:33.359229+00:00",
                 "basis": {
                   "head_equals_freeze_receipt": true,
                   "product_code_clean": true,
-                  "results_after_head_commit": true
+                  "results_after_head_commit": true,
+                  "other_seam_files_unchanged_since_run1": true,
+                  "run1_reconstruction_intact": true,
+                  "run2_reconstruction_intact": true
                 },
                 "head_commit_time": 1792689226,
-                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                "changed_keys": [
+                  "generation_inputs_sha256",
+                  "seam_state_sha256"
+                ],
+                "seam_evidence": {
+                  "run": "run1",
+                  "started_at": "2026-10-22T23:23:53Z",
+                  "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                  "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                  "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                },
+                "generation_inputs_check": {
+                  "A_BTCUSDT_4h__default": []
+                },
+                "ambient_evidence": {
+                  "launcher_ffact_env": [],
+                  "claude_settings_env": {},
+                  "settings_mtime_before_run1": true
+                },
+                "memory_tier_log": [
+                  "8gb"
+                ],
+                "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                "previous": {
+                  "at": "2026-10-23T01:12:55.675385+00:00",
+                  "basis": {
+                    "head_equals_freeze_receipt": true,
+                    "product_code_clean": true,
+                    "results_after_head_commit": true,
+                    "other_seam_files_unchanged_since_run1": true,
+                    "run1_reconstruction_intact": true,
+                    "run2_reconstruction_intact": true
+                  },
+                  "head_commit_time": 1792689226,
+                  "changed_keys": [
+                    "generation_inputs_sha256",
+                    "seam_state_sha256"
+                  ],
+                  "seam_evidence": {
+                    "run": "run1",
+                    "started_at": "2026-10-22T23:23:53Z",
+                    "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                    "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                    "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                  },
+                  "generation_inputs_check": {
+                    "A_BTCUSDT_4h__default": []
+                  },
+                  "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                  "previous": {
+                    "at": "2026-10-23T00:58:45.670866+00:00",
+                    "basis": {
+                      "head_equals_freeze_receipt": true,
+                      "product_code_clean": true,
+                      "results_after_head_commit": true,
+                      "other_seam_files_unchanged_since_run1": true,
+                      "run1_reconstruction_intact": true,
+                      "run2_reconstruction_intact": true
+                    },
+                    "head_commit_time": 1792689226,
+                    "changed_keys": [
+                      "criteria_cell_sha256",
+                      "seam_state_sha256"
+                    ],
+                    "seam_evidence": {
+                      "run": "run1",
+                      "started_at": "2026-10-22T23:23:53Z",
+                      "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                      "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                      "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                    },
+                    "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                    "previous": {
+                      "at": "2026-10-23T00:40:29.043607+00:00",
+                      "basis": {
+                        "head_equals_freeze_receipt": true,
+                        "product_code_clean": true,
+                        "results_after_head_commit": true
+                      },
+                      "head_commit_time": 1792689226,
+                      "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                    }
+                  }
+                }
               }
             }
           }
@@ -2002,126 +2102,57 @@
       }
     },
     "A_BTCUSDT_12h": {
-      "at": "2026-10-23T01:58:11.467379+00:00",
+      "at": "2026-10-23T05:15:04.521298+00:00",
       "basis": {
-        "head_equals_freeze_receipt": true,
+        "product_unchanged_since_freeze_head": true,
         "product_code_clean": true,
-        "results_after_head_commit": true,
-        "other_seam_files_unchanged_since_run1": true,
-        "run1_reconstruction_intact": true,
-        "run2_reconstruction_intact": true
+        "seam_changes_only_helpers_and_freeze_script": true,
+        "new_seam_files_committed_before_run1_and_clean": true
       },
-      "head_commit_time": 1792689226,
       "changed_keys": [
         "seam_state_sha256"
       ],
-      "seam_evidence": {
-        "run": "run1",
-        "started_at": "2026-10-22T23:23:53Z",
-        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r20_seam_diff.diff",
+      "new_seam_files_last_commit": {
+        "scripts/ffname_freeze_baseline.py": "2026-10-19T00:27:33+08:00"
       },
-      "generation_inputs_check": {
-        "A_BTCUSDT_12h__default": []
-      },
-      "ambient_evidence": {
-        "launcher_cleared_env": [],
-        "claude_settings_env": {},
-        "settings_mtime_before_run1": true
-      },
-      "memory_tier_log": [
-        "8gb"
-      ],
-      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-      "hardware_evidence": {
-        "memory_tier": "child log（memory_tier_log）",
-        "physical_memory_bytes": "推定（未於跑時記錄）",
-        "cpu_count": "推定（未於跑時記錄）",
-        "machine": "推定（未於跑時記錄）",
-        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-      },
-      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "note": "規格審查 r20（CODEX-R20-P1-02）：接縫閉包納入動態載入點目標（SEAM_GLOBS 14 檔），新增 scripts/ffname_freeze_baseline.py（tests/feature_engineering/ffname_helpers.py:41 load_freeze_module 所載）；該檔工作樹對 HEAD 無差異、最後提交早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；SEAM_GLOBS 定義之改動不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
       "previous": {
-        "at": "2026-10-23T01:45:17.924713+00:00",
+        "at": "2026-10-23T04:48:04.598415+00:00",
         "basis": {
-          "head_equals_freeze_receipt": true,
+          "product_unchanged_since_freeze_head": true,
           "product_code_clean": true,
-          "results_after_head_commit": true,
-          "other_seam_files_unchanged_since_run1": true,
-          "run1_reconstruction_intact": true,
-          "run2_reconstruction_intact": true
+          "seam_changes_only_helpers_and_freeze_script": true,
+          "new_seam_files_committed_before_run1_and_clean": true
         },
-        "head_commit_time": 1792689226,
         "changed_keys": [
-          "generation_inputs_sha256",
           "seam_state_sha256"
         ],
-        "seam_evidence": {
-          "run": "run1",
-          "started_at": "2026-10-22T23:23:53Z",
-          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r19_seam_diff.diff",
+        "new_seam_files_last_commit": {
+          "tests/feature_engineering/ff_truncation_mr_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/ffname_helpers.py": "2026-10-18T23:12:54+08:00",
+          "tests/feature_engineering/ffstat_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/fftfmeta_golden_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/icfirstalign_helpers.py": "2026-10-04T22:26:30+08:00",
+          "tests/feature_engineering/probewinsor_helpers.py": "2026-10-17T21:51:33+08:00"
         },
-        "generation_inputs_check": {
-          "A_BTCUSDT_12h__default": []
-        },
-        "ambient_evidence": {
-          "launcher_cleared_env": [],
-          "claude_settings_env": {},
-          "settings_mtime_before_run1": true
-        },
-        "memory_tier_log": [
-          "8gb"
-        ],
-        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-        "hardware_evidence": {
-          "memory_tier": "child log（memory_tier_log）",
-          "physical_memory_bytes": "推定（未於跑時記錄）",
-          "cpu_count": "推定（未於跑時記錄）",
-          "machine": "推定（未於跑時記錄）",
-          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-        },
-        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "note": "規格審查 r19：接縫改為凍結之非產品碼載入閉包（SEAM_GLOBS 明列 13 檔）。新增之 6 個 tests/feature_engineering 輔助模組工作樹對 HEAD 無差異、最後提交皆早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；本次 SEAM_GLOBS 定義之改動與 r18 之身分／收據 head 記錄方式改動皆不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
         "previous": {
-          "at": "2026-10-23T01:30:33.359229+00:00",
+          "at": "2026-10-23T04:31:43.857924+00:00",
           "basis": {
-            "head_equals_freeze_receipt": true,
+            "product_unchanged_since_freeze_head": true,
             "product_code_clean": true,
-            "results_after_head_commit": true,
-            "other_seam_files_unchanged_since_run1": true,
-            "run1_reconstruction_intact": true,
-            "run2_reconstruction_intact": true
+            "seam_changes_only_helpers_and_freeze_script": true
           },
-          "head_commit_time": 1792689226,
           "changed_keys": [
-            "generation_inputs_sha256",
+            "head",
             "seam_state_sha256"
           ],
-          "seam_evidence": {
-            "run": "run1",
-            "started_at": "2026-10-22T23:23:53Z",
-            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
-          },
-          "generation_inputs_check": {
-            "A_BTCUSDT_12h__default": []
-          },
-          "ambient_evidence": {
-            "launcher_ffact_env": [],
-            "claude_settings_env": {},
-            "settings_mtime_before_run1": true
-          },
-          "memory_tier_log": [
-            "8gb"
-          ],
-          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r18_seam_diff.diff",
+          "note": "規格審查 r18：身分移除 head（產品碼由 code_state_sha256、接縫由 seam_state_sha256 逐位元涵蓋；head 另因只改文件／測試之提交而變），生成時 HEAD 移記 generation_head；接縫收窄為凍結載入之閉包（SEAM_GLOBS 明列 7 檔）。本次接縫改動只在 SEAM_GLOBS 定義與身分／收據 head 之記錄方式，不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
           "previous": {
-            "at": "2026-10-23T01:12:55.675385+00:00",
+            "at": "2026-10-23T01:58:11.467379+00:00",
             "basis": {
               "head_equals_freeze_receipt": true,
               "product_code_clean": true,
@@ -2132,7 +2163,6 @@
             },
             "head_commit_time": 1792689226,
             "changed_keys": [
-              "generation_inputs_sha256",
               "seam_state_sha256"
             ],
             "seam_evidence": {
@@ -2145,9 +2175,26 @@
             "generation_inputs_check": {
               "A_BTCUSDT_12h__default": []
             },
-            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "ambient_evidence": {
+              "launcher_cleared_env": [],
+              "claude_settings_env": {},
+              "settings_mtime_before_run1": true
+            },
+            "memory_tier_log": [
+              "8gb"
+            ],
+            "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+            "hardware_evidence": {
+              "memory_tier": "child log（memory_tier_log）",
+              "physical_memory_bytes": "推定（未於跑時記錄）",
+              "cpu_count": "推定（未於跑時記錄）",
+              "machine": "推定（未於跑時記錄）",
+              "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+            },
+            "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+            "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
             "previous": {
-              "at": "2026-10-23T00:58:45.670866+00:00",
+              "at": "2026-10-23T01:45:17.924713+00:00",
               "basis": {
                 "head_equals_freeze_receipt": true,
                 "product_code_clean": true,
@@ -2158,7 +2205,7 @@
               },
               "head_commit_time": 1792689226,
               "changed_keys": [
-                "criteria_cell_sha256",
+                "generation_inputs_sha256",
                 "seam_state_sha256"
               ],
               "seam_evidence": {
@@ -2168,16 +2215,122 @@
                 "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
                 "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
               },
-              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "generation_inputs_check": {
+                "A_BTCUSDT_12h__default": []
+              },
+              "ambient_evidence": {
+                "launcher_cleared_env": [],
+                "claude_settings_env": {},
+                "settings_mtime_before_run1": true
+              },
+              "memory_tier_log": [
+                "8gb"
+              ],
+              "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+              "hardware_evidence": {
+                "memory_tier": "child log（memory_tier_log）",
+                "physical_memory_bytes": "推定（未於跑時記錄）",
+                "cpu_count": "推定（未於跑時記錄）",
+                "machine": "推定（未於跑時記錄）",
+                "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+              },
+              "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+              "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
               "previous": {
-                "at": "2026-10-23T00:40:29.043607+00:00",
+                "at": "2026-10-23T01:30:33.359229+00:00",
                 "basis": {
                   "head_equals_freeze_receipt": true,
                   "product_code_clean": true,
-                  "results_after_head_commit": true
+                  "results_after_head_commit": true,
+                  "other_seam_files_unchanged_since_run1": true,
+                  "run1_reconstruction_intact": true,
+                  "run2_reconstruction_intact": true
                 },
                 "head_commit_time": 1792689226,
-                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                "changed_keys": [
+                  "generation_inputs_sha256",
+                  "seam_state_sha256"
+                ],
+                "seam_evidence": {
+                  "run": "run1",
+                  "started_at": "2026-10-22T23:23:53Z",
+                  "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                  "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                  "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                },
+                "generation_inputs_check": {
+                  "A_BTCUSDT_12h__default": []
+                },
+                "ambient_evidence": {
+                  "launcher_ffact_env": [],
+                  "claude_settings_env": {},
+                  "settings_mtime_before_run1": true
+                },
+                "memory_tier_log": [
+                  "8gb"
+                ],
+                "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                "previous": {
+                  "at": "2026-10-23T01:12:55.675385+00:00",
+                  "basis": {
+                    "head_equals_freeze_receipt": true,
+                    "product_code_clean": true,
+                    "results_after_head_commit": true,
+                    "other_seam_files_unchanged_since_run1": true,
+                    "run1_reconstruction_intact": true,
+                    "run2_reconstruction_intact": true
+                  },
+                  "head_commit_time": 1792689226,
+                  "changed_keys": [
+                    "generation_inputs_sha256",
+                    "seam_state_sha256"
+                  ],
+                  "seam_evidence": {
+                    "run": "run1",
+                    "started_at": "2026-10-22T23:23:53Z",
+                    "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                    "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                    "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                  },
+                  "generation_inputs_check": {
+                    "A_BTCUSDT_12h__default": []
+                  },
+                  "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                  "previous": {
+                    "at": "2026-10-23T00:58:45.670866+00:00",
+                    "basis": {
+                      "head_equals_freeze_receipt": true,
+                      "product_code_clean": true,
+                      "results_after_head_commit": true,
+                      "other_seam_files_unchanged_since_run1": true,
+                      "run1_reconstruction_intact": true,
+                      "run2_reconstruction_intact": true
+                    },
+                    "head_commit_time": 1792689226,
+                    "changed_keys": [
+                      "criteria_cell_sha256",
+                      "seam_state_sha256"
+                    ],
+                    "seam_evidence": {
+                      "run": "run1",
+                      "started_at": "2026-10-22T23:23:53Z",
+                      "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                      "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                      "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                    },
+                    "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                    "previous": {
+                      "at": "2026-10-23T00:40:29.043607+00:00",
+                      "basis": {
+                        "head_equals_freeze_receipt": true,
+                        "product_code_clean": true,
+                        "results_after_head_commit": true
+                      },
+                      "head_commit_time": 1792689226,
+                      "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                    }
+                  }
+                }
               }
             }
           }
@@ -2185,126 +2338,57 @@
       }
     },
     "A_SOLUSDT_1h": {
-      "at": "2026-10-23T01:58:11.467379+00:00",
+      "at": "2026-10-23T05:15:04.521298+00:00",
       "basis": {
-        "head_equals_freeze_receipt": true,
+        "product_unchanged_since_freeze_head": true,
         "product_code_clean": true,
-        "results_after_head_commit": true,
-        "other_seam_files_unchanged_since_run1": true,
-        "run1_reconstruction_intact": true,
-        "run2_reconstruction_intact": true
+        "seam_changes_only_helpers_and_freeze_script": true,
+        "new_seam_files_committed_before_run1_and_clean": true
       },
-      "head_commit_time": 1792689226,
       "changed_keys": [
         "seam_state_sha256"
       ],
-      "seam_evidence": {
-        "run": "run1",
-        "started_at": "2026-10-22T23:23:53Z",
-        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r20_seam_diff.diff",
+      "new_seam_files_last_commit": {
+        "scripts/ffname_freeze_baseline.py": "2026-10-19T00:27:33+08:00"
       },
-      "generation_inputs_check": {
-        "A_SOLUSDT_1h__default": []
-      },
-      "ambient_evidence": {
-        "launcher_cleared_env": [],
-        "claude_settings_env": {},
-        "settings_mtime_before_run1": true
-      },
-      "memory_tier_log": [
-        "8gb"
-      ],
-      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-      "hardware_evidence": {
-        "memory_tier": "child log（memory_tier_log）",
-        "physical_memory_bytes": "推定（未於跑時記錄）",
-        "cpu_count": "推定（未於跑時記錄）",
-        "machine": "推定（未於跑時記錄）",
-        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-      },
-      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "note": "規格審查 r20（CODEX-R20-P1-02）：接縫閉包納入動態載入點目標（SEAM_GLOBS 14 檔），新增 scripts/ffname_freeze_baseline.py（tests/feature_engineering/ffname_helpers.py:41 load_freeze_module 所載）；該檔工作樹對 HEAD 無差異、最後提交早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；SEAM_GLOBS 定義之改動不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
       "previous": {
-        "at": "2026-10-23T01:45:17.924713+00:00",
+        "at": "2026-10-23T04:48:04.598415+00:00",
         "basis": {
-          "head_equals_freeze_receipt": true,
+          "product_unchanged_since_freeze_head": true,
           "product_code_clean": true,
-          "results_after_head_commit": true,
-          "other_seam_files_unchanged_since_run1": true,
-          "run1_reconstruction_intact": true,
-          "run2_reconstruction_intact": true
+          "seam_changes_only_helpers_and_freeze_script": true,
+          "new_seam_files_committed_before_run1_and_clean": true
         },
-        "head_commit_time": 1792689226,
         "changed_keys": [
-          "generation_inputs_sha256",
           "seam_state_sha256"
         ],
-        "seam_evidence": {
-          "run": "run1",
-          "started_at": "2026-10-22T23:23:53Z",
-          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r19_seam_diff.diff",
+        "new_seam_files_last_commit": {
+          "tests/feature_engineering/ff_truncation_mr_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/ffname_helpers.py": "2026-10-18T23:12:54+08:00",
+          "tests/feature_engineering/ffstat_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/fftfmeta_golden_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/icfirstalign_helpers.py": "2026-10-04T22:26:30+08:00",
+          "tests/feature_engineering/probewinsor_helpers.py": "2026-10-17T21:51:33+08:00"
         },
-        "generation_inputs_check": {
-          "A_SOLUSDT_1h__default": []
-        },
-        "ambient_evidence": {
-          "launcher_cleared_env": [],
-          "claude_settings_env": {},
-          "settings_mtime_before_run1": true
-        },
-        "memory_tier_log": [
-          "8gb"
-        ],
-        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-        "hardware_evidence": {
-          "memory_tier": "child log（memory_tier_log）",
-          "physical_memory_bytes": "推定（未於跑時記錄）",
-          "cpu_count": "推定（未於跑時記錄）",
-          "machine": "推定（未於跑時記錄）",
-          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-        },
-        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "note": "規格審查 r19：接縫改為凍結之非產品碼載入閉包（SEAM_GLOBS 明列 13 檔）。新增之 6 個 tests/feature_engineering 輔助模組工作樹對 HEAD 無差異、最後提交皆早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；本次 SEAM_GLOBS 定義之改動與 r18 之身分／收據 head 記錄方式改動皆不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
         "previous": {
-          "at": "2026-10-23T01:30:33.359229+00:00",
+          "at": "2026-10-23T04:31:43.857924+00:00",
           "basis": {
-            "head_equals_freeze_receipt": true,
+            "product_unchanged_since_freeze_head": true,
             "product_code_clean": true,
-            "results_after_head_commit": true,
-            "other_seam_files_unchanged_since_run1": true,
-            "run1_reconstruction_intact": true,
-            "run2_reconstruction_intact": true
+            "seam_changes_only_helpers_and_freeze_script": true
           },
-          "head_commit_time": 1792689226,
           "changed_keys": [
-            "generation_inputs_sha256",
+            "head",
             "seam_state_sha256"
           ],
-          "seam_evidence": {
-            "run": "run1",
-            "started_at": "2026-10-22T23:23:53Z",
-            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
-          },
-          "generation_inputs_check": {
-            "A_SOLUSDT_1h__default": []
-          },
-          "ambient_evidence": {
-            "launcher_ffact_env": [],
-            "claude_settings_env": {},
-            "settings_mtime_before_run1": true
-          },
-          "memory_tier_log": [
-            "8gb"
-          ],
-          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r18_seam_diff.diff",
+          "note": "規格審查 r18：身分移除 head（產品碼由 code_state_sha256、接縫由 seam_state_sha256 逐位元涵蓋；head 另因只改文件／測試之提交而變），生成時 HEAD 移記 generation_head；接縫收窄為凍結載入之閉包（SEAM_GLOBS 明列 7 檔）。本次接縫改動只在 SEAM_GLOBS 定義與身分／收據 head 之記錄方式，不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
           "previous": {
-            "at": "2026-10-23T01:12:55.675385+00:00",
+            "at": "2026-10-23T01:58:11.467379+00:00",
             "basis": {
               "head_equals_freeze_receipt": true,
               "product_code_clean": true,
@@ -2315,7 +2399,6 @@
             },
             "head_commit_time": 1792689226,
             "changed_keys": [
-              "generation_inputs_sha256",
               "seam_state_sha256"
             ],
             "seam_evidence": {
@@ -2328,9 +2411,26 @@
             "generation_inputs_check": {
               "A_SOLUSDT_1h__default": []
             },
-            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "ambient_evidence": {
+              "launcher_cleared_env": [],
+              "claude_settings_env": {},
+              "settings_mtime_before_run1": true
+            },
+            "memory_tier_log": [
+              "8gb"
+            ],
+            "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+            "hardware_evidence": {
+              "memory_tier": "child log（memory_tier_log）",
+              "physical_memory_bytes": "推定（未於跑時記錄）",
+              "cpu_count": "推定（未於跑時記錄）",
+              "machine": "推定（未於跑時記錄）",
+              "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+            },
+            "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+            "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
             "previous": {
-              "at": "2026-10-23T00:58:45.670866+00:00",
+              "at": "2026-10-23T01:45:17.924713+00:00",
               "basis": {
                 "head_equals_freeze_receipt": true,
                 "product_code_clean": true,
@@ -2341,7 +2441,7 @@
               },
               "head_commit_time": 1792689226,
               "changed_keys": [
-                "criteria_cell_sha256",
+                "generation_inputs_sha256",
                 "seam_state_sha256"
               ],
               "seam_evidence": {
@@ -2351,16 +2451,122 @@
                 "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
                 "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
               },
-              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "generation_inputs_check": {
+                "A_SOLUSDT_1h__default": []
+              },
+              "ambient_evidence": {
+                "launcher_cleared_env": [],
+                "claude_settings_env": {},
+                "settings_mtime_before_run1": true
+              },
+              "memory_tier_log": [
+                "8gb"
+              ],
+              "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+              "hardware_evidence": {
+                "memory_tier": "child log（memory_tier_log）",
+                "physical_memory_bytes": "推定（未於跑時記錄）",
+                "cpu_count": "推定（未於跑時記錄）",
+                "machine": "推定（未於跑時記錄）",
+                "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+              },
+              "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+              "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
               "previous": {
-                "at": "2026-10-23T00:40:29.043607+00:00",
+                "at": "2026-10-23T01:30:33.359229+00:00",
                 "basis": {
                   "head_equals_freeze_receipt": true,
                   "product_code_clean": true,
-                  "results_after_head_commit": true
+                  "results_after_head_commit": true,
+                  "other_seam_files_unchanged_since_run1": true,
+                  "run1_reconstruction_intact": true,
+                  "run2_reconstruction_intact": true
                 },
                 "head_commit_time": 1792689226,
-                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                "changed_keys": [
+                  "generation_inputs_sha256",
+                  "seam_state_sha256"
+                ],
+                "seam_evidence": {
+                  "run": "run1",
+                  "started_at": "2026-10-22T23:23:53Z",
+                  "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                  "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                  "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                },
+                "generation_inputs_check": {
+                  "A_SOLUSDT_1h__default": []
+                },
+                "ambient_evidence": {
+                  "launcher_ffact_env": [],
+                  "claude_settings_env": {},
+                  "settings_mtime_before_run1": true
+                },
+                "memory_tier_log": [
+                  "8gb"
+                ],
+                "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                "previous": {
+                  "at": "2026-10-23T01:12:55.675385+00:00",
+                  "basis": {
+                    "head_equals_freeze_receipt": true,
+                    "product_code_clean": true,
+                    "results_after_head_commit": true,
+                    "other_seam_files_unchanged_since_run1": true,
+                    "run1_reconstruction_intact": true,
+                    "run2_reconstruction_intact": true
+                  },
+                  "head_commit_time": 1792689226,
+                  "changed_keys": [
+                    "generation_inputs_sha256",
+                    "seam_state_sha256"
+                  ],
+                  "seam_evidence": {
+                    "run": "run1",
+                    "started_at": "2026-10-22T23:23:53Z",
+                    "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                    "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                    "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                  },
+                  "generation_inputs_check": {
+                    "A_SOLUSDT_1h__default": []
+                  },
+                  "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                  "previous": {
+                    "at": "2026-10-23T00:58:45.670866+00:00",
+                    "basis": {
+                      "head_equals_freeze_receipt": true,
+                      "product_code_clean": true,
+                      "results_after_head_commit": true,
+                      "other_seam_files_unchanged_since_run1": true,
+                      "run1_reconstruction_intact": true,
+                      "run2_reconstruction_intact": true
+                    },
+                    "head_commit_time": 1792689226,
+                    "changed_keys": [
+                      "criteria_cell_sha256",
+                      "seam_state_sha256"
+                    ],
+                    "seam_evidence": {
+                      "run": "run1",
+                      "started_at": "2026-10-22T23:23:53Z",
+                      "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                      "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                      "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                    },
+                    "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                    "previous": {
+                      "at": "2026-10-23T00:40:29.043607+00:00",
+                      "basis": {
+                        "head_equals_freeze_receipt": true,
+                        "product_code_clean": true,
+                        "results_after_head_commit": true
+                      },
+                      "head_commit_time": 1792689226,
+                      "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                    }
+                  }
+                }
               }
             }
           }
@@ -2368,126 +2574,57 @@
       }
     },
     "B_BTCUSDT_1h_4h": {
-      "at": "2026-10-23T01:58:11.467379+00:00",
+      "at": "2026-10-23T05:15:04.521298+00:00",
       "basis": {
-        "head_equals_freeze_receipt": true,
+        "product_unchanged_since_freeze_head": true,
         "product_code_clean": true,
-        "results_after_head_commit": true,
-        "other_seam_files_unchanged_since_run1": true,
-        "run1_reconstruction_intact": true,
-        "run2_reconstruction_intact": true
+        "seam_changes_only_helpers_and_freeze_script": true,
+        "new_seam_files_committed_before_run1_and_clean": true
       },
-      "head_commit_time": 1792689226,
       "changed_keys": [
         "seam_state_sha256"
       ],
-      "seam_evidence": {
-        "run": "run1",
-        "started_at": "2026-10-22T23:23:53Z",
-        "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-        "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+      "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r20_seam_diff.diff",
+      "new_seam_files_last_commit": {
+        "scripts/ffname_freeze_baseline.py": "2026-10-19T00:27:33+08:00"
       },
-      "generation_inputs_check": {
-        "B_BTCUSDT_1h_4h__default": []
-      },
-      "ambient_evidence": {
-        "launcher_cleared_env": [],
-        "claude_settings_env": {},
-        "settings_mtime_before_run1": true
-      },
-      "memory_tier_log": [
-        "8gb"
-      ],
-      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-      "hardware_evidence": {
-        "memory_tier": "child log（memory_tier_log）",
-        "physical_memory_bytes": "推定（未於跑時記錄）",
-        "cpu_count": "推定（未於跑時記錄）",
-        "machine": "推定（未於跑時記錄）",
-        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-      },
-      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "note": "規格審查 r20（CODEX-R20-P1-02）：接縫閉包納入動態載入點目標（SEAM_GLOBS 14 檔），新增 scripts/ffname_freeze_baseline.py（tests/feature_engineering/ffname_helpers.py:41 load_freeze_module 所載）；該檔工作樹對 HEAD 無差異、最後提交早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；SEAM_GLOBS 定義之改動不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
       "previous": {
-        "at": "2026-10-23T01:45:17.924713+00:00",
+        "at": "2026-10-23T04:48:04.598415+00:00",
         "basis": {
-          "head_equals_freeze_receipt": true,
+          "product_unchanged_since_freeze_head": true,
           "product_code_clean": true,
-          "results_after_head_commit": true,
-          "other_seam_files_unchanged_since_run1": true,
-          "run1_reconstruction_intact": true,
-          "run2_reconstruction_intact": true
+          "seam_changes_only_helpers_and_freeze_script": true,
+          "new_seam_files_committed_before_run1_and_clean": true
         },
-        "head_commit_time": 1792689226,
         "changed_keys": [
-          "generation_inputs_sha256",
           "seam_state_sha256"
         ],
-        "seam_evidence": {
-          "run": "run1",
-          "started_at": "2026-10-22T23:23:53Z",
-          "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-          "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+        "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r19_seam_diff.diff",
+        "new_seam_files_last_commit": {
+          "tests/feature_engineering/ff_truncation_mr_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/ffname_helpers.py": "2026-10-18T23:12:54+08:00",
+          "tests/feature_engineering/ffstat_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/fftfmeta_golden_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/icfirstalign_helpers.py": "2026-10-04T22:26:30+08:00",
+          "tests/feature_engineering/probewinsor_helpers.py": "2026-10-17T21:51:33+08:00"
         },
-        "generation_inputs_check": {
-          "B_BTCUSDT_1h_4h__default": []
-        },
-        "ambient_evidence": {
-          "launcher_cleared_env": [],
-          "claude_settings_env": {},
-          "settings_mtime_before_run1": true
-        },
-        "memory_tier_log": [
-          "8gb"
-        ],
-        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-        "hardware_evidence": {
-          "memory_tier": "child log（memory_tier_log）",
-          "physical_memory_bytes": "推定（未於跑時記錄）",
-          "cpu_count": "推定（未於跑時記錄）",
-          "machine": "推定（未於跑時記錄）",
-          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-        },
-        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "note": "規格審查 r19：接縫改為凍結之非產品碼載入閉包（SEAM_GLOBS 明列 13 檔）。新增之 6 個 tests/feature_engineering 輔助模組工作樹對 HEAD 無差異、最後提交皆早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；本次 SEAM_GLOBS 定義之改動與 r18 之身分／收據 head 記錄方式改動皆不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
         "previous": {
-          "at": "2026-10-23T01:30:33.359229+00:00",
+          "at": "2026-10-23T04:31:43.857924+00:00",
           "basis": {
-            "head_equals_freeze_receipt": true,
+            "product_unchanged_since_freeze_head": true,
             "product_code_clean": true,
-            "results_after_head_commit": true,
-            "other_seam_files_unchanged_since_run1": true,
-            "run1_reconstruction_intact": true,
-            "run2_reconstruction_intact": true
+            "seam_changes_only_helpers_and_freeze_script": true
           },
-          "head_commit_time": 1792689226,
           "changed_keys": [
-            "generation_inputs_sha256",
+            "head",
             "seam_state_sha256"
           ],
-          "seam_evidence": {
-            "run": "run1",
-            "started_at": "2026-10-22T23:23:53Z",
-            "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
-            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
-            "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
-          },
-          "generation_inputs_check": {
-            "B_BTCUSDT_1h_4h__default": []
-          },
-          "ambient_evidence": {
-            "launcher_ffact_env": [],
-            "claude_settings_env": {},
-            "settings_mtime_before_run1": true
-          },
-          "memory_tier_log": [
-            "8gb"
-          ],
-          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r18_seam_diff.diff",
+          "note": "規格審查 r18：身分移除 head（產品碼由 code_state_sha256、接縫由 seam_state_sha256 逐位元涵蓋；head 另因只改文件／測試之提交而變），生成時 HEAD 移記 generation_head；接縫收窄為凍結載入之閉包（SEAM_GLOBS 明列 7 檔）。本次接縫改動只在 SEAM_GLOBS 定義與身分／收據 head 之記錄方式，不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
           "previous": {
-            "at": "2026-10-23T01:12:55.675385+00:00",
+            "at": "2026-10-23T01:58:11.467379+00:00",
             "basis": {
               "head_equals_freeze_receipt": true,
               "product_code_clean": true,
@@ -2498,7 +2635,6 @@
             },
             "head_commit_time": 1792689226,
             "changed_keys": [
-              "generation_inputs_sha256",
               "seam_state_sha256"
             ],
             "seam_evidence": {
@@ -2511,9 +2647,26 @@
             "generation_inputs_check": {
               "B_BTCUSDT_1h_4h__default": []
             },
-            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "ambient_evidence": {
+              "launcher_cleared_env": [],
+              "claude_settings_env": {},
+              "settings_mtime_before_run1": true
+            },
+            "memory_tier_log": [
+              "8gb"
+            ],
+            "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+            "hardware_evidence": {
+              "memory_tier": "child log（memory_tier_log）",
+              "physical_memory_bytes": "推定（未於跑時記錄）",
+              "cpu_count": "推定（未於跑時記錄）",
+              "machine": "推定（未於跑時記錄）",
+              "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+            },
+            "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+            "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
             "previous": {
-              "at": "2026-10-23T00:58:45.670866+00:00",
+              "at": "2026-10-23T01:45:17.924713+00:00",
               "basis": {
                 "head_equals_freeze_receipt": true,
                 "product_code_clean": true,
@@ -2524,7 +2677,7 @@
               },
               "head_commit_time": 1792689226,
               "changed_keys": [
-                "criteria_cell_sha256",
+                "generation_inputs_sha256",
                 "seam_state_sha256"
               ],
               "seam_evidence": {
@@ -2534,16 +2687,122 @@
                 "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
                 "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
               },
-              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "generation_inputs_check": {
+                "B_BTCUSDT_1h_4h__default": []
+              },
+              "ambient_evidence": {
+                "launcher_cleared_env": [],
+                "claude_settings_env": {},
+                "settings_mtime_before_run1": true
+              },
+              "memory_tier_log": [
+                "8gb"
+              ],
+              "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+              "hardware_evidence": {
+                "memory_tier": "child log（memory_tier_log）",
+                "physical_memory_bytes": "推定（未於跑時記錄）",
+                "cpu_count": "推定（未於跑時記錄）",
+                "machine": "推定（未於跑時記錄）",
+                "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+              },
+              "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+              "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
               "previous": {
-                "at": "2026-10-23T00:40:29.043607+00:00",
+                "at": "2026-10-23T01:30:33.359229+00:00",
                 "basis": {
                   "head_equals_freeze_receipt": true,
                   "product_code_clean": true,
-                  "results_after_head_commit": true
+                  "results_after_head_commit": true,
+                  "other_seam_files_unchanged_since_run1": true,
+                  "run1_reconstruction_intact": true,
+                  "run2_reconstruction_intact": true
                 },
                 "head_commit_time": 1792689226,
-                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                "changed_keys": [
+                  "generation_inputs_sha256",
+                  "seam_state_sha256"
+                ],
+                "seam_evidence": {
+                  "run": "run1",
+                  "started_at": "2026-10-22T23:23:53Z",
+                  "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                  "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                  "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                },
+                "generation_inputs_check": {
+                  "B_BTCUSDT_1h_4h__default": []
+                },
+                "ambient_evidence": {
+                  "launcher_ffact_env": [],
+                  "claude_settings_env": {},
+                  "settings_mtime_before_run1": true
+                },
+                "memory_tier_log": [
+                  "8gb"
+                ],
+                "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                "previous": {
+                  "at": "2026-10-23T01:12:55.675385+00:00",
+                  "basis": {
+                    "head_equals_freeze_receipt": true,
+                    "product_code_clean": true,
+                    "results_after_head_commit": true,
+                    "other_seam_files_unchanged_since_run1": true,
+                    "run1_reconstruction_intact": true,
+                    "run2_reconstruction_intact": true
+                  },
+                  "head_commit_time": 1792689226,
+                  "changed_keys": [
+                    "generation_inputs_sha256",
+                    "seam_state_sha256"
+                  ],
+                  "seam_evidence": {
+                    "run": "run1",
+                    "started_at": "2026-10-22T23:23:53Z",
+                    "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                    "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                    "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                  },
+                  "generation_inputs_check": {
+                    "B_BTCUSDT_1h_4h__default": []
+                  },
+                  "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                  "previous": {
+                    "at": "2026-10-23T00:58:45.670866+00:00",
+                    "basis": {
+                      "head_equals_freeze_receipt": true,
+                      "product_code_clean": true,
+                      "results_after_head_commit": true,
+                      "other_seam_files_unchanged_since_run1": true,
+                      "run1_reconstruction_intact": true,
+                      "run2_reconstruction_intact": true
+                    },
+                    "head_commit_time": 1792689226,
+                    "changed_keys": [
+                      "criteria_cell_sha256",
+                      "seam_state_sha256"
+                    ],
+                    "seam_evidence": {
+                      "run": "run1",
+                      "started_at": "2026-10-22T23:23:53Z",
+                      "run_seam_sha256": "04d870498e04d6b7bea72ddcbe2589a9e656f493761b0280e84ecab223444dcb",
+                      "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run1_numview_freeze_baseline.py",
+                      "diff": "handoffs/run_receipts/numview_freeze_seam/run1_to_current.diff"
+                    },
+                    "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                    "previous": {
+                      "at": "2026-10-23T00:40:29.043607+00:00",
+                      "basis": {
+                        "head_equals_freeze_receipt": true,
+                        "product_code_clean": true,
+                        "results_after_head_commit": true
+                      },
+                      "head_commit_time": 1792689226,
+                      "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                    }
+                  }
+                }
               }
             }
           }
@@ -2551,126 +2810,57 @@
       }
     },
     "C_BTCUSDT_1h": {
-      "at": "2026-10-23T01:58:11.467379+00:00",
+      "at": "2026-10-23T05:15:04.521298+00:00",
       "basis": {
-        "head_equals_freeze_receipt": true,
+        "product_unchanged_since_freeze_head": true,
         "product_code_clean": true,
-        "results_after_head_commit": true,
-        "other_seam_files_unchanged_since_run1": true,
-        "run1_reconstruction_intact": true,
-        "run2_reconstruction_intact": true
+        "seam_changes_only_helpers_and_freeze_script": true,
+        "new_seam_files_committed_before_run1_and_clean": true
       },
-      "head_commit_time": 1792689226,
       "changed_keys": [
         "seam_state_sha256"
       ],
-      "seam_evidence": {
-        "run": "run2",
-        "started_at": "2026-10-23T00:11:43Z",
-        "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
-        "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
-        "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+      "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r20_seam_diff.diff",
+      "new_seam_files_last_commit": {
+        "scripts/ffname_freeze_baseline.py": "2026-10-19T00:27:33+08:00"
       },
-      "generation_inputs_check": {
-        "C_BTCUSDT_1h__default": []
-      },
-      "ambient_evidence": {
-        "launcher_cleared_env": [],
-        "claude_settings_env": {},
-        "settings_mtime_before_run1": true
-      },
-      "memory_tier_log": [
-        "8gb"
-      ],
-      "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-      "hardware_evidence": {
-        "memory_tier": "child log（memory_tier_log）",
-        "physical_memory_bytes": "推定（未於跑時記錄）",
-        "cpu_count": "推定（未於跑時記錄）",
-        "machine": "推定（未於跑時記錄）",
-        "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-      },
-      "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-      "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+      "note": "規格審查 r20（CODEX-R20-P1-02）：接縫閉包納入動態載入點目標（SEAM_GLOBS 14 檔），新增 scripts/ffname_freeze_baseline.py（tests/feature_engineering/ffname_helpers.py:41 load_freeze_module 所載）；該檔工作樹對 HEAD 無差異、最後提交早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；SEAM_GLOBS 定義之改動不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
       "previous": {
-        "at": "2026-10-23T01:45:17.924713+00:00",
+        "at": "2026-10-23T04:48:04.598415+00:00",
         "basis": {
-          "head_equals_freeze_receipt": true,
+          "product_unchanged_since_freeze_head": true,
           "product_code_clean": true,
-          "results_after_head_commit": true,
-          "other_seam_files_unchanged_since_run1": true,
-          "run1_reconstruction_intact": true,
-          "run2_reconstruction_intact": true
+          "seam_changes_only_helpers_and_freeze_script": true,
+          "new_seam_files_committed_before_run1_and_clean": true
         },
-        "head_commit_time": 1792689226,
         "changed_keys": [
-          "generation_inputs_sha256",
           "seam_state_sha256"
         ],
-        "seam_evidence": {
-          "run": "run2",
-          "started_at": "2026-10-23T00:11:43Z",
-          "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
-          "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
-          "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+        "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r19_seam_diff.diff",
+        "new_seam_files_last_commit": {
+          "tests/feature_engineering/ff_truncation_mr_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/ffname_helpers.py": "2026-10-18T23:12:54+08:00",
+          "tests/feature_engineering/ffstat_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/fftfmeta_golden_helpers.py": "2026-10-19T23:52:49+08:00",
+          "tests/feature_engineering/icfirstalign_helpers.py": "2026-10-04T22:26:30+08:00",
+          "tests/feature_engineering/probewinsor_helpers.py": "2026-10-17T21:51:33+08:00"
         },
-        "generation_inputs_check": {
-          "C_BTCUSDT_1h__default": []
-        },
-        "ambient_evidence": {
-          "launcher_cleared_env": [],
-          "claude_settings_env": {},
-          "settings_mtime_before_run1": true
-        },
-        "memory_tier_log": [
-          "8gb"
-        ],
-        "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
-        "hardware_evidence": {
-          "memory_tier": "child log（memory_tier_log）",
-          "physical_memory_bytes": "推定（未於跑時記錄）",
-          "cpu_count": "推定（未於跑時記錄）",
-          "machine": "推定（未於跑時記錄）",
-          "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
-        },
-        "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
-        "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+        "note": "規格審查 r19：接縫改為凍結之非產品碼載入閉包（SEAM_GLOBS 明列 13 檔）。新增之 6 個 tests/feature_engineering 輔助模組工作樹對 HEAD 無差異、最後提交皆早於跑①（new_seam_files_last_commit）⇒ 跑時內容＝現行內容；本次 SEAM_GLOBS 定義之改動與 r18 之身分／收據 head 記錄方式改動皆不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
         "previous": {
-          "at": "2026-10-23T01:30:33.359229+00:00",
+          "at": "2026-10-23T04:31:43.857924+00:00",
           "basis": {
-            "head_equals_freeze_receipt": true,
+            "product_unchanged_since_freeze_head": true,
             "product_code_clean": true,
-            "results_after_head_commit": true,
-            "other_seam_files_unchanged_since_run1": true,
-            "run1_reconstruction_intact": true,
-            "run2_reconstruction_intact": true
+            "seam_changes_only_helpers_and_freeze_script": true
           },
-          "head_commit_time": 1792689226,
           "changed_keys": [
-            "generation_inputs_sha256",
+            "head",
             "seam_state_sha256"
           ],
-          "seam_evidence": {
-            "run": "run2",
-            "started_at": "2026-10-23T00:11:43Z",
-            "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
-            "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
-            "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
-          },
-          "generation_inputs_check": {
-            "C_BTCUSDT_1h__default": []
-          },
-          "ambient_evidence": {
-            "launcher_ffact_env": [],
-            "claude_settings_env": {},
-            "settings_mtime_before_run1": true
-          },
-          "memory_tier_log": [
-            "8gb"
-          ],
-          "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+          "seam_diff": "handoffs/run_receipts/numview_freeze_seam/r18_seam_diff.diff",
+          "note": "規格審查 r18：身分移除 head（產品碼由 code_state_sha256、接縫由 seam_state_sha256 逐位元涵蓋；head 另因只改文件／測試之提交而變），生成時 HEAD 移記 generation_head；接縫收窄為凍結載入之閉包（SEAM_GLOBS 明列 7 檔）。本次接縫改動只在 SEAM_GLOBS 定義與身分／收據 head 之記錄方式，不改值指紋之生成與組裝（差異見 seam_diff）；產品碼自凍結 HEAD 起無改動。",
           "previous": {
-            "at": "2026-10-23T01:12:55.675385+00:00",
+            "at": "2026-10-23T01:58:11.467379+00:00",
             "basis": {
               "head_equals_freeze_receipt": true,
               "product_code_clean": true,
@@ -2681,7 +2871,6 @@
             },
             "head_commit_time": 1792689226,
             "changed_keys": [
-              "generation_inputs_sha256",
               "seam_state_sha256"
             ],
             "seam_evidence": {
@@ -2694,9 +2883,26 @@
             "generation_inputs_check": {
               "C_BTCUSDT_1h__default": []
             },
-            "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+            "ambient_evidence": {
+              "launcher_cleared_env": [],
+              "claude_settings_env": {},
+              "settings_mtime_before_run1": true
+            },
+            "memory_tier_log": [
+              "8gb"
+            ],
+            "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+            "hardware_evidence": {
+              "memory_tier": "child log（memory_tier_log）",
+              "physical_memory_bytes": "推定（未於跑時記錄）",
+              "cpu_count": "推定（未於跑時記錄）",
+              "machine": "推定（未於跑時記錄）",
+              "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+            },
+            "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+            "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
             "previous": {
-              "at": "2026-10-23T00:58:45.670866+00:00",
+              "at": "2026-10-23T01:45:17.924713+00:00",
               "basis": {
                 "head_equals_freeze_receipt": true,
                 "product_code_clean": true,
@@ -2707,7 +2913,7 @@
               },
               "head_commit_time": 1792689226,
               "changed_keys": [
-                "criteria_cell_sha256",
+                "generation_inputs_sha256",
                 "seam_state_sha256"
               ],
               "seam_evidence": {
@@ -2717,16 +2923,122 @@
                 "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
                 "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
               },
-              "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+              "generation_inputs_check": {
+                "C_BTCUSDT_1h__default": []
+              },
+              "ambient_evidence": {
+                "launcher_cleared_env": [],
+                "claude_settings_env": {},
+                "settings_mtime_before_run1": true
+              },
+              "memory_tier_log": [
+                "8gb"
+              ],
+              "seam_write_log": "handoffs/run_receipts/numview_freeze_seam/seam_write_log.json",
+              "hardware_evidence": {
+                "memory_tier": "child log（memory_tier_log）",
+                "physical_memory_bytes": "推定（未於跑時記錄）",
+                "cpu_count": "推定（未於跑時記錄）",
+                "machine": "推定（未於跑時記錄）",
+                "basis": "同一機器 MacBookAir10,1（記憶體焊於主機板、不可更換）；跑時 child log tier＝['8gb']"
+              },
+              "payload_bound": "payload 之影響值部分以設定雜湊重算對證（generation_inputs_check）；不入設定雜湊之品質門檻（max_inf_ratio／max_nan_ratio）只把產物標 partial、不改數值（feature_factory.py:3570-3587），partial 旗標只決定 partial 產物之接受與否；六格 run 皆 complete ⇒ 兩者於本基準不影響值。完整 payload 位元組之跑時快照不存在（sidecar 前向已記 payload_sha256）；估時器跑時內容＝現行內容之證據見 seam_write_log（最後寫入早於跑①）",
+              "note": "審碼 r28：清除範圍擴為產品碼讀取之全部影響值環境變數（CLEARED_ENV_PREFIXES／CLEARED_ENV_NAMES，機械掃描對證），公開 IC 頁入口亦清除；hardware 加實體記憶體（memory_budget 來源）、CPU 數、機型。審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
               "previous": {
-                "at": "2026-10-23T00:40:29.043607+00:00",
+                "at": "2026-10-23T01:30:33.359229+00:00",
                 "basis": {
                   "head_equals_freeze_receipt": true,
                   "product_code_clean": true,
-                  "results_after_head_commit": true
+                  "results_after_head_commit": true,
+                  "other_seam_files_unchanged_since_run1": true,
+                  "run1_reconstruction_intact": true,
+                  "run2_reconstruction_intact": true
                 },
                 "head_commit_time": 1792689226,
-                "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                "changed_keys": [
+                  "generation_inputs_sha256",
+                  "seam_state_sha256"
+                ],
+                "seam_evidence": {
+                  "run": "run2",
+                  "started_at": "2026-10-23T00:11:43Z",
+                  "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+                  "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+                  "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+                },
+                "generation_inputs_check": {
+                  "C_BTCUSDT_1h__default": []
+                },
+                "ambient_evidence": {
+                  "launcher_ffact_env": [],
+                  "claude_settings_env": {},
+                  "settings_mtime_before_run1": true
+                },
+                "memory_tier_log": [
+                  "8gb"
+                ],
+                "note": "審碼 r27：生成與 IC 頁第三步改為清除全部 FFACT_* 後只套明示環境；generation_inputs 加 hardware。正式跑當時無殘留選擇子（啟動殼層無 FFACT_*、Claude 設定 env 空且早於跑①未改）⇒ 新舊隔離於當時等效；child log 記 tier 唯一且等於現行自動解析值；payload 以現行 payload 重算之 config_hash 等於正式跑 run 目錄名（generation_inputs_check 含此項）。審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                "previous": {
+                  "at": "2026-10-23T01:12:55.675385+00:00",
+                  "basis": {
+                    "head_equals_freeze_receipt": true,
+                    "product_code_clean": true,
+                    "results_after_head_commit": true,
+                    "other_seam_files_unchanged_since_run1": true,
+                    "run1_reconstruction_intact": true,
+                    "run2_reconstruction_intact": true
+                  },
+                  "head_commit_time": 1792689226,
+                  "changed_keys": [
+                    "generation_inputs_sha256",
+                    "seam_state_sha256"
+                  ],
+                  "seam_evidence": {
+                    "run": "run2",
+                    "started_at": "2026-10-23T00:11:43Z",
+                    "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+                    "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+                    "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+                  },
+                  "generation_inputs_check": {
+                    "C_BTCUSDT_1h__default": []
+                  },
+                  "note": "審碼 r26：身分新增 generation_inputs_sha256；現行導出之入口、訓練週期、K 線來源、輸出段、連續性、設定覆寫逐鍵等於正式跑 sidecar 記錄值（generation_inputs_check 空清單＝全等；payload 由判準與訓練週期經未改動之估時器導出）。審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                  "previous": {
+                    "at": "2026-10-23T00:58:45.670866+00:00",
+                    "basis": {
+                      "head_equals_freeze_receipt": true,
+                      "product_code_clean": true,
+                      "results_after_head_commit": true,
+                      "other_seam_files_unchanged_since_run1": true,
+                      "run1_reconstruction_intact": true,
+                      "run2_reconstruction_intact": true
+                    },
+                    "head_commit_time": 1792689226,
+                    "changed_keys": [
+                      "criteria_cell_sha256",
+                      "seam_state_sha256"
+                    ],
+                    "seam_evidence": {
+                      "run": "run2",
+                      "started_at": "2026-10-23T00:11:43Z",
+                      "run_seam_sha256": "fbfe9dbfbe1cd112fe98db1dd351825b7f6438158be78f831752c563155e5876",
+                      "reconstruction": "handoffs/run_receipts/numview_freeze_seam/run2_numview_freeze_baseline.py",
+                      "diff": "handoffs/run_receipts/numview_freeze_seam/run2_to_current.diff"
+                    },
+                    "note": "審碼 r25：身分新增 seam_state_sha256 與 freeze_groups 成員。正式跑當下之凍結腳本由對話寫檔紀錄逆向重建；其後接縫改動只有：G3_ARTIFACTS（B 仍 raw＋processed，與原字面相同；C 於其後之跑②生成）、結果身分計算與沿用比對、收據 identity 欄、說明字面——皆不改值指紋之生成與組裝；其他接縫檔 mtime 早於跑①。判準 v7 只改說明字面（C 不含 processed、storage 路徑更名）",
+                    "previous": {
+                      "at": "2026-10-23T00:40:29.043607+00:00",
+                      "basis": {
+                        "head_equals_freeze_receipt": true,
+                        "product_code_clean": true,
+                        "results_after_head_commit": true
+                      },
+                      "head_commit_time": 1792689226,
+                      "note": "結果產於 HEAD 提交後、產品碼對 HEAD 無改動；判準 v6→v7 只改 freeze_groups._doc（身分不計說明字面）"
+                    }
+                  }
+                }
               }
             }
           }

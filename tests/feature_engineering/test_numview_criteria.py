@@ -147,6 +147,17 @@ MATERIAL_TAU_B = {"pairs": "both_finite", "undefined_verdict": "material",
                   "undefined_cases": ["all_ties", "all_nan", "fewer_than_2_pairs"]}
 #: Task 1.1 輸出欄（`postic_branchdiff.cell_diff`／`ic_material` 之鍵）
 TASK11_COLUMNS = frozenset({"max_abs", "p99_abs", "max_rel", "nan_mask_diff", "tau_b", "sign_flips", "material"})
+#: 判準 v8 之 Task 1.1 收據結構（SPEC v30 Task 1.1；規格審查 r18 X18-A／B、r19 CODEX-R19-P1-02／P1-03）：判準檔之對應段須逐字
+#: 等於下列已核定值，判準檔自身縮小（少分支、少欄）⇒ 紅
+TASK11_BRANCHES_BY_INPUT = {"i": {"contract_branches": "tests/_golden/icpostleak/contract.json#branches",
+                                  "plus": ["polars_float64"]},
+                            "ii": ["polars", "optimized", "legacy", "registry_sink", "polars_float64"]}
+TASK11_LABEL_FIELDS = ("cell_id", "input", "cache_dir", "source_sha256", "output_start", "output_end", "rows",
+                       "timestamp_sha256", "close_sha256", "frame_index_sha256", "label_sha256", "production_adapter_equal")
+TASK11_SINK_FIELDS = ("cell_id", "input", "branch", "combo", "group_id", "mode", "shards", "requires_slow", "is_chunked",
+                      "shard_stream", "group_arm", "status")
+TASK11_SINK_SUMMARY_KEYS = ("production_shard_bytes", "input_ii_group_bytes")
+TASK11_SINK_RUN_FIELDS = ("cell_id", "input", "branch", "combo", "group_ids")
 _FORBIDDEN_KEY_RE = re.compile(r"(?i)(^|_)(atol|rtol|tol|tolerance)($|_)")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _RESIDUAL_RE = re.compile(r"^NUMVIEW-R\d+$")
@@ -1460,6 +1471,268 @@ def test_result_identity_binds_seam_and_freeze_groups(tmp_path: Path, monkeypatc
     assert (after == before) is (mutant in (None, "freeze_groups_doc_only")), (mutant, before, after)
 
 
+#: 規格審查 r20（CODEX-R20-P1-02）：凍結載入閉包內之動態載入點逐一明列——（檔之 repo 相對路徑, 呼叫或子行程命令列之
+#: `ast.unparse` 原文）→ 載入目標（repo 相對路徑）。`<self>`＝以 `sys.executable` 重跑同檔之子行程；`<library_versions>`＝
+#: 契約 `library_versions` 所列第三方套件（只取版本字串）；`<wrapper:名>`＝泛用載入函式，其每個呼叫點另須逐一列出。
+#: 動態載入點＝呼叫 `FREEZE_DYNAMIC_LOADER_CALLEES` 或泛用載入函式、呼叫內建 `exec`／`eval`／`compile`、或含 `sys.executable`
+#: 之命令列；未列者由 `test_freeze_load_closure_dynamic_loaders_registered` 報紅，已列而碼中已無者亦報紅。
+FREEZE_DYNAMIC_LOADER_CALLEES = ("import_module", "__import__", "spec_from_file_location", "SourceFileLoader", "run_path",
+                                 "run_module", "load_source")
+FREEZE_DYNAMIC_LOADERS: Dict[Tuple[str, str], Tuple[str, ...]] = {
+    ("scripts/numview_freeze_baseline.py", "importlib.util.spec_from_file_location(name, path)"): ("<wrapper:_load>",),
+    ("scripts/numview_freeze_baseline.py", "_load('numview_estimate_gate', PROBES_DIR / '_estimate_gate.py')"):
+        ("handoffs/run_receipts/numview_probes/_estimate_gate.py",),
+    ("scripts/numview_freeze_baseline.py", "_load('numview_estimate', PROBES_DIR / 'estimate.py')"):
+        ("handoffs/run_receipts/numview_probes/estimate.py",),
+    ("scripts/numview_freeze_baseline.py", "_load('numview_watchdog', PROBES_DIR / '_watchdog.py')"):
+        ("handoffs/run_receipts/numview_probes/_watchdog.py",),
+    ("scripts/numview_freeze_baseline.py", "_load('numview_l2_arm_matrix', PROBES_DIR / 'l2_arm_matrix.py')"):
+        ("handoffs/run_receipts/numview_probes/l2_arm_matrix.py",),
+    ("scripts/numview_freeze_baseline.py", "[sys.executable, str(Path(__file__).resolve()), '--child', str(spec_path)]"):
+        ("<self>",),
+    ("scripts/numview_freeze_baseline.py", "importlib.import_module(name)"): ("<library_versions>",),
+    ("handoffs/run_receipts/numview_probes/estimate.py",
+     "importlib.util.spec_from_file_location('numview_estimate_gate_for_estimate', "
+     "Path(__file__).resolve().with_name('_estimate_gate.py'))"): ("handoffs/run_receipts/numview_probes/_estimate_gate.py",),
+    ("handoffs/run_receipts/numview_probes/estimate.py",
+     "importlib.util.spec_from_file_location('numview_watchdog', Path(__file__).resolve().with_name('_watchdog.py'))"):
+        ("handoffs/run_receipts/numview_probes/_watchdog.py",),
+    ("handoffs/run_receipts/numview_probes/estimate.py",
+     "[sys.executable, str(Path(__file__).resolve()), '--measure-one', str(spec_path)]"): ("<self>",),
+    ("handoffs/run_receipts/numview_probes/estimate.py", "importlib.import_module(name)"): ("<library_versions>",),
+    ("tests/feature_engineering/ffname_helpers.py", "importlib.util.spec_from_file_location('ffname_freeze_baseline', FREEZE_SCRIPT)"):
+        ("scripts/ffname_freeze_baseline.py",),
+}
+
+
+def _loader_targets(file: Path, tree: ast.Module, node: ast.AST, parent: Mapping[ast.AST, ast.AST],
+                    wrappers: Set[str]) -> Tuple[str, ...]:
+    """動態載入點之實際目標（AST 解析；規格審查 r21 CODEX-R21-P1-01）。路徑式以 `/`、字串常數、`__file__`、`Path(…)`、`.resolve()`、
+    `.parent`、`.parents[i]`、`.with_name(…)` 及模組層唯一賦值之常數（如 `PROBES_DIR`、`FREEZE_SCRIPT`）遞迴求值，得 repo 相對
+    路徑；`sys.executable` 命令列第二元素為 `str(Path(__file__).resolve())` ⇒ `<self>`；`import_module(name)` 位於
+    `for name in …['library_versions']['values']` ⇒ `<library_versions>`；載入路徑為所在函式之參數 ⇒ `<wrapper:函式名>`；
+    其餘（含無法求值）⇒ `<unresolved>`。`file`＝該檔於 repo 中之路徑（暫存複本以其登記名代入 `__file__`）。"""
+    assigned: Dict[str, List[ast.AST]] = {}
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+            assigned.setdefault(stmt.targets[0].id, []).append(stmt.value)
+        elif isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and stmt.value is not None:
+            assigned.setdefault(stmt.target.id, []).append(stmt.value)
+
+    def ev(e: ast.AST) -> Any:
+        if isinstance(e, ast.Constant) and isinstance(e.value, str):
+            return e.value
+        if isinstance(e, ast.Name) and e.id == "__file__":
+            return file
+        if isinstance(e, ast.Name) and len(assigned.get(e.id, [])) == 1:
+            return ev(assigned[e.id][0])
+        if isinstance(e, ast.BinOp) and isinstance(e.op, ast.Div):
+            return Path(ev(e.left)) / ev(e.right)
+        if isinstance(e, ast.Attribute) and e.attr == "parent":
+            return Path(ev(e.value)).parent
+        if (isinstance(e, ast.Subscript) and isinstance(e.value, ast.Attribute) and e.value.attr == "parents"
+                and isinstance(e.slice, ast.Constant) and isinstance(e.slice.value, int)):
+            return Path(ev(e.value.value)).parents[e.slice.value]
+        if isinstance(e, ast.Call) and isinstance(e.func, ast.Name) and e.func.id == "Path" and len(e.args) == 1:
+            return Path(ev(e.args[0]))
+        if isinstance(e, ast.Call) and isinstance(e.func, ast.Attribute) and e.func.attr == "resolve" and not e.args:
+            return Path(ev(e.func.value))
+        if isinstance(e, ast.Call) and isinstance(e.func, ast.Attribute) and e.func.attr == "with_name" and len(e.args) == 1:
+            return Path(ev(e.func.value)).with_name(ev(e.args[0]))
+        raise ValueError(ast.unparse(e))
+
+    def enclosing(kind: Any) -> Optional[ast.AST]:
+        cur = parent.get(node)
+        while cur is not None and not isinstance(cur, kind):
+            cur = parent.get(cur)
+        return cur
+
+    if isinstance(node, (ast.List, ast.Tuple)):
+        own = len(node.elts) > 1 and ast.unparse(node.elts[1]) == "str(Path(__file__).resolve())"
+        return ("<self>",) if own else ("<unresolved>",)
+    assert isinstance(node, ast.Call)
+    func = node.func
+    name = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ""
+    if name == "import_module" and len(node.args) == 1 and isinstance(node.args[0], ast.Name):
+        loop = enclosing(ast.For)
+        listed = (isinstance(loop, ast.For) and isinstance(loop.target, ast.Name) and loop.target.id == node.args[0].id
+                  and ast.unparse(loop.iter).endswith("['library_versions']['values']"))
+        return ("<library_versions>",) if listed else ("<unresolved>",)
+    if (name == "spec_from_file_location" or name in wrappers) and len(node.args) == 2:
+        fn = enclosing((ast.FunctionDef, ast.AsyncFunctionDef))
+        arg = node.args[1]
+        if isinstance(arg, ast.Name) and isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and arg.id in [
+                a.arg for a in fn.args.args]:
+            return (f"<wrapper:{fn.name}>",)
+        try:
+            target = Path(ev(arg)).resolve()
+        except ValueError:
+            return ("<unresolved>",)
+        return (str(target.relative_to(REPO)) if target.is_relative_to(REPO) else str(target),)
+    return ("<unresolved>",)
+
+
+def _freeze_load_closure(start: Path, alias: Optional[str] = None,
+                         sites: Optional[List[Tuple[str, str]]] = None,
+                         targets: Optional[Dict[Tuple[str, str], Tuple[str, ...]]] = None,
+                         overrides: Optional[Mapping[str, Path]] = None) -> Set[str]:
+    """`start` 之非產品碼載入閉包（repo 相對路徑，含 start）：探針以 `PROBES_DIR /`、`with_name(`、`parent /` 指名之
+    `numview_probes/*.py`，及 `from tests.feature_engineering import <模組>`／`from tests.feature_engineering.<模組> import …`／
+    `import tests.feature_engineering.<模組>` 之輔助模組（AST，含函式內 import；遞移），及動態載入點經 `_loader_targets` 解析之
+    實際目標（r21：不取登記表之宣告目標）。`alias`＝`start` 於登記表中之檔名（暫存複本用）；`sites` 給定時收集閉包內全部動態
+    載入點（含未登記者）；`targets` 給定時記各載入點之解析目標；`overrides`＝repo 相對路徑 → 改讀之暫存複本（mutation 用）。"""
+    probes = REPO / "handoffs" / "run_receipts" / "numview_probes"
+    tfe = REPO / "tests" / "feature_engineering"
+    load = re.compile(r"""(?:PROBES_DIR\s*/\s*|with_name\(\s*|parent\s*/\s*)["']([A-Za-z0-9_]+\.py)["']""")
+    wrappers = {t[len("<wrapper:"):-1] for ts in FREEZE_DYNAMIC_LOADERS.values() for t in ts if t.startswith("<wrapper:")}
+
+    def dynamic(path: Path, tree: ast.Module) -> Set[Path]:
+        key = alias if path == start and alias else (str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path))
+        parent = {child: outer for outer in ast.walk(tree) for child in ast.iter_child_nodes(outer)}
+        # r22 CODEX-R22-P1-01：內建 exec／eval／compile 之限定名稱（`builtins.exec`、`import builtins as b` 之 `b.exec`、
+        # `__builtins__`）與別名匯入（`from builtins import exec as e`、`from importlib import import_module as im`）亦為載入點
+        builtin_names = {"exec", "eval", "compile"}
+        builtin_modules = {"builtins", "__builtins__"}
+        loader_names = set(FREEZE_DYNAMIC_LOADER_CALLEES) | wrappers
+        for imp in ast.walk(tree):
+            if isinstance(imp, ast.Import):
+                builtin_modules |= {a.asname for a in imp.names if a.name == "builtins" and a.asname}
+            elif isinstance(imp, ast.ImportFrom):
+                for a in imp.names:
+                    if a.name in FREEZE_DYNAMIC_LOADER_CALLEES or (imp.module == "builtins" and a.name in builtin_names):
+                        loader_names.add(a.asname or a.name)
+        out: Set[Path] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                name = func.attr if isinstance(func, ast.Attribute) else func.id if isinstance(func, ast.Name) else ""
+                hit = name in loader_names or (isinstance(func, ast.Name) and name in builtin_names) or (
+                    isinstance(func, ast.Attribute) and name in builtin_names and isinstance(func.value, ast.Name)
+                    and func.value.id in builtin_modules)
+            else:
+                hit = isinstance(node, (ast.List, ast.Tuple)) and any(
+                    ast.unparse(e) == "sys.executable" for e in node.elts)
+            if hit:
+                site = (key, ast.unparse(node))
+                resolved = _loader_targets(REPO / key if path == start and alias else path, tree, node, parent, wrappers)
+                if sites is not None:
+                    sites.append(site)
+                if targets is not None:
+                    targets[site] = resolved
+                out |= {REPO / t for t in resolved if not t.startswith("<") and (REPO / t).is_file()}
+        return out
+
+    def deps(path: Path) -> Set[Path]:
+        rel = str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path)
+        text = Path((overrides or {}).get(rel, path)).read_text(encoding="utf-8")
+        out = {probes / n for n in load.findall(text) if (probes / n).is_file()}
+        out |= dynamic(path, ast.parse(text))
+        for node in ast.walk(ast.parse(text)):
+            names: List[str] = []
+            if isinstance(node, ast.ImportFrom) and node.module == "tests.feature_engineering":
+                names = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and (node.module or "").startswith("tests.feature_engineering."):
+                names = [str(node.module).split(".")[2]]
+            elif isinstance(node, ast.Import):
+                names = [a.name.split(".")[2] for a in node.names if a.name.startswith("tests.feature_engineering.")]
+            out |= {tfe / f"{n}.py" for n in names if (tfe / f"{n}.py").is_file()}
+        return out
+
+    seen, queue = {start}, [start]
+    while queue:
+        for dep in deps(queue.pop()):
+            if dep not in seen:
+                seen.add(dep)
+                queue.append(dep)
+    return {str(p.relative_to(REPO)) if p.is_relative_to(REPO) else str(p) for p in seen}
+
+
+@pytest.mark.parametrize("mutant", [None, "helper_import_unlisted", "probe_load_unlisted"])
+def test_seam_globs_equal_freeze_load_closure(tmp_path: Path, mutant: Optional[str]) -> None:
+    """規格審查 r18–r19（CODEX-R19-P1-01）：`numview_helpers.SEAM_GLOBS` 恰為凍結腳本之非產品碼載入閉包（多列 ⇒ 無關檔之改動
+    誤使凍結身分失效；少列 ⇒ 影響結果之檔改動不入身分）；無萬用字元。mutation：於暫存複本之凍結腳本加一個未列之
+    `tests.feature_engineering` import（numview_reference）或探針載入（postic_branchdiff）⇒ 閉包含清單外之檔。"""
+    script = REPO / "scripts" / "numview_freeze_baseline.py"
+    if mutant is not None:
+        extra = {"helper_import_unlisted": "\nfrom tests.feature_engineering import numview_reference  # noqa\n",
+                 "probe_load_unlisted": '\n_x = PROBES_DIR / "postic_branchdiff.py"\n'}[mutant]
+        copy_ = tmp_path / "numview_freeze_baseline.py"
+        copy_.write_text(script.read_text(encoding="utf-8") + extra, encoding="utf-8")
+        unlisted = _freeze_load_closure(copy_) - {str(copy_)} - set(nh.SEAM_GLOBS)
+        assert unlisted, mutant
+        return
+    closure = _freeze_load_closure(script)
+    assert {"handoffs/run_receipts/numview_probes/estimate.py", "tests/feature_engineering/ffname_helpers.py",
+            "tests/feature_engineering/probewinsor_helpers.py"} <= closure, sorted(closure)
+    assert set(nh.SEAM_GLOBS) == closure, (sorted(set(nh.SEAM_GLOBS) - closure), sorted(closure - set(nh.SEAM_GLOBS)))
+    assert all("*" not in g for g in nh.SEAM_GLOBS)
+
+
+@pytest.mark.parametrize("mutant", [None, "import_module_unlisted", "dunder_import_unlisted", "spec_from_file_unlisted",
+                                    "load_wrapper_call_unlisted", "python_subprocess_unlisted", "exec_unlisted",
+                                    "builtins_exec_unlisted", "builtins_alias_eval_unlisted",
+                                    "from_builtins_compile_unlisted", "import_module_alias_unlisted",
+                                    "ffname_freeze_script_retargeted", "ffname_freeze_script_unresolvable",
+                                    "probes_dir_retargeted"])
+def test_freeze_load_closure_dynamic_loaders_registered(tmp_path: Path, mutant: Optional[str]) -> None:
+    """規格審查 r20（CODEX-R20-P1-02）、r21（CODEX-R21-P1-01）：凍結載入閉包內每個動態載入點皆登記於 `FREEZE_DYNAMIC_LOADERS`
+    （無未登記、無過期項），且 `_loader_targets` 由 AST 解析之實際目標逐點等於登記目標；閉包取實際目標（含
+    `ffname_helpers.load_freeze_module` 之 `scripts/ffname_freeze_baseline.py`）；`<library_versions>` 所載套件皆非 repo 內模組。
+    mutation：於暫存複本之凍結腳本加一個未登記之動態載入（`importlib.import_module`、`__import__`、`spec_from_file_location`、
+    泛用 `_load`、`sys.executable` 子行程、`exec`；r22：`builtins.exec`、`import builtins as _b` 之 `_b.eval`、
+    `from builtins import compile as _c`、`from importlib import import_module as _im`）⇒ 出現未登記載入點；呼叫原文不變而目標改變（`ffname_helpers.FREEZE_SCRIPT`
+    改指 numview_reference、改為不可求值之式、凍結腳本 `PROBES_DIR` 改指他目錄）⇒ 解析目標≠登記目標。"""
+    script = REPO / "scripts" / "numview_freeze_baseline.py"
+    if mutant is not None and mutant.endswith("_unlisted"):
+        extra = {"import_module_unlisted": '\n_m = importlib.import_module("tests.feature_engineering.numview_reference")\n',
+                 "dunder_import_unlisted": '\n_m = __import__("tests.feature_engineering.numview_reference")\n',
+                 "spec_from_file_unlisted": '\n_s = importlib.util.spec_from_file_location("x", REPO / "scripts" / "x.py")\n',
+                 "load_wrapper_call_unlisted": '\n_y = _load("x", Path("handoffs/run_receipts/numview_probes/x.py"))\n',
+                 "python_subprocess_unlisted": '\n_c = [sys.executable, "handoffs/run_receipts/numview_probes/x.py"]\n',
+                 "exec_unlisted": '\nexec(Path("x.py").read_text())\n',
+                 "builtins_exec_unlisted": '\nimport builtins\nbuiltins.exec("x=1")\n',
+                 "builtins_alias_eval_unlisted": '\nimport builtins as _b\n_b.eval("1")\n',
+                 "from_builtins_compile_unlisted": '\nfrom builtins import compile as _c\n_c("x=1", "x", "exec")\n',
+                 "import_module_alias_unlisted": ('\nfrom importlib import import_module as _im\n'
+                                                  '_im("tests.feature_engineering.numview_reference")\n')}[mutant]
+        copy_ = tmp_path / "numview_freeze_baseline.py"
+        copy_.write_text(script.read_text(encoding="utf-8") + extra, encoding="utf-8")
+        found: List[Tuple[str, str]] = []
+        _freeze_load_closure(copy_, alias="scripts/numview_freeze_baseline.py", sites=found)
+        assert set(found) - set(FREEZE_DYNAMIC_LOADERS), mutant
+        return
+    if mutant is not None:
+        rel, old, new = {
+            "ffname_freeze_script_retargeted": ("tests/feature_engineering/ffname_helpers.py",
+                                                'FREEZE_SCRIPT = REPO / "scripts" / "ffname_freeze_baseline.py"',
+                                                'FREEZE_SCRIPT = REPO / "tests" / "feature_engineering" / "numview_reference.py"'),
+            "ffname_freeze_script_unresolvable": ("tests/feature_engineering/ffname_helpers.py",
+                                                  'FREEZE_SCRIPT = REPO / "scripts" / "ffname_freeze_baseline.py"',
+                                                  'FREEZE_SCRIPT = Path(os.environ["X"])'),
+            "probes_dir_retargeted": ("scripts/numview_freeze_baseline.py",
+                                      'PROBES_DIR: Path = REPO / "handoffs" / "run_receipts" / "numview_probes"',
+                                      'PROBES_DIR: Path = REPO / "handoffs" / "run_receipts" / "ffname_probes"')}[mutant]
+        text = (REPO / rel).read_text(encoding="utf-8")
+        assert text.count(old) == 1, (mutant, old)
+        copy_ = tmp_path / Path(rel).name
+        copy_.write_text(text.replace(old, new), encoding="utf-8")
+        found = []
+        resolved: Dict[Tuple[str, str], Tuple[str, ...]] = {}
+        _freeze_load_closure(script, sites=found, targets=resolved, overrides={rel: copy_})
+        assert sorted(set(found) - set(FREEZE_DYNAMIC_LOADERS)) == [], mutant
+        assert [s for s in found if resolved[s] != FREEZE_DYNAMIC_LOADERS[s]], mutant
+        return
+    found = []
+    resolved = {}
+    closure = _freeze_load_closure(script, sites=found, targets=resolved)
+    assert sorted(set(found) - set(FREEZE_DYNAMIC_LOADERS)) == []
+    assert sorted(set(FREEZE_DYNAMIC_LOADERS) - set(found)) == []
+    assert {s: resolved[s] for s in found} == FREEZE_DYNAMIC_LOADERS
+    assert "scripts/ffname_freeze_baseline.py" in closure, sorted(closure)
+    packages = nv.load_contract()["library_versions"]["values"]
+    assert packages and not [p for p in packages if (REPO / p).exists() or (REPO / f"{p}.py").exists()], packages
+
+
 @pytest.mark.parametrize("context", ["generation", "ic_page_arm", "ic_page_entry"])
 def test_freeze_contexts_clear_ambient_ffact_selectors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
                                                        context: str) -> None:
@@ -1696,6 +1969,56 @@ def test_mutation_env_scan_reports_new_access(mutant: str) -> None:
     unclassified = {n for n in names if not (n.startswith(frz.CLEARED_ENV_PREFIXES) or n in frz.CLEARED_ENV_NAMES
                                              or n in frz.ENV_NOT_CLEARED)}
     assert (unresolved - set(frz.ENV_UNRESOLVED_SITES)) or unclassified, mutant
+
+
+def task11_receipt_contract_violations(criteria: Mapping[str, Any]) -> List[str]:
+    """判準 v8 起（版本 ≥ 8）`comparison_outputs.postic_branch_vs_float64_oracle` 之 Task 1.1 收據結構逐字等於已核定值
+    （`TASK11_*` 常數）；版本 < 8 ⇒ 無對象。無斷言。"""
+    if int(criteria.get("version") or 0) < 8:
+        return []
+    spec = (criteria.get("comparison_outputs") or {}).get("postic_branch_vs_float64_oracle") or {}
+    out: List[str] = []
+    by_input = {k: v for k, v in (spec.get("branches_by_input") or {}).items() if not str(k).startswith("_")}
+    got = {"i": {k: v for k, v in (by_input.get("i") or {}).items() if not str(k).startswith("_")},
+           "ii": list((by_input.get("ii") or {}).get("branches") or [])}
+    if set(by_input) != {"i", "ii"} or got != TASK11_BRANCHES_BY_INPUT:
+        out.append(f"branches_by_input {got} ≠ 已核定 {TASK11_BRANCHES_BY_INPUT}")
+    if tuple((spec.get("label_provenance") or {}).get("fields") or ()) != TASK11_LABEL_FIELDS:
+        out.append("label_provenance.fields ≠ 已核定")
+    if not all(str((spec.get("label_provenance") or {}).get(k) or "").strip() for k in ("window_rule", "hash_rule")):
+        out.append("label_provenance.window_rule／hash_rule 缺（驗收獨立重算之依據；r22 CODEX-R22-P1-02）")
+    sink = spec.get("sink_routes") or {}
+    if tuple(sink.get("fields") or ()) != TASK11_SINK_FIELDS:
+        out.append("sink_routes.fields ≠ 已核定")
+    if tuple(sink.get("summary_keys") or ()) != TASK11_SINK_SUMMARY_KEYS:
+        out.append("sink_routes.summary_keys ≠ 已核定")
+    if sink.get("run_inventory_key") != "sink_runs" or tuple(sink.get("run_inventory_fields") or ()) != TASK11_SINK_RUN_FIELDS:
+        out.append("sink_routes.run_inventory_key／run_inventory_fields ≠ 已核定")
+    if (spec.get("label_provenance") or {}).get("receipt_key") != "label_provenance" or sink.get("receipt_key") != "sink_routes":
+        out.append("receipt_key ≠ 已核定")
+    return out
+
+
+@pytest.mark.parametrize("mutant", [None, "ii_branches_shrunk", "i_plus_dropped", "label_fields_shrunk",
+                                    "sink_fields_shrunk", "sink_inventory_dropped", "label_window_rule_dropped"])
+def test_task11_receipt_contract_locked_in_criteria(mutant: Optional[str]) -> None:
+    """規格審查 r19 CODEX-R19-P1-02：現行判準（v8 起）之 Task 1.1 收據結構逐字等於已核定值；判準檔自身縮小 ⇒ 紅。"""
+    criteria = copy.deepcopy(_load_criteria())
+    spec = criteria["comparison_outputs"]["postic_branch_vs_float64_oracle"]
+    if mutant == "ii_branches_shrunk":
+        spec["branches_by_input"]["ii"]["branches"] = ["polars", "polars_float64"]
+    elif mutant == "i_plus_dropped":
+        spec["branches_by_input"]["i"]["plus"] = []
+    elif mutant == "label_fields_shrunk":
+        spec["label_provenance"]["fields"] = ["cell_id", "input"]
+    elif mutant == "sink_fields_shrunk":
+        spec["sink_routes"]["fields"] = spec["sink_routes"]["fields"][:4]
+    elif mutant == "sink_inventory_dropped":
+        spec["sink_routes"].pop("run_inventory_key")
+    elif mutant == "label_window_rule_dropped":
+        spec["label_provenance"].pop("window_rule")
+    violations = task11_receipt_contract_violations(criteria)
+    assert (violations == []) is (mutant is None), (mutant, violations)
 
 
 def test_estimate_gate_called_first_in_generate_cell() -> None:

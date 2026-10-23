@@ -3,7 +3,7 @@ Task 4.2 ⑤ 結構重凍收據、Task 5.1 文件與 fact-key 更正。
 
 驗證：
 - Task 1.1（`handoffs/run_receipts/*-numview-postic-branchdiff.json`）：`exit_code`＝0、`criteria_sha256`＝現行判準檔 sha256；
-  列數＝格數×分支數×7（分支＝`tests/_golden/icpostleak/contract.json` 之 `branches` ∪ 候選臂 `postic_branchdiff.CANDIDATE_ARM`；
+  列數＝Σ_(格, 輸入) 該輸入分支數×7（判準 v8 起分支依輸入取 `comparison_outputs.postic_branch_vs_float64_oracle.branches_by_input`：(i)＝`tests/_golden/icpostleak/contract.json` 之 `branches` ∪ 候選臂、(ii)＝明列五臂；label_provenance、sink_routes／sink_runs 依同條目驗；
   七組合＝該契約 `combos`）；每格每可達臂具速度欄（三次牆鐘＋中位數）；ICPOSTLEAK 輸入集格（BTCUSDT 1h，取自該契約
   `kline`）之 legacy 對 optimized 七組合皆 0 差（並核 10-02 收據之 optimized 七列確為 0 差）；候選臂中間 dtype 皆記為
   float64（≥3 處；R10-A）。
@@ -270,8 +270,22 @@ def icpostleak_contract() -> Dict[str, Any]:
     return _json(ICPOSTLEAK_CONTRACT_PATH)
 
 
+def _branchdiff_output_spec() -> Dict[str, Any]:
+    """判準 `comparison_outputs.postic_branch_vs_float64_oracle`（v8 起含 branches_by_input／label_provenance／sink_routes）。"""
+    return load_criteria()["comparison_outputs"]["postic_branch_vs_float64_oracle"]
+
+
 def expected_branches() -> List[str]:
     return sorted(set(icpostleak_contract()["branches"]) | {probe("postic_branchdiff").CANDIDATE_ARM})
+
+
+def branches_for_input(input_kind: str) -> List[str]:
+    """判準 v8 `branches_by_input` 之該輸入分支封閉集合（SPEC v30 Task 1.1：(i)＝ICPOSTLEAK 契約 branches ∪ plus、
+    (ii)＝明列五臂）。"""
+    spec = _branchdiff_output_spec()["branches_by_input"][str(input_kind)]
+    if "contract_branches" in spec:
+        return sorted(set(icpostleak_contract()["branches"]) | set(spec.get("plus") or []))
+    return sorted(spec["branches"])
 
 
 def combo_names() -> List[str]:
@@ -285,7 +299,7 @@ def _entry_key(entry: Mapping[str, Any]) -> Tuple[str, str]:
 
 
 def branchdiff_rows_violations() -> List[str]:
-    """列數＝格數×分支數×7、每 (格, 輸入, 分支, 組合) 恰一列；格涵蓋：輸入 (i)＝每個 symbol×tf、輸入 (ii)＝凍結檔全部格。
+    """列數＝Σ_(格, 輸入) 該輸入分支數×7（判準 v8 起；v7 以前為格數×分支數×7）、每 (格, 輸入, 分支, 組合) 恰一列；格涵蓋：輸入 (i)＝每個 symbol×tf、輸入 (ii)＝凍結檔全部格。
     判準 v3 起（SPEC Task 1.1 v17）：輸入 (i)＝封閉清單格 A 之 symbol×tf、輸入 (ii)＝判準 `run_coverage.postic_branchdiff` 之格。"""
     receipt = load_receipt("postic-branchdiff")
     branches, combos = expected_branches(), combo_names()
@@ -308,11 +322,163 @@ def branchdiff_rows_violations() -> List[str]:
         out.append(f"輸入 (ii) 涵蓋 ≠ 凍結格：缺 {sorted(want_ii - inv_ii)[:5]} 多 {sorted(inv_ii - want_ii)[:5]}")
     rows = receipt["rows"]
     row_keys = [(str(r["cell_id"]), str(r["input"]), str(r["branch"]), str(r["combo"])) for r in rows]
-    want_rows = {(c, i, b, k) for (c, i) in set(keys) for b in branches for k in combos}
-    if len(rows) != len(set(keys)) * len(branches) * len(combos):
-        out.append(f"列數 {len(rows)} ≠ 格數 {len(set(keys))} × 分支數 {len(branches)} × {len(combos)}")
+    if not isinstance(_branchdiff_output_spec().get("branches_by_input"), Mapping):  # 判準 v7 以前：全域同一分支集合
+        want_rows = {(c, i, b, k) for (c, i) in set(keys) for b in branches for k in combos}
+        if len(rows) != len(set(keys)) * len(branches) * len(combos):
+            out.append(f"列數 {len(rows)} ≠ 格數 {len(set(keys))} × 分支數 {len(branches)} × {len(combos)}")
+        if set(row_keys) != want_rows or len(row_keys) != len(set(row_keys)):
+            out.append("列之 (格, 輸入, 分支, 組合) 非恰一")
+        return out
+    # 判準 v8 起（SPEC v30 Task 1.1）：分支依輸入取 `branches_by_input`，列數＝Σ_(格, 輸入) 該輸入分支數 × 組合數
+    want_rows = {(c, i, b, k) for (c, i) in set(keys) for b in branches_for_input(i) for k in combos}
+    if len(rows) != len(want_rows):
+        out.append(f"列數 {len(rows)} ≠ Σ_(格, 輸入) 該輸入分支數 × {len(combos)}＝{len(want_rows)}")
     if set(row_keys) != want_rows or len(row_keys) != len(set(row_keys)):
-        out.append("列之 (格, 輸入, 分支, 組合) 非恰一")
+        out.append("列之 (格, 輸入, 分支, 組合) 非恰一（含該輸入不准之分支或缺跑）")
+    return out
+
+
+def _array_sha256(values: np.ndarray) -> str:
+    """判準 v8 `label_provenance.hash_rule`：sha256(C 連續原生位元組)。"""
+    return hashlib.sha256(np.ascontiguousarray(values).tobytes()).hexdigest()
+
+
+_PRODUCTION_LABELS: Dict[Tuple[str, str, str, str], Dict[str, Any]] = {}
+
+
+def production_label_record(cell: Mapping[str, Any]) -> Dict[str, Any]:
+    """收據格（`cell_id`／`input`／`symbol`／`timeframes`／`kind`）之標籤出處，經生產 factory adapter 獨立重算（規格審查 r22
+    CODEX-R22-P1-02；判準 v8 `label_provenance.window_rule`／`hash_rule`）：來源＝判準 `kline_source`（主週期）、
+    `create_feature_factory(cache_dir=來源目錄)._layer0_data_ingestion` 讀窗、`_derive_row_index_for_artifact` 取時間軸、
+    標籤＝IC-first 同一構造 `close.pct_change().shift(-1)`（`feature_factory.py:2920`）。窗：(ii)＝`estimate.cell_window`；
+    (i)＝來源之該 symbol×tf 前 `icpostleak contract.kline.rows` 根。"""
+    from momentum.factories import create_feature_factory
+
+    criteria = load_criteria()
+    est = probe("estimate")
+    symbol, tf, kind = str(cell["symbol"]), str(cell["timeframes"][0]), str(cell["input"])
+    memo = (str(cell["cell_id"]), kind, criteria_sha256(), nh.kline_dataset_sha256(est.kline_source(tf, criteria), symbol, tf))
+    if memo in _PRODUCTION_LABELS:
+        return dict(_PRODUCTION_LABELS[memo])
+    source = est.kline_source(tf, criteria)
+    probe_cell = {"id": str(cell["cell_id"]), "kind": str(cell.get("kind") or "A"), "symbol": symbol, "timeframes": [tf]}
+    if kind == "ii":
+        start, end = est.cell_window(probe_cell, criteria)
+    else:
+        import h5py
+
+        rows = int(icpostleak_contract()["kline"]["rows"])
+        with h5py.File(str(source), "r") as handle:
+            stamps = handle[symbol][tf]["data"]["timestamp"]
+            assert stamps.shape[0] >= rows, f"{symbol}/{tf} 根數 {stamps.shape[0]} < 輸入 (i) {rows}"
+            first, last = int(stamps[0]), int(stamps[rows - 1])
+        unit = "ms" if last > 10 ** 12 else "s"
+        start = pd.Timestamp(first, unit=unit, tz="UTC").isoformat()
+        end = pd.Timestamp(last, unit=unit, tz="UTC").isoformat()
+    continuity = est.continuity_plan(probe_cell, criteria, [tf])
+    factory = create_feature_factory(cache_dir=str(source.parent), validate_continuity=continuity["validate_continuity"])
+    kline = factory._layer0_data_ingestion(symbol, tf, factory._resolve_config(None), start_date=start, end_date=end)
+    index = factory._derive_row_index_for_artifact(kline)
+    assert index is not None, f"{symbol}/{tf}：生產 adapter 取不到時間軸"
+    close = pd.Series(kline["close"].to_numpy(dtype=np.float64), index=index)
+    label = close.pct_change().shift(-1)
+    stamps_ns = np.asarray(index.asi8, dtype=np.int64)
+    record = {"cache_dir": str(source.parent.relative_to(REPO)),
+              "source_sha256": nh.kline_dataset_sha256(source, symbol, tf),
+              "output_start": start, "output_end": end, "rows": int(len(index)),
+              "timestamp_sha256": _array_sha256(stamps_ns), "close_sha256": _array_sha256(close.to_numpy(np.float64)),
+              "frame_index_sha256": _array_sha256(stamps_ns), "label_sha256": _array_sha256(label.to_numpy(np.float64))}
+    _PRODUCTION_LABELS[memo] = dict(record)
+    return record
+
+
+def label_provenance_violations() -> List[str]:
+    """判準 v8 `label_provenance`（規格審查 r18 X18-B；r22 CODEX-R22-P1-02）：每個 (格, 輸入) 恰一筆、鍵恰為 fields、雜湊欄為
+    64 位 hex、`production_adapter_equal` 為 true；且各欄（來源目錄、來源資料集、窗起訖、列數、timestamp／close／frame
+    索引／標籤雜湊）逐欄等於 `production_label_record` 經生產 adapter 獨立重算者——旗標為受驗結果、不作信任。"""
+    spec = _branchdiff_output_spec()["label_provenance"]
+    receipt = load_receipt("postic-branchdiff")
+    entries = receipt.get(spec["receipt_key"])
+    if not isinstance(entries, list) or not entries:
+        return [f"收據缺 {spec['receipt_key']}"]
+    out: List[str] = []
+    fields = list(spec["fields"])
+    seen: Set[Tuple[str, str]] = set()
+    for entry in entries:
+        key = _entry_key(entry)
+        if key in seen:
+            out.append(f"{key}：label_provenance 重複")
+        seen.add(key)
+        if sorted(entry) != sorted(fields):
+            out.append(f"{key}：鍵 {sorted(entry)} ≠ {sorted(fields)}")
+            continue
+        for name in fields:
+            if name.endswith("_sha256") and not re.fullmatch(r"[0-9a-f]{64}", str(entry[name])):
+                out.append(f"{key}：{name} 非 sha256")
+        if entry["production_adapter_equal"] is not True:
+            out.append(f"{key}：production_adapter_equal＝{entry['production_adapter_equal']!r}（標籤與生產讀取不一致）")
+        cell = next((c for c in receipt["cells"] if _entry_key(c) == key), None)
+        if cell is None:
+            out.append(f"{key}：收據 cells 無此 (格, 輸入)，無從重算")
+            continue
+        expected = production_label_record(cell)
+        for name, value in expected.items():
+            same = (pd.Timestamp(entry[name]) == pd.Timestamp(value)) if name in ("output_start", "output_end") \
+                else entry[name] == value
+            if not same:
+                out.append(f"{key}：{name}＝{entry[name]!r} ≠ 生產 adapter 重算 {value!r}")
+    want = {_entry_key(c) for c in receipt["cells"]}
+    if seen != want:
+        out.append(f"label_provenance 之 (格, 輸入) {sorted(seen)} ≠ cells {sorted(want)}")
+    return out
+
+
+def sink_routes_violations() -> List[str]:
+    """判準 v8 `sink_routes`（規格審查 r18 X18-B）：registry_sink／registry_sink_sharded 每次執行逐群組有紀錄、鍵含
+    fields；輸入 (i) 之 registry_sink_sharded 每筆 shard_stream 為 true；摘要鍵齊。"""
+    spec = _branchdiff_output_spec()["sink_routes"]
+    receipt = load_receipt("postic-branchdiff")
+    entries = receipt.get(spec["receipt_key"])
+    out: List[str] = []
+    if not isinstance(entries, list) or not entries:
+        return [f"收據缺 {spec['receipt_key']}"]
+    for entry in entries:
+        missing = [f for f in spec["fields"] if f not in entry]
+        if missing:
+            out.append(f"{entry.get('cell_id')}/{entry.get('input')}/{entry.get('branch')}：缺 {missing}")
+    sink_rows = {(str(r["cell_id"]), str(r["input"]), str(r["branch"]), str(r["combo"])) for r in receipt["rows"]
+                 if str(r["branch"]) in ("registry_sink", "registry_sink_sharded")}
+    covered = {(str(e.get("cell_id")), str(e.get("input")), str(e.get("branch")), str(e.get("combo"))) for e in entries}
+    if not sink_rows <= covered:
+        out.append(f"sink 分支之列缺路由紀錄：{sorted(sink_rows - covered)[:5]}")
+    # 規格審查 r19 CODEX-R19-P1-03：逐群組——sink_routes 依 (格, 輸入, 分支, 組合, 群組) 須恰等於 sink_runs 之展開
+    runs = receipt.get(spec["run_inventory_key"])
+    run_keys: List[Tuple[str, str, str, str]] = []
+    expected_groups: Set[Tuple[str, str, str, str, str]] = set()
+    for run in runs if isinstance(runs, list) else []:
+        key = (str(run.get("cell_id")), str(run.get("input")), str(run.get("branch")), str(run.get("combo")))
+        run_keys.append(key)
+        groups = run.get("group_ids")
+        if not (isinstance(groups, list) and groups and len(groups) == len(set(groups))):
+            out.append(f"{key}：group_ids 須為非空且不重複之清單")
+            continue
+        expected_groups |= {(*key, str(g)) for g in groups}
+    if not isinstance(runs, list) or sorted(run_keys) != sorted(sink_rows):
+        out.append(f"{spec['run_inventory_key']} 須對 sink 分支每列恰一筆")
+    route_groups = [(str(e.get("cell_id")), str(e.get("input")), str(e.get("branch")), str(e.get("combo")),
+                     str(e.get("group_id"))) for e in entries]
+    if set(route_groups) != expected_groups or len(route_groups) != len(set(route_groups)):
+        out.append(f"sink_routes 之群組≠{spec['run_inventory_key']}：缺 {sorted(expected_groups - set(route_groups))[:3]} "
+                   f"多 {sorted(set(route_groups) - expected_groups)[:3]}")
+    sharded_i = [e for e in entries if e.get("branch") == "registry_sink_sharded" and e.get("input") == "i"]
+    if not sharded_i:
+        out.append("輸入 (i) 無 registry_sink_sharded 之路由紀錄")
+    elif not all(e.get("shard_stream") is True for e in sharded_i):
+        out.append("輸入 (i) 之 registry_sink_sharded 有未實走分片串流之群組")
+    summary = receipt.get("sink_routes_summary") or {}
+    for name in spec["summary_keys"]:
+        if not isinstance(summary.get(name), int) or summary[name] <= 0:
+            out.append(f"sink_routes_summary.{name} 缺或非正整數")
     return out
 
 
@@ -357,7 +523,7 @@ def test_postic_branchdiff_receipt_rc_and_criteria() -> None:
 
 
 def test_postic_branchdiff_rows_cells_times_branches_times_seven() -> None:
-    """Task 1.1 驗證：每格每臂每組合一列（列數＝格數×分支數×7）。"""
+    """Task 1.1 驗證：每格每臂每組合一列（列數＝Σ_(格, 輸入) 該輸入分支數×7，判準 v8 起分支依輸入）。"""
     assert branchdiff_rows_violations() == []
 
 
@@ -381,6 +547,145 @@ def test_postic_branchdiff_reproduces_legacy_optimized_zero_diff() -> None:
     assert sorted(r["combo"] for r in rows) == sorted(combos), rows
     for r in rows:
         assert r["diff_cells"] == 0 and r["nan_mask_diff"] == 0 and r["max_abs_diff"] == 0.0, r
+
+
+def test_postic_branchdiff_label_provenance_matches_production() -> None:
+    """Task 1.1（判準 v8 `label_provenance`，規格審查 r18 X18-B）：每個 (格, 輸入) 之標籤出處齊備且與生產讀取逐值相等。"""
+    assert label_provenance_violations() == []
+
+
+def test_postic_branchdiff_sink_routes_recorded() -> None:
+    """Task 1.1（判準 v8 `sink_routes`，規格審查 r18 X18-B）：sink 分支逐群組路由齊備、輸入 (i) 之分片分支實走分片串流。"""
+    assert sink_routes_violations() == []
+
+
+def _mutated_branchdiff(monkeypatch: pytest.MonkeyPatch, mutate: Callable[[Dict[str, Any]], None]) -> None:
+    mutated = copy.deepcopy(load_receipt("postic-branchdiff"))
+    mutate(mutated)
+    original = THIS.load_receipt
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(mutated) if kind == "postic-branchdiff"
+                        else original(kind))
+
+
+@pytest.mark.parametrize("mutant", ["adapter_unequal", "label_hash_missing"])
+def test_mutation_label_provenance_turns_red(monkeypatch: pytest.MonkeyPatch, mutant: str) -> None:
+    """mutation（規格審查 r18 X18-B）：標籤與生產讀取不一致、或標籤雜湊欄缺 ⇒ 標籤出處檢查紅。"""
+    def mutate(r: Dict[str, Any]) -> None:
+        entry = r["label_provenance"][0]
+        if mutant == "adapter_unequal":
+            entry["production_adapter_equal"] = False
+        else:
+            entry.pop("label_sha256")
+    _mutated_branchdiff(monkeypatch, mutate)
+    assert label_provenance_violations() != []
+
+
+def test_mutation_sink_route_sharded_not_streamed_turns_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（規格審查 r18 X18-B）：輸入 (i) 之 registry_sink_sharded 有群組未實走分片串流 ⇒ 路由檢查紅。"""
+    def mutate(r: Dict[str, Any]) -> None:
+        next(e for e in r["sink_routes"] if e["branch"] == "registry_sink_sharded" and e["input"] == "i")["shard_stream"] = False
+    _mutated_branchdiff(monkeypatch, mutate)
+    assert any("分片串流" in v for v in sink_routes_violations())
+
+
+def test_mutation_branchdiff_input_ii_excluded_branch_turns_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（規格審查 r18 X18-A）：輸入 (ii) 多跑判準 v8 排除之分支（registry_sink_sharded）⇒ 列檢查紅。"""
+    def mutate(r: Dict[str, Any]) -> None:
+        extra = [dict(row, branch="registry_sink_sharded") for row in r["rows"]
+                 if row["input"] == "ii" and row["branch"] == "registry_sink"]
+        r["rows"].extend(extra)
+    _mutated_branchdiff(monkeypatch, mutate)
+    assert any("非恰一" in v or "列數" in v for v in branchdiff_rows_violations())
+
+
+def _synthetic_branchdiff_receipt() -> Dict[str, Any]:
+    """依判準 v8 合規之合成 Task 1.1 收據（只含 rows／label_provenance／sink_routes／sink_runs 檢查所需欄；每 sink 執行兩群組）。
+    供檢查器本身之可證偽測試（規格審查 r19 CODEX-R19-P1-04），不代表任何量測結果。"""
+    combos = combo_names()
+    cells: List[Dict[str, Any]] = []
+    for symbol, tfs in sorted(nh.criteria_symbol_timeframes("A")):
+        cells.append({"cell_id": f"i:{symbol}:{'+'.join(tfs)}", "input": "i", "symbol": symbol, "timeframes": list(tfs),
+                      "kind": "A", "selected": [], "columns": 6})
+    for kind, symbol, tfs in sorted(nh.criteria_run_cell_keys("postic_branchdiff")):
+        cells.append({"cell_id": f"ii:{kind}:{symbol}:{'+'.join(tfs)}", "input": "ii", "symbol": symbol,
+                      "timeframes": list(tfs), "kind": kind, "selected": [], "columns": 3})
+    rows, labels, routes, runs = [], [], [], []
+    for c in cells:
+        for branch in branches_for_input(c["input"]):
+            for combo in combos:
+                rows.append({"cell_id": c["cell_id"], "input": c["input"], "branch": branch, "combo": combo,
+                             "columns": c["columns"]})
+                if branch in ("registry_sink", "registry_sink_sharded"):
+                    runs.append({"cell_id": c["cell_id"], "input": c["input"], "branch": branch, "combo": combo,
+                                 "group_ids": ["g1", "g2"]})
+                    routes += [{"cell_id": c["cell_id"], "input": c["input"], "branch": branch, "combo": combo,
+                                "group_id": g, "mode": "replace", "shards": 3, "requires_slow": False, "is_chunked": False,
+                                "shard_stream": branch == "registry_sink_sharded", "group_arm": "arm", "status": "ok"}
+                               for g in ("g1", "g2")]
+        labels.append({"cell_id": c["cell_id"], "input": c["input"], **production_label_record(c),
+                       "production_adapter_equal": True})
+    return {"branches": expected_branches(), "cells": cells, "rows": rows, "label_provenance": labels,
+            "sink_routes": routes, "sink_runs": runs,
+            "sink_routes_summary": {"production_shard_bytes": 33554432, "input_ii_group_bytes": 6386000}}
+
+
+def _synthetic_mutant(receipt: Dict[str, Any], mutant: str) -> None:
+    sharded_i = [e for e in receipt["sink_routes"] if e["branch"] == "registry_sink_sharded" and e["input"] == "i"]
+    if mutant == "adapter_unequal":
+        receipt["label_provenance"][0]["production_adapter_equal"] = False
+    elif mutant == "label_hash_missing":
+        receipt["label_provenance"][0].pop("label_sha256")
+    elif mutant == "label_forged_flag_true":  # r22 CODEX-R22-P1-02 原例：來源與雜湊皆假、旗標仍 true
+        receipt["label_provenance"][0].update({
+            "cache_dir": "/tmp/not-the-production-source", "source_sha256": "0" * 64, "timestamp_sha256": "1" * 64,
+            "close_sha256": "2" * 64, "frame_index_sha256": "3" * 64, "label_sha256": "4" * 64,
+            "production_adapter_equal": True})
+    elif mutant == "label_hash_tampered":
+        receipt["label_provenance"][-1]["label_sha256"] = "f" * 64
+    elif mutant == "label_window_shifted":
+        receipt["label_provenance"][-1]["output_end"] = receipt["label_provenance"][0]["output_end"] \
+            if receipt["label_provenance"][0]["output_end"] != receipt["label_provenance"][-1]["output_end"] \
+            else "2000-01-01T00:00:00+00:00"
+    elif mutant == "sharded_not_streamed":
+        sharded_i[0]["shard_stream"] = False
+    elif mutant == "ii_extra_branch":
+        receipt["rows"] += [dict(r, branch="registry_sink_sharded") for r in receipt["rows"]
+                            if r["input"] == "ii" and r["branch"] == "registry_sink"]
+    elif mutant == "ii_missing_branch":
+        receipt["rows"] = [r for r in receipt["rows"] if not (r["input"] == "ii" and r["branch"] == "legacy")]
+    elif mutant == "route_group_missing":
+        receipt["sink_routes"].remove(next(e for e in receipt["sink_routes"] if e["group_id"] == "g2"))
+    elif mutant == "route_group_extra":
+        receipt["sink_routes"].append(dict(receipt["sink_routes"][0], group_id="g3"))
+
+
+#: 合成收據各 mutant 應使之紅之檢查器（rows／label／sink）
+_SYNTHETIC_MUTANT_RED = {"adapter_unequal": "label", "label_hash_missing": "label", "label_forged_flag_true": "label",
+                         "label_hash_tampered": "label", "label_window_shifted": "label", "sharded_not_streamed": "sink",
+                         "ii_extra_branch": "rows", "ii_missing_branch": "rows", "route_group_missing": "sink",
+                         "route_group_extra": "sink"}
+
+
+@pytest.mark.parametrize("mutant", [None, *_SYNTHETIC_MUTANT_RED])
+def test_v8_branchdiff_checkers_on_synthetic_receipt(monkeypatch: pytest.MonkeyPatch, mutant: Optional[str]) -> None:
+    """規格審查 r19 CODEX-R19-P1-04：判準 v8 之 Task 1.1 收據檢查器（`branchdiff_rows_violations`、
+    `label_provenance_violations`、`sink_routes_violations`）以合成收據自證——合規收據三者皆無違規（列數＝Σ_(格, 輸入) 該輸入
+    分支數×7）；每個 mutant 使其對應之檢查器紅、其餘不受牽連之檢查器維持綠（label／sink 變異不影響列檢查）。"""
+    receipt = _synthetic_branchdiff_receipt()
+    if mutant is not None:
+        _synthetic_mutant(receipt, mutant)
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(receipt) if kind == "postic-branchdiff"
+                        else pytest.fail(f"未預期讀取 {kind}"))
+    result = {"rows": branchdiff_rows_violations(), "label": label_provenance_violations(),
+              "sink": sink_routes_violations()}
+    if mutant is None:
+        assert result == {"rows": [], "label": [], "sink": []}, result
+        want = sum(len(branches_for_input(c["input"])) for c in receipt["cells"]) * len(combo_names())
+        assert len(receipt["rows"]) == want
+        return
+    assert result[_SYNTHETIC_MUTANT_RED[mutant]], (mutant, result)
+    if _SYNTHETIC_MUTANT_RED[mutant] != "rows":
+        assert result["rows"] == [], (mutant, result)
 
 
 def test_postic_branchdiff_candidate_intermediate_dtypes_float64() -> None:

@@ -515,9 +515,20 @@ def criteria_version() -> int:
     return int(match.group(1))
 
 
-#: 生成接縫之碼態範圍（審查 r6 CODEX-R6-P1-01）：凍結腳本、本 helper、PRE-PROV 生成 helper、numview 探針模組
-SEAM_GLOBS = ("scripts/numview_freeze_baseline.py", "tests/feature_engineering/numview_helpers.py",
-              "tests/feature_engineering/preprov_helpers.py", "handoffs/run_receipts/numview_probes/*.py")
+#: 生成接縫之碼態範圍（審查 r6 CODEX-R6-P1-01；規格審查 r18–r19 後改為凍結腳本之非產品碼載入閉包之封閉清單）：凍結腳本，
+#: 及其遞移載入之探針（`_load`／`with_name`／`parent /`）與 `tests.feature_engineering` 輔助模組（`from tests.feature_engineering
+#: [.<模組>] import …`，靜態閉包、含函式內 import，寧多勿漏）。原 `numview_probes/*.py` 萬用字元把凍結從不執行之探針納入、
+#: 又漏 import 之輔助模組（r19 CODEX-R19-P1-01：probewinsor_helpers、ffname_helpers）；`test_seam_globs_equal_freeze_load_closure`
+#: 機械對證清單＝閉包。規格審查 r20（CODEX-R20-P1-02）：閉包另含動態載入點（`importlib`／`spec_from_file_location`／子行程等，
+#: 逐一登記於 test_numview_criteria.FREEZE_DYNAMIC_LOADERS，未登記即紅）之目標——`ffname_helpers.load_freeze_module` 所載
+#: `scripts/ffname_freeze_baseline.py`。
+SEAM_GLOBS = ("scripts/numview_freeze_baseline.py", "scripts/ffname_freeze_baseline.py",
+              "handoffs/run_receipts/numview_probes/_estimate_gate.py", "handoffs/run_receipts/numview_probes/_watchdog.py",
+              "handoffs/run_receipts/numview_probes/estimate.py", "handoffs/run_receipts/numview_probes/l2_arm_matrix.py",
+              "tests/feature_engineering/ff_truncation_mr_helpers.py", "tests/feature_engineering/ffname_helpers.py",
+              "tests/feature_engineering/ffstat_helpers.py", "tests/feature_engineering/fftfmeta_golden_helpers.py",
+              "tests/feature_engineering/icfirstalign_helpers.py", "tests/feature_engineering/numview_helpers.py",
+              "tests/feature_engineering/preprov_helpers.py", "tests/feature_engineering/probewinsor_helpers.py")
 
 
 def _read_bytes(path: Path) -> bytes:

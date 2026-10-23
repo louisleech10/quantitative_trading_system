@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-23T05:53:25.695572+00:00",
+  "head": "e83856a08bc446167acf8ae685198080da45aafa",
+  "command": "venv/bin/python handoffs/run_receipts/numview_probes/b2_ic_scale_probe.py 200",
+  "exit_code": 0,
+  "criteria_sha256": "e45dbf76b5a8ebdc5acf7d3a47e6a49eafe8a6affa8217a319a8ce8c5999d75f",
+  "cell": "A_BTCUSDT_1h",
+  "input": "ii",
+  "columns": 200,
+  "rows": 500,
+  "request": {
+    "rank": true,
+    "rank_window": 252,
+    "zscore": true,
+    "zscore_windows": [
+      100,
+      252
+    ],
+    "gaussian": false
+  },
+  "reference_seconds": 29.075,
+  "n_eff": {
+    "min": 149,
+    "median": 149.0,
+    "max": 149
+  },
+  "ic_ref_abs_over_2se": 0,
+  "arms": {
+    "polars": {
+      "actual_arm": [
+        "polars"
+      ],
+      "seconds": 5.606,
+      "cell_diff": {
+        "max_abs": 0.00011450740282548111,
+        "p99_abs": 4.317231187128678e-06,
+        "max_rel": 1677721667.6974337,
+        "near_zero_cells": 187,
+        "near_zero_max_abs": 0.0,
+        "nan_mask_diff": 0
+      },
+      "abs_delta_ic": {
+        "max": 0.0002830738387257425,
+        "median": 0.0
+      },
+      "delta_ic_over_se": {
+        "max": 0.0034553565557650084,
+        "p99": 0.0,
+        "median": 0.0,
+        "count_ge_0_01": 0,
+        "count_ge_0_1": 0
+      },
+      "ic_material_v7": {
+        "tau_b": 1.0,
+        "sign_flips": 0,
+        "material": false,
+        "reason": "none"
+      }
+    },
+    "pandas_optimized": {
+      "actual_arm": [
+        "pandas_optimized"
+      ],
+      "seconds": 0.265,
+      "cell_diff": {
+        "max_abs": 3.023425554271597e-05,
+        "p99_abs": 7.701853996699842e-07,
+        "max_rel": 973078533.0383854,
+        "near_zero_cells": 187,
+        "near_zero_max_abs": 0.0,
+        "nan_mask_diff": 0
+      },
+      "abs_delta_ic": {
+        "max": 0.0002830738387257425,
+        "median": 0.0
+      },
+      "delta_ic_over_se": {
+        "max": 0.0034553565557650084,
+        "p99": 0.0,
+        "median": 0.0,
+        "count_ge_0_01": 0,
+        "count_ge_0_1": 0
+      },
+      "ic_material_v7": {
+        "tau_b": 1.0,
+        "sign_flips": 0,
+        "material": false,
+        "reason": "none"
+      }
+    }
+  }
+}

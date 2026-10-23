@@ -44,7 +44,13 @@
       "path": "handoffs/run_receipts/20261023-numview-freeze-baseline.json",
       "cmd": "venv/bin/python scripts/numview_freeze_baseline.py",
       "rc": 0,
-      "honest_bounds": "Task 0.5 改前基準：判準 v7 封閉格清單六格（A 四格、B、C）於 HEAD f28e7825 凍結；正式生成兩次跑（跑① A 四格＋B、跑② C），其後凍結腳本改動（G3_ARTIFACTS、結果身分、收據欄）經 handoffs/run_receipts/numview_freeze_seam/ 逆向重建證明不改值路徑、以身分補記沿用；C 只凍 raw（生產預設不產 processed）、群組粒度指紋；不涵蓋判準格清單以外之 symbol／週期"
+      "honest_bounds": "Task 0.5 改前基準：判準封閉格清單六格（A 四格、B、C；v7 與 v8 格清單相同）於 HEAD f28e7825 凍結；正式生成兩次跑（跑① A 四格＋B、跑② C），其後凍結腳本改動（G3_ARTIFACTS、結果身分、收據欄、環境清除、身分移除 head 改記 generation_head）與接縫收窄經 handoffs/run_receipts/numview_freeze_seam/ 之重建與差異證明不改值路徑、以身分補記沿用；C 只凍 raw（生產預設不產 processed）、群組粒度指紋；不涵蓋判準格清單以外之 symbol／週期"
+    },
+    {
+      "path": "handoffs/run_receipts/20261023-numview-b2-ic-scale-probe.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/numview_probes/b2_ic_scale_probe.py 200",
+      "rc": 0,
+      "honest_bounds": "b2 諮詢 r2 之判準討論證據（非 Task 1.1 結果）：A_BTCUSDT_1h 輸入 (ii) 前 200 欄、IC 頁預設 rank＋zscore，polars／pandas_optimized 對參考實作之數值差與 |ΔIC|／SE；單格、單組合、兩臂；標籤直接讀凍結 sidecar 之 K 線來源，未與生產 adapter 逐值比對（Task 1.1 收據之 label_provenance 補之）"
     }
   ],
   "batch_card": {
@@ -141,7 +147,7 @@
       "tests/feature_engineering/test_icfirstalign_memory.py"
     ],
     "callers_later": [
-      "tests/_golden/numview/preregistered_criteria_v7.json",
+      "tests/_golden/numview/preregistered_criteria_v8.json",
       "tests/_golden/numview/pre_change_fingerprints.json",
       "tests/_golden/numview/decisions.json",
       "tests/_golden/numview/refreeze_receipt.json"

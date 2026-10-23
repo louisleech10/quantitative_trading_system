@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-23T00:59:11.378637+00:00",
-  "head": "f28e7825c4a4e82e05d8d897ac86a37fbc67c30a",
+  "generated_at": "2026-10-23T05:52:48.340291+00:00",
+  "head": "e83856a08bc446167acf8ae685198080da45aafa",
   "command": "python handoffs/run_receipts/numview_probes/estimate.py",
-  "criteria_sha256": "880c1ba641325cefaef83d992efa5c0c469b44587674417697d8f6f81503160d",
+  "criteria_sha256": "e45dbf76b5a8ebdc5acf7d3a47e6a49eafe8a6affa8217a319a8ce8c5999d75f",
   "machine": {
     "platform": "macOS-27.0.1-arm64-arm-64bit",
     "python": "3.9.6"
@@ -2502,5 +2502,5 @@
     }
   },
   "reported_at": "2026-10-22T22:36:04.217434+00:00",
-  "reported_note": "使用者 2026-10-23 於對話中同意總時數約 5.0 小時（外推 18151 秒）後回覆「已經刪除。你開始做」；判準 v6→v7 只改說明字面（freeze_groups._doc、格 C 不含 processed、storage 路徑更名與錨點），估時內容（總秒數逐位相同）不變，沿用該同意"
+  "reported_note": "使用者 2026-10-23 於對話中同意總時數約 5.0 小時（外推 18151 秒）後回覆「已經刪除。你開始做」；判準 v6→v7 只改說明字面、v7→v8 只增 Task 1.1 收據結構定義（branches_by_input、label_provenance〔規格審查 r22 增窗起訖、列數欄與獨立重算規則〕、sink_routes），估時內容（總秒數逐位相同）不變，沿用該同意"
 }
