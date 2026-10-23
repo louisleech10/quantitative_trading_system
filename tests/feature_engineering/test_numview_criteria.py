@@ -98,7 +98,6 @@ CRITERIA_V2: Path = (_PRESENT_CRITERIA[0] if len(_PRESENT_CRITERIA) == 1 and _PR
 #: 判準檔名樣式（v1＝preregistered_criteria.json，其後 preregistered_criteria_v<N>.json；判準 v3 起之取代規則）
 CRITERIA_GLOB = "preregistered_criteria*.json"
 #: 估時收據（Task 0.4）：綁現行判準之 sha256、判準變動即須重估（`_estimate_gate`）——非「判準凍結後不得再改」所指之量測收據
-ESTIMATE_RECEIPT_SUFFIX = "-numview-estimate.json"
 RECEIPT_GLOB = "*-numview-*.json"
 PROBES_DIR: Path = REPO / "handoffs" / "run_receipts" / "numview_probes"
 FREEZE_SCRIPT: Path = REPO / "scripts" / "numview_freeze_baseline.py"
@@ -412,8 +411,20 @@ def frozen_violations() -> List[str]:
     return []
 
 
+#: 第 1 段收據之種類（SPEC Task 0.3 邊界①：判準只准於「任何 Phase 1 收據（Task 1.1–1.3 之收據）」提交前以 vN→vN+1 置換；
+#: 第 0 段收據〔Task 0.4 估時、Task 0.6 標準答案證明、Task 0.5 改前基準〕非數值量測判定之對象，置換後於新判準下重產，只約束
+#: `criteria_sha256` 相符——b1 審碼後 65bd80c0 實證：判準 v7 與第 0 段收據同提交、標準答案證明收據早於 v7，舊檢查將其一律
+#: 視為量測收據而與 SPEC 邊界①相牴）
+PHASE1_RECEIPT_KINDS: Tuple[str, ...] = ("postic-branchdiff", "perf-benchmark", "precision-chain", "l2-arm-matrix")
+
+
+def _is_phase1_receipt(path: Path) -> bool:
+    return any(Path(path).name.endswith(f"-numview-{kind}.json") for kind in PHASE1_RECEIPT_KINDS)
+
+
 def receipt_violations() -> List[str]:
-    """③：每份 numview 收據之 `criteria_sha256`＝現檔 sha256，且其首次提交為判準檔提交之嚴格後代；無收據亦違規。"""
+    """③：每份 numview 收據之 `criteria_sha256`＝現檔 sha256；第 1 段收據（`PHASE1_RECEIPT_KINDS`）之首次提交另須為判準檔
+    提交之嚴格後代；無收據亦違規。"""
     receipts = _receipt_paths()
     if not receipts:
         return ["無任何 *-numview-*.json 收據（③無對象）"]
@@ -431,15 +442,15 @@ def receipt_violations() -> List[str]:
         receipt_commits = _git_commits(_rel(path))
         if not receipt_commits:
             out.append(f"{path.name}：未提交")
-        elif not _strictly_before(criteria_commit, receipt_commits[-1]):
+        elif _is_phase1_receipt(path) and not _strictly_before(criteria_commit, receipt_commits[-1]):
             out.append(f"{path.name}：首次提交未晚於判準檔提交")
     return out
 
 
 def _measurement_receipt_paths() -> List[Path]:
-    """「判準凍結後不得再改」所指之收據：全部 *-numview-*.json 除估時收據（估時收據綁現行判準之 sha256，判準以 vN+1 取代時
-    須重估，本即不約束判準；③ 之 sha 相符與提交序仍涵蓋之）。"""
-    return [p for p in _receipt_paths() if not p.name.endswith(ESTIMATE_RECEIPT_SUFFIX)]
+    """「判準凍結後不得再改」所指之收據：第 1 段收據（`PHASE1_RECEIPT_KINDS`；SPEC Task 0.3 邊界①）。第 0 段收據（估時、
+    標準答案證明、改前基準）於判準置換後重產，不約束判準；③ 之 sha 相符仍涵蓋之。"""
+    return [p for p in _receipt_paths() if _is_phase1_receipt(p)]
 
 
 def _criteria_name_paths() -> List[Path]:
