@@ -1074,18 +1074,69 @@ def test_precision_chain_segments_cells_complete() -> None:
     assert precision_completeness_violations() == []
 
 
+def precision_s4_bss_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """S4 raw BSS 無損判定之違規：每個 measured 格恰一列；狀態依格類綁定（SPEC v37 細則②：codec 只於 A 格開關量測 ⇒
+    A＝measured、B／C＝codec_off，審碼 r19）；measured 列之 `bitwise_equal` 為布林；`lossless_violation` ⇔ 任一 measured
+    列不等。"""
+    out: List[str] = []
+    bss = list(receipt.get("s4_raw_bss") or [])
+    ids = [str(e.get("cell_id")) for e in bss]
+    if len(ids) != len(set(ids)):
+        out.append(f"s4_raw_bss 格重複：{ids}")
+    status = {str(e.get("cell_id")): e.get("status") for e in bss}
+    cells = [c for c in receipt.get("cells") or [] if c.get("status") == "measured"]
+    if not cells:
+        out.append("無 measured 格")
+    for c in cells:
+        cid = str(c["cell_id"])
+        want = "measured" if c.get("kind") == "A" else "codec_off"
+        if status.get(cid) != want:
+            out.append(f"{cid}（{c.get('kind')}）：s4_raw_bss 狀態 {status.get(cid)!r} ≠ {want}")
+    entries = [e for e in bss if e.get("status") == "measured"]
+    if any(not isinstance(e.get("bitwise_equal"), bool) for e in entries):
+        out.append("measured 列之 bitwise_equal 非布林")
+    if not entries:
+        out.append("無 measured 之 s4_raw_bss 列")
+    elif receipt.get("lossless_violation") is not (not all(e.get("bitwise_equal") is True for e in entries)):
+        out.append(f"lossless_violation {receipt.get('lossless_violation')!r} 與 measured 列不符")
+    return out
+
+
 def test_precision_chain_s4_raw_bss_lossless_flag() -> None:
-    """Task 1.2 驗證：S4 raw BYTE_STREAM_SPLIT 讀回逐位元相等之檢查於每個 measured 格皆有紀錄；任一不等 ⇔
+    """Task 1.2 驗證：S4 raw BYTE_STREAM_SPLIT 讀回逐位元相等之檢查於每個 measured 格皆有紀錄且狀態依格類；任一不等 ⇔
     `lossless_violation` 為 True。"""
-    receipt = load_receipt("precision-chain")
-    status = {str(e["cell_id"]): str(e.get("status") or "measured") for e in receipt["s4_raw_bss"]}
-    entries = {str(e["cell_id"]): bool(e["bitwise_equal"]) for e in receipt["s4_raw_bss"]
-               if str(e.get("status") or "measured") == "measured"}
-    measured = {str(c["cell_id"]) for c in receipt["cells"] if c["status"] == "measured"}
-    assert measured and measured <= set(status), sorted(measured - set(status))[:5]
-    # SPEC v37 細則②：codec 只於 A 格開關量測；B／C 記 codec_off、不入無損判定
-    assert entries and all(status[c] in ("measured", "codec_off") for c in measured), status
-    assert receipt["lossless_violation"] is (not all(entries.values()))
+    assert precision_s4_bss_violations(load_receipt("precision-chain")) == []
+
+
+@pytest.mark.parametrize("mutant", ["a_hidden_as_codec_off", "a_not_equal_flag_false", "b_measured", "c_missing",
+                                    "a_equal_none", "a_duplicate"])
+def test_precision_s4_bss_violations_mutations(mutant: str) -> None:
+    """審碼 r19：A 格誤標 codec_off 而 B 誤標 measured（雙錯）、A 不等而旗標 False、B 標 measured、C 缺列、A 之
+    bitwise_equal 為 None、A 列重複 ⇒ 各翻紅；合規收據 ⇒ 空。"""
+    def receipt(a_equal: Any = True, flag: bool = False) -> Dict[str, Any]:
+        return {"cells": [{"cell_id": k, "kind": k[0], "status": "measured"} for k in ("A_x", "B_x", "C_x")],
+                "s4_raw_bss": [{"cell_id": "A_x", "status": "measured", "bitwise_equal": a_equal},
+                               {"cell_id": "B_x", "status": "codec_off", "bitwise_equal": None},
+                               {"cell_id": "C_x", "status": "codec_off", "bitwise_equal": None}],
+                "lossless_violation": flag}
+    assert precision_s4_bss_violations(receipt()) == []
+    assert precision_s4_bss_violations(receipt(a_equal=False, flag=True)) == []
+    r = receipt()
+    if mutant == "a_hidden_as_codec_off":
+        r = receipt(a_equal=False)
+        r["s4_raw_bss"][0]["status"] = "codec_off"
+        r["s4_raw_bss"][1].update(status="measured", bitwise_equal=True)
+    elif mutant == "a_not_equal_flag_false":
+        r = receipt(a_equal=False)
+    elif mutant == "b_measured":
+        r["s4_raw_bss"][1].update(status="measured", bitwise_equal=True)
+    elif mutant == "c_missing":
+        r["s4_raw_bss"].pop()
+    elif mutant == "a_equal_none":
+        r = receipt(a_equal=None)
+    else:
+        r["s4_raw_bss"].append(dict(r["s4_raw_bss"][0]))
+    assert precision_s4_bss_violations(r) != []
 
 
 def test_precision_chain_extension_downgrade_field() -> None:
