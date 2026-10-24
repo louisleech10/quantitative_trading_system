@@ -214,6 +214,13 @@ def test_phase2_response_model_accepts_excluded_features() -> None:
 
 # ---------------------------------------------------------------- mutants（§V；結果須翻轉）
 
+def _stub_execution_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    """NUMVIEW Task 2.2：服務之記臂取自 `last_post_ic_execution()`（無紀錄 ⇒ 拒收）；本檔 mutant 換掉 `transform_selected`
+    而不產生執行紀錄，記臂非本 mutant 之受測項，故補固定紀錄，使 mutant 照常產出輸出供判準比對。"""
+    monkeypatch.setattr(FeaturePreprocessor, "last_post_ic_execution",
+                        lambda self: ({}, {"ic_page": {"arm": "pandas_optimized"}}))
+
+
 def test_mutation_full_sample_rank_restored_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """mutant：IC 頁所呼叫之 transform_selected 改為全樣本排名＋ppf（即手寫版之洩漏）⇒ ①之判準翻轉（前段改變）。"""
     from scipy.stats import norm
@@ -223,6 +230,7 @@ def test_mutation_full_sample_rank_restored_is_caught(tmp_path: Path, monkeypatc
                 for gid, df in groups.items()}
 
     monkeypatch.setattr(FeaturePreprocessor, "transform_selected", _leaky)
+    _stub_execution_record(monkeypatch)
     monkeypatch.chdir(tmp_path)
     frame = _real_frame()
     base = _run(tmp_path, frame, ["gaussian"], tag="la")["frame"].to_numpy(dtype=np.float64)
@@ -253,6 +261,7 @@ def test_mutation_gaussian_last_order_is_caught(tmp_path: Path, monkeypatch: pyt
         return staged
 
     monkeypatch.setattr(FeaturePreprocessor, "transform_selected", _old_order)
+    _stub_execution_record(monkeypatch)
     got = _run(tmp_path, frame, steps)["frame"]
     assert not np.array_equal(got.to_numpy(dtype=np.float64), want.to_numpy(dtype=np.float64), equal_nan=True)
 

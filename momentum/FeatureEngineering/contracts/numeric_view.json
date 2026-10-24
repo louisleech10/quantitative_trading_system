@@ -7,14 +7,14 @@
     "ic_first": {
       "arm": "polars",
       "_sources": {
-        "POST_IC_ARM = \"polars\"": [
-          "momentum/FeatureEngineering/ic_first_context.py:29"
+        "POST_IC_ARM = _numeric_view.post_ic_arm(\"ic_first\")": [
+          "momentum/FeatureEngineering/ic_first_context.py:32"
         ],
         "arm=ctx.post_ic_arm,": [
           "momentum/FeatureEngineering/feature_factory.py:2982"
         ],
         "if arm != \"polars\":": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:908"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:919"
         ]
       }
     },
@@ -23,10 +23,10 @@
       "arm_policy": "env_resolved",
       "_sources": {
         "transformed = preprocessor.transform_selected(kept_cols, {\"ic_page\": df}, config=transform_config)": [
-          "api/services/ic_analysis_service.py:2899"
+          "api/services/ic_analysis_service.py:2906"
         ],
         "use_polars = True if getattr(self, \"_forced_arm\", None) == \"polars\" else polars_enabled()": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:872"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:883"
         ],
         "if enabled and not _check_polars_available():": [
           "momentum/FeatureEngineering/polars_adapter.py:91"
@@ -47,13 +47,13 @@
         "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
       ],
       "pandas_optimized": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
       ],
       "pandas_legacy": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
       ],
       "pandas_chunked": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:885"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:896"
       ]
     }
   },
@@ -64,10 +64,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:916"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:927"
         ],
         "self._record_group(arm=\"polars\")": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:891"
         ]
       }
     },
@@ -76,10 +76,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:916"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:927"
         ],
         "\"pandas_optimized\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
         ]
       }
     },
@@ -88,10 +88,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:916"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:927"
         ],
         "\"pandas_legacy\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
         ]
       }
     },
@@ -100,10 +100,10 @@
       "min_selected_columns": 2,
       "_sources": {
         "chunk_size > 0 and num_cols > chunk_size": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:884"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:895"
         ],
         "return max(size, 0)": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:842"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:853"
         ]
       }
     }
@@ -177,28 +177,28 @@
     }
   },
   "zscore_windows_policy": {
-    "_doc": "zscore 啟用時窗清單之規則（非空、皆正整數；D3）。Task 0.1 填。 現行各臂對空窗之處置不一致（_sources 為不一致之處；Task 2.1 改為臂分派前拒收）。",
+    "_doc": "zscore 啟用時窗清單之規則（非空、皆正整數；D3）。Task 0.1 填。Task 2.1 已改為臂分派前拒收（numeric_view.validate_preprocessing_policy，掛於 FeaturePreprocessor.__init__）；各臂改前之空窗靜默處置（else 100、no_windows）已移除，改為不可達之具名拋錯（_primary_zscore_window）。_sources 為現行拒收與拋錯處及窗欄型別宣告處。",
     "rules": [
       "non_empty_when_enabled",
       "each_positive_int"
     ],
     "_sources": {
-      "else 100": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1443",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3547"
-      ],
-      "no_windows": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3350",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4616"
-      ],
       "if not normalized_windows:": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3215"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3229"
       ],
       "windows: List[int]": [
-        "momentum/FeatureEngineering/feature_config.py:298"
+        "momentum/FeatureEngineering/feature_config.py:310"
       ],
       "zscore_windows: List[int]": [
         "api/models/ic_models.py:421"
+      ],
+      "if \"non_empty_when_enabled\" in rules and not windows:": [
+        "momentum/FeatureEngineering/numeric_view.py:131"
+      ],
+      "primary_window = self._primary_zscore_window(windows)": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3362",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3559",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4626"
       ]
     }
   },
@@ -210,31 +210,32 @@
     ],
     "_sources": {
       "quantile": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3178",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3700",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3192",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3711",
         "momentum/FeatureEngineering/polars_adapter.py:419",
         "momentum/FeatureEngineering/polars_adapter.py:451",
         "momentum/FeatureEngineering/feature_config.py:169"
       ],
       "sigma": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3162",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3681",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3176",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3692",
         "momentum/FeatureEngineering/polars_adapter.py:415",
         "momentum/FeatureEngineering/polars_adapter.py:441",
-        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:436"
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:442"
       ]
     }
   },
   "winsor_method_missing_key": {
-    "_doc": "dict 入口縮尾啟用而缺 method 鍵之處置（設計選擇③；Task 2.1）。 定稿 reject：dict 入口縮尾啟用而缺 method 鍵 ⇒ NumericPolicyError；pydantic 路徑由 WinsorConfig 預設填值（唯一預設來源）。_sources 為現行各臂缺鍵預設不一致之處（快速臂 quantile、pandas／polars 臂 sigma）。",
+    "_doc": "dict 入口縮尾啟用而缺 method 鍵之處置（設計選擇③；Task 2.1）。定稿 reject：dict 入口縮尾啟用而缺 method 鍵 ⇒ NumericPolicyError；pydantic 路徑由 WinsorConfig 預設填值（唯一預設來源）。Task 2.1 已移除各臂缺鍵預設（改前快速臂 quantile、pandas／polars 臂 sigma）；_sources 為現行讀本值之拒收處與其掛載點。",
     "value": "reject",
-    "_literal": "get(\"method\"",
-    "_sources": [
-      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1427",
-      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3160",
-      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3490",
-      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3671"
-    ]
+    "_sources": {
+      "policy = contract[\"winsor_method_missing_key\"][\"value\"]": [
+        "momentum/FeatureEngineering/numeric_view.py:142"
+      ],
+      "validate_preprocessing_policy(self._config)": [
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:179"
+      ]
+    }
   },
   "selectors": {
     "_doc": "每個 FFACT_* 鍵（momentum/、api/ 全部字串常值；Task 0.2 AST 盤點）一鍵：{\"class\": <selector_classes.values 之一>, \"parser\": <解析器名>, \"reason\": <讀取點用途>, \"_sources\": [path:line]}。本票除 output_only 五鍵外一律 value_affecting；不設 non_value（使用者 2026-10-21 方向裁定）。 _sources＝該鍵於 momentum/、api/ 之全部字串常值位置（memory_budget 之 SELECTORS／SELECTOR_DEFAULTS／NON_ARM_FFACT_KEYS 登記表除外，除非為唯一位置）；parser 為讀取點之解析語意名（Task 4.1 以解析器實作對應）。",
@@ -372,7 +373,7 @@
       "reason": "特徵 registry 檔路徑；所指檔內容可影響特徵定義（SPEC Task 0.2：非 output_only）。",
       "_sources": [
         "momentum/FeatureEngineering/feature_registry.py:39",
-        "momentum/factories.py:451"
+        "momentum/factories.py:478"
       ]
     },
     "FFACT_FRACDIFF_APPLY_TO_LAYERS": {
@@ -440,7 +441,7 @@
       "parser": "nonnegative_int",
       "reason": "L6.5／post-IC transform 之欄 chunk（0＝停用）；選欄數 > chunk 時走 pandas_chunked 臂（feature_preprocessor transform 分派）。",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:837"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:848"
       ]
     },
     "FFACT_L65_NATIVE_TF": {
@@ -464,7 +465,7 @@
       "parser": "bool_text",
       "reason": "L6.5 raw sink 由大群組先處理之排程開關（預設開）。",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1887"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1899"
       ]
     },
     "FFACT_L65_SLOWPATH_PARALLEL": {
@@ -783,13 +784,13 @@
         "momentum/FeatureEngineering/polars_adapter.py:68"
       ],
       "_HAS_NUMBA = True": [
-        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:20"
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:21"
       ],
       "HAS_SCIPY = True": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:139"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:140"
       ],
       "HAS_STATSMODELS = True": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:157"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:158"
       ]
     }
   },
@@ -817,7 +818,7 @@
         "requirements.txt:52"
       ],
       "numba": [
-        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:17"
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:18"
       ],
       "scipy": [
         "requirements.txt:46"
@@ -826,7 +827,7 @@
         "requirements.txt:56"
       ],
       "bottleneck": [
-        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:112"
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:113"
       ],
       "statsmodels": [
         "requirements.txt:85"
@@ -853,10 +854,14 @@
     "_doc": "manifest 頂層與 artifact 節點新增鍵（fingerprint、algorithm_id、路由身分、observed_arms；D2）。"
   },
   "ic_page_output_attrs": {
-    "_doc": "IC 頁輸出 h5 屬性鍵（實際臂、ff_run_identity〔Task 2.2〕；view_id、algorithm_id〔Task 4.3〕）。"
+    "_doc": "IC 頁輸出 h5 屬性鍵（實際臂、ff_run_identity〔Task 2.2〕；view_id、algorithm_id〔Task 4.3〕）。",
+    "arm": "post_ic_arm",
+    "ff_run_identity": "ff_run_identity"
   },
   "ic_page_response_keys": {
-    "_doc": "ApplyTransformsResponse 新增選填鍵（同上分期）。"
+    "_doc": "ApplyTransformsResponse 新增選填鍵（同上分期）。",
+    "arm": "post_ic_arm",
+    "ff_run_identity": "ff_run_identity"
   },
   "ic_page_view_identity": {
     "_doc": "view_id 之組成（run 身分、轉換設定、臂、algorithm_id、有序 kept_cols）與正規化規則（R7-A）。",

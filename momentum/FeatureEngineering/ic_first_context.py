@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping, Optional, Sequence, Tuple
 
+from momentum.FeatureEngineering import numeric_view as _numeric_view
+
 
 class ICFirstContextError(ValueError):
     """context 建立失敗：start／end 缺、選窗超出公開窗、生成結果缺 `output_window`（Task 2.0 邊界①②）。"""
@@ -26,7 +28,8 @@ class PostICArmUnavailableError(RuntimeError):
 
 
 OUTPUT_WINDOW_KEYS: Tuple[str, ...] = ("output_start", "output_end", "ingest_start", "max_warmup_bars", "warmup_enabled")
-POST_IC_ARM = "polars"
+#: NUMVIEW Task 2.2：IC-first 之 post-IC 正式臂讀契約 `post_ic_entries.ic_first`（值不變；不另寫字面）
+POST_IC_ARM = _numeric_view.post_ic_arm("ic_first")
 
 
 @dataclass(frozen=True)

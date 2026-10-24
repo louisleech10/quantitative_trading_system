@@ -23,17 +23,17 @@ def test_explicit_path_takes_priority_over_library(tmp_path) -> None:
     expected.index.name = "timestamp"
     library, features_path = write_canonical_run(tmp_path / "features", expected, SYMBOL, PRIMARY_TF, "path-hash")
     calls = []
-    real_load = library.load
+    real_load = library.load_with_identity
 
     def spy_load(symbol, timeframe, **kwargs):
         calls.append((symbol, timeframe, kwargs.get("config_hash")))
         return real_load(symbol, timeframe, **kwargs)
 
-    library.load = spy_load
+    library.load_with_identity = spy_load
     service = ICAnalysisService()
     service._feature_library = library
 
-    actual = service._load_features_for_transforms(
+    actual, identity = service._load_features_for_transforms(
         "ETHUSDT",
         "12h",
         str(features_path),
@@ -42,16 +42,19 @@ def test_explicit_path_takes_priority_over_library(tmp_path) -> None:
 
     pd.testing.assert_frame_equal(actual, expected, check_exact=True, check_dtype=True, check_freq=False)
     assert calls == [(SYMBOL, PRIMARY_TF, "path-hash")]
+    # NUMVIEW Task 2.2：回傳之身分＝path 解析出之 run（非 selector 之 symbol／timeframe／config_hash）
+    assert (identity.symbol, identity.tf, identity.config_hash) == (SYMBOL, PRIMARY_TF, "path-hash")
 
 
 def test_library_load_receives_pinned_config_hash() -> None:
-    """無 path 時將 pinned hash 原樣交給既有 library。"""
+    """無 path 時將 pinned hash 原樣交給既有 library（NUMVIEW Task 2.2：經 load_with_identity，身分原樣回傳）。"""
     expected = pd.DataFrame({"alpha": [1.0]})
+    run_identity = object()
     service = ICAnalysisService()
     service._feature_library = MagicMock()
-    service._feature_library.load.return_value = expected
+    service._feature_library.load_with_identity.return_value = (expected, run_identity)
 
-    actual = service._load_features_for_transforms(
+    actual, identity = service._load_features_for_transforms(
         "BTCUSDT",
         "12h",
         None,
@@ -59,7 +62,8 @@ def test_library_load_receives_pinned_config_hash() -> None:
     )
 
     assert actual is expected
-    service._feature_library.load.assert_called_once_with(
+    assert identity is run_identity
+    service._feature_library.load_with_identity.assert_called_once_with(
         "BTCUSDT",
         "12h",
         config_hash="pinned-hash",
@@ -67,16 +71,18 @@ def test_library_load_receives_pinned_config_hash() -> None:
 
 
 def test_library_load_receives_none_for_latest() -> None:
-    """未指定 hash 時保留 library 的 latest 語意。"""
+    """未指定 hash 時保留 library 的 latest 語意（NUMVIEW Task 2.2：經 load_with_identity，身分原樣回傳）。"""
     expected = pd.DataFrame({"alpha": [1.0]})
+    run_identity = object()
     service = ICAnalysisService()
     service._feature_library = MagicMock()
-    service._feature_library.load.return_value = expected
+    service._feature_library.load_with_identity.return_value = (expected, run_identity)
 
-    actual = service._load_features_for_transforms("BTCUSDT", "12h", None)
+    actual, identity = service._load_features_for_transforms("BTCUSDT", "12h", None)
 
     assert actual is expected
-    service._feature_library.load.assert_called_once_with(
+    assert identity is run_identity
+    service._feature_library.load_with_identity.assert_called_once_with(
         "BTCUSDT",
         "12h",
         config_hash=None,
@@ -87,7 +93,7 @@ def test_library_error_preserves_no_source_value_error() -> None:
     """Library 失敗且無 path 時維持既有無來源錯誤類型。"""
     service = ICAnalysisService()
     service._feature_library = MagicMock()
-    service._feature_library.load.side_effect = KeyError("missing run")
+    service._feature_library.load_with_identity.side_effect = KeyError("missing run")
 
     with pytest.raises(ValueError, match="Cannot load features"):
         service._load_features_for_transforms(

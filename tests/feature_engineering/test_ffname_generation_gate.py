@@ -425,7 +425,9 @@ def test_ic_analysis_transforms_path_rejects(tmp_path, mode):
     manifest = _write_run(base)
     service = ICAnalysisService()
     service._feature_library = _library(base, [(SYMBOL, manifest)])  # canonical run：特徵根下＋registry 有條目（v13）
-    assert isinstance(service._load_features_for_transforms(None, None, str(manifest)), pd.DataFrame)
+    # NUMVIEW Task 2.2：服務回（特徵, run 身分）
+    frame, _identity = service._load_features_for_transforms(None, None, str(manifest))
+    assert isinstance(frame, pd.DataFrame)
     with tampered(manifest, mode):
         assert _rejects(lambda: service._load_features_for_transforms(None, None, str(manifest)))
 
@@ -433,7 +435,7 @@ def test_ic_analysis_transforms_path_rejects(tmp_path, mode):
 def _non_canonical_rejected(service, path: str) -> bool:
     """非 canonical run 路徑 ⇒ 產生任何 DataFrame 前拒收（不得回傳 DataFrame）。"""
     try:
-        result = service._load_features_for_transforms(None, None, path)
+        result, _identity = service._load_features_for_transforms(None, None, path)  # NUMVIEW Task 2.2：回（特徵, 身分）
     except Exception:  # noqa: BLE001
         return True
     return not isinstance(result, pd.DataFrame)

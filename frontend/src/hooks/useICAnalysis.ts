@@ -769,6 +769,9 @@ export function useICAnalysis() {
         output_cols: number;
         // ICPOSTLEAK Task 2.2：被排除（未轉換、未寫入輸出）之選中欄
         excluded_features?: { name: string; reason: string }[];
+        // NUMVIEW Task 2.2：實際執行之 post-IC 臂與來源特徵 run 身分
+        post_ic_arm?: string | null;
+        ff_run_identity?: Record<string, unknown> | null;
       }>(`/apply-transforms/${taskId}`, {
         method: 'POST',
         body: JSON.stringify(payload),

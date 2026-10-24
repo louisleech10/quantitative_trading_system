@@ -380,7 +380,9 @@ def _cell_view(cell_id: str, cell: Mapping[str, Any]) -> Dict[str, Any]:
     view = dict(cell)
     timeframes = list(cell.get("timeframes") or [])
     view["tf"] = timeframes[0] if len(timeframes) == 1 else None
-    if isinstance(cell.get("g1"), Mapping):
+    # 凍結檔之格 B／C 不凍 G1 臂份（`g1` 為空物件，`scripts/numview_freeze_baseline.py` freeze_one）⇒ 無 G1 檢視；
+    # 有任一 G1 臂份之格方須具 g1_source_env／ic_first_selected（與 test_numview_policy.py 同）
+    if isinstance(cell.get("g1"), Mapping) and cell["g1"]:
         assert "g1_source_env" in cell and "ic_first_selected" in cell, f"§G 凍結檔格 {cell_id} 缺 g1_source_env／ic_first_selected"
         view["g1"] = {
             "source_env": dict(cell["g1_source_env"]),
@@ -409,7 +411,7 @@ def _g1_cell_ids_at_collection() -> List[str]:
     """收集期列舉凍結檔之 G1 格（每格一參數）；檔缺或無 G1 ⇒ 單一佔位參數，於測試內斷言失敗（不 skip）。"""
     try:
         cells = json.loads(nh.PRE_CHANGE_FINGERPRINTS_PATH.read_text(encoding="utf-8"))["cells"]
-        ids = sorted(cid for cid, c in cells.items() if isinstance(c, dict) and "g1" in c)
+        ids = sorted(cid for cid, c in cells.items() if isinstance(c, dict) and c.get("g1"))  # 空 g1（B／C）不列
     except (OSError, ValueError, KeyError, TypeError):
         ids = []
     return ids or ["<frozen_g1_missing>"]

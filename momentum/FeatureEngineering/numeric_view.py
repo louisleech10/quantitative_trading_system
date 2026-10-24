@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
 
 CONTRACT_PATH: Path = Path(__file__).resolve().parent / "contracts" / "numeric_view.json"
 
@@ -30,6 +30,8 @@ REQUIRED_SECTIONS = (
 _ENTRY_ARM = "arm"
 _ENTRY_ARM_REF = "arm_ref"
 _ENTRY_ARM_POLICY = "arm_policy"
+#: IC 頁第三步記錄之槽（SPEC Task 2.2；契約 `ic_page_output_attrs`／`ic_page_response_keys` 之鍵；Task 4.3 另增）
+_IC_PAGE_RECORD_SLOTS: Tuple[str, ...] = ("arm", "ff_run_identity")
 
 
 class NumericPolicyError(ValueError):
@@ -161,6 +163,33 @@ def reject_bool_items(values: Any, field: str) -> Any:
     if any(isinstance(v, bool) for v in items):
         raise ValueError(f"{field} 須皆為正整數（不得為 bool），實得 {items!r}")
     return items
+
+
+def ic_page_record_keys() -> Tuple[Dict[str, str], Dict[str, str]]:
+    """IC 頁第三步之記錄鍵名（SPEC Task 2.2）：（h5 屬性鍵 `ic_page_output_attrs`, 回應鍵 `ic_page_response_keys`），
+    各為 {槽: 鍵名}；本 Task 之槽＝`arm`、`ff_run_identity`。任一槽未填或非非空字串 ⇒ `NumericPolicyError`。"""
+    contract = load_contract()
+    out = []
+    for section in ("ic_page_output_attrs", "ic_page_response_keys"):
+        keys = {k: v for k, v in contract[section].items() if not str(k).startswith("_")}
+        for slot in _IC_PAGE_RECORD_SLOTS:
+            if not isinstance(keys.get(slot), str) or not keys[slot]:
+                raise NumericPolicyError(f"契約 {section}.{slot} 未填")
+        out.append({slot: keys[slot] for slot in _IC_PAGE_RECORD_SLOTS})
+    return out[0], out[1]
+
+
+def executed_post_ic_arm(groups: Mapping[str, Mapping[str, Any]]) -> str:
+    """post-IC 一次 `transform_selected` 實際執行之臂（SPEC Task 2.2）：取執行紀錄（`last_post_ic_execution()[1]`）
+    各群組之 `arm`，須恰一且屬契約 `post_ic_arm_values`；無群組、多臂或值不屬值集 ⇒ `NumericPolicyError`
+    （不以契約政策值或環境推算代替）。"""
+    arms = {str(info.get("arm")) for info in groups.values()}
+    if len(arms) != 1:
+        raise NumericPolicyError(f"post-IC 執行紀錄之臂須恰一，實得 {sorted(arms)}")
+    arm = arms.pop()
+    if arm not in list(load_contract()["post_ic_arm_values"].get("values") or []):
+        raise NumericPolicyError(f"post-IC 執行紀錄之臂 {arm!r} 不屬契約 post_ic_arm_values")
+    return arm
 
 
 def detect_capabilities() -> Dict[str, bool]:

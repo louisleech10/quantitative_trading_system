@@ -278,6 +278,22 @@ def reject_bool_window_items(values: Any, field: str) -> Any:
     return _nv.reject_bool_items(values, field)
 
 
+def ic_page_record_keys() -> Tuple[Dict[str, str], Dict[str, str]]:
+    """NUMVIEW Task 2.2：IC 頁第三步記錄鍵名（h5 屬性鍵, 回應鍵），讀契約；委由 `numeric_view.ic_page_record_keys`
+    （api 經本模組取用，解耦 R3）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    return _nv.ic_page_record_keys()
+
+
+def executed_post_ic_arm(groups: Any) -> str:
+    """NUMVIEW Task 2.2：post-IC 實際執行之臂（執行紀錄群組臂恰一且屬契約值集）；委由
+    `numeric_view.executed_post_ic_arm`（api 經本模組取用，解耦 R3）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    return _nv.executed_post_ic_arm(groups)
+
+
 def parse_feature_name(feature_name: str, tagged: bool = True) -> Any:
     """FF-NAME §C：`api/` 取用欄名 parser 之唯一入口（委由 `feature_naming.parse_feature_name`，以模組屬性呼叫）。
     不合文法 ⇒ `FeatureNameParseError`；`label_*` ⇒ `LabelColumnNotFeatureError`。"""

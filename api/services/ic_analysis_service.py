@@ -38,7 +38,9 @@ from momentum.factories import (
     create_ic_reporter,
     create_kline_storage_manager,
     create_post_ic_transform_config,
+    executed_post_ic_arm,
     feature_naming_version_error_type,
+    ic_page_record_keys,
     ratio_unsafe_category,
     resolve_run_feature_count,
     sanitize_factor_returns,
@@ -2856,8 +2858,8 @@ class ICAnalysisService:
         features_path: Optional[str] = task_info.get("req_features_path")
         config_hash: Optional[str] = task_info.get("req_config_hash")
 
-        # --- 2. Load feature DataFrame ---
-        df = self._load_features_for_transforms(
+        # --- 2. Load feature DataFrame（NUMVIEW Task 2.2：連同來源 run 身分，只記錄、不比對）---
+        df, run_identity = self._load_features_for_transforms(
             symbol,
             timeframe,
             features_path,
@@ -2905,6 +2907,10 @@ class ICAnalysisService:
         if "ic_page" not in transformed:
             raise ValueError("post-IC transforms produced no output")
         df = transformed["ic_page"].loc[:, kept_cols]
+        # NUMVIEW Task 2.2：實際臂取自本次轉換之執行紀錄（不以契約政策值或環境推算）
+        recorded_arm = executed_post_ic_arm(preprocessor.last_post_ic_execution()[1])
+        identity = run_identity.to_dict()
+        attr_keys, response_keys = ic_page_record_keys()
         transforms_applied = [
             name for name, enabled in (("rank", rank), ("gaussian", gaussian), ("zscore", zscore)) if enabled
         ]
@@ -2941,6 +2947,8 @@ class ICAnalysisService:
                 status_s = str(analysis_status)
                 handle.attrs["analysis_status"] = status_s
                 handle.attrs["oos_guarantees"] = bool(oos_guarantees)
+                handle.attrs[attr_keys["arm"]] = recorded_arm
+                handle.attrs[attr_keys["ff_run_identity"]] = json.dumps(identity, ensure_ascii=False)
                 if "features" in handle:
                     handle["features"].attrs["analysis_status"] = status_s
         except DegradedOOSViolation:
@@ -2966,6 +2974,8 @@ class ICAnalysisService:
             "analysis_status": analysis_status,
             "oos_guarantees": oos_guarantees,
             "excluded_features": excluded_features,
+            response_keys["arm"]: recorded_arm,
+            response_keys["ff_run_identity"]: identity,
         }
 
     def _load_features_for_transforms(
@@ -2974,20 +2984,23 @@ class ICAnalysisService:
         timeframe: Optional[str],
         features_path: Optional[str],
         config_hash: Optional[str] = None,
-    ):
-        """Load feature DataFrame from FeatureLibrary（symbol/timeframe 或 canonical run 之特徵路徑）。
+    ) -> Tuple[pd.DataFrame, Any]:
+        """Load feature DataFrame from FeatureLibrary（symbol/timeframe 或 canonical run 之特徵路徑）；回（特徵, run 身分）。
 
         FF-NAME Task 3.4：`features_path` 一律先解析為 canonical run（特徵根下 `<symbol>/<timeframe>/<config_hash>/`
         或其 manifest，且 registry 有條目）再經 FeatureLibrary／FeatureReader 載入；任意 `.parquet`／`.h5` 路徑
         退路已移除（解析失敗即於產生任何 DataFrame 前拒收）。命名世代不符之例外原樣上拋，不轉為後備。
+        NUMVIEW Task 2.2：兩條來源皆經 `FeatureLibrary.load_with_identity`（DataFrame 與 `load` 逐位元相同；身分取自
+        同一次 manifest 解析），`features_path` 經 canonical 解析後同；身分只供記錄，本 Task 不比對。
         """
         if features_path:
             self._feature_library.reload_registry()
-            return self._feature_library.load_canonical_path(features_path)
+            run = self._feature_library.resolve_canonical_run(features_path)
+            return self._feature_library.load_with_identity(run.symbol, run.timeframe, config_hash=run.config_hash)
 
         if symbol and timeframe:
             try:
-                return self._feature_library.load(
+                return self._feature_library.load_with_identity(
                     symbol,
                     timeframe,
                     config_hash=config_hash,
@@ -2995,7 +3008,7 @@ class ICAnalysisService:
             except Exception as exc:
                 if isinstance(exc, feature_naming_version_error_type()):
                     raise
-                logger.warning("[apply_transforms] FeatureLibrary.load failed: %s", exc)
+                logger.warning("[apply_transforms] FeatureLibrary.load_with_identity failed: %s", exc)
 
         raise ValueError(
             "Cannot load features: no symbol/timeframe or features_path stored in task. "

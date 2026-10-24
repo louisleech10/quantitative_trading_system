@@ -469,6 +469,15 @@ class ApplyTransformsResponse(BaseModel):
         default=None,
         description="ICPOSTLEAK Task 2.2：被排除（未轉換、未寫入輸出）之選中欄與原因",
     )
+    # NUMVIEW Task 2.2：鍵名＝契約 `ic_page_response_keys`（arm、ff_run_identity 兩槽）
+    post_ic_arm: Optional[str] = Field(
+        default=None,
+        description="NUMVIEW Task 2.2：本次 post-IC 轉換實際執行之臂（取自執行紀錄）",
+    )
+    ff_run_identity: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="NUMVIEW Task 2.2：來源特徵 run 身分（FeatureLibrary.load_with_identity）",
+    )
 
 
 # ── ICRESULT_PAGING（docs/ICRESULT_PAGING_SPEC.md）：contract JSON 為單一真相源 ───────────────
