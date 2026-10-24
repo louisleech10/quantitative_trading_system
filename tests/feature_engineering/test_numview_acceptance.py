@@ -2443,3 +2443,809 @@ def test_precision_formal_readiness_addenda_type_and_binding(mutant: str) -> Non
         applied["measurements"]["B_BTCUSDT_1h_4h"]["seconds"] = 0.0
         row["seconds"] = 1e-10
     assert pc.formal_readiness_violations(applied) != []
+
+
+# ============================================================================================== Task 1.6（v40）
+
+POSTIC_CORE_KIND = "postic-core-select"
+#: SPEC Task 1.6：核心收據名、路徑 × 輸入（分塊 (a)、(b)；直接 (a)）
+POSTIC_CORES: Tuple[str, ...] = ("pandas_optimized", "pandas_legacy")
+POSTIC_PATHS: Tuple[Tuple[str, str], ...] = (("chunked", "a"), ("direct", "a"), ("chunked", "b"))
+#: 輸入 → 格（SPEC Task 1.6：(a) A_BTCUSDT_1h 凍結選欄、(b) 全特徵 C_BTCUSDT_1h 之 IC 重算選欄）
+POSTIC_CELLS: Dict[str, str] = {"a": "A_BTCUSDT_1h", "b": "C_BTCUSDT_1h"}
+#: blocked（未執行）單元得非 null 之欄（白名單；其餘監看、量測、身分、摘要欄一律須 null）
+POSTIC_BLOCKED_FIELDS: Tuple[str, ...] = ("unit_id", "core", "path", "input", "cell", "status", "reason")
+#: 單元之子行程回報欄（`postic_core_select._unit_row` 取自子行程結果者；failed 時一律 null）
+POSTIC_CHILD_REPORTED_FIELDS: Tuple[str, ...] = (
+    "wall_seconds", "load_seconds", "peak_rss_bytes", "arm_recorded", "core_observed", "chunk_calls",
+    "ratio_unsafe_dropped", "terminals", "input_columns", "input_rows", "input_sha256", "post_ic_config", "output")
+#: 收據 `checks` 之封閉鍵集（與 `postic_core_select.assemble` 同步；增刪須同改兩處）
+POSTIC_CHECK_KEYS: Tuple[str, ...] = (
+    "units_exactly_six", "watch_status_consistent", "inputs_identical_a", "inputs_identical_b", "chunk_calls_valid",
+    "arm_recorded_matches_path", "post_ic_config_same", "pair_counts_recomputable", "ic_recompute_reproduces_a",
+    "no_choice_without_choice")
+
+
+def _postic_unit_id(core: str, path: str, inp: str) -> str:
+    return f"{core}__{path}__{inp}"
+
+
+def _postic_selection_with_rule(receipt: Mapping[str, Any]) -> Tuple[str, str, str]:
+    """擇一規則之獨立重算（不呼叫探針；SPEC Task 1.6 ①–③）：回 ("choice", 核心, 規則) 或 ("no_choice", 規則分支, 規則分支)。"""
+    units = {str(u["unit_id"]): u for u in receipt["units"]}
+    wanted = [_postic_unit_id(c, p, i) for p, i in POSTIC_PATHS for c in POSTIC_CORES]
+    if sorted(units) != sorted(wanted):
+        return "no_choice", "1", "1"
+    for uid in wanted:
+        u = units[uid]
+        short = uid.split("__")[0][len("pandas_"):]
+        if u.get("status") != "complete" or list(u.get("core_observed") or []) != [short]:
+            return "no_choice", "1", "1"
+    pairs = {(str(p["path"]), str(p["input"])): p for p in receipt["pairs"]}
+    if set(pairs) != set(POSTIC_PATHS):
+        return "no_choice", "1", "1"
+
+    def tiebreak() -> str:
+        ranked = sorted(POSTIC_CORES, key=lambda c: (float(units[_postic_unit_id(c, "chunked", "b")]["wall_seconds"]),
+                                                     int(units[_postic_unit_id(c, "chunked", "b")]["peak_rss_bytes"]),
+                                                     POSTIC_CORES.index(c)))
+        return ranked[0]
+
+    if all(p["bitwise_equal"] for p in pairs.values()):
+        return "choice", tiebreak(), "2"
+    if any(not p["structure_equal"] for p in pairs.values()):
+        return "no_choice", "3_structure", "3_structure"
+    stats = (receipt.get("reference") or {}).get("stats")
+    if not stats:
+        return "no_choice", "3_reference_missing", "3_reference_missing"
+    scale_units = {"a": [(p, "a") for p, i in POSTIC_PATHS if i == "a"], "b": [("chunked", "b")]}
+    mask = {c: [all(int(stats[_postic_unit_id(c, p, i)]["nan_mask_diff"]) == 0 for p, i in scale_units[s])
+                for s in ("a", "b")] for c in POSTIC_CORES}
+    passing = [c for c in POSTIC_CORES if all(mask[c])]
+    if len(passing) == 1:
+        return "choice", passing[0], "3_nan_mask"
+    if not passing:
+        return "no_choice", "3_nan_mask", "3_nan_mask"
+    err: Dict[str, List[float]] = {}
+    for c in POSTIC_CORES:
+        err[c] = []
+        for s in ("a", "b"):
+            rows = [stats[_postic_unit_id(c, p, i)] for p, i in scale_units[s]]
+            if any(int(r["common_finite_cells"]) == 0 for r in rows):
+                return "no_choice", "3_no_common_finite", "3_no_common_finite"
+            err[c].append(max(float(r["max_abs"]) for r in rows))
+    x, y = POSTIC_CORES
+    x_better = [ex < ey for ex, ey in zip(err[x], err[y])]
+    y_better = [ey < ex for ex, ey in zip(err[x], err[y])]
+    if not any(x_better) and not any(y_better):
+        return "choice", tiebreak(), "3_error_tie"
+    if any(x_better) and not any(y_better):
+        return "choice", x, "3_error"
+    if any(y_better) and not any(x_better):
+        return "choice", y, "3_error"
+    return "no_choice", "3_error_conflict", "3_error_conflict"
+
+
+def expected_postic_selection(receipt: Mapping[str, Any]) -> Tuple[str, str]:
+    """擇一規則之獨立重算：回 ("choice", 核心) 或 ("no_choice", 規則分支)。"""
+    kind, value, _ = _postic_selection_with_rule(receipt)
+    return kind, value
+
+
+def postic_core_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """SPEC Task 1.6 驗證（收據層）：單元完整與記錄齊全、監看與狀態一致、實際核心與塊呼叫數、成對比對列存在且計數可由逐欄
+    列重算、擇一結果等於獨立重算、`no_choice` 無 `choice` 且具理由、擇定核心之單元皆 complete、IC 重算具監看與牆鐘。"""
+    out: List[str] = []
+    units = {str(u["unit_id"]): u for u in receipt.get("units") or []}
+    wanted = [_postic_unit_id(c, p, i) for p, i in POSTIC_PATHS for c in POSTIC_CORES]
+    if sorted(units) != sorted(wanted) or len(receipt.get("units") or []) != len(wanted):
+        out.append(f"單元集合 {sorted(units)} ≠ {sorted(wanted)}")
+    for uid, u in units.items():
+        if u.get("status") not in ("complete", "failed", "blocked"):
+            out.append(f"{uid}：狀態 {u.get('status')!r} 非 complete／failed／blocked")
+        if u.get("status") == "blocked":
+            # blocked＝未執行（前置不可得）：須具理由且無任何監看或量測紀錄
+            if not u.get("reason"):
+                out.append(f"{uid}：blocked 無理由")
+            ran = sorted(k for k, v in u.items() if v is not None and k not in POSTIC_BLOCKED_FIELDS)
+            if ran:
+                out.append(f"{uid}：blocked（未執行）而有監看／量測紀錄 {ran}")
+            continue
+        if u.get("status") == "failed":
+            if not u.get("reason"):
+                out.append(f"{uid}：failed 無理由")
+            # failed＝子行程未回報 ⇒ 子行程回報之欄一律 null（不得帶量測值）
+            reported = sorted(k for k in POSTIC_CHILD_REPORTED_FIELDS if u.get(k) is not None)
+            if reported:
+                out.append(f"{uid}：failed 而帶子行程回報欄 {reported}")
+        if not u.get("watch_status") or "returncode" not in u:
+            out.append(f"{uid}：缺 watch_status 或 returncode 欄")
+        normal = u.get("watch_status") == "exited" and u.get("returncode") == 0
+        if not normal and u.get("status") != "failed":
+            out.append(f"{uid}：watch_status={u.get('watch_status')} rc={u.get('returncode')} 而狀態 {u.get('status')}")
+        if u.get("child_wall_seconds") is None:
+            out.append(f"{uid}：缺 child_wall_seconds")
+        if u.get("status") == "complete":
+            for key in ("wall_seconds", "peak_rss_bytes", "input_sha256", "output"):
+                if u.get(key) is None:
+                    out.append(f"{uid}：complete 缺 {key}")
+            core, path, _ = uid.split("__")
+            if list(u.get("core_observed") or []) != [core[len("pandas_"):]]:
+                out.append(f"{uid}：core_observed={u.get('core_observed')}")
+            if int(u.get("chunk_calls") or 0) < (2 if path == "chunked" else 1):
+                out.append(f"{uid}：chunk_calls={u.get('chunk_calls')}")
+            if list(u.get("arm_recorded") or []) != (["pandas_chunked"] if path == "chunked" else [core]):
+                out.append(f"{uid}：arm_recorded={u.get('arm_recorded')}")
+    checks = receipt.get("checks")
+    if (not isinstance(checks, Mapping) or set(checks) != set(POSTIC_CHECK_KEYS)
+            or not all(v is True for v in checks.values())):
+        out.append(f"收據自我檢查非封閉鍵集或非全真：{checks}")
+    # 收據旗標之外獨立重算：同輸入之 complete 單元輸入身分相同、全部 complete 單元之 post-IC 設定相同
+    done = [u for u in units.values() if u.get("status") == "complete"]
+    for inp in ("a", "b"):
+        shas = {u.get("input_sha256") for u in done if u.get("input") == inp}
+        if len(shas) > 1:
+            out.append(f"輸入 ({inp}) 之單元輸入身分不同：{sorted(map(str, shas))}")
+    if len({json.dumps(u.get("post_ic_config"), sort_keys=True) for u in done}) > 1:
+        out.append("complete 單元之 post-IC 設定不同")
+    pair_rows = list(receipt.get("pairs") or [])
+    pairs = {(str(p["path"]), str(p["input"])): p for p in pair_rows}
+    if len(pairs) != len(pair_rows) or not set(pairs) <= set(POSTIC_PATHS):
+        out.append(f"成對比對列重複或含非契約路徑：{[(p.get('path'), p.get('input')) for p in pair_rows]}")
+    for key, p in pairs.items():
+        expected_units = [_postic_unit_id(c, *key) for c in POSTIC_CORES]
+        if list(p.get("units") or []) != expected_units:
+            out.append(f"成對比對 {key}：units={p.get('units')} ≠ {expected_units}")
+        both_done = all((units.get(uid) or {}).get("status") == "complete" for uid in expected_units)
+        if not both_done:
+            out.append(f"成對比對 {key}：兩單元非皆 complete 而有比對列")
+        rows_max = max((float(v) for v in (p.get("diff_columns") or {}).get("max_abs") or []), default=0.0)
+        if float(p.get("max_abs") if p.get("max_abs") is not None else -1.0) != rows_max:
+            out.append(f"成對比對 {key}：max_abs={p.get('max_abs')} ≠ 逐欄列最大值 {rows_max}")
+    for path, inp in POSTIC_PATHS:
+        both = all((units.get(_postic_unit_id(c, path, inp)) or {}).get("status") == "complete" for c in POSTIC_CORES)
+        if both and (path, inp) not in pairs:
+            out.append(f"成對比對缺 {path}/{inp}")
+    for key, p in pairs.items():
+        rows = p.get("diff_columns") or {}
+        dtype_x, dtype_y = rows.get("dtype_x") or [], rows.get("dtype_y") or []
+        if (p.get("columns_unequal_native") != len(rows.get("column") or [])
+                or p.get("nan_mask_diff") != sum(rows.get("nan_mask_diff") or [])
+                or p.get("value_neq_cells") != sum(rows.get("value_neq_cells") or [])
+                or p.get("dtype_mismatch_columns") != sum(1 for a, b in zip(dtype_x, dtype_y) if a != b)):
+            out.append(f"成對比對 {key}：計數與逐欄列不符")
+        # 結構與逐位元旗標由構成欄重算（欄集合與順序、時間軸、只在一側之欄、dtype 不符欄數、原生不等欄數）
+        only = list(p.get("only_x") or []) + list(p.get("only_y") or [])
+        if only and p.get("columns_equal"):
+            out.append(f"成對比對 {key}：有只在一側之欄而 columns_equal 為真")
+        structure = (p.get("columns_equal") is True and p.get("index_equal") is True and not only
+                     and int(p.get("dtype_mismatch_columns") or 0) == 0)
+        if p.get("structure_equal") is not structure:
+            out.append(f"成對比對 {key}：structure_equal={p.get('structure_equal')} ≠ 重算 {structure}")
+        bitwise = structure and int(p.get("columns_unequal_native") or 0) == 0
+        if p.get("bitwise_equal") is not bitwise:
+            out.append(f"成對比對 {key}：bitwise_equal={p.get('bitwise_equal')} ≠ 重算 {bitwise}")
+    for uid, u in units.items():
+        core, path, inp = uid.split("__")
+        if (u.get("core"), u.get("path"), u.get("input"), u.get("cell")) != (core, path, inp, POSTIC_CELLS.get(inp)):
+            out.append(f"{uid}：身分欄 {(u.get('core'), u.get('path'), u.get('input'), u.get('cell'))} 與 unit_id／契約格不符")
+    # 參考實作比對只在「全部單元 complete、三對結構皆一致、而非全部逐位元相等」時存在（規則③）
+    needs_reference = (len(pairs) == len(POSTIC_PATHS) and all(u.get("status") == "complete" for u in units.values())
+                       and all(p.get("structure_equal") for p in pairs.values())
+                       and not all(p.get("bitwise_equal") for p in pairs.values()))
+    if needs_reference != (receipt.get("reference") is not None):
+        out.append(f"參考實作比對之有無（{receipt.get('reference') is not None}）與規則③之需要（{needs_reference}）不符")
+    kind, value, rule = _postic_selection_with_rule(receipt)
+    if kind == "choice":
+        if receipt.get("choice") != value or "no_choice" in receipt or receipt.get("choice_rule") != rule:
+            out.append(f"擇一重算＝choice {value}（規則 {rule}）；收據 choice={receipt.get('choice')!r} "
+                       f"choice_rule={receipt.get('choice_rule')!r} no_choice={receipt.get('no_choice')!r}")
+        elif any(u.get("status") != "complete" for uid, u in units.items() if uid.startswith(value + "__")):
+            out.append(f"擇定 {value} 而其單元非全 complete")
+    else:
+        node = receipt.get("no_choice") or {}
+        if "choice" in receipt or node.get("rule") != value or not node.get("reason"):
+            out.append(f"擇一重算＝no_choice 規則 {value}；收據 choice={receipt.get('choice')!r} no_choice={node!r}")
+        elif value == "3_structure":
+            # 理由須逐字列出重算之結構不一致路徑（依契約路徑序）
+            broken = [f"{p}/{i}" for p, i in POSTIC_PATHS if not (pairs.get((p, i)) or {}).get("structure_equal", True)]
+            if not str(node.get("reason")).endswith(repr(broken)):
+                out.append(f"no_choice 理由未列重算之結構不一致路徑 {broken}：{node.get('reason')!r}")
+        elif value == "1":
+            bad = [uid for uid in (_postic_unit_id(c, p, i) for p, i in POSTIC_PATHS for c in POSTIC_CORES)
+                   if (units.get(uid) or {}).get("status") != "complete"]
+            if any(uid not in str(node.get("reason")) for uid in bad):
+                out.append(f"no_choice 理由未列非 complete 之單元 {bad}：{node.get('reason')!r}")
+    ic = receipt.get("ic_recompute") or {}
+    # IC 重算之 wall_seconds＝監看量得之子行程牆鐘（complete／failed 皆可得）；返回碼欄須存在（被終止者可為 null）
+    if not ic.get("watch_status") or "returncode" not in ic or ic.get("child_wall_seconds") is None:
+        out.append("IC 重算缺 watch_status、returncode 欄或子行程牆鐘")
+    if ic.get("wall_seconds") is None or ic.get("wall_seconds") != ic.get("child_wall_seconds"):
+        out.append(f"IC 重算 wall_seconds={ic.get('wall_seconds')} ≠ 子行程牆鐘 {ic.get('child_wall_seconds')}")
+    if ic.get("status") not in ("complete", "failed"):
+        out.append(f"IC 重算狀態 {ic.get('status')!r} 非 complete／failed")
+    if ic.get("status") == "complete" and ic.get("peak_rss_bytes") is None:
+        out.append("IC 重算 complete 缺峰值 RSS")
+    if ic.get("status") == "complete":
+        # 選欄摘要須具並與輸入及單元一致：(a) 重算數＝凍結選欄數、(b) 選欄數＝收據 inputs.b、各單元讀入欄數＝其輸入之選欄數
+        inputs = receipt.get("inputs") or {}
+        for inp in ("a", "b"):
+            summary = ic.get(inp) or {}
+            if not isinstance(summary.get("selected_count"), int) or not summary.get("label_rows"):
+                out.append(f"IC 重算 complete 缺 ({inp}) 選欄摘要")
+                continue
+            if (inputs.get(inp) or {}).get("selected") != summary["selected_count"]:
+                out.append(f"({inp}) 選欄數：inputs={(inputs.get(inp) or {}).get('selected')} ≠ IC 重算 {summary['selected_count']}")
+            for u in done:
+                if u.get("input") == inp and u.get("input_columns") != summary["selected_count"]:
+                    out.append(f"{u['unit_id']}：讀入欄數 {u.get('input_columns')} ≠ ({inp}) 選欄數 {summary['selected_count']}")
+    if ic.get("status") == "failed":
+        if not ic.get("reason"):
+            out.append("IC 重算 failed 無理由")
+        reported = sorted(k for k in ("peak_rss_bytes", "a", "b") if ic.get(k) is not None)
+        if reported:
+            out.append(f"IC 重算 failed 而帶子行程回報欄 {reported}")
+    # SPEC Task 1.6：watch_status 非正常結束（非 exited 或 rc≠0）⇒ 狀態必為 failed 且收據不得有 choice（單元與 IC 重算皆然）
+    ic_normal = ic.get("watch_status") == "exited" and ic.get("returncode") == 0
+    if not ic_normal and ic.get("status") != "failed":
+        out.append(f"IC 重算 watch_status={ic.get('watch_status')} rc={ic.get('returncode')} 而狀態 {ic.get('status')}")
+    if ic.get("status") != "complete":
+        if "choice" in receipt:
+            out.append("IC 重算未完成而收據有 choice")
+        if any(u.get("input") == "b" and u.get("status") != "blocked" for u in units.values()):
+            out.append("IC 重算未完成而 (b) 單元非 blocked")
+    abnormal = [uid for uid, u in units.items() if u.get("status") != "blocked"
+                and not (u.get("watch_status") == "exited" and u.get("returncode") == 0)]
+    if abnormal and "choice" in receipt:
+        out.append(f"單元監看非正常結束而收據有 choice：{abnormal}")
+    return out
+
+
+def test_postic_core_receipt_rc_and_criteria() -> None:
+    assert _receipt_common_violations(load_receipt(POSTIC_CORE_KIND)) == []
+
+
+def test_postic_core_receipt_contract() -> None:
+    """SPEC Task 1.6 驗證：收據層全部檢查（含擇一結果由獨立重算相等）。"""
+    assert postic_core_violations(load_receipt(POSTIC_CORE_KIND)) == []
+
+
+def _postic_saved(out_dir: Path) -> Tuple[List[str], Dict[str, str], np.ndarray, Callable[[str], np.ndarray]]:
+    """量測產物讀回（獨立於探針 `SavedFrame`）：`meta.json` 之欄序與 dtype、`index.npy`、依 dtype 分塊之 `block_<dtype>.npy`。"""
+    meta = json.loads((out_dir / "meta.json").read_text(encoding="utf-8"))
+    columns = [str(c) for c in meta["columns"]]
+    dtypes = dict(zip(columns, [str(d) for d in meta["dtypes"]]))
+    blocks = {d: np.load(out_dir / f"block_{d}.npy", mmap_mode="r") for d in meta["blocks"]}
+    where = {name: (d, j) for d, names in meta["blocks"].items() for j, name in enumerate(names)}
+    assert sorted(where) == sorted(columns) and all(blocks[d].dtype == np.dtype(d) for d in blocks), out_dir
+
+    def column(name: str) -> np.ndarray:
+        d, j = where[name]
+        return np.asarray(blocks[d][:, j])
+
+    return columns, dtypes, np.load(out_dir / "index.npy"), column
+
+
+def _postic_pair_from_outputs(x_dir: Path, y_dir: Path) -> Dict[str, Any]:
+    """成對比對之獨立重算（SPEC Task 1.6：值原生逐位元〔NaN payload 不計〕、NaN 遮罩、dtype、欄集合與順序、時間軸）。"""
+    xc, xd, xi, xcol = _postic_saved(x_dir)
+    yc, yd, yi, ycol = _postic_saved(y_dir)
+    rows: Dict[str, List[Any]] = {k: [] for k in ("column", "dtype_x", "dtype_y", "nan_mask_diff", "value_neq_cells", "max_abs")}
+    for name in (c for c in xc if c in yd):
+        a, b = xcol(name), ycol(name)
+        a64, b64 = a.astype(np.float64), b.astype(np.float64)
+        na, nb = np.isnan(a64), np.isnan(b64)
+        same = (a.dtype == b.dtype and np.array_equal(na, nb)
+                and np.array_equal(a[~na].tobytes(), b[~nb].tobytes()))
+        if same:
+            continue
+        both = ~na & ~nb
+        rows["column"].append(name)
+        rows["dtype_x"].append(str(a.dtype))
+        rows["dtype_y"].append(str(b.dtype))
+        rows["nan_mask_diff"].append(int((na != nb).sum()))
+        rows["value_neq_cells"].append(int((both & (a64 != b64)).sum()))
+        rows["max_abs"].append(float(np.abs(a64[both] - b64[both]).max()) if both.any() else 0.0)
+    return {"columns_equal": xc == yc, "index_equal": bool(np.array_equal(xi, yi)),
+            "only_x": sorted(set(xc) - set(yd)), "only_y": sorted(set(yc) - set(xd)), "diff_columns": rows,
+            "output_x": {"shape": [int(len(xi)), len(xc)],
+                         "dtypes": {d: sum(1 for c in xc if xd[c] == d) for d in sorted(set(xd.values()))}},
+            "output_y": {"shape": [int(len(yi)), len(yc)],
+                         "dtypes": {d: sum(1 for c in yc if yd[c] == d) for d in sorted(set(yd.values()))}}}
+
+
+def postic_core_artifact_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """收據對量測產物之重建（秒級）：工作目錄之輸出逐單元重算成對比對（逐欄列與全部旗標）與輸出摘要、輸入來源身分
+    （複本路徑、凍結 sidecar 之 config_hash、凍結與複本 manifest 之 sha256、(a) 凍結選欄數）、牆鐘與記憶體欄之一致界限。"""
+    out: List[str] = []
+    work = Path(str(receipt.get("work_root")))
+    if not work.is_dir():
+        return [f"量測工作目錄不存在（產物須保留至收票）：{work}"]
+    units = {str(u["unit_id"]): u for u in receipt["units"]}
+    for uid, u in units.items():
+        if u.get("status") != "complete":
+            continue
+        if Path(str(u.get("out_dir"))) != work / "outputs" / uid:
+            out.append(f"{uid}：out_dir {u.get('out_dir')} ≠ {work / 'outputs' / uid}")
+        wall, load, child = u.get("wall_seconds"), u.get("load_seconds"), u.get("child_wall_seconds")
+        if not (isinstance(wall, (int, float)) and isinstance(load, (int, float)) and isinstance(child, (int, float))
+                and 0 < wall and 0 <= load and wall + load <= child):
+            out.append(f"{uid}：牆鐘不一致 wall={wall} load={load} child={child}")
+        if not (isinstance(u.get("peak_rss_bytes"), int) and u["peak_rss_bytes"] > 0):
+            out.append(f"{uid}：峰值 RSS {u.get('peak_rss_bytes')}")
+    for p in receipt["pairs"]:
+        x_id, y_id = p["units"]
+        rebuilt = _postic_pair_from_outputs(work / "outputs" / x_id, work / "outputs" / y_id)
+        key = (p["path"], p["input"])
+        for field in ("columns_equal", "index_equal", "only_x", "only_y", "diff_columns"):
+            if p.get(field) != rebuilt[field]:
+                out.append(f"成對比對 {key}：{field} 與產物重算不符")
+        for uid, side in ((x_id, "output_x"), (y_id, "output_y")):
+            if (units.get(uid) or {}).get("output") != rebuilt[side]:
+                out.append(f"{uid}：output 摘要 {units.get(uid, {}).get('output')} ≠ 產物 {rebuilt[side]}")
+            if (units.get(uid) or {}).get("input_rows") != rebuilt[side]["shape"][0]:
+                out.append(f"{uid}：input_rows ≠ 輸出列數 {rebuilt[side]['shape'][0]}")
+    for inp, cell in POSTIC_CELLS.items():
+        node = (receipt.get("inputs") or {}).get(inp) or {}
+        frozen = REPO / "data_cache" / "numview_freeze_runs" / f"{cell}__default"
+        side = json.loads((frozen / "numview_cell.json").read_text(encoding="utf-8"))
+        rel = Path("features") / side["symbol"] / side["primary_tf"] / side["config_hash"] / "feature_manifest.json"
+        # 選欄來源（SPEC Task 1.6）：(a)＝凍結 run 之 IC-first 選欄、(b)＝以生產 IC-first 程序重算
+        expect = {"cell": cell, "selected_source": {"a": "frozen", "b": "ic_recompute"}[inp],
+                  "features_root": str(work / "copies" / cell / "features"),
+                  "config_hash": side["config_hash"],
+                  "manifest_sha256": hashlib.sha256((frozen / rel).read_bytes()).hexdigest(),
+                  "copy_manifest_sha256": hashlib.sha256((work / "copies" / cell / rel).read_bytes()).hexdigest()}
+        for k, v in expect.items():
+            if node.get(k) != v:
+                out.append(f"inputs.{inp}.{k}={node.get(k)!r} ≠ {v!r}")
+        if expect["manifest_sha256"] != expect["copy_manifest_sha256"]:
+            out.append(f"({inp}) 複本 manifest 與凍結不同")
+        if inp == "a" and node.get("selected") != len(side["ic_first_selected"]):
+            out.append(f"inputs.a.selected={node.get('selected')} ≠ 凍結選欄數 {len(side['ic_first_selected'])}")
+    ic = receipt.get("ic_recompute") or {}
+    if ic.get("status") == "complete":
+        seconds = sum(float((ic.get(i) or {}).get("seconds") or 0.0) for i in ("a", "b"))
+        if not (0 < seconds <= float(ic.get("child_wall_seconds") or 0.0)):
+            out.append(f"IC 重算各格秒數合計 {seconds} 不在 (0, 子行程牆鐘] 內")
+    return out
+
+
+def test_postic_core_receipt_reproduced_from_outputs() -> None:
+    """SPEC Task 1.6「成對比對列存在且數字可由收據列機械重算」之產物層：成對比對與輸出摘要由工作目錄之輸出獨立重算（審碼
+    b2 r39：收據自報欄不得只對自身對證）。"""
+    assert postic_core_artifact_violations(load_receipt(POSTIC_CORE_KIND)) == []
+
+
+@pytest.mark.parametrize("mutant", ["diff_row", "output_summary", "config_hash", "wall", "selected_source"])
+def test_postic_core_artifact_mutations(mutant: str) -> None:
+    """mutation：正式收據之逐欄差異列、單元輸出摘要、輸入 config_hash、牆鐘（轉換＋讀入逾子行程牆鐘）各單改 ⇒ 產物重建紅。"""
+    receipt = copy.deepcopy(load_receipt(POSTIC_CORE_KIND))
+    if mutant == "diff_row":
+        pair = next(p for p in receipt["pairs"] if p["diff_columns"]["column"])
+        pair["diff_columns"]["dtype_y"][0] = "float16"
+    elif mutant == "output_summary":
+        receipt["units"][0]["output"]["shape"][1] += 1
+    elif mutant == "config_hash":
+        receipt["inputs"]["a"]["config_hash"] = "0" * 32
+    elif mutant == "selected_source":
+        receipt["inputs"]["b"]["selected_source"] = "frozen"
+    else:
+        receipt["units"][0]["wall_seconds"] = float(receipt["units"][0]["child_wall_seconds"]) + 1.0
+    assert postic_core_artifact_violations(receipt), f"mutant {mutant} 存活"
+
+
+def _postic_frame_sha256(frame: pd.DataFrame) -> str:
+    """輸入身分之獨立重算（定義同 SPEC Task 1.6 收據：欄序與逐欄 dtype、時間軸 int64、逐欄原生位元組）。"""
+    digest = hashlib.sha256()
+    digest.update(json.dumps([[str(c), str(frame[c].dtype)] for c in frame.columns]).encode("utf-8"))
+    digest.update(np.ascontiguousarray(np.asarray(frame.index.asi8, dtype=np.int64)).tobytes())
+    for c in frame.columns:
+        digest.update(np.ascontiguousarray(frame[c].to_numpy()).tobytes())
+    return digest.hexdigest()
+
+
+@pytest.fixture
+def postic_vm_snapshot() -> Any:
+    """系統記憶體讀數（`sysctl vm.swapusage`）於部分沙箱不可用 ⇒ 以既有測試接縫注入固定快照（同
+    test_icfirstalign_memory.py:_snapshot）；只隔離環境讀數，IC 與轉換路徑不變。"""
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    snapshot = mb.VMSnapshot(free_bytes=8 * 2 ** 30, file_backed_bytes=0, swap_free_bytes=0, pressure_level=1,
+                             swap_volume_free_bytes=75 * 2 ** 30, swap_volume_capacity_bytes=228 * 2 ** 30)
+    with mb.vm_snapshot_override(snapshot):
+        yield snapshot
+
+
+def test_postic_core_ic_and_inputs_reproduced(tmp_path: Path, postic_vm_snapshot: Any) -> None:
+    """IC 重算與單元輸入之獨立重現（約 5 分鐘；峰值 RSS 約 0.7 GB）：凍結 A、C 之 run 複製至 tmp，以生產標籤（kline close
+    之 `pct_change().shift(-1)`、公開窗遮罩）與 `ICEngine.compute_ic_from_l7_raw`（判準 `cell_definitions.A.generation`、
+    選窗＝標籤時間戳起訖）重算選欄——A 須逐項等於凍結選欄、C 之選欄數等於收據；標籤列數與 sha256 等於收據；以重算選欄自收據之
+    複本讀 raw（`load_columns_v2`），輸入身分等於各單元 `input_sha256`、讀入欄數等於 `input_columns`；(b) 輸出欄＝選欄依序去
+    ratio-unsafe 欄。"""
+    import shutil
+
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    receipt = load_receipt(POSTIC_CORE_KIND)
+    criteria = load_criteria()
+    est = probe("estimate")
+    generation = criteria["cell_definitions"]["A"]["generation"]
+    work = Path(receipt["work_root"])
+    for inp, cell_id in POSTIC_CELLS.items():
+        cell = next(c for c in criteria["cell_rules"]["cell_list"]["cells"] if str(c["id"]) == cell_id)
+        frozen = REPO / "data_cache" / "numview_freeze_runs" / f"{cell_id}__default"
+        side = json.loads((frozen / "numview_cell.json").read_text(encoding="utf-8"))
+        rel = Path("features") / side["symbol"] / side["primary_tf"] / side["config_hash"]
+        shutil.copytree(frozen / rel, tmp_path / cell_id / rel)
+        training = [str(t) for t in cell["timeframes"]]
+        source = est.cell_source(cell, criteria)
+        start, end = est.cell_window(cell, criteria)
+        factory = create_feature_factory(cache_dir=str(source.parent),
+                                         validate_continuity=est.continuity_plan(cell, criteria, training)["validate_continuity"])
+        config = factory._resolve_config(est.cell_payload(cell, criteria, training))
+        kline = factory._layer0_data_ingestion(side["symbol"], side["primary_tf"], config, start_date=start, end_date=end)
+        index = factory._derive_row_index_for_artifact(kline)
+        close = pd.Series(kline["close"].to_numpy(dtype=float), index=index)
+        label = close.pct_change().shift(-1)[factory._utc_window_mask(index, start, end)]
+        summary = receipt["ic_recompute"][inp]
+        assert summary["label_rows"] == len(label)
+        assert summary["label_sha256"] == hashlib.sha256(
+            np.ascontiguousarray(label.to_numpy(dtype=np.float64)).tobytes()).hexdigest()
+        stamps = pd.DatetimeIndex(label.index)
+        result = ICEngine(dict(generation["ic_engine_config"])).compute_ic_from_l7_raw(
+            side["symbol"], side["primary_tf"], side["config_hash"], label,
+            feature_reader=FeatureReader(str(tmp_path / cell_id / "features")), ic_threshold=generation["ic_threshold"],
+            allow_partial_ic=False, method=None, label_horizon=str(generation["label_horizon"]),
+            selection_window={"start": str(stamps.min()), "end": str(stamps.max())}, split_id="ic_first_full_window")
+        selected = [str(f) for f in getattr(result, "selected", [])]
+        assert summary["selection_window"] == {"start": str(stamps.min()), "end": str(stamps.max())}
+        assert summary["ic_params"] == {k: generation[k] for k in ("ic_engine_config", "ic_threshold", "label_horizon")}
+        # post-IC 設定：生產已解析設定之 preprocessing（IC-first 傳 `config.preprocessing`）之 rank／zscore／gaussian 與模式
+        pre = config.preprocessing.model_dump()
+        expected_post_ic = {k: pre.get(k) for k in ("mode", "causal_preprocessing", "rank_transform", "adaptive_zscore",
+                                                    "gaussian_normalize")}
+        for u in receipt["units"]:
+            if u["input"] == inp and u["status"] == "complete":
+                assert json.loads(json.dumps(u["post_ic_config"])) == json.loads(json.dumps(expected_post_ic)), u["unit_id"]
+        if inp == "a":
+            assert selected == [str(c) for c in side["ic_first_selected"]], "A 之 IC 重算未重現凍結選欄"
+        assert len(selected) == summary["selected_count"] == receipt["inputs"][inp]["selected"]
+        raw = FeatureReader(receipt["inputs"][inp]["features_root"]).load_columns_v2(
+            side["symbol"], side["primary_tf"], side["config_hash"], selected, artifact_kind="raw", attach_row_index=True)
+        sha = _postic_frame_sha256(raw)
+        for u in receipt["units"]:
+            if u["input"] == inp and u["status"] == "complete":
+                assert u["input_sha256"] == sha and u["input_columns"] == raw.shape[1], u["unit_id"]
+                columns, _, _, _ = _postic_saved(work / "outputs" / u["unit_id"])
+                assert columns == [c for c in selected if ratio_unsafe_category(c) is None], u["unit_id"]
+                assert u["ratio_unsafe_dropped"] == sum(1 for c in selected if ratio_unsafe_category(c) is not None)
+        del raw
+
+
+def test_postic_core_receipt_bound_to_probe_source() -> None:
+    """收據綁定產出之量測程式（試跑收據轉為正式收據時尤須）：`probe_sha256` 等於現行 `postic_core_select.py` 之 sha256。"""
+    receipt = load_receipt(POSTIC_CORE_KIND)
+    current = hashlib.sha256((PROBE_DIR / "postic_core_select.py").read_bytes()).hexdigest()
+    assert receipt.get("probe_sha256") == current, (receipt.get("probe_sha256"), current)
+
+
+def test_postic_core_decision_matches_receipt() -> None:
+    """SPEC Task 1.6／1.5 ⑧：決定紀錄 d_icpage_arm 之 `report.post_ic_core` 等於收據 `choice`（收據 `no_choice` ⇒ 該欄為
+    `"no_choice"` 且 `report.no_choice_reason` 等於收據理由）。決定紀錄未產出（Task 1.5）前為紅。"""
+    receipt = load_receipt(POSTIC_CORE_KIND)
+    report = nh._decision_record("d_icpage_arm").get("report") or {}
+    if "choice" in receipt:
+        assert report.get("post_ic_core") == receipt["choice"], report
+    else:
+        assert report.get("post_ic_core") == "no_choice", report
+        assert report.get("no_choice_reason") == receipt["no_choice"]["reason"], report
+
+
+def _postic_synthetic(**over: Any) -> Dict[str, Any]:
+    """擇一規則單元案之合成收據骨架（只供規則之分支測試；數值為控制變因，非量測資料）：全單元 complete、三對逐位元相等。"""
+    units = []
+    for path, inp in POSTIC_PATHS:
+        for core in POSTIC_CORES:
+            units.append({"unit_id": _postic_unit_id(core, path, inp), "core": core, "path": path, "input": inp,
+                          "status": "complete", "watch_status": "exited", "returncode": 0, "child_wall_seconds": 10.0,
+                          "wall_seconds": 5.0, "peak_rss_bytes": 1000, "input_sha256": f"in-{inp}",
+                          "core_observed": [core[len("pandas_"):]], "chunk_calls": 2 if path == "chunked" else 1,
+                          "arm_recorded": ["pandas_chunked"] if path == "chunked" else [core],
+                          "cell": POSTIC_CELLS[inp], "input_columns": 3, "output": {"shape": [500, 3]}})
+    pairs = [{"path": p, "input": i, "units": [_postic_unit_id(c, p, i) for c in POSTIC_CORES], "max_abs": 0.0,
+              "columns_equal": True, "index_equal": True, "only_x": [], "only_y": [],
+              "structure_equal": True, "bitwise_equal": True, "columns_unequal_native": 0,
+              "nan_mask_diff": 0, "value_neq_cells": 0, "dtype_mismatch_columns": 0,
+              "diff_columns": {"column": [], "dtype_x": [], "dtype_y": [], "nan_mask_diff": [], "value_neq_cells": [],
+                               "max_abs": []}} for p, i in POSTIC_PATHS]
+    receipt = {"units": units, "pairs": pairs, "reference": None, "checks": {k: True for k in POSTIC_CHECK_KEYS},
+               "inputs": {inp: {"cell": cell, "selected": 3} for inp, cell in POSTIC_CELLS.items()},
+               "ic_recompute": {"status": "complete", "watch_status": "exited", "returncode": 0, "wall_seconds": 1.0,
+                                "child_wall_seconds": 1.0, "peak_rss_bytes": 1,
+                                "a": {"selected_count": 3, "label_rows": 500}, "b": {"selected_count": 3, "label_rows": 500}}}
+    receipt.update(over)
+    return receipt
+
+
+def _postic_unit(receipt: Dict[str, Any], uid: str) -> Dict[str, Any]:
+    return next(u for u in receipt["units"] if u["unit_id"] == uid)
+
+
+def _postic_unequal(receipt: Dict[str, Any], key: Tuple[str, str]) -> None:
+    pair = next(p for p in receipt["pairs"] if (p["path"], p["input"]) == key)
+    pair.update(bitwise_equal=False, columns_unequal_native=1, value_neq_cells=3, max_abs=1e-7,
+                diff_columns={"column": ["c0"], "dtype_x": ["float32"], "dtype_y": ["float32"], "nan_mask_diff": [0],
+                              "value_neq_cells": [3], "max_abs": [1e-7]})
+
+
+def _postic_reference(mask: Mapping[str, Tuple[int, int]], err: Mapping[str, Tuple[float, float]],
+                      finite: int = 100) -> Dict[str, Any]:
+    stats = {}
+    for core in POSTIC_CORES:
+        for path, inp in POSTIC_PATHS:
+            s = 0 if inp == "a" else 1
+            stats[_postic_unit_id(core, path, inp)] = {"nan_mask_diff": mask[core][s], "common_finite_cells": finite,
+                                                      "max_abs": err[core][s]}
+    return {"status": "complete", "stats": stats}
+
+
+def _postic_cases() -> List[Tuple[str, Dict[str, Any], Tuple[str, str]]]:
+    """(名稱, 收據, 期望)：規則①–③各分支與平手次序。"""
+    cases: List[Tuple[str, Dict[str, Any], Tuple[str, str]]] = []
+    r = _postic_synthetic()
+    _postic_unit(r, "pandas_optimized__chunked__b")["wall_seconds"] = 9.0
+    cases.append(("rule2_wall", r, ("choice", "pandas_legacy")))
+    r = _postic_synthetic()
+    _postic_unit(r, "pandas_optimized__chunked__b")["peak_rss_bytes"] = 2000
+    cases.append(("rule2_rss", r, ("choice", "pandas_legacy")))
+    cases.append(("rule2_name", _postic_synthetic(), ("choice", "pandas_optimized")))
+    r = _postic_synthetic()
+    _postic_unit(r, "pandas_legacy__chunked__b").update(status="failed", watch_status="stalled", returncode=None,
+                                                        wall_seconds=None, peak_rss_bytes=None)
+    r["pairs"] = [p for p in r["pairs"] if p["input"] != "b"]
+    cases.append(("rule1_failed", r, ("no_choice", "1")))
+    r = _postic_synthetic()
+    _postic_unit(r, "pandas_optimized__direct__a")["core_observed"] = ["legacy"]
+    cases.append(("rule1_core_mismatch", r, ("no_choice", "1")))
+    r = _postic_synthetic()
+    _postic_unequal(r, ("chunked", "a"))
+    next(p for p in r["pairs"] if (p["path"], p["input"]) == ("chunked", "a")).update(
+        structure_equal=False, dtype_mismatch_columns=1,
+        diff_columns={"column": ["c0"], "dtype_x": ["float64"], "dtype_y": ["float32"], "nan_mask_diff": [0],
+                      "value_neq_cells": [3], "max_abs": [1e-7]})
+    cases.append(("rule3_structure", r, ("no_choice", "3_structure")))
+    r = _postic_synthetic()
+    _postic_unequal(r, ("chunked", "b"))
+    cases.append(("rule3_reference_missing", r, ("no_choice", "3_reference_missing")))
+    for name, mask, err, expected in (
+            ("rule3_mask_single", {"pandas_optimized": (0, 2), "pandas_legacy": (0, 0)}, None, ("choice", "pandas_legacy")),
+            ("rule3_mask_none", {"pandas_optimized": (1, 0), "pandas_legacy": (0, 1)}, None, ("no_choice", "3_nan_mask")),
+            ("rule3_err_both_less", None, {"pandas_optimized": (1e-7, 1e-7), "pandas_legacy": (2e-7, 2e-7)},
+             ("choice", "pandas_optimized")),
+            ("rule3_err_one_less_one_equal", None, {"pandas_optimized": (2e-7, 1e-7), "pandas_legacy": (2e-7, 3e-7)},
+             ("choice", "pandas_optimized")),
+            ("rule3_err_conflict", None, {"pandas_optimized": (1e-7, 3e-7), "pandas_legacy": (2e-7, 2e-7)},
+             ("no_choice", "3_error_conflict")),
+            ("rule3_err_tie", None, {"pandas_optimized": (1e-7, 1e-7), "pandas_legacy": (1e-7, 1e-7)},
+             ("choice", "pandas_optimized"))):
+        r = _postic_synthetic()
+        _postic_unequal(r, ("chunked", "b"))
+        r["reference"] = _postic_reference(mask or {"pandas_optimized": (0, 0), "pandas_legacy": (0, 0)},
+                                           err or {"pandas_optimized": (0.0, 0.0), "pandas_legacy": (0.0, 0.0)})
+        cases.append((name, r, expected))
+    r = _postic_synthetic()
+    _postic_unequal(r, ("chunked", "b"))
+    r["reference"] = _postic_reference({"pandas_optimized": (0, 0), "pandas_legacy": (0, 0)},
+                                       {"pandas_optimized": (0.0, 0.0), "pandas_legacy": (0.0, 0.0)}, finite=0)
+    cases.append(("rule3_no_common_finite", r, ("no_choice", "3_no_common_finite")))
+    return cases
+
+
+@pytest.mark.parametrize("name", [c[0] for c in _postic_cases()])
+def test_postic_core_selection_rule_cases(name: str) -> None:
+    """擇一規則各分支（SPEC Task 1.6 ①–③、平手次序）：獨立重算與探針 `select_core` 皆等於期望。"""
+    _, receipt, expected = next(c for c in _postic_cases() if c[0] == name)
+    assert expected_postic_selection(receipt) == expected
+    got = probe("postic_core_select").select_core(receipt["units"], receipt["pairs"],
+                                                  (receipt.get("reference") or {}).get("stats"))
+    assert (("choice", got["choice"]) if "choice" in got else ("no_choice", got["no_choice"]["rule"])) == expected, got
+
+
+def _postic_mutants() -> Dict[str, Callable[[Dict[str, Any]], None]]:
+    def drop_pair(r: Dict[str, Any]) -> None:
+        r["pairs"] = r["pairs"][1:]
+
+    def stalled_complete(r: Dict[str, Any]) -> None:
+        r["units"][0]["watch_status"] = "stalled"
+
+    def chosen_blocked(r: Dict[str, Any]) -> None:
+        chosen = r.get("choice") or POSTIC_CORES[0]
+        _postic_unit(r, _postic_unit_id(chosen, "direct", "a")).update(status="blocked", reason="mutant")
+
+    def drop_b_unit(r: Dict[str, Any]) -> None:
+        r["units"] = [u for u in r["units"] if u["unit_id"] != _postic_unit_id(POSTIC_CORES[0], "chunked", "b")]
+
+    def tamper_count(r: Dict[str, Any]) -> None:
+        r["pairs"][0]["columns_unequal_native"] = int(r["pairs"][0]["columns_unequal_native"]) + 1
+
+    def wrong_arm(r: Dict[str, Any]) -> None:
+        r["units"][0]["arm_recorded"] = ["pandas_legacy"]
+
+    def check_false(r: Dict[str, Any]) -> None:
+        r["checks"][sorted(r["checks"])[0]] = False
+
+    def check_key_dropped_input_tampered(r: Dict[str, Any]) -> None:
+        r["checks"].pop("inputs_identical_a", None)
+        next(u for u in r["units"] if u["input"] == "a")["input_sha256"] = "numview-mutant"
+
+    def input_tampered(r: Dict[str, Any]) -> None:
+        next(u for u in r["units"] if u["input"] == "b" and u["status"] == "complete")["input_sha256"] = "numview-mutant"
+
+    def config_check_dropped(r: Dict[str, Any]) -> None:
+        r["checks"].pop("post_ic_config_same", None)
+
+    def ic_stalled_complete(r: Dict[str, Any]) -> None:
+        r["ic_recompute"]["watch_status"] = "stalled"
+
+    def dup_pair(r: Dict[str, Any]) -> None:
+        r["pairs"].append(copy.deepcopy(r["pairs"][0]))
+
+    def pair_max_abs_tampered(r: Dict[str, Any]) -> None:
+        r["pairs"][0]["max_abs"] = float(r["pairs"][0]["max_abs"]) + 1.0
+
+    def blocked_with_watch(r: Dict[str, Any]) -> None:
+        u = next(x for x in r["units"] if x["input"] == "b")
+        u.update(status="blocked", reason="numview-mutant", watch_status="stalled", returncode=1)
+
+    def blocked_with_measurement(r: Dict[str, Any]) -> None:
+        u = next(x for x in r["units"] if x["input"] == "b")
+        keep = {k: u[k] for k in POSTIC_BLOCKED_FIELDS if k in u}
+        u.clear()
+        u.update(keep, status="blocked", reason="numview-mutant", load_seconds=1.0)
+
+    def ic_returncode_missing(r: Dict[str, Any]) -> None:
+        r["ic_recompute"].pop("returncode", None)
+
+    def ic_wall_mismatch(r: Dict[str, Any]) -> None:
+        r["ic_recompute"]["wall_seconds"] = float(r["ic_recompute"]["child_wall_seconds"]) + 1.0
+
+    def structure_flag_contradicts(r: Dict[str, Any]) -> None:
+        r["pairs"][0]["structure_equal"] = not r["pairs"][0]["structure_equal"]
+
+    def only_side_columns_with_equal_flag(r: Dict[str, Any]) -> None:
+        r["pairs"][0].update(columns_equal=True, only_x=["numview_mutant"])
+
+    def ic_summary_dropped(r: Dict[str, Any]) -> None:
+        r["ic_recompute"].pop("a", None)
+        r["ic_recompute"].pop("b", None)
+
+    def choice_rule_wrong(r: Dict[str, Any]) -> None:
+        if "choice" in r:
+            r["choice_rule"] = "3_error"
+        else:
+            r["no_choice"] = dict(r["no_choice"], rule="3_error_conflict")
+
+    def unit_identity_tampered(r: Dict[str, Any]) -> None:
+        r["units"][0]["cell"] = "numview_mutant_cell"
+
+    def reference_spurious(r: Dict[str, Any]) -> None:
+        r["reference"] = {"status": "complete", "stats": {}}
+
+    def failed_unit_with_measurement(r: Dict[str, Any]) -> None:
+        u = next(x for x in r["units"] if x["input"] == "b")
+        u.update(status="failed", watch_status="stalled", returncode=None, reason="numview-mutant")
+
+    def failed_ic_with_rss(r: Dict[str, Any]) -> None:
+        r["ic_recompute"].update(status="failed", watch_status="stalled", returncode=None, reason="numview-mutant",
+                                 peak_rss_bytes=1)
+
+    def ic_failed_choice_kept(r: Dict[str, Any]) -> None:
+        r["ic_recompute"].update(status="failed", watch_status="stalled", returncode=None)
+        r["choice"] = r.get("choice") or POSTIC_CORES[0]
+        r.pop("no_choice", None)
+
+    return {"drop_pair": drop_pair, "stalled_complete": stalled_complete, "chosen_blocked": chosen_blocked,
+            "drop_b_unit": drop_b_unit, "tamper_count": tamper_count, "wrong_arm": wrong_arm,
+            "check_false": check_false, "check_key_dropped_input_tampered": check_key_dropped_input_tampered,
+            "input_tampered": input_tampered, "config_check_dropped": config_check_dropped,
+            "ic_stalled_complete": ic_stalled_complete, "ic_failed_choice_kept": ic_failed_choice_kept,
+            "dup_pair": dup_pair, "pair_max_abs_tampered": pair_max_abs_tampered, "blocked_with_watch": blocked_with_watch,
+            "blocked_with_measurement": blocked_with_measurement, "ic_returncode_missing": ic_returncode_missing,
+            "ic_wall_mismatch": ic_wall_mismatch, "failed_unit_with_measurement": failed_unit_with_measurement,
+            "failed_ic_with_rss": failed_ic_with_rss, "structure_flag_contradicts": structure_flag_contradicts,
+            "only_side_columns_with_equal_flag": only_side_columns_with_equal_flag,
+            "ic_summary_dropped": ic_summary_dropped, "choice_rule_wrong": choice_rule_wrong,
+            "unit_identity_tampered": unit_identity_tampered, "reference_spurious": reference_spurious}
+
+
+@pytest.mark.parametrize("mutant", sorted(_postic_mutants()))
+def test_postic_core_receipt_mutations(mutant: str) -> None:
+    """mutation（SPEC Task 1.6）：刪成對比對列、complete 單元標 stalled、擇定核心單元改 blocked、刪 (b) 單元、竄改不等欄數、
+    實際臂紀錄改錯、收據任一自我檢查改 False ⇒ 紅。
+    對象＝合成全 complete 收據（擇定 `pandas_optimized`）與正式收據之複本。"""
+    base = _postic_synthetic(choice="pandas_optimized", choice_rule="2")
+    assert postic_core_violations(base) == []
+    receipts = [base]
+    hits = sorted(nh.RECEIPTS_DIR.glob(f"*-numview-{POSTIC_CORE_KIND}.json"))
+    if len(hits) == 1:
+        receipts.append(json.loads(hits[0].read_text(encoding="utf-8")))
+    for receipt in receipts:
+        mutated = copy.deepcopy(receipt)
+        _postic_mutants()[mutant](mutated)
+        assert postic_core_violations(mutated), f"mutant {mutant} 存活"
+
+
+def test_postic_core_decision_mutation_loser_core_turns_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation：決定紀錄 `report.post_ic_core` 改為落選核心（或 no_choice 時改為任一核心）⇒ 綁定檢查紅。"""
+    receipt = _postic_synthetic(choice="pandas_optimized", choice_rule="2")
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(receipt))
+    monkeypatch.setattr(nh, "_decision_record", lambda key: {"choice": "lock", "report": {"post_ic_core": "pandas_legacy"}})
+    with pytest.raises(AssertionError):
+        test_postic_core_decision_matches_receipt()
+
+
+def test_boundary_59_postic_core_memory_failure_is_no_choice() -> None:
+    """邊界①（SPEC Task 1.6）：(b) 規模任一核心因記憶體不可完成（子行程失敗）⇒ 擇一規則①之 `no_choice`；正式收據若有
+    (b) 單元非 complete ⇒ 收據無 `choice`。"""
+    r = _postic_synthetic()
+    _postic_unit(r, "pandas_optimized__chunked__b").update({k: None for k in POSTIC_CHILD_REPORTED_FIELDS},
+                                                           status="failed", watch_status="exited", returncode=-9,
+                                                           reason="exited（MemoryError；rc=-9）")
+    r["pairs"] = [p for p in r["pairs"] if p["input"] != "b"]
+    assert expected_postic_selection(r) == ("no_choice", "1")
+    got = probe("postic_core_select").select_core(r["units"], r["pairs"], None)
+    assert got.get("no_choice", {}).get("rule") == "1", got
+    r["no_choice"] = got["no_choice"]
+    assert postic_core_violations(r) == []
+    hits = sorted(nh.RECEIPTS_DIR.glob(f"*-numview-{POSTIC_CORE_KIND}.json"))
+    if len(hits) == 1:
+        formal = json.loads(hits[0].read_text(encoding="utf-8"))
+        if any(u["input"] == "b" and u["status"] != "complete" for u in formal["units"]):
+            assert "choice" not in formal and formal["no_choice"]["rule"] == "1"
+
+
+def test_boundary_60_postic_core_ratio_unsafe_dropped_counted() -> None:
+    """邊界②（SPEC Task 1.6）：選欄含 ratio-unsafe 欄 ⇒ 入口既有剔除（兩核心同），剔除數入紀錄。真實 C_BTCUSDT_1h 凍結 run
+    之 raw：取 20 個安全欄＋3 個 ratio-unsafe 欄，兩核心經探針 `transform_unit`（生產 `transform_selected`）各轉一次，剔除數
+    等於獨立計數、輸出不含之且兩核心相同；正式收據同輸入之兩核心剔除數相等，(a) 等於凍結選欄之獨立計數。"""
+    pcs = probe("postic_core_select")
+    criteria = load_criteria()
+    work = pcs.FREEZE_RUNS / f"{pcs.CELLS['b']}__default"
+    side = json.loads((work / "numview_cell.json").read_text(encoding="utf-8"))
+    manifest = json.loads(next((work / "features" / side["symbol"] / side["primary_tf"]).glob("*/feature_manifest.json"))
+                          .read_text(encoding="utf-8"))
+    names = [str(c) for g in manifest["groups"].values() for c in g.get("columns") or []]
+    unsafe = [c for c in names if ratio_unsafe_category(c) is not None][:3]
+    safe = [c for c in names if ratio_unsafe_category(c) is None][:20]
+    assert len(unsafe) == 3 and len(safe) == 20, "C 之 raw 無足量 ratio-unsafe／安全欄"
+    ctx = pcs.production_context(pcs.CELLS["b"], criteria)
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    # 系統記憶體讀數（`sysctl vm.swapusage`）於部分沙箱不可用 ⇒ 以既有測試接縫注入固定快照（同
+    # test_icfirstalign_memory.py:_snapshot）；只隔離環境，剔除與轉換路徑不變
+    snapshot = mb.VMSnapshot(free_bytes=8 * 2 ** 30, file_backed_bytes=0, swap_free_bytes=0, pressure_level=1,
+                             swap_volume_free_bytes=75 * 2 ** 30, swap_volume_capacity_bytes=228 * 2 ** 30)
+    infos = {}
+    for core in ("optimized", "legacy"):
+        with mb.vm_snapshot_override(snapshot):
+            processed, info = pcs.transform_unit(ctx, work / "features", side["config_hash"], safe + unsafe, core,
+                                                 "direct")
+        out = processed["selected"]
+        assert info["ratio_unsafe_dropped"] == 3 and not set(unsafe) & {str(c) for c in out.columns}
+        assert [str(c) for c in out.columns] == safe
+        infos[core] = info
+    assert infos["optimized"]["ratio_unsafe_dropped"] == infos["legacy"]["ratio_unsafe_dropped"]
+    hits = sorted(nh.RECEIPTS_DIR.glob(f"*-numview-{POSTIC_CORE_KIND}.json"))
+    if len(hits) == 1:
+        formal = json.loads(hits[0].read_text(encoding="utf-8"))
+        frozen_a = json.loads((pcs.FREEZE_RUNS / f"{pcs.CELLS['a']}__default" / "numview_cell.json")
+                              .read_text(encoding="utf-8"))["ic_first_selected"]
+        independent_a = sum(1 for c in frozen_a if ratio_unsafe_category(str(c)) is not None)
+        for inp in ("a", "b"):
+            counts = {u["ratio_unsafe_dropped"] for u in formal["units"] if u["input"] == inp and u["status"] == "complete"}
+            assert len(counts) <= 1, (inp, counts)
+            if inp == "a" and counts:
+                assert counts == {independent_a}, (counts, independent_a)
