@@ -159,6 +159,8 @@ class L2Capture:
 # ============================================================================================== Task 1.3 主入口
 
 REPO = Path(__file__).resolve().parents[3]
+if str(REPO) not in sys.path:  # 以腳本執行時 repo 根不在 sys.path（同 precision_chain.py:35）
+    sys.path.insert(0, str(REPO))
 PROBES_DIR = Path(__file__).resolve().parent
 RECEIPTS_DIR = REPO / "handoffs" / "run_receipts"
 FREEZE_SCRIPT = REPO / "scripts" / "numview_freeze_baseline.py"
