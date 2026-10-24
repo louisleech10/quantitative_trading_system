@@ -1492,9 +1492,13 @@ class _Regen:
     def get(self, cell_id: str, record: Mapping[str, Any]) -> Dict[str, Any]:
         if cell_id not in self._cache:
             arms = sorted((record.get("g1") or {}).keys())
+            # `freeze_cell` 吃全票唯一格描述子 `{id, kind, symbol, timeframes}`（凍結檔格紀錄無 `id`；與
+            # `test_numview_ic_page.py` 之 `_descriptor` 同形）
+            descriptor = {"id": cell_id, "kind": record["kind"], "symbol": record["symbol"],
+                          "timeframes": list(record["timeframes"])}
             # 批次共用生成（判準檔 cell_rules.batch_cache）：root＝共用快取根、跑別＝§G 所讀之批次（舊判準 ⇒ 本倉隔離根）
             self._cache[cell_id] = freeze_script().freeze_cell(
-                record, nh.regen_root(self.root / re.sub(r"[^A-Za-z0-9_.-]", "_", cell_id)),
+                descriptor, nh.regen_root(self.root / re.sub(r"[^A-Za-z0-9_.-]", "_", cell_id)),
                 arms=arms, run_kind=nh.regen_batch_kind("regen_section_g"))
         return self._cache[cell_id]
 
