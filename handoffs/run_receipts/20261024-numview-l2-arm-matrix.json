@@ -1,0 +1,841 @@
+{
+ "schema_version": 1,
+ "generated_at": "2026-10-24T03:45:12.007878+00:00",
+ "head": "81244f121811ffb45389071b12eaa096b89d3a6f",
+ "command": "venv/bin/python handoffs/run_receipts/numview_probes/l2_arm_matrix.py",
+ "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
+ "freeze_receipt": "20261023-numview-freeze-baseline.json",
+ "work_root": "/Users/louis/Desktop/quantitative_trading_system/data_cache/numview_l2_runs/20261024T031940Z",
+ "memory": {
+  "B_BTCUSDT_1h_4h__FFACT_USE_POLARS=0": {
+   "swap_growth_max_mb": 0.0
+  },
+  "C_BTCUSDT_1h__FFACT_USE_POLARS=0": {
+   "swap_growth_max_mb": 3661.8100000000004
+  }
+ },
+ "cells": [
+  {
+   "cell_id": "A_BTCUSDT_1h",
+   "kind": "A",
+   "symbol": "BTCUSDT",
+   "timeframes": [
+    "1h"
+   ],
+   "l1_dtypes": [
+    "float32"
+   ],
+   "common_cols": 536,
+   "only_returned": [],
+   "only_category": [],
+   "nan_mask_diff": 0,
+   "f64diff": 0,
+   "f32diff": 0,
+   "max_abs": 0.0,
+   "max_rel": 0.0,
+   "errors": [],
+   "blacklist_applied": false,
+   "arms": {
+    "default": {
+     "main_calls": 1,
+     "main_rows": [
+      3855
+     ],
+     "calibration_calls": 3,
+     "returned_arm": [
+      "polars"
+     ],
+     "l1_dtypes": [
+      "float32"
+     ],
+     "returned_dtypes": [
+      "float32"
+     ],
+     "common_cols": 536,
+     "only_returned": [],
+     "only_category": [],
+     "nan_mask_diff": 0,
+     "f64diff": 0,
+     "f32diff": 0,
+     "max_abs": 0.0,
+     "max_rel": 0.0,
+     "row_mismatch": [],
+     "errors": [],
+     "blacklist_applied": false,
+     "calibration": [
+      {
+       "rows": 4050,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 8100,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 3855,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      }
+     ],
+     "source": "freeze_baseline",
+     "run_status": "frozen",
+     "env": {}
+    },
+    "FFACT_USE_POLARS=0": {
+     "main_calls": 1,
+     "main_rows": [
+      3855
+     ],
+     "calibration_calls": 3,
+     "returned_arm": [
+      "pandas"
+     ],
+     "l1_dtypes": [
+      "float32"
+     ],
+     "returned_dtypes": [
+      "float32"
+     ],
+     "common_cols": 536,
+     "only_returned": [],
+     "only_category": [],
+     "nan_mask_diff": 0,
+     "f64diff": 0,
+     "f32diff": 0,
+     "max_abs": 0.0,
+     "max_rel": 0.0,
+     "row_mismatch": [],
+     "errors": [],
+     "blacklist_applied": false,
+     "calibration": [
+      {
+       "rows": 4050,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 8100,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 3855,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      }
+     ],
+     "source": "freeze_baseline",
+     "run_status": "frozen",
+     "env": {
+      "FFACT_USE_POLARS": "0"
+     }
+    }
+   }
+  },
+  {
+   "cell_id": "B_BTCUSDT_1h_4h",
+   "kind": "B",
+   "symbol": "BTCUSDT",
+   "timeframes": [
+    "1h",
+    "4h"
+   ],
+   "l1_dtypes": [
+    "float64"
+   ],
+   "common_cols": 536,
+   "only_returned": [],
+   "only_category": [],
+   "nan_mask_diff": 0,
+   "f64diff": 6025810,
+   "f32diff": 3969919,
+   "max_abs": 0.0078125,
+   "max_rel": 1.0,
+   "errors": [],
+   "blacklist_applied": false,
+   "arms": {
+    "default": {
+     "main_calls": 1,
+     "main_rows": [
+      12256
+     ],
+     "calibration_calls": 5,
+     "returned_arm": [
+      "polars"
+     ],
+     "l1_dtypes": [
+      "float64"
+     ],
+     "returned_dtypes": [
+      "float32"
+     ],
+     "common_cols": 536,
+     "only_returned": [],
+     "only_category": [],
+     "nan_mask_diff": 0,
+     "f64diff": 6025810,
+     "f32diff": 3969919,
+     "max_abs": 0.0078125,
+     "max_rel": 1.0,
+     "row_mismatch": [],
+     "errors": [],
+     "blacklist_applied": false,
+     "calibration": [
+      {
+       "rows": 4050,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 8100,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 4963,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 12256,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 3064,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      }
+     ],
+     "source": "freeze_baseline",
+     "run_status": "frozen",
+     "env": {}
+    },
+    "FFACT_USE_POLARS=0": {
+     "main_calls": 1,
+     "main_rows": [
+      12256
+     ],
+     "calibration_calls": 5,
+     "returned_arm": [
+      "pandas"
+     ],
+     "l1_dtypes": [
+      "float64"
+     ],
+     "returned_dtypes": [
+      "float64"
+     ],
+     "common_cols": 536,
+     "only_returned": [],
+     "only_category": [],
+     "nan_mask_diff": 0,
+     "f64diff": 0,
+     "f32diff": 0,
+     "max_abs": 0.0,
+     "max_rel": 0.0,
+     "row_mismatch": [],
+     "errors": [],
+     "blacklist_applied": true,
+     "calibration": [
+      {
+       "rows": 4050,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 8100,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 4963,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 12256,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 3064,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      }
+     ],
+     "source": "generated",
+     "run_status": "complete",
+     "env": {
+      "FFACT_USE_POLARS": "0"
+     }
+    }
+   },
+   "coverage_note": "主行程只擷取主週期之 L2（各臂 main_rows）；非主週期於並行 spawn 子行程計算未擷取——子行程與主行程同呼叫 `_execute_layer1_6_preserve_dtype('Layer 2', _layer2_derived_features, …)`（multi_tf_generator.py:1474-1481 對 :1833-1840），同一程式路徑，依路徑覆蓋不另生成"
+  },
+  {
+   "cell_id": "C_BTCUSDT_1h",
+   "kind": "C",
+   "symbol": "BTCUSDT",
+   "timeframes": [
+    "1h"
+   ],
+   "l1_dtypes": [
+    "float32"
+   ],
+   "common_cols": 44827,
+   "only_returned": [],
+   "only_category": [
+    "close_cycle_HT-DCPHASE_Abs",
+    "close_cycle_HT-DCPHASE_Clip",
+    "close_cycle_HT-DCPHASE_DecayLinear-W13",
+    "close_cycle_HT-DCPHASE_DecayLinear-W21",
+    "close_cycle_HT-DCPHASE_DecayLinear-W5",
+    "close_cycle_HT-DCPHASE_Log1p",
+    "close_cycle_HT-DCPHASE_Momentum-L13",
+    "close_cycle_HT-DCPHASE_Momentum-L144",
+    "close_cycle_HT-DCPHASE_Momentum-L21",
+    "close_cycle_HT-DCPHASE_Momentum-L233",
+    "close_cycle_HT-DCPHASE_Momentum-L3",
+    "close_cycle_HT-DCPHASE_Momentum-L34",
+    "close_cycle_HT-DCPHASE_Momentum-L5",
+    "close_cycle_HT-DCPHASE_Momentum-L55",
+    "close_cycle_HT-DCPHASE_Momentum-L8",
+    "close_cycle_HT-DCPHASE_Momentum-L89",
+    "close_cycle_HT-DCPHASE_Sign",
+    "close_cycle_HT-DCPHASE_TsArgmax-W13",
+    "close_cycle_HT-DCPHASE_TsArgmax-W21",
+    "close_cycle_HT-DCPHASE_TsArgmax-W5",
+    "close_cycle_HT-DCPHASE_TsArgmin-W13",
+    "close_cycle_HT-DCPHASE_TsArgmin-W21",
+    "close_cycle_HT-DCPHASE_TsArgmin-W5",
+    "close_cycle_HT-DCPHASE_TsRank-W13",
+    "close_cycle_HT-DCPHASE_TsRank-W21",
+    "close_cycle_HT-DCPHASE_TsRank-W5",
+    "taker-ratio_cycle_HT-DCPHASE_Abs",
+    "taker-ratio_cycle_HT-DCPHASE_Clip",
+    "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W13",
+    "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W21",
+    "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W5",
+    "taker-ratio_cycle_HT-DCPHASE_Log1p",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L13",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L144",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L21",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L233",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L3",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L34",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L5",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L55",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L8",
+    "taker-ratio_cycle_HT-DCPHASE_Momentum-L89",
+    "taker-ratio_cycle_HT-DCPHASE_Sign",
+    "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W13",
+    "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W21",
+    "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W5",
+    "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W13",
+    "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W21",
+    "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W5",
+    "taker-ratio_cycle_HT-DCPHASE_TsRank-W13",
+    "taker-ratio_cycle_HT-DCPHASE_TsRank-W21",
+    "taker-ratio_cycle_HT-DCPHASE_TsRank-W5",
+    "volume_cycle_HT-DCPHASE_Abs",
+    "volume_cycle_HT-DCPHASE_Clip",
+    "volume_cycle_HT-DCPHASE_DecayLinear-W13",
+    "volume_cycle_HT-DCPHASE_DecayLinear-W21",
+    "volume_cycle_HT-DCPHASE_DecayLinear-W5",
+    "volume_cycle_HT-DCPHASE_Log1p",
+    "volume_cycle_HT-DCPHASE_Momentum-L13",
+    "volume_cycle_HT-DCPHASE_Momentum-L144",
+    "volume_cycle_HT-DCPHASE_Momentum-L21",
+    "volume_cycle_HT-DCPHASE_Momentum-L233",
+    "volume_cycle_HT-DCPHASE_Momentum-L3",
+    "volume_cycle_HT-DCPHASE_Momentum-L34",
+    "volume_cycle_HT-DCPHASE_Momentum-L5",
+    "volume_cycle_HT-DCPHASE_Momentum-L55",
+    "volume_cycle_HT-DCPHASE_Momentum-L8",
+    "volume_cycle_HT-DCPHASE_Momentum-L89",
+    "volume_cycle_HT-DCPHASE_Sign",
+    "volume_cycle_HT-DCPHASE_TsArgmax-W13",
+    "volume_cycle_HT-DCPHASE_TsArgmax-W21",
+    "volume_cycle_HT-DCPHASE_TsArgmax-W5",
+    "volume_cycle_HT-DCPHASE_TsArgmin-W13",
+    "volume_cycle_HT-DCPHASE_TsArgmin-W21",
+    "volume_cycle_HT-DCPHASE_TsArgmin-W5",
+    "volume_cycle_HT-DCPHASE_TsRank-W13",
+    "volume_cycle_HT-DCPHASE_TsRank-W21",
+    "volume_cycle_HT-DCPHASE_TsRank-W5"
+   ],
+   "nan_mask_diff": 0,
+   "f64diff": 43394,
+   "f32diff": 43394,
+   "max_abs": 0.00048828125,
+   "max_rel": 1.1920704427802611e-07,
+   "errors": [],
+   "blacklist_applied": false,
+   "arms": {
+    "default": {
+     "main_calls": 1,
+     "main_rows": [
+      4662
+     ],
+     "calibration_calls": 1,
+     "returned_arm": [
+      "polars"
+     ],
+     "l1_dtypes": [
+      "float32"
+     ],
+     "returned_dtypes": [
+      "float32",
+      "float64"
+     ],
+     "common_cols": 44827,
+     "only_returned": [],
+     "only_category": [
+      "close_cycle_HT-DCPHASE_Abs",
+      "close_cycle_HT-DCPHASE_Clip",
+      "close_cycle_HT-DCPHASE_DecayLinear-W13",
+      "close_cycle_HT-DCPHASE_DecayLinear-W21",
+      "close_cycle_HT-DCPHASE_DecayLinear-W5",
+      "close_cycle_HT-DCPHASE_Log1p",
+      "close_cycle_HT-DCPHASE_Momentum-L13",
+      "close_cycle_HT-DCPHASE_Momentum-L144",
+      "close_cycle_HT-DCPHASE_Momentum-L21",
+      "close_cycle_HT-DCPHASE_Momentum-L233",
+      "close_cycle_HT-DCPHASE_Momentum-L3",
+      "close_cycle_HT-DCPHASE_Momentum-L34",
+      "close_cycle_HT-DCPHASE_Momentum-L5",
+      "close_cycle_HT-DCPHASE_Momentum-L55",
+      "close_cycle_HT-DCPHASE_Momentum-L8",
+      "close_cycle_HT-DCPHASE_Momentum-L89",
+      "close_cycle_HT-DCPHASE_Sign",
+      "close_cycle_HT-DCPHASE_TsArgmax-W13",
+      "close_cycle_HT-DCPHASE_TsArgmax-W21",
+      "close_cycle_HT-DCPHASE_TsArgmax-W5",
+      "close_cycle_HT-DCPHASE_TsArgmin-W13",
+      "close_cycle_HT-DCPHASE_TsArgmin-W21",
+      "close_cycle_HT-DCPHASE_TsArgmin-W5",
+      "close_cycle_HT-DCPHASE_TsRank-W13",
+      "close_cycle_HT-DCPHASE_TsRank-W21",
+      "close_cycle_HT-DCPHASE_TsRank-W5",
+      "taker-ratio_cycle_HT-DCPHASE_Abs",
+      "taker-ratio_cycle_HT-DCPHASE_Clip",
+      "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W13",
+      "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W21",
+      "taker-ratio_cycle_HT-DCPHASE_DecayLinear-W5",
+      "taker-ratio_cycle_HT-DCPHASE_Log1p",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L13",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L144",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L21",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L233",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L3",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L34",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L5",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L55",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L8",
+      "taker-ratio_cycle_HT-DCPHASE_Momentum-L89",
+      "taker-ratio_cycle_HT-DCPHASE_Sign",
+      "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W13",
+      "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W21",
+      "taker-ratio_cycle_HT-DCPHASE_TsArgmax-W5",
+      "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W13",
+      "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W21",
+      "taker-ratio_cycle_HT-DCPHASE_TsArgmin-W5",
+      "taker-ratio_cycle_HT-DCPHASE_TsRank-W13",
+      "taker-ratio_cycle_HT-DCPHASE_TsRank-W21",
+      "taker-ratio_cycle_HT-DCPHASE_TsRank-W5",
+      "volume_cycle_HT-DCPHASE_Abs",
+      "volume_cycle_HT-DCPHASE_Clip",
+      "volume_cycle_HT-DCPHASE_DecayLinear-W13",
+      "volume_cycle_HT-DCPHASE_DecayLinear-W21",
+      "volume_cycle_HT-DCPHASE_DecayLinear-W5",
+      "volume_cycle_HT-DCPHASE_Log1p",
+      "volume_cycle_HT-DCPHASE_Momentum-L13",
+      "volume_cycle_HT-DCPHASE_Momentum-L144",
+      "volume_cycle_HT-DCPHASE_Momentum-L21",
+      "volume_cycle_HT-DCPHASE_Momentum-L233",
+      "volume_cycle_HT-DCPHASE_Momentum-L3",
+      "volume_cycle_HT-DCPHASE_Momentum-L34",
+      "volume_cycle_HT-DCPHASE_Momentum-L5",
+      "volume_cycle_HT-DCPHASE_Momentum-L55",
+      "volume_cycle_HT-DCPHASE_Momentum-L8",
+      "volume_cycle_HT-DCPHASE_Momentum-L89",
+      "volume_cycle_HT-DCPHASE_Sign",
+      "volume_cycle_HT-DCPHASE_TsArgmax-W13",
+      "volume_cycle_HT-DCPHASE_TsArgmax-W21",
+      "volume_cycle_HT-DCPHASE_TsArgmax-W5",
+      "volume_cycle_HT-DCPHASE_TsArgmin-W13",
+      "volume_cycle_HT-DCPHASE_TsArgmin-W21",
+      "volume_cycle_HT-DCPHASE_TsArgmin-W5",
+      "volume_cycle_HT-DCPHASE_TsRank-W13",
+      "volume_cycle_HT-DCPHASE_TsRank-W21",
+      "volume_cycle_HT-DCPHASE_TsRank-W5"
+     ],
+     "nan_mask_diff": 0,
+     "f64diff": 43394,
+     "f32diff": 43394,
+     "max_abs": 0.00048828125,
+     "max_rel": 1.1920704427802611e-07,
+     "row_mismatch": [],
+     "errors": [],
+     "blacklist_applied": false,
+     "calibration": [
+      {
+       "rows": 4662,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 44827,
+       "nan_mask_diff": 0,
+       "f32diff": 43394,
+       "max_abs": 0.00048828125,
+       "max_rel": 1.1920704427802611e-07
+      }
+     ],
+     "source": "freeze_baseline",
+     "run_status": "frozen",
+     "env": {}
+    },
+    "FFACT_USE_POLARS=0": {
+     "main_calls": 1,
+     "main_rows": [
+      4662
+     ],
+     "calibration_calls": 1,
+     "returned_arm": [
+      "pandas"
+     ],
+     "l1_dtypes": [
+      "float32"
+     ],
+     "returned_dtypes": [
+      "float32",
+      "float64"
+     ],
+     "common_cols": 44827,
+     "only_returned": [],
+     "only_category": [],
+     "nan_mask_diff": 0,
+     "f64diff": 0,
+     "f32diff": 0,
+     "max_abs": 0.0,
+     "max_rel": 0.0,
+     "row_mismatch": [],
+     "errors": [],
+     "blacklist_applied": true,
+     "calibration": [
+      {
+       "rows": 4662,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "pandas",
+       "common_cols": 44827,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      }
+     ],
+     "source": "generated",
+     "run_status": "complete",
+     "env": {
+      "FFACT_USE_POLARS": "0"
+     }
+    }
+   },
+   "only_category_note": "凍結時之 spy 未套 cascade blacklist（feature_factory.py:1771）重算公開類別表，`only_category` 為黑名單 L1 欄之衍生欄（spy 假象，非兩臂差）；共同欄之差不受影響"
+  },
+  {
+   "cell_id": "A_BTCUSDT_12h",
+   "kind": "A",
+   "symbol": "BTCUSDT",
+   "timeframes": [
+    "12h"
+   ],
+   "l1_dtypes": [
+    "float32"
+   ],
+   "common_cols": 536,
+   "only_returned": [],
+   "only_category": [],
+   "nan_mask_diff": 0,
+   "f64diff": 0,
+   "f32diff": 0,
+   "max_abs": 0.0,
+   "max_rel": 0.0,
+   "errors": [],
+   "blacklist_applied": false,
+   "arms": {
+    "default": {
+     "main_calls": 1,
+     "main_rows": [
+      3855
+     ],
+     "calibration_calls": 3,
+     "returned_arm": [
+      "polars"
+     ],
+     "l1_dtypes": [
+      "float32"
+     ],
+     "returned_dtypes": [
+      "float32"
+     ],
+     "common_cols": 536,
+     "only_returned": [],
+     "only_category": [],
+     "nan_mask_diff": 0,
+     "f64diff": 0,
+     "f32diff": 0,
+     "max_abs": 0.0,
+     "max_rel": 0.0,
+     "row_mismatch": [],
+     "errors": [],
+     "blacklist_applied": false,
+     "calibration": [
+      {
+       "rows": 4050,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 6156,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      },
+      {
+       "rows": 3855,
+       "l1_dtypes": [
+        "float32"
+       ],
+       "returned_arm": "polars",
+       "common_cols": 536,
+       "nan_mask_diff": 0,
+       "f32diff": 0,
+       "max_abs": 0.0,
+       "max_rel": 0.0
+      }
+     ],
+     "source": "freeze_baseline",
+     "run_status": "frozen",
+     "env": {}
+    }
+   }
+  }
+ ],
+ "runs": [
+  {
+   "cell": "A_BTCUSDT_1h",
+   "env": {},
+   "generations": 0,
+   "source": "freeze_baseline",
+   "status": "frozen",
+   "seconds": 0.0,
+   "covers": "Task 1.3 L2 兩臂（Polars 回傳表 vs compute_category）讀凍結 G1／G2 之預設生成：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）"
+  },
+  {
+   "cell": "A_BTCUSDT_1h",
+   "env": {
+    "FFACT_USE_POLARS": "0"
+   },
+   "generations": 0,
+   "source": "freeze_baseline",
+   "status": "frozen",
+   "seconds": 0.0,
+   "covers": "Task 1.3 L2 pandas 臂（FFACT_USE_POLARS=0）讀凍結 G2 之另一臂生成：單週期 1h、主檔來源；Phase 1 各分岔變體之宿主格（變體只在本格各重生一次）"
+  },
+  {
+   "cell": "B_BTCUSDT_1h_4h",
+   "env": {},
+   "generations": 0,
+   "source": "freeze_baseline",
+   "status": "frozen",
+   "seconds": 0.0,
+   "covers": "Task 1.3 L2 兩臂讀凍結 G3 之預設生成：多週期（層間保留 float64、訓練週期合併；主週期 1h、訓練 1h＋4h，同一主檔來源）"
+  },
+  {
+   "cell": "B_BTCUSDT_1h_4h",
+   "env": {
+    "FFACT_USE_POLARS": "0"
+   },
+   "generations": 1,
+   "source": "generated",
+   "status": "complete",
+   "seconds": 390.20073070800004,
+   "covers": "Task 1.3 L2 pandas 臂於多週期（FFACT_USE_POLARS=0；凍結無此環境之生成，唯一新增）：多週期 L1 float64 與訓練週期合併在 pandas L2 臂之路徑"
+  },
+  {
+   "cell": "C_BTCUSDT_1h",
+   "env": {},
+   "generations": 0,
+   "source": "freeze_baseline",
+   "status": "frozen",
+   "seconds": 0.0,
+   "covers": "Task 1.3 L2 兩臂讀凍結 G3 之預設生成：生產預設全特徵之 FF 生成（generate_features、足夠區間；特徵族最多：落盤 dtype 自動選（float16 安全判定）、L2 兩臂於全特徵、Phase 2／4 之 FF 輸出不變式）；不走 IC-first（v4：其於全特徵之規模無獨有路徑，見 scale_note）"
+  },
+  {
+   "cell": "C_BTCUSDT_1h",
+   "env": {
+    "FFACT_USE_POLARS": "0"
+   },
+   "generations": 1,
+   "source": "generated",
+   "status": "complete",
+   "seconds": 1094.953462791,
+   "covers": "Task 1.3 L2 pandas 臂於全特徵（FFACT_USE_POLARS=0；凍結無此環境之生成，唯一新增）：compute_category 於格 A 設定所無之特徵族"
+  },
+  {
+   "cell": "A_BTCUSDT_12h",
+   "env": {},
+   "generations": 0,
+   "source": "freeze_baseline",
+   "status": "frozen",
+   "seconds": 0.0,
+   "covers": "Task 1.3 既有零差重現：BTCUSDT 12h 之兩臂 f32diff（handoffs/run_receipts/20261004-icfirstalign-freeze-baselines.json f32diff=0；不符即停）讀凍結之預設生成"
+  }
+ ],
+ "checks": {
+  "A_BTCUSDT_1h.default.no_errors": true,
+  "A_BTCUSDT_1h.FFACT_USE_POLARS=0.no_errors": true,
+  "B_BTCUSDT_1h_4h.default.no_errors": true,
+  "B_BTCUSDT_1h_4h.FFACT_USE_POLARS=0.not_regenerating_frozen": true,
+  "B_BTCUSDT_1h_4h.FFACT_USE_POLARS=0.no_errors": true,
+  "C_BTCUSDT_1h.default.no_errors": true,
+  "C_BTCUSDT_1h.FFACT_USE_POLARS=0.not_regenerating_frozen": true,
+  "C_BTCUSDT_1h.FFACT_USE_POLARS=0.no_errors": true,
+  "A_BTCUSDT_12h.default.no_errors": true,
+  "repro_btc_12h_f32diff_zero": true,
+  "all_runs_available": true
+ },
+ "exit_code": 0
+}
