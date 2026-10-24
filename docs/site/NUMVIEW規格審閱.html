@@ -56,7 +56,7 @@
 <tr>
 <td>輸出型態</td>
 <td>跟著輸入欄走：輸入 float16 的欄寫回時被 pandas 升成 float64（pandas 警告這寫法未來會報錯）、全空欄留 float16、float32 欄維持 float32</td>
-<td>實測一律 float32（是哪一步轉成 float32 尚未逐行追查）</td>
+<td>也跟著輸入欄走但混雜少：A 格全 float32；全特徵格 float32 為主，另有 14 欄留 float16（10 欄有值、4 欄全空，與 optimized 同欄同值）——<strong>更正</strong>：我先前說「legacy 一律 float32」是錯的</td>
 </tr>
 <tr>
 <td>實測速度</td>
@@ -66,6 +66,7 @@
 </tbody>
 </table></div>
 <p>optimized 的「少複製」設計在大資料量下實際沒有比較快（可能是 8GB 記憶體開始用 swap，或整表 float64 陣列較大；推測，未查證），又有型態混雜問題，所以建議 legacy。</p>
+<p><strong>✅ 10/24 你已裁定</strong>：核心用 <strong>legacy</strong>，並且 <strong>IC 後的轉換輸出一律轉 float32 再存</strong>（legacy 的輸出只有 float32 和 float16，float16 轉 float32 不會改任何數字，只把存檔型態統一）。規格書已依此改版，送兩家委員審查中；程式還沒改（施工在之後的 Task 3.4）。</p>
 </blockquote>
 <hr />
 <h2 id="一本票範圍">一、本票範圍</h2>

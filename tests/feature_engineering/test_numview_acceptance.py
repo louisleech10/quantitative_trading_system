@@ -2933,15 +2933,28 @@ def test_postic_core_receipt_bound_to_probe_source() -> None:
 
 
 def test_postic_core_decision_matches_receipt() -> None:
-    """SPEC Task 1.6／1.5 ⑧：決定紀錄 d_icpage_arm 之 `report.post_ic_core` 等於收據 `choice`（收據 `no_choice` ⇒ 該欄為
-    `"no_choice"` 且 `report.no_choice_reason` 等於收據理由）。決定紀錄未產出（Task 1.5）前為紅。"""
+    """SPEC Task 1.6／1.5 ⑧：決定紀錄 d_icpage_arm 之 `report.post_ic_core` 等於收據 `choice`；收據 `no_choice` ⇒
+    `report.no_choice_reason` 等於收據理由，且無 `report.core_user_ruling` 時該欄為 `"no_choice"`、有之（`{date, quote}`
+    非空；v41 使用者 2026-10-24「legacy」）時為裁定之核心（屬兩核心）；收據已擇一而具 `core_user_ruling` ⇒ 紅。決定紀錄未
+    產出（Task 1.5）前為紅。"""
     receipt = load_receipt(POSTIC_CORE_KIND)
     report = nh._decision_record("d_icpage_arm").get("report") or {}
+    ruling = report.get("core_user_ruling")
     if "choice" in receipt:
+        assert ruling is None, "收據已擇一而決定紀錄另具使用者裁定"
         assert report.get("post_ic_core") == receipt["choice"], report
     else:
-        assert report.get("post_ic_core") == "no_choice", report
         assert report.get("no_choice_reason") == receipt["no_choice"]["reason"], report
+        if ruling is None:
+            assert report.get("post_ic_core") == "no_choice", report
+        else:
+            assert isinstance(ruling, Mapping) and ruling.get("date") and ruling.get("quote"), ruling
+            core = ruling.get("core")
+            assert core in POSTIC_CORES and report.get("post_ic_core") == core, (ruling, report)
+            short, other = core[len("pandas_"):], next(c for c in POSTIC_CORES if c != core)[len("pandas_"):]
+            assert short in str(ruling["quote"]) and other not in str(ruling["quote"]), ruling
+            assert ruling.get("output_dtype") == "float32" and "float32" in str(ruling.get("output_dtype_quote") or ""), ruling
+            assert report.get("post_ic_output_dtype") == ruling["output_dtype"], report
 
 
 def _postic_synthetic(**over: Any) -> Dict[str, Any]:
@@ -3185,6 +3198,34 @@ def test_postic_core_decision_mutation_loser_core_turns_red(monkeypatch: pytest.
     monkeypatch.setattr(nh, "_decision_record", lambda key: {"choice": "lock", "report": {"post_ic_core": "pandas_legacy"}})
     with pytest.raises(AssertionError):
         test_postic_core_decision_matches_receipt()
+
+
+def test_postic_core_decision_user_ruling_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v41（SPEC Task 1.5 ⑧）：收據 no_choice 而無使用者裁定卻記核心名 ⇒ 紅；有裁定而核心名不屬兩核心 ⇒ 紅；收據已擇一而
+    具裁定 ⇒ 紅；合法之使用者裁定分支（no_choice＋`core_user_ruling`＋legacy）⇒ 綠。"""
+    receipt = _postic_synthetic(choice="pandas_optimized", choice_rule="2")
+    no_choice = _postic_synthetic(no_choice={"rule": "3_structure", "reason": "r"})
+    ruling = {"date": "2026-10-24", "quote": "legacy", "core": "pandas_legacy", "output_dtype": "float32",
+              "output_dtype_quote": "legacy＋一律 float32"}
+    good = {"post_ic_core": "pandas_legacy", "no_choice_reason": "r", "core_user_ruling": ruling,
+            "post_ic_output_dtype": "float32"}
+    bad_cases = (
+        ({"post_ic_core": "pandas_legacy", "no_choice_reason": "r"}, no_choice),  # 無裁定卻記核心名
+        (dict(good, post_ic_core="pandas_optimized"), no_choice),  # 報告核心與裁定不符
+        (dict(good, core_user_ruling=dict(ruling, core="pandas_optimized"), post_ic_core="pandas_optimized"),
+         no_choice),  # 裁定核心與原話不符
+        ({k: v for k, v in good.items() if k != "post_ic_output_dtype"}, no_choice),  # 漏記輸出 dtype
+        (dict(good, core_user_ruling=dict(ruling, output_dtype="float64")), no_choice),  # 輸出 dtype 裁定被改
+        (dict(good, post_ic_core="pandas_optimized"), receipt),  # 收據已擇一而另裁
+    )
+    for rec, rcp in bad_cases:
+        monkeypatch.setattr(THIS, "load_receipt", lambda kind, r=rcp: copy.deepcopy(r))
+        monkeypatch.setattr(nh, "_decision_record", lambda key, rr=rec: {"choice": "lock", "report": rr})
+        with pytest.raises(AssertionError):
+            test_postic_core_decision_matches_receipt()
+    monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(no_choice))
+    monkeypatch.setattr(nh, "_decision_record", lambda key: {"choice": "lock", "report": copy.deepcopy(good)})
+    test_postic_core_decision_matches_receipt()  # 合法之使用者裁定分支須綠
 
 
 def test_boundary_59_postic_core_memory_failure_is_no_choice() -> None:
