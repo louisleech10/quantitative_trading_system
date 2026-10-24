@@ -15,6 +15,15 @@
 <strong>10/21 你已同意下面的方向</strong>（你否決了「13–107 小時」那項量測，並同意改走業界做法）。規格書正依此改版，改完交三家委員確認。<strong>現在一行程式都還沒改。</strong>
 動工後還有幾個地方會<strong>再停下來問你</strong>（第五節）。</p>
 </blockquote>
+<blockquote>
+<p><strong>🔴 10/24 方向已改（以這段為準；下面各節凡寫「Polars」的都是 10/21 的舊方向）</strong>：</p>
+<ul>
+<li>你看過實測後定「<strong>IC頁與IC-first都改pandas</strong>」：Polars 在 3193 欄要 88.7 秒、pandas 約 1.2 秒，而且 pandas 誤差較小。兩個入口都改用<strong>同一套 pandas 算法</strong>，Polars 不再是必備。</li>
+<li>pandas 現有兩個算法核心（optimized、legacy），會用<strong>真實大資料量</strong>（A 格約 3,200 欄、全特徵格約 13.7 萬欄）實測後只留一個，該測的項目一項都不省，時間目標一小時內。</li>
+<li>第 2 項「Polars 改高精度」不做了（Polars 不再用於這一步）。</li>
+<li>第二層兩套算法、processed 存檔方式、多週期精度：這張票只登記，移到第 9 步「特徵生產層普查」一起處理。</li>
+</ul>
+</blockquote>
 <hr />
 <h2 id="一本票範圍">一、本票範圍</h2>
 <p>只管 <strong>IC 選完特徵之後的轉換</strong>（排名、標準化、常態化；這份結果之後給 ML 吃）。有兩個入口：</p>

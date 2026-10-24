@@ -28,7 +28,8 @@
     "handoffs/run_receipts/numview_probes/estimate.py",
     "handoffs/run_receipts/numview_probes/postic_branchdiff.py",
     "handoffs/run_receipts/numview_probes/precision_chain.py",
-    "handoffs/run_receipts/numview_probes/l2_arm_matrix.py"
+    "handoffs/run_receipts/numview_probes/l2_arm_matrix.py",
+    "handoffs/run_receipts/numview_probes/postic_core_select.py"
   ],
   "contract_jsons": [
     "momentum/FeatureEngineering/contracts/numeric_view.json"
@@ -113,7 +114,8 @@
       "handoffs/run_receipts/numview_probes/estimate.py",
       "handoffs/run_receipts/numview_probes/postic_branchdiff.py",
       "handoffs/run_receipts/numview_probes/precision_chain.py",
-      "handoffs/run_receipts/numview_probes/l2_arm_matrix.py"
+      "handoffs/run_receipts/numview_probes/l2_arm_matrix.py",
+      "handoffs/run_receipts/numview_probes/postic_core_select.py"
     ],
     "callers_now": [
       "api/services/ic_analysis_service.py",
@@ -183,7 +185,8 @@
       "K 線來源（判準 v2 cell_rules.kline_source；使用者 2026-10-22：12h 讀 data_cache/feature_klines_longhist、主檔不動，主檔延長另開票）：格之列舉仍取主檔（tests 之 symbol×tf 列舉不變），生成／估時／凍結之 cache_dir、輸出段、前史與根數一律依週期之來源檔；多週期格 B 讀其主週期之單一來源（一次生成單一 cache_dir）；估時與凍結收據逐格記來源與 `<symbol>/<tf>/data` 資料集 sha256。後續批次之生成接縫（scripts/numview_freeze_baseline.generate_cell、b2 探針）須經 estimate.cell_source／cell_kline_records 取來源，不得寫死主檔；舊 12h 主檔前史不足之結論（A:12h partial）只對主檔成立"
     ],
     "coverage_risk": [
-      "邊界具名測試全票編號 01–58（各恰一支，nv_check 逐號驗）：Task 0.1＝01–02（contract）；0.2＝03–04、4.4＝55–56（selectors）；0.3＝05–06、0.4＝07–08（名含 estimate）、1.5＝21–22（criteria）；0.5＝09–12（baseline）；1.1＝13–15、1.2＝16–18、1.3＝19–20、5.1＝57–58（acceptance）；2.1＝23–25（policy）；2.2＝26–27、3.4＝37–39（名含 icpage_arm_locked）、4.3＝53–54（ic_page）；3.1＝28–29、3.2＝30–34、3.3＝35–36（core）；4.1＝40–47（名含 resolve）、4.2＝48–49（identity）、50–52（cgsa_workdir）",
+      "Task 1.6（SPEC v40）：探針 handoffs/run_receipts/numview_probes/postic_core_select.py；收據 handoffs/run_receipts/<date>-numview-postic-core-select.json（6 單元＋IC 重算、各記 wall_seconds／峰值 RSS／watch_status、成對逐位元比對、choice；正確性優先、不刪單元）實跑後登錄 run_receipts；驗收於 tests/feature_engineering/test_numview_acceptance.py（名含 postic_core：單元完整、擇一規則重算、watch_status 異常即 failed 且無 choice、report.post_ic_core＝choice（no_choice 時記 no_choice 與理由、Task 3.4 暫停）），邊界 59–60；Task 1.5 驗證⑧⑨（report.post_ic_core、measurement_limitations 綁定）於 tests/feature_engineering/test_numview_criteria.py 擴充 limitation_violations 與決定紀錄檢查",
+      "邊界具名測試全票編號 01–58（各恰一支，nv_check 逐號驗；v40 增 Task 1.6＝59–60，acceptance，名含 postic_core）：Task 0.1＝01–02（contract）；0.2＝03–04、4.4＝55–56（selectors）；0.3＝05–06、0.4＝07–08（名含 estimate）、1.5＝21–22（criteria）；0.5＝09–12（baseline）；1.1＝13–15、1.2＝16–18、1.3＝19–20、5.1＝57–58（acceptance）；2.1＝23–25（policy）；2.2＝26–27、3.4＝37–39（名含 icpage_arm_locked）、4.3＝53–54（ic_page）；3.1＝28–29、3.2＝30–34、3.3＝35–36（core）；4.1＝40–47（名含 resolve）、4.2＝48–49（identity）、50–52（cgsa_workdir）",
       "Task 0.1：test_numview_contract.py（驗證①–④、未登記入口拋錯、邊界 01–02、mutation 2：臂值越界、_sources 行偏移）",
       "Task 0.2／4.4：test_numview_selectors.py（全範圍 AST 掃描＝契約鍵集、分類規則〔value_affecting；output_only＝SPEC 五鍵；certified_equal 限 L2_ROUTE_CERTIFIED〕、reason／_sources、memory_budget 子集、能力旗標、<10 秒、解析器讀鍵＝value_affecting 集、邊界 03–04、55–56、mutation 7）；Task 0.2 之「FFACT_CGSA_WORK_DIR 改入鹽」mutation 在 test_numview_cgsa_workdir.py",
       "Task 0.3／0.4／1.5：test_numview_criteria.py（判準檔 schema、單一提交、收據 criteria_sha256 與提交序、material fail-closed 參考判定；估時收據欄位與涵蓋〔含 Phase 2–4 驗收重產七個 regen_* 跑別與 preprov_cells；R15-A〕、require 三拒收案、重型腳本 AST 前置、generate_cell／freeze_cell 前置閘 AST；決定紀錄①–⑥；邊界 05–08、21–22；mutation 11〔含 generate_cell 刪 require、收據缺任一 regen_* 跑別（參數化七案）〕）",
@@ -198,7 +201,7 @@
     "lifecycle": "keep",
     "not_executable": [
       {"item": "真實資料重型生成一律單行程串行、獨占機器；委員輪進行中不跑重型生成；量完刪中間輸出", "reason": "user-ruling", "owner": "NUMVIEW", "expiry": "2026-12-31"},
-      {"item": "Task 3.1 polars_float64 改案施工（D-POSTIC；須使用者看 Task 1.1 差異、IC 翻轉與速度數字後確認，SPEC §A 量測後白話閘）", "reason": "user-ruling", "owner": "NUMVIEW", "expiry": "2026-12-31"},
+      {"item": "Task 3.1 polars_float64 改案施工（D-POSTIC；SPEC v40：候選不成立 ⇒ retain，且 IC-first 改單一 pandas 核心後 Polars post-IC 臂不為正式臂，本項不施工）", "reason": "user-ruling", "owner": "NUMVIEW", "expiry": "2026-12-31"},
       {"item": "Task 3.2／3.3 改案施工（D-MTF、D-MEMMAP、D-WINSOR-DTYPE、D-CODEC、D-L2；只為附數字之提案，經白話閘使用者確認才實作）", "reason": "user-ruling", "owner": "NUMVIEW", "expiry": "2026-12-31"},
       {"item": "預估 >30 分鐘之重型跑開跑前之白話報告與 reported_at 寫入（Task 0.4；主委報使用者後寫入）", "reason": "user-ruling", "owner": "NUMVIEW", "expiry": "2026-12-31"},
       {"item": "NUMVIEW-R1 跨市場（台股、美股、期貨）量測與驗收（SPEC §N）", "reason": "blocked-by", "owner": "NUMVIEW", "expiry": "2026-12-31"},
