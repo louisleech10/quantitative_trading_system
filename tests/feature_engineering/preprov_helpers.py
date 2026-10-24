@@ -59,7 +59,6 @@ FIXED_ENV: Dict[str, str] = {
 SPEC_NAMED_VALUES: Dict[str, Tuple[str, str, str]] = {
     "winsor_applied": ("step_status_values.winsorization", "applied", "docs/FFDSTAR_SPEC.md:170 §V oracle ③"),
     "terminal_ratio_unsafe": ("terminal_values", "ratio_unsafe", "docs/FFDSTAR_SPEC.md:170 §V oracle ③"),
-    "post_ic_arm_polars": ("group_arm_values", "polars", "docs/FFDSTAR_SPEC.md:95 Task 1.4 驗證①"),
     # SPEC v4 §V replace 格：「numba 快速臂、shard 串流」須於驗收實際產出
     "shard_stream_arm": ("group_arm_values", "numba_shard", "docs/FFDSTAR_SPEC.md:169 §V replace 格"),
     "numba_fast_arm": ("group_arm_values", "numba_fast", "docs/FFDSTAR_SPEC.md:169 §V replace 格"),

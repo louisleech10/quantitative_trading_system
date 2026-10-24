@@ -41,6 +41,7 @@ from momentum.factories import (
     executed_post_ic_arm,
     feature_naming_version_error_type,
     ic_page_record_keys,
+    post_ic_entry_arm,
     ratio_unsafe_category,
     resolve_run_feature_count,
     sanitize_factor_returns,
@@ -2903,7 +2904,10 @@ class ICAnalysisService:
             rank=rank, rank_window=rank_window, zscore=zscore, zscore_windows=windows, gaussian=gaussian,
         )
         preprocessor = create_feature_preprocessor(transform_config.model_dump())
-        transformed = preprocessor.transform_selected(kept_cols, {"ic_page": df}, config=transform_config)
+        # NUMVIEW Task 3.4：IC 頁與 IC-first 同一擇定核心（契約 ic_page_apply_transforms 之 arm_ref＝ic_first）
+        transformed = preprocessor.transform_selected(
+            kept_cols, {"ic_page": df}, config=transform_config, arm=post_ic_entry_arm("ic_page_apply_transforms"),
+        )
         if "ic_page" not in transformed:
             raise ValueError("post-IC transforms produced no output")
         df = transformed["ic_page"].loc[:, kept_cols]

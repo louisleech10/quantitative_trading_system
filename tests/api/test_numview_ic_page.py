@@ -8,11 +8,11 @@ G1 案以凍結腳本接縫重生 §V 格 A；Task 4.3 ③以 `preprov_helpers.g
 h5 屬性鍵與回應鍵一律讀契約 `ic_page_output_attrs`／`ic_page_response_keys`（未填即紅）。
 
 **契約狀態感知（Task 2.2 與 Task 3.4 之 SPEC 矛盾）**：Task 2.2 存活至「本票交付後保留」，但其驗證①②、邊界②
-（Polars 不可用 ⇒ 靜默改走 pandas 並如實記錄）與 mutation 於 Task 3.4 鎖臂後不再成立（IC 頁恆走 Polars、
-Polars 不可用 ⇒ `PostICArmUnavailableError`）。故 Task 2.2 之測試讀契約 `post_ic_entries.ic_page_apply_transforms`：
+（Polars 不可用 ⇒ 靜默改走 pandas 並如實記錄）與 mutation 於 Task 3.4 鎖臂後不再成立（v41：IC 頁恆走擇定之 pandas 核心
+`pandas_legacy`、輸出一律 float32，Polars 不可用照常產出）。故 Task 2.2 之測試讀契約 `post_ic_entries.ic_page_apply_transforms`：
 有 `arm_policy`（Task 3.4 前）⇒ 斷言 Phase 2 語意（各臂份輸出＝G1 同臂份、記錄臂＝標示臂、Polars 不可用 ⇒ 記 pandas 臂且
 輸出＝同環境 pandas 輸出）；有 `arm_ref`（須＝`ic_first`；Task 3.4 後）⇒ 斷言鎖臂語意（各環境記錄臂＝`post_ic_arm`、
-輸出＝鎖定臂參照、Polars 不可用 ⇒ 具名錯誤且無輸出檔）；兩者皆無 ⇒ 紅。兩支皆有實質斷言；mutation 依當下狀態設計使之翻轉
+輸出＝擇定核心原生輸出轉 float32、Polars 不可用 ⇒ 照常產出且記錄臂＝擇定核心）；兩者皆無 ⇒ 紅。兩支皆有實質斷言；mutation 依當下狀態設計使之翻轉
 （鎖臂狀態下「記臂寫契約政策值」以偽造執行紀錄臂使記錄≠執行而翻轉）。
 
 驗證：
@@ -21,11 +21,15 @@ Polars 不可用 ⇒ `PostICArmUnavailableError`）。故 Task 2.2 之測試讀�
   ＝獨立擷取之執行紀錄臂；③h5 `ff_run_identity`＝另行 `load_with_identity` 之身分（服務經 `load_with_identity` 載入）；
   ④`load_with_identity` 之 DataFrame＝`load` 者逐位元。邊界 26（全 ratio-unsafe ⇒ ValueError、無輸出）、27（Polars 不可用）。
   mutation：記臂寫契約政策值、記臂以環境推算（chunked 案）、IC 頁誤傳／改傳臂。
-- Task 3.4（名稱皆含 `icpage_arm_locked`）：①G1 每格各環境輸出＝鎖定臂參照（Task 3.1 改 Polars 計算者以現行 Polars
-  環境輸出為參照）；②被移除臂份之差異逐份列於收據且＝自凍結值重算；③各環境記錄臂＝`polars`；④Polars 不可用 ⇒
-  `PostICArmUnavailableError`、無輸出檔；⑤AST：生產碼每個 `.transform_selected(` 帶 `arm=`，且 `arm` 為無預設之關鍵字專用參數；
-  ⑥決定紀錄 `d_icpage_arm`：`changes_public_output=true`、`user_ruling` 為 2026-10-21 原話；⑦pandas 臂呼叫者盤點收據與
-  AST 一致。邊界 37／38／39；mutation：刪 IC 頁 `arm=`、`arm` 改回可選、不可用時退回 pandas、刪除仍有呼叫者之函式。
+- Task 3.4（v41；名稱皆含 `icpage_arm_locked`）：①G1 每格各環境輸出＝擇定核心（`pandas_legacy`）於同輸入之原生輸出轉
+  float32（參照經 `transform()` 環境分派走該核心、不經被測之強制臂與轉換；另斷言參照＝G1 改前凍結之同核心份）；②被移除臂份
+  對改前擇定核心份之差異逐份列於收據且＝自凍結值重算；③各環境記錄臂＝擇定核心；④Polars 不可用 ⇒ IC 頁與 IC-first 入口照常
+  產出；⑤AST：生產碼每個 `.transform_selected(` 帶 `arm=`，且 `arm` 為無預設之關鍵字專用參數；⑥決定紀錄 `d_icpage_arm`：
+  `changes_public_output=true`、`user_ruling` 為 2026-10-21 原話、`re_presentation`；⑦pandas 臂呼叫者盤點收據與 AST 一致；
+  ⑧契約臂＝`POST_IC_ARM`＝決定紀錄核心＝Task 1.6 收據擇定或使用者裁定之核心；⑨輸出一律 float32（真實 legacy float16 原生欄
+  轉 float32 逐位元；float64 原生輸出 ⇒ `PostICOutputDtypeError`）。邊界 37／38／39；mutation：刪 IC 頁 `arm=`、`arm` 改回
+  可選、改回依環境選臂、`POST_IC_ARM` 改回 polars／決定紀錄核心不一致、刪除仍有呼叫者之函式、刪 float32 轉換、轉換移至核心前、
+  刪 dtype 守衛。
 - Task 4.3：①同請求兩次 ⇒ 同 `view_id`、同檔、內容相等；②轉換設定不同 ⇒ 不同檔、舊檔不變；③IC 後重生 run ⇒
   `ICViewIdentityMismatchError`、無輸出；④h5 `ff_run_identity`＝`load_with_identity`；⑤選欄增減或欄序不同 ⇒ 不同
   `view_id`、不同檔、舊檔不變；另 `view_id` 由測試依契約 `ic_page_view_identity` 組成獨立重算。邊界 53／54；mutation：
@@ -75,7 +79,7 @@ import pytest
 from momentum.FeatureEngineering import numeric_view as nv
 from momentum.FeatureEngineering import polars_adapter
 from momentum.FeatureEngineering import run_provenance
-from momentum.FeatureEngineering.ic_first_context import PostICArmUnavailableError
+from momentum.FeatureEngineering import ic_first_context as icc
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as fsh
 from tests.feature_engineering import numview_helpers as nh
@@ -89,6 +93,7 @@ ICPOSTLEAK = json.loads((REPO / "tests/_golden/icpostleak/contract.json").read_t
 RATIOUNSAFE = json.loads((REPO / "tests/_golden/ratiounsafe/contract.json").read_text(encoding="utf-8"))
 FREEZE_SCRIPT = REPO / "scripts" / "numview_freeze_baseline.py"
 PANDAS_ARM_CALLERS_GLOB = "*-numview-pandas-arm-callers.json"
+POSTIC_CORE_RECEIPT_GLOB = "*-numview-postic-core-select.json"
 ICPAGE_ARM_LOCK_GLOB = "*-numview-icpage-arm-lock.json"
 ENTRY = "ic_page_apply_transforms"  # SPEC 點名之入口
 IC_FIRST = "ic_first"  # SPEC 點名之入口
@@ -101,6 +106,13 @@ ARM_ENVS: Dict[str, Dict[str, str]] = {
     "pandas_chunked": {"FFACT_USE_POLARS": "0", "FFACT_L65_CHUNK_SIZE": "1"},
 }
 ARM_ENV_KEYS: Tuple[str, ...] = ("FFACT_USE_POLARS", "FFACT_L65_OPTIMIZATION_PROFILE", "FFACT_L65_CHUNK_SIZE")
+#: Task 3.4 參照：擇定核心 → 經 `transform()` 環境分派走該核心之環境（不經 `_forced_arm`；chunk 關閉以單次走核心，
+#: 分塊為欄獨立運算、不改值）
+CORE_ENVS: Dict[str, Dict[str, str]] = {
+    "pandas_legacy": {"FFACT_USE_POLARS": "0", "FFACT_L65_OPTIMIZATION_PROFILE": "legacy", "FFACT_L65_CHUNK_SIZE": "0"},
+    "pandas_optimized": {"FFACT_USE_POLARS": "0", "FFACT_L65_OPTIMIZATION_PROFILE": "optimized",
+                         "FFACT_L65_CHUNK_SIZE": "0"},
+}
 #: Task 4.3 view 身分之組成（＝`numeric_view.ic_page_view_id` 之關鍵字參數；契約 `components` 須恰為此集合）
 VIEW_COMPONENTS: Tuple[str, ...] = ("run_identity", "transform_config", "arm", "algorithm_id", "kept_cols")
 #: SPEC §A 所引使用者 2026-10-21 原話（D-ICPAGE-ARM 之 user_ruling；Task 1.5 ④、Task 3.4 ⑥）
@@ -306,7 +318,7 @@ def light_frame(extra_columns: int = 0) -> pd.DataFrame:
     base = fsh.kline_frame(symbol=k["symbol"], timeframe=k["timeframe"]).iloc[: k["rows"]]
     names = list(k["columns"]) + [c for c in base.columns if c not in k["columns"]][:extra_columns]
     assert len(names) == len(k["columns"]) + extra_columns, "kline 欄不足以附加"
-    return base[names].astype(np.float64).copy()
+    return base[names].astype(np.float32).copy()  # NUMVIEW Task 3.4：生產 raw 只存 float16／float32；float64 原生輸出依 v41 拒收
 
 
 def with_ratio_unsafe(frame: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
@@ -318,7 +330,7 @@ def with_ratio_unsafe(frame: pd.DataFrame) -> Tuple[pd.DataFrame, str]:
     kline = fsh.kline_frame(symbol=k["symbol"], timeframe=k["timeframe"]).loc[frame.index]
     out = frame.copy()
     out[spec["name"]] = getattr(talib, spec["fn"])(*(kline[c].to_numpy(dtype=np.float64)
-                                                       for c in ("open", "high", "low", "close"))).astype(np.float64)
+                                                       for c in ("open", "high", "low", "close"))).astype(np.float32)
     return out, str(spec["name"])
 
 
@@ -361,6 +373,79 @@ def direct_transform(frame: pd.DataFrame, env: Mapping[str, str]) -> Tuple[pd.Da
             mp.setattr(FeaturePreprocessor, name, spy)
         out = create_feature_preprocessor(cfg.model_dump()).transform(frame.copy())
     return out, calls
+
+
+def _default_post_ic_config(names: List[str]) -> Any:
+    """IC 頁預設請求之 post-IC 設定（zscore 窗排序；同服務）。"""
+    from momentum.factories import create_post_ic_transform_config
+
+    req = _default_request(list(names))
+    return create_post_ic_transform_config(rank=req.rank, rank_window=req.rank_window, zscore=req.zscore,
+                                           zscore_windows=sorted(int(w) for w in req.zscore_windows), gaussian=req.gaussian)
+
+
+def core_native_output(frame: pd.DataFrame, core: str) -> pd.DataFrame:
+    """Task 3.4 ①⑨ 之參照：擇定核心於同輸入之原生輸出——IC 頁預設請求之 post-IC 設定經 `transform_selected` 同一設定建構
+    （`_build_post_ic_transform_config`），以 `transform()` 之環境分派走該核心（`CORE_ENVS`；不經被測之強制臂與 float32
+    轉換）；斷言參照確走該核心之分支。欄序＝輸入欄序。"""
+    from momentum.factories import create_feature_preprocessor
+
+    cfg = _default_post_ic_config(list(frame.columns))
+    outer = create_feature_preprocessor(cfg.model_dump())
+    return core_native_from(independent_post_ic_mapping(cfg.model_dump(), list(frame.columns)), outer, frame, core)
+
+
+def independent_post_ic_mapping(base: Mapping[str, Any], names: List[str]) -> Dict[str, Any]:
+    """參照端之 post-IC 設定（測試自建，不呼叫被測之 `_build_post_ic_transform_config`；審碼 b4 r1 CODEX-R1-P1-03）：取基設定
+    （pydantic `model_dump()`）之深複本，`mode`＝replace、`enabled`＝True，縮尾／平穩化／ADF 關；rank／zscore／gaussian 依基設定之
+    `enabled`（缺 ⇒ 依 SPEC 之 post-IC 預設：rank、zscore 開，gaussian 關），開者 `apply_to`＝選欄。"""
+    cfg = copy.deepcopy(dict(base))
+    cfg["mode"], cfg["enabled"] = "replace", True
+    for step in ("winsorization", "fractional_differencing", "adf_differencing"):
+        cfg[step] = dict(cfg.get(step) or {}, enabled=False)
+    for step, default in (("rank_transform", True), ("adaptive_zscore", True), ("gaussian_normalize", False)):
+        node = dict(cfg.get(step) or {})
+        node["enabled"] = bool(node.get("enabled", default))
+        if node["enabled"]:
+            node["apply_to"] = list(names)
+        cfg[step] = node
+    return cfg
+
+
+def core_native_from(post_cfg: Mapping[str, Any], outer: Any, frame: pd.DataFrame, core: str) -> pd.DataFrame:
+    """同 `core_native_output`，但 post-IC 設定與脈絡（`context`／`column_layer_map`）由呼叫端給（IC-first 入口：取自被 spy
+    之前處理器與其 `_build_post_ic_transform_config`）。"""
+    with pytest.MonkeyPatch.context() as mp:
+        for key in ARM_ENV_KEYS:
+            mp.delenv(key, raising=False)
+        for key, value in CORE_ENVS[core].items():
+            mp.setenv(key, value)
+        pre = FeaturePreprocessor(dict(post_cfg), context=outer._preprocessing_context,
+                                  column_layer_map=outer._column_layer_map)
+        assert pre._can_use_optimized_dataframe_path() == (core == "pandas_optimized"), core
+        out = pre.transform(frame.copy())
+    return out.loc[:, [c for c in frame.columns if c in out.columns]]
+
+
+def executed_arms(pre: Any) -> Set[str]:
+    """前處理器最近一次 `transform_selected` 之執行紀錄群組臂集合。"""
+    return {str(g.get("arm")) for g in pre.last_post_ic_execution()[1].values()}
+
+
+def _ic_page_input(frame: pd.DataFrame, selected: List[str]) -> pd.DataFrame:
+    """IC 頁第三步之轉換輸入（同服務：保序去重、只取存在者、排除 ratio-unsafe）。"""
+    from momentum.factories import ratio_unsafe_category
+
+    kept: List[str] = []
+    for name in (str(c) for c in selected):
+        if name in frame.columns and name not in kept and ratio_unsafe_category(name) is None:
+            kept.append(name)
+    return frame.loc[:, kept]
+
+
+def _light_input(source: Source) -> pd.DataFrame:
+    frame = source.library.load(source.symbol, source.tf, config_hash=source.config_hash)
+    return _ic_page_input(frame, list(frame.columns))
 
 
 # ---------------------------------------------------------------------------------------------- G1 重生倉（重型）
@@ -452,6 +537,7 @@ class G1Lab:
         self.root = Path(root)
         self._sources: Dict[str, Source] = {}
         self._pages: Dict[Tuple[str, str], PageRun] = {}
+        self._native: Dict[Tuple[str, str], pd.DataFrame] = {}
 
     def source(self, cell_id: str) -> Source:
         if cell_id not in self._sources:
@@ -473,6 +559,15 @@ class G1Lab:
                                            task_id=f"numview_g1_{arm}")
         return self._pages[key]
 
+    def core_native(self, cell_id: str) -> pd.DataFrame:
+        """Task 3.4 參照：該格 IC 頁輸入於擇定核心之原生輸出（每格一次）。"""
+        key = ("__core__", cell_id)
+        if key not in self._native:
+            source = self.source(cell_id)
+            frame = source.library.load(source.symbol, source.tf, config_hash=source.config_hash)
+            self._native[key] = core_native_output(_ic_page_input(frame, list(_g1(cell_id)["selected"])), locked_arm())
+        return self._native[key]
+
 
 @pytest.fixture(scope="module")
 def lab(tmp_path_factory: pytest.TempPathFactory) -> G1Lab:
@@ -480,14 +575,9 @@ def lab(tmp_path_factory: pytest.TempPathFactory) -> G1Lab:
 
 
 def locked_reference(lab: G1Lab, cell_id: str) -> Dict[str, Any]:
-    """鎖臂參照（Task 3.4 ①）：D-POSTIC 決定為 `polars_float64`（Task 3.1 已改 Polars 計算）⇒ 現行鎖定臂環境之輸出；
-    否則 ⇒ G1 改前鎖定臂份之凍結值指紋。"""
-    arm = locked_arm()
-    g1 = _g1(cell_id)
-    assert arm in g1["arms"], f"G1 {cell_id} 無鎖定臂 {arm} 份"
-    if nh.decision("d_postic") == "polars_float64":
-        return nh.frame_fingerprints(lab.page(cell_id, arm).frame)
-    return g1["arms"][arm]["fingerprint"]
+    """鎖臂參照（Task 3.4 ①，v41）：擇定核心於該格 IC 頁輸入之原生輸出轉 float32 之值指紋（D-POSTIC＝retain，Polars 計算
+    未改，故不分 Task 3.1 分支）。"""
+    return nh.frame_fingerprints(lab.core_native(cell_id).astype(np.float32))
 
 
 # ---------------------------------------------------------------------------------------------- Task 2.1（API）
@@ -610,7 +700,7 @@ def test_boundary_26_all_ratio_unsafe_selection_error_unchanged(tmp_path: Path) 
 
 def test_boundary_27_polars_unavailable_with_use_polars_on(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """邊界②（Task 2.2）：Polars 不可用而 `FFACT_USE_POLARS=1`。Phase 2 ⇒ 現行靜默改走 pandas 臂並如實記錄（記錄臂＝執行
-    紀錄臂≠polars）、輸出＝同 profile 明示 `FFACT_USE_POLARS=0` 之輸出；鎖臂 ⇒ `PostICArmUnavailableError`、無輸出檔（D10）。"""
+    紀錄臂≠polars）、輸出＝同 profile 明示 `FFACT_USE_POLARS=0` 之輸出；鎖臂（v41）⇒ 照常產出、記錄臂＝擇定核心（Polars 非 post-IC 依賴，D10）。"""
     state = contract_state()
     source = light_source(tmp_path, light_frame(), "nopolars")
     reference = light_run(tmp_path, source, ARM_ENVS["pandas_optimized"], tag="ref") if state == ENV_STATE else None
@@ -623,9 +713,8 @@ def test_boundary_27_polars_unavailable_with_use_polars_on(tmp_path: Path, monke
         assert arm_record_violations(run, reference.attrs.get(attr_key("arm"))) == []
         assert nh.bitwise_diff(nh.frame_fingerprints(reference.frame), nh.frame_fingerprints(run.frame)) == []
     else:
-        with pytest.raises(PostICArmUnavailableError):
-            light_run(tmp_path, source, ARM_ENVS["polars"], tag="nopolars", cwd=cwd)
-        assert report_files(cwd) == []
+        run = light_run(tmp_path, source, ARM_ENVS["polars"], tag="nopolars", cwd=cwd)
+        assert arm_record_violations(run, locked_arm()) == []
 
 
 # ---------------------------------------------------------------------------------------------- Task 2.2 mutation
@@ -728,22 +817,67 @@ def test_mutation_ic_page_passes_wrong_arm(tmp_path: Path, monkeypatch: pytest.M
 # ---------------------------------------------------------------------------------------------- Task 3.4 驗證
 
 def _assert_locked() -> str:
+    """Task 3.4 前提：契約 IC 頁入口為 `arm_ref`＝`ic_first`，且其臂＝決定紀錄 `d_icpage_arm` 所記擇定核心（v41）。"""
     assert contract_state() == LOCKED_STATE, f"Task 3.4 未落地：契約 {ENTRY} 仍為依環境政策"
     arm = locked_arm()
-    assert nv.post_ic_arm(ENTRY) == arm == _spec_arm("polars")
+    assert nv.post_ic_arm(ENTRY) == arm == _spec_arm(_decision_record("d_icpage_arm")["report"]["post_ic_core"])
     return arm
 
 
 @pytest.mark.parametrize("cell_id", G1_CELLS)
 def test_icpage_arm_locked_g1_every_env_equals_locked_reference(cell_id: str, lab: G1Lab) -> None:
-    """Task 3.4 ①③：G1 每個已凍結臂份之環境下，IC 頁輸出逐位元＝鎖臂參照（改前 polars 份；Task 3.1 落地者為現行 Polars
-    輸出），且記錄臂＝`polars`＝執行紀錄臂。"""
+    """Task 3.4 ①③⑨：G1 每個已凍結臂份之環境下（含 `FFACT_USE_POLARS=0／1`、legacy／optimized profile、chunk 門檻），
+    IC 頁輸出逐位元＝擇定核心於同輸入之原生輸出轉 float32（v41）、每欄 float32，且記錄臂＝擇定核心＝執行紀錄臂。"""
     arm_locked = _assert_locked()
     reference = locked_reference(lab, cell_id)
     for arm in _g1(cell_id)["arms"]:
         run = lab.page(cell_id, arm)
+        assert set(map(str, run.frame.dtypes)) == {"float32"}, arm
         assert nh.bitwise_diff(reference, nh.frame_fingerprints(run.frame)) == [], arm
         assert arm_record_violations(run, arm_locked) == [], arm
+
+
+def test_icpage_arm_locked_ic_first_output_equals_core_reference(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Task 3.4 ①⑨（IC-first 入口，真實短窗 PRE-PROV `ic_first` 格）：生成時 post-IC 之 `transform_selected` 每群組輸出
+    逐位元＝擇定核心於同輸入（同 post-IC 設定與脈絡）之原生輸出轉 float32、每欄 float32，且執行紀錄臂＝擇定核心。"""
+    arm_locked = _assert_locked()
+    calls: List[Tuple[Any, List[str], Dict[str, pd.DataFrame], Dict[str, Any], Dict[str, pd.DataFrame], Set[str]]] = []
+    real = getattr(FeaturePreprocessor, "transform_selected")
+
+    def spy(self: Any, selected: Any, groups: Any, config: Any = None, *, arm: str) -> Any:
+        inputs = {str(g): df.copy() for g, df in groups.items()}
+        base = getattr(config, "preprocessing", config)
+        base = base.model_dump() if hasattr(base, "model_dump") else copy.deepcopy(dict(base or self._config))
+        post_cfg = independent_post_ic_mapping(base, [str(s) for s in selected])
+        out = real(self, selected, groups, config=config, arm=arm)
+        calls.append((self, [str(s) for s in selected], inputs, post_cfg, {g: o.copy() for g, o in out.items()},
+                      executed_arms(self)))
+        return out
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(FeaturePreprocessor, "transform_selected", spy)
+        ph.generate_short_run(tmp_path_factory.mktemp("numview_icfirst_core"), "ic_first")
+    assert calls, "IC-first 未呼叫 transform_selected"
+    compared = 0
+    for outer, selected, inputs, post_cfg, outs, arms in calls:
+        assert arms == {arm_locked}, arms
+        for gid, got in outs.items():
+            frame = inputs[gid].loc[:, [c for c in selected if c in inputs[gid].columns]]
+            native = core_native_from(post_cfg, outer, frame, arm_locked)
+            assert set(map(str, got.dtypes)) == {"float32"}, gid
+            assert nh.bitwise_diff(nh.frame_fingerprints(native.astype(np.float32)), nh.frame_fingerprints(got)) == [], gid
+            compared += 1
+    assert compared >= 1
+
+
+@pytest.mark.parametrize("cell_id", G1_CELLS)
+def test_icpage_arm_locked_core_native_pinned_to_frozen_copy(cell_id: str, lab: G1Lab) -> None:
+    """Task 3.4 ①之前提：擇定核心於同輸入之原生輸出（參照）逐位元＝§G G1 改前凍結之同核心臂份（核心本身未被改動；
+    參照不經被測之強制臂與 float32 轉換）。"""
+    arm_locked = _assert_locked()
+    frozen = _g1(cell_id)["arms"].get(arm_locked)
+    assert frozen is not None, f"G1 {cell_id} 無擇定核心 {arm_locked} 之凍結份"
+    assert nh.bitwise_diff(frozen["fingerprint"], nh.frame_fingerprints(lab.core_native(cell_id))) == []
 
 
 def _differing_columns(before: Mapping[str, Any], after: Mapping[str, Any]) -> List[str]:
@@ -754,57 +888,61 @@ def _differing_columns(before: Mapping[str, Any], after: Mapping[str, Any]) -> L
 
 
 def test_icpage_arm_locked_removed_arm_diffs_listed_in_receipt() -> None:
-    """Task 3.4 ②：被移除之臂份（G1 中非鎖定臂之份）對改前鎖定臂份之差異逐份列於收據，且＝自凍結值指紋重算之差異欄集合。"""
+    """Task 3.4 ②：被移除之臂份（G1 中非擇定核心之份，含原 Polars 份）對改前擇定核心份之差異逐份列於收據，且＝自凍結值
+    指紋重算之差異欄集合（只報告；float32 轉換所致之 dtype 差另列收據 `float32_cast_columns`，同自凍結份重算）。"""
     arm_locked = _assert_locked()
     paths = sorted(nh.RECEIPTS_DIR.glob(ICPAGE_ARM_LOCK_GLOB))
     assert paths, f"IC 頁鎖臂收據不存在：{nh.RECEIPTS_DIR}/{ICPAGE_ARM_LOCK_GLOB}"
-    receipt = json.loads(paths[-1].read_text(encoding="utf-8"))["cells"]
+    receipt = json.loads(paths[-1].read_text(encoding="utf-8"))
+    cells = receipt["cells"]
     compared = 0
     for cell_id, cell in _frozen_cells().items():
         arms = (cell.get("g1") or {}).get("arms") or {}
         if not arms:
             continue
         assert arm_locked in arms, cell_id
+        core_cols = arms[arm_locked]["fingerprint"]["columns"]
+        cast = sorted(n for n, c in core_cols.items() if c.get("dtype") != "float32")
+        assert sorted(cells[cell_id]["float32_cast_columns"]) == cast, cell_id
         for arm, frozen in arms.items():
             if arm == arm_locked:
                 continue
             expected = _differing_columns(arms[arm_locked]["fingerprint"], frozen["fingerprint"])
-            assert sorted(receipt[cell_id][arm]["differing_columns"]) == expected, (cell_id, arm)
+            assert sorted(cells[cell_id]["removed_arms"][arm]["differing_columns"]) == expected, (cell_id, arm)
             compared += 1
-    assert compared > 0, "無任何被移除臂份可比（G1 無 pandas 臂份）"
+    assert compared > 0, "無任何被移除臂份可比（G1 無他臂份）"
 
 
 @pytest.mark.parametrize("arm", sorted(ARM_ENVS))
-def test_icpage_arm_locked_recorded_arm_polars_every_env(arm: str, tmp_path: Path) -> None:
-    """Task 3.4 ③（輕量、四環境含 chunked）：記錄臂＝`polars`＝執行紀錄臂，輸出＝`FFACT_USE_POLARS=1` 之輸出。"""
+def test_icpage_arm_locked_recorded_arm_core_every_env(arm: str, tmp_path: Path) -> None:
+    """Task 3.4 ③（輕量、四環境含 chunked）：記錄臂＝擇定核心＝執行紀錄臂；輸出＝擇定核心原生輸出轉 float32，各環境同。"""
     arm_locked = _assert_locked()
     source = light_source(tmp_path, light_frame(), arm)
-    reference = light_run(tmp_path, source, ARM_ENVS["polars"], tag="ref")
     run = light_run(tmp_path, source, ARM_ENVS[arm], tag=arm)
     assert arm_record_violations(run, arm_locked) == []
-    assert nh.bitwise_diff(nh.frame_fingerprints(reference.frame), nh.frame_fingerprints(run.frame)) == []
-
-
-def unavailable_rejected(tmp_path: Path, source: Source, env: Mapping[str, str], tag: str) -> bool:
-    """Task 3.4 ④ oracle：Polars 不可用（已由呼叫端注入）⇒ 拋 `PostICArmUnavailableError` 且無任何輸出檔。"""
-    cwd = tmp_path / f"cwd_{tag}"
-    try:
-        light_run(tmp_path, source, env, tag=tag, cwd=cwd)
-    except PostICArmUnavailableError:
-        return report_files(cwd) == []
-    except Exception:  # noqa: BLE001 — 其他型別即非具名拒收
-        return False
-    return False
+    native = core_native_output(_light_input(source), arm_locked)
+    assert nh.bitwise_diff(nh.frame_fingerprints(native.astype(np.float32)), nh.frame_fingerprints(run.frame)) == []
 
 
 @pytest.mark.parametrize("env_name", ["polars", "pandas_optimized"])
-def test_icpage_arm_locked_polars_unavailable_named_error(env_name: str, tmp_path: Path,
-                                                          monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 3.4 ④：模擬 Polars 不可用（`FFACT_USE_POLARS` 為 1 或 0）⇒ `PostICArmUnavailableError`、無輸出檔（不退回 pandas）。"""
-    _assert_locked()
-    source = light_source(tmp_path, light_frame(), f"unavail_{env_name}")
+def test_icpage_arm_locked_polars_unavailable_still_produces(env_name: str, tmp_path: Path,
+                                                              monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 3.4 ④：Polars 不可用（`FFACT_USE_POLARS` 為 1 或 0）⇒ IC 頁照常產出，輸出與記錄臂同 Polars 可用時（Polars 非
+    post-IC 依賴，D10）；IC-first 入口（`transform_selected` 帶擇定核心）同。"""
+    arm_locked = _assert_locked()
+    source = light_source(tmp_path, light_frame(), f"avail_{env_name}")
+    reference = light_run(tmp_path, source, ARM_ENVS[env_name], tag="avail")
     monkeypatch.setattr(polars_adapter, "_check_polars_available", lambda: False)
-    assert unavailable_rejected(tmp_path, source, ARM_ENVS[env_name], env_name)
+    run = light_run(tmp_path, source, ARM_ENVS[env_name], tag="unavail")
+    assert arm_record_violations(run, arm_locked) == []
+    assert nh.bitwise_diff(nh.frame_fingerprints(reference.frame), nh.frame_fingerprints(run.frame)) == []
+    frame = _light_input(source)
+    from momentum.factories import create_feature_preprocessor
+
+    cfg = _default_post_ic_config(list(frame.columns))
+    pre = create_feature_preprocessor(cfg.model_dump())
+    out = pre.transform_selected(list(frame.columns), {"g": frame}, config=cfg, arm=icc.POST_IC_ARM)
+    assert set(out) == {"g"} and executed_arms(pre) == {arm_locked}
 
 
 def _git_py_files(*roots: str) -> List[str]:
@@ -873,7 +1011,7 @@ def test_icpage_arm_locked_decision_record_user_ruling() -> None:
 
 
 def test_icpage_arm_locked_decision_record_re_presentation() -> None:
-    """Task 3.4 施工前提／⑥（SPEC v17 §A 重新呈報條件、Task 1.5 ⑦）：決定紀錄 `d_icpage_arm` 具 `re_presentation`——日期不早於
+    """Task 3.4 施工前提／⑥（SPEC §A 重新呈報條件、Task 1.5 ⑦）：決定紀錄 `d_icpage_arm` 具 `re_presentation`——日期不早於
     Task 1.1 效能基準收據之首次提交、使用者回覆逐字、所據收據存在且已提交、`confirmed_choice`＝`choice`＝鎖臂（同
     `numview_helpers.re_presentation_violations`，與 Task 1.5 ⑦ 同一判定）。缺或不合 ⇒ 本批（b4）不得施工。"""
     record = _decision_record("d_icpage_arm")
@@ -888,6 +1026,42 @@ def test_mutation_icpage_arm_locked_re_presentation_deleted(monkeypatch: pytest.
               "user_ruling": {"date": RULING_DATE, "quote": list(RULING_QUOTES)}}
     monkeypatch.setattr(sys.modules[__name__], "_decision_record", lambda key: dict(record))
     assert any("缺 re_presentation" in v for v in nh.re_presentation_violations(_decision_record("d_icpage_arm")))
+
+
+def _postic_core_receipt() -> Dict[str, Any]:
+    paths = sorted(nh.RECEIPTS_DIR.glob(POSTIC_CORE_RECEIPT_GLOB))
+    assert paths, f"Task 1.6 核心擇一收據不存在：{nh.RECEIPTS_DIR}/{POSTIC_CORE_RECEIPT_GLOB}"
+    return json.loads(paths[-1].read_text(encoding="utf-8"))
+
+
+def core_binding_violations() -> List[str]:
+    """⑧機械綁定：契約 `post_ic_entries.ic_first.arm`＝`ic_first_context.POST_IC_ARM`＝決定紀錄 d_icpage_arm
+    `report.post_ic_core`＝Task 1.6 收據 `choice`（收據 `no_choice` ⇒ ＝`report.core_user_ruling.core`），且
+    `re_presentation.confirmed_choice`＝`lock`。"""
+    record = _decision_record("d_icpage_arm")
+    report = record.get("report") or {}
+    receipt = _postic_core_receipt()
+    out: List[str] = []
+    if receipt.get("choice"):
+        expected = receipt["choice"]
+    elif receipt.get("no_choice"):
+        expected = (report.get("core_user_ruling") or {}).get("core")
+    else:
+        expected = None
+        out.append("Task 1.6 收據既無 choice 亦無 no_choice")
+    chain = {"contract": nv.load_contract()["post_ic_entries"]["ic_first"].get("arm"),
+             "POST_IC_ARM": icc.POST_IC_ARM, "report.post_ic_core": report.get("post_ic_core"), "receipt": expected}
+    if len(set(chain.values())) != 1:
+        out.append(f"擇定核心不一致：{chain}")
+    if (record.get("re_presentation") or {}).get("confirmed_choice") != "lock":
+        out.append("re_presentation.confirmed_choice≠lock")
+    return out
+
+
+def test_icpage_arm_locked_core_binding() -> None:
+    """Task 3.4 ⑧：契約臂＝`POST_IC_ARM`＝決定紀錄所記核心＝Task 1.6 收據擇定（或使用者裁定）之核心，且重新呈報確認鎖臂。"""
+    _assert_locked()
+    assert core_binding_violations() == []
 
 
 def _pandas_arm_callers_receipt() -> Dict[str, Any]:
@@ -935,6 +1109,107 @@ def test_icpage_arm_locked_pandas_arm_callers_receipt_consistent() -> None:
     assert pandas_arm_receipt_violations() == []
 
 
+# ---------------------------------------------------------------------------------------------- Task 3.4 ⑨（v41 float32）
+
+def _legacy_float16_case() -> Tuple[pd.DataFrame, List[str]]:
+    """⑨真實輸入：Task 1.6 收據 (b)（`C_BTCUSDT_1h` 全特徵格）之 legacy 原生輸出為 float16 之欄，自該格凍結 run 之複本
+    （`inputs.b.features_root`；非合成）以 `FeatureReader.load_columns_v2` 只讀該等欄。欄數須＝收據該單元之 float16 欄數。
+    IC 頁之 float16 原生欄另由 G1 `A_SOLUSDT_1h`（凍結 pandas_legacy 份含 float16 欄）之①案涵蓋。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    receipt = _postic_core_receipt()
+    unit = next(u for u in receipt["units"] if u.get("core") == "pandas_legacy" and u.get("input") == "b")
+    meta = json.loads((Path(unit["out_dir"]) / "meta.json").read_text(encoding="utf-8"))
+    names = list(meta["blocks"]["float16"])
+    assert len(names) == int(unit["output"]["dtypes"]["float16"]) > 0, (len(names), unit["output"])
+    b = receipt["inputs"]["b"]
+    root = Path(b["features_root"])
+    assert (root / "BTCUSDT" / "1h" / str(b["config_hash"])).is_dir(), f"Task 1.6 (b) 凍結 run 複本不存在（須保留至收案）：{root}"
+    frame = FeatureReader(str(root)).load_columns_v2("BTCUSDT", "1h", str(b["config_hash"]), names)
+    return frame.loc[:, names], names
+
+
+@pytest.fixture(scope="module")
+def f16_case() -> Tuple[pd.DataFrame, List[str]]:
+    return _legacy_float16_case()
+
+
+def _core_entry_output(frame: pd.DataFrame, names: List[str], core_inputs: Optional[List[Dict[str, str]]] = None
+                       ) -> pd.DataFrame:
+    """IC 頁與 IC-first 共用之 post-IC 入口（`transform_selected`，擇定核心）以 IC 頁預設請求設定轉換；回該群組輸出。
+    `core_inputs` 給定時以 spy 記錄核心（`_transform_single`）每次收到之輸入欄 dtype。"""
+    from momentum.factories import create_feature_preprocessor
+
+    cfg = _default_post_ic_config(names)
+    with pytest.MonkeyPatch.context() as mp:
+        if core_inputs is not None:
+            real = FeaturePreprocessor._transform_single
+
+            def spy(self: Any, features_df: pd.DataFrame, *a: Any, **k: Any) -> Any:
+                core_inputs.append({str(c): str(d) for c, d in features_df.dtypes.items()})
+                return real(self, features_df, *a, **k)
+
+            mp.setattr(FeaturePreprocessor, "_transform_single", spy)
+        out = create_feature_preprocessor(cfg.model_dump()).transform_selected(names, {"g": frame}, config=cfg,
+                                                                                arm=icc.POST_IC_ARM)
+    return out["g"]
+
+
+def float32_output_violations(case: Tuple[pd.DataFrame, List[str]]) -> List[str]:
+    """⑨正向：含 legacy 原生 float16 輸出欄之真實輸入，post-IC 入口輸出每欄 float32，且值＝擇定核心原生輸出逐值轉 float32 後
+    逐位元相等；前提：參照之原生輸出確含 float16 欄。"""
+    frame, names = case
+    native = core_native_output(frame, locked_arm())
+    out: List[str] = []
+    if "float16" not in set(map(str, native.dtypes)):
+        out.append("前提不成立：擇定核心原生輸出無 float16 欄")
+    core_inputs: List[Dict[str, str]] = []
+    got = _core_entry_output(frame, names, core_inputs)
+    # 核心收到之輸入＝raw 原生 dtype（float32 轉換只在核心之後；轉換移至核心前之 mutant 於值上等價——收據
+    # `*-numview-cast-first-equivalence.json`：C 格 293 欄非退化 float16 輸入與 14 欄 float16 原生輸出欄皆 0 格不同——故以
+    # 核心輸入 dtype 觀測）
+    want = {str(c): str(d) for c, d in frame.dtypes.items()}
+    if not core_inputs or any(seen != {c: want[c] for c in seen} for seen in core_inputs):
+        out.append(f"核心輸入 dtype≠raw 原生 dtype：{core_inputs[:1]}")
+    if set(map(str, got.dtypes)) != {"float32"}:
+        out.append(f"輸出 dtype 非全 float32：{sorted(set(map(str, got.dtypes)))}")
+    diff = nh.bitwise_diff(nh.frame_fingerprints(native.astype(np.float32)), nh.frame_fingerprints(got))
+    if diff:
+        out.append(f"值≠原生輸出轉 float32：{diff[:3]}")
+    return out
+
+
+def float64_rejection_violations(case: Tuple[pd.DataFrame, List[str]]) -> List[str]:
+    """⑨負向：同批真實欄轉 float64 後輸入（擇定核心原生輸出含 float64 欄）⇒ `PostICOutputDtypeError`、無回傳，錯誤訊息列出
+    原生輸出為 float64 之每欄（測試內以參照核心重算之欄集合）。"""
+    frame, names = case
+    frame64 = frame.astype(np.float64)
+    native = core_native_output(frame64, locked_arm())
+    f64 = [str(c) for c, d in native.dtypes.items() if str(d) == "float64"]
+    out: List[str] = [] if f64 else ["前提不成立：float64 輸入之原生輸出無 float64 欄"]
+    try:
+        _core_entry_output(frame64, names)
+    except nv.PostICOutputDtypeError as exc:
+        missing = [c for c in f64 if c not in str(exc)]
+        if missing:
+            out.append(f"錯誤訊息未列 float64 欄：{missing[:3]}")
+    else:
+        out.append("float64 原生輸出未拒收（應 PostICOutputDtypeError）")
+    return out
+
+
+def test_icpage_arm_locked_output_float32_from_native_float16(f16_case: Tuple[pd.DataFrame, List[str]]) -> None:
+    """Task 3.4 ⑨（v41）：legacy 原生 float16 輸出欄（真實 C 格欄）經 post-IC 入口 ⇒ 每欄 float32、值＝原生輸出轉 float32。"""
+    _assert_locked()
+    assert float32_output_violations(f16_case) == []
+
+
+def test_icpage_arm_locked_native_float64_rejected(f16_case: Tuple[pd.DataFrame, List[str]]) -> None:
+    """Task 3.4 ⑨（v41）：原生輸出含 float64 欄 ⇒ `PostICOutputDtypeError`（列欄名）、無輸出。"""
+    _assert_locked()
+    assert float64_rejection_violations(f16_case) == []
+
+
 # ---------------------------------------------------------------------------------------------- Task 3.4 邊界
 
 def test_boundary_37_icpage_arm_locked_ratio_unsafe_only_error_unchanged(tmp_path: Path) -> None:
@@ -968,18 +1243,21 @@ def test_boundary_38_icpage_arm_locked_ic_first_empty_selection_unchanged(tmp_pa
     assert pre.last_post_ic_execution() == ({}, {})
 
 
-def test_boundary_39_icpage_arm_locked_use_polars_off_still_polars(tmp_path: Path) -> None:
-    """邊界③（Task 3.4）：`FFACT_USE_POLARS=0` ⇒ IC 頁仍走 Polars（記錄臂＝polars＝執行紀錄臂、輸出＝polars 環境輸出）；
-    該環境變數對特徵階段照舊（直接 `transform()` 不走 Polars 臂）。"""
+def test_boundary_39_icpage_arm_locked_env_has_no_effect_on_post_ic(tmp_path: Path) -> None:
+    """邊界③（Task 3.4）：`FFACT_USE_POLARS`、`FFACT_L65_OPTIMIZATION_PROFILE` 對 IC 頁不生效（各環境記錄臂＝擇定核心、輸出
+    相同）；對特徵階段照舊（直接 `transform()` 於 `FFACT_USE_POLARS=1` 走 Polars、`=0` 不走）。"""
     arm = _assert_locked()
     frame = light_frame()
-    source = light_source(tmp_path, frame, "off")
-    reference = light_run(tmp_path, source, ARM_ENVS["polars"], tag="ref")
-    run = light_run(tmp_path, source, ARM_ENVS["pandas_optimized"], tag="off")
-    assert arm_record_violations(run, arm) == []
-    assert nh.bitwise_diff(nh.frame_fingerprints(reference.frame), nh.frame_fingerprints(run.frame)) == []
-    _out, calls = direct_transform(frame, ARM_ENVS["pandas_optimized"])
-    assert "_transform_single_polars" not in calls and "_transform_single" in calls, calls
+    source = light_source(tmp_path, frame, "env")
+    runs = {name: light_run(tmp_path, source, ARM_ENVS[name], tag=name) for name in ("polars", "pandas_optimized")}
+    for run in runs.values():
+        assert arm_record_violations(run, arm) == []
+    assert nh.bitwise_diff(nh.frame_fingerprints(runs["polars"].frame),
+                           nh.frame_fingerprints(runs["pandas_optimized"].frame)) == []
+    _out, calls_on = direct_transform(frame, ARM_ENVS["polars"])
+    _out, calls_off = direct_transform(frame, ARM_ENVS["pandas_optimized"])
+    assert "_transform_single_polars" in calls_on, calls_on
+    assert "_transform_single_polars" not in calls_off and "_transform_single" in calls_off, calls_off
 
 
 # ---------------------------------------------------------------------------------------------- Task 3.4 mutation
@@ -1011,24 +1289,53 @@ def test_mutation_icpage_arm_locked_arm_optional_again(monkeypatch: pytest.Monke
     assert arm_signature_violations(getattr(FeaturePreprocessor, "transform_selected")) != []
 
 
-def test_mutation_icpage_arm_locked_fallback_to_pandas(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutation（Task 3.4）：臂不可用時改為退回 pandas（攔 `PostICArmUnavailableError` 改走環境分派）⇒ ④翻轉（有輸出或非具名錯誤）。"""
-    _assert_locked()
-    source = light_source(tmp_path, light_frame(), "fallback")
-    monkeypatch.setattr(polars_adapter, "_check_polars_available", lambda: False)
+def test_mutation_icpage_arm_locked_env_dispatch_restored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（Task 3.4）：`transform_selected` 改回依環境選臂（不設擇定核心）⇒ ①③之環境矩陣案翻紅（`FFACT_USE_POLARS=1`
+    下記錄臂≠擇定核心、輸出≠擇定核心轉 float32）。"""
+    arm_locked = _assert_locked()
+    source = light_source(tmp_path, light_frame(), "envmut")
+    monkeypatch.setattr(nv, "require_post_ic_core", lambda arm: arm)
     real = getattr(FeaturePreprocessor, "transform_selected")
 
-    def fallback(self: Any, selected: Any, groups: Any, config: Any = None, **kwargs: Any) -> Any:
-        try:
-            return real(self, selected, groups, config=config, **kwargs)
-        except PostICArmUnavailableError:
-            cfg = config.model_dump() if hasattr(config, "model_dump") else dict(config or {})
-            pandas_pre = FeaturePreprocessor(cfg)
-            return {gid: pandas_pre.transform(df.loc[:, [c for c in selected if c in df.columns]].copy())
-                    for gid, df in groups.items()}
+    def env_dispatch(self: Any, selected: Any, groups: Any, config: Any = None, *, arm: str) -> Any:
+        return real(self, selected, groups, config=config, arm=None)
 
-    monkeypatch.setattr(FeaturePreprocessor, "transform_selected", fallback)
-    assert not unavailable_rejected(tmp_path, source, ARM_ENVS["polars"], "fallback")
+    monkeypatch.setattr(FeaturePreprocessor, "transform_selected", env_dispatch)
+    run = light_run(tmp_path, source, ARM_ENVS["polars"], tag="envmut")
+    native = core_native_output(_light_input(source), arm_locked)
+    flipped = arm_record_violations(run, arm_locked) != [] or nh.bitwise_diff(
+        nh.frame_fingerprints(native.astype(np.float32)), nh.frame_fingerprints(run.frame)) != []
+    assert flipped
+
+
+def test_mutation_icpage_arm_locked_post_ic_builder_drops_zscore(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（審碼 b4 r1 CODEX-R1-P1-03）：被測之 post-IC 設定建構（`_build_post_ic_transform_config`）改壞為關 zscore ⇒
+    IC 頁輸出≠獨立參照（參照之設定由測試自建、不經該建構，故不隨之改變）。"""
+    arm_locked = _assert_locked()
+    source = light_source(tmp_path, light_frame(), "builder")
+    real = FeaturePreprocessor._build_post_ic_transform_config
+
+    def broken(self: Any, selected_columns: List[str], config: Any = None) -> Dict[str, Any]:
+        out = real(self, selected_columns=selected_columns, config=config)
+        out["adaptive_zscore"] = dict(out.get("adaptive_zscore") or {}, enabled=False)
+        return out
+
+    monkeypatch.setattr(FeaturePreprocessor, "_build_post_ic_transform_config", broken)
+    run = light_run(tmp_path, source, ARM_ENVS["polars"], tag="builder")
+    native = core_native_output(_light_input(source), arm_locked)
+    assert nh.bitwise_diff(nh.frame_fingerprints(native.astype(np.float32)), nh.frame_fingerprints(run.frame)) != []
+
+
+def test_mutation_icpage_arm_locked_post_ic_arm_constant_polars(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（Task 3.4）：`POST_IC_ARM` 改回 `"polars"`、或決定紀錄 `report.post_ic_core` 與契約不一致 ⇒ ⑧紅。"""
+    monkeypatch.setattr(icc, "POST_IC_ARM", _spec_arm("polars"))
+    assert core_binding_violations() != []
+    monkeypatch.undo()
+    record = copy.deepcopy(_decision_record("d_icpage_arm"))
+    record["report"]["post_ic_core"] = next(a for a in nv.load_contract()["post_ic_arm_values"]["values"]
+                                            if a != record["report"]["post_ic_core"])
+    monkeypatch.setattr(sys.modules[__name__], "_decision_record", lambda key: copy.deepcopy(record))
+    assert core_binding_violations() != []
 
 
 def test_mutation_icpage_arm_locked_shared_function_marked_deleted(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1042,6 +1349,33 @@ def test_mutation_icpage_arm_locked_shared_function_marked_deleted(monkeypatch: 
     mutated["functions"] = functions
     monkeypatch.setattr(sys.modules[__name__], "_pandas_arm_callers_receipt", lambda: mutated)
     assert any(v.startswith(name) for v in pandas_arm_receipt_violations())
+
+
+def test_mutation_icpage_arm_locked_float32_cast_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                          f16_case: Tuple[pd.DataFrame, List[str]]) -> None:
+    """mutation（v41）：刪 float32 轉換（原生輸出原樣回傳）⇒ ⑨之 float16 欄案紅。"""
+    monkeypatch.setattr(nv, "post_ic_output_float32", lambda frame: frame)
+    assert float32_output_violations(f16_case) != []
+
+
+def test_mutation_icpage_arm_locked_cast_before_core(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                      f16_case: Tuple[pd.DataFrame, List[str]]) -> None:
+    """mutation（v41）：float32 轉換改在核心之前（輸入先轉 float32）⇒ ⑨之核心輸入 dtype 案紅（值上為等價 mutant，見收據
+    `*-numview-cast-first-equivalence.json`）。"""
+    real = getattr(FeaturePreprocessor, "transform_selected")
+
+    def cast_first(self: Any, selected: Any, groups: Any, config: Any = None, *, arm: str) -> Any:
+        return real(self, selected, {g: df.astype(np.float32) for g, df in groups.items()}, config=config, arm=arm)
+
+    monkeypatch.setattr(FeaturePreprocessor, "transform_selected", cast_first)
+    assert float32_output_violations(f16_case) != []
+
+
+def test_mutation_icpage_arm_locked_dtype_guard_removed(monkeypatch: pytest.MonkeyPatch,
+                                                         f16_case: Tuple[pd.DataFrame, List[str]]) -> None:
+    """mutation（v41）：刪 dtype 守衛改為一律 `astype(float32)` ⇒ ⑨之 float64 案紅。"""
+    monkeypatch.setattr(nv, "post_ic_output_float32", lambda frame: frame.astype(np.float32))
+    assert float64_rejection_violations(f16_case) != []
 
 
 # ---------------------------------------------------------------------------------------------- Task 4.3 驗證

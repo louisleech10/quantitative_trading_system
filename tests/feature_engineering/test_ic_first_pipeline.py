@@ -13,6 +13,7 @@ import pyarrow.parquet as pq
 
 from momentum.Analysis.ic_engine import ICEngine, ICReadError
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
+from momentum.FeatureEngineering import numeric_view as _nv
 from momentum.FeatureEngineering.feature_config import PreprocessingConfig
 from momentum.FeatureEngineering.feature_factory import FeatureFactory
 from momentum.FeatureEngineering.feature_reader import FeatureReader
@@ -182,6 +183,7 @@ def test_transform_selected_only_processes_ic_features(monkeypatch) -> None:
         ["alpha", "gamma"],
         groups,
         config.preprocessing,
+        arm=_nv.post_ic_arm("ic_first"),
     )
 
     assert set(result) == {"group_alpha", "group_gamma"}
@@ -201,6 +203,7 @@ def test_ic_empty_selection(tmp_path) -> None:
             )
         },
         config.preprocessing,
+        arm=_nv.post_ic_arm("ic_first"),
     )
     assert processed_groups == {}
 

@@ -3284,19 +3284,46 @@ def test_mutation_icpage_re_presentation_invalid(mutant: str, monkeypatch: pytes
 # 重型生成之獨有覆蓋以判準檔 path_registry 之 id 機械判定（covers 文字只作人讀說明）；測試端獨立帳與估時器
 # `coverage_violations`（⑦ path_registry_violations）互為對照。
 
+def _live_anchor_lines(rel: str) -> List[str]:
+    """錨點所指檔之現行內容（逐行；檔不存在 ⇒ 空）。獨立於估時器之 `live_anchor_lines`；mutation 之注入點。"""
+    path = REPO / rel
+    return path.read_text(encoding="utf-8", errors="replace").splitlines() if path.is_file() else []
+
+
 def _path_registry_ledger_violations(criteria: Mapping[str, Any]) -> List[str]:
     """獨立重算：(a) 同碼態一 id 至多一個生成宣稱（distinct_by 所列 env／variant 兩兩相異者除外）；(b) 每個登錄 id 至少一個
     生成宣稱；(c) 錨點 path:line 解析至存在之非空行；生成列 covers_ids 非空且 ⊆ 登錄。不含 assert。"""
     paths = (criteria.get("path_registry") or {}).get("paths") or []
     reg = {str(p.get("id")): p for p in paths}
     out: List[str] = [] if len(reg) == len(paths) and paths else ["登錄為空或 id 重複"]
+    # 錨點記判準凍結當時之碼位置：依現行判準檔最後提交之檔內容解析（獨立 git 呼叫，不讀估時器之實作）
+    import subprocess
+
+    crit_rel = str(nh.current_criteria_path().relative_to(REPO))
+    commit = subprocess.run(["git", "-C", str(REPO), "log", "-1", "--format=%H", "--", crit_rel],
+                            capture_output=True, text=True).stdout.strip()
     for pid, entry in reg.items():
         for anchor in entry.get("code_anchors") or [""]:
             rel, _, line = str(anchor).rpartition(":")
-            target = REPO / rel
-            text = target.read_text(encoding="utf-8", errors="replace").splitlines() if rel and target.is_file() else []
+            shown = subprocess.run(["git", "-C", str(REPO), "show", f"{commit}:{rel}"], capture_output=True) \
+                if rel and commit else None
+            text = shown.stdout.decode("utf-8", errors="replace").splitlines() \
+                if shown is not None and shown.returncode == 0 else []
             if not line.isdigit() or not (1 <= int(line) <= len(text)) or not text[int(line) - 1].strip():
                 out.append(f"{pid} 錨點 {anchor} 不解析")
+                continue
+            # 現行碼須於同一上下文恰一次含該錨點（歷史最小唯一上下文窗；零次＝刪除／改名、多次＝無法定位，皆紅；行號位移不紅）
+            hist = [s.strip() for s in text]
+            idx, window = int(line) - 1, None
+            for radius in range(13):
+                cand = hist[max(0, idx - radius):idx + radius + 1]
+                if sum(hist[i:i + len(cand)] == cand for i in range(len(hist) - len(cand) + 1)) == 1:
+                    window = cand
+                    break
+            live = [s.strip() for s in _live_anchor_lines(rel)]
+            hits = sum(live[i:i + len(window)] == window for i in range(len(live) - len(window) + 1)) if window else 0
+            if window is None or hits != 1:
+                out.append(f"{pid} 錨點 {anchor} 之上下文於現行碼出現 {hits} 次（須恰一次）")
     seen: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
     for kind, node in (criteria.get("run_coverage") or {}).items():
         if not isinstance(node, Mapping) or not node.get("code_state"):
@@ -3329,6 +3356,7 @@ def test_estimate_path_registry_closed_and_complete() -> None:
 
 
 @pytest.mark.parametrize("mutant", ["reworded_duplicate_same_id", "registry_id_unclaimed", "anchor_missing_line",
+                                    "anchor_line_gone_from_live_code", "anchor_duplicate_line_deleted",
                                     "generation_without_covers_ids"])
 def test_mutation_estimate_path_registry(mutant: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation（CODEX-R5-P1-03）：以新措辭重複同一路徑 id（同碼態、非 distinct_by 維度）／登錄 id 無生成宣稱／錨點指向不存在
@@ -3349,6 +3377,27 @@ def test_mutation_estimate_path_registry(mutant: str, monkeypatch: pytest.Monkey
     elif mutant == "anchor_missing_line":
         criteria["path_registry"]["paths"][0]["code_anchors"] = ["momentum/factories.py:999999"]
         expect = "不解析至存在之非空行"
+    elif mutant == "anchor_duplicate_line_deleted":
+        # 判準錨點 feature_factory.py:1895 之逐字行於同檔另有一處（:1981）：只刪錨點所指之一處（經兩端之現行讀取接縫注入）
+        rel = "momentum/FeatureEngineering/feature_factory.py"
+        assert any(f"{rel}:1895" in (p.get("code_anchors") or []) for p in criteria["path_registry"]["paths"])
+        hist = ESTIMATOR.anchor_lines_at_criteria_commit(rel)
+        window = ESTIMATOR.anchor_context_window(hist, 1894)
+        live = ESTIMATOR.live_anchor_lines(rel)
+        stripped = [s.strip() for s in live]
+        start = next(i for i in range(len(stripped)) if stripped[i:i + len(window)] == window)
+        mutated = list(live)
+        mutated[start + (len(window) - 1) // 2] = "# deleted anchor"
+        assert hist[1894].strip() in {s.strip() for s in mutated}, "前提：被刪之錨點行同文仍存在於他處"
+        real_est, real_led = ESTIMATOR.live_anchor_lines, _live_anchor_lines
+        monkeypatch.setattr(ESTIMATOR, "live_anchor_lines", lambda r: mutated if r == rel else real_est(r))
+        monkeypatch.setattr(sys.modules[__name__], "_live_anchor_lines", lambda r: mutated if r == rel else real_led(r))
+        expect = "之上下文於現行碼出現 0 次"
+    elif mutant == "anchor_line_gone_from_live_code":
+        # 判準提交時 feature_preprocessor.py:3547 為空窗 `else 100` 靜默預設（NUMVIEW Task 2.1 已刪）：歷史可解析、現行碼已無該行
+        criteria["path_registry"]["paths"][0]["code_anchors"] = [
+            "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3547"]
+        expect = "之上下文於現行碼出現 0 次"
     else:
         next(r for r in cov["regen_b4"]["runs"] if r.get("variant"))["covers_ids"] = []
         expect = "缺 covers_ids"

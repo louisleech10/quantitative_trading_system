@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-24T21:42:40.675708+00:00",
+  "head": "07ae47916620c1948bbddd001183228967ad8d81",
+  "command": "venv/bin/python handoffs/run_receipts/numview_probes/cast_first_equivalence.py",
+  "probe_sha256": "15de9abc139225237d9fb7fee8dbf7da449583a031701db0922a41b9a7e091b9",
+  "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
+  "source_receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json",
+  "core_env": {
+    "FFACT_USE_POLARS": "0",
+    "FFACT_L65_OPTIMIZATION_PROFILE": "legacy",
+    "FFACT_L65_CHUNK_SIZE": "0"
+  },
+  "cases": {
+    "legacy_float16_output_columns": {
+      "columns": 14,
+      "rows": 500,
+      "input_dtypes": {
+        "float16": 14
+      },
+      "native_output_dtypes": {
+        "float16": 14
+      },
+      "cast_first_output_dtypes": {
+        "float32": 14
+      },
+      "finite_native_cells": 1500,
+      "differing_cells": 0,
+      "native_columns_with_more_than_one_value": 0
+    },
+    "nontrivial_float16_raw_columns": {
+      "columns": 293,
+      "rows": 500,
+      "input_dtypes": {
+        "float16": 293
+      },
+      "native_output_dtypes": {
+        "float32": 293
+      },
+      "cast_first_output_dtypes": {
+        "float32": 293
+      },
+      "finite_native_cells": 43950,
+      "differing_cells": 0,
+      "native_columns_with_more_than_one_value": 293
+    }
+  }
+}

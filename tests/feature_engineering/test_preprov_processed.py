@@ -15,6 +15,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
+from momentum.FeatureEngineering import numeric_view as _nv
 from momentum.FeatureEngineering import run_provenance as rp
 from tests.feature_engineering import preprov_helpers as ph
 
@@ -101,7 +102,7 @@ def post_ic_unit(runs: ph.RunCache, *, n_absent: int, with_ratio_unsafe: bool) -
     factory = create_feature_factory(cache_dir=ph.KLINE_DIR, validate_continuity=False)
     config = factory._resolve_config(copy.deepcopy(ph.CELLS["ic_first"]["payload"]))
     pre = FeaturePreprocessor(config.preprocessing.model_dump())
-    processed = pre.transform_selected(selected, groups, config.preprocessing, arm="polars")
+    processed = pre.transform_selected(selected, groups, config.preprocessing, arm=_nv.post_ic_arm("ic_first"))  # NUMVIEW Task 3.4：擇定核心（契約）
     records, exec_groups = ph.post_ic_execution(pre)
     return {"pre": pre, "selected": selected, "absent": absent, "ratio_unsafe": unsafe, "records": records,
             "groups": exec_groups, "processed_cols": [str(c) for f in processed.values() for c in f.columns]}
@@ -117,7 +118,8 @@ def unit_population_violations(unit: Mapping[str, Any], spec: Mapping[str, Any])
 # ---------------------------------------------------------------------------------------------- 驗證
 
 def test_verification_01_processed_records_per_selected_column(runs: ph.RunCache) -> None:
-    """① 真實短窗 IC-first 後 processed 紀錄逐選欄恰一筆（＝processed 群組欄、⊆ IC 選欄），群組臂＝SPEC 點名之 `polars`。"""
+    """① 真實短窗 IC-first 後 processed 紀錄逐選欄恰一筆（＝processed 群組欄、⊆ IC 選欄），群組臂＝post-IC 擇定核心（NUMVIEW Task 3.4 取代 FFDSTAR Task 1.4 之 `polars` 字面；契約
+    `post_ic_entries.ic_first`，須屬 PRE-PROV 契約 `group_arm_values`）。"""
     spec = ph.contract()
     handle = runs.get("ic_first")
     table = ph.provenance_table(handle.run_dir, "processed")
@@ -126,9 +128,12 @@ def test_verification_01_processed_records_per_selected_column(runs: ph.RunCache
     selected = set(ph.observation(handle).result_metadata["selected_features"])
     assert names and len(names) == len(set(names))
     assert set(names) == set(processed_cols) and set(names) <= selected
-    polars = ph.spec_named("post_ic_arm_polars", spec)
+    from momentum.FeatureEngineering import numeric_view as nv
+
+    core = nv.post_ic_arm("ic_first")
+    assert core in ph.contract_values("group_arm_values", spec)
     groups = ph.provenance_pointer(handle.run_dir, "processed")["groups"]
-    assert groups and all(g["arm"] == polars for g in groups.values())
+    assert groups and all(g["arm"] == core for g in groups.values())
     assert ph.sha256_file(ph.provenance_file(handle.run_dir, "processed")) == \
         ph.provenance_pointer(handle.run_dir, "processed")["sha256"]
 
@@ -204,7 +209,7 @@ def test_boundary_01_selected_columns_absent_from_raw(runs: ph.RunCache) -> None
     pre = FeaturePreprocessor(config.preprocessing.model_dump())
     groups = _raw_groups(handle)
     absent = [f"{name}_absent" for name in list(next(iter(groups.values())).columns)[:3]]
-    assert pre.transform_selected(absent, groups, config.preprocessing, arm="polars") == {}
+    assert pre.transform_selected(absent, groups, config.preprocessing, arm=_nv.post_ic_arm("ic_first")) == {}
     records = ph.preprocessor_records(pre)
     assert records == {}
     table = rp.build_provenance_table(records, output_columns=[], column_group={}, dropped_columns={})

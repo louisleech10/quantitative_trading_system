@@ -879,11 +879,19 @@ class FeaturePreprocessor:
 
         from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
-        # ICFIRSTALIGN Task 3.2：IC-first 之 post-IC 臂為 run 契約（明示 Polars，不讀環境）；其餘 caller 依環境
-        use_polars = True if getattr(self, "_forced_arm", None) == "polars" else polars_enabled()
-
         num_cols = len(features_df.columns)
         chunk_size = self._column_chunk_size
+
+        forced_arm = getattr(self, "_forced_arm", None)
+        if forced_arm is not None:
+            # NUMVIEW Task 3.4：post-IC 擇定之 pandas 核心（transform_selected 已驗）；不讀 FFACT_USE_POLARS／profile，
+            # 分塊為該核心之記憶體策略（記臂仍為核心名）
+            self._record_group(arm=forced_arm)
+            if chunk_size > 0 and num_cols > chunk_size:
+                return self._transform_chunked(features_df, chunk_size)
+            return self._transform_single(features_df)
+
+        use_polars = polars_enabled()
 
         if use_polars and not self.fracdiff_config.get("enabled", False):
             # Polars path: fracdiff not supported in Polars (requires scipy/statsmodels)
@@ -904,25 +912,23 @@ class FeaturePreprocessor:
         selected: List[str],
         groups: Dict[str, pd.DataFrame],
         config: Optional[Any] = None,
-        arm: Optional[str] = None,
+        *,
+        arm: str,
     ) -> Dict[str, pd.DataFrame]:
         """Post-IC transform for selected features only.
 
-        `arm`（ICFIRSTALIGN Task 3.2）：None ⇒ 依環境（既有 caller 行為不變）；"polars" ⇒ 固定 Polars 正式臂，
-        polars 不可用 ⇒ `PostICArmUnavailableError`。
+        `arm`（NUMVIEW Task 3.4；必填關鍵字）：須等於契約擇定之單一 pandas 核心（`post_ic_arm("ic_first")`，IC 頁經
+        `arm_ref` 引用），否則 `NumericPolicyError`；依該核心走 `_transform_single` 之對應分支，欄數逾
+        `FFACT_L65_CHUNK_SIZE` 時分塊，不讀 `FFACT_USE_POLARS`／`FFACT_L65_OPTIMIZATION_PROFILE`（Polars 非 post-IC 依賴）。
+        各群組輸出一律轉 float32，原生輸出非 float16／float32 ⇒ `PostICOutputDtypeError`（v41）。
 
         FFDSTAR Task 1.2／1.4：post-IC 前處理器沿用逐欄執行紀錄容器；回傳形態不變，紀錄（選欄全集：已寫出、入口剔除之
         ratio-unsafe、不在 raw 者各記其終態）經本實例 `last_post_ic_execution()` 取得，不併入本實例之紀錄。
         """
-        self._last_post_ic_execution = None
-        if arm is not None:
-            if arm != "polars":
-                raise ValueError(f"未知之 post-IC 臂：{arm!r}（只支援 'polars'）")
-            from momentum.FeatureEngineering import polars_adapter
-            from momentum.FeatureEngineering.ic_first_context import PostICArmUnavailableError
+        from momentum.FeatureEngineering import numeric_view as _numeric_view
 
-            if not polars_adapter._check_polars_available():
-                raise PostICArmUnavailableError("IC-first 之 post-IC 正式臂（Polars）不可用；不得退回 pandas 臂")
+        self._last_post_ic_execution = None
+        _numeric_view.require_post_ic_core(arm)
         selected_columns = [str(feature) for feature in selected]
         if not selected_columns:
             logger.warning("[IC-First] post_ic received empty IC selection")
@@ -972,7 +978,7 @@ class FeaturePreprocessor:
                 post_ic_preprocessor._record_group(status="ok" if not transformed.empty else "empty_output")
                 post_ic_preprocessor._record_input_execution(list(transformed.columns), terminal="written")
             if not transformed.empty:
-                processed_groups[str(group_id)] = transformed
+                processed_groups[str(group_id)] = _numeric_view.post_ic_output_float32(transformed)
 
         if missing_columns:
             # 選欄不在任何 raw 群組 ⇒ 不轉換、不輸出，各記其終態（逐選欄恰一筆）
@@ -3099,7 +3105,11 @@ class FeaturePreprocessor:
         return str(value) if value else None
 
     def _can_use_optimized_dataframe_path(self) -> bool:
-        if get_l65_optimization_profile() != "optimized":
+        # NUMVIEW Task 3.4：post-IC 擇定核心決定分支，不讀 FFACT_L65_OPTIMIZATION_PROFILE
+        forced_arm = getattr(self, "_forced_arm", None)
+        if forced_arm == "pandas_legacy":
+            return False
+        if forced_arm != "pandas_optimized" and get_l65_optimization_profile() != "optimized":
             return False
         if self.mode != "replace":
             return False

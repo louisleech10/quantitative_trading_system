@@ -5,31 +5,26 @@
   "post_ic_entries": {
     "_doc": "每入口一鍵（至少 ic_first、ic_page_apply_transforms）：{\"arm\": <post_ic_arm_values 之一>} 或 {\"arm_ref\": <另一入口鍵>} 或 {\"arm_policy\": <依環境解析之政策值>}，皆附 \"_sources\": [path:line]。Task 3.4 前 ic_page_apply_transforms 為 arm_policy；Task 3.4 改寫為 arm_ref=ic_first（使用者 2026-10-21 方向裁定）。",
     "ic_first": {
-      "arm": "polars",
+      "_doc": "Task 3.4（v41）：擇定之單一 pandas 核心＝pandas_legacy（Task 1.6 收據 no_choice、使用者 2026-10-24 裁定「legacy」，決定紀錄 d_icpage_arm report.core_user_ruling）；輸出一律 float32。",
+      "arm": "pandas_legacy",
       "_sources": {
         "POST_IC_ARM = _numeric_view.post_ic_arm(\"ic_first\")": [
-          "momentum/FeatureEngineering/ic_first_context.py:32"
+          "momentum/FeatureEngineering/ic_first_context.py:28"
         ],
         "arm=ctx.post_ic_arm,": [
           "momentum/FeatureEngineering/feature_factory.py:2982"
         ],
-        "if arm != \"polars\":": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:919"
+        "_numeric_view.require_post_ic_core(arm)": [
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:931"
         ]
       }
     },
     "ic_page_apply_transforms": {
-      "_doc": "Task 3.4 前：IC 頁第三步呼叫 transform_selected 不傳 arm ⇒ transform 依環境（FFACT_USE_POLARS、Polars 可用性、FFACT_L65_OPTIMIZATION_PROFILE、FFACT_L65_CHUNK_SIZE 與選欄數）解析臂。Task 3.4 改寫為 arm_ref=ic_first。",
-      "arm_policy": "env_resolved",
+      "_doc": "Task 3.4（使用者 2026-10-21 方向裁定、2026-10-24 重新呈報後改 pandas）：IC 頁第三步與 IC-first 同一擇定核心，transform_selected 傳 arm=post_ic_arm(\"ic_page_apply_transforms\")；不讀 FFACT_USE_POLARS／FFACT_L65_OPTIMIZATION_PROFILE。",
+      "arm_ref": "ic_first",
       "_sources": {
-        "transformed = preprocessor.transform_selected(kept_cols, {\"ic_page\": df}, config=transform_config)": [
-          "api/services/ic_analysis_service.py:2906"
-        ],
-        "use_polars = True if getattr(self, \"_forced_arm\", None) == \"polars\" else polars_enabled()": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:883"
-        ],
-        "if enabled and not _check_polars_available():": [
-          "momentum/FeatureEngineering/polars_adapter.py:91"
+        "arm=post_ic_entry_arm(\"ic_page_apply_transforms\")": [
+          "api/services/ic_analysis_service.py:2909"
         ]
       }
     }
@@ -47,13 +42,13 @@
         "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
       ],
       "pandas_optimized": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
       ],
       "pandas_legacy": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
       ],
       "pandas_chunked": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:896"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:904"
       ]
     }
   },
@@ -64,10 +59,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:927"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:933"
         ],
         "self._record_group(arm=\"polars\")": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:891"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
         ]
       }
     },
@@ -76,10 +71,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:927"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:933"
         ],
         "\"pandas_optimized\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
         ]
       }
     },
@@ -88,10 +83,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:927"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:933"
         ],
         "\"pandas_legacy\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
         ]
       }
     },
@@ -100,7 +95,7 @@
       "min_selected_columns": 2,
       "_sources": {
         "chunk_size > 0 and num_cols > chunk_size": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:895"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:903"
         ],
         "return max(size, 0)": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:853"
@@ -184,7 +179,7 @@
     ],
     "_sources": {
       "if not normalized_windows:": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3229"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3239"
       ],
       "windows: List[int]": [
         "momentum/FeatureEngineering/feature_config.py:310"
@@ -193,12 +188,12 @@
         "api/models/ic_models.py:421"
       ],
       "if \"non_empty_when_enabled\" in rules and not windows:": [
-        "momentum/FeatureEngineering/numeric_view.py:131"
+        "momentum/FeatureEngineering/numeric_view.py:136"
       ],
       "primary_window = self._primary_zscore_window(windows)": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3362",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3559",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4626"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3372",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3569",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4636"
       ]
     }
   },
@@ -210,15 +205,15 @@
     ],
     "_sources": {
       "quantile": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3192",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3711",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3202",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3721",
         "momentum/FeatureEngineering/polars_adapter.py:419",
         "momentum/FeatureEngineering/polars_adapter.py:451",
         "momentum/FeatureEngineering/feature_config.py:169"
       ],
       "sigma": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3176",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3692",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3186",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3702",
         "momentum/FeatureEngineering/polars_adapter.py:415",
         "momentum/FeatureEngineering/polars_adapter.py:441",
         "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:442"
@@ -230,7 +225,7 @@
     "value": "reject",
     "_sources": {
       "policy = contract[\"winsor_method_missing_key\"][\"value\"]": [
-        "momentum/FeatureEngineering/numeric_view.py:142"
+        "momentum/FeatureEngineering/numeric_view.py:147"
       ],
       "validate_preprocessing_policy(self._config)": [
         "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:179"
@@ -373,7 +368,7 @@
       "reason": "特徵 registry 檔路徑；所指檔內容可影響特徵定義（SPEC Task 0.2：非 output_only）。",
       "_sources": [
         "momentum/FeatureEngineering/feature_registry.py:39",
-        "momentum/factories.py:478"
+        "momentum/factories.py:486"
       ]
     },
     "FFACT_FRACDIFF_APPLY_TO_LAYERS": {
@@ -465,7 +460,7 @@
       "parser": "bool_text",
       "reason": "L6.5 raw sink 由大群組先處理之排程開關（預設開）。",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1899"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1905"
       ]
     },
     "FFACT_L65_SLOWPATH_PARALLEL": {

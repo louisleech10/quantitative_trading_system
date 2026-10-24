@@ -23,12 +23,8 @@ class ICFirstGenerationError(RuntimeError):
     """IC-first 之正式生成失敗（含 L6.5 失敗；Task 2.1 邊界①、Task 2.2），不回空表。"""
 
 
-class PostICArmUnavailableError(RuntimeError):
-    """IC-first 之 post-IC 正式臂（Polars）不可用（Task 3.2）。"""
-
-
 OUTPUT_WINDOW_KEYS: Tuple[str, ...] = ("output_start", "output_end", "ingest_start", "max_warmup_bars", "warmup_enabled")
-#: NUMVIEW Task 2.2：IC-first 之 post-IC 正式臂讀契約 `post_ic_entries.ic_first`（值不變；不另寫字面）
+#: NUMVIEW Task 2.2／3.4：IC-first 之 post-IC 正式臂讀契約 `post_ic_entries.ic_first`（擇定之單一 pandas 核心；不另寫字面）
 POST_IC_ARM = _numeric_view.post_ic_arm("ic_first")
 
 
@@ -147,7 +143,6 @@ def context_to_metadata(ctx: ICFirstRunContext) -> Mapping[str, Any]:
 __all__ = [
     "ICFirstContextError",
     "ICFirstGenerationError",
-    "PostICArmUnavailableError",
     "ICFirstRunContext",
     "OUTPUT_WINDOW_KEYS",
     "POST_IC_ARM",

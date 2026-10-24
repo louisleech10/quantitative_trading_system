@@ -3273,9 +3273,25 @@ def test_boundary_60_postic_core_ratio_unsafe_dropped_counted() -> None:
     # test_icfirstalign_memory.py:_snapshot）；只隔離環境，剔除與轉換路徑不變
     snapshot = mb.VMSnapshot(free_bytes=8 * 2 ** 30, file_backed_bytes=0, swap_free_bytes=0, pressure_level=1,
                              swap_volume_free_bytes=75 * 2 ** 30, swap_volume_capacity_bytes=228 * 2 ** 30)
+    # NUMVIEW Task 3.4 後 `transform_selected` 只收擇定核心（必填 `arm`、不依環境）；Task 1.6 探針（sha 綁收據、不改）依環境
+    # 選核心而不傳 arm ⇒ 以測試端轉接把探針所設之 profile 對應之核心作為 arm 傳入（只放行該核心），兩核心之入口剔除路徑不變
+    import os
+
+    from momentum.FeatureEngineering import numeric_view as nv
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    real_ts = FeaturePreprocessor.transform_selected
+
+    def env_core_arm(self: Any, selected: Any, groups: Any, config: Any = None, **kwargs: Any) -> Any:
+        profile = os.environ.get("FFACT_L65_OPTIMIZATION_PROFILE", "optimized")
+        return real_ts(self, selected, groups, config, arm="pandas_legacy" if profile == "legacy" else "pandas_optimized")
+
     infos = {}
     for core in ("optimized", "legacy"):
-        with mb.vm_snapshot_override(snapshot):
+        with mb.vm_snapshot_override(snapshot), pytest.MonkeyPatch.context() as mp:
+            mp.setattr(FeaturePreprocessor, "transform_selected", env_core_arm)
+            mp.setattr(nv, "require_post_ic_core", lambda arm: arm)
+            mp.setattr(nv, "post_ic_output_float32", lambda frame: frame)  # 探針量原生輸出（optimized 臂原生含 float64）
             processed, info = pcs.transform_unit(ctx, work / "features", side["config_hash"], safe + unsafe, core,
                                                  "direct")
         out = processed["selected"]

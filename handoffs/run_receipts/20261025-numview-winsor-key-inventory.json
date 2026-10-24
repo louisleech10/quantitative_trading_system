@@ -1,9 +1,10 @@
 {
  "schema_version": 1,
- "generated_at": "2026-10-24T12:55:21.797615+00:00",
- "head": "d47266621d9aa3c684c5338198181bdcdbe3b7f3",
+ "generated_at": "2026-10-24T21:49:50.348876+00:00",
+ "head": "07ae47916620c1948bbddd001183228967ad8d81",
  "command": "venv/bin/python handoffs/run_receipts/numview_probes/winsor_key_inventory.py",
- "probe_sha256": "6ad2a7bf55ac471fc16d482cc54cc9a3c91c048ecf5ea5beaf2cbab51b054d79",
+ "probe_sha256": "6d05e292a4955316194903a2dd46a0cef81cab5aa77e0c42004d5a20ff73db23",
+ "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
  "sources": [
   {
    "path": "momentum/FeatureEngineering/feature_factory.py:2696",
@@ -30,7 +31,7 @@
    "method": "quantile"
   },
   {
-   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:939",
+   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:945",
    "call": "FeaturePreprocessor(post_ic_config)",
    "source": "FeaturePreprocessor._build_post_ic_transform_config（transform_selected）",
    "has_method_key": true,
@@ -38,7 +39,7 @@
    "method": "quantile"
   },
   {
-   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1560",
+   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1566",
    "call": "FeaturePreprocessor(scaled_config)",
    "source": "scale_preprocessing_config_for_native（native-tf 子實例）",
    "has_method_key": true,
@@ -46,7 +47,7 @@
    "method": "quantile"
   },
   {
-   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1739",
+   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1745",
    "call": "FeaturePreprocessor(scaled_config)",
    "source": "scale_preprocessing_config_for_native（native-tf 子實例）",
    "has_method_key": true,
@@ -62,7 +63,7 @@
    "method": "quantile"
   },
   {
-   "path": "api/services/ic_analysis_service.py:2898",
+   "path": "api/services/ic_analysis_service.py:2906",
    "call": "create_feature_preprocessor(transform_config.model_dump())",
    "source": "create_post_ic_transform_config().model_dump()（IC 頁第三步）",
    "has_method_key": true,

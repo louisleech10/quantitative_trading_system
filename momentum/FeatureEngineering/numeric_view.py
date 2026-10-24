@@ -46,6 +46,11 @@ class NumericContextUnresolvedError(RuntimeError):
     名稱登記於契約 `auto_resolutions`（Task 4.1）。"""
 
 
+class PostICOutputDtypeError(ValueError):
+    """post-IC 擇定核心之原生輸出欄 dtype 非 float16／float32（轉 float32 會失真）⇒ 具名拒收、不靜默轉型
+    （SPEC Task 3.4 v41；使用者 2026-10-24「legacy＋一律 float32」，前提為數字不變）。"""
+
+
 class ICViewIdentityMismatchError(RuntimeError):
     """IC 頁第三步之載入 run 身分與 IC 任務報告 metadata 之 `ff_run_identity` 逐鍵不等（run 已於 IC 後重生；
     SPEC Task 4.3）。"""
@@ -177,6 +182,30 @@ def ic_page_record_keys() -> Tuple[Dict[str, str], Dict[str, str]]:
                 raise NumericPolicyError(f"契約 {section}.{slot} 未填")
         out.append({slot: keys[slot] for slot in _IC_PAGE_RECORD_SLOTS})
     return out[0], out[1]
+
+
+def require_post_ic_core(arm: Any) -> str:
+    """post-IC 呼叫所傳之 `arm`（SPEC Task 3.4）：須屬契約 `post_ic_arm_values` 且等於擇定核心
+    （`post_ic_arm("ic_first")`；IC 頁經 `arm_ref` 引用之）；否則 `NumericPolicyError`（不退回他臂）。"""
+    values = list(load_contract()["post_ic_arm_values"].get("values") or [])
+    if not isinstance(arm, str) or arm not in values:
+        raise NumericPolicyError(f"post-IC arm={arm!r} 不屬契約 post_ic_arm_values {values}")
+    core = post_ic_arm("ic_first")
+    if arm != core:
+        raise NumericPolicyError(f"post-IC arm={arm!r} 非擇定核心 {core!r}（契約 post_ic_entries.ic_first）")
+    return arm
+
+
+def post_ic_output_float32(frame: Any) -> Any:
+    """post-IC 輸出一律 float32（SPEC Task 3.4 v41）：只允許原生 float16／float32 欄（轉 float32 無損、值逐位元不變），
+    任一欄為其他 dtype ⇒ `PostICOutputDtypeError`（列欄名與 dtype；不靜默轉型）。回新表，不改輸入。"""
+    import numpy as np
+
+    allowed = (np.dtype(np.float16), np.dtype(np.float32))
+    bad = {str(col): str(dtype) for col, dtype in frame.dtypes.items() if dtype not in allowed}
+    if bad:
+        raise PostICOutputDtypeError(f"post-IC 原生輸出含非 float16／float32 欄（轉 float32 會失真）：{bad}")
+    return frame.astype(np.float32, copy=True)
 
 
 def executed_post_ic_arm(groups: Mapping[str, Mapping[str, Any]]) -> str:

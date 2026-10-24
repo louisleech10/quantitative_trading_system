@@ -286,6 +286,14 @@ def ic_page_record_keys() -> Tuple[Dict[str, str], Dict[str, str]]:
     return _nv.ic_page_record_keys()
 
 
+def post_ic_entry_arm(entry: str) -> str:
+    """NUMVIEW Task 3.4：post-IC 入口（契約 `post_ic_entries` 之鍵）之正式臂；委由 `numeric_view.post_ic_arm`
+    （api 經本模組取用，解耦 R3）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    return _nv.post_ic_arm(entry)
+
+
 def executed_post_ic_arm(groups: Any) -> str:
     """NUMVIEW Task 2.2：post-IC 實際執行之臂（執行紀錄群組臂恰一且屬契約值集）；委由
     `numeric_view.executed_post_ic_arm`（api 經本模組取用，解耦 R3）。"""

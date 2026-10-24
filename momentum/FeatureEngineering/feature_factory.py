@@ -2979,7 +2979,7 @@ class FeatureFactory:
             selected_features,
             raw_selected_groups,
             config.preprocessing,
-            arm=ctx.post_ic_arm,  # Task 3.2：固定 Polars 正式臂，不讀環境
+            arm=ctx.post_ic_arm,  # NUMVIEW Task 3.4：契約擇定之單一 pandas 核心（不讀環境）
         )
         del raw_selected_groups
         gc.collect()

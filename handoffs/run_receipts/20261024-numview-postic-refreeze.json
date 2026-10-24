@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-24T22:46:42.346892+00:00",
+  "head": "07ae47916620c1948bbddd001183228967ad8d81",
+  "command": "PYTHONPATH=. venv/bin/python scripts/numview_refreeze_postic.py --baseline-inputs /Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/numview_postic_prechange_inputs.json --work /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/nv_r2_mut_lj0c7v6i --check",
+  "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
+  "exit_code": 0,
+  "check_only": true,
+  "run_kind": "regen_b4",
+  "files_before_sha256": {
+    "tests/_golden/numview/pre_change_fingerprints.json": "d262d2acb7e02a59b9d17da9a0589c2088a3ea63b76aa67c11ed8d09f0589618",
+    "tests/_golden/preprov/pre_change_fingerprints.json": "4248673782b14f35e46ec650dca5c0788b0e40f46e28e70b0a788561f0cc2977"
+  },
+  "files_after_sha256": {
+    "tests/_golden/numview/pre_change_fingerprints.json": "d262d2acb7e02a59b9d17da9a0589c2088a3ea63b76aa67c11ed8d09f0589618",
+    "tests/_golden/preprov/pre_change_fingerprints.json": "4248673782b14f35e46ec650dca5c0788b0e40f46e28e70b0a788561f0cc2977"
+  },
+  "baseline_inputs": {
+    "path": "/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/numview_postic_prechange_inputs.json",
+    "sha256": "c4a7820f53acd4ea9eb2acd275af786ab238cf3f8639a4aebdd78641c06cbfb1",
+    "head": "07ae47916620c1948bbddd001183228967ad8d81"
+  },
+  "items": {
+    "numview:B_BTCUSDT_1h_4h/g3/processed": {
+      "column_set_equal": true,
+      "changed_columns": 0,
+      "columns": 5943,
+      "dtypes_before": {
+        "float": 5943
+      },
+      "dtypes_after": {
+        "float": 5943
+      },
+      "raw_bitwise_equal": true
+    },
+    "preprov:ic_first/BTCUSDT/processed": {
+      "column_set_equal": true,
+      "changed_columns": 0,
+      "columns": 3624,
+      "dtypes_before": {
+        "float": 3624
+      },
+      "dtypes_after": {
+        "float": 3624
+      },
+      "post_ic_input_bitwise_equal_to_pre_change": true,
+      "post_ic_input_groups": [
+        "selected"
+      ],
+      "post_ic_input_columns": 3624
+    },
+    "preprov:ic_first_default/BTCUSDT/processed": {
+      "column_set_equal": true,
+      "changed_columns": 0,
+      "columns": 3624,
+      "dtypes_before": {
+        "float": 3624
+      },
+      "dtypes_after": {
+        "float": 3624
+      },
+      "post_ic_input_bitwise_equal_to_pre_change": true,
+      "post_ic_input_groups": [
+        "selected"
+      ],
+      "post_ic_input_columns": 3624
+    }
+  }
+}

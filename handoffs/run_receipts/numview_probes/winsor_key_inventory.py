@@ -121,13 +121,21 @@ def build(sites: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     return {"sources": rows, "unregistered_sites": unregistered, "stale_registrations": stale}
 
 
+def _criteria_path() -> Path:
+    from tests.feature_engineering import numview_helpers as nh
+
+    return Path(nh.current_criteria_path())
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """rc 0＝每個建構點皆已登記且帶 method 鍵；rc 2＝有未登記或過期登記；rc 3＝有建構點之設定缺 method 鍵。"""
     body = build(scan_sites())
     receipt = {"schema_version": 1, "generated_at": datetime.now(timezone.utc).isoformat(),
                "head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip(),
                "command": "venv/bin/python handoffs/run_receipts/numview_probes/winsor_key_inventory.py",
-               "probe_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), **body}
+               "probe_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+               # 每份 numview 收據須記現行判準檔 sha256（SPEC Task 0.3 ③）
+               "criteria_sha256": hashlib.sha256(Path(_criteria_path()).read_bytes()).hexdigest(), **body}
     if body["unregistered_sites"] or body["stale_registrations"]:
         receipt["exit_code"] = 2
     elif not all(r["has_method_key"] for r in body["sources"]):

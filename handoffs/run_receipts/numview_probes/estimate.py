@@ -383,6 +383,50 @@ def load_criteria() -> Dict[str, Any]:
     return load_json(criteria_path())
 
 
+def anchor_lines_at_criteria_commit(rel: str) -> Optional[List[str]]:
+    """`path_registry` 錨點所指檔於現行判準檔最後提交時之內容（逐行）；錨點記判準凍結當時之碼位置，故不依工作樹（其後之
+    改碼位移不使凍結判準失效；NUMVIEW Task 3.4 審視）。判準檔未提交、git 失敗或該提交無此檔 ⇒ None（呼叫端判違規）。"""
+    import subprocess
+
+    target = criteria_path()
+    log = subprocess.run(["git", "-C", str(REPO), "log", "-1", "--format=%H", "--", str(target.relative_to(REPO))],
+                         capture_output=True, text=True)
+    commit = log.stdout.strip()
+    if log.returncode != 0 or not commit:
+        return None
+    shown = subprocess.run(["git", "-C", str(REPO), "show", f"{commit}:{rel}"], capture_output=True)
+    if shown.returncode != 0:
+        return None
+    return shown.stdout.decode("utf-8", errors="replace").splitlines()
+
+
+#: 錨點上下文窗之最大半徑（行；窗＝錨點行前後各 radius 行）
+ANCHOR_CONTEXT_MAX_RADIUS = 12
+
+
+def live_anchor_lines(rel: str) -> List[str]:
+    """錨點所指檔之現行內容（逐行）；檔不存在 ⇒ 空清單。"""
+    path = REPO / rel
+    return path.read_text(encoding="utf-8", errors="replace").splitlines() if path.is_file() else []
+
+
+def count_window(lines: Sequence[str], window: Sequence[str]) -> int:
+    """`window`（已去首尾空白之連續行）於 `lines`（逐行，比對時去首尾空白）中出現之次數。"""
+    stripped = [s.strip() for s in lines]
+    n = len(window)
+    return sum(1 for i in range(len(stripped) - n + 1) if stripped[i:i + n] == list(window)) if n else 0
+
+
+def anchor_context_window(lines: Sequence[str], idx: int) -> Optional[List[str]]:
+    """錨點行（0 起算 `idx`）於 `lines` 中之最小唯一上下文窗：半徑由 0 起增至 `ANCHOR_CONTEXT_MAX_RADIUS`，取首個於 `lines` 中
+    恰出現一次之窗（去首尾空白）；皆不唯一 ⇒ None。"""
+    for radius in range(ANCHOR_CONTEXT_MAX_RADIUS + 1):
+        window = [s.strip() for s in lines[max(0, idx - radius):idx + radius + 1]]
+        if count_window(lines, window) == 1:
+            return window
+    return None
+
+
 def classify_run_completeness(manifest: Mapping[str, Any], criteria: Mapping[str, Any]) -> Dict[str, Any]:
     """生成之 run 之前史判定（判準檔 `cell_rules.insufficient_history`，權威）：complete ⇒ `complete`；run_status＝partial、
     failure_reasons 非空且每條皆合 `reason_pattern` ⇒ `blocked`（history，`reason_counts`＝事件→欄數）；其餘 ⇒ `failed`
@@ -1136,14 +1180,22 @@ def path_registry_violations(criteria: Mapping[str, Any], plan: Mapping[str, Map
             out.append(f"path_registry：{pid} 無 code_anchors")
         for anchor in anchors:
             match = re.fullmatch(r"(.+):(\d+)", str(anchor))
-            path = REPO / match.group(1) if match else None
-            if match is None or path is None or not path.is_file():
+            lines = anchor_lines_at_criteria_commit(match.group(1)) if match else None
+            if match is None or lines is None:
                 out.append(f"path_registry：{pid} 之錨點 {anchor} 檔案不存在或格式非 path:line")
                 continue
-            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
             line = int(match.group(2))
             if not (1 <= line <= len(lines)) or not lines[line - 1].strip():
                 out.append(f"path_registry：{pid} 之錨點 {anchor} 不解析至存在之非空行（檔長 {len(lines)}）")
+                continue
+            # 現行碼須於同一上下文恰一次含該錨點：取判準提交時錨點行之最小唯一上下文窗（逐字、去首尾空白），現行檔須恰
+            # 出現一次；零次（刪除／改名）或多次（無法定位）皆違規，純行號位移不誤報（審碼 b4 r1 CODEX-R1-P1-02、r2 兩家 P1-01）
+            window = anchor_context_window(lines, line - 1)
+            hits = count_window(live_anchor_lines(match.group(1)), window) if window is not None else 0
+            if window is None:
+                out.append(f"path_registry：{pid} 之錨點 {anchor} 於判準提交時無唯一上下文（無法定位）")
+            elif hits != 1:
+                out.append(f"path_registry：{pid} 之錨點 {anchor} 之上下文於現行碼出現 {hits} 次（須恰一次）")
     claims: Dict[Tuple[str, str], List[Tuple[str, Tuple[str, str, str]]]] = {}
     for kind, node in plan.items():
         if node.get("code_state") is None:

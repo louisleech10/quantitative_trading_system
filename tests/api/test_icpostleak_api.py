@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from momentum.FeatureEngineering import numeric_view as _nv
 from momentum.FeatureEngineering.feature_config import PreprocessingConfig
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as h
@@ -32,7 +33,8 @@ UNSAFE = "ohlc_pattern_CDLDOJI"  # `feature_naming.is_ratio_unsafe_column`：去
 
 def _real_frame(extra_unsafe: bool = False) -> pd.DataFrame:
     k = CONTRACT["kline"]
-    frame = h.kline_frame(symbol=k["symbol"], timeframe=k["timeframe"]).iloc[: k["rows"]][k["columns"]].astype(float)
+    frame = h.kline_frame(symbol=k["symbol"], timeframe=k["timeframe"]).iloc[: k["rows"]][k["columns"]].astype(np.float32)
+    # NUMVIEW Task 3.4：生產 raw 只存 float16／float32；float64 原生輸出依 v41 拒收
     if extra_unsafe:
         frame[UNSAFE] = frame[k["columns"][0]].to_numpy()  # 值取真實 kline；欄名使其為 ratio-unsafe
     return frame
@@ -73,7 +75,7 @@ def _formal(frame: pd.DataFrame, steps: List[str], zscore_windows: Optional[List
         adaptive_zscore={"enabled": "zscore" in steps, "windows": sorted(zscore_windows or Z_WINDOWS), "apply_to": "all"},
         gaussian_normalize={"enabled": "gaussian" in steps, "apply_to": "all"},
     )
-    out = FeaturePreprocessor(cfg.model_dump()).transform_selected(list(frame.columns), {"ic_page": frame}, config=cfg)
+    out = FeaturePreprocessor(cfg.model_dump()).transform_selected(list(frame.columns), {"ic_page": frame}, config=cfg, arm=_nv.post_ic_arm("ic_first"))
     return out["ic_page"]
 
 
@@ -225,7 +227,7 @@ def test_mutation_full_sample_rank_restored_is_caught(tmp_path: Path, monkeypatc
     """mutant：IC 頁所呼叫之 transform_selected 改為全樣本排名＋ppf（即手寫版之洩漏）⇒ ①之判準翻轉（前段改變）。"""
     from scipy.stats import norm
 
-    def _leaky(self, selected, groups, config=None):
+    def _leaky(self, selected, groups, config=None, *, arm):
         return {gid: df[[c for c in selected if c in df.columns]].rank(pct=True, axis=0).clip(0.001, 0.999).apply(norm.ppf)
                 for gid, df in groups.items()}
 
@@ -248,7 +250,7 @@ def test_mutation_gaussian_last_order_is_caught(tmp_path: Path, monkeypatch: pyt
     want = _formal(frame, steps)
     real = FeaturePreprocessor.transform_selected
 
-    def _old_order(self, selected, groups, config=None):
+    def _old_order(self, selected, groups, config=None, *, arm):
         staged = groups
         for one in (["rank"], ["zscore"], ["gaussian"]):
             cfg = PreprocessingConfig(
@@ -257,7 +259,7 @@ def test_mutation_gaussian_last_order_is_caught(tmp_path: Path, monkeypatch: pyt
                 rank_transform={"enabled": "rank" in one, "window": RANK_W, "apply_to": "all"},
                 adaptive_zscore={"enabled": "zscore" in one, "windows": sorted(Z_WINDOWS), "apply_to": "all"},
                 gaussian_normalize={"enabled": "gaussian" in one, "apply_to": "all"})
-            staged = real(FeaturePreprocessor(cfg.model_dump()), selected, staged, config=cfg)
+            staged = real(FeaturePreprocessor(cfg.model_dump()), selected, staged, config=cfg, arm=arm)
         return staged
 
     monkeypatch.setattr(FeaturePreprocessor, "transform_selected", _old_order)

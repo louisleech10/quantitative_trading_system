@@ -21,6 +21,7 @@ import pytest
 from momentum.Analysis.ic_engine import ICEngine
 from momentum.core.contracts import AlignmentViolationError
 from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError, RowIndexLengthMismatchError
+from momentum.FeatureEngineering import numeric_view as _nv
 from momentum.FeatureEngineering.feature_reader import FeatureReader
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from tests.feature_engineering import icfirstalign_helpers as h
@@ -278,7 +279,7 @@ def test_reversed_sidecar_triggers_time_order_guard(fresh_s2: Dict[str, Any]) ->
     frame = fresh_s2["reader"].load_columns_v2(h.SYMBOL, h.PRIMARY, fresh_s2["config_hash"],
                                                _all_raw_columns(fresh_s2)[:3], attach_row_index=True)
     with pytest.raises(ValueError):
-        FeaturePreprocessor({"winsorization": {"enabled": False}}).transform_selected(list(frame.columns), {"g": frame})
+        FeaturePreprocessor({"winsorization": {"enabled": False}}).transform_selected(list(frame.columns), {"g": frame}, arm=_nv.post_ic_arm("ic_first"))
 
 
 def test_mutation_selected_readback_shifted_axis(s2: Dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:

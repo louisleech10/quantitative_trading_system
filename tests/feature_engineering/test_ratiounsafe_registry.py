@@ -22,6 +22,7 @@ import pandas as pd
 import pytest
 
 from momentum.FeatureEngineering import feature_naming as fn
+from momentum.FeatureEngineering import numeric_view as _nv
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as h
 from tests.feature_engineering.ffname_helpers import is_g6_new_lag
@@ -453,10 +454,10 @@ def test_mutation_after_baseline_detects_reverted_skip(monkeypatch: pytest.Monke
 # ---------------------------------------------------------------- Task 3.1：transform_selected
 
 def test_transform_selected_excludes_tagged_unsafe() -> None:
-    frame = _branch_frame()
+    frame = _branch_frame().astype(np.float32)  # NUMVIEW Task 3.4：生產 raw 只存 float16／float32；float64 原生輸出依 v41 拒收
     frame.columns = [fn.tag_timeframe(c, "12h") for c in frame.columns]
     selected = list(frame.columns)
-    out = FeaturePreprocessor(_config()).transform_selected(selected, {"g": frame}, None)
+    out = FeaturePreprocessor(_config()).transform_selected(selected, {"g": frame}, None, arm=_nv.post_ic_arm("ic_first"))
     cols = {c for df in out.values() for c in df.columns}
     assert not cols & {fn.tag_timeframe(c, "12h") for c in UNSAFE}
     assert {fn.tag_timeframe(c, "12h") for c in SAFE} <= cols
@@ -464,9 +465,9 @@ def test_transform_selected_excludes_tagged_unsafe() -> None:
 
 def test_boundary_01_transform_selected_all_unsafe_returns_empty() -> None:
     """Task 3.1 邊界①（IC-first）：全選帶標記 ratio-unsafe 欄 ⇒ 既有契約回空 dict（不拋錯）。"""
-    frame = _branch_frame(UNSAFE)
+    frame = _branch_frame(UNSAFE).astype(np.float32)  # NUMVIEW Task 3.4：生產 raw 只存 float16／float32；float64 原生輸出依 v41 拒收
     frame.columns = [fn.tag_timeframe(c, "12h") for c in frame.columns]
-    assert FeaturePreprocessor(_config()).transform_selected(list(frame.columns), {"g": frame}, None) == {}
+    assert FeaturePreprocessor(_config()).transform_selected(list(frame.columns), {"g": frame}, None, arm=_nv.post_ic_arm("ic_first")) == {}
 
 
 def test_mutation_extra_safe_derivative_rejected_by_exact_column_set(tmp_path: Path,

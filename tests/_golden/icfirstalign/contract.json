@@ -13,7 +13,6 @@
     "generation_failed": "ICFirstGenerationError",
     "l65_failed": "ICFirstGenerationError",
     "close_all_nan": "CloseCarrierInvalidError",
-    "post_ic_arm_unavailable": "PostICArmUnavailableError",
     "l3_double_write": "L3PersistConflictError",
     "budget_exceeded": "GenerationMemoryBudgetExceeded",
     "measurement_unavailable": "MemoryMeasurementUnavailable"
@@ -53,7 +52,7 @@
     "max_warmup_bars",
     "warmup_enabled"
   ],
-  "post_ic_arm": "polars",
+  "post_ic_arm": "pandas_legacy",
   "budget": {
     "ratio_default": 0.75,
     "disk_reserve_min_bytes": 4294967296,

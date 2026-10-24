@@ -527,46 +527,65 @@ def test_mutation_helper_swallowing_alignment_is_detected(monkeypatch: pytest.Mo
     assert me._swallows_alignment(swallowing)
 
 
-# ---------------------------------------------------------------- Task 3.2 post-IC 臂
+# ---------------------------------------------------------------- Task 3.2 post-IC 臂（NUMVIEW Task 3.4 改：契約擇定之單一 pandas 核心）
 
-def test_post_ic_arm_polars_even_when_env_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root = h.isolated(monkeypatch, tmp_path)
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
-    calls = {"polars": 0}
-    real = FeaturePreprocessor._transform_single_polars
+def _spy_post_ic_arms(monkeypatch: pytest.MonkeyPatch) -> List[set]:
+    """擷取每次 `transform_selected` 之執行紀錄群組臂（獨立於 manifest 之自述）。"""
+    seen: List[set] = []
+    real = FeaturePreprocessor.transform_selected
 
     def spy(self: FeaturePreprocessor, *a: Any, **k: Any) -> Any:
-        calls["polars"] += 1
-        return real(self, *a, **k)
+        out = real(self, *a, **k)
+        seen.append({str(g.get("arm")) for g in self.last_post_ic_execution()[1].values()})
+        return out
 
-    monkeypatch.setattr(FeaturePreprocessor, "_transform_single_polars", spy)
+    monkeypatch.setattr(FeaturePreprocessor, "transform_selected", spy)
+    return seen
+
+
+@pytest.mark.parametrize("use_polars", ["0", "1"])
+def test_post_ic_arm_core_regardless_of_env(use_polars: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """NUMVIEW Task 3.4：IC-first 之 post-IC 臂＝契約擇定核心（`icc.POST_IC_ARM`），`FFACT_USE_POLARS` 兩值皆同；執行紀錄臂與
+    processed 節點所記臂皆＝核心名。"""
+    root = h.isolated(monkeypatch, tmp_path)
+    monkeypatch.setenv("FFACT_USE_POLARS", use_polars)
+    seen = _spy_post_ic_arms(monkeypatch)
     result = _run(h.make_factory(root))
-    assert calls["polars"] > 0
+    assert seen and all(arms == {icc.POST_IC_ARM} for arms in seen), seen
     manifest = json.loads((h.run_dir(root, str(result.metadata["config_hash"])) / "feature_manifest.json")
                           .read_text(encoding="utf-8"))
-    assert manifest["artifacts"]["processed"]["post_ic_arm"] == h.CONTRACT["post_ic_arm"]
+    assert manifest["artifacts"]["processed"]["post_ic_arm"] == h.CONTRACT["post_ic_arm"] == icc.POST_IC_ARM
 
 
-def test_post_ic_arm_unavailable_raises_named(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_post_ic_polars_unavailable_still_generates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """NUMVIEW Task 3.4 ④：Polars 不可用 ⇒ IC-first 照常產出（Polars 非 post-IC 依賴），執行紀錄臂＝擇定核心。"""
     import momentum.FeatureEngineering.polars_adapter as pa_mod
 
     root = h.isolated(monkeypatch, tmp_path)
     monkeypatch.setattr(pa_mod, "_check_polars_available", lambda: False)
-    with pytest.raises(icc.PostICArmUnavailableError):
-        _run(h.make_factory(root))
+    seen = _spy_post_ic_arms(monkeypatch)
+    result = _run(h.make_factory(root))
+    assert result.metadata["post_ic_arm"] == icc.POST_IC_ARM
+    assert seen and all(arms == {icc.POST_IC_ARM} for arms in seen), seen
 
 
-def test_boundary_01_other_transform_selected_callers_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 3.2 邊界①：非 IC-first 之 `transform_selected`（不帶 arm）仍依環境：FFACT_USE_POLARS=0 ⇒ 不走 Polars。"""
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
-    calls = {"polars": 0}
-    real = FeaturePreprocessor._transform_single_polars
-    monkeypatch.setattr(FeaturePreprocessor, "_transform_single_polars",
-                        lambda self, *a, **k: (calls.__setitem__("polars", calls["polars"] + 1), real(self, *a, **k))[1])
+def test_boundary_01_transform_selected_requires_core_arm() -> None:
+    """NUMVIEW Task 3.4 ⑤：`transform_selected` 之 `arm` 為必填關鍵字（不帶 ⇒ TypeError）；非擇定核心之臂（如 `polars`）⇒
+    `NumericPolicyError`（不退回他臂）。"""
+    from momentum.FeatureEngineering import numeric_view as nv
+
     close = h.kline_close()
-    frame = pd.DataFrame({"x": close.pct_change().to_numpy()[:300]}, index=close.index[:300])
-    FeaturePreprocessor({"winsorization": {"enabled": True}}).transform_selected(["x"], {"g": frame})
-    assert calls["polars"] == 0
+    frame = pd.DataFrame({"x": close.pct_change().to_numpy(dtype=np.float32)[:300]}, index=close.index[:300])  # NUMVIEW Task 3.4：生產 raw 只存 float16／float32；float64 原生輸出依 v41 拒收
+    from momentum.factories import create_feature_preprocessor, create_post_ic_transform_config
+
+    cfg = create_post_ic_transform_config(rank=True, rank_window=252, zscore=True, zscore_windows=[100, 252], gaussian=False)
+    pre = create_feature_preprocessor(cfg.model_dump())
+    with pytest.raises(TypeError):
+        pre.transform_selected(["x"], {"g": frame}, cfg)
+    other = next(a for a in nv.load_contract()["post_ic_arm_values"]["values"] if a != icc.POST_IC_ARM)
+    with pytest.raises(nv.NumericPolicyError):
+        pre.transform_selected(["x"], {"g": frame}, cfg, arm=other)
+    assert set(pre.transform_selected(["x"], {"g": frame}, cfg, arm=icc.POST_IC_ARM)) == {"g"}
 
 
 def test_ic_first_pipeline_tests_do_not_force_pandas_arm() -> None:
@@ -575,15 +594,16 @@ def test_ic_first_pipeline_tests_do_not_force_pandas_arm() -> None:
 
 
 def test_mutation_post_ic_arm_reads_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：`transform_selected` 忽略 arm 改讀環境 ⇒ FFACT_USE_POLARS=0 下不走 Polars。"""
+    """mutant（NUMVIEW Task 3.4）：`transform_selected` 忽略 arm 改依環境分派（不設擇定核心）⇒ `FFACT_USE_POLARS=1` 下
+    執行紀錄臂≠擇定核心（`test_post_ic_arm_core_regardless_of_env` 之判準翻紅）。"""
+    from momentum.FeatureEngineering import numeric_view as nv
+
     root = h.isolated(monkeypatch, tmp_path)
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
+    monkeypatch.setenv("FFACT_USE_POLARS", "1")
     real_ts = FeaturePreprocessor.transform_selected
+    monkeypatch.setattr(nv, "require_post_ic_core", lambda arm: arm)
     monkeypatch.setattr(FeaturePreprocessor, "transform_selected",
-                        lambda self, selected, groups, config=None, arm=None: real_ts(self, selected, groups, config))
-    calls = {"polars": 0}
-    real = FeaturePreprocessor._transform_single_polars
-    monkeypatch.setattr(FeaturePreprocessor, "_transform_single_polars",
-                        lambda self, *a, **k: (calls.__setitem__("polars", calls["polars"] + 1), real(self, *a, **k))[1])
+                        lambda self, selected, groups, config=None, *, arm: real_ts(self, selected, groups, config, arm=None))
+    seen = _spy_post_ic_arms(monkeypatch)
     _run(h.make_factory(root))
-    assert calls["polars"] == 0
+    assert seen and any(arms != {icc.POST_IC_ARM} for arms in seen), seen
