@@ -1,0 +1,504 @@
+{
+ "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
+ "decisions": {
+  "d_icpage_arm": {
+   "label": "D-ICPAGE-ARM",
+   "triggered": true,
+   "choice": "lock",
+   "changes_public_output": true,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 0
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 1
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 2
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 3
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 4
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 5
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 6
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 7
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 8
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 9
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 10
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 11
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 12
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 13
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 14
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 15
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 16
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 17
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 18
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 19
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 20
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 21
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 22
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 23
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 24
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 25
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 26
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 27
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 28
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 29
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 30
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 31
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 32
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 33
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 34
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 35
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 36
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 37
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 38
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "speed",
+     "row": 39
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json",
+     "rows_key": "pairs",
+     "row": 0
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json",
+     "rows_key": "pairs",
+     "row": 1
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json",
+     "rows_key": "pairs",
+     "row": 2
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json",
+     "rows_key": "units",
+     "row": 1
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json",
+     "rows_key": "units",
+     "row": 3
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json",
+     "rows_key": "units",
+     "row": 5
+    }
+   ],
+   "user_ruling": {
+    "date": "2026-10-21",
+    "quote": [
+     "跑13-107小時這是什麼東西？這時間完全不能接受",
+     "Ok, 你確保相關的文件和檔案有更新到最新的方向和結論"
+    ]
+   },
+   "re_presentation": {
+    "date": "2026-10-24",
+    "quote": [
+     "IC頁與IC-first都改pandas"
+    ],
+    "perf_benchmark_receipt": "handoffs/run_receipts/20261023-numview-perf-benchmark.json",
+    "confirmed_choice": "lock"
+   },
+   "report": {
+    "post_ic_core": "pandas_legacy",
+    "no_choice_reason": "兩核心輸出結構（dtype／欄集合／欄順序／時間軸）不一致：['chunked/a', 'direct/a', 'chunked/b']",
+    "core_user_ruling": {
+     "date": "2026-10-24",
+     "quote": "legacy",
+     "core": "pandas_legacy",
+     "output_dtype": "float32",
+     "output_dtype_quote": "legacy＋一律 float32"
+    },
+    "post_ic_output_dtype": "float32",
+    "post_ic_core_receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json"
+   },
+   "implemented_commit": null
+  },
+  "d_postic": {
+   "label": "D-POSTIC",
+   "triggered": true,
+   "choice": "retain",
+   "changes_public_output": false,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 71
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 73
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 75
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 162
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 164
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 253
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 255
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 257
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 344
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 346
+    }
+   ],
+   "report": {
+    "trigger_rows_hit": 10,
+    "trigger_rows_selected": 56
+   },
+   "implemented_commit": null
+  },
+  "d_mtf": {
+   "label": "D-MTF",
+   "triggered": true,
+   "choice": "retain",
+   "changes_public_output": false,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 10911
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 12379
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 12879
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 13163
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 13761
+    },
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 13885
+    }
+   ],
+   "report": {
+    "trigger_rows_hit": 6,
+    "trigger_rows_selected": 3632
+   },
+   "implemented_commit": null
+  },
+  "d_memmap": {
+   "label": "D-MEMMAP",
+   "triggered": false,
+   "choice": "retain",
+   "changes_public_output": false,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 0
+    }
+   ],
+   "report": {
+    "trigger_rows_hit": 0,
+    "trigger_rows_selected": 9995
+   },
+   "implemented_commit": null
+  },
+  "d_winsor_dtype": {
+   "label": "D-WINSOR-DTYPE",
+   "triggered": false,
+   "choice": "retain",
+   "changes_public_output": false,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "forks",
+     "row": 9995
+    }
+   ],
+   "report": {
+    "trigger_rows_hit": 0,
+    "trigger_rows_selected": 683
+   },
+   "implemented_commit": null
+  },
+  "d_codec": {
+   "label": "D-CODEC",
+   "triggered": true,
+   "choice": "retain",
+   "changes_public_output": false,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "codec_checks",
+     "row": 0
+    }
+   ],
+   "report": {
+    "trigger_rows_hit": 1,
+    "trigger_rows_selected": 2
+   },
+   "implemented_commit": null
+  },
+  "d_l2": {
+   "label": "D-L2",
+   "triggered": true,
+   "choice": "retain",
+   "changes_public_output": false,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-l2-arm-matrix.json",
+     "rows_key": "cells",
+     "row": 1
+    }
+   ],
+   "report": {
+    "trigger_rows_hit": 1,
+    "trigger_rows_selected": 1
+   },
+   "implemented_commit": null
+  },
+  "d_research": {
+   "label": "D-RESEARCH",
+   "triggered": false,
+   "choice": "retain",
+   "changes_public_output": false,
+   "changes_feature_stage": false,
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261023-numview-postic-branchdiff.json",
+     "rows_key": "rows",
+     "row": 28
+    }
+   ],
+   "report": {
+    "trigger_rows_hit": 0,
+    "trigger_rows_selected": 28
+   },
+   "implemented_commit": null
+  }
+ },
+ "measurement_limitations": [
+  {
+   "id": "NUMVIEW-LIM-D-CODEC",
+   "kind": "unforeseen_situation",
+   "decision_key": "d_codec",
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-precision-chain.json",
+     "rows_key": "codec_checks",
+     "row": 0
+    }
+   ],
+   "description": "D-CODEC 已觸發而記 retain：判準 candidate_conditions.retain 要求「codec_checks 之 nonconforming_columns 全 0」，收據 codec_checks 非零（見 evidence）不成立；唯一合格之改案須改公開輸出或特徵階段。使用者 2026-10-24 裁定此類修正移交 docs/TICKET_ORDER.md 第 9 步「特徵生產層普查」（原話：「是不是該普查特徵生產層的計算是不是最平衡解，確保特徵層程式和計算只有一套最平衡解的算法？」），判準不改；Phase 3 走 retain 分支釘住現值並契約具名登記非零格。"
+  },
+  {
+   "id": "NUMVIEW-LIM-D-L2",
+   "kind": "unforeseen_situation",
+   "decision_key": "d_l2",
+   "evidence": [
+    {
+     "receipt": "handoffs/run_receipts/20261024-numview-l2-arm-matrix.json",
+     "rows_key": "cells",
+     "row": 1
+    }
+   ],
+   "description": "D-L2 已觸發而記 retain：判準 candidate_conditions.retain 要求「格 B 之 f32diff 全 0」，收據 cells（kind=B） 非零（見 evidence）不成立；唯一合格之改案須改公開輸出或特徵階段。使用者 2026-10-24 裁定此類修正移交 docs/TICKET_ORDER.md 第 9 步「特徵生產層普查」（原話：「是不是該普查特徵生產層的計算是不是最平衡解，確保特徵層程式和計算只有一套最平衡解的算法？」），判準不改；Phase 3 走 retain 分支釘住現值並契約具名登記非零格。"
+  }
+ ]
+}

@@ -376,12 +376,13 @@ def _parse(argv: Optional[Sequence[str]]) -> argparse.Namespace:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """量測主入口；rc 0＝收據寫出且檢查全過（BTCUSDT 12h 重現 f32diff=0、各 (格, 環境) 紀錄可得、未重生已凍結者）。"""
     args = _parse(argv)
-    if args.child:
-        return _child(Path(args.child))
     criteria = _criteria()
     plan = planned_runs(criteria)
     cells = sorted({p["cell"] for p in plan})
-    _gate().require(RUN_KIND, cells, receipts_dir=RECEIPTS_DIR)  # 一切生成之前（Task 0.4）
+    # 一切生成之前（Task 0.4；含子行程入口，同 precision_chain.main）；跑別以字面值寫出（＝RUN_KIND），供 AST 驗收辨識
+    _gate().require("l2_arm_matrix", cells, receipts_dir=RECEIPTS_DIR)
+    if args.child:
+        return _child(Path(args.child))
     frozen, freeze_name = _freeze_capture()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     work_root = Path(args.work_root) / stamp

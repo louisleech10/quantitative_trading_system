@@ -1327,6 +1327,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     共用之抽驗逐位元相等；標籤與生產讀取相等；候選臂中間 dtype 皆 float64；輸入 (i) 之 registry_sink_sharded 實走分片串流）；
     任一不符 ⇒ 收據 `exit_code`＝3、rc 3。試跑旗標（`--cells`／`--inputs`／`--max-cols`／`--no-speed`）須同給 `--out`。"""
     args = _parse(argv)
+    criteria = _criteria()
+    run_kind = "perf_benchmark" if args.perf else "postic_branchdiff"
+    cells = _branchdiff_cells(criteria, run_kind)
+    if args.cells:
+        wanted = set(args.cells.split(","))
+        cells = [c for c in cells if c["id"] in wanted]
+    # 一切重型工作之前（Task 0.4；含子行程入口與 --reclassify，同 precision_chain.main）
+    _gate().require(run_kind, [c["id"] for c in cells], receipts_dir=RECEIPTS_DIR)
     if args.child:
         return _child(Path(args.child))
     if args.reclassify:
@@ -1335,13 +1343,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if trial and not args.out:
         print("[branchdiff] 試跑旗標須同給 --out（不得寫正式收據）", file=sys.stderr)
         return 2
-    criteria = _criteria()
-    run_kind = "perf_benchmark" if args.perf else "postic_branchdiff"
-    cells = _branchdiff_cells(criteria, run_kind)
-    if args.cells:
-        wanted = set(args.cells.split(","))
-        cells = [c for c in cells if c["id"] in wanted]
-    _gate().require(run_kind, [c["id"] for c in cells], receipts_dir=RECEIPTS_DIR)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     work = Path(args.work_root) / stamp
     inputs = [i for i in ("i", "ii") if i in set(args.inputs.split(","))]

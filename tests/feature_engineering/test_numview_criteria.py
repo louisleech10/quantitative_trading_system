@@ -178,7 +178,10 @@ MANDATED_GATED_SCRIPTS: Dict[Path, str] = {
     PROBES_DIR / "precision_chain.py": "precision_chain",
     PROBES_DIR / "l2_arm_matrix.py": "l2_arm_matrix",
 }
-GATE_EXEMPT = frozenset({PROBES_DIR / "estimate.py", PROBES_DIR / "_estimate_gate.py"})
+#: 不經 Task 0.4 估時收據之腳本：估時器本身、前置閘本身；postic_core_select（SPEC Task 1.6：「啟動前以 (a) 實測與 (b)
+#: 欄列數估總時並白話告知後執行」，不屬估時收據之跑別）
+GATE_EXEMPT = frozenset({PROBES_DIR / "estimate.py", PROBES_DIR / "_estimate_gate.py",
+                         PROBES_DIR / "postic_core_select.py"})
 #: Phase 2–4 驗收重產之跑別（SPEC Task 0.4 驗證①、R15-A）→ 須涵蓋之格：`cells` 之格類（"A"／"AB"／"" 無）或
 #: "A:BTCUSDT:1h"（單一格 A），`preprov` 為測試直接經 `preprov_helpers` 生成之 PRE-PROV 格名（"*legacy*"＝沿用基準
 #: `tests/_golden/preprov/pre_change_fingerprints.json` 之全部格）。來源（各測試檔實際之生成呼叫）：
@@ -1053,8 +1056,32 @@ def _is_generation_call(call: ast.Call) -> bool:
     return False
 
 
+def _is_gate_heavy_call(call: ast.Call) -> bool:
+    """估時前置閘（③）所稱之重型呼叫：生成呼叫，或經卡死監看啟動之重型子行程（`_watchdog.run_watched`；如 postic_branchdiff
+    之量測單元讀凍結 run、不直呼生成入口）。只用於前置閘之行序判定，不擴及「生成須在監看子行程內」之檢查。"""
+    return _is_generation_call(call) or _call_name(call) == "run_watched"
+
+
 def _is_require_call(call: ast.Call) -> bool:
     return _call_name(call) == "require"
+
+
+def _require_kinds(main: ast.FunctionDef, arg: ast.AST) -> Optional[Set[str]]:
+    """require 首參數之跑別集合：字串常數 ⇒ 該值；main 頂層唯一賦值之名稱，其值為字串常數或兩支皆字串常數之條件式（如
+    `run_kind = "perf_benchmark" if args.perf else "postic_branchdiff"`）⇒ 各支之值；其餘 ⇒ None（無法辨識，判違規）。"""
+    def consts(node: ast.AST) -> Optional[Set[str]]:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return {node.value}
+        if isinstance(node, ast.IfExp):
+            a, b = consts(node.body), consts(node.orelse)
+            return a | b if a is not None and b is not None else None
+        return None
+
+    if isinstance(arg, ast.Name):
+        values = [s.value for s in main.body if isinstance(s, ast.Assign) and len(s.targets) == 1
+                  and isinstance(s.targets[0], ast.Name) and s.targets[0].id == arg.id]
+        return consts(values[0]) if len(values) == 1 else None
+    return consts(arg)
 
 
 def gate_call_violations_for(path: Path, expected_kind: Optional[str], mandated: bool) -> List[str]:
@@ -1063,7 +1090,7 @@ def gate_call_violations_for(path: Path, expected_kind: Optional[str], mandated:
     tree = ast.parse(_read_text(path), filename=rel)
     funcs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
     generating = {name for name, fn in funcs.items()
-                  if any(isinstance(c, ast.Call) and _is_generation_call(c) for c in ast.walk(fn))}
+                  if any(isinstance(c, ast.Call) and _is_gate_heavy_call(c) for c in ast.walk(fn))}
     changed = True
     while changed:
         changed = False
@@ -1074,14 +1101,14 @@ def gate_call_violations_for(path: Path, expected_kind: Optional[str], mandated:
                    for c in ast.walk(fn)):
                 generating.add(name)
                 changed = True
-    module_generates = any(isinstance(c, ast.Call) and _is_generation_call(c) for c in ast.walk(tree))
+    module_generates = any(isinstance(c, ast.Call) and _is_gate_heavy_call(c) for c in ast.walk(tree))
     if not module_generates and not mandated:
         return []
     main = funcs.get("main")
     if main is None:
         return [f"{rel}：無主入口 main"]
     gen_lines = sorted(c.lineno for c in ast.walk(main) if isinstance(c, ast.Call) and (
-        _is_generation_call(c) or (isinstance(c.func, ast.Name) and c.func.id in generating)))
+        _is_gate_heavy_call(c) or (isinstance(c.func, ast.Name) and c.func.id in generating)))
     if mandated and not gen_lines:
         return [f"{rel}：SPEC 點名之重型跑腳本，其 main 未見任何生成呼叫（未實作或生成入口未被辨識）"]
     top_level_requires: List[ast.Call] = []
@@ -1093,10 +1120,10 @@ def gate_call_violations_for(path: Path, expected_kind: Optional[str], mandated:
         return [f"{rel}：main 頂層未呼叫 _estimate_gate.require"]
     first = top_level_requires[0]
     out: List[str] = []
-    kind_arg = first.args[0].value if first.args and isinstance(first.args[0], ast.Constant) else None
-    allowed = {expected_kind} if expected_kind else set(ESTIMATOR.RUN_KINDS)
-    if kind_arg not in allowed:
-        out.append(f"{rel}：require 之跑別 {kind_arg!r} 不屬 {sorted(allowed)}")
+    kinds = _require_kinds(main, first.args[0]) if first.args else None
+    if not kinds or not kinds <= set(ESTIMATOR.RUN_KINDS) or (expected_kind and expected_kind not in kinds):
+        out.append(f"{rel}：require 之跑別 {sorted(kinds) if kinds else None!r} 不屬 "
+                   f"{sorted({expected_kind} if expected_kind else set(ESTIMATOR.RUN_KINDS))}")
     if gen_lines and gen_lines[0] <= first.lineno:
         out.append(f"{rel}：生成呼叫（第 {gen_lines[0]} 行）早於 require（第 {first.lineno} 行）")
     return out
@@ -1528,6 +1555,17 @@ FREEZE_DYNAMIC_LOADERS: Dict[Tuple[str, str], Tuple[str, ...]] = {
     ("handoffs/run_receipts/numview_probes/estimate.py", "importlib.import_module(name)"): ("<library_versions>",),
     ("tests/feature_engineering/ffname_helpers.py", "importlib.util.spec_from_file_location('ffname_freeze_baseline', FREEZE_SCRIPT)"):
         ("scripts/ffname_freeze_baseline.py",),
+    # Task 1.3（l2_arm_matrix 之 main 與子行程，凍結腳本經 `_l2()` 載入本檔故入閉包）
+    ("handoffs/run_receipts/numview_probes/l2_arm_matrix.py", "importlib.util.spec_from_file_location(name, path)"):
+        ("<wrapper:_load>",),
+    ("handoffs/run_receipts/numview_probes/l2_arm_matrix.py", "_load('numview_estimate_gate', PROBES_DIR / '_estimate_gate.py')"):
+        ("handoffs/run_receipts/numview_probes/_estimate_gate.py",),
+    ("handoffs/run_receipts/numview_probes/l2_arm_matrix.py", "_load('numview_watchdog', PROBES_DIR / '_watchdog.py')"):
+        ("handoffs/run_receipts/numview_probes/_watchdog.py",),
+    ("handoffs/run_receipts/numview_probes/l2_arm_matrix.py", "_load('numview_freeze_baseline_l2', FREEZE_SCRIPT)"):
+        ("scripts/numview_freeze_baseline.py",),
+    ("handoffs/run_receipts/numview_probes/l2_arm_matrix.py",
+     "[sys.executable, str(Path(__file__).resolve()), '--child', str(spec_path)]"): ("<self>",),
 }
 
 
@@ -3978,3 +4016,183 @@ def test_precision_formal_readiness_blocks_until_addenda() -> None:
     if (current.get("run_kinds") or {}).get("precision_chain", {}).get("addenda") is None:
         assert probe.formal_readiness_violations(current) != []
     assert probe.formal_readiness_violations(_applied_estimate_receipt()) == []
+
+
+# ---------------------------------------------------------------------------------------------- Task 1.5 ⑧⑨（v40／v41）
+
+POST_IC_CORES = ("pandas_optimized", "pandas_legacy")
+
+
+def _postic_core_receipt() -> Mapping[str, Any]:
+    paths = sorted(nh.RECEIPTS_DIR.glob("*-numview-postic-core-select.json"))
+    assert len(paths) == 1, f"Task 1.6 收據數 {len(paths)} ≠ 1（fail-closed）"
+    return _load_receipt(paths[0])
+
+
+def post_ic_core_violations(decisions: Mapping[str, Any], receipt: Mapping[str, Any]) -> List[str]:
+    """⑧（SPEC Task 1.5 v40／v41）：d_icpage_arm 之 `report.post_ic_core` 依 Task 1.6 收據——有 `choice` ⇒ 等於之且不得具
+    `core_user_ruling`；`no_choice` ⇒ `no_choice_reason`＝收據理由，無 `core_user_ruling` ⇒ 值為 "no_choice"，有之 ⇒
+    `core` 屬兩核心、`quote` 含該核心短名且不含另一者、`post_ic_core`＝`core`、`output_dtype`＝float32、
+    `output_dtype_quote` 含「float32」、`post_ic_output_dtype`＝`output_dtype`。"""
+    report = _record(decisions, "d_icpage_arm").get("report")
+    if not isinstance(report, Mapping):
+        return ["d_icpage_arm：缺 report"]
+    out: List[str] = []
+    ruling = report.get("core_user_ruling")
+    if "choice" in receipt:
+        if ruling is not None:
+            out.append("d_icpage_arm：收據已擇一而具 core_user_ruling")
+        if report.get("post_ic_core") != receipt["choice"] or receipt["choice"] not in POST_IC_CORES:
+            out.append(f"d_icpage_arm：post_ic_core {report.get('post_ic_core')!r} ≠ 收據 choice {receipt['choice']!r}")
+        return out
+    if report.get("no_choice_reason") != (receipt.get("no_choice") or {}).get("reason"):
+        out.append("d_icpage_arm：no_choice_reason ≠ 收據理由")
+    if ruling is None:
+        if report.get("post_ic_core") != "no_choice":
+            out.append(f"d_icpage_arm：收據 no_choice 且無使用者裁定而 post_ic_core={report.get('post_ic_core')!r}")
+        return out
+    if not (isinstance(ruling, Mapping) and _DATE_RE.match(str(ruling.get("date", ""))) and str(ruling.get("quote", "")).strip()):
+        return out + ["d_icpage_arm：core_user_ruling 缺 date／quote"]
+    core = ruling.get("core")
+    if core not in POST_IC_CORES:
+        return out + [f"d_icpage_arm：core_user_ruling.core {core!r} 不屬兩核心"]
+    other = next(c for c in POST_IC_CORES if c != core)
+    quote = str(ruling["quote"])
+    if core[len("pandas_"):] not in quote or other[len("pandas_"):] in quote:
+        out.append(f"d_icpage_arm：core_user_ruling.core {core} 與原話 {quote!r} 不符")
+    if report.get("post_ic_core") != core:
+        out.append(f"d_icpage_arm：post_ic_core {report.get('post_ic_core')!r} ≠ 裁定核心 {core}")
+    if ruling.get("output_dtype") != "float32" or "float32" not in str(ruling.get("output_dtype_quote") or ""):
+        out.append("d_icpage_arm：core_user_ruling 之 output_dtype／output_dtype_quote 不符 float32 裁定")
+    if report.get("post_ic_output_dtype") != ruling.get("output_dtype"):
+        out.append("d_icpage_arm：post_ic_output_dtype ≠ 裁定之 output_dtype")
+    return out
+
+
+def _condition_holds(trigger: Mapping[str, Any], cond: Mapping[str, Any]) -> bool:
+    """候選條件一項（rows_key／where／field／condition∈{any_nonzero, all_zero}）於觸發收據重算；欄缺或非有限 ⇒ 視為非零。"""
+    paths = sorted(nh.RECEIPTS_DIR.glob(f"*-numview-{str(trigger['receipt']).replace('_', '-')}.json"))
+    assert len(paths) == 1, trigger
+    rows = [r for r in _load_receipt(paths[0]).get(cond["rows_key"]) or []
+            if isinstance(r, Mapping) and all(r.get(k) == v for k, v in (cond.get("where") or {}).items())]
+    assert rows, f"候選條件 {dict(cond)} 選無列"
+    nonzero = [not _is_finite_zero(r.get(cond["field"])) for r in rows]
+    return any(nonzero) if cond["condition"] == "any_nonzero" else not any(nonzero)
+
+
+def _candidate_unmet(key: str, record: Mapping[str, Any], criteria: Mapping[str, Any]) -> bool:
+    """已觸發且所記 choice 之判準候選條件（`requires`／`requires_all`）依收據重算不成立；無條件者 ⇒ 否。"""
+    rule = criteria["decision_rules"][key]
+    cond = (rule.get("candidate_conditions") or {}).get(record.get("choice")) or {}
+    items = list(cond.get("requires_all") or []) + ([cond["requires"]] if cond.get("requires") else [])
+    if record.get("triggered") is not True or not items:
+        return False
+    return not all(_condition_holds(rule["trigger"], c) for c in items)
+
+
+def limitation_binding_violations(decisions: Mapping[str, Any], criteria: Mapping[str, Any]) -> List[str]:
+    """⑨（SPEC Task 1.5 v40）：`unforeseen_situation` 項具 `decision_key`（屬決定點）與可解析之 `evidence`；候選條件不成立之
+    已觸發決定點恰一項，其 evidence 含該點觸發收據之觸發列；其餘鍵不得有項。"""
+    out: List[str] = []
+    items = [i for i in decisions.get("measurement_limitations") or []
+             if isinstance(i, Mapping) and i.get("kind") == "unforeseen_situation"]
+    by_key: Dict[str, List[Mapping[str, Any]]] = {}
+    for item in items:
+        key = item.get("decision_key")
+        if key not in DECISION_POINTS:
+            out.append(f"限制項 {item.get('id')!r}：decision_key {key!r} 不屬決定點")
+            continue
+        by_key.setdefault(str(key), []).append(item)
+        refs = item.get("evidence")
+        if not isinstance(refs, list) or not refs:
+            out.append(f"限制項 {item.get('id')!r}：evidence 為空")
+            refs = []
+        for ref in refs:  # 每筆引用皆須可解析至 numview 收據列（fail-closed；同 evidence_violations）
+            path = REPO / str(ref.get("receipt", "")) if isinstance(ref, Mapping) else None
+            ok = (path is not None and path.is_file() and path.parent == nh.RECEIPTS_DIR and path.match(RECEIPT_GLOB))
+            if ok:
+                rows = _load_receipt(path).get(ref.get("rows_key"))
+                row = ref.get("row")
+                ok = (isinstance(rows, list) and isinstance(row, int) and not isinstance(row, bool) and 0 <= row < len(rows))
+            if not ok:
+                out.append(f"限制項 {item.get('id')!r}：evidence 引用不可解析：{ref!r}")
+    for r in _records(decisions):
+        key = str(r.get("key"))
+        if key not in DECISION_POINTS:
+            continue
+        need = _candidate_unmet(key, r, criteria)
+        got = by_key.get(key, [])
+        if need and len(got) != 1:
+            out.append(f"{key}：候選條件不成立而限制項數 {len(got)} ≠ 1")
+        elif not need and got:
+            out.append(f"{key}：候選條件成立或未觸發而有限制項")
+        elif need:
+            trigger = criteria["decision_rules"][key]["trigger"]
+            slug = str(trigger["receipt"]).replace("_", "-")
+            rows_ok = False
+            for ref in got[0].get("evidence") or []:
+                if not (isinstance(ref, Mapping) and str(ref.get("receipt", "")).endswith(f"-numview-{slug}.json")
+                        and ref.get("rows_key") == trigger["rows_key"]):
+                    continue
+                rows = _load_receipt(REPO / str(ref["receipt"])).get(trigger["rows_key"]) or []
+                i = ref.get("row")
+                if isinstance(i, int) and 0 <= i < len(rows) and all(rows[i].get(k) == v for k, v in trigger["where"].items()) \
+                        and not _is_finite_zero(rows[i].get(trigger["field"])) and rows[i].get(trigger["field"]) is not False:
+                    rows_ok = True
+            if not rows_ok:
+                out.append(f"{key}：限制項 evidence 未含觸發收據之觸發列")
+    return out
+
+
+def test_decision_post_ic_core_bound_to_task16_receipt() -> None:
+    """SPEC Task 1.5 驗證⑧（v40／v41）。"""
+    assert post_ic_core_violations(_load_decisions(), _postic_core_receipt()) == []
+
+
+def test_decision_limitations_bound_to_unmet_candidates() -> None:
+    """SPEC Task 1.5 驗證⑨（v40）。"""
+    assert limitation_binding_violations(_load_decisions(), _load_criteria()) == []
+
+
+@pytest.mark.parametrize("mutant", ["drop_core", "loser_core", "no_ruling_keeps_core", "ruling_core_mismatch_quote",
+                                    "drop_output_dtype"])
+def test_mutation_post_ic_core_binding(mutant: str) -> None:
+    """mutation（SPEC Task 1.5 ⑧ v40／v41）：刪 post_ic_core、改為落選核心、刪裁定仍記核心名、裁定核心與原話不符、
+    刪 post_ic_output_dtype ⇒ 紅。"""
+    def mutate(d: Dict[str, Any]) -> None:
+        report = _record_of(d, "d_icpage_arm")["report"]
+        if mutant == "drop_core":
+            report.pop("post_ic_core")
+        elif mutant == "loser_core":
+            report["post_ic_core"] = "pandas_optimized"
+        elif mutant == "no_ruling_keeps_core":
+            report.pop("core_user_ruling")
+        elif mutant == "ruling_core_mismatch_quote":
+            report["core_user_ruling"]["core"] = "pandas_optimized"
+            report["post_ic_core"] = "pandas_optimized"
+        else:
+            report.pop("post_ic_output_dtype")
+    assert post_ic_core_violations(_mutated_decisions(mutate), _postic_core_receipt()) != []
+
+
+@pytest.mark.parametrize("mutant", ["drop_l2_item", "l2_key_to_mtf", "evidence_non_trigger", "memmap_item_added",
+                                    "evidence_extra_bad_ref"])
+def test_mutation_limitation_binding(mutant: str) -> None:
+    """mutation（SPEC Task 1.5 ⑨ v40）：刪 d_l2 之限制項、其 decision_key 改 d_mtf、evidence 指非觸發收據、為候選成立之
+    d_memmap 加一項 ⇒ 紅。"""
+    def mutate(d: Dict[str, Any]) -> None:
+        items = d["measurement_limitations"]
+        l2 = next(i for i in items if i.get("decision_key") == "d_l2")
+        if mutant == "drop_l2_item":
+            items.remove(l2)
+        elif mutant == "l2_key_to_mtf":
+            l2["decision_key"] = "d_mtf"
+        elif mutant == "evidence_non_trigger":
+            l2["evidence"] = list(_record_of(d, "d_memmap")["evidence"])
+        elif mutant == "evidence_extra_bad_ref":  # 審碼 r43：合法觸發列之外另附一筆不可解析之引用
+            l2["evidence"] = list(l2["evidence"]) + [{"receipt": "handoffs/run_receipts/no-such.json", "rows_key": "cells",
+                                                      "row": 0}]
+        else:
+            items.append(dict(l2, id="NUMVIEW-LIM-MUTANT", decision_key="d_memmap",
+                              evidence=list(_record_of(d, "d_memmap")["evidence"])))
+    assert limitation_binding_violations(_mutated_decisions(mutate), _load_criteria()) != []
