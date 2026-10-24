@@ -24,6 +24,8 @@ def test_explicit_path_takes_priority_over_library(tmp_path) -> None:
     library, features_path = write_canonical_run(tmp_path / "features", expected, SYMBOL, PRIMARY_TF, "path-hash")
     calls = []
     real_load = library.load_with_identity
+    # 審碼 b3 r9（CODEX-R9-P1-01）：預期身分於裝 spy 前直接自 library 讀回（全欄比對，含 content_sha256 等）
+    _frame, expected_identity = real_load(SYMBOL, PRIMARY_TF, config_hash="path-hash")
 
     def spy_load(symbol, timeframe, **kwargs):
         calls.append((symbol, timeframe, kwargs.get("config_hash")))
@@ -44,6 +46,7 @@ def test_explicit_path_takes_priority_over_library(tmp_path) -> None:
     assert calls == [(SYMBOL, PRIMARY_TF, "path-hash")]
     # NUMVIEW Task 2.2：回傳之身分＝path 解析出之 run（非 selector 之 symbol／timeframe／config_hash）
     assert (identity.symbol, identity.tf, identity.config_hash) == (SYMBOL, PRIMARY_TF, "path-hash")
+    assert identity.to_dict() == expected_identity.to_dict()
 
 
 def test_library_load_receives_pinned_config_hash() -> None:
