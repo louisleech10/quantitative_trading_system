@@ -351,7 +351,9 @@ def _cell_view(cell_id: str, cell: Mapping[str, Any]) -> Dict[str, Any]:
     view = dict(cell)
     timeframes = list(cell.get("timeframes") or [])
     view["tf"] = timeframes[0] if len(timeframes) == 1 else None
-    if isinstance(cell.get("g1"), Mapping):
+    # 凍結檔之格 B／C 不凍 G1 臂份（`g1` 為空物件，`scripts/numview_freeze_baseline.py` freeze_one）⇒ 無 G1 檢視；
+    # 有任一 G1 臂份之格方須具 g1_source_env／ic_first_selected
+    if isinstance(cell.get("g1"), Mapping) and cell["g1"]:
         assert "g1_source_env" in cell and "ic_first_selected" in cell, f"§G 凍結檔格 {cell_id} 缺 g1_source_env／ic_first_selected"
         view["g1"] = {
             "source_env": dict(cell["g1_source_env"]),

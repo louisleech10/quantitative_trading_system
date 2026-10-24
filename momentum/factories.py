@@ -244,8 +244,11 @@ def create_post_ic_transform_config(
 ) -> Any:
     """ICPOSTLEAK Task 2.1：IC 頁「套用後處理」之正式 post-IC 轉換設定（縮尾／fracdiff／ADF 關、replace 模式；
     轉換順序由正式實作決定＝rank→gaussian→zscore）。`zscore_windows` 由呼叫端先正規化（主窗＝清單第一個）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
     from momentum.FeatureEngineering.feature_config import PreprocessingConfig
 
+    # NUMVIEW Task 2.1（審碼 b3 r4）：窗元素於 int() 轉換前拒 bool（不得把 True 轉成窗 1）；空窗不替換、交模型驗證拒收
+    zscore_windows = _nv.reject_bool_items(zscore_windows, "zscore_windows") if zscore else zscore_windows
     return PreprocessingConfig(
         enabled=True,
         mode="replace",
@@ -265,6 +268,14 @@ def ratio_unsafe_category(feature_name: str) -> Optional[str]:
     from momentum.FeatureEngineering import feature_naming as _naming
 
     return _naming.ratio_unsafe_category(str(feature_name))
+
+
+def reject_bool_window_items(values: Any, field: str) -> Any:
+    """NUMVIEW Task 2.1：窗清單之型別轉換前檢查（元素含 bool ⇒ ValueError）。判定委由
+    `numeric_view.reject_bool_items`（單一實作；api 經本模組取用，解耦 R3）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    return _nv.reject_bool_items(values, field)
 
 
 def parse_feature_name(feature_name: str, tagged: bool = True) -> Any:

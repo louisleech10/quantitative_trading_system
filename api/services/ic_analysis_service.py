@@ -117,8 +117,11 @@ check_feature_run_coverage, FeatureRunCoverage, FeatureRunCoverageError = (
 
 def _normalize_zscore_windows(windows: List[int]) -> List[int]:
     """ICPOSTLEAK Task 2.1：IC 頁 zscore 窗正規化——遞增排序，使 replace 模式之主窗（清單第一個）＝最小窗，
-    保留改前手寫版以最小窗為主窗之語意（使用者傳 [252, 100] 與 [100, 252] 同義）。"""
-    return sorted(int(w) for w in windows)
+    保留改前手寫版以最小窗為主窗之語意（使用者傳 [252, 100] 與 [100, 252] 同義）。NUMVIEW Task 2.1（審碼 b3 r4）：
+    int() 前拒 bool（不得把 True 轉成窗 1）。"""
+    from momentum.factories import reject_bool_window_items
+
+    return sorted(int(w) for w in reject_bool_window_items(windows, "zscore_windows"))
 
 
 def _dedupe_preserve_order(names: List[str]) -> List[str]:
@@ -2820,7 +2823,8 @@ class ICAnalysisService:
             zscore,
             gaussian,
             rank_window,
-            zscore_windows or [100, 252],
+            # NUMVIEW Task 2.1（審碼 b3 r4）：未給（None）才用請求模型之同一預設；明給之空窗原樣交驗證（zscore 開 ⇒ 拒收）
+            zscore_windows if zscore_windows is not None else [100, 252],
         )
 
     def _apply_transforms_sync(
@@ -2891,7 +2895,8 @@ class ICAnalysisService:
 
         # --- 4. Post-IC transforms：正式實作（ICPOSTLEAK Task 2.1；順序 rank→gaussian→zscore、窗未滿之列為 NaN、
         #     時間序非嚴格遞增 fail-closed）；改前之手寫版含全樣本排名之未來洩漏與錯誤順序，已刪除 ---
-        windows = _normalize_zscore_windows(zscore_windows)
+        # NUMVIEW Task 2.1（審碼 b3 r5）：zscore 關時不驗、不正規化其窗（同「enabled=false 之步驟不驗」）
+        windows = _normalize_zscore_windows(zscore_windows) if zscore else list(zscore_windows)
         transform_config = create_post_ic_transform_config(
             rank=rank, rank_window=rank_window, zscore=zscore, zscore_windows=windows, gaussian=gaussian,
         )

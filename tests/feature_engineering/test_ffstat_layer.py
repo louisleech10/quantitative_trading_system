@@ -16,7 +16,8 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import Featu
 from tests.feature_engineering import ffstat_helpers as h
 from tests.feature_engineering import preprov_helpers as ph
 
-_PRE_CONFIG = {"fractional_differencing": {"enabled": True, "apply_to": "non_stationary"},
+_PRE_CONFIG = {"winsorization": {"method": "sigma"},
+               "fractional_differencing": {"enabled": True, "apply_to": "non_stationary"},
                "adf_differencing": {"enabled": False},
                # v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示；前史 600 列足 500
                "calibration_bars": 500}

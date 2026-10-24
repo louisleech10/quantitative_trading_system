@@ -38,6 +38,7 @@ def _preprocessor(
     return FeaturePreprocessor(
         {
             "calibration_bars": calibration_bars,
+            "winsorization": {"method": "sigma"},
             "mode": "append",
             "adf_differencing": {"sample_size": calibration_bars},
             "fractional_differencing": {

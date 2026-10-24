@@ -279,7 +279,7 @@ def test_noncausal_winsor_helpers_fail_closed() -> None:
         with pytest.raises(ValueError):
             transform_array_fast(values, winsor_method=method, causal_preprocessing=False)
         polars_l65_winsorization(frame, columns=["c"], method=method, causal_preprocessing=True)
-        transform_array_fast(values, winsor_method=method, causal_preprocessing=True)
+        transform_array_fast(values, winsor_method=method, causal_preprocessing=True, zscore_window=100)
 
 
 def _foreign_market_ingestion_raises() -> bool:
@@ -790,7 +790,7 @@ def test_chunked_memmap_keeps_appended_columns(monkeypatch: pytest.MonkeyPatch) 
         return out
 
     monkeypatch.setattr(FeaturePreprocessor, "_transform_single", fake_single)
-    pre = FeaturePreprocessor({})
+    pre = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
     monkeypatch.setattr(FeaturePreprocessor, "_CHUNKED_MEMMAP_MIN_BYTES", 10 ** 18)
     expected = pre._transform_chunked(frame, chunk_size=2)
     monkeypatch.setattr(FeaturePreprocessor, "_CHUNKED_MEMMAP_MIN_BYTES", 0)
@@ -1046,7 +1046,7 @@ def test_chunked_memmap_all_chunks_empty_returns_zero_columns(monkeypatch: pytes
     frame = pd.DataFrame({f"c_{w}": close.rolling(w).mean() for w in (2, 3, 5)})
     monkeypatch.setattr(FeaturePreprocessor, "_transform_single", lambda self, chunk: pd.DataFrame(index=chunk.index))
     monkeypatch.setattr(FeaturePreprocessor, "_CHUNKED_MEMMAP_MIN_BYTES", 0)
-    got = FeaturePreprocessor({})._transform_chunked(frame, chunk_size=2)
+    got = FeaturePreprocessor({"winsorization": {"method": "sigma"}})._transform_chunked(frame, chunk_size=2)
     assert got.shape == (len(frame), 0) and got.index.equals(frame.index)
 
 

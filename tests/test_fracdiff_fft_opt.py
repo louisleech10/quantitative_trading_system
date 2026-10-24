@@ -26,6 +26,7 @@ from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 def _make_preprocessor(fracdiff_enabled: bool = True) -> FeaturePreprocessor:
     """Build a minimal FeaturePreprocessor with fracdiff config."""
     cfg = {
+        "winsorization": {"method": "sigma"},
         "preprocessing": {
             "enabled": fracdiff_enabled,
             "mode": "replace",
@@ -152,7 +153,8 @@ class TestFindMinDPrecomputedMatchesOriginal:
         # 而 `_make_preprocessor` 之設定巢在 "preprocessing" 之下、前處理器讀不到（fracdiff 實為關閉），故此處明設開啟
         pp = FeaturePreprocessor(
             # FFSTAT v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示 N
-            {"fractional_differencing": {"enabled": True, "precision": 0.02, "cache_d_star": False},
+            {"winsorization": {"method": "sigma"},
+             "fractional_differencing": {"enabled": True, "precision": 0.02, "cache_d_star": False},
              "calibration_bars": 500}
         )
         attach_unit_calibration(pp, series.to_frame())

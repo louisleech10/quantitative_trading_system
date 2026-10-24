@@ -1,0 +1,76 @@
+{
+ "schema_version": 1,
+ "generated_at": "2026-10-24T12:55:21.797615+00:00",
+ "head": "d47266621d9aa3c684c5338198181bdcdbe3b7f3",
+ "command": "venv/bin/python handoffs/run_receipts/numview_probes/winsor_key_inventory.py",
+ "probe_sha256": "6ad2a7bf55ac471fc16d482cc54cc9a3c91c048ecf5ea5beaf2cbab51b054d79",
+ "sources": [
+  {
+   "path": "momentum/FeatureEngineering/feature_factory.py:2696",
+   "call": "FeaturePreprocessor(winsor_config)",
+   "source": "scale_preprocessing_config_for_native(_build_l7_raw_preprocessing_config)（校準縮尾器）",
+   "has_method_key": true,
+   "winsor_enabled": true,
+   "method": "quantile"
+  },
+  {
+   "path": "momentum/FeatureEngineering/feature_factory.py:2974",
+   "call": "FeaturePreprocessor(self._preprocessing_config_dict(config))",
+   "source": "FeatureFactory._preprocessing_config_dict（IC-first post-IC 之母實例）",
+   "has_method_key": true,
+   "winsor_enabled": true,
+   "method": "quantile"
+  },
+  {
+   "path": "momentum/FeatureEngineering/feature_factory.py:3863",
+   "call": "FeaturePreprocessor(preprocessing_config)",
+   "source": "FeatureFactory._build_l7_raw_preprocessing_config（生成 L6.5）",
+   "has_method_key": true,
+   "winsor_enabled": true,
+   "method": "quantile"
+  },
+  {
+   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:939",
+   "call": "FeaturePreprocessor(post_ic_config)",
+   "source": "FeaturePreprocessor._build_post_ic_transform_config（transform_selected）",
+   "has_method_key": true,
+   "winsor_enabled": false,
+   "method": "quantile"
+  },
+  {
+   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1560",
+   "call": "FeaturePreprocessor(scaled_config)",
+   "source": "scale_preprocessing_config_for_native（native-tf 子實例）",
+   "has_method_key": true,
+   "winsor_enabled": true,
+   "method": "quantile"
+  },
+  {
+   "path": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1739",
+   "call": "FeaturePreprocessor(scaled_config)",
+   "source": "scale_preprocessing_config_for_native（native-tf 子實例）",
+   "has_method_key": true,
+   "winsor_enabled": true,
+   "method": "quantile"
+  },
+  {
+   "path": "momentum/factories.py:234",
+   "call": "FeaturePreprocessor(config)",
+   "source": "create_feature_preprocessor 之呼叫端設定（生產呼叫端＝IC 頁 create_post_ic_transform_config）",
+   "has_method_key": true,
+   "winsor_enabled": false,
+   "method": "quantile"
+  },
+  {
+   "path": "api/services/ic_analysis_service.py:2898",
+   "call": "create_feature_preprocessor(transform_config.model_dump())",
+   "source": "create_post_ic_transform_config().model_dump()（IC 頁第三步）",
+   "has_method_key": true,
+   "winsor_enabled": false,
+   "method": "quantile"
+  }
+ ],
+ "unregistered_sites": [],
+ "stale_registrations": [],
+ "exit_code": 0
+}

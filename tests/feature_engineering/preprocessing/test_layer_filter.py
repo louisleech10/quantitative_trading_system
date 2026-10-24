@@ -41,6 +41,7 @@ def _config() -> dict:
             "max_lag": 8,
         },
         "mode": "append",
+        "winsorization": {"method": "sigma"},
         "calibration_bars": 40,  # FFSTAT b3b：fixture 80 列，N 取 40（封包以 fixture 本身建，僅驗層篩選）
     }
 
@@ -139,6 +140,7 @@ def test_layer_filter_runs_non_stationary_adf_only_for_target_layers(
                 "max_lag": 8,
             },
             "mode": "append",
+            "winsorization": {"method": "sigma"},
             "calibration_bars": 40,
         },
         column_layer_map={"L1_alpha": "L1", "L3_gamma": "L3"},

@@ -25,7 +25,7 @@ def _base_df(n: int = 300) -> pd.DataFrame:
 
 
 def test_preprocess_empty_df() -> None:
-    pre = FeaturePreprocessor({"rank_transform": {"enabled": True}})
+    pre = FeaturePreprocessor({"winsorization": {"method": "sigma"}, "rank_transform": {"enabled": True}})
     out = pre.transform(pd.DataFrame())
     assert out.empty
 
@@ -34,6 +34,7 @@ def test_preprocess_all_nan_column() -> None:
     df = pd.DataFrame({"f1": [np.nan] * 100})
     pre = FeaturePreprocessor(
         {
+            "winsorization": {"method": "sigma"},
             "rank_transform": {"enabled": True, "window": 10, "apply_to": "all"},
             "adaptive_zscore": {"enabled": True, "windows": [10], "apply_to": "all"},
             "mode": "append",
@@ -49,6 +50,7 @@ def test_preprocess_constant_column() -> None:
     pre = FeaturePreprocessor(
         {
             "causal_preprocessing": True,
+            "winsorization": {"method": "sigma"},
             "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
             "gaussian_normalize": {"enabled": True, "apply_to": "all", "clip_range": [0.001, 0.999]},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
@@ -70,6 +72,7 @@ def test_adf_nan_heavy() -> None:
         {
             "causal_preprocessing": True,
             "calibration_bars": 30,  # FFSTAT b3b：單元測試 fixture 短，N 取 30（封包見下）
+            "winsorization": {"method": "sigma"},
             "adf_differencing": {"enabled": True, "apply_to": ["f1"], "max_diff": 2},
             "mode": "append",
         }
@@ -161,6 +164,7 @@ def test_preprocess_replace_mode() -> None:
     before_cols = df.shape[1]
     pre = FeaturePreprocessor(
         {
+            "winsorization": {"method": "sigma"},
             "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
             "mode": "replace",
@@ -174,6 +178,7 @@ def test_preprocess_append_mode() -> None:
     df = _base_df(120)
     pre = FeaturePreprocessor(
         {
+            "winsorization": {"method": "sigma"},
             "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
             "mode": "append",
@@ -259,6 +264,7 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
         {
             "causal_preprocessing": True,
             "calibration_bars": 30,  # FFSTAT b3b：單元測試 fixture 短，N 取 30（封包見下）
+            "winsorization": {"method": "sigma"},
             "fractional_differencing": {
                 "enabled": True,
                 "apply_to": ["L1_f2"],
@@ -293,7 +299,7 @@ def test_transform_fixed_order(monkeypatch: pytest.MonkeyPatch) -> None:
     df = _base_df(60)
     pre = FeaturePreprocessor(
         {
-            "winsorization": {"enabled": True},
+            "winsorization": {"method": "sigma"},
             "fractional_differencing": {"enabled": False},
             "adf_differencing": {"enabled": False},
             "rank_transform": {"enabled": True, "window": 10},

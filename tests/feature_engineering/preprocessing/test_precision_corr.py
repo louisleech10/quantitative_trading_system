@@ -22,6 +22,7 @@ def test_precision_corr_002_matches_001() -> None:
     series = pd.Series(np.cumsum(rng.normal(0.0, 1.0, size=360)), name="x")
     preprocessor = FeaturePreprocessor(
         {
+            "winsorization": {"method": "sigma"},
             "calibration_bars": 360,  # FFSTAT b3b：原判定取前 min(500, 360) 根＝全序列；封包以全序列建
             "fractional_differencing": {
                 "enabled": True,
@@ -73,6 +74,7 @@ def test_precision_override_reaches_find_min_d(monkeypatch: pytest.MonkeyPatch) 
                 "max_lag": 8,
             },
             "mode": "append",
+            "winsorization": {"method": "sigma"},
             "calibration_bars": 40,  # FFSTAT b3b：fixture 80 列；封包以 fixture 本身建，僅驗 precision 傳遞
         },
         # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）

@@ -372,6 +372,7 @@ def test_t2b8_l65_fracdiff_per_group_feasible(tmp_path, monkeypatch):
 
     preprocessor = FeaturePreprocessor(
         {
+            "winsorization": {"method": "sigma"},
             "fractional_differencing": {
                 "enabled": True,
                 "apply_to": "all",

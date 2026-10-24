@@ -37,8 +37,12 @@ def _materialize_registry(registry: ColumnGroupRegistry) -> pd.DataFrame:
     return pd.concat(frames, axis=1, copy=False)
 
 
-def test_t217_l65_per_group_matches_legacy(tmp_path: Path):
-    """T2.17: L6.5 per-group preprocessing should match legacy wide-DF output."""
+@pytest.mark.parametrize("winsor_method", ["quantile", "sigma"])
+def test_t217_l65_per_group_matches_legacy(tmp_path: Path, winsor_method: str):
+    """T2.17: L6.5 per-group preprocessing should match legacy wide-DF output.
+
+    NUMVIEW Task 2.1（審碼 b3 r1）：縮尾 method 須明給；兩法各自於 per-group 與寬表兩路同法比對（改前未給 method 時兩路
+    之預設不同〔registry 快速臂 quantile、寬表 sigma〕）。"""
     features = pd.DataFrame(
         {
             "close_1h_trend_EMA_5_mean": [1.0, 2.0, 100.0, 4.0, 5.0, 6.0],
@@ -61,6 +65,7 @@ def test_t217_l65_per_group_matches_legacy(tmp_path: Path):
     )
 
     preprocess_config = {
+        "winsorization": {"method": winsor_method},
         "rank_transform": {"enabled": True, "apply_to": "all", "window": 3},
     }
 

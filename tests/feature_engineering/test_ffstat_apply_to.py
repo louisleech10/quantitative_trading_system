@@ -57,7 +57,7 @@ def test_select_columns_has_no_layer1_only_prefix_branch() -> None:
 
     names = sorted(json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))["base"])[:30]
     df = pd.DataFrame({n: [1.0, 2.0, 3.0] for n in names})
-    pre = FeaturePreprocessor({})
+    pre = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
     legacy = [c for c in names if c.startswith(("close_", "open_", "high_", "low_", "volume_"))]
     assert legacy, "真實欄名須含舊前綴（測試前提）"
     assert pre._select_columns(df, "layer1_only") != legacy

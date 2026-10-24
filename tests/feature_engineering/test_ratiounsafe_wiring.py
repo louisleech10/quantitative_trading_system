@@ -61,7 +61,7 @@ def test_preprocessor_transform_drops_tagged_pattern() -> None:
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
     frame = _real_frame(TAGGED_UNSAFE + SAFE)
-    out = FeaturePreprocessor({"enabled": True, "mode": "replace"}).transform(frame)
+    out = FeaturePreprocessor({"enabled": True, "mode": "replace", "winsorization": {"method": "sigma"}}).transform(frame)
     assert not set(TAGGED_UNSAFE) & set(out.columns)
     assert set(SAFE) <= set(out.columns)
 
@@ -92,7 +92,7 @@ def test_mutation_common_core_breaks_all_consumers(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(fn, "ratio_unsafe_category", lambda column: None)
     assert set(TAGGED_UNSAFE) <= set(_l3_candidates(TAGGED_UNSAFE + SAFE))
-    out = FeaturePreprocessor({"enabled": True, "mode": "replace"}).transform(_real_frame(TAGGED_UNSAFE + SAFE))
+    out = FeaturePreprocessor({"enabled": True, "mode": "replace", "winsorization": {"method": "sigma"}}).transform(_real_frame(TAGGED_UNSAFE + SAFE))
     assert set(TAGGED_UNSAFE) <= set(out.columns)
     assert ratio_unsafe_category(TAGGED_UNSAFE[0]) is None
 
@@ -112,7 +112,7 @@ def test_mutation_wiring_consumer_reverted_to_old_rule(monkeypatch: pytest.Monke
     else:
         from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
-        out = FeaturePreprocessor({"enabled": True, "mode": "replace"}).transform(_real_frame(TAGGED_UNSAFE + SAFE))
+        out = FeaturePreprocessor({"enabled": True, "mode": "replace", "winsorization": {"method": "sigma"}}).transform(_real_frame(TAGGED_UNSAFE + SAFE))
         assert set(TAGGED_UNSAFE) <= set(out.columns)
 
 

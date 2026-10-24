@@ -158,6 +158,7 @@ def test_fracdiff_warmup_freeze_no_leak(monkeypatch: pytest.MonkeyPatch) -> None
         {
             "causal_preprocessing": True,
             "calibration_bars": 500,
+            "winsorization": {"method": "sigma"},
             # FFSTAT b3b：封包只在平穩化開啟時交付 ⇒ 明設 enabled；adf_differencing.sample_size 已刪（N＝calibration_bars）
             "fractional_differencing": {"enabled": True, "precision": 0.5, "adf_threshold": 0.1, "weight_threshold": 1e-5},
             "adf_differencing": {"enabled": True, "adf_threshold": 0.1},

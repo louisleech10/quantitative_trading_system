@@ -92,7 +92,7 @@ def test_resolve_slowpath_n_jobs_batch_concurrency(monkeypatch: pytest.MonkeyPat
         lambda: 16,
     )
 
-    preprocessor = FeaturePreprocessor({})
+    preprocessor = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
     assert preprocessor._resolve_slowpath_n_jobs() == 2
 
 
@@ -110,7 +110,7 @@ def test_resolve_slowpath_n_jobs_parallel_budget_off(monkeypatch: pytest.MonkeyP
         lambda: 16,
     )
 
-    preprocessor = FeaturePreprocessor({})
+    preprocessor = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
     assert preprocessor._resolve_slowpath_n_jobs() == 1
 
 
@@ -128,7 +128,7 @@ def test_resolve_slowpath_n_jobs_ops_nested_override(monkeypatch: pytest.MonkeyP
         lambda: 16,
     )
 
-    preprocessor = FeaturePreprocessor({})
+    preprocessor = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
     assert preprocessor._resolve_slowpath_n_jobs() == 1
 
 
@@ -186,6 +186,7 @@ def test_joblib_pickle_fail_falls_back_to_serial(monkeypatch: pytest.MonkeyPatch
                 "max_lag": 8,
             },
             "mode": "append",
+            "winsorization": {"method": "sigma"},
             "calibration_bars": 60,  # FFSTAT b3b：fixture 120 列；封包以 fixture 本身建，僅驗回退路徑
         },
         # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）

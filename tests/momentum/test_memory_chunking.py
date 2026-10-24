@@ -127,7 +127,7 @@ class TestL65ColumnChunking:
         monkeypatch.setenv("FFACT_L65_CHUNK_SIZE", "500")
         from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
-        pp = FeaturePreprocessor({})
+        pp = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
         assert pp._column_chunk_size == 500
 
 

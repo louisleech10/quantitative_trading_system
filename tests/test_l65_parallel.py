@@ -232,6 +232,9 @@ def test_fracdiff_non_target_registry_group_stays_on_fast_path(
             "can_use_numba_fast": True,
             "transform_array_fast": fake_fast,
             "do_winsorize": False,
+            # NUMVIEW Task 2.1：同 `_build_registry_transform_context` 於縮尾／zscore 關時之明設值（核心不再以預設補值）
+            "winsor_method": "",
+            "zscore_window": 0,
             "do_rank": False,
             "do_zscore": False,
             "do_fracdiff": True,

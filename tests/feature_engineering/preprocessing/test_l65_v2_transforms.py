@@ -22,6 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 def _rank_config(window: int = 3) -> dict:
     return {
         "mode": "replace",
+        "winsorization": {"method": "sigma"},
         "rank_transform": {"enabled": True, "window": window, "apply_to": "all"},
     }
 
@@ -30,6 +31,7 @@ def _gaussian_config(*, causal: bool = True) -> dict:
     return {
         "mode": "replace",
         "causal_preprocessing": causal,
+        "winsorization": {"method": "sigma"},
         "rank_transform": {"window": 1},
         "gaussian_normalize": {
             "enabled": True,
@@ -61,6 +63,7 @@ def _winsor_quantile_config(
 def _zscore_config(windows: list[int], mode: str = "replace") -> dict:
     return {
         "mode": mode,
+        "winsorization": {"method": "sigma"},
         "adaptive_zscore": {
             "enabled": True,
             "windows": windows,
@@ -495,32 +498,16 @@ def test_zscore_shared_rolling() -> None:
 
 
 def test_zscore_empty_windows() -> None:
-    frame = pd.DataFrame(
-        {
-            "alpha": [1.0, 2.0, np.nan, 4.0],
-            "beta": [3.0, 3.0, 3.0, 3.0],
-        }
-    )
+    """NUMVIEW Task 2.1（改寫）：zscore 啟用而窗清單為空 ⇒ 建構時 `NumericPolicyError`（replace／append 兩模式；改前為靜默
+    不做 zscore、回原值）；內部 `_rolling_zscore_2d` 收到空窗亦具名拋錯（不可達之守衛）。"""
+    from momentum.FeatureEngineering.numeric_view import NumericPolicyError
 
-    replace_result = FeaturePreprocessor(_zscore_config([]))._apply_adaptive_zscore(frame)
-    append_result = FeaturePreprocessor(_zscore_config([], mode="append"))._apply_adaptive_zscore(frame)
-
-    assert list(replace_result.columns) == list(frame.columns)
-    assert list(append_result.columns) == list(frame.columns)
-    np.testing.assert_allclose(
-        replace_result.to_numpy(dtype=np.float32),
-        frame.to_numpy(dtype=np.float32),
-        rtol=0.0,
-        atol=0.0,
-        equal_nan=True,
-    )
-    np.testing.assert_allclose(
-        append_result.to_numpy(dtype=np.float32),
-        frame.to_numpy(dtype=np.float32),
-        rtol=0.0,
-        atol=0.0,
-        equal_nan=True,
-    )
+    for mode in ("replace", "append"):
+        with pytest.raises(NumericPolicyError):
+            FeaturePreprocessor(_zscore_config([], mode=mode))
+    legal = FeaturePreprocessor(_zscore_config([2]))
+    with pytest.raises(NumericPolicyError):
+        legal._rolling_zscore_2d(np.ones((4, 2)), [], 1e-8, mode="replace")
 
 
 def test_zscore_append_mode_preserves_legacy_suffix_order() -> None:

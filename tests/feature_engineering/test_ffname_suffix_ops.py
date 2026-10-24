@@ -182,6 +182,7 @@ def test_append_mode_rank_gaussian_zscore_unit_names():
                               ["close"]).compute_all(kline)
     pre = FeaturePreprocessor({
         "mode": "append",
+        "winsorization": {"method": "sigma"},
         "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
         "gaussian_normalize": {"enabled": True, "apply_to": "all"},
         "adaptive_zscore": {"enabled": True, "windows": [21], "apply_to": "all"},

@@ -97,6 +97,7 @@ def _basic_l65_config() -> dict:
         "mode": "replace",
         "winsorization": {
             "enabled": True,
+            "method": "quantile",
             "lower_q": 0.01,
             "upper_q": 0.99,
         },

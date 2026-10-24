@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Literal, Union
+from typing import Any, Dict, List, Mapping, Optional, Literal, Union
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_serializer, model_validator
 
@@ -172,6 +172,18 @@ class WinsorConfig(BaseModel):
     window: int = 252
     apply_to: Union[str, List[str]] = "all"
 
+    @model_validator(mode="after")
+    def _method_in_contract(self) -> "WinsorConfig":
+        """NUMVIEW Task 2.1：啟用時 method 須屬契約 `winsor_method_values`（區分大小寫；值集讀契約，不另列舉）；
+        `enabled=false` 不驗（與 `numeric_view.validate_preprocessing_policy` 同語意；審碼 b3 r1）。"""
+        if self.enabled:
+            from momentum.FeatureEngineering.numeric_view import load_contract
+
+            values = [str(v) for v in load_contract()["winsor_method_values"]["values"]]
+            if self.method not in values:
+                raise ValueError(f"winsorization.method={self.method!r} 不屬契約 winsor_method_values {values}")
+        return self
+
 
 # FFSTAT Task 3.2：平穩化步驟之 apply_to 封閉集合（regex、欄名清單、layer1_only 一律拒收）
 STATIONARITY_APPLY_TO_ALLOWED = ("non_stationary", "all")
@@ -298,6 +310,28 @@ class AdaptiveZScoreConfig(BaseModel):
     windows: List[int] = Field(default_factory=lambda: [100, 252])
     epsilon: float = 1e-8
     apply_to: Union[str, List[str]] = "all"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_bool_windows(cls, data: Any) -> Any:
+        """NUMVIEW Task 2.1（審碼 b3 r2）：啟用時窗元素不得為 bool（pydantic 會先把 True 轉成 1；dict 入口之
+        `validate_preprocessing_policy` 同拒）；於型別轉換前檢查。"""
+        if isinstance(data, Mapping) and data.get("enabled", True) and "windows" in data:
+            from momentum.FeatureEngineering.numeric_view import reject_bool_items
+
+            data = dict(data, windows=reject_bool_items(data["windows"], "adaptive_zscore.windows"))
+        return data
+
+    @model_validator(mode="after")
+    def _windows_when_enabled(self) -> "AdaptiveZScoreConfig":
+        """NUMVIEW Task 2.1：啟用時窗清單非空且皆正整數（契約 `zscore_windows_policy`；`enabled=false` 不驗）。"""
+        if self.enabled:
+            if not self.windows:
+                raise ValueError("adaptive_zscore 啟用而 windows 為空清單（不得以預設窗代替）")
+            bad = [w for w in self.windows if w <= 0]
+            if bad:
+                raise ValueError(f"adaptive_zscore.windows 須皆為正整數，違反者 {bad!r}")
+        return self
 
 
 class PreprocessingConfig(BaseModel):

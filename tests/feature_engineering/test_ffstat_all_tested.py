@@ -124,7 +124,8 @@ def test_untested_column_marked_and_not_counted_as_tested() -> None:
     klines["volume"] = np.nan
     pre_history, frame = klines.iloc[:600], klines.iloc[600:]
     # v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示；前史 600 列足 500
-    pre = FeaturePreprocessor({"fractional_differencing": {"enabled": False},
+    pre = FeaturePreprocessor({"winsorization": {"method": "sigma"},
+                               "fractional_differencing": {"enabled": False},
                                "adf_differencing": {"enabled": True, "apply_to": "non_stationary"},
                                "calibration_bars": 500})
     h.attach_unit_calibration(pre, pre_history, ["close", "volume"])
@@ -148,7 +149,7 @@ def test_failed_group_makes_stationarity_incomplete() -> None:
 
     factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
     # FF-NAME：決策鍵經 `tag_timeframe`（週期須為合法鍵，未知週期 fail-closed）；正式路徑一律帶 run 之週期脈絡
-    pre = FeaturePreprocessor({"adf_differencing": {"enabled": True}}, context=PreprocessingContext(timeframe=h.PRIMARY_TF))
+    pre = FeaturePreprocessor({"winsorization": {"method": "sigma"}, "adf_differencing": {"enabled": True}}, context=PreprocessingContext(timeframe=h.PRIMARY_TF))
     pre._failed_groups.append("1h_L1_trend_EMA")
     pre._record_decision("close_trend_EMA_5", adf_pvalue=0.5)
     with pytest.raises(StationarityIncompleteError):

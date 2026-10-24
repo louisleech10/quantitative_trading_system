@@ -107,8 +107,60 @@ def validate_preprocessing_policy(config: Mapping[str, Any]) -> None:
     """於臂分派前驗證前處理設定（dict 或 `model_dump()` 形）；規則全讀契約（SPEC Task 2.1）：
     zscore 啟用而窗清單為空或含非正整數 ⇒ 拒收；縮尾 method 不屬契約 `winsor_method_values`（區分大小寫）⇒ 拒收；
     縮尾啟用而缺 `method` 鍵 ⇒ 依契約 `winsor_method_missing_key` 處置。違反 ⇒ `NumericPolicyError`。
-    `enabled=false` 之步驟不驗其窗或 method（邊界①）。"""
-    raise NotImplementedError("NUMVIEW Task 2.1")
+    `enabled=false` 之步驟不驗其窗或 method（邊界①）。
+
+    步驟之啟用預設同 `FeaturePreprocessor` 之讀法：zscore 缺 `enabled` ⇒ 關；縮尾缺 `enabled` ⇒ 開（含整段缺）。
+    zscore 啟用而缺 `windows` 鍵 ⇒ 依契約 `non_empty_when_enabled` 拒收（未給即非「非空清單」；審碼 b3 r1——各臂不得再以
+    預設窗補值；pydantic 路徑由 `AdaptiveZScoreConfig` 之欄位預設填值，故 model_dump 必帶此鍵）。"""
+    if not isinstance(config, Mapping):
+        raise NumericPolicyError(f"前處理設定須為 Mapping，實得 {type(config).__name__}")
+    contract = load_contract()
+    zscore = config.get("adaptive_zscore") or {}
+    if not isinstance(zscore, Mapping):
+        raise NumericPolicyError("adaptive_zscore 須為物件")
+    if zscore.get("enabled", False):
+        rules = set(contract["zscore_windows_policy"]["rules"])
+        if "windows" not in zscore:
+            if "non_empty_when_enabled" in rules:
+                raise NumericPolicyError("adaptive_zscore 啟用而缺 windows 鍵（不得以預設窗代替）")
+        windows = zscore.get("windows", [])
+        if not isinstance(windows, (list, tuple)):
+            raise NumericPolicyError(f"adaptive_zscore.windows 須為清單，實得 {windows!r}")
+        if "non_empty_when_enabled" in rules and not windows:
+            raise NumericPolicyError("adaptive_zscore 啟用而 windows 為空清單（不得以預設窗代替）")
+        if "each_positive_int" in rules:
+            bad = [w for w in windows if isinstance(w, bool) or not isinstance(w, int) or w <= 0]
+            if bad:
+                raise NumericPolicyError(f"adaptive_zscore.windows 須皆為正整數，違反者 {bad!r}")
+    winsor = config.get("winsorization") or {}
+    if not isinstance(winsor, Mapping):
+        raise NumericPolicyError("winsorization 須為物件")
+    if winsor.get("enabled", True):
+        if "method" not in winsor:
+            policy = contract["winsor_method_missing_key"]["value"]
+            if policy == "reject":
+                raise NumericPolicyError("winsorization 啟用而缺 method 鍵（契約 winsor_method_missing_key=reject）")
+            raise NumericPolicyError(f"契約 winsor_method_missing_key.value 未知：{policy!r}")
+        values = [str(v) for v in contract["winsor_method_values"]["values"]]
+        method = winsor["method"]
+        if not isinstance(method, str) or method not in values:
+            raise NumericPolicyError(f"winsorization.method={method!r} 不屬契約 winsor_method_values {values}")
+
+
+def reject_bool_items(values: Any, field: str) -> Any:
+    """窗清單之型別轉換前檢查（SPEC Task 2.1；審碼 b3 r2–r3，供 pydantic 入口 `AdaptiveZScoreConfig` 與 API
+    `ApplyTransformsRequest` 共用）：任何非字串之可迭代容器（list／tuple／set／frozenset／產生器等）先展開為 list，元素含
+    bool ⇒ ValueError（pydantic 會把 True 轉成 1；dict 入口之 `validate_preprocessing_policy` 同拒）；非可迭代之值原樣
+    回傳交 pydantic 判型別。"""
+    if isinstance(values, (str, bytes)) or values is None:
+        return values
+    try:
+        items = list(values)
+    except TypeError:
+        return values
+    if any(isinstance(v, bool) for v in items):
+        raise ValueError(f"{field} 須皆為正整數（不得為 bool），實得 {items!r}")
+    return items
 
 
 def detect_capabilities() -> Dict[str, bool]:

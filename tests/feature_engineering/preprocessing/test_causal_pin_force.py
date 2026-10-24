@@ -42,7 +42,7 @@ def _winsor_config(*, causal: bool) -> dict:
 def test_external_false_forced_true_no_warn_when_missing(caplog: pytest.LogCaptureFixture) -> None:
     """缺 key → True，不 warn。"""
     caplog.set_level("WARNING")
-    pp = FeaturePreprocessor({"mode": "replace"})
+    pp = FeaturePreprocessor({"mode": "replace", "winsorization": {"method": "sigma"}})
     assert pp.causal_preprocessing is True
     assert "被忽略" not in caplog.text
 

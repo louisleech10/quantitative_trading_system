@@ -131,9 +131,9 @@ def test_batch2d_filter_parity_map_matches_registry_layer(
     monkeypatch.setenv("FFACT_FRACDIFF_APPLY_TO_LAYERS", "L1,L2")
     columns = ["close", "volume", "rolling"]
     column_layer_map = {"close": "L1", "volume": "L2", "rolling": "L3"}
-    mapped = FeaturePreprocessor({}, column_layer_map=column_layer_map)
-    l1_registry = FeaturePreprocessor({})
-    l2_registry = FeaturePreprocessor({})
+    mapped = FeaturePreprocessor({"winsorization": {"method": "sigma"}}, column_layer_map=column_layer_map)
+    l1_registry = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
+    l2_registry = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
 
     mapped_columns = mapped._filter_fracdiff_target_columns(columns)
     expected = (
@@ -150,7 +150,7 @@ def test_batch2d_filter_parity_map_matches_registry_layer(
 
 def test_batch2d_filter_parity_all_precedes_map(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FFACT_FRACDIFF_APPLY_TO_LAYERS", "ALL")
-    preprocessor = FeaturePreprocessor({}, column_layer_map={"known": "L6"})
+    preprocessor = FeaturePreprocessor({"winsorization": {"method": "sigma"}}, column_layer_map={"known": "L6"})
     assert preprocessor._filter_fracdiff_target_columns(["known", "unknown"]) == [
         "known",
         "unknown",
@@ -163,7 +163,7 @@ def test_batch2d_filter_without_map_fails_closed(
     """FFSTAT Task 1.1（取代已退役之 `test_batch2d_filter_parity_regex_fallback_without_map`：該測試驗無對照時
     以欄名 `L<k>_` 解析層之退路，此退路依 SPEC §C「目標層」刪除）：無對照、無群組 layer ⇒ fail-closed。"""
     monkeypatch.setenv("FFACT_FRACDIFF_APPLY_TO_LAYERS", "L1,L2")
-    preprocessor = FeaturePreprocessor({})
+    preprocessor = FeaturePreprocessor({"winsorization": {"method": "sigma"}})
     with pytest.raises(ValueError, match="無層來源"):
         preprocessor._filter_fracdiff_target_columns(["L1_price", "L2_volume", "L3_rolling", "bare"])
 

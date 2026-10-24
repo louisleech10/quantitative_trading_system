@@ -137,7 +137,7 @@ def test_feature_preprocessor_uses_fast_adf_when_enabled(monkeypatch: pytest.Mon
     frame = pd.DataFrame({"L1_alpha": np.arange(100.0)})
     preprocessor = FeaturePreprocessor(
         # FFSTAT b3b：原 adf_differencing.sample_size（已刪）改為 calibration_bars；判定值只取封包（以 fixture 本身建）
-        {"calibration_bars": 80, "adf_differencing": {"enabled": True, "adf_threshold": 0.1}}
+        {"calibration_bars": 80, "winsorization": {"method": "sigma"}, "adf_differencing": {"enabled": True, "adf_threshold": 0.1}}
     )
 
     attach_unit_calibration(preprocessor, frame)

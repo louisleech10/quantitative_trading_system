@@ -57,6 +57,7 @@ from momentum.FeatureEngineering.preprocessing._numba_transforms import (
     _rolling_rank_numba,
     rolling_quantile_2d,
 )
+from momentum.FeatureEngineering.numeric_view import NumericPolicyError, validate_preprocessing_policy
 from momentum.FeatureEngineering import run_provenance as _run_provenance
 from momentum.FeatureEngineering.run_provenance import ProvenanceConflictError, ProvenanceError
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
@@ -174,6 +175,8 @@ class FeaturePreprocessor:
         column_timeframe_map: Optional[Mapping[str, str]] = None,
     ) -> None:
         self._config = config or {}
+        # NUMVIEW Task 2.1：臂分派前驗數值政策（空 zscore 窗、縮尾 method 封閉值集、缺 method 鍵；規則讀契約）
+        validate_preprocessing_policy(self._config)
         self._preprocessing_context = context or PreprocessingContext()
         self._column_layer_map = dict(column_layer_map) if column_layer_map is not None else None
         # 多週期合併 frame（legacy 路徑）各欄之原生週期；只供決策紀錄之 timeframe 欄，不參與任何判定
@@ -795,6 +798,14 @@ class FeaturePreprocessor:
                     raise ProvenanceConflictError(f"併回之執行紀錄 {key} 與既有紀錄不逐項相同")
                 self._exec_records[key] = record
             _run_provenance.merge_groups(self._exec_groups, child_groups)
+
+    @staticmethod
+    def _primary_zscore_window(windows: Any) -> int:
+        """zscore 主窗（窗清單第一個）。空清單於 `__init__` 已以 `NumericPolicyError` 拒收（NUMVIEW Task 2.1）；此處仍為空
+        ⇒ 具名拋錯（不可達之守衛，取代改前各臂之靜默預設窗 100）。"""
+        if not windows:
+            raise NumericPolicyError("zscore 啟用而窗清單為空（應於 FeaturePreprocessor.__init__ 拒收；不得以預設窗代替）")
+        return int(windows[0])
 
     def _rolling_window(self) -> int:
         window = int(self.winsor_config.get("window", self.rank_config.get("window", 252)))
@@ -1424,9 +1435,10 @@ class FeaturePreprocessor:
             from momentum.FeatureEngineering.preprocessing._numba_transforms import transform_array_fast
 
             winsor_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
-            winsor_method = str(self.winsor_config.get("method", "quantile"))
+            # NUMVIEW Task 2.1：method 不再有臂內預設（縮尾開時 `__init__` 已驗其存在且屬契約值集；關時不用）
+            winsor_method = str(self.winsor_config["method"]) if do_winsorize else ""
             winsor_sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-            zscore_windows = self.zscore_config.get("windows", [100, 252])
+            zscore_windows = self.zscore_config.get("windows") or []
             gaussian_clip = self.gaussian_config.get("clip_range", [0.001, 0.999])
 
             transform_context.update(
@@ -1440,7 +1452,7 @@ class FeaturePreprocessor:
                     "do_rank": do_rank,
                     "rank_window": int(self.rank_config.get("window", 252)),
                     "do_zscore": do_zscore,
-                    "zscore_window": int(zscore_windows[0]) if zscore_windows else 100,
+                    "zscore_window": self._primary_zscore_window(zscore_windows) if do_zscore else 0,
                     "zscore_epsilon": float(self.zscore_config.get("epsilon", 1e-8)),
                     "gaussian_clip_lower": float(gaussian_clip[0]),
                     "gaussian_clip_upper": float(gaussian_clip[1]),
@@ -2523,13 +2535,15 @@ class FeaturePreprocessor:
         values = group_array
         if not values.flags["C_CONTIGUOUS"] or values.dtype != np.float32:
             values = np.ascontiguousarray(values, dtype=np.float32)
+        # NUMVIEW Task 2.1（審碼 b3 r2）：method 與 zscore 主窗取自 `_build_registry_transform_context`（皆明設），不以預設補值；
+        # 缺鍵 ⇒ KeyError（程式錯誤，不靜默改算法或窗）
         common = dict(
-            winsor_method=str(transform_context.get("winsor_method", "quantile")),
+            winsor_method=str(transform_context["winsor_method"]),
             winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
             winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
             winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
             rank_window=int(transform_context.get("rank_window", 252)),
-            zscore_window=int(transform_context.get("zscore_window", 100)),
+            zscore_window=int(transform_context["zscore_window"]),
             zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
             causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
             winsor_window=int(transform_context.get("winsor_window", 252)),
@@ -3157,7 +3171,7 @@ class FeaturePreprocessor:
         # Caller passes a fancy-indexed slice that NumPy has already materialised
         # as a separate float64 array, so .copy() here is always redundant.
         result_array = np.ascontiguousarray(arr, dtype=np.float64)
-        method = self.winsor_config.get("method", "sigma")
+        method = self.winsor_config["method"]  # NUMVIEW Task 2.1：無臂內預設（`__init__` 已驗）
 
         if method == "sigma":
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
@@ -3213,9 +3227,8 @@ class FeaturePreprocessor:
         normalized_windows = [int(window) for window in windows]
 
         if not normalized_windows:
-            if mode == "append":
-                return {}
-            return selected.to_numpy(dtype=np.float32, copy=True)
+            # NUMVIEW Task 2.1：空窗於 `__init__` 已拒收；此處為不可達之具名守衛（改前回原值／空 dict＝靜默不做 zscore）
+            raise NumericPolicyError("zscore 窗清單為空（應於 FeaturePreprocessor.__init__ 拒收）")
 
         zscore_by_window: Dict[int, np.ndarray] = {}
         for window_int in normalized_windows:
@@ -3345,18 +3358,17 @@ class FeaturePreprocessor:
                     self.zscore_config.get("apply_to", "all"),
                 ),
             )
-            # 窗清單為空 ⇒ `_rolling_zscore_2d` 回原值（不做 zscore）
+            windows = [int(window) for window in self.zscore_config.get("windows") or []]
+            primary_window = self._primary_zscore_window(windows)  # NUMVIEW Task 2.1：空窗具名拋錯（不可達）
             self._record_selection(features_df.columns, [working_columns[p] for p in zscore_positions], STEP_ZSCORE,
-                                   "applied" if self.zscore_config.get("windows", [100, 252]) else "no_windows",
-                                   "not_selected")
+                                   "applied", "not_selected")
             if zscore_positions:
-                windows = [int(window) for window in self.zscore_config.get("windows", [100, 252])]
                 epsilon = float(self.zscore_config.get("epsilon", 1e-8))
                 zscore_input = working_values[:, zscore_positions]
                 zscore_values = _stable_mask.mask_incomplete_window_by_input_2d(
                     self._rolling_zscore_2d(zscore_input, windows, epsilon, mode="replace"),
                     zscore_input,
-                    int(windows[0]) if windows else 1,  # 空窗清單＝不做 zscore（窗 1＝遮罩無作用）
+                    primary_window,
                 )
                 working_values[:, zscore_positions] = zscore_values
 
@@ -3487,7 +3499,7 @@ class FeaturePreprocessor:
         # Polars 臂之前提＝fracdiff 關（`transform`）
         self._record_execution(input_columns, STEP_FRACDIFF, "disabled")
         if winsor_columns and self.winsor_config.get("enabled", True):  # FFSTAT r34：縮尾開關須生效
-            method = self.winsor_config.get("method", "sigma")
+            method = self.winsor_config["method"]  # NUMVIEW Task 2.1：無臂內預設（`__init__` 已驗）
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             pl_df = polars_l65_winsorization(
@@ -3542,11 +3554,10 @@ class FeaturePreprocessor:
         if self.zscore_config.get("enabled", False):
             zscore_apply_to = self.zscore_config.get("apply_to", "all")
             zscore_columns = self._select_columns(features_df, zscore_apply_to)
-            windows = self.zscore_config.get("windows", [100, 252])
+            windows = self.zscore_config.get("windows") or []
             epsilon = float(self.zscore_config.get("epsilon", 1e-8))
-            primary_window = int(windows[0]) if windows else 100
+            primary_window = self._primary_zscore_window(windows)  # NUMVIEW Task 2.1：改前空窗以 100 照做；今具名拋錯（不可達）
             if zscore_columns and self.mode == "replace":
-                # Polars 臂窗清單為空時以 100 照做（臂間不一致見 SPEC §N FFDSTAR-R4；只記實際所走）
                 self._record_selection(input_columns, zscore_columns, STEP_ZSCORE, "applied", "not_selected")
                 zscore_input = polars_to_pandas(pl_df, index=features_df.index)[zscore_columns].to_numpy(dtype=np.float64)
                 pl_df = polars_l65_adaptive_zscore(
@@ -3668,7 +3679,7 @@ class FeaturePreprocessor:
     def _apply_winsorization(self, df: pd.DataFrame) -> pd.DataFrame:
         apply_to = self.winsor_config.get("apply_to", "all")
         columns = self._select_columns(df, apply_to)
-        method = self.winsor_config.get("method", "sigma")
+        method = self.winsor_config["method"]  # NUMVIEW Task 2.1：無臂內預設（`__init__` 已驗）
         # FFDSTAR Task 1.2：轉換脈絡內才記（校準前置等脈絡外之呼叫不記）
         self._record_selection(df.columns, columns, STEP_WINSOR, "applied", "not_selected")
 
@@ -4610,10 +4621,10 @@ class FeaturePreprocessor:
     def _apply_adaptive_zscore(self, df: pd.DataFrame) -> pd.DataFrame:
         apply_to = self.zscore_config.get("apply_to", "all")
         columns = self._select_columns(df, apply_to)
-        windows = self.zscore_config.get("windows", [100, 252])
+        windows = self.zscore_config.get("windows") or []
         epsilon = float(self.zscore_config.get("epsilon", 1e-8))
-        # 窗清單為空 ⇒ replace 回原值、append 無輸出（不做 zscore）
-        self._record_selection(df.columns, columns, STEP_ZSCORE, "applied" if windows else "no_windows", "not_selected")
+        primary_window = self._primary_zscore_window(windows)  # NUMVIEW Task 2.1：空窗具名拋錯（不可達；改前不做 zscore）
+        self._record_selection(df.columns, columns, STEP_ZSCORE, "applied", "not_selected")
 
         if not columns:
             return df
@@ -4632,7 +4643,7 @@ class FeaturePreprocessor:
                     mode="replace",
                 ),
                 selected_values,
-                int(windows[0]) if windows else 1,  # 空窗清單＝不做 zscore（窗 1＝遮罩無作用）
+                primary_window,
             )
             zscore = pd.DataFrame(
                 zscore_values,

@@ -365,7 +365,7 @@ def test_cache_structural_damage_is_read_failure(damage: str, tmp_path: Path) ->
 def test_flush_failure_marks_only_same_timeframe_column() -> None:
     """b2 審碼 r1 codex P2-02：同名欄分屬 1h／12h 時，1h 寫入之快取 flush 失敗 ⇒ 只 1h 那筆記
     `dstar_cache_write_failed`，彙總為 `:1`（不誤標 12h、不放大計數）。"""
-    pre = FeaturePreprocessor({"fractional_differencing": {"enabled": True}})
+    pre = FeaturePreprocessor({"winsorization": {"method": "sigma"}, "fractional_differencing": {"enabled": True}})
     for tf in ("1h", "12h"):
         pre._decision_tls.timeframe = tf
         pre._record_decision("same", fracdiff=True, d=0.4)

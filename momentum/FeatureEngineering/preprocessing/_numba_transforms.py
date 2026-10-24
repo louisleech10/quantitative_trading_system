@@ -5,6 +5,7 @@ These operate on raw numpy float32 arrays and avoid pandas overhead entirely.
 from __future__ import annotations
 
 import os
+from typing import Optional
 
 import numpy as np
 from momentum.core.logging import get_logger
@@ -400,14 +401,14 @@ def transform_array_fast(
     arr: np.ndarray,
     *,
     winsorize: bool = True,
-    winsor_method: str = "quantile",
+    winsor_method: Optional[str] = None,
     winsor_lower_q: float = 0.01,
     winsor_upper_q: float = 0.99,
     winsor_sigma_k: float = 3.0,
     rank: bool = True,
     rank_window: int = 252,
     zscore: bool = True,
-    zscore_window: int = 100,
+    zscore_window: Optional[int] = None,
     zscore_epsilon: float = 1e-8,
     causal_preprocessing: bool = True,
     winsor_window: int = 252,
@@ -430,6 +431,11 @@ def transform_array_fast(
         # FFSTAT v53（審查 r36 codex P1-02）：全欄 nanmean／nanstd／nanquantile 分支＝未來洩漏（且 sigma 分支之廣播
         # 於實跑拋 IndexError）；生成路徑早已釘死因果，直接呼叫亦 fail-closed
         raise ValueError("非因果前處理（causal_preprocessing=False）已移除：全欄統計量含未來資料")
+    # NUMVIEW Task 2.1（審碼 b3 r1）：核心不再以預設 method／窗補值——啟用之步驟須明給
+    if (winsorize and winsor_method is None) or (zscore and zscore_window is None):
+        from momentum.FeatureEngineering.numeric_view import NumericPolicyError
+
+        raise NumericPolicyError("快速核心：縮尾啟用須明給 winsor_method、zscore 啟用須明給 zscore_window（不以預設補值）")
     data = arr.astype(np.float32, copy=True)
 
     if winsorize:
@@ -450,7 +456,9 @@ def transform_array_fast(
             if causal_preprocessing:
                 # FFSTAT Task 2.3 第①類（R6 甲）：窗未湊滿之列遮為 NaN（quantile 分支於 rolling_winsorize_array 內）
                 _stable_mask.mask_incomplete_window_inplace(data, winsor_window)
-        elif causal_preprocessing:
+        elif winsor_method == "quantile":
+            # NUMVIEW Task 2.1：明列 quantile 分支（改前 `elif causal_preprocessing` ＝ 非 sigma 之任何值一律走 quantile）；
+            # 非因果已於函式開頭拒收
             data = rolling_winsorize_array(
                 data,
                 winsor_lower_q,
@@ -459,7 +467,9 @@ def transform_array_fast(
                 min_periods=winsor_min_periods,
             )
         else:
-            data = winsorize_array(data, winsor_lower_q, winsor_upper_q)
+            from momentum.FeatureEngineering.numeric_view import NumericPolicyError
+
+            raise NumericPolicyError(f"縮尾 method={winsor_method!r} 不屬契約 winsor_method_values（快速核心）")
 
     if rank:
         # rank produces a fresh out array; safe to discard the prior `data`.

@@ -27,7 +27,7 @@ def test_non_stationary_cache_reuses_adf_result(monkeypatch: pytest.MonkeyPatch)
     frame = pd.DataFrame({"L1_alpha": np.arange(80.0)})
     preprocessor = FeaturePreprocessor(
         # FFSTAT b3b：adf_differencing.sample_size 已刪（N＝calibration_bars）；封包只在平穩化開啟時交付 ⇒ 明設 enabled
-        {"calibration_bars": 40, "adf_differencing": {"enabled": True, "adf_threshold": 0.05}}
+        {"calibration_bars": 40, "winsorization": {"method": "sigma"}, "adf_differencing": {"enabled": True, "adf_threshold": 0.05}}
     )
 
     attach_unit_calibration(preprocessor, frame)  # 封包以 fixture 本身建，僅驗同實例快取
@@ -66,6 +66,7 @@ def test_high_nan_no_adf_for_non_stationary_selection(monkeypatch: pytest.Monkey
                 "precision": 0.02,
             },
             "mode": "append",
+            "winsorization": {"method": "sigma"},
             "calibration_bars": 40,
         },
         # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）

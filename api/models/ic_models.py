@@ -422,6 +422,23 @@ class ApplyTransformsRequest(BaseModel):
         default_factory=lambda: [100, 252], description="Adaptive Z-Score 窗口清單（K 線根數；主窗＝最小窗）"
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_bool_zscore_windows(cls, data: Any) -> Any:
+        """NUMVIEW Task 2.1（審碼 b3 r3）：`zscore=true` 時窗元素不得為 bool（型別轉換前；同 `AdaptiveZScoreConfig`）。"""
+        from momentum.factories import reject_bool_window_items
+
+        if isinstance(data, dict) and data.get("zscore", True) and "zscore_windows" in data:
+            data = dict(data, zscore_windows=reject_bool_window_items(data["zscore_windows"], "zscore_windows"))
+        return data
+
+    @model_validator(mode="after")
+    def _zscore_windows_when_enabled(self) -> "ApplyTransformsRequest":
+        """NUMVIEW Task 2.1：`zscore=true` 時窗清單非空（⇒ 422；不得以預設窗代替）。"""
+        if self.zscore and not self.zscore_windows:
+            raise ValueError("zscore=true 而 zscore_windows 為空清單")
+        return self
+
 
 class ExcludedFeature(BaseModel):
     """ICPOSTLEAK Task 2.2：未轉換、未寫入輸出之選中欄。"""
