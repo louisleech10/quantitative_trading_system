@@ -1360,6 +1360,64 @@ def test_mutation_l2_error_replaced_by_zero_diff_turns_red(monkeypatch: pytest.M
         assert l2_error_violations(), "mutant 存活：錯誤以 0 差計仍判通過"
 
 
+def _l2_record(domain: str, rows: int, **over: Any) -> Dict[str, Any]:
+    base = {"schema": 1, "domain": domain, "rows": rows, "l1_dtypes": ["float32"], "returned_arm": "polars",
+            "returned_dtypes": ["float32"], "common_cols": 10, "only_returned": [], "only_category": [], "nan_mask_diff": 0,
+            "f64diff": 0, "f32diff": 0, "max_abs": 0.0, "max_rel": 0.0, "row_mismatch": [], "category_errors": {}}
+    return {**base, **over}
+
+
+def test_l2_summarize_arm_main_domain_totals_and_errors() -> None:
+    """Task 1.3（實作）：格層數字＝主生成域各次呼叫之合計（計數相加、max 取最大、清單聯集），校準域另列；類別錯誤、擷取錯誤
+    或無主生成域紀錄 ⇒ `errors` 非空且 `f32diff` 為 None（邊界②）。"""
+    m = probe("l2_arm_matrix")
+    recs = [_l2_record("calibration", 4050, f32diff=99), _l2_record("main", 100, f32diff=3, l1_dtypes=["float64"]),
+            _l2_record("main", 25, f32diff=2, max_abs=0.5, only_category=["x"])]
+    got = m.summarize_arm(recs)
+    assert (got["f32diff"], got["common_cols"], got["max_abs"], got["main_rows"]) == (5, 20, 0.5, [100, 25])
+    assert got["l1_dtypes"] == ["float32", "float64"] and got["only_category"] == ["x"] and not got["errors"]
+    assert len(got["calibration"]) == 1 and got["calibration"][0]["f32diff"] == 99
+    for bad in ([_l2_record("main", 100, category_errors={"trend": "ValueError: x"})],
+                [_l2_record("main", 100, capture_error="RuntimeError: y")], [_l2_record("calibration", 10)],
+                [_l2_record("main", 100, row_mismatch=[[100, 99]])],  # 審碼 r29：列數不符
+                [_l2_record("main", 100), _l2_record("calibration", 50, category_errors={"Cross": "KeyError: z"})]):
+        out = m.summarize_arm(bad)
+        assert out["errors"] and out["f32diff"] is None, bad
+    assert got["blacklist_applied"] is False  # schema 1 紀錄未套 cascade blacklist（審碼 r29）
+    assert m.summarize_arm([_l2_record("main", 100, blacklist_applied=True)])["blacklist_applied"] is True
+
+
+def test_l2_assemble_sources_and_checks() -> None:
+    """Task 1.3（實作）：generations＝0 ⇒ 取凍結紀錄（缺 ⇒ 該臂錯誤、`all_runs_available` 假）；generations＝1 ⇒ 取另行生成，
+    凍結已有同 (格, 環境) ⇒ `not_regenerating_frozen` 假；生成未 complete ⇒ 該臂錯誤；12h 重現格 f32diff≠0 ⇒ 重現檢查假。"""
+    m = probe("l2_arm_matrix")
+    plan = [{"cell": "A_BTCUSDT_12h", "env": {}, "generations": 0},
+            {"cell": "B_BTCUSDT_1h_4h", "env": {"FFACT_USE_POLARS": "0"}, "generations": 1}]
+    frozen = {"A_BTCUSDT_12h": {"default": [_l2_record("main", 3855)]}}
+    gen = {("B_BTCUSDT_1h_4h", "FFACT_USE_POLARS=0"): {"status": "complete", "seconds": 1.0,
+                                                       "l2_capture": [_l2_record("main", 12256, l1_dtypes=["float64"])]}}
+    ok = m.assemble(plan, frozen, gen)
+    assert all(ok["checks"].values()), ok["checks"]
+    assert {r["source"] for r in ok["runs"]} == {"freeze_baseline", "generated"}
+    b = next(c for c in ok["cells"] if c["cell_id"] == "B_BTCUSDT_1h_4h")
+    assert b["arms"]["FFACT_USE_POLARS=0"]["l1_dtypes"] == ["float64"]
+    regen = copy.deepcopy(frozen)
+    regen["B_BTCUSDT_1h_4h"] = {"FFACT_USE_POLARS=0": [_l2_record("main", 12256)]}
+    assert m.assemble(plan, regen, gen)["checks"]["B_BTCUSDT_1h_4h.FFACT_USE_POLARS=0.not_regenerating_frozen"] is False
+    failed = {k: {**v, "status": "failed", "l2_capture": None} for k, v in gen.items()}
+    out = m.assemble(plan, frozen, failed)
+    arm = next(c for c in out["cells"] if c["cell_id"] == "B_BTCUSDT_1h_4h")["arms"]["FFACT_USE_POLARS=0"]
+    assert arm["errors"] and arm["f32diff"] is None and out["checks"]["all_runs_available"] is False
+    assert m.assemble(plan, {}, gen)["checks"]["all_runs_available"] is False
+    nonzero = {"A_BTCUSDT_12h": {"default": [_l2_record("main", 3855, f32diff=1)]}}
+    assert m.assemble(plan, nonzero, gen)["checks"]["repro_btc_12h_f32diff_zero"] is False
+    # 審碼 r29：非重現格之臂有類別錯誤 ⇒ 該臂 no_errors 假（收據 rc≠0）
+    err_gen = {k: {**v, "l2_capture": [_l2_record("main", 12256, category_errors={"Distance": "ValueError: e"})]}
+               for k, v in gen.items()}
+    assert m.assemble(plan, frozen, err_gen)["checks"]["B_BTCUSDT_1h_4h.FFACT_USE_POLARS=0.no_errors"] is False
+    assert "coverage_note" in b  # 多週期非主週期未擷取之量測限制具名
+
+
 # ============================================================================================== §G 通過條件（Phase 0／2／4）
 
 def _string_leaves(node: Any) -> List[str]:
