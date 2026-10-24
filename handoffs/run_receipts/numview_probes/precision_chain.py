@@ -65,7 +65,9 @@ RUN_SPECS: Dict[str, Dict[str, Any]] = {
                            "override": {"preprocessing": {"winsorization": {"enabled": True, "method": "sigma"}}},
                            "winsor_fork": True},
     "b_production_spy": {"cell": B_CELL, "env": {"FFACT_MULTI_TF_PARALLEL": "0"}, "override": None},
-    "c_preserve_dtype": {"cell": C_CELL, "env": {}, "override": None, "preserve": True, "lift_l2": True},
+    # SPEC v39：C 之 R run 停用主鏈 layer2 spill（`feature_factory.py:531`；spill 轉 float32 使 L3–L6 讀非 float64 之 layer2）
+    "c_preserve_dtype": {"cell": C_CELL, "env": {}, "override": None, "preserve": True, "lift_l2": True,
+                         "bypass_l2_spill": True},
 }
 FREEZE_RUN_NAMES: Dict[str, str] = {HOST_CELL: "freeze_A", B_CELL: "freeze_B", C_CELL: "freeze_C"}
 
@@ -88,7 +90,7 @@ VARIANT_SETTINGS: Dict[str, Dict[str, Any]] = {
                          "lag_enabled": [False], "codec_upgrade": False, "winsor_method": ["quantile"],
                          "stationarity": ["fracdiff+adf"], "end_offset_bars": 0, "multi_tf_parallel_calls": 0},
     "c_preserve_dtype": {"preserve_dtype": [True], "l2_polars_lift": True, "spill_triggered": False,
-                         "lag_enabled": [True], "codec_upgrade": False, "end_offset_bars": 0,
+                         "l2_spill_bypassed": True, "lag_enabled": [True], "codec_upgrade": False, "end_offset_bars": 0,
                          "multi_tf_parallel_calls": 0},
 }
 
@@ -332,7 +334,10 @@ class Observer:
         self.memmap_thresholds: set = set()
         self.memmap_branches: set = set()
         self.layer4_merge: List[Dict[str, Any]] = []
-        self.spill = False
+        self.spill = False  # 主鏈 layer2 實際 spill（校準域 `calib_layer2` 另記；SPEC v39）
+        self.calibration_spill = False
+        self.l2_spill_bypassed = 0
+        self.l2_consumer_dtypes: set = set()  # 主鏈 spill 點之 layer2 dtype（L3–L6 讀入者）
         self.lag_enabled: set = set()
         self.codec: set = set()
         self.winsor_methods: set = set()
@@ -355,7 +360,9 @@ class Observer:
                 "l2_polars_lift": self.l2_lift_calls > 0,  # 實際觀測抬升生效（審碼 r11）
                 "l2_return_dtypes": sorted(self.l2_return_dtypes),
                 "memmap_threshold_bytes": sorted(self.memmap_thresholds), "memmap_branch": sorted(self.memmap_branches),
-                "spill_triggered": self.spill, "lag_enabled": sorted(self.lag_enabled),
+                "spill_triggered": self.spill, "calibration_spill": self.calibration_spill,
+                "l2_spill_bypassed": self.l2_spill_bypassed > 0, "l2_consumer_dtypes": sorted(self.l2_consumer_dtypes),
+                "lag_enabled": sorted(self.lag_enabled),
                 "codec_upgrade": any(self.codec), "winsor_method": sorted(self.winsor_methods),
                 "stationarity": sorted(self.stationarity), "end_dates": sorted(set(self.end_dates)),
                 "multi_tf_parallel_calls": self.parallel_calls,
@@ -475,8 +482,16 @@ def install_spies(obs: Observer) -> Iterator[None]:
     real_spill = FeatureFactory.__dict__["_spill_to_memmap"]
 
     def spill_spy(df: Any, label: str, dir: Optional[str] = None) -> Any:
-        if df is not None and not df.empty and df.shape[0] * df.shape[1] * 8 >= 500_000_000:
-            obs.spill = True
+        big = df is not None and not df.empty and df.shape[0] * df.shape[1] * 8 >= 500_000_000  # 同 `:572-575` 門檻
+        if label != "layer2":  # 校準域（`feature_factory.py:2745` 之 `calib_layer2`）照生產，另記
+            obs.calibration_spill = obs.calibration_spill or big
+        else:
+            if df is not None:
+                obs.l2_consumer_dtypes.update(str(t) for t in df.dtypes)
+            if obs.spec.get("bypass_l2_spill"):  # SPEC v39：C 之 R run 保留層間 float64 之 layer2
+                obs.l2_spill_bypassed += 1
+                return df
+            obs.spill = obs.spill or big
         return real_spill.__func__(df, label, dir) if isinstance(real_spill, staticmethod) else real_spill(df, label, dir)
 
     stack.enter_context(_patched(FeatureFactory, "_spill_to_memmap", staticmethod(spill_spy)))
@@ -1424,14 +1439,26 @@ def compare_c(results: Mapping[str, Mapping[str, Any]], cell_id: str = C_CELL) -
         out["unindexed_groups"] = {"c_preserve_dtype": unindexed_groups(R.get("capture_dir"))}
         out["checks"]["s1_all_indexed"] = not out["unindexed_groups"]["c_preserve_dtype"]
     if not R or R.get("settings_violations") or R.get("status") != "complete" or not out["checks"].get("s1_all_indexed", True):
-        # SPEC 邊界③：C blocked ⇒ 該格各段皆標 blocked（審碼 r11：不得混入 not_measured／codec_off 列）
-        reason = "C 之 preserve 重生 blocked、觀測設定不符或擷取不完整" if R else "C 增列未跑"
+        # SPEC 邊界③：C blocked ⇒ 該格各段皆標 blocked（審碼 r11：不得混入 not_measured／codec_off 列）；
+        # 審碼 r22：卡死監看判停滯 ⇒ 依 SPEC 標 blocked-by 硬體，鏈效應段（S0–S3）blocked、凍結讀回之 S4 照記 codec_off
+        hardware = bool(R) and R.get("status") == "failed" and R.get("watch_status") == _watchdog().STALLED
+        if hardware:
+            reason = f"blocked-by 硬體：{R.get('reason')}"
+        else:
+            reason = "C 之 preserve 重生 blocked、失敗、觀測設定不符或擷取不完整" if R else "C 增列未跑"
         for seg in ("S0", "S1", "S2"):
             out["rows"].append({"segment": seg, "cell_id": cid, "group": "*", "columns_in_group": None,
                                 "status": "blocked", "reason": reason, "max_abs": None, "max_rel": None})
-        for seg in ("S3", "S4"):
-            for g, n in sorted(out["expected_groups"][seg].items()):
-                out["rows"].append({"segment": seg, "cell_id": cid, "group": g, "columns_in_group": n,
+        for g, n in sorted(out["expected_groups"]["S3"].items()):
+            out["rows"].append({"segment": "S3", "cell_id": cid, "group": g, "columns_in_group": n,
+                                "status": "blocked", "reason": reason, "max_abs": None, "max_rel": None})
+        for g, n in sorted(out["expected_groups"]["S4"].items()):
+            if hardware:
+                out["rows"].append({"segment": "S4", "cell_id": cid, "group": g, "columns_in_group": n,
+                                    "status": "codec_off", "reason": "codec 未開（只 A 格量 codec）", "max_abs": None,
+                                    "max_rel": None, "source_run": "freeze_C"})
+            else:
+                out["rows"].append({"segment": "S4", "cell_id": cid, "group": g, "columns_in_group": n,
                                     "status": "blocked", "reason": reason, "max_abs": None, "max_rel": None})
         return out
     for g, n in sorted(out["expected_groups"]["S4"].items()):
@@ -1451,7 +1478,20 @@ def compare_c(results: Mapping[str, Mapping[str, Any]], cell_id: str = C_CELL) -
     r_ts = readback_raw(Path(R["run_dir"]))[2]
     s0, s1 = (_cols_at(_seg_values(R["capture_dir"], s), r_ts) for s in ("S0", "S1"))
     rows0 = column_rows("S0", cid, s1, s0, source_run="c_preserve_dtype", reference_run="c_preserve_dtype")
-    out["rows"] += group_rows(rows0, r_groups, "S0", cid, "c_preserve_dtype", "c_preserve_dtype")
+    grouped0 = group_rows(rows0, r_groups, "S0", cid, "c_preserve_dtype", "c_preserve_dtype")
+    # 諮詢 r3：C 之 S0 為「preserve 實得 dtype」之鏈，非全 float64 者逐群組計數並於格層回報（同 A 之 s0_incomplete），
+    # 不得呈為完整 float64 鏈；L3–L6 讀入之 layer2 dtype 取自主鏈 spill 點觀測
+    r0_dtypes = capture_dtypes(Path(R["capture_dir"]), "S0")
+    for row in grouped0:
+        row["s0_non_float64_columns"] = sum(1 for c, g in r_groups.items()
+                                            if g == row["group"] and c in s0 and r0_dtypes.get(c) != "float64")
+    out["rows"] += grouped0
+    observed = R.get("observed_settings") or {}
+    out["s0_incomplete"] = {"cell_id": cid, "source_run": "c_preserve_dtype",
+                            "non_float64_columns": sum(1 for c in s0 if r0_dtypes.get(c) != "float64"),
+                            "columns": len(s0), "dtypes": sorted({str(r0_dtypes.get(c)) for c in s0}),
+                            "l2_consumer_dtypes": observed.get("l2_consumer_dtypes"),
+                            "l2_spill_bypassed": observed.get("l2_spill_bypassed")}
     rv, _, _ = readback_raw(Path(R["run_dir"]))
     # 審碼 r12：欄集合閉合——registry 擷取欄集合須等於該 run 之 raw provenance 全部欄（獨立於擷取）；凍結讀回與 R 讀回之
     # 欄差只准由 provenance 之 `dead_dropped`（全特徵預設開 L7 死欄剔除）解釋，其餘即失敗
@@ -1480,6 +1520,8 @@ def _child(spec_path: Path) -> int:
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     if spec["mode"] == "generate":
         result = run_generation_unit(spec["source_run"], Path(spec["work"]), Path(spec["capture_dir"]))
+        import resource  # 子行程自身峰值 RSS（諮詢 r3：C 停用主鏈 spill 之記憶體實測；macOS 以位元組、Linux 以 KB 計）
+        result["peak_rss_bytes"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * (1 if sys.platform == "darwin" else 1024)
     else:
         results = {k: v for k, v in spec["results"].items()}
         if spec["cell_id"] == HOST_CELL:
@@ -1507,7 +1549,11 @@ def _run_unit(spec: Dict[str, Any], inline: bool) -> Dict[str, Any]:
                                  cwd=str(REPO))
         if watched.status == wd.STALLED or watched.returncode != 0 or not result_path.is_file():
             return {"status": "failed", "reason": f"{watched.status}（{watched.reason}；rc={watched.returncode}；"
-                                                  f"{watched.wall_seconds:.0f} 秒；見 {result_path.with_suffix('.log')}）"}
+                                                  f"{watched.wall_seconds:.0f} 秒；見 {result_path.with_suffix('.log')}）",
+                    "watch_status": watched.status, "swap_growth_max_mb": watched.swap_growth_max_mb}
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        result["swap_growth_max_mb"] = watched.swap_growth_max_mb
+        return result
     return json.loads(result_path.read_text(encoding="utf-8"))
 
 
@@ -1556,8 +1602,123 @@ def formal_readiness_violations(receipt: Mapping[str, Any]) -> List[str]:
     return out
 
 
+#: 以格為單位之收據清單鍵（每項皆帶 `cell_id`）與以 run 名為鍵之對應表鍵（SPEC v39 只重做單格之合併）
+CELL_LIST_KEYS = ("cells", "rows", "forks", "codec_checks", "extension", "s4_raw_bss", "codec_fallbacks",
+                  "processed_codec", "s0_incomplete")
+RUN_MAP_KEYS = ("runs", "observed_settings", "settings_violations", "windows", "layer4_merge", "ic_input_dtypes",
+                "timings", "run_status", "memory")
+#: 可單獨重做之格：其比對只用本格之 run（A 之比對供 B 用，A／B 不可單獨重做）
+MERGEABLE_CELLS = (C_CELL,)
+
+
+class MergeError(RuntimeError):
+    """只重做單格之合併前提不符（不得產正式收據）。"""
+
+
+_CANONICAL_GROUPS: Dict[str, Dict[str, int]] = {}
+
+
+def canonical_c_groups(cell: str = C_CELL) -> Dict[str, int]:
+    """格（群組粒度）之 S3／S4 期望群組之獨立來源：凍結 run 之 raw manifest 群組與欄數（同 `compare_c` 之 `expected_groups`；
+    審碼 r24：合併與驗收不得只信收據自報）。凍結 run 不變，行程內快取（逐值雜湊為秒級以上）。"""
+    from tests.feature_engineering import numview_helpers as nh
+
+    if cell not in _CANONICAL_GROUPS:
+        gf = nh.group_fingerprints(_freeze_run_dir(cell), "raw")
+        _CANONICAL_GROUPS[cell] = {str(g): int(v["column_count"]) for g, v in gf["columns"].items()}
+    return dict(_CANONICAL_GROUPS[cell])
+
+
+def merge_receipt(parent: Mapping[str, Any], child: Mapping[str, Any], cell: str, parent_sha256: str) -> Dict[str, Any]:
+    """SPEC v39（諮詢 r3）：以只重做 `cell` 之收據 `child` 取代正式收據 `parent` 中該格之全部內容；其餘格之清單項、run 對應表
+    與 checks 逐位保留。前提：兩者皆正式（非試跑）、判準雜湊相同、`cell` 屬 `MERGEABLE_CELLS`、parent 恰含該格一次、child 之
+    格恰為該格且其清單項全屬該格。合併後重算 `lossless_violation` 與 `exit_code`，並記 `merge` 來源。"""
+    import copy as _copy
+
+    if cell not in MERGEABLE_CELLS:
+        raise MergeError(f"{cell} 不可單獨重做（只限 {MERGEABLE_CELLS}）")
+    if parent.get("trial") is not False or child.get("trial") is not False:
+        raise MergeError("parent 與 child 皆須為正式收據（trial=false）")
+    if parent.get("criteria_sha256") != child.get("criteria_sha256"):
+        raise MergeError("判準雜湊不同")
+    if [str(c.get("cell_id")) for c in parent.get("cells") or []].count(cell) != 1:
+        raise MergeError(f"parent 須恰含 {cell} 一次")
+    if [str(c.get("cell_id")) for c in child.get("cells") or []] != [cell]:
+        raise MergeError(f"child 之格須恰為 [{cell}]")
+    missing_keys = [k for k in CELL_LIST_KEYS + RUN_MAP_KEYS + ("checks",) if k not in child]  # 審碼 r24：缺鍵不得當空
+    if missing_keys:
+        raise MergeError(f"child 缺鍵 {missing_keys}")
+    for key in CELL_LIST_KEYS:
+        stray = [e.get("cell_id") for e in child.get(key) or [] if str(e.get("cell_id")) != cell]
+        if stray:
+            raise MergeError(f"child.{key} 含他格項 {sorted(set(map(str, stray)))}")
+    cell_runs = {r for r, s in RUN_SPECS.items() if s["cell"] == cell} | {FREEZE_RUN_NAMES[cell]}
+    stray_runs = {k for key in RUN_MAP_KEYS for k in (child.get(key) or {}) if k not in cell_runs}
+    if stray_runs:
+        raise MergeError(f"child 含他格 run {sorted(stray_runs)}")
+    # 審碼 r22–r23：child 須真帶該格量測內容——S0–S4 每段皆有統計列、群組粒度段之群組集合恰等於 child 格紀錄之期望群組、
+    # 全部 run 之身分（生成失敗之 run 無身分，准缺，但此時該格列須全為 blocked／codec_off）、各 run 之設定檢查與該格之 checks
+    child_rows = [r for r in child.get("rows") or [] if str(r.get("cell_id")) == cell]
+    missing_segs = [s for s in ("S0", "S1", "S2", "S3", "S4") if not any(r.get("segment") == s for r in child_rows)]
+    if missing_segs:
+        raise MergeError(f"child 缺 {cell} 之段 {missing_segs}")
+    derived = "measured" if any(r.get("status") == "measured" for r in child_rows) else "blocked"  # 同 `assemble_receipt`
+    if child["cells"][0].get("status") != derived:  # 審碼 r25：格狀態須與列一致
+        raise MergeError(f"child {cell} 格狀態 {child['cells'][0].get('status')!r} ≠ 由列導出之 {derived}")
+    expected = (child["cells"][0].get("expected_groups") or {})
+    # 審碼 r24：期望群組不得由 child 自報——S3／S4 須等於凍結 C 之 manifest 群組（獨立來源）；有 measured 列時 S0 亦須非空
+    frozen_groups = canonical_c_groups(cell)
+    for seg in ("S3", "S4"):
+        if {str(g): int(n) for g, n in (expected.get(seg) or {}).items()} != frozen_groups:
+            raise MergeError(f"child {cell} 段 {seg} 之期望群組 ≠ 凍結 manifest 群組")
+    if any(r.get("status") == "measured" for r in child_rows) and not expected.get("S0"):
+        raise MergeError(f"child {cell} 有 measured 列而 S0 期望群組為空")
+    for seg, groups in expected.items():
+        got = sorted(str(r.get("group")) for r in child_rows if r.get("segment") == seg)
+        if got != sorted(str(g) for g in groups):
+            raise MergeError(f"child {cell} 段 {seg} 之群組列 ≠ 期望群組（{len(got)} 對 {len(groups)}）")
+    failed_runs = {r for r, s in (child.get("run_status") or {}).items() if s == "failed"}
+    missing_runs = sorted(cell_runs - set(child.get("runs") or {}) - failed_runs)
+    if missing_runs:
+        raise MergeError(f"child.runs 缺 {missing_runs}")
+    if failed_runs & cell_runs and any(r.get("status") not in ("blocked", "codec_off") for r in child_rows):
+        raise MergeError(f"child 之 run {sorted(failed_runs)} 失敗而 {cell} 仍有非 blocked／codec_off 列")
+    gen_runs = cell_runs - {FREEZE_RUN_NAMES[cell]}
+    need_checks = {f"settings.{r}" for r in gen_runs} | {f"{cell}.no_reference_rows_zero"}
+    missing_checks = sorted(need_checks - set(child.get("checks") or {}))
+    if missing_checks:
+        raise MergeError(f"child.checks 缺 {missing_checks}")
+    bad_settings = sorted(k for k in child["checks"] if k.startswith("settings.") and child["checks"][k] is not True)
+    if bad_settings and any(r.get("status") == "measured" for r in child_rows):  # 審碼 r24：設定不符之 run 不得有量測列
+        raise MergeError(f"child 設定檢查 {bad_settings} 不為真而 {cell} 有 measured 列")
+    stray_checks = [k for k in child.get("checks") or {}
+                    if not (k.startswith(f"{cell}.") or k in {f"settings.{r}" for r in cell_runs})]
+    if stray_checks:
+        raise MergeError(f"child 含他格 checks {stray_checks}")
+    out = _copy.deepcopy(dict(parent))
+    for key in CELL_LIST_KEYS:
+        out[key] = [e for e in out.get(key) or [] if str(e.get("cell_id")) != cell] + _copy.deepcopy(list(child.get(key) or []))
+    for key in RUN_MAP_KEYS:
+        kept = {k: v for k, v in (out.get(key) or {}).items() if k not in cell_runs}
+        out[key] = {**kept, **_copy.deepcopy(dict(child.get(key) or {}))}
+    checks = {k: v for k, v in (out.get("checks") or {}).items()
+              if not (k.startswith(f"{cell}.") or k in {f"settings.{r}" for r in cell_runs})}
+    out["checks"] = {**checks, **dict(child.get("checks") or {})}
+    measured_bss = [e for e in out["s4_raw_bss"] if e.get("status") == "measured"]
+    out["lossless_violation"] = not all(e["bitwise_equal"] for e in measured_bss) if measured_bss else False
+    for key in ("generated_at", "head", "command"):
+        out[key] = child.get(key)
+    out["merge"] = {"parent_sha256": parent_sha256, "parent_generated_at": parent.get("generated_at"),
+                    "parent_head": parent.get("head"), "parent_command": parent.get("command"),
+                    "replaced_cell": cell, "replaced_runs": sorted(cell_runs)}
+    out["exit_code"] = 0 if all(out["checks"].values()) else 3
+    return out
+
+
 def _parse(argv: Optional[Sequence[str]]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="NUMVIEW Task 1.2 精度鏈逐段量測")
+    parser.add_argument("--merge-into", default=None,
+                        help="只重做 C 格並併入此正式收據（就地取代；原檔備份於本次工作目錄；SPEC v39）")
     parser.add_argument("--runs", default=None, help="只跑之 source_run（逗號分隔；試跑用，須同給 --out）")
     parser.add_argument("--no-compare", action="store_true", help="只生成不比對（細則⑦實測秒數；須同給 --out）")
     parser.add_argument("--inline", action="store_true", help="單元於本行程執行（試跑用）")
@@ -1581,7 +1742,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if trial and not args.out:
         print("[precision] 試跑旗標須同給 --out（不得寫正式收據）", file=sys.stderr)
         return 2
-    runs = [r for r in RUN_SPECS if not args.runs or r in set(args.runs.split(","))]
+    if args.merge_into and (trial or args.out or args.resume):
+        print("[precision] --merge-into 為正式只重做 C，不得併用 --runs／--no-compare／--out／--resume", file=sys.stderr)
+        return 2
+    parent: Optional[Dict[str, Any]] = None
+    if args.merge_into:  # 先驗 parent 可讀且為正式收據，再啟動任何生成
+        parent_path = Path(args.merge_into)
+        parent_bytes = parent_path.read_bytes()
+        parent = json.loads(parent_bytes)
+        if parent.get("trial") is not False or parent.get("criteria_sha256") != _criteria_sha256():
+            print("[precision] --merge-into 之 parent 須為現行判準下之正式收據", file=sys.stderr)
+            return 2
+    runs = [r for r in RUN_SPECS if (RUN_SPECS[r]["cell"] in MERGEABLE_CELLS if args.merge_into
+                                     else (not args.runs or r in set(args.runs.split(","))))]
     cells = sorted({RUN_SPECS[r]["cell"] for r in runs})
     if not args.out:
         violations = formal_readiness_violations(_gate().load_estimate_receipt(RECEIPTS_DIR))
@@ -1617,16 +1790,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                        B_CELL: {**{k: v for k, v in results.items() if RUN_SPECS[k]["cell"] in (B_CELL, HOST_CELL)}},
                        C_CELL: {k: v for k, v in results.items() if RUN_SPECS[k]["cell"] == C_CELL}}
             for cid in (HOST_CELL, B_CELL, C_CELL):
-                if trial and cid not in cells:
+                if (trial or parent is not None) and cid not in cells:
                     continue
                 _log(f"比對 {cid}")
                 compared[cid] = _run_unit({"mode": "compare", "cell_id": cid, "results": by_cell[cid],
                                            "result_path": str(work / "_results" / f"compare_{cid}.json")}, args.inline)
     receipt = assemble_receipt(results, compared, timings, list(argv) if argv is not None else sys.argv[1:], trial)
+    compare_failed = any(c.get("status") == "failed" for c in compared.values())
     dest = Path(args.out) if args.out else RECEIPTS_DIR / f"{datetime.now().strftime('%Y%m%d')}-numview-precision-chain.json"
+    if parent is not None:  # SPEC v39：child 與 parent 備份留工作目錄；比對失敗不合併（parent 不動）
+        work.mkdir(parents=True, exist_ok=True)
+        (work / "child_receipt.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=1, default=str) + "\n",
+                                                 encoding="utf-8")
+        if compare_failed:
+            _log(f"比對失敗：不合併，parent 不動；child 收據 {work / 'child_receipt.json'}")
+            return 3
+        (work / "parent_receipt.json").write_bytes(parent_bytes)
+        receipt = merge_receipt(parent, receipt, C_CELL, hashlib.sha256(parent_bytes).hexdigest())
+        dest = parent_path
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(receipt, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8")
-    compare_failed = any(c.get("status") == "failed" for c in compared.values())
     if compare_failed:
         _log(f"比對有失敗單元：保留擷取 {tmp} 與生成 {work}，修正後以 --resume {stamp} 重做比對（不重生）")
     elif not args.keep_tmp:
@@ -1685,6 +1868,8 @@ def assemble_receipt(results: Mapping[str, Mapping[str, Any]], compared: Mapping
                "layer4_merge": {n: r.get("layer4_merge") for n, r in results.items() if r.get("layer4_merge")},
                "ic_input_dtypes": {n: r.get("ic_input_dtypes") for n, r in results.items()},
                "timings": dict(timings), "run_status": {n: r.get("status") for n, r in results.items()},  # 審碼 r17
+               "memory": {n: {"peak_rss_bytes": r.get("peak_rss_bytes"), "swap_growth_max_mb": r.get("swap_growth_max_mb")}
+                          for n, r in results.items()},  # 諮詢 r3
                "checks": checks}
     receipt["exit_code"] = 0 if all(checks.values()) else 3
     return receipt

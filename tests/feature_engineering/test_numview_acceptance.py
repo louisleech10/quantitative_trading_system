@@ -1042,6 +1042,14 @@ def precision_completeness_violations() -> List[str]:
                 continue
             if str(cell["kind"]) in nh.GROUP_GRANULARITY_KINDS:
                 expected = (cell.get("expected_groups") or {}).get(seg)
+                if seg in ("S3", "S4"):  # 審碼 r24：期望群組不得只信收據自報——等於凍結 manifest 群組（獨立來源）
+                    canonical = probe("precision_chain").canonical_c_groups(cid)
+                    if {str(g): int(n) for g, n in (expected or {}).items()} != canonical:
+                        out.append(f"{cid}/{seg}: 期望群組 ≠ 凍結 manifest 群組")
+                        continue
+                elif seg == "S0" and not expected:  # measured 群組粒度格之 S0 期望群組不得缺或空
+                    out.append(f"{cid}/{seg}: 期望群組缺或空")
+                    continue
                 if expected is None:
                     continue
                 keys = [(str(r.get("source_run")), str(r.get("group"))) for r in got]
@@ -1088,15 +1096,21 @@ def precision_s4_bss_violations(receipt: Mapping[str, Any]) -> List[str]:
         out.append(f"s4_raw_bss 格重複：{ids}")
     status = {str(e.get("cell_id")): e.get("status") for e in bss}
     cells = {str(c["cell_id"]) for c in receipt.get("cells") or [] if c.get("status") == "measured"}
+    all_cells = {str(c["cell_id"]) for c in receipt.get("cells") or []}
     if not cells:
         out.append("無 measured 格")
-    if set(status) != cells:
-        out.append(f"s4_raw_bss 格集合 {sorted(status)} ≠ measured 格 {sorted(cells)}")
+    if set(status) != all_cells:  # blocked 格之 S4 列亦在（如 C 被擋仍記 codec_off）；格集合對收據全部格
+        out.append(f"s4_raw_bss 格集合 {sorted(status)} ≠ 收據格 {sorted(all_cells)}")
     for cid in sorted(cells):
         if cid not in expected:
             out.append(f"{cid}：非精度鏈格")
         elif status.get(cid) != expected[cid]:
             out.append(f"{cid}：s4_raw_bss 狀態 {status.get(cid)!r} ≠ {expected[cid]}")
+    for cid in sorted(all_cells - cells):  # 審碼 r26：未量測格之 S4 狀態只准 blocked／codec_off
+        if cid not in expected:
+            out.append(f"{cid}：非精度鏈格")
+        elif status.get(cid) not in ("blocked", "codec_off"):
+            out.append(f"{cid}（未量測格）：s4_raw_bss 狀態 {status.get(cid)!r} 非 blocked／codec_off")
     entries = [e for e in bss if e.get("status") == "measured"]
     if any(not isinstance(e.get("bitwise_equal"), bool) for e in entries):
         out.append("measured 列之 bitwise_equal 非布林")
@@ -1114,7 +1128,8 @@ def test_precision_chain_s4_raw_bss_lossless_flag() -> None:
 
 
 @pytest.mark.parametrize("mutant", ["a_hidden_as_codec_off", "a_not_equal_flag_false", "b_measured", "c_missing",
-                                    "a_equal_none", "a_duplicate", "unknown_row", "kind_swapped"])
+                                    "a_equal_none", "a_duplicate", "unknown_row", "kind_swapped",
+                                    "blocked_c_unknown_status"])
 def test_precision_s4_bss_violations_mutations(mutant: str) -> None:
     """審碼 r19–r20：A 格誤標 codec_off 而 B 誤標 measured（雙錯）、A 不等而旗標 False、B 標 measured、C 缺列、A 之
     bitwise_equal 為 None、A 列重複、多一未知格列、收據 `kind` 互換配合雙錯 ⇒ 各翻紅；合規收據 ⇒ 空。"""
@@ -1149,6 +1164,9 @@ def test_precision_s4_bss_violations_mutations(mutant: str) -> None:
         r["cells"][0]["kind"], r["cells"][1]["kind"] = "B", "A"
         r["s4_raw_bss"][0]["status"] = "codec_off"
         r["s4_raw_bss"][1].update(status="measured", bitwise_equal=True)
+    elif mutant == "blocked_c_unknown_status":  # 審碼 r26：C 未量測時其 S4 狀態仍須為 blocked／codec_off
+        r["cells"][2]["status"] = "blocked"
+        r["s4_raw_bss"][2]["status"] = "mystery"
     else:
         r["s4_raw_bss"].append(dict(r["s4_raw_bss"][0]))
     assert precision_s4_bss_violations(r) != []
@@ -1706,15 +1724,19 @@ def _synthetic_precision_receipt(drop_c_s5: bool = True) -> Dict[str, Any]:
     for key in sorted(nh.criteria_run_cell_keys("precision_chain")):
         cid = _cell_id_of(key)
         grouped = key[0] in nh.GROUP_GRANULARITY_KINDS  # SPEC v37 細則①：格 C 逐群組列
+        # 審碼 r24：S3／S4 期望群組須等於凍結 manifest 群組（驗收之獨立來源）
+        canonical = probe("precision_chain").canonical_c_groups(cid) if grouped else {}
+        expected = {"S0": {"g": 1}, "S3": dict(canonical), "S4": dict(canonical)} if grouped else None
         cells.append({"cell_id": cid, "kind": key[0], "symbol": key[1], "timeframes": list(key[2]), "status": "measured",
-                      "columns": ["x"], "granularity": "group" if grouped else "column",
-                      "expected_groups": {"S0": {"g": 1}, "S3": {"g": 1}, "S4": {"g": 1}} if grouped else None})
+                      "columns": ["x"], "granularity": "group" if grouped else "column", "expected_groups": expected})
         for seg in SEGMENTS:
             if seg == "S5" and key[0] == "C" and drop_c_s5:
                 continue
-            if grouped:
-                rows.append({"cell_id": cid, "segment": seg, "group": "g" if seg in ("S0", "S3", "S4") else "*",
-                             "columns_in_group": 1 if seg in ("S0", "S3", "S4") else None, "source_run": "r"})
+            if grouped and seg in ("S0", "S3", "S4"):
+                rows += [{"cell_id": cid, "segment": seg, "group": g, "columns_in_group": n, "source_run": "r"}
+                         for g, n in expected[seg].items()]
+            elif grouped:
+                rows.append({"cell_id": cid, "segment": seg, "group": "*", "columns_in_group": None, "source_run": "r"})
             else:
                 rows.append({"cell_id": cid, "segment": seg, "column": "x"})
     return {"cells": cells, "rows": rows}
@@ -1782,9 +1804,226 @@ VARIANT_SETTINGS_EXPECTED: Dict[str, Dict[str, Any]] = {
                          "lag_enabled": [False], "codec_upgrade": False, "winsor_method": ["quantile"],
                          "stationarity": ["fracdiff+adf"], "end_offset_bars": 0, "multi_tf_parallel_calls": 0},
     "c_preserve_dtype": {"preserve_dtype": [True], "l2_polars_lift": True, "spill_triggered": False,
-                         "lag_enabled": [True], "codec_upgrade": False, "end_offset_bars": 0,
+                         "l2_spill_bypassed": True, "lag_enabled": [True], "codec_upgrade": False, "end_offset_bars": 0,
                          "multi_tf_parallel_calls": 0},
 }
+
+
+def precision_c_chain_violations(receipt: Mapping[str, Any]) -> List[str]:
+    """SPEC v39（諮詢 r3）：C 格 measured ⇒ 其 R run 主鏈 layer2 spill 已停用（`l2_spill_bypassed` 真、`spill_triggered`
+    假）、子行程峰值 RSS 為正整數、格層 `s0_incomplete` 存在且記 L3–L6 讀入之 layer2 dtype（非空）；C 之 S0 群組列皆記
+    `s0_non_float64_columns`（非負整數）。C blocked 時不查（依 SPEC 標 blocked-by）。"""
+    pc = probe("precision_chain")
+    cid = pc.C_CELL
+    cell = next((c for c in receipt.get("cells") or [] if str(c.get("cell_id")) == cid), None)
+    if cell is None or cell.get("status") != "measured":
+        return []
+    out: List[str] = []
+    observed = (receipt.get("observed_settings") or {}).get("c_preserve_dtype") or {}
+    if observed.get("l2_spill_bypassed") is not True or observed.get("spill_triggered") is not False:
+        out.append(f"C 主鏈 spill 未停用：{ {k: observed.get(k) for k in ('l2_spill_bypassed', 'spill_triggered')} }")
+    if not isinstance(observed.get("calibration_spill"), bool):  # 審碼 r22：主鏈與校準域分記
+        out.append(f"C 未分記校準域 spill：{observed.get('calibration_spill')!r}")
+    memory = (receipt.get("memory") or {}).get("c_preserve_dtype") or {}
+    peak = memory.get("peak_rss_bytes")
+    if isinstance(peak, bool) or not isinstance(peak, int) or peak <= 0:
+        out.append(f"C 峰值 RSS 未記：{peak!r}")
+    swap = memory.get("swap_growth_max_mb")  # 審碼 r22：swap 增長（卡死監看）亦須記
+    if isinstance(swap, bool) or not isinstance(swap, (int, float)) or not math.isfinite(swap) or swap < 0:
+        out.append(f"C swap 增長未記：{swap!r}")
+    if not any(str(r.get("cell_id")) == cid and r.get("segment") == "S0" and r.get("status") == "measured"
+               for r in receipt.get("rows") or []):
+        out.append("C 無 measured 之 S0 列")
+    inc = [e for e in receipt.get("s0_incomplete") or [] if str(e.get("cell_id")) == cid]
+    if len(inc) != 1 or not isinstance(inc[0].get("l2_consumer_dtypes"), list) or not inc[0]["l2_consumer_dtypes"]:
+        out.append(f"C s0_incomplete 缺或未記 layer2 dtype：{inc}")
+    for row in receipt.get("rows") or []:
+        if str(row.get("cell_id")) == cid and row.get("segment") == "S0" and row.get("status") != "blocked":
+            n = row.get("s0_non_float64_columns")
+            if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+                out.append(f"C S0 群組 {row.get('group')} 缺 s0_non_float64_columns")
+                break
+    return out
+
+
+def test_precision_c_chain_contract() -> None:
+    """Task 1.2 驗證（SPEC v39）：正式收據之 C 格主鏈 spill 停用、記憶體與 s0_incomplete 已記。"""
+    assert precision_c_chain_violations(load_receipt("precision-chain")) == []
+
+
+@pytest.mark.parametrize("mutant", ["spill_not_bypassed", "spill_happened", "peak_missing", "peak_bool",
+                                    "incomplete_missing", "consumer_dtypes_empty", "group_count_missing",
+                                    "calibration_spill_missing", "swap_missing", "no_s0_rows"])
+def test_precision_c_chain_violations_mutations(mutant: str) -> None:
+    """諮詢 r3、審碼 r22：C 主鏈 spill 未停用或仍發生、峰值 RSS 缺或為布林、s0_incomplete 缺、layer2 dtype 空、S0 群組缺
+    非 float64 計數、校準域 spill 未分記、swap 增長缺、無 measured S0 列 ⇒ 各翻紅；合規 ⇒ 空；C blocked ⇒ 不查。"""
+    cid = probe("precision_chain").C_CELL
+    good = {"cells": [{"cell_id": cid, "status": "measured"}],
+            "observed_settings": {"c_preserve_dtype": {"l2_spill_bypassed": True, "spill_triggered": False,
+                                                       "calibration_spill": True}},
+            "memory": {"c_preserve_dtype": {"peak_rss_bytes": 5_000_000_000, "swap_growth_max_mb": 3000.0}},
+            "s0_incomplete": [{"cell_id": cid, "l2_consumer_dtypes": ["float32", "float64"]}],
+            "rows": [{"cell_id": cid, "segment": "S0", "status": "measured", "group": "g", "s0_non_float64_columns": 3}]}
+    assert precision_c_chain_violations(good) == []
+    r = copy.deepcopy(good)
+    if mutant == "spill_not_bypassed":
+        r["observed_settings"]["c_preserve_dtype"]["l2_spill_bypassed"] = False
+    elif mutant == "spill_happened":
+        r["observed_settings"]["c_preserve_dtype"]["spill_triggered"] = True
+    elif mutant == "peak_missing":
+        r["memory"] = {}
+    elif mutant == "peak_bool":
+        r["memory"]["c_preserve_dtype"]["peak_rss_bytes"] = True
+    elif mutant == "incomplete_missing":
+        r["s0_incomplete"] = []
+    elif mutant == "consumer_dtypes_empty":
+        r["s0_incomplete"][0]["l2_consumer_dtypes"] = []
+    elif mutant == "calibration_spill_missing":
+        del r["observed_settings"]["c_preserve_dtype"]["calibration_spill"]
+    elif mutant == "swap_missing":
+        del r["memory"]["c_preserve_dtype"]["swap_growth_max_mb"]
+    elif mutant == "no_s0_rows":
+        r["rows"] = []
+    else:
+        del r["rows"][0]["s0_non_float64_columns"]
+    assert precision_c_chain_violations(r) != []
+    blocked = copy.deepcopy(r)
+    blocked["cells"][0]["status"] = "blocked"
+    assert precision_c_chain_violations(blocked) == []
+
+
+def _merge_fixture() -> Tuple[Any, Dict[str, Any], Dict[str, Any]]:
+    """合成 parent（A、B、C 三格）與只重做 C 之 child（C 列、run、checks 皆新值）。"""
+    pc = probe("precision_chain")
+    a, b, c = pc.HOST_CELL, pc.B_CELL, pc.C_CELL
+
+    def lists(cells: Sequence[str], tag: str) -> Dict[str, Any]:
+        return {k: [{"cell_id": x, "tag": tag} for x in cells] for k in pc.CELL_LIST_KEYS}
+
+    parent = {"trial": False, "criteria_sha256": "s", "generated_at": "t0", "head": "h0", "command": "c0",
+              **lists((a, b, c), "old"),
+              **{k: {"s0_float64_chain": {"v": k}, "b_production_spy": {"v": k}, "c_preserve_dtype": {"v": "old"},
+                     "freeze_C": {"v": "old"}} for k in pc.RUN_MAP_KEYS},
+              "checks": {f"{a}.x": True, f"{b}.y": True, f"{c}.z": False, "settings.c_preserve_dtype": False,
+                         "settings.s0_float64_chain": True},
+              "s4_raw_bss": [{"cell_id": a, "status": "measured", "bitwise_equal": True},
+                             {"cell_id": b, "status": "codec_off", "bitwise_equal": None},
+                             {"cell_id": c, "status": "blocked", "bitwise_equal": False}],
+              "lossless_violation": False, "exit_code": 3}
+    child = {"trial": False, "criteria_sha256": "s", "generated_at": "t1", "head": "h1", "command": "c1",
+             **lists((c,), "new"),
+             **{k: {"c_preserve_dtype": {"v": "new"}, "freeze_C": {"v": "new"}} for k in pc.RUN_MAP_KEYS},
+             "checks": {f"{c}.z": True, f"{c}.no_reference_rows_zero": True, "settings.c_preserve_dtype": True},
+             "s4_raw_bss": [{"cell_id": c, "status": "codec_off", "bitwise_equal": None}]}
+    # 審碼 r23–r24：child 之 C 列涵蓋 S0–S4；S3／S4 期望群組＝凍結 C manifest 群組（獨立來源），每群組一列；S0 期望非空
+    groups = pc.canonical_c_groups(c)
+    child["cells"] = [{"cell_id": c, "tag": "new", "status": "measured", "expected_groups": {"S0": {"g0": 1}, "S3": dict(groups),
+                                                                       "S4": dict(groups)}}]
+    child["rows"] = ([{"cell_id": c, "segment": "S0", "group": "g0", "status": "measured"}]
+                     + [{"cell_id": c, "segment": s, "group": "*", "status": "not_measured"} for s in ("S1", "S2")]
+                     + [{"cell_id": c, "segment": "S3", "group": g, "status": "measured"} for g in groups]
+                     + [{"cell_id": c, "segment": "S4", "group": g, "status": "codec_off"} for g in groups])
+    child["run_status"] = {"c_preserve_dtype": "complete"}
+    return pc, parent, child
+
+
+def test_precision_merge_receipt_failed_run_reports_blocked() -> None:
+    """審碼 r23：C 生成失敗（run 無身分、run_status failed）而 C 列全為 blocked／codec_off ⇒ 照常合併、C 呈 blocked、
+    `exit_code` 3（設定檢查為假），不中止。"""
+    pc, parent, child = _merge_fixture()
+    c = pc.C_CELL
+    del child["runs"]["c_preserve_dtype"]
+    child["run_status"] = {"c_preserve_dtype": "failed"}
+    child["checks"]["settings.c_preserve_dtype"] = False
+    for row in child["rows"]:
+        row["status"] = "codec_off" if row["segment"] == "S4" else "blocked"
+    child["cells"][0]["status"] = "blocked"
+    merged = pc.merge_receipt(parent, child, c, "abc")
+    assert merged["exit_code"] == 3 and "c_preserve_dtype" not in merged["runs"]
+    assert {r["status"] for r in merged["rows"] if r["cell_id"] == c} == {"blocked", "codec_off"}
+
+
+def test_precision_merge_receipt_replaces_only_c() -> None:
+    """SPEC v39：合併後非 C 之清單項、run 對應表、checks 逐位等於 parent；C 之項全為 child 者；exit_code 重算；記 merge。"""
+    pc, parent, child = _merge_fixture()
+    c = pc.C_CELL
+    merged = pc.merge_receipt(parent, child, c, "abc")
+    for key in pc.CELL_LIST_KEYS:
+        assert [e for e in merged[key] if e["cell_id"] != c] == [e for e in parent[key] if e["cell_id"] != c], key
+        assert [e for e in merged[key] if e["cell_id"] == c] == child[key], key
+    for key in pc.RUN_MAP_KEYS:
+        assert {k: v for k, v in merged[key].items() if k not in ("c_preserve_dtype", "freeze_C")} == \
+            {k: v for k, v in parent[key].items() if k not in ("c_preserve_dtype", "freeze_C")}, key
+        assert merged[key] == {**{k: v for k, v in parent[key].items() if k not in ("c_preserve_dtype", "freeze_C")},
+                               **child[key]}, key
+    assert merged["checks"] == {f"{pc.HOST_CELL}.x": True, f"{pc.B_CELL}.y": True, f"{c}.z": True,
+                                f"{c}.no_reference_rows_zero": True, "settings.c_preserve_dtype": True,
+                                "settings.s0_float64_chain": True}
+    assert merged["exit_code"] == 0 and merged["lossless_violation"] is False
+    assert merged["merge"]["parent_sha256"] == "abc" and merged["merge"]["replaced_cell"] == c
+    assert (merged["head"], merged["generated_at"]) == ("h1", "t1")
+
+
+@pytest.mark.parametrize("mutant", ["parent_trial", "criteria_differ", "child_has_a_row", "child_has_b_run",
+                                    "child_has_a_check", "parent_lacks_c", "parent_c_twice", "cell_not_mergeable",
+                                    "child_no_rows", "child_missing_run", "child_missing_settings_check",
+                                    "child_missing_no_reference_check", "child_missing_segment",
+                                    "child_group_missing", "failed_run_with_measured_rows",
+                                    "expected_groups_forged", "expected_groups_empty", "child_missing_key",
+                                    "settings_false_with_measured", "cell_status_forged"])
+def test_precision_merge_receipt_rejects(mutant: str) -> None:
+    """SPEC v39、審碼 r22–r23：parent 為試跑、判準雜湊不同、child 含他格列／run／checks、parent 缺 C 或含兩次、指定格不可
+    單獨重做、child 無 C 統計列、缺 C 之 run 身分、缺設定檢查或缺參照檢查、缺一段、群組粒度段少一群組、生成失敗之 run 無身分
+    而 C 仍有 measured 列 ⇒ `MergeError`。"""
+    pc, parent, child = _merge_fixture()
+    cell = pc.C_CELL
+    if mutant == "parent_trial":
+        parent["trial"] = True
+    elif mutant == "criteria_differ":
+        child["criteria_sha256"] = "other"
+    elif mutant == "child_has_a_row":
+        child["rows"].append({"cell_id": pc.HOST_CELL})
+    elif mutant == "child_has_b_run":
+        child["runs"]["b_production_spy"] = {}
+    elif mutant == "child_has_a_check":
+        child["checks"][f"{pc.HOST_CELL}.x"] = False
+    elif mutant == "parent_lacks_c":
+        parent["cells"] = [e for e in parent["cells"] if e["cell_id"] != cell]
+    elif mutant == "parent_c_twice":
+        parent["cells"].append({"cell_id": cell})
+    elif mutant == "child_no_rows":
+        child["rows"] = []
+    elif mutant == "child_missing_run":
+        del child["runs"]["freeze_C"]
+    elif mutant == "child_missing_settings_check":
+        del child["checks"]["settings.c_preserve_dtype"]
+    elif mutant == "child_missing_no_reference_check":
+        del child["checks"][f"{cell}.no_reference_rows_zero"]
+    elif mutant == "child_missing_segment":
+        child["rows"] = [r for r in child["rows"] if r["segment"] != "S2"]
+    elif mutant == "child_group_missing":
+        first = next(r for r in child["rows"] if r["segment"] == "S3")
+        child["rows"].remove(first)
+    elif mutant == "failed_run_with_measured_rows":
+        del child["runs"]["c_preserve_dtype"]
+        child["run_status"] = {"c_preserve_dtype": "failed"}
+    elif mutant == "expected_groups_forged":  # 同刪一群組之列與自報期望（codex r24 反例）
+        first = next(r for r in child["rows"] if r["segment"] == "S3")
+        child["rows"].remove(first)
+        del child["cells"][0]["expected_groups"]["S3"][first["group"]]
+    elif mutant == "expected_groups_empty":  # grok r24 反例
+        child["cells"][0]["expected_groups"] = {}
+    elif mutant == "child_missing_key":
+        del child["forks"]
+    elif mutant == "settings_false_with_measured":
+        child["checks"]["settings.c_preserve_dtype"] = False
+    elif mutant == "cell_status_forged":  # 審碼 r25：列全非 measured 而格標 measured
+        for row in child["rows"]:
+            row["status"] = "codec_off" if row["segment"] == "S4" else "blocked"
+    else:
+        cell = pc.HOST_CELL
+    with pytest.raises(pc.MergeError):
+        pc.merge_receipt(parent, child, cell, "abc")
 
 
 def test_precision_variant_settings_locked() -> None:
@@ -1927,18 +2166,18 @@ def test_mutation_precision_group_rows_swapped_turns_completeness_red(monkeypatc
     """mutation（SPEC v37 細則①）：群組粒度格刪一群組列並複製另一群組列使欄數合計不變 ⇒ 段×格完整檢查紅。"""
     receipt = _synthetic_precision_receipt()
     c_cell = next(c for c in receipt["cells"] if c["kind"] in nh.GROUP_GRANULARITY_KINDS)
-    c_cell["expected_groups"]["S3"] = {"g": 1, "h": 1}
-    receipt["rows"].append({"cell_id": c_cell["cell_id"], "segment": "S3", "group": "h", "columns_in_group": 1,
+    c_cell["expected_groups"]["S0"] = {"g": 1, "h": 1}
+    receipt["rows"].append({"cell_id": c_cell["cell_id"], "segment": "S0", "group": "h", "columns_in_group": 1,
                             "source_run": "r"})
     monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(receipt))
     assert precision_completeness_violations() == []
     mutated = copy.deepcopy(receipt)
-    mutated["rows"] = [r for r in mutated["rows"] if not (r["cell_id"] == c_cell["cell_id"] and r["segment"] == "S3"
+    mutated["rows"] = [r for r in mutated["rows"] if not (r["cell_id"] == c_cell["cell_id"] and r["segment"] == "S0"
                                                           and r.get("group") == "h")]
-    mutated["rows"].append({"cell_id": c_cell["cell_id"], "segment": "S3", "group": "g", "columns_in_group": 1,
+    mutated["rows"].append({"cell_id": c_cell["cell_id"], "segment": "S0", "group": "g", "columns_in_group": 1,
                             "source_run": "r2"})
     monkeypatch.setattr(THIS, "load_receipt", lambda kind: copy.deepcopy(mutated))
-    assert any("S3" in v for v in precision_completeness_violations())
+    assert any("S0" in v for v in precision_completeness_violations())
 
 
 # ---------------------------------------------------------------------------------------------- Task 1.2 審碼 r8 之單元（不依賴收據）
@@ -2118,6 +2357,13 @@ def test_precision_blocked_run_not_production_equivalent_a_and_c() -> None:
               "settings_violations": []}
     rows = pc.compare_c({"c_preserve_dtype": fake_c})["rows"]
     assert rows and {r["status"] for r in rows} == {"blocked"}
+    # 審碼 r22：卡死監看判停滯 ⇒ S0–S3 blocked-by 硬體、凍結讀回之 S4 照記 codec_off
+    fake_c["watch_status"] = pc._watchdog().STALLED
+    rows = pc.compare_c({"c_preserve_dtype": fake_c})["rows"]
+    chain = [r for r in rows if r["segment"] != "S4"]
+    assert chain and all(r["status"] == "blocked" and r["reason"].startswith("blocked-by 硬體") for r in chain)
+    s4 = [r for r in rows if r["segment"] == "S4"]
+    assert s4 and {r["status"] for r in s4} == {"codec_off"}
 
 
 @pytest.mark.parametrize("mutant", ["generations_bool", "seconds_unbound", "measurement_blocked", "measurement_zero"])
