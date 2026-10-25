@@ -896,6 +896,23 @@ def test_boundary_44_resolve_repeated_switch_recorded_each_time(switching: None,
     assert nv.route_identity(records) != nv.route_identity(records[1:])
 
 
+def test_resolve_worker_route_records_adopted_into_run(switching: None, monkeypatch: pytest.MonkeyPatch,
+                                                       tmp_path: Path) -> None:
+    """多週期 worker 行程之選路紀錄（排程器 `task_routes`）併入本 run：他行程 pid 者逐筆原樣入 `route_records`（路由身分
+    隨之改變）、未認證點觸發標記回呼；本行程 pid 者（串行臂，已在本 run）不重複併入。"""
+    _register_point(monkeypatch, TEST_UNCERT_POINT, False)
+    own = os.getpid()
+    worker = {"event": "memory_route", "pid": own + 1, "point": TEST_UNCERT_POINT, "group": "4h_g", "from": ORIG_BRANCH,
+              "to": ALT_BRANCH}
+    serial = {**worker, "pid": own, "group": "1h_g"}
+    with mb.set_route_switch_marker(_writer(tmp_path)):
+        assert mb.adopt_route_records([worker, serial]) == 1
+    records = mb.route_records()
+    assert [(r["pid"], r["group"]) for r in records] == [(own + 1, "4h_g")]
+    assert nv.route_identity(records) != nv.route_identity([])
+    assert (tmp_path / _marker_name()).is_file()
+
+
 # ---------------------------------------------------------------------------------------------- 單元工廠（不生成）
 
 def bare_factory(tmp: Path) -> FeatureFactory:
@@ -1183,14 +1200,31 @@ def _crash_after_leaf(real: Callable[..., Any]) -> Callable[..., Any]:
 
 def _force_l2_switch(mp: pytest.MonkeyPatch, *, certified: bool) -> None:
     """強制 Layer 2 換臂（模擬可用記憶體不足）：暫登 L2 設定指紋於 `L2_ROUTE_CERTIFIED` 使分派點經 `route`，且原臂
-    `check` 回容量拒絕。`certified=False` ⇒ 契約副本把該點標為未認證（HEAD 唯一之換臂點即 Layer 2；見報告之 SPEC 歧義）。"""
+    `check` 回容量拒絕。`certified=False` ⇒ 契約副本把該點標為未認證（HEAD 唯一之換臂點即 Layer 2；見報告之 SPEC 歧義）。
+    只於正式生成之 Layer 2 強制（SPEC Task 4.2 ⑧「於本 run 之後續群組換臂」）；公開域預熱探測（`_calibration_domain`
+    獨立實例，定葉前）照常不換臂——定葉前換臂之語意另由 `test_numview_cgsa_workdir` 之暫存標記案驗。"""
     assert ORIG_BRANCH in mb.BRANCH_TABLE
-    mp.setattr(FeatureFactory, "_l2_route_fingerprint", lambda self, layer1, config: "numview_forced_fp")
+    real_fp = FeatureFactory._l2_route_fingerprint
+    real_budget = FeatureFactory._budget_check_l2
+    active = {"on": False}
+
+    def budget(self: Any, *a: Any, **k: Any) -> Any:
+        if getattr(self, "_calibration_domain", False):
+            return real_budget(self, *a, **k)
+        active["on"] = True
+        try:
+            return real_budget(self, *a, **k)
+        finally:
+            active["on"] = False
+
+    mp.setattr(FeatureFactory, "_budget_check_l2", budget)
+    mp.setattr(FeatureFactory, "_l2_route_fingerprint",
+               lambda self, layer1, config: "numview_forced_fp" if active["on"] else real_fp(self, layer1, config))
     mp.setattr(FeatureFactory, "L2_ROUTE_CERTIFIED", frozenset({"numview_forced_fp"}))
     real_check = mb.check
 
     def check(branch_id: str, components: Any, **kwargs: Any) -> Any:
-        if branch_id == ORIG_BRANCH:
+        if branch_id == ORIG_BRANCH and active["on"]:
             raise mb.GenerationMemoryBudgetExceeded(str(kwargs.get("label") or branch_id), 0, 1, 0,
                                                     mb.MSG_MACHINE_INSUFFICIENT)
         return real_check(branch_id, components, **kwargs)

@@ -30,7 +30,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Callable, Deque, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Deque, Dict, Iterable, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple
 
 
 class GenerationMemoryBudgetExceeded(RuntimeError):
@@ -261,6 +261,26 @@ def route_records() -> List[Dict[str, Any]]:
     """本執行緒受保護 run 至今之選路紀錄（無受保護 run ⇒ 空）。"""
     ctx = _ACTIVE.get()
     return [] if ctx is None else [dict(r) for r in ctx.routes]
+
+
+def adopt_route_records(records: Iterable[Mapping[str, Any]]) -> int:
+    """他行程（多週期 worker，經排程器 `task_routes` 交回）之選路紀錄逐筆原樣併入本執行緒受保護 run（NUMVIEW
+    observed_arms／路由身分涵蓋 worker 內之換臂）；本行程 pid 之紀錄（串行臂）已在本 run 而略過。換臂紀錄之點未經
+    契約認證 ⇒ 呼叫已登記之標記回呼（同 `route`；例外不吞）。回傳併入筆數。"""
+    ctx = _ACTIVE.get()
+    if ctx is None:
+        return 0
+    own = os.getpid()
+    adopted = [dict(r) for r in records if r.get("pid") != own]
+    ctx.routes.extend(adopted)
+    marker = _ROUTE_SWITCH_MARKER.get()
+    if marker is not None:
+        from momentum.FeatureEngineering import numeric_view as _numeric_view
+
+        for r in adopted:
+            if "to" in r and not _numeric_view.route_point_certified(str(r.get("point"))):
+                marker({"point": r.get("point"), "group": r.get("group"), "from": r.get("from"), "to": r.get("to")})
+    return len(adopted)
 
 
 # ---------------------------------------------------------------- 取樣（macOS libproc／mach）

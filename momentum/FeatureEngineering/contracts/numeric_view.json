@@ -12,7 +12,7 @@
           "momentum/FeatureEngineering/ic_first_context.py:28"
         ],
         "arm=ctx.post_ic_arm,": [
-          "momentum/FeatureEngineering/feature_factory.py:2991"
+          "momentum/FeatureEngineering/feature_factory.py:3000"
         ],
         "_numeric_view.require_post_ic_core(arm)": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:931"
@@ -240,7 +240,7 @@
         "enters": "route_identity",
         "_literal": "def physical_memory_bytes",
         "_sources": [
-          "momentum/FeatureEngineering/memory_budget.py:455"
+          "momentum/FeatureEngineering/memory_budget.py:475"
         ]
       }
     },
@@ -251,10 +251,10 @@
         "_doc": "L2 polars ↔ pandas 選路：只於 L2 設定指紋屬 FeatureFactory.L2_ROUTE_CERTIFIED（既有逐位元收據機制；現為空集合）時經 memory_budget.route 有第二候選，故凡經此點之換臂皆為已認證等價。",
         "_sources": {
           "L2_ROUTE_CERTIFIED": [
-            "momentum/FeatureEngineering/feature_factory.py:1845"
+            "momentum/FeatureEngineering/feature_factory.py:1854"
           ],
           "_memory_budget.route(\"Layer 2\"": [
-            "momentum/FeatureEngineering/feature_factory.py:1850"
+            "momentum/FeatureEngineering/feature_factory.py:1859"
           ]
         }
       }
@@ -437,7 +437,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/feature_factory.py:1149"
+        "momentum/FeatureEngineering/feature_factory.py:1153"
       ]
     },
     "FFACT_CGSA_DISK_RESERVE_GIB": {
@@ -460,7 +460,7 @@
       "_sources": [
         "api/services/hardware_info_service.py:111",
         "api/services/hardware_info_service.py:139",
-        "momentum/FeatureEngineering/feature_factory.py:1270"
+        "momentum/FeatureEngineering/feature_factory.py:1279"
       ]
     },
     "FFACT_CGSA_PIPELINE_PER_LAYER": {
@@ -494,7 +494,7 @@
       "reason": "CGSA 工作目錄根（D7 葉路徑由身分導出；根入鹽即循環，SPEC Task 0.2）；只決定輸出寫到哪裡（output_only）。",
       "_sources": [
         "momentum/FeatureEngineering/feature_factory.py:342",
-        "momentum/FeatureEngineering/feature_factory.py:1192",
+        "momentum/FeatureEngineering/feature_factory.py:1196",
         "momentum/FeatureEngineering/run_lifecycle.py:141",
         "momentum/FeatureEngineering/run_lifecycle.py:364",
         "momentum/FeatureEngineering/run_lifecycle.py:396"
@@ -705,7 +705,7 @@
       "_sources": [
         "api/services/hardware_info_service.py:110",
         "api/services/hardware_info_service.py:138",
-        "momentum/FeatureEngineering/feature_factory.py:3881"
+        "momentum/FeatureEngineering/feature_factory.py:3890"
       ]
     },
     "FFACT_L7_CODEC_UPGRADE": {
@@ -759,7 +759,7 @@
       "default": "4",
       "domain": "positive_int",
       "_sources": [
-        "momentum/FeatureEngineering/feature_factory.py:1140"
+        "momentum/FeatureEngineering/feature_factory.py:1144"
       ]
     },
     "FFACT_LAYER1_PARALLEL": {
@@ -773,7 +773,7 @@
       ],
       "_sources": [
         "api/services/feature_factory_service.py:594",
-        "momentum/FeatureEngineering/feature_factory.py:1136"
+        "momentum/FeatureEngineering/feature_factory.py:1140"
       ]
     },
     "FFACT_LAYER3_CHUNK_SIZE": {
@@ -898,7 +898,7 @@
       "default": "1024",
       "domain": "positive_int",
       "_sources": [
-        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1302"
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1304"
       ]
     },
     "FFACT_MULTI_TF_COMPACT_ALIGNMENT": {
@@ -911,7 +911,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1343"
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1345"
       ]
     },
     "FFACT_MULTI_TF_KEEP_WORKER_NPY": {
@@ -924,7 +924,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1337"
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1339"
       ]
     },
     "FFACT_MULTI_TF_MAX_WORKERS": {
@@ -950,7 +950,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1707"
+        "momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1709"
       ]
     },
     "FFACT_NEW_COMPUTE_DUALRUN_SAMPLE_RATE": {

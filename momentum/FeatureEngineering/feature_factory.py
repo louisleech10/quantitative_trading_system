@@ -486,6 +486,9 @@ class FeatureFactory:
         if len(training_tfs) <= 1:
             # FRAMEPATH Task 1.2：單週期只走 CGSA；registry 未建立 ⇒ 於 L1 之前具名拒絕（L3 內拋會被層執行器包成層失敗）
             self._require_cgsa_registry("generate_features", symbol, timeframe)
+            # 單週期一律自 L1 重算全部層（無逐層略過）：續跑帶回中斷前之群組 ⇒ 先回滾（否則同欄以 `_2` 群組重複落盤）
+            for tf in sorted({str(group.timeframe) for _gid, group in self._cgsa_registry.iter_all()}):
+                self._cgsa_registry.rollback_timeframe(tf)
 
         if len(training_tfs) > 1:
             from momentum.FeatureEngineering.timeframe import MultiTFGenerator
@@ -1195,10 +1198,10 @@ class FeatureFactory:
         work_dir = cgsa_work_dir(root, symbol, timeframe, config_hash or "", algorithm_id or "unidentified")
         identity = _run_paths.cgsa_identity_payload(symbol, timeframe, config_hash or "", algorithm_id or "")
         identifiable = bool(config_hash) and bool(algorithm_id)
-        # 本 run 定葉前已發生之未認證換臂（預熱探測）：葉定後當下寫標記（續跑判定同無暫存者；SPEC Task 4.2 ⑧）
+        # 本 run 定葉前已發生之未認證換臂（預熱探測，其值決定預熱深度）⇒ 同含標記之葉：既有葉不續跑、移出，新葉當下寫標記
         pending = list(getattr(self, "_pending_route_markers", None) or [])
         if work_dir.exists() or work_dir.is_symlink():
-            if (not identifiable or _run_paths.read_cgsa_identity(work_dir) != identity
+            if (not identifiable or pending or _run_paths.read_cgsa_identity(work_dir) != identity
                     or _run_paths.has_route_switch_marker(work_dir)):
                 stale = _run_paths.move_to_stale(work_dir)
                 logger.info("[CGSA] Work dir %s 身分不符或含未認證換臂標記 ⇒ 移為 %s、全新開始", work_dir, stale)
@@ -4221,7 +4224,7 @@ class FeatureFactory:
     def _route_switch_marker(self, entry: Mapping[str, Any]) -> None:
         """未認證換臂標記之回呼（NUMVIEW R6-A；`memory_budget.set_route_switch_marker` 於 `generate_features` 登記）：
         寫入作用中之 CGSA 工作目錄。葉尚未定（公開域預熱探測以獨立實例於 `_prepare_cgsa_registry` 之前計算 L1–L6）
-        ⇒ 暫存，由 `_prepare_cgsa_registry` 於葉定後當下寫入。寫入例外原樣上拋（R7-B）。"""
+        ⇒ 暫存，由 `_prepare_cgsa_registry` 視同含標記：既有葉不續跑、移出，新葉當下寫入。寫入例外原樣上拋（R7-B）。"""
         registry = getattr(self, "_cgsa_registry", None)
         if registry is not None:
             _run_paths.write_route_switch_marker(Path(registry.work_dir), entry)

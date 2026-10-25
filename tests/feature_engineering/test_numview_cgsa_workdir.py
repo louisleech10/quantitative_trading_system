@@ -393,30 +393,29 @@ def test_cgsa_matching_identity_resumes(ctx: Ctx) -> None:
     assert ctx.prepare(ch, aid) == "resumed" and ctx.resume.call_count == 1
 
 
-def test_cgsa_switch_before_leaf_marked_when_leaf_ready(ctx: Ctx) -> None:
-    """定葉前（公開域預熱探測）已發生未認證換臂 ⇒ 標記回呼暫存；續跑判定不受影響（身分相符、可續跑之既有葉照常
-    續跑），標記於葉定後當下寫入該葉、暫存清空；新建葉同樣寫入。"""
+def test_cgsa_switch_before_leaf_not_resumed_and_marked(ctx: Ctx) -> None:
+    """定葉前（公開域預熱探測，其值決定預熱深度）已發生未認證換臂 ⇒ 標記回呼暫存；定葉時視同含標記之葉——身分相符、
+    可續跑之既有葉原樣移為 `.stale-*`、不續跑，新葉當下帶標記（其餘只身分檔）、暫存清空。對照：無暫存者續跑
+    （`test_cgsa_matching_identity_resumes`）。"""
     ch, aid = _md5("numview-pending"), _sha("numview-pending")
     leaf = ctx.leaf(ch, aid)
     seed_leaf(leaf, json.dumps(_identity(ctx.symbol, ctx.tf, ch, aid)))
     ctx.l7(ch, aid)
+    before = snapshot(leaf)
     f = ctx.factory()
     f._cgsa_registry = None
     entry = {"point": "Layer 2", "group": None, "from": "L2.polars", "to": "L2.pandas_serial"}
     f._route_switch_marker(entry)
     assert f._pending_route_markers == [entry]
-    assert ctx.prepare(ch, aid, factory=f) == "resumed" and ctx.resume.call_count == 1
-    assert stale_dirs(leaf) == []
+    registry = ctx.prepare(ch, aid, factory=f)
+    stale = stale_dirs(leaf)
+    assert ctx.resume.call_count == 0 and _real(registry.work_dir) == _real(leaf)
+    assert len(stale) == 1 and snapshot(stale[0]) == before
     marker_name = str(RAW["cgsa_work_identity"]["marker_file"])
+    assert set(snapshot(leaf)) == {_identity_name(), marker_name}
     marker = json.loads((leaf / marker_name).read_text(encoding="utf-8"))
     assert {k: marker[k] for k in ("point", "group", "to")} == {k: entry[k] for k in ("point", "group", "to")}
     assert f._pending_route_markers == []
-    fresh_ch = _md5("numview-pending-fresh")
-    f._route_switch_marker(entry)
-    registry = ctx.prepare(fresh_ch, aid, factory=f)
-    new_leaf = ctx.leaf(fresh_ch, aid)
-    assert _real(registry.work_dir) == _real(new_leaf)
-    assert set(snapshot(new_leaf)) == {_identity_name(), marker_name}
 
 
 def test_cgsa_new_algorithm_id_zero_reads_of_old_files(ctx: Ctx) -> None:
