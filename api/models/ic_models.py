@@ -478,6 +478,15 @@ class ApplyTransformsResponse(BaseModel):
         default=None,
         description="NUMVIEW Task 2.2：來源特徵 run 身分（FeatureLibrary.load_with_identity）",
     )
+    # NUMVIEW Task 4.3：不可變 view 身分（鍵名＝契約 `ic_page_response_keys` 之 view_id、algorithm_id 槽）
+    view_id: Optional[str] = Field(
+        default=None,
+        description="NUMVIEW Task 4.3：view 身分（run 身分、轉換設定、臂、algorithm_id、有序選欄之 sha256）；輸出檔名含之",
+    )
+    algorithm_id: Optional[str] = Field(
+        default=None,
+        description="NUMVIEW Task 4.3：本次 post-IC 轉換之數值 fingerprint 身分（sha256）",
+    )
 
 
 # ── ICRESULT_PAGING（docs/ICRESULT_PAGING_SPEC.md）：contract JSON 為單一真相源 ───────────────

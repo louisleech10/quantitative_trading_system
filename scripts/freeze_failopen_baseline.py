@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Optional, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -419,8 +419,9 @@ def _hash_l7_parquet_table(
     }
 
 
-def _combined_artifact_hashes(*work_dirs: Path) -> dict[str, Any]:
-    """合併多個產物目錄的檔案 hash(registry work_dir + L7 run dir)。"""
+def _combined_artifact_hashes(*work_dirs: Path, labels: Optional[Sequence[str]] = None) -> dict[str, Any]:
+    """合併多個產物目錄的檔案 hash(registry work_dir + L7 run dir)。`labels`：各目錄之 root 標籤（預設＝目錄名；
+    NUMVIEW D7 之 CGSA 葉名為 algorithm_id，呼叫端以 `registry` 標之，與凍結基準同）。"""
     # FFDSTAR Task 1.6：各目錄之快照檔集合依 manifest 宣告（同 `_artifact_hashes`），不以目錄全部檔代替
     from scripts._manifest_listing import (
         MANIFEST_NAME,
@@ -434,10 +435,10 @@ def _combined_artifact_hashes(*work_dirs: Path) -> dict[str, Any]:
         if (work_dir / MANIFEST_NAME).is_file():
             released_groups |= all_dead_groups_of_run(work_dir)
     entries: list[dict[str, Any]] = []
-    for work_dir in work_dirs:
+    for index, work_dir in enumerate(work_dirs):
         if not work_dir.exists():
             continue
-        root_label = work_dir.name
+        root_label = labels[index] if labels is not None else work_dir.name
         for path in declared_feature_files_snapshot(work_dir, released_groups):
             entries.append(
                 {
@@ -553,7 +554,7 @@ def _single_tf_record(symbol: str, timeframe: str, temp_root: Path) -> dict[str,
         "layers": layers,
         "final_L7": final,
         "group_set_sha256": _group_set_hash(all_groups),
-        "artifacts": _artifact_hashes(work_dir),
+        "artifacts": _artifact_hashes(Path(registry.work_dir)),  # NUMVIEW D7：registry 位於覆寫根下之身分葉
         "feature_count": int(result.feature_count),
         "perf": perf,
     }
@@ -645,7 +646,9 @@ def _multi_tf_record(symbol: str, temp_root: Path) -> dict[str, Any]:
             "raw_path": str(result.metadata.get("raw_path") or ""),
         },
         "group_set_sha256": _group_set_hash(groups),
-        "artifacts": _combined_artifact_hashes(work_dir, l7_run_dir),
+        # NUMVIEW D7：registry 位於覆寫根下之身分葉，root 標籤沿用凍結基準之 `registry`
+        "artifacts": _combined_artifact_hashes(Path(registry.work_dir), l7_run_dir,
+                                               labels=(work_dir.name, l7_run_dir.name)),
         "feature_count": int(result.feature_count),
         "perf": perf,
     }

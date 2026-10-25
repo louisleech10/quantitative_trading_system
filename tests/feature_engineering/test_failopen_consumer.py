@@ -165,21 +165,29 @@ def test_cache_gate_partial_unknown_miss_complete_hit(
 
     factory = create_feature_factory(validate_continuity=False)
 
+    from momentum.FeatureEngineering import run_paths
+
+    aid = "d" * 64  # NUMVIEW D7／D6：葉身分與 L7 manifest 之 algorithm_id 相符，使閘之判定只差 run_status
     for status in ("partial", "unknown", "complete"):
         storage, config_hash, _ = _partial_manifest(tmp_path / status, run_status=status)
         factory._storage = storage
-        work_dir = tmp_path / status / "cgsa_work"
+        manifest_path = storage.feature_run_dir("BTCUSDT", "1h", config_hash) / FeatureStorage.L7_V2_MANIFEST_NAME
+        manifest_path.write_text(json.dumps({**json.loads(manifest_path.read_text(encoding="utf-8")),
+                                             "algorithm_id": aid}), encoding="utf-8")
+        root = tmp_path / status / "cgsa_work"
+        work_dir = run_paths.cgsa_work_dir(root, "BTCUSDT", "1h", config_hash, aid)
         work_dir.mkdir(parents=True)
+        run_paths.write_cgsa_identity(work_dir, run_paths.cgsa_identity_payload("BTCUSDT", "1h", config_hash, aid))
         (work_dir / "manifest.json").write_text(
             json.dumps({"groups": {"g1": {"status": "complete"}}}),
             encoding="utf-8",
         )
-        monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir))
+        monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(root))
 
         with patch(
             "momentum.FeatureEngineering.feature_factory.ColumnGroupRegistry.resume_from_manifest"
         ) as resume_mock:
-            factory._prepare_cgsa_registry("BTCUSDT", "1h", config_hash=config_hash)
+            factory._prepare_cgsa_registry("BTCUSDT", "1h", config_hash=config_hash, algorithm_id=aid)
         result = resume_mock.call_args
         if status == "complete":
             assert result is not None

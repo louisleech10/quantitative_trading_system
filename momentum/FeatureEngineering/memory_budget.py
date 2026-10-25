@@ -922,12 +922,29 @@ def _is_capacity_refusal(exc: GenerationMemoryBudgetExceeded) -> bool:
     return exc.reason in (MSG_MACHINE_INSUFFICIENT, MSG_OWN_CAP, MSG_ESTIMATE_EXCEEDED)
 
 
+_ROUTE_SWITCH_MARKER: "contextvars.ContextVar[Optional[Callable[[Mapping[str, Any]], Any]]]" = contextvars.ContextVar(
+    "numview_route_switch_marker", default=None)
+
+
+@contextlib.contextmanager
+def set_route_switch_marker(callback: Callable[[Mapping[str, Any]], Any]) -> Iterator[None]:
+    """未認證換臂之標記回呼（NUMVIEW Task 4.1 R6-A／R7-B）：作用期間 `route()` 於未認證換臂點選定換臂後、`return`
+    前呼叫 `callback(entry)`，例外原樣上拋（換臂後之 branch 一次都不執行）。回呼由 factory 傳入（本模組不 import
+    feature_factory）；以 contextvar 登記。"""
+    token = _ROUTE_SWITCH_MARKER.set(callback)
+    try:
+        yield
+    finally:
+        _ROUTE_SWITCH_MARKER.reset(token)
+
+
 def route(point: str, candidates: Sequence[Tuple[str, Mapping[str, Any]]], *, label: Optional[str] = None,
-          scale_key: Optional[str] = None) -> str:
+          scale_key: Optional[str] = None, group: Optional[str] = None) -> str:
     """選路（SPEC v35）：`candidates[0]` 為原臂，其後為該分派點白名單之逐位元等價臂（呼叫端負責只列已登錄者）。
     同規模速度收據證明某候選較快 ⇒ 先試之；否則先試原臂。容量不足（機器可用量不足／worker 估算低估）⇒ 依序
     試其餘候選；皆不可 ⇒ 上拋原臂之錯誤。停止旗標等非容量原因不換路。回傳實際選定之分支 ID，並記入
-    `ICFA_CHECK_LOG` 之 `memory_route` 事件。"""
+    `ICFA_CHECK_LOG` 之 `memory_route` 事件（`group` 記入紀錄）。換臂點未經契約認證（NUMVIEW
+    `auto_resolutions.route_switch_points[<點>].certified`）⇒ 紀錄後、回傳前呼叫已登記之標記回呼（例外不吞）。"""
     original = candidates[0][0]
     ordered = list(candidates)
     for index, (branch, _params) in enumerate(candidates[1:], start=1):
@@ -945,7 +962,13 @@ def route(point: str, candidates: Sequence[Tuple[str, Mapping[str, Any]]], *, la
             continue
         if branch != original:
             reason = "speed_receipt" if branch == ordered[0][0] and first_error is None else "capacity"
-            _record_route_switch(point, original, candidates[0][1], branch, params, reason, first_error)
+            _record_route_switch(point, original, candidates[0][1], branch, params, reason, first_error, group=group)
+            marker = _ROUTE_SWITCH_MARKER.get()
+            if marker is not None:
+                from momentum.FeatureEngineering import numeric_view as _numeric_view
+
+                if not _numeric_view.route_point_certified(point):
+                    marker({"point": point, "group": group, "from": original, "to": branch})
         return branch
     assert first_error is not None
     raise first_error
@@ -953,9 +976,9 @@ def route(point: str, candidates: Sequence[Tuple[str, Mapping[str, Any]]], *, la
 
 def _record_route_switch(point: str, original: str, original_params: Mapping[str, Any], branch: str,
                          params: Mapping[str, Any], reason: str,
-                         refusal: Optional[GenerationMemoryBudgetExceeded]) -> None:
+                         refusal: Optional[GenerationMemoryBudgetExceeded], *, group: Optional[str] = None) -> None:
     """單行程選路之紀錄：G（選定臂）、G_from（原臂）、A、F、R；原臂被拒時附其拒絕理由。量測失敗不改變選路結果。"""
-    entry: Dict[str, Any] = {"point": point, "from": original, "to": branch, "reason": reason,
+    entry: Dict[str, Any] = {"point": point, "group": group, "from": original, "to": branch, "reason": reason,
                              "G": planned_bytes(estimate(branch, params)),
                              "G_from": planned_bytes(estimate(original, original_params)),
                              "R": configured_budget_bytes(include_override=False)}

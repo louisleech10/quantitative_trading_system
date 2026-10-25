@@ -286,6 +286,40 @@ def ic_page_record_keys() -> Tuple[Dict[str, str], Dict[str, str]]:
     return _nv.ic_page_record_keys()
 
 
+def numeric_algorithm_id(preprocessing_config: Dict[str, Any]) -> str:
+    """NUMVIEW Task 4.3：本行程環境（`os.environ`、實測能力旗標）下、以給定前處理設定解析之數值 fingerprint 之
+    `algorithm_id`（api 經本模組取用，解耦 R3）。"""
+    import os
+
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    fingerprint = _nv.resolve_numeric_fingerprint(preprocessing_config=preprocessing_config, environ=os.environ,
+                                                  capabilities=_nv.detect_capabilities())
+    return _nv.algorithm_id(fingerprint)
+
+
+def ic_page_view_id(**components: Any) -> str:
+    """NUMVIEW Task 4.3：IC 頁第三步 view 身分；委由 `numeric_view.ic_page_view_id`（呼叫時經模組屬性解析）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    return _nv.ic_page_view_id(**components)
+
+
+def ic_view_identity_mismatch_error() -> type:
+    """NUMVIEW Task 4.3：IC 頁 view 身分不符之具名例外型別（`numeric_view.ICViewIdentityMismatchError`）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    return _nv.ICViewIdentityMismatchError
+
+
+def numeric_manifest_keys() -> Dict[str, str]:
+    """NUMVIEW Task 4.2：manifest 之 fingerprint／algorithm_id／路由身分／observed_arms 鍵名（角色→鍵名），讀契約
+    `manifest_keys`（Analysis／api 經本模組取用，解耦 R2／R3）。"""
+    from momentum.FeatureEngineering import numeric_view as _nv
+
+    return {k: str(v) for k, v in _nv.load_contract()["manifest_keys"].items() if not str(k).startswith("_")}
+
+
 def post_ic_entry_arm(entry: str) -> str:
     """NUMVIEW Task 3.4：post-IC 入口（契約 `post_ic_entries` 之鍵）之正式臂；委由 `numeric_view.post_ic_arm`
     （api 經本模組取用，解耦 R3）。"""

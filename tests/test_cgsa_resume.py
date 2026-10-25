@@ -5,10 +5,26 @@ from unittest.mock import Mock
 
 import pytest
 
+from momentum.FeatureEngineering import run_paths
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 from momentum.FeatureEngineering.feature_factory import FeatureFactory
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+#: NUMVIEW D7：CGSA 葉＝`<根>/<symbol>_<tf>_<完整 config_hash>/<完整 algorithm_id>`，續跑另比對 L7 manifest 之 algorithm_id
+_AID = "b" * 64
+
+
+def _leaf(root: Path, symbol: str, timeframe: str, config_hash: str) -> Path:
+    return run_paths.cgsa_work_dir(root, symbol, timeframe, config_hash, _AID)
+
+
+def _seed_leaf(root: Path, symbol: str, timeframe: str, config_hash: str) -> Path:
+    """建葉並寫身分檔（同工廠新建葉之狀態）；回傳葉。"""
+    leaf = _leaf(root, symbol, timeframe, config_hash)
+    leaf.mkdir(parents=True, exist_ok=True)
+    run_paths.write_cgsa_identity(leaf, run_paths.cgsa_identity_payload(symbol, timeframe, config_hash, _AID))
+    return leaf
 
 
 @pytest.fixture
@@ -50,7 +66,8 @@ def _write_complete_l7_manifest(
         "quality_status": "complete",
     }
     (run_dir / factory._storage.L7_V2_MANIFEST_NAME).write_text(
-        json.dumps({"artifacts": {"raw": {"schema_version": "raw_v2", **completeness}}}),
+        json.dumps({"artifacts": {"raw": {"schema_version": "raw_v2", **completeness, "algorithm_id": _AID}},
+                    "algorithm_id": _AID}),
         encoding="utf-8",
     )
 
@@ -64,10 +81,10 @@ def test_cgsa_deterministic_path(
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
 
-    registry_one = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "abcdef1234567890")
-    registry_two = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "abcdef1234567890")
+    registry_one = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "abcdef1234567890", algorithm_id=_AID)
+    registry_two = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "abcdef1234567890", algorithm_id=_AID)
 
-    expected = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_abcdef12").resolve()
+    expected = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_abcdef1234567890" / _AID).resolve()
     assert registry_one is not None
     assert registry_two is not None
     assert registry_one.work_dir == expected
@@ -82,15 +99,14 @@ def test_cgsa_resume_from_existing_manifest(
     """測試既有 manifest：應走 resume_from_manifest 而非新建 Registry。"""
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
-    work_dir = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_12345678").resolve()
-    work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = _seed_leaf(tmp_path / "data_cache" / "cgsa_work", "ETHUSDT", "1h", "1234567890abcdef")
     (work_dir / "manifest.json").write_text(json.dumps({"groups": []}), encoding="utf-8")
     expected_registry = ColumnGroupRegistry(work_dir=work_dir)
     resume_mock = Mock(return_value=expected_registry)
     monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", resume_mock)
     _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "1234567890abcdef")
 
-    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "1234567890abcdef")
+    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "1234567890abcdef", algorithm_id=_AID)
 
     assert registry is expected_registry
     resume_mock.assert_called_once_with(work_dir)
@@ -104,8 +120,7 @@ def test_cgsa_force_fresh_skips_existing_manifest(
     """測試 force_regenerate fresh run：既有 manifest 不應被 resume 重用。"""
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
-    work_dir = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_12345678").resolve()
-    work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = _seed_leaf(tmp_path / "data_cache" / "cgsa_work", "ETHUSDT", "1h", "1234567890abcdef")
     (work_dir / "manifest.json").write_text(json.dumps({"groups": []}), encoding="utf-8")
     resume_mock = Mock(return_value=ColumnGroupRegistry(work_dir=work_dir))
     monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", resume_mock)
@@ -114,7 +129,7 @@ def test_cgsa_force_fresh_skips_existing_manifest(
     _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "1234567890abcdef")
     feature_factory._cgsa_force_fresh = True
 
-    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "1234567890abcdef")
+    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "1234567890abcdef", algorithm_id=_AID)
 
     assert registry is not None
     assert registry is not resume_mock.return_value
@@ -142,11 +157,13 @@ def test_cgsa_config_hash_passed_correctly(
     monkeypatch.setattr(feature_factory, "_resolve_config", lambda override: config)
     monkeypatch.setattr(feature_factory, "_compute_config_hash", lambda *args, **kwargs: "1234567890abcdef")
 
-    def fake_prepare(symbol: str, timeframe: str, config_hash: str = "") -> ColumnGroupRegistry:
+    def fake_prepare(symbol: str, timeframe: str, config_hash: str = "", algorithm_id: str = "") -> ColumnGroupRegistry:
         captured["symbol"] = symbol
         captured["timeframe"] = timeframe
         captured["config_hash"] = config_hash
-        return ColumnGroupRegistry(work_dir=tmp_path / "cgsa_work" / f"{symbol}_{timeframe}_{config_hash[:8]}")
+        # NUMVIEW D7：algorithm_id 為本次 fingerprint 之 sha256（64 位十六進位）
+        captured["algorithm_id_is_sha256"] = str(len(algorithm_id) == 64 and int(algorithm_id, 16) >= 0)
+        return ColumnGroupRegistry(work_dir=tmp_path / "cgsa_work" / f"{symbol}_{timeframe}_{config_hash}")
 
     monkeypatch.setattr(feature_factory, "_prepare_cgsa_registry", fake_prepare)
 
@@ -162,6 +179,7 @@ def test_cgsa_config_hash_passed_correctly(
         "symbol": "ETHUSDT",
         "timeframe": "1h",
         "config_hash": "1234567890abcdef",
+        "algorithm_id_is_sha256": "True",
     }
 
 
@@ -174,14 +192,13 @@ def test_cgsa_corrupt_manifest_fallback(
     """測試損壞 manifest：應 fallback 為新 Registry，不得拋例外。"""
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
-    work_dir = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_deadbeef").resolve()
-    work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = _seed_leaf(tmp_path / "data_cache" / "cgsa_work", "ETHUSDT", "1h", "deadbeefcafefeed")
     (work_dir / "manifest.json").write_text("{", encoding="utf-8")
     # TESTREG Task 4.4：寫入完整 L7 manifest 使 resume 閘放行，流程方能抵達損壞 manifest 之後備分支
     _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "deadbeefcafefeed")
     caplog.set_level(logging.WARNING)
 
-    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "deadbeefcafefeed")
+    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "deadbeefcafefeed", algorithm_id=_AID)
 
     assert registry is not None
     assert registry.work_dir == work_dir
@@ -199,10 +216,10 @@ def test_cgsa_empty_config_hash(
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
 
-    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "")
+    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "", algorithm_id=_AID)
 
     assert registry is not None
-    assert registry.work_dir.name == "ETHUSDT_1h_nohash"
+    assert registry.work_dir.parent.name == "ETHUSDT_1h_nohash"  # NUMVIEW D7 ④：層名後綴 nohash
 
 
 def test_cgsa_special_chars_in_symbol(
@@ -214,10 +231,10 @@ def test_cgsa_special_chars_in_symbol(
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
 
-    registry = feature_factory._prepare_cgsa_registry("BTC/USDT:PERP", "1h", "1122334455667788")
+    registry = feature_factory._prepare_cgsa_registry("BTC/USDT:PERP", "1h", "1122334455667788", algorithm_id=_AID)
 
     assert registry is not None
-    assert registry.work_dir.name == "BTC_USDT_PERP_1h_11223344"
+    assert registry.work_dir.parent.name == "BTC_USDT_PERP_1h_1122334455667788"  # NUMVIEW D7：完整 config_hash
 
 
 def test_cgsa_work_dir_env_override(
@@ -229,10 +246,11 @@ def test_cgsa_work_dir_env_override(
     override_dir = tmp_path / "override_cgsa"
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(override_dir))
 
-    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "abcdef1234567890")
+    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "abcdef1234567890", algorithm_id=_AID)
 
     assert registry is not None
-    assert registry.work_dir == override_dir
+    # NUMVIEW D7 ①：覆寫值一律視為根，葉依身分導出於其下
+    assert registry.work_dir == _leaf(override_dir, "ETHUSDT", "1h", "abcdef1234567890")
 
 
 def test_cgsa_empty_manifest_json(
@@ -244,14 +262,13 @@ def test_cgsa_empty_manifest_json(
     """測試空 manifest.json：應 fallback 為新 Registry。"""
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
-    work_dir = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_a1b2c3d4").resolve()
-    work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = _seed_leaf(tmp_path / "data_cache" / "cgsa_work", "ETHUSDT", "1h", "a1b2c3d4ef567890")
     (work_dir / "manifest.json").write_text("", encoding="utf-8")
     # TESTREG Task 4.4：寫入完整 L7 manifest 使 resume 閘放行，流程方能抵達空 manifest 之後備分支
     _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "a1b2c3d4ef567890")
     caplog.set_level(logging.WARNING)
 
-    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "a1b2c3d4ef567890")
+    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "a1b2c3d4ef567890", algorithm_id=_AID)
 
     assert registry is not None
     assert registry.work_dir == work_dir
@@ -268,8 +285,7 @@ def test_cgsa_missing_npy_files_in_manifest(
     """測試 manifest 指向遺失 .npy：應跳過缺失 group 並維持可用 Registry。"""
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
-    work_dir = (tmp_path / "data_cache" / "cgsa_work" / "ETHUSDT_1h_ffeeddcc").resolve()
-    work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir = _seed_leaf(tmp_path / "data_cache" / "cgsa_work", "ETHUSDT", "1h", "ffeeddcc99887766")
     manifest_payload = {
         "groups": [
             {
@@ -304,7 +320,7 @@ def test_cgsa_missing_npy_files_in_manifest(
     np.save(work_dir / "present.npy", np.zeros((10, 1), dtype=np.float32))
     _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "ffeeddcc99887766")
 
-    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "ffeeddcc99887766")
+    registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "ffeeddcc99887766", algorithm_id=_AID)
 
     assert registry is not None
     assert sorted(group_id for group_id, _group in registry.iter_all()) == ["1h_L1_trend_SMA"]
@@ -571,8 +587,9 @@ def _generator(factory: object, monkeypatch: pytest.MonkeyPatch, *, parallel: bo
 
 
 def _checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, fail_12h_l2: bool = True) -> Path:
-    """第一次（循序）run：於 work_dir 留下兩週期之 L1 群組與（實作後）逐週期層狀態。"""
-    work_dir = (tmp_path / "work").resolve()
+    """第一次（循序）run：於 work_dir 留下兩週期之 L1 群組與（實作後）逐週期層狀態。work_dir＝覆寫根下本 run 之
+    D7 葉（含身分檔），供 `_resume_run` 經真實續跑閘取回。"""
+    work_dir = _seed_leaf((tmp_path / "cgsa_root").resolve(), "BTCUSDT", "1h", _CFG_HASH)
     factory = _CanonicalStubFactory(_resume_frames(), ColumnGroupRegistry(work_dir))
     gen, calls = _generator(factory, monkeypatch, parallel=False, fail_12h_l2=fail_12h_l2)
     gen.generate_multi_tf("BTCUSDT")
@@ -583,12 +600,13 @@ def _checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, fail_12h_l2:
 def _resume_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, feature_factory: FeatureFactory, work_dir: Path,
                 *, parallel: bool, write_l7: bool = True) -> tuple:
     """第二次 run：經真實 `_prepare_cgsa_registry` 之 resume 閘取得 registry，再走 MultiTF（spy resume 與逐層執行）。"""
-    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir))
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir.parent.parent))  # NUMVIEW D7：覆寫值＝根
     if write_l7:
         _write_complete_l7_manifest(feature_factory, "BTCUSDT", "1h", _CFG_HASH)
     spy = Mock(wraps=ColumnGroupRegistry.resume_from_manifest)
     monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", spy)
-    registry = feature_factory._prepare_cgsa_registry("BTCUSDT", "1h", _CFG_HASH)
+    registry = feature_factory._prepare_cgsa_registry("BTCUSDT", "1h", _CFG_HASH, algorithm_id=_AID)
+    assert registry.work_dir == work_dir
     factory = _CanonicalStubFactory(_resume_frames(), registry)
     gen, calls = _generator(factory, monkeypatch, parallel=parallel, fail_12h_l2=True)
     gen.generate_multi_tf("BTCUSDT")

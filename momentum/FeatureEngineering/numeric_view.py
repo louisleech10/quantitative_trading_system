@@ -30,8 +30,9 @@ REQUIRED_SECTIONS = (
 _ENTRY_ARM = "arm"
 _ENTRY_ARM_REF = "arm_ref"
 _ENTRY_ARM_POLICY = "arm_policy"
-#: IC 頁第三步記錄之槽（SPEC Task 2.2；契約 `ic_page_output_attrs`／`ic_page_response_keys` 之鍵；Task 4.3 另增）
-_IC_PAGE_RECORD_SLOTS: Tuple[str, ...] = ("arm", "ff_run_identity")
+#: IC 頁第三步記錄之槽（契約 `ic_page_output_attrs`／`ic_page_response_keys` 之鍵；Task 2.2：arm、ff_run_identity；
+#: Task 4.3：view_id、algorithm_id）
+_IC_PAGE_RECORD_SLOTS: Tuple[str, ...] = ("arm", "ff_run_identity", "view_id", "algorithm_id")
 
 
 class NumericPolicyError(ValueError):
@@ -223,8 +224,138 @@ def executed_post_ic_arm(groups: Mapping[str, Mapping[str, Any]]) -> str:
 
 def detect_capabilities() -> Dict[str, bool]:
     """能力旗標（契約 `capability_flags`：Polars、numba、scipy、statsmodels 可用性）之實測值（SPEC Task 0.2／4.1；
-    供 Task 4.2 寫入端傳入 `resolve_numeric_fingerprint(capabilities=...)`）。"""
-    raise NotImplementedError("NUMVIEW Task 4.1")
+    供 Task 4.2 寫入端傳入 `resolve_numeric_fingerprint(capabilities=...)`）。各旗標讀其所屬模組之既有可用性判定
+    （契約 `capability_flags._sources`）；契約旗標無對應判定 ⇒ `NumericPolicyError`。"""
+    from momentum.FeatureEngineering import polars_adapter
+    from momentum.FeatureEngineering.preprocessing import _numba_transforms, feature_preprocessor
+
+    probes = {
+        "polars_available": polars_adapter._check_polars_available,
+        "numba_available": lambda: _numba_transforms._HAS_NUMBA,
+        "scipy_available": lambda: feature_preprocessor.HAS_SCIPY,
+        "statsmodels_available": lambda: feature_preprocessor.HAS_STATSMODELS,
+    }
+    flags = list(load_contract()["capability_flags"].get("values") or [])
+    missing = [f for f in flags if f not in probes]
+    if missing:
+        raise NumericPolicyError(f"契約 capability_flags 無對應之可用性判定：{missing}")
+    return {flag: bool(probes[flag]()) for flag in flags}
+
+
+def library_version(name: str) -> str:
+    """函式庫版本之唯一讀取點（契約 `library_versions` 之發行套件名；`importlib.metadata`）。未安裝 ⇒ 記 `absent`。"""
+    import importlib.metadata
+
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "absent"
+
+
+def _real_items(node: Mapping[str, Any]) -> Dict[str, Any]:
+    return {k: v for k, v in node.items() if not str(k).startswith("_")}
+
+
+def _physical_ram_bytes() -> int:
+    """實體 RAM（呼叫時 import psutil；不可用或查詢拋錯 ⇒ `NumericContextUnresolvedError`，不以預設值代替）。"""
+    try:
+        import psutil
+    except ImportError as exc:
+        raise NumericContextUnresolvedError(
+            "硬體自動解析失敗：psutil 不可用；請以環境明設 FFACT_MEMORY_TIER 與 FFACT_L65_SLOWPATH_PARALLEL") from exc
+    try:
+        return int(psutil.virtual_memory().total)
+    except Exception as exc:  # noqa: BLE001 — 任何查詢失敗皆不可解析
+        raise NumericContextUnresolvedError(
+            f"硬體自動解析失敗：psutil.virtual_memory() 查詢拋錯（{exc}）；請以環境明設 FFACT_MEMORY_TIER 與 "
+            "FFACT_L65_SLOWPATH_PARALLEL") from exc
+
+
+_BOOL_TRUE = frozenset({"1", "true", "yes", "on"})
+_BOOL_FALSE = frozenset({"", "0", "false", "no", "off"})
+
+
+def _parse_token_value(text: str, domain: str) -> Tuple[bool, Any]:
+    """依契約 `domain` 語彙（以 | 連接）解析非 auto 之文字；回傳（合法與否, 正規化值）。"""
+    from momentum.FeatureEngineering.utils import hardware_utils
+
+    tokens = [t.strip() for t in str(domain).split("|")]
+    for token in tokens:
+        try:
+            if token in ("positive_int", "non_negative_int"):
+                number = int(text)
+                if number >= (1 if token == "positive_int" else 0):
+                    return True, number
+            elif token in ("float", "ratio"):
+                number = float(text)
+                if token == "float" or 0.0 <= number <= 1.0:
+                    return True, number
+            elif token == "size_bytes":
+                parsed = hardware_utils._parse_size_bytes(text)
+                if parsed is not None and parsed > 0:
+                    return True, parsed
+            elif token in ("path", "str"):
+                return True, text
+        except ValueError:
+            continue
+    return False, None
+
+
+def _selector_entry(key: str, spec: Mapping[str, Any], raw: Optional[str], tier_config: Mapping[str, Any],
+                    tier: str, polars_on: bool) -> Dict[str, Any]:
+    """單一 value_affecting 選擇子之解析後有效值（契約 `selectors.<key>` 之 default／domain／tier_field／resolution）。
+    合法 ⇒ {value, invalid_env: False}；不合法 ⇒ 退回 default 之有效值、`invalid_env: True`、`raw`＝原始字串。"""
+    text = None if raw is None else str(raw).strip()
+    default = spec.get("default")
+    domain = spec.get("domain")
+    resolution = spec.get("resolution")
+    if resolution == "memory_tier":
+        return {"value": tier, "invalid_env": False}
+    if resolution == "polars_effective":
+        return {"value": "1" if polars_on else "0", "invalid_env": False}
+    if resolution == "slowpath_parallel":
+        raise AssertionError("slowpath_parallel 由 _slowpath_entry 解析")
+    effective_text = default if text is None or text == "" else text
+    invalid = False
+    if effective_text is None:
+        value: Any = None
+    elif isinstance(domain, list):
+        if effective_text in domain:
+            value = effective_text
+        else:
+            invalid, value = True, default
+    elif effective_text == "auto" and "auto" in str(domain).split("|"):
+        value = "auto"
+    else:
+        ok, value = _parse_token_value(effective_text, str(domain))
+        if not ok:
+            invalid = True
+            value = default
+            if value is not None and value != "auto":
+                _ok, value = _parse_token_value(str(value), str(domain))
+    if value == "auto" and spec.get("tier_field"):
+        value = tier_config[spec["tier_field"]]
+    entry: Dict[str, Any] = {"value": value, "invalid_env": invalid}
+    if invalid:
+        entry["raw"] = text
+    return entry
+
+
+def _slowpath_entry(raw: Optional[str], ram_bytes: Optional[int]) -> Dict[str, Any]:
+    """slow-path 平行之有效值（`core/config.py:get_slowpath_parallel_enabled` 之語意）：明設真／假值 ⇒ 該值；未設或
+    非法 ⇒ 實體 RAM ≥ 12 GB（非法另帶 invalid_env 與原始字串）；需自動判定而 RAM 不可解析 ⇒ 由呼叫端先拋。"""
+    if raw is not None:
+        text = str(raw).strip().lower()
+        if text in _BOOL_TRUE:
+            return {"value": True, "invalid_env": False}
+        if text in _BOOL_FALSE:
+            return {"value": False, "invalid_env": False}
+    if ram_bytes is None:
+        raise NumericContextUnresolvedError("slow-path 自動判定需實體 RAM 而無法解析")
+    entry: Dict[str, Any] = {"value": ram_bytes / 1024 ** 3 >= 12.0, "invalid_env": raw is not None}
+    if raw is not None:
+        entry["raw"] = str(raw).strip()
+    return entry
 
 
 def resolve_numeric_fingerprint(
@@ -237,26 +368,130 @@ def resolve_numeric_fingerprint(
     `value_affecting` 選擇子之**解析後有效值**（非原始字串；非法值記退回後之有效值並帶 `invalid_env` 標記）、
     能力旗標、函式庫版本、算法版本常數、表示層（codec 開關、float16 判定常數）、硬體自動解析之有效值
     （契約 `auto_resolutions`）。只讀 `environ` 中契約登記之鍵。不可解析之 auto 情境 ⇒ `NumericContextUnresolvedError`。
-    執行後觀測之實際臂（`observed_arms`）不入本 fingerprint。"""
-    raise NotImplementedError("NUMVIEW Task 4.1")
+    執行後觀測之實際臂（`observed_arms`）不入本 fingerprint。
+
+    `environ` 逐鍵查（不迭代）；能力旗標逐旗標查。`preprocessing_config` 之值已入 `config_hash` 之設定本體、其合法性由
+    臂分派前之 `validate_preprocessing_policy` 驗（Task 2.1），故不重複入 fingerprint、亦不於此驗（介面依 SPEC Task 4.1）。"""
+    from momentum.FeatureEngineering import memory_budget, polars_adapter
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+    from momentum.FeatureEngineering.utils import hardware_utils
+
+    contract = load_contract()
+    selectors = {k: v for k, v in _real_items(contract["selectors"]).items()
+                 if isinstance(v, Mapping) and v.get("class") == "value_affecting"}
+    raws = {key: environ.get(key) for key in sorted(selectors)}
+    flags = list(contract["capability_flags"].get("values") or [])
+    caps = {flag: bool(capabilities[flag]) for flag in flags}
+
+    by_resolution = {spec.get("resolution"): key for key, spec in selectors.items() if spec.get("resolution")}
+    tier_key, slow_key, polars_key = (by_resolution.get(r) for r in ("memory_tier", "slowpath_parallel",
+                                                                    "polars_effective"))
+    if tier_key is None or slow_key is None or polars_key is None:
+        raise NumericPolicyError(f"契約 selectors 缺 resolution 特例鍵：{sorted(by_resolution)}")
+
+    tier_selector = memory_budget.normalize_selectors({tier_key: raws[tier_key] or ""})[tier_key]
+    slow_raw = raws[slow_key]
+    slow_explicit = slow_raw is not None and str(slow_raw).strip().lower() in (_BOOL_TRUE | _BOOL_FALSE)
+    ram_bytes: Optional[int] = None
+    if tier_selector == "auto" or not slow_explicit:
+        ram_bytes = _physical_ram_bytes()
+    if tier_selector == "auto":
+        total_gb = ram_bytes / 1024 ** 3
+        tier = next((t for threshold, t in hardware_utils.TIER_THRESHOLDS if total_gb >= threshold), None)
+        if tier is None:
+            raise NumericContextUnresolvedError(f"實體 RAM {total_gb:.2f} GB 不落於任何 TIER_THRESHOLDS")
+    else:
+        tier = tier_selector
+    tier_config = dict(hardware_utils.get_tier_config(tier))
+    tier_config["concurrent_symbols"] = hardware_utils._CONCURRENT_SYMBOLS_BY_TIER_GB.get(
+        hardware_utils._parse_tier_gb(tier), 1)  # 明設覆寫另記於 selectors 段（只讀傳入之 environ）
+
+    polars_flag = next((f for f in flags if "polars" in f), None)
+    polars_available = polars_adapter._polars_available
+    if polars_available is None:
+        polars_available = polars_adapter._check_polars_available()
+    polars_selected = memory_budget.normalize_selectors({polars_key: raws[polars_key] or ""})[polars_key] == "1"
+    polars_on = polars_selected and bool(polars_available) and (polars_flag is None or caps[polars_flag])
+
+    selector_section: Dict[str, Any] = {}
+    for key, spec in sorted(selectors.items()):
+        raw = raws[key]
+        if key in memory_budget.SELECTORS and key not in (tier_key, polars_key):
+            normalized = memory_budget.normalize_selectors({key: raw or ""})[key]
+            value: Any = normalized
+            if normalized == "auto" and spec.get("tier_field"):
+                value = tier_config[spec["tier_field"]]
+            elif normalized.isdigit():
+                value = int(normalized)
+            selector_section[key] = {"value": value, "invalid_env": False}
+        elif key == slow_key:
+            selector_section[key] = _slowpath_entry(raw, ram_bytes)
+        else:
+            selector_section[key] = _selector_entry(key, spec, raw, tier_config, tier, polars_on)
+
+    entries = _real_items(contract["post_ic_entries"])
+    fingerprint = {
+        "contract_policy": {name: post_ic_arm(name) for name in sorted(entries)},
+        "selectors": selector_section,
+        "capabilities": caps,
+        "library_versions": {name: library_version(name)
+                             for name in list(contract["library_versions"].get("values") or [])},
+        "algorithm_versions": _real_items(contract["algorithm_versions"]),
+        "representation": {"float16_max_rel_error": FeatureStorage.FLOAT16_MAX_REL_ERROR,
+                           "float16_max_abs_error": FeatureStorage.FLOAT16_MAX_ABS_ERROR},
+        "auto_resolutions": {"memory_tier": tier, "tier_config": tier_config,
+                             "slowpath_parallel": selector_section[slow_key]["value"]},
+    }
+    expected = list(contract["fingerprint_sections"].get("values") or [])
+    if sorted(fingerprint) != sorted(expected):
+        raise NumericPolicyError(f"fingerprint 段 {sorted(fingerprint)} ≠ 契約 fingerprint_sections {sorted(expected)}")
+    return fingerprint
+
+
+def _canonical_json(obj: Any) -> str:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
 
 def algorithm_id(fingerprint: Mapping[str, Any]) -> str:
     """fingerprint 正規 JSON（`sort_keys`、無空白）之 sha256 hex（SPEC Task 4.1）。"""
-    raise NotImplementedError("NUMVIEW Task 4.1")
+    import hashlib
+
+    return hashlib.sha256(_canonical_json(fingerprint).encode("utf-8")).hexdigest()
 
 
 def config_hash_salt(fingerprint: Mapping[str, Any]) -> Dict[str, Any]:
     """`config_hash` 鹽＝fingerprint 去除函式庫版本段（設計選擇①；鹽鍵名與排除段見契約 `config_hash_salt`；
     SPEC Task 4.1／4.2）。"""
-    raise NotImplementedError("NUMVIEW Task 4.1")
+    excluded = set(load_contract()["config_hash_salt"].get("exclude_sections") or [])
+    if not excluded:
+        raise NumericPolicyError("契約 config_hash_salt.exclude_sections 未填")
+    return {k: v for k, v in fingerprint.items() if k not in excluded}
+
+
+def route_point_certified(point: str) -> bool:
+    """換臂點是否為已認證等價（契約 `auto_resolutions.route_switch_points[<點>].certified is True`；未登記 ⇒ 未認證）。"""
+    points = load_contract()["auto_resolutions"].get("route_switch_points") or {}
+    node = points.get(point)
+    return isinstance(node, Mapping) and node.get("certified") is True
 
 
 def route_identity(route_records: Sequence[Mapping[str, Any]]) -> str:
     """run 之事後路由身分（SPEC Task 4.1 ⑨）：全部**未認證**換臂點之〔換臂點、群組、所選臂〕排序後正規 JSON 之
     sha256；只含已認證換臂點（`FeatureFactory.L2_ROUTE_CERTIFIED` 機制所登錄者）之紀錄不入；無未認證換臂 ⇒
     契約 `auto_resolutions` 所定之空值摘要。同一換臂點多次觸發逐次逐群組計入、不去重（邊界⑤）。"""
-    raise NotImplementedError("NUMVIEW Task 4.1")
+    import hashlib
+
+    empty = load_contract()["auto_resolutions"].get("route_identity_empty")
+    if not empty:
+        raise NumericPolicyError("契約 auto_resolutions.route_identity_empty 未填")
+    rows = sorted(
+        [str(r.get("point")), "" if r.get("group") is None else str(r.get("group")), str(r.get("to"))]
+        for r in route_records
+        if r.get("from") != r.get("to") and not route_point_certified(str(r.get("point")))
+    )
+    if not rows:
+        return str(empty)
+    return hashlib.sha256(_canonical_json(rows).encode("utf-8")).hexdigest()
 
 
 def ic_page_view_id(
@@ -269,4 +504,15 @@ def ic_page_view_id(
 ) -> str:
     """IC 頁第三步 view 身分 `view_id`＝sha256(正規 JSON：run 身分、轉換設定、臂、`algorithm_id`、有序 `kept_cols`)；
     組成與正規化規則見契約 `ic_page_view_identity`。`kept_cols` 以原順序入身分（不排序；SPEC Task 4.3、R7-A）。"""
-    raise NotImplementedError("NUMVIEW Task 4.3")
+    import hashlib
+
+    section = load_contract()["ic_page_view_identity"]
+    values = {"run_identity": None if run_identity is None else dict(run_identity),
+              "transform_config": dict(transform_config), "arm": arm, "algorithm_id": algorithm_id,
+              "kept_cols": [str(c) for c in kept_cols]}
+    components = list(section.get("components") or [])
+    if sorted(components) != sorted(values):
+        raise NumericPolicyError(f"契約 ic_page_view_identity.components {components} ≠ {sorted(values)}")
+    payload = {name: values[name] for name in components}
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()

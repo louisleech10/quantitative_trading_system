@@ -198,6 +198,14 @@ ENV_UNRESOLVED_SITES: Dict[str, str] = {
         "只寫回快照之舊值（鍵＝`_BATCH_THREAD_ENV_KEYS` 之快照），不讀值決策；批次服務不在凍結路徑",
     "api/services/feature_factory_service.py::_temporary_environ":
         "寫入 API 請求覆寫並於離開時還原；鍵由請求之 env_overrides 決定，凍結不經此服務（生成經 `_isolated` 直呼 factory）",
+    # NUMVIEW Task 4.1／4.3：fingerprint 解析器逐鍵讀契約 selectors 之 value_affecting 鍵（皆 `FFACT_` 前綴、屬清除類）；
+    # 呼叫端只把整個 os.environ 交給解析器，不另讀值
+    "momentum/FeatureEngineering/numeric_view.py::resolve_numeric_fingerprint":
+        "鍵名迭代自契約 selectors 之 value_affecting 鍵（全為 FFACT_ 前綴，屬清除類）；只讀不寫",
+    "momentum/FeatureEngineering/feature_factory.py::_numeric_fingerprint":
+        "把 os.environ 整體交給 numeric_view.resolve_numeric_fingerprint（只讀契約登記之 FFACT_ 鍵）；本身不讀值",
+    "momentum/factories.py::numeric_algorithm_id":
+        "把 os.environ 整體交給 numeric_view.resolve_numeric_fingerprint（只讀契約登記之 FFACT_ 鍵）；本身不讀值",
 }
 
 
@@ -465,8 +473,12 @@ def _ic_page_run_in_env(handle: Any, work: Path) -> Tuple[Any, Dict[str, Any], L
 
     task_id = f"numview_freeze_{os.getpid()}_{time.time_ns()}"
     saved_cwd, saved_library = os.getcwd(), svc._feature_library
+    # NUMVIEW Task 4.3：IC 頁比對任務報告之 run 身分（設計選擇⑦）⇒ 報告帶 IC 當時（＝本 run）之身分
+    _frame, run_identity = library.load_with_identity(handle.symbol, handle.tf, config_hash=handle.config_hash)
+    del _frame
     svc._tasks[task_id] = {"req_features_path": str(Path(handle.run_dir) / "feature_manifest.json"),
-                           "result": {"analysis_status": "ok_oos", "oos_guarantees": True}}
+                           "result": {"analysis_status": "ok_oos", "oos_guarantees": True,
+                                      "metadata": {"ff_run_identity": run_identity.to_dict()}}}
     FeaturePreprocessor.transform_selected = spy_ts  # type: ignore[assignment]
     try:
         os.chdir(str(work))

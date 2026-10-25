@@ -60,8 +60,8 @@ RunIdentity 漏新鍵；`_check_object` 不遞迴；倖存者契約版本不升�
   `manifest_keys.{fingerprint, algorithm_id, observed_arms}`（角色→鍵名；頂層與 artifact 節點同名）、`run_identity_new_keys`。
 
 資料：Task 4.1 為純函式（秒級；不讀特徵資料）；Task 4.2 一律真實 kline 短窗（`preprov_helpers`，格 `h1_stat_off`、
-`ic_first`），每個生成於模組範圍只做一次；`FFACT_FEATURE_REGISTRY_PATH` 屬 `value_affecting`（SPEC Task 0.2），
-故本檔各隔離根共用同一 registry 路徑，使同設定之 run 身分相同。重型：單行程串行。
+`ic_first`），每個生成於模組範圍只做一次；本檔各隔離根共用同一 registry 路徑（`FFACT_FEATURE_REGISTRY_PATH` 於 SPEC
+v44 前屬 value_affecting 時所需；v44 起屬 output_only，共用無害）。重型：單行程串行。
 實作前應為紅（契約未填、`numeric_view` 為 NotImplementedError、接縫未建）；不得以 skip／xfail 暫避。
 """
 
@@ -1254,7 +1254,7 @@ def _gen(root: Path, registry_path: Path, *, cell: str = CELL, fresh: bool = Tru
 
         def iso(inner: pytest.MonkeyPatch, work: Path, spec: Mapping[str, Any]) -> Path:
             out = real_iso(inner, work, spec)
-            inner.setenv("FFACT_FEATURE_REGISTRY_PATH", str(registry_path))  # value_affecting：各根共用同一路徑
+            inner.setenv("FFACT_FEATURE_REGISTRY_PATH", str(registry_path))  # 各根共用同一 registry 路徑（v44 前此鍵屬 value_affecting）
             return out
 
         mp.setattr(ph, "_isolate", iso)
@@ -1835,6 +1835,38 @@ def test_boundary_49_ic_first_processed_node_carries_identity(ic_first_run: GenR
         assert node[key] == manifest[key], key
     identity = rp.resolve_run_identity(manifest, "processed")
     assert identity.algorithm_id == manifest[mk["algorithm_id"]] and getattr(identity, rk) == manifest[rk]
+
+
+def test_scheduling_only_keys_change_parallelism_not_values(registry_path: Path,
+                                                             tmp_path_factory: pytest.TempPathFactory) -> None:
+    """SPEC v44 ⑥（使用者 2026-10-25 選「分工設定不算進指紋」）：批次分工兩鍵（契約 `scheduling_only_keys`）只改 L6.5
+    slow-path 之 n_jobs、不改值——同一真實短窗（`h1_stat_on`：fracdiff／ADF 走 slow-path）於強制 slow-path 平行下，不設兩鍵與
+    設兩鍵（批次情境）各生成一次：前提＝實際觀測之 n_jobs 不同（平行 ≥2、批次 1）；斷言＝config_hash 相同（兩鍵不入身分）、
+    raw 值指紋逐位元相同。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    keys = list(RAW["selector_classes"].get("scheduling_only_keys") or [])
+    assert sorted(keys) == ["FFACT_BATCH_NESTED", "FFACT_BATCH_SYMBOL_CONCURRENCY"], keys
+    real = FeaturePreprocessor._resolve_slowpath_n_jobs
+    seen: Dict[str, List[int]] = {}
+    runs: Dict[str, GenRun] = {}
+    for tag, extra in (("parallel", {}), ("batch", {"FFACT_BATCH_NESTED": "1", "FFACT_BATCH_SYMBOL_CONCURRENCY": "2"})):
+        def spy(self: Any, _tag: str = tag) -> int:
+            n = real(self)
+            seen.setdefault(_tag, []).append(int(n))
+            return n
+
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setitem(ph.FIXED_ENV, SLOWPATH_KEY, "1")
+            for key, value in extra.items():
+                mp.setitem(ph.FIXED_ENV, key, value)
+            mp.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", spy)
+            runs[tag] = _gen(tmp_path_factory.mktemp(f"numview_sched_{tag}"), registry_path, cell="h1_stat_on")
+    assert seen.get("parallel") and min(seen["parallel"]) >= 2, f"前提不成立：平行情境之 n_jobs {seen.get('parallel')}"
+    assert seen.get("batch") and set(seen["batch"]) == {1}, f"前提不成立：批次情境之 n_jobs {seen.get('batch')}"
+    assert runs["parallel"].handle.config_hash == runs["batch"].handle.config_hash
+    assert nh.bitwise_diff(nh.fingerprints(runs["parallel"].handle.run_dir, "raw"),
+                           nh.fingerprints(runs["batch"].handle.run_dir, "raw")) == []
 
 
 # ============================================================================================== Task 4.2 mutation

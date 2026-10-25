@@ -1788,7 +1788,12 @@ def _tf_worker_entry(
         # layer methods can persist their groups, and so L3-L6 persist calls
         # below have a valid registry to write to.
         factory._cgsa_force_fresh = True
-        factory._cgsa_registry = factory._prepare_cgsa_registry(symbol, timeframe, "worker")
+        # NUMVIEW D7：worker 暫存葉之身分帶本行程之 algorithm_id（同身分沿用同一葉、不續跑；避免每次移為 .stale-*）
+        from momentum.FeatureEngineering import numeric_view as _numeric_view
+
+        worker_algorithm_id = _numeric_view.algorithm_id(factory._numeric_fingerprint(config))
+        factory._cgsa_registry = factory._prepare_cgsa_registry(symbol, timeframe, "worker",
+                                                                algorithm_id=worker_algorithm_id)
 
         from momentum.FeatureEngineering.warmup_window import (
             ingest_layer0_start_date,

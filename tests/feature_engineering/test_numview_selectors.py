@@ -2,21 +2,21 @@
 
 契約＝`momentum/FeatureEngineering/contracts/numeric_view.json`（SPEC §C 唯一真相源）。本檔不寫任何分類判斷（Task 0.2
 「不可做」：只讀契約），只用 SPEC 點名之字面：類別 `value_affecting`／`output_only`／`non_value`／`certified_equal`、
-Task 0.2 所列 `output_only` 封閉五鍵、`FFACT_FEATURE_REGISTRY_PATH`、`FFACT_L7_CODEC_UPGRADE`、`FFACT_L3_PERSIST_MODE`、
+Task 0.2 所列 `output_only` 封閉清單、`FFACT_FEATURE_REGISTRY_PATH`、`FFACT_L7_CODEC_UPGRADE`、`FFACT_L3_PERSIST_MODE`、
 既有機制名 `FeatureFactory.L2_ROUTE_CERTIFIED`。
 
 驗證（Task 0.2）：AST 掃描 `git ls-files 'momentum/*.py' 'api/*.py'` 之全部字串常值符合 `^FFACT_[A-Z0-9_]+$` 者
 （不設檔案白名單；`os.getenv`、`os.environ[...]`、`selector(...)`、寫入子行程環境者一律為字串常值）＝契約 `selectors`
 鍵集（多 ⇒「未登記」紅、少 ⇒「過期登記」紅）；分類讀契約 `selector_classes`：除 `output_only_keys` 外一律
-`value_affecting`，`output_only_keys` 恰為 SPEC 五鍵且標 `output_only`；無 `non_value`；`certified_equal` 只限既有
-`L2_ROUTE_CERTIFIED` 機制（現為空集合 ⇒ 實際不得有）；`FFACT_FEATURE_REGISTRY_PATH` 為 `value_affecting`；每鍵具非空
+`value_affecting`，`output_only_keys` 恰為 SPEC 封閉清單且標 `output_only`；無 `non_value`；`certified_equal` 只限既有
+`L2_ROUTE_CERTIFIED` 機制（現為空集合 ⇒ 實際不得有）；`FFACT_FEATURE_REGISTRY_PATH` 屬 `output_only` 封閉清單（v44）；每鍵具非空
 `reason`、`parser` 與 `_sources`（`path:line`，該行含該鍵）；`memory_budget.SELECTORS ∪ NON_ARM_FFACT_KEYS ⊆ selectors`；
 `capability_flags.values` 非空；掃描＋全部檢查 < 10 秒。
 驗證（Task 4.4）：`numeric_view.resolve_numeric_fingerprint` 實際讀取之環境鍵集合（以記錄存取之 Mapping 觀測）＝契約
 `value_affecting` 鍵集合（`output_only` 鍵不得被讀）。
 邊界：03（Task 0.2 邊界①）鍵名以 f-string／串接組成 ⇒ AST 另掃 `JoinedStr`／`BinOp`／`.format` 含 `FFACT_` 前綴者即紅；
 04（Task 0.2 邊界②）`api/` 只寫入子行程環境而不讀之鍵同樣須登記；55（Task 4.4 邊界①）契約有不屬
-{`value_affecting`、`output_only`（限 SPEC 五鍵）、`certified_equal`（限 L2 機制）} 之類別 ⇒ 紅；56（Task 4.4 邊界②）
+{`value_affecting`、`output_only`（限 SPEC 封閉清單）、`certified_equal`（限 L2 機制）} 之類別 ⇒ 紅；56（Task 4.4 邊界②）
 能力旗標新增即須被解析器讀取。
 mutation（Task 0.2）：於 `feature_preprocessor.py` 暫加 `os.getenv("FFACT_NUMVIEW_MUTANT")`（經掃描器讀檔接縫注入，不改
 實檔）⇒ 紅；契約刪 `FFACT_L7_CODEC_UPGRADE` ⇒ 紅；任一鍵標 `non_value` ⇒ 紅；`output_only` 集合增一鍵／減一鍵 ⇒ 紅；
@@ -69,11 +69,15 @@ VALUE_AFFECTING = "value_affecting"
 OUTPUT_ONLY = "output_only"
 NON_VALUE = "non_value"
 CERTIFIED_EQUAL = "certified_equal"
-#: SPEC Task 0.2 之 `output_only` 封閉清單（增列須改 SPEC）
+#: SPEC Task 0.2 之 `output_only` 封閉清單（增列須改 SPEC；v44 增 `FFACT_FEATURE_REGISTRY_PATH`：run registry 路徑，
+#: 生成端只寫入條目、不讀之作計算）
 SPEC_OUTPUT_ONLY_KEYS = frozenset({
     "FFACT_CGSA_WORK_DIR", "FFACT_API_LOG_PATH", "FFACT_CHILD_METRICS_PATH", "FFACT_LAYER_METRICS_PATH",
-    "FFACT_UVICORN_ACCESS_LOG",
+    "FFACT_UVICORN_ACCESS_LOG", "FFACT_FEATURE_REGISTRY_PATH",
 })
+#: SPEC v44 ⑥ 之 `scheduling_only` 封閉清單（批次分工兩鍵；使用者 2026-10-25 選「分工設定不算進指紋」）
+SCHEDULING_ONLY = "scheduling_only"
+SPEC_SCHEDULING_ONLY_KEYS = frozenset({"FFACT_BATCH_NESTED", "FFACT_BATCH_SYMBOL_CONCURRENCY"})
 #: 既有認證機制（`feature_factory.py:1803`）
 L2_MECHANISM_NAME = "L2_ROUTE_CERTIFIED"
 CERTIFIED_BY_FIELD = "certified_by"
@@ -220,9 +224,9 @@ def registration_violations(scan: ScanResult, contract: Mapping[str, Any]) -> Li
 
 
 def selector_class_violations(contract: Mapping[str, Any], certified_mechanism: frozenset) -> List[str]:
-    """分類：類別值集讀契約；除 `output_only_keys` 外一律 `value_affecting`；`output_only_keys` 恰為 SPEC 五鍵且標
-    `output_only`；不得 `non_value`；`certified_equal` 只限 `L2_ROUTE_CERTIFIED` 機制（非空且該鍵 `certified_by` 指之）；
-    `FFACT_FEATURE_REGISTRY_PATH` 須 `value_affecting`。"""
+    """分類：類別值集讀契約；除 `output_only_keys` 外一律 `value_affecting`；`output_only_keys` 恰為 SPEC 封閉清單且標
+    `output_only`；不得 `non_value`；`certified_equal` 只限 `L2_ROUTE_CERTIFIED` 機制（非空且該鍵 `certified_by` 指之）。
+    （v44 前另斷言 `FFACT_FEATURE_REGISTRY_PATH` 須 `value_affecting`；v44 改列封閉清單，由上列清單斷言涵蓋。）"""
     out: List[str] = []
     classes_node = contract["selector_classes"]
     classes = list(classes_node.get("values") or [])
@@ -231,8 +235,11 @@ def selector_class_violations(contract: Mapping[str, Any], certified_mechanism: 
             out.append(f"selector_classes.values 缺 SPEC 類別 {literal!r}")
     output_only = set(classes_node.get("output_only_keys") or [])
     if output_only != SPEC_OUTPUT_ONLY_KEYS:
-        out.append(f"output_only_keys 與 SPEC 五鍵不等：多 {sorted(output_only - SPEC_OUTPUT_ONLY_KEYS)}、"
+        out.append(f"output_only_keys 與 SPEC 封閉清單不等：多 {sorted(output_only - SPEC_OUTPUT_ONLY_KEYS)}、"
                    f"少 {sorted(SPEC_OUTPUT_ONLY_KEYS - output_only)}")
+    scheduling_only = set(classes_node.get("scheduling_only_keys") or [])
+    if scheduling_only != SPEC_SCHEDULING_ONLY_KEYS:
+        out.append(f"scheduling_only_keys 與 SPEC v44 清單不等：{sorted(scheduling_only)}")
     for key, sel in sorted(_selectors(contract).items()):
         cls = sel.get("class") if isinstance(sel, Mapping) else None
         if cls not in classes:
@@ -244,16 +251,18 @@ def selector_class_violations(contract: Mapping[str, Any], certified_mechanism: 
                 out.append(f"{key}：標 certified_equal 而非經既有 {L2_MECHANISM_NAME} 機制所登錄")
         elif cls == OUTPUT_ONLY:
             if key not in SPEC_OUTPUT_ONLY_KEYS or key not in output_only:
-                out.append(f"{key}：標 output_only 而不屬 SPEC 封閉五鍵／output_only_keys")
+                out.append(f"{key}：標 output_only 而不屬 SPEC 封閉清單／output_only_keys")
+        elif cls == SCHEDULING_ONLY:
+            if key not in SPEC_SCHEDULING_ONLY_KEYS or key not in scheduling_only:
+                out.append(f"{key}：標 scheduling_only 而不屬 SPEC v44 封閉清單／scheduling_only_keys")
         elif cls != VALUE_AFFECTING:
-            out.append(f"{key}：類別 {cls!r} 非 value_affecting／output_only／certified_equal")
+            out.append(f"{key}：類別 {cls!r} 非 value_affecting／output_only／scheduling_only／certified_equal")
         if key in output_only and cls != OUTPUT_ONLY:
             out.append(f"{key}：列於 output_only_keys 而類別為 {cls!r}")
         if key in SPEC_OUTPUT_ONLY_KEYS and cls != OUTPUT_ONLY:
-            out.append(f"{key}：SPEC 五鍵之一而類別為 {cls!r}")
-    registry = _selectors(contract).get("FFACT_FEATURE_REGISTRY_PATH")
-    if not isinstance(registry, Mapping) or registry.get("class") != VALUE_AFFECTING:
-        out.append("FFACT_FEATURE_REGISTRY_PATH 須登記為 value_affecting")
+            out.append(f"{key}：SPEC 封閉清單之一而類別為 {cls!r}")
+        if key in SPEC_SCHEDULING_ONLY_KEYS and cls != SCHEDULING_ONLY:
+            out.append(f"{key}：SPEC v44 scheduling_only 清單之一而類別為 {cls!r}")
     return out
 
 
@@ -407,8 +416,8 @@ def test_scan_covers_full_git_scope_without_whitelist() -> None:
 
 
 def test_selector_classes_follow_spec() -> None:
-    """Task 0.2：分類讀契約；除 SPEC 五鍵（`output_only`）外一律 `value_affecting`；無 `non_value`；`certified_equal`
-    只限 `L2_ROUTE_CERTIFIED`（現為空集合）；`FFACT_FEATURE_REGISTRY_PATH` 為 `value_affecting`。"""
+    """Task 0.2：分類讀契約；除 SPEC 封閉清單（`output_only`）外一律 `value_affecting`；無 `non_value`；`certified_equal`
+    只限 `L2_ROUTE_CERTIFIED`（現為空集合）；`FFACT_FEATURE_REGISTRY_PATH` 屬封閉清單（v44）。"""
     assert selector_class_violations(nv.load_contract(), FeatureFactory.L2_ROUTE_CERTIFIED) == []
 
 
@@ -485,9 +494,9 @@ def test_boundary_04_api_child_env_write_only_keys_registered() -> None:
 @pytest.mark.parametrize("bad", ["non_value", "numview_unknown_class", "certified_equal", "output_only"])
 def test_boundary_55_contract_class_outside_allowed_set_red(bad: str, monkeypatch: pytest.MonkeyPatch,
                                                            resolver_reads: Tuple[Set[str], Set[str]]) -> None:
-    """邊界①（SPEC Task 4.4）：本票無排除；契約有不屬 {`value_affecting`、`output_only`（限 SPEC 五鍵）、
+    """邊界①（SPEC Task 4.4）：本票無排除；契約有不屬 {`value_affecting`、`output_only`（限 SPEC 封閉清單）、
     `certified_equal`（限既有 `L2_ROUTE_CERTIFIED` 機制）} 之鍵 ⇒ 連動閘紅。（SPEC 該句字面為「遇契約有非
-    `value_affecting` 鍵即紅」，與 Task 0.2 之 `output_only` 五鍵矛盾；本案依 Task 0.2 例外解讀。）"""
+    `value_affecting` 鍵即紅」，與 Task 0.2 之 `output_only` 封閉清單矛盾；本案依 Task 0.2 例外解讀。）"""
     assert resolver_link_violations(*resolver_reads) == []
     mutated = copy.deepcopy(RAW_CONTRACT)
     key = _first_value_affecting_key(mutated)
@@ -549,7 +558,7 @@ def test_mutation_any_key_non_value_red(monkeypatch: pytest.MonkeyPatch) -> None
 
 @pytest.mark.parametrize("direction", ["add_one", "remove_one"])
 def test_mutation_output_only_set_differs_from_spec_five(direction: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutation：契約 `output_only` 集合與 SPEC 五鍵不等（增一鍵或減一鍵；類別同步改）⇒ 紅。"""
+    """mutation：契約 `output_only` 集合與 SPEC 封閉清單不等（增一鍵或減一鍵；類別同步改）⇒ 紅。"""
     assert selector_class_violations(RAW_CONTRACT, FeatureFactory.L2_ROUTE_CERTIFIED) == []
     mutated = copy.deepcopy(RAW_CONTRACT)
     keys = list(mutated["selector_classes"]["output_only_keys"])
@@ -564,7 +573,7 @@ def test_mutation_output_only_set_differs_from_spec_five(direction: str, monkeyp
     mutated["selector_classes"]["output_only_keys"] = keys
     monkeypatch.setattr(nv, "load_contract", lambda: copy.deepcopy(mutated))
     violations = selector_class_violations(nv.load_contract(), FeatureFactory.L2_ROUTE_CERTIFIED)
-    assert any(v.startswith("output_only_keys 與 SPEC 五鍵不等") for v in violations), violations
+    assert any(v.startswith("output_only_keys 與 SPEC 封閉清單不等") for v in violations), violations
 
 
 @pytest.mark.parametrize("with_mechanism_field", [False, True], ids=["no_certified_by", "certified_by_but_empty"])

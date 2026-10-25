@@ -772,6 +772,9 @@ export function useICAnalysis() {
         // NUMVIEW Task 2.2：實際執行之 post-IC 臂與來源特徵 run 身分
         post_ic_arm?: string | null;
         ff_run_identity?: Record<string, unknown> | null;
+        // NUMVIEW Task 4.3：不可變 view 身分（輸出檔名含之）與本次轉換之數值 fingerprint 身分
+        view_id?: string | null;
+        algorithm_id?: string | null;
       }>(`/apply-transforms/${taskId}`, {
         method: 'POST',
         body: JSON.stringify(payload),

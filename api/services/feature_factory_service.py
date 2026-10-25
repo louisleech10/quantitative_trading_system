@@ -47,7 +47,7 @@ from momentum.factories import (
     feature_descriptor,
 )
 from momentum.FeatureEngineering.run_locks import RunBusyError, is_run_active
-from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir
+from momentum.FeatureEngineering.run_paths import features_run_dir
 
 
 logger = get_logger("api.feature_factory_service")
@@ -961,7 +961,7 @@ class FeatureFactoryService:
         manager = self._lifecycle()
         registry_exists = manager.registry.get(symbol, timeframe, config_hash) is not None
         feature_leaf = features_run_dir(manager.features_root, symbol, timeframe, config_hash)
-        cgsa_leaf = cgsa_work_dir(manager.cgsa_root, symbol, timeframe, config_hash)
+        cgsa_leaf = manager.cgsa_layer_dir(symbol, timeframe, config_hash)  # NUMVIEW D7 ⑤：刪除單位＝config 層
         artifact_exists = (
             feature_leaf.exists()
             or feature_leaf.is_symlink()

@@ -5,7 +5,7 @@ from typing import Dict, List, Literal, Optional
 
 import numpy as np
 import pandas as pd
-import talib
+import talib  # 發行套件名 ta_lib（importlib.metadata；NUMVIEW 契約 library_versions）
 from talib import abstract
 
 from momentum.core.logging import get_logger

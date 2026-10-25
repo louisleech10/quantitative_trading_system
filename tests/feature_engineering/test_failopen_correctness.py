@@ -40,7 +40,12 @@ GATE_A_MULTI_TF_WORKER_ENV = "_FAILOPEN_CORRECTNESS_GATE_A_MULTI_TF"
 # 只新 3 欄（233 期 Skew_W3）經 _l3_oracle 驗算相符（收據 handoffs/run_receipts/20261003-prered-mtf-l3-count.json）。
 MTF_12H_L3_SURVIVOR_COUNT = 59962
 # CGSA/L7 manifest 含 run 時間等非決定性 metadata；數值檔 hash 仍須 byte 一致。
-ARTIFACT_METADATA_BASENAMES = frozenset({"manifest.json", "feature_manifest.json"})
+# NUMVIEW D7：CGSA 葉身分檔（symbol、tf、config_hash、algorithm_id；檔名讀契約）亦屬中繼資料，非數值檔。
+ARTIFACT_METADATA_BASENAMES = frozenset({
+    "manifest.json", "feature_manifest.json",
+    json.loads((ROOT / "momentum/FeatureEngineering/contracts/numeric_view.json").read_text(
+        encoding="utf-8"))["cgsa_work_identity"]["identity_file"],
+})
 
 
 def _is_artifact_data_file(path: str) -> bool:

@@ -330,7 +330,8 @@ def mismatch_case(c: Ctx, identity_text: str, tag: str) -> Dict[str, Any]:
     new_files = snapshot(leaf)
     return {
         "resumed": c.resume.call_count,
-        "same_path": _real(registry.work_dir) == _real(leaf),
+        # 續跑時 resume 為 Mock（回字串、無 work_dir）⇒ 視為非同一新葉（mutant 案）
+        "same_path": _real(getattr(registry, "work_dir", "")) == _real(leaf),
         "moved_intact": len(stale) == 1 and snapshot(stale[0]) == before,
         "new_leaf_only_identity": set(new_files) <= {_identity_name()},
         "new_identity_correct": json.loads(new_files.get(_identity_name(), b"null")) == _identity(c.symbol, c.tf, ch, aid),

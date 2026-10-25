@@ -228,6 +228,11 @@ def declared_registry_files(work_dir: Path, released_groups: Optional[Set[str]] 
                 missing.append(str(path))
     if missing:
         raise FileNotFoundError(f"registry manifest 宣告之檔不存在（且未經 L7 釋放）：{sorted(set(missing))[:5]}")
+    # NUMVIEW D7：CGSA 葉身分檔（檔名讀契約 `cgsa_work_identity.identity_file`）為工作目錄之宣告中繼資料
+    identity = work_dir / json.loads((Path(__file__).resolve().parents[1] / "momentum" / "FeatureEngineering" / "contracts"
+                                      / "numeric_view.json").read_text(encoding="utf-8"))["cgsa_work_identity"]["identity_file"]
+    if identity.is_file():
+        files.add(identity)
     listed = sorted(files)
     _guard_no_undeclared(work_dir, listed, f"registry 工作目錄 {work_dir}")
     return listed

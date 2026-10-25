@@ -15,7 +15,12 @@ from api.services.feature_factory_service import feature_factory_service
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.run_lifecycle import RunLifecycleManager
 from momentum.FeatureEngineering.run_locks import RunBusyError
-from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir
+from momentum.FeatureEngineering.run_paths import (
+    cgsa_identity_payload,
+    cgsa_work_dir,
+    features_run_dir,
+    write_cgsa_identity,
+)
 from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
 
 
@@ -77,8 +82,9 @@ def _create_run(
     feature_leaf = features_run_dir(manager.features_root, "BTCUSDT", "12h", config_hash)
     feature_leaf.mkdir(parents=True)
     (feature_leaf / "feature_manifest.json").write_text("{}", encoding="utf-8")
-    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
+    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash, "a" * 64)  # NUMVIEW D7 葉
     cgsa_leaf.mkdir(parents=True)
+    write_cgsa_identity(cgsa_leaf, cgsa_identity_payload("BTCUSDT", "12h", config_hash, "a" * 64))
     (cgsa_leaf / "manifest.json").write_text(
         '{"config_hash":"' + config_hash + '"}',
         encoding="utf-8",

@@ -825,7 +825,7 @@ function ICAnalysisPageContent() {
                     <li><span className="text-amber-200 mr-1">②</span>需在表格中勾選特徵後，按鈕才可用（未勾選應顯示 disabled）</li>
                     <li><span className="text-amber-200 mr-1">③</span>三個轉換至少勾選一個，按鈕才可用</li>
                     <li><span className="text-amber-200 mr-1">④</span>Rank + ZScore 預設開啟，Gaussian 預設關閉</li>
-                    <li><span className="text-amber-200 mr-1">⑤</span>執行後應顯示輸出路徑 <code className="bg-slate-800 px-1 rounded">data_cache/reports/post_ic_transforms_&lt;task_id&gt;.h5</code></li>
+                    <li><span className="text-amber-200 mr-1">⑤</span>執行後應顯示輸出路徑 <code className="bg-slate-800 px-1 rounded">data_cache/reports/post_ic_transforms_&lt;task_id&gt;_&lt;view_id&gt;.h5</code>（同設定與選欄重跑寫同一檔、不同則另存新檔；IC 後特徵 run 重生 ⇒ 409 須重跑 IC）</li>
                     <li><span className="text-amber-200 mr-1">⑥</span>已套用的轉換依序列出（e.g. rank → zscore）</li>
                     <li><span className="text-amber-200 mr-1">⑦</span>若 Feature Factory 以 IC-First 模式生成，驗證輸出 .h5 只含 Rank/ZScore 結果（不含原始 legacy L6.5）</li>
                     <li><span className="text-amber-200 mr-1">⑧</span>API <code className="bg-slate-800 px-1 rounded">POST /api/v1/ic/apply-transforms/&#123;task_id&#125;</code> 應回傳 selected_feature_count、transforms_applied、output_path、output_rows、output_cols</li>

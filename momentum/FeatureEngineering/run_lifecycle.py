@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import stat
@@ -13,7 +12,12 @@ from typing import Dict, Iterator, List, Optional, Tuple
 
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry, RegistryCorruptError
 from momentum.FeatureEngineering.run_locks import RunBusyError, RunLease, is_run_active
-from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir, validate_config_hash
+from momentum.FeatureEngineering.run_paths import (
+    cgsa_config_layer_dir,
+    features_run_dir,
+    read_cgsa_identity,
+    validate_config_hash,
+)
 
 
 @dataclass
@@ -138,21 +142,11 @@ class RunLifecycleManager:
         if override:
             result.skipped.append("work_dir_override")
         else:
-            cgsa_leaf = cgsa_work_dir(self.cgsa_root, symbol, timeframe, config_hash)
-            if cgsa_leaf.exists() or cgsa_leaf.is_symlink():
-                manifest_path = cgsa_leaf / "manifest.json"
-                if not manifest_path.is_file() or manifest_path.stat().st_size == 0:
-                    result.skipped.append("no_manifest")
-                else:
-                    try:
-                        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                    except (OSError, json.JSONDecodeError) as exc:
-                        result.errors.append(f"cgsa manifest: {exc}")
-                    else:
-                        if manifest.get("config_hash") != config_hash:
-                            result.skipped.append("ownership_mismatch")
-                        else:
-                            self._delete_leaf(cgsa_leaf, self.cgsa_root, "cgsa", result)
+            # NUMVIEW D7 ⑤：刪除單位＝`<symbol>_<tf>_<完整 config_hash>` 層（含其下全部 algorithm_id 葉與 .stale-*）；
+            # 層名由完整 config_hash 純函式導出，不同 run 不共用層
+            cgsa_layer = cgsa_config_layer_dir(self.cgsa_root, symbol, timeframe, config_hash)
+            if cgsa_layer.exists() or cgsa_layer.is_symlink():
+                self._delete_leaf(cgsa_layer, self.cgsa_root, "cgsa", result)
 
         if not result.errors:
             result.registry_removed = self.registry.remove(symbol, timeframe, config_hash)
@@ -361,10 +355,15 @@ class RunLifecycleManager:
             return True
         return is_run_active(self.locks_dir, symbol, timeframe, config_hash)
 
+    def cgsa_layer_dir(self, symbol: str, timeframe: str, config_hash: str) -> Path:
+        """run 之 CGSA 層路徑（不執行 IO；`api/` 經本方法取路徑，不自組；NUMVIEW D7 ⑤）。"""
+        return self._resolve_cgsa_leaf(symbol, timeframe, config_hash)
+
     def _resolve_cgsa_leaf(self, symbol: str, timeframe: str, config_hash: str) -> Path:
+        """run 之 CGSA 層（NUMVIEW D7：`<根>/<symbol>_<tf>_<完整 config_hash>`；覆寫根一律為根）。"""
         override = os.getenv("FFACT_CGSA_WORK_DIR", "").strip()
         root = Path(override) if override else self.cgsa_root
-        return cgsa_work_dir(root, symbol, timeframe, config_hash)
+        return cgsa_config_layer_dir(root, symbol, timeframe, config_hash)
 
     def _iter_disk_leaves(self) -> Iterator[Tuple[str, str, str, str]]:
         """列舉磁碟上 features 與 CGSA run leaf（含 CGSA-only）。"""
@@ -410,38 +409,38 @@ class RunLifecycleManager:
                 yield symbol, timeframe, config_hash, "cgsa"
 
     @staticmethod
-    def _identity_from_cgsa_leaf(leaf: Path) -> Optional[Tuple[str, str, str]]:
-        """從 CGSA work leaf 的 manifest 解析 run identity。"""
-        manifest_path = leaf / "manifest.json"
-        if not manifest_path.is_file() or manifest_path.stat().st_size == 0:
-            return None
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return None
-        symbol = str(manifest.get("symbol") or "").strip()
-        timeframe = str(manifest.get("timeframe") or manifest.get("primary_tf") or "").strip()
-        config_hash = str(manifest.get("config_hash") or "").strip()
-        if not symbol or not timeframe or not config_hash:
-            return None
-        try:
-            validate_config_hash(config_hash)
-        except ValueError:
-            return None
-        if not RunLifecycleManager._cgsa_owned_by_run(leaf, config_hash):
-            return None
-        return symbol, timeframe, config_hash
+    def _layer_identities(layer: Path) -> List[Dict[str, object]]:
+        """CGSA 層下各葉（不含 `.stale-*`）之身分檔內容（NUMVIEW D7；只讀身分檔）。"""
+        out: List[Dict[str, object]] = []
+        for leaf in sorted(Path(layer).iterdir()):
+            if leaf.is_dir() and ".stale-" not in leaf.name:
+                identity = read_cgsa_identity(leaf)
+                if identity is not None:
+                    out.append(identity)
+        return out
 
     @staticmethod
-    def _cgsa_owned_by_run(leaf: Path, config_hash: str) -> bool:
-        manifest_path = leaf / "manifest.json"
-        if not manifest_path.is_file():
-            return False
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return False
-        return manifest.get("config_hash") == config_hash
+    def _identity_from_cgsa_leaf(layer: Path) -> Optional[Tuple[str, str, str]]:
+        """從 CGSA 層之葉身分檔解析 run identity；層名須等於該身分導出之層名（NUMVIEW D7）。"""
+        for identity in RunLifecycleManager._layer_identities(layer):
+            symbol = str(identity.get("symbol") or "").strip()
+            timeframe = str(identity.get("tf") or "").strip()
+            config_hash = str(identity.get("config_hash") or "").strip()
+            if not symbol or not timeframe or not config_hash:
+                continue
+            try:
+                expected = cgsa_config_layer_dir(Path(layer).parent, symbol, timeframe, config_hash)
+            except ValueError:
+                continue
+            if expected.name == Path(layer).name:
+                return symbol, timeframe, config_hash
+        return None
+
+    @staticmethod
+    def _cgsa_owned_by_run(layer: Path, config_hash: str) -> bool:
+        """層下有葉之身分檔記本 run 之 config_hash（NUMVIEW D7）。"""
+        return any(identity.get("config_hash") == config_hash
+                   for identity in RunLifecycleManager._layer_identities(layer))
 
     @classmethod
     def _singleflight_lock(cls, symbol: str, timeframe: str) -> threading.Lock:

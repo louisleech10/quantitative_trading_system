@@ -384,7 +384,26 @@ def test_quality_gate_max_ratios_do_not_change_config_hash() -> None:
 
     multi = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))["multi_tf"]["BTCUSDT"]
     assert multi["primary_timeframe"] == "1h" and list(multi["training_timeframes"]) == ["1h", "12h"]
-    assert default_hash == multi["config_hash"]
+    # NUMVIEW D1：凍結值早於 NUMVIEW 之數值 fingerprint 鹽（failopen 不入 NUMVIEW 重凍，SPEC v44 ④）⇒ 以去該鹽之同一
+    # payload 重算比對（鹽鍵讀契約；同 FF-NAME 之鹽證法）
+    import momentum.FeatureEngineering.feature_factory as ff_mod
+
+    salt_key = json.loads((Path(ff_mod.__file__).parent / "contracts" / "numeric_view.json").read_text(
+        encoding="utf-8"))["config_hash_salt"]["key"]
+    real_dumps = ff_mod.json.dumps
+
+    def without_salt(obj: Any, *a: Any, **k: Any) -> str:
+        if isinstance(obj, dict) and salt_key in obj:
+            obj = {kk: v for kk, v in obj.items() if kk != salt_key}
+        return real_dumps(obj, *a, **k)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(ff_mod.json, "dumps", without_salt)
+        pre_numview_hash = factory._compute_config_hash(
+            config, "BTCUSDT", "1h", start_date=start_date, end_date=end_date
+        )
+    assert pre_numview_hash != default_hash, "前提不成立：NUMVIEW 鹽未入 config_hash"
+    assert pre_numview_hash == multi["config_hash"]
 
 
 

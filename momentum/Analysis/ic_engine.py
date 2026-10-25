@@ -8,7 +8,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -50,9 +50,12 @@ CACHE_IDENTITY_FIELDS = (
     "label_sha256",
     # FFDSTAR Task 2.3（§C D5）：特徵值身分＝manifest raw 節點之 `content_sha256`（raw 已刪時 manifest 仍在）；缺即拒用
     "content_sha256",
+    # NUMVIEW Task 4.2（D2）：產生方式（`algorithm_id`）與事後路由身分（R5-B）；取自 raw 節點，缺即拒用（舊 run 不沿用）
+    "algorithm_id",
+    "route_identity",
 )
 #: 請求身分中值為 None 即拒用（不可得 ⇒ 身分不完整）之欄
-_IDENTITY_FIELDS_REQUIRED_NON_NULL = ("feature_axis_sha256", "content_sha256")
+_IDENTITY_FIELDS_REQUIRED_NON_NULL = ("feature_axis_sha256", "content_sha256", "algorithm_id", "route_identity")
 
 
 def _utc_epoch_ns(index: Any) -> np.ndarray:
@@ -266,11 +269,13 @@ class ICEngine:
                 ).get("artifacts") or {}).get("raw") or {}
                 content_for_identity = raw_node.get("content_sha256")
             except (FileNotFoundError, ValueError):
+                raw_node = {}
                 content_for_identity = None  # manifest／raw 節點不可得 ⇒ 身分不完整 ⇒ 拒用
             request_identity = self._request_identity(
                 symbol=symbol, tf=tf, config_hash=config_hash, method=resolved_method,
                 label_horizon=label_horizon, selection_window=selection_window, split_id=split_id,
                 row_index=axis_for_identity, label=label, content_sha256=content_for_identity,
+                raw_node=raw_node,
             )
             cache_result = self._try_reuse_cached_ic_scores(
                 selected_path=selected_path,
@@ -324,6 +329,7 @@ class ICEngine:
             symbol=symbol, tf=tf, config_hash=config_hash, method=resolved_method,
             label_horizon=label_horizon, selection_window=selection_window, split_id=split_id,
             row_index=row_index, label=label, content_sha256=raw_artifact.get("content_sha256"),
+            raw_node=raw_artifact,
         ))
 
         ic_scores: Dict[str, float] = {}
@@ -765,9 +771,15 @@ class ICEngine:
         row_index: Optional[pd.DatetimeIndex],
         label: pd.Series,
         content_sha256: Optional[str],
+        raw_node: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         """本次請求之計算身分（Task 1.4）：選窗起訖正規化為 UTC epoch 秒；特徵軸與 label 以指紋表示。
-        FFDSTAR Task 2.3：`content_sha256`＝manifest raw 節點之 run 內容身分（缺 ⇒ None，沿用時拒用）。"""
+        FFDSTAR Task 2.3：`content_sha256`＝manifest raw 節點之 run 內容身分（缺 ⇒ None，沿用時拒用）。
+        NUMVIEW Task 4.2：`algorithm_id`、`route_identity` 取自 raw 節點（鍵名讀 FeatureEngineering 契約；缺 ⇒ None）。"""
+        from momentum.factories import numeric_manifest_keys
+
+        keys = numeric_manifest_keys()
+        node = raw_node or {}
         window = selection_window or {}
         return {
             "symbol": symbol,
@@ -781,6 +793,8 @@ class ICEngine:
             "feature_axis_sha256": _axis_fingerprint(row_index),
             "label_sha256": label_fingerprint(label),
             "content_sha256": None if content_sha256 is None else str(content_sha256),
+            "algorithm_id": None if node.get(keys["algorithm_id"]) is None else str(node[keys["algorithm_id"]]),
+            "route_identity": None if node.get(keys["route_identity"]) is None else str(node[keys["route_identity"]]),
         }
 
     @staticmethod

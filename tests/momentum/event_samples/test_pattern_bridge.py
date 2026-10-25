@@ -129,13 +129,13 @@ def test_j8_ic_prescreen_train_only():
 
 def test_survivor_v2_restricts_features_and_v1_rejected():
     X, y, plan, MAN = synth()
-    sv = {"schema_version": 3, "survivors": [{"feature_name": "f0"}, {"feature_name": "f1"}, {"feature_name": "ghost"}]}
+    sv = {"schema_version": pb.SURVIVOR_SCHEMA_VERSION_REQUIRED, "survivors": [{"feature_name": "f0"}, {"feature_name": "f1"}, {"feature_name": "ghost"}]}
     rep = extract_event_patterns(X, y, plan, sv, cfg(), manifest=MAN)
     assert rep["feature_names_used"] == ["f0", "f1"] and rep["survivor_restricted"] is True
     with pytest.raises(ValueError):
         extract_event_patterns(X, y, plan, {"schema_version": 1, "survivors": [{"feature_name": "f0"}]}, cfg(), manifest=MAN)
     with pytest.raises(ValueError):
-        extract_event_patterns(X, y, plan, {"schema_version": 3, "survivors": []}, cfg(), manifest=MAN)
+        extract_event_patterns(X, y, plan, {"schema_version": pb.SURVIVOR_SCHEMA_VERSION_REQUIRED, "survivors": []}, cfg(), manifest=MAN)
 
 
 def test_labels_and_inputs_guards():
@@ -159,7 +159,7 @@ def test_receipt_deterministic():
     assert a["receipt"]["train_plan_hash"] == b["receipt"]["train_plan_hash"]
     assert a["receipt"]["train_ids_sha256"] == b["receipt"]["train_ids_sha256"]
     assert [r["condition"] for r in a["rules"]] == [r["condition"] for r in b["rules"]]
-    assert pb.SURVIVOR_SCHEMA_VERSION_REQUIRED == 3  # FFDSTAR Task 2.4：倖存者契約 v2→v3
+    assert pb.SURVIVOR_SCHEMA_VERSION_REQUIRED == 4  # NUMVIEW Task 4.2：倖存者契約 v3→v4（FFDSTAR Task 2.4：v2→v3）
 
 
 def test_manifest_required_fail_closed_and_common_n():

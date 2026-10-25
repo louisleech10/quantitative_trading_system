@@ -52,8 +52,8 @@ def test_v5_4_run_and_cgsa_paths_are_symbol_scoped(tmp_path: Path) -> None:
     config_hash = "cfg_p1ff57"
     a_run = features_run_dir(tmp_path, BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash)
     b_run = features_run_dir(tmp_path, OTHER_SYMBOL, BASELINE_TIMEFRAME, config_hash)
-    a_cgsa = cgsa_work_dir(tmp_path, BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash)
-    b_cgsa = cgsa_work_dir(tmp_path, OTHER_SYMBOL, BASELINE_TIMEFRAME, config_hash)
+    a_cgsa = cgsa_work_dir(tmp_path, BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, "a" * 64)
+    b_cgsa = cgsa_work_dir(tmp_path, OTHER_SYMBOL, BASELINE_TIMEFRAME, config_hash, "a" * 64)
 
     assert a_run != b_run
     assert a_cgsa != b_cgsa

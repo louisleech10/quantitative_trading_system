@@ -250,7 +250,8 @@ def _check_label_binary(ev: Dict[str, Any], c: Dict[str, Any], label: str) -> No
 
 
 def _check_object(obj: Any, schema: Dict[str, Any], label: str) -> None:
-    """依 ``{additional_properties:false, keys:{k:{type,required,nullable}}}`` 驗一物件層（不遞迴）。"""
+    """依 ``{additional_properties:false, keys:{k:{type,required,nullable}}}`` 驗一物件層；`type: object` 且自帶
+    `keys` 之鍵（如 `provenance.ff_run_identity`，NUMVIEW Task 4.2 R2-E）其非 null 值遞迴驗證。"""
     if not isinstance(obj, dict):
         raise ContractValidationError(f"{label}: expected object, got {type(obj).__name__}")
     keys = schema["keys"]
@@ -271,6 +272,8 @@ def _check_object(obj: Any, schema: Dict[str, Any], label: str) -> None:
         checker = _TYPE_CHECKS[spec["type"]]
         if not checker(value):
             raise ContractValidationError(f"{label}.{key}: type mismatch (expect {spec['type']}, got {type(value).__name__})")
+        if spec["type"] == "object" and isinstance(spec.get("keys"), dict):
+            _check_object(value, spec, f"{label}.{key}")
 
 
 def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[Dict[str, Any]] = None, report_ref_path: Optional[str] = None) -> None:

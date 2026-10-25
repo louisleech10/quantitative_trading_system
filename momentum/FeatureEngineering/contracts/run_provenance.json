@@ -867,6 +867,8 @@
     "feature_naming_version",
     "artifact_kind",
     "content_sha256",
-    "provenance_sha256"
+    "provenance_sha256",
+    "algorithm_id",
+    "route_identity"
   ]
 }

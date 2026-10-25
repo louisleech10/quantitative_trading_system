@@ -39,6 +39,11 @@ DISP: Dict[str, Dict[str, Any]] = REFREEZE["dispositions"]
 RECEIPT = REPO / REFREEZE["receipt"]
 MAPS_DIR = REPO / "handoffs" / "run_receipts" / "ffname_refreeze_maps"
 SALT_KEY = "_feature_naming_version"
+#: FF-NAME 之後才加入之 config_hash 鹽（NUMVIEW D1；鍵名讀契約）：本檔以 FF-NAME 時之碼態語意重算 hash 時一併剝除
+LATER_SALT_KEYS = (json.loads((REPO / "momentum/FeatureEngineering/contracts/numeric_view.json").read_text(
+    encoding="utf-8"))["config_hash_salt"]["key"],)
+#: NUMVIEW Task 4.2 之結構重凍收據（PRE-PROV 之後之第二個合法後繼；docs/NUMVIEW_SPEC.md §G）
+NUMVIEW_RECEIPT = REPO / "tests" / "_golden" / "numview" / "refreeze_receipt.json"
 
 
 def _of(cls: str) -> List[str]:
@@ -348,12 +353,18 @@ def _independent_hash_checks(rel: str, new: Any, map_doc: Optional[Mapping[str, 
             if ss is not None and _sha(_pw_canon(ss).encode()) == o["stable_start_sha256"] and \
                     _sha(_pw_canon(_rename_keys_deep(ss, mapping)).encode()) == n["stable_start_sha256"]:
                 ok.add(f"cells/{cid}/stable_start_sha256")
-        # config_hash：鹽差另立，由 test_salt_only_probewinsor_config_hash 以現行碼獨立重算（此處只認該測試之證據）
+        # config_hash：鹽差另立，由 test_salt_only_probewinsor_config_hash 以現行碼獨立重算（此處只認該測試之證據）；
+        # 其後繼 NUMVIEW 鹽之重凍（收據 frozen_before＝FF-NAME 錨點、剝除後重算相等）亦接受
         salt = json.loads((MAPS_DIR / "salt_proof.json").read_text(encoding="utf-8"))["probewinsor"]
+        later = _numview_items(rel)
         for cid in new["cells"]:
             proof = salt.get(f"cells/{cid}/config_hash") or {}
-            if proof.get("proof") and proof.get("frozen") == old["cells"][cid]["config_hash"] and \
-                    proof.get("new_anchor") == new["cells"][cid]["config_hash"]:
+            anchor, now_value = proof.get("new_anchor"), new["cells"][cid]["config_hash"]
+            successor = later.get(cid) or {}
+            if proof.get("proof") and proof.get("frozen") == old["cells"][cid]["config_hash"] and (
+                    anchor == now_value or (successor.get("equal") is True and successor.get("frozen_before") == anchor
+                                            and successor.get("stripped_recomputed") == anchor
+                                            and successor.get("new_value") == now_value)):
                 ok.add(f"cells/{cid}/config_hash")
     return ok, bad
 
@@ -630,9 +641,59 @@ PREPROV_MANIFEST_BASENAMES = frozenset({"feature_manifest.json", "manifest.json"
 
 
 def bytes_bound(rel: str, bound_sha: Optional[str]) -> bool:
-    """現檔位元組綁定 FF-NAME 收據：sha256＝收據 `new_sha256`，或其唯一後繼為 PRE-PROV 結構重凍（`preprov_followon_problems`
-    為空）。值項之比對（K2 sidecar 依名逐欄）不因此放寬。"""
-    return _sha((REPO / rel).read_bytes()) == bound_sha or preprov_followon_problems(rel, bound_sha) == []
+    """現檔位元組綁定 FF-NAME 收據：sha256＝收據 `new_sha256`，或其後繼為 PRE-PROV 結構重凍（`preprov_followon_problems`
+    為空），或再其後之 NUMVIEW 結構重凍（`numview_followon_problems` 為空）。值項之比對（K2 sidecar 依名逐欄）不因此放寬。"""
+    return _sha((REPO / rel).read_bytes()) == bound_sha or preprov_followon_problems(rel, bound_sha) == [] or \
+        numview_followon_problems(rel, bound_sha) == []
+
+
+def _numview_section(rel: str) -> Optional[Dict[str, Any]]:
+    if not NUMVIEW_RECEIPT.is_file():
+        return None
+    receipt = json.loads(NUMVIEW_RECEIPT.read_text(encoding="utf-8"))
+    return next((f for f in receipt.get("files") or [] if f.get("path") == rel), None)
+
+
+def _numview_items(rel: str) -> Dict[str, Dict[str, Any]]:
+    """NUMVIEW 重凍收據該檔段之項（已寫入且 exit_code 0 者）；無 ⇒ 空。"""
+    section = _numview_section(rel)
+    if not section or section.get("written") is not True or section.get("exit_code") != 0:
+        return {}
+    return {str(i.get("item")): i for i in section.get("items") or []}
+
+
+def numview_followon_problems(rel: str, bound_sha: Optional[str]) -> List[str]:
+    """NUMVIEW Task 4.2 §G（docs/NUMVIEW_SPEC.md）：現檔＝NUMVIEW 結構重凍收據該檔段之 `sha256_after`；其 `sha256_before`
+    ＝`base_commit` 之該檔，且該版本為 FF-NAME 綁定位元組或其 PRE-PROV 後繼；每項 equal、差異路徑只在 NUMVIEW 新鍵（鍵名讀
+    收據之 stripped_keys／stripped_root_keys）；且獨立比對兩版，改動只在結構欄、恰為收據所列（同 PRE-PROV 之檢查）。"""
+    section = _numview_section(rel)
+    if section is None:
+        return [f"numview_section_missing:{rel}"]
+    receipt = json.loads(NUMVIEW_RECEIPT.read_text(encoding="utf-8"))
+    current = (REPO / rel).read_bytes()
+    proc = subprocess.run(["git", "show", f"{section.get('base_commit')}:{rel}"], cwd=str(REPO), capture_output=True)
+    base = proc.stdout if proc.returncode == 0 else b""
+    bad: List[str] = []
+    if section.get("written") is not True or section.get("exit_code") != 0:
+        bad.append(f"numview_not_written:{rel}")
+    if section.get("sha256_after") != _sha(current) or section.get("sha256_before") != _sha(base):
+        bad.append(f"numview_bytes_not_bound:{rel}")
+    if not (bound_sha and (_sha(base) == bound_sha or preprov_followon_problems(rel, bound_sha, current=base) == [])):
+        bad.append(f"numview_before_not_ffname_or_preprov:{rel}")
+    items = section.get("items") or []
+    if not items or any(i.get("equal") is not True for i in items):
+        bad.append(f"numview_item_not_equal:{rel}")
+    node_keys = set(receipt.get("stripped_keys") or [])
+    root_keys = set(receipt.get("stripped_root_keys") or [])
+    for path in (p for i in items for p in i.get("diff_paths") or []):
+        segs = str(path).split("#", 1)[-1].split(".")
+        if not ((len(segs) == 1 and segs[0] in root_keys)
+                or (len(segs) == 3 and segs[0] == "artifacts" and segs[2] in node_keys)):
+            bad.append(f"numview_diff_path:{path}")
+    if bad:
+        return bad
+    return _preprov_structural_problems(rel, json.loads(base.decode("utf-8")), json.loads(current.decode("utf-8")),
+                                        items)
 
 
 def _preprov_aggregate(files: List[Dict[str, Any]]) -> str:
@@ -1164,13 +1225,15 @@ def test_preprov_followon_failopen_rule():
 
 
 def _hash_with(fn_, strip: bool) -> str:
+    """FF-NAME 時之碼態語意之 hash：一律剝除其後才加入之鹽（`LATER_SALT_KEYS`）；`strip` ⇒ 另剝除命名世代鹽（改前形）。"""
     import momentum.FeatureEngineering.feature_factory as ff_mod
 
     real = ff_mod.json.dumps
+    drop = set(LATER_SALT_KEYS) | ({SALT_KEY} if strip else set())
 
     def dumps(obj, *a, **k):
-        if strip and isinstance(obj, dict) and SALT_KEY in obj:
-            obj = {kk: v for kk, v in obj.items() if kk != SALT_KEY}
+        if isinstance(obj, dict) and drop & set(obj):
+            obj = {kk: v for kk, v in obj.items() if kk not in drop}
         return real(obj, *a, **k)
 
     with pytest.MonkeyPatch.context() as mp:
@@ -1230,7 +1293,8 @@ def test_salt_only_probewinsor_config_hash():
         with pytest.MonkeyPatch.context() as mp:
             def strip_both(obj, *a, **k):
                 if isinstance(obj, dict):
-                    obj = {kk: v for kk, v in obj.items() if kk not in ("_probe_l65_gate", SALT_KEY)}
+                    obj = {kk: v for kk, v in obj.items()
+                           if kk not in ("_probe_l65_gate", SALT_KEY, *LATER_SALT_KEYS)}
                 return real(obj, *a, **k)
 
             mp.setattr(ff_mod.json, "dumps", strip_both)

@@ -71,6 +71,9 @@ def expected_identity(manifest: Dict[str, Any], artifact_kind: str = "raw") -> D
         "artifact_kind": artifact_kind,
         "content_sha256": node.get("content_sha256"),
         "provenance_sha256": prov.get("sha256") if isinstance(prov, dict) else None,
+        # NUMVIEW Task 4.2（D2）：artifact 節點之 algorithm_id 與事後路由身分（舊 run 無 ⇒ None）
+        "algorithm_id": node.get("algorithm_id"),
+        "route_identity": node.get("route_identity"),
     }
     assert set(out) == set(IDENTITY_KEYS), "契約 run_identity_keys 改動須同步本 oracle"
     return out

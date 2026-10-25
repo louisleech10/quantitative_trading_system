@@ -16,7 +16,7 @@ import threading
 import psutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TYPE_CHECKING, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Sequence, TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -38,6 +38,8 @@ from momentum.FeatureEngineering.feature_storage import (
     resolve_completeness_meta,
 )
 from momentum.FeatureEngineering.feature_validator import FeatureValidator
+from momentum.FeatureEngineering import numeric_view as _numeric_view
+from momentum.FeatureEngineering import run_paths as _run_paths
 from momentum.FeatureEngineering.run_paths import cgsa_work_dir
 from momentum.FeatureEngineering.run_locks import RunLease
 from momentum.FeatureEngineering.labels.label_generator import LabelGenerator
@@ -297,17 +299,19 @@ class FeatureFactory:
             # ICFIRSTALIGN Task 4.2：取得 lease 後——恢復前次強制停止之殘留，再啟動本次之獨立守護（域內任務不另起；
             # 校準前置已啟動者巢狀沿用）
             protected = _memory_budget.begin_protected_run(run_dir, run_key)
-            result = self._generate_features_impl(
-                symbol,
-                timeframe,
-                config_override,
-                force_regenerate,
-                progress_callback,
-                start_date,
-                end_date,
-                persist,
-                batch_id=batch_id,
-            )
+            # NUMVIEW R6-A：本 run 期間之未認證換臂當下寫標記於作用中之 CGSA 工作目錄
+            with _memory_budget.set_route_switch_marker(self._route_switch_marker):
+                result = self._generate_features_impl(
+                    symbol,
+                    timeframe,
+                    config_override,
+                    force_regenerate,
+                    progress_callback,
+                    start_date,
+                    end_date,
+                    persist,
+                    batch_id=batch_id,
+                )
             self._attach_output_window_metadata(result)
             self._attach_memory_route_metadata(result)
             if lease_sink is not None:
@@ -469,8 +473,15 @@ class FeatureFactory:
                     self._current_output_window,
                 )
 
+        # NUMVIEW Task 4.2：事前身分（fingerprint、algorithm_id）定 CGSA 葉與續跑閘（D6、D7），並於 manifest 提交點寫入
+        self._current_numeric_fingerprint = self._numeric_fingerprint(config)
+        self._current_algorithm_id = _numeric_view.algorithm_id(self._current_numeric_fingerprint)
         self._cgsa_force_fresh = force_regenerate
-        self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe, config_hash or "")
+        self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe, config_hash or "",
+                                                          algorithm_id=self._current_algorithm_id)
+        if self._cgsa_registry is not None:
+            # NUMVIEW R6-A：registry manifest 隨群組落盤記本次選路紀錄（續跑時沿用群組之紀錄帶入 observed_arms）
+            self._cgsa_registry.set_route_record_source(_memory_budget.route_records)
         if len(training_tfs) <= 1:
             # FRAMEPATH Task 1.2：單週期只走 CGSA；registry 未建立 ⇒ 於 L1 之前具名拒絕（L3 內拋會被層執行器包成層失敗）
             self._require_cgsa_registry("generate_features", symbol, timeframe)
@@ -1172,30 +1183,25 @@ class FeatureFactory:
         symbol: str,
         timeframe: str,
         config_hash: str = "",
+        algorithm_id: str = "",
     ) -> Optional[ColumnGroupRegistry]:
+        """CGSA 工作目錄（NUMVIEW D7）：葉＝`<根>/<symbol>_<tf>_<完整 config_hash>/<完整 algorithm_id>`
+        （`FFACT_CGSA_WORK_DIR` 一律為根）。任何讀取前先比對葉之身分檔（四鍵）並 stat 未認證換臂標記檔：身分缺、
+        不符、`config_hash`／`algorithm_id` 為空或有標記 ⇒ 不讀其他檔、葉改名移出、建全新空葉（只含身分檔）；
+        相符者再依 registry manifest、L7 manifest 狀態與其 `algorithm_id`（D6）決定續跑。"""
         configured_work_dir = os.getenv("FFACT_CGSA_WORK_DIR", "").strip()
-        if configured_work_dir:
-            work_dir = Path(configured_work_dir).expanduser().resolve()
-        else:
-            normalized_config_hash = config_hash or ""
-            if normalized_config_hash:
-                work_dir = cgsa_work_dir(
-                    Path.cwd() / "data_cache" / "cgsa_work",
-                    symbol,
-                    timeframe,
-                    normalized_config_hash,
-                )
-            else:
-                safe_symbol = re.sub(r"[^A-Za-z0-9_.-]+", "_", symbol)
-                safe_timeframe = re.sub(r"[^A-Za-z0-9_.-]+", "_", timeframe)
-                work_dir = (
-                    Path.cwd()
-                    / "data_cache"
-                    / "cgsa_work"
-                    / f"{safe_symbol}_{safe_timeframe}_nohash"
-                ).resolve()
-
-        work_dir.mkdir(parents=True, exist_ok=True)
+        root = Path(configured_work_dir) if configured_work_dir else Path.cwd() / "data_cache" / "cgsa_work"
+        work_dir = cgsa_work_dir(root, symbol, timeframe, config_hash or "", algorithm_id or "unidentified")
+        identity = _run_paths.cgsa_identity_payload(symbol, timeframe, config_hash or "", algorithm_id or "")
+        identifiable = bool(config_hash) and bool(algorithm_id)
+        if work_dir.exists() or work_dir.is_symlink():
+            if (not identifiable or _run_paths.read_cgsa_identity(work_dir) != identity
+                    or _run_paths.has_route_switch_marker(work_dir)):
+                stale = _run_paths.move_to_stale(work_dir)
+                logger.info("[CGSA] Work dir %s 身分不符或含未認證換臂標記 ⇒ 移為 %s、全新開始", work_dir, stale)
+        if not work_dir.exists():
+            work_dir.mkdir(parents=True)
+            _run_paths.write_cgsa_identity(work_dir, identity)
         owner_run_dir = _memory_budget.current_run_dir()
         if owner_run_dir is not None:
             # ICFIRSTALIGN Task 4.2：CGSA work_dir 登記為本 run 之 owned path（強制停止後之恢復刪除）
@@ -1203,7 +1209,7 @@ class FeatureFactory:
 
         manifest_path = work_dir / "manifest.json"
         force_fresh = bool(getattr(self, "_cgsa_force_fresh", False))
-        resume_allowed = manifest_path.exists() and not force_fresh
+        resume_allowed = identifiable and manifest_path.exists() and not force_fresh
         if resume_allowed:
             from momentum.FeatureEngineering.consumer_gate import is_run_status_cacheable
             from momentum.FeatureEngineering.feature_storage import resolve_run_status
@@ -1237,6 +1243,9 @@ class FeatureFactory:
                             work_dir,
                             l7_status,
                         )
+                        resume_allowed = False
+                    elif l7_manifest.get(_numeric_view.load_contract()["manifest_keys"]["algorithm_id"]) != algorithm_id:
+                        logger.info("[CGSA] Skipping resume at %s: L7 manifest algorithm_id ≠ 本次（D6）", work_dir)
                         resume_allowed = False
         if resume_allowed:
             try:
@@ -3001,6 +3010,7 @@ class FeatureFactory:
             layer_results=self.layer_results,
             post_ic_arm=ctx.post_ic_arm,
             execution=post_ic_execution,
+            numeric_identity=self._processed_numeric_identity(storage, symbol, tf, config_hash),
         )
 
         # IC-First raw/ cleanup：raw/ 只供 IC 閘；processed/ 落盤後即可回收（IC 選欄與分數保留於回傳 metadata）
@@ -3915,6 +3925,7 @@ class FeatureFactory:
                     warmup_output_start=self._warmup_output_start(),
                     warmup_probe_late=self._warmup_probe_late(),
                 ),
+                numeric_identity=self._numeric_manifest_identity(),
                 extra_metadata={
                     **self._build_l7_raw_preprocessing_metadata(
                         config,
@@ -4154,8 +4165,59 @@ class FeatureFactory:
         probe_salt = self._probe_gate_salt(config)
         if probe_salt is not None:
             config_payload["_probe_l65_gate"] = probe_salt
+        # NUMVIEW D1（設計選擇①）：數值 fingerprint 去函式庫版本段入鹽 ⇒ 臂／選擇子有效值／能力旗標／硬體自動解析
+        # 不同之 run 落於不同 run 目錄（不互相覆寫或混續）；鹽鍵名讀契約
+        salt_key = _numeric_view.load_contract()["config_hash_salt"]["key"]
+        config_payload[salt_key] = _numeric_view.config_hash_salt(self._numeric_fingerprint(config))
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _numeric_fingerprint(config: "FactoryConfig") -> Dict[str, Any]:
+        """本行程環境下之 run 數值 fingerprint（NUMVIEW Task 4.1；`os.environ`、實測能力旗標）。"""
+        dump = getattr(getattr(config, "preprocessing", None), "model_dump", None)
+        return _numeric_view.resolve_numeric_fingerprint(
+            preprocessing_config=dump() if callable(dump) else {},
+            environ=os.environ,
+            capabilities=_numeric_view.detect_capabilities(),
+        )
+
+    def _numeric_manifest_identity(self) -> Dict[str, Dict[str, Any]]:
+        """manifest 之本票新鍵（NUMVIEW D2；鍵名讀契約 `manifest_keys`）：artifact 節點與頂層皆記 fingerprint、
+        `algorithm_id`、事後路由身分；頂層另記 `observed_arms`（選路紀錄投影：續跑沿用之前次紀錄＋本次）。"""
+        keys = _numeric_view.load_contract()["manifest_keys"]
+        registry = getattr(self, "_cgsa_registry", None)
+        prior = list(registry.prior_route_records) if registry is not None else []
+        records = prior + _memory_budget.route_records()
+        # 未經 _generate_features_impl（無事前身分）⇒ 記 None ＝ legacy（快取一律不沿用，fail-closed）
+        node = {
+            keys["fingerprint"]: getattr(self, "_current_numeric_fingerprint", None),
+            keys["algorithm_id"]: getattr(self, "_current_algorithm_id", None),
+            keys["route_identity"]: _numeric_view.route_identity(records),
+        }
+        observed = {"route_records": [{k: r.get(k) for k in ("point", "group", "from", "to", "reason")}
+                                      for r in records]}
+        return {"artifact": node, "root": {**node, keys["observed_arms"]: observed}}
+
+    @staticmethod
+    def _processed_numeric_identity(storage: FeatureStorage, symbol: str, tf: str,
+                                    config_hash: str) -> Optional[Dict[str, Dict[str, Any]]]:
+        """IC-first processed 節點之身分＝同 run manifest 頂層已於 raw 提交點寫入之 fingerprint、`algorithm_id`、
+        路由身分（D2 邊界②：raw 已刪之 run 其 processed 節點仍帶身分）；頂層缺任一鍵（舊 run）⇒ None（不寫）。"""
+        keys = _numeric_view.load_contract()["manifest_keys"]
+        manifest = storage._load_feature_manifest_v2_if_exists(storage.feature_run_dir(symbol, tf, config_hash))
+        roles = ("fingerprint", "algorithm_id", "route_identity")
+        if any(keys[role] not in manifest for role in roles):
+            return None
+        node = {keys[role]: manifest[keys[role]] for role in roles}
+        return {"artifact": node, "root": dict(node)}
+
+    def _route_switch_marker(self, entry: Mapping[str, Any]) -> None:
+        """未認證換臂標記之回呼（NUMVIEW R6-A；`memory_budget.set_route_switch_marker` 於 `generate_features` 登記）：
+        寫入作用中之 CGSA 工作目錄；無 registry（非 CGSA 路徑）⇒ 只記 observed_arms。寫入例外原樣上拋（R7-B）。"""
+        registry = getattr(self, "_cgsa_registry", None)
+        if registry is not None:
+            _run_paths.write_route_switch_marker(Path(registry.work_dir), entry)
 
     def _capture_stationarity_decisions(self, preprocessor: FeaturePreprocessor, config: Any = None) -> None:
         """FFSTAT：把 L6.5 前處理器之逐欄決策（鍵＝原生週期＋L6.5 所見欄名）轉為落盤欄名為鍵，

@@ -17,7 +17,18 @@ from momentum.FeatureEngineering.feature_registry import (
 )
 from momentum.FeatureEngineering.run_locks import RunBusyError, RunLease, is_run_active
 from momentum.FeatureEngineering.run_lifecycle import RunLifecycleManager
-from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir, safe_token, validate_config_hash
+from momentum.FeatureEngineering.run_paths import (
+    cgsa_config_layer_dir,
+    cgsa_identity_payload,
+    cgsa_work_dir,
+    features_run_dir,
+    safe_token,
+    validate_config_hash,
+    write_cgsa_identity,
+)
+
+#: 測試用 algorithm_id（NUMVIEW D7 葉名）
+_AID = "a" * 64
 
 
 @pytest.fixture(autouse=True)
@@ -32,7 +43,10 @@ def test_paths_validate_and_preserve_existing_rules(tmp_path: Path) -> None:
             validate_config_hash(invalid)
     assert safe_token("BTC/USDT") == "BTC_USDT"
     assert features_run_dir(tmp_path, "BTCUSDT", "12h", "cfg_batch2d") == tmp_path / "BTCUSDT" / "12h" / "cfg_batch2d"
-    assert cgsa_work_dir(tmp_path, "BTC/USDT", "12 h", "abcdefgh123") == (tmp_path / "BTC_USDT_12_h_abcdefgh").resolve()
+    # NUMVIEW D7：層名含完整 config_hash，葉＝層／完整 algorithm_id
+    layer = cgsa_config_layer_dir(tmp_path, "BTC/USDT", "12 h", "abcdefgh123")
+    assert layer == (tmp_path / "BTC_USDT_12_h_abcdefgh123").resolve()
+    assert cgsa_work_dir(tmp_path, "BTC/USDT", "12 h", "abcdefgh123", _AID) == layer / _AID
 
 
 def test_locks_exclusive_release_and_active(tmp_path: Path) -> None:
@@ -174,8 +188,9 @@ def _create_run(manager: RunLifecycleManager, registry: FeatureRegistry, config_
     feature_leaf = features_run_dir(manager.features_root, "BTCUSDT", "12h", config_hash)
     feature_leaf.mkdir(parents=True)
     (feature_leaf / "data.bin").write_bytes(b"features")
-    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
+    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash, _AID)
     cgsa_leaf.mkdir(parents=True)
+    write_cgsa_identity(cgsa_leaf, cgsa_identity_payload("BTCUSDT", "12h", config_hash, _AID))
     (cgsa_leaf / "manifest.json").write_text('{"config_hash":"' + config_hash + '"}')
     registry.add({
         **_entry(config_hash),
@@ -206,13 +221,15 @@ def test_delete_rejects_symlink_and_keeps_registry(tmp_path: Path) -> None:
     assert outside.exists()
 
 
-def test_delete_cgsa_ownership_and_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_delete_cgsa_layer_isolated_and_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # NUMVIEW D7：刪除單位為完整 config_hash 之層；前八碼相同之他 run 之層不受影響（舊版以 manifest 比對歸屬防前綴碰撞）
     manager, registry = _manager(tmp_path)
     _create_run(manager, registry, "cfg_batch2d")
-    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", "cfg_batch2d")
-    (cgsa_leaf / "manifest.json").write_text('{"config_hash":"cfg_other"}')
+    _create_run(manager, registry, "cfg_batch2d_sibling")
+    sibling_layer = cgsa_config_layer_dir(manager.cgsa_root, "BTCUSDT", "12h", "cfg_batch2d_sibling")
     result = manager.delete_run("BTCUSDT", "12h", "cfg_batch2d")
-    assert "ownership_mismatch" in result.skipped and cgsa_leaf.exists()
+    assert result.cgsa_deleted and not cgsa_config_layer_dir(manager.cgsa_root, "BTCUSDT", "12h", "cfg_batch2d").exists()
+    assert sibling_layer.is_dir()
 
     _create_run(manager, registry, "cfg_other")
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "override"))

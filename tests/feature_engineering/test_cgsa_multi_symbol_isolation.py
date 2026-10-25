@@ -84,7 +84,7 @@ def test_shards_isolated_across_production_symbol_tf_workdirs(tmp_path: Path, mo
     n_rows, n_cols = 8192, 2048
     cases = {("ETHUSDT", "1h"): 1.0, ("BTCUSDT", "1h"): 2.0, ("ETHUSDT", "12h"): 3.0}
     cols = np.arange(n_cols, dtype=np.float32)[None, :]
-    dirs = {key: cgsa_work_dir(tmp_path, key[0], key[1], "cfgiso01") for key in cases}
+    dirs = {key: cgsa_work_dir(tmp_path, key[0], key[1], "cfgiso01", "a" * 64) for key in cases}
     assert len(set(dirs.values())) == len(cases)
     regs = {}
     for (sym, tf), value in cases.items():

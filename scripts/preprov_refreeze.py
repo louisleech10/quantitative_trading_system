@@ -20,14 +20,23 @@ failopen 之比對域（具名限制）：凍結之 `aggregate_sha256` 含兩個
 收據：`tests/_golden/preprov/refreeze_receipt.json`（每檔一段：command、exit_code、base_commit、前後檔 sha256、逐項
 frozen_before／stripped_recomputed／equal／new_value／diff_paths）。`--check`：重算並比對，不寫任何檔。
 
+NUMVIEW Task 4.2（docs/NUMVIEW_SPEC.md §G 結構凍結；`--profile numview`，CLI 預設）：同一證法，剝除改為 NUMVIEW 之 manifest
+新鍵（artifact 節點與頂層之 fingerprint／algorithm_id／路由身分、頂層 observed_arms；鍵名讀契約）——PRE-PROV 之
+`content_sha256`／`provenance` 已重凍入現行凍結值，故不再剝除；另 `probewinsor` 項：各格 config_hash 以「去 NUMVIEW 鹽
+（契約 `config_hash_salt.key`）依原算法重算＝凍結值」證之（D1；只算 hash、不生成）。收據
+`tests/_golden/numview/refreeze_receipt.json`。failopen 不在 NUMVIEW 範圍（新增之 CGSA 葉身分檔屬中繼資料，由該測試之
+比對域排除）。`--profile preprov` 為上列原設定（函式預設值即此 profile）。
+
 用法（真實資料重型跑；單行程串行、獨占、不與委員輪並行）：
   PYTHONPATH=. venv/bin/python scripts/preprov_refreeze.py framepath [--check] [--cells C1,C2]   # 約 30 分（12 格）
-  PYTHONHASHSEED=0 PYTHONPATH=. venv/bin/python scripts/preprov_refreeze.py failopen [--check]   # 約 36 分
+  PYTHONHASHSEED=0 PYTHONPATH=. venv/bin/python scripts/preprov_refreeze.py failopen --profile preprov [--check]   # 約 36 分
+  PYTHONPATH=. venv/bin/python scripts/preprov_refreeze.py probewinsor [--check]   # 秒級（只算 hash）
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import copy
 import hashlib
 import importlib
@@ -37,7 +46,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -49,6 +58,10 @@ FRAMEPATH_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
 FAILOPEN_REL = "tests/_golden/failopen/baseline.json"
 #: §G 剝除之 manifest artifact 節點新鍵（FFDSTAR Task 1.3 ⑦／1.4）
 STRIPPED_KEYS: Tuple[str, ...] = ("content_sha256", "provenance")
+#: §G 剝除之 manifest 頂層新鍵（PRE-PROV 無；NUMVIEW 見 `activate_numview`）
+STRIPPED_ROOT_KEYS: Tuple[str, ...] = ()
+#: config_hash 鹽鍵（PRE-PROV 無；NUMVIEW 見 `activate_numview`）
+SALT_KEY: Optional[str] = None
 #: 剝除之 run 根路徑段（紀錄檔目錄）
 PROVENANCE_DIR = "provenance"
 #: failopen 受影響單元（ETHUSDT/multi 為 FF-NAME K0，不得動）
@@ -62,6 +75,17 @@ class RefreezeError(RuntimeError):
     """前置條件不成立（具名拒寫）。"""
 
 
+def activate_numview() -> None:
+    """NUMVIEW Task 4.2 之剝除設定（鍵名讀契約 `manifest_keys`、`config_hash_salt.key`；收據另寫 NUMVIEW 之檔）。"""
+    global RECEIPT_REL, STRIPPED_KEYS, STRIPPED_ROOT_KEYS, SALT_KEY
+    contract = json.loads((REPO / "momentum/FeatureEngineering/contracts/numeric_view.json").read_text(encoding="utf-8"))
+    keys = contract["manifest_keys"]
+    RECEIPT_REL = "tests/_golden/numview/refreeze_receipt.json"
+    STRIPPED_KEYS = tuple(keys[r] for r in ("fingerprint", "algorithm_id", "route_identity"))
+    STRIPPED_ROOT_KEYS = STRIPPED_KEYS + (keys["observed_arms"],)
+    SALT_KEY = str(contract["config_hash_salt"]["key"])
+
+
 def _framepath_module() -> Any:
     return importlib.import_module("scripts.freeze_framepath_baseline")
 
@@ -73,8 +97,10 @@ def _failopen_module() -> Any:
 # ---------------------------------------------------------------------------------------------- 剝除（純函式）
 
 def strip_manifest(manifest: Mapping[str, Any]) -> Dict[str, Any]:
-    """manifest 之深拷貝，刪各 artifact 節點之 `STRIPPED_KEYS`（不存在者略過；其餘鍵原樣）。"""
+    """manifest 之深拷貝，刪各 artifact 節點之 `STRIPPED_KEYS` 與頂層之 `STRIPPED_ROOT_KEYS`（不存在者略過；其餘鍵原樣）。"""
     out = copy.deepcopy(dict(manifest))
+    for key in STRIPPED_ROOT_KEYS:
+        out.pop(key, None)
     for node in (out.get("artifacts") or {}).values():
         if isinstance(node, dict):
             for key in STRIPPED_KEYS:
@@ -97,9 +123,12 @@ def json_key_diffs(a: Any, b: Any, prefix: str = "") -> List[str]:
 
 
 def is_structural_manifest_path(path: str) -> bool:
-    """manifest 差異路徑（`<檔>#<鍵路徑>`）是否恰為 artifact 節點之新鍵：`artifacts.<kind>.<STRIPPED_KEYS 之一>`。"""
+    """manifest 差異路徑（`<檔>#<鍵路徑>`）是否恰為新鍵：`artifacts.<kind>.<STRIPPED_KEYS 之一>` 或頂層之
+    `STRIPPED_ROOT_KEYS` 之一（一側缺鍵時差異路徑即該鍵本身）。"""
     key_path = path.split("#", 1)[1] if "#" in path else path
     segs = key_path.split(".")
+    if len(segs) == 1:
+        return segs[0] in STRIPPED_ROOT_KEYS
     return len(segs) == 3 and segs[0] == "artifacts" and segs[2] in STRIPPED_KEYS
 
 
@@ -271,6 +300,80 @@ def failopen_dumps(doc: Any) -> str:
     return json.dumps(doc, indent=2, sort_keys=True) + "\n"
 
 
+# ---------------------------------------------------------------------------------------------- probewinsor（NUMVIEW）
+
+PROBEWINSOR_REL = "tests/_golden/probewinsor/baseline.json"
+#: probewinsor 錨點形本即不含之鹽（`test_probewinsor._hash_violations`：探測鹽之格 hash ≠ 錨點）
+PROBE_SALT_KEY = "_probe_l65_gate"
+
+
+@contextlib.contextmanager
+def config_hash_pairs(extra_strip: Sequence[str] = ()) -> Iterator[Dict[str, str]]:
+    """期間每次 `FeatureFactory._compute_config_hash` 記（回傳值 → 去 `SALT_KEY` 依原算法之值）（§G 證法；同 FF-NAME
+    之鹽證法：同一 payload 刪鍵後之 json.dumps 重算）。`extra_strip`：凍結值本即不含之鍵，兩值皆先刪；回傳值即此形。"""
+    import momentum.FeatureEngineering.feature_factory as ff_mod
+
+    pairs: Dict[str, str] = {}
+    real_hash = ff_mod.FeatureFactory._compute_config_hash
+    real_dumps = ff_mod.json.dumps
+
+    def stripping(keys: Sequence[str]) -> Any:
+        def dumps(obj: Any, *a: Any, **k: Any) -> str:
+            if isinstance(obj, dict) and any(key in obj for key in keys):
+                obj = {kk: v for kk, v in obj.items() if kk not in keys}
+            return real_dumps(obj, *a, **k)
+        return dumps
+
+    def spy(self: Any, *a: Any, **k: Any) -> str:
+        try:
+            ff_mod.json.dumps = stripping(tuple(extra_strip))
+            full = real_hash(self, *a, **k)
+            ff_mod.json.dumps = stripping(tuple(extra_strip) + (str(SALT_KEY),))
+            pairs[full] = real_hash(self, *a, **k)
+        finally:
+            ff_mod.json.dumps = real_dumps
+        return full
+
+    ff_mod.FeatureFactory._compute_config_hash = spy
+    try:
+        yield pairs
+    finally:
+        ff_mod.FeatureFactory._compute_config_hash = real_hash
+
+
+def run_probewinsor(frozen_doc: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    """probewinsor 各格之 config_hash（只算 hash、不生成；NUMVIEW profile）：錨點形＝去探測鹽；去 NUMVIEW 鹽之錨點形須＝
+    凍結值，新值＝含 NUMVIEW 鹽之錨點形。"""
+    if SALT_KEY is None:
+        raise RefreezeError("probewinsor 只限 NUMVIEW profile")
+    import tests.feature_engineering.test_probewinsor as tp
+
+    factory = tp._factory()
+    items = []
+    for cid in tp._CELLS:
+        with config_hash_pairs(extra_strip=(PROBE_SALT_KEY,)) as pairs:
+            full = tp._hash_of(factory, cid)
+        frozen = frozen_doc["cells"][cid]["config_hash"]
+        stripped = pairs.get(full)
+        items.append({"item": cid, "field": f"cells.{cid}.config_hash", "frozen_before": frozen,
+                      "stripped_recomputed": stripped, "equal": stripped == frozen, "new_value": full,
+                      "changed": full != frozen, "diff_paths": [],
+                      "other_diffs": [] if stripped == frozen else [f"去鹽重算 {stripped} ≠ 凍結值 {frozen}"]})
+    return items
+
+
+def apply_probewinsor(doc: Dict[str, Any], items: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    out = copy.deepcopy(doc)
+    for item in items:
+        out["cells"][item["item"]]["config_hash"] = item["new_value"]
+    return out
+
+
+def probewinsor_dumps(doc: Any) -> str:
+    """同 `freeze_probewinsor_baseline` 之寫檔格式。"""
+    return json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+
+
 # ---------------------------------------------------------------------------------------------- 收據與寫檔
 
 def _sha(data: bytes) -> str:
@@ -285,6 +388,10 @@ def _git(*args: str) -> Tuple[int, bytes]:
 def load_receipt(path: Path) -> Dict[str, Any]:
     if Path(path).is_file():
         return json.loads(Path(path).read_text(encoding="utf-8"))
+    if SALT_KEY is not None:
+        return {"schema_version": SCHEMA_VERSION, "spec": "docs/NUMVIEW_SPEC.md §G 結構凍結、Task 4.2（沿用 FFDSTAR §G 證法）",
+                "stripped_keys": list(STRIPPED_KEYS), "stripped_root_keys": list(STRIPPED_ROOT_KEYS),
+                "config_hash_salt_key": SALT_KEY, "files": []}
     return {"schema_version": SCHEMA_VERSION, "spec": "docs/FFDSTAR_SPEC.md §G 證法、Task 3.1",
             "stripped_keys": list(STRIPPED_KEYS), "files": []}
 
@@ -354,6 +461,9 @@ def check_errors(kind: str, items: Sequence[Mapping[str, Any]], current_doc: Map
         if kind == "framepath":
             if item["new_value"] != current_doc["cells"][name]["fingerprint"][FRAMEPATH_FIELD]:
                 errs.append(f"{name}：全值 ≠ 現檔")
+        elif kind == "probewinsor":
+            if item["new_value"] != current_doc["cells"][name]["config_hash"]:
+                errs.append(f"{name}：config_hash ≠ 現檔")
         else:
             current = current_doc["multi_tf"][name.split("/")[0]]["artifacts"]
             errs += [f"{name}：{d}" for d in artifact_entry_diffs(current, item["_artifacts"])]
@@ -374,8 +484,9 @@ def finalize(kind: str, golden_path: Path, rel: str, current: bytes, head: str, 
     sha_before = sha_after = _sha(current)
     if ok:
         doc = json.loads(current.decode("utf-8"))
-        new_doc = apply_framepath(doc, items) if kind == "framepath" else apply_failopen(doc, items)
-        text = (framepath_dumps if kind == "framepath" else failopen_dumps)(new_doc)
+        new_doc = {"framepath": apply_framepath, "failopen": apply_failopen,
+                   "probewinsor": apply_probewinsor}[kind](doc, items)
+        text = DUMPS[kind](new_doc)
         _write_atomic(Path(golden_path), text)
         sha_after = _sha(text.encode("utf-8"))
     section = build_section(rel, command, items, base_commit=head, sha_before=sha_before, sha_after=sha_after,
@@ -385,16 +496,27 @@ def finalize(kind: str, golden_path: Path, rel: str, current: bytes, head: str, 
     return 0 if ok else 1
 
 
+DUMPS = {"framepath": framepath_dumps, "failopen": failopen_dumps, "probewinsor": probewinsor_dumps}
+GOLDEN_REL = {"framepath": FRAMEPATH_REL, "failopen": FAILOPEN_REL, "probewinsor": PROBEWINSOR_REL}
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("kind", choices=("framepath", "failopen"))
+    ap.add_argument("kind", choices=("framepath", "failopen", "probewinsor"))
+    ap.add_argument("--profile", choices=("numview", "preprov"), default="numview",
+                    help="剝除設定（numview＝NUMVIEW Task 4.2；preprov＝FFDSTAR／PRE-PROV b4，已定案）")
     ap.add_argument("--check", action="store_true", help="重算並比對，不寫任何檔")
     ap.add_argument("--cells", default="", help="framepath 只跑列出之格（逗號分隔；只限 --check）")
     ap.add_argument("--work-root", default="", help="生成工作根（預設系統暫存下新目錄，結束刪除）")
-    ap.add_argument("--receipt", default=str(REPO / RECEIPT_REL))
+    ap.add_argument("--receipt", default="", help="收據路徑（預設依 profile）")
     args = ap.parse_args(argv)
+    if args.profile == "numview":
+        if args.kind == "failopen":
+            raise RefreezeError("failopen 不在 NUMVIEW 重凍範圍（見檔頭）；PRE-PROV 之重算用 --profile preprov")
+        activate_numview()
+    args.receipt = args.receipt or str(REPO / RECEIPT_REL)
     command = "scripts/preprov_refreeze.py " + " ".join(argv if argv is not None else sys.argv[1:])
-    rel = FRAMEPATH_REL if args.kind == "framepath" else FAILOPEN_REL
+    rel = GOLDEN_REL[args.kind]
     receipt_path = Path(args.receipt)
     receipt = load_receipt(receipt_path)
     fp_cells = list(_framepath_module().CELLS)
@@ -407,12 +529,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         frozen_doc, section = check_baseline(rel, receipt)
         current, head = (REPO / rel).read_bytes(), ""
     else:
-        current, head = preflight(rel, framepath_dumps if args.kind == "framepath" else failopen_dumps, receipt)
+        current, head = preflight(rel, DUMPS[args.kind], receipt)
         frozen_doc, section = json.loads(current.decode("utf-8")), None
     work_root = Path(args.work_root) if args.work_root else Path(tempfile.mkdtemp(prefix="preprov_refreeze_"))
     try:
         if args.kind == "framepath":
             items = run_framepath(cells, frozen_doc, work_root)
+        elif args.kind == "probewinsor":
+            items = run_probewinsor(frozen_doc)
         else:
             items = run_failopen(FAILOPEN_UNITS, frozen_doc, work_root)
     finally:

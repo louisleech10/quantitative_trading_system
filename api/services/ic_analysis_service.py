@@ -11,7 +11,7 @@ from io import BytesIO
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 import h5py
 import numpy as np
@@ -41,6 +41,9 @@ from momentum.factories import (
     executed_post_ic_arm,
     feature_naming_version_error_type,
     ic_page_record_keys,
+    ic_page_view_id,
+    ic_view_identity_mismatch_error,
+    numeric_algorithm_id,
     post_ic_entry_arm,
     ratio_unsafe_category,
     resolve_run_feature_count,
@@ -2859,7 +2862,7 @@ class ICAnalysisService:
         features_path: Optional[str] = task_info.get("req_features_path")
         config_hash: Optional[str] = task_info.get("req_config_hash")
 
-        # --- 2. Load feature DataFrame（NUMVIEW Task 2.2：連同來源 run 身分，只記錄、不比對）---
+        # --- 2. Load feature DataFrame（NUMVIEW Task 2.2：連同來源 run 身分）---
         df, run_identity = self._load_features_for_transforms(
             symbol,
             timeframe,
@@ -2867,6 +2870,14 @@ class ICAnalysisService:
             config_hash=config_hash,
         )
         logger.info("[apply_transforms] Loaded features: %d rows x %d cols", len(df), len(df.columns))
+        # NUMVIEW Task 4.3：載入 run 身分須逐鍵等於 IC 任務報告 metadata 之身分（run 於 IC 後重生 ⇒ 拒收）；報告身分缺或
+        # 為 null（舊任務／外部特徵路徑）⇒ 無法證明 view 與 IC 所用之 run 相同，依設計選擇⑦拒收
+        identity = run_identity.to_dict()
+        report_identity = self._report_run_identity(task_info)
+        if report_identity is None or dict(report_identity) != identity:
+            raise ic_view_identity_mismatch_error()(
+                f"IC 頁第三步：任務 {task_id} 之報告 run 身分 {'缺' if report_identity is None else '≠ 現行 run 身分'}"
+                "（run 已於 IC 後重生或為舊任務）；請以 symbol／timeframe 重跑 IC 分析")
 
         # --- 3. Filter to selected_features（ICPOSTLEAK：保序去重、只取存在者、ratio-unsafe 欄明示排除）---
         requested = _dedupe_preserve_order([str(c) for c in selected_features])
@@ -2913,8 +2924,11 @@ class ICAnalysisService:
         df = transformed["ic_page"].loc[:, kept_cols]
         # NUMVIEW Task 2.2：實際臂取自本次轉換之執行紀錄（不以契約政策值或環境推算）
         recorded_arm = executed_post_ic_arm(preprocessor.last_post_ic_execution()[1])
-        identity = run_identity.to_dict()
         attr_keys, response_keys = ic_page_record_keys()
+        # NUMVIEW Task 4.3：不可變 view 身分（同 view 冪等、不同 view 不覆寫）
+        algorithm_id = numeric_algorithm_id(transform_config.model_dump())
+        view_id = ic_page_view_id(run_identity=identity, transform_config=transform_config.model_dump(),
+                                  arm=recorded_arm, algorithm_id=algorithm_id, kept_cols=list(kept_cols))
         transforms_applied = [
             name for name, enabled in (("rank", rank), ("gaussian", gaussian), ("zscore", zscore)) if enabled
         ]
@@ -2939,7 +2953,7 @@ class ICAnalysisService:
 
         output_dir = Path("data_cache/reports")
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / f"post_ic_transforms_{task_id}.h5"
+        output_path = output_dir / f"post_ic_transforms_{task_id}_{view_id}.h5"
         df.to_hdf(str(output_path), key="features", mode="w", complevel=5)
         # oracle ⑤ / B3-XFORM-01：analysis_status attr 必寫；失敗 raise（禁吞回 success）
         from momentum.Analysis.ic_reporter import DegradedOOSViolation
@@ -2953,6 +2967,8 @@ class ICAnalysisService:
                 handle.attrs["oos_guarantees"] = bool(oos_guarantees)
                 handle.attrs[attr_keys["arm"]] = recorded_arm
                 handle.attrs[attr_keys["ff_run_identity"]] = json.dumps(identity, ensure_ascii=False)
+                handle.attrs[attr_keys["view_id"]] = view_id
+                handle.attrs[attr_keys["algorithm_id"]] = algorithm_id
                 if "features" in handle:
                     handle["features"].attrs["analysis_status"] = status_s
         except DegradedOOSViolation:
@@ -2980,7 +2996,17 @@ class ICAnalysisService:
             "excluded_features": excluded_features,
             response_keys["arm"]: recorded_arm,
             response_keys["ff_run_identity"]: identity,
+            response_keys["view_id"]: view_id,
+            response_keys["algorithm_id"]: algorithm_id,
         }
+
+    @staticmethod
+    def _report_run_identity(task_info: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+        """IC 任務報告 metadata 之 `ff_run_identity`（NUMVIEW Task 4.3）；報告或 metadata 缺、或值非物件 ⇒ None。"""
+        report = task_info.get("result") if isinstance(task_info, Mapping) else None
+        metadata = report.get("metadata") if isinstance(report, Mapping) else None
+        value = metadata.get(FF_RUN_IDENTITY_KEY) if isinstance(metadata, Mapping) else None
+        return dict(value) if isinstance(value, Mapping) else None
 
     def _load_features_for_transforms(
         self,

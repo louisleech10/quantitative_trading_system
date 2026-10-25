@@ -106,11 +106,15 @@ class RunIdentity:
     artifact_kind: str
     content_sha256: Optional[str]
     provenance_sha256: Optional[str]
+    # NUMVIEW D2：產生方式之身分（Task 4.1 `algorithm_id`）與事後路由身分（R5-B）；舊 run 無 ⇒ None
+    algorithm_id: Optional[str]
+    route_identity: Optional[str]
 
     @property
     def legacy(self) -> bool:
-        """舊 run（artifact 節點無 `content_sha256`；§C D6）⇒ True：IC 快取一律不沿用。"""
-        return self.content_sha256 is None
+        """舊 run（artifact 節點無 `content_sha256`〔FFDSTAR §C D6〕或無 `algorithm_id`〔NUMVIEW Task 4.2〕）⇒ True：
+        IC 快取一律不沿用。"""
+        return self.content_sha256 is None or self.algorithm_id is None
 
     def to_dict(self) -> Dict[str, Any]:
         """身分物件（鍵與順序＝契約 `run_identity_keys`；一切輸出中之鍵名為 `ff_run_identity`）。
@@ -606,6 +610,11 @@ def resolve_run_identity(manifest: Mapping[str, Any], artifact_kind: str) -> Run
     pointer = node.get("provenance")
     content = node.get("content_sha256")
     provenance_sha256 = pointer.get("sha256") if isinstance(pointer, Mapping) else None
+    from momentum.FeatureEngineering import numeric_view as _numeric_view
+
+    numeric_keys = _numeric_view.load_contract()["manifest_keys"]
+    algorithm = node.get(numeric_keys["algorithm_id"])
+    route = node.get(numeric_keys["route_identity"])
     return RunIdentity(
         symbol=manifest.get("symbol"),
         tf=manifest.get("tf"),
@@ -616,4 +625,6 @@ def resolve_run_identity(manifest: Mapping[str, Any], artifact_kind: str) -> Run
         artifact_kind=str(artifact_kind),
         content_sha256=None if content is None else str(content),
         provenance_sha256=None if provenance_sha256 is None else str(provenance_sha256),
+        algorithm_id=None if algorithm is None else str(algorithm),
+        route_identity=None if route is None else str(route),
     )

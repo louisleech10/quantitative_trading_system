@@ -16,6 +16,9 @@ import pytest
 from momentum.Analysis import survivor_contract as sc
 from momentum.Analysis.ic_config_schema import ContractValidationError, contract_enum
 
+#: 現行契約版本（直接讀契約檔，不經受測 loader；NUMVIEW Task 4.2：版本斷言改讀契約常數，不寫死字面）
+_CURRENT_VERSION = json.loads(sc.SURVIVOR_CONTRACT_PATH.read_text(encoding="utf-8"))["version"]
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _ALLOWED_TYPES = {"str", "int", "float", "bool", "list", "object", "null"}
@@ -53,7 +56,7 @@ def test_load_top_level_keys_exact():
     }
     assert set(contract.keys()) == expected
     assert sc.SURVIVOR_CONTRACT_TOP_KEYS == frozenset(expected)
-    assert contract["version"] == 3  # GAP-3 Task B2.4 升版（v1→v2：event 物件擴六鍵）；FFDSTAR Task 2.4 升版（v2→v3：provenance 加 ff_run_identity）
+    assert contract["version"] == _CURRENT_VERSION  # NUMVIEW Task 4.2 升版（v3→v4：ff_run_identity 內層 schema）；GAP-3 Task B2.4 升版（v1→v2：event 物件擴六鍵）；FFDSTAR Task 2.4 升版（v2→v3：provenance 加 ff_run_identity）
 
 
 # ---------------------------------------------------------------- ② capability_status_ref
@@ -94,7 +97,11 @@ def test_load_every_keys_schema_has_type_required_nullable():
         keys = obj["keys"]
         assert isinstance(keys, dict) and keys, label
         for key, spec in keys.items():
-            assert set(spec.keys()) == {"type", "required", "nullable"}, f"{label}.{key}"
+            # NUMVIEW Task 4.2 R2-E：object 型鍵可自帶內層 schema（keys＋additional_properties，遞迴驗證）
+            nested = {"keys", "additional_properties"} if spec.get("type") == "object" and "keys" in spec else set()
+            assert set(spec.keys()) == {"type", "required", "nullable"} | nested, f"{label}.{key}"
+            if nested:
+                assert spec["additional_properties"] is False and spec["keys"], f"{label}.{key}"
             assert spec["type"] in _ALLOWED_TYPES, f"{label}.{key}"
             assert isinstance(spec["required"], bool), f"{label}.{key}"
             assert isinstance(spec["nullable"], bool), f"{label}.{key}"
@@ -173,7 +180,7 @@ def test_mutation_missing_top_key_raises(tmp_path):
     """
     copy = tmp_path / "ic_survivor_contract.json"
     shutil.copy(sc.SURVIVOR_CONTRACT_PATH, copy)
-    assert sc.load_survivor_contract(copy)["version"] == 3  # 基線綠
+    assert sc.load_survivor_contract(copy)["version"] == _CURRENT_VERSION  # 基線綠
     data = json.loads(copy.read_text(encoding="utf-8"))
     del data["sample_scope_kind_values"]
     copy.write_text(json.dumps(data), encoding="utf-8")
@@ -187,7 +194,7 @@ def test_load_returns_copy_not_shared_singleton():
     a["version"] = 999
     a["reasons"]["marginal_ic"].append("tampered")
     b = sc.load_survivor_contract()
-    assert b["version"] == 3
+    assert b["version"] == _CURRENT_VERSION
     assert "tampered" not in b["reasons"]["marginal_ic"]
     assert a is not b
 
@@ -614,7 +621,7 @@ def test_v2_event_keyset_and_nulls_when_no_context():
     c = sc.load_survivor_contract()
     assert set(_V2_KEYS) <= set(c["event_definition_keys"]["keys"])
     payload = sc.build_survivor_output(**_event_kwargs())
-    assert payload["schema_version"] == 3 and payload["sample_scope"]["kind"] == "event"
+    assert payload["schema_version"] == _CURRENT_VERSION and payload["sample_scope"]["kind"] == "event"
     assert all(payload["sample_scope"]["event"][k] is None for k in _V2_KEYS)  # GAP-2 語意不變：全 null
     sc.validate_survivor_output(payload)
 
@@ -701,7 +708,7 @@ def test_v1_payload_explicitly_rejected_no_silent_coerce():
     payload["schema_version"] = 1
     with pytest.raises(ContractValidationError, match="legacy"):
         sc.validate_survivor_output(payload)
-    payload["schema_version"] = 4  # FFDSTAR Task 2.4：現行契約為 v3，未來版本＝4
+    payload["schema_version"] = _CURRENT_VERSION + 1  # 未來版本（版本讀契約常數）
     with pytest.raises(ContractValidationError, match="schema_version"):
         sc.validate_survivor_output(payload)
 

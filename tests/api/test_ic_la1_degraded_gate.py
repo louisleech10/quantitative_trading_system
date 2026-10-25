@@ -486,11 +486,15 @@ def degraded_task_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     from tests.feature_engineering.ffname_helpers import real_slice, write_canonical_run
 
     kline = real_slice(5, symbol="BTCUSDT", timeframe="1h")
-    df = pd.DataFrame({"feat_a": kline["close"].to_numpy(dtype=float)},
+    # NUMVIEW Task 3.4（v41）：生產 raw 只存 float16／float32，float64 原生輸出拒收 ⇒ 輸入取 float32
+    df = pd.DataFrame({"feat_a": kline["close"].to_numpy(dtype=np.float32)},
                       index=pd.DatetimeIndex(kline.index).tz_convert("UTC").tz_localize(None))
     library, features_path = write_canonical_run(tmp_path / "features", df, "BTCUSDT", "1h", "cfg_la1_degraded")
 
     report = _degraded_report()
+    # NUMVIEW Task 4.3：IC 頁比對報告 metadata 之 run 身分（真實 IC 報告帶之）⇒ 報告帶本 run 之身分
+    _frame, identity = library.load_with_identity("BTCUSDT", "1h", config_hash="cfg_la1_degraded")
+    report.setdefault("metadata", {})["ff_run_identity"] = identity.to_dict()
     analyzer = _FakeAnalyzer(df)
 
     app = FastAPI()

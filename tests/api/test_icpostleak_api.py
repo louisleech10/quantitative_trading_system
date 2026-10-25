@@ -54,7 +54,11 @@ def _run(tmp_path: Path, frame: pd.DataFrame, steps: List[str], selected: Option
     k = CONTRACT["kline"]
     library, path = write_canonical_run(tmp_path / f"features_{tag}", frame, k["symbol"], k["timeframe"], f"cfg_{tag}")
     tid = f"icpostleak_{tag}"
-    svc._tasks[tid] = {"req_features_path": str(path), "result": {"analysis_status": "ok_oos", "oos_guarantees": True}}
+    # NUMVIEW Task 4.3：IC 頁比對任務報告之 run 身分（真實 IC 任務之報告 metadata 帶之）⇒ 假任務帶本 run 之身分
+    _df, identity = library.load_with_identity(k["symbol"], k["timeframe"], config_hash=f"cfg_{tag}")
+    svc._tasks[tid] = {"req_features_path": str(path),
+                       "result": {"analysis_status": "ok_oos", "oos_guarantees": True,
+                                  "metadata": {"ff_run_identity": identity.to_dict()}}}
     original_library = svc._feature_library
     svc._feature_library = library
     try:

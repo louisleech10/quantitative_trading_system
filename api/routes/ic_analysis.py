@@ -30,7 +30,7 @@ from api.models.ic_models import (
 from api.core.config import settings
 from api.services.ic_analysis_service import ResultRevisionMismatch, ResultValidationError, ic_analysis_service
 from api.services.ic_result_projection import SortByNotAllowed
-from momentum.factories import load_ic_config
+from momentum.factories import ic_view_identity_mismatch_error, load_ic_config
 
 
 router = APIRouter(prefix="/api/v1/ic")
@@ -770,6 +770,9 @@ async def apply_transforms(task_id: str, request: ApplyTransformsRequest):
     except (FileNotFoundError, ValueError) as exc:
         status_code = 404 if "not found" in str(exc).lower() else 400
         raise HTTPException(status_code=status_code, detail=str(exc))
+    except ic_view_identity_mismatch_error() as exc:
+        # NUMVIEW Task 4.3：run 已於 IC 後重生或任務無 run 身分 ⇒ 409（請重跑 IC）
+        raise HTTPException(status_code=409, detail=str(exc))
     except Exception as exc:
         logger.error("apply-transforms failed for task %s: %s", task_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))

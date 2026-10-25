@@ -133,6 +133,52 @@ def test_mutation_strip_misses_key_not_equal(domain: Dict[str, Any], monkeypatch
     assert item["equal"] is False and item["stripped_recomputed"] != frozen
 
 
+# ---------------------------------------------------------------------------------------------- NUMVIEW profile（Task 4.2）
+
+@pytest.fixture()
+def numview(monkeypatch: pytest.MonkeyPatch) -> Dict[str, str]:
+    """啟用 NUMVIEW 剝除設定（模組全域於測後復原）；回傳契約 manifest_keys。"""
+    for name in ("RECEIPT_REL", "STRIPPED_KEYS", "STRIPPED_ROOT_KEYS", "SALT_KEY"):
+        monkeypatch.setattr(pr, name, getattr(pr, name))
+    pr.activate_numview()
+    contract = json.loads((Path(pr.REPO) / "momentum/FeatureEngineering/contracts/numeric_view.json")
+                          .read_text(encoding="utf-8"))
+    return {k: v for k, v in contract["manifest_keys"].items() if not k.startswith("_")}
+
+
+def _numview_manifest(keys: Dict[str, str]) -> Dict[str, Any]:
+    """PRE-PROV 重凍後之 manifest（含 content_sha256／provenance）＋NUMVIEW 新鍵（節點三鍵、頂層三鍵＋observed_arms）。"""
+    m = _new_manifest()
+    node = {keys["fingerprint"]: {"selectors": {"X": {"value": 1}}}, keys["algorithm_id"]: "a" * 64,
+            keys["route_identity"]: "r" * 64}
+    m["artifacts"]["raw"].update(copy.deepcopy(node))
+    m.update(node)
+    m[keys["observed_arms"]] = {"route_records": []}
+    return m
+
+
+def test_numview_profile_framepath_stripped_equals_preprov_frozen(domain: Dict[str, Any],
+                                                                 numview: Dict[str, str]) -> None:
+    """NUMVIEW：剝除節點與頂層之新鍵後＝現行（PRE-PROV 重凍後）凍結值；差異路徑恰為新鍵；PRE-PROV 之鍵不再剝除。"""
+    frozen = _frozen_value(_new_manifest())
+    new = _numview_manifest(numview)
+    item = pr.framepath_item("C1", _fp(frozen), _fp(_frozen_value(new)), {RUN_REL: new}, domain)
+    assert item["equal"] is True and item["stripped_recomputed"] == frozen and item["other_diffs"] == []
+    roles = ("fingerprint", "algorithm_id", "route_identity")
+    want = sorted([f"{RUN_REL}#artifacts.raw.{numview[r]}" for r in roles]
+                  + [f"{RUN_REL}#{numview[r]}" for r in roles + ("observed_arms",)])
+    assert sorted(item["diff_paths"]) == want
+
+
+def test_numview_profile_other_key_not_equal(domain: Dict[str, Any], numview: Dict[str, str]) -> None:
+    """NUMVIEW：另多一非新鍵之頂層鍵 ⇒ 剝除值≠凍結值（不等、不重凍）。"""
+    frozen = _frozen_value(_new_manifest())
+    new = _numview_manifest(numview)
+    new["numview_unlisted"] = 1
+    item = pr.framepath_item("C1", _fp(frozen), _fp(_frozen_value(new)), {RUN_REL: new}, domain)
+    assert item["equal"] is False
+
+
 # ---------------------------------------------------------------------------------------------- failopen
 
 def _entries(prov: bool = False, manifest_sha: str = "m" * 64) -> Dict[str, Any]:

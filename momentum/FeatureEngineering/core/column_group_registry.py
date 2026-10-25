@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -111,6 +111,9 @@ class ColumnGroupRegistry:
         self._manifest_context: dict[str, Any] = {}
         # FF-TFMETA Task 1.3：週期 → L1–L6 → (status 值, reason)；隨 manifest 往返供 resume 讀回
         self._layer_status_by_tf: Dict[str, Dict[str, Tuple[str, str]]] = {}
+        # NUMVIEW R6-A：續跑前之選路紀錄（resume 讀回）＋本次紀錄之來源（factory 登記）；隨 manifest 往返
+        self._prior_route_records: List[Dict[str, Any]] = []
+        self._route_record_source: Optional[Callable[[], List[Dict[str, Any]]]] = None
         self._group_parquet_paths: dict[str, str] = {}
         self._memory_buffer: dict[str, np.ndarray] = {}
         self._memory_buffer_limit = max(0, int(memory_buffer_groups))
@@ -134,6 +137,15 @@ class ColumnGroupRegistry:
     def work_dir(self) -> Path:
         """Registry working directory containing persisted intermediate files."""
         return self._work_dir
+
+    @property
+    def prior_route_records(self) -> List[Dict[str, Any]]:
+        """續跑前（前次中斷之 run）已落於 manifest 之選路紀錄（NUMVIEW R6-A；新建 registry ⇒ 空）。"""
+        return [dict(r) for r in self._prior_route_records]
+
+    def set_route_record_source(self, source: Callable[[], List[Dict[str, Any]]]) -> None:
+        """本次 run 之選路紀錄來源（factory 傳 `memory_budget.route_records`）；manifest 落盤時記前次＋本次。"""
+        self._route_record_source = source
 
     @property
     def manifest_path(self) -> Path:
@@ -1371,6 +1383,7 @@ class ColumnGroupRegistry:
             "config_snapshot": manifest.get("config_snapshot") or {},
             "created_at": manifest.get("created_at") or datetime.utcnow().isoformat(),
         }
+        registry._prior_route_records = [dict(r) for r in (manifest.get("route_records") or []) if isinstance(r, dict)]
         raw_layer_status = manifest.get("layer_status_by_tf")
         if isinstance(raw_layer_status, dict):
             registry._layer_status_by_tf = {
@@ -1610,6 +1623,10 @@ class ColumnGroupRegistry:
             "created_at": default_created_at,
             "groups": groups_payload,
         }
+        current_routes = list(self._route_record_source()) if self._route_record_source is not None else []
+        if self._prior_route_records or current_routes:
+            payload["route_records"] = self._to_json_safe(
+                {"r": [dict(r) for r in self._prior_route_records] + current_routes})["r"]
         if self._layer_status_by_tf:
             payload["layer_status_by_tf"] = {
                 tf: {layer_id: [status, reason] for layer_id, (status, reason) in sorted(entry.items())}

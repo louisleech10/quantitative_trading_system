@@ -1168,6 +1168,39 @@ POST /api/v1/ic/refilter
 }
 ```
 
+### 14.5b 套用 post-IC 轉換（IC 頁第三步）
+```http
+POST /api/v1/ic/apply-transforms/{task_id}
+```
+
+**Request Body**：`selected_features`（必填）、`rank`／`zscore`／`gaussian`（布林，至少一個開）、`rank_window`、`zscore_windows`。
+
+**功能**：對 IC 選中之欄套用與 IC-first 同一擇定核心之 post-IC 轉換（順序 rank → gaussian → zscore，輸出一律 float32），
+輸出寫入 `data_cache/reports/post_ic_transforms_<task_id>_<view_id>.h5`。`view_id`＝sha256（來源 run 身分、轉換設定、實際臂、
+`algorithm_id`、有序選欄）：同 view 冪等寫同一檔，不同 view 另存新檔、不覆寫（NUMVIEW Task 4.3）。
+
+**身分比對**：載入之特徵 run 身分須逐鍵等於 IC 任務報告 metadata 之 `ff_run_identity`；run 已於 IC 後重生、或任務報告無身分
+（舊任務、外部特徵路徑）⇒ **409**（請以 symbol／timeframe 重跑 IC）。
+
+**Response**：
+```json
+{
+  "task_id": "ic_...",
+  "selected_feature_count": 3,
+  "transforms_applied": ["rank", "zscore"],
+  "output_path": "data_cache/reports/post_ic_transforms_ic_..._<view_id>.h5",
+  "output_rows": 1000,
+  "output_cols": 3,
+  "analysis_status": "ok_oos",
+  "oos_guarantees": true,
+  "excluded_features": [],
+  "post_ic_arm": "pandas_legacy",
+  "ff_run_identity": {"symbol": "...", "tf": "...", "config_hash": "...", "algorithm_id": "...", "route_identity": "..."},
+  "view_id": "<sha256>",
+  "algorithm_id": "<sha256>"
+}
+```
+
 ### 14.6 取得 IC 衰減曲線
 ```http
 GET /api/v1/ic/decay/{feature_name}

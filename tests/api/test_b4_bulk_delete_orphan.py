@@ -28,7 +28,23 @@ from api.services.feature_factory_service import FeatureFactoryService
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.run_lifecycle import RunLifecycleManager
 from momentum.FeatureEngineering.run_locks import RunBusyError, RunLease, is_run_active
-from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir
+from momentum.FeatureEngineering.run_paths import (
+    cgsa_config_layer_dir,
+    cgsa_identity_payload,
+    cgsa_work_dir,
+    features_run_dir,
+    write_cgsa_identity,
+)
+
+#: NUMVIEW D7：CGSA 葉＝層／完整 algorithm_id；刪除與孤兒掃描以層為單位、歸屬讀葉之身分檔
+_AID = "c" * 64
+
+
+def _seed_cgsa_leaf(manager: RunLifecycleManager, symbol: str, timeframe: str, config_hash: str) -> Path:
+    leaf = cgsa_work_dir(manager.cgsa_root, symbol, timeframe, config_hash, _AID)
+    leaf.mkdir(parents=True, exist_ok=True)
+    write_cgsa_identity(leaf, cgsa_identity_payload(symbol, timeframe, config_hash, _AID))
+    return leaf
 
 
 PRODUCTION_DATA_CACHE = Path("data_cache")
@@ -70,8 +86,7 @@ def _create_run(
         encoding="utf-8",
     )
     if with_cgsa:
-        cgsa_leaf = cgsa_work_dir(manager.cgsa_root, symbol, timeframe, config_hash)
-        cgsa_leaf.mkdir(parents=True, exist_ok=True)
+        cgsa_leaf = _seed_cgsa_leaf(manager, symbol, timeframe, config_hash)
         (cgsa_leaf / "manifest.json").write_text(
             json.dumps({
                 "symbol": symbol,
@@ -171,7 +186,7 @@ async def test_bulk_delete_equiv_matches_sequential_delete_run(b4_client) -> Non
     for config_hash in hashes:
         leaf = features_run_dir(manager.features_root, "BTCUSDT", "12h", config_hash)
         assert not leaf.exists()
-        cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
+        cgsa_leaf = cgsa_config_layer_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
         assert not cgsa_leaf.exists()
 
 
@@ -181,7 +196,7 @@ async def test_bulk_delete_removes_cgsa_leaf(b4_client) -> None:
     client, _ff, manager, *_ = b4_client
     config_hash = "cfg_b4_cgsa"
     _create_run(manager, config_hash)
-    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
+    cgsa_leaf = cgsa_config_layer_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
     assert cgsa_leaf.exists()
 
     resp = await client.post(
@@ -540,9 +555,9 @@ async def test_orphan_cleanup_cgsa_only_orphan(b4_client) -> None:
     """CGSA-only 孤兒掃出+清（features/registry 皆無）。"""
     client, _ff, manager, *_ = b4_client
     config_hash = "cfg_cgsa_only"
-    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
-    cgsa_leaf.mkdir(parents=True)
-    (cgsa_leaf / "manifest.json").write_text(
+    leaf = _seed_cgsa_leaf(manager, "BTCUSDT", "12h", config_hash)
+    cgsa_leaf = leaf.parent  # NUMVIEW D7：清理單位＝層
+    (leaf / "manifest.json").write_text(
         json.dumps({
             "symbol": "BTCUSDT",
             "timeframe": "12h",

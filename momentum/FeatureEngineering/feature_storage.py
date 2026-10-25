@@ -714,6 +714,7 @@ class FeatureStorage:
         timeframe_completeness: Optional[Dict[str, List[str]]] = None,
         cross_tf_layer_failures: Sequence[str] = (),
         layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
+        numeric_identity: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Path:
         """Write IC-First raw L7 groups to the canonical V2 raw path.
 
@@ -734,6 +735,7 @@ class FeatureStorage:
             timeframe_completeness=timeframe_completeness,
             cross_tf_layer_failures=cross_tf_layer_failures,
             layer_status_by_tf=layer_status_by_tf,
+            numeric_identity=numeric_identity,
         )
 
     def write_raw_from_registry_stream(
@@ -758,8 +760,12 @@ class FeatureStorage:
         cross_tf_layer_failures: Sequence[str] = (),
         layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
         quality_gate: Optional[Dict[str, Any]] = None,
+        numeric_identity: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Tuple[Path, Dict[str, Any]]:
         """Stream CGSA registry groups into the canonical L7_raw artifact.
+
+        ``numeric_identity``：NUMVIEW D2 之 manifest 新鍵（{"artifact": 節點鍵值, "root": 頂層鍵值}）；於 manifest
+        單一提交點寫入。
 
         When ``preprocessor`` is provided, each group is transformed and written
         directly to parquet without rewriting the registry ``.npy`` file. This
@@ -1338,6 +1344,7 @@ class FeatureStorage:
                 completeness_meta=manifest_completeness,
                 content_sha256=content_sha256,
                 provenance=provenance_pointer.to_manifest(),
+                numeric_identity=numeric_identity,
             )
 
             if backup_dir is not None and backup_dir.exists():
@@ -1423,6 +1430,7 @@ class FeatureStorage:
         layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
         post_ic_arm: Optional[str] = None,
         execution: Tuple[Mapping[Tuple[str, str], Mapping[str, Any]], Mapping[str, Mapping[str, Any]]],
+        numeric_identity: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Path:
         """Write IC-First processed L7 groups to the canonical V2 processed path.
 
@@ -1451,6 +1459,7 @@ class FeatureStorage:
             layer_status_by_tf=layer_status_by_tf,
             post_ic_arm=post_ic_arm,
             execution=execution,
+            numeric_identity=numeric_identity,
         )
 
     def _write_l7_v2_artifact(
@@ -1472,6 +1481,7 @@ class FeatureStorage:
         execution: Optional[
             Tuple[Mapping[Tuple[str, str], Mapping[str, Any]], Mapping[str, Mapping[str, Any]]]
         ] = None,
+        numeric_identity: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Path:
         """L7 V2 artifact 之單一提交單元（FFDSTAR Task 1.4；raw 之 `write_raw` 同經此路徑）：群組檔、時間軸 sidecar 與
         紀錄檔一律先寫暫存根；安裝前先將舊 manifest 之該 artifact 節點標為不完整；artifact 目錄與暫存根檔（時間軸、
@@ -1620,6 +1630,7 @@ class FeatureStorage:
                 post_ic_arm=post_ic_arm,
                 content_sha256=content_sha256,
                 provenance=provenance_manifest,
+                numeric_identity=numeric_identity,
             )
 
             if backup_dir is not None and backup_dir.exists():
@@ -2102,6 +2113,7 @@ class FeatureStorage:
         post_ic_arm: Optional[str] = None,
         content_sha256: Optional[str] = None,
         provenance: Optional[Dict[str, Any]] = None,
+        numeric_identity: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Locked read-modify-write so raw/processed writers cannot clobber each other.
 
@@ -2128,6 +2140,7 @@ class FeatureStorage:
                 post_ic_arm=post_ic_arm,
                 content_sha256=content_sha256,
                 provenance=provenance,
+                numeric_identity=numeric_identity,
             )
             self._write_feature_manifest_v2_unlocked(run_dir, manifest)
             return manifest
@@ -2154,6 +2167,7 @@ class FeatureStorage:
         post_ic_arm: Optional[str] = None,
         content_sha256: Optional[str] = None,
         provenance: Optional[Dict[str, Any]] = None,
+        numeric_identity: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Dict[str, Any]:
         if existing_manifest:
             for key, expected in (("symbol", symbol), ("tf", tf), ("config_hash", config_hash)):
@@ -2205,6 +2219,8 @@ class FeatureStorage:
             artifact_manifest["content_sha256"] = str(content_sha256)
         if provenance is not None:  # FFDSTAR Task 1.3 ⑦：紀錄檔指標（鍵見契約 manifest_provenance_keys）
             artifact_manifest["provenance"] = dict(provenance)
+        if numeric_identity is not None:  # NUMVIEW D2：fingerprint、algorithm_id、路由身分（鍵名由寫入端讀契約）
+            artifact_manifest.update(json.loads(json.dumps(dict(numeric_identity["artifact"]), default=str)))
         manifest = existing_manifest or {
             "version": "l7_v2",
             "symbol": symbol,
@@ -2221,6 +2237,8 @@ class FeatureStorage:
         # FF-NAME §G ⑦（Task 2.6 通過條件；世代閘讀取端為 Task 3.4）：本 run 欄名之命名世代
         manifest["feature_naming_version"] = feature_naming.CURRENT_FEATURE_NAMING_VERSION
         manifest["groups"] = group_manifest
+        if numeric_identity is not None:  # NUMVIEW D2：頂層同記（另含 observed_arms）
+            manifest.update(json.loads(json.dumps(dict(numeric_identity["root"]), default=str)))
         if artifact_kind == "processed":
             # ICFIRSTALIGN Task 1.3：processed 之時間軸、列數、時間範圍只寫入其 artifact 節點；
             # 根之 time_range／row_count／row_index 只屬 raw（既存者不覆寫；無 raw 時亦不寫根 row_index）
