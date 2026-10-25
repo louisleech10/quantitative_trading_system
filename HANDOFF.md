@@ -6,6 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
+| 04-021 | HP-FFPROD | 進行中 | docs/TICKET_ORDER.md | 2026-10-26 開工（全票排序第 9 步「特徵生產層普查」，吸收原「縮尾重複」與 NUMVIEW §N R2／R5）：規模判定大（命中數值 a、跨模組 b、多 phase c）⇒ 完整管線。偵察諮詢 r1 兩家＋主委獨立版（handoffs/20261026-ffprod-x-consult-r1-claude.md），收斂檔 handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md 已銷帳：L2 公開結果（Polars）與 registry 落盤（pandas 逐類）兩份且 B／C 格非零差、L5／L6 讀公開結果；sigma 縮尾滾動均值／標準差於界線前轉 float32；PRE-PROV 只記縮尾狀態不記 method／參數；processed V2 與 HDF5 皆可達（HDF5 呼叫端為 ML／回測舊路，本票只登記）；d* 之 ADF 取樣串行前 N、平行後 N；單週期層間轉 float32 而多週期保留；zscore 最少有效值數三臂不一；多處無生產呼叫者之並存實作。改值組（L2 單一來源、sigma 高精度、zscore／d* 統一、層間 dtype、縮尾責任端）先以全特徵真實資料量差距再報使用者。下一步：起草 docs/FFPROD_SPEC.md 與 manifest。 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -25,6 +26,7 @@
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 全票排序第 15 步、一次做完（docs/TICKET_ORDER.md；使用者 2026-10-02 定）：於 FF-NAME、ICPATH、FFSTORE 後以新 run 重選 reference 一次。以下為停手時紀錄——🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀 |
 | 04-010 | HP-TESTSPEED | 停手 | HANDOFF.md | 2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。「各運算路徑取代表之快速版」經全票排序諮詢與使用者 2026-10-02 拍板作廢（與 2026-09-29「不挑代表、不接受專項專用」衝突；docs/TICKET_ORDER.md）；本票不再排程 |
+| 04-021 | HP-FFPROD | 進行中 | docs/TICKET_ORDER.md | 2026-10-26 開工（全票排序第 9 步「特徵生產層普查」，吸收原「縮尾重複」與 NUMVIEW §N R2／R5）：規模判定大（命中數值 a、跨模組 b、多 phase c）⇒ 完整管線。偵察諮詢 r1 兩家＋主委獨立版（handoffs/20261026-ffprod-x-consult-r1-claude.md），收斂檔 handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md 已銷帳：L2 公開結果（Polars）與 registry 落盤（pandas 逐類）兩份且 B／C 格非零差、L5／L6 讀公開結果；sigma 縮尾滾動均值／標準差於界線前轉 float32；PRE-PROV 只記縮尾狀態不記 method／參數；processed V2 與 HDF5 皆可達（HDF5 呼叫端為 ML／回測舊路，本票只登記）；d* 之 ADF 取樣串行前 N、平行後 N；單週期層間轉 float32 而多週期保留；zscore 最少有效值數三臂不一；多處無生產呼叫者之並存實作。改值組（L2 單一來源、sigma 高精度、zscore／d* 統一、層間 dtype、縮尾責任端）先以全特徵真實資料量差距再報使用者。下一步：起草 docs/FFPROD_SPEC.md 與 manifest。 |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
