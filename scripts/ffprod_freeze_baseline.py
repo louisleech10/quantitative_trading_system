@@ -200,6 +200,13 @@ def compare(frozen: Mapping[str, Any], actual: Mapping[str, Any], changed_target
     """§G 對照：回傳不符描述清單（空＝通過）。欄集合或欄序不同、非 `changed_targets` 之欄任一 `BITWISE_KEYS` 不等、
     `changed_targets` 之欄實際未改（少一欄）皆為不符。`frozen`／`actual` 為 `fingerprints` 之輸出。"""
     out: List[str] = []
+    if changed_targets and frozen.get("granularity") == "group":
+        # 群組粒度（全特徵格 C）之 columns 鍵為群組檔、非欄名：逐欄核可之對照須群組→欄映射，依 Task 2.2 裁定於 Phase 3
+        # 重凍時具體化（SPEC Task 3.x）；在此之前一律拒判，不以群組鍵比對欄名
+        return [f"群組粒度格不支援逐欄 changed_targets 對照（{len(changed_targets)} 欄待 Phase 3 具體化）"]
+    unknown = sorted(set(changed_targets) - set(frozen.get("columns", {})))
+    if unknown:
+        out.append(f"changed_targets 含凍結值中不存在之欄：{unknown[:5]}")
     for key in ("column_set_sha256", "column_order_sha256"):
         if frozen.get(key) != actual.get(key):
             out.append(f"{key} 不同")

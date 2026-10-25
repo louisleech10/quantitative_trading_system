@@ -235,6 +235,21 @@ def test_compare_exact_changed_targets() -> None:
     assert fb.compare(frozen, _fp({"a": "1"}), set()) != []                # 欄集合不同
 
 
+def test_compare_rejects_unknown_target_and_group_granularity_targets() -> None:
+    """`changed_targets` 含凍結值不存在之欄 ⇒ 不符（不得零差即放行）；群組粒度格（`granularity`＝group，columns 鍵為群組檔）
+    帶任何逐欄 changed_targets ⇒ 拒判（不以群組鍵比對欄名）；群組粒度格無 changed_targets ⇒ 照常逐位元。"""
+    fb = _load()
+    frozen = _fp({"a": "1"})
+    assert fb.compare(frozen, _fp({"a": "1"}), {"missing"}) != []
+    group = {"columns": {"raw/g.parquet": {"dtype": "d", "nan": "n", "values_native": "v"}}, "granularity": "group",
+             "column_set_sha256": "s", "column_order_sha256": "o"}
+    changed = {**group, "columns": {"raw/g.parquet": {"dtype": "D", "nan": "n", "values_native": "v"}}}
+    assert fb.compare(group, group, set()) == []
+    assert fb.compare(group, changed, set()) != []
+    assert fb.compare(group, changed, {"feature_1"}) != []
+    assert fb.compare(group, group, {"missing_feature"}) != []
+
+
 def test_gate_regenerated_cells_match_frozen() -> None:
     """§G（Phase 0–2、Phase 4）：現行 HEAD 重生之每格值指紋逐位元等於凍結值。於凍結 HEAD 跑即 SPEC Task 0.2「同格重跑
     兩次值指紋相同」（凍結為第一次、本案為第二次）。Phase 3 之逐候選／逐格對照依 Task 2.2 裁定於 SPEC 修訂版具體化
