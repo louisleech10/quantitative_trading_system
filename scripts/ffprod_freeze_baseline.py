@@ -82,7 +82,10 @@ class ArmMismatch(RuntimeError):
 def _load(name: str, path: Path) -> Any:
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
+    if name in sys.modules:
+        return sys.modules[name]
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module  # dataclass 定義於載入期需自模組表取得命名空間
     spec.loader.exec_module(module)
     return module
 
@@ -232,6 +235,17 @@ def _identity(cell: Mapping[str, Any], payload: Mapping[str, Any]) -> Dict[str, 
             "datasets": datasets}
 
 
+def cell_fingerprints(cell: Mapping[str, Any], run_dir: Path) -> Dict[str, Any]:
+    """§G 值指紋：格類屬 `numview_helpers.GROUP_GRANULARITY_KINDS`（全特徵格 C，約 20.9 萬欄；逐欄指紋使基準檔約 100 MB、
+    逾版控單檔上限）⇒ 群組粒度 `group_fingerprints`（任一欄之值、NaN、dtype、欄名或欄序改變 ⇒ 所屬群組或表層雜湊改變），
+    否則逐欄 `fingerprints`。"""
+    from tests.feature_engineering import numview_helpers as nh
+
+    if str(cell["kind"]) in nh.GROUP_GRANULARITY_KINDS:
+        return nh.group_fingerprints(Path(run_dir), "raw")
+    return nh.fingerprints(Path(run_dir), "raw")
+
+
 def _generate_in_process(cell: Mapping[str, Any], work: Path) -> Dict[str, Any]:
     """子行程內：隔離環境生成一格（`generate_features`、輸出段與連續性依 NUMVIEW 判準），回傳結果 dict。"""
     from momentum.factories import create_feature_factory
@@ -272,7 +286,7 @@ def _generate_in_process(cell: Mapping[str, Any], work: Path) -> Dict[str, Any]:
         manifests = sorted((Path(features_root) / symbol / primary).glob("*/feature_manifest.json"))
         if verdict.get("status") != "complete" or len(manifests) != 1:
             raise RuntimeError(f"{cell['id']}：run 非 complete 或 manifest 數 ≠ 1：{verdict}")
-        fingerprints = nh.fingerprints(manifests[0].parent, "raw")
+        fingerprints = cell_fingerprints(cell, manifests[0].parent)
     result: Dict[str, Any] = {"fingerprints": fingerprints, "identity": _identity(cell, payload),
                               "seconds": time.perf_counter() - started, "output_window": [start, end],
                               "observed_arms": arms}
