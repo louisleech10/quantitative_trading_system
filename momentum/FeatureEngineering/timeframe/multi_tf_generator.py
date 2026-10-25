@@ -645,8 +645,6 @@ class MultiTFGenerator:
             for outcome in outcomes:
                 if isinstance(outcome, BaseException):
                     raise outcome  # 串行臂之例外（並行臂之例外已於 join 後分類）
-            for task in tasks:  # NUMVIEW：worker 行程之選路紀錄併入本 run（manifest observed_arms／路由身分）
-                _memory_budget.adopt_route_records(scheduler.task_routes.get(task.task_id, []))
             self._memory_degraded_workers = getattr(scheduler, "degraded", None)
 
         self._report_progress("multi_tf", 0.7, "[CGSA-parallel] All TFs done")

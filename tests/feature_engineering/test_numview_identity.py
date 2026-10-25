@@ -896,21 +896,32 @@ def test_boundary_44_resolve_repeated_switch_recorded_each_time(switching: None,
     assert nv.route_identity(records) != nv.route_identity(records[1:])
 
 
-def test_resolve_worker_route_records_adopted_into_run(switching: None, monkeypatch: pytest.MonkeyPatch,
-                                                       tmp_path: Path) -> None:
-    """多週期 worker 行程之選路紀錄（排程器 `task_routes`）併入本 run：他行程 pid 者逐筆原樣入 `route_records`（路由身分
-    隨之改變）、未認證點觸發標記回呼；本行程 pid 者（串行臂，已在本 run）不重複併入。"""
+def test_resolve_worker_route_switch_collected_into_run_and_marked(switching: None, monkeypatch: pytest.MonkeyPatch,
+                                                                  tmp_path: Path) -> None:
+    """多週期 worker 行程內之換臂（`_trampoline` 經域目錄交出之紀錄）於排程器 `_collect_worker_routes` 併入本 run：
+    `route_records` 逐筆入（`worker_pid`＝worker 之 pid，路由身分隨之改變），未認證點觸發標記回呼寫本 run 葉之標記。"""
+    from types import SimpleNamespace
+
+    from momentum.factories import create_memory_budget_scheduler
+
     _register_point(monkeypatch, TEST_UNCERT_POINT, False)
-    own = os.getpid()
-    worker = {"event": "memory_route", "pid": own + 1, "point": TEST_UNCERT_POINT, "group": "4h_g", "from": ORIG_BRANCH,
-              "to": ALT_BRANCH}
-    serial = {**worker, "pid": own, "group": "1h_g"}
-    with mb.set_route_switch_marker(_writer(tmp_path)):
-        assert mb.adopt_route_records([worker, serial]) == 1
+    domain = tmp_path / "domain"
+    routes = domain / mb.ROUTES_DIR_NAME
+    routes.mkdir(parents=True)
+    worker_pid = os.getpid() + 1
+    (routes / "mtf:4h.json").write_text(json.dumps({"routes": [
+        {"event": "memory_route", "pid": worker_pid, "time": 0.0, "point": TEST_UNCERT_POINT, "group": "4h_g",
+         "from": ORIG_BRANCH, "to": ALT_BRANCH}]}), encoding="utf-8")
+    leaf = tmp_path / "leaf"
+    leaf.mkdir()
+    scheduler = create_memory_budget_scheduler(domain_dir=domain, max_workers=1)
+    with mb.set_route_switch_marker(_writer(leaf)):
+        scheduler._collect_worker_routes(SimpleNamespace(task=SimpleNamespace(task_id="mtf:4h")))
     records = mb.route_records()
-    assert [(r["pid"], r["group"]) for r in records] == [(own + 1, "4h_g")]
+    assert [(r.get("worker_pid"), r["point"], r["group"], r["to"]) for r in records] == [
+        (worker_pid, TEST_UNCERT_POINT, "4h_g", ALT_BRANCH)]
     assert nv.route_identity(records) != nv.route_identity([])
-    assert (tmp_path / _marker_name()).is_file()
+    assert (leaf / _marker_name()).is_file()
 
 
 # ---------------------------------------------------------------------------------------------- 單元工廠（不生成）
