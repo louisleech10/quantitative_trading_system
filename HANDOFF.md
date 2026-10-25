@@ -318,6 +318,9 @@
 - 🔴 **監看子代理完成勿 grep 交接檔中之 `SubagentHandback`**：該字串存在於工具定義、恆命中 ⇒ 改以「交接檔連續 N 分鐘無成長且無 pytest 程序」判定。
 - 🔴 **`committee_run --session` 須等於 task-id 之小寫**（2026-10-25 實測：task-id `20261020-NUMVIEW-B4-REVIEW-R11` ⇒ session `20261020-numview-b4-review-r11`），否則收斂與銷帳對不上。
 - 🔴 **含測試刪改之提交經 `git commit --amend` 後，清單檔仍掛 amend 前雜湊**（post-commit 依 tree 綁定，首次提交已把 `tree-*.txt` 改名 `pending-<舊sha>.txt`）：pre-push 照列舊雜湊；委員審清單之收斂檔須同列新舊雜湊，`test_change_review.sh mark` 用舊雜湊。
+- 🔴 **改了契約 `momentum/FeatureEngineering/contracts/numeric_view.json` 之 `_sources` 所登記之程式檔（`feature_factory.py`、`memory_budget.py`、`timeframe/multi_tf_generator.py` 等）後，提交前必跑 `tests/feature_engineering/test_numview_selectors.py tests/feature_engineering/test_numview_contract.py`**：增刪行即令登記行號漂移而紅（2026-10-26 3b7b5319、6ce912b8 兩度漏跑）。重定法：以最後兩測試皆綠之提交為基準，依原行全文於現檔找最近同全文行。
+- 🔴 **`check_decoupling.sh` 之 R2／R3／R4 不可用 grep 過濾後讀數**：一律讀其 `R2=… R3=… R4=…` 摘要行（2026-10-26 過濾後只見一行而誤記「一處」，實為 21 處，皆在 `scripts/decouple_baseline.txt`）。
+- 🔴 **gate 之誤判**：同一指令列中路徑含 `claude`（如 scratchpad 路徑 `claude-501`）又接 `-p` 旗標（如 `mkdir -p`）⇒ 被判為 `claude -p` 派工而擋；改用不帶 `-p` 之寫法。
 
 ## 進行中紀錄
 
