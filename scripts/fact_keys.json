@@ -1951,7 +1951,7 @@
         "HP-FFPROD",
         "進行中",
         "docs/TICKET_ORDER.md",
-        "2026-10-26 開工（全票排序第 9 步「特徵生產層普查」，吸收原「縮尾重複」與 NUMVIEW §N R2／R5）：規模判定大（命中數值 a、跨模組 b、多 phase c）⇒ 完整管線。偵察諮詢 r1 兩家＋主委獨立版（handoffs/20261026-ffprod-x-consult-r1-claude.md），收斂檔 handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md 已銷帳：L2 公開結果（Polars）與 registry 落盤（pandas 逐類）兩份且 B／C 格非零差、L5／L6 讀公開結果；sigma 縮尾滾動均值／標準差於界線前轉 float32；PRE-PROV 只記縮尾狀態不記 method／參數；processed V2 與 HDF5 皆可達（HDF5 呼叫端為 ML／回測舊路，本票只登記）；d* 之 ADF 取樣串行前 N、平行後 N；單週期層間轉 float32 而多週期保留；zscore 最少有效值數三臂不一；多處無生產呼叫者之並存實作。改值組（L2 單一來源、sigma 高精度、zscore／d* 統一、層間 dtype、縮尾責任端）先以全特徵真實資料量差距再報使用者。下一步：起草 docs/FFPROD_SPEC.md 與 manifest。"
+        "2026-10-26 開工（全票排序第 9 步「特徵生產層普查」，吸收原「縮尾重複」與 NUMVIEW §N R2／R5）：規模判定大（命中數值 a、跨模組 b、多 phase c）⇒ 完整管線。偵察諮詢 r1 兩家＋主委獨立版（handoffs/20261026-ffprod-x-consult-r1-claude.md），收斂檔 handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md 已銷帳：L2 公開結果（Polars）與 registry 落盤（pandas 逐類）兩份且 B／C 格非零差、L5／L6 讀公開結果；sigma 縮尾滾動均值／標準差於界線前轉 float32；PRE-PROV 只記縮尾狀態不記 method／參數；processed V2 與 HDF5 皆可達（HDF5 呼叫端為 ML／回測舊路，本票只登記）；d* 之 ADF 取樣串行前 N、平行後 N；單週期層間轉 float32 而多週期保留；zscore 最少有效值數三臂不一；多處無生產呼叫者之並存實作。改值組（L2 單一來源、sigma 高精度、zscore／d* 統一、層間 dtype、縮尾責任端）先以全特徵真實資料量差距再報使用者。SPEC docs/FFPROD_SPEC.md 經規格審查 r1–r6（收斂檔 handoffs/reconcile/20261026-ffprod-x-review-r{1..6}/synth.md 皆已銷帳）於 v6（473a757d）兩家 proceed 凍結；白話審閱 白話說明/FFPROD規格審閱.md（使用者離線、依「有問題你跟委員共識決定」續行）。下一步：依 templates/TODO_GENERATION_PROMPT.md 產 docs/manifests/FFPROD.json＋測試骨架並送審，再做 Phase 0（Task 0.1 盤點收據→Task 0.2 估時與改前基準凍結）。"
       ]
     ]
   },
