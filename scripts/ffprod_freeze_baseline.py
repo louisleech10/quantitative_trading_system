@@ -37,7 +37,9 @@ class ArmMismatch(RuntimeError):
 
 
 def cells() -> List[Dict[str, Any]]:
-    """回傳凍結格清單（每格含 `id`、`kind`、`symbol`、`timeframes`、`env`、L2 格另含 `declared_arm`）。"""
+    """回傳凍結格清單（每格含 `id`、`kind`、`symbol`、`timeframes`、`env`、`covers`〔該格獨有覆蓋之路徑標記，全部格之
+    聯集須含 `test_ffprod_gate.REQUIRED_COVERAGE`〕；L2 格另含 `declared_arm`〔亦列入 `covers`，`env` 含 `L2_ARM_ENV` 該臂〕）。
+    凍結 CLI 與重生對照皆用本清單。"""
     raise NotImplementedError("FFPROD Task 0.2")
 
 

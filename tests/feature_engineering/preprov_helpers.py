@@ -181,6 +181,11 @@ def _post_ic_defaults(payload: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
+def _winsor_sigma(payload: Dict[str, Any]) -> Dict[str, Any]:
+    payload["preprocessing"].setdefault("winsorization", {}).update({"enabled": True, "method": "sigma"})
+    return payload
+
+
 def _replace(payload: Dict[str, Any]) -> Dict[str, Any]:
     """前處理 mode 改為生產預設 replace（`feature_config.py` `mode: str = "replace"`；SPEC §V 格子 🔴：replace 才走 numba
     快速臂、shard 串流等路徑）。"""
@@ -246,6 +251,8 @@ VARIANTS: Dict[str, Dict[str, Any]] = {
     # h1_replace_stat_on 逐位元相同（驗證 08）
     "h1_replace_sharded": {**CELLS["h1_replace_stat_on"], "payload": _replace(_stat(["1h"], fracdiff=True, adf=True)),
                            "shard_bytes": 64 * 1024},
+    # FFPROD Task 1.2：同 h1_stat_on 但縮尾 method＝sigma（逐欄紀錄之 sigma k 分支）
+    "h1_winsor_sigma": {**CELLS["h1_stat_on"], "payload": _winsor_sigma(_stat(["1h"], fracdiff=True, adf=True))},
 }
 
 

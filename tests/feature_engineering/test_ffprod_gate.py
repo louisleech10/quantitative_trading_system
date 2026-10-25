@@ -61,7 +61,7 @@ def test_boundary_02_hardware_blocked_cell_marked(tmp_path: Path) -> None:
 
     def generate(cell: Mapping[str, Any]) -> Dict[str, Any]:
         if cell["id"] == "big":
-            raise GenerationMemoryBudgetExceeded("逾 8 GB")
+            raise GenerationMemoryBudgetExceeded("big", 6 << 30, 3 << 30, 8 << 30, "逾 8 GB")
         return {"fingerprints": _fp({"x": "a"}), "identity": {"head": "h"}}
 
     fb.freeze_cells([_cell("big"), _cell("small")], out, generate=generate)
@@ -92,6 +92,28 @@ def test_l2_arm_env_overrides_cover_three_arms() -> None:
     assert fb.L2_ARM_ENV["L2.pandas_serial"]["FFACT_L2_CATEGORY_WORKERS"] == "1"
 
 
+#: SPEC Task 0.2 改法之最少路徑集合（每格以 `covers` 宣告其獨有覆蓋；全部格之聯集須恰含下列各項）。
+REQUIRED_COVERAGE = {
+    "A_1h", "A_12h", "B_1h_4h", "C_1h", "winsor_sigma", "fracdiff_adf",
+    "L2.polars", "L2.pandas_serial", "L2.pandas_parallel",
+}
+
+
+def test_cells_cover_required_paths() -> None:
+    fb = _load()
+    cell_list = fb.cells()
+    ids = [c["id"] for c in cell_list]
+    assert len(ids) == len(set(ids))
+    covered = {tag for c in cell_list for tag in c["covers"]}
+    assert REQUIRED_COVERAGE <= covered, f"缺：{sorted(REQUIRED_COVERAGE - covered)}"
+    for cell in cell_list:
+        if "declared_arm" in cell:
+            assert cell["declared_arm"] in cell["covers"]
+            for key, value in fb.L2_ARM_ENV[cell["declared_arm"]].items():
+                assert cell["env"].get(key) == value, f"{cell['id']}：{key}"
+    assert {c["declared_arm"] for c in cell_list if "declared_arm" in c} == set(fb.L2_ARM_ENV)
+
+
 def test_compare_exact_changed_targets() -> None:
     fb = _load()
     frozen = _fp({"a": "1", "b": "2"})
@@ -104,22 +126,23 @@ def test_compare_exact_changed_targets() -> None:
 
 
 def test_gate_regenerated_cells_match_frozen() -> None:
-    """§G：現行 HEAD 重生之每格值指紋對凍結值，只准 `decisions.json` 之 `changed_targets` 不等（Phase 1 前為空集合）。"""
+    """§G（Phase 0–2、Phase 4）：現行 HEAD 重生之每格值指紋逐位元等於凍結值。於凍結 HEAD 跑即 SPEC Task 0.2「同格重跑
+    兩次值指紋相同」（凍結為第一次、本案為第二次）。Phase 3 之逐候選／逐格對照依 Task 2.2 裁定於 SPEC 修訂版具體化
+    （不得以全部候選 `changed_targets` 之聯集作全域放行），在此之前已有施工之決定 ⇒ 本案拒絕判定。"""
     fb = _load()
     assert fb.GOLDEN_PATH.exists(), f"改前基準未凍結：{fb.GOLDEN_PATH}"
     frozen = json.loads(fb.GOLDEN_PATH.read_text(encoding="utf-8"))
-    targets: Dict[str, set] = {}
     if fb.DECISIONS_PATH.exists():
-        for item in json.loads(fb.DECISIONS_PATH.read_text(encoding="utf-8"))["candidates"]:
-            if item.get("implemented_commit"):
-                targets.setdefault("*", set()).update(item["changed_targets"])
+        implemented = [d["candidate_id"] for d in json.loads(fb.DECISIONS_PATH.read_text(encoding="utf-8"))["candidates"]
+                       if d.get("implemented_commit")]
+        assert implemented == [], f"Phase 3 對照尚未具體化（Task 3.x），已施工：{implemented}"
     failures = []
     for cell in frozen["cell_list"]:
         entry = frozen["cells"][cell["id"]]
         if entry.get("status") == "blocked":
             continue
         actual = fb.regenerate(cell)["fingerprints"]
-        failures += [f"{cell['id']}: {m}" for m in fb.compare(entry["fingerprints"], actual, targets.get("*", set()))]
+        failures += [f"{cell['id']}: {m}" for m in fb.compare(entry["fingerprints"], actual, set())]
     assert failures == []
 
 

@@ -47,10 +47,26 @@ def decision_errors(decision: Mapping[str, Any], measured: Mapping[str, Any]) ->
     expected = set(options[decision["choice"]]["changed_columns"])
     if targets != expected:
         errors.append(f"{cid}：changed_targets 多 {sorted(targets - expected)[:5]} 少 {sorted(expected - targets)[:5]}")
-    if "canonical_source" in decision:
-        if decision["canonical_source"] not in L2_SOURCES or decision["canonical_source"] != decision["choice"]:
-            errors.append(f"{cid}：canonical_source {decision['canonical_source']!r} 不合")
+    if set(options) == set(L2_SOURCES) and decision.get("canonical_source") != decision["choice"]:
+        errors.append(f"{cid}：L2 候選之 canonical_source {decision.get('canonical_source')!r} 須等於 choice")
+    elif set(options) != set(L2_SOURCES) and "canonical_source" in decision:
+        errors.append(f"{cid}：非 L2 候選不得記 canonical_source")
     return errors
+
+
+def ruling_ref_errors(ref: str, spec_lines: List[str]) -> List[str]:
+    """`user_ruling_ref` 須為 `docs/FFPROD_SPEC.md:<行>`，該行位於 §A 段內（`## §A` 至下一個 `## ` 之間）且含使用者逐字「」。"""
+    prefix = "docs/FFPROD_SPEC.md:"
+    if not ref.startswith(prefix) or not ref[len(prefix):].isdigit():
+        return [f"格式不符：{ref!r}"]
+    line_no = int(ref[len(prefix):])
+    start = next((i for i, s in enumerate(spec_lines, 1) if s.startswith("## §A")), None)
+    end = next((i for i, s in enumerate(spec_lines, 1) if start and i > start and s.startswith("## ")), None)
+    if start is None or end is None or not (start < line_no < end):
+        return [f"{ref} 不在 §A 段內"]
+    if "「" not in spec_lines[line_no - 1]:
+        return [f"{ref} 該行無使用者逐字引文"]
+    return []
 
 
 # ---------------------------------------------------------------------------------------------- 驗證
@@ -69,7 +85,9 @@ def test_decisions_match_measured_options() -> None:
 
 
 def test_every_decision_cites_user_ruling() -> None:
-    assert all(str(d.get("user_ruling_ref", "")).strip() for d in _decisions())
+    spec_lines = (REPO / "docs" / "FFPROD_SPEC.md").read_text(encoding="utf-8").splitlines()
+    errors = [e for d in _decisions() for e in ruling_ref_errors(str(d.get("user_ruling_ref", "")), spec_lines)]
+    assert errors == []
 
 
 # ---------------------------------------------------------------------------------------------- 邊界（Task 2.2）
@@ -95,8 +113,20 @@ def test_mutation_extra_or_missing_target_detected(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(module, "_receipt", lambda: measured)
     monkeypatch.setattr(module, "_decisions", lambda: [good])
     test_decisions_match_measured_options()
+    missing_source = {k: v for k, v in good.items() if k != "canonical_source"}
     for broken in ({**good, "changed_targets": ["a", "b", "x"]}, {**good, "changed_targets": ["a"]},
-                   {**good, "canonical_source": "polars_public"}, {**good, "choice": "retain"}):
+                   {**good, "canonical_source": "polars_public"}, {**good, "choice": "retain"}, missing_source):
         monkeypatch.setattr(module, "_decisions", lambda b=broken: [b])
         with pytest.raises(AssertionError):
             test_decisions_match_measured_options()
+
+
+def test_mutation_ruling_ref_outside_section_a_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：決定紀錄之裁定引用改為任意字串或指到現行 SPEC §A 外之行 ⇒ 引用案轉紅。"""
+    spec_lines = (REPO / "docs" / "FFPROD_SPEC.md").read_text(encoding="utf-8").splitlines()
+    outside = next(i for i, s in enumerate(spec_lines, 1) if s.startswith("## §C"))
+    module = sys.modules[__name__]
+    for bad in ("garbage", f"docs/FFPROD_SPEC.md:{outside}", "docs/FFPROD_SPEC.md:1"):
+        monkeypatch.setattr(module, "_decisions", lambda b=bad: [{"candidate_id": "x", "user_ruling_ref": b}])
+        with pytest.raises(AssertionError):
+            test_every_decision_cites_user_ruling()

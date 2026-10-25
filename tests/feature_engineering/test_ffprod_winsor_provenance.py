@@ -1,9 +1,12 @@
 """FFPROD Task 1.2：縮尾有效設定入逐欄處理紀錄（SPEC `docs/FFPROD_SPEC.md` Task 1.2）。
 
 契約 `momentum/FeatureEngineering/contracts/run_provenance.json` 新增鍵 `winsor_effective_fields`（逐欄紀錄之縮尾有效設定欄名
-清單，皆屬 `record_columns`）；欄 `winsor_method` 值域＝契約 `winsor_method_values` ∪ {`disabled`, `passthrough`, `not_selected`}
-（後三者亦由契約列）。真實 kline 短窗生成沿 `tests/feature_engineering/preprov_helpers.py` 之格（`h1_stat_on` 縮尾開〔生產預設
-quantile〕、`h1_pp_off` 前處理關、`ratio_unsafe` 比值不安全欄原值通過），逐格單行程串行。
+清單，皆屬 `record_columns`：`winsor_method`、`winsor_lower_q`、`winsor_upper_q`、`winsor_sigma_k`、`winsor_window`、
+`winsor_min_periods`、`winsor_compute_dtype`；分位端點沿用產品碼 transform context 之 `_q` 鍵名）與值集
+`winsor_method_record_values`（`disabled`、`passthrough`、`not_selected`）；欄 `winsor_method` 值域＝契約
+`winsor_method_values` ∪ `winsor_method_record_values`。真實 kline 短窗生成沿 `tests/feature_engineering/preprov_helpers.py`
+之格（`h1_stat_on` 縮尾開〔生產預設 quantile〕、變體 `h1_winsor_sigma` 縮尾 sigma、`h1_pp_off` 前處理關、`ratio_unsafe`
+比值不安全欄原值通過），逐格單行程串行。
 """
 from __future__ import annotations
 
@@ -36,19 +39,43 @@ def _table(runs: ph.RunCache, cell: str) -> pd.DataFrame:
 def test_winsor_effective_fields_are_record_columns() -> None:
     contract = rp.load_contract()
     fields = _fields()
-    assert "winsor_method" in fields
+    assert fields == ["winsor_method", "winsor_lower_q", "winsor_upper_q", "winsor_sigma_k", "winsor_window",
+                      "winsor_min_periods", "winsor_compute_dtype"]
     assert set(fields) <= set(contract["record_columns"])
 
 
-def test_applied_columns_record_method_and_params(runs: ph.RunCache) -> None:
-    table = _table(runs, "h1_stat_on")
-    applied = table[table["winsorization"] == "applied"]
+def _assert_applied_params(applied: pd.DataFrame, method: str) -> None:
+    """逐 method 分支斷言全部有效設定欄：quantile ⇒ 兩分位端點有值、sigma k 為空；sigma ⇒ sigma k 有值、端點為空；
+    兩者之滾動窗、最少有效值、計算精度皆有值（產品碼之 transform context 鍵 `winsor_lower_q`／`winsor_upper_q`／
+    `winsor_window`／`winsor_min_periods`，`feature_preprocessor.py` 之 `_rolling_window`／`_rolling_min_periods`）。"""
     assert len(applied) > 0
-    methods = set(rp.contract_value_set(rp.load_contract(), "winsor_method_values"))
-    assert set(applied["winsor_method"]) <= methods
-    quantile = applied[applied["winsor_method"] == "quantile"]
-    assert quantile["winsor_lower"].notna().all() and quantile["winsor_upper"].notna().all()
-    assert applied["winsor_compute_dtype"].notna().all()
+    assert set(applied["winsor_method"]) == {method}
+    endpoints = applied[["winsor_lower_q", "winsor_upper_q"]]
+    if method == "quantile":
+        assert endpoints.notna().all().all() and applied["winsor_sigma_k"].isna().all()
+    else:
+        assert applied["winsor_sigma_k"].notna().all() and endpoints.isna().all().all()
+    for field in ("winsor_window", "winsor_min_periods", "winsor_compute_dtype"):
+        assert applied[field].notna().all(), field
+    assert (applied["winsor_min_periods"] <= applied["winsor_window"]).all()
+
+
+def test_applied_quantile_columns_record_all_params(runs: ph.RunCache) -> None:
+    table = _table(runs, "h1_stat_on")
+    _assert_applied_params(table[table["winsorization"] == "applied"], "quantile")
+
+
+def test_applied_sigma_columns_record_all_params(runs: ph.RunCache) -> None:
+    table = _table(runs, "h1_winsor_sigma")
+    _assert_applied_params(table[table["winsorization"] == "applied"], "sigma")
+
+
+def test_recorded_method_values_follow_contract(runs: ph.RunCache) -> None:
+    contract = rp.load_contract()
+    allowed = set(rp.contract_value_set(contract, "winsor_method_values")) | set(
+        rp.contract_value_set(contract, "winsor_method_record_values"))
+    for cell in ("h1_stat_on", "h1_winsor_sigma", "h1_pp_off", "ratio_unsafe"):
+        assert set(_table(runs, cell)["winsor_method"]) <= allowed, cell
 
 
 def test_old_record_contract_version_rejected(runs: ph.RunCache) -> None:
