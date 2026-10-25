@@ -45,8 +45,9 @@ def test_winsor_effective_fields_are_record_columns() -> None:
     assert set(fields) <= set(contract["record_columns"])
 
 
-#: 現行（Phase 3 前）兩 method 之縮尾界線皆以 float32 計（`_numba_transforms.py` sigma 分支 `move_mean(...).astype(np.float32)`、
-#: quantile 分支 `np.float32(quantile)`）。
+#: `winsor_compute_dtype`＝縮尾界線所依滾動統計量之 dtype。現行（Phase 3 前）兩 method、numba 與 pandas 兩臂皆為 float32：
+#: sigma 之滾動均值／標準差 `move_mean(...).astype(np.float32)`（`_numba_transforms.py`），quantile 之界線
+#: `rolling_quantile_2d` 回 `np.float32`；pandas 臂其後之裁切於 float64 進行，不改統計量 dtype。
 EXPECTED_COMPUTE_DTYPE = "float32"
 
 
