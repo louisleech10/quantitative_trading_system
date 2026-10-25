@@ -113,7 +113,8 @@ PER_COLUMN_SEGMENTS: Tuple[str, ...] = ("S0", "S1", "S2", "S3", "S4")
 L2_REPRO_SYMBOL, L2_REPRO_TF = "BTCUSDT", "12h"
 #: SPEC Task 5.1 點名之識別碼與措辭
 RM_NUMVIEW, ZERO_DIFF_WORD, SINGLE_STEP_WORD, OLD_ZSCORE_LITERAL = "RM-NUMVIEW", "零差", "單步", "0.00005"
-TICKET_ORDER_LINE = 36
+#: 第 4 步之列首（SPEC 起草時位於第 36 行；其後檔案增修使行號漂移，改依列首定位，恰一列）
+TICKET_ORDER_ROW_PREFIX = "| 4 |"
 TICKET_ORDER_OLD_PHRASE = "post-IC 鎖 Polars 正式臂"
 ROADMAP_BLOCK = "roadmap-status"
 
@@ -1663,8 +1664,9 @@ def test_roadmap_rm_numview_row_matches_fact_key_zero_diff() -> None:
 def test_ticket_order_line_36_scoped_ic_first_and_ic_page() -> None:
     """Task 5.1 驗證：`docs/TICKET_ORDER.md` 第 36 行（第 4 步）含 IC-first 與 IC 頁兩者之限定措辭（IC 頁依使用者
     2026-10-21 方向裁定於第 8 步一併鎖定），不再以「post-IC 鎖 Polars 正式臂」概稱。"""
-    line = read_text(TICKET_ORDER_PATH).splitlines()[TICKET_ORDER_LINE - 1]
-    assert line.startswith("| 4 |"), line[:40]
+    rows = [r for r in read_text(TICKET_ORDER_PATH).splitlines() if r.startswith(TICKET_ORDER_ROW_PREFIX)]
+    assert len(rows) == 1, f"第 4 步列須恰一列：{len(rows)}"
+    line = rows[0]
     assert "IC-first" in line and re.search(r"IC ?頁", line) and "2026-10-21" in line, line
     assert TICKET_ORDER_OLD_PHRASE not in line
 

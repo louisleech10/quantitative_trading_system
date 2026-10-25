@@ -43,7 +43,7 @@
 | 1 | FKPERF Task 4.5（小，ops） | 首個不改檔空檔背景跑全套治理測試；跑時不派委員、不改檔 | 無 |
 | 2 | PRE-RED（中） | 9 支既有紅逐支歸因（L1 五支、resume 二支、走 frame 之 `test_failopen_producer`／`test_failopen_manifest`、API alias 一支分開）＋FF 測試紅名單基線（名稱集合） | 無 |
 | 3 | RATIOUNSAFE（小） | `_is_ratio_unsafe_column` 對落盤帶週期欄名失效（`ohlc_12h_pattern_*` 之第二段為 `12h`；真實 manifest 43／43 漏判）⇒ 改讀結構化類別，IC 頁與 L6.5 共用；真實帶週期欄名測試 | 2 |
-| 4 | ICFIRSTALIGN 乙（大） | IC-first 建／復用 CGSA registry、L6.5 pre-IC 只縮尾／平穩化、raw 只由 registry 串流寫出（不依賴空 frame 分支）、L6.5 失敗語意明定並配 mutation；raw 讀回／選欄讀回／processed（`write_processed` 傳 row_index）三處時間軸、sidecar 必填、禁位置對齊；不可變 run context＋選窗介面；FU-2 全 NaN 守衛；MEM-RSS 對照量測（證明漏擋才改閘）；post-IC 鎖 Polars 正式臂（當時；2026-10-24 改裁 IC 頁與 IC-first 皆改 pandas，見上節）；label h 留 GLOBALH 接口；IC-first 測試遷離 `FFACT_USE_CGSA=0` | 2、3 |
+| 4 | ICFIRSTALIGN 乙（大） | IC-first 建／復用 CGSA registry、L6.5 pre-IC 只縮尾／平穩化、raw 只由 registry 串流寫出（不依賴空 frame 分支）、L6.5 失敗語意明定並配 mutation；raw 讀回／選欄讀回／processed（`write_processed` 傳 row_index）三處時間軸、sidecar 必填、禁位置對齊；不可變 run context＋選窗介面；FU-2 全 NaN 守衛；MEM-RSS 對照量測（證明漏擋才改閘）；IC-first 之 post-IC 鎖定正式臂（IC 頁第三步依使用者 2026-10-21 方向裁定於第 8 步 NUMVIEW 一併鎖定；2026-10-24 改裁 IC 頁與 IC-first 皆改 pandas，見上節）；label h 留 GLOBALH 接口；IC-first 測試遷離 `FFACT_USE_CGSA=0` | 2、3 |
 | 5 | FRAMEPATH（大） | 刪環境變數分派、legacy 多週期、frame 週期標記器、frame L7 落盤、舊特徵 h5 讀取（不含 IC 服務內部 h5、`kline_cache.h5`）；遷移／刪 frame 測試與腳本 | 4 |
 | 5a | TESTREG（大；2026-10-09 使用者裁定插入，於 FRAMEPATH b1 收尾後、b2 前） | 測試清冊自動維護：記錄器（耗時／結果／執行時間）、產出端登記檢查、自動過時標記、受影響測試挑選查清冊；首次分類由委員逐檔判斷保留／改寫／淘汰（淘汰須證覆蓋等價） | 5（b1）；FRAMEPATH 治理檔之改寫子批另依 5 之 b2 前 TODO 修訂（見 2026-10-13 註記） |
 | 5a-1 | PROBEWINSOR（大；2026-10-12 使用者裁定插入，於 TESTREG b2 收批後、b3 前） | 公開域預熱探測之縮尾門檻與公開輸出一致（前處理關閉時探測不縮尾）；前處理開／關 × 縮尾開之對照驗收：`warmup_late_columns.probe_late`、加倍次數與深度、公開輸出首個有限值；真實 kline | 5a（b2） |

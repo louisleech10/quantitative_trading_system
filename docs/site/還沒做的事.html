@@ -180,7 +180,7 @@
 <tr>
 <td>8</td>
 <td><strong>數值轉換版本與精度紀錄</strong></td>
-<td>定好轉換用哪套算法並記錄；量測落盤精度（不改你 9/29「維持自動選」的裁定）。另 10/18 查到：落盤時每欄依「整段資料」選精度，同一欄在較長資料下可能改存較低精度，所以歷史列存下來的數值會受後面資料影響（差在小數末幾位）</td>
+<td>定好轉換用哪套算法並記錄；量測落盤精度（不改你 9/29「維持自動選」的裁定）。另 10/18 查到：落盤時每欄依「整段資料」選精度；資料只往後延長時，同一欄只可能由較低精度（float16）改存較高精度（float32），不會反向降低，所以歷史列存下來的數值仍可能因後面資料而改變存法（差在小數末幾位）</td>
 <td>先定，ICPATH、GLOBALH 驗完才不用重驗</td>
 </tr>
 <tr>
@@ -311,7 +311,7 @@
 </table></div>
 <hr />
 <h2 id="四技術殘留你不會看到我自己追">四、技術殘留（你不會看到，我自己追）</h2>
-<p><strong>ICPOSTLEAK</strong>：各轉換分支之 z 分數算法精度不同（10/02 舊量測：Polars 分支單做標準化差約 0.00005、排名＋標準化差到 0.0975；registry 分支差到 0.04，但那條路現在不會被走到）。第 8 步 NUMVIEW 依你 10/21 方向處理：IC 後轉換固定 Polars 並改高精度計算（先報實測差距再改）。<strong>NUMVIEW 另留兩條</strong>（你 10/21 同意另處理）：①特徵產生階段收斂成一套算法（要先量 Polars 在 8GB 下分組處理的可行性與速度，另開票）；②「只影響怎麼跑」的設定（CPU 數、分批大小）目前全部記進產出身分，日後常改執行設定再個別排除（程式結構論證＋少量實測）。</p>
+<p><strong>ICPOSTLEAK</strong>：各轉換分支之 z 分數算法精度不同。10/02 舊量測之「Polars 分支差約 0.00005」是<strong>單步</strong>標準化（只做 z 分數一步）之數字，排名＋標準化差到 0.0975；第 8 步 NUMVIEW 於現行程式重量（Task 1.1 收據 <code>handoffs/run_receipts/20261023-numview-postic-branchdiff.json</code>）：單步標準化與參考值之最大差，pandas 兩分支約 0.0012、Polars 分支約 0.1。registry 分支之 z 分數那一段在現行原始特徵設定下不會被走到（不是整條 registry 路不走）。處置已完成：依你 10/24「IC頁與IC-first都改pandas」，IC 頁第三步與 IC-first 改用同一 pandas 核心、輸出一律 float32，Polars 不再用於 IC 後轉換。<strong>NUMVIEW 另留兩條</strong>：①特徵產生階段收斂成一套算法——已移入第 9 步「特徵生產層普查」；②「只影響怎麼跑」的設定：輸出位置類（含特徵登記檔路徑）與批次分工兩鍵已排除於產出身分之外（10/25 你選「分工設定不算進指紋」），其餘執行設定仍記入身分，日後常改再個別排除（程式結構論證＋少量實測）。</p>
 <p><strong>SPLITUNIFY</strong>：<code>R-4</code> 另開接線票／<code>SU-RESID-1</code>,<code>4</code>,<code>5</code>,<code>9A-UI</code>,<code>C5-TARGETS</code>,<code>V8-ATTEST</code>,
 <code>PAUSED-NO-RESULT</code>,<code>COMMITTEE-MODEL-EVIDENCE</code> 八條皆為待觸發。</p>
 <p><strong>GAP-3</strong>：20 條殘留，其中 5 條你在畫面上看得到（已併入第一節）；
