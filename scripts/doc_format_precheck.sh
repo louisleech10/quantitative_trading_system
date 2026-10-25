@@ -84,6 +84,7 @@ case "${rel}" in
 esac
 if [ -z "${kind}" ]; then
   case "${rel}" in
+    docs/API_SPECIFICATION.md) : ;;   # API 參考文件（CLAUDE.md Key Documentation），非票 SPEC；檔名含 SPEC 而誤判
     docs/*SPEC*.md) kind="spec" ;;
     docs/*TODO*.md) kind="todo" ;;
   esac
