@@ -34,6 +34,10 @@ def _fp(values: Mapping[str, str]) -> Dict[str, Any]:
     return {"columns": columns, "column_set_sha256": "|".join(sorted(order)), "column_order_sha256": "|".join(order)}
 
 
+#: 契約案之完整生成身分（SPEC Task 0.2：HEAD、設定、資料集 sha256）。
+_IDENTITY = {"head": "h", "config_sha256": "c", "dataset_sha256": "d"}
+
+
 def _cell(cell_id: str, **extra: Any) -> Dict[str, Any]:
     return {"id": cell_id, "kind": "A", "symbol": "BTCUSDT", "timeframes": ["1h"], "env": {}, **extra}
 
@@ -47,7 +51,7 @@ def test_boundary_01_interrupted_freeze_keeps_completed_cells_only(tmp_path: Pat
     def generate(cell: Mapping[str, Any]) -> Dict[str, Any]:
         if cell["id"] == "c2":
             raise RuntimeError("中途中斷")
-        return {"fingerprints": _fp({"x": "a"}), "identity": {"head": "h"}}
+        return {"fingerprints": _fp({"x": "a"}), "identity": dict(_IDENTITY)}
 
     with pytest.raises(RuntimeError, match="中途中斷"):
         fb.freeze_cells([_cell("c1"), _cell("c2")], out, generate=generate)
@@ -62,7 +66,7 @@ def test_boundary_02_hardware_blocked_cell_marked(tmp_path: Path) -> None:
     def generate(cell: Mapping[str, Any]) -> Dict[str, Any]:
         if cell["id"] == "big":
             raise GenerationMemoryBudgetExceeded("big", 6 << 30, 3 << 30, 8 << 30, "逾 8 GB")
-        return {"fingerprints": _fp({"x": "a"}), "identity": {"head": "h"}}
+        return {"fingerprints": _fp({"x": "a"}), "identity": dict(_IDENTITY)}
 
     fb.freeze_cells([_cell("big"), _cell("small")], out, generate=generate)
     written = json.loads(out.read_text(encoding="utf-8"))["cells"]
@@ -78,7 +82,7 @@ def test_l2_cell_arm_mismatch_refused(tmp_path: Path) -> None:
     cell = _cell("l2p", declared_arm="L2.pandas_parallel", env=fb.L2_ARM_ENV["L2.pandas_parallel"])
 
     def generate(_cell: Mapping[str, Any]) -> Dict[str, Any]:
-        return {"fingerprints": _fp({"x": "a"}), "identity": {"head": "h"}, "observed_arm": "L2.pandas_serial"}
+        return {"fingerprints": _fp({"x": "a"}), "identity": dict(_IDENTITY), "observed_arm": "L2.pandas_serial"}
 
     with pytest.raises(fb.ArmMismatch):
         fb.freeze_cells([cell], out, generate=generate)
@@ -151,6 +155,44 @@ def test_mutation_single_cell_claiming_all_tags_rejected(monkeypatch: pytest.Mon
     lone = [_cell("only", covers=sorted(REQUIRED_COVERAGE))]
     monkeypatch.setattr(fb, "cells", lambda: lone)
     assert coverage_errors(fb.cells(), fb) != []
+
+
+def test_cell_identity_required(tmp_path: Path) -> None:
+    """SPEC Task 0.2「逐格生成並寫值指紋與生成身分（HEAD、設定、資料集 sha256）」：身分缺任一鍵 ⇒ 拒寫該格；
+    齊全 ⇒ 寫入之身分與生成回傳逐鍵相同。"""
+    fb = _load()
+    full = dict(_IDENTITY)
+    out = tmp_path / "frozen.json"
+    fb.freeze_cells([_cell("ok")], out, generate=lambda _c: {"fingerprints": _fp({"x": "a"}), "identity": dict(full)})
+    assert json.loads(out.read_text(encoding="utf-8"))["cells"]["ok"]["identity"] == full
+    for missing in full:
+        partial = {k: v for k, v in full.items() if k != missing}
+        bad_out = tmp_path / f"bad_{missing}.json"
+        with pytest.raises(ValueError):
+            fb.freeze_cells([_cell("bad")], bad_out,
+                            generate=lambda _c, p=partial: {"fingerprints": _fp({"x": "a"}), "identity": p})
+
+
+def test_estimate_flag_only_estimates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC Task 0.2「先估時」：`main(["--estimate"])` 只呼叫 `estimate`，不呼叫 `freeze_cells`、不寫基準檔。"""
+    fb = _load()
+    calls: Dict[str, int] = {"estimate": 0, "freeze": 0}
+    monkeypatch.setattr(fb, "GOLDEN_PATH", tmp_path / "golden.json")
+    monkeypatch.setattr(fb, "cells", lambda: _complete_cells(fb))
+
+    def fake_estimate(cell_list: Any) -> Dict[str, Any]:
+        calls["estimate"] += 1
+        return {"cells": {c["id"]: 1.0 for c in cell_list}, "total_seconds": float(len(cell_list))}
+
+    def spy_freeze(*_a: Any, **_k: Any) -> Dict[str, Any]:
+        calls["freeze"] += 1
+        return {}
+
+    monkeypatch.setattr(fb, "estimate", fake_estimate)
+    monkeypatch.setattr(fb, "freeze_cells", spy_freeze)
+    assert fb.main(["--estimate"]) == 0
+    assert calls == {"estimate": 1, "freeze": 0}
+    assert not fb.GOLDEN_PATH.exists()
 
 
 def _complete_cells(fb: Any) -> List[Dict[str, Any]]:

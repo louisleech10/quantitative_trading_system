@@ -64,8 +64,15 @@ def regenerate(cell: Mapping[str, Any]) -> Dict[str, Any]:
     raise NotImplementedError("FFPROD Task 0.2")
 
 
+def estimate(cell_list: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """逐格估計生成秒數（依既有實測收據或單格試跑），回傳 {"cells": {格 id: 秒數}, "total_seconds": 合計}；不生成特徵、
+    不寫 `GOLDEN_PATH`。"""
+    raise NotImplementedError("FFPROD Task 0.2")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    """CLI：`--estimate` 只估時（>30 分先白話告知使用者）；無旗標 ⇒ 凍結全部格至 `GOLDEN_PATH`。"""
+    """CLI：`--estimate` 只呼叫 `estimate(cells())` 並印出結果（>30 分先白話告知使用者），不呼叫 `freeze_cells`、
+    不寫 `GOLDEN_PATH`；無旗標 ⇒ `freeze_cells(cells(), GOLDEN_PATH, generate=...)`。"""
     raise NotImplementedError("FFPROD Task 0.2")
 
 
