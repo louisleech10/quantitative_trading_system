@@ -1,6 +1,6 @@
 # FFPROD 特徵生產層普查 — SPEC
 
-> 版本：v1（2026-10-26；初稿，依偵察諮詢 r1 收斂檔 `handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md` 與主委獨立版 `handoffs/20261026-ffprod-x-consult-r1-claude.md`）。
+> 版本：v2（2026-10-26；規格審查 r1 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r1/synth.md`〕：①L2 單一來源不變式〔公開結果＝落盤群組＝L5／L6 實收 L2 欄〕入 Task 2.1 量測與 Phase 3 L2 施工之驗收；②§G 格補 L2 三條生產臂〔`L2.polars`、`L2.pandas_serial`、`L2.pandas_parallel`〕；③全特徵候選逾 8 GB ⇒ 效能／記憶體／檔案大小記 blocked-by 硬體，不以較小規模之數字代替；④校準域縮尾核心〔legacy〕與公開主群組〔快速核心〕之並存列為改值候選；⑤§C 刪「JSON 契約為單一真相源」之過期敘述〔v1 已改一次性收據〕；⑥§N 舊策略特徵管線〔`FeatureExtractor`→HDF5→ML 服務〕合併為一條並附呼叫鏈）。前版 v1（2026-10-26；初稿，依偵察諮詢 r1 收斂檔 `handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md` 與主委獨立版 `handoffs/20261026-ffprod-x-consult-r1-claude.md`）。
 > 來源：`docs/TICKET_ORDER.md` 第 9 列（全票排序第 9 步，吸收原「縮尾重複」與 `docs/NUMVIEW_SPEC.md` §N R2／R5）　|　日期：2026-10-26　|　對應 TODO：`docs/manifests/FFPROD.json`
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
@@ -18,7 +18,7 @@
   - FACT-RECEIPT: `sed -n 112,125p momentum/FeatureEngineering/preprocessing/_slow_path_parallel.py` → 印出 `sample = clean_values[-max(1, int(sample_size)) :]`；`sed -n 112,120p momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py` → 印出 `values = values[: int(sample_size)]`（主委 實跑 2026-10-26）
   - FACT-RECEIPT: `sed -n 738,745p momentum/FeatureEngineering/feature_factory.py` → 印出 `if not data.empty and not preserve_dtype:` `data = self._ensure_float32(data)`（主委 實跑 2026-10-26）
   - FACT-RECEIPT: `grep -rn "save_features_to_hdf5\|load_features_from_hdf5" api momentum` → 命中 `api/services/feature_task_service.py:197`、`xgboost_task_service.py:187`、`model_task_service.py:171`、`shap_analysis_service.py:71`、`:133`（主委 實跑 2026-10-26）
-- **待使用者確認**（未確認前不得施工 Phase 3）：Phase 2 量測後之改值項逐項取捨（L2 單一來源擇臂、sigma 高精度、zscore 最少有效值數統一、d\* 取樣方向統一、層間 dtype 統一、縮尾唯一責任端與 IC 頁開關）——依 `docs/TICKET_ORDER.md` 第 9 列「改特徵值或輸出檔者先報使用者」。
+- **待使用者確認**（未確認前不得施工 Phase 3）：Phase 2 量測後之改值項逐項取捨（L2 單一來源擇臂、sigma 高精度、zscore 最少有效值數統一、d\* 取樣方向統一、層間 dtype 統一、校準域與公開主群組之縮尾核心統一、縮尾唯一責任端與 IC 頁開關）——依 `docs/TICKET_ORDER.md` 第 9 列「改特徵值或輸出檔者先報使用者」。
 - **已確認結果**：2026-10-24 使用者（`docs/TICKET_ORDER.md:33`）「是不是該普查特徵生產層的計算是不是最平衡解，確保特徵層程式和計算只有一套最平衡解的算法？」「我印象小數據量和大數據量的測試可能不是線性，無法用推測的」。
 
 ## §C 約束（不重抄，引用 + 只列本任務相關）
@@ -28,7 +28,7 @@
 - 資料一律真實 `data_cache/feature_klines/kline_cache.h5`（12h 用長歷史檔，沿 NUMVIEW 判準 `cell_rules.kline_source`），禁合成 fixture。
 - 不改 post-IC 轉換（NUMVIEW 已定：IC 頁與 IC-first 同一 `pandas_legacy`、輸出 float32）。
 - 研究設計不寫死 24h／UTC／加密貨幣特有假設。
-- 定義新資料結構一律 JSON 契約為單一真相源（並存實作清單、判準、改值候選），本 SPEC 只 pointer。
+- 本票不新增常駐契約或清單檢查：盤點（Task 0.1）與量測（Task 2.1）為一次性收據，使用者裁定記於 §A；唯一常駐測試為 §G 值指紋對照與 Phase 3 各施工項之單元測試。施工清單 `docs/manifests/FFPROD.json` 於本 SPEC 凍結後依 `templates/TODO_GENERATION_PROMPT.md` 生成。
 
 ## §G Golden / Baseline
 - **條件**：涉特徵生成與計算 ⇒ 真實 kline；改前基準於 Phase 0 凍結。
@@ -49,7 +49,7 @@
 
 **Task 0.2 — 估時與改前基準凍結**
 - 目標：施工前 HEAD 之值指紋。　檔案：新建 `scripts/ffprod_freeze_baseline.py`、`tests/_golden/ffprod/pre_change_fingerprints.json`、`tests/feature_engineering/test_ffprod_gate.py`（§G 對照）。
-- 改法：格只取覆蓋獨有分支之最少集合（A 單週期 1h、A 12h、B 多週期 1h＋4h、C 全特徵 1h，另依盤點補 sigma 縮尾開、fracdiff／ADF 開之單週期格）；先估時（>30 分之跑先白話告知使用者）；逐格生成並寫值指紋與生成身分（HEAD、設定、資料集 sha256）。
+- 改法：格只取覆蓋獨有分支之最少集合（A 單週期 1h、A 12h、B 多週期 1h＋4h、C 全特徵 1h，另依盤點補 sigma 縮尾開、fracdiff／ADF 開之單週期格；L2 三條生產臂各至少一格——`L2.polars`〔預設〕、`L2.pandas_serial`〔`FFACT_USE_POLARS=0`、`FFACT_L2_CATEGORY_WORKERS=1`〕、`L2.pandas_parallel`〔`FFACT_USE_POLARS=0`、workers>1〕，以 A 單週期 1h 加環境覆寫為之，不另加幣種）；先估時（>30 分之跑先白話告知使用者）；逐格生成並寫值指紋與生成身分（HEAD、設定、資料集 sha256）。
 - **驗證**：`venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q` 於凍結 HEAD 全綠（重生成之值指紋 sha256 逐位元等於凍結值）；同格重跑兩次值指紋相同。
 - **邊界**：①凍結中途中斷 ⇒ 未完成格不寫入；②某格於 8 GB 不可跑 ⇒ 標 blocked-by 硬體並列 §N。
 - **存活至**：本票交付後保留（Phase 3 只重凍使用者核可之 `changed_targets`）。
@@ -78,7 +78,7 @@
 - 目標：對 §A 所列每個改值候選，以 Task 0.2 格與判準量「改前／改後」之值差、IC 翻轉、速度、峰值記憶體、輸出檔大小。　檔案：新建 `scripts/ffprod_measure.py`、收據 `handoffs/run_receipts/<日期>-ffprod-candidates.json`。
 - 改法：候選以環境或探針切換（不改正式碼），每候選一格全特徵真實資料量效能與記憶體。
 - **驗證**：收據 `handoffs/run_receipts/<日期>-ffprod-candidates.json` 每候選有值差摘要（變動欄數、最大絕對差、NaN 遮罩差欄數）、IC 正負號翻轉與選欄進出數、耗時秒數、峰值 RSS 位元組、輸出檔位元組；候選集合 == Task 0.1 收據之「量測」項集合（主委收件時 `jq` 核對）。
-- **邊界**：①某候選於全特徵格逾 8 GB ⇒ 記 blocked-by 硬體、改以可跑之最大規模量並註明；②候選間交互（例 sigma 與層間 dtype）⇒ 單獨與合併各一次。
+- **邊界**：①某候選於全特徵格逾 8 GB ⇒ 該候選之效能、記憶體、檔案大小記 blocked-by 硬體（RM-FULLSCALE），不以較小規模之數字代替；值差與判準仍於可跑之格量並標其規模；②候選間交互（例 sigma 與層間 dtype）⇒ 單獨與合併各一次；③L2 候選另量 registry 落盤群組（逐類 concat）對公開結果、對 L5／L6 實收 L2 欄之值差（三者兩兩比）。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
 - 不可做：不在量測前改正式碼；不以小樣本推論大規模（使用者 2026-10-24）。
@@ -95,7 +95,7 @@
 **Task 3.x — 依裁定施工**（每候選一 Task；候選清單與施工細節於 Task 2.2 後以 SPEC 修訂版具體化）
 - 目標：只留裁定之一套實作，刪其餘；重凍 `changed_targets`。
 - **驗證**：`venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q` 全綠：非 `changed_targets` 之欄值指紋 sha256 逐位元等於凍結值；`changed_targets` 之新值指紋等於 Task 2.1 收據之改後值指紋；該組被淘汰實作之函式名 `grep -rn` 於 `momentum api` 零命中。
-- **邊界**：①多週期與單週期皆覆蓋；②續跑（CGSA 葉）與 IC 快取之身分隨改值失效（沿 NUMVIEW algorithm_id）。
+- **邊界**：①多週期與單週期皆覆蓋；②續跑（CGSA 葉）與 IC 快取之身分隨改值失效（沿 NUMVIEW algorithm_id）；③L2 施工項另新增單元測試：公開結果、registry 落盤群組逐類 concat、L5／L6 實收 L2 欄三者之欄集合、欄序、NaN 遮罩與原生 dtype 值位元組相同（mutation：落盤之 category_frame 任一欄加 1e-3 而公開結果不變 ⇒ 紅）。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
 - 不可做：未經裁定之候選不得施工。
@@ -119,6 +119,5 @@
 - 每 Phase 獨立 commit 可單獨 revert；Phase 3 每候選一 commit；§G 不符不合併。
 
 ## §N N/A 登記與殘留
-- **FFPROD-R1 processed 之 HDF5 舊存法**（`feature_storage.save_features_to_hdf5`／`load_features_from_hdf5`，呼叫端 feature_task／xgboost／model／shap 四服務）— `為何現在不做: blocked-by:ML 與回測模組重建（呼叫端屬模組成熟度地圖之不完整層；FF／IC-first 之 processed 唯一正式存法為 V2，本票禁新正式入口寫 HDF5）`；觸發：ML 或回測開票；登記處：本 SPEC §N、RM-FFPROD。
-- **FFPROD-R2 FF 管線外之舊手寫指標**（`indicators/{ema,rsi,macd}_extractor.py`、`strategy_registry.py` 之第二份 RSI，非 Wilder 平滑；經 `momentum/factories.py` `FeatureExtractor` 供 API／Optimization）— `為何現在不做: blocked-by:Optimization／策略模組重建（不屬特徵工廠生產層）`；觸發：Optimization 或策略開票；登記處：本 SPEC §N。
+- **FFPROD-R1 舊策略特徵管線（含 HDF5 存法與舊手寫指標）**——呼叫鏈：`api/routes/feature_engineering.py:20` → `api/services/feature_task_service.py`（`:82` `create_feature_extractor()` 之 `extract_features_from_strategy`，即 `momentum/factories.py` 之 `FeatureExtractor`，經`indicators/{ema,rsi,macd}_extractor.py` 與 `strategy_registry.py`〔RSI 非 Wilder 平滑〕）→ `:197` `save_features_to_hdf5` → 讀取端 `api/services/xgboost_task_service.py:187`、`model_task_service.py:171`、`shap_analysis_service.py:71`、`:133` `load_features_from_hdf5`。此管線不經特徵工廠（`FeatureFactory`），不屬本票「特徵生產層」之並存實作——`為何現在不做: blocked-by:ML 與策略模組重建（其讀取端 XGBoost／model／SHAP 與策略特徵抽取屬模組成熟度地圖之不完整層；FF／IC-first 之 processed 唯一正式存法為 V2）`；觸發：ML 或策略開票；登記處：本 SPEC §N、RM-FFPROD。
 - **FFPROD-R3 跨市場量測**（台股、美股、期貨）— `為何現在不做: blocked-by:PRE-MARKET-DATA（無該市場資料）`；觸發：跨市場資料到位；登記處：本 SPEC §N。
