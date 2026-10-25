@@ -41,6 +41,7 @@ import copy
 import hashlib
 import importlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -69,6 +70,10 @@ FAILOPEN_UNITS: Tuple[str, ...] = ("BTCUSDT/multi",)
 #: failopen 快照中位元組含生成時間戳之 manifest 檔名（逐項比對只比存在）
 MANIFEST_BASENAMES = frozenset({"feature_manifest.json", "manifest.json"})
 FRAMEPATH_FIELD = "manifest_sha256"
+#: NUMVIEW：CGSA registry manifest 頂層之選路紀錄鍵（`column_group_registry._write_manifest`；續跑併入 observed_arms 之來源）
+REGISTRY_ROUTE_KEY = "route_records"
+#: NUMVIEW：config_hash 加鹽後，fingerprint 中含 config_hash 路徑之項（重凍時換回去鹽值比凍結值，寫入時取新值）
+FRAMEPATH_PATH_FIELDS: Tuple[str, ...] = ("time_index_sha256", "path_receipt")
 
 
 class RefreezeError(RuntimeError):
@@ -82,7 +87,7 @@ def activate_numview() -> None:
     keys = contract["manifest_keys"]
     RECEIPT_REL = "tests/_golden/numview/refreeze_receipt.json"
     STRIPPED_KEYS = tuple(keys[r] for r in ("fingerprint", "algorithm_id", "route_identity"))
-    STRIPPED_ROOT_KEYS = STRIPPED_KEYS + (keys["observed_arms"],)
+    STRIPPED_ROOT_KEYS = STRIPPED_KEYS + (keys["observed_arms"], REGISTRY_ROUTE_KEY)
     SALT_KEY = str(contract["config_hash_salt"]["key"])
 
 
@@ -138,41 +143,68 @@ def is_provenance_path(path: str) -> bool:
 
 # ---------------------------------------------------------------------------------------------- framepath
 
-def framepath_manifest_values(manifests: Mapping[str, Mapping[str, Any]], domain: Mapping[str, Any]
-                              ) -> Tuple[str, str, List[str]]:
+def unsalt(obj: Any, pairs: Mapping[str, str]) -> Any:
+    """JSON 值中每個新 config_hash 字串（含作路徑段者）換回其去鹽值（`config_hash_pairs` 之對照）；其餘原樣。"""
+    text = json.dumps(obj, ensure_ascii=False)
+    for new, old in pairs.items():
+        if new != old:
+            text = text.replace(new, old)
+    return json.loads(text)
+
+
+def framepath_manifest_values(manifests: Mapping[str, Mapping[str, Any]], domain: Mapping[str, Any],
+                              pairs: Optional[Mapping[str, str]] = None) -> Tuple[str, str, List[str]]:
     """(剝除後值, 全值, 差異路徑)。兩值皆依原凍結算法：`{run 內相對路徑: filter_manifest(m)}` 之 `_canonical_sha256`
-    （同 `freeze_framepath_baseline._fingerprint`）；剝除值先 `strip_manifest` 再篩。差異路徑＝`<檔>#<鍵路徑>`。"""
+    （同 `freeze_framepath_baseline._fingerprint`）；剝除值先 `strip_manifest` 再篩。差異路徑＝`<檔>#<鍵路徑>`。
+    `pairs` 給定（NUMVIEW）⇒ 剝除值與差異路徑皆先把相對路徑與 manifest 中之新 config_hash 換回去鹽值。"""
     fp = _framepath_module()
     full = {rel: fp.filter_manifest(m, domain) for rel, m in manifests.items()}
-    stripped = {rel: fp.filter_manifest(strip_manifest(m), domain) for rel, m in manifests.items()}
-    diffs = [f"{rel}#{p}" for rel in sorted(manifests) for p in json_key_diffs(stripped[rel], full[rel])]
+    base = unsalt(dict(manifests), pairs) if pairs else dict(manifests)
+    stripped = {rel: fp.filter_manifest(strip_manifest(m), domain) for rel, m in base.items()}
+    base_full = {rel: fp.filter_manifest(m, domain) for rel, m in base.items()}
+    diffs = [f"{rel}#{p}" for rel in sorted(base) for p in json_key_diffs(stripped[rel], base_full[rel])]
     return fp._canonical_sha256(stripped), fp._canonical_sha256(full), diffs
 
 
 def framepath_item(cell: str, frozen_fp: Mapping[str, Any], fresh_fp: Mapping[str, Any],
                    manifests: Optional[Mapping[str, Mapping[str, Any]]], domain: Mapping[str, Any],
-                   memory_errors: Sequence[str] = ()) -> Dict[str, Any]:
-    """單格之重凍判定。`manifests`＝改後 run 落盤之 feature manifest（鍵＝fingerprint `path_receipt.manifests`）；
-    None ⇒ 該格無落盤 feature manifest（C7 registry、C9 拒絕），其值須原樣不變。
+                   memory_errors: Sequence[str] = (), *, pairs: Optional[Mapping[str, str]] = None,
+                   time_parts: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+    """單格之重凍判定。`manifests`＝改後 run 落盤之 feature manifest（鍵＝fingerprint `path_receipt.manifests`；NUMVIEW
+    另含 C7 之 `registry`）；None ⇒ 該格無 manifest（C9 拒絕；PRE-PROV 之 C7），其值須原樣不變。
     equal ⇔ ①剝除值＝凍結值 ②其餘 fingerprint 項以 `compare_cell` 無差異 ③記憶體閘無錯 ④自盤上重算之全值＝子行程
-    fingerprint 之值（確認剝除作用於同一批 manifest）⑤差異路徑皆為新鍵。"""
+    fingerprint 之值（確認剝除作用於同一批 manifest）⑤差異路徑皆為新鍵。
+    `pairs`（NUMVIEW：子行程 config_hash 新→去鹽對照）給定 ⇒ ①⑤之 manifest 與 `FRAMEPATH_PATH_FIELDS` 兩項先把新
+    config_hash 換回去鹽值再比（`time_index_sha256` 由 `time_parts` 換回後重算；`time_parts` 原樣重算須＝子行程之值）；
+    寫入時兩項取新值（`new_fields`）。"""
     fp = _framepath_module()
     frozen = frozen_fp.get(FRAMEPATH_FIELD)
     without = lambda d: {k: v for k, v in d.items() if k != FRAMEPATH_FIELD}  # noqa: E731
-    other = list(memory_errors) + list(fp.compare_cell(without(frozen_fp), without(fresh_fp)))
+    compared = dict(fresh_fp)
+    errors = list(memory_errors)
+    new_fields: Dict[str, Any] = {}
+    if pairs is not None:
+        if time_parts is not None:
+            if _sha("\n".join(time_parts).encode("utf-8")) != fresh_fp.get("time_index_sha256"):
+                errors.append("time_index_parts 原樣重算 ≠ 子行程 time_index_sha256")
+            compared["time_index_sha256"] = _sha("\n".join(unsalt(list(time_parts), pairs)).encode("utf-8"))
+        compared["path_receipt"] = unsalt(fresh_fp.get("path_receipt"), pairs)
+        new_fields = {k: fresh_fp.get(k) for k in FRAMEPATH_PATH_FIELDS}
+    other = errors + list(fp.compare_cell(without(frozen_fp), without(compared)))
     if manifests is None:
         stripped = full = fresh_fp.get(FRAMEPATH_FIELD)
         diffs: List[str] = []
     else:
-        stripped, full, diffs = framepath_manifest_values(manifests, domain)
+        stripped, full, diffs = framepath_manifest_values(manifests, domain, pairs)
         if full != fresh_fp.get(FRAMEPATH_FIELD):
             other.append(f"盤上重算之全值 {full} ≠ 子行程 fingerprint {fresh_fp.get(FRAMEPATH_FIELD)}")
     bad_paths = [p for p in diffs if not is_structural_manifest_path(p)]
     other += [f"差異路徑非新鍵：{p}" for p in bad_paths]
     equal = stripped == frozen and not other
     return {"item": cell, "field": f"cells.{cell}.fingerprint.{FRAMEPATH_FIELD}", "frozen_before": frozen,
-            "stripped_recomputed": stripped, "equal": equal, "new_value": full, "changed": full != frozen,
-            "diff_paths": diffs, "other_diffs": other}
+            "stripped_recomputed": stripped, "equal": equal, "new_value": full,
+            "changed": full != frozen or any(new_fields[k] != frozen_fp.get(k) for k in new_fields),
+            "new_fields": new_fields, "diff_paths": diffs, "other_diffs": other}
 
 
 def _cell_manifests(work_root: Path, cell: str, fresh_fp: Mapping[str, Any]) -> Optional[Dict[str, Dict[str, Any]]]:
@@ -188,19 +220,49 @@ def run_framepath(cells: Sequence[str], frozen_doc: Mapping[str, Any], work_root
     fp = _framepath_module()
     domain = fp.load_compare_domain()
     items = []
-    for cell in cells:
-        out = fp.run_cell(cell, work_root)
-        manifests = _cell_manifests(work_root, cell, out["fingerprint"])
-        items.append(framepath_item(cell, frozen_doc["cells"][cell]["fingerprint"], out["fingerprint"], manifests,
-                                    domain, fp.memory_gate_errors(cell, out["memory"])))
-        shutil.rmtree(Path(work_root) / cell, ignore_errors=True)
+    salted = SALT_KEY is not None
+    with _env(fp.CONFIG_HASH_PAIRS_ENV, "1" if salted else None):
+        for cell in cells:
+            out = fp.run_cell(cell, work_root)
+            receipt = out.get("receipt") or {}
+            detail = receipt.get("fingerprint_detail")
+            if salted and detail is not None:
+                # NUMVIEW：manifest 取子行程算 manifest_sha256 之同一批（含 C7 registry），路徑與值中之 config_hash 換回去鹽值
+                manifests = dict(detail.get("manifests") or {}) or None
+                kwargs = {"pairs": dict(receipt.get("config_hash_pairs") or {}),
+                          "time_parts": detail.get("time_index_parts")}
+            else:
+                manifests = _cell_manifests(work_root, cell, out["fingerprint"])
+                kwargs = {"pairs": {}} if salted else {}
+            items.append(framepath_item(cell, frozen_doc["cells"][cell]["fingerprint"], out["fingerprint"],
+                                        manifests, domain, fp.memory_gate_errors(cell, out["memory"]), **kwargs))
+            shutil.rmtree(Path(work_root) / cell, ignore_errors=True)
     return items
+
+
+@contextlib.contextmanager
+def _env(name: str, value: Optional[str]) -> Iterator[None]:
+    """`value` 非 None ⇒ 期間設環境變數 `name`（結束還原）；None ⇒ 不動。"""
+    if value is None:
+        yield
+        return
+    before = os.environ.get(name)
+    os.environ[name] = value
+    try:
+        yield
+    finally:
+        if before is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = before
 
 
 def apply_framepath(doc: Dict[str, Any], items: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     out = copy.deepcopy(doc)
     for item in items:
         out["cells"][item["item"]]["fingerprint"][FRAMEPATH_FIELD] = item["new_value"]
+        for key, value in (item.get("new_fields") or {}).items():
+            out["cells"][item["item"]]["fingerprint"][key] = value
     return out
 
 
@@ -341,6 +403,61 @@ def config_hash_pairs(extra_strip: Sequence[str] = ()) -> Iterator[Dict[str, str
         ff_mod.FeatureFactory._compute_config_hash = real_hash
 
 
+def unsalted_bytes(data: bytes, hash_pairs: Mapping[str, str]) -> bytes:
+    """檔案位元組中之新 config_hash 換回去鹽值；只換等長者（位置不位移）。parquet 另有 footer key-value metadata 之
+    base64 值（`ARROW:schema` 內嵌 schema metadata 之 config_hash）：解碼後換回再編碼（等長）。"""
+    swaps = [(n.encode("utf-8"), o.encode("utf-8")) for n, o in hash_pairs.items() if n != o and len(n) == len(o)]
+    if data[:4] == b"PAR1" and data[-4:] == b"PAR1":
+        import base64
+        import io
+
+        import pyarrow.parquet as pq
+
+        for value in (pq.read_metadata(io.BytesIO(data)).metadata or {}).values():
+            try:
+                raw = base64.b64decode(value, validate=True)
+            except ValueError:
+                continue
+            fixed = raw
+            for new, old in swaps:
+                fixed = fixed.replace(new, old)
+            if fixed != raw:
+                data = data.replace(value, base64.b64encode(fixed))
+    for new, old in swaps:
+        data = data.replace(new, old)
+    return data
+
+
+@contextlib.contextmanager
+def content_hash_pairs(hash_pairs: Mapping[str, str]) -> Iterator[Dict[str, str]]:
+    """期間每次 `run_provenance.compute_content_sha256` 記（回傳值 → 各組成檔與 row index 檔之位元組經 `unsalted_bytes`
+    換回後依原算法重算之值）。`hash_pairs`＝同期 `config_hash_pairs` 之對照（生成中即時增補）。"""
+    import dataclasses
+
+    import momentum.FeatureEngineering.run_provenance as rp
+
+    pairs: Dict[str, str] = {}
+    files: Dict[str, str] = {}
+    real_file, real_content = rp.file_sha256, rp.compute_content_sha256
+
+    def file_spy(path: Any) -> str:
+        real = real_file(path)
+        files[real] = hashlib.sha256(unsalted_bytes(Path(path).read_bytes(), hash_pairs)).hexdigest()
+        return real
+
+    def content_spy(entries: Sequence[Any], row_index_sha256: Any) -> str:
+        real = real_content(entries, row_index_sha256)
+        mapped = [dataclasses.replace(e, file_sha256=files.get(e.file_sha256, e.file_sha256)) for e in entries]
+        pairs[real] = real_content(mapped, files.get(row_index_sha256, row_index_sha256))
+        return real
+
+    rp.file_sha256, rp.compute_content_sha256 = file_spy, content_spy
+    try:
+        yield pairs
+    finally:
+        rp.file_sha256, rp.compute_content_sha256 = real_file, real_content
+
+
 def run_probewinsor(frozen_doc: Mapping[str, Any]) -> List[Dict[str, Any]]:
     """probewinsor 各格之 config_hash（只算 hash、不生成；NUMVIEW profile）：錨點形＝去探測鹽；去 NUMVIEW 鹽之錨點形須＝
     凍結值，新值＝含 NUMVIEW 鹽之錨點形。"""
@@ -459,8 +576,10 @@ def check_errors(kind: str, items: Sequence[Mapping[str, Any]], current_doc: Map
     for item in items:
         name = item["item"]
         if kind == "framepath":
-            if item["new_value"] != current_doc["cells"][name]["fingerprint"][FRAMEPATH_FIELD]:
+            current_fp = current_doc["cells"][name]["fingerprint"]
+            if item["new_value"] != current_fp[FRAMEPATH_FIELD]:
                 errs.append(f"{name}：全值 ≠ 現檔")
+            errs += [f"{name}：{k} ≠ 現檔" for k, v in (item.get("new_fields") or {}).items() if v != current_fp.get(k)]
         elif kind == "probewinsor":
             if item["new_value"] != current_doc["cells"][name]["config_hash"]:
                 errs.append(f"{name}：config_hash ≠ 現檔")

@@ -65,6 +65,9 @@ REFUSED_CELLS = ("C9",)
 CALIBRATION_PARTIAL_CELLS = ("C3", "C6")
 CALIBRATION_PARTIAL_REASON = "calibration_insufficient_history:"
 DSTAR_CACHE_FLAG = "dstar_cache_hit"
+#: 設定 ⇒ 子行程記 config_hash（含 NUMVIEW 鹽 → 去鹽）對照與 fingerprint 細項於 receipt（只供 preprov_refreeze 重凍；
+#: 未設時輸出逐字不變）
+CONFIG_HASH_PAIRS_ENV = "FRAMEPATH_CONFIG_HASH_PAIRS"
 PEAK_LIMIT_BYTES = 2 * 1024 ** 3
 SAMPLE_INTERVAL_SECONDS = 0.1
 # 每格 fingerprint 之比對項（§G baseline 內容；compare_cell 逐項無容差比對）
@@ -287,7 +290,10 @@ def generate_cell(cell: str, work_root: Path, *, force_regenerate_second: bool =
             mine = [c for c in calls if str(work_dir) in str(Path(c[0]).resolve())]
             receipt["resume_entered"] = bool(mine)
             receipt["resume_groups"] = mine[-1][1] if mine else None
-        fingerprint = _fingerprint(settings, root, result)
+        detail: Optional[Dict[str, Any]] = {} if os.environ.get(CONFIG_HASH_PAIRS_ENV, "").strip() else None
+        fingerprint = _fingerprint(settings, root, result, detail=detail)
+        if detail is not None:
+            receipt["fingerprint_detail"] = detail
     finally:
         mp.undo()
     return {"fingerprint": fingerprint, "receipt": receipt}
@@ -388,8 +394,11 @@ def _registry_columns(manifest_path: Path, columns: Dict[str, Dict[str, str]]) -
     return names, manifest
 
 
-def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[str, Any]:
-    """§G baseline 內容（落盤者讀 L7 V2 parquet 與 manifest；C7 無落盤 ⇒ 回傳結果與 completeness metadata）。"""
+def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any,
+                 detail: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """§G baseline 內容（落盤者讀 L7 V2 parquet 與 manifest；C7 無落盤 ⇒ 回傳結果與 completeness metadata）。
+    `detail` 給定 ⇒ 另填 `time_index_parts`（time_index_sha256 之各段）與 `manifests`（manifest_sha256 之篩後各檔），
+    供 config_hash 加鹽後之重凍把路徑與 manifest 中之新 config_hash 換回去鹽值再比凍結值（NUMVIEW Task 4.2）。"""
     from momentum.factories import create_feature_reader
     from momentum.FeatureEngineering.feature_storage import COMPLETENESS_FIELD_NAMES, FeatureStorage
 
@@ -460,6 +469,9 @@ def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[s
                  for col, d in (md.get("stationarity_decisions") or {}).items()}
     cache_hits = sorted(col for col, d in (md.get("stationarity_decisions") or {}).items()
                         if isinstance(d, dict) and d.get(DSTAR_CACHE_FLAG))
+    if detail is not None:
+        detail["time_index_parts"] = list(time_parts)
+        detail["manifests"] = manifests
     return {
         "column_names_sha256": _canonical_sha256(names),
         "column_count": len(names),
@@ -566,7 +578,15 @@ def _child_main(cell: str, work_dir: str, out_json: str) -> int:
         gate = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(gate)
         gate.install_def_probe()
-    out = generate_cell(cell, Path(work_dir))
+    if os.environ.get(CONFIG_HASH_PAIRS_ENV, "").strip():
+        import scripts.preprov_refreeze as pr
+
+        pr.activate_numview()
+        with pr.config_hash_pairs() as pairs, pr.content_hash_pairs(pairs) as content_pairs:
+            out = generate_cell(cell, Path(work_dir))
+        out["receipt"]["config_hash_pairs"] = {**pairs, **content_pairs}
+    else:
+        out = generate_cell(cell, Path(work_dir))
     tmp = Path(out_json + ".tmp")
     tmp.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, default=str), encoding="utf-8")
     os.replace(tmp, out_json)

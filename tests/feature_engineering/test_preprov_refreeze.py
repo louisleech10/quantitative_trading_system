@@ -179,6 +179,103 @@ def test_numview_profile_other_key_not_equal(domain: Dict[str, Any], numview: Di
     assert item["equal"] is False
 
 
+SALTED = "f" * 32
+SALTED_REL = RUN_REL.replace("/abc/", f"/{SALTED}/")
+
+
+def _sha_lines(parts: list) -> str:
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def _salted_case(keys: Dict[str, str], ts_digest: str = "t1") -> Dict[str, Any]:
+    """改後 run：config_hash（manifest 值與 run 目錄段）由 abc 變 SALTED；凍結側為 abc。time_index 各段含 run 相對路徑。"""
+    new = _numview_manifest(keys)
+    new["config_hash"] = SALTED
+    old_parts = [RUN_REL.replace("feature_manifest.json", "timestamps.parquet") + ":t1", "result_index:r1"]
+    new_parts = [SALTED_REL.replace("feature_manifest.json", "timestamps.parquet") + f":{ts_digest}", "result_index:r1"]
+    frozen_fp = _fp(_frozen_value(_new_manifest()), time_index_sha256=_sha_lines(old_parts))
+    full = _canon({SALTED_REL: {k: v for k, v in pr._framepath_module().filter_manifest(new, pr._framepath_module()
+                                                                                         .load_compare_domain()).items()}})
+    fresh_fp = _fp(full, time_index_sha256=_sha_lines(new_parts), path_receipt={"manifests": [SALTED_REL]})
+    return {"frozen": frozen_fp, "fresh": fresh_fp, "manifests": {SALTED_REL: new}, "parts": new_parts}
+
+
+def test_numview_salted_config_hash_unsalted_equal(domain: Dict[str, Any], numview: Dict[str, str]) -> None:
+    """NUMVIEW 鹽使 config_hash 變：manifest 值、run 目錄段、time_index 各段、path_receipt 中之新值換回去鹽值後＝凍結值
+    ⇒ equal；寫入取新值（manifest_sha256、time_index_sha256、path_receipt）。"""
+    case = _salted_case(numview)
+    item = pr.framepath_item("C1", case["frozen"], case["fresh"], case["manifests"], domain,
+                             pairs={SALTED: "abc"}, time_parts=case["parts"])
+    assert item["equal"] is True and item["other_diffs"] == [], item["other_diffs"]
+    assert item["new_fields"] == {"time_index_sha256": case["fresh"]["time_index_sha256"],
+                                  "path_receipt": {"manifests": [SALTED_REL]}}
+    doc = pr.apply_framepath({"cells": {"C1": {"fingerprint": dict(case["frozen"])}}}, [item])
+    got = doc["cells"]["C1"]["fingerprint"]
+    assert (got["manifest_sha256"], got["time_index_sha256"], got["path_receipt"]) == (
+        case["fresh"]["manifest_sha256"], case["fresh"]["time_index_sha256"], {"manifests": [SALTED_REL]})
+
+
+def test_numview_salted_value_change_or_missing_pair_not_equal(domain: Dict[str, Any],
+                                                                numview: Dict[str, str]) -> None:
+    """mutation：時間軸內容變（timestamps 段雜湊不同）、無對照（pairs 空）、time_parts 與子行程值不符 ⇒ 皆不等。"""
+    case = _salted_case(numview, ts_digest="t2")
+    item = pr.framepath_item("C1", case["frozen"], case["fresh"], case["manifests"], domain,
+                             pairs={SALTED: "abc"}, time_parts=case["parts"])
+    assert item["equal"] is False and any(d.startswith("time_index_sha256") for d in item["other_diffs"])
+    case = _salted_case(numview)
+    assert pr.framepath_item("C1", case["frozen"], case["fresh"], case["manifests"], domain, pairs={},
+                             time_parts=case["parts"])["equal"] is False
+    item = pr.framepath_item("C1", case["frozen"], case["fresh"], case["manifests"], domain,
+                             pairs={SALTED: "abc"}, time_parts=case["parts"][:1])
+    assert item["equal"] is False
+
+
+def test_content_hash_pairs_maps_salted_bytes_to_unsalted(tmp_path: Path) -> None:
+    """群組檔 footer 含新 config_hash ⇒ content_sha256 之對照值＝把檔中新值換回去鹽值之檔所算者（獨立重算）；
+    換回後位元組仍不同（值變）⇒ 對照值≠舊檔所算者。"""
+    from momentum.FeatureEngineering import run_provenance as rp
+
+    def write(name: str, body: bytes) -> Path:
+        p = tmp_path / name
+        p.write_bytes(body)
+        return p
+
+    def content(paths: list) -> str:
+        entries = [rp.ContentEntry(relative_path=p.name, columns=("a",), row_count=1, dtype="float32",
+                                   file_sha256=hashlib.sha256(p.read_bytes()).hexdigest()) for p in paths]
+        return rp.compute_content_sha256(entries, hashlib.sha256(paths[-1].read_bytes()).hexdigest())
+
+    old = [write("g_old.parquet", b"PAR1 data config_hash abc" + b"0" * 29), write("t_old.parquet", b"ts")]
+    new = [write("g.parquet", b"PAR1 data config_hash " + SALTED.encode()), write("t.parquet", b"ts")]
+    with pr.content_hash_pairs({SALTED: "abc" + "0" * 29}) as pairs:
+        entries = [rp.ContentEntry(relative_path=p.name.replace(".parquet", "_old.parquet"), columns=("a",),
+                                   row_count=1, dtype="float32", file_sha256=rp.file_sha256(p)) for p in new]
+        real = rp.compute_content_sha256(entries, rp.file_sha256(new[-1]))
+    assert rp.file_sha256.__name__ == "file_sha256", "期間外須還原"
+    assert pairs[real] == content(old)
+    changed = write("g_val.parquet", b"PAR2 data config_hash " + SALTED.encode())
+    with pr.content_hash_pairs({SALTED: "abc" + "0" * 29}) as pairs:
+        entry = rp.ContentEntry(relative_path="g_old.parquet", columns=("a",), row_count=1, dtype="float32",
+                                file_sha256=rp.file_sha256(changed))
+        real = rp.compute_content_sha256([entry, entries[1]], rp.file_sha256(new[-1]))
+    assert pairs[real] != content(old)
+
+
+def test_numview_registry_manifest_unsalted_equal(domain: Dict[str, Any], numview: Dict[str, str]) -> None:
+    """C7（persist=False）之 registry manifest：config_hash 換回去鹽值、剝除選路紀錄後＝凍結值；另多他鍵 ⇒ 不等。"""
+    old = {"schema_version": 2, "config_hash": "abc", "groups": [{"name": "g", "columns": ["a"]}]}
+    new = dict(copy.deepcopy(old), config_hash=SALTED, route_records=[{"point": "p", "to": "x"}])
+    frozen = _canon({"registry": old})
+    fresh = _fp(_canon({"registry": new}), path_receipt={"manifests": ["registry"]})
+    item = pr.framepath_item("C7", _fp(frozen, path_receipt={"manifests": ["registry"]}), fresh,
+                             {"registry": new}, domain, pairs={SALTED: "abc"}, time_parts=None)
+    assert item["equal"] is True, item["other_diffs"]
+    new["extra"] = 1
+    item = pr.framepath_item("C7", _fp(frozen, path_receipt={"manifests": ["registry"]}),
+                             _fp(_canon({"registry": new})), {"registry": new}, domain, pairs={SALTED: "abc"})
+    assert item["equal"] is False
+
+
 # ---------------------------------------------------------------------------------------------- failopen
 
 def _entries(prov: bool = False, manifest_sha: str = "m" * 64) -> Dict[str, Any]:
