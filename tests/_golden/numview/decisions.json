@@ -505,6 +505,15 @@
     }
    ],
    "description": "D-L2 已觸發而記 retain：判準 candidate_conditions.retain 要求「格 B 之 f32diff 全 0」，收據 cells（kind=B） 非零（見 evidence）不成立；唯一合格之改案須改公開輸出或特徵階段。使用者 2026-10-24 裁定此類修正移交 docs/TICKET_ORDER.md 第 9 步「特徵生產層普查」（原話：「是不是該普查特徵生產層的計算是不是最平衡解，確保特徵層程式和計算只有一套最平衡解的算法？」），判準不改；Phase 3 走 retain 分支釘住現值並契約具名登記非零格。"
+  },
+  {
+   "id": "NUMVIEW-LIM-CRIT-MUT-L2-PUBLIC-SOURCE",
+   "kind": "criteria_defect",
+   "criteria_ids": [
+    "mutation.mut_l2_named_l5_l6_public_source"
+   ],
+   "replaced_by": "tests/feature_engineering/test_numview_core.py::test_l2_named_public_source_equivalent_on_current_cells",
+   "description": "判準登記之 D-L2 保留案 mutant（L5／L6 改吃公開落盤值來源 ⇒ L5／L6 逐位元案紅）於現行 A 四格與 B 格為值上等價：收據 handoffs/run_receipts/20261025-numview-l2-source-effect.json 吃 L2 之 L5／L6 呼叫 A 各 8 次、B 14 次，以公開 L2 重算之輸出與實際輸出逐位元相同、0 次不等，故其 mutation_test 無法成立（SPEC v43 ①）。依 SPEC Task 0.3 邊界②判準不改，改由 replaced_by 之測試釘住此等價（日後轉為有影響即紅）；判準之 run_coverage 列與 path_registry 錨點於檢查中以本項豁免「mutation_test 須存在」與「錨點上下文於現行碼恰一次」，改驗 replaced_by 之測試存在。"
   }
  ]
 }

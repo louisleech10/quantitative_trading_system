@@ -404,6 +404,23 @@ def anchor_lines_at_criteria_commit(rel: str) -> Optional[List[str]]:
 ANCHOR_CONTEXT_MAX_RADIUS = 12
 
 
+def criteria_defect_replacements(decisions_path: Optional[Path] = None) -> Dict[str, str]:
+    """決定紀錄 `measurement_limitations` 中 `kind=criteria_defect` 項之 {判準路徑 id: replaced_by（path::測試名）}——SPEC Task 0.3
+    邊界②：Phase 1 收據後判準不改，判準缺陷（如等價 mutant）以限制項具名、改由 replaced_by 之測試承擔。決定紀錄不存在 ⇒ 空。"""
+    path = decisions_path or (REPO / "tests" / "_golden" / "numview" / "decisions.json")
+    if not path.is_file():
+        return {}
+    items = json.loads(path.read_text(encoding="utf-8")).get("measurement_limitations") or []
+    return {str(pid): str(item.get("replaced_by") or "") for item in items
+            if isinstance(item, Mapping) and item.get("kind") == "criteria_defect" for pid in item.get("criteria_ids") or []}
+
+
+def count_test_defs(ref: str) -> int:
+    """`path::測試名` 於現行檔中 `def 測試名(` 之出現次數（檔不存在或格式不符 ⇒ 0）。"""
+    rel, _, name = str(ref).partition("::")
+    return sum(1 for s in live_anchor_lines(rel) if re.match(rf"\s*def {re.escape(name)}\(", s)) if rel and name else 0
+
+
 def live_anchor_lines(rel: str) -> List[str]:
     """錨點所指檔之現行內容（逐行）；檔不存在 ⇒ 空清單。"""
     path = REPO / rel
@@ -1169,6 +1186,7 @@ def path_registry_violations(criteria: Mapping[str, Any], plan: Mapping[str, Map
         return ["判準檔缺 path_registry.paths（封閉路徑登錄）"]
     out: List[str] = []
     entries: Dict[str, Mapping[str, Any]] = {}
+    replaced = criteria_defect_replacements()
     for entry in registry:
         pid = str(entry.get("id") or "")
         if not pid or pid in entries:
@@ -1190,6 +1208,10 @@ def path_registry_violations(criteria: Mapping[str, Any], plan: Mapping[str, Map
                 continue
             # 現行碼須於同一上下文恰一次含該錨點：取判準提交時錨點行之最小唯一上下文窗（逐字、去首尾空白），現行檔須恰
             # 出現一次；零次（刪除／改名）或多次（無法定位）皆違規，純行號位移不誤報（審碼 b4 r1 CODEX-R1-P1-02、r2 兩家 P1-01）
+            if pid in replaced:  # 判準缺陷限制項（邊界②）：錨點所指之 mutation_test 已由 replaced_by 取代，改驗其存在
+                if count_test_defs(replaced[pid]) != 1:
+                    out.append(f"path_registry：{pid} 之判準缺陷限制項 replaced_by {replaced[pid]!r} 於現行碼須恰一個")
+                continue
             window = anchor_context_window(lines, line - 1)
             hits = count_window(live_anchor_lines(match.group(1)), window) if window is not None else 0
             if window is None:
