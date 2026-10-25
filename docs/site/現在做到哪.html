@@ -17,9 +17,9 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>第 8 步 NUMVIEW（IC 後轉換算法與精度紀錄），第 3 段已完成，下一步開新 session 做第 4 段。</strong> 第 3 段四項全部提交並審完（第 4 批審查到第 10 輪兩家零問題）。</p>
+<p><strong>第 8 步 NUMVIEW 已收案（2026-10-26），接著照順序開第 9 步「特徵生產層普查」。</strong> 你睡覺期間依你的指示照票順序做，遇到取捨交兩位委員共識決定。</p>
 <h2 id="做到哪">做到哪</h2>
-<p><strong>NUMVIEW 全部項目</strong>（規格 <code>docs/NUMVIEW_SPEC.md</code> v43；施工清單 <code>docs/manifests/NUMVIEW.json</code>）：</p>
+<p><strong>NUMVIEW 全部項目</strong>（規格 <code>docs/NUMVIEW_SPEC.md</code> v46；施工清單 <code>docs/manifests/NUMVIEW.json</code>）：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -43,51 +43,39 @@
 <td>—</td>
 </tr>
 <tr>
-<td>第 2 段 2.1</td>
-<td>設定錯（空窗、縮尾方法、缺欄位）直接報錯，不再默默套預設</td>
-<td>✅ 6971a75c</td>
+<td>第 2 段（2.1–2.2）</td>
+<td>設定錯直接報錯；IC 頁記下實際用哪套算法與哪一次特徵產出</td>
+<td>✅ 10/25</td>
 <td>—</td>
 </tr>
 <tr>
-<td>第 2 段 2.2</td>
-<td>IC 頁記下實際用哪套算法、吃的是哪一次特徵產出（不改數值）</td>
-<td>✅ ae67618b、e4c4d7fb</td>
-<td>—</td>
-</tr>
-<tr>
-<td>第 3 段 3.4</td>
-<td>IC 頁與 IC-first 同一套 pandas 算法、輸出一律 float32</td>
-<td>✅ 8c961545</td>
-<td>—</td>
-</tr>
-<tr>
-<td>第 3 段 3.1–3.3</td>
-<td>不改的精度分岔用測試釘住、L2 差異登記進定義檔</td>
-<td>✅ a8064877、3cc5ce31、0558383d</td>
+<td>第 3 段（3.1–3.4）</td>
+<td>IC 頁與 IC-first 同一套 pandas 算法、輸出一律 float32；不改的精度分岔用測試釘住</td>
+<td>✅ 10/25</td>
 <td>—</td>
 </tr>
 <tr>
 <td>第 4 段（4.1–4.4）</td>
 <td>把「用哪套算法、哪些設定」記進產出的身分，換算法就認得出是不同產出、不會誤續跑或誤用舊快取</td>
-<td>未開始（開新 session 做）</td>
-<td>全部</td>
+<td>✅ 10/26（e9f59f9a 等，三輪審查收斂）</td>
+<td>—</td>
 </tr>
 <tr>
 <td>第 5 段（5.1）</td>
-<td>文件更正</td>
-<td>未開始</td>
-<td>全部</td>
+<td>白話文件與狀態表更正</td>
+<td>✅ 10/26（ab5d8b11、bb863644，兩輪審查收斂）</td>
+<td>—</td>
 </tr>
 </tbody>
 </table></div>
-<p><strong>順帶查到的事（不在本票改）</strong>：特徵工廠的兩套 L2 算法，在多週期那組（B）有 3,969,919 格存成 float32 後數值不同；但實測後面的 L5、L6 吃到的值完全一樣（A 組各 8 次、B 組 14 次，0 次不同）。依 10/24 安排，本票只登記，移到第 9 步（特徵生產層普查）處理。</p>
-<p><strong>今天另外做的</strong>：統計本票 155 輪審查的原因（多數出在我寫的規格和我自建的驗證機制，產品程式真缺陷約 5%），據此加了自我提問和委員提醒，記在 <code>docs/SCAR_LEDGER.md</code>。</p>
+<p><strong>這段做的時候順手修掉的既有問題</strong>：完整產生一次後「強制重算到一半當機、再一般重跑」會整個報錯（同一欄出現兩次）——這是本票開工前就存在的錯，已修好並實測。</p>
+<p><strong>還在、但不屬本票的紅燈</strong>（本票開工前就紅，已查證改動前版本同樣失敗）：多週期產生器的 7 個完整度測試、解耦規則 21 處既有違規（在基線清單內，沒有增加）。</p>
 <h2 id="要你決定嗎">要你決定嗎</h2>
 <p><strong>現在不用。</strong></p>
 <h2 id="卡住嗎">卡住嗎</h2>
 <p>沒有。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>開新 session 做第 4 段：測試與流程照一般業界做法，嚴格只用在會影響數值或資料正確性的地方。</p>
+<p>第 9 步「特徵生產層普查」：盤點特徵產生各層每一種有兩套以上做法的計算，用實際大量資料比精度、速度、記憶體、檔案大小後只留一套。先做開工偵察（我與兩位委員各自盤點再互審）。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
