@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -44,30 +45,66 @@ def test_winsor_effective_fields_are_record_columns() -> None:
     assert set(fields) <= set(contract["record_columns"])
 
 
-def _assert_applied_params(applied: pd.DataFrame, method: str) -> None:
-    """逐 method 分支斷言全部有效設定欄：quantile ⇒ 兩分位端點有值、sigma k 為空；sigma ⇒ sigma k 有值、端點為空；
-    兩者之滾動窗、最少有效值、計算精度皆有值（產品碼之 transform context 鍵 `winsor_lower_q`／`winsor_upper_q`／
-    `winsor_window`／`winsor_min_periods`，`feature_preprocessor.py` 之 `_rolling_window`／`_rolling_min_periods`）。"""
-    assert len(applied) > 0
-    assert set(applied["winsor_method"]) == {method}
-    endpoints = applied[["winsor_lower_q", "winsor_upper_q"]]
-    if method == "quantile":
-        assert endpoints.notna().all().all() and applied["winsor_sigma_k"].isna().all()
+#: 現行（Phase 3 前）兩 method 之縮尾界線皆以 float32 計（`_numba_transforms.py` sigma 分支 `move_mean(...).astype(np.float32)`、
+#: quantile 分支 `np.float32(quantile)`）。
+EXPECTED_COMPUTE_DTYPE = "float32"
+
+
+def expected_settings(cell: str) -> Dict[str, Any]:
+    """由格之設定（`preprov_helpers.cell_spec(cell)` 之 payload）與 `WinsorConfig` 預設獨立導出之有效設定（不讀紀錄表、
+    不經 preprocessor）。min_periods 依 L6.5 既有公式 min(window, max(20, window // 4)) 於本處獨立重寫。"""
+    from momentum.FeatureEngineering.feature_config import WinsorConfig
+
+    raw = dict(ph.cell_spec(cell)["payload"].get("preprocessing", {}).get("winsorization", {}))
+    cfg = WinsorConfig(**raw)
+    window = int(cfg.window)
+    out: Dict[str, Any] = {"winsor_method": cfg.method, "winsor_window": window,
+                           "winsor_min_periods": min(window, max(20, window // 4)),
+                           "winsor_compute_dtype": EXPECTED_COMPUTE_DTYPE,
+                           "winsor_lower_q": None, "winsor_upper_q": None, "winsor_sigma_k": None}
+    if cfg.method == "quantile":
+        out["winsor_lower_q"], out["winsor_upper_q"] = float(cfg.quantile_range[0]), float(cfg.quantile_range[1])
     else:
-        assert applied["winsor_sigma_k"].notna().all() and endpoints.isna().all().all()
-    for field in ("winsor_window", "winsor_min_periods", "winsor_compute_dtype"):
-        assert applied[field].notna().all(), field
-    assert (applied["winsor_min_periods"] <= applied["winsor_window"]).all()
+        out["winsor_sigma_k"] = float(cfg.sigma_k)
+    return out
+
+
+def _assert_applied_params(applied: pd.DataFrame, expected: Dict[str, Any]) -> None:
+    """逐列逐欄等於獨立導出之有效設定（空值欄須為空；非空值欄須相等）。"""
+    assert len(applied) > 0
+    for field, value in expected.items():
+        column = applied[field]
+        if value is None:
+            assert column.isna().all(), field
+        else:
+            assert (column == value).all(), f"{field}：期望 {value!r}，實得 {sorted(set(column.astype(str)))[:3]}"
 
 
 def test_applied_quantile_columns_record_all_params(runs: ph.RunCache) -> None:
     table = _table(runs, "h1_stat_on")
-    _assert_applied_params(table[table["winsorization"] == "applied"], "quantile")
+    _assert_applied_params(table[table["winsorization"] == "applied"], expected_settings("h1_stat_on"))
 
 
 def test_applied_sigma_columns_record_all_params(runs: ph.RunCache) -> None:
     table = _table(runs, "h1_winsor_sigma")
-    _assert_applied_params(table[table["winsorization"] == "applied"], "sigma")
+    _assert_applied_params(table[table["winsorization"] == "applied"], expected_settings("h1_winsor_sigma"))
+
+
+def test_mutation_wrong_param_value_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：紀錄表之值非空但錯（sigma k、window、min periods、分位端點）⇒ 兩 method 之紀錄案轉紅；正確值 ⇒ 綠。
+    以 monkeypatch 置換紀錄表來源（不生成）。"""
+    module = sys.modules[__name__]
+    cases = (("h1_winsor_sigma", test_applied_sigma_columns_record_all_params,
+              (("winsor_sigma_k", 999.0), ("winsor_window", 1), ("winsor_min_periods", 1))),
+             ("h1_stat_on", test_applied_quantile_columns_record_all_params, (("winsor_upper_q", 0.5),)))
+    for cell, case, mutants in cases:
+        good = pd.DataFrame([{**expected_settings(cell), "winsorization": "applied"}])
+        monkeypatch.setattr(module, "_table", lambda _runs, _cell, t=good: t)
+        case(None)
+        for field, bad in mutants:
+            monkeypatch.setattr(module, "_table", lambda _runs, _cell, t=good.assign(**{field: bad}): t)
+            with pytest.raises(AssertionError):
+                case(None)
 
 
 def test_recorded_method_values_follow_contract(runs: ph.RunCache) -> None:

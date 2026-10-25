@@ -54,8 +54,9 @@ def decision_errors(decision: Mapping[str, Any], measured: Mapping[str, Any]) ->
     return errors
 
 
-def ruling_ref_errors(ref: str, spec_lines: List[str]) -> List[str]:
-    """`user_ruling_ref` 須為 `docs/FFPROD_SPEC.md:<行>`，該行位於 §A 段內（`## §A` 至下一個 `## ` 之間）且含使用者逐字「」。"""
+def ruling_ref_errors(ref: str, spec_lines: List[str], candidate_id: str) -> List[str]:
+    """`user_ruling_ref` 須為 `docs/FFPROD_SPEC.md:<行>`，該行位於 §A 段內（`## §A` 至下一個 `## ` 之間）、含該候選之
+    `` `<candidate_id>` ``（反引號包住，SPEC §A 逐候選一行記裁定），且含成對之使用者逐字引文「…」。"""
     prefix = "docs/FFPROD_SPEC.md:"
     if not ref.startswith(prefix) or not ref[len(prefix):].isdigit():
         return [f"格式不符：{ref!r}"]
@@ -64,9 +65,14 @@ def ruling_ref_errors(ref: str, spec_lines: List[str]) -> List[str]:
     end = next((i for i, s in enumerate(spec_lines, 1) if start and i > start and s.startswith("## ")), None)
     if start is None or end is None or not (start < line_no < end):
         return [f"{ref} 不在 §A 段內"]
-    if "「" not in spec_lines[line_no - 1]:
-        return [f"{ref} 該行無使用者逐字引文"]
-    return []
+    line = spec_lines[line_no - 1]
+    errors = []
+    if f"`{candidate_id}`" not in line:
+        errors.append(f"{ref} 該行非候選 {candidate_id} 之裁定")
+    opening = line.find("「")
+    if opening < 0 or line.find("」", opening) < 0:
+        errors.append(f"{ref} 該行無成對之使用者逐字引文")
+    return errors
 
 
 # ---------------------------------------------------------------------------------------------- 驗證
@@ -84,9 +90,14 @@ def test_decisions_match_measured_options() -> None:
     assert errors == []
 
 
+def _spec_lines() -> List[str]:
+    return (REPO / "docs" / "FFPROD_SPEC.md").read_text(encoding="utf-8").splitlines()
+
+
 def test_every_decision_cites_user_ruling() -> None:
-    spec_lines = (REPO / "docs" / "FFPROD_SPEC.md").read_text(encoding="utf-8").splitlines()
-    errors = [e for d in _decisions() for e in ruling_ref_errors(str(d.get("user_ruling_ref", "")), spec_lines)]
+    spec_lines = _spec_lines()
+    errors = [e for d in _decisions()
+              for e in ruling_ref_errors(str(d.get("user_ruling_ref", "")), spec_lines, str(d["candidate_id"]))]
     assert errors == []
 
 
@@ -122,11 +133,21 @@ def test_mutation_extra_or_missing_target_detected(monkeypatch: pytest.MonkeyPat
 
 
 def test_mutation_ruling_ref_outside_section_a_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    """改壞：決定紀錄之裁定引用改為任意字串或指到現行 SPEC §A 外之行 ⇒ 引用案轉紅。"""
-    spec_lines = (REPO / "docs" / "FFPROD_SPEC.md").read_text(encoding="utf-8").splitlines()
-    outside = next(i for i, s in enumerate(spec_lines, 1) if s.startswith("## §C"))
+    """改壞：裁定引用為任意字串、指到 §A 外、缺右引號、或交換為他候選之裁定行 ⇒ 引用案轉紅；正確對應 ⇒ 綠。
+    以 monkeypatch 置換決定紀錄與 SPEC 讀取來源。"""
+    spec = ["# FFPROD", "## §A 假設", "- `l2`：使用者「選 pandas」", "- `sigma`：使用者「保留現狀」",
+            "- `zscore`：使用者「改", "## §C 約束", "- `l2`：「在 §C」"]
     module = sys.modules[__name__]
-    for bad in ("garbage", f"docs/FFPROD_SPEC.md:{outside}", "docs/FFPROD_SPEC.md:1"):
-        monkeypatch.setattr(module, "_decisions", lambda b=bad: [{"candidate_id": "x", "user_ruling_ref": b}])
+    monkeypatch.setattr(module, "_spec_lines", lambda: spec)
+    ok = [{"candidate_id": "l2", "user_ruling_ref": "docs/FFPROD_SPEC.md:3"},
+          {"candidate_id": "sigma", "user_ruling_ref": "docs/FFPROD_SPEC.md:4"}]
+    monkeypatch.setattr(module, "_decisions", lambda: ok)
+    test_every_decision_cites_user_ruling()
+    swapped = [{"candidate_id": "l2", "user_ruling_ref": "docs/FFPROD_SPEC.md:4"},
+               {"candidate_id": "sigma", "user_ruling_ref": "docs/FFPROD_SPEC.md:3"}]
+    for bad in (swapped, [{"candidate_id": "l2", "user_ruling_ref": "garbage"}],
+                [{"candidate_id": "l2", "user_ruling_ref": "docs/FFPROD_SPEC.md:7"}],
+                [{"candidate_id": "zscore", "user_ruling_ref": "docs/FFPROD_SPEC.md:5"}]):
+        monkeypatch.setattr(module, "_decisions", lambda b=bad: b)
         with pytest.raises(AssertionError):
             test_every_decision_cites_user_ruling()

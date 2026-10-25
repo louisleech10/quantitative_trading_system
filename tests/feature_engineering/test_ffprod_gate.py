@@ -9,7 +9,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, List, Mapping
 
 import pytest
 
@@ -99,19 +99,52 @@ REQUIRED_COVERAGE = {
 }
 
 
+def _pre(cell: Mapping[str, Any]) -> Mapping[str, Any]:
+    return cell.get("preprocessing", {})
+
+
+#: 每個覆蓋標記之結構判準（只由格之 `kind`／`timeframes`／`preprocessing`／`declared_arm`／`env` 導出，不信 `covers` 自述）。
+COVERAGE_PREDICATES = {
+    "A_1h": lambda c, fb: c["kind"] == "A" and list(c["timeframes"]) == ["1h"],
+    "A_12h": lambda c, fb: c["kind"] == "A" and list(c["timeframes"]) == ["12h"],
+    "B_1h_4h": lambda c, fb: c["kind"] == "B" and list(c["timeframes"]) == ["1h", "4h"],
+    "C_1h": lambda c, fb: c["kind"] == "C" and list(c["timeframes"]) == ["1h"],
+    "winsor_sigma": lambda c, fb: _pre(c).get("winsorization", {}).get("method") == "sigma",
+    "fracdiff_adf": lambda c, fb: bool(_pre(c).get("fractional_differencing")) and bool(_pre(c).get("adf_differencing")),
+    **{arm: (lambda c, fb, arm=arm: c.get("declared_arm") == arm
+             and all(c["env"].get(k) == v for k, v in fb.L2_ARM_ENV[arm].items()))
+       for arm in ("L2.polars", "L2.pandas_serial", "L2.pandas_parallel")},
+}
+
+
+def coverage_errors(cell_list: Any, fb: Any) -> List[str]:
+    """`covers` 每個標記須滿足其結構判準；每個必需標記須至少一格以結構判準成立；格 id 唯一。"""
+    errors = []
+    ids = [c["id"] for c in cell_list]
+    if len(ids) != len(set(ids)):
+        errors.append("格 id 重複")
+    for cell in cell_list:
+        for tag in cell["covers"]:
+            if tag not in COVERAGE_PREDICATES or not COVERAGE_PREDICATES[tag](cell, fb):
+                errors.append(f"{cell['id']} 宣告 {tag} 而結構不符")
+    for tag in sorted(REQUIRED_COVERAGE):
+        if not any(tag in c["covers"] and COVERAGE_PREDICATES[tag](c, fb) for c in cell_list):
+            errors.append(f"缺 {tag}")
+    return errors
+
+
 def test_cells_cover_required_paths() -> None:
     fb = _load()
-    cell_list = fb.cells()
-    ids = [c["id"] for c in cell_list]
-    assert len(ids) == len(set(ids))
-    covered = {tag for c in cell_list for tag in c["covers"]}
-    assert REQUIRED_COVERAGE <= covered, f"缺：{sorted(REQUIRED_COVERAGE - covered)}"
-    for cell in cell_list:
-        if "declared_arm" in cell:
-            assert cell["declared_arm"] in cell["covers"]
-            for key, value in fb.L2_ARM_ENV[cell["declared_arm"]].items():
-                assert cell["env"].get(key) == value, f"{cell['id']}：{key}"
-    assert {c["declared_arm"] for c in cell_list if "declared_arm" in c} == set(fb.L2_ARM_ENV)
+    assert set(COVERAGE_PREDICATES) == REQUIRED_COVERAGE
+    assert coverage_errors(fb.cells(), fb) == []
+
+
+def test_mutation_single_cell_claiming_all_tags_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：`cells()` 退化為單格並自述全部標記 ⇒ 覆蓋案轉紅（結構判準不信自述）。"""
+    fb = _load()
+    lone = [_cell("only", covers=sorted(REQUIRED_COVERAGE))]
+    monkeypatch.setattr(fb, "cells", lambda: lone)
+    assert coverage_errors(fb.cells(), fb) != []
 
 
 def test_compare_exact_changed_targets() -> None:
