@@ -42,8 +42,8 @@ QUESTION = (
 # NUMVIEW 155 輪 321 條 P0／P1 之歸因（docs/SCAR_LEDGER.md 同日條）——主委自建驗證機制之破口、規格錯／殘留、
 # 修一漏同類各占大宗，產品碼真缺陷約 5%；舊自問只對準「未查證」。下列三問對準其餘三類。
 DESIGN = (
-    "  【機制】本產出是否新增或擴充測試／治理機制（驗證器、快取、登記表、閘、豁免）？業界常規需要它嗎？不建會少驗哪條"
-    "量化正確性路徑？答不出 ⇒ 不建，改用一般測試。\n"
+    "  【機制】本產出是否新增或擴充測試之外的輔助機制（收據驗證器、測試快取、登記表、閘、豁免）？業界常規需要它嗎？"
+    "不建會少驗哪條量化正確性路徑？答不出 ⇒ 不建，改用一般測試直接驗（要驗的東西照驗，只是不另蓋機制）。\n"
     "  【修補】處置 finding 時是否已 grep 同類全部實例一次修完（範圍與結果寫入收斂檔），而非只修反例那一處？\n"
 )
 SPEC_Q = "  【規格】本段寫的是行為與驗收（該寫）還是測試實作細節（不寫）？改一處是否已全文 grep 舊敘述並同步？\n"
@@ -52,11 +52,12 @@ if mode == "brief":
     path = str(((d.get("tool_input") or {}).get("file_path")) or "")
     if (re.search(r"handoffs/[^/]*BRIEF[^/]*\.md$", path) or re.search(r"handoffs/reconcile/[^/]+/synth\.md$", path)
             or re.search(r"白話說明/[^/]+\.md$", path) or path.endswith("scripts/fact_keys.json")
-            or re.search(r"handoffs/javis/to_javis/", path) or re.search(r"docs/[^/]*_SPEC\.md$", path)):
+            or re.search(r"handoffs/javis/to_javis/", path) or re.search(r"docs/[^/]*_(SPEC|TODO)\.md$", path)
+            or re.search(r"docs/manifests/[^/]+\.json$", path)):
+        is_plan = bool(re.search(r"docs/[^/]*_(SPEC|TODO)\.md$", path) or re.search(r"docs/manifests/[^/]+\.json$", path))
         sys.stderr.write(QUESTION.format(target=f"給委員之產出 {path} ") +
                          "  ④ fact-verified 行與收斂檔之每條結論是否附同輪實跑或檔:行證據？fact-verified 須逐字貼本輪命令與輸出"
-                         "（不改寫、不摘要）；查不到者標「推測，未查證」。\n" + DESIGN +
-                         (SPEC_Q if path.endswith("_SPEC.md") else ""))
+                         "（不改寫、不摘要）；查不到者標「推測，未查證」。\n" + DESIGN + (SPEC_Q if is_plan else ""))
         raise SystemExit(2)
     raise SystemExit(0)
 
