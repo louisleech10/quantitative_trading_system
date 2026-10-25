@@ -1,0 +1,34 @@
+{
+  "ticket": "FFPROD",
+  "task": "Task 0.2 估時與改前基準凍結",
+  "estimate": {"cmd": "venv/bin/python scripts/ffprod_freeze_baseline.py --estimate", "rc": 0, "total_seconds": 2202.1319691249996,
+               "source": "handoffs/run_receipts/20261023-numview-estimate.json（A／B 含 IC-first，為上界）"},
+  "freeze": {
+    "cmd": "venv/bin/python scripts/ffprod_freeze_baseline.py",
+    "rc": 0,
+    "generation_head": "8c886067f2ac674a040d41428726b8499f9d924b",
+    "output": "tests/_golden/ffprod/pre_change_fingerprints.json",
+    "cells": {
+      "A_BTCUSDT_1h": {"seconds": 51, "observed_arm": "L2.polars", "columns": 3632},
+      "A_BTCUSDT_12h": {"seconds": 68, "observed_arm": "L2.polars", "columns": 3632},
+      "B_BTCUSDT_1h_4h": {"seconds": 204, "observed_arm": "L2.polars", "columns": 7264},
+      "C_BTCUSDT_1h": {"seconds": 1059, "observed_arm": "L2.polars", "columns": 209053, "granularity": "group", "groups": 249},
+      "A_BTCUSDT_1h__winsor_sigma": {"seconds": 31, "observed_arm": "L2.polars", "columns": 3632},
+      "A_BTCUSDT_1h__l2_pandas_serial": {"seconds": 49, "observed_arm": "L2.pandas_serial", "columns": 3632},
+      "A_BTCUSDT_1h__l2_pandas_parallel": {"seconds": 49, "observed_arm": "L2.pandas_parallel", "columns": 3632}
+    },
+    "first_attempt": "首次啟動於載入卡住監看模組即失敗（importlib 載入含 dataclass 之模組前未登記 sys.modules）；修 _load 後重跑，未生成任何格",
+    "c_granularity": "首次凍結 C 格逐欄指紋使基準檔約 100 MB（100695370 bytes）；凍結腳本改 C 格群組粒度（cell_fingerprints，同 numview_helpers.GROUP_GRANULARITY_KINDS），以 scripts/ffprod_refingerprint_c.py 自同次凍結之 C 格 run 目錄重算寫回（rc=0，249 群組，檔 10801289 bytes），未重生成"
+  },
+  "regen_gate": {
+    "cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_ffprod_gate.py",
+    "head": "44473ba3",
+    "result": "12 passed in 1626.35s (0:27:06)",
+    "pytest_rc": 0,
+    "meaning": "7 格於凍結 HEAD 之產品碼態重生，值指紋逐位元等於凍結值（SPEC Task 0.2「同格重跑兩次值指紋相同」：凍結為第一次、本跑為第二次）；C 格群組指紋寫回亦經此驗證；8c886067→44473ba3 之間只改 scripts／golden／文件，未改產品碼"
+  },
+  "honest_bounds": [
+    "§G 格只覆蓋 Task 0.2 改法之最少路徑集合（單標的 BTCUSDT），不涵蓋 §V 邊界目錄之極端輸入（屬 Phase 3 單元測試）",
+    "凍結與重生之暫存 run 目錄 $TMPDIR/ffprod-freeze 刪除被權限擋下，未刪（列交使用者執行）"
+  ]
+}
