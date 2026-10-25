@@ -267,7 +267,13 @@
     "post_ic_output_dtype": "float32",
     "post_ic_core_receipt": "handoffs/run_receipts/20261024-numview-postic-core-select.json"
    },
-   "implemented_commit": null
+   "implemented_commit": "8c961545c7fd739f8b0bbf9bf4e2a4877340e643",
+   "changed_targets": [
+    {
+     "group": "g1",
+     "note": "Task 3.4：IC 頁第三步改擇定核心＋輸出一律 float32，G1 各凍結臂份（改前紀錄、不重凍）於 §G 閘例外；IC 頁輸出之釘住由 tests/api/test_numview_ic_page.py 之 Task 3.4 ①與核心釘住案承擔"
+    }
+   ]
   },
   "d_postic": {
    "label": "D-POSTIC",

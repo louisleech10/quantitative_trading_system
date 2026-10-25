@@ -1,0 +1,547 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-25T00:16:48.692722+00:00",
+  "head": "8c961545c7fd739f8b0bbf9bf4e2a4877340e643",
+  "command": "venv/bin/python handoffs/run_receipts/numview_probes/l2_source_effect.py",
+  "probe_sha256": "40d34fa55a27519a831013145b4a480173c18f1a08a3241fcb123b5675cf025d",
+  "criteria_sha256": "b049be53e0530386ae18fc5ce956f8460626b526d64f3a2f53f2672b294ee879",
+  "code_state_sha256": "a9d0fa23a9ce14b661e88aa8a2e95260b5258cd9eff3e722fc3e99849bcd5abf",
+  "cells": {
+    "A_BTCUSDT_1h": {
+      "l5_l6_calls_eating_l2": 8,
+      "unequal_calls": 0,
+      "uses": [
+        {
+          "instance": 5883802720,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5883802720,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5881613616,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5881613616,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5893738304,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5893738304,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5901610144,
+          "tf": "1h",
+          "calibration": false,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5901610144,
+          "tf": "1h",
+          "calibration": false,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        }
+      ]
+    },
+    "A_BTCUSDT_4h": {
+      "l5_l6_calls_eating_l2": 8,
+      "unequal_calls": 0,
+      "uses": [
+        {
+          "instance": 5885813520,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5885813520,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5890048256,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5890048256,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5895034432,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5895034432,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5885788704,
+          "tf": "4h",
+          "calibration": false,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5885788704,
+          "tf": "4h",
+          "calibration": false,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        }
+      ]
+    },
+    "A_BTCUSDT_12h": {
+      "l5_l6_calls_eating_l2": 8,
+      "unequal_calls": 0,
+      "uses": [
+        {
+          "instance": 5880801552,
+          "tf": "12h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5880801552,
+          "tf": "12h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5896796336,
+          "tf": "12h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5896796336,
+          "tf": "12h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5878073568,
+          "tf": "12h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5878073568,
+          "tf": "12h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5884259440,
+          "tf": "12h",
+          "calibration": false,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5884259440,
+          "tf": "12h",
+          "calibration": false,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        }
+      ]
+    },
+    "A_SOLUSDT_1h": {
+      "l5_l6_calls_eating_l2": 8,
+      "unequal_calls": 0,
+      "uses": [
+        {
+          "instance": 5888249568,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5888249568,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5895034480,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5895034480,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5901406160,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5901406160,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5907301616,
+          "tf": "1h",
+          "calibration": false,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5907301616,
+          "tf": "1h",
+          "calibration": false,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        }
+      ]
+    },
+    "B_BTCUSDT_1h_4h": {
+      "l5_l6_calls_eating_l2": 14,
+      "unequal_calls": 0,
+      "uses": [
+        {
+          "instance": 5563871776,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5563871776,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5563833024,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5563833024,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5594494624,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5594494624,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5620394736,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5620394736,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5594314400,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5594314400,
+          "tf": "1h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5620446304,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5620446304,
+          "tf": "4h",
+          "calibration": true,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5563243776,
+          "tf": "1h",
+          "calibration": false,
+          "layer": "L5",
+          "l2_columns": 536,
+          "output_columns": 0,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        },
+        {
+          "instance": 5563243776,
+          "tf": "1h",
+          "calibration": false,
+          "layer": "L6",
+          "l2_columns": 536,
+          "output_columns": 9,
+          "missing_public": 0,
+          "extra_public": 0,
+          "recomputed_equal": true
+        }
+      ]
+    }
+  }
+}

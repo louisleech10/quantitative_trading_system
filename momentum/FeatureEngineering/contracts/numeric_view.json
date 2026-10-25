@@ -858,6 +858,18 @@
     "arm": "post_ic_arm",
     "ff_run_identity": "ff_run_identity"
   },
+  "l2_value_sources": {
+    "_doc": "D-L2 具名保留（SPEC Task 3.3 v40：d_l2＝retain，統一案移交第 9 步）：L2 兩值來源——Polars 回傳表（L5／L6 所吃）與逐類別 compute_category 公開落盤表——之 float32 逐位元差異非零之格，依 Task 1.3 收據逐格 f32diff 具名；未列之格兩來源 float32 逐位元相等。",
+    "receipt": "handoffs/run_receipts/20261024-numview-l2-arm-matrix.json",
+    "nonzero_cells": [
+      "B_BTCUSDT_1h_4h",
+      "C_BTCUSDT_1h"
+    ],
+    "f32diff": {
+      "B_BTCUSDT_1h_4h": 3969919,
+      "C_BTCUSDT_1h": 43394
+    }
+  },
   "ic_page_view_identity": {
     "_doc": "view_id 之組成（run 身分、轉換設定、臂、algorithm_id、有序 kept_cols）與正規化規則（R7-A）。",
     "components": [],

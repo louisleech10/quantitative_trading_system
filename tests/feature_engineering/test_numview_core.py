@@ -79,6 +79,7 @@ import hashlib
 import importlib.util
 import inspect
 import itertools
+import pickle
 import json
 import sys
 from pathlib import Path
@@ -719,6 +720,8 @@ def _install_spies(mp: pytest.MonkeyPatch, run: CellRun) -> None:
 
 Patch = Callable[[pytest.MonkeyPatch, CellRun], None]
 _GEN_COUNTER = itertools.count()
+#: 批次共用快取格內之核心觀測紀錄檔（判準 batch_cache：觀測器掛於唯一生成並與 run 同存）
+CORE_OBSERVATIONS = "numview_core_observations.pkl"
 
 
 def _generate(root: Path, kind: str, cell: Mapping[str, Any], *, env: Optional[Mapping[str, str]] = None,
@@ -726,19 +729,82 @@ def _generate(root: Path, kind: str, cell: Mapping[str, Any], *, env: Optional[M
     """單格真實生成（接縫 `generate_cell`）；觀測器先裝、mutant patch 後裝（故觀測器看得到 mutant 之效果）。"""
     run = CellRun(kind=kind, cell=dict(cell), key=_cell_key(kind, cell))
     work = Path(root) / f"{kind}_{run.key}_{next(_GEN_COUNTER)}"
+    descriptor = {**dict(cell), "kind": kind}
+    env_map = dict(env) if env else None
+    # 無 mutant patch ⇒ 批次共用生成（判準檔 cell_rules.batch_cache；root＝共用快取根、跑別＝b4）；含 patch ⇒ 另一碼態，
+    # 一律用本測試之暫存根（不讀寫共用快取）
+    shared = not patches and nh.regen_root(work) == nh.regen_batch_root()
+    obs_path = nh.regen_batch_root() / nh.regen_cache_key(descriptor, env_map) / CORE_OBSERVATIONS if shared else None
+    stored = pickle.loads(obs_path.read_bytes()) if obs_path is not None and obs_path.is_file() else None
+    if isinstance(stored, dict) and stored.get("observer_digest") == _observer_digest():
+        # 判準 batch_cache：核心觀測器掛於該碼態之唯一生成並與 run 同存；命中且觀測器碼態相符 ⇒ 讀回、run 經快取取回（不重生）。
+        # 觀測器碼態不符（審碼 b4 r5 CODEX-R5-P1-02）⇒ 視同無觀測、重取
+        found = stored["run"]
+        found.handle = _freeze().generate_cell(nh.regen_batch_root(), descriptor,
+                                               run_kind=nh.regen_core_kind(False), env=env_map)
+        return found
+    reuse_without_obs = obs_path is not None and (obs_path.parent / "numview_cell.json").is_file()
     mp = pytest.MonkeyPatch()
     try:
         _install_spies(mp, run)
         for patch in patches:
             patch(mp, run)
-        # 無 mutant patch ⇒ 批次共用生成（判準檔 cell_rules.batch_cache；root＝共用快取根、跑別＝b4）；含 patch ⇒ 另一碼態，
-        # 一律用本測試之暫存根（不讀寫共用快取）
-        run.handle = _freeze().generate_cell(work if patches else nh.regen_root(work),
-                                             {**dict(cell), "kind": kind}, run_kind=nh.regen_core_kind(bool(patches)),
-                                             env=dict(env) if env else None)
+        # 共用快取已有 run 而無核心觀測紀錄（他檢查先生成、未掛核心觀測器）⇒ 於本測試暫存根重生一次以取觀測，紀錄寫回
+        # 該快取格（同碼態、同生成身分，決定性生成）；其後命中即讀回
+        target = work if (patches or reuse_without_obs) else nh.regen_root(work)
+        run.handle = _freeze().generate_cell(target, descriptor, run_kind=nh.regen_core_kind(bool(patches)), env=env_map)
     finally:
         mp.undo()
+    if obs_path is not None:
+        if reuse_without_obs:
+            # 私有根之觀測寫回共用格前，其 run 須與共用快取 run 逐位元等值（raw／processed 值指紋；審碼 b4 r5 CODEX-R5-P1-01），
+            # 不等即拒收、不寫（不得以決定性生成推定）
+            cached = _freeze().generate_cell(nh.regen_batch_root(), descriptor, run_kind=nh.regen_core_kind(False),
+                                             env=env_map)
+            # 生成身分（審碼 b4 r6 CODEX-R6-P1-01）：兩 run 之 sidecar 逐鍵相等（payload_sha256、來源、連續性、輸出窗、env、
+            # 設定覆寫、清除之環境、config_hash、選欄、run_status 等；只除去計時 seconds、機器讀數 hardware、L2 擷取路徑 l2_capture）。
+            # 清除之環境中由隔離導向本根之路徑（CGSA 工作目錄、registry 等）之根前綴換成 <work> 後逐字比，其餘值不動
+            def _identity(work: Path) -> Dict[str, Any]:
+                side = _freeze()._sidecar(work)
+                roots = sorted({str(work), str(work.resolve())}, key=len, reverse=True)
+
+                def _rel(value: Any) -> Any:
+                    text = str(value)
+                    for root in roots:
+                        text = text.replace(root, "<work>")
+                    return text
+
+                ident = {k: v for k, v in side.items() if k not in ("seconds", "hardware", "l2_capture")}
+                if "effective_cleared_env" in ident:
+                    ident["effective_cleared_env"] = {k: _rel(v) for k, v in ident["effective_cleared_env"].items()}
+                return ident
+
+            ours_id, theirs_id = (_identity(Path(getattr(h, "work", Path(h.run_dir).parents[3]))) for h in (run.handle, cached))
+            assert ours_id == theirs_id, f"{run.key}：私有根與共用 run 之生成身分不等，拒寫觀測：" \
+                f"{sorted(k for k in set(ours_id) | set(theirs_id) if ours_id.get(k) != theirs_id.get(k))}"
+            for artifact in ("raw", "processed"):
+                ours, theirs = Path(run.handle.run_dir) / artifact, Path(cached.run_dir) / artifact
+                assert ours.exists() == theirs.exists(), f"{run.key}：私有根與共用 run 之 {artifact} 有無不同"
+                if ours.exists():
+                    diff = nh.bitwise_diff(nh.fingerprints(cached.run_dir, artifact),
+                                           nh.fingerprints(run.handle.run_dir, artifact))
+                    assert diff == [], f"{run.key}：私有根觀測之 run 與共用快取 run 之 {artifact} 不等，拒寫觀測：{diff[:3]}"
+        obs_path.parent.mkdir(parents=True, exist_ok=True)
+        handle, run.handle = run.handle, None
+        try:
+            obs_path.write_bytes(pickle.dumps({"observer_digest": _observer_digest(), "run": run}))
+        finally:
+            run.handle = handle
     return run
+
+
+def _observer_digest() -> str:
+    """核心觀測器之碼態：觀測器安裝、L2 使用判定與觀測紀錄型別之原始碼 sha256（審碼 b4 r5 CODEX-R5-P1-02；觀測檔載入時比對，
+    不符即重取）。"""
+    # 含觀測器呼叫之輔助函式（審碼 b4 r6 CODEX-R6-P1-02：`_ctx`、`_layer_data`、`_frames_identical`、`_ulp_report` 決定觀測內容）
+    parts = [inspect.getsource(obj) for obj in (_install_spies, _l2_use, _ctx, _layer_data, _frames_identical,
+                                                _ulp_report, CellRun, PostICCall, LayerExit, L2Use)]
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 
 class _Runs:
@@ -799,7 +865,9 @@ def _legacy_arm(frame: pd.DataFrame, config: Any) -> pd.DataFrame:
         for key, value in LEGACY_ENV.items():
             mp.setenv(key, value)
         pre = FeaturePreprocessor(_effective_post_ic_dict(config))
-        out = pre.transform(frame.copy())
+        # 群組臂紀錄只於執行群組範圍內記（同 transform_selected 之 `_execution_group_scope`）
+        with pre._execution_group_scope("numview_legacy_oracle"):
+            out = pre.transform(frame.copy())
         arms = {str(info.get("arm")) for info in pre.execution_groups().values()}
     finally:
         mp.undo()
@@ -1427,13 +1495,32 @@ def _key_to_cell(kind: str) -> Dict[str, Dict[str, Any]]:
     return {_cell_key(kind, c): c for c in _cells(kind)}
 
 
+def _runs_with_frozen(runs: "_Runs", kind: str, artifact: str) -> List[CellRun]:
+    """凍結檔中具 `artifact` 之 `kind` 格之 run（§G 只凍結判準 freeze 組所列之份：G2 raw＝A_BTCUSDT_1h、G3 raw＝B／C）；
+    無任何格 ⇒ 紅（R6-B「對 §G 改前凍結值逐位元相等」之對象須存在）。"""
+    cells = _key_to_cell(kind)
+    keys = [key for key, node in _frozen_doc().get("cells", {}).get(kind, {}).items() if artifact in node]
+    assert keys, f"凍結檔無任何 {kind} 格具 {artifact}"
+    missing = [key for key in keys if key not in cells]
+    assert not missing, f"凍結格 {missing} 不在現行列舉"
+    return [runs.get(kind, cells[key]) for key in keys]
+
+
 def test_postic_retained_processed_and_ic_page_bitwise_equal_frozen(runs: _Runs, tmp_path: Path) -> None:
-    """R6-B：IC-first processed（凍結檔中每個含 processed 之格）與 IC 頁 `polars` 臂份（格 A 全部格）對 §G 改前凍結逐位元
-    相等（`values_native`＋`dtype`＋`nan`、欄集合與欄序，atol=0）；沿用 PRE-PROV `ic_first_default` processed 基準
-    （legacy 相容比對）。Task 1.1 收據之 max_abs 只作報告，不作通過條件。"""
+    """R6-B（v40 註：Task 3.4 後之釘住對象＝擇定核心輸出）：IC-first processed（凍結檔中每個含 processed 之格；Task 3.4
+    同提交重凍）對 §G 凍結逐位元相等（`values_native`＋`dtype`＋`nan`、欄集合與欄序，atol=0）；沿用 PRE-PROV
+    `ic_first_default` processed 基準（Task 3.4 同提交重凍；legacy 相容比對）。IC 頁輸出之釘住由 Task 3.4 ①
+    （`tests/api/test_numview_ic_page.py::test_icpage_arm_locked_g1_every_env_equals_locked_reference`：輸出＝擇定核心
+    原生輸出轉 float32）與核心釘住案（`::test_icpage_arm_locked_core_native_pinned_to_frozen_copy`：原生輸出＝G1 改前同核心份）
+    承擔，本案不重複。Task 1.1 收據之 max_abs 只作報告，不作通過條件。"""
     _require_decision(D_POSTIC[0], D_POSTIC[2])
-    arm = _formal_arm()
     bad: List[str] = []
+    # 擇定核心之 post-IC 輸入為生產 raw（只存 float16／float32，feature_storage.py:1003）：此前提使「核心改於 float32 計算」
+    # 為等價 mutant（值本即 float32 可表示）；前提不再成立 ⇒ 紅（審碼 b4 r5 CODEX-R5-P1-03）
+    for run in runs.all("A") + runs.all("B"):
+        dtypes = {str(d) for d in _ic_first_call(run).frame.dtypes}
+        if not dtypes <= {"float16", "float32"}:
+            bad.append(f"{run.key}|post-IC 輸入 dtype {sorted(dtypes)} 非 float16／float32")
     for kind in ("A", "B"):
         cells = _key_to_cell(kind)
         frozen_kind = _frozen_doc().get("cells", {}).get(kind, {})
@@ -1444,10 +1531,6 @@ def test_postic_retained_processed_and_ic_page_bitwise_equal_frozen(runs: _Runs,
             run = runs.get(kind, cells[key])
             bad.extend(f"{kind}|{key}|processed|{d}" for d in
                        nh.bitwise_diff(node[FROZEN_PROCESSED], nh.fingerprints(run.handle.run_dir, "processed")))
-    for run in runs.all("A"):
-        frame, _resp = _freeze().ic_page_output(run.handle, tmp_path / f"icpage_{run.key}")
-        bad.extend(f"A|{run.key}|ic_page|{d}" for d in
-                   nh.bitwise_diff(_frozen_fp("A", run.key, FROZEN_IC_PAGE, arm), nh.frame_fingerprints(frame)))
     legacy = json.loads(nh.LEGACY_BASELINE_PATH.read_text(encoding="utf-8"))["cells"]["ic_first_default"]
     cache = ph.RunCache(tmp_path / "preprov")
     for symbol, node in legacy.items():
@@ -1463,7 +1546,7 @@ def _retained_processed_diff(run: CellRun, root: Path, mutants: Sequence[Mutant]
     run_dir, error = _direct_write_processed(root, run.handle.symbol, run.handle.tf, "numview_replay", out, execution,
                                              _raw_row_index(run.handle), _formal_arm())
     assert error is None, error
-    return _column_bitwise_diff(_frozen_fp("A", run.key, FROZEN_PROCESSED), nh.fingerprints(run_dir, "processed"))
+    return _column_bitwise_diff(_frozen_fp(run.kind, run.key, FROZEN_PROCESSED), nh.fingerprints(run_dir, "processed"))
 
 
 def _zscore_epsilon_in_variance(_real: Callable) -> Callable:
@@ -1485,30 +1568,43 @@ def _zscore_epsilon_in_variance(_real: Callable) -> Callable:
     return mutant
 
 
-def test_mutation_postic_retained_float64_compute_breaks_bitwise(runs: _Runs, tmp_path: Path) -> None:
-    """mutation（R6-B）：保留分支下把 Polars 計算改為 Float64（候選 `polars_float64`；差異在 Task 1.1 max_abs 內甚至更近
-    oracle）⇒ 逐位元案紅。先證未注入之重放等於凍結（對照）。"""
+def _legacy_zscore_window_shift(real: Callable) -> Any:
+    """（工廠，注入擇定核心 `FeaturePreprocessor._rolling_zscore_2d`）微小核心改動：zscore 窗長各 +1。（「入口先轉 float32」
+    於生產為等價 mutant：post-IC 輸入為只存 float16／float32 之 raw，值本即 float32 可表示，再轉 float32 不改值；float64 輸入
+    由 v41 之 `PostICOutputDtypeError` 拒收。前提由 `test_postic_retained_processed_and_ic_page_bitwise_equal_frozen` 釘住。）"""
+    return staticmethod(lambda arr, windows, epsilon, mode="replace": real(arr, [int(w) + 1 for w in windows],
+                                                                           epsilon, mode))
+
+
+def _legacy_zscore_epsilon_scaled(real: Callable) -> Any:
+    """（工廠，注入擇定核心 `FeaturePreprocessor._rolling_zscore_2d`）微小核心改動：ε 放大 1000 倍。"""
+    return staticmethod(lambda arr, windows, epsilon, mode="replace": real(arr, windows, epsilon * 1e3, mode))
+
+
+def test_mutation_postic_retained_zscore_window_shift_breaks_bitwise(runs: _Runs, tmp_path: Path) -> None:
+    """mutation（R6-B；v40 後保留分支之釘住對象＝擇定核心 pandas_legacy，Polars 已非 post-IC 正式臂）：擇定核心之 zscore
+    窗長 +1 ⇒ 逐位元案紅。格＝凍結檔中含 processed 之格（B）；先證未注入之重放等於凍結（對照）。"""
     _require_decision(D_POSTIC[0], D_POSTIC[2])
-    run = runs.first("A")
+    run = runs.first("B")
     assert _retained_processed_diff(run, tmp_path / "control", []) == [], "對照：未注入之重放須等於凍結"
-    candidate = [(polars_adapter, "pandas_to_polars", _always_float64),
-                 (polars_adapter, "polars_l65_rank_transform", _rank_transform_with(np.float64, False)),
-                 (FeaturePreprocessor, "_polars_mask_columns", _mask_keep_float64)]
-    assert _retained_processed_diff(run, tmp_path / "mutant", candidate), "Float64 計算未被逐位元案偵測"
+    mutant = (FeaturePreprocessor, "_rolling_zscore_2d", _legacy_zscore_window_shift)
+    assert _retained_processed_diff(run, tmp_path / "mutant", [mutant]), "zscore 窗長改動未被逐位元案偵測"
 
 
 def test_mutation_postic_retained_zscore_epsilon_placement_breaks_bitwise(runs: _Runs, tmp_path: Path) -> None:
-    """mutation（R6-B）：zscore ε 位置之微小核心改動 ⇒ 逐位元案紅（對照同上）。"""
+    """mutation（R6-B）：擇定核心 zscore 之 ε 微小改動 ⇒ 逐位元案紅（對照同上）。"""
     _require_decision(D_POSTIC[0], D_POSTIC[2])
-    run = runs.first("A")
+    run = runs.first("B")
     assert _retained_processed_diff(run, tmp_path / "control", []) == []
-    mutant = (polars_adapter, "polars_l65_adaptive_zscore", _zscore_epsilon_in_variance)
+    mutant = (FeaturePreprocessor, "_rolling_zscore_2d", _legacy_zscore_epsilon_scaled)
     assert _retained_processed_diff(run, tmp_path / "mutant", [mutant])
 
 
 # ============================================================================================== Task 3.1 邊界（core_always）
 
 def _formal_vs_legacy(frame: pd.DataFrame, combo: Sequence[str]) -> Tuple[np.ndarray, np.ndarray]:
+    # NUMVIEW Task 3.4（v41）：生產 raw 只存 float16／float32（feature_storage.py:1003），float64 原生輸出具名拒收 ⇒ 輸入取 float32
+    frame = frame.astype(np.float32)
     cfg = _combo_config(combo)
     formal = FeaturePreprocessor(cfg.model_dump()).transform_selected(
         list(frame.columns), {"numview": frame.copy()}, config=cfg, arm=_formal_arm())["numview"]
@@ -1755,7 +1851,7 @@ def test_memmap_retained_l3_l4_downstream_bitwise_equal_frozen(runs: _Runs) -> N
     bad: List[str] = []
     seen = 0
     for kind, artifact in (("A", FROZEN_RAW_A), ("B", FROZEN_RAW_B)):
-        for run in runs.all(kind):
+        for run in _runs_with_frozen(runs, kind, artifact):
             names = _layer_columns(run.handle.run_dir, ("L3", "L4"))
             seen += len(names)
             bad.extend(f"{kind}|{run.key}|{d}" for d in _column_bitwise_diff(
@@ -1846,7 +1942,7 @@ def test_winsor_dtype_retained_slow_path_raw_bitwise_and_sigma_float64(runs: _Ru
     dtype 維持現行 float64（quantile float32）——凍結格之縮尾為生產預設 quantile，sigma 之保留以直接呼叫釘住。"""
     _require_decision(D_WINSOR[0], D_WINSOR[2])
     bad: List[str] = []
-    for run in runs.all("A"):
+    for run in _runs_with_frozen(runs, "A", FROZEN_RAW_A):
         bad.extend(f"{run.key}|{d}" for d in nh.bitwise_diff(_frozen_fp("A", run.key, FROZEN_RAW_A),
                                                              nh.fingerprints(run.handle.run_dir, "raw")))
     for tag, sigma, quantile in _winsor_outputs():
@@ -2464,24 +2560,61 @@ def _l2_matrix_rerun(run_list: Iterable[CellRun]) -> Dict[Tuple[str, str], int]:
     return out
 
 
-def _l2_named_violations(contract: Mapping[str, Any], matrix: Mapping[Tuple[str, str], int]) -> List[str]:
+def _l2_source_divergence(run: CellRun) -> bool:
+    """該 run 之某次 L5／L6（吃到 L2 者）實際輸出≠以公開 L2 重算之輸出（記憶體內 float64 比對，`L2Use.recomputed_equal`）。"""
+    return any(u.l2_columns and not u.recomputed_equal for u in run.l2_use)
+
+
+def _per_cell(matrix: Mapping[Tuple[str, str], int]) -> Dict[str, int]:
+    out: Dict[str, int] = {}
+    for (cell, _tf), n in matrix.items():
+        out[cell] = out.get(cell, 0) + int(n)
+    return out
+
+
+def _l2_receipt_per_cell() -> Dict[str, int]:
+    """Task 1.3 收據之逐格 f32diff（`cells[].{cell_id, f32diff}`；格內各週期合計）。收據＝契約 `l2_value_sources.receipt`
+    所指之檔（不以 glob 最新檔替代；審碼 b4 r6 CODEX-R6-P1-03），須屬 Task 1.3 收據樣式且 `criteria_sha256`＝現行判準檔。"""
+    rel = str((nv.load_contract().get("l2_value_sources") or {}).get("receipt") or "")
+    path = REPO / rel
+    assert rel and path.is_file() and path.match(L2_MATRIX_RECEIPT_GLOB), f"契約 l2_value_sources.receipt 不可用：{rel!r}"
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    current = hashlib.sha256(nh.current_criteria_path().read_bytes()).hexdigest()
+    assert receipt.get("criteria_sha256") == current, f"{rel}：criteria_sha256 ≠ 現行判準檔"
+    return {str(r["cell_id"]): int(r["f32diff"]) for r in receipt["cells"]}
+
+
+def _l2_named_violations(contract: Mapping[str, Any], per_cell: Mapping[str, int]) -> List[str]:
     named = sorted(str(c) for c in (contract.get("l2_value_sources") or {}).get("nonzero_cells") or [])
-    nonzero = sorted({cell for (cell, _tf), n in matrix.items() if n})
-    return [] if named == nonzero else [f"契約具名非零格 {named} ≠ 重跑非零格 {nonzero}"]
+    nonzero = sorted(cell for cell, n in per_cell.items() if n)
+    return [] if named == nonzero else [f"契約具名非零格 {named} ≠ 收據非零格 {nonzero}"]
 
 
 def test_l2_named_matrix_pinned_nonzero_named_and_layers_bitwise(runs: _Runs) -> None:
-    """D-L2 具名保留：Task 1.3 矩陣之每格 f32diff 被釘（重跑相等）；非零格於契約 `l2_value_sources.nonzero_cells`
-    具名；格 A＋格 B 之公開 L2 與 L5／L6 欄對 §G 凍結逐位元相等（R6-B）。"""
+    """D-L2 具名保留：Task 1.3 矩陣之每格 f32diff 被釘（本模組重跑之格與收據共有之格逐格相等）；收據之非零格（含格 C）
+    於契約 `l2_value_sources.nonzero_cells` 恰具名，且重跑非零格 ⊆ 具名；凍結檔具 raw 之格 A／B 之公開 L2 與 L5／L6 欄
+    對 §G 凍結逐位元相等（R6-B）。"""
     _require_decision(D_L2[0], D_L2[2])
     run_list = runs.all("A") + runs.all("B")
-    matrix = _l2_matrix_rerun(run_list)
-    receipt = {(str(r["cell"]), str(r["timeframe"])): int(r["f32diff"])
-               for r in _latest_receipt(L2_MATRIX_RECEIPT_GLOB)["rows"]}
-    assert matrix and matrix == receipt, sorted(set(matrix.items()) ^ set(receipt.items()))[:10]
-    assert _l2_named_violations(nv.load_contract(), matrix) == []
+    rerun = _per_cell(_l2_matrix_rerun(run_list))
+    receipt = _l2_receipt_per_cell()
+    # 重跑覆蓋恰為 A＋B 全部格（審碼 b4 r5 CODEX-R5-P1-04：不得以交集掩蓋缺格）
+    assert set(rerun) == {run.key for run in run_list}, (sorted(rerun), [run.key for run in run_list])
+    contract = nv.load_contract()
+    source = contract.get("l2_value_sources") or {}
+    named = set(source.get("nonzero_cells") or [])
+    for cell, n in sorted(rerun.items()):
+        if cell in receipt:
+            assert n == receipt[cell], f"{cell}：重跑 f32diff {n} ≠ 收據 {receipt[cell]}"
+        else:
+            # 收據未量之格（Task 1.3 只量 A_BTCUSDT_1h／12h、B、C）：契約「未列之格兩來源逐位元相等」⇒ 須 0 且不在具名
+            assert n == 0 and cell not in named, f"{cell}：收據未量而重跑 f32diff {n}（具名：{cell in named}）"
+    assert _l2_named_violations(contract, receipt) == []
+    assert {c for c, n in rerun.items() if n} <= named, (rerun, sorted(named))
+    # 契約之逐格 f32diff 綁收據（審碼 b4 r5 CODEX-R5-P1-05）
+    assert source.get("f32diff") == {c: receipt[c] for c in sorted(named)}, (source.get("f32diff"), receipt)
     bad: List[str] = []
-    for run in run_list:
+    for run in _runs_with_frozen(runs, "A", FROZEN_RAW_A) + _runs_with_frozen(runs, "B", FROZEN_RAW_B):
         artifact = FROZEN_RAW_A if run.kind == "A" else FROZEN_RAW_B
         names = _layer_columns(run.handle.run_dir, ("L2", "L5", "L6"))
         bad.extend(f"{run.key}|{d}" for d in _column_bitwise_diff(
@@ -2492,56 +2625,27 @@ def test_l2_named_matrix_pinned_nonzero_named_and_layers_bitwise(runs: _Runs) ->
 def test_mutation_l2_named_contract_drops_cell_breaks_naming(runs: _Runs, monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：契約刪一個非零格 ⇒ 具名案紅。"""
     _require_decision(D_L2[0], D_L2[2])
-    matrix = _l2_matrix_rerun(runs.all("A") + runs.all("B"))
+    receipt = _l2_receipt_per_cell()
     contract = nv.load_contract()
     named = list((contract.get("l2_value_sources") or {}).get("nonzero_cells") or [])
     assert named, "契約無具名非零格 ⇒ 刪格 mutant 無對象"
+    assert _l2_named_violations(contract, receipt) == [], "對照：未刪格之契約須與收據一致"
     mutated = copy.deepcopy(contract)
     mutated["l2_value_sources"]["nonzero_cells"] = named[1:]
     monkeypatch.setattr(nv, "load_contract", lambda: copy.deepcopy(mutated))
-    assert _l2_named_violations(nv.load_contract(), matrix)
+    assert _l2_named_violations(nv.load_contract(), receipt)
 
 
-def _l5_l6_eat_public(mp: pytest.MonkeyPatch, run: CellRun) -> None:
-    """保留分支下 L5／L6 改吃公開落盤值來源（同實例同週期之公開 L2，依所吃 L2 之欄序）。"""
-    FF = ff_mod.FeatureFactory
-
-    def public_of(self: Any, layer2: pd.DataFrame) -> pd.DataFrame:
-        inst, tf, _calib = _ctx(self)
-        frames = [c for _r, c in run.public.get((inst, tf), [])]
-        if not frames or layer2 is None or layer2.empty:
-            return layer2
-        pub = pd.concat(frames, axis=1)
-        pub = pub.loc[:, ~pub.columns.duplicated(keep="first")]
-        pub = pub.loc[:, [c for c in layer2.columns if c in pub.columns]].copy()
-        pub.index = layer2.index
-        return pub
-
-    cur5, cur6 = FF._layer5_cross_sectional, FF._layer6_meta_features
-    mp.setattr(FF, "_layer5_cross_sectional",
-               lambda self, layer1, layer2, config: cur5(self, layer1, public_of(self, layer2), config))
-    mp.setattr(FF, "_layer6_meta_features",
-               lambda self, layer1, layer2, data, config: cur6(self, layer1, public_of(self, layer2), data, config))
-
-
-def test_mutation_l2_named_l5_l6_public_source_breaks_bitwise(tmp_path: Path) -> None:
-    """mutation（R6-B）：保留分支下 L5／L6 改吃公開落盤值來源（差異僅 float32 捨入量級）⇒ L5／L6 欄逐位元案紅。
-    對象＝契約具名之第一個非零格。"""
+def test_l2_named_public_source_equivalent_on_current_cells(runs: _Runs) -> None:
+    """D-L2 保留之實測釘住（SPEC v43；取代「L5／L6 改吃公開落盤值 ⇒ 逐位元紅」之 mutation——該 mutant 於現行格為值上等價，
+    收據 `handoffs/run_receipts/20261025-numview-l2-source-effect.json`：A 四格各 8 次、B 格 14 次吃 L2 之 L5／L6 呼叫，以公開
+    L2 重算之輸出與實際輸出記憶體內逐位元相同 0 次不等）：A＋B 全部格之每次吃 L2 之 L5／L6，實際輸出＝以公開 L2 重算之輸出。
+    日後資料或碼使 L2 雙來源對 L5／L6 有影響 ⇒ 本案紅，提示重審 D-L2 保留（移交第 9 步之 L2 統一）。"""
     _require_decision(D_L2[0], D_L2[2])
-    named = list((nv.load_contract().get("l2_value_sources") or {}).get("nonzero_cells") or [])
-    assert named, "契約無具名非零格 ⇒ 本 mutant 無可現形之格"
-    target = None
-    for kind in ("A", "B"):
-        for cell in _cells(kind):
-            if _cell_key(kind, cell) == named[0]:
-                target = (kind, cell)
-    assert target is not None, f"具名格 {named[0]} 不在現行列舉"
-    run = _generate(tmp_path, target[0], target[1], patches=[_l5_l6_eat_public])
-    names = _layer_columns(run.handle.run_dir, ("L5", "L6"))
-    artifact = FROZEN_RAW_A if target[0] == "A" else FROZEN_RAW_B
-    assert names
-    assert _column_bitwise_diff(_frozen_fp(target[0], run.key, artifact), nh.fingerprints(run.handle.run_dir, "raw"),
-                                names)
+    run_list = runs.all("A") + runs.all("B")
+    eating = sum(1 for run in run_list for u in run.l2_use if u.l2_columns)
+    assert eating > 0, "無任何 L5／L6 呼叫吃到 L2 ⇒ 本案無對象"
+    assert [run.key for run in run_list if _l2_source_divergence(run)] == []
 
 
 def _consistency_violations(run: CellRun) -> List[str]:
@@ -2569,7 +2673,12 @@ def test_boundary_35_core_always_l2_polars_failure_fallback_consistent(tmp_path:
     except RuntimeError as exc:
         failure = exc
     if failure is not None:
-        assert "Layer 2" in str(failure), f"失敗未具名 Layer 2：{failure}"
+        # 具名 Layer 2 失敗＝例外訊息具名，或 run 以 partial 終止且 manifest 之 failed_layers（頂層或 raw 節點）具名 L2
+        # （現行 `feature_factory._layer2_derived_polars` 於 compute_all_polars 拋錯時記 L2 失敗、run 為 partial）
+        manifests = [json.loads(p.read_text(encoding="utf-8")) for p in Path(tmp_path).rglob("feature_manifest.json")]
+        named = any("L2" in (m.get("failed_layers") or [])
+                    or "L2" in (((m.get("artifacts") or {}).get("raw") or {}).get("failed_layers") or []) for m in manifests)
+        assert "Layer 2" in str(failure) or named, f"失敗未具名 Layer 2：{failure}"
     else:
         assert run is not None and run.l2_use, "run 完成但未觀測到任何 L5／L6 呼叫"
         assert _consistency_violations(run) == []
