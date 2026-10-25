@@ -1186,7 +1186,10 @@ def path_registry_violations(criteria: Mapping[str, Any], plan: Mapping[str, Map
         return ["判準檔缺 path_registry.paths（封閉路徑登錄）"]
     out: List[str] = []
     entries: Dict[str, Mapping[str, Any]] = {}
-    replaced = criteria_defect_replacements()
+    # 判準缺陷豁免只限 regen_b4_mutants 列宣稱之 mutation id（等價 mutant）；其他 id 列入限制項亦不豁免
+    mutant_ids = {str(i) for r in ((criteria.get("run_coverage") or {}).get("regen_b4_mutants") or {}).get("runs") or []
+                  for i in r.get("covers_ids") or [] if str(i).startswith("mutation.")}
+    replaced = {pid: ref for pid, ref in criteria_defect_replacements().items() if pid in mutant_ids}
     for entry in registry:
         pid = str(entry.get("id") or "")
         if not pid or pid in entries:

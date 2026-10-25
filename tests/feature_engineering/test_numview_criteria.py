@@ -777,11 +777,11 @@ def limitation_violations(decisions: Mapping[str, Any]) -> List[str]:
         elif not str(item.get("description", "")).strip():
             out.append(f"measurement_limitations.{ident}：description 為空")
         elif item.get("kind") == "criteria_defect" and "criteria_ids" in item:
-            # 判準缺陷之豁免項（邊界②）：所列 id 須屬判準 path_registry，replaced_by 之測試於現行碼恰一個
-            reg = {str(p.get("id")) for p in (_load_criteria().get("path_registry") or {}).get("paths") or []}
+            # 判準缺陷之豁免項（邊界②）：所列 id 只限判準 regen_b4_mutants 列宣稱之 mutation id（豁免只為等價 mutant），
+            # replaced_by 之測試於現行碼恰一個
             ids_ = item.get("criteria_ids")
-            if not isinstance(ids_, list) or not ids_ or not {str(i) for i in ids_} <= reg:
-                out.append(f"measurement_limitations.{ident}：criteria_ids {ids_!r} 空或含未登錄 id")
+            if not isinstance(ids_, list) or not ids_ or not {str(i) for i in ids_} <= _mutant_row_ids(_load_criteria()):
+                out.append(f"measurement_limitations.{ident}：criteria_ids {ids_!r} 空或含非 mutant 列之 id")
             if _test_def_count(str(item.get("replaced_by") or "")) != 1:
                 out.append(f"measurement_limitations.{ident}：replaced_by {item.get('replaced_by')!r} 於現行碼須恰一個")
     return out
@@ -796,11 +796,19 @@ def _test_def_count(ref: str) -> int:
     return sum(1 for s in path.read_text(encoding="utf-8").splitlines() if re.match(rf"\s*def {re.escape(name)}\(", s))
 
 
+def _mutant_row_ids(criteria: Mapping[str, Any]) -> Set[str]:
+    """判準 `run_coverage.regen_b4_mutants` 各列宣稱之 `mutation.*` 路徑 id。不含 assert。"""
+    rows = (criteria.get("run_coverage") or {}).get("regen_b4_mutants", {}).get("runs") or []
+    return {str(i) for r in rows for i in r.get("covers_ids") or [] if str(i).startswith("mutation.")}
+
+
 def _criteria_defect_ids() -> Set[str]:
     """決定紀錄 `kind=criteria_defect` 且具 `criteria_ids` 之限制項所列之判準路徑 id（豁免現行碼錨點與 mutation_test 存在檢查，
     改由 `limitation_violations` 驗 replaced_by）。不含 assert。"""
+    mutants = _mutant_row_ids(_load_criteria())
     return {str(pid) for item in _load_decisions().get("measurement_limitations") or []
-            if isinstance(item, Mapping) and item.get("kind") == "criteria_defect" for pid in item.get("criteria_ids") or []}
+            if isinstance(item, Mapping) and item.get("kind") == "criteria_defect" for pid in item.get("criteria_ids") or []
+            if str(pid) in mutants}
 
 
 # ---------------------------------------------------------------------------------------------- Task 0.4
@@ -3617,11 +3625,13 @@ def test_mutation_estimate_unlisted_core_patched_generation(monkeypatch: pytest.
     assert any("未列估時" in v for v in mutant_rows_violations(_load_criteria(), _read_core_source()))
 
 
-@pytest.mark.parametrize("mutant", ["limitation_removed", "replaced_by_missing", "criteria_id_unregistered"])
+@pytest.mark.parametrize("mutant", ["limitation_removed", "replaced_by_missing", "criteria_id_unregistered",
+                                    "criteria_id_non_mutant"])
 def test_mutation_criteria_defect_limitation_exemption(monkeypatch: pytest.MonkeyPatch, mutant: str) -> None:
     """判準缺陷限制項（SPEC Task 0.3 邊界②、v43 ①）之豁免：現行為零違規；拿掉限制項 ⇒ mutant 列之 mutation_test 不存在與
     錨點上下文 0 次皆紅（測試帳與估時器）；replaced_by 指不存在之測試 ⇒ limitation_violations 與估時器紅；criteria_ids 含未
-    登錄 id ⇒ limitation_violations 紅。"""
+    登錄 id ⇒ limitation_violations 紅；criteria_ids 改列非 mutant 列之登錄 id（審碼 b4 r9）⇒ limitation_violations 紅、
+    該 id 不入豁免（原 mutant 失去豁免 ⇒ 測試帳與估時器之錨點紅）。"""
     criteria = _load_criteria()
     real = _load_decisions()
     assert limitation_violations(real) == [] and mutant_rows_violations(criteria, _read_core_source()) == []
@@ -3632,8 +3642,10 @@ def test_mutation_criteria_defect_limitation_exemption(monkeypatch: pytest.Monke
         items.remove(target)
     elif mutant == "replaced_by_missing":
         target["replaced_by"] = "tests/feature_engineering/test_numview_core.py::test_numview_no_such_test"
-    else:
+    elif mutant == "criteria_id_unregistered":
         target["criteria_ids"] = list(target["criteria_ids"]) + ["mutation.no_such_id"]
+    else:
+        target["criteria_ids"] = ["cell.single_tf_1h_main_source"]
     monkeypatch.setattr(sys.modules[__name__], "_load_decisions", lambda: decisions)
     tmp = nh.RECEIPTS_DIR.parent / ".numview_defect_mutant_decisions.json"
     try:  # 估時器自讀決定紀錄檔：以其路徑參數讀變體（不改 repo 之決定紀錄）
@@ -3649,8 +3661,13 @@ def test_mutation_criteria_defect_limitation_exemption(monkeypatch: pytest.Monke
     elif mutant == "replaced_by_missing":
         assert any("replaced_by" in v for v in limitation_violations(decisions))
         assert any("replaced_by" in v for v in ESTIMATOR.coverage_violations(criteria))
+    elif mutant == "criteria_id_unregistered":
+        assert any("非 mutant 列" in v for v in limitation_violations(decisions))
     else:
-        assert any("未登錄" in v for v in limitation_violations(decisions))
+        assert any("非 mutant 列" in v for v in limitation_violations(decisions))
+        assert "cell.single_tf_1h_main_source" not in _criteria_defect_ids()
+        assert any("出現 0 次" in v for v in _path_registry_ledger_violations(criteria))
+        assert any("出現 0 次" in v for v in ESTIMATOR.coverage_violations(criteria))
 
 
 # ---------------------------------------------------------------------------------------------- 卡住偵測（使用者 2026-10-22；判準 v6 cell_rules.watchdog）
