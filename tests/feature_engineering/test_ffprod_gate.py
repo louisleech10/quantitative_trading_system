@@ -127,6 +127,12 @@ def coverage_errors(cell_list: Any, fb: Any) -> List[str]:
         for tag in cell["covers"]:
             if tag not in COVERAGE_PREDICATES or not COVERAGE_PREDICATES[tag](cell, fb):
                 errors.append(f"{cell['id']} 宣告 {tag} 而結構不符")
+        arm = cell.get("declared_arm")
+        if arm is not None:
+            if arm not in fb.L2_ARM_ENV:
+                errors.append(f"{cell['id']} 之 declared_arm {arm!r} 不屬 L2_ARM_ENV")
+            elif arm not in cell["covers"] or not COVERAGE_PREDICATES[arm](cell, fb):
+                errors.append(f"{cell['id']} 之 declared_arm {arm} 未列於自身 covers 或環境不符")
     for tag in sorted(REQUIRED_COVERAGE):
         if not any(tag in c["covers"] and COVERAGE_PREDICATES[tag](c, fb) for c in cell_list):
             errors.append(f"缺 {tag}")
@@ -145,6 +151,35 @@ def test_mutation_single_cell_claiming_all_tags_rejected(monkeypatch: pytest.Mon
     lone = [_cell("only", covers=sorted(REQUIRED_COVERAGE))]
     monkeypatch.setattr(fb, "cells", lambda: lone)
     assert coverage_errors(fb.cells(), fb) != []
+
+
+def _complete_cells(fb: Any) -> List[Dict[str, Any]]:
+    """滿足全部結構判準之最小格組（契約案用）。"""
+    both = {"winsorization": {"method": "quantile"}, "fractional_differencing": True, "adf_differencing": True}
+    cells = [
+        {**_cell("a1", covers=["A_1h", "fracdiff_adf"]), "preprocessing": both},
+        {**_cell("a12", timeframes=["12h"], covers=["A_12h"])},
+        {**_cell("b", kind="B", timeframes=["1h", "4h"], covers=["B_1h_4h"])},
+        {**_cell("c", kind="C", covers=["C_1h"])},
+        {**_cell("sig", covers=["A_1h", "winsor_sigma"]), "preprocessing": {"winsorization": {"method": "sigma"}}},
+    ]
+    for arm, env in fb.L2_ARM_ENV.items():
+        cells.append(_cell(arm, covers=["A_1h", arm], declared_arm=arm, env=dict(env)))
+    return cells
+
+
+def test_mutation_l2_cell_arm_binding_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：多一個漏標自身 arm 之 L2 格、或未知 arm 之格 ⇒ 覆蓋案轉紅；完整格組 ⇒ 綠。"""
+    fb = _load()
+    good = _complete_cells(fb)
+    monkeypatch.setattr(fb, "cells", lambda: good)
+    assert coverage_errors(fb.cells(), fb) == []
+    unlabeled = _cell("extra", covers=["A_1h"], declared_arm="L2.pandas_parallel",
+                      env=dict(fb.L2_ARM_ENV["L2.pandas_parallel"]))
+    unknown = _cell("odd", covers=["A_1h"], declared_arm="L2.unknown", env={})
+    for extra in (unlabeled, unknown):
+        monkeypatch.setattr(fb, "cells", lambda e=extra: good + [e])
+        assert coverage_errors(fb.cells(), fb) != []
 
 
 def test_compare_exact_changed_targets() -> None:
