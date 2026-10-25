@@ -437,6 +437,7 @@ class FeatureFactory:
         self._current_timeframe = timeframe
         self._current_config_hash = None
         self._cgsa_registry = None
+        self._pending_route_markers: List[Dict[str, Any]] = []
         self.layer_results = {}
         self._preprocessing_applied = None
         self._effective_preprocessing_config = None
@@ -1194,6 +1195,8 @@ class FeatureFactory:
         work_dir = cgsa_work_dir(root, symbol, timeframe, config_hash or "", algorithm_id or "unidentified")
         identity = _run_paths.cgsa_identity_payload(symbol, timeframe, config_hash or "", algorithm_id or "")
         identifiable = bool(config_hash) and bool(algorithm_id)
+        # 本 run 定葉前已發生之未認證換臂（預熱探測）：葉定後當下寫標記（續跑判定同無暫存者；SPEC Task 4.2 ⑧）
+        pending = list(getattr(self, "_pending_route_markers", None) or [])
         if work_dir.exists() or work_dir.is_symlink():
             if (not identifiable or _run_paths.read_cgsa_identity(work_dir) != identity
                     or _run_paths.has_route_switch_marker(work_dir)):
@@ -1202,6 +1205,9 @@ class FeatureFactory:
         if not work_dir.exists():
             work_dir.mkdir(parents=True)
             _run_paths.write_cgsa_identity(work_dir, identity)
+        if pending:
+            _run_paths.write_route_switch_marker(work_dir, pending[0])
+            self._pending_route_markers = []
         owner_run_dir = _memory_budget.current_run_dir()
         if owner_run_dir is not None:
             # ICFIRSTALIGN Task 4.2：CGSA work_dir 登記為本 run 之 owned path（強制停止後之恢復刪除）
@@ -4214,10 +4220,13 @@ class FeatureFactory:
 
     def _route_switch_marker(self, entry: Mapping[str, Any]) -> None:
         """未認證換臂標記之回呼（NUMVIEW R6-A；`memory_budget.set_route_switch_marker` 於 `generate_features` 登記）：
-        寫入作用中之 CGSA 工作目錄；無 registry（非 CGSA 路徑）⇒ 只記 observed_arms。寫入例外原樣上拋（R7-B）。"""
+        寫入作用中之 CGSA 工作目錄。葉尚未定（公開域預熱探測以獨立實例於 `_prepare_cgsa_registry` 之前計算 L1–L6）
+        ⇒ 暫存，由 `_prepare_cgsa_registry` 於葉定後當下寫入。寫入例外原樣上拋（R7-B）。"""
         registry = getattr(self, "_cgsa_registry", None)
         if registry is not None:
             _run_paths.write_route_switch_marker(Path(registry.work_dir), entry)
+        else:
+            self._pending_route_markers = list(getattr(self, "_pending_route_markers", None) or []) + [dict(entry)]
 
     def _capture_stationarity_decisions(self, preprocessor: FeaturePreprocessor, config: Any = None) -> None:
         """FFSTAT：把 L6.5 前處理器之逐欄決策（鍵＝原生週期＋L6.5 所見欄名）轉為落盤欄名為鍵，

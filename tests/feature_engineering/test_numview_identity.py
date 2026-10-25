@@ -1171,6 +1171,16 @@ def _crash(*_a: Any, **_k: Any) -> Any:
     raise SimulatedCrash("numview 模擬崩潰")
 
 
+def _crash_after_leaf(real: Callable[..., Any]) -> Callable[..., Any]:
+    """只於正式生成（CGSA 葉已定）崩潰；公開域預熱探測（定葉前以 `_calibration_domain` 獨立實例、暫存 registry 算
+    L1–L6）照常執行——崩潰案之對象是已有部分落盤之葉。"""
+    def wrapped(self: Any, *a: Any, **k: Any) -> Any:
+        if getattr(self, "_cgsa_registry", None) is not None and not getattr(self, "_calibration_domain", False):
+            _crash()
+        return real(self, *a, **k)
+    return wrapped
+
+
 def _force_l2_switch(mp: pytest.MonkeyPatch, *, certified: bool) -> None:
     """強制 Layer 2 換臂（模擬可用記憶體不足）：暫登 L2 設定指紋於 `L2_ROUTE_CERTIFIED` 使分派點經 `route`，且原臂
     `check` 回容量拒絕。`certified=False` ⇒ 契約副本把該點標為未認證（HEAD 唯一之換臂點即 Layer 2；見報告之 SPEC 歧義）。"""
@@ -1289,9 +1299,9 @@ def _gen(root: Path, registry_path: Path, *, cell: str = CELL, fresh: bool = Tru
         if switch is not None:
             _force_l2_switch(mp, certified=(switch == "certified"))
         if crash == "after_switch":
-            mp.setattr(FeatureFactory, "_layer2_derived_pandas", _crash)
+            mp.setattr(FeatureFactory, "_layer2_derived_pandas", _crash_after_leaf(FeatureFactory._layer2_derived_pandas))
         elif crash == "before_l2":
-            mp.setattr(FeatureFactory, "_budget_check_l2", _crash)
+            mp.setattr(FeatureFactory, "_budget_check_l2", _crash_after_leaf(FeatureFactory._budget_check_l2))
         if watch is not None:
             _install_open_spy(mp, watch, events)
         try:

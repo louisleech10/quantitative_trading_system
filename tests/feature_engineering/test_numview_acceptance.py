@@ -1614,7 +1614,9 @@ def test_structural_refreeze_receipt_proves_strip_equals_frozen() -> None:
     """Task 4.2 驗證⑤（SPEC §G 結構凍結）：重凍收據之剝除鍵涵蓋契約新鍵；每檔 rc=0、每項「剝除新鍵後依原算法重算」＝凍結前值
     且 `equal` 為 True；`sha256_after` 等於現行凍結檔之 sha256（重凍確已寫入）。"""
     receipt = _json(nh.REFREEZE_RECEIPT_PATH)
-    missing = contract_new_keys() - {str(k) for k in receipt["stripped_keys"]}
+    # 收據分記 artifact 節點之剝除鍵（stripped_keys）與頂層之剝除鍵（stripped_root_keys；observed_arms 只寫頂層）
+    stripped = {str(k) for k in receipt["stripped_keys"]} | {str(k) for k in receipt.get("stripped_root_keys") or []}
+    missing = contract_new_keys() - stripped
     assert not missing, f"剝除鍵缺契約新鍵：{sorted(missing)}"
     assert receipt["files"], "重凍收據無任何檔"
     for entry in receipt["files"]:
