@@ -1,6 +1,6 @@
 # FFPROD 特徵生產層普查 — SPEC
 
-> 版本：v3（2026-10-26；規格審查 r2 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r2/synth.md`〕：①`L2.pandas_parallel` 格明設 `FFACT_L2_CATEGORY_WORKERS=2`，各 L2 格以 spy 核對 `_budget_check_l2` 實際回傳臂、不符即拒寫；②L2 單一來源驗收語意：canonical 由使用者於 Task 2.2 裁定，施工後三者取自同源故相同，施工前已知差異只量不驗、非 canonical 側改值入 `changed_targets`）。前版 v2（2026-10-26；規格審查 r1 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r1/synth.md`〕：①L2 單一來源不變式〔公開結果＝落盤群組＝L5／L6 實收 L2 欄〕入 Task 2.1 量測與 Phase 3 L2 施工之驗收；②§G 格補 L2 三條生產臂〔`L2.polars`、`L2.pandas_serial`、`L2.pandas_parallel`〕；③全特徵候選逾 8 GB ⇒ 效能／記憶體／檔案大小記 blocked-by 硬體，不以較小規模之數字代替；④校準域縮尾核心〔legacy〕與公開主群組〔快速核心〕之並存列為改值候選；⑤§C 刪「JSON 契約為單一真相源」之過期敘述〔v1 已改一次性收據〕；⑥§N 舊策略特徵管線〔`FeatureExtractor`→HDF5→ML 服務〕合併為一條並附呼叫鏈）。前版 v1（2026-10-26；初稿，依偵察諮詢 r1 收斂檔 `handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md` 與主委獨立版 `handoffs/20261026-ffprod-x-consult-r1-claude.md`）。
+> 版本：v4（2026-10-26；規格審查 r3 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r3/synth.md`〕：①Task 2.1 收據逐候選、逐選項存逐欄改前／改後值指紋；②Task 2.2 決定紀錄機讀檔 `tests/_golden/ffprod/decisions.json`，逐候選記 `choice`、L2 候選另記 `canonical_source`〔`polars_public`｜`pandas_category`〕與使用者核可之精確 `changed_targets`；③Phase 3 實際改值欄集合須等於 `changed_targets`、不得自動擴張；④§G 值指紋改引 `tests/feature_engineering/numview_helpers.py` 之 `fingerprints`〔`values_native` 原生 dtype 位元組；前版所引 `preprov_helpers.value_fingerprints` 先轉 float32，主委自查〕）。前版 v3（2026-10-26；規格審查 r2 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r2/synth.md`〕：①`L2.pandas_parallel` 格明設 `FFACT_L2_CATEGORY_WORKERS=2`，各 L2 格以 spy 核對 `_budget_check_l2` 實際回傳臂、不符即拒寫；②L2 單一來源驗收語意：canonical 由使用者於 Task 2.2 裁定，施工後三者取自同源故相同，施工前已知差異只量不驗、非 canonical 側改值入 `changed_targets`）。前版 v2（2026-10-26；規格審查 r1 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r1/synth.md`〕：①L2 單一來源不變式〔公開結果＝落盤群組＝L5／L6 實收 L2 欄〕入 Task 2.1 量測與 Phase 3 L2 施工之驗收；②§G 格補 L2 三條生產臂〔`L2.polars`、`L2.pandas_serial`、`L2.pandas_parallel`〕；③全特徵候選逾 8 GB ⇒ 效能／記憶體／檔案大小記 blocked-by 硬體，不以較小規模之數字代替；④校準域縮尾核心〔legacy〕與公開主群組〔快速核心〕之並存列為改值候選；⑤§C 刪「JSON 契約為單一真相源」之過期敘述〔v1 已改一次性收據〕；⑥§N 舊策略特徵管線〔`FeatureExtractor`→HDF5→ML 服務〕合併為一條並附呼叫鏈）。前版 v1（2026-10-26；初稿，依偵察諮詢 r1 收斂檔 `handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md` 與主委獨立版 `handoffs/20261026-ffprod-x-consult-r1-claude.md`）。
 > 來源：`docs/TICKET_ORDER.md` 第 9 列（全票排序第 9 步，吸收原「縮尾重複」與 `docs/NUMVIEW_SPEC.md` §N R2／R5）　|　日期：2026-10-26　|　對應 TODO：`docs/manifests/FFPROD.json`
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
@@ -28,12 +28,12 @@
 - 資料一律真實 `data_cache/feature_klines/kline_cache.h5`（12h 用長歷史檔，沿 NUMVIEW 判準 `cell_rules.kline_source`），禁合成 fixture。
 - 不改 post-IC 轉換（NUMVIEW 已定：IC 頁與 IC-first 同一 `pandas_legacy`、輸出 float32）。
 - 研究設計不寫死 24h／UTC／加密貨幣特有假設。
-- 本票不新增常駐契約或清單檢查：盤點（Task 0.1）與量測（Task 2.1）為一次性收據，使用者裁定記於 §A；唯一常駐測試為 §G 值指紋對照與 Phase 3 各施工項之單元測試。施工清單 `docs/manifests/FFPROD.json` 於本 SPEC 凍結後依 `templates/TODO_GENERATION_PROMPT.md` 生成。
+- 本票不新增常駐契約或清單檢查：盤點（Task 0.1）與量測（Task 2.1）為一次性收據，使用者裁定逐字記於 §A、機讀副本 `tests/_golden/ffprod/decisions.json` 供 §G 對照讀取；唯一常駐測試為 §G 值指紋對照與 Phase 3 各施工項之單元測試。施工清單 `docs/manifests/FFPROD.json` 於本 SPEC 凍結後依 `templates/TODO_GENERATION_PROMPT.md` 生成。
 
 ## §G Golden / Baseline
 - **條件**：涉特徵生成與計算 ⇒ 真實 kline；改前基準於 Phase 0 凍結。
-- **凍結時機與設定**：Task 0.2 於施工前 HEAD 以其路徑覆蓋格生成，存 `tests/_golden/ffprod/pre_change_fingerprints.json`（值指紋沿 `tests/feature_engineering/preprov_helpers.py` 之 `value_fingerprints`：逐欄原生 dtype 位元組 sha256、NaN 遮罩、欄名與欄序）。
-- **通過條件**：Phase 1 之收斂 ⇒ 全格逐位元等於凍結值；Phase 3 之改值項 ⇒ 只限使用者核可之目標欄（決定紀錄 `changed_targets`）不等，其餘逐位元相等；超出即列欄與實際差 = FAIL。
+- **凍結時機與設定**：Task 0.2 於施工前 HEAD 以其路徑覆蓋格生成，存 `tests/_golden/ffprod/pre_change_fingerprints.json`（值指紋沿 `tests/feature_engineering/numview_helpers.py` 之 `fingerprints`：逐欄 `dtype`、NaN 遮罩、`values_native`〔落盤原生 dtype 位元組 sha256〕、`column_set_sha256`、`column_order_sha256`；逐位元比對鍵沿同檔 `BITWISE_COLUMN_KEYS`）。
+- **通過條件**：Phase 1 之收斂 ⇒ 全格逐位元等於凍結值；Phase 3 之改值項 ⇒ 只限使用者核可之目標欄（`tests/_golden/ffprod/decisions.json` 之 `changed_targets`）不等，其餘逐位元相等；超出即列欄與實際差 = FAIL。
 
 ## §P Phase 與依賴
 
@@ -77,15 +77,15 @@
 **Task 2.1 — 改值候選量測**
 - 目標：對 §A 所列每個改值候選，以 Task 0.2 格與判準量「改前／改後」之值差、IC 翻轉、速度、峰值記憶體、輸出檔大小。　檔案：新建 `scripts/ffprod_measure.py`、收據 `handoffs/run_receipts/<日期>-ffprod-candidates.json`。
 - 改法：候選以環境或探針切換（不改正式碼），每候選一格全特徵真實資料量效能與記憶體。
-- **驗證**：收據 `handoffs/run_receipts/<日期>-ffprod-candidates.json` 每候選有值差摘要（變動欄數、最大絕對差、NaN 遮罩差欄數）、IC 正負號翻轉與選欄進出數、耗時秒數、峰值 RSS 位元組、輸出檔位元組；候選集合 == Task 0.1 收據之「量測」項集合（主委收件時 `jq` 核對）。
+- **驗證**：收據 `handoffs/run_receipts/<日期>-ffprod-candidates.json` 每候選、每選項（L2 候選之選項＝`polars_public`、`pandas_category`）有值差摘要（變動欄數、最大絕對差、NaN 遮罩差欄數）、逐欄改前／改後值指紋（§G 格式）與由之導出之改值欄集合、IC 正負號翻轉與選欄進出數、耗時秒數、峰值 RSS 位元組、輸出檔位元組；候選集合 == Task 0.1 收據之「量測」項集合（主委收件時 `jq` 核對）。
 - **邊界**：①某候選於全特徵格逾 8 GB ⇒ 該候選之效能、記憶體、檔案大小記 blocked-by 硬體（RM-FULLSCALE），不以較小規模之數字代替；值差與判準仍於可跑之格量並標其規模；②候選間交互（例 sigma 與層間 dtype）⇒ 單獨與合併各一次；③L2 候選另量 registry 落盤群組（逐類 concat）對公開結果、對 L5／L6 實收 L2 欄之值差（三者兩兩比）。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
 - 不可做：不在量測前改正式碼；不以小樣本推論大規模（使用者 2026-10-24）。
 
 **Task 2.2 — 白話閘與決定紀錄**
-- 目標：逐候選向使用者白話報告差距與建議，取得裁定。　檔案：本 SPEC §A「已確認結果」逐候選記使用者裁定（日期＋逐字）與 `changed_targets`（欄集合），並據以修訂 Phase 3 各 Task。
-- **驗證**：§A 之已確認結果條數 == Task 2.1 收據候選數；Phase 3 每 Task 引用其對應之已確認結果行（審碼核對）。
+- 目標：逐候選向使用者白話報告差距與建議，取得裁定。　檔案：本 SPEC §A「已確認結果」逐候選記使用者裁定（日期＋逐字）；機讀決定紀錄 `tests/_golden/ffprod/decisions.json` 逐候選記 `choice`（所選選項或 `retain`）、L2 候選另記 `canonical_source`（`polars_public`｜`pandas_category`）、`changed_targets`（使用者核可之精確欄集合＝Task 2.1 收據該選項導出之改值欄集合）與 `user_ruling_ref`（§A 對應行）；並據以修訂 Phase 3 各 Task。
+- **驗證**：§A 之已確認結果條數 == Task 2.1 收據候選數 == `decisions.json` 候選數；`decisions.json` 每候選之 `changed_targets` 等於 Task 2.1 收據該 `choice` 之改值欄集合（`jq` 核對）；Phase 3 每 Task 引用其對應之已確認結果行（審碼核對）。
 - **邊界**：①使用者選保留現狀 ⇒ 該候選不施工、具名登記差異上界；②使用者要求再量 ⇒ 回 Task 2.1。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
@@ -94,8 +94,8 @@
 ### Phase 3 — 改值施工（依賴：Phase 2 之對應裁定）
 **Task 3.x — 依裁定施工**（每候選一 Task；候選清單與施工細節於 Task 2.2 後以 SPEC 修訂版具體化）
 - 目標：只留裁定之一套實作，刪其餘；重凍 `changed_targets`。
-- **驗證**：`venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q` 全綠：非 `changed_targets` 之欄值指紋 sha256 逐位元等於凍結值；`changed_targets` 之新值指紋等於 Task 2.1 收據之改後值指紋；該組被淘汰實作之函式名 `grep -rn` 於 `momentum api` 零命中。
-- **邊界**：①多週期與單週期皆覆蓋；②續跑（CGSA 葉）與 IC 快取之身分隨改值失效（沿 NUMVIEW algorithm_id）；③L2 施工項另新增單元測試：施工後三者皆取自使用者於 Task 2.2 裁定之單一來源（Polars 公開表或 pandas 逐類，二擇一），故公開結果、registry 落盤群組逐類 concat、L5／L6 實收 L2 欄三者之欄集合、欄序、NaN 遮罩與原生 dtype 值位元組相同（mutation：落盤之 category_frame 任一欄加 1e-3 而公開結果不變 ⇒ 紅）；施工前 B／C 格之已知差異只於 Task 2.1 量測、不作本驗收；非 canonical 一側之欄值改變列入該項 `changed_targets`。
+- **驗證**：`venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q` 全綠：`test_ffprod_gate.py` 讀 `tests/_golden/ffprod/decisions.json`；實際與凍結值不等之欄集合 == 該項 `changed_targets`（多一欄或少一欄皆紅）；非 `changed_targets` 之欄值指紋 sha256 逐位元等於凍結值；`changed_targets` 之新值指紋等於 Task 2.1 收據該 `choice` 之改後值指紋；該組被淘汰實作之函式名 `grep -rn` 於 `momentum api` 零命中。
+- **邊界**：①多週期與單週期皆覆蓋；②續跑（CGSA 葉）與 IC 快取之身分隨改值失效（沿 NUMVIEW algorithm_id）；③L2 施工項另新增單元測試：施工後三者皆取自 `decisions.json` 該項 `canonical_source` 所指之單一來源（`polars_public`＝Polars 公開表、`pandas_category`＝pandas 逐類，二擇一），故公開結果、registry 落盤群組逐類 concat、L5／L6 實收 L2 欄三者之欄集合、欄序、NaN 遮罩與原生 dtype 值位元組相同（mutation：落盤之 category_frame 任一欄加 1e-3 而公開結果不變 ⇒ 紅）；施工前 B／C 格之已知差異只於 Task 2.1 量測、不作本驗收；非 canonical 一側之改值欄只能是使用者已核可之 `changed_targets`，施工不得自行擴張該集合。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
 - 不可做：未經裁定之候選不得施工。
