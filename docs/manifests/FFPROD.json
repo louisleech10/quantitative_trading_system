@@ -1,0 +1,147 @@
+{
+  "spec_path": "docs/FFPROD_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [],
+  "test_files": [
+    "tests/feature_engineering/test_ffprod_gate.py",
+    "tests/feature_engineering/test_ffprod_winsor_provenance.py",
+    "tests/feature_engineering/test_ffprod_removal.py",
+    "tests/feature_engineering/test_ffprod_decisions.py"
+  ],
+  "script_acceptance": [
+    "scripts/ffprod_freeze_baseline.py",
+    "scripts/ffprod_measure.py"
+  ],
+  "contract_jsons": [
+    "momentum/FeatureEngineering/contracts/run_provenance.json"
+  ],
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/FFPROD_SPEC.md",
+      "tests/registry/catalog.json",
+      "momentum/FeatureEngineering/contracts/run_provenance.json",
+      "momentum/FeatureEngineering/run_provenance.py",
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
+      "momentum/FeatureEngineering/preprocessing/_slow_path_parallel.py",
+      "momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py",
+      "momentum/FeatureEngineering/polars_adapter.py",
+      "momentum/Analysis/data_preprocessor.py"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/feature_reader.py",
+      "api/services/feature_factory_service.py",
+      "api/services/ic_analysis_service.py"
+    ],
+    "callers_later": [
+      "tests/_golden/ffprod/pre_change_fingerprints.json",
+      "tests/_golden/ffprod/decisions.json",
+      "handoffs/run_receipts/<date>-ffprod-inventory.json",
+      "handoffs/run_receipts/<date>-ffprod-candidates.json"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_ffprod_gate.py tests/feature_engineering/test_ffprod_winsor_provenance.py tests/feature_engineering/test_ffprod_removal.py && bash scripts/check_decoupling.sh && bash scripts/gen_fact_key_blocks.sh --check",
+    "forbidden": [
+      {
+        "rule": "momentum/ 不得 import api/（解耦 R1）；跨域經 Protocol 與 momentum.factories（R2／R3）；服務不互相 import（R4）；設定單一來源（R5）；check_decoupling.sh 之 R2／R3／R4 摘要行不得增加",
+        "observable": true
+      },
+      {
+        "rule": "Phase 0–2 與 Phase 4 不得改任何特徵值、NaN 遮罩、欄集合、欄序、dtype（§G 逐位元；test_ffprod_gate.py）；Phase 3 只准 decisions.json 之 changed_targets 不等，多一欄或少一欄皆紅",
+        "observable": true
+      },
+      {
+        "rule": "無使用者裁定（SPEC §A 已確認結果＋decisions.json user_ruling_ref）不得施工任何改值候選；不以委員共識代替使用者裁定（SPEC Task 2.2）",
+        "observable": true
+      },
+      {
+        "rule": "不得弱化 NaN／inf 閘；不得改 float16／float32 落盤自動選（2026-09-29 dtype 裁定不重議）；不擅改輸出大小；不得放寬既有測試斷言（刪改測試同提交登記審清單）",
+        "observable": true
+      },
+      {
+        "rule": "不得刪有生產呼叫者之實作；刪除依據只限 Task 0.1 收據之 grep 實跑輸出（test_ffprod_removal.py）",
+        "observable": true
+      },
+      {
+        "rule": "量測與凍結一律真實 kline（data_cache/feature_klines/kline_cache.h5；12h 用長歷史檔）、禁合成 fixture；不以小樣本數字代替逾 8 GB 之全特徵數字",
+        "observable": false
+      },
+      {
+        "rule": "真實資料重型生成一律單行程串行、獨占機器；委員輪進行中不跑重型生成；>30 分之跑先白話告知使用者；量完刪中間輸出",
+        "observable": false
+      }
+    ],
+    "risk_mitigation": [
+      "分批（依 SPEC §P；每批獨立提交）：b1＝Phase 0（Task 0.1 盤點收據→Task 0.2 估時→改前基準凍結；凍結工具可沿用 scripts/numview_freeze_baseline.py 之隔離環境與硬體 blocked 處置）",
+      "b2＝Phase 1（Task 1.1 刪除、Task 1.2 縮尾有效設定入紀錄；契約版本加一，舊紀錄依 PRE-PROV 既有版本不符處置）",
+      "b3＝Phase 2（Task 2.1 量測、Task 2.2 白話閘——停下等使用者逐項裁定）；test_ffprod_decisions.py 於 b3 起入 gate_cmd",
+      "b4＝Phase 3（依裁定逐候選一提交，SPEC 依裁定修訂並補 Task 3.x 之具名測試）；b5＝Phase 4",
+      "每批 code review 家數依 docs/MULTI_AGENT_ORCHESTRATION.md §1 現行分工行",
+      "gate_cmd 之 test_ffprod_gate.py 含真實 kline 重生案（耗時依 Task 0.2 估時）",
+      "前端與 API 契約不改，故不適用 npm run build"
+    ],
+    "coverage_risk": [
+      "邊界具名測試全票編號 01–07：Task 0.2＝01–02（test_ffprod_gate.py）；Task 1.2＝03–04（test_ffprod_winsor_provenance.py）；Task 1.1＝05–06（test_ffprod_removal.py）；Task 2.2 ①＝07（test_ffprod_decisions.py）",
+      "Task 0.2：test_ffprod_gate.py（freeze_cells 中斷只留已完成格、硬體不足標 blocked、L2 實際臂不符拒寫、三臂環境覆寫、compare 精確 changed_targets 與欄序欄集合、§G 重生對照、mutation：清空 BITWISE_KEYS 即漏抓）",
+      "Task 1.1：test_ffprod_removal.py（讀恰一份盤點收據；remove 項於 momentum／api／tests 零命中、只由 scripts 呼叫者已改寫或列停用、字串查表字面零命中、mutation：樣式改永不命中即漏抓植入呼叫）",
+      "Task 1.2：test_ffprod_winsor_provenance.py（契約 winsor_effective_fields ⊆ record_columns、縮尾開之格 method 屬契約值集且 quantile 端點非空、關之格 disabled、比值不安全欄 passthrough、舊契約版本拒讀、mutation：組表清空 winsor_method 即寫入拒收）",
+      "Task 2.1／2.2：test_ffprod_decisions.py（決定紀錄涵蓋全部量測候選、changed_targets 等於所選選項之改值欄集合、L2 canonical_source 值域與 choice 一致、每項引使用者裁定、retain 不施工、mutation：多一欄／少一欄／來源不一即轉紅）",
+      "既有行為不得變更之處：PRE-PROV 既有測試（tests/feature_engineering/test_preprov_*.py）與 NUMVIEW 既有測試斷言不放寬；Task 1.2 契約版本加一後，PRE-PROV 之舊版本拒讀語意不變"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "user-ruling",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 0.1 邊界①②（同名函式依 path＋函式定位、字串查表計為呼叫者）：盤點為一次性收據，SPEC §C 不建常駐清單檢查；其結果由 test_ffprod_removal.py 於刪除時消費（使用者 2026-10-14「你跟委員不要摳細節」「就用主流軟體業界和量化金融的模式和規則就好了啊」）",
+        "reason": "user-ruling",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 2.1 邊界①②③（逾 8 GB 標 blocked-by 硬體、候選交互單獨與合併各一、L2 改前三者兩兩比）：量測為一次性收據，主委收件時 jq 核對；決定紀錄對收據之一致由 test_ffprod_decisions.py 驗（使用者 2026-10-14「你跟委員不要摳細節」）",
+        "reason": "user-ruling",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 2.2 邊界②（使用者要求再量 ⇒ 回 Task 2.1）：流程分支依使用者當下回答，無可預寫之斷言",
+        "reason": "user-ruling",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 3.x 邊界①②③（多週期與單週期皆覆蓋、續跑與 IC 快取身分隨改值失效、L2 施工後三者同源之單元測試）：候選清單與施工細節依 Task 2.2 使用者裁定以 SPEC 修訂版具體化後補具名測試",
+        "reason": "blocked-by",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 4.1 邊界①②（生成區塊不手改、凍結 SPEC 不改字面）：既有 scripts/factkey_write_guard.sh 產出端 hook 與 gen_fact_key_blocks.sh --check（列 gate_cmd）擋，不另建測試（使用者 2026-10-14「你跟委員不要摳細節」）",
+        "reason": "user-ruling",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "量測與凍結一律真實 kline（data_cache/feature_klines/kline_cache.h5；12h 用長歷史檔）、禁合成 fixture；不以小樣本數字代替逾 8 GB 之全特徵數字",
+        "reason": "user-ruling",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "真實資料重型生成一律單行程串行、獨占機器；委員輪進行中不跑重型生成；>30 分之跑先白話告知使用者；量完刪中間輸出",
+        "reason": "user-ruling",
+        "owner": "FFPROD",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}
