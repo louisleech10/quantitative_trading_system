@@ -1,6 +1,6 @@
 # FFPROD 特徵生產層普查 — SPEC
 
-> 版本：v2（2026-10-26；規格審查 r1 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r1/synth.md`〕：①L2 單一來源不變式〔公開結果＝落盤群組＝L5／L6 實收 L2 欄〕入 Task 2.1 量測與 Phase 3 L2 施工之驗收；②§G 格補 L2 三條生產臂〔`L2.polars`、`L2.pandas_serial`、`L2.pandas_parallel`〕；③全特徵候選逾 8 GB ⇒ 效能／記憶體／檔案大小記 blocked-by 硬體，不以較小規模之數字代替；④校準域縮尾核心〔legacy〕與公開主群組〔快速核心〕之並存列為改值候選；⑤§C 刪「JSON 契約為單一真相源」之過期敘述〔v1 已改一次性收據〕；⑥§N 舊策略特徵管線〔`FeatureExtractor`→HDF5→ML 服務〕合併為一條並附呼叫鏈）。前版 v1（2026-10-26；初稿，依偵察諮詢 r1 收斂檔 `handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md` 與主委獨立版 `handoffs/20261026-ffprod-x-consult-r1-claude.md`）。
+> 版本：v3（2026-10-26；規格審查 r2 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r2/synth.md`〕：①`L2.pandas_parallel` 格明設 `FFACT_L2_CATEGORY_WORKERS=2`，各 L2 格以 spy 核對 `_budget_check_l2` 實際回傳臂、不符即拒寫；②L2 單一來源驗收語意：canonical 由使用者於 Task 2.2 裁定，施工後三者取自同源故相同，施工前已知差異只量不驗、非 canonical 側改值入 `changed_targets`）。前版 v2（2026-10-26；規格審查 r1 處置〔收斂檔 `handoffs/reconcile/20261026-ffprod-x-review-r1/synth.md`〕：①L2 單一來源不變式〔公開結果＝落盤群組＝L5／L6 實收 L2 欄〕入 Task 2.1 量測與 Phase 3 L2 施工之驗收；②§G 格補 L2 三條生產臂〔`L2.polars`、`L2.pandas_serial`、`L2.pandas_parallel`〕；③全特徵候選逾 8 GB ⇒ 效能／記憶體／檔案大小記 blocked-by 硬體，不以較小規模之數字代替；④校準域縮尾核心〔legacy〕與公開主群組〔快速核心〕之並存列為改值候選；⑤§C 刪「JSON 契約為單一真相源」之過期敘述〔v1 已改一次性收據〕；⑥§N 舊策略特徵管線〔`FeatureExtractor`→HDF5→ML 服務〕合併為一條並附呼叫鏈）。前版 v1（2026-10-26；初稿，依偵察諮詢 r1 收斂檔 `handoffs/reconcile/20261026-ffprod-x-consult-r1/synth.md` 與主委獨立版 `handoffs/20261026-ffprod-x-consult-r1-claude.md`）。
 > 來源：`docs/TICKET_ORDER.md` 第 9 列（全票排序第 9 步，吸收原「縮尾重複」與 `docs/NUMVIEW_SPEC.md` §N R2／R5）　|　日期：2026-10-26　|　對應 TODO：`docs/manifests/FFPROD.json`
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
@@ -49,7 +49,7 @@
 
 **Task 0.2 — 估時與改前基準凍結**
 - 目標：施工前 HEAD 之值指紋。　檔案：新建 `scripts/ffprod_freeze_baseline.py`、`tests/_golden/ffprod/pre_change_fingerprints.json`、`tests/feature_engineering/test_ffprod_gate.py`（§G 對照）。
-- 改法：格只取覆蓋獨有分支之最少集合（A 單週期 1h、A 12h、B 多週期 1h＋4h、C 全特徵 1h，另依盤點補 sigma 縮尾開、fracdiff／ADF 開之單週期格；L2 三條生產臂各至少一格——`L2.polars`〔預設〕、`L2.pandas_serial`〔`FFACT_USE_POLARS=0`、`FFACT_L2_CATEGORY_WORKERS=1`〕、`L2.pandas_parallel`〔`FFACT_USE_POLARS=0`、workers>1〕，以 A 單週期 1h 加環境覆寫為之，不另加幣種）；先估時（>30 分之跑先白話告知使用者）；逐格生成並寫值指紋與生成身分（HEAD、設定、資料集 sha256）。
+- 改法：格只取覆蓋獨有分支之最少集合（A 單週期 1h、A 12h、B 多週期 1h＋4h、C 全特徵 1h，另依盤點補 sigma 縮尾開、fracdiff／ADF 開之單週期格；L2 三條生產臂各至少一格——`L2.polars`〔預設〕、`L2.pandas_serial`〔`FFACT_USE_POLARS=0`、`FFACT_L2_CATEGORY_WORKERS=1`〕、`L2.pandas_parallel`〔`FFACT_USE_POLARS=0`、`FFACT_L2_CATEGORY_WORKERS=2`；`momentum/FeatureEngineering/utils/hardware_utils.py` 之 `_L2_CATEGORY_WORKERS_BY_TIER` 為 `"8gb": 1`，`auto` 下落串行，故須明設〕，以 A 單週期 1h 加環境覆寫為之，不另加幣種；每格以 spy 記 `FeatureFactory._budget_check_l2` 之回傳臂，不等於該格宣告之臂 ⇒ 凍結拒寫該格）；先估時（>30 分之跑先白話告知使用者）；逐格生成並寫值指紋與生成身分（HEAD、設定、資料集 sha256）。
 - **驗證**：`venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q` 於凍結 HEAD 全綠（重生成之值指紋 sha256 逐位元等於凍結值）；同格重跑兩次值指紋相同。
 - **邊界**：①凍結中途中斷 ⇒ 未完成格不寫入；②某格於 8 GB 不可跑 ⇒ 標 blocked-by 硬體並列 §N。
 - **存活至**：本票交付後保留（Phase 3 只重凍使用者核可之 `changed_targets`）。
@@ -95,7 +95,7 @@
 **Task 3.x — 依裁定施工**（每候選一 Task；候選清單與施工細節於 Task 2.2 後以 SPEC 修訂版具體化）
 - 目標：只留裁定之一套實作，刪其餘；重凍 `changed_targets`。
 - **驗證**：`venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q` 全綠：非 `changed_targets` 之欄值指紋 sha256 逐位元等於凍結值；`changed_targets` 之新值指紋等於 Task 2.1 收據之改後值指紋；該組被淘汰實作之函式名 `grep -rn` 於 `momentum api` 零命中。
-- **邊界**：①多週期與單週期皆覆蓋；②續跑（CGSA 葉）與 IC 快取之身分隨改值失效（沿 NUMVIEW algorithm_id）；③L2 施工項另新增單元測試：公開結果、registry 落盤群組逐類 concat、L5／L6 實收 L2 欄三者之欄集合、欄序、NaN 遮罩與原生 dtype 值位元組相同（mutation：落盤之 category_frame 任一欄加 1e-3 而公開結果不變 ⇒ 紅）。
+- **邊界**：①多週期與單週期皆覆蓋；②續跑（CGSA 葉）與 IC 快取之身分隨改值失效（沿 NUMVIEW algorithm_id）；③L2 施工項另新增單元測試：施工後三者皆取自使用者於 Task 2.2 裁定之單一來源（Polars 公開表或 pandas 逐類，二擇一），故公開結果、registry 落盤群組逐類 concat、L5／L6 實收 L2 欄三者之欄集合、欄序、NaN 遮罩與原生 dtype 值位元組相同（mutation：落盤之 category_frame 任一欄加 1e-3 而公開結果不變 ⇒ 紅）；施工前 B／C 格之已知差異只於 Task 2.1 量測、不作本驗收；非 canonical 一側之欄值改變列入該項 `changed_targets`。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
 - 不可做：未經裁定之候選不得施工。
