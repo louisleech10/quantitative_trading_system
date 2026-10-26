@@ -441,9 +441,13 @@ class TestT5:
         assert generator._present_timeframes(["12h", "1h", "4h"]) == []
 
 
-@pytest.mark.slow
-def test_perf_smoke_nan_stats_within_frozen_budget() -> None:
-    baseline = _load_baseline()
+@pytest.fixture(scope="module")
+def stream_benchmark_metrics() -> dict[str, float]:
+    """`run_stream_benchmark`（子行程；4 輪取後 3 輪中位）跑一次，供凍結預算兩條共用（不重複計算）。
+
+    TESTSEL S3：`wall`（牆鐘）隨機器負載而變 ⇒ 其預算斷言移至 perf 測試；`peak` 為 tracemalloc 之 Python 配置峰值
+    （與機器負載無關、由程式與輸入決定）⇒ 留在非 perf 測試。
+    """
     benchmark = subprocess.run(
         [
             sys.executable,
@@ -461,9 +465,22 @@ def test_perf_smoke_nan_stats_within_frozen_budget() -> None:
         check=True,
     )
     metrics = json.loads(benchmark.stdout.strip().splitlines()[-1])
-    wall = float(metrics["wall"])
-    peak = int(metrics["peak"])
+    return {"wall": float(metrics["wall"]), "peak": int(metrics["peak"])}
+
+
+@pytest.mark.perf
+@pytest.mark.slow
+def test_perf_stream_benchmark_wall_within_frozen_budget(stream_benchmark_metrics: dict[str, float]) -> None:
+    """凍結基準之牆鐘預算（＋15%）：效能基準，opt-in。"""
+    baseline = _load_baseline()
+    wall = float(stream_benchmark_metrics["wall"])
     assert wall <= float(baseline["perf_wall_seconds"]) * 1.15
+
+
+@pytest.mark.slow
+def test_perf_smoke_nan_stats_within_frozen_budget(stream_benchmark_metrics: dict[str, float]) -> None:
+    baseline = _load_baseline()
+    peak = int(stream_benchmark_metrics["peak"])
     assert peak <= int(baseline["perf_peak_bytes"]) * 1.10
 
     mask = np.zeros(20_000_000, dtype=bool)
