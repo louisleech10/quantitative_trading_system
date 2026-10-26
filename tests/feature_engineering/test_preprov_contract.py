@@ -207,33 +207,48 @@ def source_violations(spec: Mapping[str, Any]) -> List[str]:
                 out.append(f"{path}.{value}: 無 _sources")
                 continue
             for ref in refs:
-                m = _SOURCE_RE.match(str(ref))
-                if not m:
-                    out.append(f"{path}.{value}: _sources 格式非 path:line：{ref!r}")
-                    continue
-                target = ph.REPO / m["path"]
-                if not target.is_file():
-                    out.append(f"{path}.{value}: 檔不存在 {ref}")
-                    continue
-                lines = target.read_text(encoding="utf-8").splitlines()
-                n = int(m["line"])
-                text = lines[n - 1].strip() if 1 <= n <= len(lines) else ""
-                if not text or text.startswith("#"):
-                    out.append(f"{path}.{value}: {ref} 為空行或註解行")
-                    continue
-                if not in_source_scope(m["path"], scope):
-                    out.append(f"{path}.{value}: {ref} 不在契約 source_scope（特徵工廠寫入路徑）內")
-                if not target.suffix == ".py":
-                    out.append(f"{path}.{value}: {ref} 非 Python 原始碼（無法驗字串字面）")
-                    continue
-                call = statement_record_call(_innermost_statement(_parsed(target), n))
-                if call is None:
-                    out.append(f"{path}.{value}: {ref} 之陳述式非紀錄函式呼叫（被呼叫者名須合 {RECORDING_CALLEE_RE.pattern!r}）")
-                if call is None or value not in record_call_literals(call):
-                    out.append(f"{path}.{value}: {ref} 之陳述式之紀錄呼叫實參不含該值之字串字面")
-                elif path.startswith("step_status_values.") and value not in step_literals(
-                        call, path.split(".", 1)[1], _parsed(target)):
-                    out.append(f"{path}.{value}: {ref} 之紀錄呼叫未以該值寫入步驟 {path.split('.', 1)[1]}")
+                out.extend(_ref_violations(f"{path}.{value}", path, value, ref, scope))
+    # 審碼 b2 r6 CODEX-R6-P1-01：`_unreachable` 之 `_sources`（鍵＝`<值集路徑>.<值>` 或值本身）同一判準驗
+    paths = list(ph.enum_paths(spec))
+    for key, entry in sorted(dict(spec.get("_unreachable") or {}).items()):
+        if not isinstance(entry, Mapping) or "_sources" not in entry:
+            continue
+        path = next((p for p in paths if key.startswith(p + ".")), None)
+        if path is None:
+            out.append(f"_unreachable.{key}: 鍵不屬任何值集路徑")
+            continue
+        value = key[len(path) + 1:]
+        for ref in list(entry.get("_sources") or []):
+            out.extend(_ref_violations(f"_unreachable.{key}", path, value, ref, scope))
+    return out
+
+
+def _ref_violations(where: str, path: str, value: str, ref: Any, scope: Any) -> List[str]:
+    """單一 `path:line` 錨點之 ① 判準（值集 `_sources` 與 `_unreachable._sources` 共用）。"""
+    out: List[str] = []
+    m = _SOURCE_RE.match(str(ref))
+    if not m:
+        return [f"{where}: _sources 格式非 path:line：{ref!r}"]
+    target = ph.REPO / m["path"]
+    if not target.is_file():
+        return [f"{where}: 檔不存在 {ref}"]
+    lines = target.read_text(encoding="utf-8").splitlines()
+    n = int(m["line"])
+    text = lines[n - 1].strip() if 1 <= n <= len(lines) else ""
+    if not text or text.startswith("#"):
+        return [f"{where}: {ref} 為空行或註解行"]
+    if not in_source_scope(m["path"], scope):
+        out.append(f"{where}: {ref} 不在契約 source_scope（特徵工廠寫入路徑）內")
+    if not target.suffix == ".py":
+        return out + [f"{where}: {ref} 非 Python 原始碼（無法驗字串字面）"]
+    call = statement_record_call(_innermost_statement(_parsed(target), n))
+    if call is None:
+        out.append(f"{where}: {ref} 之陳述式非紀錄函式呼叫（被呼叫者名須合 {RECORDING_CALLEE_RE.pattern!r}）")
+    if call is None or value not in record_call_literals(call):
+        out.append(f"{where}: {ref} 之陳述式之紀錄呼叫實參不含該值之字串字面")
+    elif path.startswith("step_status_values.") and value not in step_literals(
+            call, path.split(".", 1)[1], _parsed(target)):
+        out.append(f"{where}: {ref} 之紀錄呼叫未以該值寫入步驟 {path.split('.', 1)[1]}")
     return out
 
 
@@ -642,6 +657,21 @@ def test_mutation_dynamic_step_source_requires_step_context(monkeypatch: pytest.
     monkeypatch.setattr(sys.modules[__name__], "dynamic_steps", lambda tree: {"adf_differencing"})
     caught = _violations_of(path, value, source_violations(spec))
     assert any("未以該值寫入步驟" in v for v in caught), caught
+
+
+def test_mutation_unreachable_source_on_non_record_line_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（審碼 b2 r6 CODEX-R6-P1-01）：`_unreachable` 某鍵之 `_sources` 改指非紀錄呼叫之可執行行（模組層 import）
+    ⇒ ① 轉紅；正對照：真實契約之 `_unreachable` 錨點無違規。"""
+    spec = ph.contract()
+    key = "step_status_values.gaussian_normalize.no_scipy"
+    assert key in spec["_unreachable"], "契約無該 _unreachable 鍵 ⇒ mutation 空轉"
+    assert not [v for v in source_violations(spec) if v.startswith(f"_unreachable.{key}:")], "正對照不成立"
+    tree = _parsed(ph.REPO / _PREPROCESSOR)
+    line = next(stmt.lineno for stmt in tree.body if isinstance(stmt, (ast.Import, ast.ImportFrom)))
+    mutant = copy.deepcopy(spec)
+    mutant["_unreachable"][key]["_sources"] = [f"{_PREPROCESSOR}:{line}"]
+    caught = [v for v in source_violations(mutant) if v.startswith(f"_unreachable.{key}:")]
+    assert any("非紀錄函式呼叫" in v for v in caught), caught
 
 
 def test_mutation_manifest_group_fallback_scalar_is_caught(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch) -> None:

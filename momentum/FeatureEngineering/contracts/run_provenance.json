@@ -599,187 +599,170 @@
     "step_status_values.winsorization.not_selected": {
       "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2174",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1012"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197"
       ]
     },
     "step_status_values.winsorization.source_missing": {
       "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:984",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:958"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1001"
       ]
     },
     "step_status_values.fractional_differencing.not_selected": {
       "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2911",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1012"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2932"
       ]
     },
     "step_status_values.fractional_differencing.source_missing": {
       "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:984",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:958"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1001"
       ]
     },
     "step_status_values.adf_differencing.not_selected": {
       "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3066",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1012"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3087"
       ]
     },
     "step_status_values.adf_differencing.source_missing": {
       "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:984",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:958"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1001"
       ]
     },
     "step_status_values.rank_transform.not_selected": {
       "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2177",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1012"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2200"
       ]
     },
     "step_status_values.rank_transform.source_missing": {
       "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:984",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:958"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1001"
       ]
     },
     "step_status_values.adaptive_zscore.not_selected": {
       "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2179",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1012"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202"
       ]
     },
     "step_status_values.adaptive_zscore.source_missing": {
       "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:984",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:958"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1001"
       ]
     },
     "step_status_values.gaussian_normalize.not_selected": {
       "reason": "§V 各格之 apply_to 皆為預設（縮尾／rank／zscore／gaussian＝all，fracdiff／ADF＝non_stationary）；post-IC 之 apply_to＝該群組之選欄且群組只含選欄 ⇒ 無未選之輸入欄",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2178",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1012"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2201"
       ]
     },
     "step_status_values.gaussian_normalize.source_missing": {
       "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:984",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:958"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1001"
       ]
     },
     "step_status_values.gaussian_normalize.no_scipy": {
       "reason": "驗收環境 scipy 可匯入",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1727",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:143"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2285"
       ]
     },
     "step_status_values.fractional_differencing.search_failed": {
       "reason": "d* 搜尋例外為資料／數值異常之出口；§V 短窗真實資料皆搜尋成功",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2836"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2857"
       ]
     },
     "step_status_values.adf_differencing.insufficient_after_diff": {
       "reason": "差分後有效值 < 20 只在校準長度 N 近 20 時可達；§V 之 N 依週期預設（1h＝1000、12h＝500）",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3112"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3133"
       ]
     },
     "step_status_values.adf_differencing.max_diff_exhausted": {
       "reason": "ADF 差分候選（non_stationary 且未 fracdiff 者）於 §V 資料皆在 max_diff 內平穩",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3130"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3151"
       ]
     },
     "step_status_values.adf_differencing.skipped_dstar_failed": {
       "reason": "只在 d* 搜尋失敗之欄出現；§V 無 d* 搜尋失敗（見 fractional_differencing.search_failed）",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3083"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3104"
       ]
     },
     "terminal_values.missing_from_raw": {
       "reason": "IC-first 之選欄取自同 run 之 raw 群組 ⇒ 驗收格無「選欄不在 raw」；只由 post-IC 單元案例產出",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:984",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:958"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1001"
       ]
     },
     "terminal_values.ratio_unsafe_dropped": {
       "reason": "post-IC 入口剔除 ratio-unsafe 欄；§V 之 IC-first 格未開 pattern ⇒ 選欄無 ratio-unsafe（raw 路徑不經 transform 入口）",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:888"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
       ]
     },
     "group_arm_values.pandas_optimized": {
       "reason": "optimized 臂需 replace 模式且 fracdiff／ADF 皆關；raw 串流路徑之 replace 群組只在 fracdiff／ADF 迫使慢路徑時才離開快速臂（`can_use_numba_fast`＝replace），兩條件互斥 ⇒ raw 路徑結構上不可達；post-IC 於 IC-first 固定 Polars 臂",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1343",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2019",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:913"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:923",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1812"
       ]
     },
     "group_arm_values.pandas_chunked": {
       "reason": "只在 post-IC 非 Polars 臂且選欄數 > FFACT_L65_CHUNK_SIZE；IC-first 固定 Polars 臂",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:910",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:909"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:920"
       ]
     },
     "group_arm_values.slow_chunked": {
       "reason": "只在群組欄數 > split_threshold；§V 短窗精簡設定之群組皆未超過",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1247",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1138"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1264"
       ]
     },
     "group_status_values.empty_output": {
       "reason": "post-IC 群組轉換後為空只在其選欄全為 ratio-unsafe；§V 之 IC-first 格未開 pattern",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:977"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:994"
       ]
     },
     "fallback_values.fracdiff_serial_fallback": {
       "reason": "parallel fracdiff 例外之降級出口；§V 各格無例外（由變體 h12h1_native_fallback_parallel_fail 注入驗之）",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3001"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3022"
       ]
     },
     "fallback_values.native_ineligible": {
       "reason": "§V 多週期格之 compact-aligned 群組皆合 native 條件（列數 ≥ N）",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1450"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1468"
       ]
     },
     "fallback_values.native_failed": {
       "reason": "native 子實例轉換例外之降級出口；§V 無例外",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1504"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1522"
       ]
     },
     "fallback_values.native_no_columns": {
       "reason": "ratio-unsafe 切片不剔原欄 ⇒ native 輸出恆含原欄（防禦出口）",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1516"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1534"
       ]
     },
     "fallback_values.native_no_idx_map": {
       "reason": "compact-aligned 群組之 registry 恆存對齊映射（防禦出口）",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1467"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1485"
       ]
     }
   },
