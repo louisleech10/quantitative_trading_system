@@ -1848,9 +1848,21 @@ def _item_node(receipt: Mapping[str, Any], cell_id: str, item: Mapping[str, Any]
             .get("cells", {}).get(cell_id))
 
 
-def _item_done(receipt: Mapping[str, Any], cell_id: str, item: Mapping[str, Any]) -> bool:
-    node = _item_node(receipt, cell_id, item)
+def _generated(node: Optional[Mapping[str, Any]]) -> bool:
+    """生成（或不可達判定）已完成且可沿用；自證失敗、probe_invalid 等皆非完成（續跑重做）。"""
     return bool(node) and node.get("status") in ("measured", "blocked", "frozen", "unreachable_difference")
+
+
+def _needs_ic(node: Optional[Mapping[str, Any]], item: Mapping[str, Any]) -> bool:
+    """已生成而尚缺 IC 結果（選項／交互之 measured 紀錄無 `ic`）。"""
+    return item["kind"] in ("option", "interaction") and bool(node) and node.get("status") == "measured" \
+        and not isinstance(node.get("ic"), dict)
+
+
+def _item_done(receipt: Mapping[str, Any], cell_id: str, item: Mapping[str, Any], need_ic: bool = True) -> bool:
+    """可略過＝生成已完成，且（要求 IC 時）IC 亦已完成。"""
+    node = _item_node(receipt, cell_id, item)
+    return _generated(node) and not (need_ic and _needs_ic(node, item))
 
 
 def _store(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any], record: Dict[str, Any]) -> None:
@@ -1955,9 +1967,24 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
     `ic(receipt, cell_id, item)` 就地補 IC。自證失敗之選項不寫入、記入回傳碼（3）；其餘續跑。"""
     receipt = load_receipt(receipt_path, cell_id, work_root)
     rc = 0
+
+    def run_ic(item: Mapping[str, Any]) -> int:
+        try:
+            ic(receipt, cell_id, item)
+            return 0
+        except Exception as exc:  # noqa: BLE001 — IC 失敗不毀生成紀錄；`ic` 未寫入 ⇒ 下次續跑只補 IC
+            print(f"[ffprod-measure] {item['key']}：IC 失敗 {type(exc).__name__}: {exc}", flush=True)
+            return 3
+        finally:
+            write_receipt(receipt_path, receipt)  # IC 步就地改之狀態（含 self_proof_failed）一律落盤
+
     for item in items:
-        if _item_done(receipt, cell_id, item):
+        if _item_done(receipt, cell_id, item, need_ic=ic is not None):
             print(f"[ffprod-measure] {cell_id} {item['key']}：已完成，略過", flush=True)
+            continue
+        if ic is not None and _needs_ic(_item_node(receipt, cell_id, item), item):
+            print(f"[ffprod-measure] {cell_id} {item['key']}：已生成，只補 IC", flush=True)
+            rc = max(rc, run_ic(item))
             continue
         if item["kind"] == "unreachable":
             rc = max(rc, _record_unreachable(receipt, item, work_root, generate))
@@ -1970,7 +1997,13 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
             if gen.get("status") == "failed":
                 print(f"[ffprod-measure] 改前基準 {item['key']} 失敗：{gen.get('error')}", flush=True)
                 return 3
-            record = {"status": "blocked" if gen.get("status") == "blocked" else "frozen", "cell": cell_id,
+            proof_failed = gen.get("status") == "ok" and not (gen.get("proof") or {}).get("passed")
+            if proof_failed:  # 與選項同一閘：自證失敗之基準留診斷紀錄但非 frozen（不可沿用、續跑重做）
+                print(f"[ffprod-measure] 改前基準 {item['key']} 自證失敗——{(gen.get('proof') or {}).get('failures')}",
+                      flush=True)
+                rc = 3
+            record = {"status": "self_proof_failed" if proof_failed else
+                      "blocked" if gen.get("status") == "blocked" else "frozen", "cell": cell_id,
                       "baseline": item["baseline"], "probe": _probe_ref(item), "run_dir": gen.get("run_dir"),
                       "identity": gen.get("identity"), "fingerprints": gen.get("fingerprints"),
                       "seconds": {"generation": gen.get("generation_seconds"), "child_total": gen.get("seconds"),
@@ -2021,12 +2054,7 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
         _store(receipt, cell_id, item, record)
         write_receipt(receipt_path, receipt)
         if ic is not None and record["status"] == "measured":
-            try:
-                ic(receipt, cell_id, item)
-                write_receipt(receipt_path, receipt)
-            except Exception as exc:  # noqa: BLE001 — IC 失敗不毀生成紀錄；可以 `ic` 子命令重跑
-                print(f"[ffprod-measure] {item['key']}：IC 失敗 {type(exc).__name__}: {exc}", flush=True)
-                rc = 3
+            rc = max(rc, run_ic(item))
     return rc
 
 

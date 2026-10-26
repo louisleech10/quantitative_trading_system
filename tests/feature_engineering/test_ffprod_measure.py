@@ -541,6 +541,83 @@ def test_unreachable_candidate_rejects_broken_probe(tmp_path: Path, extra: List[
     assert seen == ["A_BTCUSDT_1h__default"]
 
 
+def test_baseline_self_proof_failure_is_not_frozen_and_reruns(tmp_path: Path) -> None:
+    """改前基準自證失敗 ⇒ 記 self_proof_failed（非 frozen）、rc 3、依賴之選項不跑；續跑重做基準。"""
+    calls: List[str] = []
+
+    def generate(item: Mapping[str, Any], cell: Mapping[str, Any], item_dir: Path) -> Dict[str, Any]:
+        calls.append(item["kind"])
+        return _fake_gen(passed=item["kind"] != "baseline" or len(calls) > 1)
+
+    items = fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"])
+    receipt_path = tmp_path / "r.json"
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff) == 3
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert receipt["baselines"]["A_BTCUSDT_1h"]["default"]["status"] == "self_proof_failed"
+    assert calls == ["baseline"]  # 選項未以壞基準生成
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff) == 0
+    assert calls == ["baseline", "baseline", "option"]
+
+
+def test_measured_without_ic_is_not_done_and_resume_only_runs_ic(tmp_path: Path) -> None:
+    """`--skip-ic`（ic=None）留下之 measured 紀錄於要求 IC 時非完成；續跑不重生成、只補 IC。"""
+    gens: List[str] = []
+    ic_calls: List[str] = []
+
+    def generate(item: Mapping[str, Any], cell: Mapping[str, Any], item_dir: Path) -> Dict[str, Any]:
+        gens.append(item["kind"])
+        return _fake_gen()
+
+    def ic(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any]) -> None:
+        ic_calls.append(item["key"])
+        fm._item_node(receipt, cell_id, item)["ic"] = {"mode": "changed_columns"}
+
+    items = fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"])
+    receipt_path = tmp_path / "r.json"
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff) == 0
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    opt = next(i for i in items if i["kind"] == "option")
+    assert fm._item_done(receipt, "A_BTCUSDT_1h", opt, need_ic=False)
+    assert not fm._item_done(receipt, "A_BTCUSDT_1h", opt)
+    assert fm.plan("A_BTCUSDT_1h", ["layer_dtype"], receipt)["items"][-1]["status"] == "pending"
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=ic) == 0
+    assert gens == ["baseline", "option"] and ic_calls == [opt["key"]]
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=ic) == 0
+    assert gens == ["baseline", "option"] and ic_calls == [opt["key"]]
+
+
+def test_ic_failure_persists_state_and_resume_retries_ic(tmp_path: Path) -> None:
+    """IC 步失敗：其就地改之狀態落盤；未寫 `ic` ⇒ 續跑只補 IC（不重生成）；IC 自證失敗（self_proof_failed）⇒ 續跑重做該項。"""
+    gens: List[str] = []
+    attempts: List[str] = []
+
+    def generate(item: Mapping[str, Any], cell: Mapping[str, Any], item_dir: Path) -> Dict[str, Any]:
+        gens.append(item["kind"])
+        return _fake_gen()
+
+    def ic(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any]) -> None:
+        attempts.append(item["key"])
+        node = fm._item_node(receipt, cell_id, item)
+        if len(attempts) == 1:
+            raise RuntimeError("IC 子行程未寫結果")
+        if len(attempts) == 2:
+            node["ic"] = {"self_proof": {"passed": False}}
+            node["status"] = "self_proof_failed"
+            raise fm.SelfProofFailed("IC 自證失敗")
+        node["ic"] = {"mode": "changed_columns"}
+
+    items = fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"])
+    receipt_path = tmp_path / "r.json"
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=ic) == 3
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=ic) == 3
+    assert gens == ["baseline", "option"]  # 第二次只補 IC
+    opt = next(i for i in items if i["kind"] == "option")
+    node = fm._item_node(json.loads(receipt_path.read_text(encoding="utf-8")), "A_BTCUSDT_1h", opt)
+    assert node["status"] == "self_proof_failed"  # IC 步改之狀態已落盤
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=ic) == 0
+    assert gens == ["baseline", "option", "option"] and len(attempts) == 3
+
+
 def test_receipt_spec_version_follows_spec_header(tmp_path: Path) -> None:
     """收據之 spec 欄取 SPEC 檔頭現行版本（不寫死字面）並附 SPEC 雜湊。"""
     spec = tmp_path / "S.md"
