@@ -187,13 +187,11 @@
         ],
         "not_selected": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202",
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2502"
         ],
         "disabled": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202",
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2366"
         ],
         "ratio_unsafe_skip": [
@@ -236,8 +234,7 @@
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3460"
         ],
         "insufficient_history": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3051",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3416"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3051"
         ],
         "not_target_layer": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
@@ -247,14 +244,12 @@
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2932"
         ],
         "no_statsmodels": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2906",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3388"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2906"
         ],
         "disabled": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2366"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2198",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2374"
         ],
         "ratio_unsafe_skip": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899",
@@ -290,13 +285,11 @@
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3143"
         ],
         "stationary_skip": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3143",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3416",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3460"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3143"
         ],
         "insufficient_history": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3121",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3416"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3131"
         ],
         "insufficient_after_diff": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3133"
@@ -317,14 +310,12 @@
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3087"
         ],
         "no_statsmodels": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3077",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3388"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3077"
         ],
         "disabled": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2366"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2199",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2379"
         ],
         "ratio_unsafe_skip": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899",
@@ -350,19 +341,18 @@
       "_sources": {
         "applied": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2229",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2245",
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3189"
         ],
         "not_selected": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2229",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2200",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2245",
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3189"
         ],
         "disabled": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2366"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2200",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2384"
         ],
         "ratio_unsafe_skip": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899",
@@ -388,19 +378,19 @@
       "_sources": {
         "applied": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2267",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3263"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2300",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3304"
         ],
         "not_selected": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2267",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3263"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2300",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3304"
         ],
         "disabled": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2256",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2374"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2202",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2289",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2394"
         ],
         "ratio_unsafe_skip": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899",
@@ -427,12 +417,12 @@
       "_sources": {
         "applied": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2245",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2266",
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3263"
         ],
         "not_selected": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2245",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2201",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2266",
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3263"
         ],
         "no_scipy": [
@@ -442,9 +432,9 @@
         ],
         "disabled": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1747",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2197",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2233",
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2366"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2201",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2256",
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2389"
         ],
         "ratio_unsafe_skip": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899",

@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import copy
 import re
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Set, Tuple
 
@@ -112,6 +113,72 @@ def record_call_literals(call: ast.Call) -> Set[str]:
     return out
 
 
+def _step_constants() -> Dict[str, str]:
+    """前處理器之步驟常數名 → 步驟名（`STEP_*`，讀生產模組，不在測試另抄）。"""
+    from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fp
+
+    return {name: str(getattr(fp, name)) for name in dir(fp) if name.startswith("STEP_")}
+
+
+def step_value_args(call: ast.Call) -> Dict[str, List[ast.expr]]:
+    """紀錄呼叫 → {步驟名或 "*"（全部步驟）: 寫入該步驟之值實參}（審碼 b2 r3 CODEX-R3-P1-01：值須寫在該步驟上，非同呼叫
+    任一實參）。`_record_execution(cols, STEP_X, v)`、`_record_selection(cols, sel, STEP_X, v1, v2)`；
+    `_record_input_execution(cols, v)`／`record_all_steps(records, keys, v)` 為全部步驟；`_record_input_execution(cols,
+    <步驟名>=v, …)` 逐關鍵字；其他紀錄函式（終態、群組、決策）不寫步驟狀態 ⇒ 空。步驟實參非步驟常數或字面 ⇒ 不歸屬。"""
+    name = recording_callee(call)
+    consts = _step_constants()
+
+    def step_of(node: ast.expr) -> Optional[str]:
+        if isinstance(node, ast.Name):
+            return consts.get(node.id)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        return None
+
+    out: Dict[str, List[ast.expr]] = {}
+    if name == "_record_execution" and len(call.args) >= 3:
+        step = step_of(call.args[1])
+        # 步驟實參為變數（如 `_get_non_stationary_columns` 由 `_stationarity_step_context` 帶入之 `step`）⇒ 動態步驟 "?"
+        out["?" if step is None and isinstance(call.args[1], ast.Name) else step] = [call.args[2]]
+    elif name == "_record_selection" and len(call.args) >= 5:
+        step = step_of(call.args[2])
+        if step is not None:
+            out[step] = [call.args[3], call.args[4]]
+    elif name == "_record_input_execution":
+        if len(call.args) >= 2:
+            out["*"] = [call.args[1]]
+        for kw in call.keywords:
+            if kw.arg not in (None, "terminal", "fast_arm"):
+                out.setdefault(kw.arg, []).append(kw.value)
+    elif name == "record_all_steps" and len(call.args) >= 3:
+        out["*"] = [call.args[2]]
+    return out
+
+
+def dynamic_steps(tree: ast.AST) -> Set[str]:
+    """模組內 `_stationarity_step_context(<步驟常數>)` 所設之步驟集合（動態步驟實參之可能值）。"""
+    consts = _step_constants()
+    out: Set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                and node.func.attr == "_stationarity_step_context" and node.args and isinstance(node.args[0], ast.Name):
+            step = consts.get(node.args[0].id)
+            if step is not None:
+                out.add(step)
+    return out
+
+
+def step_literals(call: ast.Call, step: str, tree: Optional[ast.AST] = None) -> Set[str]:
+    """紀錄呼叫寫入 `step` 之字串字面（含全部步驟者；動態步驟 "?" 只在 `step` 屬 `tree` 之 `dynamic_steps` 時計入）。"""
+    out: Set[str] = set()
+    dyn = dynamic_steps(tree) if tree is not None else set()
+    for key, exprs in step_value_args(call).items():
+        if key in (step, "*") or (key == "?" and step in dyn):
+            for expr in exprs:
+                out |= {n.value for n in ast.walk(expr) if isinstance(n, ast.Constant) and isinstance(n.value, str)}
+    return out
+
+
 def in_source_scope(rel: str, scope: Any) -> bool:
     """`rel`（repo 相對 POSIX 路徑）屬 `scope`：目錄項（`/` 結尾）為其下任意檔，檔案項逐字相等。"""
     return any(rel.startswith(str(s)) if str(s).endswith("/") else rel == str(s) for s in scope or ())
@@ -164,6 +231,9 @@ def source_violations(spec: Mapping[str, Any]) -> List[str]:
                     out.append(f"{path}.{value}: {ref} 之陳述式非紀錄函式呼叫（被呼叫者名須合 {RECORDING_CALLEE_RE.pattern!r}）")
                 if call is None or value not in record_call_literals(call):
                     out.append(f"{path}.{value}: {ref} 之陳述式之紀錄呼叫實參不含該值之字串字面")
+                elif path.startswith("step_status_values.") and value not in step_literals(
+                        call, path.split(".", 1)[1], _parsed(target)):
+                    out.append(f"{path}.{value}: {ref} 之紀錄呼叫未以該值寫入步驟 {path.split('.', 1)[1]}")
     return out
 
 
@@ -538,6 +608,40 @@ def test_mutation_source_pointing_to_other_domain_same_literal_is_caught(monkeyp
     assert any("source_scope" in v for v in caught), caught
     assert any("非紀錄函式呼叫" in v for v in caught), caught
     assert not any("註解行" in v or "檔不存在" in v for v in caught), caught
+
+
+def test_mutation_source_pointing_to_other_step_same_literal_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（審碼 b2 r3 CODEX-R3-P1-01）：`winsorization.not_selected` 之 `_sources` 改指只寫 `STEP_ZSCORE` 而同含
+    "not_selected" 字面之紀錄呼叫 ⇒ ① 轉紅（紅因「未以該值寫入步驟」）。反證非空轉：該行確為紀錄呼叫且實參含該字面（未分步驟
+    之舊判準會放行）。正對照：契約真實出處無違規。"""
+    spec = ph.contract()
+    path, value = "step_status_values.winsorization", "not_selected"
+    assert _violations_of(path, value, source_violations(spec)) == [], "正對照不成立 ⇒ mutation 空轉"
+    target = ph.REPO / _PREPROCESSOR
+    tree = _parsed(target)
+    other = next(
+        stmt.lineno for stmt in ast.walk(tree) if isinstance(stmt, ast.stmt)
+        and (call := statement_record_call(stmt)) is not None and value in record_call_literals(call)
+        and recording_callee(call) == "_record_execution" and set(step_value_args(call)) == {"adaptive_zscore"})
+    mutant = copy.deepcopy(spec)
+    ph.enum_node(path, mutant)["_sources"][value] = [f"{_PREPROCESSOR}:{other}"]
+    monkeypatch.setattr(rp, "load_contract", lambda: mutant)
+    caught = _violations_of(path, value, source_violations(rp.load_contract()))
+    assert any("未以該值寫入步驟" in v for v in caught), caught
+    assert not any("非紀錄函式呼叫" in v or "不含該值" in v for v in caught), caught
+
+
+def test_mutation_dynamic_step_source_requires_step_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（審碼 b2 r3）：動態步驟之紀錄呼叫（`_record_execution(..., step, "stationary_skip")`）只在模組確有
+    `_stationarity_step_context(STEP_FRACDIFF)` 時可為 fracdiff 之出處；令動態步驟集合不含 fractional_differencing ⇒ ① 轉紅。
+    正對照：真實模組（含 STEP_FRACDIFF 與 STEP_ADF 之脈絡）無違規。"""
+    spec = ph.contract()
+    path, value = "step_status_values.fractional_differencing", "stationary_skip"
+    assert _violations_of(path, value, source_violations(spec)) == [], "正對照不成立 ⇒ mutation 空轉"
+    assert {"fractional_differencing", "adf_differencing"} <= dynamic_steps(_parsed(ph.REPO / _PREPROCESSOR))
+    monkeypatch.setattr(sys.modules[__name__], "dynamic_steps", lambda tree: {"adf_differencing"})
+    caught = _violations_of(path, value, source_violations(spec))
+    assert any("未以該值寫入步驟" in v for v in caught), caught
 
 
 def test_mutation_manifest_group_fallback_scalar_is_caught(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch) -> None:
