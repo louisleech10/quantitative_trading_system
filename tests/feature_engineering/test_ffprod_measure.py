@@ -749,10 +749,30 @@ def test_ic_override_turns_decay_off_and_self_proof_rejects_decay(tmp_path: Path
         override = fm.ic_override(request, winsor_off)
         assert override["report"]["include_decay_analysis"] is False
         assert (override.get("preprocessing", {}).get("winsorization", {}).get("enabled") is False) == winsor_off
-    assert fm.assert_decay_off({"ic_decay": {}}, {}) == 0
-    assert fm.assert_decay_off({}, {}) == 0
-    with pytest.raises(RuntimeError):
-        fm.assert_decay_off({"ic_decay": {"x": {"half_life": None}}}, {})
+    off = fm.ic_override(request, False)
+    assert fm.assert_decay_off({"ic_decay": {}}, off) == 0
+    for report, ov in (({"ic_decay": {"x": {"half_life": None}}}, off),  # 報告有衰減結果
+                       ({}, off),  # 報告缺 ic_decay 鍵
+                       ({"ic_decay": None}, off),
+                       ({"ic_decay": {}}, {"report": {"include_decay_analysis": True}}),  # 覆寫未關
+                       ({"ic_decay": {}}, {}),  # 覆寫缺鍵
+                       ({"ic_decay": {}}, None)):
+        with pytest.raises(RuntimeError):
+            fm.assert_decay_off(report, ov)
+
+
+def test_premise_mismatches_cover_stage5_inputs_and_nan() -> None:
+    """替換前提逐欄比第 5 階段實讀之輸入（非只四欄）；兩側皆 NaN 為一致；stage1 去留不同為不一致。"""
+    nan = float("nan")
+    row = {k: 0.1 for k in fm.PREMISE_KEYS}
+    assert fm.premise_mismatches({"x": row}, {"x": dict(row)}, ["x"]) == []
+    for key in fm.PREMISE_KEYS:
+        assert fm.premise_mismatches({"x": row}, {"x": {**row, key: 0.2}}, ["x"]) == ["x"], key
+    assert fm.premise_mismatches({"x": {**row, "coverage": nan}}, {"x": {**row, "coverage": nan}}, ["x"]) == []
+    assert fm.premise_mismatches({"x": row}, {}, ["x"]) == ["x"]
+    assert fm.premise_mismatches({}, {"x": row}, ["x"]) == ["x"]
+    assert fm.premise_mismatches({}, {}, ["x"]) == []
+    assert "p_value_adj" not in fm.PREMISE_KEYS  # 全 universe FDR，替換後重算
 
 
 def test_ic_results_from_other_settings_are_recomputed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -839,7 +859,7 @@ def test_ic_step_sign_flips_on_changed_columns_and_selection_blocked_by_hardware
             assert ic["selection"]["selection_out"] == 1 and ic["selection"]["passed_before"] == 2
 
 
-@pytest.mark.parametrize("mode", ["baseline_changed_blocked", "premise_mismatch"])
+@pytest.mark.parametrize("mode", ["baseline_changed_blocked", "premise_mismatch", "premise_mismatch_hit_rate"])
 def test_ic_step_selection_requires_substitution_premise(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> None:
     """選欄由替換推導，須改前改值欄子集可得且與改前全欄 IC 相同：子集受阻 ⇒ selection 記 blocked_by hardware；
@@ -857,6 +877,9 @@ def test_ic_step_selection_requires_substitution_premise(
             return {"status": "ok", "rows": {"x": {**row(-0.01), "feature_name": "x"}}, "seconds": 1.0, "peak_rss_bytes": 1}
         if mode == "baseline_changed_blocked":
             return {"status": "blocked", "blocked_by": "hardware", "reason": "卡死監看終止"}
+        if mode == "premise_mismatch_hit_rate":  # 四欄相同、只第 5 階段另讀之 ic_hit_rate 不同
+            return {"status": "ok", "rows": {"x": {**row(0.05), "ic_hit_rate": 0.1, "feature_name": "x"}},
+                    "seconds": 1.0, "peak_rss_bytes": 1}
         return {"status": "ok", "rows": {"x": {**row(0.04), "feature_name": "x"}}, "seconds": 1.0, "peak_rss_bytes": 1}
 
     monkeypatch.setattr(fm, "_selection_tools", lambda override: _tools())

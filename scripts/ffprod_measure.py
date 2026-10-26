@@ -1721,12 +1721,17 @@ def ic_in_process(run_dir: Path, symbol: str, timeframe: str, include: Optional[
 
 
 def assert_decay_off(report: Mapping[str, Any], override: Any) -> int:
-    """自證 `IC_MEASURE_OVERRIDE` 確實關衰減：報告之 `ic_decay`（`ic_reporter.py` report 組裝，逐特徵）須為空，回 0；
-    否則 RuntimeError。摘要表 half_life 不作判據：衰減開時亦可為 None（IC 隨 horizon 無衰減形狀）。"""
-    decay = len(report.get("ic_decay") or {})
-    if decay:
-        raise RuntimeError(f"IC 衰減分析未關：報告 ic_decay 有 {decay} 個特徵（override={override}）")
-    return decay
+    """自證 `IC_MEASURE_OVERRIDE` 確實關衰減，三條皆須成立否則 RuntimeError：送出之 override 之
+    `report.include_decay_analysis` 為 False；報告帶 `ic_decay` 鍵（`ic_reporter.py` report 組裝固定輸出）且為 mapping；
+    該 mapping 為空。回 0。摘要表 half_life 不作判據：衰減開時亦可為 None（IC 隨 horizon 無衰減形狀）。"""
+    flag = ((override or {}).get("report") or {}).get("include_decay_analysis") if isinstance(override, Mapping) else None
+    if flag is not False:
+        raise RuntimeError(f"IC 衰減分析未關：override report.include_decay_analysis={flag!r}")
+    if "ic_decay" not in report or not isinstance(report["ic_decay"], Mapping):
+        raise RuntimeError(f"IC 報告缺 ic_decay mapping（{type(report.get('ic_decay')).__name__}），無從自證衰減已關")
+    if report["ic_decay"]:
+        raise RuntimeError(f"IC 衰減分析未關：報告 ic_decay 有 {len(report['ic_decay'])} 個特徵（override={override}）")
+    return 0
 
 
 def _count(value: Any) -> Optional[int]:
@@ -2163,6 +2168,30 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
     return rc
 
 
+#: 替換前提之逐欄比較鍵：翻轉與第 5 階段門檻（`ic_filter_orchestrator._apply_thresholds`）實際讀之逐特徵輸入；
+#: `p_value_adj` 不比（全 universe FDR，由 `select_features` 於替換後重算）
+PREMISE_KEYS = ("ic_mean", "icir", "p_value", "t_stat", "ic_hit_rate", "monotonicity_score", "coverage",
+                "long_short_spread")
+
+
+def _same_value(a: Any, b: Any) -> bool:
+    """逐位元相等；兩側皆 NaN 視為相同（缺值一致）。"""
+    if isinstance(a, float) and isinstance(b, float) and a != a and b != b:
+        return True
+    return a == b
+
+
+def premise_mismatches(full_rows: Mapping[str, Mapping[str, Any]], subset_rows: Mapping[str, Mapping[str, Any]],
+                       changed: Sequence[str]) -> List[str]:
+    """改前全欄列與改前改值欄子集列於改值欄之不一致者：一側有列一側無（stage1 去留不同），或任一 PREMISE_KEYS 不同。"""
+    out = []
+    for f in changed:
+        a, b = full_rows.get(f), subset_rows.get(f)
+        if (a is None) != (b is None) or (a is not None and not all(_same_value(a.get(k), b.get(k)) for k in PREMISE_KEYS)):
+            out.append(f)
+    return out
+
+
 def blocked_summary(sources: Mapping[str, Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
     """多份 IC 來源中受阻者之摘要：`blocked_by`＝受阻原因類別（hardware／watchdog_timeout；多類以「+」依字母序連）、
     `reason`／`causes`＝逐來源之理由與類別；全部可得 ⇒ None。"""
@@ -2282,11 +2311,9 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
             out["selection"] = {**blocked, "scope": "改前全欄 IC 試跑一次（SPEC v10 補③）"}
         else:
             base_rows = json.loads(Path(bnode["rows_path"]).read_text(encoding="utf-8"))
-            keys = ("ic_mean", "icir", "p_value", "t_stat")
-            mismatch = [f for f in changed if f in base_rows and (base_sub["rows"].get(f) is None or
-                        any(base_sub["rows"][f].get(k) != base_rows[f].get(k) for k in keys))]
+            mismatch = premise_mismatches(base_rows, base_sub["rows"], changed)
             out["substitution_premise"] = {"checked_columns": len(changed), "mismatched": len(mismatch),
-                                           "examples": mismatch[:10], "keys": list(keys), "holds": not mismatch}
+                                           "examples": mismatch[:10], "keys": list(PREMISE_KEYS), "holds": not mismatch}
             if mismatch:  # 前提不成立 ⇒ 替換不等價於全量重算，不輸出選欄數字
                 out["selection"] = {"not_derived": "替換前提不成立（改前改值欄子集 IC ≠ 改前全欄 IC）",
                                     "mismatched": len(mismatch)}
