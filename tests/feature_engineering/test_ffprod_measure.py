@@ -645,6 +645,78 @@ def test_cpu_heartbeat_writes_while_busy_and_stays_silent_when_idle(capsys: pyte
     assert "[ffprod-heartbeat]" not in capsys.readouterr().err
 
 
+def test_measure_watchdog_has_no_wall_cap_but_keeps_stall_detection() -> None:
+    """量測監看不設牆鐘上限（長計算以 CPU 心跳證明在跑）；log 靜默門檻照判準檔，真卡死仍被終止。"""
+    fb = fm._fb()
+    wd = fb._watchdog()
+    base = wd.load_config(fb._criteria())
+    cfg = fm.measure_watch_config(fb, wd)
+    assert wd.wall_cap_seconds(cfg, 1059.0) == float("inf") and wd.wall_cap_seconds(cfg, None) == float("inf")
+    assert cfg.log_stall_seconds == base.log_stall_seconds and cfg.check_interval_seconds == base.check_interval_seconds
+    assert cfg.swap_growth_fraction_of_ram == base.swap_growth_fraction_of_ram
+    import inspect
+
+    src = inspect.getsource(fm)
+    assert src.count("measure_watch_config(fb, wd)") == 2 and "config=wd.load_config(" not in src  # 生成與 IC 皆用之
+
+
+def test_watchdog_stopped_results_are_never_done(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """監看終止（watchdog_timeout）之結果不算完成：IC 結果與改前全欄 IC 快取皆重算；硬體受阻者沿用。"""
+    item = next(i for i in fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"]) if i["kind"] == "option")
+    tagged = {"ic_settings": fm.IC_MEASURE_SETTINGS, "mode": "changed_columns"}
+    assert fm.ic_current(tagged)
+    assert not fm.ic_current({**tagged, "selection": {"blocked_by": "watchdog_timeout"}})
+    assert not fm.ic_current({**tagged, "sign_flips": {"blocked_by": "hardware+watchdog_timeout"}})
+    assert fm.ic_current({**tagged, "selection": {"blocked_by": "hardware"}})
+    assert fm._needs_ic({"status": "measured", "ic": {**tagged, "selection": {"blocked_by": "watchdog_timeout"}}}, item)
+    calls: List[Any] = []
+
+    def watched(run_dir: Path, symbol: str, tf: str, include: Any, winsor_off: bool, item_dir: Path) -> Dict[str, Any]:
+        calls.append(include)
+        return {"status": "blocked", "blocked_by": "hardware", "reason": "記憶體守護"}
+
+    monkeypatch.setattr(fm, "ic_watched", watched)
+    for cause, rerun in (("watchdog_timeout", True), ("hardware", False)):
+        calls.clear()
+        receipt = fm.new_receipt("A_BTCUSDT_1h", tmp_path)
+        receipt["baselines"]["A_BTCUSDT_1h"] = {"default": {"status": "frozen", "run_dir": str(tmp_path / "base")}}
+        receipt["ic"]["baselines"]["A_BTCUSDT_1h"] = {"default": {"status": "blocked", "blocked_by": cause,
+                                                                   "ic_settings": fm.IC_MEASURE_SETTINGS}}
+        receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
+            "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"]}
+        fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
+        assert (None in calls) == rerun, cause  # 改前全欄 IC：監看終止者重算、硬體受阻者沿用
+
+
+def test_run_with_retries_reruns_watchdog_stops_up_to_limit(tmp_path: Path) -> None:
+    """生成遭監看終止（stalled）或收據留有 watchdog_timeout ⇒ 自動重跑；至多 MAX_PASSES 次；其他錯誤照拋。"""
+    passes: List[int] = []
+
+    def flaky() -> int:
+        passes.append(1)
+        if len(passes) == 1:
+            raise RuntimeError("C_BTCUSDT_1h__stat：stalled（log 檔 600 秒未增長）")
+        return 0
+
+    assert fm.run_with_retries(flaky, lambda: False, tmp_path / "r.json") == 0 and len(passes) == 2
+    passes.clear()
+    state = {"stopped": True}
+
+    def once() -> int:
+        passes.append(1)
+        if len(passes) == 2:
+            state["stopped"] = False
+        return 3
+
+    fm.run_with_retries(once, lambda: state["stopped"], tmp_path / "r.json")
+    assert len(passes) == 2
+    passes.clear()
+    assert fm.run_with_retries(lambda: (passes.append(1), 3)[1], lambda: True, tmp_path / "r.json") == 3
+    assert len(passes) == fm.MAX_PASSES  # 真卡住：不無限迴圈
+    with pytest.raises(RuntimeError):
+        fm.run_with_retries(lambda: (_ for _ in ()).throw(RuntimeError("其他錯誤")), lambda: False, tmp_path / "r.json")
+
+
 def test_run_passes_expected_seconds_only_for_frozen_preprocessing(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """預期秒數（監看牆鐘上限之基準）只給與凍結格同設定之生成；設定變體（sigma、平穩化開）傳 None。"""
@@ -731,8 +803,9 @@ def test_ic_watched_separates_watchdog_timeout_from_hardware(
             real._write_atomic(tmp_path / "ic" / "ic_result.json", watched["child"])
         return result
 
-    wd = types.SimpleNamespace(STALLED="stalled", run_watched=run_watched, load_config=lambda c: None)
-    fake = types.SimpleNamespace(_watchdog=lambda: wd, _criteria=lambda: {}, _write_atomic=real._write_atomic)
+    real_wd = real._watchdog()
+    wd = types.SimpleNamespace(STALLED="stalled", run_watched=run_watched, load_config=real_wd.load_config)
+    fake = types.SimpleNamespace(_watchdog=lambda: wd, _criteria=real._criteria, _write_atomic=real._write_atomic)
     monkeypatch.setattr(fm, "_fb", lambda: fake)
     out = fm.ic_watched(tmp_path / "run", "BTCUSDT", "1h", None, False, tmp_path / "ic")
     assert out["status"] == "blocked" and out["blocked_by"] == expected

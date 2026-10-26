@@ -25,6 +25,8 @@ from __future__ import annotations
 import argparse
 import contextlib
 import copy
+import dataclasses
+import math
 import hashlib
 import importlib.util
 import json
@@ -61,6 +63,25 @@ SCRIPT_ENV = "FFPROD_MEASURE_SCRIPT"
 BLOCKED_BY_HARDWARE = "hardware"
 #: 卡死監看終止（log 靜默＝無 CPU 進度心跳、或牆鐘上限）：非記憶體證據，與硬體區分（SPEC v10 補③）
 BLOCKED_BY_WATCHDOG = "watchdog_timeout"
+
+
+def measure_watch_config(fb: Any, wd: Any) -> Any:
+    """量測之卡死監看設定：判準檔（NUMVIEW 凍結，不改）之 log 靜默與 swap 條件照用，牆鐘上限關閉（無限大）——
+    長時間計算以 CPU 進度心跳（`cpu_heartbeat`）證明在跑，只有無 CPU 進度之 log 靜默才終止（SPEC v12 補⑤；
+    使用者 2026-10-27「講幾千次不準再因為時間上限問題被停掉」）。"""
+    return dataclasses.replace(wd.load_config(fb._criteria()), wall_multiple_of_expected=math.inf,
+                               wall_ceiling_seconds=math.inf)
+
+
+def has_watchdog_timeout(obj: Any) -> bool:
+    """結果中任一處受阻類別含 watchdog_timeout（監看終止之結果一律不算完成、續跑重算）。"""
+    if isinstance(obj, Mapping):
+        if BLOCKED_BY_WATCHDOG in str(obj.get("blocked_by") or ""):
+            return True
+        return any(has_watchdog_timeout(v) for v in obj.values())
+    if isinstance(obj, (list, tuple)):
+        return any(has_watchdog_timeout(v) for v in obj)
+    return False
 #: 自證紀錄之樣本上限（每行程；違規另計總數）
 SAMPLE_CAP = 20
 #: 逐欄指紋外置門檻（改值欄數；見 `_externalize_fingerprints`）
@@ -1494,7 +1515,7 @@ def generate_watched(cell: Mapping[str, Any], probes: Mapping[str, str], item_di
     env["PYTHONPATH"] = os.pathsep.join([str(site_dir), str(REPO)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     print(f"[ffprod-measure] {cell['id']} {dict(probes)}：子行程開始（預期 {expected_seconds} 秒）", flush=True)
     watched = wd.run_watched([sys.executable, str(Path(__file__).resolve()), "--gen-child", str(spec_path)],
-                             log_path=item_dir / "child.log", config=wd.load_config(fb._criteria()),
+                             log_path=item_dir / "child.log", config=measure_watch_config(fb, wd),
                              expected_seconds=expected_seconds, cwd=str(REPO), env=env)
     if watched.status == wd.STALLED or not result_path.is_file():
         raise RuntimeError(f"{cell['id']}：{watched.status}（{watched.reason}；rc={watched.returncode}；"
@@ -1781,7 +1802,7 @@ def ic_watched(run_dir: Path, symbol: str, timeframe: str, include: Optional[Seq
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join([str(REPO)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     watched = wd.run_watched([sys.executable, str(Path(__file__).resolve()), "--ic-child", str(spec_path)],
-                             log_path=item_dir / "ic_child.log", config=wd.load_config(fb._criteria()),
+                             log_path=item_dir / "ic_child.log", config=measure_watch_config(fb, wd),
                              cwd=str(item_dir), env=env)
     log = str(item_dir / "ic_child.log")
     if watched.status == wd.STALLED:  # SPEC v10 補③：記憶體證據（swap 增長逾監看門檻）⇒ hardware；其餘終止 ⇒ watchdog_timeout
@@ -1959,8 +1980,10 @@ def _generated(node: Optional[Mapping[str, Any]]) -> bool:
 
 
 def ic_current(ic: Any) -> bool:
-    """IC 結果已以現行量測設定（`IC_MEASURE_SETTINGS`）完成；無改值欄者不依設定（不跑 IC）。"""
-    return isinstance(ic, dict) and (ic.get("mode") == "no_changed_columns" or ic.get("ic_settings") == IC_MEASURE_SETTINGS)
+    """IC 結果已以現行量測設定（`IC_MEASURE_SETTINGS`）完成；無改值欄者不依設定（不跑 IC）。任一處受阻於
+    watchdog_timeout ⇒ 非完成（監看終止之結果續跑重算，不沿用）。"""
+    return isinstance(ic, dict) and not has_watchdog_timeout(ic) and \
+        (ic.get("mode") == "no_changed_columns" or ic.get("ic_settings") == IC_MEASURE_SETTINGS)
 
 
 def _needs_ic(node: Optional[Mapping[str, Any]], item: Mapping[str, Any]) -> bool:
@@ -2081,6 +2104,10 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
     def run_ic(item: Mapping[str, Any]) -> int:
         try:
             ic(receipt, cell_id, item)
+            if has_watchdog_timeout(_item_node(receipt, cell_id, item)) or \
+                    has_watchdog_timeout(receipt.get("ic", {}).get("baselines", {}).get(cell_id, {})):
+                print(f"[ffprod-measure] {item['key']}：IC 遭監看終止（watchdog_timeout），不算完成、續跑重算", flush=True)
+                return 3
             return 0
         except Exception as exc:  # noqa: BLE001 — IC 失敗不毀生成紀錄；`ic` 未寫入 ⇒ 下次續跑只補 IC
             print(f"[ffprod-measure] {item['key']}：IC 失敗 {type(exc).__name__}: {exc}", flush=True)
@@ -2216,8 +2243,9 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
         node = receipt["ic"]["baselines"].setdefault(cell_id, {})
         cached = node.get(bid)
         if cached and not force and cached.get("ic_settings") == IC_MEASURE_SETTINGS and \
+                not has_watchdog_timeout(cached) and \
                 (cached.get("status") == "blocked" or Path(cached.get("rows_path", "")).is_file()):
-            return cached
+            return cached  # 只沿用成功或硬體受阻者；監看終止者重算
         base = receipt["baselines"][cell_id][bid]
         cell = measure_cell(cell_id, bid)
         res = ic_watched(Path(base["run_dir"]), str(cell["symbol"]), str(cell["timeframes"][0]), None, False,
@@ -2337,7 +2365,44 @@ def run(args: argparse.Namespace) -> int:
         return run_value_diff(Path(base["run_dir"]), Path(gen["run_dir"]), base["fingerprints"], gen["fingerprints"])
 
     step = None if args.skip_ic else make_ic_step(work_root)
-    rc = execute(cell_id, items, receipt_path, work_root, generate=generate, diff=diff, ic=step)
+    return run_with_retries(lambda: execute(cell_id, items, receipt_path, work_root, generate=generate, diff=diff,
+                                            ic=step),
+                            lambda: _receipt_has_watchdog_timeout(receipt_path), receipt_path)
+
+
+#: 監看終止（真卡死：無 CPU 進度 log 靜默）之自動重跑次數上限：同一跑連續 MAX_PASSES 次仍被終止 ⇒ 判為程式真卡住
+#: （非等候可解），停止並報告，不無限迴圈
+MAX_PASSES = 3
+
+
+def _receipt_has_watchdog_timeout(receipt_path: Path) -> bool:
+    if not Path(receipt_path).is_file():
+        return False
+    receipt = json.loads(Path(receipt_path).read_text(encoding="utf-8"))
+    return has_watchdog_timeout(receipt.get("candidates")) or has_watchdog_timeout(receipt.get("ic")) or \
+        has_watchdog_timeout(receipt.get("interactions"))
+
+
+def run_with_retries(once: Callable[[], int], stopped: Callable[[], bool], receipt_path: Path,
+                     max_passes: int = MAX_PASSES) -> int:
+    """執行 `once`（續跑式 execute）；遭監看終止（生成子行程 stalled 之 RuntimeError，或收據留有 watchdog_timeout）
+    ⇒ 自動再跑（已完成者略過、被終止者重算），至多 `max_passes` 次。"""
+    rc = 3
+    for attempt in range(1, max_passes + 1):
+        try:
+            rc = once()
+        except RuntimeError as exc:
+            if "stalled" not in str(exc):
+                raise
+            print(f"[ffprod-measure] 第 {attempt} 次：生成遭監看終止——{exc}", flush=True)
+            rc = 3
+            if attempt < max_passes:
+                continue
+            break
+        if not stopped():
+            break
+        print(f"[ffprod-measure] 第 {attempt} 次：收據留有監看終止之結果，"
+              f"{'自動重跑' if attempt < max_passes else '已達上限，停止並報告'}", flush=True)
     print(f"[ffprod-measure] 收據 {receipt_path}（rc={rc}）", flush=True)
     return rc
 
