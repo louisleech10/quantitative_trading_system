@@ -706,17 +706,32 @@ def test_tree_cpu_seconds_degrades_when_children_unlistable(monkeypatch: pytest.
 @pytest.mark.parametrize("watched,expected", [
     ({"status": "stalled", "reason": "牆鐘 5400 秒逾上限 5400 秒", "returncode": -15}, "watchdog_timeout"),
     ({"status": "stalled", "reason": "log 檔 600 秒未增長（門檻 600 秒）", "returncode": -15}, "watchdog_timeout"),
+    # 判準停用 swap 條件（門檻 None）時，即使 swap 有增長亦非 swap 終止
+    ({"status": "stalled", "reason": "log 檔 600 秒未增長（門檻 600 秒）", "returncode": -15, "swap": 3000.0,
+      "threshold": None}, "watchdog_timeout"),
+    ({"status": "stalled", "reason": "swap 自啟動增長 3000 MB > 門檻 1000 MB 連續 2 次", "returncode": -15,
+      "swap": 3000.0, "threshold": 1000.0}, "hardware"),
     ({"status": "exited", "reason": None, "returncode": -9}, "hardware"),
+    ({"status": "exited", "reason": None, "returncode": 0, "child": {"status": "blocked", "error": "MemoryError"}},
+     "hardware"),
 ])
 def test_ic_watched_separates_watchdog_timeout_from_hardware(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch, watched: Dict[str, Any], expected: str) -> None:
-    """IC 監看：卡死監看終止（log 靜默、牆鐘）⇒ watchdog_timeout；訊號終止未寫結果（OOM kill）⇒ hardware。"""
+    """IC 監看：卡死監看終止（log 靜默、牆鐘）⇒ watchdog_timeout；記憶體證據（swap 增長逾監看門檻、訊號終止未寫結果、
+    子行程記憶體守護）⇒ hardware。"""
     import types
 
     result = types.SimpleNamespace(status=watched["status"], reason=watched["reason"], returncode=watched["returncode"],
-                                   wall_seconds=1.0, swap_growth_max_mb=0.0)
-    wd = types.SimpleNamespace(STALLED="stalled", run_watched=lambda *a, **k: result, load_config=lambda c: None)
+                                   wall_seconds=1.0, swap_growth_max_mb=watched.get("swap", 0.0),
+                                   swap_growth_threshold_mb=watched.get("threshold"))
     real = fm._fb()
+
+    def run_watched(*a: Any, **k: Any) -> Any:
+        if "child" in watched:
+            real._write_atomic(tmp_path / "ic" / "ic_result.json", watched["child"])
+        return result
+
+    wd = types.SimpleNamespace(STALLED="stalled", run_watched=run_watched, load_config=lambda c: None)
     fake = types.SimpleNamespace(_watchdog=lambda: wd, _criteria=lambda: {}, _write_atomic=real._write_atomic)
     monkeypatch.setattr(fm, "_fb", lambda: fake)
     out = fm.ic_watched(tmp_path / "run", "BTCUSDT", "1h", None, False, tmp_path / "ic")

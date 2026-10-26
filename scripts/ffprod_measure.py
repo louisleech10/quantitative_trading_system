@@ -1762,9 +1762,13 @@ def ic_watched(run_dir: Path, symbol: str, timeframe: str, include: Optional[Seq
                              log_path=item_dir / "ic_child.log", config=wd.load_config(fb._criteria()),
                              cwd=str(item_dir), env=env)
     log = str(item_dir / "ic_child.log")
-    if watched.status == wd.STALLED:  # SPEC v10 補③：卡死監看終止 ⇒ watchdog_timeout（只記憶體證據才記 hardware）
-        return {"status": "blocked", "blocked_by": BLOCKED_BY_WATCHDOG, "reason": f"卡死監看終止：{watched.reason}",
-                "wall_seconds": watched.wall_seconds, "swap_growth_max_mb": watched.swap_growth_max_mb, "log": log}
+    if watched.status == wd.STALLED:  # SPEC v10 補③：記憶體證據（swap 增長逾監看門檻）⇒ hardware；其餘終止 ⇒ watchdog_timeout
+        threshold = getattr(watched, "swap_growth_threshold_mb", None)
+        growth = watched.swap_growth_max_mb
+        swap_hit = threshold is not None and growth is not None and growth > threshold
+        return {"status": "blocked", "blocked_by": BLOCKED_BY_HARDWARE if swap_hit else BLOCKED_BY_WATCHDOG,
+                "reason": f"卡死監看終止：{watched.reason}", "wall_seconds": watched.wall_seconds,
+                "swap_growth_max_mb": growth, "swap_growth_threshold_mb": threshold, "log": log}
     if not out_path.is_file():  # 子行程被訊號終止（例 OOM kill）而未寫結果
         if watched.returncode is not None and watched.returncode < 0:
             return {"status": "blocked", "blocked_by": BLOCKED_BY_HARDWARE,
