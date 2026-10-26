@@ -3996,6 +3996,26 @@
    "rewrite_targets": [],
    "ticket": "FFPROD"
   },
+  "tests/feature_engineering/test_ffprod_measure.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A9",
+    "A15",
+    "A19"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_ffprod_measure.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFPROD"
+  },
   "tests/feature_engineering/test_ffprod_removal.py": {
    "claim": [
     "correctness",
