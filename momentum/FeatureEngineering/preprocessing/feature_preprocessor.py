@@ -128,10 +128,10 @@ STEP_RANK = "rank_transform"
 STEP_ZSCORE = "adaptive_zscore"
 STEP_GAUSSIAN = "gaussian_normalize"
 EXECUTION_STEPS: Tuple[str, ...] = (STEP_WINSOR, STEP_FRACDIFF, STEP_ADF, STEP_RANK, STEP_ZSCORE, STEP_GAUSSIAN)
-# FFPROD Task 1.2：縮尾界線所依滾動統計量之 dtype（兩 method、numba 與 pandas 兩臂同）：sigma 之滾動均值／標準差
-# 為 float32（兩臂共用 `_numba_transforms._rolling_mean_std` 之 `.astype(np.float32)`），
-# quantile 之界線 `rolling_quantile_2d` 回 float32；其後裁切之精度不改統計量 dtype
-WINSOR_COMPUTE_DTYPE = "float32"
+# FFPROD Task 1.2：縮尾滾動統計量之計算 dtype（審碼 r1）：quantile 一律於 float64 計算（`rolling_quantile_2d` 轉 float64）；
+# sigma 於 pandas 臂輸入 float64、於快速臂輸入 float32（`transform_array_fast` 先轉 float32，bottleneck 依輸入 dtype 累加）
+WINSOR_COMPUTE_DTYPE_FAST_SIGMA = "float32"
+WINSOR_COMPUTE_DTYPE_DEFAULT = "float64"
 # FFDSTAR Task 1.2、§N FFDSTAR-R3：statsmodels ADF 檢定拋例外（現行以 p=1.0 續行）之逐欄事件（契約 named_values）
 EVENT_ADF_TEST_ERROR = "adf_test_error"
 # 當次 ADF 檢定之例外紀錄回呼（`FeaturePreprocessor._adf_error_context` 設定；執行緒區域）
@@ -617,6 +617,7 @@ class FeaturePreprocessor:
         terminal: Optional[str] = None,
         dstar_source: Optional[str] = None,
         event: Optional[str] = None,
+        fast_arm: bool = False,
     ) -> None:
         key = (self._execution_key_timeframe(column), str(column))
         scope = self._execution_scope_group()
@@ -630,7 +631,7 @@ class FeaturePreprocessor:
             for step, value in steps.items():
                 self._set_execution_field(record, key, step, str(value))
             if steps.get(STEP_WINSOR) == "applied":
-                for field, value in self._winsor_applied_fields().items():
+                for field, value in self._winsor_applied_fields(fast_arm=fast_arm).items():
                     self._set_execution_field(record, key, field, value)
             if terminal is not None:
                 self._set_execution_field(record, key, "terminal", str(terminal))
@@ -663,13 +664,13 @@ class FeaturePreprocessor:
 
     def _record_input_execution(
         self, columns: Iterable[Any], value: Optional[str] = None, *, terminal: Optional[str] = None,
-        **step_values: str,
+        fast_arm: bool = False, **step_values: str,
     ) -> None:
         """呼叫端確知為本次輸入欄者（ratio-unsafe 切片、快速臂、post-IC 入口剔除與缺欄）：不經輸入欄集合過濾。
-        `value` 給定 ⇒ 六步驟皆記該值；否則依 `step_values`（步驟名 → 值）。"""
+        `value` 給定 ⇒ 六步驟皆記該值；否則依 `step_values`（步驟名 → 值）。`fast_arm`：快速 numba 臂（縮尾計算 dtype 依臂）。"""
         steps = {step: value for step in EXECUTION_STEPS} if value is not None else dict(step_values)
         for column in columns:
-            self._store_execution(str(column), steps=steps, terminal=terminal)
+            self._store_execution(str(column), steps=steps, terminal=terminal, fast_arm=fast_arm)
 
     def _record_execution_event(self, column: Any, event: str) -> None:
         """一欄之執行事件（不改狀態）；轉換脈絡內只記本次輸入欄。"""
@@ -822,16 +823,17 @@ class FeaturePreprocessor:
     def _rolling_min_periods(window: int) -> int:
         return resolve_winsor_min_periods(int(window))
 
-    def _winsor_applied_fields(self) -> Dict[str, Any]:
+    def _winsor_applied_fields(self, fast_arm: bool = False) -> Dict[str, Any]:
         """FFPROD Task 1.2：本實例縮尾之有效設定（逐欄紀錄之契約 `winsor_effective_fields`；縮尾 applied 時記）。
-        窗與最少期數同各臂實際所用（`_rolling_window`／`_rolling_min_periods`；native 子實例為其縮放後之窗）；
-        quantile 只記分位端點、sigma 只記倍數，預設值同各臂（`quantile_range` [0.01, 0.99]、`sigma_k` 3.0）。"""
+        窗與最少期數同各臂實際所用（`_rolling_window`／`_rolling_min_periods`；native 子實例為其縮放後之窗）；quantile 只記
+        分位端點、sigma 只記倍數，預設值同各臂（`quantile_range` [0.01, 0.99]、`sigma_k` 3.0）；計算 dtype 依 method 與臂。"""
         method = str(self.winsor_config["method"])
         window = self._rolling_window()
         fields: Dict[str, Any] = {
             "winsor_method": method, "winsor_lower_q": None, "winsor_upper_q": None, "winsor_sigma_k": None,
             "winsor_window": int(window), "winsor_min_periods": int(self._rolling_min_periods(window)),
-            "winsor_compute_dtype": WINSOR_COMPUTE_DTYPE,
+            "winsor_compute_dtype": WINSOR_COMPUTE_DTYPE_FAST_SIGMA if (fast_arm and method == "sigma")
+            else WINSOR_COMPUTE_DTYPE_DEFAULT,
         }
         if method == "quantile":
             lower, upper = self.winsor_config.get("quantile_range", [0.01, 0.99])
@@ -1744,6 +1746,7 @@ class FeaturePreprocessor:
         do_gaussian = bool(transform_context.get("do_gaussian", False))
         self._record_input_execution(
             columns,
+            fast_arm=True,
             winsorization="applied" if bool(transform_context.get("do_winsorize", True)) else "disabled",
             fractional_differencing="not_target_layer" if bool(transform_context.get("do_fracdiff", False))
             else "disabled",

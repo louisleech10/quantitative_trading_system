@@ -15,7 +15,7 @@
           "momentum/FeatureEngineering/feature_factory.py:3000"
         ],
         "_numeric_view.require_post_ic_core(arm)": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:945"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:947"
         ]
       }
     },
@@ -38,13 +38,13 @@
     ],
     "_sources": {
       "pandas_optimized": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:923"
       ],
       "pandas_legacy": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:923"
       ],
       "pandas_chunked": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:918"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:920"
       ]
     }
   },
@@ -55,10 +55,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:947"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:949"
         ],
         "\"pandas_optimized\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:923"
         ]
       }
     },
@@ -67,10 +67,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:947"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:949"
         ],
         "\"pandas_legacy\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:923"
         ]
       }
     },
@@ -79,10 +79,10 @@
       "min_selected_columns": 2,
       "_sources": {
         "chunk_size > 0 and num_cols > chunk_size": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:917"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:919"
         ],
         "return max(size, 0)": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:878"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
         ]
       }
     }
@@ -280,7 +280,7 @@
     ],
     "_sources": {
       "if not normalized_windows:": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2163"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2166"
       ],
       "windows: List[int]": [
         "momentum/FeatureEngineering/feature_config.py:310"
@@ -292,8 +292,8 @@
         "momentum/FeatureEngineering/numeric_view.py:137"
       ],
       "primary_window = self._primary_zscore_window(windows)": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2296",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3300"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2299",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3303"
       ]
     }
   },
@@ -305,13 +305,13 @@
     ],
     "_sources": {
       "quantile": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2126",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2526",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2129",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2529",
         "momentum/FeatureEngineering/feature_config.py:169"
       ],
       "sigma": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2110",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2507",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2113",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2510",
         "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:395"
       ]
     }
@@ -589,7 +589,7 @@
       "default": "2000",
       "domain": "non_negative_int",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:873"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:875"
       ]
     },
     "FFACT_L65_NATIVE_TF": {
@@ -628,7 +628,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1647"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1649"
       ]
     },
     "FFACT_L65_SLOWPATH_PARALLEL": {

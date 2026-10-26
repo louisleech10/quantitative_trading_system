@@ -149,7 +149,8 @@ def _l65_config(*, mode: str = "replace") -> dict:
     return {
         "enabled": True,
         "mode": mode,
-        "winsorization": {"enabled": True, "method": "quantile", "lower_q": 0.01, "upper_q": 0.99},
+        # 窗 240（1h）⇒ native 12h 縮放為 20；原由 rank 窗 240 供給（`_rolling_window` 之後備），rank 關閉後明設（審碼 r1）
+        "winsorization": {"enabled": True, "method": "quantile", "lower_q": 0.01, "upper_q": 0.99, "window": 240},
         # FFPROD Task 1.1：生產 raw 之 L6.5 一律關 rank／zscore／gaussian
         "rank_transform": {"enabled": False},
         "adaptive_zscore": {"enabled": False},
@@ -227,6 +228,84 @@ class TestRealEthForwardFillStructure:
         assert np.all(np.isnan(result[gap_mask, 0])), (
             "expected NaN at every idx_map==-1 position"
         )
+
+
+    @staticmethod
+    def _append_native_fracdiff_run(tmp_path, monkeypatch):
+        """生產 raw 可達之 append＋native＋fracdiff，經生產 sink 入口（收集式 sink）；回傳 (sink 收到之紀錄, idx_map, native 路徑回傳值)。"""
+        monkeypatch.setenv("FFACT_L65_NATIVE_TF", "1")
+        registry, _native, idx_map, _ = _make_real_eth_compact_registry(tmp_path, primary_rows=20352, n_cols=1)
+        config = {**_l65_config(mode="append"), "fractional_differencing": {"enabled": True, "apply_to": "all"}}
+        pre = FeaturePreprocessor(config)
+        pre.set_no_start_calibration()
+        native_results = []
+        real = FeaturePreprocessor._maybe_run_native_l65_to_sink
+
+        def spy(self, *args, **kwargs):
+            out = real(self, *args, **kwargs)
+            native_results.append(out)
+            return out
+
+        monkeypatch.setattr(FeaturePreprocessor, "_maybe_run_native_l65_to_sink", spy)
+        received = []
+
+        def sink(group_id, columns, data, source_group_id, source_disk_path, cleanup_source) -> None:
+            received.append((str(group_id), list(columns), np.array(data, copy=True), bool(cleanup_source)))
+
+        pre.transform_registry_groups_to_sink(registry, sink, n_workers=1)
+        return received, idx_map, native_results
+
+    @staticmethod
+    def _sibling_violations(received, idx_map) -> list:
+        """append 兄弟群組之結構違規：恰兩筆（來源原欄、`<gid>_L65` 衍生欄）、清理旗標依序、衍生欄主週期形狀與 float32、
+        同一 native idx 之列逐值恆定、idx_map==-1 之列為 NaN。"""
+        out = []
+        if [r[0] for r in received] != ["12h_L1_eth_close", "12h_L1_eth_close_L65"]:
+            return [f"sink 群組 {[r[0] for r in received]}"]
+        if [r[3] for r in received] != [False, True]:
+            out.append(f"清理旗標 {[r[3] for r in received]}")
+        if received[0][1] != ["close_lag0"]:
+            out.append(f"來源欄 {received[0][1]}")
+        cols, data = received[1][1], received[1][2]
+        if len(cols) != 1 or "close_lag0" == cols[0] or "fracdiff" not in cols[0]:
+            out.append(f"衍生欄 {cols}")
+        if data.shape != (len(idx_map), 1) or data.dtype != np.float32 or not np.isfinite(data).any():
+            out.append(f"衍生欄形狀／dtype／有限值 {data.shape} {data.dtype}")
+            return out
+        if not np.all(np.isnan(data[idx_map == -1, 0])):
+            out.append("idx_map==-1 之列非 NaN")
+        starts = np.flatnonzero(np.r_[True, idx_map[1:] != idx_map[:-1]])
+        ends = np.r_[starts[1:], len(idx_map)]
+        for s, e in zip(starts, ends):
+            if idx_map[s] >= 0 and e - s > 1:
+                block = data[s:e, 0]
+                if not (np.all(np.isnan(block)) or np.array_equal(block, np.full(e - s, block[0]), equal_nan=True)):
+                    out.append(f"native idx {int(idx_map[s])} 之列非恆定")
+                    break
+        return out
+
+    def test_append_mode_native_fracdiff_creates_l65_sibling_via_sink(self, tmp_path, monkeypatch):
+        """FFPROD b2 審碼 r1（補回 2de795c4 之 test_append_mode_creates_l65_group 所守、生產仍可達之行為）：append 模式＋native-tf
+        ＋平穩化（fracdiff；raw 之 rank／zscore 已關，衍生欄由平穩化產生）⇒ 經生產 sink 入口送出來源群組原欄與 `<gid>_L65` 兄弟群組。"""
+        received, idx_map, native_results = self._append_native_fracdiff_run(tmp_path, monkeypatch)
+        assert native_results and native_results[0] is not None, "前提：須走 native 路徑"
+        assert self._sibling_violations(received, idx_map) == []
+
+    def test_mutation_append_sibling_without_forward_fill_detected(self, tmp_path, monkeypatch):
+        """mutant：native 衍生欄展開不前向填補（只放在每段首列）⇒ 結構檢查轉紅（證檢查有鑑別力）。"""
+        from momentum.FeatureEngineering.preprocessing import _native_tf_helpers as helpers
+
+        real_apply = helpers.apply_idx_map_to_array
+
+        def no_ffill(arr, idx_map, n_rows):
+            out = real_apply(arr, idx_map, n_rows)
+            starts = np.r_[True, np.asarray(idx_map)[1:] != np.asarray(idx_map)[:-1]]
+            out[~starts] = np.nan
+            return out
+
+        monkeypatch.setattr(helpers, "apply_idx_map_to_array", no_ffill)
+        received, idx_map, _ = self._append_native_fracdiff_run(tmp_path, monkeypatch)
+        assert self._sibling_violations(received, idx_map) != []
 
 
 # ---------------------------------------------------------------------------
@@ -543,4 +622,3 @@ class TestEdgeCases:
         assert not np.array_equal(compact_result, compact_off, equal_nan=True), (
             "compact group produced identical output with native flag on/off — native path not taken"
         )
-

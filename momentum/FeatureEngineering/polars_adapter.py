@@ -364,5 +364,3 @@ def polars_l2_derived_momentum(
 
     result = pl_df.select(exprs)
     return ensure_nan_semantics(result)
-
-

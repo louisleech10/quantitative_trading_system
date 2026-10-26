@@ -31,8 +31,12 @@ def _fields() -> List[str]:
 
 
 def _table(runs: ph.RunCache, cell: str) -> pd.DataFrame:
+    """紀錄表＋各列所屬群組之臂（`_arm`，取自 manifest 群組表）。"""
     handle = runs.get(cell)
-    return ph.provenance_table(handle.run_dir, "raw")
+    table = ph.provenance_table(handle.run_dir, "raw")
+    groups = ph.provenance_pointer(handle.run_dir, "raw")["groups"]
+    table["_arm"] = [(groups.get(str(g)) or {}).get("arm") for g in table["group_id"]]
+    return table
 
 
 # ---------------------------------------------------------------------------------------------- 驗證
@@ -45,13 +49,17 @@ def test_winsor_effective_fields_are_record_columns() -> None:
     assert set(fields) <= set(contract["record_columns"])
 
 
-#: `winsor_compute_dtype`＝縮尾界線所依滾動統計量之 dtype。現行（Phase 3 前）兩 method、numba 與 pandas 兩臂皆為 float32：
-#: sigma 之滾動均值／標準差 `move_mean(...).astype(np.float32)`（`_numba_transforms.py`），quantile 之界線
-#: `rolling_quantile_2d` 回 `np.float32`；pandas 臂其後之裁切於 float64 進行，不改統計量 dtype。
-EXPECTED_COMPUTE_DTYPE = "float32"
+#: `winsor_compute_dtype`＝縮尾滾動統計量之計算 dtype（審碼 r1 更正）：quantile 一律 float64（`rolling_quantile_2d` 先
+#: `np.asarray(arr, dtype=np.float64)`）；sigma 於快速 numba 臂（群組臂 numba_fast／numba_shard）float32（`transform_array_fast`
+#: 先 `astype(np.float32)`，bottleneck 依輸入 dtype 累加），於 pandas 臂 float64（輸入先轉 float64）。
+FAST_ARMS = ("numba_fast", "numba_shard")
 
 
-def expected_settings(cell: str) -> Dict[str, Any]:
+def expected_compute_dtype(method: str, arm: Any) -> str:
+    return "float32" if (method == "sigma" and arm in FAST_ARMS) else "float64"
+
+
+def expected_settings(cell: str, arm: Any) -> Dict[str, Any]:
     """由格之設定（`preprov_helpers.cell_spec(cell)` 之 payload）與 `WinsorConfig` 預設獨立導出之有效設定（不讀紀錄表、
     不經 preprocessor）。min_periods 依 L6.5 既有公式 min(window, max(20, window // 4)) 於本處獨立重寫。"""
     from momentum.FeatureEngineering.feature_config import WinsorConfig
@@ -61,7 +69,7 @@ def expected_settings(cell: str) -> Dict[str, Any]:
     window = int(cfg.window)
     out: Dict[str, Any] = {"winsor_method": cfg.method, "winsor_window": window,
                            "winsor_min_periods": min(window, max(20, window // 4)),
-                           "winsor_compute_dtype": EXPECTED_COMPUTE_DTYPE,
+                           "winsor_compute_dtype": expected_compute_dtype(str(cfg.method), arm),
                            "winsor_lower_q": None, "winsor_upper_q": None, "winsor_sigma_k": None}
     if cfg.method == "quantile":
         out["winsor_lower_q"], out["winsor_upper_q"] = float(cfg.quantile_range[0]), float(cfg.quantile_range[1])
@@ -70,25 +78,36 @@ def expected_settings(cell: str) -> Dict[str, Any]:
     return out
 
 
-def _assert_applied_params(applied: pd.DataFrame, expected: Dict[str, Any]) -> None:
-    """逐列逐欄等於獨立導出之有效設定（空值欄須為空；非空值欄須相等）。"""
+def _assert_applied_params(applied: pd.DataFrame, cell: str) -> None:
+    """逐列逐欄等於獨立導出之有效設定（依各列群組臂分組；空值欄須為空；非空值欄須相等）。"""
     assert len(applied) > 0
-    for field, value in expected.items():
-        column = applied[field]
-        if value is None:
-            assert column.isna().all(), field
-        else:
-            assert (column == value).all(), f"{field}：期望 {value!r}，實得 {sorted(set(column.astype(str)))[:3]}"
+    for arm, rows in applied.groupby(applied["_arm"].astype(object).where(applied["_arm"].notna(), "<none>")):
+        for field, value in expected_settings(cell, arm).items():
+            column = rows[field]
+            if value is None:
+                assert column.isna().all(), (arm, field)
+            else:
+                assert (column == value).all(), f"{arm}.{field}：期望 {value!r}，實得 {sorted(set(column.astype(str)))[:3]}"
 
 
 def test_applied_quantile_columns_record_all_params(runs: ph.RunCache) -> None:
     table = _table(runs, "h1_stat_on")
-    _assert_applied_params(table[table["winsorization"] == "applied"], expected_settings("h1_stat_on"))
+    _assert_applied_params(table[table["winsorization"] == "applied"], "h1_stat_on")
 
 
 def test_applied_sigma_columns_record_all_params(runs: ph.RunCache) -> None:
     table = _table(runs, "h1_winsor_sigma")
-    _assert_applied_params(table[table["winsorization"] == "applied"], expected_settings("h1_winsor_sigma"))
+    applied = table[table["winsorization"] == "applied"]
+    assert set(applied["_arm"]) - set(FAST_ARMS), "前提：append 格須含 pandas 臂群組（float64 計算路徑須被覆蓋）"
+    _assert_applied_params(applied, "h1_winsor_sigma")
+
+
+def test_applied_sigma_fast_arm_records_float32(runs: ph.RunCache) -> None:
+    """審碼 r1：replace（生產預設）格之 sigma 走快速 numba 臂 ⇒ 該臂群組記 float32、其餘臂記 float64。"""
+    table = _table(runs, "h1_replace_winsor_sigma")
+    applied = table[table["winsorization"] == "applied"]
+    assert set(applied["_arm"]) & set(FAST_ARMS), "前提：replace 格須含快速臂群組（float32 計算路徑須被覆蓋）"
+    _assert_applied_params(applied, "h1_replace_winsor_sigma")
 
 
 def test_mutation_wrong_param_value_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,7 +118,8 @@ def test_mutation_wrong_param_value_rejected(monkeypatch: pytest.MonkeyPatch) ->
               (("winsor_sigma_k", 999.0), ("winsor_window", 1), ("winsor_min_periods", 1))),
              ("h1_stat_on", test_applied_quantile_columns_record_all_params, (("winsor_upper_q", 0.5),)))
     for cell, case, mutants in cases:
-        good = pd.DataFrame([{**expected_settings(cell), "winsorization": "applied"}])
+        good = pd.DataFrame([{**expected_settings(cell, arm), "winsorization": "applied", "_arm": arm}
+                             for arm in ("numba_fast", "pandas_legacy")])
         monkeypatch.setattr(module, "_table", lambda _runs, _cell, t=good: t)
         case(None)
         for field, bad in mutants:
@@ -112,7 +132,7 @@ def test_recorded_method_values_follow_contract(runs: ph.RunCache) -> None:
     contract = rp.load_contract()
     allowed = set(rp.contract_value_set(contract, "winsor_method_values")) | set(
         rp.contract_value_set(contract, "winsor_method_record_values"))
-    for cell in ("h1_stat_on", "h1_winsor_sigma", "h1_pp_off", "ratio_unsafe"):
+    for cell in ("h1_stat_on", "h1_winsor_sigma", "h1_replace_winsor_sigma", "h1_pp_off", "ratio_unsafe"):
         assert set(_table(runs, cell)["winsor_method"]) <= allowed, cell
 
 

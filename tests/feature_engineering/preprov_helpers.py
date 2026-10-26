@@ -253,6 +253,10 @@ VARIANTS: Dict[str, Dict[str, Any]] = {
                            "shard_bytes": 64 * 1024},
     # FFPROD Task 1.2：同 h1_stat_on 但縮尾 method＝sigma（逐欄紀錄之 sigma k 分支）
     "h1_winsor_sigma": {**CELLS["h1_stat_on"], "payload": _winsor_sigma(_stat(["1h"], fracdiff=True, adf=True))},
+    # FFPROD b2 審碼 r1：同 h1_replace_stat_on 但縮尾 method＝sigma——replace（生產預設）才走快速 numba 臂，覆蓋 sigma 於
+    # 快速臂以 float32 計算滾動統計量之紀錄（h1_winsor_sigma 為 append、全走 pandas 臂）
+    "h1_replace_winsor_sigma": {**CELLS["h1_replace_stat_on"],
+                                "payload": _winsor_sigma(_replace(_stat(["1h"], fracdiff=True, adf=True)))},
 }
 
 

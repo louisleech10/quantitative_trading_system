@@ -323,5 +323,3 @@ def test_cgsa_buffer_crash_loses_unflushed(tmp_path: Path) -> None:
     assert len(registry._memory_buffer) == 2
     assert not (registry.work_dir / "pending_a.npy").exists()
     assert not (registry.work_dir / "pending_b.npy").exists()
-
-
