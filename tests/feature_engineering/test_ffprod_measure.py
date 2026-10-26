@@ -570,7 +570,7 @@ def test_measured_without_ic_is_not_done_and_resume_only_runs_ic(tmp_path: Path)
 
     def ic(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any]) -> None:
         ic_calls.append(item["key"])
-        fm._item_node(receipt, cell_id, item)["ic"] = {"mode": "changed_columns"}
+        fm._item_node(receipt, cell_id, item)["ic"] = {"mode": "changed_columns", "ic_settings": fm.IC_MEASURE_SETTINGS}
 
     items = fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"])
     receipt_path = tmp_path / "r.json"
@@ -604,7 +604,7 @@ def test_ic_failure_persists_state_and_resume_retries_ic(tmp_path: Path) -> None
             node["ic"] = {"self_proof": {"passed": False}}
             node["status"] = "self_proof_failed"
             raise fm.SelfProofFailed("IC 自證失敗")
-        node["ic"] = {"mode": "changed_columns"}
+        node["ic"] = {"mode": "changed_columns", "ic_settings": fm.IC_MEASURE_SETTINGS}
 
     items = fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"])
     receipt_path = tmp_path / "r.json"
@@ -740,6 +740,47 @@ def test_ic_watched_separates_watchdog_timeout_from_hardware(
     assert summary["blocked_by"] == expected and set(summary["causes"]) == {"baseline_full"}
     mixed = fm.blocked_summary({"a": out, "b": {"status": "blocked", "blocked_by": "hardware"}})
     assert mixed["blocked_by"] == "+".join(sorted({expected, "hardware"}))
+
+
+def test_ic_override_turns_decay_off_and_self_proof_rejects_decay(tmp_path: Path) -> None:
+    """量測之 IC 一律關衰減（IC 頁預設請求深合併 IC_MEASURE_OVERRIDE；縮尾關者亦同）；報告帶 ic_decay ⇒ 自證拒收。"""
+    request = fm.ic_request("BTCUSDT", "1h", "h", ["x"])
+    for winsor_off in (False, True):
+        override = fm.ic_override(request, winsor_off)
+        assert override["report"]["include_decay_analysis"] is False
+        assert (override.get("preprocessing", {}).get("winsorization", {}).get("enabled") is False) == winsor_off
+    assert fm.assert_decay_off({"ic_decay": {}}, {}) == 0
+    assert fm.assert_decay_off({}, {}) == 0
+    with pytest.raises(RuntimeError):
+        fm.assert_decay_off({"ic_decay": {"x": {"half_life": None}}}, {})
+
+
+def test_ic_results_from_other_settings_are_recomputed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """收據中非現行設定（衰減開）所算之 IC 結果與改前全欄 IC 快取皆非完成：續跑只重算 IC、不重生成；無改值欄者不依設定。"""
+    item = next(i for i in fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"]) if i["kind"] == "option")
+    node = {"status": "measured", "ic": {"mode": "changed_columns", "sign_flips": 0}}
+    assert fm._needs_ic(node, item)
+    node["ic"]["ic_settings"] = fm.IC_MEASURE_SETTINGS
+    assert not fm._needs_ic(node, item)
+    assert not fm._needs_ic({"status": "measured", "ic": {"mode": "no_changed_columns"}}, item)
+    calls: List[Any] = []
+
+    def watched(run_dir: Path, symbol: str, tf: str, include: Any, winsor_off: bool, item_dir: Path) -> Dict[str, Any]:
+        calls.append(include)
+        return {"status": "blocked", "blocked_by": "watchdog_timeout", "reason": "牆鐘"}
+
+    monkeypatch.setattr(fm, "ic_watched", watched)
+    receipt = fm.new_receipt("A_BTCUSDT_1h", tmp_path)
+    receipt["baselines"]["A_BTCUSDT_1h"] = {"default": {"status": "frozen", "run_dir": str(tmp_path / "base")}}
+    receipt["ic"]["baselines"]["A_BTCUSDT_1h"] = {"default": {"status": "blocked", "blocked_by": "watchdog_timeout"}}
+    receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
+        "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"],
+        "ic": {"mode": "changed_columns", "sign_flips": 0}}
+    fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
+    assert None in calls  # 舊設定之改前全欄 IC 快取（無 ic_settings）被重算
+    rec = receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"]
+    assert rec["ic"]["ic_settings"] == fm.IC_MEASURE_SETTINGS
+    assert receipt["ic"]["baselines"]["A_BTCUSDT_1h"]["default"]["ic_settings"] == fm.IC_MEASURE_SETTINGS
 
 
 def test_receipt_spec_version_follows_spec_header(tmp_path: Path) -> None:

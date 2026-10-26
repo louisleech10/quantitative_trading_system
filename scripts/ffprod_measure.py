@@ -146,6 +146,13 @@ INTERACTIONS: Dict[str, Dict[str, Any]] = {
 #: IC 只算前處理縮尾關（`winsor_responsibility`）之覆寫（`momentum/Analysis/ic_config_schema.py` PreprocessingConfig）
 IC_WINSOR_OFF_OVERRIDE: Dict[str, Any] = {"preprocessing": {"winsorization": {"enabled": False}}}
 
+#: 量測之 IC 一律關 IC 衰減分析（SPEC v11 補③）：翻轉與第 5 階段選欄只用 ic_mean／icir／p_value／t_stat 等欄
+#: （`ic_filter_orchestrator._apply_thresholds`），衰減只入報告半衰期欄；全欄 209,053 欄時衰減逾監看上限（量測首跑實測
+#: 改前全欄 IC 於衰減段 70 分鐘未完）。等同 IC 頁「foundation」層之 ic_decay 關（`icAnalysisStore.ts` PRESET_TOGGLES）
+IC_MEASURE_OVERRIDE: Dict[str, Any] = {"report": {"include_decay_analysis": False}}
+#: IC 結果之設定標記：收據中 IC 結果之標記不等於此值者視為未完成（續跑以現行設定重算，全量測同一設定）
+IC_MEASURE_SETTINGS = "ic_decay_off"
+
 #: 生成與 IC 之選項收據必備欄（SPEC Task 2.1 驗證段）
 OPTION_REQUIRED_KEYS = ("option", "candidate", "cell", "baseline", "probe", "run_dir", "identity", "status",
                         "self_proof", "value_diff", "changed_columns", "fingerprints", "seconds", "peak_rss_bytes",
@@ -1656,12 +1663,12 @@ def ic_request(symbol: str, timeframe: str, config_hash: str, include: Optional[
 
 
 def ic_override(request: Any, winsor_off: bool) -> Optional[Dict[str, Any]]:
-    """IC 頁預設請求之 config_override（服務之 `_build_config_override`，不另寫參數）；`winsor_off` ⇒ 深合併
-    `IC_WINSOR_OFF_OVERRIDE`。"""
+    """IC 頁預設請求之 config_override（服務之 `_build_config_override`，不另寫參數）深合併 `IC_MEASURE_OVERRIDE`
+    （衰減分析關）；`winsor_off` ⇒ 再深合併 `IC_WINSOR_OFF_OVERRIDE`。"""
     from api.services.ic_analysis_service import ICAnalysisService
 
     svc = ICAnalysisService.__new__(ICAnalysisService)
-    override = svc._build_config_override(request)
+    override = svc._deep_merge(svc._build_config_override(request) or {}, IC_MEASURE_OVERRIDE)
     if winsor_off:
         override = svc._deep_merge(override or {}, IC_WINSOR_OFF_OVERRIDE)
     return override
@@ -1699,6 +1706,7 @@ def ic_in_process(run_dir: Path, symbol: str, timeframe: str, include: Optional[
                               config_override=override, progress_callback=progress,
                               kline_reader=create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR))
     rows = {str(r.get("feature_name")): {k: _jsonable(v) for k, v in r.items()} for r in report.get("summary_table") or []}
+    decay_rows = assert_decay_off(report, override)
     filter_log = report.get("filter_log") or {}
     stage1 = filter_log.get("stage1_preprocessing") or {}
     stage5 = filter_log.get("stage5_thresholds") or {}
@@ -1709,7 +1717,16 @@ def ic_in_process(run_dir: Path, symbol: str, timeframe: str, include: Optional[
             "stage5": {k: _jsonable(v) for k, v in stage5.items() if not isinstance(v, (list, dict))},
             # 報告 stage5 只帶通過數（`output_features.count`，ic_filter_orchestrator.py:2056-2067），不帶欄名清單
             "passed_count_from_report": _count(stage5.get("output_features")),
-            "report_keys": sorted(report)}
+            "ic_settings": IC_MEASURE_SETTINGS, "decay_rows": decay_rows, "report_keys": sorted(report)}
+
+
+def assert_decay_off(report: Mapping[str, Any], override: Any) -> int:
+    """自證 `IC_MEASURE_OVERRIDE` 確實關衰減：報告之 `ic_decay`（`ic_reporter.py` report 組裝，逐特徵）須為空，回 0；
+    否則 RuntimeError。摘要表 half_life 不作判據：衰減開時亦可為 None（IC 隨 horizon 無衰減形狀）。"""
+    decay = len(report.get("ic_decay") or {})
+    if decay:
+        raise RuntimeError(f"IC 衰減分析未關：報告 ic_decay 有 {decay} 個特徵（override={override}）")
+    return decay
 
 
 def _count(value: Any) -> Optional[int]:
@@ -1936,10 +1953,15 @@ def _generated(node: Optional[Mapping[str, Any]]) -> bool:
     return bool(node) and node.get("status") in ("measured", "blocked", "frozen", "unreachable_difference")
 
 
+def ic_current(ic: Any) -> bool:
+    """IC 結果已以現行量測設定（`IC_MEASURE_SETTINGS`）完成；無改值欄者不依設定（不跑 IC）。"""
+    return isinstance(ic, dict) and (ic.get("mode") == "no_changed_columns" or ic.get("ic_settings") == IC_MEASURE_SETTINGS)
+
+
 def _needs_ic(node: Optional[Mapping[str, Any]], item: Mapping[str, Any]) -> bool:
-    """已生成而尚缺 IC 結果（選項／交互之 measured 紀錄無 `ic`）。"""
+    """已生成而尚缺現行設定之 IC 結果（選項／交互之 measured 紀錄無 `ic`，或其 `ic` 非現行設定所算）。"""
     return item["kind"] in ("option", "interaction") and bool(node) and node.get("status") == "measured" \
-        and not isinstance(node.get("ic"), dict)
+        and not ic_current(node.get("ic"))
 
 
 def _item_done(receipt: Mapping[str, Any], cell_id: str, item: Mapping[str, Any], need_ic: bool = True) -> bool:
@@ -2164,7 +2186,8 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
     def base_ic(receipt: Dict[str, Any], cell_id: str, bid: str) -> Dict[str, Any]:
         node = receipt["ic"]["baselines"].setdefault(cell_id, {})
         cached = node.get(bid)
-        if cached and not force and (cached.get("status") == "blocked" or Path(cached.get("rows_path", "")).is_file()):
+        if cached and not force and cached.get("ic_settings") == IC_MEASURE_SETTINGS and \
+                (cached.get("status") == "blocked" or Path(cached.get("rows_path", "")).is_file()):
             return cached
         base = receipt["baselines"][cell_id][bid]
         cell = measure_cell(cell_id, bid)
@@ -2172,7 +2195,7 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
                          Path(work_root) / cell_id / f"ic__baseline__{bid}")
         if res.get("status") == "blocked":
             node[bid] = {"status": "blocked", "blocked_by": res.get("blocked_by"), "reason": res.get("reason"),
-                         "swap_growth_max_mb": res.get("swap_growth_max_mb"),
+                         "swap_growth_max_mb": res.get("swap_growth_max_mb"), "ic_settings": IC_MEASURE_SETTINGS,
                          "scope": "改前全欄 IC", "log": res.get("log"), "wall_seconds": res.get("wall_seconds")}
             return node[bid]
         rows_path = Path(work_root) / cell_id / f"ic__baseline__{bid}" / "rows.json"
@@ -2180,7 +2203,8 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
         rows_path.write_text(json.dumps(res["rows"], ensure_ascii=False), encoding="utf-8")
         tools = _selection_tools(res["override"])
         passed = select_features(res["rows"], tools)
-        node[bid] = {"status": "ok", "rows_path": str(rows_path), "rows_sha256": _sha256_file(rows_path),
+        node[bid] = {"status": "ok", "ic_settings": IC_MEASURE_SETTINGS,
+                     "rows_path": str(rows_path), "rows_sha256": _sha256_file(rows_path),
                      "features": len(res["rows"]),
                      "seconds": res["seconds"], "peak_rss_bytes": res["peak_rss_bytes"], "override": res["override"],
                      "config_sha256": res["config_sha256"], "ic_config_files": res.get("ic_config_files"),
@@ -2196,8 +2220,12 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
     def step(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any]) -> None:
         rec = _item_node(receipt, cell_id, item)
         assert rec is not None
-        if rec.get("ic") and not force:
+        if ic_current(rec.get("ic")) and not force:
             return
+        compute(receipt, cell_id, item, rec)
+        rec["ic"]["ic_settings"] = IC_MEASURE_SETTINGS  # 正常完成才標記（自證失敗之 raise 不標 ⇒ 續跑重算）
+
+    def compute(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any], rec: Dict[str, Any]) -> None:
         cell = measure_cell(cell_id, item["baseline"])
         symbol, tf = str(cell["symbol"]), str(cell["timeframes"][0])
         idir = Path(work_root) / cell_id / f"ic__{item['key']}"
