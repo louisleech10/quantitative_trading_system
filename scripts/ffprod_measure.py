@@ -59,6 +59,8 @@ DSTAR_NO_EFFECTIVE = "dstar：無校準序列長於 N 之檢定（取樣方向�
 PROBES_ENV = "FFPROD_MEASURE_PROBES"
 SCRIPT_ENV = "FFPROD_MEASURE_SCRIPT"
 BLOCKED_BY_HARDWARE = "hardware"
+#: 卡死監看終止（log 靜默＝無 CPU 進度心跳、或牆鐘上限）：非記憶體證據，與硬體區分（SPEC v10 補③）
+BLOCKED_BY_WATCHDOG = "watchdog_timeout"
 #: 自證紀錄之樣本上限（每行程；違規另計總數）
 SAMPLE_CAP = 20
 #: 逐欄指紋外置門檻（改值欄數；見 `_externalize_fingerprints`）
@@ -304,6 +306,15 @@ def freeze_seconds(cell_id: str) -> Optional[float]:
     return float(seconds) if isinstance(seconds, (int, float)) else None
 
 
+def expected_seconds(cell: Mapping[str, Any]) -> Optional[float]:
+    """該生成格之預期秒數（監看牆鐘上限之基準、plan 之估時）：取其所屬凍結格（`base_cell`）之實測秒數，且只在其預處理
+    設定與該凍結格相同時；設定變體（sigma、平穩化開）無實測 ⇒ None（監看改用判準之 wall_ceiling_seconds），不以他設定或他格代替。"""
+    base = str(cell.get("base_cell") or cell["id"])
+    if cell_preprocessing(cell) != cell_preprocessing(measure_cell(base, "default")):
+        return None
+    return freeze_seconds(base)
+
+
 def plan_items(cell_id: str, candidates: Optional[Sequence[str]] = None) -> List[Dict[str, Any]]:
     """將執行之項目（依序：改前基準、各候選各選項、交互）。每項 {kind, key, candidate, option, baseline, probes, ic_only,
     generation}；只列 `candidates` 所需之基準與交互（交互之成員皆在 `candidates` 時才列）。"""
@@ -344,7 +355,6 @@ def plan(cell_id: str, candidates: Optional[Sequence[str]] = None,
          receipt: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     """計畫：逐項之估時（凍結收據該格秒數；IC 秒數未量者記 None，不估）、完成狀態（讀既有收據）與前提衝突。"""
     per_gen = freeze_seconds(cell_id)
-    frozen_pre = cell_preprocessing(measure_cell(cell_id, "default"))
     rows = []
     for item in plan_items(cell_id, candidates):
         done = _item_done(receipt or {}, cell_id, item)
@@ -353,14 +363,15 @@ def plan(cell_id: str, candidates: Optional[Sequence[str]] = None,
         row = {**{k: item[k] for k in ("kind", "key", "baseline", "probes", "ic_only", "generation")},
                "status": "done" if done else "pending", "conflicts": conflicts}
         if item["generation"]:
-            same = cell_preprocessing(measure_cell(cell_id, item["baseline"])) == frozen_pre
-            # 凍結收據只有凍結設定之實測秒數；設定變體（sigma、平穩化開）之秒數未量 ⇒ None（不以凍結設定代替）
-            row["estimated_generation_seconds"] = per_gen if same else None
-            row["estimate_basis"] = "凍結格同設定" if same else "設定變體：凍結收據無同設定實測，未估"
+            # 與 run 之監看預期秒數同一規則（`expected_seconds`）；設定變體無實測 ⇒ None
+            est = expected_seconds(measure_cell(cell_id, item["baseline"]))
+            row["estimated_generation_seconds"] = est
+            row["estimate_basis"] = "凍結格同設定" if est is not None else "設定變體：凍結收據無同設定實測，未估"
         else:
             row["estimated_generation_seconds"] = 0.0
         if item["kind"] == "unreachable":
-            row.update(probe_cell=item["probe_cell"], probe_estimated_seconds=freeze_seconds(item["probe_cell"]),
+            row.update(probe_cell=item["probe_cell"],
+                       probe_estimated_seconds=expected_seconds(measure_cell(item["probe_cell"], item["baseline"])),
                        note="差異不可達（SPEC v9 補②）：不於本格生成；探針收據於 probe_cell 生成一次")
         rows.append(row)
     pending = [r for r in rows if r["status"] == "pending" and r["generation"]]
@@ -1294,20 +1305,24 @@ HEARTBEAT_MIN_CPU_FRACTION = 0.25
 
 
 def tree_cpu_seconds() -> float:
-    """本行程＋存活子孫＋已回收子行程之 CPU 秒數（user＋system）。"""
-    import psutil
+    """本行程＋存活子孫＋已回收子行程之 CPU 秒數（user＋system）。子孫不可列舉（沙箱／權限，psutil 列 pid 失敗）⇒ 保守降級為
+    本行程＋已回收子行程（標準庫 `resource`，不依 psutil）——平行 worker 之 CPU 不計入，不會多算。"""
+    own = resource.getrusage(resource.RUSAGE_SELF)
+    reaped = resource.getrusage(resource.RUSAGE_CHILDREN)
+    total = own.ru_utime + own.ru_stime + reaped.ru_utime + reaped.ru_stime
+    try:
+        import psutil
 
-    proc = psutil.Process()
-    times = proc.cpu_times()
-    total = times.user + times.system
-    for child in proc.children(recursive=True):
+        children = psutil.Process().children(recursive=True)
+    except Exception:  # noqa: BLE001 — psutil.Error／PermissionError（macOS sysctl KERN_PROC_ALL）
+        return total
+    for child in children:
         try:
             ct = child.cpu_times()
             total += ct.user + ct.system
-        except psutil.Error:
+        except Exception:  # noqa: BLE001 — 子行程於列舉後結束或不可讀
             pass
-    reaped = resource.getrusage(resource.RUSAGE_CHILDREN)
-    return total + reaped.ru_utime + reaped.ru_stime
+    return total
 
 
 def heartbeat_line(prev_cpu: float, cpu: float, elapsed: float) -> Optional[str]:
@@ -1324,17 +1339,21 @@ def cpu_heartbeat(interval: float = HEARTBEAT_SECONDS,
     stop = threading.Event()
 
     def beat() -> None:
-        prev, last = read_cpu(), time.monotonic()
-        while not stop.wait(interval):
+        prev: Optional[float] = None
+        last = time.monotonic()
+        while True:
             try:
-                cpu = read_cpu()
-            except Exception:  # noqa: BLE001 — 讀不到 CPU ⇒ 不寫心跳（保守：交由 log 靜默條件判）
-                continue
+                cpu: Optional[float] = read_cpu()
+            except Exception:  # noqa: BLE001 — 讀不到 CPU ⇒ 本窗不寫心跳（保守：交由 log 靜默條件判），執行緒不退出
+                cpu = None
             now = time.monotonic()
-            line = heartbeat_line(prev, cpu, now - last)
-            if line is not None:
-                print(line, file=sys.stderr, flush=True)
+            if cpu is not None and prev is not None:
+                line = heartbeat_line(prev, cpu, now - last)
+                if line is not None:
+                    print(line, file=sys.stderr, flush=True)
             prev, last = cpu, now  # 逐窗判定（不跨窗累積），閒置之微量 CPU 不會攢成心跳
+            if stop.wait(interval):
+                return
 
     thread = threading.Thread(target=beat, daemon=True)
     thread.start()
@@ -1743,8 +1762,8 @@ def ic_watched(run_dir: Path, symbol: str, timeframe: str, include: Optional[Seq
                              log_path=item_dir / "ic_child.log", config=wd.load_config(fb._criteria()),
                              cwd=str(item_dir), env=env)
     log = str(item_dir / "ic_child.log")
-    if watched.status == wd.STALLED:  # SPEC v9 補③：卡死監看終止 ⇒ blocked_by hardware（RM-FULLSCALE）
-        return {"status": "blocked", "blocked_by": BLOCKED_BY_HARDWARE, "reason": f"卡死監看終止：{watched.reason}",
+    if watched.status == wd.STALLED:  # SPEC v10 補③：卡死監看終止 ⇒ watchdog_timeout（只記憶體證據才記 hardware）
+        return {"status": "blocked", "blocked_by": BLOCKED_BY_WATCHDOG, "reason": f"卡死監看終止：{watched.reason}",
                 "wall_seconds": watched.wall_seconds, "swap_growth_max_mb": watched.swap_growth_max_mb, "log": log}
     if not out_path.is_file():  # 子行程被訊號終止（例 OOM kill）而未寫結果
         if watched.returncode is not None and watched.returncode < 0:
@@ -2118,11 +2137,23 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
     return rc
 
 
+def blocked_summary(sources: Mapping[str, Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+    """多份 IC 來源中受阻者之摘要：`blocked_by`＝受阻原因類別（hardware／watchdog_timeout；多類以「+」依字母序連）、
+    `reason`／`causes`＝逐來源之理由與類別；全部可得 ⇒ None。"""
+    hit = {k: v for k, v in sources.items() if v.get("status") == "blocked"}
+    if not hit:
+        return None
+    causes = {k: v.get("blocked_by") or BLOCKED_BY_HARDWARE for k, v in hit.items()}
+    return {"blocked_by": "+".join(sorted(set(causes.values()))), "reason": {k: v.get("reason") for k, v in hit.items()},
+            "causes": causes}
+
+
 def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, Any], str, Mapping[str, Any]], None]:
     """IC 步（SPEC v9 補③）：
     - 正負號翻轉：改前 run 與選項 run 各只算改值欄（產品 IC 縱向路徑、IC 頁預設請求），比 ic_mean 正負號。
     - 選欄進出：第 5 階段門檻由「改前全欄 IC（每個改前基準試跑一次，快取於收據 `ic.baselines`）中替換改值欄之列」重算 FDR
-      與門檻導出；改前全欄 IC 逾 8 GB 或卡死監看終止 ⇒ 記 `blocked_by: hardware`（不以較小規模代替）。另以改前 run 只算
+      與門檻導出；改前全欄 IC 逾 8 GB（記憶體守護、訊號終止）⇒ 記 `blocked_by: hardware`，卡死監看終止 ⇒
+      `blocked_by: watchdog_timeout`（SPEC v10 補③；皆不以較小規模代替）。另以改前 run 只算
       改值欄之列對照全欄列（替換前提）。第 6 階段不導出（收據註明）。
     - `ic_winsor_off`：改前 run 全欄、IC 前處理縮尾關重算；全欄 IC 任一側受阻 ⇒ 翻轉與選欄皆記 blocked。"""
 
@@ -2136,7 +2167,8 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
         res = ic_watched(Path(base["run_dir"]), str(cell["symbol"]), str(cell["timeframes"][0]), None, False,
                          Path(work_root) / cell_id / f"ic__baseline__{bid}")
         if res.get("status") == "blocked":
-            node[bid] = {"status": "blocked", "blocked_by": BLOCKED_BY_HARDWARE, "reason": res.get("reason"),
+            node[bid] = {"status": "blocked", "blocked_by": res.get("blocked_by"), "reason": res.get("reason"),
+                         "swap_growth_max_mb": res.get("swap_growth_max_mb"),
                          "scope": "改前全欄 IC", "log": res.get("log"), "wall_seconds": res.get("wall_seconds")}
             return node[bid]
         rows_path = Path(work_root) / cell_id / f"ic__baseline__{bid}" / "rows.json"
@@ -2169,9 +2201,8 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
         if item.get("ic_only"):
             bnode = base_ic(receipt, cell_id, item["baseline"])
             res = ic_watched(Path(rec["run_dir"]), symbol, tf, None, True, idir)
-            if bnode.get("status") == "blocked" or res.get("status") == "blocked":
-                blocked = {"blocked_by": BLOCKED_BY_HARDWARE,
-                           "reason": {"baseline_full": bnode.get("reason"), "winsor_off_full": res.get("reason")}}
+            blocked = blocked_summary({"baseline_full": bnode, "winsor_off_full": res})
+            if blocked:
                 rec["ic"] = {"mode": "full_rerun_winsor_off", "sign_flips": blocked, "selection": blocked,
                              "stage6_redundancy": STAGE6_NOTE}
                 return
@@ -2207,18 +2238,16 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
         out: Dict[str, Any] = {"mode": "changed_columns", "seconds": res.get("seconds"),
                                "baseline_changed_seconds": base_sub.get("seconds"), "peak_rss_bytes": res.get("peak_rss_bytes"),
                                "stage6_redundancy": STAGE6_NOTE}
-        if res.get("status") == "blocked" or base_sub.get("status") == "blocked":
-            out["sign_flips"] = {"blocked_by": BLOCKED_BY_HARDWARE,
-                                 "reason": {"option_changed": res.get("reason"), "baseline_changed": base_sub.get("reason")}}
+        flips_blocked = blocked_summary({"option_changed": res, "baseline_changed": base_sub})
+        if flips_blocked:
+            out["sign_flips"] = flips_blocked
         else:
             out.update(sign_flips(base_sub["rows"], res["rows"], changed))
         bnode = base_ic(receipt, cell_id, item["baseline"])
         # 選欄由替換推導，須三份皆可得：改前全欄、選項改值欄、改前改值欄（後者用以驗替換前提）
-        sources = {"baseline_full": bnode, "option_changed": res, "baseline_changed": base_sub}
-        blocked = {k: v.get("reason") for k, v in sources.items() if v.get("status") == "blocked"}
+        blocked = blocked_summary({"baseline_full": bnode, "option_changed": res, "baseline_changed": base_sub})
         if blocked:
-            out["selection"] = {"blocked_by": BLOCKED_BY_HARDWARE, "reason": blocked,
-                                "scope": "改前全欄 IC 試跑一次（SPEC v9 補③）"}
+            out["selection"] = {**blocked, "scope": "改前全欄 IC 試跑一次（SPEC v10 補③）"}
         else:
             base_rows = json.loads(Path(bnode["rows_path"]).read_text(encoding="utf-8"))
             keys = ("ic_mean", "icir", "p_value", "t_stat")
@@ -2241,14 +2270,9 @@ def run(args: argparse.Namespace) -> int:
     receipt_path = Path(args.receipt) if args.receipt else default_receipt_path()
     work_root = Path(args.work_root)
     items = plan_items(cell_id, args.candidates)
-    per_gen = freeze_seconds(cell_id)
-    frozen_pre = cell_preprocessing(measure_cell(cell_id, "default"))
 
     def generate(item: Mapping[str, Any], cell: Mapping[str, Any], item_dir: Path) -> Dict[str, Any]:
-        # 預期秒數只用凍結格同設定之實測；設定變體（sigma、平穩化開）無實測 ⇒ None（監看用判準之 wall_ceiling_seconds），
-        # 不以凍結設定之秒數代替（與 plan 之估時同一規則）
-        same = cell_preprocessing(cell) == frozen_pre
-        return generate_watched(cell, item["probes"], item_dir, per_gen if same else None)
+        return generate_watched(cell, item["probes"], item_dir, expected_seconds(cell))
 
     def diff(base: Mapping[str, Any], gen: Mapping[str, Any]) -> Dict[str, Any]:
         return run_value_diff(Path(base["run_dir"]), Path(gen["run_dir"]), base["fingerprints"], gen["fingerprints"])

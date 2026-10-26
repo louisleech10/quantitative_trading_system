@@ -654,6 +654,8 @@ def test_run_passes_expected_seconds_only_for_frozen_preprocessing(
                      ic: Any = None) -> int:
         for bid in ("default", "sigma", "stat"):
             generate({"probes": {}}, fm.measure_cell(cell_id, bid), tmp_path / bid)
+        unreachable = next(i for i in fm.plan_items(cell_id, ["dstar_adf_sample_direction"]))
+        generate(unreachable, fm.measure_cell(unreachable["probe_cell"], unreachable["baseline"]), tmp_path / "probe")
         return 0
 
     monkeypatch.setattr(fm, "execute", fake_execute)
@@ -666,6 +668,63 @@ def test_run_passes_expected_seconds_only_for_frozen_preprocessing(
     assert fm.run(args) == 0
     assert seen["default"] == fm.freeze_seconds(fm.DEFAULT_CELL) and seen["default"]
     assert seen["sigma"] is None and seen["stat"] is None
+    # 不可達探針於 A 格生成 ⇒ 取 A 格自身之凍結秒數（非主格 C）
+    assert seen["probe"] == fm.freeze_seconds("A_BTCUSDT_1h") != fm.freeze_seconds(fm.DEFAULT_CELL)
+    plan = fm.plan(fm.DEFAULT_CELL, ["dstar_adf_sample_direction"])
+    assert plan["items"][0]["probe_estimated_seconds"] == fm.freeze_seconds("A_BTCUSDT_1h")
+
+
+def test_tree_cpu_seconds_degrades_when_children_unlistable(monkeypatch: pytest.MonkeyPatch,
+                                                           capsys: pytest.CaptureFixture[str]) -> None:
+    """子孫不可列舉（沙箱 PermissionError）⇒ 降級為本行程＋已回收子行程，仍隨計算前進；心跳執行緒遇讀取失敗不退出。"""
+    import psutil
+    import time as _time
+
+    def deny(self: Any, recursive: bool = False) -> Any:
+        raise PermissionError(1, "Operation not permitted (originated from sysctl(KERN_PROC_ALL))")
+
+    monkeypatch.setattr(psutil.Process, "children", deny)
+    before = fm.tree_cpu_seconds()
+    end = _time.perf_counter() + 0.3
+    while _time.perf_counter() < end:
+        pass
+    assert fm.tree_cpu_seconds() - before >= 0.2
+    t0 = _time.monotonic()
+    calls = {"n": 0}
+
+    def flaky() -> float:
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise PermissionError("denied")
+        return (_time.monotonic() - t0) * 2.0
+
+    with fm.cpu_heartbeat(interval=0.05, read_cpu=flaky):
+        _time.sleep(0.5)
+    assert "[ffprod-heartbeat]" in capsys.readouterr().err and calls["n"] > 3
+
+
+@pytest.mark.parametrize("watched,expected", [
+    ({"status": "stalled", "reason": "牆鐘 5400 秒逾上限 5400 秒", "returncode": -15}, "watchdog_timeout"),
+    ({"status": "stalled", "reason": "log 檔 600 秒未增長（門檻 600 秒）", "returncode": -15}, "watchdog_timeout"),
+    ({"status": "exited", "reason": None, "returncode": -9}, "hardware"),
+])
+def test_ic_watched_separates_watchdog_timeout_from_hardware(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, watched: Dict[str, Any], expected: str) -> None:
+    """IC 監看：卡死監看終止（log 靜默、牆鐘）⇒ watchdog_timeout；訊號終止未寫結果（OOM kill）⇒ hardware。"""
+    import types
+
+    result = types.SimpleNamespace(status=watched["status"], reason=watched["reason"], returncode=watched["returncode"],
+                                   wall_seconds=1.0, swap_growth_max_mb=0.0)
+    wd = types.SimpleNamespace(STALLED="stalled", run_watched=lambda *a, **k: result, load_config=lambda c: None)
+    real = fm._fb()
+    fake = types.SimpleNamespace(_watchdog=lambda: wd, _criteria=lambda: {}, _write_atomic=real._write_atomic)
+    monkeypatch.setattr(fm, "_fb", lambda: fake)
+    out = fm.ic_watched(tmp_path / "run", "BTCUSDT", "1h", None, False, tmp_path / "ic")
+    assert out["status"] == "blocked" and out["blocked_by"] == expected
+    summary = fm.blocked_summary({"baseline_full": out, "option_changed": {"status": "ok"}})
+    assert summary["blocked_by"] == expected and set(summary["causes"]) == {"baseline_full"}
+    mixed = fm.blocked_summary({"a": out, "b": {"status": "blocked", "blocked_by": "hardware"}})
+    assert mixed["blocked_by"] == "+".join(sorted({expected, "hardware"}))
 
 
 def test_receipt_spec_version_follows_spec_header(tmp_path: Path) -> None:
