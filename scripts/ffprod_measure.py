@@ -51,6 +51,9 @@ L2_MATRIX_PROBE = RECEIPTS_DIR / "numview_probes" / "l2_arm_matrix.py"
 DEFAULT_CELL = "C_BTCUSDT_1h"
 DEFAULT_WORK_ROOT = Path(os.environ.get("TMPDIR", "/tmp")) / "ffprod-measure"
 SCHEMA_VERSION = 1
+SPEC_PATH = REPO / "docs" / "FFPROD_SPEC.md"
+#: d* 探針唯一可豁免之自證失敗（差異不可達之觀測本身）；其餘失敗或違規皆不得記 unreachable_difference
+DSTAR_NO_EFFECTIVE = "dstar：無校準序列長於 N 之檢定（取樣方向無從生效）"
 
 #: 子行程探針之環境鍵（`FFPROD_` 不屬凍結腳本之清除類前綴，生成隔離不清之）
 PROBES_ENV = "FFPROD_MEASURE_PROBES"
@@ -1201,7 +1204,7 @@ def verify_proof(probes: Mapping[str, str], proofs: Sequence[Mapping[str, Any]],
             if serial + parallel < 1:
                 failures.append("dstar：ADF 檢定未被呼叫（fracdiff／ADF 關？）")
             elif effective < 1:
-                failures.append("dstar：無校準序列長於 N 之檢定（取樣方向無從生效）")
+                failures.append(DSTAR_NO_EFFECTIVE)
             if par_items > 0 and parallel < 1:
                 failures.append(f"dstar：平行派工 {par_items} 項而 worker 無探針紀錄")
         elif name == "layer_dtype":
@@ -1781,11 +1784,20 @@ def default_receipt_path() -> Path:
     return hits[0] if hits else RECEIPTS_DIR / f"{datetime.now().strftime('%Y%m%d')}-ffprod-candidates.json"
 
 
+def spec_version(path: Path = SPEC_PATH) -> str:
+    """SPEC 檔頭現行版本（`> 版本：v<N>`）；收據據此記錄，不寫死字面（版本前進時不漂）。"""
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith("> 版本：v"):
+                return "v" + line[len("> 版本：v"):].split("（", 1)[0].strip()
+    raise RuntimeError(f"{path}：檔頭無「> 版本：v」行")
+
+
 def new_receipt(cell_id: str, work_root: Path) -> Dict[str, Any]:
     assert_candidate_set()
     inv = _single(INVENTORY_GLOB)
     return {"schema_version": SCHEMA_VERSION, "ticket": "FFPROD", "task": "Task 2.1 改值候選量測",
-            "spec": "docs/FFPROD_SPEC.md v8 Task 2.1", "design": "handoffs/20261026-FFPROD-B3-MEASURE-PLAN.md",
+            "spec": f"docs/FFPROD_SPEC.md {spec_version()} Task 2.1", "spec_sha256": _sha256_file(SPEC_PATH), "design": "handoffs/20261026-FFPROD-B3-MEASURE-PLAN.md",
             "script": "scripts/ffprod_measure.py", "script_sha256": _sha256_file(Path(__file__)),
             "inventory": {"path": str(inv.relative_to(REPO)), "sha256": _sha256_file(inv),
                           "measure_candidates": inventory_measure_ids(inv)},
@@ -1915,7 +1927,17 @@ def _record_unreachable(receipt: Dict[str, Any], item: Mapping[str, Any], work_r
                      "L_gt_N_tests": info.get("effective_calls"),
                      "self_proof_failures": (gen.get("proof") or {}).get("failures"), "error": gen.get("error")}
     node = receipt["candidates"][cid]
-    reachable = gen.get("status") != "ok" or not probe_receipt["tests"] or (probe_receipt["L_gt_N_tests"] or 0) > 0
+    proof = gen.get("proof") or {}
+    # 自證完整性：只豁免「無 L＞N 檢定」本身；探針安裝錯、worker 缺紀錄、取樣違規等一律不得記不可達
+    unexpected = [f for f in (proof.get("failures") or []) if f != DSTAR_NO_EFFECTIVE]
+    probe_receipt["violation_count"] = int(proof.get("violation_count") or 0)
+    if gen.get("status") != "ok" or unexpected or probe_receipt["violation_count"] or not probe_receipt["tests"]:
+        node.update(status="probe_invalid", evidence=list(spec["evidence"]), probe_receipt=probe_receipt,
+                    unexpected_failures=unexpected)
+        print(f"[ffprod-measure] {cid}：probe_invalid（{gen.get('status')}；{unexpected}；"
+              f"違規 {probe_receipt['violation_count']} 次）", flush=True)
+        return 3
+    reachable = (probe_receipt["L_gt_N_tests"] or 0) > 0
     node.update(status="reachable_measure_required" if reachable else "unreachable_difference",
                 evidence=list(spec["evidence"]), probe_receipt=probe_receipt)
     print(f"[ffprod-measure] {cid}：{node['status']}（檢定 {probe_receipt['tests']} 次、L 最大 {probe_receipt['max_L']}、"
@@ -2103,19 +2125,24 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
         else:
             out.update(sign_flips(base_sub["rows"], res["rows"], changed))
         bnode = base_ic(receipt, cell_id, item["baseline"])
-        if bnode.get("status") == "blocked" or res.get("status") == "blocked":
-            out["selection"] = {"blocked_by": BLOCKED_BY_HARDWARE, "reason": bnode.get("reason") or res.get("reason"),
+        # 選欄由替換推導，須三份皆可得：改前全欄、選項改值欄、改前改值欄（後者用以驗替換前提）
+        sources = {"baseline_full": bnode, "option_changed": res, "baseline_changed": base_sub}
+        blocked = {k: v.get("reason") for k, v in sources.items() if v.get("status") == "blocked"}
+        if blocked:
+            out["selection"] = {"blocked_by": BLOCKED_BY_HARDWARE, "reason": blocked,
                                 "scope": "改前全欄 IC 試跑一次（SPEC v9 補③）"}
         else:
             base_rows = json.loads(Path(bnode["rows_path"]).read_text(encoding="utf-8"))
             keys = ("ic_mean", "icir", "p_value", "t_stat")
-            mismatch = [] if base_sub.get("status") == "blocked" else \
-                [f for f in changed if f in base_rows and (base_sub["rows"].get(f) is None or
-                 any(base_sub["rows"][f].get(k) != base_rows[f].get(k) for k in keys))]
-            out["substitution_premise"] = {"checked_columns": 0 if base_sub.get("status") == "blocked" else len(changed),
-                                           "mismatched": len(mismatch), "examples": mismatch[:10], "keys": list(keys),
-                                           "holds": base_sub.get("status") != "blocked" and not mismatch}
-            out["selection"] = selection_effect(base_rows, res["rows"], changed, _selection_tools(bnode["override"]))
+            mismatch = [f for f in changed if f in base_rows and (base_sub["rows"].get(f) is None or
+                        any(base_sub["rows"][f].get(k) != base_rows[f].get(k) for k in keys))]
+            out["substitution_premise"] = {"checked_columns": len(changed), "mismatched": len(mismatch),
+                                           "examples": mismatch[:10], "keys": list(keys), "holds": not mismatch}
+            if mismatch:  # 前提不成立 ⇒ 替換不等價於全量重算，不輸出選欄數字
+                out["selection"] = {"not_derived": "替換前提不成立（改前改值欄子集 IC ≠ 改前全欄 IC）",
+                                    "mismatched": len(mismatch)}
+            else:
+                out["selection"] = selection_effect(base_rows, res["rows"], changed, _selection_tools(bnode["override"]))
         rec["ic"] = out
 
     return step

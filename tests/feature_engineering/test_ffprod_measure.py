@@ -12,7 +12,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Sequence
 
 import numpy as np
 import pytest
@@ -480,8 +480,10 @@ def test_execute_records_hardware_block_without_perf_numbers(tmp_path: Path) -> 
     assert rec["value_diff"] is None and rec["value_diff_unavailable"]
 
 
-def _dstar_gen(tests: int, effective: int) -> Dict[str, Any]:
-    gen = _fake_gen(passed=effective > 0)
+def _dstar_gen(tests: int, effective: int, extra_failures: Sequence[str] = (), violations: int = 0) -> Dict[str, Any]:
+    gen = _fake_gen(passed=effective > 0 and not extra_failures and not violations)
+    gen["proof"]["failures"] = ([] if effective > 0 else [fm.DSTAR_NO_EFFECTIVE]) + list(extra_failures)
+    gen["proof"]["violation_count"] = violations
     gen["proof"]["per_probe"] = {"dstar": {"serial_calls": tests, "parallel_calls": 0, "effective_calls": effective,
                                            "max_L": 1000 + effective, "N_values": [1000]}}
     return gen
@@ -520,6 +522,36 @@ def test_unreachable_candidate_flags_reachable_when_probe_sees_l_gt_n(tmp_path: 
     assert rc == 3
     node = json.loads(receipt_path.read_text(encoding="utf-8"))["candidates"]["dstar_adf_sample_direction"]
     assert node["status"] == "reachable_measure_required" and node["probe_receipt"]["L_gt_N_tests"] == 3
+
+
+@pytest.mark.parametrize("extra,violations", [(["mutation"], 0), ([], 1),
+                                              (["dstar：平行派工 4 項而 worker 無探針紀錄"], 0)])
+def test_unreachable_candidate_rejects_broken_probe(tmp_path: Path, extra: List[str], violations: int) -> None:
+    """自證完整性：只豁免「無 L＞N 檢定」本身；其他自證失敗或取樣違規 ⇒ probe_invalid、rc 3，不記不可達、續跑重做。"""
+    items = fm.plan_items(fm.DEFAULT_CELL, ["dstar_adf_sample_direction"])
+    receipt_path = tmp_path / "r.json"
+    gen = lambda i, c, d: _dstar_gen(382, 0, extra, violations)  # noqa: E731
+    assert fm.execute(fm.DEFAULT_CELL, items, receipt_path, tmp_path, generate=gen, diff=_diff) == 3
+    node = json.loads(receipt_path.read_text(encoding="utf-8"))["candidates"]["dstar_adf_sample_direction"]
+    assert node["status"] == "probe_invalid" and node["unexpected_failures"] == extra
+    assert node["probe_receipt"]["violation_count"] == violations
+    seen: List[str] = []
+    assert fm.execute(fm.DEFAULT_CELL, items, receipt_path, tmp_path,
+                      generate=lambda i, c, d: (seen.append(c["id"]), _dstar_gen(382, 0))[1], diff=_diff) == 0
+    assert seen == ["A_BTCUSDT_1h__default"]
+
+
+def test_receipt_spec_version_follows_spec_header(tmp_path: Path) -> None:
+    """收據之 spec 欄取 SPEC 檔頭現行版本（不寫死字面）並附 SPEC 雜湊。"""
+    spec = tmp_path / "S.md"
+    spec.write_text("# T\n\n> 版本：v12（2026-10-27；說明）；v11（舊）\n", encoding="utf-8")
+    assert fm.spec_version(spec) == "v12"
+    header = fm.SPEC_PATH.read_text(encoding="utf-8").splitlines()[2]
+    assert fm.new_receipt(fm.DEFAULT_CELL, tmp_path)["spec"] == \
+        f"docs/FFPROD_SPEC.md {header.split('版本：', 1)[1].split('（', 1)[0]} Task 2.1"
+    spec.write_text("# T\n", encoding="utf-8")
+    with pytest.raises(RuntimeError):
+        fm.spec_version(spec)
 
 
 def test_ic_step_sign_flips_on_changed_columns_and_selection_blocked_by_hardware(
@@ -563,6 +595,45 @@ def test_ic_step_sign_flips_on_changed_columns_and_selection_blocked_by_hardware
         else:
             assert ic["substitution_premise"]["holds"] is True
             assert ic["selection"]["selection_out"] == 1 and ic["selection"]["passed_before"] == 2
+
+
+@pytest.mark.parametrize("mode", ["baseline_changed_blocked", "premise_mismatch"])
+def test_ic_step_selection_requires_substitution_premise(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> None:
+    """選欄由替換推導，須改前改值欄子集可得且與改前全欄 IC 相同：子集受阻 ⇒ selection 記 blocked_by hardware；
+    子集與全欄不符 ⇒ 前提不成立、不輸出選欄數字。"""
+    def row(ic: float) -> Dict[str, Any]:
+        return {"ic_mean": ic, "icir": 1.0, "p_value": 0.01, "t_stat": 2.0}
+
+    def watched(run_dir: Path, symbol: str, tf: str, include: Any, winsor_off: bool, item_dir: Path) -> Dict[str, Any]:
+        if include is None:
+            return {"status": "ok", "rows": {"x": {**row(0.05), "feature_name": "x"},
+                                             "y": {**row(0.03), "feature_name": "y"}},
+                    "override": None, "seconds": 1.0, "peak_rss_bytes": 1, "config_sha256": "c",
+                    "stage1_winsorized_count": 2, "passed_count_from_report": 2, "stage5": {}}
+        if str(run_dir).endswith("opt"):
+            return {"status": "ok", "rows": {"x": {**row(-0.01), "feature_name": "x"}}, "seconds": 1.0, "peak_rss_bytes": 1}
+        if mode == "baseline_changed_blocked":
+            return {"status": "blocked", "blocked_by": "hardware", "reason": "卡死監看終止"}
+        return {"status": "ok", "rows": {"x": {**row(0.04), "feature_name": "x"}}, "seconds": 1.0, "peak_rss_bytes": 1}
+
+    monkeypatch.setattr(fm, "_selection_tools", lambda override: _tools())
+    monkeypatch.setattr(fm, "ic_watched", watched)
+    receipt = fm.new_receipt("A_BTCUSDT_1h", tmp_path)
+    receipt["baselines"]["A_BTCUSDT_1h"] = {"default": {"status": "frozen", "run_dir": str(tmp_path / "base")}}
+    item = next(i for i in fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"]) if i["kind"] == "option")
+    receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
+        "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"]}
+    fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
+    ic = receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"]["ic"]
+    assert "selection_out" not in ic["selection"] and "selection_in" not in ic["selection"]
+    if mode == "baseline_changed_blocked":
+        assert ic["selection"]["blocked_by"] == "hardware"
+        assert set(ic["selection"]["reason"]) == {"baseline_changed"}
+    else:
+        assert ic["substitution_premise"] == {**ic["substitution_premise"], "holds": False, "mismatched": 1,
+                                              "checked_columns": 1}
+        assert ic["selection"]["mismatched"] == 1 and "not_derived" in ic["selection"]
 
 
 def test_large_fingerprint_sets_go_to_sidecar_with_hash(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
