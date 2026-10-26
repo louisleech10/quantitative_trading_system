@@ -3712,19 +3712,60 @@ def test_watchdog_thresholds_come_from_criteria_and_estimator_uses_it() -> None:
 
 
 def test_watchdog_silent_child_stalled(tmp_path: Path) -> None:
-    """(a) 子行程 log 未增長逾門檻 ⇒ stalled（理由具名 log）並終止子行程。"""
+    """(a) 子行程 log 未增長且 CPU 無進度逾門檻 ⇒ stalled（理由具名 log）；終止前留現場：原因 hang、Python 全執行緒堆疊
+    （注入之 faulthandler，經 SIGUSR1）寫入 `<log>.stacks.txt` 且指到卡住之 `time.sleep` 行、macOS 另有原生堆疊。"""
     wd = ESTIMATOR.watchdog_module()
-    result = wd.run_watched(_SILENT_CHILD, log_path=tmp_path / "silent.log", config=_fast_config(), probe_swap=lambda: 0.0)
+    log = tmp_path / "silent.log"
+    result = wd.run_watched(_SILENT_CHILD, log_path=log, config=_fast_config(), probe_swap=lambda: 0.0)
     assert result.status == wd.STALLED and "log" in result.reason, result
-    assert result.wall_seconds < 15
+    assert result.cause == wd.CAUSE_HANG, result
+    stacks = Path(result.diagnosis["stacks_file"])
+    assert stacks == Path(str(log) + ".stacks.txt") and 'File "<string>", line 1' in stacks.read_text(), result.diagnosis
+    if sys.platform == "darwin":
+        native = [p for p in result.diagnosis["native_stacks"].values() if p]
+        assert native and Path(native[0]).is_file(), result.diagnosis
+    assert result.diagnosis["processes"] and result.wall_seconds < 30
 
 
-def test_watchdog_wall_cap_stalled(tmp_path: Path) -> None:
-    """(c) 持續寫 log 但牆鐘逾上限（有預期 ⇒ 3×預期；此處預期 0.2 秒 ⇒ 上限 0.6 秒）⇒ stalled（理由具名牆鐘）。"""
+def test_watchdog_busy_silent_child_not_stalled(tmp_path: Path) -> None:
+    """長時間無 log 但在用 CPU（全特徵校準、全欄 IC 之類）⇒ 不判卡死、正常結束；只看 log 之舊判準會在 0.4 秒誤殺。"""
     wd = ESTIMATOR.watchdog_module()
-    result = wd.run_watched(_CHATTY_CHILD, log_path=tmp_path / "wall.log", config=_fast_config(log_stall_seconds=30.0),
+    busy = [sys.executable, "-c", "import time\nt = time.time()\nwhile time.time() - t < 2.0:\n    pass"]
+    result = wd.run_watched(busy, log_path=tmp_path / "busy.log", config=_fast_config(), probe_swap=lambda: 0.0)
+    assert result.status == wd.EXITED and result.returncode == 0, result
+
+
+def test_watchdog_wall_cap_only_records(tmp_path: Path) -> None:
+    """(c) 持續寫 log 而牆鐘逾預期（預期 0.2 秒 ⇒ 上限 0.6 秒）⇒ **不終止**（使用者 2026-10-27「講幾千次不準再因為時間上限
+    問題被停掉」），正常結束並記 `over_expected`、log 寫一行說明。"""
+    wd = ESTIMATOR.watchdog_module()
+    log = tmp_path / "wall.log"
+    result = wd.run_watched(_CHATTY_CHILD, log_path=log, config=_fast_config(log_stall_seconds=30.0),
                             expected_seconds=0.2, probe_swap=lambda: 0.0)
-    assert result.status == wd.STALLED and "牆鐘" in result.reason, result
+    assert result.status == wd.EXITED and result.returncode == 0 and result.over_expected is True, result
+    assert "只記錄，不終止" in log.read_text(encoding="utf-8")
+
+
+def test_watchdog_stack_dump_chains_existing_sitecustomize(tmp_path: Path) -> None:
+    """注入之 sitecustomize 須串接呼叫端原有之 sitecustomize（例：量測探針經 PYTHONPATH 注入），不得取代。"""
+    wd = ESTIMATOR.watchdog_module()
+    site = tmp_path / "callersite"
+    site.mkdir()
+    (site / "sitecustomize.py").write_text("print('CALLER_SITE_LOADED', flush=True)\n", encoding="utf-8")
+    env = {**os.environ, "PYTHONPATH": str(site)}
+    log = tmp_path / "chain.log"
+    result = wd.run_watched([sys.executable, "-c", "print('ok')"], log_path=log, config=_fast_config(), env=env,
+                            probe_swap=lambda: 0.0)
+    assert result.status == wd.EXITED and "CALLER_SITE_LOADED" in log.read_text(encoding="utf-8"), result
+
+
+def test_watchdog_memory_cause_from_swap_evidence(tmp_path: Path) -> None:
+    """原因判定：swap 逾門檻終止 ⇒ memory（呼叫端記硬體受阻，不當程式卡住）。"""
+    wd = ESTIMATOR.watchdog_module()
+    readings = iter([6000.0] + [9000.0] * 100000)
+    result = wd.run_watched(_CHATTY_CHILD, log_path=tmp_path / "mem.log", config=_fast_config(log_stall_seconds=30.0),
+                            probe_swap=lambda: next(readings), probe_ram=lambda: 8000.0)
+    assert result.status == wd.STALLED and result.cause == wd.CAUSE_MEMORY, result
 
 
 def test_watchdog_swap_over_threshold_stalled(tmp_path: Path) -> None:

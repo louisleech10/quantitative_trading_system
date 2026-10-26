@@ -25,8 +25,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import copy
-import dataclasses
-import math
 import hashlib
 import importlib.util
 import json
@@ -65,12 +63,17 @@ BLOCKED_BY_HARDWARE = "hardware"
 BLOCKED_BY_WATCHDOG = "watchdog_timeout"
 
 
-def measure_watch_config(fb: Any, wd: Any) -> Any:
-    """量測之卡死監看設定：判準檔（NUMVIEW 凍結，不改）之 log 靜默與 swap 條件照用，牆鐘上限關閉（無限大）——
-    長時間計算以 CPU 進度心跳（`cpu_heartbeat`）證明在跑，只有無 CPU 進度之 log 靜默才終止（SPEC v12 補⑤；
-    使用者 2026-10-27「講幾千次不準再因為時間上限問題被停掉」）。"""
-    return dataclasses.replace(wd.load_config(fb._criteria()), wall_multiple_of_expected=math.inf,
-                               wall_ceiling_seconds=math.inf)
+class HangDetected(RuntimeError):
+    """監看判定程式卡住（無 log 亦無 CPU 進度，原因非記憶體）：已留現場，整跑停止、不自動重跑——依堆疊查因修好再跑。"""
+
+
+def raise_hang(target: str, watched: Any, item_dir: Path) -> None:
+    path = Path(item_dir) / "stall_diagnosis.json"
+    _fb()._write_atomic(path, {"target": target, "reason": watched.reason, "cause": watched.cause,
+                               "wall_seconds": watched.wall_seconds, **(watched.diagnosis or {})})
+    stacks = (watched.diagnosis or {}).get("stacks_file")
+    raise HangDetected(f"{target}：程式卡住（{watched.reason}）——現場 {path}、Python 堆疊 {stacks}、原生堆疊 "
+                       f"{(watched.diagnosis or {}).get('native_stacks')}；不自動重跑，依堆疊查因修好再跑")
 
 
 def has_watchdog_timeout(obj: Any) -> bool:
@@ -1515,11 +1518,17 @@ def generate_watched(cell: Mapping[str, Any], probes: Mapping[str, str], item_di
     env["PYTHONPATH"] = os.pathsep.join([str(site_dir), str(REPO)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     print(f"[ffprod-measure] {cell['id']} {dict(probes)}：子行程開始（預期 {expected_seconds} 秒）", flush=True)
     watched = wd.run_watched([sys.executable, str(Path(__file__).resolve()), "--gen-child", str(spec_path)],
-                             log_path=item_dir / "child.log", config=measure_watch_config(fb, wd),
+                             log_path=item_dir / "child.log", config=wd.load_config(fb._criteria()),
                              expected_seconds=expected_seconds, cwd=str(REPO), env=env)
-    if watched.status == wd.STALLED or not result_path.is_file():
-        raise RuntimeError(f"{cell['id']}：{watched.status}（{watched.reason}；rc={watched.returncode}；"
-                           f"見 {item_dir / 'child.log'}）")
+    if watched.status == wd.STALLED and watched.cause == wd.CAUSE_MEMORY:  # 記憶體證據 ⇒ 硬體受阻（照記、不重跑）
+        _fb()._write_atomic(item_dir / "stall_diagnosis.json", watched.diagnosis)
+        return {"status": "blocked", "error": f"卡死監看（記憶體）：{watched.reason}", "run_dir": None,
+                "watch": {"status": watched.status, "cause": watched.cause, "reason": watched.reason,
+                          "diagnosis": str(item_dir / "stall_diagnosis.json")}}
+    if watched.status == wd.STALLED:  # 程式卡住 ⇒ 留現場、停止整跑（不自動重跑；依堆疊查因修好再跑）
+        raise_hang(f"{cell['id']} 生成", watched, item_dir)
+    if not result_path.is_file():
+        raise RuntimeError(f"{cell['id']}：子行程 rc={watched.returncode} 未寫結果（見 {item_dir / 'child.log'}）")
     result = json.loads(result_path.read_text(encoding="utf-8"))
     result["watch"] = {"status": watched.status, "wall_seconds": watched.wall_seconds,
                        "swap_growth_max_mb": watched.swap_growth_max_mb, "log": str(item_dir / "child.log")}
@@ -1802,16 +1811,17 @@ def ic_watched(run_dir: Path, symbol: str, timeframe: str, include: Optional[Seq
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join([str(REPO)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     watched = wd.run_watched([sys.executable, str(Path(__file__).resolve()), "--ic-child", str(spec_path)],
-                             log_path=item_dir / "ic_child.log", config=measure_watch_config(fb, wd),
+                             log_path=item_dir / "ic_child.log", config=wd.load_config(fb._criteria()),
                              cwd=str(item_dir), env=env)
     log = str(item_dir / "ic_child.log")
-    if watched.status == wd.STALLED:  # SPEC v10 補③：記憶體證據（swap 增長逾監看門檻）⇒ hardware；其餘終止 ⇒ watchdog_timeout
-        threshold = getattr(watched, "swap_growth_threshold_mb", None)
-        growth = watched.swap_growth_max_mb
-        swap_hit = threshold is not None and growth is not None and growth > threshold
-        return {"status": "blocked", "blocked_by": BLOCKED_BY_HARDWARE if swap_hit else BLOCKED_BY_WATCHDOG,
-                "reason": f"卡死監看終止：{watched.reason}", "wall_seconds": watched.wall_seconds,
-                "swap_growth_max_mb": growth, "swap_growth_threshold_mb": threshold, "log": log}
+    if watched.status == wd.STALLED and watched.cause == wd.CAUSE_MEMORY:  # SPEC v12 補③：記憶體證據 ⇒ hardware
+        _fb()._write_atomic(Path(item_dir) / "stall_diagnosis.json", watched.diagnosis)
+        return {"status": "blocked", "blocked_by": BLOCKED_BY_HARDWARE, "reason": f"卡死監看（記憶體）：{watched.reason}",
+                "wall_seconds": watched.wall_seconds, "swap_growth_max_mb": watched.swap_growth_max_mb,
+                "swap_growth_threshold_mb": watched.swap_growth_threshold_mb, "log": log,
+                "diagnosis": str(Path(item_dir) / "stall_diagnosis.json")}
+    if watched.status == wd.STALLED:  # 程式卡住 ⇒ 留現場、停止整跑（不自動重跑）
+        raise_hang(f"IC {run_dir}", watched, Path(item_dir))
     if not out_path.is_file():  # 子行程被訊號終止（例 OOM kill）而未寫結果
         if watched.returncode is not None and watched.returncode < 0:
             return {"status": "blocked", "blocked_by": BLOCKED_BY_HARDWARE,
@@ -2109,6 +2119,8 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
                 print(f"[ffprod-measure] {item['key']}：IC 遭監看終止（watchdog_timeout），不算完成、續跑重算", flush=True)
                 return 3
             return 0
+        except HangDetected:
+            raise  # 程式卡住：整跑停止（不續跑其他項、不自動重跑）
         except Exception as exc:  # noqa: BLE001 — IC 失敗不毀生成紀錄；`ic` 未寫入 ⇒ 下次續跑只補 IC
             print(f"[ffprod-measure] {item['key']}：IC 失敗 {type(exc).__name__}: {exc}", flush=True)
             return 3
@@ -2365,44 +2377,11 @@ def run(args: argparse.Namespace) -> int:
         return run_value_diff(Path(base["run_dir"]), Path(gen["run_dir"]), base["fingerprints"], gen["fingerprints"])
 
     step = None if args.skip_ic else make_ic_step(work_root)
-    return run_with_retries(lambda: execute(cell_id, items, receipt_path, work_root, generate=generate, diff=diff,
-                                            ic=step),
-                            lambda: _receipt_has_watchdog_timeout(receipt_path), receipt_path)
-
-
-#: 監看終止（真卡死：無 CPU 進度 log 靜默）之自動重跑次數上限：同一跑連續 MAX_PASSES 次仍被終止 ⇒ 判為程式真卡住
-#: （非等候可解），停止並報告，不無限迴圈
-MAX_PASSES = 3
-
-
-def _receipt_has_watchdog_timeout(receipt_path: Path) -> bool:
-    if not Path(receipt_path).is_file():
-        return False
-    receipt = json.loads(Path(receipt_path).read_text(encoding="utf-8"))
-    return has_watchdog_timeout(receipt.get("candidates")) or has_watchdog_timeout(receipt.get("ic")) or \
-        has_watchdog_timeout(receipt.get("interactions"))
-
-
-def run_with_retries(once: Callable[[], int], stopped: Callable[[], bool], receipt_path: Path,
-                     max_passes: int = MAX_PASSES) -> int:
-    """執行 `once`（續跑式 execute）；遭監看終止（生成子行程 stalled 之 RuntimeError，或收據留有 watchdog_timeout）
-    ⇒ 自動再跑（已完成者略過、被終止者重算），至多 `max_passes` 次。"""
-    rc = 3
-    for attempt in range(1, max_passes + 1):
-        try:
-            rc = once()
-        except RuntimeError as exc:
-            if "stalled" not in str(exc):
-                raise
-            print(f"[ffprod-measure] 第 {attempt} 次：生成遭監看終止——{exc}", flush=True)
-            rc = 3
-            if attempt < max_passes:
-                continue
-            break
-        if not stopped():
-            break
-        print(f"[ffprod-measure] 第 {attempt} 次：收據留有監看終止之結果，"
-              f"{'自動重跑' if attempt < max_passes else '已達上限，停止並報告'}", flush=True)
+    try:
+        rc = execute(cell_id, items, receipt_path, work_root, generate=generate, diff=diff, ic=step)
+    except HangDetected as exc:  # 不自動重跑：留現場後停止，依堆疊查因修好再跑
+        print(f"[ffprod-measure] 停止：{exc}", flush=True)
+        rc = 4
     print(f"[ffprod-measure] 收據 {receipt_path}（rc={rc}）", flush=True)
     return rc
 

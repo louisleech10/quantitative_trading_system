@@ -645,19 +645,27 @@ def test_cpu_heartbeat_writes_while_busy_and_stays_silent_when_idle(capsys: pyte
     assert "[ffprod-heartbeat]" not in capsys.readouterr().err
 
 
-def test_measure_watchdog_has_no_wall_cap_but_keeps_stall_detection() -> None:
-    """量測監看不設牆鐘上限（長計算以 CPU 心跳證明在跑）；log 靜默門檻照判準檔，真卡死仍被終止。"""
-    fb = fm._fb()
-    wd = fb._watchdog()
-    base = wd.load_config(fb._criteria())
-    cfg = fm.measure_watch_config(fb, wd)
-    assert wd.wall_cap_seconds(cfg, 1059.0) == float("inf") and wd.wall_cap_seconds(cfg, None) == float("inf")
-    assert cfg.log_stall_seconds == base.log_stall_seconds and cfg.check_interval_seconds == base.check_interval_seconds
-    assert cfg.swap_growth_fraction_of_ram == base.swap_growth_fraction_of_ram
-    import inspect
+def test_hang_stops_whole_run_without_retry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """程式卡住（HangDetected）⇒ 整跑停止、rc 4、不自動重跑（execute 只呼叫一次）；現場檔已寫。"""
+    import argparse
+    import types
 
-    src = inspect.getsource(fm)
-    assert src.count("measure_watch_config(fb, wd)") == 2 and "config=wd.load_config(" not in src  # 生成與 IC 皆用之
+    calls: List[int] = []
+
+    def fake_execute(*a: Any, **k: Any) -> int:
+        calls.append(1)
+        watched = types.SimpleNamespace(reason="log 檔 600 秒未增長且 CPU 無進度", cause="hang", wall_seconds=900.0,
+                                        diagnosis={"stacks_file": "/x.stacks.txt", "native_stacks": {}})
+        fm.raise_hang("C 生成", watched, tmp_path)
+        return 0
+
+    monkeypatch.setattr(fm, "execute", fake_execute)
+    args = argparse.Namespace(cell=fm.DEFAULT_CELL, candidates=None, receipt=str(tmp_path / "r.json"),
+                              work_root=str(tmp_path), skip_ic=True)
+    assert fm.run(args) == 4 and calls == [1]
+    diag = json.loads((tmp_path / "stall_diagnosis.json").read_text(encoding="utf-8"))
+    assert diag["cause"] == "hang" and diag["stacks_file"] == "/x.stacks.txt"
+    assert not hasattr(fm, "run_with_retries") and not hasattr(fm, "MAX_PASSES")
 
 
 def test_watchdog_stopped_results_are_never_done(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -686,35 +694,6 @@ def test_watchdog_stopped_results_are_never_done(tmp_path: Path, monkeypatch: py
             "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"]}
         fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
         assert (None in calls) == rerun, cause  # 改前全欄 IC：監看終止者重算、硬體受阻者沿用
-
-
-def test_run_with_retries_reruns_watchdog_stops_up_to_limit(tmp_path: Path) -> None:
-    """生成遭監看終止（stalled）或收據留有 watchdog_timeout ⇒ 自動重跑；至多 MAX_PASSES 次；其他錯誤照拋。"""
-    passes: List[int] = []
-
-    def flaky() -> int:
-        passes.append(1)
-        if len(passes) == 1:
-            raise RuntimeError("C_BTCUSDT_1h__stat：stalled（log 檔 600 秒未增長）")
-        return 0
-
-    assert fm.run_with_retries(flaky, lambda: False, tmp_path / "r.json") == 0 and len(passes) == 2
-    passes.clear()
-    state = {"stopped": True}
-
-    def once() -> int:
-        passes.append(1)
-        if len(passes) == 2:
-            state["stopped"] = False
-        return 3
-
-    fm.run_with_retries(once, lambda: state["stopped"], tmp_path / "r.json")
-    assert len(passes) == 2
-    passes.clear()
-    assert fm.run_with_retries(lambda: (passes.append(1), 3)[1], lambda: True, tmp_path / "r.json") == 3
-    assert len(passes) == fm.MAX_PASSES  # 真卡住：不無限迴圈
-    with pytest.raises(RuntimeError):
-        fm.run_with_retries(lambda: (_ for _ in ()).throw(RuntimeError("其他錯誤")), lambda: False, tmp_path / "r.json")
 
 
 def test_run_passes_expected_seconds_only_for_frozen_preprocessing(
@@ -776,26 +755,24 @@ def test_tree_cpu_seconds_degrades_when_children_unlistable(monkeypatch: pytest.
 
 
 @pytest.mark.parametrize("watched,expected", [
-    ({"status": "stalled", "reason": "牆鐘 5400 秒逾上限 5400 秒", "returncode": -15}, "watchdog_timeout"),
-    ({"status": "stalled", "reason": "log 檔 600 秒未增長（門檻 600 秒）", "returncode": -15}, "watchdog_timeout"),
-    # 判準停用 swap 條件（門檻 None）時，即使 swap 有增長亦非 swap 終止
-    ({"status": "stalled", "reason": "log 檔 600 秒未增長（門檻 600 秒）", "returncode": -15, "swap": 3000.0,
-      "threshold": None}, "watchdog_timeout"),
+    # 程式卡住（監看判 hang）⇒ 整跑停止（HangDetected），不記為受阻、不自動重跑
+    ({"status": "stalled", "reason": "log 檔 600 秒未增長且 CPU 無進度", "returncode": -15, "cause": "hang"}, "hang"),
+    # 記憶體證據 ⇒ hardware：監看判 memory、訊號終止未寫結果、子行程記憶體守護
     ({"status": "stalled", "reason": "swap 自啟動增長 3000 MB > 門檻 1000 MB 連續 2 次", "returncode": -15,
-      "swap": 3000.0, "threshold": 1000.0}, "hardware"),
+      "swap": 3000.0, "threshold": 1000.0, "cause": "memory"}, "hardware"),
     ({"status": "exited", "reason": None, "returncode": -9}, "hardware"),
     ({"status": "exited", "reason": None, "returncode": 0, "child": {"status": "blocked", "error": "MemoryError"}},
      "hardware"),
 ])
-def test_ic_watched_separates_watchdog_timeout_from_hardware(
+def test_ic_watched_separates_hang_from_hardware(
         tmp_path: Path, monkeypatch: pytest.MonkeyPatch, watched: Dict[str, Any], expected: str) -> None:
-    """IC 監看：卡死監看終止（log 靜默、牆鐘）⇒ watchdog_timeout；記憶體證據（swap 增長逾監看門檻、訊號終止未寫結果、
-    子行程記憶體守護）⇒ hardware。"""
+    """IC 監看依監看之原因判定分流：hang ⇒ 留現場、拋 HangDetected（整跑停止）；記憶體證據 ⇒ blocked hardware。"""
     import types
 
     result = types.SimpleNamespace(status=watched["status"], reason=watched["reason"], returncode=watched["returncode"],
                                    wall_seconds=1.0, swap_growth_max_mb=watched.get("swap", 0.0),
-                                   swap_growth_threshold_mb=watched.get("threshold"))
+                                   swap_growth_threshold_mb=watched.get("threshold"), cause=watched.get("cause"),
+                                   diagnosis={"stacks_file": None, "native_stacks": {}})
     real = fm._fb()
 
     def run_watched(*a: Any, **k: Any) -> Any:
@@ -804,9 +781,15 @@ def test_ic_watched_separates_watchdog_timeout_from_hardware(
         return result
 
     real_wd = real._watchdog()
-    wd = types.SimpleNamespace(STALLED="stalled", run_watched=run_watched, load_config=real_wd.load_config)
+    wd = types.SimpleNamespace(STALLED="stalled", run_watched=run_watched, load_config=real_wd.load_config,
+                               CAUSE_MEMORY=real_wd.CAUSE_MEMORY, CAUSE_HANG=real_wd.CAUSE_HANG)
     fake = types.SimpleNamespace(_watchdog=lambda: wd, _criteria=real._criteria, _write_atomic=real._write_atomic)
     monkeypatch.setattr(fm, "_fb", lambda: fake)
+    if expected == "hang":
+        with pytest.raises(fm.HangDetected):
+            fm.ic_watched(tmp_path / "run", "BTCUSDT", "1h", None, False, tmp_path / "ic")
+        assert json.loads((tmp_path / "ic" / "stall_diagnosis.json").read_text(encoding="utf-8"))["cause"] == "hang"
+        return
     out = fm.ic_watched(tmp_path / "run", "BTCUSDT", "1h", None, False, tmp_path / "ic")
     assert out["status"] == "blocked" and out["blocked_by"] == expected
     summary = fm.blocked_summary({"baseline_full": out, "option_changed": {"status": "ok"}})
