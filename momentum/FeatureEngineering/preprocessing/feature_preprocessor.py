@@ -1742,8 +1742,8 @@ class FeaturePreprocessor:
 
     def _record_fast_arm_steps(self, columns: Sequence[Any], transform_context: Dict[str, object]) -> None:
         """快速 numba 臂之逐欄狀態（FFDSTAR 盤點④：核心對整個陣列同式套用、無逐欄跳過分支 ⇒ 依呼叫參數記錄）。
-        fracdiff／ADF 於本臂恆不執行：開啟而路由至快速臂 ⇒ 群組層非目標層（`_group_requires_slow_transform`）。"""
-        do_gaussian = bool(transform_context.get("do_gaussian", False))
+        fracdiff／ADF 於本臂恆不執行：開啟而路由至快速臂 ⇒ 群組層非目標層（`_group_requires_slow_transform`）。
+        rank／zscore／gaussian：本臂只做縮尾，三者開啟即於 `_registry_fast_transform` 拒收（FFPROD Task 1.1）⇒ 恆記 disabled。"""
         self._record_input_execution(
             columns,
             fast_arm=True,
@@ -1751,9 +1751,9 @@ class FeaturePreprocessor:
             fractional_differencing="not_target_layer" if bool(transform_context.get("do_fracdiff", False))
             else "disabled",
             adf_differencing="not_target_layer" if bool(transform_context.get("do_adf", False)) else "disabled",
-            rank_transform="applied" if bool(transform_context.get("do_rank", False)) else "disabled",
-            gaussian_normalize=("applied" if HAS_SCIPY else "no_scipy") if do_gaussian else "disabled",
-            adaptive_zscore="applied" if bool(transform_context.get("do_zscore", False)) else "disabled",
+            rank_transform="disabled",
+            gaussian_normalize="disabled",
+            adaptive_zscore="disabled",
         )
 
     def _apply_dataframe_passthrough(
