@@ -62,6 +62,16 @@ def _baseline() -> Dict[str, Any]:
     return json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
 
+#: FF-NAME 收案提交（b4 收尾 21d6774f，2026-10-19）。K0／K3 驗的是 FF-NAME 本身對該檔之處置，故比對該提交時之檔；
+#: 其後他票（FFPROD b2 刪 icpostleak／ratiounsafe 已刪入口之分支等）對同檔之合法改動不在 FF-NAME 驗收範圍。
+FFNAME_CLOSE_COMMIT = "21d6774f"
+
+
+def _at_close(rel: str) -> bytes:
+    proc = subprocess.run(["git", "show", f"{FFNAME_CLOSE_COMMIT}:{rel}"], cwd=str(REPO), capture_output=True, check=True)
+    return proc.stdout
+
+
 def _blob(rel: str) -> Optional[bytes]:
     """改前位元組：baseline `frozen_at_head` 之該檔（git 物件；Phase 2 前、不可變）。"""
     head = _baseline().get("frozen_at_head")
@@ -232,7 +242,7 @@ def k0_problems(rel: str, current: Optional[bytes] = None) -> List[str]:
     old = _blob(rel)
     if old is None:
         return [f"no_blob:{rel}"]
-    now = (REPO / rel).read_bytes() if current is None else current
+    now = _at_close(rel) if current is None else current
     return [] if now == old else [f"k0_bytes_changed:{rel}"]
 
 
@@ -517,7 +527,7 @@ def k3_problems(rel: str, new_doc: Any = None) -> List[str]:
         return [f"no_blob:{rel}"]
     renames = DISP[rel]["k3_renames"]
     old = json.loads(old_bytes.decode("utf-8"))
-    new = json.loads((REPO / rel).read_text(encoding="utf-8")) if new_doc is None else new_doc
+    new = json.loads(_at_close(rel).decode("utf-8")) if new_doc is None else new_doc
     if not any(k in renames for k in _strings(old)):
         return [f"k3_rename_absent_in_old:{rel}"]
     return [] if _deep_rename_keys(old, renames) == new else [f"k3_not_exact:{rel}"]

@@ -449,6 +449,20 @@ PERF_CANDIDATE_ARM = "polars_float64"
 PERF_RUNS = 3
 
 
+def contract_for_receipt(path: Path, receipt: Mapping[str, Any]) -> Dict[str, Any]:
+    """收據之對照契約：收據帶 `head`（實跑收據）⇒ 該提交之契約版本（`git show <head>:<path>`）；無 `head`（合成收據）⇒ 現行
+    契約。FFPROD b2：現行契約已刪無生產呼叫者之臂／分支（L6.5 polars、registry 原地覆寫入口），NUMVIEW 歷史量測收據不改寫，
+    對其產生時之契約驗。"""
+    import subprocess
+
+    head = receipt.get("head") if isinstance(receipt, Mapping) else None
+    if not head:
+        return json.loads(path.read_text(encoding="utf-8"))
+    shown = subprocess.run(["git", "-C", str(REPO), "show", f"{head}:{path.relative_to(REPO).as_posix()}"],
+                           capture_output=True, text=True, check=True)
+    return json.loads(shown.stdout)
+
+
 def perf_benchmark_receipt_violations(receipt: Any) -> List[str]:
     """Task 1.1 效能基準收據之內容（SPEC v17 Task 1.1「效能基準」；審查 r6 CODEX-R6-P1-04；D-ICPAGE-ARM 重新呈報與收案閘共用）：
     `inputs`＝[{cell, arms: {臂: {runs_seconds: [3 個正數], median_seconds, reachable} 或 {reachable: false, unreachable_reason}}}]，
@@ -460,7 +474,7 @@ def perf_benchmark_receipt_violations(receipt: Any) -> List[str]:
     if not isinstance(receipt, Mapping):
         return ["收據非物件"]
     out: List[str] = []
-    contract = json.loads(NUMVIEW_CONTRACT_PATH.read_text(encoding="utf-8"))
+    contract = contract_for_receipt(NUMVIEW_CONTRACT_PATH, receipt)
     arms_want = set(contract["post_ic_arm_values"]["values"]) | {PERF_CANDIDATE_ARM}
     cells_want = set(criteria_run_cells("perf_benchmark") or [])
     inputs = receipt.get("inputs")

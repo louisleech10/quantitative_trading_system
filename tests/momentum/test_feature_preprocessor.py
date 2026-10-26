@@ -291,9 +291,7 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_transform_fixed_order(monkeypatch: pytest.MonkeyPatch) -> None:
     # Force pandas path so we can monkey-patch the _apply_* helpers and capture
-    # call order. The polars path uses different (equivalent) helpers
-    # (polars_l65_winsorization etc.) and the order is asserted by other
-    # numerical-equivalence tests (e.g. test_winsor_then_zscore).
+    # call order（transform 之 Polars 分支已於 FFPROD Task 1.1 刪除，pandas 為唯一核心）.
     monkeypatch.setenv("FFACT_USE_POLARS", "0")
 
     df = _base_df(60)

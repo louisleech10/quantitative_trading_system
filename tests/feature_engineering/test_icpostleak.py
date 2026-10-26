@@ -34,6 +34,9 @@ CONTRACT = json.loads((REPO / "tests/_golden/icpostleak/contract.json").read_tex
 ORDER: List[str] = CONTRACT["order"]
 COMBOS: List[List[str]] = CONTRACT["combos"]
 BRANCHES: Dict[str, dict] = CONTRACT["branches"]
+#: FFPROD Task 1.1：rank／gaussian／zscore 之生產實作只剩 post-IC pandas 核心（registry 路徑只服務 raw，raw 一律關此三步、快速路徑
+#: 開啟即拒；Polars post-IC 鏈已刪）⇒ 正式順序與遮罩之分支驗收限 entry＝transform 之分支
+POST_IC_BRANCHES: List[str] = [b for b, s in BRANCHES.items() if s["entry"] == "transform"]
 RANK_W = int(CONTRACT["rank_window"])
 Z_WINDOWS: List[int] = [int(w) for w in CONTRACT["zscore_windows"]]
 
@@ -110,11 +113,6 @@ def _run_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, branch: str, st
     group = registry.save_data(group, frame.to_numpy(dtype=np.float32))
     if "patch_shard_bytes" in spec:
         assert getattr(group, "shards", ()), "前提：群組已分片"
-    if spec_all["entry"] == "transform_registry_groups":
-        pre.transform_registry_groups(registry, n_workers=int(spec.get("n_workers", 1)))
-        if spec.get("spy"):
-            assert calls, f"具名分支 {branch} 未執行 {spec['spy']}"
-        return pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
     # sink 入口（一般／sharded／chunked 由契約 env 切換）：收集各輸出部分，依欄名重組
     parts: Dict[str, np.ndarray] = {}
 
@@ -155,67 +153,28 @@ def _kernel_step(branch: str, pre: FeaturePreprocessor, step: str, values: np.nd
         w = _gaussian_window(pre)
         return np.asarray(pre._gaussian_2d(values, lower=float(clip[0]), upper=float(clip[1]), causal=True,
                                            window=w, min_periods=pre._rolling_min_periods(w)), dtype=np.float64)
-    if branch in ("legacy", "optimized"):
-        if step == "rank":
-            return np.asarray(pre._rolling_rank_2d_v2(values, RANK_W), dtype=np.float64)
-        return np.asarray(pre._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8, mode="replace"), dtype=np.float64)
-    if branch == "polars":
-        from momentum.FeatureEngineering.polars_adapter import (
-            pandas_to_polars,
-            polars_l65_adaptive_zscore,
-            polars_l65_rank_transform,
-            polars_to_pandas,
-        )
-
-        # 同生產入口之轉換（float32＋NaN→null；`_transform_single_polars` 經 pandas_to_polars）
-        pl_df = pandas_to_polars(pd.DataFrame(values, columns=columns))
-        if step == "rank":
-            pl_df = polars_l65_rank_transform(pl_df, columns=columns, window=RANK_W)
-        else:
-            pl_df = polars_l65_adaptive_zscore(pl_df, columns=columns, window=Z_WINDOWS[0], epsilon=1e-8)
-        return polars_to_pandas(pl_df)[columns].to_numpy(dtype=np.float64)
-    from momentum.FeatureEngineering.preprocessing._numba_transforms import transform_array_fast
-
-    return np.asarray(transform_array_fast(values.astype(np.float32), winsorize=False, rank=step == "rank",
-                                           rank_window=RANK_W, zscore=step == "zscore",
-                                           zscore_window=Z_WINDOWS[0]), dtype=np.float64)
+    if branch not in ("legacy", "optimized"):
+        raise ValueError(f"分支 {branch} 不做 rank／zscore（FFPROD Task 1.1：只 post-IC pandas 核心）")
+    if step == "rank":
+        return np.asarray(pre._rolling_rank_2d_v2(values, RANK_W), dtype=np.float64)
+    return np.asarray(pre._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8, mode="replace"), dtype=np.float64)
 
 
 def _step_window(pre: FeaturePreprocessor, step: str) -> int:
     return RANK_W if step == "rank" else (_gaussian_window(pre) if step == "gaussian" else Z_WINDOWS[0])
 
 
-def _polars_roundtrip(values: np.ndarray, columns: List[str]) -> np.ndarray:
-    """Polars 臂之每次 pandas↔polars 往返（`pandas_to_polars`：float32＋NaN→null；`polars_to_pandas`）。"""
-    from momentum.FeatureEngineering.polars_adapter import pandas_to_polars, polars_to_pandas
-
-    return polars_to_pandas(pandas_to_polars(pd.DataFrame(values, columns=columns)))[columns].to_numpy(dtype=np.float64)
-
-
 def _oracle(branch: str, steps: List[str], frame: pd.DataFrame) -> np.ndarray:
-    """逐步驟 oracle。Polars 分支重放 `_transform_single_polars` 之轉換序：入口 `pandas_to_polars`（float32＋null）、
-    gaussian 前後各一次 pandas↔polars 往返（`_apply_gaussian_normalize` 回落）、出口 `polars_to_pandas`。"""
+    """逐步驟 oracle（post-IC pandas 分支；FFPROD Task 1.1 後 Polars／registry 之 rank／zscore 實作已刪）。"""
     pre = FeaturePreprocessor(_config(steps))
     columns = [str(c) for c in frame.columns]
     values = frame.to_numpy(dtype=np.float64)
-    if branch == "polars":
-        values = _polars_roundtrip(values, columns)
-    elif branch.startswith("registry"):
-        values = _f32(values)  # registry `save_data(..., float32)` 入口
     for step in ORDER:
         if step not in steps:
             continue
         values = _oracle_mask(_kernel_step(branch, pre, step, values, columns), values, _step_window(pre, step))
-        if branch == "polars":
-            values = _polars_roundtrip(values, columns)  # 每步結果回存 polars（float32）
-        elif branch.startswith("registry"):
-            values = _f32(values)  # registry 群組陣列為 float32，每步結果回存（sink 出口亦 cast float32）
     return values
 
-
-def _f32(values: np.ndarray) -> np.ndarray:
-    """float32 取整後回 float64 比較（registry 落盤／群組陣列之 dtype）。"""
-    return np.asarray(values, dtype=np.float32).astype(np.float64)
 
 
 def _first_finite(arr: np.ndarray) -> List[int]:
@@ -235,7 +194,7 @@ def _expected_first_finite(frame: pd.DataFrame, steps: List[str]) -> List[int]:
 
 # ---------------------------------------------------------------- Phase 1 驗證（Task 1.1）
 
-@pytest.mark.parametrize("branch", list(BRANCHES))
+@pytest.mark.parametrize("branch", POST_IC_BRANCHES)
 @pytest.mark.parametrize("steps", COMBOS, ids=["+".join(c) for c in COMBOS])
 def test_phase1_stepwise_oracle_bytes_equal(branch: str, steps: List[str], tmp_path: Path,
                                             monkeypatch: pytest.MonkeyPatch) -> None:
@@ -254,13 +213,13 @@ def test_phase1_branch_parity_mask_positions(steps: List[str], tmp_path: Path, m
     """Task 1.1 ②：四分支之逐欄首個有限值列完全相同（數值依分支各自 oracle，見上）。"""
     frame = _real_frame()
     firsts = {}
-    for branch in BRANCHES:
+    for branch in POST_IC_BRANCHES:
         with monkeypatch.context() as mp:
             firsts[branch] = _first_finite(_run_branch(mp, tmp_path, branch, steps, frame).to_numpy(dtype=np.float64))
     assert len({tuple(v) for v in firsts.values()}) == 1, firsts
 
 
-@pytest.mark.parametrize("branch", ["polars", "legacy"])
+@pytest.mark.parametrize("branch", ["legacy"])
 def test_phase1_append_mode_each_window_masked(branch: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """§G ②（append）：zscore 窗 [100, 252] 之每個衍生欄各自自輸入首個有限值起遮 `窗−1` 列。"""
     frame = _real_frame()
@@ -282,25 +241,8 @@ def test_phase1_append_mode_each_window_masked(branch: str, tmp_path: Path, monk
         assert np.array_equal(actual, want, equal_nan=True), window  # 全陣列：成熟區段之值亦逐位元組比
 
 
-def test_phase1_registry_chunked_append_masked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 1.1（registry chunked）：`_stream_single_group_chunked_to_sink` 只於 requires_slow（append 模式）觸發，
-    每塊呼叫 `_transform_single`（legacy；append 停用 optimized）⇒ 以 append＋split 門檻 2 實跑，spy 證明執行該待測物，
-    各窗衍生欄與 legacy append oracle 全陣列逐位元組相同。"""
-    cfg = CONTRACT["registry_chunked_append"]
-    frame = _real_frame()
-    got = _run_branch(monkeypatch, tmp_path, "registry_chunked", cfg["steps"], frame, mode=cfg["mode"],
-                      spec_override={"env": cfg["env"], "entry": "transform_registry_groups_to_sink", "spy": cfg["spy"]})
-    values = _f32(frame.to_numpy(dtype=np.float64))  # registry `save_data(..., float32)` 入口
-    by_window = FeaturePreprocessor(_config(cfg["steps"], "append"))._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8,
-                                                                                         mode="append")
-    for window in Z_WINDOWS:
-        cols = [f"{c}_zscore-{window}" for c in frame.columns]  # FF-NAME：op 段 `zscore-<w>`
-        assert all(c in got.columns for c in cols), (window, list(got.columns))
-        want = _f32(_oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window))  # sink 出口 float32
-        assert np.array_equal(got[cols].to_numpy(dtype=np.float64), want, equal_nan=True), window
 
-
-@pytest.mark.parametrize("branch", list(BRANCHES))
+@pytest.mark.parametrize("branch", POST_IC_BRANCHES)
 def test_phase1_causal_perturb_last_row(branch: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 1.1 ③：最後一列 ×50 ⇒ 前 2999 列逐位元組不變（三項全開）。"""
     frame = _real_frame()
@@ -452,7 +394,7 @@ def _window_minus_two(output, step_input, window):
     return _oracle_mask(output, step_input, int(window) - 2)
 
 
-@pytest.mark.parametrize("branch", list(BRANCHES))
+@pytest.mark.parametrize("branch", POST_IC_BRANCHES)
 def test_mutation_mask_identity_is_caught(branch: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """mutant：遮罩 identity（逐分支各一）⇒ 該分支輸出 ≠ oracle。"""
     monkeypatch.setattr(stable_mask, "mask_incomplete_window_by_input_2d", _identity)
@@ -486,27 +428,6 @@ def test_mutation_append_masks_first_window_only_is_caught(tmp_path: Path, monke
     inputs = _first_finite(frame.to_numpy(dtype=np.float64))
     assert _first_finite(got[cols].to_numpy(dtype=np.float64)) != [f + Z_WINDOWS[1] - 1 for f in inputs]
 
-
-def test_mutation_parallel_slice_skips_gaussian_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：切片並行路徑回到改前（融合核心、無 gaussian 後置、無遮罩）⇒ registry_parallel_split 輸出 ≠ oracle。"""
-
-    def _old_slice(self, array_slice, transform_context):
-        fast = transform_context["transform_array_fast"]
-        return fast(np.ascontiguousarray(array_slice, dtype=np.float32),
-                    winsorize=bool(transform_context.get("do_winsorize", True)),
-                    rank=bool(transform_context.get("do_rank", False)),
-                    rank_window=int(transform_context.get("rank_window", 252)),
-                    zscore=bool(transform_context.get("do_zscore", False)),
-                    zscore_window=int(transform_context.get("zscore_window", 100)))
-
-    monkeypatch.setattr(FeaturePreprocessor, "_transform_array_slice", _old_slice)
-    frame = _real_frame()
-    steps = ["gaussian"]
-    spec = dict(BRANCHES["registry_parallel_split"])
-    spec.pop("spy", None)
-    got = _run_branch(monkeypatch, tmp_path, "registry_parallel_split", steps, frame,
-                      spec_override=spec).to_numpy(dtype=np.float64)
-    assert not np.array_equal(got, _oracle("registry_parallel_split", steps, frame), equal_nan=True)
 
 
 def test_mutation_time_order_check_removed_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -427,11 +427,7 @@ def test_rank_constant_window() -> None:
 
 
 def test_winsorize_numpy_equivalence() -> None:
-    helper_source = inspect.getsource(FeaturePreprocessor._winsorize_2d_inplace)
-    assert "np.nanquantile" in inspect.getsource(FeaturePreprocessor._nanquantile_linear)
-    assert "np.clip" in helper_source
-    assert "out=arr" in helper_source
-
+    # FFPROD Task 1.1：原檢查之 2D in-place 縮尾 helper 生產無呼叫者已刪；本案只驗生產縮尾之數值等價
     frame = pd.DataFrame(
         {
             "trend": [1.0, 2.0, 3.0, 4.0, 100.0],

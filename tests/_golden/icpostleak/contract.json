@@ -85,12 +85,6 @@
     ]
   ],
   "branches": {
-    "polars": {
-      "env": {
-        "FFACT_USE_POLARS": "1"
-      },
-      "entry": "transform"
-    },
     "optimized": {
       "env": {
         "FFACT_USE_POLARS": "0",
@@ -105,10 +99,6 @@
       },
       "entry": "transform"
     },
-    "registry": {
-      "env": {},
-      "entry": "transform_registry_groups"
-    },
     "registry_sink": {
       "env": {},
       "entry": "transform_registry_groups_to_sink",
@@ -119,15 +109,6 @@
       "entry": "transform_registry_groups_to_sink",
       "patch_shard_bytes": 4096,
       "spy": "_stream_sharded_group_to_sink"
-    },
-    "registry_parallel_split": {
-      "env": {
-        "FFACT_L65_SPLIT_THRESHOLD": "2"
-      },
-      "entry": "transform_registry_groups",
-      "n_workers": 2,
-      "spy": "_transform_array_slice",
-      "note": "大群組切片並行（ThreadPool）；改前此路徑漏做 gaussian"
     }
   },
   "perturb": {

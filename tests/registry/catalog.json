@@ -12358,24 +12358,6 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
-  "tests/performance/test_l65_parallel_perf.py": {
-   "claim": [
-    "perf"
-   ],
-   "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
-   "guarantee": [
-    "A10"
-   ],
-   "oracle": [
-    "SMOKE"
-   ],
-   "path": "tests/performance/test_l65_parallel_perf.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "unknown"
-  },
   "tests/performance/test_l65_perf.py": {
    "claim": [
     "contract",

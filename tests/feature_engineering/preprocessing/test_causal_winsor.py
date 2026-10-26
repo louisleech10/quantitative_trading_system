@@ -16,7 +16,6 @@ from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
 )
 from momentum.FeatureEngineering.preprocessing._numba_transforms import (
     rolling_quantile_2d,
-    transform_array_fast,
 )
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import HAS_SCIPY, FeaturePreprocessor
 from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
@@ -225,124 +224,68 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
     optimized = FeaturePreprocessor(config).transform(frame)
     np.testing.assert_allclose(legacy.to_numpy(np.float32), optimized.to_numpy(np.float32), atol=1e-6, equal_nan=True)
 
-    if HAS_SCIPY:
-        fast_config = {
+    # FFPROD：registry 快速路徑只做縮尾（生產 raw 設定關 rank／zscore／gaussian；polars 臂與快速核心 rank 已刪）
+    fast_pre = FeaturePreprocessor(config)
+    fast_context = fast_pre._build_registry_transform_context()
+
+    def _run_fast(values: pd.DataFrame) -> np.ndarray:
+        registry = Mock()
+        registry.load_data.return_value = values.to_numpy(np.float32)
+        group = SimpleNamespace(
+            group_id="fast",
+            columns=("alpha",),
+            alignment=None,
+            layer="L1",
+        )
+        outputs = fast_pre._transform_single_group_to_arrays(registry, group, fast_context)
+        return np.concatenate([data for _, _, data in outputs], axis=1)
+
+    fast = _run_fast(frame)
+    np.testing.assert_allclose(legacy.to_numpy(np.float32), fast, atol=1e-6, equal_nan=True)
+    perturbed = frame.copy()
+    perturbed.iloc[-1, 0] = -9999.0
+    fast_perturbed = _run_fast(perturbed)
+    np.testing.assert_allclose(fast[:-1], fast_perturbed[:-1], atol=1e-6, equal_nan=True)
+
+    fracdiff_pre = FeaturePreprocessor(
+        {
             **config,
             "winsorization": {"enabled": False, "window": 20},
-            "gaussian_normalize": {
+            "fractional_differencing": {
                 "enabled": True,
-                "clip_range": [0.001, 0.999],
                 "apply_to": "all",
+                "precision": 0.5,
             },
-        }
-        fast_pre = FeaturePreprocessor(fast_config)
-        fast_context = fast_pre._build_registry_transform_context()
+            # FFSTAT v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示；前史 600 列足 500
+            "calibration_bars": 500,
+        },
+        # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+        column_layer_map={"L1_alpha": "L1"},
+    )
+    original_fracdiff = fracdiff_pre._apply_fractional_differencing
+    fracdiff_calls: list[bool] = []
 
-        def _run_fast(values: pd.DataFrame) -> np.ndarray:
-            registry = Mock()
-            registry.load_data.return_value = values.to_numpy(np.float32)
-            captured: dict[str, np.ndarray] = {}
-            registry.overwrite_data.side_effect = lambda _group_id, data: captured.setdefault("data", data.copy())
-            group = SimpleNamespace(
-                group_id="fast",
-                columns=("alpha",),
-                alignment=None,
-                layer="L1",
-            )
-            fast_pre._transform_single_group(registry, group, fast_context)
-            return captured["data"]
+    def _causal_fracdiff(df: pd.DataFrame, source_layer=None) -> pd.DataFrame:
+        fracdiff_calls.append(fracdiff_pre.causal_preprocessing)
+        return original_fracdiff(df, source_layer=source_layer)
 
-        fast = _run_fast(frame)
-        perturbed = frame.copy()
-        perturbed.iloc[-1, 0] = -9999.0
-        fast_perturbed = _run_fast(perturbed)
-        np.testing.assert_allclose(fast[:-1], fast_perturbed[:-1], atol=1e-6, equal_nan=True)
-
-        rank_only = transform_array_fast(
-            frame.to_numpy(np.float32),
-            winsorize=False,
-            rank=True,
-            rank_window=20,
-            zscore=False,
-        )
-        assert np.isnan(rank_only[:19]).all()
-        assert np.isfinite(rank_only[19:]).all()
-
-    try:
-        import polars  # noqa: F401
-    except Exception:
-        polars = None
-
-    if polars is not None:
-        monkeypatch.setenv("FFACT_USE_POLARS", "1")
-        polars_result = FeaturePreprocessor(config)._transform_single_polars(frame)
-        np.testing.assert_allclose(legacy.to_numpy(np.float32), polars_result.to_numpy(np.float32), atol=1e-6, equal_nan=True)
-
-        if HAS_SCIPY:
-            gaussian_pre = FeaturePreprocessor(
-                {
-                    **config,
-                    "winsorization": {"enabled": False, "window": 20},
-                    "gaussian_normalize": {"enabled": True, "apply_to": "all"},
-                }
-            )
-            original_gaussian = gaussian_pre._apply_gaussian_normalize
-            gaussian_calls: list[bool] = []
-
-            def _causal_gaussian(df: pd.DataFrame) -> pd.DataFrame:
-                gaussian_calls.append(gaussian_pre.causal_preprocessing)
-                return original_gaussian(df)
-
-            monkeypatch.setattr(gaussian_pre, "_apply_gaussian_normalize", _causal_gaussian)
-            gaussian_result = gaussian_pre._transform_single_polars(frame)
-            gaussian_perturbed = gaussian_pre._transform_single_polars(perturbed)
-            assert gaussian_calls == [True, True]
-            np.testing.assert_allclose(
-                gaussian_result.iloc[:-1].to_numpy(np.float32),
-                gaussian_perturbed.iloc[:-1].to_numpy(np.float32),
-                atol=1e-6,
-                equal_nan=True,
-            )
-
-        fracdiff_pre = FeaturePreprocessor(
-            {
-                **config,
-                "winsorization": {"enabled": False, "window": 20},
-                "fractional_differencing": {
-                    "enabled": True,
-                    "apply_to": "all",
-                    "precision": 0.5,
-                },
-                # FFSTAT v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示；前史 600 列足 500
-                "calibration_bars": 500,
-            },
-            # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
-            column_layer_map={"L1_alpha": "L1"},
-        )
-        original_fracdiff = fracdiff_pre._apply_fractional_differencing
-        fracdiff_calls: list[bool] = []
-
-        def _causal_fracdiff(df: pd.DataFrame, source_layer=None) -> pd.DataFrame:
-            fracdiff_calls.append(fracdiff_pre.causal_preprocessing)
-            return original_fracdiff(df, source_layer=source_layer)
-
-        monkeypatch.setattr(fracdiff_pre, "_apply_fractional_differencing", _causal_fracdiff)
-        fracdiff_frame = pd.DataFrame(
-            {"L1_alpha": np.r_[np.linspace(1.0, 600.0, 600), np.linspace(601.0, 620.0, 20)]}
-        )
-        # FFSTAT b3b：判定值只取封包——以前 600 列（兩次轉換共用、未被擾動）為前史建封包
-        attach_unit_calibration(fracdiff_pre, fracdiff_frame.iloc[:600])
-        fracdiff_result = fracdiff_pre.transform(fracdiff_frame)
-        fracdiff_perturbed_frame = fracdiff_frame.copy()
-        fracdiff_perturbed_frame.iloc[-1, 0] = -9999.0
-        fracdiff_perturbed = fracdiff_pre.transform(fracdiff_perturbed_frame)
-        assert fracdiff_calls == [True, True]
-        np.testing.assert_allclose(
-            fracdiff_result.iloc[:-1].to_numpy(np.float32),
-            fracdiff_perturbed.iloc[:-1].to_numpy(np.float32),
-            atol=1e-6,
-            equal_nan=True,
-        )
+    monkeypatch.setattr(fracdiff_pre, "_apply_fractional_differencing", _causal_fracdiff)
+    fracdiff_frame = pd.DataFrame(
+        {"L1_alpha": np.r_[np.linspace(1.0, 600.0, 600), np.linspace(601.0, 620.0, 20)]}
+    )
+    # FFSTAT b3b：判定值只取封包——以前 600 列（兩次轉換共用、未被擾動）為前史建封包
+    attach_unit_calibration(fracdiff_pre, fracdiff_frame.iloc[:600])
+    fracdiff_result = fracdiff_pre.transform(fracdiff_frame)
+    fracdiff_perturbed_frame = fracdiff_frame.copy()
+    fracdiff_perturbed_frame.iloc[-1, 0] = -9999.0
+    fracdiff_perturbed = fracdiff_pre.transform(fracdiff_perturbed_frame)
+    assert fracdiff_calls == [True, True]
+    np.testing.assert_allclose(
+        fracdiff_result.iloc[:-1].to_numpy(np.float32),
+        fracdiff_perturbed.iloc[:-1].to_numpy(np.float32),
+        atol=1e-6,
+        equal_nan=True,
+    )
 
     native_config = {
         **config,
@@ -380,8 +323,11 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
         registry.load_data_native.return_value = values
         registry.get_alignment_idx_map.return_value = idx_map
         captured: dict[str, np.ndarray] = {}
-        registry.overwrite_data.side_effect = lambda _group_id, data: captured.setdefault("data", data.copy())
-        assert FeaturePreprocessor(native_config)._maybe_run_native_l65_inplace(registry, group)
+
+        def sink(_gid, _cols, data, _src, _path, _cleanup) -> None:
+            captured.setdefault("data", np.array(data, copy=True))
+
+        assert FeaturePreprocessor(native_config)._maybe_run_native_l65_to_sink(registry, group, sink)
         return captured["data"]
 
     native = _run_native(native_values)

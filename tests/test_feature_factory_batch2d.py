@@ -104,68 +104,6 @@ def test_t214_manifest_contains_required_fields(tmp_path: Path):
     assert group_ids == sorted(group_ids)
 
 
-def test_task211_materialize_wide_df_prefers_parquet(tmp_path: Path):
-    """Task 2.11: materialize_wide_df 應優先從 parquet 重組 wide DataFrame。"""
-    registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
-
-    group_adx = _make_group(
-        group_id="1h_L1_trend_ADX",
-        layer=LayerSource.L1,
-        timeframe="1h",
-        columns=("close_1h_trend_ADX_14",),
-        indicator="ADX",
-    )
-    group_ratio = _make_group(
-        group_id="12h_L2_Ratio",
-        layer=LayerSource.L2,
-        timeframe="12h",
-        columns=("close_12h_momentum_RSI_5_ratio",),
-        indicator="Ratio",
-    )
-
-    saved_adx = registry.save_data(group_adx, np.array([[10.0], [20.0], [30.0]], dtype=np.float32))
-    saved_ratio = registry.save_data(group_ratio, np.array([[1.0], [2.0], [3.0]], dtype=np.float32))
-
-    parquet_dir = tmp_path / "parquet"
-    parquet_dir.mkdir(parents=True, exist_ok=True)
-
-    parquet_adx = parquet_dir / "1h_L1_trend_ADX.parquet"
-    parquet_ratio = parquet_dir / "12h_L2_Ratio.parquet"
-
-    pd.DataFrame({"close_1h_trend_ADX_14": [100.0, 200.0, 300.0]}).to_parquet(parquet_adx, index=False)
-    pd.DataFrame({"close_12h_momentum_RSI_5_ratio": [7.0, 8.0, 9.0]}).to_parquet(parquet_ratio, index=False)
-
-    registry.set_group_parquet_paths(
-        {
-            saved_adx.group_id: str(parquet_adx.resolve()),
-            saved_ratio.group_id: str(parquet_ratio.resolve()),
-        },
-        write_manifest=False,
-    )
-
-    # 強制驗證 materialize 走 parquet 路徑，而不是 fallback npy。
-    if saved_adx.disk_path is not None:
-        saved_adx.disk_path.unlink()
-    if saved_ratio.disk_path is not None:
-        saved_ratio.disk_path.unlink()
-
-    wide_df = registry.materialize_wide_df()
-
-    assert wide_df.columns.tolist() == registry.all_column_names()
-    np.testing.assert_allclose(
-        wide_df["close_1h_trend_ADX_14"].to_numpy(dtype=np.float64),
-        np.array([100.0, 200.0, 300.0], dtype=np.float64),
-        atol=1e-6,
-        equal_nan=True,
-    )
-    np.testing.assert_allclose(
-        wide_df["close_12h_momentum_RSI_5_ratio"].to_numpy(dtype=np.float64),
-        np.array([7.0, 8.0, 9.0], dtype=np.float64),
-        atol=1e-6,
-        equal_nan=True,
-    )
-
-
 def test_task210_layer7_cgsa_per_group_validate_without_materialize(tmp_path: Path, monkeypatch):
     """Task 2.10（FRAMEPATH：改走唯一 CGSA L7 入口 `_layer7_raw_from_cgsa_pipeline`）：per-group validate，且不在 validate 階段 materialize、persist=False 不落盤（V1 版面寫入 persist_registry_to_parquet 已刪，落盤探針改掛 V2 串流寫入）。"""
     from types import SimpleNamespace
@@ -192,12 +130,7 @@ def test_task210_layer7_cgsa_per_group_validate_without_materialize(tmp_path: Pa
     registry.save_data(group_nan, np.array([[np.nan], [np.nan], [np.nan]], dtype=np.float32))
     registry.save_data(group_inf, np.array([[1.0], [np.inf], [2.0]], dtype=np.float32))
 
-    # 若被呼叫代表違反 Task 2.10（validate 階段不應 materialize）。
-    monkeypatch.setattr(
-        registry,
-        "materialize_wide_df",
-        lambda: (_ for _ in ()).throw(AssertionError("materialize_wide_df should not be called")),
-    )
+    # Task 2.10（validate 階段不應 materialize）：寬表組裝已於 FFPROD Task 1.1 刪除（生產無呼叫者），結構上不可呼叫。
 
     persist_called = {"value": False}
 

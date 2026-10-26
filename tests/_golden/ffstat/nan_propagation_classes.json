@@ -412,16 +412,6 @@
       "class": "not_in_generation_path",
       "evidence": "operator_registry.py:31-59 只經 OperatorRegistry.default_registry 註冊；OperatorRegistry 全 repo 無呼叫者（operators/__init__.py 只匯出）"
     },
-    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_aggregator": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "rolling_aggregator.py:926 派發函式"
-    },
-    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregator": {
-      "propagates_nan": true,
-      "class": "propagating",
-      "evidence": "rolling_aggregator.py:937 rolling(window) 預設 min_periods=window"
-    },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregators_chunked": {
       "propagates_nan": false,
       "class": "dispatcher",
@@ -487,11 +477,6 @@
       "class": "propagating",
       "evidence": "rolling_aggregator.py:644 numba_rolling.rolling_rank（:335，輸出預設 NaN、窗滿才填）"
     },
-    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_numba_slope": {
-      "propagates_nan": true,
-      "class": "propagating",
-      "evidence": "rolling_aggregator.py:653 numba 斜率核心（窗滿才填）"
-    },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_range": {
       "propagates_nan": true,
       "class": "propagating",
@@ -501,11 +486,6 @@
       "propagates_nan": true,
       "class": "propagating",
       "evidence": "rolling_aggregator.py:1074 rolling(window).rank"
-    },
-    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_single_agg_window": {
-      "propagates_nan": true,
-      "class": "propagating",
-      "evidence": "rolling_aggregator.py:661 rolling(window)"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_skew": {
       "propagates_nan": true,
@@ -642,11 +622,6 @@
       "class": "helper",
       "evidence": "polars_adapter.py:67-91 環境旗標"
     },
-    "momentum.FeatureEngineering.polars_adapter:_make_rolling_pct_rank_fn": {
-      "propagates_nan": false,
-      "class": "not_in_generation_path",
-      "evidence": "feature_factory.py:2830-2836 pre-IC 強制關閉 rank／zscore／gaussian；只於 post-IC（R7 歸 ICFIRSTALIGN）"
-    },
     "momentum.FeatureEngineering.polars_adapter:_safe_denom_expr": {
       "propagates_nan": false,
       "class": "helper",
@@ -686,21 +661,6 @@
       "propagates_nan": true,
       "class": "propagating",
       "evidence": "polars_adapter.py:204-239 逐點 A/B（pandas_to_polars:124 NaN→null，null 運算傳遞）"
-    },
-    "momentum.FeatureEngineering.polars_adapter:polars_l65_adaptive_zscore": {
-      "propagates_nan": false,
-      "class": "not_in_generation_path",
-      "evidence": "feature_factory.py:2830-2836 pre-IC 強制關閉 rank／zscore／gaussian；只於 post-IC（R7 歸 ICFIRSTALIGN）"
-    },
-    "momentum.FeatureEngineering.polars_adapter:polars_l65_rank_transform": {
-      "propagates_nan": false,
-      "class": "not_in_generation_path",
-      "evidence": "feature_factory.py:2830-2836 pre-IC 強制關閉 rank／zscore／gaussian；只於 post-IC（R7 歸 ICFIRSTALIGN）"
-    },
-    "momentum.FeatureEngineering.polars_adapter:polars_l65_winsorization": {
-      "propagates_nan": false,
-      "class": "incomplete_window",
-      "evidence": "polars_adapter.py:401-420 因果路徑 _rolling_mean_std／rolling_quantile_2d 以 min_periods 出界線，界線未定之列保留原值；非因果分支不可達（feature_preprocessor.py:168-176 causal_preprocessing 強制 True）"
     },
     "momentum.FeatureEngineering.polars_adapter:polars_to_pandas": {
       "propagates_nan": true,
@@ -1027,11 +987,6 @@
       "class": "helper",
       "evidence": "_numba_transforms.py:484 JIT 預熱"
     },
-    "momentum.FeatureEngineering.preprocessing._numba_transforms:winsorize_array": {
-      "propagates_nan": false,
-      "class": "not_in_generation_path",
-      "evidence": "_numba_transforms.py:340-371 全樣本分位；只於 causal_preprocessing=False 分支（:449），生成路徑不可達（feature_preprocessor.py:168-176 causal_preprocessing 強制 True）"
-    },
     "momentum.FeatureEngineering.preprocessing._slow_path_parallel:ParallelSlowPath.map": {
       "propagates_nan": false,
       "class": "dispatcher",
@@ -1297,11 +1252,6 @@
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
     },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._log_registry_io_summary": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
-    },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._mark_event_on_keys": {
       "propagates_nan": false,
       "class": "helper",
@@ -1311,11 +1261,6 @@
       "propagates_nan": false,
       "class": "mask",
       "evidence": "preprocessing/feature_preprocessor.py 逐欄校準列遮罩（Task 2.3 ④）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._maybe_run_native_l65_inplace": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._maybe_run_native_l65_to_sink": {
       "propagates_nan": false,
@@ -1382,11 +1327,6 @@
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
     },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._registry_io_stats": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
-    },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._resolve_fracdiff_max_lag": {
       "propagates_nan": false,
       "class": "helper",
@@ -1401,11 +1341,6 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_last_rank_pct_for_preprocess": {
-      "propagates_nan": false,
-      "class": "not_in_generation_path",
-      "evidence": "preprocessing/feature_preprocessor.py:3745 rank 轉換核心，只於 post-IC（R7）"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_min_periods": {
       "propagates_nan": false,
@@ -1462,47 +1397,12 @@
       "class": "dispatcher",
       "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
     },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_array_slice": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_chunked": {
       "propagates_nan": false,
       "class": "dispatcher",
       "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
     },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_registry_parallel": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_registry_serial": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_group": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_group_chunked": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_group_chunked_to_arrays": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_group_optimized": {
       "propagates_nan": false,
       "class": "dispatcher",
       "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
@@ -1521,11 +1421,6 @@
       "propagates_nan": false,
       "class": "dispatcher",
       "evidence": "preprocessing/feature_preprocessor.py:2704-2786 依旗標呼叫 _winsorize_2d_legacy_equivalent（縮尾）；rank／zscore／gaussian pre-IC 關閉"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_polars": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._warmup_numba_if_needed": {
       "propagates_nan": false,
@@ -1568,11 +1463,6 @@
       "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.transform": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.transform_registry_groups": {
       "propagates_nan": false,
       "class": "dispatcher",
       "evidence": "preprocessing/feature_preprocessor.py:478-2999 L6.5 執行入口／群組派發：輸出＝縮尾、fracdiff、ADF 差分等已列步驟之結果（native 路徑經 apply_idx_map_to_array 展開）"
@@ -1996,11 +1886,6 @@
       "propagates_nan": false,
       "class": "dispatcher",
       "evidence": "preprocessing/feature_preprocessor.py ICPOSTLEAK Task 1.1：registry 快速路徑單一實作，依正式順序派發縮尾／rank／gaussian／zscore 已列核心並以 mask_incomplete_window_by_input_2d 遮窗未滿列（RATIOUNSAFE 補登：ICPOSTLEAK 新增後未入盤點）"
-    },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._polars_mask_columns": {
-      "propagates_nan": false,
-      "class": "mask",
-      "evidence": "preprocessing/feature_preprocessor.py ICPOSTLEAK：Polars 分支之輸入錨點窗未滿遮罩（RATIOUNSAFE 補登）"
     },
     "momentum.FeatureEngineering.preprocessing.stable_mask:mask_incomplete_window_by_input_2d": {
       "propagates_nan": false,

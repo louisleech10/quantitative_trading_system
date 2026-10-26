@@ -420,7 +420,6 @@ def test_l65_failure_raises_named_not_write_raw_empty(tmp_path: Path, monkeypatc
     """L6.5 拋例外 ⇒ `ICFirstGenerationError`，且其例外鏈帶 L6.5 之原始失敗（非 `write_raw requires non-empty`）。"""
     root = h.isolated(monkeypatch, tmp_path)
     monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups_to_sink", _l65_raises(RuntimeError("l65 boom")))
-    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", _l65_raises(RuntimeError("l65 boom")))
     with pytest.raises(icc.ICFirstGenerationError) as info:
         _run(h.make_factory(root))
     assert "requires non-empty" not in str(info.value)
@@ -434,7 +433,6 @@ def test_boundary_01_non_degradable_errors_reraised_as_is(tmp_path: Path, monkey
     root = h.isolated(monkeypatch, tmp_path)
     err = CalibrationError("non degradable", timeframe="12h", field="compute")
     monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups_to_sink", _l65_raises(err))
-    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", _l65_raises(err))
     with pytest.raises(CalibrationError):
         _run(h.make_factory(root))
 
@@ -475,7 +473,6 @@ def test_mutation_l65_failure_degrades_to_empty(tmp_path: Path, monkeypatch: pyt
             return 0
 
     monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups_to_sink", swallowed)
-    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", swallowed)
     try:
         _run(h.make_factory(root))
         raised: Any = None

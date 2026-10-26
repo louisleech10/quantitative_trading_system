@@ -193,9 +193,6 @@ def run_branch(branch: str, frame, work_dir: Path, cfg: Optional[dict] = None, t
                             data_source="ohlc", indicator="RATIOUNSAFE", columns=tuple(frame.columns), shape=(0, 0),
                             dtype="float32", disk_path=None)
         group = registry.save_data(group, frame.to_numpy(dtype=np.float32))
-        if spec["entry"] == "transform_registry_groups":
-            pre.transform_registry_groups(registry, n_workers=int(spec.get("n_workers", 1)))
-            return pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
         parts = {}
 
         def _sink(group_id, columns, data, source_group_id, source_disk_path, cleanup_source) -> None:

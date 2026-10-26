@@ -396,7 +396,9 @@ def test_t2b8_l65_fracdiff_per_group_feasible(tmp_path, monkeypatch):
 
     monkeypatch.setattr(preprocessor, "_apply_fractional_differencing", _fake_fracdiff)
 
-    processed_count = preprocessor.transform_registry_groups(registry)
+    from tests._fixtures.registry_l65 import apply_l65_via_sink
+
+    processed_count = apply_l65_via_sink(preprocessor, registry)  # FFPROD Task 1.1：經生產 raw 串流入口
 
     assert processed_count == 2
     assert calls["count"] == 2

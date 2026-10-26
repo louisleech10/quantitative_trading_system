@@ -341,9 +341,9 @@ def env_violations(arm: str, env: Mapping[str, Any], selected_count: int) -> Lis
 
 def g1_violations() -> List[str]:
     """驗證①（見模組說明）。"""
-    contract = load_contract()
     freeze = load_freeze()
     receipt = load_freeze_receipt()
+    contract = nh.contract_for_receipt(nh.NUMVIEW_CONTRACT_PATH, receipt)  # 歷史凍結對其產生時之契約（FFPROD b2 刪 polars 臂）
     arms = contract_arms(contract)
     for named in (SPEC_ARM_POLARS, SPEC_ARM_OPTIMIZED, SPEC_ARM_LEGACY, SPEC_ARM_CHUNKED):
         assert named in arms, f"SPEC 點名之臂 {named} 不屬契約 post_ic_arm_values"

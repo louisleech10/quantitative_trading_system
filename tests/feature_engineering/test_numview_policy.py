@@ -1,23 +1,24 @@
 """NUMVIEW Task 2.1（docs/NUMVIEW_SPEC.md §C D3、Task 2.1、§V oracle ②）：數值政策驗證之 Python 入口驗收。
 
 API 入口（`ApplyTransformsRequest` 之 422）見 `tests/api/test_numview_ic_page.py`。
-三入口＝pydantic（`PreprocessingConfig`／`FactoryConfig`）、dict 直接建構 `FeaturePreprocessor`、API；四臂＝`polars`、
-`pandas_optimized`、`pandas_legacy`、registry 快速臂（numba `transform_array_fast`）。臂之環境沿用
-`tests/_golden/icpostleak/contract.json` 之 `branches`（既有單一落點：polars／optimized／legacy／registry）。
-「臂分派前拒收」以 spy 斷言（§V oracle ②）：各臂轉換函式（`_transform_single_polars`、`_transform_single`、
-`_transform_single_optimized_df`、`_transform_single_legacy`、`_transform_chunked`、`_build_registry_transform_context`、
-`_transform_registry_serial`、`_transform_registry_parallel`、`_numba_transforms.transform_array_fast`）呼叫次數皆 0。
+三入口＝pydantic（`PreprocessingConfig`／`FactoryConfig`）、dict 直接建構 `FeaturePreprocessor`、API；臂＝
+`pandas_optimized`、`pandas_legacy`、registry 快速臂（numba `transform_array_fast`，經生產 raw 串流入口）。臂之環境沿用
+`tests/_golden/icpostleak/contract.json` 之 `branches`（optimized／legacy／registry_sink）。FFPROD Task 1.1：原四臂之
+`polars`（post-IC Polars 轉換鏈）生產不可達已刪，其臂案與 mutation 一併移除。
+「臂分派前拒收」以 spy 斷言（§V oracle ②）：各臂轉換函式（`_transform_single`、`_transform_single_optimized_df`、
+`_transform_single_legacy`、`_transform_chunked`、`_build_registry_transform_context`、`_transform_single_group_to_arrays`、
+`_numba_transforms.transform_array_fast`）呼叫次數皆 0。
 每個臂案另以同臂合法設定為正控制（該臂之具名轉換函式確被呼叫），證 spy 與環境確能觀測該臂。
 
 驗證：①空窗（zscore 啟用、windows=[]）：pydantic 驗證錯、dict 入口 `NumericPolicyError`，×四臂皆分派前拒收；
 ②未知 method（`bogus`）：同入口×四臂，含快速核心直接呼叫 `transform_array_fast(winsor_method="bogus")` 拋
 `NumericPolicyError`；③dict 入口縮尾啟用而缺 `method` 鍵 ⇒ 拒收（依契約 `winsor_method_missing_key`；pydantic 由
 `WinsorConfig` 預設填值不拒）；④合法設定（真實 kline 格 A 之 BTCUSDT 1h）四臂輸出對 §G 逐位元相等——
-`polars`／`pandas_optimized`／`pandas_legacy` 對 G1 同臂份（以 IC 頁預設請求之 post-IC 設定經 `transform()` 依環境
+`pandas_optimized`／`pandas_legacy` 對 G1 同臂份（以 IC 頁預設請求之 post-IC 設定經 `transform()` 依環境
 分派重算），registry 快速臂對 G2（格 A raw 於 `FFACT_USE_POLARS` 各值之份；並斷言該 run 確有群組走 numba 快速臂）；
 另：winsor 缺鍵盤點收據（`handoffs/run_receipts/*-numview-winsor-key-inventory.json`）證生產 dict 來源皆帶 `method`。
 邊界：23 `enabled=false` 且空窗 ⇒ 合法且輸出＝zscore 關之輸出；24 窗含 0 或負數 ⇒ 拒收；25 method 大小寫變體 ⇒ 拒收。
-mutation：恢復 Polars 之 `else 100` 並繞過驗證 ⇒ ①Polars 案翻轉；恢復快速核心 `elif causal_preprocessing`
+mutation：恢復快速核心 `elif causal_preprocessing`
 （非 sigma 一律 quantile）⇒ ②快速核心案翻轉；驗證器只掛 pydantic 不掛 `__init__` ⇒ ①③dict 案翻轉。
 
 測試接縫（實作須提供；名稱為本檔之假設，見回報）：
@@ -78,19 +79,18 @@ WINSOR_INVENTORY_GLOB = "*-numview-winsor-key-inventory.json"
 
 #: SPEC Task 2.1 點名之四臂（前三者為契約 `post_ic_arm_values` 之值，見 `test_spec_named_arms_belong_to_contract`）
 REGISTRY_ARM = "registry_fast"  # 測試端標籤（SPEC「registry 快速臂」），非契約值
-ARMS: Tuple[str, ...] = ("polars", "pandas_optimized", "pandas_legacy", REGISTRY_ARM)
-POST_IC_ARMS: Tuple[str, ...] = ARMS[:3]
+# FFPROD Task 1.1：Polars post-IC 轉換鏈已刪（契約 post_ic_arm_values 無 polars）；registry 快速臂經生產 raw 串流入口
+ARMS: Tuple[str, ...] = ("pandas_optimized", "pandas_legacy", REGISTRY_ARM)
+POST_IC_ARMS: Tuple[str, ...] = ARMS[:2]
 #: 臂 → icpostleak 契約 `branches` 之鍵（環境與入口之既有單一落點）
-ARM_BRANCH: Dict[str, str] = {"polars": "polars", "pandas_optimized": "optimized", "pandas_legacy": "legacy",
-                              REGISTRY_ARM: "registry"}
+ARM_BRANCH: Dict[str, str] = {"pandas_optimized": "optimized", "pandas_legacy": "legacy", REGISTRY_ARM: "registry_sink"}
 #: 各臂之具名轉換函式（正控制：合法設定下須被呼叫）
-ARM_PROBE: Dict[str, str] = {"polars": "_transform_single_polars", "pandas_optimized": "_transform_single_optimized_df",
+ARM_PROBE: Dict[str, str] = {"pandas_optimized": "_transform_single_optimized_df",
                              "pandas_legacy": "_transform_single_legacy", REGISTRY_ARM: "transform_array_fast"}
 #: 「臂分派」之 spy 對象（任一被呼叫即非分派前拒收；§V oracle ②）
 DISPATCH_FUNCS: Tuple[str, ...] = (
-    "_transform_single_polars", "_transform_single", "_transform_single_optimized_df", "_transform_single_legacy",
-    "_transform_chunked", "_build_registry_transform_context", "_transform_registry_serial",
-    "_transform_registry_parallel",
+    "_transform_single", "_transform_single_optimized_df", "_transform_single_legacy",
+    "_transform_chunked", "_build_registry_transform_context", "_transform_single_group_to_arrays",
 )
 ARM_ENV_KEYS: Tuple[str, ...] = ("FFACT_USE_POLARS", "FFACT_L65_OPTIMIZATION_PROFILE", "FFACT_L65_CHUNK_SIZE")
 #: SPEC §A／設計選擇③以字面點名之縮尾 method（mutant 重現舊快速核心語意用；先斷言屬契約值集）
@@ -168,7 +168,8 @@ def _set_arm_env(mp: pytest.MonkeyPatch, arm: str) -> None:
 
 
 def _dispatch(pre: FeaturePreprocessor, arm: str, frame: pd.DataFrame, work: Path) -> pd.DataFrame:
-    """依臂之入口執行：registry 快速臂經 `transform_registry_groups`（同 icpostleak 分支測試之群組建法），其餘經 `transform`。"""
+    """依臂之入口執行：registry 快速臂經生產 raw 串流入口 `transform_registry_groups_to_sink`（`tests/_fixtures/registry_l65.py`
+    之收集式 sink 寫回；同 icpostleak 分支測試之群組建法），其餘經 `transform`。"""
     if ICPOSTLEAK["branches"][ARM_BRANCH[arm]]["entry"] == "transform":
         return pre.transform(frame.copy())
     from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
@@ -178,7 +179,13 @@ def _dispatch(pre: FeaturePreprocessor, arm: str, frame: pd.DataFrame, work: Pat
     group = ColumnGroup(group_id="1h_L1_numview", layer=LayerSource.L1, timeframe="1h", data_source="close",
                         indicator="NUMVIEW", columns=tuple(frame.columns), shape=(0, 0), dtype="float32", disk_path=None)
     group = registry.save_data(group, frame.to_numpy(dtype=np.float32))
-    pre.transform_registry_groups(registry, n_workers=1)
+    from tests._fixtures.registry_l65 import apply_l65_via_sink
+
+    # 同生產：registry 路徑只服務 raw，raw 之 L6.5 一律關 rank／zscore／gaussian（`feature_factory.
+    # _build_l7_raw_preprocessing_config`）；於建構後關閉，建構時之政策驗證仍對原設定執行（拒收案語意不變）
+    for step_config in (pre.rank_config, pre.zscore_config, pre.gaussian_config):
+        step_config["enabled"] = False
+    apply_l65_via_sink(pre, registry, n_workers=1)
     return pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
 
 
@@ -274,7 +281,7 @@ def _fast_core_error(method: str) -> Optional[BaseException]:
     """快速核心直接呼叫（經模組屬性，mutant 可替換）；回傳所拋例外或 None。"""
     arr = _real_frame().to_numpy(dtype=np.float32)
     try:
-        nt.transform_array_fast(arr, winsorize=True, winsor_method=method, rank=False, zscore=False,
+        nt.transform_array_fast(arr, winsorize=True, winsor_method=method,
                                 causal_preprocessing=True)
     except Exception as exc:  # noqa: BLE001 — 型別由呼叫端斷言
         return exc
@@ -288,7 +295,7 @@ def test_fast_core_unknown_method_raises() -> None:
     arr = _real_frame().to_numpy(dtype=np.float32)
     outputs = {}
     for method in _method_values():
-        outputs[method] = nt.transform_array_fast(arr, winsorize=True, winsor_method=method, rank=False, zscore=False,
+        outputs[method] = nt.transform_array_fast(arr, winsorize=True, winsor_method=method,
                                                   causal_preprocessing=True)
         assert outputs[method].shape == arr.shape
     assert not np.array_equal(outputs[SPEC_SIGMA], outputs[SPEC_QUANTILE], equal_nan=True)
@@ -486,10 +493,11 @@ def test_legal_setting_registry_fast_arm_bitwise_equal_g2(lab: CellLab) -> None:
 @pytest.mark.parametrize("arm", ARMS)
 def test_boundary_23_zscore_disabled_with_empty_windows_is_legal(arm: str, tmp_path: Path) -> None:
     """邊界①（Task 2.1）：`enabled=false` 且窗清單為空 ⇒ 合法不拒（pydantic、validator、dict 建構皆通過），且真實資料
-    輸出逐位元等於 zscore 關（預設窗）之輸出；rank 開故輸出≠輸入（非空轉）。"""
+    輸出逐位元等於 zscore 關（預設窗）之輸出；rank 開故輸出≠輸入（非空轉）——registry 臂同生產只做縮尾，改以縮尾開防空轉。"""
     frame = _real_frame()
-    off_empty = _payload(zscore={"enabled": False, "windows": [], "apply_to": "all"})
-    off_default = _payload(zscore={"enabled": False, "apply_to": "all"})
+    winsor = _legal_winsor("quantile") if arm == REGISTRY_ARM else None
+    off_empty = _payload(zscore={"enabled": False, "windows": [], "apply_to": "all"}, winsor=winsor)
+    off_default = _payload(zscore={"enabled": False, "apply_to": "all"}, winsor=winsor)
     PreprocessingConfig(**off_empty)
     AdaptiveZScoreConfig(enabled=False, windows=[])
     assert nv.validate_preprocessing_policy(off_empty) is None
@@ -559,29 +567,6 @@ def _bypass_validation(monkeypatch: pytest.MonkeyPatch, only_from_preprocessor: 
         monkeypatch.setattr(fp_mod, "validate_preprocessing_policy", mutant)
 
 
-def test_mutation_polars_else_100_restored_and_validation_bypassed(monkeypatch: pytest.MonkeyPatch,
-                                                                    tmp_path: Path) -> None:
-    """mutation：恢復 Polars 臂 `primary_window = … else 100`（空窗以 100 照做）並繞過驗證 ⇒ ①之 Polars dict 案翻轉：
-    不再於分派前拒收，且輸出逐位元等於窗 [100] 之合法輸出（靜默改值）。"""
-    _bypass_validation(monkeypatch, only_from_preprocessor=False)
-    real = getattr(FeaturePreprocessor, "_transform_single_polars")
-
-    def restored_else_100(self: FeaturePreprocessor, features_df: pd.DataFrame) -> pd.DataFrame:
-        if self.zscore_config.get("enabled", False) and not self.zscore_config.get("windows"):
-            self.zscore_config = dict(self.zscore_config, windows=[100])
-        return real(self, features_df)
-
-    monkeypatch.setattr(FeaturePreprocessor, "_transform_single_polars", restored_else_100)
-    frame = _real_frame()
-    bad = _payload(zscore={"enabled": True, "windows": [], "apply_to": "all"})
-    outcome = _attempt(lambda: FeaturePreprocessor(copy.deepcopy(bad)), "polars", frame, tmp_path)
-    assert not rejected_before_dispatch(outcome, nv.NumericPolicyError)
-    assert outcome.error is None and "_transform_single_polars" in outcome.calls
-    legal = _attempt(lambda: FeaturePreprocessor(_payload(zscore={"enabled": True, "windows": [100], "apply_to": "all"})),
-                     "polars", frame, tmp_path)
-    assert np.array_equal(outcome.output.to_numpy(dtype=np.float64), legal.output.to_numpy(dtype=np.float64),
-                          equal_nan=True)
-
 
 def test_mutation_fast_core_elif_causal_restored(monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：恢復快速核心 `elif causal_preprocessing:`（非 sigma 之 method 一律走 quantile）⇒ ②快速核心案翻轉：
@@ -595,7 +580,7 @@ def test_mutation_fast_core_elif_causal_restored(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(nt, "transform_array_fast", old_core)
     assert _fast_core_error(BOGUS_METHOD) is None
     arr = _real_frame().to_numpy(dtype=np.float32)
-    kwargs = dict(winsorize=True, rank=False, zscore=False, causal_preprocessing=True)
+    kwargs = dict(winsorize=True, causal_preprocessing=True)
     assert np.array_equal(nt.transform_array_fast(arr, winsor_method=BOGUS_METHOD, **kwargs),
                           real(arr, winsor_method=SPEC_QUANTILE, **kwargs), equal_nan=True)
 

@@ -11,6 +11,7 @@ from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSour
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests._fixtures.registry_l65 import apply_l65_via_sink
 
 
 def _make_group(group_id: str, columns: Tuple[str, ...]) -> ColumnGroup:
@@ -64,19 +65,19 @@ def test_t217_l65_per_group_matches_legacy(tmp_path: Path, winsor_method: str):
         features.loc[:, list(group_b_cols)].to_numpy(dtype=np.float32),
     )
 
-    preprocess_config = {
-        "winsorization": {"method": winsor_method},
-        "rank_transform": {"enabled": True, "apply_to": "all", "window": 3},
-    }
+    # FFPROD Task 1.1：per-group 經生產 raw 串流入口（registry 路徑只做縮尾；raw 之 L6.5 一律關 rank／zscore／gaussian，
+    # 原 rank 開啟之 per-group 比對對象〔in-place 入口〕已刪）；窗 3 使 6 列輸出有有限值（避免兩路皆全遮罩之空比對）
+    preprocess_config = {"winsorization": {"method": winsor_method, "window": 3}}
 
     per_group_preprocessor = FeaturePreprocessor(preprocess_config)
-    processed_group_count = per_group_preprocessor.transform_registry_groups(registry)
+    processed_group_count = apply_l65_via_sink(per_group_preprocessor, registry)
     per_group_output = _materialize_registry(registry).loc[:, list(features.columns)]
 
     legacy_output = FeaturePreprocessor(preprocess_config).transform(features)
     legacy_output = legacy_output.loc[:, list(features.columns)]
 
     assert processed_group_count == 2
+    assert np.isfinite(per_group_output.to_numpy(dtype=np.float64)).any()
     np.testing.assert_allclose(
         per_group_output.to_numpy(dtype=np.float64),
         legacy_output.to_numpy(dtype=np.float64),

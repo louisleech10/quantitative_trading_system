@@ -263,23 +263,15 @@ def test_mutation_denominator_full_column_median_is_caught() -> None:
 
 
 def test_noncausal_winsor_helpers_fail_closed() -> None:
-    """v53（審查 r36 codex P1-02）：`polars_l65_winsorization`、`transform_array_fast` 直接以
-    `causal_preprocessing=False` 呼叫即拋例外（改前走全欄統計量＝未來洩漏；sigma 分支另於實跑拋 IndexError）；
-    因果呼叫照常。"""
-    import polars as pl
-
-    from momentum.FeatureEngineering.polars_adapter import polars_l65_winsorization
+    """v53（審查 r36 codex P1-02）：`transform_array_fast` 直接以 `causal_preprocessing=False` 呼叫即拋例外（改前走
+    全欄統計量＝未來洩漏；sigma 分支另於實跑拋 IndexError）；因果呼叫照常。（FFPROD：L6.5 polars 縮尾無生產呼叫者已刪）"""
     from momentum.FeatureEngineering.preprocessing._numba_transforms import transform_array_fast
 
     values = _close("1h")[:600].reshape(-1, 1).astype(np.float32)
-    frame = pl.DataFrame({"c": values[:, 0].astype(np.float64)})
     for method in ("sigma", "quantile"):
         with pytest.raises(ValueError):
-            polars_l65_winsorization(frame, columns=["c"], method=method, causal_preprocessing=False)
-        with pytest.raises(ValueError):
             transform_array_fast(values, winsor_method=method, causal_preprocessing=False)
-        polars_l65_winsorization(frame, columns=["c"], method=method, causal_preprocessing=True)
-        transform_array_fast(values, winsor_method=method, causal_preprocessing=True, zscore_window=100)
+        transform_array_fast(values, winsor_method=method, causal_preprocessing=True)
 
 
 def _foreign_market_ingestion_raises() -> bool:
@@ -542,7 +534,6 @@ def test_inventory_closure_reaches_off_prefix_and_nested_steps() -> None:
     for name in (f"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor._winsorize_2d_legacy_equivalent",
                  f"{fe}.operators._worldquant_numba:_ts_argmax_2d",
                  f"{fe}.polars_adapter:polars_l2_derived_momentum",
-                 f"{fe}.polars_adapter:polars_l65_winsorization",
                  f"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor.transform_registry_groups_to_sink",
                  f"{fe}.preprocessing._numba_transforms:transform_array_fast"):
         assert name in got, name
@@ -571,7 +562,7 @@ def _ast_step_functions() -> set:
     for path in _step_source_files():
         module = ".".join(path.relative_to(REPO).with_suffix("").parts)
         defined |= {f"{module}:{q}" for q in _module_functions(ast.parse(path.read_text(encoding="utf-8")))}
-    # 種子＝一切公開函式（L6.5 之 transform／transform_registry_groups* 等入口不合前綴）＋合前綴之私有函式
+    # 種子＝一切公開函式（L6.5 之 transform／transform_registry_groups_to_sink 等入口不合前綴）＋合前綴之私有函式
     out = {q for q in defined if not (n := q.split(":")[1].split(".")[-1]).startswith("_") or n.startswith(prefixes)}
     frontier = set(out)
     while frontier:
@@ -802,7 +793,6 @@ def test_chunked_memmap_keeps_appended_columns(monkeypatch: pytest.MonkeyPatch) 
 
 _WINSOR_PATHS = {
     # 路徑名 → (FFACT_USE_POLARS, FFACT_L65_OPTIMIZATION_PROFILE, mode, 欄分塊大小〔0＝不分塊〕)
-    "polars": ("1", "optimized", "append", 0),
     "legacy_append": ("0", "optimized", "append", 0),
     "optimized_replace": ("0", "optimized", "replace", 0),
     "legacy_replace": ("0", "legacy", "replace", 0),
@@ -813,7 +803,7 @@ _WINSOR_PATHS = {
 @pytest.mark.parametrize("path", sorted(_WINSOR_PATHS))
 def test_winsorization_switch_honoured_on_every_path(path: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """審查 r34 主委實跑所得（改前既有缺陷）：`winsorization.enabled=False` 時 L6.5 各轉換路徑須不縮尾、輸出＝輸入；
-    改前 `_transform_single_legacy`、`_transform_single_optimized_df`、`_transform_single_polars` 無視開關（其餘轉換皆有
+    改前 `_transform_single_legacy`、`_transform_single_optimized_df` 與 L6.5 polars 臂（FFPROD 已刪）無視開關（其餘轉換皆有
     `enabled` 判斷），關縮尾仍縮尾並遮開頭 251 列。同一路徑開縮尾須與輸入不同（證明本測試觀測得到縮尾）。"""
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 

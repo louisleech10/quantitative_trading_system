@@ -39,8 +39,8 @@ if _HAS_NUMBA:
 
         Note (P1.1 reverted 2026-04-25):
             We previously experimented with ``@njit(parallel=True) + prange``
-            here. It is **incompatible** with the L6.5 outer ThreadPool
-            (``feature_preprocessor._transform_registry_parallel``) under the
+            here. It is **incompatible** with an L6.5 outer ThreadPool
+            (registry 群組平行轉換；該入口已於 FFPROD Task 1.1 刪除) under the
             default Numba ``workqueue`` threading layer, which is *not*
             threadsafe. Concurrent calls from multiple Python threads aborted
             the worker process. Switching layers (``omp``/``tbb``) requires
@@ -339,40 +339,6 @@ def rolling_quantile_2d(
 # Winsorization (quantile clipping) — pure numpy
 # ---------------------------------------------------------------------------
 
-def winsorize_array(arr: np.ndarray, lower_q: float = 0.01, upper_q: float = 0.99) -> np.ndarray:
-    """Quantile winsorization on float32 array, column-wise.
-
-    Memory-conscious in-place variant (P2.5 — 2026-04-25):
-        Profiler showed the previous implementation peaked at ~4× input
-        because each of ``np.clip`` / ``np.where`` / ``.astype`` allocated
-        a new full-size copy. We now:
-        1. Clip in-place into ``arr`` (caller already passed a fresh copy
-           via ``transform_array_fast``'s opening ``astype(copy=True)``).
-        2. Compute the NaN mask once and write NaN back via boolean
-           indexing instead of ``np.where`` (no copy).
-        3. Skip the trailing ``.astype(np.float32)`` because clip preserves
-           dtype when the bounds match.
-        Peak drops from ~4× input to ~2× input (only the two quantile
-        bound vectors are extra).
-
-    Single-sort optimization (P4.3 — 2026-04-25):
-        ``np.nanquantile`` sorts each column to compute the quantile.
-        Calling it twice (lower then upper) doubles the sort cost. By
-        passing both quantiles as an array, numpy sorts each column once
-        and interpolates both quantiles from the same sorted view —
-        bit-exact equivalent to two separate calls.
-    """
-    bounds = np.nanquantile(arr, [lower_q, upper_q], axis=0).astype(
-        np.float32, copy=False
-    )
-    lowers = bounds[0]
-    uppers = bounds[1]
-    nan_mask = np.isnan(arr)
-    np.clip(arr, lowers, uppers, out=arr)
-    arr[nan_mask] = np.nan
-    return arr
-
-
 def rolling_winsorize_array(
     arr: np.ndarray,
     lower_q: float = 0.01,
@@ -405,37 +371,24 @@ def transform_array_fast(
     winsor_lower_q: float = 0.01,
     winsor_upper_q: float = 0.99,
     winsor_sigma_k: float = 3.0,
-    rank: bool = True,
-    rank_window: int = 252,
-    zscore: bool = True,
-    zscore_window: Optional[int] = None,
-    zscore_epsilon: float = 1e-8,
     causal_preprocessing: bool = True,
     winsor_window: int = 252,
     winsor_min_periods: int = 63,
 ) -> np.ndarray:
-    """Apply L6.5 transforms on a raw float32 array (rows × cols).
+    """Apply the L6.5 winsorize step on a raw float32 array (rows × cols); returns float32 of same shape.
 
-    Order: winsorize → rank_transform → adaptive_zscore (matches _transform_single).
-    Returns float32 array of same shape (replace mode only).
-
-    Memory-conscious in-place chain (P2.5 — 2026-04-25):
-        Profiler revealed zscore was the largest RAM amplifier (peak ~7×
-        input) because the formula ``(data-mean)/(std+eps)`` plus two
-        ``np.where`` calls plus ``.astype`` allocated 5+ full-size temps.
-        We now compute zscore in-place on the rolling-rank output,
-        eliminating those copies. Combined with the winsorize in-place
-        change, peak per-group drops from ~7× to ~3× input.
+    FFPROD Task 1.1：快速核心只服務 raw 生成（registry 路徑），raw 之 L6.5 一律關 rank／zscore／gaussian
+    （`feature_factory._build_l7_raw_preprocessing_config`），故核心只保留縮尾步；rank／zscore 之生產實作在 pandas 核心。
     """
     if not causal_preprocessing:
         # FFSTAT v53（審查 r36 codex P1-02）：全欄 nanmean／nanstd／nanquantile 分支＝未來洩漏（且 sigma 分支之廣播
         # 於實跑拋 IndexError）；生成路徑早已釘死因果，直接呼叫亦 fail-closed
         raise ValueError("非因果前處理（causal_preprocessing=False）已移除：全欄統計量含未來資料")
-    # NUMVIEW Task 2.1（審碼 b3 r1）：核心不再以預設 method／窗補值——啟用之步驟須明給
-    if (winsorize and winsor_method is None) or (zscore and zscore_window is None):
+    # NUMVIEW Task 2.1（審碼 b3 r1）：核心不再以預設 method 補值——啟用之步驟須明給
+    if winsorize and winsor_method is None:
         from momentum.FeatureEngineering.numeric_view import NumericPolicyError
 
-        raise NumericPolicyError("快速核心：縮尾啟用須明給 winsor_method、zscore 啟用須明給 zscore_window（不以預設補值）")
+        raise NumericPolicyError("快速核心：縮尾啟用須明給 winsor_method（不以預設補值）")
     data = arr.astype(np.float32, copy=True)
 
     if winsorize:
@@ -470,33 +423,6 @@ def transform_array_fast(
             from momentum.FeatureEngineering.numeric_view import NumericPolicyError
 
             raise NumericPolicyError(f"縮尾 method={winsor_method!r} 不屬契約 winsor_method_values（快速核心）")
-
-    if rank:
-        # rank produces a fresh out array; safe to discard the prior `data`.
-        data = _rolling_rank_numba(data, rank_window, _rolling_min_periods(rank_window))
-
-    if zscore:
-        mean, std = _rolling_mean_std(
-            data,
-            zscore_window,
-            min_periods=_rolling_min_periods(zscore_window),
-        )
-        # Cache masks BEFORE mutating any input — preserves bit-exact parity
-        # with the original (data-mean)/(std+eps) + np.where(std>0,..) formula.
-        # NB: ``~(std > 0)`` matches BOTH std==0 and std==NaN (mirrors the
-        # original `np.where(std > 0, z, 0.0)` semantic where NaN std → 0.0).
-        nan_mask = np.isnan(data)
-        bad_std = ~(std > 0)
-        # In-place: data <- data - mean   (saves one full-size temp)
-        np.subtract(data, mean, out=data)
-        # In-place: std <- std + epsilon  (std is a fresh array; safe to mutate)
-        np.add(std, zscore_epsilon, out=std)
-        # In-place: data <- data / (std+eps)
-        np.divide(data, std, out=data)
-        if bad_std.any():
-            data[bad_std] = 0.0
-        data[nan_mask] = np.nan
-        # data is already float32 (rank output is float32); no astype needed.
 
     return data
 

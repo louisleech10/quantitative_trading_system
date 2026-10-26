@@ -76,7 +76,6 @@
     {"path": "scripts/verify_cgsa_pipeline.py", "qualname": "_check_available_tfs", "call": "h5py.File", "purpose": "K 線"},
     {"path": "scripts/verify_l1_warmup_requirements.py", "qualname": "load_klines", "call": "h5py.File", "purpose": "K 線"},
     {"path": "scripts/verify_nan_poisoning_fix.py", "qualname": "_load_raw", "call": "h5py.File", "purpose": "K 線"},
-    {"path": "momentum/FeatureEngineering/core/column_group_registry.py", "qualname": "ColumnGroupRegistry._load_group_frame_for_materialize", "call": "pd.read_parquet", "purpose": "產生端讀自身 CGSA 工作目錄之群組暫存 parquet（生成進行中、尚無 run manifest；非已落盤特徵 run）"},
     {"path": "momentum/FeatureEngineering/feature_storage.py", "qualname": "FeatureStorage.load_features_from_hdf5", "call": "h5py.File", "purpose": "case 特徵 h5（舊產生器 FeatureNamingConfig 之 case 儲存，寫入端 save_features_to_hdf5 同列；非 FF run、無 manifest；命名統一屬 SPEC §N 舊產生器殘留）"},
     {"path": "scripts/validate_cgsa_ab.py", "qualname": "_load_dataframe", "call": "pd.read_parquet", "purpose": "CGSA A/B 驗證工具讀層對照 JSON 所列之外部匯出比對檔（parquet／csv／pkl；非 FF run 版面）"}
   ],

@@ -819,6 +819,18 @@ def _estimate_receipt_path() -> Path:
     return paths[0]
 
 
+_ERA_CONTRACTS: Dict[Path, Dict[str, Any]] = {}
+
+
+def _estimate_era_contract(path: Path) -> Dict[str, Any]:
+    """估時收據產生時（其 `head`）之契約。NUMVIEW 估時工具與其收據檢查之臂／分支集合一律取此（FFPROD b2：現行契約已刪
+    L6.5 polars 臂與 registry 原地覆寫分支，歷史估時工具之成本模型仍以之為必量臂；歷史收據不改寫）。"""
+    if path not in _ERA_CONTRACTS:
+        receipt = json.loads(_estimate_receipt_path().read_text(encoding="utf-8"))
+        _ERA_CONTRACTS[path] = nh.contract_for_receipt(path, receipt)
+    return copy.deepcopy(_ERA_CONTRACTS[path])
+
+
 def _positive_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
 
@@ -937,7 +949,7 @@ def estimate_receipt_violations(receipt: Mapping[str, Any], kline: Mapping[str, 
         if not _positive_number(node.get("extrapolated_total_seconds")):
             out.append(f"{kind}：缺外推總秒數")
     groups = (run_kinds.get("freeze_baseline") or {}).get("groups") or {}
-    arms = set(nv.load_contract()["post_ic_arm_values"]["values"])
+    arms = set(_estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"])
     if not arms:
         out.append("契約 post_ic_arm_values 為空（G1 臂集無從比對）")
     g1 = groups.get("G1") or {}
@@ -2574,7 +2586,7 @@ def test_estimate_receipt_lists_history_blocked_cells_outside_extrapolation() ->
                                                        src_inv[probe_symbol][blocked_tf] - output_bars + 1},
                                        "reason_counts": {event: 1}, "attempt_seconds": 2.0}
     body = ESTIMATOR.build_receipt(cells, inventory, criteria, measurements,
-                                   nv.load_contract()["post_ic_arm_values"]["values"])
+                                   _estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"])
     receipt = json.loads(json.dumps({"reported_at": "2026-10-22T00:00:00+08:00", "cells": cells, **body}))
     expected = {c["id"] for c in cells["A"] if c["timeframes"] == [blocked_tf]
                 and src_inv[c["symbol"]][blocked_tf] <= src_inv[probe_symbol][blocked_tf]}
@@ -2605,7 +2617,7 @@ def _synthetic_measurements(inventory: Mapping[str, Mapping[str, int]], cells: M
                                   "seconds": 1.0, "peak_rss_bytes": 1}
         cell = target.get("cell")
         if cell is not None:
-            record["arm_seconds"] = {arm: 1.0 for arm in nv.load_contract()["post_ic_arm_values"]["values"]}
+            record["arm_seconds"] = {arm: 1.0 for arm in _estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"]}
             record["branch_seconds"] = {b: 1.0 for b in _icpostleak_registry_branches()}
             record["training_timeframes"] = list(cell["timeframes"])
         if cell is not None and target["category"] in ("A", "C"):
@@ -2616,7 +2628,7 @@ def _synthetic_measurements(inventory: Mapping[str, Mapping[str, int]], cells: M
                           pre_history={"required_pre_history_bars": 0,
                                        "ingest_floor": ESTIMATOR.cell_window(cell, criteria)[0]})
         if target["category"] in ("A", "B"):
-            record["arm_seconds"] = {arm: 1.0 for arm in nv.load_contract()["post_ic_arm_values"]["values"]}
+            record["arm_seconds"] = {arm: 1.0 for arm in _estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"]}
         out[target["target"]] = record
     return out
 
@@ -2648,7 +2660,7 @@ def cell_c_history_violations(estimator: ModuleType) -> List[str]:
         out.append("measurement_accepted 拒收格 C 之前史 blocked")
         return out
     body = estimator.build_receipt(cells, inventory, criteria, measurements,
-                                   nv.load_contract()["post_ic_arm_values"]["values"])
+                                   _estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"])
     receipt = json.loads(json.dumps({"reported_at": "2026-10-22T00:00:00+08:00", "cells": cells, **body}))
     expected = {c["id"] for c in cells["C"] if c["timeframes"] == [tf]
                 and src_inv[c["symbol"]][tf] <= src_inv[probe_symbol][tf]}
@@ -2944,7 +2956,7 @@ def closed_estimate_receipt_violations(receipt: Mapping[str, Any], kline: Mappin
             out.append(f"{kind}：缺外推總秒數")
     groups = (run_kinds.get("freeze_baseline") or {}).get("groups") or {}
     want_groups = criteria["cell_rules"]["freeze_groups"]
-    arms = set(nv.load_contract()["post_ic_arm_values"]["values"])
+    arms = set(_estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"])
     for name in ("G1", "G2", "G3"):
         if set((groups.get(name) or {}).get("cells") or []) != set(want_groups[name]):
             out.append(f"freeze_baseline.groups.{name} ≠ 判準 freeze_groups")
@@ -3208,7 +3220,7 @@ def test_estimate_receipt_closed_list_checker_discriminates() -> None:
     inventory = ESTIMATOR.kline_inventory(nh.KLINE_PATH)
     cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)
     body = ESTIMATOR.build_receipt(cells, inventory, criteria, _synthetic_measurements(inventory, cells),
-                                   nv.load_contract()["post_ic_arm_values"]["values"])
+                                   _estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"])
     receipt = json.loads(json.dumps({"reported_at": "2026-10-22T00:00:00+08:00", "cells": cells, **body}))
     assert closed_estimate_receipt_violations(receipt, _kline_index()) == []
     dropped = copy.deepcopy(receipt)
@@ -3446,8 +3458,11 @@ def test_mutation_estimate_path_registry(mutant: str, monkeypatch: pytest.Monkey
 def _valid_perf_receipt() -> Dict[str, Any]:
     """合 SPEC Task 1.1「效能基準」之收據樣本（結構；秒數為佔位）：判準 perf_benchmark 之每格一輸入、契約臂＋polars_float64
     各三次與中位數、Polars 慢因剖析。"""
-    arms = list(nv.load_contract()["post_ic_arm_values"]["values"]) + [nh.PERF_CANDIDATE_ARM]
-    return {"inputs": [{"cell": cid, "arms": {arm: {"reachable": True, "runs_seconds": [3.0, 1.0, 2.0], "median_seconds": 2.0}
+    arms = list(_estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"]) + [nh.PERF_CANDIDATE_ARM]
+    # head＝估時收據之 head：臂集合取同一時代之契約（FFPROD b2），檢查器據 head 讀該時代契約
+    head = json.loads(_estimate_receipt_path().read_text(encoding="utf-8"))["head"]
+    return {"head": head,
+            "inputs": [{"cell": cid, "arms": {arm: {"reachable": True, "runs_seconds": [3.0, 1.0, 2.0], "median_seconds": 2.0}
                                               for arm in arms}}
                        for cid in nh.criteria_run_cells("perf_benchmark")],
             "polars_profile": {"steps": [{"step": "rank_udf", "seconds": 80.0}, {"step": "zscore", "seconds": 5.0}],
@@ -3490,7 +3505,7 @@ def test_mutation_icpage_re_presentation_perf_receipt_content(mutant: str, monke
 
 def _icpostleak_registry_branches() -> List[str]:
     """ICPOSTLEAK 契約之非 IC 頁臂分支（registry 系；估時器 `branch_seconds` 之鍵）。不含 assert。"""
-    contract = json.loads((REPO / "tests" / "_golden" / "icpostleak" / "contract.json").read_text(encoding="utf-8"))
+    contract = _estimate_era_contract(REPO / "tests" / "_golden" / "icpostleak" / "contract.json")
     return [b for b in contract["branches"] if b not in ESTIMATOR.BRANCH_ARM]
 
 
@@ -3501,7 +3516,7 @@ def test_mutation_estimate_missing_arm_invalidates_receipt(mutant: str) -> None:
     criteria = _load_criteria()
     inventory = ESTIMATOR.kline_inventory(nh.KLINE_PATH)
     cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)
-    arms = nv.load_contract()["post_ic_arm_values"]["values"]
+    arms = _estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"]
 
     def receipt_for(measurements: Mapping[str, Any]) -> Dict[str, Any]:
         body = ESTIMATOR.build_receipt(cells, inventory, criteria, measurements, arms)
@@ -3513,7 +3528,9 @@ def test_mutation_estimate_missing_arm_invalidates_receipt(mutant: str) -> None:
     if mutant == "drop_contract_arm":
         target["arm_seconds"].pop("pandas_legacy")
     elif mutant == "drop_registry_branch":
-        target["branch_seconds"].pop(_icpostleak_registry_branches()[0])
+        # 估時器讀現行 ICPOSTLEAK 契約之分支（FFPROD b2 已刪 registry 原地覆寫分支）⇒ 改壞須取兩時代皆有之分支
+        live = json.loads((REPO / "tests" / "_golden" / "icpostleak" / "contract.json").read_text(encoding="utf-8"))
+        target["branch_seconds"].pop(next(b for b in _icpostleak_registry_branches() if b in live["branches"]))
     else:
         target["arm_seconds"].pop(ESTIMATOR.CANDIDATE_BRANCH_ARM)
     mutated = receipt_for(measurements)
@@ -3610,7 +3627,7 @@ def test_estimate_b4_mutant_generations_listed_and_costed() -> None:
     inventory = ESTIMATOR.kline_inventory(nh.KLINE_PATH)
     cells = ESTIMATOR.enumerate_cells(nh.KLINE_PATH)
     body = ESTIMATOR.build_receipt(cells, inventory, criteria, _synthetic_measurements(inventory, cells),
-                                   nv.load_contract()["post_ic_arm_values"]["values"])
+                                   _estimate_era_contract(nh.NUMVIEW_CONTRACT_PATH)["post_ic_arm_values"]["values"])
     rows = body["run_kinds"]["regen_b4_mutants"]["runs"]
     assert rows and all(r["seconds"] > 0 and r.get("mutation_test") for r in rows), rows
     assert body["run_kinds"]["regen_b4_mutants"]["extrapolated_total_seconds"] > 0

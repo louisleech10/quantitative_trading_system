@@ -17,7 +17,6 @@ from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
 )
 from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fp_mod
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
-    HAS_SCIPY,
     FeaturePreprocessor,
 )
 
@@ -94,19 +93,10 @@ def test_external_false_output_matches_causal_true_fast_registry_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """fast/registry 路徑：外部 False 經 transform_context 傳播後輸出 == causal True。"""
-    if not HAS_SCIPY:
-        pytest.skip("scipy required")
 
     frame = pd.DataFrame({"alpha": np.r_[np.linspace(1.0, 30.0, 30), 9999.0, 31.0]})
-    fast_config = {
-        **_winsor_config(causal=True),
-        "winsorization": {"enabled": False, "window": 20},
-        "gaussian_normalize": {
-            "enabled": True,
-            "clip_range": [0.001, 0.999],
-            "apply_to": "all",
-        },
-    }
+    # FFPROD：registry 快速路徑只做縮尾（生產 raw 設定關 rank／zscore／gaussian），改以縮尾驗傳播
+    fast_config = _winsor_config(causal=True)
     false_config = {**fast_config, "causal_preprocessing": False}
 
     causal_pre = FeaturePreprocessor(fast_config)
@@ -131,8 +121,8 @@ def test_external_false_output_matches_causal_true_fast_registry_path(
             alignment=None,
             layer="L1",
         )
-        pp._transform_single_group(registry, group, ctx)
-        return captured["data"]
+        outputs = pp._transform_single_group_to_arrays(registry, group, ctx)
+        return np.concatenate([data for _, _, data in outputs], axis=1)
 
     causal_fast = _run_fast(causal_pre, causal_ctx, frame)
     forced_fast = _run_fast(forced_pre, forced_ctx, frame)
@@ -188,10 +178,10 @@ def test_native_subinstance_external_false_still_causal() -> None:
         registry.load_data_native.return_value = values
         registry.get_alignment_idx_map.return_value = idx_map
         captured: dict[str, np.ndarray] = {}
-        registry.overwrite_data.side_effect = lambda _gid, data: captured.setdefault(
-            "data", data.copy()
-        )
-        assert pp._maybe_run_native_l65_inplace(registry, group)
+        def sink(_gid, _cols, data, _src, _path, _cleanup) -> None:
+            captured.setdefault("data", np.array(data, copy=True))
+
+        assert pp._maybe_run_native_l65_to_sink(registry, group, sink)
         return captured["data"]
 
     causal_out = _run_native(causal_parent, native_values)

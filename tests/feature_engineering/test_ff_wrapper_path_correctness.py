@@ -275,22 +275,14 @@ def _l65_config(*, fracdiff: bool = False) -> dict[str, Any]:
     }
 
 
-def test_v7_3_l65_polars_optimized_and_fracdiff_serial_paths(
+def test_v7_3_l65_optimized_and_fracdiff_serial_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """V7.3：L6.5 polars/numba_fast/serial-fracdiff 互斥路徑有 sentinel。"""
-    pytest.importorskip("polars")
-    import momentum.FeatureEngineering.polars_adapter as polars_adapter
-
+    """V7.3：L6.5 optimized／serial-fracdiff 互斥路徑有 sentinel（FFPROD：L6.5 polars 臂已刪，不再列為路徑）。"""
     frame = _l65_frame()
-    calls = {"polars": 0, "optimized": 0, "fracdiff": 0}
-    original_polars = FeaturePreprocessor._transform_single_polars
+    calls = {"optimized": 0, "fracdiff": 0}
     original_optimized = FeaturePreprocessor._transform_single_optimized_df
     original_serial = FeaturePreprocessor._apply_fractional_differencing_serial
-
-    def _counting_polars(self: FeaturePreprocessor, features_df: pd.DataFrame) -> pd.DataFrame:
-        calls["polars"] += 1
-        return original_polars(self, features_df)
 
     def _counting_optimized(self: FeaturePreprocessor, features_df: pd.DataFrame) -> pd.DataFrame:
         calls["optimized"] += 1
@@ -300,25 +292,15 @@ def test_v7_3_l65_polars_optimized_and_fracdiff_serial_paths(
         calls["fracdiff"] += 1
         return original_serial(self, *args, **kwargs)
 
-    monkeypatch.setattr(FeaturePreprocessor, "_transform_single_polars", _counting_polars)
     monkeypatch.setattr(FeaturePreprocessor, "_transform_single_optimized_df", _counting_optimized)
     monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing_serial", _counting_serial)
     monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self: 1)
 
-    monkeypatch.setattr(polars_adapter, "polars_enabled", lambda: True)
-    polars_result = FeaturePreprocessor(_l65_config(fracdiff=False)).transform(frame)
-    assert calls["polars"] >= 1
-    assert calls["optimized"] == 0
-
-    calls.update({"polars": 0, "optimized": 0, "fracdiff": 0})
-    monkeypatch.setattr(polars_adapter, "polars_enabled", lambda: False)
-    optimized_result = FeaturePreprocessor(_l65_config(fracdiff=False)).transform(frame)
+    _ = FeaturePreprocessor(_l65_config(fracdiff=False)).transform(frame)
     assert calls["optimized"] >= 1
-    assert calls["polars"] == 0
-    _assert_common_numeric_equal(optimized_result, polars_result, atol=1e-5)
+    assert calls["fracdiff"] == 0
 
-    calls.update({"polars": 0, "optimized": 0, "fracdiff": 0})
-    monkeypatch.setattr(polars_adapter, "polars_enabled", lambda: True)
+    calls.update({"optimized": 0, "fracdiff": 0})
     # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
     # FFSTAT b3b 起平穩化開啟須有校準封包（只由校準前置關卡產生）；本測試驗路徑互斥 sentinel，以 fixture 本身建封包
     # （同 tests/momentum/test_feature_preprocessor.py 之單元測試作法；fixture 96 列 ⇒ N 取 30）
@@ -331,7 +313,7 @@ def test_v7_3_l65_polars_optimized_and_fracdiff_serial_paths(
     attach_unit_calibration(fracdiff_pre, frame)
     _ = fracdiff_pre.transform(frame)
     assert calls["fracdiff"] >= 1
-    assert calls["polars"] == 0
+    assert calls["optimized"] == 0
 
 
 def test_v7_4_float16_error_bound_contract_is_explicit(

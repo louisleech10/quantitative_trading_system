@@ -128,6 +128,10 @@ STEP_RANK = "rank_transform"
 STEP_ZSCORE = "adaptive_zscore"
 STEP_GAUSSIAN = "gaussian_normalize"
 EXECUTION_STEPS: Tuple[str, ...] = (STEP_WINSOR, STEP_FRACDIFF, STEP_ADF, STEP_RANK, STEP_ZSCORE, STEP_GAUSSIAN)
+# FFPROD Task 1.2：縮尾界線所依滾動統計量之 dtype（兩 method、numba 與 pandas 兩臂同）：sigma 之滾動均值／標準差
+# 為 float32（兩臂共用 `_numba_transforms._rolling_mean_std` 之 `.astype(np.float32)`），
+# quantile 之界線 `rolling_quantile_2d` 回 float32；其後裁切之精度不改統計量 dtype
+WINSOR_COMPUTE_DTYPE = "float32"
 # FFDSTAR Task 1.2、§N FFDSTAR-R3：statsmodels ADF 檢定拋例外（現行以 p=1.0 續行）之逐欄事件（契約 named_values）
 EVENT_ADF_TEST_ERROR = "adf_test_error"
 # 當次 ADF 檢定之例外紀錄回呼（`FeaturePreprocessor._adf_error_context` 設定；執行緒區域）
@@ -625,6 +629,9 @@ class FeaturePreprocessor:
                 self._exec_records[key] = record
             for step, value in steps.items():
                 self._set_execution_field(record, key, step, str(value))
+            if steps.get(STEP_WINSOR) == "applied":
+                for field, value in self._winsor_applied_fields().items():
+                    self._set_execution_field(record, key, field, value)
             if terminal is not None:
                 self._set_execution_field(record, key, "terminal", str(terminal))
             if dstar_source is not None:
@@ -815,6 +822,24 @@ class FeaturePreprocessor:
     def _rolling_min_periods(window: int) -> int:
         return resolve_winsor_min_periods(int(window))
 
+    def _winsor_applied_fields(self) -> Dict[str, Any]:
+        """FFPROD Task 1.2：本實例縮尾之有效設定（逐欄紀錄之契約 `winsor_effective_fields`；縮尾 applied 時記）。
+        窗與最少期數同各臂實際所用（`_rolling_window`／`_rolling_min_periods`；native 子實例為其縮放後之窗）；
+        quantile 只記分位端點、sigma 只記倍數，預設值同各臂（`quantile_range` [0.01, 0.99]、`sigma_k` 3.0）。"""
+        method = str(self.winsor_config["method"])
+        window = self._rolling_window()
+        fields: Dict[str, Any] = {
+            "winsor_method": method, "winsor_lower_q": None, "winsor_upper_q": None, "winsor_sigma_k": None,
+            "winsor_window": int(window), "winsor_min_periods": int(self._rolling_min_periods(window)),
+            "winsor_compute_dtype": WINSOR_COMPUTE_DTYPE,
+        }
+        if method == "quantile":
+            lower, upper = self.winsor_config.get("quantile_range", [0.01, 0.99])
+            fields["winsor_lower_q"], fields["winsor_upper_q"] = float(lower), float(upper)
+        else:
+            fields["winsor_sigma_k"] = float(self.winsor_config.get("sigma_k", 3.0))
+        return fields
+
     def _stationarity_n(self) -> int:
         """平穩化三路（ADF 差分候選、fracdiff 目標篩選、d* 搜尋）共用之樣本數 N（FFSTAT Task 2.2）：
         當次原生週期之 N，決定規則見 `feature_config.resolve_calibration_bars`（FFSTAT v58）。"""
@@ -877,8 +902,6 @@ class FeaturePreprocessor:
         # FFSTAT Task 2.1：平穩化開啟時，於任何轉換前依本次輸入欄取子封包並核對
         self._prepare_calibration(self._columns_by_timeframe(str(c) for c in features_df.columns))
 
-        from momentum.FeatureEngineering.polars_adapter import polars_enabled
-
         num_cols = len(features_df.columns)
         chunk_size = self._column_chunk_size
 
@@ -890,15 +913,6 @@ class FeaturePreprocessor:
             if chunk_size > 0 and num_cols > chunk_size:
                 return self._transform_chunked(features_df, chunk_size)
             return self._transform_single(features_df)
-
-        use_polars = polars_enabled()
-
-        if use_polars and not self.fracdiff_config.get("enabled", False):
-            # Polars path: fracdiff not supported in Polars (requires scipy/statsmodels)
-            # FFSTAT Task 2.3 ④：ADF 差分之逐欄校準列同樣遮罩
-            self._record_group(arm="polars")
-            with self._decision_context(features_df.columns):
-                return self._mask_no_start_rows(self._transform_single_polars(features_df))
 
         if chunk_size > 0 and num_cols > chunk_size:
             self._record_group(arm="pandas_chunked")
@@ -1049,78 +1063,6 @@ class FeaturePreprocessor:
         step_config["enabled"] = enabled
         if apply_to is not None:
             step_config["apply_to"] = list(apply_to)
-
-    def transform_registry_groups(
-        self,
-        registry: "ColumnGroupRegistry",
-        n_workers: int = 1,
-    ) -> int:
-        """Apply L6.5 transforms per group from registry and overwrite each group in place."""
-        if registry is None:
-            return 0
-
-        groups = [group for _, group in registry.iter_all() if group.n_cols > 0]
-        if not groups:
-            return 0
-        self._prepare_calibration_for_groups(groups)  # FFSTAT Task 2.1：轉換前取子封包並核對
-        # RATIOUNSAFE Task 2.1：全為 ratio-unsafe 之群組於 inplace 入口不派發、不覆寫 registry（原值即輸出）
-        all_unsafe = [g for g in groups
-                      if all(is_ratio_unsafe_column(str(c)) for c in getattr(g, "columns", ()))]
-        if all_unsafe:
-            for group in all_unsafe:  # FFDSTAR Task 1.2：原值即輸出之群組與其欄
-                with self._group_execution_scope(group):
-                    self._record_input_execution(list(getattr(group, "columns")), "ratio_unsafe_skip",
-                                                 terminal="ratio_unsafe")
-                    self._record_group(status="ratio_unsafe_passthrough")
-            skip_ids = {str(getattr(g, "group_id")) for g in all_unsafe}
-            groups = [g for g in groups if str(getattr(g, "group_id")) not in skip_ids]
-            logger.info("[L6.5] ratio-unsafe passthrough: %d group(s) left untouched", len(all_unsafe))
-            if not groups:
-                return len(all_unsafe)
-
-        worker_count = max(1, int(n_workers))
-        transform_context = self._build_registry_transform_context()
-        logger.info(
-            "[L6.5] Registry transform config: groups=%d workers=%d mode=%s "
-            "use_fast=%s can_use_numba_fast=%s winsor=%s rank=%s zscore=%s "
-            "fracdiff=%s fracdiff_apply_to=%s fracdiff_layers=%s adf=%s gaussian=%s",
-            len(groups),
-            worker_count,
-            self.mode,
-            bool(transform_context.get("use_fast", False)),
-            bool(transform_context.get("can_use_numba_fast", False)),
-            bool(transform_context.get("do_winsorize", False)),
-            bool(transform_context.get("do_rank", False)),
-            bool(transform_context.get("do_zscore", False)),
-            bool(transform_context.get("do_fracdiff", False)),
-            self.fracdiff_config.get("apply_to", "non_stationary"),
-            sorted(self._fracdiff_apply_to_layers),
-            bool(transform_context.get("do_adf", False)),
-            bool(transform_context.get("do_gaussian", False)),
-        )
-
-        io_stats_before = self._registry_io_stats(registry)
-
-        def _execute() -> int:
-            if worker_count <= 1:
-                return self._transform_registry_serial(registry, groups, transform_context)
-
-            return self._transform_registry_parallel(
-                registry,
-                groups,
-                transform_context,
-                worker_count,
-            )
-
-        defer_manifest = getattr(registry, "defer_manifest_writes", None)
-        if callable(defer_manifest):
-            with defer_manifest("l65_transform"):
-                completed = _execute()
-        else:
-            completed = _execute()
-
-        self._log_registry_io_summary(registry, io_stats_before)
-        return completed + len(all_unsafe)
 
     def transform_registry_groups_to_sink(
         self,
@@ -1444,8 +1386,6 @@ class FeaturePreprocessor:
             # NUMVIEW Task 2.1：method 不再有臂內預設（縮尾開時 `__init__` 已驗其存在且屬契約值集；關時不用）
             winsor_method = str(self.winsor_config["method"]) if do_winsorize else ""
             winsor_sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-            zscore_windows = self.zscore_config.get("windows") or []
-            gaussian_clip = self.gaussian_config.get("clip_range", [0.001, 0.999])
 
             transform_context.update(
                 {
@@ -1455,13 +1395,6 @@ class FeaturePreprocessor:
                     "winsor_sigma_k": winsor_sigma_k,
                     "winsor_lower_q": float(winsor_range[0]),
                     "winsor_upper_q": float(winsor_range[1]),
-                    "do_rank": do_rank,
-                    "rank_window": int(self.rank_config.get("window", 252)),
-                    "do_zscore": do_zscore,
-                    "zscore_window": self._primary_zscore_window(zscore_windows) if do_zscore else 0,
-                    "zscore_epsilon": float(self.zscore_config.get("epsilon", 1e-8)),
-                    "gaussian_clip_lower": float(gaussian_clip[0]),
-                    "gaussian_clip_upper": float(gaussian_clip[1]),
                     "causal_preprocessing": self.causal_preprocessing,
                     "winsor_window": self._rolling_window(),
                     "winsor_min_periods": self._rolling_min_periods(self._rolling_window()),
@@ -1650,197 +1583,6 @@ class FeaturePreprocessor:
         self._merge_decisions_from(native_pp, idx_map)  # FFSTAT：native-tf 子實例之決策併回（校準列換主週期列）
         return len(outputs)
 
-    def _maybe_run_native_l65_inplace(
-        self,
-        registry: "ColumnGroupRegistry",
-        group: object,
-    ) -> bool:
-        """Native-resolution L6.5 in-place variant.
-
-        Loads native rows, runs L6.5, expands to primary rows via idx_map,
-        and overwrites the registry entry with the primary-shaped result.
-        Returns ``True`` when the native path was taken, ``False`` otherwise.
-
-        Note: After ``overwrite_data`` the alignment metadata is stripped (the
-        on-disk array now stores fully expanded primary rows). Downstream
-        consumers using ``load_data`` see primary-shaped output, identical to
-        the legacy expand-then-transform path — only the L6.5 statistics are
-        computed correctly on native rows.
-        """
-        from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
-            apply_idx_map_to_array,
-            scale_preprocessing_config_for_native,
-            should_use_native_path,
-        )
-        from momentum.FeatureEngineering.core.column_group import (
-            ColumnGroup as _CG,
-            LayerSource as _LS,
-        )
-        from dataclasses import replace as _dc_replace
-
-        alignment = getattr(group, "alignment", None)
-        if alignment is None:
-            return False
-
-        group_id = str(getattr(group, "group_id"))
-        columns = list(getattr(group, "columns"))
-        if not columns:
-            return False
-
-        source_tf = str(getattr(alignment, "source_timeframe", "") or "")
-        primary_tf = str(getattr(alignment, "primary_timeframe", "") or "")
-        source_n_rows = int(getattr(alignment, "source_n_rows", 0))
-        primary_n_rows = int(getattr(alignment, "primary_n_rows", 0))
-
-        scaled_config = scale_preprocessing_config_for_native(
-            self._config,
-            source_tf,
-            primary_tf,
-        )
-
-        use_native, reason = should_use_native_path(
-            is_compact_aligned=True,
-            source_timeframe=source_tf,
-            primary_timeframe=primary_tf,
-            source_n_rows=source_n_rows,
-            scaled_config=scaled_config,
-        )
-        if not use_native:
-            logger.info(
-                "[L6.5] native-tf in-place skipped: group=%s reason=%s "
-                "src_tf=%s primary_tf=%s native_rows=%d",
-                group_id,
-                reason,
-                source_tf,
-                primary_tf,
-                source_n_rows,
-            )
-            self._record_group(group_id, fallback="native_ineligible", failure_reason=str(reason))
-            return False
-
-        native_arr = np.asarray(registry.load_data_native(group_id), dtype=np.float32)
-        if native_arr.shape[0] != source_n_rows:
-            logger.warning(
-                "[L6.5] native-tf in-place row mismatch: group=%s expected=%d got=%d, "
-                "falling back",
-                group_id,
-                source_n_rows,
-                native_arr.shape[0],
-            )
-            self._record_group(group_id, fallback="native_row_mismatch",
-                               failure_reason=f"expected={source_n_rows} got={native_arr.shape[0]}")
-            return False
-        idx_map = registry.get_alignment_idx_map(group_id)
-        if idx_map is None:
-            self._record_group(group_id, fallback="native_no_idx_map")
-            return False
-
-        native_ctx = _dc_replace(
-            self._preprocessing_context,
-            timeframe=source_tf or self._preprocessing_context.timeframe,
-            row_count=int(source_n_rows),
-            time_range=None,
-        )
-
-        native_pp = FeaturePreprocessor(scaled_config, context=native_ctx)
-        native_pp._fracdiff_apply_to_layers = self._fracdiff_apply_to_layers
-        native_pp._inherit_calibration(self)  # FFSTAT Task 2.1：子實例沿用父實例已核對之子封包
-
-        native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
-        try:
-            with native_pp._group_execution_scope(group):
-                processed_df = native_pp._transform_single_passthrough(
-                    native_df,
-                    source_layer=self._group_layer_name(group),
-                    source_timeframe=self._group_timeframe(group),
-                )
-        except Exception as exc:  # noqa: BLE001
-            if isinstance(exc, NON_DEGRADABLE_ERRORS):
-                raise  # FFSTAT：平穩化來源缺漏不可以 native-tf 回退吞下
-            logger.warning(
-                "[L6.5] native-tf in-place transform failed: group=%s err=%s, "
-                "falling back",
-                group_id,
-                exc,
-            )
-            self._record_group(group_id, fallback="native_failed", failure_reason=f"{type(exc).__name__}: {exc}")
-            return False
-        finally:
-            del native_df, native_arr
-
-        is_append = self.mode == "append"
-        original_cols_present = [c for c in columns if c in processed_df.columns]
-        if not original_cols_present:
-            logger.warning(
-                "[L6.5] native-tf in-place produced no original columns: group=%s, "
-                "falling back",
-                group_id,
-            )
-            self._record_group(group_id, fallback="native_no_columns")
-            return False
-
-        orig_native = processed_df[original_cols_present].to_numpy(
-            dtype=np.float32, copy=False
-        )
-        orig_aligned = apply_idx_map_to_array(orig_native, idx_map, primary_n_rows)
-        del orig_native
-
-        # If replace mode but column subset, fill gaps with original values.
-        if len(original_cols_present) != len(columns):
-            full_aligned = np.empty((primary_n_rows, len(columns)), dtype=np.float32)
-            existing_primary = np.asarray(registry.load_data(group_id), dtype=np.float32)
-            full_aligned[:] = existing_primary
-            del existing_primary
-            present_idx = [columns.index(c) for c in original_cols_present]
-            full_aligned[:, present_idx] = orig_aligned
-            del orig_aligned
-            registry.overwrite_data(group_id, full_aligned)
-            del full_aligned
-        else:
-            registry.overwrite_data(group_id, orig_aligned)
-            del orig_aligned
-
-        if is_append:
-            new_cols = [c for c in processed_df.columns if c not in columns]
-            if new_cols:
-                new_native = processed_df[new_cols].to_numpy(
-                    dtype=np.float32, copy=False
-                )
-                new_aligned = apply_idx_map_to_array(new_native, idx_map, primary_n_rows)
-                del new_native
-                new_gid = f"{group_id}_L65"
-                suffix = 1
-                while new_gid in registry._groups:
-                    new_gid = f"{group_id}_L65_{suffix}"
-                    suffix += 1
-                new_group = _CG(
-                    group_id=new_gid,
-                    layer=_LS.L65,
-                    timeframe=getattr(group, "timeframe"),
-                    data_source="preprocessed",
-                    indicator=getattr(group, "indicator"),
-                    columns=tuple(new_cols),
-                    shape=(new_aligned.shape[0], new_aligned.shape[1]),
-                    dtype="float32",
-                )
-                registry.save_data(new_group, new_aligned)
-                del new_aligned
-
-        del processed_df
-
-        logger.info(
-            "[L6.5] native-tf in-place completed: group=%s src_tf=%s primary_tf=%s "
-            "native_rows=%d primary_rows=%d",
-            group_id,
-            source_tf,
-            primary_tf,
-            source_n_rows,
-            primary_n_rows,
-        )
-        self._merge_decisions_from(native_pp, idx_map)  # FFSTAT：native-tf 子實例之決策併回（校準列換主週期列）
-        self._record_group(group_id, arm="native_tf", status="ok")
-        return True
-
     def _warmup_numba_if_needed(self) -> None:
         """Compile relevant Numba kernels once before any fan-out begins."""
 
@@ -1905,48 +1647,6 @@ class FeaturePreprocessor:
         raw = os.getenv("FFACT_L65_RAW_SINK_LARGEST_FIRST", "1").strip().lower()
         return raw not in {"0", "false", "no", "off"}
 
-    @staticmethod
-    def _registry_io_stats(registry: "ColumnGroupRegistry") -> Dict[str, float]:
-        stats = getattr(registry, "io_stats", None)
-        if callable(stats):
-            return stats()
-        return {}
-
-    @staticmethod
-    def _log_registry_io_summary(
-        registry: "ColumnGroupRegistry",
-        before: Dict[str, float],
-    ) -> None:
-        stats = getattr(registry, "io_stats", None)
-        if not callable(stats):
-            return
-        after = stats()
-
-        def delta(key: str) -> float:
-            return float(after.get(key, 0.0)) - float(before.get(key, 0.0))
-
-        overwrite_count = delta("overwrite_count")
-        persist_count = delta("persist_count")
-        manifest_writes = delta("manifest_write_count")
-        manifest_deferred = delta("manifest_deferred_count")
-        if overwrite_count <= 0 and persist_count <= 0 and manifest_writes <= 0:
-            return
-
-        logger.info(
-            "[L6.5] Registry I/O summary: overwrites=%.0f overwrite_mb=%.2f overwrite_sec=%.2f "
-            "persists=%.0f persist_mb=%.2f persist_sec=%.2f manifest_writes=%.0f "
-            "manifest_deferred=%.0f manifest_sec=%.2f",
-            overwrite_count,
-            delta("overwrite_bytes") / (1024 ** 2),
-            delta("overwrite_seconds"),
-            persist_count,
-            delta("persist_bytes") / (1024 ** 2),
-            delta("persist_seconds"),
-            manifest_writes,
-            manifest_deferred,
-            delta("manifest_write_seconds"),
-        )
-
     def _group_requires_slow_transform(
         self,
         group: object,
@@ -1969,8 +1669,8 @@ class FeaturePreprocessor:
             # does not need ADF; continue to per-layer fracdiff check below.
             # source_layer None (unknown origin) → also falls through; the fracdiff
             # column-based filter at the end handles unknown-layer groups correctly.
-        # Gaussian with apply_to="all" is handled as a vectorised post-step after the
-        # numba fast path (see _transform_single_group), so it does NOT force slow path.
+        # Gaussian with apply_to="all" does NOT force slow path here; the numba fast path itself rejects any
+        # enabled gaussian（`_registry_fast_transform`；raw 之 L6.5 一律關 gaussian，FFPROD Task 1.1）.
         # Only non-"all" apply_to needs column names and therefore requires slow path.
         if bool(transform_context.get("do_gaussian", False)):
             if transform_context.get("gaussian_apply_to", "all") != "all":
@@ -1988,607 +1688,33 @@ class FeaturePreprocessor:
         columns = list(getattr(group, "columns", []))
         return bool(self._filter_fracdiff_target_columns(columns))
 
-    def _transform_registry_serial(
-        self,
-        registry: "ColumnGroupRegistry",
-        groups: List[object],
-        transform_context: Dict[str, object],
-    ) -> int:
-        """Serial fallback path for deterministic L6.5 registry transforms."""
-        from momentum.FeatureEngineering.utils.hardware_utils import get_l65_split_threshold
-
-        completed = 0
-        failed = 0
-        started_at = time.perf_counter()
-
-        use_fast = bool(transform_context.get("use_fast", False))
-        can_use_numba_fast = bool(transform_context.get("can_use_numba_fast", use_fast))
-        split_threshold = get_l65_split_threshold()
-
-        # ── Sub-step progress logging ────────────────────────────────────
-        # Mirrors the parallel path heartbeat so SIGKILL leaves the last
-        # attempted group visible in the log.
-        total = len(groups)
-        heartbeat_step = max(1, total // 20)
-        heartbeat_interval_sec = 30.0
-        last_heartbeat_at = started_at
-        last_heartbeat_done = 0
-        last_group_label = "<none>"
-
-        logger.info("[L6.5] Serial start: %d groups, rss=%dMB", total, _PROC.memory_info().rss >> 20)
-
-        for group in groups:
-            gid = getattr(group, "group_id", "<unknown>")
-            n_cols = self._group_n_columns(group)
-            try:
-                # Route oversized slow-path groups through chunked processing
-                # to cap peak memory (avoids 3-4× full_array copies for 1.8 GB groups).
-                requires_slow = self._group_requires_slow_transform(group, transform_context)
-                slow_route_candidate = requires_slow or not can_use_numba_fast
-                if slow_route_candidate and split_threshold > 0 and n_cols > split_threshold:
-                    self._transform_single_group_chunked(registry, group, chunk_size=split_threshold)
-                    last_group_label = f"{gid} (slow-chunked)"
-                else:
-                    self._transform_single_group(registry, group, transform_context)
-                    last_group_label = f"{gid} ({'slow' if slow_route_candidate else 'fast'})"
-                completed += 1
-            except Exception as error:
-                if isinstance(error, NON_DEGRADABLE_ERRORS):
-                    raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
-                self._failed_groups.append(str(gid))
-                self._record_group(str(gid), status="failed", failure_reason=f"{type(error).__name__}: {error}")
-                failed += 1
-                logger.error(
-                    "[L6.5] Failed group %s: %s",
-                    gid,
-                    error,
-                    exc_info=True,
-                )
-
-            gc.collect()
-            now = time.perf_counter()
-            done = completed + failed
-            if (
-                done - last_heartbeat_done >= heartbeat_step
-                or (now - last_heartbeat_at) >= heartbeat_interval_sec
-            ):
-                elapsed_so_far = now - started_at
-                rate = done / elapsed_so_far if elapsed_so_far > 0 else 0.0
-                eta = (total - done) / rate if rate > 0 else float("inf")
-                logger.info(
-                    "[L6.5] heartbeat (serial): %d/%d (%.1f%%), elapsed=%.1fs, "
-                    "rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
-                    done,
-                    total,
-                    100.0 * done / max(total, 1),
-                    elapsed_so_far,
-                    rate,
-                    eta if eta != float("inf") else -1,
-                    _PROC.memory_info().rss >> 20,
-                    last_group_label,
-                )
-                last_heartbeat_at = now
-                last_heartbeat_done = done
-
-        elapsed = time.perf_counter() - started_at
-        logger.info(
-            "[L6.5] Serial complete: %d/%d in %.2fs (%d failed), rss=%dMB",
-            completed,
-            len(groups),
-            elapsed,
-            failed,
-            _PROC.memory_info().rss >> 20,
-        )
-        return completed
-
-    def _transform_registry_parallel(
-        self,
-        registry: "ColumnGroupRegistry",
-        groups: List[object],
-        transform_context: Dict[str, object],
-        n_workers: int,
-    ) -> int:
-        """ThreadPool-based L6.5 registry transform with greedy scheduling.
-
-        P1.2 — Large-group splitting:
-            When a group's column count exceeds ``FFACT_L65_SPLIT_THRESHOLD``
-            (tier-aware), it is partitioned into balanced column slices that
-            run as independent sub-tasks in the same ThreadPool. This reduces
-            tail latency caused by giant groups (e.g. ``L2_Momentum`` with
-            ~16k cols) blocking otherwise idle workers. Splitting only applies
-            on the fast (Numba) path because column-wise transforms (winsor /
-            rank / zscore) are independent and safely concatenable; the slow
-            pandas path is left intact for correctness.
-        """
-
-        if not groups:
-            return 0
-
-        from momentum.FeatureEngineering.utils.hardware_utils import get_l65_split_threshold
-
-        split_threshold = get_l65_split_threshold()
-        can_use_numba_fast = bool(
-            transform_context.get(
-                "can_use_numba_fast",
-                bool(transform_context.get("use_fast", False)),
-            )
-        )
-        can_split = can_use_numba_fast and split_threshold > 0
-
-        ordered_groups = sorted(
-            groups,
-            key=self._group_n_columns,
-            reverse=True,
-        )
-
-        # Partition groups into three categories:
-        #   "full"         – normal ThreadPool task (fast or slow path, n_cols ≤ threshold)
-        #   "split"        – fast-path Numba column-slice sub-tasks (n_cols > threshold)
-        #   "slow_chunked" – slow-path (FracDiff/ADF) large-group sequential chunking
-        full_groups: List[object] = []
-        split_meta: Dict[str, Dict[str, object]] = {}
-        slow_chunked_groups: List[object] = []
-        slow_full_count = 0
-        fast_full_count = 0
-        max_group_cols = 0
-
-        for group in ordered_groups:
-            n_cols = self._group_n_columns(group)
-            max_group_cols = max(max_group_cols, n_cols)
-            requires_slow = self._group_requires_slow_transform(group, transform_context)
-            slow_route_candidate = requires_slow or not can_use_numba_fast
-            if (not requires_slow) and can_split and n_cols > split_threshold:
-                # Balance slice widths: ceil(n_cols / n_splits) ensures a final
-                # slice no larger than the others (avoids straggler).
-                n_splits = (n_cols + split_threshold - 1) // split_threshold
-                slice_width = (n_cols + n_splits - 1) // n_splits
-                slices = [
-                    (i * slice_width, min((i + 1) * slice_width, n_cols))
-                    for i in range(n_splits)
-                ]
-                # Load array once; sub-tasks share read-only views.
-                group_array = np.asarray(registry.load_data(group.group_id), dtype=np.float32)
-                self._record_group(str(group.group_id), arm="numba_split")
-                split_meta[group.group_id] = {
-                    "group": group,
-                    "array": group_array,
-                    "slices": slices,
-                    "results": {},
-                    "completed_slices": 0,
-                }
-            elif slow_route_candidate and split_threshold > 0 and n_cols > split_threshold:
-                # Slow path (FracDiff/ADF/Gaussian) with a large group: process in
-                # column chunks sequentially to cap peak memory at ~full_array + chunk_copies
-                # instead of full_array × 3–4 copies (which OOM-kills on 8 GB systems).
-                # Task 1.1 keeps statsmodels ADF out of ThreadPool; optional loky
-                # parallelism happens inside the FracDiff slow path only.
-                slow_chunked_groups.append(group)
-            else:
-                full_groups.append(group)
-                if slow_route_candidate:
-                    slow_full_count += 1
-                else:
-                    fast_full_count += 1
-
-        completed = 0
-        failed = 0
-        started_at = time.perf_counter()
-
-        # ── Sub-step progress logging ────────────────────────────────────
-        # Goal: when L6.5 OOM-kills mid-pipeline, the last log line tells
-        # us which group/slice was running. Without this, we only see the
-        # "Parallel complete" line at the very end (which never prints on
-        # crash). Heartbeat every max(1, total//20) completions OR every
-        # 30s, whichever comes first.
-        total_tasks = (
-            len(full_groups)
-            + sum(len(info["slices"]) for info in split_meta.values())
-            + len(slow_chunked_groups)
-        )
-        heartbeat_step = max(1, total_tasks // 20)
-        heartbeat_interval_sec = 30.0
-        last_heartbeat_at = started_at
-        last_heartbeat_done = 0
-        tasks_done = 0  # full task or single slice (fan-out granularity)
-        last_group_label = "<none>"
-
-        logger.info(
-            "[L6.5] Parallel start: %d full groups (fast=%d, slow=%d) + "
-            "%d big-group splits → %d sub-tasks "
-            "(workers=%d, split_threshold=%d, slow_chunked=%d, max_group_cols=%d, rss=%dMB)",
-            len(full_groups),
-            fast_full_count,
-            slow_full_count,
-            len(split_meta),
-            total_tasks,
-            n_workers,
-            split_threshold,
-            len(slow_chunked_groups),
-            max_group_cols,
-            _PROC.memory_info().rss >> 20,
-        )
-
-        # Submit task type tagging: ("full", group, None) or ("slice", group, (s, e)).
-        with ThreadPoolExecutor(max_workers=n_workers) as pool:
-            futures: Dict[object, Tuple[str, object, Optional[Tuple[int, int]]]] = {}
-
-            for group in full_groups:
-                fut = pool.submit(self._transform_single_group, registry, group, transform_context)
-                futures[fut] = ("full", group, None)
-
-            for gid, info in split_meta.items():
-                group_array = info["array"]
-                for (start, end) in info["slices"]:
-                    slice_view = group_array[:, start:end]
-                    fut = pool.submit(self._transform_array_slice_scoped, info["group"], slice_view, transform_context,
-                                      list(getattr(info["group"], "columns"))[start:end])
-                    futures[fut] = ("slice", info["group"], (start, end))
-
-            split_completed_groups: set[str] = set()
-
-            for fut in as_completed(futures):
-                kind, group, slice_range = futures[fut]
-                gid = getattr(group, "group_id", "<unknown>")
-                try:
-                    result = fut.result()
-                    if kind == "full":
-                        completed += 1
-                        last_group_label = f"{gid} (full)"
-                    else:
-                        meta = split_meta[gid]
-                        meta["results"][slice_range] = result
-                        meta["completed_slices"] += 1
-                        last_group_label = (
-                            f"{gid} slice[{slice_range[0]}:{slice_range[1]}] "
-                            f"({meta['completed_slices']}/{len(meta['slices'])})"
-                        )
-                        if meta["completed_slices"] == len(meta["slices"]):
-                            # Concatenate slices in column order and persist.
-                            ordered = sorted(meta["results"].items(), key=lambda kv: kv[0][0])
-                            merged = np.concatenate([r for _, r in ordered], axis=1)
-                            registry.overwrite_data(gid, merged)
-                            # Free intermediate buffers asap.
-                            del meta["results"]
-                            del meta["array"]
-                            split_completed_groups.add(gid)
-                            self._record_group(str(gid), status="ok")
-                            completed += 1
-                            last_group_label = f"{gid} (split→merged)"
-                except Exception as error:
-                    if isinstance(error, NON_DEGRADABLE_ERRORS):
-                        raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
-                    self._failed_groups.append(str(gid))
-                    self._record_group(str(gid), status="failed", failure_reason=f"{type(error).__name__}: {error}")
-                    failed += 1
-                    logger.error(
-                        "[L6.5] Failed group %s (%s): %s",
-                        gid,
-                        kind,
-                        error,
-                        exc_info=True,
-                    )
-
-                # Heartbeat: emit periodic progress so a SIGKILL leaves
-                # the last-attempted group visible in the log.
-                tasks_done += 1
-                now = time.perf_counter()
-                if (
-                    tasks_done - last_heartbeat_done >= heartbeat_step
-                    or (now - last_heartbeat_at) >= heartbeat_interval_sec
-                ):
-                    elapsed = now - started_at
-                    rate = tasks_done / elapsed if elapsed > 0 else 0.0
-                    eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
-                    logger.info(
-                        "[L6.5] heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
-                        "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
-                        tasks_done,
-                        total_tasks,
-                        100.0 * tasks_done / max(total_tasks, 1),
-                        completed,
-                        len(groups),
-                        elapsed,
-                        rate,
-                        eta if eta != float("inf") else -1,
-                        _PROC.memory_info().rss >> 20,
-                        last_group_label,
-                    )
-                    last_heartbeat_at = now
-                    last_heartbeat_done = tasks_done
-
-        # ── Slow-path chunked groups (sequential, after ThreadPool) ──────
-        # These are large groups (n_cols > split_threshold) on the slow path
-        # (FracDiff/ADF/Gaussian). Processing them sequentially with column
-        # chunking caps peak memory at ~full_array + chunk_copies instead of
-        # full_array × 3–4 copies (which OOM-kills on 8 GB systems).
-        for group in slow_chunked_groups:
-            gid = getattr(group, "group_id", "<unknown>")
-            try:
-                safe_chunk_size = split_threshold if split_threshold > 0 else self._group_n_columns(group)
-                self._transform_single_group_chunked(registry, group, chunk_size=safe_chunk_size)
-                completed += 1
-                last_group_label = f"{gid} (slow-chunked)"
-            except Exception as error:
-                if isinstance(error, NON_DEGRADABLE_ERRORS):
-                    raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
-                self._failed_groups.append(str(gid))
-                self._record_group(str(gid), status="failed", failure_reason=f"{type(error).__name__}: {error}")
-                failed += 1
-                logger.error(
-                    "[L6.5] Failed slow-chunked group %s: %s",
-                    gid,
-                    error,
-                    exc_info=True,
-                )
-            gc.collect()
-
-            tasks_done += 1
-            now = time.perf_counter()
-            if (
-                tasks_done - last_heartbeat_done >= heartbeat_step
-                or (now - last_heartbeat_at) >= heartbeat_interval_sec
-            ):
-                elapsed_so_far = now - started_at
-                rate = tasks_done / elapsed_so_far if elapsed_so_far > 0 else 0.0
-                eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
-                logger.info(
-                    "[L6.5] heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
-                    "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
-                    tasks_done,
-                    total_tasks,
-                    100.0 * tasks_done / max(total_tasks, 1),
-                    completed,
-                    len(groups),
-                    elapsed_so_far,
-                    rate,
-                    eta if eta != float("inf") else -1,
-                    _PROC.memory_info().rss >> 20,
-                    last_group_label,
-                )
-                last_heartbeat_at = now
-                last_heartbeat_done = tasks_done
-
-        elapsed = time.perf_counter() - started_at
-        split_count = len(split_meta)
-        if split_count:
-            total_slices = sum(len(info["slices"]) for info in split_meta.values())
-            logger.info(
-                "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers "
-                "(%d failed, %d big-group splits → %d sub-tasks, %d slow-chunked, rss=%dMB)",
-                completed,
-                len(groups),
-                elapsed,
-                n_workers,
-                failed,
-                split_count,
-                total_slices,
-                len(slow_chunked_groups),
-                _PROC.memory_info().rss >> 20,
-            )
-        else:
-            logger.info(
-                "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers "
-                "(%d failed, %d slow-chunked, rss=%dMB)",
-                completed,
-                len(groups),
-                elapsed,
-                n_workers,
-                failed,
-                len(slow_chunked_groups),
-                _PROC.memory_info().rss >> 20,
-            )
-        return completed
-
-    def _transform_single_group_chunked(
-        self,
-        registry: "ColumnGroupRegistry",
-        group: object,
-        chunk_size: int,
-    ) -> None:
-        """Process a large CGSA group in column chunks on the slow (pandas/FracDiff) path.
-
-        This is the memory-safe alternative to _transform_single_group for groups whose
-        column count exceeds split_threshold when use_fast=False (i.e. FracDiff/ADF/Gaussian
-        is enabled).
-
-        Memory comparison for a 1.8 GB group (L2_WorldQuant):
-          - Without chunking: full_array(1.8) + copy_A(1.8) + copy_B(3.6 append) = 7.2 GB
-          - With chunk_size=2000: full_array(1.8) + chunk_copies(~0.14) = ~1.94 GB peak
-
-        Correctness: All L6.5 transforms (winsor / rank / zscore / fracdiff / ADF /
-        gaussian) are column-wise independent → chunking by columns is mathematically
-        equivalent to processing all columns at once.
-
-        Performance: d_star cache is loaded once per group (shared across chunks) to
-        avoid 50× file-I/O storm. The full source array is freed before assembling
-        the output to avoid compounding allocations.
-
-        Handles both "replace" mode (same column count) and "append" mode (adds _fracdiff etc).
-        """
-        # FFDSTAR Task 1.2：本群組之紀錄脈絡
-        with self._group_execution_scope(group):
-            if not self._maybe_run_native_l65_inplace(registry, group):
-                self._record_group(str(getattr(group, "group_id")), arm="slow_chunked")
-                self._transform_single_group_chunked_core(registry, group, chunk_size)
-            self._record_group(str(getattr(group, "group_id")), status="ok")
-
-    def _transform_single_group_chunked_core(
-        self,
-        registry: "ColumnGroupRegistry",
-        group: object,
-        chunk_size: int,
-    ) -> None:
-        from momentum.FeatureEngineering.core.column_group import (
-            ColumnGroup as _CG,
-            LayerSource as _LS,
-        )
-
-        # Native-resolution L6.5 path for compact-aligned groups bypasses
-        # column chunking entirely (native rows are already small)——於外層 `_transform_single_group_chunked` 先試。
-        group_id = getattr(group, "group_id")
-        col_names = list(getattr(group, "columns"))
-        n_cols = len(col_names)
-
-        # Load the full group array ONCE. Slice views below are zero-copy
-        # when the underlying array is F-order (typical for CGSA .npy files).
-        full_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
-
-        is_append = self.mode == "append"
-
-        # ── Shared d_star cache (avoids per-chunk file I/O storm) ───────
-        # Without this, every chunk re-loads/saves the cache file, turning
-        # a 50-chunk group into 50 disk roundtrips during FracDiff search.
-        use_shared_dstar_cache = bool(
-            self.fracdiff_config.get("enabled", False)
-            and self.fracdiff_config.get("cache_d_star", True)
-        )
-        previous_shared_cache = self._d_star_cache_shared
-        if use_shared_dstar_cache:
-            self._d_star_cache_shared = True
-            self._d_star_cache = None
-
-        orig_chunks: List[np.ndarray] = []
-        new_chunks: List[np.ndarray] = []
-        new_col_names_all: List[str] = []
-
-        try:
-            for chunk_start in range(0, n_cols, chunk_size):
-                chunk_end = min(chunk_start + chunk_size, n_cols)
-                chunk_cols = col_names[chunk_start:chunk_end]
-
-                # F-order column slice is contiguous → pandas accepts copy=False
-                # without an internal copy. C-order falls back to a chunk-sized
-                # copy inside pandas (still much smaller than the full array).
-                chunk_view = full_array[:, chunk_start:chunk_end]
-                chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
-
-                processed_df = self._transform_single_passthrough(
-                    chunk_df,
-                    source_layer=self._group_layer_name(group),
-                    source_timeframe=self._group_timeframe(group),
-                )
-
-                orig_chunks.append(
-                    processed_df[chunk_cols].to_numpy(dtype=np.float32, copy=False)
-                )
-
-                if is_append:
-                    new_col_names = [c for c in processed_df.columns if c not in chunk_cols]
-                    if new_col_names:
-                        new_chunks.append(
-                            processed_df[new_col_names].to_numpy(dtype=np.float32, copy=False)
-                        )
-                        new_col_names_all.extend(new_col_names)
-
-                # Free chunk temporaries immediately to prevent RSS accumulation.
-                del chunk_df, processed_df
-
-        finally:
-            # Persist d_star cache once after all chunks complete.
-            if use_shared_dstar_cache and self._d_star_cache is not None:
-                self._flush_dstar_cache(self._d_star_cache)
-                self._d_star_cache = None
-            self._d_star_cache_shared = previous_shared_cache
-
-            # Free the large source array before assembling results so the
-            # concatenation allocations don't compound with it.
-            del full_array
-            gc.collect()
-
-        # Reassemble original columns and write back to registry.
-        orig_merged = np.concatenate(orig_chunks, axis=1)
-        del orig_chunks
-        registry.overwrite_data(group_id, orig_merged)
-        del orig_merged
-        gc.collect()
-
-        # Create L65 group for appended columns (e.g. _fracdiff, _diff1).
-        if is_append and new_chunks:
-            new_merged = np.concatenate(new_chunks, axis=1)
-            del new_chunks
-
-            timeframe = getattr(group, "timeframe", "unknown")
-            indicator = getattr(group, "indicator", "preprocessed")
-
-            new_gid = f"{group_id}_L65"
-            suffix = 1
-            while new_gid in registry._groups:
-                new_gid = f"{group_id}_L65_{suffix}"
-                suffix += 1
-
-            new_group = _CG(
-                group_id=new_gid,
-                layer=_LS.L65,
-                timeframe=timeframe,
-                data_source="preprocessed",
-                indicator=indicator,
-                columns=tuple(new_col_names_all),
-                shape=(new_merged.shape[0], new_merged.shape[1]),
-                dtype="float32",
-            )
-            registry.save_data(new_group, new_merged)
-            del new_merged
-            gc.collect()
-
     def _registry_fast_transform(self, group_array: np.ndarray, transform_context: Dict[str, object]) -> np.ndarray:
-        """registry 快速路徑之單一實作（ICPOSTLEAK Task 1.1）：縮尾 → rank → gaussian → zscore（正式順序，同
-        `_transform_single_legacy`），rank／gaussian／zscore 每步之後以輸入錨點遮窗未滿之列。
+        """registry 快速路徑之單一實作（ICPOSTLEAK Task 1.1）：只做縮尾步（numba `transform_array_fast`）。
 
-        改前四處（`_transform_array_slice`、`_transform_single_group`、`_transform_single_group_to_arrays`、
-        `_stream_sharded_group_to_sink`）各自呼叫融合核心（rank→zscore）再後置 gaussian，順序與正式路徑不同，且切片
-        並行路徑漏做 gaussian；本函式統一之。各步數值核心不變（numba `transform_array_fast` 單步、`_gaussian_2d`）。"""
+        FFPROD Task 1.1：registry 路徑只服務 raw 生成，raw 之 L6.5 一律關 rank／zscore／gaussian
+        （`feature_factory._build_l7_raw_preprocessing_config`），快速路徑之 rank／gaussian／zscore 步生產不可達、已刪；
+        設定開啟任一者 ⇒ ValueError（不靜默略過）。rank／zscore／gaussian 之生產實作為 pandas 核心（post-IC）。"""
+        enabled = [step for step in ("do_rank", "do_gaussian", "do_zscore") if bool(transform_context.get(step, False))]
+        if enabled:
+            raise ValueError(f"registry 快速路徑只做縮尾（raw 之 L6.5 一律關 rank／zscore／gaussian）；設定開啟 {enabled}")
         transform_array_fast = transform_context["transform_array_fast"]
         values = group_array
         if not values.flags["C_CONTIGUOUS"] or values.dtype != np.float32:
             values = np.ascontiguousarray(values, dtype=np.float32)
-        # NUMVIEW Task 2.1（審碼 b3 r2）：method 與 zscore 主窗取自 `_build_registry_transform_context`（皆明設），不以預設補值；
-        # 缺鍵 ⇒ KeyError（程式錯誤，不靜默改算法或窗）
-        common = dict(
+        # NUMVIEW Task 2.1（審碼 b3 r2）：method 取自 `_build_registry_transform_context`（明設），不以預設補值；
+        # 缺鍵 ⇒ KeyError（程式錯誤，不靜默改算法）
+        # 縮尾步一律經核心（縮尾關時為複製）：保留改前「快速路徑必呼叫核心」之可觀測路由（數值不變）
+        return transform_array_fast(
+            values,
+            winsorize=bool(transform_context.get("do_winsorize", True)),
             winsor_method=str(transform_context["winsor_method"]),
             winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
             winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
             winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
-            rank_window=int(transform_context.get("rank_window", 252)),
-            zscore_window=int(transform_context["zscore_window"]),
-            zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
             causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
             winsor_window=int(transform_context.get("winsor_window", 252)),
             winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
         )
-        # 縮尾步一律經核心（縮尾關時為複製）：保留改前「快速路徑必呼叫核心」之可觀測路由（數值不變）
-        values = transform_array_fast(
-            values, winsorize=bool(transform_context.get("do_winsorize", True)), rank=False, zscore=False, **common
-        )
-        if bool(transform_context.get("do_rank", False)):
-            step_input = values
-            values = _stable_mask.mask_incomplete_window_by_input_2d(
-                transform_array_fast(step_input, winsorize=False, rank=True, zscore=False, **common),
-                step_input, common["rank_window"],
-            ).astype(np.float32, copy=False)
-        if bool(transform_context.get("do_gaussian", False)) and HAS_SCIPY:
-            if transform_context.get("gaussian_apply_to", "all") != "all":
-                # 快速路徑以整個陣列為單位；部分欄 gaussian 須走慢路徑（改前 sharded 路徑於此靜默略過 gaussian）
-                raise ValueError("registry 快速路徑不支援 gaussian_normalize.apply_to 非 all（須走慢路徑）")
-            step_input = values
-            gaussian_window = int(transform_context.get("winsor_window", 252))
-            values = _stable_mask.mask_incomplete_window_by_input_2d(
-                self._gaussian_2d(
-                    step_input.astype(np.float64, copy=False),
-                    lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
-                    upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
-                    causal=bool(transform_context.get("causal_preprocessing", True)),
-                    window=gaussian_window,
-                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
-                ),
-                step_input, gaussian_window,
-            ).astype(np.float32, copy=False)
-        if bool(transform_context.get("do_zscore", False)):
-            step_input = np.ascontiguousarray(values, dtype=np.float32)
-            values = _stable_mask.mask_incomplete_window_by_input_2d(
-                transform_array_fast(step_input, winsorize=False, rank=False, zscore=True, **common),
-                step_input, common["zscore_window"],
-            ).astype(np.float32, copy=False)
-        return values
 
     def _registry_fast_transform_passthrough(
         self,
@@ -2660,117 +1786,6 @@ class FeaturePreprocessor:
         """RATIOUNSAFE Task 2.1：`_transform_single` 之呼叫點切片版（registry 各分支與 native 子實例使用）。"""
         return self._apply_dataframe_passthrough(frame, lambda part: self._transform_single(part, **kwargs))
 
-    def _transform_array_slice(
-        self,
-        array_slice: np.ndarray,
-        transform_context: Dict[str, object],
-        columns: Optional[Sequence[str]] = None,
-    ) -> np.ndarray:
-        """Run the fast Numba transform pipeline on a column slice.
-
-        Used by ``_transform_registry_parallel`` for big-group sub-tasks (P1.2).
-        Inputs/outputs are decoupled from the registry; the caller concatenates
-        slice results and writes back. Operations are column-wise so slicing is
-        safe (winsor / rolling rank / rolling zscore each operate per column).
-        """
-        # ICPOSTLEAK Task 1.1：同其他 registry 路徑之單一實作（含 gaussian；改前此路徑漏做 gaussian）
-        if columns is None:
-            return self._registry_fast_transform(array_slice, transform_context)
-        # RATIOUNSAFE Task 2.1：切片欄名由呼叫端給，於此依欄名切出非 ratio-unsafe 子矩陣
-        return self._registry_fast_transform_passthrough(array_slice, columns, transform_context)
-
-    def _transform_array_slice_scoped(
-        self,
-        group: object,
-        array_slice: np.ndarray,
-        transform_context: Dict[str, object],
-        columns: Optional[Sequence[str]] = None,
-    ) -> np.ndarray:
-        """`_transform_array_slice` 於該群組之紀錄脈絡內執行（執行緒池之子任務；只供紀錄）。"""
-        with self._group_execution_scope(group):
-            return self._transform_array_slice(array_slice, transform_context, columns)
-
-    def _transform_single_group(
-        self,
-        registry: "ColumnGroupRegistry",
-        group: object,
-        transform_context: Dict[str, object],
-    ) -> None:
-        """Transform a single registry group in-place."""
-        # FFDSTAR Task 1.2：本群組之紀錄脈絡（in-place 路徑可於執行緒池內執行；執行緒區域）
-        with self._group_execution_scope(group):
-            self._transform_single_group_core(registry, group, transform_context)
-            self._record_group(str(getattr(group, "group_id")), status="ok")
-
-    def _transform_single_group_core(
-        self,
-        registry: "ColumnGroupRegistry",
-        group: object,
-        transform_context: Dict[str, object],
-    ) -> None:
-        from momentum.FeatureEngineering.core.column_group import ColumnGroup as _CG, LayerSource as _LS
-
-        # Native-resolution L6.5 path for compact-aligned groups: compute on
-        # source rows then expand to primary rows. Avoids step-function bias
-        # in fracdiff and distribution-based statistics.
-        if self._maybe_run_native_l65_inplace(registry, group):
-            return
-
-        group_id = getattr(group, "group_id")
-        group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
-        use_fast = bool(transform_context.get("can_use_numba_fast", transform_context.get("use_fast", False)))
-        requires_slow = self._group_requires_slow_transform(group, transform_context)
-
-        if use_fast and not requires_slow:
-            # ICPOSTLEAK Task 1.1：registry 快速路徑單一實作（正式順序＋各步遮罩）
-            self._record_group(str(group_id), arm="numba_fast")
-            processed_array = self._registry_fast_transform_passthrough(group_array, list(getattr(group, "columns")), transform_context)
-            registry.overwrite_data(group_id, processed_array)
-            return
-
-        if self._can_use_optimized_dataframe_path():
-            self._record_group(str(group_id), arm="pandas_optimized")
-            self._transform_single_group_optimized(registry, group, group_array)
-            return
-
-        self._record_group(str(group_id), arm="pandas_legacy")
-        is_append = self.mode == "append"
-        group_df = pd.DataFrame(group_array, columns=list(getattr(group, "columns")), copy=False)
-        processed_df = self._transform_single_passthrough(
-            group_df,
-            source_layer=self._group_layer_name(group),
-            source_timeframe=self._group_timeframe(group),
-        )
-
-        if is_append and len(processed_df.columns) > getattr(group, "n_cols"):
-            orig_cols = list(getattr(group, "columns"))
-            orig_array = processed_df[orig_cols].to_numpy(dtype=np.float32, copy=False)
-            registry.overwrite_data(group_id, orig_array)
-
-            new_cols = [column for column in processed_df.columns if column not in orig_cols]
-            if new_cols:
-                new_array = processed_df[new_cols].to_numpy(dtype=np.float32, copy=False)
-                new_gid = f"{group_id}_L65"
-                suffix = 1
-                while new_gid in registry._groups:
-                    new_gid = f"{group_id}_L65_{suffix}"
-                    suffix += 1
-                new_group = _CG(
-                    group_id=new_gid,
-                    layer=_LS.L65,
-                    timeframe=getattr(group, "timeframe"),
-                    data_source="preprocessed",
-                    indicator=getattr(group, "indicator"),
-                    columns=tuple(new_cols),
-                    shape=(new_array.shape[0], new_array.shape[1]),
-                    dtype="float32",
-                )
-                registry.save_data(new_group, new_array)
-            return
-
-        processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
-        registry.overwrite_data(group_id, processed_array)
-
     def _transform_single_group_to_arrays(
         self,
         registry: "ColumnGroupRegistry",
@@ -2823,75 +1838,6 @@ class FeaturePreprocessor:
 
         processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
         return [(group_id, list(processed_df.columns), processed_array)]
-
-    def _transform_single_group_chunked_to_arrays(
-        self,
-        registry: "ColumnGroupRegistry",
-        group: object,
-        chunk_size: int,
-    ) -> List[Tuple[str, List[str], np.ndarray]]:
-        """Chunked slow-path transform that streams arrays to the L7_raw writer."""
-        group_id = str(getattr(group, "group_id"))
-        col_names = list(getattr(group, "columns"))
-        n_cols = len(col_names)
-        full_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
-        is_append = self.mode == "append"
-
-        use_shared_dstar_cache = bool(
-            self.fracdiff_config.get("enabled", False)
-            and self.fracdiff_config.get("cache_d_star", True)
-        )
-        previous_shared_cache = self._d_star_cache_shared
-        if use_shared_dstar_cache:
-            self._d_star_cache_shared = True
-            self._d_star_cache = None
-
-        orig_chunks: List[np.ndarray] = []
-        new_chunks: List[np.ndarray] = []
-        new_col_names_all: List[str] = []
-
-        try:
-            for chunk_start in range(0, n_cols, chunk_size):
-                chunk_end = min(chunk_start + chunk_size, n_cols)
-                chunk_cols = col_names[chunk_start:chunk_end]
-                chunk_view = full_array[:, chunk_start:chunk_end]
-                chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
-                processed_df = self._transform_single_passthrough(
-                    chunk_df,
-                    source_layer=self._group_layer_name(group),
-                    source_timeframe=self._group_timeframe(group),
-                )
-                orig_chunks.append(processed_df[chunk_cols].to_numpy(dtype=np.float32, copy=False))
-                if is_append:
-                    new_col_names = [column for column in processed_df.columns if column not in chunk_cols]
-                    if new_col_names:
-                        new_chunks.append(processed_df[new_col_names].to_numpy(dtype=np.float32, copy=False))
-                        new_col_names_all.extend(new_col_names)
-                del chunk_df, processed_df
-        finally:
-            if use_shared_dstar_cache and self._d_star_cache is not None:
-                self._flush_dstar_cache(self._d_star_cache)
-                self._d_star_cache = None
-            self._d_star_cache_shared = previous_shared_cache
-            del full_array
-            gc.collect()
-
-        outputs: List[Tuple[str, List[str], np.ndarray]] = []
-        orig_merged = np.concatenate(orig_chunks, axis=1)
-        del orig_chunks
-        outputs.append((group_id, col_names, orig_merged))
-
-        if is_append and new_chunks:
-            new_merged = np.concatenate(new_chunks, axis=1)
-            del new_chunks
-            new_group_id = f"{group_id}_L65"
-            suffix = 1
-            while new_group_id in registry._groups:
-                new_group_id = f"{group_id}_L65_{suffix}"
-                suffix += 1
-            outputs.append((new_group_id, new_col_names_all, new_merged))
-
-        return outputs
 
     def _stream_sharded_group_to_sink(
         self,
@@ -3067,28 +2013,6 @@ class FeaturePreprocessor:
             _PROC.memory_info().rss >> 20,
         )
         return outputs_written
-
-    def _transform_single_group_optimized(
-        self,
-        registry: "ColumnGroupRegistry",
-        group: object,
-        group_array: Optional[np.ndarray] = None,
-    ) -> None:
-        """Transform a registry group via the optimized single-copy DataFrame path."""
-
-        group_id = getattr(group, "group_id")
-        source_array = group_array
-        if source_array is None:
-            source_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
-
-        group_df = pd.DataFrame(
-            source_array,
-            columns=list(getattr(group, "columns")),
-            copy=False,
-        )
-        processed_df = self._apply_dataframe_passthrough(group_df, self._transform_single_optimized_df)
-        processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
-        registry.overwrite_data(group_id, processed_array)
 
     @staticmethod
     def _group_layer_name(group: object) -> Optional[str]:
@@ -3468,125 +2392,6 @@ class FeaturePreprocessor:
 
         return transformed
 
-    @staticmethod
-    def _polars_mask_columns(pl_df: Any, columns: List[str], step_input: np.ndarray, window: int,
-                             index: pd.Index) -> Any:
-        """ICPOSTLEAK Task 1.1：Polars 臂單步核心之後，對 `columns` 套輸入錨點遮罩並回存 polars（float32＋null）。"""
-        from momentum.FeatureEngineering.polars_adapter import pandas_to_polars, polars_to_pandas
-
-        frame = polars_to_pandas(pl_df, index=index)
-        masked = _stable_mask.mask_incomplete_window_by_input_2d(
-            frame[columns].to_numpy(dtype=np.float64), step_input, window
-        )
-        frame = frame.astype({column: np.float64 for column in columns})
-        frame.loc[:, columns] = masked
-        return pandas_to_polars(frame)
-
-    def _transform_single_polars(self, features_df: pd.DataFrame) -> pd.DataFrame:
-        """Polars-based L6.5 transform (Task 4.3).
-
-        Handles winsorization, rank, zscore using Polars expressions.
-        fracdiff and ADF are not supported (require scipy/statsmodels)
-        and must use the pandas path.
-        """
-        from momentum.FeatureEngineering.polars_adapter import (
-            pandas_to_polars,
-            polars_l65_adaptive_zscore,
-            polars_l65_rank_transform,
-            polars_l65_winsorization,
-            polars_to_pandas,
-        )
-
-        pl_df = pandas_to_polars(features_df)
-        input_columns = list(features_df.columns)
-
-        # Winsorization
-        winsor_apply_to = self.winsor_config.get("apply_to", "all")
-        winsor_columns = self._select_columns(features_df, winsor_apply_to)
-        winsor_on = bool(self.winsor_config.get("enabled", True))
-        self._record_selection(input_columns, winsor_columns if winsor_on else [], STEP_WINSOR, "applied",
-                               "not_selected" if winsor_on else "disabled")
-        # Polars 臂之前提＝fracdiff 關（`transform`）
-        self._record_execution(input_columns, STEP_FRACDIFF, "disabled")
-        if winsor_columns and self.winsor_config.get("enabled", True):  # FFSTAT r34：縮尾開關須生效
-            method = self.winsor_config["method"]  # NUMVIEW Task 2.1：無臂內預設（`__init__` 已驗）
-            sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-            quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
-            pl_df = polars_l65_winsorization(
-                pl_df,
-                columns=winsor_columns,
-                method=method,
-                sigma_k=sigma_k,
-                quantile_range=(float(quantile_range[0]), float(quantile_range[1])),
-                causal_preprocessing=self.causal_preprocessing,
-                window=self._rolling_window(),
-                min_periods=self._rolling_min_periods(self._rolling_window()),
-            )
-
-        # ADF differencing (pandas fallback — not supported in Polars)
-        if self.adf_config.get("enabled", False):
-            # Convert back to pandas, apply ADF, then convert back
-            pd_temp = polars_to_pandas(pl_df, index=features_df.index)
-            pd_temp = self._apply_adf_differencing(pd_temp)
-            pl_df = pandas_to_polars(pd_temp)
-        else:
-            self._record_execution(input_columns, STEP_ADF, "disabled")
-
-        # Rank transform (polars 1.x: map_batches + scipy, numerically equiv. to pandas)
-        if self.rank_config.get("enabled", False):
-            rank_apply_to = self.rank_config.get("apply_to", "all")
-            rank_columns = self._select_columns(features_df, rank_apply_to)
-            rank_window = int(self.rank_config.get("window", 252))
-            if rank_columns and self.mode == "replace":
-                self._record_selection(input_columns, rank_columns, STEP_RANK, "applied", "not_selected")
-                rank_input = polars_to_pandas(pl_df, index=features_df.index)[rank_columns].to_numpy(dtype=np.float64)
-                pl_df = polars_l65_rank_transform(
-                    pl_df, columns=rank_columns, window=rank_window
-                )
-                pl_df = self._polars_mask_columns(pl_df, rank_columns, rank_input, rank_window, features_df.index)
-            else:
-                # append mode or empty column list: fall back to pandas
-                pd_temp = polars_to_pandas(pl_df, index=features_df.index)
-                pd_temp = self._apply_rank_transform(pd_temp)
-                pl_df = pandas_to_polars(pd_temp)
-        else:
-            self._record_execution(input_columns, STEP_RANK, "disabled")
-
-        # Gaussian normalize (pandas fallback — requires scipy erfinv)
-        if self.gaussian_config.get("enabled", False):
-            pd_temp = polars_to_pandas(pl_df, index=features_df.index)
-            pd_temp = self._apply_gaussian_normalize(pd_temp)
-            pl_df = pandas_to_polars(pd_temp)
-        else:
-            self._record_execution(input_columns, STEP_GAUSSIAN, "disabled")
-
-        # Adaptive z-score
-        if self.zscore_config.get("enabled", False):
-            zscore_apply_to = self.zscore_config.get("apply_to", "all")
-            zscore_columns = self._select_columns(features_df, zscore_apply_to)
-            windows = self.zscore_config.get("windows") or []
-            epsilon = float(self.zscore_config.get("epsilon", 1e-8))
-            primary_window = self._primary_zscore_window(windows)  # NUMVIEW Task 2.1：改前空窗以 100 照做；今具名拋錯（不可達）
-            if zscore_columns and self.mode == "replace":
-                self._record_selection(input_columns, zscore_columns, STEP_ZSCORE, "applied", "not_selected")
-                zscore_input = polars_to_pandas(pl_df, index=features_df.index)[zscore_columns].to_numpy(dtype=np.float64)
-                pl_df = polars_l65_adaptive_zscore(
-                    pl_df, columns=zscore_columns, window=primary_window, epsilon=epsilon
-                )
-                pl_df = self._polars_mask_columns(pl_df, zscore_columns, zscore_input, primary_window, features_df.index)
-            elif zscore_columns:
-                # append mode: fall back to pandas
-                pd_temp = polars_to_pandas(pl_df, index=features_df.index)
-                pd_temp = self._apply_adaptive_zscore(pd_temp)
-                pl_df = pandas_to_polars(pd_temp)
-            else:
-                self._record_execution(input_columns, STEP_ZSCORE, "not_selected")
-        else:
-            self._record_execution(input_columns, STEP_ZSCORE, "disabled")
-
-        result = polars_to_pandas(pl_df, index=features_df.index)
-        return result
-
     def _transform_chunked(self, features_df: pd.DataFrame, chunk_size: int) -> pd.DataFrame:
         """Process columns in chunks to limit peak memory on wide DataFrames.
 
@@ -3749,126 +2554,6 @@ class FeaturePreprocessor:
             raise ValueError(f"Unsupported winsorization method: {method}")
 
         return result
-
-    @staticmethod
-    def _partition_nanquantile_2d(
-        arr: np.ndarray,
-        quantiles: List[float],
-    ) -> np.ndarray:
-        """O(n) partial-sort replacement for np.nanquantile(arr, q, axis=0).
-
-        Fast path (all columns have the same finite-element count):
-            Replaces NaN/inf with +inf to push them after all finite values,
-            then calls ``np.partition`` once for all required k-th positions.
-            Complexity: O(n × |kths|) where |kths| ≤ 2 × len(quantiles).
-
-        Slow path (heterogeneous finite-element counts across columns):
-            Falls back to ``_nanquantile_linear`` (np.nanquantile).  Triggered
-            only when columns differ in NaN count — uncommon for L6.5 rolling
-            groups where every column shares the same rolling-window warmup
-            NaN prefix.
-
-        Numerical equivalence:
-            Produces bit-identical output to
-            ``np.nanquantile(..., method='linear')`` for all inputs where the
-            fast path applies.
-        """
-        n_rows, n_cols = arr.shape
-        if n_cols == 0:
-            return np.empty((len(quantiles), 0), dtype=np.float64)
-        finite_counts = np.sum(np.isfinite(arr), axis=0)  # shape: (n_cols,)
-
-        # Fast path: uniform finite-element count across all columns.
-        # L6.5 rolling groups satisfy this because each group's rolling-window
-        # warmup NaN prefix is identical for every column in the group.
-        if int(finite_counts.min()) == int(finite_counts.max()):
-            n_valid = int(finite_counts[0])
-            if n_valid == 0:
-                # Every value in every column is NaN → return NaN bounds.
-                return np.full((len(quantiles), n_cols), np.nan, dtype=np.float64)
-
-            # Push NaN / ±inf to the end of each column so np.partition
-            # sees only finite values in the first n_valid positions.
-            tmp = arr.copy()
-            tmp[~np.isfinite(tmp)] = np.inf
-
-            # Pre-compute k-th positions and linear-interpolation fractions.
-            k_lo_list: List[int] = []
-            k_hi_list: List[int] = []
-            frac_list: List[float] = []
-            kths_seen: set = set()
-            kths_sorted: List[int] = []
-            for q in quantiles:
-                k_f = float(q) * (n_valid - 1)
-                k_lo = int(np.floor(k_f))
-                k_hi = min(k_lo + 1, n_valid - 1)
-                frac = k_f - k_lo
-                k_lo_list.append(k_lo)
-                k_hi_list.append(k_hi)
-                frac_list.append(frac)
-                for k in (k_lo, k_hi):
-                    if k not in kths_seen:
-                        kths_seen.add(k)
-                        kths_sorted.append(k)
-
-            # Single np.partition call covers all needed positions.
-            partitioned = np.partition(tmp, sorted(kths_sorted), axis=0)
-
-            results = np.empty((len(quantiles), n_cols), dtype=np.float64)
-            for q_idx in range(len(quantiles)):
-                lo = partitioned[k_lo_list[q_idx]]   # shape: (n_cols,)
-                hi = partitioned[k_hi_list[q_idx]]   # shape: (n_cols,)
-                results[q_idx] = lo + frac_list[q_idx] * (hi - lo)
-            return results
-
-        # Slow path: heterogeneous NaN counts → fall back to nanquantile.
-        return FeaturePreprocessor._nanquantile_linear(arr, quantiles)
-
-    @staticmethod
-    def _nanquantile_linear(
-        arr: np.ndarray,
-        quantiles: List[float],
-    ) -> np.ndarray:
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="All-NaN slice encountered",
-                category=RuntimeWarning,
-            )
-            try:
-                return np.nanquantile(
-                    arr,
-                    quantiles,
-                    axis=0,
-                    method="linear",
-                )
-            except TypeError:
-                return np.nanquantile(
-                    arr,
-                    quantiles,
-                    axis=0,
-                    interpolation="linear",
-                )
-
-    @classmethod
-    def _winsorize_2d_inplace(
-        cls,
-        arr: np.ndarray,
-        lower_q: float,
-        upper_q: float,
-        method: str = "linear",
-    ) -> np.ndarray:
-        if method != "linear":
-            raise ValueError(f"Unsupported winsorize quantile method: {method}")
-
-        if arr.ndim != 2:
-            raise ValueError("winsorize input must be a 2D array")
-        if arr.shape[0] == 0 or arr.shape[1] == 0:
-            return arr
-
-        bounds = cls._partition_nanquantile_2d(arr, [lower_q, upper_q])
-        np.clip(arr, bounds[0], bounds[1], out=arr)
-        return arr
 
     def _resolve_fracdiff_precision(self) -> float:
         return get_fracdiff_precision(self.fracdiff_config.get("precision", 0.02))
@@ -4523,27 +3208,6 @@ class FeaturePreprocessor:
             result = pd.concat([result, ranked_df], axis=1)
 
         return result
-
-    def _rolling_last_rank_pct_for_preprocess(self, values: np.ndarray) -> float:
-        """Rolling percentile rank for the last value, preserving legacy constant-window behavior."""
-        last = values[-1]
-        if np.isnan(last):
-            return np.nan
-
-        valid_mask = ~np.isnan(values)
-        valid_count = int(valid_mask.sum())
-        if valid_count == 0:
-            return np.nan
-
-        valid_values = values[valid_mask]
-        # Keep legacy behavior: constant windows map to 0.5 exactly.
-        if np.nanmax(valid_values) == np.nanmin(valid_values):
-            return 0.5
-
-        less_count = int(np.sum(valid_values < last))
-        equal_count = int(np.sum(valid_values == last))
-        average_rank = less_count + (equal_count + 1) / 2.0
-        return average_rank / float(valid_count)
 
     @staticmethod
     def _gaussian_2d(

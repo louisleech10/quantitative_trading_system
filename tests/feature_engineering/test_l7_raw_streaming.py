@@ -278,14 +278,11 @@ def test_raw_streaming_slow_chunked_groups_stream_chunks(tmp_path, monkeypatch, 
             }
         )
 
-    def fail_old_chunk_concat(*args, **kwargs):
-        raise AssertionError("raw-sink must stream chunk outputs instead of concatenating them")
-
+    # 舊之分塊後串接實作已於 FFPROD Task 1.1 刪除（生產無呼叫者）；串流與否由下方逐塊輸出之斷言驗證
     from momentum.FeatureEngineering.utils import hardware_utils
 
     monkeypatch.setattr(hardware_utils, "get_l65_split_threshold", lambda: 2)
     monkeypatch.setattr(preprocessor, "_group_requires_slow_transform", lambda _group, _context: True)
-    monkeypatch.setattr(preprocessor, "_transform_single_group_chunked_to_arrays", fail_old_chunk_concat)
 
     logger_name = "momentum.FeatureEngineering.preprocessing.feature_preprocessor"
     with caplog.at_level(logging.INFO, logger=logger_name):

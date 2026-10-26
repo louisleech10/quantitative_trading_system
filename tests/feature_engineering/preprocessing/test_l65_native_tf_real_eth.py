@@ -31,6 +31,7 @@ from momentum.FeatureEngineering.core.column_group import (
     LayerSource,
 )
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+from tests._fixtures.registry_l65 import apply_l65_via_sink
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     FeaturePreprocessor,
 )
@@ -148,9 +149,10 @@ def _l65_config(*, mode: str = "replace") -> dict:
     return {
         "enabled": True,
         "mode": mode,
-        "winsorization": {"enabled": True, "lower_q": 0.01, "upper_q": 0.99},
-        "rank_transform": {"enabled": True, "window": 240},  # 1h primary → 20 12h
-        "adaptive_zscore": {"enabled": True, "windows": [120, 240]},
+        "winsorization": {"enabled": True, "method": "quantile", "lower_q": 0.01, "upper_q": 0.99},
+        # FFPROD Task 1.1：生產 raw 之 L6.5 一律關 rank／zscore／gaussian
+        "rank_transform": {"enabled": False},
+        "adaptive_zscore": {"enabled": False},
         "fractional_differencing": {"enabled": False},
         "adf_differencing": {"enabled": False},
         "gaussian_normalize": {"enabled": False},
@@ -171,8 +173,7 @@ class TestRealEthForwardFillStructure:
         registry, _native, idx_map, _n_native = _make_real_eth_compact_registry(
             tmp_path, primary_rows=20352, n_cols=1
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
         )
         result = registry.load_data("12h_L1_eth_close")
         assert result.shape == (len(idx_map), 1)
@@ -204,8 +205,7 @@ class TestRealEthForwardFillStructure:
         registry, _, _, _ = _make_real_eth_compact_registry(
             tmp_path, primary_rows=20352, n_cols=1
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
         )
         result = registry.load_data("12h_L1_eth_close")
         assert result.dtype == np.float32
@@ -220,8 +220,7 @@ class TestRealEthForwardFillStructure:
         leading_gaps = int((idx_map[: min(20, len(idx_map))] == -1).sum())
         if leading_gaps == 0:
             pytest.skip("real ETH alignment has no leading gaps; structural test n/a")
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
         )
         result = registry.load_data("12h_L1_eth_close")
         gap_mask = idx_map == -1
@@ -243,8 +242,7 @@ class TestRealEthStatisticalDivergence:
         legacy_reg, _, idx_map, _ = _make_real_eth_compact_registry(
             tmp_path / "legacy", primary_rows=20352, n_cols=1
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            legacy_reg, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), legacy_reg, n_workers=1
         )
         legacy_result = legacy_reg.load_data("12h_L1_eth_close").copy()
 
@@ -253,8 +251,7 @@ class TestRealEthStatisticalDivergence:
         native_reg, _, _, _ = _make_real_eth_compact_registry(
             tmp_path / "native", primary_rows=20352, n_cols=1
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            native_reg, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), native_reg, n_workers=1
         )
         native_result = native_reg.load_data("12h_L1_eth_close")
 
@@ -283,15 +280,17 @@ class TestRealEthStatisticalDivergence:
         # legacy（1h 列）下界＝縮尾 239＋rank 239＋zscore 主窗 119＝597（實測 609）；native（12h 根，窗 240→20、
         # zscore 120→10）下界＝(19＋19＋9)×12＝564（實測 588）。遮罩主導前綴後，改前「native > legacy」（源於 min_periods
         # 經 ffill 放大）不再成立，改以各自遮罩下界斷言；區間寬度同原式 80；穩態 NaN 全等不變（主委探針 2026-10-02）。
-        legacy_floor = 239 + 239 + 119
-        native_floor = (19 + 19 + 9) * 12
+        # FFPROD Task 1.1：改經生產 raw 串流入口，設定同生產 raw（rank／zscore 關）⇒ 下界只剩縮尾窗：legacy 239、
+        # native 19×12（窗 240→20）
+        legacy_floor = 239
+        native_floor = 19 * 12
         assert legacy_floor <= legacy_prefix <= legacy_floor + 80, (
             f"legacy warmup prefix {legacy_prefix} outside expected causal range "
-            f"(winsor/rank/zscore incomplete-window masks on 1h step-series; measured=609)"
+            f"(winsor incomplete-window mask on 1h step-series)"
         )
         assert native_floor <= native_prefix <= native_floor + 80, (
             f"native warmup prefix {native_prefix} outside expected causal range "
-            f"(scaled winsor/rank/zscore masks on 12h grid × ffill; measured=588)"
+            f"(scaled winsor mask on 12h grid × ffill)"
         )
         assert legacy_prefix >= legacy_floor and native_prefix >= native_floor, (
             f"prefixes {legacy_prefix}/{native_prefix} below their mask floors {legacy_floor}/{native_floor}"
@@ -347,7 +346,7 @@ class TestRealEthStatisticalDivergence:
         # don't pass context — but the native sibling MUST construct a new
         # context with timeframe=12h.
         outer = fp_mod.FeaturePreprocessor(_l65_config())
-        outer.transform_registry_groups(registry, n_workers=1)
+        apply_l65_via_sink(outer, registry, n_workers=1)
 
         assert captured.get("native_ctx_timeframe") == "12h", (
             "native sibling preprocessor did not use source-TF (12h) in its "
@@ -413,8 +412,7 @@ class TestEdgeCases:
         registry = _make_synthetic_compact(
             tmp_path, native=native, idx_map=idx_map, columns=("only_col",)
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
         )
         result = registry.load_data("12h_L1_synth")
         assert result.shape == (1200, 1)
@@ -431,8 +429,7 @@ class TestEdgeCases:
         registry = _make_synthetic_compact(
             tmp_path, native=native, idx_map=idx_map, columns=cols
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
         )
         result = registry.load_data("12h_L1_synth")
         assert result.shape == (1800, n_cols)
@@ -446,8 +443,7 @@ class TestEdgeCases:
         registry = _make_synthetic_compact(
             tmp_path, native=native, idx_map=idx_map, columns=("a", "b")
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
         )
         result = registry.load_data("12h_L1_synth")
         assert result.shape == (1200, 2)
@@ -472,8 +468,7 @@ class TestEdgeCases:
         registry = _make_synthetic_compact(
             tmp_path, native=native, idx_map=idx_map, columns=("v",)
         )
-        FeaturePreprocessor(_l65_config()).transform_registry_groups(
-            registry, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
         )
         result = registry.load_data("12h_L1_synth")
         assert result.shape == (primary_n, 1)
@@ -523,8 +518,7 @@ class TestEdgeCases:
                 dtype="float32",
             )
             registry.save_data(plain_group, plain.copy())
-            FeaturePreprocessor(_l65_config()).transform_registry_groups(
-                registry, n_workers=1
+            apply_l65_via_sink(FeaturePreprocessor(_l65_config()), registry, n_workers=1
             )
             return (
                 registry.load_data("12h_compact").copy(),
@@ -550,39 +544,3 @@ class TestEdgeCases:
             "compact group produced identical output with native flag on/off — native path not taken"
         )
 
-    def test_append_mode_creates_l65_group(self, tmp_path, monkeypatch):
-        """In append mode, native path should produce a `_L65` sibling group
-        with primary-shape data."""
-        monkeypatch.setenv("FFACT_L65_NATIVE_TF", "1")
-        rng = np.random.default_rng(4)
-        native = rng.standard_normal((100, 1)).astype(np.float32)
-        idx_map = np.repeat(np.arange(100, dtype=np.int32), 12)
-        registry = _make_synthetic_compact(
-            tmp_path, native=native, idx_map=idx_map, columns=("v",),
-            group_id="12h_append",
-        )
-        FeaturePreprocessor(_l65_config(mode="append")).transform_registry_groups(
-            registry, n_workers=1
-        )
-        # TESTREG 4.4：原註解「append 可能不產 _L65、兩者皆可」與生產行為不符——append 模式下 rank／zscore
-        # 之輸出為新欄（`_maybe_run_native_l65_to_sink` 之 new_cols），恆產 `_L65` 兄弟群組；改為強制斷言。
-        groups = dict(registry.iter_all())
-        assert "12h_append" in groups
-        original = registry.load_data("12h_append")
-        assert original.shape == (1200, 1)
-        assert "12h_append_L65" in groups, f"append mode produced no _L65 sibling: {sorted(groups)}"
-        # 欄集合由設定經 native 縮放推得（rank 窗 240→20 不入欄名；zscore 窗 [120, 240]→[10, 20]）
-        assert set(groups["12h_append_L65"].columns) == {
-            "v_rank", "v_zscore_10", "v_rank_zscore_10", "v_zscore_20", "v_rank_zscore_20",
-        }
-        sibling = registry.load_data("12h_append_L65")
-        assert sibling.shape == (1200, 5)
-        assert sibling.dtype == np.float32
-        assert np.isfinite(sibling).any()
-        # primary 形狀之展開＝native 值 forward-fill：同一 native idx 之 12 列逐欄恆定
-        for k in range(100):
-            block = sibling[k * 12:(k + 1) * 12]
-            for c in range(block.shape[1]):
-                finite = block[np.isfinite(block[:, c]), c]
-                if finite.size > 1:
-                    assert np.all(finite == finite[0]), f"_L65 col {c} native idx={k} not step-constant"

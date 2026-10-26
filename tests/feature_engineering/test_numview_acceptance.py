@@ -276,16 +276,19 @@ def _branchdiff_output_spec() -> Dict[str, Any]:
     return load_criteria()["comparison_outputs"]["postic_branch_vs_float64_oracle"]
 
 
-def expected_branches() -> List[str]:
-    return sorted(set(icpostleak_contract()["branches"]) | {probe("postic_branchdiff").CANDIDATE_ARM})
+def expected_branches(contract: Optional[Mapping[str, Any]] = None) -> List[str]:
+    """`contract`：ICPOSTLEAK 契約（驗收據時為其產生時之版本，`nh.contract_for_receipt`；未給 ⇒ 現行）。"""
+    contract = contract if contract is not None else icpostleak_contract()
+    return sorted(set(contract["branches"]) | {probe("postic_branchdiff").CANDIDATE_ARM})
 
 
-def branches_for_input(input_kind: str) -> List[str]:
+def branches_for_input(input_kind: str, contract: Optional[Mapping[str, Any]] = None) -> List[str]:
     """判準 v8 `branches_by_input` 之該輸入分支封閉集合（SPEC v30 Task 1.1：(i)＝ICPOSTLEAK 契約 branches ∪ plus、
-    (ii)＝明列五臂）。"""
+    (ii)＝明列五臂）。`contract` 同 `expected_branches`。"""
     spec = _branchdiff_output_spec()["branches_by_input"][str(input_kind)]
     if "contract_branches" in spec:
-        return sorted(set(icpostleak_contract()["branches"]) | set(spec.get("plus") or []))
+        contract = contract if contract is not None else icpostleak_contract()
+        return sorted(set(contract["branches"]) | set(spec.get("plus") or []))
     return sorted(spec["branches"])
 
 
@@ -303,7 +306,8 @@ def branchdiff_rows_violations() -> List[str]:
     """列數＝Σ_(格, 輸入) 該輸入分支數×7（判準 v8 起；v7 以前為格數×分支數×7）、每 (格, 輸入, 分支, 組合) 恰一列；格涵蓋：輸入 (i)＝每個 symbol×tf、輸入 (ii)＝凍結檔全部格。
     判準 v3 起（SPEC Task 1.1 v17）：輸入 (i)＝封閉清單格 A 之 symbol×tf、輸入 (ii)＝判準 `run_coverage.postic_branchdiff` 之格。"""
     receipt = load_receipt("postic-branchdiff")
-    branches, combos = expected_branches(), combo_names()
+    icpl = nh.contract_for_receipt(ICPOSTLEAK_CONTRACT_PATH, receipt)
+    branches, combos = expected_branches(icpl), combo_names()
     out: List[str] = []
     if sorted(receipt.get("branches") or []) != branches:
         out.append(f"branches {sorted(receipt.get('branches') or [])} ≠ {branches}")
@@ -331,7 +335,7 @@ def branchdiff_rows_violations() -> List[str]:
             out.append("列之 (格, 輸入, 分支, 組合) 非恰一")
         return out
     # 判準 v8 起（SPEC v30 Task 1.1）：分支依輸入取 `branches_by_input`，列數＝Σ_(格, 輸入) 該輸入分支數 × 組合數
-    want_rows = {(c, i, b, k) for (c, i) in set(keys) for b in branches_for_input(i) for k in combos}
+    want_rows = {(c, i, b, k) for (c, i) in set(keys) for b in branches_for_input(i, icpl) for k in combos}
     if len(rows) != len(want_rows):
         out.append(f"列數 {len(rows)} ≠ Σ_(格, 輸入) 該輸入分支數 × {len(combos)}＝{len(want_rows)}")
     if set(row_keys) != want_rows or len(row_keys) != len(set(row_keys)):
@@ -486,7 +490,7 @@ def sink_routes_violations() -> List[str]:
 def speed_violations() -> List[str]:
     """每格每可達臂（契約可達條件＋候選臂）具三次牆鐘秒數與其中位數。"""
     receipt = load_receipt("postic-branchdiff")
-    contract = load_contract()
+    contract = nh.contract_for_receipt(nh.NUMVIEW_CONTRACT_PATH, receipt)
     candidate = probe("postic_branchdiff").CANDIDATE_ARM
     speed: Dict[Tuple[str, str, str], Mapping[str, Any]] = {}
     out: List[str] = []
@@ -586,38 +590,6 @@ def test_postic_branchdiff_registry_definition_cells_causally_zero() -> None:
         assert isinstance(row.get("registry_definition_cells"), int), row
         assert row.get("registry_definition_nonzero") == 0, row
     assert any(int(r["registry_definition_cells"]) > 0 for r in rows)
-
-
-@pytest.mark.parametrize("threshold_shift", [0, 5, -5])
-def test_registry_definition_audit_detects_threshold_misplacement(tmp_path: Path, threshold_shift: int) -> None:
-    """審碼 b2 r6 CODEX-R6-P1-01（可證偽）：真實 BTCUSDT 1h 對數報酬 500 根、以固定步距挖空使 zscore 窗內有效值數遍歷 20–100；
-    registry_sink zscore 實際輸出對參照之 registry 定義差異格——門檻＝產品 `_rolling_min_periods`（shift 0）⇒ 格數 > 0 且格內
-    輸出非 0 之數＝0；門檻多 5 ⇒ 格內含 registry 已計 z 之格（非 0）；門檻少 5 ⇒ 漏列：格外存在 registry 輸出 0 而參照非 0 之格。"""
-    bd = probe("postic_branchdiff")
-    ret = real_log_returns()[-500:].copy()
-    keep = np.zeros(ret.size, dtype=bool)
-    keep[::5] = True  # 窗 100 內約 20 個有效值（< 25）；第 300 列起全留 ⇒ 有效值數自 20 升至 100，跨 20、25、30
-    keep[300:] = True
-    ret[~keep] = np.nan
-    frame = pd.DataFrame({"x": ret}, index=pd.date_range("2024-01-01", periods=ret.size, freq="h", tz="UTC"))
-    out = bd.run_branch("registry_sink", ["zscore"], frame, "1h", tmp_path)
-    z_w = int(icpostleak_contract()["zscore_windows"][0])
-    base = bd._registry_zscore_min_valid(z_w)
-    original = bd._registry_zscore_min_valid
-    try:
-        bd._registry_zscore_min_valid = lambda w: base + threshold_shift
-        ref, _, reg = bd._reference_column((ret.astype(np.float64), int(icpostleak_contract()["rank_window"]), 252, z_w))["zscore"]
-    finally:
-        bd._registry_zscore_min_valid = original
-    audit = bd.registry_definition_audit(reg[:, None], out)
-    leaked = int(np.count_nonzero(~reg & np.isfinite(ref) & (out[:, 0] == 0.0) & (ref != 0.0)))
-    if threshold_shift == 0:
-        assert audit["registry_definition_cells"] > 0 and audit["registry_definition_nonzero"] == 0 and leaked == 0, \
-            (audit, leaked)
-    elif threshold_shift > 0:
-        assert audit["registry_definition_nonzero"] > 0, audit
-    else:
-        assert leaked > 0, (audit, leaked)
 
 
 def test_perf_benchmark_receipt_rc_criteria_and_content() -> None:
@@ -805,44 +777,6 @@ def test_postic_branchdiff_candidate_value_fidelity_points() -> None:
             (_entry_key(cell), got)
         checked += 1
     assert checked >= 1
-
-
-@pytest.mark.parametrize("mutant", [None, "to_pandas_float32", "gaussian_rank_float32", "zscore_float32"])
-def test_candidate_fidelity_self_test_detects_float32_paths(monkeypatch: pytest.MonkeyPatch, mutant: Optional[str]) -> None:
-    """`postic_branchdiff._candidate_fidelity` 可證偽：完整候選改動下四點皆 float64；還原產品 `polars_to_pandas`（轉
-    float32）⇒ 往返與遮罩兩點記 float32；gaussian 內部 rank 改回產品 float32 版 ⇒ gaussian rank 點記 float32；zscore 於
-    Float32 計算 ⇒ zscore 點記 float32（審碼 b2 r2）。"""
-    from momentum.FeatureEngineering import polars_adapter as pa
-    from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fpm
-
-    bd = probe("postic_branchdiff")
-    real_to_pandas = pa.polars_to_pandas
-    real_rank = fpm._rolling_rank_numba
-    bd._install_candidate(monkeypatch, [])
-    if mutant == "to_pandas_float32":
-        monkeypatch.setattr(pa, "polars_to_pandas", real_to_pandas)
-    elif mutant == "gaussian_rank_float32":
-        monkeypatch.setattr(bd, "_rolling_rank_2d_float64",
-                            lambda a, w, m: real_rank(np.asarray(a, dtype=np.float64), int(w), int(m)))
-    elif mutant == "zscore_float32":
-        import polars as pl
-
-        installed = pa.polars_l65_adaptive_zscore
-        monkeypatch.setattr(pa, "polars_l65_adaptive_zscore", lambda df, columns, window=100, epsilon=1e-8: installed(
-            df.with_columns([pl.col(c).cast(pl.Float32) for c in columns]), columns=columns, window=window,
-            epsilon=epsilon))
-    got: List[Tuple[str, str]] = []
-    bd._candidate_fidelity(got)
-    verdict = dict(got)
-    assert set(verdict) == set(CANDIDATE_FIDELITY_POINTS), verdict
-    if mutant is None:
-        assert set(verdict.values()) == {"float64"}, verdict
-    elif mutant == "to_pandas_float32":
-        assert verdict["fidelity_roundtrip"] == verdict["fidelity_mask"] == "float32", verdict
-    elif mutant == "gaussian_rank_float32":
-        assert verdict["fidelity_gaussian_rank"] == "float32", verdict
-    else:
-        assert verdict["fidelity_zscore"] == "float32", verdict
 
 
 # ---------------------------------------------------------------------------------------------- 真實向量

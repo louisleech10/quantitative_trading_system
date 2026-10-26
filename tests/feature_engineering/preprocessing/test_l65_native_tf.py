@@ -21,6 +21,7 @@ from momentum.FeatureEngineering.core.column_group import (
     LayerSource,
 )
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+from tests._fixtures.registry_l65 import apply_l65_via_sink
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     FeaturePreprocessor,
 )
@@ -91,7 +92,7 @@ def _make_idx_map_uniform(n_native: int, ratio: int) -> np.ndarray:
 
 
 def _basic_l65_config() -> dict:
-    """Config with rank + zscore enabled (no fracdiff/ADF — keep test fast)."""
+    """生產 raw 之 L6.5 設定（FFPROD Task 1.1：raw 一律關 rank／zscore／gaussian；no fracdiff/ADF — keep test fast）。"""
     return {
         "enabled": True,
         "mode": "replace",
@@ -101,14 +102,8 @@ def _basic_l65_config() -> dict:
             "lower_q": 0.01,
             "upper_q": 0.99,
         },
-        "rank_transform": {
-            "enabled": True,
-            "window": 240,  # primary 1h units → scaled to 20 in 12h source
-        },
-        "adaptive_zscore": {
-            "enabled": True,
-            "windows": [120, 240],  # primary → [10, 20]
-        },
+        "rank_transform": {"enabled": False},
+        "adaptive_zscore": {"enabled": False},
         "fractional_differencing": {"enabled": False},
         "adf_differencing": {"enabled": False},
         "gaussian_normalize": {"enabled": False},
@@ -138,7 +133,7 @@ class TestNativePathInPlace:
 
         config = _basic_l65_config()
         preprocessor = FeaturePreprocessor(config)
-        completed = preprocessor.transform_registry_groups(registry, n_workers=1)
+        completed = apply_l65_via_sink(preprocessor, registry, n_workers=1)
 
         assert completed == 1
         result = registry.load_data("12h_L1_compact")
@@ -162,7 +157,7 @@ class TestNativePathInPlace:
 
         config = _basic_l65_config()
         preprocessor = FeaturePreprocessor(config)
-        completed = preprocessor.transform_registry_groups(registry, n_workers=1)
+        completed = apply_l65_via_sink(preprocessor, registry, n_workers=1)
         assert completed == 1
         result = registry.load_data("12h_L1_compact")
         assert result.shape == (n_native * ratio, n_cols)
@@ -180,8 +175,7 @@ class TestNativePathInPlace:
         legacy_reg = _make_compact_registry(
             tmp_path / "legacy", source=source, idx_map=idx_map
         )
-        FeaturePreprocessor(_basic_l65_config()).transform_registry_groups(
-            legacy_reg, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_basic_l65_config()), legacy_reg, n_workers=1
         )
         legacy_result = legacy_reg.load_data("12h_L1_compact").copy()
 
@@ -190,8 +184,7 @@ class TestNativePathInPlace:
         native_reg = _make_compact_registry(
             tmp_path / "native", source=source, idx_map=idx_map
         )
-        FeaturePreprocessor(_basic_l65_config()).transform_registry_groups(
-            native_reg, n_workers=1
+        apply_l65_via_sink(FeaturePreprocessor(_basic_l65_config()), native_reg, n_workers=1
         )
         native_result = native_reg.load_data("12h_L1_compact")
 
@@ -225,7 +218,7 @@ class TestNativePathInPlace:
 
         config = _basic_l65_config()
         preprocessor = FeaturePreprocessor(config)
-        completed = preprocessor.transform_registry_groups(registry, n_workers=1)
+        completed = apply_l65_via_sink(preprocessor, registry, n_workers=1)
         assert completed == 1
         result = registry.load_data("12h_L1_compact")
         # Falls back to legacy expand path; output stays primary-shape.
@@ -246,7 +239,7 @@ def test_legacy_path_equals_transform_of_pre_expanded_group(tmp_path, monkeypatc
     source = _make_synthetic_native_data(n_native, 2)
     idx_map = _make_idx_map_uniform(n_native, ratio)
     registry = _make_compact_registry(tmp_path / "compact", source=source, idx_map=idx_map)
-    FeaturePreprocessor(_basic_l65_config()).transform_registry_groups(registry, n_workers=1)
+    apply_l65_via_sink(FeaturePreprocessor(_basic_l65_config()), registry, n_workers=1)
     out = registry.load_data("12h_L1_compact")
     expanded = ColumnGroupRegistry(tmp_path / "expanded")
     expanded.save_data(
@@ -262,7 +255,7 @@ def test_legacy_path_equals_transform_of_pre_expanded_group(tmp_path, monkeypatc
         ),
         source[idx_map].astype(np.float32),
     )
-    FeaturePreprocessor(_basic_l65_config()).transform_registry_groups(expanded, n_workers=1)
+    apply_l65_via_sink(FeaturePreprocessor(_basic_l65_config()), expanded, n_workers=1)
     expected = expanded.load_data("g_expanded")
     assert np.isfinite(expected).sum() > 0 and np.array_equal(out, expected, equal_nan=True)
 
@@ -289,8 +282,7 @@ class TestNonCompactGroupUnaffected:
                 dtype="float32",
             )
             registry.save_data(group, data.copy())
-            FeaturePreprocessor(_basic_l65_config()).transform_registry_groups(
-                registry, n_workers=1
+            apply_l65_via_sink(FeaturePreprocessor(_basic_l65_config()), registry, n_workers=1
             )
             return registry.load_data("g1")
 

@@ -15,7 +15,7 @@
           "momentum/FeatureEngineering/feature_factory.py:3000"
         ],
         "_numeric_view.require_post_ic_core(arm)": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:931"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:945"
         ]
       }
     },
@@ -32,49 +32,33 @@
   "post_ic_arm_values": {
     "_doc": "post-IC 轉換（`FeaturePreprocessor.transform` 分派）現行可達之臂；⊆ run_provenance.json group_arm_values.values。順序＝SPEC §G G1 之臂份順序。",
     "values": [
-      "polars",
       "pandas_optimized",
       "pandas_legacy",
       "pandas_chunked"
     ],
     "_sources": {
-      "polars": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:880"
-      ],
       "pandas_optimized": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
       ],
       "pandas_legacy": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
       ],
       "pandas_chunked": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:904"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:918"
       ]
     }
   },
   "post_ic_arm_reachability": {
     "_doc": "每個 post_ic_arm_values 之臂一鍵：{\"condition\": <條件名>, \"min_selected_columns\": <int，選欄數（ratio-unsafe 剔除後）≥ 此值方可達>, \"_sources\": [path:line]}；pandas_chunked 之條件須表「chunk_size > 0 且選欄數 > chunk_size」（feature_preprocessor.py transform 分派；R3-D），其 min_selected_columns 須為 2。",
-    "polars": {
-      "condition": "selected_nonempty",
-      "min_selected_columns": 1,
-      "_sources": {
-        "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:933"
-        ],
-        "self._record_group(arm=\"polars\")": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:899"
-        ]
-      }
-    },
     "pandas_optimized": {
       "condition": "selected_nonempty",
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:933"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:947"
         ],
         "\"pandas_optimized\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
         ]
       }
     },
@@ -83,10 +67,10 @@
       "min_selected_columns": 1,
       "_sources": {
         "if not selected_columns:": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:933"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:947"
         ],
         "\"pandas_legacy\"": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:907"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
         ]
       }
     },
@@ -95,10 +79,10 @@
       "min_selected_columns": 2,
       "_sources": {
         "chunk_size > 0 and num_cols > chunk_size": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:903"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:917"
         ],
         "return max(size, 0)": [
-          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:853"
+          "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:878"
         ]
       }
     }
@@ -266,34 +250,18 @@
   "research_arms": {
     "_doc": "研究臂與不可達理由（承 ICPOSTLEAK §N；D-RESEARCH 依 Task 1.5）。",
     "values": [
-      "registry",
-      "registry_parallel_split",
       "registry_sink",
       "registry_sink_sharded"
     ],
     "_sources": {
-      "registry": [
-        "tests/_golden/icpostleak/contract.json:108"
-      ],
-      "registry_parallel_split": [
-        "tests/_golden/icpostleak/contract.json:123"
-      ],
       "registry_sink": [
-        "tests/_golden/icpostleak/contract.json:112"
+        "tests/_golden/icpostleak/contract.json:102"
       ],
       "registry_sink_sharded": [
-        "tests/_golden/icpostleak/contract.json:117"
+        "tests/_golden/icpostleak/contract.json:107"
       ]
     },
     "_unreachable": {
-      "registry": {
-        "reason": "registry 帶 rank／zscore／gaussian 經現行分派不可達：pre-IC 與 L7 raw 設定強制關閉三者、帶選欄之 post-IC 無生產呼叫者（ICPOSTLEAK §N 第一條）；處置依 D-RESEARCH（Task 1.5）。",
-        "evidence": "docs/ICPOSTLEAK_SPEC.md:99"
-      },
-      "registry_parallel_split": {
-        "reason": "registry 帶 rank／zscore／gaussian 經現行分派不可達：pre-IC 與 L7 raw 設定強制關閉三者、帶選欄之 post-IC 無生產呼叫者（ICPOSTLEAK §N 第一條）；處置依 D-RESEARCH（Task 1.5）。",
-        "evidence": "docs/ICPOSTLEAK_SPEC.md:99"
-      },
       "registry_sink": {
         "reason": "registry 帶 rank／zscore／gaussian 經現行分派不可達：pre-IC 與 L7 raw 設定強制關閉三者、帶選欄之 post-IC 無生產呼叫者（ICPOSTLEAK §N 第一條）；處置依 D-RESEARCH（Task 1.5）。",
         "evidence": "docs/ICPOSTLEAK_SPEC.md:99"
@@ -312,7 +280,7 @@
     ],
     "_sources": {
       "if not normalized_windows:": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3239"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2163"
       ],
       "windows: List[int]": [
         "momentum/FeatureEngineering/feature_config.py:310"
@@ -324,9 +292,8 @@
         "momentum/FeatureEngineering/numeric_view.py:137"
       ],
       "primary_window = self._primary_zscore_window(windows)": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3372",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3569",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:4636"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2296",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3300"
       ]
     }
   },
@@ -338,18 +305,14 @@
     ],
     "_sources": {
       "quantile": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3202",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3721",
-        "momentum/FeatureEngineering/polars_adapter.py:419",
-        "momentum/FeatureEngineering/polars_adapter.py:451",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2126",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2526",
         "momentum/FeatureEngineering/feature_config.py:169"
       ],
       "sigma": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3186",
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3702",
-        "momentum/FeatureEngineering/polars_adapter.py:415",
-        "momentum/FeatureEngineering/polars_adapter.py:441",
-        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:442"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2110",
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2507",
+        "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:395"
       ]
     }
   },
@@ -361,7 +324,7 @@
         "momentum/FeatureEngineering/numeric_view.py:148"
       ],
       "validate_preprocessing_policy(self._config)": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:179"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:183"
       ]
     }
   },
@@ -447,7 +410,7 @@
       "default": null,
       "domain": "float",
       "_sources": [
-        "momentum/FeatureEngineering/core/column_group_registry.py:1005"
+        "momentum/FeatureEngineering/core/column_group_registry.py:976"
       ]
     },
     "FFACT_CGSA_MEMORY_BUFFER": {
@@ -626,7 +589,7 @@
       "default": "2000",
       "domain": "non_negative_int",
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:848"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:873"
       ]
     },
     "FFACT_L65_NATIVE_TF": {
@@ -665,7 +628,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1905"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:1647"
       ]
     },
     "FFACT_L65_SLOWPATH_PARALLEL": {
@@ -728,7 +691,7 @@
       "default": "1.5",
       "domain": "float",
       "_sources": [
-        "momentum/FeatureEngineering/feature_storage.py:2767"
+        "momentum/FeatureEngineering/feature_storage.py:2761"
       ]
     },
     "FFACT_L7_MIN_FREE_GIB": {
@@ -738,7 +701,7 @@
       "default": "2.0",
       "domain": "float",
       "_sources": [
-        "momentum/FeatureEngineering/feature_storage.py:2780"
+        "momentum/FeatureEngineering/feature_storage.py:2774"
       ]
     },
     "FFACT_L7_ZSTD_LEVEL": {
@@ -787,7 +750,7 @@
         "api/services/feature_factory_service.py:595",
         "api/services/hardware_info_service.py:113",
         "api/services/hardware_info_service.py:141",
-        "momentum/FeatureEngineering/operators/rolling_aggregator.py:1134"
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:1019"
       ]
     },
     "FFACT_LAYER4_CHUNK_SIZE": {
@@ -1111,10 +1074,10 @@
         "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:21"
       ],
       "HAS_SCIPY = True": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:140"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:144"
       ],
       "HAS_STATSMODELS = True": [
-        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:158"
+        "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:162"
       ]
     }
   },

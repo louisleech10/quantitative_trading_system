@@ -17,6 +17,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
+import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -250,6 +251,67 @@ def _check_value(contract: Mapping[str, Any], path: str, value: Any, where: str)
         raise ProvenanceError(f"{where}：值 {value!r} 不屬契約 {path}")
 
 
+# ---------------------------------------------------------------------------------------------- 縮尾有效設定（FFPROD Task 1.2）
+
+#: 縮尾 method 值集之另一份契約（兩份須相同；不符 ⇒ 拒收）
+_NUMERIC_VIEW_CONTRACT_PATH: Path = CONTRACT_PATH.parent / "numeric_view.json"
+
+
+def winsor_method_values(contract: Mapping[str, Any]) -> List[str]:
+    """縮尾 method 封閉值集；與 numeric_view 契約之同名值集不同 ⇒ `ProvenanceError`。"""
+    values = contract_value_set(contract, "winsor_method_values")
+    other = json.loads(_NUMERIC_VIEW_CONTRACT_PATH.read_text(encoding="utf-8"))["winsor_method_values"]["values"]
+    if set(values) != {str(v) for v in other}:
+        raise ProvenanceError(f"契約 winsor_method_values {values} ≠ numeric_view 契約 {list(other)}")
+    return values
+
+
+def winsor_table_errors(table: pd.DataFrame, contract: Mapping[str, Any], methods: Sequence[str]) -> List[str]:
+    """整表核縮尾有效設定與縮尾步驟狀態之一致性（向量化；回傳違規之欄名與原因，空＝合規）：applied ⇒ method 屬 `methods`、
+    窗／最少期數／計算 dtype 非空，quantile 只填分位端點、sigma 只填倍數；其餘狀態 ⇒ method＝`status_map` 之對應值且參數欄皆空。"""
+    if not len(table):
+        return []
+    fields = [str(f) for f in contract["winsor_effective_fields"]]
+    for field in fields + ["winsorization", "output_column"]:
+        if field not in table.columns:
+            return [f"紀錄表缺欄 {field}"]
+    present = {f: table[f].notna().to_numpy() for f in fields[1:]}
+    method = table["winsor_method"]
+    status = table["winsorization"].astype(object)
+    applied = (status == "applied").to_numpy()
+    want = {
+        "quantile": {"winsor_lower_q", "winsor_upper_q", "winsor_window", "winsor_min_periods", "winsor_compute_dtype"},
+        "sigma": {"winsor_sigma_k", "winsor_window", "winsor_min_periods", "winsor_compute_dtype"},
+    }
+    bad = np.zeros(len(table), dtype=bool)
+    for name in want:
+        if name not in set(methods):
+            raise ProvenanceError(f"縮尾 method {name!r} 不屬契約 winsor_method_values {list(methods)}")
+    known = method.isin(list(want)).to_numpy()
+    bad |= applied & ~known
+    for name, need in want.items():
+        rows = applied & (method == name).to_numpy()
+        for field, mask in present.items():
+            bad |= rows & (mask != (field in need))
+    expected = status.map(dict(contract["winsor_method_record_values"]["status_map"]))
+    other = ~applied
+    bad |= other & ~(method.to_numpy(dtype=object) == expected.to_numpy(dtype=object))
+    for mask in present.values():
+        bad |= other & mask
+    if not bad.any():
+        return []
+    rows = table.loc[bad, ["output_column", "winsorization", "winsor_method"]].head(3).to_dict("records")
+    return [f"{int(bad.sum())} 欄之縮尾有效設定與縮尾狀態不一致（例 {rows}）"]
+
+
+def _fill_winsor(row: Dict[str, Any], record: Mapping[str, Any], contract: Mapping[str, Any]) -> None:
+    """列之縮尾欄：取紀錄（applied 時前處理器所記之有效設定）；未記 method 之非 applied 狀態 ⇒ 依 `status_map` 補。"""
+    for field in contract["winsor_effective_fields"]:
+        row[str(field)] = record.get(str(field))
+    if row.get("winsor_method") is None and row.get("winsorization") != "applied":
+        row["winsor_method"] = dict(contract["winsor_method_record_values"]["status_map"]).get(str(row["winsorization"]))
+
+
 def build_provenance_table(
     records: Mapping[Tuple[str, str], Mapping[str, Any]],
     *,
@@ -274,6 +336,7 @@ def build_provenance_table(
     contract = load_contract()
     steps = list(contract["steps"])
     columns = list(contract["record_columns"])
+    methods = winsor_method_values(contract)
     terminals = dict(terminals or {})
     extra_events = {str(k): list(v) for k, v in dict(events or {}).items()}
     dropped = {str(k): str(v) for k, v in dict(dropped_columns).items()}
@@ -358,6 +421,7 @@ def build_provenance_table(
             raise ProvenanceExhaustivenessError(f"欄 {name} 無終態")
         _check_value(contract, "terminal_values", terminal, f"欄 {name}.terminal")
         row["terminal"] = str(terminal)
+        _fill_winsor(row, record, contract)  # 衍生欄承父欄（同步驟狀態）
         if parent is None:
             for field in _DECISION_FIELDS:
                 row[field] = record.get(field)
@@ -371,7 +435,11 @@ def build_provenance_table(
     orphans = sorted(set(by_output) - used)
     if orphans:
         raise ProvenanceExhaustivenessError(f"{len(orphans)} 欄有執行紀錄而未落盤、非 dead-drop 亦無終態（例 {orphans[:3]}）")
-    return pd.DataFrame(rows, columns=columns)
+    table = pd.DataFrame(rows, columns=columns)
+    errors = winsor_table_errors(table, contract, methods)
+    if errors:
+        raise ProvenanceError(errors[0])
+    return table
 
 
 def build_post_ic_table(
@@ -544,6 +612,10 @@ def write_provenance_table(
     寫入失敗一律上拋（不得吞例外）。`summary_extra`：併入摘要之額外鍵（processed 之 `selected_columns`，
     SPEC Task 1.4；與既有摘要鍵同名 ⇒ `ProvenanceConflictError`）。"""
     contract = load_contract()
+    methods = winsor_method_values(contract)
+    errors = winsor_table_errors(table, contract, methods)  # FFPROD Task 1.2：寫入前核縮尾有效設定（組表後被改亦拒收）
+    if errors:
+        raise ProvenanceError(errors[0])
     relative = str(contract["files"][artifact_kind])
     target = Path(staging_dir) / relative
     target.parent.mkdir(parents=True, exist_ok=True)

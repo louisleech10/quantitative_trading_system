@@ -686,52 +686,6 @@ class RollingAggregator:
         return pd.DataFrame(out, index=data.index, columns=data.columns, copy=False)
 
     @staticmethod
-    def _compute_numba_slope(data: pd.DataFrame, window: int, slope_fn: callable) -> pd.DataFrame:
-        n_rows, n_cols = data.shape
-        out = np.empty((n_rows, n_cols), dtype=np.float32)
-        for col_idx, col_name in enumerate(data.columns):
-            values = data[col_name].to_numpy(dtype=np.float64, copy=False)
-            out[:, col_idx] = slope_fn(values, window)
-        return pd.DataFrame(out, index=data.index, columns=data.columns, copy=False)
-
-    def _compute_single_agg_window(
-        self,
-        data: pd.DataFrame,
-        agg_name: str,
-        window: int,
-        agg_label: str,
-    ) -> pd.DataFrame:
-        """Compute a single (agg, window) combination for the given data columns."""
-        rolling = data.rolling(window)
-
-        if agg_name == "mean":
-            result = rolling.mean()
-        elif agg_name == "std":
-            result = rolling.std()
-        elif agg_name == "min":
-            result = rolling.min()
-        elif agg_name == "max":
-            result = rolling.max()
-        elif agg_name == "skew":
-            result = rolling.skew()
-        elif agg_name == "kurt":
-            result = rolling.kurt()
-        elif agg_name == "range":
-            result = rolling.max() - rolling.min()
-        elif agg_name == "zscore":
-            mean = rolling.mean()
-            std = rolling.std().replace(0, np.nan)
-            result = (data - mean) / std
-        elif agg_name == "rank":
-            result = rolling.rank(method="average", pct=True)
-        elif agg_name == "slope":
-            result = self._compute_slope_vectorized(data, window)
-        else:
-            return pd.DataFrame(index=data.index)
-
-        return self._with_l3_op(result, agg_label, window)
-
-    @staticmethod
     def _compute_slope_vectorized(data: pd.DataFrame, window: int) -> pd.DataFrame:
         """Rolling OLS slope（窗內 x＝0..w−1；窗內任一 NaN ⇒ NaN）。
 
@@ -821,21 +775,6 @@ class RollingAggregator:
         }
         return df.loc[:, ~dead_mask], reasons
 
-    @staticmethod
-    def _should_keep_output(data: np.ndarray, nan_threshold: float = 0.9) -> bool:
-        if data.size == 0:
-            return False
-
-        values = np.asarray(data, dtype=np.float64)
-        if np.isinf(values).any():
-            return False
-
-        # FFSTAT Task 2.3 ⑦：與 _variance_filter、L7 同一死欄純函式
-        decision = _stable_mask.dead_column_decision(
-            values.reshape(-1), nan_rate_threshold=nan_threshold, min_valid=_VARIANCE_FILTER_MIN_EFFECTIVE_N
-        )
-        return not decision.dead
-
     def _batch_variance_filter(
         self,
         window_results: Dict[str, np.ndarray],
@@ -905,60 +844,6 @@ class RollingAggregator:
         if not ordered_frames:
             return pd.DataFrame(index=features_df.index)
         return pd.concat(ordered_frames, axis=1, copy=False)
-
-    def _apply_aggregator(
-        self,
-        data: pd.DataFrame,
-        method: callable,
-        agg_name: str,
-    ) -> pd.DataFrame:
-        # All aggregators are routed through the vectorized path.
-        # "rank" and "slope" are handled inside _apply_vectorized_aggregator
-        # using raw=True callbacks, which avoids per-row Python object creation.
-        return self._apply_vectorized_aggregator(data, agg_name)
-
-    def _apply_vectorized_aggregator(self, data: pd.DataFrame, agg_name: str) -> pd.DataFrame:
-        frames: List[pd.DataFrame] = []
-        agg_label = self._format_agg_label(agg_name)
-        for window in self._windows:
-            if agg_name == "mean":
-                result = data.rolling(window).mean()
-            elif agg_name == "std":
-                result = data.rolling(window).std()
-            elif agg_name == "min":
-                result = data.rolling(window).min()
-            elif agg_name == "max":
-                result = data.rolling(window).max()
-            elif agg_name == "skew":
-                result = data.rolling(window).skew()
-            elif agg_name == "kurt":
-                result = data.rolling(window).kurt()
-            elif agg_name == "range":
-                rolling_max = data.rolling(window).max()
-                rolling_min = data.rolling(window).min()
-                result = rolling_max - rolling_min
-            elif agg_name == "zscore":
-                mean = data.rolling(window).mean()
-                std = data.rolling(window).std().replace(0, np.nan)
-                result = (data - mean) / std
-            elif agg_name == "rank":
-                # raw=True passes a numpy array to the lambda — no pd.Series construction.
-                # rankdata runs in C via scipy, giving ~100-1000× speedup over raw=False.
-                n = window
-
-                def _rank_pct(arr: np.ndarray, _n: int = n) -> float:
-                    return rankdata(arr)[-1] / _n
-
-                result = data.rolling(window).apply(_rank_pct, raw=True)
-            elif agg_name == "slope":
-                result = self._compute_slope_vectorized(data, window)
-            else:
-                continue
-            frames.append(self._with_l3_op(result, agg_label, window))
-
-        if not frames:
-            return pd.DataFrame(index=data.index)
-        return pd.concat(frames, axis=1)
 
     def _apply_vectorized_aggregators_with_cache(self, data: pd.DataFrame) -> pd.DataFrame:
         valid_aggs = [agg for agg in self._enabled_aggregators if agg in self.AGGREGATORS]

@@ -18,6 +18,19 @@ REPO = Path(__file__).resolve().parents[2]
 RECEIPTS_DIR = REPO / "handoffs" / "run_receipts"
 #: Task 1.1 驗證之零命中範圍（SPEC：`grep -rn` 於 `momentum api tests`）。
 SEARCH_ROOTS = ("momentum", "api", "tests")
+#: 具名歷史字面（repo 相對路徑 → {被刪函式名: 理由}）：該檔之命中為凍結之歷史紀錄字面、非呼叫，不計入零命中。
+HISTORICAL_LITERALS: Dict[str, Dict[str, str]] = {
+    "tests/feature_engineering/test_framepath_cgsa_only.py": {
+        "_rolling_last_rank_pct_for_preprocess": "HEAD_DEAD＝FRAMEPATH 於 HEAD 6e07e0ad 凍結之既有死碼清單，"
+                                                 "該檔斷言其等於產生收據（不得改寫）；字面記歷史狀態、非呼叫",
+    },
+}
+
+
+def _historical(name: str, hit: str) -> bool:
+    path = hit.rsplit(":", 1)[0]
+    rel = str(Path(path).resolve().relative_to(REPO)) if Path(path).is_absolute() else path
+    return name in HISTORICAL_LITERALS.get(rel, {})
 
 
 def _inventory() -> Dict[str, Any]:
@@ -55,8 +68,13 @@ def _references(name: str, roots: Iterable[str]) -> List[str]:
 def test_removed_functions_have_no_references() -> None:
     removed = _removed()
     assert removed, "盤點收據無 remove 項"
-    leftovers = {item["function"]: _references(item["function"], SEARCH_ROOTS) for item in removed}
+    leftovers = {item["function"]: [hit for hit in _references(item["function"], SEARCH_ROOTS)
+                                    if not _historical(item["function"], hit)] for item in removed}
     assert {k: v for k, v in leftovers.items() if v} == {}
+    named = {(path, name) for path, names in HISTORICAL_LITERALS.items() for name in names}
+    removed_names = {item["function"] for item in removed}
+    assert all(name in removed_names and _references(name, [path]) for path, name in named), \
+        "具名歷史字面須對應盤點 remove 項且於該檔確有命中（防過期例外）"
 
 
 # ---------------------------------------------------------------------------------------------- 邊界

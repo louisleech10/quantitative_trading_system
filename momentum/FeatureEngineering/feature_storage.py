@@ -2312,12 +2312,6 @@ class FeatureStorage:
             json.dump(manifest, manifest_file, ensure_ascii=False, indent=2, default=str)
         os.replace(temp_path, manifest_path)
 
-    @classmethod
-    def _write_feature_manifest_v2(cls, run_dir: Path, manifest: Dict[str, Any]) -> None:
-        """Backward-compatible manifest write with exclusive lock."""
-        with cls._manifest_v2_lock(run_dir):
-            cls._write_feature_manifest_v2_unlocked(run_dir, manifest)
-    
     def save_features_to_hdf5(
         self,
         case_id: str,

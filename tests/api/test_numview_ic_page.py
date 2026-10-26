@@ -363,7 +363,7 @@ def direct_transform(frame: pd.DataFrame, env: Mapping[str, str]) -> Tuple[pd.Da
             mp.delenv(key, raising=False)
         for key, value in env.items():
             mp.setenv(key, value)
-        for name in ("_transform_single_polars", "_transform_single"):
+        for name in ("_transform_single_legacy", "_transform_single_optimized_df"):
             real = getattr(FeaturePreprocessor, name)
 
             def spy(*args: Any, _n: str = name, _r: Callable[..., Any] = real, **kwargs: Any) -> Any:
@@ -790,10 +790,6 @@ def test_mutation_ic_page_passes_wrong_arm(tmp_path: Path, monkeypatch: pytest.M
     鎖臂 ⇒ IC 頁改傳環境臂（pandas_optimized），輸出≠鎖臂參照或拋錯（①紅）。前提：同一真實輸入之 polars 與 pandas 輸出不等。"""
     state = contract_state()
     frame = light_frame()
-    polars_out, _ = direct_transform(frame, ARM_ENVS["polars"])
-    pandas_out, _ = direct_transform(frame, ARM_ENVS["pandas_optimized"])
-    assert nh.bitwise_diff(nh.frame_fingerprints(polars_out), nh.frame_fingerprints(pandas_out)) != [], \
-        "前提不成立：polars 與 pandas 輸出相等，無從觀測換臂"
     source = light_source(tmp_path, frame, "wrongarm")
     env = ARM_ENVS["pandas_optimized"]
     reference = light_run(tmp_path, source, env, tag="ref")
@@ -810,6 +806,12 @@ def test_mutation_ic_page_passes_wrong_arm(tmp_path: Path, monkeypatch: pytest.M
     except Exception:  # noqa: BLE001 — 改壞後拒收（拋錯）亦為①翻轉
         flipped = True
     else:
+        # 未拒收 ⇒ 以輸出判定；前提：所傳臂與參照臂之輸出不等（否則無從觀測換臂）。FFPROD：特徵階段 L6.5 polars 臂已刪
+        # （`transform()` 不再讀 `FFACT_USE_POLARS`），前提改以兩 pandas 核心之直接 `transform()` 輸出表述
+        legacy_out, _ = direct_transform(frame, ARM_ENVS["pandas_legacy"])
+        optimized_out, _ = direct_transform(frame, ARM_ENVS["pandas_optimized"])
+        assert nh.bitwise_diff(nh.frame_fingerprints(legacy_out), nh.frame_fingerprints(optimized_out)) != [], \
+            "前提不成立：legacy 與 optimized 輸出相等，無從觀測換臂"
         flipped = nh.bitwise_diff(nh.frame_fingerprints(reference.frame), nh.frame_fingerprints(mutated.frame)) != []
     assert flipped
 
@@ -1245,19 +1247,22 @@ def test_boundary_38_icpage_arm_locked_ic_first_empty_selection_unchanged(tmp_pa
 
 def test_boundary_39_icpage_arm_locked_env_has_no_effect_on_post_ic(tmp_path: Path) -> None:
     """邊界③（Task 3.4）：`FFACT_USE_POLARS`、`FFACT_L65_OPTIMIZATION_PROFILE` 對 IC 頁不生效（各環境記錄臂＝擇定核心、輸出
-    相同）；對特徵階段照舊（直接 `transform()` 於 `FFACT_USE_POLARS=1` 走 Polars、`=0` 不走）。"""
+    相同）；對特徵階段照舊（直接 `transform()` 於 profile `legacy` 走 legacy 核心、預設走 optimized 核心）。
+    （FFPROD：特徵階段 L6.5 polars 臂無生產呼叫者已刪，`transform()` 不再讀 `FFACT_USE_POLARS` ⇒ 特徵階段對照改以 profile 環境）"""
     arm = _assert_locked()
     frame = light_frame()
     source = light_source(tmp_path, frame, "env")
-    runs = {name: light_run(tmp_path, source, ARM_ENVS[name], tag=name) for name in ("polars", "pandas_optimized")}
+    names = ("polars", "pandas_legacy", "pandas_optimized")
+    runs = {name: light_run(tmp_path, source, ARM_ENVS[name], tag=name) for name in names}
     for run in runs.values():
         assert arm_record_violations(run, arm) == []
-    assert nh.bitwise_diff(nh.frame_fingerprints(runs["polars"].frame),
-                           nh.frame_fingerprints(runs["pandas_optimized"].frame)) == []
-    _out, calls_on = direct_transform(frame, ARM_ENVS["polars"])
-    _out, calls_off = direct_transform(frame, ARM_ENVS["pandas_optimized"])
-    assert "_transform_single_polars" in calls_on, calls_on
-    assert "_transform_single_polars" not in calls_off and "_transform_single" in calls_off, calls_off
+    for name in names[1:]:
+        assert nh.bitwise_diff(nh.frame_fingerprints(runs["polars"].frame),
+                               nh.frame_fingerprints(runs[name].frame)) == [], name
+    _out, calls_legacy = direct_transform(frame, ARM_ENVS["pandas_legacy"])
+    _out, calls_optimized = direct_transform(frame, ARM_ENVS["pandas_optimized"])
+    assert "_transform_single_legacy" in calls_legacy and "_transform_single_optimized_df" not in calls_legacy, calls_legacy
+    assert "_transform_single_optimized_df" in calls_optimized, calls_optimized
 
 
 # ---------------------------------------------------------------------------------------------- Task 3.4 mutation

@@ -242,35 +242,6 @@ class ColumnGroupRegistry:
         """
         self._write_manifest_thread_safe()
 
-    @contextmanager
-    def defer_manifest_writes(self, reason: str = "") -> Iterator[None]:
-        """Batch manifest writes until the protected mutation block exits."""
-        with self._manifest_lock:
-            self._manifest_defer_depth += 1
-
-        started_at = time.perf_counter()
-        try:
-            yield
-        finally:
-            should_flush = False
-            deferred_count = 0.0
-            with self._manifest_lock:
-                self._manifest_defer_depth = max(0, self._manifest_defer_depth - 1)
-                if self._manifest_defer_depth == 0 and self._manifest_dirty:
-                    self._manifest_dirty = False
-                    should_flush = True
-                    deferred_count = self._io_stats.get("manifest_deferred_count", 0.0)
-
-            if should_flush:
-                self._write_manifest_thread_safe()
-                elapsed = time.perf_counter() - started_at
-                logger.info(
-                    "[registry] Deferred manifest writes flushed: reason=%s deferred=%.0f elapsed=%.2fs",
-                    reason or "unspecified",
-                    deferred_count,
-                    elapsed,
-                )
-
     def io_stats(self) -> Dict[str, float]:
         """Return cumulative registry I/O counters for coarse performance diagnostics."""
         return dict(self._io_stats)
@@ -1811,65 +1782,6 @@ class ColumnGroupRegistry:
         """Flush any remaining buffered arrays to disk."""
 
         self._flush_buffer()
-
-    @deprecated("Use iter_all()/load_data() instead; materialize_wide_df may consume large RAM.")
-    def materialize_wide_df(self) -> pd.DataFrame:
-        """Rebuild a wide DataFrame from per-group parquet (fallback to .npy) in canonical column order."""
-        if not self._groups:
-            return pd.DataFrame()
-
-        estimated_gb = sum(group.est_bytes for group in self._groups.values()) / (1024**3)
-        logger.warning(
-            "[registry] materialize_wide_df() is deprecated and may consume %.2f GB RAM",
-            estimated_gb,
-        )
-
-        frames: list[pd.DataFrame] = []
-        expected_rows: Optional[int] = None
-
-        for group in self._sorted_groups_for_materialize():
-            frame = self._load_group_frame_for_materialize(group)
-            if expected_rows is None:
-                expected_rows = len(frame)
-            elif len(frame) != expected_rows:
-                raise ColumnGroupRegistryError(
-                    (
-                        f"Group {group.group_id} row mismatch during materialization: "
-                        f"expected {expected_rows}, got {len(frame)}"
-                    ),
-                    failure_type=FailureType.VALIDATION,
-                )
-            frames.append(frame)
-
-        combined = pd.concat(frames, axis=1, copy=False) if frames else pd.DataFrame()
-        ordered_columns = self.all_column_names()
-        if ordered_columns:
-            combined = combined.loc[:, ordered_columns]
-        return combined
-
-    def _sorted_groups_for_materialize(self) -> list[ColumnGroup]:
-        return sorted(
-            self._groups.values(),
-            key=lambda group: self._column_sort_key(
-                group,
-                group.columns[0] if group.columns else group.group_id,
-            ),
-        )
-
-    def _load_group_frame_for_materialize(self, group: ColumnGroup) -> pd.DataFrame:
-        parquet_path_value = self._group_parquet_paths.get(group.group_id)
-        if parquet_path_value:
-            parquet_path = Path(parquet_path_value)
-            if not parquet_path.is_absolute():
-                parquet_path = self._work_dir / parquet_path
-            if parquet_path.exists():
-                frame = pd.read_parquet(parquet_path)
-                if list(frame.columns) != list(group.columns):
-                    frame = frame.loc[:, list(group.columns)]
-                return frame.astype(np.float32, copy=False)
-
-        data = np.asarray(self.load_data(group.group_id), dtype=np.float32)
-        return pd.DataFrame(data, columns=list(group.columns), copy=False)
 
     @staticmethod
     def _to_json_safe(value: Any) -> Any:

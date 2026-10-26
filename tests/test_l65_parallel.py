@@ -11,6 +11,7 @@ from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRe
 from momentum.FeatureEngineering.feature_factory import FeatureFactory
 from momentum.FeatureEngineering.preprocessing import feature_preprocessor as feature_preprocessor_module
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests._fixtures.registry_l65 import apply_l65_via_sink
 
 
 def _build_group(
@@ -75,100 +76,7 @@ def l65_config() -> dict:
 
 
 
-def test_parallel_transform_matches_serial(tmp_path: Path, l65_config: dict) -> None:
-    """測試平行 L6.5：4 workers 結果應與串行完全一致。"""
-    rng = np.random.default_rng(7)
-    arrays = [
-        rng.normal(size=(24, 2)).astype(np.float32),
-        rng.normal(size=(24, 4)).astype(np.float32),
-        rng.normal(size=(24, 3)).astype(np.float32),
-    ]
-    arrays[0][0, 0] = np.nan
-    arrays[1][1, 2] = np.nan
 
-    serial_registry = _make_registry_from_arrays(tmp_path / "serial", arrays)
-    parallel_registry = _make_registry_from_arrays(tmp_path / "parallel", arrays)
-
-    serial_preprocessor = FeaturePreprocessor(l65_config)
-    parallel_preprocessor = FeaturePreprocessor(l65_config)
-
-    serial_completed = serial_preprocessor.transform_registry_groups(serial_registry, n_workers=1)
-    parallel_completed = parallel_preprocessor.transform_registry_groups(parallel_registry, n_workers=4)
-
-    assert serial_completed == len(arrays)
-    assert parallel_completed == len(arrays)
-
-    for index in range(1, len(arrays) + 1):
-        group_id = f"group_{index}"
-        serial_array = np.asarray(serial_registry.load_data(group_id), dtype=np.float32)
-        parallel_array = np.asarray(parallel_registry.load_data(group_id), dtype=np.float32)
-        assert np.allclose(serial_array, parallel_array, atol=1e-4, equal_nan=True)
-
-
-def test_parallel_transform_all_groups_complete(tmp_path: Path, l65_config: dict, monkeypatch: pytest.MonkeyPatch) -> None:
-    """測試平行 L6.5：所有 groups 都應被處理完成。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "all_groups", [2, 4, 3, 5])
-    preprocessor = FeaturePreprocessor(l65_config)
-
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
-    monkeypatch.setattr(preprocessor, "_transform_single_group", lambda registry, group, context: None)
-
-    completed = preprocessor.transform_registry_groups(registry, n_workers=4)
-
-    assert completed == 4
-
-
-def test_parallel_slow_path_chunks_only_large_groups(
-    tmp_path: Path,
-    l65_config: dict,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """測試 slow path routing：只有超過 threshold 的 group 才走 chunked。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "slow_route", [2, 5])
-    preprocessor = FeaturePreprocessor(l65_config)
-    full_groups: list[str] = []
-    chunked_groups: list[str] = []
-
-    class _ImmediateFuture:
-        def __init__(self, group_id: str) -> None:
-            self._group_id = group_id
-
-        def result(self) -> None:
-            return None
-
-    class _Executor:
-        def __init__(self, max_workers: int) -> None:
-            self.max_workers = max_workers
-
-        def __enter__(self) -> "_Executor":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def submit(self, func, registry, group, context):
-            full_groups.append(group.group_id)
-            return _ImmediateFuture(group.group_id)
-
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
-    monkeypatch.setattr(
-        "momentum.FeatureEngineering.utils.hardware_utils.get_l65_split_threshold",
-        lambda: 3,
-    )
-    monkeypatch.setattr(feature_preprocessor_module, "ThreadPoolExecutor", _Executor)
-    monkeypatch.setattr(feature_preprocessor_module, "as_completed", lambda futures: list(futures))
-    monkeypatch.setattr(preprocessor, "_transform_single_group", lambda registry, group, context: None)
-
-    def fake_chunked(registry: ColumnGroupRegistry, group: ColumnGroup, chunk_size: int) -> None:
-        chunked_groups.append(group.group_id)
-
-    monkeypatch.setattr(preprocessor, "_transform_single_group_chunked", fake_chunked)
-
-    completed = preprocessor.transform_registry_groups(registry, n_workers=2)
-
-    assert completed == 2
-    assert full_groups == ["group_1"]
-    assert chunked_groups == ["group_2"]
 
 
 def test_fracdiff_without_layer_source_fails_closed(l65_config: dict) -> None:
@@ -257,42 +165,12 @@ def test_fracdiff_non_target_registry_group_stays_on_fast_path(
 
     monkeypatch.setattr(preprocessor, "_transform_single", fake_slow)
 
-    completed = preprocessor.transform_registry_groups(registry, n_workers=2)
+    completed = apply_l65_via_sink(preprocessor, registry)  # FFPROD Task 1.1：經生產 raw 串流入口
 
     assert completed == 2
     assert fast_calls == [(8, 2)]
     assert slow_layers == ["L1"]
 
-
-def test_l65_transform_defers_manifest_rewrites(
-    tmp_path: Path,
-    l65_config: dict,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """測試 P2 manifest batching：L6.5 多 group overwrite 只 flush manifest 一次。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "defer_manifest", [2, 3, 4])
-    preprocessor = FeaturePreprocessor(l65_config)
-    manifest_writes: list[str] = []
-
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
-    monkeypatch.setattr(registry, "_write_manifest", lambda: manifest_writes.append("write"))
-
-    def fake_transform(registry: ColumnGroupRegistry, group: ColumnGroup, context: dict) -> None:
-        del context
-        registry.overwrite_data(
-            group.group_id,
-            np.ones((group.n_rows, group.n_cols), dtype=np.float32),
-        )
-
-    monkeypatch.setattr(preprocessor, "_transform_single_group", fake_transform)
-
-    completed = preprocessor.transform_registry_groups(registry, n_workers=1)
-
-    assert completed == 3
-    assert manifest_writes == ["write"]
-    stats = registry.io_stats()
-    assert stats["manifest_deferred_count"] == 3.0
-    assert stats["manifest_write_count"] == 1.0
 
 
 def test_tier_auto_selects_workers(
@@ -406,99 +284,16 @@ def test_cgsa_buffer_finalize_flushes_remaining(tmp_path: Path, monkeypatch: pyt
     assert len(registry._memory_buffer) == 0
 
 
-def test_parallel_greedy_scheduling_largest_groups_first(
-    tmp_path: Path,
-    l65_config: dict,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """測試 greedy scheduling：最大 group 應最先提交到 pool。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "greedy", [2, 7, 4, 5])
-    preprocessor = FeaturePreprocessor(l65_config)
-    submission_order: list[str] = []
-
-    class _ImmediateFuture:
-        def __init__(self, group_id: str) -> None:
-            self._group_id = group_id
-
-        def result(self) -> None:
-            return None
-
-    class _Executor:
-        def __init__(self, max_workers: int) -> None:
-            self.max_workers = max_workers
-
-        def __enter__(self) -> "_Executor":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def submit(self, func, registry, group, context):
-            submission_order.append(group.group_id)
-            return _ImmediateFuture(group.group_id)
-
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
-    monkeypatch.setattr(preprocessor, "_transform_single_group", lambda registry, group, context: None)
-    monkeypatch.setattr(feature_preprocessor_module, "ThreadPoolExecutor", _Executor)
-    monkeypatch.setattr(feature_preprocessor_module, "as_completed", lambda futures: list(futures))
-
-    completed = preprocessor.transform_registry_groups(registry, n_workers=3)
-
-    assert completed == 4
-    assert submission_order == ["group_2", "group_4", "group_3", "group_1"]
-
 
 def test_parallel_zero_groups(tmp_path: Path, l65_config: dict) -> None:
     """測試空 groups：應直接回傳 0，不得 crash。"""
     registry = ColumnGroupRegistry(work_dir=tmp_path / "empty")
     preprocessor = FeaturePreprocessor(l65_config)
 
-    assert preprocessor.transform_registry_groups(registry, n_workers=4) == 0
+    assert apply_l65_via_sink(preprocessor, registry) == 0  # FFPROD Task 1.1：經生產 raw 串流入口
 
 
-def test_parallel_single_group(tmp_path: Path, l65_config: dict, monkeypatch: pytest.MonkeyPatch) -> None:
-    """測試單一 group：平行路徑也應正常完成。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "single", [3])
-    preprocessor = FeaturePreprocessor(l65_config)
 
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
-    monkeypatch.setattr(preprocessor, "_transform_single_group", lambda registry, group, context: None)
-
-    assert preprocessor.transform_registry_groups(registry, n_workers=4) == 1
-
-
-def test_parallel_one_group_fails(tmp_path: Path, l65_config: dict, monkeypatch: pytest.MonkeyPatch) -> None:
-    """測試單一 group 失敗：其他 groups 應持續完成。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "fail_one", [2, 3, 4])
-    preprocessor = FeaturePreprocessor(l65_config)
-
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
-
-    def fake_transform(registry: ColumnGroupRegistry, group: ColumnGroup, context: dict) -> None:
-        if group.group_id == "group_2":
-            raise RuntimeError("boom")
-
-    monkeypatch.setattr(preprocessor, "_transform_single_group", fake_transform)
-
-    assert preprocessor.transform_registry_groups(registry, n_workers=3) == 2
-
-
-def test_parallel_workers_1_is_serial(tmp_path: Path, l65_config: dict, monkeypatch: pytest.MonkeyPatch) -> None:
-    """測試 workers=1：必須走串行 fallback 路徑。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "serial_fallback", [2, 3])
-    preprocessor = FeaturePreprocessor(l65_config)
-    captured: dict[str, int] = {}
-
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
-
-    def fake_serial(registry: ColumnGroupRegistry, groups: list[ColumnGroup], context: dict) -> int:
-        captured["count"] = len(groups)
-        return len(groups)
-
-    monkeypatch.setattr(preprocessor, "_transform_registry_serial", fake_serial)
-
-    assert preprocessor.transform_registry_groups(registry, n_workers=1) == 2
-    assert captured["count"] == 2
 
 
 def test_cgsa_buffer_zero_is_immediate_flush(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -530,46 +325,3 @@ def test_cgsa_buffer_crash_loses_unflushed(tmp_path: Path) -> None:
     assert not (registry.work_dir / "pending_b.npy").exists()
 
 
-def test_numba_warmup_runs_before_process_pool_fanout(
-    tmp_path: Path,
-    l65_config: dict,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """測試 warmup 順序：主執行緒 warmup 必須先於 worker 提交。"""
-    registry = _make_registry_with_registered_groups(tmp_path / "warmup", [2, 3])
-    preprocessor = FeaturePreprocessor(l65_config)
-    call_order: list[str] = []
-
-    class _ImmediateFuture:
-        def result(self) -> None:
-            return None
-
-    class _Executor:
-        def __init__(self, max_workers: int) -> None:
-            self.max_workers = max_workers
-
-        def __enter__(self) -> "_Executor":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:
-            return None
-
-        def submit(self, func, registry, group, context):
-            call_order.append("submit")
-            return _ImmediateFuture()
-
-    def fake_build_context() -> dict:
-        preprocessor._warmup_numba_if_needed()
-        return {"use_fast": False}
-
-    monkeypatch.setattr(preprocessor, "_warmup_numba_if_needed", lambda: call_order.append("warmup"))
-    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", fake_build_context)
-    monkeypatch.setattr(preprocessor, "_transform_single_group", lambda registry, group, context: None)
-    monkeypatch.setattr(feature_preprocessor_module, "ThreadPoolExecutor", _Executor)
-    monkeypatch.setattr(feature_preprocessor_module, "as_completed", lambda futures: list(futures))
-
-    completed = preprocessor.transform_registry_groups(registry, n_workers=2)
-
-    assert completed == 2
-    assert call_order[0] == "warmup"
-    assert call_order[1:] == ["submit", "submit"]
