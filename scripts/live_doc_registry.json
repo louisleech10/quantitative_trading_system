@@ -646,6 +646,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/NOCAP_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/NUMVIEW_SPEC.md",
       "LIVE-SPEC"
     ],
