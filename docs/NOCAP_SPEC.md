@@ -45,11 +45,19 @@
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：不以黑名單列舉可接受寫法（登記檔為白名單）。
 
-**Task 0.3 — 重型跑必經監看之產出端閘**
-- 目標：重型命令（特徵生成腳本、凍結腳本、量測 `run|ic`、pytest 之重型檔）未經共用監看執行時於產出端擋下。
-- 改法：PreToolUse hook `scripts/heavy_run_guard.sh`（掛 `.claude/settings.json`）比對命令與 `scripts/heavy_commands.json`（封閉清單）；命中而未經 `scripts/run_watched.sh`（新建：以共用監看包任意命令、印 `[run-watched] start|progress|stalled|exit` 行）⇒ 擋並提示改法。
-- **驗證**：`tests/governance/test_heavy_run_guard.py`：重型命令直跑 ⇒ rc=2；經 `scripts/run_watched.sh` ⇒ rc=0；非重型命令 ⇒ rc=0；hook 單次耗時 < 1 秒。
-- **邊界**：命令經 `bash handoffs/run_receipts/.<票>-*.sh` 間接呼叫 ⇒ 以腳本內容比對（讀檔）；hook stdin 讀不到 ⇒ 放行並記錄（不阻擋一般操作）。
+**Task 0.2b — 寫碼當下擋新增時間上限（產出端，使用者 2026-10-27「你能確保在此專案每次都會用到嗎? 不然你可能自己手動加上時間限制，或根本不用做好的共用監看?」）**
+- 目標：任何 Edit／Write 寫入之新內容含逾時／期限樣式而不在 `scripts/timeout_registry.json` 白名單 ⇒ 寫入當下擋下（不等測試）。
+- 改法：PreToolUse hook `scripts/timeout_write_guard.sh`（掛 `.claude/settings.json` 之 Edit／Write／MultiEdit）只掃本次新增之文字（Edit 之 new_string 相對 old_string 之增量、Write 之新檔對既有檔之增量），樣式與 Task 0.2 掃描測試共用同一份樣式定義（`scripts/timeout_patterns.json`，單一真相源）；命中且非白名單 ⇒ rc=2 並印登記方法與「長運算不得登記」規則。白名單只收 B／C／D 類且每列附理由；A 類（依牆鐘停止或縮減運算）不可登記（登記檔 schema 拒收）。
+- **驗證**：`tests/governance/test_timeout_write_guard.py`：Edit 新增 `subprocess.run(cmd, timeout=600)` 於 `scripts/` ⇒ rc=2；新增 `asyncio.wait_for(x, timeout=30)` ⇒ rc=2；改動既有已登記行之其他字 ⇒ rc=0；新增白名單已登記之 B 類（如 Binance HTTP 逾時）⇒ rc=0；登記檔加 A 類列 ⇒ schema 拒收 rc=1；hook 單次耗時 < 1 秒。
+- **邊界**：hook stdin 讀不到 ⇒ 擋（寫入類 fail-closed，與一般命令不同）；非 Python／shell 檔（.md 說明文字）⇒ 不掃；字串中出現樣式（log 文字）⇒ 以 AST 判斷是否為實際呼叫，非呼叫者放行。
+- **存活至**：永久。　**覆蓋風險**：無。
+- 不可做：不以黑名單列舉可接受寫法；不得超過秒級。
+
+**Task 0.3 — 重型跑必經監看且背景執行之產出端閘**
+- 目標：重型命令（特徵生成腳本、凍結腳本、量測 `run|ic`、IC 分析、重型 pytest 檔、委員派工）未經共用監看或未以背景執行時於下指令當下擋下——保證卡死必被終止並留現場、行程結束必有完成通知，不需使用者詢問。
+- 改法：PreToolUse hook `scripts/heavy_run_guard.sh`（掛 `.claude/settings.json` 之 Bash）比對命令與 `scripts/heavy_commands.json`（封閉清單）；命中而（未經 `scripts/run_watched.sh` 或 `tool_input.run_in_background` 非 true）⇒ 擋並提示改法。`scripts/run_watched.sh`（新建）以共用監看包任意命令、印 `[run-watched] start|progress|stalled|exit` 行。
+- **驗證**：`tests/governance/test_heavy_run_guard.py`：重型命令直跑 ⇒ rc=2；經 `scripts/run_watched.sh` 但前景 ⇒ rc=2；經包裝且背景 ⇒ rc=0；非重型命令 ⇒ rc=0；hook 單次耗時 < 1 秒。
+- **邊界**：命令經 `bash handoffs/run_receipts/.<票>-*.sh` 間接呼叫 ⇒ 讀腳本內容比對（遞迴一層）；hook stdin 讀不到 ⇒ 重型樣式無從判定 ⇒ 擋（fail-closed）。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：hook 不得超過秒級。
 
@@ -113,6 +121,7 @@
 
 ## §V 驗證策略與邊界測試目錄
 - mutation：Task 0.2 掃描（加回任一 A 類即紅）、Task 5.1（恢復時間縮減即紅）、Task 0.1（`ENABLED=False` 即不判卡死，既有）。
+- 三道防線（寫碼當下 Task 0.2b、下指令當下 Task 0.3、測試期 Task 0.2）之外，`templates/COMMITTEE_FINDING_TEMPLATE.md` 首節增一項必查：「本次變更是否新增或擴大依時間停止／縮減運算之機制，或重型執行繞過共用監看」（樣式比對抓不到之新寫法由審碼抓）。
 - 測試層級：單元（監看、登記掃描、hook）／整合（閘門 runner、IC 等候、API 背景工作）。受影響測試照 `docs/TEST_SELECTION.md`。
 - 防假綠：刪除之牆鐘終止測試（`test_watchdog_wall_cap_stalled`）改寫為只記錄，同提交送測試刪改清單審。
 - 邊界目錄：API 重啟（背景工作）、並發（多工作）、OOM（記憶體原因）、psutil 不可用、非 macOS（無 `sample`）。
