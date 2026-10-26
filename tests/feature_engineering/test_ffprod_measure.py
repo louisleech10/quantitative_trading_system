@@ -618,6 +618,56 @@ def test_ic_failure_persists_state_and_resume_retries_ic(tmp_path: Path) -> None
     assert gens == ["baseline", "option", "option"] and len(attempts) == 3
 
 
+def test_heartbeat_line_only_when_cpu_advances_by_fraction() -> None:
+    """心跳只在窗內行程樹 CPU 前進 ≥ 四分之一經過秒數時寫；閒置（取樣執行緒約 1% 核）與 0 秒窗不寫。"""
+    assert fm.heartbeat_line(100.0, 160.0, 60.0) is not None  # 一核滿載
+    assert fm.heartbeat_line(100.0, 115.0, 60.0) is not None  # 恰四分之一核
+    assert fm.heartbeat_line(100.0, 114.9, 60.0) is None
+    assert fm.heartbeat_line(100.0, 100.6, 60.0) is None  # 閒置
+    assert fm.heartbeat_line(100.0, 200.0, 0.0) is None
+    before = fm.tree_cpu_seconds()  # 真讀取器：忙迴圈後行程樹 CPU 前進
+    end = fm.time.perf_counter() + 0.3
+    while fm.time.perf_counter() < end:
+        pass
+    assert fm.tree_cpu_seconds() - before >= 0.2
+
+
+def test_cpu_heartbeat_writes_while_busy_and_stays_silent_when_idle(capsys: pytest.CaptureFixture[str]) -> None:
+    """忙（CPU 隨牆鐘前進）⇒ 有心跳行；卡住（CPU 不動）⇒ 無心跳行，log 靜默條件照常生效。"""
+    import time as _time
+
+    t0 = _time.monotonic()
+    with fm.cpu_heartbeat(interval=0.05, read_cpu=lambda: (_time.monotonic() - t0) * 2.0):
+        _time.sleep(0.4)
+    assert "[ffprod-heartbeat]" in capsys.readouterr().err
+    with fm.cpu_heartbeat(interval=0.05, read_cpu=lambda: 5.0):
+        _time.sleep(0.4)
+    assert "[ffprod-heartbeat]" not in capsys.readouterr().err
+
+
+def test_run_passes_expected_seconds_only_for_frozen_preprocessing(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """預期秒數（監看牆鐘上限之基準）只給與凍結格同設定之生成；設定變體（sigma、平穩化開）傳 None。"""
+    seen: Dict[str, Any] = {}
+
+    def fake_execute(cell_id: str, items: Any, receipt_path: Path, work_root: Path, *, generate: Any, diff: Any,
+                     ic: Any = None) -> int:
+        for bid in ("default", "sigma", "stat"):
+            generate({"probes": {}}, fm.measure_cell(cell_id, bid), tmp_path / bid)
+        return 0
+
+    monkeypatch.setattr(fm, "execute", fake_execute)
+    monkeypatch.setattr(fm, "generate_watched",
+                        lambda cell, probes, item_dir, expected: seen.__setitem__(Path(item_dir).name, expected) or {})
+    import argparse
+
+    args = argparse.Namespace(cell=fm.DEFAULT_CELL, candidates=None, receipt=str(tmp_path / "r.json"),
+                              work_root=str(tmp_path), skip_ic=True)
+    assert fm.run(args) == 0
+    assert seen["default"] == fm.freeze_seconds(fm.DEFAULT_CELL) and seen["default"]
+    assert seen["sigma"] is None and seen["stat"] is None
+
+
 def test_receipt_spec_version_follows_spec_header(tmp_path: Path) -> None:
     """收據之 spec 欄取 SPEC 檔頭現行版本（不寫死字面）並附 SPEC 雜湊。"""
     spec = tmp_path / "S.md"

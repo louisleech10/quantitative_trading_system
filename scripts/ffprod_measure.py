@@ -1286,6 +1286,64 @@ def _peak_sampler(stop: threading.Event, out: Dict[str, int], interval: float = 
         stop.wait(interval)
 
 
+#: CPU 進度心跳（卡死監看之 log 靜默條件只認 log 增長）：每 HEARTBEAT_SECONDS 秒，行程樹 CPU 秒數之前進 ≥
+#: HEARTBEAT_MIN_CPU_FRACTION × 經過秒數（平均至少四分之一核在算）才寫一行——長時間無 log 之計算（全特徵平穩化校準、
+#: 全欄 IC）不被誤殺；真卡死（等鎖／等 I/O，只剩取樣執行緒約 1% 核）不寫、仍於 log 靜默門檻被終止
+HEARTBEAT_SECONDS = 60.0
+HEARTBEAT_MIN_CPU_FRACTION = 0.25
+
+
+def tree_cpu_seconds() -> float:
+    """本行程＋存活子孫＋已回收子行程之 CPU 秒數（user＋system）。"""
+    import psutil
+
+    proc = psutil.Process()
+    times = proc.cpu_times()
+    total = times.user + times.system
+    for child in proc.children(recursive=True):
+        try:
+            ct = child.cpu_times()
+            total += ct.user + ct.system
+        except psutil.Error:
+            pass
+    reaped = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return total + reaped.ru_utime + reaped.ru_stime
+
+
+def heartbeat_line(prev_cpu: float, cpu: float, elapsed: float) -> Optional[str]:
+    """CPU 前進 ≥ HEARTBEAT_MIN_CPU_FRACTION × elapsed ⇒ 心跳行，否則 None（不寫）。"""
+    delta = cpu - prev_cpu
+    if elapsed <= 0 or delta < HEARTBEAT_MIN_CPU_FRACTION * elapsed:
+        return None
+    return f"[ffprod-heartbeat] 行程樹 CPU {cpu:.0f} 秒（近 {elapsed:.0f} 秒 +{delta:.0f} 秒）"
+
+
+@contextlib.contextmanager
+def cpu_heartbeat(interval: float = HEARTBEAT_SECONDS,
+                  read_cpu: Callable[[], float] = tree_cpu_seconds) -> Iterator[None]:
+    stop = threading.Event()
+
+    def beat() -> None:
+        prev, last = read_cpu(), time.monotonic()
+        while not stop.wait(interval):
+            try:
+                cpu = read_cpu()
+            except Exception:  # noqa: BLE001 — 讀不到 CPU ⇒ 不寫心跳（保守：交由 log 靜默條件判）
+                continue
+            now = time.monotonic()
+            line = heartbeat_line(prev, cpu, now - last)
+            if line is not None:
+                print(line, file=sys.stderr, flush=True)
+            prev, last = cpu, now  # 逐窗判定（不跨窗累積），閒置之微量 CPU 不會攢成心跳
+
+    thread = threading.Thread(target=beat, daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        stop.set()
+
+
 def _ru_maxrss_bytes(who: int) -> int:
     value = int(resource.getrusage(who).ru_maxrss)
     return value if sys.platform == "darwin" else value * 1024
@@ -1334,7 +1392,8 @@ def _gen_child(spec_path: Path) -> int:
         FeatureFactory.generate_features = timed_generate  # type: ignore[assignment]
         sampler.start()
         try:
-            gen = _fb()._generate_in_process(spec["cell"], Path(spec["work"]))
+            with cpu_heartbeat():
+                gen = _fb()._generate_in_process(spec["cell"], Path(spec["work"]))
         finally:
             stop.set()
             FeatureFactory.generate_features = real_generate  # type: ignore[assignment]
@@ -1557,8 +1616,9 @@ def _ic_child(spec_path: Path) -> int:
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     started = time.perf_counter()
     try:
-        out = ic_in_process(Path(spec["run_dir"]), spec["symbol"], spec["timeframe"], spec.get("include"),
-                            bool(spec.get("winsor_off")), Path(spec["work"]))
+        with cpu_heartbeat():
+            out = ic_in_process(Path(spec["run_dir"]), spec["symbol"], spec["timeframe"], spec.get("include"),
+                                bool(spec.get("winsor_off")), Path(spec["work"]))
         out["status"] = "ok"
     except BaseException as exc:  # noqa: BLE001 — 記憶體守護／MemoryError ⇒ blocked（硬體），其餘 failed
         out = {"status": "blocked" if _fb()._estimator()._is_memory_guard(exc) else "failed",
@@ -2182,9 +2242,13 @@ def run(args: argparse.Namespace) -> int:
     work_root = Path(args.work_root)
     items = plan_items(cell_id, args.candidates)
     per_gen = freeze_seconds(cell_id)
+    frozen_pre = cell_preprocessing(measure_cell(cell_id, "default"))
 
     def generate(item: Mapping[str, Any], cell: Mapping[str, Any], item_dir: Path) -> Dict[str, Any]:
-        return generate_watched(cell, item["probes"], item_dir, per_gen)
+        # 預期秒數只用凍結格同設定之實測；設定變體（sigma、平穩化開）無實測 ⇒ None（監看用判準之 wall_ceiling_seconds），
+        # 不以凍結設定之秒數代替（與 plan 之估時同一規則）
+        same = cell_preprocessing(cell) == frozen_pre
+        return generate_watched(cell, item["probes"], item_dir, per_gen if same else None)
 
     def diff(base: Mapping[str, Any], gen: Mapping[str, Any]) -> Dict[str, Any]:
         return run_value_diff(Path(base["run_dir"]), Path(gen["run_dir"]), base["fingerprints"], gen["fingerprints"])
