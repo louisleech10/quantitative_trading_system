@@ -1,0 +1,30 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false tests/feature_engineering/test_failopen_correctness.py::test_v3_multi_tf_btc_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_ethusdt_1h_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline tests/feature_engineering/test_failopen_contract.py::test_l1_baseline_hash_matches_frozen tests/feature_engineering/test_failopen_contract.py::test_required_fail_returns_result tests/feature_engineering/test_failopen_layers.py::test_layer_golden_matches_baseline tests/feature_engineering/test_icfirstalign_memory.py::test_boundary_01_probe_first_step_over_half_stops tests/feature_engineering/test_icfirstalign_memory.py::test_boundary_02_probe_records_platform tests/feature_engineering/test_icfirstalign_memory.py::test_guard_lifecycle_two_runs_old_guard_has_no_power tests/feature_engineering/test_icfirstalign_memory.py::test_guard_single_reading_does_not_kill tests/feature_engineering/test_icfirstalign_memory.py::test_guard_stops_main_during_compiled_numba_kernel tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_guard_not_stopped_at_run_exit_kills_next_run tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_metric_max_resident_footprint tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_probe_series_written_at_end_only tests/feature_engineering/test_icfirstalign_memory.py::test_probe_stop_loss_keeps_partial_series tests/feature_engineering/test_framepath_disposition.py::test_mutation_affected_gate_r59_anchor_restore_and_collect_progress tests/feature_engineering/test_framepath_disposition.py::test_mutation_d11_7_empty_sentinel_not_unconditional tests/feature_engineering/test_framepath_disposition.py::test_mutation_d11_7_inventory_hand_edit_is_red tests/feature_engineering/test_framepath_disposition.py::test_mutation_out_of_scope_rename_is_red_in_check_7",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（b3 收案前重型受影響測試）",
+      "created_at": "2026-10-27T13:24:50+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 3300,
+  "basis": [
+    ".testreg/summary.json 所選 19 節點歷次最大 duration_s 加總約 3043 秒（最大者 test_failopen_correctness::test_v3_multi_tf_btc_matches_frozen_baseline 2285 秒）"
+  ],
+  "spec_path": "docs/NOCAP_SPEC.md",
+  "coverage_path_ids": [
+    "NOCAP-BUDGET-3"
+  ]
+}
