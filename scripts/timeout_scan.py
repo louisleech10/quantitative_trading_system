@@ -56,9 +56,15 @@ class Hit:
     text: str
 
 
+_PATTERN_CACHE: Dict[Tuple[str, float], Tuple[Tuple[str, ...], List[Tuple[str, "re.Pattern[str]"]]]] = {}
+
+
 def _load_patterns(path: Path = PATTERNS) -> Tuple[Tuple[str, ...], List[Tuple[str, "re.Pattern[str]"]]]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return tuple(raw["suffixes"]), [(p["id"], re.compile(p["regex"])) for p in raw["patterns"]]
+    key = (str(path), path.stat().st_mtime)  # 同一行程內只讀一次（檔變更則重讀）
+    if key not in _PATTERN_CACHE:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        _PATTERN_CACHE[key] = (tuple(raw["suffixes"]), [(p["id"], re.compile(p["regex"])) for p in raw["patterns"]])
+    return _PATTERN_CACHE[key]
 
 
 def _dotted(node: ast.AST) -> str:
@@ -84,6 +90,7 @@ class _Index(ast.NodeVisitor):
         self.stack: List[str] = []
         self.func_of_line: Dict[int, str] = {}
         self.calls: List[Tuple[int, int, str, str]] = []  # (起行, 迄行, 被呼叫者, 逾時字面值)
+        self.strings: Dict[int, List[Tuple[int, int]]] = {}  # 各行之字串字面區間（欄位；取自 AST，免另跑 tokenize）
 
     def _visit_scope(self, node: Any) -> None:
         self.stack.append(node.name)
@@ -94,6 +101,20 @@ class _Index(ast.NodeVisitor):
         self.stack.pop()
 
     visit_FunctionDef = visit_AsyncFunctionDef = visit_ClassDef = _visit_scope
+
+    def _string_span(self, node: Any) -> None:
+        end_l = getattr(node, "end_lineno", None) or node.lineno
+        end_c = getattr(node, "end_col_offset", None)
+        for r in range(node.lineno, end_l + 1):
+            self.strings.setdefault(r, []).append((node.col_offset if r == node.lineno else 0,
+                                                   end_c if (r == end_l and end_c is not None) else 10 ** 9))
+
+    def visit_Constant(self, node: ast.Constant) -> None:
+        if isinstance(node.value, (str, bytes)):
+            self._string_span(node)
+
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> None:  # f-string 整段視為字串
+        self._string_span(node)
 
     def visit_Call(self, node: ast.Call) -> None:
         name = _dotted(node.func)
@@ -126,7 +147,9 @@ def _scan_python(path: str, text: str, patterns: Sequence[Tuple[str, "re.Pattern
     index = _Index()
     if tree is not None:
         index.visit(tree)
-    strings = _string_spans(text)
+        strings = index.strings
+    else:  # 語法錯誤之檔：退回 tokenize 取字串區間
+        strings = _string_spans(text)
     hits: List[Hit] = []
     for n, line in enumerate(text.splitlines(), start=1):
         for pid, rx in patterns:
