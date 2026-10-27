@@ -512,8 +512,6 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
             return WatchResult(EXITED, rc, None, clock() - started, growth_max, threshold, over,
                                diagnosis={"monitor_degraded": degraded} if degraded else {})
         _nap(proc, config.check_interval_seconds, sleep)
-        if proc.poll() is not None:
-            continue  # 已結束（_nap 之 poll 已回收行程）⇒ 回頂端收結果；此時讀 CPU 必得 None，不是監看降級
         _remember(proc.pid, seen)
         if not ENABLED:
             continue
@@ -523,6 +521,8 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
             last_size, last_growth = size, now
         cpu = probe_cpu(proc.pid)
         if cpu is None:
+            if proc.poll() is not None:
+                continue  # 子行程已結束（_nap 之 poll 已回收，或讀取當下結束）⇒ 讀不到是因結束而非監看降級；回頂端收結果
             # 讀不到 CPU ⇒ 無從證明無進度：不以 log 停滯判卡死（無輸出之計算不得被監看器誤殺；NOCAP Task 0.1 增修①），
             # 記監看降級並續跑；記憶體證據照判
             last_growth = now

@@ -86,6 +86,24 @@ def test_normal_exit_during_nap_not_recorded_degraded(tmp_path: Path) -> None:
     assert "監看降級" not in (tmp_path / "exit.log").read_text(encoding="utf-8")
 
 
+def test_exit_while_reading_cpu_not_recorded_degraded(tmp_path: Path) -> None:
+    """子行程於讀 CPU 當下結束（迴圈內 poll 時仍存活、讀取回 None 時已結束）⇒ 亦不得記 monitor_degraded。"""
+    calls: List[int] = []
+
+    def probe(_pid: int) -> Any:
+        calls.append(_pid)
+        if len(calls) == 1:  # 迴圈前之基準讀數
+            return 0.0
+        time.sleep(1.5)  # 讀取期間子行程（睡 0.5 秒）結束
+        return None
+
+    result = wd.run_watched([sys.executable, "-c", "import time\ntime.sleep(0.5)"], log_path=tmp_path / "race.log",
+                            config=_config(), probe_swap=lambda: 0.0, probe_cpu=probe)
+    assert result.status == wd.EXITED and result.returncode == 0, result
+    assert len(calls) >= 2, calls
+    assert "monitor_degraded" not in result.diagnosis, result
+
+
 def test_boundary_02_cpu_unreadable_memory_evidence_still_stalls(tmp_path: Path) -> None:
     """CPU 讀不到、但 swap 連續增長逾門檻 ⇒ 仍判 STALLED 且 cause=memory（記憶體證據不因監看降級而失效）。"""
     used = iter([0.0] + [10_000.0] * 1000)
