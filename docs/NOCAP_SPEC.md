@@ -1,6 +1,6 @@
 # NOCAP 全專案移除運算時間上限、卡死以進度判定並留現場 — SPEC
 
-> 版本：v4（2026-10-27；規格審查 r1–r3 處置，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r{1,2,3}/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
+> 版本：v5（2026-10-27；規格審查 r1–r4 處置，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r{1,2,3,4}/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（跨 scripts／momentum／api／tests 與共用監看；多 phase）。
@@ -41,8 +41,8 @@
 ### Phase 0 — 登記與機械閘（依賴：無）
 **Task 0.1 — 共用監看：不因時間終止、進度判卡死、留現場判原因**（已實作於 `07e8887c`、`020f9796`；v4 增修兩項見下，屬本 Task 施工）
 - 目標：`_watchdog.run_watched` 牆鐘只記錄 `over_expected`；卡死＝log 未增長且行程樹 CPU < `CPU_PROGRESS_FRACTION` 核持續 `log_stall_seconds`；終止前 `diagnose`（注入 sitecustomize 以 faulthandler 經 SIGUSR1 寫全執行緒 Python 堆疊至 `<log>.stacks.txt`、串接呼叫端原 sitecustomize；macOS `sample`；各行程狀態／CPU／RSS、swap、log 尾段），`cause`∈{`memory`,`hang`}。
-- v4 增修①：CPU 讀不到（`probe_cpu` 回 None）時**不得**以 log 停滯判卡死（現行 `_watchdog.py:304-307` 會以「log 未增長（CPU 讀不到）」終止，無輸出之計算會被誤殺）⇒ 改為記 `monitor_degraded`（原因、起始時刻）並寫一行 log、運算續跑；記憶體證據（swap／RSS）仍照判 `memory`。②卡死或記憶體終止時終止**整個子行程樹**（現行 `_terminate` 只對根 `Popen` 送 terminate／kill，`:253-259`）：終止前先取子孫快照，對樹內全部行程送 SIGTERM、寬限後對仍存活者 SIGKILL，無權限或已結束者照記。
-- **驗證**：`tests/feature_engineering/test_numview_criteria.py -k watchdog` 全綠，含 `test_watchdog_busy_silent_child_not_stalled`、`test_watchdog_wall_cap_only_records`、`test_watchdog_silent_child_stalled`（堆疊檔含卡住行）、`test_watchdog_stack_dump_chains_existing_sitecustomize`、`test_watchdog_memory_cause_from_swap_evidence`；增：無輸出忙迴圈子行程＋注入 `probe_cpu=lambda _pid: None` 逾 `log_stall_seconds` ⇒ 非 STALLED、結果含 `monitor_degraded`；同條件注入 swap 證據 ⇒ STALLED 且 `cause=memory`；真實 `Popen` 父行程啟動無輸出睡眠孫行程、注入卡死 ⇒ STALLED 返回時根與全部子孫皆已結束（`psutil.pid_exists` 皆 False）。
+- v4 增修①：CPU 讀不到（`probe_cpu` 回 None）時**不得**以 log 停滯判卡死（現行 `_watchdog.py:304-307` 會以「log 未增長（CPU 讀不到）」終止，無輸出之計算會被誤殺）⇒ 改為記 `monitor_degraded`（原因、起始時刻）並寫一行 log、運算續跑；記憶體證據（swap／RSS）仍照判 `memory`。②卡死或記憶體終止時終止**整個子行程樹**（現行 `_terminate` 只對根 `Popen` 送 terminate／kill，`:253-259`）：子行程以新 session 啟動（`start_new_session=True`，自成行程群組），終止時對整個群組送 SIGTERM（`os.killpg`）、寬限後 SIGKILL，涵蓋快照後才 fork 之子孫；另於送信號前後各取一次子孫快照，對已脫離群組（自行 `setsid`）者逐一送信號，重複至無存活子孫為止；無權限或已結束者照記。
+- **驗證**：`tests/feature_engineering/test_numview_criteria.py -k watchdog` 全綠，含 `test_watchdog_busy_silent_child_not_stalled`、`test_watchdog_wall_cap_only_records`、`test_watchdog_silent_child_stalled`（堆疊檔含卡住行）、`test_watchdog_stack_dump_chains_existing_sitecustomize`、`test_watchdog_memory_cause_from_swap_evidence`；增：無輸出忙迴圈子行程＋注入 `probe_cpu=lambda _pid: None` 逾 `log_stall_seconds` ⇒ 非 STALLED、結果含 `monitor_degraded`；同條件注入 swap 證據 ⇒ STALLED 且 `cause=memory`；真實 `Popen` 父行程啟動無輸出睡眠孫行程、注入卡死 ⇒ STALLED 返回時根與全部子孫皆已結束（`psutil.pid_exists` 皆 False）；父行程於收到 SIGTERM 時再 fork 一個子行程 ⇒ 該新子行程亦已結束；孫行程自行 `setsid` 脫離群組 ⇒ 亦已結束。
 - **邊界**：CPU 讀不到 ⇒ 不判卡死、記 `monitor_degraded`（運算不因監看器失能而被停）；子行程於留現場或終止期間自行結束 ⇒ 盡力而為、照記。
 - **存活至**：本票完工後保留。　**覆蓋風險**：無。
 - 不可做：不改判準檔鍵集合；不加入任何依牆鐘終止之條件。
@@ -75,7 +75,7 @@
 
 **Task 0.3b — 全規模重型跑前須有成長曲線收據（使用者 2026-10-27「軟體和量化業界會這樣直接測大規模到崩潰？你不是保證用業界做法？」）**
 - 目標：業界逐步放大——全規模之前先於小、中規模實測耗時與峰值記憶體、得成長曲線與全規模推算，確認可行才跑全規模。`scripts/heavy_commands.json` 之重型項目增欄 `scale_receipt`（收據路徑樣式）；`heavy_run_guard` 於下指令時查：對應收據存在、含 ≥ 3 個規模點（每點之欄數或列數、秒數、峰值 RSS）、全規模推算值、且其程式碼態雜湊等於現行碼；缺或過期 ⇒ 擋。
-- 改法：新增 `scripts/scale_probe.py`（以同一入口、同一真實資料取子集跑 3 個規模點並擬合，寫收據 `handoffs/run_receipts/<日期>-<目標>-scale.json`）；探針本身經共用監看、背景執行。
+- 改法：新增 `scripts/scale_probe.py`（以同一入口、同一真實資料取子集跑 3 個規模點並擬合，寫收據 `handoffs/run_receipts/<日期>-<目標>-scale.json`）；探針本身經共用監看、背景執行。起始例外：`scale_probe.py` 為產生成長曲線與估時收據者，列 `heavy_commands.json` 之 `self_watched`（須背景、原始碼須呼叫 `run_watched(`），但**不**要求其自身之成長曲線或估時收據（否則第一份收據無從產生）；其規模點以 `--scale` 明列、每點經共用監看各自啟動。驗證：前景跑 `scale_probe.py` ⇒ rc=2；背景跑且無任何收據 ⇒ rc=0。
 - **收據身分 `identity`（0.3b／0.3c／0.4 三種收據共用）**：`identity` 分兩部分——比對欄 `match`＝{`entrypoint`（repo 路徑）、`target_argv`（本收據所授權之 argv，以 `shlex.join` 正規化、repo 內路徑轉相對路徑）、`code_sha256`（`entrypoint` 與清單規則必填之 `code_paths` 各檔**工作樹實際內容**之 `git hash-object` 依路徑排序串接之 sha256——含未提交改動）、`data`（每個輸入檔 {path, size, sha256}；sha256 以 (path, size, mtime_ns) 快取）、`config_sha256`（入口所讀設定檔內容）、`hardware`（CPU 型號、核數、RAM、OS；三種收據皆為耗時／記憶體量測，硬體不同即不可沿用）}；紀錄欄 `meta`＝{`producer`、`created_at`}，不參與比對。`heavy_run_guard` 於下指令當下重算 `match` 各欄，任一欄不等 ⇒ 收據失配、擋；只有 `meta` 不同 ⇒ 可沿用。
 - **驗證（身分）**：`code_paths` 某檔工作樹改一行未提交 ⇒ 失配 rc=2；換 `target_argv` 一個參數 ⇒ rc=2；只改 `meta.created_at` ⇒ rc=0；輸入檔內容改一位元組（size 不變）⇒ rc=2。
 - **成長曲線收據**（`-scale.json`）：`points` ≥ 3，每點 {`scale`（列數或欄數）、`unit`、`seconds`、`peak_rss_bytes`}（單次 < 60 秒者跑 3 次取中位數，否則 1 次）；`fit` {`model`=冪次、`exponent`、`r2`}；`projection` {`scale`、`seconds`、`peak_rss_bytes`}；`superlinear`（`exponent` > 1.2）。放行條件（任一不成立 ⇒ 收據標 `extrapolation_unreliable`、擋全規模命令，須加測規模點或由主委報使用者核可）：`r2` ≥ 0.9；各點 `seconds` 與 `peak_rss_bytes` 隨規模不減；`projection` 取保守值＝冪次擬合推算與「最後兩點斜率線性外推」兩者之較大者。
@@ -85,7 +85,7 @@
 - 不可做：不以小規模之結果代替全規模結論（只用於推算與可行性判斷）。
 
 **Task 0.3c — 驗證與建基準之運算預算（全專案；使用者 2026-10-27「就像ICPERF我就怕你為了要建立基準，就跑幾十小時的計算 -> 這我只是舉例，我感覺你所有票都這樣搞，這有符合業界做法嗎？」）**
-- 目標（業界做法）：正確性基準與回歸驗證預設只用**小而具代表性之真實資料**（加關鍵案例）；全規模跑少而有據、先估時、可沿用即沿用、每跑須有獨有覆蓋路徑。過往 FF-STAT 一批驗收 3 時 16 分、NUMVIEW 原列 13–107 小時、FFPROD 全欄 IC、TESTSEL 首次全量約 33 小時皆違此做法。
+- 目標（業界做法）：正確性基準與回歸驗證預設只用**小而具代表性之真實資料**（加關鍵案例）；全規模跑少而有據、先估時、可沿用即沿用、每跑須有獨有覆蓋路徑。過往違此做法之例：TESTSEL 首次全量建依賴紀錄約 33 小時（`docs/TICKET_ORDER.md:55`）、FFPROD 改前全欄 IC（209,053 欄）推算約 47 小時（收據 `handoffs/run_receipts/icperf_probes/result_N2000.json`：`analyze_seconds` 1632.16、`summary_rows` 1999 ⇒ 每欄約 0.816 秒，× 209,053 欄）。
 - 改法：①`templates/SPEC_TEMPLATE.md` §B（Task 0.4）增「驗證運算預算」表：每個重型跑一列（獨有覆蓋路徑、規模、估時依據、沿用來源），合計逾 2 小時須附「不降驗證之省法」與為何小規模驗不到；②`scripts/heavy_commands.json` 之重型項目（不只全規模）一律須估時收據（`handoffs/run_receipts/<日期>-<目標>-estimate.json`：`identity`（同 Task 0.3b）、`scale`、`estimate_seconds`、`basis`（所依之成長曲線或前次實跑收據路徑）、`spec_path`、`coverage_path_ids`（每個 id 須為 `spec_path` 之 §B 預算表某列之 id）），`heavy_run_guard` 於下指令時查收據存在、`identity` 逐欄相符、`coverage_path_ids` 皆在該 SPEC §B 表，缺或不符即擋；③審碼必查「本批重型跑是否皆有獨有覆蓋路徑、能否以較小規模或沿用結果達同等驗證力」。
 - **驗證**：`tests/governance/test_heavy_run_guard.py` 增案：重型命令無估時收據 ⇒ rc=2；收據碼態不符 ⇒ rc=2；有效收據 ⇒ rc=0；`bash scripts/template_check.sh spec` 對 §B 缺預算表或合計逾 2 小時而無省法說明之 SPEC ⇒ rc=1。
 - **邊界**：無法縮小規模者（單一固定全規模格）⇒ 收據標 `scale_exempt` 並寫理由（審碼必查）；既有凍結 SPEC 不溯及。
@@ -143,7 +143,7 @@
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不改 ADF 參數。
 
 **Task 5.3 — 長運算服務改背景工作＋進度**：`model_enhancement_service.py`（`asyncio.wait_for` 逾時後執行緒仍在跑、結果丟棄）、`ic_analysis_service.py` 掃描網格之逐格／全網格期限：改為背景工作至完成、逐步回報進度、可由使用者取消；HTTP 請求不等待運算（立即回工作 ID）。工作紀錄：狀態機 `queued→running→{completed,failed,cancelled,interrupted}`，每次狀態變更與結果原子寫入檔案（現為行程內 dict：`model_enhancement_service.py:66`、`ic_analysis_service.py:523`）；API 啟動時讀回紀錄，未終態者標 `interrupted`（附原因），同 task_id 可查得明確狀態並可重送。進度欄 `progress`＝{`phase`、`processed`、`total`、`updated_at`} 隨工作推進原子寫入紀錄檔；`processed` 不減、`updated_at` 每次推進更新；查詢 API 回傳之；服務端不依 `updated_at` 自動終止工作（卡死屬程式缺陷，使用者由 `updated_at` 停滯判斷後可取消）。前端對長運算之輪詢不以次數或時間上限放棄（現行 `frontend/src/store/searchStore.ts:99` `maxAttempts = 150`、`frontend/src/app/result/page.tsx:251` `maxAttempts = 60`、`frontend/src/app/search/page.tsx:637` `maxAttempts = 30` 逾限即報「Search timeout」而後端可能仍在算；全量以 Task 0.2 掃描結果為準）⇒ 輪詢至終態（completed／failed／cancelled／interrupted）、顯示 `progress` 與 `updated_at`、提供取消；網路錯誤依退避重試（B 類，屬等外部）。本機單行程研究平台不承諾重啟後續跑（續跑需分散式工作佇列，非本票範圍）。`api/routes/feature_browser.py` 之請求逾時屬互動服務契約 ⇒ 運算改快取＋背景計算，請求逾時保留並登記 B（理由：互動請求延遲上限，非運算上限，逾時不中止運算）。
-- **驗證**：`tests/api/test_nocap_background_jobs.py`：長運算請求（注入 5 秒）於 1 秒內回工作 ID；完成後結果可取且等於同步計算之結果（`==`）；取消後工作狀態＝cancelled；工作執行中以新服務實例（同紀錄目錄）模擬 API 重啟 ⇒ 原 task_id 狀態＝interrupted、`progress` 為重啟前最後寫入值、已完成者結果可取且 `==` 原結果；注入 5 步之工作 ⇒ 輪詢所得 `processed` 序列不減、完成前至少一次 0 < `processed` < `total`、`updated_at` 嚴格遞增；取消後 `progress` 保留取消當下之值；model_enhancement 與 IC 服務各一組；前端 vitest（`cd frontend && npm test`）：注入狀態序列「running 共 200 次（逾舊上限 150）後 completed」⇒ 取得結果、不拋 timeout；running 中使用者取消 ⇒ 送出取消並停止輪詢；`grep -rnE "maxAttempts|took too long|did not complete within" frontend/src` 計數＝0（或僅剩登記 B／D 者）；`grep -rn "scan_cell_timeout\|skipped_reason=\"timeout\"" api momentum` 計數＝0。
+- **驗證**：`tests/api/test_nocap_background_jobs.py`：長運算請求（注入 5 秒）於 1 秒內回工作 ID；完成後結果可取且等於同步計算之結果（`==`）；取消後工作狀態＝cancelled；工作執行中以新服務實例（同紀錄目錄）模擬 API 重啟 ⇒ 原 task_id 狀態＝interrupted、`progress` 為重啟前最後寫入值、已完成者結果可取且 `==` 原結果；注入 5 步之工作 ⇒ 輪詢所得 `processed` 序列不減、完成前至少一次 0 < `processed` < `total`、`updated_at` 嚴格遞增；取消後 `progress` 保留取消當下之值；model_enhancement 與 IC 服務各一組；前端 vitest（`cd frontend && npm test`）：注入狀態序列「running 共 200 次（逾舊上限 150）後 completed」⇒ 取得結果、不拋 timeout；running 中使用者取消 ⇒ 送出取消並停止輪詢；後端回 `running → cancelled`、`running → interrupted`、`running → failed` 三序列 ⇒ 各自停止輪詢、結束 loading 並顯示該終態（interrupted 附可重送）；`grep -rnE "maxAttempts|took too long|did not complete within" frontend/src` 計數＝0（或僅剩登記 B／D 者）；`grep -rn "scan_cell_timeout\|skipped_reason=\"timeout\"" api momentum` 計數＝0。
 - **邊界**：前端輪詢中斷 ⇒ 工作照跑、結果保留；API 重啟 ⇒ 未終態工作標 interrupted（不續跑）。
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不改各分析之計算內容。
 
