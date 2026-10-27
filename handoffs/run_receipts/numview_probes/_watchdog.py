@@ -167,11 +167,48 @@ class _PidOnly:
         raise RuntimeError(f"pid {self.pid} 無 psutil 物件（{name} 不可用）")
 
 
+#: 本程序內子孫列舉曾全數失敗（psutil、libproc、ps 皆被拒）⇒ 終止時於診斷明記「脫離群組者無從追蹤」（不靜默）
+ENUMERATION_UNAVAILABLE = {"seen": False}
+
+
+def _libproc_descendants(pid: int) -> Optional[List[int]]:
+    """macOS 原生 `libproc.proc_listchildpids` 逐層求子孫（不經 sysctl KERN_PROC_ALL，沙箱禁其時仍可用；b3 審碼 r3
+    CODEX-R3-P1-01）；非 macOS 或呼叫失敗 ⇒ None。"""
+    if platform.system() != "Darwin":
+        return None
+    try:
+        import ctypes
+
+        fn = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True).proc_listchildpids
+        fn.argtypes, fn.restype = [ctypes.c_int, ctypes.c_void_p, ctypes.c_int], ctypes.c_int
+    except (OSError, AttributeError):
+        return None
+    found: List[int] = []
+    stack = [pid]
+    while stack:
+        parent = stack.pop()
+        buf = (ctypes.c_int * 4096)()
+        n = fn(parent, buf, ctypes.sizeof(buf))
+        if n < 0:
+            return None if parent == pid else found
+        for i in range(n):
+            c = int(buf[i])
+            if c > 0 and c not in found:
+                found.append(c)
+                stack.append(c)
+    return found
+
+
 def _ps_descendants(pid: int) -> List[int]:
-    """以 `ps -axo pid=,ppid=` 建父子表求 `pid` 之子孫（psutil 列舉被拒時之退路；b3 審碼 r2 CODEX-R2-P1-01）。"""
+    """psutil 列舉被拒時之退路：先 libproc（macOS 原生），再 `ps -axo pid=,ppid=` 建父子表；皆不可用 ⇒ 空並記
+    `ENUMERATION_UNAVAILABLE`（b3 審碼 r2 CODEX-R2-P1-01、r3 CODEX-R3-P1-01）。"""
+    native = _libproc_descendants(pid)
+    if native is not None:
+        return native
     try:
         out = subprocess.run(["ps", "-axo", "pid=,ppid="], capture_output=True, text=True).stdout
     except OSError:
+        ENUMERATION_UNAVAILABLE["seen"] = True
         return []
     kids: Dict[int, List[int]] = {}
     for line in out.splitlines():
@@ -413,6 +450,7 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
     `probe_swap` 回系統 swap 已用量（MB）；啟動前讀一次為基線，之後只計增長。門檻＝`swap_growth_fraction_of_ram` ×
     `probe_ram()`（MB）；後者讀不到 ⇒ 本跑不判 swap 條件。"""
     log_path = Path(log_path)
+    ENUMERATION_UNAVAILABLE["seen"] = False
     baseline = probe_swap()
     ram = probe_ram()
     frac = config.swap_growth_fraction_of_ram
@@ -518,6 +556,11 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
             if degraded:
                 diag["monitor_degraded"] = degraded
             rc = _terminate(proc, seen)
+            if ENUMERATION_UNAVAILABLE["seen"]:  # 明記：自行 setsid 脫離群組之子孫無從追蹤（群組內者已整組終止）
+                diag["descendant_enumeration_unavailable"] = ("psutil、libproc、ps 皆被拒；同群組子孫已整組終止，"
+                                                              "自行 setsid 脫離群組者無從追蹤、可能殘留")
+                log.write("[watchdog] 子孫列舉不可用：自行 setsid 脫離群組之子孫可能殘留（見 diagnosis）\n")
+                log.flush()
             return WatchResult(STALLED, rc, reason, clock() - started, growth_max, threshold, over,
                                diag.get("cause"), diag)
 

@@ -525,7 +525,7 @@
       "path": "tests/feature_engineering/test_nocap_watchdog\\.py",
       "lines": [
         33,
-        233
+        320
       ],
       "class": "D",
       "reason": "受測負載之忙迴圈（字串程式／測試本體），非等候期限"
@@ -541,7 +541,7 @@
     {
       "path": "tests/feature_engineering/test_nocap_watchdog\\.py",
       "lines": [
-        284
+        343
       ],
       "class": "D",
       "reason": "效能斷言：同步阻塞之 coroutine 於 10 秒內被中斷"

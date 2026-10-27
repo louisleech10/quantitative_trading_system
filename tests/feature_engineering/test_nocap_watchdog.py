@@ -211,6 +211,65 @@ def test_setsid_grandchild_killed_when_psutil_queries_denied(tmp_path: Path, mon
         _kill_all(pids)
 
 
+def _deny_psutil_and_ps(monkeypatch: pytest.MonkeyPatch) -> None:
+    """模擬委員沙箱（b3 審碼 r3 實測：sysctl KERN_PROC_ALL 與啟動 ps 皆 PermissionError）。"""
+    def denied(self: Any, *a: Any, **k: Any) -> Any:
+        raise psutil.AccessDenied(self.pid)
+
+    for name in ("children", "status", "create_time"):
+        monkeypatch.setattr(psutil.Process, name, denied)
+    real_run = wd.subprocess.run
+
+    def no_ps(argv: Any, *a: Any, **k: Any) -> Any:
+        if list(argv)[:1] == ["ps"]:
+            raise PermissionError(1, "Operation not permitted", "ps")
+        return real_run(argv, *a, **k)
+
+    monkeypatch.setattr(wd.subprocess, "run", no_ps)
+
+
+def _setsid_program(pf: Path) -> List[str]:
+    return [sys.executable, "-c", (
+        "import os, subprocess, sys, time\n"
+        f"pf = {str(pf)!r}\n"
+        "kid = subprocess.Popen([sys.executable, '-c', 'import os, time\\nos.setsid()\\ntime.sleep(60)'])\n"
+        "open(pf, 'a').write(f'{os.getpid()} {kid.pid} ')\n"
+        "time.sleep(60)\n")]
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="libproc 為 macOS 原生 API")
+def test_setsid_grandchild_killed_via_libproc_when_psutil_and_ps_denied(tmp_path: Path,
+                                                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    """psutil 與 ps 皆被拒（委員沙箱實況）⇒ 以 libproc.proc_listchildpids 列舉子孫，自行 setsid 之孫行程仍被終止。"""
+    _deny_psutil_and_ps(monkeypatch)
+    pf = tmp_path / "pids.txt"
+    result = wd.run_watched(_setsid_program(pf), log_path=tmp_path / "libproc.log", config=_config(),
+                            probe_swap=lambda: 0.0)
+    pids = _pids_from(pf)
+    monkeypatch.undo()
+    try:
+        assert result.status == wd.STALLED and "descendant_enumeration_unavailable" not in result.diagnosis, result
+        assert len(pids) == 2 and _alive(pids) == [], (pids, result)
+    finally:
+        _kill_all(pids)
+
+
+def test_enumeration_unavailable_is_reported_not_silent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """psutil、libproc、ps 皆不可用 ⇒ 終止後於 diagnosis 明記 `descendant_enumeration_unavailable`、log 亦寫一行（不靜默）。"""
+    _deny_psutil_and_ps(monkeypatch)
+    monkeypatch.setattr(wd, "_libproc_descendants", lambda pid: None)
+    pf = tmp_path / "pids.txt"
+    result = wd.run_watched(_setsid_program(pf), log_path=tmp_path / "none.log", config=_config(),
+                            probe_swap=lambda: 0.0)
+    pids = _pids_from(pf)
+    monkeypatch.undo()
+    try:
+        assert result.status == wd.STALLED and "descendant_enumeration_unavailable" in result.diagnosis, result
+        assert "子孫列舉不可用" in (tmp_path / "none.log").read_text(encoding="utf-8")
+    finally:
+        _kill_all(pids)
+
+
 def test_mutation_no_accumulated_descendants_leaves_setsid_grandchild(tmp_path: Path,
                                                                       monkeypatch: pytest.MonkeyPatch) -> None:
     """改壞對照：不用逐輪累積之子孫（`_seen_alive` 恆空）且終止當下列舉失敗 ⇒ 自行 setsid 之孫行程存活（上一案之鑑別力）。"""
