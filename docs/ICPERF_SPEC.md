@@ -1,6 +1,6 @@
 # ICPERF IC 計算最優化（第 5 段 PIT 分位／排名、前處理與 IC 計算之規模效能）— SPEC
 
-> 版本：v5.1（2026-10-28；規格審查 r3 處置〔收斂檔 `handoffs/reconcile/20261028-icperf-x-review-r3/synth.md`〕：Task 3.1、4.1 驗收改比 §G 三項凍結）；v5（2026-10-28；規格審查 r2 處置，收斂檔 `handoffs/reconcile/20261028-icperf-x-review-r2/synth.md`：退回觸發欄由標籤矩陣導出、超線性判準與 extrapolation_unreliable 對齊、Task 2.2 依賴 Task 0.2、回退改 git revert 不設執行期旗標、BUDGET-1 上下界與 §G 合計重算、§G 三項凍結全文同步、Task 0.1 驗證要求三項凍結齊備、manifest 凍結後產出）；v4（2026-10-28；規格審查 r1 處置，收斂檔 `handoffs/reconcile/20261028-icperf-x-review-r1/synth.md`：PIT 現行語意逐項入 §C、逐位元對象為整數標籤、2D 核心加有效遮罩與逐欄 q、消費端輸入不共用、q=3 只對觸發欄、深度分析與第 1 段逐根 PIT 入 Task 2.2、Task 0.2 路徑清冊與判準固定規則、RSS 同量測器、進度回報擴及清冊長路徑、A 格列數先實查）；v3（2026-10-28；補 §B 驗證運算預算表與四項平衡節——NOCAP Task 0.3c／0.4 之規格必填，本 SPEC 未凍結故自本版適用、自不溯及清單移除）；v2（2026-10-27；範圍擴為 IC 篩選之全部計算——使用者「IC PERF優化應該要涵蓋所有IC篩選的所有計算？」：Phase 0 改為逐段全面規模盤點，凡隨規模超線性或單欄成本高者皆入施工；優化細節於本票規格審查與小規模實測後定，使用者「所有ICPERF優化要怎麼做，到那票再說，對吧？」）；v1（2026-10-27；初稿）　|　來源：使用者 2026-10-27 指示（逐字見 §A）、第 5 段成長曲線收據 `handoffs/run_receipts/icperf_probes/result_N{500,2000}.json`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/ICPERF.json`（規格凍結後產出，同 NOCAP／FFPROD 管線；凍結前不存在）
+> 版本：v5.2（2026-10-28；規格審查 r4 處置〔收斂檔 `handoffs/reconcile/20261028-icperf-x-review-r4/synth.md`〕：Task 2.2 驗收含 §G 三項凍結、§V 增通則——凡改產品碼之 Task 收尾皆比 §G 三項）；v5.1（2026-10-28；規格審查 r3 處置〔收斂檔 `handoffs/reconcile/20261028-icperf-x-review-r3/synth.md`〕：Task 3.1、4.1 驗收改比 §G 三項凍結）；v5（2026-10-28；規格審查 r2 處置，收斂檔 `handoffs/reconcile/20261028-icperf-x-review-r2/synth.md`：退回觸發欄由標籤矩陣導出、超線性判準與 extrapolation_unreliable 對齊、Task 2.2 依賴 Task 0.2、回退改 git revert 不設執行期旗標、BUDGET-1 上下界與 §G 合計重算、§G 三項凍結全文同步、Task 0.1 驗證要求三項凍結齊備、manifest 凍結後產出）；v4（2026-10-28；規格審查 r1 處置，收斂檔 `handoffs/reconcile/20261028-icperf-x-review-r1/synth.md`：PIT 現行語意逐項入 §C、逐位元對象為整數標籤、2D 核心加有效遮罩與逐欄 q、消費端輸入不共用、q=3 只對觸發欄、深度分析與第 1 段逐根 PIT 入 Task 2.2、Task 0.2 路徑清冊與判準固定規則、RSS 同量測器、進度回報擴及清冊長路徑、A 格列數先實查）；v3（2026-10-28；補 §B 驗證運算預算表與四項平衡節——NOCAP Task 0.3c／0.4 之規格必填，本 SPEC 未凍結故自本版適用、自不溯及清單移除）；v2（2026-10-27；範圍擴為 IC 篩選之全部計算——使用者「IC PERF優化應該要涵蓋所有IC篩選的所有計算？」：Phase 0 改為逐段全面規模盤點，凡隨規模超線性或單欄成本高者皆入施工；優化細節於本票規格審查與小規模實測後定，使用者「所有ICPERF優化要怎麼做，到那票再說，對吧？」）；v1（2026-10-27；初稿）　|　來源：使用者 2026-10-27 指示（逐字見 §A）、第 5 段成長曲線收據 `handoffs/run_receipts/icperf_probes/result_N{500,2000}.json`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/ICPERF.json`（規格凍結後產出，同 NOCAP／FFPROD 管線；凍結前不存在）
 
 ## §RISK 風險分級
 - **大小**：大（IC 正確性路徑、跨模組 `momentum/Analysis/*`、多 phase）。
@@ -87,7 +87,7 @@
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不改統計量公式；不跨消費端共用標籤。
 
 **Task 2.2 — 深度分析與第 1 段之逐根 PIT**：依 Task 0.2 路徑清冊與判準，凡判定列入施工之逐根 PIT 入口（至少含 `long_short_analyzer.py:56-60`〔`require_full_q=True`〕、`factor_return_analyzer.py:319-366` `_pit_expanding_position`、`pit_stats.py` 之 `pit_expanding_bounds`／`pit_expanding_quantile_thresholds`／`pit_expanding_mean_std`／`pit_expanding_mad` 之呼叫端）改經 2D 核心或等價之逐步更新核心，參數照各入口現行（不統一 `require_full_q` 等語意）；判定不列入者於清冊記理由。
-- **驗證**：各入口改後對其現行實作（移入測試作 oracle）於真實資料逐元素 `==`；深度分析模組之 §G 補凍：Task 0.1 凍結時一併凍結 A 格 IC 頁深度分析之現行輸出（逐模組逐欄位 sha256），改後 `==`。
+- **驗證**：各入口改後對其現行實作（移入測試作 oracle）於真實資料逐元素 `==`；§G 三項凍結（含主流程第 (1)、(2) 項——第 1 段之 pit_stats 呼叫端改動可影響主流程輸出）完整輸出 `==`；深度分析模組之 §G 補凍：Task 0.1 凍結時一併凍結 A 格 IC 頁深度分析之現行輸出（逐模組逐欄位 sha256），改後 `==`。
 - **邊界**：同 Task 1.1；`_pit_expanding_position` 之自訂窗口與 q_eff 照現行。
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不改任一入口之語意參數。
 
@@ -118,6 +118,7 @@
 - mutation：Task 1.1（插值法改變、忽略有效遮罩即紅）、Task 1.2（method 改 min、歷史排除 ±inf 即紅）、Task 2.1（重複計算次數斷言、退回改全欄、跨消費端共用標籤即紅）、Task 2.2（各入口對現行 oracle 不等即紅）、Task 4.1（子集與全欄不等即紅）。
 - 測試層級：單元（2D 核心對 pandas oracle）／Golden（§G 三項凍結逐位元）／規模（三點收據＋全欄實跑）。真實資料、禁合成 fixture（單元邊界案除外，需明列為邊界輸入）。
 - 防假綠：刪改既有測試照測試刪改清單送審。
+- 通則：凡改動產品碼之 Task（Phase 1–5），收尾驗收一律含 §G 三項凍結完整輸出逐位元 `==`，不以「本 Task 只影響某一項」縮小比對範圍（各 Task 驗收所列為最低要求）。
 - 邊界目錄：全 NaN 列、std=0（常數段）、Inf、重複值、q 不足、寬表分頁、OOM 降載。
 
 ## §R 回退
