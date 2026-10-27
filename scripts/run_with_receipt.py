@@ -203,21 +203,39 @@ def collect_selected_node_ids(cmd: list[str], output: str) -> list[str]:
 def _collect_node_ids_fallback(cmd: list[str]) -> list[str]:
     """argv/輸出都拿不到 node id 時（如 -k + -q），跑 --collect-only 補記。
 
-    只讀不執行測試；collect 失敗回空清單（fail-open 僅影響 receipt 豐富度，
-    不影響 receipt 本身的 pass/fail 記錄）。
+    只讀不執行測試；collect 以非 0 結束或無法啟動 ⇒ 回空清單（僅影響 receipt 豐富度，不影響 receipt 本身的
+    pass/fail 記錄）。collect 經共用監看、不設秒數上限（NOCAP Task 2.1）；卡死（無輸出亦無 CPU 進度）⇒ 留堆疊後
+    RuntimeError（不以空清單掩蓋；b3 審碼 r1 CODEX-R1-P1-01）。
     """
+    import importlib.util
+    import tempfile
+
     # 剝掉原有 verbosity 旗標：殘留 -q 會疊成 -qq，collect 輸出縮成「檔名: 數量」而非 node id
     verbosity_flags = {"-q", "-qq", "--quiet", "-v", "-vv", "--verbose"}
     collect_cmd = [arg for arg in cmd if arg not in verbosity_flags]
     collect_cmd += ["--collect-only", "-q"]
+    root = Path(__file__).resolve().parents[1]
+    loaded = {}
+    for name, path in (("rwr_watchdog", root / "handoffs" / "run_receipts" / "numview_probes" / "_watchdog.py"),
+                       ("rwr_run_watched", root / "scripts" / "run_watched.py")):
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        loaded[name] = mod
+    wd = loaded["rwr_watchdog"]
+    work = Path(tempfile.mkdtemp(prefix="rwr-collect-"))
     try:
-        proc = subprocess.run(
-            collect_cmd, capture_output=True, timeout=300, check=False
-        )
-    except (OSError, subprocess.TimeoutExpired):
+        res = wd.run_watched(collect_cmd, log_path=work / "collect.log",
+                             config=wd.load_config(loaded["rwr_run_watched"]._criteria()),
+                             stderr_path=work / "collect.err")
+    except OSError:
         return []
+    if res.status != wd.EXITED:
+        stacks = (res.diagnosis or {}).get("stacks_file") or f"{work / 'collect.log'}.stacks.txt"
+        raise RuntimeError(f"run_with_receipt：collect-only 卡死（{res.reason}）：堆疊 {stacks}")
     node_ids: list[str] = []
-    for line in proc.stdout.decode("utf-8", errors="replace").splitlines():
+    for line in (work / "collect.log").read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if "::" in line and not line.startswith(("=", "-", "<")) and " " not in line:
             node_ids.append(line)

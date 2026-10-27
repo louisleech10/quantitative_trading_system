@@ -1524,6 +1524,78 @@
       "line": "p.add_argument(\"--max-seconds\", type=float, default=1.0)",
       "class": "D",
       "reason": "封存、不執行（TESTREG v6 profiling 已收案之探針；SPEC Task 2.1「同改或登記 D」）"
+    },
+    {
+      "path": "tests/feature_engineering/test_ffprod_measure.py",
+      "function": "test_heartbeat_line_only_when_cpu_advances_by_fraction",
+      "callee": "fm.time.perf_counter",
+      "literal": "",
+      "class": "D",
+      "reason": "受測負載之 0.3 秒忙迴圈（驗 CPU 讀取器前進），非等候期限"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_domain.py",
+      "function": "test_sigint_without_outstanding_worker_raises_promptly",
+      "callee": "isinstance",
+      "literal": "",
+      "class": "D",
+      "reason": "效能斷言：SIGINT 後 1.5 秒內返回"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog.py",
+      "line": "_BUSY_SILENT = [sys.executable, \"-c\", \"import time\\nt = time.perf_counter()\\nwhile time.perf_counter() - t < 2.0:\\n    pass\"]",
+      "class": "D",
+      "reason": "受測負載之忙迴圈（字串程式／測試本體），非等候期限"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog.py",
+      "function": "_alive",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "C",
+      "reason": "等受測子行程樹退出之收尾保險（settle 秒級）"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog.py",
+      "function": "test_progress_wait_busy_cpu_is_not_stalled",
+      "callee": "time.perf_counter",
+      "literal": "",
+      "class": "D",
+      "reason": "受測負載之忙迴圈（字串程式／測試本體），非等候期限"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog.py",
+      "function": "test_await_progressing_interrupts_synchronously_blocked_coroutine",
+      "callee": "time.perf_counter",
+      "literal": "",
+      "class": "D",
+      "reason": "效能斷言：同步阻塞之 coroutine 於 10 秒內被中斷"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_criteria.py",
+      "line": "busy = [sys.executable, \"-c\", \"import time\\nt = time.time()\\nwhile time.time() - t < 2.0:\\n    pass\"]",
+      "class": "D",
+      "reason": "監看判準測試設定之牆鐘欄（Task 0.1 後只記錄、不終止）"
+    },
+    {
+      "path": "tests/governance/test_heavy_run_guard.py",
+      "function": "test_hook_is_wired_and_fast",
+      "callee": "time.perf_counter",
+      "literal": "",
+      "class": "D",
+      "reason": "效能斷言：hook 單次 < 1 秒（SPEC Task 0.3）"
+    },
+    {
+      "path": "tests/registry/test_gate_runner_nocap.py",
+      "line": "busy = \"import time\\n_t = time.perf_counter()\\nwhile time.perf_counter() - _t < 1.5:\\n    pass\"",
+      "class": "D",
+      "reason": "測試資料字串中之忙迴圈程式（受測負載）"
+    },
+    {
+      "path": "tests/registry/test_gate_runner_nocap.py",
+      "line": "\"_t = time.perf_counter()\\n    while time.perf_counter() - _t < 1.5:\\n        pass\")",
+      "class": "D",
+      "reason": "測試資料字串中之忙迴圈程式（受測負載）"
     }
   ]
 }

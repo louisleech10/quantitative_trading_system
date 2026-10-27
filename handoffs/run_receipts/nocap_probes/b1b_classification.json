@@ -90,11 +90,6 @@
       "reason": "逐任務 deadline 與 pool 停滯終止（盤點收據 A；Phase 4）"
     },
     {
-      "path": "scripts/run_with_receipt\\.py",
-      "class": "A",
-      "reason": "pytest collect-only 300 秒逾時（盤點收據未列，本次掃描新發現；同 Phase 2 Task 2.1 collect-only 牆鐘刪除）"
-    },
-    {
       "path": "momentum/Analysis/feature_quality_diagnostics\\.py",
       "class": "A",
       "reason": "逐特徵 ADF 5 秒逾時（盤點收據 A；Phase 5）"
@@ -509,6 +504,65 @@
       "path": "frontend/src/hooks/useICAnalysis\\.ts",
       "class": "D",
       "reason": "AbortController 用於換任務時丟棄舊世代請求，非時間"
+    },
+    {
+      "path": "tests/feature_engineering/test_ffprod_measure\\.py",
+      "lines": [
+        682
+      ],
+      "class": "D",
+      "reason": "受測負載之 0.3 秒忙迴圈（驗 CPU 讀取器前進），非等候期限"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_domain\\.py",
+      "lines": [
+        1331
+      ],
+      "class": "D",
+      "reason": "效能斷言：SIGINT 後 1.5 秒內返回"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog\\.py",
+      "lines": [
+        33,
+        233
+      ],
+      "class": "D",
+      "reason": "受測負載之忙迴圈（字串程式／測試本體），非等候期限"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog\\.py",
+      "lines": [
+        44
+      ],
+      "class": "C",
+      "reason": "等受測子行程樹退出之收尾保險（settle 秒級）"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog\\.py",
+      "lines": [
+        253
+      ],
+      "class": "D",
+      "reason": "效能斷言：同步阻塞之 coroutine 於 10 秒內被中斷"
+    },
+    {
+      "path": "tests/governance/test_heavy_run_guard\\.py",
+      "lines": [
+        133
+      ],
+      "class": "D",
+      "reason": "效能斷言：hook 單次 < 1 秒（SPEC Task 0.3）"
+    },
+    {
+      "path": "tests/registry/test_gate_runner_nocap\\.py",
+      "lines": [
+        134,
+        161,
+        177
+      ],
+      "class": "D",
+      "reason": "測試資料字串中之忙迴圈程式（受測負載）"
     }
   ]
 }

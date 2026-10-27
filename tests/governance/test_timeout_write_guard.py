@@ -37,6 +37,8 @@ def _run(payload: Any) -> int:
     "    runner = Runner(out, max_seconds=3600)",
     "timeout 300 python x.py",
     "pytestmark = pytest.mark.timeout(600)",  # b1 審碼 r6 CODEX-R6-P1-01：標記亦為時間上限樣式
+    "    while time.time() - start < 300:",  # b3 審碼 r1：小於號寫法之期限
+    "    while time.monotonic() < end:",  # b3 審碼 r1：以終點時刻寫之期限
 ])
 def test_new_time_cap_in_code_is_blocked(line: str) -> None:
     """運算路徑新增各類時間上限寫法 ⇒ rc 2。"""

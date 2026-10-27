@@ -12,6 +12,7 @@ Client.ping = lambda self: {}
 
 from api.main import app
 from api.services.ic_analysis_service import ic_analysis_service
+from tests._nocap_wait import ProgressWait
 from tests.fixtures.ic_persist_redirect import get_active_redirect_root
 from tests.fixtures.ic_api_real_kline import ic_api_real_kline
 
@@ -41,9 +42,10 @@ def _export_fixture_filtered_path(metadata: dict) -> Path:
     return active_root / "features" / name
 
 
-def _wait_for_task(task_id: str, timeout: float = 20.0) -> None:
-    start = time.time()
-    while time.time() - start < timeout:
+def _wait_for_task(task_id: str) -> None:
+    """輪詢至 completed／failed；不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
+    waiter = ProgressWait(f"ic task {task_id}")
+    while True:
         response = client.get(f"/api/v1/ic/task/{task_id}")
         assert response.status_code == 200
         payload = response.json()
@@ -51,8 +53,8 @@ def _wait_for_task(task_id: str, timeout: float = 20.0) -> None:
             return
         if payload["status"] == "failed":
             pytest.fail(f"task failed: {payload.get('error')}")
+        waiter.check(payload)
         time.sleep(0.2)
-    pytest.fail("task timeout")
 
 
 @pytest.fixture(scope="session")

@@ -150,6 +150,120 @@ def test_mutation_root_only_terminate_leaves_child_alive(tmp_path: Path, monkeyp
         _kill_all(pids)
 
 
+def test_setsid_grandchild_killed_even_if_enumeration_fails_at_termination(tmp_path: Path,
+                                                                          monkeypatch: pytest.MonkeyPatch) -> None:
+    """終止當下子孫列舉失敗（只得根行程；負載下 psutil 例外之情形）⇒ 仍以監看期間逐輪累積之子孫補殺自行 setsid 之孫行程
+    （b3 審碼 r1 CODEX-R1-P1-02）。改壞（不累積、只靠終止當下快照）⇒ 孫行程存活。"""
+    pf = tmp_path / "pids.txt"
+    code = (
+        "import os, subprocess, sys, time\n"
+        f"pf = {str(pf)!r}\n"
+        "kid = subprocess.Popen([sys.executable, '-c', 'import os, time\\nos.setsid()\\ntime.sleep(60)'])\n"
+        "open(pf, 'a').write(f'{os.getpid()} {kid.pid} ')\n"
+        "time.sleep(60)\n"
+    )
+    real_tree, broken = wd._tree, {"on": False}
+
+    def flaky_tree(pid: int) -> Any:
+        procs = real_tree(pid)
+        return procs[:1] if broken["on"] else procs
+
+    def diagnose_then_break(*a: Any, **k: Any) -> dict:
+        broken["on"] = True  # 自留現場起，列舉只回根行程
+        return {"cause": wd.CAUSE_HANG}
+
+    monkeypatch.setattr(wd, "_tree", flaky_tree)
+    result = wd.run_watched([sys.executable, "-c", code], log_path=tmp_path / "flaky.log", config=_config(),
+                            probe_swap=lambda: 0.0, diagnose_fn=diagnose_then_break)
+    pids = _pids_from(pf)
+    try:
+        assert result.status == wd.STALLED, result
+        assert len(pids) == 2 and _alive(pids) == [], (pids, result)
+    finally:
+        _kill_all(pids)
+
+
+def test_mutation_no_accumulated_descendants_leaves_setsid_grandchild(tmp_path: Path,
+                                                                      monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞對照：不用逐輪累積之子孫（`_seen_alive` 恆空）且終止當下列舉失敗 ⇒ 自行 setsid 之孫行程存活（上一案之鑑別力）。"""
+    pf = tmp_path / "pids.txt"
+    code = (
+        "import os, subprocess, sys, time\n"
+        f"pf = {str(pf)!r}\n"
+        "kid = subprocess.Popen([sys.executable, '-c', 'import os, time\\nos.setsid()\\ntime.sleep(60)'])\n"
+        "open(pf, 'a').write(f'{os.getpid()} {kid.pid} ')\n"
+        "time.sleep(60)\n"
+    )
+    real_tree, broken = wd._tree, {"on": False}
+    monkeypatch.setattr(wd, "_tree", lambda pid: real_tree(pid)[:1] if broken["on"] else real_tree(pid))
+    monkeypatch.setattr(wd, "_seen_alive", lambda seen: [])
+
+    def diagnose_then_break(*a: Any, **k: Any) -> dict:
+        broken["on"] = True
+        return {"cause": wd.CAUSE_HANG}
+
+    wd.run_watched([sys.executable, "-c", code], log_path=tmp_path / "mut.log", config=_config(),
+                   probe_swap=lambda: 0.0, diagnose_fn=diagnose_then_break)
+    pids = _pids_from(pf)
+    try:
+        assert len(pids) == 2 and _alive(pids[1:], settle=0.5) == pids[1:]
+    finally:
+        _kill_all(pids)
+
+
+def test_progress_wait_stalled_state_without_cpu_fails_with_stacks() -> None:
+    """測試內程序內等候：狀態未變且 CPU 無進度達門檻 ⇒ AssertionError，訊息含堆疊檔且檔存在（NOCAP Task 2.2）。"""
+    from tests._nocap_wait import ProgressWait
+
+    waiter = ProgressWait("probe", stall=0.3)
+    with pytest.raises(AssertionError) as exc:
+        for _ in range(100):
+            waiter.check("running")
+            time.sleep(0.05)
+    path = Path(str(exc.value).split("全執行緒堆疊 ", 1)[1].split(" ", 1)[0])
+    assert "卡死" in str(exc.value) and path.exists()
+
+
+def test_progress_wait_busy_cpu_is_not_stalled() -> None:
+    """狀態未變但本程序在忙算（CPU 有進度）⇒ 不判卡死。"""
+    from tests._nocap_wait import ProgressWait
+
+    waiter = ProgressWait("busy", stall=0.3)
+    t0 = time.perf_counter()
+    while time.perf_counter() - t0 < 1.0:  # noqa: 忙算 1 秒（效能斷言外之受測負載）
+        waiter.check("running")
+
+
+def test_await_progressing_interrupts_synchronously_blocked_coroutine() -> None:
+    """受測 coroutine 同步阻塞（未 yield）⇒ 獨立監看執行緒判卡死、留堆疊並以 SIGINT 中斷（b3 審碼 r1 CODEX-R1-P1-04）。"""
+    import asyncio
+
+    from tests._nocap_wait import await_progressing
+
+    async def blocked() -> None:
+        time.sleep(30)
+
+    t0 = time.perf_counter()
+    loop = asyncio.new_event_loop()  # 獨立 loop：asyncio.run 會清除全域 event loop，污染後續以 get_event_loop 之測試
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            loop.run_until_complete(await_progressing(blocked(), "blocked", stall=0.3))
+    finally:
+        loop.close()
+    assert time.perf_counter() - t0 < 10.0
+
+
+def test_run_watched_subprocess_separates_streams_and_fails_on_stall(monkeypatch: pytest.MonkeyPatch) -> None:
+    """子行程 helper：stdout／stderr 分開（監看註記不入 stdout）；睡眠卡死 ⇒ AssertionError 附堆疊。"""
+    import tests._nocap_subprocess as ns
+
+    ok = ns.run_watched_subprocess([sys.executable, "-c", "import sys; print('out'); print('err', file=sys.stderr)"])
+    assert ok.returncode == 0 and ok.stdout.strip() == "out" and "err" in ok.stderr
+    monkeypatch.setattr(ns, "watchdog_config", lambda: _config())
+    with pytest.raises(AssertionError, match="卡死"):
+        ns.run_watched_subprocess([sys.executable, "-c", "import time; time.sleep(30)"])
+
+
 def test_short_command_returns_without_waiting_full_check_interval(tmp_path: Path) -> None:
     """判準之檢查間隔 30 秒下，秒級短命令（閘門之 collect-only、hook）結束即返回，不空等滿一個間隔（b3 審碼前實測發現：
     原迴圈固定睡滿間隔 ⇒ 每次 pytest 子行程至少 30 秒）。效能斷言：5 秒內返回、rc 0。"""

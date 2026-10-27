@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 Client.ping = lambda self: {}
 
 from api.main import app
+from tests._nocap_wait import ProgressWait
 from tests.fixtures.ic_api_real_kline import ic_api_real_kline
 
 
@@ -21,9 +22,10 @@ pytestmark = [
 ]
 
 
-def _wait_for_task(task_id: str, timeout: float = 15.0) -> None:
-    start = time.time()
-    while time.time() - start < timeout:
+def _wait_for_task(task_id: str) -> None:
+    """輪詢至 completed／failed；不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
+    waiter = ProgressWait(f"ic task {task_id}")
+    while True:
         response = client.get(f"/api/v1/ic/task/{task_id}")
         assert response.status_code == 200
         data = response.json()
@@ -31,8 +33,8 @@ def _wait_for_task(task_id: str, timeout: float = 15.0) -> None:
             return
         if data["status"] == "failed":
             pytest.fail(f"task failed: {data.get('error')}")
+        waiter.check(data)
         time.sleep(0.2)
-    pytest.fail("task timeout")
 
 
 def _build_ic_analysis_task(real_kline: dict) -> dict:

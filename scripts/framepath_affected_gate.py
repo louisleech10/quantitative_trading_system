@@ -679,7 +679,9 @@ def run_watched(args: Sequence[str], cwd: Path, env: Mapping[str, str]) -> subpr
     runner = globals().get("_RUNNER")
     log_dir = Path(runner.out) / "watch_logs" if runner is not None else Path(tempfile.mkdtemp(prefix="gate-watch-"))
     log_dir.mkdir(parents=True, exist_ok=True)
-    log = Path(tempfile.mkstemp(prefix="pytest-", suffix=".log", dir=str(log_dir))[1])
+    fd, log_name = tempfile.mkstemp(prefix="pytest-", suffix=".log", dir=str(log_dir))
+    os.close(fd)  # 只取唯一檔名；監看器自行以路徑開檔（不關則每次呼叫洩漏一個 fd；b3 審碼 r1 CODEX-R1-P1-03）
+    log = Path(log_name)
     cmd = [sys.executable, "-m", "pytest", *args]
     wd = _wd()
     res = wd.run_watched(cmd, log_path=log, config=watchdog_config(), cwd=str(cwd), env=dict(env))

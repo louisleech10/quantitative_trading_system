@@ -18,9 +18,8 @@
     "handoffs/run_receipts/numview_probes/estimate.py": 2,
     "momentum/Analysis/feature_quality_diagnostics.py": 1,
     "scripts/capture_ic1eb_baseline.py": 2,
-    "scripts/ic1c_freeze_baseline.py": 1,
+    "scripts/ic1c_freeze_baseline.py": 3,
     "scripts/ic1eb_b5_replay.py": 3,
-    "scripts/run_with_receipt.py": 2,
     "scripts/verify_l1_warmup_requirements.py": 6,
     "tests/api/test_feature_browser_routes.py": 4,
     "tests/feature_engineering/test_warmup_verify_guards.py": 2,
@@ -48,6 +47,26 @@
       "literal": "",
       "text": "while time.monotonic() < deadline:",
       "reason": "IC 基準擷取等候期限 1800 秒（盤點收據 A；Phase 3）"
+    },
+    {
+      "path": "scripts/ic1c_freeze_baseline.py",
+      "line": 1336,
+      "pattern_id": "elapsed_compare",
+      "function": "freeze_new2",
+      "callee": "time.time",
+      "literal": "",
+      "text": "while time.time() - t0 < 120.0:",
+      "reason": "深度分析等候 60 秒即 SystemExit（盤點收據 A；Phase 3）"
+    },
+    {
+      "path": "scripts/ic1c_freeze_baseline.py",
+      "line": 1366,
+      "pattern_id": "elapsed_compare",
+      "function": "freeze_new2",
+      "callee": "time.time",
+      "literal": "",
+      "text": "while time.time() - t1 < 60.0:",
+      "reason": "深度分析等候 60 秒即 SystemExit（盤點收據 A；Phase 3）"
     },
     {
       "path": "scripts/ic1c_freeze_baseline.py",
@@ -88,26 +107,6 @@
       "literal": "",
       "text": "while time.monotonic() < deadline:",
       "reason": "IC 縱向分析等候期限 1800 秒（盤點收據 A；Phase 3）"
-    },
-    {
-      "path": "scripts/run_with_receipt.py",
-      "line": 215,
-      "pattern_id": "kwarg_timeout",
-      "function": "_collect_node_ids_fallback",
-      "callee": "subprocess.run",
-      "literal": "300",
-      "text": "collect_cmd, capture_output=True, timeout=300, check=False",
-      "reason": "pytest collect-only 300 秒逾時（盤點收據未列，本次掃描新發現；同 Phase 2 Task 2.1 collect-only 牆鐘刪除）"
-    },
-    {
-      "path": "scripts/run_with_receipt.py",
-      "line": 217,
-      "pattern_id": "timeout_expired",
-      "function": "_collect_node_ids_fallback",
-      "callee": "",
-      "literal": "",
-      "text": "except (OSError, subprocess.TimeoutExpired):",
-      "reason": "pytest collect-only 300 秒逾時（盤點收據未列，本次掃描新發現；同 Phase 2 Task 2.1 collect-only 牆鐘刪除）"
     },
     {
       "path": "scripts/verify_l1_warmup_requirements.py",

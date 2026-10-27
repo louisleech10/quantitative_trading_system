@@ -286,11 +286,40 @@ def _alive(pids: Sequence[int]) -> List[int]:
     return out
 
 
-def _terminate(proc: "subprocess.Popen[Any]") -> Optional[int]:
+def _remember(pid: int, seen: Dict[int, float]) -> None:
+    """把 `pid` 之子孫（含已 setsid 脫離群組者）以 {pid: 建立時刻} 累積進 `seen`；列舉失敗即略過（下一輪再補）。"""
+    for p in _tree(pid):
+        try:
+            seen.setdefault(p.pid, p.create_time())
+        except Exception:  # noqa: BLE001 — 列舉後已結束
+            pass
+
+
+def _seen_alive(seen: Optional[Mapping[int, float]]) -> List[int]:
+    """`seen` 中仍存活且建立時刻相同者（防 pid 被重用而誤殺他行程）；psutil 不可用 ⇒ 空。"""
+    out: List[int] = []
+    if not seen:
+        return out
+    try:
+        import psutil
+    except Exception:  # noqa: BLE001
+        return out
+    for pid, created in seen.items():
+        try:
+            p = psutil.Process(pid)
+            if abs(p.create_time() - created) < 1e-3 and p.status() != psutil.STATUS_ZOMBIE:
+                out.append(pid)
+        except Exception:  # noqa: BLE001 — 已結束或無權限
+            pass
+    return out
+
+
+def _terminate(proc: "subprocess.Popen[Any]", seen: Optional[Mapping[int, float]] = None) -> Optional[int]:
     """終止整個子行程樹（NOCAP Task 0.1 v4／v5 增修②）：子行程以新 session 啟動而自成行程群組 ⇒ 對整個群組送 SIGTERM
     （涵蓋快照後才 fork 者），寬限後 SIGKILL；另於送信號前後各取子孫快照、對已脫離群組（自行 setsid）者逐一送信號，
-    重複至無存活子孫為止。無權限或已結束者略過。"""
-    pids = [p.pid for p in _tree(proc.pid)]
+    重複至無存活子孫為止。`seen`＝監看期間逐輪累積之子孫（b3 審碼 r1 CODEX-R1-P1-02：單次快照若列舉失敗，脫離群組之孫
+    行程於根行程結束後即成孤兒而漏殺）。無權限或已結束者略過。"""
+    pids = sorted({p.pid for p in _tree(proc.pid)} | set(_seen_alive(seen)))
     try:
         pgid: Optional[int] = os.getpgid(proc.pid)
         if pgid == os.getpgid(0):  # 未自成群組（例：呼叫端覆寫 Popen）⇒ 不得對自身群組送信號
@@ -302,7 +331,7 @@ def _terminate(proc: "subprocess.Popen[Any]") -> Optional[int]:
         rc: Optional[int] = proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
         rc = None
-    pids = sorted(set(pids) | {p.pid for p in _tree(proc.pid)})
+    pids = sorted(set(pids) | {p.pid for p in _tree(proc.pid)} | set(_seen_alive(seen)))
     _signal_all(pgid, pids, signal.SIGKILL)
     if rc is None:
         rc = proc.wait()
@@ -383,12 +412,14 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
     over = False
     degraded: Optional[Dict[str, Any]] = None
     prev_cpu, prev_t = probe_cpu(proc.pid), started
+    seen: Dict[int, float] = {}  # 逐輪累積之子孫（終止時補殺脫離群組者；b3 審碼 r1 CODEX-R1-P1-02）
     while True:
         rc = proc.poll()
         if rc is not None:
             return WatchResult(EXITED, rc, None, clock() - started, growth_max, threshold, over,
                                diagnosis={"monitor_degraded": degraded} if degraded else {})
         _nap(proc, config.check_interval_seconds, sleep)
+        _remember(proc.pid, seen)
         if not ENABLED:
             continue
         now = clock()
@@ -431,7 +462,7 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
                                              swap_hit=swap_hits >= config.swap_consecutive_checks, ram_mb=ram)
             if degraded:
                 diag["monitor_degraded"] = degraded
-            rc = _terminate(proc)
+            rc = _terminate(proc, seen)
             return WatchResult(STALLED, rc, reason, clock() - started, growth_max, threshold, over,
                                diag.get("cause"), diag)
 
