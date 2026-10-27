@@ -559,6 +559,57 @@ def test_baseline_self_proof_failure_is_not_frozen_and_reruns(tmp_path: Path) ->
     assert calls == ["baseline", "baseline", "option"]
 
 
+def test_execute_full_ic_resume_reruns_deferred_ic_only(tmp_path: Path) -> None:
+    """execute 經 IC 步之 full_ic 屬性判完成（CODEX-R9-P1-01）：預設跑後之延後 IC 於同收據以 full_ic 續跑 ⇒ 只補 IC、不重生成；
+    預設模式續跑 ⇒ 視為完成、不重算。"""
+    gens: List[str] = []
+    ic_calls: List[str] = []
+
+    def generate(item: Mapping[str, Any], cell: Mapping[str, Any], item_dir: Path) -> Dict[str, Any]:
+        gens.append(item["kind"])
+        return _fake_gen()
+
+    def make_ic(full: bool) -> Any:
+        def ic(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any]) -> None:
+            ic_calls.append(item["key"])
+            sel = {"selection_in": 0} if full else {"blocked_by": fm.BLOCKED_BY_FULLSCALE}
+            fm._item_node(receipt, cell_id, item)["ic"] = {"mode": "changed_columns", "selection": sel,
+                                                            "ic_settings": fm.IC_MEASURE_SETTINGS}
+        ic.full_ic = full  # type: ignore[attr-defined]
+        return ic
+
+    items = fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"])
+    receipt_path = tmp_path / "r.json"
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=make_ic(False)) == 0
+    assert gens == ["baseline", "option"] and len(ic_calls) == 1
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=make_ic(False)) == 0
+    assert len(ic_calls) == 1  # 預設模式：延後即完成
+    assert fm.execute("A_BTCUSDT_1h", items, receipt_path, tmp_path, generate=generate, diff=_diff, ic=make_ic(True)) == 0
+    assert gens == ["baseline", "option"] and len(ic_calls) == 2  # --full-ic：只補 IC
+
+
+def test_generate_watched_records_over_expected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """正常完成之生成紀錄 watch 帶 over_expected（CODEX-R9-P1-03）。"""
+    import types
+
+    real = fm._fb()
+
+    def run_watched(cmd: Any, **k: Any) -> Any:
+        real._write_atomic(tmp_path / "item" / "result.json", {"status": "ok", "run_dir": str(tmp_path / "run")})
+        return types.SimpleNamespace(status="exited", returncode=0, reason=None, wall_seconds=10.0,
+                                     swap_growth_max_mb=0.0, over_expected=True, cause=None, diagnosis={})
+
+    wd = types.SimpleNamespace(STALLED="stalled", CAUSE_MEMORY="memory", run_watched=run_watched,
+                               load_config=lambda c: None)
+    fake = types.SimpleNamespace(_watchdog=lambda: wd, _criteria=lambda: {}, _write_atomic=real._write_atomic)
+    monkeypatch.setattr(fm, "_fb", lambda: fake)
+    monkeypatch.setattr(fm, "run_dir_of", lambda work, symbol, tf: tmp_path / "run")
+    monkeypatch.setattr(fm, "output_bytes", lambda run_dir: 0)
+    out = fm.generate_watched({"id": "A_BTCUSDT_1h", "symbol": "BTCUSDT", "timeframes": ["1h"]}, {},
+                              tmp_path / "item", 100.0)
+    assert out["watch"]["over_expected"] is True
+
+
 def test_measured_without_ic_is_not_done_and_resume_only_runs_ic(tmp_path: Path) -> None:
     """`--skip-ic`（ic=None）留下之 measured 紀錄於要求 IC 時非完成；續跑不重生成、只補 IC。"""
     gens: List[str] = []
@@ -996,12 +1047,17 @@ def test_full_column_ic_deferred_by_default_and_flips_still_measured(
     fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", wo)
     wic = receipt["candidates"]["winsor_responsibility"]["options"]["ic_winsor_off"]["cells"]["A_BTCUSDT_1h"]["ic"]
     assert fm.BLOCKED_BY_FULLSCALE in wic["selection"]["blocked_by"]
-    # --full-ic：延後之快取不沿用 ⇒ 呼叫全欄 IC
+    # --full-ic 於同一收據續跑（不移除既有 ic 節點；CODEX-R9-P1-01）：延後之結果非完成 ⇒ 重算並呼叫全欄 IC
     calls.clear()
-    receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"].pop("ic")
-    fm.make_ic_step(tmp_path / "w", full_ic=True)(receipt, "A_BTCUSDT_1h", item)
+    node = receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"]
+    assert fm.ic_current(node["ic"]) and not fm.ic_current(node["ic"], full_ic=True)
+    assert not fm._needs_ic(node, item) and fm._needs_ic(node, item, full_ic=True)
+    step = fm.make_ic_step(tmp_path / "w", full_ic=True)
+    assert step.full_ic is True and fm.make_ic_step(tmp_path / "w").full_ic is False
+    step(receipt, "A_BTCUSDT_1h", item)
     assert any(c[1] is None for c in calls)
     assert receipt["ic"]["baselines"]["A_BTCUSDT_1h"]["default"]["status"] == "ok"
+    assert node["ic"]["selection"].get("blocked_by") != fm.BLOCKED_BY_FULLSCALE
 
 
 def test_large_fingerprint_sets_go_to_sidecar_with_hash(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

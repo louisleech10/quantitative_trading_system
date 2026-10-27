@@ -1531,7 +1531,8 @@ def generate_watched(cell: Mapping[str, Any], probes: Mapping[str, str], item_di
         raise RuntimeError(f"{cell['id']}：子行程 rc={watched.returncode} 未寫結果（見 {item_dir / 'child.log'}）")
     result = json.loads(result_path.read_text(encoding="utf-8"))
     result["watch"] = {"status": watched.status, "wall_seconds": watched.wall_seconds,
-                       "swap_growth_max_mb": watched.swap_growth_max_mb, "log": str(item_dir / "child.log")}
+                       "swap_growth_max_mb": watched.swap_growth_max_mb, "log": str(item_dir / "child.log"),
+                       "over_expected": bool(getattr(watched, "over_expected", False))}  # CODEX-R9-P1-03
     proofs, errors = read_proofs(proof_dir)
     result["proof"] = verify_proof(probes, proofs, errors) if probes else {"passed": True, "failures": [],
                                                                             "per_probe": {}, "overhead_seconds": 0.0}
@@ -1989,23 +1990,37 @@ def _generated(node: Optional[Mapping[str, Any]]) -> bool:
     return bool(node) and node.get("status") in ("measured", "blocked", "frozen", "unreachable_difference")
 
 
-def ic_current(ic: Any) -> bool:
+def _has_blocked_by(obj: Any, value: str) -> bool:
+    if isinstance(obj, Mapping):
+        if value in str(obj.get("blocked_by") or ""):
+            return True
+        return any(_has_blocked_by(v, value) for v in obj.values())
+    if isinstance(obj, (list, tuple)):
+        return any(_has_blocked_by(v, value) for v in obj)
+    return False
+
+
+def ic_current(ic: Any, full_ic: bool = False) -> bool:
     """IC 結果已以現行量測設定（`IC_MEASURE_SETTINGS`）完成；無改值欄者不依設定（不跑 IC）。任一處受阻於
-    watchdog_timeout ⇒ 非完成（監看終止之結果續跑重算，不沿用）。"""
+    watchdog_timeout ⇒ 非完成（監看終止之結果續跑重算，不沿用）。`full_ic`（--full-ic）時，先前延後
+    （fullscale_deferred）之結果非完成 ⇒ 續跑以全欄 IC 重算（CODEX-R9-P1-01）。"""
+    if full_ic and _has_blocked_by(ic, BLOCKED_BY_FULLSCALE):
+        return False
     return isinstance(ic, dict) and not has_watchdog_timeout(ic) and \
         (ic.get("mode") == "no_changed_columns" or ic.get("ic_settings") == IC_MEASURE_SETTINGS)
 
 
-def _needs_ic(node: Optional[Mapping[str, Any]], item: Mapping[str, Any]) -> bool:
+def _needs_ic(node: Optional[Mapping[str, Any]], item: Mapping[str, Any], full_ic: bool = False) -> bool:
     """已生成而尚缺現行設定之 IC 結果（選項／交互之 measured 紀錄無 `ic`，或其 `ic` 非現行設定所算）。"""
     return item["kind"] in ("option", "interaction") and bool(node) and node.get("status") == "measured" \
-        and not ic_current(node.get("ic"))
+        and not ic_current(node.get("ic"), full_ic)
 
 
-def _item_done(receipt: Mapping[str, Any], cell_id: str, item: Mapping[str, Any], need_ic: bool = True) -> bool:
+def _item_done(receipt: Mapping[str, Any], cell_id: str, item: Mapping[str, Any], need_ic: bool = True,
+               full_ic: bool = False) -> bool:
     """可略過＝生成已完成，且（要求 IC 時）IC 亦已完成。"""
     node = _item_node(receipt, cell_id, item)
-    return _generated(node) and not (need_ic and _needs_ic(node, item))
+    return _generated(node) and not (need_ic and _needs_ic(node, item, full_ic))
 
 
 def _store(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any], record: Dict[str, Any]) -> None:
@@ -2109,6 +2124,7 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
     """逐項執行並原子寫入收據（可續跑：已完成項跳過）。`generate(item, cell, item_dir)` 回生成結果；`diff(base, gen)` 回值差；
     `ic(receipt, cell_id, item)` 就地補 IC。自證失敗之選項不寫入、記入回傳碼（3）；其餘續跑。"""
     receipt = load_receipt(receipt_path, cell_id, work_root)
+    full_ic = bool(getattr(ic, "full_ic", False))  # --full-ic：先前延後之 IC 不算完成（CODEX-R9-P1-01）
     rc = 0
 
     def run_ic(item: Mapping[str, Any]) -> int:
@@ -2128,10 +2144,10 @@ def execute(cell_id: str, items: Sequence[Mapping[str, Any]], receipt_path: Path
             write_receipt(receipt_path, receipt)  # IC 步就地改之狀態（含 self_proof_failed）一律落盤
 
     for item in items:
-        if _item_done(receipt, cell_id, item, need_ic=ic is not None):
+        if _item_done(receipt, cell_id, item, need_ic=ic is not None, full_ic=full_ic):
             print(f"[ffprod-measure] {cell_id} {item['key']}：已完成，略過", flush=True)
             continue
-        if ic is not None and _needs_ic(_item_node(receipt, cell_id, item), item):
+        if ic is not None and _needs_ic(_item_node(receipt, cell_id, item), item, full_ic):
             print(f"[ffprod-measure] {cell_id} {item['key']}：已生成，只補 IC", flush=True)
             rc = max(rc, run_ic(item))
             continue
@@ -2301,7 +2317,7 @@ def make_ic_step(work_root: Path, force: bool = False,
     def step(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any]) -> None:
         rec = _item_node(receipt, cell_id, item)
         assert rec is not None
-        if ic_current(rec.get("ic")) and not force:
+        if ic_current(rec.get("ic"), full_ic) and not force:
             return
         compute(receipt, cell_id, item, rec)
         rec["ic"]["ic_settings"] = IC_MEASURE_SETTINGS  # 正常完成才標記（自證失敗之 raise 不標 ⇒ 續跑重算）
@@ -2373,6 +2389,7 @@ def make_ic_step(work_root: Path, force: bool = False,
                 out["selection"] = selection_effect(base_rows, res["rows"], changed, _selection_tools(bnode["override"]))
         rec["ic"] = out
 
+    step.full_ic = full_ic  # type: ignore[attr-defined]  # execute 之完成判定據此（CODEX-R9-P1-01）
     return step
 
 
