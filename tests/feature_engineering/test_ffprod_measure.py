@@ -719,6 +719,38 @@ def test_hang_stops_whole_run_without_retry(tmp_path: Path, monkeypatch: pytest.
     assert not hasattr(fm, "run_with_retries") and not hasattr(fm, "MAX_PASSES")
 
 
+def test_ic_only_hang_stops_without_next_item(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`ic` 子命令（ic_only）遇程式卡住 ⇒ 留現場、整跑停止回 rc 4，不續跑下一項（CODEX-R10-P1-01）。"""
+    import argparse
+    import types
+
+    cands = ["layer_dtype", "winsor_responsibility"]
+    receipt_path = tmp_path / "r.json"
+    assert fm.execute("A_BTCUSDT_1h", fm.plan_items("A_BTCUSDT_1h", cands), receipt_path, tmp_path,
+                      generate=lambda item, cell, item_dir: _fake_gen(), diff=_diff) == 0
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    measured = [i["key"] for i in fm.plan_items("A_BTCUSDT_1h", cands)
+                if i["kind"] not in ("baseline", "unreachable")
+                and (fm._item_node(receipt, "A_BTCUSDT_1h", i) or {}).get("status") == "measured"]
+    assert len(measured) >= 2  # 前提：卡住項之後確有下一項
+    calls: List[str] = []
+
+    def make_step(work_root: Path, force: bool = False, full_ic: bool = False) -> Any:
+        def step(receipt: Dict[str, Any], cell_id: str, item: Mapping[str, Any]) -> None:
+            calls.append(item["key"])
+            watched = types.SimpleNamespace(reason="log 檔 600 秒未增長且 CPU 無進度", cause="hang", wall_seconds=900.0,
+                                            diagnosis={"stacks_file": "/x.stacks.txt", "native_stacks": {}})
+            fm.raise_hang("改前全欄 IC", watched, tmp_path)
+        return step
+
+    monkeypatch.setattr(fm, "make_ic_step", make_step)
+    args = argparse.Namespace(cell="A_BTCUSDT_1h", candidates=cands, receipt=str(receipt_path),
+                              work_root=str(tmp_path), force=False, full_ic=True)
+    assert fm.ic_only(args) == 4 and calls == measured[:1]
+    diag = json.loads((tmp_path / "stall_diagnosis.json").read_text(encoding="utf-8"))
+    assert diag["cause"] == "hang" and diag["stacks_file"] == "/x.stacks.txt"
+
+
 def test_watchdog_stopped_results_are_never_done(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """監看終止（watchdog_timeout）之結果不算完成：IC 結果與改前全欄 IC 快取皆重算；硬體受阻者沿用。"""
     item = next(i for i in fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"]) if i["kind"] == "option")
@@ -787,8 +819,8 @@ def test_tree_cpu_seconds_degrades_when_children_unlistable(monkeypatch: pytest.
 
     monkeypatch.setattr(psutil.Process, "children", deny)
     before = fm.tree_cpu_seconds()
-    end = _time.perf_counter() + 0.3
-    while _time.perf_counter() < end:
+    end = _time.process_time() + 0.3  # 依本行程 CPU 時間忙等（牆鐘忙等在機器滿載時 CPU 不足 0.2 秒而誤紅）
+    while _time.process_time() < end:
         pass
     assert fm.tree_cpu_seconds() - before >= 0.2
     t0 = _time.monotonic()

@@ -2429,6 +2429,10 @@ def ic_only(args: argparse.Namespace) -> int:
             continue
         try:
             step(receipt, cell_id, item)
+        except HangDetected as exc:  # 程式卡住：留現場後整跑停止（不續跑其他項、不自動重跑；CODEX-R10-P1-01）
+            write_receipt(receipt_path, receipt)
+            print(f"[ffprod-measure] 停止：{exc}", flush=True)
+            return 4
         except Exception as exc:  # noqa: BLE001
             print(f"[ffprod-measure] {item['key']}：IC 失敗 {type(exc).__name__}: {exc}", flush=True)
             rc = 3

@@ -59,6 +59,7 @@
 | `govb1_ghostpath_check.sh` | 常態檢查 | 未掛 |
 | `govb1_selfcheck.sh` | 常態檢查 | gate  |
 | `govb1_single_source_check.sh` | 常態檢查 | gate  |
+| `heavy_run_guard.sh` | 常態檢查 | PreToolUse  |
 | `ic_wiring_check.sh` | 常態檢查 | 未掛 |
 | `install_verify_hooks.sh` | 工具 | 未掛 |
 | `list_active_mechanisms.sh` | 常態檢查 | PostToolUse  |
@@ -91,6 +92,7 @@
 | `testreg_write_guard.sh` | 常態檢查 | PostToolUse pre-commit  |
 | `ticket_batch_check.sh` | 常態檢查 | commit-msg gov_check  |
 | `ticket_universe.sh` | 常態檢查 | 未掛 |
+| `timeout_write_guard.sh` | 常態檢查 | PreToolUse  |
 | `todo_spec_crosscheck.sh` | 常態檢查 | 未掛 |
 | `todofmt_check.sh` | 常態檢查 | 未掛 |
 | `todofmt_freeze_check.sh` | 常態檢查 | 未掛 |
@@ -116,10 +118,12 @@
 | `check_decoupling_imports.py` | 常態檢查 | narrow_check_router  |
 | `check_doc_manifest_b.py` | 常態檢查 | 未掛 |
 | `extract_phase2_expected_flips.py` | 常態檢查 | narrow_check_router  |
+| `heavy_run_guard.py` | 常態檢查 | 未掛 |
 | `ic_wiring_check.py` | 常態檢查 | 未掛 |
 | `patch_locus_check.py` | 常態檢查 | 未掛 |
 | `register_anchor_check.py` | 常態檢查 | 未掛 |
 | `strategy_wiring_check.py` | 常態檢查 | 未掛 |
+| `timeout_write_guard.py` | 常態檢查 | 未掛 |
 | `verification_claim_check.py` | 常態檢查 | pre-commit commit-msg  |
 | `verify_audit_chain.py` | 常態檢查 | 未掛 |
 | `verify_cgsa_pipeline.py` | 常態檢查 | 未掛 |
