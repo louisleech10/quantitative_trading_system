@@ -39,10 +39,21 @@ q=3 退回）；`q`＝最終採用之 q；`q_insufficient`＝最終 q 小於請�
 
 from __future__ import annotations
 
+import hashlib
+import importlib.util
+import json
+import os
+import stat
+import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
+# 本檔亦由子行程之 sitecustomize 以檔案路徑載入（寫入審計），故模組層只 import 標準函式庫；numpy／pandas／h5py
+# 一律於函式內載入。
+
 REPO = Path(__file__).resolve().parents[1]
+PROBES_DIR = REPO / "handoffs" / "run_receipts" / "numview_probes"
 GOLDEN_PATH = REPO / "tests" / "_golden" / "icperf" / "pre_change.json"
 CELL = "A_BTCUSDT_1h"
 SEED = 20261027
@@ -76,7 +87,96 @@ class FreezeError(RuntimeError):
     """凍結／比對之 fail-closed 錯誤：審計記錄之路徑或輸出根落在快照範圍外、收據份數不為一等；訊息須含具名路徑。"""
 
 
+def _load(name: str, path: Path) -> Any:
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module  # dataclass 定義於載入期需自模組表取得命名空間
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+def path_key(path: Path, repo_root: Path) -> str:
+    """path_key（模組說明）：repo 根之下＝repo 相對 POSIX；其餘＝解析後絕對路徑。"""
+    p = Path(os.path.realpath(path))
+    try:
+        return p.relative_to(Path(os.path.realpath(repo_root))).as_posix()
+    except ValueError:
+        return str(p)
+
+
+def _key_path(key: str, repo_root: Path) -> Path:
+    return Path(key) if os.path.isabs(key) else Path(repo_root) / key
+
+
+def _under(path: str, root: Path) -> bool:
+    p, r = os.path.realpath(path), os.path.realpath(root)
+    return p == r or p.startswith(r.rstrip(os.sep) + os.sep)
+
+
 # ── §G (a)(b)(c) 寫出捕獲 ─────────────────────────────────────────────────────────────────────────────
+
+#: 本行程之審計狀態：記錄檔 fd、其解析後路徑、hook 是否已裝；`_AUDIT_TLS.busy` 防 hook 內之 I/O 自我遞迴
+_AUDIT_STATE: Dict[str, Any] = {"fd": None, "path": None, "installed": False}
+_AUDIT_TLS = threading.local()
+_WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC
+
+
+def _as_path_str(p: Any) -> Optional[str]:
+    if isinstance(p, int):
+        return None  # 以 fd 開檔（os.fdopen 等）：該 fd 之開檔已另記
+    try:
+        return os.fsdecode(os.fspath(p))
+    except TypeError:
+        return None
+
+
+def _audit_record(event: str, args: Tuple[Any, ...]) -> Optional[Dict[str, Any]]:
+    if event == "open":
+        raw, mode, flags = (tuple(args) + (None, None, None))[:3]
+        path = _as_path_str(raw)
+        if path is None:
+            return None
+        if isinstance(mode, str):
+            writes = any(c in WRITE_MODE_CHARS for c in mode)
+        else:
+            writes = isinstance(flags, int) and bool(flags & _WRITE_FLAGS)
+        if not writes:
+            return None
+        real = os.path.realpath(path)
+        if real == _AUDIT_STATE["path"]:
+            return None
+        try:  # 既存之非一般檔（/dev/null 等字元裝置、FIFO）不是寫出物
+            if not stat.S_ISREG(os.stat(real).st_mode) and not stat.S_ISDIR(os.stat(real).st_mode):
+                return None
+        except OSError:
+            pass  # 尚不存在＝新建之一般檔
+        return {"event": event, "path": real, "src": None, "mode": mode if isinstance(mode, str) else None,
+                "flags": flags if isinstance(flags, int) else None, "pid": os.getpid()}
+    src, dst = _as_path_str(args[0]), _as_path_str(args[1])
+    if dst is None:
+        return None
+    return {"event": event, "path": os.path.realpath(dst), "src": os.path.realpath(src) if src else None,
+            "mode": None, "flags": None, "pid": os.getpid()}
+
+
+def _audit_hook(event: str, args: Tuple[Any, ...]) -> None:
+    # CPython 之 os.replace 亦發 "os.rename" 審計事件；`install_write_audit` 包裝 os.replace，其呼叫期間之事件記為 os.replace
+    if event == "os.rename" and getattr(_AUDIT_TLS, "replacing", False):
+        event = "os.replace"
+    if event not in AUDIT_EVENTS or _AUDIT_STATE["fd"] is None or getattr(_AUDIT_TLS, "busy", False):
+        return
+    _AUDIT_TLS.busy = True
+    try:
+        try:
+            rec = _audit_record(event, args)
+        except Exception as exc:  # 審計不得靜默漏記：寫錯誤列，`read_write_log` 見之即 FreezeError
+            rec = {"event": "audit_error", "path": None, "detail": f"{event}: {exc!r}", "pid": os.getpid()}
+        if rec is not None:
+            os.write(_AUDIT_STATE["fd"], (json.dumps(rec, ensure_ascii=False) + "\n").encode("utf-8"))
+    finally:
+        _AUDIT_TLS.busy = False
 
 
 def install_write_audit(log_path: Path) -> None:
@@ -85,48 +185,245 @@ def install_write_audit(log_path: Path) -> None:
     每列 {"event": "open"|"os.rename"|"os.replace", "path": <解析後絕對路徑；rename／replace 為目的地>,
     "src": <rename／replace 之來源或 None>, "mode": <open 之 mode 或 None>, "flags": <os.open 之 flags 或 None>,
     "pid": <行程 id>}；只記寫入／附加／建立模式之開檔（見 `WRITE_MODE_CHARS`），唯讀開檔不記；記錄檔本身之寫入不記。
-    hook 只裝一次，重複呼叫改切換記錄檔。"""
-    raise NotImplementedError(_STUB)
+    hook 只裝一次，重複呼叫改切換記錄檔。多行程以 O_APPEND 寫同一檔，每列一次 write。CPython 對 os.replace 只發
+    "os.rename" 事件，故安裝時包裝 `os.replace`，其呼叫期間之該事件記為 "os.replace"（目的地照記，不因名稱而漏）。"""
+    _AUDIT_TLS.busy = True
+    try:
+        old = _AUDIT_STATE["fd"]
+        Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(str(log_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        _AUDIT_STATE.update(fd=fd, path=os.path.realpath(log_path))
+        if old is not None:
+            os.close(old)
+    finally:
+        _AUDIT_TLS.busy = False
+    if not _AUDIT_STATE["installed"]:
+        sys.addaudithook(_audit_hook)
+        _orig_replace = os.replace
+
+        def _replace(src: Any, dst: Any, *a: Any, **k: Any) -> None:
+            _AUDIT_TLS.replacing = True
+            try:
+                return _orig_replace(src, dst, *a, **k)
+            finally:
+                _AUDIT_TLS.replacing = False
+
+        os.replace = _replace  # type: ignore[assignment]
+        _AUDIT_STATE["installed"] = True
 
 
 def capture_sitecustomize_source(log_path: Path) -> str:
     """回注入子行程之 sitecustomize 原始碼：讀 `CAPTURE_LOG_ENV`（缺則用 `log_path`）安裝與 `install_write_audit` 相同之
-    hook（事件集合取呼叫當下之 `AUDIT_EVENTS`），並串接 sys.path 上原有之 sitecustomize（含共用監看之堆疊傾印注入）。"""
-    raise NotImplementedError(_STUB)
+    hook（事件集合取呼叫當下之 `AUDIT_EVENTS`），並串接 sys.path 上原有之 sitecustomize（含共用監看之堆疊傾印注入）。
+    串接只找 sys.path 上位於本檔目錄之後者（之前者即先載入而串接到本檔之注入，例如共用監看）；同行程只執行一次。"""
+    return f'''\
+import importlib.util as _ic_iu, os as _ic_os, sys as _ic_sys
+if not getattr(_ic_sys, "_icperf_audit_done", False):
+    _ic_sys._icperf_audit_done = True
+    _ic_spec = _ic_iu.spec_from_file_location("_icperf_write_audit", {str(Path(__file__).resolve())!r})
+    _ic_mod = _ic_iu.module_from_spec(_ic_spec)
+    _ic_spec.loader.exec_module(_ic_mod)
+    _ic_mod.AUDIT_EVENTS = {tuple(AUDIT_EVENTS)!r}
+    _ic_mod.install_write_audit(_ic_os.environ.get({CAPTURE_LOG_ENV!r}) or {str(log_path)!r})
+    _ic_here = _ic_os.path.dirname(_ic_os.path.abspath(__file__))
+    _ic_paths = [_ic_os.path.abspath(_p or ".") for _p in _ic_sys.path]
+    _ic_after = _ic_paths[_ic_paths.index(_ic_here) + 1:] if _ic_here in _ic_paths else []
+    for _ic_p in _ic_after:
+        _ic_cand = _ic_os.path.join(_ic_p, "sitecustomize.py")
+        if _ic_p != _ic_here and _ic_os.path.isfile(_ic_cand):
+            _ic_cs = _ic_iu.spec_from_file_location("_icperf_chained_sitecustomize", _ic_cand)
+            _ic_cm = _ic_iu.module_from_spec(_ic_cs)
+            _ic_cs.loader.exec_module(_ic_cm)
+            break
+'''
 
 
 def isolated_env(base_env: Mapping[str, str], iso_root: Path) -> Dict[str, str]:
     """回 `base_env` 之副本，`TMPDIR`＝`iso_root/tmp`、`HOME`＝`iso_root/home`（皆建立、互異）；其餘鍵原樣保留。"""
-    raise NotImplementedError(_STUB)
+    env = dict(base_env)
+    tmp, home = Path(iso_root) / "tmp", Path(iso_root) / "home"
+    tmp.mkdir(parents=True, exist_ok=True)
+    home.mkdir(parents=True, exist_ok=True)
+    env["TMPDIR"], env["HOME"] = str(tmp), str(home)
+    return env
 
 
 def capture_env(base_env: Mapping[str, str], *, log_path: Path, iso_root: Path, site_dir: Path) -> Dict[str, str]:
     """子行程環境＝`isolated_env` ＋ `CAPTURE_LOG_ENV`＝`log_path` ＋ `site_dir`（寫入 `capture_sitecustomize_source`）
-    前置 `PYTHONPATH`；孫行程繼承同一環境，故寫入進同一記錄。"""
-    raise NotImplementedError(_STUB)
+    前置 `PYTHONPATH`；孫行程繼承同一環境，故寫入進同一記錄。另設 `PYTHONDONTWRITEBYTECODE=1`：位元組碼快取寫入
+    與產品輸出無關，且可能落在快照範圍外而誤觸 (c)。"""
+    env = isolated_env(base_env, iso_root)
+    site_dir = Path(site_dir)
+    site_dir.mkdir(parents=True, exist_ok=True)
+    (site_dir / "sitecustomize.py").write_text(capture_sitecustomize_source(log_path), encoding="utf-8")
+    env[CAPTURE_LOG_ENV] = str(log_path)
+    env["PYTHONPATH"] = os.pathsep.join([str(site_dir)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
 
 
 def read_write_log(log_path: Path) -> List[Dict[str, Any]]:
-    """讀審計記錄（`install_write_audit` 之列格式）；檔不存在 ⇒ 空清單；列不可解析 ⇒ FreezeError。"""
-    raise NotImplementedError(_STUB)
+    """讀審計記錄（`install_write_audit` 之列格式）；檔不存在 ⇒ 空清單；列不可解析或含審計錯誤列 ⇒ FreezeError。"""
+    log_path = Path(log_path)
+    if not log_path.is_file():
+        return []
+    out = []
+    for n, line in enumerate(log_path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise FreezeError(f"{log_path}:{n} 審計記錄列不可解析：{exc}") from exc
+        if rec.get("event") == "audit_error":
+            raise FreezeError(f"{log_path}:{n} 審計 hook 失敗（不得漏記）：{rec.get('detail')}")
+        out.append(rec)
+    return out
+
+
+#: 檔案雜湊快取（本行程）：鍵＝(解析後路徑, 大小, mtime_ns)；大小與 mtime 皆未變即視為內容未變（同 rsync 判準）
+_SHA_CACHE: Dict[Tuple[str, int, int], str] = {}
+
+
+def _file_sha256(path: str) -> str:
+    st = os.stat(path)
+    key = (path, st.st_size, st.st_mtime_ns)
+    if key not in _SHA_CACHE:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 22), b""):
+                h.update(chunk)
+        _SHA_CACHE[key] = h.hexdigest()
+    return _SHA_CACHE[key]
 
 
 def snapshot_files(roots: Sequence[Path], *, repo_root: Path) -> Dict[str, str]:
     """對 `roots` 下全部檔案取 {path_key: 位元組 sha256}；排除任一層名為 `SNAPSHOT_EXCLUDE_DIRS` 之目錄、副檔名為
     `NUMBA_CACHE_SUFFIXES` 之檔與呼叫當下環境變數 `NUMBA_CACHE_DIR` 所指目錄之整棵（不論副檔名；未設則不排除該目錄）；
-    不跟隨指向 roots 外之 symlink。"""
-    raise NotImplementedError(_STUB)
+    不跟隨指向 roots 外之 symlink。雜湊以（路徑、大小、mtime）快取。"""
+    nd = os.environ.get("NUMBA_CACHE_DIR")
+    numba_dir = os.path.realpath(nd) if nd else None
+    real_roots = [os.path.realpath(r) for r in roots]
+    out: Dict[str, str] = {}
+    for root in real_roots:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in SNAPSHOT_EXCLUDE_DIRS
+                           and not (numba_dir is not None and os.path.realpath(os.path.join(dirpath, d)) == numba_dir)]
+            for fn in filenames:
+                if fn.endswith(NUMBA_CACHE_SUFFIXES):
+                    continue
+                full = os.path.join(dirpath, fn)
+                if os.path.islink(full) and not any(_under(full, r) for r in real_roots):
+                    continue
+                if os.path.islink(full) or not os.path.isfile(full):
+                    target = os.path.realpath(full)
+                    if not os.path.isfile(target) or not any(_under(target, r) for r in real_roots):
+                        continue
+                out[path_key(Path(full), repo_root)] = _file_sha256(os.path.realpath(full))
+    return out
 
 
 def snapshot_diff(before: Mapping[str, str], after: Mapping[str, str]) -> Dict[str, List[str]]:
     """回 {"added": [...], "changed": [...], "removed": [...]}（皆排序之 path_key）。"""
-    raise NotImplementedError(_STUB)
+    return {"added": sorted(set(after) - set(before)),
+            "changed": sorted(k for k in set(after) & set(before) if after[k] != before[k]),
+            "removed": sorted(set(before) - set(after))}
+
+
+def _sha_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _array_sha(arr: Any) -> str:
+    """陣列之 sha256：數值／定長字串等原生 dtype 取 C 連續位元組（前綴 dtype 與 shape）；object dtype 以正準 JSON。"""
+    import numpy as np
+
+    a = np.asarray(arr)
+    head = f"{a.dtype.str}|{a.shape}|".encode("utf-8")
+    if a.dtype.kind == "O":
+        return _sha_bytes(head + _canonical_json([_jsonable(v) for v in a.ravel().tolist()]))
+    return _sha_bytes(head + np.ascontiguousarray(a).tobytes())
+
+
+def _nan_mask(arr: Any) -> Any:
+    import numpy as np
+    import pandas as pd
+
+    return np.asarray(pd.isna(np.asarray(arr, dtype=object) if np.asarray(arr).dtype.kind == "O" else np.asarray(arr)))
+
+
+def _jsonable(v: Any) -> Any:
+    import numpy as np
+
+    if isinstance(v, bytes):
+        return {"__bytes__": v.hex()}
+    if isinstance(v, np.generic):
+        return {"__np__": v.dtype.str, "v": v.item() if v.dtype.kind != "V" else v.tobytes().hex()}
+    if isinstance(v, (list, tuple)):
+        return [_jsonable(x) for x in v]
+    if isinstance(v, dict):
+        return {str(k): _jsonable(x) for k, x in v.items()}
+    if v is None or isinstance(v, (bool, int, float, str)):
+        return v
+    return {"__repr__": f"{type(v).__module__}.{type(v).__qualname__}", "v": str(v)}
+
+
+def _canonical_json(v: Any) -> bytes:
+    return json.dumps(v, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=True).encode("utf-8")
 
 
 def hdf5_digest(path: Path) -> Dict[str, Dict[str, Any]]:
     """HDF5 逐物件摘要：{<物件名，如 "/" "/g" "/g/v">: {"kind": "group"|"dataset", "attrs": {<屬性名>: <sha256>},
-    資料集另 "dtype", "shape", "sha256"（原生 dtype 位元組）}}。"""
-    raise NotImplementedError(_STUB)
+    資料集另 "dtype", "shape", "sha256"（原生 dtype 位元組；依首軸分塊串接雜湊，與整塊 tobytes 相同）}}。"""
+    import h5py
+    import numpy as np
+
+    out: Dict[str, Dict[str, Any]] = {}
+
+    def attrs_of(obj: Any) -> Dict[str, str]:
+        return {str(k): _array_sha(obj.attrs[k]) for k in sorted(obj.attrs.keys())}
+
+    def visit(name: str, obj: Any) -> None:
+        key = "/" + name
+        if isinstance(obj, h5py.Dataset):
+            h = hashlib.sha256(f"{obj.dtype.str}|{obj.shape}|".encode("utf-8"))
+            if obj.dtype.kind == "O" or h5py.check_string_dtype(obj.dtype) is not None:
+                vals = obj.asstr()[()] if h5py.check_string_dtype(obj.dtype) is not None else obj[()]
+                h.update(_canonical_json(_jsonable(np.asarray(vals, dtype=object).ravel().tolist())))
+            elif obj.shape == () or obj.ndim == 0:
+                h.update(np.ascontiguousarray(obj[()]).tobytes())
+            else:
+                row_bytes = max(1, int(np.prod(obj.shape[1:], dtype=np.int64)) * obj.dtype.itemsize)
+                step = max(1, (1 << 26) // row_bytes)
+                for i in range(0, obj.shape[0], step):
+                    h.update(np.ascontiguousarray(obj[i:i + step]).tobytes())
+            out[key] = {"kind": "dataset", "attrs": attrs_of(obj), "dtype": obj.dtype.str,
+                        "shape": list(obj.shape), "sha256": h.hexdigest()}
+        else:
+            out[key] = {"kind": "group", "attrs": attrs_of(obj)}
+
+    with h5py.File(path, "r") as f:
+        out["/"] = {"kind": "group", "attrs": attrs_of(f)}
+        f.visititems(visit)
+    return out
+
+
+def _ptr_seg(seg: Any) -> str:
+    return str(seg).replace("~", "~0").replace("/", "~1")
+
+
+def _as_container(obj: Any) -> Any:
+    import dataclasses
+
+    import pandas as pd
+
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return dataclasses.asdict(obj)
+    if hasattr(obj, "model_dump") and not isinstance(obj, (pd.DataFrame, pd.Series)):
+        return obj.model_dump()
+    return obj
 
 
 def flatten_fields(obj: Any) -> Dict[str, str]:
@@ -134,43 +431,120 @@ def flatten_fields(obj: Any) -> Dict[str, str]:
     dict 每鍵接 "/<鍵>"（鍵以 str() 轉、`~`→`~0`、`/`→`~1`）、list／tuple 每元素接 "/<索引>"，遞迴；
     DataFrame ⇒ "<路徑>#index" 與每欄 "<路徑>/<欄名>#values"、"<路徑>/<欄名>#nan_mask"；Series／ndarray ⇒
     "<路徑>#values"、"<路徑>#nan_mask"（Series 另 "<路徑>#index"）；其餘（純量、None）⇒ "<路徑>" 以正準 JSON 位元組。
-    值取原生 dtype 位元組之 sha256。"""
-    raise NotImplementedError(_STUB)
+    值取原生 dtype 位元組之 sha256。dataclass 與具 model_dump 之物件先轉為 dict；空 dict／list 視為純量。"""
+    import numpy as np
+    import pandas as pd
+
+    out: Dict[str, str] = {}
+
+    def walk(o: Any, path: str) -> None:
+        o = _as_container(o)
+        if isinstance(o, pd.DataFrame):
+            out[f"{path}#index"] = _array_sha(o.index.to_numpy())
+            for i, c in enumerate(o.columns):
+                col = o.iloc[:, i].to_numpy()
+                out[f"{path}/{_ptr_seg(c)}#values"] = _array_sha(col)
+                out[f"{path}/{_ptr_seg(c)}#nan_mask"] = _array_sha(_nan_mask(col))
+        elif isinstance(o, pd.Series):
+            vals = o.to_numpy()
+            out[f"{path}#index"] = _array_sha(o.index.to_numpy())
+            out[f"{path}#values"] = _array_sha(vals)
+            out[f"{path}#nan_mask"] = _array_sha(_nan_mask(vals))
+        elif isinstance(o, np.ndarray):
+            out[f"{path}#values"] = _array_sha(o)
+            out[f"{path}#nan_mask"] = _array_sha(_nan_mask(o))
+        elif isinstance(o, dict) and o:
+            for k, v in o.items():
+                walk(v, f"{path}/{_ptr_seg(k)}")
+        elif isinstance(o, (list, tuple)) and o:
+            for i, v in enumerate(o):
+                walk(v, f"{path}/{i}")
+        else:
+            out[path] = _sha_bytes(_canonical_json(_jsonable(o)))
+
+    walk(obj, "")
+    return out
 
 
 def describe_file(path: Path) -> Dict[str, Any]:
     """單一寫出檔之摘要：{"sha256": <位元組>, "hdf5": hdf5_digest(...)|None, "fields": flatten_fields(<JSON 內容>)|None}；
-    HDF5 以檔頭簽章判定，JSON 以副檔名 .json 判定。"""
-    raise NotImplementedError(_STUB)
+    HDF5 以檔頭簽章判定，JSON 以副檔名 .json 判定（內容不可解析 ⇒ fields 為 None，仍以位元組比）。"""
+    path = Path(path)
+    real = os.path.realpath(path)
+    with open(real, "rb") as fh:
+        head = fh.read(8)
+    fields = None
+    if path.suffix.lower() == ".json":
+        try:
+            fields = flatten_fields(json.loads(Path(real).read_text(encoding="utf-8")))
+        except (ValueError, UnicodeDecodeError):
+            fields = None
+    return {"sha256": _file_sha256(real), "hdf5": hdf5_digest(Path(real)) if head == b"\x89HDF\r\n\x1a\n" else None,
+            "fields": fields}
 
 
 def check_scope(write_log: Sequence[Mapping[str, Any]], output_roots: Sequence[Path],
                 snapshot_roots: Sequence[Path]) -> None:
     """§G (c) fail-closed：審計記錄任一路徑（含 rename／replace 目的地）或任一輸出根不在 `snapshot_roots` 之下 ⇒
     FreezeError（訊息列出該路徑之解析後絕對路徑）。不得把範圍外之已記路徑補入快照範圍而視為成功收集。"""
-    raise NotImplementedError(_STUB)
+    bad = sorted({os.path.realpath(p) for p in [e["path"] for e in write_log if e.get("path")]
+                  + [str(r) for r in output_roots]
+                  if not any(_under(str(p), root) for root in snapshot_roots)})
+    if bad:
+        raise FreezeError("寫出落在快照範圍外（§G (c) fail-closed）：" + "、".join(bad))
 
 
 def collect_written_files(write_log: Sequence[Mapping[str, Any]], before: Mapping[str, str], after: Mapping[str, str],
                           *, repo_root: Path, snapshot_roots: Sequence[Path],
                           output_roots: Sequence[Path]) -> Dict[str, Any]:
     """先 `check_scope`；回 {"files": {path_key: describe_file(...)}（差集之新增與變更檔）, "transient": [path_key...]
-    （審計記錄有而差集無變化者，記入不比）}。"""
-    raise NotImplementedError(_STUB)
+    （審計記錄有而差集無變化者，記入不比）, "removed": [path_key...]（執行前存在、執行後消失者）}。"""
+    check_scope(write_log, output_roots, snapshot_roots)
+    diff = snapshot_diff(before, after)
+    written = set(diff["added"]) | set(diff["changed"])
+    files = {k: describe_file(_key_path(k, repo_root)) for k in sorted(written)}
+    logged = {path_key(Path(e["path"]), repo_root) for e in write_log if e.get("path")}
+    return {"files": files, "transient": sorted(logged - written), "removed": diff["removed"]}
+
+
+def _criteria() -> Dict[str, Any]:
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from tests.feature_engineering import numview_helpers as nh
+
+    return json.loads(nh.current_criteria_path().read_text(encoding="utf-8"))
 
 
 def run_watched(cmd: Sequence[str], *, log_path: Path, env: Mapping[str, str], cwd: Path) -> Dict[str, Any]:
     """以共用監看（`handoffs/run_receipts/numview_probes/_watchdog.py` 之 run_watched，判準取 NUMVIEW 判準檔
     `cell_rules.watchdog`；不設時間上限）啟動子行程；回 {"rc", "status", "log_path"}；卡死 ⇒ FreezeError 附診斷路徑。"""
-    raise NotImplementedError(_STUB)
+    wd = _load("icperf_numview_watchdog", PROBES_DIR / "_watchdog.py")
+    res = wd.run_watched(list(cmd), log_path=Path(log_path), config=wd.load_config(_criteria()), cwd=str(cwd), env=env)
+    if res.status == wd.STALLED:
+        raise FreezeError(f"子行程卡住終止（{res.reason}；原因 {res.cause}）：見 {log_path} 與其 .stacks 診斷")
+    return {"rc": res.returncode, "status": res.status, "log_path": str(log_path)}
 
 
 def capture_run(cmd: Sequence[str], *, repo_root: Path, iso_root: Path, output_roots: Sequence[Path],
                 work_dir: Path) -> Dict[str, Any]:
     """一次請求之寫出捕獲：快照（repo_root＋iso_root）→ `run_watched`（`capture_env`，cwd＝repo_root）→ 快照 →
-    `collect_written_files`。回 {"rc", "files", "transient", "write_log"}；審計記錄與 sitecustomize 置於 `work_dir`
-    （不在快照範圍內，不入記錄）。範圍外路徑（含經 os.replace／os.rename 落到範圍外之目的地）或輸出根 ⇒ FreezeError。"""
-    raise NotImplementedError(_STUB)
+    `collect_written_files`。回 {"rc", "files", "transient", "removed", "write_log"}；審計記錄與 sitecustomize 置於
+    `work_dir`（不在快照範圍內；落在其下之寫入屬捕獲機制本身〔回應 pickle、監看堆疊檔〕，不入記錄）。範圍外路徑（含經
+    os.replace／os.rename 落到範圍外之目的地）或輸出根 ⇒ FreezeError；輸出根於執行前即先檢查。"""
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    log_path = work_dir / "write_audit.jsonl"
+    log_path.unlink(missing_ok=True)
+    env = capture_env(os.environ, log_path=log_path, iso_root=Path(iso_root), site_dir=work_dir / "site")
+    roots = [Path(repo_root), Path(iso_root)]
+    check_scope([], output_roots, roots)
+    before = snapshot_files(roots, repo_root=repo_root)
+    res = run_watched(cmd, log_path=work_dir / "run.log", env=env, cwd=Path(repo_root))
+    after = snapshot_files(roots, repo_root=repo_root)
+    log = [e for e in read_write_log(log_path) if not (e.get("path") and _under(e["path"], work_dir))]
+    collected = collect_written_files(log, before, after, repo_root=repo_root, snapshot_roots=roots,
+                                      output_roots=output_roots)
+    return {"rc": res["rc"], **collected, "write_log": log}
 
 
 # ── 比對（改後對凍結；Phase 1–5 收尾共用） ───────────────────────────────────────────────────────────────
@@ -178,7 +552,47 @@ def capture_run(cmd: Sequence[str], *, repo_root: Path, iso_root: Path, output_r
 
 def compared_paths(frozen_files: Mapping[str, Any], current_files: Mapping[str, Any]) -> Set[str]:
     """比對之檔集合＝兩側 path_key 之聯集（只在一側者即為多一檔／少一檔）。`compare_capture` 經本模組層函式取之。"""
-    raise NotImplementedError(_STUB)
+    return set(frozen_files) | set(current_files)
+
+
+def _parse_volatile(volatile: Sequence[str]) -> Tuple[Set[str], Dict[str, Set[str]]]:
+    resp: Set[str] = set()
+    files: Dict[str, Set[str]] = {}
+    for v in volatile:
+        if v.startswith("response:"):
+            resp.add(v[len("response:"):])
+        elif v.startswith("file:") and "#" in v:
+            key, field = v[len("file:"):].split("#", 1)
+            files.setdefault(key, set()).add(field)
+        else:
+            raise FreezeError(f"volatile 項格式不合（須 response:<欄位> 或 file:<path_key>#<欄位>）：{v}")
+    return resp, files
+
+
+def _compare_maps(a: Mapping[str, Any], b: Mapping[str, Any], label: str, skip: Set[str] = frozenset()) -> List[str]:
+    out = []
+    for k in sorted(set(a) | set(b)):
+        if k in skip:
+            continue
+        if k not in a or k not in b:
+            out.append(f"{label}{k}：只在{'凍結' if k in a else '改後'}側")
+        elif a[k] != b[k]:
+            out.append(f"{label}{k}：不等")
+    return out
+
+
+def _compare_hdf5(key: str, a: Mapping[str, Any], b: Mapping[str, Any]) -> List[str]:
+    out = []
+    for obj in sorted(set(a) | set(b)):
+        if obj not in a or obj not in b:
+            out.append(f"file:{key} HDF5 物件 {obj}：只在{'凍結' if obj in a else '改後'}側")
+            continue
+        for fld in ("kind", "dtype", "shape", "sha256"):
+            if a[obj].get(fld) != b[obj].get(fld):
+                out.append(f"file:{key} HDF5 物件 {obj} 之 {fld}：不等")
+        out += [p.replace("attr:", f"file:{key} HDF5 物件 {obj} 屬性 ", 1)
+                for p in _compare_maps(a[obj].get("attrs") or {}, b[obj].get("attrs") or {}, "attr:")]
+    return out
 
 
 def compare_capture(frozen: Mapping[str, Any], current: Mapping[str, Any], *,
@@ -186,13 +600,66 @@ def compare_capture(frozen: Mapping[str, Any], current: Mapping[str, Any], *,
     """比對一項之 "response" 與 "files"；回問題清單（空＝逐位元相同）。檔集合取 `compared_paths`：只在一側者、sha256
     不等者、HDF5 任一物件之 sha256／dtype／shape／屬性不等者皆列（訊息含 path_key 與物件／屬性名）。
     `volatile` 項之格式：`response:<欄位路徑>` 或 `file:<path_key>#<欄位路徑>`；只對所列路徑排除——該檔改以
-    "fields" 逐欄位比（排除所列），未列欄位不等仍列為問題。"""
-    raise NotImplementedError(_STUB)
+    "fields" 逐欄位比（排除所列），未列欄位不等仍列為問題。兩側皆有 "removed" 時另比執行中刪除之既有檔。"""
+    vol_resp, vol_files = _parse_volatile(volatile)
+    problems = _compare_maps(frozen.get("response") or {}, current.get("response") or {}, "response:", vol_resp)
+    ff, cf = frozen.get("files") or {}, current.get("files") or {}
+    for key in sorted(compared_paths(ff, cf)):
+        if key not in ff or key not in cf:
+            problems.append(f"file:{key}：只在{'凍結' if key in ff else '改後'}側（{'少' if key in ff else '多'}一檔）")
+            continue
+        a, b = ff[key], cf[key]
+        if key in vol_files:
+            if a.get("fields") is None or b.get("fields") is None:
+                problems.append(f"file:{key}：列有 volatile 欄位但非可解析 JSON，無從逐欄位比")
+                continue
+            problems += [p.replace("field:", f"file:{key}#", 1)
+                         for p in _compare_maps(a["fields"], b["fields"], "field:", vol_files[key])]
+            continue
+        if a.get("sha256") != b.get("sha256"):
+            problems.append(f"file:{key}：sha256 不等")
+        if a.get("hdf5") is not None or b.get("hdf5") is not None:
+            problems += _compare_hdf5(key, a.get("hdf5") or {}, b.get("hdf5") or {})
+    if "removed" in frozen and "removed" in current and sorted(frozen["removed"]) != sorted(current["removed"]):
+        problems.append(f"removed：執行中刪除之既有檔不同（凍結 {sorted(frozen['removed'])}、改後 {sorted(current['removed'])}）")
+    return problems
+
+
+def _compare_features(item: str, a: Mapping[str, Any], b: Mapping[str, Any]) -> List[str]:
+    out = []
+    for feat in sorted(set(a) | set(b)):
+        if feat not in a or feat not in b:
+            out.append(f"{item}/{feat}：只在{'凍結' if feat in a else '改後'}側")
+            continue
+        out += [p.replace("fld:", f"{item}/{feat}/", 1) for p in _compare_maps(a[feat], b[feat], "fld:")]
+    return out
 
 
 def compare_golden(frozen: Mapping[str, Any], current: Mapping[str, Any]) -> List[str]:
-    """§G 全部凍結項之逐位元比對（依 `frozen["volatile"]` 排除）；任一不等即列出項、特徵與欄位。"""
-    raise NotImplementedError(_STUB)
+    """§G 全部凍結項之逐位元比對（依 `frozen["volatile"]` 排除；其項格式為 `<項>:response:<欄位>` 或
+    `<項>:file:<path_key>#<欄位>`）；任一不等即列出項、特徵與欄位。"""
+    problems = []
+    vol: Dict[str, List[str]] = {}
+    for v in frozen.get("volatile") or []:
+        item, rest = v.split(":", 1)
+        vol.setdefault(item, []).append(rest)
+    fi, ci = frozen.get("items") or {}, current.get("items") or {}
+    for item in G_ITEMS:
+        if item not in fi or item not in ci:
+            problems.append(f"{item}：只在{'凍結' if item in fi else '改後'}側")
+            continue
+        a, b = fi[item], ci[item]
+        if item in OUTPUT_ITEMS:
+            problems += [f"{item}/{p}" for p in compare_capture(a, b, volatile=vol.get(item, []))]
+        if "features" in a or "features" in b:
+            problems += _compare_features(item, a.get("features") or {}, b.get("features") or {})
+        for fld in ("selected", "stage_cols"):
+            if (fld in a or fld in b) and a.get(fld) != b.get(fld):
+                problems.append(f"{item}/{fld}：不等")
+        if "pit_labels" in a or "pit_labels" in b:
+            problems += [p.replace("lbl:", f"{item}/pit_labels/", 1)
+                         for p in _compare_maps(a.get("pit_labels") or {}, b.get("pit_labels") or {}, "lbl:")]
+    return problems
 
 
 # ── Task 0.1 凍結 ───────────────────────────────────────────────────────────────────────────────────────
@@ -267,7 +734,10 @@ def freeze(out_path: Path = GOLDEN_PATH, *, repo_root: Path = REPO, work_root: O
 
 def load_single_receipt(pattern: str, *, repo_root: Path = REPO) -> Dict[str, Any]:
     """`repo_root.glob(pattern)` 恰一份 ⇒ 回其 JSON；零份或多份 ⇒ FreezeError。"""
-    raise NotImplementedError(_STUB)
+    paths = sorted(Path(repo_root).glob(pattern))
+    if len(paths) != 1:
+        raise FreezeError(f"{pattern} 須恰一份，實得 {[str(p) for p in paths]}")
+    return json.loads(paths[0].read_text(encoding="utf-8"))
 
 
 def build_path_inventory(repo_root: Path = REPO) -> Dict[str, Any]:
@@ -279,12 +749,12 @@ def build_path_inventory(repo_root: Path = REPO) -> Dict[str, Any]:
 
 def measured_ids(scale_receipt: Mapping[str, Any]) -> Set[str]:
     """量測收據之入口 id 集合（`scale_receipt["entries"]` 之鍵）。"""
-    raise NotImplementedError(_STUB)
+    return set(scale_receipt.get("entries") or {})
 
 
 def uncovered_entries(inventory: Mapping[str, Any], scale_receipt: Mapping[str, Any]) -> List[str]:
     """清冊中標需量測（measure＝True）之 id − `measured_ids`；排序回傳（空＝無漏量）。"""
-    raise NotImplementedError(_STUB)
+    return sorted({e["id"] for e in inventory.get("entries") or [] if e.get("measure")} - measured_ids(scale_receipt))
 
 
 def evaluate_criteria(entry: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
