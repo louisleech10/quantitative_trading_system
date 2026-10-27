@@ -5562,7 +5562,7 @@ def _cli_impact(root: Path, changed_from: str, manifest_rel: str, phase: int) ->
 
 
 def run_subbatch(repo_root: Path, manifest_path: str, phase: int, base: str, *, out: Path, receipt: Path,
-                 max_seconds: float = 3600.0) -> int:
+                 max_seconds: Optional[float] = None) -> int:
     """子批閘：changed_paths＝`git diff --name-only <base>` ∪ 相對 HEAD 之 diff ∪ 未追蹤檔（扣閘之 FP_EXCLUDES）；
     選測＝`impact`（must＝`must_from_manifest`；previously_failed 取自 summary）之 selected，整檔執行；執行器＝
     `framepath_affected_gate.Runner`（分段、`max_seconds` 用盡於呼叫之間停下回 3、同指紋沿用、progress.json）；非綠
@@ -5595,23 +5595,13 @@ def _subbatch_changed(g: Any, root: Path, base: str) -> List[str]:
 
 
 def _subbatch_collect(g: Any, test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
-    """完整收集（含類別方法與參數化）：逐行 nodeid 之輸出所需 verbosity 依 pytest.ini 之 addopts 而異（本 repo 之
-    addopts 含 -v ⇒ -qq；無 -v 之倉 ⇒ -q），兩者依序試，取第一個逐行印出 nodeid 者；皆無 ⇒ TestregError。"""
-    tail = ""
-    for q in ("-q", "-qq"):
-        g.restore_generated(cwd)
-        try:
-            proc = g._pytest(["--collect-only", q, "-p", "no:cacheprovider", test_file], cwd, env,
-                             timeout=g.COLLECT_TIMEOUT_SECONDS)
-        except subprocess.TimeoutExpired as exc:
-            raise TestregError(f"RUN {test_file} collect 逾 {g.COLLECT_TIMEOUT_SECONDS} 秒未返回") from exc
-        finally:
-            g.restore_generated(cwd)
-        ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
-        if proc.returncode == 0 and ids:
-            return ids
-        tail = (proc.stdout + proc.stderr)[-300:]
-    raise TestregError(f"RUN {test_file} 收集失敗或為空：{tail}")
+    """完整收集（含類別方法與參數化）：共用閘門之 `collect`（經共用監看、依序試 -qq／-q；NOCAP Task 2.1 不設牆鐘，
+    卡死以無進度判定並留現場）；收集失敗、為空或卡死 ⇒ TestregError（訊息含閘門原因與堆疊檔路徑）。"""
+    g.restore_generated(cwd)
+    try:
+        return g.collect(test_file, cwd, env)
+    except g.GateError as exc:
+        raise TestregError(f"RUN {test_file} 收集失敗、為空或卡死：{exc}") from exc
 
 
 def _base_worktree(g: Any, root: Path, out: Path, base: str) -> Path:
@@ -5880,7 +5870,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         p.add_argument(a, required=True)
     p.add_argument("--phase", type=int, required=True)
     p.add_argument("--out")
-    p.add_argument("--max-seconds", type=float, default=3600.0)
+    p.add_argument("--max-seconds", type=float, default=None)
     args = ap.parse_args(list(argv) if argv is not None else None)
     root = Path(args.repo).resolve()
     findings: List[Finding] = []

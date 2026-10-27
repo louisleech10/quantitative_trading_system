@@ -28,6 +28,7 @@ import copy
 import datetime
 import hashlib
 import importlib
+import importlib.util
 import json
 import math
 import os
@@ -645,13 +646,52 @@ def _git(repo: Path, *args: str) -> str:
     return proc.stdout
 
 
-def _pytest(args: Sequence[str], cwd: Path, env: Mapping[str, str],
-            timeout: Optional[float] = None) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, "-m", "pytest", *args], cwd=cwd, env=dict(env), capture_output=True,
-                          text=True, timeout=timeout)
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+_WATCHDOG_PATH = _SCRIPTS_DIR.parent / "handoffs" / "run_receipts" / "numview_probes" / "_watchdog.py"
 
 
-COLLECT_TIMEOUT_SECONDS = 900  # 單檔 collect-only（只匯入與收集，不執行測試本體）之上限；逾時即具名停下
+def _load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
+
+
+def _wd():
+    return sys.modules.get("framepath_gate_watchdog") or _load_module("framepath_gate_watchdog", _WATCHDOG_PATH)
+
+
+def watchdog_config():
+    """共用監看設定（判準檔 `cell_rules.watchdog`，與 `scripts/run_watched.py` 同源；NOCAP Task 2.1）。"""
+    rw = sys.modules.get("framepath_gate_run_watched") or _load_module("framepath_gate_run_watched",
+                                                                         _SCRIPTS_DIR / "run_watched.py")
+    return _wd().load_config(rw._criteria())
+
+
+class Stalled(GateError):
+    """pytest 子行程經共用監看判卡死（無 log 亦無 CPU 進度）：已留現場（堆疊檔）並終止整個子行程樹。"""
+
+
+def run_watched(args: Sequence[str], cwd: Path, env: Mapping[str, str]) -> subprocess.CompletedProcess:
+    """pytest 子行程一律經共用監看（NOCAP Task 2.1：不依牆鐘停止；卡死以無 log 亦無 CPU 進度判定、終止前留現場）。
+    輸出（stdout＋stderr）寫入監看 log，回傳時讀回為 `stdout`；卡死 ⇒ `Stalled`（訊息含堆疊檔路徑）。"""
+    runner = globals().get("_RUNNER")
+    log_dir = Path(runner.out) / "watch_logs" if runner is not None else Path(tempfile.mkdtemp(prefix="gate-watch-"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log = Path(tempfile.mkstemp(prefix="pytest-", suffix=".log", dir=str(log_dir))[1])
+    cmd = [sys.executable, "-m", "pytest", *args]
+    wd = _wd()
+    res = wd.run_watched(cmd, log_path=log, config=watchdog_config(), cwd=str(cwd), env=dict(env))
+    out = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+    if res.status != wd.EXITED:
+        stacks = (res.diagnosis or {}).get("stacks_file") or f"{log}.stacks.txt"
+        raise Stalled(f"pytest 子行程卡死（{res.reason}；原因 {res.cause}）：已留現場 {stacks} （log {log}；"
+                      f"依堆疊查因修好再跑，不得直接重跑）")
+    return subprocess.CompletedProcess(cmd, res.returncode, out, "")
+
+
+_pytest = run_watched  # 舊名（testreg 等呼叫端沿用）
 
 
 PYTEST_RC_NO_TESTS = 5  # pytest ExitCode.NO_TESTS_COLLECTED
@@ -685,22 +725,29 @@ def collect(test_file: str, cwd: Path, env: Mapping[str, str],
     if empty_sink is not None:
         return collect_or_empty(test_file, cwd, env, empty_sink)
     # 諮詢 r5 CODEX-R5-P1-01：本專案 pytest.ini 下 `-q` 輸出表頭與 `<Function …>`，`-qq` 才逐行輸出 nodeid
-    # 審查 r59：collect 前後亦寫 progress.json（挑選與 A 組收集階段可監看），逾時具名停下（不無限等待）
+    # 審查 r59：collect 前後亦寫 progress.json（挑選與 A 組收集階段可監看）；NOCAP Task 2.1：不設牆鐘，經共用監看
+    # 判卡死（無 log 亦無 CPU 進度）並留現場後具名停下
     runner = globals().get("_RUNNER")
     if runner is not None:
         runner.progress("collect", test_file, [])
-    try:
-        proc = _pytest(["--collect-only", "-qq", "-p", "no:cacheprovider", test_file], cwd, env,
-                       timeout=COLLECT_TIMEOUT_SECONDS)
-    except subprocess.TimeoutExpired as exc:
-        restore_generated(cwd)
-        if runner is not None:
-            runner.progress("collect", test_file, [], state="collect-timeout")
-        raise GateError(f"{test_file} collect 逾 {COLLECT_TIMEOUT_SECONDS} 秒未返回（匯入或收集卡住）") from exc
-    restore_generated(cwd)  # 審查 r58：collect-only 會改寫已追蹤清冊（tests/conftest.py），立即還原
+    # 逐行 nodeid 之輸出所需 verbosity 依 pytest.ini 之 addopts 而異（本 repo 含 -v ⇒ -qq；無 -v 之倉 ⇒ -q；原 testreg
+    # `_subbatch_collect` 之相容邏輯併入此處，兩入口共用同一實作；NOCAP Task 2.1）
+    for q in ("-qq", "-q"):
+        try:
+            proc = run_watched(["--collect-only", q, "-p", "no:cacheprovider", test_file], cwd, env)
+        except Stalled as exc:
+            restore_generated(cwd)
+            if runner is not None:
+                runner.progress("collect", test_file, [], state="collect-stalled")
+            raise GateError(f"{test_file} collect 卡死（匯入或收集無進度）：{exc}") from exc
+        restore_generated(cwd)  # 審查 r58：collect-only 會改寫已追蹤清冊（tests/conftest.py），立即還原
+        ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
+        if ids and proc.returncode == 0:
+            break
+        if not ids and is_empty_collect(proc.returncode, proc.stdout + proc.stderr):
+            break
     if runner is not None:
         runner.progress("collect", test_file, [], state="finished-call")
-    ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
     if not ids and is_empty_collect(proc.returncode, proc.stdout + proc.stderr):
         raise EmptyCollect(f"{test_file} 無測試函式（rc={proc.returncode}、{NO_TESTS_MARKER}）")
     if proc.returncode != 0 or not ids:
@@ -713,7 +760,10 @@ def run_file(test_file: str, xml_path: Path, cwd: Path, env: Mapping[str, str],
     xml_path.parent.mkdir(parents=True, exist_ok=True)
     if xml_path.exists():
         xml_path.unlink()
-    proc = _pytest([*PYTEST_FLAGS, *extra, f"--junitxml={xml_path}", *(nodeids or [test_file])], cwd, env)
+    try:
+        proc = run_watched([*PYTEST_FLAGS, *extra, f"--junitxml={xml_path}", *(nodeids or [test_file])], cwd, env)
+    except Stalled as exc:
+        raise GateError(f"{test_file} 執行卡死（測試無進度）：{exc}") from exc
     res = junit_results(xml_path.read_text(encoding="utf-8"), test_file) if xml_path.is_file() else {}
     return proc.returncode, res
 
@@ -739,6 +789,11 @@ class Runner:
     def _ledger_names(self) -> set:
         d = self.ledger_dir
         return {p.name for p in d.glob("*.jsonl")} if d is not None and d.is_dir() else set()
+
+    def _check_budget(self) -> None:
+        """分段上限只在使用者明示時生效（使用者自設之預算，登記 B；NOCAP Task 2.1：預設 None 不分段）。"""
+        if self.max_seconds is not None and time.monotonic() - self.start > self.max_seconds:
+            raise Paused(f"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}")
 
     def progress(self, phase: str, test_file: str, nodeids: Sequence[str], state: str = "running") -> None:
         self.out.mkdir(parents=True, exist_ok=True)
@@ -801,8 +856,7 @@ class Runner:
                     # 沿用之結果：其呼叫所產之 session 記於 meta（ledger_new），視為本次之「呼叫後新增」
                     self.ledger_snapshots[test_file] = self._ledger_names() - set(m.get("ledger_new") or [])
                 return m["rc"], res
-        if self.max_seconds is not None and time.monotonic() - self.start > self.max_seconds:
-            raise Paused(f"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}")
+        self._check_budget()
         if probe_dir is not None:
             probe_dir.mkdir(parents=True, exist_ok=True)
             for stale in probe_dir.glob("*.json"):
@@ -1572,9 +1626,6 @@ def _row_nodeids(rows: Sequence[str], prefix: str) -> List[str]:
     return [p for p in hits[0][len(prefix):].split() if p] if hits else []
 
 
-ADMISSION_BUDGET_SECONDS = 7200
-
-
 def out_exclusion(repo: Path, out_dir: Optional[Path]) -> Optional[str]:
     """本次 `--out` 位於 repo 內 ⇒ 排除其下未追蹤內容之 pathspec（前綴由參數導出）；位於 repo 外或未給 ⇒ None。"""
     if out_dir is None:
@@ -1761,15 +1812,15 @@ def junit_times(xml_text: str, repo: Path) -> Dict[str, float]:
     return out
 
 
-def admission(selected: Iterable[str], times: Mapping[str, float], budget: float = ADMISSION_BUDGET_SECONDS
+def admission(selected: Iterable[str], times: Mapping[str, float], budget: Optional[float] = None
               ) -> Dict[str, object]:
-    """執行前 admission（純函式）：已知估時總和、估時未知之 nodeid；status＝within（全部已知且 ≤ 預算）｜over｜unknown。
-    非有限或負值之估時視為未知（不得以 NaN 比較語意落入 within）。"""
+    """執行前估時（純函式）：已知估時總和、估時未知之 nodeid；status＝within（全部已知且未逾明示預算）｜over（只在呼叫端
+    明示 `budget` 時）｜unknown。NOCAP Task 2.1：預設無預算、閘門只印估時不拒跑。非有限或負值之估時視為未知。"""
     sel = list(selected)
     ok = {n: times[n] for n in sel if n in times and math.isfinite(times[n]) and times[n] >= 0}
     known = round(sum(ok.values()), 3)
     unknown = sorted(n for n in sel if n not in ok)
-    status = "over" if known > budget else ("unknown" if unknown else "within")
+    status = "over" if budget is not None and known > budget else ("unknown" if unknown else "within")
     return {"budget_seconds": budget, "known_seconds": known, "unknown": unknown, "status": status}
 
 
@@ -1942,8 +1993,9 @@ def main(argv: Sequence[str]) -> int:
                     help="估時來源目錄（其下 junit xml；可重複）；本執行器之結果目錄恆納入")
     ap.add_argument("--admit", default=None,
                     help="admission 非 within（估時未知或逾預算）時，呈報後以該次挑選之 inputs_digest 批准執行")
-    ap.add_argument("--max-seconds", type=float, default=3600.0,
-                    help="本段時間預算：已用逾此值即不再開新 pytest 呼叫、於呼叫之間停下（rc 3），同命令接續")
+    ap.add_argument("--max-seconds", type=float, default=None,
+                    help="選填之分段：使用者明示時，已用逾此值即不再開新 pytest 呼叫、於呼叫之間停下（rc 3），同命令接續；"
+                         "未給 ⇒ 不分段（NOCAP Task 2.1）")
     args = ap.parse_args(argv)
     batch = current_batch()
     args.phase = BATCH_PHASE[batch]
@@ -1974,9 +2026,8 @@ def main(argv: Sequence[str]) -> int:
               f"known={adm['known_seconds']}s unknown={len(adm['unknown'])} inputs_digest={sel['inputs_digest']} "
               f"→ {plan_path.relative_to(REPO)}")
         return 0
-    if adm["status"] != "within" and args.admit != sel["inputs_digest"]:
-        raise GateError(f"admission={adm['status']}（已知 {adm['known_seconds']} 秒、估時未知 {len(adm['unknown'])} 項、"
-                        f"預算 {adm['budget_seconds']} 秒）：先 --plan 呈報，批准後以 --admit {sel['inputs_digest']} 執行")
+    # NOCAP Task 2.1：估時只印不拒跑（不依預計耗時擋下運算；卡死由共用監看依進度判定）
+    print(f"FRAMEPATH affected 估時：已知 {adm['known_seconds']} 秒、估時未知 {len(adm['unknown'])} 項（status={adm['status']}）")
     anchor_wt = (Path(args.anchor_worktree).resolve() if args.anchor_worktree
                  else make_anchor_worktree(anchor, out / f"anchor_{anchor[:12]}" / "wt"))
     verify_anchor_worktree(anchor_wt, anchor)

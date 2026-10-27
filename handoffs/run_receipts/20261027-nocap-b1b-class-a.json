@@ -1,6 +1,6 @@
 {
   "_doc": "NOCAP b1b：A 類（依牆鐘停止／縮減運算或對長運算放棄等候）逐處清單，不登記，待 Phase 1–6 改碼移除；分類規則 handoffs/run_receipts/nocap_probes/b1b_classification.json。",
-  "count": 196,
+  "count": 161,
   "by_path": {
     "api/models/feature_browser_models.py": 3,
     "api/models/optimization_models.py": 2,
@@ -14,20 +14,13 @@
     "frontend/src/components/strategy-test/OptunaConfigPanel.tsx": 2,
     "frontend/src/lib/api.ts": 1,
     "frontend/src/store/searchStore.ts": 3,
-    "handoffs/run_receipts/framepath_probes/admit_after.sh": 2,
-    "handoffs/run_receipts/framepath_probes/admit_loop.sh": 1,
     "handoffs/run_receipts/icfirstalign_probes/calibration_dtype_diff_probe.py": 1,
     "handoffs/run_receipts/numview_probes/estimate.py": 2,
-    "handoffs/run_receipts/probewinsor_probes/affected_chunk.sh": 1,
-    "handoffs/run_receipts/testreg_probes/b3/light_sweep.sh": 1,
-    "handoffs/run_receipts/testreg_probes/v6_profile.py": 3,
     "momentum/Analysis/feature_quality_diagnostics.py": 1,
     "scripts/capture_ic1eb_baseline.py": 2,
-    "scripts/framepath_affected_gate.py": 10,
     "scripts/ic1c_freeze_baseline.py": 1,
     "scripts/ic1eb_b5_replay.py": 3,
     "scripts/run_with_receipt.py": 2,
-    "scripts/testreg.py": 10,
     "scripts/verify_l1_warmup_requirements.py": 6,
     "tests/api/test_batch_date.py": 1,
     "tests/api/test_batch_retention.py": 3,
@@ -70,9 +63,7 @@
     "tests/momentum/Analysis/test_icfirstalign_fu2.py": 1,
     "tests/momentum/Analysis/test_preprov_ic_cache.py": 1,
     "tests/momentum/Analysis/test_preprov_survivor_identity.py": 1,
-    "tests/performance/step6_multitf_batch_benchmark.py": 1,
-    "tests/registry/test_testreg_gate_wiring.py": 3,
-    "tests/registry/test_testreg_run.py": 4
+    "tests/performance/step6_multitf_batch_benchmark.py": 1
   },
   "hits": [
     {
@@ -94,106 +85,6 @@
       "literal": "",
       "text": "while time.monotonic() < deadline:",
       "reason": "IC 基準擷取等候期限 1800 秒（盤點收據 A；Phase 3）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 651,
-      "pattern_id": "kwarg_timeout",
-      "function": "_pytest",
-      "callee": "subprocess.run",
-      "literal": "timeout",
-      "text": "text=True, timeout=timeout)",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 694,
-      "pattern_id": "kwarg_timeout",
-      "function": "collect",
-      "callee": "_pytest",
-      "literal": "COLLECT_TIMEOUT_SECONDS",
-      "text": "timeout=COLLECT_TIMEOUT_SECONDS)",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 695,
-      "pattern_id": "timeout_expired",
-      "function": "collect",
-      "callee": "",
-      "literal": "",
-      "text": "except subprocess.TimeoutExpired as exc:",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 727,
-      "pattern_id": "max_seconds",
-      "function": "Runner",
-      "callee": "",
-      "literal": "",
-      "text": "跑太久也不知道也不允許」）：①同狀態指紋之結果檔沿用（中斷後接續不重跑）②已用時間逾 `max_seconds` 即不再開新呼叫、",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 731,
-      "pattern_id": "max_seconds",
-      "function": "Runner.__init__",
-      "callee": "",
-      "literal": "",
-      "text": "def __init__(self, out: Path, max_seconds: Optional[float], total: int, ledger_dir: Optional[Path] = None):",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 732,
-      "pattern_id": "max_seconds",
-      "function": "Runner.__init__",
-      "callee": "",
-      "literal": "",
-      "text": "self.out, self.max_seconds, self.total = out, max_seconds, total",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 804,
-      "pattern_id": "max_seconds",
-      "function": "Runner.run",
-      "callee": "time.monotonic",
-      "literal": "",
-      "text": "if self.max_seconds is not None and time.monotonic() - self.start > self.max_seconds:",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 805,
-      "pattern_id": "max_seconds",
-      "function": "Runner.run",
-      "callee": "",
-      "literal": "",
-      "text": "raise Paused(f\"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}\")",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 1945,
-      "pattern_id": "max_seconds",
-      "function": "main",
-      "callee": "",
-      "literal": "",
-      "text": "ap.add_argument(\"--max-seconds\", type=float, default=3600.0,",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/framepath_affected_gate.py",
-      "line": 1957,
-      "pattern_id": "max_seconds",
-      "function": "main",
-      "callee": "Runner",
-      "literal": "",
-      "text": "runner = _RUNNER = Runner(out, args.max_seconds, 0, ledger_dir=ledger_dir)  # 審查 r59：挑選與收集階段即寫 progress.json",
-      "reason": "閘門 runner：collect 900 秒、max_seconds 分段暫停（盤點收據 A；Phase 2 Task 2.1）"
     },
     {
       "path": "scripts/ic1c_freeze_baseline.py",
@@ -254,106 +145,6 @@
       "literal": "",
       "text": "except (OSError, subprocess.TimeoutExpired):",
       "reason": "pytest collect-only 300 秒逾時（盤點收據未列，本次掃描新發現；同 Phase 2 Task 2.1 collect-only 牆鐘刪除）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 19,
-      "pattern_id": "max_seconds",
-      "function": "<module>",
-      "callee": "",
-      "literal": "",
-      "text": "testreg.py [--repo R] run --manifest M --phase N --base <rev> --receipt P [--out D] [--max-seconds S]",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5565,
-      "pattern_id": "max_seconds",
-      "function": "run_subbatch",
-      "callee": "",
-      "literal": "",
-      "text": "max_seconds: float = 3600.0) -> int:",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5568,
-      "pattern_id": "max_seconds",
-      "function": "run_subbatch",
-      "callee": "",
-      "literal": "",
-      "text": "`framepath_affected_gate.Runner`（分段、`max_seconds` 用盡於呼叫之間停下回 3、同指紋沿用、progress.json）；非綠",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5575,
-      "pattern_id": "max_seconds",
-      "function": "run_subbatch",
-      "callee": "_run_subbatch",
-      "literal": "",
-      "text": "return _run_subbatch(g, root, manifest_path, phase, base, out, receipt, max_seconds)",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5605,
-      "pattern_id": "kwarg_timeout",
-      "function": "_subbatch_collect",
-      "callee": "g._pytest",
-      "literal": "g.COLLECT_TIMEOUT_SECONDS",
-      "text": "timeout=g.COLLECT_TIMEOUT_SECONDS)",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5606,
-      "pattern_id": "timeout_expired",
-      "function": "_subbatch_collect",
-      "callee": "",
-      "literal": "",
-      "text": "except subprocess.TimeoutExpired as exc:",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5667,
-      "pattern_id": "max_seconds",
-      "function": "_run_subbatch",
-      "callee": "",
-      "literal": "",
-      "text": "receipt: Path, max_seconds: Optional[float]) -> int:",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5697,
-      "pattern_id": "max_seconds",
-      "function": "_run_subbatch",
-      "callee": "g.Runner",
-      "literal": "",
-      "text": "runner = _SUBBATCH_RUNNER[\"runner\"] = g.Runner(out, max_seconds, len(expected), ledger_dir=ledger_dir)",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5883,
-      "pattern_id": "max_seconds",
-      "function": "main",
-      "callee": "",
-      "literal": "",
-      "text": "p.add_argument(\"--max-seconds\", type=float, default=3600.0)",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
-    },
-    {
-      "path": "scripts/testreg.py",
-      "line": 5907,
-      "pattern_id": "max_seconds",
-      "function": "main",
-      "callee": "",
-      "literal": "args.max_seconds",
-      "text": "max_seconds=args.max_seconds)",
-      "reason": "testreg 子批 runner 之 max_seconds 與 collect 逾時（盤點收據 A；Phase 2 Task 2.1）"
     },
     {
       "path": "scripts/verify_l1_warmup_requirements.py",
@@ -1706,106 +1497,6 @@
       "reason": "基準腳本等候批次生成期限（Task 2.2 同型）"
     },
     {
-      "path": "tests/registry/test_testreg_gate_wiring.py",
-      "line": 13,
-      "pattern_id": "max_seconds",
-      "function": "<module>",
-      "callee": "",
-      "literal": "",
-      "text": "current 中無紀錄之 caused nodeid 一律不吸收。編排：`Runner(out, max_seconds, total, ledger_dir=…)` 於每次 pytest 呼叫前",
-      "reason": "測試資料為閘門 --max-seconds 選項（A 機制之參數；Phase 2 Task 2.1 同步改）"
-    },
-    {
-      "path": "tests/registry/test_testreg_gate_wiring.py",
-      "line": 694,
-      "pattern_id": "max_seconds",
-      "function": "<module>",
-      "callee": "",
-      "literal": "",
-      "text": "\"allowed_options\": (GATE + \" --out /tmp/x --max-seconds 3600 --timings a --timings b\", True),",
-      "reason": "測試資料為閘門 --max-seconds 選項（A 機制之參數；Phase 2 Task 2.1 同步改）"
-    },
-    {
-      "path": "tests/registry/test_testreg_gate_wiring.py",
-      "line": 699,
-      "pattern_id": "max_seconds",
-      "function": "<module>",
-      "callee": "",
-      "literal": "",
-      "text": "\"max_seconds_twice\": (GATE + \" --max-seconds 1 --max-seconds 2\", False),",
-      "reason": "測試資料為閘門 --max-seconds 選項（A 機制之參數；Phase 2 Task 2.1 同步改）"
-    },
-    {
-      "path": "tests/registry/test_testreg_run.py",
-      "line": 142,
-      "pattern_id": "max_seconds",
-      "function": "test_boundary_02_pause_then_same_command_resumes_without_restart",
-      "callee": "",
-      "literal": "",
-      "text": "\"\"\"--max-seconds 0.5：第一段跑完第一個檔（test_other 內含 1.2 秒）即於呼叫之間停下（rc 3、progress paused）；",
-      "reason": "測試 --max-seconds 分段暫停機制本身（Phase 2 Task 2.1 同步改）"
-    },
-    {
-      "path": "tests/registry/test_testreg_run.py",
-      "line": 147,
-      "pattern_id": "max_seconds",
-      "function": "test_boundary_02_pause_then_same_command_resumes_without_restart",
-      "callee": "",
-      "literal": "",
-      "text": "proc, _ = _run(r, base, tmp_path, \"--max-seconds\", \"0.5\")",
-      "reason": "測試 --max-seconds 分段暫停機制本身（Phase 2 Task 2.1 同步改）"
-    },
-    {
-      "path": "tests/registry/test_testreg_run.py",
-      "line": 164,
-      "pattern_id": "max_seconds",
-      "function": "test_resume_after_dependency_change_reruns_unchanged_test_file",
-      "callee": "",
-      "literal": "",
-      "text": "proc, _ = _run(r, base, tmp_path, \"--max-seconds\", \"0.5\")",
-      "reason": "測試 --max-seconds 分段暫停機制本身（Phase 2 Task 2.1 同步改）"
-    },
-    {
-      "path": "tests/registry/test_testreg_run.py",
-      "line": 177,
-      "pattern_id": "max_seconds",
-      "function": "test_resume_after_change_reruns_changed_file",
-      "callee": "",
-      "literal": "",
-      "text": "proc, _ = _run(r, base, tmp_path, \"--max-seconds\", \"0.5\")",
-      "reason": "測試 --max-seconds 分段暫停機制本身（Phase 2 Task 2.1 同步改）"
-    },
-    {
-      "path": "handoffs/run_receipts/framepath_probes/admit_after.sh",
-      "line": 2,
-      "pattern_id": "max_seconds",
-      "function": "",
-      "callee": "",
-      "literal": "",
-      "text": "# 等目前閘段（pid）結束；若其 log 為 PAUSED，改以單段（--max-seconds 86400）接續，避免跨段沿用判定因測試改寫共用忽略資料而反覆失效。",
-      "reason": "以 --max-seconds 分段呼叫閘門（盤點收據 A；Phase 2 隨 --max-seconds 移除）"
-    },
-    {
-      "path": "handoffs/run_receipts/framepath_probes/admit_after.sh",
-      "line": 14,
-      "pattern_id": "max_seconds",
-      "function": "",
-      "callee": "",
-      "literal": "",
-      "text": "PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --admit \"$D\" --max-seconds 86400 \\",
-      "reason": "以 --max-seconds 分段呼叫閘門（盤點收據 A；Phase 2 隨 --max-seconds 移除）"
-    },
-    {
-      "path": "handoffs/run_receipts/framepath_probes/admit_loop.sh",
-      "line": 7,
-      "pattern_id": "max_seconds",
-      "function": "",
-      "callee": "",
-      "literal": "",
-      "text": "PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --admit \"$D\" --max-seconds 3300 \\",
-      "reason": "以 --max-seconds 分段呼叫閘門（盤點收據 A；Phase 2 隨 --max-seconds 移除）"
-    },
-    {
       "path": "handoffs/run_receipts/icfirstalign_probes/calibration_dtype_diff_probe.py",
       "line": 131,
       "pattern_id": "kwarg_timeout",
@@ -1834,56 +1525,6 @@
       "literal": "",
       "text": "result = _run_target(target, work_root, kline_path, args.timeout_seconds,",
       "reason": "估時子行程 wall_ceiling 與 --timeout-seconds（盤點收據 A；Phase 1）"
-    },
-    {
-      "path": "handoffs/run_receipts/probewinsor_probes/affected_chunk.sh",
-      "line": 33,
-      "pattern_id": "shell_elapsed_compare",
-      "function": "",
-      "callee": "",
-      "literal": "",
-      "text": "if [ $(( $(date +%s) - t_start )) -ge \"${budget}\" ]; then",
-      "reason": "牆鐘預算逾即檔間暫停（盤點收據 A）"
-    },
-    {
-      "path": "handoffs/run_receipts/testreg_probes/b3/light_sweep.sh",
-      "line": 19,
-      "pattern_id": "shell_elapsed_compare",
-      "function": "",
-      "callee": "",
-      "literal": "",
-      "text": "if [ $(( $(date +%s) - start )) -ge \"$MAX\" ]; then",
-      "reason": "逐檔 pytest 逾 MAX 秒即 kill（盤點收據 A）"
-    },
-    {
-      "path": "handoffs/run_receipts/testreg_probes/v6_profile.py",
-      "line": 7,
-      "pattern_id": "max_seconds",
-      "function": "<module>",
-      "callee": "",
-      "literal": "",
-      "text": "以自己的 tmp_path 生成、無模組層共享 fixture，逐項呼叫不改其計算；為使單次背景執行不跨越單一長呼叫，`--max-seconds`",
-      "reason": "profiling 以 Runner max_seconds 分段（盤點收據 A；Phase 2 隨 Runner 改）"
-    },
-    {
-      "path": "handoffs/run_receipts/testreg_probes/v6_profile.py",
-      "line": 66,
-      "pattern_id": "max_seconds",
-      "function": "cmd_run",
-      "callee": "g.Runner",
-      "literal": "",
-      "text": "runner = g.Runner(OUT, args.max_seconds, len(ids), ledger_dir=ledger)",
-      "reason": "profiling 以 Runner max_seconds 分段（盤點收據 A；Phase 2 隨 Runner 改）"
-    },
-    {
-      "path": "handoffs/run_receipts/testreg_probes/v6_profile.py",
-      "line": 160,
-      "pattern_id": "max_seconds",
-      "function": "main",
-      "callee": "",
-      "literal": "",
-      "text": "p.add_argument(\"--max-seconds\", type=float, default=1.0)",
-      "reason": "profiling 以 Runner max_seconds 分段（盤點收據 A；Phase 2 隨 Runner 改）"
     },
     {
       "path": "config/optimization_config.yaml",

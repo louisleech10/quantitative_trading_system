@@ -29,6 +29,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import platform
 import re
@@ -345,6 +346,19 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
             raise
 
 
+NAP_STEP_SECONDS = 0.05  # 檢查間隔內每隔此秒數查一次子行程是否已結束
+
+
+def _nap(proc: "subprocess.Popen[Any]", seconds: float, sleep: Callable[[float], None]) -> None:
+    """睡至下一次檢查；子行程先結束即提早返回——否則每個短命令（秒級 collect、hook）都要空等滿一個檢查間隔
+    （判準 30 秒；NOCAP b3 實測閘門改經共用監看時發現）。切成等長小段，總睡眠量與原單次 sleep 相同（注入時鐘之測試不變）。"""
+    n = max(1, math.ceil(seconds / NAP_STEP_SECONDS))
+    for _ in range(n):
+        if proc.poll() is not None:
+            return
+        sleep(seconds / n)
+
+
 def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config: WatchdogConfig,
                 expected_seconds: Optional[float], baseline: Optional[float], ram: Optional[float],
                 threshold: Optional[float], started: float, probe_swap: Callable[[], Optional[float]],
@@ -361,7 +375,7 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
         if rc is not None:
             return WatchResult(EXITED, rc, None, clock() - started, growth_max, threshold, over,
                                diagnosis={"monitor_degraded": degraded} if degraded else {})
-        sleep(config.check_interval_seconds)
+        _nap(proc, config.check_interval_seconds, sleep)
         if not ENABLED:
             continue
         now = clock()

@@ -1346,6 +1346,184 @@
       "line": "timeout: number  // seconds",
       "class": "B",
       "reason": "Optuna 搜尋預算欄之型別宣告（使用者明示之預算；SPEC Task 5.4）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate.py",
+      "function": "Runner._check_budget",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段（使用者自設之預算；SPEC Task 2.1 邊界：預設 None 不分段，登記 B「使用者明示」）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate.py",
+      "line": "raise Paused(f\"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}\")",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段（使用者自設之預算；SPEC Task 2.1 邊界：預設 None 不分段，登記 B「使用者明示」）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate.py",
+      "line": "ap.add_argument(\"--max-seconds\", type=float, default=None,",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段（使用者自設之預算；SPEC Task 2.1 邊界：預設 None 不分段，登記 B「使用者明示」）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "line": "max_seconds: Optional[float] = None) -> int:",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段（使用者自設之預算；SPEC Task 2.1 邊界：預設 None 不分段，登記 B「使用者明示」）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "line": "p.add_argument(\"--max-seconds\", type=float, default=None)",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段（使用者自設之預算；SPEC Task 2.1 邊界：預設 None 不分段，登記 B「使用者明示」）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate.py",
+      "line": "跑太久也不知道也不允許」）：①同狀態指紋之結果檔沿用（中斷後接續不重跑）②已用時間逾 `max_seconds` 即不再開新呼叫、",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate.py",
+      "line": "def __init__(self, out: Path, max_seconds: Optional[float], total: int, ledger_dir: Optional[Path] = None):",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate.py",
+      "line": "self.out, self.max_seconds, self.total = out, max_seconds, total",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate.py",
+      "function": "main",
+      "callee": "Runner",
+      "literal": "",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "line": "testreg.py [--repo R] run --manifest M --phase N --base <rev> --receipt P [--out D] [--max-seconds S]",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "line": "`framepath_affected_gate.Runner`（分段、`max_seconds` 用盡於呼叫之間停下回 3、同指紋沿用、progress.json）；非綠",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "function": "run_subbatch",
+      "callee": "_run_subbatch",
+      "literal": "",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "line": "receipt: Path, max_seconds: Optional[float]) -> int:",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "function": "_run_subbatch",
+      "callee": "g.Runner",
+      "literal": "",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/testreg.py",
+      "line": "max_seconds=args.max_seconds)",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "tests/registry/test_testreg_gate_wiring.py",
+      "line": "current 中無紀錄之 caused nodeid 一律不吸收。編排：`Runner(out, max_seconds, total, ledger_dir=…)` 於每次 pytest 呼叫前",
+      "class": "B",
+      "reason": "測試資料為使用者明示之 --max-seconds 選項（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "tests/registry/test_testreg_gate_wiring.py",
+      "line": "\"allowed_options\": (GATE + \" --out /tmp/x --max-seconds 3600 --timings a --timings b\", True),",
+      "class": "B",
+      "reason": "測試資料為使用者明示之 --max-seconds 選項（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "tests/registry/test_testreg_gate_wiring.py",
+      "line": "\"max_seconds_twice\": (GATE + \" --max-seconds 1 --max-seconds 2\", False),",
+      "class": "B",
+      "reason": "測試資料為使用者明示之 --max-seconds 選項（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "tests/registry/test_testreg_run.py",
+      "line": "\"\"\"--max-seconds 0.5：第一段跑完第一個檔（test_other 內含 1.2 秒）即於呼叫之間停下（rc 3、progress paused）；",
+      "class": "B",
+      "reason": "測試使用者明示 --max-seconds 之分段暫停（SPEC Task 2.1 邊界之 B，行為保留）"
+    },
+    {
+      "path": "tests/registry/test_testreg_run.py",
+      "line": "proc, _ = _run(r, base, tmp_path, \"--max-seconds\", \"0.5\")",
+      "class": "B",
+      "reason": "測試使用者明示 --max-seconds 之分段暫停（SPEC Task 2.1 邊界之 B，行為保留）"
+    },
+    {
+      "path": "handoffs/run_receipts/framepath_probes/admit_after.sh",
+      "line": "# 等目前閘段（pid）結束；若其 log 為 PAUSED，改以單段（--max-seconds 86400）接續，避免跨段沿用判定因測試改寫共用忽略資料而反覆失效。",
+      "class": "B",
+      "reason": "探針以使用者明示之 --max-seconds 分段呼叫閘門（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "handoffs/run_receipts/framepath_probes/admit_after.sh",
+      "line": "PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --admit \"$D\" --max-seconds 86400 \\",
+      "class": "B",
+      "reason": "探針以使用者明示之 --max-seconds 分段呼叫閘門（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "handoffs/run_receipts/framepath_probes/admit_loop.sh",
+      "line": "PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --admit \"$D\" --max-seconds 3300 \\",
+      "class": "B",
+      "reason": "探針以使用者明示之 --max-seconds 分段呼叫閘門（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "handoffs/run_receipts/probewinsor_probes/affected_chunk.sh",
+      "line": "if [ $(( $(date +%s) - t_start )) -ge \"${budget}\" ]; then",
+      "class": "B",
+      "reason": "探針之必填預算參數＝使用者明示之分段：逾即於檔間暫停、不中止進行中之測試（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/b3/light_sweep.sh",
+      "line": "if [ $(( $(date +%s) - start )) -ge \"$MAX\" ]; then",
+      "class": "D",
+      "reason": "封存、不執行（TESTREG b3 已收案之探針；SPEC Task 2.1「同改或登記 D」）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/v6_profile.py",
+      "line": "以自己的 tmp_path 生成、無模組層共享 fixture，逐項呼叫不改其計算；為使單次背景執行不跨越單一長呼叫，`--max-seconds`",
+      "class": "D",
+      "reason": "封存、不執行（TESTREG v6 profiling 已收案之探針；SPEC Task 2.1「同改或登記 D」）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/v6_profile.py",
+      "function": "cmd_run",
+      "callee": "g.Runner",
+      "literal": "",
+      "class": "D",
+      "reason": "封存、不執行（TESTREG v6 profiling 已收案之探針；SPEC Task 2.1「同改或登記 D」）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/v6_profile.py",
+      "line": "p.add_argument(\"--max-seconds\", type=float, default=1.0)",
+      "class": "D",
+      "reason": "封存、不執行（TESTREG v6 profiling 已收案之探針；SPEC Task 2.1「同改或登記 D」）"
     }
   ]
 }

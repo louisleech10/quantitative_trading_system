@@ -148,3 +148,11 @@ def test_mutation_root_only_terminate_leaves_child_alive(tmp_path: Path, monkeyp
         assert len(pids) == 2 and _alive(pids[1:], settle=0.5) == pids[1:]
     finally:
         _kill_all(pids)
+
+
+def test_short_command_returns_without_waiting_full_check_interval(tmp_path: Path) -> None:
+    """判準之檢查間隔 30 秒下，秒級短命令（閘門之 collect-only、hook）結束即返回，不空等滿一個間隔（b3 審碼前實測發現：
+    原迴圈固定睡滿間隔 ⇒ 每次 pytest 子行程至少 30 秒）。效能斷言：5 秒內返回、rc 0。"""
+    res = wd.run_watched([sys.executable, "-c", "pass"], log_path=tmp_path / "short.log",
+                         config=_config(check_interval_seconds=30.0, log_stall_seconds=600.0))
+    assert res.status == wd.EXITED and res.returncode == 0 and res.wall_seconds < 5.0, res

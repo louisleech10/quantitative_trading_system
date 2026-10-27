@@ -63,6 +63,8 @@ def test_boundary_07_testreg_run_cap_defaults_to_none() -> None:
         if isinstance(node, ast.FunctionDef) and node.args.defaults:
             args = node.args.args[-len(node.args.defaults):]
             found += [d for a, d in zip(args, node.args.defaults) if a.arg == MAX_ARG]
+        if isinstance(node, ast.FunctionDef):  # 僅限關鍵字參數（`*` 之後）之預設亦須為 None
+            found += [d for a, d in zip(node.args.kwonlyargs, node.args.kw_defaults) if a.arg == MAX_ARG and d is not None]
     assert found and all(isinstance(d, ast.Constant) and d.value is None for d in found), [ast.dump(d) for d in found]
 
 

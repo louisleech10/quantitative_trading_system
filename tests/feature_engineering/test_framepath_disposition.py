@@ -2791,12 +2791,15 @@ def test_mutation_affected_gate_r59_anchor_restore_and_collect_progress(tmp_path
     (tmp_path / "slow").mkdir()
     (tmp_path / "slow" / "test_slow_import.py").write_text("import time\ntime.sleep(30)\n\ndef test_a():\n    pass\n",
                                                           encoding="utf-8")
-    monkeypatch.setattr(g, "COLLECT_TIMEOUT_SECONDS", 2)
+    # NOCAP Task 2.1：collect 不設牆鐘，改經共用監看判卡死（匯入睡眠＝無 log 亦無 CPU）；注入秒級監看門檻
+    import dataclasses
+    fast = dataclasses.replace(g.watchdog_config(), check_interval_seconds=0.05, log_stall_seconds=0.6)
+    monkeypatch.setattr(g, "watchdog_config", lambda: fast)
     monkeypatch.setattr(g, "_RUNNER", g.Runner(tmp_path / "out2", None, 0))
     with pytest.raises(g.GateError):
         g.collect("test_slow_import.py", tmp_path / "slow", dict(os.environ, PYTHONPATH=str(REPO)))
     prog = json.loads((tmp_path / "out2" / "progress.json").read_text(encoding="utf-8"))
-    assert prog["phase"] == "collect" and prog["state"] == "collect-timeout" and prog["file"] == "test_slow_import.py"
+    assert prog["phase"] == "collect" and prog["state"] == "collect-stalled" and prog["file"] == "test_slow_import.py"
 
 
 def test_mutation_split_commit_paths_foreign_vs_ticket():
