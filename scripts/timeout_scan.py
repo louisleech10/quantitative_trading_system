@@ -215,31 +215,57 @@ def scan_staged(repo: Path = REPO) -> List[Hit]:
     return hits
 
 
-_ADDED_CACHE: Dict[Tuple[str, str], set] = {}
+def _binding_key(h: Hit) -> Tuple[str, str, str, str, str]:
+    return (h.pattern_id, h.function, h.callee, h.literal, h.text.strip())
 
 
-def _added_vs_head(repo: Path, rel: str) -> set:
-    """暫存版相對 HEAD 新增之行（集合）；HEAD 無此檔 ⇒ 暫存版全部行。"""
-    key = (str(repo), rel)
-    if key not in _ADDED_CACHE:
+def new_vs_head(repo: Path, hits: Sequence[Hit]) -> List[Hit]:
+    """相對 HEAD 之新命中：以綁定（樣式、所在函式、被呼叫者、字面值、整行）之多重集合差判定——同一行搬到另一函式
+    或改綁亦算新（b1 審碼 r1 CODEX-R1-P1-02）。HEAD 無此檔 ⇒ 全部為新。"""
+    by_path: Dict[str, List[Hit]] = {}
+    for h in hits:
+        by_path.setdefault(h.path, []).append(h)
+    out: List[Hit] = []
+    for rel, staged_hits in by_path.items():
         head = subprocess.run(["git", "-C", str(repo), "show", f"HEAD:{rel}"], capture_output=True, text=True)
-        staged = subprocess.run(["git", "-C", str(repo), "show", f":{rel}"], capture_output=True, text=True)
-        old = head.stdout.splitlines() if head.returncode == 0 else []
-        remaining: Dict[str, int] = {}
-        for line in old:
-            remaining[line] = remaining.get(line, 0) + 1
-        added = set()
-        for line in staged.stdout.splitlines():
-            if remaining.get(line, 0) > 0:
-                remaining[line] -= 1
+        remaining: Dict[Tuple[str, str, str, str, str], int] = {}
+        for h in (scan_text(rel, head.stdout) if head.returncode == 0 else []):
+            remaining[_binding_key(h)] = remaining.get(_binding_key(h), 0) + 1
+        for h in staged_hits:
+            k = _binding_key(h)
+            if remaining.get(k, 0) > 0:
+                remaining[k] -= 1
             else:
-                added.add(line)
-        _ADDED_CACHE[key] = added
-    return _ADDED_CACHE[key]
+                out.append(h)
+    return out
 
 
-def load_registry(path: Path = REGISTRY) -> List[Dict[str, Any]]:
-    return list(json.loads(path.read_text(encoding="utf-8"))["entries"])
+ALLOWED_CLASSES = {"B", "C", "D"}
+#: whole_file（整檔放行）只准守衛、掃描器本身與其測試
+WHOLE_FILE_OK = {"scripts/timeout_write_guard.py", "tests/governance/test_timeout_write_guard.py",
+                 "scripts/timeout_scan.py"}
+
+
+def validate_registry(entries: Sequence[Mapping[str, Any]]) -> None:
+    """任一列 class 不屬 B／C／D、缺理由或 path、綁定不恰為一種（whole_file／function＋callee＋literal／line）、或
+    whole_file 而非守衛／掃描器本身 ⇒ ValueError（整份無效；守衛與 pre-commit 共用，b1 審碼 r1 CODEX-R1-P1-03）。"""
+    for e in entries:
+        if e.get("class") not in ALLOWED_CLASSES:
+            raise ValueError(f"登記檔列 class={e.get('class')!r} 不允許（只准 B／C／D；長運算之時間上限＝A 類不可登記）：{e}")
+        if not str(e.get("reason") or "").strip() or not e.get("path"):
+            raise ValueError(f"登記檔列缺 path 或理由：{e}")
+        kinds = [bool(e.get("whole_file")), all(k in e for k in ("function", "callee", "literal")), "line" in e]
+        if sum(kinds) != 1:
+            raise ValueError(f"登記檔列須恰一種綁定（whole_file／function＋callee＋literal／line）：{e}")
+        if e.get("whole_file") and e.get("path") not in WHOLE_FILE_OK:
+            raise ValueError(f"登記檔列 whole_file（整檔放行）只准守衛、掃描器本身與其測試：{e}")
+
+
+def load_registry(path: Path = REGISTRY, text: Optional[str] = None) -> List[Dict[str, Any]]:
+    """讀登記檔並驗證（`text` 給定時以之為內容，供 pre-commit 讀暫存版）。"""
+    entries = list(json.loads(text if text is not None else path.read_text(encoding="utf-8"))["entries"])
+    validate_registry(entries)
+    return entries
 
 
 def registered(hit: Hit, registry: Sequence[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -290,10 +316,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--json", action="store_true", help="以 JSON 印未登記之命中（盤點用）")
     args = ap.parse_args(argv)
     repo = Path(args.repo)
+    try:
+        if args.staged:  # pre-commit 讀暫存版登記檔（同提交改登記檔亦須合格）
+            show = subprocess.run(["git", "-C", str(repo), "show", ":scripts/timeout_registry.json"],
+                                  capture_output=True, text=True)
+            registry = load_registry(text=show.stdout) if show.returncode == 0 else load_registry()
+        else:
+            registry = load_registry(repo / "scripts" / "timeout_registry.json")
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"🔴 timeout_scan（NOCAP）：登記檔無效 ⇒ 擋：{exc}", file=sys.stderr)
+        return 1
     hits = scan_staged(repo) if args.staged else scan_repo(repo)
-    if args.staged:  # pre-commit：以完整內容判綁定、只對相對 HEAD 新增之行報錯（既有寫法由全庫登記與測試期掃描管）
-        hits = [h for h in hits if h.text in _added_vs_head(repo, h.path)]
-    missing = unregistered(hits, load_registry())
+    stale: List[Dict[str, Any]] = []
+    if args.staged:  # pre-commit：以完整內容判綁定、只對相對 HEAD 之新綁定報錯（既有寫法由全庫登記與測試期掃描管）
+        hits = new_vs_head(repo, hits)
+    else:
+        stale = stale_entries(registry, hits, repo)
+    missing = unregistered(hits, registry)
+    for e in stale:
+        print(f"過期登記（已無對應命中）：{json.dumps(e, ensure_ascii=False)}", file=sys.stderr)
     if args.json:
         print(json.dumps([h.__dict__ for h in missing], ensure_ascii=False, indent=1))
     else:
@@ -303,6 +344,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"🔴 timeout_scan（NOCAP）：{len(missing)} 處逾時／期限寫法未登記或屬 A 類（依牆鐘停止或縮減運算，"
               f"須改經共用監看）；等外部方或短輔助命令之保險於 scripts/timeout_registry.json 登記 B／C／D 並附理由",
               file=sys.stderr)
+        return 1
+    if stale:
+        print(f"🔴 timeout_scan（NOCAP）：{len(stale)} 列過期登記（防漂移：刪除或改綁定）", file=sys.stderr)
         return 1
     return 0
 

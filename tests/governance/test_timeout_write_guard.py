@@ -116,6 +116,8 @@ def test_boundary_21_same_literal_in_unregistered_function_blocked() -> None:
     "sed -i '' 's/a/b/' scripts/new_runtime.py",
     "echo 'timeout 5 ls' | tee scripts/new_helper.sh",
     "perl -pi -e 's/a/b/' momentum/x.py",
+    "bash -c \"echo 'x = 1' >> scripts/new_runtime.py\"",  # 內層命令（b1 審碼 r1 CODEX-R1-P1-04）
+    "eval \"sed -i '' 's/a/b/' scripts/new_runtime.py\"",
 ])
 def test_boundary_22_bash_write_into_code_file_blocked(command: str) -> None:
     """NOCAP v2 Task 0.2b③：Bash 以重導向／tee／sed -i／perl -i 寫入 .py／.sh ⇒ 擋並要求改用 Edit。"""
@@ -144,6 +146,50 @@ def test_boundary_24_precommit_staged_content_scan_rejects(tmp_path: Path) -> No
     subprocess.run(["git", "-C", str(tmp_path), "add", "scripts/new_job.py"], check=True)
     hits = scan.scan_staged(tmp_path)
     assert [(h.path, h.function, h.literal) for h in hits] == [("scripts/new_job.py", "go", "60")]
+
+
+def _scan_mod() -> Any:
+    spec = importlib.util.spec_from_file_location("timeout_scan_wg2", REPO / "scripts" / "timeout_scan.py")
+    scan = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = scan
+    spec.loader.exec_module(scan)  # type: ignore[union-attr]
+    return scan
+
+
+def test_boundary_60_precommit_call_moved_to_other_function_counts_as_new(tmp_path: Path) -> None:
+    """pre-commit 之新增判定依綁定：同一行逾時呼叫自 f 搬到 g ⇒ 算新命中（不因整行文字相同而略過；b1 審碼 r1 P1-02）。"""
+    scan = _scan_mod()
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for k, v in (("user.email", "t@t"), ("user.name", "t")):
+        subprocess.run(["git", "-C", str(tmp_path), "config", k, v], check=True)
+    (tmp_path / "scripts").mkdir()
+    f = tmp_path / "scripts" / "job.py"
+    f.write_text("import subprocess\n\ndef f(cmd):\n    subprocess.run(cmd, timeout=5)\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-q", "-m", "x", "--no-verify"], check=True)
+    f.write_text("import subprocess\n\ndef f(cmd):\n    pass\n\ndef g(cmd):\n    subprocess.run(cmd, timeout=5)\n",
+                 encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    new = scan.new_vs_head(tmp_path, scan.scan_staged(tmp_path))
+    assert [(h.function, h.literal) for h in new] == [("g", "5")]
+
+
+def test_boundary_61_whole_file_outside_allowlist_rejected() -> None:
+    """登記檔 whole_file 列不在守衛／掃描器本身名單 ⇒ 驗證拒收（pre-commit 與守衛共用；b1 審碼 r1 P1-03）。"""
+    scan = _scan_mod()
+    with pytest.raises(ValueError):
+        scan.validate_registry([{"path": "scripts/ffprod_measure.py", "whole_file": True, "class": "D", "reason": "x"}])
+
+
+def test_boundary_62_cli_reports_stale_registry_entries(tmp_path: Path) -> None:
+    """全庫掃描命令列回報過期登記（已無對應命中之列）⇒ rc=1（b1 審碼 r1 P1-06）。"""
+    scan = _scan_mod()
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "scripts" / "timeout_registry.json").write_text(json.dumps({"entries": [
+        {"path": "scripts/a.py", "line": "subprocess.run(cmd, timeout=5)", "class": "C", "reason": "已刪除之舊呼叫"}]}),
+        encoding="utf-8")
+    assert scan.main(["--repo", str(tmp_path)]) == 1
 
 
 def test_boundary_25_precommit_hook_invokes_staged_scan() -> None:

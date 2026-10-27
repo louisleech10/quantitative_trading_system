@@ -50,18 +50,7 @@ def load_patterns(path: Path = PATTERNS) -> Tuple[Tuple[str, ...], List[Tuple[st
 def load_registry(path: Path = REGISTRY) -> List[Dict[str, Any]]:
     """登記檔；任一列 class 不屬 B／C／D、缺理由、缺綁定（whole_file／function＋callee＋literal／line 恰一種）、或
     whole_file 而非守衛／掃描器本身 ⇒ ValueError（整份無效）。"""
-    entries = json.loads(path.read_text(encoding="utf-8"))["entries"]
-    for e in entries:
-        if e.get("class") not in ALLOWED_CLASSES:
-            raise ValueError(f"登記檔列 class={e.get('class')!r} 不允許（只准 B／C／D；長運算之時間上限＝A 類不可登記）：{e}")
-        if not str(e.get("reason") or "").strip() or not e.get("path"):
-            raise ValueError(f"登記檔列缺 path 或理由：{e}")
-        kinds = [bool(e.get("whole_file")), all(k in e for k in ("function", "callee", "literal")), "line" in e]
-        if sum(kinds) != 1:
-            raise ValueError(f"登記檔列須恰一種綁定（whole_file／function＋callee＋literal／line）：{e}")
-        if e.get("whole_file") and e.get("path") not in WHOLE_FILE_OK:
-            raise ValueError(f"登記檔列 whole_file（整檔放行）只准守衛、掃描器本身與其測試：{e}")
-    return entries
+    return _scanner().load_registry(path)  # 驗證與 pre-commit 共用（scripts/timeout_scan.py validate_registry）
 
 
 def rel_path(file_path: str) -> str:
@@ -172,7 +161,11 @@ def bash_code_writes(command: str) -> List[str]:
             return
         prog = Path(argv[0]).name
         files = [a for a in argv[1:] if a.endswith(CODE_SUFFIXES)]
-        if prog == "tee" and files:
+        if prog in ("bash", "sh", "zsh") and "-c" in argv[1:-1]:  # 內層命令字串遞迴（b1 審碼 r1 CODEX-R1-P1-04）
+            found.extend(bash_code_writes(argv[argv.index("-c") + 1]))
+        elif prog == "eval":
+            found.extend(bash_code_writes(" ".join(argv[1:])))
+        elif prog == "tee" and files:
             found.append(f"tee {' '.join(files)}")
         elif prog == "sed" and files and any(a == "-i" or a.startswith("-i") or a == "--in-place" or
                                             (a.startswith("-") and not a.startswith("--") and "i" in a[1:])
