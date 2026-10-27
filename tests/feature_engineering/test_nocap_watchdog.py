@@ -76,6 +76,16 @@ def test_boundary_01_cpu_unreadable_busy_silent_child_not_stalled(tmp_path: Path
     assert result.diagnosis.get("monitor_degraded"), result
 
 
+def test_normal_exit_during_nap_not_recorded_degraded(tmp_path: Path) -> None:
+    """CPU 讀得到、子行程於檢查間隔中途正常結束 ⇒ 不得記 monitor_degraded。`_nap` 偵測結束時之 poll() 已回收行程，
+    若續讀 CPU 必得 None（行程已不存在），那是結束而非讀不到；2026-10-27 NOCAP 重型受影響測試全綠之 log 尾即誤記一行降級。"""
+    result = wd.run_watched([sys.executable, "-c", "import time\ntime.sleep(1.0)"], log_path=tmp_path / "exit.log",
+                            config=_config(check_interval_seconds=0.5), probe_swap=lambda: 0.0)
+    assert result.status == wd.EXITED and result.returncode == 0, result
+    assert "monitor_degraded" not in result.diagnosis, result
+    assert "監看降級" not in (tmp_path / "exit.log").read_text(encoding="utf-8")
+
+
 def test_boundary_02_cpu_unreadable_memory_evidence_still_stalls(tmp_path: Path) -> None:
     """CPU 讀不到、但 swap 連續增長逾門檻 ⇒ 仍判 STALLED 且 cause=memory（記憶體證據不因監看降級而失效）。"""
     used = iter([0.0] + [10_000.0] * 1000)

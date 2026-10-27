@@ -512,6 +512,8 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
             return WatchResult(EXITED, rc, None, clock() - started, growth_max, threshold, over,
                                diagnosis={"monitor_degraded": degraded} if degraded else {})
         _nap(proc, config.check_interval_seconds, sleep)
+        if proc.poll() is not None:
+            continue  # 已結束（_nap 之 poll 已回收行程）⇒ 回頂端收結果；此時讀 CPU 必得 None，不是監看降級
         _remember(proc.pid, seen)
         if not ENABLED:
             continue
