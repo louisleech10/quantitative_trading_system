@@ -66,6 +66,14 @@ def test_boundary_18_python_hit_carries_function_callee_literal() -> None:
     assert [(h.function, h.callee, h.literal) for h in hits] == [("go", "subprocess.run", "60")]
 
 
+def test_boundary_63_non_ascii_string_before_call_on_same_line() -> None:
+    """同一行先有非 ASCII 字串、其後才是真正之逾時呼叫 ⇒ 判為呼叫型（AST 位元組偏移與正則字元偏移須換算；b1 審碼 r4 P1-01）。"""
+    # 中文字串之位元組長度須遠大於字元長度，使未換算時呼叫位置落入字串之位元組區間（改前會誤判為字串型）
+    text = "import subprocess\n\ndef go(cmd):\n    note = '" + "中文說明" * 6 + "'; " + INJECTED.lstrip()
+    hits = scan.scan_text("scripts/x.py", text)
+    assert [(h.function, h.callee, h.literal) for h in hits] == [("go", "subprocess.run", "60")]
+
+
 def test_boundary_19_archived_copies_registered_as_class_d() -> None:
     """封存副本（numview_freeze_seam／testreg_probes/trial_impl）之命中皆登記 D「封存、不執行」。"""
     for h in scan.scan_repo(REPO):

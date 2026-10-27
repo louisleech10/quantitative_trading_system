@@ -147,16 +147,20 @@ def _scan_python(path: str, text: str, patterns: Sequence[Tuple[str, "re.Pattern
     index = _Index()
     if tree is not None:
         index.visit(tree)
-        strings = index.strings
-    else:  # 語法錯誤之檔：退回 tokenize 取字串區間
+        strings = index.strings  # AST 欄位為 UTF-8 位元組偏移
+        byte_offsets = True
+    else:  # 語法錯誤之檔：退回 tokenize 取字串區間（字元偏移）
         strings = _string_spans(text)
+        byte_offsets = False
     hits: List[Hit] = []
     for n, line in enumerate(text.splitlines(), start=1):
         for pid, rx in patterns:
             m = rx.search(line)
             if not m:
                 continue
-            in_string = any(a <= m.start() < b for a, b in strings.get(n, []))
+            # AST 之欄位為 UTF-8 位元組偏移、正則為字元偏移：換算後比較（同行有非 ASCII 字串時兩者不同；b1 審碼 r4 P1-01）
+            pos = len(line[:m.start()].encode("utf-8")) if byte_offsets else m.start()
+            in_string = any(a <= pos < b for a, b in strings.get(n, []))
             callee, literal = "", ""
             if not in_string:
                 covering = [c for c in index.calls if c[0] <= n <= c[1]]
