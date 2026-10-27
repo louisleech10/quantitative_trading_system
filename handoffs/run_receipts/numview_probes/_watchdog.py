@@ -157,8 +157,39 @@ def wall_cap_seconds(config: WatchdogConfig, expected_seconds: Optional[float]) 
             else config.wall_ceiling_seconds)
 
 
+class _PidOnly:
+    """列舉退回 `ps` 而 psutil 無法建立該行程物件時之替身：只有 `pid`；其餘查詢一律拋例外（呼叫端逐行程 try）。"""
+
+    def __init__(self, pid: int) -> None:
+        self.pid = pid
+
+    def __getattr__(self, name: str) -> Any:
+        raise RuntimeError(f"pid {self.pid} 無 psutil 物件（{name} 不可用）")
+
+
+def _ps_descendants(pid: int) -> List[int]:
+    """以 `ps -axo pid=,ppid=` 建父子表求 `pid` 之子孫（psutil 列舉被拒時之退路；b3 審碼 r2 CODEX-R2-P1-01）。"""
+    try:
+        out = subprocess.run(["ps", "-axo", "pid=,ppid="], capture_output=True, text=True).stdout
+    except OSError:
+        return []
+    kids: Dict[int, List[int]] = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            kids.setdefault(int(parts[1]), []).append(int(parts[0]))
+    found, stack = [], list(kids.get(pid, []))
+    while stack:
+        c = stack.pop()
+        if c not in found:
+            found.append(c)
+            stack.extend(kids.get(c, []))
+    return found
+
+
 def _tree(pid: int) -> List[Any]:
-    """`pid` 與其存活子孫之 psutil.Process；psutil 不可用或列舉失敗 ⇒ 盡力而為（至少本行程）／空。"""
+    """`pid` 與其存活子孫之 psutil.Process；psutil 列舉被拒 ⇒ 退回 `ps` 求子孫（建不了 psutil 物件者以 `_PidOnly` 代）；
+    psutil 不可用 ⇒ 空。"""
     try:
         import psutil
 
@@ -168,7 +199,13 @@ def _tree(pid: int) -> List[Any]:
     try:
         return [root] + root.children(recursive=True)
     except Exception:  # noqa: BLE001 — 沙箱／權限不可列舉子孫
-        return [root]
+        procs: List[Any] = [root]
+        for c in _ps_descendants(pid):
+            try:
+                procs.append(psutil.Process(c))
+            except Exception:  # noqa: BLE001
+                procs.append(_PidOnly(c))
+        return procs
 
 
 def tree_cpu_seconds(pid: int) -> Optional[float]:
@@ -266,55 +303,73 @@ def _signal_all(pgid: Optional[int], pids: Sequence[int], sig: int) -> None:
             pass
 
 
+def _exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:  # 存在但不可送信號
+        return True
+    except OSError:
+        return False
+
+
 def _alive(pids: Sequence[int]) -> List[int]:
-    """仍存活（非殭屍）之 pid；psutil 不可用 ⇒ 以 os.kill(pid, 0) 判。"""
+    """仍存活（非殭屍）之 pid；psutil 不可用或查詢被拒（沙箱／權限；b3 審碼 r2 CODEX-R2-P1-01）⇒ 以 os.kill(pid, 0) 判。"""
     out = []
     for pid in pids:
         try:
             import psutil
-
+        except ImportError:
+            if _exists(pid):
+                out.append(pid)
+            continue
+        try:
             if psutil.Process(pid).status() != psutil.STATUS_ZOMBIE:
                 out.append(pid)
-        except ImportError:
-            try:
-                os.kill(pid, 0)
-                out.append(pid)
-            except OSError:
-                pass
-        except Exception:  # noqa: BLE001 — 已結束
+        except psutil.NoSuchProcess:
             pass
+        except Exception:  # noqa: BLE001 — AccessDenied 等 ⇒ 不得當作已結束
+            if _exists(pid):
+                out.append(pid)
     return out
 
 
-def _remember(pid: int, seen: Dict[int, float]) -> None:
-    """把 `pid` 之子孫（含已 setsid 脫離群組者）以 {pid: 建立時刻} 累積進 `seen`；列舉失敗即略過（下一輪再補）。"""
+def _remember(pid: int, seen: Dict[int, Optional[float]]) -> None:
+    """把 `pid` 之子孫（含已 setsid 脫離群組者）以 {pid: 建立時刻} 累積進 `seen`；建立時刻讀不到 ⇒ 記 None（仍記 pid）。"""
     for p in _tree(pid):
         try:
-            seen.setdefault(p.pid, p.create_time())
-        except Exception:  # noqa: BLE001 — 列舉後已結束
-            pass
+            created: Optional[float] = p.create_time()
+        except Exception:  # noqa: BLE001 — 已結束或查詢被拒
+            created = None
+        seen.setdefault(p.pid, created)
 
 
-def _seen_alive(seen: Optional[Mapping[int, float]]) -> List[int]:
-    """`seen` 中仍存活且建立時刻相同者（防 pid 被重用而誤殺他行程）；psutil 不可用 ⇒ 空。"""
+def _seen_alive(seen: Optional[Mapping[int, Optional[float]]]) -> List[int]:
+    """`seen` 中仍存活者：建立時刻可讀且不同 ⇒ pid 已被重用，排除（防誤殺他行程）；建立時刻不可讀（沙箱／權限）⇒ 以
+    pid 仍存在為準（終止當下距記錄僅一個檢查間隔，pid 重用機率可忽略）。"""
     out: List[int] = []
     if not seen:
         return out
     try:
         import psutil
     except Exception:  # noqa: BLE001
-        return out
+        return [pid for pid in seen if _exists(pid)]
     for pid, created in seen.items():
         try:
             p = psutil.Process(pid)
-            if abs(p.create_time() - created) < 1e-3 and p.status() != psutil.STATUS_ZOMBIE:
+            if created is not None and abs(p.create_time() - created) >= 1e-3:
+                continue
+            if p.status() != psutil.STATUS_ZOMBIE:
                 out.append(pid)
-        except Exception:  # noqa: BLE001 — 已結束或無權限
+        except psutil.NoSuchProcess:
             pass
+        except Exception:  # noqa: BLE001 — 查詢被拒
+            if _exists(pid):
+                out.append(pid)
     return out
 
 
-def _terminate(proc: "subprocess.Popen[Any]", seen: Optional[Mapping[int, float]] = None) -> Optional[int]:
+def _terminate(proc: "subprocess.Popen[Any]", seen: Optional[Mapping[int, Optional[float]]] = None) -> Optional[int]:
     """終止整個子行程樹（NOCAP Task 0.1 v4／v5 增修②）：子行程以新 session 啟動而自成行程群組 ⇒ 對整個群組送 SIGTERM
     （涵蓋快照後才 fork 者），寬限後 SIGKILL；另於送信號前後各取子孫快照、對已脫離群組（自行 setsid）者逐一送信號，
     重複至無存活子孫為止。`seen`＝監看期間逐輪累積之子孫（b3 審碼 r1 CODEX-R1-P1-02：單次快照若列舉失敗，脫離群組之孫
@@ -412,7 +467,7 @@ def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config:
     over = False
     degraded: Optional[Dict[str, Any]] = None
     prev_cpu, prev_t = probe_cpu(proc.pid), started
-    seen: Dict[int, float] = {}  # 逐輪累積之子孫（終止時補殺脫離群組者；b3 審碼 r1 CODEX-R1-P1-02）
+    seen: Dict[int, Optional[float]] = {}  # 逐輪累積之子孫（終止時補殺脫離群組者；b3 審碼 r1 CODEX-R1-P1-02）
     while True:
         rc = proc.poll()
         if rc is not None:

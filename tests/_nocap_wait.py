@@ -51,10 +51,18 @@ class ProgressWait:
                                  f"全執行緒堆疊 {stacks} （依堆疊查因，不得改回固定秒數）")
 
 
+class StallError(AssertionError):
+    """程序內等候判卡死（只令當前測試失敗，不中止整個 pytest 場次）。"""
+
+
+_STALL_SIGNAL = signal.SIGUSR2  # SIGUSR1 已供共用監看之 faulthandler 留現場使用
+
+
 class _StallMonitor(threading.Thread):
     """獨立於 event loop 之監看執行緒：受測 coroutine 若同步阻塞（未 yield，event loop 內之輪詢無從執行；b3 審碼 r1
-    CODEX-R1-P1-04），本程序 CPU 無進度達 `stall` 秒 ⇒ 寫全執行緒堆疊、對本程序送 SIGINT（阻塞中之主執行緒以
-    KeyboardInterrupt 中斷，pytest 停止並保留堆疊檔）。忙算（有 CPU）不判卡死。"""
+    CODEX-R1-P1-04），本程序 CPU 無進度達 `stall` 秒 ⇒ 寫全執行緒堆疊、對本程序送 SIGUSR2；主執行緒之臨時處理器拋
+    `StallError`（阻塞之系統呼叫被信號中斷），只令當前測試失敗（同業界 pytest-timeout 之 signal 法；b3 審碼 r2
+    CODEX-R2-P1-02：SIGINT 會中止整個場次）。忙算（有 CPU）不判卡死。"""
 
     def __init__(self, label: str, stall: float, poll: float) -> None:
         super().__init__(daemon=True)
@@ -74,9 +82,8 @@ class _StallMonitor(threading.Thread):
                 self.stacks = Path(name)
                 with os.fdopen(fd, "w", encoding="utf-8") as fh:
                     faulthandler.dump_traceback(file=fh, all_threads=True)
-                sys.stderr.write(f"\n[nocap-wait] {self.label} 卡死（同步阻塞、CPU 無進度達 {self.stall:g} 秒）：全執行緒堆疊 "
-                                 f"{self.stacks} ；送 SIGINT 中斷\n")
-                os.kill(os.getpid(), signal.SIGINT)
+                if not self._done.is_set():
+                    os.kill(os.getpid(), _STALL_SIGNAL)
                 return
 
     def stop(self) -> None:
@@ -89,6 +96,12 @@ async def await_progressing(awaitable: Awaitable[Any], label: str, stall: Option
     另起 `_StallMonitor` 涵蓋受測 coroutine 同步阻塞而 event loop 無從輪詢之情形。"""
     limit = stall_seconds() if stall is None else float(stall)
     monitor = _StallMonitor(label, limit, max(poll, 0.05))
+
+    def _raise_stall(signum: int, frame: Any) -> None:
+        raise StallError(f"{label} 卡死（同步阻塞、本程序 CPU 無進度達 {limit:g} 秒）：全執行緒堆疊 {monitor.stacks} "
+                         f"（依堆疊查因，不得改回固定秒數）")
+
+    previous = signal.signal(_STALL_SIGNAL, _raise_stall)  # 測試於主執行緒執行；處理器只在本次等候期間有效
     monitor.start()
     task = asyncio.ensure_future(awaitable)
     waiter = ProgressWait(label, limit)
@@ -101,4 +114,5 @@ async def await_progressing(awaitable: Awaitable[Any], label: str, stall: Option
         raise
     finally:
         monitor.stop()
+        signal.signal(_STALL_SIGNAL, previous)
     return task.result()

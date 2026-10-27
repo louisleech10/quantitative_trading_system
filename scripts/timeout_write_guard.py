@@ -113,6 +113,8 @@ def violations(edits: Iterable[Tuple[str, str, str]], registry: Sequence[Dict[st
     out = []
     for path, before, after in edits:
         rel = rel_path(path)
+        if Path(rel).is_absolute() or not scan._in_scope(rel):  # 與全庫掃描（Task 0.2）同一範圍；repo 外之暫存檔不管
+            continue
         added: Dict[str, int] = {}
         for line in added_lines(before, after):
             added[line] = added.get(line, 0) + 1

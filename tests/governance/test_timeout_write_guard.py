@@ -39,6 +39,8 @@ def _run(payload: Any) -> int:
     "pytestmark = pytest.mark.timeout(600)",  # b1 審碼 r6 CODEX-R6-P1-01：標記亦為時間上限樣式
     "    while time.time() - start < 300:",  # b3 審碼 r1：小於號寫法之期限
     "    while time.monotonic() < end:",  # b3 審碼 r1：以終點時刻寫之期限
+    "    while time.monotonic() <= 300:",  # b3 審碼 r2 CODEX-R2-P1-03：右側為數字
+    "    if time.time() <= (t0 + 60):",
 ])
 def test_new_time_cap_in_code_is_blocked(line: str) -> None:
     """運算路徑新增各類時間上限寫法 ⇒ rc 2。"""
@@ -76,6 +78,15 @@ def test_write_tool_scans_only_added_content(tmp_path: Path) -> None:
     assert _run(payload) == 0
     payload["tool_input"]["content"] = existing + "\nsubprocess.run(cmd, timeout=60)\n"
     assert _run(payload) == 2
+
+
+def test_scope_matches_repo_scan(tmp_path: Path) -> None:
+    """寫碼閘範圍同全庫掃描（Task 0.2）：repo 外之暫存檔、掃描範圍外之 repo 路徑 ⇒ 不擋；範圍內 ⇒ 擋。"""
+    line = "x = 1\nsubprocess.run(cmd, timeout=60)\n"
+    outside = {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "probe.py"), "content": line}}
+    assert _run(outside) == 0
+    assert _run(_edit("docs/x_probe.py", "", line)) == 0
+    assert _run(_edit("scripts/x_probe.py", "", line)) == 2
 
 
 def test_registry_rejects_class_a_and_unreasoned(tmp_path: Path) -> None:

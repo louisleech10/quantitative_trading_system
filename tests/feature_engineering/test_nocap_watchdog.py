@@ -183,6 +183,34 @@ def test_setsid_grandchild_killed_even_if_enumeration_fails_at_termination(tmp_p
         _kill_all(pids)
 
 
+def test_setsid_grandchild_killed_when_psutil_queries_denied(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """沙箱／權限下 psutil 之 children、status、create_time 一律 AccessDenied（b3 審碼 r2 CODEX-R2-P1-01 之環境類）⇒
+    子孫改由 `ps` 列舉、存活改以 os.kill(pid, 0) 判，自行 setsid 之孫行程仍被終止。"""
+    def denied(self: Any, *a: Any, **k: Any) -> Any:
+        raise psutil.AccessDenied(self.pid)
+
+    monkeypatch.setattr(psutil.Process, "children", denied)
+    monkeypatch.setattr(psutil.Process, "status", denied)
+    monkeypatch.setattr(psutil.Process, "create_time", denied)
+    pf = tmp_path / "pids.txt"
+    code = (
+        "import os, subprocess, sys, time\n"
+        f"pf = {str(pf)!r}\n"
+        "kid = subprocess.Popen([sys.executable, '-c', 'import os, time\\nos.setsid()\\ntime.sleep(60)'])\n"
+        "open(pf, 'a').write(f'{os.getpid()} {kid.pid} ')\n"
+        "time.sleep(60)\n"
+    )
+    result = wd.run_watched([sys.executable, "-c", code], log_path=tmp_path / "denied.log", config=_config(),
+                            probe_swap=lambda: 0.0)
+    pids = _pids_from(pf)
+    monkeypatch.undo()
+    try:
+        assert result.status == wd.STALLED, result
+        assert len(pids) == 2 and _alive(pids) == [], (pids, result)
+    finally:
+        _kill_all(pids)
+
+
 def test_mutation_no_accumulated_descendants_leaves_setsid_grandchild(tmp_path: Path,
                                                                       monkeypatch: pytest.MonkeyPatch) -> None:
     """改壞對照：不用逐輪累積之子孫（`_seen_alive` 恆空）且終止當下列舉失敗 ⇒ 自行 setsid 之孫行程存活（上一案之鑑別力）。"""
@@ -235,22 +263,26 @@ def test_progress_wait_busy_cpu_is_not_stalled() -> None:
 
 
 def test_await_progressing_interrupts_synchronously_blocked_coroutine() -> None:
-    """受測 coroutine 同步阻塞（未 yield）⇒ 獨立監看執行緒判卡死、留堆疊並以 SIGINT 中斷（b3 審碼 r1 CODEX-R1-P1-04）。"""
+    """受測 coroutine 同步阻塞（未 yield）⇒ 獨立監看執行緒判卡死、留堆疊，只令本測試以 StallError（AssertionError）失敗、
+    不中止 pytest 場次（b3 審碼 r1 CODEX-R1-P1-04、r2 CODEX-R2-P1-02）；處理器於等候結束後還原。"""
     import asyncio
+    import signal as _signal
 
-    from tests._nocap_wait import await_progressing
+    from tests._nocap_wait import StallError, await_progressing
 
     async def blocked() -> None:
         time.sleep(30)
 
+    before = _signal.getsignal(_signal.SIGUSR2)
     t0 = time.perf_counter()
     loop = asyncio.new_event_loop()  # 獨立 loop：asyncio.run 會清除全域 event loop，污染後續以 get_event_loop 之測試
     try:
-        with pytest.raises(KeyboardInterrupt):
+        with pytest.raises(StallError, match="堆疊"):
             loop.run_until_complete(await_progressing(blocked(), "blocked", stall=0.3))
     finally:
         loop.close()
     assert time.perf_counter() - t0 < 10.0
+    assert _signal.getsignal(_signal.SIGUSR2) is before
 
 
 def test_run_watched_subprocess_separates_streams_and_fails_on_stall(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -541,7 +541,7 @@
     {
       "path": "tests/feature_engineering/test_nocap_watchdog\\.py",
       "lines": [
-        253
+        284
       ],
       "class": "D",
       "reason": "效能斷言：同步阻塞之 coroutine 於 10 秒內被中斷"
