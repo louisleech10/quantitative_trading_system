@@ -1,0 +1,18 @@
+{
+  "_doc": "NOCAP（docs/NOCAP_SPEC.md Task 0.2／0.2b）：依時間停止或縮減運算之寫法樣式——單一真相源，寫碼當下守衛（scripts/timeout_write_guard.py）與測試期掃描共用。只套用於 suffixes 所列之檔；命中之新增行須於 scripts/timeout_registry.json 白名單登記（只收 B／C／D 類，A 類不可登記）。使用者 2026-10-27「你能確保在此專案每次都會用到嗎? 不然你可能自己手動加上時間限制，或根本不用做好的共用監看?」。",
+  "suffixes": [".py", ".sh"],
+  "patterns": [
+    {"id": "kwarg_timeout", "regex": "\\btimeout\\s*=\\s*(?!None\\b)[^,)\\s]"},
+    {"id": "asyncio_wait_for", "regex": "\\bwait_for\\s*\\("},
+    {"id": "future_result_timeout", "regex": "\\.result\\s*\\(\\s*timeout"},
+    {"id": "signal_alarm", "regex": "\\bsignal\\.alarm\\s*\\(|\\bSIGALRM\\b"},
+    {"id": "timeout_expired", "regex": "\\bTimeoutExpired\\b"},
+    {"id": "deadline", "regex": "\\bdeadline\\b"},
+    {"id": "max_seconds", "regex": "\\bmax_seconds\\b|--max-seconds|\\bMAX_SECONDS\\b"},
+    {"id": "wall_cap", "regex": "\\bwall_(cap|ceiling|multiple)"},
+    {"id": "elapsed_compare", "regex": "(time\\.time|time\\.monotonic|monotonic|perf_counter)\\s*\\(\\s*\\)\\s*-\\s*[\\w.\\[\\]\"']+\\s*\\)?\\s*(>=|>)"},
+    {"id": "shell_timeout_cmd", "regex": "(^|[;&|(]\\s*|\\s)(g?timeout)\\s+-?[0-9]"},
+    {"id": "shell_elapsed_compare", "regex": "\\$\\(\\(\\s*\\$\\(date \\+%s\\)\\s*-"},
+    {"id": "optuna_timeout_attr", "regex": "\\btimeout_seconds\\b"}
+  ]
+}

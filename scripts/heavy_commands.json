@@ -1,0 +1,23 @@
+{
+  "_doc": "NOCAP Task 0.3（docs/NOCAP_SPEC.md）：重型命令封閉清單。命中者須以背景執行（run_in_background＝true），且須經共用監看：wrapped＝必經 scripts/run_watched.py 包裝；self_watched＝腳本本身以共用監看跑其重型子行程（`run_watched(` 呼叫，heavy_run_guard 以原始碼機械對證）。使用者 2026-10-27「也不準跑完或沒動靜還要等我問你才去查」「你能確保在此專案每次都會用到嗎?」。",
+  "self_watched": [
+    {"id": "ffprod_measure", "regex": "scripts/ffprod_measure\\.py\\s+(run|ic)\\b", "source": "scripts/ffprod_measure.py"},
+    {"id": "ffprod_freeze", "regex": "scripts/ffprod_freeze_baseline\\.py(?!.*--check-only)", "source": "scripts/ffprod_freeze_baseline.py"},
+    {"id": "numview_freeze", "regex": "scripts/numview_freeze_baseline\\.py", "source": "scripts/numview_freeze_baseline.py"},
+    {"id": "numview_estimate", "regex": "numview_probes/estimate\\.py", "source": "handoffs/run_receipts/numview_probes/estimate.py"},
+    {"id": "numview_precision", "regex": "numview_probes/precision_chain\\.py", "source": "handoffs/run_receipts/numview_probes/precision_chain.py"},
+    {"id": "numview_branchdiff", "regex": "numview_probes/postic_branchdiff\\.py", "source": "handoffs/run_receipts/numview_probes/postic_branchdiff.py"},
+    {"id": "numview_core_select", "regex": "numview_probes/postic_core_select\\.py", "source": "handoffs/run_receipts/numview_probes/postic_core_select.py"},
+    {"id": "numview_l2_matrix", "regex": "numview_probes/l2_arm_matrix\\.py", "source": "handoffs/run_receipts/numview_probes/l2_arm_matrix.py"}
+  ],
+  "wrapped": [
+    {"id": "pytest_heavy", "regex": "pytest\\b.*\\b(test_ffprod_gate|test_ffprod_winsor_provenance|test_numview_acceptance|test_numview_core|test_numview_identity|test_numview_policy|test_failopen_correctness|test_failopen_contract|test_failopen_layers|test_preprov_contract::test_verification_03|test_icfirstalign_memory)\\b"},
+    {"id": "pytest_full_suite", "regex": "pytest\\s*(-q\\s*)?(tests/?|tests/governance/?)?\\s*($|[;&|])"},
+    {"id": "testsel_full", "regex": "scripts/testsel\\.py\\s+full\\b"},
+    {"id": "gov_check_full", "regex": "scripts/gov_check\\.sh\\s+--no-probe"},
+    {"id": "feature_generation_cli", "regex": "scripts/(generate_features|run_feature_factory)\\.py"}
+  ],
+  "background_only": [
+    {"id": "committee_run", "regex": "scripts/committee_run\\.sh\\b"}
+  ]
+}

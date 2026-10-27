@@ -1,0 +1,16 @@
+{
+  "_doc": "NOCAP 白名單（docs/NOCAP_SPEC.md Task 0.2）：每列＝{path, contains, class, reason}——path 為 repo 相對路徑、contains 為該行須含之子字串（逐字）、class 只准 B（等外部方：網路／API／委員 CLI／鎖）、C（短輔助命令之掛住保險）、D（效能斷言／依資源判定／純字串／測試樣本／封存不執行）；A（依牆鐘停止或縮減長運算）不可登記（scripts/timeout_write_guard.py 拒收）。新增列須於同一提交經審碼。",
+  "entries": [
+    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "contains": "timeout=5", "class": "C", "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"},
+    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "contains": "proc.wait(timeout=10)", "class": "C", "reason": "已決定終止後 terminate→kill 之等候"},
+    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "contains": "subprocess.TimeoutExpired", "class": "C", "reason": "同上 terminate→kill 之例外"},
+    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "contains": "timeout=60)", "class": "C", "reason": "卡死留現場時 macOS sample 取原生堆疊之掛住保險（取樣 2 秒）"},
+    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "contains": "wall_cap_seconds", "class": "D", "reason": "牆鐘逾預期只記錄 over_expected、不終止（NOCAP Task 0.1）"},
+    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "contains": "wall_multiple_of_expected", "class": "D", "reason": "判準檔鍵；只記錄語意"},
+    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "contains": "wall_ceiling_seconds", "class": "D", "reason": "判準檔鍵；只記錄語意"},
+    {"path": "scripts/timeout_write_guard.py", "contains": "", "class": "D", "reason": "守衛本身之樣式說明與測試字串"},
+    {"path": "tests/governance/test_timeout_write_guard.py", "contains": "", "class": "D", "reason": "守衛測試之樣本字串（刻意命中樣式）"},
+    {"path": "tests/governance/test_heavy_run_guard.py", "contains": "wall_multiple_of_expected=cfg.wall_multiple_of_expected", "class": "D", "reason": "測試以判準檔之牆鐘鍵建構監看設定（只記錄語意）"},
+    {"path": "tests/governance/test_heavy_run_guard.py", "contains": "wall_ceiling_seconds=cfg.wall_ceiling_seconds", "class": "D", "reason": "同上"}
+  ]
+}

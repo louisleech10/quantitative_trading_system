@@ -6954,6 +6954,25 @@
    "rewrite_targets": [],
    "ticket": "GOVERNANCE"
   },
+  "tests/governance/test_heavy_run_guard.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_heavy_run_guard.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
+  },
   "tests/governance/test_low_risk_impl_requires_reconcile.py": {
    "claim": [
     "contract"
@@ -7336,6 +7355,25 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "TODOFMT"
+  },
+  "tests/governance/test_timeout_write_guard.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_timeout_write_guard.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
   },
   "tests/governance/test_todofmt_constitution_sync.py": {
    "claim": [
