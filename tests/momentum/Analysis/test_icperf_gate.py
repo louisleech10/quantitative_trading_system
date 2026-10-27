@@ -1,0 +1,1088 @@
+"""ICPERF Phase 0 具名驗收（docs/ICPERF_SPEC.md §G、Task 0.1／0.2；manifest docs/manifests/ICPERF.json）。
+
+施工前為紅：`scripts/icperf_freeze_baseline.py` 為空殼，凍結檔與 Task 0.2 收據尚未產出。
+- boundary_05–13 與三支 mutation：秒級，只用 tmp_path 自建小檔（h5py／tempfile 寫入屬捕獲機制之邊界輸入、不涉資料值，
+  SPEC Task 0.1、§V）。
+- boundary_01／02：讀凍結檔 `tests/_golden/icperf/pre_change.json`，另以測試自寫之獨立 oracle（os.walk 全樹前後差集＋
+  回應鍵集合）對小規模真實請求對照（slow＋requires_kline）。
+- boundary_03／04：讀真實資料 A 格（requires_kline，缺檔 FAIL）；boundary_21：真實 kline 索引上之明列邊界輸入（秒級，
+  requires_kline）。
+- boundary_14–20：讀 Task 0.2 收據（各恰一份），量測點逐欄綁定 scale_probe 收據。
+- test_freeze_reproducible：重型（slow＋requires_kline；真實資料 500 欄第 5 段重跑，改前實測約 393 秒）。
+- 本檔之 pytest 列 `scripts/heavy_commands.json` 之 wrapped（`pytest_icperf_gate`）：須經共用監看包裝並背景；只有
+  `-m "not slow and not requires_kline"`（排除全部重型與真實資料測試）之選取不列重型。
+"""
+
+from __future__ import annotations
+
+import ast
+import copy
+import dataclasses
+import hashlib
+import importlib.util
+import json
+import os
+import pickle
+import re
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
+
+import numpy as np
+import pandas as pd
+import pytest
+
+REPO = Path(__file__).resolve().parents[3]
+SCRIPT = REPO / "scripts" / "icperf_freeze_baseline.py"
+GOLDEN = REPO / "tests" / "_golden" / "icperf" / "pre_change.json"
+INVENTORY_PATTERN = "handoffs/run_receipts/*-icperf-path-inventory.json"
+SCALE_BEFORE_PATTERN = "handoffs/run_receipts/*-icperf-scale-before.json"
+
+#: SPEC §G (1)–(5)（測試自持之 oracle，不引腳本常數）
+G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfirst_post_ic")
+#: §G 凍結範圍：第 (1)、(3)、(4)、(5) 項須含回應全部欄位與快照差集之全部寫出檔
+OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic")
+#: §G：第 (1)–(4) 項為逐特徵逐欄位輸出
+FEATURE_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report")
+CELL = "A_BTCUSDT_1h"
+SEED = 20261027
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+
+#: SPEC Task 0.2 範圍：第 0–7 段（含 6b）、深度分析、IC 後轉換、IC-first、事件型路徑
+REQUIRED_STAGES = {"0", "1", "2", "3", "4", "5", "6", "6b", "7", "deep_analysis", "post_ic_transform", "icfirst", "event"}
+#: SPEC Task 0.2 具名之逐根 PIT 入口
+REQUIRED_NAMED_ENTRIES = {
+    "momentum.Analysis.long_short_analyzer:LongShortAnalyzer.compute_pit_bins",  # long_short_analyzer.py:56-60
+    "momentum.Analysis.factor_return_analyzer:FactorReturnAnalyzer._pit_expanding_position",  # :319-366
+}
+#: SPEC Task 0.2：pit_stats 四函式之「各呼叫端」
+PIT_CALLEES = ("pit_expanding_bounds", "pit_expanding_quantile_thresholds", "pit_expanding_mean_std", "pit_expanding_mad")
+INVENTORY_KEYS = {"id", "stage", "input_axes", "ic_page", "ic_first", "loop", "measure", "no_measure_reason", "evidence"}
+INPUT_AXES = {"cols", "rows", "passed_cols"}
+LOOPS = {"per_bar", "per_column", "per_group", "none"}
+SCALE_POINTS = {500, 1000, 2000}
+#: SPEC §G 時間紀律：§B ICPERF-BUDGET-2 上界 80 分鐘（SPEC v5.7）
+BUDGET2_UPPER_SECONDS = 80 * 60
+#: SPEC Task 0.2 邊界：元件於 2000 欄逾 10 分鐘 ⇒ 只量 500／1000
+TWO_POINT_SECONDS = 10 * 60
+#: boundary_01／02 獨立 oracle 之小規模真實請求欄數
+ORACLE_FEATURES = 20
+#: 獨立 oracle 之快照排除（SPEC §G 原文：.git、venv、__pycache__、numba 快取、測試選取工具狀態目錄；測試自持）
+ORACLE_EXCLUDE_DIRS = {".git", "venv", "__pycache__", ".testsel"}
+ORACLE_EXCLUDE_SUFFIXES = (".nbi", ".nbc")
+KLINE_CACHE = REPO / "data_cache" / "feature_klines" / "kline_cache.h5"
+
+
+def _load(name: str, path: Path) -> Any:
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
+
+
+HEAVY_MARKERS = ("slow", "requires_kline")
+
+
+def _watchdog_missing(markers: Sequence[str], environ: Mapping[str, str]) -> bool:
+    """本檔重型／真實資料測試（標 slow 或 requires_kline）未在共用監看下執行 ⇒ True。共用監看對子行程恆注入
+    `WATCHDOG_STACK_FILE`（handoffs/run_receipts/numview_probes/_watchdog.py:462 `stack_dump_env`）。"""
+    return any(m in HEAVY_MARKERS for m in markers) and not environ.get("WATCHDOG_STACK_FILE")
+
+
+@pytest.fixture(autouse=True)
+def _heavy_tests_require_shared_watchdog(request: pytest.FixtureRequest) -> None:
+    """r13 CODEX-R13-P1-01：下指令閘以字面比對命令（命令經 shell 變數傳路徑即比不到），故本檔重型測試於執行端自證經共用
+    監看——不論命令怎麼寫，未經監看即 FAIL，不靜默在前景無監看跑完。"""
+    if _watchdog_missing([m.name for m in request.node.iter_markers()], os.environ):
+        pytest.fail("本檔標 slow／requires_kline 之測試須經共用監看執行："
+                    "venv/bin/python scripts/run_watched.py --log <路徑> -- <pytest 命令>（背景）")
+
+
+@pytest.fixture(scope="module")
+def fb() -> Any:
+    return _load("icperf_freeze_baseline", SCRIPT)
+
+
+@pytest.fixture(scope="module")
+def scale_probe() -> Any:
+    return _load("icperf_gate_scale_probe", REPO / "scripts" / "scale_probe.py")
+
+
+# ── 共用小工具 ─────────────────────────────────────────────────────────────────────────────────────────
+
+
+def _key(path: Path, repo: Path) -> str:
+    """path_key（腳本模組說明）：repo 下＝repo 相對 POSIX；其餘＝解析後絕對路徑。測試自算，不引腳本。"""
+    p, r = path.resolve(), repo.resolve()
+    try:
+        return p.relative_to(r).as_posix()
+    except ValueError:
+        return str(p)
+
+
+def _repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    (repo / "data_cache" / "features").mkdir(parents=True, exist_ok=True)
+    (repo / "data_cache" / "reports").mkdir(parents=True, exist_ok=True)
+    return repo
+
+
+def _capture(fb: Any, tmp_path: Path, body: str, *, output_roots: Optional[Sequence[Path]] = None,
+             tag: str = "child") -> Dict[str, Any]:
+    """於 tmp_path/repo 以子行程執行 `body`，經腳本之寫出捕獲取結果。"""
+    repo = _repo(tmp_path)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir(parents=True, exist_ok=True)
+    child = scripts / f"{tag}.py"
+    child.write_text(textwrap.dedent(body), encoding="utf-8")
+    roots = list(output_roots) if output_roots is not None else [repo / "data_cache"]
+    return fb.capture_run([sys.executable, str(child)], repo_root=repo, iso_root=tmp_path / f"iso_{tag}",
+                          output_roots=roots, work_dir=tmp_path / f"work_{tag}")
+
+
+def _logged_paths(res: Mapping[str, Any]) -> List[str]:
+    return [str(Path(e["path"]).resolve()) for e in res["write_log"]]
+
+
+def _golden() -> Dict[str, Any]:
+    assert GOLDEN.is_file(), f"凍結檔不存在：{GOLDEN}（Task 0.1 尚未凍結）"
+    return json.loads(GOLDEN.read_text(encoding="utf-8"))
+
+
+def _single(pattern: str) -> Dict[str, Any]:
+    paths = sorted(REPO.glob(pattern))
+    assert len(paths) == 1, f"{pattern} 須恰一份，實得 {[str(p) for p in paths]}"
+    return json.loads(paths[0].read_text(encoding="utf-8"))
+
+
+def _inventory_entries() -> Dict[str, Dict[str, Any]]:
+    inv = _single(INVENTORY_PATTERN)
+    entries = inv["entries"]
+    ids = [e["id"] for e in entries]
+    assert len(ids) == len(set(ids)), "清冊入口 id 重複"
+    return {e["id"]: e for e in entries}
+
+
+# ── 獨立 oracle（不經凍結腳本之最小實作；boundary_01／02） ─────────────────────────────────────────────
+
+
+def _oracle_walk(roots: Sequence[Path]) -> Dict[str, Tuple[int, int]]:
+    """os.walk 全樹：{path_key: (大小, mtime_ns)}；排除集照 SPEC §G 原文（含 NUMBA_CACHE_DIR 整棵），不引腳本。"""
+    nd = os.environ.get("NUMBA_CACHE_DIR")
+    numba_dir = Path(nd).resolve() if nd else None
+    out: Dict[str, Tuple[int, int]] = {}
+    for root in roots:
+        if not root.exists():
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in ORACLE_EXCLUDE_DIRS
+                           and not (numba_dir is not None and (Path(dirpath) / d).resolve() == numba_dir)]
+            for fn in filenames:
+                if fn.endswith(ORACLE_EXCLUDE_SUFFIXES):
+                    continue
+                p = Path(dirpath) / fn
+                try:
+                    st = p.stat()
+                except OSError:
+                    continue
+                out[_key(p, REPO)] = (st.st_size, st.st_mtime_ns)
+    return out
+
+
+def _as_container(obj: Any) -> Any:
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return dataclasses.asdict(obj)
+    if hasattr(obj, "model_dump") and not isinstance(obj, (pd.DataFrame, pd.Series)):
+        return obj.model_dump()
+    return obj
+
+
+def _ptr(seg: Any) -> str:
+    return str(seg).replace("~", "~0").replace("/", "~1")
+
+
+def _oracle_field_paths(obj: Any, path: str = "") -> Set[str]:
+    """回應物件之欄位路徑集合（規則照 `flatten_fields` docstring；測試自寫，不呼叫腳本）。"""
+    obj = _as_container(obj)
+    if isinstance(obj, pd.DataFrame):
+        return {f"{path}#index"} | {f"{path}/{_ptr(c)}{s}" for c in obj.columns for s in ("#values", "#nan_mask")}
+    if isinstance(obj, pd.Series):
+        return {f"{path}#index", f"{path}#values", f"{path}#nan_mask"}
+    if isinstance(obj, np.ndarray):
+        return {f"{path}#values", f"{path}#nan_mask"}
+    if isinstance(obj, dict) and obj:
+        return set().union(*(_oracle_field_paths(v, f"{path}/{_ptr(k)}") for k, v in obj.items()))
+    if isinstance(obj, (list, tuple)) and obj:
+        return set().union(*(_oracle_field_paths(v, f"{path}/{i}") for i, v in enumerate(obj)))
+    return {path}
+
+
+def _resolve(obj: Any, pointer: str) -> Any:
+    for seg in pointer.split("/")[1:]:
+        obj = _as_container(obj)
+        seg = seg.replace("~1", "/").replace("~0", "~")
+        obj = obj[int(seg)] if isinstance(obj, (list, tuple)) else obj[seg]
+    return _as_container(obj)
+
+
+def _top_segments(paths: Sequence[str]) -> Set[str]:
+    return {p[1:].split("/")[0].split("#")[0] if p.startswith("/") else p for p in paths}
+
+
+def _root_of(key: str, roots: Sequence[str]) -> str:
+    for r in roots:
+        r = r.rstrip("/")
+        if key == r or key.startswith(r + "/"):
+            return r
+    return "<isolated>" if key.startswith("/") else "<other>"
+
+
+def _check_item_against_oracle(fb: Any, name: str, run: Mapping[str, Any], frozen_item: Mapping[str, Any]) -> None:
+    """boundary_02 之單項判定（r12 CODEX-R12-P1-02／-P1-03：抽出以供 mutation 直接驅動）。
+    ① 同一小規模請求：凍結機制之記錄（run["record"]）逐特徵逐欄位之值與 NaN 遮罩 sha256、欄位集合、選欄通過集合
+       == 測試自原始回應重算之 oracle（帶特徵名、逐值）。
+    ② 凍結檔（整格請求）對 oracle 只比表結構、不比逐特徵值：FDR 等跨特徵校正依請求之特徵數
+       （momentum/Analysis/ic_filter_orchestrator.py:56 `apply_fdr`），20 欄與整格之逐特徵值與通過與否本可不同。
+       逐特徵表須全成員（oracle 各特徵欄位集合恰一種；成員依請求而變者於 Phase 0 即紅、不放行），凍結檔之共同欄位集合
+       與之相等，且 oracle 特徵（`small_request` 取凍結請求排序後之前 ORACLE_FEATURES 個）皆在凍結檔。"""
+    rec, raw = run["record"], run["raw"]
+    expected: Dict[str, Set[str]] = {}
+    for ptr in fb.feature_tables(name):
+        df = _resolve(raw, ptr)
+        assert isinstance(df, pd.DataFrame), f"{name}：{ptr} 非逐特徵表"
+        for feat in df.index:
+            expected.setdefault(str(feat), set()).update(f"{ptr}/{c}" for c in df.columns)
+        for c in df.columns:
+            if not pd.api.types.is_numeric_dtype(df[c]):
+                continue
+            for feat in df.index:
+                arr = df.loc[[feat], c].to_numpy()
+                got = rec["features"][str(feat)][f"{ptr}/{c}"]
+                assert got["sha256"] == hashlib.sha256(arr.tobytes()).hexdigest(), f"{name}/{feat}/{c}：值"
+                mask = np.isnan(arr.astype("float64"))
+                assert got["nan_mask_sha256"] == hashlib.sha256(mask.tobytes()).hexdigest(), f"{name}/{feat}/{c}：遮罩"
+    assert expected, f"{name}：獨立 oracle 未取得任何逐特徵表"
+    assert {f: set(v) for f, v in rec["features"].items()} == expected, f"{name}：逐特徵欄位 != 獨立 oracle"
+    oracle_schema = {frozenset(v) for v in expected.values()}
+    assert len(oracle_schema) == 1, f"{name}：逐特徵表非全成員（成員依請求而變）⇒ 凍結結構無從對照"
+    frozen_feats = frozen_item["features"]
+    assert {frozenset(v) for v in frozen_feats.values()} == oracle_schema, f"{name}：凍結檔逐特徵欄位結構 != oracle"
+    missing = set(expected) - set(frozen_feats)
+    assert not missing, f"{name}：oracle 特徵不在凍結檔：{sorted(missing)[:5]}"
+    sel = fb.selected_pointer(name)
+    if sel is not None:
+        assert sorted(map(str, _resolve(raw, sel))) == sorted(rec["selected"]), f"{name}：選欄通過集合 != oracle"
+
+
+@pytest.fixture(scope="module")
+def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Dict[str, Any]]:
+    """每一輸出項對同一小規模真實請求跑一次凍結機制，同時以獨立 oracle 觀測同一次執行。"""
+    golden = _golden()
+    out: Dict[str, Dict[str, Any]] = {}
+    for item in OUTPUT_ITEMS:
+        work = tmp_path_factory.mktemp(f"oracle_{item}")
+        request = fb.small_request(item, golden["items"][item]["request"], ORACLE_FEATURES)
+        iso = work / item / "iso"
+        before = _oracle_walk([REPO, iso])
+        record = fb.freeze_item(item, request=request, repo_root=REPO, work_root=work)
+        after = _oracle_walk([REPO, iso])
+        written = {k for k, v in after.items() if before.get(k) != v}
+        with open(work / item / "response.pkl", "rb") as fh:
+            raw = pickle.load(fh)
+        out[item] = {"record": record, "raw": raw, "written": written, "fields": _oracle_field_paths(raw)}
+    return out
+
+
+# ── Task 0.1 驗證：凍結檔內容 ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.slow
+@pytest.mark.requires_kline
+def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str, Any]]) -> None:
+    """§G (1)–(5) 五項皆在；各項逐特徵逐欄位 sha256 非空；(1)(3)(4)(5) 各含回應全部欄位與快照差集之全部寫出檔；
+    獨立 oracle：同一小規模真實請求之回應鍵集合與 os.walk 全樹差集 == 凍結機制之記錄，凍結檔之欄位與輸出根結構相同。"""
+    golden = _golden()
+    items = golden["items"]
+    missing = [k for k in G_ITEMS if k not in items]
+    assert not missing, f"缺凍結項 {missing}"
+    for name in FEATURE_ITEMS:
+        features = items[name]["features"]
+        assert features, f"{name}：無逐特徵輸出"
+        for feat, fields in features.items():
+            assert fields, f"{name}/{feat}：無欄位"
+            for field, digest in fields.items():
+                assert HEX64.match(str(digest.get("sha256") or "")), f"{name}/{feat}/{field}：sha256 空或非法"
+    for name in OUTPUT_ITEMS:
+        response, files = items[name]["response"], items[name]["files"]
+        assert response, f"{name}：回應欄位為空"
+        assert all(HEX64.match(str(v)) for v in response.values()), f"{name}：回應欄位 sha256 非法"
+        assert files, f"{name}：快照差集之寫出檔為空"
+        for key, rec in files.items():
+            assert HEX64.match(str(rec.get("sha256") or "")), f"{name}/{key}：檔 sha256 空或非法"
+    post_ic = items["icfirst_post_ic"]["files"]
+    assert any(rec.get("hdf5") for rec in post_ic.values()), "icfirst_post_ic：無逐群組逐資料集摘要之 HDF5"
+    sub = items["stage5_subset"]
+    assert sub["seed"] == SEED and sub["n_cols_requested"] == 2000
+    assert sub["stage_cols"] == len(sub["features"]) and 0 < sub["stage_cols"] <= 2000
+    for name in OUTPUT_ITEMS:
+        run, frozen = oracle_runs[name], items[name]
+        rec = run["record"]
+        assert set(rec["response"]) == run["fields"], (
+            f"{name}：回應欄位集合 != 獨立 oracle（少 {sorted(run['fields'] - set(rec['response']))[:5]}，"
+            f"多 {sorted(set(rec['response']) - run['fields'])[:5]}）")
+        listed = set(rec["files"]) | {t for t in rec["transient"] if t in run["written"]}
+        assert listed == run["written"], (
+            f"{name}：寫出檔集合 != os.walk 全樹差集（漏 {sorted(run['written'] - listed)[:5]}，"
+            f"多 {sorted(listed - run['written'])[:5]}）")
+        assert _top_segments(list(frozen["response"])) == _top_segments(list(run["fields"])), \
+            f"{name}：凍結檔之回應頂層欄位 != 同請求小規模 oracle"
+        assert {_root_of(k, frozen["output_roots"]) for k in frozen["files"]} == \
+            {_root_of(k, rec["output_roots"]) for k in run["written"]}, f"{name}：凍結檔之寫出根 != 同請求小規模 oracle"
+
+
+@pytest.mark.slow
+@pytest.mark.requires_kline
+def test_boundary_02_frozen_baseline_content_complete(fb: Any, oracle_runs: Dict[str, Dict[str, Any]]) -> None:
+    """逐特徵逐欄位值 sha256（原生 dtype 位元組）、NaN 遮罩 sha256、選欄通過集合、PIT 標籤序列 sha256 皆在；
+    獨立 oracle（同一小規模請求）：自原始回應之逐特徵表重算欄位集合與數值欄之值／NaN 遮罩 sha256、選欄通過集合，
+    與記錄相同；凍結檔對 oracle 只比表結構（見 `_check_item_against_oracle`）。"""
+    items = _golden()["items"]
+    for name in ("ic_report", "deep_analysis", "event_report"):
+        _check_item_against_oracle(fb, name, oracle_runs[name], items[name])
+    for name in FEATURE_ITEMS:
+        features = items[name]["features"]
+        field_sets = {frozenset(f) for f in features.values()}
+        assert len(field_sets) == 1, f"{name}：各特徵欄位集合不一致"
+        for feat, fields in features.items():
+            for field, digest in fields.items():
+                assert HEX64.match(str(digest.get("sha256") or "")), f"{name}/{feat}/{field}：值 sha256 缺"
+                assert HEX64.match(str(digest.get("nan_mask_sha256") or "")), f"{name}/{feat}/{field}：NaN 遮罩缺"
+    for name in ("ic_report", "event_report"):
+        selected = items[name]["selected"]
+        assert isinstance(selected, list) and all(isinstance(s, str) for s in selected), f"{name}：選欄通過集合缺"
+        assert set(selected) <= set(items[name]["features"]), f"{name}：選欄通過集合含未凍結之特徵"
+    for name in ("ic_report", "stage5_subset"):
+        labels = items[name]["pit_labels"]
+        assert labels, f"{name}：PIT 標籤序列缺"
+        for feat, rec in labels.items():
+            if rec["skipped_all_nan"]:
+                assert rec["label_sha256"] is None, f"{name}/{feat}：跳過之欄不得有標籤"
+            else:
+                assert HEX64.match(str(rec["label_sha256"] or "")), f"{name}/{feat}：PIT 標籤 sha256 缺"
+            assert isinstance(rec["q"], int) and isinstance(rec["q_insufficient"], bool)
+    assert set(items["stage5_subset"]["pit_labels"]) >= set(items["stage5_subset"]["features"])
+
+
+@pytest.mark.slow
+@pytest.mark.requires_kline
+def test_freeze_reproducible(fb: Any) -> None:
+    """SPEC Task 0.1 具名：2,000 欄子集之 500 欄巢狀子集（同 seed、同碼路徑）重跑第 5 段 == 凍結之對應欄。"""
+    frozen = _golden()["items"]["stage5_subset"]
+    cur = fb.stage5_subset_digests(500, seed=SEED)
+    assert 0 < cur["stage_cols"] <= 500 and cur["stage_cols"] == len(cur["features"])
+    extra = set(cur["features"]) - set(frozen["features"])
+    assert not extra, f"500 欄子集非 2,000 欄子集之巢狀子集：{sorted(extra)[:5]}"
+    for feat, fields in cur["features"].items():
+        assert fields == frozen["features"][feat], f"第 5 段輸出不可重現：{feat}"
+    for feat, rec in cur["pit_labels"].items():
+        assert rec == frozen["pit_labels"][feat], f"PIT 標籤不可重現：{feat}"
+
+
+# ── Task 0.1 邊界（真實資料） ───────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.requires_kline
+def test_boundary_03_q_insufficient_labels_nan_as_frozen(fb: Any) -> None:
+    """A 格 q 不足之特徵（若存在）：凍結之標籤含 NaN，且 PIT 標籤序列 sha256 等於現行碼對該欄重算之值。
+    不依賴 A 格恰有此類特徵；q 不足之語意另由 boundary_21 以真實索引上之明列邊界輸入覆蓋。"""
+    labels = _golden()["items"]["ic_report"]["pit_labels"]
+    cases = {k: v for k, v in labels.items() if v["q_insufficient"] and not v["skipped_all_nan"]}
+    if not cases:
+        return
+    features, label = fb.load_cell(CELL)
+    cur = fb.pit_label_digests(features[sorted(cases)], label)
+    for feat, rec in cases.items():
+        assert rec["label_nan_count"] > 0, f"{feat}：q 不足之欄標籤應含 NaN"
+        assert cur[feat]["q_insufficient"] is True, feat
+        assert cur[feat]["label_sha256"] == rec["label_sha256"], f"{feat}：現行碼重算之標籤 != 凍結"
+        assert cur[feat]["label_nan_count"] == rec["label_nan_count"], feat
+
+
+@pytest.mark.requires_kline
+def test_boundary_04_all_nan_column_skipped_as_current(fb: Any) -> None:
+    """全 NaN 欄於凍結與現行同被跳過；另以真實索引上之全 NaN 欄（明列邊界輸入）驗現行跳過。"""
+    labels = _golden()["items"]["ic_report"]["pit_labels"]
+    frozen_skipped = {k for k, v in labels.items() if v["skipped_all_nan"]}
+    features, label = fb.load_cell(CELL)
+    all_nan_now = {c for c in features.columns if bool(features[c].isna().all())}
+    assert frozen_skipped == all_nan_now, "凍結之全 NaN 跳過集合 != 現行資料之全 NaN 欄"
+    probe = features.iloc[:, :1].copy()
+    probe["__icperf_all_nan_boundary__"] = np.nan  # 邊界輸入：真實索引上之全 NaN 欄
+    cur = fb.pit_label_digests(probe, label)
+    assert cur["__icperf_all_nan_boundary__"]["skipped_all_nan"] is True
+    assert cur["__icperf_all_nan_boundary__"]["label_sha256"] is None
+    if frozen_skipped:
+        again = fb.pit_label_digests(features[sorted(frozen_skipped)], label)
+        assert all(again[c]["skipped_all_nan"] for c in frozen_skipped)
+
+
+def _real_kline_frame(symbol: str = "BTCUSDT", timeframe: str = "1h", rows: int = 500) -> pd.DataFrame:
+    import h5py
+
+    assert KLINE_CACHE.is_file(), f"真實 kline 不存在：{KLINE_CACHE}"
+    with h5py.File(KLINE_CACHE, "r") as f:
+        data = f[f"{symbol}/{timeframe}/data"][-rows:]
+    idx = pd.to_datetime(data["timestamp"].astype("int64"), unit="s", utc=True)  # kline_cache 時戳為 epoch 秒
+    return pd.DataFrame({"close": data["close"].astype("float64")}, index=idx)
+
+
+@pytest.mark.requires_kline
+def test_boundary_21_q_insufficient_explicit_boundary_on_real_index(fb: Any) -> None:
+    """q 不足之語意（秒級）：真實 kline 索引與標籤上，特徵只前 140 列有效（明列邊界輸入：樣本數 140 / 請求 q=5 < 最小組
+    大小 30 ⇒ 降為 q=3；前 MIN_SAMPLES 根標籤 NaN）⇒ q_insufficient、q==3、標籤含 NaN，且標籤 sha256 等於現行單調性碼路徑
+    之獨立重算。"""
+    from momentum.Analysis.monotonicity_tester import MonotonicityTester
+
+    k = _real_kline_frame()
+    label = k["close"].pct_change().shift(-1).rename("label")
+    feature = k["close"].where(np.arange(len(k)) < 140).rename("f")  # 邊界輸入：真實值、只前 140 列有效
+    tester = MonotonicityTester({})
+    data = tester._prepare_data(feature, label)
+    q = tester._select_num_quantiles(len(data), 5)
+    assert q == 3, "邊界輸入未觸發 q 不足（前提失效）"
+    bins = tester._assign_quantiles(data, q)
+    expected = np.asarray(bins, dtype="float64")
+    cur = fb.pit_label_digests(pd.DataFrame({"f": feature}), label, num_quantiles=5)["f"]
+    assert cur["q_insufficient"] is True and cur["q"] == 3 and cur["skipped_all_nan"] is False
+    assert cur["label_nan_count"] == int(np.isnan(expected).sum()) > 0
+    assert cur["label_sha256"] == hashlib.sha256(expected.tobytes()).hexdigest()
+
+
+# ── §G 寫出捕獲機制之秒級契約測試 ───────────────────────────────────────────────────────────────────────
+
+
+def test_boundary_05_capture_repo_h5py_write(fb: Any, tmp_path: Path) -> None:
+    """repo 內以 h5py 寫入（不經 Python open）之檔進差集，且帶逐物件摘要。"""
+    res = _capture(fb, tmp_path, """
+        import h5py
+        import numpy as np
+        with h5py.File("data_cache/features/filtered_features.h5", "w") as f:
+            f.create_dataset("g/v", data=np.arange(4, dtype="float64"))
+            f["g"].attrs["k"] = 1
+    """)
+    assert res["rc"] == 0
+    rec = res["files"]["data_cache/features/filtered_features.h5"]
+    assert HEX64.match(rec["sha256"])
+    assert rec["hdf5"]["/g/v"]["kind"] == "dataset" and HEX64.match(rec["hdf5"]["/g/v"]["sha256"])
+    assert "k" in rec["hdf5"]["/g"]["attrs"]
+
+
+def _outside_replace_outcome(fb: Any, tmp_path: Path) -> str:
+    """repo 外 tempfile 暫存經 os.replace 落到快照範圍外 ⇒ 結果分類："fail"（FreezeError 且訊息具名目的地）、
+    "fail_other"（FreezeError 而未具名目的地）、"collected"（未擋而收集，違反 §G (c)）、"missed"（兩者皆無）。"""
+    dest = tmp_path / "elsewhere" / "report.bin"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    body = f"""
+        import os, tempfile
+        fd, tmp = tempfile.mkstemp(suffix=".part")
+        os.write(fd, b"abc")
+        os.close(fd)
+        os.replace(tmp, {str(dest)!r})
+    """
+    try:
+        res = _capture(fb, tmp_path, body, tag="outside")
+    except fb.FreezeError as exc:
+        return "fail" if str(dest.resolve()) in str(exc) or str(dest) in str(exc) else "fail_other"
+    return "collected" if _key(dest, tmp_path / "repo") in res["files"] else "missed"
+
+
+def _boundary_06_holds(fb: Any, tmp_path: Path) -> bool:
+    """repo 內目的地：os.replace 目的地入審計記錄且進集合；快照範圍外目的地：只准觸發 (c) FreezeError 且訊息具名該目的地
+    （收集即違反 fail-closed，SPEC §G (c)）。"""
+    repo = _repo(tmp_path)
+    dest = repo / "data_cache" / "reports" / "summary.bin"
+    res = _capture(fb, tmp_path, f"""
+        import os, tempfile
+        fd, tmp = tempfile.mkstemp(suffix=".part")
+        os.write(fd, b"abc")
+        os.close(fd)
+        os.replace(tmp, {str(dest)!r})
+    """, tag="inside")
+    inside_ok = (res["rc"] == 0 and str(dest.resolve()) in _logged_paths(res)
+                 and any(e["event"] == "os.replace" for e in res["write_log"])
+                 and "data_cache/reports/summary.bin" in res["files"])
+    return inside_ok and _outside_replace_outcome(fb, tmp_path) == "fail"
+
+
+def test_boundary_06_capture_outside_tempfile_replace(fb: Any, tmp_path: Path) -> None:
+    """repo 外 tempfile 暫存經 os.replace：落 repo 內 ⇒ 目的地入審計記錄且進集合；落快照範圍外 ⇒ 凍結 FAIL（fail-closed）。"""
+    assert _boundary_06_holds(fb, tmp_path)
+    assert _outside_replace_outcome(fb, tmp_path / "again") == "fail"
+
+
+def test_boundary_07_capture_subprocess_writes(fb: Any, tmp_path: Path) -> None:
+    """子行程（經共用監看啟動）與其孫行程之寫入／附加／建立模式開檔皆進同一記錄；唯讀開檔不記。"""
+    repo = _repo(tmp_path)
+    (repo / "data_cache" / "existing.txt").write_text("r", encoding="utf-8")
+    f1, f2, f3 = (repo / "data_cache" / n for n in ("w.txt", "a.txt", "x.txt"))
+    grand = (f"open({str(f2)!r}, 'a').write('a'); open({str(f3)!r}, 'x').write('x'); "
+             f"open({str(repo / 'data_cache' / 'existing.txt')!r}).read()")
+    res = _capture(fb, tmp_path, f"""
+        import subprocess, sys
+        open({str(f1)!r}, "w").write("w")
+        subprocess.run([sys.executable, "-c", {grand!r}], check=True)
+    """)
+    assert res["rc"] == 0
+    logged = _logged_paths(res)
+    for f in (f1, f2, f3):
+        assert str(f.resolve()) in logged, f"未記錄 {f}"
+    assert str((repo / "data_cache" / "existing.txt").resolve()) not in logged, "唯讀開檔不得記錄"
+    pid_of = {str(Path(e["path"]).resolve()): e["pid"] for e in res["write_log"]}
+    assert pid_of[str(f1.resolve())] != pid_of[str(f2.resolve())], "孫行程之寫入須來自另一行程（經 sitecustomize 注入）"
+    for f in (f1, f2, f3):
+        assert _key(f, repo) in res["files"]
+
+
+def test_boundary_08_tmpdir_home_isolated_and_snapshotted(fb: Any, tmp_path: Path) -> None:
+    """TMPDIR、HOME 指向隔離目錄（其餘環境不變），且隔離目錄納入快照（寫入者進集合）。"""
+    iso = tmp_path / "iso_env"
+    env = fb.isolated_env({"HOME": "/nonexistent-home", "TMPDIR": "/nonexistent-tmp", "PATH": "/usr/bin"}, iso)
+    home, tmpdir = Path(env["HOME"]).resolve(), Path(env["TMPDIR"]).resolve()
+    assert home != tmpdir
+    for p in (home, tmpdir):
+        assert p.is_dir() and p.is_relative_to(iso.resolve()), f"{p} 不在隔離目錄 {iso} 之下"
+    assert env["PATH"] == "/usr/bin"
+    res = _capture(fb, tmp_path, """
+        import os, tempfile
+        from pathlib import Path
+        h = Path(os.environ["HOME"]) / ".cache" / "h.bin"
+        h.parent.mkdir(parents=True, exist_ok=True)
+        h.write_bytes(b"h")
+        (Path(tempfile.gettempdir()) / "t.bin").write_bytes(b"t")
+        print(os.environ["HOME"], tempfile.gettempdir())
+    """, tag="iso")
+    assert res["rc"] == 0
+    iso_root = (tmp_path / "iso_iso").resolve()
+    written = [k for k in res["files"] if k.startswith(str(iso_root))]
+    assert any(k.endswith("/.cache/h.bin") for k in written), f"HOME 寫入未進集合：{sorted(res['files'])}"
+    assert any(k.endswith("/t.bin") for k in written), f"TMPDIR 寫入未進集合：{sorted(res['files'])}"
+
+
+def test_boundary_09_output_root_outside_snapshot_fails(fb: Any, tmp_path: Path) -> None:
+    """請求設定解析出之輸出根落快照範圍外 ⇒ FAIL；範圍內 ⇒ 放行；實際各路徑預設請求之輸出根皆在 repo 內。"""
+    outside = tmp_path / "elsewhere_root"
+    outside.mkdir()
+    with pytest.raises(fb.FreezeError) as exc:
+        _capture(fb, tmp_path, "pass\n", output_roots=[outside], tag="outroot")
+    assert str(outside.resolve()) in str(exc.value) or str(outside) in str(exc.value)
+    ok = _capture(fb, tmp_path, "pass\n", output_roots=[tmp_path / "repo" / "data_cache"], tag="inroot")
+    assert ok["rc"] == 0
+    for item in OUTPUT_ITEMS:
+        roots = fb.resolve_output_roots(item, fb.default_request(item, CELL), REPO)
+        assert roots, f"{item}：未解析出任何輸出根"
+        for r in roots:
+            assert str(Path(r).resolve()).startswith(str(REPO.resolve()) + "/"), f"{item}：輸出根 {r} 在 repo 外"
+
+
+def test_boundary_10_write_then_delete_recorded_not_compared(fb: Any, tmp_path: Path) -> None:
+    """寫後刪除之暫存檔記入收據（transient）、不入比對集合；保留之檔照常進集合。"""
+    res = _capture(fb, tmp_path, """
+        import os
+        open("data_cache/scratch.tmp", "w").write("x")
+        os.remove("data_cache/scratch.tmp")
+        open("data_cache/reports/kept.json", "w").write("{}")
+    """)
+    assert res["rc"] == 0
+    assert "data_cache/scratch.tmp" in res["transient"]
+    assert "data_cache/scratch.tmp" not in res["files"]
+    assert "data_cache/reports/kept.json" in res["files"]
+    assert "data_cache/reports/kept.json" not in res["transient"]
+
+
+def test_boundary_22_same_content_overwrite_recorded_not_compared(fb: Any, tmp_path: Path) -> None:
+    """既有檔以相同位元組覆寫（SPEC §G (c)「(a) 有而差集無變化者」）：審計記到該路徑與寫入模式、記入 transient、
+    不入比對集合；同一行程改寫內容之既有檔照常進集合（r11 CODEX-R11-P2-06）。"""
+    repo = _repo(tmp_path)
+    (repo / "data_cache" / "reports" / "same.json").write_text('{"a": 1}', encoding="utf-8")
+    (repo / "data_cache" / "reports" / "diff.json").write_text('{"a": 1}', encoding="utf-8")
+    res = _capture(fb, tmp_path, """
+        open("data_cache/reports/same.json", "w").write('{"a": 1}')
+        open("data_cache/reports/diff.json", "w").write('{"a": 2}')
+    """, tag="overwrite")
+    assert res["rc"] == 0
+    same = str((repo / "data_cache" / "reports" / "same.json").resolve())
+    assert any(str(Path(e["path"]).resolve()) == same and "w" in str(e["mode"]) for e in res["write_log"]), \
+        "同內容覆寫未記入寫入審計"
+    assert "data_cache/reports/same.json" in res["transient"]
+    assert "data_cache/reports/same.json" not in res["files"]
+    assert "data_cache/reports/diff.json" in res["files"]
+    assert "data_cache/reports/diff.json" not in res["transient"]
+
+
+def test_boundary_11_snapshot_exclusions_exact(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """快照排除集恰為 .git、venv、__pycache__、numba 快取（副檔名與 NUMBA_CACHE_DIR 所指目錄整棵）、測試選取工具狀態目錄
+    （相似名之對照組不排除；NUMBA_CACHE_DIR 未設時同一目錄不排除＝改壞對照）。"""
+    monkeypatch.delenv("NUMBA_CACHE_DIR", raising=False)
+    repo = tmp_path / "snaprepo"
+    excluded = [".git/HEAD", "venv/bin/python", "pkg/__pycache__/m.cpython-39.pyc", "pkg/__pycache__/f.k-1.py39.nbi",
+                "pkg/cache/f.k-1.py39.1.nbc", ".testsel/receipts/r.json", "sub/.git/config", "sub/venv/x"]
+    kept = ["venvx/a.txt", "git/b.txt", ".gitignore", "pkg/m.py", ".testsel_note.txt", "pkg/data.h5",
+            "pkg/pycache/c.txt", "pkg/nbi.txt"]
+    for rel in excluded + kept:
+        p = repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(rel.encode("utf-8"))
+    snap = fb.snapshot_files([repo], repo_root=repo)
+    assert set(snap) == set(kept), f"多：{sorted(set(snap) - set(kept))}；少：{sorted(set(kept) - set(snap))}"
+    assert all(HEX64.match(v) for v in snap.values())
+    # NUMBA_CACHE_DIR 所指目錄整棵排除（一般副檔名之檔亦然）；相似名之兄弟目錄不排除
+    numba_files = ["nbcache/sub/cache.dat", "nbcache/index.json"]
+    sibling = ["nbcache_other/cache.dat"]
+    for rel in numba_files + sibling:
+        p = repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(rel.encode("utf-8"))
+    unset = fb.snapshot_files([repo], repo_root=repo)
+    assert set(unset) == set(kept) | set(numba_files) | set(sibling), "NUMBA_CACHE_DIR 未設時該目錄不得被排除（改壞對照）"
+    monkeypatch.setenv("NUMBA_CACHE_DIR", str(repo / "nbcache"))
+    with_env = fb.snapshot_files([repo], repo_root=repo)
+    assert set(with_env) == set(kept) | set(sibling), \
+        f"NUMBA_CACHE_DIR 整棵未排除：{sorted(set(with_env) & set(numba_files))}"
+
+
+def _write_h5(path: Path, attr: int) -> None:
+    import h5py
+
+    with h5py.File(path, "w") as f:
+        f.create_dataset("g/v", data=np.arange(3, dtype="float64"))
+        f["g"].attrs["k"] = attr
+
+
+def _boundary_12_holds(fb: Any, tmp_path: Path) -> bool:
+    """改後差集多一檔或少一檔 ⇒ FAIL；同檔 sha256 不等 ⇒ FAIL；HDF5 逐資料集逐屬性比；全同 ⇒ 無問題。"""
+    d = tmp_path / "cmp"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "a.bin").write_bytes(b"a")
+    (d / "a2.bin").write_bytes(b"A")
+    (d / "c.bin").write_bytes(b"c")
+    _write_h5(d / "b.h5", 1)
+    _write_h5(d / "b_attr.h5", 2)
+    a, a2, c = (fb.describe_file(d / n) for n in ("a.bin", "a2.bin", "c.bin"))
+    b, b_attr = fb.describe_file(d / "b.h5"), fb.describe_file(d / "b_attr.h5")
+    frozen = {"response": {}, "files": {"a.bin": a, "b.h5": b}}
+
+    def problems(files: Dict[str, Any]) -> List[str]:
+        return fb.compare_capture(frozen, {"response": {}, "files": files})
+
+    same = problems({"a.bin": a, "b.h5": b})
+    extra = problems({"a.bin": a, "b.h5": b, "c.bin": c})
+    missing = problems({"a.bin": a})
+    changed = problems({"a.bin": a2, "b.h5": b})
+    attr = problems({"a.bin": a, "b.h5": b_attr})
+    return (same == [] and any("c.bin" in p for p in extra) and any("b.h5" in p for p in missing)
+            and any("a.bin" in p for p in changed) and any("b.h5" in p and "k" in p for p in attr))
+
+
+def test_boundary_12_compare_file_set_and_hashes(fb: Any, tmp_path: Path) -> None:
+    """改後差集多一檔或少一檔 ⇒ FAIL；同檔 sha256 不等 ⇒ FAIL；HDF5 逐資料集逐屬性比。"""
+    assert _boundary_12_holds(fb, tmp_path)
+
+
+def test_boundary_13_volatile_fields_only_listed_paths_excluded(fb: Any, tmp_path: Path) -> None:
+    """每次必異欄位只對所列路徑排除；未列欄位不等 ⇒ FAIL（檔內 JSON 欄位與回應欄位皆然）。"""
+    d = tmp_path / "vol"
+    d.mkdir()
+    (d / "f.json").write_text(json.dumps({"run_id": "r1", "generated_at": "t1", "ic": 0.5}), encoding="utf-8")
+    (d / "c.json").write_text(json.dumps({"run_id": "r2", "generated_at": "t2", "ic": 0.5}), encoding="utf-8")
+    frozen = {"response": fb.flatten_fields({"meta": {"run_id": "x"}, "summary": [1, 2]}),
+              "files": {"r.json": fb.describe_file(d / "f.json")}}
+    current = {"response": fb.flatten_fields({"meta": {"run_id": "y"}, "summary": [1, 2]}),
+               "files": {"r.json": fb.describe_file(d / "c.json")}}
+    only_run_id = fb.compare_capture(frozen, current, volatile=["file:r.json#/run_id", "response:/meta/run_id"])
+    assert only_run_id, "未列之 generated_at 不等須列為問題"
+    assert any("generated_at" in p for p in only_run_id)
+    assert not any("run_id" in p for p in only_run_id)
+    both = fb.compare_capture(frozen, current, volatile=["file:r.json#/run_id", "file:r.json#/generated_at",
+                                                         "response:/meta/run_id"])
+    assert both == []
+    unlisted_response = fb.compare_capture(frozen, current, volatile=["file:r.json#/run_id",
+                                                                      "file:r.json#/generated_at"])
+    assert any("run_id" in p for p in unlisted_response), "回應欄位未列即須比"
+
+
+# ── Task 0.2 收據 ───────────────────────────────────────────────────────────────────────────────────────
+
+
+def _pit_callers() -> set:
+    """AST 掃 momentum/：呼叫 PIT_CALLEES 任一者之 `<模組>:<限定名>`（測試自持之 oracle）。"""
+    out = set()
+    for path in sorted((REPO / "momentum").rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        module = ".".join(path.relative_to(REPO).with_suffix("").parts)
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+
+        def visit(node: ast.AST, qual: List[str]) -> None:
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    visit(child, qual + [child.name])
+                    continue
+                if isinstance(child, ast.Call) and qual:
+                    f = child.func
+                    name = f.attr if isinstance(f, ast.Attribute) else f.id if isinstance(f, ast.Name) else None
+                    if name in PIT_CALLEES:
+                        out.add(f"{module}:{'.'.join(qual)}")
+                visit(child, qual)
+
+        visit(tree, [])
+    return out
+
+
+def test_boundary_14_inventory_fields_and_scope() -> None:
+    """清冊每一入口欄位齊備；範圍涵蓋 SPEC Task 0.2 列名之各段與具名逐根 PIT 入口、pit_stats 四函式各呼叫端。"""
+    entries = _inventory_entries()
+    for eid, e in entries.items():
+        assert INVENTORY_KEYS <= set(e), f"{eid}：缺欄 {sorted(INVENTORY_KEYS - set(e))}"
+        assert re.match(r"^[A-Za-z_][\w.]*:[A-Za-z_][\w.]*$", eid), f"{eid}：id 須為 模組:函式"
+        assert e["stage"] in REQUIRED_STAGES, f"{eid}：所屬段 {e['stage']} 非法"
+        assert e["input_axes"] and set(e["input_axes"]) <= INPUT_AXES, f"{eid}：輸入軸非法"
+        assert isinstance(e["ic_page"], bool) and isinstance(e["ic_first"], bool), eid
+        assert e["loop"] in LOOPS, f"{eid}：迴圈型別非法"
+    stages = {e["stage"] for e in entries.values()}
+    assert REQUIRED_STAGES <= stages, f"清冊未涵蓋段：{sorted(REQUIRED_STAGES - stages)}"
+    assert REQUIRED_NAMED_ENTRIES <= set(entries), f"缺具名入口：{sorted(REQUIRED_NAMED_ENTRIES - set(entries))}"
+    callers = _pit_callers()
+    assert callers, "AST 掃描未找到 pit_stats 四函式之呼叫端（oracle 失效）"
+    assert callers <= set(entries), f"清冊缺 pit_stats 呼叫端：{sorted(callers - set(entries))}"
+
+
+def _cover_check_catches_swapped_id(fb: Any, inventory: Mapping[str, Any], scale: Mapping[str, Any]) -> bool:
+    """覆蓋檢查須比 id 集合：把某一需量測入口之量測鍵換成無關 id（筆數不變）⇒ 須點名該入口。"""
+    needed = sorted(e["id"] for e in inventory["entries"] if e["measure"])
+    if not needed:
+        return False
+    swapped = copy.deepcopy(dict(scale))
+    entries = dict(swapped["entries"])
+    victim = needed[0]
+    entries["__icperf_unrelated_entry__"] = entries.pop(victim, {"points": []})
+    swapped["entries"] = entries
+    return fb.uncovered_entries(inventory, swapped) == [victim]
+
+
+def test_boundary_15_measured_ids_cover_inventory(fb: Any) -> None:
+    """每一入口標需量測或附「不量」碼證理由；量測收據入口 id 集合 ⊇ 需量測者（漏量即紅）。"""
+    inv = _single(INVENTORY_PATTERN)
+    scale = _single(SCALE_BEFORE_PATTERN)
+    for e in inv["entries"]:
+        if not e["measure"]:
+            assert str(e["no_measure_reason"] or "").strip(), f"{e['id']}：不量須附理由"
+            assert re.match(r"^[\w./-]+\.py:\d+", str(e["evidence"] or "")), f"{e['id']}：不量須附碼證 檔:行"
+    needed = {e["id"] for e in inv["entries"] if e["measure"]}
+    extra = set(scale["entries"]) - {e["id"] for e in inv["entries"]}
+    assert not extra, f"量測收據含清冊外之入口 id：{sorted(extra)[:5]}"
+    assert needed <= set(scale["entries"]), f"漏量：{sorted(needed - set(scale['entries']))}"
+    assert fb.uncovered_entries(inv, scale) == []
+    assert _cover_check_catches_swapped_id(fb, inv, scale)
+
+
+def _scale_entries() -> Dict[str, Dict[str, Any]]:
+    return _single(SCALE_BEFORE_PATTERN)["entries"]
+
+
+def _scale_probe_receipt(path_str: Any) -> Dict[str, Any]:
+    """量測點所引之 scale_probe 收據（實存、producer＝scripts/scale_probe.py）。"""
+    src = str(path_str or "")
+    assert src and (REPO / src).is_file(), f"量測點須引實存之 scale_probe 收據：{src!r}"
+    rec = json.loads((REPO / src).read_text(encoding="utf-8"))
+    assert rec["identity"]["meta"]["producer"] == "scripts/scale_probe.py", f"{src} 非 scale_probe 收據"
+    return rec
+
+
+def _sha_at_commit(head: str, paths: Sequence[str]) -> str:
+    """`run_receipt_identity.code_sha256` 之同一算式，但取 `head` 提交中之 blob（量測時之碼；之後改碼不影響）。"""
+    parts = []
+    for rel in sorted(set(paths)):
+        res = subprocess.run(["git", "rev-parse", "--verify", "-q", f"{head}:{rel}"], cwd=REPO,
+                             capture_output=True, text=True)
+        parts.append(f"{rel}:{res.stdout.strip() if res.returncode == 0 else 'missing'}")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def _assert_receipt_identity(eid: str, rec: Mapping[str, Any], probe: Mapping[str, Any], head: str) -> None:
+    """scale_probe 收據之 identity.match 逐欄等於該入口宣告之量測命令（r11 CODEX-R11-P1-03）：命令須含入口 id；
+    entrypoint／target_argv 照 scale_probe 之取法、data 照現行檔重算（雜湊有快取）、code／config 取量測時提交
+    `head` 之 blob、hardware 等於本機。錯入口、錯 argv、錯資料、改過之量測碼所產之收據即紅。"""
+    rid = _load("icperf_gate_receipt_identity", REPO / "scripts" / "run_receipt_identity.py")
+    cmd = [str(a) for a in probe["cmd"]]
+    assert eid in cmd, f"{eid}：量測命令未指名本入口：{cmd}"
+    entry = next((t for t in cmd if (REPO / t).is_file() and Path(t).suffix in (".py", ".sh")), cmd[0])
+    expected = rid.compute_match(entry, cmd, [], probe["data"], probe["config"])
+    expected["code_sha256"] = _sha_at_commit(head, [expected["entrypoint"]] if (REPO / expected["entrypoint"]).is_file()
+                                             else [])
+    expected["config_sha256"] = _sha_at_commit(head, [str(c) for c in probe["config"]])
+    got = rec["identity"]["match"]
+    for k in rid.MATCH_KEYS:
+        assert got.get(k) == expected[k], f"{eid}：scale_probe 收據 identity.match.{k} != 宣告之量測命令"
+
+
+def _assert_point_bound(eid: str, point: Mapping[str, Any], scale: int, unit: str, probe: Mapping[str, Any],
+                        head: str) -> None:
+    rec = _scale_probe_receipt(point.get("scale_probe_receipt"))
+    _assert_receipt_identity(eid, rec, probe, head)
+    hits = [q for q in rec["points"] if q["scale"] == scale and q["unit"] == unit]
+    assert len(hits) == 1, f"{eid}：{point['scale_probe_receipt']} 無 scale={scale}／unit={unit} 之實測點"
+    for k in ("seconds", "peak_rss_bytes"):
+        assert point[k] == hits[0][k], f"{eid}：{k} {point[k]} != scale_probe 實測 {hits[0][k]}"
+
+
+def test_boundary_16_three_points_per_entry() -> None:
+    """每一入口 points 長度 3（boundary_19 之兩點例外除外）；逐點秒數與峰值 RSS；x 軸同記輸入欄數與實際進段欄數；
+    每一點引用實存之 scale_probe 收據且秒數與峰值 RSS 逐欄等於其實測值（列長點同），且該收據之身分逐欄等於入口宣告之
+    量測命令（`probe`／列長點 `row_probe`：cmd、data、config；code 取收據頂層 `head` 提交）。"""
+    inv = _inventory_entries()
+    receipt = _single(SCALE_BEFORE_PATTERN)
+    head = str(receipt.get("head") or "")
+    assert re.fullmatch(r"[0-9a-f]{40}", head), f"量測收據須記量測時之提交 head：{head!r}"
+    for eid, m in receipt["entries"].items():
+        pts = m["points"]
+        if not m.get("two_point_exception"):
+            assert len(pts) == 3, f"{eid}：須 3 點，實得 {len(pts)}"
+        for p in pts:
+            assert isinstance(p["seconds"], (int, float)) and p["seconds"] >= 0, eid
+            assert isinstance(p["peak_rss_bytes"], int) and p["peak_rss_bytes"] > 0, eid
+            assert isinstance(p["input_cols"], int) and isinstance(p["stage_cols"], int), eid
+            assert 0 <= p["stage_cols"] <= p["input_cols"], f"{eid}：實際進段欄數不得多於輸入欄數"
+            _assert_point_bound(eid, p, p["input_cols"], "cols", m["probe"], head)
+        assert len({p["input_cols"] for p in pts}) == len(pts), f"{eid}：規模點重複"
+        if eid in inv and "rows" in inv[eid]["input_axes"]:
+            rows = m["row_points"]
+            assert len(rows) == 3 and len({r["rows"] for r in rows}) == 3, f"{eid}：列數成長元件須三種列長"
+            for r in rows:
+                _assert_point_bound(eid, r, r["rows"], "rows", m["row_probe"], head)
+
+
+def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
+    """擬合指數、r²、判準①–⑤判定結果與依據欄齊備；r² < 0.9 或標 extrapolation_unreliable 者①依據為碼層複雜度分析；
+    ②須有 lower_bound_seconds_per_unit 或碼層下限分析；各點同引一份 scale_probe 收據者，fit 與 extrapolation_unreliable
+    等於該收據。"""
+    for eid, m in _scale_entries().items():
+        fit = m["fit"]
+        assert isinstance(fit["exponent"], (int, float)) and isinstance(fit["r2"], (int, float)), eid
+        assert isinstance(m["extrapolation_unreliable"], bool), eid
+        sources = {str(p.get("scale_probe_receipt") or "") for p in m["points"]}
+        if len(sources) == 1:
+            rec = _scale_probe_receipt(next(iter(sources)))
+            assert fit["exponent"] == rec["fit"]["exponent"] and fit["r2"] == rec["fit"]["r2"], f"{eid}：fit != 收據"
+            assert m["extrapolation_unreliable"] == rec["extrapolation_unreliable"], f"{eid}：可靠性旗標 != 收據"
+        crit = m["criteria"]
+        assert set(crit) == {"1", "2", "3", "4", "5"}, f"{eid}：判準鍵 {sorted(crit)}"
+        for k, c in crit.items():
+            assert isinstance(c["result"], bool) and str(c["basis"]).strip(), f"{eid}：判準{k} 欄位缺"
+        if fit["r2"] < scale_probe.MIN_R2 or m["extrapolation_unreliable"]:
+            assert crit["1"]["basis"] == "complexity_analysis", f"{eid}：擬合不可靠時①須以碼層複雜度分析判定"
+            assert str(m.get("complexity_analysis") or "").strip(), f"{eid}：缺碼層複雜度分析"
+        else:
+            assert crit["1"]["result"] == (fit["exponent"] > scale_probe.SUPERLINEAR_EXPONENT), f"{eid}：①判定與擬合不符"
+        lb = m.get("lower_bound_seconds_per_unit")
+        assert (isinstance(lb, (int, float)) and lb > 0) or str(m.get("lower_bound_analysis") or "").strip(), \
+            f"{eid}：②缺下限實測或碼層下限分析"
+
+
+def test_boundary_18_scale_points_within_budget() -> None:
+    """規模點 ⊆ 500／1000／2000 欄；三點推估逾預算者收據記縮列長或元件層級計時。"""
+    receipt = _single(SCALE_BEFORE_PATTERN)
+    budget = receipt["budget_seconds"]
+    assert isinstance(budget, (int, float)) and 0 < budget <= BUDGET2_UPPER_SECONDS
+    for eid, m in receipt["entries"].items():
+        cols = {p["input_cols"] for p in m["points"]}
+        assert cols <= SCALE_POINTS, f"{eid}：規模點 {sorted(cols)} 超出 500／1000／2000"
+        if m["projected_seconds"] > budget:
+            red = m.get("reduction") or {}
+            assert red.get("kind") in ("row_length", "component_timing") and str(red.get("note") or "").strip(), \
+                f"{eid}：推估逾預算須記縮列長或元件層級計時"
+
+
+def _projected_2000_seconds(points: Sequence[Mapping[str, Any]]) -> float:
+    """以 500／1000 兩點推估 2000 欄耗時（線性外推與兩點冪次外推取大，保守）；測試自算，不引收據自述值。"""
+    by = {p["input_cols"]: float(p["seconds"]) for p in points}
+    s5, s10 = by[500], by[1000]
+    linear = 2.0 * s10 - s5
+    power = s10 * s10 / s5 if s5 > 0 and s10 > 0 else linear
+    return max(linear, power)
+
+
+def test_boundary_19_over_ten_minutes_two_points_annotated() -> None:
+    """500／1000 兩點推估 2000 欄逾 10 分鐘之元件 ⇒ 須帶 two_point_exception、收據不得含其 2000 欄點、附碼層複雜度分析
+    （boundary_16 之唯一例外）；未逾者不得帶例外且須 500／1000／2000 三點。"""
+    for eid, m in _scale_entries().items():
+        exc = m.get("two_point_exception")
+        cols = sorted(p["input_cols"] for p in m["points"])
+        assert 500 in cols and 1000 in cols, f"{eid}：須含 500／1000 欄點"
+        projected = _projected_2000_seconds(m["points"])
+        if projected > TWO_POINT_SECONDS:
+            assert exc, f"{eid}：2000 欄推估 {projected:.0f} 秒逾 10 分鐘，須帶 two_point_exception"
+            assert cols == [500, 1000], f"{eid}：兩點例外之收據不得含 2000 欄點（實得 {cols}）"
+            assert exc["projected_2000_seconds"] > TWO_POINT_SECONDS, f"{eid}：例外之推估值須逾 10 分鐘"
+            assert str(m.get("complexity_analysis") or "").strip(), f"{eid}：兩點例外須附碼層複雜度分析"
+        else:
+            assert not exc, f"{eid}：2000 欄推估 {projected:.0f} 秒未逾 10 分鐘，不得帶 two_point_exception"
+            assert cols == [500, 1000, 2000], f"{eid}：未逾 10 分鐘者須三點（實得 {cols}）"
+
+
+def test_boundary_20_rss_meter_and_chunk_cap_recorded() -> None:
+    """量測器（scale_probe 行程樹 RSS）與取樣間隔記於收據；2D 核心依欄分塊之工作記憶體上限值寫入收據。"""
+    receipt = _single(SCALE_BEFORE_PATTERN)
+    meter = receipt["meter"]
+    assert meter["tool"] == "scripts/scale_probe.py"
+    assert meter["rss_scope"] == "process_tree"
+    assert isinstance(meter["sample_interval_seconds"], (int, float)) and meter["sample_interval_seconds"] > 0
+    cap = receipt["chunk_cap"]
+    assert isinstance(cap["bytes"], int) and cap["bytes"] > 0
+    assert str(cap["basis"]).strip()
+
+
+# ── mutation（改壞入口行為 ⇒ 對應邊界翻轉） ─────────────────────────────────────────────────────────────
+
+
+def test_mutation_capture_drops_replace_destination(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """捕獲改為不記 os.replace 目的地 ⇒ boundary_06 翻轉。"""
+    assert _boundary_06_holds(fb, tmp_path / "orig")
+    monkeypatch.setattr(fb, "AUDIT_EVENTS", tuple(e for e in fb.AUDIT_EVENTS if e != "os.replace"))
+    assert not _boundary_06_holds(fb, tmp_path / "mutant")
+
+
+def _intersection_only(frozen_files: Mapping[str, Any], current_files: Mapping[str, Any]) -> set:
+    return set(frozen_files) & set(current_files)
+
+
+def test_mutation_compare_intersection_only(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """比對改為只比兩集合交集 ⇒ boundary_12 翻轉。"""
+    assert _boundary_12_holds(fb, tmp_path / "orig")
+    monkeypatch.setattr(fb, "compared_paths", _intersection_only)
+    assert not _boundary_12_holds(fb, tmp_path / "mutant")
+
+
+def _count_only_cover_check(inventory: Mapping[str, Any], scale: Mapping[str, Any]) -> List[str]:
+    needed = [e["id"] for e in inventory["entries"] if e["measure"]]
+    return [] if len(scale["entries"]) >= len(needed) else sorted(needed)
+
+
+def test_mutation_inventory_cover_check_disabled(fb: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """覆蓋檢查改為不比 id 集合（只比筆數）⇒ boundary_15 之覆蓋判定翻轉。邊界輸入：最小清冊與量測收據。"""
+    inventory = {"entries": [{"id": "m.a:f", "measure": True}, {"id": "m.b:g", "measure": True},
+                             {"id": "m.c:h", "measure": False}]}
+    scale = {"entries": {"m.a:f": {"points": []}, "m.b:g": {"points": []}}}
+    assert fb.uncovered_entries(inventory, scale) == []
+    assert _cover_check_catches_swapped_id(fb, inventory, scale)
+    monkeypatch.setattr(fb, "uncovered_entries", _count_only_cover_check)
+    assert not _cover_check_catches_swapped_id(fb, inventory, scale)
+
+
+def _sha(arr: np.ndarray) -> str:
+    return hashlib.sha256(arr.tobytes()).hexdigest()
+
+
+def _boundary02_inputs() -> Tuple[Any, Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """boundary_02 之最小輸入（邊界輸入：記憶體內之逐特徵表與凍結檔，不涉資料值）：(fb, oracle_runs, golden)。"""
+    df = pd.DataFrame({"ic": [0.1, 0.2], "p": [0.5, np.nan]}, index=["f_a", "f_b"])
+    rec_feats = {f: {f"/summary/{c}": {"sha256": _sha(df.loc[[f], c].to_numpy()),
+                                        "nan_mask_sha256": _sha(np.isnan(df.loc[[f], c].to_numpy().astype("float64")))}
+                     for c in df.columns} for f in df.index}
+    digest = {"sha256": "a" * 64, "nan_mask_sha256": "b" * 64}
+    frozen_feats = {f: {"/summary/ic": dict(digest), "/summary/p": dict(digest)} for f in ("f_a", "f_b", "f_c")}
+    labels = {f: {"skipped_all_nan": False, "label_sha256": "c" * 64, "q": 5, "q_insufficient": False}
+              for f in frozen_feats}
+    items: Dict[str, Any] = {n: {"features": copy.deepcopy(frozen_feats)} for n in FEATURE_ITEMS}
+    for n in ("ic_report", "event_report"):
+        items[n]["selected"] = ["f_a"]
+    for n in ("ic_report", "stage5_subset"):
+        items[n]["pit_labels"] = copy.deepcopy(labels)
+    runs = {n: {"record": {"features": copy.deepcopy(rec_feats), "selected": ["f_a"]},
+                "raw": {"summary": df.copy(), "sel": ["f_a"]}} for n in ("ic_report", "deep_analysis", "event_report")}
+    fake_fb = type("FakeFb", (), {
+        "feature_tables": staticmethod(lambda name: ["/summary"]),
+        "selected_pointer": staticmethod(lambda name: "/sel" if name in ("ic_report", "event_report") else None)})()
+    return fake_fb, runs, {"items": items}
+
+
+def test_mutation_boundary_02_oracle_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """直接驅動 boundary_02（r12 CODEX-R12-P1-02／-P1-03）：相符者綠；同請求記錄之值 sha256 改壞、凍結檔某特徵缺一欄、
+    oracle 特徵不在凍結檔、逐特徵表非全成員（成員依請求而變）、選欄通過集合不同 ⇒ 各自紅。"""
+    module = sys.modules[__name__]
+
+    def run(mutate: Any) -> None:
+        fake_fb, runs, golden = _boundary02_inputs()
+        mutate(runs, golden)
+        monkeypatch.setattr(module, "_golden", lambda: golden)
+        test_boundary_02_frozen_baseline_content_complete(fake_fb, runs)
+
+    run(lambda r, g: None)
+    mutants = [
+        lambda r, g: r["ic_report"]["record"]["features"]["f_a"]["/summary/ic"].update(sha256="0" * 64),
+        lambda r, g: g["items"]["deep_analysis"]["features"]["f_b"].pop("/summary/p"),
+        lambda r, g: g["items"]["event_report"]["features"].pop("f_b"),
+        lambda r, g: r["ic_report"]["raw"].update(passed=pd.DataFrame({"x": [1.0]}, index=["f_a"])) or None,
+        lambda r, g: r["event_report"]["record"].update(selected=["f_b"]),
+    ]
+    for i, mutate in enumerate(mutants):
+        fake_fb, runs, golden = _boundary02_inputs()
+        mutate(runs, golden)
+        if i == 3:  # 第二張逐特徵表只列 f_a（成員依請求而變）
+            fake_fb = type("FakeFb2", (), {
+                "feature_tables": staticmethod(lambda name: ["/summary", "/passed"]),
+                "selected_pointer": staticmethod(lambda name: "/sel" if name in ("ic_report", "event_report") else None)})()
+            runs["ic_report"]["record"]["features"]["f_a"]["/passed/x"] = {
+                "sha256": _sha(np.array([1.0])), "nan_mask_sha256": _sha(np.array([False]))}
+        monkeypatch.setattr(module, "_golden", lambda g=golden: g)
+        with pytest.raises(AssertionError):
+            test_boundary_02_frozen_baseline_content_complete(fake_fb, runs)
+
+
+def test_boundary_23_heavy_tests_require_shared_watchdog() -> None:
+    """標 slow 或 requires_kline 而環境無 WATCHDOG_STACK_FILE ⇒ 判定未經監看；有則放行；非重型測試不受限（r13
+    CODEX-R13-P1-01）。邊界輸入：記憶體內之標記與環境。"""
+    assert _watchdog_missing(["slow"], {})
+    assert _watchdog_missing(["requires_kline", "parametrize"], {"WATCHDOG_STACK_FILE": ""})
+    assert not _watchdog_missing(["slow", "requires_kline"], {"WATCHDOG_STACK_FILE": "/tmp/x.log.stacks"})
+    assert not _watchdog_missing([], {})
+    assert not _watchdog_missing(["parametrize"], {})
+
+
+def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """直接驅動 boundary_16（r12 CODEX-R12-P1-03）：清冊與量測收據以記憶體內最小輸入置換讀取函式；收據身分相符者綠；
+    命令未指名本入口、錯 entrypoint、錯 argv、量測碼與 head 不同 ⇒ boundary_16 紅。身分以 run_receipt_identity 對
+    repo 內已提交之 scripts/scale_probe.py 產生（不跑量測）。"""
+    module = sys.modules[__name__]
+    rid = _load("icperf_gate_receipt_identity", REPO / "scripts" / "run_receipt_identity.py")
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True).stdout.strip()
+    eid = "m.a:f"
+    probe = {"cmd": ["venv/bin/python", "scripts/scale_probe.py", "--entry", eid], "data": [], "config": []}
+    match = rid.compute_match("scripts/scale_probe.py", probe["cmd"], [], [], [])
+    match["code_sha256"] = _sha_at_commit(head, ["scripts/scale_probe.py"])
+    match["config_sha256"] = _sha_at_commit(head, [])
+
+    def run(entry_probe: Mapping[str, Any], receipt_match: Mapping[str, Any]) -> None:
+        pts = [{"input_cols": n, "stage_cols": n, "seconds": 1.0 * n, "peak_rss_bytes": 1000 + n,
+                "scale_probe_receipt": "r.json"} for n in (500, 1000, 2000)]
+        probe_rec = {"identity": {"match": dict(receipt_match), "meta": {"producer": "scripts/scale_probe.py"}},
+                     "points": [{"scale": p["input_cols"], "unit": "cols", "seconds": p["seconds"],
+                                 "peak_rss_bytes": p["peak_rss_bytes"]} for p in pts]}
+        scale = {"head": head, "entries": {eid: {"probe": dict(entry_probe), "row_probe": None, "points": pts}}}
+        monkeypatch.setattr(module, "_inventory_entries", lambda: {eid: {"input_axes": ["cols"]}})
+        monkeypatch.setattr(module, "_single", lambda pattern: scale)
+        monkeypatch.setattr(module, "_scale_probe_receipt", lambda path_str: probe_rec)
+        test_boundary_16_three_points_per_entry()
+
+    run(probe, match)
+    bad = [
+        ({**probe, "cmd": ["venv/bin/python", "scripts/scale_probe.py", "--entry", "m.b:g"]}, match),  # 命令未指名本入口
+        (probe, {**match, "entrypoint": "scripts/run_watched.py"}),  # 錯入口檔
+        (probe, {**match, "target_argv": rid.normalize_argv(probe["cmd"] + ["--cols", "9"])}),  # 錯 argv
+        (probe, {**match, "code_sha256": "0" * 64}),  # 量測碼與 head 提交不同
+    ]
+    for p, m in bad:
+        with pytest.raises(AssertionError):
+            run(p, m)

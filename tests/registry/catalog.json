@@ -9333,6 +9333,30 @@
    ],
    "ticket": "IC-HC"
   },
+  "tests/momentum/Analysis/test_icperf_gate.py": {
+   "claim": [
+    "contract",
+    "perf",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A10",
+    "A13",
+    "A17",
+    "A3",
+    "A7"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/momentum/Analysis/test_learning_curve_analyzer.py": {
    "claim": [
     "contract",

@@ -75,6 +75,36 @@ def test_heavy_command_rules(cmd: str, background: bool, expected: int) -> None:
     assert _rc(_bash(cmd, background)) == expected
 
 
+ICPERF_GATE = "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_gate.py"
+
+
+@pytest.mark.parametrize("cmd,background,expected", [
+    # 正例（命中 pytest_icperf_gate）：前景直跑、-k 篩到重型、背景未包裝、包裝背景但無估時收據 ⇒ 擋
+    (ICPERF_GATE, False, 2),
+    (ICPERF_GATE + " -k test_freeze_reproducible", False, 2),
+    (ICPERF_GATE + " -m slow", True, 2),
+    (WRAP + ICPERF_GATE, True, 2),
+    # 末個 -m 生效：非重型篩選之後又帶 -m ⇒ 仍命中
+    (ICPERF_GATE + " -m 'not slow and not requires_kline' -m slow", False, 2),
+    # 豁免式後又延伸表示式（引號內 `or slow`／`or requires_kline`）⇒ 選到重型，仍命中；豁免式後接位置參數 ⇒ fail-closed 命中
+    (ICPERF_GATE + " -m 'not slow and not requires_kline or slow'", False, 2),
+    (ICPERF_GATE + " -m \"not slow and not requires_kline or requires_kline\"", False, 2),
+    ("venv/bin/python -m pytest -q -m 'not slow and not requires_kline' tests/momentum/Analysis/test_icperf_gate.py",
+     False, 2),
+    # 反例：最後一個 -m 恰為排除全部重型與真實資料測試之篩選 ⇒ 非重型、前景放行
+    (ICPERF_GATE + " -m 'not slow and not requires_kline'", False, 0),
+    (ICPERF_GATE + " -m 'not slow and not requires_kline' -k boundary_06", False, 0),
+    (ICPERF_GATE + " -m \"not slow and not requires_kline\" > /tmp/x.log 2>&1; echo rc=$?", False, 0),
+    (ICPERF_GATE + " -m 'not slow and not requires_kline' 2> /tmp/x.err", False, 0),
+    # `-m=EXPR` 與 `-m EXPR` 等價（r12 CODEX-R12-P2-04）
+    (ICPERF_GATE + " -m='not slow and not requires_kline'", False, 0),
+    (ICPERF_GATE + " -m='not slow and not requires_kline or slow'", False, 2),
+])
+def test_icperf_gate_pytest_is_heavy(cmd: str, background: bool, expected: int) -> None:
+    """ICPERF 施工清單審查 r10 群集 A：test_icperf_gate 之 pytest 須經共用監看並背景（非重型篩選除外）。"""
+    assert _rc(_bash(cmd, background)) == expected
+
+
 def test_executed_script_body_only_counts_command_position() -> None:
     """執行之 repo 內 .sh：檔內真的執行之重型命令擋；註解、字串、grep 樣式、`${x#y}` 後之下一行皆照實判定。"""
     helper = REPO / "handoffs" / "run_receipts" / ".nocap-guardtest-body.sh"
@@ -109,13 +139,21 @@ def test_indirect_helper_script_is_expanded_with_args(tmp_path: Path) -> None:
 
 
 def test_self_watched_sources_really_call_shared_watchdog() -> None:
-    """清單之 self_watched 腳本皆確實呼叫共用監看 run_watched(（機械對證；移除即擋）。"""
+    """清單之 self_watched 腳本皆確實呼叫共用監看 run_watched(（機械對證；移除即擋）。以守衛同一 AST 判定（呼叫節點），
+    不以原始碼字串命中——docstring 或註解提到 run_watched( 不算（ICPERF 施工清單審查 r13 CODEX-R13-P1-02）。"""
     catalog = json.loads((REPO / "scripts" / "heavy_commands.json").read_text(encoding="utf-8"))
     for rule in catalog["self_watched"]:
         assert "run_watched(" in (REPO / rule["source"]).read_text(encoding="utf-8"), rule
+        assert g.calls_run_watched(REPO / rule["source"]), rule
     fake = {"self_watched": [{"id": "x", "regex": "scripts/x_heavy\\.py", "source": "scripts/heavy_run_guard.py"}]}
     problems = g.check(_bash("venv/bin/python scripts/x_heavy.py", True), fake)
     assert problems and "未呼叫共用監看" in problems[0]
+    doc_only = REPO / "handoffs" / "run_receipts" / ".nocap-guardtest-doconly.py"
+    doc_only.write_text('"""只在說明提到 run_watched(，未呼叫。"""\n# run_watched(\nx = "run_watched("\n', encoding="utf-8")
+    try:
+        assert not g.calls_run_watched(doc_only)
+    finally:
+        doc_only.unlink()
 
 
 def test_unreadable_payload_blocks_and_other_tools_pass() -> None:

@@ -1,0 +1,171 @@
+{
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [],
+  "test_files": [
+    "tests/momentum/Analysis/test_icperf_gate.py",
+    "tests/governance/test_heavy_run_guard.py"
+  ],
+  "script_acceptance": [
+    "scripts/icperf_freeze_baseline.py"
+  ],
+  "contract_jsons": [],
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/ICPERF_SPEC.md",
+      "scripts/icperf_freeze_baseline.py",
+      "tests/momentum/Analysis/test_icperf_gate.py",
+      "scripts/heavy_commands.json",
+      "tests/governance/test_heavy_run_guard.py",
+      "tests/registry/catalog.json"
+    ],
+    "callers_now": [
+      "scripts/heavy_run_guard.py",
+      "scripts/testreg.py"
+    ],
+    "callers_later": [
+      "tests/_golden/icperf/pre_change.json",
+      "handoffs/run_receipts/<日期>-icperf-freeze-estimate.json",
+      "handoffs/run_receipts/<日期>-icperf-path-inventory.json",
+      "handoffs/run_receipts/<日期>-icperf-scale-before.json",
+      "handoffs/run_receipts/<日期>-icperf-scale-after.json",
+      "momentum/Analysis/pit_kernels.py",
+      "tests/momentum/Analysis/test_pit_kernels.py"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_gate.py && venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_heavy_run_guard.py && bash scripts/check_decoupling.sh && ! grep -n run_api tests/momentum/Analysis/test_icperf_gate.py scripts/icperf_freeze_baseline.py && bash scripts/gen_fact_key_blocks.sh --check",
+    "forbidden": [
+      {
+        "rule": "momentum/ 不得 import api/（解耦 R1）；跨域經 Protocol 與 momentum.factories（R2／R3）；服務不互相 import（R4）；設定單一來源（R5）；check_decoupling.sh 之 R2／R3／R4 摘要行不得增加",
+        "observable": true
+      },
+      {
+        "rule": "本票測試不依賴 run_api.py（canonical R6）：test_icperf_gate.py 與 icperf_freeze_baseline.py 不得引用 run_api（gate_cmd 之 grep 零命中）",
+        "observable": true
+      },
+      {
+        "rule": "不得弱化 NaN／inf 閘；不得改 PIT 語意（SPEC §C 逐項照現行 oracle）；不擅改輸出大小；不得放寬既有測試斷言（刪改測試同提交登記審清單）；新測試檔須登記 tests/registry/catalog.json（pre-commit 之 TESTREG 檢查）",
+        "observable": true
+      },
+      {
+        "rule": "凍結不得靜默漏收寫出檔：審計記錄之路徑或請求設定解析出之輸出根落在快照範圍外 ⇒ 凍結 FAIL；改後差集多一檔或少一檔即 FAIL（SPEC §G (c)；test_boundary_06、09、12）",
+        "observable": true
+      },
+      {
+        "rule": "改前碼之盤點量測規模點限 500／1000／2000 欄巢狀子集（seed 20261027；第 6 段另以通過欄數為軸、列數成長元件另三種列長），不得加大規模、不以改前碼跑 ≥ 8,000 欄或全欄；不以 2 點外推定案（SPEC §G 時間紀律、Task 0.2；test_boundary_16、18、19）",
+        "observable": true
+      },
+      {
+        "rule": "不得新增任何依牆鐘停止或縮減運算之機制（NOCAP；凍結腳本與量測入口一律只經共用監看判卡死），由 scripts/timeout_write_guard.py 產出端 hook 擋",
+        "observable": true
+      },
+      {
+        "rule": "Phase 0 不改任何產品碼（momentum/、api/ 一律不動）：凍結與盤點皆以現行碼執行，改前基準方為改前（SPEC §G「動工前以現行碼對真實資料跑」）",
+        "observable": false
+      },
+      {
+        "rule": "凍結與量測一律真實資料（A_BTCUSDT_1h 全部欄、改前基準全特徵 run 之 2,000 欄巢狀子集 seed 20261027），禁合成 fixture；捕獲機制契約測試之 h5py／tempfile 寫入屬機制邊界輸入、不涉資料值（SPEC Task 0.1「不以合成資料凍結」、§V）",
+        "observable": false
+      },
+      {
+        "rule": "重型跑（凍結、500 欄可重現性、Task 0.2 量測）一律經共用監看且背景執行、先寫估時收據；委員輪進行中不跑重型；合計逾 2 小時須先白話報使用者（SPEC §G 預估約 1.7–5.2 小時）",
+        "observable": false
+      }
+    ],
+    "risk_mitigation": [
+      "分批（依 SPEC §P 依賴；每 Phase 獨立提交，回退＝git revert，SPEC §R）：b1＝Phase 0。b1 內序：①§G 寫出捕獲機制（sys.addaudithook 記寫入／附加／建立模式開檔與 os.rename／os.replace 目的地、子行程經共用監看 sitecustomize 注入同一記錄；TMPDIR／HOME 指向隔離目錄；repo 根全部〔排除 .git、venv、__pycache__、numba 快取、測試選取工具狀態目錄〕＋隔離目錄＋所記路徑之前後快照差集；範圍外 fail-closed）與其秒級契約測試（test_boundary_05–13）先行；②秒級實查 A 格 IC 讀入後之列數，非 500 列則依 PIT 分位每欄 O(T²) 重算估時（SPEC §B ICPERF-BUDGET-1 前提）；③寫估時收據（coverage_path_ids＝ICPERF-BUDGET-1、-2）並白話報使用者後，背景經共用監看跑 Task 0.1 凍結五項（第 (4)、(5) 項請求設定與每次必異欄位之路徑以 FACT-RECEIPT 寫入 SPEC）；④500 欄巢狀子集重跑第 5 段驗可重現（test_freeze_reproducible）；⑤Task 0.2 讀碼路徑清冊→以 scripts/scale_probe.py 量清冊每一需量測入口→判準①–⑤寫入收據",
+      "scripts/icperf_freeze_baseline.py 為新重型命令：scripts/heavy_commands.json 新增 self_watched 列 icperf_freeze（腳本自以共用監看啟動子行程），使 heavy_run_guard 之背景、監看與估時收據檢查涵蓋之；不設 scale_receipt（改前碼只跑小中規模，SPEC §G）；空殼只有 run_watched 定義而無 AST 呼叫，heavy_run_guard 實跑時判「未呼叫共用監看」而擋＝施工前預期之 fail-closed，實作之 run_watched 須呼叫共用監看（_watchdog.run_watched）；另新增 wrapped 列 pytest_icperf_gate 命中 test_icperf_gate.py 之 pytest（含 -k 與其他 -m 篩選），強制經 scripts/run_watched.py 包裝並背景、照 pytest_heavy 慣例需估時收據（不設豁免）；唯一不命中＝最後一個 -m 恰為 not slow and not requires_kline（排除全部重型與真實資料測試）；tests/governance/test_heavy_run_guard.py 只增 test_icperf_gate_pytest_is_heavy；既有列與既有斷言不改",
+      "後續批（Phase 1–5 之具名測試與空殼見 not_executable，屆時以本 manifest 修訂版補列；gate_cmd 只增不減）：b2＝Phase 1（Task 1.1／1.2，新建 momentum/Analysis/pit_kernels.py 空殼與 tests/momentum/Analysis/test_pit_kernels.py）；b3＝Phase 2（Task 2.1；Task 2.2 依 Task 0.2 清冊）；b4＝Phase 3（依 Task 0.2 曲線）；b5＝Phase 4（依賴 Task 0.1，可與 b2 起並行排程，但與他批同檔改動須串行）；b6＝Phase 5（Task 5.1 依清冊判準⑤、Task 5.2 規模驗收）",
+      "SPEC §V 通則：Phase 1–5 每一改產品碼之批，收尾驗收一律含 §G 全部凍結項（五項）完整輸出逐位元 ==，對 tests/_golden/icperf/pre_change.json 比、不重跑改前碼（SPEC §B ICPERF-BUDGET-3）",
+      "§G 第 (2) 項之輸入＝探針 handoffs/run_receipts/icperf_probes/prep.py 所讀之改前基準全特徵 run 交接 h5（2026-10-28 實查仍在，但位於系統暫存目錄、可能被清除）：b1 宜先跑凍結；若已不存在須回報主委，不得以其他 run 代替而不註明",
+      "gate_cmd 之 test_freeze_reproducible 含 500 欄第 5 段真實資料重跑（改前實測 393.19 秒，handoffs/run_receipts/icperf_probes/result_N500.json），boundary_01／02 另含四項小規模真實請求之獨立 oracle，整條 gate_cmd 須背景執行（其 pytest 段由 heavy_commands.json 之 pytest_icperf_gate 機械強制經 scripts/run_watched.py 包裝）；Task 0.2 之收據測試（test_boundary_14–20）於清冊與量測收據產出前為紅",
+      "contract_jsons 為空之理由（not_executable item＝contract_jsons）：SPEC v5.7 未定任何契約 JSON；§G 凍結項之鍵集、快照排除集、Task 0.2 判準①–⑤門檻皆以 SPEC 原文為權威；超線性門檻 1.2 與 r² 0.9 已為 scripts/scale_probe.py 之常數 SUPERLINEAR_EXPONENT／MIN_R2，測試引用之、不另抄；若審查認須獨立契約檔，須先修 SPEC",
+      "每批 code review 家數依 docs/MULTI_AGENT_ORCHESTRATION.md §1 現行分工行",
+      "前端與 API 契約本批不改，故不適用 npm run build"
+    ],
+    "coverage_risk": [
+      "邊界具名測試（b1，皆在 tests/momentum/Analysis/test_icperf_gate.py）：Task 0.1 驗證＝test_boundary_01_frozen_contains_all_g_items（§G (1)–(5) 五項皆在；各項逐特徵逐欄位 sha256 非空；(1)(3)(4)(5) 各含回應全部欄位與快照差集之全部寫出檔；缺任一即紅；獨立 oracle〔測試自寫、不經凍結腳本：os.walk 全樹前後差集＋回應鍵集合，對 small_request 所得之同一小規模真實請求觀測同一次 freeze_item〕之回應鍵集合與寫出檔集合 == 記錄，凍結檔之回應頂層欄位與寫出根 == oracle；slow＋requires_kline）、test_boundary_02_frozen_baseline_content_complete（逐特徵逐欄位值 sha256〔原生 dtype 位元組〕、NaN 遮罩 sha256、選欄通過集合、PIT 標籤序列 sha256 皆在；獨立 oracle 自原始回應之 feature_tables 重算逐特徵欄位集合與數值欄之值／遮罩 sha256、selected_pointer 之選欄集合 == 記錄〔同一小請求、帶特徵名逐值〕；凍結檔〔整格請求〕對 oracle 只比表結構不比逐特徵值——FDR 等跨特徵校正依請求之特徵數〔ic_filter_orchestrator.py:56 apply_fdr〕，兩請求之逐特徵值本可不同：逐特徵表須全成員〔oracle 各特徵欄位集合恰一種，成員依請求而變即紅〕、凍結檔共同欄位集合 == oracle、oracle 特徵〔small_request 取凍結請求排序後之前 20 個〕皆在凍結檔；slow＋requires_kline）、test_freeze_reproducible（SPEC 具名；2,000 欄子集之 500 欄巢狀子集同 seed 同碼路徑重跑第 5 段 == 凍結對應欄）",
+      "Task 0.1 邊界：test_boundary_03_q_insufficient_labels_nan_as_frozen（條件式：凍結檔中 q 不足之特徵若存在，則其標籤含 NaN 且 PIT 標籤序列 sha256 等於現行碼對該欄重算之值；不依賴 A 格恰有此類特徵）、test_boundary_04_all_nan_column_skipped_as_current（全 NaN 欄於凍結與現行同被跳過）、test_boundary_21_q_insufficient_explicit_boundary_on_real_index（秒級、requires_kline：真實 kline 索引與標籤上之明列邊界輸入〔特徵只前 140 列有效，請求 q=5 ⇒ 降為 3〕⇒ q_insufficient、q==3、標籤含 NaN，標籤 sha256 == 現行單調性碼路徑獨立重算）",
+      "§G 寫出捕獲機制之秒級契約測試：test_boundary_05_capture_repo_h5py_write（repo 內以 h5py 寫入〔不經 Python open〕之檔進差集）、test_boundary_06_capture_outside_tempfile_replace（repo 外 tempfile 暫存經 os.replace：落 repo 內 ⇒ 目的地入審計記錄且進集合；落快照範圍外 ⇒ 只准 (c) FreezeError 且訊息具名目的地，收集即紅）、test_boundary_07_capture_subprocess_writes（子行程經共用監看 sitecustomize 注入之寫入開檔進同一記錄）、test_boundary_08_tmpdir_home_isolated_and_snapshotted（TMPDIR、HOME 指向隔離目錄且納入快照）、test_boundary_09_output_root_outside_snapshot_fails（請求設定解析出之輸出根落快照範圍外 ⇒ FAIL）、test_boundary_10_write_then_delete_recorded_not_compared（寫後刪除之暫存檔記入收據、不比對）、test_boundary_22_same_content_overwrite_recorded_not_compared（既有檔以相同位元組覆寫 ⇒ 寫入審計記到該路徑與模式、記入 transient、不入比對集合；改寫內容之既有檔照常進集合）、test_boundary_11_snapshot_exclusions_exact（快照排除集恰為 .git、venv、__pycache__、numba 快取〔副檔名與 NUMBA_CACHE_DIR 所指目錄整棵〕、測試選取工具狀態目錄；NUMBA_CACHE_DIR 未設時同一目錄不排除之改壞對照）、test_boundary_12_compare_file_set_and_hashes（改後差集多一檔或少一檔 ⇒ FAIL；同檔 sha256 不等 ⇒ FAIL；HDF5 逐資料集逐屬性比）、test_boundary_13_volatile_fields_only_listed_paths_excluded（每次必異欄位只對 FACT-RECEIPT 列出之路徑排除；未列欄位不等 ⇒ FAIL）",
+      "Task 0.2 收據（各讀恰一份 handoffs/run_receipts/*-icperf-path-inventory.json 與 *-icperf-scale-before.json）：test_boundary_14_inventory_fields_and_scope（每一入口含 模組:函式、所屬段、輸入軸〔欄數／列數／通過欄數〕、IC 頁與 IC-first 是否經過、是否逐根或逐欄迴圈；範圍涵蓋 SPEC Task 0.2 列名之第 0–7 段〔含 6b〕、深度分析各模組、IC 後轉換、IC-first、事件型路徑，及 pit_stats 之 pit_expanding_bounds／pit_expanding_quantile_thresholds／pit_expanding_mean_std／pit_expanding_mad 各呼叫端、long_short_analyzer.py:56-60、factor_return_analyzer.py:319-366 _pit_expanding_position）、test_boundary_15_measured_ids_cover_inventory（每一入口標需量測或附「不量」碼證理由；量測收據入口 id 集合 ⊆ 清冊 id 且 ⊇ 需量測者，多出清冊外 id 或漏量即紅）、test_boundary_16_three_points_per_entry（每一入口 points 長度 3、逐點秒數與峰值 RSS、x 軸同記輸入欄數與實際進段欄數；每一點〔含列長點〕引用實存之 scale_probe 收據且秒數與峰值 RSS 逐欄等於該收據之實測點；該收據 identity.match 逐欄等於入口宣告之量測命令 probe／row_probe〔cmd 須含清冊 id；entrypoint、target_argv、data、hardware 照現行重算，code／config 取量測收據頂層 head 提交之 blob〕）、test_boundary_17_criteria_fields_and_rules（擬合指數、r²、判準①–⑤判定結果與依據欄齊備；各點同引一份 scale_probe 收據者 fit 與 extrapolation_unreliable 等於該收據；r² < 0.9 或標 extrapolation_unreliable 者①之依據須為碼層複雜度分析；②須有 lower_bound_seconds_per_unit 或碼層下限分析註記）、test_boundary_18_scale_points_within_budget（規模點 ⊆ 500／1000／2000 欄；三點推估逾預算者收據記縮列長或元件層級計時）、test_boundary_19_over_ten_minutes_two_points_annotated（以 500／1000 兩點推估 2000 欄〔線性與冪次取大，測試自算〕逾 10 分鐘 ⇒ 須帶 two_point_exception、收據不得含其 2000 欄點、附碼層複雜度分析補第三點之判斷，為 boundary_16 之唯一例外；未逾者不得帶例外且須三點）、test_boundary_20_rss_meter_and_chunk_cap_recorded（量測器 scale_probe 行程樹 RSS 與取樣間隔記於收據；2D 核心依欄分塊之工作記憶體上限值寫入收據〔SPEC §B 四項平衡〕）",
+      "mutation：test_mutation_capture_drops_replace_destination（捕獲改為不記 os.replace 目的地 ⇒ boundary_06 翻轉）、test_mutation_compare_intersection_only（比對改為只比兩集合交集 ⇒ boundary_12 翻轉）、test_mutation_inventory_cover_check_disabled（覆蓋檢查改為不比 id 集合 ⇒ boundary_15 翻轉）、test_mutation_boundary_02_oracle_checks（以記憶體內最小輸入直接驅動 boundary_02：同請求記錄之值 sha256 改壞、凍結檔某特徵缺一欄、oracle 特徵不在凍結檔、逐特徵表非全成員、選欄通過集合不同 ⇒ 各自紅；相符者綠）、test_mutation_boundary_16_receipt_identity（置換清冊與收據讀取函式後直接驅動 boundary_16：收據身分錯入口 id／entrypoint／argv／量測碼 ⇒ 紅；相符者綠）",
+      "既有行為不得變更之處：b1 不改 momentum/、api/ 任何檔；scripts/heavy_commands.json 只新增 icperf_freeze、pytest_icperf_gate 兩列、既有列不改；tests/governance/test_heavy_run_guard.py 只新增 pytest_icperf_gate 命中／不命中案，並於 test_self_watched_sources_really_call_shared_watchdog 加守衛同一 AST 呼叫判定（原字串斷言保留；空殼只在 docstring 提到 run_watched( ⇒ 該測試於 Task 0.1 實作呼叫共用監看前為預期紅）；本檔標 slow／requires_kline 之測試以 autouse fixture 自證經共用監看（環境無 WATCHDOG_STACK_FILE 即 FAIL；test_boundary_23_heavy_tests_require_shared_watchdog）；heavy_run_guard 與 TESTREG 既有測試斷言不放寬；tests/registry/catalog.json 只新增本票測試檔之登記"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 1（Task 1.1／1.2，依賴 Task 0.1）：空殼 momentum/Analysis/pit_kernels.py（pit_expanding_qcut_label_2d(values: float64[T, N], valid: bool[T, N], q: int64[N], min_samples, require_full_q) -> float64[T, N]、pit_expanding_rank_2d(values, valid, min_samples)，函式體 raise NotImplementedError）與 tests/momentum/Analysis/test_pit_kernels.py 之具名測試：Task 1.1 驗證（真實資料 2,000 欄＋邊界案對 pandas oracle 整數標籤 ==；q∈{3,5,10} 含逐欄不同 q；valid 全真與中段缺列；重複值、常數段、NaN 與 ±inf 穿插、require_full_q 兩值）與邊界（有效數 < MIN_SAMPLES ⇒ NaN；全部相同值 ⇒ bin 數 1、require_full_q 時 NaN；±inf 視為非有限）、mutation（分位點改最近鄰插值、忽略 valid）；Task 1.2 驗證（對 pd.Series(values[:t+1]).rank(method=\"average\") 逐元素 ==，含重複值、歷史含 ±inf、NaN 穿插）與邊界（當根非有限 ⇒ NaN；全歷史僅一值 ⇒ 1.0）、mutation（method 改 min、歷史排除 ±inf）；1D pit_expanding_qcut_label／pit_expanding_rank 改呼叫 2D 核心，callers_now 屆時補 monotonicity_tester.py、turnover_analyzer.py、long_short_analyzer.py、factor_return_analyzer.py；b2 以本 manifest 修訂版補列",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 2 Task 2.1（依賴 Phase 1）：test_icperf_gate.py::test_stage5_outputs_equal_frozen（第 5 段全部逐特徵輸出對 §G 凍結 ==）、呼叫計數斷言（單調性每次 compute_all 之 2D 分位呼叫＝1，有欄觸發退回時＋1 且第二次欄集合恰為觸發欄；換手率分位與排名各 1）、混合觸發與不觸發欄之真實資料案對現行逐欄遞迴 ==、邊界（單一欄全 NaN 跳過、欄數 0 空結果、全部欄觸發退回）、mutation（退回改全欄重算 q=3、換手率改用單調性之壓縮標籤）；b3 以修訂版補列",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 2 Task 2.2（依賴 Phase 1 與 Task 0.2 路徑清冊）：列入施工之逐根 PIT 入口集合（至少 long_short_analyzer.py:56-60、factor_return_analyzer.py:319-366 _pit_expanding_position、pit_stats 之 pit_expanding_bounds／quantile_thresholds／mean_std／mad 呼叫端）、各入口對現行實作 oracle 之逐元素 == 測試與 §G 五項 ==，須待 Task 0.2 判準結果定範圍；不列入者理由記於清冊",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 3 Task 3.1（依賴 Task 0.2）：第 1、4 段超線性來源（file:line）、施工範圍與驗收（§G 五項 ==、改後三點斜率 ≤ 改前 1/2 或改為線性、寬表分塊結果相同）須待 Task 0.2 三點曲線與逐行取樣定位；施工清單依 SPEC Task 0.2「施工清單於盤點後補入本 SPEC」先修 SPEC 再補列",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 4 Task 4.1（依賴 Task 0.1）：test_icperf_gate.py::test_filtered_equals_full_subset（指定 100 欄 == 全欄取同 100 欄；§G 五項 ==；1 欄請求前處理耗時 < 全欄 1/100）、邊界（指定欄不存在照現行報錯、指定欄全被剔除與現行一致）、mutation（子集與全欄不等即紅）；前提之第 1 段各步驟輸入範圍 FACT-RECEIPT 於本 Task 動工時讀碼寫入 SPEC；b5 以修訂版補列",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 5 Task 5.1（依賴 Phase 2–4 與 Task 0.2 清冊判準⑤）：判準⑤成立之入口集合須待清冊；各入口進度測試（單位數遞增、相鄰事件間隔 ≤ 60 秒、無 callback 行為不變）與「判準⑤入口 ⊆ 有進度測試之入口」之 id 比對，b6 以修訂版補列",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 5 Task 5.2（依賴 Phase 2–4）：handoffs/run_receipts/<日期>-icperf-scale-after.json 之改後三點、全特徵 run 20.9 萬欄實跑一次（開跑前以改後三點推算逾 4 小時即不開跑，SPEC §B ICPERF-BUDGET-4）、43 萬欄推算、第 5 段每欄 ≤ 改前 1/50（目標，實測照實記）、逾 8 GB 記 blocked_by hardware；b6 以修訂版補列",
+        "reason": "blocked-by",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 0 不改任何產品碼（momentum/、api/ 一律不動）：凍結與盤點皆以現行碼執行，改前基準方為改前（SPEC §G「動工前以現行碼對真實資料跑」）",
+        "reason": "user-ruling",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "凍結與量測一律真實資料（A_BTCUSDT_1h 全部欄、改前基準全特徵 run 之 2,000 欄巢狀子集 seed 20261027），禁合成 fixture；捕獲機制契約測試之 h5py／tempfile 寫入屬機制邊界輸入、不涉資料值（SPEC Task 0.1「不以合成資料凍結」、§V）",
+        "reason": "user-ruling",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "重型跑（凍結、500 欄可重現性、Task 0.2 量測）一律經共用監看且背景執行、先寫估時收據；委員輪進行中不跑重型；合計逾 2 小時須先白話報使用者（SPEC §G 預估約 1.7–5.2 小時）",
+        "reason": "user-ruling",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}
