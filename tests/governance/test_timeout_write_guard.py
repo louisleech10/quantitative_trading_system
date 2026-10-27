@@ -51,9 +51,12 @@ def test_unchanged_existing_line_and_none_timeout_pass() -> None:
 
 
 def test_registered_external_wait_passes() -> None:
-    """白名單已登記之 C 類（監看之 sysctl 掛住保險）⇒ 放行；同檔未登記之新寫法 ⇒ 擋。"""
+    """白名單已登記之 C 類（監看之 sysctl 掛住保險）：於已登記之函式內改寫該呼叫（函式＋被呼叫者＋字面值相同）⇒ 放行；
+    同檔未登記之新寫法 ⇒ 擋（NOCAP v2 精確綁定：模組層插入同字面呼叫不再因子字串相符而放行，見 boundary 21）。"""
     path = "handoffs/run_receipts/numview_probes/_watchdog.py"
-    assert _run(_edit(path, "", 'text = subprocess.run(["sysctl"], capture_output=True, text=True, timeout=5).stdout\n')) == 0
+    old = '            text = subprocess.run(["sysctl", "-n", "vm.swapusage"], capture_output=True, text=True, timeout=5).stdout\n'
+    new = '            text = subprocess.run(["sysctl", "-n", "vm.swapusage"], text=True, capture_output=True, timeout=5).stdout\n'
+    assert _run(_edit(path, old, new)) == 0
     assert _run(_edit(path, "", "proc.communicate(timeout=900)\n")) == 2
 
 
@@ -120,7 +123,9 @@ def test_boundary_22_bash_write_into_code_file_blocked(command: str) -> None:
 
 
 @pytest.mark.parametrize("command", ["echo hi > /tmp/x.log", "jq . a.json > handoffs/run_receipts/b.json",
-                                     "cat scripts/x.py > /dev/null", "timeout 5 ls"])
+                                     "cat scripts/x.py > /dev/null", "timeout 5 ls",
+                                     "git commit -q -F - <<'EOF'\nfix: sed -i 寫入 scripts/x.py 與 > scripts/y.sh 之說明\nEOF",
+                                     "git commit -m 'echo x >> scripts/x.py 之說明'"])
 def test_boundary_23_bash_non_code_write_or_read_allowed(command: str) -> None:
     """Bash 寫入非程式檔（log、收據 JSON）或只讀程式檔 ⇒ 放行。"""
     assert _run(_bash(command)) == 0
@@ -148,7 +153,9 @@ def test_boundary_25_precommit_hook_invokes_staged_scan() -> None:
 
 
 def test_mutation_empty_patterns_lets_cap_through(monkeypatch: pytest.MonkeyPatch) -> None:
-    """改壞：樣式清空 ⇒ 新增之 `subprocess.run(cmd, timeout=600)` 不再被擋（本檔各擋案之鑑別力）。"""
-    suffixes, _ = g.load_patterns()
-    monkeypatch.setattr(g, "load_patterns", lambda *a, **k: (suffixes, []))
+    """改壞：掃描器之樣式清空 ⇒ 新增之 `subprocess.run(cmd, timeout=600)` 不再被擋（本檔各擋案之鑑別力）。"""
+    scan = g._scanner()
+    suffixes, _ = scan._load_patterns()
+    monkeypatch.setattr(scan, "_load_patterns", lambda *a, **k: (suffixes, []))
+    monkeypatch.setattr(g, "_scanner", lambda: scan)
     assert _run(_edit("scripts/ffprod_measure.py", "", "    subprocess.run(cmd, timeout=600)\n")) == 0
