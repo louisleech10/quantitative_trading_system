@@ -692,7 +692,7 @@ def test_watchdog_stopped_results_are_never_done(tmp_path: Path, monkeypatch: py
                                                                    "ic_settings": fm.IC_MEASURE_SETTINGS}}
         receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
             "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"]}
-        fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
+        fm.make_ic_step(tmp_path / "w", full_ic=True)(receipt, "A_BTCUSDT_1h", item)
         assert (None in calls) == rerun, cause  # 改前全欄 IC：監看終止者重算、硬體受阻者沿用
 
 
@@ -852,7 +852,7 @@ def test_ic_results_from_other_settings_are_recomputed(tmp_path: Path, monkeypat
     receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
         "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"],
         "ic": {"mode": "changed_columns", "sign_flips": 0}}
-    fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
+    fm.make_ic_step(tmp_path / "w", full_ic=True)(receipt, "A_BTCUSDT_1h", item)
     assert None in calls  # 舊設定之改前全欄 IC 快取（無 ic_settings）被重算
     rec = receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"]
     assert rec["ic"]["ic_settings"] == fm.IC_MEASURE_SETTINGS
@@ -903,7 +903,7 @@ def test_ic_step_sign_flips_on_changed_columns_and_selection_blocked_by_hardware
         receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
             "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"]}
         monkeypatch.setattr(fm, "ic_watched", make_watched(full_blocked))
-        fm.make_ic_step(tmp_path / f"w{full_blocked}")(receipt, "A_BTCUSDT_1h", item)
+        fm.make_ic_step(tmp_path / f"w{full_blocked}", full_ic=True)(receipt, "A_BTCUSDT_1h", item)
         ic = receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"]["ic"]
         assert ic["sign_flips"] == 1 and ic["sign_flip_columns"] == 1
         assert ic["stage6_redundancy"].startswith("不導出")
@@ -945,7 +945,7 @@ def test_ic_step_selection_requires_substitution_premise(
     item = next(i for i in fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"]) if i["kind"] == "option")
     receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
         "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"]}
-    fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
+    fm.make_ic_step(tmp_path / "w", full_ic=True)(receipt, "A_BTCUSDT_1h", item)
     ic = receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"]["ic"]
     assert "selection_out" not in ic["selection"] and "selection_in" not in ic["selection"]
     if mode == "baseline_changed_blocked":
@@ -955,6 +955,53 @@ def test_ic_step_selection_requires_substitution_premise(
         assert ic["substitution_premise"] == {**ic["substitution_premise"], "holds": False, "mismatched": 1,
                                               "checked_columns": 1}
         assert ic["selection"]["mismatched"] == 1 and "not_derived" in ic["selection"]
+
+
+def test_full_column_ic_deferred_by_default_and_flips_still_measured(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """預設（無 --full-ic）不跑改前全欄 IC（2026-09-28 裁定延後至完整規模驗證）：選欄記 fullscale_deferred、翻轉照算；
+    ic_winsor_off（兩側皆全欄）亦記延後；延後之結果算完成；`--full-ic` 後延後之快取不沿用、重算。"""
+    def row(ic: float) -> Dict[str, Any]:
+        return {"ic_mean": ic, "icir": 1.0, "p_value": 0.01, "t_stat": 2.0}
+
+    calls: List[Any] = []
+
+    def watched(run_dir: Path, symbol: str, tf: str, include: Any, winsor_off: bool, item_dir: Path) -> Dict[str, Any]:
+        calls.append((Path(run_dir).name, include, winsor_off))
+        if include is None:
+            return {"status": "ok", "rows": {"x": {**row(0.05), "feature_name": "x"}}, "override": None, "seconds": 1.0,
+                    "peak_rss_bytes": 1, "config_sha256": "c", "stage1_winsorized_count": 1,
+                    "passed_count_from_report": 1, "stage5": {}}
+        ic = -0.01 if str(run_dir).endswith("opt") else 0.05
+        return {"status": "ok", "rows": {"x": {**row(ic), "feature_name": "x"}}, "seconds": 1.0, "peak_rss_bytes": 1}
+
+    monkeypatch.setattr(fm, "_selection_tools", lambda override: _tools())
+    monkeypatch.setattr(fm, "ic_watched", watched)
+    receipt = fm.new_receipt("A_BTCUSDT_1h", tmp_path)
+    receipt["baselines"]["A_BTCUSDT_1h"] = {"default": {"status": "frozen", "run_dir": str(tmp_path / "base")}}
+    item = next(i for i in fm.plan_items("A_BTCUSDT_1h", ["layer_dtype"]) if i["kind"] == "option")
+    receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"] = {
+        "status": "measured", "run_dir": str(tmp_path / "opt"), "changed_columns": ["x"]}
+    fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", item)
+    ic = receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"]["ic"]
+    assert all(c[1] is not None for c in calls)  # 未呼叫全欄 IC
+    assert ic["sign_flips"] == 1 and ic["selection"]["blocked_by"] == fm.BLOCKED_BY_FULLSCALE
+    assert fm.ic_current(ic)
+    assert receipt["ic"]["baselines"]["A_BTCUSDT_1h"]["default"]["blocked_by"] == fm.BLOCKED_BY_FULLSCALE
+    # ic_winsor_off：兩側皆全欄 ⇒ 延後
+    calls.clear()
+    wo = next(i for i in fm.plan_items("A_BTCUSDT_1h", ["winsor_responsibility"]) if i["kind"] == "option")
+    receipt["candidates"]["winsor_responsibility"]["options"]["ic_winsor_off"]["cells"]["A_BTCUSDT_1h"] = {
+        "status": "measured", "run_dir": str(tmp_path / "base"), "changed_columns": []}
+    fm.make_ic_step(tmp_path / "w")(receipt, "A_BTCUSDT_1h", wo)
+    wic = receipt["candidates"]["winsor_responsibility"]["options"]["ic_winsor_off"]["cells"]["A_BTCUSDT_1h"]["ic"]
+    assert fm.BLOCKED_BY_FULLSCALE in wic["selection"]["blocked_by"]
+    # --full-ic：延後之快取不沿用 ⇒ 呼叫全欄 IC
+    calls.clear()
+    receipt["candidates"]["layer_dtype"]["options"]["preserve"]["cells"]["A_BTCUSDT_1h"].pop("ic")
+    fm.make_ic_step(tmp_path / "w", full_ic=True)(receipt, "A_BTCUSDT_1h", item)
+    assert any(c[1] is None for c in calls)
+    assert receipt["ic"]["baselines"]["A_BTCUSDT_1h"]["default"]["status"] == "ok"
 
 
 def test_large_fingerprint_sets_go_to_sidecar_with_hash(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2242,7 +2242,15 @@ def blocked_summary(sources: Mapping[str, Mapping[str, Any]]) -> Optional[Dict[s
             "causes": causes}
 
 
-def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, Any], str, Mapping[str, Any]], None]:
+#: 改前全欄 IC 依使用者 2026-09-28 裁定（8 GB 跑不動之大規模驗證延後至完整規模驗證，docs/TICKET_ORDER.md 第 16 步
+#: RM-FULLSCALE）及 NUMVIEW 2026-10-22 實測（全特徵格全欄 IC 於 8 GB 無法完成）延後：預設不跑，記此受阻類別（SPEC v13 補③）
+BLOCKED_BY_FULLSCALE = "fullscale_deferred"
+FULLSCALE_REASON = ("全特徵格之改前全欄 IC 依 2026-09-28 使用者裁定延後至完整規模驗證（docs/TICKET_ORDER.md 第 16 步 "
+                    "RM-FULLSCALE；NUMVIEW 2026-10-22 實測 8 GB 無法完成）；以 --full-ic 於完整規模機器執行")
+
+
+def make_ic_step(work_root: Path, force: bool = False,
+                 full_ic: bool = False) -> Callable[[Dict[str, Any], str, Mapping[str, Any]], None]:
     """IC 步（SPEC v9 補③）：
     - 正負號翻轉：改前 run 與選項 run 各只算改值欄（產品 IC 縱向路徑、IC 頁預設請求），比 ic_mean 正負號。
     - 選欄進出：第 5 階段門檻由「改前全欄 IC（每個改前基準試跑一次，快取於收據 `ic.baselines`）中替換改值欄之列」重算 FDR
@@ -2253,11 +2261,15 @@ def make_ic_step(work_root: Path, force: bool = False) -> Callable[[Dict[str, An
 
     def base_ic(receipt: Dict[str, Any], cell_id: str, bid: str) -> Dict[str, Any]:
         node = receipt["ic"]["baselines"].setdefault(cell_id, {})
+        if not full_ic:  # 延後至完整規模驗證：不跑，記受阻（翻轉只用改值欄 IC，不受影響）
+            node[bid] = {"status": "blocked", "blocked_by": BLOCKED_BY_FULLSCALE, "reason": FULLSCALE_REASON,
+                         "scope": "改前全欄 IC", "ic_settings": IC_MEASURE_SETTINGS}
+            return node[bid]
         cached = node.get(bid)
         if cached and not force and cached.get("ic_settings") == IC_MEASURE_SETTINGS and \
-                not has_watchdog_timeout(cached) and \
+                not has_watchdog_timeout(cached) and cached.get("blocked_by") != BLOCKED_BY_FULLSCALE and \
                 (cached.get("status") == "blocked" or Path(cached.get("rows_path", "")).is_file()):
-            return cached  # 只沿用成功或硬體受阻者；監看終止者重算
+            return cached  # 只沿用成功或硬體受阻者；監看終止者與先前延後者重算
         base = receipt["baselines"][cell_id][bid]
         cell = measure_cell(cell_id, bid)
         res = ic_watched(Path(base["run_dir"]), str(cell["symbol"]), str(cell["timeframes"][0]), None, False,
@@ -2376,7 +2388,7 @@ def run(args: argparse.Namespace) -> int:
     def diff(base: Mapping[str, Any], gen: Mapping[str, Any]) -> Dict[str, Any]:
         return run_value_diff(Path(base["run_dir"]), Path(gen["run_dir"]), base["fingerprints"], gen["fingerprints"])
 
-    step = None if args.skip_ic else make_ic_step(work_root)
+    step = None if args.skip_ic else make_ic_step(work_root, full_ic=args.full_ic)
     try:
         rc = execute(cell_id, items, receipt_path, work_root, generate=generate, diff=diff, ic=step)
     except HangDetected as exc:  # 不自動重跑：留現場後停止，依堆疊查因修好再跑
@@ -2390,7 +2402,7 @@ def ic_only(args: argparse.Namespace) -> int:
     cell_id = args.cell
     receipt_path = Path(args.receipt) if args.receipt else default_receipt_path()
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    step = make_ic_step(Path(receipt.get("work_root") or args.work_root), force=args.force)
+    step = make_ic_step(Path(receipt.get("work_root") or args.work_root), force=args.force, full_ic=args.full_ic)
     rc = 0
     for item in plan_items(cell_id, args.candidates):
         if item["kind"] in ("baseline", "unreachable"):
@@ -2422,6 +2434,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             p.add_argument("--skip-ic", action="store_true")
         if name == "ic":
             p.add_argument("--force", action="store_true")
+        if name in ("run", "ic"):
+            p.add_argument("--full-ic", action="store_true",
+                           help="跑改前全欄 IC（只於完整規模驗證機器；預設延後，見 FULLSCALE_REASON）")
     args = parser.parse_args(list(argv) if argv is not None else None)
     if args.gen_child:
         return _gen_child(Path(args.gen_child))
