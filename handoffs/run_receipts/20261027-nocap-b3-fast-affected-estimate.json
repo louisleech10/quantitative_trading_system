@@ -1,0 +1,30 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/api/test_feature_name_descriptor.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false tests/api/test_feature_name_descriptor.py tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py tests/feature_engineering/test_ffname_freeze_baseline.py tests/feature_engineering/test_ffprod_measure.py tests/feature_engineering/test_framepath_disposition.py tests/feature_engineering/test_icfirstalign_domain.py tests/feature_engineering/test_icfirstalign_memory.py tests/feature_engineering/test_numview_criteria.py tests/feature_engineering/test_warmup_verify_guards.py tests/governance/test_cxrun_watchdog_stale_done.py tests/governance/test_govb49_path_grant.py tests/governance/test_heavy_run_guard.py tests/governance/test_result_state_format_failed.py tests/governance/test_timeout_write_guard.py tests/governance/test_verify_gate.py tests/governance/test_verify_gate_b3.py tests/momentum/Analysis/test_ic_persist_redirect_isolation.py tests/registry/test_gate_runner_nocap.py tests/registry/test_testreg_gate_wiring.py tests/registry/test_testreg_run.py tests/registry/test_testreg_validate.py tests/registry/test_timeout_registry.py --deselect tests/feature_engineering/test_failopen_contract.py::test_l1_baseline_hash_matches_frozen --deselect tests/feature_engineering/test_failopen_contract.py::test_required_fail_returns_result --deselect tests/feature_engineering/test_failopen_layers.py::test_layer_golden_matches_baseline --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_boundary_01_probe_first_step_over_half_stops --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_boundary_02_probe_records_platform --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_guard_lifecycle_two_runs_old_guard_has_no_power --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_guard_single_reading_does_not_kill --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_guard_stops_main_during_compiled_numba_kernel --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_guard_not_stopped_at_run_exit_kills_next_run --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_metric_max_resident_footprint --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_mutation_probe_series_written_at_end_only --deselect tests/feature_engineering/test_icfirstalign_memory.py::test_probe_stop_loss_keeps_partial_series --deselect tests/feature_engineering/test_framepath_disposition.py::test_mutation_affected_gate_r59_anchor_restore_and_collect_progress --deselect tests/feature_engineering/test_framepath_disposition.py::test_mutation_d11_7_empty_sentinel_not_unconditional --deselect tests/feature_engineering/test_framepath_disposition.py::test_mutation_d11_7_inventory_hand_edit_is_red --deselect tests/feature_engineering/test_framepath_disposition.py::test_mutation_out_of_scope_rename_is_red_in_check_7",
+      "code_sha256": "d7b5c78dab41a18b21a59398e85837374de254c0facf10d412ab3114af695d00",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（NOCAP b3 收案前快速層受影響測試）",
+      "created_at": "2026-10-27T15:46:12+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 4300.0,
+  "basis": [
+    "TEST_SELECTION §5 過渡：c966cf48／189212b2 改共用監看 _watch_loop ⇒ 引用監看入口之 23 檔整檔（扣已跑之重型 19 節點）；.testreg/summary.json 所列節點歷次最大 duration_s 加總約 3880 秒（含已不存在之舊節點，故偏高估），取 4300 秒"
+  ],
+  "spec_path": "docs/NOCAP_SPEC.md",
+  "coverage_path_ids": [
+    "NOCAP-BUDGET-3"
+  ]
+}
