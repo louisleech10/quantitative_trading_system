@@ -335,6 +335,7 @@
 - 🔴 **`pytest -k coverage` 選不到 `test_verification_03_observed_values_subset_and_covered`**：宣稱跑過某測試須用明確 node id，並在 log 確認該名出現（2026-10-26 曾誤稱已跑）。
 - 🔴 **逐測試固定隨機種子用 hook（`pytest_runtest_setup`／`pytest_fixture_setup`），不用 autouse fixture**：autouse 會改動每個測試之 fixture closure，使 TESTREG E1 碑之 V08 檢查失效。
 - 🔴 **`scripts/gen_fact_key_blocks.sh` 須在 repo 根執行**：在子目錄執行時 receipt 相對路徑解析失敗，誤報「指向不存在之檔」。
+- 🔴 **session 中途改 `.claude/settings.json` 後，既有 Stop hook（`self_verify_check.sh`）疑似未再觸發**：2026-10-27 改設定加 hook 之後各則回覆漏「（自查：已查證）」而無任何 Stop hook 回灌（使用者「為何最後幾則 (自查：已查證)這類自我檢查這都沒了？」）；手動以本 session transcript 跑該 hook rc=2、0.46 秒，腳本本身正常。推測為中途改設定使 hook 待 `/hooks` 確認（未查證：session 內無法觀察 hook 載入狀態；查證法＝新 session 送一則不含標記之回覆，看是否被回灌）。新 session 開工第一件事：確認 Stop hook 與兩道新 hook 皆觸發。
 - 🔴 **新加之 hook 不會在當前 session 生效**：直接改 `.claude/settings.json` 加之 hook，須於 `/hooks` 選單確認或開新 session 才啟用（2026-10-27 實測：timeout_write_guard 手動跑 rc=2，但同 session 之 Edit 未被擋）。驗 hook 生效須於新 session 實際觸發一次。
 - 🔴 **重型跑前先量成長曲線，不得直接上全規模**（使用者 2026-10-27「軟體和量化業界會這樣直接測大規模到崩潰？」）：IC 全欄在 20.9 萬欄需約 47 小時，事前未量即跑；且違反 2026-09-28「8 GB 跑不動者延至第 16 步」裁定。先以小、中規模 3 點（如 500／1000／2000 欄）實測耗時與 RSS 再推算；建基準與驗證預設只用小中規模、每批重型跑先列預算，逾 2 小時先找省法（使用者「我感覺你所有票都這樣搞，這有符合業界做法嗎？」；NOCAP Task 0.3c）。慢程式（改前碼）不跑全規模。
 - 🔴 **延到換機只限記憶體做不到；計算沒效率須現在最優化**（使用者 2026-10-27「換大機器跟整個計算要最優化是不同事吧」）。
