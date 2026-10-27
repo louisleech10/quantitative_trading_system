@@ -43,6 +43,11 @@ def test_new_time_cap_in_code_is_blocked(line: str) -> None:
     assert _run(_edit("scripts/ffprod_measure.py", "x = 1\n", f"x = 1\n{line}\n")) == 2
 
 
+def test_non_pytest_mark_timeout_method_not_a_cap() -> None:
+    """非 pytest 物件之 `x.mark.timeout(...)` 方法呼叫不是 pytest 標記 ⇒ 不擋（b1 審碼 r7 CODEX-R7-P1-01）。"""
+    assert _run(_edit("tests/x_probe.py", "x = 1\n", "x = 1\nreturn_value = x.mark.timeout(600)\n")) == 0
+
+
 def test_unchanged_existing_line_and_none_timeout_pass() -> None:
     """既有行未變（只改他處）⇒ 放行；`timeout=None` 不算上限 ⇒ 放行；非程式檔（.md）不管轄。"""
     old = "a = 1\nsubprocess.run(cmd, timeout=600)\n"
