@@ -33,7 +33,8 @@ def _load_scanner():
 
 def _rule_for(hit, rules):
     for i, r in enumerate(rules):
-        if re.fullmatch(r["path"], hit.path) and ("lines" not in r or hit.line in r["lines"]):
+        if re.fullmatch(r["path"], hit.path) and ("lines" not in r or hit.line in r["lines"]) \
+                and ("pattern_id" not in r or hit.pattern_id == r["pattern_id"]):
             return i, r
     return None, None
 
@@ -58,14 +59,23 @@ def main() -> int:
     existing = doc["entries"]
     hits = scan.scan_repo(REPO)
     todo = scan.unregistered(hits, existing)
+    todo_keys = {id(h) for h in todo}
     problems, used, class_a, new = [], Counter(), [], []
     seen = {json.dumps({k: v for k, v in e.items() if k not in ("class", "reason")}, sort_keys=True) for e in existing}
-    for h in todo:
+    for h in hits:  # 規則套全庫命中：已登記者亦須有規則（驗既有登記無 A、規則無過期）
+        prior = None if id(h) in todo_keys else scan.registered(h, existing)
+        if prior is not None and prior.get("whole_file"):
+            continue
         i, r = _rule_for(h, rules)
         if r is None:
-            problems.append(f"無規則：{h.path}:{h.line} {h.text.strip()[:80]}")
+            if prior is None:
+                problems.append(f"無規則：{h.path}:{h.line} {h.text.strip()[:80]}")
             continue
         used[i] += 1
+        if prior is not None:
+            if r["class"] == "A":
+                problems.append(f"規則判 A 而已登記（{prior.get('class')}）：{h.path}:{h.line} {h.text.strip()[:80]}")
+            continue
         if r["class"] == "A":
             class_a.append({"path": h.path, "line": h.line, "pattern_id": h.pattern_id, "function": h.function,
                             "callee": h.callee, "literal": h.literal, "text": h.text.strip(), "reason": r["reason"]})

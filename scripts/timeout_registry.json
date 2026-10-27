@@ -1238,6 +1238,114 @@
       "line": "const elapsedSeconds = startedAtMs ? Math.max(0, Math.round((Date.now() - startedAtMs) / 1000)) : 0;",
       "class": "D",
       "reason": "顯示已耗時，非期限"
+    },
+    {
+      "path": "momentum/Optimization/optuna_optimizer.py",
+      "line": "self.timeout = timeout",
+      "class": "B",
+      "reason": "Optuna 使用者明示之搜尋預算（選填、預設 None，以 n_trials 界定；SPEC Task 5.4）"
+    },
+    {
+      "path": "momentum/Optimization/optuna_optimizer.py",
+      "function": "OptunaOptimizer._optimize_with_pluggable_objective",
+      "callee": "self.study.optimize",
+      "literal": "self.timeout",
+      "class": "B",
+      "reason": "Optuna 使用者明示之搜尋預算（選填、預設 None，以 n_trials 界定；SPEC Task 5.4）"
+    },
+    {
+      "path": "momentum/Optimization/optuna_optimizer.py",
+      "function": "OptunaOptimizer.optimize",
+      "callee": "self.study.optimize",
+      "literal": "self.timeout",
+      "class": "B",
+      "reason": "Optuna 使用者明示之搜尋預算（選填、預設 None，以 n_trials 界定；SPEC Task 5.4）"
+    },
+    {
+      "path": "api/routes/execution_optimization.py",
+      "function": "start_execution_optimization",
+      "callee": "optimization_task_service.create_task",
+      "literal": "request.timeout_seconds",
+      "class": "B",
+      "reason": "傳遞使用者明示之 Optuna 搜尋預算（SPEC Task 5.4）"
+    },
+    {
+      "path": "api/routes/hyperparameter_optimization.py",
+      "function": "start_hyperparameter_optimization",
+      "callee": "optimization_task_service.create_task",
+      "literal": "request.timeout_seconds",
+      "class": "B",
+      "reason": "傳遞使用者明示之 Optuna 搜尋預算（SPEC Task 5.4）"
+    },
+    {
+      "path": "api/services/optimization_task_service.py",
+      "line": "timeout_seconds: Optional[int] = None,",
+      "class": "B",
+      "reason": "傳遞使用者明示之 Optuna 搜尋預算（選填；SPEC Task 5.4）"
+    },
+    {
+      "path": "api/services/optimization_task_service.py",
+      "line": "'timeout_seconds': timeout_seconds,",
+      "class": "B",
+      "reason": "傳遞使用者明示之 Optuna 搜尋預算（選填；SPEC Task 5.4）"
+    },
+    {
+      "path": "api/services/optimization_task_service.py",
+      "function": "OptimizationTaskService.create_task",
+      "callee": "dict",
+      "literal": "timeout_seconds",
+      "class": "B",
+      "reason": "傳遞使用者明示之 Optuna 搜尋預算（選填；SPEC Task 5.4）"
+    },
+    {
+      "path": "tests/api/test_phase4_optimization_routes.py",
+      "line": "\"timeout_seconds\": 60,",
+      "class": "B",
+      "reason": "測試請求明示之 Optuna 搜尋預算（SPEC Task 5.4 之 B）"
+    },
+    {
+      "path": "tests/integration/test_e2e_execution.py",
+      "function": "_make_execution_optimizer",
+      "callee": "create_optuna_optimizer",
+      "literal": "120",
+      "class": "B",
+      "reason": "測試明示傳入之 Optuna 搜尋預算（SPEC Task 5.4 之 B；b1 審碼 r6 CODEX-R6-P1-03）"
+    },
+    {
+      "path": "tests/integration/test_e2e_hyperparameter.py",
+      "function": "_make_optimizer",
+      "callee": "create_optuna_optimizer",
+      "literal": "120",
+      "class": "B",
+      "reason": "測試明示傳入之 Optuna 搜尋預算（SPEC Task 5.4 之 B；b1 審碼 r6 CODEX-R6-P1-03）"
+    },
+    {
+      "path": "tests/integration/test_optuna_checkpoint_recovery.py",
+      "function": "_make_optimizer",
+      "callee": "create_optuna_optimizer",
+      "literal": "120",
+      "class": "B",
+      "reason": "測試明示傳入之 Optuna 搜尋預算（SPEC Task 5.4 之 B；b1 審碼 r6 CODEX-R6-P1-03）"
+    },
+    {
+      "path": "tests/integration/test_optuna_multi_objective.py",
+      "function": "_make_optimizer",
+      "callee": "create_optuna_optimizer",
+      "literal": "120",
+      "class": "B",
+      "reason": "測試明示傳入之 Optuna 搜尋預算（SPEC Task 5.4 之 B；b1 審碼 r6 CODEX-R6-P1-03）"
+    },
+    {
+      "path": "tests/registry/test_testreg_markers.py",
+      "line": "src = \"import pytest\\n\\npytestmark = [pytest.mark.slow, pytest.mark.timeout(10)]\\n\\n\\ndef test_x():\\n    assert True\\n\"",
+      "class": "D",
+      "reason": "測試資料字串中之 pytest.mark.timeout 字面（非標記）"
+    },
+    {
+      "path": "frontend/src/components/strategy-test/OptunaConfigPanel.tsx",
+      "line": "timeout: number  // seconds",
+      "class": "B",
+      "reason": "Optuna 搜尋預算欄之型別宣告（使用者明示之預算；SPEC Task 5.4）"
     }
   ]
 }

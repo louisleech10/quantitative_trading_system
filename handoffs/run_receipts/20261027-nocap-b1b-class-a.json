@@ -1,20 +1,17 @@
 {
   "_doc": "NOCAP b1b：A 類（依牆鐘停止／縮減運算或對長運算放棄等候）逐處清單，不登記，待 Phase 1–6 改碼移除；分類規則 handoffs/run_receipts/nocap_probes/b1b_classification.json。",
-  "count": 195,
+  "count": 196,
   "by_path": {
     "api/models/feature_browser_models.py": 3,
     "api/models/optimization_models.py": 2,
-    "api/routes/execution_optimization.py": 1,
     "api/routes/feature_browser.py": 6,
-    "api/routes/hyperparameter_optimization.py": 1,
     "api/services/ic_analysis_service.py": 4,
     "api/services/model_enhancement_service.py": 14,
-    "api/services/optimization_task_service.py": 3,
     "config/optimization_config.yaml": 1,
     "frontend/src/app/result/page.tsx": 3,
     "frontend/src/app/search/page.tsx": 4,
     "frontend/src/components/feature-factory/ExportButtons.tsx": 1,
-    "frontend/src/components/strategy-test/OptunaConfigPanel.tsx": 3,
+    "frontend/src/components/strategy-test/OptunaConfigPanel.tsx": 2,
     "frontend/src/lib/api.ts": 1,
     "frontend/src/store/searchStore.ts": 3,
     "handoffs/run_receipts/framepath_probes/admit_after.sh": 2,
@@ -25,7 +22,6 @@
     "handoffs/run_receipts/testreg_probes/b3/light_sweep.sh": 1,
     "handoffs/run_receipts/testreg_probes/v6_profile.py": 3,
     "momentum/Analysis/feature_quality_diagnostics.py": 1,
-    "momentum/Optimization/optuna_optimizer.py": 6,
     "scripts/capture_ic1eb_baseline.py": 2,
     "scripts/framepath_affected_gate.py": 10,
     "scripts/ic1c_freeze_baseline.py": 1,
@@ -42,26 +38,38 @@
     "tests/api/test_ic_deep_analysis.py": 8,
     "tests/api/test_ic_la1_degraded_gate.py": 8,
     "tests/api/test_ic_run_selector.py": 3,
-    "tests/api/test_phase4_optimization_routes.py": 2,
+    "tests/api/test_numview_ic_page.py": 1,
+    "tests/api/test_preprov_ingest_cache.py": 1,
     "tests/feature_engineering/test_failopen_contract.py": 1,
     "tests/feature_engineering/test_failopen_correctness.py": 1,
     "tests/feature_engineering/test_failopen_layers.py": 1,
     "tests/feature_engineering/test_ffname_freeze_baseline.py": 1,
     "tests/feature_engineering/test_ffprod_measure.py": 1,
     "tests/feature_engineering/test_framepath_disposition.py": 3,
-    "tests/feature_engineering/test_icfirstalign_domain.py": 1,
-    "tests/feature_engineering/test_icfirstalign_memory.py": 6,
+    "tests/feature_engineering/test_icfirstalign_calibration_domain.py": 1,
+    "tests/feature_engineering/test_icfirstalign_context.py": 1,
+    "tests/feature_engineering/test_icfirstalign_domain.py": 2,
+    "tests/feature_engineering/test_icfirstalign_icfirst.py": 1,
+    "tests/feature_engineering/test_icfirstalign_l3_arms.py": 1,
+    "tests/feature_engineering/test_icfirstalign_memory.py": 7,
+    "tests/feature_engineering/test_icfirstalign_timeaxis.py": 1,
+    "tests/feature_engineering/test_numview_acceptance.py": 1,
+    "tests/feature_engineering/test_numview_cgsa_workdir.py": 1,
+    "tests/feature_engineering/test_numview_core.py": 1,
+    "tests/feature_engineering/test_numview_identity.py": 1,
+    "tests/feature_engineering/test_numview_policy.py": 1,
+    "tests/feature_engineering/test_preprov_identity.py": 1,
     "tests/feature_engineering/test_warmup_verify_guards.py": 5,
     "tests/golden/ic_phase1_1a_cut1/freeze_baseline.py": 7,
     "tests/golden/ic_phase1_1a_cut1/freeze_baseline_new.py": 7,
     "tests/golden/ic_phase1_contract/freeze_baseline.py": 7,
     "tests/governance/test_govb49_path_grant.py": 2,
-    "tests/integration/test_e2e_execution.py": 1,
-    "tests/integration/test_e2e_hyperparameter.py": 1,
-    "tests/integration/test_optuna_checkpoint_recovery.py": 1,
-    "tests/integration/test_optuna_multi_objective.py": 1,
     "tests/momentum/Analysis/test_ic_1a_cut1_golden.py": 3,
     "tests/momentum/Analysis/test_ic_persist_redirect_isolation.py": 2,
+    "tests/momentum/Analysis/test_icfirstalign_cache.py": 1,
+    "tests/momentum/Analysis/test_icfirstalign_fu2.py": 1,
+    "tests/momentum/Analysis/test_preprov_ic_cache.py": 1,
+    "tests/momentum/Analysis/test_preprov_survivor_identity.py": 1,
     "tests/performance/step6_multitf_batch_benchmark.py": 1,
     "tests/registry/test_testreg_gate_wiring.py": 3,
     "tests/registry/test_testreg_run.py": 4
@@ -418,66 +426,6 @@
       "reason": "逐特徵 ADF 5 秒逾時（盤點收據 A；Phase 5）"
     },
     {
-      "path": "momentum/Optimization/optuna_optimizer.py",
-      "line": 431,
-      "pattern_id": "kwarg_timeout",
-      "function": "OptunaOptimizer.__init__",
-      "callee": "",
-      "literal": "",
-      "text": "self.timeout = timeout",
-      "reason": "Optuna study.optimize 時間預算（盤點收據 A；Phase 5 改選填）"
-    },
-    {
-      "path": "momentum/Optimization/optuna_optimizer.py",
-      "line": 2121,
-      "pattern_id": "kwarg_timeout",
-      "function": "OptunaOptimizer._optimize_with_pluggable_objective",
-      "callee": "self.study.optimize",
-      "literal": "self.timeout",
-      "text": "timeout=self.timeout,",
-      "reason": "Optuna study.optimize 時間預算（盤點收據 A；Phase 5 改選填）"
-    },
-    {
-      "path": "momentum/Optimization/optuna_optimizer.py",
-      "line": 2477,
-      "pattern_id": "kwarg_timeout",
-      "function": "OptunaOptimizer.optimize",
-      "callee": "self.study.optimize",
-      "literal": "self.timeout",
-      "text": "timeout=self.timeout,",
-      "reason": "Optuna study.optimize 時間預算（盤點收據 A；Phase 5 改選填）"
-    },
-    {
-      "path": "momentum/Optimization/optuna_optimizer.py",
-      "line": 2508,
-      "pattern_id": "kwarg_timeout",
-      "function": "OptunaOptimizer.optimize",
-      "callee": "self.study.optimize",
-      "literal": "self.timeout",
-      "text": "timeout=self.timeout,",
-      "reason": "Optuna study.optimize 時間預算（盤點收據 A；Phase 5 改選填）"
-    },
-    {
-      "path": "momentum/Optimization/optuna_optimizer.py",
-      "line": 2551,
-      "pattern_id": "kwarg_timeout",
-      "function": "OptunaOptimizer.optimize",
-      "callee": "self.study.optimize",
-      "literal": "self.timeout",
-      "text": "timeout=self.timeout,",
-      "reason": "Optuna study.optimize 時間預算（盤點收據 A；Phase 5 改選填）"
-    },
-    {
-      "path": "momentum/Optimization/optuna_optimizer.py",
-      "line": 2578,
-      "pattern_id": "kwarg_timeout",
-      "function": "OptunaOptimizer.optimize",
-      "callee": "self.study.optimize",
-      "literal": "self.timeout",
-      "text": "timeout=self.timeout,",
-      "reason": "Optuna study.optimize 時間預算（盤點收據 A；Phase 5 改選填）"
-    },
-    {
       "path": "api/models/feature_browser_models.py",
       "line": 20,
       "pattern_id": "optuna_timeout_attr",
@@ -515,7 +463,7 @@
       "callee": "Field",
       "literal": "",
       "text": "timeout_seconds: int = Field(default=300, ge=1)",
-      "reason": "Optuna 時間預算請求欄 300／1800（盤點收據 A；Phase 5）"
+      "reason": "Optuna 時間預算固定預設 300／1800（SPEC Task 5.4 改 None）"
     },
     {
       "path": "api/models/optimization_models.py",
@@ -525,17 +473,7 @@
       "callee": "Field",
       "literal": "",
       "text": "timeout_seconds: int = Field(default=1800, ge=1)",
-      "reason": "Optuna 時間預算請求欄 300／1800（盤點收據 A；Phase 5）"
-    },
-    {
-      "path": "api/routes/execution_optimization.py",
-      "line": 48,
-      "pattern_id": "optuna_timeout_attr",
-      "function": "start_execution_optimization",
-      "callee": "optimization_task_service.create_task",
-      "literal": "request.timeout_seconds",
-      "text": "timeout_seconds=request.timeout_seconds,",
-      "reason": "Optuna 時間預算傳遞（Phase 5）"
+      "reason": "Optuna 時間預算固定預設 300／1800（SPEC Task 5.4 改 None）"
     },
     {
       "path": "api/routes/feature_browser.py",
@@ -596,16 +534,6 @@
       "literal": "request.timeout_seconds",
       "text": "timeout=request.timeout_seconds,",
       "reason": "覆蓋矩陣 wait_for(to_thread) 逾時 504（盤點收據 A；Phase 5 Task 5.3）"
-    },
-    {
-      "path": "api/routes/hyperparameter_optimization.py",
-      "line": 80,
-      "pattern_id": "optuna_timeout_attr",
-      "function": "start_hyperparameter_optimization",
-      "callee": "optimization_task_service.create_task",
-      "literal": "request.timeout_seconds",
-      "text": "timeout_seconds=request.timeout_seconds,",
-      "reason": "Optuna 時間預算傳遞（Phase 5）"
     },
     {
       "path": "api/services/ic_analysis_service.py",
@@ -786,36 +714,6 @@
       "literal": "",
       "text": "if (datetime.now() - started).total_seconds() > timeout_seconds:",
       "reason": "模組任務 wait_for 逾時即 failed、執行緒續跑（盤點收據 A；Phase 5 Task 5.3）"
-    },
-    {
-      "path": "api/services/optimization_task_service.py",
-      "line": 187,
-      "pattern_id": "optuna_timeout_attr",
-      "function": "OptimizationTaskService.create_task",
-      "callee": "",
-      "literal": "",
-      "text": "timeout_seconds: Optional[int] = None,",
-      "reason": "Optuna 時間預算傳遞（Phase 5）"
-    },
-    {
-      "path": "api/services/optimization_task_service.py",
-      "line": 239,
-      "pattern_id": "optuna_timeout_attr",
-      "function": "OptimizationTaskService.create_task",
-      "callee": "",
-      "literal": "",
-      "text": "'timeout_seconds': timeout_seconds,",
-      "reason": "Optuna 時間預算傳遞（Phase 5）"
-    },
-    {
-      "path": "api/services/optimization_task_service.py",
-      "line": 255,
-      "pattern_id": "kwarg_timeout",
-      "function": "OptimizationTaskService.create_task",
-      "callee": "dict",
-      "literal": "timeout_seconds",
-      "text": "timeout=timeout_seconds,",
-      "reason": "Optuna 時間預算傳遞（Phase 5）"
     },
     {
       "path": "tests/api/test_batch_date.py",
@@ -1128,24 +1026,24 @@
       "reason": "測試輪詢受測 IC 至終態 30 秒（盤點收據 A；Task 2.2）"
     },
     {
-      "path": "tests/api/test_phase4_optimization_routes.py",
-      "line": 149,
-      "pattern_id": "optuna_timeout_attr",
-      "function": "test_hyperparameter_optimization_start",
-      "callee": "",
+      "path": "tests/api/test_numview_ic_page.py",
+      "line": 89,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
       "literal": "",
-      "text": "\"timeout_seconds\": 60,",
-      "reason": "測試設定 Optuna 時間預算欄（A 機制之參數；Phase 5 同步改）"
+      "text": "pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(3600)]",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
     },
     {
-      "path": "tests/api/test_phase4_optimization_routes.py",
-      "line": 172,
-      "pattern_id": "optuna_timeout_attr",
-      "function": "test_execution_optimization_start",
-      "callee": "",
+      "path": "tests/api/test_preprov_ingest_cache.py",
+      "line": 46,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
       "literal": "",
-      "text": "\"timeout_seconds\": 60,",
-      "reason": "測試設定 Optuna 時間預算欄（A 機制之參數；Phase 5 同步改）"
+      "text": "pytestmark = pytest.mark.timeout(2400)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
     },
     {
       "path": "tests/feature_engineering/test_failopen_contract.py",
@@ -1228,6 +1126,36 @@
       "reason": "inventory collect 子行程逾時（盤點收據 A；Task 2.2）"
     },
     {
+      "path": "tests/feature_engineering/test_icfirstalign_calibration_domain.py",
+      "line": 30,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(1200)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_context.py",
+      "line": 21,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(900)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_domain.py",
+      "line": 26,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(120)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
       "path": "tests/feature_engineering/test_icfirstalign_domain.py",
       "line": 1271,
       "pattern_id": "kwarg_timeout",
@@ -1236,6 +1164,36 @@
       "literal": "",
       "text": "env={**os.environ, \"PYTHONPATH\": str(h.REPO)}, capture_output=True, text=True, timeout=60)",
       "reason": "測試子行程執行受測波次運算 60 秒（Task 2.2）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_icfirst.py",
+      "line": 32,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(900)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_l3_arms.py",
+      "line": 30,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_memory.py",
+      "line": 29,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(1800)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
     },
     {
       "path": "tests/feature_engineering/test_icfirstalign_memory.py",
@@ -1296,6 +1254,76 @@
       "literal": "",
       "text": "timeout=600, env=env, cwd=str(tmp_path))",
       "reason": "測試子行程執行受測記憶體守門與實際運算 120–600 秒（盤點收據 A 列 1471-1472；同檔同型；Task 2.2）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_timeaxis.py",
+      "line": 30,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_acceptance.py",
+      "line": 87,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(43200)]",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_cgsa_workdir.py",
+      "line": 64,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_core.py",
+      "line": 104,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(6 * 3600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_identity.py",
+      "line": 112,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(3600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_policy.py",
+      "line": 71,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(3600)]",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/feature_engineering/test_preprov_identity.py",
+      "line": 37,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(1800)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
     },
     {
       "path": "tests/feature_engineering/test_warmup_verify_guards.py",
@@ -1578,46 +1606,6 @@
       "reason": "測試等候 600 秒（盤點收據 A；Task 2.2）"
     },
     {
-      "path": "tests/integration/test_e2e_execution.py",
-      "line": 23,
-      "pattern_id": "kwarg_timeout",
-      "function": "_make_execution_optimizer",
-      "callee": "create_optuna_optimizer",
-      "literal": "120",
-      "text": "timeout=120,",
-      "reason": "測試以 Optuna 時間預算 120 秒（盤點收據 A；Phase 5）"
-    },
-    {
-      "path": "tests/integration/test_e2e_hyperparameter.py",
-      "line": 41,
-      "pattern_id": "kwarg_timeout",
-      "function": "_make_optimizer",
-      "callee": "create_optuna_optimizer",
-      "literal": "120",
-      "text": "timeout=120,",
-      "reason": "測試以 Optuna 時間預算 120 秒（盤點收據 A；Phase 5）"
-    },
-    {
-      "path": "tests/integration/test_optuna_checkpoint_recovery.py",
-      "line": 35,
-      "pattern_id": "kwarg_timeout",
-      "function": "_make_optimizer",
-      "callee": "create_optuna_optimizer",
-      "literal": "120",
-      "text": "timeout=120,",
-      "reason": "測試以 Optuna 時間預算 120 秒（盤點收據 A；Phase 5）"
-    },
-    {
-      "path": "tests/integration/test_optuna_multi_objective.py",
-      "line": 36,
-      "pattern_id": "kwarg_timeout",
-      "function": "_make_optimizer",
-      "callee": "create_optuna_optimizer",
-      "literal": "120",
-      "text": "timeout=120,",
-      "reason": "測試以 Optuna 時間預算 120 秒（盤點收據 A；Phase 5）"
-    },
-    {
       "path": "tests/momentum/Analysis/test_ic_1a_cut1_golden.py",
       "line": 60,
       "pattern_id": "optuna_timeout_attr",
@@ -1666,6 +1654,46 @@
       "literal": "60",
       "text": "timeout=60,",
       "reason": "測試子行程執行受測 IC 60 秒（盤點收據 A；Task 2.2）"
+    },
+    {
+      "path": "tests/momentum/Analysis/test_icfirstalign_cache.py",
+      "line": 28,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/momentum/Analysis/test_icfirstalign_fu2.py",
+      "line": 29,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/momentum/Analysis/test_preprov_ic_cache.py",
+      "line": 32,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(1800)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
+    },
+    {
+      "path": "tests/momentum/Analysis/test_preprov_survivor_identity.py",
+      "line": 43,
+      "pattern_id": "pytest_mark_timeout",
+      "function": "<module>",
+      "callee": "pytest.mark.timeout",
+      "literal": "",
+      "text": "pytestmark = pytest.mark.timeout(3600)",
+      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
     },
     {
       "path": "tests/performance/step6_multitf_batch_benchmark.py",
@@ -1865,7 +1893,7 @@
       "callee": "",
       "literal": "",
       "text": "timeout: 300",
-      "reason": "Optuna 時間預算 300 秒設定（盤點收據 A；Phase 5）"
+      "reason": "Optuna 時間預算預設 300（SPEC Task 5.4 刪或改 null）"
     },
     {
       "path": "frontend/src/app/result/page.tsx",
@@ -1949,23 +1977,13 @@
     },
     {
       "path": "frontend/src/components/strategy-test/OptunaConfigPanel.tsx",
-      "line": 46,
-      "pattern_id": "fe_timeout_key",
-      "function": "",
-      "callee": "",
-      "literal": "",
-      "text": "timeout: number  // seconds",
-      "reason": "Optuna 時間預算預設 1800 秒（Phase 5）"
-    },
-    {
-      "path": "frontend/src/components/strategy-test/OptunaConfigPanel.tsx",
       "line": 68,
       "pattern_id": "fe_timeout_key",
       "function": "",
       "callee": "",
       "literal": "",
       "text": "timeout: 1800,  // 30 minutes",
-      "reason": "Optuna 時間預算預設 1800 秒（Phase 5）"
+      "reason": "Optuna 時間預算前端預設 1800 秒（同 SPEC Task 5.4 之預設改選填）"
     },
     {
       "path": "frontend/src/components/strategy-test/OptunaConfigPanel.tsx",
@@ -1975,7 +1993,7 @@
       "callee": "",
       "literal": "",
       "text": "onChange={(e) => updateConfig({ timeout: parseInt(e.target.value) || 1800 })}",
-      "reason": "Optuna 時間預算預設 1800 秒（Phase 5）"
+      "reason": "Optuna 時間預算前端預設 1800 秒（同 SPEC Task 5.4 之預設改選填）"
     },
     {
       "path": "frontend/src/lib/api.ts",

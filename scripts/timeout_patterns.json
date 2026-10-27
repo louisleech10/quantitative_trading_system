@@ -13,6 +13,7 @@
     {"id": "elapsed_compare", "regex": "(time\\.time|time\\.monotonic|monotonic|perf_counter)\\s*\\(\\s*\\)\\s*-\\s*[\\w.\\[\\]\"']+\\s*\\)?\\s*(>=|>)"},
     {"id": "shell_timeout_cmd", "regex": "(^|[;&|(]\\s*|\\s)(g?timeout)\\s+-?[0-9]"},
     {"id": "shell_elapsed_compare", "regex": "\\$\\(\\(\\s*\\$\\(date \\+%s\\)\\s*-"},
-    {"id": "optuna_timeout_attr", "regex": "\\btimeout_seconds\\b"}
+    {"id": "optuna_timeout_attr", "regex": "\\btimeout_seconds\\b"},
+    {"id": "pytest_mark_timeout", "regex": "\\bmark\\.timeout\\s*\\("}
   ]
 }
