@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from api.main import app
 from api.services.ic_analysis_service import ic_analysis_service
+from tests._nocap_wait import ProgressWait
 from tests.fixtures.ic_api_real_kline import ic_api_real_kline
 
 
@@ -31,9 +32,10 @@ def _reset_rate_limit_state() -> None:
         current = current.app
 
 
-def _wait_for_task_completed(task_id: str, timeout: float = 20.0) -> None:
-    start = time.time()
-    while time.time() - start < timeout:
+def _wait_for_task_completed(task_id: str) -> None:
+    """輪詢至 completed／failed；不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
+    waiter = ProgressWait(f"ic task {task_id}")
+    while True:
         response = client.get(f"/api/v1/ic/task/{task_id}")
         assert response.status_code == 200
         data = response.json()
@@ -41,47 +43,41 @@ def _wait_for_task_completed(task_id: str, timeout: float = 20.0) -> None:
             return
         if data["status"] == "failed":
             pytest.fail(f"task failed: {data.get('error')}")
+        waiter.check(data)
         time.sleep(0.2)
-    pytest.fail("task timeout")
 
 
-def _wait_for_deep_result(task_id: str, timeout: float = 30.0) -> dict:
-    """輪詢至 completed/failed。不因 results 非空提前返回(背景任務可能仍 running)。"""
-    start = time.time()
-    last: dict | None = None
-    while time.time() - start < timeout:
+def _wait_for_deep_result(task_id: str) -> dict:
+    """輪詢至 completed/failed。不因 results 非空提前返回(背景任務可能仍 running)。不設秒數上限，卡死由 ProgressWait 判定。"""
+    waiter = ProgressWait(f"deep analysis {task_id}")
+    while True:
         response = client.get(f"/api/v1/ic/deep-analysis/{task_id}/result")
         assert response.status_code == 200
         data = response.json()
-        last = data
         if data.get("status") in {"completed", "failed"}:
             return data
+        waiter.check(data)
         time.sleep(0.5)
-    pytest.fail(f"deep analysis timeout; last={last}")
 
 
-def _ensure_ic_task_ready_for_deep(task_id: str, timeout: float = 60.0) -> None:
-    """session/module 共用 task:輪詢至真實 completed;failed/timeout 則 fail。
+def _ensure_ic_task_ready_for_deep(task_id: str) -> None:
+    """session/module 共用 task:輪詢至真實 completed;failed 則 fail;卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定。
 
-    禁把 failed 或逾時 running 強制改 completed(假綠)。
+    禁把 failed 或停滯之 running 強制改 completed(假綠)。
     """
-    start = time.time()
-    last_status: str | None = None
-    last_error: object = None
-    while time.time() - start < timeout:
+    waiter = ProgressWait(f"ic task {task_id} ready for deep")
+    while True:
         with ic_analysis_service._lock:
             info = ic_analysis_service._tasks.get(task_id)
             status = (info or {}).get("status")
-            last_status = status if isinstance(status, str) else None
             last_error = (info or {}).get("error") if info else None
+            snapshot = copy.deepcopy(info)
         if status == "completed":
             return
         if status == "failed":
             pytest.fail(f"ic task failed, cannot start deep: {last_error}")
+        waiter.check(snapshot)
         time.sleep(0.3)
-    pytest.fail(
-        f"ic task not ready for deep (timeout={timeout}s); last_status={last_status}"
-    )
 
 
 @pytest.fixture(autouse=True)
@@ -222,7 +218,7 @@ def test_start_deep_analysis_and_get_result(completed_ic_task: str) -> None:
     response = client.post(f"/api/v1/ic/deep-analysis/{completed_ic_task}", json=deep_request)
     assert response.status_code == 200
 
-    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    deep_result = _wait_for_deep_result(completed_ic_task)
     # 終態必 completed/failed(不得殘 running 污染 session task)
     assert deep_result["status"] in {"completed", "failed"}
     assert deep_result["results"] is not None
@@ -281,7 +277,7 @@ def test_api_deep_cache_key_includes_fit_mode(completed_ic_task: str) -> None:
         json=deep_req,
     )
     assert response.status_code == 200, response.text
-    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    deep_result = _wait_for_deep_result(completed_ic_task)
     assert deep_result.get("status") in {"completed", "failed"}
 
     filtered = getattr(analyzer, "_filtered_features_df", None)
@@ -433,7 +429,7 @@ def test_deep_analysis_start(completed_ic_task: str) -> None:
     payload = response.json()
     assert payload.get("status") in {"started", "running"}
     # 必等深分析結束,否則 session 共用 task 殘 running → 後續 deep POST 400
-    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    deep_result = _wait_for_deep_result(completed_ic_task)
     assert deep_result.get("status") in {"completed", "failed"}
 
 
@@ -624,7 +620,7 @@ def test_legacy_request_gross_only(completed_ic_task: str) -> None:
         f"/api/v1/ic/deep-analysis/{completed_ic_task}", json=deep_request
     )
     assert response.status_code == 200
-    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    deep_result = _wait_for_deep_result(completed_ic_task)
     assert deep_result["status"] == "completed"
     results = deep_result.get("results") or {}
     net_ic = (results.get("results") or results).get("net_ic_analysis") or {}
@@ -665,7 +661,7 @@ def test_cost_bps_fullstack_wiring(completed_ic_task: str) -> None:
         f"/api/v1/ic/deep-analysis/{completed_ic_task}", json=deep_request
     )
     assert response.status_code == 200, response.text
-    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    deep_result = _wait_for_deep_result(completed_ic_task)
     assert deep_result["status"] == "completed", deep_result.get("error")
     results = deep_result.get("results") or {}
     net_ic = (results.get("results") or results).get("net_ic_analysis") or {}
@@ -707,7 +703,7 @@ def test_e2e_unavailable_union_shape(completed_ic_task: str) -> None:
         f"/api/v1/ic/deep-analysis/{completed_ic_task}", json=deep_request
     )
     assert response.status_code == 200
-    deep_result = _wait_for_deep_result(completed_ic_task, timeout=60.0)
+    deep_result = _wait_for_deep_result(completed_ic_task)
     assert deep_result["status"] == "completed"
     # allow_nan=False 序列化不得炸
     import json as _json
@@ -1433,7 +1429,7 @@ def test_readiness_helper_does_not_force_completed() -> None:
         }
     try:
         with pytest.raises(pytest.fail.Exception, match="failed"):
-            _ensure_ic_task_ready_for_deep(task_id, timeout=1.0)
+            _ensure_ic_task_ready_for_deep(task_id)
         with ic_analysis_service._lock:
             info = ic_analysis_service._tasks[task_id]
             assert info["status"] == "failed"

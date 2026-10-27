@@ -321,9 +321,11 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
                 probe_ram: Callable[[], Optional[float]] = physical_memory_mb,
                 clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep,
                 probe_cpu: Callable[[int], Optional[float]] = tree_cpu_seconds,
-                diagnose_fn: Optional[Callable[..., Dict[str, Any]]] = None) -> WatchResult:
-    """啟動 `cmd`（stdout／stderr 寫入 `log_path`），依 `config` 監看；卡住（無 log 亦無 CPU 進度、或 swap 逾門檻）⇒
-    留現場（`diagnose`）後終止並回 STALLED＋理由＋原因，否則回 EXITED＋rc；牆鐘逾預期只記錄。
+                diagnose_fn: Optional[Callable[..., Dict[str, Any]]] = None,
+                stderr_path: Optional[Path] = None) -> WatchResult:
+    """啟動 `cmd`（stdout／stderr 寫入 `log_path`；給 `stderr_path` 則 stderr 另寫該檔、進度只計 stdout log 與 CPU），
+    依 `config` 監看；卡住（無 log 亦無 CPU 進度、或 swap 逾門檻）⇒ 留現場（`diagnose`）後終止並回 STALLED＋理由＋原因，
+    否則回 EXITED＋rc；牆鐘逾預期只記錄。
     `probe_swap` 回系統 swap 已用量（MB）；啟動前讀一次為基線，之後只計增長。門檻＝`swap_growth_fraction_of_ram` ×
     `probe_ram()`（MB）；後者讀不到 ⇒ 本跑不判 swap 條件。"""
     log_path = Path(log_path)
@@ -333,17 +335,28 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
     threshold = None if ram is None or frac is None else frac * ram
     started = clock()
     run_env = stack_dump_env(env, log_path)
-    with open(log_path, "w", encoding="utf-8") as log:
+    with open(log_path, "w", encoding="utf-8") as log, \
+            (open(stderr_path, "w", encoding="utf-8") if stderr_path is not None else _NullCtx()) as err:
         # 自成行程群組（新 session）：卡死終止時整組送信號，涵蓋子孫與快照後才 fork 者（NOCAP Task 0.1 增修②）
-        proc = subprocess.Popen(list(cmd), cwd=cwd, env=run_env, stdout=log, stderr=subprocess.STDOUT,
-                                start_new_session=True)
+        proc = subprocess.Popen(list(cmd), cwd=cwd, env=run_env, stdout=log,
+                                stderr=err if stderr_path is not None else subprocess.STDOUT, start_new_session=True)
         try:
-            return _watch_loop(proc, log, log_path, config, expected_seconds, baseline, ram, threshold, started,
+            # stderr 分檔時監看自身之註記寫 stderr 檔（stdout 留給呼叫端解析）；進度仍以 stdout log 大小與 CPU 判定
+            return _watch_loop(proc, err if stderr_path is not None else log, log_path, config, expected_seconds,
+                               baseline, ram, threshold, started,
                                probe_swap, clock, sleep, probe_cpu, diagnose_fn)
         except BaseException:  # 呼叫端中斷（Ctrl-C 不再傳到新 session 之子行程）⇒ 一併終止整樹，不留孤兒
             if proc.poll() is None:
                 _terminate(proc)
             raise
+
+
+class _NullCtx:
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(self, *exc: Any) -> None:
+        return None
 
 
 NAP_STEP_SECONDS = 0.05  # 檢查間隔內每隔此秒數查一次子行程是否已結束

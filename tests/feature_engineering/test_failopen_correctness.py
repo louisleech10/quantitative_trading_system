@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tempfile
 import types
+
+from tests._nocap_subprocess import run_watched_subprocess
 from pathlib import Path
 
 import h5py
@@ -378,7 +380,9 @@ def _run_gate_a_subprocess(test_name: str, worker_env: str) -> None:
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = "0"
     env[worker_env] = "1"
-    proc = subprocess.run(
+    # NOCAP Task 2.2：經共用監看等候（不設秒數上限；ICFIRSTALIGN b4 實測多週期單元生成 2132 秒、改前 4841 秒，
+    # 舊 1800／7200 秒上限即曾於比對前誤判失敗），卡死以無進度判定並留堆疊
+    proc = run_watched_subprocess(
         [
             sys.executable,
             "-m",
@@ -389,11 +393,6 @@ def _run_gate_a_subprocess(test_name: str, worker_env: str) -> None:
         ],
         cwd=str(ROOT),
         env=env,
-        capture_output=True,
-        text=True,
-        # ICFIRSTALIGN b4：多週期單元之生成實測 2132 秒（改前基準記錄 4841 秒），原 1800 秒於比對前即逾時；
-        # 逾時只決定子行程等待上限，不改任何比對斷言
-        timeout=7200,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
 

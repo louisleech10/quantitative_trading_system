@@ -31,6 +31,8 @@ import textwrap
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple  # noqa: F401
 
+from tests._nocap_subprocess import run_watched_subprocess
+
 import pytest
 
 REPO = Path(__file__).resolve().parents[2]
@@ -1574,19 +1576,18 @@ def check_7_live_doc_revisions(revisions: Sequence[Tuple[str, Dict[str, Any], Di
 # 豁免：改動之內容須等於以現行樹 collect 重產之結果（collect 副作用免報、手動竄改仍抓）。
 GENERATED_INVENTORY_REL = "tests/golden/l65/test_inventory.txt"
 INVENTORY_EMPTY = b"BLOCKER: no L6.5/preprocessing tests collected\n"  # 生成器於收集不到相關 nodeid 時之輸出
-INVENTORY_COLLECT_TIMEOUT = 600
 
 
 def regenerate_inventory(files: Sequence[str], repo: Path = REPO) -> bytes:
     """以現行樹 collect-only 收集 `files`（同 D10② 之生成規則：由 conftest 之 collection hook 寫出清冊）並回傳寫出之
-    位元組；呼叫前之清冊位元組於結束時原樣寫回（不留副作用）。collect 失敗 ⇒ RuntimeError。"""
+    位元組；呼叫前之清冊位元組於結束時原樣寫回（不留副作用）。collect 失敗 ⇒ RuntimeError；collect 卡死（共用監看判
+    無進度，NOCAP Task 2.2 不設秒數上限）⇒ AssertionError（附堆疊）。"""
     inv = repo / GENERATED_INVENTORY_REL
     saved = inv.read_bytes() if inv.is_file() else None
     try:
-        proc = subprocess.run(
+        proc = run_watched_subprocess(
             [sys.executable, "-m", "pytest", "--collect-only", "-q", "-o", "addopts=--import-mode=importlib",
-             "-p", "no:cacheprovider", *files], cwd=repo, capture_output=True, text=True,
-            timeout=INVENTORY_COLLECT_TIMEOUT)
+             "-p", "no:cacheprovider", *files], cwd=str(repo))
         if proc.returncode != 0:
             raise RuntimeError(f"collect rc={proc.returncode}：{proc.stdout[-800:]}{proc.stderr[-400:]}")
         return inv.read_bytes()
@@ -1612,7 +1613,7 @@ def inventory_integrity_errors(content: Optional[bytes], regenerate=regenerate_i
                              if "::" in ln})
         try:
             regenerated = regenerate(head_files)
-        except (RuntimeError, subprocess.TimeoutExpired) as exc:
+        except (RuntimeError, AssertionError) as exc:
             return [f"⑦ {GENERATED_INVENTORY_REL} 為空標記而 HEAD 版所列檔無法 collect 重產：{str(exc)[:300]}"]
         if regenerated != INVENTORY_EMPTY:
             return [f"⑦ {GENERATED_INVENTORY_REL} 被換成空集合標記，而以 HEAD 版所列檔 collect 重產非空（手動改動？）"]
@@ -1623,7 +1624,7 @@ def inventory_integrity_errors(content: Optional[bytes], regenerate=regenerate_i
     files = sorted({ln.split("::", 1)[0] for ln in lines})
     try:
         regenerated = regenerate(files)
-    except (RuntimeError, subprocess.TimeoutExpired) as exc:
+    except (RuntimeError, AssertionError) as exc:
         return [f"⑦ {GENERATED_INVENTORY_REL} 所列檔無法 collect 重產：{str(exc)[:300]}"]
     if regenerated != content:
         return [f"⑦ {GENERATED_INVENTORY_REL} 與以現行樹 collect 重產之結果不等（手動改動？）"]

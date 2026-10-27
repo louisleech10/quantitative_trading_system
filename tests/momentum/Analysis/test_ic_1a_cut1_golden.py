@@ -11,6 +11,7 @@ import pytest
 
 from api.models.ic_models import FeatureFilterConfig, ICAnalyzeRequest
 from api.services.ic_analysis_service import ICAnalysisService
+from tests._nocap_wait import ProgressWait
 
 pytestmark = [
     pytest.mark.ic_persist_redirect,
@@ -56,10 +57,9 @@ def _without_generated_at(payload: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-async def _run_baseline(
-    *, split_on: bool, timeout_seconds: int = 120
-) -> dict[str, Any]:
-    """供 redirect A/B 等 caller 重用（非 B6 主 gate）。"""
+async def _run_baseline(*, split_on: bool) -> dict[str, Any]:
+    """供 redirect A/B 等 caller 重用（非 B6 主 gate）。輪詢至終態不設秒數上限，卡死（狀態未變且 CPU 無進度）由
+    ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
     service = ICAnalysisService()
     request = ICAnalyzeRequest(
         features_path=str(FEATURES_PATH.resolve()),
@@ -73,9 +73,8 @@ async def _run_baseline(
     )
     started = await service.start_analysis(request)
     task_id = started["task_id"]
-    deadline = time.monotonic() + timeout_seconds
-
-    while time.monotonic() < deadline:
+    waiter = ProgressWait(f"IC golden run {task_id}")
+    while True:
         status = service.get_task_status(task_id)
         if status and status.get("status") == "completed":
             result = service.get_result(task_id)
@@ -84,9 +83,8 @@ async def _run_baseline(
             return result
         if status and status.get("status") == "failed":
             raise AssertionError(f"IC task failed: {status.get('error')}")
+        waiter.check(status)
         await asyncio.sleep(0.25)
-
-    raise TimeoutError(f"IC golden run timed out: task_id={task_id}")
 
 
 def _load(path: Path) -> dict[str, Any]:

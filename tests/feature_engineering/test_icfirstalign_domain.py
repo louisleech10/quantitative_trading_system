@@ -12,6 +12,8 @@ import ast
 import os
 import subprocess
 import sys
+
+from tests._nocap_subprocess import run_watched_subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -1264,9 +1266,9 @@ print("RESULT", outcome, sched._tasks["A"].status, sched._tasks["B"].status,
 def test_double_sigint_during_wave_no_deadlock(tmp_path: Path) -> None:
     """v34（審碼 b3 r5 codex P1-01）：波次中兩次 SIGINT（第二次固定於主執行緒 `Condition.notify_all` 入口——原實作之
     處理器內 `Event.set` 持鎖點）⇒ 不死結：A 確認退出並 joined、B 不執行、上拋 KeyboardInterrupt、處理器還原。
-    於新子行程執行（死結時以逾時判紅，不掛住測試行程）。"""
-    proc = subprocess.run([sys.executable, "-c", _REENTRANT_SIGINT_PROBE, str(tmp_path)], cwd=str(h.REPO),
-                          env={**os.environ, "PYTHONPATH": str(h.REPO)}, capture_output=True, text=True, timeout=60)
+    於新子行程執行（死結＝無輸出亦無 CPU ⇒ 共用監看判卡死並留堆疊判紅，不掛住測試行程；NOCAP Task 2.2 不設秒數）。"""
+    proc = run_watched_subprocess([sys.executable, "-c", _REENTRANT_SIGINT_PROBE, str(tmp_path)], cwd=str(h.REPO),
+                                  env={**os.environ, "PYTHONPATH": str(h.REPO)})
     assert proc.returncode == 0, proc.stderr[-2000:]
     assert "RESULT KeyboardInterrupt joined queued True" in proc.stdout, proc.stdout[-2000:]
 

@@ -8,6 +8,8 @@ import os
 import subprocess
 import sys
 import tempfile
+
+from tests._nocap_subprocess import run_watched_subprocess
 from functools import lru_cache
 from pathlib import Path
 
@@ -285,7 +287,7 @@ def test_l1_baseline_hash_matches_frozen(monkeypatch: pytest.MonkeyPatch) -> Non
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = "0"
     env[L1_ORACLE_WORKER_ENV] = "1"
-    proc = subprocess.run(
+    proc = run_watched_subprocess(
         [
             sys.executable,
             "-m",
@@ -296,9 +298,6 @@ def test_l1_baseline_hash_matches_frozen(monkeypatch: pytest.MonkeyPatch) -> Non
         ],
         cwd=str(ROOT),
         env=env,
-        capture_output=True,
-        text=True,
-        timeout=1800,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
 

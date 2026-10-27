@@ -25,12 +25,12 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from tests._nocap_subprocess import run_watched_subprocess  # noqa: E402
 from tests.governance import _role_pin  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 STAMP_FILE = "tests/governance/test_stamp_taskid_inject.py"
 V12_FN = "test_v12_non_stamp_kinds_no_stamp_target_ok"
-_TIMEOUT = 600
 
 # 🔴 外部字面集合：2-② 之判準寫字面 `passed == 3`，**不得**寫 `len(review_families)`
 # （自我參照 ⇒ 名冊縮成一家時判準跟著縮，恆真）。
@@ -126,19 +126,13 @@ def _run_iso(iso: Path, selector: str) -> dict[str, int | str]:
         "LANG": "C.UTF-8",
     }
     before = _repo_snapshot()
-    try:
-        p = subprocess.run(
-            [sys.executable, "-m", "pytest", selector, "-q", "--tb=short",
-             "-p", "no:cacheprovider"],
-            cwd=str(iso),
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=_TIMEOUT,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:  # ③ 逾時 ⇒ 直接紅
-        raise AssertionError(f"隔離子程序逾時 {_TIMEOUT}s：{selector}") from exc
+    # ③ 子程序卡死（共用監看判無進度並留堆疊；NOCAP Task 2.2 不設秒數上限）⇒ run_watched_subprocess 拋 AssertionError 直接紅
+    p = run_watched_subprocess(
+        [sys.executable, "-m", "pytest", selector, "-q", "--tb=short",
+         "-p", "no:cacheprovider"],
+        cwd=str(iso),
+        env=env,
+    )
     after = _repo_snapshot()
     # ④ 主 repo 不得被子程序動到
     assert before == after, (

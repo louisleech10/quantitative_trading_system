@@ -11,6 +11,8 @@ import importlib.util
 import json
 import subprocess
 import sys
+
+from tests._nocap_subprocess import run_watched_subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence
 
@@ -41,8 +43,7 @@ def _snippet(code: str, tmp_path: Path) -> str:
                f"import importlib.util\n_s = importlib.util.spec_from_file_location('fm', {str(SCRIPT)!r})\n"
                "fm = importlib.util.module_from_spec(_s); sys.modules['fm'] = fm; _s.loader.exec_module(fm)\n"
                f"PROOF = {str(tmp_path / 'proof')!r}\n")
-    proc = subprocess.run([sys.executable, "-c", prelude + code], cwd=str(REPO), capture_output=True, text=True,
-                          timeout=120)
+    proc = run_watched_subprocess([sys.executable, "-c", prelude + code], cwd=str(REPO))
     assert proc.returncode == 0, proc.stdout[-3000:] + proc.stderr[-3000:]
     return proc.stdout
 

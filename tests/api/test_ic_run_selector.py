@@ -16,6 +16,7 @@ from api.models.ic_models import ICAnalyzeRequest
 from api.services.cross_symbol_training_service import CrossSymbolTrainingService
 from api.services.ic_analysis_service import ICAnalysisService
 from momentum.factories import create_feature_library
+from tests._nocap_wait import ProgressWait
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
@@ -201,19 +202,18 @@ def test_live_registry_skips_orphan_latest() -> None:
     assert library._registry.is_materialized(entry)
 
 
-async def _drive_to_terminal(
-    service: ICAnalysisService, request: ICAnalyzeRequest, timeout_seconds: int = 30
-) -> Dict[str, Any]:
-    """啟動 IC 任務並輪詢至 completed/failed，回傳終態 status。"""
+async def _drive_to_terminal(service: ICAnalysisService, request: ICAnalyzeRequest) -> Dict[str, Any]:
+    """啟動 IC 任務並輪詢至 completed/failed，回傳終態 status；不設秒數上限，卡死（狀態未變且 CPU 無進度）由
+    ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
     started = await service.start_analysis(request)
     task_id = started["task_id"]
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
+    waiter = ProgressWait(f"ic task {task_id}")
+    while True:
         status = service.get_task_status(task_id)
         if status and status.get("status") in ("completed", "failed"):
             return status
+        waiter.check(status)
         await asyncio.sleep(0.05)
-    raise TimeoutError(f"task did not terminate: {task_id}")
 
 
 @pytest.mark.ic_run_selector

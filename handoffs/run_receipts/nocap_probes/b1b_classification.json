@@ -1,116 +1,514 @@
 {
   "_doc": "NOCAP b1b（docs/NOCAP_SPEC.md Task 0.2）：scripts/timeout_scan.py 未登記命中之逐處分類規則。依序比對、首條命中者勝；path 為正則（re.fullmatch），lines 省略＝該檔全部命中。class A＝依牆鐘停止／縮減運算或對長運算放棄等候（不登記，待 Phase 1–6 改碼移除；boundary 12 屆時轉綠）；B＝等外部方（網路、鎖、hook stdin、使用者端連線、信件）；C＝短輔助命令／同步原語之掛住保險（受測動作為秒級以下）；D＝只記錄耗時、輪詢或心跳間隔、效能斷言、純字串、封存不執行。產生器：handoffs/run_receipts/nocap_probes/b1b_build_registry.py。",
   "rules": [
-    {"path": "tests/registry/test_testreg_markers\\.py", "pattern_id": "pytest_mark_timeout", "class": "D", "reason": "測試資料字串中之 pytest.mark.timeout 字面（非標記）"},
-    {"path": "momentum/Optimization/optuna_optimizer\\.py", "class": "B", "reason": "Optuna 使用者明示之搜尋預算（選填、預設 None，以 n_trials 界定；SPEC Task 5.4）"},
-    {"path": "api/models/optimization_models\\.py", "class": "A", "reason": "Optuna 時間預算固定預設 300／1800（SPEC Task 5.4 改 None）"},
-    {"path": "config/optimization_config\\.yaml", "class": "A", "reason": "Optuna 時間預算預設 300（SPEC Task 5.4 刪或改 null）"},
-    {"path": "api/routes/(execution|hyperparameter)_optimization\\.py", "class": "B", "reason": "傳遞使用者明示之 Optuna 搜尋預算（SPEC Task 5.4）"},
-    {"path": "api/services/optimization_task_service\\.py", "class": "B", "reason": "傳遞使用者明示之 Optuna 搜尋預算（選填；SPEC Task 5.4）"},
-    {"path": "frontend/src/components/strategy-test/OptunaConfigPanel\\.tsx", "lines": [68, 193], "class": "A", "reason": "Optuna 時間預算前端預設 1800 秒（同 SPEC Task 5.4 之預設改選填）"},
-    {"path": "frontend/src/components/strategy-test/OptunaConfigPanel\\.tsx", "lines": [46], "class": "B", "reason": "Optuna 搜尋預算欄之型別宣告（使用者明示之預算；SPEC Task 5.4）"},
-    {"path": "tests/integration/test_(e2e_execution|e2e_hyperparameter|optuna_checkpoint_recovery|optuna_multi_objective)\\.py", "class": "B", "reason": "測試明示傳入之 Optuna 搜尋預算（SPEC Task 5.4 之 B；b1 審碼 r6 CODEX-R6-P1-03）"},
-    {"path": "tests/api/test_phase4_optimization_routes\\.py", "class": "B", "reason": "測試請求明示之 Optuna 搜尋預算（SPEC Task 5.4 之 B）"},
-    {"path": "scripts/capture_ic1eb_baseline\\.py", "class": "A", "reason": "IC 基準擷取等候期限 1800 秒（盤點收據 A；Phase 3）"},
-    {"path": "scripts/framepath_affected_gate\\.py", "class": "B", "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"},
-    {"path": "scripts/testreg\\.py", "class": "B", "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"},
-    {"path": "scripts/ic1c_freeze_baseline\\.py", "class": "A", "reason": "深度分析等候 60 秒即 SystemExit（盤點收據 A；Phase 3）"},
-    {"path": "scripts/ic1eb_b5_replay\\.py", "class": "A", "reason": "IC 縱向分析等候期限 1800 秒（盤點收據 A；Phase 3）"},
-    {"path": "scripts/verify_l1_warmup_requirements\\.py", "class": "A", "reason": "逐任務 deadline 與 pool 停滯終止（盤點收據 A；Phase 4）"},
-    {"path": "scripts/run_with_receipt\\.py", "class": "A", "reason": "pytest collect-only 300 秒逾時（盤點收據未列，本次掃描新發現；同 Phase 2 Task 2.1 collect-only 牆鐘刪除）"},
-    {"path": "momentum/Analysis/feature_quality_diagnostics\\.py", "class": "A", "reason": "逐特徵 ADF 5 秒逾時（盤點收據 A；Phase 5）"},
-    {"path": "api/models/feature_browser_models\\.py", "class": "A", "reason": "覆蓋矩陣請求逾時欄（wait_for 逾時即 504、計算不回收；盤點收據 A；Phase 5 Task 5.3 改快取＋背景後登記 B）"},
-    {"path": "api/routes/feature_browser\\.py", "class": "A", "reason": "覆蓋矩陣 wait_for(to_thread) 逾時 504（盤點收據 A；Phase 5 Task 5.3）"},
-    {"path": "api/services/ic_analysis_service\\.py", "class": "A", "reason": "IC 掃描網格逐格與全網格期限（盤點收據 A；Phase 5 Task 5.3）"},
-    {"path": "api/services/model_enhancement_service\\.py", "class": "A", "reason": "模組任務 wait_for 逾時即 failed、執行緒續跑（盤點收據 A；Phase 5 Task 5.3）"},
-    {"path": "frontend/src/app/result/page\\.tsx", "class": "A", "reason": "長運算輪詢 maxAttempts 60 逾限放棄（SPEC Task 5.3 所列）"},
-    {"path": "frontend/src/app/search/page\\.tsx", "class": "A", "reason": "長運算輪詢 maxAttempts 30 逾限放棄（SPEC Task 5.3 所列）"},
-    {"path": "frontend/src/store/searchStore\\.ts", "class": "A", "reason": "長運算輪詢 maxAttempts 150 逾限放棄（SPEC Task 5.3 所列）"},
-    {"path": "frontend/src/lib/api\\.ts", "lines": [407], "class": "A", "reason": "waitForTaskCompletion 等任務 300 秒逾即放棄（本次掃描新發現；Task 5.3 同型）"},
-    {"path": "frontend/src/components/feature-factory/ExportButtons\\.tsx", "class": "A", "reason": "大資料匯出 10 分鐘 setTimeout abort（本次掃描新發現；Task 5.3 同型：對長運算放棄等候）"},
-    {"path": "handoffs/run_receipts/numview_probes/estimate\\.py", "class": "A", "reason": "估時子行程 wall_ceiling 與 --timeout-seconds（盤點收據 A；Phase 1）"},
-    {"path": "handoffs/run_receipts/framepath_probes/admit_(after|loop)\\.sh", "class": "B", "reason": "探針以使用者明示之 --max-seconds 分段呼叫閘門（SPEC Task 2.1 邊界之 B）"},
-    {"path": "handoffs/run_receipts/icfirstalign_probes/calibration_dtype_diff_probe\\.py", "class": "A", "reason": "校準子行程 1800 秒逾時（盤點收據 A）"},
-    {"path": "handoffs/run_receipts/probewinsor_probes/affected_chunk\\.sh", "lines": [33], "class": "B", "reason": "探針之必填預算參數＝使用者明示之分段：逾即於檔間暫停、不中止進行中之測試（SPEC Task 2.1 邊界之 B）"},
-    {"path": "handoffs/run_receipts/testreg_probes/b3/light_sweep\\.sh", "lines": [19], "class": "D", "reason": "封存、不執行（TESTREG b3 已收案之探針；SPEC Task 2.1「同改或登記 D」）"},
-    {"path": "handoffs/run_receipts/testreg_probes/v6_profile\\.py", "class": "D", "reason": "封存、不執行（TESTREG v6 profiling 已收案之探針；SPEC Task 2.1「同改或登記 D」）"},
-    {"path": "tests/feature_engineering/test_failopen_(contract|correctness|layers)\\.py", "class": "A", "reason": "測試等候受測生成子行程 1800／7200 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/feature_engineering/test_ffname_freeze_baseline\\.py", "class": "A", "reason": "測試等候凍結腳本 600 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/feature_engineering/test_ffprod_measure\\.py", "class": "A", "reason": "測試子行程執行受測量測探針 120 秒（SPEC Task 2.2 審查 r1 補列）"},
-    {"path": "tests/feature_engineering/test_framepath_disposition\\.py", "class": "A", "reason": "inventory collect 子行程逾時（盤點收據 A；Task 2.2）"},
-    {"path": "tests/feature_engineering/test_icfirstalign_memory\\.py", "class": "A", "reason": "測試子行程執行受測記憶體守門與實際運算 120–600 秒（盤點收據 A 列 1471-1472；同檔同型；Task 2.2）"},
-    {"path": "tests/feature_engineering/test_icfirstalign_domain\\.py", "lines": [1269], "class": "A", "reason": "測試子行程執行受測波次運算 60 秒（Task 2.2）"},
-    {"path": "tests/feature_engineering/test_warmup_verify_guards\\.py", "class": "A", "reason": "測試等候受測驗證腳本 180／600 秒、及測試 verify_l1 之 deadline 機制本身（盤點收據 A；Task 2.2／Phase 4）"},
-    {"path": "tests/governance/test_govb49_path_grant\\.py", "class": "A", "reason": "測試等候 600 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/api/test_feature_name_descriptor\\.py", "class": "A", "reason": "測試等候受測匯出腳本 600 秒（Task 2.2）"},
-    {"path": "tests/api/test_batch_(date|retention)\\.py", "class": "A", "reason": "測試輪詢受測批次生成至終態之期限（Task 2.2）"},
-    {"path": "tests/api/test_feature_factory_batch_(resume|step4)\\.py", "lines": [58, 70], "class": "A", "reason": "測試輪詢受測批次生成至終態之期限（Task 2.2）"},
-    {"path": "tests/api/test_ic_deep_analysis\\.py", "class": "A", "reason": "測試等候受測深度分析 60 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/api/test_ic_la1_degraded_gate\\.py", "class": "A", "reason": "測試 wait_for 受測 IC 回呼 120／180 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/api/test_ic_run_selector\\.py", "class": "A", "reason": "測試輪詢受測 IC 至終態 30 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/api/test_feature_browser_routes\\.py", "class": "A", "reason": "測試設定覆蓋矩陣請求逾時欄（A 機制之參數；Phase 5 Task 5.3 同步改）"},
-    {"path": "tests/golden/ic_phase1_(contract|1a_cut1)/freeze_baseline(_new)?\\.py", "class": "A", "reason": "IC 基準凍結等候期限（盤點收據 A；Phase 3）"},
-    {"path": "tests/momentum/Analysis/test_ic_1a_cut1_golden\\.py", "class": "A", "reason": "測試輪詢受測 IC 期限 120 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/momentum/Analysis/test_ic_persist_redirect_isolation\\.py", "class": "A", "reason": "測試子行程執行受測 IC 60 秒（盤點收據 A；Task 2.2）"},
-    {"path": "tests/performance/step6_multitf_batch_benchmark\\.py", "class": "A", "reason": "基準腳本等候批次生成期限（Task 2.2 同型）"},
-    {"path": "tests/registry/test_testreg_gate_wiring\\.py", "class": "B", "reason": "測試資料為使用者明示之 --max-seconds 選項（SPEC Task 2.1 邊界之 B）"},
-    {"path": "tests/registry/test_testreg_run\\.py", "class": "B", "reason": "測試使用者明示 --max-seconds 之分段暫停（SPEC Task 2.1 邊界之 B，行為保留）"},
-
-    {"path": "handoffs/run_receipts/testreg_probes/trial_impl/.*", "class": "D", "reason": "封存、不執行（SPEC Task 0.2 邊界）"},
-    {"path": "handoffs/run_receipts/testreg_probes/test_testreg_gate_wiring\\.renamed_proposal\\.py", "class": "D", "reason": "封存之測試改名提案、不執行（不在 pytest testpaths）"},
-
-    {"path": "scripts/(doc_format_precheck|factkey_write_guard|gate_check|list_active_mechanisms|narrow_check_router|self_verify_check|spec_xref_hook|status_marker_check|synth_attribution_hook|verify_pretooluse|javis_mail)\\.sh", "lines": [13, 17, 20, 22, 24, 25, 43, 56, 68, 104, 133, 157], "class": "B", "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"},
-    {"path": "scripts/javis_mail.sh", "lines": [256], "class": "B", "reason": "信箱守候等外部來信，到期結束後由守候者重啟（非運算）"},
-    {"path": "momentum/FeatureEngineering/(feature_factory|run_lifecycle)\\.py", "class": "B", "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"},
-    {"path": "momentum/FeatureEngineering/(run_locks|feature_registry)\\.py", "class": "B", "reason": "等檔案鎖之期限（等他行程釋放鎖，非運算）"},
-    {"path": "tests/feature_engineering/test_icfirstalign_icfirst\\.py", "class": "B", "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"},
-    {"path": "api/services/feature_kline_service\\.py", "class": "B", "reason": "交易所 HTTP 請求逾時（等外部網路）"},
-    {"path": "frontend/src/lib/api\\.ts", "lines": [69, 71], "class": "B", "reason": "前端互動請求逾時（SPEC Task 0.2：前端互動請求逾時歸 B）"},
-    {"path": "frontend/src/lib/errorHandler\\.ts", "class": "B", "reason": "網路錯誤之重試次數（等外部）"},
-    {"path": "frontend/playwright\\.config\\.ts", "class": "B", "reason": "e2e 測試工具等瀏覽器外部事件（SPEC Task 0.2：歸 B）"},
-    {"path": "frontend/src/app/search/eventExportByEventId\\.test\\.tsx", "class": "B", "reason": "前端測試工具 waitFor 等 DOM 事件（同 e2e 等待）"},
-
-    {"path": "scripts/_live_doc_registry\\.py", "class": "C", "reason": "寫一筆稽核事件之短命令（秒級）掛住保險；失敗不改擋下結果"},
-    {"path": "scripts/(b7_l65_threadpool_microbench|benchmark_l65|benchmark_l65_v2|tmp/b7_l65_threadpool_microbench)\\.py", "class": "C", "reason": "結束時回收 RSS 取樣執行緒之 join 保險"},
-    {"path": "momentum/FeatureEngineering/memory_budget\\.py", "class": "C", "reason": "diskutil 查詢／守門子行程收尾之短命令掛住保險"},
-    {"path": "handoffs/run_receipts/icfirstalign_probes/memory_series_probe\\.py", "class": "C", "reason": "等守門子行程就緒／回收取樣執行緒之掛住保險"},
-    {"path": "tests/feature_engineering/preprocessing/test_l65_v2_transforms\\.py", "class": "C", "reason": "CLI --help 之短命令掛住保險"},
-    {"path": "tests/feature_engineering/test_failopen_manifest\\.py", "class": "C", "reason": "並行測試 barrier 同步之死鎖保險（受測動作為毫秒級）"},
-    {"path": "tests/feature_engineering/test_icfirstalign_domain\\.py", "lines": [473], "class": "C", "reason": "子行程池回傳 os.getpid 之掛住保險"},
-    {"path": "tests/feature_engineering/test_run_lifecycle\\.py", "class": "C", "reason": "kill 後等子行程退出之收尾保險"},
-    {"path": "tests/api/test_feature_factory_batch_resume\\.py", "lines": [243], "class": "C", "reason": "測試同步事件之死鎖保險"},
-    {"path": "tests/governance/test_cxrun_watchdog_stale_done\\.py", "class": "C", "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"},
-    {"path": "tests/governance/test_result_state_format_failed\\.py", "class": "C", "reason": "假 CLI 腳本（秒級）之掛住保險"},
-    {"path": "tests/governance/test_(doc_format_precheck|docrot_f2_total_items_count|gov_check_cheap_first|gov_check_dep_failclosed)\\.py", "class": "C", "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"},
-    {"path": "tests/governance/test_redispatch\\.py", "class": "C", "reason": "臨時 repo 內 gate 腳本（秒級）與 FIFO 死鎖偵測之掛住保險"},
-    {"path": "tests/momentum/Analysis/strategy_validation/test_(ledger_conformance|wiring_check)\\.py", "class": "C", "reason": "並行寫入之 join／秒級 wiring 檢查之掛住保險"},
-    {"path": "tests/momentum/Analysis/test_ic_artifact\\.py", "class": "C", "reason": "回收 RSS 取樣執行緒之 join 保險"},
-    {"path": "tests/momentum/DataExtraction/test_search_download_pagination\\.py", "class": "C", "reason": "並行測試 join／queue 之死鎖保險"},
-    {"path": "tests/registry/test_testreg_recorder\\.py", "class": "C", "reason": "臨時 repo 微型 pytest（秒級）之掛住保險"},
-    {"path": "tests/test_phase_d_granular_control\\.py", "class": "C", "reason": "並行設定讀寫之 join 死鎖保險"},
-
-    {"path": "scripts/_patch_hook_stdin_timeout\\.py", "class": "D", "reason": "純字串（修補說明與寫入之樣板文字）"},
-    {"path": "scripts/ffname_refreeze_(failopen|framepath)\\.sh", "class": "D", "reason": "只記錄耗時"},
-    {"path": "scripts/measure_ic_footprint\\.sh", "lines": [164], "class": "D", "reason": "只記錄總耗時（同檔 :130 之採樣上限為 A，樣式未抓，盤點收據已列）"},
-    {"path": "scripts/ffprod_measure\\.py", "class": "D", "reason": "docstring 字串／進度 log 每秒至多一行之間隔"},
-    {"path": "momentum/FeatureEngineering/memory_guard\\.py", "class": "D", "reason": "取樣間隔之睡眠迴圈"},
-    {"path": "config/ic_config\\.yaml", "class": "D", "reason": "空設定欄，僅 schema 宣告（momentum/Analysis/ic_config_schema.py:365），無程式讀取"},
-    {"path": "api/services/feature_factory_batch_service\\.py", "class": "D", "reason": "層指標回報之心跳間隔（逾時即續迴圈）"},
-    {"path": "api/websocket/.*\\.py", "class": "D", "reason": "websocket 心跳迴圈：逾時只送 ping／檢查連線後續等"},
-    {"path": "handoffs/run_receipts/govsuite_probes/run_(chunk|nodes)\\.sh", "class": "D", "reason": "只記錄耗時"},
-    {"path": "handoffs/run_receipts/probewinsor_probes/affected_(chunk|run)\\.sh", "lines": [35, 48], "class": "D", "reason": "只記錄耗時"},
-    {"path": "handoffs/run_receipts/testreg_probes/b3/light_sweep\\.sh", "lines": [26], "class": "D", "reason": "只記錄耗時"},
-    {"path": "handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe\\.py", "class": "D", "reason": "定期取樣之間隔"},
-    {"path": "tests/feature_engineering/test_numview_criteria\\.py", "class": "D", "reason": "監看判準測試設定之牆鐘欄（Task 0.1 後只記錄、不終止）"},
-    {"path": "tests/governance/_fkperf_spawn\\.py", "class": "D", "reason": "效能比例斷言之計時器：逾比例上限即判不合格"},
-    {"path": "tests/governance/test_fkperf_scale\\.py", "class": "D", "reason": "效能比例斷言（規模 10×／40× 耗時比上限）"},
-    {"path": "tests/governance/test_gate_lex_b3r_c5\\.py", "class": "D", "reason": "詞法器線性時間之效能斷言（CPU 忙之回溯無法以進度判定，逾上限即判 HANG 不合格）"},
-    {"path": "tests/api/test_ic_response_v2\\.py", "class": "D", "reason": "串流首段回應之效能斷言（2 秒）"},
-    {"path": "frontend/src/app/strategy-(demo|test)/page\\.tsx", "class": "D", "reason": "計算日期區間（現在減 N 天），非期限"},
-    {"path": "frontend/src/components/feature-factory/RunManagerPanel\\.tsx", "class": "D", "reason": "顯示相對時間，非期限"},
-    {"path": "frontend/src/components/feature-factory/__tests__/BatchProgressPanel\\.test\\.tsx", "class": "D", "reason": "測試資料之開始時間，非期限"},
-    {"path": "frontend/src/store/featureFactoryStore\\.ts", "class": "D", "reason": "顯示已耗時，非期限"},
-    {"path": "frontend/src/components/feature-factory/FeatureTable\\.tsx", "class": "D", "reason": "AbortController 用於取消過時之排序請求，非時間"},
-    {"path": "frontend/src/hooks/useICAnalysis\\.ts", "class": "D", "reason": "AbortController 用於換任務時丟棄舊世代請求，非時間"}
+    {
+      "path": "tests/registry/test_testreg_markers\\.py",
+      "pattern_id": "pytest_mark_timeout",
+      "class": "D",
+      "reason": "測試資料字串中之 pytest.mark.timeout 字面（非標記）"
+    },
+    {
+      "path": "momentum/Optimization/optuna_optimizer\\.py",
+      "class": "B",
+      "reason": "Optuna 使用者明示之搜尋預算（選填、預設 None，以 n_trials 界定；SPEC Task 5.4）"
+    },
+    {
+      "path": "api/models/optimization_models\\.py",
+      "class": "A",
+      "reason": "Optuna 時間預算固定預設 300／1800（SPEC Task 5.4 改 None）"
+    },
+    {
+      "path": "config/optimization_config\\.yaml",
+      "class": "A",
+      "reason": "Optuna 時間預算預設 300（SPEC Task 5.4 刪或改 null）"
+    },
+    {
+      "path": "api/routes/(execution|hyperparameter)_optimization\\.py",
+      "class": "B",
+      "reason": "傳遞使用者明示之 Optuna 搜尋預算（SPEC Task 5.4）"
+    },
+    {
+      "path": "api/services/optimization_task_service\\.py",
+      "class": "B",
+      "reason": "傳遞使用者明示之 Optuna 搜尋預算（選填；SPEC Task 5.4）"
+    },
+    {
+      "path": "frontend/src/components/strategy-test/OptunaConfigPanel\\.tsx",
+      "lines": [
+        68,
+        193
+      ],
+      "class": "A",
+      "reason": "Optuna 時間預算前端預設 1800 秒（同 SPEC Task 5.4 之預設改選填）"
+    },
+    {
+      "path": "frontend/src/components/strategy-test/OptunaConfigPanel\\.tsx",
+      "lines": [
+        46
+      ],
+      "class": "B",
+      "reason": "Optuna 搜尋預算欄之型別宣告（使用者明示之預算；SPEC Task 5.4）"
+    },
+    {
+      "path": "tests/integration/test_(e2e_execution|e2e_hyperparameter|optuna_checkpoint_recovery|optuna_multi_objective)\\.py",
+      "class": "B",
+      "reason": "測試明示傳入之 Optuna 搜尋預算（SPEC Task 5.4 之 B；b1 審碼 r6 CODEX-R6-P1-03）"
+    },
+    {
+      "path": "tests/api/test_phase4_optimization_routes\\.py",
+      "class": "B",
+      "reason": "測試請求明示之 Optuna 搜尋預算（SPEC Task 5.4 之 B）"
+    },
+    {
+      "path": "scripts/capture_ic1eb_baseline\\.py",
+      "class": "A",
+      "reason": "IC 基準擷取等候期限 1800 秒（盤點收據 A；Phase 3）"
+    },
+    {
+      "path": "scripts/framepath_affected_gate\\.py",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/testreg\\.py",
+      "class": "B",
+      "reason": "使用者明示 --max-seconds 才分段之參數傳遞（SPEC Task 2.1 邊界；預設 None 不分段，b3 改）"
+    },
+    {
+      "path": "scripts/ic1c_freeze_baseline\\.py",
+      "class": "A",
+      "reason": "深度分析等候 60 秒即 SystemExit（盤點收據 A；Phase 3）"
+    },
+    {
+      "path": "scripts/ic1eb_b5_replay\\.py",
+      "class": "A",
+      "reason": "IC 縱向分析等候期限 1800 秒（盤點收據 A；Phase 3）"
+    },
+    {
+      "path": "scripts/verify_l1_warmup_requirements\\.py",
+      "class": "A",
+      "reason": "逐任務 deadline 與 pool 停滯終止（盤點收據 A；Phase 4）"
+    },
+    {
+      "path": "scripts/run_with_receipt\\.py",
+      "class": "A",
+      "reason": "pytest collect-only 300 秒逾時（盤點收據未列，本次掃描新發現；同 Phase 2 Task 2.1 collect-only 牆鐘刪除）"
+    },
+    {
+      "path": "momentum/Analysis/feature_quality_diagnostics\\.py",
+      "class": "A",
+      "reason": "逐特徵 ADF 5 秒逾時（盤點收據 A；Phase 5）"
+    },
+    {
+      "path": "api/models/feature_browser_models\\.py",
+      "class": "A",
+      "reason": "覆蓋矩陣請求逾時欄（wait_for 逾時即 504、計算不回收；盤點收據 A；Phase 5 Task 5.3 改快取＋背景後登記 B）"
+    },
+    {
+      "path": "api/routes/feature_browser\\.py",
+      "class": "A",
+      "reason": "覆蓋矩陣 wait_for(to_thread) 逾時 504（盤點收據 A；Phase 5 Task 5.3）"
+    },
+    {
+      "path": "api/services/ic_analysis_service\\.py",
+      "class": "A",
+      "reason": "IC 掃描網格逐格與全網格期限（盤點收據 A；Phase 5 Task 5.3）"
+    },
+    {
+      "path": "api/services/model_enhancement_service\\.py",
+      "class": "A",
+      "reason": "模組任務 wait_for 逾時即 failed、執行緒續跑（盤點收據 A；Phase 5 Task 5.3）"
+    },
+    {
+      "path": "frontend/src/app/result/page\\.tsx",
+      "class": "A",
+      "reason": "長運算輪詢 maxAttempts 60 逾限放棄（SPEC Task 5.3 所列）"
+    },
+    {
+      "path": "frontend/src/app/search/page\\.tsx",
+      "class": "A",
+      "reason": "長運算輪詢 maxAttempts 30 逾限放棄（SPEC Task 5.3 所列）"
+    },
+    {
+      "path": "frontend/src/store/searchStore\\.ts",
+      "class": "A",
+      "reason": "長運算輪詢 maxAttempts 150 逾限放棄（SPEC Task 5.3 所列）"
+    },
+    {
+      "path": "frontend/src/lib/api\\.ts",
+      "lines": [
+        407
+      ],
+      "class": "A",
+      "reason": "waitForTaskCompletion 等任務 300 秒逾即放棄（本次掃描新發現；Task 5.3 同型）"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/ExportButtons\\.tsx",
+      "class": "A",
+      "reason": "大資料匯出 10 分鐘 setTimeout abort（本次掃描新發現；Task 5.3 同型：對長運算放棄等候）"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/estimate\\.py",
+      "class": "A",
+      "reason": "估時子行程 wall_ceiling 與 --timeout-seconds（盤點收據 A；Phase 1）"
+    },
+    {
+      "path": "handoffs/run_receipts/framepath_probes/admit_(after|loop)\\.sh",
+      "class": "B",
+      "reason": "探針以使用者明示之 --max-seconds 分段呼叫閘門（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "handoffs/run_receipts/icfirstalign_probes/calibration_dtype_diff_probe\\.py",
+      "class": "A",
+      "reason": "校準子行程 1800 秒逾時（盤點收據 A）"
+    },
+    {
+      "path": "handoffs/run_receipts/probewinsor_probes/affected_chunk\\.sh",
+      "lines": [
+        33
+      ],
+      "class": "B",
+      "reason": "探針之必填預算參數＝使用者明示之分段：逾即於檔間暫停、不中止進行中之測試（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/b3/light_sweep\\.sh",
+      "lines": [
+        19
+      ],
+      "class": "D",
+      "reason": "封存、不執行（TESTREG b3 已收案之探針；SPEC Task 2.1「同改或登記 D」）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/v6_profile\\.py",
+      "class": "D",
+      "reason": "封存、不執行（TESTREG v6 profiling 已收案之探針；SPEC Task 2.1「同改或登記 D」）"
+    },
+    {
+      "path": "tests/feature_engineering/test_warmup_verify_guards\\.py",
+      "class": "A",
+      "reason": "測試等候受測驗證腳本 180／600 秒、及測試 verify_l1 之 deadline 機制本身（盤點收據 A；Task 2.2／Phase 4）"
+    },
+    {
+      "path": "tests/api/test_feature_browser_routes\\.py",
+      "class": "A",
+      "reason": "測試設定覆蓋矩陣請求逾時欄（A 機制之參數；Phase 5 Task 5.3 同步改）"
+    },
+    {
+      "path": "tests/golden/ic_phase1_(contract|1a_cut1)/freeze_baseline(_new)?\\.py",
+      "class": "A",
+      "reason": "IC 基準凍結等候期限（盤點收據 A；Phase 3）"
+    },
+    {
+      "path": "tests/registry/test_testreg_gate_wiring\\.py",
+      "class": "B",
+      "reason": "測試資料為使用者明示之 --max-seconds 選項（SPEC Task 2.1 邊界之 B）"
+    },
+    {
+      "path": "tests/registry/test_testreg_run\\.py",
+      "class": "B",
+      "reason": "測試使用者明示 --max-seconds 之分段暫停（SPEC Task 2.1 邊界之 B，行為保留）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/.*",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/test_testreg_gate_wiring\\.renamed_proposal\\.py",
+      "class": "D",
+      "reason": "封存之測試改名提案、不執行（不在 pytest testpaths）"
+    },
+    {
+      "path": "scripts/(doc_format_precheck|factkey_write_guard|gate_check|list_active_mechanisms|narrow_check_router|self_verify_check|spec_xref_hook|status_marker_check|synth_attribution_hook|verify_pretooluse|javis_mail)\\.sh",
+      "lines": [
+        13,
+        17,
+        20,
+        22,
+        24,
+        25,
+        43,
+        56,
+        68,
+        104,
+        133,
+        157
+      ],
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/javis_mail.sh",
+      "lines": [
+        256
+      ],
+      "class": "B",
+      "reason": "信箱守候等外部來信，到期結束後由守候者重啟（非運算）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/(feature_factory|run_lifecycle)\\.py",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/(run_locks|feature_registry)\\.py",
+      "class": "B",
+      "reason": "等檔案鎖之期限（等他行程釋放鎖，非運算）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_icfirst\\.py",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "api/services/feature_kline_service\\.py",
+      "class": "B",
+      "reason": "交易所 HTTP 請求逾時（等外部網路）"
+    },
+    {
+      "path": "frontend/src/lib/api\\.ts",
+      "lines": [
+        69,
+        71
+      ],
+      "class": "B",
+      "reason": "前端互動請求逾時（SPEC Task 0.2：前端互動請求逾時歸 B）"
+    },
+    {
+      "path": "frontend/src/lib/errorHandler\\.ts",
+      "class": "B",
+      "reason": "網路錯誤之重試次數（等外部）"
+    },
+    {
+      "path": "frontend/playwright\\.config\\.ts",
+      "class": "B",
+      "reason": "e2e 測試工具等瀏覽器外部事件（SPEC Task 0.2：歸 B）"
+    },
+    {
+      "path": "frontend/src/app/search/eventExportByEventId\\.test\\.tsx",
+      "class": "B",
+      "reason": "前端測試工具 waitFor 等 DOM 事件（同 e2e 等待）"
+    },
+    {
+      "path": "scripts/_live_doc_registry\\.py",
+      "class": "C",
+      "reason": "寫一筆稽核事件之短命令（秒級）掛住保險；失敗不改擋下結果"
+    },
+    {
+      "path": "scripts/(b7_l65_threadpool_microbench|benchmark_l65|benchmark_l65_v2|tmp/b7_l65_threadpool_microbench)\\.py",
+      "class": "C",
+      "reason": "結束時回收 RSS 取樣執行緒之 join 保險"
+    },
+    {
+      "path": "momentum/FeatureEngineering/memory_budget\\.py",
+      "class": "C",
+      "reason": "diskutil 查詢／守門子行程收尾之短命令掛住保險"
+    },
+    {
+      "path": "handoffs/run_receipts/icfirstalign_probes/memory_series_probe\\.py",
+      "class": "C",
+      "reason": "等守門子行程就緒／回收取樣執行緒之掛住保險"
+    },
+    {
+      "path": "tests/feature_engineering/preprocessing/test_l65_v2_transforms\\.py",
+      "class": "C",
+      "reason": "CLI --help 之短命令掛住保險"
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_manifest\\.py",
+      "class": "C",
+      "reason": "並行測試 barrier 同步之死鎖保險（受測動作為毫秒級）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_domain\\.py",
+      "lines": [
+        475
+      ],
+      "class": "C",
+      "reason": "子行程池回傳 os.getpid 之掛住保險"
+    },
+    {
+      "path": "tests/feature_engineering/test_run_lifecycle\\.py",
+      "class": "C",
+      "reason": "kill 後等子行程退出之收尾保險"
+    },
+    {
+      "path": "tests/api/test_feature_factory_batch_resume\\.py",
+      "lines": [
+        240
+      ],
+      "class": "C",
+      "reason": "測試同步事件之死鎖保險"
+    },
+    {
+      "path": "tests/governance/test_cxrun_watchdog_stale_done\\.py",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_result_state_format_failed\\.py",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_(doc_format_precheck|docrot_f2_total_items_count|gov_check_cheap_first|gov_check_dep_failclosed)\\.py",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_redispatch\\.py",
+      "class": "C",
+      "reason": "臨時 repo 內 gate 腳本（秒級）與 FIFO 死鎖偵測之掛住保險"
+    },
+    {
+      "path": "tests/momentum/Analysis/strategy_validation/test_(ledger_conformance|wiring_check)\\.py",
+      "class": "C",
+      "reason": "並行寫入之 join／秒級 wiring 檢查之掛住保險"
+    },
+    {
+      "path": "tests/momentum/Analysis/test_ic_artifact\\.py",
+      "class": "C",
+      "reason": "回收 RSS 取樣執行緒之 join 保險"
+    },
+    {
+      "path": "tests/momentum/DataExtraction/test_search_download_pagination\\.py",
+      "class": "C",
+      "reason": "並行測試 join／queue 之死鎖保險"
+    },
+    {
+      "path": "tests/registry/test_testreg_recorder\\.py",
+      "class": "C",
+      "reason": "臨時 repo 微型 pytest（秒級）之掛住保險"
+    },
+    {
+      "path": "tests/test_phase_d_granular_control\\.py",
+      "class": "C",
+      "reason": "並行設定讀寫之 join 死鎖保險"
+    },
+    {
+      "path": "scripts/_patch_hook_stdin_timeout\\.py",
+      "class": "D",
+      "reason": "純字串（修補說明與寫入之樣板文字）"
+    },
+    {
+      "path": "scripts/ffname_refreeze_(failopen|framepath)\\.sh",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "scripts/measure_ic_footprint\\.sh",
+      "lines": [
+        164
+      ],
+      "class": "D",
+      "reason": "只記錄總耗時（同檔 :130 之採樣上限為 A，樣式未抓，盤點收據已列）"
+    },
+    {
+      "path": "scripts/ffprod_measure\\.py",
+      "class": "D",
+      "reason": "docstring 字串／進度 log 每秒至多一行之間隔"
+    },
+    {
+      "path": "momentum/FeatureEngineering/memory_guard\\.py",
+      "class": "D",
+      "reason": "取樣間隔之睡眠迴圈"
+    },
+    {
+      "path": "config/ic_config\\.yaml",
+      "class": "D",
+      "reason": "空設定欄，僅 schema 宣告（momentum/Analysis/ic_config_schema.py:365），無程式讀取"
+    },
+    {
+      "path": "api/services/feature_factory_batch_service\\.py",
+      "class": "D",
+      "reason": "層指標回報之心跳間隔（逾時即續迴圈）"
+    },
+    {
+      "path": "api/websocket/.*\\.py",
+      "class": "D",
+      "reason": "websocket 心跳迴圈：逾時只送 ping／檢查連線後續等"
+    },
+    {
+      "path": "handoffs/run_receipts/govsuite_probes/run_(chunk|nodes)\\.sh",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/probewinsor_probes/affected_(chunk|run)\\.sh",
+      "lines": [
+        35,
+        48
+      ],
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/b3/light_sweep\\.sh",
+      "lines": [
+        26
+      ],
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe\\.py",
+      "class": "D",
+      "reason": "定期取樣之間隔"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_criteria\\.py",
+      "class": "D",
+      "reason": "監看判準測試設定之牆鐘欄（Task 0.1 後只記錄、不終止）"
+    },
+    {
+      "path": "tests/governance/_fkperf_spawn\\.py",
+      "class": "D",
+      "reason": "效能比例斷言之計時器：逾比例上限即判不合格"
+    },
+    {
+      "path": "tests/governance/test_fkperf_scale\\.py",
+      "class": "D",
+      "reason": "效能比例斷言（規模 10×／40× 耗時比上限）"
+    },
+    {
+      "path": "tests/governance/test_gate_lex_b3r_c5\\.py",
+      "class": "D",
+      "reason": "詞法器線性時間之效能斷言（CPU 忙之回溯無法以進度判定，逾上限即判 HANG 不合格）"
+    },
+    {
+      "path": "tests/api/test_ic_response_v2\\.py",
+      "class": "D",
+      "reason": "串流首段回應之效能斷言（2 秒）"
+    },
+    {
+      "path": "frontend/src/app/strategy-(demo|test)/page\\.tsx",
+      "class": "D",
+      "reason": "計算日期區間（現在減 N 天），非期限"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/RunManagerPanel\\.tsx",
+      "class": "D",
+      "reason": "顯示相對時間，非期限"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/__tests__/BatchProgressPanel\\.test\\.tsx",
+      "class": "D",
+      "reason": "測試資料之開始時間，非期限"
+    },
+    {
+      "path": "frontend/src/store/featureFactoryStore\\.ts",
+      "class": "D",
+      "reason": "顯示已耗時，非期限"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/FeatureTable\\.tsx",
+      "class": "D",
+      "reason": "AbortController 用於取消過時之排序請求，非時間"
+    },
+    {
+      "path": "frontend/src/hooks/useICAnalysis\\.ts",
+      "class": "D",
+      "reason": "AbortController 用於換任務時丟棄舊世代請求，非時間"
+    }
   ]
 }

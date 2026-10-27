@@ -12,6 +12,8 @@ import sys
 import time
 from pathlib import Path
 
+from tests._nocap_subprocess import run_watched_subprocess
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,7 +27,7 @@ def _run(tmp_path: Path, *extra: str, workers: str = "2") -> subprocess.Complete
     env = dict(os.environ, PYTHONPATH=str(ROOT))
     cmd = [sys.executable, str(SCRIPT), "--exhaustive", "--workers", workers, "--timeframes", "1d",
            "--symbols", "BTCUSDT", "--no-write", "--output", str(tmp_path / "table.yaml"), *extra]
-    return subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
+    return run_watched_subprocess(cmd, cwd=str(ROOT), env=env)
 
 
 @pytest.mark.parametrize("workers", ["1", "2"])
@@ -88,7 +90,7 @@ def _merge(tmp_path: Path, name: str, receipts: list, *extra: str) -> subprocess
     cmd = [sys.executable, str(SCRIPT), "--merge-receipts", *[str(p) for p in receipts], "--timeframes", "1d",
            "--output", str(tmp_path / f"{name}.yaml"), "--receipt", str(tmp_path / f"{name}.json"), *criteria,
            *extra]
-    return subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
+    return run_watched_subprocess(cmd, cwd=str(ROOT), env=env)
 
 
 @pytest.mark.skipif(not RECEIPT.exists(), reason="需要倍數量測收據")
@@ -224,7 +226,7 @@ def test_resume_refuses_partial_log_with_other_market(tmp_path: Path) -> None:
         cmd = [sys.executable, str(SCRIPT), "--symbols", "BTCUSDT", "--timeframes", "1d", "--only", "RSI",
                "--eval-positions", "2", "--workers", "1", "--partial-log", str(path), "--no-write",
                "--market", market]
-        proc = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
+        proc = run_watched_subprocess(cmd, cwd=str(ROOT), env=env)
         assert proc.returncode == 0, proc.stdout[-800:] + proc.stderr[-800:]
         return proc.stdout
 

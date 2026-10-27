@@ -14,6 +14,8 @@ import json
 import os
 import subprocess
 import sys
+
+from tests._nocap_subprocess import run_watched_subprocess
 import time
 from contextlib import ExitStack
 from pathlib import Path
@@ -131,8 +133,8 @@ def test_mutation_metric_max_resident_footprint(tmp_path: Path) -> None:
     b3 實作期（測試調整 25）：於新子行程執行——長 session 後段本行程 footprint 遠大於 resident（壓縮／換出頁），
     觸頁 256 MiB 映射使 resident 上升仍不超過 footprint，mutant 之讀數不變而不拋（全套後段實測兩次）；新行程之
     resident≈footprint，mutant 判定與環境無關。案例本體（mutant、上限、觸頁量、斷言）不變。"""
-    proc = subprocess.run([sys.executable, "-c", _MAX_METRIC_PROBE, str(tmp_path)], cwd=str(h.REPO),
-                          env={**os.environ, "PYTHONPATH": str(h.REPO)}, capture_output=True, text=True, timeout=300)
+    proc = run_watched_subprocess([sys.executable, "-c", _MAX_METRIC_PROBE, str(tmp_path)], cwd=str(h.REPO),
+                                  env={**os.environ, "PYTHONPATH": str(h.REPO)})
     assert proc.returncode == 0, proc.stderr[-2000:]
     assert "RESULT raised" in proc.stdout, proc.stdout[-2000:]
 
@@ -1333,7 +1335,7 @@ gb.stop()
 print(json.dumps({"a_abort": (a / "memory_guard_abort.json").exists(), "alive": os.getpid()}))
 """ % (C["guard_test_readings_env"], str(a_rows), C["guard_test_readings_env"], str(b_rows))
     child = _child_script(tmp_path, body)
-    proc = subprocess.run([sys.executable, str(child), str(tmp_path)], capture_output=True, text=True, timeout=120)
+    proc = run_watched_subprocess([sys.executable, str(child), str(tmp_path)])
     assert proc.returncode == 0, proc.stderr[-2000:]
     out = json.loads(proc.stdout.strip().splitlines()[-1])
     assert out["a_abort"] is False
@@ -1354,7 +1356,7 @@ time.sleep(5.0)
 print("survived")
 """ % (C["guard_test_readings_env"], str(a_rows))
     child = _child_script(tmp_path, body)
-    proc = subprocess.run([sys.executable, str(child), str(tmp_path)], capture_output=True, text=True, timeout=120)
+    proc = run_watched_subprocess([sys.executable, str(child), str(tmp_path)])
     assert proc.returncode != 0 and "survived" not in proc.stdout
 
 
@@ -1375,7 +1377,7 @@ for _ in range(400):
 print("finished")
 """ % (C["guard_test_readings_env"], str(readings))
     child = _child_script(tmp_path, body)
-    proc = subprocess.run([sys.executable, str(child), str(tmp_path)], capture_output=True, text=True, timeout=300)
+    proc = run_watched_subprocess([sys.executable, str(child), str(tmp_path)])
     assert proc.returncode == -9 and "finished" not in proc.stdout
     receipt = json.loads((tmp_path / "run" / C["guard_files"]["abort_receipt"]).read_text(encoding="utf-8"))
     assert set(C["guard_files"]["abort_receipt_keys"]) <= set(receipt)
@@ -1404,7 +1406,7 @@ g.stop()
 print("survived")
 """ % (C["guard_test_readings_env"], str(readings))
     child = _child_script(tmp_path, body)
-    proc = subprocess.run([sys.executable, str(child), str(tmp_path)], capture_output=True, text=True, timeout=120)
+    proc = run_watched_subprocess([sys.executable, str(child), str(tmp_path)])
     assert proc.returncode == 0 and "survived" in proc.stdout
 
 
@@ -1466,8 +1468,7 @@ PROBE = h.REPO / "handoffs/run_receipts/icfirstalign_probes/memory_series_probe.
 def _run_probe(tmp_path: Path, extra_env: Dict[str, str]) -> Tuple[subprocess.CompletedProcess, Path]:
     out = tmp_path / "series.jsonl"
     env = {**os.environ, "PYTHONPATH": str(h.REPO), "ICFA_SERIES_OUT": str(out), **extra_env}
-    proc = subprocess.run([sys.executable, str(PROBE), "--max-steps", "3"], capture_output=True, text=True,
-                          timeout=600, env=env, cwd=str(tmp_path))
+    proc = run_watched_subprocess([sys.executable, str(PROBE), "--max-steps", "3"], env=env, cwd=str(tmp_path))
     return proc, out
 
 

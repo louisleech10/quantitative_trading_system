@@ -20,6 +20,8 @@ import importlib.util
 import json
 import subprocess
 import sys
+
+from tests._nocap_subprocess import run_watched_subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -113,7 +115,7 @@ def recompute_mismatches(vectors: Dict[str, Any]) -> List[str]:
 # ---------------------------------------------------------------- Task 1.2
 
 def test_export_script_check_rc0():
-    proc = subprocess.run([sys.executable, str(SCRIPT), "--check"], cwd=str(REPO), capture_output=True, text=True, timeout=600)
+    proc = run_watched_subprocess([sys.executable, str(SCRIPT), "--check"], cwd=str(REPO))
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
@@ -220,7 +222,7 @@ def test_exporter_does_not_read_committed_vectors(monkeypatch, tmp_path):
 
 def test_vectors_regeneration_is_deterministic(tmp_path):
     out = tmp_path / "vectors.json"
-    proc = subprocess.run([sys.executable, str(SCRIPT), "--out", str(out)], cwd=str(REPO), capture_output=True, text=True, timeout=600)
+    proc = run_watched_subprocess([sys.executable, str(SCRIPT), "--out", str(out)], cwd=str(REPO))
     assert proc.returncode == 0, proc.stderr
     assert hashlib.sha256(out.read_bytes()).hexdigest() == hashlib.sha256(VECTORS_PATH.read_bytes()).hexdigest()
 

@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tempfile
 from functools import lru_cache
+
+from tests._nocap_subprocess import run_watched_subprocess
 from pathlib import Path
 import types
 
@@ -249,7 +251,7 @@ def test_layer_golden_matches_baseline() -> None:
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = "0"
     env[GATE_A_WORKER_ENV] = "1"
-    proc = subprocess.run(
+    proc = run_watched_subprocess(
         [
             sys.executable,
             "-m",
@@ -260,9 +262,6 @@ def test_layer_golden_matches_baseline() -> None:
         ],
         cwd=str(ROOT),
         env=env,
-        capture_output=True,
-        text=True,
-        timeout=1800,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
 

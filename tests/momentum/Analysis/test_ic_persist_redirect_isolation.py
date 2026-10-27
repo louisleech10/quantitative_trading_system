@@ -10,6 +10,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from tests._nocap_subprocess import run_watched_subprocess
+
 from tests.fixtures.ic_persist_redirect import REQUIRED_SEAM_IDS, RedirectPatchSet
 
 
@@ -54,13 +56,7 @@ sys.exit(int(rc))
 
 
 def _run_cumulative(nodeid: str, out: Path, env: dict[str, str]) -> tuple[subprocess.CompletedProcess, dict]:
-    completed = subprocess.run(
-        ["venv/bin/python", "-c", _CUMULATIVE_RUNNER, str(out), nodeid],
-        text=True,
-        capture_output=True,
-        env=env,
-        timeout=60,
-    )
+    completed = run_watched_subprocess(["venv/bin/python", "-c", _CUMULATIVE_RUNNER, str(out), nodeid], env=env)
     payload = json.loads(out.read_text(encoding="utf-8")) if out.exists() else {}
     return completed, payload
 
@@ -71,13 +67,7 @@ def test_non_opt_in_subprocesses_never_activate(tmp_path: Path) -> None:
         env = os.environ.copy()
         env["IC_PERSIST_ASSERT_NO_ACTIVATION"] = "1"
         env["IC_PERSIST_PROBE_JSON"] = str(probe)
-        completed = subprocess.run(
-            ["venv/bin/python", "-m", "pytest", nodeid, "-q"],
-            text=True,
-            capture_output=True,
-            env=env,
-            timeout=60,
-        )
+        completed = run_watched_subprocess(["venv/bin/python", "-m", "pytest", nodeid, "-q"], env=env)
         assert completed.returncode == 0, completed.stdout + completed.stderr
         payload = json.loads(probe.read_text(encoding="utf-8"))
         assert payload == {"activation_count": 0, "violations": []}

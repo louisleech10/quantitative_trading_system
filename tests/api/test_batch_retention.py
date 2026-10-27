@@ -17,6 +17,7 @@ import pytest_asyncio
 from fastapi import FastAPI
 
 import api.services.feature_factory_service as feature_service_module
+from tests._nocap_wait import ProgressWait
 from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service, router as feature_factory_router
@@ -177,12 +178,9 @@ def _compute_tracked_nonblock(
     return _compute_success(symbol, timeframe, config_override, force_regenerate, cache_dir, batch_id)
 
 
-async def _wait_batch_done(
-    service: FeatureFactoryBatchService,
-    task_id: str,
-    timeout: float = 5.0,
-) -> Dict[str, Any]:
-    started = time.time()
+async def _wait_batch_done(service: FeatureFactoryBatchService, task_id: str) -> Dict[str, Any]:
+    """輪詢至終態（含兩種暫停）；不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定並留堆疊
+    （NOCAP Task 2.2）。"""
     terminal = {
         "completed",
         "partial",
@@ -190,12 +188,13 @@ async def _wait_batch_done(
         "paused_disk_backpressure",
         "paused_disk_hard",
     }
-    while time.time() - started < timeout:
+    waiter = ProgressWait(f"batch {task_id}")
+    while True:
         status = service.get_status(task_id)
         if status and status["status"] in terminal:
             return status
+        waiter.check(status)
         await asyncio.sleep(0.02)
-    raise TimeoutError(f"batch did not reach terminal state: {task_id}")
 
 
 def _seed_registry(
@@ -1011,7 +1010,7 @@ async def test_retention_backpressure_low_free_pending_pauses(
     task_id = await service.start_batch(
         BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="1h", force_regenerate=True)
     )
-    await _wait_batch_done(service, task_id, timeout=8.0)
+    await _wait_batch_done(service, task_id)
 
     status = service.get_status(task_id)
     assert status is not None
@@ -1054,7 +1053,7 @@ async def test_retention_backpressure_discard_wakeup_continues(
     )
     assert resp.status_code == 200
 
-    final = await _wait_batch_done(batch_service, task_id, timeout=8.0)
+    final = await _wait_batch_done(batch_service, task_id)
     assert final["status"] == "completed"
     checkpoint = batch_service._load_checkpoint(task_id)
     assert checkpoint is not None
@@ -1090,7 +1089,7 @@ async def test_retention_backpressure_no_pending_hard_pause_observable(
     )
     assert retain.status_code == 200
 
-    hard = await _wait_batch_done(batch_service, task_id, timeout=8.0)
+    hard = await _wait_batch_done(batch_service, task_id)
     assert hard["status"] == "paused_disk_hard"
     checkpoint = batch_service._load_checkpoint(task_id)
     assert checkpoint is not None

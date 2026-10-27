@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 import api.services.feature_factory_batch_service as batch_service_module
 import api.services.feature_factory_service as feature_service_module
+from tests._nocap_wait import ProgressWait
 from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service
@@ -45,18 +46,14 @@ def reset_heavy_batch_slot(monkeypatch) -> None:
     )
 
 
-async def _wait_until_done(
-    service: FeatureFactoryBatchService,
-    task_id: str,
-    timeout_sec: float = 5.0,
-) -> Dict:
-    started = time.time()
+async def _wait_until_done(service: FeatureFactoryBatchService, task_id: str) -> Dict:
+    """輪詢至終態；不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
+    waiter = ProgressWait(f"batch {task_id}")
     while True:
         status = service.get_status(task_id)
         if status and status["status"] in {"completed", "partial", "failed", "paused_ram_gate"}:
             return status
-        if time.time() - started > timeout_sec:
-            raise TimeoutError(f"Task did not finish in {timeout_sec}s: {task_id}")
+        waiter.check(status)
         await asyncio.sleep(0.02)
 
 

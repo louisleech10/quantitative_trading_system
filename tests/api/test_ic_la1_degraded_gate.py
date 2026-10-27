@@ -19,6 +19,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests._nocap_wait import await_progressing
+
 from momentum.Analysis.ic_reporter import (
     DegradedOOSViolation,
     ICReporter,
@@ -963,10 +965,7 @@ async def test_callback_completion_degraded_real_chain_a() -> None:
         labels_path="",
         config_override=cfg,
     )
-    await asyncio.wait_for(
-        service._run_analysis(task_id, analyzer, request, cfg),
-        timeout=120,
-    )
+    await await_progressing(service._run_analysis(task_id, analyzer, request, cfg), f"ic run_analysis {task_id}")
     await asyncio.sleep(0)
 
     completed = _completed_events(recorded)
@@ -1016,10 +1015,7 @@ async def test_callback_completion_ok_real_chain_a() -> None:
         labels_path="",
         config_override=cfg,
     )
-    await asyncio.wait_for(
-        service._run_analysis(task_id, analyzer, request, cfg),
-        timeout=180,
-    )
+    await await_progressing(service._run_analysis(task_id, analyzer, request, cfg), f"ic run_analysis {task_id}")
     await asyncio.sleep(0)
 
     completed = _completed_events(recorded)
@@ -1073,10 +1069,8 @@ async def test_callback_completion_degraded_real_chain_b(tmp_path: Path) -> None
         deep_analysis=False,
         config_override=cfg,
     )
-    await asyncio.wait_for(
-        service._run_full_analysis(task_id, analyzer, request, cfg),
-        timeout=120,
-    )
+    await await_progressing(service._run_full_analysis(task_id, analyzer, request, cfg),
+                            f"ic run_full_analysis {task_id}")
     await asyncio.sleep(0)
 
     completed = _completed_events(recorded)
@@ -1144,10 +1138,7 @@ async def test_callback_payload_missing_status_detected(
         labels_path="",
         config_override=cfg,
     )
-    await asyncio.wait_for(
-        service._run_analysis(task_id, analyzer, request, cfg),
-        timeout=120,
-    )
+    await await_progressing(service._run_analysis(task_id, analyzer, request, cfg), f"ic run_analysis {task_id}")
     await asyncio.sleep(0)
 
     completed = _completed_events(recorded)

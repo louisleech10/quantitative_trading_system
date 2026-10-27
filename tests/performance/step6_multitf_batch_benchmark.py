@@ -20,6 +20,7 @@ from api.services.feature_factory_batch_adapters import (
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
 from api.services.feature_factory_service import feature_factory_service
 from momentum.factories import create_feature_factory, create_kline_storage_manager
+from tests._nocap_wait import ProgressWait
 
 
 def _pick_symbols(required_tfs: List[str], count: int) -> List[str]:
@@ -97,14 +98,14 @@ def _benchmark_single_symbol(factory, symbol: str) -> Dict[str, float]:
     }
 
 
-async def _wait_batch_done(service: FeatureFactoryBatchService, task_id: str, timeout_sec: float = 1800.0) -> Dict[str, Any]:
-    start = time.perf_counter()
+async def _wait_batch_done(service: FeatureFactoryBatchService, task_id: str) -> Dict[str, Any]:
+    """輪詢至終態；不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
+    waiter = ProgressWait(f"batch {task_id}")
     while True:
         status = service.get_status(task_id)
         if status and status["status"] in {"completed", "partial", "failed"}:
             return status
-        if (time.perf_counter() - start) > timeout_sec:
-            raise TimeoutError(f"batch timeout: {task_id}")
+        waiter.check(status)
         await asyncio.sleep(1.0)
 
 

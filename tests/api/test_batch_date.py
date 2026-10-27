@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 import api.services.feature_factory_service as feature_service_module
+from tests._nocap_wait import ProgressWait
 from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
@@ -158,18 +159,14 @@ def _manifest_row_count_from_result(result: Any) -> int:
     raise AssertionError("result missing row_count and features_df")
 
 
-async def _wait_until_done(
-    service: FeatureFactoryBatchService,
-    task_id: str,
-    timeout_sec: float = 180.0,
-) -> Dict[str, Any]:
-    started = time.time()
+async def _wait_until_done(service: FeatureFactoryBatchService, task_id: str) -> Dict[str, Any]:
+    """輪詢至終態；不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait 判定並留堆疊（NOCAP Task 2.2）。"""
+    waiter = ProgressWait(f"batch {task_id}")
     while True:
         status = service.get_status(task_id)
         if status and status["status"] in {"completed", "partial", "failed"}:
             return status
-        if time.time() - started > timeout_sec:
-            raise TimeoutError(f"Task did not finish in {timeout_sec}s: {task_id}")
+        waiter.check(status)
         await asyncio.sleep(0.05)
 
 
@@ -314,7 +311,7 @@ async def test_batch_date_applied_row_count_primary_12h(
         force_regenerate=True,
     )
     task_id = await service.start_batch(request)
-    status = await _wait_until_done(service, task_id, timeout_sec=600.0)
+    status = await _wait_until_done(service, task_id)
 
     assert status["status"] == "completed"
     assert mock_browse_registrar.calls, "batch should register manifest"
@@ -355,7 +352,7 @@ async def test_batch_date_applied_row_count_primary_1h(
         force_regenerate=True,
     )
     task_id = await service.start_batch(request)
-    status = await _wait_until_done(service, task_id, timeout_sec=600.0)
+    status = await _wait_until_done(service, task_id)
 
     assert status["status"] == "completed"
     manifest_path = mock_browse_registrar.calls[0]["manifest_path"]
@@ -408,7 +405,7 @@ async def test_batch_vs_single_row_count_and_hash_consistency(
         force_regenerate=True,
     )
     task_id = await service.start_batch(request)
-    status = await _wait_until_done(service, task_id, timeout_sec=300.0)
+    status = await _wait_until_done(service, task_id)
     assert status["status"] == "completed"
 
     batch_manifest_path = mock_browse_registrar.calls[-1]["manifest_path"]

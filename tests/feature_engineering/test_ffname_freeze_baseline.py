@@ -15,6 +15,8 @@ import json
 import subprocess
 import sys
 
+from tests._nocap_subprocess import run_watched_subprocess
+
 import pytest
 
 from tests.feature_engineering.ffname_helpers import (
@@ -109,8 +111,7 @@ def test_missing_parts_detects_unrecorded_manifest_column():
 
 
 def test_baseline_check_rc0():
-    proc = subprocess.run([sys.executable, str(FREEZE_SCRIPT), "--check"], cwd=str(REPO),
-                          capture_output=True, text=True, timeout=600)
+    proc = run_watched_subprocess([sys.executable, str(FREEZE_SCRIPT), "--check"], cwd=str(REPO))
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
