@@ -373,8 +373,9 @@ def test_boundary_56_heavy_command_with_mismatched_estimate_receipt_blocked(brea
 
 
 def test_mutation_depth_zero_misses_two_level_chain(monkeypatch: pytest.MonkeyPatch) -> None:
-    """改壞：展開深度設 0 ⇒ 一層 .sh 內之全套 pytest 漏擋（遞迴展開之鑑別力）。"""
-    monkeypatch.setattr(g, "MAX_DEPTH", 0)
+    """改壞：不展開被執行之 .sh（讀檔一律回 None）⇒ 一層 .sh 內之全套 pytest 漏擋（遞迴展開之鑑別力；逾深度上限
+    之 fail-closed 不受此改壞影響，故改壞點選在讀檔）。"""
+    monkeypatch.setattr(g, "_script_body", lambda *a, **k: None)
     try:
         assert _rc(_bash(f"bash {_chain(1, 'venv/bin/python -m pytest -q')}", False)) == 0
     finally:

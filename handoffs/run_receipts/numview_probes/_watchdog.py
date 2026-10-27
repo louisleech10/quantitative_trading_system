@@ -4,7 +4,9 @@
 🔴 全專案規則（使用者 2026-10-27：「講幾千次不準再因為時間上限問題被停掉」「判停一律重跑，不先查停止的原因，直接重跑不也會停?」）：
 - **不因時間終止**：(c) 牆鐘逾預期只記錄（`over_expected`）並於 log 寫一行，不終止。
 - **卡死＝無進度**：(a) 須「log 未增長」且「子行程樹 CPU 未前進」（窗內平均 < `CPU_PROGRESS_FRACTION` 核）同時持續
-  `log_stall_seconds` 秒；長時間無 log 之計算只要在用 CPU 即不判卡死。讀不到 CPU（psutil 失敗）⇒ 退回只看 log。
+  `log_stall_seconds` 秒；長時間無 log 之計算只要在用 CPU 即不判卡死。讀不到 CPU（psutil 失敗）⇒ **不判卡死**（無從證明
+  無進度），記 `monitor_degraded` 續跑，記憶體證據照判（NOCAP Task 0.1 v4 增修①）。
+- **終止整個子行程樹**：子行程以新 session 啟動而自成行程群組，終止時整組送信號並補殺脫離群組之子孫（增修②）。
 - **終止前先留現場、判原因**（`diagnose`）：向子行程樹送 SIGUSR1（Python 子行程經注入之 sitecustomize 以 faulthandler 把
   全部執行緒之堆疊寫入每行程一檔 `<log>.stacks.<pid>.txt`）、macOS 以 `sample` 取各行程原生堆疊（`<log>.sample.<pid>.txt`；
   失敗時記 rc 與 stderr，不靜默），並記各行程狀態／CPU／RSS、swap 增長與 log 尾段；`cause`＝`memory`（swap 逾門檻終止、或
@@ -250,13 +252,66 @@ def _native_sample(pid: int, log_path: Path) -> Dict[str, Any]:
             "error": None if ok else f"sample 未產出檔（rc={done.returncode}）"}
 
 
+def _signal_all(pgid: Optional[int], pids: Sequence[int], sig: int) -> None:
+    if pgid is not None:
+        try:
+            os.killpg(pgid, sig)
+        except OSError:  # 群組已空或無權限
+            pass
+    for pid in pids:
+        try:
+            os.kill(pid, sig)
+        except OSError:  # 已結束或無權限
+            pass
+
+
+def _alive(pids: Sequence[int]) -> List[int]:
+    """仍存活（非殭屍）之 pid；psutil 不可用 ⇒ 以 os.kill(pid, 0) 判。"""
+    out = []
+    for pid in pids:
+        try:
+            import psutil
+
+            if psutil.Process(pid).status() != psutil.STATUS_ZOMBIE:
+                out.append(pid)
+        except ImportError:
+            try:
+                os.kill(pid, 0)
+                out.append(pid)
+            except OSError:
+                pass
+        except Exception:  # noqa: BLE001 — 已結束
+            pass
+    return out
+
+
 def _terminate(proc: "subprocess.Popen[Any]") -> Optional[int]:
-    proc.terminate()
+    """終止整個子行程樹（NOCAP Task 0.1 v4／v5 增修②）：子行程以新 session 啟動而自成行程群組 ⇒ 對整個群組送 SIGTERM
+    （涵蓋快照後才 fork 者），寬限後 SIGKILL；另於送信號前後各取子孫快照、對已脫離群組（自行 setsid）者逐一送信號，
+    重複至無存活子孫為止。無權限或已結束者略過。"""
+    pids = [p.pid for p in _tree(proc.pid)]
     try:
-        return proc.wait(timeout=10)
+        pgid: Optional[int] = os.getpgid(proc.pid)
+        if pgid == os.getpgid(0):  # 未自成群組（例：呼叫端覆寫 Popen）⇒ 不得對自身群組送信號
+            pgid = None
+    except OSError:
+        pgid = None
+    _signal_all(pgid, pids, signal.SIGTERM)
+    try:
+        rc: Optional[int] = proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        proc.kill()
-        return proc.wait()
+        rc = None
+    pids = sorted(set(pids) | {p.pid for p in _tree(proc.pid)})
+    _signal_all(pgid, pids, signal.SIGKILL)
+    if rc is None:
+        rc = proc.wait()
+    for _ in range(100):  # 已決定終止後之收尾：補殺仍存活之子孫（脫離群組者）
+        left = _alive(pids)
+        if not left:
+            break
+        _signal_all(None, left, signal.SIGKILL)
+        time.sleep(0.05)
+    return rc
 
 
 def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, expected_seconds: Optional[float] = None,
@@ -275,57 +330,83 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, config: WatchdogConfig, e
     ram = probe_ram()
     frac = config.swap_growth_fraction_of_ram
     threshold = None if ram is None or frac is None else frac * ram
-    growth_max: Optional[float] = None
     started = clock()
     run_env = stack_dump_env(env, log_path)
     with open(log_path, "w", encoding="utf-8") as log:
-        proc = subprocess.Popen(list(cmd), cwd=cwd, env=run_env, stdout=log, stderr=subprocess.STDOUT)
-        last_size, last_growth, swap_hits = -1, started, 0
-        cap = wall_cap_seconds(config, expected_seconds)
-        over = False
-        prev_cpu, prev_t = probe_cpu(proc.pid), started
-        while True:
-            rc = proc.poll()
-            if rc is not None:
-                return WatchResult(EXITED, rc, None, clock() - started, growth_max, threshold, over)
-            sleep(config.check_interval_seconds)
-            if not ENABLED:
-                continue
-            now = clock()
-            size = log_path.stat().st_size if log_path.exists() else 0
-            if size != last_size:
-                last_size, last_growth = size, now
-            cpu = probe_cpu(proc.pid)
-            if cpu is not None and prev_cpu is not None and now > prev_t and \
-                    cpu - prev_cpu >= CPU_PROGRESS_FRACTION * (now - prev_t):
-                last_growth = now  # CPU 有進度 ⇒ 不是卡死（長時間無 log 之計算）
-            prev_cpu, prev_t = cpu, now
-            reason = None
-            if now - last_growth >= config.log_stall_seconds:
-                reason = (f"log 檔 {now - last_growth:.0f} 秒未增長且 CPU 無進度（門檻 {config.log_stall_seconds:.0f} 秒）"
-                          if cpu is not None else
-                          f"log 檔 {now - last_growth:.0f} 秒未增長（CPU 讀不到；門檻 {config.log_stall_seconds:.0f} 秒）")
-            used = probe_swap()
-            if used is not None and baseline is None:
-                baseline = used
-            growth = None if used is None or baseline is None else used - baseline
-            if growth is not None:
-                growth_max = growth if growth_max is None else max(growth_max, growth)
-            swap_hits = swap_hits + 1 if growth is not None and threshold is not None and growth > threshold else 0
-            if reason is None and swap_hits >= config.swap_consecutive_checks:
-                reason = (f"swap 自啟動增長 {growth:.0f} MB > 門檻 {threshold:.0f} MB 連續 {swap_hits} 次"
-                          if growth is not None and threshold is not None else "swap 增長逾門檻")
-            if not over and now - started >= cap:  # 只記錄、不終止
-                over = True
-                log.write(f"[watchdog] 牆鐘 {now - started:.0f} 秒逾預期 {cap:.0f} 秒（只記錄，不終止；CPU 進度持續監看）\n")
+        # 自成行程群組（新 session）：卡死終止時整組送信號，涵蓋子孫與快照後才 fork 者（NOCAP Task 0.1 增修②）
+        proc = subprocess.Popen(list(cmd), cwd=cwd, env=run_env, stdout=log, stderr=subprocess.STDOUT,
+                                start_new_session=True)
+        try:
+            return _watch_loop(proc, log, log_path, config, expected_seconds, baseline, ram, threshold, started,
+                               probe_swap, clock, sleep, probe_cpu, diagnose_fn)
+        except BaseException:  # 呼叫端中斷（Ctrl-C 不再傳到新 session 之子行程）⇒ 一併終止整樹，不留孤兒
+            if proc.poll() is None:
+                _terminate(proc)
+            raise
+
+
+def _watch_loop(proc: "subprocess.Popen[Any]", log: Any, log_path: Path, config: WatchdogConfig,
+                expected_seconds: Optional[float], baseline: Optional[float], ram: Optional[float],
+                threshold: Optional[float], started: float, probe_swap: Callable[[], Optional[float]],
+                clock: Callable[[], float], sleep: Callable[[float], None], probe_cpu: Callable[[int], Optional[float]],
+                diagnose_fn: Optional[Callable[..., Dict[str, Any]]]) -> WatchResult:
+    growth_max: Optional[float] = None
+    last_size, last_growth, swap_hits = -1, started, 0
+    cap = wall_cap_seconds(config, expected_seconds)
+    over = False
+    degraded: Optional[Dict[str, Any]] = None
+    prev_cpu, prev_t = probe_cpu(proc.pid), started
+    while True:
+        rc = proc.poll()
+        if rc is not None:
+            return WatchResult(EXITED, rc, None, clock() - started, growth_max, threshold, over,
+                               diagnosis={"monitor_degraded": degraded} if degraded else {})
+        sleep(config.check_interval_seconds)
+        if not ENABLED:
+            continue
+        now = clock()
+        size = log_path.stat().st_size if log_path.exists() else 0
+        if size != last_size:
+            last_size, last_growth = size, now
+        cpu = probe_cpu(proc.pid)
+        if cpu is None:
+            # 讀不到 CPU ⇒ 無從證明無進度：不以 log 停滯判卡死（無輸出之計算不得被監看器誤殺；NOCAP Task 0.1 增修①），
+            # 記監看降級並續跑；記憶體證據照判
+            last_growth = now
+            if degraded is None:
+                degraded = {"reason": "CPU 讀不到（psutil 失敗）", "since_seconds": round(now - started, 3)}
+                log.write("[watchdog] 監看降級：CPU 讀不到，log 停滯不判卡死（記憶體證據照判）\n")
                 log.flush()
                 last_size = log_path.stat().st_size if log_path.exists() else last_size
-            if reason is not None and proc.poll() is None:
-                diag = (diagnose_fn or diagnose)(proc.pid, log_path, swap_growth_mb=growth_max, swap_threshold_mb=threshold,
-                                                 swap_hit=swap_hits >= config.swap_consecutive_checks, ram_mb=ram)
-                rc = _terminate(proc)
-                return WatchResult(STALLED, rc, reason, clock() - started, growth_max, threshold, over,
-                                   diag.get("cause"), diag)
+        elif prev_cpu is not None and now > prev_t and cpu - prev_cpu >= CPU_PROGRESS_FRACTION * (now - prev_t):
+            last_growth = now  # CPU 有進度 ⇒ 不是卡死（長時間無 log 之計算）
+        prev_cpu, prev_t = cpu, now
+        reason = None
+        if now - last_growth >= config.log_stall_seconds:
+            reason = f"log 檔 {now - last_growth:.0f} 秒未增長且 CPU 無進度（門檻 {config.log_stall_seconds:.0f} 秒）"
+        used = probe_swap()
+        if used is not None and baseline is None:
+            baseline = used
+        growth = None if used is None or baseline is None else used - baseline
+        if growth is not None:
+            growth_max = growth if growth_max is None else max(growth_max, growth)
+        swap_hits = swap_hits + 1 if growth is not None and threshold is not None and growth > threshold else 0
+        if reason is None and swap_hits >= config.swap_consecutive_checks:
+            reason = (f"swap 自啟動增長 {growth:.0f} MB > 門檻 {threshold:.0f} MB 連續 {swap_hits} 次"
+                      if growth is not None and threshold is not None else "swap 增長逾門檻")
+        if not over and now - started >= cap:  # 只記錄、不終止
+            over = True
+            log.write(f"[watchdog] 牆鐘 {now - started:.0f} 秒逾預期 {cap:.0f} 秒（只記錄，不終止；CPU 進度持續監看）\n")
+            log.flush()
+            last_size = log_path.stat().st_size if log_path.exists() else last_size
+        if reason is not None and proc.poll() is None:
+            diag = (diagnose_fn or diagnose)(proc.pid, log_path, swap_growth_mb=growth_max, swap_threshold_mb=threshold,
+                                             swap_hit=swap_hits >= config.swap_consecutive_checks, ram_mb=ram)
+            if degraded:
+                diag["monitor_degraded"] = degraded
+            rc = _terminate(proc)
+            return WatchResult(STALLED, rc, reason, clock() - started, growth_max, threshold, over,
+                               diag.get("cause"), diag)
 
 
 def summary_line(target: str, result: WatchResult) -> str:

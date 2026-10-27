@@ -102,15 +102,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/block_busywait.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
             "command": "bash scripts/heavy_run_guard.sh"
           }
         ]

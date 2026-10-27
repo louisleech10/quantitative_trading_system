@@ -32,7 +32,8 @@ _SEPARATORS = set(";&|()\n")
 _SHELLS = {"bash", "sh", "zsh", "source", "."}
 _PREFIXES = {"env", "nohup", "time", "exec", "command", "caffeinate", "nice"}
 _ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-MAX_DEPTH = 1  # 執行之 .sh 只展開一層（與舊版同）
+MAX_DEPTH = 5  # 執行之 .sh 遞迴展開之深度上限；逾限 ⇒ 擋（fail-closed，NOCAP Task 0.3 v3）
+DEPTH_EXCEEDED = "<heavy_run_guard:depth-exceeded>"
 
 
 def _simple_commands(text: str, comments: bool) -> Optional[List[List[str]]]:
@@ -132,30 +133,82 @@ def executed(command: str, depth: int = 0, comments: bool = False) -> List[Tuple
     return out
 
 
+#: 動態啟動器之「帶值」選項（其後一個 token 為選項值、非內層命令）
+_XARGS_VALUE_OPTS = {"-I", "-L", "-n", "-P", "-s", "-d", "-E", "-a", "-J", "-R", "-S"}
+_PARALLEL_VALUE_OPTS = {"-j", "--jobs", "-S", "--sshlogin", "--joblog", "--results", "-I", "--colsep"}
+_FIND_EXEC = {"-exec", "-execdir", "-ok", "-okdir"}
+
+
+def _after_options(argv: List[str], value_opts: set) -> List[str]:
+    i = 1
+    while i < len(argv) and argv[i].startswith("-"):
+        i += 2 if argv[i] in value_opts else 1
+    return argv[i:]
+
+
+#: 單次判定內已展開之腳本實體路徑——腳本互相呼叫時不重複展開（否則循環呼叫必觸深度上限）
+_SEEN: set = set()
+
+
+def _expand_script(script: str, args: List[str], depth: int, wrapped: bool) -> List[Tuple[str, bool]]:
+    """執行之 repo 內 .sh：遞迴至不再出現新的 .sh；同一腳本＋參數只展開一次；逾深度上限 ⇒ 標記擋（fail-closed）。
+    非 repo 內或讀不到之路徑（含未解析變數如 `${SCRIPT_DIR}/x.sh`）不計入深度。"""
+    path = Path(script) if Path(script).is_absolute() else REPO / script
+    try:
+        if not (path.is_file() and REPO.resolve() in path.resolve().parents):
+            return []
+        key = str(path.resolve())  # 只依路徑：同一腳本以不同參數互相呼叫（gate.sh 等治理腳本鏈）亦只展開一次
+    except OSError:
+        return []
+    if key in _SEEN:
+        return []
+    if depth >= MAX_DEPTH:
+        return [(f"{DEPTH_EXCEEDED} {script}", wrapped)]
+    _SEEN.add(key)
+    body = _script_body(script, args)
+    if body is None:
+        return []
+    return [(t, w or wrapped) for t, w in executed(body, depth + 1, comments=True)]
+
+
 def _analyze(argv: List[str], depth: int, wrapped: bool) -> List[Tuple[str, bool]]:
     if not argv:
         return []
     prog = Path(argv[0]).name
+    if argv[0].startswith("$") or "`" in argv[0]:  # 命令位置為未解析變數或命令替換 ⇒ argv 全文比對（保守）
+        return [(" ".join(argv), wrapped)]
     if prog.startswith("python") and len(argv) > 1 and argv[1].endswith(WRAPPER):
         inner = argv[argv.index("--") + 1:] if "--" in argv else []
         return [(" ".join(argv), True)] + _analyze(_strip_prefixes(inner), depth, wrapped=True)
+    if prog == "eval":  # eval 只看其組出之命令字串
+        return executed(" ".join(argv[1:]), depth)
+    if prog == "xargs":  # 內層命令遞迴判定（`ls | xargs grep x` 之內層為 grep ⇒ 放行）
+        return _analyze(_strip_prefixes(_after_options(argv, _XARGS_VALUE_OPTS)), depth, wrapped)
+    if prog == "parallel":
+        inner = _after_options(argv, _PARALLEL_VALUE_OPTS)
+        return _analyze(_strip_prefixes(inner[:inner.index(":::")] if ":::" in inner else inner), depth, wrapped)
+    if prog == "find":
+        out: List[Tuple[str, bool]] = []
+        for i, tok in enumerate(argv):
+            if tok in _FIND_EXEC:
+                inner = []
+                for t in argv[i + 1:]:
+                    if t in (";", "+", "\\;"):
+                        break
+                    inner.append(t)
+                out += _analyze(_strip_prefixes(inner), depth, wrapped)
+        return out
     if prog in _SHELLS:
         rest = argv[1:]
         if "-c" in rest and rest.index("-c") + 1 < len(rest):  # 只分析內層字串（外層 argv 含其全文，比對會誤擋）
             return [(t, w or wrapped) for t, w in executed(rest[rest.index("-c") + 1], depth)]
         script = next((a for a in rest if not a.startswith("-")), None)
         out = [(" ".join(argv), wrapped)]
-        if script and script.endswith(".sh") and depth < MAX_DEPTH:
-            body = _script_body(script, rest[rest.index(script) + 1:])
-            if body is not None:
-                out += [(t, w or wrapped) for t, w in executed(body, depth + 1, comments=True)]
+        if script and script.endswith(".sh"):
+            out += _expand_script(script, rest[rest.index(script) + 1:], depth, wrapped)
         return out
     if prog.endswith(".sh"):
-        out = [(" ".join(argv), wrapped)]
-        body = _script_body(argv[0], argv[1:]) if depth < MAX_DEPTH else None
-        if body is not None:
-            out += [(t, w or wrapped) for t, w in executed(body, depth + 1, comments=True)]
-        return out
+        return [(" ".join(argv), wrapped)] + _expand_script(argv[0], argv[1:], depth, wrapped)
     if prog.startswith("python") or prog in ("pytest", "py.test"):
         return [(" ".join(argv), wrapped)]
     return []  # 非啟動器（ls、grep、pgrep、echo、cat…）：其參數不是被執行之命令
@@ -163,9 +216,15 @@ def _analyze(argv: List[str], depth: int, wrapped: bool) -> List[Tuple[str, bool
 
 def check(payload: Dict[str, Any], catalog: Dict[str, Any]) -> List[str]:
     tool_input = dict(payload.get("tool_input") or {})
+    _SEEN.clear()
     runs = executed(str(tool_input.get("command") or ""))
     background = tool_input.get("run_in_background") is True
     problems: List[str] = []
+    deep = sorted({text.split(" ", 1)[1] for text, w in runs
+                   if text.startswith(DEPTH_EXCEEDED) and not (w and background)})
+    if deep:
+        problems.append(f"腳本間接執行逾 {MAX_DEPTH} 層（{', '.join(deep)}）⇒ 無從判定是否重型；"
+                        f"改以 `venv/bin/python {WRAPPER} --log <路徑> -- <命令>` 背景執行")
     for kind in ("self_watched", "wrapped", "background_only"):
         for rule in catalog.get(kind) or []:
             hits = [w for text, w in runs if re.search(rule["regex"], text, re.M | re.S)]

@@ -15,9 +15,13 @@
     {"id": "pytest_full_suite", "regex": "pytest\\s*(-q\\s*)?(tests/?|tests/governance/?)?\\s*($|[;&|])"},
     {"id": "testsel_full", "regex": "scripts/testsel\\.py\\s+full\\b"},
     {"id": "gov_check_full", "regex": "scripts/gov_check\\.sh\\s+--no-probe"},
-    {"id": "feature_generation_cli", "regex": "scripts/(generate_features|run_feature_factory)\\.py"}
+    {"id": "feature_generation_cli", "regex": "scripts/(generate_features|run_feature_factory)\\.py"},
+    {"id": "ic_wait_scripts", "regex": "(scripts/(ic1eb_b5_replay|capture_ic1eb_baseline|ic1c_freeze_baseline)\\.py|tests/golden/ic_phase1_(contract|1a_cut1)/freeze_baseline(_new)?\\.py|scripts/measure_ic_footprint\\.sh)\\b", "_phase": "Phase 3 Task 3.1 入口；改經共用監看前歸 wrapped"},
+    {"id": "warmup_verify", "regex": "scripts/verify_l1_warmup_requirements\\.py\\b", "_phase": "Phase 4 Task 4.1 入口"},
+    {"id": "pytest_gate_runner", "regex": "(scripts/framepath_affected_gate\\.py\\b(?!.*\\s(--help|-h)\\b)|scripts/testreg\\.py\\b.*\\srun\\b)", "_phase": "Phase 2 Task 2.1 入口"}
   ],
   "background_only": [
-    {"id": "committee_run", "regex": "scripts/committee_run\\.sh\\b"}
+    {"id": "committee_run", "regex": "scripts/committee_run\\.sh\\b"},
+    {"id": "committee_cli", "regex": "scripts/cx_run\\.sh\\b", "_phase": "Phase 6 Task 6.1 入口（委員 CLI 等候）"}
   ]
 }
