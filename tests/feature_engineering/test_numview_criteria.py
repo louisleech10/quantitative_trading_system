@@ -3719,12 +3719,41 @@ def test_watchdog_silent_child_stalled(tmp_path: Path) -> None:
     result = wd.run_watched(_SILENT_CHILD, log_path=log, config=_fast_config(), probe_swap=lambda: 0.0)
     assert result.status == wd.STALLED and "log" in result.reason, result
     assert result.cause == wd.CAUSE_HANG, result
+    pid = str(result.diagnosis["processes"][0]["pid"])
     stacks = Path(result.diagnosis["stacks_file"])
-    assert stacks == Path(str(log) + ".stacks.txt") and 'File "<string>", line 1' in stacks.read_text(), result.diagnosis
-    if sys.platform == "darwin":
-        native = [p for p in result.diagnosis["native_stacks"].values() if p]
-        assert native and Path(native[0]).is_file(), result.diagnosis
-    assert result.diagnosis["processes"] and result.wall_seconds < 30
+    assert stacks == Path(f"{log}.stacks.{pid}.txt") and 'File "<string>", line 1' in stacks.read_text(), result.diagnosis
+    assert result.diagnosis["stacks_files"] == {pid: str(stacks)}
+    native = result.diagnosis["native_stacks"][pid]
+    if sys.platform == "darwin":  # 成功 ⇒ 檔存在；平台拒絕（如沙箱）⇒ 照記 rc／stderr 與原因，不得靜默
+        assert (native["path"] and Path(native["path"]).is_file()) or (native["error"] and "rc" in native), native
+    else:
+        assert native["error"] == "unsupported_platform", native
+    assert result.wall_seconds < 15, result
+
+
+@pytest.mark.parametrize("core_per_sec, expect_stalled", [(0.04, True), (0.05, False), (0.06, False)])
+def test_watchdog_cpu_progress_threshold_boundary(tmp_path: Path, core_per_sec: float, expect_stalled: bool) -> None:
+    """CPU 進度門檻 0.05 核（收據 handoffs/run_receipts/20261027-nocap-cpu-threshold.json）：無 log 之子行程，注入行程樹 CPU 以
+    每秒 0.04／0.05／0.06 核前進 ⇒ 低於門檻判卡死、等於與高於不判。以注入時鐘與 CPU 讀值，秒級。"""
+    wd = ESTIMATOR.watchdog_module()
+    assert wd.CPU_PROGRESS_FRACTION == 0.05
+    clock = {"t": 0.0}
+
+    def fake_clock() -> float:
+        return clock["t"]
+
+    def fake_sleep(s: float) -> None:
+        clock["t"] += s
+
+    def fake_cpu(pid: int) -> float:
+        return clock["t"] * core_per_sec
+
+    child = [sys.executable, "-c", "import time; time.sleep(5)"]
+    result = wd.run_watched(child, log_path=tmp_path / "cpu.log",
+                            config=_fast_config(check_interval_seconds=1.0, log_stall_seconds=10.0),
+                            probe_swap=lambda: 0.0, clock=fake_clock, sleep=fake_sleep, probe_cpu=fake_cpu,
+                            diagnose_fn=lambda *a, **k: {"cause": wd.CAUSE_HANG})
+    assert (result.status == wd.STALLED) is expect_stalled, result
 
 
 def test_watchdog_busy_silent_child_not_stalled(tmp_path: Path) -> None:

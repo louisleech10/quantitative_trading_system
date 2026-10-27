@@ -6,9 +6,13 @@
 - **卡死＝無進度**：(a) 須「log 未增長」且「子行程樹 CPU 未前進」（窗內平均 < `CPU_PROGRESS_FRACTION` 核）同時持續
   `log_stall_seconds` 秒；長時間無 log 之計算只要在用 CPU 即不判卡死。讀不到 CPU（psutil 失敗）⇒ 退回只看 log。
 - **終止前先留現場、判原因**（`diagnose`）：向子行程樹送 SIGUSR1（Python 子行程經注入之 sitecustomize 以 faulthandler 把
-  全部執行緒之堆疊寫入 `<log>.stacks.txt`）、macOS 以 `sample` 取各行程原生堆疊（`<log>.sample.<pid>.txt`），並記各行程
-  狀態／CPU／RSS、swap 增長與 log 尾段；`cause`＝`memory`（swap 逾門檻終止、或 swap 增長 ≥ 實體記憶體之半、或行程樹
-  RSS ≥ 實體記憶體 85%）或 `hang`（其餘：程式卡住）。**呼叫端不得對 `hang` 自動重跑**——須依堆疊查原因、修好再跑。
+  全部執行緒之堆疊寫入每行程一檔 `<log>.stacks.<pid>.txt`）、macOS 以 `sample` 取各行程原生堆疊（`<log>.sample.<pid>.txt`；
+  失敗時記 rc 與 stderr，不靜默），並記各行程狀態／CPU／RSS、swap 增長與 log 尾段；`cause`＝`memory`（swap 逾門檻終止、或
+  swap 增長 ≥ 實體記憶體之半、或行程樹 RSS ≥ 實體記憶體 85%）或 `hang`（其餘：程式卡住）。**呼叫端不得對 `hang` 自動
+  重跑**——須依堆疊查原因、修好再跑。
+- **判準檔說明已被取代**：`tests/_golden/numview/preregistered_criteria_v9.json` 之 `cell_rules.watchdog._doc`／`_basis` 為 NUMVIEW
+  凍結檔（其雜湊綁定既有收據，不得改），其中「log 靜默即終止」「牆鐘上限兜底」之敘述描述 2026-10-27 前之語意；鍵之數值
+  照用，終止語意以本模組為準（FFPROD b3 審碼 r9 COMPOSER-R9-P1-01 部分採納）。
 
 `run_watched` 啟動子行程並每 `check_interval_seconds` 檢查一次，任一成立即留現場後終止子行程、回 `stalled`（附理由）：
 (a) 子行程之 log 檔 `log_stall_seconds` 秒未增長且 CPU 無進度；(b) 系統 swap 已用量自子行程啟動時之基線增長 > `swap_growth_fraction_of_ram` × 實體
@@ -37,8 +41,10 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 ENABLED = True
 STALLED = "stalled"
 EXITED = "exited"
-#: 子行程樹 CPU 進度門檻：一檢查窗內 CPU 秒數前進 ≥ 此比例 × 窗秒數 ⇒ 視為有進度（不判卡死）
-CPU_PROGRESS_FRACTION = 0.25
+#: 子行程樹 CPU 進度門檻：一檢查窗內 CPU 秒數前進 ≥ 此比例 × 窗秒數 ⇒ 視為有進度（不判卡死）。依據（收據
+#: handoffs/run_receipts/20261027-nocap-cpu-threshold.json，探針 nocap_probes/idle_cpu.py，30 秒窗實測）：睡眠／等鎖／阻塞讀
+#: 皆 0 核、監看自身之 0.5 秒 psutil 取樣執行緒 0.024 核、實際計算約 1 核 ⇒ 0.05 核（監看開銷之 2 倍、低於計算 20 倍）
+CPU_PROGRESS_FRACTION = 0.05
 CAUSE_MEMORY = "memory"
 CAUSE_HANG = "hang"
 #: 注入 Python 子行程之 sitecustomize：以 faulthandler 註冊 SIGUSR1 把全部執行緒堆疊寫入 WATCHDOG_STACK_FILE，再串接
@@ -47,7 +53,7 @@ _SITECUSTOMIZE = '''\
 import faulthandler, importlib.util, os, signal, sys
 _wd_path = os.environ.get("WATCHDOG_STACK_FILE")
 if _wd_path and hasattr(signal, "SIGUSR1"):
-    _wd_file = open(_wd_path, "a")
+    _wd_file = open(_wd_path + "." + str(os.getpid()) + ".txt", "a")
     faulthandler.register(signal.SIGUSR1, file=_wd_file, all_threads=True, chain=False)
 _wd_here = os.path.dirname(os.path.abspath(__file__))
 for _wd_p in list(sys.path):
@@ -178,20 +184,22 @@ def tree_cpu_seconds(pid: int) -> Optional[float]:
 
 
 def stack_dump_env(env: Optional[Mapping[str, str]], log_path: Path) -> Dict[str, str]:
-    """回注入堆疊傾印之子行程環境：sitecustomize 目錄前置 PYTHONPATH、`WATCHDOG_STACK_FILE`＝`<log>.stacks.txt`。"""
+    """回注入堆疊傾印之子行程環境：sitecustomize 目錄前置 PYTHONPATH、`WATCHDOG_STACK_FILE`＝`<log>.stacks`（各 Python 行程寫
+    `<log>.stacks.<pid>.txt`，多行程不互相交錯）。"""
     out = dict(os.environ if env is None else env)
     site = Path(str(log_path) + ".wdsite")
     site.mkdir(parents=True, exist_ok=True)
     (site / "sitecustomize.py").write_text(_SITECUSTOMIZE, encoding="utf-8")
     out["PYTHONPATH"] = os.pathsep.join([str(site)] + ([out["PYTHONPATH"]] if out.get("PYTHONPATH") else []))
-    out["WATCHDOG_STACK_FILE"] = str(log_path) + ".stacks.txt"
+    out["WATCHDOG_STACK_FILE"] = str(log_path) + ".stacks"
     return out
 
 
 def diagnose(pid: int, log_path: Path, *, swap_growth_mb: Optional[float], swap_threshold_mb: Optional[float],
              swap_hit: bool, ram_mb: Optional[float], settle_seconds: float = 3.0,
-             sampler: Optional[Callable[[int, Path], Optional[str]]] = None) -> Dict[str, Any]:
-    """終止前留現場並判原因（見模組說明）。回 {cause, processes, stacks_file, native_stacks, swap_growth_mb, log_tail}。"""
+             sampler: Optional[Callable[[int, Path], Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """終止前留現場並判原因（見模組說明）。回 {cause, processes, stacks_files（pid→檔）, stacks_file（主行程）, native_stacks
+    （pid→{path, rc, stderr, error}）, swap_growth_mb, log_tail}。"""
     log_path = Path(log_path)
     procs = _tree(pid)
     info = []
@@ -205,7 +213,7 @@ def diagnose(pid: int, log_path: Path, *, swap_growth_mb: Optional[float], swap_
         except Exception as exc:  # noqa: BLE001
             row["error"] = f"{type(exc).__name__}: {exc}"[:200]
         info.append(row)
-    for p in procs:  # Python 子行程（經注入之 sitecustomize）把全部執行緒堆疊寫入 <log>.stacks.txt
+    for p in procs:  # Python 子行程（經注入之 sitecustomize）把全部執行緒堆疊寫入 <log>.stacks.<pid>.txt
         try:
             os.kill(p.pid, signal.SIGUSR1)
         except Exception:  # noqa: BLE001
@@ -213,7 +221,8 @@ def diagnose(pid: int, log_path: Path, *, swap_growth_mb: Optional[float], swap_
     time.sleep(settle_seconds)
     sample = sampler or _native_sample
     native = {str(p.pid): sample(p.pid, log_path) for p in procs}
-    stacks = Path(str(log_path) + ".stacks.txt")
+    stacks = {str(p.pid): str(f) for p in procs
+              for f in [Path(f"{log_path}.stacks.{p.pid}.txt")] if f.is_file() and f.stat().st_size}
     try:
         tail = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-30:]
     except OSError:
@@ -222,20 +231,23 @@ def diagnose(pid: int, log_path: Path, *, swap_growth_mb: Optional[float], swap_
         (ram_mb is not None and rss_total >= 0.85 * ram_mb * 1024 * 1024)
     return {"cause": CAUSE_MEMORY if memory else CAUSE_HANG, "processes": info, "rss_tree_bytes": rss_total,
             "swap_growth_mb": swap_growth_mb, "swap_threshold_mb": swap_threshold_mb, "ram_mb": ram_mb,
-            "stacks_file": str(stacks) if stacks.is_file() and stacks.stat().st_size else None,
+            "stacks_files": stacks, "stacks_file": stacks.get(str(pid)),
             "native_stacks": native, "log_tail": tail}
 
 
-def _native_sample(pid: int, log_path: Path) -> Optional[str]:
-    """macOS `sample <pid> 2`（免 root，同使用者行程）之原生堆疊檔路徑；非 macOS 或失敗 ⇒ None。"""
+def _native_sample(pid: int, log_path: Path) -> Dict[str, Any]:
+    """macOS `sample <pid> 2`（免 root，同使用者行程）之原生堆疊：{path（成功時）, rc, stderr, error}；失敗照記原因、不靜默。
+    非 macOS ⇒ {error: "unsupported_platform"}。"""
     if platform.system() != "Darwin":
-        return None
+        return {"path": None, "error": "unsupported_platform"}
     out = Path(f"{log_path}.sample.{pid}.txt")
     try:
-        subprocess.run(["sample", str(pid), "2", "-file", str(out)], capture_output=True, timeout=60)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return str(out) if out.is_file() else None
+        done = subprocess.run(["sample", str(pid), "2", "-file", str(out)], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"path": None, "error": f"{type(exc).__name__}: {exc}"[:300]}
+    ok = out.is_file() and out.stat().st_size > 0
+    return {"path": str(out) if ok else None, "rc": done.returncode, "stderr": (done.stderr or "")[-500:],
+            "error": None if ok else f"sample 未產出檔（rc={done.returncode}）"}
 
 
 def _terminate(proc: "subprocess.Popen[Any]") -> Optional[int]:
