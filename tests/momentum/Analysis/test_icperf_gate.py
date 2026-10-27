@@ -215,6 +215,9 @@ def _oracle_field_paths(obj: Any, path: str = "") -> Set[str]:
         return {f"{path}#values", f"{path}#nan_mask"}
     if isinstance(obj, dict) and obj:
         return set().union(*(_oracle_field_paths(v, f"{path}/{_ptr(k)}") for k, v in obj.items()))
+    if isinstance(obj, (list, tuple)) and obj and all(v is None or isinstance(v, (bool, int, float, str, np.generic))
+                                                     for v in obj):
+        return {f"{path}#values", f"{path}#nan_mask"}  # 純量序列整段一值（SPEC §G 摘要粒度）
     if isinstance(obj, (list, tuple)) and obj:
         return set().union(*(_oracle_field_paths(v, f"{path}/{i}") for i, v in enumerate(obj)))
     return {path}
@@ -566,9 +569,11 @@ def test_boundary_08_tmpdir_home_isolated_and_snapshotted(fb: Any, tmp_path: Pat
     """, tag="iso")
     assert res["rc"] == 0
     iso_root = (tmp_path / "iso_iso").resolve()
-    written = [k for k in res["files"] if k.startswith(str(iso_root))]
+    written = [k for k in res["files"] if k.startswith(str(iso_root)) or k.startswith("<iso>/")]
     assert any(k.endswith("/.cache/h.bin") for k in written), f"HOME 寫入未進集合：{sorted(res['files'])}"
     assert any(k.endswith("/t.bin") for k in written), f"TMPDIR 寫入未進集合：{sorted(res['files'])}"
+    # SPEC §G (b)：隔離目錄之寫出以 `<iso>/` 前綴記，跨次執行可比；不得以絕對路徑記
+    assert all(k.startswith("<iso>/") for k in written), f"隔離目錄寫出須以 <iso>/ 前綴記：{sorted(written)}"
 
 
 def test_boundary_09_output_root_outside_snapshot_fails(fb: Any, tmp_path: Path) -> None:

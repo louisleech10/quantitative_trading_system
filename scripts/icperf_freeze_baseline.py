@@ -97,16 +97,26 @@ def _load(name: str, path: Path) -> Any:
     return module
 
 
-def path_key(path: Path, repo_root: Path) -> str:
-    """path_key（模組說明）：repo 根之下＝repo 相對 POSIX；其餘＝解析後絕對路徑。"""
-    p = Path(os.path.realpath(path))
-    try:
-        return p.relative_to(Path(os.path.realpath(repo_root))).as_posix()
-    except ValueError:
-        return str(p)
+def path_key(path: Path, repo_root: Path, prefixes: Optional[Mapping[str, Path]] = None) -> str:
+    """path_key（SPEC §G (b)）：`repo_root`（本次執行之工作目錄）之下＝相對 POSIX；`prefixes` 所列根（如
+    {"<iso>": 隔離目錄, "<repo>": repo 根}）之下＝`<前綴>/<相對 POSIX>`（多根皆含時取最深者）；其餘＝解析後絕對路徑。
+    前綴使隔離目錄與 repo 之寫出於跨次執行可比。"""
+    p = os.path.realpath(path)
+    best: Optional[Tuple[str, str]] = None
+    for prefix, root in [("", repo_root)] + list((prefixes or {}).items()):
+        r = os.path.realpath(root)
+        if (p == r or p.startswith(r.rstrip(os.sep) + os.sep)) and (best is None or len(r) > len(best[1])):
+            best = (prefix, r)
+    if best is None:
+        return p
+    rel = Path(os.path.relpath(p, best[1])).as_posix()
+    return rel if best[0] == "" else f"{best[0]}/{rel}"
 
 
-def _key_path(key: str, repo_root: Path) -> Path:
+def _key_path(key: str, repo_root: Path, prefixes: Optional[Mapping[str, Path]] = None) -> Path:
+    head, _, rest = key.partition("/")
+    if prefixes and head in prefixes:
+        return Path(prefixes[head]) / rest
     return Path(key) if os.path.isabs(key) else Path(repo_root) / key
 
 
@@ -297,7 +307,8 @@ def _file_sha256(path: str) -> str:
     return _SHA_CACHE[key]
 
 
-def snapshot_files(roots: Sequence[Path], *, repo_root: Path) -> Dict[str, str]:
+def snapshot_files(roots: Sequence[Path], *, repo_root: Path,
+                   prefixes: Optional[Mapping[str, Path]] = None) -> Dict[str, str]:
     """對 `roots` 下全部檔案取 {path_key: 位元組 sha256}；排除任一層名為 `SNAPSHOT_EXCLUDE_DIRS` 之目錄、副檔名為
     `NUMBA_CACHE_SUFFIXES` 之檔與呼叫當下環境變數 `NUMBA_CACHE_DIR` 所指目錄之整棵（不論副檔名；未設則不排除該目錄）；
     不跟隨指向 roots 外之 symlink。雜湊以（路徑、大小、mtime）快取。"""
@@ -321,7 +332,7 @@ def snapshot_files(roots: Sequence[Path], *, repo_root: Path) -> Dict[str, str]:
                     target = os.path.realpath(full)
                     if not os.path.isfile(target) or not any(_under(target, r) for r in real_roots):
                         continue
-                out[path_key(Path(full), repo_root)] = _file_sha256(os.path.realpath(full))
+                out[path_key(Path(full), repo_root, prefixes)] = _file_sha256(os.path.realpath(full))
     return out
 
 
@@ -410,6 +421,12 @@ def hdf5_digest(path: Path) -> Dict[str, Dict[str, Any]]:
     return out
 
 
+def _is_scalar(v: Any) -> bool:
+    import numpy as np
+
+    return v is None or isinstance(v, (bool, int, float, str, np.generic))
+
+
 def _ptr_seg(seg: Any) -> str:
     return str(seg).replace("~", "~0").replace("/", "~1")
 
@@ -428,7 +445,8 @@ def _as_container(obj: Any) -> Any:
 
 def flatten_fields(obj: Any) -> Dict[str, str]:
     """把回應物件攤平為 {<欄位路徑>: <sha256>}。路徑規則（boundary_01 之獨立 oracle 依此重算鍵集合）：根＝""；
-    dict 每鍵接 "/<鍵>"（鍵以 str() 轉、`~`→`~0`、`/`→`~1`）、list／tuple 每元素接 "/<索引>"，遞迴；
+    dict 每鍵接 "/<鍵>"（鍵以 str() 轉、`~`→`~0`、`/`→`~1`）；元素皆為純量（None／bool／int／float／str／numpy 純量）
+    之非空 list／tuple ⇒ "<路徑>#values"、"<路徑>#nan_mask"（整段一值）；其餘 list／tuple 每元素接 "/<索引>"，遞迴；
     DataFrame ⇒ "<路徑>#index" 與每欄 "<路徑>/<欄名>#values"、"<路徑>/<欄名>#nan_mask"；Series／ndarray ⇒
     "<路徑>#values"、"<路徑>#nan_mask"（Series 另 "<路徑>#index"）；其餘（純量、None）⇒ "<路徑>" 以正準 JSON 位元組。
     值取原生 dtype 位元組之 sha256。dataclass 與具 model_dump 之物件先轉為 dict；空 dict／list 視為純量。"""
@@ -456,6 +474,10 @@ def flatten_fields(obj: Any) -> Dict[str, str]:
         elif isinstance(o, dict) and o:
             for k, v in o.items():
                 walk(v, f"{path}/{_ptr_seg(k)}")
+        elif isinstance(o, (list, tuple)) and o and all(_is_scalar(v) for v in o):
+            arr = np.asarray(list(o), dtype=object)  # 純量序列整段一值（SPEC §G 摘要粒度）
+            out[f"{path}#values"] = _array_sha(arr)
+            out[f"{path}#nan_mask"] = _array_sha(_nan_mask(arr))
         elif isinstance(o, (list, tuple)) and o:
             for i, v in enumerate(o):
                 walk(v, f"{path}/{i}")
@@ -496,14 +518,15 @@ def check_scope(write_log: Sequence[Mapping[str, Any]], output_roots: Sequence[P
 
 def collect_written_files(write_log: Sequence[Mapping[str, Any]], before: Mapping[str, str], after: Mapping[str, str],
                           *, repo_root: Path, snapshot_roots: Sequence[Path],
-                          output_roots: Sequence[Path]) -> Dict[str, Any]:
+                          output_roots: Sequence[Path],
+                          prefixes: Optional[Mapping[str, Path]] = None) -> Dict[str, Any]:
     """先 `check_scope`；回 {"files": {path_key: describe_file(...)}（差集之新增與變更檔）, "transient": [path_key...]
     （審計記錄有而差集無變化者，記入不比）, "removed": [path_key...]（執行前存在、執行後消失者）}。"""
     check_scope(write_log, output_roots, snapshot_roots)
     diff = snapshot_diff(before, after)
     written = set(diff["added"]) | set(diff["changed"])
-    files = {k: describe_file(_key_path(k, repo_root)) for k in sorted(written)}
-    logged = {path_key(Path(e["path"]), repo_root) for e in write_log if e.get("path")}
+    files = {k: describe_file(_key_path(k, repo_root, prefixes)) for k in sorted(written)}
+    logged = {path_key(Path(e["path"]), repo_root, prefixes) for e in write_log if e.get("path")}
     return {"files": files, "transient": sorted(logged - written), "removed": diff["removed"]}
 
 
@@ -526,24 +549,28 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, env: Mapping[str, str], c
 
 
 def capture_run(cmd: Sequence[str], *, repo_root: Path, iso_root: Path, output_roots: Sequence[Path],
-                work_dir: Path) -> Dict[str, Any]:
-    """一次請求之寫出捕獲：快照（repo_root＋iso_root）→ `run_watched`（`capture_env`，cwd＝repo_root）→ 快照 →
-    `collect_written_files`。回 {"rc", "files", "transient", "removed", "write_log"}；審計記錄與 sitecustomize 置於
+                work_dir: Path, extra_roots: Optional[Mapping[str, Path]] = None,
+                env_base: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+    """一次請求之寫出捕獲：快照（repo_root＝本次執行之工作目錄、iso_root、`extra_roots` 如 {"<repo>": repo 根}）→
+    `run_watched`（`capture_env`，cwd＝repo_root）→ 快照 → `collect_written_files`。回 {"rc", "files", "transient",
+    "removed", "write_log"}；path_key 依 `path_key`（iso_root 之下前綴 `<iso>`）。審計記錄與 sitecustomize 置於
     `work_dir`（不在快照範圍內；落在其下之寫入屬捕獲機制本身〔回應 pickle、監看堆疊檔〕，不入記錄）。範圍外路徑（含經
     os.replace／os.rename 落到範圍外之目的地）或輸出根 ⇒ FreezeError；輸出根於執行前即先檢查。"""
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     log_path = work_dir / "write_audit.jsonl"
     log_path.unlink(missing_ok=True)
-    env = capture_env(os.environ, log_path=log_path, iso_root=Path(iso_root), site_dir=work_dir / "site")
-    roots = [Path(repo_root), Path(iso_root)]
+    env = capture_env(os.environ if env_base is None else env_base, log_path=log_path, iso_root=Path(iso_root),
+                      site_dir=work_dir / "site")
+    prefixes = {"<iso>": Path(iso_root), **dict(extra_roots or {})}
+    roots = [Path(repo_root), Path(iso_root)] + [Path(r) for r in (extra_roots or {}).values()]
     check_scope([], output_roots, roots)
-    before = snapshot_files(roots, repo_root=repo_root)
+    before = snapshot_files(roots, repo_root=repo_root, prefixes=prefixes)
     res = run_watched(cmd, log_path=work_dir / "run.log", env=env, cwd=Path(repo_root))
-    after = snapshot_files(roots, repo_root=repo_root)
+    after = snapshot_files(roots, repo_root=repo_root, prefixes=prefixes)
     log = [e for e in read_write_log(log_path) if not (e.get("path") and _under(e["path"], work_dir))]
     collected = collect_written_files(log, before, after, repo_root=repo_root, snapshot_roots=roots,
-                                      output_roots=output_roots)
+                                      output_roots=output_roots, prefixes=prefixes)
     return {"rc": res["rc"], **collected, "write_log": log}
 
 
