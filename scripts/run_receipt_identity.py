@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -144,6 +145,58 @@ def coverage_ids_valid(estimate_receipt: Mapping[str, Any], spec_text: str) -> b
     ids = (estimate_receipt or {}).get("coverage_path_ids")
     valid = set(budget_ids(spec_text))
     return isinstance(ids, list) and bool(ids) and all(i in valid for i in ids)
+
+
+def _nonneg(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+
+
+def estimate_receipt_problems(receipt: Mapping[str, Any], repo: Path = REPO) -> List[str]:
+    """Task 0.3c 估時收據必填欄（SPEC：identity、scale、estimate_seconds、basis、spec_path、coverage_path_ids）。"""
+    out = []
+    if not isinstance(((receipt.get("identity") or {}).get("match")), Mapping):
+        out.append("缺 identity.match")
+    if receipt.get("scale") in (None, ""):
+        out.append("缺 scale")
+    if not _nonneg(receipt.get("estimate_seconds")):
+        out.append("estimate_seconds 須為有限非負數")
+    if not isinstance(receipt.get("basis"), list):
+        out.append("basis 須為串列（所依之成長曲線或前次實跑收據路徑）")
+    if not (repo / str(receipt.get("spec_path") or "")).is_file() or not receipt.get("spec_path"):
+        out.append("spec_path 不存在")
+    if not isinstance(receipt.get("coverage_path_ids"), list) or not receipt.get("coverage_path_ids"):
+        out.append("coverage_path_ids 須為非空串列")
+    return out
+
+
+def scale_receipt_problems(receipt: Mapping[str, Any]) -> List[str]:
+    """Task 0.3b 成長曲線收據必填欄（SPEC：≥ 3 相異規模點各含 scale／unit／seconds／peak_rss_bytes；fit 含 model／exponent／
+    r2；projection 含 scale／seconds／peak_rss_bytes；未標 extrapolation_unreliable）。"""
+    out = []
+    pts = receipt.get("points")
+    if not isinstance(pts, list) or len(pts) < 3:
+        out.append("points 須 ≥ 3 個")
+        pts = pts if isinstance(pts, list) else []
+    for i, p in enumerate(pts):
+        if not isinstance(p, Mapping) or not all(_nonneg(p.get(k)) for k in ("scale", "seconds", "peak_rss_bytes")) \
+                or not p.get("unit"):
+            out.append(f"points[{i}] 須含 scale／unit／seconds／peak_rss_bytes（有限非負）")
+    if len({p.get("scale") for p in pts if isinstance(p, Mapping)}) < 3:
+        out.append("規模點須 ≥ 3 個相異值")
+    fit = receipt.get("fit") or {}
+    if not (isinstance(fit, Mapping) and fit.get("model") and isinstance(fit.get("exponent"), (int, float))
+            and isinstance(fit.get("r2"), (int, float))):
+        out.append("fit 須含 model／exponent／r2")
+    proj = receipt.get("projection") or {}
+    if not (isinstance(proj, Mapping) and all(_nonneg(proj.get(k)) for k in ("scale", "seconds", "peak_rss_bytes"))):
+        out.append("projection 須含 scale／seconds／peak_rss_bytes（有限非負）")
+    if receipt.get("extrapolation_unreliable") is not False:
+        out.append("extrapolation_unreliable 須明確為 false")
+    return out
+
+
+#: 成長曲線收據與全規模命令之身分比對欄（規模點之 argv 與全規模命令不同，故不比 target_argv）
+SCALE_MATCH_KEYS = tuple(k for k in MATCH_KEYS if k != "target_argv")
 
 
 BALANCE_HEADING = "## §B 四項平衡實測"

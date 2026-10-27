@@ -380,8 +380,27 @@ def test_boundary_56_heavy_command_with_mismatched_estimate_receipt_blocked(brea
         receipt.unlink()
 
 
+@pytest.mark.parametrize("drop", ["scale", "estimate_seconds", "basis", "spec_path"])
+def test_estimate_receipt_missing_required_field_blocked(drop: str) -> None:
+    """Task 0.3c：估時收據缺必填欄（scale、estimate_seconds、basis、spec_path）⇒ 擋（b2 審碼 r1 CODEX-R1-P1-01）。"""
+    rid = _mod("run_receipt_identity")
+    inner = ["venv/bin/python", "-m", "pytest", "tests/feature_engineering/test_ffprod_gate.py", "-q"]
+    match = rid.compute_match("tests/feature_engineering/test_ffprod_gate.py", inner,
+                              ["tests/feature_engineering/test_ffprod_gate.py"], [], [])
+    body = {"identity": {"match": match, "meta": {"producer": "test", "created_at": "t"}}, "scale": "single",
+            "estimate_seconds": 60, "basis": [], "spec_path": "docs/NOCAP_SPEC.md", "coverage_path_ids": ["NOCAP-BUDGET-3"]}
+    del body[drop]
+    receipt = REPO / "handoffs" / "run_receipts" / "20261027-nocap-guardtest-estimate.json"
+    receipt.write_text(json.dumps(body), encoding="utf-8")
+    try:
+        assert _rc(_bash(WRAP + " ".join(inner), True)) == 2
+    finally:
+        receipt.unlink()
+
+
 @pytest.mark.parametrize("variant,expected", [("valid", 0), ("two_points", 2), ("code_mismatch", 2),
-                                              ("unreliable", 2), ("missing", 2)])
+                                              ("unreliable", 2), ("missing", 2), ("hardware_mismatch", 2),
+                                              ("empty_points", 2), ("no_fit", 2)])
 def test_scale_receipt_gate_for_full_scale_command(variant: str, expected: int) -> None:
     """Task 0.3b：設 scale_receipt 之重型命令（ffprod_measure）背景執行且有效估時收據下——成長曲線收據有效 ⇒ 放行；
     只 2 點、程式碼態雜湊不符、標 extrapolation_unreliable、或無收據 ⇒ 擋。"""
@@ -395,6 +414,7 @@ def test_scale_receipt_gate_for_full_scale_command(variant: str, expected: int) 
                                "coverage_path_ids": ["NOCAP-BUDGET-3"]}), encoding="utf-8")
     pts = _pts([10.0, 20.0, 40.0], [1e8, 2e8, 4e8])
     receipt = {"identity": {"match": match, "meta": {"producer": "test", "created_at": "t"}}, "points": pts,
+               "fit": {"model": "power", "exponent": 1.0, "r2": 1.0},
                "projection": {"scale": 8000, "seconds": 160.0, "peak_rss_bytes": 1.6e9},
                "extrapolation_unreliable": False}
     if variant == "two_points":
@@ -403,6 +423,12 @@ def test_scale_receipt_gate_for_full_scale_command(variant: str, expected: int) 
         receipt["identity"]["match"] = {**match, "code_sha256": "0" * 64}
     elif variant == "unreliable":
         receipt["extrapolation_unreliable"] = True
+    elif variant == "hardware_mismatch":  # b2 審碼 r1 COMPOSER-R1-P1-01：他機收據不得沿用
+        receipt["identity"]["match"] = {**match, "hardware": {"cpu": "fake", "cores": 1, "ram_bytes": 1, "os": "Fake"}}
+    elif variant == "empty_points":  # b2 審碼 r1 CODEX-R1-P1-01：點欄位不齊即無效
+        receipt["points"] = [{}, {}, {}]
+    elif variant == "no_fit":
+        del receipt["fit"]
     if variant != "missing":
         scale.write_text(json.dumps(receipt), encoding="utf-8")
     try:

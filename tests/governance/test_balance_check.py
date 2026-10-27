@@ -60,6 +60,28 @@ def test_boundary_57_peak_rss_increase_over_threshold_fails() -> None:
     assert bc.compare(_record(), _record(rss=1.10e9)) == []
 
 
+@pytest.mark.parametrize("drop", ["precision", "max_abs_diff", "bitwise_equal", "output_bytes"])
+def test_missing_balance_field_rejected(drop: str) -> None:
+    """本次量測任一點缺四項欄位（精度差、逐位元相等、檔案大小）⇒ ValueError；缺資料不得當無變差
+    （b2 審碼 r1 CODEX-R1-P1-02）。"""
+    cur = _record()
+    for p in cur["points"]:
+        if drop in ("max_abs_diff", "bitwise_equal"):
+            del p["precision"][drop]
+        else:
+            del p[drop]
+    with pytest.raises(ValueError):
+        bc.compare(_record(), cur)
+
+
+def test_bitwise_equality_lost_is_regression() -> None:
+    """基準逐位元相等、本次 max_abs_diff 0 但不再逐位元相等（如 -0.0／NaN 型樣改變）⇒ 判變差。"""
+    cur = _record()
+    for p in cur["points"]:
+        p["precision"]["bitwise_equal"] = False
+    assert bc.compare(_record(), cur) != []
+
+
 def test_boundary_43_hardware_mismatch_rejected() -> None:
     """基準與本次硬體不同 ⇒ ValueError（硬體不同不可比）。"""
     other = _record()

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
@@ -19,8 +20,22 @@ _RELATIVE = (("seconds", "seconds_increase", "耗時"), ("peak_rss_bytes", "peak
              ("output_bytes", "output_bytes_increase", "檔案大小"))
 
 
+def _finite_nonneg(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+
+
 def _points(record: Mapping[str, Any], label: str) -> Dict[float, Mapping[str, Any]]:
+    """每點須含四項：seconds、peak_rss_bytes、output_bytes（有限非負）與 precision.{max_abs_diff（有限非負）、
+    bitwise_equal（bool）}；缺欄或型別不符 ⇒ ValueError（缺資料不得當作無變差）。"""
     pts = record.get("points") or []
+    for i, p in enumerate(pts):
+        prec = p.get("precision") if isinstance(p, Mapping) else None
+        if not (isinstance(p, Mapping) and all(_finite_nonneg(p.get(k)) for k in ("scale", "seconds", "peak_rss_bytes",
+                                                                                   "output_bytes"))
+                and isinstance(prec, Mapping) and _finite_nonneg(prec.get("max_abs_diff"))
+                and isinstance(prec.get("bitwise_equal"), bool)):
+            raise ValueError(f"{label} points[{i}] 四項欄位不齊或型別不符（須 seconds、peak_rss_bytes、output_bytes、"
+                             "precision.max_abs_diff、precision.bitwise_equal）")
     by_scale = {float(p["scale"]): p for p in pts}
     if len(by_scale) < MIN_POINTS:
         raise ValueError(f"{label} 規模點 {len(by_scale)} 個 < {MIN_POINTS}（無成長曲線不可比）")
@@ -47,9 +62,11 @@ def compare(baseline: Mapping[str, Any], current: Mapping[str, Any]) -> List[str
                 worse.append(f"規模 {scale:g}：{name} {bv:g} → {cv:g}（+{(cv - bv) / bv:.1%} > {thr[key]:.0%}）")
             elif bv == 0 and cv > 0:
                 worse.append(f"規模 {scale:g}：{name} 0 → {cv:g}")
-        diff = float(((c.get("precision") or {}).get("max_abs_diff")) or 0.0)
+        diff = float(c["precision"]["max_abs_diff"])
         if diff > thr["precision_max_abs_diff"]:
             worse.append(f"規模 {scale:g}：精度差 max_abs_diff {diff:g} > {thr['precision_max_abs_diff']:g}")
+        elif b["precision"]["bitwise_equal"] and not c["precision"]["bitwise_equal"]:
+            worse.append(f"規模 {scale:g}：基準逐位元相等、本次不再逐位元相等（如 -0.0／NaN 型樣改變）")
     return worse
 
 

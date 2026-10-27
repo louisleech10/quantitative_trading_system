@@ -306,26 +306,25 @@ def receipt_problems(rule: Dict[str, Any], argvs: List[List[str]]) -> List[str]:
                 continue
             spec = REPO / str(rec.get("spec_path") or "")
             spec_text = spec.read_text(encoding="utf-8") if spec.is_file() else ""
-            if rid.coverage_ids_valid(rec, spec_text):
+            if not rid.estimate_receipt_problems(rec, REPO) and rid.coverage_ids_valid(rec, spec_text):
                 ok = True
                 break
         if not ok:
-            problems.append(f"{rule['id']}：無相符之估時收據（{ESTIMATE_GLOB}：identity.match 須與本命令逐欄相符、"
-                            "coverage_path_ids 須皆在 spec_path 之 §B 驗證運算預算表；NOCAP Task 0.3c）")
+            problems.append(f"{rule['id']}：無相符且欄位齊全之估時收據（{ESTIMATE_GLOB}：identity.match 須與本命令逐欄相符；"
+                            "須含 scale、estimate_seconds、basis、spec_path；coverage_path_ids 須皆在 spec_path 之 §B 驗證"
+                            "運算預算表；NOCAP Task 0.3c）")
     if rule.get("scale_receipt") and not rule.get("scale_exempt"):
         ok = False
         for rec in _load_receipts(str(rule["scale_receipt"])):
             m = ((rec.get("identity") or {}).get("match") or {})
-            same = any(m.get("entrypoint") == cur["entrypoint"] and m.get("code_sha256") == cur["code_sha256"]
-                       for cur in matches)
-            proj = rec.get("projection") or {}
-            if same and len(rec.get("points") or []) >= 3 and proj.get("seconds") is not None \
-                    and not rec.get("extrapolation_unreliable"):
+            same = any(all(k in m and m[k] == cur[k] for k in rid.SCALE_MATCH_KEYS) for cur in matches)
+            if same and not rid.scale_receipt_problems(rec):
                 ok = True
                 break
         if not ok:
-            problems.append(f"{rule['id']}：全規模前須有成長曲線收據（{rule['scale_receipt']}：程式碼態雜湊等於現行碼、"
-                            "≥ 3 個規模點、推算可用；以 scripts/scale_probe.py 背景產生；NOCAP Task 0.3b）")
+            problems.append(f"{rule['id']}：全規模前須有成長曲線收據（{rule['scale_receipt']}：身分除 target_argv 外逐欄"
+                            "等於現行〔程式碼態、資料、設定、硬體〕、≥ 3 個相異規模點且欄位齊全、推算可用；以 "
+                            "scripts/scale_probe.py 背景產生；NOCAP Task 0.3b）")
     return problems
 
 
