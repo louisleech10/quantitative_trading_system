@@ -51,23 +51,26 @@ CPU_PROGRESS_FRACTION = 0.05
 CAUSE_MEMORY = "memory"
 CAUSE_HANG = "hang"
 #: 注入 Python 子行程之 sitecustomize：以 faulthandler 註冊 SIGUSR1 把全部執行緒堆疊寫入 WATCHDOG_STACK_FILE，再串接
-#: sys.path 上原本會載入之 sitecustomize（不取代呼叫端既有之探針注入）
+#: sys.path 上原本會載入之 sitecustomize（不取代呼叫端既有之探針注入）。同行程只執行一次：另一個串接下一個
+#: sitecustomize 之注入會再載回本檔，無此判斷即兩者互相串接至遞迴上限
 _SITECUSTOMIZE = '''\
 import faulthandler, importlib.util, os, signal, sys
-_wd_path = os.environ.get("WATCHDOG_STACK_FILE")
-if _wd_path and hasattr(signal, "SIGUSR1"):
-    _wd_file = open(_wd_path + "." + str(os.getpid()) + ".txt", "a")
-    faulthandler.register(signal.SIGUSR1, file=_wd_file, all_threads=True, chain=False)
-_wd_here = os.path.dirname(os.path.abspath(__file__))
-for _wd_p in list(sys.path):
-    if os.path.abspath(_wd_p or ".") == _wd_here:
-        continue
-    _wd_cand = os.path.join(_wd_p or ".", "sitecustomize.py")
-    if os.path.isfile(_wd_cand):
-        _wd_spec = importlib.util.spec_from_file_location("_wd_chained_sitecustomize", _wd_cand)
-        _wd_mod = importlib.util.module_from_spec(_wd_spec)
-        _wd_spec.loader.exec_module(_wd_mod)
-        break
+if not getattr(sys, "_wd_sitecustomize_done", False):
+    sys._wd_sitecustomize_done = True
+    _wd_path = os.environ.get("WATCHDOG_STACK_FILE")
+    if _wd_path and hasattr(signal, "SIGUSR1"):
+        _wd_file = open(_wd_path + "." + str(os.getpid()) + ".txt", "a")
+        faulthandler.register(signal.SIGUSR1, file=_wd_file, all_threads=True, chain=False)
+    _wd_here = os.path.dirname(os.path.abspath(__file__))
+    for _wd_p in list(sys.path):
+        if os.path.abspath(_wd_p or ".") == _wd_here:
+            continue
+        _wd_cand = os.path.join(_wd_p or ".", "sitecustomize.py")
+        if os.path.isfile(_wd_cand):
+            _wd_spec = importlib.util.spec_from_file_location("_wd_chained_sitecustomize", _wd_cand)
+            _wd_mod = importlib.util.module_from_spec(_wd_spec)
+            _wd_spec.loader.exec_module(_wd_mod)
+            break
 '''
 WATCHDOG_KEYS = ("check_interval_seconds", "log_stall_seconds", "swap_growth_fraction_of_ram", "swap_consecutive_checks",
                  "wall_multiple_of_expected", "wall_ceiling_seconds")

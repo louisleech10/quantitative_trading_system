@@ -104,6 +104,31 @@ def test_exit_while_reading_cpu_not_recorded_degraded(tmp_path: Path) -> None:
     assert "monitor_degraded" not in result.diagnosis, result
 
 
+_UNGUARDED_CHAINER = '''\
+import importlib.machinery, importlib.util, os, sys
+with open(os.environ["CHAIN_COUNT_FILE"], "a") as fh:
+    fh.write("x\\n")
+here = os.path.dirname(os.path.abspath(__file__))
+spec = importlib.machinery.PathFinder.find_spec("sitecustomize", [p for p in sys.path if os.path.abspath(p or ".") != here])
+if spec is not None and spec.loader is not None:
+    spec.loader.exec_module(importlib.util.module_from_spec(spec))
+'''
+
+
+def test_sitecustomize_runs_once_when_another_injection_chains_back(tmp_path: Path) -> None:
+    """子行程另有一個「串接下一個 sitecustomize」之注入且自身不防重入（例：覆蓋率／選測工具之 boot）⇒ 共用監看之
+    sitecustomize 須同行程只執行一次，否則兩者互相串接至遞迴上限、子行程崩潰（TESTSEL 合入 main 時實測）。"""
+    other = tmp_path / "other_site"
+    other.mkdir()
+    (other / "sitecustomize.py").write_text(_UNGUARDED_CHAINER, encoding="utf-8")
+    count = tmp_path / "count.txt"
+    env = dict(os.environ, PYTHONPATH=str(other), CHAIN_COUNT_FILE=str(count))
+    result = wd.run_watched([sys.executable, "-c", "print('ok')"], log_path=tmp_path / "chain.log",
+                            config=_config(), probe_swap=lambda: 0.0, env=env)
+    assert result.status == wd.EXITED and result.returncode == 0, (result, (tmp_path / "chain.log").read_text())
+    assert count.read_text().count("x") == 1
+
+
 def test_boundary_02_cpu_unreadable_memory_evidence_still_stalls(tmp_path: Path) -> None:
     """CPU 讀不到、但 swap 連續增長逾門檻 ⇒ 仍判 STALLED 且 cause=memory（記憶體證據不因監看降級而失效）。"""
     used = iter([0.0] + [10_000.0] * 1000)
