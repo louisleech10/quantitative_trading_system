@@ -43,9 +43,47 @@ WRAP = "venv/bin/python scripts/run_watched.py --log /tmp/x.log -- "
     ("bash scripts/committee_run.sh --session s brief out codex,composer", False, 2),
     ("bash scripts/committee_run.sh --session s brief out codex,composer", True, 0),
     ("git status --short", False, 0),
+    # 只比對執行位置（2026-10-27 實測舊版逐字比對全文之誤擋）
+    ("pgrep -fl 'pytest|ffprod_measure|generate_features'", False, 0),
+    ("grep -n 'venv/bin/python -m pytest -q' docs/NOCAP_SPEC.md", False, 0),
+    ("echo 'bash scripts/committee_run.sh --session s'", False, 0),
+    ("bash scripts/list_active_mechanisms.sh --write", False, 0),  # 檔內只於名單／case 樣式提到 committee_run
+    ("bash scripts/template_check.sh spec docs/NOCAP_SPEC.md", False, 0),  # 檔內只於正則／註解提到 pytest
+    ("bash -c \"pgrep -fl 'pytest|x'\"", False, 0),
+    # 仍須擋：分隔符、前置變數與前綴、bash -c、多行、子殼
+    ("cd /tmp && venv/bin/python -m pytest -q", True, 2),
+    ("git status; venv/bin/python scripts/ffprod_measure.py run --cell C_BTCUSDT_1h", False, 2),
+    ("FOO=1 nohup venv/bin/python scripts/ffprod_measure.py run --cell C_BTCUSDT_1h", False, 2),
+    ("bash -c 'venv/bin/python -m pytest -q'", True, 2),
+    ("git status\nvenv/bin/python scripts/ffprod_measure.py ic --cell C_BTCUSDT_1h", False, 2),
+    ("(venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q) > /tmp/o.log 2>&1", True, 2),
+    ("ls | venv/bin/python -m pytest -q", True, 2),
+    ("echo \"unterminated venv/bin/python -m pytest -q", False, 2),  # 引號不成對 ⇒ 全文比對（保守）
+    # 包裝只認該命令本身：另一段落提到包裝不算
+    ("echo scripts/run_watched.py; venv/bin/python -m pytest -q", True, 2),
 ])
 def test_heavy_command_rules(cmd: str, background: bool, expected: int) -> None:
     assert _rc(_bash(cmd, background)) == expected
+
+
+def test_executed_script_body_only_counts_command_position() -> None:
+    """執行之 repo 內 .sh：檔內真的執行之重型命令擋；註解、字串、grep 樣式、`${x#y}` 後之下一行皆照實判定。"""
+    helper = REPO / "handoffs" / "run_receipts" / ".nocap-guardtest-body.sh"
+    helper.write_text("#!/usr/bin/env bash\n# bash scripts/committee_run.sh 只是註解\n"
+                      "echo 'venv/bin/python -m pytest -q'\ngrep -q 'scripts/committee_run.sh' x\n"
+                      'case "$1" in\n  scripts/gate.sh|scripts/committee_run.sh) : ;;\n  *) echo ok ;;\nesac\n'
+                      'y="${HOME#/}"\n', encoding="utf-8")
+    try:
+        assert _rc(_bash(f"bash {helper}", False)) == 0  # case 樣式中之 committee_run 非命令
+        assert _rc(_bash(f"ls {helper}", False)) == 0 and _rc(_bash(f"cat {helper}", False)) == 0
+        base = helper.read_text(encoding="utf-8")
+        helper.write_text(base + "bash scripts/committee_run.sh --session s b o c\n", encoding="utf-8")
+        assert _rc(_bash(f"bash {helper}", False)) == 2  # `${HOME#/}` 後之下一行仍為獨立命令
+        helper.write_text(base + 'case "$1" in\n  a|b) venv/bin/python -m pytest -q ;;\nesac\n', encoding="utf-8")
+        assert _rc(_bash(f"bash {helper}", True)) == 2  # case 分支內真的執行之全套 pytest（未包裝）
+        assert _rc(_bash(f"ls {helper}", False)) == 0  # 未執行
+    finally:
+        helper.unlink()
 
 
 def test_indirect_helper_script_is_expanded_with_args(tmp_path: Path) -> None:

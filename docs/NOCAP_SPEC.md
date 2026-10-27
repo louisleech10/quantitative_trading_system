@@ -55,9 +55,9 @@
 
 **Task 0.3 — 重型跑必經監看且背景執行之產出端閘**
 - 目標：重型命令（特徵生成腳本、凍結腳本、量測 `run|ic`、IC 分析、重型 pytest 檔、委員派工）未經共用監看或未以背景執行時於下指令當下擋下——保證卡死必被終止並留現場、行程結束必有完成通知，不需使用者詢問。
-- 改法：PreToolUse hook `scripts/heavy_run_guard.sh`（掛 `.claude/settings.json` 之 Bash）比對命令與 `scripts/heavy_commands.json`（封閉清單）；命中而（未經 `scripts/run_watched.sh` 或 `tool_input.run_in_background` 非 true）⇒ 擋並提示改法。`scripts/run_watched.sh`（新建）以共用監看包任意命令、印 `[run-watched] start|progress|stalled|exit` 行。
-- **驗證**：`tests/governance/test_heavy_run_guard.py`：重型命令直跑 ⇒ rc=2；經 `scripts/run_watched.sh` 但前景 ⇒ rc=2；經包裝且背景 ⇒ rc=0；非重型命令 ⇒ rc=0；hook 單次耗時 < 1 秒。
-- **邊界**：命令經 `bash handoffs/run_receipts/.<票>-*.sh` 間接呼叫 ⇒ 讀腳本內容比對（遞迴一層）；hook stdin 讀不到 ⇒ 重型樣式無從判定 ⇒ 擋（fail-closed）。
+- 改法：PreToolUse hook `scripts/heavy_run_guard.sh`（掛 `.claude/settings.json` 之 Bash）比對命令與 `scripts/heavy_commands.json`（封閉清單）；命中而（該命令未經 `scripts/run_watched.py` 包裝或 `tool_input.run_in_background` 非 true）⇒ 擋並提示改法。`scripts/run_watched.py`（新建）以共用監看包任意命令、印 `[run-watched] start|progress|stalled|exit` 行。比對對象＝依 shell 語法拆出之**執行位置**命令（分隔符 `;`／`&&`／`||`／`|`／`&`／`(`／`)`／換行；去重導向、前置環境變數與 env／nohup／time 等前綴；啟動器 python*／pytest／bash／sh／zsh／source 與直接執行之 `.sh`；`bash -c` 只看內層字串；`case` 分支樣式非命令），`ls`／`grep`／`pgrep`／`echo` 之參數與腳本內註解、字串不算；包裝只認該命令本身經 `run_watched.py`（同列他段提到不算）。
+- **驗證**：`tests/governance/test_heavy_run_guard.py`：重型命令直跑 ⇒ rc=2；經 `scripts/run_watched.py` 但前景 ⇒ rc=2；經包裝且背景 ⇒ rc=0；非重型命令 ⇒ rc=0；非執行位置提到重型命令（`pgrep 'pytest|…'`、`echo`、`grep` 樣式、執行之腳本內註解／字串／`case` 樣式）⇒ rc=0；分隔符、前置變數、`bash -c`、多行、子殼、管線中之重型命令 ⇒ rc=2；hook 單次耗時 < 1 秒。
+- **邊界**：命令經 `bash handoffs/run_receipts/.<票>-*.sh` 間接執行 ⇒ 讀腳本內容以同法拆解比對（遞迴一層、參數代入）；引號不成對無從拆解 ⇒ 退回全文比對（保守）；hook stdin 讀不到 ⇒ 重型樣式無從判定 ⇒ 擋（fail-closed）。不涵蓋：經 `xargs`／`find -exec`／`eval`／變數展開組出之命令、SPEC ASSERT 行經 `template_check.sh` `TEMPLATE_CHECK_EXEC=1` 動態執行者（屬間接動態執行；本閘只擋主委自己下之命令列）。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：hook 不得超過秒級。
 
