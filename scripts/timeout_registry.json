@@ -1,28 +1,1243 @@
 {
   "_doc": "NOCAP 白名單（docs/NOCAP_SPEC.md Task 0.2／0.2b）：每列＝{path, class, reason}＋綁定之一——Python 呼叫型＝function（所在函式全名，模組層 <module>）＋callee（被呼叫者）＋literal（逾時參數字面值）；其餘（shell、config、frontend、Python 字串型）＝line（去頭尾空白之整行）；whole_file＝true 只准守衛、掃描器本身與其測試。class 只准 B（等外部方：網路／API／委員 CLI／鎖）、C（短輔助命令之掛住保險）、D（效能斷言／依資源判定／純字串／測試樣本／封存不執行）；A（依牆鐘停止或縮減長運算）不可登記。新增列須於同一提交經審碼。",
   "entries": [
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "function": "swap_used_mb", "callee": "subprocess.run", "literal": "5", "class": "C", "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "function": "physical_memory_mb", "callee": "subprocess.run", "literal": "5", "class": "C", "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "function": "swap_used_fraction", "callee": "subprocess.run", "literal": "5", "class": "C", "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "function": "_terminate", "callee": "proc.wait", "literal": "10", "class": "C", "reason": "已決定終止後 terminate→kill 之等候"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "except subprocess.TimeoutExpired:", "class": "C", "reason": "同上 terminate→kill 之例外"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "function": "_native_sample", "callee": "subprocess.run", "literal": "60", "class": "C", "reason": "卡死留現場時 macOS sample 取原生堆疊之掛住保險（取樣 2 秒）"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "def wall_cap_seconds(config: WatchdogConfig, expected_seconds: Optional[float]) -> float:", "class": "D", "reason": "牆鐘逾預期只記錄 over_expected、不終止（NOCAP Task 0.1）"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "function": "_watch_loop", "callee": "wall_cap_seconds", "literal": "", "class": "D", "reason": "牆鐘逾預期只記錄 over_expected、不終止（NOCAP Task 0.1）"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "增長——判準 v6 現行即停用：8 GB 機上正常全特徵生成之 swap 增長與卡住同量級，見判準 `_basis`）。系統既有 swap 不計——判準 v4 之使用比例條件於系統既有 85% swap 時 60 秒即誤殺，見判準 `_basis`）；(c) 牆鐘逾 `wall_multiple_of_expected` × 預期", "class": "D", "reason": "判準檔鍵；只記錄語意"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "\"wall_multiple_of_expected\", \"wall_ceiling_seconds\")", "class": "D", "reason": "判準檔鍵；只記錄語意"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "wall_multiple_of_expected: float", "class": "D", "reason": "判準檔鍵；只記錄語意"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "function": "wall_cap_seconds", "callee": "float", "literal": "", "class": "D", "reason": "判準檔鍵；只記錄語意"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "單格秒數（有預期時），否則逾 `wall_ceiling_seconds` ⇒ 只記錄、不終止（見上）。門檻唯一來源＝現行判準檔 `cell_rules.watchdog`（`load_config`），不另寫。", "class": "D", "reason": "判準檔鍵；只記錄語意"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "wall_ceiling_seconds: float", "class": "D", "reason": "判準檔鍵；只記錄語意"},
-    {"path": "handoffs/run_receipts/numview_probes/_watchdog.py", "line": "else config.wall_ceiling_seconds)", "class": "D", "reason": "判準檔鍵；只記錄語意"},
-    {"path": "scripts/timeout_write_guard.py", "whole_file": true, "class": "D", "reason": "守衛本身之樣式說明與測試字串"},
-    {"path": "tests/governance/test_timeout_write_guard.py", "whole_file": true, "class": "D", "reason": "守衛測試之樣本字串（刻意命中樣式）"},
-    {"path": "scripts/timeout_scan.py", "whole_file": true, "class": "D", "reason": "全庫掃描器本身之樣式定義與比對字面（NOCAP Task 0.2）"},
-    {"path": "tests/governance/test_heavy_run_guard.py", "function": "test_run_watched_wrapper_reports_stall_with_diagnosis.fast", "callee": "wd.WatchdogConfig", "literal": "", "class": "D", "reason": "測試以判準檔之牆鐘鍵建構監看設定（只記錄語意）"},
-    {"path": "tests/feature_engineering/test_nocap_watchdog.py", "line": "\"swap_consecutive_checks\": 2, \"wall_multiple_of_expected\": 3.0, \"wall_ceiling_seconds\": 30.0}", "class": "D", "reason": "NOCAP Task 0.1 測試以判準檔之牆鐘鍵建構監看設定（只記錄 over_expected，不終止）"},
-    {"path": "tests/registry/test_gate_runner_nocap.py", "line": "MAX_OPT, MAX_ARG = \"--max-seconds\", \"max_seconds\"", "class": "D", "reason": "NOCAP Task 2.1 測試以 AST 斷言閘門上限參數預設 None（引用參數名字串，非呼叫）"},
-    {"path": "tests/registry/test_gate_runner_nocap.py", "function": "_fast_watch", "callee": "wd.WatchdogConfig", "literal": "", "class": "D", "reason": "NOCAP Task 2.1 測試以判準檔之牆鐘鍵建構小門檻監看設定（只記錄 over_expected，不終止）"},
-    {"path": "tests/registry/test_timeout_registry.py", "line": "INJECTED, STRING_ONLY = \"    subprocess.run(cmd, timeout=60)\\n\", \"log.info(\\\"timeout=5 seconds\\\")\\n\"", "class": "D", "reason": "NOCAP Task 0.2 掃描測試之注入樣本（刻意命中樣式以驗掃描器）"}
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "function": "swap_used_mb",
+      "callee": "subprocess.run",
+      "literal": "5",
+      "class": "C",
+      "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "function": "physical_memory_mb",
+      "callee": "subprocess.run",
+      "literal": "5",
+      "class": "C",
+      "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "function": "swap_used_fraction",
+      "callee": "subprocess.run",
+      "literal": "5",
+      "class": "C",
+      "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "function": "_terminate",
+      "callee": "proc.wait",
+      "literal": "10",
+      "class": "C",
+      "reason": "已決定終止後 terminate→kill 之等候"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "except subprocess.TimeoutExpired:",
+      "class": "C",
+      "reason": "同上 terminate→kill 之例外"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "function": "_native_sample",
+      "callee": "subprocess.run",
+      "literal": "60",
+      "class": "C",
+      "reason": "卡死留現場時 macOS sample 取原生堆疊之掛住保險（取樣 2 秒）"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "def wall_cap_seconds(config: WatchdogConfig, expected_seconds: Optional[float]) -> float:",
+      "class": "D",
+      "reason": "牆鐘逾預期只記錄 over_expected、不終止（NOCAP Task 0.1）"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "function": "_watch_loop",
+      "callee": "wall_cap_seconds",
+      "literal": "",
+      "class": "D",
+      "reason": "牆鐘逾預期只記錄 over_expected、不終止（NOCAP Task 0.1）"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "增長——判準 v6 現行即停用：8 GB 機上正常全特徵生成之 swap 增長與卡住同量級，見判準 `_basis`）。系統既有 swap 不計——判準 v4 之使用比例條件於系統既有 85% swap 時 60 秒即誤殺，見判準 `_basis`）；(c) 牆鐘逾 `wall_multiple_of_expected` × 預期",
+      "class": "D",
+      "reason": "判準檔鍵；只記錄語意"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "\"wall_multiple_of_expected\", \"wall_ceiling_seconds\")",
+      "class": "D",
+      "reason": "判準檔鍵；只記錄語意"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "wall_multiple_of_expected: float",
+      "class": "D",
+      "reason": "判準檔鍵；只記錄語意"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "function": "wall_cap_seconds",
+      "callee": "float",
+      "literal": "",
+      "class": "D",
+      "reason": "判準檔鍵；只記錄語意"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "單格秒數（有預期時），否則逾 `wall_ceiling_seconds` ⇒ 只記錄、不終止（見上）。門檻唯一來源＝現行判準檔 `cell_rules.watchdog`（`load_config`），不另寫。",
+      "class": "D",
+      "reason": "判準檔鍵；只記錄語意"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "wall_ceiling_seconds: float",
+      "class": "D",
+      "reason": "判準檔鍵；只記錄語意"
+    },
+    {
+      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "line": "else config.wall_ceiling_seconds)",
+      "class": "D",
+      "reason": "判準檔鍵；只記錄語意"
+    },
+    {
+      "path": "scripts/timeout_write_guard.py",
+      "whole_file": true,
+      "class": "D",
+      "reason": "守衛本身之樣式說明與測試字串"
+    },
+    {
+      "path": "tests/governance/test_timeout_write_guard.py",
+      "whole_file": true,
+      "class": "D",
+      "reason": "守衛測試之樣本字串（刻意命中樣式）"
+    },
+    {
+      "path": "scripts/timeout_scan.py",
+      "whole_file": true,
+      "class": "D",
+      "reason": "全庫掃描器本身之樣式定義與比對字面（NOCAP Task 0.2）"
+    },
+    {
+      "path": "tests/governance/test_heavy_run_guard.py",
+      "function": "test_run_watched_wrapper_reports_stall_with_diagnosis.fast",
+      "callee": "wd.WatchdogConfig",
+      "literal": "",
+      "class": "D",
+      "reason": "測試以判準檔之牆鐘鍵建構監看設定（只記錄語意）"
+    },
+    {
+      "path": "tests/feature_engineering/test_nocap_watchdog.py",
+      "line": "\"swap_consecutive_checks\": 2, \"wall_multiple_of_expected\": 3.0, \"wall_ceiling_seconds\": 30.0}",
+      "class": "D",
+      "reason": "NOCAP Task 0.1 測試以判準檔之牆鐘鍵建構監看設定（只記錄 over_expected，不終止）"
+    },
+    {
+      "path": "tests/registry/test_gate_runner_nocap.py",
+      "line": "MAX_OPT, MAX_ARG = \"--max-seconds\", \"max_seconds\"",
+      "class": "D",
+      "reason": "NOCAP Task 2.1 測試以 AST 斷言閘門上限參數預設 None（引用參數名字串，非呼叫）"
+    },
+    {
+      "path": "tests/registry/test_gate_runner_nocap.py",
+      "function": "_fast_watch",
+      "callee": "wd.WatchdogConfig",
+      "literal": "",
+      "class": "D",
+      "reason": "NOCAP Task 2.1 測試以判準檔之牆鐘鍵建構小門檻監看設定（只記錄 over_expected，不終止）"
+    },
+    {
+      "path": "tests/registry/test_timeout_registry.py",
+      "line": "INJECTED, STRING_ONLY = \"    subprocess.run(cmd, timeout=60)\\n\", \"log.info(\\\"timeout=5 seconds\\\")\\n\"",
+      "class": "D",
+      "reason": "NOCAP Task 0.2 掃描測試之注入樣本（刻意命中樣式以驗掃描器）"
+    },
+    {
+      "path": "scripts/_live_doc_registry.py",
+      "function": "emit_block_event",
+      "callee": "subprocess.run",
+      "literal": "30",
+      "class": "C",
+      "reason": "寫一筆稽核事件之短命令（秒級）掛住保險；失敗不改擋下結果"
+    },
+    {
+      "path": "scripts/_live_doc_registry.py",
+      "line": "except (OSError, subprocess.TimeoutExpired) as exc:",
+      "class": "C",
+      "reason": "寫一筆稽核事件之短命令（秒級）掛住保險；失敗不改擋下結果"
+    },
+    {
+      "path": "scripts/_patch_hook_stdin_timeout.py",
+      "line": "修法：讀 stdin 之處一律加 `signal.alarm(_HOOK_STDIN_TIMEOUT)`（預設 5 秒）。",
+      "class": "D",
+      "reason": "純字串（修補說明與寫入之樣板文字）"
+    },
+    {
+      "path": "scripts/_patch_hook_stdin_timeout.py",
+      "line": "逾時 ⇒ python 被 SIGALRM 殺掉 ⇒ 既有的 `|| true` 讓變數為空 ⇒ 走各腳本**既有的**",
+      "class": "D",
+      "reason": "純字串（修補說明與寫入之樣板文字）"
+    },
+    {
+      "path": "scripts/_patch_hook_stdin_timeout.py",
+      "line": "f\"signal.alarm({TIMEOUT})   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時\\n\"",
+      "class": "D",
+      "reason": "純字串（修補說明與寫入之樣板文字）"
+    },
+    {
+      "path": "scripts/_patch_hook_stdin_timeout.py",
+      "line": "f\"signal.alarm({TIMEOUT})   # 同上：bare cat 對永不關閉的管道會無限等\\n\"",
+      "class": "D",
+      "reason": "純字串（修補說明與寫入之樣板文字）"
+    },
+    {
+      "path": "scripts/b7_l65_threadpool_microbench.py",
+      "function": "_PeakRssMonitor.__exit__",
+      "callee": "self._thread.join",
+      "literal": "1.0",
+      "class": "C",
+      "reason": "結束時回收 RSS 取樣執行緒之 join 保險"
+    },
+    {
+      "path": "scripts/benchmark_l65.py",
+      "function": "PeakRssSampler.__exit__",
+      "callee": "self._thread.join",
+      "literal": "1.0",
+      "class": "C",
+      "reason": "結束時回收 RSS 取樣執行緒之 join 保險"
+    },
+    {
+      "path": "scripts/benchmark_l65_v2.py",
+      "function": "PeakRssSampler.__exit__",
+      "callee": "self._thread.join",
+      "literal": "1.0",
+      "class": "C",
+      "reason": "結束時回收 RSS 取樣執行緒之 join 保險"
+    },
+    {
+      "path": "scripts/doc_format_precheck.sh",
+      "line": "signal.alarm(5)   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/factkey_write_guard.sh",
+      "line": "signal.alarm(5)   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/ffname_refreeze_failopen.sh",
+      "line": "echo \"[done] $unit $side rc=$rc $(( $(date +%s) - t0 ))s\" | tee -a \"$LOG\"",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "scripts/ffname_refreeze_framepath.sh",
+      "line": "echo \"[done] framepath $side rc=$rc $(( $(date +%s) - t0 ))s\" | tee -a \"$LOG\"",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "scripts/ffprod_measure.py",
+      "line": "設定與該凍結格相同時；設定變體（sigma、平穩化開）無實測 ⇒ None（監看改用判準之 wall_ceiling_seconds），不以他設定或他格代替。\"\"\"",
+      "class": "D",
+      "reason": "docstring 字串／進度 log 每秒至多一行之間隔"
+    },
+    {
+      "path": "scripts/ffprod_measure.py",
+      "function": "_ProofLog.count",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "D",
+      "reason": "docstring 字串／進度 log 每秒至多一行之間隔"
+    },
+    {
+      "path": "scripts/gate_check.sh",
+      "line": "signal.alarm(5)",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/javis_mail.sh",
+      "line": "signal.alarm(2)",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/javis_mail.sh",
+      "line": "if [ $(( $(date +%s) - start )) -ge $(( maxmin * 60 )) ]; then",
+      "class": "B",
+      "reason": "信箱守候等外部來信，到期結束後由守候者重啟（非運算）"
+    },
+    {
+      "path": "scripts/list_active_mechanisms.sh",
+      "line": "signal.alarm(5)   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/measure_ic_footprint.sh",
+      "line": "total_sec=$(( $(date +%s) - started ))",
+      "class": "D",
+      "reason": "只記錄總耗時（同檔 :130 之採樣上限為 A，樣式未抓，盤點收據已列）"
+    },
+    {
+      "path": "scripts/narrow_check_router.sh",
+      "line": "signal.alarm(5)   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/self_verify_check.sh",
+      "line": "signal.alarm(5)",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/spec_xref_hook.sh",
+      "line": "signal.alarm(5)",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/status_marker_check.sh",
+      "line": "signal.alarm(5)   # 同上：bare cat 對永不關閉的管道會無限等",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/status_marker_check.sh",
+      "line": "signal.alarm(5)   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/synth_attribution_hook.sh",
+      "line": "signal.alarm(5)",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "scripts/tmp/b7_l65_threadpool_microbench.py",
+      "function": "RssSampler.__exit__",
+      "callee": "self._thread.join",
+      "literal": "1.0",
+      "class": "C",
+      "reason": "結束時回收 RSS 取樣執行緒之 join 保險"
+    },
+    {
+      "path": "scripts/verify_pretooluse.sh",
+      "line": "signal.alarm(5)",
+      "class": "B",
+      "reason": "hook 讀 Claude Code 傳入之 stdin（外部管道）；永不關閉之管道曾使 hook 掛住 8 小時"
+    },
+    {
+      "path": "momentum/FeatureEngineering/feature_factory.py",
+      "function": "FeatureFactory.generate_features",
+      "callee": "RunLease.acquire",
+      "literal": "0",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/feature_registry.py",
+      "function": "FeatureRegistry._locked_mutate",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "B",
+      "reason": "等檔案鎖之期限（等他行程釋放鎖，非運算）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/memory_budget.py",
+      "function": "backing_bus_protocol",
+      "callee": "subprocess.run",
+      "literal": "30",
+      "class": "C",
+      "reason": "diskutil 查詢／守門子行程收尾之短命令掛住保險"
+    },
+    {
+      "path": "momentum/FeatureEngineering/memory_budget.py",
+      "function": "GuardHandle.stop",
+      "callee": "proc.wait",
+      "literal": "10",
+      "class": "C",
+      "reason": "diskutil 查詢／守門子行程收尾之短命令掛住保險"
+    },
+    {
+      "path": "momentum/FeatureEngineering/memory_budget.py",
+      "line": "except subprocess.TimeoutExpired:",
+      "class": "C",
+      "reason": "diskutil 查詢／守門子行程收尾之短命令掛住保險"
+    },
+    {
+      "path": "momentum/FeatureEngineering/memory_budget.py",
+      "function": "start_guard",
+      "callee": "proc.communicate",
+      "literal": "5",
+      "class": "C",
+      "reason": "diskutil 查詢／守門子行程收尾之短命令掛住保險"
+    },
+    {
+      "path": "momentum/FeatureEngineering/memory_guard.py",
+      "function": "main",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "D",
+      "reason": "取樣間隔之睡眠迴圈"
+    },
+    {
+      "path": "momentum/FeatureEngineering/run_lifecycle.py",
+      "function": "RunLifecycleManager.delete_run",
+      "callee": "RunLease.acquire",
+      "literal": "0",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/run_lifecycle.py",
+      "function": "RunLifecycleManager.set_run_alias",
+      "callee": "RunLease.acquire",
+      "literal": "0",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/run_lifecycle.py",
+      "function": "RunLifecycleManager.auto_cleanup",
+      "callee": "RunLease.acquire",
+      "literal": "0",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/run_lifecycle.py",
+      "function": "RunLifecycleManager.clean_orphans",
+      "callee": "RunLease.acquire",
+      "literal": "0",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/run_locks.py",
+      "function": "RunLease.acquire",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "B",
+      "reason": "等檔案鎖之期限（等他行程釋放鎖，非運算）"
+    },
+    {
+      "path": "momentum/FeatureEngineering/run_locks.py",
+      "function": "RunLease.acquire",
+      "callee": "time.sleep",
+      "literal": "",
+      "class": "B",
+      "reason": "等檔案鎖之期限（等他行程釋放鎖，非運算）"
+    },
+    {
+      "path": "api/services/feature_factory_batch_service.py",
+      "function": "FeatureFactoryBatchService._process_item_wave._layer_metrics_tick",
+      "callee": "asyncio.wait_for",
+      "literal": "LAYER_METRICS_TICK_SECONDS",
+      "class": "D",
+      "reason": "層指標回報之心跳間隔（逾時即續迴圈）"
+    },
+    {
+      "path": "api/services/feature_kline_service.py",
+      "function": "FeatureKlineService._get_all_usdt_pairs",
+      "callee": "requests.get",
+      "literal": "10",
+      "class": "B",
+      "reason": "交易所 HTTP 請求逾時（等外部網路）"
+    },
+    {
+      "path": "api/websocket/feature_factory_ws.py",
+      "function": "feature_factory_websocket",
+      "callee": "asyncio.wait_for",
+      "literal": "60.0",
+      "class": "D",
+      "reason": "websocket 心跳迴圈：逾時只送 ping／檢查連線後續等"
+    },
+    {
+      "path": "api/websocket/feature_factory_ws.py",
+      "function": "feature_factory_batch_websocket",
+      "callee": "asyncio.wait_for",
+      "literal": "30",
+      "class": "D",
+      "reason": "websocket 心跳迴圈：逾時只送 ping／檢查連線後續等"
+    },
+    {
+      "path": "api/websocket/ic_analysis_ws.py",
+      "function": "ic_analysis_websocket",
+      "callee": "asyncio.wait_for",
+      "literal": "60.0",
+      "class": "D",
+      "reason": "websocket 心跳迴圈：逾時只送 ping／檢查連線後續等"
+    },
+    {
+      "path": "api/websocket/optimization_ws.py",
+      "function": "optimization_websocket_endpoint",
+      "callee": "asyncio.wait_for",
+      "literal": "60.0",
+      "class": "D",
+      "reason": "websocket 心跳迴圈：逾時只送 ping／檢查連線後續等"
+    },
+    {
+      "path": "tests/api/test_feature_factory_batch_resume.py",
+      "function": "test_current_symbol_updates_on_submit_before_item_completes._compute_block_second",
+      "callee": "release_second.wait",
+      "literal": "2",
+      "class": "C",
+      "reason": "測試同步事件之死鎖保險"
+    },
+    {
+      "path": "tests/api/test_ic_response_v2.py",
+      "function": "test_export_route_streaming",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "D",
+      "reason": "串流首段回應之效能斷言（2 秒）"
+    },
+    {
+      "path": "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py",
+      "function": "test_l65_v2_benchmark_cli_help",
+      "callee": "subprocess.run",
+      "literal": "30",
+      "class": "C",
+      "reason": "CLI --help 之短命令掛住保險"
+    },
+    {
+      "path": "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py",
+      "function": "test_l65_v2_golden_builder_cli_help",
+      "callee": "subprocess.run",
+      "literal": "30",
+      "class": "C",
+      "reason": "CLI --help 之短命令掛住保險"
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_manifest.py",
+      "function": "_run_concurrent_raw_processed_merge._interleaved_load",
+      "callee": "load_interleave_barrier.wait",
+      "literal": "30.0",
+      "class": "C",
+      "reason": "並行測試 barrier 同步之死鎖保險（受測動作為毫秒級）"
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_manifest.py",
+      "function": "_run_concurrent_raw_processed_merge._effective_lock",
+      "callee": "entry_barrier.wait",
+      "literal": "30.0",
+      "class": "C",
+      "reason": "並行測試 barrier 同步之死鎖保險（受測動作為毫秒級）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_domain.py",
+      "function": "test_real_spawn_tracker_is_separate_pid",
+      "callee": "result",
+      "literal": "60",
+      "class": "C",
+      "reason": "子行程池回傳 os.getpid 之掛住保險"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_icfirst.py",
+      "function": "test_lease_busy_during_ic_stage.during_ic",
+      "callee": "release",
+      "literal": "",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_icfirst.py",
+      "function": "test_lease_busy_during_ic_stage",
+      "callee": "release",
+      "literal": "",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_icfirst.py",
+      "function": "test_lease_released_after_generation_exception",
+      "callee": "release",
+      "literal": "",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_icfirst.py",
+      "function": "test_lease_released_after_ic_exception",
+      "callee": "release",
+      "literal": "",
+      "class": "B",
+      "reason": "RunLease 非阻塞取鎖（timeout=0，不等）"
+    },
+    {
+      "path": "tests/feature_engineering/test_numview_criteria.py",
+      "line": "\"swap_consecutive_checks\": 2, \"wall_multiple_of_expected\": 3.0, \"wall_ceiling_seconds\": 30.0}",
+      "class": "D",
+      "reason": "監看判準測試設定之牆鐘欄（Task 0.1 後只記錄、不終止）"
+    },
+    {
+      "path": "tests/feature_engineering/test_run_lifecycle.py",
+      "function": "test_locks_subprocess_kill_releases_kernel_lock",
+      "callee": "proc.wait",
+      "literal": "1",
+      "class": "C",
+      "reason": "kill 後等子行程退出之收尾保險"
+    },
+    {
+      "path": "tests/governance/_fkperf_spawn.py",
+      "line": "逾時須先殺死該次子程序再回傳（`subprocess.run(timeout=…)`；入口以 `exec python3` 使核心即為該子程序，",
+      "class": "D",
+      "reason": "效能比例斷言之計時器：逾比例上限即判不合格"
+    },
+    {
+      "path": "tests/governance/_fkperf_spawn.py",
+      "function": "time_mode",
+      "callee": "subprocess.run",
+      "literal": "timeout if timeout > 0 else None",
+      "class": "D",
+      "reason": "效能比例斷言之計時器：逾比例上限即判不合格"
+    },
+    {
+      "path": "tests/governance/_fkperf_spawn.py",
+      "line": "except subprocess.TimeoutExpired:",
+      "class": "D",
+      "reason": "效能比例斷言之計時器：逾比例上限即判不合格"
+    },
+    {
+      "path": "tests/governance/test_cxrun_watchdog_stale_done.py",
+      "function": "_run_watchdog",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_cxrun_watchdog_stale_done.py",
+      "function": "_kill_wrapper_group",
+      "callee": "proc.communicate",
+      "literal": "10",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_cxrun_watchdog_stale_done.py",
+      "line": "except subprocess.TimeoutExpired:",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_cxrun_watchdog_stale_done.py",
+      "function": "test_signal_to_wrapper_group_terminates_detached_cli_group",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_cxrun_watchdog_stale_done.py",
+      "function": "test_signal_to_wrapper_group_terminates_detached_cli_group",
+      "callee": "spid_file.exists",
+      "literal": "",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_cxrun_watchdog_stale_done.py",
+      "function": "test_signal_to_wrapper_group_terminates_detached_cli_group",
+      "callee": "proc.communicate",
+      "literal": "30",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）與收尾之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_doc_format_precheck.py",
+      "function": "_run",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_doc_format_precheck.py",
+      "function": "test_dext_real_d001_passes",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_doc_format_precheck.py",
+      "function": "test_precheck_hook_mode_reads_stdin_json",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_doc_format_precheck.py",
+      "function": "test_precheck_hook_mode_bad_json_is_noop",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_docrot_f2_total_items_count.py",
+      "function": "_run_gov_fast",
+      "callee": "str",
+      "literal": "",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_fkperf_scale.py",
+      "function": "_ratio_verdict",
+      "callee": "sp.time_mode",
+      "literal": "C['ratio_max'] * t4",
+      "class": "D",
+      "reason": "效能比例斷言（規模 10×／40× 耗時比上限）"
+    },
+    {
+      "path": "tests/governance/test_fkperf_scale.py",
+      "function": "test_boundary_21_check_rc0_at_10x_and_40x",
+      "callee": "sp.time_mode",
+      "literal": "C['ratio_max'] * t4",
+      "class": "D",
+      "reason": "效能比例斷言（規模 10×／40× 耗時比上限）"
+    },
+    {
+      "path": "tests/governance/test_gate_lex_b3r_c5.py",
+      "line": "🔴 為什麼不能只用 `subprocess.run(timeout=...)`：那只殺**直接子程序**。",
+      "class": "D",
+      "reason": "詞法器線性時間之效能斷言（CPU 忙之回溯無法以進度判定，逾上限即判 HANG 不合格）"
+    },
+    {
+      "path": "tests/governance/test_gate_lex_b3r_c5.py",
+      "function": "_run_bounded",
+      "callee": "proc.communicate",
+      "literal": "timeout",
+      "class": "D",
+      "reason": "詞法器線性時間之效能斷言（CPU 忙之回溯無法以進度判定，逾上限即判 HANG 不合格）"
+    },
+    {
+      "path": "tests/governance/test_gate_lex_b3r_c5.py",
+      "line": "except subprocess.TimeoutExpired:",
+      "class": "D",
+      "reason": "詞法器線性時間之效能斷言（CPU 忙之回溯無法以進度判定，逾上限即判 HANG 不合格）"
+    },
+    {
+      "path": "tests/governance/test_gate_lex_b3r_c5.py",
+      "function": "_decide",
+      "callee": "subprocess.run",
+      "literal": "C5_4MB_SEC * 4",
+      "class": "D",
+      "reason": "詞法器線性時間之效能斷言（CPU 忙之回溯無法以進度判定，逾上限即判 HANG 不合格）"
+    },
+    {
+      "path": "tests/governance/test_gov_check_cheap_first.py",
+      "function": "_run",
+      "callee": "str",
+      "literal": "",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_gov_check_cheap_first.py",
+      "function": "test_document_assert_is_not_executed_by_default",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_gov_check_cheap_first.py",
+      "function": "test_default_mode_announces_unverified_asserts",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_gov_check_dep_failclosed.py",
+      "function": "_run_fast",
+      "callee": "subprocess.run",
+      "literal": "180",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_gov_check_dep_failclosed.py",
+      "function": "_run_health",
+      "callee": "str",
+      "literal": "",
+      "class": "C",
+      "reason": "hook／gov_check --fast 等秒級腳本之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_redispatch.py",
+      "function": "Repo.run",
+      "callee": "str",
+      "literal": "",
+      "class": "C",
+      "reason": "臨時 repo 內 gate 腳本（秒級）與 FIFO 死鎖偵測之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_redispatch.py",
+      "function": "_abandon",
+      "callee": "repo.run",
+      "literal": "timeout",
+      "class": "C",
+      "reason": "臨時 repo 內 gate 腳本（秒級）與 FIFO 死鎖偵測之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_redispatch.py",
+      "function": "test_abandon_exhausted_output_fifo_rc1",
+      "callee": "_abandon",
+      "literal": "60",
+      "class": "C",
+      "reason": "臨時 repo 內 gate 腳本（秒級）與 FIFO 死鎖偵測之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_redispatch.py",
+      "line": "except subprocess.TimeoutExpired:",
+      "class": "C",
+      "reason": "臨時 repo 內 gate 腳本（秒級）與 FIFO 死鎖偵測之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_redispatch.py",
+      "function": "test_lease_inherited_by_child_process",
+      "callee": "proc.wait",
+      "literal": "5",
+      "class": "C",
+      "reason": "臨時 repo 內 gate 腳本（秒級）與 FIFO 死鎖偵測之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_result_state_format_failed.py",
+      "function": "test_t2_s5_signal_during_cli_emits_single_failed_row",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_result_state_format_failed.py",
+      "function": "test_t2_s5_signal_during_cli_emits_single_failed_row",
+      "callee": "spid_file.exists",
+      "literal": "",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）之掛住保險"
+    },
+    {
+      "path": "tests/governance/test_result_state_format_failed.py",
+      "function": "test_t2_s5_signal_during_cli_emits_single_failed_row",
+      "callee": "proc.communicate",
+      "literal": "60",
+      "class": "C",
+      "reason": "假 CLI 腳本（秒級）之掛住保險"
+    },
+    {
+      "path": "tests/momentum/Analysis/strategy_validation/test_ledger_conformance.py",
+      "function": "test_duplicate_evaluation_id_race_writes_exactly_one_row",
+      "callee": "t.join",
+      "literal": "10",
+      "class": "C",
+      "reason": "並行寫入之 join／秒級 wiring 檢查之掛住保險"
+    },
+    {
+      "path": "tests/momentum/Analysis/strategy_validation/test_ledger_conformance.py",
+      "function": "test_multi_process_long_lines_do_not_interleave",
+      "callee": "p.communicate",
+      "literal": "60",
+      "class": "C",
+      "reason": "並行寫入之 join／秒級 wiring 檢查之掛住保險"
+    },
+    {
+      "path": "tests/momentum/Analysis/strategy_validation/test_wiring_check.py",
+      "function": "_run",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "並行寫入之 join／秒級 wiring 檢查之掛住保險"
+    },
+    {
+      "path": "tests/momentum/Analysis/strategy_validation/test_wiring_check.py",
+      "function": "test_sh_wrapper_and_default_paths_pass",
+      "callee": "subprocess.run",
+      "literal": "120",
+      "class": "C",
+      "reason": "並行寫入之 join／秒級 wiring 檢查之掛住保險"
+    },
+    {
+      "path": "tests/momentum/Analysis/test_ic_artifact.py",
+      "function": "_rss_peak_for",
+      "callee": "sampler.join",
+      "literal": "1.0",
+      "class": "C",
+      "reason": "回收 RSS 取樣執行緒之 join 保險"
+    },
+    {
+      "path": "tests/momentum/DataExtraction/test_search_download_pagination.py",
+      "function": "test_worker_logging_captures_dataloader_and_momentum_in_real_child",
+      "callee": "p.join",
+      "literal": "60",
+      "class": "C",
+      "reason": "並行測試 join／queue 之死鎖保險"
+    },
+    {
+      "path": "tests/momentum/DataExtraction/test_search_download_pagination.py",
+      "function": "test_worker_logging_captures_dataloader_and_momentum_in_real_child",
+      "callee": "q.get",
+      "literal": "5",
+      "class": "C",
+      "reason": "並行測試 join／queue 之死鎖保險"
+    },
+    {
+      "path": "tests/momentum/DataExtraction/test_search_download_pagination.py",
+      "function": "test_shared_loader_serializes_concurrent_downloads",
+      "callee": "t.join",
+      "literal": "10",
+      "class": "C",
+      "reason": "並行測試 join／queue 之死鎖保險"
+    },
+    {
+      "path": "tests/registry/test_testreg_recorder.py",
+      "function": "_parallel",
+      "callee": "p.communicate",
+      "literal": "120",
+      "class": "C",
+      "reason": "臨時 repo 微型 pytest（秒級）之掛住保險"
+    },
+    {
+      "path": "tests/test_phase_d_granular_control.py",
+      "function": "TestD1ConcurrentConfigWrite.test_concurrent_batch_toggle_no_crash",
+      "callee": "t.join",
+      "literal": "10",
+      "class": "C",
+      "reason": "並行設定讀寫之 join 死鎖保險"
+    },
+    {
+      "path": "tests/test_phase_d_granular_control.py",
+      "function": "TestD1ConcurrentConfigWrite.test_concurrent_config_read_write_no_corruption",
+      "callee": "t.join",
+      "literal": "10",
+      "class": "C",
+      "reason": "並行設定讀寫之 join 死鎖保險"
+    },
+    {
+      "path": "tests/test_phase_d_granular_control.py",
+      "function": "TestD1ResultContracts.test_concurrent_toggle_and_schema_return_per_call_results",
+      "callee": "t.join",
+      "literal": "60",
+      "class": "C",
+      "reason": "並行設定讀寫之 join 死鎖保險"
+    },
+    {
+      "path": "handoffs/run_receipts/govsuite_probes/run_chunk.sh",
+      "line": "echo \"PYTEST_RC=$rc ELAPSED=$(( $(date +%s) - start ))\" >> \"$LOG\"",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/govsuite_probes/run_nodes.sh",
+      "line": "echo \"PYTEST_RC=$rc ELAPSED=$(( $(date +%s) - start ))\" >> \"$LOG\"",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py",
+      "function": "main",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "D",
+      "reason": "定期取樣之間隔"
+    },
+    {
+      "path": "handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py",
+      "function": "_wait_for_guard",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "C",
+      "reason": "等守門子行程就緒／回收取樣執行緒之掛住保險"
+    },
+    {
+      "path": "handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py",
+      "function": "main",
+      "callee": "sampler.join",
+      "literal": "5",
+      "class": "C",
+      "reason": "等守門子行程就緒／回收取樣執行緒之掛住保險"
+    },
+    {
+      "path": "handoffs/run_receipts/probewinsor_probes/affected_chunk.sh",
+      "line": "echo \"${i}/${COUNT} ${f} rc=${rc} seconds=$(( $(date +%s) - t0 )) $(tail -1 \"${out}/${label}/${key}.log\" | tr -d '=')\" >> \"${progress}\"",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/probewinsor_probes/affected_run.sh",
+      "line": "echo \"${i}/35 ${f} rc=${rc} seconds=$(( $(date +%s) - t0 )) $(tail -1 \"${out}/${label}/${key}.log\" | tr -d '=')\" >> \"${progress}\"",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/b3/light_sweep.sh",
+      "line": "secs=$(( $(date +%s) - start ))",
+      "class": "D",
+      "reason": "只記錄耗時"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/test_testreg_gate_wiring.renamed_proposal.py",
+      "line": "current 中無紀錄之 caused nodeid 一律不吸收。編排：`Runner(out, max_seconds, total, ledger_dir=…)` 於每次 pytest 呼叫前",
+      "class": "D",
+      "reason": "封存之測試改名提案、不執行（不在 pytest testpaths）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/test_testreg_gate_wiring.renamed_proposal.py",
+      "line": "\"allowed_options\": (GATE + \" --out /tmp/x --max-seconds 3600 --timings a --timings b\", True),",
+      "class": "D",
+      "reason": "封存之測試改名提案、不執行（不在 pytest testpaths）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/test_testreg_gate_wiring.renamed_proposal.py",
+      "line": "\"max_seconds_twice\": (GATE + \" --max-seconds 1 --max-seconds 2\", False),",
+      "class": "D",
+      "reason": "封存之測試改名提案、不執行（不在 pytest testpaths）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "function": "_pytest",
+      "callee": "subprocess.run",
+      "literal": "timeout",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "function": "collect",
+      "callee": "_pytest",
+      "literal": "COLLECT_TIMEOUT_SECONDS",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "line": "except subprocess.TimeoutExpired as exc:",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "line": "跑太久也不知道也不允許」）：①同狀態指紋之結果檔沿用（中斷後接續不重跑）②已用時間逾 `max_seconds` 即不再開新呼叫、",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "line": "def __init__(self, out: Path, max_seconds: Optional[float], total: int, ledger_dir: Optional[Path] = None):",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "line": "self.out, self.max_seconds, self.total = out, max_seconds, total",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "function": "Runner.run",
+      "callee": "time.monotonic",
+      "literal": "",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "line": "raise Paused(f\"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}\")",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "line": "ap.add_argument(\"--max-seconds\", type=float, default=3600.0,",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/framepath_affected_gate.phase2_minimal_wiring.py",
+      "function": "main",
+      "callee": "Runner",
+      "literal": "",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/testreg.py",
+      "line": "testreg.py [--repo R] run --manifest M --phase N --base <rev> --receipt P [--out D] [--max-seconds S]",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/testreg.py",
+      "line": "max_seconds: float = 3600.0) -> int:",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/testreg.py",
+      "line": "`framepath_affected_gate.Runner`（分段、`max_seconds` 用盡於呼叫之間停下回 3、同指紋沿用、progress.json）；非綠",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg_probes/trial_impl/scripts/testreg.py",
+      "line": "p.add_argument(\"--max-seconds\", type=float, default=3600.0)",
+      "class": "D",
+      "reason": "封存、不執行（SPEC Task 0.2 邊界）"
+    },
+    {
+      "path": "config/ic_config.yaml",
+      "line": "timeout_overrides: {}",
+      "class": "D",
+      "reason": "空設定欄，僅 schema 宣告（momentum/Analysis/ic_config_schema.py:365），無程式讀取"
+    },
+    {
+      "path": "frontend/playwright.config.ts",
+      "line": "timeout: 120_000,",
+      "class": "B",
+      "reason": "e2e 測試工具等瀏覽器外部事件（SPEC Task 0.2：歸 B）"
+    },
+    {
+      "path": "frontend/playwright.config.ts",
+      "line": "actionTimeout: 30_000,",
+      "class": "B",
+      "reason": "e2e 測試工具等瀏覽器外部事件（SPEC Task 0.2：歸 B）"
+    },
+    {
+      "path": "frontend/playwright.config.ts",
+      "line": "navigationTimeout: 60_000,",
+      "class": "B",
+      "reason": "e2e 測試工具等瀏覽器外部事件（SPEC Task 0.2：歸 B）"
+    },
+    {
+      "path": "frontend/src/app/search/eventExportByEventId.test.tsx",
+      "line": "await waitFor(() => expect(blobs.length > 0 || alertCalls.length > 0).toBe(true), { timeout: 5000 });",
+      "class": "B",
+      "reason": "前端測試工具 waitFor 等 DOM 事件（同 e2e 等待）"
+    },
+    {
+      "path": "frontend/src/app/strategy-demo/page.tsx",
+      "line": "Date.now() - 30 * 24 * 60 * 60 * 1000",
+      "class": "D",
+      "reason": "計算日期區間（現在減 N 天），非期限"
+    },
+    {
+      "path": "frontend/src/app/strategy-test/page.tsx",
+      "line": "const startTime = parseDateToTimestamp(state.dateRange.start, Date.now() - 7 * 24 * 60 * 60 * 1000);",
+      "class": "D",
+      "reason": "計算日期區間（現在減 N 天），非期限"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/FeatureTable.tsx",
+      "line": "const serverSortAbortRef = useRef<AbortController | null>(null);",
+      "class": "D",
+      "reason": "AbortController 用於取消過時之排序請求，非時間"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/FeatureTable.tsx",
+      "line": "const ctrl = new AbortController();",
+      "class": "D",
+      "reason": "AbortController 用於取消過時之排序請求，非時間"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/RunManagerPanel.tsx",
+      "line": "const diffMs = Date.now() - date.getTime();",
+      "class": "D",
+      "reason": "顯示相對時間，非期限"
+    },
+    {
+      "path": "frontend/src/components/feature-factory/__tests__/BatchProgressPanel.test.tsx",
+      "line": "batchStartedAtMs: Date.now() - 10_000,",
+      "class": "D",
+      "reason": "測試資料之開始時間，非期限"
+    },
+    {
+      "path": "frontend/src/hooks/useICAnalysis.ts",
+      "line": "const summaryAbortRef = useRef<AbortController | null>(null);",
+      "class": "D",
+      "reason": "AbortController 用於換任務時丟棄舊世代請求，非時間"
+    },
+    {
+      "path": "frontend/src/hooks/useICAnalysis.ts",
+      "line": "const detailAbortRef = useRef<AbortController | null>(null);",
+      "class": "D",
+      "reason": "AbortController 用於換任務時丟棄舊世代請求，非時間"
+    },
+    {
+      "path": "frontend/src/hooks/useICAnalysis.ts",
+      "line": "const controller = new AbortController();",
+      "class": "D",
+      "reason": "AbortController 用於換任務時丟棄舊世代請求，非時間"
+    },
+    {
+      "path": "frontend/src/lib/api.ts",
+      "line": "timeout: number = 30000  // 30秒超時",
+      "class": "B",
+      "reason": "前端互動請求逾時（SPEC Task 0.2：前端互動請求逾時歸 B）"
+    },
+    {
+      "path": "frontend/src/lib/api.ts",
+      "line": "const controller = new AbortController();",
+      "class": "B",
+      "reason": "前端互動請求逾時（SPEC Task 0.2：前端互動請求逾時歸 B）"
+    },
+    {
+      "path": "frontend/src/lib/errorHandler.ts",
+      "line": "maxRetries?: number;",
+      "class": "B",
+      "reason": "網路錯誤之重試次數（等外部）"
+    },
+    {
+      "path": "frontend/src/lib/errorHandler.ts",
+      "line": "const { maxRetries = 3, retryDelay = 1000, onRetry } = options;",
+      "class": "B",
+      "reason": "網路錯誤之重試次數（等外部）"
+    },
+    {
+      "path": "frontend/src/lib/errorHandler.ts",
+      "line": "for (let attempt = 1; attempt <= maxRetries; attempt++) {",
+      "class": "B",
+      "reason": "網路錯誤之重試次數（等外部）"
+    },
+    {
+      "path": "frontend/src/lib/errorHandler.ts",
+      "line": "if (attempt === maxRetries) {",
+      "class": "B",
+      "reason": "網路錯誤之重試次數（等外部）"
+    },
+    {
+      "path": "frontend/src/lib/errorHandler.ts",
+      "line": "maxRetries = 3,",
+      "class": "B",
+      "reason": "網路錯誤之重試次數（等外部）"
+    },
+    {
+      "path": "frontend/src/lib/errorHandler.ts",
+      "line": "? await withRetry(fn, { maxRetries })",
+      "class": "B",
+      "reason": "網路錯誤之重試次數（等外部）"
+    },
+    {
+      "path": "frontend/src/store/featureFactoryStore.ts",
+      "line": "const elapsedSeconds = startedAtMs ? Math.max(0, Math.round((Date.now() - startedAtMs) / 1000)) : 0;",
+      "class": "D",
+      "reason": "顯示已耗時，非期限"
+    }
   ]
 }
