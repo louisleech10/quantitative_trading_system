@@ -12,7 +12,7 @@
   ],
   "wrapped": [
     {"id": "pytest_heavy", "regex": "pytest\\b.*\\b(test_ffprod_gate|test_ffprod_winsor_provenance|test_numview_acceptance|test_numview_core|test_numview_identity|test_numview_policy|test_failopen_correctness|test_failopen_contract|test_failopen_layers|test_preprov_contract::test_verification_03|test_icfirstalign_memory)\\b"},
-    {"id": "pytest_full_suite", "regex": "pytest(\\s+(-[kmpocn]\\s+\\S+|-\\S+|tests(/governance)?/?))*\\s*$", "_doc": "無參數或只帶選項／tests、tests/governance 目錄之 pytest（b1 審碼 r1 CODEX-R1-P1-05：帶選項之全套亦算）"},
+    {"id": "pytest_full_suite", "regex": "pytest(\\s+(-[kmpocn]\\s+\\S+|-\\S+|(\\./)?tests(/governance)?/?(\\./?)?|\\./?))*\\s*$", "_doc": "無參數或只帶選項／tests、tests/governance 目錄（含 ./ 前綴與 /. 尾綴別名）之 pytest（b1 審碼 r1 CODEX-R1-P1-05、r2 CODEX-R2-P1-01）"},
     {"id": "testsel_full", "regex": "scripts/testsel\\.py\\s+full\\b"},
     {"id": "gov_check_full", "regex": "scripts/gov_check\\.sh\\s+--no-probe"},
     {"id": "feature_generation_cli", "regex": "scripts/(generate_features|run_feature_factory)\\.py"},

@@ -42,6 +42,9 @@ WRAP = "venv/bin/python scripts/run_watched.py --log /tmp/x.log -- "
     ("venv/bin/python -m pytest -q", True, 2),  # 無參數全套
     ("venv/bin/python -m pytest tests -x -q", True, 2),  # 帶選項之全套（b1 審碼 r1 CODEX-R1-P1-05）
     ("venv/bin/python -m pytest -q -p no:cacheprovider tests/governance", True, 2),
+    ("venv/bin/python -m pytest ./tests -q", True, 2),  # 路徑別名（b1 審碼 r2 CODEX-R2-P1-01）
+    ("venv/bin/python -m pytest tests/. -q", True, 2),
+    ("venv/bin/python -m pytest . -q", True, 2),
     ("venv/bin/python -m pytest -k watchdog tests/feature_engineering/test_numview_criteria.py -q", False, 0),
     # 委員派工：須背景
     ("bash scripts/committee_run.sh --session s brief out codex,composer", False, 2),
