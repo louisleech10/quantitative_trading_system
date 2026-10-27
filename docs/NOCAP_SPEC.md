@@ -1,6 +1,6 @@
 # NOCAP 全專案移除運算時間上限、卡死以進度判定並留現場 — SPEC
 
-> 版本：v2（2026-10-27；規格審查 r1 處置，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r1/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
+> 版本：v3（2026-10-27；規格審查 r1、r2 處置，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r{1,2}/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（跨 scripts／momentum／api／tests 與共用監看；多 phase）。
@@ -26,10 +26,10 @@
 ## §B 驗證運算預算
 | id | 重型跑 | 獨有覆蓋路徑 | 規模 | 估時與依據 | 沿用來源 |
 |---|---|---|---|---|---|
-| NOCAP-BUDGET-1 | Task 5.1 §G 基準凍結（現行碼、時間預算足夠） | 負對照未縮減路徑之逐值基準 | 既有負對照測試之真實資料輸入（Task 5.1 動工前定檔） | 數分鐘：`ic_filter_orchestrator.py:5110` 註解「乾淨資料 0.5s/次（50 次＝26s）」、預設 `negative_control_n: int = 50`（`ic_config_schema.py:81`）；動工前以估時收據實測 | 無 |
-| NOCAP-BUDGET-2 | Task 5.1 改後兩次（注入快／慢耗時） | 次數固定與機器快慢無關 | 同 NOCAP-BUDGET-1 | 同 NOCAP-BUDGET-1 之兩倍 | 無 |
+| NOCAP-BUDGET-1 | Task 5.1 §G 基準凍結（現行碼、時間預算足夠） | 負對照未縮減路徑之逐值基準 | 既有負對照測試之真實資料輸入（Task 5.1 動工前定檔） | 每次約 26–200 秒（推算，未實測：`ic_filter_orchestrator.py:5110-5111` 註解「乾淨資料 0.5s/次（50 次＝26s）」「10% NaN 時 ~4s/次 ⇒ 50 次約 200s」、預設 `negative_control_n: int = 50`〔`ic_config_schema.py:81`〕；所用輸入之 NaN 比例須於 Task 5.1 定檔後才知，故動工前以估時收據實測、據實更新本列） | 無 |
+| NOCAP-BUDGET-2 | Task 5.1 改後兩次（注入快／慢耗時） | 次數固定與機器快慢無關 | 同 NOCAP-BUDGET-1 | 同 NOCAP-BUDGET-1 之兩倍（推算，同上） | 無 |
 | NOCAP-BUDGET-3 | 全票完工前之受影響測試（`docs/TEST_SELECTION.md` §4） | 各 Phase 改動之既有測試回歸 | 依選取結果 | 全票完工前以選取結果估時、逾 2 小時先報 | 依賴未變者沿用上次通過 |
-- 其餘驗證皆為注入時鐘／注入狀態之單元測試（秒級），不屬重型跑。NOCAP-BUDGET-1、-2 合計 < 2 小時；NOCAP-BUDGET-3 於全票完工前另估。
+- 其餘驗證皆為注入時鐘／注入狀態之單元測試（秒級），不屬重型跑。NOCAP-BUDGET-1、-2 依上列推算合計約 1.5–10 分鐘（未實測，動工前之估時收據為準）；NOCAP-BUDGET-3 之具體節點取決於各 Phase 實際改動，施工前無從列舉，於全票完工前以 `docs/TEST_SELECTION.md` 選取結果逐節點列入估時收據，合計逾 2 小時先報並附不降驗證之省法。
 
 ## §G Golden / Baseline
 - 適用：Task 5.1（負對照置換次數，RISK-HIT d）。其餘 Task 不改數值。
@@ -48,7 +48,7 @@
 
 **Task 0.2 — 時間上限登記檔與掃描測試**
 - 目標：`scripts/timeout_registry.json` 逐處登記 repo 內每個逾時／期限機制（檔:符號、類別 B／C／D、理由、上限值來源）；A 類（依牆鐘停止或縮減運算）不得出現。
-- 改法：新測試 `tests/registry/test_timeout_registry.py` 以 AST＋文字掃描 `scripts/ momentum/ api/ tests/ handoffs/run_receipts/*_probes/` 之逾時樣式（`timeout=`、`wait_for(`、`result(timeout=`、`signal.alarm`、`deadline`、`max_seconds`、`wall_cap`、`time.time() - … >`、`monotonic() - … >` 之比較），每處須在登記檔且類別非 A；登記檔中已不存在之項目亦紅（防漂移）。
+- 改法：新測試 `tests/registry/test_timeout_registry.py` 以 AST＋文字掃描 `scripts/ momentum/ api/ tests/ handoffs/run_receipts/*_probes/` 之逾時樣式（`timeout=`、`wait_for(`、`result(timeout=`、`signal.alarm`、`deadline`、`max_seconds`、`wall_cap`、`time.time() - … >`、`monotonic() - … >` 之比較），另以文字掃描 `config/`（YAML／JSON 之 `timeout`、`deadline`、`*_seconds` 鍵，如 `config/optimization_config.yaml:59` `timeout: 300`）與 `frontend/src/`（`AbortController`、`AbortSignal.timeout`、請求設定之 `timeout:`、`setTimeout(` 內呼叫 `abort`）；前端互動請求逾時歸 B、輪詢間隔與 debounce 歸 D、會中止後端運算者歸 A。每處須在登記檔且類別非 A；登記檔中已不存在之項目亦紅（防漂移）。
 - **驗證**：`pytest tests/registry/test_timeout_registry.py` 全綠；mutation：於 `scripts/ffprod_measure.py` 加 `subprocess.run(cmd, timeout=60)` ⇒ 紅；刪登記檔任一列 ⇒ 紅；登記一個 repo 已不存在之檔:符號 ⇒ 紅。
 - **邊界**：封存副本（`numview_freeze_seam/run{1,2}_*`、`testreg_probes/trial_impl/*`）登記為 D「封存、不執行」；字串型命中（設定說明、log 文字）登記 D。
 - **存活至**：永久。　**覆蓋風險**：無。
@@ -56,7 +56,7 @@
 
 **Task 0.2b — 寫碼當下擋新增時間上限（產出端，使用者 2026-10-27「你能確保在此專案每次都會用到嗎? 不然你可能自己手動加上時間限制，或根本不用做好的共用監看?」）**
 - 目標：任何 Edit／Write 寫入之新內容含逾時／期限樣式而不在 `scripts/timeout_registry.json` 白名單 ⇒ 寫入當下擋下（不等測試）。
-- 改法：PreToolUse hook `scripts/timeout_write_guard.sh`（掛 `.claude/settings.json` 之 Edit／Write／MultiEdit）只掃本次新增之文字（Edit 之 new_string 相對 old_string 之增量、Write 之新檔對既有檔之增量），樣式與 Task 0.2 掃描測試共用同一份樣式定義（`scripts/timeout_patterns.json`，單一真相源）；命中且非白名單 ⇒ rc=2 並印登記方法與「長運算不得登記」規則。白名單只收 B／C／D 類且每列附理由；A 類（依牆鐘停止或縮減運算）不可登記（登記檔 schema 拒收）。②白名單之比對單位＝精確呼叫，非路徑＋子字串：Python 列綁 `path`＋所在函式全名（AST，模組層為 `<module>`）＋被呼叫者（如 `subprocess.run`）＋逾時參數之字面值；shell 列綁 `path`＋去頭尾空白後之整行相等。新增之呼叫任一欄不符 ⇒ 擋（同檔另一函式重用已登記之 `timeout=5` 不放行）。③Bash 寫檔路徑：同一 hook 另掛 Bash——以重導向（`>`／`>>`）、`tee`、`sed -i`、`perl -i` 寫入受管程式檔（`.py`／`.sh`）⇒ 擋並要求改用 Edit（CLAUDE.md 既有「改檔一律用 Edit」）；其餘寫檔方式（執行之腳本自寫檔、`git apply`、他 agent、他工具）由 pre-commit 對暫存差異之新增行跑同一掃描（秒級）攔下，並為 Task 0.2 測試期掃描之前哨。
+- 改法：PreToolUse hook `scripts/timeout_write_guard.sh`（掛 `.claude/settings.json` 之 Edit／Write／MultiEdit）只掃本次新增之文字（Edit 之 new_string 相對 old_string 之增量、Write 之新檔對既有檔之增量），樣式與 Task 0.2 掃描測試共用同一份樣式定義（`scripts/timeout_patterns.json`，單一真相源）；命中且非白名單 ⇒ rc=2 並印登記方法與「長運算不得登記」規則。白名單只收 B／C／D 類且每列附理由；A 類（依牆鐘停止或縮減運算）不可登記（登記檔 schema 拒收）。②白名單之比對單位＝精確呼叫，非路徑＋子字串：Python 列綁 `path`＋所在函式全名（AST，模組層為 `<module>`）＋被呼叫者（如 `subprocess.run`）＋逾時參數之字面值；shell 列綁 `path`＋去頭尾空白後之整行相等。新增之呼叫任一欄不符 ⇒ 擋（同檔另一函式重用已登記之 `timeout=5` 不放行）。③Bash 寫檔路徑：同一 hook 另掛 Bash——以重導向（`>`／`>>`）、`tee`、`sed -i`、`perl -i` 寫入受管程式檔（`.py`／`.sh`）⇒ 擋並要求改用 Edit（CLAUDE.md 既有「改檔一律用 Edit」）；其餘寫檔方式（執行之腳本自寫檔、`git apply`、產生器、他 agent、他工具）由 pre-commit 攔下：對每個暫存之 `.py`／`.sh`／`config/`／`frontend/src/` 檔讀暫存區內容（`git show :<path>`，非只差異片段）跑與 Task 0.2 同一掃描器，未登記之逾時呼叫 ⇒ 拒提交。各寫入路徑之攔截時點：Claude 之 Edit／Write／Bash ＝寫入當下；其他工具與 agent ＝提交當下（業界 pre-commit 常規；任意工具之寫入無從於寫入當下攔截）；全庫＝測試期（Task 0.2）。pre-commit 掃描之耗時於施工時以本 repo 代表性提交（數檔、數百行差異）實測寫收據，逾 2 秒即改為只掃差異所在函式並重測。
 - **驗證**：`tests/governance/test_timeout_write_guard.py`：Edit 新增 `subprocess.run(cmd, timeout=600)` 於 `scripts/` ⇒ rc=2；新增 `asyncio.wait_for(x, timeout=30)` ⇒ rc=2；改動既有已登記行之其他字 ⇒ rc=0；新增白名單已登記之 B 類（如 Binance HTTP 逾時）⇒ rc=0；於 `_watchdog.py` 非登記函式新增 `subprocess.run(["long_job"], timeout=5)`（與已登記 C 類同字面）⇒ rc=2；Bash `printf '%s\n' 'subprocess.run(cmd, timeout=60)' >> scripts/x.py` ⇒ rc=2；Bash `sed -i '' 's/a/b/' scripts/x.py` ⇒ rc=2；暫存差異新增未登記逾時行之 commit ⇒ pre-commit rc≠0；登記檔加 A 類列 ⇒ schema 拒收 rc=1；hook 單次耗時 < 1 秒、pre-commit 掃描 < 2 秒。
 - **邊界**：hook stdin 讀不到 ⇒ 擋（寫入類 fail-closed，與一般命令不同）；非 Python／shell 檔（.md 說明文字）⇒ 不掃；字串中出現樣式（log 文字）⇒ 以 AST 判斷是否為實際呼叫，非呼叫者放行；Bash 寫入非程式檔（log、收據 JSON）⇒ 放行。
 - **存活至**：永久。　**覆蓋風險**：無。
@@ -67,14 +67,16 @@
 - 清單涵蓋：`scripts/heavy_commands.json` 須涵蓋 §C 與 Phase 1–6 所列、及盤點收據 A 類之**每個可執行入口**（含 `scripts/ic1eb_b5_replay.py`、`scripts/capture_ic1eb_baseline.py`、`scripts/ic1c_freeze_baseline.py`、`tests/golden/ic_phase1_contract/freeze_baseline.py`、`tests/golden/ic_phase1_1a_cut1/freeze_baseline{,_new}.py`、`scripts/measure_ic_footprint.sh`、`scripts/verify_l1_warmup_requirements.py`、`scripts/framepath_affected_gate.py`、`scripts/cx_run.sh`）；入口於對應 Phase 改經共用監看前歸 `wrapped`（須經 `run_watched.py`），改後歸 `self_watched`（原始碼機械對證）。
 - 改法：PreToolUse hook `scripts/heavy_run_guard.sh`（掛 `.claude/settings.json` 之 Bash）比對命令與 `scripts/heavy_commands.json`（封閉清單）；命中而（該命令未經 `scripts/run_watched.py` 包裝或 `tool_input.run_in_background` 非 true）⇒ 擋並提示改法。`scripts/run_watched.py`（新建）以共用監看包任意命令、印 `[run-watched] start|progress|stalled|exit` 行。比對對象＝依 shell 語法拆出之**執行位置**命令（分隔符 `;`／`&&`／`||`／`|`／`&`／`(`／`)`／換行；去重導向、前置環境變數與 env／nohup／time 等前綴；啟動器 python*／pytest／bash／sh／zsh／source 與直接執行之 `.sh`；`bash -c`、`eval` 只看內層字串；`xargs`、`parallel`、`find -exec／-execdir` 取其所啟動之內層命令遞迴判定；命令位置為未解析變數（`$X`、`${X}`）或含反引號 ⇒ 以該命令之 argv 全文比對（保守）；`case` 分支樣式非命令），`ls`／`grep`／`pgrep`／`echo` 之參數與腳本內註解、字串不算；包裝只認該命令本身經 `run_watched.py`（同列他段提到不算）。②移除 `.claude/settings.json` 之 `bash scripts/block_busywait.sh` 掛載（9bfcb587 掛上、腳本從未入版控、實跑 rc=127 之空殼）；治理測試斷言 settings 每個 hook 指令所指之 repo 腳本皆存在。③`AGENTS.md`、`.cursorrules` 各增執行端合約一行（§C 適用範圍）。
 - **驗證**：`tests/governance/test_heavy_run_guard.py`：重型命令直跑 ⇒ rc=2；經 `scripts/run_watched.py` 但前景 ⇒ rc=2；經包裝且背景 ⇒ rc=0；非重型命令 ⇒ rc=0；非執行位置提到重型命令（`pgrep 'pytest|…'`、`echo`、`grep` 樣式、執行之腳本內註解／字串／`case` 樣式、`ls | xargs grep pytest`）⇒ rc=0；分隔符、前置變數、`bash -c`、多行、子殼、管線中之重型命令 ⇒ rc=2；`printf x | xargs -I{} venv/bin/python -m pytest -q`、`find . -name x -exec venv/bin/python -m pytest -q \;`、`eval "venv/bin/python -m pytest -q"`、`$PY -m pytest -q`（背景、未包裝）⇒ rc=2；清單涵蓋：上列每個入口直跑前景 ⇒ rc=2（逐入口參數化）；hook 單次耗時 < 1 秒。
-- **邊界**：命令經 `bash handoffs/run_receipts/.<票>-*.sh` 間接執行 ⇒ 讀腳本內容以同法拆解比對（遞迴一層、參數代入）；引號不成對無從拆解 ⇒ 退回全文比對（保守）；hook stdin 讀不到 ⇒ 重型樣式無從判定 ⇒ 擋（fail-closed）。不涵蓋：二層以上 `.sh` 間接、已啟動之腳本於執行期自行啟動之子行程（含 SPEC ASSERT 行經 `template_check.sh` `TEMPLATE_CHECK_EXEC=1` 執行者）——屬執行期行為，由該腳本自身經共用監看（`self_watched` 之原始碼對證）與審碼必查項涵蓋。
+- **邊界**：命令經 repo 內 `.sh` 間接執行 ⇒ 讀腳本內容以同法拆解比對（參數代入），遞迴至不再出現新的 `.sh`；深度上限 5，逾限 ⇒ 擋（fail-closed，提示改經 `run_watched.py`）；引號不成對無從拆解 ⇒ 退回全文比對（保守）；hook stdin 讀不到 ⇒ 重型樣式無從判定 ⇒ 擋（fail-closed）。執行期子行程（已啟動之 Python 腳本以 `subprocess` 啟動者，含 SPEC ASSERT 行經 `template_check.sh` `TEMPLATE_CHECK_EXEC=1` 執行者）非命令列可見，不由本閘判定：父行程經共用監看時，監看之對象即**整個子行程樹**（`_watchdog.py` 卡死判定取「子行程樹 CPU」、留現場向子行程樹送信號）⇒ 子行程自動在監看下；會啟動重型子行程之 Python 驅動腳本本身須列入清單（`self_watched` 須原始碼確有 `run_watched(` 呼叫，否則 `wrapped`；審碼必查）。
+- **驗證（遞迴）**：兩層 `.sh`（`outer.sh` → `inner.sh` → `venv/bin/python -m pytest -q`）前景 ⇒ rc=2；六層 `.sh` ⇒ rc=2（逾限擋）；兩層而內層只 `echo` 重型字樣 ⇒ rc=0。
 - **存活至**：永久。　**覆蓋風險**：無。
 - 不可做：hook 不得超過秒級。
 
 **Task 0.3b — 全規模重型跑前須有成長曲線收據（使用者 2026-10-27「軟體和量化業界會這樣直接測大規模到崩潰？你不是保證用業界做法？」）**
 - 目標：業界逐步放大——全規模之前先於小、中規模實測耗時與峰值記憶體、得成長曲線與全規模推算，確認可行才跑全規模。`scripts/heavy_commands.json` 之重型項目增欄 `scale_receipt`（收據路徑樣式）；`heavy_run_guard` 於下指令時查：對應收據存在、含 ≥ 3 個規模點（每點之欄數或列數、秒數、峰值 RSS）、全規模推算值、且其程式碼態雜湊等於現行碼；缺或過期 ⇒ 擋。
 - 改法：新增 `scripts/scale_probe.py`（以同一入口、同一真實資料取子集跑 3 個規模點並擬合，寫收據 `handoffs/run_receipts/<日期>-<目標>-scale.json`）；探針本身經共用監看、背景執行。
-- **收據身分（0.3b／0.3c／0.4 三種收據共用，`heavy_run_guard` 只接受逐欄相等）**：`identity`＝{`entrypoint`（repo 路徑）、`target_argv`（本收據所授權之完整 argv）、`code_sha256`（`entrypoint` 與清單規則必填之 `code_paths` 各檔 git blob 雜湊依路徑排序串接之 sha256）、`data`（每個輸入檔 {path, size, sha256}；sha256 以 (path, size, mtime_ns) 快取）、`config_sha256`（入口所讀設定檔內容）、`hardware`（CPU 型號、核數、RAM、OS）、`producer`、`created_at`}。任一欄與下指令當下不符 ⇒ 收據失配、擋。
+- **收據身分 `identity`（0.3b／0.3c／0.4 三種收據共用）**：`identity` 分兩部分——比對欄 `match`＝{`entrypoint`（repo 路徑）、`target_argv`（本收據所授權之 argv，以 `shlex.join` 正規化、repo 內路徑轉相對路徑）、`code_sha256`（`entrypoint` 與清單規則必填之 `code_paths` 各檔**工作樹實際內容**之 `git hash-object` 依路徑排序串接之 sha256——含未提交改動）、`data`（每個輸入檔 {path, size, sha256}；sha256 以 (path, size, mtime_ns) 快取）、`config_sha256`（入口所讀設定檔內容）、`hardware`（CPU 型號、核數、RAM、OS；三種收據皆為耗時／記憶體量測，硬體不同即不可沿用）}；紀錄欄 `meta`＝{`producer`、`created_at`}，不參與比對。`heavy_run_guard` 於下指令當下重算 `match` 各欄，任一欄不等 ⇒ 收據失配、擋；只有 `meta` 不同 ⇒ 可沿用。
+- **驗證（身分）**：`code_paths` 某檔工作樹改一行未提交 ⇒ 失配 rc=2；換 `target_argv` 一個參數 ⇒ rc=2；只改 `meta.created_at` ⇒ rc=0；輸入檔內容改一位元組（size 不變）⇒ rc=2。
 - **成長曲線收據**（`-scale.json`）：`points` ≥ 3，每點 {`scale`（列數或欄數）、`unit`、`seconds`、`peak_rss_bytes`}（單次 < 60 秒者跑 3 次取中位數，否則 1 次）；`fit` {`model`=冪次、`exponent`、`r2`}；`projection` {`scale`、`seconds`、`peak_rss_bytes`}；`superlinear`（`exponent` > 1.2）。
 - **驗證**：`tests/governance/test_heavy_run_guard.py` 增案：無收據 ⇒ rc=2；收據只 2 點 ⇒ rc=2；收據碼態雜湊不符 ⇒ rc=2；3 點且推算存在 ⇒ rc=0；`scripts/scale_probe.py` 對 3 點寫出之推算與注入之線性耗時誤差 < 5%。
 - **邊界**：目標本身無法縮小規模（例：單一固定格之凍結）⇒ 清單標 `scale_exempt` 並寫理由（審碼必查）；推算為超線性 ⇒ 收據標記並印出，由主委報使用者後再跑。
@@ -139,8 +141,8 @@
 - **邊界**：ADF 拋例外 ⇒ 照既有錯誤處理記錄（不變）；單一欄全 NaN ⇒ 照既有跳過規則（不變）。
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不改 ADF 參數。
 
-**Task 5.3 — 長運算服務改背景工作＋進度**：`model_enhancement_service.py`（`asyncio.wait_for` 逾時後執行緒仍在跑、結果丟棄）、`ic_analysis_service.py` 掃描網格之逐格／全網格期限：改為背景工作至完成、逐步回報進度、可由使用者取消；HTTP 請求不等待運算（立即回工作 ID）。工作紀錄：狀態機 `queued→running→{completed,failed,cancelled,interrupted}`，每次狀態變更與結果原子寫入檔案（現為行程內 dict：`model_enhancement_service.py:66`、`ic_analysis_service.py:523`）；API 啟動時讀回紀錄，未終態者標 `interrupted`（附原因），同 task_id 可查得明確狀態並可重送。本機單行程研究平台不承諾重啟後續跑（續跑需分散式工作佇列，非本票範圍）。`api/routes/feature_browser.py` 之請求逾時屬互動服務契約 ⇒ 運算改快取＋背景計算，請求逾時保留並登記 B（理由：互動請求延遲上限，非運算上限，逾時不中止運算）。
-- **驗證**：`tests/api/test_nocap_background_jobs.py`：長運算請求（注入 5 秒）於 1 秒內回工作 ID；完成後結果可取且等於同步計算之結果（`==`）；取消後工作狀態＝cancelled；工作執行中以新服務實例（同紀錄目錄）模擬 API 重啟 ⇒ 原 task_id 狀態＝interrupted、已完成者結果可取且 `==` 原結果；`grep -rn "scan_cell_timeout\|skipped_reason=\"timeout\"" api momentum` 計數＝0。
+**Task 5.3 — 長運算服務改背景工作＋進度**：`model_enhancement_service.py`（`asyncio.wait_for` 逾時後執行緒仍在跑、結果丟棄）、`ic_analysis_service.py` 掃描網格之逐格／全網格期限：改為背景工作至完成、逐步回報進度、可由使用者取消；HTTP 請求不等待運算（立即回工作 ID）。工作紀錄：狀態機 `queued→running→{completed,failed,cancelled,interrupted}`，每次狀態變更與結果原子寫入檔案（現為行程內 dict：`model_enhancement_service.py:66`、`ic_analysis_service.py:523`）；API 啟動時讀回紀錄，未終態者標 `interrupted`（附原因），同 task_id 可查得明確狀態並可重送。進度欄 `progress`＝{`phase`、`processed`、`total`、`updated_at`} 隨工作推進原子寫入紀錄檔；`processed` 不減、`updated_at` 每次推進更新；查詢 API 回傳之；服務端不依 `updated_at` 自動終止工作（卡死屬程式缺陷，使用者由 `updated_at` 停滯判斷後可取消）。本機單行程研究平台不承諾重啟後續跑（續跑需分散式工作佇列，非本票範圍）。`api/routes/feature_browser.py` 之請求逾時屬互動服務契約 ⇒ 運算改快取＋背景計算，請求逾時保留並登記 B（理由：互動請求延遲上限，非運算上限，逾時不中止運算）。
+- **驗證**：`tests/api/test_nocap_background_jobs.py`：長運算請求（注入 5 秒）於 1 秒內回工作 ID；完成後結果可取且等於同步計算之結果（`==`）；取消後工作狀態＝cancelled；工作執行中以新服務實例（同紀錄目錄）模擬 API 重啟 ⇒ 原 task_id 狀態＝interrupted、`progress` 為重啟前最後寫入值、已完成者結果可取且 `==` 原結果；注入 5 步之工作 ⇒ 輪詢所得 `processed` 序列不減、完成前至少一次 0 < `processed` < `total`、`updated_at` 嚴格遞增；取消後 `progress` 保留取消當下之值；model_enhancement 與 IC 服務各一組；`grep -rn "scan_cell_timeout\|skipped_reason=\"timeout\"" api momentum` 計數＝0。
 - **邊界**：前端輪詢中斷 ⇒ 工作照跑、結果保留；API 重啟 ⇒ 未終態工作標 interrupted（不續跑）。
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不改各分析之計算內容。
 
