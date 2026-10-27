@@ -186,7 +186,8 @@ No hardcoded symbols, prices, or metrics.
 - 使用者之裁定與原則通用整條量化主線，不只限提出當時那票。
 - 2026-10-14 原話：「你跟委員不要摳細節」「就用主流軟體業界和量化金融的模式和規則就好了啊」——測試與治理照主流業界做法；量化金融本即從嚴處（look-ahead／PIT、資料正確、回測與 IC 統計、真實資料驗證）照業界從嚴。
 - 引用使用者只用「」放逐字原話；自己的歸納標「我的判斷」。
-- 機械提醒：`scripts/self_verify_check.sh`（Stop 與產出端 PostToolUse）；委員每輪依 `templates/COMMITTEE_FINDING_TEMPLATE.md` 首節第三項審。
+- 2026-10-28 原話（ICPERF 提問三點後）：「以上這樣的概念不只是在這一票，泛指整個專案，還要加上是否有做法和計算是否有對齊軟體和量化業界」——四項平衡要主動找更快／更省／更準／更小之機會（不是不比現況差就不做）；全規模須在本機以平衡解於可接受時間跑完（大機器另驗更快算法）；「改後等於改前」之外須以業界標準函式庫獨立驗證現行值本身正確；做法與計算須對齊主流軟體與量化業界。
+- 機械提醒：`scripts/self_verify_check.sh`（Stop 與產出端 PostToolUse，含【全專案四問】）；委員每輪依 `templates/COMMITTEE_FINDING_TEMPLATE.md` 首節第三項與第 7 項審。
 
 ### Validate Assumptions Before Acting（實測 > 假設）
 1. 明確說出假設 2. 最便宜驗證（grep/讀檔/載入資料）3. 先驗證再 code 4. 證據推翻計劃→停下更新。出處與事故敘事見 `docs/SCAR_LEDGER.md`。
