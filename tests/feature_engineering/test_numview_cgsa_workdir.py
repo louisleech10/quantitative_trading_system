@@ -61,8 +61,6 @@ from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.run_lifecycle import RunLifecycleManager
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = pytest.mark.timeout(600)
-
 RAW: Dict[str, Any] = json.loads(nv.CONTRACT_PATH.read_text(encoding="utf-8"))
 EMPTY = "<契約未填>"
 #: SPEC Task 0.2／D7 點名之 output_only 鍵（CGSA 工作目錄根）

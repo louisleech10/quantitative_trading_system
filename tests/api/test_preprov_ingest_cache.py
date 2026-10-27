@@ -43,8 +43,6 @@ from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = pytest.mark.timeout(2400)
-
 REPO = Path(__file__).resolve().parents[2]
 CONTRACT: Dict[str, Any] = json.loads(rp.CONTRACT_PATH.read_text(encoding="utf-8"))
 IDENTITY_KEYS: List[str] = list(CONTRACT["run_identity_keys"])

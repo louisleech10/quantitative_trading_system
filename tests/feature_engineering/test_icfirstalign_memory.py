@@ -26,8 +26,6 @@ import pytest
 from momentum.FeatureEngineering import memory_budget as mb
 from tests.feature_engineering import icfirstalign_helpers as h
 
-pytestmark = pytest.mark.timeout(1800)
-
 C = h.CONTRACT
 B = C["budget"]
 MSG = C["budget_messages"]

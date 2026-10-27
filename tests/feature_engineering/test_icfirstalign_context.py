@@ -18,8 +18,6 @@ from momentum.FeatureEngineering import ic_first_context as icc
 from momentum.FeatureEngineering.feature_factory import FeatureFactory
 from tests.feature_engineering import icfirstalign_helpers as h
 
-pytestmark = pytest.mark.timeout(900)
-
 W1: Tuple[str, str] = ("2025-07-01", "2026-01-31")
 W2: Tuple[str, str] = ("2025-09-01", "2026-03-31")
 OW_KEYS = tuple(h.CONTRACT["output_window_keys"])

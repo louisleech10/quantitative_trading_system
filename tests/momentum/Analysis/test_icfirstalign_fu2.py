@@ -26,8 +26,6 @@ from momentum.Analysis import ic_filter_orchestrator as ifo  # noqa: E402
 from momentum.core.icfirstalign_errors import CloseCarrierInvalidError  # noqa: E402
 from scripts.ic1d_baseline_freeze import _build_advanced_config, prepare_real_kline_inputs  # noqa: E402
 
-pytestmark = pytest.mark.timeout(600)
-
 
 @pytest.fixture(scope="module")
 def production(tmp_path_factory: pytest.TempPathFactory) -> Tuple[Any, pd.DataFrame]:

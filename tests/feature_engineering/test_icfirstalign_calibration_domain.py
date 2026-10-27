@@ -27,8 +27,6 @@ from momentum.FeatureEngineering.preprocessing import calibration as cal
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import icfirstalign_helpers as h
 
-pytestmark = pytest.mark.timeout(1200)
-
 PROBE = json.loads((h.REPO / "tests/_golden/icfirstalign/probe_baseline.json").read_text(encoding="utf-8"))
 CALIB = json.loads((h.REPO / "tests/_golden/icfirstalign/calibration_baseline.json").read_text(encoding="utf-8"))
 SETTINGS = {"P1": (frz.p1_payload, frz.P1_WINDOW), "P2": (frz.p2_payload, h.S2_WINDOW)}

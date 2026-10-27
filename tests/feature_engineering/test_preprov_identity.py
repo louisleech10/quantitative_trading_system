@@ -34,8 +34,6 @@ from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = pytest.mark.timeout(1800)
-
 # 契約為身分鍵之唯一真相源（SPEC §C）；直接讀 JSON，不經待測之 `load_contract`
 CONTRACT: Dict[str, Any] = json.loads(rp.CONTRACT_PATH.read_text(encoding="utf-8"))
 IDENTITY_KEYS: List[str] = list(CONTRACT["run_identity_keys"])

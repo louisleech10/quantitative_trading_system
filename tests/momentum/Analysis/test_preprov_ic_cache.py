@@ -29,8 +29,6 @@ from momentum.core.icfirstalign_errors import ICCacheRawUnavailableError
 from momentum.FeatureEngineering.feature_reader import FeatureReader
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = pytest.mark.timeout(1800)
-
 NEW_FIELD = "content_sha256"
 # 改前碼態之十欄（ic_engine.py:39-50）；本 Task 不得放寬任一欄
 HEAD_IDENTITY_FIELDS = ("symbol", "tf", "config_hash", "method", "label_horizon", "selection_window_start",

@@ -27,8 +27,6 @@ from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from tests.feature_engineering import icfirstalign_helpers as h
 from tests.feature_engineering.processed_execution_helpers import direct_write_execution
 
-pytestmark = pytest.mark.timeout(600)
-
 POSITIONAL_KEYS = tuple(h.CONTRACT["positional_selection_keys"])
 
 

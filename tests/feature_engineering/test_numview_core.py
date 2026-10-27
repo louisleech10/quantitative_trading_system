@@ -101,8 +101,6 @@ from tests.feature_engineering import ffstat_helpers as fsh
 from tests.feature_engineering import numview_helpers as nh
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = pytest.mark.timeout(6 * 3600)
-
 REPO = Path(__file__).resolve().parents[2]
 ICPL = json.loads((REPO / "tests/_golden/icpostleak/contract.json").read_text(encoding="utf-8"))
 COMBOS: List[Tuple[str, ...]] = [tuple(c) for c in ICPL["combos"]]

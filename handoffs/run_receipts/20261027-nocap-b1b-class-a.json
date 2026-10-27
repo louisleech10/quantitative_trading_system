@@ -1,6 +1,6 @@
 {
   "_doc": "NOCAP b1b：A 類（依牆鐘停止／縮減運算或對長運算放棄等候）逐處清單，不登記，待 Phase 1–6 改碼移除；分類規則 handoffs/run_receipts/nocap_probes/b1b_classification.json。",
-  "count": 161,
+  "count": 142,
   "by_path": {
     "api/models/feature_browser_models.py": 3,
     "api/models/optimization_models.py": 2,
@@ -31,27 +31,14 @@
     "tests/api/test_ic_deep_analysis.py": 8,
     "tests/api/test_ic_la1_degraded_gate.py": 8,
     "tests/api/test_ic_run_selector.py": 3,
-    "tests/api/test_numview_ic_page.py": 1,
-    "tests/api/test_preprov_ingest_cache.py": 1,
     "tests/feature_engineering/test_failopen_contract.py": 1,
     "tests/feature_engineering/test_failopen_correctness.py": 1,
     "tests/feature_engineering/test_failopen_layers.py": 1,
     "tests/feature_engineering/test_ffname_freeze_baseline.py": 1,
     "tests/feature_engineering/test_ffprod_measure.py": 1,
     "tests/feature_engineering/test_framepath_disposition.py": 3,
-    "tests/feature_engineering/test_icfirstalign_calibration_domain.py": 1,
-    "tests/feature_engineering/test_icfirstalign_context.py": 1,
-    "tests/feature_engineering/test_icfirstalign_domain.py": 2,
-    "tests/feature_engineering/test_icfirstalign_icfirst.py": 1,
-    "tests/feature_engineering/test_icfirstalign_l3_arms.py": 1,
-    "tests/feature_engineering/test_icfirstalign_memory.py": 7,
-    "tests/feature_engineering/test_icfirstalign_timeaxis.py": 1,
-    "tests/feature_engineering/test_numview_acceptance.py": 1,
-    "tests/feature_engineering/test_numview_cgsa_workdir.py": 1,
-    "tests/feature_engineering/test_numview_core.py": 1,
-    "tests/feature_engineering/test_numview_identity.py": 1,
-    "tests/feature_engineering/test_numview_policy.py": 1,
-    "tests/feature_engineering/test_preprov_identity.py": 1,
+    "tests/feature_engineering/test_icfirstalign_domain.py": 1,
+    "tests/feature_engineering/test_icfirstalign_memory.py": 6,
     "tests/feature_engineering/test_warmup_verify_guards.py": 5,
     "tests/golden/ic_phase1_1a_cut1/freeze_baseline.py": 7,
     "tests/golden/ic_phase1_1a_cut1/freeze_baseline_new.py": 7,
@@ -59,10 +46,6 @@
     "tests/governance/test_govb49_path_grant.py": 2,
     "tests/momentum/Analysis/test_ic_1a_cut1_golden.py": 3,
     "tests/momentum/Analysis/test_ic_persist_redirect_isolation.py": 2,
-    "tests/momentum/Analysis/test_icfirstalign_cache.py": 1,
-    "tests/momentum/Analysis/test_icfirstalign_fu2.py": 1,
-    "tests/momentum/Analysis/test_preprov_ic_cache.py": 1,
-    "tests/momentum/Analysis/test_preprov_survivor_identity.py": 1,
     "tests/performance/step6_multitf_batch_benchmark.py": 1
   },
   "hits": [
@@ -817,26 +800,6 @@
       "reason": "測試輪詢受測 IC 至終態 30 秒（盤點收據 A；Task 2.2）"
     },
     {
-      "path": "tests/api/test_numview_ic_page.py",
-      "line": 89,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(3600)]",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/api/test_preprov_ingest_cache.py",
-      "line": 46,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(2400)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
       "path": "tests/feature_engineering/test_failopen_contract.py",
       "line": 301,
       "pattern_id": "kwarg_timeout",
@@ -917,38 +880,8 @@
       "reason": "inventory collect 子行程逾時（盤點收據 A；Task 2.2）"
     },
     {
-      "path": "tests/feature_engineering/test_icfirstalign_calibration_domain.py",
-      "line": 30,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(1200)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_icfirstalign_context.py",
-      "line": 21,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(900)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
       "path": "tests/feature_engineering/test_icfirstalign_domain.py",
-      "line": 26,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(120)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_icfirstalign_domain.py",
-      "line": 1271,
+      "line": 1269,
       "pattern_id": "kwarg_timeout",
       "function": "test_double_sigint_during_wave_no_deadlock",
       "callee": "str",
@@ -957,38 +890,8 @@
       "reason": "測試子行程執行受測波次運算 60 秒（Task 2.2）"
     },
     {
-      "path": "tests/feature_engineering/test_icfirstalign_icfirst.py",
-      "line": 32,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(900)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_icfirstalign_l3_arms.py",
-      "line": 30,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
       "path": "tests/feature_engineering/test_icfirstalign_memory.py",
-      "line": 29,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(1800)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_icfirstalign_memory.py",
-      "line": 137,
+      "line": 135,
       "pattern_id": "kwarg_timeout",
       "function": "test_mutation_metric_max_resident_footprint",
       "callee": "str",
@@ -998,7 +901,7 @@
     },
     {
       "path": "tests/feature_engineering/test_icfirstalign_memory.py",
-      "line": 1338,
+      "line": 1336,
       "pattern_id": "kwarg_timeout",
       "function": "test_guard_lifecycle_two_runs_old_guard_has_no_power",
       "callee": "subprocess.run",
@@ -1008,7 +911,7 @@
     },
     {
       "path": "tests/feature_engineering/test_icfirstalign_memory.py",
-      "line": 1359,
+      "line": 1357,
       "pattern_id": "kwarg_timeout",
       "function": "test_mutation_guard_not_stopped_at_run_exit_kills_next_run",
       "callee": "subprocess.run",
@@ -1018,7 +921,7 @@
     },
     {
       "path": "tests/feature_engineering/test_icfirstalign_memory.py",
-      "line": 1380,
+      "line": 1378,
       "pattern_id": "kwarg_timeout",
       "function": "test_guard_stops_main_during_compiled_numba_kernel",
       "callee": "subprocess.run",
@@ -1028,7 +931,7 @@
     },
     {
       "path": "tests/feature_engineering/test_icfirstalign_memory.py",
-      "line": 1409,
+      "line": 1407,
       "pattern_id": "kwarg_timeout",
       "function": "test_guard_single_reading_does_not_kill",
       "callee": "subprocess.run",
@@ -1038,83 +941,13 @@
     },
     {
       "path": "tests/feature_engineering/test_icfirstalign_memory.py",
-      "line": 1472,
+      "line": 1470,
       "pattern_id": "kwarg_timeout",
       "function": "_run_probe",
       "callee": "str",
       "literal": "",
       "text": "timeout=600, env=env, cwd=str(tmp_path))",
       "reason": "測試子行程執行受測記憶體守門與實際運算 120–600 秒（盤點收據 A 列 1471-1472；同檔同型；Task 2.2）"
-    },
-    {
-      "path": "tests/feature_engineering/test_icfirstalign_timeaxis.py",
-      "line": 30,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_numview_acceptance.py",
-      "line": 87,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(43200)]",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_numview_cgsa_workdir.py",
-      "line": 64,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_numview_core.py",
-      "line": 104,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(6 * 3600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_numview_identity.py",
-      "line": 112,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(3600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_numview_policy.py",
-      "line": 71,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(3600)]",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/feature_engineering/test_preprov_identity.py",
-      "line": 37,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(1800)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
     },
     {
       "path": "tests/feature_engineering/test_warmup_verify_guards.py",
@@ -1445,46 +1278,6 @@
       "literal": "60",
       "text": "timeout=60,",
       "reason": "測試子行程執行受測 IC 60 秒（盤點收據 A；Task 2.2）"
-    },
-    {
-      "path": "tests/momentum/Analysis/test_icfirstalign_cache.py",
-      "line": 28,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/momentum/Analysis/test_icfirstalign_fu2.py",
-      "line": 29,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/momentum/Analysis/test_preprov_ic_cache.py",
-      "line": 32,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(1800)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
-    },
-    {
-      "path": "tests/momentum/Analysis/test_preprov_survivor_identity.py",
-      "line": 43,
-      "pattern_id": "pytest_mark_timeout",
-      "function": "<module>",
-      "callee": "pytest.mark.timeout",
-      "literal": "",
-      "text": "pytestmark = pytest.mark.timeout(3600)",
-      "reason": "pytest.mark.timeout 標記（未裝 pytest-timeout 而不生效、且屬時間上限；Task 2.2 全刪，boundary 20；b1 審碼 r6 CODEX-R6-P1-01）"
     },
     {
       "path": "tests/performance/step6_multitf_batch_benchmark.py",

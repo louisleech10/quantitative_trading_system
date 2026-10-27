@@ -1,5 +1,6 @@
-"""TESTREG Task 1.4 驗收：`pytest.ini` 註冊 flaky_quarantine 與 timeout；`scripts/testreg.py markers` 對未註冊標記 rc≠0
-（docs/TESTREG_SPEC.md）。9 處 `pytest.mark.timeout` 宣告保留不動。實作前（空殼）為紅。"""
+"""TESTREG Task 1.4 驗收：`pytest.ini` 註冊 flaky_quarantine；`scripts/testreg.py markers` 對未註冊標記 rc≠0
+（docs/TESTREG_SPEC.md）。`pytest.mark.timeout` 宣告與其註冊已依 NOCAP Task 2.2 全刪（未裝 pytest-timeout、不生效且屬時間
+上限；docs/NOCAP_SPEC.md），其不存在由 tests/registry/test_timeout_registry.py boundary 20 以 AST 驗。"""
 from __future__ import annotations
 
 import configparser
@@ -16,19 +17,10 @@ def _registered(ini_text: str):
     return {l.split(":", 1)[0].strip() for l in cp["pytest"]["markers"].splitlines() if l.strip()}
 
 
-def test_pytest_ini_registers_flaky_quarantine_and_timeout():
-    text = (REPO / "pytest.ini").read_text(encoding="utf-8")
-    assert {"flaky_quarantine", "timeout"} <= _registered(text)
-    timeout_line = next(l for l in text.splitlines() if l.strip().startswith("timeout:"))
-    assert "pytest-timeout" in timeout_line and "未安裝" in timeout_line
-
-
-def test_timeout_declarations_untouched():
-    out = subprocess.run(["git", "-C", str(REPO), "grep", "-c", "pytest.mark.timeout", "--", "tests"],
-                         capture_output=True, text=True).stdout
-    total = sum(int(l.rsplit(":", 1)[1]) for l in out.splitlines() if l.strip())
-    test_self = sum(int(l.rsplit(":", 1)[1]) for l in out.splitlines() if l.startswith("tests/registry/"))
-    assert total - test_self == 9
+def test_pytest_ini_registers_flaky_quarantine_not_timeout():
+    registered = _registered((REPO / "pytest.ini").read_text(encoding="utf-8"))
+    assert "flaky_quarantine" in registered
+    assert "timeout" not in registered  # NOCAP Task 2.2：逾時標記與其註冊全刪
 
 
 def test_real_tree_markers_rc0():

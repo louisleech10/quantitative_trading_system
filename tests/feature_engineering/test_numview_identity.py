@@ -109,8 +109,6 @@ from momentum.FeatureEngineering.utils import hardware_utils as hw
 from tests.feature_engineering import numview_helpers as nh
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = pytest.mark.timeout(3600)
-
 REPO = Path(__file__).resolve().parents[2]
 #: 契約（唯一真相源）直接讀 JSON 供收集期參數化；值一律取自此，不另列值集
 RAW: Dict[str, Any] = json.loads(nv.CONTRACT_PATH.read_text(encoding="utf-8"))

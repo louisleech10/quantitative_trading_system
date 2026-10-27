@@ -84,7 +84,7 @@ from tests.feature_engineering import ffstat_helpers as fsh
 from tests.feature_engineering import numview_helpers as nh
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(43200)]
+pytestmark = [pytest.mark.requires_kline]
 
 REPO = nh.REPO
 THIS = sys.modules[__name__]

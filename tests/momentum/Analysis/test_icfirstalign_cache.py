@@ -25,8 +25,6 @@ from momentum.core.icfirstalign_errors import ICCacheRawUnavailableError
 from momentum.FeatureEngineering.feature_reader import FeatureReader
 from tests.feature_engineering import icfirstalign_helpers as h
 
-pytestmark = pytest.mark.timeout(600)
-
 IDENTITY_FIELDS = list(h.CONTRACT["cache_identity_fields"])
 
 

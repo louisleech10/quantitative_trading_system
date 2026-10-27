@@ -27,8 +27,6 @@ from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggr
 from scripts.freeze_icfirstalign_baseline import l3_digests
 from tests.feature_engineering import icfirstalign_helpers as h
 
-pytestmark = pytest.mark.timeout(600)
-
 GOLDEN = json.loads((h.REPO / "tests/_golden/icfirstalign/l3_default_arm.json").read_text(encoding="utf-8"))
 ARMS = {
     "numba_off": {"FFACT_USE_NUMBA_ROLLING": "0"},

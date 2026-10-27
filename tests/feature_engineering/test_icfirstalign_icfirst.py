@@ -29,8 +29,6 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import Featu
 from momentum.FeatureEngineering.run_locks import RunBusyError, RunLease
 from tests.feature_engineering import icfirstalign_helpers as h
 
-pytestmark = pytest.mark.timeout(900)
-
 W = h.S2_WINDOW
 MIGRATED = [
     "tests/feature_engineering/test_b6_warmup_trim.py",

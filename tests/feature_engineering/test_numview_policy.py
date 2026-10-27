@@ -68,7 +68,7 @@ from tests.feature_engineering import ffstat_helpers as fsh
 from tests.feature_engineering import numview_helpers as nh
 from tests.feature_engineering import preprov_helpers as ph
 
-pytestmark = [pytest.mark.requires_kline, pytest.mark.timeout(3600)]
+pytestmark = [pytest.mark.requires_kline]
 
 REPO = Path(__file__).resolve().parents[2]
 ICPOSTLEAK = json.loads((REPO / "tests/_golden/icpostleak/contract.json").read_text(encoding="utf-8"))

@@ -23,8 +23,6 @@ import pytest
 from momentum.FeatureEngineering import memory_budget as mb
 from tests.feature_engineering import icfirstalign_helpers as h
 
-pytestmark = pytest.mark.timeout(120)
-
 GiB = 1 << 30
 MiB = 1 << 20
 
