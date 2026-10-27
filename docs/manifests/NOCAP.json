@@ -1,0 +1,132 @@
+{
+  "spec_path": "docs/NOCAP_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [
+    "scripts/timeout_scan.py",
+    "scripts/run_receipt_identity.py",
+    "scripts/scale_probe.py",
+    "scripts/balance_check.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_nocap_watchdog.py",
+    "tests/feature_engineering/test_numview_criteria.py",
+    "tests/registry/test_timeout_registry.py",
+    "tests/registry/test_gate_runner_nocap.py",
+    "tests/governance/test_timeout_write_guard.py",
+    "tests/governance/test_heavy_run_guard.py",
+    "tests/governance/test_balance_check.py"
+  ],
+  "script_acceptance": [
+    "scripts/heavy_run_guard.py",
+    "scripts/timeout_write_guard.py",
+    "scripts/run_watched.py"
+  ],
+  "contract_jsons": [
+    "scripts/timeout_patterns.json",
+    "scripts/timeout_registry.json",
+    "scripts/heavy_commands.json"
+  ],
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/NOCAP_SPEC.md",
+      "handoffs/run_receipts/numview_probes/_watchdog.py",
+      "handoffs/run_receipts/numview_probes/estimate.py",
+      "scripts/heavy_run_guard.py",
+      "scripts/heavy_commands.json",
+      "scripts/timeout_write_guard.py",
+      "scripts/timeout_patterns.json",
+      "scripts/timeout_registry.json",
+      "scripts/run_watched.py",
+      "scripts/framepath_affected_gate.py",
+      "scripts/testreg.py",
+      "scripts/template_check.sh",
+      "scripts/git_hooks/pre-commit",
+      ".claude/settings.json",
+      "AGENTS.md",
+      ".cursorrules",
+      "templates/SPEC_TEMPLATE.md",
+      "templates/COMMITTEE_FINDING_TEMPLATE.md",
+      "tests/registry/catalog.json"
+    ],
+    "callers_now": [
+      "scripts/numview_freeze_baseline.py",
+      "scripts/ffprod_freeze_baseline.py",
+      "scripts/ffprod_measure.py",
+      "handoffs/run_receipts/numview_probes/estimate.py",
+      "handoffs/run_receipts/numview_probes/l2_arm_matrix.py",
+      "handoffs/run_receipts/numview_probes/postic_branchdiff.py",
+      "handoffs/run_receipts/numview_probes/postic_core_select.py",
+      "handoffs/run_receipts/numview_probes/precision_chain.py",
+      "scripts/run_watched.py",
+      "scripts/testreg.py"
+    ],
+    "callers_later": [
+      "tests/_golden/balance/<模組>.json",
+      "handoffs/run_receipts/<日期>-<目標>-scale.json",
+      "handoffs/run_receipts/<日期>-<目標>-estimate.json"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_nocap_watchdog.py tests/registry/test_timeout_registry.py tests/registry/test_gate_runner_nocap.py tests/governance/test_timeout_write_guard.py tests/governance/test_heavy_run_guard.py tests/governance/test_balance_check.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_numview_criteria.py -k watchdog && bash scripts/check_decoupling.sh && grep -q 'scripts/run_watched.py' AGENTS.md && grep -q 'scripts/run_watched.py' .cursorrules && bash scripts/gen_fact_key_blocks.sh --check",
+    "forbidden": [
+      {
+        "rule": "不得新增任何依牆鐘停止或縮減運算之機制（A 類）；長運算之卡死只依無 log 亦無 CPU 進度判定、終止前留現場；監看器讀不到 CPU 時不得判卡死（SPEC Task 0.1）",
+        "observable": true
+      },
+      {
+        "rule": "不得新增自動重跑：cause=hang 一律留現場後停止（使用者 2026-10-27「判停一律重跑，不先查停止的原因，直接重跑不也會停?」）",
+        "observable": true
+      },
+      {
+        "rule": "momentum/ 不得 import api/（解耦 R1）；跨域經 Protocol 與 momentum.factories（R2／R3）；服務不互相 import（R4）；設定單一來源（R5）；check_decoupling.sh 之 R2／R3／R4 摘要行不得增加",
+        "observable": true
+      },
+      {
+        "rule": "本票測試不依賴 run_api.py（canonical R6）；不得放寬既有測試斷言（刪改測試同提交登記審清單）；新測試檔須登記 tests/registry/catalog.json",
+        "observable": true
+      },
+      {
+        "rule": "白名單（scripts/timeout_registry.json）不得登記 A 類、不得整檔放行（守衛本身與其測試除外）；新增列須同提交經審碼",
+        "observable": true
+      },
+      {
+        "rule": "重型跑一律經共用監看且背景執行；委員輪進行中不跑重型；>30 分之跑先白話告知使用者",
+        "observable": false
+      }
+    ],
+    "risk_mitigation": [
+      "分批（依 SPEC §P 與使用者 2026-10-27 執行序）：b1＝Phase 0（Task 0.1 監看增修①②、0.2 掃描器＋全量登記、0.2b 精確綁定＋Bash 寫檔擋＋pre-commit、0.3 動態啟動遞迴＋深度上限＋清單涵蓋＋死 hook 移除＋執行端合約）；b2＝Phase 0 收據與平衡（0.3b、0.3c、0.4，含 templates 與 template_check §B）；b3＝Phase 2（Task 2.1 閘門 runner、2.2 測試內部等候與 pytest.mark.timeout 刪除）",
+      "gate_cmd 涵蓋三批之全部測試（施工前紅、該批完成後其所屬測試轉綠；未施工批之紅測試於該批派工前不視為回歸）",
+      "改 .claude/settings.json（移除死 hook、timeout_write_guard 加掛 Bash）後新 session 才生效：該批收尾須於新 session 實測三道 hook",
+      "每批 code review 家數依 docs/MULTI_AGENT_ORCHESTRATION.md §1 現行分工行",
+      "前端與 API 不在 Phase 0／2 範圍（屬 Phase 5 Task 5.3），故本批不適用 npm run build"
+    ],
+    "coverage_risk": [
+      "邊界具名測試全票（Phase 0＋2）編號 01–59（r7 增 56、57；r8 增 58、59：testreg collect 入口之忙算完成與卡死留現場）：Task 0.1＝01–05（test_nocap_watchdog.py；既有 test_numview_criteria.py -k watchdog 不放寬）；Task 2.1＝06–11（靜態契約）、45–48（collect／執行之卡死與忙算之執行期分支）、58–59（testreg 之 _subbatch_collect 執行期分支；test_gate_runner_nocap.py）；Task 0.2＝12–19、Task 2.2＝20（以 AST 認 pytest.mark.timeout 之真呼叫全刪，現 19 處；測試資料字串不算；test_timeout_registry.py）；Task 0.2b＝21–25（test_timeout_write_guard.py）；Task 0.3＝26–32、Task 0.3b＝31（scale_probe 前景擋）、33–36、49（背景無收據放行）、50（三點收據與推算誤差 < 5%）、Task 0.3c＝37–38、51（有效估時收據放行）、56（估時收據 target_argv／code_sha256 失配或 coverage id 無效 ⇒ 擋；test_heavy_run_guard.py）；Task 0.4＝39–43、52–53（≥ 3 點且規模對齊）、57（峰值 RSS 變差）、Task 0.3c／0.4 範本＝44（四項平衡節有／無）、54（預算表缺）、55（逾 2 小時須附省法；test_balance_check.py）",
+      "mutation：test_mutation_root_only_terminate_leaves_child_alive、test_mutation_explicit_cap_still_pauses、test_mutation_substring_binding_hides_injected_cap、test_mutation_empty_patterns_lets_cap_through、test_mutation_depth_zero_misses_two_level_chain、test_mutation_huge_threshold_lets_regression_through",
+      "既有行為不得變更之處：test_timeout_write_guard.py／test_heavy_run_guard.py 既有案例（含 fb0509e8 之執行位置判定 32 案）、test_numview_criteria.py -k watchdog 既有案例斷言不放寬",
+      "Task 0.3 ③ 執行端合約以 gate_cmd 之 grep 驗；Task 0.3c ③、0.4 ③ 審碼必查項以 templates/COMMITTEE_FINDING_TEMPLATE.md 首節新增列驗（b2 審碼核對）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "contract_jsons 以外之契約：Task 0.2 登記檔之新 schema（function／callee／literal 欄）於 b1 施工時隨掃描器定稿，舊 path＋contains 列於同批遷移",
+        "reason": "blocked-by",
+        "owner": "NOCAP",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Phase 1（Task 1.1 八呼叫端依原因處理）、Phase 3（Task 3.1 等 IC 腳本）、Phase 4（Task 4.1 驗證腳本）、Phase 5（Task 5.1–5.4）、Phase 6（Task 6.1 委員 CLI）之具名測試：依使用者 2026-10-27 執行序（docs/TICKET_ORDER.md 9a 列）排於 TESTSEL、ICPERF、FFPROD 其餘量測之後，屆時以本 manifest 修訂版補列",
+        "reason": "user-ruling",
+        "owner": "NOCAP",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "重型跑一律經共用監看且背景執行；委員輪進行中不跑重型；>30 分之跑先白話告知使用者",
+        "reason": "user-ruling",
+        "owner": "NOCAP",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

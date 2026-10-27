@@ -96,3 +96,59 @@ def test_hook_is_wired_and_fast() -> None:
     rc = subprocess.run(["bash", str(REPO / "scripts" / "timeout_write_guard.sh")], input=payload, text=True,
                         capture_output=True).returncode
     assert rc == 0 and time.perf_counter() - start < 1.0
+
+
+def _bash(command: str) -> Dict[str, Any]:
+    return {"tool_name": "Bash", "tool_input": {"command": command}}
+
+
+def test_boundary_21_same_literal_in_unregistered_function_blocked() -> None:
+    """NOCAP v2 Task 0.2b②：白名單精確綁定——`_watchdog.py` 已登記之 sysctl `timeout=5` 不放行同檔另一函式之同字面呼叫。"""
+    new = "def long_job_runner(cmd):\n    subprocess.run([\"long_job\"], timeout=5)\n"
+    assert _run(_edit("handoffs/run_receipts/numview_probes/_watchdog.py", "", new)) == 2
+
+
+@pytest.mark.parametrize("command", [
+    "printf '%s\\n' 'subprocess.run(cmd, timeout=60)' >> scripts/new_runtime.py",
+    "sed -i '' 's/a/b/' scripts/new_runtime.py",
+    "echo 'timeout 5 ls' | tee scripts/new_helper.sh",
+    "perl -pi -e 's/a/b/' momentum/x.py",
+])
+def test_boundary_22_bash_write_into_code_file_blocked(command: str) -> None:
+    """NOCAP v2 Task 0.2b③：Bash 以重導向／tee／sed -i／perl -i 寫入 .py／.sh ⇒ 擋並要求改用 Edit。"""
+    assert _run(_bash(command)) == 2
+
+
+@pytest.mark.parametrize("command", ["echo hi > /tmp/x.log", "jq . a.json > handoffs/run_receipts/b.json",
+                                     "cat scripts/x.py > /dev/null", "timeout 5 ls"])
+def test_boundary_23_bash_non_code_write_or_read_allowed(command: str) -> None:
+    """Bash 寫入非程式檔（log、收據 JSON）或只讀程式檔 ⇒ 放行。"""
+    assert _run(_bash(command)) == 0
+
+
+def test_boundary_24_precommit_staged_content_scan_rejects(tmp_path: Path) -> None:
+    """其他工具（git apply、腳本、他 agent）寫入之未登記逾時呼叫 ⇒ pre-commit 讀暫存區完整內容掃描攔下。"""
+    spec = importlib.util.spec_from_file_location("timeout_scan_wg", REPO / "scripts" / "timeout_scan.py")
+    scan = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = scan
+    spec.loader.exec_module(scan)  # type: ignore[union-attr]
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "new_job.py").write_text("import subprocess\n\ndef go(cmd):\n    subprocess.run(cmd, timeout=60)\n",
+                                                    encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "scripts/new_job.py"], check=True)
+    hits = scan.scan_staged(tmp_path)
+    assert [(h.path, h.function, h.literal) for h in hits] == [("scripts/new_job.py", "go", "60")]
+
+
+def test_boundary_25_precommit_hook_invokes_staged_scan() -> None:
+    """pre-commit（`core.hooksPath`＝scripts/git_hooks）呼叫 `scripts/timeout_scan.py --staged`。"""
+    hook = (REPO / "scripts" / "git_hooks" / "pre-commit").read_text(encoding="utf-8")
+    assert "scripts/timeout_scan.py --staged" in hook
+
+
+def test_mutation_empty_patterns_lets_cap_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：樣式清空 ⇒ 新增之 `subprocess.run(cmd, timeout=600)` 不再被擋（本檔各擋案之鑑別力）。"""
+    suffixes, _ = g.load_patterns()
+    monkeypatch.setattr(g, "load_patterns", lambda *a, **k: (suffixes, []))
+    assert _run(_edit("scripts/ffprod_measure.py", "", "    subprocess.run(cmd, timeout=600)\n")) == 0

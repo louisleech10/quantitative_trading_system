@@ -114,6 +114,7 @@
 | `_live_doc_write_guard.py` | 常態檢查 | 未掛 |
 | `_redispatch_check.py` | 常態檢查 | gate cx_run  |
 | `b49_closure_static_check.py` | 常態檢查 | narrow_check_router  |
+| `balance_check.py` | 常態檢查 | 未掛 |
 | `build_l65_golden_baseline.py` | 常態檢查 | 未掛 |
 | `check_decoupling_imports.py` | 常態檢查 | narrow_check_router  |
 | `check_doc_manifest_b.py` | 常態檢查 | 未掛 |

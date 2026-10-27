@@ -4729,6 +4729,25 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
+  "tests/feature_engineering/test_nocap_watchdog.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A12",
+    "A4"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_nocap_watchdog.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
+  },
   "tests/feature_engineering/test_numeric_guards.py": {
    "claim": [
     "contract"
@@ -5607,6 +5626,25 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "CONVERGENCE"
+  },
+  "tests/governance/test_balance_check.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_balance_check.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
   },
   "tests/governance/test_brief_conformance.py": {
    "claim": [
@@ -12817,6 +12855,25 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
+  "tests/registry/test_gate_runner_nocap.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/registry/test_gate_runner_nocap.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
+  },
   "tests/registry/test_testreg_bootstrap.py": {
    "claim": [
     "contract"
@@ -13086,6 +13143,25 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "TESTREG"
+  },
+  "tests/registry/test_timeout_registry.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/registry/test_timeout_registry.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
   },
   "tests/test_append_fix.py": {
    "claim": [

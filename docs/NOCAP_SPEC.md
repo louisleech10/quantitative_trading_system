@@ -1,6 +1,6 @@
 # NOCAP 全專案移除運算時間上限、卡死以進度判定並留現場 — SPEC
 
-> 版本：v5（2026-10-27；規格審查 r1–r4 處置，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r{1,2,3,4}/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
+> 版本：v5.1（2026-10-27；規格審查 r1–r4 處置＋施工清單審查 r8 之 Task 2.2 驗收字面更正，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r{1,2,3,4,8}/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（跨 scripts／momentum／api／tests 與共用監看；多 phase）。
@@ -11,7 +11,7 @@
 - **已確認結果**：2026-10-27 使用者原話：「講幾千次不準再因為時間上限問題被停掉，一直再犯，不要給我講藉口，只准提如何解決」「我說的時間上限問題不是只有這一票，是整個專案」「判停一律重跑，不先查停止的原因，直接重跑不也會停?」「時間上限的問題要根本解決，確保軟體和量化業界怎麼做，在這專案中不準再次發生，也不準跑完或沒動靜還要等我問你才去查，這也不準在這專案中再次發生」。2026-10-26 使用者原話：「我完全沒有任何一次要求你把時間控制在多少時間以內」。
 - **已驗證事實**（4 條 FACT-RECEIPT）：
   - FACT-RECEIPT: 子代理唯讀盤點（grep `wall_cap_seconds|wall_ceiling_seconds|run_watched(|TimeoutExpired|signal.alarm|mark.timeout|timeout_seconds|max_seconds|deadline|wait_for|result(timeout=` 等並逐處讀碼分類）→ 印出 A 類（依牆鐘停止／縮減運算）約 40 處、B／C／D 分組摘要（主委 實跑 2026-10-27；全文收據 `handoffs/run_receipts/20261027-nocap-inventory.md`）
-  - FACT-RECEIPT: `venv/bin/python -c "import pytest_timeout"` → 印出 `ModuleNotFoundError`（盤點子代理 實跑 2026-10-27）——21 個 `pytest.mark.timeout` 標記現不生效。
+  - FACT-RECEIPT: `venv/bin/python -c "import pytest_timeout"` → 印出 `ModuleNotFoundError`（盤點子代理 實跑 2026-10-27）——`pytest.mark.timeout` 標記現不生效（v5.1 更正：以 AST 計真呼叫為 19 處；原記 21 含 `tests/registry/test_testreg_markers.py` 兩處測試資料字串）。
   - FACT-RECEIPT: `venv/bin/py-spy dump --pid <同使用者 python>` → 印出 `This program requires root on OSX.`；`sample <pid> 1 -file f` → rc=0 且含 `__select` 堆疊；子行程 `faulthandler.register(SIGUSR1, all_threads=True)` 後送 SIGUSR1 → 印出 `Current thread … File "<string>", line 1`（主委 實跑 2026-10-27）。
   - FACT-RECEIPT: FFPROD 量測首跑改前全欄 IC（209,053 欄）→ 收據逐字 `牆鐘 5404 秒逾上限 5400 秒`、`swap_growth_max_mb` 約 1086（主委 實跑 2026-10-27，`handoffs/run_receipts/20261026-ffprod-candidates.json`）。
 - **業界依據（本 SPEC 之判準來源）**：批次運算之卡死判定以進度（心跳／log／CPU）為準、不以固定牆鐘時間終止；判卡死時先取執行緒堆疊再終止（JVM thread dump、Python faulthandler、py-spy 同類做法）；只有可重試之暫時性失敗（網路、外部服務）才自動重試且有退避；互動請求之逾時屬服務契約（HTTP 504），長運算改背景工作＋進度，不在請求內殺運算；統計檢定（置換、自助法）之次數固定、與機器快慢無關（可重現性）。
@@ -115,7 +115,7 @@
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不刪 progress.json 既有欄位。
 
 **Task 2.2 — 測試內部之子行程等候**：`tests/` 內子行程之 `timeout=`——盤點收據 A 類測試表，及審查 r1 補列之 `tests/feature_engineering/test_ffprod_measure.py:45`（`timeout=120`）、`tests/feature_engineering/preprocessing/test_l65_v2_transforms.py:364,380`（`timeout=30`）；全量以 Task 0.2 掃描結果為準——等候受測運算者改經共用監看，等候外部或短輔助命令者登記 B／C；`pytest.mark.timeout` 標記全刪（未安裝、無效且誤導）。
-- **驗證**：`pytest tests/registry/test_timeout_registry.py` 全綠（測試內部 A 類計數＝0）；`grep -rn "pytest.mark.timeout" tests` 計數＝0；受影響測試照 `docs/TEST_SELECTION.md` 跑且結果與改前相同。
+- **驗證**：`pytest tests/registry/test_timeout_registry.py` 全綠（測試內部 A 類計數＝0）；以 AST 判定之 `pytest.mark.timeout` 呼叫於 `tests/` 計數＝0（測試資料字串中之字面不算；v5.1 自原「grep 計數＝0」更正）；受影響測試照 `docs/TEST_SELECTION.md` 跑且結果與改前相同。
 - **邊界**：等候外部（委員 CLI、網路）者登記 B。
 - **存活至**／**覆蓋風險**：永久／無。　不可做：不改測試斷言之語意（只換等候機制）；刪改測試照測試刪改清單送審。
 
