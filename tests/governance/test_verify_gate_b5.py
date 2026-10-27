@@ -324,6 +324,17 @@ def test_b5_spec_fact_receipt_missing_fails(tmp_path: Path) -> None:
     assert "FACT-RECEIPT" in proc.stdout
 
 
+#: NOCAP Task 0.3c／0.4 起新 SPEC 必填之兩節（`template_check.sh spec`）；「應通過」之範例須含
+_B_SECTIONS = [
+    "## §B 驗證運算預算",
+    "| id | 重型跑 | 獨有覆蓋路徑 | 規模 | 估時與依據 | 沿用來源 |",
+    "|---|---|---|---|---|---|",
+    "| X-BUDGET-1 | 無重型跑 | 不適用 | 不適用 | 0 秒 | 無 |",
+    "## §B 四項平衡實測",
+    "- N/A：範例 SPEC，不改計算路徑。",
+]
+
+
 def test_b5_spec_fact_receipt_present_passes(tmp_path: Path) -> None:
     """5.3：§A 附 FACT-RECEIPT → template_check 過。"""
     fixture = _write_fixture(
@@ -350,6 +361,7 @@ def test_b5_spec_fact_receipt_present_passes(tmp_path: Path) -> None:
                 "v",
                 "## §R",
                 "r",
+                *_B_SECTIONS,
                 "## §N",
                 "§G：N/A — test",
                 "## §G",
@@ -387,6 +399,7 @@ def test_b5_spec_pending_confirmation_passes(tmp_path: Path) -> None:
                 "v",
                 "## §R",
                 "r",
+                *_B_SECTIONS,
                 "## §N",
                 "§G：N/A — test",
                 "## §G",

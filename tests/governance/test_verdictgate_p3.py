@@ -18,6 +18,8 @@ _SCRIPTS = (
     "gate.sh", "gate_check.sh", "_gate_lex.sh", "debt_ledger.sh", "_debt_ledger_core.py", "template_check.sh",
     "completeness_check.sh", "reconcile_stamps_check.sh", "review_quorum_check.sh", "prev_review_resolve.sh",
     "verdictgate_check.sh", "verify_task_provenance.py", "stampable_artifacts.txt", "_role_gate.sh",
+    # template_check.sh spec 之 §B 檢查（NOCAP Task 0.3c／0.4）與其不溯及清單；pre-push 之測試刪改待審清單檢查
+    "run_receipt_identity.py", "template_balance_legacy.txt", "test_change_review.sh",
 )
 ZERO = "0" * 40
 

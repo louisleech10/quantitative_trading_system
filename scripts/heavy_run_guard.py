@@ -171,12 +171,22 @@ def _expand_script(script: str, args: List[str], depth: int, wrapped: bool) -> L
     return [(t, w or wrapped) for t, w in executed(body, depth + 1, comments=True)]
 
 
+#: 本次判定中每個執行位置命令之全文 → argv（估時／成長曲線收據之身分以 argv 重算；`check` 開頭清空）
+_ARGV: Dict[str, List[str]] = {}
+
+
+def _rec(argv: List[str], wrapped: bool) -> Tuple[str, bool]:
+    text = " ".join(argv)
+    _ARGV[text] = list(argv)
+    return text, wrapped
+
+
 def _analyze(argv: List[str], depth: int, wrapped: bool) -> List[Tuple[str, bool]]:
     if not argv:
         return []
     prog = Path(argv[0]).name
     if argv[0].startswith("$") or "`" in argv[0]:  # 命令位置為未解析變數或命令替換 ⇒ argv 全文比對（保守）
-        return [(" ".join(argv), wrapped)]
+        return [_rec(argv, wrapped)]
     if prog.startswith("python") and len(argv) > 1 and argv[1].endswith(WRAPPER):
         inner = argv[argv.index("--") + 1:] if "--" in argv else []
         return [(" ".join(argv), True)] + _analyze(_strip_prefixes(inner), depth, wrapped=True)
@@ -203,20 +213,21 @@ def _analyze(argv: List[str], depth: int, wrapped: bool) -> List[Tuple[str, bool
         if "-c" in rest and rest.index("-c") + 1 < len(rest):  # 只分析內層字串（外層 argv 含其全文，比對會誤擋）
             return [(t, w or wrapped) for t, w in executed(rest[rest.index("-c") + 1], depth)]
         script = next((a for a in rest if not a.startswith("-")), None)
-        out = [(" ".join(argv), wrapped)]
+        out = [_rec(argv, wrapped)]
         if script and script.endswith(".sh"):
             out += _expand_script(script, rest[rest.index(script) + 1:], depth, wrapped)
         return out
     if prog.endswith(".sh"):
-        return [(" ".join(argv), wrapped)] + _expand_script(argv[0], argv[1:], depth, wrapped)
+        return [_rec(argv, wrapped)] + _expand_script(argv[0], argv[1:], depth, wrapped)
     if prog.startswith("python") or prog in ("pytest", "py.test"):
-        return [(" ".join(argv), wrapped)]
+        return [_rec(argv, wrapped)]
     return []  # 非啟動器（ls、grep、pgrep、echo、cat…）：其參數不是被執行之命令
 
 
 def check(payload: Dict[str, Any], catalog: Dict[str, Any]) -> List[str]:
     tool_input = dict(payload.get("tool_input") or {})
     _SEEN.clear()
+    _ARGV.clear()
     runs = executed(str(tool_input.get("command") or ""))
     background = tool_input.get("run_in_background") is True
     problems: List[str] = []
@@ -230,12 +241,91 @@ def check(payload: Dict[str, Any], catalog: Dict[str, Any]) -> List[str]:
             hits = [w for text, w in runs if re.search(rule["regex"], text, re.M | re.S)]
             if not hits:
                 continue
+            before = len(problems)
             if not background:
                 problems.append(f"{rule['id']}：重型命令須以背景執行（run_in_background＝true），結束時才有完成通知")
             if kind == "wrapped" and not all(hits):
                 problems.append(f"{rule['id']}：須經共用監看包裝 `venv/bin/python {WRAPPER} --log <路徑> -- <命令>`")
             if kind == "self_watched" and not calls_run_watched(REPO / rule["source"]):
                 problems.append(f"{rule['id']}：{rule['source']} 未呼叫共用監看 run_watched( ⇒ 改經 {WRAPPER} 包裝")
+            if len(problems) == before:  # 背景與監看皆合規 ⇒ 再查收據（Task 0.3c 估時、0.3b 成長曲線）
+                argvs = [_ARGV[text] for text, _w in runs
+                         if text in _ARGV and re.search(rule["regex"], text, re.M | re.S)]
+                problems += receipt_problems(rule, argvs)
+    return problems
+
+
+ESTIMATE_GLOB = "handoffs/run_receipts/*-estimate.json"
+
+
+def _rid() -> Any:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("heavy_run_guard_rid", REPO / "scripts" / "run_receipt_identity.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
+
+
+def _entrypoint(rule: Dict[str, Any], argv: List[str]) -> str:
+    """清單規則之 `entrypoint`；未設 ⇒ argv 中第一個 repo 內 .py／.sh 檔（啟動器之後）；皆無 ⇒ argv[0]。"""
+    if rule.get("entrypoint"):
+        return str(rule["entrypoint"])
+    for tok in argv[1:]:
+        if Path(tok).suffix in (".py", ".sh") and (REPO / tok).is_file():
+            return tok
+    return argv[0]
+
+
+def _load_receipts(pattern: str) -> List[Dict[str, Any]]:
+    out = []
+    for path in sorted(REPO.glob(pattern)):
+        try:
+            out.append({**json.loads(path.read_text(encoding="utf-8")), "_path": str(path.relative_to(REPO))})
+        except (OSError, json.JSONDecodeError):
+            continue
+    return out
+
+
+def receipt_problems(rule: Dict[str, Any], argvs: List[List[str]]) -> List[str]:
+    """Task 0.3c：須有 `identity.match` 與當下逐欄相符、且 `coverage_path_ids` 皆在其 `spec_path` 之 §B 預算表之估時收據
+    （`estimate_exempt` 附理由者免；scale_probe 為起始例外）。Task 0.3b：規則設 `scale_receipt`（收據路徑樣式）者另須
+    成長曲線收據：entrypoint 與 code_sha256 等於現行碼、≥ 3 點、推算存在且未標 extrapolation_unreliable
+    （`scale_exempt` 附理由者免）。"""
+    if not argvs:
+        return []
+    rid = _rid()
+    problems: List[str] = []
+    matches = [rid.compute_match(_entrypoint(rule, a), a, rule.get("code_paths") or [], rule.get("data_paths") or [],
+                                 rule.get("config_paths") or []) for a in argvs]
+    if not rule.get("estimate_exempt"):
+        ok = False
+        for rec in _load_receipts(ESTIMATE_GLOB):
+            if not any(rid.receipt_matches(rec, m) for m in matches):
+                continue
+            spec = REPO / str(rec.get("spec_path") or "")
+            spec_text = spec.read_text(encoding="utf-8") if spec.is_file() else ""
+            if rid.coverage_ids_valid(rec, spec_text):
+                ok = True
+                break
+        if not ok:
+            problems.append(f"{rule['id']}：無相符之估時收據（{ESTIMATE_GLOB}：identity.match 須與本命令逐欄相符、"
+                            "coverage_path_ids 須皆在 spec_path 之 §B 驗證運算預算表；NOCAP Task 0.3c）")
+    if rule.get("scale_receipt") and not rule.get("scale_exempt"):
+        ok = False
+        for rec in _load_receipts(str(rule["scale_receipt"])):
+            m = ((rec.get("identity") or {}).get("match") or {})
+            same = any(m.get("entrypoint") == cur["entrypoint"] and m.get("code_sha256") == cur["code_sha256"]
+                       for cur in matches)
+            proj = rec.get("projection") or {}
+            if same and len(rec.get("points") or []) >= 3 and proj.get("seconds") is not None \
+                    and not rec.get("extrapolation_unreliable"):
+                ok = True
+                break
+        if not ok:
+            problems.append(f"{rule['id']}：全規模前須有成長曲線收據（{rule['scale_receipt']}：程式碼態雜湊等於現行碼、"
+                            "≥ 3 個規模點、推算可用；以 scripts/scale_probe.py 背景產生；NOCAP Task 0.3b）")
     return problems
 
 

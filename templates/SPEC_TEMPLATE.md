@@ -70,6 +70,20 @@ per-Task 必填欄（awk 機檢）：驗證 / 邊界 / **存活至** / **覆蓋�
 > 正確回應＝在 §V 寫成**驗收條件**，**不是動手把它寫出來**。
 > 本 SPEC 若新增檔案數超出預期 → 命中「膨脹升級 5 訊號」，**當場重新分類任務**，退回 TODO 流程。
 
+## §B 驗證運算預算（必填；NOCAP Task 0.3c，`template_check.sh spec` 機檢）
+> 正確性基準與回歸驗證預設只用**小而具代表性之真實資料**；全規模跑少而有據、先估時、可沿用即沿用，每跑須有獨有覆蓋路徑（覆蓋以路徑計，不以重複計）。
+> 重型命令下指令前須有估時收據（`handoffs/run_receipts/<日期>-<目標>-estimate.json`），其 `coverage_path_ids` 須為本表之列 id。
+
+| id | 重型跑 | 獨有覆蓋路徑 | 規模 | 估時與依據 | 沿用來源 |
+|---|---|---|---|---|---|
+| <EPIC>-BUDGET-1 | <命令或目標> | <只有這一跑覆蓋之路徑／分支／邊界> | <列數／欄數／格> | <N 秒／分／小時（收據或推算依據）> | <沿用之收據；無則「無」> |
+
+- 合計逾 2 小時 ⇒ 須另列「- 不降驗證之省法：…」與「小規模驗不到之理由：…」（缺即機檢 FAIL）。
+
+## §B 四項平衡實測（必填；NOCAP Task 0.4，`template_check.sh spec` 機檢）
+> 改到計算路徑或使用者操作（頁面等待、API 回應）者：實際規模下耗時、峰值 RSS、精度差（對 float64 oracle）、檔案大小四項，代表規模＋≥ 3 點成長曲線；主要模組另比 `tests/_golden/balance/<模組>.json` 基準（`scripts/balance_check.py`）。
+> 不涉計算者寫「- N/A：<理由>」。
+
 ## §G Golden / Baseline（高風險(a/d)必填；否則移 §N 標 N/A+理由）
 > 凡改「數值正確性/特徵計算/ML 路徑」，必須有客觀 baseline 證明行為不變，否則驗收=口說。
 - **feature/kline 條件**：涉 feature/kline 生成/計算/merge/split/洩漏 → 須真實 `data_cache/feature_klines/kline_cache.h5`+三方簽核計畫；禁合成 fixture；**不適用即略過**。

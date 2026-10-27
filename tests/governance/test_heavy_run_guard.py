@@ -32,12 +32,14 @@ WRAP = "venv/bin/python scripts/run_watched.py --log /tmp/x.log -- "
 @pytest.mark.parametrize("cmd,background,expected", [
     # 自帶監看之量測：須背景
     ("venv/bin/python scripts/ffprod_measure.py run --cell C_BTCUSDT_1h", False, 2),
-    ("venv/bin/python scripts/ffprod_measure.py run --cell C_BTCUSDT_1h", True, 0),
+    # 背景、但無估時與成長曲線收據 ⇒ 擋（NOCAP Task 0.3b／0.3c）；committee_run 背景放行見下（estimate_exempt）
+    ("venv/bin/python scripts/ffprod_measure.py run --cell C_BTCUSDT_1h", True, 2),
     ("venv/bin/python scripts/ffprod_measure.py plan --cell C_BTCUSDT_1h", False, 0),  # plan 非重型
     # 重型 pytest：須包裝且背景
     ("venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q", True, 2),
     (WRAP + "venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q", False, 2),
-    (WRAP + "venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q", True, 0),
+    # 經包裝且背景、但無估時收據 ⇒ 擋（NOCAP Task 0.3c；有相符收據之放行見 boundary 51）
+    (WRAP + "venv/bin/python -m pytest tests/feature_engineering/test_ffprod_gate.py -q", True, 2),
     ("venv/bin/python -m pytest tests/feature_engineering/test_ffprod_measure.py -q", False, 0),  # 輕量
     ("venv/bin/python -m pytest -q", True, 2),  # 無參數全套
     ("venv/bin/python -m pytest tests -x -q", True, 2),  # 帶選項之全套（b1 審碼 r1 CODEX-R1-P1-05）
@@ -376,6 +378,38 @@ def test_boundary_56_heavy_command_with_mismatched_estimate_receipt_blocked(brea
         assert _rc(_bash(WRAP + " ".join(inner), True)) == 2
     finally:
         receipt.unlink()
+
+
+@pytest.mark.parametrize("variant,expected", [("valid", 0), ("two_points", 2), ("code_mismatch", 2),
+                                              ("unreliable", 2), ("missing", 2)])
+def test_scale_receipt_gate_for_full_scale_command(variant: str, expected: int) -> None:
+    """Task 0.3b：設 scale_receipt 之重型命令（ffprod_measure）背景執行且有效估時收據下——成長曲線收據有效 ⇒ 放行；
+    只 2 點、程式碼態雜湊不符、標 extrapolation_unreliable、或無收據 ⇒ 擋。"""
+    rid = _mod("run_receipt_identity")
+    argv = ["venv/bin/python", "scripts/ffprod_measure.py", "run", "--cell", "C_BTCUSDT_1h"]
+    match = rid.compute_match("scripts/ffprod_measure.py", argv, [], [], [])
+    rr = REPO / "handoffs" / "run_receipts"
+    est, scale = rr / "20261027-nocap-guardtest-estimate.json", rr / "20261027-nocap-guardtest-ffprod_measure-scale.json"
+    est.write_text(json.dumps({"identity": {"match": match, "meta": {"producer": "test", "created_at": "t"}},
+                               "scale": "single", "estimate_seconds": 60, "basis": [], "spec_path": "docs/NOCAP_SPEC.md",
+                               "coverage_path_ids": ["NOCAP-BUDGET-3"]}), encoding="utf-8")
+    pts = _pts([10.0, 20.0, 40.0], [1e8, 2e8, 4e8])
+    receipt = {"identity": {"match": match, "meta": {"producer": "test", "created_at": "t"}}, "points": pts,
+               "projection": {"scale": 8000, "seconds": 160.0, "peak_rss_bytes": 1.6e9},
+               "extrapolation_unreliable": False}
+    if variant == "two_points":
+        receipt["points"] = pts[:2]
+    elif variant == "code_mismatch":
+        receipt["identity"]["match"] = {**match, "code_sha256": "0" * 64}
+    elif variant == "unreliable":
+        receipt["extrapolation_unreliable"] = True
+    if variant != "missing":
+        scale.write_text(json.dumps(receipt), encoding="utf-8")
+    try:
+        assert _rc(_bash(" ".join(argv), True)) == expected
+    finally:
+        est.unlink(missing_ok=True)
+        scale.unlink(missing_ok=True)
 
 
 def test_mutation_depth_zero_misses_two_level_chain(monkeypatch: pytest.MonkeyPatch) -> None:

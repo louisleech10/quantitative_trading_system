@@ -1,7 +1,8 @@
 {
-  "_doc": "NOCAP Task 0.3（docs/NOCAP_SPEC.md）：重型命令封閉清單。命中者須以背景執行（run_in_background＝true），且須經共用監看：wrapped＝必經 scripts/run_watched.py 包裝；self_watched＝腳本本身以共用監看跑其重型子行程（`run_watched(` 呼叫，heavy_run_guard 以原始碼機械對證）。使用者 2026-10-27「也不準跑完或沒動靜還要等我問你才去查」「你能確保在此專案每次都會用到嗎?」。",
+  "_doc": "NOCAP Task 0.3（docs/NOCAP_SPEC.md）：重型命令封閉清單。命中者須以背景執行（run_in_background＝true），且須經共用監看：wrapped＝必經 scripts/run_watched.py 包裝；self_watched＝腳本本身以共用監看跑其重型子行程（`run_watched(` 呼叫，heavy_run_guard 以原始碼機械對證）。使用者 2026-10-27「也不準跑完或沒動靜還要等我問你才去查」「你能確保在此專案每次都會用到嗎?」。Task 0.3c：背景與監看皆合規後另須估時收據（handoffs/run_receipts/*-estimate.json，identity.match 與本命令逐欄相符、coverage_path_ids 皆在 spec_path 之 §B 驗證運算預算表）；`estimate_exempt`（附理由）免，審碼必查。身分欄之 entrypoint／code_paths／data_paths／config_paths 取自規則（未設 entrypoint ⇒ argv 中第一個 repo 內 .py／.sh）。Task 0.3b：設 `scale_receipt`（收據路徑樣式）者另須成長曲線收據（scripts/scale_probe.py 產生）；`scale_exempt`（附理由）免。",
   "self_watched": [
-    {"id": "ffprod_measure", "regex": "scripts/ffprod_measure\\.py\\s+(run|ic)\\b", "source": "scripts/ffprod_measure.py"},
+    {"id": "scale_probe", "regex": "scripts/scale_probe\\.py\\b(?!.*\\s(--help|-h)\\b)", "source": "scripts/scale_probe.py", "estimate_exempt": "Task 0.3b 起始例外：本腳本產生成長曲線與估時之依據，不要求其自身之收據（否則第一份收據無從產生）"},
+    {"id": "ffprod_measure", "regex": "scripts/ffprod_measure\\.py\\s+(run|ic)\\b", "source": "scripts/ffprod_measure.py", "scale_receipt": "handoffs/run_receipts/*-ffprod_measure-scale.json", "_scale_doc": "單格全特徵生成與全欄 IC 皆為全規模（改前全欄 IC 209,053 欄推算約 47 小時，SPEC Task 0.3c 目標段）⇒ 須先有成長曲線收據"},
     {"id": "ffprod_freeze", "regex": "scripts/ffprod_freeze_baseline\\.py(?!.*--check-only)", "source": "scripts/ffprod_freeze_baseline.py"},
     {"id": "numview_freeze", "regex": "scripts/numview_freeze_baseline\\.py", "source": "scripts/numview_freeze_baseline.py"},
     {"id": "numview_estimate", "regex": "numview_probes/estimate\\.py", "source": "handoffs/run_receipts/numview_probes/estimate.py"},
@@ -21,7 +22,7 @@
     {"id": "pytest_gate_runner", "regex": "(scripts/framepath_affected_gate\\.py\\b(?!.*\\s(--help|-h)\\b)|scripts/testreg\\.py\\b.*\\srun\\b)", "_phase": "Phase 2 Task 2.1 入口"}
   ],
   "background_only": [
-    {"id": "committee_run", "regex": "scripts/committee_run\\.sh\\b"},
-    {"id": "committee_cli", "regex": "scripts/cx_run\\.sh\\b", "_phase": "Phase 6 Task 6.1 入口（委員 CLI 等候）"}
+    {"id": "committee_run", "regex": "scripts/committee_run\\.sh\\b", "estimate_exempt": "委員派工：等外部 CLI 回覆，非本機運算（無規模可估）"},
+    {"id": "committee_cli", "regex": "scripts/cx_run\\.sh\\b", "_phase": "Phase 6 Task 6.1 入口（委員 CLI 等候）", "estimate_exempt": "委員 CLI：等外部回覆，非本機運算（無規模可估）"}
   ]
 }

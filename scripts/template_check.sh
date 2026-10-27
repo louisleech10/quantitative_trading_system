@@ -145,6 +145,14 @@ case "${kind}" in
     fi
     fi
 
+    # NOCAP Task 0.3c／0.4：§B 驗證運算預算表與四項平衡實測節（合計逾 2 小時須附省法）。既有凍結 SPEC 不溯及：
+    # 判準同上之 legacy 清單做法——repo 相對路徑在 scripts/template_balance_legacy.txt 者豁免，新檔預設強制。
+    if ! { [ -f "${SCRIPT_DIR}/template_balance_legacy.txt" ] \
+           && grep -qxF "${_lc_rel}" "${SCRIPT_DIR}/template_balance_legacy.txt" 2>/dev/null; }; then
+      _bal_out="$(python3 "${SCRIPT_DIR}/run_receipt_identity.py" spec-budget "${file}" 2>&1)" \
+        || missing="${missing}${_bal_out}\n"
+    fi
+
     # §RISK RISK-HIT 宣告制（Task 2.2 [A-3]）
     sec_risk="$(awk '/^## §RISK/{f=1; print; next} f&&/^## /{f=0} f{print}' "${file}")"
     risk_hit_line="$(printf '%s\n' "${sec_risk}" | grep -E '^[[:space:]]*(-[[:space:]]+)?RISK-HIT:' | head -1 || true)"
@@ -405,8 +413,10 @@ if [ "${kind}" = "dext" ]; then
   # 中括號類別不含反斜線，跨 awk 實作行為一致。
   _hollow3_re='^[[:space:]]*[-*][[:space:]]*([*][*])?驗證'
 fi
+# NOCAP Task 0.3c：§B 預算逾 2 小時之必填說明「- 不降驗證之省法：…」是省法宣告、不是驗證欄（字樣含「驗證」），
+# 只排除此一標籤；其餘驗證 bullet 照驗。
 if awk -v re="${_hollow3_re}" '
-    $0 ~ re {
+    $0 ~ re && $0 !~ /^[[:space:]]*[-*][[:space:]]*不降驗證之省法/ {
       if ($0 !~ /[0-9]|pytest|assert|==|<=|>=|!=|atol|rtol|sha256|grep|exit|\.py|\.json|\.h5|\.csv|\.parquet|npm|jest|vitest|expect|toHaveBeen|\.ts|\.tsx/) { found=1 }
     }
     END { exit(found?0:1) }' "${file}"; then

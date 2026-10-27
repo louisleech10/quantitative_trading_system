@@ -1,6 +1,6 @@
 # NOCAP 全專案移除運算時間上限、卡死以進度判定並留現場 — SPEC
 
-> 版本：v5.1（2026-10-27；規格審查 r1–r4 處置＋施工清單審查 r8 之 Task 2.2 驗收字面更正，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r{1,2,3,4,8}/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
+> 版本：v5.2（2026-10-27；v5.2＝b2 施工依 Task 0.3c／0.4 自身新規補 §B 省法與四項平衡節；v5.1＝規格審查 r1–r4 處置＋施工清單審查 r8 之 Task 2.2 驗收字面更正，收斂檔 `handoffs/reconcile/20261027-nocap-x-review-r{1,2,3,4,8}/synth.md`）　|　來源：使用者 2026-10-27 裁定（逐字見 §A）、盤點收據 `handoffs/run_receipts/20261027-nocap-inventory.md`　|　日期：2026-10-27　|　對應 TODO：`docs/manifests/NOCAP.json`（規格凍結後產出，同 FFPROD 管線）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（跨 scripts／momentum／api／tests 與共用監看；多 phase）。
@@ -30,6 +30,10 @@
 | NOCAP-BUDGET-2 | Task 5.1 改後兩次（注入快／慢耗時） | 次數固定與機器快慢無關 | 同 NOCAP-BUDGET-1 | 同 NOCAP-BUDGET-1 之兩倍（推算，同上） | 無 |
 | NOCAP-BUDGET-3 | 全票完工前之受影響測試（`docs/TEST_SELECTION.md` §4） | 各 Phase 改動之既有測試回歸 | 依選取結果 | 全票完工前以選取結果估時、逾 2 小時先報 | 依賴未變者沿用上次通過 |
 - 其餘驗證皆為注入時鐘／注入狀態之單元測試（秒級），不屬重型跑。NOCAP-BUDGET-1、-2 依上列推算合計約 1.5–10 分鐘（未實測，動工前之估時收據為準）；NOCAP-BUDGET-3 之具體節點取決於各 Phase 實際改動，施工前無從列舉，於全票完工前以 `docs/TEST_SELECTION.md` 選取結果逐節點列入估時收據，合計逾 2 小時先報並附不降驗證之省法。
+- 不降驗證之省法：NOCAP-BUDGET-3 依 `docs/TEST_SELECTION.md` 只跑依賴有變之受影響測試、依賴未變者沿用上次通過之結果；小規模驗不到之理由：受影響之既有測試以其原設計之資料與規模驗回歸，縮小規模即改變被驗之路徑。
+
+## §B 四項平衡實測
+- N/A（Phase 0、2）：本票此兩 Phase 改監看、閘門、登記與測試等候之治理機制，不改計算路徑與使用者操作之耗時、峰值 RSS、精度與輸出大小。Phase 5（Task 5.1 負對照次數固定、Task 5.3 長運算改背景工作）改及計算與使用者操作，施工前於本 SPEC 新版次補四項實測（v5.2 起本節為 Task 0.4 必填錨點）。
 
 ## §G Golden / Baseline
 - 適用：Task 5.1（負對照置換次數，RISK-HIT d）。其餘 Task 不改數值。

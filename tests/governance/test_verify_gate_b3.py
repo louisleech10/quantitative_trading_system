@@ -189,6 +189,12 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         "doc_format_precheck.sh",
         "template_check.sh",
         "brief_conformance_check.sh",
+        # NOCAP：pre-commit 呼叫 timeout_scan --staged（缺即 fail-closed 拒提交）；template_check §B 檢查之依賴
+        "timeout_scan.py",
+        "timeout_patterns.json",
+        "timeout_registry.json",
+        "run_receipt_identity.py",
+        "template_balance_legacy.txt",
     ):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
     # DOCROT2 D2B：pre-commit 之活文件兩道判定缺 helper 即 fail-closed ⇒ 迷你 repo 須備齊 helper
