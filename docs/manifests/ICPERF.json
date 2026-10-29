@@ -65,7 +65,9 @@
       "momentum/Analysis/ic_reporter.py",
       "api/routes/ic_analysis.py",
       "momentum/Analysis/contracts/ic_result_paging_contract.json",
-      "frontend/src/store/icAnalysisStore.ts"
+      "frontend/src/store/icAnalysisStore.ts",
+      "api/services/ic_result_projection.py",
+      "momentum/core/protocols.py"
     ],
     "callers_now": [
       "scripts/heavy_run_guard.py",
@@ -142,7 +144,8 @@
       "前端與 API 契約只改 SPEC Task 0.4 ⑧ 所列（summary_table 增 direction／ic_hit_rate_aligned／monotonicity_score_aligned、倖存者 IC 快照增 direction、前端 ICFeatureInfo 增選填 direction 與自動建議排序方向對齊）與 ⑪ 之 metadata 來源欄，故 gate_cmd 含 npm --prefix frontend run build；test_boundary_25_ic_page_default_payload_matches_frontend 只以 regex 讀 frontend/src/store/icAnalysisStore.ts、frontend/src/lib/icConfigOverride.ts、frontend/src/hooks/useICAnalysis.ts 與 momentum/Analysis/contracts/ui_stage_toggles.json（不跑前端）",
       "API 必填關鍵字（SPEC v5.28 ⑬⑯）：`RollingOOSValidator.validate_batch` 與 `FactorReturnAnalyzer.compute_batch` 之 horizon 為必填關鍵字（缺 ⇒ TypeError，不給預設），呼叫端 `_run_rolling_oos`、`_run_factor_return` 傳 split_context 之 `effective_horizon`（無切分時 _resolve_effective_label_horizon(config)）；其餘呼叫者以 grep 全數同步，秒級測試含不傳 horizon ⇒ TypeError",
       "SPEC v5.29 ⑧⑬：倖存者機讀契約 momentum/Analysis/contracts/ic_survivor_contract.json 之 survivor_record_keys 增 direction（additional_properties 仍 false）；`get_top_features`（API GET /top-features、深度分析 `_resolve_selected_features` 經之）與 ic_reporter top_features 預設排序鍵改方向對齊強度 d·icir；`_run_parameter_sensitivity` 傳請求 IC 方法、`ParameterSensitivityAnalyzer._compute_ic` 依 method 計（spearman／pearson／kendall）",
-      "SPEC v5.30 ⑧ 排序封閉清單：summary 列增 `icir_aligned`＝d·icir；預設排序鍵一律 icir_aligned（get_top_features、跨標的 summary 與 ranked_features、ic_reporter 三處 top_features 與弱訊號判定、API _build_summary 與 summary 分頁 Query 預設、_sort_artifact_rows、前端 ICSummaryTable 與 icAnalysisStore summaryParams 預設）；靜態掃描測試命中原始 icir 為預設排序鍵即紅"
+      "SPEC v5.30 ⑧ 排序封閉清單：summary 列增 `icir_aligned`＝d·icir；預設排序鍵一律 icir_aligned（get_top_features、跨標的 summary 與 ranked_features、ic_reporter 三處 top_features 與弱訊號判定、API _build_summary 與 summary 分頁 Query 預設、_sort_artifact_rows、前端 ICSummaryTable 與 icAnalysisStore summaryParams 預設）；靜態掃描測試命中原始 icir 為預設排序鍵即紅",
+      "SPEC v5.31 ⑧ 驗收⑥具名測試 tests/momentum/Analysis/test_icperf_gate.py::test_no_raw_icir_default_sort：以 AST 掃 momentum/、api/ 非測試 .py——字串常數 \"icir\" 出現於 sorted／sort／max／min／heapq.nlargest／nsmallest 之 key= 值內（含同檔具名函式或 lambda 本體一層）、sort_by 參數預設值、sort_by= 關鍵字引數、名稱含 sort 之呼叫位置引數即紅；frontend/src 非測試 .ts／.tsx 以 sort_by: 'icir'、?? 'icir'、useState('icir') 樣式命中即紅；改前原型命中恰 14 處＝SPEC ⑧ 封閉清單，改後 0；測試內以四類寫法各造字串碼自證命中"
     ],
     "coverage_risk": [
       "邊界具名測試（b1，tests/momentum/Analysis/test_icperf_gate.py）：Task 0.1 驗證＝test_boundary_01_frozen_contains_all_g_items（§G (1)–(7) 七項九鍵皆在；(1)(2)(4)(6)(7) 逐特徵逐欄位 sha256 非空；(1)(3)(4)(5)(6)(7) 各含回應全部欄位與快照差集之全部寫出檔，缺任一即紅；獨立 oracle〔測試自寫、不經凍結腳本：os.walk 三根〔cwd 根、<iso>、<repo>，三根前綴之 path_key 測試自算〕前後差集＋回應鍵集合〔扣除逐特徵來源之子路徑〕，對 small_request 所得之同一小規模真實請求觀測同一次 freeze_item〕之回應鍵集合與寫出檔集合 == 記錄，凍結檔之回應頂層欄位與寫出根 == oracle；IC-first 凍結檔恰含一個 processed/selected.parquet 且帶 sha256〔V2 artifact，不寫 HDF5；日後若寫出 .h5 仍須逐物件摘要〕；freeze_item 記錄之 roots〔cwd、iso〕== oracle 走訪之根；slow＋requires_kline）、test_boundary_02_frozen_baseline_content_complete（逐特徵逐欄位值與 NaN 遮罩 sha256、選欄通過集合、PIT 標籤序列 sha256 皆在；獨立 oracle 依逐特徵來源之形狀重算——summary_table〔list[dict]、以 feature_name 為鍵〕逐列逐欄一值、quantile_returns／coverage_analysis／turnover_analysis〔以特徵名為鍵之 dict〕逐特徵整段子樹一值〔正準序列化雜湊含 NaN 遮罩，測試自寫 _oracle_digest〕——== 記錄〔同一小請求、帶特徵名逐值〕；選欄通過集合＝第 6 段後之倖存者，oracle 讀同次執行寫出之 data_cache/reports/ic_survivors_<case_id>.json 之 feature_names；凍結檔〔整格請求〕對 oracle 只比表結構、與成員無關、不比逐特徵值——FDR 等跨特徵校正依請求之特徵數〔ic_filter_orchestrator.py:56 apply_fdr〕：表欄位結構須全成員且 == oracle、oracle 特徵〔small_request 取凍結請求排序後之前 20 個〕皆在凍結檔、by_key 來源 oracle 出現者凍結檔皆有且凍結檔來源皆屬 SPEC 所列；slow＋requires_kline）、test_freeze_reproducible（SPEC 具名；同一 2,000 欄子集同 seed 同碼路徑同交接 h5 雜湊重跑第 5 段 == 凍結全部對應欄）",
