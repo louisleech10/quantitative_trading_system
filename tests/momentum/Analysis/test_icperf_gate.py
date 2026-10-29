@@ -47,17 +47,21 @@ INVENTORY_PATTERN = "handoffs/run_receipts/*-icperf-path-inventory.json"
 SCALE_BEFORE_PATTERN = "handoffs/run_receipts/*-icperf-scale-before.json"
 
 #: SPEC §G (1)–(5)（測試自持之 oracle，不引腳本常數）
-G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfirst_post_ic")
+G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfirst_post_ic",
+           "ic_report_long", "deep_analysis_long", "event_import_report")  # SPEC v5.26 §G (1)–(7) 九鍵
 #: §G 凍結範圍：第 (1)、(3)、(4)、(5) 項須含回應全部欄位與快照差集之全部寫出檔
-OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic")
+OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic",
+                "ic_report_long", "deep_analysis_long", "event_import_report")
+#: SPEC v5.26：第 (6)(7) 項之請求待 Task 0.3 定 L 格與匯入批（未定前 default_request／freeze 須 FreezeError）
+PENDING_ITEMS = ("ic_report_long", "deep_analysis_long", "event_import_report")
 #: §G：第 (1)、(2)、(4) 項為逐特徵逐欄位輸出（SPEC v5.8：第 (3) 項深度分析之逐模組逐欄位由「回應全部欄位」涵蓋）
-FEATURE_ITEMS = ("ic_report", "stage5_subset", "event_report")
+FEATURE_ITEMS = ("ic_report", "stage5_subset", "event_report", "ic_report_long", "event_import_report")  # v5.26 增 (6)(7)
 #: SPEC §G baseline 內容：IC 報告（dict）之逐特徵來源與形狀（測試自持）——summary_table＝list[dict]、以 feature_name 為鍵；
 #: 其餘＝以特徵名為鍵之 dict
 FEATURE_SOURCES = {"/summary_table": "rows", "/quantile_returns": "by_key", "/coverage_analysis": "by_key",
                    "/turnover_analysis": "by_key"}
 #: 回應帶逐特徵來源之項（第 (1)、(4) 項）；其選欄通過集合＝第 6 段後之倖存者，取自寫出之 ic_survivors_<case_id>.json
-SURVIVOR_ITEMS = ("ic_report", "event_report")
+SURVIVOR_ITEMS = ("ic_report", "event_report", "ic_report_long", "event_import_report")  # v5.26 增 (6)(7)
 #: 倖存者檔之 path_key（cwd 根相對；momentum/Analysis/ic_reporter.py:880 `ic_survivors_{case_id}.json`，case_id 預設
 #: ic_gatekeeper，ic_filter_orchestrator.py:5837）
 SURVIVORS_KEY_RE = re.compile(r"^data_cache/reports/ic_survivors_[^/]+\.json$")
@@ -807,12 +811,12 @@ def test_boundary_09_output_root_outside_snapshot_fails(fb: Any, tmp_path: Path)
     assert str(outside.resolve()) in str(exc.value) or str(outside) in str(exc.value)
     ok = _capture(fb, tmp_path, "pass\n", output_roots=[tmp_path / "repo" / "data_cache"], tag="inroot")
     assert ok["rc"] == 0
-    for item in OUTPUT_ITEMS:
+    for item in [i for i in OUTPUT_ITEMS if i not in PENDING_ITEMS]:  # 待定項見 test_pending_items_fail_closed
         roots = fb.resolve_output_roots(item, fb.default_request(item, CELL))  # 參數預設 repo_root=REPO
         assert roots, f"{item}：未解析出任何輸出根"
         for r in roots:
             assert str(Path(r).resolve()).startswith(str(REPO.resolve()) + "/"), f"{item}：輸出根 {r} 在 repo 外"
-    for item in OUTPUT_ITEMS:
+    for item in [i for i in OUTPUT_ITEMS if i not in PENDING_ITEMS]:
         cwd_root = _isolated_cwd_root(tmp_path / "work", item)
         cwd_roots = fb.resolve_output_roots(item, fb.default_request(item, CELL), cwd_root)
         assert cwd_roots, f"{item}：隔離 cwd 根下未解析出任何輸出根"
@@ -1214,6 +1218,29 @@ def test_volatile_probe_diff_unexcludable_cases(fb: Any, tmp_path: Path) -> None
     for name, (pa, pb, needle) in cases.items():
         _, bad = fb.probe_diff({**a, **pa}, {**b, **pb})
         assert any(needle in p for p in bad), f"{name}：須列為無法排除之差異（點名 {needle}），實得 {bad}"
+
+
+def test_item_sets_match_spec_and_pending_fail_closed(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC v5.26 §G：凍結腳本之項集合＝(1)–(7) 九鍵（測試自持）；第 (6)(7) 項於 Task 0.3 定 L 格與匯入批前，
+    `default_request` 須 FreezeError，`freeze` 須於啟動任何執行前即拒（替身 `freeze_item` 被呼叫即 FAIL）；第 (3) 項請求之
+    深度分析模組全開（含預設關閉者）。"""
+    assert tuple(fb.G_ITEMS) == G_ITEMS and tuple(fb.OUTPUT_ITEMS) == OUTPUT_ITEMS
+    assert tuple(fb.PENDING_ITEMS) == PENDING_ITEMS
+    for item in PENDING_ITEMS:
+        with pytest.raises(fb.FreezeError):
+            fb.default_request(item)
+
+    def must_not_run(*a: Any, **k: Any) -> None:
+        pytest.fail("請求未定時 freeze 不得啟動任何執行")
+
+    monkeypatch.setattr(fb, "freeze_item", must_not_run)
+    with pytest.raises(fb.FreezeError):
+        fb.freeze(tmp_path / "g.json.gz", work_root=tmp_path / "w")
+    assert not (tmp_path / "g.json.gz").exists()
+    from api.models.ic_models import DeepAnalysisModules
+
+    modules = fb.default_request("deep_analysis", CELL)["deep"]["modules"]
+    assert set(modules) == set(DeepAnalysisModules.model_fields) and all(v is True for v in modules.values()), modules
 
 
 def test_describe_file_json_by_content(fb: Any, tmp_path: Path) -> None:

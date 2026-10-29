@@ -92,11 +92,17 @@ SUBSET_COLS = 2000
 REPRO_COLS = SUBSET_COLS
 SCALE_POINTS = (500, 1000, 2000)
 
-#: §G (1)–(5)：A 格完整 IC 報告、2,000 欄子集第 5 段、A 格深度分析、A 格 K 線條件式事件 IC 報告、A 格 IC-first post-IC
-#: 輸出（V2 parquet artifact；IC-first 不寫 HDF5）
-G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfirst_post_ic")
-#: 須含「回應全部欄位＋快照差集之全部寫出檔」之項（§G 凍結範圍：第 (1)、(3)、(4)、(5) 項）
-OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic")
+#: §G (1)–(7)：A 格完整 IC 報告、2,000 欄子集第 5 段、A 格深度分析（全部模組）、A 格 K 線條件式事件 IC 報告、A 格 IC-first
+#: post-IC 輸出（V2 parquet artifact；IC-first 不寫 HDF5）、長資料格 L 之 IC 報告與深度分析（SPEC v5.26 第 (6) 項兩鍵）、
+#: 事件匯入批 IC 報告（第 (7) 項）
+G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfirst_post_ic",
+           "ic_report_long", "deep_analysis_long", "event_import_report")
+#: 須含「回應全部欄位＋快照差集之全部寫出檔」之項（§G 凍結範圍：第 (1)、(3)、(4)、(5)、(6)、(7) 項）
+OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic",
+                "ic_report_long", "deep_analysis_long", "event_import_report")
+#: SPEC v5.26：L 格列數／特徵子集與事件匯入批須於 Task 0.3 以 FACT-RECEIPT 定後才能寫請求；未定前 `default_request`
+#: 對此三鍵 FreezeError，`freeze` 於啟動任何執行前即拒（不得只凍其餘項）
+PENDING_ITEMS = ("ic_report_long", "deep_analysis_long", "event_import_report")
 
 #: SPEC §G「各項請求設定」：前端 IC 頁初始狀態實際送出之 payload（衰減照頁面預設開啟）。`config_override`＝
 #: `buildConfigOverride(defaultConfig)`（`frontend/src/lib/icConfigOverride.ts`；值見 `frontend/src/store/icAnalysisStore.ts`
@@ -916,10 +922,11 @@ def _run_feature_names(request: Mapping[str, Any]) -> List[str]:
 def default_request(item: str, cell: str = CELL) -> Dict[str, Any]:
     """各路徑之預設請求設定（SPEC §G「各項請求設定」）：第 (1)(3) 項＝前端 IC 頁初始狀態實際送出之 payload
     `IC_PAGE_DEFAULT_PAYLOAD`（衰減照頁面預設開啟，不沿用 FFPROD 量測之衰減關），經服務 `_build_config_override` 得 override、
-    以 `scripts/ffprod_measure.py` 之 `ic_in_process` 同法於行程內呼叫；第 (3) 項另取 `DeepAnalysisRequest()` 預設之模組與
-    top_n、同一 analyzer 實例；第 (4) 項＝第 (1) 項之請求加 `event_query="close > open"`（K 線條件式事件 legacy
-    `event_query` 一格；事件匯入批分支不凍結）；第 (5) 項＝NUMVIEW 判準檔 A 格定義之 `FeatureFactory.run_ic_first`
-    （特徵根置於本次執行之 cwd 根內）。
+    以 `scripts/ffprod_measure.py` 之 `ic_in_process` 同法於行程內呼叫；第 (3) 項另取 `DeepAnalysisRequest()` 預設之 top_n、
+    `DeepAnalysisModules` 全部模組開（SPEC v5.26，含預設關閉者）、同一 analyzer 實例；第 (4) 項＝第 (1) 項之請求加
+    `event_query="close > open"`（K 線條件式事件 legacy `event_query` 一格；事件匯入批見第 (7) 項）；第 (5) 項＝NUMVIEW
+    判準檔 A 格定義之 `FeatureFactory.run_ic_first`（特徵根置於本次執行之 cwd 根內）。第 (6)(7) 項（`PENDING_ITEMS`）
+    於 Task 0.3 定 L 格與匯入批前一律 FreezeError。
 
     回傳可 JSON 化之請求記錄：IC 頁 {"kind": "ic_page", "item", "cell", "symbol", "timeframe", "config_hash", "run_dir"
     （repo 相對）, "config_override", "feature_tiers", "event_query", "feature_filter", "deep"（第 (3) 項＝
@@ -937,8 +944,12 @@ def default_request(item: str, cell: str = CELL) -> Dict[str, Any]:
             _ensure_repo_path()
             from api.models.ic_models import DeepAnalysisRequest
 
-            req["deep"] = _json_copy(DeepAnalysisRequest().model_dump())
+            deep = _json_copy(DeepAnalysisRequest().model_dump())
+            deep["modules"] = {k: True for k in deep["modules"]}  # SPEC v5.26 §G (3)：全部模組開（含預設關閉者）
+            req["deep"] = deep
         return req
+    if item in PENDING_ITEMS:
+        raise FreezeError(f"{item}：SPEC v5.26 第 (6)(7) 項之 L 格／事件匯入批待 Task 0.3 FACT-RECEIPT 定義後才能寫請求")
     if item == "icfirst_post_ic":
         desc = _cell_descriptor(cell)
         generation = _criteria()["cell_definitions"][desc["kind"]]["generation"]
@@ -994,10 +1005,10 @@ def feature_tables(item: str) -> Dict[str, str]:
     之 DataFrame（通用形狀，本票各項無）。第 (1)、(4) 項 ⇒ {"/summary_table": "rows", "/quantile_returns": "by_key",
     "/coverage_analysis": "by_key", "/turnover_analysis": "by_key"}；第 (3)、(5) 項 ⇒ {}（深度分析之逐模組逐欄位由回應全部
     欄位涵蓋，SPEC §G）。第 (2) 項（`stage5_subset`）同第 (1) 項（模組說明：來源、命名與摘要粒度同第 (1) 項）。"""
-    if item in ("ic_report", "event_report", "stage5_subset"):
+    if item in ("ic_report", "event_report", "stage5_subset", "ic_report_long", "event_import_report"):
         return {"/summary_table": "rows", "/quantile_returns": "by_key", "/coverage_analysis": "by_key",
                 "/turnover_analysis": "by_key"}
-    if item in ("deep_analysis", "icfirst_post_ic"):
+    if item in ("deep_analysis", "icfirst_post_ic", "deep_analysis_long"):
         return {}
     raise FreezeError(f"未知凍結項：{item}")
 
@@ -1621,13 +1632,14 @@ def freeze(out_path: Path = GOLDEN_PATH, *, repo_root: Path = REPO, work_root: O
     "volatile_candidates", "work_root", "items"}；經 `write_golden` 原子寫出（正準 JSON；`.gz` 路徑 gzip 決定性壓縮）。"""
     import tempfile
 
+    requests = {item: default_request(item) for item in G_ITEMS}  # 任一項請求未定（PENDING_ITEMS）⇒ 啟動任何執行前即拒
     work = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-freeze-"))
     work.mkdir(parents=True, exist_ok=True)
     items: Dict[str, Any] = {}
     candidates: List[Dict[str, str]] = []
     for item in G_ITEMS:
         print(f"[icperf-freeze] {item} 開始（工作目錄 {work / item}）", flush=True)
-        items[item] = freeze_item(item, request=default_request(item), repo_root=Path(repo_root), work_root=work)
+        items[item] = freeze_item(item, request=requests[item], repo_root=Path(repo_root), work_root=work)
         candidates += items[item].pop("volatile_candidates", [])
         print(f"[icperf-freeze] {item} 完成", flush=True)
     print("[icperf-freeze] ic_report PIT 標籤 開始", flush=True)
