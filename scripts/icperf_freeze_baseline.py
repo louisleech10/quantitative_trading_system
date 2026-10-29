@@ -13,20 +13,27 @@
   {"schema": "icperf-pre-change/1", "code_state": {...}, "volatile": [<每次必異欄位之路徑，FACT-RECEIPT 寫入 SPEC>],
    "items": {
      "ic_report"|"deep_analysis"|"event_report"|"icfirst_post_ic": {
-        "request": {...請求設定...}, "output_roots": [...],
-        "response": {<欄位路徑>: <sha256>},            # 回應／回傳物件之全部欄位（flatten_fields）
+        "request": {...請求設定...}, "output_roots": [<cwd 根相對 POSIX>...],
+        "roots": {"cwd": <本次執行之 cwd 根，解析後絕對路徑>, "iso": <隔離目錄，解析後絕對路徑>},
+        "response": {<欄位路徑>: <sha256>},            # 回應／回傳物件之全部欄位（flatten_fields；逐特徵來源不重複攤平）
         "files": {<path_key>: describe_file(...)},      # 快照差集之全部寫出檔
         "transient": [<path_key>...],                   # 審計記錄有而差集無變化（寫後刪除），記入不比
-        "features": {<特徵>: {<欄位>: {"sha256", "nan_mask_sha256"}}},   # 第 (1)–(4) 項
-        "selected": [<選欄通過之特徵>...],              # 第 (1)、(4) 項
+        "features": {<特徵>: {<欄位>: {"sha256", "nan_mask_sha256"}}},   # 第 (1)、(4) 項（深度分析由回應全部欄位涵蓋）
+        "selected": [<第 6 段後之倖存者>...],          # 第 (1)、(4) 項（寫出之 ic_survivors_<case_id>.json 之 feature_names）
         "pit_labels": {<特徵>: {"q", "q_insufficient", "skipped_all_nan", "label_sha256"|None, "label_nan_count"}}},
      "stage5_subset": {"seed": 20261027, "n_cols_requested": 2000, "stage_cols": <實際進第 5 段欄數>,
         "features": {...同上...}, "pit_labels": {...同上...}}}}
 
-path_key 規則：位於 repo 根之下者＝repo 相對 POSIX 路徑；其餘（TMPDIR／HOME 隔離目錄）＝解析後之絕對路徑。
+path_key 規則（SPEC §G (b) 三根前綴）：本次執行之 cwd 根（新建之隔離工作目錄）之下＝相對 POSIX；隔離目錄（TMPDIR／
+HOME）之下＝`<iso>/<相對 POSIX>`；repo 根之下＝`<repo>/<相對 POSIX>`；多根皆含時取最具體（解析後最長）之根；三根皆不含
+＝解析後絕對路徑（只出現於 §G (c) fail-closed 之訊息）。
 
-逐特徵欄位（"features"）之來源與命名：回應中 `feature_tables(item)` 所列之逐特徵表（JSON pointer 所指之 DataFrame，
-index＝特徵名）；欄位名＝"<pointer>/<欄名>"；值摘要＝`value_digest(df.loc[[特徵], 欄].to_numpy())`（1 元素、原生 dtype）。
+逐特徵欄位（"features"）之來源與命名（SPEC §G baseline 內容與摘要粒度）：`feature_tables(item)` 所列之逐特徵來源——
+IC 報告（dict）之 `summary_table`（list[dict]，以 `feature_name` 為鍵）⇒ 每列每欄（`feature_name` 除外）一值，欄位名＝
+"/summary_table/<欄名>"（JSON pointer 跳脫），值摘要＝`value_digest(列[欄])`；以特徵名為鍵之 `quantile_returns`、
+`coverage_analysis`、`turnover_analysis` ⇒ 每特徵每來源整段子樹一值，欄位名＝來源 pointer（如 "/quantile_returns"），
+值摘要＝`value_digest(來源[特徵])`。逐特徵來源之子路徑（"<來源 pointer>/…"）於 "response" 不重複攤平（兩者聯集＝回應
+全部欄位；來源本身為空容器時仍依 `flatten_fields` 以純量記於 "response"）。
 
 PIT 標籤（"pit_labels"）：照單調性之現行輸入定義（特徵與標籤同時非 NaN 之列壓縮、`_select_num_quantiles` 選 q、
 q=3 退回）；`q`＝最終採用之 q；`q_insufficient`＝最終 q 小於請求 q（樣本數不足而降為 3，或 bin 數不足退回 3）；
@@ -61,10 +68,37 @@ SUBSET_COLS = 2000
 REPRO_COLS = 500
 SCALE_POINTS = (500, 1000, 2000)
 
-#: §G (1)–(5)：A 格完整 IC 報告、2,000 欄子集第 5 段、A 格深度分析、A 格事件型 IC 報告、A 格 IC-first post-IC HDF5
+#: §G (1)–(5)：A 格完整 IC 報告、2,000 欄子集第 5 段、A 格深度分析、A 格 K 線條件式事件 IC 報告、A 格 IC-first post-IC
+#: 輸出（V2 parquet artifact；IC-first 不寫 HDF5）
 G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfirst_post_ic")
 #: 須含「回應全部欄位＋快照差集之全部寫出檔」之項（§G 凍結範圍：第 (1)、(3)、(4)、(5) 項）
 OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic")
+
+#: SPEC §G「各項請求設定」：前端 IC 頁初始狀態實際送出之 payload（衰減照頁面預設開啟）。`config_override`＝
+#: `buildConfigOverride(defaultConfig)`（`frontend/src/lib/icConfigOverride.ts`；值見 `frontend/src/store/icAnalysisStore.ts`
+#: 之 `defaultConfig`）併 `feature_tiers`（初始 tier `featureTier: 'intermediate'`、`PRESET_TOGGLES.intermediate` 之開關、
+#: 鍵集 `momentum/Analysis/contracts/ui_stage_toggles.json` 之 `stage_keys`；組裝 `getEffectiveConfig` 與
+#: `frontend/src/hooks/useICAnalysis.ts` 之 payload）。寫死於此；前端改預設 ⇒ 秒級契約測試
+#: （`test_icperf_gate.py::test_boundary_25_ic_page_default_payload_matches_frontend`）紅，須重凍。
+IC_PAGE_DEFAULT_PAYLOAD: Dict[str, Any] = {
+    "config_override": {
+        "thresholds": {"ic_mean_min": 0.02, "icir_min": 0.5, "p_value_max": 0.05, "monotonicity_score_min": 0.6},
+        "redundancy": {"correlation_threshold": 0.7},
+        "labels": {"horizons": [1, 2, 3, 5, 8, 13, 21]},
+        "feature_tiers": {
+            "active_preset": "intermediate",
+            "custom_overrides": {"stage_overrides": {
+                "ic_decay": True, "grouped_ic": True, "turnover_analysis": True, "event_filtering": True,
+                "ai_summary": True, "fdr_correction": True, "marginal_ic": True}},
+        },
+    },
+    "feature_tiers": {
+        "active_preset": "intermediate",
+        "custom_overrides": {"stage_overrides": {
+            "ic_decay": True, "grouped_ic": True, "turnover_analysis": True, "event_filtering": True,
+            "ai_summary": True, "fdr_correction": True, "marginal_ic": True}},
+    },
+}
 
 #: 寫出捕獲記錄之審計事件；本行程之 hook 與注入子行程之 sitecustomize 皆於呼叫當下讀本常數（mutation 探針改之）
 AUDIT_EVENTS = ("open", "os.rename", "os.replace")
@@ -693,13 +727,18 @@ def compare_golden(frozen: Mapping[str, Any], current: Mapping[str, Any]) -> Lis
 
 
 def default_request(item: str, cell: str = CELL) -> Dict[str, Any]:
-    """各路徑之預設請求設定（IC 頁預設、衰減關以外照預設；事件型取事件篩選模式預設；IC-first 取預設）；
-    第 (4)、(5) 項之設定於凍結時以 FACT-RECEIPT 寫入 SPEC。"""
+    """各路徑之預設請求設定（SPEC §G「各項請求設定」）：第 (1)(3) 項＝前端 IC 頁初始狀態實際送出之 payload
+    `IC_PAGE_DEFAULT_PAYLOAD`（衰減照頁面預設開啟，不沿用 FFPROD 量測之衰減關），經服務 `_build_config_override` 得 override、
+    以 `scripts/ffprod_measure.py` 之 `ic_in_process` 同法於行程內呼叫；第 (3) 項另取 `DeepAnalysisRequest()` 預設之模組與
+    top_n、同一 analyzer 實例；第 (4) 項＝第 (1) 項之請求加 `event_query="close > open"`（K 線條件式事件 legacy
+    `event_query` 一格；事件匯入批分支不凍結）；第 (5) 項＝NUMVIEW 判準檔 A 格定義之 `FeatureFactory.run_ic_first`
+    （特徵根置於本次執行之 cwd 根內）。"""
     raise NotImplementedError(_STUB)
 
 
 def resolve_output_roots(item: str, request: Mapping[str, Any], repo_root: Path = REPO) -> List[Path]:
-    """自請求設定與產品寫死之相對路徑解析該路徑之全部輸出根（如 `data_cache/features/`、`data_cache/reports/`）。"""
+    """自請求設定與產品寫死之相對路徑解析該路徑之全部輸出根（如 `data_cache/features/`、`data_cache/reports/`）；
+    `repo_root`＝本次執行之 cwd 根（相對寫入根皆落於其中，SPEC §G (b)）。"""
     raise NotImplementedError(_STUB)
 
 
@@ -709,13 +748,21 @@ def small_request(item: str, request: Mapping[str, Any], n_features: int) -> Dic
     raise NotImplementedError(_STUB)
 
 
-def feature_tables(item: str) -> List[str]:
-    """該項回應中逐特徵表之 JSON pointer 清單（index＝特徵名之 DataFrame，如 summary_table）；"features" 之來源。"""
+def feature_tables(item: str) -> Dict[str, str]:
+    """該項回應中逐特徵來源：{<JSON pointer>: <形狀>}，"features" 之來源（SPEC §G baseline 內容；IC 報告為 dict，
+    `ic_filter_orchestrator.py:1255`）。形狀：`"rows"`＝list[dict]、以 `feature_name` 為鍵（`summary_table`，`:4942`）；
+    `"by_key"`＝以特徵名為鍵之 dict（`quantile_returns`、`coverage_analysis`、`turnover_analysis`）；`"frame"`＝index 為特徵名
+    之 DataFrame（通用形狀，本票各項無）。第 (1)、(4) 項 ⇒ {"/summary_table": "rows", "/quantile_returns": "by_key",
+    "/coverage_analysis": "by_key", "/turnover_analysis": "by_key"}；第 (3)、(5) 項 ⇒ {}（深度分析之逐模組逐欄位由回應全部
+    欄位涵蓋，SPEC §G）。"""
     raise NotImplementedError(_STUB)
 
 
 def selected_pointer(item: str) -> Optional[str]:
-    """該項回應中選欄通過集合（特徵名清單）之 JSON pointer；無此概念之項 ⇒ None。"""
+    """該項回應中選欄通過集合（特徵名清單）之 JSON pointer；無此概念、或通過集合不在回應之項 ⇒ None。§G 第 (1)、(4) 項之
+    通過集合＝第 6 段後之倖存者（`analyzer.get_filtered_features().columns`，`ic_filter_orchestrator.py:3390`；報告頂層無
+    名單），不在回應 ⇒ None；其 "selected" 取自該次執行寫出之 `data_cache/reports/ic_survivors_<case_id>.json`（case_id 預設
+    `ic_gatekeeper`，`ic_filter_orchestrator.py:5837`）之 `feature_names`（`momentum/Analysis/survivor_contract.py`）。"""
     raise NotImplementedError(_STUB)
 
 
@@ -725,7 +772,15 @@ def load_cell(cell: str = CELL) -> Tuple[Any, Any]:
 
 
 def value_digest(values: Any) -> Dict[str, str]:
-    """{"sha256": <原生 dtype 位元組>, "nan_mask_sha256": <NaN 遮罩位元組>}。"""
+    """{"sha256", "nan_mask_sha256"}（boundary_02 之獨立 oracle 依此重算，`test_icperf_gate.py::_oracle_digest`）：
+    - ndarray（"frame" 形狀之 1 元素欄）⇒ sha256(`values.tobytes()`，原生 dtype 位元組)、遮罩＝sha256(
+      `np.isnan(values.astype("float64")).tobytes()`)；
+    - 其餘（"rows" 之欄值、"by_key" 之整段子樹）⇒ 正準形 c＝`canon(values)`：dict ⇒ {str(鍵): canon(值)}；list／tuple ⇒
+      [canon(元素)]；ndarray ⇒ {"__ndarray__": dtype.str, "shape": [...], "v": canon(tolist())}；numpy 純量 ⇒
+      {"__np__": dtype.str, "v": item()}（item 非 JSON 原生型別者取 str）；None／bool／int／float／str 原樣；其餘 ⇒
+      {"__repr__": "<模組>.<限定名>", "v": str(值)}；dataclass 與具 model_dump 之物件先轉 dict。sha256＝sha256(
+      `json.dumps(c, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=True)` 之 UTF-8)；遮罩＝同法序列化
+      「c 之同形樹、葉＝該葉為 float 且為 NaN」之 sha256。float 以 repr 序列化（與 float64 位元組一一對應，NaN 由遮罩記）。"""
     raise NotImplementedError(_STUB)
 
 
@@ -739,15 +794,21 @@ def pit_label_digests(features: Any, label: Any, *, num_quantiles: Optional[int]
 def stage5_subset_digests(n_cols: int, *, seed: int = SEED) -> Dict[str, Any]:
     """改前基準全特徵 run 交接 h5 之 n_cols 欄巢狀隨機子集（seed 同探針 `icperf_probes/prep.py`）以產品
     `create_ic_analyzer(...).analyze()` 跑第 5 段；回 {"stage_cols", "features": {<特徵>: {<欄位>: value_digest}},
-    "pit_labels": {...}}；交接 h5 不存在 ⇒ FreezeError（不以其他 run 代替）。"""
+    "pit_labels": {...}}（"features" 之來源、欄位命名與摘要粒度同第 (1) 項，見模組說明）；交接 h5 不存在 ⇒ FreezeError
+    （不以其他 run 代替）。"""
     raise NotImplementedError(_STUB)
 
 
 def freeze_item(item: str, *, request: Mapping[str, Any], repo_root: Path, work_root: Path) -> Dict[str, Any]:
     """凍結 §G 單一項：第 (1)、(3)、(4)、(5) 項經 `capture_run` 取回應全部欄位與寫出檔；第 (2) 項經
-    `stage5_subset_digests(SUBSET_COLS)`。子行程把回傳物件原樣以 pickle 寫 `work_root/<item>/response.pkl`，隔離目錄
-    ＝`work_root/<item>/iso`（審計記錄與 sitecustomize 亦置於 `work_root/<item>`，pickle 與記錄不在快照範圍）；回之記錄
-    另含 "request"、"output_roots"（repo 相對 POSIX）。"""
+    `stage5_subset_digests(SUBSET_COLS)`。三根（SPEC §G (b)）：cwd 根＝新建之 `work_root/<item>/cwd`（唯讀輸入
+    `data_cache/feature_klines`、`data_cache/feature_klines_longhist`、`config/` 自 `repo_root` 以 symlink 引入，同
+    `scripts/ffprod_measure.py` `ic_watched`；快照不跟隨其下之目錄 symlink）、隔離目錄＝`work_root/<item>/iso`
+    （TMPDIR／HOME，前綴 `<iso>`）、`repo_root`（前綴 `<repo>`，抓逃逸寫出）；`capture_run(..., repo_root=<cwd 根>,
+    iso_root=<隔離目錄>, extra_roots={"<repo>": repo_root})`。子行程把回傳物件原樣以 pickle 寫
+    `work_root/<item>/response.pkl`（審計記錄與 sitecustomize 亦置於 `work_root/<item>`，pickle 與記錄不在快照範圍）；
+    回之記錄另含 "request"、"output_roots"（cwd 根相對 POSIX）、"roots"＝{"cwd": <cwd 根>, "iso": <隔離目錄>}（解析後
+    絕對路徑；boundary_01 之獨立 oracle 以同一組根走訪並比對）、"features"／"selected"（第 (1)、(4) 項，見模組說明）。"""
     raise NotImplementedError(_STUB)
 
 
@@ -770,7 +831,10 @@ def load_single_receipt(pattern: str, *, repo_root: Path = REPO) -> Dict[str, An
 def build_path_inventory(repo_root: Path = REPO) -> Dict[str, Any]:
     """讀碼列 Task 0.2 範圍內每一計算入口：{"entries": [{"id": "<模組>:<限定名>", "stage", "input_axes"
     （⊆ cols／rows／passed_cols）, "ic_page", "ic_first", "loop"（per_bar／per_column／per_group／none）, "measure",
-    "no_measure_reason", "evidence": "<檔>:<行>"}]}。"""
+    "no_measure_reason", "evidence": "<檔>:<行>", "coverage_path_id": <與入口一一對應之字串>, "unit_axis": {"axes":
+    [<scale_vector 鍵>...], "function": <單位成本之複雜度函數，如 "input_cols*rows">}, "scale_vector": [<該入口所用之
+    rows／input_cols／stage_cols／survivors／survivor_pairs>...]}]}（SPEC Task 0.2 路徑清冊；與 Task 5.4 總時間門檻共用 schema；
+    `unit_axis.axes` ⊆ `scale_vector`）。"""
     raise NotImplementedError(_STUB)
 
 
@@ -792,14 +856,26 @@ def evaluate_criteria(entry: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
 
 def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = SCALE_POINTS,
                       out_path: Path) -> Dict[str, Any]:
-    """以 `scripts/scale_probe.py` 量清冊每一需量測入口於 `scales` 之耗時與峰值 RSS（行程樹），寫 `out_path`：
-    {"head": <量測時之 40 位提交雜湊>, "meter": {"tool", "rss_scope", "sample_interval_seconds"}, "chunk_cap": {"bytes", "basis"},
-    "budget_seconds",
-    "entries": {<清冊 id>: {"probe": {"cmd", "data", "config"}, "row_probe": {"cmd", "data", "config"}|None,
-    "points": [{"input_cols", "stage_cols", "seconds", "peak_rss_bytes", "scale_probe_receipt"}],
-    "row_points": [{"rows", "seconds", "peak_rss_bytes", "scale_probe_receipt"}], "fit": {"exponent", "r2"},
+    """以 `scripts/scale_probe.py` 量清冊每一需量測入口於 `scales` 之耗時與峰值 RSS（行程樹），並以 `sample <pid>` 取峰值
+    Physical footprint（§B 門檻；同 `scripts/measure_ic_footprint.sh` 之工具，只沿用工具、不沿用其取樣停止與超標終止：受測
+    行程結束前持續取樣、不因超標中止，SPEC Task 0.2），寫 `out_path`：
+    {"head": <量測時之 40 位提交雜湊>, "meter": {"tool", "rss_scope", "sample_interval_seconds", "footprint": {"tool":
+    "sample:Physical footprint", "sampling": "until_target_exit", "terminate_target_on_exceed": False}},
+    "chunk_cap": {"bytes", "basis"}, "budget_seconds",
+    "entries": {<清冊 id>: {"coverage_path_id", "unit_axis"（皆＝清冊該入口之值）, "probe": {"cmd", "data", "config"},
+    "row_probe": {"cmd", "data", "config"}|None,
+    "points": [{"input_cols", "stage_cols", "seconds", "peak_rss_bytes", "peak_footprint_bytes", "scale_vector":
+    {<清冊 scale_vector 之每一鍵>: <int>}, "scale_probe_receipt"}],
+    "row_points": [{"rows", "seconds", "peak_rss_bytes", "peak_footprint_bytes", "scale_vector", "scale_probe_receipt"}],
+    "fit": {"exponent", "r2"},
     "extrapolation_unreliable", "projected_seconds", "reduction", "two_point_exception": {"projected_2000_seconds"}|None,
-    "complexity_analysis", "lower_bound_seconds_per_unit", "lower_bound_analysis", "criteria"}}}。
+    "complexity_analysis", "lower_bound_seconds_per_unit", "lower_bound_analysis", "criteria",
+    "opportunities": {"time"|"memory"|"precision"|"file_size": {"status": "none"|"planned"|"needs_user"|"done",
+    "evidence", "before", "after", "downstream", "user_ruling"}}}}}。
+    points 恰 3 點（500／1000／2000）；唯一例外＝帶 two_point_exception 者恰 2 點（500／1000）且不含 2000 欄點。每點之
+    scale_vector 鍵集＝清冊該入口之 scale_vector（缺軸即拒收），其 input_cols／stage_cols／rows 與點之同名欄相等；下限單位
+    成本依同一 unit_axis 擬合。opportunities 四鍵齊備：`none` 須 evidence（無機會之理由）；`planned` 須 evidence；
+    `needs_user`（改值者）須 before、after、downstream；`done` 須 before、after（同工具量測）。
     入口 id 只取清冊 id；每一點之 seconds／peak_rss_bytes 逐欄抄自其 `scale_probe_receipt`（scale_probe 寫出之收據，
     該收據 points 中 scale＝input_cols〔列長點為 rows〕之點）；`probe`／`row_probe` 為交給 scale_probe 之量測命令
     （cmd 含清冊 id）與其 --data／--config，該收據之 identity.match 須與之逐欄相符（量測前先提交量測碼，`head` 即該提交）；同一收據之三點者 fit／extrapolation_unreliable 等於該收據。

@@ -7,7 +7,11 @@
   回應鍵集合）對小規模真實請求對照（slow＋requires_kline）。
 - boundary_03／04：讀真實資料 A 格（requires_kline，缺檔 FAIL）；boundary_21：真實 kline 索引上之明列邊界輸入（秒級，
   requires_kline）。
-- boundary_14–20：讀 Task 0.2 收據（各恰一份），量測點逐欄綁定 scale_probe 收據。
+- boundary_14–20：讀 Task 0.2 收據（各恰一份），量測點逐欄綁定 scale_probe 收據；清冊與量測收據之 coverage_path_id／
+  unit_axis／scale_vector（與 Task 5.4 共用 schema）、峰值 Physical footprint、四項機會欄（SPEC v5.13–v5.21）。
+- boundary_24／25：秒級契約——逐特徵來源與形狀＝SPEC §G（IC 報告為 dict：summary_table list[dict]、其餘以特徵名為鍵）；
+  凍結腳本寫死之 IC 頁初始 payload（衰減開）== 前端原始碼與 ui_stage_toggles.json 導出值。
+- Task 0.3（現行 IC 正確性獨立驗證）之測試另見 tests/momentum/Analysis/test_icperf_correctness.py。
 - test_freeze_reproducible：重型（slow＋requires_kline；真實資料 500 欄第 5 段重跑，改前實測約 393 秒）。
 - 本檔之 pytest 列 `scripts/heavy_commands.json` 之 wrapped（`pytest_icperf_gate`）：須經共用監看包裝並背景；只有
   `-m "not slow and not requires_kline"`（排除全部重型與真實資料測試）之選取不列重型。
@@ -44,8 +48,17 @@ SCALE_BEFORE_PATTERN = "handoffs/run_receipts/*-icperf-scale-before.json"
 G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfirst_post_ic")
 #: §G 凍結範圍：第 (1)、(3)、(4)、(5) 項須含回應全部欄位與快照差集之全部寫出檔
 OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic")
-#: §G：第 (1)–(4) 項為逐特徵逐欄位輸出
-FEATURE_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report")
+#: §G：第 (1)、(2)、(4) 項為逐特徵逐欄位輸出（SPEC v5.8：第 (3) 項深度分析之逐模組逐欄位由「回應全部欄位」涵蓋）
+FEATURE_ITEMS = ("ic_report", "stage5_subset", "event_report")
+#: SPEC §G baseline 內容：IC 報告（dict）之逐特徵來源與形狀（測試自持）——summary_table＝list[dict]、以 feature_name 為鍵；
+#: 其餘＝以特徵名為鍵之 dict
+FEATURE_SOURCES = {"/summary_table": "rows", "/quantile_returns": "by_key", "/coverage_analysis": "by_key",
+                   "/turnover_analysis": "by_key"}
+#: 回應帶逐特徵來源之項（第 (1)、(4) 項）；其選欄通過集合＝第 6 段後之倖存者，取自寫出之 ic_survivors_<case_id>.json
+SURVIVOR_ITEMS = ("ic_report", "event_report")
+#: 倖存者檔之 path_key（cwd 根相對；momentum/Analysis/ic_reporter.py:880 `ic_survivors_{case_id}.json`，case_id 預設
+#: ic_gatekeeper，ic_filter_orchestrator.py:5837）
+SURVIVORS_KEY_RE = re.compile(r"^data_cache/reports/ic_survivors_[^/]+\.json$")
 CELL = "A_BTCUSDT_1h"
 SEED = 20261027
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
@@ -63,6 +76,14 @@ INVENTORY_KEYS = {"id", "stage", "input_axes", "ic_page", "ic_first", "loop", "m
 INPUT_AXES = {"cols", "rows", "passed_cols"}
 LOOPS = {"per_bar", "per_column", "per_group", "none"}
 SCALE_POINTS = {500, 1000, 2000}
+#: SPEC Task 0.2／5.4 共用 schema：scale_vector 之軸（各入口取其所用者）
+SCALE_VECTOR_KEYS = {"rows", "input_cols", "stage_cols", "survivors", "survivor_pairs"}
+#: SPEC Task 0.2「記憶體量測與四項機會欄」
+OPPORTUNITY_KEYS = {"time", "memory", "precision", "file_size"}
+OPPORTUNITY_STATUSES = {"none", "planned", "needs_user", "done"}
+OPPORTUNITY_FIELDS = {"status", "evidence", "before", "after", "downstream", "user_ruling"}
+#: §B 峰值記憶體門檻工具（同 scripts/measure_ic_footprint.sh；handoffs/run_receipts/gap3ux-b9-footprint.receipt.json 之 tool）
+FOOTPRINT_TOOL = "sample:Physical footprint"
 #: SPEC §G 時間紀律：§B ICPERF-BUDGET-2 上界 80 分鐘（SPEC v5.7）
 BUDGET2_UPPER_SECONDS = 80 * 60
 #: SPEC Task 0.2 邊界：元件於 2000 欄逾 10 分鐘 ⇒ 只量 500／1000
@@ -114,13 +135,20 @@ def scale_probe() -> Any:
 # ── 共用小工具 ─────────────────────────────────────────────────────────────────────────────────────────
 
 
-def _key(path: Path, repo: Path) -> str:
-    """path_key（腳本模組說明）：repo 下＝repo 相對 POSIX；其餘＝解析後絕對路徑。測試自算，不引腳本。"""
-    p, r = path.resolve(), repo.resolve()
-    try:
-        return p.relative_to(r).as_posix()
-    except ValueError:
+def _key(path: Path, repo: Path, prefixes: Optional[Mapping[str, Path]] = None) -> str:
+    """path_key（SPEC §G (b) 三根前綴規則；測試自算，不引腳本之 path_key）：`repo`＝本次執行之工作目錄（cwd 根）之下＝
+    相對 POSIX；`prefixes` 所列根（如 {"<iso>": 隔離目錄, "<repo>": repo 根}）之下＝`<前綴>/<相對 POSIX>`；多根皆含時
+    取解析後路徑最長（最具體）之根；皆不含＝解析後絕對路徑。"""
+    p = path.resolve()
+    best: Optional[Tuple[str, Path]] = None
+    for prefix, root in [("", repo)] + list((prefixes or {}).items()):
+        r = Path(root).resolve()
+        if (p == r or r in p.parents) and (best is None or len(str(r)) > len(str(best[1]))):
+            best = (prefix, r)
+    if best is None:
         return str(p)
+    rel = p.relative_to(best[1]).as_posix()
+    return rel if best[0] == "" else f"{best[0]}/{rel}"
 
 
 def _repo(tmp_path: Path) -> Path:
@@ -128,6 +156,23 @@ def _repo(tmp_path: Path) -> Path:
     (repo / "data_cache" / "features").mkdir(parents=True, exist_ok=True)
     (repo / "data_cache" / "reports").mkdir(parents=True, exist_ok=True)
     return repo
+
+
+#: SPEC §G (b)／`freeze_item` 契約：隔離 cwd 根以 symlink 自 repo 引入之唯讀輸入（相對 cwd 根之路徑）
+READONLY_INPUTS = ("data_cache/feature_klines", "data_cache/feature_klines_longhist", "config")
+
+
+def _isolated_cwd_root(work_root: Path, item: str) -> Path:
+    """與 `freeze_item` 同語意之隔離 cwd 根（測試自建，不引腳本）：`work_root/<item>/cwd`，唯讀輸入 `READONLY_INPUTS`
+    自 repo 以 symlink 引入（repo 無該輸入者略過）。"""
+    cwd = work_root / item / "cwd"
+    cwd.mkdir(parents=True, exist_ok=True)
+    for rel in READONLY_INPUTS:
+        src, dst = REPO / rel, cwd / rel
+        if src.exists() and not dst.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.symlink_to(src, target_is_directory=src.is_dir())
+    return cwd
 
 
 def _capture(fb: Any, tmp_path: Path, body: str, *, output_roots: Optional[Sequence[Path]] = None,
@@ -169,12 +214,21 @@ def _inventory_entries() -> Dict[str, Dict[str, Any]]:
 # ── 獨立 oracle（不經凍結腳本之最小實作；boundary_01／02） ─────────────────────────────────────────────
 
 
-def _oracle_walk(roots: Sequence[Path]) -> Dict[str, Tuple[int, int]]:
-    """os.walk 全樹：{path_key: (大小, mtime_ns)}；排除集照 SPEC §G 原文（含 NUMBA_CACHE_DIR 整棵），不引腳本。"""
+def _oracle_roots(cwd: Path, iso: Path) -> Dict[str, Path]:
+    """獨立 oracle 之三根（SPEC §G (b)）：工作目錄（cwd 根，前綴空）、隔離目錄 `<iso>`、repo 根 `<repo>`。"""
+    return {"": Path(cwd), "<iso>": Path(iso), "<repo>": REPO}
+
+
+def _oracle_walk(roots: Mapping[str, Path]) -> Dict[str, Tuple[int, int]]:
+    """os.walk 全樹：{path_key: (大小, mtime_ns)}；`roots`＝{前綴: 根}（`_oracle_roots`；前綴空者為 cwd 根），鍵依 `_key`
+    之三根前綴規則；排除集照 SPEC §G 原文（含 NUMBA_CACHE_DIR 整棵），不引腳本。不跟隨目錄 symlink（cwd 內唯讀輸入之
+    symlink 不展開）。"""
     nd = os.environ.get("NUMBA_CACHE_DIR")
     numba_dir = Path(nd).resolve() if nd else None
+    cwd_root = Path(roots[""])  # cwd 根必給（不得以 git 根 REPO 代之；r30 CODEX-R30-P1-01 同類）
+    prefixes = {k: Path(v) for k, v in roots.items() if k}
     out: Dict[str, Tuple[int, int]] = {}
-    for root in roots:
+    for root in roots.values():
         if not root.exists():
             continue
         for dirpath, dirnames, filenames in os.walk(root):
@@ -188,7 +242,7 @@ def _oracle_walk(roots: Sequence[Path]) -> Dict[str, Tuple[int, int]]:
                     st = p.stat()
                 except OSError:
                     continue
-                out[_key(p, REPO)] = (st.st_size, st.st_mtime_ns)
+                out[_key(p, cwd_root, prefixes)] = (st.st_size, st.st_mtime_ns)
     return out
 
 
@@ -231,29 +285,100 @@ def _resolve(obj: Any, pointer: str) -> Any:
     return _as_container(obj)
 
 
+def _oracle_response_fields(item: str, raw: Any) -> Set[str]:
+    """§G 摘要粒度：回應全部欄位扣除逐特徵來源之子路徑（逐特徵來源不於「回應全部欄位」重複攤平；來源本身為空容器時
+    仍以純量記）。只對回應帶逐特徵來源之項（SURVIVOR_ITEMS）扣除。"""
+    fields = _oracle_field_paths(raw)
+    if item not in SURVIVOR_ITEMS:
+        return fields
+    return {p for p in fields if not any(p.startswith(src + "/") for src in FEATURE_SOURCES)}
+
+
+def _canon(v: Any) -> Any:
+    """`value_digest` 之正準形（腳本 docstring 之規則；測試自寫，不呼叫腳本）。"""
+    v = _as_container(v)
+    if isinstance(v, dict):
+        return {str(k): _canon(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_canon(x) for x in v]
+    if isinstance(v, np.ndarray):
+        return {"__ndarray__": v.dtype.str, "shape": list(v.shape), "v": _canon(v.tolist())}
+    if isinstance(v, np.generic):
+        item = v.item()
+        return {"__np__": v.dtype.str,
+                "v": item if item is None or isinstance(item, (bool, int, float, str)) else str(item)}
+    if v is None or isinstance(v, (bool, int, float, str)):
+        return v
+    return {"__repr__": f"{type(v).__module__}.{type(v).__qualname__}", "v": str(v)}
+
+
+def _nan_tree(c: Any) -> Any:
+    if isinstance(c, dict):
+        return {k: _nan_tree(x) for k, x in c.items()}
+    if isinstance(c, list):
+        return [_nan_tree(x) for x in c]
+    return isinstance(c, float) and c != c
+
+
+def _canon_bytes(c: Any) -> bytes:
+    return json.dumps(c, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=True).encode("utf-8")
+
+
+def _oracle_digest(v: Any) -> Dict[str, str]:
+    """"rows" 之欄值與 "by_key" 之整段子樹之摘要（SPEC §G 摘要粒度：子樹攤平後之正準序列化雜湊，含 NaN 遮罩）。"""
+    c = _canon(v)
+    return {"sha256": hashlib.sha256(_canon_bytes(c)).hexdigest(),
+            "nan_mask_sha256": hashlib.sha256(_canon_bytes(_nan_tree(c))).hexdigest()}
+
+
+def _is_table_field(field: str) -> bool:
+    """逐特徵欄位名是否屬表結構（"rows"／"frame" 之 "<來源>/<欄名>"）；"by_key" 之欄位名＝來源 pointer 本身（單段）。"""
+    return field.rsplit("/", 1)[0] != ""
+
+
+def _oracle_survivors(run: Mapping[str, Any]) -> Tuple[List[str], Optional[List[str]]]:
+    """獨立 oracle 之倖存者：(同次執行寫出差集中之 ic_survivors_<case_id>.json 鍵〔cwd 根相對〕, 恰一個時其
+    feature_names〔momentum/Analysis/survivor_contract.py〕，否則 None)；份數由呼叫端斷言。"""
+    hits = sorted(k for k in run.get("written") or () if SURVIVORS_KEY_RE.match(k))
+    if len(hits) != 1:
+        return hits, None
+    payload = json.loads((Path(run["roots"]["cwd"]) / hits[0]).read_text(encoding="utf-8"))
+    return hits, [str(n) for n in payload["feature_names"]]
+
+
 def _top_segments(paths: Sequence[str]) -> Set[str]:
     return {p[1:].split("/")[0].split("#")[0] if p.startswith("/") else p for p in paths}
 
 
 def _root_of(key: str, roots: Sequence[str]) -> str:
+    """path_key 所屬之輸出根（`roots` 為 cwd 相對 POSIX）；`<iso>/`、`<repo>/` 前綴者歸其前綴，絕對路徑歸 `<outside>`。"""
     for r in roots:
         r = r.rstrip("/")
         if key == r or key.startswith(r + "/"):
             return r
-    return "<isolated>" if key.startswith("/") else "<other>"
+    for prefix in ("<iso>", "<repo>"):
+        if key.startswith(prefix + "/"):
+            return prefix
+    return "<outside>" if key.startswith("/") else "<other>"
 
 
 def _check_item_against_oracle(fb: Any, name: str, run: Mapping[str, Any], frozen_item: Mapping[str, Any]) -> None:
-    """boundary_02 之單項判定（r12 CODEX-R12-P1-02／-P1-03：抽出以供 mutation 直接驅動）。
+    """boundary_02 之單項判定（r12 CODEX-R12-P1-02／-P1-03：抽出以供 mutation 直接驅動）。逐特徵來源依
+    `fb.feature_tables(name)` 之形狀（SPEC §G baseline 內容；IC 報告為 dict，各形狀見腳本 `feature_tables`）：
+    "rows"（summary_table：list[dict]、以 feature_name 為鍵）每列每欄一值、"by_key"（quantile_returns、coverage_analysis、
+    turnover_analysis）每特徵整段子樹一值（`_oracle_digest`）、"frame"（index 為特徵名之 DataFrame，通用形狀）每欄一值。
     ① 同一小規模請求：凍結機制之記錄（run["record"]）逐特徵逐欄位之值與 NaN 遮罩 sha256、欄位集合、選欄通過集合
-       == 測試自原始回應重算之 oracle（帶特徵名、逐值）。
-    ② 凍結檔（整格請求）對 oracle 只比表結構、不比逐特徵值：FDR 等跨特徵校正依請求之特徵數
-       （momentum/Analysis/ic_filter_orchestrator.py:56 `apply_fdr`），20 欄與整格之逐特徵值與通過與否本可不同。
-       逐特徵表須全成員（oracle 各特徵欄位集合恰一種；成員依請求而變者於 Phase 0 即紅、不放行），凍結檔之共同欄位集合
-       與之相等，且 oracle 特徵（`small_request` 取凍結請求排序後之前 ORACLE_FEATURES 個）皆在凍結檔。"""
+       == 測試自原始回應重算之 oracle（帶特徵名、逐值）；第 (1)、(4) 項之選欄通過集合＝第 6 段後之倖存者，oracle 讀同次
+       執行寫出之 `data_cache/reports/ic_survivors_<case_id>.json` 之 feature_names（報告頂層無名單，
+       ic_filter_orchestrator.py:3390）。
+    ② 凍結檔（整格請求）對 oracle 只比表結構、與成員無關、不比逐特徵值：FDR 等跨特徵校正依請求之特徵數
+       （momentum/Analysis/ic_filter_orchestrator.py:56 `apply_fdr`），20 欄與整格之逐特徵值、通過與否與 "by_key" 來源之
+       成員本可不同。表結構（"rows"／"frame" 之欄）須全成員（oracle 各特徵之表欄位集合恰一種），凍結檔之表欄位集合與之相等，
+       oracle 特徵（`small_request` 取凍結請求排序後之前 ORACLE_FEATURES 個）皆在凍結檔，"by_key" 來源：oracle 出現者凍結檔
+       皆有。"""
     rec, raw = run["record"], run["raw"]
     expected: Dict[str, Set[str]] = {}
-    for ptr in fb.feature_tables(name):
+    for ptr in [p for p, k in fb.feature_tables(name).items() if k == "frame"]:
         df = _resolve(raw, ptr)
         assert isinstance(df, pd.DataFrame), f"{name}：{ptr} 非逐特徵表"
         for feat in df.index:
@@ -267,35 +392,80 @@ def _check_item_against_oracle(fb: Any, name: str, run: Mapping[str, Any], froze
                 assert got["sha256"] == hashlib.sha256(arr.tobytes()).hexdigest(), f"{name}/{feat}/{c}：值"
                 mask = np.isnan(arr.astype("float64"))
                 assert got["nan_mask_sha256"] == hashlib.sha256(mask.tobytes()).hexdigest(), f"{name}/{feat}/{c}：遮罩"
+    # "rows"／"by_key"（SPEC §G 摘要粒度）；區域名沿用上段（斷言之名序不變）
+    for ptr, shape in fb.feature_tables(name).items():
+        if shape == "frame":
+            continue
+        df = _resolve(raw, ptr)
+        if shape == "rows":
+            assert isinstance(df, list) and all(isinstance(got, dict) and "feature_name" in got for got in df), \
+                f"{name}：{ptr} 非以 feature_name 為鍵之 list[dict]"
+            assert len({str(got["feature_name"]) for got in df}) == len(df), f"{name}：{ptr} 之 feature_name 重複"
+            for got in df:
+                feat = str(got["feature_name"])
+                for c, arr in got.items():
+                    if c == "feature_name":
+                        continue
+                    expected.setdefault(feat, set()).add(f"{ptr}/{_ptr(c)}")
+                    assert rec["features"][feat][f"{ptr}/{_ptr(c)}"] == _oracle_digest(arr), \
+                        f"{name}/{feat}{ptr}/{c}：值或 NaN 遮罩 != 獨立 oracle"
+        elif shape == "by_key":
+            assert isinstance(df, dict), f"{name}：{ptr} 非以特徵名為鍵之 dict"
+            for feat, arr in df.items():
+                expected.setdefault(str(feat), set()).add(ptr)
+                assert rec["features"][str(feat)][ptr] == _oracle_digest(arr), \
+                    f"{name}/{feat}{ptr}：子樹值或 NaN 遮罩 != 獨立 oracle"
+        else:
+            pytest.fail(f"{name}：{ptr} 之逐特徵來源形狀未知（須 rows／by_key／frame）")
     assert expected, f"{name}：獨立 oracle 未取得任何逐特徵表"
     assert {f: set(v) for f, v in rec["features"].items()} == expected, f"{name}：逐特徵欄位 != 獨立 oracle"
-    oracle_schema = {frozenset(v) for v in expected.values()}
+    oracle_schema = {frozenset(x for x in v if _is_table_field(x)) for v in expected.values()}  # 表結構（與成員無關）
     assert len(oracle_schema) == 1, f"{name}：逐特徵表非全成員（成員依請求而變）⇒ 凍結結構無從對照"
-    frozen_feats = frozen_item["features"]
+    frozen_feats = {f: {x for x in v if _is_table_field(x)} for f, v in frozen_item["features"].items()}
     assert {frozenset(v) for v in frozen_feats.values()} == oracle_schema, f"{name}：凍結檔逐特徵欄位結構 != oracle"
     missing = set(expected) - set(frozen_feats)
     assert not missing, f"{name}：oracle 特徵不在凍結檔：{sorted(missing)[:5]}"
     sel = fb.selected_pointer(name)
     if sel is not None:
         assert sorted(map(str, _resolve(raw, sel))) == sorted(rec["selected"]), f"{name}：選欄通過集合 != oracle"
+    # 以下重用上段已綁之區域名（missing、sel），不另綁新名：呼叫者之斷言名序不變（TESTREG V19 normalize ②）。
+    # "by_key" 來源之存在（與成員無關）：oracle 出現之來源凍結檔皆有，凍結檔之來源皆屬 SPEC 所列（FEATURE_SOURCES）
+    missing = _keyed_sources(expected) - _keyed_sources(frozen_item["features"])
+    assert not missing, f"{name}：凍結檔缺逐特徵來源 {sorted(missing)}"
+    missing = _keyed_sources(frozen_item["features"]) - set(FEATURE_SOURCES)
+    assert not missing, f"{name}：凍結檔含 SPEC 外之逐特徵來源 {sorted(missing)}"
+    # SPEC §G：第 (1)、(4) 項之選欄通過集合＝第 6 段後之倖存者（同次執行寫出之 ic_survivors_<case_id>.json；報告頂層無名單）
+    if name in SURVIVOR_ITEMS:
+        sel = _oracle_survivors(run)  # (寫出差集中之倖存者檔鍵, 恰一份時其 feature_names)
+        assert len(sel[0]) == 1, f"{name}：同次執行之寫出差集須恰一個 ic_survivors_<case_id>.json，實得 {sel[0]}"
+        assert sorted(sel[1] or []) == sorted(rec["selected"]), f"{name}：選欄通過集合（第 6 段倖存者）!= 獨立 oracle"
+
+
+def _keyed_sources(features: Mapping[str, Any]) -> Set[str]:
+    """逐特徵欄位中屬 "by_key" 來源者（欄位名＝來源 pointer 本身）之聯集。"""
+    return {x for fields in features.values() for x in fields if not _is_table_field(x)}
 
 
 @pytest.fixture(scope="module")
 def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Dict[str, Any]]:
-    """每一輸出項對同一小規模真實請求跑一次凍結機制，同時以獨立 oracle 觀測同一次執行。"""
+    """每一輸出項對同一小規模真實請求跑一次凍結機制，同時以獨立 oracle 觀測同一次執行。三根（SPEC §G (b)）：cwd 根＝
+    `work/<item>/cwd`、隔離目錄＝`work/<item>/iso`（`freeze_item` 契約）、repo 根；`freeze_item` 之記錄須以 "roots" 回報
+    其實際所用之 cwd 根與隔離目錄，且與 oracle 前後兩次走訪之根相同（boundary_01 末斷言）。"fields"＝回應全部欄位扣除逐特徵
+    來源之子路徑（SPEC §G 摘要粒度；逐特徵來源由 boundary_02 逐特徵比對）。"""
     golden = _golden()
     out: Dict[str, Dict[str, Any]] = {}
     for item in OUTPUT_ITEMS:
         work = tmp_path_factory.mktemp(f"oracle_{item}")
         request = fb.small_request(item, golden["items"][item]["request"], ORACLE_FEATURES)
         iso = work / item / "iso"
-        before = _oracle_walk([REPO, iso])
+        before = _oracle_walk(_oracle_roots(work / item / "cwd", iso))
         record = fb.freeze_item(item, request=request, repo_root=REPO, work_root=work)
-        after = _oracle_walk([REPO, iso])
+        after = _oracle_walk(_oracle_roots(work / item / "cwd", iso))
         written = {k for k, v in after.items() if before.get(k) != v}
         with open(work / item / "response.pkl", "rb") as fh:
             raw = pickle.load(fh)
-        out[item] = {"record": record, "raw": raw, "written": written, "fields": _oracle_field_paths(raw)}
+        out[item] = {"record": record, "raw": raw, "written": written, "fields": _oracle_response_fields(item, raw),
+                     "roots": {"cwd": str((work / item / "cwd").resolve()), "iso": str(iso.resolve())}}
     return out
 
 
@@ -305,8 +475,10 @@ def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, 
 @pytest.mark.slow
 @pytest.mark.requires_kline
 def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str, Any]]) -> None:
-    """§G (1)–(5) 五項皆在；各項逐特徵逐欄位 sha256 非空；(1)(3)(4)(5) 各含回應全部欄位與快照差集之全部寫出檔；
-    獨立 oracle：同一小規模真實請求之回應鍵集合與 os.walk 全樹差集 == 凍結機制之記錄，凍結檔之欄位與輸出根結構相同。"""
+    """§G (1)–(5) 五項皆在；(1)(2)(4) 逐特徵逐欄位 sha256 非空；(1)(3)(4)(5) 各含回應全部欄位與快照差集之全部寫出檔；
+    獨立 oracle：同一小規模真實請求之回應鍵集合（扣除逐特徵來源之子路徑）與 os.walk 三根（cwd 根、`<iso>`、`<repo>`）前後
+    差集 == 凍結機制之記錄，凍結檔之欄位與輸出根結構相同；IC-first 凍結檔含 processed/selected.parquet（V2 artifact，不寫
+    HDF5）；記錄回報之根 == oracle 走訪之根。"""
     golden = _golden()
     items = golden["items"]
     missing = [k for k in G_ITEMS if k not in items]
@@ -326,7 +498,10 @@ def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str
         for key, rec in files.items():
             assert HEX64.match(str(rec.get("sha256") or "")), f"{name}/{key}：檔 sha256 空或非法"
     post_ic = items["icfirst_post_ic"]["files"]
-    assert any(rec.get("hdf5") for rec in post_ic.values()), "icfirst_post_ic：無逐群組逐資料集摘要之 HDF5"
+    # SPEC v5.8：IC-first 寫 V2 parquet artifact、不寫 HDF5（selected.parquet 之斷言見本函式末）；日後若寫出 .h5，仍須帶
+    # 逐物件摘要
+    if any(k.endswith((".h5", ".hdf5")) for k in post_ic):
+        assert any(rec.get("hdf5") for rec in post_ic.values()), "icfirst_post_ic：無逐群組逐資料集摘要之 HDF5"
     sub = items["stage5_subset"]
     assert sub["seed"] == SEED and sub["n_cols_requested"] == 2000
     assert sub["stage_cols"] == len(sub["features"]) and 0 < sub["stage_cols"] <= 2000
@@ -344,6 +519,16 @@ def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str
             f"{name}：凍結檔之回應頂層欄位 != 同請求小規模 oracle"
         assert {_root_of(k, frozen["output_roots"]) for k in frozen["files"]} == \
             {_root_of(k, rec["output_roots"]) for k in run["written"]}, f"{name}：凍結檔之寫出根 != 同請求小規模 oracle"
+    # SPEC v5.8 §G (5)：IC-first 之 post-IC 輸出為 V2 parquet artifact（不寫 HDF5），凍結檔須含 processed/selected.parquet
+    selected_parquet = sorted(k for k in post_ic if k.split("/")[-2:] == ["processed", "selected.parquet"])
+    assert len(selected_parquet) == 1, f"icfirst_post_ic：須恰一個 processed/selected.parquet，實得 {selected_parquet}"
+    assert HEX64.match(str(post_ic[selected_parquet[0]].get("sha256") or "")), "icfirst_post_ic：selected.parquet 無 sha256"
+    # SPEC §G (b)：freeze_item 之記錄回報所用之 cwd 根與隔離目錄，須與獨立 oracle 前後走訪之根相同（三根前綴之鍵方可比）
+    for name in OUTPUT_ITEMS:
+        run = oracle_runs[name]
+        used = run["record"].get("roots") or {}
+        assert {r: str(Path(p).resolve()) for r, p in used.items()} == run["roots"], \
+            f"{name}：freeze_item 所用之根 {used} != oracle 走訪之根 {run['roots']}"
 
 
 @pytest.mark.slow
@@ -351,13 +536,15 @@ def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str
 def test_boundary_02_frozen_baseline_content_complete(fb: Any, oracle_runs: Dict[str, Dict[str, Any]]) -> None:
     """逐特徵逐欄位值 sha256（原生 dtype 位元組）、NaN 遮罩 sha256、選欄通過集合、PIT 標籤序列 sha256 皆在；
     獨立 oracle（同一小規模請求）：自原始回應之逐特徵表重算欄位集合與數值欄之值／NaN 遮罩 sha256、選欄通過集合，
-    與記錄相同；凍結檔對 oracle 只比表結構（見 `_check_item_against_oracle`）。"""
+    與記錄相同；凍結檔對 oracle 只比表結構、與成員無關（見 `_check_item_against_oracle`）；選欄通過集合＝第 6 段後之
+    倖存者，oracle 讀同次執行寫出之 ic_survivors_<case_id>.json（見 `_check_item_sources_and_survivors`）。第 (3) 項深度分析
+    無逐特徵輸出（SPEC v5.8：由回應全部欄位涵蓋，boundary_01）。"""
     items = _golden()["items"]
-    for name in ("ic_report", "deep_analysis", "event_report"):
+    for name in SURVIVOR_ITEMS:
         _check_item_against_oracle(fb, name, oracle_runs[name], items[name])
     for name in FEATURE_ITEMS:
         features = items[name]["features"]
-        field_sets = {frozenset(f) for f in features.values()}
+        field_sets = {frozenset(x for x in f if _is_table_field(x)) for f in features.values()}  # 表結構（與成員無關）
         assert len(field_sets) == 1, f"{name}：各特徵欄位集合不一致"
         for feat, fields in features.items():
             for field, digest in fields.items():
@@ -577,7 +764,11 @@ def test_boundary_08_tmpdir_home_isolated_and_snapshotted(fb: Any, tmp_path: Pat
 
 
 def test_boundary_09_output_root_outside_snapshot_fails(fb: Any, tmp_path: Path) -> None:
-    """請求設定解析出之輸出根落快照範圍外 ⇒ FAIL；範圍內 ⇒ 放行；實際各路徑預設請求之輸出根皆在 repo 內。"""
+    """請求設定解析出之輸出根落快照範圍外 ⇒ FAIL；範圍內 ⇒ 放行；實際各路徑預設請求之輸出根皆落於所給之 cwd 根內
+    （`resolve_output_roots` 之 `repo_root`＝本次執行之 cwd 根，`scripts/icperf_freeze_baseline.py:739-741`）：①參數預設值
+    （`repo_root=REPO`，非隔離執行之 cwd 即 repo 根）⇒ 落 repo 內；②與 `freeze_item` 同語意之隔離 cwd 根
+    `work_root/<item>/cwd`（唯讀輸入自 repo 以 symlink 引入）⇒ 解析後落該 cwd 根內（相對根相對 cwd 根解析；落入唯讀輸入
+    symlink 者解析後出 cwd 根即紅）。r30 CODEX-R30-P1-01／COMPOSER-R30-P1-01。"""
     outside = tmp_path / "elsewhere_root"
     outside.mkdir()
     with pytest.raises(fb.FreezeError) as exc:
@@ -586,10 +777,18 @@ def test_boundary_09_output_root_outside_snapshot_fails(fb: Any, tmp_path: Path)
     ok = _capture(fb, tmp_path, "pass\n", output_roots=[tmp_path / "repo" / "data_cache"], tag="inroot")
     assert ok["rc"] == 0
     for item in OUTPUT_ITEMS:
-        roots = fb.resolve_output_roots(item, fb.default_request(item, CELL), REPO)
+        roots = fb.resolve_output_roots(item, fb.default_request(item, CELL))  # 參數預設 repo_root=REPO
         assert roots, f"{item}：未解析出任何輸出根"
         for r in roots:
             assert str(Path(r).resolve()).startswith(str(REPO.resolve()) + "/"), f"{item}：輸出根 {r} 在 repo 外"
+    for item in OUTPUT_ITEMS:
+        cwd_root = _isolated_cwd_root(tmp_path / "work", item)
+        cwd_roots = fb.resolve_output_roots(item, fb.default_request(item, CELL), cwd_root)
+        assert cwd_roots, f"{item}：隔離 cwd 根下未解析出任何輸出根"
+        for cr in cwd_roots:
+            resolved = (cwd_root / cr).resolve()
+            assert resolved == cwd_root.resolve() or cwd_root.resolve() in resolved.parents, \
+                f"{item}：輸出根 {cr}（解析為 {resolved}）不在隔離 cwd 根 {cwd_root} 內"
 
 
 def test_boundary_10_write_then_delete_recorded_not_compared(fb: Any, tmp_path: Path) -> None:
@@ -718,6 +917,101 @@ def test_boundary_13_volatile_fields_only_listed_paths_excluded(fb: Any, tmp_pat
     assert any("run_id" in p for p in unlisted_response), "回應欄位未列即須比"
 
 
+# ── §G 請求設定與逐特徵來源之秒級契約 ───────────────────────────────────────────────────────────────────────
+
+
+def test_boundary_24_feature_sources_per_spec(fb: Any) -> None:
+    """SPEC §G baseline 內容：第 (1)、(4) 項之逐特徵來源與形狀＝FEATURE_SOURCES（summary_table "rows"、quantile_returns／
+    coverage_analysis／turnover_analysis "by_key"）；第 (3)、(5) 項無逐特徵來源（深度分析由回應全部欄位涵蓋）；通過集合
+    不在回應（selected_pointer 為 None，取自寫出之倖存者檔，boundary_02）。"""
+    for item in SURVIVOR_ITEMS:
+        assert fb.feature_tables(item) == FEATURE_SOURCES, f"{item}：逐特徵來源 != SPEC §G"
+        assert fb.selected_pointer(item) is None, f"{item}：通過集合不在回應（報告頂層無名單）"
+    for item in ("deep_analysis", "icfirst_post_ic"):
+        assert fb.feature_tables(item) == {}, f"{item}：SPEC v5.8 起無逐特徵來源"
+
+
+FRONTEND_STORE = REPO / "frontend" / "src" / "store" / "icAnalysisStore.ts"
+FRONTEND_OVERRIDE = REPO / "frontend" / "src" / "lib" / "icConfigOverride.ts"
+FRONTEND_HOOK = REPO / "frontend" / "src" / "hooks" / "useICAnalysis.ts"
+UI_STAGE_TOGGLES = REPO / "momentum" / "Analysis" / "contracts" / "ui_stage_toggles.json"
+
+
+def _ts_block(src: str, head: str) -> str:
+    """自 TypeScript 原始碼取 `head` 起之第一個大括號區塊內容（括號配對；測試自寫之最小解析）。"""
+    start = src.index(head)
+    i = src.index("{", start)
+    depth = 0
+    for j in range(i, len(src)):
+        depth += {"{": 1, "}": -1}.get(src[j], 0)
+        if depth == 0:
+            return src[i + 1:j]
+    raise AssertionError(f"{head}：大括號不成對")
+
+
+def _ts_number(text: str) -> Any:
+    return int(text) if re.fullmatch(r"-?\d+", text) else float(text)
+
+
+def _frontend_ic_page_payload() -> Dict[str, Any]:
+    """由前端原始碼導出 IC 頁初始狀態送出之 config_override 與 feature_tiers（測試自寫之 regex 解析，不跑前端）：
+    `defaultConfig` 之 horizons／thresholds、`buildConfigOverride` 之鍵對映、初始 `featureTier` 與 `featureToggles`、
+    `PRESET_TOGGLES.intermediate`、`STAGE_TOGGLE_KEYS`、`getEffectiveConfig` 具名 preset 分支、`useICAnalysis` 之 payload 組裝。"""
+    store = FRONTEND_STORE.read_text(encoding="utf-8")
+    override_src = FRONTEND_OVERRIDE.read_text(encoding="utf-8")
+    hook = FRONTEND_HOOK.read_text(encoding="utf-8")
+    default_cfg = _ts_block(store, "const defaultConfig: ICAnalysisConfig =")
+    horizons = [int(x) for x in re.search(r"\bhorizons:\s*\[([^\]]*)\]", default_cfg).group(1).split(",") if x.strip()]
+    thresholds = {k: _ts_number(v) for k, v in
+                  re.findall(r"(\w+):\s*(-?[\d.]+)", _ts_block(default_cfg, "thresholds:"))}
+    cfg = {"horizons": horizons, "thresholds": thresholds}
+    body = _ts_block(override_src, "export const buildConfigOverride =")
+    out_thr = {k: cfg["thresholds"][src_k] for k, src_k in
+               re.findall(r"(\w+):\s*config\.thresholds\.(\w+)", _ts_block(body, "const thresholds"))}
+    for k, src_k in re.findall(r"thresholds\.(\w+)\s*=\s*config\.thresholds\.(\w+)", body):
+        if isinstance(cfg["thresholds"].get(src_k), (int, float)):  # `typeof … === 'number'` 之條件分支
+            out_thr[k] = cfg["thresholds"][src_k]
+    red = re.search(r"redundancy:\s*\{\s*(\w+):\s*config\.thresholds\.(\w+)", body)
+    lab = re.search(r"labels:\s*\{\s*(\w+):\s*config\.(\w+)", body)
+    config_override: Dict[str, Any] = {"thresholds": out_thr, "redundancy": {red.group(1): cfg["thresholds"][red.group(2)]},
+                                       "labels": {lab.group(1): cfg[lab.group(2)]}}
+    tier = re.search(r"\n\s*featureTier:\s*'(\w+)'", store).group(1)
+    toggles_tier = re.search(r"\n\s*featureToggles:\s*\{\s*\.\.\.PRESET_TOGGLES\.(\w+)\s*\}", store).group(1)
+    assert toggles_tier == tier, f"前端初始 featureToggles（{toggles_tier}）!= 初始 featureTier（{tier}）"
+    preset = {k: v == "true" for k, v in
+              re.findall(r"(\w+):\s*(true|false)", _ts_block(_ts_block(store, "const PRESET_TOGGLES"), f"{tier}:"))}
+    stage_keys = re.findall(r"'(\w+)'", re.search(r"export const STAGE_TOGGLE_KEYS = \[([^\]]*)\]", store).group(1))
+    effective = _ts_block(store, "getEffectiveConfig: () => {")  # 實作（非 interface 之型別宣告）
+    named = effective[effective.rindex("return {"):]
+    assert re.search(r"active_preset:\s*state\.featureTier", named) and \
+        re.search(r"custom_overrides:\s*\{\s*stage_overrides:\s*stageOverrides\s*\}", named), \
+        "getEffectiveConfig 具名 preset 分支之組裝已變（須重審 IC_PAGE_DEFAULT_PAYLOAD）"
+    assert re.search(r"config_override:\s*\{\s*\.\.\.buildConfigOverride\(config\),\s*"
+                     r"\.\.\.\(effectiveConfig\.feature_tiers \? \{ feature_tiers: effectiveConfig\.feature_tiers \} : \{\}\),",
+                     hook), "useICAnalysis 之 config_override 組裝已變（須重審 IC_PAGE_DEFAULT_PAYLOAD）"
+    assert re.search(r"\n\s*feature_tiers:\s*effectiveConfig\.feature_tiers,", hook), \
+        "useICAnalysis 之頂層 feature_tiers 組裝已變（須重審 IC_PAGE_DEFAULT_PAYLOAD）"
+    feature_tiers = {"active_preset": tier,
+                     "custom_overrides": {"stage_overrides": {k: bool(preset.get(k)) for k in stage_keys}}}
+    return {"config_override": {**config_override, "feature_tiers": feature_tiers}, "feature_tiers": feature_tiers,
+            "stage_keys": stage_keys}
+
+
+def test_boundary_25_ic_page_default_payload_matches_frontend(fb: Any) -> None:
+    """SPEC §G「各項請求設定」：凍結腳本寫死之 IC 頁初始 payload（IC_PAGE_DEFAULT_PAYLOAD）== 前端原始碼導出之初始
+    payload（衰減開：intermediate 之 ic_decay 為 true）；stage_overrides 鍵集 == ui_stage_toggles.json 之 stage_keys ==
+    前端 STAGE_TOGGLE_KEYS。前端改預設即紅（須重凍）。"""
+    expected = _frontend_ic_page_payload()
+    contract = json.loads(UI_STAGE_TOGGLES.read_text(encoding="utf-8"))
+    assert expected["stage_keys"] == contract["stage_keys"], "前端 STAGE_TOGGLE_KEYS != ui_stage_toggles.json stage_keys"
+    payload = fb.IC_PAGE_DEFAULT_PAYLOAD
+    assert payload["config_override"] == expected["config_override"], "config_override != 前端初始 payload"
+    assert payload["feature_tiers"] == expected["feature_tiers"], "feature_tiers != 前端初始 payload"
+    stage = payload["config_override"]["feature_tiers"]["custom_overrides"]["stage_overrides"]
+    assert set(stage) == set(contract["stage_keys"]), "stage_overrides 鍵集 != ui_stage_toggles.json stage_keys"
+    assert stage["ic_decay"] is True, "SPEC §G：IC 頁預設衰減開（不沿用 FFPROD 量測之衰減關）"
+
+
 # ── Task 0.2 收據 ───────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -762,6 +1056,23 @@ def test_boundary_14_inventory_fields_and_scope() -> None:
     callers = _pit_callers()
     assert callers, "AST 掃描未找到 pit_stats 四函式之呼叫端（oracle 失效）"
     assert callers <= set(entries), f"清冊缺 pit_stats 呼叫端：{sorted(callers - set(entries))}"
+    # SPEC v5.19 Task 0.2：每一入口另記 coverage_path_id（與入口一一對應）、unit_axis、scale_vector（與 Task 5.4 共用 schema）
+    for eid, e in entries.items():
+        _assert_inventory_axes(eid, e)
+    cpids = [e["coverage_path_id"] for e in entries.values()]
+    assert len(set(cpids)) == len(cpids), "coverage_path_id 須與入口一一對應（重複）"
+
+
+def _assert_inventory_axes(eid: str, e: Mapping[str, Any]) -> None:
+    """清冊入口之 coverage_path_id／unit_axis／scale_vector（SPEC Task 0.2、5.4）：拒收缺軸、單位歧義。"""
+    assert isinstance(e.get("coverage_path_id"), str) and e["coverage_path_id"].strip(), f"{eid}：缺 coverage_path_id"
+    sv = e.get("scale_vector")
+    assert isinstance(sv, list) and sv and len(set(sv)) == len(sv) and set(sv) <= SCALE_VECTOR_KEYS, \
+        f"{eid}：scale_vector 須為 {sorted(SCALE_VECTOR_KEYS)} 之非空不重複子集，實得 {sv!r}"
+    ua = e.get("unit_axis")
+    assert isinstance(ua, dict) and isinstance(ua.get("axes"), list) and ua["axes"], f"{eid}：缺 unit_axis.axes"
+    assert set(ua["axes"]) <= set(sv), f"{eid}：unit_axis.axes {ua['axes']} 不在 scale_vector {sv} 內（單位歧義）"
+    assert isinstance(ua.get("function"), str) and ua["function"].strip(), f"{eid}：缺 unit_axis.function（單位歧義）"
 
 
 def _cover_check_catches_swapped_id(fb: Any, inventory: Mapping[str, Any], scale: Mapping[str, Any]) -> bool:
@@ -867,6 +1178,44 @@ def test_boundary_16_three_points_per_entry() -> None:
             assert len(rows) == 3 and len({r["rows"] for r in rows}) == 3, f"{eid}：列數成長元件須三種列長"
             for r in rows:
                 _assert_point_bound(eid, r, r["rows"], "rows", m["row_probe"], head)
+    # SPEC v5.19–v5.21 Task 0.2：點數規則（3 點；唯一例外＝帶 two_point_exception 者恰 2 點且不含 2,000 欄點）、
+    # coverage_path_id／unit_axis 與清冊一致、每點帶完整 scale_vector 與峰值 Physical footprint
+    # 重用上段區域名（pts＝該入口之量測記錄、p＝清冊入口），不另綁新名：既有斷言之名序不變（TESTREG V19 normalize ②）
+    for eid, pts in receipt["entries"].items():
+        p = inv.get(eid)
+        assert not _entry_schema_problems(pts, p), f"{eid}：量測收據 schema 不合：{_entry_schema_problems(pts, p)}"
+
+
+def _entry_schema_problems(m: Mapping[str, Any], inv_entry: Optional[Mapping[str, Any]]) -> List[str]:
+    """量測收據單一入口之 schema 問題清單（空＝成立；SPEC Task 0.2「驗證」與「路徑清冊」）：點數規則（3 點；唯一例外＝帶
+    two_point_exception 者恰 500／1000 兩點、不含 2,000 欄點）、coverage_path_id 與 unit_axis 與清冊一致、每點（含列長點）之
+    scale_vector 鍵集＝清冊 scale_vector 且值為非負整數並與點之同名欄相等、每點帶峰值 Physical footprint。拒收缺軸、單位
+    歧義或 id 與清冊不一致之收據。以問題清單回報（呼叫端單一斷言；不另綁斷言區域名，TESTREG V19 名序不變）。"""
+    out: List[str] = []
+    cols = sorted(p["input_cols"] for p in m["points"])
+    want = [500, 1000] if m.get("two_point_exception") else [500, 1000, 2000]
+    if cols != want:
+        out.append(f"規模點 {cols} != {want}（兩點例外恰 500／1000 且不含 2,000 欄點；無例外者三點）")
+    if inv_entry is None:
+        return out + ["量測收據之入口不在清冊"]
+    if m.get("coverage_path_id") != inv_entry.get("coverage_path_id"):
+        out.append(f"coverage_path_id {m.get('coverage_path_id')!r} != 清冊 {inv_entry.get('coverage_path_id')!r}")
+    if m.get("unit_axis") != inv_entry.get("unit_axis"):
+        out.append("unit_axis != 清冊（單位歧義）")
+    axes = set(inv_entry.get("scale_vector") or [])
+    for i, p in enumerate(list(m["points"]) + list(m.get("row_points") or [])):
+        sv = p.get("scale_vector")
+        if not isinstance(sv, dict) or set(sv) != axes:
+            out.append(f"點 {i}：scale_vector 鍵 {sorted(sv or {})} != 清冊 {sorted(axes)}（缺軸或多軸）")
+            continue
+        if not all(isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in sv.values()):
+            out.append(f"點 {i}：scale_vector 值須為非負整數")
+        out += [f"點 {i}：scale_vector.{k} {sv[k]} != 點之 {k} {p[k]}" for k in ("input_cols", "stage_cols", "rows")
+                if k in sv and k in p and sv[k] != p[k]]
+        fp = p.get("peak_footprint_bytes")
+        if not (isinstance(fp, int) and fp > 0):
+            out.append(f"點 {i}：缺峰值 Physical footprint（§B 門檻；RSS 只作輔助）")
+    return out
 
 
 def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
@@ -894,6 +1243,29 @@ def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
         lb = m.get("lower_bound_seconds_per_unit")
         assert (isinstance(lb, (int, float)) and lb > 0) or str(m.get("lower_bound_analysis") or "").strip(), \
             f"{eid}：②缺下限實測或碼層下限分析"
+        # SPEC v5.13 Task 0.2「記憶體量測與四項機會欄」：每入口四鍵齊備且各狀態之必填欄非空
+        _assert_opportunities(eid, m)
+
+
+def _filled(v: Any) -> bool:
+    return v is not None and (not isinstance(v, str) or bool(v.strip())) and v != {} and v != []
+
+
+def _assert_opportunities(eid: str, m: Mapping[str, Any]) -> None:
+    """opportunities＝{time|memory|precision|file_size: {status, evidence, before, after, downstream, user_ruling}}；
+    none＝無機會須附理由（evidence）；planned 須 evidence；needs_user（改值者）須改前改後實測與受影響之下游判定；
+    done 須改前改後同工具量測（SPEC Task 0.2）。"""
+    opp = m.get("opportunities")
+    assert isinstance(opp, dict) and set(opp) == OPPORTUNITY_KEYS, \
+        f"{eid}：opportunities 須恰為 {sorted(OPPORTUNITY_KEYS)}，實得 {sorted(opp or {})}"
+    for key, o in opp.items():
+        assert isinstance(o, dict) and OPPORTUNITY_FIELDS <= set(o), f"{eid}/{key}：缺欄 {sorted(OPPORTUNITY_FIELDS - set(o or {}))}"
+        assert o["status"] in OPPORTUNITY_STATUSES, f"{eid}/{key}：status {o['status']!r} 非法"
+        assert _filled(o["evidence"]), f"{eid}/{key}：缺 evidence（none 須附無機會之理由）"
+        if o["status"] in ("needs_user", "done"):
+            assert _filled(o["before"]) and _filled(o["after"]), f"{eid}/{key}：{o['status']} 須改前改後實測"
+        if o["status"] == "needs_user":
+            assert _filled(o["downstream"]), f"{eid}/{key}：needs_user（改值）須受影響之下游判定"
 
 
 def test_boundary_18_scale_points_within_budget() -> None:
@@ -947,6 +1319,12 @@ def test_boundary_20_rss_meter_and_chunk_cap_recorded() -> None:
     cap = receipt["chunk_cap"]
     assert isinstance(cap["bytes"], int) and cap["bytes"] > 0
     assert str(cap["basis"]).strip()
+    # SPEC v5.13／v5.17 §B、Task 0.2：門檻指標＝Physical footprint（同 measure_ic_footprint.sh 之工具）；只沿用工具，不沿用
+    # 其取樣停止與超標終止（受測行程結束前持續取樣、不因超標中止）
+    meter = receipt["meter"]["footprint"]
+    assert meter["tool"] == FOOTPRINT_TOOL, f"footprint 量測工具 {meter['tool']!r} != {FOOTPRINT_TOOL!r}"
+    assert meter["sampling"] == "until_target_exit", "footprint 須於受測行程結束前持續取樣（不設取樣停止點）"
+    assert meter["terminate_target_on_exceed"] is False, "footprint 超標不得中止受測行程（照記為超標點）"
 
 
 # ── mutation（改壞入口行為 ⇒ 對應邊界翻轉） ─────────────────────────────────────────────────────────────
@@ -990,36 +1368,72 @@ def _sha(arr: np.ndarray) -> str:
     return hashlib.sha256(arr.tobytes()).hexdigest()
 
 
-def _boundary02_inputs() -> Tuple[Any, Dict[str, Dict[str, Any]], Dict[str, Any]]:
-    """boundary_02 之最小輸入（邊界輸入：記憶體內之逐特徵表與凍結檔，不涉資料值）：(fb, oracle_runs, golden)。"""
-    df = pd.DataFrame({"ic": [0.1, 0.2], "p": [0.5, np.nan]}, index=["f_a", "f_b"])
-    rec_feats = {f: {f"/summary/{c}": {"sha256": _sha(df.loc[[f], c].to_numpy()),
-                                        "nan_mask_sha256": _sha(np.isnan(df.loc[[f], c].to_numpy().astype("float64")))}
-                     for c in df.columns} for f in df.index}
+def _boundary02_survivors(root: Path, names: Sequence[str]) -> Dict[str, Any]:
+    """邊界輸入：tmp 下之 cwd 根寫一份倖存者檔（feature_names＝names），回 oracle_runs 所需之 "written"／"roots"。"""
+    key = "data_cache/reports/ic_survivors_ic_gatekeeper.json"
+    path = root / "cwd" / key
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"feature_names": list(names)}), encoding="utf-8")
+    return {"written": {key}, "roots": {"cwd": str((root / "cwd").resolve()), "iso": str((root / "iso").resolve())}}
+
+
+def _boundary02_inputs(root: Path, sources: bool = False) -> Tuple[Any, Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """boundary_02 之最小輸入（邊界輸入：記憶體內之逐特徵來源與凍結檔、tmp 下之倖存者檔，不涉資料值）：
+    (fb, oracle_runs, golden)。`sources`＝False ⇒ "frame" 形狀（通用 DataFrame 表）；True ⇒ SPEC §G 之 IC 報告形狀
+    （summary_table＝list[dict] "rows"、quantile_returns／turnover_analysis "by_key"，turnover 只含 f_a＝成員依請求而變）。"""
     digest = {"sha256": "a" * 64, "nan_mask_sha256": "b" * 64}
-    frozen_feats = {f: {"/summary/ic": dict(digest), "/summary/p": dict(digest)} for f in ("f_a", "f_b", "f_c")}
+    if sources:
+        raw: Dict[str, Any] = {
+            "summary_table": [{"feature_name": "f_a", "ic_mean": 0.1, "p_value": 0.5},
+                              {"feature_name": "f_b", "ic_mean": 0.2, "p_value": float("nan")}],
+            "quantile_returns": {"f_a": {"q1": [0.1, float("nan")], "long_short_spread": 0.2},
+                                 "f_b": {"q1": [0.3, 0.4], "long_short_spread": float("nan")}},
+            "coverage_analysis": {},
+            "turnover_analysis": {"f_a": {"turnover": np.float64(0.3)}}}
+        rec_feats: Dict[str, Dict[str, Any]] = {}
+        for row in raw["summary_table"]:
+            for c, v in row.items():
+                if c != "feature_name":
+                    rec_feats.setdefault(row["feature_name"], {})[f"/summary_table/{c}"] = _oracle_digest(v)
+        for src in ("quantile_returns", "turnover_analysis"):
+            for f, sub in raw[src].items():
+                rec_feats[f][f"/{src}"] = _oracle_digest(sub)
+        frozen_feats = {f: {"/summary_table/ic_mean": dict(digest), "/summary_table/p_value": dict(digest),
+                            "/quantile_returns": dict(digest)} for f in ("f_a", "f_b", "f_c")}
+        frozen_feats["f_c"]["/turnover_analysis"] = dict(digest)
+        tables: Dict[str, str] = dict(FEATURE_SOURCES)
+    else:
+        df = pd.DataFrame({"ic": [0.1, 0.2], "p": [0.5, np.nan]}, index=["f_a", "f_b"])
+        rec_feats = {f: {f"/summary/{c}": {"sha256": _sha(df.loc[[f], c].to_numpy()),
+                                            "nan_mask_sha256": _sha(np.isnan(df.loc[[f], c].to_numpy().astype("float64")))}
+                         for c in df.columns} for f in df.index}
+        frozen_feats = {f: {"/summary/ic": dict(digest), "/summary/p": dict(digest)} for f in ("f_a", "f_b", "f_c")}
+        raw = {"summary": df, "sel": ["f_a"]}
+        tables = {"/summary": "frame"}
     labels = {f: {"skipped_all_nan": False, "label_sha256": "c" * 64, "q": 5, "q_insufficient": False}
               for f in frozen_feats}
     items: Dict[str, Any] = {n: {"features": copy.deepcopy(frozen_feats)} for n in FEATURE_ITEMS}
-    for n in ("ic_report", "event_report"):
+    for n in SURVIVOR_ITEMS:
         items[n]["selected"] = ["f_a"]
     for n in ("ic_report", "stage5_subset"):
         items[n]["pit_labels"] = copy.deepcopy(labels)
-    runs = {n: {"record": {"features": copy.deepcopy(rec_feats), "selected": ["f_a"]},
-                "raw": {"summary": df.copy(), "sel": ["f_a"]}} for n in ("ic_report", "deep_analysis", "event_report")}
+    runs = {n: {"record": {"features": copy.deepcopy(rec_feats), "selected": ["f_a"]}, "raw": copy.deepcopy(raw),
+                **_boundary02_survivors(root / n, ["f_a"])} for n in SURVIVOR_ITEMS}
     fake_fb = type("FakeFb", (), {
-        "feature_tables": staticmethod(lambda name: ["/summary"]),
-        "selected_pointer": staticmethod(lambda name: "/sel" if name in ("ic_report", "event_report") else None)})()
+        "feature_tables": staticmethod(lambda name: dict(tables)),
+        "selected_pointer": staticmethod(lambda name: None if sources else "/sel")})()
     return fake_fb, runs, {"items": items}
 
 
-def test_mutation_boundary_02_oracle_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mutation_boundary_02_oracle_checks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """直接驅動 boundary_02（r12 CODEX-R12-P1-02／-P1-03）：相符者綠；同請求記錄之值 sha256 改壞、凍結檔某特徵缺一欄、
-    oracle 特徵不在凍結檔、逐特徵表非全成員（成員依請求而變）、選欄通過集合不同 ⇒ 各自紅。"""
+    oracle 特徵不在凍結檔、逐特徵表非全成員（成員依請求而變）、選欄通過集合不同 ⇒ 各自紅。SPEC v5.8 §G 之 IC 報告形狀
+    （"rows"／"by_key"）另驗：相符（含 "by_key" 成員依請求而變）者綠；by_key 子樹摘要改壞、rows 欄值摘要改壞、
+    feature_name 重複、凍結檔缺 oracle 出現之來源、凍結檔含 SPEC 外之來源、無倖存者檔、倖存者與記錄不同 ⇒ 各自紅。"""
     module = sys.modules[__name__]
 
-    def run(mutate: Any) -> None:
-        fake_fb, runs, golden = _boundary02_inputs()
+    def run(mutate: Any, sources: bool = False) -> None:
+        fake_fb, runs, golden = _boundary02_inputs(tmp_path / ("src" if sources else "frame"), sources)
         mutate(runs, golden)
         monkeypatch.setattr(module, "_golden", lambda: golden)
         test_boundary_02_frozen_baseline_content_complete(fake_fb, runs)
@@ -1027,23 +1441,38 @@ def test_mutation_boundary_02_oracle_checks(monkeypatch: pytest.MonkeyPatch) -> 
     run(lambda r, g: None)
     mutants = [
         lambda r, g: r["ic_report"]["record"]["features"]["f_a"]["/summary/ic"].update(sha256="0" * 64),
-        lambda r, g: g["items"]["deep_analysis"]["features"]["f_b"].pop("/summary/p"),
+        lambda r, g: g["items"]["ic_report"]["features"]["f_b"].pop("/summary/p"),
         lambda r, g: g["items"]["event_report"]["features"].pop("f_b"),
         lambda r, g: r["ic_report"]["raw"].update(passed=pd.DataFrame({"x": [1.0]}, index=["f_a"])) or None,
         lambda r, g: r["event_report"]["record"].update(selected=["f_b"]),
     ]
     for i, mutate in enumerate(mutants):
-        fake_fb, runs, golden = _boundary02_inputs()
+        fake_fb, runs, golden = _boundary02_inputs(tmp_path / f"m{i}")
         mutate(runs, golden)
         if i == 3:  # 第二張逐特徵表只列 f_a（成員依請求而變）
             fake_fb = type("FakeFb2", (), {
-                "feature_tables": staticmethod(lambda name: ["/summary", "/passed"]),
+                "feature_tables": staticmethod(lambda name: {"/summary": "frame", "/passed": "frame"}),
                 "selected_pointer": staticmethod(lambda name: "/sel" if name in ("ic_report", "event_report") else None)})()
             runs["ic_report"]["record"]["features"]["f_a"]["/passed/x"] = {
                 "sha256": _sha(np.array([1.0])), "nan_mask_sha256": _sha(np.array([False]))}
         monkeypatch.setattr(module, "_golden", lambda g=golden: g)
         with pytest.raises(AssertionError):
             test_boundary_02_frozen_baseline_content_complete(fake_fb, runs)
+    run(lambda r, g: None, sources=True)
+    source_mutants = [
+        lambda r, g: r["ic_report"]["record"]["features"]["f_b"]["/quantile_returns"].update(nan_mask_sha256="0" * 64),
+        lambda r, g: r["event_report"]["raw"]["quantile_returns"]["f_a"].update(long_short_spread=0.25),
+        lambda r, g: r["ic_report"]["raw"]["summary_table"][1].update(p_value=0.0),
+        lambda r, g: r["ic_report"]["raw"]["summary_table"].append({"feature_name": "f_a", "ic_mean": 0.1, "p_value": 0.5}),
+        lambda r, g: [v.pop("/turnover_analysis", None) for v in g["items"]["ic_report"]["features"].values()],
+        lambda r, g: g["items"]["event_report"]["features"]["f_c"].update(
+            {"/bogus_analysis": {"sha256": "a" * 64, "nan_mask_sha256": "b" * 64}}),
+        lambda r, g: r["ic_report"].update(written=set()),
+        lambda r, g: r["event_report"]["record"].update(selected=["f_b"]),
+    ]
+    for mutate in source_mutants:
+        with pytest.raises(AssertionError):
+            run(mutate, sources=True)
 
 
 def test_boundary_23_heavy_tests_require_shared_watchdog() -> None:
@@ -1069,14 +1498,21 @@ def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) 
     match["code_sha256"] = _sha_at_commit(head, ["scripts/scale_probe.py"])
     match["config_sha256"] = _sha_at_commit(head, [])
 
-    def run(entry_probe: Mapping[str, Any], receipt_match: Mapping[str, Any]) -> None:
+    def run(entry_probe: Mapping[str, Any], receipt_match: Mapping[str, Any], mutate: Any = None) -> None:
         pts = [{"input_cols": n, "stage_cols": n, "seconds": 1.0 * n, "peak_rss_bytes": 1000 + n,
+                "peak_footprint_bytes": 2000 + n, "scale_vector": {"input_cols": n, "stage_cols": n},
                 "scale_probe_receipt": "r.json"} for n in (500, 1000, 2000)]
         probe_rec = {"identity": {"match": dict(receipt_match), "meta": {"producer": "scripts/scale_probe.py"}},
                      "points": [{"scale": p["input_cols"], "unit": "cols", "seconds": p["seconds"],
                                  "peak_rss_bytes": p["peak_rss_bytes"]} for p in pts]}
-        scale = {"head": head, "entries": {eid: {"probe": dict(entry_probe), "row_probe": None, "points": pts}}}
-        monkeypatch.setattr(module, "_inventory_entries", lambda: {eid: {"input_axes": ["cols"]}})
+        axis = {"axes": ["stage_cols"], "function": "stage_cols"}
+        scale = {"head": head, "entries": {eid: {"probe": dict(entry_probe), "row_probe": None, "points": pts,
+                                                 "coverage_path_id": "cp-m.a:f", "unit_axis": dict(axis)}}}
+        inventory = {eid: {"input_axes": ["cols"], "coverage_path_id": "cp-m.a:f", "unit_axis": dict(axis),
+                           "scale_vector": ["input_cols", "stage_cols"]}}
+        if mutate is not None:
+            mutate(scale["entries"][eid], inventory[eid])
+        monkeypatch.setattr(module, "_inventory_entries", lambda: inventory)
         monkeypatch.setattr(module, "_single", lambda pattern: scale)
         monkeypatch.setattr(module, "_scale_probe_receipt", lambda path_str: probe_rec)
         test_boundary_16_three_points_per_entry()
@@ -1091,3 +1527,19 @@ def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) 
     for p, m in bad:
         with pytest.raises(AssertionError):
             run(p, m)
+    # SPEC v5.19–v5.21 Task 0.2 收據 schema：缺軸、多軸、scale_vector 與點不符、單位歧義、coverage_path_id 與清冊不一致、
+    # 缺 footprint、兩點例外仍含 2,000 欄點、無例外而只兩點 ⇒ boundary_16 紅
+    schema_bad = [
+        lambda e, i: e["points"][0]["scale_vector"].pop("stage_cols"),
+        lambda e, i: e["points"][1]["scale_vector"].update(rows=500),
+        lambda e, i: e["points"][2]["scale_vector"].update(stage_cols=1999),
+        lambda e, i: e.update(unit_axis={"axes": ["input_cols"], "function": "input_cols"}),
+        lambda e, i: e.update(coverage_path_id="cp-other"),
+        lambda e, i: e["points"][0].pop("peak_footprint_bytes"),
+        lambda e, i: e.update(two_point_exception={"projected_2000_seconds": 900.0}),
+        lambda e, i: e["points"].pop(),
+    ]
+    p, m = probe, match  # 重用上段區域名：既有斷言之名序不變（TESTREG V19 normalize ②）
+    for mutate in schema_bad:
+        with pytest.raises(AssertionError):
+            run(p, m, mutate)

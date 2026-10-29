@@ -105,6 +105,37 @@ def test_icperf_gate_pytest_is_heavy(cmd: str, background: bool, expected: int) 
     assert _rc(_bash(cmd, background)) == expected
 
 
+ICPERF_CORRECTNESS = "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_correctness.py"
+
+
+@pytest.mark.parametrize("cmd,background,expected", [
+    # 正例（命中 pytest_icperf_correctness）：前景直跑、-k 篩到重型、背景未包裝、包裝背景但無估時收據 ⇒ 擋
+    (ICPERF_CORRECTNESS, False, 2),
+    (ICPERF_CORRECTNESS + " -k coverage_closed", False, 2),
+    (ICPERF_CORRECTNESS + " -m requires_kline", True, 2),
+    (WRAP + ICPERF_CORRECTNESS, True, 2),
+    # 末個 -m 生效；豁免式後延伸表示式或接位置參數 ⇒ 命中（fail-closed）
+    (ICPERF_CORRECTNESS + " -m 'not slow and not requires_kline' -m slow", False, 2),
+    (ICPERF_CORRECTNESS + " -m 'not slow and not requires_kline or requires_kline'", False, 2),
+    ("venv/bin/python -m pytest -q -m 'not slow and not requires_kline' tests/momentum/Analysis/test_icperf_correctness.py",
+     False, 2),
+    (ICPERF_CORRECTNESS + " -m='not slow and not requires_kline or slow'", False, 2),
+    # 與 test_icperf_gate 同一命令：任一列命中即擋
+    (ICPERF_CORRECTNESS + " tests/momentum/Analysis/test_icperf_gate.py -m 'not slow and not requires_kline' -m slow",
+     False, 2),
+    # 反例：最後一個 -m 恰為排除全部重型與真實資料測試之篩選 ⇒ 非重型、前景放行
+    (ICPERF_CORRECTNESS + " -m 'not slow and not requires_kline'", False, 0),
+    (ICPERF_CORRECTNESS + " -m 'not slow and not requires_kline' -k hac", False, 0),
+    (ICPERF_CORRECTNESS + " -m \"not slow and not requires_kline\" > /tmp/x.log 2>&1; echo rc=$?", False, 0),
+    (ICPERF_CORRECTNESS + " -m 'not slow and not requires_kline' 2> /tmp/x.err", False, 0),
+    (ICPERF_CORRECTNESS + " -m='not slow and not requires_kline'", False, 0),
+])
+def test_icperf_correctness_pytest_is_heavy(cmd: str, background: bool, expected: int) -> None:
+    """ICPERF Task 0.3：test_icperf_correctness 之 pytest 須經共用監看並背景（非重型篩選除外；豁免語意同
+    pytest_icperf_gate）。"""
+    assert _rc(_bash(cmd, background)) == expected
+
+
 def test_executed_script_body_only_counts_command_position() -> None:
     """執行之 repo 內 .sh：檔內真的執行之重型命令擋；註解、字串、grep 樣式、`${x#y}` 後之下一行皆照實判定。"""
     helper = REPO / "handoffs" / "run_receipts" / ".nocap-guardtest-body.sh"
