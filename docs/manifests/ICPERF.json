@@ -23,7 +23,10 @@
       "tests/governance/test_heavy_run_guard.py",
       "tests/registry/catalog.json",
       "momentum/Analysis/turnover_analyzer.py",
-      "momentum/Analysis/ic_engine.py"
+      "momentum/Analysis/ic_engine.py",
+      "momentum/Analysis/pit_stats.py",
+      "tests/momentum/test_turnover_analyzer.py",
+      "handoffs/run_receipts/gap2_golden_pre.json"
     ],
     "callers_now": [
       "scripts/heavy_run_guard.py",
@@ -75,7 +78,7 @@
         "observable": true
       },
       {
-        "rule": "Phase 0 除 SPEC Task 0.4 所列三項（turnover_analyzer.py:85、:168 頂分位；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）",
+        "rule": "Phase 0 除 SPEC Task 0.4 所列三項（turnover_analyzer.py:85、:168 頂分位〔pit_stats.py 新增 pit_expanding_qcut_top_mask，pit_expanding_qcut_label 輸出不變〕；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）",
         "observable": false
       },
       {
@@ -184,7 +187,7 @@
         "expiry": "2026-12-31"
       },
       {
-        "item": "Phase 0 除 SPEC Task 0.4 所列三項（turnover_analyzer.py:85、:168 頂分位；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）",
+        "item": "Phase 0 除 SPEC Task 0.4 所列三項（turnover_analyzer.py:85、:168 頂分位〔pit_stats.py 新增 pit_expanding_qcut_top_mask，pit_expanding_qcut_label 輸出不變〕；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）",
         "reason": "user-ruling",
         "owner": "ICPERF",
         "expiry": "2026-12-31"

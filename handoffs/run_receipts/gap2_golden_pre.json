@@ -1,9 +1,9 @@
 {
-  "fixture_sha256": "dfe038f5ec83efdc31118675604b8507cc441e5fe1f1fb3c71f144a1dbdb9a80",
-  "config_hash": "ecee6a17445ff12652eba48109a5c44e",
+  "fixture_sha256": "55e27b4b671ce7db0133c772764d8bcc387c96aed6fb4d5b369d3c2cdc22b31f",
+  "config_hash": "875b0025f621241b36b64399f983cc64",
   "case_id": "ic_gatekeeper",
-  "canonical_sha": "363ae1ceebb62cb6c9d8dee3a3158be3cfa51ac90e308765b500ed4338349d77",
-  "canonical_sha_legacy": "4bcb2cab7a08dc7b19436cd422aa90af41f3ad5345caf8bfe0d61d9295cd3b35",
+  "canonical_sha": "d0e5b8da4a6a11d9aca86724db63000b57c0e427b8a658af27e7644031494213",
+  "canonical_sha_legacy": "6d7e5064d8880f0cfa1a4d8ebf1713c5b2284b3eef0027cfc34970cd1095e5be",
   "summary_table": [
     {
       "feature_name": "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
@@ -18,7 +18,7 @@
       "long_short_spread": -0.0268658705587898,
       "coverage": 1.0,
       "turnover_rate": 0.02553191489361702,
-      "ic_half_life": NaN,
+      "ic_half_life": 9.69343684411772,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -52,7 +52,7 @@
       "long_short_spread": 0.0,
       "coverage": 1.0,
       "turnover_rate": 0.00851063829787234,
-      "ic_half_life": 7.874754569951538,
+      "ic_half_life": 7.8748977685099915,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -69,7 +69,7 @@
       "long_short_spread": 0.0,
       "coverage": 1.0,
       "turnover_rate": 0.01702127659574468,
-      "ic_half_life": 1.0406473531576714,
+      "ic_half_life": 55693.650701463164,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -86,7 +86,7 @@
       "long_short_spread": 0.007917760956359926,
       "coverage": 1.0,
       "turnover_rate": 0.03404255319148936,
-      "ic_half_life": 2.7861743564910535,
+      "ic_half_life": 2.7861407158318254,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -103,7 +103,7 @@
       "long_short_spread": 0.014657299414924954,
       "coverage": 1.0,
       "turnover_rate": 0.09361702127659574,
-      "ic_half_life": 53814.27068405345,
+      "ic_half_life": 68592.18901365183,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -137,7 +137,7 @@
       "long_short_spread": 0.014725848081264089,
       "coverage": 1.0,
       "turnover_rate": 0.11063829787234042,
-      "ic_half_life": 16746.888679078416,
+      "ic_half_life": 17274.621570487467,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -154,7 +154,7 @@
       "long_short_spread": 0.009754504878045578,
       "coverage": 1.0,
       "turnover_rate": 0.03404255319148936,
-      "ic_half_life": 0.06462832461803394,
+      "ic_half_life": 63516.67483809924,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -171,7 +171,7 @@
       "long_short_spread": -0.010171155300405289,
       "coverage": 1.0,
       "turnover_rate": 0.03404255319148936,
-      "ic_half_life": 7.054754774820851,
+      "ic_half_life": 7.052500985663342,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -188,7 +188,7 @@
       "long_short_spread": 0.004085811185630369,
       "coverage": 1.0,
       "turnover_rate": 0.03404255319148936,
-      "ic_half_life": 3.0363834996885877,
+      "ic_half_life": 3.036395583020044,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -205,7 +205,7 @@
       "long_short_spread": -0.005816884164686327,
       "coverage": 1.0,
       "turnover_rate": 0.00851063829787234,
-      "ic_half_life": 0.05792046640561259,
+      "ic_half_life": 52840.042514849345,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -222,7 +222,7 @@
       "long_short_spread": 0.06608260343040245,
       "coverage": 1.0,
       "turnover_rate": 0.02127659574468085,
-      "ic_half_life": 5.921859997648491,
+      "ic_half_life": 5.921859280861452,
       "regime_robust": null,
       "pass_class": "oos"
     },
@@ -238,8 +238,8 @@
       "monotonicity_score": 1.0,
       "long_short_spread": 0.0279086152859676,
       "coverage": 1.0,
-      "turnover_rate": 0.1702127659574468,
-      "ic_half_life": 1.3668487502048612,
+      "turnover_rate": 0.17872340425531916,
+      "ic_half_life": 1.366770329345753,
       "regime_robust": null,
       "pass_class": "oos"
     }
@@ -290,5 +290,5 @@
     }
   },
   "generated_by": "scripts/gap2_freeze_golden.py --write",
-  "ts": "2026-09-08T16:43:48Z"
+  "ts": "2026-10-29T06:41:50Z"
 }

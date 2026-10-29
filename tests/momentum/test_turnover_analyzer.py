@@ -16,18 +16,36 @@ def _long_series(n: int = 200, seed: int = 0) -> pd.Series:
     return pd.Series(rng.normal(size=n).cumsum())
 
 
-def test_quantile_turnover_matches_expected():
-    """頂部分位變化比例計算正確（PIT qcut）。"""
-    series = _long_series(220, seed=1)
+def _ref_pit_top_mask(series: pd.Series, q: int) -> pd.Series:
+    """獨立逐根參考：第 t 根以截至 t 之有限歷史求 q 分位邊界（去重），當根值落最高箱 ⇒ 1.0。
+
+    pd.qcut 箱為右閉、首箱含最小值 ⇒ 最高箱＝(edges[-2], edges[-1]]；只剩一箱時恆為最高箱。
+    """
+    values = series.to_numpy(dtype=float)
+    out = np.full(values.shape[0], np.nan)
+    for t in range(values.shape[0]):
+        hist = values[: t + 1]
+        finite = hist[np.isfinite(hist)]
+        if finite.size < MIN_SAMPLES or not np.isfinite(values[t]):
+            continue
+        edges = np.unique(np.quantile(finite, np.linspace(0.0, 1.0, q + 1)))
+        out[t] = 1.0 if edges.size <= 2 or values[t] > edges[-2] else 0.0
+    return pd.Series(out, index=series.index)
+
+
+@pytest.mark.parametrize("seed", [1, 2])
+def test_quantile_turnover_matches_expected(seed):
+    """頂部分位變化比例＝逐根 PIT 參考之頂分位遮罩 |Δ| 均值（ICPERF Task 0.4 ①）。
+
+    舊預期以整段最大標籤界定頂分位（讀 t 之後資料）：seed=1 序列一路下行、當根標籤只到 1，
+    舊法把第 2 檔當頂分位而得 0.1667；逐根定義下從未進第 5 檔 ⇒ 0.0。
+    """
+    series = _long_series(220, seed=seed)
     analyzer = TurnoverAnalyzer({"num_quantiles": 5})
 
     turnover = analyzer.compute_quantile_turnover(series, num_quantiles=5)
 
-    quantiles = pit_expanding_qcut_label(
-        series, q=5, min_samples=MIN_SAMPLES, duplicates="drop"
-    )
-    max_label = quantiles.max(skipna=True)
-    top_mask = (quantiles == max_label).astype(float).where(quantiles.notna(), np.nan)
+    top_mask = _ref_pit_top_mask(series, q=5)
     expected = float(top_mask.diff().abs().replace([np.inf, -np.inf], np.nan).dropna().mean())
     assert np.isclose(turnover, expected)
 
@@ -99,7 +117,7 @@ def test_turnover_handles_empty_and_qcut_failure(monkeypatch):
         raise ValueError("qcut fail")
 
     monkeypatch.setattr(
-        "momentum.Analysis.turnover_analyzer.pit_expanding_qcut_label", _raise
+        "momentum.Analysis.turnover_analyzer.pit_expanding_qcut_top_mask", _raise
     )
     series = pd.Series([1.0, 2.0, 3.0])
     assert np.isnan(analyzer.compute_quantile_turnover(series, num_quantiles=5))
@@ -179,11 +197,11 @@ def test_quantile_turnover_empty_changes(monkeypatch):
         out = pd.Series(np.nan, index=series.index)
         fv = first_valid_index(series, min_samples=min_samples)
         if fv is not None:
-            out.iloc[fv:] = 0.0  # always top, never change
+            out.iloc[fv:] = 1.0  # always top, never change
         return out
 
     monkeypatch.setattr(
-        "momentum.Analysis.turnover_analyzer.pit_expanding_qcut_label", _const_top
+        "momentum.Analysis.turnover_analyzer.pit_expanding_qcut_top_mask", _const_top
     )
     assert analyzer.compute_quantile_turnover(series, num_quantiles=5) == 0.0
 
@@ -248,7 +266,7 @@ def test_compute_turnover_time_series_qcut_failure(monkeypatch):
         raise ValueError("qcut fail")
 
     monkeypatch.setattr(
-        "momentum.Analysis.turnover_analyzer.pit_expanding_qcut_label", _raise
+        "momentum.Analysis.turnover_analyzer.pit_expanding_qcut_top_mask", _raise
     )
     result = analyzer.compute_turnover_time_series(series, num_quantiles=4)
     assert len(result["quantile_turnovers"]) == len(series)

@@ -481,7 +481,9 @@ class ICEngine:
                 ic_mean = float(np.nanmean(values))
                 ic_std = float(np.nanstd(values))
                 icir = float(ic_mean / ic_std) if ic_std > 0 else np.nan
-                hit_rate = float(np.mean(values > 0))
+                # ICPERF Task 0.4 ②：勝率只計有限 IC（滾動窗可出 NaN，pit_stats.py:277、:288），同 ic_mean 之 nanmean
+                finite = values[np.isfinite(values)]
+                hit_rate = float(np.mean(finite > 0)) if finite.size else np.nan
 
             icir_results[feature] = {
                 "ic_mean": ic_mean,
@@ -1164,11 +1166,24 @@ class ICEngine:
         def model(h, a, lam, c):
             return a * np.exp(-lam * h) + c
 
+        # ICPERF Task 0.4 ③：固定起點集合逐一擬合、取殘差平方和最小者（單一預設起點會落入較差之局部解）
+        starts = (None, [y[0], 1.0, 0.0], [y[0], 0.1, 0.0], [y[0] - y[-1], 0.5, y[-1]])
+        best_params = None
+        best_ss_res = np.inf
+        for p0 in starts:
+            try:
+                cand, _ = optimize.curve_fit(model, x, y, p0=p0, maxfev=20000)
+            except Exception:
+                continue
+            cand_ss_res = float(np.sum((y - model(x, *cand)) ** 2))
+            if np.isfinite(cand_ss_res) and cand_ss_res < best_ss_res:
+                best_params, best_ss_res = cand, cand_ss_res
+
         try:
-            params, _ = optimize.curve_fit(model, x, y, maxfev=2000)
-            a, lam, c = params
-            fitted = model(x, a, lam, c)
-            ss_res = float(np.sum((y - fitted) ** 2))
+            if best_params is None:
+                raise RuntimeError("all decay fit starts failed")
+            a, lam, c = best_params
+            ss_res = best_ss_res
             ss_tot = float(np.sum((y - np.mean(y)) ** 2))
             r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
             decay_type = "exponential" if r2 >= 0.5 else "non_exponential"

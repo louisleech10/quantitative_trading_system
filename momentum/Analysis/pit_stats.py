@@ -326,11 +326,45 @@ def pit_expanding_qcut_label(
         預設 False = 舊行為（duplicates='drop' 後可能 label 落在 reduced bins）。
     """
     index = _index_of(series)
-    values = _as_1d_float(series)
+    labels, _ = _pit_expanding_qcut_core(
+        _as_1d_float(series), q, min_samples, duplicates, require_full_q
+    )
+    return pd.Series(labels, index=index, dtype=float)
+
+
+def pit_expanding_qcut_top_mask(
+    series: ArrayLike,
+    q: int,
+    min_samples: int = MIN_SAMPLES,
+    duplicates: str = "drop",
+) -> pd.Series:
+    """per-t 頂分位指示：第 t 根之 PIT 標籤＝k_t − 1 ⇒ 1.0，否則 0.0；標籤 NaN 處 NaN。
+
+    k_t＝第 t 根以截至 t 之有限歷史 ``pd.qcut``（duplicates 同 ``pit_expanding_qcut_label``）
+    實際所得之箱數（相異邊界數 − 1）。頂分位只依當根自身之分箱界定，不讀 t 之後資料
+    （ICPERF Task 0.4 ①：舊法以整段序列最大標籤界定，後段新分箱會改寫前段）。
+    """
+    index = _index_of(series)
+    labels, n_bins = _pit_expanding_qcut_core(
+        _as_1d_float(series), q, min_samples, duplicates, False
+    )
+    top = np.where(np.isnan(labels), np.nan, (labels == n_bins - 1).astype(np.float64))
+    return pd.Series(top, index=index, dtype=float)
+
+
+def _pit_expanding_qcut_core(
+    values: np.ndarray,
+    q: int,
+    min_samples: int,
+    duplicates: str,
+    require_full_q: bool,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """逐根 expanding qcut：回傳（當根標籤, 當根實際箱數）；無標籤之根兩者皆 NaN。"""
     n = values.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
+    n_bins = np.full(n, np.nan, dtype=np.float64)
     if n == 0:
-        return pd.Series(out, index=index, dtype=float)
+        return out, n_bins
 
     q = int(q)
     if q < 2:
@@ -345,8 +379,10 @@ def pit_expanding_qcut_label(
         hist = values[: t + 1]
         finite = hist[np.isfinite(hist)]
         try:
-            # labels=False → integer bin ids 0..
-            bins = pd.qcut(finite, q=q, labels=False, duplicates=duplicates)
+            # labels=False → integer bin ids 0..；retbins 取實際邊界（duplicates='drop' 後之箱數）
+            bins, edges = pd.qcut(
+                finite, q=q, labels=False, duplicates=duplicates, retbins=True
+            )
         except ValueError:
             continue
         bins_arr = bins.to_numpy() if isinstance(bins, pd.Series) else np.asarray(bins)
@@ -362,7 +398,8 @@ def pit_expanding_qcut_label(
         if pd.isna(label):
             continue
         out[t] = float(label)
-    return pd.Series(out, index=index, dtype=float)
+        n_bins[t] = float(len(edges) - 1)
+    return out, n_bins
 
 
 # ---------------------------------------------------------------------------

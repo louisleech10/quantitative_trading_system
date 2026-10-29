@@ -450,10 +450,8 @@ def test_ic_hit_rate_definition_without_nan(case: str) -> None:
     assert _rel(got, _finite_hit_rate(values)) == 0.0
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Task 0.3 稽核發現（裁定前不修產品碼）：現行勝率 np.mean(values > 0)（ic_engine.py:484）以含非有限值之序列長度為分母"
-    "（NaN、-inf 計為未勝，+inf 計為勝），與 ic_mean／ic_std 忽略 NaN 之口徑不一；無有限值之序列得 0.0 等而非 NaN。"
-    "修正見 SPEC Task 0.4 ②（只計有限值、無有限值 ⇒ NaN）。待記入 " + FINDING_RECEIPT + " 並白話報使用者"))
+# Task 0.3 稽核發現、SPEC Task 0.4 ② 已修：修正前勝率 np.mean(values > 0)（ic_engine.py:484）以含非有限值之序列長度為分母
+# （NaN、-inf 計為未勝，+inf 計為勝）、無有限值之序列得 0.0 等而非 NaN；修正後只計有限值、無有限值 ⇒ NaN。
 @pytest.mark.parametrize("case", sorted(HIT_RATE_NON_FINITE_CASES))
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_ic_hit_rate_ignores_nan_like_ic_mean(case: str) -> None:
@@ -578,9 +576,8 @@ def test_decay_fit_optimal_and_derived_consistent(case: str) -> None:
     _assert_derived_consistent(fit)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Task 0.3 稽核發現（裁定前不修產品碼）：現行衰減擬合只自 scipy 預設起點擬一次（ic_engine.py:1167），峰後衰減曲線"
-    "落於較差之局部解或擬合失敗，殘差平方和高於 oracle 固定起點集合之最小值。待記入 " + FINDING_RECEIPT + " 並白話報使用者"))
+# Task 0.3 稽核發現、SPEC Task 0.4 ③ 已修：修正前衰減擬合只自 scipy 預設起點擬一次（ic_engine.py:1168），峰後衰減曲線
+# 落於較差之局部解或擬合失敗；修正後自固定起點集合逐一擬合、取殘差平方和最小者。
 @pytest.mark.parametrize("case", sorted(DECAY_LOCAL_MINIMUM_CASES))
 def test_decay_fit_reaches_oracle_minimum_on_hump_curve(case: str) -> None:
     """同 ②（雙向判定）：峰後衰減之 IC 曲線。"""
@@ -1104,10 +1101,9 @@ def _stage5_turnover_inputs() -> pd.DataFrame:
     return feats.assign(late_bins=_late_bins_series(len(feats)).to_numpy())
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Task 0.3 稽核發現（裁定前不修產品碼）：分位換手率與逐根換手時序之頂分位以全序列 PIT 標籤最大值界定"
-    "（turnover_analyzer.py:85-89、:168-172 `quantiles.max(skipna=True)`），與逐根 PIT 定義（第 t 根標籤＝其自身分箱之 "
-    "k_t − 1）於箱數隨歷史成長之序列不一致（偷看未來）。修正見 SPEC Task 0.4 ①。待記入 " + FINDING_RECEIPT + " 並白話報使用者"))
+# Task 0.3 稽核發現、SPEC Task 0.4 ① 已修：修正前分位換手率與逐根換手時序之頂分位以全序列 PIT 標籤最大值界定
+# （turnover_analyzer.py 舊 :85-89、:168-172 `quantiles.max(skipna=True)`），於箱數隨歷史成長之序列偷看未來；修正後依逐根
+# PIT 定義（第 t 根標籤＝其自身分箱之 k_t − 1，pit_stats.pit_expanding_qcut_top_mask）。
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_stage5_quantile_turnover_matches_per_bar_pit_reference() -> None:
     """第 5 段頂分位兩欄（`TurnoverAnalyzer.compute_all` 之 `quantile_turnover`、`time_series.quantile_turnovers`）== 逐根
@@ -1625,10 +1621,8 @@ def test_prefix_invariance_of_pit_series() -> None:
     assert np.nanmax(full) > np.nanmax(pre) and np.nanmax(pre) >= 1, "邊界輸入未使全序列最大標籤 > 前段（前提失效）"
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "Task 0.3 稽核發現（裁定前不修產品碼）：逐根換手時序之頂分位以全序列 PIT 標籤最大值界定（turnover_analyzer.py:168-171 "
-    "`quantiles.max(skipna=True)`），後段新增之 bin 會改寫前段每根之頂分位指示與換手值——截去後段即改變前段（偷看未來）；"
-    "分位換手率純量（:85-89）同用全序列最大值。待記入 " + FINDING_RECEIPT + " 並白話報使用者"))
+# Task 0.3 稽核發現、SPEC Task 0.4 ① 已修：修正前逐根換手時序之頂分位以全序列 PIT 標籤最大值界定，後段新增之 bin 會改寫
+# 前段每根之頂分位指示與換手值——截去後段即改變前段（偷看未來）；修正後截去後段前段不變。
 def test_turnover_time_series_prefix_invariant_with_late_bins() -> None:
     """前綴不變性（同上）：`_late_bins_series` 截至第 150 根之逐根換手時序 == 全序列之前 150 根。"""
     s = _late_bins_series()

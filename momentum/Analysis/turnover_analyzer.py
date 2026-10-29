@@ -10,7 +10,7 @@ import pandas as pd
 from momentum.Analysis.pit_stats import (
     MIN_SAMPLES,
     first_valid_index,
-    pit_expanding_qcut_label,
+    pit_expanding_qcut_top_mask,
     pit_expanding_rank,
 )
 from momentum.core.logging import get_logger
@@ -69,7 +69,8 @@ class TurnoverAnalyzer:
 
         num_quantiles = max(int(num_quantiles or self._num_quantiles), 2)
         try:
-            quantiles = pit_expanding_qcut_label(
+            # ICPERF Task 0.4 ①：頂分位依當根自身分箱（label＝k_t−1），不以整段最大標籤界定
+            top_mask = pit_expanding_qcut_top_mask(
                 series,
                 q=num_quantiles,
                 min_samples=self._min_samples,
@@ -79,15 +80,9 @@ class TurnoverAnalyzer:
             logger.warning("pit qcut failed for turnover: %s", exc)
             return float("nan")
 
-        if quantiles.notna().sum() == 0:
+        if top_mask.notna().sum() == 0:
             return float("nan")
 
-        max_label = quantiles.max(skipna=True)
-        if pd.isna(max_label):
-            return float("nan")
-
-        top_mask = (quantiles == max_label).astype(float)
-        top_mask = top_mask.where(quantiles.notna(), np.nan)
         changes = top_mask.diff().abs()
         finite = changes[np.isfinite(changes.to_numpy(dtype=float))]
         if finite.empty:
@@ -145,7 +140,8 @@ class TurnoverAnalyzer:
         first_valid = first_valid_index(series, min_samples=self._min_samples)
 
         try:
-            quantiles = pit_expanding_qcut_label(
+            # ICPERF Task 0.4 ①：頂分位依當根自身分箱（label＝k_t−1），不以整段最大標籤界定
+            top_mask = pit_expanding_qcut_top_mask(
                 series,
                 q=num_quantiles,
                 min_samples=self._min_samples,
@@ -164,12 +160,6 @@ class TurnoverAnalyzer:
         ranks = pit_expanding_rank(
             series, min_samples=self._min_samples, ties="average"
         )
-
-        max_label = quantiles.max(skipna=True)
-        top_mask = pd.Series(np.nan, index=series.index, dtype=float)
-        if pd.notna(max_label):
-            top_mask = (quantiles == max_label).astype(float)
-            top_mask = top_mask.where(quantiles.notna(), np.nan)
 
         quantile_turnovers = top_mask.diff().abs()
         rank_change_rates = ranks.diff().abs()
