@@ -1072,6 +1072,67 @@ def test_c_handoff_sha_mismatch_fails_before_run(fb: Any, tmp_path: Path, monkey
     assert fb.REPRO_COLS == fb.SUBSET_COLS == 2000
 
 
+def test_c_handoff_identity_failures_never_start_child(fb: Any, tmp_path: Path,
+                                                       monkeypatch: pytest.MonkeyPatch) -> None:
+    """r37 CODEX-R37-P1-02：交接 h5 不存在、大小不符、內容 sha256 不符三類 ⇒ `stage5_subset_digests` 於啟動子行程
+    **之前** FreezeError（`_run_child` 換成一被呼叫即記錄之替身，三類皆須零次呼叫）；身分相符 ⇒ 確實進到子行程（改壞
+    對照：替身被呼叫一次）。"""
+    calls: List[Dict[str, Any]] = []
+
+    class _Started(Exception):
+        pass
+
+    def spy(spec: Dict[str, Any], **_kw: Any) -> Dict[str, Any]:
+        calls.append(spec)
+        raise _Started()
+
+    monkeypatch.setattr(fb, "_run_child", spy)
+    h5 = _small_handoff(tmp_path)
+    good_sha = hashlib.sha256(b"0123456789").hexdigest()
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 10)
+    cases = ((tmp_path / "nope.h5", 10, None), (h5, 11, None), (h5, 10, "0" * 64))
+    for path, size, sha in cases:
+        monkeypatch.setenv(C_HANDOFF_ENV, str(path))
+        monkeypatch.setattr(fb, "C_HANDOFF_BYTES", size)
+        with pytest.raises(fb.FreezeError):
+            fb.stage5_subset_digests(5, seed=SEED, expected_sha256=sha)
+    assert calls == []
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 10)
+    with pytest.raises(_Started):
+        fb.stage5_subset_digests(5, seed=SEED, expected_sha256=good_sha)
+    assert len(calls) == 1 and calls[0]["source_h5"] == str(h5)
+
+
+def test_c_handoff_relative_path_absolute_and_repro_uses_frozen_path(fb: Any, tmp_path: Path,
+                                                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """r37 CODEX-R37-P1-01：相對路徑之 `ICPERF_C_HANDOFF_H5` 解析為呼叫端 cwd 下之絕對路徑（子行程於隔離 cwd 仍指向同檔）；
+    環境變數未設時 `repro` 取凍結所記之 `request.source_h5`（非預設本機路徑）傳給子行程。"""
+    calls: List[Dict[str, Any]] = []
+
+    class _Started(Exception):
+        pass
+
+    def spy(spec: Dict[str, Any], **_kw: Any) -> Dict[str, Any]:
+        calls.append(spec)
+        raise _Started()
+
+    monkeypatch.setattr(fb, "_run_child", spy)
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 10)
+    h5 = _small_handoff(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(C_HANDOFF_ENV, h5.name)
+    assert fb.c_handoff_path().is_absolute() and fb.c_handoff_path() == Path(os.path.abspath(h5))
+    monkeypatch.delenv(C_HANDOFF_ENV)
+    golden = tmp_path / "golden.json"
+    golden.write_text(json.dumps({"items": {"stage5_subset": {
+        "n_cols_requested": 2000, "seed": SEED,
+        "request": {"source_h5": str(h5), "source_sha256": hashlib.sha256(b"0123456789").hexdigest()}}}}),
+        encoding="utf-8")
+    with pytest.raises(_Started):
+        fb.repro(2000, golden_path=golden)
+    assert len(calls) == 1 and calls[0]["source_h5"] == str(Path(os.path.abspath(h5)))
+
+
 # ── §G 請求設定與逐特徵來源之秒級契約 ───────────────────────────────────────────────────────────────────────
 
 

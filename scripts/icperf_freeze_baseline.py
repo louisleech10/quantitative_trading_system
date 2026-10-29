@@ -1283,16 +1283,18 @@ def _run_child(spec: Mapping[str, Any], *, cwd: Path, work_dir: Path, iso: Path)
     return json.loads(out.read_text(encoding="utf-8")) if spec.get("out_json") else {}
 
 
-def c_handoff_path() -> Path:
-    """第 (2) 項之 C 格交接 h5 路徑：環境變數 `C_HANDOFF_ENV`（CLI `--c-handoff` 亦設此變數）優先，未設取 `C_HANDOFF_H5`。"""
-    return Path(os.environ.get(C_HANDOFF_ENV) or C_HANDOFF_H5)
+def c_handoff_path(fallback: Optional[Path] = None) -> Path:
+    """第 (2) 項之 C 格交接 h5 路徑（解析為絕對路徑，子行程於隔離 cwd 亦指向同檔；r37 CODEX-R37-P1-01）：環境變數
+    `C_HANDOFF_ENV`（CLI `--c-handoff` 亦設此變數）優先；未設取 `fallback`（可重現性傳凍結所記之 `request.source_h5`），
+    再無則取 `C_HANDOFF_H5`。"""
+    return Path(os.path.abspath(os.path.expanduser(str(os.environ.get(C_HANDOFF_ENV) or fallback or C_HANDOFF_H5))))
 
 
-def c_handoff_identity(*, with_sha256: bool = True) -> Dict[str, Any]:
+def c_handoff_identity(*, with_sha256: bool = True, fallback: Optional[Path] = None) -> Dict[str, Any]:
     """C 格交接 h5 之身分（SPEC v5.24 §G (2)；r36 群集 D）：{"path", "meta", "size", "sha256"}。h5 或其同名 meta
     （`<stem>_meta.json`，prep.py 同名規則）不存在、或 h5 大小 != `C_HANDOFF_BYTES` ⇒ FreezeError（不以他 run 代替）。
-    sha256＝內容全檔重算（不用快照快取；`with_sha256=False` ⇒ None）。"""
-    src = c_handoff_path()
+    sha256＝內容全檔重算（不用快照快取；`with_sha256=False` ⇒ None）。路徑取法見 `c_handoff_path(fallback)`。"""
+    src = c_handoff_path(fallback)
     meta = src.with_name(src.stem + "_meta.json")
     if not src.is_file() or not meta.is_file():
         raise FreezeError(f"改前基準全特徵 run 交接檔不存在（不以他 run 代替）：{src if not src.is_file() else meta}")
@@ -1303,14 +1305,16 @@ def c_handoff_identity(*, with_sha256: bool = True) -> Dict[str, Any]:
     return {"path": str(src), "meta": str(meta), "size": size, "sha256": sha}
 
 
-def stage5_subset_digests(n_cols: int, *, seed: int = SEED, expected_sha256: Optional[str] = None) -> Dict[str, Any]:
+def stage5_subset_digests(n_cols: int, *, seed: int = SEED, expected_sha256: Optional[str] = None,
+                          source_h5: Optional[Path] = None) -> Dict[str, Any]:
     """改前基準全特徵 run 交接 h5 之 n_cols 欄巢狀隨機子集（seed 同探針 `icperf_probes/prep.py`）以產品
     `create_ic_analyzer(...).analyze()` 跑第 5 段；回 {"stage_cols", "features": {<特徵>: {<欄位>: value_digest}},
     "pit_labels": {...}}（"features" 之來源、欄位命名與摘要粒度同第 (1) 項，見模組說明）；交接 h5 不存在 ⇒ FreezeError
     （不以其他 run 代替）。
 
-    交接 h5 經 `c_handoff_identity`（路徑可由環境變數覆寫、大小檢查）；`expected_sha256` 給定（可重現性與改後比對：
-    凍結所記之 `request.source_sha256`）而內容 sha256 不等 ⇒ FreezeError，於啟動子行程前判定。
+    交接 h5 經 `c_handoff_identity(fallback=source_h5)`（環境變數優先、次為 `source_h5`〔可重現性傳凍結所記之路徑〕、
+    再次為預設；解析為絕對路徑；大小檢查）；`expected_sha256` 給定（可重現性與改後比對：凍結所記之
+    `request.source_sha256`）而內容 sha256 不等 ⇒ FreezeError；身分檢查皆於啟動子行程前判定。
     請求＝第 (1) 項之 IC 頁預設請求（`default_request("ic_report")`）。子集取法同 prep.py（`default_rng(seed).permutation`
     之前 n_cols 個、排序；float32；同 root／group 屬性；meta 只留 symbol／timeframe／config_hash／ff_run_identity 與所選
     欄）。計算於子行程（`_run_child`，隔離 cwd 與 TMPDIR 於新建暫存目錄；成功即刪，失敗留現場）。stage_cols＝報告
@@ -1319,7 +1323,7 @@ def stage5_subset_digests(n_cols: int, *, seed: int = SEED, expected_sha256: Opt
     import shutil
     import tempfile
 
-    ident = c_handoff_identity(with_sha256=expected_sha256 is not None)
+    ident = c_handoff_identity(with_sha256=expected_sha256 is not None, fallback=source_h5)
     if expected_sha256 is not None and ident["sha256"] != expected_sha256:
         raise FreezeError(f"交接 h5 內容 sha256 {ident['sha256']} != 凍結所記 {expected_sha256}：{ident['path']}")
     src, meta = Path(ident["path"]), Path(ident["meta"])
@@ -1603,14 +1607,18 @@ def repro(n_cols: int = REPRO_COLS, *, golden_path: Path = GOLDEN_PATH) -> Dict[
     路徑、同交接 h5 雜湊）重跑第 5 段，對凍結之全部對應欄逐位元比——stage_cols 相等、逐特徵之特徵集合與 PIT 標籤之特徵
     集合皆相等、逐欄位與 PIT 標籤逐一相等；回 {"n_cols", "stage_cols", "problems"}。`n_cols` 須等於凍結之
     `n_cols_requested`（欄集合不同即非同輸入：第 5 段 FDR 依進段全部欄，`ic_filter_orchestrator.py:4435-4442`），否則
-    FreezeError。凍結未記 `request.source_sha256` 或交接 h5 內容 sha256 不等 ⇒ FreezeError（於重跑前判定）。"""
+    FreezeError。凍結未記 `request.source_sha256` 或交接 h5 內容 sha256 不等 ⇒ FreezeError（於重跑前判定）。交接 h5
+    路徑：環境變數優先，未設取凍結所記之 `request.source_h5`（r37 CODEX-R37-P1-01）。"""
     frozen = json.loads(Path(golden_path).read_text(encoding="utf-8"))["items"]["stage5_subset"]
     if int(n_cols) != int(frozen.get("n_cols_requested", -1)):
         raise FreezeError(f"可重現性須以凍結之同一子集重跑：n_cols={n_cols} != 凍結 {frozen.get('n_cols_requested')}")
-    expected = (frozen.get("request") or {}).get("source_sha256")
+    frozen_req = frozen.get("request") or {}
+    expected = frozen_req.get("source_sha256")
     if not expected:
         raise FreezeError("凍結檔之 stage5_subset 未記 request.source_sha256，無從驗交接 h5 身分")
-    cur = stage5_subset_digests(int(n_cols), seed=int(frozen.get("seed", SEED)), expected_sha256=str(expected))
+    frozen_src = frozen_req.get("source_h5")
+    cur = stage5_subset_digests(int(n_cols), seed=int(frozen.get("seed", SEED)), expected_sha256=str(expected),
+                                source_h5=Path(frozen_src) if frozen_src else None)
     problems: List[str] = []
     if not (0 < cur["stage_cols"] <= int(n_cols) and cur["stage_cols"] == len(cur["features"])):
         problems.append(f"stage_cols {cur['stage_cols']} 不合（逐特徵數 {len(cur['features'])}、請求 {n_cols}）")
