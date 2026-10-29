@@ -12,7 +12,9 @@
 - boundary_24／25：秒級契約——逐特徵來源與形狀＝SPEC §G（IC 報告為 dict：summary_table list[dict]、其餘以特徵名為鍵）；
   凍結腳本寫死之 IC 頁初始 payload（衰減開）== 前端原始碼與 ui_stage_toggles.json 導出值。
 - Task 0.3（現行 IC 正確性獨立驗證）之測試另見 tests/momentum/Analysis/test_icperf_correctness.py。
-- test_freeze_reproducible：重型（slow＋requires_kline；真實資料 500 欄第 5 段重跑，改前實測約 393 秒）。
+- test_freeze_reproducible：重型（slow＋requires_kline；SPEC v5.24：同一 2,000 欄子集第 5 段重跑，改前實測 1610.20 秒，
+  handoffs/run_receipts/icperf_probes/result_N2000.json）。
+- C 格交接 h5 身分（SPEC v5.24 §G (2)）：路徑覆寫、不存在、大小不符、內容 sha256 不符之 FreezeError（秒級，tmp_path 小檔）。
 - 本檔之 pytest 列 `scripts/heavy_commands.json` 之 wrapped（`pytest_icperf_gate`）：須經共用監看包裝並背景；只有
   `-m "not slow and not requires_kline"`（排除全部重型與真實資料測試）之選取不列重型。
 """
@@ -195,6 +197,24 @@ def _logged_paths(res: Mapping[str, Any]) -> List[str]:
 def _golden() -> Dict[str, Any]:
     assert GOLDEN.is_file(), f"凍結檔不存在：{GOLDEN}（Task 0.1 尚未凍結）"
     return json.loads(GOLDEN.read_text(encoding="utf-8"))
+
+
+#: SPEC v5.24 §G (2)：C 格交接 h5 路徑之環境變數（測試自持，不引腳本常數）
+C_HANDOFF_ENV = "ICPERF_C_HANDOFF_H5"
+
+
+def _sha256_of_file(path: Any) -> str:
+    """檔案內容 sha256（4 MiB 分塊；測試自算，不經腳本之快取）。"""
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 22), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _c_handoff_file(frozen_stage5: Mapping[str, Any]) -> Path:
+    """重跑所用之 C 格交接 h5：環境變數覆寫優先，否則凍結所記之 `request.source_h5`（SPEC v5.24 §G (2)）。"""
+    return Path(os.environ.get(C_HANDOFF_ENV) or frozen_stage5["request"]["source_h5"])
 
 
 def _single(pattern: str) -> Dict[str, Any]:
@@ -569,14 +589,23 @@ def test_boundary_02_frozen_baseline_content_complete(fb: Any, oracle_runs: Dict
 @pytest.mark.slow
 @pytest.mark.requires_kline
 def test_freeze_reproducible(fb: Any) -> None:
-    """SPEC Task 0.1 具名：2,000 欄子集之 500 欄巢狀子集（同 seed、同碼路徑）重跑第 5 段 == 凍結之對應欄。"""
+    """SPEC v5.24 Task 0.1 具名（r36 群集 A）：同一 2,000 欄子集（同 seed、同碼路徑、同交接 h5 雜湊）重跑第 5 段 ==
+    凍結之全部對應欄（stage_cols 相等、特徵集合相等、逐欄位與 PIT 標籤逐一相等）。第 5 段之 FDR 對進段全部欄計算
+    （momentum/Analysis/ic_filter_orchestrator.py:4435-4442），故不以較小子集代替。重跑前先驗交接 h5 之內容 sha256
+    等於凍結所記（測試自算）。"""
+    # 區域名之首次綁定序沿用改版前（frozen、cur、extra、feat、fields、rec；TESTREG V19 normalize 依此改名）
     frozen = _golden()["items"]["stage5_subset"]
-    cur = fb.stage5_subset_digests(500, seed=SEED)
-    assert 0 < cur["stage_cols"] <= 500 and cur["stage_cols"] == len(cur["features"])
+    assert _sha256_of_file(_c_handoff_file(frozen)) == frozen["request"]["source_sha256"], "交接 h5 內容 != 凍結所記"
+    assert frozen["n_cols_requested"] == 2000
+    cur = fb.stage5_subset_digests(2000, seed=SEED, expected_sha256=frozen["request"]["source_sha256"])
+    assert 0 < cur["stage_cols"] <= 2000 and cur["stage_cols"] == len(cur["features"])
+    assert cur["stage_cols"] == frozen["stage_cols"], "第 5 段實際進段欄數 != 凍結"
     extra = set(cur["features"]) - set(frozen["features"])
     assert not extra, f"500 欄子集非 2,000 欄子集之巢狀子集：{sorted(extra)[:5]}"
+    assert set(cur["features"]) == set(frozen["features"]), "凍結有而重跑無之特徵（非同一 2,000 欄子集）"
     for feat, fields in cur["features"].items():
         assert fields == frozen["features"][feat], f"第 5 段輸出不可重現：{feat}"
+    assert set(cur["pit_labels"]) == set(frozen["pit_labels"]), "PIT 標籤之特徵集合 != 凍結"
     for feat, rec in cur["pit_labels"].items():
         assert rec == frozen["pit_labels"][feat], f"PIT 標籤不可重現：{feat}"
 
@@ -915,6 +944,132 @@ def test_boundary_13_volatile_fields_only_listed_paths_excluded(fb: Any, tmp_pat
     unlisted_response = fb.compare_capture(frozen, current, volatile=["file:r.json#/run_id",
                                                                       "file:r.json#/generated_at"])
     assert any("run_id" in p for p in unlisted_response), "回應欄位未列即須比"
+
+
+def test_boundary_13_hdf5_volatile_attrs_only_listed_excluded(fb: Any, tmp_path: Path) -> None:
+    """boundary_13 之 HDF5 正反例（SPEC v5.24 §G；r36 群集 B）：HDF5 檔以「物件＋屬性名」列 volatile
+    （file:<path_key>@<物件>#attr:<屬性名>）——該檔改比全部物件之 kind／dtype／shape／資料 sha256 與未列屬性、只跳過所列
+    屬性、不比整檔位元組。邊界輸入：tmp_path 以 h5py 秒級建之小檔。另驗格式不合與同檔混列 JSON／HDF5 ⇒ FreezeError。"""
+    assert _boundary_13_hdf5_holds(fb, tmp_path)
+    with pytest.raises(fb.FreezeError):
+        fb.compare_capture({"response": {}, "files": {}}, {"response": {}, "files": {}},
+                           volatile=["file:f.h5@g#attr:k"])  # 物件須以 / 起首 ⇒ 不合任一格式
+    with pytest.raises(fb.FreezeError):
+        fb.compare_capture({"response": {}, "files": {}}, {"response": {}, "files": {}},
+                           volatile=["file:f.h5#/a", "file:f.h5@/g#attr:k"])
+    with pytest.raises(fb.FreezeError):
+        fb.compare_golden({"volatile": ["ic_report:file:f.h5@g#attr:k"], "items": {}}, {"items": {}})
+
+
+def _write_volatile_h5(path: Path, *, stamp: str, k: int = 1, data: Optional[np.ndarray] = None) -> None:
+    import h5py
+
+    with h5py.File(path, "w") as f:
+        f.create_dataset("g/v", data=np.arange(3, dtype="float64") if data is None else data)
+        f["g"].attrs["source_generated_at"] = stamp
+        f["g"].attrs["k"] = k
+        f.attrs["source_generated_at"] = stamp
+
+
+def _boundary_13_hdf5_holds(fb: Any, d: Path) -> bool:
+    """只改所列屬性 ⇒ 無問題（未列 volatile 時同一對須列問題＝改壞對照）；改未列屬性或資料集內容 ⇒ 列問題（點名該屬性或
+    資料集）；所列物件不同（屬性同名但物件未列）仍比。"""
+    _write_volatile_h5(d / "base.h5", stamp="t1")
+    _write_volatile_h5(d / "stamp.h5", stamp="t2")
+    _write_volatile_h5(d / "unlisted.h5", stamp="t2", k=2)
+    _write_volatile_h5(d / "data.h5", stamp="t2", data=np.array([0.0, 1.0, 5.0]))
+    base = {"response": {}, "files": {"f.h5": fb.describe_file(d / "base.h5")}}
+
+    def problems(name: str, volatile: Sequence[str]) -> List[str]:
+        return fb.compare_capture(base, {"response": {}, "files": {"f.h5": fb.describe_file(d / name)}},
+                                  volatile=list(volatile))
+
+    listed = ["file:f.h5@/g#attr:source_generated_at", "file:f.h5@/#attr:source_generated_at"]
+    only_stamp = problems("stamp.h5", listed)
+    unlisted_stamp = problems("stamp.h5", [])
+    group_only = problems("stamp.h5", listed[:1])
+    unlisted_attr = problems("unlisted.h5", listed)
+    data_changed = problems("data.h5", listed)
+    return (only_stamp == [] and bool(unlisted_stamp)
+            and any("source_generated_at" in p and "物件 / " in p for p in group_only)
+            and any("屬性 k" in p for p in unlisted_attr) and not any("source_generated_at" in p for p in unlisted_attr)
+            and any("/g/v" in p and "sha256" in p for p in data_changed))
+
+
+# ── §G (2) C 格交接 h5 身分之秒級契約（SPEC v5.24；r36 群集 D） ────────────────────────────────────────────
+
+
+def _small_handoff(root: Path, payload: bytes = b"0123456789") -> Path:
+    """邊界輸入：tmp_path 下之小交接檔與其同名 meta（prep.py 同名規則 `<stem>_meta.json`；不涉資料值）。"""
+    h5 = root / "X_1h_abc.h5"
+    h5.write_bytes(payload)
+    (root / "X_1h_abc_meta.json").write_text("{}", encoding="utf-8")
+    return h5
+
+
+def test_c_handoff_env_override_and_identity(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """環境變數 ICPERF_C_HANDOFF_H5 覆寫交接 h5 路徑；身分＝路徑、同名 meta、大小與內容 sha256（測試自算）；未設 ⇒ 本機現值。"""
+    h5 = _small_handoff(tmp_path)
+    monkeypatch.setenv(C_HANDOFF_ENV, str(h5))
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 10)
+    assert fb.c_handoff_path() == h5
+    ident = fb.c_handoff_identity()
+    assert Path(ident["path"]) == h5 and Path(ident["meta"]) == tmp_path / "X_1h_abc_meta.json"
+    assert ident["size"] == 10 and ident["sha256"] == hashlib.sha256(b"0123456789").hexdigest()
+    assert fb.default_request("stage5_subset")["source_h5"] == str(h5)
+    monkeypatch.delenv(C_HANDOFF_ENV)
+    assert fb.c_handoff_path() == Path(fb.C_HANDOFF_H5)
+
+
+def test_c_handoff_missing_fails(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """交接 h5 或其同名 meta 不存在 ⇒ FreezeError（訊息具名該檔）；`stage5_subset_digests` 於啟動子行程前即擋。"""
+    missing = tmp_path / "nope.h5"
+    monkeypatch.setenv(C_HANDOFF_ENV, str(missing))
+    with pytest.raises(fb.FreezeError) as exc:
+        fb.c_handoff_identity()
+    assert str(missing) in str(exc.value)
+    with pytest.raises(fb.FreezeError):
+        fb.stage5_subset_digests(5, seed=SEED)
+    only = tmp_path / "only.h5"
+    only.write_bytes(b"x")
+    monkeypatch.setenv(C_HANDOFF_ENV, str(only))
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 1)
+    with pytest.raises(fb.FreezeError) as exc_meta:
+        fb.c_handoff_identity()
+    assert "only_meta.json" in str(exc_meta.value)
+
+
+def test_c_handoff_size_mismatch_fails(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """交接 h5 大小 != 登記大小 ⇒ FreezeError（訊息具名實際大小與路徑）；大小相符 ⇒ 放行（改壞對照）。"""
+    h5 = _small_handoff(tmp_path)
+    monkeypatch.setenv(C_HANDOFF_ENV, str(h5))
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 11)
+    with pytest.raises(fb.FreezeError) as exc:
+        fb.c_handoff_identity()
+    assert "10" in str(exc.value) and str(h5) in str(exc.value)
+    with pytest.raises(fb.FreezeError):
+        fb.stage5_subset_digests(5, seed=SEED)
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 10)
+    assert fb.c_handoff_identity()["size"] == 10
+
+
+def test_c_handoff_sha_mismatch_fails_before_run(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """內容 sha256 != 凍結所記 ⇒ `stage5_subset_digests` 於啟動子行程前 FreezeError；`repro` 於凍結未記
+    source_sha256、子集欄數 != 凍結、或雜湊不等時皆 FreezeError（不重跑）。"""
+    h5 = _small_handoff(tmp_path)
+    monkeypatch.setenv(C_HANDOFF_ENV, str(h5))
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 10)
+    with pytest.raises(fb.FreezeError) as exc:
+        fb.stage5_subset_digests(5, seed=SEED, expected_sha256="0" * 64)
+    assert "sha256" in str(exc.value)
+    golden = tmp_path / "golden.json"
+    for stage5, n_cols in (({"n_cols_requested": 2000, "seed": SEED, "request": {}}, 2000),
+                           ({"n_cols_requested": 2000, "seed": SEED, "request": {"source_sha256": "0" * 64}}, 500),
+                           ({"n_cols_requested": 2000, "seed": SEED, "request": {"source_sha256": "0" * 64}}, 2000)):
+        golden.write_text(json.dumps({"items": {"stage5_subset": stage5}}), encoding="utf-8")
+        with pytest.raises(fb.FreezeError):
+            fb.repro(n_cols, golden_path=golden)
+    assert fb.REPRO_COLS == fb.SUBSET_COLS == 2000
 
 
 # ── §G 請求設定與逐特徵來源之秒級契約 ───────────────────────────────────────────────────────────────────────

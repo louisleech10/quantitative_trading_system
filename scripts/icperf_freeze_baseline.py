@@ -7,13 +7,15 @@
 - 第 (1)(3)(4) 項：`ic_page`——同 `scripts/ffprod_measure.py` 之 `ic_in_process`（服務 `_build_config_override`、
   `_materialize_features_for_ic`、`create_ic_analyzer(...).analyze`）；第 (3) 項於同一 analyzer 實例續跑深度分析。
 - 第 (5) 項：`ic_first`——同 `scripts/numview_freeze_baseline.py:316-323`（`_isolated` 導向本次 cwd 根）。
-- 第 (2) 項：`stage5`——交接 h5 之巢狀子集（同 `icperf_probes/prep.py`）後 `analyze`。
-- 第 (1) 項之 PIT 標籤：`pit_labels`——`load_cell` 後 `pit_label_digests`。
+- 第 (2) 項：`stage5`——交接 h5 之巢狀子集（同 `icperf_probes/prep.py`）後 `analyze`；PIT 標籤取同一次 analyze 之
+  第 5 段實際輸入對。
+- 第 (1) 項之 PIT 標籤：`pit_labels`——IC 頁請求執行至第 5 段入口，取第 5 段實際輸入對後 `pit_label_digests`；
+  `load_cell` 以 `stage5_inputs` 取同一對（`_stage5_input_spy`；SPEC v5.24、r36 群集 C）。
 
 用法（重型，列 `scripts/heavy_commands.json` 之 `self_watched`：須背景、先寫估時收據〔coverage_path_ids＝ICPERF-BUDGET-1／-2〕，
 子行程一律經本檔 `run_watched` 以共用監看啟動）：
-  venv/bin/python scripts/icperf_freeze_baseline.py freeze [--out tests/_golden/icperf/pre_change.json]
-  venv/bin/python scripts/icperf_freeze_baseline.py repro --cols 500
+  venv/bin/python scripts/icperf_freeze_baseline.py freeze [--out tests/_golden/icperf/pre_change.json] [--c-handoff <h5>]
+  venv/bin/python scripts/icperf_freeze_baseline.py repro [--cols 2000] [--c-handoff <h5>]
   venv/bin/python scripts/icperf_freeze_baseline.py inventory --out handoffs/run_receipts/<日期>-icperf-path-inventory.json
   venv/bin/python scripts/icperf_freeze_baseline.py measure --inventory <清冊> --out handoffs/run_receipts/<日期>-icperf-scale-before.json
 
@@ -29,8 +31,8 @@
         "features": {<特徵>: {<欄位>: {"sha256", "nan_mask_sha256"}}},   # 第 (1)、(4) 項（深度分析由回應全部欄位涵蓋）
         "selected": [<第 6 段後之倖存者>...],          # 第 (1)、(4) 項（寫出之 ic_survivors_<case_id>.json 之 feature_names）
         "pit_labels": {<特徵>: {"q", "q_insufficient", "skipped_all_nan", "label_sha256"|None, "label_nan_count"}}},
-     "stage5_subset": {"seed": 20261027, "n_cols_requested": 2000, "stage_cols": <實際進第 5 段欄數>,
-        "features": {...同上...}, "pit_labels": {...同上...}}}}
+     "stage5_subset": {"request": {..., "source_h5", "source_sha256"}, "seed": 20261027, "n_cols_requested": 2000,
+        "stage_cols": <實際進第 5 段欄數>, "features": {...同上...}, "pit_labels": {...同上...}}}}
 
 path_key 規則（SPEC §G (b) 三根前綴）：本次執行之 cwd 根（新建之隔離工作目錄）之下＝相對 POSIX；隔離目錄（TMPDIR／
 HOME）之下＝`<iso>/<相對 POSIX>`；repo 根之下＝`<repo>/<相對 POSIX>`；多根皆含時取最具體（解析後最長）之根；三根皆不含
@@ -45,7 +47,9 @@ IC 報告（dict）之 `summary_table`（list[dict]，以 `feature_name` 為鍵�
 
 PIT 標籤（"pit_labels"）：照單調性之現行輸入定義（特徵與標籤同時非 NaN 之列壓縮、`_select_num_quantiles` 選 q、
 q=3 退回）；`q`＝最終採用之 q；`q_insufficient`＝最終 q 小於請求 q（樣本數不足而降為 3，或 bin 數不足退回 3）；
-`label_sha256`＝壓縮後之 PIT 標籤序列轉 float64 之原生位元組 sha256；`label_nan_count`＝其中 NaN 數。
+`label_sha256`＝壓縮後之 PIT 標籤序列轉 float64 之原生位元組 sha256；`label_nan_count`＝其中 NaN 數。輸入（SPEC v5.24
+§G）＝第 5 段統計之實際輸入對（第 1 段後之特徵與標籤以 test_mask 切出之段，`ic_filter_orchestrator.py:4398-4402`），
+於產品執行中取得、不另建。
 
 註記（ICPERF 施工清單審查 r10 群集 A）：本檔列 `scripts/heavy_commands.json` 之 `self_watched`，heavy_run_guard
 以 AST 驗原始碼確有 `run_watched(...)` 呼叫；`run_watched` 呼叫共用監看（`_watchdog.run_watched`）。
@@ -56,6 +60,7 @@ volatile（每次必異欄位）：凍結檔之 "volatile" 留空，由 FACT-REC
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -65,7 +70,7 @@ import stat
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence, Set, Tuple
 
 # 本檔亦由子行程之 sitecustomize 以檔案路徑載入（寫入審計），故模組層只 import 標準函式庫；numpy／pandas／h5py
 # 一律於函式內載入。
@@ -76,7 +81,9 @@ GOLDEN_PATH = REPO / "tests" / "_golden" / "icperf" / "pre_change.json"
 CELL = "A_BTCUSDT_1h"
 SEED = 20261027
 SUBSET_COLS = 2000
-REPRO_COLS = 500
+#: SPEC v5.24 Task 0.1（r36 群集 A）：可重現性以同一 2,000 欄子集重跑第 5 段——第 5 段之 FDR 對進段全部欄計算
+#: （`ic_filter_orchestrator.py:4435-4442`），欄集合不同即非同輸入，故不以較小子集代替
+REPRO_COLS = SUBSET_COLS
 SCALE_POINTS = (500, 1000, 2000)
 
 #: §G (1)–(5)：A 格完整 IC 報告、2,000 欄子集第 5 段、A 格深度分析、A 格 K 線條件式事件 IC 報告、A 格 IC-first post-IC
@@ -336,14 +343,19 @@ def read_write_log(log_path: Path) -> List[Dict[str, Any]]:
     return out
 
 
-#: 檔案雜湊快取（本行程）：鍵＝(解析後路徑, 大小, mtime_ns)；大小與 mtime 皆未變即視為內容未變（同 rsync 判準）
+#: 檔案雜湊快取（本行程）：鍵＝(解析後路徑, 大小, mtime_ns)；大小與 mtime_ns 皆未變即視為內容未變——同 rsync 預設之
+#: 「大小＋修改時間」快速判準之取捨（r36 群集 E）：**不宣稱**能偵測「內容改變而大小與 mtime_ns 皆不變」者（例：寫後以
+#: os.utime 還原 mtime）。快取只存活於單一行程，跨次執行（凍結與改後）一律重新雜湊。
+SNAPSHOT_CACHE_RULE = ("同行程內以 (解析後路徑, 大小, mtime_ns) 快取檔案 sha256（同 rsync 大小＋修改時間判準之取捨）；"
+                       "不宣稱偵測內容改變而大小與 mtime_ns 皆不變者；跨行程不沿用")
 _SHA_CACHE: Dict[Tuple[str, int, int], str] = {}
 
 
-def _file_sha256(path: str) -> str:
+def _file_sha256(path: str, *, cache: bool = True) -> str:
+    """檔案位元組 sha256（4 MiB 分塊）；`cache` ⇒ 依 `SNAPSHOT_CACHE_RULE` 快取，否則每次全檔重算（身分驗證用）。"""
     st = os.stat(path)
     key = (path, st.st_size, st.st_mtime_ns)
-    if key not in _SHA_CACHE:
+    if not cache or key not in _SHA_CACHE:
         h = hashlib.sha256()
         with open(path, "rb") as fh:
             for chunk in iter(lambda: fh.read(1 << 22), b""):
@@ -356,7 +368,8 @@ def snapshot_files(roots: Sequence[Path], *, repo_root: Path,
                    prefixes: Optional[Mapping[str, Path]] = None) -> Dict[str, str]:
     """對 `roots` 下全部檔案取 {path_key: 位元組 sha256}；排除任一層名為 `SNAPSHOT_EXCLUDE_DIRS` 之目錄、副檔名為
     `NUMBA_CACHE_SUFFIXES` 之檔與呼叫當下環境變數 `NUMBA_CACHE_DIR` 所指目錄之整棵（不論副檔名；未設則不排除該目錄）；
-    不跟隨指向 roots 外之 symlink。雜湊以（路徑、大小、mtime）快取。"""
+    不跟隨指向 roots 外之 symlink。雜湊以（解析後路徑、大小、mtime_ns）於本行程快取（`SNAPSHOT_CACHE_RULE`：同 rsync
+    之大小＋修改時間取捨，不宣稱偵測內容改變而大小與 mtime_ns 皆不變者）。"""
     nd = os.environ.get("NUMBA_CACHE_DIR")
     numba_dir = os.path.realpath(nd) if nd else None
     real_roots = [os.path.realpath(r) for r in roots]
@@ -627,18 +640,35 @@ def compared_paths(frozen_files: Mapping[str, Any], current_files: Mapping[str, 
     return set(frozen_files) | set(current_files)
 
 
-def _parse_volatile(volatile: Sequence[str]) -> Tuple[Set[str], Dict[str, Set[str]]]:
+#: volatile 之 HDF5 屬性項：`file:<path_key>@<HDF5 物件，以 / 起首>#attr:<屬性名>`（SPEC v5.24 §G；r36 群集 B）
+_VOLATILE_HDF5_RE = re.compile(r"^file:(?P<key>.+)@(?P<obj>/[^@#]*)#attr:(?P<attr>.+)$")
+
+
+def _parse_volatile(volatile: Sequence[str]) -> Tuple[Set[str], Dict[str, Set[str]], Dict[str, Dict[str, Set[str]]]]:
+    """volatile 項 ⇒ (回應欄位集合, {JSON 檔 path_key: 欄位集合}, {HDF5 檔 path_key: {物件: 屬性名集合}})。格式：
+    `response:<欄位>`、`file:<path_key>#<欄位>`（JSON）、`file:<path_key>@<物件>#attr:<屬性名>`（HDF5；先判此式）。
+    同一檔同列 JSON 欄位與 HDF5 屬性、或格式不合 ⇒ FreezeError。"""
     resp: Set[str] = set()
     files: Dict[str, Set[str]] = {}
+    h5attrs: Dict[str, Dict[str, Set[str]]] = {}
     for v in volatile:
+        m = _VOLATILE_HDF5_RE.match(v)
         if v.startswith("response:"):
             resp.add(v[len("response:"):])
+        elif m is not None:
+            h5attrs.setdefault(m.group("key"), {}).setdefault(m.group("obj"), set()).add(m.group("attr"))
+        elif v.startswith("file:") and "#attr:" in v:
+            raise FreezeError(f"HDF5 屬性之 volatile 項須為 file:<path_key>@</物件>#attr:<屬性名>：{v}")
         elif v.startswith("file:") and "#" in v:
             key, field = v[len("file:"):].split("#", 1)
             files.setdefault(key, set()).add(field)
         else:
-            raise FreezeError(f"volatile 項格式不合（須 response:<欄位> 或 file:<path_key>#<欄位>）：{v}")
-    return resp, files
+            raise FreezeError("volatile 項格式不合（須 response:<欄位>、file:<path_key>#<欄位> 或 "
+                              f"file:<path_key>@<HDF5 物件>#attr:<屬性名>）：{v}")
+    both = sorted(set(files) & set(h5attrs))
+    if both:
+        raise FreezeError(f"同一檔不得同列 JSON 欄位與 HDF5 屬性之 volatile：{both}")
+    return resp, files, h5attrs
 
 
 def _compare_maps(a: Mapping[str, Any], b: Mapping[str, Any], label: str, skip: Set[str] = frozenset()) -> List[str]:
@@ -653,8 +683,11 @@ def _compare_maps(a: Mapping[str, Any], b: Mapping[str, Any], label: str, skip: 
     return out
 
 
-def _compare_hdf5(key: str, a: Mapping[str, Any], b: Mapping[str, Any]) -> List[str]:
+def _compare_hdf5(key: str, a: Mapping[str, Any], b: Mapping[str, Any],
+                  skip_attrs: Optional[Mapping[str, Set[str]]] = None) -> List[str]:
+    """HDF5 逐物件比：物件集合、kind／dtype／shape／資料 sha256 與屬性；`skip_attrs`＝{物件: 屬性名集合} 只跳過所列屬性。"""
     out = []
+    skip_attrs = skip_attrs or {}
     for obj in sorted(set(a) | set(b)):
         if obj not in a or obj not in b:
             out.append(f"file:{key} HDF5 物件 {obj}：只在{'凍結' if obj in a else '改後'}側")
@@ -663,7 +696,8 @@ def _compare_hdf5(key: str, a: Mapping[str, Any], b: Mapping[str, Any]) -> List[
             if a[obj].get(fld) != b[obj].get(fld):
                 out.append(f"file:{key} HDF5 物件 {obj} 之 {fld}：不等")
         out += [p.replace("attr:", f"file:{key} HDF5 物件 {obj} 屬性 ", 1)
-                for p in _compare_maps(a[obj].get("attrs") or {}, b[obj].get("attrs") or {}, "attr:")]
+                for p in _compare_maps(a[obj].get("attrs") or {}, b[obj].get("attrs") or {}, "attr:",
+                                       set(skip_attrs.get(obj) or ()))]
     return out
 
 
@@ -671,9 +705,11 @@ def compare_capture(frozen: Mapping[str, Any], current: Mapping[str, Any], *,
                     volatile: Sequence[str] = ()) -> List[str]:
     """比對一項之 "response" 與 "files"；回問題清單（空＝逐位元相同）。檔集合取 `compared_paths`：只在一側者、sha256
     不等者、HDF5 任一物件之 sha256／dtype／shape／屬性不等者皆列（訊息含 path_key 與物件／屬性名）。
-    `volatile` 項之格式：`response:<欄位路徑>` 或 `file:<path_key>#<欄位路徑>`；只對所列路徑排除——該檔改以
-    "fields" 逐欄位比（排除所列），未列欄位不等仍列為問題。兩側皆有 "removed" 時另比執行中刪除之既有檔。"""
-    vol_resp, vol_files = _parse_volatile(volatile)
+    `volatile` 項之格式：`response:<欄位路徑>`、`file:<path_key>#<欄位路徑>`（JSON 檔）或
+    `file:<path_key>@<HDF5 物件>#attr:<屬性名>`（HDF5 檔，SPEC v5.24 §G）；只對所列路徑排除——JSON 檔改以 "fields"
+    逐欄位比（排除所列），未列欄位不等仍列為問題；HDF5 檔改比全部物件之 kind／dtype／shape／資料 sha256 與未列之屬性，
+    只跳過所列屬性、不比整檔位元組 sha256（任一側無 HDF5 摘要 ⇒ 列問題）。兩側皆有 "removed" 時另比執行中刪除之既有檔。"""
+    vol_resp, vol_files, vol_h5 = _parse_volatile(volatile)
     problems = _compare_maps(frozen.get("response") or {}, current.get("response") or {}, "response:", vol_resp)
     ff, cf = frozen.get("files") or {}, current.get("files") or {}
     for key in sorted(compared_paths(ff, cf)):
@@ -687,6 +723,12 @@ def compare_capture(frozen: Mapping[str, Any], current: Mapping[str, Any], *,
                 continue
             problems += [p.replace("field:", f"file:{key}#", 1)
                          for p in _compare_maps(a["fields"], b["fields"], "field:", vol_files[key])]
+            continue
+        if key in vol_h5:
+            if a.get("hdf5") is None or b.get("hdf5") is None:
+                problems.append(f"file:{key}：列有 HDF5 屬性 volatile 但非 HDF5，無從逐物件比")
+                continue
+            problems += _compare_hdf5(key, a["hdf5"], b["hdf5"], vol_h5[key])
             continue
         if a.get("sha256") != b.get("sha256"):
             problems.append(f"file:{key}：sha256 不等")
@@ -708,14 +750,24 @@ def _compare_features(item: str, a: Mapping[str, Any], b: Mapping[str, Any]) -> 
 
 
 def compare_golden(frozen: Mapping[str, Any], current: Mapping[str, Any]) -> List[str]:
-    """§G 全部凍結項之逐位元比對（依 `frozen["volatile"]` 排除；其項格式為 `<項>:response:<欄位>` 或
-    `<項>:file:<path_key>#<欄位>`）；任一不等即列出項、特徵與欄位。"""
+    """§G 全部凍結項之逐位元比對（依 `frozen["volatile"]` 排除；其項格式為 `<項>:response:<欄位>`、
+    `<項>:file:<path_key>#<欄位>` 或 `<項>:file:<path_key>@<HDF5 物件>#attr:<屬性名>`，`<項>` 須為 `OUTPUT_ITEMS` 之一、
+    其餘部分依 `_parse_volatile` 驗格式，不合 ⇒ FreezeError）；任一不等即列出項、特徵與欄位。第 (2) 項另比兩側請求之
+    交接 h5 內容 sha256（`request.source_sha256`，SPEC v5.24 §G (2)）。"""
     problems = []
     vol: Dict[str, List[str]] = {}
     for v in frozen.get("volatile") or []:
-        item, rest = v.split(":", 1)
+        item, sep, rest = str(v).partition(":")
+        if not sep or item not in OUTPUT_ITEMS:
+            raise FreezeError(f"volatile 項須以 <項>: 起首且 <項> ∈ {list(OUTPUT_ITEMS)}：{v}")
+        _parse_volatile([rest])
         vol.setdefault(item, []).append(rest)
     fi, ci = frozen.get("items") or {}, current.get("items") or {}
+    if "stage5_subset" in fi and "stage5_subset" in ci:
+        sa = (fi["stage5_subset"].get("request") or {}).get("source_sha256")
+        sb = (ci["stage5_subset"].get("request") or {}).get("source_sha256")
+        if not sa or sa != sb:
+            problems.append(f"stage5_subset/request/source_sha256：交接 h5 身分不等或缺（凍結 {sa}、改後 {sb}）")
     for item in G_ITEMS:
         if item not in fi or item not in ci:
             problems.append(f"{item}：只在{'凍結' if item in fi else '改後'}側")
@@ -738,8 +790,11 @@ def compare_golden(frozen: Mapping[str, Any], current: Mapping[str, Any]) -> Lis
 
 #: SPEC §G FACT-RECEIPT：第 (1)(3)(4) 項之 A 格資料根（NUMVIEW 凍結之 run；`{cell}` 代入格 id，repo 相對）
 CELL_FEATURES_ROOT = "data_cache/numview_freeze_runs/{cell}__default/features"
-#: SPEC §G (2)：改前基準全特徵 run（C 格）之 IC 交接 h5（`handoffs/run_receipts/icperf_probes/prep.py` 之 SRC_DIR／HASH；
-#: 225,002,383 bytes，`ls -la` 實查）；不存在或大小不符 ⇒ FreezeError（不以他 run 代替）
+#: SPEC v5.24 §G (2)：改前基準全特徵 run（C 格）之 IC 交接 h5——路徑由環境變數 `C_HANDOFF_ENV`（或 CLI
+#: `--c-handoff`）傳入，未設取 `C_HANDOFF_H5`（本機現值＝`handoffs/run_receipts/icperf_probes/prep.py` 之 SRC_DIR／HASH；
+#: 225,002,383 bytes，`ls -la` 實查）；meta 照 prep.py 同名規則（`<stem>_meta.json`）。不存在、大小或內容 sha256 不符
+#: ⇒ FreezeError（不以他 run 代替）
+C_HANDOFF_ENV = "ICPERF_C_HANDOFF_H5"
 C_HANDOFF_H5 = Path("/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ffprod-measure/C_BTCUSDT_1h/"
                     "ic__baseline__default/data_cache/reports/ic_ingest_cache/"
                     "BTCUSDT_1h_fe927783c302dc6232adf0a0087846e8.h5")
@@ -829,7 +884,8 @@ def default_request(item: str, cell: str = CELL) -> Dict[str, Any]:
     （repo 相對）, "config_override", "feature_tiers", "event_query", "feature_filter", "deep"（第 (3) 項＝
     `DeepAnalysisRequest().model_dump()`，餘 None）}；IC-first {"kind": "ic_first", "item", "cell"（判準檔格描述子）,
     "generation"（判準檔 `cell_definitions.<格類>.generation`）}；第 (2) 項 {"kind": "stage5", "item", "source_h5",
-    "seed", "n_cols", "ic_request"（＝第 (1) 項之請求）}。"""
+    "seed", "n_cols", "ic_request"（＝第 (1) 項之請求）}（"source_h5"＝`c_handoff_path()`；"source_sha256" 由
+    `freeze_item` 記入）。"""
     if item in IC_PAGE_ITEMS:
         payload = _json_copy(IC_PAGE_DEFAULT_PAYLOAD)
         req: Dict[str, Any] = {"kind": "ic_page", "item": item, "cell": cell, **_cell_run(cell),
@@ -849,8 +905,9 @@ def default_request(item: str, cell: str = CELL) -> Dict[str, Any]:
             raise FreezeError(f"{cell}：判準檔格類 {desc['kind']} 之生成入口非 run_ic_first（{generation.get('entry')}）")
         return {"kind": "ic_first", "item": item, "cell": desc, "generation": _json_copy(generation)}
     if item == "stage5_subset":
-        return {"kind": "stage5", "item": item, "source_h5": str(C_HANDOFF_H5), "seed": SEED, "n_cols": SUBSET_COLS,
-                "ic_request": default_request("ic_report", cell)}
+        # 內容 sha256（"source_sha256"）由 `freeze_item` 於凍結時計算記入（雜湊 225 MB 不放在本輕量函式）
+        return {"kind": "stage5", "item": item, "source_h5": str(c_handoff_path()), "seed": SEED,
+                "n_cols": SUBSET_COLS, "ic_request": default_request("ic_report", cell)}
     raise FreezeError(f"未知凍結項：{item}")
 
 
@@ -958,56 +1015,111 @@ def _ic_service(request: Mapping[str, Any], registry: Path) -> Any:
     return svc
 
 
-def _write_handoff(svc: Any, request: Mapping[str, Any], out_dir: Path) -> Tuple[Path, Path]:
-    """服務 `_materialize_features_for_ic` 之同一寫法（`api/services/ic_analysis_service.py:3342-3375`），但寫入 `out_dir`
-    （不依 cwd 相對之 `data_cache/reports/ic_ingest_cache`，避免同行程呼叫寫入 repo）；回 (h5, meta)。"""
-    from momentum.core.contracts import FF_RUN_IDENTITY_KEY
-
-    sym, tf, ch = request["symbol"], request["timeframe"], request["config_hash"]
-    features_df, run_identity = svc._feature_library.load_with_identity(sym, tf, config_hash=ch)
-    identity = run_identity.to_dict()
-    safe = f"{sym}_{tf}_{ch}".replace("/", "_")
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    h5, meta = out_dir / f"{safe}.h5", out_dir / f"{safe}_meta.json"
-    svc._write_features_h5(h5, sym, tf, features_df, run_identity=identity)
-    payload = svc._build_ic_metadata_from_run(sym, tf, ch, list(features_df.columns))
-    payload[FF_RUN_IDENTITY_KEY] = identity
-    meta.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    return h5, meta
+class _Stage5InputsCaptured(BaseException):
+    """stop 模式之哨兵：第 5 段實際輸入對已取得，中止其後之計算。刻意非 Exception 子類——產品碼之 `except Exception`
+    不得攔下而續跑或改走他路。"""
 
 
-def _stage0_and_label(h5: Path, meta: Path, override: Optional[Mapping[str, Any]]) -> Tuple[Any, Any]:
-    """產品 analyzer 之第 0 段讀入（`_stage0_ingestion`）＋標籤（`_stage2_label_generation`；labels_path 空時第 0 段無
-    標籤，標籤於第 2 段由 K 線生成）；設定＝`analyze` 之同一解析（`_apply_tier_config(_apply_config_override(...))`）。"""
+@contextlib.contextmanager
+def _stage5_input_spy(stop: bool) -> Iterator[List[Tuple[Any, Any]]]:
+    """於本行程內取第 5 段統計之實際輸入對（SPEC v5.24 §G baseline 內容；r36 群集 C）：暫時包住
+    `ICFilterOrchestrator._stage5_statistical_validation`，其執行期間把模組層 `_slice_by_mask` 換成記錄者——第 5 段本體
+    第一次呼叫 `_slice_by_mask` 即 `features_for_stats, label_for_stats = _slice_by_mask(features_df, label_series,
+    test_mask)`（`momentum/Analysis/ic_filter_orchestrator.py:4398-4402`；同段之前無其他呼叫），記錄其回傳之
+    (features_for_stats, label_for_stats)（第 1 段後之特徵與標籤以 test_mask 切出之段，原物件、不複製不另算）。
+    `stop` ⇒ 記錄後拋 `_Stage5InputsCaptured` 中止 analyze（只需輸入對時省去第 5 段之後之計算）；否則原樣回傳續跑。
+    yield 之清單收集每次第 5 段呼叫之輸入對；離開時還原兩者。不改產品碼（只在呼叫端行程內暫換屬性）。"""
+    import momentum.Analysis.ic_filter_orchestrator as orch
+
+    cls = orch.ICFilterOrchestrator
+    orig_stage5 = cls.__dict__["_stage5_statistical_validation"]
+    orig_slice = orch._slice_by_mask
+    calls: List[Tuple[Any, Any]] = []
+
+    def stage5(self: Any, *args: Any, **kwargs: Any) -> Any:
+        first = [True]
+
+        def spy(features_df: Any, label_series: Any, mask: Any) -> Any:
+            out = orig_slice(features_df, label_series, mask)
+            if first[0]:
+                first[0] = False
+                calls.append(out)
+                if stop:
+                    raise _Stage5InputsCaptured()
+            return out
+
+        orch._slice_by_mask = spy
+        try:
+            return orig_stage5(self, *args, **kwargs)
+        finally:
+            orch._slice_by_mask = orig_slice
+
+    cls._stage5_statistical_validation = stage5
+    try:
+        yield calls
+    finally:
+        cls._stage5_statistical_validation = orig_stage5
+        orch._slice_by_mask = orig_slice
+
+
+def _single_stage5_pair(calls: Sequence[Tuple[Any, Any]]) -> Tuple[Any, Any]:
+    """一次 analyze 恰一次第 5 段（全樣本退回皆在第 5 段之前改走重跑，`ic_filter_orchestrator.py:1405`、`:1505`、
+    `:1675` < `:1699`）；次數不為一 ⇒ FreezeError（未達第 5 段或重入，輸入對不可判定）。"""
+    if len(calls) != 1:
+        raise FreezeError(f"第 5 段輸入對須恰取得一次，實得 {len(calls)} 次（未達第 5 段或重入）")
+    return calls[0]
+
+
+def _ic_page_analyze(request: Mapping[str, Any], registry: Path) -> Tuple[Any, Any, Any]:
+    """IC 頁路徑之一次 analyze（同 `ffprod_measure.ic_in_process`：服務 `_build_config_override` 得 override、
+    `_materialize_features_for_ic` 物化〔寫 cwd 相對之交接快取〕、`create_ic_analyzer(override).analyze`）；回
+    (服務實例, analyzer, 報告)。"""
+    from api.services.ic_analysis_service import FEATURE_KLINE_CACHE_DIR
     from momentum.factories import create_ic_analyzer, create_kline_storage_manager
 
-    override = dict(override) if override else None
+    svc = _ic_service(request, Path(registry))
+    override = svc._build_config_override(_ic_analyze_request(request))
     analyzer = create_ic_analyzer(override)
-    config = analyzer._apply_tier_config(analyzer._apply_config_override(override))
-    kline = create_kline_storage_manager(cache_dir=str(REPO / "data_cache" / "feature_klines"))
-    features, labels_df, metadata, _log = analyzer._stage0_ingestion(str(h5), "", str(meta), config=config,
-                                                                       kline_reader=kline)
-    label, _labels = analyzer._stage2_label_generation(labels_df, metadata, config, kline, features_df=features)
-    return features, label
+    features_path, meta_path = svc._materialize_features_for_ic(request["symbol"], request["timeframe"],
+                                                                request["config_hash"])
+    report = analyzer.analyze(features_path=features_path, labels_path="", meta_path=meta_path,
+                              config_override=override, progress_callback=_progress,
+                              kline_reader=create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR))
+    return svc, analyzer, report
+
+
+def _ic_page_stage5_inputs(request: Mapping[str, Any], registry: Path) -> Tuple[Any, Any]:
+    """IC 頁請求之第 5 段實際輸入對：`_ic_page_analyze` 於 `_stage5_input_spy(stop=True)` 下執行至第 5 段入口即止。"""
+    with _stage5_input_spy(stop=True) as calls:
+        try:
+            _ic_page_analyze(request, registry)
+        except _Stage5InputsCaptured:
+            pass
+    return _single_stage5_pair(calls)
 
 
 def load_cell(cell: str = CELL) -> Tuple[Any, Any]:
     """讀真實資料格之 IC 讀入結果（第 0 段後）：回 (features: DataFrame, label: Series)；不存在 ⇒ FreezeError。
 
-    請求＝第 (1) 項之 IC 頁預設請求；交接 h5 與 registry 寫入暫存目錄、用畢刪除；features＝第 0 段之輸出，label＝第 2 段
-    依同一請求之標籤設定生成之序列（第 0 段於 labels_path 空時不產標籤）。"""
+    SPEC v5.24（r36 群集 C）起，回傳之對＝第 (1) 項 IC 頁預設請求於產品執行中第 5 段統計之實際輸入對
+    （features_for_stats＝第 1 段後之特徵以 test_mask 切出之段、label_for_stats＝同切之標籤，
+    `ic_filter_orchestrator.py:4398-4402`；`_stage5_input_spy`），即單調性 PIT 標籤之實際輸入；不另建 oracle。
+    於子行程計算（`_run_child`：隔離 cwd 與 TMPDIR 於新建暫存目錄、經共用監看；analyze 至第 5 段入口即止），輸入對以
+    pickle 交回；成功即刪暫存，失敗留現場。"""
+    import pickle
     import shutil
     import tempfile
 
-    request = default_request("ic_report", cell)
     tmp = Path(tempfile.mkdtemp(prefix="icperf-load-cell-"))
-    try:
-        svc = _ic_service(request, tmp / "registry.json")
-        h5, meta = _write_handoff(svc, request, tmp)
-        return _stage0_and_label(h5, meta, _override_for(request))
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+    cap = tmp / "capture"
+    spec = {"task": "stage5_inputs", "request": default_request("ic_report", cell),
+            "registry": str(cap / "registry.json"), "out_pickle": str(cap / "stage5_inputs.pkl")}
+    _run_child(spec, cwd=_prepare_cwd(tmp / "cwd"), work_dir=cap, iso=tmp / "iso")
+    _ensure_repo_path()
+    with open(cap / "stage5_inputs.pkl", "rb") as fh:
+        features, label = pickle.load(fh)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return features, label
 
 
 def value_digest(values: Any) -> Dict[str, str]:
@@ -1085,7 +1197,11 @@ def pit_label_digests(features: Any, label: Any, *, num_quantiles: Optional[int]
     逐欄：`_prepare_data`（壓縮）→ `_select_num_quantiles(len, 請求 q)` → `_assign_quantiles`（產品碼；其 q=3 退回為遞迴
     呼叫，以子類記錄每次呼叫之 q，最後一次＝最終採用之 q）。請求 q 預設 `DEFAULT_NUM_QUANTILES`。`_assign_quantiles` 回
     None（無任何 bin）⇒ 標籤序列記為長度＝壓縮列數之全 NaN；壓縮後無列 ⇒ 空序列。全 NaN 欄：q＝請求 q、
-    q_insufficient＝False、label_nan_count＝0。`progress` ⇒ 每 500 欄印一行進度（子行程心跳用）。"""
+    q_insufficient＝False、label_nan_count＝0。`progress` ⇒ 每 500 欄印一行進度（子行程心跳用）。
+
+    輸入（SPEC v5.24；r36 群集 C）：凍結之第 (1) 項與第 (2) 項一律傳入產品執行中第 5 段統計之實際輸入對
+    （`load_cell`／`_stage5_input_spy` 取得之 features_for_stats、label_for_stats）；本函式本身只依所給之對計算，
+    明列邊界輸入（boundary_04／21）亦可直接傳入。"""
     _ensure_repo_path()
     import numpy as np
 
@@ -1151,40 +1267,62 @@ def _child_cmd(spec_path: Path) -> List[str]:
 
 
 def _run_child(spec: Mapping[str, Any], *, cwd: Path, work_dir: Path, iso: Path) -> Dict[str, Any]:
-    """非捕獲之計算子行程（第 (2) 項、PIT 標籤）：spec 寫 `work_dir/spec.json`，經 `run_watched`（cwd＝`cwd`、
-    TMPDIR／HOME＝`iso`）啟動；rc≠0 或未寫 `out_json` ⇒ FreezeError（附 log 路徑）；回 `out_json` 之內容。"""
+    """非捕獲之計算子行程（第 (2) 項、PIT 標籤、第 5 段輸入對）：spec 寫 `work_dir/spec.json`，經 `run_watched`
+    （cwd＝`cwd`、TMPDIR／HOME＝`iso`）啟動；rc≠0 或未寫結果檔（`out_json`，否則 `out_pickle`）⇒ FreezeError（附 log
+    路徑）；有 `out_json` 回其內容，否則回 {}（呼叫端自讀 pickle）。"""
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     spec_path = work_dir / "spec.json"
     spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
     res = run_watched(_child_cmd(spec_path), log_path=work_dir / "run.log",
                       env=isolated_env(_child_env_base(), Path(iso)), cwd=Path(cwd))
-    out = Path(spec["out_json"])
+    out = Path(spec.get("out_json") or spec["out_pickle"])
     if res["rc"] != 0 or not out.is_file():
         raise FreezeError(f"子行程 {spec['task']} rc={res['rc']}、結果檔{'存在' if out.is_file() else '不存在'}"
                           f"（見 {res['log_path']}）")
-    return json.loads(out.read_text(encoding="utf-8"))
+    return json.loads(out.read_text(encoding="utf-8")) if spec.get("out_json") else {}
 
 
-def stage5_subset_digests(n_cols: int, *, seed: int = SEED) -> Dict[str, Any]:
+def c_handoff_path() -> Path:
+    """第 (2) 項之 C 格交接 h5 路徑：環境變數 `C_HANDOFF_ENV`（CLI `--c-handoff` 亦設此變數）優先，未設取 `C_HANDOFF_H5`。"""
+    return Path(os.environ.get(C_HANDOFF_ENV) or C_HANDOFF_H5)
+
+
+def c_handoff_identity(*, with_sha256: bool = True) -> Dict[str, Any]:
+    """C 格交接 h5 之身分（SPEC v5.24 §G (2)；r36 群集 D）：{"path", "meta", "size", "sha256"}。h5 或其同名 meta
+    （`<stem>_meta.json`，prep.py 同名規則）不存在、或 h5 大小 != `C_HANDOFF_BYTES` ⇒ FreezeError（不以他 run 代替）。
+    sha256＝內容全檔重算（不用快照快取；`with_sha256=False` ⇒ None）。"""
+    src = c_handoff_path()
+    meta = src.with_name(src.stem + "_meta.json")
+    if not src.is_file() or not meta.is_file():
+        raise FreezeError(f"改前基準全特徵 run 交接檔不存在（不以他 run 代替）：{src if not src.is_file() else meta}")
+    size = src.stat().st_size
+    if size != C_HANDOFF_BYTES:
+        raise FreezeError(f"交接 h5 大小 {size} != SPEC 實查之 {C_HANDOFF_BYTES}：{src}")
+    sha = _file_sha256(os.path.realpath(src), cache=False) if with_sha256 else None
+    return {"path": str(src), "meta": str(meta), "size": size, "sha256": sha}
+
+
+def stage5_subset_digests(n_cols: int, *, seed: int = SEED, expected_sha256: Optional[str] = None) -> Dict[str, Any]:
     """改前基準全特徵 run 交接 h5 之 n_cols 欄巢狀隨機子集（seed 同探針 `icperf_probes/prep.py`）以產品
     `create_ic_analyzer(...).analyze()` 跑第 5 段；回 {"stage_cols", "features": {<特徵>: {<欄位>: value_digest}},
     "pit_labels": {...}}（"features" 之來源、欄位命名與摘要粒度同第 (1) 項，見模組說明）；交接 h5 不存在 ⇒ FreezeError
     （不以其他 run 代替）。
 
+    交接 h5 經 `c_handoff_identity`（路徑可由環境變數覆寫、大小檢查）；`expected_sha256` 給定（可重現性與改後比對：
+    凍結所記之 `request.source_sha256`）而內容 sha256 不等 ⇒ FreezeError，於啟動子行程前判定。
     請求＝第 (1) 項之 IC 頁預設請求（`default_request("ic_report")`）。子集取法同 prep.py（`default_rng(seed).permutation`
     之前 n_cols 個、排序；float32；同 root／group 屬性；meta 只留 symbol／timeframe／config_hash／ff_run_identity 與所選
     欄）。計算於子行程（`_run_child`，隔離 cwd 與 TMPDIR 於新建暫存目錄；成功即刪，失敗留現場）。stage_cols＝報告
-    `filter_log.stage5_thresholds.input_features`，須等於逐特徵數。PIT 標籤＝子集交接 h5 之第 0 段特徵與第 2 段標籤。"""
+    `filter_log.stage5_thresholds.input_features`，須等於逐特徵數。PIT 標籤（SPEC v5.24；r36 群集 C）＝同一次 analyze
+    中第 5 段統計之實際輸入對（`_stage5_input_spy(stop=False)`，須恰一次）。"""
     import shutil
     import tempfile
 
-    src = Path(C_HANDOFF_H5)
-    meta = src.with_name(src.stem + "_meta.json")
-    if not src.is_file() or not meta.is_file():
-        raise FreezeError(f"改前基準全特徵 run 交接檔不存在（不以他 run 代替）：{src if not src.is_file() else meta}")
-    if src.stat().st_size != C_HANDOFF_BYTES:
-        raise FreezeError(f"交接 h5 大小 {src.stat().st_size} != SPEC 實查之 {C_HANDOFF_BYTES}：{src}")
+    ident = c_handoff_identity(with_sha256=expected_sha256 is not None)
+    if expected_sha256 is not None and ident["sha256"] != expected_sha256:
+        raise FreezeError(f"交接 h5 內容 sha256 {ident['sha256']} != 凍結所記 {expected_sha256}：{ident['path']}")
+    src, meta = Path(ident["path"]), Path(ident["meta"])
     tmp = Path(tempfile.mkdtemp(prefix=f"icperf-stage5-{int(n_cols)}-"))
     cap = tmp / "capture"
     spec = {"task": "stage5", "n_cols": int(n_cols), "seed": int(seed), "source_h5": str(src),
@@ -1208,12 +1346,16 @@ def freeze_item(item: str, *, request: Mapping[str, Any], repo_root: Path, work_
     捕獲機制之工作目錄＝`work_root/<item>/capture`（審計記錄、sitecustomize、子行程 log、spec、暫存 registry 與子行程寫出
     之 pickle；不在快照範圍，其下之寫入由 `capture_run` 濾除）；子行程結束後由本行程（未掛審計）把 pickle 移至
     `work_root/<item>/response.pkl`。`work_root/<item>` 已存在且非空 ⇒ FreezeError（殘留會使差集隨執行前狀態而變）。
-    第 (2) 項之記錄另含 "request"、"seed"、"n_cols_requested"。各項記錄另含 "volatile_candidates"（`freeze` 收至頂層）。"""
+    第 (2) 項之記錄另含 "request"（其 "source_h5"／"source_sha256"＝`c_handoff_identity` 之路徑與內容 sha256，SPEC v5.24
+    §G (2)）、"seed"、"n_cols_requested"。各項記錄另含 "volatile_candidates"（`freeze` 收至頂層）。"""
     request = _json_copy(request)
     if item == "stage5_subset":
         n_cols, seed = int(request.get("n_cols", SUBSET_COLS)), int(request.get("seed", SEED))
+        ident = c_handoff_identity()
+        request["source_h5"], request["source_sha256"] = ident["path"], ident["sha256"]
         return {"request": request, "seed": seed, "n_cols_requested": n_cols,
-                **stage5_subset_digests(n_cols, seed=seed), "volatile_candidates": []}
+                **stage5_subset_digests(n_cols, seed=seed, expected_sha256=ident["sha256"]),
+                "volatile_candidates": []}
     if item not in OUTPUT_ITEMS:
         raise FreezeError(f"未知凍結項：{item}")
     item_root = Path(work_root) / item
@@ -1356,8 +1498,8 @@ def _volatile_hits(obj: Any, roots: Sequence[str]) -> List[Tuple[str, str]]:
 def _volatile_candidates(item: str, raw: Any, files: Mapping[str, Any], cwd: Path, iso: Path,
                          repo_root: Path) -> List[Dict[str, str]]:
     """每次必異欄位之候選（只供 FACT-RECEIPT 判定、不自動排除）：回應與 JSON 寫出檔之欄位（格式同 `compare_golden` 之
-    volatile 項：`<項>:response:<欄位>`、`<項>:file:<path_key>#<欄位>`）；HDF5 寫出檔之屬性名含提示者另列（現行 volatile
-    格式只能逐欄位排除 JSON 檔，HDF5 屬性無從表達 ⇒ 理由標 hdf5_attr_unexpressible）。"""
+    volatile 項：`<項>:response:<欄位>`、`<項>:file:<path_key>#<欄位>`）；HDF5 寫出檔之屬性名含提示者以
+    `<項>:file:<path_key>@<HDF5 物件>#attr:<屬性名>`（SPEC v5.24 §G；r36 群集 B）列。理由：name_hint／run_root_path。"""
     roots = sorted({os.path.realpath(cwd), os.path.realpath(iso), str(cwd), str(iso)})
     out = [{"entry": f"{item}:response:{p}", "reason": why} for p, why in _volatile_hits(raw, roots)]
     prefixes = {"<iso>": Path(iso), "<repo>": Path(repo_root)}
@@ -1372,7 +1514,7 @@ def _volatile_candidates(item: str, raw: Any, files: Mapping[str, Any], cwd: Pat
         for obj, desc in sorted((rec.get("hdf5") or {}).items()):
             for attr in sorted(desc.get("attrs") or {}):
                 if any(h in attr.lower() for h in VOLATILE_NAME_HINTS):
-                    out.append({"entry": f"{item}:hdf5:{key}:{obj}@{attr}", "reason": "hdf5_attr_unexpressible"})
+                    out.append({"entry": f"{item}:file:{key}@{obj}#attr:{attr}", "reason": "name_hint"})
     return out
 
 
@@ -1399,7 +1541,8 @@ def _git_head(repo_root: Path) -> Optional[str]:
 
 
 def _code_state(repo_root: Path) -> Dict[str, Any]:
-    """凍結時之碼態：HEAD 提交、Python 與數值函式庫版本、本腳本 sha256。"""
+    """凍結時之碼態：HEAD 提交、Python 與數值函式庫版本、本腳本 sha256、快照雜湊快取判準（"snapshot_cache_rule"＝
+    `SNAPSHOT_CACHE_RULE`；r36 群集 E）。"""
     from importlib import metadata as md
 
     libs: Dict[str, Optional[str]] = {}
@@ -1409,16 +1552,19 @@ def _code_state(repo_root: Path) -> Dict[str, Any]:
         except md.PackageNotFoundError:
             libs[name] = None
     return {"head": _git_head(repo_root), "python": sys.version.split()[0], "libraries": libs,
-            "script_sha256": _file_sha256(os.path.realpath(__file__))}
+            "script_sha256": _file_sha256(os.path.realpath(__file__), cache=False),
+            "snapshot_cache_rule": SNAPSHOT_CACHE_RULE}
 
 
 def _cell_pit_labels(cell: str, work_root: Path) -> Dict[str, Any]:
-    """第 (1) 項之 PIT 標籤（`pit_label_digests(*load_cell(cell))`）：於子行程計算（`_run_child`，工作目錄
-    `work_root/pit_labels`）。"""
+    """第 (1) 項之 PIT 標籤：`pit_label_digests(*load_cell(cell))` 之同一輸入——IC 頁預設請求於產品執行中第 5 段統計之
+    實際輸入對（`_ic_page_stage5_inputs`）；於子行程計算（`_run_child`，工作目錄 `work_root/pit_labels`）。"""
     base = Path(work_root) / "pit_labels"
     if base.exists() and any(base.iterdir()):
         raise FreezeError(f"PIT 標籤工作目錄已存在且非空（須新建）：{base}")
-    spec = {"task": "pit_labels", "cell": cell, "out_json": str(base / "capture" / "pit_labels.json")}
+    spec = {"task": "pit_labels", "request": default_request("ic_report", cell),
+            "registry": str(base / "capture" / "registry.json"),
+            "out_json": str(base / "capture" / "pit_labels.json")}
     return _run_child(spec, cwd=_prepare_cwd(base / "cwd"), work_dir=base / "capture", iso=base / "iso")["pit_labels"]
 
 
@@ -1453,22 +1599,26 @@ def freeze(out_path: Path = GOLDEN_PATH, *, repo_root: Path = REPO, work_root: O
 
 
 def repro(n_cols: int = REPRO_COLS, *, golden_path: Path = GOLDEN_PATH) -> Dict[str, Any]:
-    """凍結之可重現性（SPEC Task 0.1 驗證；判準同 `test_freeze_reproducible`）：2,000 欄子集之 n_cols 欄巢狀子集（同 seed、
-    同碼路徑）重跑第 5 段，逐特徵逐欄位與 PIT 標籤對凍結之對應欄逐位元比；回 {"n_cols", "stage_cols", "problems"}。"""
+    """凍結之可重現性（SPEC v5.24 Task 0.1 驗證；判準同 `test_freeze_reproducible`）：同一 2,000 欄子集（同 seed、同碼
+    路徑、同交接 h5 雜湊）重跑第 5 段，對凍結之全部對應欄逐位元比——stage_cols 相等、逐特徵之特徵集合與 PIT 標籤之特徵
+    集合皆相等、逐欄位與 PIT 標籤逐一相等；回 {"n_cols", "stage_cols", "problems"}。`n_cols` 須等於凍結之
+    `n_cols_requested`（欄集合不同即非同輸入：第 5 段 FDR 依進段全部欄，`ic_filter_orchestrator.py:4435-4442`），否則
+    FreezeError。凍結未記 `request.source_sha256` 或交接 h5 內容 sha256 不等 ⇒ FreezeError（於重跑前判定）。"""
     frozen = json.loads(Path(golden_path).read_text(encoding="utf-8"))["items"]["stage5_subset"]
-    cur = stage5_subset_digests(int(n_cols), seed=int(frozen.get("seed", SEED)))
+    if int(n_cols) != int(frozen.get("n_cols_requested", -1)):
+        raise FreezeError(f"可重現性須以凍結之同一子集重跑：n_cols={n_cols} != 凍結 {frozen.get('n_cols_requested')}")
+    expected = (frozen.get("request") or {}).get("source_sha256")
+    if not expected:
+        raise FreezeError("凍結檔之 stage5_subset 未記 request.source_sha256，無從驗交接 h5 身分")
+    cur = stage5_subset_digests(int(n_cols), seed=int(frozen.get("seed", SEED)), expected_sha256=str(expected))
     problems: List[str] = []
     if not (0 < cur["stage_cols"] <= int(n_cols) and cur["stage_cols"] == len(cur["features"])):
         problems.append(f"stage_cols {cur['stage_cols']} 不合（逐特徵數 {len(cur['features'])}、請求 {n_cols}）")
-    extra = sorted(set(cur["features"]) - set(frozen["features"]))
-    if extra:
-        problems.append(f"非 2,000 欄子集之巢狀子集：{extra[:5]}")
-    for feat, fields in sorted(cur["features"].items()):
-        if feat in frozen["features"]:
-            problems += _compare_maps(frozen["features"][feat], fields, f"features/{feat}/")
-    for feat, rec in sorted(cur["pit_labels"].items()):
-        if rec != (frozen.get("pit_labels") or {}).get(feat):
-            problems.append(f"pit_labels/{feat}：不等")
+    if cur["stage_cols"] != frozen.get("stage_cols"):
+        problems.append(f"stage_cols {cur['stage_cols']} != 凍結 {frozen.get('stage_cols')}")
+    problems += _compare_features("features", frozen.get("features") or {}, cur["features"])
+    problems += [p.replace("lbl:", "pit_labels/", 1)
+                 for p in _compare_maps(frozen.get("pit_labels") or {}, cur["pit_labels"], "lbl:")]
     return {"n_cols": int(n_cols), "stage_cols": cur["stage_cols"], "problems": problems}
 
 
@@ -1488,18 +1638,9 @@ def _child_ic_page(spec: Mapping[str, Any]) -> Any:
     第 (3) 項：同一 analyzer 實例續跑深度分析（服務 `_run_deep_analysis` 之同一步驟：`_build_deep_module_override`、
     `_resolve_selected_features`、`run_deep_analysis`、`_serialize_deep_report`、`_attach_cross_symbol_context`），回其序列化。"""
     from api.models.ic_models import DeepAnalysisRequest
-    from api.services.ic_analysis_service import FEATURE_KLINE_CACHE_DIR
-    from momentum.factories import create_ic_analyzer, create_kline_storage_manager
 
     request = spec["request"]
-    svc = _ic_service(request, Path(spec["registry"]))
-    override = svc._build_config_override(_ic_analyze_request(request))
-    analyzer = create_ic_analyzer(override)
-    features_path, meta_path = svc._materialize_features_for_ic(request["symbol"], request["timeframe"],
-                                                                request["config_hash"])
-    report = analyzer.analyze(features_path=features_path, labels_path="", meta_path=meta_path,
-                              config_override=override, progress_callback=_progress,
-                              kline_reader=create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR))
+    svc, analyzer, report = _ic_page_analyze(request, Path(spec["registry"]))
     if request.get("deep") is None:
         return report
     deep_request = DeepAnalysisRequest(**request["deep"])
@@ -1602,27 +1743,35 @@ def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, o
 
 def _child_stage5(spec: Mapping[str, Any]) -> Dict[str, Any]:
     """第 (2) 項：子集交接 h5（cwd 下 `stage5_input/`）以 IC 頁預設請求之 override 跑產品 `analyze`；回 {"stage_cols",
-    "features", "pit_labels"}（見 `stage5_subset_digests`）。"""
+    "features", "pit_labels"}（見 `stage5_subset_digests`）。PIT 標籤之輸入＝同一次 analyze 之第 5 段實際輸入對
+    （`_stage5_input_spy(stop=False)`，須恰一次）。"""
     from api.services.ic_analysis_service import FEATURE_KLINE_CACHE_DIR
     from momentum.factories import create_ic_analyzer, create_kline_storage_manager
 
     override = _override_for(spec["request"])
     h5, meta = _write_stage5_subset(Path(spec["source_h5"]), Path(spec["source_meta"]), int(spec["n_cols"]),
                                     int(spec["seed"]), Path.cwd() / "stage5_input")
-    report = create_ic_analyzer(override).analyze(
-        features_path=str(h5), labels_path="", meta_path=str(meta), config_override=override,
-        progress_callback=_progress, kline_reader=create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR))
+    with _stage5_input_spy(stop=False) as calls:
+        report = create_ic_analyzer(override).analyze(
+            features_path=str(h5), labels_path="", meta_path=str(meta), config_override=override,
+            progress_callback=_progress, kline_reader=create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR))
+    features_for_stats, label_for_stats = _single_stage5_pair(calls)
     features = _feature_digests("stage5_subset", report)
     stage_cols = ((report.get("filter_log") or {}).get("stage5_thresholds") or {}).get("input_features")
     if isinstance(stage_cols, bool) or not isinstance(stage_cols, (int, float)) or int(stage_cols) != len(features):
         raise FreezeError(f"第 5 段輸入欄數 {stage_cols!r} != 逐特徵數 {len(features)}")
-    pit = pit_label_digests(*_stage0_and_label(h5, meta, override), progress=True)
+    pit = pit_label_digests(features_for_stats, label_for_stats, progress=True)
     return {"stage_cols": int(stage_cols), "features": features, "pit_labels": pit}
 
 
+def _child_stage5_inputs(spec: Mapping[str, Any]) -> Tuple[Any, Any]:
+    """`load_cell` 之子行程：IC 頁請求之第 5 段實際輸入對（`_ic_page_stage5_inputs`），原樣 pickle 交回。"""
+    return _ic_page_stage5_inputs(spec["request"], Path(spec["registry"]))
+
+
 def _child_pit_labels(spec: Mapping[str, Any]) -> Dict[str, Any]:
-    """第 (1) 項之 PIT 標籤：`pit_label_digests(*load_cell(cell))`。"""
-    features, label = load_cell(str(spec["cell"]))
+    """第 (1) 項之 PIT 標籤：`pit_label_digests` 作用於 IC 頁請求之第 5 段實際輸入對（與 `load_cell` 同一取法）。"""
+    features, label = _ic_page_stage5_inputs(spec["request"], Path(spec["registry"]))
     return {"pit_labels": pit_label_digests(features, label, progress=True)}
 
 
@@ -1634,7 +1783,7 @@ def _child_main(spec_path: Path) -> int:
     _ensure_repo_path()
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     tasks = {"ic_page": _child_ic_page, "ic_first": _child_ic_first, "stage5": _child_stage5,
-             "pit_labels": _child_pit_labels}
+             "pit_labels": _child_pit_labels, "stage5_inputs": _child_stage5_inputs}
     try:
         if spec.get("task") not in tasks:
             raise FreezeError(f"未知子行程任務：{spec.get('task')!r}")
@@ -1730,10 +1879,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = sub.add_parser("freeze", help="凍結 §G 第 (1)–(5) 項，寫凍結檔")
     p.add_argument("--out", type=Path, default=GOLDEN_PATH, help=f"凍結檔（預設 {GOLDEN_PATH.relative_to(REPO)}）")
     p.add_argument("--work-root", type=Path, default=None, help="各項隔離工作目錄之根（預設新建暫存目錄；項目錄須不存在）")
-    p = sub.add_parser("repro", help="第 5 段巢狀子集重跑，對凍結檔逐位元比")
-    p.add_argument("--cols", type=int, default=REPRO_COLS, help=f"子集欄數（預設 {REPRO_COLS}）")
+    p.add_argument("--c-handoff", type=Path, default=None,
+                   help=f"第 (2) 項之 C 格交接 h5（設環境變數 {C_HANDOFF_ENV}；未給取該變數或本機現值）")
+    p = sub.add_parser("repro", help="同一 2,000 欄子集重跑第 5 段，對凍結檔逐位元比")
+    p.add_argument("--cols", type=int, default=REPRO_COLS, help=f"子集欄數（預設 {REPRO_COLS}，須等於凍結之子集欄數）")
     p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
     p.add_argument("--out", type=Path, default=None, help="比對結果 JSON（不給則只印出）")
+    p.add_argument("--c-handoff", type=Path, default=None,
+                   help=f"C 格交接 h5（設環境變數 {C_HANDOFF_ENV}；內容 sha256 須等於凍結所記）")
     p = sub.add_parser("inventory", help="Task 0.2 路徑清冊")
     p.add_argument("--out", type=Path, required=True)
     p = sub.add_parser("measure", help="Task 0.2 規模量測")
@@ -1747,6 +1900,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     if args.cmd == CHILD_CMD:
         return _child_main(args.spec)
+    if getattr(args, "c_handoff", None) is not None:
+        os.environ[C_HANDOFF_ENV] = str(args.c_handoff)  # 子行程與 `c_handoff_path` 同讀此變數
     try:
         if args.cmd == "freeze":
             golden = freeze(args.out, work_root=args.work_root)
