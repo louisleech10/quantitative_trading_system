@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/20261029-icperf-volatile-probe-full.json",
+      "code_sha256": "6bd5d0c8b166b5d0a12bad65456450db10c561c491f8857e325b27b84f1a2289",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 volatile 整格實測）",
+      "created_at": "2026-10-29T12:00:58+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 10800,
+  "basis": [
+    "docs/ICPERF_SPEC.md §B ICPERF-BUDGET-1（v5.25）：volatile 實測＝第 (1)(3)(4)(5) 項各以整格請求重跑一次，約 110–180 分鐘",
+    "依據：凍結實跑各項工作目錄建立至回應寫出——IC 頁 45 分、深度分析 44 分、事件型 19 分、IC-first 約 2 分，合計 110 分；另加第 (1) 項寫出檔摘要與快照約 30 分及各項快照（快取命中後 35 秒）",
+    "取上界 10800 秒"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

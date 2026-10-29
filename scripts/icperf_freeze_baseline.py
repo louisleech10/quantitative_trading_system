@@ -18,6 +18,7 @@
   venv/bin/python scripts/icperf_freeze_baseline.py repro [--cols 2000] [--c-handoff <h5>]
   venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/<日期>-icperf-volatile-probe.json
   venv/bin/python scripts/icperf_freeze_baseline.py set-volatile --probe <實測收據>
+  venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell [--out <結果 JSON>]   # 估時收據 coverage_path_ids＝ICPERF-BUDGET-8
   venv/bin/python scripts/icperf_freeze_baseline.py inventory --out handoffs/run_receipts/<日期>-icperf-path-inventory.json
   venv/bin/python scripts/icperf_freeze_baseline.py measure --inventory <清冊> --out handoffs/run_receipts/<日期>-icperf-scale-before.json
 
@@ -91,6 +92,13 @@ SUBSET_COLS = 2000
 #: （`ic_filter_orchestrator.py:4435-4442`），欄集合不同即非同輸入，故不以較小子集代替
 REPRO_COLS = SUBSET_COLS
 SCALE_POINTS = (500, 1000, 2000)
+#: SPEC v5.26 Task 0.3 FACT-RECEIPT：長資料格 L＝A 格（`LONG_CELL_BASE`）之同一生成定義（NUMVIEW 判準檔格類之設定覆寫、
+#: 生成入口、連續性、K 線來源），只把輸出段改為主週期最後 `LONG_CELL_BARS` 根（產品切分器實算：訓練 1,600／測試 379、
+#: 1h 調整後最大滾動窗 1,512 之終點落測試段 379 根）；生成於 `LONG_CELL_ROOT`（其 `features` 即 `CELL_FEATURES_ROOT`）
+LONG_CELL = "L_BTCUSDT_1h"
+LONG_CELL_BASE = "A_BTCUSDT_1h"
+LONG_CELL_BARS = 2000
+LONG_CELL_ROOT = "data_cache/numview_freeze_runs/{cell}__default"
 
 #: §G (1)–(7)：A 格完整 IC 報告、2,000 欄子集第 5 段、A 格深度分析（全部模組）、A 格 K 線條件式事件 IC 報告、A 格 IC-first
 #: post-IC 輸出（V2 parquet artifact；IC-first 不寫 HDF5）、長資料格 L 之 IC 報告與深度分析（SPEC v5.26 第 (6) 項兩鍵）、
@@ -100,9 +108,9 @@ G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfir
 #: 須含「回應全部欄位＋快照差集之全部寫出檔」之項（§G 凍結範圍：第 (1)、(3)、(4)、(5)、(6)、(7) 項）
 OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic",
                 "ic_report_long", "deep_analysis_long", "event_import_report")
-#: SPEC v5.26：L 格列數／特徵子集與事件匯入批須於 Task 0.3 以 FACT-RECEIPT 定後才能寫請求；未定前 `default_request`
-#: 對此三鍵 FreezeError，`freeze` 於啟動任何執行前即拒（不得只凍其餘項）
-PENDING_ITEMS = ("ic_report_long", "deep_analysis_long", "event_import_report")
+#: 請求未定之項：`default_request` 對其 FreezeError，`freeze`／`volatile-probe` 於啟動任何執行前即拒（不得只凍其餘項）。
+#: SPEC v5.26 第 (6)(7) 項之 L 格與事件匯入批已於 Task 0.3 定（`LONG_CELL`、`EVENT_IMPORT_ID`）⇒ 空
+PENDING_ITEMS: Tuple[str, ...] = ()
 
 #: SPEC §G「各項請求設定」：前端 IC 頁初始狀態實際送出之 payload（衰減照頁面預設開啟）。`config_override`＝
 #: `buildConfigOverride(defaultConfig)`（`frontend/src/lib/icConfigOverride.ts`；值見 `frontend/src/store/icAnalysisStore.ts`
@@ -856,8 +864,17 @@ READONLY_INPUTS = ("data_cache/feature_klines", "data_cache/feature_klines_longh
 #: （`handoffs/run_receipts/numview_probes/estimate.py:_isolate`）
 IC_PAGE_OUTPUT_ROOTS = ("data_cache/features", "data_cache/reports")
 IC_FIRST_OUTPUT_ROOTS = ("features", "cgsa_work", "dstar_cache", "sys_tmp")
-#: 第 (1)(3)(4) 項（IC 頁路徑）
-IC_PAGE_ITEMS = ("ic_report", "deep_analysis", "event_report")
+#: SPEC v5.26 §G (7)：事件匯入批（`scripts/icperf_event_batch.py` 依明列規則以 L 格真實 kline 建批、經
+#: `EventImportService.import_records` 落檔；FACT-RECEIPT `EVENT_BATCH_RECEIPT`）
+EVENT_IMPORT_ID = "20261029T144145Z-3483f542"
+EVENT_BATCH_RECEIPT = "handoffs/run_receipts/20261029-icperf-event-batch.json"
+#: 第 (1)(3)(4)(6)(7) 項（IC 頁路徑）
+IC_PAGE_ITEMS = ("ic_report", "deep_analysis", "event_report", "ic_report_long", "deep_analysis_long",
+                 "event_import_report")
+#: 含深度分析之項（同一 analyzer 實例續跑全部模組）
+DEEP_ITEMS = ("deep_analysis", "deep_analysis_long")
+#: 項之資料格（未列者＝呼叫端所給之格，預設 `CELL`）：第 (6)(7) 項＝長資料格 L
+ITEM_CELLS = {"ic_report_long": LONG_CELL, "deep_analysis_long": LONG_CELL, "event_import_report": LONG_CELL}
 #: 子行程入口之子命令名（不列於 --help）
 CHILD_CMD = "_child"
 #: PIT 標籤之請求 q：第 5 段 `MonotonicityTester.compute_all(features_for_stats, label_for_stats)` 不帶 q
@@ -925,8 +942,10 @@ def default_request(item: str, cell: str = CELL) -> Dict[str, Any]:
     以 `scripts/ffprod_measure.py` 之 `ic_in_process` 同法於行程內呼叫；第 (3) 項另取 `DeepAnalysisRequest()` 預設之 top_n、
     `DeepAnalysisModules` 全部模組開（SPEC v5.26，含預設關閉者）、同一 analyzer 實例；第 (4) 項＝第 (1) 項之請求加
     `event_query="close > open"`（K 線條件式事件 legacy `event_query` 一格；事件匯入批見第 (7) 項）；第 (5) 項＝NUMVIEW
-    判準檔 A 格定義之 `FeatureFactory.run_ic_first`（特徵根置於本次執行之 cwd 根內）。第 (6)(7) 項（`PENDING_ITEMS`）
-    於 Task 0.3 定 L 格與匯入批前一律 FreezeError。
+    判準檔 A 格定義之 `FeatureFactory.run_ic_first`（特徵根置於本次執行之 cwd 根內）。第 (6) 項＝長資料格 L
+    （`ITEM_CELLS`）上同第 (1)(3) 項之請求；第 (7) 項＝L 格上第 (1) 項之請求加 `event_import_id`＝`EVENT_IMPORT_ID`（前端
+    事件批分支之初始 payload：只送 `event_import_id`，`event_label_spec` 省略由後端導出、`event_label_mode` 預設 auto，
+    `frontend/src/hooks/useICAnalysis.ts` 事件批分支）。`PENDING_ITEMS` 之項一律 FreezeError。
 
     回傳可 JSON 化之請求記錄：IC 頁 {"kind": "ic_page", "item", "cell", "symbol", "timeframe", "config_hash", "run_dir"
     （repo 相對）, "config_override", "feature_tiers", "event_query", "feature_filter", "deep"（第 (3) 項＝
@@ -934,22 +953,31 @@ def default_request(item: str, cell: str = CELL) -> Dict[str, Any]:
     "generation"（判準檔 `cell_definitions.<格類>.generation`）}；第 (2) 項 {"kind": "stage5", "item", "source_h5",
     "seed", "n_cols", "ic_request"（＝第 (1) 項之請求）}（"source_h5"＝`c_handoff_path()`；"source_sha256" 由
     `freeze_item` 記入）。"""
+    if item in PENDING_ITEMS:
+        raise FreezeError(f"{item}：請求未定（PENDING_ITEMS）")
+    cell = ITEM_CELLS.get(item, cell)
     if item in IC_PAGE_ITEMS:
         payload = _json_copy(IC_PAGE_DEFAULT_PAYLOAD)
         req: Dict[str, Any] = {"kind": "ic_page", "item": item, "cell": cell, **_cell_run(cell),
                                "config_override": payload["config_override"], "feature_tiers": payload["feature_tiers"],
                                "event_query": EVENT_QUERY if item == "event_report" else None,
+                               "event_import_id": EVENT_IMPORT_ID if item == "event_import_report" else None,
                                "feature_filter": None, "deep": None}
-        if item == "deep_analysis":
+        if item in DEEP_ITEMS:
             _ensure_repo_path()
             from api.models.ic_models import DeepAnalysisRequest
 
             deep = _json_copy(DeepAnalysisRequest().model_dump())
             deep["modules"] = {k: True for k in deep["modules"]}  # SPEC v5.26 §G (3)：全部模組開（含預設關閉者）
             req["deep"] = deep
+            # 具名 preset（intermediate）之 `disabled_modules` 會把請求 modules 之正交化／曝險靜默改回關閉
+            # （`ic_filter_orchestrator.py` `_apply_tier_config`、`ic_config_schema.py:408`）⇒ 改前端 custom 方案之
+            # payload 形狀（`frontend/src/store/icAnalysisStore.ts` custom 分支：stage_overrides 同中階＋module_overrides），
+            # 模組全開，階段開關與中階相同
+            for tiers in (req["feature_tiers"], req["config_override"]["feature_tiers"]):
+                tiers["active_preset"] = "custom"
+                tiers["custom_overrides"]["module_overrides"] = {k: True for k in deep["modules"]}
         return req
-    if item in PENDING_ITEMS:
-        raise FreezeError(f"{item}：SPEC v5.26 第 (6)(7) 項之 L 格／事件匯入批待 Task 0.3 FACT-RECEIPT 定義後才能寫請求")
     if item == "icfirst_post_ic":
         desc = _cell_descriptor(cell)
         generation = _criteria()["cell_definitions"][desc["kind"]]["generation"]
@@ -1033,6 +1061,7 @@ def _ic_analyze_request(request: Mapping[str, Any]) -> Any:
     return ICAnalyzeRequest(symbol=request["symbol"], timeframe=request["timeframe"], config_hash=request["config_hash"],
                             config_override=_json_copy(request["config_override"]),
                             event_query=request.get("event_query"),
+                            event_import_id=request.get("event_import_id"),
                             feature_filter=FeatureFilterConfig(**ff) if ff else None,
                             feature_tiers=FeatureTierRequest(**tiers) if tiers else None)
 
@@ -1828,6 +1857,8 @@ def _child_ic_page(spec: Mapping[str, Any]) -> Any:
     from api.models.ic_models import DeepAnalysisRequest
 
     request = spec["request"]
+    if request.get("event_import_id"):
+        return _event_import_analyze(request, Path(spec["registry"]))
     svc, analyzer, report = _ic_page_analyze(request, Path(spec["registry"]))
     if request.get("deep") is None:
         return report
@@ -1837,6 +1868,59 @@ def _child_ic_page(spec: Mapping[str, Any]) -> Any:
                                               top_n=deep_request.top_n)
     deep_report = analyzer.run_deep_analysis(selected, deep_override, _progress, None)
     return svc._attach_cross_symbol_context(svc._serialize_deep_report(deep_report), analyzer)
+
+
+#: 第 (7) 項回應不含之任務欄（analyzer 物件不可序列化、非回應內容；其餘任務欄——結果與事件分支揭露欄——全入，
+#: 每次必異者〔task_id、created_at 等〕由 volatile-probe 實測判定）
+EVENT_TASK_EXCLUDE = ("analyzer",)
+
+
+def _event_import_analyze(request: Mapping[str, Any], registry: Path) -> Dict[str, Any]:
+    """第 (7) 項之回應（SPEC §G (7)：形狀同 (1)）：`event_import_run` 之報告（任務 `result`）於頂層，其餘任務欄
+    （事件分支揭露欄；`EVENT_TASK_EXCLUDE` 除外）置於頂層鍵 `EVENT_TASK_KEY`。"""
+    return event_import_response(event_import_run(request, registry))
+
+
+#: 第 (7) 項回應中事件分支任務欄之頂層鍵（報告本身無此鍵）
+EVENT_TASK_KEY = "event_task"
+
+
+def event_import_response(info: Mapping[str, Any]) -> Dict[str, Any]:
+    """任務 dict ⇒ 第 (7) 項回應：{**報告, EVENT_TASK_KEY: 其餘任務欄}；報告已含 `EVENT_TASK_KEY` ⇒ FreezeError。"""
+    report = dict(info.get("result") or {})
+    if EVENT_TASK_KEY in report:
+        raise FreezeError(f"報告已含頂層鍵 {EVENT_TASK_KEY!r}，無法併入事件任務欄")
+    report[EVENT_TASK_KEY] = {k: v for k, v in info.items() if k not in EVENT_TASK_EXCLUDE and k != "result"}
+    return report
+
+
+def event_import_run(request: Mapping[str, Any], registry: Path) -> Dict[str, Any]:
+    """第 (7) 項：同 route `start_ic_analysis`（`api/routes/ic_analysis.py`：`_resolve_event_batch` 以 `event_import_id`
+    查批並解析 `event_label_spec`）＋服務 `start_analysis`→`_run_analysis`（事件五階段 `_run_event_label_stages`、embargo
+    抬高、`analyzer.analyze`、三元綁定與注入、`_set_result`）之同一步驟；`start_analysis` 以 `asyncio.create_task` 啟動之
+    分析於同一事件迴圈內等候完成。回任務 dict 全部欄（含 analyzer 實例）；status ≠ completed ⇒ FreezeError 附 error。"""
+    import asyncio
+    import threading
+
+    from api.routes.ic_analysis import _resolve_event_batch
+
+    svc = _ic_service(request, Path(registry))
+    svc._lock = threading.Lock()
+    svc._tasks = {}
+    req = _ic_analyze_request(request)
+    event_batch = _resolve_event_batch(req)
+
+    async def run() -> str:
+        started = await svc.start_analysis(req, event_batch=event_batch)
+        pending = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+        await asyncio.gather(*pending)
+        return str(started["task_id"])
+
+    task_id = asyncio.run(run())
+    info = svc._tasks[task_id]
+    if info.get("status") != "completed":
+        raise FreezeError(f"事件匯入批分析未完成：status={info.get('status')!r} error={info.get('error')!r}")
+    return info
 
 
 def _child_ic_first(spec: Mapping[str, Any]) -> Any:
@@ -1872,6 +1956,52 @@ def _child_ic_first(spec: Mapping[str, Any]) -> Any:
                                     ic_threshold=generation["ic_threshold"],
                                     label_horizon=str(generation["label_horizon"]),
                                     cleanup_raw=bool(generation["cleanup_raw"]))
+
+
+def long_cell_descriptor() -> Dict[str, Any]:
+    """長資料格 L 之格描述子：`LONG_CELL_BASE` 之描述子（判準檔格類、標的、週期）改 id 為 `LONG_CELL`。"""
+    return {**_cell_descriptor(LONG_CELL_BASE), "id": LONG_CELL}
+
+
+def long_cell_criteria(criteria: Mapping[str, Any]) -> Dict[str, Any]:
+    """NUMVIEW 判準檔之複本，只把 L 格所屬格類之 `output_bars` 改為 `LONG_CELL_BARS`（其餘生成定義不變）。"""
+    out = _json_copy(criteria)
+    out["cell_definitions"][long_cell_descriptor()["kind"]]["output_bars"] = LONG_CELL_BARS
+    return out
+
+
+def _long_cell_sidecar(work: Path) -> Optional[Dict[str, Any]]:
+    path = Path(work) / "numview_cell.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+
+
+def gen_long_cell(*, repo_root: Path = REPO, work_root: Optional[Path] = None) -> Dict[str, Any]:
+    """生成長資料格 L（SPEC v5.26 Task 0.3、ICPERF-BUDGET-8）：子行程（`_run_child`，經共用監看）以
+    `numview_freeze_baseline.generate_cell_run` 於 `LONG_CELL_ROOT` 生成（判準檔以 `long_cell_criteria` 覆寫輸出段）。
+    已有 complete 之 sidecar ⇒ 不重生、回其內容；目錄存在而無 sidecar（前次中斷）⇒ FreezeError（不自行刪除，交使用者清）。"""
+    import tempfile
+
+    work = Path(repo_root) / LONG_CELL_ROOT.format(cell=LONG_CELL)
+    side = _long_cell_sidecar(work)
+    if side is not None and side.get("status") == "complete":
+        return {"reused": True, "work": str(work), "sidecar": side}
+    if work.exists():
+        raise FreezeError(f"{work} 已存在而無 complete sidecar（前次生成中斷）；請先移除該目錄再重跑")
+    tmp = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-longcell-"))
+    out = tmp / "capture" / "result.json"
+    spec = {"task": "gen_long_cell", "work": str(work), "out_json": str(out)}
+    result = _run_child(spec, cwd=_prepare_cwd(tmp / "cwd", repo_root), work_dir=tmp / "capture", iso=tmp / "iso")
+    return {"reused": False, "work": str(work), "sidecar": result}
+
+
+def _child_gen_long_cell(spec: Mapping[str, Any]) -> Dict[str, Any]:
+    """`gen_long_cell` 之子行程：`numview_freeze_baseline._criteria` 換為 `long_cell_criteria` 之結果後呼叫
+    `generate_cell_run`（只在本子行程內換）；回 sidecar（JSON 化）。"""
+    nfb = _load("icperf_numview_freeze_baseline", REPO / "scripts" / "numview_freeze_baseline.py")
+    criteria = long_cell_criteria(nfb._criteria())
+    nfb._criteria = lambda: criteria
+    side = nfb.generate_cell_run(Path(spec["work"]), long_cell_descriptor(), {})
+    return json.loads(json.dumps(side, ensure_ascii=False, default=str))
 
 
 def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, out_dir: Path) -> Tuple[Path, Path]:
@@ -1971,7 +2101,8 @@ def _child_main(spec_path: Path) -> int:
     _ensure_repo_path()
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     tasks = {"ic_page": _child_ic_page, "ic_first": _child_ic_first, "stage5": _child_stage5,
-             "pit_labels": _child_pit_labels, "stage5_inputs": _child_stage5_inputs}
+             "pit_labels": _child_pit_labels, "stage5_inputs": _child_stage5_inputs,
+             "gen_long_cell": _child_gen_long_cell}
     try:
         if spec.get("task") not in tasks:
             raise FreezeError(f"未知子行程任務：{spec.get('task')!r}")
@@ -2083,6 +2214,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--probe", type=Path, required=True, help="volatile-probe 之實測收據")
     p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
     p.add_argument("--out", type=Path, default=None, help="寫入結果 JSON（volatile、absent、未入 volatile 之候選全列）")
+    p = sub.add_parser("gen-long-cell", help="Task 0.3：生成長資料格 L（A 格同一生成定義、最後 2,000 根）")
+    p.add_argument("--out", type=Path, default=None, help="結果 JSON（不給則只印出）")
     p = sub.add_parser("inventory", help="Task 0.2 路徑清冊")
     p.add_argument("--out", type=Path, required=True)
     p = sub.add_parser("measure", help="Task 0.2 規模量測")
@@ -2131,6 +2264,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(json.dumps({"n_volatile": len(result["volatile"]), "absent": result["absent"],
                               "candidates_not_volatile": len(result["candidates_not_volatile"])},
                              ensure_ascii=False, indent=1))
+            return 0
+        if args.cmd == "gen-long-cell":
+            result = gen_long_cell()
+            text = json.dumps(result, ensure_ascii=False, indent=1, default=str)
+            if args.out is not None:
+                Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.out).write_text(text, encoding="utf-8")
+            side = result["sidecar"]
+            print(json.dumps({"reused": result["reused"], "work": result["work"], "status": side.get("status"),
+                              "config_hash": side.get("config_hash"), "output_window": side.get("output_window"),
+                              "seconds": side.get("seconds")}, ensure_ascii=False, indent=1))
             return 0
     except FreezeError as exc:
         print(f"FreezeError：{exc}", file=sys.stderr)

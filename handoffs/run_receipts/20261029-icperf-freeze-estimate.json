@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py freeze",
+      "code_sha256": "bc0c9a84fc0c2b09122246e8c4d63f5155b4d8bd45d606591a7ea7ad6282bd73",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 凍結）",
+      "created_at": "2026-10-29T08:31:26+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 14400,
+  "basis": [
+    "docs/ICPERF_SPEC.md §B ICPERF-BUDGET-1 上界 230 分鐘（下界約 78 分鐘：2,000 欄子集第 5 段實測 1610.20 秒、A 格第 5 段每欄 0.81 秒推約 43 分鐘、第 1／4 段約 30 秒；其餘段、深度分析、事件型、IC-first 未實測上界）",
+    "A 格前提核對：timestamps.parquet 500 列、processed/selected.parquet 3193 欄（與 SPEC 前提之 500 列、約 3.2k 欄相符，不需依 O(T²) 重算）",
+    "另加每項凍結前後之 repo 快照（約 19 GB，首次全檔雜湊）與 PIT 標籤取輸入對之子行程，取整為 4 小時"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

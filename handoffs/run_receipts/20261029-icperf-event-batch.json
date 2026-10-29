@@ -1,0 +1,47 @@
+{
+ "rule": {
+  "rule_id": "icperf-t03:breakout24:close_gt_prior_high:h12",
+  "breakout_bars": 24,
+  "horizon_bars": 12,
+  "doc": "scripts/icperf_event_batch.py 模組說明"
+ },
+ "cell": {
+  "cell": "L_BTCUSDT_1h",
+  "symbol": "BTCUSDT",
+  "timeframe": "1h",
+  "output_window": [
+   "2026-02-03T16:00:00+00:00",
+   "2026-04-27T23:00:00+00:00"
+  ],
+  "source": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5"
+ },
+ "n_window_bars": 2000,
+ "kline_sha256": "1c93c37938a4917ac54f892759444c6c464f94dd9bea3745037ea09d91dd3ecd",
+ "n_events": 75,
+ "n_label_1": 29,
+ "n_label_0": 46,
+ "import_id": "20261029T144145Z-3483f542",
+ "stored_path": "/Users/louis/Desktop/quantitative_trading_system/data_cache/events/20261029T144145Z-3483f542.json",
+ "n_valid": 75,
+ "warnings": [],
+ "lookahead_declaration": {
+  "requires_declaration": true,
+  "referenced_columns": [],
+  "default_window_bars": {
+   "1h": 0
+  },
+  "declared_window_bars": {
+   "1h": 12
+  },
+  "lookahead_bars_declared": {
+   "1h": 12
+  },
+  "acknowledged_unverifiable": false,
+  "embargo_ms_by_symbol": {
+   "BTCUSDT": 43200000
+  },
+  "split_blocked": false
+ },
+ "upload_sha256": "6c2db876b2730771d04cbe808f2c5ee93cbd62d946b9162d5655efaedc4ff513",
+ "validate_only": false
+}

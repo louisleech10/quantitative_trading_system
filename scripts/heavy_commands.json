@@ -6,6 +6,7 @@
     {"id": "ffprod_freeze", "regex": "scripts/ffprod_freeze_baseline\\.py(?!.*--check-only)", "source": "scripts/ffprod_freeze_baseline.py"},
     {"id": "numview_freeze", "regex": "scripts/numview_freeze_baseline\\.py", "source": "scripts/numview_freeze_baseline.py"},
     {"id": "icperf_freeze", "regex": "scripts/icperf_freeze_baseline\\.py\\b(?!.*\\s(--help|-h)\\b)", "source": "scripts/icperf_freeze_baseline.py", "_doc": "ICPERF Task 0.1／0.2（docs/ICPERF_SPEC.md §G）：凍結、500 欄可重現性、路徑清冊與改前規模盤點；估時收據 coverage_path_ids＝ICPERF-BUDGET-1／-2；不設 scale_receipt（改前碼只跑小中規模，SPEC §G 時間紀律）"},
+    {"id": "icperf_correctness", "regex": "scripts/icperf_correctness_receipt\\.py\\s+capture\\b(?!.*\\s(--help|-h)\\b)", "source": "scripts/icperf_correctness_receipt.py", "_doc": "ICPERF Task 0.3（docs/ICPERF_SPEC.md Task 0.3）：逐請求執行真實請求並擷取輸入；估時收據 coverage_path_ids＝ICPERF-BUDGET-7／-9／-10；receipt 子命令只讀擷取檔、非重型"},
     {"id": "numview_estimate", "regex": "numview_probes/estimate\\.py", "source": "handoffs/run_receipts/numview_probes/estimate.py"},
     {"id": "numview_precision", "regex": "numview_probes/precision_chain\\.py", "source": "handoffs/run_receipts/numview_probes/precision_chain.py"},
     {"id": "numview_branchdiff", "regex": "numview_probes/postic_branchdiff\\.py", "source": "handoffs/run_receipts/numview_probes/postic_branchdiff.py"},

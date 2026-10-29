@@ -52,8 +52,13 @@ G_ITEMS = ("ic_report", "stage5_subset", "deep_analysis", "event_report", "icfir
 #: §G 凍結範圍：第 (1)、(3)、(4)、(5) 項須含回應全部欄位與快照差集之全部寫出檔
 OUTPUT_ITEMS = ("ic_report", "deep_analysis", "event_report", "icfirst_post_ic",
                 "ic_report_long", "deep_analysis_long", "event_import_report")
-#: SPEC v5.26：第 (6)(7) 項之請求待 Task 0.3 定 L 格與匯入批（未定前 default_request／freeze 須 FreezeError）
-PENDING_ITEMS = ("ic_report_long", "deep_analysis_long", "event_import_report")
+#: 請求未定之項（default_request／freeze／volatile_probe 須 FreezeError）：SPEC v5.26 第 (6)(7) 項之 L 格與匯入批已於
+#: Task 0.3 定 ⇒ 空；fail-closed 之驗證以替身設一待定項（`PENDING_PROBE`）
+PENDING_ITEMS: Tuple[str, ...] = ()
+PENDING_PROBE = ("ic_report_long", "deep_analysis_long", "event_import_report")
+#: SPEC v5.26 Task 0.3 FACT-RECEIPT：第 (6)(7) 項之資料格與事件匯入批（測試自持）
+LONG_CELL = "L_BTCUSDT_1h"
+EVENT_IMPORT_ID = "20261029T144145Z-3483f542"
 #: §G：第 (1)、(2)、(4) 項為逐特徵逐欄位輸出（SPEC v5.8：第 (3) 項深度分析之逐模組逐欄位由「回應全部欄位」涵蓋）
 FEATURE_ITEMS = ("ic_report", "stage5_subset", "event_report", "ic_report_long", "event_import_report")  # v5.26 增 (6)(7)
 #: SPEC §G baseline 內容：IC 報告（dict）之逐特徵來源與形狀（測試自持）——summary_table＝list[dict]、以 feature_name 為鍵；
@@ -1221,12 +1226,13 @@ def test_volatile_probe_diff_unexcludable_cases(fb: Any, tmp_path: Path) -> None
 
 
 def test_item_sets_match_spec_and_pending_fail_closed(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """SPEC v5.26 §G：凍結腳本之項集合＝(1)–(7) 九鍵（測試自持）；第 (6)(7) 項於 Task 0.3 定 L 格與匯入批前，
-    `default_request` 須 FreezeError，`freeze` 須於啟動任何執行前即拒（替身 `freeze_item` 被呼叫即 FAIL）；第 (3) 項請求之
-    深度分析模組全開（含預設關閉者）。"""
+    """SPEC v5.26 §G：凍結腳本之項集合＝(1)–(7) 九鍵（測試自持）；待定項（`PENDING_ITEMS`）之 `default_request` 須
+    FreezeError，`freeze` 須於啟動任何執行前即拒（以替身設 `PENDING_PROBE` 驗；替身 `freeze_item` 被呼叫即 FAIL）；第 (3)(6)
+    項請求之深度分析模組全開（含預設關閉者）；第 (6)(7) 項之格＝L、第 (7) 項帶 Task 0.3 所建之匯入批 id、其餘項不帶。"""
     assert tuple(fb.G_ITEMS) == G_ITEMS and tuple(fb.OUTPUT_ITEMS) == OUTPUT_ITEMS
     assert tuple(fb.PENDING_ITEMS) == PENDING_ITEMS
-    for item in PENDING_ITEMS:
+    monkeypatch.setattr(fb, "PENDING_ITEMS", PENDING_PROBE)
+    for item in PENDING_PROBE:
         with pytest.raises(fb.FreezeError):
             fb.default_request(item)
 
@@ -1237,10 +1243,37 @@ def test_item_sets_match_spec_and_pending_fail_closed(fb: Any, tmp_path: Path, m
     with pytest.raises(fb.FreezeError):
         fb.freeze(tmp_path / "g.json.gz", work_root=tmp_path / "w")
     assert not (tmp_path / "g.json.gz").exists()
+    monkeypatch.setattr(fb, "PENDING_ITEMS", PENDING_ITEMS)
     from api.models.ic_models import DeepAnalysisModules
 
-    modules = fb.default_request("deep_analysis", CELL)["deep"]["modules"]
-    assert set(modules) == set(DeepAnalysisModules.model_fields) and all(v is True for v in modules.values()), modules
+    for item in ("deep_analysis", "deep_analysis_long"):
+        modules = fb.default_request(item, CELL)["deep"]["modules"]
+        assert set(modules) == set(DeepAnalysisModules.model_fields) and all(v is True for v in modules.values()), modules
+        # 具名 preset 之 disabled_modules 會靜默關掉正交化／曝險 ⇒ 深度項須走 custom 方案且 module_overrides 全開
+        req = fb.default_request(item, CELL)
+        for tiers in (req["feature_tiers"], req["config_override"]["feature_tiers"]):
+            assert tiers["active_preset"] == "custom", tiers
+            assert tiers["custom_overrides"]["module_overrides"] == {k: True for k in DeepAnalysisModules.model_fields}
+            assert tiers["custom_overrides"]["stage_overrides"] == \
+                fb.IC_PAGE_DEFAULT_PAYLOAD["feature_tiers"]["custom_overrides"]["stage_overrides"]
+    for item in ("ic_report_long", "deep_analysis_long", "event_import_report"):
+        assert fb.default_request(item, CELL)["cell"] == LONG_CELL, item
+    assert fb.default_request("event_import_report", CELL)["event_import_id"] == EVENT_IMPORT_ID
+    for item in ("ic_report", "deep_analysis", "event_report", "ic_report_long", "deep_analysis_long"):
+        assert fb.default_request(item, CELL)["event_import_id"] is None, item
+
+
+def test_event_import_response_shape_same_as_ic_report(fb: Any) -> None:
+    """SPEC v5.26 §G (7)：事件匯入批回應之形狀同第 (1) 項——任務 `result`（報告）於頂層、其餘任務欄（analyzer 除外）
+    置於 `event_task`；報告自帶 `event_task` 鍵 ⇒ FreezeError。邊界輸入：明列任務 dict。"""
+    info = {"status": "completed", "result": {"summary_table": [{"feature_name": "x"}], "version": "v"},
+            "analyzer": object(), "task_id": "t", "event_sample_design": {"kind": "case_control"}}
+    out = fb.event_import_response(info)
+    assert set(out) == {"summary_table", "version", "event_task"}
+    assert out["event_task"] == {"status": "completed", "task_id": "t", "event_sample_design": {"kind": "case_control"}}
+    assert set(fb.feature_tables("event_import_report")) == set(fb.feature_tables("ic_report"))
+    with pytest.raises(fb.FreezeError):
+        fb.event_import_response({"result": {"event_task": 1}})
 
 
 def test_describe_file_json_by_content(fb: Any, tmp_path: Path) -> None:
@@ -1293,6 +1326,7 @@ def test_volatile_probe_rejects_pending_items_before_any_run(fb: Any, tmp_path: 
         pytest.fail("待定項未定時 volatile_probe 不得啟動任何執行")
 
     monkeypatch.setattr(fb, "freeze_item", must_not_run)
+    monkeypatch.setattr(fb, "PENDING_ITEMS", PENDING_PROBE)
     with pytest.raises(fb.FreezeError):
         fb.volatile_probe(golden_path=path, work_root=tmp_path / "w")
 

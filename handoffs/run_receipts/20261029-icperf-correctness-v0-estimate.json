@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir /private/tmp/claude-501/icperf-correct-v0",
+      "code_sha256": "4fb894de07fac5bf2188d676e30f50e6887f8a26e4de171a9b9647a22796e1a2",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.3 收據擷取 v0，現行碼）",
+      "created_at": "2026-10-29T14:57:22+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 7200,
+  "basis": [
+    "handoffs/run_receipts/20261029-icperf-correctness-probe-estimate.json 之試跑：A.ic_report 120 欄實測約 2 分鐘（22:53:44→22:55:40）",
+    "A 格三請求（含深度分析全部模組）約 8 分鐘；L 格 2,000 根之第 5 段逐根 PIT 為 O(T²)，以 4 倍列數約 16 倍計每請求約 20 分鐘，三請求約 60 分鐘；合計約 75 分鐘，取上限 2 小時（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-7、-9、-10）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-9"
+  ]
+}

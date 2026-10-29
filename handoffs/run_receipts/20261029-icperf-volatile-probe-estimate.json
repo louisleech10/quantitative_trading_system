@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/20261029-icperf-volatile-probe.json",
+      "code_sha256": "3cb8c81954e20f716c09652a272d3befedee7a1d50386b1c4a0e4d1d1a08f3d9",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 volatile 實測）",
+      "created_at": "2026-10-29T11:40:53+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 2400,
+  "basis": [
+    "docs/ICPERF_SPEC.md §B ICPERF-BUDGET-1（v5.25）：volatile 實測＝4 項各 2 次小規模請求（20 特徵；IC-first 為整格）",
+    "第一次實測實跑 19:25:15–19:37:39（12 分 24 秒；工作根建立時間至收據寫出時間，stat 實查）；取 3 倍上界 2400 秒"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}
