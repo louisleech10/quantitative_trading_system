@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell --out handoffs/run_receipts/20261029-icperf-long-cell-4h.json",
+      "code_sha256": "8e0202fa5c6b0c940d1f372d4d0eebec6a86ccf7c2cd9fec14ff556bef234c40",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.3 L 格 4h 生成）",
+      "created_at": "2026-10-29T15:22:24+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1200,
+  "basis": [
+    "data_cache/numview_freeze_runs/A_BTCUSDT_4h__default/numview_cell.json：A_BTCUSDT_4h 同一生成定義（500 根）實測 seconds 151.7",
+    "handoffs/run_receipts/20261029-icperf-long-cell.json：L_BTCUSDT_1h 2,000 根實測 104.6 秒；4h 2,000 根取上限 20 分鐘（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-8）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-8"
+  ]
+}

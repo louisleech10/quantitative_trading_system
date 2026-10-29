@@ -92,11 +92,20 @@ SUBSET_COLS = 2000
 #: （`ic_filter_orchestrator.py:4435-4442`），欄集合不同即非同輸入，故不以較小子集代替
 REPRO_COLS = SUBSET_COLS
 SCALE_POINTS = (500, 1000, 2000)
-#: SPEC v5.26 Task 0.3 FACT-RECEIPT：長資料格 L＝A 格（`LONG_CELL_BASE`）之同一生成定義（NUMVIEW 判準檔格類之設定覆寫、
-#: 生成入口、連續性、K 線來源），只把輸出段改為主週期最後 `LONG_CELL_BARS` 根（產品切分器實算：訓練 1,600／測試 379、
-#: 1h 調整後最大滾動窗 1,512 之終點落測試段 379 根）；生成於 `LONG_CELL_ROOT`（其 `features` 即 `CELL_FEATURES_ROOT`）
-LONG_CELL = "L_BTCUSDT_1h"
-LONG_CELL_BASE = "A_BTCUSDT_1h"
+#: SPEC Task 0.3 FACT-RECEIPT（v5.27 更正）：長資料格 L＝A 格（`LONG_CELL_BASE`）之同一生成定義（NUMVIEW 判準檔格類之
+#: 設定覆寫、生成入口、連續性、K 線來源），只把輸出段改為主週期最後 `LONG_CELL_BARS` 根；生成於 `LONG_CELL_ROOT`（其
+#: `features` 即 `CELL_FEATURES_ROOT`）。切分成立條件（產品實跑）：測試段列數 ≥ 調整後最大滾動窗＋label horizon
+#: （`ic_filter_orchestrator.py` 第 4 段 `rolling_warmup_insufficient`；purge＝label horizon 5）——1h（窗 ×12＝1,512）須
+#: N ≥ 7,610，BTCUSDT 1h 2,000 根實跑退回全樣本（test 395 < 1,517）；4h（窗 ×3＝378）2,000 根：訓練 1,600／測試 395 ≥ 383。
+#: 前史（v5.27，依使用者 2026-10-29「3.資料不足就要補齊到可以跑和測試」）：主檔 BTCUSDT 4h 只 5,088 根，以之生成 2,000 根
+#: 實跑 34 欄（KAMA 長週期）`calibration_insufficient_history` ⇒ run partial、IC 頁預設不收（`allow_partial_training=False`）
+#: ⇒ K 線來源改長歷史檔 `LONG_CELL_SOURCE`（BTCUSDT 4h 19,963 根，與主檔重疊 5,088 根之 OHLCV 逐值相同，實查），輸出段
+#: 改為「長歷史序列中不晚於 IC 頁標籤來源（`LONG_CELL_LABEL_SOURCE`＝`FEATURE_KLINE_CACHE_DIR` 之主檔）末根」之最後
+#: `LONG_CELL_BARS` 根，使 IC 頁之標籤與特徵同窗
+LONG_CELL = "L_BTCUSDT_4h_longhist"
+LONG_CELL_BASE = "A_BTCUSDT_4h"
+LONG_CELL_SOURCE = "data_cache/feature_klines_longhist/kline_cache.h5"
+LONG_CELL_LABEL_SOURCE = "data_cache/feature_klines/kline_cache.h5"
 LONG_CELL_BARS = 2000
 LONG_CELL_ROOT = "data_cache/numview_freeze_runs/{cell}__default"
 
@@ -866,8 +875,8 @@ IC_PAGE_OUTPUT_ROOTS = ("data_cache/features", "data_cache/reports")
 IC_FIRST_OUTPUT_ROOTS = ("features", "cgsa_work", "dstar_cache", "sys_tmp")
 #: SPEC v5.26 §G (7)：事件匯入批（`scripts/icperf_event_batch.py` 依明列規則以 L 格真實 kline 建批、經
 #: `EventImportService.import_records` 落檔；FACT-RECEIPT `EVENT_BATCH_RECEIPT`）
-EVENT_IMPORT_ID = "20261029T144145Z-3483f542"
-EVENT_BATCH_RECEIPT = "handoffs/run_receipts/20261029-icperf-event-batch.json"
+EVENT_IMPORT_ID = "20261029T152937Z-d5c4ac41"
+EVENT_BATCH_RECEIPT = "handoffs/run_receipts/20261029-icperf-event-batch-4h.json"
 #: 第 (1)(3)(4)(6)(7) 項（IC 頁路徑）
 IC_PAGE_ITEMS = ("ic_report", "deep_analysis", "event_report", "ic_report_long", "deep_analysis_long",
                  "event_import_report")
@@ -1905,8 +1914,12 @@ def event_import_run(request: Mapping[str, Any], registry: Path) -> Dict[str, An
     from api.routes.ic_analysis import _resolve_event_batch
 
     svc = _ic_service(request, Path(registry))
+    # `ICAnalysisService.__init__` 之其餘任務狀態欄（`_ic_service` 不經 __init__ 以改指特徵庫；`api/services/ic_analysis_service.py`
+    # 建構子：_tasks、_callbacks、_lock、_last_task_id）
     svc._lock = threading.Lock()
     svc._tasks = {}
+    svc._callbacks = {}
+    svc._last_task_id = None
     req = _ic_analyze_request(request)
     event_batch = _resolve_event_batch(req)
 
@@ -1964,10 +1977,34 @@ def long_cell_descriptor() -> Dict[str, Any]:
 
 
 def long_cell_criteria(criteria: Mapping[str, Any]) -> Dict[str, Any]:
-    """NUMVIEW 判準檔之複本，只把 L 格所屬格類之 `output_bars` 改為 `LONG_CELL_BARS`（其餘生成定義不變）。"""
+    """NUMVIEW 判準檔之複本：L 格所屬格類之 `output_bars` 改 `LONG_CELL_BARS`、主週期之 K 線來源改 `LONG_CELL_SOURCE`
+    （其餘生成定義不變）。"""
+    desc = long_cell_descriptor()
     out = _json_copy(criteria)
-    out["cell_definitions"][long_cell_descriptor()["kind"]]["output_bars"] = LONG_CELL_BARS
+    out["cell_definitions"][desc["kind"]]["output_bars"] = LONG_CELL_BARS
+    out["cell_rules"]["kline_source"]["by_timeframe"][desc["timeframes"][0]] = LONG_CELL_SOURCE
     return out
+
+
+def long_cell_window(repo_root: Path = REPO) -> Tuple[str, str]:
+    """L 格輸出段：`LONG_CELL_SOURCE` 主週期序列中時間戳 ≤ `LONG_CELL_LABEL_SOURCE` 同序列末根者之最後 `LONG_CELL_BARS`
+    根之（起, 訖）ISO 字串（UTC）；根數不足或標籤來源末根不在長歷史序列 ⇒ FreezeError。"""
+    import h5py
+    import numpy as np
+    import pandas as pd
+
+    desc = long_cell_descriptor()
+    key = f"{desc['symbol']}/{desc['timeframes'][0]}/data"
+    with h5py.File(str(Path(repo_root) / LONG_CELL_LABEL_SOURCE), "r") as f:
+        end = int(f[key]["timestamp"][-1])
+    with h5py.File(str(Path(repo_root) / LONG_CELL_SOURCE), "r") as f:
+        ts = np.asarray(f[key]["timestamp"][:], dtype="int64")
+    upto = ts[ts <= end]
+    if upto.size < LONG_CELL_BARS or int(upto[-1]) != end:
+        raise FreezeError(f"{LONG_CELL_SOURCE} 之 {key} 不足 {LONG_CELL_BARS} 根或不含標籤來源末根 {end}")
+    unit = "ms" if end > 10 ** 12 else "s"
+    return (pd.Timestamp(int(upto[-LONG_CELL_BARS]), unit=unit, tz="UTC").isoformat(),
+            pd.Timestamp(end, unit=unit, tz="UTC").isoformat())
 
 
 def _long_cell_sidecar(work: Path) -> Optional[Dict[str, Any]]:
@@ -1995,11 +2032,13 @@ def gen_long_cell(*, repo_root: Path = REPO, work_root: Optional[Path] = None) -
 
 
 def _child_gen_long_cell(spec: Mapping[str, Any]) -> Dict[str, Any]:
-    """`gen_long_cell` 之子行程：`numview_freeze_baseline._criteria` 換為 `long_cell_criteria` 之結果後呼叫
-    `generate_cell_run`（只在本子行程內換）；回 sidecar（JSON 化）。"""
+    """`gen_long_cell` 之子行程：`numview_freeze_baseline._criteria` 換為 `long_cell_criteria` 之結果、估時器之
+    `cell_window` 換為 `long_cell_window` 後呼叫 `generate_cell_run`（只在本子行程內換）；回 sidecar（JSON 化）。"""
     nfb = _load("icperf_numview_freeze_baseline", REPO / "scripts" / "numview_freeze_baseline.py")
     criteria = long_cell_criteria(nfb._criteria())
     nfb._criteria = lambda: criteria
+    window = long_cell_window()
+    nfb._estimator().cell_window = lambda cell, crit: window
     side = nfb.generate_cell_run(Path(spec["work"]), long_cell_descriptor(), {})
     return json.loads(json.dumps(side, ensure_ascii=False, default=str))
 

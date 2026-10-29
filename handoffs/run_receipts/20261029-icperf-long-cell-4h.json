@@ -1,0 +1,154 @@
+{
+ "reused": false,
+ "work": "/Users/louis/Desktop/quantitative_trading_system/data_cache/numview_freeze_runs/L_BTCUSDT_4h__default",
+ "sidecar": {
+  "cell": {
+   "id": "L_BTCUSDT_4h",
+   "kind": "A",
+   "symbol": "BTCUSDT",
+   "timeframes": [
+    "4h"
+   ]
+  },
+  "env": {},
+  "entry": "run_ic_first",
+  "symbol": "BTCUSDT",
+  "primary_tf": "4h",
+  "training_timeframes": [
+   "4h"
+  ],
+  "output_window": [
+   "2025-05-29T16:00:00+00:00",
+   "2026-04-27T20:00:00+00:00"
+  ],
+  "source": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5",
+  "continuity": {
+   "production_setting": true,
+   "validate_continuity": true,
+   "series_gaps": {}
+  },
+  "config_override": {
+   "atomic_indicators": {
+    "cycle": {
+     "enabled": false
+    },
+    "entropy": {
+     "enabled": false
+    },
+    "microstructure": {
+     "enabled": false
+    },
+    "momentum": {
+     "enabled": false
+    },
+    "pattern": {
+     "enabled": false
+    },
+    "statistics": {
+     "enabled": false
+    },
+    "tail_risk": {
+     "enabled": false
+    },
+    "trend": {
+     "enabled": true
+    },
+    "volatility": {
+     "enabled": false
+    },
+    "volume": {
+     "enabled": false
+    }
+   },
+   "cross_sectional": {
+    "enabled": false
+   },
+   "data_sources": {
+    "enabled_sources": [
+     "close"
+    ],
+    "synthetic_sources": []
+   },
+   "lag_features": {
+    "enabled": false
+   },
+   "max_nan_ratio": 1.0,
+   "nan_strategy": {
+    "l7_dead_feature_drop": {
+     "enabled": false
+    }
+   },
+   "operators": {
+    "binary_signal": {
+     "enabled": false
+    },
+    "cross": {
+     "enabled": true
+    },
+    "distance": {
+     "enabled": false
+    },
+    "enabled": true,
+    "momentum": {
+     "enabled": false
+    },
+    "ratio": {
+     "enabled": true
+    },
+    "worldquant": {
+     "enabled": false
+    }
+   },
+   "preprocessing": {
+    "adf_differencing": {
+     "apply_to": "non_stationary",
+     "enabled": true
+    },
+    "causal_preprocessing": true,
+    "enabled": true,
+    "fractional_differencing": {
+     "apply_to": "non_stationary",
+     "enabled": true
+    },
+    "gaussian_normalize": {
+     "enabled": false
+    },
+    "mode": "replace",
+    "winsorization": {
+     "enabled": true
+    }
+   },
+   "rolling_aggregation": {
+    "enabled": true,
+    "windows": [
+     5,
+     13
+    ]
+   },
+   "timeframes": {
+    "alignment_mode": "open_minus"
+   }
+  },
+  "payload_sha256": "ee1b939ab3b0610858a54dd533b053e4ac2280e4eb930a555efff81cb268c606",
+  "hardware": {
+   "memory_tier": "8gb",
+   "physical_memory_bytes": 8589934592,
+   "cpu_count": 8,
+   "machine": "arm64"
+  },
+  "effective_cleared_env": {
+   "FFACT_CGSA_WORK_DIR": "/Users/louis/Desktop/quantitative_trading_system/data_cache/numview_freeze_runs/L_BTCUSDT_4h__default/cgsa_work",
+   "FFACT_FEATURE_REGISTRY_PATH": "/Users/louis/Desktop/quantitative_trading_system/data_cache/numview_freeze_runs/L_BTCUSDT_4h__default/features/registry.json"
+  },
+  "seconds": 69.85733579199999,
+  "status": "blocked",
+  "blocked_by": "history",
+  "run_status": "partial",
+  "reason_counts": {
+   "calibration_insufficient_history": 34
+  },
+  "config_hash": "5add4c126a094ea3b7ba34ad57dfd314",
+  "ic_first_selected": null,
+  "l2_capture": null
+ }
+}

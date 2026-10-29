@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell --out handoffs/run_receipts/20261029-icperf-long-cell-4h-longhist.json",
+      "code_sha256": "5a380d7f0ce72ec9605fc933ffcac98d9eb7e864b4069001d8364f237f365dd7",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.3 L 格 4h 長歷史前史生成）",
+      "created_at": "2026-10-29T15:27:32+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1200,
+  "basis": [
+    "handoffs/run_receipts/20261029-icperf-long-cell-4h.json：同一 4h 2,000 根輸出段以主檔前史生成實測 69.9 秒（34 欄前史不足、partial）",
+    "改長歷史檔前史後 d* 校準多讀約 1.4 萬根前史，取上限 20 分鐘（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-8）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-8"
+  ]
+}
