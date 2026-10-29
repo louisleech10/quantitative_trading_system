@@ -565,7 +565,7 @@
         "ICPERF：IC 計算最優化（第 9b 步；第 5 段逐欄 PIT 分位改整批、先篩欄再前處理、進度回報）",
         "進行中",
         "docs/ICPERF_SPEC.md",
-        "使用者 2026-10-27 排序第三（TESTSEL 後）。實測第 5 段每欄 0.81 秒、線性，20.9 萬欄約 47 小時（收據 handoffs/run_receipts/icperf_probes/）。SPEC 經規格審查 r1–r9 於 v5.6（96a5a840）凍結，施工清單審查 r10 連帶 v5.7（5c8d02a6）；施工清單 docs/manifests/ICPERF.json 經審查 r10–r14、戳記輪 R16 三家核可，落點已提交（1e9ec16e）；下一步 Phase 0 實作（凍結與規模盤點）；細節見 HP-ICPERF；併 RM-GAP-6（43 萬欄規模防護）"
+        "使用者 2026-10-27 排序第三（TESTSEL 後）。實測第 5 段每欄 0.81 秒、線性，20.9 萬欄約 47 小時（收據 handoffs/run_receipts/icperf_probes/）。SPEC 經規格審查 r1–r9 於 v5.6（96a5a840）凍結，施工清單審查 r10 連帶 v5.7（5c8d02a6）；施工清單 docs/manifests/ICPERF.json 經審查 r10–r14、戳記輪 R16 三家核可，落點已提交（1e9ec16e）；2026-10-28–29 規格審查 r17–r29 至 v5.21、施工清單審查 r30–r32＋戳記輪 R33 三家核可，SPEC v5.22 與正確性 oracle 測試提交（1881228b）；Task 0.3 秒級稽核發現三處現行錯誤（換手率頂分位偷看未來、勝率分母含缺值、衰減擬合單一起點），新增 Task 0.4 於凍結前修正；下一步 Task 0.4 → 凍結入口實作 → 估時 → 凍結；細節見 HP-ICPERF；併 RM-GAP-6（43 萬欄規模防護）"
       ],
       [
         "342",
