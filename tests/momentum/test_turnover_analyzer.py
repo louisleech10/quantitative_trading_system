@@ -6,6 +6,7 @@ from momentum.Analysis.pit_stats import (
     MIN_SAMPLES,
     first_valid_index,
     pit_expanding_qcut_label,
+    pit_expanding_qcut_top_mask,
     pit_expanding_rank,
 )
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
@@ -19,18 +20,57 @@ def _long_series(n: int = 200, seed: int = 0) -> pd.Series:
 def _ref_pit_top_mask(series: pd.Series, q: int) -> pd.Series:
     """獨立逐根參考：第 t 根以截至 t 之有限歷史求 q 分位邊界（去重），當根值落最高箱 ⇒ 1.0。
 
-    pd.qcut 箱為右閉、首箱含最小值 ⇒ 最高箱＝(edges[-2], edges[-1]]；只剩一箱時恆為最高箱。
+    有效根：截至 t 之非 NaN 數（±inf 計入，同 §MS effective_count）≥ MIN_SAMPLES 且當根有限。
+    pd.qcut 箱為右閉、首箱含最小值 ⇒ 最高箱＝(edges[-2], edges[-1]]；只剩一箱時恆為最高箱；
+    有限歷史全相同（去重後只一個邊界、無箱）⇒ 無標籤 ⇒ NaN（SPEC Task 0.4 ①）。
     """
     values = series.to_numpy(dtype=float)
     out = np.full(values.shape[0], np.nan)
+    seen = 0
     for t in range(values.shape[0]):
+        seen += int(not np.isnan(values[t]))
+        if seen < MIN_SAMPLES or not np.isfinite(values[t]):
+            continue
         hist = values[: t + 1]
         finite = hist[np.isfinite(hist)]
-        if finite.size < MIN_SAMPLES or not np.isfinite(values[t]):
-            continue
         edges = np.unique(np.quantile(finite, np.linspace(0.0, 1.0, q + 1)))
-        out[t] = 1.0 if edges.size <= 2 or values[t] > edges[-2] else 0.0
+        if edges.size == 1:
+            continue
+        out[t] = 1.0 if edges.size == 2 or values[t] > edges[-2] else 0.0
     return pd.Series(out, index=series.index)
+
+
+def _boundary_series(case: str) -> pd.Series:
+    n = MIN_SAMPLES + 40
+    if case == "all_identical":
+        return pd.Series(np.ones(n))
+    if case == "identical_then_new":
+        vals = np.ones(n)
+        vals[MIN_SAMPLES + 5 :] = np.arange(2.0, 2.0 + n - MIN_SAMPLES - 5)
+        return pd.Series(vals)
+    vals = _long_series(n, seed=11).to_numpy(copy=True)  # nan_inf_mixed
+    vals[[3, 50, MIN_SAMPLES + 2, MIN_SAMPLES + 20]] = np.nan
+    vals[[7, MIN_SAMPLES + 4]] = np.inf
+    vals[[60, MIN_SAMPLES + 9]] = -np.inf
+    return pd.Series(vals)
+
+
+@pytest.mark.parametrize("case", ["all_identical", "identical_then_new", "nan_inf_mixed"])
+def test_top_mask_and_turnover_boundaries_match_reference(case):
+    """頂分位遮罩與單值換手率之邊界（CODEX-R34-P1-01）：全相同 ⇒ 無標籤 NaN、換手率 NaN；
+    全相同後出現新值 ⇒ 新值起有標籤；NaN／±inf 混合 ⇒ 有效根依 §MS 非 NaN 計數。"""
+    series = _boundary_series(case)
+    ref = _ref_pit_top_mask(series, q=5)
+    mask = pit_expanding_qcut_top_mask(series, q=5, min_samples=MIN_SAMPLES, duplicates="drop")
+    turnover = TurnoverAnalyzer({"num_quantiles": 5}).compute_quantile_turnover(series, num_quantiles=5)
+    expected = (
+        float("nan") if ref.notna().sum() == 0
+        else float(ref.diff().abs().replace([np.inf, -np.inf], np.nan).dropna().mean())
+    )
+
+    assert np.array_equal(mask.to_numpy(), ref.to_numpy(), equal_nan=True)
+    assert (np.isnan(turnover) and np.isnan(expected)) or np.isclose(turnover, expected)
+    assert (ref.notna().sum() == 0) == (case == "all_identical")
 
 
 @pytest.mark.parametrize("seed", [1, 2])

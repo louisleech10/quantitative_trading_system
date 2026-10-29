@@ -557,7 +557,7 @@ DECAY_CASES = {
     "negative": [-0.020, -0.018, -0.015, -0.011, -0.007, -0.004, -0.003],
     "with_nan": [0.050, math.nan, 0.035, 0.020, math.nan, 0.008, 0.006],
 }
-#: 現行只自 scipy 預設起點擬一次（ic_engine.py:1167），可能落於較差之局部解——SPEC Task 0.3 要找之正確性問題
+#: Task 0.4 ③ 前之產品只自 scipy 預設起點擬一次，於此曲線落於較差之局部解（SPEC Task 0.3 發現、Task 0.4 ③ 修正）
 DECAY_LOCAL_MINIMUM_CASES = {
     "hump": [0.012, 0.031, 0.028, 0.015, -0.004, 0.006, 0.002],
 }
@@ -872,7 +872,8 @@ def _ref_pit_qcut(x: np.ndarray, q: int, min_samples: int = PIT_MIN) -> np.ndarr
 def _ref_pit_qcut_bins(x: np.ndarray, q: int, min_samples: int = PIT_MIN) -> Any:
     """PIT 分位標籤與當根自身箱數 k_t（SPEC Task 0.4 ①）：同 `_ref_pit_qcut` 之逐根規則，另以同一次
     `pd.qcut(..., retbins=True, duplicates="drop")` 之去重後邊界數 − 1 得 k_t（第 t 根自身分箱所得之箱數，不以請求 q
-    代替；箱數計邊界而非已占用之標籤數——最高箱恆含當前歷史最大值，故標籤 k_t − 1 恆可達）。標籤 NaN 處 k_t＝NaN。
+    代替；箱數計邊界而非已占用之標籤數——最高箱恆含當前歷史最大值，故有箱時標籤 k_t − 1 恆可達）。有限歷史全相同
+    （去重後只一個邊界、無箱）⇒ pd.qcut 無標籤。標籤 NaN 處 k_t＝NaN。
     回 (labels, k)。"""
     out, k = np.full(x.size, np.nan), np.full(x.size, np.nan)
     seen = 0

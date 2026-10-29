@@ -341,7 +341,8 @@ def pit_expanding_qcut_top_mask(
     """per-t 頂分位指示：第 t 根之 PIT 標籤＝k_t − 1 ⇒ 1.0，否則 0.0；標籤 NaN 處 NaN。
 
     k_t＝第 t 根以截至 t 之有限歷史 ``pd.qcut``（duplicates 同 ``pit_expanding_qcut_label``）
-    實際所得之箱數（相異邊界數 − 1）。頂分位只依當根自身之分箱界定，不讀 t 之後資料
+    實際所得之箱數（相異邊界數 − 1）；有限歷史全相同（只一個邊界、無箱）⇒ 無標籤 ⇒ NaN。
+    頂分位只依當根自身之分箱界定，不讀 t 之後資料
     （ICPERF Task 0.4 ①：舊法以整段序列最大標籤界定，後段新分箱會改寫前段）。
     """
     index = _index_of(series)
