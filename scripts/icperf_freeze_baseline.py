@@ -14,12 +14,15 @@
 
 用法（重型，列 `scripts/heavy_commands.json` 之 `self_watched`：須背景、先寫估時收據〔coverage_path_ids＝ICPERF-BUDGET-1／-2〕，
 子行程一律經本檔 `run_watched` 以共用監看啟動）：
-  venv/bin/python scripts/icperf_freeze_baseline.py freeze [--out tests/_golden/icperf/pre_change.json] [--c-handoff <h5>]
+  venv/bin/python scripts/icperf_freeze_baseline.py freeze [--out tests/_golden/icperf/pre_change.json.gz] [--c-handoff <h5>]
   venv/bin/python scripts/icperf_freeze_baseline.py repro [--cols 2000] [--c-handoff <h5>]
+  venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/<日期>-icperf-volatile-probe.json
+  venv/bin/python scripts/icperf_freeze_baseline.py set-volatile --probe <實測收據>
   venv/bin/python scripts/icperf_freeze_baseline.py inventory --out handoffs/run_receipts/<日期>-icperf-path-inventory.json
   venv/bin/python scripts/icperf_freeze_baseline.py measure --inventory <清冊> --out handoffs/run_receipts/<日期>-icperf-scale-before.json
 
-凍結檔 `tests/_golden/icperf/pre_change.json` 之形狀（§G）：
+凍結檔 `tests/_golden/icperf/pre_change.json.gz`（SPEC v5.25 §G：正準 JSON 位元組以 gzip 決定性壓縮，`write_golden`／
+`load_golden`）之形狀（§G）：
   {"schema": "icperf-pre-change/1", "code_state": {...}, "volatile": [<每次必異欄位之路徑，FACT-RECEIPT 寫入 SPEC>],
    "items": {
      "ic_report"|"deep_analysis"|"event_report"|"icfirst_post_ic": {
@@ -56,6 +59,8 @@ q=3 退回）；`q`＝最終採用之 q；`q_insufficient`＝最終 q 小於請�
 
 volatile（每次必異欄位）：凍結檔之 "volatile" 留空，由 FACT-RECEIPT 判定後寫入（SPEC §G）；凍結時另列
 "volatile_candidates"（欄位名形似時間戳／耗時／執行 id、或值含本次執行根之絕對路徑者），只供判定、不自動排除。
+判定以實測（SPEC v5.25 §G）：`volatile_probe` 對第 (1)、(3)、(4)、(5) 項各以凍結所記之同一整格請求再跑一次，與凍結記錄
+之差異即 volatile 項；`apply_volatile` 驗各項於凍結檔存在後寫入 "volatile"，並列出未入 volatile 之候選供 FACT-RECEIPT 覆核。
 """
 
 from __future__ import annotations
@@ -77,7 +82,8 @@ from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence, Set, 
 
 REPO = Path(__file__).resolve().parents[1]
 PROBES_DIR = REPO / "handoffs" / "run_receipts" / "numview_probes"
-GOLDEN_PATH = REPO / "tests" / "_golden" / "icperf" / "pre_change.json"
+#: SPEC v5.25 §G：凍結檔以 gzip 存（未壓縮實測 150,530,327 bytes，超 GitHub 單檔 100 MB 上限；壓縮後約 20.7 MB）
+GOLDEN_PATH = REPO / "tests" / "_golden" / "icperf" / "pre_change.json.gz"
 CELL = "A_BTCUSDT_1h"
 SEED = 20261027
 SUBSET_COLS = 2000
@@ -443,6 +449,40 @@ def _canonical_json(v: Any) -> bytes:
     return json.dumps(v, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=True).encode("utf-8")
 
 
+#: gzip 檔頭魔數（RFC 1952）
+_GZIP_MAGIC = b"\x1f\x8b"
+
+
+def write_golden(golden: Mapping[str, Any], out_path: Path) -> None:
+    """凍結檔寫出（SPEC v5.25 §G）：內容＝正準 JSON（`_canonical_json`：sort_keys、緊湊分隔、allow_nan）之 UTF-8 位元組；
+    路徑以 `.gz` 結尾者以 gzip 決定性壓縮（檔頭 mtime 0、檔名空、等級 9；同內容恆得同位元組），否則原樣寫出；暫存檔＋
+    `os.replace` 原子寫出。"""
+    import gzip
+    import io
+
+    data = _canonical_json(golden)
+    if str(out_path).endswith(".gz"):
+        buf = io.BytesIO()
+        with gzip.GzipFile(filename="", mode="wb", fileobj=buf, compresslevel=9, mtime=0) as gz:
+            gz.write(data)
+        data = buf.getvalue()
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    staging = out.with_name(out.name + ".tmp")
+    staging.write_bytes(data)
+    os.replace(staging, out)
+
+
+def load_golden(path: Path) -> Dict[str, Any]:
+    """讀凍結檔：檔頭為 gzip 魔數者先解壓（不依副檔名），再以 JSON 解析。"""
+    import gzip
+
+    data = Path(path).read_bytes()
+    if data[:2] == _GZIP_MAGIC:
+        data = gzip.decompress(data)
+    return json.loads(data.decode("utf-8"))
+
+
 def hdf5_digest(path: Path) -> Dict[str, Dict[str, Any]]:
     """HDF5 逐物件摘要：{<物件名，如 "/" "/g" "/g/v">: {"kind": "group"|"dataset", "attrs": {<屬性名>: <sha256>},
     資料集另 "dtype", "shape", "sha256"（原生 dtype 位元組；依首軸分塊串接雜湊，與整塊 tobytes 相同）}}。"""
@@ -548,13 +588,14 @@ def flatten_fields(obj: Any) -> Dict[str, str]:
 
 def describe_file(path: Path) -> Dict[str, Any]:
     """單一寫出檔之摘要：{"sha256": <位元組>, "hdf5": hdf5_digest(...)|None, "fields": flatten_fields(<JSON 內容>)|None}；
-    HDF5 以檔頭簽章判定，JSON 以副檔名 .json 判定（內容不可解析 ⇒ fields 為 None，仍以位元組比）。"""
+    HDF5 以檔頭簽章判定，JSON 以副檔名 .json 或首位元組為 `{`／`[` 判定（SPEC v5.25：如 `features/.locks/*.lock` 之租約檔
+    內容為 JSON 而副檔名非 .json；內容不可解析 ⇒ fields 為 None，仍以位元組比）。"""
     path = Path(path)
     real = os.path.realpath(path)
     with open(real, "rb") as fh:
         head = fh.read(8)
     fields = None
-    if path.suffix.lower() == ".json":
+    if path.suffix.lower() == ".json" or head[:1] in (b"{", b"["):
         try:
             fields = flatten_fields(json.loads(Path(real).read_text(encoding="utf-8")))
         except (ValueError, UnicodeDecodeError):
@@ -1577,7 +1618,7 @@ def freeze(out_path: Path = GOLDEN_PATH, *, repo_root: Path = REPO, work_root: O
 
     `work_root` 未給 ⇒ 新建暫存目錄（保留供診斷，路徑記於凍結檔 "work_root"）。第 (1) 項另加 "pit_labels"
     （`_cell_pit_labels`）。凍結檔＝{"schema", "code_state", "volatile": []（FACT-RECEIPT 判定後寫入）,
-    "volatile_candidates", "work_root", "items"}；以暫存檔＋`os.replace` 原子寫出（正準 JSON：sort_keys、緊湊分隔）。"""
+    "volatile_candidates", "work_root", "items"}；經 `write_golden` 原子寫出（正準 JSON；`.gz` 路徑 gzip 決定性壓縮）。"""
     import tempfile
 
     work = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-freeze-"))
@@ -1593,12 +1634,7 @@ def freeze(out_path: Path = GOLDEN_PATH, *, repo_root: Path = REPO, work_root: O
     items["ic_report"]["pit_labels"] = _cell_pit_labels(CELL, work)
     golden = {"schema": "icperf-pre-change/1", "code_state": _code_state(Path(repo_root)), "volatile": [],
               "volatile_candidates": candidates, "work_root": str(work), "items": items}
-    out = Path(out_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    staging = out.with_name(out.name + ".tmp")
-    staging.write_text(json.dumps(golden, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=True),
-                       encoding="utf-8")
-    os.replace(staging, out)
+    write_golden(golden, Path(out_path))
     return golden
 
 
@@ -1609,7 +1645,7 @@ def repro(n_cols: int = REPRO_COLS, *, golden_path: Path = GOLDEN_PATH) -> Dict[
     `n_cols_requested`（欄集合不同即非同輸入：第 5 段 FDR 依進段全部欄，`ic_filter_orchestrator.py:4435-4442`），否則
     FreezeError。凍結未記 `request.source_sha256` 或交接 h5 內容 sha256 不等 ⇒ FreezeError（於重跑前判定）。交接 h5
     路徑：環境變數優先，未設取凍結所記之 `request.source_h5`（r37 CODEX-R37-P1-01）。"""
-    frozen = json.loads(Path(golden_path).read_text(encoding="utf-8"))["items"]["stage5_subset"]
+    frozen = load_golden(Path(golden_path))["items"]["stage5_subset"]
     if int(n_cols) != int(frozen.get("n_cols_requested", -1)):
         raise FreezeError(f"可重現性須以凍結之同一子集重跑：n_cols={n_cols} != 凍結 {frozen.get('n_cols_requested')}")
     frozen_req = frozen.get("request") or {}
@@ -1628,6 +1664,135 @@ def repro(n_cols: int = REPRO_COLS, *, golden_path: Path = GOLDEN_PATH) -> Dict[
     problems += [p.replace("lbl:", "pit_labels/", 1)
                  for p in _compare_maps(frozen.get("pit_labels") or {}, cur["pit_labels"], "lbl:")]
     return {"n_cols": int(n_cols), "stage_cols": cur["stage_cols"], "problems": problems}
+
+
+# ── volatile 實測判定（SPEC v5.25 §G） ─────────────────────────────────────────────────────────────────────
+
+
+def _one_sided(a: Mapping[str, Any], b: Mapping[str, Any], label: str) -> List[str]:
+    return [f"{label}{k}：只在第{'一' if k in a else '二'}次" for k in sorted(set(a) ^ set(b))]
+
+
+def probe_diff(a: Mapping[str, Any], b: Mapping[str, Any]) -> Tuple[List[str], List[str]]:
+    """同一請求兩次 `freeze_item` 記錄之差異 ⇒ (volatile 項, 無法排除之差異)。volatile 項格式同 `compare_capture`：
+    `response:<欄位>`（兩次皆有而值不等）、`file:<path_key>#<欄位>`（兩次皆有之可解析 JSON 檔，兩次皆有而值不等之欄位）、
+    `file:<path_key>@<物件>#attr:<屬性名>`（兩次皆有之 HDF5 檔，兩次皆有而值不等之屬性）。無法以 volatile 項排除者：
+    回應欄位或寫出檔只在一次、JSON 欄位／HDF5 物件／屬性只在一次、HDF5 物件之 kind／dtype／shape／資料 sha256 不等、
+    非 JSON 亦非 HDF5 之檔位元組不等、逐特徵摘要（"features"）或選欄集合（"selected"）不等、執行中刪除之既有檔不同。"""
+    vol: List[str] = []
+    bad: List[str] = []
+    ra, rb = a.get("response") or {}, b.get("response") or {}
+    bad += _one_sided(ra, rb, "response:")
+    vol += [f"response:{k}" for k in sorted(set(ra) & set(rb)) if ra[k] != rb[k]]
+    fa, fb_ = a.get("files") or {}, b.get("files") or {}
+    bad += _one_sided(fa, fb_, "file:")
+    for key in sorted(set(fa) & set(fb_)):
+        x, y = fa[key], fb_[key]
+        if x.get("sha256") == y.get("sha256"):
+            continue
+        n_before = (len(vol), len(bad))
+        if x.get("fields") is not None and y.get("fields") is not None:
+            bad += _one_sided(x["fields"], y["fields"], f"file:{key}#")
+            vol += [f"file:{key}#{f}" for f in sorted(set(x["fields"]) & set(y["fields"]))
+                    if x["fields"][f] != y["fields"][f]]
+            if (len(vol), len(bad)) == n_before:
+                bad.append(f"file:{key}：JSON 檔位元組不等而逐欄位皆等（序列化不定，volatile 語法無從排除）")
+        elif x.get("hdf5") is not None and y.get("hdf5") is not None:
+            ha, hb = x["hdf5"], y["hdf5"]
+            bad += [f"file:{key} HDF5 物件 {o}：只在第{'一' if o in ha else '二'}次" for o in sorted(set(ha) ^ set(hb))]
+            for obj in sorted(set(ha) & set(hb)):
+                bad += [f"file:{key} HDF5 物件 {obj} 之 {fld}：不等" for fld in ("kind", "dtype", "shape", "sha256")
+                        if ha[obj].get(fld) != hb[obj].get(fld)]
+                aa, ab = ha[obj].get("attrs") or {}, hb[obj].get("attrs") or {}
+                bad += _one_sided(aa, ab, f"file:{key}@{obj}#attr:")
+                vol += [f"file:{key}@{obj}#attr:{n}" for n in sorted(set(aa) & set(ab)) if aa[n] != ab[n]]
+            if (len(vol), len(bad)) == n_before:
+                bad.append(f"file:{key}：HDF5 檔位元組不等而逐物件皆等（檔層中繼資料，volatile 語法無從排除）")
+        else:
+            bad.append(f"file:{key}：非 JSON 亦非 HDF5 之檔位元組不等")
+    if (a.get("features") or {}) != (b.get("features") or {}):
+        bad += _compare_features("features", a.get("features") or {}, b.get("features") or {}) or ["features：不等"]
+    if a.get("selected") != b.get("selected"):
+        bad.append("selected：不等")
+    if sorted(a.get("removed") or []) != sorted(b.get("removed") or []):
+        bad.append("removed：執行中刪除之既有檔不同")
+    return vol, bad
+
+
+def volatile_probe(*, golden_path: Path = GOLDEN_PATH, repo_root: Path = REPO,
+                   work_root: Optional[Path] = None) -> Dict[str, Any]:
+    """每次必異欄位之實測（SPEC v5.25 §G）：第 (1)、(3)、(4)、(5) 項各以凍結檔所記之同一整格請求（該項 "request"）於新建
+    工作根再跑一次 `freeze_item`，`probe_diff(凍結記錄, 重跑記錄)`——所得即日後改後比對時同一請求之每次必異欄位，並兼驗
+    四項整格輸出之可重現性（"features"／"selected" 不等即無法排除）。自檢：以所得 volatile 項排除後 `compare_capture` 仍有
+    問題而無法排除之差異為空 ⇒ FreezeError。回 {"golden_sha256"（凍結檔位元組 sha256）, "work_root", "items": {<項>:
+    {"volatile": [...], "unexcludable": [...]}}, "volatile": [<項>:<volatile 項>...], "unexcludable": [...]}。"""
+    import tempfile
+
+    golden = load_golden(Path(golden_path))
+    work = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-volprobe-"))
+    work.mkdir(parents=True, exist_ok=True)
+    out: Dict[str, Any] = {"golden_sha256": _file_sha256(str(Path(golden_path).resolve()), cache=False),
+                           "work_root": str(work), "items": {}, "volatile": [], "unexcludable": []}
+    for item in OUTPUT_ITEMS:
+        frozen = (golden.get("items") or {}).get(item)
+        if not frozen or "request" not in frozen:
+            raise FreezeError(f"凍結檔缺 {item} 或其請求")
+        print(f"[icperf-volprobe] {item} 重跑開始", flush=True)
+        rec = freeze_item(item, request=frozen["request"], repo_root=Path(repo_root), work_root=work)
+        recs = [frozen, rec]
+        vol, bad = probe_diff(recs[0], recs[1])
+        residual = compare_capture(recs[0], recs[1], volatile=vol)
+        if residual and not bad:
+            raise FreezeError(f"{item}：volatile 項排除後仍有差異而無法排除之差異為空（判定不一致）：{residual[:5]}")
+        out["items"][item] = {"volatile": vol, "unexcludable": bad}
+        out["volatile"] += [f"{item}:{v}" for v in vol]
+        out["unexcludable"] += [f"{item}:{v}" for v in bad]
+    return out
+
+
+def _volatile_present(item_rec: Mapping[str, Any], entry: str) -> bool:
+    """volatile 項（不含 `<項>:` 前綴）於凍結檔該項是否存在：回應欄位鍵、JSON 檔之 "fields" 鍵、HDF5 物件之屬性鍵。"""
+    m = _VOLATILE_HDF5_RE.match(entry)
+    files = item_rec.get("files") or {}
+    if entry.startswith("response:"):
+        return entry[len("response:"):] in (item_rec.get("response") or {})
+    if m is not None:
+        h5 = (files.get(m.group("key")) or {}).get("hdf5") or {}
+        return m.group("attr") in ((h5.get(m.group("obj")) or {}).get("attrs") or {})
+    key, _, field = entry[len("file:"):].partition("#")
+    return field in ((files.get(key) or {}).get("fields") or {})
+
+
+def apply_volatile(probe: Mapping[str, Any], *, golden_path: Path = GOLDEN_PATH,
+                   probe_sha256: Optional[str] = None) -> Dict[str, Any]:
+    """把 `volatile_probe` 之實測 volatile 項寫入凍結檔之 "volatile"（SPEC v5.25 §G）。實測之 "unexcludable" 非空、或
+    凍結檔位元組 sha256 不等於實測所記之 "golden_sha256"（實測後凍結檔已變）⇒ FreezeError（凍結檔不改）；各項須於凍結檔
+    該項存在才寫入，不存在者列 "absent"；凍結檔之 "volatile_candidates" 不在寫入集合者列 "candidates_not_volatile"（供
+    FACT-RECEIPT 覆核，不自動加入）。凍結檔另記 "volatile_probe"＝{"golden_sha256", "sha256"（實測收據之內容 sha256，
+    未給為 None）}；經 `write_golden` 原子寫回。回 {"volatile", "absent", "candidates_not_volatile"}。"""
+    if probe.get("unexcludable"):
+        raise FreezeError(f"實測有無法以 volatile 排除之差異，不寫入：{list(probe['unexcludable'])[:5]}")
+    current = _file_sha256(str(Path(golden_path).resolve()), cache=False)
+    if probe.get("golden_sha256") != current:
+        raise FreezeError(f"凍結檔已非實測時之同一檔（實測 {probe.get('golden_sha256')}、現 {current}），須重跑實測")
+    golden = load_golden(Path(golden_path))
+    items = golden.get("items") or {}
+    keep: List[str] = []
+    absent: List[str] = []
+    for v in probe.get("volatile") or []:
+        item, sep, rest = str(v).partition(":")
+        if not sep or item not in OUTPUT_ITEMS:
+            raise FreezeError(f"volatile 項須以 <項>: 起首且 <項> ∈ {list(OUTPUT_ITEMS)}：{v}")
+        _parse_volatile([rest])
+        (keep if item in items and _volatile_present(items[item], rest) else absent).append(str(v))
+    keep = sorted(set(keep))
+    golden["volatile"] = keep
+    golden["volatile_probe"] = {"golden_sha256": current, "sha256": probe_sha256}
+    write_golden(golden, Path(golden_path))
+    listed = set(keep)
+    return {"volatile": keep, "absent": sorted(set(absent)),
+            "candidates_not_volatile": sorted({c["entry"] for c in golden.get("volatile_candidates") or []
+                                               if c.get("entry") not in listed})}
 
 
 # ── 子行程入口（`_child <spec.json>`；由 `capture_run`／`_run_child` 經共用監看啟動） ─────────────────────────
@@ -1883,7 +2048,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         prog="icperf_freeze_baseline.py",
         description="ICPERF Phase 0（docs/ICPERF_SPEC.md §G、Task 0.1／0.2）：凍結改前輸出、可重現性重跑、規模盤點。"
                     "重型（scripts/heavy_commands.json self_watched）：須背景執行，子行程經共用監看。")
-    sub = parser.add_subparsers(dest="cmd", metavar="{freeze,repro,inventory,measure}")
+    sub = parser.add_subparsers(dest="cmd", metavar="{freeze,repro,volatile-probe,set-volatile,inventory,measure}")
     p = sub.add_parser("freeze", help="凍結 §G 第 (1)–(5) 項，寫凍結檔")
     p.add_argument("--out", type=Path, default=GOLDEN_PATH, help=f"凍結檔（預設 {GOLDEN_PATH.relative_to(REPO)}）")
     p.add_argument("--work-root", type=Path, default=None, help="各項隔離工作目錄之根（預設新建暫存目錄；項目錄須不存在）")
@@ -1895,6 +2060,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--out", type=Path, default=None, help="比對結果 JSON（不給則只印出）")
     p.add_argument("--c-handoff", type=Path, default=None,
                    help=f"C 格交接 h5（設環境變數 {C_HANDOFF_ENV}；內容 sha256 須等於凍結所記）")
+    p = sub.add_parser("volatile-probe", help="第 (1)(3)(4)(5) 項以凍結所記之整格請求再跑一次，與凍結之差異＝volatile 項")
+    p.add_argument("--out", type=Path, required=True, help="實測收據 JSON")
+    p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
+    p.add_argument("--work-root", type=Path, default=None, help="重跑之工作根（預設新建暫存目錄）")
+    p = sub.add_parser("set-volatile", help="把實測收據之 volatile 項寫入凍結檔")
+    p.add_argument("--probe", type=Path, required=True, help="volatile-probe 之實測收據")
+    p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
+    p.add_argument("--out", type=Path, default=None, help="寫入結果 JSON（volatile、absent、未入 volatile 之候選全列）")
     p = sub.add_parser("inventory", help="Task 0.2 路徑清冊")
     p.add_argument("--out", type=Path, required=True)
     p = sub.add_parser("measure", help="Task 0.2 規模量測")
@@ -1926,6 +2099,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(json.dumps({**result, "problems": result["problems"][:50], "n_problems": len(result["problems"])},
                              ensure_ascii=False, indent=1))
             return 0 if not result["problems"] else 1
+        if args.cmd == "volatile-probe":
+            result = volatile_probe(golden_path=args.golden, work_root=args.work_root)
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+            print(json.dumps({"out": str(args.out), "n_volatile": len(result["volatile"]),
+                              "unexcludable": result["unexcludable"][:50]}, ensure_ascii=False, indent=1))
+            return 0 if not result["unexcludable"] else 1
+        if args.cmd == "set-volatile":
+            probe = json.loads(Path(args.probe).read_text(encoding="utf-8"))
+            result = apply_volatile(probe, golden_path=args.golden,
+                                    probe_sha256=_file_sha256(str(Path(args.probe).resolve()), cache=False))
+            if args.out is not None:
+                Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.out).write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+            print(json.dumps({"n_volatile": len(result["volatile"]), "absent": result["absent"],
+                              "candidates_not_volatile": len(result["candidates_not_volatile"])},
+                             ensure_ascii=False, indent=1))
+            return 0
     except FreezeError as exc:
         print(f"FreezeError：{exc}", file=sys.stderr)
         return 1

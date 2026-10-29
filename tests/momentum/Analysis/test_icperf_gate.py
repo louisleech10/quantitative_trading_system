@@ -3,7 +3,7 @@
 施工前為紅：`scripts/icperf_freeze_baseline.py` 為空殼，凍結檔與 Task 0.2 收據尚未產出。
 - boundary_05–13 與三支 mutation：秒級，只用 tmp_path 自建小檔（h5py／tempfile 寫入屬捕獲機制之邊界輸入、不涉資料值，
   SPEC Task 0.1、§V）。
-- boundary_01／02：讀凍結檔 `tests/_golden/icperf/pre_change.json`，另以測試自寫之獨立 oracle（os.walk 全樹前後差集＋
+- boundary_01／02：讀凍結檔 `tests/_golden/icperf/pre_change.json.gz`，另以測試自寫之獨立 oracle（os.walk 全樹前後差集＋
   回應鍵集合）對小規模真實請求對照（slow＋requires_kline）。
 - boundary_03／04：讀真實資料 A 格（requires_kline，缺檔 FAIL）；boundary_21：真實 kline 索引上之明列邊界輸入（秒級，
   requires_kline）。
@@ -42,7 +42,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 SCRIPT = REPO / "scripts" / "icperf_freeze_baseline.py"
-GOLDEN = REPO / "tests" / "_golden" / "icperf" / "pre_change.json"
+GOLDEN = REPO / "tests" / "_golden" / "icperf" / "pre_change.json.gz"  # SPEC v5.25 §G：gzip 存檔
 INVENTORY_PATTERN = "handoffs/run_receipts/*-icperf-path-inventory.json"
 SCALE_BEFORE_PATTERN = "handoffs/run_receipts/*-icperf-scale-before.json"
 
@@ -196,7 +196,9 @@ def _logged_paths(res: Mapping[str, Any]) -> List[str]:
 
 def _golden() -> Dict[str, Any]:
     assert GOLDEN.is_file(), f"凍結檔不存在：{GOLDEN}（Task 0.1 尚未凍結）"
-    return json.loads(GOLDEN.read_text(encoding="utf-8"))
+    import gzip
+
+    return json.loads(gzip.decompress(GOLDEN.read_bytes()).decode("utf-8"))
 
 
 #: SPEC v5.24 §G (2)：C 格交接 h5 路徑之環境變數（測試自持，不引腳本常數）
@@ -1131,6 +1133,162 @@ def test_c_handoff_relative_path_absolute_and_repro_uses_frozen_path(fb: Any, tm
     with pytest.raises(_Started):
         fb.repro(2000, golden_path=golden)
     assert len(calls) == 1 and calls[0]["source_h5"] == str(Path(os.path.abspath(h5)))
+
+
+# ── §G 凍結檔 gzip 存檔與 volatile 實測判定之秒級契約（SPEC v5.25） ─────────────────────────────────────────
+
+
+def _canon_golden_bytes(obj: Any) -> bytes:
+    """凍結檔內容之正準 JSON 位元組（測試自寫：sort_keys、緊湊分隔、allow_nan、UTF-8）。"""
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=True).encode("utf-8")
+
+
+def test_golden_gzip_deterministic_roundtrip(fb: Any, tmp_path: Path) -> None:
+    """`.gz` 路徑：內容＝正準 JSON 位元組之 gzip（檔頭 mtime 0），同內容兩次寫出位元組相同、內容一改即異；
+    `load_golden` 依檔頭魔數解壓（非 .gz 路徑原樣寫出，同函式可讀）。邊界輸入：含 NaN 與非 ASCII 之小物件。"""
+    import gzip
+
+    g = {"b": [1.5, float("nan")], "a": {"x": "中"}}
+    p1, p2, p3, plain = tmp_path / "1.json.gz", tmp_path / "2.json.gz", tmp_path / "3.json.gz", tmp_path / "p.json"
+    fb.write_golden(g, p1)
+    fb.write_golden(g, p2)
+    fb.write_golden({**g, "c": 0}, p3)
+    fb.write_golden(g, plain)
+    raw = p1.read_bytes()
+    assert raw[:2] == b"\x1f\x8b" and raw[4:8] == b"\x00\x00\x00\x00", "須為 gzip 且檔頭 mtime 為 0"
+    assert raw == p2.read_bytes(), "同內容兩次寫出位元組須相同"
+    assert raw != p3.read_bytes(), "內容改變須使位元組改變"
+    assert gzip.decompress(raw) == _canon_golden_bytes(g)
+    assert plain.read_bytes() == _canon_golden_bytes(g), "非 .gz 路徑須原樣寫出正準 JSON"
+    for p in (p1, plain):
+        assert _canon_golden_bytes(fb.load_golden(p)) == _canon_golden_bytes(g)
+    assert not list(tmp_path.glob("*.tmp")), "暫存檔須已原子換名"
+
+
+def _probe_pair(fb: Any, d: Path) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """同一請求兩次之記錄（邊界輸入：tmp_path 小檔）：回應與 JSON 檔之 generated_at、HDF5 之 source_generated_at 兩處屬性
+    不同，其餘相同。"""
+    for run, stamp in (("1", "t1"), ("2", "t2")):
+        (d / f"r{run}.json").write_text(json.dumps({"generated_at": stamp, "ic": 0.5}), encoding="utf-8")
+        _write_volatile_h5(d / f"f{run}.h5", stamp=stamp)
+    rec = [{"response": fb.flatten_fields({"meta": {"generated_at": s}, "ic": [1, 2]}),
+            "files": {"r.json": fb.describe_file(d / f"r{run}.json"), "f.h5": fb.describe_file(d / f"f{run}.h5")},
+            "features": {"x": {"/summary_table/ic_mean": {"sha256": "0" * 64, "nan_mask_sha256": "1" * 64}}},
+            "selected": ["x"], "removed": []} for run, s in (("1", "t1"), ("2", "t2"))]
+    return rec[0], rec[1]
+
+
+def test_volatile_probe_diff_classifies_excludable(fb: Any, tmp_path: Path) -> None:
+    """兩次只差時間戳 ⇒ volatile 項恰為回應欄位、JSON 檔欄位、HDF5 兩處屬性，無法排除之差異為空；以之排除後
+    `compare_capture` 無問題，不排除則有（改壞對照）。"""
+    a, b = _probe_pair(fb, tmp_path)
+    vol, bad = fb.probe_diff(a, b)
+    assert sorted(vol) == sorted(["response:/meta/generated_at", "file:r.json#/generated_at",
+                                  "file:f.h5@/#attr:source_generated_at", "file:f.h5@/g#attr:source_generated_at"])
+    assert bad == []
+    assert fb.compare_capture(a, b, volatile=vol) == []
+    assert fb.compare_capture(a, b), "未排除時須列問題"
+
+
+def test_volatile_probe_diff_unexcludable_cases(fb: Any, tmp_path: Path) -> None:
+    """無法以 volatile 排除之差異各自列出（點名檔或欄位）：多一檔、非 JSON 非 HDF5 之位元組不等、HDF5 資料集不等、
+    JSON 位元組不等而逐欄位皆等、回應欄位只在一次、逐特徵摘要不等、選欄集合不等。"""
+    a, b = _probe_pair(fb, tmp_path)
+    (tmp_path / "x1.bin").write_bytes(b"a")
+    (tmp_path / "x2.bin").write_bytes(b"b")
+    (tmp_path / "o1.json").write_text('{"a":1,"b":2}', encoding="utf-8")
+    (tmp_path / "o2.json").write_text('{"b":2,"a":1}', encoding="utf-8")
+    _write_volatile_h5(tmp_path / "d2.h5", stamp="t2", data=np.array([0.0, 1.0, 5.0]))
+    cases = {
+        "extra": ({}, {"files": {**b["files"], "new.json": fb.describe_file(tmp_path / "r2.json")}}, "new.json"),
+        "binary": ({"files": {**a["files"], "x.bin": fb.describe_file(tmp_path / "x1.bin")}},
+                   {"files": {**b["files"], "x.bin": fb.describe_file(tmp_path / "x2.bin")}}, "x.bin"),
+        "h5data": ({}, {"files": {**b["files"], "f.h5": fb.describe_file(tmp_path / "d2.h5")}}, "/g/v"),
+        "order": ({"files": {**a["files"], "o.json": fb.describe_file(tmp_path / "o1.json")}},
+                  {"files": {**b["files"], "o.json": fb.describe_file(tmp_path / "o2.json")}}, "o.json"),
+        "resp": ({}, {"response": {**b["response"], "/extra": "0" * 64}}, "/extra"),
+        "features": ({}, {"features": {"x": {"/summary_table/ic_mean": {"sha256": "2" * 64,
+                                                                         "nan_mask_sha256": "1" * 64}}}}, "features/x"),
+        "selected": ({}, {"selected": ["y"]}, "selected"),
+    }
+    for name, (pa, pb, needle) in cases.items():
+        _, bad = fb.probe_diff({**a, **pa}, {**b, **pb})
+        assert any(needle in p for p in bad), f"{name}：須列為無法排除之差異（點名 {needle}），實得 {bad}"
+
+
+def test_describe_file_json_by_content(fb: Any, tmp_path: Path) -> None:
+    """內容為 JSON 而副檔名非 .json 者（如租約鎖檔 `{"pid", "ts"}`）亦逐欄位摘要；首位元組非 `{`／`[` 者（parquet 魔數、
+    空檔）與不可解析者 fields 為 None。邊界輸入：tmp_path 小檔。"""
+    (tmp_path / "a.lock").write_text('{"pid": 1, "ts": "t"}', encoding="utf-8")
+    (tmp_path / "b.parquet").write_bytes(b"PAR1\x00\x00PAR1")
+    (tmp_path / "c.lock").write_bytes(b"")
+    (tmp_path / "d.lock").write_bytes(b"{not json")
+    assert set(fb.describe_file(tmp_path / "a.lock")["fields"]) == {"/pid", "/ts"}
+    for name in ("b.parquet", "c.lock", "d.lock"):
+        assert fb.describe_file(tmp_path / name)["fields"] is None, name
+
+
+def test_volatile_probe_reruns_frozen_request_once(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`volatile_probe`：第 (1)(3)(4)(5) 項各以凍結檔所記之同一請求再跑一次，與凍結記錄之差異帶 `<項>:` 前綴彙總，收據記
+    凍結檔位元組 sha256；逐特徵摘要不等 ⇒ 無法排除（整格可重現性）。以替身 `freeze_item` 驗編排（不跑產品碼）。"""
+    golden = {"items": {i: {"request": {"item": i}, "response": {"/generated_at": "t0", "/ic": "same"}, "files": {},
+                            "removed": []} for i in OUTPUT_ITEMS}}
+    golden["items"]["event_report"]["features"] = {"x": {"/q": {"sha256": "0" * 64}}}
+    path = tmp_path / "g.json.gz"
+    fb.write_golden(golden, path)
+    calls: List[Tuple[str, Dict[str, Any]]] = []
+
+    def fake_freeze_item(item: str, *, request: Mapping[str, Any], repo_root: Path, work_root: Path) -> Dict[str, Any]:
+        calls.append((item, dict(request)))
+        rec: Dict[str, Any] = {"response": {"/generated_at": "t1", "/ic": "same"}, "files": {}, "removed": []}
+        if item == "event_report":
+            rec["features"] = {"x": {"/q": {"sha256": "1" * 64}}}
+        return rec
+
+    monkeypatch.setattr(fb, "freeze_item", fake_freeze_item)
+    out = fb.volatile_probe(golden_path=path, work_root=tmp_path / "w")
+    assert calls == [(i, {"item": i}) for i in OUTPUT_ITEMS]
+    assert out["volatile"] == [f"{i}:response:/generated_at" for i in OUTPUT_ITEMS]
+    assert any(u.startswith("event_report:features/x") for u in out["unexcludable"]), out["unexcludable"]
+    assert out["golden_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_apply_volatile_writes_present_entries_only(fb: Any, tmp_path: Path) -> None:
+    """`apply_volatile`：凍結檔中存在之項（回應欄位、JSON 檔欄位、HDF5 物件屬性）寫入 "volatile"，不存在者列 "absent"，
+    未入 volatile 之候選列 "candidates_not_volatile"；寫回後 `compare_golden` 可解析（本檔只含第 (1) 項，只看該項）；
+    實測有無法排除之差異、項前綴不合、或凍結檔已非實測時之同一檔 ⇒ FreezeError 且凍結檔位元組不變。"""
+    path = tmp_path / "g.json.gz"
+    golden = {"schema": "icperf-pre-change/1", "volatile": [],
+              "volatile_candidates": [{"entry": "ic_report:response:/generated_at", "reason": "name_hint"},
+                                      {"entry": "ic_report:response:/x/timestamps#values", "reason": "name_hint"}],
+              "items": {"ic_report": {
+                  "response": {"/generated_at": "0" * 64, "/x/timestamps#values": "1" * 64},
+                  "files": {"r.json": {"sha256": "2" * 64, "hdf5": None, "fields": {"/generated_at": "3" * 64}},
+                            "f.h5": {"sha256": "4" * 64, "fields": None,
+                                     "hdf5": {"/g": {"kind": "group", "attrs": {"source_generated_at": "5" * 64}}}}}}}}
+    fb.write_golden(golden, path)
+    present = ["ic_report:response:/generated_at", "ic_report:file:r.json#/generated_at",
+               "ic_report:file:f.h5@/g#attr:source_generated_at"]
+    missing = "ic_report:response:/deep_analysis_errors/3/timestamp"
+    before = path.read_bytes()
+    sha = hashlib.sha256(before).hexdigest()
+    with pytest.raises(fb.FreezeError):
+        fb.apply_volatile({"golden_sha256": sha, "volatile": present,
+                           "unexcludable": ["ic_report:file:x.bin：位元組不等"]}, golden_path=path)
+    with pytest.raises(fb.FreezeError):
+        fb.apply_volatile({"golden_sha256": sha, "volatile": ["nope:response:/a"], "unexcludable": []},
+                          golden_path=path)
+    with pytest.raises(fb.FreezeError):  # 實測後凍結檔已變（實測所記之凍結檔 sha256 不符）
+        fb.apply_volatile({"golden_sha256": "7" * 64, "volatile": present, "unexcludable": []}, golden_path=path)
+    assert path.read_bytes() == before, "FreezeError 時凍結檔不得改動"
+    res = fb.apply_volatile({"golden_sha256": sha, "volatile": present + [missing], "unexcludable": []},
+                            golden_path=path, probe_sha256="6" * 64)
+    assert res["volatile"] == sorted(present) and res["absent"] == [missing]
+    assert res["candidates_not_volatile"] == ["ic_report:response:/x/timestamps#values"]
+    again = fb.load_golden(path)
+    assert again["volatile"] == sorted(present)
+    assert again["volatile_probe"] == {"golden_sha256": sha, "sha256": "6" * 64}
+    assert not [p for p in fb.compare_golden(again, again) if p.startswith("ic_report/")], "寫入之 volatile 須可解析且自比無差異"
 
 
 # ── §G 請求設定與逐特徵來源之秒級契約 ───────────────────────────────────────────────────────────────────────
