@@ -40,6 +40,8 @@ REQUESTS: Dict[str, Dict[str, Any]] = {
     "L.ic_report": {"item": "ic_report_long", "n_features": 120},
     "L.deep_analysis": {"item": "deep_analysis_long", "n_features": 120},
     "L.event_import_report": {"item": "event_import_report", "n_features": 120},
+    # r42 群集 D／F：IC-11 待驗——12h 格特徵來自長歷史檔而 IC 頁標籤讀主檔，記標籤有限列比例
+    "A12.ic_report": {"item": "ic_report", "n_features": 20, "cell": "A_BTCUSDT_12h"},
 }
 #: 分析器快取中供 oracle 之鍵（`ic_filter_orchestrator.py` `self._ic_cache = {...}`）
 CACHE_KEYS = ("features_df", "label_series", "close_series", "metadata", "split_context", "event_info",
@@ -74,7 +76,7 @@ def request_for(req_id: str) -> Dict[str, Any]:
     """請求 id ⇒ 凍結腳本之預設請求加特徵子集（`feature_filter.include_features`）。"""
     fb = _fb()
     spec = REQUESTS[req_id]
-    request = fb.default_request(spec["item"])
+    request = fb.default_request(spec["item"], spec["cell"]) if spec.get("cell") else fb.default_request(spec["item"])
     names = subset_names(fb._run_feature_names(request), spec["n_features"])
     request["feature_filter"] = {"include_features": names}
     request["receipt_request_id"] = req_id
