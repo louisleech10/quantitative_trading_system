@@ -5,10 +5,17 @@
   "test_files": [
     "tests/momentum/Analysis/test_icperf_gate.py",
     "tests/momentum/Analysis/test_icperf_correctness.py",
-    "tests/governance/test_heavy_run_guard.py"
+    "tests/governance/test_heavy_run_guard.py",
+    "tests/momentum/Analysis/test_icperf_deep_factor_return.py",
+    "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py",
+    "tests/momentum/Analysis/test_icperf_deep_sensitivity_oos.py",
+    "tests/momentum/Analysis/test_icperf_deep_orth_exposure.py",
+    "tests/momentum/Analysis/test_icperf_deep_quality_netic.py"
   ],
   "script_acceptance": [
-    "scripts/icperf_freeze_baseline.py"
+    "scripts/icperf_freeze_baseline.py",
+    "scripts/icperf_event_batch.py",
+    "scripts/icperf_correctness_receipt.py"
   ],
   "contract_jsons": [],
   "run_receipts": [],
@@ -26,7 +33,31 @@
       "momentum/Analysis/ic_engine.py",
       "momentum/Analysis/pit_stats.py",
       "tests/momentum/test_turnover_analyzer.py",
-      "handoffs/run_receipts/gap2_golden_pre.json"
+      "handoffs/run_receipts/gap2_golden_pre.json",
+      "scripts/icperf_event_batch.py",
+      "scripts/icperf_correctness_receipt.py",
+      "tests/momentum/Analysis/test_icperf_deep_factor_return.py",
+      "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py",
+      "tests/momentum/Analysis/test_icperf_deep_sensitivity_oos.py",
+      "tests/momentum/Analysis/test_icperf_deep_orth_exposure.py",
+      "tests/momentum/Analysis/test_icperf_deep_quality_netic.py",
+      "momentum/Analysis/ic_filter_orchestrator.py",
+      "momentum/Analysis/monotonicity_tester.py",
+      "momentum/Analysis/redundancy_filter.py",
+      "momentum/Analysis/parameter_sensitivity_analyzer.py",
+      "momentum/Analysis/rolling_oos_validator.py",
+      "momentum/Analysis/factor_return_analyzer.py",
+      "momentum/Analysis/trend_analyzer.py",
+      "momentum/Analysis/factor_centrality_analyzer.py",
+      "momentum/Analysis/factor_orthogonalizer.py",
+      "momentum/Analysis/factor_exposure_analyzer.py",
+      "momentum/Analysis/net_ic_analyzer.py",
+      "momentum/Analysis/feature_quality_diagnostics.py",
+      "momentum/Analysis/survivor_contract.py",
+      "momentum/Analysis/ic_config_schema.py",
+      "api/services/ic_analysis_service.py",
+      "frontend/src/lib/types.ts",
+      "frontend/src/components/ic-analysis/ICSummaryTable.tsx"
     ],
     "callers_now": [
       "scripts/heavy_run_guard.py",
@@ -43,7 +74,7 @@
       "momentum/Analysis/pit_kernels.py",
       "tests/momentum/Analysis/test_pit_kernels.py"
     ],
-    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_gate.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_correctness.py && venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_heavy_run_guard.py && bash scripts/check_decoupling.sh && ! grep -n run_api tests/momentum/Analysis/test_icperf_gate.py tests/momentum/Analysis/test_icperf_correctness.py scripts/icperf_freeze_baseline.py && bash scripts/gen_fact_key_blocks.sh --check",
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_gate.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_correctness.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_deep_factor_return.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_deep_centrality_trend.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_deep_sensitivity_oos.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_deep_orth_exposure.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/momentum/Analysis/test_icperf_deep_quality_netic.py && venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_heavy_run_guard.py && bash scripts/check_decoupling.sh && ! grep -n run_api tests/momentum/Analysis/test_icperf_gate.py tests/momentum/Analysis/test_icperf_correctness.py scripts/icperf_freeze_baseline.py && bash scripts/gen_fact_key_blocks.sh --check && npm --prefix frontend run build",
     "forbidden": [
       {
         "rule": "momentum/ 不得 import api/（解耦 R1）；跨域經 Protocol 與 momentum.factories（R2／R3）；服務不互相 import（R4）；設定單一來源（R5）；check_decoupling.sh 之 R2／R3／R4 摘要行不得增加",
@@ -74,7 +105,7 @@
         "observable": true
       },
       {
-        "rule": "Task 0.3 為稽核：不一致是要找的結果，記入收據（逐項：一致／不一致＋原因＋差異大小與特徵＋受影響之通過集合與下游判定）並白話報使用者；不得於本票默默修正產品碼（改值一律落 SPEC Task 0.4，只改其所列 ①–⑤；Task 0.3 之後之新發現：偷看未來與算錯之值必修〔SPEC Task 0.4 增列後施工〕，未實作欄位報使用者裁定）；不以本票自己的新實作當 oracle、不以修正後之產品碼當自身 oracle（SPEC Task 0.3、0.4 邊界、不可做）",
+        "rule": "Task 0.3 為稽核：不一致是要找的結果，記入收據（逐項：一致／不一致＋原因＋差異大小與特徵＋受影響之通過集合與下游判定）並白話報使用者；不得於本票默默修正產品碼（改值一律落 SPEC Task 0.4，只改其所列 ①–㉒；Task 0.3 之後之新發現：偷看未來與算錯之值必修〔SPEC Task 0.4 增列後施工〕，未實作欄位報使用者裁定）；不以本票自己的新實作當 oracle、不以修正後之產品碼當自身 oracle（SPEC Task 0.3、0.4 邊界、不可做）",
         "observable": true
       },
       {
@@ -91,7 +122,7 @@
       }
     ],
     "risk_mitigation": [
-      "分批（依 SPEC §P 依賴；每 Phase 獨立提交，回退＝git revert，SPEC §R）：b1＝Phase 0（Task 0.1、0.2、0.3、0.4）。b1 內序（SPEC v5.26 Phase 0 執行順序：Task 0.3 真實資料收據〔A 格＋長資料格 L，IC 報告與深度分析全部模組，資料充足判準〕全 PASS → Task 0.4 修正〔①–⑤〕後重產收據 → 凍結執行〔§G 七項九鍵〕→ 可重現性 → Task 0.2；下列各分項依此順序執行）：⓪Task 0.4 修正（獨立提交；tests/momentum/Analysis/test_icperf_correctness.py 中 reason 指向 SPEC Task 0.4 之全部 xfail(strict=True)〔現為四支：test_ic_hit_rate_ignores_nan_like_ic_mean（②）、test_decay_fit_reaches_oracle_minimum_on_hump_curve（③）、test_stage5_quantile_turnover_matches_per_bar_pit_reference、test_turnover_time_series_prefix_invariant_with_late_bins（皆①）；以 grep 該檔之 strict xfail 對照，不以本清單為上限〕一律轉為一致斷言且通過；受影響之既有測試依 docs/TEST_SELECTION.md 選取並跑），須於③凍結執行前完成；①§G 寫出捕獲機制（sys.addaudithook 記寫入／附加／建立模式開檔與 os.rename／os.replace 目的地、子行程經共用監看 sitecustomize 注入同一記錄；每次執行之 cwd＝新建之隔離工作目錄〔唯讀輸入 data_cache/feature_klines、data_cache/feature_klines_longhist、config/ 以 symlink 引入〕、TMPDIR／HOME 指向隔離目錄；三根前後快照〔path_key：cwd 根之下相對 POSIX、隔離目錄 <iso>/ 前綴、repo 根 <repo>/ 前綴；repo 根排除 .git、venv、__pycache__、numba 快取、測試選取工具狀態目錄〕差集；範圍外 fail-closed）與其秒級契約測試（test_boundary_05–13、22）先行；②秒級實查 A 格 IC 讀入後之列數，非 500 列則依 PIT 分位每欄 O(T²) 重算估時（SPEC §B ICPERF-BUDGET-1 前提）；③寫估時收據（coverage_path_ids＝ICPERF-BUDGET-1、-2、-7）並白話報使用者後，背景經共用監看跑 Task 0.1 凍結七項九鍵（v5.26 增 (6) L 格 ic_report_long／deep_analysis_long、(7) 事件匯入批 event_import_report、(3) 深度分析全部模組開；(6)(7) 之請求於 Task 0.3 定義前 FreezeError）——(1)(3)(4) 之請求＝前端 IC 頁初始實際 payload（衰減開；凍結腳本常數 IC_PAGE_DEFAULT_PAYLOAD，test_boundary_25_ic_page_default_payload_matches_frontend 對照前端原始碼與 ui_stage_toggles.json）、(4)＝K 線條件式事件 event_query=\"close > open\" 一格、(5)＝IC-first 之 V2 parquet artifact（processed/selected.parquet 等，IC-first 不寫 HDF5）；每次必異欄位之路徑以 FACT-RECEIPT 寫入 SPEC；④同一 2,000 欄巢狀子集重跑第 5 段驗可重現（test_freeze_reproducible）；⑤Task 0.2 讀碼路徑清冊（每入口另記 coverage_path_id、unit_axis、scale_vector）→以 scripts/scale_probe.py 量清冊每一需量測入口並以 sample <pid> 取峰值 Physical footprint→判準①–⑤與四項機會欄寫入收據；⑥Task 0.3 現行 IC 正確性獨立驗證（A 格小規模子集與長資料格 L，涵蓋深度分析全部模組；依 v5.26 於⓪之前執行；scipy 1.13.1、statsmodels 0.14.6 為 oracle），不一致項記入收據並白話報使用者，test_icperf_correctness.py 之對應測試標 xfail(strict=True) 引收據",
+      "分批（依 SPEC §P 依賴；每 Phase 獨立提交，回退＝git revert，SPEC §R）：b1＝Phase 0（Task 0.1、0.2、0.3、0.4）。b1 內序（SPEC v5.26 Phase 0 執行順序：Task 0.3 真實資料收據〔A 格＋長資料格 L，IC 報告與深度分析全部模組，資料充足判準〕全 PASS → Task 0.4 修正〔①–㉒〕後重產收據 → 凍結執行〔§G 七項九鍵〕→ 可重現性 → Task 0.2；下列各分項依此順序執行）：⓪Task 0.4 修正（獨立提交；tests/momentum/Analysis/test_icperf_correctness.py 中 reason 指向 SPEC Task 0.4 之全部 xfail(strict=True)〔現為四支：test_ic_hit_rate_ignores_nan_like_ic_mean（②）、test_decay_fit_reaches_oracle_minimum_on_hump_curve（③）、test_stage5_quantile_turnover_matches_per_bar_pit_reference、test_turnover_time_series_prefix_invariant_with_late_bins（皆①）；以 grep 該檔之 strict xfail 對照，不以本清單為上限〕一律轉為一致斷言且通過；受影響之既有測試依 docs/TEST_SELECTION.md 選取並跑），須於③凍結執行前完成；①§G 寫出捕獲機制（sys.addaudithook 記寫入／附加／建立模式開檔與 os.rename／os.replace 目的地、子行程經共用監看 sitecustomize 注入同一記錄；每次執行之 cwd＝新建之隔離工作目錄〔唯讀輸入 data_cache/feature_klines、data_cache/feature_klines_longhist、config/ 以 symlink 引入〕、TMPDIR／HOME 指向隔離目錄；三根前後快照〔path_key：cwd 根之下相對 POSIX、隔離目錄 <iso>/ 前綴、repo 根 <repo>/ 前綴；repo 根排除 .git、venv、__pycache__、numba 快取、測試選取工具狀態目錄〕差集；範圍外 fail-closed）與其秒級契約測試（test_boundary_05–13、22）先行；②秒級實查 A 格 IC 讀入後之列數，非 500 列則依 PIT 分位每欄 O(T²) 重算估時（SPEC §B ICPERF-BUDGET-1 前提）；③寫估時收據（coverage_path_ids＝ICPERF-BUDGET-1、-2、-7）並白話報使用者後，背景經共用監看跑 Task 0.1 凍結七項九鍵（v5.26 增 (6) L 格 ic_report_long／deep_analysis_long、(7) 事件匯入批 event_import_report、(3) 深度分析全部模組開；(6)(7) 之請求於 Task 0.3 定義前 FreezeError）——(1)(3)(4) 之請求＝前端 IC 頁初始實際 payload（衰減開；凍結腳本常數 IC_PAGE_DEFAULT_PAYLOAD，test_boundary_25_ic_page_default_payload_matches_frontend 對照前端原始碼與 ui_stage_toggles.json）、(4)＝K 線條件式事件 event_query=\"close > open\" 一格、(5)＝IC-first 之 V2 parquet artifact（processed/selected.parquet 等，IC-first 不寫 HDF5）；每次必異欄位之路徑以 FACT-RECEIPT 寫入 SPEC；④同一 2,000 欄巢狀子集重跑第 5 段驗可重現（test_freeze_reproducible）；⑤Task 0.2 讀碼路徑清冊（每入口另記 coverage_path_id、unit_axis、scale_vector）→以 scripts/scale_probe.py 量清冊每一需量測入口並以 sample <pid> 取峰值 Physical footprint→判準①–⑤與四項機會欄寫入收據；⑥Task 0.3 現行 IC 正確性獨立驗證（A 格小規模子集與長資料格 L，涵蓋深度分析全部模組；依 v5.26 於⓪之前執行；scipy 1.13.1、statsmodels 0.14.6 為 oracle），不一致項記入收據並白話報使用者，test_icperf_correctness.py 之對應測試標 xfail(strict=True) 引收據",
       "scripts/icperf_freeze_baseline.py 為重型命令：scripts/heavy_commands.json 之 self_watched 列 icperf_freeze（腳本自以共用監看啟動子行程），使 heavy_run_guard 之背景、監看與估時收據檢查涵蓋之；不設 scale_receipt（改前碼只跑小中規模，SPEC §G）；空殼只有 run_watched 定義而無 AST 呼叫，heavy_run_guard 實跑時判「未呼叫共用監看」而擋＝施工前預期之 fail-closed，實作之 run_watched 須呼叫共用監看（_watchdog.run_watched）；wrapped 列 pytest_icperf_gate、pytest_icperf_correctness 分別命中 test_icperf_gate.py、test_icperf_correctness.py 之 pytest（含 -k 與其他 -m 篩選），強制經 scripts/run_watched.py 包裝並背景、照 pytest_heavy 慣例需估時收據（不設豁免）；唯一不命中＝最後一個 -m 恰為 not slow and not requires_kline（排除全部重型與真實資料測試），其後只准接選項、單一 fd 數字 token 或命令結尾；tests/governance/test_heavy_run_guard.py 只增 test_icperf_gate_pytest_is_heavy、test_icperf_correctness_pytest_is_heavy；既有列與既有斷言不改",
       "後續批（Phase 1–5 之具名測試與空殼見 not_executable，屆時以本 manifest 修訂版補列；gate_cmd 只增不減）：b2＝Phase 1（Task 1.1／1.2，新建 momentum/Analysis/pit_kernels.py 空殼與 tests/momentum/Analysis/test_pit_kernels.py）；b3＝Phase 2（Task 2.1；Task 2.2 依 Task 0.2 清冊）；b4＝Phase 3（Task 3.1 依 Task 0.2 曲線；Task 3.2 全流程記憶體有界依 Task 0.2 逐段峰值 footprint 曲線）；b5＝Phase 4（依賴 Task 0.1，可與 b2 起並行排程，但與他批同檔改動須串行）；b6＝Phase 5（Task 5.1 依清冊判準⑤、Task 5.2 規模驗收、Task 5.3 欄數上限改由改後量測導出、Task 5.4 43 萬欄本機實跑）",
       "SPEC §V 通則：Phase 1–5 每一改產品碼之批，收尾驗收一律含 §G 全部凍結項（七項九鍵）完整輸出逐位元 ==，對 tests/_golden/icperf/pre_change.json.gz 比、不重跑改前碼（SPEC §B ICPERF-BUDGET-3）；Phase 1 以後之逐位元基準＝Task 0.4 修正後之碼（改值與改算法分屬不同提交、改值於凍結執行前完成，避免同時改值與改算法而無法歸因）",
@@ -100,7 +131,7 @@
       "SPEC §B 之預算列：ICPERF-BUDGET-1（Task 0.1 凍結）、-2（Task 0.2 盤點）、-7（Task 0.3 正確性獨立驗證，A 格小規模子集與 A 格深度分析全部模組，約 10–40 分鐘）、-8（L 格生成）、-9（L 格 IC 與深度分析＋oracle）、-10（事件匯入批）、-11（跨標的）屬 b1——-8～-11 之估時須於 Task 0.3 實算列數／實查批後寫估時收據，未寫不得開跑；-3（Phase 1–4 改後 §G 比對）、-4（Task 5.2 規模驗收）、-5（收案前受影響測試）、-6（Task 5.4 43 萬欄本機實跑，開跑前寫估時收據並白話報使用者確認可接受時間後才跑）屬後續批",
       "contract_jsons 為空之理由（not_executable item＝contract_jsons）：SPEC v5.25 未定任何契約 JSON；§G 凍結項之鍵集、快照排除集、Task 0.2 判準①–⑤門檻、Task 0.2／5.4 共用之 coverage_path_id／unit_axis／scale_vector schema、Task 0.3 收據形狀皆以 SPEC 原文為權威（測試檔之模組常數與 docstring 照抄）；超線性門檻 1.2 與 r² 0.9 已為 scripts/scale_probe.py 之常數 SUPERLINEAR_EXPONENT／MIN_R2，測試引用之、不另抄；若審查認須獨立契約檔，須先修 SPEC",
       "每批 code review 家數依 docs/MULTI_AGENT_ORCHESTRATION.md §1 現行分工行",
-      "前端與 API 契約本批不改，故不適用 npm run build；test_boundary_25_ic_page_default_payload_matches_frontend 只以 regex 讀 frontend/src/store/icAnalysisStore.ts、frontend/src/lib/icConfigOverride.ts、frontend/src/hooks/useICAnalysis.ts 與 momentum/Analysis/contracts/ui_stage_toggles.json（不跑前端）"
+      "前端與 API 契約只改 SPEC Task 0.4 ⑧ 所列（summary_table 增 direction／ic_hit_rate_aligned／monotonicity_score_aligned、倖存者 IC 快照增 direction、前端 ICFeatureInfo 增選填 direction 與自動建議排序方向對齊）與 ⑪ 之 metadata 來源欄，故 gate_cmd 含 npm --prefix frontend run build；test_boundary_25_ic_page_default_payload_matches_frontend 只以 regex 讀 frontend/src/store/icAnalysisStore.ts、frontend/src/lib/icConfigOverride.ts、frontend/src/hooks/useICAnalysis.ts 與 momentum/Analysis/contracts/ui_stage_toggles.json（不跑前端）"
     ],
     "coverage_risk": [
       "邊界具名測試（b1，tests/momentum/Analysis/test_icperf_gate.py）：Task 0.1 驗證＝test_boundary_01_frozen_contains_all_g_items（§G (1)–(7) 七項九鍵皆在；(1)(2)(4)(6)(7) 逐特徵逐欄位 sha256 非空；(1)(3)(4)(5)(6)(7) 各含回應全部欄位與快照差集之全部寫出檔，缺任一即紅；獨立 oracle〔測試自寫、不經凍結腳本：os.walk 三根〔cwd 根、<iso>、<repo>，三根前綴之 path_key 測試自算〕前後差集＋回應鍵集合〔扣除逐特徵來源之子路徑〕，對 small_request 所得之同一小規模真實請求觀測同一次 freeze_item〕之回應鍵集合與寫出檔集合 == 記錄，凍結檔之回應頂層欄位與寫出根 == oracle；IC-first 凍結檔恰含一個 processed/selected.parquet 且帶 sha256〔V2 artifact，不寫 HDF5；日後若寫出 .h5 仍須逐物件摘要〕；freeze_item 記錄之 roots〔cwd、iso〕== oracle 走訪之根；slow＋requires_kline）、test_boundary_02_frozen_baseline_content_complete（逐特徵逐欄位值與 NaN 遮罩 sha256、選欄通過集合、PIT 標籤序列 sha256 皆在；獨立 oracle 依逐特徵來源之形狀重算——summary_table〔list[dict]、以 feature_name 為鍵〕逐列逐欄一值、quantile_returns／coverage_analysis／turnover_analysis〔以特徵名為鍵之 dict〕逐特徵整段子樹一值〔正準序列化雜湊含 NaN 遮罩，測試自寫 _oracle_digest〕——== 記錄〔同一小請求、帶特徵名逐值〕；選欄通過集合＝第 6 段後之倖存者，oracle 讀同次執行寫出之 data_cache/reports/ic_survivors_<case_id>.json 之 feature_names；凍結檔〔整格請求〕對 oracle 只比表結構、與成員無關、不比逐特徵值——FDR 等跨特徵校正依請求之特徵數〔ic_filter_orchestrator.py:56 apply_fdr〕：表欄位結構須全成員且 == oracle、oracle 特徵〔small_request 取凍結請求排序後之前 20 個〕皆在凍結檔、by_key 來源 oracle 出現者凍結檔皆有且凍結檔來源皆屬 SPEC 所列；slow＋requires_kline）、test_freeze_reproducible（SPEC 具名；同一 2,000 欄子集同 seed 同碼路徑同交接 h5 雜湊重跑第 5 段 == 凍結全部對應欄）",
