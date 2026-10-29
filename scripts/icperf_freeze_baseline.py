@@ -1740,6 +1740,9 @@ def volatile_probe(*, golden_path: Path = GOLDEN_PATH, repo_root: Path = REPO,
     {"volatile": [...], "unexcludable": [...]}}, "volatile": [<項>:<volatile 項>...], "unexcludable": [...]}。"""
     import tempfile
 
+    pending = [i for i in OUTPUT_ITEMS if i in PENDING_ITEMS]
+    if pending:  # r41 CODEX-R41-P1-04：重跑入口同 freeze，待定項未定前於任何 freeze_item 前即拒
+        raise FreezeError(f"SPEC v5.26 第 (6)(7) 項待 Task 0.3 定義，不得重跑：{pending}")
     golden = load_golden(Path(golden_path))
     work = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-volprobe-"))
     work.mkdir(parents=True, exist_ok=True)

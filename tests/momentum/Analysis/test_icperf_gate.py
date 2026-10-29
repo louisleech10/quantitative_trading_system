@@ -1273,11 +1273,28 @@ def test_volatile_probe_reruns_frozen_request_once(fb: Any, tmp_path: Path, monk
         return rec
 
     monkeypatch.setattr(fb, "freeze_item", fake_freeze_item)
+    monkeypatch.setattr(fb, "PENDING_ITEMS", ())  # 編排驗證情境：第 (6)(7) 項已定義（待定時之拒絕見下一支測試）
     out = fb.volatile_probe(golden_path=path, work_root=tmp_path / "w")
     assert calls == [(i, {"item": i}) for i in OUTPUT_ITEMS]
     assert out["volatile"] == [f"{i}:response:/generated_at" for i in OUTPUT_ITEMS]
     assert any(u.startswith("event_report:features/x") for u in out["unexcludable"]), out["unexcludable"]
     assert out["golden_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_volatile_probe_rejects_pending_items_before_any_run(fb: Any, tmp_path: Path,
+                                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    """r41 CODEX-R41-P1-04：第 (6)(7) 項待定時，即使凍結檔含其請求，`volatile_probe` 仍須於任何 `freeze_item` 前 FreezeError
+    （同 `freeze` 之 fail-closed；替身被呼叫即 FAIL）。"""
+    golden = {"items": {i: {"request": {"item": i}, "response": {}, "files": {}, "removed": []} for i in OUTPUT_ITEMS}}
+    path = tmp_path / "g.json.gz"
+    fb.write_golden(golden, path)
+
+    def must_not_run(*a: Any, **k: Any) -> None:
+        pytest.fail("待定項未定時 volatile_probe 不得啟動任何執行")
+
+    monkeypatch.setattr(fb, "freeze_item", must_not_run)
+    with pytest.raises(fb.FreezeError):
+        fb.volatile_probe(golden_path=path, work_root=tmp_path / "w")
 
 
 def test_apply_volatile_writes_present_entries_only(fb: Any, tmp_path: Path) -> None:
