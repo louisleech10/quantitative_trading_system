@@ -74,3 +74,38 @@ def test_load_ic_config_missing_user_file(tmp_path):
     config = load_ic_config(default_path=str(default_path), user_path=str(tmp_path / "missing.yaml"))
 
     assert config.thresholds.icir_min == 0.5
+
+
+@pytest.mark.parametrize("key", ["global", "global_settings"])
+def test_load_ic_config_override_accepts_field_name_and_alias(tmp_path, key):
+    """api_override 以 alias（global）或欄名（global_settings）指定皆生效（基底 YAML 為 alias 形狀）；
+    改前欄名鍵被靜默忽略（code review r52）。"""
+    default_path = tmp_path / "ic_config.yaml"
+    default_path.write_text(yaml.safe_dump({"global": {"default_method": "spearman"}}), encoding="utf-8")
+    config = load_ic_config(default_path=str(default_path), user_path=str(tmp_path / "missing.yaml"),
+                            api_override={key: {"default_method": "pearson"}})
+    assert config.global_settings.default_method == "pearson"
+
+
+def test_load_ic_config_override_conflicting_field_name_and_alias_rejected(tmp_path):
+    """同一 override 同給欄名與 alias 且值不同 ⇒ ValueError（不猜取哪一個）。"""
+    default_path = tmp_path / "ic_config.yaml"
+    default_path.write_text("version: '1.0'", encoding="utf-8")
+    with pytest.raises(ValueError, match="global_settings"):
+        load_ic_config(default_path=str(default_path), user_path=str(tmp_path / "missing.yaml"),
+                       api_override={"global": {"default_method": "pearson"},
+                                     "global_settings": {"default_method": "kendall"}})
+
+
+@pytest.mark.parametrize("key", ["global", "global_settings"])
+def test_orchestrator_config_override_accepts_field_name_and_alias(key):
+    """`ICFilterOrchestrator._apply_config_override`（analyze 等入口之合併）：alias 與欄名皆生效；衝突 ⇒ InvalidInputError。"""
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+    from momentum.core.exceptions import InvalidInputError
+
+    orch = ICFilterOrchestrator.__new__(ICFilterOrchestrator)
+    orch._config = ICConfig()
+    assert orch._apply_config_override({key: {"default_method": "pearson"}}).global_settings.default_method == "pearson"
+    with pytest.raises(InvalidInputError):
+        orch._apply_config_override({"global": {"default_method": "pearson"},
+                                     "global_settings": {"default_method": "kendall"}})

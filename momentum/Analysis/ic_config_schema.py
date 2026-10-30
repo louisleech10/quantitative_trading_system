@@ -486,6 +486,24 @@ class ICConfig(BaseModel):
     marginal_ic: MarginalICConfig = Field(default_factory=MarginalICConfig)
 
 
+def canonicalize_ic_config_keys(data: Dict[str, Any]) -> Dict[str, Any]:
+    """頂層欄名鍵改為 alias 鍵（如 `global_settings` → `global`），供以 alias 形狀之深合併使用。
+
+    `ICConfig` 之 `populate_by_name` 本即接受欄名與 alias 兩種輸入；但合併基底為 alias 形狀時，欄名鍵與基底之
+    alias 鍵並存，Pydantic 取 alias ⇒ 欄名鍵之覆寫被靜默忽略。同一 dict 兩種寫法並存且值不同 ⇒ ValueError（不猜）。
+    """
+    out = dict(data)
+    for name, field in ICConfig.model_fields.items():
+        alias = field.alias
+        if not alias or alias == name or name not in out:
+            continue
+        value = out.pop(name)
+        if alias in out and out[alias] != value:
+            raise ValueError(f"IC config 同時給 {name!r} 與其 alias {alias!r} 且值不同")
+        out[alias] = value
+    return out
+
+
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     result = dict(base)
     for key, value in override.items():
@@ -519,14 +537,14 @@ def load_ic_config(
 ) -> ICConfig:
     """三層合併載入 IC Config：預設 < 使用者 < API Override."""
 
-    default_data = _read_yaml(Path(default_path), required=True)
-    user_data = _read_yaml(Path(user_path), required=False)
+    default_data = canonicalize_ic_config_keys(_read_yaml(Path(default_path), required=True))
+    user_data = canonicalize_ic_config_keys(_read_yaml(Path(user_path), required=False))
 
     merged = _deep_merge(default_data, user_data)
     if api_override:
         if not isinstance(api_override, dict):
             raise ValueError("api_override must be a dict")
-        merged = _deep_merge(merged, api_override)
+        merged = _deep_merge(merged, canonicalize_ic_config_keys(api_override))
 
     _warn_removed_keys(merged)
     logger.info("IC config loaded")

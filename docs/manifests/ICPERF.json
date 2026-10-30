@@ -12,7 +12,8 @@
     "tests/momentum/Analysis/test_icperf_deep_orth_exposure.py",
     "tests/momentum/Analysis/test_icperf_deep_quality_netic.py",
     "tests/momentum/Analysis/test_icperf_h5_lossless.py",
-    "tests/momentum/Analysis/test_icperf_regime_robust.py"
+    "tests/momentum/Analysis/test_icperf_regime_robust.py",
+    "tests/momentum/test_ic_config.py"
   ],
   "script_acceptance": [
     "scripts/icperf_freeze_baseline.py",

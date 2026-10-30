@@ -1355,6 +1355,8 @@ GET  /api/v1/ic/deep-analysis/{task_id}/result
 
 merge 順序：typed `net_ic` **最後**注入 engine config，override 不得蓋 typed。
 
+`config_override` 之全域設定節可寫 alias `global` 或欄名 `global_settings`（合併前欄名鍵轉為 alias；同一 override 兩者並給且值不同 ⇒ 拒收，不猜取其一）。
+
 #### 輸出：§U 三 profile（鍵集合 equality；多/少鍵 = 非法）
 
 每 feature 恰落下列之一（`net_ic` **鍵全樹禁止輸出，含別名**）：

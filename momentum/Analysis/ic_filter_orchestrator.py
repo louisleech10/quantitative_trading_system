@@ -57,7 +57,7 @@ from momentum.Analysis.statistical_validator import (
     compute_hac_ic_statistics,
 )
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
-from momentum.Analysis.ic_config_schema import FeatureFilterSchema, ICConfig
+from momentum.Analysis.ic_config_schema import FeatureFilterSchema, ICConfig, canonicalize_ic_config_keys
 from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedResult
 from momentum.core.exceptions import (
     AnalysisCancelled,
@@ -6337,7 +6337,12 @@ class ICFilterOrchestrator:
         if not isinstance(config_override, dict):
             raise InvalidInputError("config_override must be a dict")
         base = self._config.model_dump(by_alias=True)
-        merged = self._deep_merge(base, config_override)
+        # 基底為 alias 形狀 ⇒ 覆寫之欄名鍵（如 global_settings）先轉 alias，否則被靜默忽略
+        try:
+            override = canonicalize_ic_config_keys(config_override)
+        except ValueError as exc:
+            raise InvalidInputError(str(exc)) from exc
+        merged = self._deep_merge(base, override)
         return ICConfig.model_validate(merged)
 
     def _hash_config(self, config: ICConfig) -> str:
