@@ -10,7 +10,9 @@
     "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py",
     "tests/momentum/Analysis/test_icperf_deep_sensitivity_oos.py",
     "tests/momentum/Analysis/test_icperf_deep_orth_exposure.py",
-    "tests/momentum/Analysis/test_icperf_deep_quality_netic.py"
+    "tests/momentum/Analysis/test_icperf_deep_quality_netic.py",
+    "tests/momentum/Analysis/test_icperf_h5_lossless.py",
+    "tests/momentum/Analysis/test_icperf_regime_robust.py"
   ],
   "script_acceptance": [
     "scripts/icperf_freeze_baseline.py",
@@ -70,7 +72,11 @@
       "momentum/core/protocols.py",
       "frontend/src/components/ic-analysis/FactorCentralityChart.tsx",
       "momentum/core/contracts.py",
-      "momentum/Analysis/long_short_analyzer.py"
+      "momentum/Analysis/long_short_analyzer.py",
+      "momentum/core/h5_feature_precision.py",
+      "scripts/ic1eb_b5_replay.py",
+      "docs/API_SPECIFICATION.md",
+      "frontend/src/components/ic-analysis/NetICChart.test.tsx"
     ],
     "callers_now": [
       "scripts/heavy_run_guard.py",

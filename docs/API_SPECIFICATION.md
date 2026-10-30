@@ -1368,7 +1368,7 @@ merge 順序：typed `net_ic` **最後**注入 engine config，override 不得�
 - `turnover_semantics` 恒 = `"membership_change_both_legs_per_bar"`
 - `cost_semantics` 恒 = `"per_rebalance_not_annualized"`（**未年化**；不同 timeframe **不可直接比較**）
 - `cost_drag_return = (cost_bps/10000) × turnover`（**無 ×2**；quantile_turnover 已含進出雙腿）
-- `capacity` 子鍵恰為 `{estimated_capacity_usd: number|null, capacity_tier: str, calibration: "uncalibrated"}`
+- `capacity` 子鍵恰為 `{estimated_capacity_quote: number|null, capacity_tier: str, calibration: "uncalibrated", quote_currency: str|null}`（ICPERF Task 0.4 ㉖：幣種中立，日均成交值以同請求 kline 之報價幣成交額〔無則 close×volume〕依日曆日加總後平均；`quote_currency` 只取請求 metadata 明示值，未給 ⇒ null）
 
 #### Conditional metric union（存在時形狀）
 
@@ -1396,9 +1396,10 @@ merge 順序：typed `net_ic` **最後**注入 engine config，override 不得�
         "turnover": 0.8,
         "turnover_semantics": "membership_change_both_legs_per_bar",
         "capacity": {
-          "estimated_capacity_usd": null,
+          "estimated_capacity_quote": null,
           "capacity_tier": "unknown",
-          "calibration": "uncalibrated"
+          "calibration": "uncalibrated",
+          "quote_currency": null
         },
         "net_factor_return": {
           "status": "unavailable",

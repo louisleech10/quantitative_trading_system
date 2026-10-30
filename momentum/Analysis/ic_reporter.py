@@ -14,6 +14,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from momentum.core.h5_feature_precision import write_feature_datasets
 from momentum.core.logging import get_logger
 
 
@@ -801,12 +802,13 @@ class ICReporter:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        data = features_df[selected_features].to_numpy(dtype=np.float32)
+        selected_frame = features_df[selected_features]
         timestamps = self._extract_timestamps(features_df)
 
         with h5py.File(path, "w") as file:
             group = file.create_group("filtered")
-            group.create_dataset("features", data=data, compression="gzip")
+            # ICPERF Task 0.4 ⑫：與交接 h5 共用逐欄 float32 無損判定（不無損欄存 `features_f64`＋`f64_columns`）
+            write_feature_datasets(group, selected_frame, compression="gzip")
             group.create_dataset("timestamps", data=timestamps, compression="gzip")
             str_dtype = h5py.string_dtype(encoding="utf-8")
             group.create_dataset(

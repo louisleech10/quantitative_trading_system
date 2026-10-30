@@ -17,6 +17,12 @@ logger = get_logger(__name__)
 
 #: CUSUM 漂移判定之顯著水準（Ploberger–Krämer OLS-CUSUM；ICPERF Task 0.4 ㉒ QN-3）
 _CUSUM_SIGNIFICANCE = 0.05
+#: PSI 近期窗之預設觀測數（同 `ic_config_schema.FeatureQualityDiagnosticsConfig.drift_window`；ICPERF Task 0.4 ㉖）
+_DEFAULT_DRIFT_WINDOW = 60
+#: PSI 參照段（近期窗之前）之最少有限觀測數（同 `_psi` 每側下限）
+_PSI_MIN_REFERENCE = 5
+#: PSI 觀測不足之原因碼（有限觀測 < drift_window＋_PSI_MIN_REFERENCE）
+PSI_INSUFFICIENT_REASON = "insufficient_observations_for_drift_window"
 
 
 class FeatureQualityDiagnostics:
@@ -30,6 +36,7 @@ class FeatureQualityDiagnostics:
         self._drift_threshold = float(cfg.get("drift_threshold", 0.25))
         self._redundancy_threshold = float(cfg.get("redundancy_threshold", 0.85))
         self._adf_min_samples = int(cfg.get("adf_min_samples", 20))
+        self._drift_window = int(cfg.get("drift_window", _DEFAULT_DRIFT_WINDOW))
 
     def run_batch_adf_test(self, features_df: pd.DataFrame) -> dict[str, dict]:
         """逐欄 ADF。未實際檢定（全缺／樣本不足／常數／ADF 例外）或 p 非有限 ⇒ is_stationary=None（未知，
@@ -157,16 +164,22 @@ class FeatureQualityDiagnostics:
             _sup_b, cusum_p, _crit = breaks_cusumolsresid(centered.to_numpy(dtype=float), ddof=0)
         drift_by_cusum = bool(np.isfinite(cusum_p) and cusum_p < _CUSUM_SIGNIFICANCE)
 
-        mid = len(series) // 2
-        p = series.iloc[:mid]
-        q = series.iloc[mid:]
-        psi_score = self._psi(p, q)
+        # ICPERF Task 0.4 ㉖ QN-6：PSI 近期窗＝最近 drift_window 個有限觀測，參照＝其之前全部有限觀測（舊法前後兩半，
+        # 設定 drift_window 未被讀）；參照段 < _PSI_MIN_REFERENCE ⇒ PSI NaN 並記原因。CUSUM 不變。
+        n_reference = len(series) - self._drift_window
+        if n_reference < _PSI_MIN_REFERENCE or self._drift_window < _PSI_MIN_REFERENCE:
+            psi_score = np.nan
+            psi_reason: Optional[str] = PSI_INSUFFICIENT_REASON
+        else:
+            psi_score = self._psi(series.iloc[:n_reference], series.iloc[n_reference:])
+            psi_reason = None
         drifted = bool(drift_by_cusum or (np.isfinite(psi_score) and psi_score > self._drift_threshold))
 
         return {
             "feature_name": feature_name,
             "cusum_breakpoint": str(breakpoint_idx) if breakpoint_idx is not None else None,
             "psi_score": float(psi_score) if np.isfinite(psi_score) else np.nan,
+            "psi_reason": psi_reason,
             "drifted": drifted,
             "skipped": False,
         }

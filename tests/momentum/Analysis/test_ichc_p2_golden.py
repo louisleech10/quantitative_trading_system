@@ -50,7 +50,12 @@ def live_receipt(helpers):
 # ICPERF Task 0.4（2026-10-30）：receipt 以 scripts/ichc_freeze_p2_golden.py 依現行碼重凍（quantile／多空值因 ⑥ K 線 float64
 # 與 ⑦ 單調性分箱而變；ICConfig 只因 ⑲ 增 factor_centrality.crowding_threshold_relative 而變）⇒
 # 凍結雜湊即現行全量雜湊，自凍結後新增之清單歸零；此後新增欄照上述規則逐項登記。
-_ICCONFIG_FIELDS_ADDED_SINCE_FREEZE: tuple = ()
+_ICCONFIG_FIELDS_ADDED_SINCE_FREEZE: tuple = (
+    # ICPERF Task 0.4 ㉓：regime_robust 每 regime 最少樣本數
+    ("ic_calculation", "grouped_analysis", "regime_robust_min_samples"),
+    # ICPERF Task 0.4 ㉖：ADF 最少樣本數入 schema
+    ("feature_quality_diagnostics", "adf_min_samples"),
+)
 
 
 def _config_hash_without_post_freeze_fields(helpers) -> str:

@@ -142,6 +142,11 @@ class FactorReturnAnalyzer:
         ls_return_nov = ls_return_full.iloc[np.flatnonzero(non_overlap)]
 
         ls_cumulative = (1.0 + ls_return_nov).cumprod() - 1.0
+        # ICPERF Task 0.4 ㉕：同一不重疊序列之逐時點輸出（趨勢 factor_return 維）——置於原時間軸自首個有效根起每 h 根之
+        # 格點（格點序號＝(位置−首位置)／h），無有效根之格點為 NaN（中段缺根不壓縮時間軸）；不重疊 ⇒ 無重疊窗
+        grid = (valid_pos[non_overlap] - valid_pos[0]) // h
+        ls_return_series = np.full(int(grid[-1]) + 1, np.nan)
+        ls_return_series[grid] = ls_return_nov.to_numpy(dtype=float)
         active_bar_count = int((position != 0).sum())
         turnover_series = position.astype(float).diff().abs().fillna(0.0)
         turnover = float(turnover_series.mean())
@@ -171,6 +176,7 @@ class FactorReturnAnalyzer:
         return {
             "long_short_mean_return": float(ls_return_full.mean()),
             "ls_cumulative_sampled": self._sample_series(ls_cumulative, max_points=100),
+            "ls_return_series": ls_return_series.tolist(),
             "risk_metrics": risk_metrics,
             "active_bar_count": active_bar_count,
             "turnover": turnover,

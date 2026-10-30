@@ -9483,6 +9483,48 @@
    "rewrite_targets": [],
    "ticket": "ICPERF"
   },
+  "tests/momentum/Analysis/test_icperf_h5_lossless.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_h5_lossless.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_regime_robust.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_regime_robust.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/momentum/Analysis/test_learning_curve_analyzer.py": {
    "claim": [
     "contract",

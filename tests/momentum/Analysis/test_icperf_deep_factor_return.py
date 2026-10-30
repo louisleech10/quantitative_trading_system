@@ -91,6 +91,8 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     f"{FR_KEY}/value/warmup_periods": {"oracle": NON_STAT, "producer": f"{FRA}:334"},
     f"{_FR_FEAT}/long_short_mean_return": {"oracle": "fr.ls_mean", "producer": f"{FRA}:134,171"},
     f"{_FR_FEAT}/ls_cumulative_sampled/#": {"oracle": "fr.ls_cumulative", "producer": f"{FRA}:139-143,172,424-430"},
+    # ICPERF Task 0.4 ㉕：趨勢 factor_return 維之逐時點序列＝不重疊擇時多空報酬（h 根格點，格點無有效根 ⇒ NaN）
+    f"{_FR_FEAT}/ls_return_series/#": {"oracle": "fr.ls_return_series", "producer": f"{FRA}:compute_factor_returns"},
     **{f"{_FR_FEAT}/risk_metrics/{k}": {"oracle": f"fr.risk.{k}", "producer": v} for k, v in _RISK_PRODUCERS.items()},
     f"{_FR_FEAT}/active_bar_count": {"oracle": "fr.position_pit", "producer": f"{FRA}:144,341-398"},
     f"{_FR_FEAT}/turnover": {"oracle": "fr.turnover", "producer": f"{FRA}:145-146"},
@@ -110,6 +112,8 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     f"{_LS_FEAT}/asymmetry/ratio": {"oracle": "ls.asymmetry", "producer": f"{LSA}:244"},
     f"{_LS_FEAT}/recommendation": {"oracle": "ls.recommendation", "producer": f"{LSA}:145-157,259-269"},
     f"{_LS_FEAT}/num_quantiles_used": {"oracle": NON_STAT, "producer": f"{LSA}:103,165"},
+    # ICPERF Task 0.4 ㉕：趨勢 ls_spread 維之逐時點序列（多側根＝報酬、空側根＝負報酬、其餘 NaN；特徵時間軸）
+    f"{_LS_FEAT}/ls_spread_series/#": {"oracle": "ls.spread_series", "producer": f"{LSA}:analyze"},
     f"{_LS_FEAT}/skipped": {"oracle": NON_STAT, "producer": f"{LSA}:181"},
     f"{_LS_FEAT}/reason": {"oracle": NON_STAT, "producer": f"{LSA}:182"},
     f"{_LS_FEAT}/error_type": {"oracle": NON_STAT, "producer": f"{LSA}:183"},
@@ -285,12 +289,19 @@ def _ref_fr_feature(feature: pd.Series, y: pd.Series, cfg: Dict[str, Any], h: in
     if int((pv != 0).sum()) == 0:  # :127
         return None, pos
     ls = pv.astype(float) * ym
-    nov = ls[ref_non_overlap_positions(np.flatnonzero(m), int(h))]
+    nov_idx = ref_non_overlap_positions(np.flatnonzero(m), int(h))
+    nov = ls[nov_idx]
     cum = np.cumprod(1.0 + nov) - 1.0
     turnover = float(np.concatenate([[0.0], np.abs(np.diff(pv.astype(float)))]).mean())
+    # ㉕：不重疊序列置於原時間軸自首個有效根起每 h 根之格點（格點序號＝(位置−首位置)／h；無有效根之格點 NaN）
+    vpos = np.flatnonzero(m)[nov_idx]
+    grid = (vpos - vpos[0]) // int(h)
+    series = np.full(int(grid[-1]) + 1, np.nan)
+    series[grid] = nov
     result = {
         "long_short_mean_return": float(np.mean(ls)),
         "ls_cumulative_sampled": _ref_sample(cum),
+        "ls_return_series": [float(v) for v in series],
         "risk_metrics": ref_risk_metrics(nov, cfg["rf"], ref_bars_per_year(frame_index) / int(h)),
         "active_bar_count": int((pv != 0).sum()),
         "turnover": turnover,
@@ -408,9 +419,14 @@ def _ref_ls_feature(feature: pd.Series, future_returns: pd.Series, cfg: Dict[str
     ssel = np.isin(bins, [k - 1 for k in short_q]) & np.isfinite(rv)
     long_side = _ref_side(fv[lsel], rv[lsel], "long")
     short_side = _ref_side(fv[ssel], -rv[ssel], "short")  # :127 空側報酬取負
+    # ㉕：逐時點多空序列（特徵時間軸；多側＝報酬、空側＝負報酬、其餘 NaN）——兩側之樣本即上兩行之 side 報酬
+    spread = np.full(fv.size, np.nan)
+    spread[lsel] = rv[lsel]
+    spread[ssel] = -rv[ssel]
     return {"long_analysis": long_side, "short_analysis": short_side,
             "asymmetry": _ref_asym(long_side["mean_return"], short_side["mean_return"]),
-            "recommendation": _ref_recommend(long_side, short_side), "num_quantiles_used": q}
+            "recommendation": _ref_recommend(long_side, short_side), "num_quantiles_used": q,
+            "ls_spread_series": [float(v) for v in spread]}
 
 
 def ref_long_short(features_df: pd.DataFrame, future_returns: pd.Series, top_n: int = 30,
@@ -721,6 +737,25 @@ def test_periods_per_year_branches() -> None:
 
 
 # long_short 秒級
+
+
+@pytest.mark.parametrize("h", [1, 3])
+def test_trend_source_series_prefix_invariant(h: int) -> None:
+    """防偷看未來（ICPERF Task 0.4 ㉕ 新輸出之逐時點序列）：輸入截去末 60 根後，因子報酬 `ls_return_series`（h 根格點）與
+    多空 `ls_spread_series` 之前段逐值不變（每點只用其時點以前之特徵歷史與該點標籤）；且兩序列各有有限值。"""
+    feats, y, _ = _explicit_inputs(n=360, h=h)
+    full_fr, _ = _run_fr(feats, y, horizon=h)
+    cut_fr, _ = _run_fr(feats.iloc[:-60], y.iloc[:-60], horizon=h)
+    full_ls, cut_ls = _run_ls(feats, y), _run_ls(feats.iloc[:-60], y.iloc[:-60])
+    pairs = [(np.asarray(v["ls_return_series"], dtype=float),
+              np.asarray(full_fr["value"]["features"][n]["ls_return_series"], dtype=float))
+             for n, v in cut_fr["value"]["features"].items()]
+    pairs += [(np.asarray(v["ls_spread_series"], dtype=float), np.asarray(full_ls[n]["ls_spread_series"], dtype=float))
+              for n, v in cut_ls.items() if not v.get("skipped")]
+    assert len(pairs) == 2 * len(feats.columns)
+    for cut, full in pairs:
+        assert np.isfinite(cut).any() and cut.size < full.size
+        np.testing.assert_array_equal(cut, full[: cut.size])
 
 
 def test_long_short_matches_oracle_explicit() -> None:

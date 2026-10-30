@@ -225,9 +225,10 @@ describe('NetICChart / cost wiring (T4)', () => {
       turnover: 0.3,
       turnover_semantics: 'membership_change_both_legs_per_bar',
       capacity: {
-        estimated_capacity_usd: null,
+        estimated_capacity_quote: null,
         capacity_tier: 'unknown',
         calibration: 'uncalibrated' as const,
+        quote_currency: null,
       },
       net_factor_return: {
         status: 'unavailable' as const,
@@ -319,9 +320,10 @@ describe('NetICChart / F4 breakeven wiring', () => {
           turnover: 0.5,
           turnover_semantics: 'membership_change_both_legs_per_bar',
           capacity: {
-            estimated_capacity_usd: null,
+            estimated_capacity_quote: null,
             capacity_tier: 'unknown',
             calibration: 'uncalibrated',
+            quote_currency: null,
           },
           net_factor_return: { status: 'ok', value: 0.0005, reason: null },
           cost_bps: 10,
@@ -361,9 +363,10 @@ describe('NetICChart / F4 breakeven wiring', () => {
           turnover: 0.0,
           turnover_semantics: 'membership_change_both_legs_per_bar',
           capacity: {
-            estimated_capacity_usd: null,
+            estimated_capacity_quote: null,
             capacity_tier: 'unknown',
             calibration: 'uncalibrated',
+            quote_currency: null,
           },
           net_factor_return: {
             status: 'ok',

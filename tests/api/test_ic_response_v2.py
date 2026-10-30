@@ -179,7 +179,11 @@ def test_flag_off_get_result_no_eval_status_key() -> None:
 
     assert isinstance(result, dict)
     assert not _has_key_recursive(result, "eval_status")
-    assert _strip_dynamic(result) == _strip_dynamic(baseline)
+    # ICPERF Task 0.4 ㉓：ICResult 新增 regime_robust_reason（預設 None）⇒ 經 ICResult 往返之首列
+    # 多此一鍵；baseline 早於該欄，期望值只於該列補此預設鍵，其餘逐鍵仍須相等。
+    expected = copy.deepcopy(baseline)
+    expected["summary_table"][0]["regime_robust_reason"] = None
+    assert _strip_dynamic(result) == _strip_dynamic(expected)
 
 
 def test_flag_off_deep_equal_baseline(baseline_task: dict[str, Any]) -> None:

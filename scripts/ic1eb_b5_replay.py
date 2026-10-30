@@ -125,19 +125,20 @@ async def run_longitudinal(
 def _load_h5_features(path: Path, symbol: str, timeframe: str) -> pd.DataFrame:
     import h5py
 
+    from momentum.core.h5_feature_precision import read_feature_frame
     from momentum.factories import assert_h5_feature_naming_version
 
     with h5py.File(path, "r") as file:
         assert_h5_feature_naming_version(file.attrs, path)  # FF-NAME Task 3.4（v18）：IC 交接 h5 命名世代閘
         group = file[f"{symbol}/{timeframe}"]
-        matrix = group["features"][:]
         names = [
             n.decode("utf-8") if isinstance(n, (bytes, bytearray)) else str(n)
             for n in group["feature_names"][:]
         ]
         ts = group["timestamps"][:]
         index = pd.to_datetime(ts, unit="s", utc=True).tz_localize(None)
-        return pd.DataFrame(matrix, columns=names, index=index)
+        # ICPERF Task 0.4 ⑫：`features`＋（可有）`features_f64`／`f64_columns` 依全序還原；舊格式讀法不變
+        return read_feature_frame(group, names, index)
 
 
 # data_cache 前置條件缺失才允許 premat fallback；其他例外直接 raise（F1 / review）。

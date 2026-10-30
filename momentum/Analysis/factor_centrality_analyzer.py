@@ -1,4 +1,4 @@
-"""Module 2: Factor centrality analyzer."""
+"""Module 2: Factor centrality analyzer（ICPERF Task 0.4 ㉔：逐特徵 trend 由滾動中心性序列以 trend 模組同一檢定判定）。"""
 
 from __future__ import annotations
 
@@ -10,10 +10,18 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 from momentum.Analysis.deep_analysis_types import SkippedResult
+from momentum.Analysis.trend_analyzer import TrendAnalyzer
 from momentum.core.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+#: ICPERF Task 0.4 ㉔：`features.*.trend_reason`（trend 為 None 之原因；可判定時為 None）
+TREND_REASON_NOT_COMPUTED = "not_computed"
+TREND_REASON_INSUFFICIENT_DATA = "insufficient_data"
+TREND_REASON_INDETERMINATE = "indeterminate"
+#: trend 模組判定 → 中心性趨勢標籤
+_TREND_LABELS = {"up": "rising", "down": "falling", "flat": "flat"}
 
 
 class FactorCentralityAnalyzer:
@@ -94,7 +102,9 @@ class FactorCentralityAnalyzer:
                     "crowded": crowded,
                     "risk_level": "high" if crowded else "low",
                     "percentile_rank": float(rank_pct[name]),
-                    "trend": "flat",
+                    # ICPERF Task 0.4 ㉔：單一矩陣無滾動序列 ⇒ 由 attach_feature_trends 以滾動中心性判定後填入
+                    "trend": None,
+                    "trend_reason": TREND_REASON_NOT_COMPUTED,
                 }
 
             # CT-3：有效秩（參與率 (Σλ)²／Σλ²）以全部特徵值計
@@ -140,7 +150,9 @@ class FactorCentralityAnalyzer:
                     "crowded": bool(value >= fallback_cut),
                     "risk_level": "high" if value >= fallback_cut else "low",
                     "percentile_rank": float(rank_pct[name]),
-                    "trend": "flat",
+                    # ㉔：同主路徑（由 attach_feature_trends 填入）
+                    "trend": None,
+                    "trend_reason": TREND_REASON_NOT_COMPUTED,
                 }
                 for name, value in centrality.items()
             }
@@ -167,8 +179,7 @@ class FactorCentralityAnalyzer:
             return pd.DataFrame()
 
         n_rows = len(ic_matrix)
-        use_window = int(window or self._rolling_window)
-        use_window = min(use_window, n_rows)
+        use_window = self.effective_rolling_window(n_rows, window)
         if use_window < 5:
             return pd.DataFrame()
 
@@ -191,6 +202,39 @@ class FactorCentralityAnalyzer:
         if not any_valid:
             return pd.DataFrame()
         return pd.DataFrame(outputs, index=output_index, dtype=float).sort_index(axis=1)
+
+    def effective_rolling_window(self, n_rows: int, window: Optional[int] = None) -> int:
+        """滾動中心性實際窗長＝min(window 或設定 rolling_window, 列數)（滾動序列每值涵蓋之滾動 IC 列數）。"""
+        return min(int(window or self._rolling_window), int(n_rows))
+
+    def attach_feature_trends(
+        self,
+        centrality: dict,
+        rolling_centrality: pd.DataFrame,
+        window: int,
+        trend_config: Optional[dict] = None,
+    ) -> dict:
+        """ICPERF Task 0.4 ㉔（CT-5）：逐特徵 `trend` 由其滾動中心性序列（同請求已算，不另算）判定，就地寫入並回傳。
+
+        檢定同 trend 模組（`TrendAnalyzer.analyze_trend`：OLS 斜率、HAC p 值，頻寬下限＝`window`〔滾動中心性窗長，相鄰值
+        共用 window−1 列〕；顯著性與 R² 門檻＝`trend_config`〔trend_analysis 設定〕）；up／down／flat ⇒ rising／falling／
+        flat、`trend_reason`＝None。無該特徵之序列或有限觀測 < min_samples ⇒ trend None、`insufficient_data`；斜率非有限
+        ⇒ None、`indeterminate`。主路徑與相關係數退回路徑同此規則。
+        """
+        features = centrality.get("features") or {}
+        analyzer = TrendAnalyzer(trend_config or {})
+        has_rolling = rolling_centrality is not None and not rolling_centrality.empty
+        for name, entry in features.items():
+            label: Optional[str] = None
+            reason: Optional[str] = TREND_REASON_INSUFFICIENT_DATA
+            if has_rolling and name in rolling_centrality.columns:
+                result = analyzer.analyze_trend(rolling_centrality[name], str(name), overlap_window=int(window))
+                if not isinstance(result, SkippedResult):
+                    label = _TREND_LABELS.get(str(result.get("trend")))
+                    reason = None if label is not None else TREND_REASON_INDETERMINATE
+            entry["trend"] = label
+            entry["trend_reason"] = reason
+        return centrality
 
     def detect_crowding_regime(
         self,

@@ -2046,9 +2046,15 @@ def _child_gen_long_cell(spec: Mapping[str, Any]) -> Dict[str, Any]:
 def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, out_dir: Path) -> Tuple[Path, Path]:
     """交接 h5 之 n_cols 欄巢狀隨機子集（同 `handoffs/run_receipts/icperf_probes/prep.py`：`default_rng(seed).permutation`
     之前 n_cols 個排序、依 chunk 寬 ×6 之欄段讀、float32、root／group 屬性照抄、gzip；meta 只留 symbol／timeframe／
-    config_hash／ff_run_identity 與所選欄）；回 (h5, meta)。"""
+    config_hash／ff_run_identity 與所選欄）；回 (h5, meta)。
+
+    ICPERF Task 0.4 ⑫：來源含 `features_f64`（不無損欄 float64）⇒ 所選之不無損欄保 float64、經共用寫出端寫出；
+    來源為舊格式或所選全為 float32 欄 ⇒ 寫法與舊碼相同。"""
     import h5py
     import numpy as np
+    import pandas as pd
+
+    from momentum.core import h5_feature_precision as h5fp
 
     meta_all = json.loads(Path(src_meta).read_text(encoding="utf-8"))
     symbol, tf = str(meta_all["symbol"]), str(meta_all["timeframe"])
@@ -2059,23 +2065,32 @@ def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, o
         names = [n.decode() if isinstance(n, bytes) else str(n) for n in g["feature_names"][:]]
         ts = g["timestamps"][:]
         ds = g["features"]
-        total = int(ds.shape[1])
+        # ICPERF Task 0.4 ⑫：交接 h5 可含 `features_f64`＋`f64_columns`（不無損欄 float64）；全序欄數＝兩資料集欄數和。
+        # 舊格式（無 `features_f64`）⇒ f64_idx 空、下列讀寫與舊碼相同。
+        try:
+            _rows, total, f64_idx = h5fp.feature_layout(g)
+        except ValueError as exc:
+            raise FreezeError(f"交接 h5 綱要不合：{exc}") from exc
         if not 0 < n_cols <= total:
             raise FreezeError(f"子集欄數 {n_cols} 不在 (0, {total}]")
         chosen = np.sort(np.random.default_rng(seed).permutation(total)[:n_cols])
-        cols = np.empty((ds.shape[0], n_cols), dtype=np.float32)
-        slab = (ds.chunks[1] if ds.chunks else total) * 6
+        f32_sel, f64_sel = h5fp.f32_dataset_positions(chosen, f64_idx, total)
+        n32 = int(f32_sel.size)
+        width32 = int(ds.shape[1])
+        cols = np.empty((ds.shape[0], n32), dtype=np.float32)
+        slab = (ds.chunks[1] if ds.chunks else max(width32, 1)) * 6
         pos = 0
-        for start in range(0, total, slab):
-            stop = min(start + slab, total)
-            sel = chosen[(chosen >= start) & (chosen < stop)]
+        for start in range(0, width32, slab):
+            stop = min(start + slab, width32)
+            sel = f32_sel[(f32_sel >= start) & (f32_sel < stop)]
             if sel.size == 0:
                 continue
             block = ds[:, start:stop]
             cols[:, pos:pos + sel.size] = block[:, sel - start]
             pos += sel.size
-    if pos != n_cols:
-        raise FreezeError(f"子集讀取欄數 {pos} != {n_cols}")
+        cols64 = g["features_f64"][:, f64_sel] if f64_sel.size else None
+    if pos != n32:
+        raise FreezeError(f"子集讀取欄數 {pos} != {n32}")
     if len(meta_all) != total + 4:
         raise FreezeError(f"交接 meta 鍵數 {len(meta_all)} != 欄數 {total} + 4（prep.py 之同一前提）")
     out_dir = Path(out_dir)
@@ -2087,7 +2102,15 @@ def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, o
         g = f.create_group(f"{symbol}/{tf}")
         for k, v in group_attrs.items():
             g.attrs[k] = v
-        g.create_dataset("features", data=cols, compression="gzip")
+        if cols64 is None:
+            g.create_dataset("features", data=cols, compression="gzip")
+        else:
+            # 子集含不無損欄 ⇒ 依子集全序組回（float32 欄、float64 欄各保原 dtype），以共用寫出端寫 features／features_f64
+            is64 = np.isin(chosen, f64_idx)
+            it32, it64 = iter(range(n32)), iter(range(int(cols64.shape[1])))
+            parts = [cols64[:, next(it64)] if flag else cols[:, next(it32)] for flag in is64]
+            sub = pd.DataFrame({i: p for i, p in enumerate(parts)}, index=pd.RangeIndex(len(ts)))
+            h5fp.write_feature_datasets(g, sub, compression="gzip")
         g.create_dataset("timestamps", data=ts, compression="gzip")
         g.create_dataset("feature_names", data=np.array([names[int(c)] for c in chosen], dtype=object),
                          dtype=h5py.string_dtype(encoding="utf-8"))

@@ -2545,7 +2545,9 @@ export interface FactorCentralityData {
     crowded?: boolean;
     risk_level?: string;
     percentile_rank?: number;
-    trend?: string;
+    /** ㉔：滾動中心性之 HAC 趨勢判定；序列不足 ⇒ null（原因見 trend_reason） */
+    trend?: 'rising' | 'falling' | 'flat' | string | null;
+    trend_reason?: 'insufficient_data' | 'indeterminate' | 'not_computed' | string | null;
   }>;
   crowded_features?: string[];
   independent_features?: string[];
@@ -2565,6 +2567,8 @@ export type TrendAnalysisData = Record<string, {
   centrality_trend?: TrendResult;
   factor_return_trend?: TrendResult;
   ls_spread_trend?: TrendResult;
+  /** ㉕：未算出之維與原因（來源模組未跑／Skipped／資料不足） */
+  dimension_status?: Record<string, 'source_module_off' | 'source_skipped' | 'insufficient_data' | string>;
   combined_signal?: {
     recommendation?: string;
     reason?: string;
@@ -2773,6 +2777,8 @@ export interface FeatureQualityDiagnosticsData {
   drift_results?: Record<string, {
     cusum_breakpoint?: string | null;
     psi_score?: number;
+    /** ICPERF Task 0.4 ㉖：PSI 近期窗(drift_window)觀測不足之原因;已算出 ⇒ null */
+    psi_reason?: string | null;
     drifted?: boolean;
     skipped?: boolean;
     reason?: string;
@@ -2823,12 +2829,15 @@ export type ConditionalMetricUnion =
   | ConditionalMetricOk
   | ConditionalMetricUnavailable;
 
-/** capacity 子鍵集合(SPEC v1.1 精確鍵,多/少=FAIL)。 */
+/** capacity 子鍵集合(SPEC v1.1 精確鍵,多/少=FAIL;ICPERF Task 0.4 ㉖ 欄名幣種中立並附 quote_currency)。 */
 export type NetICCapacity = {
-  estimated_capacity_usd: number | null;
+  /** 以報價幣計之容量(日均報價幣成交值×參與率/換手率);量能或換手率不可得 ⇒ null */
+  estimated_capacity_quote: number | null;
   capacity_tier: string;
   /** 恒 "uncalibrated"(未建 canonical capacity 校準前) */
   calibration: 'uncalibrated';
+  /** 計價報價幣代號(請求未給 ⇒ null,不由商品代號猜) */
+  quote_currency: string | null;
 };
 
 /** SCHEMA_SKIPPED 精確鍵={skipped, reason};排除全部非 skipped 鍵。 */

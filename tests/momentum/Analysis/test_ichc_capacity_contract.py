@@ -19,28 +19,28 @@ def analyzer():
 
 class TestCapacityUnknownContract:
     def test_no_adv_is_unknown(self, analyzer):
-        result = analyzer.estimate_factor_capacity(turnover=0.3, avg_daily_volume_usd=None)
+        result = analyzer.estimate_factor_capacity(turnover=0.3, avg_daily_quote_volume=None)
         assert result["capacity_tier"] == "unknown"
-        assert math.isnan(result["estimated_capacity_usd"])
+        assert math.isnan(result["estimated_capacity_quote"])
 
     def test_zero_adv_is_unknown(self, analyzer):
-        result = analyzer.estimate_factor_capacity(turnover=0.3, avg_daily_volume_usd=0.0)
+        result = analyzer.estimate_factor_capacity(turnover=0.3, avg_daily_quote_volume=0.0)
         assert result["capacity_tier"] == "unknown"
 
     def test_negative_adv_is_unknown(self, analyzer):
-        result = analyzer.estimate_factor_capacity(turnover=0.3, avg_daily_volume_usd=-5.0)
+        result = analyzer.estimate_factor_capacity(turnover=0.3, avg_daily_quote_volume=-5.0)
         assert result["capacity_tier"] == "unknown"
 
     def test_normal_adv_computes_tier(self, analyzer):
         """回歸：有 ADV → tier 依 turnover 分級、capacity 為有限正值。"""
         result = analyzer.estimate_factor_capacity(
-            turnover=0.3, avg_daily_volume_usd=1_000_000.0
+            turnover=0.3, avg_daily_quote_volume=1_000_000.0
         )
         assert result["capacity_tier"] == "high"
-        assert result["estimated_capacity_usd"] > 0
-        assert math.isfinite(result["estimated_capacity_usd"])
+        assert result["estimated_capacity_quote"] > 0
+        assert math.isfinite(result["estimated_capacity_quote"])
 
     def test_unknown_never_in_tradable_tiers(self, analyzer):
         tradable = {"low", "medium", "high"}
-        result = analyzer.estimate_factor_capacity(turnover=1.5, avg_daily_volume_usd=None)
+        result = analyzer.estimate_factor_capacity(turnover=1.5, avg_daily_quote_volume=None)
         assert result["capacity_tier"] not in tradable

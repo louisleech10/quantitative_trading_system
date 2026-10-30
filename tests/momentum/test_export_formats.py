@@ -91,9 +91,10 @@ def _sample_report(deep_enabled: bool = True) -> dict:
                             "turnover": 1.5,
                             "turnover_semantics": "membership_change_both_legs_per_bar",
                             "capacity": {
-                                "estimated_capacity_usd": None,
+                                "estimated_capacity_quote": None,
                                 "capacity_tier": "unknown",
                                 "calibration": "uncalibrated",
+                                "quote_currency": None,
                             },
                             "net_factor_return": {
                                 "status": "unavailable",

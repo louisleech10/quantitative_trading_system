@@ -7,8 +7,10 @@ handoffs/20261030-ICPERF-T04-DEEP-FIX-BRIEF.md）。
 `momentum/Analysis/trend_analyzer.py`（`_run_trend_analysis`）；兩者吃滾動 IC 序列，經 `_extract_rolling_ic_series` 取每特徵
 最長之窗。oracle＝`numpy.linalg.eigh`（PCA）、`scipy.stats`（rankdata／linregress／pearsonr／spearmanr）、
 `statsmodels.api.OLS`（含 HAC）與測試自寫之最簡參考實作（`ref_*`，逐條註明產品 `檔:行`）；不呼叫被測模組或其內部函式當
-oracle。Task 0.4 修正後之定義（⑱⑲）為 oracle 之現行定義；未實作欄位（CT-5、CT-9）待使用者裁定，仍標 `xfail(strict=True)`；
-需呼叫端傳滾動窗長者（CT-1 之端到端）標 `xfail(strict=True)` 待主委改呼叫端（改後 XPASS ⇒ 移除標記）。
+oracle。Task 0.4 修正後之定義（⑱⑲）為 oracle 之現行定義；CT-5（㉔ 逐特徵中心性趨勢）與 CT-9（㉕ 趨勢其餘三維與
+`dimension_status`）依 SPEC v5.34 使用者裁定實作，oracle＝`statsmodels` OLS `cov_type="HAC"`（`ref_trend_series`）於同請求
+之逐時點序列（滾動中心性以 `ref_rolling_centrality` 獨立重算；因子報酬 `ls_return_series`、多空 `ls_spread_series` 取來源
+模組輸出，其值另由 `test_icperf_deep_factor_return.py` 之 oracle 對照）。
 
 輸入：秒級測試以明列輸入（邊界案）直接餵產品公開入口（`ICFilterOrchestrator._run_factor_centrality`／
 `_run_trend_analysis`，以只帶 `_ic_cache["rolling_ic"]` 之 stub 呼叫）或模組公開方法；真實資料測試以
@@ -70,8 +72,10 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     "factor_centrality/features/*/crowded": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:30-32,58,79"},
     "factor_centrality/features/*/risk_level": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:87"},
     "factor_centrality/features/*/percentile_rank": {"oracle": "centrality.rank_pct", "producer": f"{_FC}:73,88"},
-    "factor_centrality/features/*/trend": {"oracle": "centrality.feature_trend（unimplemented：寫死 flat，CT-5）",
-                                           "producer": f"{_FC}:89"},
+    "factor_centrality/features/*/trend": {"oracle": "centrality.feature_trend_hac（㉔ CT-5）",
+                                           "producer": f"{_FC}:attach_feature_trends；{_ORC}:_run_factor_centrality"},
+    "factor_centrality/features/*/trend_reason": {"oracle": "centrality.feature_trend_hac（㉔ CT-5）",
+                                                  "producer": f"{_FC}:attach_feature_trends"},
     "factor_centrality/crowded_features/#": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:76-81,104"},
     "factor_centrality/independent_features/#": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:77,83,105"},
     "factor_centrality/rolling_centrality/*/#": {"oracle": "centrality.rolling_pit",
@@ -87,10 +91,22 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     "trend_analysis/*/ic_trend/tail_estimate": {"oracle": "trend.ols", "producer": f"{_TA}:82"},
     "trend_analysis/*/ic_trend/trend": {"oracle": "trend.classify", "producer": f"{_TA}:75-80"},
     "trend_analysis/*/ic_trend/interpretation": {"oracle": "trend.classify", "producer": f"{_TA}:83,230-238"},
+    **{f"trend_analysis/*/{dim}_trend/{k}": {"oracle": o, "producer": f"{_TA}:analyze_trend；{_ORC}:_trend_dimension_inputs"}
+       for dim in ("centrality", "factor_return", "ls_spread")
+       for k, o in (("slope", "trend.ols"), ("p_value", "trend.hac"), ("r_squared", "trend.ols_r2"),
+                    ("tail_estimate", "trend.ols"), ("trend", "trend.classify"), ("interpretation", "trend.classify"))},
     "trend_analysis/*/combined_signal/recommendation": {"oracle": "trend.combined_signal", "producer": f"{_TA}:245-285"},
     "trend_analysis/*/combined_signal/reason": {"oracle": "trend.combined_signal", "producer": f"{_TA}:245-285"},
     "trend_analysis/*/combined_signal/action": {"oracle": "trend.combined_signal", "producer": f"{_TA}:245-285"},
+    # ㉕：未出之維 → 封閉值集原因（整個 dict 為一葉，逐鍵完全相等）
+    "trend_analysis/*/dimension_status": {"oracle": "trend.dimension_status", "producer": f"{_TA}:batch_analyze"},
 }
+#: 整個 dict 視為單一葉（逐鍵完全相等比對；空 dict 亦為一葉）
+_DICT_LEAVES = {"trend_analysis/*/dimension_status"}
+#: ㉕ 趨勢之四維（設定 `dimensions` 之值 → 輸出鍵 `<dim>_trend`）
+TREND_DIMS = ("ic", "centrality", "factor_return", "ls_spread")
+#: ㉕ dimension_status 封閉值集
+DIM_STATUS = frozenset({"source_module_off", "source_skipped", "insufficient_data"})
 #: 退回路徑（PCA 例外，factor_centrality_analyzer.py:106-148）另有之鍵（真實資料不走此路徑，故不入 MODULE_FIELDS；
 #: 以 `test_factor_centrality_fallback_matches_reference` 明列輸入驗）
 MODULE_FIELDS_FALLBACK: Dict[str, Dict[str, str]] = {
@@ -105,7 +121,18 @@ NUMERIC_PATHS = {
     "factor_centrality/regimes/*/crowding_ratio", "factor_centrality/regimes/*/latest",
     "trend_analysis/*/ic_trend/slope", "trend_analysis/*/ic_trend/p_value", "trend_analysis/*/ic_trend/r_squared",
     "trend_analysis/*/ic_trend/tail_estimate",
+    *{f"trend_analysis/*/{dim}_trend/{k}" for dim in ("centrality", "factor_return", "ls_spread")
+      for k in ("slope", "p_value", "r_squared", "tail_estimate")},
 }
+#: 值域有界於 [0, 1] 且為單位總量之份額者（R²＝r²、|r| ≤ 1；中心性＝單位範數特徵向量分量平方 × 解釋變異比、總和 ≤ 1）：
+#: 兩條獨立數值路徑之絕對誤差約為機器精度 × 單位尺度，值本身趨近 0 時（如 r≈1e-5、分量≈1e-5.5）相對誤差不具意義
+#: ⇒ 判定為「相對誤差 ≤ 1e-12 或絕對誤差 ≤ 1e-12 × 單位尺度」（同 numpy.isclose 之 rtol＋atol；其餘欄仍只用相對誤差）
+UNIT_SCALE_PATHS = {
+    "factor_centrality/features/*/centrality", "factor_centrality/rolling_centrality/*/#",
+    "factor_centrality/regimes/*/latest",
+    *{f"trend_analysis/*/{dim}_trend/r_squared" for dim in ("ic", "centrality", "factor_return", "ls_spread")},
+}
+ABS_TOL_UNIT = 1e-12
 #: 逐特徵鍵之 dict 層（其鍵寫 `*`）
 _FEATURE_KEYED = {"factor_centrality/features", "factor_centrality/rolling_centrality", "factor_centrality/regimes",
                   "trend_analysis"}
@@ -146,6 +173,9 @@ def _stub(rolling_ic: dict) -> Any:
                                  _extract_rolling_ic_series=ICFilterOrchestrator._extract_rolling_ic_series)
     # 呼叫端（主委改，⑱ CT-1）以 `_rolling_overlap_window` 導出窗長傳 `batch_analyze(overlap_window=)`
     stub._rolling_overlap_window = types.MethodType(ICFilterOrchestrator._rolling_overlap_window, stub)
+    # ㉕：趨勢各維來源取同請求之深度報告（stub 無 ⇒ 來源模組未執行）；ls_spread 之重疊窗＝標籤 horizon
+    stub._deep_horizon = types.MethodType(ICFilterOrchestrator._deep_horizon, stub)
+    stub._trend_dimension_inputs = getattr(ICFilterOrchestrator, "_trend_dimension_inputs", None)
     return stub
 
 
@@ -290,8 +320,9 @@ def ref_centrality(mat: np.ndarray, names: Sequence[str], cfg: Mapping[str, Any]
     features: Dict[str, dict] = {}
     for j, name in enumerate(cols):
         crowded = bool(cen[j] >= cut)
+        # ㉔：單窗結果無滾動序列 ⇒ 趨勢待呼叫端以滾動中心性填（ref_factor_centrality）
         features[name] = {"centrality": float(cen[j]), "crowded": crowded, "risk_level": "high" if crowded else "low",
-                          "percentile_rank": float(rank[j]), "trend": "flat"}
+                          "percentile_rank": float(rank[j]), "trend": None, "trend_reason": "not_computed"}
     return {
         "pca_summary": {"explained_variance_ratio": [float(v) for v in evr], "total_variance_explained": float(evr.sum()),
                         "effective_rank": eff, "n_components_used": int(k),
@@ -330,7 +361,7 @@ def _ref_centrality_fallback(m: np.ndarray, cols: Sequence[str], tau: float, exc
     rank = stats.rankdata(cen, method="average") / p * 100.0
     features = {name: {"centrality": float(cen[j]), "crowded": bool(cen[j] >= cut),
                        "risk_level": "high" if cen[j] >= cut else "low", "percentile_rank": float(rank[j]),
-                       "trend": "flat"} for j, name in enumerate(cols)}
+                       "trend": None, "trend_reason": "not_computed"} for j, name in enumerate(cols)}
     return {
         "pca_summary": {"explained_variance_ratio": [], "total_variance_explained": math.nan, "effective_rank": math.nan,
                         "n_components_used": 0, "crowded_threshold": cut if math.isfinite(cut) else None,
@@ -386,10 +417,28 @@ def ref_regime(rolling: Mapping[str, List[float]], name: str, cfg: Any) -> dict:
             "trend": trend, "latest": float(s[-1])}
 
 
+_CEN_TREND = {"up": "rising", "down": "falling", "flat": "flat"}
+
+
+def ref_feature_trend(values: Any, trend_cfg: Mapping[str, Any], window: int) -> Tuple[Optional[str], Optional[str]]:
+    """㉔（CT-5）逐特徵中心性趨勢：該特徵之滾動中心性序列以 `ref_trend_series`（statsmodels OLS 斜率、`cov_type="HAC"`
+    p 值；頻寬下限＝滾動中心性窗長 `window`〔重疊窗〕；顯著性與 R² 門檻＝trend_analysis 設定）判定，up→rising、
+    down→falling、flat→flat；無序列或有效數 < min_samples ⇒ (None, "insufficient_data")；斜率非有限 ⇒
+    (None, "indeterminate")。回 (trend, trend_reason)。"""
+    if values is None:
+        return None, "insufficient_data"
+    res = ref_trend_series(values, trend_cfg, overlap_window=window)
+    if res is None:
+        return None, "insufficient_data"
+    if res["trend"] not in _CEN_TREND:
+        return None, "indeterminate"
+    return _CEN_TREND[res["trend"]], None
+
+
 def ref_factor_centrality(rolling_ic: dict, selected: Sequence[str], cfg: Mapping[str, Any],
-                          pca_fails: bool = False) -> Any:
+                          pca_fails: bool = False, trend_cfg: Optional[Mapping[str, Any]] = None) -> Any:
     """呼叫端 `_run_factor_centrality` 之參考：矩陣空 ⇒ 略過；centrality 略過 ⇒ 略過；否則併 rolling_centrality（原矩陣）
-    與逐欄 regimes。"""
+    與逐欄 regimes；㉔ 逐特徵 trend 以其滾動中心性序列判定（窗長＝min(rolling_window, 列數)）。"""
     names, mat, _ = ref_ic_matrix(rolling_ic, selected)
     if mat.size == 0:
         return RefSkip("rolling_ic matrix unavailable")
@@ -397,6 +446,10 @@ def ref_factor_centrality(rolling_ic: dict, selected: Sequence[str], cfg: Mappin
     if isinstance(cen, RefSkip):
         return cen
     rolling = ref_rolling_centrality(mat, names, cfg, pca_fails=pca_fails)
+    window = min(int(cfg["rolling_window"]), mat.shape[0])
+    tcfg = dict(trend_cfg) if trend_cfg is not None else _cfg_t()
+    for name, feat in cen["features"].items():
+        feat["trend"], feat["trend_reason"] = ref_feature_trend(rolling.get(name), tcfg, window)
     out = dict(cen)
     out["rolling_centrality"] = rolling
     out["regimes"] = {name: ref_regime(rolling, name, cfg) for name in names}
@@ -470,8 +523,11 @@ def ref_trend_series(values: Any, cfg: Mapping[str, Any], overlap_window: Option
     if not math.isfinite(p_value):
         p_value = 1.0
     trend = _ref_classify(slope, p_value, r2, cfg)
+    # 斜率之自然尺度＝std(y)／std(x)（斜率 ≈ r·此尺度）：斜率趨近 0 時兩條獨立路徑之差約為機器精度 × 此尺度
+    scale = float(np.std(yw) / np.std(x)) if x.size > 1 and np.std(x) > 0 and np.all(np.isfinite(yw)) else math.nan
     return {"slope": slope, "p_value": p_value, "r_squared": r2, "tail_estimate": float(intercept + slope * x[-1]),
-            "trend": trend, "interpretation": _INTERP.get(trend, "趨勢不確定"), "_t_abs": t_abs, "_df": df_resid}
+            "trend": trend, "interpretation": _INTERP.get(trend, "趨勢不確定"), "_t_abs": t_abs, "_df": df_resid,
+            "_slope_scale": scale}
 
 
 def ref_combined_signal(ic_trend: Optional[str], centrality_trend: Optional[str],
@@ -503,22 +559,51 @@ def window_overlap(window_key: Optional[str], stride: int) -> Optional[int]:
     return int(math.ceil(w / max(1, stride)))
 
 
+#: ㉕ 來源：維 → 封閉值集狀態字串（來源不可用），或 ({特徵: 逐時點序列}, 重疊窗長〔None ⇒ 自動頻寬〕)
+TrendSources = Mapping[str, Any]
+
+
 def ref_trend_analysis(rolling_ic: dict, selected: Sequence[str], cfg: Mapping[str, Any],
-                       overlap_window: Any = None, rolling_stride: int = 1) -> Any:
-    """呼叫端 `_run_trend_analysis`＋`batch_analyze`（trend_analyzer.py:147-178）：取矩陣前 max(1, len(selected)) 欄，每欄只算
-    IC 維度（呼叫端未傳 centrality／half_life）；有效數不足者無 `ic_trend` 鍵、combined_signal 依缺維度＝flat。
-    `overlap_window`：產品收到之值（int／None）；字串 "from_key" ⇒ 依各欄窗鍵與 stride 導出（SPEC ⑱ 之端到端定義）。"""
+                       overlap_window: Any = None, rolling_stride: int = 1,
+                       sources: Optional[TrendSources] = None, dimensions: Optional[Sequence[str]] = None) -> Any:
+    """呼叫端 `_run_trend_analysis`＋`batch_analyze`：取矩陣前 max(1, len(selected)) 欄；㉕ 依 `dimensions`（None ⇒
+    `cfg["dimensions"]`）逐維：ic 維＝滾動 IC 欄（`overlap_window`：產品收到之值；"from_key" ⇒ 依窗鍵與 stride 導出，⑱）；
+    其餘三維取 `sources[dim]`——缺 ⇒ "source_module_off"（來源模組未於本請求執行）、為字串 ⇒ 該狀態、該特徵不在序列表 ⇒
+    "source_skipped"；序列有效數 < min_samples ⇒ "insufficient_data"；可算者出 `<dim>_trend`。combined_signal 依現行規則表
+    以實際可得之 ic／centrality 維（缺 ⇒ flat）；`dimension_status`＝未出之維 → 原因。"""
     names, mat, keys = ref_ic_matrix(rolling_ic, selected)
     if mat.size == 0:
         return RefSkip("rolling_ic matrix unavailable")
+    dims = list(cfg["dimensions"] if dimensions is None else dimensions)
+    srcs = dict(sources or {})
     out: Dict[str, dict] = {}
     for j, name in enumerate(names[: max(1, len(selected))]):
-        ow = window_overlap(keys[j], rolling_stride) if overlap_window == "from_key" else overlap_window
-        res = ref_trend_series(mat[:, j], cfg, overlap_window=ow)
         entry: Dict[str, Any] = {}
-        if res:
-            entry["ic_trend"] = res
-        entry["combined_signal"] = ref_combined_signal(res["trend"] if res else None, None, None)
+        status: Dict[str, str] = {}
+        for dim in TREND_DIMS:
+            if dim not in dims:
+                continue
+            if dim == "ic":
+                values: Any = mat[:, j]
+                ow = window_overlap(keys[j], rolling_stride) if overlap_window == "from_key" else overlap_window
+            else:
+                src = srcs.get(dim, "source_module_off")
+                if isinstance(src, str):
+                    status[dim] = src
+                    continue
+                series_map, ow = src
+                if name not in series_map:
+                    status[dim] = "source_skipped"
+                    continue
+                values = series_map[name]
+            res = ref_trend_series(values, cfg, overlap_window=ow)
+            if res is None:
+                status[dim] = "insufficient_data"
+                continue
+            entry[f"{dim}_trend"] = res
+        entry["combined_signal"] = ref_combined_signal(entry.get("ic_trend", {}).get("trend"),
+                                                       entry.get("centrality_trend", {}).get("trend"), None)
+        entry["dimension_status"] = status
         out[name] = entry
     return out
 
@@ -528,6 +613,8 @@ def ref_trend_analysis(rolling_ic: dict, selected: Sequence[str], cfg: Mapping[s
 
 def _paths(obj: Any, path: str) -> set:
     """輸出之欄位路徑集合（逐特徵段→`*`、純量 list→`/#`）。"""
+    if path in _DICT_LEAVES:
+        return {path}
     if isinstance(obj, dict):
         out: set = set()
         for k, v in obj.items():
@@ -546,6 +633,8 @@ def _paths(obj: Any, path: str) -> set:
 
 def _leaves(obj: Any, path: str, tag: str = "") -> List[Tuple[str, str, Any]]:
     """(欄位路徑, 位置標記, 值)：逐特徵段之鍵與 list 索引記入位置標記，供逐元素對照。"""
+    if path in _DICT_LEAVES:
+        return [(path, tag, dict(obj) if isinstance(obj, dict) else obj)]
     if isinstance(obj, dict):
         out: List[Tuple[str, str, Any]] = []
         for k, v in obj.items():
@@ -572,7 +661,8 @@ def _to_float(v: Any) -> float:
     return float(v)
 
 
-def _verdict_numeric(pairs: List[Tuple[str, Any, Any]]) -> Dict[str, Any]:
+def _verdict_numeric(pairs: List[Tuple[str, Any, Any]], atol: float = 0.0) -> Dict[str, Any]:
+    """浮點對照：相對誤差 ≤ 1e-12；`atol` > 0（UNIT_SCALE_PATHS）時另認絕對誤差 ≤ atol。"""
     max_rel, n_fin, bad = 0.0, 0, []
     for tag, pv, ov in pairs:
         if pv is None and ov is None:
@@ -582,7 +672,7 @@ def _verdict_numeric(pairs: List[Tuple[str, Any, Any]]) -> Dict[str, Any]:
             n_fin += 1
         r = _rel(a, b)
         max_rel = max(max_rel, r)
-        if r > REL_TOL:
+        if r > REL_TOL and not (atol > 0.0 and math.isfinite(a) and math.isfinite(b) and abs(a - b) <= atol):
             bad.append(f"{tag}: 產品 {a!r} vs oracle {b!r}")
     return {"verdict": "一致" if not bad else "不一致", "max_rel_diff": max_rel if pairs else None, "n_finite": n_fin,
             "detail": "; ".join(bad[:5])}
@@ -617,6 +707,23 @@ def _verdict_pvalue(items: List[Tuple[str, Any, Any, float, float]]) -> Dict[str
             "detail": "; ".join(bad[:5]) + ("（p 或其對應 |t| 之相對誤差 ≤ 1e-12 即一致）" if items else "")}
 
 
+def _verdict_slope(items: List[Tuple[str, Any, Any, float]]) -> Dict[str, Any]:
+    """斜率對照：相對誤差 ≤ 1e-12，或絕對誤差 ≤ 1e-12 × 斜率之自然尺度 std(y)／std(x)（同 numpy.isclose 之 rtol＋atol；
+    斜率趨近 0 時相對誤差不具意義——兩條獨立 OLS 路徑之差約為機器精度 × 此尺度）。"""
+    max_rel, n_fin, bad = 0.0, 0, []
+    for tag, pv, ov, scale in items:
+        a, b = _to_float(pv), _to_float(ov)
+        n_fin += int(math.isfinite(a))
+        r = _rel(a, b)
+        max_rel = max(max_rel, r)
+        ok = r <= REL_TOL or (math.isfinite(scale) and math.isfinite(a) and math.isfinite(b)
+                              and abs(a - b) <= REL_TOL * scale)
+        if not ok:
+            bad.append(f"{tag}: 產品 {a!r} vs oracle {b!r}")
+    return {"verdict": "一致" if not bad else "不一致", "max_rel_diff": max_rel if items else None, "n_finite": n_fin,
+            "detail": "; ".join(bad[:5])}
+
+
 def _verdict_exact(pairs: List[Tuple[str, Any, Any]]) -> Dict[str, Any]:
     bad = [f"{tag}: 產品 {pv!r} vs oracle {ov!r}" for tag, pv, ov in pairs if pv != ov]
     n_fin = sum(1 for _, pv, _ in pairs if pv is not None)
@@ -643,7 +750,8 @@ def _compare_trees(product: Any, oracle: Any, root: str) -> Dict[str, Dict[str, 
                          "detail": f"位置不同：只產品 {sorted(tags_p - tags_o)[:5]}；只 oracle {sorted(tags_o - tags_p)[:5]}"}
             continue
         pairs = [(t, d["p"][t], d["o"][t]) for t in sorted(tags_p)]
-        out[path] = _verdict_numeric(pairs) if path in NUMERIC_PATHS else _verdict_exact(pairs)
+        out[path] = (_verdict_numeric(pairs, atol=ABS_TOL_UNIT if path in UNIT_SCALE_PATHS else 0.0)
+                     if path in NUMERIC_PATHS else _verdict_exact(pairs))
     return out
 
 
@@ -682,12 +790,13 @@ def _tie_aware_percentiles(ref_features: Dict[str, dict], prod_features: Mapping
 
 
 def compare_factor_centrality(product_output: Any, rolling_ic: dict, selected_features: Sequence[str],
-                              config: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
+                              config: Mapping[str, Any],
+                              trend_config: Optional[Mapping[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
     """`results.factor_centrality` 逐欄對照。輸入＝產品公開入口之同一組（`_ic_cache["rolling_ic"]`、selected、
-    `config.factor_centrality.model_dump()`）；`product_output` 為產品回傳 dict 或其拋出之例外。另附一致性 oracle（鍵帶
-    `@`）：`features/*/trend@regimes`（同模組 regimes 之斜率趨勢；CT-5 未實作）。"""
+    `config.factor_centrality.model_dump()`、㉔ 逐特徵趨勢所用之 `config.trend_analysis.model_dump()`〔None ⇒ 預設〕）；
+    `product_output` 為產品回傳 dict 或其拋出之例外。`features/*/trend` 之 oracle＝`ref_feature_trend`（statsmodels HAC）。"""
     pca_fails = isinstance(product_output, dict) and "fallback" in product_output.get("pca_summary", {})
-    ref = ref_factor_centrality(rolling_ic, selected_features, config, pca_fails=pca_fails)
+    ref = ref_factor_centrality(rolling_ic, selected_features, config, pca_fails=pca_fails, trend_cfg=trend_config)
     if isinstance(ref, RefSkip) or isinstance(product_output, BaseException):
         return _skip_verdict(product_output, ref, "factor_centrality（略過）")
     _tie_aware_percentiles(ref["features"], product_output.get("features", {}))
@@ -696,37 +805,47 @@ def compare_factor_centrality(product_output: Any, rolling_ic: dict, selected_fe
         # Task 0.3 之業界定義項（⑱ CT-3 後即產品定義，恆與上列 effective_rank 同判）
         out["factor_centrality/pca_summary/effective_rank@all_eigen"] = _verdict_numeric(
             [("", product_output["pca_summary"]["effective_rank"], ref["pca_summary"]["effective_rank"])])
+    # 一致性項（㉔ 後之定義）：判為 rising／falling 之特徵，其方向 == 同模組 regimes.*.trend（同一序列之 OLS 斜率正負號）；
+    # flat／None（檢定不顯著或不足）不比——regimes 為未檢定之正負號，非 ㉔ 判準
     out["factor_centrality/features/*/trend@regimes"] = _verdict_exact(
         [(f"[{n}]", v.get("trend"), ref["regimes"].get(n, {}).get("trend"))
-         for n, v in product_output.get("features", {}).items()])
+         for n, v in product_output.get("features", {}).items() if v.get("trend") in ("rising", "falling")])
     return out
 
 
 def compare_trend_analysis(product_output: Any, rolling_ic: dict, selected_features: Sequence[str],
                            config: Mapping[str, Any], rolling_stride: int = 1,
-                           overlap_window: Any = "from_key") -> Dict[str, Dict[str, Any]]:
+                           overlap_window: Any = "from_key", sources: Optional[TrendSources] = None,
+                           dimensions: Optional[Sequence[str]] = None) -> Dict[str, Dict[str, Any]]:
     """`results.trend_analysis` 逐欄對照（輸入同產品公開入口；`config`＝`config.trend_analysis.model_dump()`；
     `overlap_window`＝產品 `batch_analyze` 實際收到之值——預設 "from_key"＝依窗鍵與 `rolling_stride` 導出
-    ceil(w／stride)，即呼叫端 `_rolling_overlap_window` 之定義；模組端直接呼叫時傳實際值或 None）。另附端到端項（鍵帶
+    ceil(w／stride)，即呼叫端 `_rolling_overlap_window` 之定義；模組端直接呼叫時傳實際值或 None）。㉕ `sources`／
+    `dimensions` 見 `ref_trend_analysis`（模組端直接呼叫 `batch_analyze` 未傳 dimensions ⇒ 傳 ["ic"]）。另附端到端項（鍵帶
     `@hac`）：以窗鍵導出之 overlap 重算之 p 值與趨勢（SPEC ⑱）；產品未收到窗長時此項不一致。"""
     ref = ref_trend_analysis(rolling_ic, selected_features, config, overlap_window=overlap_window,
-                             rolling_stride=rolling_stride)
+                             rolling_stride=rolling_stride, sources=sources, dimensions=dimensions)
     if isinstance(ref, RefSkip) or isinstance(product_output, BaseException):
         return _skip_verdict(product_output, ref, "trend_analysis（略過）")
     out = _compare_trees(product_output, ref, "trend_analysis")
 
-    def _pv(reference: dict) -> Dict[str, Any]:
-        return _verdict_pvalue([(f"[{n}]", product_output.get(n, {}).get("ic_trend", {}).get("p_value"),
-                                 e["ic_trend"]["p_value"], e["ic_trend"].get("_t_abs", math.nan),
-                                 e["ic_trend"].get("_df", math.nan))
-                                for n, e in reference.items() if "ic_trend" in e])
+    def _pv(reference: dict, dim_key: str = "ic_trend") -> Dict[str, Any]:
+        return _verdict_pvalue([(f"[{n}]", product_output.get(n, {}).get(dim_key, {}).get("p_value"),
+                                 e[dim_key]["p_value"], e[dim_key].get("_t_abs", math.nan),
+                                 e[dim_key].get("_df", math.nan))
+                                for n, e in reference.items() if dim_key in e])
 
-    pkey = "trend_analysis/*/ic_trend/p_value"
-    if pkey in out and "位置不同" not in out[pkey]["detail"] and "未登錄" not in out[pkey]["detail"]:
-        out[pkey] = _pv(ref)
+    for dim in TREND_DIMS:
+        pkey = f"trend_analysis/*/{dim}_trend/p_value"
+        if pkey in out and "位置不同" not in out[pkey]["detail"] and "未登錄" not in out[pkey]["detail"]:
+            out[pkey] = _pv(ref, f"{dim}_trend")
+        skey = f"trend_analysis/*/{dim}_trend/slope"
+        if skey in out and "位置不同" not in out[skey]["detail"] and "未登錄" not in out[skey]["detail"]:
+            out[skey] = _verdict_slope([(f"[{n}]", product_output.get(n, {}).get(f"{dim}_trend", {}).get("slope"),
+                                         e[f"{dim}_trend"]["slope"], e[f"{dim}_trend"].get("_slope_scale", math.nan))
+                                        for n, e in ref.items() if f"{dim}_trend" in e])
     out["trend_analysis/*（鍵集合）"] = _verdict_exact([("", list(product_output), list(ref))])
     full = ref_trend_analysis(rolling_ic, selected_features, config, overlap_window="from_key",
-                              rolling_stride=rolling_stride)
+                              rolling_stride=rolling_stride, sources=sources, dimensions=dimensions)
     out["trend_analysis/*/ic_trend/p_value@hac"] = _pv(full)
     out["trend_analysis/*/ic_trend/trend@hac"] = _verdict_exact(
         [(f"[{n}]", product_output.get(n, {}).get("ic_trend", {}).get("trend"), e["ic_trend"]["trend"])
@@ -874,6 +993,8 @@ def test_factor_centrality_matches_oracle(case: str) -> None:
     if case == "rows_below_window":
         assert all(len(v) == 1 for v in prod["rolling_centrality"].values())
         assert all(r["trend"] == "flat" for r in prod["regimes"].values())
+        # ㉔ 序列不足路徑：單窗 ⇒ 有效數 < min_samples ⇒ trend None 並記原因
+        assert all(v["trend"] is None and v["trend_reason"] == "insufficient_data" for v in prod["features"].values())
     if case == "one_constant_k1":
         assert prod["pca_summary"]["n_components_used"] == 1 and prod["regimes"]["c"]["regime"] == "unknown"
     if case == "skipped_windows_keep_position":
@@ -959,22 +1080,59 @@ def test_effective_rank_uses_all_eigenvalues() -> None:
         "factor_centrality/pca_summary/effective_rank"]
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致（unimplemented，CT-5 待使用者裁定）：features.*.trend 寫死 flat，"
-                                       f"與同模組 regimes.*.trend（滾動中心性斜率）不一致；收據 {RECEIPT}")
+def _shifting_crowding_ic(n: int = 400, seed: int = 16) -> Dict[str, np.ndarray]:
+    """明列輸入（㉔ 三種判定）：a、b 共同成分之載荷隨時間 0→1（中心性上升）；e、f 自 1→0（中心性下降）；c、d 獨立雜訊。"""
+    rng = np.random.default_rng(seed)
+    t = np.arange(n) / (n - 1)
+    up, down = rng.standard_normal(n), rng.standard_normal(n)
+    cols = {"a": t * up + 0.3 * rng.standard_normal(n), "b": t * up + 0.3 * rng.standard_normal(n),
+            "e": (1 - t) * down + 0.3 * rng.standard_normal(n), "f": (1 - t) * down + 0.3 * rng.standard_normal(n),
+            "c": rng.standard_normal(n), "d": rng.standard_normal(n)}
+    return {k: 0.1 * v for k, v in cols.items()}
+
+
 def test_feature_trend_field_reflects_regime_trend() -> None:
-    """同一特徵之 `features.*.trend` 應反映其滾動中心性之趨勢（== `regimes.*.trend`）；明列輸入中心性隨時間變化。"""
-    n = 200
-    t = np.arange(n) / n
-    rng = np.random.default_rng(16)
-    common = rng.standard_normal(n)
-    cols = {"a": 0.1 * (t * common + 0.3 * rng.standard_normal(n)), "b": 0.1 * (t * common + 0.3 * rng.standard_normal(n)),
-            "c": 0.1 * rng.standard_normal(n), "d": 0.1 * rng.standard_normal(n)}
+    """㉔ CT-5（Task 0.3 xfail 轉一般斷言；函式名沿用）：`features.*.trend` == 該特徵滾動中心性序列之 statsmodels OLS＋HAC
+    判定（頻寬下限＝滾動中心性窗長；顯著性與 R² 門檻＝trend_analysis 設定）之映射——不再比 `regimes.*.trend`（後者為未檢定之
+    斜率正負號，非 SPEC ㉔ 之定義）；明列輸入使 rising／falling／flat 三種判定皆出現；trend_reason 為 None。"""
+    cols = _shifting_crowding_ic()
     rolling_ic = _ic_dict(cols)
-    prod, cfg = _run_c(rolling_ic, list(cols))
+    prod, cfg = _run_c(rolling_ic, list(cols), n_components=1, rolling_window=40)
     assert any(r["trend"] in ("rising", "falling") for r in prod["regimes"].values())
     res = compare_factor_centrality(prod, rolling_ic, list(cols), cfg)
+    _assert_all_consistent(res)
     assert res["factor_centrality/features/*/trend@regimes"]["verdict"] == "一致", res[
         "factor_centrality/features/*/trend@regimes"]
+    got = {k: v["trend"] for k, v in prod["features"].items()}
+    assert set(got.values()) == {"rising", "falling", "flat"}, got
+    assert got["a"] == got["b"] == "rising" and got["e"] == got["f"] == "falling", got
+    assert all(v["trend_reason"] is None for v in prod["features"].values())
+    # 獨立 oracle 直接重算一欄（不經 compare 之樹對照）：HAC maxlags＝max(自動, 窗長−1)
+    series = np.asarray(prod["rolling_centrality"]["a"], dtype=float)
+    x = np.arange(series.size, dtype=float)
+    yw = _ref_winsorize(series)
+    lags = max(int(4 * (series.size / 100.0) ** (2.0 / 9.0)), 40 - 1)
+    hac = sm.OLS(yw, sm.add_constant(x)).fit(cov_type="HAC", use_t=True,
+                                             cov_kwds={"maxlags": lags, "kernel": "bartlett", "use_correction": False})
+    assert float(hac.params[1]) > 0 and float(hac.pvalues[1]) <= cfg_t_sig() and \
+        float(stats.pearsonr(x, yw)[0]) ** 2 >= float(TrendAnalysisConfig().r_squared_threshold)
+
+
+def cfg_t_sig() -> float:
+    """trend_analysis 預設顯著性門檻（`ic_config_schema.py` TrendAnalysisConfig.significance_level）。"""
+    return float(TrendAnalysisConfig().significance_level)
+
+
+def test_feature_trend_uses_trend_config_thresholds() -> None:
+    """㉔「判準同 trend_analysis 之顯著性門檻」：同一輸入，trend_analysis.r_squared_threshold＝1.0（非完全線性之序列不可達）
+    ⇒ 全部 flat；且與 oracle 一致（判定門檻取 trend_analysis 設定，不另設）。"""
+    cols = _shifting_crowding_ic()
+    rolling_ic = _ic_dict(cols)
+    cfg = _config(centrality={"n_components": 1, "rolling_window": 40}, trend={"r_squared_threshold": 1.0})
+    prod = run_factor_centrality(rolling_ic, list(cols), cfg)
+    _assert_all_consistent(compare_factor_centrality(prod, rolling_ic, list(cols), cfg.factor_centrality.model_dump(),
+                                                     trend_config=cfg.trend_analysis.model_dump()))
+    assert {v["trend"] for v in prod["features"].values()} == {"flat"}
 
 
 @pytest.mark.parametrize("value", [0.1, 0.3])
@@ -1193,7 +1351,8 @@ def test_trend_module_p_value_uses_hac_for_overlapping_windows() -> None:
     rolling_ic = {k: {"window_100": [float(x) for x in v]} for k, v in cols.items()}
     cfg = _config()
     prod = run_trend_module(rolling_ic, list(cols), cfg, overlap_window=100)
-    res = compare_trend_analysis(prod, rolling_ic, list(cols), cfg.trend_analysis.model_dump(), overlap_window=100)
+    res = compare_trend_analysis(prod, rolling_ic, list(cols), cfg.trend_analysis.model_dump(), overlap_window=100,
+                                 dimensions=["ic"])
     _assert_all_consistent(res)
     assert res["trend_analysis/*/ic_trend/p_value@hac"]["verdict"] == "一致", res["trend_analysis/*/ic_trend/p_value@hac"]
     for name, v in cols.items():
@@ -1230,15 +1389,191 @@ def test_trend_slope_uses_time_position_across_nan_gap() -> None:
     assert _rel(prod["a"]["ic_trend"]["tail_estimate"], float(fit.fittedvalues[-1])) <= REL_TOL
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致（unimplemented，CT-9 待使用者裁定）：trend_analysis.dimensions 預設"
-                                       f"含 centrality、factor_return、ls_spread，呼叫端只傳 IC 維（未接滾動中心性與 half_life）⇒ "
-                                       f"combined_signal 之擁擠／半衰期規則恆不觸發；收據 {RECEIPT}")
+# ── ㉕ 深度分析端到端（產品公開入口 `run_deep_analysis`；同請求之來源模組）──────────────────────────────
+
+
+#: 趨勢與其三個來源模組（深度報告 results 鍵）
+_FOUR = ["factor_returns", "factor_centrality", "long_short_analysis", "trend_analysis"]
+#: 具名 preset 會把模組開關改回開（`_apply_tier_config`）；關閉來源模組須走 custom preset 之 module_overrides
+_MODULE_KEYS = ("factor_return", "factor_centrality", "trend_analysis", "parameter_sensitivity", "rolling_oos",
+                "factor_orthogonalization", "factor_exposure", "long_short_analysis", "feature_quality_diagnostics",
+                "net_ic_analysis")
+_CEN_FROM_TREND = {"up": "rising", "down": "falling", "flat": "flat"}
+
+
+def _explicit_deep_inputs(n: int = 420, h: int = 3, seed: int = 41, with_const: bool = False
+                          ) -> Tuple[pd.DataFrame, pd.Series, dict]:
+    """明列輸入（秒級）：固定種子價格路徑之因果特徵（只用 0..t）、h 根前瞻報酬標籤、明列之滾動 IC（低秩共同成分；窗鍵
+    window_30）。with_const ⇒ 加常數特徵 const（因子報酬略過、中心性剔除、多空兩側皆空）。"""
+    rng = np.random.default_rng(seed)
+    idx = pd.date_range("2024-01-01", periods=n, freq="h", tz="UTC")
+    price = pd.Series(100.0 * np.exp(np.cumsum(rng.normal(0, 0.01, n))), index=idx)
+    ret = price.pct_change()
+    feats = pd.DataFrame({"ret1": ret, "dev20": price / price.rolling(20).mean() - 1.0,
+                          "mom10": price / price.shift(10) - 1.0, "vol20": ret.rolling(20).std()})
+    if with_const:
+        feats["const"] = 0.5
+    label = (price.shift(-h) / price - 1.0).rename("label")
+    ic = _factor_ic(n - 40, len(feats.columns), seed=seed + 1)
+    rolling_ic = {name: {"window_30": [float(v) for v in ic[f"f{j:02d}"]]} for j, name in enumerate(feats.columns)}
+    if with_const:
+        rolling_ic["const"] = {"window_30": [0.0] * (n - 40)}
+    return feats, label, rolling_ic
+
+
+def _deep_orchestrator(features_df: pd.DataFrame, label: pd.Series, rolling_ic: dict, horizon: int) -> ICFilterOrchestrator:
+    """產品 orchestrator，IC 快取只帶深度分析所讀之鍵（同 tests/phase26/test_deep_analysis_integration.py）；標籤 horizon
+    經 `split_context.effective_horizon`（`_deep_horizon`）。"""
+    orc = ICFilterOrchestrator(ICConfig())
+    orc._ic_cache = {"features_df": features_df, "label_series": label, "metadata": {}, "icir": {},
+                     "rolling_ic": rolling_ic, "ic_decay": {}, "grouped_ic": {}, "event_info": {}, "stage0_log": {},
+                     "preproc_log": {}, "split_context": {"effective_horizon": int(horizon)}}
+    orc._filtered_features_df = features_df
+    orc._report = {"summary_table": []}
+    return orc
+
+
+def _ref_trend_sources(report: Any, rolling_ic: dict, names: Sequence[str], cfg: ICConfig, horizon: int) -> dict:
+    """㉕ 來源之 oracle 端：來源模組於本請求之狀態取 `module_summary`（completed ⇒ 可用；skipped／unavailable ⇒
+    "source_skipped"；未執行 ⇒ "source_module_off"）；centrality 序列以 `ref_rolling_centrality` 獨立重算、重疊窗＝
+    min(rolling_window, 列數)；factor_return 取 `ls_return_series`（不重疊抽樣 ⇒ None＝自動頻寬）；ls_spread 取
+    `ls_spread_series`（逐根 h 根前瞻報酬 ⇒ 重疊窗＝horizon）。後兩者之值由 test_icperf_deep_factor_return.py 對照 oracle。"""
+    summary, results = report.module_summary, report.results
+
+    def _state(module: str) -> Optional[str]:
+        s = summary.get(module)
+        if s in ("completed", "completed_partial"):
+            return None
+        return "source_skipped" if s in ("skipped", "unavailable") else "source_module_off"
+
+    out: Dict[str, Any] = {}
+    st = _state("factor_centrality")
+    if st is None:
+        nm, mat, _ = ref_ic_matrix(rolling_ic, names)
+        ccfg = cfg.factor_centrality.model_dump()
+        out["centrality"] = (ref_rolling_centrality(mat, nm, ccfg), min(int(ccfg["rolling_window"]), mat.shape[0]))
+    else:
+        out["centrality"] = st
+    st = _state("factor_returns")
+    out["factor_return"] = st if st is not None else (
+        {n: v["ls_return_series"] for n, v in results["factor_returns"]["value"]["features"].items()}, None)
+    st = _state("long_short_analysis")
+    out["ls_spread"] = st if st is not None else (
+        {n: v["ls_spread_series"] for n, v in results["long_short_analysis"].items() if not v.get("skipped")}, int(horizon))
+    return out
+
+
+def _assert_feature_trend_matches_centrality_dim(report: Any) -> None:
+    """㉔＝㉕ 之 centrality 維：同一序列、同一檢定 ⇒ features.*.trend == centrality_trend.trend 之映射。"""
+    feats = report.results["factor_centrality"]["features"]
+    for name, entry in report.results["trend_analysis"].items():
+        if name in feats and "centrality_trend" in entry:
+            assert feats[name]["trend"] == _CEN_FROM_TREND.get(entry["centrality_trend"]["trend"]), name
+
+
 def test_trend_analysis_honors_configured_dimensions() -> None:
-    """設定 `dimensions` 含 "centrality" ⇒ 每特徵輸出應含 `centrality_trend`。"""
-    ic = _factor_ic(150, 4, seed=22)
-    prod, _ = _run_t(_ic_dict(ic), list(ic))
+    """㉕ CT-9（Task 0.3 xfail 轉一般斷言；函式名沿用）四維全開：經 `run_deep_analysis`，trend 排在三個來源模組之後
+    （進度事件序）；每特徵四維皆出、`dimension_status` 空；各維 == statsmodels OLS＋HAC oracle（ic 維頻寬下限＝滾動 IC
+    窗長、centrality＝滾動中心性窗長、factor_return 自動、ls_spread＝horizon）；combined_signal == 規則表（實際可得之
+    ic／centrality 維）；㉔ 逐特徵中心性趨勢與 centrality 維一致。"""
+    h = 3
+    feats, label, rolling_ic = _explicit_deep_inputs(h=h)
+    names = list(feats)
+    orc = _deep_orchestrator(feats, label, rolling_ic, h)
+    events: List[dict] = []
+    rep = orc.run_deep_analysis(selected_features=names, force_modules=_FOUR, progress_callback=events.append)
+    prod = rep.results["trend_analysis"]
     assert "centrality" in TrendAnalysisConfig().dimensions
     assert all("centrality_trend" in v for v in prod.values()), {k: sorted(v) for k, v in prod.items()}
+    order = [e["module_name"] for e in events]
+    assert order.index("trend_analysis") > max(order.index(m) for m in _FOUR[:3]), order
+    cfg = ICConfig()
+    res = compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(),
+                                 sources=_ref_trend_sources(rep, rolling_ic, names, cfg, h))
+    _assert_all_consistent(res)
+    assert res["trend_analysis/*/ic_trend/p_value@hac"]["verdict"] == "一致", res["trend_analysis/*/ic_trend/p_value@hac"]
+    for dim in TREND_DIMS:
+        assert all(f"{dim}_trend" in v for v in prod.values()), dim
+    assert all(v["dimension_status"] == {} for v in prod.values())
+    _assert_feature_trend_matches_centrality_dim(rep)
+
+
+def test_trend_dimension_status_per_feature_skip_and_insufficient() -> None:
+    """㉕ 逐特徵路徑：常數特徵——因子報酬略過該特徵、中心性剔除常數欄 ⇒ "source_skipped"；多空兩側皆空 ⇒ 序列全 NaN ⇒
+    "insufficient_data"；其餘特徵四維皆出；全部 == oracle；狀態值屬封閉值集。"""
+    h = 3
+    feats, label, rolling_ic = _explicit_deep_inputs(h=h, with_const=True)
+    names = list(feats)
+    rep = _deep_orchestrator(feats, label, rolling_ic, h).run_deep_analysis(selected_features=names, force_modules=_FOUR)
+    prod = rep.results["trend_analysis"]
+    cfg = ICConfig()
+    _assert_all_consistent(compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(),
+                                                  sources=_ref_trend_sources(rep, rolling_ic, names, cfg, h)))
+    assert prod["const"]["dimension_status"] == {"centrality": "source_skipped", "factor_return": "source_skipped",
+                                                 "ls_spread": "insufficient_data"}, prod["const"]
+    assert all(v["dimension_status"] == {} for k, v in prod.items() if k != "const")
+    assert {s for v in prod.values() for s in v["dimension_status"].values()} <= DIM_STATUS
+
+
+def test_trend_dimension_status_source_module_off() -> None:
+    """㉕ 來源模組關閉（custom preset 只開 trend）：三來源 not_run ⇒ 三維不出、`dimension_status` 皆 "source_module_off"；
+    ic 維照出且 == oracle；combined_signal 依實際可得之 ic 維。"""
+    feats, label, rolling_ic = _explicit_deep_inputs()
+    names = list(feats)
+    override = {"feature_tiers": {"active_preset": "custom", "custom_overrides": {
+        "module_overrides": {m: m == "trend_analysis" for m in _MODULE_KEYS}}}}
+    rep = _deep_orchestrator(feats, label, rolling_ic, 3).run_deep_analysis(selected_features=names,
+                                                                             config_override=override)
+    assert {m: rep.module_summary[m] for m in _FOUR} == {"factor_returns": "not_run", "factor_centrality": "not_run",
+                                                         "long_short_analysis": "not_run", "trend_analysis": "completed"}
+    prod = rep.results["trend_analysis"]
+    cfg = ICConfig()
+    _assert_all_consistent(compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(),
+                                                  sources=_ref_trend_sources(rep, rolling_ic, names, cfg, 3)))
+    off = {"centrality": "source_module_off", "factor_return": "source_module_off", "ls_spread": "source_module_off"}
+    assert all(v["dimension_status"] == off and "ic_trend" in v for v in prod.values()), prod
+
+
+def test_trend_dimension_status_source_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """㉕ 來源 Skipped：三來源 runner 拋 InsufficientDataError ⇒ module_summary skipped／unavailable ⇒ 三維不出、
+    `dimension_status` 皆 "source_skipped"；trend 本身 completed。"""
+    feats, label, rolling_ic = _explicit_deep_inputs()
+    names = list(feats)
+    orc = _deep_orchestrator(feats, label, rolling_ic, 3)
+
+    def _raise(*_a: Any, **_k: Any) -> dict:
+        raise InsufficientDataError("forced source skip")
+
+    for runner in ("_run_factor_return", "_run_factor_centrality", "_run_long_short"):
+        monkeypatch.setattr(orc, runner, _raise)
+    rep = orc.run_deep_analysis(selected_features=names, force_modules=_FOUR)
+    assert rep.module_summary["trend_analysis"] == "completed"
+    prod = rep.results["trend_analysis"]
+    cfg = ICConfig()
+    _assert_all_consistent(compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(),
+                                                  sources=_ref_trend_sources(rep, rolling_ic, names, cfg, 3)))
+    skipped = {"centrality": "source_skipped", "factor_return": "source_skipped", "ls_spread": "source_skipped"}
+    assert all(v["dimension_status"] == skipped for v in prod.values()), prod
+
+
+def test_trend_dimensions_subset_from_config() -> None:
+    """㉕「依設定 dimensions」：dimensions＝[ls_spread, centrality] ⇒ 只出此二維（無 ic_trend、無 factor_return_trend）、
+    無狀態；combined_signal 依實際可得之 centrality 維（ic 缺 ⇒ flat）；== oracle。"""
+    feats, label, rolling_ic = _explicit_deep_inputs()
+    names = list(feats)
+    override = {"trend_analysis": {"dimensions": ["ls_spread", "centrality"]}}
+    rep = _deep_orchestrator(feats, label, rolling_ic, 3).run_deep_analysis(
+        selected_features=names, config_override=override, force_modules=_FOUR)
+    prod = rep.results["trend_analysis"]
+    cfg = _config(trend={"dimensions": ["ls_spread", "centrality"]})
+    _assert_all_consistent(compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(),
+                                                  sources=_ref_trend_sources(rep, rolling_ic, names, cfg, 3)))
+    assert all(set(v) == {"ls_spread_trend", "centrality_trend", "combined_signal", "dimension_status"}
+               for v in prod.values()), {k: sorted(v) for k, v in prod.items()}
+
+
+# 來源模組新輸出逐時點序列之前綴不變性見 test_icperf_deep_factor_return.py::test_trend_source_series_prefix_invariant
+# （因子報酬分析器之直接呼叫者受 test_factor_return_stopgap.py 之凍結 allowlist 約束，故不放本檔）
 
 
 # ── 真實 kline（requires_kline）────────────────────────────────────────────────────────────────────────
@@ -1294,15 +1629,23 @@ def _real(symbol: str, wide: bool = False) -> Tuple[dict, List[str], pd.Datetime
 #: 真實 BTCUSDT 7 特徵之中心性約 0.134–0.143（均值約 0.139，最大／均值約 1.03 ⇒ 預設 τ＝1.5 不觸發）：τ＝1.0 ⇒ 門檻＝均值，
 #: 擁擠／非擁擠皆出現（資料充足用）
 REAL_TAU = 1.0
+#: 真實 BNBUSDT 1h 7 特徵之滾動中心性：mom10／dev100／vchg 之 HAC p < 0.01、R² 約 0.084–0.094（預設門檻 0.1 未達）⇒
+#: R² 門檻 0.05 時判非 flat（資料充足用；㉔ rising／falling 路徑於真實資料實際產出）
+REAL_TREND_R2 = 0.05
 
 
 @pytest.mark.requires_kline
 def test_centrality_trend_fields_closed() -> None:
-    """真實 BTCUSDT 1h：產品兩模組實際輸出之欄位路徑集合 == MODULE_FIELDS 鍵集合（封閉）；每欄之 oracle 與產生處非空。"""
+    """真實 BTCUSDT 1h：產品兩模組實際輸出之欄位路徑集合 == MODULE_FIELDS 鍵集合（封閉）；每欄之 oracle 與產生處非空。
+    ㉕ 起趨勢之其餘三維取同請求來源模組 ⇒ 經 `run_deep_analysis`（因子報酬、中心性〔τ＝REAL_TAU〕、多空、趨勢）取輸出。"""
     rolling_ic, names, _ = _real("BTCUSDT")
     cfg = _config(centrality={"crowding_threshold_relative": REAL_TAU})
-    got = _paths(run_factor_centrality(rolling_ic, names, cfg), "factor_centrality") | _paths(
-        run_trend_analysis(rolling_ic, names, cfg), "trend_analysis")
+    feats, label = _real_frames("BTCUSDT")
+    rep = _deep_orchestrator(feats, label, rolling_ic, 1).run_deep_analysis(
+        selected_features=names, force_modules=_FOUR,
+        config_override={"factor_centrality": cfg.factor_centrality.model_dump()})
+    got = _paths(rep.results["factor_centrality"], "factor_centrality") | _paths(
+        rep.results["trend_analysis"], "trend_analysis")
     assert got == set(MODULE_FIELDS), (sorted(got - set(MODULE_FIELDS)), sorted(set(MODULE_FIELDS) - got))
     assert all(v["oracle"] and v["producer"] for v in {**MODULE_FIELDS, **MODULE_FIELDS_FALLBACK}.values())
 
@@ -1371,7 +1714,9 @@ def test_trend_analysis_matches_oracle_on_real_kline() -> None:
             finite[k] = finite.get(k, 0) + v["n_finite"]
         trends |= {v["ic_trend"]["trend"] for v in prod.values()}
         recs |= {v["combined_signal"]["recommendation"] for v in prod.values()}
-    missing = [p for p in MODULE_FIELDS if p.startswith("trend_analysis/") and p in NUMERIC_PATHS and not finite.get(p)]
+    # 呼叫端 stub 無同請求來源模組 ⇒ 只 ic 維（其餘三維之資料充足見 test_trend_four_dimensions_on_real_kline）
+    missing = [p for p in MODULE_FIELDS if p.startswith("trend_analysis/*/ic_trend/") and p in NUMERIC_PATHS
+               and not finite.get(p)]
     assert not missing, f"無有限值之欄：{missing}"
     assert {"up", "down", "flat"} <= trends and {"正常", "警告"} <= recs, (trends, recs)
 
@@ -1384,7 +1729,8 @@ def test_trend_module_with_window_matches_hac_on_real_kline() -> None:
         rolling_ic, names, _ = _real(sym)
         cfg = _config()
         prod = run_trend_module(rolling_ic, names, cfg, overlap_window=252)
-        res = compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(), overlap_window=252)
+        res = compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(), overlap_window=252,
+                                     dimensions=["ic"])
         _assert_all_consistent(res)
         assert res["trend_analysis/*/ic_trend/trend@hac"]["verdict"] == "一致", res
         if sym == "BNBUSDT":
@@ -1414,14 +1760,57 @@ def test_effective_rank_all_eigen_on_real_kline() -> None:
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致（unimplemented，CT-5 待使用者裁定）：features.*.trend 寫死 flat，"
-                                       f"真實 BTCUSDT 之 regimes.*.trend 為 rising／falling；收據 {RECEIPT}")
 def test_feature_trend_reflects_rolling_centrality_on_real_kline() -> None:
+    """㉔ CT-5（真實；Task 0.3 xfail 轉一般斷言）：`features.*.trend` == 其滾動中心性序列之 statsmodels OLS＋HAC oracle
+    （頻寬下限＝滾動中心性窗長 60）之判定；判為 rising／falling 者方向 == regimes 斜率號。
+    - 真實 BTCUSDT 1h 7 特徵、預設設定：全部 flat 為正確結果（2,190 點滾動中心性之 HAC p 值與 R² 均未達門檻，主委實查
+      BTCUSDT／ETHUSDT／BNBUSDT × 1,800–6,000 根皆然）。
+    - 資料充足（rising／falling 路徑於真實資料實際產出）：真實 BNBUSDT 1h、trend_analysis.r_squared_threshold＝REAL_TREND_R2
+      （mom10／dev100／vchg 之 HAC p < 0.01、R²≈0.08–0.09）⇒ 至少一特徵非 flat，且 == oracle。"""
     rolling_ic, names, _ = _real("BTCUSDT")
     prod, cfg = _run_c(rolling_ic, names)
     res = compare_factor_centrality(prod, rolling_ic, names, cfg)
     assert res["factor_centrality/features/*/trend@regimes"]["verdict"] == "一致", res[
         "factor_centrality/features/*/trend@regimes"]
+    _assert_all_consistent(res)
+    bnb_ic, bnb_names, _ = _real("BNBUSDT")
+    bnb_cfg = _config(trend={"r_squared_threshold": REAL_TREND_R2})
+    bnb = run_factor_centrality(bnb_ic, bnb_names, bnb_cfg)
+    bnb_res = compare_factor_centrality(bnb, bnb_ic, bnb_names, bnb_cfg.factor_centrality.model_dump(),
+                                        trend_config=bnb_cfg.trend_analysis.model_dump())
+    _assert_all_consistent(bnb_res)
+    verdicts = {k: v["trend"] for k, v in bnb["features"].items()}
+    assert set(verdicts.values()) & {"rising", "falling"}, verdicts
+    assert bnb_res["factor_centrality/features/*/trend@regimes"]["verdict"] == "一致", bnb_res[
+        "factor_centrality/features/*/trend@regimes"]
+
+
+def _real_frames(symbol: str) -> Tuple[pd.DataFrame, pd.Series]:
+    """`_real_case` 同一建法之特徵與前瞻 1 根標籤（剔除任一欄非有限之列後）。"""
+    k = _load_kline(symbol, REAL_ROWS)
+    feats = _real_features(k)
+    label = (k["close"].shift(-1) / k["close"] - 1.0).rename("label")
+    ok = np.isfinite(feats.to_numpy()).all(axis=1) & np.isfinite(label.to_numpy())
+    return feats[ok], label[ok]
+
+
+@pytest.mark.requires_kline
+def test_trend_four_dimensions_on_real_kline() -> None:
+    """㉕ CT-9（真實）：真實 BTCUSDT 1h 7 特徵、horizon 1，經 `run_deep_analysis`（因子報酬、中心性、多空、趨勢）：四維逐欄
+    == statsmodels OLS＋HAC oracle、`dimension_status` 空；資料充足——每維至少一特徵得有限斜率；㉔ 與 centrality 維一致
+    （欄位封閉性見 `test_centrality_trend_fields_closed`）。"""
+    rolling_ic, names, _ = _real("BTCUSDT")
+    feats, label = _real_frames("BTCUSDT")
+    rep = _deep_orchestrator(feats, label, rolling_ic, 1).run_deep_analysis(selected_features=names, force_modules=_FOUR)
+    prod = rep.results["trend_analysis"]
+    cfg = ICConfig()
+    _assert_all_consistent(compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(),
+                                                  sources=_ref_trend_sources(rep, rolling_ic, names, cfg, 1)))
+    for dim in TREND_DIMS:
+        slopes = [v[f"{dim}_trend"]["slope"] for v in prod.values() if f"{dim}_trend" in v]
+        assert any(math.isfinite(s) for s in slopes), (dim, slopes)
+    assert all(v["dimension_status"] == {} for v in prod.values())
+    _assert_feature_trend_matches_centrality_dim(rep)
 
 
 @pytest.mark.requires_kline

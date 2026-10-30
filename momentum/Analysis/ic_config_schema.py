@@ -129,6 +129,9 @@ class ICCalculationConfig(BaseModel):
             "min_samples_for_fit": 100,
             "refit_interval": 50,
         }
+        # ICPERF Task 0.4 ㉓：summary `regime_robust` 之合格 regime 門檻——該 regime 之 IC 有限且（特徵, 標籤）
+        # 有限配對數 ≥ 本值才計入；預設 30＝與 `FactorReturnConfig.min_samples` 同值之專案內一致性預設（非外部標準）
+        regime_robust_min_samples: int = Field(default=30, ge=2)
 
     grouped_analysis: GroupedConfig = GroupedConfig()
 
@@ -325,6 +328,9 @@ class FeatureQualityDiagnosticsConfig(BaseModel):
     ljungbox_lags: int = Field(default=10, ge=1, le=500)
     ljungbox_significance: float = Field(default=0.05, gt=0.0, le=0.2)
     coverage_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
+    #: ICPERF Task 0.4 ㉖：ADF 最少有限樣本數（少於即 insufficient_samples 跳過；預設同現行 20）
+    adf_min_samples: int = Field(default=20, ge=10, le=100000)
+    #: ICPERF Task 0.4 ㉖：PSI 近期窗＝最近 drift_window 個滾動 IC 觀測，對其之前全部觀測比（觀測不足 ⇒ PSI NaN 並記原因）
     drift_window: int = Field(default=60, ge=10, le=5000)
     drift_threshold: float = Field(default=0.25, ge=0.0, le=10.0)
     redundancy_threshold: float = Field(default=0.85, ge=0.0, le=1.0)

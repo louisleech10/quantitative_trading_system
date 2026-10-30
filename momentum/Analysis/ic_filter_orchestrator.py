@@ -66,6 +66,7 @@ from momentum.core.exceptions import (
     ModuleUnavailableError,
 )
 from momentum.core.icfirstalign_errors import CloseCarrierInvalidError
+from momentum.core.h5_feature_precision import feature_layout, read_feature_frame
 from momentum.core.logging import get_logger
 from momentum.core.contracts import (
     FF_RUN_IDENTITY_KEY,
@@ -342,6 +343,26 @@ def _build_close_carrier(raw_data: pd.DataFrame, feature_index: pd.Index) -> pd.
         index=source_index,
     )
     return _rekey_close_carrier(close, feature_index)
+
+
+def _build_quote_value_carrier(raw_data: Optional[pd.DataFrame], feature_index: pd.Index) -> Optional[pd.Series]:
+    """容量量能載體（ICPERF Task 0.4 ㉖ QN-6）：同請求 kline 之每根報價幣成交值（`bar_quote_value`：有 `quote_volume`
+    欄用之，否則 close×volume），只取與特徵時間戳同一 UTC 時刻之列；索引保留 kline 自身時間軸（含其時區），供
+    `average_daily_quote_volume` 依資料時間戳之日曆日加總。kline 缺、無量欄、時間軸不可正規化 ⇒ None（容量 unknown）。"""
+    from momentum.Analysis.net_ic_analyzer import bar_quote_value
+
+    if raw_data is None or getattr(raw_data, "empty", True):
+        return None
+    values, _source = bar_quote_value(raw_data)
+    if values is None:
+        return None
+    try:
+        source_index = _normalize_frame_time_index(raw_data, "raw_data")
+        feature_key = _utc_instant_key(_normalize_ic_time_index(pd.Index(feature_index), "features_df"))
+    except AlignmentViolationError:
+        return None
+    keep = _utc_instant_key(source_index).isin(feature_key)
+    return pd.Series(values.to_numpy(dtype=np.float64)[keep], index=source_index[keep], name="quote_value")
 
 
 def _numeric_payload_sha256(data: pd.Series | pd.DataFrame) -> str:
@@ -1170,6 +1191,40 @@ def _direction_fields(ic_mean: Any, icir_item: Mapping[str, Any], quantile_retur
             (quantile_returns or {}).get("quantile_mean_returns") or {}, direction
         ),
     }
+
+
+#: ICPERF Task 0.4 ㉓：`regime_robust` 為 None 時之原因（封閉值集）
+REGIME_ROBUST_REASONS: tuple[str, ...] = ("regime_analysis_off", "insufficient_regimes")
+
+
+def _regime_robust_fields(
+    feature: str,
+    direction: int,
+    by_regime: Any,
+    pair_counts: Optional[Mapping[str, Mapping[str, int]]],
+    min_samples: int,
+) -> dict:
+    """summary 列之 `regime_robust`／`regime_robust_reason`（ICPERF Task 0.4 ㉓；由同請求 `grouped_ic.by_regime` 導出，不另算 IC）。
+
+    合格 regime＝該 regime 之 IC 有限且（特徵, 標籤）有限配對數 ≥ min_samples；合格 ≥ 2 ⇒ True ⟺ 每一合格 regime 之
+    direction·IC > 0（direction＝summary 之 direction＝sign(ic_mean)；任一 ≤ 0 ⇒ False）；合格 < 2 ⇒ None／
+    `insufficient_regimes`；by_regime 未算（非 dict：分組 IC 未跑、`by_regime` 關、跨標的路徑）⇒ None／`regime_analysis_off`。
+    """
+    if not isinstance(by_regime, dict):
+        return {"regime_robust": None, "regime_robust_reason": "regime_analysis_off"}
+    counts = pair_counts or {}
+    signed: list[float] = []
+    for regime, body in by_regime.items():
+        if not isinstance(body, dict):
+            continue
+        ic = _finite_num(body.get(feature))
+        n = (counts.get(regime) or {}).get(feature, 0)
+        if ic is None or int(n) < int(min_samples):
+            continue
+        signed.append(float(direction) * ic)
+    if len(signed) < 2:
+        return {"regime_robust": None, "regime_robust_reason": "insufficient_regimes"}
+    return {"regime_robust": bool(all(v > 0 for v in signed)), "regime_robust_reason": None}
 
 
 def _threshold_view(row: Mapping[str, Any]) -> dict:
@@ -2370,7 +2425,8 @@ class ICFilterOrchestrator:
                     "coverage": None,
                     "turnover_rate": None,
                     "ic_half_life": None,
-                    "regime_robust": None,
+                    # ICPERF Task 0.4 ㉓：跨標的路徑不算分組 IC（grouped_ic＝not_applicable）⇒ by_regime 未算
+                    **_regime_robust_fields(feature_name, 0, None, None, 0),
                     # ICPERF Task 0.4 ⑧：跨標的列同算方向欄（截面 IC 序列之有限值中 < 0 之比例為負向勝率）
                     **_direction_fields(
                         ic_mean,
@@ -2835,15 +2891,17 @@ class ICFilterOrchestrator:
                 # force-merge:以 cache 為 base 再重跑 force_modules(legacy FR 可能殘留)
                 base_report = deepcopy(self._deep_analysis_cache[cache_key])
 
+            # ICPERF Task 0.4 ㉕：trend_analysis 排在其三個來源模組（factor_returns、factor_centrality、
+            # long_short_analysis）之後，讀同請求已算之逐時點序列
             module_runners: list[tuple[str, Callable[..., dict]]] = [
                 ("factor_returns", self._run_factor_return),
                 ("factor_centrality", self._run_factor_centrality),
-                ("trend_analysis", self._run_trend_analysis),
                 ("parameter_sensitivity", self._run_parameter_sensitivity),
                 ("rolling_oos", self._run_rolling_oos),
                 ("factor_orthogonalization", self._run_factor_orthogonalization),
                 ("factor_exposure", self._run_factor_exposure),
                 ("long_short_analysis", self._run_long_short),
+                ("trend_analysis", self._run_trend_analysis),
                 ("feature_quality_diagnostics", self._run_feature_quality_diagnostics),
                 ("net_ic_analysis", self._run_net_ic),
             ]
@@ -2858,6 +2916,8 @@ class ICFilterOrchestrator:
 
             total_targets = max(1, len(run_targets))
             started = time.perf_counter()
+            # ㉕：本請求之報告（含 force-merge 時同快取鍵之既有結果）供 trend 讀來源模組之結果與狀態；迴圈後清除
+            self._deep_run_report = base_report
 
             for idx, (module_name, runner) in enumerate(run_targets, start=1):
                 module_started = time.perf_counter()
@@ -2917,6 +2977,7 @@ class ICFilterOrchestrator:
                     progress_callback or self._progress_callback, payload
                 )
 
+            self._deep_run_report = None
             base_report.total_execution_time_s = float(time.perf_counter() - started)
 
             all_module_names = [name for name, _ in module_runners]
@@ -3127,6 +3188,11 @@ class ICFilterOrchestrator:
         if isinstance(centrality, SkippedResult):
             raise InsufficientDataError(centrality.reason)
         rolling = analyzer.compute_rolling_centrality(matrix)
+        # ICPERF Task 0.4 ㉔：逐特徵 trend 由同請求之滾動中心性以 trend 模組同一檢定判定（頻寬下限＝滾動中心性窗長）
+        centrality = analyzer.attach_feature_trends(
+            centrality, rolling, window=analyzer.effective_rolling_window(len(matrix)),
+            trend_config=config.trend_analysis.model_dump(),
+        )
         regimes = {
             name: analyzer.detect_crowding_regime(rolling, name)
             for name in list(matrix.columns)
@@ -3150,11 +3216,81 @@ class ICFilterOrchestrator:
             raise InsufficientDataError("rolling_ic matrix unavailable")
 
         analyzer = TrendAnalyzer(config.trend_analysis.model_dump())
+        # ICPERF Task 0.4 ㉕：依設定 dimensions 逐維餵入同請求來源模組已算之逐時點序列（不另算）
+        dimension_inputs = self._trend_dimension_inputs(
+            getattr(self, "_deep_run_report", None), config, len(matrix), self._deep_horizon(config),
+        )
         # ICPERF Task 0.4 ⑱ CT-1：重疊窗之 HAC 頻寬下限＝所用窗長／步長（窗長取 `_extract_rolling_ic_series` 所選之窗鍵）
         return analyzer.batch_analyze(
             matrix, top_n=len(selected_features),
             overlap_window=self._rolling_overlap_window(rolling_ic, selected_features, config),
+            dimensions=list(config.trend_analysis.dimensions),
+            dimension_inputs=dimension_inputs,
         )
+
+    @staticmethod
+    def _trend_dimension_inputs(report: Any, config: ICConfig, n_rows: int, horizon: int) -> dict:
+        """ICPERF Task 0.4 ㉕：趨勢 centrality／factor_return／ls_spread 三維之來源（同請求深度報告 `report` 之已算結果）。
+
+        來源模組狀態取 `report.module_summary`：completed／completed_partial ⇒ 用其結果；skipped／unavailable ⇒
+        `source_skipped`；未於本請求執行（關閉或未列入 force_modules 且無同快取鍵之既有結果）⇒ `source_module_off`。
+        各維序列與 HAC 頻寬下限：
+        - centrality：`factor_centrality.rolling_centrality`，重疊窗＝滾動中心性實際窗長 min(rolling_window, 列數)
+        - factor_return：`factor_returns.value.features.*.ls_return_series`（不重疊抽樣 ⇒ 無重疊、自動頻寬）
+        - ls_spread：`long_short_analysis.*.ls_spread_series`（逐根 h 根前瞻報酬 ⇒ 重疊窗＝horizon）
+        """
+        from momentum.Analysis.factor_centrality_analyzer import FactorCentralityAnalyzer
+        from momentum.Analysis.trend_analyzer import (
+            DIMENSION_SOURCE_MODULE_OFF,
+            DIMENSION_SOURCE_SKIPPED,
+            TrendDimensionInput,
+        )
+
+        results = getattr(report, "results", None) or {}
+        summary = getattr(report, "module_summary", None) or {}
+
+        def _state(module: str) -> Optional[str]:
+            status = summary.get(module)
+            if status in ("completed", "completed_partial") and isinstance(results.get(module), dict):
+                return None
+            if status in ("skipped", "unavailable"):
+                return DIMENSION_SOURCE_SKIPPED
+            return DIMENSION_SOURCE_MODULE_OFF
+
+        def _series_map(raw: Any) -> dict[str, pd.Series]:
+            return {str(name): pd.Series(values, dtype=float) for name, values in (raw or {}).items()
+                    if isinstance(values, list)}
+
+        inputs: dict[str, TrendDimensionInput] = {}
+        state = _state("factor_centrality")
+        if state is None:
+            window = FactorCentralityAnalyzer(config.factor_centrality.model_dump()).effective_rolling_window(n_rows)
+            inputs["centrality"] = TrendDimensionInput(
+                series=_series_map(results["factor_centrality"].get("rolling_centrality")), overlap_window=window)
+        else:
+            inputs["centrality"] = TrendDimensionInput(status=state)
+
+        state = _state("factor_returns")
+        fr = results.get("factor_returns") if state is None else None
+        if state is None and not (isinstance(fr, dict) and fr.get("status") == "ok"):
+            state = DIMENSION_SOURCE_SKIPPED
+        if state is None:
+            features = (fr.get("value") or {}).get("features") or {}
+            inputs["factor_return"] = TrendDimensionInput(
+                series=_series_map({n: v.get("ls_return_series") for n, v in features.items() if isinstance(v, dict)}))
+        else:
+            inputs["factor_return"] = TrendDimensionInput(status=state)
+
+        state = _state("long_short_analysis")
+        if state is None:
+            per_feature = results["long_short_analysis"]
+            inputs["ls_spread"] = TrendDimensionInput(
+                series=_series_map({n: v.get("ls_spread_series") for n, v in per_feature.items()
+                                    if isinstance(v, dict) and not v.get("skipped")}),
+                overlap_window=max(1, int(horizon)))
+        else:
+            inputs["ls_spread"] = TrendDimensionInput(status=state)
+        return inputs
 
     def _rolling_overlap_window(self, rolling_ic: dict, selected_features: list[str], config: ICConfig) -> Optional[int]:
         """`_extract_rolling_ic_series` 所選窗鍵（最長序列者）之窗長除以步長（向上取整）；無可解析之窗鍵 ⇒ None。"""
@@ -3395,7 +3531,7 @@ class ICFilterOrchestrator:
         turnover series 於 analyzer 內 ``position.diff().abs().fillna(0)``(D6 首 bar=0)。
         cache-hit 無 owner → 不得回傳 series-dependent ok/evaluable(F1 護欄)。
         """
-        from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
+        from momentum.Analysis.net_ic_analyzer import NetICAnalyzer, average_daily_quote_volume
 
         # ICHC Task 5.3（R1 三家同判 C1）：turnover 停用 → NetIC 顯式 typed
         # unavailable（reason 入契約枚舉），禁靜默 skip、禁偷算 turnover（方案 B 否決）
@@ -3407,8 +3543,16 @@ class ICFilterOrchestrator:
             return {"status": "unavailable", "reason": "turnover_disabled"}
 
         analyzer = NetICAnalyzer(config.net_ic_analysis.model_dump())
+        # ICPERF Task 0.4 ㉖ QN-6：容量之日均報價幣成交值由同請求 kline 計（載體於第 4 段建；依資料時間戳之日曆日加總後
+        # 平均，不假設 24 小時交易）；無載體 ⇒ None ⇒ 容量 unknown。報價幣代號只取請求 metadata 明示者（不由代號猜）
+        ic_cache = self._ic_cache or {}
+        quote_value = ic_cache.get("quote_value_series")
+        avg_daily_quote = average_daily_quote_volume(quote_value) if isinstance(quote_value, pd.Series) else None
+        cache_meta = ic_cache.get("metadata") or {}
+        raw_quote_currency = cache_meta.get("quote_currency") if isinstance(cache_meta, dict) else None
+        quote_currency = raw_quote_currency if isinstance(raw_quote_currency, str) and raw_quote_currency else None
         summary = {
-            row["feature_name"]: {"ic_mean": row.get("ic_mean")}
+            row["feature_name"]: {"ic_mean": row.get("ic_mean"), "avg_daily_quote_volume": avg_daily_quote}
             for row in (self._report or {}).get("summary_table", [])
             if row.get("feature_name") in selected_features
         }
@@ -3427,6 +3571,7 @@ class ICFilterOrchestrator:
             summary,
             turnover_data,
             factor_return_series=series_for_batch,
+            quote_currency=quote_currency,
         )
         if (
             not self._factor_return_series
@@ -4487,6 +4632,8 @@ class ICFilterOrchestrator:
                     config.labels.return_type,
                 )
 
+        # ICPERF Task 0.4 ㉓：by_regime 各 regime 逐特徵有限配對數（與 by_regime 同遮罩；只供 summary regime_robust）
+        regime_pair_counts: dict[str, dict[str, int]] = {}
         if raw_data_for_ic is not None and config.report.include_regime_analysis:
             self._stage4_checkpoint("grouped_ic", 5)
             grouped_ic = self._ic_engine.compute_grouped_ic(
@@ -4495,6 +4642,7 @@ class ICFilterOrchestrator:
                 raw_data_for_ic,
                 metadata,
                 config.ic_calculation.grouped_analysis.model_dump(),
+                regime_pair_counts=regime_pair_counts,
             )
 
         # LA-2 B3 close carrier：對齊 features_df index
@@ -4504,6 +4652,8 @@ class ICFilterOrchestrator:
             close_series_out = _build_close_carrier(raw_data_for_ic, features_df.index)
         elif raw_data is not None and "close" in getattr(raw_data, "columns", []):
             close_series_out = _build_close_carrier(raw_data, features_df.index)
+        # ICPERF Task 0.4 ㉖：容量量能載體（同請求整段 kline 對齊特徵時間戳之每根報價幣成交值；與因子擇時序列同一全樣本）
+        quote_value_out = _build_quote_value_carrier(raw_data, features_df.index)
 
         ic_results = {
             "label_series": label_series,
@@ -4513,7 +4663,9 @@ class ICFilterOrchestrator:
             "ic_autocorr": ic_autocorr,
             "ic_decay": ic_decay,
             "grouped_ic": grouped_ic,
+            "regime_pair_counts": regime_pair_counts,
             "close_series": close_series_out,
+            "quote_value_series": quote_value_out,
             "scope": "test" if split_context is not None else "full",
         }
 
@@ -4684,6 +4836,11 @@ class ICFilterOrchestrator:
             turnover_results,
             ic_results.get("ic_decay", {}),
             point_ic=ic_results.get("ic_values") or {},
+            grouped_ic=ic_results.get("grouped_ic"),
+            regime_pair_counts=ic_results.get("regime_pair_counts"),
+            regime_robust_min_samples=int(
+                config.ic_calculation.grouped_analysis.regime_robust_min_samples
+            ),
         )
 
         # ── EVTLABEL Task 3.6：匯入標籤模式之主統計進表 ────────────────────────
@@ -4999,11 +5156,15 @@ class ICFilterOrchestrator:
             "features_df": features_df,
             "label_series": ic_results.get("label_series"),
             "close_series": close_series,
+            # ICPERF Task 0.4 ㉖：容量量能載體（net_ic 日均報價幣成交值之來源）
+            "quote_value_series": ic_results.get("quote_value_series") if isinstance(ic_results, dict) else None,
             "metadata": metadata,
             "icir": ic_results.get("icir", {}),
             "rolling_ic": ic_results.get("rolling_ic", {}),
             "ic_decay": ic_results.get("ic_decay", {}),
             "grouped_ic": ic_results.get("grouped_ic", {}),
+            # ICPERF Task 0.4 ㉓：refilter 重建 summary 時 regime_robust 與首跑同一來源
+            "regime_pair_counts": ic_results.get("regime_pair_counts", {}),
             "event_info": event_info,
             "feature_filter_info": feature_filter_info,
             "stage0_log": stage0_log,
@@ -5120,8 +5281,14 @@ class ICFilterOrchestrator:
         turnover_results: dict,
         ic_decay: dict,
         point_ic: Optional[dict] = None,
+        grouped_ic: Optional[Mapping[str, Any]] = None,
+        regime_pair_counts: Optional[Mapping[str, Mapping[str, int]]] = None,
+        regime_robust_min_samples: int = 30,
     ) -> list[dict]:
         """summary_table 組裝。
+
+        ICPERF Task 0.4 ㉓：`regime_robust`／`regime_robust_reason` 由同請求 `grouped_ic.by_regime` 與其逐 regime 有限配對數
+        （`regime_pair_counts`）導出，方向取同列 `direction`（見 `_regime_robust_fields`）。
 
         🔴 UAT 2026-09-09（事件 run 165 事件、1h 視窗 252/756/1512 > 事件數）：rolling 序列全空 ⇒ `icir_item.ic_mean` 全 NaN
         ⇒ `_apply_thresholds` 之 `ic_mean_min` 把 **5909 個特徵全部砍光**（EVTWARMUP 只豁免了 ICIR，漏了 ic_mean）。
@@ -5131,6 +5298,7 @@ class ICFilterOrchestrator:
         table: list[dict] = []
         point_ic = point_ic or {}
         source_counts = {"rolling_mean": 0, "pooled_point_ic": 0, "unavailable": 0}
+        by_regime = grouped_ic.get("by_regime") if isinstance(grouped_ic, dict) else None
         for feature in feature_names:
             icir_item = icir.get(feature, {})
             ic_mean_val = icir_item.get("ic_mean")
@@ -5148,6 +5316,9 @@ class ICFilterOrchestrator:
             coverage_item = coverage_results.get(feature, {})
             turnover_item = turnover_results.get(feature, {})
             decay_item = ic_decay.get(feature, {})
+            direction_fields = _direction_fields(
+                ic_mean_val, icir_item, quantile_item.get("quantile_returns") or {}
+            )
 
             table.append(
                 {
@@ -5168,10 +5339,11 @@ class ICFilterOrchestrator:
                     "coverage": coverage_item.get("coverage"),
                     "turnover_rate": turnover_item.get("quantile_turnover"),
                     "ic_half_life": decay_item.get("half_life"),
-                    "regime_robust": None,
-                    **_direction_fields(
-                        ic_mean_val, icir_item, quantile_item.get("quantile_returns") or {}
+                    **_regime_robust_fields(
+                        feature, int(direction_fields["direction"]), by_regime,
+                        regime_pair_counts, regime_robust_min_samples,
                     ),
+                    **direction_fields,
                 }
             )
         # ICHC R6 修補（CODEX-R6）：turnover disabled → key 缺席（非 None 值）
@@ -6042,19 +6214,29 @@ class ICFilterOrchestrator:
             features = group.get("features")
             if features is None:
                 raise InvalidInputError("features dataset missing")
-            feature_matrix = features[:]
+            # ICPERF Task 0.4 ⑫：可含 `features_f64`＋`f64_columns`（不無損欄 float64）；依 `feature_names` 全序還原欄序與
+            # dtype；舊格式（只 `features`）讀法不變；`f64_columns` 損壞 ⇒ 拒讀
+            try:
+                n_rows, n_cols, _f64_idx = feature_layout(group)
+            except ValueError as exc:
+                raise InvalidInputError(str(exc)) from exc
 
             timestamps = group.get("timestamps")
             if timestamps is not None:
                 index = pd.Index(timestamps[:], name="timestamp")
             else:
-                index = pd.RangeIndex(start=0, stop=feature_matrix.shape[0])
+                index = pd.RangeIndex(start=0, stop=n_rows)
 
             feature_names = self._read_names(group, "feature_names")
             if not feature_names:
-                feature_names = [f"feature_{i}" for i in range(feature_matrix.shape[1])]
+                feature_names = [f"feature_{i}" for i in range(n_cols)]
 
-            features_df = pd.DataFrame(feature_matrix, columns=feature_names, index=index)
+            try:
+                features_df = read_feature_frame(group, feature_names, index)
+            except ValueError as exc:
+                if _f64_idx.size == 0:
+                    raise
+                raise InvalidInputError(str(exc)) from exc
             metadata = {}
             metadata_json = group.attrs.get("metadata_json")
             if metadata_json:

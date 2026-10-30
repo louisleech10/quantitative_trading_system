@@ -45,6 +45,50 @@ def _finite_or_null(value: Any) -> float | None:
     return fv
 
 
+#: 每根報價幣成交值之來源標記（ICPERF Task 0.4 ㉖）
+QUOTE_VALUE_SOURCE_QUOTE_VOLUME = "quote_volume"
+QUOTE_VALUE_SOURCE_CLOSE_X_VOLUME = "close_x_volume"
+
+
+def bar_quote_value(kline: pd.DataFrame) -> tuple[pd.Series | None, str | None]:
+    """每根報價幣成交值（ICPERF Task 0.4 ㉖ QN-6）：有報價幣成交額欄 `quote_volume` ⇒ 用之；否則 close×volume；
+    兩者皆無 ⇒ (None, None)。一律 float64（kline 快取為 float32，float32 相乘有捨入誤差）；不寫死市場或幣種。
+
+    Returns:
+        (每根成交值序列〔索引同輸入〕, 來源標記)
+    """
+    if QUOTE_VALUE_SOURCE_QUOTE_VOLUME in kline.columns:
+        return (
+            pd.to_numeric(kline[QUOTE_VALUE_SOURCE_QUOTE_VOLUME], errors="coerce").astype(np.float64),
+            QUOTE_VALUE_SOURCE_QUOTE_VOLUME,
+        )
+    if "close" in kline.columns and "volume" in kline.columns:
+        close = pd.to_numeric(kline["close"], errors="coerce").astype(np.float64)
+        volume = pd.to_numeric(kline["volume"], errors="coerce").astype(np.float64)
+        return close * volume, QUOTE_VALUE_SOURCE_CLOSE_X_VOLUME
+    return None, None
+
+
+def average_daily_quote_volume(quote_value: pd.Series | None) -> float | None:
+    """日均報價幣成交值（ICPERF Task 0.4 ㉖ QN-6）：只取有限值，依時間戳之日曆日（索引帶時區 ⇒ 該時區之日界；
+    無時區 ⇒ 索引原值之日界）加總後，對有資料之日取平均。不假設每日根數、不假設 24 小時交易（休市日不計入）。
+
+    索引非 DatetimeIndex、無有限值、平均非有限或 ≤ 0 ⇒ None（容量 unknown）。
+    """
+    if quote_value is None or not isinstance(quote_value.index, pd.DatetimeIndex) or quote_value.empty:
+        return None
+    values = pd.to_numeric(quote_value, errors="coerce").to_numpy(dtype=np.float64)
+    finite = np.isfinite(values)
+    if not bool(finite.any()):
+        return None
+    days = quote_value.index[finite].normalize()
+    daily = pd.Series(values[finite], index=days).groupby(level=0, sort=False).sum()
+    mean = float(daily.mean())
+    if not math.isfinite(mean) or mean <= 0.0:
+        return None
+    return mean
+
+
 def position_to_turnover_series(position: pd.Series) -> pd.Series:
     """D6: turnover_t = |position_t − position_{t−1}|;首 bar=0(fillna,非 NaN-drop)。
 
@@ -240,22 +284,25 @@ class NetICAnalyzer:
     def estimate_factor_capacity(
         self,
         turnover: float,
-        avg_daily_volume_usd: Optional[float] = None,
+        avg_daily_quote_volume: Optional[float] = None,
         participation_rate: float = 0.01,
     ) -> dict:
-        """容量估計(計算本體不變;calibration 由 batch 組 dict 時注入)。"""
+        """容量估計(計算本體不變;calibration 由 batch 組 dict 時注入)。
+
+        ICPERF Task 0.4 ㉖：量能＝日均報價幣成交值，容量以同一報價幣計（欄名幣種中立 `estimated_capacity_quote`）。
+        """
         turnover_value = max(0.0, float(turnover))
-        if avg_daily_volume_usd is None or avg_daily_volume_usd <= 0:
+        if avg_daily_quote_volume is None or avg_daily_quote_volume <= 0:
             return {
-                "estimated_capacity_usd": np.nan,
+                "estimated_capacity_quote": np.nan,
                 "capacity_tier": "unknown",
             }
 
         effective_rate = float(participation_rate or self._participation_rate)
         if turnover_value <= 0:
-            capacity = float(avg_daily_volume_usd * effective_rate)
+            capacity = float(avg_daily_quote_volume * effective_rate)
         else:
-            capacity = float((avg_daily_volume_usd * effective_rate) / turnover_value)
+            capacity = float((avg_daily_quote_volume * effective_rate) / turnover_value)
 
         if turnover_value > 1.0:
             tier = "low"
@@ -265,7 +312,7 @@ class NetICAnalyzer:
             tier = "high"
 
         return {
-            "estimated_capacity_usd": capacity,
+            "estimated_capacity_quote": capacity,
             "capacity_tier": tier,
         }
 
@@ -288,20 +335,25 @@ class NetICAnalyzer:
     def _capacity_payload(
         self,
         turnover: Optional[float],
-        avg_daily_volume_usd: Optional[float],
+        avg_daily_quote_volume: Optional[float],
+        quote_currency: Optional[str],
     ) -> dict[str, Any]:
+        """容量子樹：{estimated_capacity_quote, capacity_tier, calibration, quote_currency}（ICPERF Task 0.4 ㉖：
+        欄名幣種中立；quote_currency＝請求所給之報價幣代號，未給 ⇒ None，不由商品代號猜）。"""
         if turnover is None:
             # 無同列擇時部位序列 ⇒ 換手率未知 ⇒ 容量未知（不以他種換手率代填）
-            return {"estimated_capacity_usd": None, "capacity_tier": "unknown", "calibration": "uncalibrated"}
+            return {"estimated_capacity_quote": None, "capacity_tier": "unknown", "calibration": "uncalibrated",
+                    "quote_currency": quote_currency}
         raw = self.estimate_factor_capacity(
             turnover=float(turnover),
-            avg_daily_volume_usd=avg_daily_volume_usd,
+            avg_daily_quote_volume=avg_daily_quote_volume,
             participation_rate=self._participation_rate,
         )
         return {
-            "estimated_capacity_usd": _finite_or_null(raw.get("estimated_capacity_usd")),
+            "estimated_capacity_quote": _finite_or_null(raw.get("estimated_capacity_quote")),
             "capacity_tier": str(raw.get("capacity_tier", "unknown")),
             "calibration": "uncalibrated",
+            "quote_currency": quote_currency,
         }
 
     def _series_conditional_metrics(
@@ -375,16 +427,19 @@ class NetICAnalyzer:
         ic_summary: dict[str, dict],
         turnover_data: dict[str, float],
         factor_return_series: Optional[dict[str, Any]] = None,
+        quote_currency: Optional[str] = None,
     ) -> dict:
         """依 cost_enabled 輸出 §U 三 profile;series owner 回填 net/breakeven/profitable。
 
         Args:
-            ic_summary: feature → {gross_ic|ic_mean, ...}
+            ic_summary: feature → {gross_ic|ic_mean, avg_daily_quote_volume(可缺), ...};
+                avg_daily_quote_volume＝日均報價幣成交值(ICPERF Task 0.4 ㉖;呼叫端由同請求 kline 計),缺 ⇒ 容量 unknown
             turnover_data: feature → scalar(呼叫端現傳第 5 段 quantile_turnover);只作分析對象與輸入有效性
                 之分流(缺/非有限/負 → skipped),**不入成本、容量計算**(ICPERF Task 0.4 ㉒ QN-1:
                 換手率、cost_drag、成本階梯、容量一律取同列 factor_return_series 之 mean(|Δposition|))
             factor_return_series: feature → FactorTimingReturnSeries(ls_return+position);
                 缺/無效 → conditional metrics unavailable(禁 scalar 廣播)。
+            quote_currency: 容量計價之報價幣代號(原樣入 capacity.quote_currency;未給 ⇒ None)。
         """
         series_map = factor_return_series or {}
 
@@ -433,7 +488,7 @@ class NetICAnalyzer:
                 }
                 continue
 
-            volume = metric.get("avg_daily_volume_usd")
+            volume = metric.get("avg_daily_quote_volume")
             volume_f = float(volume) if volume is not None else None
             series_obj = series_map.get(feature_name)
 
@@ -453,7 +508,7 @@ class NetICAnalyzer:
                     "gross_ic": gross_f,
                     "turnover": series_to,
                     "turnover_semantics": _TURNOVER_SEMANTICS,
-                    "capacity": self._capacity_payload(series_to, volume_f),
+                    "capacity": self._capacity_payload(series_to, volume_f, quote_currency),
                     **cond,
                 }
                 continue
@@ -484,7 +539,7 @@ class NetICAnalyzer:
                 "gross_ic": gross_f,
                 "turnover": series_to,
                 "turnover_semantics": _TURNOVER_SEMANTICS,
-                "capacity": self._capacity_payload(series_to, volume_f),
+                "capacity": self._capacity_payload(series_to, volume_f, quote_currency),
                 "cost_bps": cost_bps,
                 "cost_semantics": _COST_SEMANTICS,
                 "cost_drag_return": drag,

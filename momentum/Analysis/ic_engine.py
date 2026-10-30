@@ -554,8 +554,16 @@ class ICEngine:
         raw_data: pd.DataFrame,
         metadata: dict,
         config: dict,
+        *,
+        regime_pair_counts: Optional[dict[str, dict[str, int]]] = None,
     ) -> dict[str, dict]:
-        """分組 IC 分析."""
+        """分組 IC 分析.
+
+        Args:
+            regime_pair_counts: ICPERF Task 0.4 ㉓——呼叫端傳入空 dict 時，`by_regime` 各 regime 之逐特徵（特徵, 標籤）
+                有限配對數就地寫入（`{regime: {feature: n}}`，與 `by_regime` 同一遮罩、同一對齊）；不進回傳之分組 IC
+                輸出（輸出形狀不變）。None ⇒ 不計。
+        """
 
         grouped_results: dict[str, dict] = {}
         config = config or self._grouped_config
@@ -588,7 +596,8 @@ class ICEngine:
 
         if config.get("by_regime"):
             grouped_results["by_regime"] = self._compute_regime_groups(
-                features_df, label, raw_data, config
+                features_df, label, raw_data, config,
+                pair_counts=regime_pair_counts,
             )
 
         if config.get("by_category"):
@@ -1318,6 +1327,7 @@ class ICEngine:
         label: pd.Series,
         raw_data: pd.DataFrame,
         config: dict,
+        pair_counts: Optional[dict[str, dict[str, int]]] = None,
     ) -> dict[str, dict]:
         close = raw_data.get("close")
         if close is None:
@@ -1328,12 +1338,40 @@ class ICEngine:
 
         if regime_method == "kmeans":
             return self._compute_regime_groups_kmeans(
-                features_df, label, close, raw_data, config
+                features_df, label, close, raw_data, config,
+                pair_counts=pair_counts,
             )
 
         return self._compute_regime_groups_rule(
-            features_df, label, close, config
+            features_df, label, close, config, pair_counts=pair_counts,
         )
+
+    #: 有限配對數逐欄塊之欄數（只限峰值記憶體：每塊 n_rows × 本值之 bool 暫存）
+    _PAIR_COUNT_COL_BLOCK = 512
+
+    @classmethod
+    def _regime_finite_pair_counts(
+        cls,
+        features_df: pd.DataFrame,
+        label: pd.Series,
+        masks: Mapping[str, np.ndarray],
+    ) -> dict[str, dict[str, int]]:
+        """ICPERF Task 0.4 ㉓：各 regime 逐特徵之（特徵, 標籤）兩者皆有限之列數。
+
+        masks 為與 ``features_df`` 列位置對齊之 bool 陣列（同 `by_regime` 取列之遮罩）；標籤依特徵索引對齊（同
+        ``compute_ic`` 之 ``label.loc[idx]``）。逐欄塊計算，峰值暫存＝n_rows × ``_PAIR_COUNT_COL_BLOCK`` bool。
+        """
+        columns = list(features_df.columns)
+        y_ok = np.isfinite(label.reindex(features_df.index).to_numpy(dtype=np.float64))
+        rows = {name: np.asarray(m, dtype=bool) & y_ok for name, m in masks.items()}
+        out: dict[str, dict[str, int]] = {name: {} for name in masks}
+        for start in range(0, len(columns), cls._PAIR_COUNT_COL_BLOCK):
+            block = columns[start:start + cls._PAIR_COUNT_COL_BLOCK]
+            finite = np.isfinite(features_df[block].to_numpy(dtype=np.float64))
+            for name, row_mask in rows.items():
+                counts = finite[row_mask].sum(axis=0)
+                out[name].update(zip(block, (int(c) for c in counts)))
+        return out
 
     @staticmethod
     def _parse_regime_vol_percentiles(regime_defs: dict) -> tuple[float, float]:
@@ -1413,16 +1451,22 @@ class ICEngine:
         label: pd.Series,
         close: pd.Series,
         config: dict,
+        pair_counts: Optional[dict[str, dict[str, int]]] = None,
     ) -> dict[str, dict]:
         """規則式 regime 分組（bull/bear/high_vol/low_vol）。
 
         high/low vol 門檻為 per-t expanding PIT（LA-1 P1-1）；
-        bull/bear 維持 EMA 因果規則不變。
+        bull/bear 維持 EMA 因果規則不變。pair_counts 見 ``compute_grouped_ic``。
         """
         masks = self._build_regime_rule_masks(close, config)
         if masks is None:
             return {}
 
+        if pair_counts is not None:
+            pair_counts.update(self._regime_finite_pair_counts(
+                features_df, label,
+                {name: mask.to_numpy(dtype=bool) for name, mask in masks.items()},
+            ))
         results: dict[str, dict] = {}
         method = config.get("method", self._methods[0])
         for name, mask in masks.items():
@@ -1442,8 +1486,9 @@ class ICEngine:
         close: pd.Series,
         raw_data: pd.DataFrame,
         config: dict,
+        pair_counts: Optional[dict[str, dict[str, int]]] = None,
     ) -> dict[str, dict]:
-        """K-Means 無監督 regime 分組。"""
+        """K-Means 無監督 regime 分組（pair_counts 見 ``compute_grouped_ic``）。"""
         from momentum.Analysis.regime_detector import RegimeDetector
 
         kmeans_cfg = config.get("regime_kmeans", {})
@@ -1467,9 +1512,17 @@ class ICEngine:
 
         results: dict[str, dict] = {}
         method = config.get("method", self._methods[0])
-        for regime_name in set(detection.labels):
-            if not regime_name or regime_name == "unknown":
-                continue
+        # 名稱依字串序（set 之迭代序隨字串雜湊種子而變 ⇒ 輸出鍵序不可重現）
+        regime_names = sorted(
+            str(name) for name in set(detection.labels)
+            if name and name != "unknown"
+        )
+        if pair_counts is not None:
+            pair_counts.update(self._regime_finite_pair_counts(
+                features_df, label,
+                {name: (detection.labels == name)[:len(features_df)] for name in regime_names},
+            ))
+        for regime_name in regime_names:
             mask = detection.labels == regime_name
             idx = features_df.index[mask[:len(features_df)]]
             if len(idx) == 0:

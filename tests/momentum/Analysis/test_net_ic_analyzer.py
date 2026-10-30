@@ -60,10 +60,12 @@ def _assert_union_unavailable(payload: Any) -> None:
 def _assert_capacity(cap: Any) -> None:
     assert isinstance(cap, dict)
     assert set(cap.keys()) == CAPACITY_KEYS
-    usd = cap["estimated_capacity_usd"]
+    # ICPERF Task 0.4 ㉖：容量欄名幣種中立（報價幣計）並附 quote_currency（未給 ⇒ None）
+    usd = cap["estimated_capacity_quote"]
     assert usd is None or (isinstance(usd, (int, float)) and math.isfinite(float(usd)))
     assert isinstance(cap["capacity_tier"], str)
     assert cap["calibration"] == "uncalibrated"
+    assert cap["quote_currency"] is None or isinstance(cap["quote_currency"], str)
 
 
 def test_no_net_ic_key_anywhere() -> None:
@@ -172,7 +174,7 @@ def test_finite_invariants() -> None:
     }
     out = analyzer.batch_analyze(
         {
-            "f1": {"gross_ic": 0.05, "avg_daily_volume_usd": 1_000_000},
+            "f1": {"gross_ic": 0.05, "avg_daily_quote_volume": 1_000_000},
             "f2": {"gross_ic": 0.02},
         },
         {"f1": 0.2, "f2": 0.7},
@@ -181,7 +183,7 @@ def test_finite_invariants() -> None:
     assert out["features"]["f1"]["cost_drag_return"] == pytest.approx(NetICAnalyzer.compute_cost_drag(10.0, 0.2))
     assert out["features"]["f2"]["cost_drag_return"] == pytest.approx(NetICAnalyzer.compute_cost_drag(10.0, 0.7))
     # ICPERF Task 0.4 ㉒ QN-1：無序列 ⇒ 成本拖累 None、容量 unknown，仍 strict-JSON 可序列化、鍵集合不變
-    no_series = analyzer.batch_analyze({"f1": {"gross_ic": 0.05, "avg_daily_volume_usd": 1_000_000}}, {"f1": 0.2})
+    no_series = analyzer.batch_analyze({"f1": {"gross_ic": 0.05, "avg_daily_quote_volume": 1_000_000}}, {"f1": 0.2})
     assert no_series["features"]["f1"]["cost_drag_return"] is None
     assert set(no_series["features"]["f1"].keys()) == SCHEMA_COST_ENABLED
     _assert_capacity(no_series["features"]["f1"]["capacity"])
@@ -328,16 +330,16 @@ def test_factor_returns_bare_series_ignored() -> None:
 def test_capacity_tiers_unchanged() -> None:
     analyzer = NetICAnalyzer({})
     assert analyzer.estimate_factor_capacity(
-        turnover=1.2, avg_daily_volume_usd=1_000_000
+        turnover=1.2, avg_daily_quote_volume=1_000_000
     )["capacity_tier"] == "low"
     assert analyzer.estimate_factor_capacity(
-        turnover=0.2, avg_daily_volume_usd=1_000_000
+        turnover=0.2, avg_daily_quote_volume=1_000_000
     )["capacity_tier"] == "high"
     assert analyzer.estimate_factor_capacity(
-        turnover=0.7, avg_daily_volume_usd=1_000_000
+        turnover=0.7, avg_daily_quote_volume=1_000_000
     )["capacity_tier"] == "medium"
     assert analyzer.estimate_factor_capacity(
-        turnover=0.2, avg_daily_volume_usd=None
+        turnover=0.2, avg_daily_quote_volume=None
     )["capacity_tier"] == "unknown"
 
 

@@ -33,11 +33,13 @@ SCHEMA_COST_ENABLED: frozenset[str] = SCHEMA_GROSS_ONLY | frozenset(
 )
 
 # capacity 允許子鍵(鍵集合+型別斷言,r5)
+# ICPERF Task 0.4 ㉖：容量欄名幣種中立(estimated_capacity_usd → estimated_capacity_quote)並附 quote_currency
 CAPACITY_KEYS: frozenset[str] = frozenset(
     {
-        "estimated_capacity_usd",
+        "estimated_capacity_quote",
         "capacity_tier",
         "calibration",
+        "quote_currency",
     }
 )
 
@@ -53,5 +55,5 @@ def test_schema_profile_constants_frozen() -> None:
     assert "net_ic" not in SCHEMA_COST_ENABLED
     assert SCHEMA_GROSS_ONLY.issubset(SCHEMA_COST_ENABLED)
     assert CAPACITY_KEYS == frozenset(
-        {"estimated_capacity_usd", "capacity_tier", "calibration"}
+        {"estimated_capacity_quote", "capacity_tier", "calibration", "quote_currency"}
     )

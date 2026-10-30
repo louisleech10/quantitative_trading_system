@@ -126,6 +126,12 @@ class LongShortAnalyzer:
         short_raw_returns = ret.loc[short_sel].astype(float)
         short_returns = -short_raw_returns
 
+        # ICPERF Task 0.4 ㉕：逐時點多空序列（趨勢 ls_spread 維；特徵時間軸）＝同上兩側之報酬依時點置回——多側根＝報酬、
+        # 空側根＝負報酬、其餘 NaN（兩側不重疊，見 config 驗證）
+        ls_spread_series = np.full(len(feat), np.nan)
+        ls_spread_series[long_sel.to_numpy(dtype=bool)] = long_returns.to_numpy(dtype=float)
+        ls_spread_series[short_sel.to_numpy(dtype=bool)] = short_returns.to_numpy(dtype=float)
+
         long_analysis = self._compute_side_metrics(
             feat.loc[long_sel],
             long_returns,
@@ -163,6 +169,7 @@ class LongShortAnalyzer:
             "recommendation": recommendation,
             # schema 鎖：固定 q == requested（禁暗示全域實際 bin 數）
             "num_quantiles_used": use_quantiles,
+            "ls_spread_series": ls_spread_series.tolist(),
         }
 
     def batch_analyze(

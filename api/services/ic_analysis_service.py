@@ -56,6 +56,7 @@ from momentum.core.contracts import (
     ICResult,
 )
 from momentum.core.exceptions import AnalysisCancelled
+from momentum.core.h5_feature_precision import write_feature_datasets
 
 
 logger = get_logger("api.ic_analysis_service")
@@ -3448,11 +3449,9 @@ class ICAnalysisService:
             # FF-NAME Task 3.4（v18）：IC 交接 h5 根屬性＝寫入資料之命名世代（資料來自已過世代閘之 FeatureLibrary）
             stamp_h5_feature_naming_version(file.attrs)
             group = file.create_group(group_key)
-            group.create_dataset(
-                "features",
-                data=features_df.to_numpy(dtype=np.float32),
-                compression="gzip",
-            )
+            # ICPERF Task 0.4 ⑫：逐欄 float32 無損判定——無損欄 `features`（float32）、不無損欄 `features_f64`（float64）
+            # ＋`f64_columns`；全無損 ⇒ 與舊寫法位元相同。`feature_names` 為全序。
+            write_feature_datasets(group, features_df, compression="gzip")
             group.create_dataset("timestamps", data=timestamps, compression="gzip")
             str_dtype = h5py.string_dtype(encoding="utf-8")
             group.create_dataset(

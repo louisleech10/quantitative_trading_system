@@ -314,8 +314,11 @@ class ICResult:
     coverage: Optional[float] = None
     turnover_rate: Optional[float] = None
     ic_half_life: Optional[float] = None
+    # ICPERF Task 0.4 ㉓：由同請求 grouped_ic.by_regime 導出；None 時 regime_robust_reason ∈
+    # {"regime_analysis_off", "insufficient_regimes"}，非 None 時 reason 為 None
     regime_robust: Optional[bool] = None
     eval_status: EvaluationStatus = EvaluationStatus.UNKNOWN_LEGACY
+    regime_robust_reason: Optional[str] = None
 
 
 def filter_evaluated(results: List[ICResult]) -> List[ICResult]:

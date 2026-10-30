@@ -90,6 +90,8 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     f"{FQ}/drift_results/*/reason": _f("fq.drift", f"{_FQ_PY}:150,241,251"),
     f"{FQ}/drift_results/*/cusum_breakpoint": _f("fq.cusum", f"{_FQ_PY}:156-159,170"),
     f"{FQ}/drift_results/*/psi_score": _f("fq.psi", f"{_FQ_PY}:162-165,171,321-337"),
+    # ICPERF Task 0.4 ㉖：PSI 近期窗＝drift_window；觀測不足 ⇒ PSI NaN 並記原因
+    f"{FQ}/drift_results/*/psi_reason": _f("fq.psi", f"{_FQ_PY}:detect_concept_drift"),
     f"{FQ}/drift_results/*/drifted": _f("fq.drift", f"{_FQ_PY}:158-160,166"),
     f"{FQ}/coverage_stats/*/coverage": _f("fq.coverage", f"{_FQ_PY}:180-182"),
     f"{FQ}/coverage_stats/*/nan_count": _f("fq.coverage", f"{_FQ_PY}:181"),
@@ -115,9 +117,11 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     f"{NET}/features/*/gross_ic": _f("net.gross_ic", f"{_NET_PY}:409-411,446,469;{_ORCH_PY}:3241-3245"),
     f"{NET}/features/*/turnover": _f("net.turnover", f"{_NET_PY}:384-386,447,470;{_ORCH_PY}:3246-3250"),
     f"{NET}/features/*/turnover_semantics": _f(NON_STAT, f"{_NET_PY}:16,448,471"),
-    f"{NET}/features/*/capacity/estimated_capacity_usd": _f("net.capacity", f"{_NET_PY}:239-257,282"),
+    # ICPERF Task 0.4 ㉖：容量欄名幣種中立（報價幣計價）並附 quote_currency
+    f"{NET}/features/*/capacity/estimated_capacity_quote": _f("net.capacity", f"{_NET_PY}:239-257,282"),
     f"{NET}/features/*/capacity/capacity_tier": _f("net.capacity", f"{_NET_PY}:259-264,283"),
     f"{NET}/features/*/capacity/calibration": _f(NON_STAT, f"{_NET_PY}:284"),
+    f"{NET}/features/*/capacity/quote_currency": _f(NON_STAT, f"{_NET_PY}:_capacity_payload"),
     f"{NET}/features/*/cost_bps": _f(NON_STAT, f"{_NET_PY}:456,473"),
     f"{NET}/features/*/cost_semantics": _f(NON_STAT, f"{_NET_PY}:17,474"),
     f"{NET}/features/*/cost_drag_return": _f("net.cost_drag", f"{_NET_PY}:175-180,457,475"),
@@ -282,7 +286,13 @@ def _fq_cfg(config: Optional[Mapping[str, Any]]) -> Dict[str, float]:
         "drift_threshold": float(cfg.get("drift_threshold", 0.25)),
         "redundancy_threshold": float(cfg.get("redundancy_threshold", 0.85)),
         "adf_min_samples": int(cfg.get("adf_min_samples", 20)),
+        # ㉖：PSI 近期窗（schema 預設 60）
+        "drift_window": int(cfg.get("drift_window", 60)),
     }
+
+
+#: ㉖ PSI 觀測不足之原因碼（oracle 定義：近期窗後之參照段 < 5 筆）
+PSI_INSUFFICIENT_REASON = "insufficient_observations_for_drift_window"
 
 
 def _ref_adf(values: np.ndarray, significance: float, min_samples: int) -> Dict[str, Any]:
@@ -362,11 +372,13 @@ def _ref_psi(front: np.ndarray, back: np.ndarray, bins: int = 10) -> float:
     return float(np.sum((fr - br) * np.log(fr / br)))
 
 
-def _ref_drift(series: Optional[pd.Series], name: str, drift_threshold: float, reason_absent: str) -> Dict[str, Any]:
+def _ref_drift(series: Optional[pd.Series], name: str, drift_threshold: float, reason_absent: str,
+               drift_window: int = 60) -> Dict[str, Any]:
     """漂移 oracle：去缺值後 < 20 跳過（`:145-154`）；斷點＝argmax|Σ(x−x̄)| 之索引標籤（同產品，取首次）；
     CUSUM 判定（自算 Ploberger–Krämer OLS-CUSUM，不呼叫產品所用之 statsmodels 函式）：e＝x−x̄，
     sup_b＝max_k|Σ_{i≤k} e_i|／√Σe²，p＝`scipy.stats.kstwobign.sf(sup_b)`（Brownian bridge 上確界分布），p < ORACLE_CUSUM_ALPHA；
-    Σe²＝0 ⇒ p 非有限 ⇒ 不判；PSI 前後兩半（`:162-165`）＞門檻；兩者取或。"""
+    Σe²＝0 ⇒ p 非有限 ⇒ 不判；PSI（ICPERF Task 0.4 ㉖）＝最近 drift_window 個有限觀測（近期）對其之前全部有限觀測（參照）
+    之 `_ref_psi`，參照段 < 5 筆 ⇒ PSI NaN、psi_reason＝PSI_INSUFFICIENT_REASON（否則 None）；PSI＞門檻；兩者取或。"""
     if series is None:
         return {"feature_name": name, "skipped": True, "reason": reason_absent, "cusum_breakpoint": None,
                 "psi_score": math.nan, "drifted": False}
@@ -386,12 +398,15 @@ def _ref_drift(series: Optional[pd.Series], name: str, drift_threshold: float, r
         cusum_p = float(stats.kstwobign.sf(float(np.max(np.abs(cum))) / math.sqrt(ss)))
     else:
         cusum_p = math.nan
-    mid = x.size // 2
-    psi = _ref_psi(x[:mid], x[mid:])
+    n_ref = x.size - drift_window
+    if n_ref < 5:
+        psi, psi_reason = math.nan, PSI_INSUFFICIENT_REASON
+    else:
+        psi, psi_reason = _ref_psi(x[:n_ref], x[n_ref:]), None
     drifted = bool((math.isfinite(cusum_p) and cusum_p < ORACLE_CUSUM_ALPHA)
                    or (math.isfinite(psi) and psi > drift_threshold))
     return {"feature_name": name, "cusum_breakpoint": str(bp), "psi_score": psi if math.isfinite(psi) else math.nan,
-            "drifted": drifted, "skipped": False}
+            "psi_reason": psi_reason, "drifted": drifted, "skipped": False}
 
 
 def _ref_redundancy(df: pd.DataFrame, threshold: float) -> Dict[str, Any]:
@@ -439,9 +454,9 @@ def ref_feature_quality_diagnostics(
         cov[name] = {"coverage": float(nn / total) if total > 0 else 0.0, "nan_count": int(total - nn), "total": int(total)}
         if rolling_ic_dict:
             series = rolling_ic_dict.get(name)
-            drift[name] = _ref_drift(series, name, c["drift_threshold"], "rolling_ic_missing")
+            drift[name] = _ref_drift(series, name, c["drift_threshold"], "rolling_ic_missing", c["drift_window"])
         else:
-            drift[name] = _ref_drift(None, name, c["drift_threshold"], "rolling_ic_unavailable")
+            drift[name] = _ref_drift(None, name, c["drift_threshold"], "rolling_ic_unavailable", c["drift_window"])
     flags = {
         "non_stationary": [n for n in cols if not adf[n]["skipped"] and math.isfinite(adf[n]["p_value"])
                            and adf[n]["p_value"] >= c["adf_significance"]],
@@ -512,18 +527,43 @@ def _ref_ok(value: Any) -> Dict[str, Any]:
     return {"status": "ok", "value": value, "reason": None}
 
 
-def _ref_capacity(turnover: Optional[float], volume: Optional[float], rate: float) -> Dict[str, Any]:
+def _ref_capacity(turnover: Optional[float], volume: Optional[float], rate: float,
+                  quote_currency: Optional[str] = None) -> Dict[str, Any]:
     """容量 oracle（產品 `:239-285`）：換手率未知（無序列）或無量能 ⇒ None／unknown；否則 量能×參與率／換手率
-    （換手率 0 ⇒ 不除）；級距：換手率 > 1 ⇒ low、> 0.5 ⇒ medium、否則 high。"""
+    （換手率 0 ⇒ 不除）；級距：換手率 > 1 ⇒ low、> 0.5 ⇒ medium、否則 high。ICPERF Task 0.4 ㉖：量能＝日均報價幣成交值，
+    容量以報價幣計（欄名幣種中立 `estimated_capacity_quote`），並原樣附 `quote_currency`。"""
+    unknown = {"estimated_capacity_quote": None, "capacity_tier": "unknown", "calibration": "uncalibrated",
+               "quote_currency": quote_currency}
     if turnover is None or volume is None or volume <= 0:
-        return {"estimated_capacity_usd": None, "capacity_tier": "unknown", "calibration": "uncalibrated"}
+        return unknown
     t = max(0.0, turnover)
-    if volume <= 0:
-        return {"estimated_capacity_usd": None, "capacity_tier": "unknown", "calibration": "uncalibrated"}
     cap = volume * rate if t <= 0 else volume * rate / t
     tier = "low" if t > 1.0 else ("medium" if t > 0.5 else "high")
-    return {"estimated_capacity_usd": cap if math.isfinite(cap) else None, "capacity_tier": tier,
-            "calibration": "uncalibrated"}
+    return {"estimated_capacity_quote": cap if math.isfinite(cap) else None, "capacity_tier": tier,
+            "calibration": "uncalibrated", "quote_currency": quote_currency}
+
+
+def _ref_daily_quote_volume(quote_value: pd.Series) -> Optional[float]:
+    """日均報價幣成交值 oracle（ICPERF Task 0.4 ㉖）：只取有限值；pandas `resample("1D")`（依索引自身時區之日曆日界）
+    `sum(min_count=1)`，去掉無資料之日（不假設每日根數、不假設 24 小時交易）後取平均；無日、非有限或 ≤ 0 ⇒ None。"""
+    s = pd.Series(quote_value, dtype=float)
+    s = s[np.isfinite(s.to_numpy(dtype=float))]
+    if s.empty:
+        return None
+    daily = s.resample("1D").sum(min_count=1).dropna()
+    if daily.empty:
+        return None
+    v = float(daily.mean())
+    return v if math.isfinite(v) and v > 0.0 else None
+
+
+def _ref_bar_quote_value(kline: pd.DataFrame) -> Optional[pd.Series]:
+    """每根報價幣成交值 oracle（㉖）：有報價幣成交額欄 `quote_volume` ⇒ 該欄（float64）；否則 close×volume（float64）；皆無 ⇒ None。"""
+    if "quote_volume" in kline.columns:
+        return kline["quote_volume"].astype("float64")
+    if "close" in kline.columns and "volume" in kline.columns:
+        return kline["close"].astype("float64") * kline["volume"].astype("float64")
+    return None
 
 
 def ref_net_ic_analysis(
@@ -531,8 +571,10 @@ def ref_net_ic_analysis(
     turnover_data: Mapping[str, Any],
     factor_return_series: Optional[Mapping[str, Any]] = None,
     config: Optional[Mapping[str, Any]] = None,
+    quote_currency: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """`NetICAnalyzer(config).batch_analyze(ic_summary, turnover_data, factor_return_series)` 之獨立參考實作。
+    """`NetICAnalyzer(config).batch_analyze(ic_summary, turnover_data, factor_return_series, quote_currency=…)` 之獨立參考實作
+    （量能鍵＝逐列 `avg_daily_quote_volume`，ICPERF Task 0.4 ㉖）。
     跳過分支同產品（換手率輸入缺／非有限／負、gross 缺）；**換手率 oracle**＝該特徵因子擇時序列之
     mean(|Δposition|)（序列有效且對齊後非空時；否則 None——輸入之 turnover_data 不入任何成本計算），
     成本拖累＝(c／10⁴)×換手率（＝gross 均值 − net 均值），階梯、容量同此換手率（None ⇒ 拖累 None、階梯值 None、容量 unknown，
@@ -629,8 +671,8 @@ def ref_net_ic_analysis(
                         cond["breakeven_cost_bps"] = _ref_ok(be) if be is not None and math.isfinite(be) \
                             else _ref_unavail(reason_be or "zero_mean_turnover")
                         cond["profitable_after_cost"] = _ref_ok(profitable)
-        vol = metric.get("avg_daily_volume_usd")
-        cap = _ref_capacity(turnover, float(vol) if vol is not None else None, rate)
+        vol = metric.get("avg_daily_quote_volume")
+        cap = _ref_capacity(turnover, float(vol) if vol is not None else None, rate, quote_currency)
         row: Dict[str, Any] = {"gross_ic": g, "turnover": turnover, "turnover_semantics": "membership_change_both_legs_per_bar",
                                "capacity": cap}
         if evaluable:
@@ -663,9 +705,11 @@ def compare_net_ic_analysis(
     turnover_data: Mapping[str, Any],
     factor_return_series: Optional[Mapping[str, Any]] = None,
     config: Optional[Mapping[str, Any]] = None,
+    quote_currency: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
-    """產品 `batch_analyze` 輸出 vs oracle；輸入＝產品公開入口之同一組（三參數＋建構 config）。"""
-    return _compare(product_output, ref_net_ic_analysis(ic_summary, turnover_data, factor_return_series, config), NET)
+    """產品 `batch_analyze` 輸出 vs oracle；輸入＝產品公開入口之同一組（三參數＋建構 config＋quote_currency）。"""
+    return _compare(product_output, ref_net_ic_analysis(ic_summary, turnover_data, factor_return_series, config,
+                                                        quote_currency), NET)
 
 
 def _assert_consistent(cmp: Dict[str, Dict[str, Any]], fields: Optional[Sequence[str]] = None,
@@ -779,17 +823,21 @@ def _drift_inputs() -> Tuple[pd.DataFrame, Dict[str, pd.Series]]:
 
 def test_fq_drift_psi_breakpoint_match_oracle_boundaries() -> None:
     """漂移：跳過分支、PSI（自算計數）、CUSUM 斷點（argmax |Σ|）、均值大幅移位時之漂移判定，皆與 oracle 一致；
-    滾動 IC 缺鍵 ⇒ rolling_ic_missing；未給滾動 IC ⇒ rolling_ic_unavailable。"""
+    滾動 IC 缺鍵 ⇒ rolling_ic_missing；未給滾動 IC ⇒ rolling_ic_unavailable。
+    （ICPERF Task 0.4 ㉖：PSI 改為近期窗定義；本案設 drift_window＝10，使 30 筆之 few 仍走「邊界 < 3 ⇒ 0」分支——
+    舊碼前後兩半之定義下 few 亦為 0，預設窗 60 下 few 之參照段不足 ⇒ NaN，由 test_fq_psi_* 另案覆蓋。）"""
     df, ric = _drift_inputs()
-    out = FeatureQualityDiagnostics({}).run_full_diagnostics(df, rolling_ic_dict=ric)
-    cmp = compare_feature_quality_diagnostics(out, df, ric)
+    cfg = {"drift_window": 10}
+    out = FeatureQualityDiagnostics(cfg).run_full_diagnostics(df, rolling_ic_dict=ric)
+    cmp = compare_feature_quality_diagnostics(out, df, ric, cfg)
     _assert_consistent(cmp, [f"{FQ}/drift_results/*/skipped", f"{FQ}/drift_results/*/reason",
-                             f"{FQ}/drift_results/*/cusum_breakpoint", f"{FQ}/drift_results/*/psi_score"])
+                             f"{FQ}/drift_results/*/cusum_breakpoint", f"{FQ}/drift_results/*/psi_score",
+                             f"{FQ}/drift_results/*/psi_reason"])
     assert out["drift_results"]["s19"]["reason"] == "insufficient_rolling_ic"
     assert out["drift_results"]["nokey"]["reason"] == "rolling_ic_missing"
     assert out["drift_results"]["few"]["psi_score"] == 0.0
     assert out["drift_results"]["shift"]["drifted"] is True
-    ref = ref_feature_quality_diagnostics(df, ric)
+    ref = ref_feature_quality_diagnostics(df, ric, cfg)
     assert ref["drift_results"]["shift"]["drifted"] is True
     none = FeatureQualityDiagnostics({}).run_full_diagnostics(df)
     _assert_consistent(compare_feature_quality_diagnostics(none, df), [f"{FQ}/drift_results/*/reason"])
@@ -805,6 +853,132 @@ def test_fq_drift_iid_noise_not_flagged(n: int) -> None:
     assert ref["drifted"] is False
     out = FeatureQualityDiagnostics({}).detect_concept_drift(ric["x"], "x")
     assert out["drifted"] is ref["drifted"]
+
+
+# ── 秒級：㉖ PSI 近期窗（drift_window）、adf_min_samples ──────────────────────────────────────────────
+
+
+def _psi_series(n: int, recent_shift: int, seed: int, nan_at: Sequence[int] = ()) -> pd.Series:
+    """i.i.d. 常態 n 筆；最後 recent_shift 筆均值移位 +0.8（只近期變化 ⇒ 前後兩半之舊定義與近期窗定義必不同）；nan_at 置缺值。"""
+    x = np.random.default_rng(seed).normal(size=n)
+    if recent_shift:
+        x[-recent_shift:] += 0.8
+    x[list(nan_at)] = np.nan
+    return pd.Series(x)
+
+
+@pytest.mark.parametrize("window", [10, 60, 200])
+def test_fq_psi_recent_window_matches_numpy_oracle(window: int) -> None:
+    """㉖：PSI＝最近 drift_window 個有限觀測（近期）對其之前全部有限觀測（參照）；oracle＝獨立 numpy `_ref_psi`（等分位邊界、
+    searchsorted 計數）於同窗重算。300 筆、只最後 40 筆移位、近期窗內外皆有缺值（窗以有限觀測計、非以列計）；
+    CUSUM 斷點與判定不隨窗而變（同 oracle）。另證本案可分辨定義：oracle 近期窗值 ≠ 前後兩半之值（舊碼定義）。"""
+    s = _psi_series(300, 40, 61, nan_at=(100, 280, 295))
+    out = FeatureQualityDiagnostics({"drift_window": window}).detect_concept_drift(s, "x")
+    ref = _ref_drift(s, "x", 0.25, "rolling_ic_missing", window)
+    assert out["skipped"] is False
+    assert out.get("psi_reason", "缺鍵") is None and ref["psi_reason"] is None
+    assert math.isfinite(ref["psi_score"]) and _rel(out["psi_score"], ref["psi_score"]) <= REL_TOL, (out, ref)
+    assert out["cusum_breakpoint"] == ref["cusum_breakpoint"] and out["drifted"] is ref["drifted"]
+    x = s.dropna().to_numpy()
+    assert _ref_psi(x[: x.size // 2], x[x.size // 2:]) != ref["psi_score"]
+
+
+@pytest.mark.parametrize("extra", [4, 5])
+def test_fq_psi_insufficient_observations_reason(extra: int) -> None:
+    """㉖ 邊界：有限觀測＝drift_window＋4（參照段 4 筆 < 5）⇒ PSI NaN、psi_reason＝PSI_INSUFFICIENT_REASON，仍非 skipped 且
+    CUSUM 照算；＝drift_window＋5 ⇒ PSI 有限、psi_reason None；兩格皆與 oracle 一致（缺值 2 筆不計入觀測數）。"""
+    w = 60
+    s = _psi_series(w + extra + 2, 0, 62, nan_at=(3, 7))
+    out = FeatureQualityDiagnostics({"drift_window": w}).detect_concept_drift(s, "x")
+    ref = _ref_drift(s, "x", 0.25, "rolling_ic_missing", w)
+    assert out["skipped"] is False and out["cusum_breakpoint"] == ref["cusum_breakpoint"]
+    assert out.get("psi_reason", "缺鍵") == ref["psi_reason"]
+    assert _rel(out["psi_score"], ref["psi_score"]) <= REL_TOL
+    if extra == 4:
+        assert math.isnan(out["psi_score"]) and out["psi_reason"] == PSI_INSUFFICIENT_REASON
+    else:
+        assert math.isfinite(out["psi_score"]) and out["psi_reason"] is None
+
+
+def test_fq_drift_window_from_schema_reaches_diagnostics() -> None:
+    """㉖：schema `drift_window`（預設 60）經呼叫端 `_run_feature_quality_diagnostics`（ICConfig.model_dump）生效：
+    改值 ⇒ 該特徵 PSI＝同窗 oracle 值（改前此鍵未被讀、恆前後兩半）。"""
+    s = _psi_series(300, 40, 63)
+    feats = pd.DataFrame({"x": np.zeros(10)})
+    for w in (60, 25):
+        cfg = ICConfig(feature_quality_diagnostics={"drift_window": w})
+        stub = SimpleNamespace(_ic_cache={"features_df": feats, "rolling_ic": {"x": {"window_63": s.tolist()}}},
+                               _extract_rolling_ic_series=ICFilterOrchestrator._extract_rolling_ic_series)
+        out = ICFilterOrchestrator._run_feature_quality_diagnostics(stub, ["x"], cfg)["drift_results"]["x"]
+        ref = _ref_drift(s, "x", cfg.feature_quality_diagnostics.drift_threshold, "rolling_ic_missing", w)
+        assert _rel(out["psi_score"], ref["psi_score"]) <= REL_TOL, (w, out, ref)
+
+
+@pytest.mark.parametrize("min_samples", [20, 50])
+def test_fq_adf_min_samples_schema_moves_skip_boundary(min_samples: int) -> None:
+    """㉖：品質設定 schema 含 `adf_min_samples`（預設 20＝現行），經 ICConfig.model_dump 傳入產品；有限樣本＝m−1 ⇒
+    insufficient_samples、＝m ⇒ 實際檢定，與 statsmodels oracle（`_ref_adf` 同 m）一致。改前 schema 無此鍵
+    （pydantic 預設靜默吞鍵）⇒ 產品恆用 20。"""
+    assert ICConfig().feature_quality_diagnostics.model_dump().get("adf_min_samples") == 20
+    cfg = ICConfig(feature_quality_diagnostics={"adf_min_samples": min_samples}).feature_quality_diagnostics.model_dump()
+    assert cfg.get("adf_min_samples") == min_samples
+    n = 120
+    cols: Dict[str, np.ndarray] = {}
+    for tag, m in (("below", min_samples - 1), ("at", min_samples)):
+        v = np.full(n, np.nan)
+        v[-m:] = _ar1(m, 0.3, 40 + m)
+        cols[tag] = v
+    df = pd.DataFrame(cols)
+    out = FeatureQualityDiagnostics(cfg).run_batch_adf_test(df)
+    for tag in cols:
+        ref = _ref_adf(df[tag].to_numpy(), cfg["adf_significance"], min_samples)
+        assert out[tag]["skipped"] is ref["skipped"] and out[tag].get("reason") == ref.get("reason"), (tag, out[tag], ref)
+        if not ref["skipped"]:
+            assert _rel(out[tag]["adf_statistic"], ref["adf_statistic"]) <= REL_TOL
+    assert out["below"]["reason"] == "insufficient_samples" and out["at"]["skipped"] is False
+
+
+def test_fq_adf_min_samples_schema_bounds() -> None:
+    """㉖：`adf_min_samples` 域下界 10（低於即設定錯誤，同 `drift_window` 下界；我的判斷：更少樣本之 ADF 無統計意義）。"""
+    with pytest.raises(ValueError):
+        ICConfig(feature_quality_diagnostics={"adf_min_samples": 9})
+    assert ICConfig(feature_quality_diagnostics={"adf_min_samples": 10}).feature_quality_diagnostics.adf_min_samples == 10
+
+
+# ── 秒級：㉖ 日均報價幣成交值（容量量能） ────────────────────────────────────────────────────────────
+
+
+def test_average_daily_quote_volume_unit_boundaries() -> None:
+    """㉖ 精確 oracle 單元邊界（真實資料案見 requires_kline）：空／全缺／全 0 ⇒ None；跨 UTC 午夜之時刻依日曆日分日、
+    缺值與 inf 不計；索引帶時區 ⇒ 依該時區之日曆日（同一批時刻於 UTC+9 落同一日）；整日無資料之日不計入平均（休市日）。
+    皆 == pandas `resample("1D")` oracle。"""
+    from momentum.Analysis.net_ic_analyzer import average_daily_quote_volume
+
+    idx = pd.date_range("2024-03-01 21:00", periods=6, freq="h")
+    assert average_daily_quote_volume(pd.Series([], index=pd.DatetimeIndex([]), dtype=float)) is None
+    assert average_daily_quote_volume(pd.Series(np.nan, index=idx)) is None
+    assert average_daily_quote_volume(pd.Series(0.0, index=idx)) is None
+    vals = pd.Series([1.0, 2.0, np.nan, 4.0, np.inf, 8.0], index=idx)
+    assert average_daily_quote_volume(vals) == _ref_daily_quote_volume(vals) == 7.5
+    local = vals.copy()
+    local.index = idx.tz_localize("UTC").tz_convert("Asia/Tokyo")
+    assert average_daily_quote_volume(local) == _ref_daily_quote_volume(local) == 15.0
+    gap = pd.Series([1.0, 1.0, 4.0], index=pd.DatetimeIndex(["2024-03-04 10:00", "2024-03-04 11:00", "2024-03-06 10:00"]))
+    assert average_daily_quote_volume(gap) == _ref_daily_quote_volume(gap) == 3.0
+
+
+def test_bar_quote_value_column_branches() -> None:
+    """㉖：每根報價幣成交值——有 `quote_volume` 欄 ⇒ 用之（float64）；否則 close×volume（float64 相乘，非 float32）；皆無 ⇒ None。"""
+    from momentum.Analysis.net_ic_analyzer import bar_quote_value
+
+    k = pd.DataFrame({"close": np.array([2.5, 3.1], dtype=np.float32), "volume": np.array([5.3, 7.7], dtype=np.float32),
+                      "quote_volume": np.array([11.0, 23.0], dtype=np.float32)})
+    v, src = bar_quote_value(k)
+    assert src == "quote_volume" and v.dtype == np.float64 and v.tolist() == [11.0, 23.0]
+    v2, src2 = bar_quote_value(k.drop(columns=["quote_volume"]))
+    assert src2 == "close_x_volume" and v2.dtype == np.float64
+    assert v2.tolist() == _ref_bar_quote_value(k.drop(columns=["quote_volume"])).tolist()
+    assert bar_quote_value(k[["close"]]) == (None, None)
 
 
 def test_fq_redundancy_matches_scipy_boundaries() -> None:
@@ -924,10 +1098,11 @@ def _net_inputs() -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any], Dict[str, 
         ["flip", "hold", "gap", "loss", "bare", "noser", "big", "nan_t", "neg_t", "str_t", "missing_t"])}
     summary["nan_g"] = {"ic_mean": math.nan}
     summary["none_g"] = {"ic_mean": None}
-    summary["noser"]["avg_daily_volume_usd"] = 2.0e8
-    summary["big"]["avg_daily_volume_usd"] = 2.0e8
-    summary["flip"]["avg_daily_volume_usd"] = 1.0e8
-    summary["hold"]["avg_daily_volume_usd"] = 1.0e8
+    # ㉖：量能鍵改幣種中立（日均報價幣成交值）
+    summary["noser"]["avg_daily_quote_volume"] = 2.0e8
+    summary["big"]["avg_daily_quote_volume"] = 2.0e8
+    summary["flip"]["avg_daily_quote_volume"] = 1.0e8
+    summary["hold"]["avg_daily_quote_volume"] = 1.0e8
     return summary, turnover, series
 
 
@@ -982,7 +1157,7 @@ def test_net_ic_invalid_position_sequence_fail_closed(bad: float) -> None:
                                  position=pd.Series([1.0, bad, 1.0, 1.0], index=idx, dtype=float),
                                  index_policy="frame_dropna")
     cfg = {"cost_enabled": True, "cost_bps": 10.0}
-    summary = {"f": {"ic_mean": 0.1, "avg_daily_volume_usd": 1.0e8}}
+    summary = {"f": {"ic_mean": 0.1, "avg_daily_quote_volume": 1.0e8}}
     out = NetICAnalyzer(cfg).batch_analyze(summary, {"f": math.nan}, factor_return_series={"f": s})
     _assert_consistent(compare_net_ic_analysis(out, summary, {"f": math.nan}, {"f": s}, cfg))
     row = out["features"]["f"]
@@ -1007,10 +1182,10 @@ def test_net_ic_turnover_consistent_with_series() -> None:
     s2 = _series([0, 1, -1, -1, 1, 0, 0, 1, 1, -1] * 3, np.random.default_rng(2).normal(0.001, 0.01, 30))
     to2 = _series_turnover(s2)
     vol = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0}).batch_analyze(
-        {"f": {"ic_mean": 0.05, "avg_daily_volume_usd": 1.0e8}}, {"f": 0.2}, factor_return_series={"f": s2})
+        {"f": {"ic_mean": 0.05, "avg_daily_quote_volume": 1.0e8}}, {"f": 0.2}, factor_return_series={"f": s2})
     for item in vol["features"]["f"]["cost_sensitivity"]:
         assert _rel(item["cost_drag_return"], item["cost_bps"] / 10000.0 * to2) <= REL_TOL
-    assert _rel(vol["features"]["f"]["capacity"]["estimated_capacity_usd"], 1.0e8 * 0.01 / to2) <= REL_TOL
+    assert _rel(vol["features"]["f"]["capacity"]["estimated_capacity_quote"], 1.0e8 * 0.01 / to2) <= REL_TOL
     assert _rel(vol["summary"]["avg_cost_drag_return"], 10.0 / 10000.0 * to2) <= REL_TOL
 
 
@@ -1022,7 +1197,7 @@ def test_net_ic_no_series_cost_metrics_null() -> None:
     empty_aligned = FactorTimingReturnSeries(feature="e", ls_return=pd.Series(np.nan, index=idx),
                                              position=pd.Series([0, 1, 1, 0, 1], index=idx, dtype=int),
                                              index_policy="frame_dropna")
-    summary = {k: {"ic_mean": 0.02, "avg_daily_volume_usd": 1.0e8} for k in ("none", "bare", "e")}
+    summary = {k: {"ic_mean": 0.02, "avg_daily_quote_volume": 1.0e8} for k in ("none", "bare", "e")}
     turnover = {"none": 0.4, "bare": 0.4, "e": 0.4}
     series = {"bare": pd.Series([0.1]), "e": empty_aligned}
     for c in (cfg, {}):
@@ -1040,11 +1215,12 @@ def test_net_ic_no_series_cost_metrics_null() -> None:
 
 def test_net_ic_caller_passes_quantile_turnover_and_disabled_envelope() -> None:
     """呼叫端 `ic_filter_orchestrator.py:3233-3268`：turnover 停用 ⇒ {status: unavailable, reason: turnover_disabled}；
-    否則 ic_summary 只帶 summary_table 之 ic_mean（無 avg_daily_volume_usd ⇒ 容量恆 unknown）；呼叫端所傳 quantile_turnover
-    只作分流，輸出換手率＝同列序列之 mean(|Δposition|)（QN-1）。"""
+    否則 ic_summary 帶 summary_table 之 ic_mean 與同請求 kline 之日均報價幣成交值（ICPERF Task 0.4 ㉖；無成交值載體 ⇒
+    容量 unknown）；呼叫端所傳 quantile_turnover 只作分流，輸出換手率＝同列序列之 mean(|Δposition|)（QN-1）。"""
     stub = SimpleNamespace(
         _report={"turnover_analysis": {"status": "disabled", "reason": "turnover_disabled"}},
         _factor_return_series={},
+        _ic_cache={},
         _net_ic_payload_depends_on_series_owner=ICFilterOrchestrator._net_ic_payload_depends_on_series_owner,
     )
     out = ICFilterOrchestrator._run_net_ic(stub, ["f"], ICConfig())
@@ -1055,10 +1231,23 @@ def test_net_ic_caller_passes_quantile_turnover_and_disabled_envelope() -> None:
     stub._factor_return_series = {"f": s}
     got = ICFilterOrchestrator._run_net_ic(stub, ["f"], ICConfig())
     direct = NetICAnalyzer(ICConfig().net_ic_analysis.model_dump()).batch_analyze(
-        {"f": {"ic_mean": 0.03}}, {"f": 0.25}, factor_return_series={"f": s})
+        {"f": {"ic_mean": 0.03, "avg_daily_quote_volume": None}}, {"f": 0.25}, factor_return_series={"f": s})
     assert got == direct
     assert got["features"]["f"]["turnover"] == _series_turnover(s) != 0.25
     assert got["features"]["f"]["capacity"]["capacity_tier"] == "unknown"
+    # ㉖：有同請求 kline 之每根報價幣成交值載體（30 根 1h：首日 24 根、次日 6 根）⇒ 日均成交值＝日曆日加總後平均
+    # （oracle `resample("1D")`），容量＝日均×參與率／序列換手率；quote_currency 由請求 metadata 原樣帶出
+    carrier = pd.Series(np.arange(1.0, 31.0) * 1000.0, index=s.ls_return.index)
+    stub._ic_cache = {"quote_value_series": carrier, "metadata": {"quote_currency": "QC"}}
+    got2 = ICFilterOrchestrator._run_net_ic(stub, ["f"], ICConfig())
+    cap = got2["features"]["f"]["capacity"]
+    adv = _ref_daily_quote_volume(carrier)
+    assert adv is not None and cap["quote_currency"] == "QC" and cap["capacity_tier"] != "unknown"
+    assert _rel(cap["estimated_capacity_quote"], adv * ICConfig().net_ic_analysis.participation_rate / _series_turnover(s)) \
+        <= REL_TOL
+    _assert_consistent(compare_net_ic_analysis(
+        got2, {"f": {"ic_mean": 0.03, "avg_daily_quote_volume": adv}}, {"f": 0.25}, {"f": s},
+        ICConfig().net_ic_analysis.model_dump(), "QC"))
 
 
 # ── 真實 kline（requires_kline） ─────────────────────────────────────────────────────────────────
@@ -1072,6 +1261,16 @@ def _real_kline(rows: int = L_ROWS, symbol: str = "BTCUSDT") -> pd.DataFrame:
         data = f[f"{symbol}/1h/data"][-rows:]
     idx = pd.to_datetime(data["timestamp"].astype("int64"), unit="s", utc=True)
     return pd.DataFrame({k: data[k].astype("float64") for k in ("close", "volume", "quote_volume")}, index=idx)
+
+
+def _real_raw_kline(rows: int = L_ROWS, symbol: str = "BTCUSDT") -> pd.DataFrame:
+    """真實 kline 原始形狀（同 `KlineStorage.read_klines`：`timestamp` 欄＝epoch 秒、RangeIndex、檔內原 dtype float32）。"""
+    import h5py
+
+    assert KLINE_CACHE.is_file(), f"真實 kline 不存在：{KLINE_CACHE}"
+    with h5py.File(KLINE_CACHE, "r") as f:
+        data = f[f"{symbol}/1h/data"][-rows:]
+    return pd.DataFrame({k: data[k] for k in ("timestamp", "close", "volume", "quote_volume")})
 
 
 def _real_fq_features(k: pd.DataFrame) -> pd.DataFrame:
@@ -1126,6 +1325,9 @@ def _real_fq_case() -> Tuple[pd.DataFrame, Dict[str, Any], Dict[str, pd.Series],
     ric: Dict[str, Any] = {name: _rolling_ic_lists(feats[name], label, (63, 126))
                            for name in ("ret1", "dev20", "dev24", "logc", "spike")}
     ric["sparse"] = {"window_63": _rolling_ic_lists(feats["sparse"], label, (63,))["window_63"][:10]}
+    # ㉖：dev24 只留 40 個滾動 IC 觀測（≥ 20 不跳過、< drift_window 60＋5）⇒ 走 PSI 觀測不足分支（psi_reason 有值）；
+    # 其餘全長之特徵走 PSI 已算分支
+    ric["dev24"] = {"window_63": ric["dev24"]["window_63"][:40]}
     stub = SimpleNamespace(_ic_cache={"features_df": feats, "rolling_ic": ric},
                            _extract_rolling_ic_series=ICFilterOrchestrator._extract_rolling_ic_series)
     out = ICFilterOrchestrator._run_feature_quality_diagnostics(stub, list(feats.columns), ICConfig())
@@ -1136,7 +1338,11 @@ def _real_fq_case() -> Tuple[pd.DataFrame, Dict[str, Any], Dict[str, pd.Series],
 def _real_net_case(cost_cfg: Dict[str, Any]) -> Tuple[Dict[str, Any], Tuple[Any, ...], Dict[str, Any]]:
     """真實 BTCUSDT 1h 末 2,000 根；標籤＝1 根前瞻報酬；因子擇時序列由產品第 6 段 `FactorReturnAnalyzer.compute_batch`（全樣本）、
     quantile_turnover 由第 5 段 `TurnoverAnalyzer.compute_all`（末 20% 測試段，同 `ic_filter_orchestrator.py:4400`、`:4502`）、
-    ic_mean 以測試段 `scipy.stats.spearmanr`；經呼叫端 `_run_net_ic`。"""
+    ic_mean 以測試段 `scipy.stats.spearmanr`；經呼叫端 `_run_net_ic`。ICPERF Task 0.4 ㉖：同請求 kline 之每根報價幣成交值載體
+    由產品 `_build_quote_value_carrier`（原始 kline 形狀 → 特徵時間戳）建；oracle 之日均成交值以 `_ref_daily_quote_volume`
+    於同 2,000 根之 quote_volume 獨立重算並入 ic_summary（請求 metadata 無 quote_currency ⇒ None）。"""
+    from momentum.Analysis.ic_filter_orchestrator import _build_quote_value_carrier
+
     k = _real_kline()
     c = k["close"]
     feats = pd.DataFrame({
@@ -1158,22 +1364,83 @@ def _real_net_case(cost_cfg: Dict[str, Any]) -> Tuple[Dict[str, Any], Tuple[Any,
             warnings.simplefilter("ignore")
             ic = float(stats.spearmanr(pair[:, 0], pair[:, 1])[0]) if pair.shape[0] > 2 else math.nan
         rows.append({"feature_name": name, "ic_mean": math.nan if name == "nanic" else ic})
+    carrier = _build_quote_value_carrier(_real_raw_kline(), feats.index)
     stub = SimpleNamespace(_report={"summary_table": rows, "turnover_analysis": turnover},
                            _factor_return_series=fr.get_series_map(),
+                           _ic_cache={"quote_value_series": carrier, "metadata": {"symbol": "BTCUSDT", "timeframe": "1h"}},
                            _net_ic_payload_depends_on_series_owner=ICFilterOrchestrator._net_ic_payload_depends_on_series_owner)
     selected = list(feats.columns)
     out = ICFilterOrchestrator._run_net_ic(stub, selected, cfg)
-    ic_summary = {r["feature_name"]: {"ic_mean": r["ic_mean"]} for r in rows}
+    adv = _ref_daily_quote_volume(_ref_bar_quote_value(k))
+    ic_summary = {r["feature_name"]: {"ic_mean": r["ic_mean"], "avg_daily_quote_volume": adv} for r in rows}
     turnover_data = {n: float(d["quantile_turnover"]) for n, d in turnover.items() if n in selected}
     inputs = (ic_summary, turnover_data, fr.get_series_map(), cfg.net_ic_analysis.model_dump())
     extra = {"kline": k, "stub": stub, "selected": selected, "cfg": cfg}
     return out, inputs, extra
 
 
-def _daily_usd_volume(k: pd.DataFrame) -> float:
-    """平均日成交額（USD）：quote_volume 依 UTC 日加總之均值（只取完整日）。"""
-    daily = k["quote_volume"].groupby(k.index.floor("D")).agg(["sum", "count"])
-    return float(daily.loc[daily["count"] == 24, "sum"].mean())
+def _complete_24h_day_count(bars: pd.Series) -> int:
+    """舊測試法（只取每日 24 根之「完整日」，即假設 24 小時交易）可用之日數——㉖ 證明此假設於交易時段子集不成立。"""
+    counts = bars.groupby(bars.index.floor("D")).size()
+    return int((counts == 24).sum())
+
+
+#: ㉖ 非 24 小時交易之時間戳（真實 kline 抽出交易時段子集；依 UTC 時刻判）
+_SESSIONS = {
+    "weekday_14_20": lambda ix: (ix.dayofweek < 5) & (ix.hour >= 14) & (ix.hour <= 20),
+    "cross_midnight_22_02": lambda ix: np.isin(ix.hour, [22, 23, 0, 1, 2]),
+}
+
+
+@pytest.mark.requires_kline
+@pytest.mark.parametrize("session", sorted(_SESSIONS))
+@pytest.mark.parametrize("drop_quote", [False, True])
+def test_daily_quote_volume_session_subset_matches_resample_on_real_kline(session: str, drop_quote: bool) -> None:
+    """㉖：真實 BTCUSDT 1h 末 2,000 根，特徵時間戳＝抽出之交易時段子集（平日 14–20 時；跨 UTC 午夜 22–02 時），經產品載體
+    `_build_quote_value_carrier`（整段原始 kline → 只取特徵時間戳）與 `average_daily_quote_volume` 所得日均報價幣成交值 ==
+    pandas `resample("1D")` 於同子集獨立重算（日界＝時間戳之日曆日，不足 24 根之日照計、無資料之日不計）；
+    drop_quote ⇒ 無報價幣成交額欄，走 close×volume 分支。另證舊法（只取 24 根完整日）於此子集無可用日。"""
+    from momentum.Analysis.ic_filter_orchestrator import _build_quote_value_carrier
+    from momentum.Analysis.net_ic_analyzer import average_daily_quote_volume
+
+    raw = _real_raw_kline()
+    if drop_quote:
+        raw = raw.drop(columns=["quote_volume"])
+    ts = pd.DatetimeIndex(pd.to_datetime(raw["timestamp"].astype("int64"), unit="s"))
+    keep = np.asarray(_SESSIONS[session](ts))
+    feat_index = pd.DatetimeIndex(ts[keep]).tz_localize("UTC")
+    carrier = _build_quote_value_carrier(raw, feat_index)
+    oracle_bars = _ref_bar_quote_value(raw.set_index(ts))
+    assert oracle_bars is not None
+    oracle_bars = oracle_bars[keep]
+    ref = _ref_daily_quote_volume(oracle_bars)
+    got = average_daily_quote_volume(carrier)
+    assert ref is not None and got is not None and _rel(got, ref) <= REL_TOL, (got, ref)
+    assert carrier is not None and len(carrier) == int(keep.sum())
+    assert _complete_24h_day_count(oracle_bars) == 0
+
+
+@pytest.mark.requires_kline
+def test_net_ic_capacity_known_on_real_kline() -> None:
+    """㉖：真實 BTCUSDT 1h（成本 10 bps）經呼叫端 `_run_net_ic`，日均成交值取自同請求 kline 載體：每一有序列換手率之特徵
+    capacity_tier 非 unknown、estimated_capacity_quote == oracle 日均成交值×參與率／序列換手率；quote_currency 鍵存在
+    （請求 metadata 未給 ⇒ None，不由代號猜幣種）。改前呼叫端未傳量能 ⇒ 恆 unknown。"""
+    out, inputs, _ = _real_net_case({"cost_enabled": True, "cost_bps": 10.0})
+    ic_summary, _, series, cfg = inputs
+    rate = float(cfg["participation_rate"])
+    known = []
+    for name, row in out["features"].items():
+        if row.get("skipped") or row.get("turnover") is None:
+            continue
+        cap = row["capacity"]
+        to = _series_turnover(series[name])
+        adv = ic_summary[name]["avg_daily_quote_volume"]
+        exp = adv * rate / to if to > 0 else adv * rate
+        assert cap["capacity_tier"] != "unknown", (name, cap)
+        assert _rel(cap["estimated_capacity_quote"], exp) <= REL_TOL, (name, cap, exp)
+        assert "quote_currency" in cap and cap["quote_currency"] is None
+        known.append(name)
+    assert "ret1" in known and len(known) >= 3, known
 
 
 @pytest.mark.requires_kline
@@ -1199,6 +1466,9 @@ def test_quality_netic_fields_closed() -> None:
         keys |= field_keys(out, NET)
     stub = extra["stub"]
     stub._report = {"summary_table": stub._report["summary_table"], "turnover_analysis": {}}
+    # 換手率全缺且無部位序列 ⇒ 整批 skipped（code review r48 起有序列者不因純量缺而略過，故須同清序列方走此分支；
+    # 改前本測試於 r48 後即缺 `net_ic_analysis/skipped` 而紅——與 ㉖ 無關之既有紅）
+    stub._factor_return_series = {}
     keys |= field_keys(ICFilterOrchestrator._run_net_ic(stub, extra["selected"], extra["cfg"]), NET)
     stub._report = {"turnover_analysis": {"status": "disabled", "reason": "turnover_disabled"}}
     keys |= field_keys(ICFilterOrchestrator._run_net_ic(stub, extra["selected"], extra["cfg"]), NET)
@@ -1258,8 +1528,9 @@ def test_net_ic_matches_oracle_on_real_kline() -> None:
             finite[f_] = finite.get(f_, 0) + r["n_finite"]
         assert out["features"]["ret1"]["net_factor_return"]["status"] == "ok"
     ic_summary, turnover_data, series, _ = inputs
-    vol = _daily_usd_volume(extra["kline"])
-    with_vol = {n: {**m, "avg_daily_volume_usd": vol} for n, m in ic_summary.items()}
+    # ㉖：ic_summary 已帶 oracle 日均報價幣成交值（`_ref_daily_quote_volume`，日曆日加總後平均；舊法只取 24 根完整日）
+    with_vol = {n: dict(m) for n, m in ic_summary.items()}
+    assert all(m["avg_daily_quote_volume"] is not None for m in with_vol.values())
     cfg_cost = {"cost_enabled": True, "cost_bps": 10.0}
     # 換手率輸入改為序列換手率（兩定義重合）以驗容量、成本拖累與階梯公式本身
     to_series = {n: (_series_turnover(series[n]) if n in series else t) for n, t in turnover_data.items()}
@@ -1268,7 +1539,7 @@ def test_net_ic_matches_oracle_on_real_kline() -> None:
     _assert_consistent(cmp_eq)
     for f_, r in cmp_eq.items():
         finite[f_] = finite.get(f_, 0) + r["n_finite"]
-    assert direct_eq["features"]["ret1"]["capacity"]["estimated_capacity_usd"] is not None
+    assert direct_eq["features"]["ret1"]["capacity"]["estimated_capacity_quote"] is not None
     empty = [f_ for f_, n in finite.items() if n == 0]
     assert not empty, f"無有限值之統計欄：{empty}"
 

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,30 @@ from momentum.core.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+#: ICPERF Task 0.4 ㉕：趨勢之四維（設定 `dimensions` 之值；輸出鍵＝`<dim>_trend`），依此序計算
+TREND_DIMENSIONS: tuple[str, ...] = ("ic", "centrality", "factor_return", "ls_spread")
+#: ㉕ 未出之維之原因（`dimension_status` 封閉值集）
+DIMENSION_SOURCE_MODULE_OFF = "source_module_off"
+DIMENSION_SOURCE_SKIPPED = "source_skipped"
+DIMENSION_INSUFFICIENT_DATA = "insufficient_data"
+DIMENSION_STATUS_VALUES: frozenset[str] = frozenset(
+    {DIMENSION_SOURCE_MODULE_OFF, DIMENSION_SOURCE_SKIPPED, DIMENSION_INSUFFICIENT_DATA}
+)
+
+
+@dataclass(frozen=True)
+class TrendDimensionInput:
+    """ICPERF Task 0.4 ㉕：趨勢某一維之來源（同請求之來源模組已算）。
+
+    - `series`：特徵名 → 逐時點序列（位置即時間軸；NaN 為缺值、保留位置）；特徵不在其中 ⇒ 該特徵此維 `source_skipped`
+    - `overlap_window`：序列每值涵蓋之觀測數（HAC 頻寬下限＝其 −1）；None ⇒ 無重疊、只用自動頻寬
+    - `status`：來源整體不可用之原因（`source_module_off`／`source_skipped`）；非 None 時忽略 `series`
+    """
+
+    series: Mapping[str, pd.Series] = field(default_factory=dict)
+    overlap_window: Optional[int] = None
+    status: Optional[str] = None
 
 
 class TrendAnalyzer:
@@ -101,8 +126,12 @@ class TrendAnalyzer:
         ic_decay_half_life: Optional[float] = None,
         *,
         overlap_window: Optional[int] = None,
+        centrality_overlap_window: Optional[int] = None,
+        factor_return_overlap_window: Optional[int] = None,
+        ls_spread_overlap_window: Optional[int] = None,
     ) -> dict:
-        """`overlap_window` 只套 IC 維（滾動 IC 之窗長／步長）；其餘維度之重疊結構未知，p 值只用自動頻寬。"""
+        """`overlap_window` 套 IC 維（滾動 IC 之窗長／步長）；ICPERF Task 0.4 ㉕：其餘各維之 HAC 頻寬下限各由
+        `<dim>_overlap_window` 給（該序列每值涵蓋之觀測數；None ⇒ 無重疊、只用自動頻寬）。"""
         dimensions: dict[str, dict] = {}
 
         ic_result = (
@@ -111,17 +140,20 @@ class TrendAnalyzer:
             else None
         )
         centrality_result = (
-            self._ensure_trend_dict(self.analyze_trend(rolling_centrality, "rolling_centrality"))
+            self._ensure_trend_dict(self.analyze_trend(rolling_centrality, "rolling_centrality",
+                                                       overlap_window=centrality_overlap_window))
             if rolling_centrality is not None
             else None
         )
         factor_return_result = (
-            self._ensure_trend_dict(self.analyze_trend(factor_return_cumulative, "factor_return"))
+            self._ensure_trend_dict(self.analyze_trend(factor_return_cumulative, "factor_return",
+                                                       overlap_window=factor_return_overlap_window))
             if factor_return_cumulative is not None
             else None
         )
         ls_spread_result = (
-            self._ensure_trend_dict(self.analyze_trend(ls_spread_series, "ls_spread"))
+            self._ensure_trend_dict(self.analyze_trend(ls_spread_series, "ls_spread",
+                                                       overlap_window=ls_spread_overlap_window))
             if ls_spread_series is not None
             else None
         )
@@ -151,28 +183,64 @@ class TrendAnalyzer:
         top_n: int = 30,
         *,
         overlap_window: Optional[int] = None,
+        dimensions: Optional[Sequence[str]] = None,
+        dimension_inputs: Optional[Mapping[str, TrendDimensionInput]] = None,
     ) -> dict[str, dict]:
-        """`overlap_window`：滾動 IC 每值涵蓋之觀測數（窗長 w、步長 s ⇒ ceil(w／s)），供 IC 趨勢之 HAC 落後期數。"""
+        """逐特徵多維趨勢（特徵集合＝滾動 IC 矩陣前 top_n 欄）。
+
+        - `overlap_window`：滾動 IC 每值涵蓋之觀測數（窗長 w、步長 s ⇒ ceil(w／s)），供 IC 趨勢之 HAC 落後期數。
+        - ICPERF Task 0.4 ㉕ `dimensions`：依序計算之維（`TREND_DIMENSIONS` 之子集；其他值忽略）；None ⇒ ic，另給
+          `rolling_centrality_matrix` 時加 centrality（舊呼叫相容；該矩陣之重疊窗未知 ⇒ 自動頻寬）。
+        - `dimension_inputs`：ic 以外各維之來源（`TrendDimensionInput`）；缺 ⇒ `source_module_off`。
+        - 每特徵輸出 `<dim>_trend`（可算者）、`combined_signal`（現行規則表，用實際可得之 ic／centrality 維）與
+          `dimension_status`（未出之維 → 封閉值集原因：來源狀態、該特徵不在來源序列 ⇒ `source_skipped`、
+          有效觀測 < min_samples ⇒ `insufficient_data`）。
+        """
         results: dict[str, dict] = {}
         selected = list(rolling_ic_matrix.columns)[: max(1, int(top_n))]
+        inputs: dict[str, TrendDimensionInput] = dict(dimension_inputs or {})
+        if dimensions is None:
+            dims = ["ic"] + (["centrality"] if rolling_centrality_matrix is not None else [])
+        else:
+            dims = [str(d) for d in dimensions]
+        if rolling_centrality_matrix is not None and "centrality" not in inputs:
+            inputs["centrality"] = TrendDimensionInput(
+                series={str(c): rolling_centrality_matrix[c] for c in rolling_centrality_matrix.columns}
+            )
+        active = [d for d in TREND_DIMENSIONS if d in dims]
 
         for feature_name in selected:
-            ic_series = rolling_ic_matrix[feature_name]
-            centrality_series = None
-            if (
-                rolling_centrality_matrix is not None
-                and feature_name in rolling_centrality_matrix.columns
-            ):
-                centrality_series = rolling_centrality_matrix[feature_name]
-
-            results.update(
-                self.analyze_multi_dimension(
-                    feature_name=feature_name,
-                    rolling_ic=ic_series,
-                    rolling_centrality=centrality_series,
-                    overlap_window=overlap_window,
-                )
-            )
+            entry: dict[str, dict] = {}
+            status: dict[str, str] = {}
+            for dim in active:
+                if dim == "ic":
+                    series: Optional[pd.Series] = rolling_ic_matrix[feature_name]
+                    lag_window = overlap_window
+                else:
+                    source = inputs.get(dim)
+                    if source is None:
+                        status[dim] = DIMENSION_SOURCE_MODULE_OFF
+                        continue
+                    if source.status is not None:
+                        status[dim] = source.status
+                        continue
+                    series = source.series.get(str(feature_name))
+                    if series is None:
+                        status[dim] = DIMENSION_SOURCE_SKIPPED
+                        continue
+                    lag_window = source.overlap_window
+                result = self.analyze_trend(series, dim, overlap_window=lag_window)
+                if isinstance(result, SkippedResult):
+                    status[dim] = DIMENSION_INSUFFICIENT_DATA
+                    continue
+                entry[f"{dim}_trend"] = result
+            results[feature_name] = {
+                **entry,
+                "combined_signal": self._combine_signal(
+                    entry.get("ic_trend"), entry.get("centrality_trend"), None
+                ),
+                "dimension_status": status,
+            }
 
         logger.info("Trend analysis completed: %s features", len(selected))
         return results
