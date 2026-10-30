@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir /private/tmp/claude-501/t03-debug --requests A.ic_report,A.deep_analysis,X.cross_sectional,L.event_import_report --n-features 10",
+      "code_sha256": "12ec89c3a0d3809d89edef19bd0f400bcabe825d3e54300b81e3b83f879d188b",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "ICPERF Task 0.3 施工子代理（build_receipt 小規模除錯擷取，現行碼）",
+      "created_at": "2026-10-30T11:05:17+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 900,
+  "basis": [
+    "handoffs/run_receipts/20261029-icperf-correctness-probe-estimate.json 之試跑：A.ic_report 120 欄約 2 分鐘（500 列）；本次 10 欄、A 格兩請求各約 1–2 分鐘（讀入與物化為主）",
+    "L.event_import_report：L 格 2,000 根、93 筆事件、10 欄；BUDGET-10 以 A 格事件條件請求 30.4 秒之 oracle 對照為參考，取上限 5 分鐘",
+    "X.cross_sectional：2 標的 × 500 列 × 10 欄，逐時點逐特徵 pandas 迴圈約 1 萬次，秒級至 1 分鐘（BUDGET-11 小子集秒級量測外推）",
+    "合計約 6–10 分鐘，取上限 15 分鐘（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-7、-10、-11）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

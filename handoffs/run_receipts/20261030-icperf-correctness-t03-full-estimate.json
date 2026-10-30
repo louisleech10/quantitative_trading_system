@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir /private/tmp/claude-501/t03-captures",
+      "code_sha256": "48d5b498cfe66db370460905e8b591dc40fd50f121f4f6ec8fe282ed5dc5856c",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "ICPERF Task 0.3 施工子代理（全請求擷取，Task 0.4 修正後之現行碼）",
+      "created_at": "2026-10-30T11:13:26+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 3600,
+  "basis": [
+    "逐請求（驗哪些路徑、預估多久）：A.ic_report 120 欄（全樣本退回路徑、滾動 IC／ICIR／衰減／分組／第 5 段／第 6 段，約 2 分鐘，v0 實測 22:53:44→22:55:40）；A.ic_report.cov 與 A.event_report.cov 各 20 欄（頂層 coverage 之同一小請求，各約 1 分鐘）；A.ic_report.pearson／.kendall 各 30 欄（點 IC、滾動、衰減、分組之 Pearson／Kendall 分支，各約 1–2 分鐘）；A.event_report 120 欄（K 線條件式事件，約 1–2 分鐘）；A.deep_analysis 120 欄（深度十模組全開，v0 約 3 分鐘）；L.ic_report 120 欄（切分成立之樣本外路徑，v0 約 8 分鐘）；L.deep_analysis 120 欄（v0 約 10 分鐘）；L.event_import_report（事件匯入批，小規模除錯實測於第 4 段崩潰約 12 秒；若通過約 5–10 分鐘）；X.cross_sectional 20 欄 2 標的（小規模除錯 10 欄實測 9.4 秒，20 欄約 20 秒）",
+    "小規模除錯實測（handoffs/run_receipts/20261030-icperf-correctness-t03-debug-estimate.json 之同碼路徑）：A.ic_report 10 欄 18.9 秒、A.deep_analysis 10 欄 24.4 秒、X.cross_sectional 9.4 秒、L.event_import_report 12.2 秒（rc=3）",
+    "合計約 30–45 分鐘，取上限 60 分鐘，未逾 2 小時（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-7、-9、-10、-11）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

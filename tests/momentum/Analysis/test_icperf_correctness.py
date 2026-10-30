@@ -2171,3 +2171,254 @@ def test_full_sample_fallback_aligns_raw_kline_to_features() -> None:
         for h, got in zip([1, 5], decay[c]["ic_values"]):
             r = (aligned["close"].shift(-h) / aligned["close"] - 1.0).to_numpy(dtype=float)
             assert _rel(float(got), _ic_oracle(F[c].to_numpy(dtype=float), r, "spearman")) <= REL_TOL, (c, h)
+
+
+# ── Task 0.3 真實資料收據之綁定測試（收據項 `tests` 須為本檔實存之測試；scripts/icperf_correctness_receipt.py
+#    `EXTRA_ITEM_TESTS`）：標籤、滾動窗邊界與深度十模組／regime_robust 之秒級 oracle 測試（後者執行各模組測試檔之明列輸入
+#    oracle 測試，oracle 本體在該檔） ───────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.requires_kline
+@pytest.mark.parametrize("return_type", ["simple", "log"])
+@pytest.mark.parametrize("horizon", [1, 5])
+def test_label_matches_float64_kline_oracle_on_real_kline(return_type: str, horizon: int) -> None:
+    """收據項 label（SPEC Task 0.4 ⑥）：第 2 段之 K 線讀入（`_read_klines_float64`）價格欄為 float64 且逐值 == h5 原值；
+    標籤（`LabelGenerator.generate_returns_by_type`）== close[t+h]／close[t]−1（log ⇒ ln 比值）之 float64 oracle（相對誤差
+    ≤ 1e-12；末 h 根 NaN）。真實 BTCUSDT 1h。"""
+    from momentum.Analysis.ic_filter_orchestrator import _read_klines_float64
+    from momentum.factories import create_kline_storage_manager, create_label_generator
+
+    raw = _read_klines_float64(create_kline_storage_manager(cache_dir=str(KLINE_CACHE.parent)), "BTCUSDT", "1h")
+    assert raw["close"].dtype == np.float64
+    close_h5 = _real_close(len(raw))
+    np.testing.assert_array_equal(raw["close"].to_numpy(), close_h5.to_numpy())
+    close = close_h5.iloc[-800:]
+    got = create_label_generator().generate_returns_by_type(close, horizon, return_type).to_numpy(dtype=float)
+    ratio = close.shift(-horizon).to_numpy(dtype=float) / close.to_numpy(dtype=float)
+    exp = ratio - 1.0 if return_type == "simple" else np.log(ratio)
+    assert np.isnan(got[-horizon:]).all() and np.isnan(exp[-horizon:]).all()
+    for i, (a, b) in enumerate(zip(got[:-horizon], exp[:-horizon])):
+        assert _rel(float(a), float(b)) <= REL_TOL, (i, a, b)
+
+
+@pytest.mark.parametrize("method", ["spearman", "pearson"])
+def test_rolling_ic_window_longer_than_axis_is_empty(method: str) -> None:
+    """收據 verified-na 之明列邊界（SPEC Task 0.3 資料充足判準）：窗長 > 時間軸列數（標籤有限之列）⇒ 該窗之滾動 IC 序列為空
+    （無窗終點），等於 oracle；窗長 ≤ 列數之窗照常有值。"""
+    F, y = _rolling_inputs()
+    n_axis = int(np.isfinite(y.to_numpy(dtype=float)).sum())
+    got = ICEngine({}).compute_rolling_ic(F, y, [21, n_axis + 1], 1, method)
+    for c in F.columns:
+        assert got[c][f"window_{n_axis + 1}"] == [] == _ref_rolling(F, y, n_axis + 1, method)[c]
+        assert len(got[c]["window_21"]) == n_axis - 21 + 1
+
+
+# ── Task 0.3 真實資料收據之「不一致」項（照正確答案寫；裁定前 xfail(strict=True)，修正落 SPEC Task 0.4） ─────────
+
+
+@pytest.mark.requires_kline
+@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：rolling_ic_icir（A.ic_report.kendall）——"
+                                       "compute_rolling_ic 之非 spearman 分支一律以 raw Pearson 計（ic_engine.py:455-463），"
+                                       "default_method＝kendall 時滾動 IC 及其 ic_mean／ic_std／ICIR／勝率／方向非 Kendall τ；裁定 None")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_rolling_ic_kendall_matches_kendalltau_xfail() -> None:
+    """正確答案：method＝kendall 之滾動 IC 逐窗 == `scipy.stats.kendalltau`（同時間軸、窗內非有限或常數 ⇒ NaN；相對誤差
+    ≤ 1e-12）。真實 BTCUSDT 1h 明列輸入（`_rolling_inputs`）。"""
+    F, y = _rolling_inputs()
+    got = ICEngine({}).compute_rolling_ic(F, y, ROLL_WINDOWS, 1, "kendall")
+    for w in ROLL_WINDOWS:
+        _assert_rolling_equal(got, _ref_rolling(F, y, w, "kendall"), w, REL_TOL)
+
+
+@pytest.mark.requires_kline
+@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：rolling_ic_icir（A.ic_report.pearson）——Pearson "
+                                       "滾動 IC 以原值累積和計（ic_engine.py `_rolling_corr_matrix`），價格水準欄（值約 7 萬）"
+                                       "相消誤差使逐窗相對誤差達 1e-7 量級（> 1e-12）；裁定 None")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_rolling_ic_pearson_price_level_matches_scipy_xfail() -> None:
+    """正確答案：Pearson 滾動 IC 逐窗 == `scipy.stats.pearsonr`（相對誤差 ≤ 1e-12），含價格水準之真實特徵（收盤、20 根均線）。"""
+    close = _real_close(400)
+    F = pd.DataFrame({"close": close, "sma20": close.rolling(20).mean(), "ret1": close.pct_change()}).iloc[20:]
+    y = _real_label(close).reindex(F.index)
+    got = ICEngine({}).compute_rolling_ic(F, y, ROLL_WINDOWS, 1, "pearson")
+    for w in ROLL_WINDOWS:
+        _assert_rolling_equal(got, _ref_rolling(F, y, w, "pearson"), w, REL_TOL)
+
+
+@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}（extra_findings：L.event_import_report 10 欄小規模"
+                                       "擷取於第 4 段崩潰）——compute_ic 之 Spearman 向量化路徑（無缺值）於標籤為常數時 "
+                                       "scipy.stats.spearmanr 回純量，`corr[0, 1:]` 拋 TypeError（ic_engine.py:1601-1602）；"
+                                       "Pearson 路徑回 NaN；裁定 None")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_point_ic_spearman_constant_label_returns_nan_xfail() -> None:
+    """正確答案：標籤為常數（無缺值、多特徵）⇒ 每特徵 IC＝NaN（同 `_ic_oracle`：任一常數 ⇒ NaN；同 Pearson 分支），不得拋例外。"""
+    df = _point_inputs(False)
+    label = pd.Series(np.full(len(df), 0.5), name="label")
+    got = ICEngine({}).compute_ic(df[["a", "b"]], label, "spearman")
+    assert set(got) == {"a", "b"} and all(math.isnan(float(v)) for v in got.values())
+    assert all(math.isnan(_ic_oracle(df[c].to_numpy(dtype=float), label.to_numpy(dtype=float), "spearman")) for c in "ab")
+
+
+@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：stage5_pit_stats（L.event_import_report）——"
+                                       "常數序列（測試段 19 筆事件之同一值，如 26767.52）之 lag-1 自相關，產品以 pandas "
+                                       "autocorr 得 0.9999999999999998（浮點殘差），定義上未定義應為 NaN；裁定 None")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_turnover_autocorrelation_constant_series_is_nan_xfail() -> None:
+    """正確答案：常數特徵之 lag-1 自相關＝NaN（`_ref_turnover`：去 NaN 後任一半常數 ⇒ NaN，同 scipy.stats.pearsonr 之未定義），
+    明列邊界：19 根同值之價格水準序列。"""
+    x = pd.Series(np.full(19, 26767.52), index=pd.date_range("2026-02-24", periods=19, freq="4h", tz="UTC"), name="f")
+    got = TurnoverAnalyzer({}).compute_all(x.to_frame())["f"]["autocorrelation"]
+    assert math.isnan(_ref_turnover(x)["autocorrelation"])
+    assert math.isnan(float(got)), f"常數序列自相關 {got!r}（應為 NaN）"
+
+
+@pytest.mark.requires_kline
+@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：deep.feature_quality_diagnostics（A／L 深度分析）——"
+                                       "價格水準、近單位自相關特徵之 effective_sample_ratio 與 oracle 相對差 1e-12–5e-11"
+                                       "（捨入級，非演算法差異；容差或數值穩定算法待裁定）；裁定 None")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_fq_effective_sample_ratio_price_level_matches_oracle_xfail() -> None:
+    """正確答案：`FeatureQualityDiagnostics.run_full_diagnostics` 之全部統計欄（含 effective_sample_ratio）== 模組 oracle
+    （test_icperf_deep_quality_netic.py `compare_feature_quality_diagnostics`，相對誤差 ≤ 1e-12）；真實 BTCUSDT 1h 末 500 根之
+    價格水準特徵（13 根均線之 5 根滾動最小、收盤、55 根 EMA）。"""
+    from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
+
+    QN = _sibling("deep_quality_netic")
+    close = _real_close(500)
+    F = pd.DataFrame({"sma13min5": close.rolling(13).mean().rolling(5).min(), "close": close,
+                      "dema": close.ewm(span=55).mean()}).dropna()
+    res = QN.compare_feature_quality_diagnostics(FeatureQualityDiagnostics({}).run_full_diagnostics(F), F)
+    bad = {k: v["detail"] for k, v in res.items() if v["verdict"] != "一致"}
+    assert not bad, bad
+
+
+@pytest.mark.requires_kline
+@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：deep.trend_analysis（A 深度分析）——趨勢之斜率／p 值／"
+                                       "尾端估計於寬特徵集之真實資料與 statsmodels OLS＋HAC oracle 相對差 1e-12–1e-11"
+                                       "（捨入級，非演算法差異）；裁定 None")
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_trend_four_dimensions_wide_real_kline_matches_oracle_xfail() -> None:
+    """正確答案：真實 BTCUSDT 1h 寬特徵集（動量／均線偏離／波動前 30 欄）經 `run_deep_analysis`（因子報酬、中心性、多空、
+    趨勢四維）之 trend_analysis 逐欄 == 模組 oracle（test_icperf_deep_centrality_trend.py `compare_trend_analysis`）。"""
+    from momentum.Analysis.ic_config_schema import ICConfig
+
+    CT = _sibling("deep_centrality_trend")
+    rolling_ic, names, idx = CT._real("BTCUSDT", wide=True)
+    k = CT._load_kline("BTCUSDT", CT.REAL_ROWS)
+    feats = CT._real_features(k, wide=True).loc[idx]
+    label = (k["close"].shift(-1) / k["close"] - 1.0).rename("label").loc[idx]
+    names = names[:30]
+    rep = CT._deep_orchestrator(feats[names], label, rolling_ic, 1).run_deep_analysis(
+        selected_features=names, force_modules=CT._FOUR)
+    cfg = ICConfig()
+    res = CT.compare_trend_analysis(rep.results["trend_analysis"], rolling_ic, names, cfg.trend_analysis.model_dump(),
+                                    sources=CT._ref_trend_sources(rep, rolling_ic, names, cfg, 1),
+                                    dimensions=list(cfg.trend_analysis.dimensions))
+    bad = {kk: v["detail"] for kk, v in res.items() if v["verdict"] != "一致"}
+    assert not bad, bad
+
+
+def _sibling(name: str) -> Any:
+    """同目錄之 ICPERF 測試檔（深度十模組、regime_robust 之 oracle 所在）。"""
+    return sys.modules.get(f"icperf_cr_sib_{name}") or _load(f"icperf_cr_sib_{name}",
+                                                             Path(__file__).with_name(f"test_icperf_{name}.py"))
+
+
+#: 收據項 → 其 oracle 所在測試檔之明列輸入（秒級）oracle 測試（函式名）
+SIBLING_ORACLE_TESTS: Dict[str, tuple] = {
+    "factor_returns": ("deep_factor_return", ("test_factor_return_matches_oracle_explicit",
+                                              "test_factor_return_skip_branches_match_oracle")),
+    "long_short_analysis": ("deep_factor_return", ("test_long_short_matches_oracle_explicit",
+                                                   "test_long_short_skip_and_edge_branches_match_oracle")),
+    "factor_centrality": ("deep_centrality_trend", ("test_factor_centrality_skip_boundaries",
+                                                    "test_crowding_triggers_under_default_threshold")),
+    "trend_analysis": ("deep_centrality_trend", ("test_trend_analysis_matches_oracle",
+                                                 "test_trend_analysis_honors_configured_dimensions")),
+    "parameter_sensitivity": ("deep_sensitivity_oos", ("test_parameter_sensitivity_kendall_ic_equals_scipy_kendalltau",
+                                                       "test_parameter_sensitivity_best_param_sign_flip_invariant")),
+    "rolling_oos": ("deep_sensitivity_oos", ("test_rolling_oos_split_generation_matches_ref",
+                                             "test_rolling_oos_kendall_method_uses_kendall_tau")),
+    "factor_orthogonalization": ("deep_orth_exposure", ("test_gram_schmidt_accepts_production_icir_cache_shape",
+                                                        "test_gram_schmidt_degenerate_flag_matches_oracle")),
+    "factor_exposure": ("deep_orth_exposure", ("test_exposure_beta_neutral_matches_oracle_on_common_sample",
+                                               "test_exposure_uses_valid_rows_mean")),
+    "feature_quality_diagnostics": ("deep_quality_netic", ("test_fq_adf_coverage_matches_oracle_boundaries",
+                                                           "test_fq_drift_psi_breakpoint_match_oracle_boundaries")),
+    "net_ic_analysis": ("deep_quality_netic", ("test_net_ic_turnover_consistent_with_series",
+                                               "test_average_daily_quote_volume_unit_boundaries")),
+    "regime_robust": ("regime_robust", ("test_regime_robust_decision_matches_oracle_exact",
+                                        "test_regime_robust_reason_closed_set")),
+}
+
+
+def _run_sibling(item: str) -> None:
+    mod_name, names = SIBLING_ORACLE_TESTS[item]
+    mod = _sibling(mod_name)
+    for name in names:
+        getattr(mod, name)()
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_factor_returns_oracle_suite() -> None:
+    """收據項 deep.factor_returns 之綁定：test_icperf_deep_factor_return.py 之因子報酬明列輸入 oracle 測試。"""
+    _run_sibling("factor_returns")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_long_short_analysis_oracle_suite() -> None:
+    """收據項 deep.long_short_analysis 之綁定：test_icperf_deep_factor_return.py 之多空明列輸入 oracle 測試。"""
+    _run_sibling("long_short_analysis")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_factor_centrality_oracle_suite() -> None:
+    """收據項 deep.factor_centrality 之綁定：test_icperf_deep_centrality_trend.py 之中心性明列輸入 oracle 測試。"""
+    _run_sibling("factor_centrality")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_trend_analysis_oracle_suite() -> None:
+    """收據項 deep.trend_analysis 之綁定：test_icperf_deep_centrality_trend.py 之趨勢明列輸入 oracle 測試。"""
+    _run_sibling("trend_analysis")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_parameter_sensitivity_oracle_suite() -> None:
+    """收據項 deep.parameter_sensitivity 之綁定：test_icperf_deep_sensitivity_oos.py 之參數敏感度明列輸入 oracle 測試。"""
+    _run_sibling("parameter_sensitivity")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_rolling_oos_oracle_suite() -> None:
+    """收據項 deep.rolling_oos 之綁定：test_icperf_deep_sensitivity_oos.py 之滾動樣本外明列輸入 oracle 測試。"""
+    _run_sibling("rolling_oos")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_factor_orthogonalization_oracle_suite() -> None:
+    """收據項 deep.factor_orthogonalization 之綁定：test_icperf_deep_orth_exposure.py 之正交化明列輸入 oracle 測試。"""
+    _run_sibling("factor_orthogonalization")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_factor_exposure_oracle_suite() -> None:
+    """收據項 deep.factor_exposure 之綁定：test_icperf_deep_orth_exposure.py 之曝險明列輸入 oracle 測試。"""
+    _run_sibling("factor_exposure")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_feature_quality_diagnostics_oracle_suite() -> None:
+    """收據項 deep.feature_quality_diagnostics 之綁定：test_icperf_deep_quality_netic.py 之品質診斷明列輸入 oracle 測試。"""
+    _run_sibling("feature_quality_diagnostics")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_net_ic_analysis_oracle_suite() -> None:
+    """收據項 deep.net_ic_analysis 之綁定：test_icperf_deep_quality_netic.py 之淨 IC 明列輸入 oracle 測試。"""
+    _run_sibling("net_ic_analysis")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_regime_robust_oracle_suite() -> None:
+    """收據項 regime_robust 之綁定：test_icperf_regime_robust.py 之秒級精確判定表與 reason 封閉值集。"""
+    _run_sibling("regime_robust")

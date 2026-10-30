@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/momentum/Analysis/test_icperf_correctness.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_correctness.py",
+      "code_sha256": "1a8a5f41c3bf2f759ca2448a2e7f7e558c8095acf4ecb12e5bf3dd6d0d2e04b7",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "ICPERF Task 0.3 施工子代理（test_icperf_correctness.py 全檔，含 slow／requires_kline）",
+      "created_at": "2026-10-30T12:17:49+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1500,
+  "basis": [
+    "秒級層（-m 'not slow and not requires_kline'）同碼實測 26.6 秒（/private/tmp/claude-501/t03-fast.log：107 passed、2 xfailed）",
+    "slow：test_correctness_coverage_closed_over_response_keys 以凍結腳本 freeze_item 跑 A 格 20 欄 IC 頁與事件請求各一次，同規模擷取實測 24 秒與 16 秒（/private/tmp/claude-501/t03-captures/capture_status.json），含寫出捕獲與快照約各 1–3 分鐘",
+    "requires_kline：真實 kline 秒級測試約 30 支，加新增之寬特徵趨勢四維（30 欄 run_deep_analysis，探針實測約 1 分鐘）與品質診斷；合計約 10–20 分鐘，取上限 25 分鐘（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-7）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7"
+  ]
+}
