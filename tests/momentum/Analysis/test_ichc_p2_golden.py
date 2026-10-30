@@ -47,16 +47,10 @@ def live_receipt(helpers):
 # （以 a943e500 版 ic_config_schema.py 重算 model_dump 之雜湊＝凍結值 c1616bdf…，逐鍵比對僅 ADDED）。
 # config 雜湊比對改為：現行預設 config 剔除此具名清單後須與凍結雜湊 byte 相同——既有欄任一預設改動、
 # 或未登記之新欄，仍會紅。新增欄對 golden 數值無影響由 test_per_feature_canonical_exact 逐 path exact 把關。
-_ICCONFIG_FIELDS_ADDED_SINCE_FREEZE = (
-    ("marginal_ic",),  # ab53c24e 2026-08-19
-    ("event_filter", "min_test_events"),  # 39b48531 2026-09-08
-    ("event_filter", "min_events_per_class"),  # a69287f3 2026-09-10
-    ("event_filter", "negative_control_n"),  # a69287f3
-    ("event_filter", "oracle_seed"),  # a69287f3
-    ("event_filter", "perm_budget_total"),  # a69287f3
-    ("event_filter", "negative_control_budget_seconds"),  # 77aa5817 2026-09-10
-    ("thresholds", "rank_biserial_min"),  # a69287f3
-)
+# ICPERF Task 0.4（2026-10-30）：receipt 以 scripts/ichc_freeze_p2_golden.py 依現行碼重凍（quantile／多空值因 ⑥ K 線 float64
+# 與 ⑦ 單調性分箱而變；ICConfig 只因 ⑲ 增 factor_centrality.crowding_threshold_relative 而變）⇒
+# 凍結雜湊即現行全量雜湊，自凍結後新增之清單歸零；此後新增欄照上述規則逐項登記。
+_ICCONFIG_FIELDS_ADDED_SINCE_FREEZE: tuple = ()
 
 
 def _config_hash_without_post_freeze_fields(helpers) -> str:

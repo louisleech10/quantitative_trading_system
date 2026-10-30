@@ -8,18 +8,14 @@
   `ic_filter_orchestrator.py:3201-3207` `_run_long_short`；PIT 分箱 `pit_expanding_qcut_label(min_samples=100,
   require_full_q=True)`，RB-3：分箱只看特徵自身時序）。
 
-本檔為**稽核**：參考實作 `ref_factor_return`／`ref_long_short` 依產品公式（逐式註明產品 `檔:行`）以 numpy／pandas／scipy
-獨立重算，**不呼叫被測模組或其內部函式**；以下三處 oracle 採正確定義而非照抄產品（各有 xfail(strict=True) 證實其不一致）：
-  ① 頂分位＝當根實際箱數 k_t 之最大標籤 k_t−1（`pd.qcut(duplicates="drop")` 減箱後；k_t < 2 ⇒ 無頂底、position 0）——
-     產品 `factor_return_analyzer.py:335-351` 以 `q_eff − 1` 判頂（SPEC 第 125 行；與 Task 0.4 ① 同型）；
-  ② factor_return 之分箱歷史＝特徵自身有限值 0..t（同 RB-3，`long_short_analyzer.py:47-50`），不受標籤可得性影響——
-     產品 `factor_return_analyzer.py:78-81` 以特徵∩標籤 dropna 後之序列建（SPEC 第 127 行）；
-  ③ long_short 之分箱樣本門檻以**有限值**計數（同模組 finite gate，`long_short_analyzer.py:25-28`）——產品經
-     `pit_stats.effective_count`（`pit_stats.py:49-52`，計 ~isnan，±inf 亦計）。
-業界定義差異（Sortino 下行偏差、年化報酬 CAGR、h 根重疊標籤之年化、非 24/7 市場之年化期數）另以 xfail 記錄，
-參考實作本身照產品公式（compare 只驗產品是否照其自身公式算對）。
-
-不一致收據：handoffs/run_receipts/<日期>-icperf-correctness.json（主委彙整）。
+本檔為**稽核**：參考實作 `ref_factor_return`／`ref_long_short` 依 SPEC 定義以 numpy／pandas／scipy 獨立重算，**不呼叫被測
+模組或其內部函式**。Task 0.3 以下列正確定義證實之不一致（原 xfail(strict=True)），已於 Task 0.4 ⑭–⑰ 修正並轉一般斷言：
+  ① 頂分位＝當根實際箱數 k_t 之最大標籤 k_t−1（`pd.qcut(duplicates="drop")` 減箱後；k_t < 2 ⇒ 無頂底、position 0）（⑭）；
+  ② factor_return 之分箱歷史＝特徵自身有限值 0..t（同 RB-3，`long_short_analyzer.py:47-50`），不受標籤可得性影響（⑮）；
+  ③ 風險指標：標籤 horizon h ⇒ 自首個有效根起每隔 h 根（原始時間位置）之不重疊序列；年化期數＝根密度（時間戳導出）／h；
+     Sortino 下行偏差＝√mean(min(r,0)²)；年化報酬＝CAGR；ls_cumulative 以不重疊序列連乘（⑯）；離散度相對容差判 0（⑰）；
+  ④ 分箱樣本門檻以**有限值**計數（`pit_stats` 共用核心，⑰ FR-10）。
+修正前之實跑差異記於各測試 docstring 與收據 handoffs/run_receipts/<日期>-icperf-correctness.json（主委彙整）。
 """
 
 from __future__ import annotations
@@ -73,36 +69,36 @@ def _heavy_tests_require_shared_watchdog(request: pytest.FixtureRequest) -> None
 # ── 欄位清冊 ─────────────────────────────────────────────────────────────────────────────────────────
 
 _RISK_PRODUCERS = {
-    "sharpe_ratio": f"{FRA}:219-226",
-    "sortino_ratio": f"{FRA}:228-238",
-    "calmar_ratio": f"{FRA}:248-256",
-    "max_drawdown": f"{FRA}:240-247",
-    "win_rate": f"{FRA}:258-260",
-    "annualized_return": f"{FRA}:205-210",
-    "annualized_volatility": f"{FRA}:212-217",
+    "sharpe_ratio": f"{FRA}:139-153,234-241",
+    "sortino_ratio": f"{FRA}:139-153,243-250",
+    "calmar_ratio": f"{FRA}:139-153,261-269",
+    "max_drawdown": f"{FRA}:139-153,252-260",
+    "win_rate": f"{FRA}:139-153,271-273",
+    "annualized_return": f"{FRA}:139-153,215-226",
+    "annualized_volatility": f"{FRA}:139-153,228-232",
 }
 _FR_FEAT = f"{FR_KEY}/value/features/*"
 _LS_FEAT = f"{LS_KEY}/*"
 
 MODULE_FIELDS: Dict[str, Dict[str, str]] = {
-    f"{FR_KEY}/status": {"oracle": NON_STAT, "producer": f"{FRA}:305"},
-    f"{FR_KEY}/reason": {"oracle": NON_STAT, "producer": f"{FRA}:315"},
-    f"{FR_KEY}/value/schema_version": {"oracle": NON_STAT, "producer": f"{FRA}:307"},
-    f"{FR_KEY}/value/semantics": {"oracle": NON_STAT, "producer": f"{FRA}:308"},
-    f"{FR_KEY}/value/quantile_fit": {"oracle": NON_STAT, "producer": f"{FRA}:309"},
-    f"{FR_KEY}/value/return_transform": {"oracle": NON_STAT, "producer": f"{FRA}:310"},
-    f"{FR_KEY}/value/turnover_semantics": {"oracle": NON_STAT, "producer": f"{FRA}:311"},
-    f"{FR_KEY}/value/warmup_periods": {"oracle": NON_STAT, "producer": f"{FRA}:312"},
-    f"{_FR_FEAT}/long_short_mean_return": {"oracle": "fr.ls_mean", "producer": f"{FRA}:133,165"},
-    f"{_FR_FEAT}/ls_cumulative_sampled/#": {"oracle": "fr.ls_cumulative", "producer": f"{FRA}:138,166,377-383"},
+    f"{FR_KEY}/status": {"oracle": NON_STAT, "producer": f"{FRA}:327"},
+    f"{FR_KEY}/reason": {"oracle": NON_STAT, "producer": f"{FRA}:337"},
+    f"{FR_KEY}/value/schema_version": {"oracle": NON_STAT, "producer": f"{FRA}:329"},
+    f"{FR_KEY}/value/semantics": {"oracle": NON_STAT, "producer": f"{FRA}:330"},
+    f"{FR_KEY}/value/quantile_fit": {"oracle": NON_STAT, "producer": f"{FRA}:331"},
+    f"{FR_KEY}/value/return_transform": {"oracle": NON_STAT, "producer": f"{FRA}:332"},
+    f"{FR_KEY}/value/turnover_semantics": {"oracle": NON_STAT, "producer": f"{FRA}:333"},
+    f"{FR_KEY}/value/warmup_periods": {"oracle": NON_STAT, "producer": f"{FRA}:334"},
+    f"{_FR_FEAT}/long_short_mean_return": {"oracle": "fr.ls_mean", "producer": f"{FRA}:134,171"},
+    f"{_FR_FEAT}/ls_cumulative_sampled/#": {"oracle": "fr.ls_cumulative", "producer": f"{FRA}:139-143,172,424-430"},
     **{f"{_FR_FEAT}/risk_metrics/{k}": {"oracle": f"fr.risk.{k}", "producer": v} for k, v in _RISK_PRODUCERS.items()},
-    f"{_FR_FEAT}/active_bar_count": {"oracle": "fr.position_pit", "producer": f"{FRA}:139,319-352"},
-    f"{_FR_FEAT}/turnover": {"oracle": "fr.turnover", "producer": f"{FRA}:140-141"},
-    f"{_FR_FEAT}/quantile_summary/descriptive_full_sample": {"oracle": NON_STAT, "producer": f"{FRA}:361"},
-    **{f"{_FR_FEAT}/quantile_summary/Q{i}": {"oracle": "fr.quantile_summary", "producer": f"{FRA}:362-374"}
+    f"{_FR_FEAT}/active_bar_count": {"oracle": "fr.position_pit", "producer": f"{FRA}:144,341-398"},
+    f"{_FR_FEAT}/turnover": {"oracle": "fr.turnover", "producer": f"{FRA}:145-146"},
+    f"{_FR_FEAT}/quantile_summary/descriptive_full_sample": {"oracle": NON_STAT, "producer": f"{FRA}:407"},
+    **{f"{_FR_FEAT}/quantile_summary/Q{i}": {"oracle": "fr.quantile_summary", "producer": f"{FRA}:408-420"}
        for i in range(1, 6)},
-    f"{_FR_FEAT}/num_quantiles_used": {"oracle": NON_STAT, "producer": f"{FRA}:119,171"},
-    f"{_FR_FEAT}/newey_west_adjusted": {"oracle": NON_STAT, "producer": f"{FRA}:172"},
+    f"{_FR_FEAT}/num_quantiles_used": {"oracle": NON_STAT, "producer": f"{FRA}:119,177"},
+    f"{_FR_FEAT}/newey_west_adjusted": {"oracle": NON_STAT, "producer": f"{FRA}:178"},
     **{f"{_LS_FEAT}/{side}_analysis/{k}": {"oracle": o, "producer": f"{LSA}:{p}"}
        for side in ("long", "short")
        for k, o, p in (("mean_return", "ls.side_mean", "219,223"), ("ic", "ls.side_ic_spearman", "212-216"),
@@ -176,18 +172,31 @@ def ref_fr_position(feature: pd.Series, frame_index: pd.Index, q: int, warmup: i
     return pd.Series(out, index=frame_index, dtype=int)
 
 
-def ref_periods_per_year(index: pd.Index) -> int:
-    """`factor_return_analyzer.py:385-394`：非 DatetimeIndex 或 < 2 列 ⇒ 365；否則 round(24·365／相鄰間隔中位數〔時〕)。"""
+def ref_bars_per_year(index: pd.Index) -> float:
+    """觀測根密度（SPEC Task 0.4 ⑯ FR-9）：(有效根數−1)·365 日／時間跨度；無時間戳、< 2 列或跨度 ≤ 0 ⇒ NaN。"""
     if not isinstance(index, pd.DatetimeIndex) or len(index) < 2:
-        return 365
-    med_h = float(np.median(np.diff(index.asi8) / 1e9)) / 3600.0
-    if not np.isfinite(med_h) or med_h <= 0:
-        return 365
-    return int(round((24.0 * 365.0) / med_h))
+        return float("nan")
+    span = (index[-1] - index[0]).total_seconds()
+    if not span > 0:
+        return float("nan")
+    return (len(index) - 1) * 365.0 * 86400.0 / span
 
 
-def ref_risk_metrics(returns: Sequence[float], rf: float = 0.0, periods: Optional[int] = None) -> Dict[str, float]:
-    """`factor_return_analyzer.py:175-270` 之公式（numpy 重算）。"""
+def ref_non_overlap_positions(valid_positions: np.ndarray, h: int) -> np.ndarray:
+    """不重疊抽樣（SPEC ⑯）：原始時間軸上自首個有效根 t0 起走 t0, t0+h, t0+2h, …，保留其中有效之根（回其於有效根
+    序列中之序號）。"""
+    if valid_positions.size == 0:
+        return np.zeros(0, dtype=int)
+    valid_set = {int(p): i for i, p in enumerate(valid_positions)}
+    picks = [valid_set[t] for t in range(int(valid_positions[0]), int(valid_positions[-1]) + 1, h) if t in valid_set]
+    return np.asarray(picks, dtype=int)
+
+
+def ref_risk_metrics(returns: Sequence[float], rf: float = 0.0, periods: Optional[float] = None) -> Dict[str, float]:
+    """風險指標 oracle（SPEC Task 0.4 ⑯⑰；產品 `factor_return_analyzer.py` `compute_risk_metrics`）：輸入為不重疊逐期
+    報酬、P＝每年期數（None ⇒ 365、非有限 ⇒ 年化類 NaN）。CAGR＝exp(Σlog1p(r)·P／N)−1（empyrical.annual_return 同義；
+    |·| > 1e6 ⇒ NaN）；Sharpe＝(μ−rf／P)／s·√P、波動＝s·√P（s＝ddof=1）；Sortino＝(μ−rf／P)／√mean(min(r,0)²)·√P
+    （Sortino & Price）；離散度 ≤ 1e-12·max|r| 視為 0；MDD＝權益／前高−1 之最小；Calmar＝CAGR／|MDD|。"""
     r = np.asarray(returns, dtype=float)
     r = r[np.isfinite(r)]
     nan = float("nan")
@@ -195,28 +204,34 @@ def ref_risk_metrics(returns: Sequence[float], rf: float = 0.0, periods: Optiona
             "annualized_return", "annualized_volatility")
     if r.size == 0:
         return {k: nan for k in keys}
-    P = int(periods or 365)
+    P = 365.0 if periods is None else float(periods)
+    p_ok = math.isfinite(P) and P > 0
     m = float(np.mean(r))
+    tol = 1e-12 * float(np.max(np.abs(r)))
     s = float(np.std(r, ddof=1)) if r.size > 1 else nan
-    try:  # :205-210
-        ann = float((1.0 + m) ** P - 1.0)
-        if not math.isfinite(ann) or abs(ann) > 1e6:
-            ann = nan
-    except (OverflowError, ValueError):
-        ann = nan
-    vol = float(s * math.sqrt(P)) if math.isfinite(s) and s > 0 else nan  # :212-217
-    rfp = rf / P
-    sharpe = float((m - rfp) / s * math.sqrt(P)) if math.isfinite(s) and s > 0 else nan  # :219-224
-    down = r[r < 0.0]
-    dstd = float(np.std(down, ddof=1)) if down.size >= 2 else nan  # :228-229
-    sortino = float((m - rfp) / dstd * math.sqrt(P)) if math.isfinite(dstd) and dstd > 0 else nan
-    eq = np.cumprod(1.0 + r)  # :240-245
+    s_ok = math.isfinite(s) and s > tol
+    ann = nan
+    if p_ok:
+        if np.any(r == -1.0):
+            ann = -1.0
+        elif np.all(r > -1.0):
+            try:
+                ann = math.expm1(float(np.sum(np.log1p(r))) * P / r.size)
+            except OverflowError:
+                ann = nan
+            if not math.isfinite(ann) or abs(ann) > 1e6:
+                ann = nan
+    vol = (s * math.sqrt(P) if s_ok else (0.0 if math.isfinite(s) else nan)) if p_ok else nan
+    rfp = rf / P if p_ok else nan
+    sharpe = (m - rfp) / s * math.sqrt(P) if s_ok and p_ok else nan
+    dd = math.sqrt(float(np.mean(np.square(np.minimum(r, 0.0)))))
+    sortino = (m - rfp) / dd * math.sqrt(P) if p_ok and dd > tol else nan
+    eq = np.cumprod(1.0 + r)
     with np.errstate(divide="ignore", invalid="ignore"):
-        dd = eq / np.maximum.accumulate(eq) - 1.0
-    mdd = float(np.min(dd))
-    if not math.isfinite(mdd):
-        mdd = nan
-    calmar = float(ann / abs(mdd)) if math.isfinite(ann) and math.isfinite(mdd) and mdd < 0 else nan  # :248-254
+        ddn = eq / np.maximum.accumulate(eq) - 1.0
+    ddn = ddn[np.isfinite(ddn)]
+    mdd = float(np.min(ddn)) if ddn.size else nan
+    calmar = ann / abs(mdd) if math.isfinite(ann) and math.isfinite(mdd) and mdd < 0 else nan
     win = float(np.mean(r > 0))
     out = {"sharpe_ratio": sharpe, "sortino_ratio": sortino, "calmar_ratio": calmar, "max_drawdown": mdd,
            "win_rate": win, "annualized_return": ann, "annualized_volatility": vol}
@@ -248,9 +263,10 @@ def _ref_sample(values: np.ndarray, max_points: int = 100) -> List[float]:
     return [float(x) for x in v[idx]]
 
 
-def _ref_fr_feature(feature: pd.Series, y: pd.Series, cfg: Dict[str, Any]
+def _ref_fr_feature(feature: pd.Series, y: pd.Series, cfg: Dict[str, Any], h: int = 1
                     ) -> Tuple[Optional[Dict[str, Any]], Optional[pd.Series]]:
-    """單特徵 oracle：回 (結果 dict 或 None〔產品 SkippedResult，`compute_batch` 不入 features〕, position)。"""
+    """單特徵 oracle：回 (結果 dict 或 None〔產品 SkippedResult，`compute_batch` 不入 features〕, position)。
+    h＝標籤前瞻根數：風險指標與累積以不重疊序列、年化期數＝根密度／h（SPEC ⑯）；均值、換手率、active 以全部有效根。"""
     f = pd.Series(feature, dtype=float)
     yy = pd.Series(y, dtype=float).reindex(f.index)
     fv, yv = f.to_numpy(), yy.to_numpy()
@@ -268,13 +284,14 @@ def _ref_fr_feature(feature: pd.Series, y: pd.Series, cfg: Dict[str, Any]
     pv = pos.to_numpy()
     if int((pv != 0).sum()) == 0:  # :127
         return None, pos
-    ls = pv.astype(float) * ym  # :133
-    cum = np.cumprod(1.0 + ls) - 1.0  # :138
-    turnover = float(np.concatenate([[0.0], np.abs(np.diff(pv.astype(float)))]).mean())  # :140-141
+    ls = pv.astype(float) * ym
+    nov = ls[ref_non_overlap_positions(np.flatnonzero(m), int(h))]
+    cum = np.cumprod(1.0 + nov) - 1.0
+    turnover = float(np.concatenate([[0.0], np.abs(np.diff(pv.astype(float)))]).mean())
     result = {
         "long_short_mean_return": float(np.mean(ls)),
         "ls_cumulative_sampled": _ref_sample(cum),
-        "risk_metrics": ref_risk_metrics(ls, cfg["rf"], ref_periods_per_year(frame_index)),
+        "risk_metrics": ref_risk_metrics(nov, cfg["rf"], ref_bars_per_year(frame_index) / int(h)),
         "active_bar_count": int((pv != 0).sum()),
         "turnover": turnover,
         "quantile_summary": _ref_quantile_summary(fm, ym, cfg["q"]),
@@ -284,13 +301,13 @@ def _ref_fr_feature(feature: pd.Series, y: pd.Series, cfg: Dict[str, Any]
     return result, pos
 
 
-def ref_factor_return(features_df: pd.DataFrame, future_returns: pd.Series, top_n: int = 30,
+def ref_factor_return(features_df: pd.DataFrame, future_returns: pd.Series, *, horizon: int, top_n: int,
                       config: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
-    """`FactorReturnAnalyzer(config).compute_batch(features_df, future_returns, top_n)` 之 oracle（`:272-316`）。"""
+    """`FactorReturnAnalyzer(config).compute_batch(features_df, future_returns, horizon=, top_n=)` 之 oracle。"""
     cfg = _fr_cfg(config)
     feats: Dict[str, Any] = {}
-    for name in list(features_df.columns)[: max(1, int(top_n))]:  # :281
-        res, _ = _ref_fr_feature(features_df[name], future_returns, cfg)
+    for name in list(features_df.columns)[: max(1, int(top_n))]:
+        res, _ = _ref_fr_feature(features_df[name], future_returns, cfg, horizon)
         if res is not None:
             feats[str(name)] = res
     return {"status": "ok", "value": {
@@ -480,9 +497,11 @@ def _compare(product: Any, oracle: Any, root: str) -> Dict[str, Dict[str, Any]]:
 
 
 def compare_factor_return(product_output: Mapping[str, Any], features_df: pd.DataFrame, future_returns: pd.Series,
-                          top_n: int = 30, config: Optional[Mapping[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
+                          *, horizon: int, top_n: int = 30,
+                          config: Optional[Mapping[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
     """產品 `compute_batch` 輸出 vs `ref_factor_return`（同一組輸入）；逐統計欄位回 verdict／max_rel_diff／n_finite／detail。"""
-    return _compare(product_output, ref_factor_return(features_df, future_returns, top_n, config), FR_KEY)
+    return _compare(product_output,
+                    ref_factor_return(features_df, future_returns, horizon=horizon, top_n=top_n, config=config), FR_KEY)
 
 
 def compare_long_short(product_output: Mapping[str, Any], features_df: pd.DataFrame, future_returns: pd.Series,
@@ -494,9 +513,10 @@ def compare_long_short(product_output: Mapping[str, Any], features_df: pd.DataFr
 # ── 產品執行 ─────────────────────────────────────────────────────────────────────────────────────────
 
 
-def _run_fr(features_df: pd.DataFrame, y: pd.Series, top_n: int = 30, config: Optional[dict] = None):
+def _run_fr(features_df: pd.DataFrame, y: pd.Series, top_n: int = 30, config: Optional[dict] = None,
+            *, horizon: int = DEFAULT_H):
     analyzer = create_factor_return_analyzer(config or {})
-    return analyzer.compute_batch(features_df, y, top_n=top_n), analyzer.get_series_map()
+    return analyzer.compute_batch(features_df, y, horizon=horizon, top_n=top_n), analyzer.get_series_map()
 
 
 def _run_ls(features_df: pd.DataFrame, y: pd.Series, top_n: int = 30, config: Optional[dict] = None):
@@ -546,7 +566,7 @@ def test_factor_return_matches_oracle_explicit() -> None:
     """一般輸入（特徵與標籤同索引，標籤只尾端缺）：全部統計欄一致且每欄有有限值。"""
     feats, label, _ = _explicit_inputs()
     out, _ = _run_fr(feats, label)
-    cmp = compare_factor_return(out, feats, label)
+    cmp = compare_factor_return(out, feats, label, horizon=DEFAULT_H)
     _assert_all_consistent(cmp)
     _assert_every_stat_field_finite(cmp, FR_KEY)
 
@@ -557,8 +577,63 @@ def test_factor_return_positions_match_oracle_explicit() -> None:
     _, series = _run_fr(feats, label)
     cfg = _fr_cfg(None)
     for name in feats.columns:
-        _, pos = _ref_fr_feature(feats[name], label, cfg)
+        _, pos = _ref_fr_feature(feats[name], label, cfg, DEFAULT_H)
         pd.testing.assert_series_equal(series[name].position, pos, check_names=False)
+
+
+def test_compute_batch_requires_horizon() -> None:
+    """SPEC ⑯（v5.28 API）：`compute_batch` 之 horizon 為必填關鍵字——缺 ⇒ TypeError；< 1 ⇒ ValueError；不接受位置參數。"""
+    feats, label, _ = _explicit_inputs(n=120)
+    analyzer = create_factor_return_analyzer({})
+    with pytest.raises(TypeError):
+        analyzer.compute_batch(feats, label, top_n=2)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        analyzer.compute_batch(feats, label, 5, 2)  # type: ignore[misc]
+    with pytest.raises(ValueError):
+        analyzer.compute_batch(feats, label, horizon=0, top_n=2)
+
+
+@pytest.mark.parametrize("h", [1, 5, 21])
+def test_non_overlap_sampling_and_annualization_by_horizon(h: int) -> None:
+    """SPEC ⑯ 驗收：h＝1／5／21 之標籤；風險指標與 ls_cumulative 以自首個有效根起每隔 h 根之不重疊序列計、年化期數＝
+    根密度／h（1h 軸 8760／h）。另於中段挖缺標籤（缺值不改原始時間軸上之抽樣位置）。"""
+    feats, label, _ = _explicit_inputs(n=360, seed=31 + h, h=h)
+    label = label.copy()
+    label.iloc[150:153] = np.nan
+    out, series = _run_fr(feats, label, horizon=h)
+    _assert_all_consistent(compare_factor_return(out, feats, label, horizon=h))
+    # 直接以定義重算一欄（不經 oracle 函式）：不重疊序列之年化波動
+    ls = series["dev20"].ls_return
+    pos_axis = feats.index.get_indexer(ls.index)
+    keep = (pos_axis - pos_axis[0]) % h == 0
+    nov = ls.to_numpy()[keep]
+    axis_set = set(pos_axis.tolist())
+    assert int(keep.sum()) == sum(1 for t in range(pos_axis[0], pos_axis[-1] + 1, h) if t in axis_set)
+    span_h = (ls.index[-1] - ls.index[0]).total_seconds() / 3600.0
+    P = (len(ls) - 1) * 8760.0 / span_h / h
+    rm = out["value"]["features"]["dev20"]["risk_metrics"]
+    assert _leaf_cmp(rm["annualized_volatility"], float(np.std(nov, ddof=1)) * math.sqrt(P))[0]
+    cum = out["value"]["features"]["dev20"]["ls_cumulative_sampled"]
+    assert _leaf_cmp(cum[-1], float(np.prod(1.0 + nov) - 1.0))[0]
+    if h == 1:
+        assert keep.all()
+
+
+def test_business_day_annualization_uses_observed_density() -> None:
+    """SPEC ⑯ 驗收：工作日日線（非 24/7）——年化期數＝(有效根數−1)·365 日／跨度 ≈ 261，非寫死之 365。"""
+    n = 520
+    idx = pd.bdate_range("2022-01-03", periods=n, tz="UTC")
+    rng = np.random.default_rng(37)
+    price = pd.Series(100.0 * np.exp(np.cumsum(rng.normal(0, 0.01, n))), index=idx)
+    feats = pd.DataFrame({"ret1": price.pct_change(), "dev20": price / price.rolling(20).mean() - 1.0})
+    label = price.shift(-1) / price - 1.0
+    out, series = _run_fr(feats, label, horizon=1)
+    _assert_all_consistent(compare_factor_return(out, feats, label, horizon=1))
+    ls = series["dev20"].ls_return
+    P = (len(ls) - 1) * 365.0 * 86400.0 / (ls.index[-1] - ls.index[0]).total_seconds()
+    assert 255.0 < P < 265.0
+    vol = out["value"]["features"]["dev20"]["risk_metrics"]["annualized_volatility"]
+    assert _leaf_cmp(vol, float(np.std(ls.to_numpy(), ddof=1)) * math.sqrt(P))[0]
 
 
 @pytest.mark.parametrize("cfg", [{"num_quantiles": 2}, {"num_quantiles": 10}, {"warmup_periods": 0},
@@ -567,7 +642,7 @@ def test_factor_return_config_variants_match_oracle(cfg: dict) -> None:
     """設定分支（q、warmup、rf、min_samples）。"""
     feats, label, _ = _explicit_inputs(n=200, seed=11)
     out, _ = _run_fr(feats, label, config=cfg)
-    _assert_all_consistent(compare_factor_return(out, feats, label, config=cfg))
+    _assert_all_consistent(compare_factor_return(out, feats, label, horizon=DEFAULT_H, config=cfg))
 
 
 def test_factor_return_skip_branches_match_oracle() -> None:
@@ -582,56 +657,67 @@ def test_factor_return_skip_branches_match_oracle() -> None:
     df["n30"] = feats["dev20"].where(np.arange(200) >= 200 - DEFAULT_H - 30)
     out, _ = _run_fr(df, label)
     assert set(out["value"]["features"]) == {"ret1", "dev20", "withinf", "n30"}
-    _assert_all_consistent(compare_factor_return(out, df, label))
+    _assert_all_consistent(compare_factor_return(out, df, label, horizon=DEFAULT_H))
     flat_y = pd.Series(0.0, index=idx)
     out0, _ = _run_fr(feats, flat_y)
-    assert out0["value"]["features"] == {} == ref_factor_return(feats, flat_y)["value"]["features"]
-    # 常數 0.01 標籤：浮點下 nanstd 非恰 0（`:110` 以 == 0.0 判）⇒ 不 skip，其 Sortino 退化見
-    # test_fr_sortino_degenerate_downside_is_nan_xfail
+    assert out0["value"]["features"] == {} == ref_factor_return(
+        feats, flat_y, horizon=DEFAULT_H, top_n=30)["value"]["features"]
+    # 常數 0.01 標籤：浮點下 nanstd 非恰 0（產品以 == 0.0 判）⇒ 不 skip；其值仍須照公式一致（離散度相對容差守衛，⑰）
+    const_y = pd.Series(0.01, index=idx)
+    outc, _ = _run_fr(feats, const_y)
+    _assert_all_consistent(compare_factor_return(outc, feats, const_y, horizon=DEFAULT_H))
     out1, _ = _run_fr(df, label, top_n=1)
     assert list(out1["value"]["features"]) == ["ret1"]
-    _assert_all_consistent(compare_factor_return(out1, df, label, top_n=1))
+    _assert_all_consistent(compare_factor_return(out1, df, label, horizon=DEFAULT_H, top_n=1))
     empty = pd.DataFrame({"x": pd.Series(dtype=float)})
     oute, _ = _run_fr(empty, pd.Series(dtype=float))
-    assert oute["value"]["features"] == {} == ref_factor_return(empty, pd.Series(dtype=float))["value"]["features"]
+    assert oute["value"]["features"] == {} == ref_factor_return(
+        empty, pd.Series(dtype=float), horizon=DEFAULT_H, top_n=30)["value"]["features"]
 
 
 def test_factor_return_interior_label_nan_h1_matches_oracle() -> None:
-    """標籤中段缺值但 h=1（缺值不屬未來）：只驗 ls 等以同一 frame 計之欄；position 之歷史差異見 xfail 測試。"""
+    """標籤中段缺值（h=1）：frame 只取標籤有限之列、分箱歷史仍用特徵全時序；全部統計欄一致。"""
     feats, label, _ = _explicit_inputs(n=200, seed=5, h=1)
-    out, _ = _run_fr(feats, label)
-    _assert_all_consistent(compare_factor_return(out, feats, label))
+    label = label.copy()
+    label.iloc[[60, 61, 90, 140]] = np.nan
+    out, _ = _run_fr(feats, label, horizon=1)
+    _assert_all_consistent(compare_factor_return(out, feats, label, horizon=1))
 
 
 @pytest.mark.parametrize("returns", [[], [0.01], [0.01, 0.02, 0.03], [-0.01, 0.02], [0.05] * 3 + [-0.02, -0.01],
-                                     [0.5] * 40, [np.inf, 0.01, -0.02, np.nan, 0.03, -0.01]])
-def test_risk_metrics_boundaries_match_oracle(returns: list) -> None:
+                                     [0.5] * 40, [np.inf, 0.01, -0.02, np.nan, 0.03, -0.01], [0.01] * 50,
+                                     [-1.0, 0.02, 0.03], [0.0, 0.0, 0.0]])
+@pytest.mark.parametrize("periods", [8760, 52.3, None, float("nan")])
+def test_risk_metrics_boundaries_match_oracle(returns: list, periods: Optional[float]) -> None:
     """`compute_risk_metrics` 邊界：空、單筆（std NaN）、無下行（sortino NaN、mdd 0 ⇒ calmar NaN）、恰一筆下行、
-    年化 > 1e6 ⇒ NaN、含 ±inf／NaN（先剔除）。"""
-    got = create_factor_return_analyzer({}).compute_risk_metrics(pd.Series(returns, dtype=float), 0.0, 8760)
-    exp = ref_risk_metrics(returns, 0.0, 8760)
+    年化 > 1e6 ⇒ NaN、含 ±inf／NaN（先剔除）、常數（離散度相對容差 ⇒ Sharpe／波動 NaN）、−100%（CAGR −1）、全 0；
+    期數：整數、非整數、None（365）、NaN（年化類 NaN）。"""
+    got = create_factor_return_analyzer({}).compute_risk_metrics(pd.Series(returns, dtype=float), 0.0, periods)
+    exp = ref_risk_metrics(returns, 0.0, periods)
     for k, v in exp.items():
         ok, rel = _leaf_cmp(got[k], v)
         assert ok, f"{k}：{got[k]} vs {v}（rel {rel}）"
 
 
 def test_ls_cumulative_sampling_boundary_matches_oracle() -> None:
-    """抽樣上限邊界：frame 列數 ≤ 100（原樣）與 > 100（linspace 100 點）。"""
-    for n in (60, 100 + DEFAULT_H, 101 + DEFAULT_H, 300):
-        feats, label, _ = _explicit_inputs(n=n, seed=n)
-        out, _ = _run_fr(feats, label)
-        _assert_all_consistent(compare_factor_return(out, feats, label))
+    """抽樣上限邊界：不重疊序列長 ≤ 100（原樣）與 > 100（linspace 100 點）；h＝1 下 frame 列數 100／101。"""
+    for n, h in ((60, DEFAULT_H), (101, 1), (102, 1), (300, 1), (700, DEFAULT_H)):
+        feats, label, _ = _explicit_inputs(n=n, seed=n, h=h)
+        out, _ = _run_fr(feats, label, horizon=h)
+        _assert_all_consistent(compare_factor_return(out, feats, label, horizon=h))
 
 
 def test_periods_per_year_branches() -> None:
-    """年化期數（產品經公開輸出驗）：RangeIndex ⇒ 365、1h ⇒ 8760、1d ⇒ 365、15m ⇒ 35040。"""
-    assert ref_periods_per_year(pd.RangeIndex(10)) == 365
-    for freq, exp in (("h", 8760), ("D", 365), ("15min", 35040)):
-        assert ref_periods_per_year(pd.date_range("2024-01-01", periods=50, freq=freq)) == exp
+    """根密度：1h ⇒ 8760、1d ⇒ 365、15m ⇒ 35040、RangeIndex ⇒ NaN（產品年化類欄 NaN，其餘欄照算）。"""
+    assert math.isnan(ref_bars_per_year(pd.RangeIndex(10)))
+    for freq, exp in (("h", 8760.0), ("D", 365.0), ("15min", 35040.0)):
+        assert _leaf_cmp(ref_bars_per_year(pd.date_range("2024-01-01", periods=50, freq=freq)), exp)[0]
     feats, label, _ = _explicit_inputs(n=200, seed=9)
     rfeats, rlabel = feats.reset_index(drop=True), label.reset_index(drop=True)
     out, _ = _run_fr(rfeats, rlabel)
-    _assert_all_consistent(compare_factor_return(out, rfeats, rlabel))
+    _assert_all_consistent(compare_factor_return(out, rfeats, rlabel, horizon=DEFAULT_H))
+    rm = out["value"]["features"]["dev20"]["risk_metrics"]
+    assert math.isnan(rm["sharpe_ratio"]) and math.isfinite(rm["max_drawdown"])
 
 
 # long_short 秒級
@@ -704,7 +790,7 @@ def test_long_short_recommendation_branches(li: float, si: float, exp: str) -> N
         assert LongShortAnalyzer._recommendation(li, si) == exp
 
 
-# ── 秒級：已查不一致（xfail strict） ───────────────────────────────────────────────────────────────────
+# ── 秒級：Task 0.3 已查不一致之修正（Task 0.4 ⑭–⑰；原 xfail(strict=True)，修正後轉一般斷言） ────────────
 
 
 def _tied_feature(n: int, zero_every: int) -> pd.Series:
@@ -713,38 +799,33 @@ def _tied_feature(n: int, zero_every: int) -> pd.Series:
     return pd.Series(np.where(i % zero_every == 0, (i + 1) / n, 0.0), index=_hourly(n), name="tied")
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：factor_return 減箱時以 q_eff−1 判頂分位、頂箱永不 +1"
-                   f"（factor_return_analyzer.py:335-351）；收據 {RECEIPT}")
 def test_fr_top_quantile_uses_actual_bin_count_xfail() -> None:
-    """50% 為 0：q=5 之 20%／40% 分位邊界重複被刪，實際 3 箱（標籤 0..2）；oracle 頂箱標籤 2 ⇒ +1。產品只比 4 ⇒ 0 次 +1。"""
+    """⑭ FR-1：50% 為 0：q=5 之 20%／40% 分位邊界重複被刪，實際 3 箱（標籤 0..2）；頂箱標籤 2 ⇒ +1（修正前產品只比 4 ⇒
+    0 次 +1）。"""
     n = 120
     feat = _tied_feature(n, 2)
     label = pd.Series(np.random.default_rng(1).normal(0, 0.01, n), index=feat.index)
     _, series = _run_fr(feat.to_frame(), label)
-    _, pos = _ref_fr_feature(feat, label, _fr_cfg(None))
+    _, pos = _ref_fr_feature(feat, label, _fr_cfg(None), DEFAULT_H)
     assert int((pos == 1).sum()) > 0
     pd.testing.assert_series_equal(series["tied"].position, pos, check_names=False)
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：factor_return 只得 1 箱時當根標籤 0 被判為底分位、"
-                   f"每根皆 −1（含特徵最大值之根）（factor_return_analyzer.py:335-351）；收據 {RECEIPT}")
 def test_fr_single_bin_yields_no_position_xfail() -> None:
-    """95% 為 0、其餘 1：q_eff＝2 而 qcut 邊界 [0, 0, 1] 刪重後只 1 箱；oracle 無頂底 ⇒ 無 position ⇒ skip。
-    產品每根 −1（連特徵＝1 之根也做空）而輸出 ok。"""
+    """⑭ FR-2：95% 為 0、其餘 1：q_eff＝2 而 qcut 邊界 [0, 0, 1] 刪重後只 1 箱；無頂底 ⇒ 無 position ⇒ skip（修正前每根 −1，
+    連特徵＝1 之根也做空）。"""
     n = 200
     i = np.arange(n)
     feat = pd.Series(np.where(i % 20 == 0, 1.0, 0.0), index=_hourly(n), name="tied")
     label = pd.Series(np.random.default_rng(2).normal(0, 0.01, n), index=feat.index)
     out, _ = _run_fr(feat.to_frame(), label)
-    assert out["value"]["features"] == ref_factor_return(feat.to_frame(), label)["value"]["features"]
+    assert out["value"]["features"] == ref_factor_return(
+        feat.to_frame(), label, horizon=DEFAULT_H, top_n=30)["value"]["features"]
 
 
-@pytest.mark.xfail(strict=True, reason=f"偷看未來：ICPERF Task 0.3 不一致：factor_return 分箱歷史取特徵∩標籤 dropna，"
-                   f"t 之後之價格缺值（使 t−h+1..t 間某根標籤 NaN）改寫第 t 根 position"
-                   f"（factor_return_analyzer.py:78-81,120-124）；收據 {RECEIPT}")
 def test_fr_position_prefix_invariant_to_future_price_gap_xfail() -> None:
-    """情境 A 與 B 之價格於 0..g−1 完全相同，B 只令 p_g＝NaN（g 之後才發生）；h＝5 ⇒ B 之 y_{g−5} 為 NaN。第 t 根
-    （t < g）可得資訊兩情境相同，正確 PIT position 必相同（oracle 自證見下一測試）；產品之 position 於某 t < g 不同。"""
+    """⑮ FR-3（偷看未來修正）：情境 A 與 B 之價格於 0..g−1 完全相同，B 只令 p_g＝NaN（g 之後才發生）；h＝5 ⇒ B 之 y_{g−5}
+    為 NaN。第 t 根（t < g）可得資訊兩情境相同，PIT position 必相同（修正前 11 組 (g, 特徵) 不同）。"""
     feats, label, price = _explicit_inputs(n=160, seed=17)
     diffs = []
     _, sa = _run_fr(feats, label)
@@ -775,56 +856,62 @@ def test_fr_oracle_position_prefix_invariant_to_future_price_gap() -> None:
         fb = pd.DataFrame({"ret1": pb.pct_change(fill_method=None), "dev20": pb / pb.rolling(20).mean() - 1.0})
         lb = pb.shift(-DEFAULT_H) / pb - 1.0
         for name in ("ret1", "dev20"):
-            _, pa = _ref_fr_feature(feats[name], label, cfg)
-            _, pbp = _ref_fr_feature(fb[name], lb, cfg)
+            _, pa = _ref_fr_feature(feats[name], label, cfg, DEFAULT_H)
+            _, pbp = _ref_fr_feature(fb[name], lb, cfg, DEFAULT_H)
             common = pa.index.intersection(pbp.index)
             common = common[common < price.index[g]]
             assert (pa.loc[common] == pbp.loc[common]).all(), (g, name)
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：factor_return 未收標籤 horizon，h 根重疊前瞻報酬以每根一期"
-                   f"年化（年化波動、Sharpe 高估約 √h 倍）（factor_return_analyzer.py:143-147,212-224）；收據 {RECEIPT}")
 def test_fr_annualization_accounts_for_label_horizon_xfail() -> None:
-    """h＝5 之前瞻報酬每根取樣而相鄰重疊：一年只有 P／h 個獨立 h 根期，業界（Lo 2002；alphalens 以 period 換算）年化
-    波動＝std·√(P／h)、Sharpe＝mean／std·√(P／h)。嚴格遞增特徵 ⇒ 暖機後每根皆頂分位 +1。"""
+    """⑯ FR-5：h＝5 之前瞻報酬每根取樣而相鄰重疊：一年只有 P／h 個獨立 h 根期。SPEC ⑯ 定義：風險指標以自首個有效根起
+    每隔 h 根之不重疊序列計、年化期數＝根密度（1h 軸 8760）／h；年化波動＝std(不重疊)·√(8760／h)、Sharpe 同。嚴格遞增
+    特徵 ⇒ 暖機後每根皆頂分位 +1。修正前以全部重疊報酬 ×√8760 ⇒ 波動 2.023（定義值約 0.9）。"""
     feats, label, _ = _explicit_inputs(n=300, seed=19)
     feat = pd.Series(np.arange(300, dtype=float), index=feats.index, name="trend")
     out, series = _run_fr(feat.to_frame(), label)
     ls = series["trend"].ls_return.to_numpy()
-    P = 8760
-    std = float(np.std(ls, ddof=1))
+    nov = ls[::DEFAULT_H]  # 有效根於 1h 軸上連續（標籤只尾端缺）⇒ 每隔 h 根
+    P = 8760.0 / DEFAULT_H
+    std = float(np.std(nov, ddof=1))
     rm = out["value"]["features"]["trend"]["risk_metrics"]
-    assert _leaf_cmp(rm["annualized_volatility"], std * math.sqrt(P / DEFAULT_H))[0]
-    assert _leaf_cmp(rm["sharpe_ratio"], float(np.mean(ls)) / std * math.sqrt(P / DEFAULT_H))[0]
+    assert _leaf_cmp(rm["annualized_volatility"], std * math.sqrt(P))[0]
+    assert _leaf_cmp(rm["sharpe_ratio"], float(np.mean(nov)) / std * math.sqrt(P))[0]
+    assert rm["annualized_volatility"] < float(np.std(ls, ddof=1)) * math.sqrt(8760.0) / 1.5
 
 
 _INDUSTRY_R = [0.012, -0.004, 0.007, -0.011, 0.003, 0.009, -0.002, -0.006, 0.010, 0.001, -0.008, 0.005]
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：Sortino 下行偏差取負報酬子樣本之標準差（ddof=1、對其自身"
-                   f"均值），非業界 √mean(min(r,0)²)（factor_return_analyzer.py:228-236）；收據 {RECEIPT}")
 def test_fr_sortino_uses_industry_downside_deviation_xfail() -> None:
-    """Sortino & Price（1994）／empyrical.sortino_ratio：下行偏差＝√(Σ min(r−0,0)²／N)，N＝全部觀測。"""
+    """⑯ FR-6：Sortino & Price（1994）／empyrical.sortino_ratio：下行偏差＝√(Σ min(r−0,0)²／N)，N＝全部觀測
+    （修正前 35.73，定義值 27.85）。"""
     r = np.asarray(_INDUSTRY_R)
     dd = math.sqrt(float(np.mean(np.minimum(r, 0.0) ** 2)))
     got = create_factor_return_analyzer({}).compute_risk_metrics(pd.Series(r), 0.0, 8760)
     assert _leaf_cmp(got["sortino_ratio"], float(np.mean(r)) / dd * math.sqrt(8760))[0]
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：下行報酬全相同時 pandas Series.std 得 ~3.5e-18 而非 0，"
-                   f"Sortino 輸出 ~1e16 之垃圾值而非 NaN（factor_return_analyzer.py:229-236）；收據 {RECEIPT}")
 def test_fr_sortino_degenerate_downside_is_nan_xfail() -> None:
-    """下行報酬 50 筆皆 −0.01（離散跳動、常數標籤時可達）：數學上下行標準差＝0 ⇒ 產品自身之守衛（`:233` dstd > 0）
-    應給 NaN；numpy.std 得恰 0、pandas 兩段式得 3.5e-18 ⇒ 守衛失效。"""
-    r = pd.Series([0.02] * 30 + [-0.01] * 50, dtype=float)
-    got = create_factor_return_analyzer({}).compute_risk_metrics(r, 0.0, 8760)
-    assert math.isnan(got["sortino_ratio"]), got["sortino_ratio"]
+    """⑰ FR-7：離散度守衛以 numpy ddof=1 與相對容差判 0。
+    (a) 常數報酬 50 筆 0.01：數學上 std＝0 ⇒ 年化波動恰 0、Sharpe NaN（分母 0）；無下行 ⇒ Sortino NaN（修正前 pandas 兩段式
+    std 得 ~1.7e-18 ⇒ Sharpe ~1e16 之垃圾值）。
+    (b) 下行報酬 50 筆皆 −0.01（離散跳動、常數標籤時可達）：修正前下行偏差取負報酬子樣本 std（pandas 得 3.5e-18）⇒
+    Sortino 3.34e16；依 ⑯ 定義下行偏差＝√mean(min(r,0)²)＝0.01·√(50／80) > 0 ⇒ Sortino 為有限之定義值、非垃圾值。"""
+    const = create_factor_return_analyzer({}).compute_risk_metrics(pd.Series([0.01] * 50, dtype=float), 0.0, 8760)
+    for k in ("sharpe_ratio", "sortino_ratio"):
+        assert math.isnan(const[k]), (k, const[k])
+    assert const["annualized_volatility"] == 0.0, const["annualized_volatility"]
+    r = np.asarray([0.02] * 30 + [-0.01] * 50, dtype=float)
+    got = create_factor_return_analyzer({}).compute_risk_metrics(pd.Series(r), 0.0, 8760)
+    dd = 0.01 * math.sqrt(50.0 / 80.0)
+    assert _leaf_cmp(got["sortino_ratio"], float(np.mean(r)) / dd * math.sqrt(8760))[0], got["sortino_ratio"]
+    assert abs(got["sortino_ratio"]) < 1e6
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：年化報酬以 (1+算術均值)^P−1，非業界幾何 CAGR"
-                   f"（prod(1+r))^(P/N)−1；Calmar 隨之偏（factor_return_analyzer.py:205-210,248-254）；收據 {RECEIPT}")
 def test_fr_annualized_return_is_cagr_xfail() -> None:
-    """empyrical.annual_return／calmar_ratio：CAGR＝(Π(1+r))^(P／N)−1，Calmar＝CAGR／|MDD|。"""
+    """⑯ FR-8：empyrical.annual_return／calmar_ratio：CAGR＝(Π(1+r))^(P／N)−1，Calmar＝CAGR／|MDD|（修正前 0.6264，
+    定義值 0.6109）。"""
     r = np.asarray(_INDUSTRY_R)
     P = 365
     cagr = float(np.prod(1.0 + r) ** (P / r.size) - 1.0)
@@ -835,29 +922,27 @@ def test_fr_annualized_return_is_cagr_xfail() -> None:
     assert _leaf_cmp(got["calmar_ratio"], cagr / abs(mdd))[0]
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：年化期數寫死 24·365／間隔中位數，非 24/7 市場（交易日"
-                   f"日線）得 365 而非實際每年根數（factor_return_analyzer.py:385-394）；收據 {RECEIPT}")
 def test_fr_periods_per_year_follows_observed_bar_density_xfail() -> None:
-    """工作日日線（週末無資料）：每年實得根數＝(N−1)·365 日／跨度；產品以間隔中位數 1 日 ⇒ 365（√(365／261) 高估年化
-    波動與 Sharpe）。不得寫死 24h（使用者「不得侷限加密貨幣」）。"""
+    """⑯ FR-9：工作日日線（週末無資料）：每年實得根數＝(N−1)·365 日／跨度（SPEC：觀測根密度，不取整）；修正前以間隔
+    中位數 1 日 ⇒ 365（√(365／261) 高估年化波動與 Sharpe：0.1923 vs 0.1626）。不得寫死 24h。"""
     n = 520
     idx = pd.bdate_range("2022-01-03", periods=n, tz="UTC")
     rng = np.random.default_rng(23)
     price = pd.Series(100.0 * np.exp(np.cumsum(rng.normal(0, 0.01, n))), index=idx)
     feat = pd.Series(np.arange(n, dtype=float), index=idx, name="trend")
     label = price.shift(-1) / price - 1.0
-    out, series = _run_fr(feat.to_frame(), label)
+    out, series = _run_fr(feat.to_frame(), label, horizon=1)
     fidx = series["trend"].ls_return.index
-    P = int(round((len(fidx) - 1) * 365.0 * 86400.0 / ((fidx[-1] - fidx[0]).total_seconds())))
+    P = (len(fidx) - 1) * 365.0 * 86400.0 / ((fidx[-1] - fidx[0]).total_seconds())
+    assert 255.0 < P < 265.0
     ls = series["trend"].ls_return.to_numpy()
     rm = out["value"]["features"]["trend"]["risk_metrics"]
     assert _leaf_cmp(rm["annualized_volatility"], float(np.std(ls, ddof=1)) * math.sqrt(P))[0]
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：long_short 分箱樣本門檻經 effective_count 計 ~isnan，±inf "
-                   f"亦計入，有限值不足 100 即分箱（pit_stats.py:49-52,374-377；long_short_analyzer.py:56-61）；收據 {RECEIPT}")
 def test_ls_bin_min_samples_counts_finite_only_xfail() -> None:
-    """首根 +inf、其後 149 根相異有限值：第 99 根（有限歷史 99 筆）不得有標籤；產品已標。"""
+    """⑰ FR-10：首根 +inf、其後 149 根相異有限值：第 99 根（有限歷史 99 筆）不得有標籤（修正前已標，首個有標籤之根
+    idx 99，定義為 100）。"""
     n = 150
     vals = np.concatenate([[np.inf], np.random.default_rng(29).normal(0, 1, n - 1)])
     feat = pd.Series(vals, index=_hourly(n))
@@ -906,13 +991,25 @@ def test_factor_return_matches_oracle_on_real_kline() -> None:
     """真實 BTCUSDT 1h 2,000 列、特徵與標籤同索引：全部統計欄一致，且每一統計欄至少一特徵得有限值。"""
     feats, label, _ = _real_inputs()
     out, series = _run_fr(feats, label)
-    cmp = compare_factor_return(out, feats, label)
+    cmp = compare_factor_return(out, feats, label, horizon=DEFAULT_H)
     _assert_all_consistent(cmp)
     _assert_every_stat_field_finite(cmp, FR_KEY)
     cfg = _fr_cfg(None)
     for name in feats.columns:
-        _, pos = _ref_fr_feature(feats[name], label, cfg)
+        _, pos = _ref_fr_feature(feats[name], label, cfg, DEFAULT_H)
         pd.testing.assert_series_equal(series[name].position, pos, check_names=False)
+
+
+@pytest.mark.requires_kline
+@pytest.mark.parametrize("h", [1, 21])
+def test_factor_return_horizon_variants_on_real_kline(h: int) -> None:
+    """⑯ 驗收（真實資料）：BTCUSDT 1h 標籤 h＝1／21（close[t+h]／close[t]−1），compute_batch 傳同 h；全部統計欄一致。"""
+    feats, _, close = _real_inputs()
+    label = (close.shift(-h) / close - 1.0).rename("label")
+    out, _ = _run_fr(feats, label, horizon=h)
+    cmp = compare_factor_return(out, feats, label, horizon=h)
+    _assert_all_consistent(cmp)
+    _assert_every_stat_field_finite(cmp, FR_KEY)
 
 
 @pytest.mark.requires_kline
@@ -928,23 +1025,19 @@ def test_long_short_matches_oracle_on_real_kline() -> None:
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：呼叫端標籤只覆蓋測試段時，factor_return 之分箱歷史被截為"
-                   f"測試段（另付 20 根暖機），非特徵自身全歷史（違 RB-3，long_short_analyzer.py:47-50）"
-                   f"（factor_return_analyzer.py:78-81）；收據 {RECEIPT}")
 def test_fr_history_not_truncated_by_label_segment_on_real_kline_xfail() -> None:
-    """真實 BTCUSDT 1h：features 全長 2,000 列、標籤只末 400 列（同 `_run_factor_return` 之實際輸入形狀）。"""
+    """⑮ FR-4（真實 BTCUSDT 1h）：features 全長 2,000 列、標籤只末 400 列（同 `_run_factor_return` 之實際輸入形狀）；分箱
+    歷史用特徵全時序（修正前截為測試段：16 統計欄中 11 欄不一致，如 ret1 active 145 vs 100）。"""
     feats, label, _ = _real_inputs()
     lab = label.iloc[-400:]
     out, _ = _run_fr(feats, lab)
-    _assert_all_consistent(compare_factor_return(out, feats, lab))
+    _assert_all_consistent(compare_factor_return(out, feats, lab, horizon=DEFAULT_H))
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：離散特徵（報酬正負號）於真實資料減為 1 箱，factor_return "
-                   f"每根皆 −1（factor_return_analyzer.py:335-351）；收據 {RECEIPT}")
 def test_fr_discrete_feature_on_real_kline_xfail() -> None:
-    """真實 BTCUSDT 1h：sign(過去 1 根報酬)（因果，取值 {−1, 0, 1}）。"""
+    """⑭（真實 BTCUSDT 1h）：sign(過去 1 根報酬)（因果，取值 {−1, 0, 1}）——減箱時頂底依實際箱數（修正前 −1 有 1943 根）。"""
     feats, label, _ = _real_inputs()
     df = pd.DataFrame({"sign1": np.sign(feats["ret1"])})
     out, _ = _run_fr(df, label)
-    _assert_all_consistent(compare_factor_return(out, df, label))
+    _assert_all_consistent(compare_factor_return(out, df, label, horizon=DEFAULT_H))

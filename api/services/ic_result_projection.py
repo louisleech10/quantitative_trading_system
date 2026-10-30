@@ -28,12 +28,26 @@ def _missing(v: Any) -> bool:
     return True
 
 
+def derived_icir_aligned(row: Mapping[str, Any]) -> Optional[float]:
+    """列無 `icir_aligned` 欄時（V2 artifact 固定欄、Task 0.4 ⑧ 前產出之報告）由同列值導出＝sign(ic_mean)·icir；
+    ic_mean 為 0／非有限或 icir 非有限 ⇒ None（缺）。定義同 `ic_filter_orchestrator._direction_fields`。"""
+    try:
+        mean, icir = float(row.get("ic_mean")), float(row.get("icir"))
+    except (TypeError, ValueError):
+        return None
+    if not (math.isfinite(mean) and math.isfinite(icir)) or mean == 0.0:
+        return None
+    return icir if mean > 0 else -icir
+
+
 def sort_key(row: Mapping[str, Any], field: str, sort_order: str, contract: Mapping[str, Any]) -> Tuple:
     """缺值兩向沉底；主鍵依 sort_order；並列以 feature_name 升冪；字串欄純字串序。"""
     name = str(row.get("feature_name", ""))
     if field in contract["sort_policy"]["string_fields"]:
         return (0, name, name)  # 字串欄由 build_sort_index 以 reverse 處理 desc；此鍵只供 asc／tie-break
     v = row.get(field)
+    if field == "icir_aligned" and v is None:
+        v = derived_icir_aligned(row)
     if _missing(v):
         return (1, 0.0, name)  # 兩向沉底
     f = float(v)
@@ -244,7 +258,7 @@ def project_light_view(report: Mapping[str, Any], contract: Mapping[str, Any], *
     out = apply_count_paths(out, contract)
     rows = report.get("summary_table") or []
     out["summary_page"] = paginate_summary(
-        list(rows), sort_by="icir", sort_order="desc", offset=0, limit=int(contract["limit_default"]),
+        list(rows), sort_by="icir_aligned", sort_order="desc", offset=0, limit=int(contract["limit_default"]),  # ICPERF Task 0.4 ⑧
         contract=contract, task_id=task_id, revision=revision,
     )
     out["filter_log_funnel"] = funnel

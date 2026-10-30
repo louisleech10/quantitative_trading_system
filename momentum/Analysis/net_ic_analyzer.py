@@ -270,9 +270,12 @@ class NetICAnalyzer:
 
     def _capacity_payload(
         self,
-        turnover: float,
+        turnover: Optional[float],
         avg_daily_volume_usd: Optional[float],
     ) -> dict[str, Any]:
+        if turnover is None:
+            # 無同列擇時部位序列 ⇒ 換手率未知 ⇒ 容量未知（不以他種換手率代填）
+            return {"estimated_capacity_usd": None, "capacity_tier": "unknown", "calibration": "uncalibrated"}
         raw = self.estimate_factor_capacity(
             turnover=float(turnover),
             avg_daily_volume_usd=avg_daily_volume_usd,
@@ -290,13 +293,15 @@ class NetICAnalyzer:
         *,
         cost_bps: float | None,
         include_cost_keys: bool,
-    ) -> tuple[dict[str, Any], bool, bool]:
-        """由 PIT series 回填 net/breakeven/profitable。
+    ) -> tuple[dict[str, Any], bool, bool, float | None]:
+        """由 PIT series 回填 net/breakeven/profitable,並回該列換手率。
 
         Returns:
             metrics: 要 merge 進 feature dict 的 conditional keys
             is_evaluable: 對齊後可評估(含 zero-turnover 但 net 可算)
             is_profitable: profitable_after_cost value is True
+            series_turnover: 同列擇時部位之 mean(|Δposition|)(與 net/breakeven 同一對齊樣本);
+                無序列/對齊後空/非有限 → None(ICPERF Task 0.4 ㉒ QN-1)
         """
         extracted = _extract_gross_position(series_obj)
         if extracted is None:
@@ -310,11 +315,12 @@ class NetICAnalyzer:
                 metrics["profitable_after_cost"] = _unavailable(
                     _SERIES_SHAPE_REASON if series_obj is not None else _UNAVAILABLE_REASON
                 )
-            return metrics, False, False
+            return metrics, False, False, None
 
         gross, position = extracted
         turnover_s = position_to_turnover_series(position)
         stats = compute_breakeven_and_net(gross, turnover_s, cost_bps=cost_bps)
+        series_turnover = _finite_or_null(stats.get("turnover_mean"))
 
         if not stats["evaluable"] or stats["net_mean"] is None:
             reason = str(stats.get("reason") or _INSUFFICIENT_ALIGNED_REASON)
@@ -322,7 +328,7 @@ class NetICAnalyzer:
             if include_cost_keys:
                 metrics["breakeven_cost_bps"] = _unavailable(reason)
                 metrics["profitable_after_cost"] = _unavailable(reason)
-            return metrics, False, False
+            return metrics, False, False, series_turnover
 
         net_mean = float(stats["net_mean"])
         metrics = {"net_factor_return": _ok(net_mean)}
@@ -338,7 +344,7 @@ class NetICAnalyzer:
                 metrics["breakeven_cost_bps"] = _ok(float(be))
             metrics["profitable_after_cost"] = _ok(is_profitable)
 
-        return metrics, True, is_profitable
+        return metrics, True, is_profitable, series_turnover
 
     def batch_analyze(
         self,
@@ -350,7 +356,9 @@ class NetICAnalyzer:
 
         Args:
             ic_summary: feature → {gross_ic|ic_mean, ...}
-            turnover_data: feature → scalar quantile turnover(容量/cost_drag 用)
+            turnover_data: feature → scalar(呼叫端現傳第 5 段 quantile_turnover);只作分析對象與輸入有效性
+                之分流(缺/非有限/負 → skipped),**不入成本、容量計算**(ICPERF Task 0.4 ㉒ QN-1:
+                換手率、cost_drag、成本階梯、容量一律取同列 factor_return_series 之 mean(|Δposition|))
             factor_return_series: feature → FactorTimingReturnSeries(ls_return+position);
                 缺/無效 → conditional metrics unavailable(禁 scalar 廣播)。
         """
@@ -426,16 +434,15 @@ class NetICAnalyzer:
                 continue
 
             volume = metric.get("avg_daily_volume_usd")
-            capacity = self._capacity_payload(
-                turnover=turnover_f,
-                avg_daily_volume_usd=float(volume) if volume is not None else None,
-            )
-
+            volume_f = float(volume) if volume is not None else None
             series_obj = series_map.get(feature_name)
 
+            # ICPERF Task 0.4 ㉒ QN-1：換手率、成本拖累、成本階梯、容量一律以同列擇時部位序列之
+            # mean(|Δposition|)（與 net／breakeven 同一對齊樣本）計；turnover_data（第 5 段頂分位單邊
+            # quantile_turnover）只作上方輸入有效性之分流，不入任何成本計算。無序列 ⇒ 上列各值 null。
             if not self._cost_enabled:
                 # SCHEMA_GROSS_ONLY(無 breakeven/profitable 鍵)
-                cond, is_eval, _is_prof = self._series_conditional_metrics(
+                cond, is_eval, _is_prof, series_to = self._series_conditional_metrics(
                     series_obj,
                     cost_bps=None,
                     include_cost_keys=False,
@@ -444,9 +451,9 @@ class NetICAnalyzer:
                     evaluable_count += 1
                 feature_results[feature_name] = {
                     "gross_ic": gross_f,
-                    "turnover": turnover_f,
+                    "turnover": series_to,
                     "turnover_semantics": _TURNOVER_SEMANTICS,
-                    "capacity": capacity,
+                    "capacity": self._capacity_payload(series_to, volume_f),
                     **cond,
                 }
                 continue
@@ -454,26 +461,34 @@ class NetICAnalyzer:
             # SCHEMA_COST_ENABLED
             assert self._cost_bps is not None  # validated in __init__
             cost_bps = float(self._cost_bps)
-            drag = self.compute_cost_drag(cost_bps, turnover_f)
-            cost_drags.append(drag)
-            cond, is_eval, is_prof = self._series_conditional_metrics(
+            cond, is_eval, is_prof, series_to = self._series_conditional_metrics(
                 series_obj,
                 cost_bps=cost_bps,
                 include_cost_keys=True,
             )
+            if series_to is None:
+                drag: float | None = None
+                sensitivity = [
+                    {"cost_bps": item["cost_bps"], "cost_drag_return": None}
+                    for item in self.cost_sensitivity_analysis(cost_bps, 0.0)
+                ]
+            else:
+                drag = self.compute_cost_drag(cost_bps, series_to)
+                cost_drags.append(drag)
+                sensitivity = self.cost_sensitivity_analysis(cost_bps, series_to)
             if is_eval:
                 evaluable_count += 1
                 if is_prof:
                     profitable_count += 1
             feature_results[feature_name] = {
                 "gross_ic": gross_f,
-                "turnover": turnover_f,
+                "turnover": series_to,
                 "turnover_semantics": _TURNOVER_SEMANTICS,
-                "capacity": capacity,
+                "capacity": self._capacity_payload(series_to, volume_f),
                 "cost_bps": cost_bps,
                 "cost_semantics": _COST_SEMANTICS,
                 "cost_drag_return": drag,
-                "cost_sensitivity": self.cost_sensitivity_analysis(cost_bps, turnover_f),
+                "cost_sensitivity": sensitivity,
                 **cond,
             }
 

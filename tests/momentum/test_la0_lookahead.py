@@ -35,6 +35,10 @@ ATTR_ALLOWLIST = LA0_GOLDEN_DIR / "attribution_allowlist.json"
 ATTR_JSON = LA0_GOLDEN_DIR / "attribution.json"
 AFTER_BTC = LA0_GOLDEN_DIR / "BTCUSDT_1h_baseline_after.json"
 AFTER_ETH = LA0_GOLDEN_DIR / "ETHUSDT_12h_baseline_after.json"
+# LA-0 歸因（attribution.json）所對之 after 快照，凍結於 LA-0 收案時（位元組＝其 sha256_prefix）。即時對照之
+# AFTER_* 隨後續票之刻意改值重產（ICPERF Task 0.4 ④：滾動 IC 逐特徵時間軸），歸因只證 LA-0 本身之改值範圍。
+AFTER_BTC_LA0 = LA0_GOLDEN_DIR / "BTCUSDT_1h_baseline_after_la0.json"
+AFTER_ETH_LA0 = LA0_GOLDEN_DIR / "ETHUSDT_12h_baseline_after_la0.json"
 AFTER_BTC_SPLIT_OFF = LA0_GOLDEN_DIR / "BTCUSDT_1h_baseline_after_split_off.json"
 AFTER_ETH_SPLIT_OFF = LA0_GOLDEN_DIR / "ETHUSDT_12h_baseline_after_split_off.json"
 BEFORE_BTC = LA0_GOLDEN_DIR / "BTCUSDT_1h_baseline.json"
@@ -223,10 +227,15 @@ def test_rolling_ic_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
         force_legacy_global_rank: bool = False,
     ) -> None:
         features, label = _build_rolling_ic_inputs(kline, n_rows=400, dtype=dtype)
-        # dropna 後長度 = 有效對齊列數
-        aligned_n = int(
-            pd.concat([features, label.rename("label")], axis=1).dropna().shape[0]
-        )
+
+        def _axis_n(feat: pd.DataFrame, lab: pd.Series) -> int:
+            # ICPERF Task 0.4 ④：產品時間軸＝標籤有限之列（逐特徵，不跨特徵聯合 dropna；特徵非有限之窗為 NaN）；
+            # legacy mutation 路徑仍為聯合 dropna 後之列
+            if force_legacy_global_rank:
+                return int(pd.concat([feat, lab.rename("label")], axis=1).dropna().shape[0])
+            return int(np.isfinite(lab.to_numpy(dtype=np.float64)).sum())
+
+        aligned_n = _axis_n(features, label)
         assert aligned_n > window + tr + 5
 
         feat_t = truncate_future(features, tr)
@@ -248,8 +257,7 @@ def test_rolling_ic_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
             )
 
         key = f"window_{window}"
-        # 用 aligned length 算 emitted ends（與 dropna 後序列一致）
-        # 截尾後 aligned 約 short tr（特徵/label 同 index）
+        # 用時間軸長度算 emitted ends（與 _axis_n 之序列一致）；截尾後時間軸約短 tr
         keep = _early_emitted_indices(aligned_n, window, stride, tr)
         assert len(keep) > 10, "need enough early emitted ends for discrimination"
 
@@ -257,10 +265,7 @@ def test_rolling_ic_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
             full_arr = np.asarray(full[col][key], dtype=np.float64)
             trunc_arr = np.asarray(trunc[col][key], dtype=np.float64)
             assert full_arr.shape[0] == (aligned_n - window) // stride + 1
-            # trunc aligned length ≈ aligned_n - tr（dropna 後同切）
-            trunc_aligned_n = int(
-                pd.concat([feat_t, lab_t.rename("label")], axis=1).dropna().shape[0]
-            )
+            trunc_aligned_n = _axis_n(feat_t, lab_t)
             assert trunc_arr.shape[0] == (trunc_aligned_n - window) // stride + 1
             np.testing.assert_allclose(
                 full_arr[keep],
@@ -293,9 +298,8 @@ def test_rolling_ic_pit(la0_real_kline: Dict[str, pd.DataFrame]) -> None:
     rolling = engine.compute_rolling_ic(
         features, label, windows=[21, 63], stride=1, method="spearman"
     )
-    aligned_n = int(
-        pd.concat([features, label.rename("label")], axis=1).dropna().shape[0]
-    )
+    # ICPERF Task 0.4 ④：時間軸＝標籤有限之列（逐特徵）
+    aligned_n = int(np.isfinite(label.to_numpy(dtype=np.float64)).sum())
     for w in (21, 63):
         if aligned_n >= w:
             expected_len = (aligned_n - w) // 1 + 1
@@ -707,8 +711,8 @@ def _load_la0_baseline_maps() -> tuple[dict[str, Any], dict[str, Any], dict[str,
         "ETHUSDT_12h": json.loads(BEFORE_ETH.read_text(encoding="utf-8")),
     }
     after_map = {
-        "BTCUSDT_1h": json.loads(AFTER_BTC.read_text(encoding="utf-8")),
-        "ETHUSDT_12h": json.loads(AFTER_ETH.read_text(encoding="utf-8")),
+        "BTCUSDT_1h": json.loads(AFTER_BTC_LA0.read_text(encoding="utf-8")),
+        "ETHUSDT_12h": json.loads(AFTER_ETH_LA0.read_text(encoding="utf-8")),
     }
     return allow, before_map, after_map
 
@@ -728,7 +732,7 @@ def test_attribution_schema_valid() -> None:
     assert ATTR_ALLOWLIST.is_file(), f"missing {ATTR_ALLOWLIST}"
     assert ATTR_JSON.is_file(), f"missing {ATTR_JSON}"
     assert BEFORE_BTC.is_file() and BEFORE_ETH.is_file()
-    assert AFTER_BTC.is_file() and AFTER_ETH.is_file()
+    assert AFTER_BTC_LA0.is_file() and AFTER_ETH_LA0.is_file()
 
     allow, before_map, after_map = _load_la0_baseline_maps()
     attr = json.loads(ATTR_JSON.read_text(encoding="utf-8"))

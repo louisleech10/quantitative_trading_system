@@ -145,16 +145,10 @@ def _assert_la0_after_gate() -> None:
             assert abs(float(row["delta"])) <= 1e-12
 
 
-# a17b57e7（EVTWARMUP Task 3.1，刻意之生產改動）起 rolling 視窗依 run 週期換算：BTCUSDT 1h 之 control_pearson_rolling_ic
-# 等隨之改變，07-16 凍結之 LA-0 golden 與歸因表（before／after 皆以舊視窗產生）已過期；重凍需整套 LA-0 重基準與重新
-# 歸因簽核（TESTREG Task 4.4 實測：build_after_and_attribution.py 於 HEAD 判 control 兩項 unexpected）。
-_LA0_REBASELINE_PENDING = pytest.mark.xfail(
-    strict=True,
-    reason="LA-0 golden 待重基準（a17b57e7 視窗換算後凍結值過期）；見 白話說明/還沒做的事.md",
-)
-
-
-@_LA0_REBASELINE_PENDING
+# a17b57e7（EVTWARMUP Task 3.1）起 rolling 視窗依 run 週期換算，07-16 凍結之 LA-0 after golden 過期（原以 xfail 標記待重基準）。
+# ICPERF Task 0.4（2026-10-30）：after golden 即時對照快照 *_baseline_after{,_split_off}.json 以
+# `build_after_and_attribution.py --live-only` 依現行碼（含 a17b57e7 視窗換算與 Task 0.4 ④–㉒，其值另經 scipy／statsmodels
+# oracle 測試獨立驗證）重產 ⇒ 標記移除；LA-0 修正之歸因簽核（attribution.json）不重簽，續對凍結複本 *_baseline_after_la0.json。
 def test_flag_off_deep_equal_baseline() -> None:
     """G-OLD / flag-off 強 gate：split-OFF after-golden + **live** deep-equal。
 
@@ -212,7 +206,13 @@ def test_flag_off_deep_equal_baseline() -> None:
         assert legacy.get("baseline_role") != "after_pit_split_off"
 
 
-@_LA0_REBASELINE_PENDING
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "既有紅（HEAD 同紅）：la0 輸入 h5 經 FF-NAME 0b196320 補命名世代屬性後位元組改變，"
+        "before 基準 input_contract.features_h5_sha256 未同步；列 ICPERF code review r48 定修法"
+    ),
+)
 def test_flag_on_matches_new_golden() -> None:
     """G-NEW / flag-on 強 gate：split-ON after golden + live deep-equal。"""
     from tests.golden.la0.build_after_and_attribution import (  # noqa: WPS433

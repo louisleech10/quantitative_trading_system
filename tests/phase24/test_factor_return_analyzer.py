@@ -86,7 +86,8 @@ def test_compute_batch():
     labels = pd.Series(features["f1"] * 0.01 + rng.normal(scale=0.01, size=300), index=idx)
     analyzer = FactorReturnAnalyzer({})
 
-    result = analyzer.compute_batch(features, labels, top_n=2)
+    # ICPERF Task 0.4 ⑯：horizon 為必填關鍵字；labels 為同根 1 期報酬 ⇒ horizon=1
+    result = analyzer.compute_batch(features, labels, horizon=1, top_n=2)
 
     # 舊: assert len(result)==2 / keys=={f1,f2}  — 錯,現為 ok union 包一層
     assert result["status"] == "ok"
@@ -117,7 +118,9 @@ def test_compute_risk_metrics_empty_and_flat_returns():
     assert np.isnan(empty_result["sharpe_ratio"])
 
     flat_result = analyzer.compute_risk_metrics(pd.Series([0.01] * 20))
-    assert abs(float(flat_result["annualized_volatility"])) < 1e-8
+    # ICPERF Task 0.4 ⑰ FR-7：常數報酬之離散度以 numpy ddof=1＋相對容差判 0 ⇒ 波動恰 0（舊值 ~3e-17 為 pandas 浮點殘差）
+    assert float(flat_result["annualized_volatility"]) == 0.0
+    assert np.isnan(flat_result["sharpe_ratio"])
     assert np.isnan(flat_result["sortino_ratio"]) or abs(float(flat_result["sortino_ratio"])) < 1e-8
 
 
@@ -141,7 +144,16 @@ def test_assign_quantiles_and_sampling_branches():
 def test_infer_periods_per_year_default_branch():
     analyzer = FactorReturnAnalyzer({})
     periods = analyzer._infer_periods_per_year(pd.Index([1, 2, 3]))
-    assert periods == 365
+    # ICPERF Task 0.4 ⑯ FR-9：年化期數＝時間戳導出之根密度；無時間戳無從導出 ⇒ NaN（舊寫死 365＝假設日線）
+    assert np.isnan(periods)
+    # 年化類指標隨之 NaN，非年化欄照算
+    idx = pd.RangeIndex(60)
+    feature = pd.Series(np.linspace(-1.0, 1.0, 60)[::-1].copy(), index=idx)
+    label = pd.Series(np.sin(np.arange(60)) * 0.01, index=idx)
+    result = analyzer.compute_factor_returns(feature, label)
+    assert np.isnan(result["risk_metrics"]["sharpe_ratio"])
+    assert np.isnan(result["risk_metrics"]["annualized_volatility"])
+    assert np.isfinite(result["risk_metrics"]["max_drawdown"])
 
 
 def test_infer_periods_per_year_datetime_branch():
@@ -369,7 +381,10 @@ def test_compute_risk_metrics_calmar_nan_iff_no_drawdown_with_hand_oracle():
         eq *= 1.0 + r
         peak = max(peak, eq)
         mdd = min(mdd, eq / peak - 1.0)
-    mean = sum(rets) / len(rets)
-    calmar_oracle = ((1.0 + mean) ** 365 - 1.0) / abs(mdd)
+    # ICPERF Task 0.4 ⑯ FR-8：年化報酬＝CAGR＝(Π(1+r))^(P/N)−1（empyrical.annual_return；舊為 (1+算術均值)^P−1）
+    growth = 1.0
+    for r in rets:
+        growth *= 1.0 + r
+    calmar_oracle = (growth ** (365 / len(rets)) - 1.0) / abs(mdd)
     got = analyzer.compute_risk_metrics(pd.Series(rets), periods_per_year=365)
     assert mdd < 0 and abs(got["max_drawdown"] - mdd) < 1e-12 and abs(got["calmar_ratio"] - calmar_oracle) < 1e-9, (got, mdd, calmar_oracle)

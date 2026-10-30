@@ -75,22 +75,25 @@ def _rel(a: float, b: float) -> float:
 
 #: oracle 項 id → 說明（MODULE_FIELDS 之 oracle 欄引用）
 ORACLES: Dict[str, str] = {
-    "orth.priority_order": "測試自寫排序參考：icir_scores 非空且全有限 ⇒ ICIR 降序（值為 dict 取 'icir'，ic_engine.py:488-493 之形狀），"
-                           "否則 |值| 均值降序（factor_orthogonalizer.py:127-142）",
-    "orth.correlation_before": "numpy.corrcoef（同列剔除後之排序矩陣）取絕對值之非對角 nanmean（factor_orthogonalizer.py:65、:144-153）",
-    "orth.correlation_after": "Gram–Schmidt 定義：逐欄以 statsmodels OLS（無截距、對前序欄）殘差單位化為正交基（數值零殘差之欄為零向量），"
-                              "numpy.corrcoef 絕對值之非對角 nanmean（factor_orthogonalizer.py:43-44、:66）",
-    "orth.residual_variance": "statsmodels.api.OLS(target, 前序欄).fit().resid 之 np.var（ddof=0）（factor_orthogonalizer.py:49-56）",
-    "orth.degenerate": "同上殘差變異 ≤ degenerate_threshold（factor_orthogonalizer.py:57-59）",
+    "orth.priority_order": "測試自寫排序參考：icir_scores 非空且全有限 ⇒ |ICIR| 降序、同強度依原欄序（值為 dict 取 'icir'，"
+                           "ic_engine.py:488-493 之形狀），否則 |值| 均值降序（factor_orthogonalizer.py:149-172）",
+    "orth.correlation_before": "numpy.corrcoef（同列剔除後之排序矩陣）取絕對值之非對角 nanmean（factor_orthogonalizer.py:92、:184-193）",
+    "orth.correlation_after": "Gram–Schmidt 定義：逐欄以 statsmodels OLS（含截距、對前序欄）殘差單位化為正交基（退化欄為零向量），"
+                              "numpy.corrcoef 絕對值之非對角 nanmean；相關係數有界故以絕對誤差判（factor_orthogonalizer.py:63-93）",
+    "orth.residual_variance": "statsmodels.api.OLS(target, add_constant(前序欄)).fit().resid 之 np.var（ddof=0，原尺度）"
+                              "（factor_orthogonalizer.py:67-80）",
+    "orth.degenerate": "原變異為 0，或上列殘差變異 ≤ degenerate_threshold × 原變異（相對門檻，factor_orthogonalizer.py:77-82）",
     "pca.explained_variance_ratio": "numpy.linalg.svd(去均值矩陣) 之 s²／Σs²（全部成分為分母，同 sklearn 定義）",
     "pca.loadings": "numpy.linalg.svd 右奇異向量，符號依 sklearn svd_flip(u_based_decision=False)：每成分絕對值最大之分量為正；"
                     "單位向量故以絕對誤差判",
-    "exposure.portfolio_exposure": "測試自寫：Σ_t 有限值 x_t／列數 n（缺值當 0、時間等權 1/n；ic_filter_orchestrator.py:3115-3117、"
-                                   "factor_exposure_analyzer.py:176-184）",
-    "exposure.concentration": "測試自寫：w=|e|/Σ|e|、HHI=Σw²、argmax 取首、門檻與警告規則（factor_exposure_analyzer.py:302-337）",
-    "exposure.neutralized": "none：缺值當 0；beta_neutral：statsmodels OLS（含截距）於 x 與市場代理共同有效樣本之斜率 β，x−β·m；"
-                            "vol_neutral：逐根 PIT 滾動標準差（numpy ddof=1，只用 0..t）；inf→NaN→0 後同曝險公式"
-                            "（factor_exposure_analyzer.py:97-159；代理＝收盤簡單報酬落後 1 根，ic_filter_orchestrator.py:3109-3113）",
+    "exposure.portfolio_exposure": "測試自寫：逐欄只取有限值列之均值（時間等權之有效列 nanmean；該欄無有效列 ⇒ NaN；"
+                                   "ic_filter_orchestrator.py:3115-3117、factor_exposure_analyzer.py:196-210）",
+    "exposure.concentration": "測試自寫：w=|e|/Σ|e|（NaN 當 0）、HHI=Σw²、argmax 取首、門檻與警告規則"
+                              "（factor_exposure_analyzer.py:328-363）",
+    "exposure.neutralized": "none：原值；beta_neutral：statsmodels OLS（含截距）於 x 與市場代理共同有效樣本之斜率 β，x−β·m"
+                            "（代理有限值 < 10、或變異 ≤ 1e-12·E[m²] ⇒ 不中和；共同樣本 < 10 或其代理變異可忽略 ⇒ 保留原值）；"
+                            "vol_neutral：逐根 PIT 滾動標準差（numpy ddof=1，只用 0..t）；無定義處保留 NaN，再以有效列均值計曝險"
+                            "（factor_exposure_analyzer.py:100-179；代理＝收盤簡單報酬落後 1 根、缺價不前補，ic_filter_orchestrator.py:3109-3113）",
     "exposure.delta_hhi": "原始 HHI − 中和後 HHI（ic_filter_orchestrator.py:3140-3144）",
 }
 
@@ -119,26 +122,26 @@ _ORTH_ENVELOPE: Dict[str, str] = {
 #: Gram–Schmidt 摘要：相對 summary 之路徑 → (oracle, 檔:行)；摘要於模組 dict 出現三份（頂層 :3089、payload/summary :3070、
 #: typed_result/payload/summary :3072-3077）
 _ORTH_GS: Dict[str, Tuple[str, str]] = {
-    "method": (NON_STAT, f"{_FO}:69"),
-    "priority_order/#": ("orth.priority_order", f"{_FO}:70（:39、:127-142）"),
-    "correlation_before": ("orth.correlation_before", f"{_FO}:71（:65、:144-153）"),
-    "correlation_after": ("orth.correlation_after", f"{_FO}:72（:43-44、:66、:144-153）"),
-    "features/*/residual_variance": ("orth.residual_variance", f"{_FO}:60-61（:48-56）"),
-    "features/*/degenerate": ("orth.degenerate", f"{_FO}:62（:57）"),
-    "degenerate_features/#": ("orth.degenerate", f"{_FO}:74（:58-59）"),
+    "method": (NON_STAT, f"{_FO}:96"),
+    "priority_order/#": ("orth.priority_order", f"{_FO}:97（:48、:149-172）"),
+    "correlation_before": ("orth.correlation_before", f"{_FO}:98（:92、:184-193）"),
+    "correlation_after": ("orth.correlation_after", f"{_FO}:99（:63-93、:184-193）"),
+    "features/*/residual_variance": ("orth.residual_variance", f"{_FO}:87（:54-76）"),
+    "features/*/degenerate": ("orth.degenerate", f"{_FO}:88（:77-79）"),
+    "degenerate_features/#": ("orth.degenerate", f"{_FO}:101（:80-81）"),
 }
 _ORTH_PCA: Dict[str, Tuple[str, str]] = {
-    "method": (NON_STAT, f"{_FO}:115"),
-    "n_components": (NON_STAT, f"{_FO}:116（:99-101；計數）"),
-    "explained_variance_ratio/#": ("pca.explained_variance_ratio", f"{_FO}:117（:103-104）"),
-    "loadings/*/PC#": ("pca.loadings", f"{_FO}:118（:108-112）"),
-    "principal_components/#": (NON_STAT, f"{_FO}:119（:105；名單）"),
+    "method": (NON_STAT, f"{_FO}:142"),
+    "n_components": (NON_STAT, f"{_FO}:143（:126-128；計數）"),
+    "explained_variance_ratio/#": ("pca.explained_variance_ratio", f"{_FO}:144（:130-131）"),
+    "loadings/*/PC#": ("pca.loadings", f"{_FO}:145（:135-139）"),
+    "principal_components/#": (NON_STAT, f"{_FO}:146（:132；名單）"),
 }
 _ORTH_SKIP: Dict[str, Tuple[str, str]] = {
-    "module_name": (NON_STAT, f"{_FO}:33、:86、:93"),
-    "skipped": (NON_STAT, f"{_FO}:34、:87、:94；頂層另由 {_ORCH}:2801（runner 例外）"),
-    "reason": (NON_STAT, f"{_FO}:35、:88、:95；頂層另由 {_ORCH}:2802"),
-    "error_type": (NON_STAT, f"{_FO}:36、:89、:96；頂層另由 {_ORCH}:2803"),
+    "module_name": (NON_STAT, f"{_FO}:32、:42、:113、:120"),
+    "skipped": (NON_STAT, f"{_FO}:33、:43、:114、:121；頂層另由 {_ORCH}:2801（runner 例外）"),
+    "reason": (NON_STAT, f"{_FO}:34、:44、:115、:122；頂層另由 {_ORCH}:2802"),
+    "error_type": (NON_STAT, f"{_FO}:35、:45、:116、:123；頂層另由 {_ORCH}:2803"),
 }
 _EXPO_ENVELOPE: Dict[str, str] = {
     "typed_result/module": f"{_ORCH}:3181-3186、:3190",
@@ -155,21 +158,21 @@ _EXPO_ENVELOPE: Dict[str, str] = {
     "consumer_deny": f"{_ORCH}:3196",
 }
 _CONC = {
-    "max_exposure_factor": f"{_FE}:321、:312",
-    "max_exposure_value": f"{_FE}:322、:313",
-    "hhi": f"{_FE}:320、:314",
-    "concentrated": f"{_FE}:335、:315",
-    "warnings/#": f"{_FE}:325-329、:316",
+    "max_exposure_factor": f"{_FE}:347、:358、:338",
+    "max_exposure_value": f"{_FE}:348、:359、:339",
+    "hhi": f"{_FE}:346、:360、:340",
+    "concentrated": f"{_FE}:361、:341",
+    "warnings/#": f"{_FE}:351-355、:362、:342",
 }
 _EXPO_SUMMARY: Dict[str, Tuple[str, str]] = {
-    "portfolio_exposure/*": ("exposure.portfolio_exposure", f"{_ORCH}:3155（:3115-3117、:3127；{_FE}:161-184）"),
+    "portfolio_exposure/*": ("exposure.portfolio_exposure", f"{_ORCH}:3155（:3115-3117、:3127；{_FE}:181-210）"),
     "factor_attribution/status": (NON_STAT, f"{_ORCH}:3156-3160（寫死 unavailable）"),
     "factor_attribution/value": (NON_STAT, f"{_ORCH}:3156-3160"),
     "factor_attribution/reason": (NON_STAT, f"{_ORCH}:3149-3153、:3156-3160"),
     **{f"concentration/{k}": ("exposure.concentration", f"{_ORCH}:3161（:3131-3134；{v}）") for k, v in _CONC.items()},
     "neutralization_mode": (NON_STAT, f"{_ORCH}:3162（設定回顯）"),
     "neutralization_lookback": (NON_STAT, f"{_ORCH}:3163（設定回顯）"),
-    "neutralized_portfolio_exposure/*": ("exposure.neutralized", f"{_ORCH}:3164（:3113、:3120-3130；{_FE}:97-159）"),
+    "neutralized_portfolio_exposure/*": ("exposure.neutralized", f"{_ORCH}:3164（:3113、:3120-3130；{_FE}:100-179、:181-210）"),
     **{f"neutralized_concentration/{k}": ("exposure.concentration", f"{_ORCH}:3165（:3135-3138；{v}）")
        for k, v in _CONC.items()},
     "neutralization_delta_hhi": ("exposure.delta_hhi", f"{_ORCH}:3166（:3140-3144）"),
@@ -338,13 +341,13 @@ def _ref_icir_score(value: Any) -> float:
 
 
 def _ref_priority_order(clean: pd.DataFrame, icir_scores: Mapping[str, Any]) -> List[str]:
-    """factor_orthogonalizer.py:132-142：icir 非空 ⇒ 依分數降序（缺者 −inf、Python 穩定排序），全有限才採用；否則 |x| 均值降序。"""
+    """icir 非空且各欄皆有有限分數 ⇒ 依 |ICIR| 降序，同強度依原欄序；否則 |x| 均值降序（SPEC Task 0.4 ㉑）。"""
     cols = list(clean.columns)
     if icir_scores:
-        scores = {c: (_ref_icir_score(icir_scores[c]) if c in icir_scores else -math.inf) for c in cols}
-        order = sorted(cols, key=lambda c: scores[c], reverse=True)
-        if all(math.isfinite(scores[c]) for c in cols):
-            return order
+        strength = {c: (abs(_ref_icir_score(icir_scores[c])) if c in icir_scores else math.nan) for c in cols}
+        if all(math.isfinite(strength[c]) for c in cols):
+            ranked = sorted(range(len(cols)), key=lambda i: (-strength[cols[i]], i))
+            return [cols[i] for i in ranked]
     abs_mean = np.mean(np.abs(clean.to_numpy(dtype=float)), axis=0)
     return [cols[i] for i in np.argsort(-abs_mean, kind="stable")]
 
@@ -370,8 +373,8 @@ def ref_factor_orthogonalizer(factors: pd.DataFrame, icir_scores: Mapping[str, A
                               degenerate_threshold: float = DEGENERATE_THRESHOLD) -> Dict[str, Any]:
     """正交化摘要之獨立參考（不呼叫產品模組）。
 
-    共同前處理（factor_orthogonalizer.py:30、:82）：數值化後剔除任一欄缺值之列。特徵 < 2 ⇒ 略過（:31-37、:84-90）。
-    Gram–Schmidt：樣本 < 特徵 ⇒ 依 PCA 同規則略過（:91-97；產品 GS 缺此守門，見 xfail 測試）。
+    共同前處理（factor_orthogonalizer.py:29、:109）：數值化後剔除任一欄缺值之列。特徵 < 2 ⇒ 略過；樣本 < 特徵 ⇒ 略過
+    （GS 與 PCA 同規則）。Gram–Schmidt＝含截距之逐步 OLS（等同對去均值欄正交化）；退化＝原變異 0 或殘差變異 ≤ 門檻 × 原變異。
     """
     clean = factors.apply(pd.to_numeric, errors="coerce").dropna(axis=0, how="any")
     n, p = clean.shape
@@ -404,12 +407,13 @@ def ref_factor_orthogonalizer(factors: pd.DataFrame, icir_scores: Mapping[str, A
     degenerate: List[str] = []
     for i, name in enumerate(order):
         y = X[:, i]
-        r = y.copy() if i == 0 else sm.OLS(y, X[:, :i]).fit().resid
+        design = sm.add_constant(X[:, :i], has_constant="add") if i else np.ones((len(y), 1))
+        r = sm.OLS(y, design).fit().resid
         rv = float(np.var(r))
-        deg = bool(rv <= degenerate_threshold)
-        nr = float(np.linalg.norm(r))
-        if nr > 1e-8 * max(float(np.linalg.norm(y)), 1e-300):
-            basis[:, i] = r / nr
+        var_y = float(np.var(y))
+        deg = bool(var_y == 0.0 or rv <= degenerate_threshold * var_y)
+        if not deg:
+            basis[:, i] = r / float(np.linalg.norm(r))
         if deg:
             degenerate.append(name)
         feats_meta[name] = {"residual_variance": rv, "degenerate": deg}
@@ -427,20 +431,23 @@ def compare_factor_orthogonalizer(product_output: Any, factors: pd.DataFrame, ic
                                   method: str = "gram_schmidt",
                                   degenerate_threshold: float = DEGENERATE_THRESHOLD) -> Dict[str, Dict[str, Any]]:
     """產品 `results.factor_orthogonalization` vs oracle（輸入＝`_run_factor_orthogonalization` 之 features_df[selected]、
-    `_ic_cache['icir']`、`config.factor_orthogonalization.method`）。退化殘差（兩者皆 ≤ 門檻）為數值零，不比相對誤差。
-    PCA loadings 為單位向量之分量，以絕對誤差判。"""
+    `_ic_cache['icir']`、`config.factor_orthogonalization.method`）。退化殘差（兩者皆 ≤ 門檻 × 原變異）為數值零，不比相對誤差。
+    PCA loadings（單位向量分量）與 correlation_after（有界於 [0, 1]，正交後為數值零）以絕對誤差判。"""
     oracle = ref_factor_orthogonalizer(factors, icir_scores, method, degenerate_threshold)
+    clean = factors.apply(pd.to_numeric, errors="coerce").dropna(axis=0, how="any")
+    var = {c: float(np.var(clean[c].to_numpy(dtype=float))) for c in clean.columns}
 
-    def _resid(_k: Tuple, p: float, o: float) -> float:
-        if p <= degenerate_threshold and o <= degenerate_threshold:
+    def _resid(k: Tuple, p: float, o: float) -> float:
+        bound = degenerate_threshold * var.get(str(k[1]), 0.0)
+        if p <= bound and o <= bound:
             return 0.0
         return _rel(p, o)
 
-    def _unit(_k: Tuple, p: float, o: float) -> float:
+    def _abs(_k: Tuple, p: float, o: float) -> float:
         return 0.0 if (math.isnan(p) and math.isnan(o)) else abs(p - o)
 
     return _compare(ORTH, product_output, oracle, list(factors.columns),
-                    {"features/*/residual_variance": _resid, "loadings/*/PC#": _unit})
+                    {"features/*/residual_variance": _resid, "loadings/*/PC#": _abs, "correlation_after": _abs})
 
 
 # ── 參考實作：factor_exposure_analyzer ─────────────────────────────────────────────────────────────────
@@ -453,11 +460,15 @@ def _ref_market_proxy(close_series: Optional[pd.Series], index: pd.Index) -> pd.
 
 
 def _ref_time_exposure(frame: pd.DataFrame, n_rows: int) -> Dict[str, float]:
-    """factor_exposure_analyzer.py:176-184 與 ic_filter_orchestrator.py:3115-3117：Σ 有限值／列數（缺值當 0）。"""
+    """時間等權之有效列均值（只取有限值；該欄無有效列 ⇒ NaN）。"""
     if frame.shape[1] == 0 or n_rows == 0:
         return {}
-    w = 1.0 / max(1, n_rows)
-    return {c: float(np.nansum(frame[c].to_numpy(dtype=float)) * w) for c in frame.columns}
+    out: Dict[str, float] = {}
+    for c in frame.columns:
+        v = frame[c].to_numpy(dtype=float)
+        v = v[np.isfinite(v)]
+        out[c] = float(np.mean(v)) if v.size else float("nan")
+    return out
 
 
 def _ref_concentration(exposure: Mapping[str, float], threshold: float) -> Dict[str, Any]:
@@ -495,25 +506,30 @@ def _ref_rolling_std(x: np.ndarray, window: int, min_periods: int) -> np.ndarray
 
 
 def _ref_neutralize(F: pd.DataFrame, proxy: pd.Series, mode: str, lookback: int) -> pd.DataFrame:
-    """factor_exposure_analyzer.py:97-159 之定義；beta 依 OLS 定義取 x 與 m 之共同有效樣本。"""
+    """中和之定義（SPEC Task 0.4 ㉑）；beta 依 OLS 定義取 x 與 m 之共同有效樣本；無定義處保留 NaN。"""
     if F.empty:
         return pd.DataFrame()
+    F = F.replace([np.inf, -np.inf], np.nan)
+
+    def _negligible(v: np.ndarray) -> bool:   # 相對容差：var ≤ 1e-12·E[m²]（全 0 ⇒ 可忽略）
+        return float(np.var(v)) <= 1e-12 * float(np.mean(v ** 2))
+
     if mode == "beta_neutral":
-        m = proxy.reindex(F.index)
+        m = proxy.reindex(F.index).replace([np.inf, -np.inf], np.nan)
         mv = m.to_numpy(dtype=float)
         fin = np.isfinite(mv)
-        if fin.sum() < 10 or float(np.var(mv[fin])) == 0.0:      # :127-134（var 為 0 ⇒ 斜率無定義）
-            return F.fillna(0.0)
+        if fin.sum() < 10 or _negligible(mv[fin]):                 # 樣本不足或斜率無定義 ⇒ 不中和
+            return F
         out = pd.DataFrame(index=F.index)
         for col in F.columns:
             x = F[col]
             al = pd.concat([x.rename("x"), m.rename("m")], axis=1).dropna()
-            if len(al) < 10:                                        # :140-142
+            if len(al) < 10 or _negligible(al["m"].to_numpy(dtype=float)):
                 out[col] = x
                 continue
             fit = sm.OLS(al["x"].to_numpy(dtype=float), sm.add_constant(al["m"].to_numpy(dtype=float), has_constant="add")).fit()
             out[col] = x - float(fit.params[1]) * m
-        return out.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        return out.replace([np.inf, -np.inf], np.nan)
     if mode == "vol_neutral":
         window = max(5, int(lookback))
         minp = max(5, window // 3)                                  # :155-156
@@ -524,8 +540,8 @@ def _ref_neutralize(F: pd.DataFrame, proxy: pd.Series, mode: str, lookback: int)
             sd = np.where(sd == 0.0, np.nan, sd)                    # :157
             with np.errstate(invalid="ignore", divide="ignore"):
                 out[col] = x / sd
-        return out.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    return F.fillna(0.0)                                            # none 與未知模式（:110-111、:118-119）
+        return out.replace([np.inf, -np.inf], np.nan)
+    return F                                                        # none 與未知模式：原值
 
 
 def ref_factor_exposure_analyzer(factors: pd.DataFrame, close_series: Optional[pd.Series],
@@ -664,29 +680,56 @@ def test_gram_schmidt_proxy_order_matches_oracle() -> None:
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
-@pytest.mark.parametrize("scores,expect_icir_order", [
-    ({"a": 0.1, "b": 0.9, "c": -0.5, "d": 0.3}, True),
-    ({"a": 0.1, "b": float("nan"), "c": -0.5, "d": 0.3}, False),   # 含 NaN ⇒ 退回 |均值|（:138）
-    ({"a": 0.1, "c": -0.5, "d": 0.3}, False),                      # 缺鍵 ⇒ 退回（:138 get→nan）
+@pytest.mark.parametrize("scores,expect_order", [
+    ({"a": 0.1, "b": 0.9, "c": -0.5, "d": 0.3}, ["b", "c", "d", "a"]),   # |ICIR| 降序：反向 c（−0.5）排第二
+    ({"a": 0.1, "b": float("nan"), "c": -0.5, "d": 0.3}, None),        # 含 NaN ⇒ 退回 |均值|
+    ({"a": 0.1, "c": -0.5, "d": 0.3}, None),                           # 缺鍵 ⇒ 退回
 ])
-def test_gram_schmidt_float_icir_order_matches_oracle(scores: Dict[str, float], expect_icir_order: bool) -> None:
-    """icir 值為裸浮點（舊測試 test_la2_lookahead.py:1400 所用形狀）⇒ 依 ICIR 有號降序；非全有限 ⇒ 退回 |均值|。"""
+def test_gram_schmidt_float_icir_order_matches_oracle(scores: Dict[str, float], expect_order: Optional[List[str]]) -> None:
+    """icir 值為裸浮點（舊測試 test_la2_lookahead.py:1400 所用形狀）⇒ 依 |ICIR| 降序（SPEC Task 0.4 ㉑、v5.32 驗收⑥範圍說明）；
+    非全有限 ⇒ 退回 |均值|。"""
     feats = _explicit_factors()
     out = _run_product(ORTH, feats, icir=scores, method="gram_schmidt")
     res = compare_factor_orthogonalizer(out, feats, scores, "gram_schmidt")
     assert not _all_consistent(res), _all_consistent(res)
     order = out["priority_order"]
-    assert (order == ["b", "d", "a", "c"]) is expect_icir_order
+    if expect_order is not None:
+        assert order == expect_order
+    else:
+        assert order == _ref_priority_order(feats.dropna(), {}), "退回代理排序"
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+@pytest.mark.parametrize("shape", ["float", "production_dict"])
+def test_gram_schmidt_icir_sign_flip_same_rank(shape: str) -> None:
+    """±同強度名次相同（SPEC v5.32 驗收⑥範圍說明）：全部 ICIR 變號 ⇒ 排序與全部輸出不變；同強度 ±（a＝+0.5、b＝−0.5）
+    依原欄序並列，不因符號分先後；兩種 icir 形狀（裸浮點、compute_icir dict）皆同。"""
+    feats = _explicit_factors()
+    base = {"a": 0.5, "b": -0.5, "c": 0.2, "d": -0.7}
+    flipped = {k: -v for k, v in base.items()}
+
+    def _shape(v: Mapping[str, float]) -> Mapping[str, Any]:
+        return dict(v) if shape == "float" else _production_icir(v)
+
+    outs = []
+    for scores in (base, flipped):
+        icir = _shape(scores)
+        out = _run_product(ORTH, feats, icir=icir, method="gram_schmidt")
+        res = compare_factor_orthogonalizer(out, feats, icir, "gram_schmidt")
+        assert not _all_consistent(res), _all_consistent(res)
+        outs.append(out)
+    assert outs[0]["priority_order"] == outs[1]["priority_order"] == ["d", "a", "b", "c"]
+    assert outs[0]["features"] == outs[1]["features"]
+    assert outs[0]["correlation_after"] == outs[1]["correlation_after"]
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_gram_schmidt_constant_column_matches_oracle() -> None:
-    """常數欄：殘差變異 0 ⇒ degenerate（np.var，非向量範數）；其 |corr| 為 NaN 而 nanmean 略過。"""
+    """常數欄：原變異 0 ⇒ degenerate、不入正交基（零欄，相關為 NaN 而 nanmean 略過）；u、v 之正交基相關 ≈ 0。"""
     feats = _constant_column_factors()
     out = _run_product(ORTH, feats, icir={}, method="gram_schmidt")
     res = compare_factor_orthogonalizer(out, feats, {}, "gram_schmidt")
-    bad = [b for b in _all_consistent(res) if "correlation_after" not in b]
-    assert not bad, bad
+    assert not _all_consistent(res), _all_consistent(res)
     assert out["degenerate_features"] == ["k"]
 
 
@@ -695,21 +738,20 @@ def _constant_column_factors() -> pd.DataFrame:
     return pd.DataFrame({"k": np.full(60, 5.0), "u": rng.normal(size=60), "v": rng.normal(size=60)}, index=_idx(60))
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：常數欄之正交基欄於數學上為常數，QR 捨入使其帶 1e-17 級雜訊，"
-                                       f"pandas corr 對雜訊回非 NaN 之相關並計入 correlation_after（factor_orthogonalizer.py:43-44、:66）；"
-                                       f"收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_gram_schmidt_constant_column_correlation_after() -> None:
-    """常數欄 k 排第一（|均值| 最大）⇒ 其正交基為常數向量，相關無定義（NaN，nanmean 略過）；u、v 之正交基相關 ≈ 0。"""
+    """（Task 0.3 OE-4，Task 0.4 ㉑ 修後轉一致）常數欄 k 排第一（|均值| 最大）⇒ 不入正交基；correlation_after 只計 u、v
+    （去均值正交後 ≈ 0），不得含常數欄之捨入雜訊相關（修前產品 0.0705 vs oracle 3.8e-17）。"""
     feats = _constant_column_factors()
     out = _run_product(ORTH, feats, icir={}, method="gram_schmidt")
     res = compare_factor_orthogonalizer(out, feats, {}, "gram_schmidt")
     assert not _all_consistent(res), _all_consistent(res)
+    assert out["priority_order"][0] == "k" and abs(out["correlation_after"]) <= 1e-12
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_gram_schmidt_degenerate_flag_matches_oracle() -> None:
-    """完全共線欄（b＝2a）：退化旗標與退化名單、退化欄之前與退化欄本身之殘差變異 == oracle（其後各欄見下列 xfail）。"""
+    """完全共線欄（b＝2a）：退化旗標與退化名單、退化欄之前與退化欄本身之殘差變異 == oracle（其後各欄見下一測試）。"""
     rng = np.random.default_rng(5)
     a = rng.normal(size=300)
     feats = pd.DataFrame({"a": a, "b": 2.0 * a, "c": rng.normal(size=300), "d": rng.normal(size=300)}, index=_idx(300))
@@ -723,19 +765,24 @@ def test_gram_schmidt_degenerate_flag_matches_oracle() -> None:
     exp = ref_factor_orthogonalizer(feats, scores)
     for f in ("a", "b"):
         rv = out["features"][f]["residual_variance"]
-        assert rv == pytest.approx(exp["features"][f]["residual_variance"], rel=1e-12, abs=DEGENERATE_THRESHOLD)
+        assert rv == pytest.approx(exp["features"][f]["residual_variance"], rel=1e-12,
+                                   abs=DEGENERATE_THRESHOLD * float(np.var(feats[f])))
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
-def test_degenerate_threshold_is_absolute_variance() -> None:
-    """方法論證據（非公式不一致）：門檻為絕對變異 1e-10（factor_orthogonalizer.py:22、:57），小尺度但獨立之特徵被標退化。"""
+def test_degenerate_threshold_is_relative_to_variance() -> None:
+    """退化門檻相對原變異（SPEC Task 0.4 ㉑；修前為絕對變異 1e-10，小尺度獨立特徵 `tiny` 被誤標退化）：
+    小尺度獨立特徵不退化；與 big 近共線（相對殘差變異 1e-16）之小尺度特徵 `tiny_dup` 退化。"""
     rng = np.random.default_rng(9)
-    feats = pd.DataFrame({"big": rng.normal(size=200), "tiny": 1e-6 * rng.normal(size=200)}, index=_idx(200))
-    out = _run_product(ORTH, feats, icir={}, method="gram_schmidt")
-    res = compare_factor_orthogonalizer(out, feats, {}, "gram_schmidt")
+    big = rng.normal(size=200)
+    feats = pd.DataFrame({"big": big, "tiny": 1e-6 * rng.normal(size=200),
+                          "tiny_dup": 1e-7 * (big + 1e-8 * rng.normal(size=200))}, index=_idx(200))
+    scores = {"big": 0.3, "tiny": 0.2, "tiny_dup": 0.1}
+    out = _run_product(ORTH, feats, icir=scores, method="gram_schmidt")
+    res = compare_factor_orthogonalizer(out, feats, scores, "gram_schmidt")
     assert not _all_consistent(res), _all_consistent(res)
-    assert out["degenerate_features"] == ["tiny"]
-    assert abs(float(np.corrcoef(feats["big"], feats["tiny"])[0, 1])) < 0.2, "前提：兩欄近乎獨立"
+    assert out["degenerate_features"] == ["tiny_dup"]
+    assert float(np.var(feats["tiny"])) < DEGENERATE_THRESHOLD, "前提：tiny 之原變異低於絕對門檻（修前會被誤標）"
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -753,32 +800,23 @@ def test_orthogonalization_skips_below_two_features(method: str, cols: List[str]
     assert not _all_consistent(res) and all(r["n_finite"] == 0 for r in res.values())
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：Gram–Schmidt 以 float(icir_scores[name]) 取排序鍵，而 "
-                                       f"_ic_cache['icir'] 之值為 dict（ic_engine.py:488-493）⇒ TypeError，產品恆回 skipped；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_gram_schmidt_accepts_production_icir_cache_shape() -> None:
-    """`_run_factor_orthogonalization` 傳入之 icir_scores＝`_ic_cache['icir']`（ic_filter_orchestrator.py:3053、:4834），
-    其值為 {ic_mean, ic_std, icir, ic_hit_rate}；正確行為＝依 ICIR 排序並輸出 oracle 之全部統計欄。"""
+    """（Task 0.3 OE-1，Task 0.4 ㉑ 修後轉一致）`_run_factor_orthogonalization` 傳入之 icir_scores＝`_ic_cache['icir']`
+    （ic_filter_orchestrator.py:3053、:4834），其值為 {ic_mean, ic_std, icir, ic_hit_rate}；正確行為＝依 |ICIR| 排序並輸出
+    oracle 之全部統計欄（修前 TypeError ⇒ skipped／INTERNAL_ERROR）。"""
     feats = _explicit_factors()
     icir = _production_icir({"a": 0.1, "b": 0.9, "c": -0.5, "d": 0.3})
     out = _run_product(ORTH, feats, icir=icir, method="gram_schmidt")
     res = compare_factor_orthogonalizer(out, feats, icir, "gram_schmidt")
     assert not _all_consistent(res), _all_consistent(res)
+    assert out["priority_order"] == ["b", "c", "d", "a"] and "error_type" not in out
 
 
-def test_gram_schmidt_production_icir_shape_currently_errors() -> None:
-    """（現況紀錄，供收據）同上輸入之產品輸出＝run_deep_analysis 例外 envelope（ic_filter_orchestrator.py:2795-2809）。"""
-    feats = _explicit_factors()
-    out = _run_product(ORTH, feats, icir=_production_icir({"a": 0.1, "b": 0.9, "c": -0.5, "d": 0.3}), method="gram_schmidt")
-    assert set(out) == {"skipped", "reason", "error_type"}
-    assert out["skipped"] is True and out["error_type"] == "INTERNAL_ERROR" and "dict" in out["reason"]
-
-
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：完全共線欄之 QR 正交基欄為捨入雜訊方向，其後各欄再對其投影，"
-                                       f"殘差變異與 correlation_after 偏離 OLS 定義（factor_orthogonalizer.py:43、:53-55）；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_gram_schmidt_residuals_after_degenerate_feature_match_ols() -> None:
-    """b＝2a 排第二 ⇒ c、d 之殘差應等於對 [a, b] 之 OLS 殘差（statsmodels pinv）；產品對雜訊方向多投影一次。"""
+    """（Task 0.3 OE-3，Task 0.4 ㉑ 修後轉一致）b＝2a 排第二 ⇒ c、d 之殘差 == 對 [1, a, b] 之 OLS 殘差（statsmodels pinv）；
+    修前產品對退化欄之捨入方向多投影一次（c 0.98120 vs 0.98608）。"""
     rng = np.random.default_rng(5)
     a = rng.normal(size=300)
     feats = pd.DataFrame({"a": a, "b": 2.0 * a, "c": rng.normal(size=300), "d": rng.normal(size=300)}, index=_idx(300))
@@ -788,12 +826,10 @@ def test_gram_schmidt_residuals_after_degenerate_feature_match_ols() -> None:
     assert not _all_consistent(res), _all_consistent(res)
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：Gram–Schmidt 缺「樣本 < 特徵」守門（PCA 有，"
-                                       f"factor_orthogonalizer.py:91-97），QR 經濟形狀與欄名不符 ⇒ ValueError／LAPACK 錯，報 INTERNAL_ERROR"
-                                       f"而非 INSUFFICIENT_DATA；收據 {RECEIPT}")
 @pytest.mark.parametrize("n_rows", [0, 3])
 def test_gram_schmidt_fewer_samples_than_features_skips_like_pca(n_rows: int) -> None:
-    """同列剔除後樣本 < 特徵（含 0 列；寬請求同列剔除常致此）⇒ 應同 PCA 回 INSUFFICIENT_DATA 略過。"""
+    """（Task 0.3 OE-5，Task 0.4 ㉑ 修後轉一致）同列剔除後樣本 < 特徵（含 0 列）⇒ 同 PCA 回 INSUFFICIENT_DATA 略過
+    （修前 ValueError／LAPACK 錯 ⇒ INTERNAL_ERROR）。"""
     feats = _explicit_factors(n=40).iloc[15:15 + n_rows]
     out = _run_product(ORTH, feats, icir={}, method="gram_schmidt")
     exp = ref_factor_orthogonalizer(feats, {}, "gram_schmidt")
@@ -869,14 +905,33 @@ def test_exposure_beta_neutral_matches_oracle_on_common_sample() -> None:
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @pytest.mark.parametrize("case", ["proxy_lt_10", "flat_close"])
 def test_exposure_beta_neutral_skip_branches(case: str) -> None:
-    """代理有限值 < 10（:127-129）與代理變異為 0（收盤不變，:131-134）⇒ 不中和（缺值當 0）。"""
+    """代理有限值 < 10 與代理變異可忽略（收盤不變 ⇒ 代理全 0，相對容差下仍判可忽略）⇒ 不中和（中和後曝險 == 原曝險）。"""
     n = 60 if case == "flat_close" else 11
     close = pd.Series(100.0, index=_idx(n)) if case == "flat_close" else _explicit_close(n)
     feats = _explicit_factors(n)
     out = _run_product(EXPO, feats, close=close, neutralization_mode="beta_neutral")
     res = compare_factor_exposure_analyzer(out, feats, close, "beta_neutral", 63, 0.4)
     assert not _all_consistent(res), _all_consistent(res)
-    assert out["neutralized_portfolio_exposure"] == out["portfolio_exposure"]
+    raw, neu = out["portfolio_exposure"], out["neutralized_portfolio_exposure"]
+    assert set(raw) == set(neu) and all(_rel(float(neu[k]), float(raw[k])) == 0.0 for k in raw), (raw, neu)
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_exposure_uses_valid_rows_mean() -> None:
+    """（Task 0.3 方法論項，Task 0.4 ㉑ 修）曝險＝有效列 nanmean：首 120 根缺值之常數 1 特徵曝險為 1.0，不得被缺值稀釋為 0.5；
+    全缺值欄 ⇒ NaN（集中度當 0）。"""
+    n = 240
+    close = _explicit_close(n)
+    half = pd.Series(1.0, index=_idx(n))
+    half.iloc[:120] = np.nan
+    feats = pd.DataFrame({"half": half, "full": pd.Series(-0.5, index=_idx(n)), "none": np.nan}, index=_idx(n))
+    out = _run_product(EXPO, feats, close=close)
+    res = compare_factor_exposure_analyzer(out, feats, close, "none", 63, 0.4)
+    assert not _all_consistent(res), _all_consistent(res)
+    assert out["portfolio_exposure"]["half"] == 1.0 and out["portfolio_exposure"]["full"] == -0.5
+    assert math.isnan(out["portfolio_exposure"]["none"])
+    assert out["concentration"]["max_exposure_factor"] == "half"
+    assert out["concentration"]["hhi"] == pytest.approx((2 / 3) ** 2 + (1 / 3) ** 2, rel=1e-12)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
@@ -909,11 +964,10 @@ def test_exposure_without_close_carrier_errors() -> None:
     assert set(out) == {"skipped", "reason", "error_type"} and out["skipped"] is True
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：beta 分子 cov 取特徵與代理共同樣本、分母 var 取代理全部有限樣本"
-                                       f"（factor_exposure_analyzer.py:131、:139-145），兩者樣本不同時 beta ≠ OLS 斜率；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_exposure_beta_uses_common_sample() -> None:
-    """特徵首 40 根缺值（暖機）而代理只缺首 2 根，且代理前段波動較大 ⇒ 正確 beta＝共同樣本之 OLS 斜率。"""
+    """（Task 0.3 OE-2，Task 0.4 ㉑ 修後轉一致）特徵首 40 根缺值（暖機）而代理只缺首 2 根，且代理前段波動較大 ⇒
+    beta＝共同樣本之 OLS 斜率（修前分母取代理全部有限樣本，x 之中和後曝險 1.617e-4 vs oracle −1.254e-4）。"""
     n = 240
     rng = np.random.default_rng(19)
     vol = np.where(np.arange(n) < 40, 0.03, 0.01)
@@ -927,11 +981,10 @@ def test_exposure_beta_uses_common_sample() -> None:
     assert not _all_consistent(res), _all_consistent(res)
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：代理變異以 np.isclose(var, 0)（絕對容差 1e-8）判近零，"
-                                       f"報酬標準差 < 1e-4 之低波動標的 beta 中和被靜默跳過（factor_exposure_analyzer.py:132、:145）；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_exposure_beta_neutral_low_volatility_proxy() -> None:
-    """代理報酬標準差 5e-5（變異 2.5e-9 > 0）⇒ OLS 斜率有定義，應中和。"""
+    """（Task 0.3 OE-6，Task 0.4 ㉑ 修後轉一致）代理報酬標準差 5e-5（變異 2.5e-9 > 0）⇒ OLS 斜率有定義，應中和
+    （修前絕對容差 np.isclose(var, 0) 靜默跳過）。"""
     n = 240
     close = _explicit_close(n, vol=5e-5)
     proxy = close.pct_change().shift(1)
@@ -944,8 +997,6 @@ def test_exposure_beta_neutral_low_volatility_proxy() -> None:
     assert not _all_consistent(res), _all_consistent(res)
 
 
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：市場代理以 pct_change() 預設 fill_method='pad' 前補缺價，"
-                                       f"缺價根之報酬被造為 0、其後一根為跨兩根報酬（ic_filter_orchestrator.py:3113）；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 @pytest.mark.filterwarnings("ignore::FutureWarning")
 def test_exposure_market_proxy_does_not_fabricate_returns_over_missing_close() -> None:
@@ -1031,9 +1082,11 @@ def _real_scenarios() -> Dict[str, Tuple[str, Dict[str, Any], Dict[str, Dict[str
     out["pca"] = (ORTH, o, compare_factor_orthogonalizer(o, feats, {}, "pca"), None)
     dup = feats.assign(mom10_pct=100.0 * feats["mom10"])
     o = _run_product(ORTH, dup, icir={}, method="gram_schmidt")
-    out["gs_degenerate"] = (ORTH, o, compare_factor_orthogonalizer(o, dup, {}, "gram_schmidt"),
-                            {"priority_order/#", "features/*/degenerate", "degenerate_features/#", "correlation_before"})
-    for mode in ("none", "vol_neutral"):
+    out["gs_degenerate"] = (ORTH, o, compare_factor_orthogonalizer(o, dup, {}, "gram_schmidt"), None)
+    icir_prod = _real_production_icir(feats, close)
+    o = _run_product(ORTH, feats, icir=icir_prod, method="gram_schmidt")
+    out["gs_production_icir"] = (ORTH, o, compare_factor_orthogonalizer(o, feats, icir_prod, "gram_schmidt"), None)
+    for mode in ("none", "vol_neutral", "beta_neutral"):
         o = _run_product(EXPO, feats, close=close, neutralization_mode=mode)
         out[f"exposure_{mode}"] = (EXPO, o, compare_factor_exposure_analyzer(o, feats, close, mode, 63, 0.4), None)
     common = pd.DataFrame({"ret1": feats["ret1"], "ret2": close / close.shift(2) - 1.0})
@@ -1054,18 +1107,28 @@ def real_scenarios() -> Dict[str, Tuple[str, Dict[str, Any], Dict[str, Dict[str,
 
 @pytest.mark.requires_kline
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
-def test_orth_exposure_fields_closed() -> None:
-    """真實 BTCUSDT 1h 末 400 根：逐分支執行產品，實際鍵集合 == BRANCH_FIELDS 該分支；各分支聯集 == MODULE_FIELDS。"""
+def test_orth_exposure_fields_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """真實 BTCUSDT 1h 末 400 根：逐分支執行產品，實際鍵集合 == BRANCH_FIELDS 該分支；各分支聯集 == MODULE_FIELDS。
+    正交化 runner 例外分支（ic_filter_orchestrator.py:2795-2809）於 Task 0.4 ㉑ 修後無自然觸發輸入（修前由 dict 形 icir
+    之 TypeError 觸發），改以注入分析器例外驗其 envelope 形狀。"""
+    from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
+
     close = _real_close(400)
     feats = _real_features(close)
     runs = {
-        "orth_gram_schmidt": (ORTH, _run_product(ORTH, feats, icir={}, method="gram_schmidt"), feats),
+        "orth_gram_schmidt": (ORTH, _run_product(ORTH, feats, icir=_real_production_icir(feats, close),
+                                                 method="gram_schmidt"), feats),
         "orth_pca": (ORTH, _run_product(ORTH, feats, icir={}, method="pca"), feats),
         "orth_skipped": (ORTH, _run_product(ORTH, feats[["ret1"]], icir={}, method="gram_schmidt"), feats[["ret1"]]),
-        "orth_runner_error": (ORTH, _run_product(ORTH, feats, icir=_real_production_icir(feats, close), method="gram_schmidt"), feats),
         "exposure_ok": (EXPO, _run_product(EXPO, feats, close=close), feats),
         "exposure_runner_error": (EXPO, _run_product(EXPO, feats, close=None), feats),
     }
+
+    def _boom(self: Any, factors: pd.DataFrame, priority_order: Optional[List[str]] = None) -> Any:
+        raise RuntimeError("injected analyzer failure")
+
+    monkeypatch.setattr(FactorOrthogonalizer, "gram_schmidt", _boom)
+    runs["orth_runner_error"] = (ORTH, _run_product(ORTH, feats, icir={}, method="gram_schmidt"), feats)
     assert set(runs) == set(BRANCH_FIELDS)
     union: Set[str] = set()
     for branch, (module, output, f) in runs.items():
@@ -1078,7 +1141,7 @@ def test_orth_exposure_fields_closed() -> None:
 @pytest.mark.requires_kline
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_orth_exposure_match_oracle_on_real_kline(real_scenarios) -> None:
-    """真實 BTCUSDT 1h 2,000 根：各情境之統計欄 == oracle（gs_degenerate 只驗退化旗標與名單等，其後殘差見 xfail）。"""
+    """真實 BTCUSDT 1h 2,000 根：各情境（GS 代理排序／裸浮點 ICIR／產品 icir 快取／含共線欄、PCA、曝險三種中和）之統計欄 == oracle。"""
     bad = []
     for name, (_m, _o, res, subset) in real_scenarios.items():
         for path, r in res.items():
@@ -1102,11 +1165,10 @@ def test_every_stat_field_verified_finite_on_real_kline(real_scenarios) -> None:
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：Gram–Schmidt 以 float() 讀 dict 形之 _ic_cache['icir'] ⇒ TypeError，"
-                                       f"真實請求恆 skipped；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_gram_schmidt_production_icir_on_real_kline() -> None:
-    """真實 BTCUSDT 1h 2,000 根，icir 快取由產品 compute_rolling_ic → compute_icir 產生 ⇒ 正確行為＝全部統計欄 == oracle。"""
+    """（Task 0.3 OE-1，Task 0.4 ㉑ 修後轉一致）真實 BTCUSDT 1h 2,000 根，icir 快取由產品 compute_rolling_ic → compute_icir
+    產生 ⇒ 全部統計欄 == oracle（修前 TypeError ⇒ skipped）。"""
     close = _real_close()
     feats = _real_features(close)
     icir = _real_production_icir(feats, close)
@@ -1116,21 +1178,22 @@ def test_gram_schmidt_production_icir_on_real_kline() -> None:
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：完全共線欄（mom10 與其百分比）之後，各欄殘差變異與 correlation_after "
-                                       f"含對雜訊方向之投影（factor_orthogonalizer.py:43、:53-55）；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_gram_schmidt_residuals_after_degenerate_on_real_kline(real_scenarios) -> None:
-    """真實 BTCUSDT 1h：特徵加 mom10_pct＝100·mom10（同指標不同單位）⇒ 退化欄之後各欄殘差應 == OLS。"""
+    """（Task 0.3 OE-3，Task 0.4 ㉑ 修後轉一致）真實 BTCUSDT 1h：特徵加 mom10_pct＝100·mom10（同指標不同單位）⇒
+    退化欄之後各欄殘差 == OLS（修前 vol20 4.91902e-6 vs 4.92218e-6）。"""
     res = real_scenarios["gs_degenerate"][2]
     assert not _all_consistent(res), _all_consistent(res)
+    out = real_scenarios["gs_degenerate"][1]
+    assert out["degenerate_features"] == ["mom10"] and out["priority_order"][0] == "mom10_pct"
+    assert abs(out["correlation_after"]) <= 1e-12
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"ICPERF Task 0.3 不一致：beta 分子分母樣本不同（factor_exposure_analyzer.py:131、:139-145），"
-                                       f"真實資料上 dev20／vol20／mom10 之 beta 偏離 OLS 斜率約 3%；收據 {RECEIPT}")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_exposure_beta_neutral_on_real_kline() -> None:
-    """真實 BTCUSDT 1h 2,000 根，四特徵暖機長度各異（1／19／20／10 根）而代理缺首 2 根 ⇒ beta 須為共同樣本 OLS 斜率。"""
+    """（Task 0.3 OE-2，Task 0.4 ㉑ 修後轉一致）真實 BTCUSDT 1h 2,000 根，四特徵暖機長度各異（1／19／20／10 根）而代理缺首
+    2 根 ⇒ beta 為共同樣本 OLS 斜率（修前 dev20 之 beta 0.92184 vs OLS 0.95059）。"""
     close = _real_close()
     feats = _real_features(close)
     out = _run_product(EXPO, feats, close=close, neutralization_mode="beta_neutral")

@@ -150,11 +150,17 @@ def test_compute_rolling_centrality_empty_input():
 def test_detect_crowding_regime_values_hand_calc():
     """TESTREG 4.2 純增：regime／crowding_ratio／trend 以手算值比對（原目標只驗回聲與全值域）。
 
-    linspace(0.1, 0.5, 10) 中 ≥0.3 者為後 5 個（0.3222…0.5）⇒ crowding_ratio＝5/10＝0.5，
-    恰在 crowded 邊界（≥0.5）⇒ regime＝crowded；遞增 ⇒ rising；反序 ⇒ falling，比例不變。
+    ICPERF Task 0.4 ⑲：τ／p 恆不觸發（centrality ≤ 1／p）改 τ·mean——擁擠 ⟺ centrality ≥ τ × 該窗有限值平均
+    （預設 τ＝1.5；舊絕對門檻 crowded_threshold 已不再使用）。
+    單欄：每窗平均＝自身 ⇒ centrality ≥ 1.5×自身恆假 ⇒ crowding_ratio＝0、regime＝normal；遞增 ⇒ rising；反序 ⇒ falling。
+    多欄：f0＝linspace(0.1, 0.5, 10)、f1＝f2＝0.1 ⇒ 門檻＝1.5×(f0＋0.2)／3＝0.5·f0＋0.1，f0 ≥ 門檻 ⟺ f0 ≥ 0.2 ⇒
+    後 7 個（0.2333…0.5）⇒ crowding_ratio＝7/10＝0.7 ≥ 0.5 ⇒ regime＝crowded、rising、latest 0.5。
     """
     analyzer = FactorCentralityAnalyzer({"crowded_threshold": 0.3})
     index = pd.date_range("2024-01-01", periods=10, freq="12h")
     up = analyzer.detect_crowding_regime(pd.DataFrame({"f0": np.linspace(0.1, 0.5, 10)}, index=index), "f0")
     down = analyzer.detect_crowding_regime(pd.DataFrame({"f0": np.linspace(0.5, 0.1, 10)}, index=index), "f0")
-    assert (up, down) == ({"feature": "f0", "regime": "crowded", "crowding_ratio": 0.5, "trend": "rising", "latest": 0.5}, {"feature": "f0", "regime": "crowded", "crowding_ratio": 0.5, "trend": "falling", "latest": 0.1})
+    assert (up, down) == ({"feature": "f0", "regime": "normal", "crowding_ratio": 0.0, "trend": "rising", "latest": 0.5}, {"feature": "f0", "regime": "normal", "crowding_ratio": 0.0, "trend": "falling", "latest": 0.1})
+    multi = pd.DataFrame({"f0": np.linspace(0.1, 0.5, 10), "f1": [0.1] * 10, "f2": [0.1] * 10}, index=index)
+    crowded = analyzer.detect_crowding_regime(multi, "f0")
+    assert crowded == {"feature": "f0", "regime": "crowded", "crowding_ratio": 0.7, "trend": "rising", "latest": 0.5}, crowded

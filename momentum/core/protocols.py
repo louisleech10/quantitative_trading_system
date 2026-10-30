@@ -167,7 +167,7 @@ class IICAnalyzer(Protocol):
     ) -> dict:
         ...
 
-    def get_top_features(self, n: int, sort_by: str = "icir") -> list:
+    def get_top_features(self, n: int, sort_by: str = "icir_aligned") -> list:
         ...
 
     def get_filtered_features(self) -> Any:

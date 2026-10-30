@@ -27,6 +27,8 @@ class DeepAnalysisReport:
     # （如 factor_attribution unavailable）；計入 completed_count（D-12）。
     module_summary: dict[str, str] = field(default_factory=dict)
     total_modules: int = 10
+    # ICPERF Task 0.4 ⑩：請求明示之模組開關蓋過具名 preset 者（{模組: {"requested", "preset"}}；無則空）
+    tier_module_overrides: dict[str, dict] = field(default_factory=dict)
     completed_count: int = 0
     skipped_count: int = 0
     failed_count: int = 0

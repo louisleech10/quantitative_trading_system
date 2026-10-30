@@ -14,13 +14,23 @@ def test_insufficient_ls_samples():
 
 
 def test_quantile_exceeds_samples():
+    """舊斷言（60 根、q=10 ⇒ 回 dict）屬 LA-1 前之減箱退回行為；現行 PIT 分箱最少樣本 §MS＝100 有限值
+    （`long_short_analyzer.py:22`、`:109-119`；ICPERF Task 0.4 ⑰ FR-10 起只計有限值）⇒ 60 根結構上無法成箱 ⇒
+    SkippedResult(NUMERICAL_ERROR)。另驗足量（150 根）時 q=10 照請求固定（schema 鎖 num_quantiles_used == requested）。"""
     analyzer = LongShortAnalyzer(config={"num_quantiles": 10})
     np.random.seed(42)
     feature = pd.Series(np.random.randn(60))
     returns = pd.Series(np.random.randn(60) * 0.01)
     result = analyzer.analyze(feature, returns, num_quantiles=10)
-    assert isinstance(result, dict)
-    assert result["num_quantiles_used"] >= 2
+    assert isinstance(result, SkippedResult)
+    assert result.error_type == "NUMERICAL_ERROR" and result.reason == "cannot form quantiles"
+
+    feature_long = pd.Series(np.random.randn(150))
+    returns_long = pd.Series(np.random.randn(150) * 0.01)
+    result_long = analyzer.analyze(feature_long, returns_long, num_quantiles=10)
+    assert isinstance(result_long, dict)
+    assert result_long["num_quantiles_used"] == 10
+    assert result_long["long_analysis"]["samples"] > 0 and result_long["short_analysis"]["samples"] > 0
 
 
 def test_both_sides_negative_ic():
@@ -73,9 +83,18 @@ def test_classify_asymmetry_total_zero_and_short_dominant():
 
 
 def test_assign_quantiles_none_for_constant_feature():
-    bins, used = LongShortAnalyzer._assign_quantiles_with_fallback(pd.Series([1.0] * 60), requested=5)
-    assert bins is None
-    assert used == 0
+    """舊測呼叫已刪 helper `_assign_quantiles_with_fallback`（LA-1 B2 P1-2 改 PIT 分箱 `compute_pit_bins`）。
+    現改驗同一語意「常數特徵無分箱」：60 根與 150 根常數 ⇒ `compute_pit_bins` 全 NaN（無任何標籤）；
+    150 根常數經 analyze ⇒ 兩側樣本 0、不建議（`long_short_analyzer.py:109-119`、`:145-155`）。"""
+    analyzer = LongShortAnalyzer(config={"num_quantiles": 5})
+    for n in (60, 150):
+        bins = analyzer.compute_pit_bins(pd.Series([1.0] * n), num_quantiles=5)
+        assert len(bins) == n
+        assert int(bins.notna().sum()) == 0
+    result = analyzer.analyze(pd.Series([1.0] * 150), pd.Series(np.linspace(-0.01, 0.01, 150)), num_quantiles=5)
+    assert isinstance(result, dict)
+    assert result["long_analysis"]["samples"] == 0 and result["short_analysis"]["samples"] == 0
+    assert result["recommendation"] == "不建議"
 
 
 def test_both_sides_negative_ic_concrete_outcome():

@@ -5,6 +5,21 @@ from momentum.Analysis.deep_analysis_types import SkippedResult
 from momentum.Analysis.parameter_sensitivity_analyzer import ParameterSensitivityAnalyzer
 
 
+def _rolling_icir_oracle(x, y, window):
+    """ICPERF Task 0.4 ⑳：滾動 ICIR oracle（逐窗 scipy.stats.spearmanr；窗內常數 ⇒ NaN；nanmean／nanstd ddof=0）。"""
+    from scipy import stats as _stats
+
+    vals = []
+    for end in range(window, len(y) + 1):
+        xs, ys = x[end - window:end], y[end - window:end]
+        vals.append(np.nan if np.unique(xs).size <= 1 or np.unique(ys).size <= 1 else _stats.spearmanr(xs, ys)[0])
+    arr = np.asarray(vals, dtype=float)
+    if not np.isfinite(arr).any():
+        return np.nan
+    sd = float(np.nanstd(arr))
+    return float(np.nanmean(arr) / sd) if sd > 0 else np.nan
+
+
 def _make_dataset():
     rng = np.random.default_rng(42)
     idx = pd.date_range("2024-01-01", periods=240, freq="12h")
@@ -147,8 +162,16 @@ def test_compute_ic_and_icir_proxy_edge_cases():
     y2 = pd.Series([1, 2, 3, 4, 5, 6])
     assert np.isnan(ParameterSensitivityAnalyzer._compute_ic(x2, y2))
 
-    zeros = pd.Series([0, 0, 0, 0, 0, 0])
-    assert np.isnan(ParameterSensitivityAnalyzer._compute_icir_proxy(zeros, y2))
+    # ICPERF Task 0.4 ⑳：icir 代理 `_compute_icir_proxy` 已刪 → 改測 `_compute_rolling_icir`（常數特徵 ⇒ 全窗 NaN ⇒ ICIR NaN；
+    # 一般輸入 == 逐窗 scipy spearman 之 nanmean／nanstd(ddof=0)）
+    zeros = pd.Series([0.0] * 6)
+    assert np.isnan(ParameterSensitivityAnalyzer._compute_rolling_icir(zeros.to_frame("z"), y2.astype(float), "spearman", 3)["z"])
+    i = np.arange(40, dtype=float)
+    feat = pd.Series(np.sin(i / 3.0) + 0.2 * np.cos(i / 1.3))
+    lab = pd.Series(np.sin((i + 1) / 3.0) + 0.5 * np.cos(i / 2.1))
+    got = ParameterSensitivityAnalyzer._compute_rolling_icir(feat.to_frame("f"), lab, "spearman", 10)["f"]
+    exp = _rolling_icir_oracle(feat.to_numpy(), lab.to_numpy(), 10)
+    assert np.isfinite(exp) and abs(got - exp) <= 1e-12 * abs(exp), (got, exp)
 
 
 def test_extract_param_value_without_suffix():
@@ -167,12 +190,12 @@ def test_batch_analyze_classifies_stable_robust_and_noisy_not_robust():
     idx = pd.date_range("2024-01-01", periods=240, freq="12h")
     rng = np.random.default_rng(11)
     base = rng.normal(size=240)
-    labels = pd.Series(base + rng.normal(scale=0.1, size=240), index=idx)
+    labels = pd.Series(base + rng.normal(scale=1.0, size=240), index=idx)  # ICPERF Task 0.4 ⑳：標籤雜訊 0.1→1.0（icir 改滾動 ICIR 後，IC≈0.99 之窗間 std 趨 0 使 ICIR 爆大、穩定族 icir_std 達 60；改為中等 IC 使 ICIR 落一般量級）
     df = pd.DataFrame(
         {
-            "stable_10": base + rng.normal(scale=0.01, size=240),
-            "stable_20": base + rng.normal(scale=0.01, size=240),
-            "stable_30": base + rng.normal(scale=0.01, size=240),
+            "stable_10": base + rng.normal(scale=0.001, size=240),  # ICPERF Task 0.4 ⑳：變體雜訊 0.01→0.001（同族變體近乎相同 ⇒ 滾動 ICIR 近乎相同，stable 仍判 low）
+            "stable_20": base + rng.normal(scale=0.001, size=240),
+            "stable_30": base + rng.normal(scale=0.001, size=240),
             "noisy_10": rng.normal(size=240),
             "noisy_20": rng.normal(size=240),
             "noisy_30": rng.normal(size=240),
@@ -187,8 +210,8 @@ def test_batch_analyze_classifies_stable_robust_and_noisy_not_robust():
     def _oracle(prefix):
         cols = [f"{prefix}_{p}" for p in (10, 20, 30)]
         ics = np.array([_stats.spearmanr(df[c].to_numpy(), labels.to_numpy())[0] for c in cols])
-        prods = [df[c].to_numpy() * labels.to_numpy() for c in cols]
-        icirs = np.array([p.mean() / np.sqrt(((p - p.mean()) ** 2).sum() / (p.size - 1)) for p in prods])
+        # ICPERF Task 0.4 ⑳：icir oracle 由代理 mean(x·y)/std(x·y) → 滾動 IC（窗 63、步長 1、逐窗 scipy spearman）之 nanmean／nanstd（同 compute_icir）
+        icirs = np.array([_rolling_icir_oracle(df[c].to_numpy(), labels.to_numpy(), 63) for c in cols])
         ic_std = float(np.sqrt(((ics - ics.mean()) ** 2).mean()))
         icir_std = float(np.sqrt(((icirs - icirs.mean()) ** 2).mean()))
         risk = "low" if (ic_std < 0.02 and icir_std < 0.15) else ("medium" if (ic_std < 0.05 and icir_std < 0.3) else "high")

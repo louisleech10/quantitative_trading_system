@@ -79,7 +79,8 @@ def test_effective_sample_ratio_and_psi_helpers(monkeypatch):
 
     monkeypatch.setattr(np, "corrcoef", lambda a, b: np.array([[1.0, np.nan], [np.nan, 1.0]]))
     ratio_nan = FeatureQualityDiagnostics._effective_sample_ratio(pd.Series(np.random.randn(20)))
-    assert ratio_nan == 1.0
+    # ICPERF Task 0.4 ㉒ QN-4：舊＝lag-1 自相關非有限（常數序列等）⇒ 1.0（宣稱樣本完全獨立）；新＝無定義 ⇒ NaN
+    assert np.isnan(ratio_nan)
 
     psi_insufficient = FeatureQualityDiagnostics._psi(pd.Series([1.0, 2.0]), pd.Series([1.0, 2.0]))
     assert np.isnan(psi_insufficient)

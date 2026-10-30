@@ -27,7 +27,7 @@ from momentum.Analysis.data_preprocessor import DataPreprocessor
 from momentum.Analysis.event_filter import EventFilter
 from momentum.Analysis.factor_combiner import combine_factors
 from momentum.Analysis.ic_engine import ICEngine
-from momentum.Analysis.ic_reporter import ICReporter, _finite_or_neg_inf
+from momentum.Analysis.ic_reporter import DEFAULT_SORT_KEY, ICReporter, _finite_or_neg_inf
 from momentum.Analysis.marginal_ic import MarginalICParams, compute_marginal_ic
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
 from momentum.Analysis.binary_discrimination import (
@@ -459,7 +459,7 @@ def _intersect_features_with_kline_period(
     timeframe = meta.get("timeframe")
     if not symbol or not timeframe:
         return features_df, None
-    raw = kline_reader.read_klines(symbol, timeframe)
+    raw = _read_klines_float64(kline_reader, symbol, timeframe)
     if raw is None or raw.empty:
         return features_df, None
     kline_index = _normalize_frame_time_index(raw, "raw_data")
@@ -1129,15 +1129,108 @@ def _slice_by_mask(
     return sliced_features, sliced_label
 
 
+def _finite_num(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float, np.integer, np.floating)):
+        return None
+    v = float(value)
+    return v if np.isfinite(v) else None
+
+
+def _aligned_monotonicity(quantile_mean_returns: Mapping[str, Any], direction: int) -> float:
+    """方向對齊單調性（ICPERF Task 0.4 ⑧）：分位均值依 Q 序；direction＝+1 ⇒ 相鄰差 > 0 之比例（同
+    `MonotonicityTester.compute_monotonicity_score`），−1 ⇒ 相鄰差 < 0 之比例；缺 bin 之差不計；無可比之差 ⇒ 0.0；
+    direction＝0 ⇒ NaN。"""
+    if direction == 0:
+        return float("nan")
+    keys = sorted(quantile_mean_returns or {})
+    values = np.asarray([quantile_mean_returns[k] for k in keys], dtype=float)
+    if values.size < 2:
+        return 0.0
+    pair = np.isfinite(values[:-1]) & np.isfinite(values[1:])
+    if not pair.any():
+        return 0.0
+    diffs = (values[1:] - values[:-1])[pair]
+    return float(np.mean(diffs > 0)) if direction > 0 else float(np.mean(diffs < 0))
+
+
+def _direction_fields(ic_mean: Any, icir_item: Mapping[str, Any], quantile_returns: Mapping[str, Any]) -> dict:
+    """summary 列之方向欄（ICPERF Task 0.4 ⑧，SPEC 方向單一來源）：direction＝sign(ic_mean)（ic_mean 為門檻所用之同一值；
+    0／NaN／缺 ⇒ 0）；icir_aligned＝direction·icir（direction 0 或 icir 非有限 ⇒ NaN）；ic_hit_rate_aligned＝滾動 IC 有限值
+    中與 direction 同號之比例（+1 ⇒ ic_hit_rate、−1 ⇒ ic_neg_rate）；monotonicity_score_aligned 見 `_aligned_monotonicity`。"""
+    m = _finite_num(ic_mean)
+    direction = 0 if m is None or m == 0 else (1 if m > 0 else -1)
+    icir = _finite_num((icir_item or {}).get("icir"))
+    hit_key = "ic_hit_rate" if direction > 0 else "ic_neg_rate"
+    hit = _finite_num((icir_item or {}).get(hit_key)) if direction != 0 else None
+    return {
+        "direction": direction,
+        "icir_aligned": float(direction * icir) if (direction != 0 and icir is not None) else float("nan"),
+        "ic_hit_rate_aligned": hit if hit is not None else float("nan"),
+        "monotonicity_score_aligned": _aligned_monotonicity(
+            (quantile_returns or {}).get("quantile_mean_returns") or {}, direction
+        ),
+    }
+
+
+def _threshold_view(row: Mapping[str, Any]) -> dict:
+    """門檻判定用之方向對齊值（ICPERF Task 0.4 ⑧）：列已帶 `_direction_fields` 之欄 ⇒ 用之；否則（非本段產生之列）依
+    同定義自列之有號欄導出（direction＝sign(ic_mean)；勝率以 direction＝+1 時之 ic_hit_rate，−1 時無負向勝率 ⇒ NaN）。"""
+    m = _finite_num(row.get("ic_mean"))
+    direction = row.get("direction")
+    if direction is None:
+        direction = 0 if m is None or m == 0 else (1 if m > 0 else -1)
+    icir = _finite_num(row.get("icir"))
+    spread = _finite_num(row.get("long_short_spread"))
+    nan = float("nan")
+    hit = row.get("ic_hit_rate_aligned", row.get("ic_hit_rate") if direction > 0 else nan)
+    mono = row.get("monotonicity_score_aligned", row.get("monotonicity_score") if direction > 0 else nan)
+    return {
+        "ic_mean_abs": abs(m) if m is not None else nan,
+        "icir_aligned": row.get("icir_aligned", direction * icir if (direction and icir is not None) else nan),
+        "ic_hit_rate_aligned": hit,
+        "monotonicity_score_aligned": mono,
+        "long_short_spread_aligned": direction * spread if (direction and spread is not None) else nan,
+    }
+
+
+#: K 線價格與量欄（讀入後一律轉 float64；ICPERF Task 0.4 ⑥）
+_KLINE_FLOAT_COLUMNS = ("open", "high", "low", "close", "volume")
+
+
+def _read_klines_float64(kline_reader: Any, symbol: str, timeframe: str) -> Optional[pd.DataFrame]:
+    """讀 K 線並把價格與量欄轉 float64（ICPERF Task 0.4 ⑥）：kline 快取之 close 為 float32，舊版以 float32 直接算報酬標籤、
+    衰減前瞻報酬與分組 regime（A 格標籤與 float64 重算最大相對誤差 2.05e-4）。其餘欄原樣；讀不到 ⇒ 原樣回傳 None／空表。"""
+    raw = kline_reader.read_klines(symbol, timeframe)
+    if raw is None or getattr(raw, "empty", True):
+        return raw
+    cols = [c for c in _KLINE_FLOAT_COLUMNS if c in raw.columns and raw[c].dtype != np.float64]
+    if not cols:
+        return raw
+    out = raw.copy(deep=False)
+    for c in cols:
+        out[c] = raw[c].astype(np.float64)
+    return out
+
+
 def _slice_raw_data_by_mask(
     raw_data: pd.DataFrame,
     features_df: pd.DataFrame,
     sliced_features: pd.DataFrame,
     mask: Optional[np.ndarray],
 ) -> pd.DataFrame:
-    """用 feature row 位置切 raw kline，避免 RangeIndex 與 timestamp index 錯配。"""
+    """用 feature row 位置切 raw kline，避免 RangeIndex 與 timestamp index 錯配。
+
+    ICPERF Task 0.4 ⑤：mask 為 None（全樣本退回）時亦依時間軸對齊至特徵索引（同下方 reindex 分支）；舊版原樣回傳整段 kline
+    （RangeIndex），衰減與分組 IC 與時間索引之特徵配對 0 列 ⇒ 全 NaN。"""
     if mask is None:
-        return raw_data
+        # 兩側皆轉同一 UTC 時刻鍵再對齊（tz-aware／tz-naive 皆可；同 `_rekey_close_carrier`）
+        raw_key = _utc_instant_key(_normalize_frame_time_index(raw_data, "raw_data"))
+        sliced_key = _utc_instant_key(_normalize_ic_time_index(sliced_features.index, "sliced_features"))
+        normalized_raw = raw_data.copy(deep=False)
+        normalized_raw.index = raw_key
+        aligned_raw = normalized_raw.reindex(sliced_key)
+        aligned_raw.index = sliced_features.index
+        return aligned_raw
     mask_arr = np.asarray(mask, dtype=bool)
     if mask_arr.shape[0] != len(features_df):
         raise ValueError("split mask length must match features length")
@@ -2278,10 +2371,18 @@ class ICFilterOrchestrator:
                     "turnover_rate": None,
                     "ic_half_life": None,
                     "regime_robust": None,
+                    # ICPERF Task 0.4 ⑧：跨標的列同算方向欄（截面 IC 序列之有限值中 < 0 之比例為負向勝率）
+                    **_direction_fields(
+                        ic_mean,
+                        {"icir": icir, "ic_hit_rate": ic_hit_rate,
+                         "ic_neg_rate": (float(np.mean(values[np.isfinite(values)] < 0))
+                                         if np.isfinite(values).any() else np.nan)},
+                        {},
+                    ),
                 }
             )
 
-        # FDR 對該路徑全 feature（n_tests=finite p）；排序仍按 ICIR、不加門檻
+        # FDR 對該路徑全 feature（n_tests=finite p）；排序按方向對齊之 ICIR（icir_aligned）、不加門檻
         p_values_map: dict[str, float] = {}
         for item in summary_table:
             name = str(item["feature_name"])
@@ -2306,11 +2407,7 @@ class ICFilterOrchestrator:
 
         summary_table = sorted(
             summary_table,
-            key=lambda item: (
-                item.get("icir")
-                if isinstance(item.get("icir"), (int, float)) and np.isfinite(item.get("icir"))
-                else float("-inf")
-            ),
+            key=lambda item: _finite_or_neg_inf(item.get(DEFAULT_SORT_KEY)),
             reverse=True,
         )
 
@@ -2692,6 +2789,9 @@ class ICFilterOrchestrator:
             raise InvalidInputError("IC cache is empty, run analyze() first")
 
         config = self._apply_tier_config(self._apply_config_override(config_override))
+        # ICPERF Task 0.4 ⑩：深度請求明示之模組開關優先於具名 preset 之 disabled_modules（舊版靜默改回關閉）；
+        # 被蓋過之 preset 值揭露於 report.tier_module_overrides
+        config, tier_module_overrides = self._apply_explicit_module_requests(config, config_override)
 
         # F1.1：每次 deep run 先 invalidate series owner（cache hit 路徑亦不殘留 stale）
         self._factor_return_series = {}
@@ -2843,7 +2943,34 @@ class ICFilterOrchestrator:
         # (冪等;cache-hit 路徑此為唯一 sanitize,force 路徑為雙重保險)
         # F1 雙審:owner 空時不得服務依賴 series 的 stale net_ic ok
         sanitized = self._sanitize_deep_report_factor_returns(base_report)
+        sanitized.tier_module_overrides = dict(tier_module_overrides)
         return self._ensure_net_ic_owner_consistency(sanitized)
+
+    @staticmethod
+    def _apply_explicit_module_requests(config: ICConfig, config_override: Optional[dict]) -> tuple[ICConfig, dict]:
+        """深度請求 override 中各模組 `{"enabled": bool}` 之明示值覆寫具名 preset 之 `disabled_modules`（ICPERF Task 0.4 ⑩）；
+        只作用於「具名 preset、該 preset 允許深度分析、且模組列於其 disabled_modules」者（foundation 之整體關閉與 custom 之
+        module_overrides 不受影響）；回 (新 config, {模組鍵: {"requested": bool, "preset": bool}})——只記兩者不同者。"""
+        override = config_override or {}
+        data = config.model_dump(by_alias=True)
+        tiers = data.get("feature_tiers") or {}
+        active = str(tiers.get("active_preset", "intermediate"))
+        preset = (tiers.get("presets") or {}).get(active) or {}
+        if active == "custom" or not bool(preset.get("deep_analysis", True)):
+            return config, {}
+        disabled = set(preset.get("disabled_modules") or [])
+        changed: dict[str, dict] = {}
+        for module_key, (section, field_name) in MODULE_ENABLED_PATHS.items():
+            if module_key not in disabled:
+                continue
+            node = override.get(section)
+            if not isinstance(node, dict) or not isinstance(node.get(field_name), bool):
+                continue
+            current = (data.get(section) or {}).get(field_name)
+            if isinstance(data.get(section), dict) and current != node[field_name]:
+                changed[module_key] = {"requested": bool(node[field_name]), "preset": bool(current)}
+                data[section][field_name] = bool(node[field_name])
+        return (ICConfig.model_validate(data) if changed else config), changed
 
     def _compute_deep_cache_key(self, selected_features: list[str], config: ICConfig) -> str:
         deep_cfg = {
@@ -2944,8 +3071,10 @@ class ICFilterOrchestrator:
         features_df = self._ic_cache["features_df"][selected_features]
         labels = self._ic_cache["label_series"]
         analyzer = create_factor_return_analyzer(config.factor_return.model_dump())
+        # ICPERF Task 0.4 ⑯：horizon 必填（重疊 h 根標籤之不重疊抽樣與年化）
         result = analyzer.compute_batch(
-            features_df, labels, top_n=len(selected_features) if selected_features else 1
+            features_df, labels, horizon=self._deep_horizon(config),
+            top_n=len(selected_features) if selected_features else 1,
         )
         # series owner：唯一 API = analyzer.get_series_map()（F0 鎖）
         self._factor_return_series = analyzer.get_series_map()
@@ -3021,7 +3150,37 @@ class ICFilterOrchestrator:
             raise InsufficientDataError("rolling_ic matrix unavailable")
 
         analyzer = TrendAnalyzer(config.trend_analysis.model_dump())
-        return analyzer.batch_analyze(matrix, top_n=len(selected_features))
+        # ICPERF Task 0.4 ⑱ CT-1：重疊窗之 HAC 頻寬下限＝所用窗長／步長（窗長取 `_extract_rolling_ic_series` 所選之窗鍵）
+        return analyzer.batch_analyze(
+            matrix, top_n=len(selected_features),
+            overlap_window=self._rolling_overlap_window(rolling_ic, selected_features, config),
+        )
+
+    def _rolling_overlap_window(self, rolling_ic: dict, selected_features: list[str], config: ICConfig) -> Optional[int]:
+        """`_extract_rolling_ic_series` 所選窗鍵（最長序列者）之窗長除以步長（向上取整）；無可解析之窗鍵 ⇒ None。"""
+        stride = max(1, int(config.ic_calculation.rolling_stride or 1))
+        for name in selected_features:
+            windows = rolling_ic.get(name)
+            if not isinstance(windows, dict) or not windows:
+                continue
+            best_key = max(windows, key=lambda k: len(windows.get(k, [])) if isinstance(windows.get(k, []), list) else 0)
+            match = re.fullmatch(r"window_(\d+)", str(best_key))
+            if match:
+                return int(math.ceil(int(match.group(1)) / stride))
+        return None
+
+    def _deep_horizon(self, config: ICConfig) -> int:
+        """深度模組之標籤 horizon（ICPERF Task 0.4 ⑬⑯）：切分時之 effective_horizon，無切分時依設定解析。"""
+        split_context = (self._ic_cache or {}).get("split_context") or {}
+        if split_context.get("effective_horizon"):
+            return int(split_context["effective_horizon"])
+        return int(_resolve_effective_label_horizon(config, None))
+
+    def _deep_directions(self) -> dict[str, int]:
+        """上游選欄方向（ICPERF Task 0.4 ⑧：深度模組方向一律取 summary_table.direction）。"""
+        rows = (self._report or {}).get("summary_table") or []
+        return {str(r["feature_name"]): int(r["direction"]) for r in rows
+                if isinstance(r, dict) and r.get("feature_name") is not None and isinstance(r.get("direction"), (int, float))}
 
     def _run_parameter_sensitivity(self, selected_features: list[str], config: ICConfig) -> dict:
         from momentum.Analysis.parameter_sensitivity_analyzer import ParameterSensitivityAnalyzer
@@ -3029,8 +3188,13 @@ class ICFilterOrchestrator:
         features_df = self._ic_cache["features_df"][selected_features]
         labels = self._ic_cache["label_series"]
         metadata = self._ic_cache.get("metadata") or {}
-        analyzer = ParameterSensitivityAnalyzer(config.parameter_sensitivity.model_dump())
-        return analyzer.batch_analyze(features_df, labels, metadata=metadata)
+        # ICPERF Task 0.4 ⑬⑳：ICIR 窗＝IC 頁之調整後 ICIR 窗；IC 方法與上游方向傳入
+        icir_window = self._ic_engine._adjust_rolling_windows([int(config.ic_calculation.icir.window)])[0]
+        analyzer = ParameterSensitivityAnalyzer({**config.parameter_sensitivity.model_dump(), "icir_window": int(icir_window)})
+        return analyzer.batch_analyze(
+            features_df, labels, metadata=metadata,
+            method=str(config.global_settings.default_method), direction=self._deep_directions(),
+        )
 
     def _run_rolling_oos(self, selected_features: list[str], config: ICConfig) -> dict:
         from momentum.Analysis.rolling_oos_validator import RollingOOSValidator
@@ -3038,7 +3202,12 @@ class ICFilterOrchestrator:
         features_df = self._ic_cache["features_df"][selected_features]
         labels = self._ic_cache["label_series"]
         analyzer = RollingOOSValidator(config.rolling_oos.model_dump())
-        return analyzer.validate_batch(features_df, labels, top_n=len(selected_features))
+        # ICPERF Task 0.4 ⑳ SO-1／⑬：purge ≥ 標籤 horizon、IC 方法與上游方向傳入
+        return analyzer.validate_batch(
+            features_df, labels, horizon=self._deep_horizon(config),
+            method=str(config.global_settings.default_method), direction=self._deep_directions(),
+            top_n=len(selected_features),
+        )
 
     def _run_factor_orthogonalization(self, selected_features: list[str], config: ICConfig) -> dict:
         """C-3 loud：GS/PCA 算法不變；結果包 FactorModuleResult（oos_guarantees=False）。"""
@@ -3110,7 +3279,7 @@ class ICFilterOrchestrator:
             factor_values.index
         )
         # lag≥1：pct_change().shift(1) → bar t 只用 close[t-1]/close[t-2]
-        market_proxy = close_aligned.pct_change().shift(1)
+        market_proxy = close_aligned.pct_change(fill_method=None).shift(1)  # ICPERF Task 0.4 ㉑ OE-7：缺價不前補
         # 時間軸等權（len=列數非標的數），非交易持倉
         equal_time_weights = pd.Series(
             1.0 / max(1, len(factor_values)), index=factor_values.index
@@ -3371,7 +3540,7 @@ class ICFilterOrchestrator:
         values = window_dict.get(best_key, [])
         return pd.Series(values, dtype=float)
 
-    def get_top_features(self, n: int = 30, sort_by: str = "icir") -> list[dict]:
+    def get_top_features(self, n: int = 30, sort_by: str = DEFAULT_SORT_KEY) -> list[dict]:
         """取得 Top N 特徵。"""
 
         if not self._report:
@@ -3445,7 +3614,7 @@ class ICFilterOrchestrator:
                 symbol = meta.get("symbol")
                 timeframe = meta.get("timeframe")
                 if symbol and timeframe:
-                    raw_data = kline_reader.read_klines(symbol, timeframe)
+                    raw_data = _read_klines_float64(kline_reader, symbol, timeframe)
                     if raw_data is not None and not raw_data.empty and "close" in raw_data.columns:
                         close_index = _normalize_frame_time_index(raw_data, "raw_data")
                         close = pd.Series(
@@ -3595,7 +3764,7 @@ class ICFilterOrchestrator:
         if kline_reader is None or not symbol or not timeframe:
             raise InvalidInputError("labels_path is required when kline_reader is missing")
 
-        raw_data = kline_reader.read_klines(symbol, timeframe)
+        raw_data = _read_klines_float64(kline_reader, symbol, timeframe)
         if raw_data is None or raw_data.empty or "close" not in raw_data.columns:
             raise InvalidInputError("raw close data is required for label generation")
 
@@ -3838,7 +4007,7 @@ class ICFilterOrchestrator:
             symbol = metadata.get("symbol")
             timeframe = metadata.get("timeframe")
             if symbol and timeframe:
-                raw_data = kline_reader.read_klines(symbol, timeframe)
+                raw_data = _read_klines_float64(kline_reader, symbol, timeframe)
                 if raw_data is not None and not raw_data.empty:
                     raw_index = _normalize_frame_time_index(raw_data, "raw_data")
                     filter_base = raw_data.copy(deep=False)
@@ -4297,7 +4466,7 @@ class ICFilterOrchestrator:
             symbol = metadata.get("symbol")
             timeframe = metadata.get("timeframe")
             if symbol and timeframe:
-                raw_data = kline_reader.read_klines(symbol, timeframe)
+                raw_data = _read_klines_float64(kline_reader, symbol, timeframe)
                 if raw_data is not None:
                     raw_data_for_ic = _slice_raw_data_by_mask(
                         raw_data,
@@ -4913,23 +5082,25 @@ class ICFilterOrchestrator:
         if test_mask is None:
             return rolling_ic
 
-        label_name = label_series.name or "label"
-        aligned = pd.concat(
-            [features_df, label_series.rename(label_name)], axis=1
-        ).dropna()
-        if aligned.empty:
+        # ICPERF Task 0.4 ④：時間軸＝標籤有限之列（同 `ICEngine.compute_rolling_ic`）；⑨：測試段指標只用**整窗落於測試段**
+        # 之窗（窗首與窗尾皆在測試段），窗跨入訓練段者不入
+        label_values = label_series.reindex(features_df.index).to_numpy(dtype=float)
+        axis_rows = np.isfinite(label_values)
+        if not axis_rows.any():
             return {name: {} for name in features_df.columns}
+        axis_index = features_df.index[axis_rows]
 
-        test_index = set(features_df.index[np.asarray(test_mask, dtype=bool)])
+        test_arr = np.asarray(test_mask, dtype=bool)
+        in_test = test_arr[axis_rows]
         adjusted_windows = self._ic_engine._adjust_rolling_windows(windows)
         sliced: dict[str, dict] = {name: {} for name in features_df.columns}
 
         for window in adjusted_windows:
             key = f"window_{window}"
-            end_positions = np.arange(window, len(aligned) + 1, stride)
-            end_index = aligned.index[end_positions - 1]
+            end_positions = np.arange(window, len(axis_index) + 1, stride)
             keep_positions = [
-                idx for idx, timestamp in enumerate(end_index) if timestamp in test_index
+                idx for idx, end in enumerate(end_positions)
+                if in_test[end - 1] and in_test[end - window]
             ]
             for feature in features_df.columns:
                 values = list((rolling_ic.get(feature, {}) or {}).get(key, []))
@@ -4998,6 +5169,9 @@ class ICFilterOrchestrator:
                     "turnover_rate": turnover_item.get("quantile_turnover"),
                     "ic_half_life": decay_item.get("half_life"),
                     "regime_robust": None,
+                    **_direction_fields(
+                        ic_mean_val, icir_item, quantile_item.get("quantile_returns") or {}
+                    ),
                 }
             )
         # ICHC R6 修補（CODEX-R6）：turnover disabled → key 缺席（非 None 值）
@@ -5336,10 +5510,13 @@ class ICFilterOrchestrator:
                 passed.append(name)
                 continue
 
-            if not self._passes_threshold(row.get("ic_mean"), thresholds.ic_mean_min):
+            # ICPERF Task 0.4 ⑧：方向中立門檻——強度以 |ic_mean|、方向對齊之 icir／勝率／單調性／多空價差判定
+            # （direction＝sign(ic_mean)；0 ⇒ |ic_mean| 為 0 或 NaN，於 ic_mean 門檻即剔除）
+            aligned = _threshold_view(row)
+            if not self._passes_threshold(aligned["ic_mean_abs"], thresholds.ic_mean_min):
                 removed["ic_mean"].append(name)
                 continue
-            if not self._passes_threshold(row.get("icir"), thresholds.icir_min):
+            if not self._passes_threshold(aligned["icir_aligned"], thresholds.icir_min):
                 if icir_gate:
                     removed["icir"].append(name)
                     continue
@@ -5351,12 +5528,12 @@ class ICFilterOrchestrator:
                 removed["p_value"].append(name)
                 continue
             if not self._passes_threshold(
-                row.get("ic_hit_rate"), thresholds.ic_hit_rate_min
+                aligned["ic_hit_rate_aligned"], thresholds.ic_hit_rate_min
             ):
                 removed["ic_hit_rate"].append(name)
                 continue
             if not self._passes_threshold(
-                row.get("monotonicity_score"), thresholds.monotonicity_score_min
+                aligned["monotonicity_score_aligned"], thresholds.monotonicity_score_min
             ):
                 removed["monotonicity"].append(name)
                 continue
@@ -5368,7 +5545,7 @@ class ICFilterOrchestrator:
 
             if thresholds.long_short_spread.enabled:
                 if not self._passes_threshold(
-                    row.get("long_short_spread"),
+                    aligned["long_short_spread_aligned"],
                     thresholds.long_short_spread.min_spread,
                 ):
                     removed["long_short_spread"].append(name)

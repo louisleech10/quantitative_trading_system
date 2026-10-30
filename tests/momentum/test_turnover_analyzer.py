@@ -20,7 +20,8 @@ def _long_series(n: int = 200, seed: int = 0) -> pd.Series:
 def _ref_pit_top_mask(series: pd.Series, q: int) -> pd.Series:
     """獨立逐根參考：第 t 根以截至 t 之有限歷史求 q 分位邊界（去重），當根值落最高箱 ⇒ 1.0。
 
-    有效根：截至 t 之非 NaN 數（±inf 計入，同 §MS effective_count）≥ MIN_SAMPLES 且當根有限。
+    有效根：截至 t 之有限值數（±inf 不計；ICPERF Task 0.4 ⑰ FR-10：分箱最少樣本只計有限值，舊版同 §MS
+    effective_count 把 ±inf 計入，致有限值不足 MIN_SAMPLES 即分箱）≥ MIN_SAMPLES 且當根有限。
     pd.qcut 箱為右閉、首箱含最小值 ⇒ 最高箱＝(edges[-2], edges[-1]]；只剩一箱時恆為最高箱；
     有限歷史全相同（去重後只一個邊界、無箱）⇒ 無標籤 ⇒ NaN（SPEC Task 0.4 ①）。
     """
@@ -28,7 +29,7 @@ def _ref_pit_top_mask(series: pd.Series, q: int) -> pd.Series:
     out = np.full(values.shape[0], np.nan)
     seen = 0
     for t in range(values.shape[0]):
-        seen += int(not np.isnan(values[t]))
+        seen += int(np.isfinite(values[t]))  # ICPERF Task 0.4 ⑰ FR-10：只計有限值
         if seen < MIN_SAMPLES or not np.isfinite(values[t]):
             continue
         hist = values[: t + 1]
@@ -58,7 +59,7 @@ def _boundary_series(case: str) -> pd.Series:
 @pytest.mark.parametrize("case", ["all_identical", "identical_then_new", "nan_inf_mixed"])
 def test_top_mask_and_turnover_boundaries_match_reference(case):
     """頂分位遮罩與單值換手率之邊界（CODEX-R34-P1-01）：全相同 ⇒ 無標籤 NaN、換手率 NaN；
-    全相同後出現新值 ⇒ 新值起有標籤；NaN／±inf 混合 ⇒ 有效根依 §MS 非 NaN 計數。"""
+    全相同後出現新值 ⇒ 新值起有標籤；NaN／±inf 混合 ⇒ 有效根依有限值計數（ICPERF Task 0.4 ⑰ FR-10；舊為非 NaN）。"""
     series = _boundary_series(case)
     ref = _ref_pit_top_mask(series, q=5)
     mask = pit_expanding_qcut_top_mask(series, q=5, min_samples=MIN_SAMPLES, duplicates="drop")

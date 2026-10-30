@@ -49,6 +49,7 @@ type SortField =
   | 'rank'
   | 'ic_mean'
   | 'icir'
+  | 'icir_aligned'
   | 'ic_hit_rate'
   | 't_stat'
   | 'p_value'
@@ -107,7 +108,8 @@ export default function ICSummaryTable({
   // 不另外拉一個 prop——多一個真相源就會有兩者不一致的一天。
   const firstRow = (page?.rows ?? data ?? [])[0];
   const isBinaryMode = firstRow?.rank_biserial !== undefined;
-  const sortField = (params?.sort_by ?? page?.sort_by ?? 'icir') as SortField;
+  // ICPERF Task 0.4 ⑧：預設排序＝方向對齊之 ICIR（強反向因子與同強度正向因子名次相同）
+  const sortField = (params?.sort_by ?? page?.sort_by ?? 'icir_aligned') as SortField;
   const sortDirection = params?.sort_order ?? page?.sort_order ?? 'desc';
   // 翻頁時保留舊列到新列到達（不閃白）；skeleton 以 overlay 呈現
   const lastRowsRef = useRef<ICFeatureInfo[]>([]);
@@ -279,12 +281,13 @@ export default function ICSummaryTable({
   const autoSuggestToWatchlist = () => {
     const scored = sortedData
       .map((item) => {
-        if (!isFiniteNumber(item.ic_mean) || !isFiniteNumber(item.icir)) {
+        // ICPERF Task 0.4 ⑧：方向對齊——|ic_mean|·100 ＋ icir_aligned·10（＝direction·icir），± 同強度因子同分
+        if (!isFiniteNumber(item.ic_mean) || !isFiniteNumber(item.icir_aligned)) {
           return null;
         }
 
         const turnover = isFiniteNumber(item.turnover_rate) ? Math.max(0, item.turnover_rate) : 0;
-        const score = Math.abs(item.ic_mean) * 100 + item.icir * 10 - turnover * 5;
+        const score = Math.abs(item.ic_mean) * 100 + item.icir_aligned * 10 - turnover * 5;
         return { item, score };
       })
       .filter((row): row is { item: ICFeatureInfo; score: number } => row !== null)
@@ -425,6 +428,9 @@ export default function ICSummaryTable({
                   <TableHead className="w-[120px]">
                     <SortButton field="icir" label="ICIR" />
                   </TableHead>
+                  <TableHead className="w-[120px]" title="方向對齊之 ICIR（方向 × ICIR）：強反向因子與同強度正向因子同值">
+                    <SortButton field="icir_aligned" label="對齊 ICIR" />
+                  </TableHead>
                   {isCrossSectional ? (
                     <>
                       <TableHead className="w-[140px]">
@@ -499,6 +505,14 @@ export default function ICSummaryTable({
                       </TableCell>
                       <TableCell className="font-mono text-xs text-emerald-300">
                         {formatFinite(item.icir, 3)}
+                      </TableCell>
+                      <TableCell
+                        className="font-mono text-xs text-emerald-300"
+                        data-testid="ic-summary-icir-aligned"
+                        title={item.direction === -1 ? '反向因子（使用時取負號）' : item.direction === 1 ? '正向因子' : '方向未定'}
+                      >
+                        {item.direction === -1 ? '↓ ' : item.direction === 1 ? '↑ ' : ''}
+                        {formatFinite(item.icir_aligned, 3)}
                       </TableCell>
                       {isCrossSectional ? (
                         <>

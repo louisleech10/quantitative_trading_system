@@ -716,6 +716,8 @@ def build_survivor_output(
             "icir": _f(snap.get("icir")),
             "p_value_adj": _f(snap.get("p_value_adj")),
             "pass_class": str(snap["pass_class"]) if snap.get("pass_class") is not None else None,
+            # ICPERF Task 0.4 ⑧：選欄方向（summary_table.direction；缺 ⇒ null）
+            "direction": int(snap["direction"]) if isinstance(snap.get("direction"), (int, float)) else None,
             "train_ic": _f(train_ic_map.get(name)),
             "gross_ic": _f(pf.get("gross_ic")) if ok else None,
             "marginal_ic_loo": _f(pf.get("marginal_ic")) if ok else None,

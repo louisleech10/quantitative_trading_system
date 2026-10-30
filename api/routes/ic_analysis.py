@@ -300,7 +300,7 @@ async def get_result(task_id: str, schema_version: Optional[int] = Query(None), 
 @router.get("/result/{task_id}/summary", response_model=ICSummaryPageResponse)
 async def get_result_summary_page(
     task_id: str,
-    sort_by: str = Query("icir"),
+    sort_by: str = Query("icir_aligned"),  # ICPERF Task 0.4 ⑧：預設方向對齊之 ICIR
     sort_order: str = Query("desc"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1),
@@ -485,7 +485,7 @@ async def get_summary(task_id: str):
 @router.get("/top-features")
 async def get_top_features(
     n: int = Query(30, ge=1, le=500),
-    sort_by: str = Query("icir"),
+    sort_by: str = Query("icir_aligned"),  # ICPERF Task 0.4 ⑧：預設方向對齊之 ICIR
     task_id: Optional[str] = Query(None),
 ):
     """Get top features for the latest task."""
@@ -795,7 +795,7 @@ def _build_summary(report: Dict[str, Any]) -> str:
         # 🔴 UAT B15（2026-09-02，票 `G3-D15`）：degraded／full-sample 或樣本極少時 `icir` 鍵**存在但為 None**
         #    （`get(..., -inf)` 對「鍵在、值 None」無效）⇒ `None < None` TypeError ⇒ `/ic/summary` 500 ⇒ 畫面紅字。
         #    非有限值一律排最後，不當成數字。
-        v = item.get("icir")
+        v = item.get("icir_aligned")  # ICPERF Task 0.4 ⑧：方向對齊之 ICIR
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)) else float("-inf")
 
     top_features = sorted(summary_table, key=_icir_key, reverse=True)[:5]

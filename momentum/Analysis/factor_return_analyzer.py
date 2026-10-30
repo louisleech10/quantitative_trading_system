@@ -53,14 +53,23 @@ class FactorReturnAnalyzer:
         *,
         feature_name: Optional[str] = None,
         store_series: bool = True,
+        horizon: int = 1,
     ) -> dict | SkippedResult:
         """計算單因子 PIT expanding 擇時多空序列與摘要指標。
 
-        公式鎖(SPEC §C):
-          - returns_w = future_return(raw identity, 無 winsorize)
-          - position_t = PIT expanding qcut 邊分位 membership(+1 top / -1 bottom / 0 else)
-          - ls_return_full = position * returns_w
+        公式鎖(SPEC §C;ICPERF Task 0.4 ⑭–⑰):
+          - returns_w = future_return(raw identity, 無 winsorize);``horizon``＝其前瞻根數 h
+          - position_t = PIT expanding qcut 邊分位 membership(+1 top / -1 bottom / 0 else);
+            分箱歷史＝特徵自身全時序 0..t 之有限值(RB-3,不受標籤可得性影響);頂分位＝當根實際箱數 k_t−1
+          - ls_return_full = position * returns_w(只在特徵與標籤皆有限之列)
+          - 風險指標與 ls_cumulative 以自首個有效根起每隔 h 根(原始時間位置)之不重疊序列計;
+            年化期數＝有效根密度(每年根數,時間戳導出)／h
+
+        ``horizon`` 預設 1 僅為單特徵直接呼叫之相容預設;批次入口 ``compute_batch`` 必填。
         """
+        h = int(horizon)
+        if h < 1:
+            raise ValueError(f"horizon must be >= 1, got {horizon!r}")
         name = feature_name
         if name is None:
             name = str(feature.name) if feature.name is not None else "feature"
@@ -75,53 +84,46 @@ class FactorReturnAnalyzer:
                 error_type=error_type,
             )
 
-        frame = pd.concat(
-            [feature.rename("feature"), future_returns.rename("y")],
-            axis=1,
-        ).dropna()
+        # 特徵全時序(分箱歷史來源);標籤對齊至特徵時間軸(特徵軸外之標籤列無特徵、不可能入 frame)
+        feat_all = pd.Series(feature, dtype=float)
+        y_all = pd.Series(future_returns, dtype=float).reindex(feat_all.index)
+        feat_arr = feat_all.to_numpy(dtype=float)
+        y_arr = y_all.to_numpy(dtype=float)
 
         # NaN/inf gate: 非有限值明確剔除(鐵律,不得 silent 進 ls/risk)
-        if not frame.empty:
-            feat_f = frame["feature"].astype(float)
-            y_f = frame["y"].astype(float)
-            finite_mask = np.isfinite(feat_f.to_numpy(dtype=float)) & np.isfinite(
-                y_f.to_numpy(dtype=float)
-            )
-            if not bool(finite_mask.all()):
-                # 若整段皆非有限 → INVALID_DATA;部分 → drop 該列
-                if not bool(finite_mask.any()):
-                    return _skip(
-                        "non-finite feature/future_returns (all inf/nan after dropna)",
-                        "INVALID_DATA",
-                    )
-                frame = frame.loc[finite_mask].copy()
-
-        if len(frame) < self._min_samples:
+        both_present = ~np.isnan(feat_arr) & ~np.isnan(y_arr)
+        valid = np.isfinite(feat_arr) & np.isfinite(y_arr)
+        if bool(both_present.any()) and not bool(valid.any()):
             return _skip(
-                f"insufficient samples: {len(frame)} < {self._min_samples}",
+                "non-finite feature/future_returns (all inf/nan after dropna)",
+                "INVALID_DATA",
+            )
+        valid_pos = np.flatnonzero(valid)
+        frame_index = feat_all.index[valid]
+
+        if len(frame_index) < self._min_samples:
+            return _skip(
+                f"insufficient samples: {len(frame_index)} < {self._min_samples}",
                 "INSUFFICIENT_DATA",
             )
 
-        if frame["feature"].nunique(dropna=True) <= 1:
+        if np.unique(feat_arr[valid_pos]).size <= 1:
             return _skip("constant feature", "INSUFFICIENT_DATA")
 
         # 全期 nanstd 僅作 skip 守衛(不入報酬值;SPEC §C 保留)
-        y_vals = frame["y"].values.astype(float)
-        if not np.isfinite(y_vals).all() or float(np.nanstd(y_vals)) == 0.0:
-            if not np.isfinite(y_vals).all():
-                return _skip(
-                    "non-finite future_returns after finite filter",
-                    "INVALID_DATA",
-                )
+        y_vals = y_arr[valid_pos]
+        if float(np.nanstd(y_vals)) == 0.0:
             return _skip("zero variance future_returns", "INSUFFICIENT_DATA")
 
-        returns_w = frame["y"].astype(float)  # raw identity(v0.6 winsorize 移除)
+        returns_w = pd.Series(y_vals, index=frame_index, dtype=float)  # raw identity(v0.6 winsorize 移除)
         quantiles = int(num_quantiles or self._num_quantiles)
         position = self._pit_expanding_position(
-            frame["feature"].astype(float),
+            feat_all,
             num_quantiles=quantiles,
             warmup_periods=self._warmup_periods,
+            eval_positions=valid_pos,
         )
+        position.index = frame_index
 
         # post-warmup 全程無 ±1 → 整段 skip
         if int((position != 0).sum()) == 0:
@@ -135,20 +137,25 @@ class FactorReturnAnalyzer:
         if not np.isfinite(ls_return_full.to_numpy(dtype=float)).all():
             return _skip("non-finite ls_return produced", "INVALID_DATA")
 
-        ls_cumulative = (1.0 + ls_return_full).cumprod() - 1.0
+        # h 根前瞻報酬每根取樣而相鄰重疊 ⇒ 自首個有效根起每隔 h 根(原始時間位置)取一,得不重疊序列
+        non_overlap = ((valid_pos - valid_pos[0]) % h) == 0
+        ls_return_nov = ls_return_full.iloc[np.flatnonzero(non_overlap)]
+
+        ls_cumulative = (1.0 + ls_return_nov).cumprod() - 1.0
         active_bar_count = int((position != 0).sum())
         turnover_series = position.astype(float).diff().abs().fillna(0.0)
         turnover = float(turnover_series.mean())
 
+        bars_per_year = self._infer_periods_per_year(frame_index)
         risk_metrics = self.compute_risk_metrics(
-            ls_return_full,
+            ls_return_nov,
             risk_free_rate=self._risk_free_rate,
-            periods_per_year=self._infer_periods_per_year(frame.index),
+            periods_per_year=bars_per_year / h,
         )
 
         # 描述性 ex-post 全樣本分位摘要(非可交易訊號;標 descriptive_full_sample)
         quantile_summary = self._descriptive_quantile_summary(
-            frame["feature"].astype(float),
+            pd.Series(feat_arr[valid_pos], index=frame_index, dtype=float),
             returns_w,
             quantiles,
         )
@@ -176,12 +183,18 @@ class FactorReturnAnalyzer:
         self,
         returns: pd.Series,
         risk_free_rate: float = 0.0,
-        periods_per_year: Optional[int] = None,
+        periods_per_year: Optional[float] = None,
     ) -> dict:
+        """風險指標(輸入須為不重疊之逐期報酬;``periods_per_year``＝每年期數)。
+
+        ICPERF Task 0.4 ⑯⑰:年化報酬＝CAGR＝∏(1+r)^(P/N)−1;Sortino 下行偏差＝√mean(min(r,0)²)(全觀測);
+        標準差以 numpy ddof=1、以相對容差判 0(避免浮點殘差 ~1e-18 冒充非零)。
+        ``periods_per_year`` 為 None ⇒ 365(直接呼叫之相容預設);非有限或 ≤ 0 ⇒ 年化類指標 NaN。
+        """
         # 非有限輸入全轉 nan 後剔除(F0-codex-2);禁止 inf 出口
-        raw = pd.Series(returns, dtype=float)
-        clean = raw[np.isfinite(raw.to_numpy(dtype=float))]
-        if clean.empty:
+        raw = pd.Series(returns, dtype=float).to_numpy(dtype=float)
+        clean = raw[np.isfinite(raw)]
+        if clean.size == 0:
             return {
                 "sharpe_ratio": np.nan,
                 "sortino_ratio": np.nan,
@@ -192,57 +205,64 @@ class FactorReturnAnalyzer:
                 "annualized_volatility": np.nan,
             }
 
-        periods = int(periods_per_year or 365)
-        mean_return = float(clean.mean())
-        std_return = float(clean.std(ddof=1))
-        if not np.isfinite(mean_return):
-            mean_return = np.nan
-        if not np.isfinite(std_return):
-            std_return = np.nan
+        periods = 365.0 if periods_per_year is None else float(periods_per_year)
+        periods_ok = bool(np.isfinite(periods) and periods > 0)
+        n_obs = int(clean.size)
+        mean_return = float(np.mean(clean))
+        # 相對容差:|r| 尺度之 1e-12 以下之離散度視為 0
+        zero_tol = 1e-12 * float(np.max(np.abs(clean)))
+        std_return = float(np.std(clean, ddof=1)) if n_obs > 1 else np.nan
+        std_ok = bool(np.isfinite(std_return) and std_return > zero_tol)
 
-        # crypto 高頻 + 大 mean 時 (1+r)^periods 可能 overflow / 不合理大數 → nan
-        # 合理界 abs>1e6 視為 garbage(F0-composer-2)
-        try:
-            annualized_return = float((1.0 + mean_return) ** periods - 1.0)
-            if (not np.isfinite(annualized_return)) or abs(annualized_return) > 1e6:
-                annualized_return = np.nan
-        except (OverflowError, FloatingPointError, ValueError):
-            annualized_return = np.nan
+        # CAGR;權益曾 ≤ 0(某期 r ≤ −1)⇒ 歸零記 −1、轉負無定義記 NaN;合理界 abs>1e6 視為 garbage(F0-composer-2)
+        growth = float(np.prod(1.0 + clean))
+        annualized_return = np.nan
+        if periods_ok and np.isfinite(growth):
+            if bool(np.any(clean == -1.0)):
+                annualized_return = -1.0
+            elif bool(np.all(clean > -1.0)):
+                try:
+                    annualized_return = float(growth ** (periods / n_obs) - 1.0)
+                except OverflowError:
+                    annualized_return = np.nan
+                if (not np.isfinite(annualized_return)) or abs(annualized_return) > 1e6:
+                    annualized_return = np.nan
 
-        if np.isfinite(std_return) and std_return > 0:
+        # 離散度判為 0(常數報酬)⇒ 波動恰 0(數學值);Sharpe／Sortino 分母 0 ⇒ NaN
+        if std_ok and periods_ok:
             annualized_volatility = float(std_return * np.sqrt(periods))
-            if not np.isfinite(annualized_volatility):
-                annualized_volatility = np.nan
+        elif np.isfinite(std_return) and periods_ok:
+            annualized_volatility = 0.0
         else:
             annualized_volatility = np.nan
+        if not np.isfinite(annualized_volatility):
+            annualized_volatility = np.nan
 
-        rf_period = risk_free_rate / periods
+        rf_period = risk_free_rate / periods if periods_ok else np.nan
         sharpe = (
             float((mean_return - rf_period) / std_return * np.sqrt(periods))
-            if np.isfinite(std_return) and std_return > 0 and np.isfinite(mean_return)
+            if std_ok and periods_ok
             else np.nan
         )
         if not np.isfinite(sharpe):
             sharpe = np.nan
 
-        downside = clean[clean < 0.0]
-        downside_std = float(downside.std(ddof=1)) if len(downside) >= 2 else np.nan
+        downside_dev = float(np.sqrt(np.mean(np.minimum(clean, 0.0) ** 2)))
         sortino = (
-            float((mean_return - rf_period) / downside_std * np.sqrt(periods))
-            if np.isfinite(downside_std)
-            and downside_std > 0
-            and np.isfinite(mean_return)
+            float((mean_return - rf_period) / downside_dev * np.sqrt(periods))
+            if periods_ok and downside_dev > zero_tol
             else np.nan
         )
         if not np.isfinite(sortino):
             sortino = np.nan
 
-        equity = (1.0 + clean).cumprod()
-        rolling_peak = equity.cummax()
+        equity = np.cumprod(1.0 + clean)
+        rolling_peak = np.maximum.accumulate(equity)
         # 避免 0/0 或 inf equity 污染 drawdown
         with np.errstate(divide="ignore", invalid="ignore"):
             drawdown = equity / rolling_peak - 1.0
-        max_drawdown = float(drawdown.min()) if not drawdown.empty else np.nan
+        finite_dd = drawdown[np.isfinite(drawdown)]
+        max_drawdown = float(np.min(finite_dd)) if finite_dd.size else np.nan
         if not np.isfinite(max_drawdown):
             max_drawdown = np.nan
         calmar = (
@@ -273,9 +293,17 @@ class FactorReturnAnalyzer:
         self,
         features_df: pd.DataFrame,
         future_returns: pd.Series,
-        top_n: int = 30,
+        *,
+        horizon: int,
+        top_n: int,
     ) -> dict[str, Any]:
-        """批次計算並回傳 §U ok union;series 經 get_series_map() 取用。"""
+        """批次計算並回傳 §U ok union;series 經 get_series_map() 取用。
+
+        ``horizon``＝標籤前瞻根數(必填關鍵字,ICPERF Task 0.4 ⑯;呼叫端傳 effective_horizon)。
+        """
+        h = int(horizon)
+        if h < 1:
+            raise ValueError(f"horizon must be >= 1, got {horizon!r}")
         self._series_map = {}
         features_payload: dict[str, dict[str, Any]] = {}
         selected_columns = list(features_df.columns)[: max(1, int(top_n))]
@@ -286,6 +314,7 @@ class FactorReturnAnalyzer:
                 future_returns,
                 feature_name=str(name),
                 store_series=True,
+                horizon=h,
             )
             if isinstance(result, SkippedResult):
                 # SkippedResult 不入 features;series_map 亦不寫
@@ -321,35 +350,59 @@ class FactorReturnAnalyzer:
         *,
         num_quantiles: int,
         warmup_periods: int,
+        eval_positions: Optional[np.ndarray] = None,
     ) -> pd.Series:
-        """§C 手刻 PIT expanding 分位 membership。
+        """§C 手刻 PIT expanding 分位 membership(ICPERF Task 0.4 ⑭⑮)。
 
-        不複用 pit_stats.pit_expanding_qcut_label(語意差會改凍結 golden)。
+        第 t 根(t ∈ ``eval_positions``,特徵時間軸之位置;None ⇒ 全部有限根):
+          - 分箱歷史＝``feature`` 於 0..t 之有限值(特徵自身全時序,RB-3;不受標籤可得性影響)
+          - 有限歷史序位 < ``warmup_periods`` ⇒ 0
+          - q_eff＝min(q, 歷史相異值數),< 2 ⇒ 0;``pd.qcut(歷史, q_eff, duplicates="drop")``
+            之當根標籤 ℓ 與實際箱數 k_t;k_t < 2 ⇒ 0;ℓ＝k_t−1 ⇒ +1;ℓ＝0 ⇒ −1
+        回傳 position(index＝``feature.index[eval_positions]``)。不複用 pit_stats(q_eff 語意不同)。
         """
-        position = pd.Series(0, index=feature.index, dtype=int)
-        n = len(feature)
-        for t in range(n):
-            if t < warmup_periods:
+        vals = pd.Series(feature, dtype=float).to_numpy(dtype=float)
+        fin = np.isfinite(vals)
+        if eval_positions is None:
+            eval_positions = np.flatnonzero(fin)
+        eval_positions = np.asarray(eval_positions, dtype=np.int64)
+        out = np.zeros(eval_positions.size, dtype=int)
+        if eval_positions.size == 0:
+            return pd.Series(out, index=feature.index[eval_positions], dtype=int)
+        q = int(num_quantiles)
+        finite_rank = np.cumsum(fin) - 1  # 當根於有限歷史中之序位
+        seen: set = set()
+        hist: list[float] = []
+        cursor = 0
+        for j, t in enumerate(eval_positions):
+            # 增量擴張有限歷史至 t(含)
+            while cursor <= t:
+                if fin[cursor]:
+                    v = float(vals[cursor])
+                    hist.append(v)
+                    seen.add(v)
+                cursor += 1
+            if not fin[t] or finite_rank[t] < warmup_periods:
                 continue
-            window = feature.iloc[: t + 1]
-            q_eff = min(int(num_quantiles), int(window.nunique()))
+            q_eff = min(q, len(seen))
             if q_eff < 2:
                 continue
             try:
-                labels = pd.qcut(window, q_eff, labels=False, duplicates="drop")
+                labels, edges = pd.qcut(
+                    np.asarray(hist, dtype=float), q_eff, labels=False, duplicates="drop", retbins=True
+                )
             except ValueError:
                 continue
-            if labels is None or labels.dropna().empty:
-                continue
-            label_t = labels.iloc[-1]
-            if pd.isna(label_t):
+            label_t = np.asarray(labels, dtype=float)[-1]
+            k_t = len(edges) - 1
+            if not np.isfinite(label_t) or k_t < 2:
                 continue
             label_i = int(label_t)
-            if label_i == q_eff - 1:
-                position.iloc[t] = 1
+            if label_i == k_t - 1:
+                out[j] = 1
             elif label_i == 0:
-                position.iloc[t] = -1
-        return position
+                out[j] = -1
+        return pd.Series(out, index=feature.index[eval_positions], dtype=int)
 
     @staticmethod
     def _descriptive_quantile_summary(
@@ -383,12 +436,15 @@ class FactorReturnAnalyzer:
         return values[idx].astype(float).tolist()
 
     @staticmethod
-    def _infer_periods_per_year(index: pd.Index) -> int:
+    def _infer_periods_per_year(index: pd.Index) -> float:
+        """觀測根密度＝每年根數＝(有效根數−1)／時間跨度(年,365 日)(ICPERF Task 0.4 ⑯ FR-9)。
+
+        由時間戳導出,不寫死 24h(非 24/7 市場如工作日日線得實際每年根數);非 DatetimeIndex、
+        < 2 列或跨度 ≤ 0 ⇒ NaN(無時間戳無從導出,年化類指標隨之 NaN)。
+        """
         if not isinstance(index, pd.DatetimeIndex) or len(index) < 2:
-            return 365
-        median_delta_hours = (
-            pd.Series(index).diff().dropna().dt.total_seconds().median() / 3600.0
-        )
-        if not np.isfinite(median_delta_hours) or median_delta_hours <= 0:
-            return 365
-        return int(round((24.0 * 365.0) / median_delta_hours))
+            return float("nan")
+        span_seconds = float(index[-1].value - index[0].value) / 1e9
+        if not np.isfinite(span_seconds) or span_seconds <= 0:
+            return float("nan")
+        return float((len(index) - 1) * 365.0 * 86400.0 / span_seconds)

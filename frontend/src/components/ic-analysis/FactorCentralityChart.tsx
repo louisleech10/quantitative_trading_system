@@ -12,16 +12,17 @@ interface FactorCentralityChartProps {
 
 export default function FactorCentralityChart({ data }: FactorCentralityChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const threshold = data?.pca_summary?.crowded_threshold ?? 0.3;
+  // ICPERF ⑲：門檻＝後端實際值（τ × 跨特徵平均）；後端不判擁擠時為 null ⇒ 不畫參考線。擁擠與否以後端逐特徵旗標為準
+  const threshold = data?.pca_summary?.crowded_threshold ?? null;
 
   const chartData = useMemo(() => {
     const features = data?.features || {};
     return Object.entries(features).map(([name, value]) => ({
       name,
       centrality: value.centrality ?? 0,
-      over: (value.centrality ?? 0) > threshold ? value.centrality : 0,
+      over: value.crowded ? value.centrality ?? 0 : 0,
     }));
-  }, [data?.features, threshold]);
+  }, [data?.features]);
 
   const handleExportPNG = async () => {
     if (!containerRef.current) return;
@@ -50,7 +51,7 @@ export default function FactorCentralityChart({ data }: FactorCentralityChartPro
               <XAxis dataKey="name" hide />
               <YAxis />
               <Tooltip />
-              <ReferenceLine y={threshold} stroke="#f59e0b" strokeDasharray="4 4" />
+              {threshold !== null && <ReferenceLine y={threshold} stroke="#f59e0b" strokeDasharray="4 4" />}
               <Area dataKey="over" fill="#ef444433" stroke="none" />
               <Line dataKey="centrality" stroke="#a78bfa" dot={false} />
             </ComposedChart>

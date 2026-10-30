@@ -370,7 +370,8 @@ def test_compute_batch_ok_union_schema() -> None:
     )
     future = pd.Series(FUTURE_7, index=idx, dtype=float)
     analyzer = _make_test_analyzer()
-    batch = analyzer.compute_batch(features, future, top_n=2)
+    # ICPERF Task 0.4 ⑯：horizon 為必填關鍵字；FUTURE_7 為逐根 1 期前瞻報酬 ⇒ horizon=1
+    batch = analyzer.compute_batch(features, future, horizon=1, top_n=2)
     assert batch["status"] == "ok"
     assert batch["reason"] is None
     value = batch["value"]

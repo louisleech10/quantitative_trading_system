@@ -889,7 +889,32 @@ def _write_after_baselines(
     return after_map, telem
 
 
+def refresh_live_snapshots() -> int:
+    """只重產即時對照快照 ``*_baseline_after{,_split_off}.json``（後續票刻意改值時用；ICPERF Task 0.4 起）。
+
+    不動 attribution.json 與 ``*_baseline_after_la0.json``（LA-0 收案時之歸因快照，歸因只證 LA-0 本身之改值範圍）；
+    split-OFF 契約（holdout 關、stage1 fit_mode＝pit_expanding）照驗。
+    """
+    before_map = {
+        key: json.loads((OUT / fname).read_text(encoding="utf-8")) for key, fname in BEFORE_FILES.items()
+    }
+    _write_after_baselines(before_map, config_override=None, role="after_pit", name_suffix="")
+    after_off_map, _ = _write_after_baselines(
+        before_map, config_override=SPLIT_OFF_OVERRIDE, role="after_pit_split_off", name_suffix="_split_off"
+    )
+    for key, after_off in after_off_map.items():
+        fit_mode = (after_off.get("stage1") or {}).get("preproc_log", {}).get("fit_mode")
+        if after_off["config_snapshot"]["ic_train_test_split"] is not False or fit_mode != "pit_expanding":
+            print(f"[b6] FAIL: {key} split-off contract (split={after_off['config_snapshot']['ic_train_test_split']}, "
+                  f"fit_mode={fit_mode!r})")
+            return 1
+    print("[b6] live snapshots OK")
+    return 0
+
+
 def main() -> int:
+    if "--live-only" in sys.argv[1:]:
+        return refresh_live_snapshots()
     before_map: dict[str, dict[str, Any]] = {}
     for key, fname in BEFORE_FILES.items():
         before_path = OUT / fname

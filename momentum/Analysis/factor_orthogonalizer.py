@@ -6,7 +6,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from scipy.linalg import qr
 from sklearn.decomposition import PCA
 
 from momentum.core.logging import get_logger
@@ -36,31 +35,59 @@ class FactorOrthogonalizer:
                 "error_type": "INSUFFICIENT_DATA",
             }
 
+        n_samples, n_features = clean.shape
+        # ICPERF Task 0.4 ㉑：同 PCA 之樣本數守門（:91-97）；n < p 時 QR 經濟形狀與欄名不符
+        if n_samples < n_features:
+            return pd.DataFrame(index=clean.index), {
+                "module_name": "factor_orthogonalization",
+                "skipped": True,
+                "reason": f"n_samples({n_samples}) < n_features({n_features})",
+                "error_type": "INSUFFICIENT_DATA",
+            }
+
         order = self._resolve_priority_order(clean, priority_order)
         ordered = clean[order]
 
-        matrix = ordered.values.astype(float)
-        q_matrix, _ = qr(matrix, mode="economic")
-        orth = pd.DataFrame(q_matrix, index=ordered.index, columns=order)
+        # ICPERF Task 0.4 ㉑：對去均值、標準化欄做 Gram–Schmidt（含截距之逐步 OLS 殘差）；
+        # 退化欄（殘差變異 ≤ 門檻 × 原變異，或原變異為 0）不入正交基、輸出零欄，
+        # 避免數值零殘差之捨入方向污染其後各欄與 correlation_after。
+        matrix = ordered.to_numpy(dtype=float)
+        means = matrix.mean(axis=0)
+        variances = matrix.var(axis=0)
+        stds = np.sqrt(variances)
+        centered = matrix - means
+        standardized = np.zeros_like(centered)
+        nonconstant = stds > 0
+        standardized[:, nonconstant] = centered[:, nonconstant] / stds[nonconstant]
 
+        orth_values = np.zeros_like(standardized)
+        basis_cols: list[np.ndarray] = []
         features_meta: dict[str, dict] = {}
         degenerate_features: list[str] = []
         for idx, feature_name in enumerate(order):
-            target = matrix[:, idx]
-            if idx == 0:
-                residual = target
-            else:
-                basis = q_matrix[:, :idx]
-                projection = basis @ (basis.T @ target)
-                residual = target - projection
-            residual_variance = float(np.var(residual))
-            degenerate = bool(residual_variance <= self._degenerate_threshold)
+            residual = standardized[:, idx].copy()
+            if basis_cols:
+                basis = np.column_stack(basis_cols)
+                # 再正交化一次（"twice is enough"）以抑制古典 GS 之正交性流失
+                residual -= basis @ (basis.T @ residual)
+                residual -= basis @ (basis.T @ residual)
+            original_variance = float(variances[idx])
+            relative_variance = float(np.var(residual)) if nonconstant[idx] else 0.0
+            residual_variance = relative_variance * original_variance
+            degenerate = bool(
+                (not nonconstant[idx]) or relative_variance <= self._degenerate_threshold
+            )
             if degenerate:
                 degenerate_features.append(feature_name)
+            else:
+                unit = residual / float(np.linalg.norm(residual))
+                basis_cols.append(unit)
+                orth_values[:, idx] = unit
             features_meta[feature_name] = {
                 "residual_variance": residual_variance,
                 "degenerate": degenerate,
             }
+        orth = pd.DataFrame(orth_values, index=ordered.index, columns=order)
 
         corr_before = ordered.corr().abs()
         corr_after = orth.corr().abs()
@@ -130,16 +157,29 @@ class FactorOrthogonalizer:
             return valid + remain
 
         if self._icir_scores:
-            order = sorted(
-                list(factors.columns),
-                key=lambda name: float(self._icir_scores.get(name, -np.inf)),
-                reverse=True,
-            )
-            if all(np.isfinite(float(self._icir_scores.get(name, np.nan))) for name in order):
-                return order
+            # ICPERF Task 0.4 ㉑：值可為 float 或 compute_icir 之 dict（取 "icir"，ic_engine.py:488-493）；
+            # 強度以 |ICIR| 降序（反向因子同強度同名次；同值依原欄序，穩定排序）
+            strengths = {
+                name: abs(self._icir_value(self._icir_scores[name]))
+                if name in self._icir_scores
+                else np.nan
+                for name in factors.columns
+            }
+            if all(np.isfinite(value) for value in strengths.values()):
+                return sorted(list(factors.columns), key=lambda name: strengths[name], reverse=True)
 
         proxy = factors.abs().mean().sort_values(ascending=False)
         return list(proxy.index)
+
+    @staticmethod
+    def _icir_value(value: object) -> float:
+        """ICIR 分數：dict（compute_icir 輸出形狀）取 "icir"；無法讀為數值 ⇒ NaN（退回代理排序）。"""
+        if isinstance(value, dict):
+            value = value.get("icir", np.nan)
+        try:
+            return float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return float("nan")
 
     @staticmethod
     def _mean_off_diagonal(corr_matrix: pd.DataFrame) -> float:

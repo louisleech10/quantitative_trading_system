@@ -28,6 +28,11 @@ def _finite_or_neg_inf(value: Any) -> float:
         return float("-inf")
     return v if math.isfinite(v) else float("-inf")
 
+
+#: 預設排序鍵（ICPERF Task 0.4 ⑧）：方向對齊之 ICIR（summary 列 `icir_aligned`＝direction·icir），使強反向因子與同強度
+#: 正向因子名次相同；一切預設排序（Top-N、報告 top_features、分頁、跨標的排序）用之，呼叫端明示 sort_by 時照指定
+DEFAULT_SORT_KEY = "icir_aligned"
+
 # OOS 宣稱關鍵字（degraded 出口禁出現未降級文案）
 _OOS_CLAIM_MARKERS = (
     "oos-passed",
@@ -415,7 +420,7 @@ class ICReporter:
         summary_table = report.get("summary_table", [])
         top_features = sorted(
             summary_table,
-            key=lambda item: _finite_or_neg_inf(item.get("icir")),
+            key=lambda item: _finite_or_neg_inf(item.get(DEFAULT_SORT_KEY)),
             reverse=True,
         )[:5]
 
@@ -582,7 +587,7 @@ class ICReporter:
         top_n = int(self._config.get("ai_json_top_n", 30))
         top_features = sorted(
             summary_table,
-            key=lambda item: _finite_or_neg_inf(item.get("icir")),
+            key=lambda item: _finite_or_neg_inf(item.get(DEFAULT_SORT_KEY)),
             reverse=True,
         )[:top_n]
 
@@ -673,7 +678,7 @@ class ICReporter:
         summary_table = report.get("summary_table", []) if isinstance(report, dict) else []
         top_features = sorted(
             summary_table,
-            key=lambda item: _finite_or_neg_inf(item.get("icir")),
+            key=lambda item: _finite_or_neg_inf(item.get(DEFAULT_SORT_KEY)),
             reverse=True,
         )[:10]
         # F2: envelope unwrap + sanitizer(ok 放行 / legacy 擋)
@@ -1236,7 +1241,10 @@ class ICReporter:
             warnings.append("無可用因子，建議放寬門檻或檢查數據品質。")
             return warnings
 
-        weak = [item for item in top_features if item.get("icir") is not None and item.get("icir") < 0.3]
+        # ICPERF Task 0.4 ⑧：弱訊號以方向對齊之 ICIR 判（強反向因子 icir 為負但不弱）
+        weak = [item for item in top_features
+                if _finite_or_neg_inf(item.get(DEFAULT_SORT_KEY)) != float("-inf")
+                and item.get(DEFAULT_SORT_KEY) < 0.3]
         if weak:
             warnings.append("部分高排名因子 ICIR 偏低，可能存在穩定性風險。")
 

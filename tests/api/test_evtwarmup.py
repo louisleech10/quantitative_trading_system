@@ -286,8 +286,17 @@ def test_global_run_unchanged_vs_golden():
 def test_event_path_ic_mean_falls_back_to_pooled_point_ic_when_rolling_empty(event_report_80):
     """UAT 2026-09-09：事件 run 之 rolling 視窗 > 事件數 ⇒ rolling 均值全空 ⇒ ic_mean 原本全 None ⇒ ic_mean_min 把全部特徵砍光。
     修後：ic_mean 回退為 pooled point IC（HAC t/p 所檢定者）、有限；stage5 不再因 ic_mean 全砍；metadata 揭露來源計數。
-    對照：80 事件（> 視窗 21）rolling 有值 ⇒ 不回退、不寫 ic_mean_source 鍵（全域／有 rolling 之報告逐位元組不動）。"""
-    assert "ic_mean_source" not in event_report_80["metadata"]["ic_window_disclosure"]
+    對照：80 事件不切分（全段 80 > 視窗 21）rolling 有值 ⇒ 不回退、不寫 ic_mean_source 鍵（全域／有 rolling 之報告逐位元組不動）。
+    ICPERF Task 0.4 ④：切分時測試段滾動 IC 只留起訖皆在測試段之窗 ⇒ event_report_80 之測試段事件（< 30）不足最小窗 21 ⇒
+    rolling 空、ic_mean 回退 pooled（改前以跨段窗算出之值含訓練段資料）。"""
+    lv_c, owners_c = _event_inputs(80)
+    ctrl = run_analyze({"ic_train_test_split": False, "event_filter": {"enabled": True, "min_events": 30, "min_test_events": 30}},
+                       event_timestamps=list(lv_c), event_label_values=lv_c, event_label_owners=owners_c, event_context=CTX)
+    assert "ic_mean_source" not in ctrl["metadata"]["ic_window_disclosure"]
+    split = event_report_80["metadata"]["ic_train_test_split"]
+    assert split["applied"] is True and split["test_events"] < 21, split
+    src80 = event_report_80["metadata"]["ic_window_disclosure"].get("ic_mean_source") or {}
+    assert src80.get("rolling_mean", 0) == 0 and src80.get("pooled_point_ic", 0) == len(event_report_80["summary_table"])
     # 以「視窗 > 樣本」重現使用者實機（1h 事件 run：視窗 1512 > 可用列）⇒ rolling 序列全空；事件路徑不受 bar warmup 預檢擋
     lv, owners = _event_inputs(80)
     rep = run_analyze({"event_filter": {"enabled": True, "min_events": 30, "min_test_events": 30},

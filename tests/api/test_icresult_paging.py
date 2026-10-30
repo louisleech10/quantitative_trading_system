@@ -355,7 +355,14 @@ def test_light_view_g4(client, task, fixture_report, golden, contract):
     for k in ("marginal_ic", "correlation_matrix", "analysis_status", "oos_guarantees", "version", "diversification_metrics", "cross_sectional_symbol_ic", "cross_symbol_validation"):
         if k in fixture_report:
             assert light[k] == fixture_report[k], k
-    ref = proj.paginate_summary(fixture_report["summary_table"], sort_by="icir", sort_order="desc", offset=0, limit=contract["limit_default"], contract=contract)
+    # ICPERF Task 0.4 ⑧：light view 預設排序＝icir_aligned（fixture 為 ⑧ 前報告、無該欄 ⇒ 由 sign(ic_mean)·icir 導出）
+    ref = proj.paginate_summary(fixture_report["summary_table"], sort_by="icir_aligned", sort_order="desc", offset=0, limit=contract["limit_default"], contract=contract)
+    assert [r["feature_name"] for r in ref["rows"]] == [
+        r["feature_name"] for r in sorted(
+            fixture_report["summary_table"],
+            key=lambda r: (proj.derived_icir_aligned(r) is None, -(proj.derived_icir_aligned(r) or 0.0), str(r["feature_name"])),
+        )[: contract["limit_default"]]
+    ], "fixture 之導出排序 oracle 不符"
     assert light["summary_page"]["rows"] == ref["rows"] and light["summary_page"]["total"] == ref["total"]
     assert light["view"] == "light" and light["total_features"] == len(fixture_report["summary_table"]) and light["result_revision"] == 1
 

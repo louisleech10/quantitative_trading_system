@@ -128,5 +128,6 @@ def test_vol_neutralization_reduces_volatility_gap():
     neutralized = analyzer.neutralize_factor_matrix(factors, pd.Series(np.zeros(len(index)), index=index))
 
     raw_ratio = float(np.std(values[200:]) / np.std(values[:200]))
-    neutral_ratio = float(np.std(neutralized["f1"].values[200:]) / np.std(neutralized["f1"].values[:200]))
+    # ICPERF Task 0.4 ㉑ OE-8：中和後保留 NaN（不再填 0），波動以有效列計
+    neutral_ratio = float(np.nanstd(neutralized["f1"].values[200:]) / np.nanstd(neutralized["f1"].values[:200]))
     assert neutral_ratio < raw_ratio

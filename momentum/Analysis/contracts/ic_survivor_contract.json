@@ -589,7 +589,7 @@
     }
   },
   "survivor_record_keys": {
-    "_doc": "survivors[] 單筆；IC 快照四欄自 report summary_table；marginal 欄自 marginal_ic loo 視角（not_computed ⇒ null）。",
+    "_doc": "survivors[] 單筆；IC 快照四欄自 report summary_table；marginal 欄自 marginal_ic loo 視角（not_computed ⇒ null）。direction（ICPERF Task 0.4 ⑧）＝sign(summary_table.ic_mean) ∈ {1, -1, 0}，本欄新增前寫出之倖存者檔無此鍵（required false）。",
     "additional_properties": false,
     "keys": {
       "feature_name": {
@@ -615,6 +615,11 @@
       "pass_class": {
         "type": "str",
         "required": true,
+        "nullable": true
+      },
+      "direction": {
+        "type": "int",
+        "required": false,
         "nullable": true
       },
       "train_ic": {

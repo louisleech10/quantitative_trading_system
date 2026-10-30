@@ -8,20 +8,18 @@ Task 0.4「深度分析讀碼盤點」之 feature_quality 與 net_ic 兩條待�
 - `net_ic_analysis`：`momentum/Analysis/net_ic_analyzer.py`（呼叫端 `ic_filter_orchestrator.py:3221-3268` `_run_net_ic`；
   換手率來源 `:3246-3250` 讀第 5 段 `turnover_analysis.<特徵>.quantile_turnover`）。
 
-本檔為**稽核**：參考實作 `ref_*` 以 statsmodels（`adfuller`、`breaks_cusumolsresid`）、scipy（`chi2.sf`、`pearsonr`、
-`spearmanr`）、numpy／pandas 與測試自寫之最簡公式獨立重算，不呼叫被測模組或其內部函式；不一致是要找的結果，以
-`xfail(strict=True)` 斷言正確（oracle）行為，裁定前不修產品碼。
+本檔原為 Task 0.3 **稽核**：參考實作 `ref_*` 以 statsmodels（`adfuller`）、scipy（`chi2.sf`、`kstwobign.sf`、`pearsonr`、
+`spearmanr`）、numpy／pandas 與測試自寫之最簡公式獨立重算，不呼叫被測模組或其內部函式。
 
-oracle 定義與產品不同之處（即本檔所記不一致，皆附理由）：
-- ADF 值不得依牆鐘時間而變（使用者 2026-10-27「全專案禁時間上限停運算」；產品 `:68-70` 逾時即丟棄已算結果）。
-- 未做 ADF 檢定之欄（全缺、樣本不足、常數、ADF 例外、逾時）不得標「非平穩」（產品 `:264`、`:269-270`）。
-- CUSUM 漂移判定以 Ploberger–Krämer OLS-CUSUM（statsmodels `breaks_cusumolsresid`，統計量＝max|S_k|／(σ√n)）於
-  `ORACLE_CUSUM_ALPHA` 判定；產品 `:158-160` 之門檻 5σ 未隨 √n 縮放 ⇒ 長序列恆判漂移。
-- 有效樣本比於 lag-1 自相關無定義（常數序列）時為 NaN，不得寫 1.0（產品 `:316-317`）。
-- net_ic 之 `turnover`／`cost_drag_return`／`cost_sensitivity`／`capacity`／`avg_cost_drag_return` 以該特徵因子擇時序列之
+Task 0.3 所查之不一致（皆已於 Task 0.4 ㉒ QN-1～QN-5 修正，原 `xfail(strict=True)` 已轉為一般斷言，斷言內容不變）：
+- QN-5：ADF 值不得依牆鐘時間而變（使用者 2026-10-27「全專案禁時間上限停運算」；舊碼逾時即丟棄已算結果）。
+- QN-2：未做 ADF 檢定之欄（全缺、樣本不足、常數、ADF 例外）is_stationary＝None、不標「非平穩」。
+- QN-3：CUSUM 漂移判定為 Ploberger–Krämer OLS-CUSUM（統計量＝max|S_k|／√Σe²，p＝Brownian bridge 上確界分布
+  `scipy.stats.kstwobign.sf`）＜ `ORACLE_CUSUM_ALPHA`；舊碼門檻 5σ 未隨 √n 縮放 ⇒ 長序列恆判漂移。
+- QN-4：有效樣本比於 lag-1 自相關無定義（常數序列）時為 NaN，不得寫 1.0。
+- QN-1：net_ic 之 `turnover`／`cost_drag_return`／`cost_sensitivity`／`capacity`／`avg_cost_drag_return` 以該特徵因子擇時序列之
   逐根 PIT 換手率 mean(|position_t − position_{t−1}|)（首根 0）為準——與同列 `net_factor_return`、`breakeven_cost_bps`
-  （`net_ic_analyzer.py:316`）同一定義、同一樣本；產品改用第 5 段頂分位單邊 `quantile_turnover`（測試段樣本，
-  `ic_filter_orchestrator.py:3247`）卻標 `membership_change_both_legs_per_bar`（`net_ic_analyzer.py:16`、`:448`）。
+  同一定義、同一樣本；無序列 ⇒ 上列各值 null（舊碼用第 5 段頂分位單邊 `quantile_turnover`）。
 
 本檔之 requires_kline 測試須經共用監看執行（autouse 自證，同 test_icperf_correctness.py）。
 """
@@ -39,7 +37,6 @@ import numpy as np
 import pandas as pd
 import pytest
 from scipy import stats
-from statsmodels.stats.diagnostic import breaks_cusumolsresid
 from statsmodels.tsa.stattools import adfuller
 
 from momentum.Analysis import feature_quality_diagnostics as fq_mod
@@ -80,7 +77,6 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     f"{FQ}/adf_results/*/is_stationary": _f("fq.adf", f"{_FQ_PY}:75"),
     f"{FQ}/adf_results/*/skipped": _f("fq.adf", f"{_FQ_PY}:38-64,76,78-96"),
     f"{FQ}/adf_results/*/reason": _f("fq.adf", f"{_FQ_PY}:41,50,59,81,91"),
-    f"{FQ}/adf_results/*/timeout": _f(NON_STAT, f"{_FQ_PY}:82"),
     f"{FQ}/adf_results/*/error": _f(NON_STAT, f"{_FQ_PY}:92"),
     f"{FQ}/autocorrelation_results/*/ljungbox_stat": _f("fq.ljungbox", f"{_FQ_PY}:116-117"),
     f"{FQ}/autocorrelation_results/*/p_value": _f("fq.ljungbox", f"{_FQ_PY}:118"),
@@ -145,18 +141,8 @@ _FEATURE_MAPS = {
     FQ: {"adf_results", "autocorrelation_results", "drift_results", "coverage_stats"},
     NET: {"features"},
 }
-#: 已查之不一致（欄位 → 原因）；真實資料對照斷言其餘統計欄一致，本表欄位另以 xfail(strict=True) 斷言 oracle 行為
-KNOWN_INCONSISTENT: Dict[str, str] = {
-    f"{FQ}/quality_flags/non_stationary/#": "未檢定之欄標非平穩",
-    f"{FQ}/summary/low_quality_count": "由上項導出",
-    f"{FQ}/autocorrelation_results/*/effective_sample_ratio": "常數序列寫 1.0（應 NaN）；非常數欄另斷言一致",
-    f"{NET}/features/*/turnover": "換手率定義與 net_factor_return 不同",
-    f"{NET}/features/*/cost_drag_return": "同上",
-    f"{NET}/features/*/cost_sensitivity/#/cost_drag_return": "同上",
-    f"{NET}/features/*/capacity/estimated_capacity_usd": "同上",
-    f"{NET}/features/*/capacity/capacity_tier": "同上",
-    f"{NET}/summary/avg_cost_drag_return": "同上",
-}
+#: 已查而未修之不一致（欄位 → 原因）；Task 0.4 ㉒ QN-1～QN-5 修正後為空——真實資料對照斷言全部統計欄一致
+KNOWN_INCONSISTENT: Dict[str, str] = {}
 
 
 # ── 共用監看（同 test_icperf_correctness.py） ──────────────────────────────────────────────────────
@@ -302,9 +288,9 @@ def _fq_cfg(config: Optional[Mapping[str, Any]]) -> Dict[str, float]:
 def _ref_adf(values: np.ndarray, significance: float, min_samples: int) -> Dict[str, Any]:
     """ADF oracle：分支同 `:38-64`；縮尾 1%／99%（`:305-308`，線性內插分位＝numpy 預設）；
     `adfuller(regression="c", autolag="AIC", maxlag=⌈12(n/100)^{1/4}⌉ 且 ≤ n//2−2)`（statsmodels 預設，產品 `:69` 未給參數）；
-    無逾時（值不依牆鐘而變）。"""
+    無逾時（值不依牆鐘而變）；未實際檢定（跳過、例外）或 p 非有限 ⇒ is_stationary＝None（未知，QN-2）。"""
     clean = values[~np.isnan(values)]
-    nan_out = {"adf_statistic": math.nan, "p_value": math.nan, "is_stationary": False}
+    nan_out = {"adf_statistic": math.nan, "p_value": math.nan, "is_stationary": None}
     if clean.size == 0:
         return {"skipped": True, "reason": "all_nan", **nan_out}
     if clean.size < min_samples:
@@ -319,8 +305,9 @@ def _ref_adf(values: np.ndarray, significance: float, min_samples: int) -> Dict[
         stat, pval, *_ = adfuller(w, maxlag=maxlag, regression="c", autolag="AIC")
     except Exception as exc:  # noqa: BLE001 — 同產品之例外分支
         return {"skipped": True, "reason": "adf_error", "error": str(exc), **nan_out}
-    return {"adf_statistic": float(stat), "p_value": float(pval), "is_stationary": bool(float(pval) < significance),
-            "skipped": False}
+    pval = float(pval)
+    return {"adf_statistic": float(stat), "p_value": pval,
+            "is_stationary": bool(pval < significance) if math.isfinite(pval) else None, "skipped": False}
 
 
 def _ref_ljungbox(values: np.ndarray, lags: int, significance: float) -> Dict[str, Any]:
@@ -377,7 +364,9 @@ def _ref_psi(front: np.ndarray, back: np.ndarray, bins: int = 10) -> float:
 
 def _ref_drift(series: Optional[pd.Series], name: str, drift_threshold: float, reason_absent: str) -> Dict[str, Any]:
     """漂移 oracle：去缺值後 < 20 跳過（`:145-154`）；斷點＝argmax|Σ(x−x̄)| 之索引標籤（同產品，取首次）；
-    CUSUM 判定＝`breaks_cusumolsresid(x−x̄, ddof=0)` 之 p < ORACLE_CUSUM_ALPHA；PSI 前後兩半（`:162-165`）＞門檻；兩者取或。"""
+    CUSUM 判定（自算 Ploberger–Krämer OLS-CUSUM，不呼叫產品所用之 statsmodels 函式）：e＝x−x̄，
+    sup_b＝max_k|Σ_{i≤k} e_i|／√Σe²，p＝`scipy.stats.kstwobign.sf(sup_b)`（Brownian bridge 上確界分布），p < ORACLE_CUSUM_ALPHA；
+    Σe²＝0 ⇒ p 非有限 ⇒ 不判；PSI 前後兩半（`:162-165`）＞門檻；兩者取或。"""
     if series is None:
         return {"feature_name": name, "skipped": True, "reason": reason_absent, "cusum_breakpoint": None,
                 "psi_score": math.nan, "drifted": False}
@@ -392,9 +381,11 @@ def _ref_drift(series: Optional[pd.Series], name: str, drift_threshold: float, r
     centered = x - x.mean()
     cum = np.cumsum(centered)
     bp = labels[int(np.argmax(np.abs(cum)))]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        _, cusum_p, _ = breaks_cusumolsresid(centered, ddof=0)
+    ss = float(np.dot(centered, centered))
+    if ss > 0.0:
+        cusum_p = float(stats.kstwobign.sf(float(np.max(np.abs(cum))) / math.sqrt(ss)))
+    else:
+        cusum_p = math.nan
     mid = x.size // 2
     psi = _ref_psi(x[:mid], x[mid:])
     drifted = bool((math.isfinite(cusum_p) and cusum_p < ORACLE_CUSUM_ALPHA)
@@ -521,11 +512,13 @@ def _ref_ok(value: Any) -> Dict[str, Any]:
     return {"status": "ok", "value": value, "reason": None}
 
 
-def _ref_capacity(turnover: float, volume: Optional[float], rate: float) -> Dict[str, Any]:
-    """容量 oracle（產品 `:239-285`）：無量能 ⇒ None／unknown；否則 量能×參與率／換手率（換手率 0 ⇒ 不除）；
-    級距：換手率 > 1 ⇒ low、> 0.5 ⇒ medium、否則 high。"""
+def _ref_capacity(turnover: Optional[float], volume: Optional[float], rate: float) -> Dict[str, Any]:
+    """容量 oracle（產品 `:239-285`）：換手率未知（無序列）或無量能 ⇒ None／unknown；否則 量能×參與率／換手率
+    （換手率 0 ⇒ 不除）；級距：換手率 > 1 ⇒ low、> 0.5 ⇒ medium、否則 high。"""
+    if turnover is None or volume is None or volume <= 0:
+        return {"estimated_capacity_usd": None, "capacity_tier": "unknown", "calibration": "uncalibrated"}
     t = max(0.0, turnover)
-    if volume is None or volume <= 0:
+    if volume <= 0:
         return {"estimated_capacity_usd": None, "capacity_tier": "unknown", "calibration": "uncalibrated"}
     cap = volume * rate if t <= 0 else volume * rate / t
     tier = "low" if t > 1.0 else ("medium" if t > 0.5 else "high")
@@ -541,8 +534,9 @@ def ref_net_ic_analysis(
 ) -> Dict[str, Any]:
     """`NetICAnalyzer(config).batch_analyze(ic_summary, turnover_data, factor_return_series)` 之獨立參考實作。
     跳過分支同產品（換手率輸入缺／非有限／負、gross 缺）；**換手率 oracle**＝該特徵因子擇時序列之
-    mean(|Δposition|)（序列有效時；無序列時退用輸入值），成本拖累＝(c／10⁴)×換手率（＝gross 均值 − net 均值），
-    階梯、容量同此換手率；net＝mean(ls_t − (c／10⁴)·|Δposition_t|)（c 未啟用 ⇒ 0）、損益兩平＝mean(ls)／mean(|Δposition|)×10⁴。"""
+    mean(|Δposition|)（序列有效且對齊後非空時；否則 None——輸入之 turnover_data 不入任何成本計算），
+    成本拖累＝(c／10⁴)×換手率（＝gross 均值 − net 均值），階梯、容量同此換手率（None ⇒ 拖累 None、階梯值 None、容量 unknown，
+    摘要均值只計非 None）；net＝mean(ls_t − (c／10⁴)·|Δposition_t|)（c 未啟用 ⇒ 0）、損益兩平＝mean(ls)／mean(|Δposition|)×10⁴。"""
     cfg = dict(config or {})
     cost_enabled = bool(cfg.get("cost_enabled", False))
     cost_bps = None if cfg.get("cost_bps") is None else float(cfg["cost_bps"])
@@ -584,7 +578,7 @@ def ref_net_ic_analysis(
         cond: Dict[str, Any]
         evaluable = False
         profitable = False
-        turnover = t_in
+        turnover: Optional[float] = None
         if ext is None:
             reason = "factor_return_series_missing_or_invalid" if sobj is not None else \
                 "canonical_factor_return_series_not_built (1c-FR)"
@@ -605,7 +599,7 @@ def ref_net_ic_analysis(
                 gm = float(np.mean(gross))
                 tm = float(np.mean(to))
                 net = float(np.mean(gross - (c / 10000.0) * to))
-                turnover = tm
+                turnover = tm if math.isfinite(tm) else None
                 if not math.isfinite(tm) or tm == 0.0:
                     be, reason_be = None, "zero_mean_turnover"
                 elif not math.isfinite(gm) or not math.isfinite(net):
@@ -634,12 +628,14 @@ def ref_net_ic_analysis(
             n_eval += 1
         if cost_enabled:
             assert cost_bps is not None
-            drag = cost_bps / 10000.0 * turnover
-            drags.append(drag)
+            drag = None if turnover is None else cost_bps / 10000.0 * turnover
+            if drag is not None:
+                drags.append(drag)
             ladder = sorted({round(min(1000.0, max(0.1, x)), 1)
                              for x in (cost_bps / 2.0, cost_bps, 2.0 * cost_bps, 5.0 * cost_bps)})
             row.update({"cost_bps": cost_bps, "cost_semantics": "per_rebalance_not_annualized", "cost_drag_return": drag,
-                        "cost_sensitivity": [{"cost_bps": float(s), "cost_drag_return": s / 10000.0 * turnover}
+                        "cost_sensitivity": [{"cost_bps": float(s),
+                                              "cost_drag_return": None if turnover is None else s / 10000.0 * turnover}
                                              for s in ladder]})
             if evaluable and profitable:
                 n_prof += 1
@@ -745,10 +741,8 @@ def test_fq_ljungbox_ess_match_oracle_boundaries(lags: int) -> None:
     assert out["autocorrelation_results"]["neg"]["effective_sample_ratio"] == 1.0
 
 
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：常數序列 lag-1 自相關無定義，有效樣本比寫 1.0（應 NaN）；"
-                                        f"收據 {RECEIPT}")
 def test_fq_ess_undefined_for_constant_series() -> None:
-    """常數序列（ρ₁ 無定義）之有效樣本比 oracle＝NaN；產品 `feature_quality_diagnostics.py:316-317` 回 1.0（宣稱樣本完全獨立）。"""
+    """QN-4：常數序列（ρ₁ 無定義）之有效樣本比 oracle＝NaN（修正前回 1.0，宣稱樣本完全獨立；Task 0.3 xfail 轉一般斷言）。"""
     df = pd.DataFrame({"const": np.full(50, 2.0)})
     out = FeatureQualityDiagnostics({}).run_batch_autocorrelation_test(df)
     assert math.isnan(out["const"]["effective_sample_ratio"])
@@ -792,12 +786,10 @@ def test_fq_drift_psi_breakpoint_match_oracle_boundaries() -> None:
     _assert_consistent(compare_feature_quality_diagnostics(none, df), [f"{FQ}/drift_results/*/reason"])
 
 
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：CUSUM 漂移門檻 5σ 未隨 √n 縮放，無漂移之序列（n≥~30）恆判漂移；"
-                                        f"收據 {RECEIPT}")
 @pytest.mark.parametrize("n", [200, 1000])
 def test_fq_drift_iid_noise_not_flagged(n: int) -> None:
-    """無結構變化之 i.i.d. 常態序列：oracle（statsmodels `breaks_cusumolsresid`，p ≫ 0.05；PSI < 門檻）判未漂移；
-    產品 `feature_quality_diagnostics.py:158-160` max|S_k| > 5σ（未除 √n）⇒ 判漂移（實測種子 100–149 之 n=1000 序列 50/50 判漂移）。"""
+    """QN-3：無結構變化之 i.i.d. 常態序列：oracle（自算 OLS-CUSUM＋`kstwobign.sf`，p ≫ 0.05；PSI < 門檻）判未漂移，產品同
+    （修正前 max|S_k| > 5σ 未除 √n ⇒ 判漂移，種子 100–149 之 n=1000 序列 50/50 判漂移；Task 0.3 xfail 轉一般斷言）。"""
     df = pd.DataFrame({"x": np.zeros(10)})
     ric = {"x": pd.Series(np.random.default_rng(100).normal(size=n))}
     ref = ref_feature_quality_diagnostics(df, ric)["drift_results"]["x"]
@@ -851,29 +843,40 @@ def test_fq_flags_summary_match_oracle_when_all_tested() -> None:
     assert e_out["summary"] == {"total_features": 0, "stationary_rate": 0.0, "mean_coverage": 0.0, "low_quality_count": 0}
 
 
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：未做 ADF 檢定之欄（全缺／樣本不足／常數／ADF 例外）仍列入"
-                                        f"non_stationary 並計入低品質數；收據 {RECEIPT}")
 def test_fq_skipped_adf_not_flagged_non_stationary() -> None:
-    """oracle：非平穩旗標只含已做 ADF 且 p ≥ α 之欄；產品 `feature_quality_diagnostics.py:264`、`:269-270` 以
-    `is_stationary=False` 判，跳過之欄（`:44`、`:53`、`:62`、`:85`、`:95` 寫死 False）一律標非平穩。"""
+    """QN-2：非平穩旗標只含已做 ADF 且 p ≥ α 之欄，跳過之欄 is_stationary＝None（修正前寫死 False 而一律標非平穩；
+    Task 0.3 xfail 轉一般斷言）。"""
     df = _boundary_frame()
     out = FeatureQualityDiagnostics({}).run_full_diagnostics(df)
     cmp = compare_feature_quality_diagnostics(out, df)
     _assert_consistent(cmp, [f"{FQ}/quality_flags/non_stationary/#", f"{FQ}/summary/low_quality_count"])
+    res = FeatureQualityDiagnostics({}).run_full_diagnostics(df)
+    for k in ("only19", "const", "allnan", "wconst"):
+        assert res["adf_results"][k]["is_stationary"] is None and k not in res["quality_flags"]["non_stationary"]
+    assert res["adf_results"]["rw"]["is_stationary"] is False and "rw" in res["quality_flags"]["non_stationary"]
 
 
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：ADF 逾時（牆鐘上限）即丟棄已算之值改 NaN／跳過，且 with 區塊"
-                                        f"仍等待工作執行緒算完、逾時不省時間；收據 {RECEIPT}")
-def test_fq_adf_value_independent_of_wall_clock() -> None:
-    """oracle：ADF 值與牆鐘無關（使用者 2026-10-27「全專案禁時間上限停運算」）。產品 `feature_quality_diagnostics.py:68-70`
-    以 `future.result` 帶逾時參數等待，逾時 ⇒ `:78-86` 跳過；`ThreadPoolExecutor.__exit__` 為 `shutdown(wait=True)`，逾時後仍待算完。
-    以極小逾時（建構 config `adf_timeout_sec`；生產路徑為預設 5 秒，2 萬列 ADF 本機實測 1.7–3.5 秒／欄）重現。"""
+def test_fq_adf_value_independent_of_wall_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """QN-5：ADF 值與牆鐘無關（使用者 2026-10-27「全專案禁時間上限停運算」）。修正前以執行緒＋逾時參數等待、逾時即丟值
+    （Task 0.3 xfail，以舊 config `adf_timeout_sec`＝1e-9 重現）；修正後該鍵無作用，且 ADF 慢於任何舊上限時仍得同一值。"""
+    import time as _time
+
     df = pd.DataFrame({"x": np.cumsum(np.random.default_rng(3).normal(size=400))})
     cfg = {"adf_timeout_sec": 1e-9}
     out = FeatureQualityDiagnostics(cfg).run_batch_adf_test(df)
     ref = _ref_adf(df["x"].to_numpy(), 0.05, 20)
     assert out["x"]["skipped"] is False
     assert _rel(out["x"]["adf_statistic"], ref["adf_statistic"]) <= REL_TOL
+    real = fq_mod.adfuller
+
+    def slow(*a: Any, **k: Any) -> Any:
+        _time.sleep(0.2)  # 慢於舊碼可設之任何小上限；值不得因此改變
+        return real(*a, **k)
+
+    monkeypatch.setattr(fq_mod, "adfuller", slow)
+    slow_out = FeatureQualityDiagnostics({"adf_timeout_sec": 0.01}).run_batch_adf_test(df)
+    assert slow_out["x"]["skipped"] is False and slow_out["x"]["adf_statistic"] == out["x"]["adf_statistic"]
+    assert not hasattr(fq_mod, "ThreadPoolExecutor")
 
 
 # ── 秒級：net_ic_analysis 邊界 ────────────────────────────────────────────────────────────────────
@@ -900,10 +903,14 @@ def _net_inputs() -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any], Dict[str, 
     ls_nan[[2, 7]] = np.nan
     gap = _series([0, 1, 1, 0, -1] * 4, ls_nan)
     loss = _series([1, -1] * 10, np.full(20, -0.001))
-    series = {"flip": flip, "hold": hold, "gap": gap, "loss": loss, "bare": pd.Series([0.1, 0.2])}
+    # QN-1 後容量級距依序列換手率：big＝每根翻倉（mean|Δ|≈1.9 ⇒ low）、noser＝0/1 交錯（≈0.95 ⇒ medium）；
+    # 「無序列」之案改由 test_net_ic_no_series_cost_metrics_null 覆蓋（鍵名 noser 沿用 Task 0.3 版）
+    big = _series([1, -1] * 10, rng.normal(0.0, 0.01, 20))
+    mid = _series([0, 1] * 10, rng.normal(0.0, 0.01, 20))
+    series = {"flip": flip, "hold": hold, "gap": gap, "loss": loss, "bare": pd.Series([0.1, 0.2]), "big": big,
+              "noser": mid}
     turnover: Dict[str, Any] = {k: _series_turnover(v) for k, v in series.items() if k != "bare"}
-    turnover.update({"bare": 0.5, "noser": 0.7, "big": 1.5, "nan_t": math.nan, "neg_t": -0.1, "str_t": "x",
-                     "nan_g": 0.3, "none_g": 0.3})
+    turnover.update({"bare": 0.5, "nan_t": math.nan, "neg_t": -0.1, "str_t": "x", "nan_g": 0.3, "none_g": 0.3})
     summary = {k: {"ic_mean": 0.05 + 0.01 * i} for i, k in enumerate(
         ["flip", "hold", "gap", "loss", "bare", "noser", "big", "nan_t", "neg_t", "str_t", "missing_t"])}
     summary["nan_g"] = {"ic_mean": math.nan}
@@ -939,12 +946,9 @@ def test_net_ic_matches_oracle_boundaries(cfg: Dict[str, Any]) -> None:
     assert empty["skipped"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：turnover／cost_drag_return／成本階梯／容量用第 5 段頂分位單邊"
-                                        "quantile_turnover，與同列 net_factor_return／breakeven 之逐根 |Δposition| 不同定義；"
-                                        f"收據 {RECEIPT}")
 def test_net_ic_turnover_consistent_with_series() -> None:
-    """oracle：同一列之成本拖累＝gross 均值 − net 均值＝(c／10⁴)·mean(|Δposition|)。輸入之 quantile_turnover 0.2（頂分位單邊）
-    與序列換手率 mean(|Δposition|) 不同時，產品 `net_ic_analyzer.py:457`、`:470`、`:476` 用前者、`:316` 用後者。"""
+    """QN-1：同一列之成本拖累＝gross 均值 − net 均值＝(c／10⁴)·mean(|Δposition|)；輸入之 quantile_turnover 0.2（頂分位單邊）
+    與序列換手率不同時亦然（修正前用前者算成本、net 用後者；Task 0.3 xfail 轉一般斷言）。"""
     s = _series([0, 1, -1, -1, 1, 0, 0, 1, 1, -1] * 3, np.random.default_rng(2).normal(0.001, 0.01, 30))
     cfg = {"cost_enabled": True, "cost_bps": 10.0}
     out = NetICAnalyzer(cfg).batch_analyze({"f": {"ic_mean": 0.05}}, {"f": 0.2}, factor_return_series={"f": s})
@@ -953,11 +957,45 @@ def test_net_ic_turnover_consistent_with_series() -> None:
     drag_identity = gm - row["net_factor_return"]["value"]
     assert abs(row["cost_drag_return"] - drag_identity) <= 1e-15 + REL_TOL * abs(drag_identity)
     assert _rel(row["turnover"], _series_turnover(s)) <= REL_TOL
+    # 成本階梯、容量、摘要拖累均值同此換手率
+    s2 = _series([0, 1, -1, -1, 1, 0, 0, 1, 1, -1] * 3, np.random.default_rng(2).normal(0.001, 0.01, 30))
+    to2 = _series_turnover(s2)
+    vol = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0}).batch_analyze(
+        {"f": {"ic_mean": 0.05, "avg_daily_volume_usd": 1.0e8}}, {"f": 0.2}, factor_return_series={"f": s2})
+    for item in vol["features"]["f"]["cost_sensitivity"]:
+        assert _rel(item["cost_drag_return"], item["cost_bps"] / 10000.0 * to2) <= REL_TOL
+    assert _rel(vol["features"]["f"]["capacity"]["estimated_capacity_usd"], 1.0e8 * 0.01 / to2) <= REL_TOL
+    assert _rel(vol["summary"]["avg_cost_drag_return"], 10.0 / 10000.0 * to2) <= REL_TOL
+
+
+def test_net_ic_no_series_cost_metrics_null() -> None:
+    """QN-1：無同列擇時部位序列（未建、形狀無效、對齊後空）⇒ 換手率、成本拖累、階梯值為 None、容量 unknown，不以輸入之
+    quantile_turnover 代填；摘要拖累均值只計有序列之列，全無 ⇒ None。"""
+    cfg = {"cost_enabled": True, "cost_bps": 10.0}
+    idx = pd.date_range("2024-01-01", periods=5, freq="h", tz="UTC")
+    empty_aligned = FactorTimingReturnSeries(feature="e", ls_return=pd.Series(np.nan, index=idx),
+                                             position=pd.Series([0, 1, 1, 0, 1], index=idx, dtype=int),
+                                             index_policy="frame_dropna")
+    summary = {k: {"ic_mean": 0.02, "avg_daily_volume_usd": 1.0e8} for k in ("none", "bare", "e")}
+    turnover = {"none": 0.4, "bare": 0.4, "e": 0.4}
+    series = {"bare": pd.Series([0.1]), "e": empty_aligned}
+    for c in (cfg, {}):
+        res = NetICAnalyzer(c).batch_analyze(summary, turnover, factor_return_series=series)
+        _assert_consistent(compare_net_ic_analysis(res, summary, turnover, series, c))
+        for k in ("none", "bare", "e"):
+            row = res["features"][k]
+            assert row["turnover"] is None and row["capacity"]["capacity_tier"] == "unknown"
+            if c:
+                assert row["cost_drag_return"] is None
+                assert all(i["cost_drag_return"] is None for i in row["cost_sensitivity"])
+        if c:
+            assert res["summary"]["avg_cost_drag_return"] is None
 
 
 def test_net_ic_caller_passes_quantile_turnover_and_disabled_envelope() -> None:
     """呼叫端 `ic_filter_orchestrator.py:3233-3268`：turnover 停用 ⇒ {status: unavailable, reason: turnover_disabled}；
-    否則 ic_summary 只帶 summary_table 之 ic_mean（無 avg_daily_volume_usd ⇒ 容量恆 unknown）、換手率取 quantile_turnover。"""
+    否則 ic_summary 只帶 summary_table 之 ic_mean（無 avg_daily_volume_usd ⇒ 容量恆 unknown）；呼叫端所傳 quantile_turnover
+    只作分流，輸出換手率＝同列序列之 mean(|Δposition|)（QN-1）。"""
     stub = SimpleNamespace(
         _report={"turnover_analysis": {"status": "disabled", "reason": "turnover_disabled"}},
         _factor_return_series={},
@@ -973,7 +1011,8 @@ def test_net_ic_caller_passes_quantile_turnover_and_disabled_envelope() -> None:
     direct = NetICAnalyzer(ICConfig().net_ic_analysis.model_dump()).batch_analyze(
         {"f": {"ic_mean": 0.03}}, {"f": 0.25}, factor_return_series={"f": s})
     assert got == direct
-    assert got["features"]["f"]["turnover"] == 0.25 and got["features"]["f"]["capacity"]["capacity_tier"] == "unknown"
+    assert got["features"]["f"]["turnover"] == _series_turnover(s) != 0.25
+    assert got["features"]["f"]["capacity"]["capacity_tier"] == "unknown"
 
 
 # ── 真實 kline（requires_kline） ─────────────────────────────────────────────────────────────────
@@ -1062,7 +1101,8 @@ def _real_net_case(cost_cfg: Dict[str, Any]) -> Tuple[Dict[str, Any], Tuple[Any,
     cfg = ICConfig(net_ic_analysis=cost_cfg)
     fr = FactorReturnAnalyzer(cfg.factor_return.model_dump())
     # nofr：有換手率、無因子擇時序列（net 三欄 unavailable）；noturn：無換手率（turnover_missing）
-    fr.compute_batch(feats.drop(columns=["nofr"]), label, top_n=feats.shape[1])
+    # Task 0.4 ⑬：compute_batch 之 horizon 為必填關鍵字；標籤為 1 根前瞻報酬 ⇒ horizon=1
+    fr.compute_batch(feats.drop(columns=["nofr"]), label, horizon=1, top_n=feats.shape[1])
     test = feats.iloc[int(len(feats) * 0.8):]
     turnover = TurnoverAnalyzer(cfg.turnover.model_dump()).compute_all(test.drop(columns=["noturn"]))
     rows = []
@@ -1130,7 +1170,7 @@ def test_feature_quality_matches_oracle_on_real_kline() -> None:
     empty = [f for f, r in cmp.items() if r["n_finite"] == 0]
     assert not empty, f"無有限值之統計欄：{empty}"
     assert out["adf_results"]["spike"]["reason"] == "adf_error"
-    # 有效樣本比：常數欄以外之欄須一致（常數欄之不一致另由 xfail 斷言）
+    # 有效樣本比：常數欄以外之欄亦單獨對照（常數欄另由 test_feature_quality_ess_constant_on_real_kline 斷言）
     ess = f"{FQ}/autocorrelation_results/*/effective_sample_ratio"
     nonconst = [c for c in feats.columns if c != "const"]
     out_nc = {"autocorrelation_results": {c: out["autocorrelation_results"][c] for c in nonconst}}
@@ -1138,25 +1178,22 @@ def test_feature_quality_matches_oracle_on_real_kline() -> None:
               ["autocorrelation_results"]}
     r = _compare(out_nc, ref_nc, FQ)[ess]
     assert r["verdict"] == "一致" and r["n_finite"] >= 1, r["detail"]
-    # 真實滾動 IC（重疊窗、強自相關）上兩種 CUSUM 定義皆判漂移，漂移欄於本資料一致（不一致之反例見 i.i.d. xfail）
+    # 真實滾動 IC（重疊窗、強自相關）上 OLS-CUSUM 判漂移（修正前後皆然；修正前後不同之反例見 i.i.d. 測試）
     assert cmp[f"{FQ}/drift_results/*/drifted"]["verdict"] == "一致"
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：真實資料上常數欄之有效樣本比寫 1.0（lag-1 自相關無定義，應 NaN）；"
-                                        f"收據 {RECEIPT}")
 def test_feature_quality_ess_constant_on_real_kline() -> None:
-    """真實 BTCUSDT 1h：常數欄 `autocorrelation_results.const.effective_sample_ratio` == oracle（NaN）。"""
+    """QN-4 真實 BTCUSDT 1h：常數欄 `autocorrelation_results.const.effective_sample_ratio` == oracle（NaN）（Task 0.3 xfail 轉一般斷言）。"""
     feats, out, series, cfg = _real_fq_case()
     cmp = compare_feature_quality_diagnostics(out, feats, series, cfg)
     _assert_consistent(cmp, [f"{FQ}/autocorrelation_results/*/effective_sample_ratio"])
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：真實資料上常數／樣本不足／全缺／ADF 例外之欄列為非平穩；"
-                                        f"收據 {RECEIPT}")
 def test_feature_quality_non_stationary_flag_on_real_kline() -> None:
-    """真實 BTCUSDT 1h：`quality_flags.non_stationary` 與低品質數 == oracle（只含已檢定且 p ≥ α 之欄）。"""
+    """QN-2 真實 BTCUSDT 1h：`quality_flags.non_stationary` 與低品質數 == oracle（只含已檢定且 p ≥ α 之欄）（Task 0.3 xfail
+    轉一般斷言）。"""
     feats, out, series, cfg = _real_fq_case()
     cmp = compare_feature_quality_diagnostics(out, feats, series, cfg)
     _assert_consistent(cmp, [f"{FQ}/quality_flags/non_stationary/#"])
@@ -1191,10 +1228,9 @@ def test_net_ic_matches_oracle_on_real_kline() -> None:
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason="ICPERF Task 0.3 不一致：真實資料上 turnover／cost_drag_return 為測試段頂分位單邊換手率，"
-                                        "非同列 net_factor_return 所用全樣本雙邊 |Δposition|；收據 " + RECEIPT)
 def test_net_ic_turnover_consistent_with_series_on_real_kline() -> None:
-    """真實 BTCUSDT 1h（成本 10 bps）：每一有序列之特徵 turnover == mean(|Δposition|)、cost_drag_return == (c／10⁴)·該值。"""
+    """QN-1 真實 BTCUSDT 1h（成本 10 bps）：每一有序列之特徵 turnover == mean(|Δposition|)、cost_drag_return == (c／10⁴)·該值
+    （Task 0.3 xfail 轉一般斷言；修正前 ret1 0.2733 vs 0.4750、dev20 0.0667 vs 0.1303、logc 0.1333 vs 0.0605）。"""
     out, inputs, _ = _real_net_case({"cost_enabled": True, "cost_bps": 10.0})
     cmp = compare_net_ic_analysis(out, *inputs)
     _assert_consistent(cmp, [f"{NET}/features/*/turnover", f"{NET}/features/*/cost_drag_return"])

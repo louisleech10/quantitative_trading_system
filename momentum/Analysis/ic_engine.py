@@ -436,19 +436,19 @@ class ICEngine:
         輸出 list 長度 = emitted window-ends（window-1, window-1+stride, ...）。
         """
 
-        label_name = label.name or "label"
-        aligned = pd.concat(
-            [features_df, label.rename(label_name)], axis=1
-        ).dropna()
-        if aligned.empty:
+        # ICPERF Task 0.4 ④：時間軸＝標籤有限之列（與其他特徵無關，同請求各特徵共用此軸）；每窗每特徵獨立——窗內該特徵
+        # 有任一非有限值 ⇒ 該窗 NaN（兩分支皆同）。舊版對全部特徵與標籤聯合 dropna，任一欄全 NaN 即使全部特徵滾動 IC 為空
+        label_values = label.reindex(features_df.index).to_numpy(dtype=float)
+        axis_rows = np.isfinite(label_values)
+        if not axis_rows.any():
             return {name: {} for name in features_df.columns}
 
         adjusted_windows = self._adjust_rolling_windows(windows)
         results: dict[str, dict] = {name: {} for name in features_df.columns}
 
         # raw values — spearman 不再全序列 pre-rank（P0-1 look-ahead 修正）
-        x_values = aligned[features_df.columns].to_numpy(dtype=float)
-        y_values = aligned[label_name].to_numpy(dtype=float)
+        x_values = features_df.to_numpy(dtype=float)[axis_rows]
+        y_values = label_values[axis_rows]
 
         for window in adjusted_windows:
             window_key = f"window_{window}"
@@ -477,6 +477,7 @@ class ICEngine:
                 ic_std = np.nan
                 icir = np.nan
                 hit_rate = np.nan
+                neg_rate = np.nan
             else:
                 ic_mean = float(np.nanmean(values))
                 ic_std = float(np.nanstd(values))
@@ -484,12 +485,15 @@ class ICEngine:
                 # ICPERF Task 0.4 ②：勝率只計有限 IC（滾動窗可出 NaN，pit_stats.py:277、:288），同 ic_mean 之 nanmean
                 finite = values[np.isfinite(values)]
                 hit_rate = float(np.mean(finite > 0)) if finite.size else np.nan
+                # ICPERF Task 0.4 ⑧：負向勝率（有限 IC 中 < 0 之比例），供方向對齊勝率（direction＝−1 時）
+                neg_rate = float(np.mean(finite < 0)) if finite.size else np.nan
 
             icir_results[feature] = {
                 "ic_mean": ic_mean,
                 "ic_std": ic_std,
                 "icir": icir,
                 "ic_hit_rate": hit_rate,
+                "ic_neg_rate": neg_rate,
             }
 
         return icir_results
@@ -1615,9 +1619,16 @@ class ICEngine:
         if n_rows < window:
             return np.empty((0, x_values.shape[1]))
 
-        x = x_values.astype(float, copy=False)
-        y = y_values.astype(float, copy=False)
-        n_features = x.shape[1]
+        x_raw = x_values.astype(float, copy=False)
+        y_raw = y_values.astype(float, copy=False)
+        n_features = x_raw.shape[1]
+        # ICPERF Task 0.4 ④：窗內任一非有限值 ⇒ 該窗該欄 NaN（同 pit_stats.rolling_window_rank_corr 之窗內非有限處理），
+        # 不污染其他窗——非有限處以 0 代入累積和並另計非有限數（全部有限時與改前逐位元相同，SPEC Task 0.4 ④）
+        fx, fy = np.isfinite(x_raw), np.isfinite(y_raw)
+        x = np.where(fx, x_raw, 0.0)
+        y = np.where(fy, y_raw, 0.0)
+        bad_x = np.vstack([np.zeros((1, n_features)), np.cumsum(~fx, axis=0)])
+        bad_y = np.concatenate(([0], np.cumsum(~fy)))
 
         csum_x = np.vstack([np.zeros((1, n_features)), np.cumsum(x, axis=0)])
         csum_x2 = np.vstack([np.zeros((1, n_features)), np.cumsum(x * x, axis=0)])
@@ -1642,6 +1653,8 @@ class ICEngine:
         with np.errstate(divide="ignore", invalid="ignore"):
             corr = cov_num / denom
         corr[~np.isfinite(corr)] = np.nan
+        window_bad = ((bad_x[ends] - bad_x[starts]) > 0) | ((bad_y[ends] - bad_y[starts]) > 0)[:, None]
+        corr[window_bad] = np.nan
         return corr
 
     def _select_peak_horizon(

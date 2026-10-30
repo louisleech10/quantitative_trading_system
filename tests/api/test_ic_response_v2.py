@@ -234,6 +234,35 @@ def test_v2_top_n_derived_from_artifact(
     assert payload["top_n_summary"] == expected_top_n
 
 
+def test_v2_top_n_ranks_strong_negative_by_icir_aligned(
+    baseline_task: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """ICPERF Task 0.4 ⑧：artifact 無 icir_aligned 欄 ⇒ 由 sign(ic_mean)·icir 導出排序；強負向因子排最前、
+    ic_mean＝0 者（direction 0 ⇒ icir_aligned 缺）排最末。"""
+    artifact_path = _artifact_path(tmp_path, baseline_task)
+    rows = _write_ranked_artifact(artifact_path)
+    base = dict(rows[0])
+    extra = [
+        {**base, "feature_name": "alpha_strong_neg", "ic_mean": -0.50, "icir": -5.00},
+        {**base, "feature_name": "alpha_zero_mean", "ic_mean": 0.0, "icir": 9.00},
+    ]
+    write(rows + extra, artifact_path)
+    monkeypatch.setattr(settings, "ic_response_v2", True)
+    monkeypatch.setattr(
+        ICAnalysisService, "_resolve_v2_top_n", staticmethod(lambda _task_info: len(rows) + len(extra))
+    )
+
+    response = CLIENT.get(f"/api/v1/ic/result/{BASELINE_TASK_ID}?schema_version=2")
+
+    assert response.status_code == 200
+    names = [row["feature_name"] for row in response.json()["top_n_summary"]]
+    assert names[0] == "alpha_strong_neg"
+    assert names[-1] == "alpha_zero_mean"
+    assert names[1:-1] == [r["feature_name"] for r in sorted(rows, key=lambda r: -float(r["icir"]))]
+
+
 def test_flag_off_subroutes_unchanged(baseline_task: dict[str, Any]) -> None:
     feature_name = next(iter(baseline_task["ic_decay"]))
     cases = [

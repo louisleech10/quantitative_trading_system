@@ -2117,6 +2117,12 @@ export interface ICFeatureInfo {
   monotonicity_score?: number;
   coverage?: number;
   turnover_rate?: number;
+  /** ICPERF Task 0.4 ⑧：選欄方向＝sign(ic_mean) ∈ {1, -1, 0}；舊 report 可缺欄 */
+  direction?: number;
+  /** ICPERF Task 0.4 ⑧：方向對齊之 ICIR（direction·icir）；預設排序鍵；direction 0 或 icir 非有限 ⇒ null */
+  icir_aligned?: number | null;
+  ic_hit_rate_aligned?: number | null;
+  monotonicity_score_aligned?: number | null;
 }
 
 export interface ICDecayData {
@@ -2531,7 +2537,8 @@ export interface FactorCentralityData {
     total_variance_explained?: number;
     effective_rank?: number;
     n_components_used?: number;
-    crowded_threshold?: number;
+    /** ⑲：τ × 跨特徵平均中心性；不判擁擠時 null */
+    crowded_threshold?: number | null;
   };
   features?: Record<string, {
     centrality?: number;
@@ -2750,7 +2757,8 @@ export interface FeatureQualityDiagnosticsData {
   adf_results?: Record<string, {
     adf_statistic?: number;
     p_value?: number;
-    is_stationary?: boolean;
+    /** ICPERF Task 0.4 ㉒ QN-2：未做 ADF（跳過、例外、p 非有限）⇒ null，不計為非平穩 */
+    is_stationary?: boolean | null;
     skipped?: boolean;
     reason?: string;
   }>;
@@ -2843,7 +2851,8 @@ export type NetICFeatureSkipped = {
 /** GROSS_ONLY 共用欄(無 cost / 無 skipped)。 */
 type NetICFeatureGrossCore = {
   gross_ic: number;
-  turnover: number;
+  /** ICPERF Task 0.4 ㉒ QN-1：同列擇時部位序列之 mean(|Δposition|)；無序列 ⇒ null */
+  turnover: number | null;
   turnover_semantics: string;
   capacity: NetICCapacity;
   net_factor_return: ConditionalMetricUnion;
@@ -2865,8 +2874,9 @@ export type NetICFeatureGrossOnly = NetICFeatureGrossCore & {
 export type NetICFeatureCostEnabled = NetICFeatureGrossCore & {
   cost_bps: number;
   cost_semantics: string;
-  cost_drag_return: number;
-  cost_sensitivity: Array<{ cost_bps: number; cost_drag_return: number }>;
+  /** ICPERF Task 0.4 ㉒ QN-1：無序列 ⇒ null */
+  cost_drag_return: number | null;
+  cost_sensitivity: Array<{ cost_bps: number; cost_drag_return: number | null }>;
   breakeven_cost_bps: ConditionalMetricUnion;
   profitable_after_cost: ConditionalMetricUnion;
   skipped?: never;

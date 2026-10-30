@@ -83,8 +83,14 @@ def test_cost_drag_hand_calc() -> None:
     """手算 oracle:(10/1e4)*1.5 == 0.0015(無 ×2)。"""
     assert NetICAnalyzer.compute_cost_drag(10.0, 1.5) == pytest.approx(0.0015)
     analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
-    out = analyzer.batch_analyze({"f1": {"gross_ic": 0.05}}, {"f1": 1.5})
+    # ICPERF Task 0.4 ㉒ QN-1：舊＝只傳 turnover_data 1.5 即得 0.0015；新＝成本拖累只依同列擇時部位序列
+    # mean(|Δposition|) 計（position [1,-1,1,-1] ⇒ |Δ| [0,2,2,2] ⇒ 1.5 ⇒ 0.0015），turnover_data 不入成本
+    art = _make_timing_series(gross=[0.001] * 4, position=[1.0, -1.0, 1.0, -1.0])
+    out = analyzer.batch_analyze({"f1": {"gross_ic": 0.05}}, {"f1": 1.5}, factor_return_series={"f1": art})
     assert out["features"]["f1"]["cost_drag_return"] == pytest.approx(0.0015)
+    # ICPERF Task 0.4 ㉒ QN-1：無序列 ⇒ 換手率未知 ⇒ 成本拖累 None（舊：以 turnover_data 代算 0.0015）
+    no_series = analyzer.batch_analyze({"f1": {"gross_ic": 0.05}}, {"f1": 1.5})
+    assert no_series["features"]["f1"]["cost_drag_return"] is None
 
 
 def test_breakeven_unavailable_1c() -> None:
@@ -118,11 +124,26 @@ def test_summary_contract_b_strict() -> None:
     assert summary["evaluable_count"] == 0
     assert summary["profitable_count"] == 0
     assert "avg_cost_drag_return" in summary
-    assert summary["avg_cost_drag_return"] == pytest.approx(
-        (0.0015 + NetICAnalyzer.compute_cost_drag(10.0, 0.3)) / 2.0
-    )
+    # ICPERF Task 0.4 ㉒ QN-1：舊＝無序列時以 turnover_data 算 (0.0015+0.0003)/2；新＝無序列 ⇒ 無成本拖累 ⇒ None
+    assert summary["avg_cost_drag_return"] is None
     assert "avg_ic_loss_pct" not in summary
     assert "rank_correlation_gross_vs_net" not in summary
+    # ICPERF Task 0.4 ㉒ QN-1：有序列時均值＝各列 (c/1e4)×mean(|Δposition|)：f1 |Δ| [0,2,2,2]⇒1.5、
+    # f2 position [0]*7+[1,-1,-1] ⇒ |Δ| 總和 3／10 根 ⇒ 0.3 ⇒ (0.0015+0.0003)/2；分析數 2、可評估 2
+    series = {
+        "f1": _make_timing_series(gross=[0.001] * 4, position=[1.0, -1.0, 1.0, -1.0], name="f1"),
+        "f2": _make_timing_series(gross=[0.001] * 10, position=[0.0] * 7 + [1.0, -1.0, -1.0], name="f2"),
+    }
+    with_series = analyzer.batch_analyze(
+        {"f1": {"gross_ic": 0.05}, "f2": {"gross_ic": 0.02}},
+        {"f1": 1.5, "f2": 0.3},
+        factor_return_series=series,
+    )
+    assert with_series["summary"]["total_analyzed"] == 2
+    assert with_series["summary"]["evaluable_count"] == 2
+    assert with_series["summary"]["avg_cost_drag_return"] == pytest.approx(
+        (0.0015 + NetICAnalyzer.compute_cost_drag(10.0, 0.3)) / 2.0
+    )
 
     # GROSS_ONLY:avg_cost_drag_return 鍵不存在
     gross = NetICAnalyzer({}).batch_analyze(
@@ -141,13 +162,30 @@ def test_unavailable_union_shape() -> None:
 def test_finite_invariants() -> None:
     """capacity 子樹 strict-JSON 可序列化+鍵集合恰等+calibration。"""
     analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
+    # ICPERF Task 0.4 ㉒ QN-1：舊＝只傳 turnover_data 即有有限成本拖累；新＝成本拖累依同列擇時部位序列計，
+    # 故傳入序列（f1 |Δ| 總和 2／10 根＝0.2、f2 總和 7／10 根＝0.7，與原 turnover_data 同值）以維持有限性斷言
+    series = {
+        "f1": _make_timing_series(gross=[0.001] * 10, position=[0.0] * 8 + [1.0, 0.0], name="f1"),
+        "f2": _make_timing_series(
+            gross=[0.001] * 10, position=[0.0, 1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], name="f2"
+        ),
+    }
     out = analyzer.batch_analyze(
         {
             "f1": {"gross_ic": 0.05, "avg_daily_volume_usd": 1_000_000},
             "f2": {"gross_ic": 0.02},
         },
         {"f1": 0.2, "f2": 0.7},
+        factor_return_series=series,
     )
+    assert out["features"]["f1"]["cost_drag_return"] == pytest.approx(NetICAnalyzer.compute_cost_drag(10.0, 0.2))
+    assert out["features"]["f2"]["cost_drag_return"] == pytest.approx(NetICAnalyzer.compute_cost_drag(10.0, 0.7))
+    # ICPERF Task 0.4 ㉒ QN-1：無序列 ⇒ 成本拖累 None、容量 unknown，仍 strict-JSON 可序列化、鍵集合不變
+    no_series = analyzer.batch_analyze({"f1": {"gross_ic": 0.05, "avg_daily_volume_usd": 1_000_000}}, {"f1": 0.2})
+    assert no_series["features"]["f1"]["cost_drag_return"] is None
+    assert set(no_series["features"]["f1"].keys()) == SCHEMA_COST_ENABLED
+    _assert_capacity(no_series["features"]["f1"]["capacity"])
+    json.dumps(no_series, allow_nan=False)
     for name, feat in out["features"].items():
         if feat.get("skipped"):
             continue
@@ -201,10 +239,17 @@ def test_no_turnover_data() -> None:
 
 def test_zero_turnover_cost_drag() -> None:
     analyzer = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
-    out = analyzer.batch_analyze({"f1": {"gross_ic": 0.05}}, {"f1": 0.0})
+    # ICPERF Task 0.4 ㉒ QN-1：舊＝turnover_data 0.0 ⇒ 拖累 0.0；新＝零換手由同列擇時部位序列定義
+    # （持倉不變 [1,1,1] ⇒ mean(|Δposition|)＝0 ⇒ 拖累 0.0、損益兩平 unavailable：zero_mean_turnover）
+    art = _make_timing_series(gross=[0.001, 0.002, 0.001], position=[1.0, 1.0, 1.0])
+    out = analyzer.batch_analyze({"f1": {"gross_ic": 0.05}}, {"f1": 0.0}, factor_return_series={"f1": art})
     feat = out["features"]["f1"]
     assert feat["cost_drag_return"] == 0.0
     _assert_union_unavailable(feat["breakeven_cost_bps"])
+    # ICPERF Task 0.4 ㉒ QN-1：無序列 ⇒ 換手率未知 ⇒ 拖累 None（不得以 turnover_data 0.0 代填）
+    no_series = analyzer.batch_analyze({"f1": {"gross_ic": 0.05}}, {"f1": 0.0})
+    assert no_series["features"]["f1"]["cost_drag_return"] is None
+    _assert_union_unavailable(no_series["features"]["f1"]["breakeven_cost_bps"])
 
 
 def test_cost_bps_zero_raises() -> None:
@@ -620,9 +665,21 @@ def test_batch_analyze_cost_drag_hand_calc_rejects_mixed_and_x2() -> None:
     手算 oracle：(10/1e4)×1.5＝0.0015、(10/1e4)×0.3＝0.0003、平均 0.0009。
     混減（IC − cost×turnover）或 ×2（四腿計費）在生產路徑出現即紅。
     """
+    # ICPERF Task 0.4 ㉒ QN-1：舊＝無序列時以 turnover_data 1.5／0.3 算拖累；新＝依同列擇時部位序列之
+    # mean(|Δposition|)：f1 [1,-1,1,-1] ⇒ 1.5、f2 [0]*7+[1,-1,-1] ⇒ 0.3（手算值不變，混減／×2 仍即紅）
+    series = {
+        "f1": _make_timing_series(gross=[0.001] * 4, position=[1.0, -1.0, 1.0, -1.0], name="f1"),
+        "f2": _make_timing_series(gross=[0.001] * 10, position=[0.0] * 7 + [1.0, -1.0, -1.0], name="f2"),
+    }
     out = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0}).batch_analyze(
         {"f1": {"gross_ic": 0.05}, "f2": {"gross_ic": 0.02}},
         {"f1": 1.5, "f2": 0.3},
+        factor_return_series=series,
     )
+    # ICPERF Task 0.4 ㉒ QN-1：無序列 ⇒ 拖累 None、摘要均值 None
+    no_series = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0}).batch_analyze(
+        {"f1": {"gross_ic": 0.05}}, {"f1": 1.5}
+    )
+    assert no_series["features"]["f1"]["cost_drag_return"] is None and no_series["summary"]["avg_cost_drag_return"] is None
     drags = {name: out["features"][name]["cost_drag_return"] for name in ("f1", "f2")}
     assert drags == {"f1": pytest.approx(0.0015), "f2": pytest.approx(0.0003)} and out["summary"]["avg_cost_drag_return"] == pytest.approx(0.0009)

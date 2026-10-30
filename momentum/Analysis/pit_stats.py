@@ -317,7 +317,7 @@ def pit_expanding_qcut_label(
 ) -> pd.Series:
     """per-t expanding qcut → 當前 bar 分位 **label**（非分位值）。
 
-    effective_count(t) < min_samples → NaN（§MS，非 t < min_samples）。
+    截至 t 之有限值數 < min_samples → NaN（§MS，非 t < min_samples；±inf 不計，ICPERF Task 0.4 FR-10）。
 
     Parameters
     ----------
@@ -371,7 +371,8 @@ def _pit_expanding_qcut_core(
     if q < 2:
         raise ValueError("q must be >= 2")
 
-    counts = effective_count(values)
+    # 最少樣本只計有限值（ICPERF Task 0.4 ⑰ FR-10）：±inf 不入 qcut，亦不得計入門檻
+    counts = np.cumsum(np.isfinite(values), dtype=np.int64)
     for t in range(n):
         if counts[t] < min_samples:
             continue

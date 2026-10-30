@@ -240,7 +240,11 @@ class FactorCentralityConfig(BaseModel):
     enabled: bool = True
     n_components: int = Field(default=5, ge=1, le=50)
     rolling_window: int = Field(default=60, ge=5, le=500)
+    # ICPERF Task 0.4 ⑲（CT-10）：已不再使用——中心性總和 ≤ 1，絕對門檻於 p ≥ 4 恆不觸發；改由
+    # crowding_threshold_relative 判定（保留欄位以相容既有設定檔，值不影響任何輸出）
     crowded_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+    # ICPERF Task 0.4 ⑲（CT-10）：擁擠門檻相對於平均——擁擠 ⟺ centrality ≥ τ·mean(centrality)（τ／p 恆不觸發，因 centrality ≤ 1／p）
+    crowding_threshold_relative: float = Field(default=1.5, gt=0.0, le=1000.0)
     min_samples_for_pca: int = Field(default=30, ge=10, le=10000)
 
 

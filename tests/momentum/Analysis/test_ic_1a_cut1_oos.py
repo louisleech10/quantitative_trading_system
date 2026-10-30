@@ -141,10 +141,12 @@ def test_oos_ic_rolling_warmup() -> None:
         split_context=context,
     )
 
+    # ICPERF Task 0.4 ④：測試段滾動 IC 只留起訖皆在測試段之窗（改前以訓練段資料暖機、窗終點落測試段即留 ⇒
+    # 測試段 IC 大半由訓練段資料構成）⇒ 窗數＝測試列數 − 窗長 + 1，且等於只以測試段資料計之滾動 IC
     test_rows = int(context["test_mask"].sum())
     assert results["scope"] == "test"
-    assert len(results["rolling_ic"]["trend"]["window_5"]) == test_rows
-    assert results["icir"]["trend"]["ic_mean"] != orchestrator._ic_engine.compute_icir(
+    assert len(results["rolling_ic"]["trend"]["window_5"]) == test_rows - 5 + 1
+    assert results["icir"]["trend"]["ic_mean"] == orchestrator._ic_engine.compute_icir(
         orchestrator._ic_engine.compute_rolling_ic(
             features.loc[context["test_mask"]],
             label.loc[context["test_mask"]],

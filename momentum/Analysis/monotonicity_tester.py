@@ -31,15 +31,17 @@ class MonotonicityTester:
         """分位數收益分析（PIT bin + pit_pool 聚合）。"""
 
         data = self._prepare_data(feature, label)
-        if data.empty:
+        agg = self._agg(data)
+        if not agg.any():
             return self._empty_quantile_result(num_quantiles)
 
         num_quantiles = self._select_num_quantiles(
-            len(data), num_quantiles or self._default_quantiles
+            int(agg.sum()), num_quantiles or self._default_quantiles
         )
         quantile_bins = self._assign_quantiles(data, num_quantiles)
         if quantile_bins is None:
             return self._empty_quantile_result(num_quantiles)
+        quantile_bins = quantile_bins.where(agg)
 
         # §P0-2-AGG: 預填 Q1..QK；缺 bin → NaN（score 端該 diff 不計）
         quantile_mean_returns = {
@@ -107,7 +109,8 @@ class MonotonicityTester:
         """Long-Short Spread + t-test（同 PIT bin）。"""
 
         data = self._prepare_data(feature, label)
-        if data.empty:
+        agg = self._agg(data)
+        if not agg.any():
             return {
                 "spread": np.nan,
                 "tstat": np.nan,
@@ -116,9 +119,11 @@ class MonotonicityTester:
             }
 
         num_quantiles = self._select_num_quantiles(
-            len(data), num_quantiles or self._default_quantiles
+            int(agg.sum()), num_quantiles or self._default_quantiles
         )
         quantile_bins = self._assign_quantiles(data, num_quantiles)
+        if quantile_bins is not None:
+            quantile_bins = quantile_bins.where(agg)
         if quantile_bins is None:
             return {
                 "spread": np.nan,
@@ -193,10 +198,18 @@ class MonotonicityTester:
     def _prepare_data(
         self, feature: pd.Series, label: pd.Series
     ) -> pd.DataFrame:
+        """特徵有限值之列（含標籤缺值者）：分箱歷史只依特徵自身時序（RB-3，同 `long_short_analyzer`）；聚合時才取標籤
+        有限之列（`_agg`）。ICPERF Task 0.4 ⑦：舊版先對特徵∩標籤 dropna 再逐根分箱，中段缺標籤（缺價）使第 t 根之分箱
+        歷史取決於 t 之後之價格（偷看未來）。"""
         data = pd.concat(
             [feature.rename("feature"), label.rename("label")], axis=1
-        ).dropna()
-        return data
+        )
+        return data[data["feature"].notna()]
+
+    @staticmethod
+    def _agg(data: pd.DataFrame) -> pd.Series:
+        """聚合列遮罩：標籤有限者。"""
+        return data["label"].notna()
 
     def _select_num_quantiles(self, n_samples: int, requested: int) -> int:
         requested = max(int(requested), 2)
@@ -224,12 +237,14 @@ class MonotonicityTester:
                 return self._assign_quantiles(data, 3)
             return None
 
-        if bins.isna().all():
+        # 判定只看聚合列（標籤有限者）；分箱歷史則含全部特徵有限列（ICPERF Task 0.4 ⑦）
+        bins_agg = bins[data["label"].notna()]
+        if bins_agg.isna().all():
             if num_quantiles > 3:
                 return self._assign_quantiles(data, 3)
             return None
 
-        valid = bins.dropna()
+        valid = bins_agg.dropna()
         if valid.empty:
             return None
         actual_bins = int(valid.max()) + 1

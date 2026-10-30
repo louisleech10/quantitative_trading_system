@@ -253,6 +253,19 @@ def _build_kwargs(*, event=None, fallback=False, root="ok_oos", extra=("z",)):
     ), test_plan
 
 
+def test_survivor_direction_roundtrip():
+    """ICPERF Task 0.4 ⑧ 驗收③：summary 列之 direction 序列化至倖存者 IC 快照並通過契約驗證（含反向因子 −1）；summary
+    缺 direction 之舊形狀 ⇒ null 亦通過（契約 required false）。"""
+    kw, _ = _build_kwargs()
+    kw["summary_by_feature"] = {"s1": {"ic_mean": -0.1, "icir": -1.2, "p_value_adj": 0.01, "pass_class": "oos", "direction": -1},
+                                "s2": {"ic_mean": 0.1, "icir": 1.2, "p_value_adj": 0.01, "pass_class": "oos", "direction": 1},
+                                "f": {"ic_mean": 0.1, "icir": 1.2, "p_value_adj": 0.01, "pass_class": "oos"}}
+    payload = sc.build_survivor_output(**kw)
+    sc.validate_survivor_output(payload, report_meta=kw["report_meta"], report_ref_path="/x/ic_report_ic_gatekeeper.json")
+    got = {s["feature_name"]: s["direction"] for s in payload["survivors"]}
+    assert got == {"s1": -1, "s2": 1, "f": None}
+
+
 def test_roundtrip_build_then_validate():  # ①
     kw, test_plan = _build_kwargs()
     payload = sc.build_survivor_output(**kw)

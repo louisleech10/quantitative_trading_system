@@ -3,6 +3,7 @@
   "version": 1,
   "spec": "docs/ICRESULT_PAGING_SPEC.md",
   "sort_fields": [
+    "icir_aligned",
     "icir",
     "ic_mean",
     "ic_std",

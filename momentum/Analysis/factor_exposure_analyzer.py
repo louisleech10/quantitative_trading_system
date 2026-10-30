@@ -12,6 +12,9 @@ from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+#: 市場代理近零變異之相對門檻：var ≤ 本值 × E[m²]（ICPERF Task 0.4 ㉑，取代絕對容差 1e-8）
+_NEGLIGIBLE_VARIANCE_RATIO = 1e-12
+
 
 def _attribution_unavailable(reason: str) -> dict[str, Any]:
     """歸因 fail-closed 形：恰三鍵 status/value/reason（D-6）。"""
@@ -104,11 +107,13 @@ class FactorExposureAnalyzer:
         if factor_values is None or factor_values.empty:
             return pd.DataFrame()
 
-        normalized = factor_values.apply(pd.to_numeric, errors="coerce")
+        # ICPERF Task 0.4 ㉑：中和後之值無定義處（特徵缺值、代理缺值、滾動標準差未成形）保留 NaN，
+        # 不再填 0——曝險以有效列 nanmean 計（calculate_portfolio_exposure），填 0 會稀釋均值。
+        normalized = factor_values.apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan)
         effective_mode = str(mode or self._neutralization_mode or "none")
 
         if effective_mode == "none":
-            return normalized.fillna(0.0)
+            return normalized
         if effective_mode == "beta_neutral":
             return self._apply_beta_neutralization(normalized, market_proxy)
         if effective_mode == "vol_neutral":
@@ -116,36 +121,51 @@ class FactorExposureAnalyzer:
             return self._apply_vol_neutralization(normalized, effective_lookback)
 
         logger.warning("unknown neutralization mode: %s", effective_mode)
-        return normalized.fillna(0.0)
+        return normalized
+
+    @staticmethod
+    def _variance_is_negligible(values: np.ndarray) -> bool:
+        """近零變異之相對判定：var ≤ 1e-12 × E[m²]（全 0 ⇒ True）；取代絕對容差 np.isclose(var, 0)，
+        使低波動標的（報酬標準差 < 1e-4）之 beta 仍有定義。"""
+        variance = float(np.var(values))
+        second_moment = float(np.mean(np.square(values)))
+        return variance <= _NEGLIGIBLE_VARIANCE_RATIO * second_moment
 
     def _apply_beta_neutralization(
         self,
         factor_values: pd.DataFrame,
         market_proxy: pd.Series,
     ) -> pd.DataFrame:
-        proxy = pd.to_numeric(market_proxy, errors="coerce").reindex(factor_values.index)
-        if proxy.notna().sum() < 10:
+        proxy = (
+            pd.to_numeric(market_proxy, errors="coerce")
+            .reindex(factor_values.index)
+            .replace([np.inf, -np.inf], np.nan)
+        )
+        finite_proxy = proxy.dropna().to_numpy(dtype=float)
+        if finite_proxy.size < 10:
             logger.warning("beta-neutral skipped: insufficient market proxy samples")
-            return factor_values.fillna(0.0)
+            return factor_values
 
-        proxy_var = float(np.nanvar(proxy.to_numpy(dtype=float)))
-        if np.isclose(proxy_var, 0.0):
+        if self._variance_is_negligible(finite_proxy):
             logger.warning("beta-neutral skipped: market proxy variance near zero")
-            return factor_values.fillna(0.0)
+            return factor_values
 
         neutralized = pd.DataFrame(index=factor_values.index)
         for column_name in factor_values.columns:
             feature_series = pd.to_numeric(factor_values[column_name], errors="coerce")
             aligned = pd.concat([feature_series.rename("x"), proxy.rename("m")], axis=1).dropna()
-            if len(aligned) < 10:
+            m_aligned = aligned["m"].to_numpy(dtype=float)
+            if len(aligned) < 10 or self._variance_is_negligible(m_aligned):
                 neutralized[column_name] = feature_series
                 continue
 
-            covariance = float(np.cov(aligned["x"].to_numpy(), aligned["m"].to_numpy(), ddof=0)[0, 1])
-            beta = covariance / proxy_var if not np.isclose(proxy_var, 0.0) else 0.0
+            # ICPERF Task 0.4 ㉑：β＝OLS 斜率，分子分母取同一共同有效樣本（同 statsmodels OLS 含截距）
+            x_aligned = aligned["x"].to_numpy(dtype=float)
+            m_centered = m_aligned - m_aligned.mean()
+            beta = float(np.dot(x_aligned - x_aligned.mean(), m_centered) / np.dot(m_centered, m_centered))
             neutralized[column_name] = feature_series - beta * proxy
 
-        return neutralized.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        return neutralized.replace([np.inf, -np.inf], np.nan)
 
     def _apply_vol_neutralization(
         self,
@@ -156,7 +176,7 @@ class FactorExposureAnalyzer:
         rolling_std = factor_values.rolling(window=window, min_periods=max(5, window // 3)).std()
         stabilized = rolling_std.replace(0.0, np.nan)
         neutralized = factor_values / stabilized
-        return neutralized.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        return neutralized.replace([np.inf, -np.inf], np.nan)
 
     def calculate_portfolio_exposure(
         self,
@@ -177,11 +197,17 @@ class FactorExposureAnalyzer:
         abs_sum = float(weights.abs().sum())
         if abs_sum == 0.0:
             return pd.Series(0.0, index=factor_values.columns, dtype=float)
-        if not np.isclose(abs_sum, 1.0):
-            weights = weights / abs_sum
 
-        exposure = factor_values.apply(pd.to_numeric, errors="coerce").fillna(0.0).T @ weights
-        return exposure.astype(float)
+        # ICPERF Task 0.4 ㉑：逐欄只用有效（有限值）列、權重於該欄有效列上重新正規化
+        # （時間等權 ⇒ 有效列 nanmean）；缺值不再當 0 曝險。該欄無有效列 ⇒ NaN。
+        values = factor_values.apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+        valid = np.isfinite(values)
+        w = weights.to_numpy(dtype=float)[:, None]
+        numerator = np.where(valid, values * w, 0.0).sum(axis=0)
+        denominator = np.where(valid, np.abs(w), 0.0).sum(axis=0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            exposure = np.where(denominator > 0.0, numerator / denominator, np.nan)
+        return pd.Series(exposure, index=factor_values.columns, dtype=float)
 
     def calculate_factor_attribution(
         self,

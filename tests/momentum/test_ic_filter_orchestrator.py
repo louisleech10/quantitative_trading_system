@@ -798,7 +798,8 @@ def test_alignment_gate_stage0_and_stage2_close_preserve_raw_dtype(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """B2-DTYPE-01/02: caller 傳入 gate 的 close dtype 與 raw_data 保持一致。"""
+    """B2-DTYPE-01/02: caller 傳入 gate 的 close dtype 與 raw_data 保持一致（ICPERF Task 0.4 ⑥ 後 raw_data 為 float64；
+    reader 回 float32 之 close 仍須升為 float64 才進 gate）。"""
     n_features = 120
     timestamps = pd.Index(
         1_704_067_200 + np.arange(n_features, dtype=np.int64) * 43_200,
@@ -853,7 +854,8 @@ def test_alignment_gate_stage0_and_stage2_close_preserve_raw_dtype(
         None, {"symbol": "BTCUSDT", "timeframe": "12h"}, config, _DummyReader(), features_df=features.copy()
     )
 
-    assert captured_close_dtypes == [np.dtype("float32"), np.dtype("float32")]
+    # ICPERF Task 0.4 ⑥：raw_data 經 _read_klines_float64 讀入（價格／量欄 float64），gate 之 close 與 raw_data 同為 float64
+    assert captured_close_dtypes == [np.dtype("float64"), np.dtype("float64")]
 
 
 def test_alignment_gate_m6_noop_validate_keeps_ic_output_sha(

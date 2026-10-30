@@ -1263,6 +1263,80 @@ def test_item_sets_match_spec_and_pending_fail_closed(fb: Any, tmp_path: Path, m
         assert fb.default_request(item, CELL)["event_import_id"] is None, item
 
 
+_ICIR_SORT_CALLS = {"sorted", "sort", "max", "min", "nlargest", "nsmallest"}
+_ICIR_TS_PATTERNS = [re.compile(r"sort_by:\s*[\"'`]icir[\"'`]"), re.compile(r"\?\?\s*[\"'`]icir[\"'`]"),
+                     re.compile(r"useState\(\s*[\"'`]icir[\"'`]")]
+
+
+def _icir_default_sort_hits_py(src: str, path: str = "<s>") -> List[Tuple[str, int, str]]:
+    """SPEC Task 0.4 ⑧ 驗收⑥：以 AST 找以字面 "icir" 為預設排序鍵之四類寫法——(a) sorted／sort／max／min／nlargest／
+    nsmallest 之 key= 值內（含 key 為同檔具名函式時其本體）；(b) 名為 sort_by 之參數預設值；(c) 關鍵字引數 sort_by="icir"；
+    (d) 名稱含 sort 之呼叫之位置引數。"""
+    def _name(f: Any) -> str:
+        return f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else ""
+
+    def _has(node: Any) -> bool:
+        return any(isinstance(n, ast.Constant) and n.value == "icir" for n in ast.walk(node))
+
+    tree = ast.parse(src)
+    defs = {n.name: n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    hits: List[Tuple[str, int, str]] = []
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Call):
+            fn = _name(n.func)
+            for kw in n.keywords:
+                if kw.arg == "key" and fn in _ICIR_SORT_CALLS:
+                    v = kw.value
+                    if _has(v) or (isinstance(v, ast.Name) and v.id in defs and _has(defs[v.id])):
+                        hits.append((path, n.lineno, "a"))
+                if kw.arg == "sort_by" and isinstance(kw.value, ast.Constant) and kw.value.value == "icir":
+                    hits.append((path, n.lineno, "c"))
+            if "sort" in fn.lower() and any(isinstance(a, ast.Constant) and a.value == "icir" for a in n.args):
+                hits.append((path, n.lineno, "d"))
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            args = n.args.args + n.args.kwonlyargs
+            defaults = [None] * (len(n.args.args) - len(n.args.defaults)) + list(n.args.defaults) + list(n.args.kw_defaults)
+            for a, d in zip(args, defaults):
+                if a.arg == "sort_by" and d is not None and _has(d):
+                    hits.append((path, n.lineno, "b"))
+    return hits
+
+
+def _icir_default_sort_hits_ts(src: str, path: str = "<s>") -> List[Tuple[str, int, str]]:
+    return [(path, i, "ts") for i, line in enumerate(src.splitlines(), 1) if any(p.search(line) for p in _ICIR_TS_PATTERNS)]
+
+
+def _is_test_path(p: Path) -> bool:
+    s = p.as_posix()
+    return "/tests/" in s or p.name.startswith("test_") or ".test." in p.name or "__tests__" in s
+
+
+def test_no_raw_icir_default_sort() -> None:
+    """SPEC Task 0.4 ⑧ 驗收⑥：`momentum/`、`api/` 非測試 .py 與 `frontend/src` 非測試 .ts／.tsx，以字面 "icir" 為預設排序鍵
+    者為 0（預設排序一律 `icir_aligned`）；反例自證：四類 Python 寫法與三種前端引號各造一段字串碼，掃描須逐一命中。"""
+    for src, cls in [
+        ("rows = sorted(t, key=lambda r: f(r.get('icir')))", "a"),
+        ("def _k(r):\n    return r.get('icir')\nrows = sorted(t, key=_k)", "a"),
+        ("def g(n, sort_by='icir'):\n    return n", "b"),
+        ("def g(n, sort_by=Query('icir')):\n    return n", "b"),
+        ("page = paginate(rows, sort_by='icir')", "c"),
+        ("x = self._sort_rows(rows, 'icir')", "d"),
+    ]:
+        assert [h[2] for h in _icir_default_sort_hits_py(src)] == [cls], src
+    for src in ("summaryParams: { sort_by: 'icir' }", 'sort_by: "icir"', "const f = p ?? `icir`", "useState('icir')"):
+        assert _icir_default_sort_hits_ts(src), src
+    assert not _icir_default_sort_hits_py("rows = sorted(t, key=lambda r: r.get(sort_by))")
+    hits: List[Tuple[str, int, str]] = []
+    for base in ("momentum", "api"):
+        for p in (REPO / base).rglob("*.py"):
+            if not _is_test_path(p):
+                hits += _icir_default_sort_hits_py(p.read_text(encoding="utf-8"), p.relative_to(REPO).as_posix())
+    for p in (REPO / "frontend" / "src").rglob("*.ts*"):
+        if not _is_test_path(p):
+            hits += _icir_default_sort_hits_ts(p.read_text(encoding="utf-8"), p.relative_to(REPO).as_posix())
+    assert hits == [], f"以原始 icir 為預設排序鍵之生產碼：{hits}"
+
+
 def test_event_import_response_shape_same_as_ic_report(fb: Any) -> None:
     """SPEC v5.26 §G (7)：事件匯入批回應之形狀同第 (1) 項——任務 `result`（報告）於頂層、其餘任務欄（analyzer 除外）
     置於 `event_task`；報告自帶 `event_task` 鍵 ⇒ FreezeError。邊界輸入：明列任務 dict。"""

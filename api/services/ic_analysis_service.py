@@ -2218,7 +2218,7 @@ class ICAnalysisService:
             return response.model_dump()
 
         rows = create_ic_artifact_writer().read(artifact_path)
-        sorted_rows = self._sort_artifact_rows(rows, "icir")
+        sorted_rows = self._sort_artifact_rows(rows, "icir_aligned")  # ICPERF Task 0.4 ⑧
         top_n = self._resolve_v2_top_n(task_info)
         response = ICResultV2Response(
             schema_version=2,
@@ -2267,11 +2267,16 @@ class ICAnalysisService:
 
     @staticmethod
     def _sort_artifact_rows(rows: List[Dict[str, Any]], sort_by: str) -> List[Dict[str, Any]]:
-        """Sort artifact rows for top-N derivation using artifact values only."""
+        """Sort artifact rows for top-N derivation using artifact values only.
+
+        ICPERF Task 0.4 ⑧：V2 artifact 欄位固定（`ic_artifact_writer.ARTIFACT_COLUMNS`，無 `icir_aligned`）⇒ 依排序鍵
+        `icir_aligned` 時由同列 artifact 值導出（`_proj.derived_icir_aligned`；缺 ⇒ 排末）。"""
         descending = sort_by != "p_value"
 
         def key(row: Dict[str, Any]) -> tuple[int, float]:
             value = row.get(sort_by)
+            if sort_by == "icir_aligned" and value is None:
+                value = _proj.derived_icir_aligned(row)
             if value is None:
                 return (1, 0.0)
             try:

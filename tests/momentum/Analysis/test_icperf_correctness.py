@@ -918,24 +918,35 @@ def _ref_select_q(n: int, requested: int, min_group: int = 30) -> int:
     return 3 if requested > 3 and n / requested < min_group else requested
 
 
-def _ref_mono_bins(x: np.ndarray, q: int) -> Optional[np.ndarray]:
-    """單調性之分組（monotonicity_tester.py:206-237 之規則）：PIT 標籤全 NaN、或實際 bin 數 < q 且 q > 3 ⇒ 改 q=3 重分。"""
+def _ref_mono_bins(x: np.ndarray, q: int, agg: Optional[np.ndarray] = None) -> Optional[np.ndarray]:
+    """單調性之分組（monotonicity_tester.py `_assign_quantiles` 之規則）：PIT 標籤依特徵 x 之全部有限歷史（SPEC Task 0.4 ⑦：
+    不因標籤缺值而剔除歷史）；聚合列 `agg`（標籤有限者；None＝全部）上之標籤全 NaN、或實際 bin 數 < q 且 q > 3 ⇒ 改 q=3
+    重分；回聚合列以外為 NaN 之標籤陣列。"""
     lab = _ref_pit_qcut(x, q)
+    agg = np.ones(x.size, dtype=bool) if agg is None else np.asarray(agg, dtype=bool)
+    lab = np.where(agg, lab, np.nan)
     if np.isnan(lab).all():
-        return _ref_mono_bins(x, 3) if q > 3 else None
+        return _ref_mono_bins(x, 3, agg) if q > 3 else None
     if int(np.nanmax(lab)) + 1 < q and q > 3:
-        return _ref_mono_bins(x, 3)
+        return _ref_mono_bins(x, 3, agg)
     return lab
+
+
+def _ref_mono_frame(feature: pd.Series, label: pd.Series) -> Any:
+    """單調性輸入（SPEC Task 0.4 ⑦）：特徵非 NaN 之列（含標籤缺值者），回 (frame, agg＝標籤有限)。"""
+    data = pd.concat([feature.rename("f"), label.rename("y")], axis=1)
+    data = data[data["f"].notna()]
+    return data, data["y"].notna().to_numpy()
 
 
 def _ref_long_short(feature: pd.Series, label: pd.Series, q_req: int = 5) -> Dict[str, float]:
     """多空價差、t、p、pooled Sharpe 之 oracle（SPEC Task 0.3：測試自寫之 PIT 分組重得兩組報酬後呼叫
     `scipy.stats.ttest_ind(high, low, nan_policy="omit")`，同 monotonicity_tester.py:153-164 之參數）。"""
     nan4 = {"spread": math.nan, "tstat": math.nan, "pvalue": math.nan, "sharpe": math.nan}
-    data = pd.concat([feature.rename("f"), label.rename("y")], axis=1).dropna()
-    if data.empty:
+    data, agg = _ref_mono_frame(feature, label)
+    if not agg.any():
         return nan4
-    bins = _ref_mono_bins(data["f"].to_numpy(dtype=float), _ref_select_q(len(data), q_req))
+    bins = _ref_mono_bins(data["f"].to_numpy(dtype=float), _ref_select_q(int(agg.sum()), q_req), agg)
     if bins is None or np.isnan(bins).all():
         return nan4
     y = data["y"].to_numpy(dtype=float)
@@ -955,11 +966,12 @@ def _ref_monotonicity(feature: pd.Series, label: pd.Series, q_req: int = 5) -> D
     """`MonotonicityTester.compute_all` 單一特徵之 oracle：分位平均報酬（預填 Q1..Qq，缺 bin ⇒ NaN）、各分位累積報酬
     （分位內依時間序之累加）、單調性分數（依分位序相鄰差 > 0 之比例，缺 bin 之差不計，monotonicity_tester.py:79-100）、
     多空（`_ref_long_short`）。"""
-    data = pd.concat([feature.rename("f"), label.rename("y")], axis=1).dropna()
-    q = _ref_select_q(len(data), q_req) if len(data) else q_req
+    data, agg = _ref_mono_frame(feature, label)
+    n_agg = int(agg.sum())
+    q = _ref_select_q(n_agg, q_req) if n_agg else q_req
     means: Dict[str, float] = {f"Q{i + 1}": math.nan for i in range(q)}
     cums: Dict[str, List[float]] = {f"Q{i + 1}": [] for i in range(q)}
-    bins = _ref_mono_bins(data["f"].to_numpy(dtype=float), q) if len(data) else None
+    bins = _ref_mono_bins(data["f"].to_numpy(dtype=float), q, agg) if n_agg else None
     ls = _ref_long_short(feature, label, q_req)
     if bins is not None:
         y = data["y"].to_numpy(dtype=float)
@@ -1530,7 +1542,7 @@ def _ref_ic_mean_source(X: pd.DataFrame, y: pd.Series, window: int) -> Any:
 
 
 def _ic_mean_inputs(n: int) -> Any:
-    """明列邊界輸入：正相關、負相關（ic_mean 為負 ⇒ 不過 ic_mean_min）、弱相關與常數特徵（滾動與 pooled 皆 NaN ⇒
+    """明列邊界輸入：正相關、負相關（ic_mean 為負；⑧ 後依 |ic_mean| 判，強負向應通過）、弱相關與常數特徵（滾動與 pooled 皆 NaN ⇒
     unavailable）；n＝200 ⇒ 63 窗有值，n＝50 ⇒ 滾動序列為空（SPEC 之邊界）⇒ 回退 pooled。"""
     i = np.arange(n, dtype=float)
     y = np.sin(i / 3.0) + 0.5 * np.cos(i / 1.3)
@@ -1559,7 +1571,8 @@ def test_ic_mean_source_fallback_matches_oracle(n: int, expected_source: str) ->
     assert exp_counts[expected_source] == 3 and exp_counts["unavailable"] == 1, "邊界輸入未落預期來源（前提失效）"
     thr = analyzer._config.thresholds
     _, threshold_log = analyzer._apply_thresholds(table, thr, 0.05, fdr_enabled=False)
-    exp_removed = sorted(f for f, v in exp_vals.items() if not (math.isfinite(v) and v >= thr.ic_mean_min))
+    # ICPERF Task 0.4 ⑧：ic_mean 門檻方向中立＝|ic_mean| ≥ ic_mean_min（強負向因子不再被剔除）
+    exp_removed = sorted(f for f, v in exp_vals.items() if not (math.isfinite(v) and abs(v) >= thr.ic_mean_min))
     assert sorted(threshold_log["removed_features"]["ic_mean"]) == exp_removed
     assert set(exp_removed) not in (set(), set(X.columns)), "邊界輸入未使門檻兩側皆有（前提失效）"
 
@@ -1715,7 +1728,13 @@ def _ref_cross_sectional(df: pd.DataFrame, label_col: str = XSEC_LABEL) -> Dict[
             mean, std = float(np.mean(v)), float(np.std(v))
             summary[f] = {"ic_mean": mean, "ic_std": std, "icir": mean / std if std > 0 else math.nan,
                           "ic_hit_rate": float(np.mean(v > 0))}
-    ranked = sorted(feats, key=lambda f: summary[f]["icir"] if math.isfinite(summary[f]["icir"]) else -math.inf, reverse=True)
+    # ICPERF Task 0.4 ⑧：預設排序＝icir_aligned＝direction·icir（direction＝sign(ic_mean)；0／NaN ⇒ icir_aligned NaN ⇒ 排末）
+    def _aligned(f: str) -> float:
+        mean, icir = summary[f]["ic_mean"], summary[f]["icir"]
+        d = 0.0 if not math.isfinite(mean) else float(np.sign(mean))
+        return d * icir if d != 0 and math.isfinite(icir) else -math.inf
+
+    ranked = sorted(feats, key=_aligned, reverse=True)
     symbols = sorted(str(s) for s in df.index.get_level_values(1).unique())
     matrix: Dict[str, Dict[str, Optional[float]]] = {f: {} for f in ranked}
     for sym, g in df.groupby(level=1, sort=True):
@@ -1949,3 +1968,206 @@ def test_cross_sectional_matches_oracle_on_real_kline() -> None:
     assert df.index.get_level_values("symbol").nunique() >= 2, "本機無多標的真實資料（SPEC：收據記未驗並白話報使用者）"
     exp = _assert_cross_sectional(df)
     assert exp["validation"]["status"] == "completed"
+
+
+# ── Task 0.4 ⑧⑩：方向中立門檻、預設排序、深度模組開關 ─────────────────────────────────────────────────────────
+
+
+def _summary_row(name: str, ic_mean: float, icir: float, hit: float, neg: float, qmeans: List[float],
+                 spread: float) -> Dict[str, Any]:
+    """明列 summary 列：方向欄由產品 `_direction_fields` 依同一 ic_mean／icir 序列結果導出。"""
+    from momentum.Analysis.ic_filter_orchestrator import _direction_fields
+
+    q = {f"Q{i + 1}": v for i, v in enumerate(qmeans)}
+    return {"feature_name": name, "ic_mean": ic_mean, "icir": icir, "ic_hit_rate": hit, "p_value": 0.001,
+            "p_value_adj": 0.001, "monotonicity_score": float(np.mean(np.diff(qmeans) > 0)), "long_short_spread": spread,
+            "coverage": 1.0, **_direction_fields(ic_mean, {"icir": icir, "ic_hit_rate": hit, "ic_neg_rate": neg},
+                                               {"quantile_mean_returns": q})}
+
+
+def test_direction_neutral_thresholds_pass_strong_reverse_factor() -> None:
+    """SPEC Task 0.4 ⑧ 驗收①：強反向因子（ic_mean −0.08、icir −0.8、方向對齊勝率 0.6、分位均值遞減）通過全部門檻且
+    direction −1；其鏡像正向因子同樣通過；|ic_mean| 不足、方向對齊勝率不足、icir 與 ic_mean 異號者各被對應門檻剔除。"""
+    orch = create_ic_analyzer(None)
+    th = orch._config.thresholds
+    rows = [
+        _summary_row("rev", -0.08, -0.8, 0.40, 0.60, [0.004, 0.002, 0.0, -0.002, -0.004], -0.008),
+        _summary_row("fwd", 0.08, 0.8, 0.60, 0.40, [-0.004, -0.002, 0.0, 0.002, 0.004], 0.008),
+        _summary_row("weak", -0.01, -0.8, 0.40, 0.60, [0.004, 0.002, 0.0, -0.002, -0.004], -0.008),
+        _summary_row("flip_hit", -0.08, -0.8, 0.60, 0.40, [0.004, 0.002, 0.0, -0.002, -0.004], -0.008),
+        _summary_row("sign_clash", -0.08, 0.8, 0.40, 0.60, [0.004, 0.002, 0.0, -0.002, -0.004], -0.008),
+    ]
+    passed, log = orch._apply_thresholds(rows, th, 0.05)
+    assert passed == ["rev", "fwd"], log
+    assert rows[0]["direction"] == -1 and rows[0]["icir_aligned"] == pytest.approx(0.8)
+    assert rows[0]["monotonicity_score_aligned"] == 1.0 and rows[0]["ic_hit_rate_aligned"] == 0.60
+    removed = log["removed_features"] if "removed_features" in log else log
+    flat = {k: v for k, v in removed.items() if isinstance(v, list)}
+    assert "weak" in flat["ic_mean"] and "flip_hit" in flat["ic_hit_rate"] and "sign_clash" in flat["icir"]
+
+
+def test_top_features_default_sort_is_direction_aligned() -> None:
+    """SPEC Task 0.4 ⑧ 驗收⑤：`get_top_features` 預設排序鍵＝icir_aligned——± 同強度因子名次相鄰且相同強度、弱者在後、
+    direction 0 者排最後；明示 sort_by="icir" 時照有號排序。"""
+    orch = create_ic_analyzer(None)
+    rows = [
+        _summary_row("pos_strong", 0.08, 0.9, 0.6, 0.4, [0, 1, 2, 3, 4], 0.01),
+        _summary_row("neg_strong", -0.08, -0.9, 0.4, 0.6, [4, 3, 2, 1, 0], -0.01),
+        _summary_row("pos_weak", 0.03, 0.2, 0.55, 0.45, [0, 1, 2, 3, 4], 0.01),
+        {**_summary_row("zero", 0.0, 0.5, 0.5, 0.5, [0, 1, 2, 3, 4], 0.0)},
+    ]
+    orch._report = {"summary_table": rows}
+    names = [r["feature_name"] for r in orch.get_top_features(n=4)]
+    assert set(names[:2]) == {"pos_strong", "neg_strong"} and names[2] == "pos_weak" and names[3] == "zero"
+    signed = [r["feature_name"] for r in orch.get_top_features(n=4, sort_by="icir")]
+    assert signed[-1] == "neg_strong"
+
+
+def test_explicit_deep_module_request_overrides_named_preset() -> None:
+    """SPEC Task 0.4 ⑩：intermediate preset（disabled_modules＝正交化、曝險）下，深度請求明示開正交化 ⇒ 該模組開啟並揭露於
+    tier_module_overrides；未明示之曝險維持 preset 之關閉；custom preset 不受此規則影響。"""
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    orch = create_ic_analyzer(None)
+    base = orch._apply_tier_config(orch._apply_config_override({"feature_tiers": {"active_preset": "intermediate"}}))
+    assert base.factor_orthogonalization.enabled is False, "前提：intermediate preset 關閉正交化"
+    cfg, changed = ICFilterOrchestrator._apply_explicit_module_requests(
+        base, {"factor_orthogonalization": {"enabled": True}})
+    assert cfg.factor_orthogonalization.enabled is True and cfg.factor_exposure.enabled is False
+    assert changed == {"factor_orthogonalization": {"requested": True, "preset": False}}
+    custom = orch._apply_tier_config(orch._apply_config_override({"feature_tiers": {"active_preset": "custom"}}))
+    _, changed_custom = ICFilterOrchestrator._apply_explicit_module_requests(
+        custom, {"factor_orthogonalization": {"enabled": not custom.factor_orthogonalization.enabled}})
+    assert changed_custom == {}
+
+
+# ── Task 0.4 ⑦：單調性分箱歷史只依特徵自身（未來缺標籤不得改變過去分箱） ─────────────────────────────────────────
+
+
+@pytest.mark.parametrize("gap", [130, 200, 260])
+def test_monotonicity_bins_prefix_invariant_to_future_label_gap(gap: int) -> None:
+    """SPEC Task 0.4 ⑦：第 g 根標籤由有限改為 NaN（如缺價——其值取決於 g＋h 之價格）時，**每一根**之 PIT 分箱皆不變
+    （分箱只依特徵 0..t；舊版自歷史剔除第 g 根，使 t ≥ g 各根之分箱改變，即 t ∈ [g, g＋h) 偷看未來），且單調性輸出與只在
+    聚合時排除第 g 根之 oracle 相同。明列邊界輸入：確定性特徵（含同值）與標籤，320 根小時頻索引。"""
+    n = 320
+    idx = pd.date_range("2025-01-01", periods=n, freq="h", tz="UTC")
+    i = np.arange(n, dtype=float)
+    f = pd.Series(np.sin(i / 7.0) + 0.01 * ((i * 13) % 17), index=idx)
+    y = pd.Series(0.002 * np.cos(i / 5.0) + 0.0005 * f.to_numpy(), index=idx)
+    y_gap = y.copy()
+    y_gap.iloc[gap] = np.nan
+    mt = MonotonicityTester({})
+    b0 = mt._assign_quantiles(mt._prepare_data(f, y), 5)
+    b1 = mt._assign_quantiles(mt._prepare_data(f, y_gap), 5)
+    pd.testing.assert_series_equal(b0, b1)
+    assert b0.iloc[gap:].notna().any(), "邊界輸入退化：缺值根之後無分箱（前提失效）"
+    _assert_close_tree(mt.compute_all(f.to_frame("f"), y_gap)["f"]["quantile_returns"],
+                       _ref_monotonicity(f, y_gap)["quantile_returns"], "mono")
+
+
+# ── Task 0.4 ④⑤⑨：滾動 IC 逐特徵獨立、樣本外整窗、全樣本退回之 kline 對齊 ───────────────────────────────────────
+
+ROLL_WINDOWS = [21, 63]
+
+
+def _ref_rolling(F: pd.DataFrame, y: pd.Series, window: int, method: str) -> Dict[str, List[float]]:
+    """滾動 IC 之 oracle（SPEC Task 0.4 ④）：時間軸＝標籤有限之列；每窗每特徵獨立，窗內該特徵或標籤有任一非有限值、
+    或任一為常數 ⇒ NaN；否則 scipy（spearmanr／pearsonr）。"""
+    yv = y.reindex(F.index).to_numpy(dtype=float)
+    rows = np.flatnonzero(np.isfinite(yv))
+    X = F.to_numpy(dtype=float)
+    out: Dict[str, List[float]] = {c: [] for c in F.columns}
+    for end in range(window - 1, rows.size):
+        sel = rows[end - window + 1:end + 1]
+        yw = yv[sel]
+        for j, c in enumerate(F.columns):
+            xw = X[sel, j]
+            if not (np.all(np.isfinite(xw)) and np.all(np.isfinite(yw))) or np.ptp(xw) == 0 or np.ptp(yw) == 0:
+                out[c].append(math.nan)
+            else:
+                out[c].append(float(_SCIPY[method](xw, yw)[0]))
+    return out
+
+
+def _assert_rolling_equal(got: Mapping[str, Any], exp: Mapping[str, List[float]], window: int, tol: float) -> None:
+    for c, vals in exp.items():
+        g = got[c][f"window_{window}"]
+        assert len(g) == len(vals), f"{c}/window_{window}：長度 {len(g)} vs oracle {len(vals)}"
+        for i, (a, b) in enumerate(zip(g, vals)):
+            assert _rel(float(a), float(b)) <= tol, f"{c}/window_{window}[{i}]：產品 {a} vs oracle {b}"
+
+
+def _rolling_inputs() -> Any:
+    """明列邊界輸入於真實 kline 索引（BTCUSDT 1h 末 400 根）：ret1、dev20（前 19 根暖機 NaN）、mom10，標籤 1 根前瞻報酬。"""
+    close = _real_close(400)
+    F = _real_features_wide(close)[["ret1", "dev20", "mom10"]].iloc[20:]
+    return F, _real_label(close).reindex(F.index)
+
+
+# Pearson 分支以累積和計，窗長 63 之捨入相對誤差實測量級 1e-13；以 1e-9 判一致（Spearman 分支 1e-12）
+ROLL_TOL = {"spearman": REL_TOL, "pearson": 1e-9}
+
+
+@pytest.mark.requires_kline
+@pytest.mark.parametrize("method", ["spearman", "pearson"])
+@pytest.mark.parametrize("case", ["all_finite", "feature_nan", "label_nan", "all_nan_column"])
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_rolling_ic_per_feature_matches_scipy(method: str, case: str) -> None:
+    """SPEC Task 0.4 ④：`ICEngine.compute_rolling_ic` 每特徵獨立、時間軸＝標籤有限之列——逐窗等於 scipy oracle；同請求內
+    其他欄之缺值（含整欄全 NaN）不改變某特徵之輸出（與該特徵單獨計算逐位元相同）。邊界：全有值、單一特徵中段缺值、
+    標籤中段缺值、另加一欄全 NaN。"""
+    F, y = _rolling_inputs()
+    if case == "feature_nan":
+        F.iloc[150, 0] = np.nan
+    elif case == "label_nan":
+        y.iloc[120] = np.nan
+    elif case == "all_nan_column":
+        F = F.assign(dead=np.nan)
+    engine = ICEngine({})
+    got = engine.compute_rolling_ic(F, y, ROLL_WINDOWS, 1, method)
+    for w in ROLL_WINDOWS:
+        _assert_rolling_equal(got, _ref_rolling(F, y, w, method), w, ROLL_TOL[method])
+    for c in ("dev20", "mom10"):
+        alone = engine.compute_rolling_ic(F[[c]], y, ROLL_WINDOWS, 1, method)
+        assert alone[c] == got[c], f"{c}：與單獨計算不同（受同請求其他欄影響）"
+    assert any(math.isfinite(v) for v in got["dev20"]["window_63"]), "邊界輸入退化（前提失效）"
+
+
+@pytest.mark.requires_kline
+@pytest.mark.parametrize("method", ["spearman", "pearson"])
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_rolling_ic_test_slice_keeps_whole_test_windows_only(method: str) -> None:
+    """SPEC Task 0.4 ④⑨：`_slice_rolling_ic_to_test` 以同一時間軸（標籤有限之列）判窗，只留窗首與窗尾皆在測試段之窗，
+    值逐窗等於 oracle；窗跨入訓練段者不入。邊界：測試段＝末 150 列、標籤於測試段中段缺一根。"""
+    F, y = _rolling_inputs()
+    y.iloc[len(y) - 60] = np.nan
+    test_mask = np.zeros(len(F), dtype=bool)
+    test_mask[-150:] = True
+    orch = create_ic_analyzer(None)
+    full = orch._ic_engine.compute_rolling_ic(F, y, ROLL_WINDOWS, 1, method)
+    sliced = orch._slice_rolling_ic_to_test(full, F, y, ROLL_WINDOWS, 1, test_mask)
+    for w in ROLL_WINDOWS:
+        Ft, yt = F.loc[test_mask], y.loc[test_mask]
+        _assert_rolling_equal(sliced, _ref_rolling(Ft, yt, w, method), w, ROLL_TOL[method])
+    n_axis_test = int(np.isfinite(y.loc[test_mask].to_numpy(dtype=float)).sum())
+    assert len(sliced["ret1"]["window_63"]) == n_axis_test - 63 + 1
+
+
+@pytest.mark.requires_kline
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_full_sample_fallback_aligns_raw_kline_to_features() -> None:
+    """SPEC Task 0.4 ⑤：mask 為 None 時 `_slice_raw_data_by_mask` 依時間軸對齊至特徵索引——整段 RangeIndex kline（含特徵窗外
+    之列）對齊後之 close 逐根等於特徵索引上之真實 close；衰減逐 horizon IC 因而等於 scipy oracle。"""
+    from momentum.Analysis.ic_filter_orchestrator import _slice_raw_data_by_mask
+
+    close = _real_close(700)
+    F = _real_features_wide(close).iloc[-300:]
+    raw = pd.DataFrame({"timestamp": (close.index.asi8 // 10 ** 9).astype("int64"), "close": close.to_numpy()})
+    aligned = _slice_raw_data_by_mask(raw, F, F, None)
+    assert list(aligned.index) == list(F.index)
+    np.testing.assert_array_equal(aligned["close"].to_numpy(dtype=float), close.reindex(F.index).to_numpy(dtype=float))
+    decay = ICEngine({}).compute_ic_decay(F, aligned["close"], [1, 5], "spearman", "simple")
+    for c in F.columns:
+        for h, got in zip([1, 5], decay[c]["ic_values"]):
+            r = (aligned["close"].shift(-h) / aligned["close"] - 1.0).to_numpy(dtype=float)
+            assert _rel(float(got), _ic_oracle(F[c].to_numpy(dtype=float), r, "spearman")) <= REL_TOL, (c, h)

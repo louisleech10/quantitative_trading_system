@@ -242,7 +242,9 @@ fi
 #   減少（V01、V07、V15、V19、V20）照業界由同提交之 code review 把關——只列清單供審碼、不擋提交；其餘規則照舊擋。
 #   使用者同日逐字「同意小任務也一定要派委員審清單」：清單登記為待審（.testreg/test_change_review/），post-commit
 #   綁 commit sha，pre-push 擋未審者（scripts/test_change_review.sh）。
-_TR_REVIEW_ONLY='^V(01|07|15|19|20) '
+#   V08（碑之刪除證據收據不成立，含 E1 替代測試因產品行為改變而改寫致 AST 與歷史收據不符）同屬「刪測試須機器證據」，
+#   依同裁定列清單待審、不擋（2026-10-30 ICPERF Task 0.4 ㉒ 移除 ADF 牆鐘逾時，替代測試 test_adf_timeout_single 必改寫）。
+_TR_REVIEW_ONLY='^V(01|07|08|15|19|20) '
 _tr_log="$(mktemp)"
 if git diff --cached --name-only -z | tr '\0' '\n' \
    | grep -E '^tests/.*\.py$|^tests/registry/catalog\.json$|^docs/manifests/[^/]+\.json$|^pytest\.ini$' >/dev/null; then

@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import warnings
 from typing import Optional
 
 import numpy as np
 import pandas as pd
-from statsmodels.stats.diagnostic import acorr_ljungbox
+from statsmodels.stats.diagnostic import acorr_ljungbox, breaks_cusumolsresid
 from statsmodels.tsa.stattools import adfuller
 
 from momentum.core.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+#: CUSUM 漂移判定之顯著水準（Ploberger–Krämer OLS-CUSUM；ICPERF Task 0.4 ㉒ QN-3）
+_CUSUM_SIGNIFICANCE = 0.05
 
 
 class FeatureQualityDiagnostics:
@@ -26,10 +29,12 @@ class FeatureQualityDiagnostics:
         self._coverage_threshold = float(cfg.get("coverage_threshold", 0.8))
         self._drift_threshold = float(cfg.get("drift_threshold", 0.25))
         self._redundancy_threshold = float(cfg.get("redundancy_threshold", 0.85))
-        self._adf_timeout_sec = float(cfg.get("adf_timeout_sec", 5.0))
         self._adf_min_samples = int(cfg.get("adf_min_samples", 20))
 
     def run_batch_adf_test(self, features_df: pd.DataFrame) -> dict[str, dict]:
+        """逐欄 ADF。未實際檢定（全缺／樣本不足／常數／ADF 例外）或 p 非有限 ⇒ is_stationary=None（未知，
+        不得當非平穩；ICPERF Task 0.4 ㉒ QN-2）。不設牆鐘逾時（QN-5，使用者 2026-10-27「全專案禁時間上限停運算」；
+        卡死一律交共用監看）。"""
         results: dict[str, dict] = {}
         for feature_name in features_df.columns:
             series = pd.Series(features_df[feature_name], dtype=float)
@@ -41,7 +46,7 @@ class FeatureQualityDiagnostics:
                     "reason": "all_nan",
                     "adf_statistic": np.nan,
                     "p_value": np.nan,
-                    "is_stationary": False,
+                    "is_stationary": None,
                 }
                 continue
             if len(clean) < self._adf_min_samples:
@@ -50,7 +55,7 @@ class FeatureQualityDiagnostics:
                     "reason": "insufficient_samples",
                     "adf_statistic": np.nan,
                     "p_value": np.nan,
-                    "is_stationary": False,
+                    "is_stationary": None,
                 }
                 continue
             if clean.nunique(dropna=True) <= 1:
@@ -59,30 +64,19 @@ class FeatureQualityDiagnostics:
                     "reason": "constant_feature",
                     "adf_statistic": np.nan,
                     "p_value": np.nan,
-                    "is_stationary": False,
+                    "is_stationary": None,
                 }
                 continue
 
             winsorized = self._winsorize(clean)
             try:
-                with ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(adfuller, winsorized.values.astype(float))
-                    adf_stat, p_value, *_ = future.result(timeout=self._adf_timeout_sec)
+                adf_stat, p_value, *_ = adfuller(winsorized.values.astype(float))
                 p_value = float(p_value)
                 results[feature_name] = {
                     "adf_statistic": float(adf_stat),
                     "p_value": p_value,
-                    "is_stationary": bool(p_value < self._adf_significance),
+                    "is_stationary": bool(p_value < self._adf_significance) if np.isfinite(p_value) else None,
                     "skipped": False,
-                }
-            except TimeoutError:
-                results[feature_name] = {
-                    "skipped": True,
-                    "reason": "adf_timeout",
-                    "timeout": True,
-                    "adf_statistic": np.nan,
-                    "p_value": np.nan,
-                    "is_stationary": False,
                 }
             except Exception as exc:
                 logger.warning("ADF failed for %s: %s", feature_name, exc)
@@ -92,7 +86,7 @@ class FeatureQualityDiagnostics:
                     "error": str(exc),
                     "adf_statistic": np.nan,
                     "p_value": np.nan,
-                    "is_stationary": False,
+                    "is_stationary": None,
                 }
 
         return results
@@ -155,9 +149,13 @@ class FeatureQualityDiagnostics:
 
         centered = series - float(series.mean())
         cumulative = centered.cumsum()
-        threshold = float(centered.std(ddof=0) * 5.0)
         breakpoint_idx = cumulative.abs().idxmax() if not cumulative.empty else None
-        drift_by_cusum = bool(np.isfinite(threshold) and cumulative.abs().max() > threshold)
+        # ICPERF Task 0.4 ㉒ QN-3：Ploberger–Krämer OLS-CUSUM（統計量 max|S_k|／(σ√n)，Brownian bridge 臨界值）；
+        # 舊法 max|S_k| > 5σ 未除 √n ⇒ 長序列恆判漂移。σ 非有限或為 0 ⇒ p 非有限 ⇒ 不判漂移。
+        with warnings.catch_warnings(), np.errstate(divide="ignore", invalid="ignore"):
+            warnings.simplefilter("ignore", RuntimeWarning)
+            _sup_b, cusum_p, _crit = breaks_cusumolsresid(centered.to_numpy(dtype=float), ddof=0)
+        drift_by_cusum = bool(np.isfinite(cusum_p) and cusum_p < _CUSUM_SIGNIFICANCE)
 
         mid = len(series) // 2
         p = series.iloc[:mid]
@@ -261,12 +259,13 @@ class FeatureQualityDiagnostics:
             "drifted": [],
         }
         for feature_name in features_df.columns:
-            adf_ok = bool(adf_results[feature_name].get("is_stationary", False))
+            # QN-2：只有實際檢定且判非平穩（is_stationary is False）者入旗標；None＝未檢定、不入
+            adf_flag = adf_results[feature_name].get("is_stationary") is False
             acf_flag = bool(autocorrelation_results[feature_name].get("significant_autocorrelation", False))
             coverage = float(coverage_stats[feature_name].get("coverage", 0.0))
             drifted = bool(drift_results[feature_name].get("drifted", False))
 
-            if not adf_ok:
+            if adf_flag:
                 quality_flags["non_stationary"].append(feature_name)
             if acf_flag:
                 quality_flags["high_autocorrelation"].append(feature_name)
@@ -275,7 +274,7 @@ class FeatureQualityDiagnostics:
             if drifted:
                 quality_flags["drifted"].append(feature_name)
 
-        stationary_count = sum(1 for r in adf_results.values() if bool(r.get("is_stationary", False)))
+        stationary_count = sum(1 for r in adf_results.values() if r.get("is_stationary") is True)
         total_features = int(len(features_df.columns))
         mean_coverage = float(np.mean([v["coverage"] for v in coverage_stats.values()])) if total_features > 0 else 0.0
 
@@ -312,10 +311,15 @@ class FeatureQualityDiagnostics:
         values = series.values.astype(float)
         if len(values) < 3:
             return 1.0
-        acf1 = np.corrcoef(values[:-1], values[1:])[0, 1]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            acf1 = np.corrcoef(values[:-1], values[1:])[0, 1]
         if not np.isfinite(acf1):
+            # ICPERF Task 0.4 ㉒ QN-4：lag-1 自相關無定義（常數序列）⇒ 有效樣本比無定義，不得寫 1.0
+            return float("nan")
+        if (1.0 + acf1) <= 0.0:
+            # ρ₁ → −1 之極限 (1−ρ)/(1+ρ) → +∞，截上限後＝1（舊碼於此回 0.0，與 ρ₁ 略大於 −1 時之 1.0 不連續）
             return 1.0
-        ratio = (1.0 - acf1) / (1.0 + acf1) if (1.0 + acf1) != 0 else 0.0
+        ratio = (1.0 - acf1) / (1.0 + acf1)
         return float(max(0.0, min(1.0, ratio)))
 
     @staticmethod
