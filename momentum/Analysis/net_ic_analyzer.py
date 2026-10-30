@@ -19,6 +19,7 @@ _UNAVAILABLE_REASON = "canonical_factor_return_series_not_built (1c-FR)"
 _ZERO_TURNOVER_REASON = "zero_mean_turnover"
 _INSUFFICIENT_ALIGNED_REASON = "insufficient_aligned_series"
 _SERIES_SHAPE_REASON = "factor_return_series_missing_or_invalid"
+_INVALID_POSITION_REASON = "invalid_position_sequence"
 
 
 def _unavailable(reason: str = _UNAVAILABLE_REASON) -> dict[str, Any]:
@@ -334,6 +335,13 @@ class NetICAnalyzer:
             return metrics, False, False, None
 
         gross, position = extracted
+        # code review r49 CODEX-P1-02：部位序列任一非有限（中段 NaN／±inf）⇒ 無效序列 fail-closed，不以 fillna(0) 當零換手
+        if not bool(np.all(np.isfinite(position.to_numpy(dtype=float)))):
+            metrics = {"net_factor_return": _unavailable(_INVALID_POSITION_REASON)}
+            if include_cost_keys:
+                metrics["breakeven_cost_bps"] = _unavailable(_INVALID_POSITION_REASON)
+                metrics["profitable_after_cost"] = _unavailable(_INVALID_POSITION_REASON)
+            return metrics, False, False, None
         turnover_s = position_to_turnover_series(position)
         stats = compute_breakeven_and_net(gross, turnover_s, cost_bps=cost_bps)
         series_turnover = _finite_or_null(stats.get("turnover_mean"))

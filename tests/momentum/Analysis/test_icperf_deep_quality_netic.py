@@ -588,6 +588,13 @@ def ref_net_ic_analysis(
             if cost_enabled:
                 cond["breakeven_cost_bps"] = _ref_unavail(reason)
                 cond["profitable_after_cost"] = _ref_unavail(reason)
+        elif not np.all(np.isfinite(ext[1].to_numpy(dtype=float))):
+            # code review r49 CODEX-P1-02：部位序列任一非有限 ⇒ 無效序列，成本與換手率皆不可得
+            reason = "invalid_position_sequence"
+            cond = {"net_factor_return": _ref_unavail(reason)}
+            if cost_enabled:
+                cond["breakeven_cost_bps"] = _ref_unavail(reason)
+                cond["profitable_after_cost"] = _ref_unavail(reason)
         else:
             gross, to = _ref_series_turnover(*ext)
             if gross.size == 0:
@@ -964,6 +971,25 @@ def test_net_ic_series_present_ignores_scalar_turnover_gate(scalar: Any) -> None
     assert out["features"]["g"] == {"skipped": True, "reason": "non_finite_turnover"}
     only_series = NetICAnalyzer(cfg).batch_analyze({"f": {"ic_mean": 0.05}}, {}, factor_return_series={"f": s})
     assert only_series.get("skipped") is not True and not only_series["features"]["f"].get("skipped")
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+def test_net_ic_invalid_position_sequence_fail_closed(bad: float) -> None:
+    """code review r49 CODEX-P1-02（原反例）：部位序列中段非有限 ⇒ net／損益兩平／獲利 unavailable（invalid_position_sequence）、
+    換手率與成本拖累不得為有限值、容量 unknown；與 oracle 一致。改前 fillna(0) 使中段缺值變零換手而得有限 net 與獲利 True。"""
+    idx = pd.date_range("2024-01-01", periods=4, freq="h", tz="UTC")
+    s = FactorTimingReturnSeries(feature="f", ls_return=pd.Series([0.01, 0.015, 0.02, 0.03], index=idx, dtype=float),
+                                 position=pd.Series([1.0, bad, 1.0, 1.0], index=idx, dtype=float),
+                                 index_policy="frame_dropna")
+    cfg = {"cost_enabled": True, "cost_bps": 10.0}
+    summary = {"f": {"ic_mean": 0.1, "avg_daily_volume_usd": 1.0e8}}
+    out = NetICAnalyzer(cfg).batch_analyze(summary, {"f": math.nan}, factor_return_series={"f": s})
+    _assert_consistent(compare_net_ic_analysis(out, summary, {"f": math.nan}, {"f": s}, cfg))
+    row = out["features"]["f"]
+    for key in ("net_factor_return", "breakeven_cost_bps", "profitable_after_cost"):
+        assert row[key] == {"status": "unavailable", "value": None, "reason": "invalid_position_sequence"}
+    assert row.get("turnover") is None and row.get("cost_drag_return") is None
+    assert row["capacity"]["capacity_tier"] == "unknown"
 
 
 def test_net_ic_turnover_consistent_with_series() -> None:
