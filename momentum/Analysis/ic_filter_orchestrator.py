@@ -4641,7 +4641,8 @@ class ICFilterOrchestrator:
                 label_for_ic,
                 raw_data_for_ic,
                 metadata,
-                config.ic_calculation.grouped_analysis.model_dump(),
+                # 分組／regime IC 與主 IC 同估計量（同請求 effective method；未帶時引擎退回 methods[0]）
+                {**config.ic_calculation.grouped_analysis.model_dump(), "method": method},
                 regime_pair_counts=regime_pair_counts,
             )
 

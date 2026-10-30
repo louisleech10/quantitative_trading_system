@@ -354,6 +354,60 @@ def test_regime_robust_reason_closed_set() -> None:
     assert set(orch_mod.REGIME_ROBUST_REASONS) == REASONS
 
 
+#: 判定邊界之逐 regime（IC, 有限配對數）表：每列＝(特徵, ic_mean, {regime: (IC, n)})；值為手寫之精確輸入
+_DECISION_CASES: Tuple[Tuple[str, float, Dict[str, Tuple[float, int]]], ...] = (
+    ("all_pos", 0.1, {"bull": (0.2, 40), "bear": (0.05, 40)}),
+    ("mixed", 0.1, {"bull": (0.2, 40), "bear": (-0.05, 40)}),
+    ("neg_aligned", -0.1, {"bull": (-0.2, 40), "bear": (-0.05, 40)}),
+    ("neg_mixed", -0.1, {"bull": (-0.2, 40), "bear": (0.05, 40)}),
+    ("zero_ic_regime", 0.1, {"bull": (0.2, 40), "bear": (0.0, 40)}),
+    ("zero_direction", 0.0, {"bull": (0.2, 40), "bear": (0.05, 40)}),
+    ("one_qualified", 0.1, {"bull": (0.2, 40), "bear": (-0.3, MIN_SAMPLES - 1)}),
+    ("at_threshold", 0.1, {"bull": (0.2, MIN_SAMPLES), "bear": (0.1, MIN_SAMPLES)}),
+    ("nan_regime", 0.1, {"bull": (0.2, 40), "bear": (math.nan, 40), "range": (-0.1, 40)}),
+    ("nan_skipped_rest_pos", 0.1, {"bull": (0.2, 40), "bear": (math.nan, 40), "range": (0.1, 40)}),
+    ("three_one_neg", 0.1, {"bull": (0.2, 40), "bear": (0.1, 40), "range": (-0.01, 40)}),
+)
+
+
+def _decision_inputs() -> Tuple[Dict[str, Any], Dict[str, Dict[str, int]], Dict[str, float],
+                                Dict[str, Dict[str, Tuple[float, int]]]]:
+    """手寫表 ⇒ 產品之 grouped_ic／pair_counts／point_ic 與測試 oracle 之 {regime: {特徵: (IC, n)}}。"""
+    regimes = sorted({r for _f, _m, per in _DECISION_CASES for r in per})
+    by: Dict[str, Dict[str, float]] = {r: {} for r in regimes}
+    counts: Dict[str, Dict[str, int]] = {r: {} for r in regimes}
+    oracle: Dict[str, Dict[str, Tuple[float, int]]] = {r: {} for r in regimes}
+    for f, _m, per in _DECISION_CASES:
+        for r in regimes:
+            ic, n = per.get(r, (math.nan, 0))
+            by[r][f] = ic
+            counts[r][f] = n
+            oracle[r][f] = (ic, n)
+    return {"by_regime": by}, counts, {f: m for f, m, _p in _DECISION_CASES}, oracle
+
+
+def test_regime_robust_decision_matches_oracle_exact() -> None:
+    """產品 `_build_summary_table`（含 `_regime_robust_fields`）於手寫逐 regime IC／配對數表上 == 本檔 oracle 判定，
+    且各分支必達（True／False／None、direction −1 對齊、direction 0、IC＝0、配對數 29／30 邊界、IC 非有限略過）。
+    秒級：產品判定改壞（如恆 True、恆 None、忽略 direction、門檻改 >）⇒ 本測試紅（code review r51 CODEX-R51-P1-01）。"""
+    grouped, counts, point_ic, oracle = _decision_inputs()
+    rows = {r["feature_name"]: r for r in ICFilterOrchestrator._build_summary_table(
+        SimpleNamespace(), [f for f, _m, _p in _DECISION_CASES], {}, {}, {}, {}, {}, {}, point_ic=point_ic,
+        grouped_ic=grouped, regime_pair_counts=counts, regime_robust_min_samples=MIN_SAMPLES)}
+    assert robust_mismatches(rows, oracle) == []
+    got = {f: (r["regime_robust"], r["regime_robust_reason"]) for f, r in rows.items()}
+    assert got == {
+        "all_pos": (True, None), "mixed": (False, None), "neg_aligned": (True, None), "neg_mixed": (False, None),
+        "zero_ic_regime": (False, None), "zero_direction": (False, None),
+        "one_qualified": (None, "insufficient_regimes"), "at_threshold": (True, None),
+        "nan_regime": (False, None), "nan_skipped_rest_pos": (True, None), "three_one_neg": (False, None),
+    }
+    off = {r["feature_name"]: r for r in ICFilterOrchestrator._build_summary_table(
+        SimpleNamespace(), ["all_pos"], {}, {}, {}, {}, {}, {}, point_ic={"all_pos": 0.1},
+        grouped_ic={}, regime_pair_counts={}, regime_robust_min_samples=MIN_SAMPLES)}
+    assert (off["all_pos"]["regime_robust"], off["all_pos"]["regime_robust_reason"]) == (None, "regime_analysis_off")
+
+
 # ── 真實 kline：規則型與 kmeans 兩分支 ─────────────────────────────────────────────────────────────
 
 
@@ -487,8 +541,9 @@ def test_regime_robust_off_when_by_regime_not_computed() -> None:
 
 @pytest.mark.requires_kline
 def test_regime_robust_mutation_fixed_true_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
-    """MUTATION：`regime_robust` 固定 True 時，兩 regime 一正一負 IC 之特徵（mixed：bull 正、bear 負）必被本檔判定抓到；
-    固定 None 亦然。"""
+    """判定靈敏度（真實資料）：`regime_robust` 固定 True 時，兩 regime 一正一負 IC 之特徵（mixed：bull 正、bear 負）必被
+    本檔之真實資料比對（`robust_mismatches`）抓到；固定 None 亦然。產品本身之判定改壞由秒級
+    `test_regime_robust_decision_matches_oracle_exact` 與上列真實資料 oracle 測試直接轉紅（code review r51 CODEX-R51-P1-01）。"""
     k = _real_kline(1200)
     close = k["close"]
     label = _forward_return(close)
@@ -598,6 +653,40 @@ def test_regime_robust_end_to_end_analyze_and_refilter(tmp_path: Path, regime_me
     rows2 = {r["feature_name"]: r for r in refiltered["summary_table"]}
     assert {f: (r["regime_robust"], r["regime_robust_reason"]) for f, r in rows2.items()} == \
         {f: (r["regime_robust"], r["regime_robust_reason"]) for f, r in rows.items()}
+
+
+@pytest.mark.requires_kline
+@pytest.mark.usefixtures("ic_persist_redirect")
+@pytest.mark.ic_persist_redirect
+def test_regime_robust_end_to_end_uses_request_ic_method(tmp_path: Path) -> None:
+    """主 IC 估計量（`global_settings.default_method`＝pearson）與 `ic_calculation.methods[0]`（spearman）不同時：
+    報告 grouped_ic.by_regime == scipy.pearsonr oracle（與主 IC 同估計量），且至少一格與 spearman oracle 不同（非空真）；
+    summary regime_robust == pearson oracle 判定（code review r51 CODEX-R51-P1-02）。"""
+    k, feats, label, paths = _e2e_inputs(tmp_path)
+    override = _e2e_override("rule")
+    override["global"] = {"default_method": "pearson"}  # ICConfig.global_settings 之 alias（合併以 by_alias）
+    override["ic_calculation"]["methods"] = ["spearman"]
+    orch = create_ic_analyzer(override)
+    report = orch.analyze(features_path=str(paths["features"]), labels_path=str(paths["labels"]),
+                          meta_path=str(paths["meta"]), config_override=override,
+                          kline_reader=create_kline_storage_manager(cache_dir=str(KLINE_CACHE.parent)))
+    scope = _scope_rows(report, feats.index)
+    ks, fs, ls = k[scope], feats[scope], label[scope]
+    masks = oracle_rule_masks(ks["close"])
+    oracle = oracle_by_regime(fs, ls, masks, "pearson")
+    spear = oracle_by_regime(fs, ls, masks, "spearman")
+    by = report["grouped_ic"]["by_regime"]
+    assert set(by) == set(oracle)
+    differs = 0
+    for regime, per in oracle.items():
+        for f, (ic, _n) in per.items():
+            got = (by[regime] or {}).get(f)
+            assert (got is None and math.isnan(ic)) or abs(float(got) - ic) <= 1e-9, f"{regime}/{f}: {got} vs {ic}"
+            s = spear[regime][f][0]
+            differs += int(math.isfinite(ic) and math.isfinite(s) and abs(ic - s) > 1e-6)
+    assert differs > 0, "前提：pearson 與 spearman 之逐 regime IC 須有可區分之格"
+    rows = {r["feature_name"]: r for r in report["summary_table"]}
+    assert robust_mismatches(rows, oracle) == []
 
 
 @pytest.mark.requires_kline

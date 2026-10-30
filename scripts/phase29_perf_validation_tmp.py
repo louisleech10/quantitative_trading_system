@@ -80,7 +80,7 @@ record("Feature Quality Diagnostics (50x2K)", time.perf_counter() - start, 3.0)
 # F4 簽名:factor_return_series= dict[str, FactorTimingReturnSeries]
 ni = NetICAnalyzer({"cost_enabled": True, "cost_bps": 10.0})
 ics = {
-    f"n{i}": {"ic_mean": float(rng.normal(scale=0.05)), "avg_daily_volume_usd": 1_000_000.0}
+    f"n{i}": {"ic_mean": float(rng.normal(scale=0.05)), "avg_daily_quote_volume": 1_000_000.0}
     for i in range(30)
 }
 to = {f"n{i}": float(rng.uniform(0.1, 0.8)) for i in range(30)}
