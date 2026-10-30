@@ -13,6 +13,15 @@ from momentum.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+def quantile_key_order(key: object) -> tuple:
+    """分位鍵（`Q1`…`Qn`）之數值序（code review r48 CODEX-P1-03：字串排序使 Q10 排在 Q1 與 Q2 之間，
+    num_quantiles ≥ 10 時單調性錯算）。非 `Q<整數>` 之鍵排在其後、依字串序。"""
+    text = str(key)
+    if len(text) > 1 and text[0] == "Q" and text[1:].isdigit():
+        return (0, int(text[1:]), text)
+    return (1, 0, text)
+
+
 class MonotonicityTester:
     """Stage 5 (部分): 單調性驗證。"""
 
@@ -84,7 +93,7 @@ class MonotonicityTester:
         if not mean_returns:
             return 0.0
 
-        ordered_keys = sorted(mean_returns.keys())
+        ordered_keys = sorted(mean_returns.keys(), key=quantile_key_order)
         values = np.asarray(
             [mean_returns[key] for key in ordered_keys], dtype=float
         )
@@ -208,8 +217,8 @@ class MonotonicityTester:
 
     @staticmethod
     def _agg(data: pd.DataFrame) -> pd.Series:
-        """聚合列遮罩：標籤有限者。"""
-        return data["label"].notna()
+        """聚合列遮罩：標籤有限者（code review r48 CODEX-P1-02：±inf 標籤不得進分位均值與多空價差）。"""
+        return pd.Series(np.isfinite(data["label"].to_numpy(dtype=float)), index=data.index)
 
     def _select_num_quantiles(self, n_samples: int, requested: int) -> int:
         requested = max(int(requested), 2)
@@ -238,7 +247,7 @@ class MonotonicityTester:
             return None
 
         # 判定只看聚合列（標籤有限者）；分箱歷史則含全部特徵有限列（ICPERF Task 0.4 ⑦）
-        bins_agg = bins[data["label"].notna()]
+        bins_agg = bins[self._agg(data)]
         if bins_agg.isna().all():
             if num_quantiles > 3:
                 return self._assign_quantiles(data, 3)

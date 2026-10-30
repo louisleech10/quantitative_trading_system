@@ -29,7 +29,7 @@ from momentum.Analysis.factor_combiner import combine_factors
 from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.ic_reporter import DEFAULT_SORT_KEY, ICReporter, _finite_or_neg_inf
 from momentum.Analysis.marginal_ic import MarginalICParams, compute_marginal_ic
-from momentum.Analysis.monotonicity_tester import MonotonicityTester
+from momentum.Analysis.monotonicity_tester import MonotonicityTester, quantile_key_order
 from momentum.Analysis.binary_discrimination import (
     BINARY_STATUS_OK,
     _permute_blocks,
@@ -1142,7 +1142,7 @@ def _aligned_monotonicity(quantile_mean_returns: Mapping[str, Any], direction: i
     direction＝0 ⇒ NaN。"""
     if direction == 0:
         return float("nan")
-    keys = sorted(quantile_mean_returns or {})
+    keys = sorted(quantile_mean_returns or {}, key=quantile_key_order)  # 數值序（Q10 不排在 Q1／Q2 之間）
     values = np.asarray([quantile_mean_returns[k] for k in keys], dtype=float)
     if values.size < 2:
         return 0.0

@@ -38,6 +38,42 @@ def test_quantile_returns_and_spread():
     assert np.isclose(result["long_short_spread"], expected_spread, atol=1e-6)
 
 
+@pytest.mark.parametrize("bad", [np.inf, -np.inf, np.nan])
+def test_nonfinite_label_excluded_from_aggregation(bad):
+    """code review r48 CODEX-P1-02：標籤 ±inf／NaN 之列不進分位均值與多空價差（聚合只取標籤有限列）；oracle＝同分箱下
+    以 np.isfinite(label) 遮罩後之 numpy 均值；分箱仍依特徵全時序（壞標籤之列之分箱不變）。"""
+    n = 300
+    rng = np.random.default_rng(7)
+    feature = pd.Series(rng.normal(size=n), name="feature")
+    label = pd.Series(feature.to_numpy() + rng.normal(scale=0.1, size=n), name="label")
+    label.iloc[[150, 260]] = bad
+    tester = MonotonicityTester({"num_quantiles": 5, "min_group_size": 10})
+    result = tester.compute_quantile_returns(feature, label, num_quantiles=5)
+    data = tester._prepare_data(feature, label)
+    bins = tester._assign_quantiles(data, 5)
+    finite = np.isfinite(data["label"].to_numpy(dtype=float))
+    for q in range(5):
+        sel = (bins.to_numpy() == q) & finite
+        expected = float(np.mean(data["label"].to_numpy(dtype=float)[sel])) if sel.any() else np.nan
+        got = result["quantile_mean_returns"][f"Q{q + 1}"]
+        assert np.isfinite(got) and np.isclose(got, expected, rtol=0, atol=1e-12), (q, got, expected)
+    assert np.isfinite(result["long_short_spread"])
+
+
+@pytest.mark.parametrize("q", [3, 5, 10, 20])
+@pytest.mark.parametrize("direction", [1, -1])
+def test_monotonicity_score_numeric_quantile_order(q, direction):
+    """code review r48 CODEX-P1-03：Q 鍵依數值序（Q10 不排在 Q1 與 Q2 之間）；嚴格單調輸入 ⇒ 遞增 1.0、遞減 0.0
+    （產品與方向對齊版 `_aligned_monotonicity` 皆為數值序；oracle＝依整數 bin 序之相鄰差比例）。"""
+    from momentum.Analysis.ic_filter_orchestrator import _aligned_monotonicity
+
+    means = {f"Q{i}": float(direction * i) for i in range(1, q + 1)}
+    score = MonotonicityTester({}).compute_monotonicity_score({"quantile_mean_returns": means})
+    assert score == (1.0 if direction > 0 else 0.0)
+    assert _aligned_monotonicity(means, direction) == 1.0
+    assert _aligned_monotonicity(means, -direction) == 0.0
+
+
 def test_monotonicity_score_perfect():
     """完美單調時分數為 1.0。"""
     tester = MonotonicityTester({})

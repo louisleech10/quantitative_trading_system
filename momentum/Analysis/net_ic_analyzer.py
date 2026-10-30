@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 import numpy as np
 import pandas as pd
@@ -268,6 +268,22 @@ class NetICAnalyzer:
             "capacity_tier": tier,
         }
 
+    @staticmethod
+    def _scalar_turnover_skip_reason(turnover_data: Mapping[str, Any], feature_name: str) -> Optional[str]:
+        """無部位序列之特徵依呼叫端純量換手率分流：缺 ⇒ turnover_missing；非數／非有限 ⇒ non_finite_turnover；
+        負 ⇒ negative_turnover（禁 max(0,·) 靜默 clamp）；否則 None（不略過）。"""
+        if feature_name not in turnover_data:
+            return "turnover_missing"
+        try:
+            value = float(turnover_data[feature_name])
+        except (TypeError, ValueError):
+            return "non_finite_turnover"
+        if not math.isfinite(value):
+            return "non_finite_turnover"
+        if value < 0.0:
+            return "negative_turnover"
+        return None
+
     def _capacity_payload(
         self,
         turnover: Optional[float],
@@ -364,7 +380,7 @@ class NetICAnalyzer:
         """
         series_map = factor_return_series or {}
 
-        if not turnover_data:
+        if not turnover_data and not any(v is not None for v in series_map.values()):
             return {
                 "skipped": True,
                 "reason": "turnover_not_available",
@@ -382,37 +398,13 @@ class NetICAnalyzer:
         profitable_count = 0
 
         for feature_name, metric in ic_summary.items():
-            if feature_name not in turnover_data:
-                feature_results[feature_name] = {
-                    "skipped": True,
-                    "reason": "turnover_missing",
-                }
-                continue
-
-            turnover_raw = turnover_data[feature_name]
-            try:
-                turnover_f = float(turnover_raw)
-            except (TypeError, ValueError):
-                feature_results[feature_name] = {
-                    "skipped": True,
-                    "reason": "non_finite_turnover",
-                }
-                continue
-
-            if not math.isfinite(turnover_f):
-                feature_results[feature_name] = {
-                    "skipped": True,
-                    "reason": "non_finite_turnover",
-                }
-                continue
-
-            if turnover_f < 0.0:
-                # 禁 max(0,·) 靜默 clamp
-                feature_results[feature_name] = {
-                    "skipped": True,
-                    "reason": "negative_turnover",
-                }
-                continue
+            # code review r48 GROK-P2-01：成本／換手率一律取同列部位序列（㉒ QN-1）⇒ 有部位序列之特徵不再因呼叫端之
+            # 頂分位換手率（quantile_turnover）缺／非有限／負而整列略過；無序列者照舊依該純量分流
+            if series_map.get(feature_name) is None:
+                skip_reason = self._scalar_turnover_skip_reason(turnover_data, feature_name)
+                if skip_reason is not None:
+                    feature_results[feature_name] = {"skipped": True, "reason": skip_reason}
+                    continue
 
             gross_ic = metric.get(
                 "gross_ic", metric.get("ic_mean", metric.get("mean_ic", np.nan))

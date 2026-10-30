@@ -1,7 +1,7 @@
 {
   "after_baselines": {
-    "BTCUSDT_1h": "tests/golden/la0/BTCUSDT_1h_baseline_after.json",
-    "ETHUSDT_12h": "tests/golden/la0/ETHUSDT_12h_baseline_after.json",
+    "BTCUSDT_1h": "tests/golden/la0/BTCUSDT_1h_baseline_after_la0.json",
+    "ETHUSDT_12h": "tests/golden/la0/ETHUSDT_12h_baseline_after_la0.json",
     "pit_stats_version": "la0_b1_v1",
     "sha256_prefix": {
       "BTCUSDT_1h": "6b13a11484795476",
@@ -9,8 +9,8 @@
     }
   },
   "after_baselines_split_off": {
-    "BTCUSDT_1h": "tests/golden/la0/BTCUSDT_1h_baseline_after_split_off.json",
-    "ETHUSDT_12h": "tests/golden/la0/ETHUSDT_12h_baseline_after_split_off.json",
+    "BTCUSDT_1h": "tests/golden/la0/BTCUSDT_1h_baseline_after_split_off_la0.json",
+    "ETHUSDT_12h": "tests/golden/la0/ETHUSDT_12h_baseline_after_split_off_la0.json",
     "config": {
       "ic_train_test_split": false
     },

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import math
 import os
 import subprocess
 import sys
@@ -357,10 +358,19 @@ def test_light_view_g4(client, task, fixture_report, golden, contract):
             assert light[k] == fixture_report[k], k
     # ICPERF Task 0.4 ⑧：light view 預設排序＝icir_aligned（fixture 為 ⑧ 前報告、無該欄 ⇒ 由 sign(ic_mean)·icir 導出）
     ref = proj.paginate_summary(fixture_report["summary_table"], sort_by="icir_aligned", sort_order="desc", offset=0, limit=contract["limit_default"], contract=contract)
+    def _hand_aligned(r):  # 獨立手算（不經產品 helper；code review r48 GROK-P3-01）：sign(ic_mean)·icir，缺／0／非有限 ⇒ None
+        try:
+            m, i = float(r.get("ic_mean")), float(r.get("icir"))
+        except (TypeError, ValueError):
+            return None
+        if not (math.isfinite(m) and math.isfinite(i)) or m == 0.0:
+            return None
+        return i if m > 0 else -i
+
     assert [r["feature_name"] for r in ref["rows"]] == [
         r["feature_name"] for r in sorted(
             fixture_report["summary_table"],
-            key=lambda r: (proj.derived_icir_aligned(r) is None, -(proj.derived_icir_aligned(r) or 0.0), str(r["feature_name"])),
+            key=lambda r: (_hand_aligned(r) is None, -(_hand_aligned(r) or 0.0), str(r["feature_name"])),
         )[: contract["limit_default"]]
     ], "fixture 之導出排序 oracle 不符"
     assert light["summary_page"]["rows"] == ref["rows"] and light["summary_page"]["total"] == ref["total"]

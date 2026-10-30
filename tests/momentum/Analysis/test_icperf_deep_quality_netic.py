@@ -542,7 +542,8 @@ def ref_net_ic_analysis(
     cost_bps = None if cfg.get("cost_bps") is None else float(cfg["cost_bps"])
     rate = float(cfg.get("participation_rate", 0.01))
     series_map = factor_return_series or {}
-    if not turnover_data:
+    # code review r48 GROK-P2-01：有部位序列之特徵不依輸入之純量換手率略過（成本只取序列）；無序列者照舊分流
+    if not turnover_data and all(v is None for v in series_map.values()):
         return {"skipped": True, "reason": "turnover_not_available", "features": {},
                 "summary": {"total_analyzed": 0, "evaluable_count": 0, "profitable_count": 0}}
     feats: Dict[str, Any] = {}
@@ -550,20 +551,21 @@ def ref_net_ic_analysis(
     n_eval = 0
     n_prof = 0
     for name, metric in ic_summary.items():
-        if name not in turnover_data:
-            feats[name] = {"skipped": True, "reason": "turnover_missing"}
-            continue
-        try:
-            t_in = float(turnover_data[name])
-        except (TypeError, ValueError):
-            feats[name] = {"skipped": True, "reason": "non_finite_turnover"}
-            continue
-        if not math.isfinite(t_in):
-            feats[name] = {"skipped": True, "reason": "non_finite_turnover"}
-            continue
-        if t_in < 0.0:
-            feats[name] = {"skipped": True, "reason": "negative_turnover"}
-            continue
+        if series_map.get(name) is None:
+            if name not in turnover_data:
+                feats[name] = {"skipped": True, "reason": "turnover_missing"}
+                continue
+            try:
+                t_in = float(turnover_data[name])
+            except (TypeError, ValueError):
+                feats[name] = {"skipped": True, "reason": "non_finite_turnover"}
+                continue
+            if not math.isfinite(t_in):
+                feats[name] = {"skipped": True, "reason": "non_finite_turnover"}
+                continue
+            if t_in < 0.0:
+                feats[name] = {"skipped": True, "reason": "negative_turnover"}
+                continue
         g_raw = metric.get("gross_ic", metric.get("ic_mean", metric.get("mean_ic", math.nan)))
         try:
             g = float(g_raw)
@@ -944,6 +946,24 @@ def test_net_ic_matches_oracle_boundaries(cfg: Dict[str, Any]) -> None:
     empty = NetICAnalyzer(cfg).batch_analyze(summary, {})
     _assert_consistent(compare_net_ic_analysis(empty, summary, {}, None, cfg))
     assert empty["skipped"] is True
+
+
+@pytest.mark.parametrize("scalar", [math.nan, -0.1, "x", None])
+def test_net_ic_series_present_ignores_scalar_turnover_gate(scalar: Any) -> None:
+    """code review r48 GROK-P2-01：有部位序列之特徵，輸入之頂分位換手率缺（None ⇒ 不給鍵）／NaN／負／非數時不再整列略過——
+    換手率、成本拖累、net 皆依序列計，且與 oracle 一致；同批無序列之特徵照舊依純量略過。"""
+    s = _series([0, 1, -1, -1, 1, 0, 0, 1, 1, -1] * 3, np.random.default_rng(5).normal(0.001, 0.01, 30))
+    cfg = {"cost_enabled": True, "cost_bps": 10.0}
+    summary = {"f": {"ic_mean": 0.05}, "g": {"ic_mean": 0.04}}
+    turnover: Dict[str, Any] = {"g": math.nan} if scalar is None else {"f": scalar, "g": math.nan}
+    out = NetICAnalyzer(cfg).batch_analyze(summary, turnover, factor_return_series={"f": s})
+    _assert_consistent(compare_net_ic_analysis(out, summary, turnover, {"f": s}, cfg))
+    row = out["features"]["f"]
+    assert not row.get("skipped") and row["net_factor_return"]["status"] == "ok"
+    assert _rel(row["turnover"], _series_turnover(s)) <= REL_TOL
+    assert out["features"]["g"] == {"skipped": True, "reason": "non_finite_turnover"}
+    only_series = NetICAnalyzer(cfg).batch_analyze({"f": {"ic_mean": 0.05}}, {}, factor_return_series={"f": s})
+    assert only_series.get("skipped") is not True and not only_series["features"]["f"].get("skipped")
 
 
 def test_net_ic_turnover_consistent_with_series() -> None:
