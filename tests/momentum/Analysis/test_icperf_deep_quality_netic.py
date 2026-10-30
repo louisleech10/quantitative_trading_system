@@ -49,8 +49,25 @@ from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
 
 REPO = Path(__file__).resolve().parents[3]
 KLINE_CACHE = REPO / "data_cache" / "feature_klines" / "kline_cache.h5"
-#: SPEC Task 0.3「驗證」：浮點相對誤差門檻
+#: SPEC Task 0.3「驗證」：浮點相對誤差門檻（直接統計量）
 REL_TOL = 1e-12
+
+
+def _tolerance_policy() -> Any:
+    """SPEC v5.39 Task 0.3 ④ 分級判準之唯一來源（`test_icperf_correctness.py` 之 `rel_tol_for`：直接統計量 1e-12、衍生量
+    封閉清單〔本模組：品質診斷之有效樣本比與自相關衍生欄〕1e-9）；收據工具與本檔 compare_* 共用。"""
+    import importlib.util
+    import sys
+
+    name = "icperf_cr_tolerance_policy"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name("test_icperf_correctness.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return sys.modules[name]
+
+
 HEAVY_MARKERS = ("slow", "requires_kline")
 RECEIPT = "handoffs/run_receipts/20261029-icperf-correctness.json"
 #: oracle 之 CUSUM 顯著水準（產品無此參數；我的判斷：取同模組 adf／ljungbox 之預設 0.05）
@@ -214,8 +231,9 @@ def _is_float_like(v: Any) -> bool:
     return isinstance(v, (float, np.floating)) or v is None
 
 
-def _value_diff(a: Any, b: Any) -> Tuple[bool, Optional[float]]:
-    """回（相等, 相對誤差或 None）；浮點 rel ≤ REL_TOL；None 視同 NaN；bool／int／str 完全相等。"""
+def _value_diff(a: Any, b: Any, tol: float = REL_TOL) -> Tuple[bool, Optional[float]]:
+    """回（相等, 相對誤差或 None）；浮點 rel ≤ `tol`（SPEC v5.39 ④：呼叫端依欄位路徑取，直接統計量 1e-12、衍生量 1e-9）；
+    None 視同 NaN；bool／int／str 完全相等（判定欄恆完全相同）。"""
     if isinstance(a, (bool, np.bool_)) or isinstance(b, (bool, np.bool_)):
         return (isinstance(a, (bool, np.bool_)) and isinstance(b, (bool, np.bool_)) and bool(a) == bool(b)), None
     if isinstance(a, str) or isinstance(b, str):
@@ -226,7 +244,7 @@ def _value_diff(a: Any, b: Any) -> Tuple[bool, Optional[float]]:
         fa = math.nan if a is None else float(a)
         fb = math.nan if b is None else float(b)
         r = _rel(fa, fb)
-        return r <= REL_TOL, r
+        return r <= tol, r
     return a == b, None
 
 
@@ -253,13 +271,14 @@ def _compare(product: Any, oracle: Any, module: str) -> Dict[str, Dict[str, Any]
         bad: List[str] = []
         rels: List[float] = []
         n_finite = 0
+        tol = float(_tolerance_policy().rel_tol_for(field))  # SPEC v5.39 ④ 分級判準（依欄位路徑）
         for k in keys:
             if k not in p or k not in o:
                 bad.append(f"{k}：{'產品' if k not in p else 'oracle'}缺鍵（產品={p.get(k)!r}，oracle={o.get(k)!r}）")
                 continue
             if _finite_leaf(p[k]):
                 n_finite += 1
-            eq, r = _value_diff(p[k], o[k])
+            eq, r = _value_diff(p[k], o[k], tol)
             if r is not None and math.isfinite(r):
                 rels.append(r)
             if not eq:

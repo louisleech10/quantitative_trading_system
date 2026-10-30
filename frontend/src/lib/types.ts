@@ -2060,7 +2060,20 @@ export interface ICAnalysisConfig {
     monotonicity_score_min?: number;
     correlation_threshold: number;
   };
+  /**
+   * ICPERF Task 0.4 ㊲：第 6 段多元化約束（後端 `redundancy.diversification`）。
+   * 未設定（undefined）⇒ 不送、沿用後端設定（預設關）；使用者一動任何一項即整組明送（含 `enabled`）。
+   */
+  diversification?: ICDiversificationConfig;
   feature_tiers?: FeatureTierConfig;
+}
+
+/** 多元化約束設定：相異類別數下限、相異資料來源數下限、單一類別佔比上限、開關。 */
+export interface ICDiversificationConfig {
+  enabled: boolean;
+  min_categories: number;
+  min_data_sources: number;
+  max_same_category_pct: number;
 }
 
 export type FeatureTierLevel = 'foundation' | 'intermediate' | 'advanced' | 'custom';

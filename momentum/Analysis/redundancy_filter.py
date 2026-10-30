@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 import numpy as np
 import pandas as pd
@@ -63,6 +63,16 @@ class IRedundancyFilter(Protocol):
     ) -> dict:
         ...
 
+    def apply_diversification_constraint(
+        self,
+        features_df: pd.DataFrame,
+        selected: list[str],
+        candidates: list[str],
+        ic_scores: dict,
+        metadata: dict,
+    ) -> tuple[list[str], dict]:
+        ...
+
 
 class RedundancyFilter:
     """Stage 6: 冗餘剔除 — 相關性矩陣 + 階層聚類 + VIF。"""
@@ -76,6 +86,25 @@ class RedundancyFilter:
         self._linkage_method = hierarchical.get("linkage_method", "average")
         vif_cfg = self._config.get("vif", {}) or {}
         self._max_vif = float(vif_cfg.get("max_vif", 10.0))
+        div_cfg = self._config.get("diversification", {}) or {}
+        self._div_enabled = bool(div_cfg.get("enabled", False))
+        self._div_min_categories = int(div_cfg.get("min_categories", 3))
+        self._div_min_data_sources = int(div_cfg.get("min_data_sources", 2))
+        self._div_max_same_category_pct = float(div_cfg.get("max_same_category_pct", 0.4))
+
+    @property
+    def diversification_enabled(self) -> bool:
+        """ICPERF Task 0.4 ㊲：多元化約束是否開啟（關 ⇒ 第 6 段與改前相同）。"""
+        return self._div_enabled
+
+    def diversification_settings(self) -> dict:
+        """多元化約束之有效設定（enabled 與三數值）。"""
+        return {
+            "enabled": self._div_enabled,
+            "min_categories": self._div_min_categories,
+            "min_data_sources": self._div_min_data_sources,
+            "max_same_category_pct": self._div_max_same_category_pct,
+        }
 
     def filter(
         self,
@@ -346,6 +375,245 @@ class RedundancyFilter:
             "data_source_coverage": data_source_coverage,
             "layer_coverage": layer_coverage,
         }
+
+    # ------------------------------------------------------------------ ICPERF Task 0.4 ㊲ 多元化約束
+    _DIV_EPS = 1e-9
+
+    def apply_diversification_constraint(
+        self,
+        features_df: pd.DataFrame,
+        selected: list[str],
+        candidates: list[str],
+        ic_scores: dict,
+        metadata: dict,
+    ) -> tuple[list[str], dict]:
+        """第 6 段多元化約束（ICPERF Task 0.4 ㊲）：冗餘剔除後之倖存集合 S 須滿足
+        ①相異類別數 ≥ `min_categories` ②相異資料來源數 ≥ `min_data_sources`
+        ③任一類別之倖存數 ≤ `max_same_category_pct` ×（類別已知之倖存數）。
+
+        輸入：`features_df`＝第 6 段所用之列（切分成立時為測試段）；`selected`＝冗餘剔除之倖存；`candidates`＝通過第 5 段
+        門檻之全部特徵（順序＝通過名單順序）；`ic_scores`＝冗餘所用之分數（同 tiebreaker）；`metadata`＝逐特徵 metadata。
+
+        規則（依序；每一步皆確定性）：
+        - 已知值：metadata 項為 dict、`metadata_source` 不為 `missing`、該欄不為 None；否則該特徵不計入任何類別或來源
+          （③之分母亦不計），並記數於 `metadata_missing`。
+        - 排序鍵：同冗餘之分數（非有限 ⇒ 最低），同分依通過名單順序。「合格候選」＝在 `candidates` 中、不在 S、未曾被本約束
+          剔除，且與當下 S 之每一成員 |Pearson（兩者皆有限之列）| ≤ `correlation_threshold`（相關 NaN 視為不冗餘）——與
+          冗餘剔除同一門檻，補入不得重新引入冗餘。
+        - 步驟 1（①）：相異類別數不足時，自合格候選中取「類別已知且為 S 所無」之最高排序者補入，重複至滿足；無此候選 ⇒
+          未滿足，原因 `candidates_redundant`（有新類別候選但皆冗餘）或 `no_candidate_with_new_value`。
+        - 步驟 2（②）：同步驟 1，對資料來源。
+        - 步驟 3（③）：違反時取倖存數最多之類別 k（同數取名稱最小），於 k 之成員中由排序最低者起，取第一個「移除後相異
+          類別數 ≥ min(①下限, 移除前) 且相異來源數 ≥ min(②下限, 移除前)」者 r（全受保護 ⇒ 未滿足 `coverage_protected`）；
+          先嘗試換入：最高排序之合格候選 e（相對 S∖{r}），其類別已知、≠ k、且換入後該類別數 ≤ 門檻 ⇒ 以 e 換 r（集合大小
+          不變）；無 e 時，若相異類別數 × 比例 < 1（即使每類只留一個仍超過）⇒ 未滿足 `insufficient_categories`、不剔除；
+          否則剔除 r。重複至滿足。
+        - 終止：每次換入／剔除皆使一個特徵永久離開，候選有限。
+
+        業界對齊：於分數排序下加群組（類別）上限之貪婪選取＝分割擬陣（partition matroid）上之貪婪，於群組上限下為總分最大
+        （Edmonds 1971, "Matroids and the greedy algorithm"）；群組下限以補入最高分者滿足，同組合建構中之產業／風格曝險上下限
+        （Grinold & Kahn, *Active Portfolio Management*, 2nd ed., ch. 14 portfolio construction constraints）。
+
+        回 (最終倖存〔依 `candidates` 順序〕, 記錄)。`enabled` 為 False 時呼叫端不應呼叫（回原集合與 `{"enabled": False}`）。
+        """
+
+        settings = self.diversification_settings()
+        if not self._div_enabled:
+            return list(selected), {"enabled": False}
+        min_c = self._div_min_categories
+        min_s = self._div_min_data_sources
+        pct = self._div_max_same_category_pct
+        eps = self._DIV_EPS
+        metadata = metadata or {}
+        order = list(candidates)
+        position = {name: i for i, name in enumerate(order)}
+        score = {
+            name: self._score_value(ic_scores, name, self._tiebreaker) for name in order
+        }
+        rank = sorted(order, key=lambda name: (-score[name], position[name]))
+        rank_pos = {name: i for i, name in enumerate(rank)}
+        selected_set = set(selected)
+        members = [name for name in rank if name in selected_set]
+        gone: set[str] = set()
+        added: list[dict] = []
+        removed: list[dict] = []
+        unmet: dict[str, str] = {}
+        corr_cache: dict[tuple[str, str], float] = {}
+        arrays: dict[str, np.ndarray] = {}
+
+        def known(name: str, key: str) -> Optional[str]:
+            info = metadata.get(name)
+            if not isinstance(info, dict) or info.get("metadata_source") == "missing":
+                return None
+            value = info.get(key)
+            return None if value is None else str(value)
+
+        def values(names: list[str], key: str) -> list[str]:
+            return [v for v in (known(n, key) for n in names) if v is not None]
+
+        def column(name: str) -> np.ndarray:
+            arr = arrays.get(name)
+            if arr is None:
+                arr = pd.to_numeric(features_df[name], errors="coerce").to_numpy(dtype=float)
+                arrays[name] = arr
+            return arr
+
+        def abs_corr(a: str, b: str) -> float:
+            pair = (a, b) if a <= b else (b, a)
+            cached = corr_cache.get(pair)
+            if cached is not None:
+                return cached
+            x, y = column(a), column(b)
+            mask = np.isfinite(x) & np.isfinite(y)
+            value = float("nan")
+            if int(mask.sum()) >= 2:
+                xm = x[mask] - x[mask].mean()
+                ym = y[mask] - y[mask].mean()
+                den = float(np.sqrt(np.dot(xm, xm) * np.dot(ym, ym)))
+                if den > 0.0:
+                    value = abs(float(np.dot(xm, ym) / den))
+            corr_cache[pair] = value
+            return value
+
+        def redundant(name: str, against: list[str]) -> bool:
+            for other in against:
+                value = abs_corr(name, other)
+                if np.isfinite(value) and value > self._corr_threshold:
+                    return True
+            return False
+
+        def admissible(before: list[str], after: list[str]) -> bool:
+            cats_b, cats_a = len(set(values(before, "category"))), len(set(values(after, "category")))
+            srcs_b, srcs_a = len(set(values(before, "data_source"))), len(set(values(after, "data_source")))
+            return cats_a >= min(min_c, cats_b) and srcs_a >= min(min_s, srcs_b)
+
+        def entry(name: str, condition: str, **extra: Any) -> dict:
+            value = score[name]
+            return {
+                "name": name,
+                "category": known(name, "category"),
+                "data_source": known(name, "data_source"),
+                "score": value if np.isfinite(value) else None,
+                "condition": condition,
+                **extra,
+            }
+
+        def summary(names: list[str]) -> dict:
+            cats = values(names, "category")
+            srcs = values(names, "data_source")
+            cat_counts: dict[str, int] = {}
+            for c in cats:
+                cat_counts[c] = cat_counts.get(c, 0) + 1
+            src_counts: dict[str, int] = {}
+            for s in srcs:
+                src_counts[s] = src_counts.get(s, 0) + 1
+            return {
+                "n_features": len(names),
+                "n_categories": len(cat_counts),
+                "n_data_sources": len(src_counts),
+                "max_category_share": (max(cat_counts.values()) / len(cats)) if cats else None,
+                "category_counts": dict(sorted(cat_counts.items())),
+                "data_source_counts": dict(sorted(src_counts.items())),
+            }
+
+        def missing_count(names: list[str]) -> int:
+            return sum(
+                1 for n in names
+                if not isinstance(metadata.get(n), dict) or metadata[n].get("metadata_source") == "missing"
+            )
+
+        before = list(members)
+        for condition, key, need in (
+            ("min_categories", "category", min_c),
+            ("min_data_sources", "data_source", min_s),
+        ):
+            while len(set(values(members, key))) < need:
+                have = set(values(members, key))
+                pool = [
+                    name for name in rank
+                    if name not in members and name not in gone
+                    and known(name, key) is not None and known(name, key) not in have
+                ]
+                pick = next((name for name in pool if not redundant(name, members)), None)
+                if pick is None:
+                    unmet[condition] = "candidates_redundant" if pool else "no_candidate_with_new_value"
+                    break
+                members.append(pick)
+                added.append(entry(pick, condition))
+
+        while True:
+            cats = values(members, "category")
+            n_known = len(cats)
+            counts: dict[str, int] = {}
+            for c in cats:
+                counts[c] = counts.get(c, 0) + 1
+            if n_known == 0 or max(counts.values()) <= pct * n_known + eps:
+                break
+            top = max(counts.values())
+            k = sorted(c for c, v in counts.items() if v == top)[0]
+            in_rank = sorted(members, key=lambda name: rank_pos[name])
+            victims = [name for name in reversed(in_rank) if known(name, "category") == k]
+            r = next(
+                (name for name in victims if admissible(members, [m for m in members if m != name])),
+                None,
+            )
+            if r is None:
+                unmet["max_same_category_pct"] = "coverage_protected"
+                break
+            rest = [m for m in members if m != r]
+            swap = None
+            for name in rank:
+                if name in members or name in gone:
+                    continue
+                cat = known(name, "category")
+                if cat is None or cat == k or counts.get(cat, 0) + 1 > pct * n_known + eps:
+                    continue
+                if redundant(name, rest):
+                    continue
+                swap = name
+                break
+            if swap is not None:
+                members = rest + [swap]
+                gone.add(r)
+                removed.append(entry(r, "max_same_category_pct", action="swap", replaced_by=swap))
+                added.append(entry(swap, "max_same_category_pct", replaces=r))
+                continue
+            if len(counts) * pct < 1.0 - eps:
+                unmet["max_same_category_pct"] = "insufficient_categories"
+                break
+            members = rest
+            gone.add(r)
+            removed.append(entry(r, "max_same_category_pct", action="trim"))
+
+        final_set = set(members)
+        final = [name for name in order if name in final_set]
+        after = summary(final)
+        satisfied = {
+            "min_categories": after["n_categories"] >= min_c,
+            "min_data_sources": after["n_data_sources"] >= min_s,
+            "max_same_category_pct": (
+                after["max_category_share"] is None
+                or max(after["category_counts"].values()) <= pct * sum(after["category_counts"].values()) + eps
+            ),
+        }
+        log = {
+            "enabled": True,
+            "settings": {k: v for k, v in settings.items() if k != "enabled"},
+            "n_before": len(before),
+            "n_after": len(final),
+            "before": summary([name for name in order if name in set(before)]),
+            "after": after,
+            "satisfied": satisfied,
+            "unmet_reasons": unmet,
+            "added": added,
+            "removed": removed,
+            "metadata_missing": {
+                "selected_before": missing_count(before),
+                "candidates": missing_count([n for n in order if n not in selected_set]),
+                "final": missing_count(final),
+            },
+        }
+        return final, log
 
     def _compute_vif_scores(self, data: pd.DataFrame) -> dict[str, float]:
         vifs: dict[str, float] = {}

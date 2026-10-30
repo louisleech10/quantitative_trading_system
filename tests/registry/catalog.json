@@ -1668,6 +1668,27 @@
    "rewrite_targets": [],
    "ticket": "IC-HC"
   },
+  "tests/api/test_icperf_feature_metadata.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/api/test_icperf_feature_metadata.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/api/test_icpostleak_api.py": {
    "claim": [
     "contract",
@@ -9459,6 +9480,27 @@
    "rewrite_targets": [],
    "ticket": "ICPERF"
   },
+  "tests/momentum/Analysis/test_icperf_diversification_constraint.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_diversification_constraint.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/momentum/Analysis/test_icperf_gate.py": {
    "claim": [
     "contract",
@@ -9520,6 +9562,48 @@
     "TOLERANCE"
    ],
    "path": "tests/momentum/Analysis/test_icperf_regime_robust.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_rolling_numerics.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_rolling_numerics.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_xsec_placeholders.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_xsec_placeholders.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],

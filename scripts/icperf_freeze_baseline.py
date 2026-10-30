@@ -330,12 +330,15 @@ if not getattr(_ic_sys, "_icperf_audit_done", False):
 
 
 def isolated_env(base_env: Mapping[str, str], iso_root: Path) -> Dict[str, str]:
-    """回 `base_env` 之副本，`TMPDIR`＝`iso_root/tmp`、`HOME`＝`iso_root/home`（皆建立、互異）；其餘鍵原樣保留。"""
+    """回 `base_env` 之副本，`TMPDIR`＝`iso_root/tmp`、`HOME`＝`iso_root/home`、`NUMBA_CACHE_DIR`＝`iso_root/numba_cache`
+    （皆建立、互異）；其餘鍵原樣保留。`NUMBA_CACHE_DIR` 一律覆寫（ICPERF SPEC v5.38 Task 0.3 ⑤：呼叫端之值〔如 pytest
+    conftest 設於系統暫存〕使子行程 numba 快取寫出落在快照範圍外而 fail-closed；隔離目錄在快照範圍內，快取檔另依
+    `NUMBA_CACHE_SUFFIXES` 排除於比對）。"""
     env = dict(base_env)
-    tmp, home = Path(iso_root) / "tmp", Path(iso_root) / "home"
-    tmp.mkdir(parents=True, exist_ok=True)
-    home.mkdir(parents=True, exist_ok=True)
-    env["TMPDIR"], env["HOME"] = str(tmp), str(home)
+    tmp, home, nb = Path(iso_root) / "tmp", Path(iso_root) / "home", Path(iso_root) / "numba_cache"
+    for d in (tmp, home, nb):
+        d.mkdir(parents=True, exist_ok=True)
+    env["TMPDIR"], env["HOME"], env["NUMBA_CACHE_DIR"] = str(tmp), str(home), str(nb)
     return env
 
 
@@ -875,8 +878,9 @@ IC_PAGE_OUTPUT_ROOTS = ("data_cache/features", "data_cache/reports")
 IC_FIRST_OUTPUT_ROOTS = ("features", "cgsa_work", "dstar_cache", "sys_tmp")
 #: SPEC v5.26 §G (7)：事件匯入批（`scripts/icperf_event_batch.py` 依明列規則以 L 格真實 kline 建批、經
 #: `EventImportService.import_records` 落檔；FACT-RECEIPT `EVENT_BATCH_RECEIPT`）
-EVENT_IMPORT_ID = "20261029T152937Z-d5c4ac41"
-EVENT_BATCH_RECEIPT = "handoffs/run_receipts/20261029-icperf-event-batch-4h.json"
+#: SPEC v5.38 Task 0.3 補足①：舊批（20261029T152937Z-d5c4ac41，93 筆、測試段 19 < 30）改為 BREAKOUT_BARS 6 之新批
+EVENT_IMPORT_ID = "20261030T140536Z-91a1dc03"
+EVENT_BATCH_RECEIPT = "handoffs/run_receipts/20261030-icperf-event-batch-4h-b6.json"
 #: 第 (1)(3)(4)(6)(7) 項（IC 頁路徑）
 IC_PAGE_ITEMS = ("ic_report", "deep_analysis", "event_report", "ic_report_long", "deep_analysis_long",
                  "event_import_report")

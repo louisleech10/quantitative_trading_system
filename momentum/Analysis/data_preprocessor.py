@@ -565,16 +565,6 @@ class DataPreprocessor:
 
     # 型態特徵合法離散值（pattern/type 標籤）；僅作 value 判定集合，非時間序列屬性
     _TYPE_FEATURE_VALUES: frozenset = frozenset({-100, 0, 100, -100.0, 0.0, 100.0})
-    _TYPE_CATEGORY_TOKENS: frozenset[str] = frozenset(
-        {
-            "type",
-            "pattern",
-            "categorical",
-            "categorical_position",
-            "discrete_type",
-            "type_feature",
-        }
-    )
 
     @classmethod
     def _is_type_feature(cls, series: pd.Series) -> bool:
@@ -612,12 +602,9 @@ class DataPreprocessor:
             return None
         if "is_type_feature" in col_meta:
             return bool(col_meta["is_type_feature"])
-        for key in ("category", "feature_type", "dtype_kind", "feature_category"):
-            token = col_meta.get(key)
-            if token is None:
-                continue
-            if str(token).lower().strip() in cls._TYPE_CATEGORY_TOKENS:
-                return True
+        # ICPERF Task 0.4 ㉝：不以 category 等分類詞宣告型態特徵——特徵族別（如 pattern）同時含 ±100 型態值與計數／延遲值
+        # （C 格 98 欄 pattern 只 30 欄值域屬型態集合）；只認顯式宣告（type_features 清單、is_type_feature），未宣告者
+        # 由 _column_is_type_feature 依 fit 可見切片之值域判定
         return None
 
     def _column_is_type_feature(

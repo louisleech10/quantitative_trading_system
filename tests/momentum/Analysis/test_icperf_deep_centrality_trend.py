@@ -45,8 +45,30 @@ from momentum.core.exceptions import InsufficientDataError
 
 REPO = Path(__file__).resolve().parents[3]
 KLINE_CACHE = REPO / "data_cache" / "feature_klines" / "kline_cache.h5"
-#: SPEC Task 0.3「驗證」：浮點對照之相對誤差門檻
+#: SPEC Task 0.3「驗證」：浮點對照之相對誤差門檻（直接統計量）
 REL_TOL = 1e-12
+
+
+def _tolerance_policy() -> Any:
+    """SPEC v5.39 Task 0.3 ④ 分級判準之唯一來源（`test_icperf_correctness.py` 之 `rel_tol_for`／`tolerance_class`：直接統計量
+    1e-12、衍生量封閉清單 1e-9）；收據工具與本檔 compare_* 共用。"""
+    import importlib.util
+    import sys
+
+    name = "icperf_cr_tolerance_policy"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name("test_icperf_correctness.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return sys.modules[name]
+
+
+def _tol(path: str) -> float:
+    """欄位路徑之相對誤差門檻（SPEC v5.39 ④；趨勢各維之斜率／p 值／尾端估計／r_squared 為衍生量 1e-9，其餘 1e-12）。"""
+    return float(_tolerance_policy().rel_tol_for(path))
+
+
 NON_STAT = "非統計欄"
 HEAVY_MARKERS = ("slow", "requires_kline")
 RECEIPT = "handoffs/run_receipts/<日期>-icperf-correctness.json"
@@ -661,8 +683,9 @@ def _to_float(v: Any) -> float:
     return float(v)
 
 
-def _verdict_numeric(pairs: List[Tuple[str, Any, Any]], atol: float = 0.0) -> Dict[str, Any]:
-    """浮點對照：相對誤差 ≤ 1e-12；`atol` > 0（UNIT_SCALE_PATHS）時另認絕對誤差 ≤ atol。"""
+def _verdict_numeric(pairs: List[Tuple[str, Any, Any]], atol: float = 0.0, tol: float = REL_TOL) -> Dict[str, Any]:
+    """浮點對照：相對誤差 ≤ `tol`（SPEC v5.39 ④：呼叫端依欄位路徑以 `_tol` 取，直接統計量 1e-12、衍生量 1e-9）；`atol` > 0
+    （UNIT_SCALE_PATHS）時另認絕對誤差 ≤ atol。"""
     max_rel, n_fin, bad = 0.0, 0, []
     for tag, pv, ov in pairs:
         if pv is None and ov is None:
@@ -672,52 +695,54 @@ def _verdict_numeric(pairs: List[Tuple[str, Any, Any]], atol: float = 0.0) -> Di
             n_fin += 1
         r = _rel(a, b)
         max_rel = max(max_rel, r)
-        if r > REL_TOL and not (atol > 0.0 and math.isfinite(a) and math.isfinite(b) and abs(a - b) <= atol):
+        if r > tol and not (atol > 0.0 and math.isfinite(a) and math.isfinite(b) and abs(a - b) <= atol):
             bad.append(f"{tag}: 產品 {a!r} vs oracle {b!r}")
     return {"verdict": "一致" if not bad else "不一致", "max_rel_diff": max_rel if pairs else None, "n_finite": n_fin,
             "detail": "; ".join(bad[:5])}
 
 
-def _p_consistent(p_prod: float, p_orc: float, t_abs: float, df: float) -> Tuple[bool, float]:
-    """p 值一致判定：p 相對誤差 ≤ 1e-12，**或**產品 p 落於 oracle |t| 擾動 ±1e-12（相對）所對應之雙尾 p 區間
-    [2·t.sf(|t|(1+1e-12)), 2·t.sf(|t|(1−1e-12))]（`scipy.stats.t`，df＝n−2；後向誤差判定）。理由：雙尾 p 對 t 之條件數約
+def _p_consistent(p_prod: float, p_orc: float, t_abs: float, df: float, tol: float = REL_TOL) -> Tuple[bool, float]:
+    """p 值一致判定：p 相對誤差 ≤ `tol`，**或**產品 p 落於 oracle |t| 擾動 ±`tol`（相對）所對應之雙尾 p 區間
+    [2·t.sf(|t|(1+tol)), 2·t.sf(|t|(1−tol))]（`scipy.stats.t`，df＝n−2；後向誤差判定）。理由：雙尾 p 對 t 之條件數約
     |t|·(df+1)|t|／(df+t²)，極端尾部（如 p≈1e-76、|t|≈45）時 t 之 1e-14 捨入差即放大為 p 之 1e-12 以上，不屬計算錯誤；
-    t 為良態量（反推用之 `t.isf` 於此尾部本身僅約 1e-11 精度，故不採反推）。回 (一致, p 之相對誤差)。"""
+    t 為良態量（反推用之 `t.isf` 於此尾部本身僅約 1e-11 精度，故不採反推）。`tol`＝SPEC v5.39 ④ 依欄位路徑之判準
+    （趨勢 p 值屬衍生量封閉清單 ⇒ 1e-9；預設 1e-12）。回 (一致, p 之相對誤差)。"""
     r = _rel(p_prod, p_orc)
-    if r <= REL_TOL:
+    if r <= tol:
         return True, r
     if math.isfinite(t_abs) and math.isfinite(df) and t_abs > 0 and math.isfinite(p_prod):
-        lo = 2.0 * float(stats.t.sf(t_abs * (1.0 + REL_TOL), df))
-        hi = 2.0 * float(stats.t.sf(t_abs * (1.0 - REL_TOL), df))
-        if lo * (1.0 - REL_TOL) <= p_prod <= hi * (1.0 + REL_TOL):
+        lo = 2.0 * float(stats.t.sf(t_abs * (1.0 + tol), df))
+        hi = 2.0 * float(stats.t.sf(t_abs * (1.0 - tol), df))
+        if lo * (1.0 - tol) <= p_prod <= hi * (1.0 + tol):
             return True, r
     return False, r
 
 
-def _verdict_pvalue(items: List[Tuple[str, Any, Any, float, float]]) -> Dict[str, Any]:
+def _verdict_pvalue(items: List[Tuple[str, Any, Any, float, float]], tol: float = REL_TOL) -> Dict[str, Any]:
     max_rel, n_fin, bad = 0.0, 0, []
     for tag, pv, ov, t_abs, df in items:
         a, b = _to_float(pv), _to_float(ov)
         n_fin += int(math.isfinite(a))
-        ok, r = _p_consistent(a, b, t_abs, df)
+        ok, r = _p_consistent(a, b, t_abs, df, tol)
         max_rel = max(max_rel, r)
         if not ok:
             bad.append(f"{tag}: 產品 {a!r} vs oracle {b!r}")
     return {"verdict": "一致" if not bad else "不一致", "max_rel_diff": max_rel if items else None, "n_finite": n_fin,
-            "detail": "; ".join(bad[:5]) + ("（p 或其對應 |t| 之相對誤差 ≤ 1e-12 即一致）" if items else "")}
+            "detail": "; ".join(bad[:5]) + (f"（p 或其對應 |t| 之相對誤差 ≤ {tol:g} 即一致）" if items else "")}
 
 
-def _verdict_slope(items: List[Tuple[str, Any, Any, float]]) -> Dict[str, Any]:
-    """斜率對照：相對誤差 ≤ 1e-12，或絕對誤差 ≤ 1e-12 × 斜率之自然尺度 std(y)／std(x)（同 numpy.isclose 之 rtol＋atol；
-    斜率趨近 0 時相對誤差不具意義——兩條獨立 OLS 路徑之差約為機器精度 × 此尺度）。"""
+def _verdict_slope(items: List[Tuple[str, Any, Any, float]], tol: float = REL_TOL) -> Dict[str, Any]:
+    """斜率對照：相對誤差 ≤ `tol`，或絕對誤差 ≤ `tol` × 斜率之自然尺度 std(y)／std(x)（同 numpy.isclose 之 rtol＋atol；
+    斜率趨近 0 時相對誤差不具意義——兩條獨立 OLS 路徑之差約為機器精度 × 此尺度）。`tol`＝SPEC v5.39 ④ 依欄位路徑之判準
+    （趨勢斜率屬衍生量 ⇒ 1e-9）。"""
     max_rel, n_fin, bad = 0.0, 0, []
     for tag, pv, ov, scale in items:
         a, b = _to_float(pv), _to_float(ov)
         n_fin += int(math.isfinite(a))
         r = _rel(a, b)
         max_rel = max(max_rel, r)
-        ok = r <= REL_TOL or (math.isfinite(scale) and math.isfinite(a) and math.isfinite(b)
-                              and abs(a - b) <= REL_TOL * scale)
+        ok = r <= tol or (math.isfinite(scale) and math.isfinite(a) and math.isfinite(b)
+                          and abs(a - b) <= tol * scale)
         if not ok:
             bad.append(f"{tag}: 產品 {a!r} vs oracle {b!r}")
     return {"verdict": "一致" if not bad else "不一致", "max_rel_diff": max_rel if items else None, "n_finite": n_fin,
@@ -750,7 +775,7 @@ def _compare_trees(product: Any, oracle: Any, root: str) -> Dict[str, Dict[str, 
                          "detail": f"位置不同：只產品 {sorted(tags_p - tags_o)[:5]}；只 oracle {sorted(tags_o - tags_p)[:5]}"}
             continue
         pairs = [(t, d["p"][t], d["o"][t]) for t in sorted(tags_p)]
-        out[path] = (_verdict_numeric(pairs, atol=ABS_TOL_UNIT if path in UNIT_SCALE_PATHS else 0.0)
+        out[path] = (_verdict_numeric(pairs, atol=ABS_TOL_UNIT if path in UNIT_SCALE_PATHS else 0.0, tol=_tol(path))
                      if path in NUMERIC_PATHS else _verdict_exact(pairs))
     return out
 
@@ -832,7 +857,8 @@ def compare_trend_analysis(product_output: Any, rolling_ic: dict, selected_featu
         return _verdict_pvalue([(f"[{n}]", product_output.get(n, {}).get(dim_key, {}).get("p_value"),
                                  e[dim_key]["p_value"], e[dim_key].get("_t_abs", math.nan),
                                  e[dim_key].get("_df", math.nan))
-                                for n, e in reference.items() if dim_key in e])
+                                for n, e in reference.items() if dim_key in e],
+                               tol=_tol(f"trend_analysis/*/{dim_key}/p_value"))
 
     for dim in TREND_DIMS:
         pkey = f"trend_analysis/*/{dim}_trend/p_value"
@@ -842,7 +868,7 @@ def compare_trend_analysis(product_output: Any, rolling_ic: dict, selected_featu
         if skey in out and "位置不同" not in out[skey]["detail"] and "未登錄" not in out[skey]["detail"]:
             out[skey] = _verdict_slope([(f"[{n}]", product_output.get(n, {}).get(f"{dim}_trend", {}).get("slope"),
                                          e[f"{dim}_trend"]["slope"], e[f"{dim}_trend"].get("_slope_scale", math.nan))
-                                        for n, e in ref.items() if f"{dim}_trend" in e])
+                                        for n, e in ref.items() if f"{dim}_trend" in e], tol=_tol(skey))
     out["trend_analysis/*（鍵集合）"] = _verdict_exact([("", list(product_output), list(ref))])
     full = ref_trend_analysis(rolling_ic, selected_features, config, overlap_window="from_key",
                               rolling_stride=rolling_stride, sources=sources, dimensions=dimensions)

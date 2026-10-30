@@ -7,9 +7,13 @@
 `test_icperf_deep_*.py` 之 `_ref_*`／`compare_*`，皆不呼叫被測碼）自上列輸入重算回應之每一統計欄位逐值對照，另以真實
 kline 獨立重建標籤、以切分參考實作重建訓練／測試段，驗產品輸入本身。
 
-收據 `handoffs/run_receipts/<日期>-icperf-correctness.json`（形狀見 `build_receipt`）。逐請求封閉（SPEC v5.26 r40）：每一
-請求之實際回應涵蓋鍵集合 == 該請求 coverage 鍵集合；每鍵狀態 verified／verified-na／unimplemented／metadata-missing／
-insufficient-data，後三者存在 ⇒ 收據不 PASS。
+收據 `handoffs/run_receipts/<日期>-icperf-correctness.json`（形狀見 `build_receipt`）。逐請求封閉（SPEC v5.26 r40；v5.39 ⑧）：
+每一請求之實際回應鍵集合以與 coverage 抽取獨立之規則（`test_icperf_correctness.py` 之 `_paths`／`_coverage_keys`）重算，
+== 該請求 coverage 鍵集合；每鍵狀態只准五態（v5.39 ⑦）verified／verified-na／unimplemented／metadata-missing／
+insufficient-data＋非統計欄 non-stat；已對映 oracle 項而無逐值對照之統計鍵記 insufficient-data 並標 `uncompared`、逐鍵列入
+FAIL 原因（不另立狀態）；unimplemented、metadata-missing 任一請求出現即不 PASS，insufficient-data 於任一請求皆未 verified／
+verified-na 之鍵不 PASS。浮點判準（v5.39 ④）：直接統計量相對 1e-12、衍生量封閉清單 1e-9（`test_icperf_correctness.py`
+`rel_tol_for`，三處同一判準）、判定欄完全相同。
 
 用法（capture 為重型，列 `scripts/heavy_commands.json` 之 `icperf_correctness`：須背景、經共用監看、先寫估時收據；
 `--n-features` 為小規模除錯之子集欄數上限，不改 `REQUESTS` 預設）：
@@ -22,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import functools
 import importlib.util
 import json
 import os
@@ -43,6 +48,12 @@ COVERAGE_FEATURES = 20
 #: over_response_keys` 之同一請求）；否則 seed 隨機巢狀子集。`method`＝覆寫 `global.default_method`（SPEC Task 0.3「Pearson、
 #: Kendall 分支各至少一格」、BUDGET-7）。`kind="cross"`＝跨標的請求（SPEC Task 0.3 跨標的欄、BUDGET-11）。
 #: 12h 長歷史格不列（SPEC v5.33 ⑪：IC 頁驗證之資料格須與產品 K 線同源，12h 長歷史格不作 IC 頁驗證格）。
+#: `family`＝深度請求之特徵子集以明列規則納入一組完整參數家族（SPEC v5.39 ②；`family_aware_subset`）：子集欄數＝
+#: `n_features`（≤ 深度預設 top_n，使 top_n 選取路徑選入子集全部欄、含該家族）。`event_batch_receipt`＝事件匯入批改用
+#: `scripts/icperf_event_batch.py` 依明列規則重建之批（SPEC v5.38 ①；其 FACT-RECEIPT 之 import_id）。跨標的兩請求（SPEC
+#: v5.39 ⑩）：`X.cross_sectional`＝兩格 FF 特徵之退回分支（明列 `override_extra`＝關切分；不以預設失敗後退回）；
+#: `X.cross_sectional.default`＝`kline_cache.h5` 該週期全部標的之末 `rows` 根真實 kline 因果特徵（`XSEC_FEATURES`）之預設
+#: 分支（預設切分須成立，失敗 ⇒ 請求失敗、收據 FAIL）。
 REQUESTS: Dict[str, Dict[str, Any]] = {
     "A.ic_report": {"item": "ic_report", "n_features": 120},
     "A.ic_report.cov": {"item": "ic_report", "n_features": COVERAGE_FEATURES, "sorted": True},
@@ -50,13 +61,22 @@ REQUESTS: Dict[str, Dict[str, Any]] = {
     "A.ic_report.kendall": {"item": "ic_report", "n_features": 30, "method": "kendall"},
     "A.event_report": {"item": "event_report", "n_features": 120},
     "A.event_report.cov": {"item": "event_report", "n_features": COVERAGE_FEATURES, "sorted": True},
-    "A.deep_analysis": {"item": "deep_analysis", "n_features": 120},
+    "A.deep_analysis": {"item": "deep_analysis", "n_features": 30, "family": True},
     "L.ic_report": {"item": "ic_report_long", "n_features": 120},
-    "L.deep_analysis": {"item": "deep_analysis_long", "n_features": 120},
-    "L.event_import_report": {"item": "event_import_report", "n_features": 120},
+    "L.deep_analysis": {"item": "deep_analysis_long", "n_features": 30, "family": True},
+    "L.event_import_report": {"item": "event_import_report", "n_features": 120,
+                              "event_batch_receipt": "handoffs/run_receipts/20261030-icperf-event-batch-4h-b6.json"},
     "X.cross_sectional": {"kind": "cross", "item": "ic_report", "cells": ["A_BTCUSDT_1h", "A_SOLUSDT_1h"],
-                          "n_features": 20},
+                          "n_features": 20, "override_extra": {"ic_train_test_split": False}},
+    "X.cross_sectional.default": {"kind": "cross_kline", "item": "ic_report", "service_cell": "A_BTCUSDT_1h",
+                                  "timeframe": "1h", "rows": 2000},
 }
+#: 跨標的預設分支之真實 kline 因果特徵（只用 0..t；同 `test_icperf_correctness.py` `_real_features_wide` 之定義）
+XSEC_FEATURES = ("ret1", "dev20", "vol20", "mom10")
+#: 參數家族之名稱規則（同產品 `ParameterSensitivityAnalyzer.detect_feature_families` 之自動偵測樣式，
+#: parameter_sensitivity_analyzer.py:67）與最少成員數（同 `min_family_size` 預設 3，:40）
+FAMILY_PATTERN = r"^(.+?)_(\d+)$"
+FAMILY_MIN_SIZE = 3
 #: 頂層 coverage 之來源請求（§G (1)(4) 之 A 格小請求；同測試之涵蓋鍵規則）
 TOP_COVERAGE_REQUESTS = ("A.ic_report.cov", "A.event_report.cov")
 #: 子集欄數之覆寫（小規模除錯；不改 `REQUESTS` 預設值）
@@ -96,9 +116,55 @@ def _n_features(spec: Mapping[str, Any]) -> Optional[int]:
     return n
 
 
+def parameter_families(names: Sequence[str], min_size: int = FAMILY_MIN_SIZE) -> Dict[str, List[str]]:
+    """名稱規則（`FAMILY_PATTERN`）之參數家族：{前綴: [成員…]（依原順序）}，只留成員數 ≥ `min_size` 者。"""
+    out: Dict[str, List[str]] = {}
+    for name in names:
+        m = re.match(FAMILY_PATTERN, str(name))
+        if m:
+            out.setdefault(m.group(1), []).append(str(name))
+    return {k: v for k, v in out.items() if len(v) >= int(min_size)}
+
+
+def family_aware_subset(names: Sequence[str], n: int, seed: int = SEED) -> Dict[str, Any]:
+    """SPEC v5.39 ②：特徵子集明列規則——取成員數最少（同數取前綴字典序首個）且 ≤ n 之完整參數家族之全部成員，其餘名額以
+    `subset_names` 之 seed 巢狀隨機子集（排除該家族成員）依序補足至 n。回 {"names"（依 run 原順序）, "family", "members"}；
+    run 內無合格家族 ⇒ ValueError（請求定義不成立，不靜默改用無家族子集）。"""
+    fams = {k: v for k, v in parameter_families(names).items() if len(v) <= int(n)}
+    if not fams:
+        raise ValueError(f"run 內無成員數 ≥ {FAMILY_MIN_SIZE} 且 ≤ {n} 之參數家族（SPEC v5.39 ② 請求定義不成立）")
+    fam = min(fams, key=lambda k: (len(fams[k]), k))
+    members = list(fams[fam])
+    rest = [x for x in names if x not in set(members)]
+    fill = subset_names(rest, max(0, int(n) - len(members)), seed)
+    chosen = set(members) | set(fill)
+    return {"names": [x for x in names if x in chosen], "family": fam, "members": members}
+
+
+def _event_batch_import_id(receipt_path: str) -> str:
+    """事件批 FACT-RECEIPT（`scripts/icperf_event_batch.py --out`）之 import_id；檔不存在或 validate_only ⇒ ValueError。"""
+    path = REPO / receipt_path
+    if not path.is_file():
+        raise ValueError(f"事件批 FACT-RECEIPT 不存在：{receipt_path}（先跑 scripts/icperf_event_batch.py --out <此路徑>）")
+    rec = json.loads(path.read_text(encoding="utf-8"))
+    if rec.get("validate_only") or not rec.get("import_id"):
+        raise ValueError(f"事件批 FACT-RECEIPT 未落檔：{receipt_path}")
+    return str(rec["import_id"])
+
+
+def kline_symbols(timeframe: str) -> List[str]:
+    """`kline_cache.h5` 中具該週期資料之全部標的（由檔案導出，不寫死標的）。"""
+    import h5py
+
+    with h5py.File(KLINE_H5, "r") as f:
+        return sorted(k for k in f.keys() if not k.startswith("_") and f"{k}/{timeframe}/data" in f)
+
+
 def request_for(req_id: str) -> Dict[str, Any]:
     """請求 id ⇒ 凍結腳本之預設請求加特徵子集（`feature_filter.include_features`）；`sorted` ⇒ 同凍結腳本 `small_request`；
-    `method` ⇒ `config_override.global.default_method`；跨標的 ⇒ 各格之 run 與兩格共有特徵之子集。"""
+    `family` ⇒ `family_aware_subset`（請求記 `parameter_family`）；`method` ⇒ `config_override.global.default_method`；
+    `event_batch_receipt` ⇒ `event_import_id` 改取重建之批；跨標的 ⇒ 各格之 run 與兩格共有特徵之子集（`override_extra`
+    明列）；跨標的 kline ⇒ 該週期全部標的、末 `rows` 根、`XSEC_FEATURES`。"""
     fb = _fb()
     spec = REQUESTS[req_id]
     n = _n_features(spec)
@@ -108,14 +174,33 @@ def request_for(req_id: str) -> Dict[str, Any]:
         names = subset_names(common, n)
         return {"kind": "cross", "item": spec["item"], "cells": cells, "timeframe": cells[0]["timeframe"],
                 "config_override": cells[0]["config_override"], "feature_tiers": cells[0]["feature_tiers"],
-                "feature_filter": {"include_features": names}, "receipt_request_id": req_id}
+                "feature_filter": {"include_features": names}, "override_extra": dict(spec.get("override_extra") or {}),
+                "receipt_request_id": req_id}
+    if spec.get("kind") == "cross_kline":
+        cell = fb.default_request(spec["item"], spec["service_cell"])
+        tf = str(spec["timeframe"])
+        return {"kind": "cross_kline", "item": spec["item"], "service_cell": cell, "timeframe": tf,
+                "symbols": kline_symbols(tf), "rows": int(spec["rows"]), "features": list(XSEC_FEATURES),
+                "kline": str(KLINE_H5.relative_to(REPO)), "override_extra": dict(spec.get("override_extra") or {}),
+                "receipt_request_id": req_id}
     request = fb.default_request(spec["item"], spec["cell"]) if spec.get("cell") else fb.default_request(spec["item"])
     if spec.get("sorted"):
         request = fb.small_request(spec["item"], request, int(n))
+    elif spec.get("family"):
+        sub = family_aware_subset(fb._run_feature_names(request), int(n))
+        request["feature_filter"] = {"include_features": sub["names"]}
+        request["parameter_family"] = {"family": sub["family"], "members": sub["members"], "rule": FAMILY_PATTERN,
+                                       "min_size": FAMILY_MIN_SIZE}
+        top_n = int(((request.get("deep") or {}).get("top_n")) or 0)
+        if request.get("deep") is not None and len(sub["names"]) > top_n:
+            raise ValueError(f"{req_id}：子集 {len(sub['names'])} 欄 > 深度 top_n {top_n}，家族成員不保證全入選")
     else:
         request["feature_filter"] = {"include_features": subset_names(fb._run_feature_names(request), n)}
     if spec.get("method"):
         request["config_override"] = {**request["config_override"], "global": {"default_method": spec["method"]}}
+    if spec.get("event_batch_receipt"):
+        request["event_import_id"] = _event_batch_import_id(spec["event_batch_receipt"])
+        request["event_batch_receipt"] = spec["event_batch_receipt"]
     request["receipt_request_id"] = req_id
     return request
 
@@ -144,11 +229,9 @@ def _peak_rss_bytes() -> int:
 def _child_cross(request: Mapping[str, Any]) -> Dict[str, Any]:
     """跨標的請求（SPEC Task 0.3 跨標的欄；服務 `_run_analysis` 之 `mode == "cross_sectional"` 分支同一步驟：逐標的讀特徵
     〔各格各自之特徵根，故逐格以該格 FeatureLibrary 之 `load_multi` 讀〕、加 `_symbol` 層、`_append_cross_sectional_labels`、
-    `analyze_cross_sectional`）。特徵限縮於請求之子集（BUDGET-11 控時；產品跨標的路徑無 feature_filter）。預設設定之切分
-    不成立（InvalidInputError）⇒ 記錄其訊息並以 `ic_train_test_split=False` 重跑（回應兩者皆記）。"""
+    `analyze_cross_sectional`）。特徵限縮於請求之子集（BUDGET-11 控時；產品跨標的路徑無 feature_filter）。設定＝IC 頁預設
+    覆寫＋請求明列之 `override_extra`（SPEC v5.39 ⑩：退回分支以明列請求驗，不以預設失敗後自動退回；失敗即拋、子行程 rc≠0）。"""
     import pandas as pd
-
-    from momentum.factories import create_ic_analyzer
 
     fb = _fb()
     names = list(request["feature_filter"]["include_features"])
@@ -163,22 +246,72 @@ def _child_cross(request: Mapping[str, Any]) -> Dict[str, Any]:
         frame["_symbol"] = cell["symbol"]
         frames.append(frame)
     cross_df = pd.concat(frames, axis=0).set_index("_symbol", append=True)
-    cross_df = svc._append_cross_sectional_labels(cross_df, [c["symbol"] for c in request["cells"]], request["timeframe"])
-    override = svc._build_config_override(fb._ic_analyze_request({**request["cells"][0], "feature_filter": None}))
-    attempts = []
-    report = None
-    for extra in (None, {"ic_train_test_split": False}):
-        ov = {**(override or {}), **(extra or {})}
-        analyzer = create_ic_analyzer(ov)
-        try:
-            report = analyzer.analyze_cross_sectional(features=cross_df, labels_path=None, config_override=ov,
-                                                      progress_callback=fb._progress, timeframe=request["timeframe"])
-            attempts.append({"override_extra": extra, "ok": True})
-            break
-        except Exception as exc:  # noqa: BLE001 — 切分不成立之訊息入回應記錄
-            attempts.append({"override_extra": extra, "ok": False, "error": f"{type(exc).__name__}: {exc}"})
-    return {"response": report, "ic_report": report, "cross_df": cross_df, "attempts": attempts,
+    return _run_cross(svc, cross_df, [c["symbol"] for c in request["cells"]], request["cells"][0], request)
+
+
+def _run_cross(svc: Any, cross_df: Any, symbols: Sequence[str], cell: Mapping[str, Any],
+               request: Mapping[str, Any]) -> Dict[str, Any]:
+    """跨標的之共同步驟（服務 `_run_analysis` cross_sectional 分支）：`_append_cross_sectional_labels`（kline 衍生標籤）→
+    IC 頁預設覆寫（`_build_config_override`）＋請求明列 `override_extra` → `analyze_cross_sectional`；例外原樣拋出。"""
+    from momentum.factories import create_ic_analyzer
+
+    fb = _fb()
+    # SPEC Task 0.4 ㊱：同服務分支——逐特徵 metadata（`_feature_metadata_entry`）與 kline 收盤（標籤同一次讀取）交給產品
+    feature_metadata = {str(c): svc._feature_metadata_entry(str(c)) for c in cross_df.columns}
+    close_out: Dict[str, Any] = {}
+    cross_df = svc._append_cross_sectional_labels(cross_df, list(symbols), request["timeframe"], close_out=close_out)
+    override = svc._build_config_override(fb._ic_analyze_request({**cell, "feature_filter": None}))
+    extra = dict(request.get("override_extra") or {})
+    ov = {**(override or {}), **extra}
+    analyzer = create_ic_analyzer(ov)
+    report = analyzer.analyze_cross_sectional(features=cross_df, labels_path=None, config_override=ov,
+                                              progress_callback=fb._progress, timeframe=request["timeframe"],
+                                              close=close_out.get("close"), feature_metadata=feature_metadata)
+    return {"response": report, "ic_report": report, "cross_df": cross_df,
+            "close": close_out.get("close"), "feature_metadata": feature_metadata,
+            "attempts": [{"override_extra": extra or None, "ok": True}],
             "config": _effective_config(analyzer, ov), "analyzer": analyzer}
+
+
+def kline_frame(symbol: str, timeframe: str, rows: int) -> Any:
+    """真實 kline（`kline_cache.h5` 直接讀、float64）末 `rows` 根之 OHLCV；索引＝UTC 時間（naive，同特徵庫之時間索引）。"""
+    import h5py
+    import pandas as pd
+
+    with h5py.File(KLINE_H5, "r") as f:
+        data = f[f"{symbol}/{timeframe}/data"][-int(rows):]
+    ts = data["timestamp"].astype("int64")
+    unit = "ms" if int(ts[-1]) > 10 ** 12 else "s"
+    idx = pd.to_datetime(ts, unit=unit)
+    return pd.DataFrame({k: data[k].astype("float64") for k in ("open", "high", "low", "close")}, index=idx)
+
+
+def xsec_kline_features(close: Any) -> Any:
+    """跨標的預設分支之因果特徵（只用 0..t；`XSEC_FEATURES`）：過去 1 根報酬、對 20 根均線之偏離、20 根報酬波動率、10 根動量。"""
+    import pandas as pd
+
+    ret = close.pct_change()
+    return pd.DataFrame({"ret1": ret, "dev20": close / close.rolling(20).mean() - 1.0, "vol20": ret.rolling(20).std(),
+                         "mom10": close / close.shift(10) - 1.0})[list(XSEC_FEATURES)]
+
+
+def _child_cross_kline(request: Mapping[str, Any]) -> Dict[str, Any]:
+    """跨標的預設分支（SPEC v5.39 ⑩）：`kline_cache.h5` 該週期全部標的之末 `rows` 根真實 kline 建 `XSEC_FEATURES`，加
+    `_symbol` 層後走 `_run_cross`（預設設定之切分須成立；不成立即拋 ⇒ 請求失敗）。服務實例取自 `service_cell`（只供標籤與
+    設定覆寫，特徵不經特徵庫）。"""
+    import pandas as pd
+
+    fb = _fb()
+    frames = []
+    for sym in request["symbols"]:
+        k = kline_frame(sym, request["timeframe"], request["rows"])
+        frame = xsec_kline_features(k["close"])
+        frame.index.name = "timestamp"
+        frame["_symbol"] = sym
+        frames.append(frame)
+    cross_df = pd.concat(frames, axis=0).set_index("_symbol", append=True).sort_index()
+    svc = fb._ic_service(request["service_cell"], Path(request["_work"]) / "registry_xsec.json")
+    return _run_cross(svc, cross_df, request["symbols"], request["service_cell"], request)
 
 
 @contextlib.contextmanager
@@ -221,8 +354,9 @@ def _child_capture(spec: Mapping[str, Any]) -> Dict[str, Any]:
     registry = Path(spec["registry"])
     out: Dict[str, Any] = {"request": request, "deep_raw": None, "deep_config": None, "selected": None,
                            "fr_series": None}
-    if request.get("kind") == "cross":
-        res = _child_cross({**request, "_work": str(registry.parent)})
+    if request.get("kind") in ("cross", "cross_kline"):
+        child = _child_cross if request.get("kind") == "cross" else _child_cross_kline
+        res = child({**request, "_work": str(registry.parent)})
         analyzer = res.pop("analyzer")
         out.update(res)
         out.update({"cache": dict(getattr(analyzer, "_ic_cache", None) or {}), "stage5_inputs": [],
@@ -329,7 +463,30 @@ def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
 
 ORACLE_TEST = REPO / "tests" / "momentum" / "Analysis" / "test_icperf_correctness.py"
 KLINE_H5 = REPO / "data_cache" / "feature_klines" / "kline_cache.h5"
+SPEC_DOC = REPO / "docs" / "ICPERF_SPEC.md"
+#: 直接統計量之相對誤差門檻；衍生量（封閉清單）之門檻與分類取 `test_icperf_correctness.py` 之 `DERIVED_REL_TOL`／
+#: `rel_tol_for`／`tolerance_class`（SPEC v5.39 ④：收據工具、測試檔一致判準、深度 compare_* 三處同一判準）
 REL_TOL = 1e-12
+
+
+def spec_version() -> str:
+    """SPEC 首個版本行（`> 版本：v<主>.<次>（…`）之版本號（SPEC v5.39 ⑪：收據 spec 欄不寫死）；找不到 ⇒ ValueError。"""
+    m = re.search(r"版本：(v\d+\.\d+)", SPEC_DOC.read_text(encoding="utf-8"))
+    if not m:
+        raise ValueError(f"{SPEC_DOC} 無版本行")
+    return m.group(1)
+
+
+@functools.lru_cache(maxsize=None)
+def _tol_for(key: str) -> float:
+    """涵蓋鍵之浮點相對誤差門檻（SPEC v5.39 ④；`test_icperf_correctness.py` `rel_tol_for`；同鍵重複甚多 ⇒ 快取）。"""
+    return float(_oracles().rel_tol_for(key))
+
+
+@functools.lru_cache(maxsize=None)
+def _tol_class(key: str) -> str:
+    """涵蓋鍵之判準類別（"direct"／"derived"；`test_icperf_correctness.py` `tolerance_class`）。"""
+    return str(_oracles().tolerance_class(key))
 
 
 def _oracles() -> Any:
@@ -365,6 +522,8 @@ class Tally:
 
     def __init__(self, oracle: str) -> None:
         self.oracle, self.n, self.n_finite, self.max_rel = oracle, 0, 0, 0.0
+        #: 分級判準之兩類各自最大相對誤差（SPEC v5.39 ④；"direct"／"derived"）
+        self.max_rel_cls: Dict[str, float] = {"direct": 0.0, "derived": 0.0}
         self.mismatch: List[Dict[str, Any]] = []
         self.n_mismatch = 0
         self.notes: List[str] = []
@@ -378,11 +537,20 @@ class Tally:
         rec[1] += int(informative)
         rec[2] += int(miss)
 
-    def num(self, key: str, where: str, prod: Any, orc: Any, tol: float = REL_TOL,
-            feature: Optional[str] = None) -> None:
-        """浮點對照：相對誤差（oracle 為 0 ⇒ 絕對誤差）≤ tol 為一致；NaN＝NaN、None＝None。"""
+    def _rel(self, key: str, d: float) -> None:
         import math
 
+        cls = _tol_class(key)
+        cur = self.max_rel_cls.get(cls, 0.0)
+        self.max_rel_cls[cls] = max(cur, d) if math.isfinite(d) and math.isfinite(cur) else math.inf
+
+    def num(self, key: str, where: str, prod: Any, orc: Any, tol: Optional[float] = None,
+            feature: Optional[str] = None) -> None:
+        """浮點對照：相對誤差（oracle 為 0 ⇒ 絕對誤差）≤ tol（未給 ⇒ 依涵蓋鍵之分級判準 `_tol_for`，SPEC v5.39 ④）為一致；
+        NaN＝NaN、None＝None。"""
+        import math
+
+        tol = _tol_for(key) if tol is None else float(tol)
         self.n += 1
         p, o = _f(prod), _f(orc)
         if p is None or o is None:
@@ -402,6 +570,7 @@ class Tally:
         info = p is not None and o is not None and math.isfinite(p) and math.isfinite(o)
         self.n_finite += int(info)
         self.max_rel = max(self.max_rel, d) if math.isfinite(d) else math.inf
+        self._rel(key, d)
         miss = d > tol
         self._key(key, info, miss)
         if miss:
@@ -432,8 +601,10 @@ class Tally:
         import math
 
         verdict = "未驗" if self.n == 0 else ("一致" if self.n_mismatch == 0 else "不一致")
+        fin = {c: (v if math.isfinite(v) else None) for c, v in self.max_rel_cls.items()}
         return {"verdict": verdict, "oracle": self.oracle, "n_compared": self.n, "n_finite": self.n_finite,
                 "n_mismatch": self.n_mismatch, "max_rel_diff": None if not math.isfinite(self.max_rel) else self.max_rel,
+                "max_rel_diff_direct": fin["direct"], "max_rel_diff_derived": fin["derived"],
                 "examples": self.mismatch, "mismatch_features": sorted(self.features)[:50],
                 "n_mismatch_features": len(self.features), "notes": self.notes[:20],
                 "keys": {k: {"n": v[0], "n_informative": v[1], "n_mismatch": v[2]} for k, v in sorted(self.keys.items())},
@@ -816,9 +987,12 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     # 標籤（獨立讀 kline，float64；SPEC ⑥）
     ev = cache.get("event_info") or {}
     if str(ev.get("label_source")) == "event_label_value":
-        # 事件匯入批：標籤＝事件管線（`label_value_from_case`）依各事件之 label_definition 所算之值，非主線 h 根報酬
-        facts["event_label"] = {"label_source": ev.get("label_source"), "label_kind": ev.get("label_kind"),
-                                "n_events": ev.get("n_events"), "oracle": "未建（事件管線標籤定義另驗）"}
+        # 事件匯入批（SPEC v5.38 ①）：標籤＝事件管線依分析用 event_label_spec 所算之值（後端預設＝依批次宣告深度之
+        # trigger_open／open_to_horizon_close，故與主線 close[t+h]／close[t]−1 不同：基準價為 t0 根開盤，加密資料之
+        # open[t0] 與 close[t0−1] 常有微差——此即首份收據 93 筆中 53 筆約 1e-6 之差之成因）；oracle 依明列定義自 kline 重算
+        t_e = T("event_label", "事件標籤 oracle（測試自寫 _ref_event_spec／_ref_event_label_values：批次宣告深度導出 spec、"
+                "kline_cache.h5 直接讀 open／close〔float64〕、entry／end 根依 D1-6 映射、方向乘號；特徵列＝決策根前一根之開盤時間）")
+        facts["event_label"] = _evaluate_event_label(cap, rep, y, t_e)
     else:
         t = T("label", "close[t+h]/close[t]−1（kline_cache.h5 直接讀、float64、截至特徵末根；log 報酬取 ln 比值）")
         lab = oracle_label(close_full, y.index, horizon, str(cfg["labels"]["return_type"]))
@@ -874,7 +1048,8 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     pw = sorted({int(k.split("_", 1)[1]) for v in ri.values() if isinstance(v, dict) for k in v})
     t_r = T("rolling_ic_icir", "滾動 IC 參考實作（時間軸＝標籤有限列、逐特徵獨立、樣本外整窗、scipy 對應方法）＋ nanmean／"
             "nanstd(ddof0)／比值")
-    t_r.eq("@windows", "rolling_windows", pw, sorted(owins))
+    # 產品滾動 IC 之窗鍵＝換算後之滾動窗；㉛ 換算後 ICIR 窗不在其中而另算者，其窗鍵亦可出現（只准該窗）
+    t_r.eq("@windows", "rolling_windows", pw, sorted(set(owins) | ({icir_w} if icir_w in pw else set())))
     facts["windows"] = {"bar_hours": bh, "oracle": owins, "product": pw, "icir_window_adjusted": icir_w}
     roll = {w: oracle_rolling_ic(F_seg, y_seg, w, method, stride) for w in owins}
     for c in F.columns:
@@ -905,9 +1080,11 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     src_counts = {"rolling_mean": 0, "pooled_point_ic": 0, "unavailable": 0}
     oracle_rows: Dict[str, Dict[str, Any]] = {}
     icir_cache = cache.get("icir") or {}
-    # ICIR 所用序列＝`_select_icir_series` 之選擇（SPEC Task 0.3：鍵 `window_<icir.window>`〔設定值，未經週期換算〕存在
-    # 則用之，否則窗字典之首窗〔設定順序〕）
-    sel_w = int(icc["icir"]["window"]) if int(icc["icir"]["window"]) in roll else (owins[0] if owins else None)
+    # ICIR 所用序列（SPEC Task 0.4 ㉛）：ICIR 窗＝設定 `icir.window` 依同一週期換算（`oracle_windows`）；換算後之窗不在滾動窗
+    # 集合 ⇒ 另算該窗之滾動 IC（oracle 參考實作，不退回首窗）
+    sel_w = int(icir_w)
+    if sel_w not in roll:
+        roll[sel_w] = oracle_rolling_ic(F_seg, y_seg, sel_w, method, stride)
     facts["windows"]["icir_series_window"] = sel_w
     for c in F.columns:
         vals = roll[sel_w][c] if sel_w is not None else []
@@ -1013,6 +1190,10 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     for key in ("by_year", "by_quarter", "by_regime", "by_category", "by_data_source", "by_layer"):
         if key in got_g or gcfg.get(key):
             _tree(t_g, key_of, f"/grouped_ic/{key}", got_g.get(key, {}), exp_g.get(key, {}) if gcfg.get(key) else {})
+    # SPEC v5.38 ③：該段無任一列落入之 regime（如 L 格測試段之 high_vol）依定義為空組；明列邊界輸入另證
+    for reg, grp in (exp_g.get("by_regime") or {}).items():
+        if isinstance(grp, dict) and not grp:
+            t_g.na(f"/grouped_ic/by_regime/{reg}", "test_grouped_ic_regime_without_rows_is_empty")
     # regime_robust（SPEC ㉓：由 by_regime 導出、合格＝IC 有限且有限配對數 ≥ min_samples）
     t_rr = T("regime_robust", "由 oracle by_regime（scipy）與逐 regime 有限配對數依 ㉓ 判 True／False／None 與 reason"
              "（test_icperf_regime_robust.py oracle_regime_robust）")
@@ -1124,9 +1305,101 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     mi = rep.get("marginal_ic") or {}
     if isinstance(mi, dict) and mi.get("status") == "ok":
         _evaluate_marginal(cap, rep, cfg, key_of, items, horizon)
+    elif isinstance(mi, dict) and mi.get("reason") == "no_survivors":
+        _evaluate_marginal_empty(cap, mi, key_of, items)
     facts["survivors"] = list(cap.get("survivors") or [])
     facts["marginal_status"] = mi.get("status") if isinstance(mi, dict) else None
     return facts
+
+
+#: SPEC v5.38 ③：邊際 IC 無倖存者時之空葉（marginal_ic.py:347-351 `_empty_result`、factor_combiner.py:202-203 `_empty`）
+#: 之明列邊界證明
+MARGINAL_EMPTY_PROOF = "test_marginal_ic_no_survivors_leaves_are_empty"
+#: 邊際 IC 逐候選 reason 之非 None 分支（insufficient_rows、residual_degenerate）之明列邊界證明
+MARGINAL_REASON_PROOF = "test_marginal_ic_views_match_statsmodels_oracle"
+
+
+def _evaluate_marginal_empty(cap: Mapping[str, Any], mi: Mapping[str, Any], key_of: "KeyOf",
+                             items: Dict[str, Tally]) -> None:
+    """邊際 IC 於無倖存者（`reason == no_survivors`）時之空葉對照（SPEC v5.38 ③）：oracle＝定義（倖存者為空 ⇒ 三視角與
+    train_ic 為空容器、組合因子之權重／符號為空 dict、數值欄 None、使用列數 0），先斷言擷取之倖存者確為空；各葉記
+    verified-na（明列邊界證明 `MARGINAL_EMPTY_PROOF`）。"""
+    t_m = items.setdefault("marginal_ic", Tally("statsmodels OLS 投影（秩常態分數）、R²、numpy.linalg.cond、scipy Spearman、"
+                                                "固定 seed 成對 moving-block bootstrap（測試自寫 _ref_marginal）"))
+    t_t = items.setdefault("marginal_ic.train_ic", Tally("train 段有限列 scipy.stats.spearmanr（測試自寫 _ref_train_ic）"))
+    t_c = items.setdefault("marginal_ic.composite", Tally("train 段定權與符號、test 段計 composite IC、固定 seed delta_ci95"
+                                                          "（測試自寫 _ref_composite）"))
+    t_m.eq("@marginal/survivors", "survivors(empty)", list(cap.get("survivors") or []), [])
+    _tree(t_t, key_of, "/marginal_ic/train_ic", mi.get("train_ic"), {})
+    t_t.na("/marginal_ic/train_ic", MARGINAL_EMPTY_PROOF)
+    for view, empty in (("per_feature", {}), ("sequential", []), ("removed_candidates", {})):
+        _tree(t_m, key_of, f"/marginal_ic/{view}", mi.get(view), empty)
+        t_m.na(f"/marginal_ic/{view}", MARGINAL_EMPTY_PROOF)
+    comp = mi.get("composite") or {}
+    exp_c = {"weights": {}, "signs": {}, "composite_ic": None, "composite_ic_train_insample": None,
+             "top_train_single": None, "top_train_single_test_ic": None, "best_single_test_ic": None,
+             "best_single_feature": None, "delta_vs_top_train_single": None, "delta_ci95": None,
+             "n_used_test": 0, "n_used_train": 0}
+    for k, v in exp_c.items():
+        path = f"/marginal_ic/composite/{k}"
+        if isinstance(v, dict):
+            _tree(t_c, key_of, path, comp.get(k), v)
+        else:
+            t_c.eq(key_of(path), path, comp.get(k), v)
+        if v is None or isinstance(v, dict):
+            t_c.na(key_of(path), MARGINAL_EMPTY_PROOF)
+
+
+def _evaluate_event_label(cap: Mapping[str, Any], rep: Mapping[str, Any], y: Any, t: Tally) -> Dict[str, Any]:
+    """事件匯入批標籤之 oracle 對照（SPEC v5.38 ①）：批次檔（`data_cache/events/<import_id>.json`）之 records 與宣告深度，
+    以測試檔 `_ref_event_spec`（後端預設導出規則，event_label_spec_resolution.py:130-151）得分析用 spec，與報告
+    `metadata.event_label_rule` 逐鍵 ==；以 `_ref_event_label_values`（kline_cache.h5 直接讀 open／close〔float64〕、D1-6
+    entry／end 根、方向乘號；列鍵＝決策根前一根之開盤時間）逐事件重算，與產品標籤序列逐列 1e-12。另記定因：同列以
+    close[t+h]／close[t]−1 計之差（open[t0] ≠ close[t0−1] 之筆數）。回 FACT。"""
+    import math
+
+    import numpy as np
+
+    O = _oracles()
+    req = cap["request"]
+    iid = str(req.get("event_import_id") or "")
+    batch = json.loads((REPO / "data_cache" / "events" / f"{iid}.json").read_text(encoding="utf-8"))
+    records = list(batch.get("records") or [])
+    declared = (batch.get("lookahead_declaration") or {}).get("lookahead_bars_declared") or \
+        (records[0].get("lookahead_bars_declared") if records else None) or {}
+    spec = O._ref_event_spec(records, declared, O._contract_k_min(), req.get("event_label_spec"))
+    rule = (rep.get("metadata") or {}).get("event_label_rule") or {}
+    for k in ("entry_price_semantic", "label_return_mode", "horizon_bars"):
+        t.eq("@event_label/spec", f"spec/{k}", rule.get(k), spec[k])
+    ref = O._ref_event_label_values(records, spec, KLINE_H5)
+    by_row: Dict[int, List[Any]] = {}
+    for eid, v in ref.items():
+        if v["row_open_ms"] is not None:
+            by_row.setdefault(int(v["row_open_ms"]), []).append(v)
+    idx = _utc(y.index)
+    n_cmp, n_c2c_diff = 0, 0
+    for ts, pv in zip(idx, y.to_numpy(dtype=float)):
+        row = int(ts.value // 1_000_000)
+        exp = by_row.get(row) or []
+        if len(exp) != 1:
+            t.eq("@input/event_label_series", f"event_label@{ts}#n_events", len(exp), 1)
+            continue
+        n_cmp += 1
+        t.num("@input/event_label_series", f"event_label@{ts}", pv, exp[0]["value"])
+        c2c = exp[0].get("close_to_close")
+        if c2c is not None and math.isfinite(c2c) and abs(c2c - pv) > 1e-12:
+            n_c2c_diff += 1
+    sc = (cap.get("cache") or {}).get("split_context") or {}
+    tem = sc.get("test_mask")
+    ev_cfg = ((cap.get("config") or {}).get("event_filter") or {})
+    return {"import_id": iid, "batch_receipt": req.get("event_batch_receipt"), "n_records": len(records),
+            "n_oracle_events": len(ref), "n_product_rows": int(len(y)), "n_compared": n_cmp, "spec_oracle": spec,
+            "spec_product": {k: rule.get(k) for k in ("entry_price_semantic", "label_return_mode", "horizon_bars")},
+            "n_close_to_close_differs": n_c2c_diff,
+            "cause": "分析用 spec＝trigger_open／open_to_horizon_close（基準價＝t0 根開盤），非 close[t]；open[t0] 與 close[t0−1] "
+                     "相異之事件即與 close[t+h]／close[t]−1 有微差",
+            "n_test_events": None if tem is None else int(np.asarray(tem, bool).sum()),
+            "min_test_events": ev_cfg.get("min_test_events", 30)}
 
 
 def _evaluate_marginal(cap: Mapping[str, Any], rep: Mapping[str, Any], cfg: Mapping[str, Any], key_of: "KeyOf",
@@ -1171,6 +1444,11 @@ def _evaluate_marginal(cap: Mapping[str, Any], rep: Mapping[str, Any], cfg: Mapp
     _tree(t_t, key_of, "/marginal_ic/train_ic", mi.get("train_ic"), exp["train_ic"])
     for view in ("per_feature", "sequential", "removed_candidates"):
         _tree(t_m, key_of, f"/marginal_ic/{view}", mi.get(view), exp[view])
+    # SPEC v5.38 ③：reason 僅於退化候選非 None（marginal_ic.py `_not_computed_stat`）；本輸入候選皆可算 ⇒ 逐值對照皆 None，
+    # 非 None 分支（insufficient_rows／residual_degenerate）由明列邊界輸入另證
+    for k in ("/marginal_ic/per_feature/*/reason", "/marginal_ic/removed_candidates/*/reason",
+              "/marginal_ic/sequential/#/reason"):
+        t_m.na(k, MARGINAL_REASON_PROOF)
     if survivors:
         comp = O._ref_composite(F, yv, tr, te, survivors, p)
         got = dict(mi.get("composite") or {})
@@ -1204,7 +1482,9 @@ def _deep_cov_key(path: str) -> str:
 
 
 def _norm_deep_key(key: str) -> str:
-    """回應涵蓋鍵 → 與深度測試檔 MODULE_FIELDS 比對之形（`PC<n>` → `PC#`）。"""
+    """回應涵蓋鍵 → 與深度測試檔 MODULE_FIELDS 比對之形（`PC<n>` → `PC#`；參數家族名段 → `*`，同 MODULE_FIELDS 之
+    `parameter_sensitivity/families/*/…`——家族名非特徵名，`coverage_keys` 不會將其換為 `*`）。"""
+    key = re.sub(r"^(/results/parameter_sensitivity/families)/[^/]+(?=/|$)", r"\1/*", key)
     return re.sub(r"/PC\d+(?=/|$)", "/PC#", key)
 
 
@@ -1228,8 +1508,11 @@ def _tally_from_compare(t: Tally, res: Mapping[str, Mapping[str, Any]]) -> None:
         rel = r.get("max_rel_diff")
         if rel is not None:
             t.max_rel = max(t.max_rel, float(rel)) if math.isfinite(float(rel)) else math.inf
+            # 分級判準（SPEC v5.39 ④）：依欄位路徑分記直接／衍生兩類（`@` 端到端項依其欄位本身）
+            t._rel(key.split("@", 1)[0], float(rel))
         elif miss:
             t.max_rel = math.inf
+            t._rel(key.split("@", 1)[0], math.inf)
         last = str(path).rstrip("/#").rsplit("/", 1)[-1].split("@", 1)[0]
         t._key(key, bool(r.get("n_finite")) or (not miss and last in _DEEP_NONNUMERIC), miss)
         if miss:
@@ -1323,36 +1606,169 @@ def evaluate_deep(cap: Mapping[str, Any], items: Dict[str, Tally]) -> Dict[str, 
     qc = meta.get("quote_currency") if isinstance(meta.get("quote_currency"), str) and meta.get("quote_currency") else None
     run("net_ic_analysis", lambda p: QN.compare_net_ic_analysis(p, summary, tov, factor_return_series=frs,
                                                                 config=dc["net_ic_analysis"], quote_currency=qc))
+    # SPEC v5.38 ③：名單類欄位於本輸入為空（compare_* 已逐值對照為空）時，以明列邊界輸入之觸發測試另證 ⇒ verified-na
+    for key, proof in DEEP_LIST_NA_PROOFS.items():
+        t = items.get(f"deep.{key.split('/')[2]}")
+        if t is not None:
+            t.na(key, proof)
     return status
 
 
-#: 跨標的路徑結構上不算之 summary 欄（`ic_filter_orchestrator.py` analyze_cross_sectional 之 None 佔位）
-XSEC_PLACEHOLDERS = ("monotonicity_score", "long_short_spread", "coverage", "turnover_rate", "ic_half_life")
-#: 跨標的路徑之第 6 段區段（不跑冗餘篩選 ⇒ 空）
-XSEC_EMPTY = {"correlation_matrix": {"features": [], "matrix": []}, "diversification_metrics": {}}
+#: SPEC v5.38 ③：深度名單類欄位 → 其非空分支之明列邊界觸發測試（`test_icperf_correctness.py` 內實存）
+DEEP_LIST_NA_PROOFS: Dict[str, str] = {
+    "/results/factor_centrality/crowded_features": "test_deep_factor_centrality_oracle_suite",
+    **{f"/results/factor_orthogonalization/{p}degenerate_features": "test_deep_factor_orthogonalization_oracle_suite"
+       for p in ("", "payload/summary/", "typed_result/payload/summary/")},
+    **{f"/results/factor_exposure/{p}{c}/warnings": "test_deep_factor_exposure_concentration_warnings_boundaries"
+       for p in ("", "payload/summary/", "typed_result/payload/summary/")
+       for c in ("concentration", "neutralized_concentration")},
+    **{f"/results/parameter_sensitivity/{k}": "test_deep_parameter_sensitivity_risk_lists_boundaries"
+       for k in ("high_risk_families", "robust_families")},
+    "/results/feature_quality_diagnostics/quality_flags/low_coverage": "test_deep_fq_low_coverage_flag_boundaries",
+}
 
 
-def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tally]) -> Dict[str, Any]:
-    """跨標的請求之 oracle（測試檔 `_ref_cross_sectional`：每時點逐特徵 scipy.stats.spearmanr 截面 IC、逐標的逐特徵
-    spearmanr、`cross_symbol_validation` 參考實作；截面 IC 序列之 HAC 以 statsmodels）；預設設定之切分不成立而以
-    `ic_train_test_split=False` 執行者照該設定對照（擷取之 attempts 記兩次嘗試）。"""
+#: SPEC Task 0.4 ㊱：跨標的 summary 之截面分位四欄（oracle＝`XSEC_ORACLE_TEST` 之 `_ref_quantile_fields`）
+XSEC_QUANTILE_FIELDS = ("monotonicity_score", "long_short_spread", "coverage", "turnover_rate")
+#: 跨標的佔位欄位之獨立 oracle（測試自寫參考實作：逐時點 pd.qcut、scipy spearmanr／pearsonr、curve_fit）
+XSEC_ORACLE_TEST = REPO / "tests" / "momentum" / "Analysis" / "test_icperf_xsec_placeholders.py"
+
+
+def _xsec_oracles() -> Any:
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    return sys.modules.get("icperf_xsec_oracles_cr") or _load("icperf_xsec_oracles_cr", XSEC_ORACLE_TEST)
+
+
+def _evaluate_cross_placeholders(t: Tally, key_of: "KeyOf", rep: Mapping[str, Any], seg: Any, label: str,
+                                 cap: Mapping[str, Any], cfg: Mapping[str, Any], rows: Mapping[str, Any],
+                                 directions: Mapping[str, int]) -> None:
+    """SPEC Task 0.4 ㊱：summary 五欄、`ic_decay`、相關矩陣、多元化指標、`metadata.cross_sectional_unavailable_fields` 對
+    `test_icperf_xsec_placeholders.py` 之參考實作（同檔 `_assert_report` 之判準：直接統計量 1e-12；時間平均之近 0 值以
+    1e-12 × 被平均項平均絕對值；半衰期驗擬合最佳性與衍生一致）。分析段＝產品實際分析段（切分成立時為測試段）。"""
     import math
 
     import numpy as np
 
+    X = _xsec_oracles()
+    df = seg.rename(columns={label: X.LABEL}) if label != X.LABEL else seg
+    icc = cfg.get("ic_calculation") or {}
+    horizons = [int(h) for h in icc.get("ic_decay_horizons") or X._horizons()]
+    decay_on = bool((cfg.get("report") or {}).get("include_decay_analysis", True))
+    turnover_on = bool((cfg.get("turnover") or {}).get("enabled", True))
+    close = cap.get("close")
+    meta = cap.get("feature_metadata")
+    exp = X._ref_all(df, close if decay_on else None, meta, horizons)
+    for f, fields in exp["rows"].items():
+        row = rows.get(f) or {}
+        for k in XSEC_QUANTILE_FIELDS:
+            if k == "turnover_rate" and not turnover_on:
+                t.eq(f"/summary_table/#/{k}", f"xsec/{f}/{k}_absent", k in row, False, f)
+                continue
+            t.num(f"/summary_table/#/{k}", f"xsec/{f}/{k}", row.get(k), fields[k], feature=f)
+        d = int(directions.get(f, 0))
+        t.num("/summary_table/#/monotonicity_score_aligned", f"xsec/{f}/monotonicity_score_aligned",
+              row.get("monotonicity_score_aligned"), X._ref_aligned_monotonicity(fields["_means"], d), feature=f)
+        if exp["decay"] is None:
+            t.eq("/summary_table/#/ic_half_life", f"xsec/{f}/ic_half_life", row.get("ic_half_life"), None, f)
+            continue
+        fit = (rep.get("ic_decay") or {}).get(f)
+        kp = f"/ic_decay/{_ptr(f)}"
+        if not isinstance(fit, dict):
+            t.eq(key_of(kp), f"xsec/{f}/ic_decay", fit, "ic_decay 節", f)
+            continue
+        t.eq(key_of(kp + "/horizons"), f"xsec/{f}/horizons", [int(h) for h in fit.get("horizons") or []], horizons, f)
+        for h, g, w, s in zip(horizons, fit.get("ic_values") or [], exp["decay"][f]["ic_values"],
+                              exp["decay"][f]["scales"]):
+            t.eq(key_of(kp + "/ic_values"), f"xsec/{f}/ic_decay@{h}", bool(X._mean_close(g, w, s)), True, f)
+        prod_ic = [X._nan_if_none(v) for v in fit.get("ic_values") or []]
+        try:
+            X._assert_decay_fit(fit, prod_ic, X._ref_min_ssr(horizons, prod_ic), f"{f}/ic_decay")
+            fit_ok: Any = True
+        except AssertionError as exc:
+            fit_ok = str(exc)
+        for k in ("decay_rate", "half_life", "fit_r2", "decay_type", "fit_warning", "fit_warning_reason"):
+            t.eq(key_of(kp + "/" + k), f"xsec/{f}/fit_optimal_and_derived", fit_ok, True, f)
+        # peak_horizon：oracle 截面 IC 衰減值之 |IC| 最大 horizon（同主線 `_ref_peak`）
+        t.eq(key_of(kp + "/peak_horizon"), f"xsec/{f}/peak_horizon", fit.get("peak_horizon"),
+             _oracles()._ref_peak(horizons, [X._nan_if_none(v) for v in exp["decay"][f]["ic_values"]]), f)
+        t.num("/summary_table/#/ic_half_life", f"xsec/{f}/summary_half_life", row.get("ic_half_life"),
+              fit.get("half_life"), feature=f)
+    if exp["decay"] is None:
+        # 無收盤或衰減關 ⇒ 產品維持契約 status（`ic_filter_orchestrator.py` analyze_cross_sectional 之 not_applicable）
+        _tree(t, key_of, "/ic_decay", rep.get("ic_decay"), {"status": "not_applicable", "reason": "cross_sectional_mode"})
+    cm = rep.get("correlation_matrix") or {}
+    t.eq("/correlation_matrix/features", "xsec/correlation_matrix/features", cm.get("features"), exp["features"])
+    want = np.nan_to_num(exp["corr"], nan=0.0)
+    got = np.asarray(cm.get("matrix") or [], dtype=float)
+    if got.shape != want.shape:
+        t.eq("/correlation_matrix/matrix/#", "xsec/correlation_matrix/shape", list(got.shape), list(want.shape))
+    else:
+        # 逐格對照（同 ic_decay 逐 horizon：比對結果為 bool ⇒ 有內容；空名單之比較不計內容）
+        for i, a in enumerate(exp["features"]):
+            for j, b in enumerate(exp["features"]):
+                t.eq("/correlation_matrix/matrix/#", f"xsec/correlation_matrix/{a}/{b}",
+                     bool(X._mean_close(got[i, j], want[i, j], exp["corr_scale"][i, j])), True)
+    div = rep.get("diversification_metrics") or {}
+    for k in X.DIV_KEYS:
+        t.num(f"/diversification_metrics/{k}", f"xsec/diversification_metrics/{k}", div.get(k), exp["div"][k])
+    unavailable: Dict[str, str] = {}
+    if exp["decay"] is None:
+        unavailable["ic_half_life"] = "decay_analysis_off" if not decay_on else "close_not_provided"
+    if meta is None:
+        unavailable["diversification_metrics.metadata_coverage"] = "feature_metadata_not_provided"
+    t.eq("/metadata/cross_sectional_unavailable_fields", "xsec/unavailable_fields",
+         (rep.get("metadata") or {}).get("cross_sectional_unavailable_fields") or {}, unavailable)
+
+
+def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tally]) -> Dict[str, Any]:
+    """跨標的請求之 oracle（測試檔 `_ref_cross_sectional`：每時點逐特徵 scipy.stats.spearmanr 截面 IC、逐標的逐特徵
+    spearmanr、`cross_symbol_validation` 參考實作；截面 IC 序列之 HAC 以 statsmodels）。設定之切分開（預設分支，SPEC v5.39
+    ⑩）⇒ 以測試檔 `_ref_cross_split`（全域同步時間 holdout 參考實作；K 線間距由資料導出）重建測試段後對照；關（退回分支，
+    請求明列）⇒ 全樣本。標籤 `return_<h>` 以 kline_cache.h5 直接讀之收盤逐標的重算（1e-12）。"""
+    import math
+
+    import numpy as np
+    import pandas as pd
+
     O = _oracles()
     t = items.setdefault("cross_sectional", Tally("每時點截面 scipy.stats.spearmanr、逐標的 spearmanr、cross_symbol_validation "
-                                                  "測試自寫參考實作（_ref_cross_sectional）"))
+                                                  "測試自寫參考實作（_ref_cross_sectional）；預設分支之切分以 _ref_cross_split"))
     rep = cap["ic_report"] or {}
     df = cap["cross_df"]
+    cfg = cap["config"] or {}
     label_col = [c for c in df.columns if str(c).startswith("return_")]
-    facts = {"attempts": cap.get("attempts"), "shape": list(df.shape), "label_col": label_col,
-             "symbols": sorted(map(str, df.index.get_level_values(-1).unique()))}
+    facts = {"kind": cap["request"].get("kind"), "attempts": cap.get("attempts"), "shape": list(df.shape),
+             "label_col": label_col, "symbols": sorted(map(str, df.index.get_level_values(-1).unique())),
+             "override_extra": cap["request"].get("override_extra")}
     if not rep or not label_col:
         t.eq("/cross_sectional_symbol_ic", "report", None, "跨標的報告")
         return facts
-    facts["split_applied"] = ((rep.get("metadata") or {}).get("ic_train_test_split") or {}).get("applied")
-    exp = O._ref_cross_sectional(df, label_col[0])
+    mh0 = re.match(r"return_(\d+)$", str(label_col[0]))
+    h_lab = int(mh0.group(1)) if mh0 else 1
+    # 標籤（跨標的路徑之定義＝服務 `_append_cross_sectional_labels`〔ic_analysis_service.py:3595-3668〕：kline 全序列之 h 根
+    # 對數報酬 ln(close[t+h]／close[t])，欄名 return_<h>；oracle 以 kline_cache.h5 直接讀之收盤〔float64〕逐標的重算）
+    t_l = items.setdefault("label.cross_sectional", Tally("ln(close[t+h]／close[t])（kline_cache.h5 直接讀、float64、kline 全序列）"))
+    tf = str(cap["request"].get("timeframe"))
+    for sym, g in df.groupby(level=-1, sort=True):
+        ts = _utc(g.index.get_level_values(0))
+        c = read_kline_close(str(sym), tf)
+        lab = np.log(c.shift(-h_lab) / c).reindex(ts).to_numpy(dtype=float)
+        for when, pv, ov in zip(ts, g[label_col[0]].to_numpy(dtype=float), lab):
+            t_l.num("@input/label_series", f"{sym}/label@{when}", pv, ov)
+    split_meta = (rep.get("metadata") or {}).get("ic_train_test_split") or {}
+    facts["split_applied"] = split_meta.get("applied")
+    seg = df
+    if bool(cfg.get("ic_train_test_split")):
+        bh = bar_hours(df.index.get_level_values(0).unique())
+        osp = O._ref_cross_split(df, float(cfg["oos_test_size"]), int(cfg["min_test_rows"]), int(cfg.get("embargo") or 0),
+                                 h_lab, pd.Timedelta(hours=bh) if bh else None)
+        facts["split"] = {k: v for k, v in osp.items() if k != "test_mask"}
+        t.eq("@input/split", "cross_split_ok", bool(osp["ok"]), True)
+        t.eq("@input/split", "cross_split_applied", bool(split_meta.get("applied", True)), True)
+        if osp["ok"]:
+            seg = df.iloc[np.flatnonzero(osp["test_mask"])]
+    exp = O._ref_cross_sectional(seg, label_col[0])
     srs = rep.get("rolling_ic_series") or {}
     for f, values in exp["series"].items():
         _tree(t, key_of, f"/rolling_ic_series/{_ptr(f)}/window_cross_sectional",
@@ -1363,7 +1779,10 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
             t.num(f"/summary_table/#/{k}", f"{f}/{k}", (rows.get(f) or {}).get(k), v, feature=f)
     _tree(t, key_of, "/cross_sectional_symbol_ic", rep.get("cross_sectional_symbol_ic"), exp["symbol_ic"])
     _tree(t, key_of, "/cross_symbol_validation", rep.get("cross_symbol_validation"), exp["validation"])
-    cfg = cap["config"] or {}
+    # SPEC v5.38 ③：完成分支之 reason＝None、方向衝突名單於本資料可為空；非空／skipped 分支以明列邊界輸入另證
+    for k in ("/cross_symbol_validation/reason", "/cross_symbol_validation/samples/sign_conflict_features"):
+        t.na(k, "test_cross_symbol_validation_skipped_and_conflict_branches")
+    t.na("/summary_table/#/regime_robust", "test_regime_robust_oracle_suite")
     mh = re.match(r"return_(\d+)$", str(label_col[0]))
     h = int(mh.group(1)) if mh else 1
     maxlags = (cfg.get("significance") or {}).get("maxlags")
@@ -1371,6 +1790,7 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
     t_q = items.setdefault("fdr", Tally("statsmodels multipletests fdr_bh（同檢定集合）"))
     t_d = items.setdefault("direction", Tally("direction＝sign(ic_mean)、icir_aligned＝d·icir、方向對齊勝率與單調性"))
     pv: Dict[str, float] = {}
+    directions: Dict[str, int] = {}
     for f, values in exp["series"].items():
         z = np.asarray(values, dtype=float)
         z = z[np.isfinite(z)]
@@ -1381,17 +1801,13 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
         pv[f] = o["p_value"]
         s = exp["summary"][f]
         d = 0 if not math.isfinite(s["ic_mean"]) or s["ic_mean"] == 0 else (1 if s["ic_mean"] > 0 else -1)
+        directions[f] = d
         neg = float(np.mean(z < 0)) if z.size else math.nan
         t_d.eq("/summary_table/#/direction", f"xsec/{f}/direction", row.get("direction"), d, f)
         t_d.num("/summary_table/#/icir_aligned", f"xsec/{f}/icir_aligned", row.get("icir_aligned"),
                 d * s["icir"] if d != 0 and math.isfinite(s["icir"]) else math.nan, feature=f)
         t_d.num("/summary_table/#/ic_hit_rate_aligned", f"xsec/{f}/ic_hit_rate_aligned", row.get("ic_hit_rate_aligned"),
                 s["ic_hit_rate"] if d > 0 else (neg if d < 0 else math.nan), feature=f)
-        t_d.num("/summary_table/#/monotonicity_score_aligned", f"xsec/{f}/monotonicity_score_aligned",
-                row.get("monotonicity_score_aligned"), _aligned_mono({}, d), feature=f)
-        for k in XSEC_PLACEHOLDERS:
-            t.eq(f"/summary_table/#/{k}", f"xsec/{f}/{k}", row.get(k), None, f)
-            t.na(f"/summary_table/#/{k}", "test_cross_sectional_matches_oracle")
         t.eq("/summary_table/#/regime_robust", f"xsec/{f}/regime_robust", row.get("regime_robust"), None, f)
         t.eq("/summary_table/#/regime_robust_reason", f"xsec/{f}/regime_robust_reason", row.get("regime_robust_reason"),
              "regime_analysis_off", f)
@@ -1399,11 +1815,7 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
     for f in exp["series"]:
         t_q.num("/summary_table/#/p_value_adj", f"xsec/{f}/p_value_adj", (rows.get(f) or {}).get("p_value_adj"),
                 adj.get(f, math.nan), feature=f)
-    for key in ("correlation_matrix", "diversification_metrics"):
-        if key in rep:
-            _tree(t, key_of, f"/{key}", rep.get(key), XSEC_EMPTY.get(key))
-    for k in ("/correlation_matrix/features", "/correlation_matrix/matrix", "/diversification_metrics"):
-        t.na(k, "test_cross_sectional_matches_oracle")
+    _evaluate_cross_placeholders(t, key_of, rep, seg, str(label_col[0]), cap, cfg, rows, directions)
     return facts
 
 
@@ -1480,8 +1892,48 @@ COVERAGE_RULES: List[tuple] = [
      r"deep_analysis_errors)(/|$)", NON_STAT, f"{_ORC}:2988"),
     (r"^/module_summary/", NON_STAT, f"{_ORC}:2937"),
 ]
-#: 依 metadata 分組且全落 `unknown` 或無任一特徵帶該 metadata ⇒ metadata-missing（特徵 metadata 未帶入）
-METADATA_MISSING = [r"^/grouped_ic/by_category/unknown(/|$)", r"^/grouped_ic/by_data_source$"]
+#: SPEC v5.39 ⑨：依 metadata 之鍵 → 其所依之 metadata 欄；該請求任一特徵之該欄為預設值（或來源記為預設／缺）⇒ 該鍵
+#: metadata-missing（category、data_source、layer 皆同；多元化之三涵蓋率依同一 metadata，一併判）
+METADATA_KEYS: List[tuple] = [
+    (r"^/grouped_ic/by_category(/|$)", "category"),
+    (r"^/grouped_ic/by_data_source(/|$)", "data_source"),
+    (r"^/grouped_ic/by_layer(/|$)", "layer"),
+    (r"^/diversification_metrics/category_coverage$", "category"),
+    (r"^/diversification_metrics/data_source_coverage$", "data_source"),
+    (r"^/diversification_metrics/layer_coverage$", "layer"),
+]
+#: 服務端缺 metadata 時之預設值樣式（api/services/ic_analysis_service.py:3510-3536 之 fallback：category＝"unknown"、
+#: layer＝1、data_source 不帶；路 F〔SPEC ㉜〕記來源前，無來源欄者依此判）
+METADATA_DEFAULTS = {"category": (None, "", "unknown"), "data_source": (None, "", "unknown"), "layer": (None, 1, "1")}
+#: 來源欄之「非持久化」值（SPEC ㉜：取不到 ⇒ 記原因，不以預設值冒充）
+METADATA_UNSOURCED = {"", "default", "fallback", "missing", "unavailable", "unknown", "none"}
+#: SPEC v5.39 ⑦：寫死常數或恆為佔位之鍵（(涵蓋鍵正則, 請求種類, 產生之檔:行, 說明)）⇒ unimplemented（報使用者裁定實作或
+#: 移除；收據不 PASS）。逐條以 `test_receipt_unimplemented_anchors_hardcode_placeholders` 驗產生處確為寫死佔位。
+#: SPEC Task 0.4 ㊱ 實作跨標的 summary 五欄、相關矩陣與多元化指標後無寫死佔位之鍵（清單保留供日後新發現者登記）
+UNIMPLEMENTED: List[tuple] = []
+
+
+def metadata_missing_fields(meta: Mapping[str, Any], features: Sequence[str]) -> Dict[str, Dict[str, str]]:
+    """SPEC v5.39 ⑨：{metadata 欄: {特徵: 原因}}——特徵之該欄為服務預設值（`METADATA_DEFAULTS`）且無持久化來源，或來源欄
+    記為非持久化（`METADATA_UNSOURCED`；含 `missing`）、或帶缺漏原因。來源欄（路 F，ic_analysis_service.py
+    `IC_FEATURE_METADATA_SOURCE_KEY`／`IC_FEATURE_METADATA_REASON_KEY`）：`metadata_source` 為字串 ⇒ 三欄同源，為 dict ⇒
+    逐欄；`metadata_missing_reason`（三欄共用）或 `<欄>_missing_reason`；另認 `<欄>_source`。"""
+    out: Dict[str, Dict[str, str]] = {f: {} for f in METADATA_DEFAULTS}
+    for name in features:
+        m = meta.get(name) if isinstance(meta.get(name), dict) else {}
+        raw = m.get("metadata_source")
+        srcs = raw if isinstance(raw, dict) else ({f: raw for f in METADATA_DEFAULTS} if isinstance(raw, str) else {})
+        for field, defaults in METADATA_DEFAULTS.items():
+            src = srcs.get(field, m.get(f"{field}_source"))
+            why = m.get(f"{field}_missing_reason") or m.get("metadata_missing_reason")
+            if why:
+                out[field][str(name)] = f"missing_reason={why}"
+            elif src is not None:
+                if str(src).strip().lower() in METADATA_UNSOURCED or str(src).lower().startswith("default"):
+                    out[field][str(name)] = f"source={src}"
+            elif m.get(field) in defaults:
+                out[field][str(name)] = f"預設值 {m.get(field)!r}（無來源欄）"
+    return out
 
 
 def _producer_norm(prod: str) -> str:
@@ -1509,6 +1961,14 @@ def map_key(key: str, deep: Mapping[str, Mapping[str, str]], is_deep: bool, is_c
         return "cross_sectional", f"{_ORC}:2391", key
     if is_cross and re.match(r"^/summary_table/#/(ic_mean|ic_std|icir|ic_hit_rate)$", key):
         return "cross_sectional", f"{_ORC}:2386", key
+    # 跨標的路徑之 summary 五欄（SPEC Task 0.4 ㊱ 實作，`_xsec_placeholder_stats`）與 regime_robust（跨標的不算分組 IC ⇒
+    # None／regime_analysis_off）由 `evaluate_cross` 於 cross_sectional 項對照
+    if is_cross and re.match(r"^/summary_table/#/(monotonicity_score|monotonicity_score_aligned|long_short_spread|coverage|"
+                             r"turnover_rate|ic_half_life|regime_robust|regime_robust_reason)$", key):
+        return "cross_sectional", f"{_ORC}:2602", key
+    if is_cross and re.match(r"^/(correlation_matrix/(features|matrix(/#)*)|diversification_metrics(/.*)?|ic_decay(/.*)?|"
+                             r"metadata/cross_sectional_unavailable_fields(/.*)?)$", key):
+        return "cross_sectional", f"{_ORC}:2602", key
     if is_deep and key.startswith("/results/"):
         nk = _norm_deep_key(key)
         match = nk if nk in deep else None
@@ -1533,23 +1993,45 @@ def map_key(key: str, deep: Mapping[str, Mapping[str, str]], is_deep: bool, is_c
     return None
 
 
-def key_status(key: str, oracle: str, items: Mapping[str, Tally]) -> str:
-    """單鍵狀態（SPEC Task 0.3 r39 群集 E）：非統計欄 ⇒ non-stat；metadata 分組全落 unknown ⇒ metadata-missing；該項於此鍵有
-    內容之比較 ⇒ verified；有比較而皆為 NaN／空且有明列邊界證明 ⇒ verified-na；無內容之比較 ⇒ insufficient-data；未比較
-    ⇒ not-compared（收據工具未對照，FAIL）。"""
+#: SPEC v5.39 ⑦：coverage 狀態之封閉集合（五態＋非統計欄）
+COVERAGE_STATES = ("verified", "verified-na", "unimplemented", "metadata-missing", "insufficient-data", "non-stat")
+
+
+def unimplemented_reason(key: str, kind: str) -> Optional[str]:
+    """寫死佔位之鍵（`UNIMPLEMENTED`）⇒ "<檔:行>：<說明>"；否則 None。"""
+    for rx, kinds, prod, why in UNIMPLEMENTED:
+        if kind in kinds and re.match(rx, key):
+            return f"{prod}：{why}"
+    return None
+
+
+def key_status(key: str, oracle: str, items: Mapping[str, Tally], *, kind: str = "",
+               meta_missing: Optional[Mapping[str, Mapping[str, str]]] = None) -> Dict[str, Any]:
+    """單鍵狀態（SPEC Task 0.3 r39 群集 E；v5.39 ⑦⑨，只准 `COVERAGE_STATES`）：非統計欄 ⇒ non-stat；寫死佔位 ⇒
+    unimplemented；依 metadata 之鍵而該請求任一特徵之該欄為預設值 ⇒ metadata-missing；該項於此鍵有內容之比較 ⇒ verified；
+    比較皆為 NaN／空且有明列邊界證明 ⇒ verified-na；無內容之比較 ⇒ insufficient-data；已對映 oracle 項而無逐值對照 ⇒
+    insufficient-data 且 `uncompared`（列入收據 FAIL 原因，不另立狀態）。回 {"status", ["uncompared"], ["reason"]}。"""
     if oracle == NON_STAT:
-        return "non-stat"
-    if any(re.match(rx, key) for rx in METADATA_MISSING):
-        return "metadata-missing"
+        return {"status": "non-stat"}
+    why = unimplemented_reason(key, kind)
+    if why:
+        return {"status": "unimplemented", "reason": why}
+    for rx, field in METADATA_KEYS:
+        miss = (meta_missing or {}).get(field) or {}
+        if re.match(rx, key) and miss:
+            return {"status": "metadata-missing",
+                    "reason": f"{field}：{len(miss)} 特徵為預設值或無持久化來源（例 {sorted(miss.items())[:3]}）"}
     t = items.get(oracle)
     rec = None if t is None else t.keys.get(key)
     if rec is None:
-        return "verified-na" if t is not None and key in t.na_proofs else "not-compared"
+        if t is not None and key in t.na_proofs:
+            return {"status": "verified-na", "proof": t.na_proofs[key]}
+        return {"status": "insufficient-data", "uncompared": True, "reason": "已對映 oracle 項而無逐值對照（收據工具未對照）"}
     if rec[1] > 0:
-        return "verified"
+        return {"status": "verified"}
     if key in t.na_proofs:
-        return "verified-na"
-    return "insufficient-data"
+        return {"status": "verified-na", "proof": t.na_proofs[key]}
+    return {"status": "insufficient-data"}
 
 
 # ── 收據組裝 ──────────────────────────────────────────────────────────────────────────────────────────
@@ -1564,7 +2046,15 @@ EXTRA_ITEM_TESTS: Dict[str, tuple] = {
                   "test_top_features_default_sort_is_direction_aligned"),
     "summary_passthrough": ("test_stage5_pit_stats_match_reference", "test_stage5_pit_stats_match_reference_on_real_kline"),
     "regime_robust": ("test_regime_robust_oracle_suite",),
+    "event_label": ("test_event_label_oracle_matches_product_on_real_batch",
+                    "test_event_label_oracle_boundaries_explicit"),
+    "label.cross_sectional": ("test_cross_sectional_label_float64_matches_kline_oracle_xfail",),
     **{f"deep.{m}": (f"test_deep_{m}_oracle_suite",) for m in DEEP_MODULES},
+    # SPEC v5.39 ④：兩深度模組之捨入級差異依分級判準轉一般斷言（真實 kline 秒級）
+    "deep.feature_quality_diagnostics": ("test_deep_feature_quality_diagnostics_oracle_suite",
+                                         "test_fq_effective_sample_ratio_price_level_matches_oracle_xfail"),
+    "deep.trend_analysis": ("test_deep_trend_analysis_oracle_suite",
+                            "test_trend_four_dimensions_wide_real_kline_matches_oracle_xfail"),
 }
 _KENDALL = {"xfail": "test_rolling_ic_kendall_matches_kendalltau_xfail",
             "reason": "請求 IC 方法為 Kendall 時，滾動 IC 實以 Pearson 計（ic_engine.py compute_rolling_ic 之非 spearman 分支），"
@@ -1573,8 +2063,11 @@ _KENDALL = {"xfail": "test_rolling_ic_kendall_matches_kendalltau_xfail",
                         "icir_aligned、ic_hit_rate_aligned、regime_robust 與 rolling_ic_series；第 5 段 ic_mean／icir／勝率門檻"
                         "之通過集合與 Top-N 排序隨之改變（本收據 A 格 30 欄請求為全樣本研究模式，倖存者 0）"}
 _PEARSON = {"xfail": "test_rolling_ic_pearson_price_level_matches_scipy_xfail",
-            "reason": "Pearson 滾動 IC 以原值累積和計，價格水準欄相消誤差使逐窗相對誤差超過 1e-12（A 格請求實測至 1e-11 量級、"
-                      "明列真實收盤欄輸入至 1e-7 量級）",
+            "reason": "SPEC Task 0.4 ㉘ 窗內中心化後（改前以原值累積和計，A 格實測相對誤差至 1e-11 量級），2026-10-31 擷取之 "
+                      "A.ic_report.pearson 7,531 值僅 1 值不一致：close_1h_trend_DEMA_89_Skew-W5 window_252 第 190 點，"
+                      "產品 −1.2649121565600512e-05、oracle −1.2649121565570104e-05，絕對差約 3.0e-17（低於倍精度 eps "
+                      "2.2e-16），因值近 0 換算相對差 2.4e-12 超過純相對判準 1e-12；判準是否加絕對下限（numpy isclose 式 "
+                      "atol＋rtol·|b|）待 code review r55 裁定",
             "affected": "default_method＝pearson 之請求：滾動 IC 序列與其 ic_mean／ic_std／icir／勝率／方向欄之低位數；本收據"
                         "資料之門檻判定未因此改變，但不滿足 1e-12"}
 _AUTOCORR = {"xfail": "test_turnover_autocorrelation_constant_series_is_nan_xfail",
@@ -1587,21 +2080,23 @@ XFAIL_TESTS: Dict[str, str] = {
     **{f"{i}.kendall": _KENDALL["xfail"] for i in _ROLL_IDS},
     **{f"{i}.pearson": _PEARSON["xfail"] for i in _ROLL_IDS},
     "stage5_pit_stats": _AUTOCORR["xfail"],
-    "deep.feature_quality_diagnostics": "test_fq_effective_sample_ratio_price_level_matches_oracle_xfail",
-    "deep.trend_analysis": "test_trend_four_dimensions_wide_real_kline_matches_oracle_xfail",
+    "label.cross_sectional": "test_cross_sectional_label_float64_matches_kline_oracle_xfail",
 }
-#: 「不一致」項之原因、受影響之通過集合與下游判定
+#: 本批（路 G）之新發現：跨標的路徑標籤以 float32 計（不在 Task 0.4 ①–㉜；報主委裁定是否列 Task 0.4）
+_XSEC_LABEL = {
+    "reason": "跨標的標籤 return_<h>（服務 `_append_cross_sectional_labels`，ic_analysis_service.py:3638-3645）以 kline 讀出之 "
+              "float32 收盤經 `generate_returns_by_type(close, h, 'log')` 計，結果仍為 float32：與 float64 之 "
+              "ln(close[t+h]／close[t]) 絕對差至 5.9e-8（首份擷取 BTCUSDT 1h 499 列全數 > 1e-15；小報酬時相對差至 0.5%）。主線"
+              "標籤已改 float64（SPEC Task 0.4 ⑥），跨標的路徑未同步",
+    "affected": "跨標的請求之截面 IC 序列、summary ic_mean／ic_std／icir／勝率、HAC t／p、cross_sectional_symbol_ic 與 "
+                "cross_symbol_validation 之輸入標籤低位數；排名相關對近同值之排序可能改變"}
+#: 「不一致」項之原因、受影響之通過集合與下游判定（SPEC v5.39 ④ 後，deep.feature_quality_diagnostics／deep.trend_analysis
+#: 之捨入級差異〔1e-12–8e-11〕屬衍生量封閉清單，依 1e-9 判一致，不再列為不一致）
 FINDINGS: Dict[str, Dict[str, str]] = {
     **{f"{i}.kendall": _KENDALL for i in _ROLL_IDS},
     **{f"{i}.pearson": _PEARSON for i in _ROLL_IDS},
     "stage5_pit_stats": _AUTOCORR,
-    "deep.feature_quality_diagnostics": {
-        "reason": "價格水準、近單位自相關之特徵，effective_sample_ratio 與 oracle 相對差 1e-12–5e-11（捨入級，非演算法差異）",
-        "affected": "feature_quality_diagnostics.autocorrelation_results.<特徵>.effective_sample_ratio；不入篩選門檻與旗標判定"
-                    "（旗標以 Ljung–Box p 值判），無通過集合變動"},
-    "deep.trend_analysis": {
-        "reason": "趨勢之斜率／p 值／尾端估計與 statsmodels OLS＋HAC oracle 相對差 1e-12–1e-11（捨入級，非演算法差異）",
-        "affected": "trend_analysis.<特徵>.<維>_trend 之 slope／p_value／tail_estimate 低位數；本收據資料之 trend 判定無變動"},
+    "label.cross_sectional": _XSEC_LABEL,
 }
 #: 收據項以外之發現（小規模除錯擷取所見之崩潰；收據項不涵蓋者）
 EXTRA_FINDINGS: List[Dict[str, Any]] = [
@@ -1610,6 +2105,11 @@ EXTRA_FINDINGS: List[Dict[str, Any]] = [
                  "stats.spearmanr(values, axis=0) 於標籤為常數時回純量、`corr[0, 1:]` 拋 TypeError（120 欄時因含缺值走逐對"
                  "路徑而未觸發）",
      "xfail_test": "test_point_ic_spearman_constant_label_returns_nan_xfail", "ruling": None},
+    {"id": "cross_sectional.tz_aware_split_crash",
+     "evidence": "路 G 跨標的預設分支除錯（SPEC v5.39 ⑩）：analyze_cross_sectional 之預設切分於時間層 tz-aware（UTC）之輸入拋 "
+                 "TypeError（momentum/core/contracts.py:660 `diffs <= np.timedelta64(0, 'ns')`）；naive 正常（服務端特徵庫為 "
+                 "naive，故 IC 頁跨標的路徑不觸發；momentum 層公開入口接受 tz-aware 即崩潰）",
+     "xfail_test": "test_cross_sectional_default_split_tz_aware_index_xfail", "ruling": None},
 ]
 
 
@@ -1624,21 +2124,36 @@ def _git_head() -> Optional[str]:
 
 
 def _feature_names_of(cap: Mapping[str, Any]) -> List[str]:
+    """請求所指之特徵名全集：跨標的＝各格 run 特徵之聯集（kline 跨標的＝`cross_df` 之欄）；其餘＝該 run 之特徵。"""
     fb = _fb()
     req = cap["request"]
     if req.get("kind") == "cross":
         return sorted(set().union(*(fb._run_feature_names(c) for c in req["cells"])))
+    if req.get("kind") == "cross_kline":
+        df = cap.get("cross_df")
+        return sorted(str(c) for c in (df.columns if df is not None else req.get("features") or []))
     return fb._run_feature_names(req)
 
 
+def closure_check(response: Any, names: Sequence[str], coverage: Mapping[str, Any]) -> Dict[str, Any]:
+    """SPEC v5.39 ⑧ 逐請求封閉：實際回應鍵集合以與 `coverage_keys` 獨立之規則（測試檔 `_coverage_keys`／`_paths`）重算，
+    與 coverage 鍵集合比對；回 {"closed", "n_response_keys", "missing"（回應有而 coverage 無）, "extra"（coverage 多記）}。"""
+    got = set(_oracles()._coverage_keys(response, list(names)))
+    cov = set(coverage)
+    return {"closed": got == cov, "n_response_keys": len(got), "missing": sorted(got - cov)[:50],
+            "extra": sorted(cov - got)[:50]}
+
+
 def evaluate_request(rid: str, cap: Mapping[str, Any], deep: Mapping[str, Mapping[str, str]]) -> Dict[str, Any]:
-    """單一請求：oracle 對照（items）＋逐鍵涵蓋對映與狀態（逐請求封閉：涵蓋鍵＝該請求實際回應之 `flatten_fields` 鍵）。"""
+    """單一請求：oracle 對照（items）＋逐鍵涵蓋對映與狀態（`key_status`，SPEC v5.39 ⑦⑨）；逐請求封閉（⑧）以獨立抽取之
+    回應鍵集合比對（`closure_check`）。"""
     import collections
 
     names = _feature_names_of(cap)
     key_of = KeyOf(names)
     items: Dict[str, Tally] = {}
-    is_cross = cap["request"].get("kind") == "cross"
+    kind = str(cap["request"].get("kind") or "")
+    is_cross = kind in ("cross", "cross_kline")
     is_deep = cap.get("deep_raw") is not None
     # 報告之 JSON 契約以 null 表未定義之浮點（NaN）：null 與 NaN 視為同值（null 對有限值仍判不一致）
     NULL_IS_NAN["on"] = True
@@ -1650,29 +2165,43 @@ def evaluate_request(rid: str, cap: Mapping[str, Any], deep: Mapping[str, Mappin
             prefix_invariance(cap, items)
         if is_deep:
             facts["deep_status"] = evaluate_deep(cap, items)
+            ps = ((cap["response"] or {}).get("results") or {}).get("parameter_sensitivity")
+            fam = cap["request"].get("parameter_family")
+            if fam is not None:
+                facts["parameter_family"] = {**fam, "response_families": sorted((ps or {}).get("families") or {})
+                                             if isinstance(ps, dict) else []}
     cov_paths = coverage_keys(cap["response"], names)
     coverage: Dict[str, Dict[str, Any]] = {}
     unmapped: List[str] = []
     method = str(((cap.get("config") or {}).get("global_settings") or {}).get("default_method") or "spearman")
+    F = (cap.get("cache") or {}).get("features_df")
+    meta_missing = metadata_missing_fields((cap.get("cache") or {}).get("metadata") or {},
+                                           [] if F is None else [str(c) for c in F.columns])
     for key in sorted(cov_paths):
         m = map_key(key, deep, is_deep, is_cross)
         if m is None:
             unmapped.append(key)
-            coverage[key] = {"oracle": None, "producer": None, "status": "unmapped"}
+            coverage[key] = {"oracle": None, "producer": None, "status": "insufficient-data", "unmapped": True,
+                             "uncompared": True, "reason": "涵蓋鍵未對映任何 oracle 項"}
             continue
         oracle = m[0]
         if not is_cross and method != "spearman" and oracle in ROLLING_DERIVED_ITEMS:
             oracle = f"{oracle}.{method}"
-        coverage[key] = {"oracle": oracle, "producer": m[1], "status": key_status(m[2], oracle, items),
-                         "n_paths": len(cov_paths[key])}
+        coverage[key] = {"oracle": oracle, "producer": m[1], "n_paths": len(cov_paths[key]),
+                         **key_status(m[2], oracle, items, kind=kind, meta_missing=meta_missing)}
     counts = collections.Counter(v["status"] for v in coverage.values())
+    closure = closure_check(cap["response"], names, coverage)
+    facts["metadata_missing"] = {f: len(v) for f, v in meta_missing.items()}
     return {"items": items, "coverage": coverage, "unmapped": unmapped, "status_counts": dict(counts), "facts": facts,
-            "closed": set(coverage) == set(cov_paths)}
+            "closed": closure["closed"], "closure": closure,
+            "uncompared": sorted(k for k, v in coverage.items() if v.get("uncompared"))}
 
 
 def _merge_items(per_req: Mapping[str, Mapping[str, Tally]]) -> Dict[str, Dict[str, Any]]:
-    """逐請求之同一 oracle 項合併：任一請求不一致 ⇒ 不一致；皆一致且至少一請求有比較 ⇒ 一致（最大相對誤差 > 1e-12 ⇒
-    不一致）；否則未驗。"""
+    """逐請求之同一 oracle 項合併：任一請求不一致 ⇒ 不一致；皆一致且至少一請求有比較 ⇒ 一致（分級判準，SPEC v5.39 ④：
+    直接統計量最大相對誤差 > 1e-12 或衍生量 > 1e-9 ⇒ 不一致；兩類分記 `max_rel_diff_direct`／`max_rel_diff_derived`）；
+    否則未驗。"""
+    derived_tol = float(_oracles().DERIVED_REL_TOL)
     out: Dict[str, Dict[str, Any]] = {}
     for iid in sorted({i for items in per_req.values() for i in items}):
         recs = {rid: items[iid].record() for rid, items in per_req.items() if iid in items}
@@ -1682,10 +2211,20 @@ def _merge_items(per_req: Mapping[str, Mapping[str, Tally]]) -> Dict[str, Dict[s
         rels = [v["max_rel_diff"] for v in compared.values()]
         max_rel = None if any(v["max_rel_diff"] is None and v["n_mismatch"] for v in compared.values()) else \
             max([r for r in rels if r is not None], default=0.0)
-        if verdict == "一致" and max_rel is not None and max_rel > REL_TOL:
+
+        def cls_max(cls: str) -> Optional[float]:
+            vals = [v.get(f"max_rel_diff_{cls}") for v in compared.values()]
+            if any(x is None and v["n_mismatch"] for x, v in zip(vals, compared.values())):
+                return None
+            return max([x for x in vals if x is not None], default=0.0)
+
+        max_direct, max_derived = cls_max("direct"), cls_max("derived")
+        if verdict == "一致" and ((max_direct is not None and max_direct > REL_TOL)
+                                  or (max_derived is not None and max_derived > derived_tol)):
             verdict = "不一致"
         first = next(iter(recs.values()))
         out[iid] = {"verdict": verdict, "oracle": first["oracle"], "max_rel_diff": max_rel,
+                    "max_rel_diff_direct": max_direct, "max_rel_diff_derived": max_derived,
                     "n_compared": sum(v["n_compared"] for v in recs.values()),
                     "n_finite": sum(v["n_finite"] for v in recs.values()),
                     "n_mismatch": sum(v["n_mismatch"] for v in recs.values()),
@@ -1695,6 +2234,37 @@ def _merge_items(per_req: Mapping[str, Mapping[str, Tally]]) -> Dict[str, Dict[s
                     "mismatch_features": sorted({f for v in bad.values() for f in v["mismatch_features"]})[:50],
                     "n_mismatch_features": sum(v["n_mismatch_features"] for v in bad.values())}
     return out
+
+
+def receipt_fail_reasons(per_req: Mapping[str, Mapping[str, Any]]) -> List[str]:
+    """逐請求之 FAIL 原因（SPEC v5.39 ⑦⑧⑨⑩、v5.38 ①②）：unmapped 鍵；逐請求封閉不成立（獨立抽取之回應鍵 ≠ coverage）；
+    未逐值對照之統計鍵（逐鍵列出）；unimplemented、metadata-missing 之鍵（逐鍵，任一請求出現即 FAIL）；跨標的任一嘗試失敗；
+    深度請求之參數家族為空；事件匯入批測試段事件數不足。"""
+    fail: List[str] = []
+    for rid, rr in per_req.items():
+        if rr["unmapped"]:
+            fail.append(f"{rid}：unmapped 鍵 {len(rr['unmapped'])}（例 {rr['unmapped'][:3]}）")
+        clo = rr.get("closure") or {}
+        if not clo.get("closed", False):
+            fail.append(f"{rid}：逐請求封閉不成立（獨立抽取回應鍵有而 coverage 無 {clo.get('missing')}；coverage 多記 "
+                        f"{clo.get('extra')}）")
+        for key in rr.get("uncompared") or []:
+            fail.append(f"{rid}：未逐值對照之統計鍵 {key}")
+        for key, ent in sorted(rr["coverage"].items()):
+            if ent.get("status") in ("unimplemented", "metadata-missing"):
+                fail.append(f"{rid}：{ent['status']} {key}（{ent.get('reason')}）")
+        facts = rr.get("facts") or {}
+        for att in facts.get("attempts") or []:
+            if not att.get("ok"):
+                fail.append(f"{rid}：跨標的嘗試失敗（{att}）")
+        fam = facts.get("parameter_family")
+        if fam is not None and not fam.get("response_families"):
+            fail.append(f"{rid}：深度請求之參數家族為空（請求家族 {fam.get('family')}，SPEC v5.38 ②）")
+        ev = facts.get("event_label")
+        if isinstance(ev, dict) and ev.get("min_test_events") is not None and \
+                int(ev.get("n_test_events") or 0) < int(ev["min_test_events"]):
+            fail.append(f"{rid}：事件匯入批測試段 {ev.get('n_test_events')} 筆 < min_test_events {ev['min_test_events']}")
+    return fail
 
 
 def build_receipt(captures: Path) -> Dict[str, Any]:
@@ -1755,36 +2325,39 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
             m = rc.get(key)
             if m is None:
                 mm = map_key(key, deep, False, False)
-                m = {"oracle": mm[0] if mm else None, "producer": mm[1] if mm else None,
-                     "status": key_status(mm[2], mm[0], per_req[rid]["items"]) if mm else "unmapped"}
+                m = ({"oracle": mm[0], "producer": mm[1], **key_status(mm[2], mm[0], per_req[rid]["items"])} if mm else
+                     {"oracle": None, "producer": None, "status": "insufficient-data", "uncompared": True})
             ent = coverage.setdefault(key, {"oracle": m.get("oracle"), "producer": m.get("producer"), "status": {}})
             ent["status"][rid] = m.get("status")
-    # 跨請求資料充足：每一統計鍵於至少一請求 verified／verified-na
+    fail.extend(receipt_fail_reasons(per_req))
+    # 跨請求資料充足：每一統計鍵於至少一請求 verified／verified-na（參數家族名段依 `_norm_deep_key` 正規化為 `*`：各資料格
+    # 之家族名含週期而互異，同一欄位跨請求須視為同鍵）
     stat_keys: Dict[str, Dict[str, str]] = {}
     for rid, rr in per_req.items():
         for key, ent in rr["coverage"].items():
             if ent["status"] != "non-stat":
-                stat_keys.setdefault(key, {})[rid] = ent["status"]
+                stat_keys.setdefault(_norm_deep_key(key), {})[rid] = ent["status"]
     unsatisfied = {k: v for k, v in stat_keys.items() if not any(s in ("verified", "verified-na") for s in v.values())}
-    for rid, rr in per_req.items():
-        if rr["unmapped"]:
-            fail.append(f"{rid}：unmapped 鍵 {len(rr['unmapped'])}（例 {rr['unmapped'][:3]}）")
     if unsatisfied:
         fail.append(f"統計鍵無任一請求 verified／verified-na：{len(unsatisfied)}（例 {sorted(unsatisfied)[:5]}）")
     bad_items = sorted(i for i, v in merged.items() if v["verdict"] != "一致")
     if bad_items:
         fail.append(f"非一致項：{bad_items}")
     requests_out = {rid: {**caps_meta.get(rid, {}), "coverage": rr["coverage"], "unmapped": rr["unmapped"],
-                          "closed": rr["closed"], "status_counts": rr["status_counts"], "facts": rr["facts"],
+                          "closed": rr["closed"], "closure": rr["closure"], "uncompared": rr["uncompared"],
+                          "status_counts": rr["status_counts"], "facts": rr["facts"],
                           "items": {i: {k: t.record()[k] for k in ("verdict", "n_compared", "n_finite", "n_mismatch",
-                                                                     "max_rel_diff")} for i, t in rr["items"].items()}}
+                                                                     "max_rel_diff", "max_rel_diff_direct",
+                                                                     "max_rel_diff_derived")}
+                                    for i, t in rr["items"].items()}}
                     for rid, rr in per_req.items()}
     for rid, meta in caps_meta.items():
         requests_out.setdefault(rid, dict(meta))
     return {
-        "head": _git_head(), "spec": "docs/ICPERF_SPEC.md v5.37 Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
+        "head": _git_head(), "spec": f"docs/ICPERF_SPEC.md {spec_version()} Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
         "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
-        "tolerance": {"relative": REL_TOL, "ssr_slack": SSR_SLACK},
+        "tolerance": {"relative": REL_TOL, "derived_relative": float(O.DERIVED_REL_TOL),
+                      "derived_fields": list(O.DERIVED_FIELD_PATTERNS), "ssr_slack": SSR_SLACK},
         "data": {"cell": "A_BTCUSDT_1h", "fact_receipt": {rid: rr["facts"] for rid, rr in per_req.items()},
                  "long_cell": "L_BTCUSDT_4h_longhist（handoffs/run_receipts/20261029-icperf-long-cell-4h-longhist.json）",
                  "kline": str(KLINE_H5.relative_to(REPO)), "captures": str(captures)},

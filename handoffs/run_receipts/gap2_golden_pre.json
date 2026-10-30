@@ -1,9 +1,9 @@
 {
   "fixture_sha256": "55e27b4b671ce7db0133c772764d8bcc387c96aed6fb4d5b369d3c2cdc22b31f",
-  "config_hash": "9180dd5763ecbe9e67ed746f2fbbda63",
+  "config_hash": "64027ea64515424f39a9b3a04372a97c",
   "case_id": "ic_gatekeeper",
-  "canonical_sha": "149353cfbc6c862c0b86cb985a8fd82b06fa30ea450665597c16ef998d68172d",
-  "canonical_sha_legacy": "ca3c0ad3d2e56fbb4f427175f0422a21f23e24168d822c7d697ae400dcd2a5bc",
+  "canonical_sha": "5802dbcd7765adfc35924b897e021a237803c5c500f776577be60e9d0483f026",
+  "canonical_sha_legacy": "01eea6092de318891351448e04702b5d9c61b2a2fa57d5b49c676d5099d4782e",
   "summary_table": [
     {
       "feature_name": "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
@@ -361,5 +361,5 @@
     }
   },
   "generated_by": "scripts/gap2_freeze_golden.py --write",
-  "ts": "2026-10-30T04:36:20Z"
+  "ts": "2026-10-30T22:37:20Z"
 }

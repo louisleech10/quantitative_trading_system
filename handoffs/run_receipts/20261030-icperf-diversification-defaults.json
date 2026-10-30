@@ -1,0 +1,1006 @@
+{
+ "spec": "docs/ICPERF_SPEC.md Task 0.4 ㊲",
+ "producer": "claude-opus-5-5（路 I 子代理）",
+ "created_at": "2026-10-31T00:28:38+0800",
+ "method": "凍結腳本 IC 頁預設請求（前端初始 payload）一次 analyze 攔截第 6 段實際輸入；以產品 RedundancyFilter 同冗餘設定重跑第 6 段，約束關 vs 開（預設與候選值）",
+ "defaults_evaluated": {
+  "min_categories": 3,
+  "min_data_sources": 2,
+  "max_same_category_pct": 0.4
+ },
+ "candidates": {
+  "min_categories": [
+   2,
+   3,
+   4
+  ],
+  "min_data_sources": [
+   1,
+   2,
+   3
+  ],
+  "max_same_category_pct": [
+   0.3,
+   0.4,
+   0.5
+  ]
+ },
+ "c_cell": "未納入：C 格 209,053 欄，第 6 段之輸入須先跑全欄第 1–5 段（改前推算約 47 小時，ffprod_measure 收據），不可能在 30 分鐘內完成第 6 段",
+ "working_tree_diff_stat": [
+  " 52 files changed, 40400 insertions(+), 16219 deletions(-)"
+ ],
+ "eval_peak_rss_bytes": 307134464,
+ "cells": {
+  "ic_report": {
+   "cell": "A_BTCUSDT_1h",
+   "symbol": "BTCUSDT",
+   "timeframe": "1h",
+   "config_hash": "e0b9095cff6a9395c008accc86a3d269",
+   "n_rows_stage6": 500,
+   "n_passed_thresholds": 0,
+   "passed_category_distribution": {},
+   "passed_data_source_distribution": {},
+   "passed_metadata_missing": 0,
+   "product_survivors": 0,
+   "off_equals_product_survivors": true,
+   "analyze_seconds_capture": 3185.721771458,
+   "stage6_seconds_product": 0.003207750000001397,
+   "peak_rss_bytes_capture": 827703296,
+   "variants": {
+    "off": {
+     "diversification": null,
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": null,
+     "stage6_seconds": 7.687499999997627e-05
+    },
+    "on_default": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 0,
+      "n_after": 0,
+      "before": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "after": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": true
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "no_candidate_with_new_value"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 3.983300000021117e-05
+    },
+    "on_min_categories=2": {
+     "diversification": {
+      "min_categories": 2,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 2,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 0,
+      "n_after": 0,
+      "before": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "after": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": true
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "no_candidate_with_new_value"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 2.904199999997914e-05
+    },
+    "on_min_categories=4": {
+     "diversification": {
+      "min_categories": 4,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 4,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 0,
+      "n_after": 0,
+      "before": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "after": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": true
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "no_candidate_with_new_value"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 2.641699999994529e-05
+    },
+    "on_min_data_sources=1": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 1,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 1,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 0,
+      "n_after": 0,
+      "before": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "after": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": true
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "no_candidate_with_new_value"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 2.487499999981324e-05
+    },
+    "on_min_data_sources=3": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 3,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 3,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 0,
+      "n_after": 0,
+      "before": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "after": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": true
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "no_candidate_with_new_value"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 2.691700000001518e-05
+    },
+    "on_max_same_category_pct=0.3": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.3,
+      "enabled": true
+     },
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.3
+      },
+      "n_before": 0,
+      "n_after": 0,
+      "before": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "after": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": true
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "no_candidate_with_new_value"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 2.4207999999692476e-05
+    },
+    "on_max_same_category_pct=0.5": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.5,
+      "enabled": true
+     },
+     "n_survivors": 0,
+     "final": [],
+     "category_distribution": {},
+     "data_source_distribution": {},
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.5
+      },
+      "n_before": 0,
+      "n_after": 0,
+      "before": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "after": {
+       "n_features": 0,
+       "n_categories": 0,
+       "n_data_sources": 0,
+       "max_category_share": null,
+       "category_counts": {},
+       "data_source_counts": {}
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": true
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "no_candidate_with_new_value"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 2.3874999999673463e-05
+    }
+   }
+  },
+  "ic_report_long": {
+   "cell": "L_BTCUSDT_4h_longhist",
+   "symbol": "BTCUSDT",
+   "timeframe": "4h",
+   "config_hash": "2f522a293917655280c483f50d200069",
+   "n_rows_stage6": 395,
+   "n_passed_thresholds": 2,
+   "passed_category_distribution": {
+    "trend": 2
+   },
+   "passed_data_source_distribution": {
+    "close": 1,
+    "hl": 1
+   },
+   "passed_metadata_missing": 0,
+   "product_survivors": 1,
+   "off_equals_product_survivors": true,
+   "analyze_seconds_capture": 2264.70495,
+   "stage6_seconds_product": 0.050181207999685284,
+   "peak_rss_bytes_capture": 1218232320,
+   "variants": {
+    "off": {
+     "diversification": null,
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": null,
+     "stage6_seconds": 0.0012661669999998182
+    },
+    "on_default": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 1,
+      "n_after": 1,
+      "before": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "after": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": false
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "candidates_redundant",
+       "max_same_category_pct": "coverage_protected"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 0.0008537499999996534
+    },
+    "on_min_categories=2": {
+     "diversification": {
+      "min_categories": 2,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 2,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 1,
+      "n_after": 1,
+      "before": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "after": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": false
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "candidates_redundant",
+       "max_same_category_pct": "coverage_protected"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 0.0007969170000001746
+    },
+    "on_min_categories=4": {
+     "diversification": {
+      "min_categories": 4,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 4,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 1,
+      "n_after": 1,
+      "before": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "after": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": false
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "candidates_redundant",
+       "max_same_category_pct": "coverage_protected"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 0.0007803329999997999
+    },
+    "on_min_data_sources=1": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 1,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 1,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 1,
+      "n_after": 1,
+      "before": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "after": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": true,
+       "max_same_category_pct": false
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "max_same_category_pct": "coverage_protected"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 0.0006757090000002464
+    },
+    "on_min_data_sources=3": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 3,
+      "max_same_category_pct": 0.4,
+      "enabled": true
+     },
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 3,
+       "max_same_category_pct": 0.4
+      },
+      "n_before": 1,
+      "n_after": 1,
+      "before": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "after": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": false
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "candidates_redundant",
+       "max_same_category_pct": "coverage_protected"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 0.0007841669999999468
+    },
+    "on_max_same_category_pct=0.3": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.3,
+      "enabled": true
+     },
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.3
+      },
+      "n_before": 1,
+      "n_after": 1,
+      "before": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "after": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": false
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "candidates_redundant",
+       "max_same_category_pct": "coverage_protected"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 0.0007811669999999715
+    },
+    "on_max_same_category_pct=0.5": {
+     "diversification": {
+      "min_categories": 3,
+      "min_data_sources": 2,
+      "max_same_category_pct": 0.5,
+      "enabled": true
+     },
+     "n_survivors": 1,
+     "final": [
+      "close_4h_trend_MIDPOINT_13_ZScore-W13"
+     ],
+     "category_distribution": {
+      "trend": 1
+     },
+     "data_source_distribution": {
+      "close": 1
+     },
+     "added": [],
+     "removed": [],
+     "constraint_log": {
+      "enabled": true,
+      "settings": {
+       "min_categories": 3,
+       "min_data_sources": 2,
+       "max_same_category_pct": 0.5
+      },
+      "n_before": 1,
+      "n_after": 1,
+      "before": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "after": {
+       "n_features": 1,
+       "n_categories": 1,
+       "n_data_sources": 1,
+       "max_category_share": 1.0,
+       "category_counts": {
+        "trend": 1
+       },
+       "data_source_counts": {
+        "close": 1
+       }
+      },
+      "satisfied": {
+       "min_categories": false,
+       "min_data_sources": false,
+       "max_same_category_pct": false
+      },
+      "unmet_reasons": {
+       "min_categories": "no_candidate_with_new_value",
+       "min_data_sources": "candidates_redundant",
+       "max_same_category_pct": "coverage_protected"
+      },
+      "added": [],
+      "removed": [],
+      "metadata_missing": {
+       "selected_before": 0,
+       "candidates": 0,
+       "final": 0
+      }
+     },
+     "stage6_seconds": 0.0007797909999998076
+    }
+   }
+  }
+ }
+}

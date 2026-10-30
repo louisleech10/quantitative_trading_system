@@ -58,7 +58,7 @@ PENDING_ITEMS: Tuple[str, ...] = ()
 PENDING_PROBE = ("ic_report_long", "deep_analysis_long", "event_import_report")
 #: SPEC v5.26 Task 0.3 FACT-RECEIPT：第 (6)(7) 項之資料格與事件匯入批（測試自持）
 LONG_CELL = "L_BTCUSDT_4h_longhist"
-EVENT_IMPORT_ID = "20261029T152937Z-d5c4ac41"
+EVENT_IMPORT_ID = "20261030T140536Z-91a1dc03"  # SPEC v5.38 Task 0.3 補足①：重建之事件匯入批
 #: §G：第 (1)、(2)、(4) 項為逐特徵逐欄位輸出（SPEC v5.8：第 (3) 項深度分析之逐模組逐欄位由「回應全部欄位」涵蓋）
 FEATURE_ITEMS = ("ic_report", "stage5_subset", "event_report", "ic_report_long", "event_import_report")  # v5.26 增 (6)(7)
 #: SPEC §G baseline 內容：IC 報告（dict）之逐特徵來源與形狀（測試自持）——summary_table＝list[dict]、以 feature_name 為鍵；

@@ -648,7 +648,7 @@ def test_b3_test01_routes_service_callback_real_chain(
     # 3) service apply_transforms（真 service 同步路徑 + response carrier）
     import asyncio
 
-    xform = asyncio.get_event_loop().run_until_complete(
+    xform = asyncio.run(
         service.apply_transforms(
             task_id=tid,
             selected_features=["feat_a"],
@@ -782,7 +782,7 @@ def test_b3_xform01_attr_write_failure_raises(
     import asyncio
 
     with pytest.raises(DegradedOOSViolation, match="analysis_status attr"):
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             service.apply_transforms(
                 task_id=tid,
                 selected_features=["feat_a"],

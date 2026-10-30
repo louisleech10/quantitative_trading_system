@@ -90,6 +90,7 @@ redundancy:
   vif:
     max_vif: 10.0  # VIF 上限
   diversification:
+    enabled: false  # 多元化約束開關（ICPERF Task 0.4 ㊲；預設值待使用者裁定）
     min_categories: 3  # 類別最少數
     min_data_sources: 2  # 資料源最少數
     max_same_category_pct: 0.4  # 同類別上限比例

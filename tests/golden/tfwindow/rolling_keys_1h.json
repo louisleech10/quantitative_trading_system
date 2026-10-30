@@ -45,6 +45,12 @@
       756,
       1512
     ],
-    "icir_role": "threshold"
+    "icir_role": "threshold",
+    "icir_window_selection": {
+      "adjusted_window": 756,
+      "configured_window": 63,
+      "key": "window_756",
+      "source": "rolling_windows"
+    }
   }
 }

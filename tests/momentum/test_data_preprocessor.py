@@ -297,3 +297,29 @@ def test_preprocess_full_sample_clips_to_full_period_quantiles_single_outlier():
     p01, p99 = float(raw.quantile(0.01)), float(raw.quantile(0.99))
     expected = np.minimum(np.maximum(values, p01), p99)
     assert p99 < 1e6 and np.allclose(out["x"].to_numpy(), expected, rtol=0, atol=1e-12) and float(out["x"].max()) == pytest.approx(p99)
+
+
+@pytest.mark.requires_kline
+def test_type_feature_not_declared_by_category_token(requires_kline_data):
+    """ICPERF Task 0.4 ㉝：metadata category＝pattern 不宣告型態特徵——值域屬 {−100, 0, 100} 之欄（fit 切片判定）跳過縮尾，
+    同族別之計數欄照常縮尾；縮尾值以 numpy 於 fit 切片之線性分位（同 pandas quantile 預設）獨立重算。真實 BTCUSDT 1h。"""
+    k = requires_kline_data("BTCUSDT", "1h")
+    close = k["close"].astype(float).iloc[-2000:].reset_index(drop=True)
+    ret = close.pct_change()
+    df = pd.DataFrame({
+        "ohlc_1h_pattern_SignCDL": (100.0 * np.sign(ret)).where(ret.abs() > ret.abs().median(), 0.0),
+        "ohlc_1h_pattern_BearishCount_5": (ret < 0).astype(float).rolling(5).sum(),
+    })
+    meta = {c: {"name": c, "category": "pattern", "layer": "layer1"} for c in df.columns}
+    fit_mask = np.zeros(len(df), dtype=bool)
+    fit_mask[: int(len(df) * 0.7)] = True
+    prep = DataPreprocessor({})
+    out, log = prep.winsorize(df, method="percentile", lower=5.0, upper=95.0, metadata=meta,
+                              fit_mask=fit_mask, fit_mode="train_mask")
+    assert log["skipped"] == ["ohlc_1h_pattern_SignCDL"]
+    np.testing.assert_array_equal(out["ohlc_1h_pattern_SignCDL"].to_numpy(), df["ohlc_1h_pattern_SignCDL"].to_numpy())
+    cnt = df["ohlc_1h_pattern_BearishCount_5"].to_numpy(dtype=float)
+    fit = cnt[fit_mask]
+    lo, hi = np.nanpercentile(fit, 5.0), np.nanpercentile(fit, 95.0)
+    assert lo < hi, "前提：計數欄 fit 切片之 5／95 分位相異（縮尾有作用）"
+    np.testing.assert_array_equal(out["ohlc_1h_pattern_BearishCount_5"].to_numpy(), np.clip(cnt, lo, hi))

@@ -65,8 +65,31 @@ SCRIPT = REPO / "scripts" / "icperf_freeze_baseline.py"
 CORRECTNESS_PATTERN = "handoffs/run_receipts/*-icperf-correctness.json"
 KLINE_CACHE = REPO / "data_cache" / "feature_klines" / "kline_cache.h5"
 CELL = "A_BTCUSDT_1h"
-#: SPEC Task 0.3「驗證」：浮點對照之相對誤差門檻
+#: SPEC Task 0.3「驗證」：浮點對照之相對誤差門檻（直接統計量）
 REL_TOL = 1e-12
+#: SPEC v5.39 Task 0.3 ④ 分級判準：經最小平方或自相關累積之衍生量（封閉清單 `DERIVED_FIELD_PATTERNS`）之相對誤差門檻；
+#: 清單外一律 `REL_TOL`；判定欄（旗標、trend 標籤、通過與否等非浮點欄）恆以 `==` 比。收據工具 `Tally`、本檔一致判準
+#: （`_assert_close_tree`、收據測試）與深度測試檔 `compare_*`（含 p 值規則）三處皆經 `rel_tol_for` 取同一判準。
+DERIVED_REL_TOL = 1e-9
+#: 衍生量之封閉清單（SPEC v5.39 ④：趨勢分析各維之斜率、p 值、t 值、尾端估計、r_squared；品質診斷之有效樣本比與自相關
+#: 衍生欄〔Ljung–Box 統計量與 p 值〕）。路徑形式：收據涵蓋鍵（`/results/<模組>/…`）、深度測試檔欄位（`<模組>/…`，可帶
+#: `@<端到端項>` 尾綴）；特徵段為 `*` 或特徵名。
+DERIVED_FIELD_PATTERNS = (
+    r"(^|/)trend_analysis/[^/]+/[a-z_]+_trend/(slope|p_value|t_value|t_stat|tail_estimate|r_squared)(@[a-z_]+)?$",
+    r"(^|/)feature_quality_diagnostics/autocorrelation_results/[^/]+/(effective_sample_ratio|ljungbox_stat|p_value)$",
+)
+
+
+def tolerance_class(path: Any) -> str:
+    """欄位路徑之判準類別（SPEC v5.39 ④）：命中 `DERIVED_FIELD_PATTERNS` ⇒ "derived"，否則 "direct"。"""
+    return "derived" if any(re.search(p, str(path)) for p in DERIVED_FIELD_PATTERNS) else "direct"
+
+
+def rel_tol_for(path: Any) -> float:
+    """欄位路徑之浮點相對誤差門檻（衍生量 `DERIVED_REL_TOL`、其餘 `REL_TOL`）。"""
+    return DERIVED_REL_TOL if tolerance_class(path) == "derived" else REL_TOL
+
+
 #: SPEC Task 0.3 衰減擬合 ②：產品殘差平方和之容許倍數
 SSR_SLACK = 1e-9
 #: SPEC Task 0.3 衰減擬合 ②：oracle 之 curve_fit 設定（固定起點集合、maxfev；不含產品參數）
@@ -124,6 +147,18 @@ COVERAGE_ITEMS = ("ic_report", "event_report")
 COVERAGE_FEATURES = 20
 HEAVY_MARKERS = ("slow", "requires_kline")
 FINDING_RECEIPT = "handoffs/run_receipts/<日期>-icperf-correctness.json"
+SPEC_PATH = REPO / "docs" / "ICPERF_SPEC.md"
+RECEIPT_TOOL = REPO / "scripts" / "icperf_correctness_receipt.py"
+#: SPEC v5.39 ⑦：收據 coverage 每鍵之狀態只准五態＋非統計欄（未逐值對照之統計鍵不另立狀態，列入 FAIL 原因）
+COVERAGE_STATES = {"verified", "verified-na", "unimplemented", "metadata-missing", "insufficient-data", "non-stat"}
+
+
+def _spec_version_of(text: Any) -> Optional[str]:
+    """版本號：含 SPEC 版本行（`版本：v<主>.<次>`）者取該行之號，否則取首個 `v<主>.<次>`（收據 spec 欄
+    `docs/ICPERF_SPEC.md v5.39 …`）；皆無 ⇒ None。"""
+    s = str(text or "")
+    m = re.search(r"版本：v(\d+\.\d+)", s) or re.search(r"\bv(\d+\.\d+)\b", s)
+    return m.group(1) if m else None
 
 
 def _load(name: str, path: Path) -> Any:
@@ -172,6 +207,10 @@ def test_correctness_receipt_items_and_verdicts() -> None:
     receipt = _single(CORRECTNESS_PATTERN)
     assert re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("head") or "")), "收據須記執行時之提交 head"
     assert receipt["tolerance"]["relative"] == REL_TOL
+    # SPEC v5.39 ⑪：收據 spec 欄之版本號＝SPEC 首個版本行（不寫死）；④：衍生量門檻同本檔
+    assert _spec_version_of(receipt.get("spec")) == _spec_version_of(SPEC_PATH.read_text(encoding="utf-8")), \
+        f"收據 spec 欄 {receipt.get('spec')!r} 與 SPEC 現行版本不符"
+    assert receipt["tolerance"].get("derived_relative") == DERIVED_REL_TOL, "收據須記衍生量判準（SPEC v5.39 ④）"
     items = receipt["items"]
     assert REQUIRED_ITEMS <= set(items), f"收據缺 SPEC 最少項：{sorted(REQUIRED_ITEMS - set(items))}"
     module = sys.modules[__name__]
@@ -179,8 +218,12 @@ def test_correctness_receipt_items_and_verdicts() -> None:
         assert it["verdict"] in VERDICTS, f"{iid}：verdict {it['verdict']!r} 非法"
         assert str(it.get("oracle") or "").strip(), f"{iid}：缺 oracle 說明"
         if it["verdict"] == "一致":
-            d = it.get("max_rel_diff")
-            assert d is None or (isinstance(d, (int, float)) and 0 <= d <= REL_TOL), f"{iid}：一致而相對誤差 {d} > 1e-12"
+            # SPEC v5.39 ④ 分級判準：直接統計量 ≤ 1e-12、衍生量（封閉清單）≤ 1e-9（收據逐項分記兩類之最大相對誤差）
+            d = it.get("max_rel_diff_direct", it.get("max_rel_diff"))
+            assert d is None or (isinstance(d, (int, float)) and 0 <= d <= REL_TOL), f"{iid}：一致而直接統計量相對誤差 {d} > 1e-12"
+            dd = it.get("max_rel_diff_derived")
+            assert dd is None or (isinstance(dd, (int, float)) and 0 <= dd <= DERIVED_REL_TOL), \
+                f"{iid}：一致而衍生量相對誤差 {dd} > 1e-9"
         elif it["verdict"] == "不一致":
             for k in ("reason", "features", "affected"):
                 assert it.get(k), f"{iid}：不一致須附 {k}"
@@ -244,6 +287,13 @@ def test_correctness_receipt_coverage_entries() -> None:
         assert m and (REPO / m.group(1)).is_file(), f"{key}：producer 須為實存之 檔:行，實得 {rec.get('producer')!r}"
         if key.startswith(CROSS_SYMBOL_KEYS):
             assert rec["oracle"] == NON_STAT, f"{key}：縱向請求之跨標的欄恆為空 dict，coverage 須記非統計欄"
+    # SPEC v5.39 ⑦：逐請求 coverage 之狀態 ⊆ 五態＋非統計欄；未逐值對照之統計鍵須逐鍵列入 fail_reasons
+    for rid, req in (receipt.get("requests") or {}).items():
+        for key, rec in (req.get("coverage") or {}).items():
+            assert rec.get("status") in COVERAGE_STATES, f"{rid}{key}：狀態 {rec.get('status')!r} 不在 SPEC 五態＋非統計欄"
+            if rec.get("uncompared"):
+                assert any(f"{rid}" in r and key in r for r in receipt.get("fail_reasons") or []), \
+                    f"{rid}{key}：未逐值對照之統計鍵須逐鍵列入 fail_reasons"
 
 
 def _ptr(seg: Any) -> str:
@@ -277,10 +327,14 @@ def _paths(obj: Any, path: str = "") -> Set[str]:
     return {path}
 
 
-def _coverage_keys(raw: Mapping[str, Any]) -> Set[str]:
-    """涵蓋鍵：回應欄位路徑去 `#values`／`#index` 尾綴，特徵名段→`*`、list 索引段→`#`（特徵名取 summary_table 之
-    feature_name）。"""
-    feats = {_ptr(r.get("feature_name")) for r in raw.get("summary_table") or [] if isinstance(r, dict)}
+def _coverage_keys(raw: Mapping[str, Any], feature_names: Optional[Sequence[str]] = None) -> Set[str]:
+    """涵蓋鍵：回應欄位路徑去 `#values`／`#index` 尾綴，特徵名段→`*`、list 索引段→`#`（特徵名取 `feature_names`；未給
+    ⇒ summary_table 之 feature_name）。與收據工具 `coverage_keys`（凍結腳本 `flatten_fields`）為兩條獨立之抽取規則
+    （SPEC v5.39 ⑧：逐請求封閉以本規則重算比對）。"""
+    if feature_names is not None:
+        feats = {_ptr(f) for f in feature_names}
+    else:
+        feats = {_ptr(r.get("feature_name")) for r in raw.get("summary_table") or [] if isinstance(r, dict)}
     out = set()
     for p in _paths(raw):
         segs = re.sub(r"#(values|index)$", "", p).split("/")[1:]
@@ -305,6 +359,35 @@ def test_correctness_coverage_closed_over_response_keys(tmp_path: Path) -> None:
     assert keys, "小請求回應無任何欄位"
     covered = set(receipt["coverage"])
     assert keys == covered, f"coverage 未對應之回應欄位 {sorted(keys - covered)[:10]}；多記 {sorted(covered - keys)[:10]}"
+    # SPEC v5.39 ⑧：逐請求封閉——收據全部請求之擷取檔，各以本檔之獨立抽取（`_paths`）重算實際回應鍵集合 == 收據該請求
+    # coverage 鍵集合（擷取檔缺 ⇒ FAIL）
+    cap_dir = Path(str((receipt.get("data") or {}).get("captures") or ""))
+    requests = receipt.get("requests") or {}
+    assert requests, "收據無逐請求 coverage"
+    for rid, req in sorted(requests.items()):
+        pkl = cap_dir / f"{rid}.pkl"
+        assert pkl.is_file(), f"{rid}：擷取檔不存在 {pkl}（逐請求封閉須涵蓋全部請求之擷取檔）"
+        with open(pkl, "rb") as fh:
+            cap = pickle.load(fh)
+        names = _capture_feature_names(fb, cap)
+        got = _coverage_keys(cap["response"], names)
+        cov = set(req.get("coverage") or {})
+        assert got == cov, f"{rid}：獨立抽取之回應鍵未入 coverage {sorted(got - cov)[:10]}；coverage 多記 {sorted(cov - got)[:10]}"
+
+
+def _capture_feature_names(fb: Any, cap: Mapping[str, Any]) -> List[str]:
+    """擷取檔所指請求之特徵名全集（特徵段 → `*` 之依據）：跨標的＝各格 run 特徵之聯集與 `cross_df` 之欄；其餘＝該 run 之特徵
+    （凍結腳本 `_run_feature_names`，讀 run 之特徵清單；不經涵蓋鍵抽取）。"""
+    req = cap["request"]
+    names: Set[str] = set()
+    if req.get("kind") in ("cross", "cross_kline"):
+        for cell in req.get("cells") or []:
+            names |= set(fb._run_feature_names(cell))
+        df = cap.get("cross_df")
+        if df is not None:
+            names |= {str(c) for c in df.columns}
+        return sorted(names)
+    return list(fb._run_feature_names(req))
 
 
 # ── 秒級 oracle 定義測試：HAC ─────────────────────────────────────────────────────────────────────────
@@ -713,7 +796,8 @@ def test_decay_ic_values_match_scipy_on_real_kline(method: str) -> None:
 
 
 def _assert_close_tree(got: Any, exp: Any, path: str = "") -> None:
-    """巢狀 dict／list 逐葉比對：鍵集合相同、float 相對誤差 ≤ 1e-12（NaN＝NaN）、None 與其餘型別 `==`（None 不得視為 0）。"""
+    """巢狀 dict／list 逐葉比對：鍵集合相同、float 相對誤差 ≤ 1e-12（NaN＝NaN）、None 與其餘型別 `==`（None 不得視為 0）。
+    本 helper 只用於直接統計量之秒級對照（SPEC v5.39 ④ 衍生量封閉清單之欄不經此處）。"""
     if isinstance(exp, Mapping):
         assert isinstance(got, Mapping), f"{path}：產品 {type(got).__name__} 非 dict"
         assert set(map(str, got)) == set(map(str, exp)), \
@@ -2104,8 +2188,9 @@ def _rolling_inputs() -> Any:
     return F, _real_label(close).reindex(F.index)
 
 
-# Pearson 分支以累積和計，窗長 63 之捨入相對誤差實測量級 1e-13；以 1e-9 判一致（Spearman 分支 1e-12）
-ROLL_TOL = {"spearman": REL_TOL, "pearson": 1e-9}
+# SPEC Task 0.4 ㉘：Pearson 分支改窗內中心化動差後與 scipy.stats.pearsonr 相對誤差 ≤ 1e-12（同 Spearman 分支；舊版以原值
+# 累積和計而放寬至 1e-9）
+ROLL_TOL = {"spearman": REL_TOL, "pearson": REL_TOL}
 
 
 @pytest.mark.requires_kline
@@ -2217,13 +2302,11 @@ def test_rolling_ic_window_longer_than_axis_is_empty(method: str) -> None:
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：rolling_ic_icir（A.ic_report.kendall）——"
-                                       "compute_rolling_ic 之非 spearman 分支一律以 raw Pearson 計（ic_engine.py:455-463），"
-                                       "default_method＝kendall 時滾動 IC 及其 ic_mean／ic_std／ICIR／勝率／方向非 Kendall τ；裁定 None")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_rolling_ic_kendall_matches_kendalltau_xfail() -> None:
     """正確答案：method＝kendall 之滾動 IC 逐窗 == `scipy.stats.kendalltau`（同時間軸、窗內非有限或常數 ⇒ NaN；相對誤差
-    ≤ 1e-12）。真實 BTCUSDT 1h 明列輸入（`_rolling_inputs`）。"""
+    ≤ 1e-12）。真實 BTCUSDT 1h 明列輸入（`_rolling_inputs`）。Task 0.3 收據 rolling_ic_icir（A.ic_report.kendall）之不一致
+    已由 SPEC Task 0.4 ㉗ 修正（逐窗 Kendall τ-b），xfail 轉一般斷言（函式名沿用收據綁定）。"""
     F, y = _rolling_inputs()
     got = ICEngine({}).compute_rolling_ic(F, y, ROLL_WINDOWS, 1, "kendall")
     for w in ROLL_WINDOWS:
@@ -2231,12 +2314,11 @@ def test_rolling_ic_kendall_matches_kendalltau_xfail() -> None:
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：rolling_ic_icir（A.ic_report.pearson）——Pearson "
-                                       "滾動 IC 以原值累積和計（ic_engine.py `_rolling_corr_matrix`），價格水準欄（值約 7 萬）"
-                                       "相消誤差使逐窗相對誤差達 1e-7 量級（> 1e-12）；裁定 None")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_rolling_ic_pearson_price_level_matches_scipy_xfail() -> None:
-    """正確答案：Pearson 滾動 IC 逐窗 == `scipy.stats.pearsonr`（相對誤差 ≤ 1e-12），含價格水準之真實特徵（收盤、20 根均線）。"""
+    """正確答案：Pearson 滾動 IC 逐窗 == `scipy.stats.pearsonr`（相對誤差 ≤ 1e-12），含價格水準之真實特徵（收盤、20 根均線）。
+    Task 0.3 收據 rolling_ic_icir（A.ic_report.pearson）之不一致（原值累積和相消）已由 SPEC Task 0.4 ㉘ 修正（窗內中心化
+    動差），xfail 轉一般斷言（函式名沿用收據綁定）。"""
     close = _real_close(400)
     F = pd.DataFrame({"close": close, "sma20": close.rolling(20).mean(), "ret1": close.pct_change()}).iloc[20:]
     y = _real_label(close).reindex(F.index)
@@ -2245,13 +2327,11 @@ def test_rolling_ic_pearson_price_level_matches_scipy_xfail() -> None:
         _assert_rolling_equal(got, _ref_rolling(F, y, w, "pearson"), w, REL_TOL)
 
 
-@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}（extra_findings：L.event_import_report 10 欄小規模"
-                                       "擷取於第 4 段崩潰）——compute_ic 之 Spearman 向量化路徑（無缺值）於標籤為常數時 "
-                                       "scipy.stats.spearmanr 回純量，`corr[0, 1:]` 拋 TypeError（ic_engine.py:1601-1602）；"
-                                       "Pearson 路徑回 NaN；裁定 None")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_point_ic_spearman_constant_label_returns_nan_xfail() -> None:
-    """正確答案：標籤為常數（無缺值、多特徵）⇒ 每特徵 IC＝NaN（同 `_ic_oracle`：任一常數 ⇒ NaN；同 Pearson 分支），不得拋例外。"""
+    """正確答案：標籤為常數（無缺值、多特徵）⇒ 每特徵 IC＝NaN（同 `_ic_oracle`：任一常數 ⇒ NaN；同 Pearson 分支），不得拋例外。
+    Task 0.3 收據 extra_findings（向量化路徑 `corr[0, 1:]` TypeError）已由 SPEC Task 0.4 ㉚ 修正，xfail 轉一般斷言（函式名
+    沿用收據綁定）。"""
     df = _point_inputs(False)
     label = pd.Series(np.full(len(df), 0.5), name="label")
     got = ICEngine({}).compute_ic(df[["a", "b"]], label, "spearman")
@@ -2259,28 +2339,37 @@ def test_point_ic_spearman_constant_label_returns_nan_xfail() -> None:
     assert all(math.isnan(_ic_oracle(df[c].to_numpy(dtype=float), label.to_numpy(dtype=float), "spearman")) for c in "ab")
 
 
-@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：stage5_pit_stats（L.event_import_report）——"
-                                       "常數序列（測試段 19 筆事件之同一值，如 26767.52）之 lag-1 自相關，產品以 pandas "
-                                       "autocorr 得 0.9999999999999998（浮點殘差），定義上未定義應為 NaN；裁定 None")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_turnover_autocorrelation_constant_series_is_nan_xfail() -> None:
     """正確答案：常數特徵之 lag-1 自相關＝NaN（`_ref_turnover`：去 NaN 後任一半常數 ⇒ NaN，同 scipy.stats.pearsonr 之未定義），
-    明列邊界：19 根同值之價格水準序列。"""
+    明列邊界：19 根同值之價格水準序列。Task 0.3 收據 stage5_pit_stats（L.event_import_report）之不一致已由 SPEC Task 0.4 ㉙
+    修正，xfail 轉一般斷言（函式名沿用收據綁定）。"""
     x = pd.Series(np.full(19, 26767.52), index=pd.date_range("2026-02-24", periods=19, freq="4h", tz="UTC"), name="f")
     got = TurnoverAnalyzer({}).compute_all(x.to_frame())["f"]["autocorrelation"]
     assert math.isnan(_ref_turnover(x)["autocorrelation"])
     assert math.isnan(float(got)), f"常數序列自相關 {got!r}（應為 NaN）"
 
 
+def _assert_graded(res: Mapping[str, Mapping[str, Any]]) -> None:
+    """深度 compare_* 結果全一致，且逐欄最大相對誤差 ≤ 該欄之分級門檻（SPEC v5.39 ④：`rel_tol_for(欄位)`；直接統計量 1e-12、
+    衍生量封閉清單 1e-9）——判準由欄位路徑決定，不得因任一欄落於 1e-9 內而放寬清單外之欄。"""
+    bad = {k: v["detail"] for k, v in res.items() if v["verdict"] != "一致"}
+    assert not bad, bad
+    over = {k: v["max_rel_diff"] for k, v in res.items()
+            if isinstance(v.get("max_rel_diff"), (int, float)) and math.isfinite(v["max_rel_diff"])
+            and v["max_rel_diff"] > rel_tol_for(k.split("@", 1)[0]) and "@" not in k}
+    assert not over, f"超過分級門檻之欄：{over}"
+
+
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：deep.feature_quality_diagnostics（A／L 深度分析）——"
-                                       "價格水準、近單位自相關特徵之 effective_sample_ratio 與 oracle 相對差 1e-12–5e-11"
-                                       "（捨入級，非演算法差異；容差或數值穩定算法待裁定）；裁定 None")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_fq_effective_sample_ratio_price_level_matches_oracle_xfail() -> None:
-    """正確答案：`FeatureQualityDiagnostics.run_full_diagnostics` 之全部統計欄（含 effective_sample_ratio）== 模組 oracle
-    （test_icperf_deep_quality_netic.py `compare_feature_quality_diagnostics`，相對誤差 ≤ 1e-12）；真實 BTCUSDT 1h 末 500 根之
-    價格水準特徵（13 根均線之 5 根滾動最小、收盤、55 根 EMA）。"""
+    """（Task 0.3 收據 deep.feature_quality_diagnostics 之捨入級差異；SPEC v5.39 ④ 分級判準定案後轉一般斷言，函式名沿用
+    以免未立碑改名）
+    `FeatureQualityDiagnostics.run_full_diagnostics` 之全部統計欄 == 模組 oracle（test_icperf_deep_quality_netic.py
+    `compare_feature_quality_diagnostics`）：effective_sample_ratio 與 Ljung–Box 衍生欄屬衍生量封閉清單（相對 ≤ 1e-9；收據實測
+    1e-12–5e-11，兩條獨立浮點路徑於近單位自相關輸入之累積捨入），其餘欄相對 ≤ 1e-12、判定欄（旗標）完全相同。真實
+    BTCUSDT 1h 末 500 根之價格水準特徵（13 根均線之 5 根滾動最小、收盤、55 根 EMA）。"""
     from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
 
     QN = _sibling("deep_quality_netic")
@@ -2288,18 +2377,17 @@ def test_fq_effective_sample_ratio_price_level_matches_oracle_xfail() -> None:
     F = pd.DataFrame({"sma13min5": close.rolling(13).mean().rolling(5).min(), "close": close,
                       "dema": close.ewm(span=55).mean()}).dropna()
     res = QN.compare_feature_quality_diagnostics(FeatureQualityDiagnostics({}).run_full_diagnostics(F), F)
-    bad = {k: v["detail"] for k, v in res.items() if v["verdict"] != "一致"}
-    assert not bad, bad
+    _assert_graded(res)
 
 
 @pytest.mark.requires_kline
-@pytest.mark.xfail(strict=True, reason=f"Task 0.3 收據 {FINDING_RECEIPT}：deep.trend_analysis（A 深度分析）——趨勢之斜率／p 值／"
-                                       "尾端估計於寬特徵集之真實資料與 statsmodels OLS＋HAC oracle 相對差 1e-12–1e-11"
-                                       "（捨入級，非演算法差異）；裁定 None")
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_trend_four_dimensions_wide_real_kline_matches_oracle_xfail() -> None:
-    """正確答案：真實 BTCUSDT 1h 寬特徵集（動量／均線偏離／波動前 30 欄）經 `run_deep_analysis`（因子報酬、中心性、多空、
-    趨勢四維）之 trend_analysis 逐欄 == 模組 oracle（test_icperf_deep_centrality_trend.py `compare_trend_analysis`）。"""
+    """（Task 0.3 收據 deep.trend_analysis 之捨入級差異；SPEC v5.39 ④ 分級判準定案後轉一般斷言，函式名沿用以免未立碑改名）
+    真實 BTCUSDT 1h 寬特徵集
+    （動量／均線偏離／波動前 30 欄）經 `run_deep_analysis`（因子報酬、中心性、多空、趨勢四維）之 trend_analysis 逐欄 == 模組
+    oracle（test_icperf_deep_centrality_trend.py `compare_trend_analysis`）：各維斜率／p 值／尾端估計／r_squared 屬衍生量封閉清單
+    （相對 ≤ 1e-9；收據實測 1e-12–8e-11），trend 標籤等判定欄完全相同。"""
     from momentum.Analysis.ic_config_schema import ICConfig
 
     CT = _sibling("deep_centrality_trend")
@@ -2314,8 +2402,7 @@ def test_trend_four_dimensions_wide_real_kline_matches_oracle_xfail() -> None:
     res = CT.compare_trend_analysis(rep.results["trend_analysis"], rolling_ic, names, cfg.trend_analysis.model_dump(),
                                     sources=CT._ref_trend_sources(rep, rolling_ic, names, cfg, 1),
                                     dimensions=list(cfg.trend_analysis.dimensions))
-    bad = {kk: v["detail"] for kk, v in res.items() if v["verdict"] != "一致"}
-    assert not bad, bad
+    _assert_graded(res)
 
 
 def _sibling(name: str) -> Any:
@@ -2422,3 +2509,550 @@ def test_deep_net_ic_analysis_oracle_suite() -> None:
 def test_regime_robust_oracle_suite() -> None:
     """收據項 regime_robust 之綁定：test_icperf_regime_robust.py 之秒級精確判定表與 reason 封閉值集。"""
     _run_sibling("regime_robust")
+
+
+# ── Task 0.3 補足（SPEC v5.38 ①–⑤、v5.39 ⑦–⑪）：收據工具契約、名單類欄位之邊界證明、事件標籤與跨標的預設分支 ───────────
+
+
+def _receipt_tool() -> Any:
+    """收據工具模組（`scripts/icperf_correctness_receipt.py`；其 oracle 取本檔，故以獨立名載入）。"""
+    return sys.modules.get("icperf_receipt_tool_t") or _load("icperf_receipt_tool_t", RECEIPT_TOOL)
+
+
+def test_graded_tolerance_closed_list_and_mutation() -> None:
+    """SPEC v5.39 ④ 分級判準：(i) 分類表——封閉清單內之衍生量（趨勢各維之斜率／p 值／尾端估計／r_squared、品質診斷之
+    有效樣本比與 Ljung–Box 衍生欄，收據鍵與深度欄兩種路徑形式、含 `@` 端到端尾綴）為 1e-9，清單外（判定欄、中心性、ICIR、
+    ADF p 值等）為 1e-12；(ii) 突變——同一欄相對偏差 1e-9 之內（×(1−ε)）判一致、之外（×(1+ε)）判不一致，直接統計量偏差
+    5e-10 即判不一致；三處（收據 `Tally`、深度 compare_* 之數值／斜率／p 值規則、品質診斷 `_value_diff`）結果相同。"""
+    derived = ["/results/trend_analysis/*/ic_trend/slope", "trend_analysis/*/centrality_trend/p_value@hac",
+               "trend_analysis/f1/factor_return_trend/tail_estimate", "trend_analysis/*/ls_spread_trend/r_squared",
+               "/results/feature_quality_diagnostics/autocorrelation_results/*/effective_sample_ratio",
+               "feature_quality_diagnostics/autocorrelation_results/*/ljungbox_stat",
+               "feature_quality_diagnostics/autocorrelation_results/*/p_value"]
+    direct = ["trend_analysis/*/ic_trend/trend", "factor_centrality/features/*/centrality", "/summary_table/#/icir",
+              "feature_quality_diagnostics/adf_results/*/p_value", "/rolling_ic_series/*/window_252",
+              "feature_quality_diagnostics/autocorrelation_results/*/significant_autocorrelation"]
+    assert all(rel_tol_for(p) == DERIVED_REL_TOL and tolerance_class(p) == "derived" for p in derived), \
+        {p: rel_tol_for(p) for p in derived}
+    assert all(rel_tol_for(p) == REL_TOL and tolerance_class(p) == "direct" for p in direct), {p: rel_tol_for(p) for p in direct}
+    inside, outside = 1.0 + DERIVED_REL_TOL * (1 - 1e-3), 1.0 + DERIVED_REL_TOL * (1 + 1e-3)
+    R = _receipt_tool()
+    for key, factor, miss in (("/results/trend_analysis/*/ic_trend/slope", inside, 0),
+                              ("/results/trend_analysis/*/ic_trend/slope", outside, 1),
+                              ("/summary_table/#/icir", 1.0 + 5e-10, 1)):
+        t = R.Tally("突變")
+        t.num(key, key, 0.37 * factor, 0.37)
+        assert t.n_mismatch == miss, (key, factor, t.n_mismatch)
+    rec = R.Tally("類別")
+    rec.num("/results/trend_analysis/*/ic_trend/slope", "a", 0.37 * inside, 0.37)
+    rec.num("/summary_table/#/icir", "b", 0.5, 0.5)
+    r = rec.record()
+    assert r["max_rel_diff_derived"] > REL_TOL and r["max_rel_diff_direct"] == 0.0, r
+    # 深度 compare_*：趨勢之數值／斜率／p 值規則與品質診斷 `_value_diff` 依欄位路徑取同一門檻
+    CT, QN = _sibling("deep_centrality_trend"), _sibling("deep_quality_netic")
+    for path, verdict_of in (("trend_analysis/*/ic_trend/tail_estimate",
+                              lambda f, p: CT._verdict_numeric([("x", 0.37 * f, 0.37)], tol=CT._tol(p))["verdict"]),
+                             ("trend_analysis/*/ic_trend/slope",
+                              lambda f, p: CT._verdict_slope([("x", 0.37 * f, 0.37, math.nan)], tol=CT._tol(p))["verdict"]),
+                             ("trend_analysis/*/ic_trend/p_value",
+                              lambda f, p: CT._verdict_pvalue([("x", 0.037 * f, 0.037, math.nan, math.nan)],
+                                                              tol=CT._tol(p))["verdict"]),
+                             ("feature_quality_diagnostics/autocorrelation_results/*/effective_sample_ratio",
+                              lambda f, p: "一致" if QN._value_diff(0.37 * f, 0.37, QN._tolerance_policy().rel_tol_for(p))[0]
+                              else "不一致")):
+        assert verdict_of(inside, path) == "一致" and verdict_of(outside, path) == "不一致", path
+    assert CT._verdict_numeric([("x", 0.37 * (1 + 5e-10), 0.37)], tol=CT._tol("factor_centrality/features/*/centrality"))[
+        "verdict"] == "不一致"
+    assert not QN._value_diff(0.37 * (1 + 5e-10), 0.37, QN._tolerance_policy().rel_tol_for(
+        "feature_quality_diagnostics/adf_results/*/adf_statistic"))[0]
+
+
+def test_isolated_env_sets_numba_cache_inside_iso(tmp_path: Path) -> None:
+    """SPEC v5.38 ⑤：凍結腳本 `isolated_env` 將 `NUMBA_CACHE_DIR` 設於隔離目錄內（覆寫呼叫端之值，如 conftest 之系統暫存），
+    目錄已建立；TMPDIR／HOME 仍在隔離目錄、其餘鍵原樣（改壞對照：保留呼叫端之 NUMBA_CACHE_DIR ⇒ 不在 iso 之下）。"""
+    fb = _load("icperf_freeze_baseline_t05", SCRIPT)
+    iso = tmp_path / "iso"
+    env = fb.isolated_env({"NUMBA_CACHE_DIR": "/tmp/qts_numba_cache", "PATH": "/usr/bin"}, iso)
+    nb = Path(env["NUMBA_CACHE_DIR"]).resolve()
+    assert nb.is_dir() and nb.is_relative_to(iso.resolve()), f"NUMBA_CACHE_DIR {nb} 不在隔離目錄 {iso} 之下"
+    for k in ("TMPDIR", "HOME"):
+        assert Path(env[k]).resolve().is_relative_to(iso.resolve())
+    assert len({env["NUMBA_CACHE_DIR"], env["TMPDIR"], env["HOME"]}) == 3 and env["PATH"] == "/usr/bin"
+
+
+def test_receipt_spec_version_read_from_spec() -> None:
+    """SPEC v5.39 ⑪：收據工具之 spec 版本＝SPEC 首個版本行之號（不寫死；本檔獨立以 `_spec_version_of` 取）。"""
+    R = _receipt_tool()
+    assert R.spec_version() == "v" + str(_spec_version_of(SPEC_PATH.read_text(encoding="utf-8")))
+
+
+def test_receipt_key_status_only_five_states_and_uncompared() -> None:
+    """SPEC v5.39 ⑦：`key_status` 只出五態＋非統計欄；已對映 oracle 項而無逐值對照 ⇒ insufficient-data 且 `uncompared`
+    （FAIL 原因逐鍵列出）；寫死佔位之鍵 ⇒ unimplemented；有內容 ⇒ verified；皆空且有明列邊界證明 ⇒ verified-na；皆空無證明
+    ⇒ insufficient-data（非 uncompared）。"""
+    R = _receipt_tool()
+    t = R.Tally("x")
+    t.num("/summary_table/#/icir", "a", 0.5, 0.5)
+    t.eq("/marginal_ic/train_ic", "b", {}, {})
+    t.eq("/grouped_ic/by_regime/high_vol", "c", {}, {})
+    t.na("/grouped_ic/by_regime/high_vol", "test_grouped_ic_regime_without_rows_is_empty")
+    items = {"x": t}
+    cases = {"/summary_table/#/icir": ("verified", False), "/marginal_ic/train_ic": ("insufficient-data", False),
+             "/grouped_ic/by_regime/high_vol": ("verified-na", False), "/summary_table/#/t_stat": ("insufficient-data", True)}
+    for key, (state, unc) in cases.items():
+        st = R.key_status(key, "x", items)
+        assert st["status"] == state and bool(st.get("uncompared")) is unc, (key, st)
+    assert R.key_status("/filter_log/x", NON_STAT, items)["status"] == "non-stat"
+    # SPEC Task 0.4 ㊱ 後跨標的五欄已實算（`UNIMPLEMENTED` 為空）⇒ 未對照即 insufficient-data＋uncompared；
+    # 寫死佔位之判定路徑以注入一條清單項驗（清單日後再出現佔位時同一路徑生效）
+    for kind in ("cross", "cross_kline"):
+        st = R.key_status("/summary_table/#/monotonicity_score", "x", items, kind=kind)
+        assert st["status"] == "insufficient-data" and st.get("uncompared") is True, st
+    saved = list(R.UNIMPLEMENTED)
+    R.UNIMPLEMENTED[:] = [(r"^/summary_table/#/monotonicity_score$", ("cross", "cross_kline"), "x.py:1-1", "佔位")]
+    try:
+        for kind in ("cross", "cross_kline"):
+            st = R.key_status("/summary_table/#/monotonicity_score", "x", items, kind=kind)
+            assert st["status"] == "unimplemented" and st["reason"] == "x.py:1-1：佔位", st
+        assert R.key_status("/summary_table/#/monotonicity_score", "x", items)["status"] == "insufficient-data"
+    finally:
+        R.UNIMPLEMENTED[:] = saved
+    assert R.key_status("/summary_table/#/icir", "x", items, kind="cross")["status"] == "verified"
+    assert set(R.COVERAGE_STATES) == COVERAGE_STATES
+    per_req = {"r1": {"unmapped": [], "closure": {"closed": True}, "uncompared": ["/summary_table/#/t_stat"],
+                      "coverage": {"/summary_table/#/monotonicity_score": {"status": "unimplemented", "reason": "佔位"}},
+                      "facts": {}}}
+    reasons = R.receipt_fail_reasons(per_req)
+    assert any("r1" in s and "/summary_table/#/t_stat" in s for s in reasons), reasons
+    assert any("unimplemented" in s and "monotonicity_score" in s for s in reasons), reasons
+
+
+def test_receipt_unimplemented_anchors_hardcode_placeholders() -> None:
+    """SPEC v5.39 ⑦：`UNIMPLEMENTED` 每條之產生處（檔:起訖行）確為寫死之佔位（None／空容器），非計算值。
+    SPEC Task 0.4 ㊱ 實作跨標的五欄與相關／多元化後清單為空（其值改由 `test_icperf_xsec_placeholders.py` 之 oracle 驗）。"""
+    R = _receipt_tool()
+    for rx, kinds, prod, why in R.UNIMPLEMENTED:
+        m = re.match(r"^([\w./-]+\.py):(\d+)-(\d+)$", prod)
+        assert m, prod
+        lines = (REPO / m.group(1)).read_text(encoding="utf-8").splitlines()[int(m.group(2)) - 1:int(m.group(3))]
+        assert lines and all(re.search(r":\s*(None|\{\}|\{\"features\": \[\], \"matrix\": \[\]\})\s*,", ln) for ln in lines), \
+            (prod, lines)
+
+
+def test_receipt_closure_independent_of_coverage_extractor() -> None:
+    """SPEC v5.39 ⑧：`closure_check` 以本檔 `_coverage_keys`（`_paths`，與收據工具 `coverage_keys`／凍結腳本 `flatten_fields`
+    獨立）重算回應鍵：coverage 與之相同 ⇒ closed；coverage 漏一鍵（如 extractor 漏抽）或多記一鍵 ⇒ 不 closed 並列出。"""
+    R = _receipt_tool()
+    resp = {"summary_table": [{"feature_name": "f1", "icir": 0.1}, {"feature_name": "f2", "icir": None}],
+            "rolling_ic_series": {"f1": {"window_21": [0.1, 0.2]}}, "grouped_ic": {"by_regime": {"high_vol": {}}},
+            "metadata": {"warnings": []}}
+    full = {k: None for k in _coverage_keys(resp, ["f1", "f2"])}
+    assert R.closure_check(resp, ["f1", "f2"], full)["closed"]
+    drop = dict(full)
+    drop.pop("/rolling_ic_series/*/window_21")
+    res = R.closure_check(resp, ["f1", "f2"], drop)
+    assert not res["closed"] and res["missing"] == ["/rolling_ic_series/*/window_21"], res
+    res = R.closure_check(resp, ["f1", "f2"], {**full, "/ghost": None})
+    assert not res["closed"] and res["extra"] == ["/ghost"], res
+
+
+def test_receipt_metadata_missing_on_default_or_unsourced_values() -> None:
+    """SPEC v5.39 ⑨：任一特徵之 category／data_source／layer 為服務預設值（無來源欄）、或來源欄記為非持久化、或帶缺漏原因
+    ⇒ 該欄之分組鍵 metadata-missing（by_layer 同）；三欄皆有持久化來源（含 layer＝1 之真值）⇒ 不判缺。"""
+    R = _receipt_tool()
+    t = R.Tally("g")
+    t.num("/grouped_ic/by_layer/#/*", "a", 0.2, 0.2)
+    persisted = {"a": {"category": "trend", "data_source": "kline", "layer": 1,
+                       "metadata_source": {"category": "catalog", "data_source": "catalog", "layer": "catalog"}}}
+    assert not any(R.metadata_missing_fields(persisted, ["a"]).values())
+    # 路 F 之實際形狀（ic_analysis_service.py `_feature_metadata_entry`）：metadata_source 為字串、三欄同源
+    by_name = {"a": {"category": "trend", "data_source": "close", "layer": "layer1", "metadata_source": "feature_name"}}
+    assert not any(R.metadata_missing_fields(by_name, ["a"]).values())
+    gone = {"a": {"category": None, "data_source": None, "layer": None, "metadata_source": "missing",
+                  "metadata_missing_reason": "label_column"}}
+    assert all(R.metadata_missing_fields(gone, ["a"])[f] for f in ("category", "data_source", "layer"))
+    assert R.key_status("/grouped_ic/by_layer/#/*", "g", {"g": t},
+                        meta_missing=R.metadata_missing_fields(persisted, ["a"]))["status"] == "verified"
+    cases = [({"a": {"category": "trend", "data_source": "kline", "layer": 1}}, "layer", "/grouped_ic/by_layer/#/*"),
+             ({"a": {"category": "unknown", "data_source": "kline", "layer": 2}}, "category", "/grouped_ic/by_category/unknown/*"),
+             ({"a": {"category": "trend", "layer": 2}}, "data_source", "/grouped_ic/by_data_source"),
+             ({"a": {**persisted["a"], "metadata_source": {**persisted["a"]["metadata_source"], "layer": "default"}}},
+              "layer", "/diversification_metrics/layer_coverage"),
+             ({"a": {**persisted["a"], "data_source_missing_reason": "catalog_missing"}}, "data_source",
+              "/grouped_ic/by_data_source/kline/*")]
+    for meta, field, key in cases:
+        miss = R.metadata_missing_fields(meta, ["a"])
+        assert miss[field] == {"a": miss[field]["a"]} and miss[field]["a"], (meta, miss)
+        st = R.key_status(key, "g", {"g": t}, meta_missing=miss)
+        assert st["status"] == "metadata-missing" and field in st["reason"], (key, st)
+
+
+@pytest.mark.requires_kline
+def test_deep_requests_include_complete_parameter_family() -> None:
+    """SPEC v5.38 ②：兩深度請求之特徵子集依明列規則納入一組完整參數家族（名稱規則同產品自動偵測、成員數 ≥ 3、該 run 之
+    全部成員），子集欄數 ≤ 深度 top_n（top_n 選取路徑選入全部欄）；請求定義記家族與成員。"""
+    R = _receipt_tool()
+    fb = _load("icperf_freeze_baseline_t02", SCRIPT)
+    for rid in ("A.deep_analysis", "L.deep_analysis"):
+        req = R.request_for(rid)
+        fam = req["parameter_family"]
+        names = set(req["feature_filter"]["include_features"])
+        run = fb._run_feature_names(req)
+        members = [n for n in run if re.match(rf"^{re.escape(fam['family'])}_(\d+)$", n)]
+        assert len(members) >= 3 and set(members) == set(fam["members"]) <= names, (rid, fam, members)
+        assert len(names) <= int(req["deep"]["top_n"]), (rid, len(names), req["deep"]["top_n"])
+
+
+def test_marginal_ic_no_survivors_leaves_are_empty() -> None:
+    """SPEC v5.38 ③（邊際 IC 空葉之明列邊界證明）：倖存者為空 ⇒ `compute_marginal_ic` 三視角與 train_ic 為空容器、狀態
+    not_applicable／no_survivors；`combine_factors` 權重與符號為空 dict、組合 IC 等數值欄 None、使用列數 0（同收據工具
+    `_evaluate_marginal_empty` 之 oracle）；對照組：倖存者非空 ⇒ 各葉非空（此空非恆常）。"""
+    X, y, tr, te = _marginal_inputs()
+    got = compute_marginal_ic(X, y, train_mask=tr, test_mask=te, survivors=[], params=MARGINAL_PARAMS,
+                              fit_scope="train").to_dict()
+    assert (got["status"], got["reason"]) == ("not_applicable", "no_survivors")
+    assert got["per_feature"] == {} and got["sequential"] == [] and got["removed_candidates"] == {} and got["train_ic"] == {}
+    comp = combine_factors(X, y, train_mask=tr, test_mask=te, survivors=[], params=MARGINAL_PARAMS,
+                           fit_scope="train").to_dict()
+    assert comp["weights"] == {} and comp["signs"] == {} and comp["n_used_test"] == 0 and comp["n_used_train"] == 0
+    assert all(comp[k] is None for k in ("composite_ic", "composite_ic_train_insample", "top_train_single",
+                                         "top_train_single_test_ic", "best_single_test_ic", "best_single_feature",
+                                         "delta_vs_top_train_single", "delta_ci95"))
+    full = compute_marginal_ic(X, y, train_mask=tr, test_mask=te, survivors=MARGINAL_SURVIVORS, params=MARGINAL_PARAMS,
+                               fit_scope="train").to_dict()
+    assert full["per_feature"] and full["train_ic"], "對照組：倖存者非空時各葉應非空"
+
+
+def _decaying_vol_close(n: int = 420) -> pd.Series:
+    """明列邊界輸入：日頻、報酬振幅指數遞減之確定性收盤（55 根滾動波動率逐根下降 ⇒ PIT 80 分位門檻恆高於當根 ⇒ 無 high_vol 根）。"""
+    i = np.arange(n, dtype=float)
+    ret = 0.03 * np.exp(-i / 120.0) * np.sin(i / 1.7) + 0.0002
+    return pd.Series(100.0 * np.exp(np.cumsum(ret)), index=pd.date_range("2022-01-01", periods=n, freq="D", tz="UTC"),
+                     name="close")
+
+
+def test_grouped_ic_regime_without_rows_is_empty() -> None:
+    """SPEC v5.38 ③（regime 空組之明列邊界證明；如 L 格測試段之 high_vol 0 列）：無任一根落入 high_vol ⇒ 產品
+    `compute_grouped_ic` 之 `by_regime.high_vol` == {}，同 oracle `_ref_grouped_ic`（組內列數 0 ⇒ {}）；其餘 regime 非空。"""
+    close = _decaying_vol_close()
+    i = np.arange(len(close), dtype=float)
+    feats = pd.DataFrame({"a": np.sin(i / 5.0), "b": np.cos(i / 3.1) + 0.001 * i}, index=close.index)
+    label = (close.shift(-1) / close - 1.0).rename("label")
+    masks = _ref_regime_masks(close)
+    assert not masks["high_vol"].any() and masks["low_vol"].any(), "邊界輸入未使 high_vol 為空（前提失效）"
+    got = ICEngine({"methods": ["spearman"]}).compute_grouped_ic(feats, label, pd.DataFrame({"close": close}), {},
+                                                                 dict(GROUPED_CONFIG))
+    exp = _ref_grouped_ic(feats, label, close, {}, "spearman")
+    assert got["by_regime"]["high_vol"] == {} == exp["by_regime"]["high_vol"]
+    _assert_close_tree(got["by_regime"], exp["by_regime"], "by_regime")
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_factor_exposure_concentration_warnings_boundaries() -> None:
+    """SPEC v5.38 ③（曝險集中度警告名單之明列邊界證明；concentration 與 neutralized_concentration 同一
+    `monitor_exposure_concentration`）：test_icperf_deep_orth_exposure.py `test_exposure_concentration_branches` 四分支
+    （空、全 0、≥21 欄均分 ⇒ near_zero 警告、門檻內不警告）。"""
+    mod = _sibling("deep_orth_exposure")
+    for case in ("empty", "all_zero", "many_features", "below_threshold"):
+        mod.test_exposure_concentration_branches(case)
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_deep_fq_low_coverage_flag_boundaries() -> None:
+    """SPEC v5.38 ③（品質診斷 low_coverage 旗標名單之明列邊界證明；真實資料 A／L 格全部欄覆蓋皆高於門檻 ⇒ 名單空）：
+    test_icperf_deep_quality_netic.py `test_fq_flags_summary_match_oracle_when_all_tested`（前 100 根缺值之欄 ⇒ 入
+    low_coverage、四旗標與摘要 == oracle）。"""
+    _sibling("deep_quality_netic").test_fq_flags_summary_match_oracle_when_all_tested()
+
+
+def test_deep_parameter_sensitivity_risk_lists_boundaries() -> None:
+    """SPEC v5.38 ③（參數敏感度 high_risk／robust 名單之明列邊界證明）：test_icperf_deep_sensitivity_oos.py
+    `test_parameter_sensitivity_risk_lists_with_thresholds`（門檻分出 high、名單 == oracle），另斷言同一輸入之 robust 名單非空。"""
+    SO = _sibling("deep_sensitivity_oos")
+    SO.test_parameter_sensitivity_risk_lists_with_thresholds()
+    df, label, _ = SO._ps_inputs("base")
+    ref0 = SO.ref_parameter_sensitivity(df, label, None, SO.PS_SMALL)
+    stds = sorted(f["stability_metrics"]["ic_std_across_params"] for f in ref0["families"].values())
+    cfg = {**SO.PS_SMALL, "ic_std_threshold_low": (stds[0] + stds[1]) / 2, "ic_std_threshold_high": (stds[1] + stds[2]) / 2}
+    got = SO._run_ps(df, label, None, cfg)
+    assert got["high_risk_families"] and got["robust_families"], got
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_cross_symbol_validation_skipped_and_conflict_branches() -> None:
+    """SPEC v5.38 ③（`cross_symbol_validation` 之 reason 與方向衝突名單之明列邊界證明）：(i) 單一標的 ⇒ skipped、reason
+    非空；(ii) 兩標的之特徵方向相反 ⇒ sign_conflict_features 非空；兩者產品 == `_ref_cross_symbol_validation`。"""
+    one = _xsec_inputs().xs("AAA", level="symbol", drop_level=False)
+    rep1 = create_ic_analyzer().analyze_cross_sectional(one, config_override={"ic_train_test_split": False})
+    exp1 = _ref_cross_symbol_validation({}, ["AAA"], [])
+    assert rep1["cross_symbol_validation"]["status"] == "skipped" and rep1["cross_symbol_validation"]["reason"]
+    assert rep1["cross_symbol_validation"]["reason"] == exp1["reason"]
+    ts = pd.date_range("2024-03-01", periods=80, freq="h", tz="UTC")
+    rows = []
+    for t, stamp in enumerate(ts):
+        for j, sym in enumerate(("AAA", "BBB", "CCC")):
+            y = 0.01 * math.cos(t / 3.0 + 0.7 * j)
+            f = (y if sym != "CCC" else -y) + 0.001 * math.sin(t + j)
+            rows.append((stamp, sym, f, y))
+    df = pd.DataFrame(rows, columns=["timestamp", "symbol", "f1", XSEC_LABEL]).set_index(["timestamp", "symbol"]).sort_index()
+    exp = _assert_cross_sectional(df)
+    assert exp["validation"]["samples"]["sign_conflict_features"] == ["f1"], exp["validation"]
+
+
+@pytest.mark.requires_kline
+def test_cross_sectional_label_float64_matches_kline_oracle_xfail() -> None:
+    """（ICPERF Task 0.4 ㉞ 已修：收盤轉 float64 後計標籤；函式名保留供收據綁定）正確答案：跨標的標籤 return_1 == ln(close[t+1]／close[t])（kline_cache.h5 直接讀、float64；kline 全序列；相對誤差
+    ≤ 1e-12），同主線標籤之 float64 定義（SPEC Task 0.4 ⑥）。真實 BTCUSDT／SOLUSDT 1h 末 300 根。"""
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    df = _real_cross_sectional_frame(300)
+    df = df[df.index.get_level_values("symbol").isin(["BTCUSDT", "SOLUSDT"])][["ret1", "dev20"]]
+    df.index = df.index.set_names(["timestamp", "_symbol"])
+    df.index = df.index.set_levels(df.index.levels[0].tz_localize(None), level=0)
+    got = ICAnalysisService._append_cross_sectional_labels(None, df, ["BTCUSDT", "SOLUSDT"], "1h")  # type: ignore[arg-type]
+    for sym in ("BTCUSDT", "SOLUSDT"):
+        close = _real_close(20352, sym)
+        exp = np.log(close.shift(-1) / close)
+        g = got.xs(sym, level="_symbol")["return_1"]
+        e = exp.reindex(pd.DatetimeIndex(g.index).tz_localize("UTC")).to_numpy(dtype=float)
+        bad = [(i, a, b) for i, (a, b) in enumerate(zip(g.to_numpy(dtype=float), e)) if _rel(float(a), float(b)) > REL_TOL]
+        assert not bad, f"{sym}：{len(bad)} 列 > 1e-12（例 {bad[:3]}）"
+
+
+def _xsec_split_inputs(tz: Optional[str]) -> pd.DataFrame:
+    """明列邊界輸入（足使預設切分成立）：3 標的 × 900 時點 1h、兩特徵、標籤 `return_1`；時間層 tz＝`tz`（None ⇒ naive）。"""
+    ts = pd.date_range("2024-01-01", periods=900, freq="h", tz=tz)
+    rows = []
+    for t, stamp in enumerate(ts):
+        for j, sym in enumerate(("AAA", "BBB", "CCC")):
+            y = 0.01 * math.cos(t / 3.0 + 0.7 * j)
+            rows.append((stamp, sym, y + 0.002 * math.sin(t + j), math.cos(t / 5.0 + j), y))
+    return pd.DataFrame(rows, columns=["timestamp", "symbol", "f1", "f2", XSEC_LABEL]).set_index(["timestamp", "symbol"])
+
+
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_cross_sectional_default_split_tz_aware_index_xfail() -> None:
+    """（ICPERF Task 0.4 ㉟ 已修：時間陣列一律轉 UTC 去時區標記；函式名保留供收據綁定）正確答案：時間層 tz-aware（UTC）與 naive 之同一跨標的輸入，預設切分（`ic_train_test_split` 開）皆成立且截面 IC 序列與
+    summary 相同（時區表示不得改變結果或使之崩潰）。"""
+    naive = create_ic_analyzer().analyze_cross_sectional(_xsec_split_inputs(None), timeframe="1h")
+    aware = create_ic_analyzer().analyze_cross_sectional(_xsec_split_inputs("UTC"), timeframe="1h")
+    _assert_close_tree(aware["rolling_ic_series"], naive["rolling_ic_series"], "rolling_ic_series")
+    _assert_close_tree({r["feature_name"]: r["icir"] for r in aware["summary_table"]},
+                       {r["feature_name"]: r["icir"] for r in naive["summary_table"]}, "icir")
+
+
+def _ref_cross_split(df: pd.DataFrame, oos: float, min_rows: int, embargo: int, horizon: int,
+                     freq: Optional[pd.Timedelta]) -> Dict[str, Any]:
+    """跨標的預設切分之參考實作（全域同步時間邊界 holdout，依 ic_filter_orchestrator.py:986-1036 之定義獨立重寫）：唯一時點
+    排序後 train＝前 floor((1−oos)·n) 個時點（含）；test＝≥ train 末時點＋(horizon＋embargo)×K 線間距（間距由資料導出，
+    不假設週期）；全域 train／test 列數與每標的 test 列數皆 ≥ min_rows 方成立。"""
+    ts = pd.DatetimeIndex(df.index.get_level_values(0))
+    sym = np.asarray(df.index.get_level_values(-1)).astype(str)
+    uts = ts.unique().sort_values()
+    n = int(len(uts))
+    sp = int(math.floor((1.0 - oos) * n))
+    if n < 2 or sp < 1 or sp >= n or freq is None:
+        return {"ok": False, "reason": "no_train_or_test_timestamps", "n_ts": n, "test_mask": np.zeros(len(df), bool)}
+    t_end = uts[sp - 1]
+    t_start = t_end + (int(horizon) + int(embargo)) * freq
+    train, test = np.asarray(ts <= t_end), np.asarray(ts >= t_start)
+    per = {s: int((test & (sym == s)).sum()) for s in sorted(set(sym))}
+    ok = int(train.sum()) >= min_rows and int(test.sum()) >= min_rows and all(v >= min_rows for v in per.values())
+    return {"ok": ok, "n_ts": n, "split_point": sp, "train_end": str(t_end), "test_start": str(t_start),
+            "train_rows": int(train.sum()), "test_rows": int(test.sum()), "per_symbol_test_rows": per, "test_mask": test}
+
+
+@pytest.mark.requires_kline
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_cross_sectional_default_split_matches_oracle_on_real_kline() -> None:
+    """SPEC v5.39 ⑩（跨標的預設分支）：本機 kline_cache.h5 之全部 1h 標的末 2,000 根真實資料（足使預設切分成立）、預設設定
+    （`ic_train_test_split` 開）之 `analyze_cross_sectional` 截面 IC 序列、summary、`cross_sectional_symbol_ic`、
+    `cross_symbol_validation` == 以 `_ref_cross_split` 重建之測試段上之 `_ref_cross_sectional`；切分參考實作須成立且每標的
+    測試段 ≥ min_test_rows。"""
+    from momentum.Analysis.ic_config_schema import ICConfig
+
+    df = _real_cross_sectional_frame(2000)
+    # 時間層取 naive UTC（同服務端跨標的路徑：特徵庫之時間索引為 naive；tz-aware 索引之崩潰另見
+    # `test_cross_sectional_default_split_tz_aware_index_xfail`）
+    df.index = df.index.set_levels(df.index.levels[0].tz_localize(None), level=0)
+    cfg = ICConfig()
+    assert cfg.ic_train_test_split, "前提：預設設定之切分為開"
+    ts = pd.DatetimeIndex(df.index.get_level_values(0)).unique().sort_values()
+    freq = pd.Timedelta(np.median(np.diff(ts.asi8)), unit="ns")
+    osp = _ref_cross_split(df, float(cfg.oos_test_size), int(cfg.min_test_rows), int(cfg.embargo), 1, freq)
+    assert osp["ok"], f"預設切分不成立（資料不足）：{osp}"
+    report = create_ic_analyzer().analyze_cross_sectional(df, timeframe="1h")
+    exp = _ref_cross_sectional(df.iloc[np.flatnonzero(osp["test_mask"])])
+    for f, values in exp["series"].items():
+        _assert_close_tree(report["rolling_ic_series"][f]["window_cross_sectional"], values, f"series/{f}")
+    rows = {r["feature_name"]: r for r in report["summary_table"]}
+    for f, fields in exp["summary"].items():
+        _assert_close_tree({k: rows[f][k] for k in fields}, fields, f"summary/{f}")
+    _assert_close_tree(report["cross_sectional_symbol_ic"], exp["symbol_ic"], "cross_sectional_symbol_ic")
+    _assert_close_tree(report["cross_symbol_validation"], exp["validation"], "cross_symbol_validation")
+
+
+# ── 事件匯入批標籤 oracle（SPEC v5.38 ①） ─────────────────────────────────────────────────────────────────────
+
+
+def _contract_k_min() -> int:
+    """事件匯入契約 `decision_offset_bars` 之 min（momentum/Analysis/contracts/event_import_contract.json；分析用 k 之初始值
+    ＝契約 min，event_label_spec_resolution.py:149-151）。"""
+    contract = json.loads((REPO / "momentum" / "Analysis" / "contracts" / "event_import_contract.json").read_text(encoding="utf-8"))
+
+    def find(o: Any) -> Optional[int]:
+        if isinstance(o, dict):
+            v = o.get("decision_offset_bars")
+            if isinstance(v, dict) and "min" in v:
+                return int(v["min"])
+            for x in o.values():
+                r = find(x)
+                if r is not None:
+                    return r
+        elif isinstance(o, list):
+            for x in o:
+                r = find(x)
+                if r is not None:
+                    return r
+        return None
+
+    k = find(contract)
+    assert k is not None, "契約無 decision_offset_bars.min"
+    return k
+
+
+def _ref_event_spec(records: Sequence[Mapping[str, Any]], declared: Mapping[str, Any], k_min: int,
+                    requested: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """分析用 event_label_spec 之參考實作（後端預設導出規則，event_label_spec_resolution.py:130-151，獨立重寫）：請求明給之鍵
+    優先；單一觸發週期且宣告深度 d ≥ 1 ⇒ trigger_open／open_to_horizon_close／h＝d；否則 trigger_open／open_to_close／h＝1；
+    decision_offset_bars＝契約 min。"""
+    tfs = sorted({str(r.get("timeframe")) for r in records if r.get("timeframe")})
+    depth = int((declared or {}).get(tfs[0], 0)) if len(tfs) == 1 else 0
+    preset = ("trigger_open", "open_to_horizon_close", depth) if depth >= 1 else ("trigger_open", "open_to_close", 1)
+    spec = {"entry_price_semantic": preset[0], "label_return_mode": preset[1], "horizon_bars": int(preset[2]),
+            "decision_offset_bars": int(k_min)}
+    spec.update({k: v for k, v in (requested or {}).items() if v is not None})
+    return spec
+
+
+def _ref_event_label_values(records: Sequence[Mapping[str, Any]], spec: Mapping[str, Any],
+                            kline: Path = KLINE_CACHE) -> Dict[str, Dict[str, Any]]:
+    """事件標籤之參考實作（依 label_value_from_case.py:359-384、:1213-1241 之定義獨立重寫；kline_cache.h5 直接讀 open／close
+    〔float64〕）：t0 根＝開盤時間 == t0 之根；entry 根＝trigger_*：t0、next_open：t0＋1、decision_bar_*：t0−k；基準價＝
+    close_to_close：t0 根收盤，否則 entry 根之 open（*_open）或 close（*_close）；終點根＝close_to_close：t0＋h、open_to_close：
+    entry、open_to_horizon_close：entry＋h；值＝方向乘號（short ⇒ −1）×(終點收盤−基準價)／基準價；越界或基準價 ≤ 0 ⇒ None。
+    特徵列＝決策根（t0−k）前一根之開盤時間（毫秒）。另回 `close_to_close`＝同終點根、基準改為 entry 前一根收盤之報酬
+    （定因用：*_open 基準之 open[entry] 與 close[entry−1] 相同時兩者相等，相異時即為首份收據所見之微差）。"""
+    import h5py
+
+    bars: Dict[tuple, Dict[str, np.ndarray]] = {}
+    out: Dict[str, Dict[str, Any]] = {}
+    k, h = int(spec["decision_offset_bars"]), int(spec["horizon_bars"])
+    entry, mode = str(spec["entry_price_semantic"]), str(spec["label_return_mode"])
+    for r in records:
+        key = (str(r["symbol"]), str(r["timeframe"]))
+        if key not in bars:
+            with h5py.File(kline, "r") as f:
+                d = f[f"{key[0]}/{key[1]}/data"][:]
+            ts = d["timestamp"].astype("int64")
+            ms = ts if int(ts[-1]) > 10 ** 12 else ts * 1000
+            bars[key] = {"ms": ms, "open": d["open"].astype("float64"), "close": d["close"].astype("float64")}
+        b = bars[key]
+        pos = np.flatnonzero(b["ms"] == int(r["t0"]))
+        val: Optional[float] = None
+        row = c2c = None
+        if pos.size == 1:
+            t0 = int(pos[0])
+            e = {"trigger_open": t0, "trigger_close": t0, "next_open": t0 + 1,
+                 "decision_bar_open": t0 - k, "decision_bar_close": t0 - k}[entry]
+            end = {"close_to_close": t0 + h, "open_to_close": e, "open_to_horizon_close": e + h}[mode]
+            field = "open" if entry.endswith("_open") else "close"
+            base = b["close"][t0] if mode == "close_to_close" else (b[field][e] if 0 <= e < b["ms"].size else math.nan)
+            sign = -1.0 if str(r.get("direction")) == "short" else 1.0
+            if 0 <= end < b["ms"].size and math.isfinite(base) and base > 0:
+                val = sign * (float(b["close"][end]) - float(base)) / float(base)
+                prev = float(b["close"][e - 1]) if mode != "close_to_close" and e >= 1 else float(base)
+                c2c = sign * (float(b["close"][end]) - prev) / prev
+            r_idx = t0 - k - 1
+            if r_idx >= 0:
+                row = int(b["ms"][r_idx])
+        out[str(r["event_id"])] = {"row_open_ms": row, "value": val, "close_to_close": c2c}
+    return out
+
+
+def test_event_label_oracle_boundaries_explicit(tmp_path: Path) -> None:
+    """事件標籤 oracle 之明列邊界：(i) spec 導出——單週期深度 12 ⇒ trigger_open／open_to_horizon_close／12、深度 0 與混週期
+    ⇒ open_to_close／1、請求明給之鍵優先；(ii) 取價——open[t0] ≠ close[t0−1] 之根使 open_to_horizon_close 與
+    close[t+h]／close[t]−1 不同（首份收據 93 筆中 53 筆約 1e-6 差之成因）、short 取負、越界 ⇒ None、列＝t0−k−1。"""
+    import h5py
+
+    recs = [{"symbol": "S", "timeframe": "4h", "event_id": "e1", "t0": 5 * 3_600_000 * 4, "direction": "long"},
+            {"symbol": "S", "timeframe": "4h", "event_id": "e2", "t0": 7 * 3_600_000 * 4, "direction": "short"},
+            {"symbol": "S", "timeframe": "4h", "event_id": "e3", "t0": 9 * 3_600_000 * 4, "direction": "long"}]
+    assert _ref_event_spec(recs, {"4h": 12}, 0)["label_return_mode"] == "open_to_horizon_close"
+    assert _ref_event_spec(recs, {"4h": 0}, 0)["label_return_mode"] == "open_to_close"
+    assert _ref_event_spec([*recs, {"timeframe": "1h"}], {"4h": 3}, 0)["horizon_bars"] == 1
+    assert _ref_event_spec(recs, {"4h": 3}, 0, {"horizon_bars": 2})["horizon_bars"] == 2
+    n = 11
+    ms = np.arange(n, dtype="int64") * 3_600_000 * 4
+    close = 100.0 + np.arange(n, dtype="float64")
+    opn = np.r_[100.0, close[:-1]]
+    opn[5] = close[4] + 0.37   # 開盤跳空：open[t0] ≠ close[t0−1]
+    arr = np.zeros(n, dtype=[("timestamp", "<i8"), ("open", "<f4"), ("close", "<f4")])
+    # 同 kline_cache.h5 之格式：時間戳為 epoch 秒、價格 float32
+    arr["timestamp"], arr["open"], arr["close"] = ms // 1000 + 1_700_000_000, opn, close
+    ms = (arr["timestamp"].astype("int64")) * 1000
+    for r, i in zip(recs, (5, 7, 9)):
+        r["t0"] = int(ms[i])
+    path = tmp_path / "k.h5"
+    with h5py.File(path, "w") as f:
+        f.create_dataset("S/4h/data", data=arr)
+    spec = _ref_event_spec(recs, {"4h": 3}, 0)
+    out = _ref_event_label_values(recs, spec, path)
+    o32, c32 = arr["open"].astype("float64"), arr["close"].astype("float64")
+    assert out["e1"]["row_open_ms"] == int(ms[4])
+    assert out["e1"]["value"] == (c32[8] - o32[5]) / o32[5]
+    # 定因：同終點根、基準改 close[t0−1]；e1 之 t0 根跳空 ⇒ 相異，e2 之 open[t0]＝close[t0−1] ⇒ 相同
+    assert out["e1"]["close_to_close"] == (c32[8] - c32[4]) / c32[4] and out["e1"]["close_to_close"] != out["e1"]["value"]
+    assert out["e2"]["value"] == -(c32[10] - o32[7]) / o32[7] == out["e2"]["close_to_close"]
+    assert out["e3"]["value"] is None   # t0＋h 越界
+
+
+@pytest.mark.requires_kline
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_event_label_oracle_matches_product_on_real_batch() -> None:
+    """SPEC v5.38 ①：收據所用之事件匯入批（收據工具 `REQUESTS["L.event_import_report"]` 之 FACT-RECEIPT；真實 kline 依明列
+    規則所建）——產品後端 spec 解析（`resolve_event_label_spec`）== `_ref_event_spec`；產品事件管線（`prepare_analysis_windows`
+    → `resolve_label_value_at_analyze`，真實 kline bars）逐事件 label_value == `_ref_event_label_values`（相對 ≤ 1e-12）；並
+    證定因：至少一筆 open[t0] ≠ close[t0−1] 而與 close[t+h]／close[t]−1 相異。"""
+    from momentum.Analysis.event_samples.event_label_spec_resolution import resolve_event_label_spec
+    from momentum.factories import create_event_sample_pipeline
+
+    R = _receipt_tool()
+    iid = R._event_batch_import_id(R.REQUESTS["L.event_import_report"]["event_batch_receipt"])
+    batch = json.loads((REPO / "data_cache" / "events" / f"{iid}.json").read_text(encoding="utf-8"))
+    records = list(batch["records"])
+    declared = (batch.get("lookahead_declaration") or {}).get("lookahead_bars_declared") or {}
+    spec = _ref_event_spec(records, declared, _contract_k_min())
+    pipeline = create_event_sample_pipeline()
+    resolved = resolve_event_label_spec(records, requested_spec=None, declared_receipt={"lookahead_bars_declared": declared},
+                                        k_domain=pipeline.int_field_domain("decision_offset_bars"))
+    assert resolved.spec == spec, (resolved.spec, spec)
+    symbols = sorted({str(r["symbol"]) for r in records})
+    tfs = sorted({str(r["timeframe"]) for r in records})
+    bars = pipeline.bars_from_kline_cache(symbols, tfs)
+    prepared = pipeline.prepare_analysis_windows(records, bars, event_label_spec=spec, event_import_id=iid,
+                                                 lookahead_bars_declared=declared,
+                                                 timeframe_seconds=pipeline.timeframe_seconds_for(tfs),
+                                                 feature_timeframe=tfs[0])
+    got = pipeline.resolve_label_value_at_analyze(prepared, bars, event_label_spec=spec).label_values
+    exp = _ref_event_label_values(records, spec)
+    assert set(got) <= set(exp) and len(got) >= 30, (len(got), len(exp))
+    for eid, v in got.items():
+        e = exp[eid]["value"]
+        assert (v is None and e is None) or _rel(float(v), float(e)) <= REL_TOL, (eid, v, e)
+    diff = [eid for eid, v in got.items() if v is not None and exp[eid]["close_to_close"] is not None
+            and abs(exp[eid]["close_to_close"] - float(v)) > 1e-12]
+    same = [eid for eid, v in got.items() if v is not None and exp[eid]["close_to_close"] is not None
+            and abs(exp[eid]["close_to_close"] - float(v)) <= 1e-12]
+    assert diff and same, f"定因：open[t0] ≠ close[t0−1] 之事件須相異、相同者須相等（相異 {len(diff)}、相同 {len(same)}）"

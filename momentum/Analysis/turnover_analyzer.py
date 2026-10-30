@@ -109,10 +109,20 @@ class TurnoverAnalyzer:
         return float(finite.mean())
 
     def compute_factor_autocorrelation(self, feature: pd.Series) -> float:
-        """因子自相關：corr(values_t, values_{t-1})。"""
+        """因子自相關：corr(values_t, values_{t-1})（去 NaN 後 lag-1 Pearson）。
+
+        ICPERF Task 0.4 ㉙：含 ±inf、列數 < 2、或 lag 兩段（values[:-1]／values[1:]）任一為常數 ⇒ NaN（定義上分母為 0；
+        舊版 pandas `autocorr` 於常數序列得 0.9999999999999998、於單一相異值在首／尾之序列得 1e-13 量級之浮點殘差）。
+        """
 
         series = feature.dropna()
         if series.size < 2:
+            return float("nan")
+        values = series.to_numpy(dtype=float)
+        if not np.all(np.isfinite(values)):
+            return float("nan")
+        head, tail = values[:-1], values[1:]
+        if np.all(head == head[0]) or np.all(tail == tail[0]):
             return float("nan")
         return float(series.autocorr(lag=1))
 

@@ -143,8 +143,11 @@ def _analyze_with_isolation(tmp_path, isolation, *, n: int = 600, horizon: int =
 
     # 🔴 rolling 視窗須縮小：預設 [252,756,1512] 會讓 stage4 之 warmup 預檢要求 test 段 ≥1517 列，
     #    小資料集必走 full-sample fallback（那條路徑不建 holdout，測不到本 Task 的接線）。
+    #    ICPERF Task 0.4 ㉛：ICIR 窗另計暖機（預設 63→1h 換算 756），故一併縮到 5。
     orch = ICFilterOrchestrator(
-        ICConfig.model_validate({"min_test_rows": 20, "ic_calculation": {"rolling_windows": [5]}})
+        ICConfig.model_validate(
+            {"min_test_rows": 20, "ic_calculation": {"rolling_windows": [5], "icir": {"window": 5}}}
+        )
     )
     orch._stage1_preprocessing = lambda features, metadata, fit_mask=None, fit_mode=None: (features, {})
     orch._stage4_ic_calculation = lambda *a, **k: {

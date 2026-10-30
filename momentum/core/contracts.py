@@ -444,7 +444,10 @@ class SplitPairLeakageError(ValueError):
 
 
 def _coerce_timestamp_array(values: Any) -> np.ndarray:
-    """將 timestamp array 正規化成 pandas datetime64[ns] 陣列。"""
+    """將 timestamp array 正規化成 pandas datetime64[ns] 陣列（naive，UTC 時刻）。
+
+    ICPERF Task 0.4 ㉟：帶時區之輸入（tz-aware DatetimeIndex／Timestamp）先轉 UTC 再去時區標記，否則 `np.asarray`
+    得 object 陣列、後續與 `np.timedelta64` 比較拋 TypeError；naive 輸入視為 UTC，值不變。"""
     arr = np.asarray(values)
     if arr.size == 0:
         return pd.to_datetime(arr).to_numpy()
@@ -452,7 +455,7 @@ def _coerce_timestamp_array(values: Any) -> np.ndarray:
         return pd.to_datetime(arr).to_numpy()
     if np.issubdtype(arr.dtype, np.number):
         return pd.to_datetime(arr, unit="s").to_numpy()
-    return pd.to_datetime(arr).to_numpy()
+    return pd.DatetimeIndex(pd.to_datetime(arr, utc=True)).tz_localize(None).to_numpy()
 
 
 def _normalize_symbol_value(value: Any) -> str:

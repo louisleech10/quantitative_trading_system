@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir /private/tmp/claude-501/t04d-captures",
+      "code_sha256": "79b57d3cd5a5519a8eaa81cf7a5977104dfdcb8dcc516067d41a3198fdb45baf",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "ICPERF Task 0.4 整合（主委；㉗–㊲ 修正後之現行碼全請求擷取）",
+      "created_at": "2026-10-31T06:50:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1800,
+  "basis": [
+    "前次同請求集全擷取實測約 11 分鐘（/private/tmp/claude-501/t03-captures 擷取檔時戳 2026-10-30 19:13:33 監看起 → 19:24:01 末檔 X.cross_sectional.pkl）",
+    "本次差異：X.cross_sectional 增跨標的五欄／相關矩陣／多元化（路徑 H 實測 40 欄 21.6→22.6 秒，本請求 20 欄增量秒級）；滾動 Pearson 改兩段式、Kendall 改 numba、ICIR 窗依週期換算（路徑 E），單請求增量不逾分鐘級",
+    "估約 12–15 分鐘，取上限 30 分鐘，未逾 2 小時（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-7、-9、-10、-11）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

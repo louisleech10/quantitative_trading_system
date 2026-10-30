@@ -171,9 +171,19 @@ class RedundancyConfig(BaseModel):
     vif: VIFConfig = VIFConfig()
 
     class DiversificationConfig(BaseModel):
-        min_categories: int = 3
-        min_data_sources: int = 2
-        max_same_category_pct: float = 0.4
+        """ICPERF Task 0.4 ㊲：第 6 段多元化約束（規則見 `RedundancyFilter.apply_diversification_constraint`）。
+
+        `enabled` 預設 False（關 ⇒ 第 6 段輸出與改前完全相同）；三數值之預設照改前 schema，`enabled` 與三數值之預設
+        待以真實資料評估後由使用者定。拼錯之鍵（如 `enable`）拒收，免開關被靜默忽略。"""
+
+        model_config = {"extra": "forbid"}
+        enabled: bool = False
+        #: 倖存集合之相異類別數下限（metadata 缺漏者不計）
+        min_categories: int = Field(default=3, ge=1)
+        #: 倖存集合之相異資料來源數下限（metadata 缺漏者不計）
+        min_data_sources: int = Field(default=2, ge=1)
+        #: 任一類別佔「類別已知之倖存數」之比例上限
+        max_same_category_pct: float = Field(default=0.4, gt=0.0, le=1.0)
 
     diversification: DiversificationConfig = DiversificationConfig()
 

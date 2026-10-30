@@ -55,6 +55,8 @@ _ICCONFIG_FIELDS_ADDED_SINCE_FREEZE: tuple = (
     ("ic_calculation", "grouped_analysis", "regime_robust_min_samples"),
     # ICPERF Task 0.4 ㉖：ADF 最少樣本數入 schema
     ("feature_quality_diagnostics", "adf_min_samples"),
+    # ICPERF Task 0.4 ㊲：多元化約束開關（預設 False ⇒ 第 6 段與改前相同）
+    ("redundancy", "diversification", "enabled"),
 )
 
 

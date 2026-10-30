@@ -39,11 +39,14 @@ from momentum.factories import (
     create_kline_storage_manager,
     create_post_ic_transform_config,
     executed_post_ic_arm,
+    feature_layer_of,
+    feature_name_errors,
     feature_naming_version_error_type,
     ic_page_record_keys,
     ic_page_view_id,
     ic_view_identity_mismatch_error,
     numeric_algorithm_id,
+    parse_feature_name,
     post_ic_entry_arm,
     ratio_unsafe_category,
     resolve_run_feature_count,
@@ -62,6 +65,19 @@ from momentum.core.h5_feature_precision import write_feature_datasets
 logger = get_logger("api.ic_analysis_service")
 #: ingest `_meta.json` 缺 `ff_run_identity`／不可讀時之哨兵（必不等於任何身分 ⇒ 快取不沿用；FFDSTAR Task 2.2）
 _MISSING_IDENTITY = object()
+#: ICPERF Task 0.4 ㉜：ingest `_meta.json` 逐特徵 metadata 之格式世代（頂層鍵；缺或不等 ⇒ `_meta.json` 重寫，
+#: 不沿用改前以預設值〔`category: unknown`、`layer: 1`〕填之舊格式）
+IC_FEATURE_METADATA_VERSION_KEY = "feature_metadata_version"
+IC_FEATURE_METADATA_VERSION = 2
+#: 逐特徵 metadata 由持久化來源取得之三欄（分組 IC by_category／by_data_source／by_layer 與多元化涵蓋率之依據）
+IC_FEATURE_METADATA_FIELDS: Tuple[str, ...] = ("category", "data_source", "layer")
+#: 逐特徵項內記來源之鍵（值 ∈ {`feature_name`, `missing`}，同時適用三欄——三欄出自同一次欄名解析，必同源；
+#: 以單一字串而非逐欄 dict 存，C 格 21 萬欄之 `_meta.json`／報告 metadata 少約 13 MB）與缺值原因之鍵（只在缺值時出現）
+IC_FEATURE_METADATA_SOURCE_KEY = "metadata_source"
+IC_FEATURE_METADATA_REASON_KEY = "metadata_missing_reason"
+#: 來源：特徵欄名＝身分之唯一序列化（FF-NAME；`<source>_<tf>_<category>_<indicator>…`），生成時即落盤於 manifest／provenance
+IC_FEATURE_METADATA_FROM_NAME = "feature_name"
+IC_FEATURE_METADATA_MISSING = "missing"
 
 
 class ResultRevisionMismatch(Exception):
@@ -1765,12 +1781,20 @@ class ICAnalysisService:
                 cross_df = pd.concat(frames, axis=0)
                 cross_df = cross_df.set_index("_symbol", append=True)
 
+                # ICPERF Task 0.4 ㊱：逐特徵 metadata（同縱向 `_feature_metadata_entry` 欄名身分）供多元化三覆蓋率；
+                # 收盤只在標籤由 kline 導出時隨同一次讀取取得——給 labels_path 時不讀 kline，半衰期 None 並由
+                # analyze_cross_sectional 記原因 `close_not_provided`
+                feature_metadata = {
+                    str(name): self._feature_metadata_entry(str(name)) for name in cross_df.columns
+                }
+                close_out: Dict[str, Any] = {}
                 labels_path = request.labels_path
                 if not labels_path:
                     cross_df = self._append_cross_sectional_labels(
                         cross_df,
                         symbols_resolved,
                         request.timeframe,
+                        close_out=close_out,
                     )
 
                 report = await asyncio.to_thread(
@@ -1780,6 +1804,8 @@ class ICAnalysisService:
                     config_override=config_override,
                     progress_callback=progress_callback,
                     timeframe=request.timeframe,
+                    close=close_out.get("close"),
+                    feature_metadata=feature_metadata,
                 )
             else:
                 symbol = request.symbol
@@ -3344,7 +3370,10 @@ class ICAnalysisService:
         FFDSTAR Task 2.2（§C D5）：run 身分一律經 `FeatureLibrary.load_with_identity`（與載入同一次 manifest 解析）取得，
         本服務不自組。交接 h5 之 `metadata_json`（orchestrator 讀取之群組屬性）與 `_meta.json` 皆帶 `ff_run_identity`；
         沿用條件＝兩者皆帶與本次相同之身分且命名世代現行，否則兩者一併重寫；身分為 legacy（舊 run）⇒ 一律重寫。
-        快取檔名保留可讀前綴（`latest` 之沿用與否以解析後之身分判定，不以檔名判定）。"""
+        快取檔名保留可讀前綴（`latest` 之沿用與否以解析後之身分判定，不以檔名判定）。
+
+        ICPERF Task 0.4 ㉜：h5 可沿用而 `_meta.json` 之逐特徵 metadata 格式世代（`feature_metadata_version`）缺或過期
+        ⇒ 只重寫 `_meta.json`（特徵值未變，不重寫 h5）；h5 不可沿用 ⇒ 兩者一併重寫（同前）。"""
         features_df, run_identity = self._feature_library.load_with_identity(
             symbol,
             timeframe,
@@ -3358,15 +3387,20 @@ class ICAnalysisService:
         h5_path = cache_dir / f"{safe_key}.h5"
         meta_path = cache_dir / f"{safe_key}_meta.json"
 
-        reusable = (
+        meta_version: Any = None
+        h5_reusable = (
             not run_identity.legacy
             and h5_path.exists()
             and meta_path.exists()
             and self._ic_handoff_h5_current(h5_path, group_key=f"{symbol}/{timeframe}", run_identity=identity)
-            and self._ic_meta_json_identity(meta_path) == identity
         )
-        if not reusable:
+        if h5_reusable:
+            meta_identity, meta_version = self._ic_meta_json_state(meta_path)
+            h5_reusable = meta_identity == identity
+        meta_reusable = h5_reusable and meta_version == IC_FEATURE_METADATA_VERSION
+        if not h5_reusable:
             self._write_features_h5(h5_path, symbol, timeframe, features_df, run_identity=identity)
+        if not meta_reusable:
             meta_payload = self._build_ic_metadata_from_run(
                 symbol,
                 timeframe,
@@ -3383,13 +3417,20 @@ class ICAnalysisService:
     @staticmethod
     def _ic_meta_json_identity(meta_path: Path) -> Any:
         """`_meta.json` 所帶之 `ff_run_identity`；檔不可讀、非物件或缺鍵 ⇒ 回唯一哨兵（必不等於任何身分 ⇒ 不沿用）。"""
+        return ICAnalysisService._ic_meta_json_state(meta_path)[0]
+
+    @staticmethod
+    def _ic_meta_json_state(meta_path: Path) -> Tuple[Any, Any]:
+        """`_meta.json` 一次解析取（`ff_run_identity`, `feature_metadata_version`）。檔不可讀或非物件 ⇒（哨兵, None）；
+        缺身分鍵 ⇒ 身分為哨兵；缺世代鍵 ⇒ 世代 None（改前格式 ⇒ 不沿用）。"""
         try:
             payload = json.loads(Path(meta_path).read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            return _MISSING_IDENTITY
-        if not isinstance(payload, dict) or FF_RUN_IDENTITY_KEY not in payload:
-            return _MISSING_IDENTITY
-        return payload[FF_RUN_IDENTITY_KEY]
+            return _MISSING_IDENTITY, None
+        if not isinstance(payload, dict):
+            return _MISSING_IDENTITY, None
+        identity = payload[FF_RUN_IDENTITY_KEY] if FF_RUN_IDENTITY_KEY in payload else _MISSING_IDENTITY
+        return identity, payload.get(IC_FEATURE_METADATA_VERSION_KEY)
 
     @staticmethod
     def _ic_handoff_h5_current(
@@ -3501,12 +3542,21 @@ class ICAnalysisService:
         config_hash: Optional[str],
         feature_names: List[str],
     ) -> Dict[str, Any]:
-        """從 run catalog 建立 IC orchestrator 需要的 per-feature metadata。"""
+        """建立 IC orchestrator 需要的 per-feature metadata（ICPERF Task 0.4 ㉜）。
+
+        欄名集合＝run catalog（`feature_catalog_cache.parquet`，存在時；呼叫端未給欄名之 `_write_ic_meta_json` 路徑靠它）
+        ∪ `feature_names`（catalog 在前，保序去重）。三欄（category、data_source、layer）一律取自欄名身分
+        （`_feature_metadata_entry`）：欄名為身分之唯一序列化、生成時即落盤於 manifest／provenance；catalog 只是 CGSA
+        瀏覽頁以同一欄名推導（`feature_factory_service._get_feature_metadata_map`）之快取、無 data_source、特徵生成不產出，
+        其值不採用。取不到 ⇒ 值 None、來源 `missing`、記原因，不以預設值冒充（改前 `category: unknown`、`layer: 1`）。
+        頂層帶 `feature_metadata_version`（交接快取據以判舊格式不沿用）。"""
         metadata: Dict[str, Any] = {
             "symbol": symbol,
             "timeframe": timeframe,
             "config_hash": config_hash,
+            IC_FEATURE_METADATA_VERSION_KEY: IC_FEATURE_METADATA_VERSION,
         }
+        names: List[str] = []
         catalog_path: Optional[Path] = None
         if config_hash:
             catalog_path = (
@@ -3518,36 +3568,59 @@ class ICAnalysisService:
             )
         if catalog_path and catalog_path.exists():
             catalog_df = pd.read_parquet(catalog_path)
-            for _, row in catalog_df.iterrows():
-                name = str(row.get("name"))
-                if not name:
-                    continue
-                metadata[name] = {
-                    "name": name,
-                    "category": row.get("category") or "unknown",
-                    "layer": row.get("layer") or 1,
-                }
-        for feature_name in feature_names:
-            if feature_name not in metadata:
-                metadata[feature_name] = {
-                    "name": feature_name,
-                    "category": "unknown",
-                    "layer": 1,
-                }
+            if "name" in catalog_df.columns:
+                names.extend(str(value) for value in catalog_df["name"].tolist() if value is not None and str(value))
+        names.extend(str(name) for name in feature_names)
+        for name in dict.fromkeys(names):
+            if name not in metadata:
+                metadata[name] = self._feature_metadata_entry(name)
         return metadata
+
+    @staticmethod
+    def _feature_metadata_entry(name: str) -> Dict[str, Any]:
+        """單一特徵之 metadata 項（ICPERF Task 0.4 ㉜）：欄名身分（`parse_feature_name`）⇒ category＝身分 category、
+        data_source＝身分 source 段（輸入來源，如 `close`、`hl`、`close-quote-volume`）、layer＝`feature_layer`
+        （`layer1`…`layer6_5`，與 API 他處層字彙同）；`metadata_source`＝`feature_name`（三欄同源）。
+        `label_*` 欄或不合文法 ⇒ 三欄 None、`metadata_source`＝`missing`、`metadata_missing_reason` 記原因（None 不入
+        分組 IC 組、不計入多元化涵蓋率）。"""
+        parse_error, label_error = feature_name_errors()
+        try:
+            identity = parse_feature_name(name)
+        except label_error:
+            reason = "label_column"
+        except parse_error as exc:
+            reason = f"feature_name_unparseable: {exc}"
+        else:
+            return {
+                "name": name,
+                "category": str(identity.category),
+                "data_source": str(identity.source),
+                "layer": feature_layer_of(identity),
+                IC_FEATURE_METADATA_SOURCE_KEY: IC_FEATURE_METADATA_FROM_NAME,
+            }
+        entry: Dict[str, Any] = {"name": name, **{field: None for field in IC_FEATURE_METADATA_FIELDS}}
+        entry[IC_FEATURE_METADATA_SOURCE_KEY] = IC_FEATURE_METADATA_MISSING
+        entry[IC_FEATURE_METADATA_REASON_KEY] = reason
+        return entry
 
     def _append_cross_sectional_labels(
         self,
         cross_df: pd.DataFrame,
         symbols: List[str],
         timeframe: str,
+        *,
+        close_out: Optional[Dict[str, Any]] = None,
     ) -> pd.DataFrame:
-        """從 kline 為橫截面特徵附加 return_1 標籤欄。"""
+        """從 kline 為橫截面特徵附加 return_1 標籤欄。
+
+        ICPERF Task 0.4 ㊱：`close_out` 給定時，於同一次 kline 讀取順帶寫入 `close_out["close"]`＝與回傳框同索引之
+        float64 收盤（供 `analyze_cross_sectional(close=…)` 之 IC 衰減與半衰期；不另讀一次 kline）。"""
         from momentum.factories import create_label_generator
 
         kline_reader = create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR)
         label_generator = create_label_generator()
         working_df = cross_df.copy()
+        close_values = np.full(len(working_df), np.nan, dtype=np.float64)
 
         if not isinstance(working_df.index, pd.MultiIndex):
             raise ValueError("cross-sectional features must use MultiIndex")
@@ -3580,7 +3653,8 @@ class ICAnalysisService:
                     "increasing without duplicates"
                 )
             kline_index = pd.DatetimeIndex(pd.to_datetime(ts_raw, unit="s"))
-            close = raw_data["close"].copy()
+            # ICPERF Task 0.4 ㉞：kline 存 float32；標籤以 float64 計（同主線 ⑥），否則小報酬相對差可達約 0.5%
+            close = raw_data["close"].astype(np.float64)
             close.index = kline_index
             label_series = label_generator.generate_returns_by_type(
                 close,
@@ -3611,7 +3685,10 @@ class ICAnalysisService:
                         ),
                     )
             working_df.loc[symbol_mask, "return_1"] = aligned.to_numpy()
+            close_values[symbol_mask] = close.reindex(symbol_index).to_numpy(dtype=np.float64)
 
+        if close_out is not None:
+            close_out["close"] = pd.Series(close_values, index=working_df.index, name="close")
         return working_df
 
     def _load_meta(self, meta_path: Optional[str]) -> Dict[str, Any]:

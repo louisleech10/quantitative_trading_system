@@ -296,11 +296,15 @@ def test_compute_returns_fallback():
 
 
 def test_select_icir_series_fallbacks():
-    """ICIR Series 選擇回退分支。"""
+    """ICIR Series 選擇：取換算後 ICIR 窗之鍵；無該鍵 ⇒ 空序列（ICPERF Task 0.4 ㉛：不靜默退回第一個窗）。"""
     engine = ICEngine({"icir": {"window": 99}})
 
     assert engine._select_icir_series({}) == []
-    assert engine._select_icir_series({"window_5": [0.1]}) == [0.1]
+    assert engine._select_icir_series({"window_5": [0.1]}) == []
+    assert engine._select_icir_series({"window_5": [0.1], "window_99": [0.2, 0.3]}) == [0.2, 0.3]
+
+    tf_engine = ICEngine({"icir": {"window": 10, "reference_tf": "12h"}, "timeframe": "4h"})
+    assert tf_engine._select_icir_series({"window_10": [0.1], "window_30": [0.4]}) == [0.4]
 
 
 def test_time_index_parsing_and_alignment():

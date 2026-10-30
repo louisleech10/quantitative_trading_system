@@ -247,8 +247,11 @@ def test_pipeline_order_split_before_preprocessing(tmp_path: Path) -> None:
     #    ⇒ 切分直接被判不足、退回全樣本，stage1 拿不到 fit_mask（本測試自 9/8 起紅）。
     #    本測試要驗的是**管線順序**（切分先於預處理），不是 warmup 政策 ⇒ 把視窗縮到 fixture
     #    撐得起的大小（同 `test_evtlabel_isolation_channel.py:145` 之作法），順序斷言原樣保留。
+    #    ICPERF Task 0.4 ㉛：ICIR 窗另計暖機（預設 63→1h 換算 756），故一併縮到 5。
     orchestrator = ICFilterOrchestrator(
-        ICConfig.model_validate({"min_test_rows": 20, "ic_calculation": {"rolling_windows": [5]}})
+        ICConfig.model_validate(
+            {"min_test_rows": 20, "ic_calculation": {"rolling_windows": [5], "icir": {"window": 5}}}
+        )
     )
     calls: list[str] = []
 

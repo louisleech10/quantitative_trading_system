@@ -36,6 +36,174 @@ from momentum.core.protocols import IFeatureReader
 
 logger = get_logger(__name__)
 
+try:
+    from numba import njit
+except ImportError:  # pragma: no cover
+    def njit(*args, **kwargs):  # type: ignore[misc]
+        def _decorator(fn):
+            return fn
+
+        if args and callable(args[0]):
+            return args[0]
+        return _decorator
+
+
+@njit(cache=True)
+def _rolling_pearson_numba(x: np.ndarray, y: np.ndarray, window: int, stride: int) -> np.ndarray:
+    """ICPERF Task 0.4 ㉘：逐窗 Pearson（窗內兩趟：先均值、再中心化動差；不以原值累積和相減）。
+
+    窗內該特徵或標籤有任一非有限值、或任一為常數（窗內全等於首值，同 `scipy.stats.pearsonr` 之常數判定）⇒ NaN；
+    結果截於 [−1, 1]（同 scipy）。特徵維於內層迴圈（列主序連續存取），逐窗配置之暫存皆於迴圈外預配。
+    """
+    n_bars, n_features = x.shape
+    n_out = (n_bars - window) // stride + 1
+    out = np.full((n_out, n_features), np.nan)
+    sum_x = np.empty(n_features)
+    sxy = np.empty(n_features)
+    sxx = np.empty(n_features)
+    ok = np.empty(n_features, dtype=np.bool_)
+    varying = np.empty(n_features, dtype=np.bool_)
+    for oi in range(n_out):
+        start = oi * stride
+        y0 = y[start]
+        y_ok = True
+        y_varying = False
+        y_sum = 0.0
+        for i in range(window):
+            v = y[start + i]
+            if not np.isfinite(v):
+                y_ok = False
+                break
+            if v != y0:
+                y_varying = True
+            y_sum += v
+        if not (y_ok and y_varying):
+            continue
+        y_bar = y_sum / window
+        syy = 0.0
+        for i in range(window):
+            dy = y[start + i] - y_bar
+            syy += dy * dy
+        for fi in range(n_features):
+            sum_x[fi] = 0.0
+            sxy[fi] = 0.0
+            sxx[fi] = 0.0
+            ok[fi] = True
+            varying[fi] = False
+        for i in range(window):
+            row = start + i
+            for fi in range(n_features):
+                v = x[row, fi]
+                if not np.isfinite(v):
+                    ok[fi] = False
+                elif v != x[start, fi]:
+                    varying[fi] = True
+                sum_x[fi] += v
+        for fi in range(n_features):
+            sum_x[fi] = sum_x[fi] / window
+        for i in range(window):
+            row = start + i
+            dy = y[row] - y_bar
+            for fi in range(n_features):
+                dx = x[row, fi] - sum_x[fi]
+                sxy[fi] += dx * dy
+                sxx[fi] += dx * dx
+        sy = np.sqrt(syy)
+        for fi in range(n_features):
+            if ok[fi] and varying[fi]:
+                r = sxy[fi] / (np.sqrt(sxx[fi]) * sy)
+                if r > 1.0:
+                    r = 1.0
+                elif r < -1.0:
+                    r = -1.0
+                out[oi, fi] = r
+    return out
+
+
+@njit(cache=True)
+def _rolling_kendall_numba(x: np.ndarray, y: np.ndarray, window: int, stride: int) -> np.ndarray:
+    """ICPERF Task 0.4 ㉗：逐窗 Kendall τ-b（同 `scipy.stats.kendalltau` 預設 variant='b'），滑窗增量維護整數計數。
+
+    窗內點對之 S＝Σ sign(xᵢ−xⱼ)·sign(yᵢ−yⱼ)（＝一致對數−不一致對數）、x 同值對數 Tx、y 同值對數 Ty 以整數精確維護：
+    新點進窗加上其與窗內各點之貢獻、舊點出窗減去其與窗內其餘點之貢獻（每步 O(window)）；τ-b＝S／√(tot−Tx)／√(tot−Ty)，
+    tot＝window(window−1)/2（同 scipy 之運算次序，截於 [−1, 1]）。窗內任一點 x 或 y 非有限 ⇒ NaN（非有限點不入計數）；
+    Tx＝tot 或 Ty＝tot（常數窗）⇒ NaN（同 scipy）。
+    """
+    n_bars, n_features = x.shape
+    n_out = (n_bars - window) // stride + 1
+    out = np.full((n_out, n_features), np.nan)
+    tot = window * (window - 1) // 2
+    y_fin = np.empty(n_bars, dtype=np.bool_)
+    for t in range(n_bars):
+        y_fin[t] = np.isfinite(y[t])
+    xc = np.empty(n_bars)
+    good = np.empty(n_bars, dtype=np.bool_)
+    for fi in range(n_features):
+        for t in range(n_bars):
+            xc[t] = x[t, fi]
+            good[t] = y_fin[t] and np.isfinite(xc[t])
+        s = 0
+        tx = 0
+        ty = 0
+        bad = 0
+        for t in range(n_bars):
+            lo = t - window + 1
+            if lo < 0:
+                lo = 0
+            if good[t]:
+                xt = xc[t]
+                yt = y[t]
+                for j in range(lo, t):
+                    if not good[j]:
+                        continue
+                    xj = xc[j]
+                    yj = y[j]
+                    if xt == xj:
+                        tx += 1
+                        if yt == yj:
+                            ty += 1
+                    elif yt == yj:
+                        ty += 1
+                    elif (xt > xj) == (yt > yj):
+                        s += 1
+                    else:
+                        s -= 1
+            else:
+                bad += 1
+            if t < window - 1:
+                continue
+            start = t - window + 1
+            if start % stride == 0 and bad == 0 and tx != tot and ty != tot:
+                tau = s / np.sqrt(float(tot - tx)) / np.sqrt(float(tot - ty))
+                if tau > 1.0:
+                    tau = 1.0
+                elif tau < -1.0:
+                    tau = -1.0
+                out[start // stride, fi] = tau
+            # 舊點出窗：減去 start 與窗內其餘點（start+1..t）之貢獻
+            if good[start]:
+                xs = xc[start]
+                ys = y[start]
+                for j in range(start + 1, t + 1):
+                    if not good[j]:
+                        continue
+                    xj = xc[j]
+                    yj = y[j]
+                    if xs == xj:
+                        tx -= 1
+                        if ys == yj:
+                            ty -= 1
+                    elif ys == yj:
+                        ty -= 1
+                    elif (xs > xj) == (ys > yj):
+                        s -= 1
+                    else:
+                        s += 1
+            else:
+                bad -= 1
+    return out
+
+
 # ICFIRSTALIGN Task 1.4：IC cache 重用之完整計算身分（只容 threshold 不同；任一不同或缺欄 ⇒ 拒用、需 raw 重算）
 CACHE_IDENTITY_FIELDS = (
     "symbol",
@@ -432,8 +600,11 @@ class ICEngine:
         """Rolling IC 時間序列.
 
         spearman：每窗內 rank + batch corr（PIT，見 ``pit_stats.rolling_window_rank_corr``）。
-        pearson / 其他：raw 值 rolling pearson（行為不變）。
+        kendall：逐窗 Kendall τ-b（ICPERF Task 0.4 ㉗，同 `scipy.stats.kendalltau`；`_rolling_kendall_matrix`）。
+        pearson / 其他：逐窗 Pearson，窗內兩趟中心化動差（ICPERF Task 0.4 ㉘；`_rolling_corr_matrix`）。
         輸出 list 長度 = emitted window-ends（window-1, window-1+stride, ...）。
+        ICPERF Task 0.4 ㉛：輸出窗＝依週期換算之 `windows`，另加換算後之 ICIR 窗（不在其中時另算，供 `compute_icir` 取用，
+        不靜默退回第一個窗）。
         """
 
         # ICPERF Task 0.4 ④：時間軸＝標籤有限之列（與其他特徵無關，同請求各特徵共用此軸）；每窗每特徵獨立——窗內該特徵
@@ -443,7 +614,10 @@ class ICEngine:
         if not axis_rows.any():
             return {name: {} for name in features_df.columns}
 
-        adjusted_windows = self._adjust_rolling_windows(windows)
+        adjusted_windows = list(self._adjust_rolling_windows(windows))
+        icir_window = self._adjusted_icir_window()
+        if icir_window not in adjusted_windows:
+            adjusted_windows.append(icir_window)
         results: dict[str, dict] = {name: {} for name in features_df.columns}
 
         # raw values — spearman 不再全序列 pre-rank（P0-1 look-ahead 修正）
@@ -456,8 +630,12 @@ class ICEngine:
                 corr_matrix = rolling_window_rank_corr(
                     x_values, y_values, window=int(window), stride=int(stride)
                 )
+            elif method == "kendall":
+                corr_matrix = self._rolling_kendall_matrix(
+                    x_values, y_values, window, stride
+                )
             else:
-                # pearson（及 non-spearman）：維持 raw rolling pearson
+                # pearson（及其他非 spearman／kendall）：逐窗 Pearson
                 corr_matrix = self._rolling_corr_matrix(
                     x_values, y_values, window, stride
                 )
@@ -469,6 +647,7 @@ class ICEngine:
         """ICIR = IC Mean / IC Std."""
 
         icir_results: dict[str, dict] = {}
+        self._warn_missing_icir_window(rolling_ic_results)
         for feature, windows in rolling_ic_results.items():
             series = self._select_icir_series(windows)
             values = np.array(series, dtype=float)
@@ -1270,15 +1449,36 @@ class ICEngine:
             benchmark_close=benchmark_close,
         )
 
+    def _adjusted_icir_window(self) -> int:
+        """ICPERF Task 0.4 ㉛：ICIR 窗依週期換算（與滾動窗同一 `_adjust_rolling_windows`；未注入週期 ⇒ 設定值原值）。"""
+        return int(self._adjust_rolling_windows([int(self._icir_window)])[0])
+
+    def icir_window_selection(self, windows: list[int]) -> dict[str, Any]:
+        """ICPERF Task 0.4 ㉛：ICIR 選窗之揭露——設定窗、換算後之窗與其滾動 IC 鍵，以及來源
+        （`rolling_windows`＝換算後之滾動窗集合已含；`extra_window`＝不在其中、由 `compute_rolling_ic` 另算）。"""
+        adjusted = [int(w) for w in self._adjust_rolling_windows(list(windows))]
+        icir_window = self._adjusted_icir_window()
+        return {
+            "configured_window": int(self._icir_window),
+            "adjusted_window": icir_window,
+            "key": f"window_{icir_window}",
+            "source": "rolling_windows" if icir_window in adjusted else "extra_window",
+        }
+
     def _select_icir_series(self, windows: dict) -> list[float]:
+        """ICIR／IC 自相關所用之滾動 IC 序列＝換算後 ICIR 窗之鍵；無該鍵 ⇒ 空序列（ICIR NaN），不退回其他窗
+        （ICPERF Task 0.4 ㉛：舊版以設定值原值找鍵、找不到即取第一個窗 ⇒ 1h／4h 之 ICIR 實為最短窗）。"""
         if not windows:
             return []
-        key = f"window_{self._icir_window}"
-        if key in windows:
-            return windows[key]
-        for values in windows.values():
-            return values
-        return []
+        return list(windows.get(f"window_{self._adjusted_icir_window()}", []))
+
+    def _warn_missing_icir_window(self, rolling_ic_results: dict) -> None:
+        """有特徵之滾動結果非空卻缺 ICIR 窗之鍵 ⇒ 記一次警告（逐特徵迴圈外；ICIR 為 NaN、不退回其他窗）。"""
+        key = f"window_{self._adjusted_icir_window()}"
+        missing = sum(1 for windows in rolling_ic_results.values() if windows and key not in windows)
+        if missing:
+            logger.warning("ICIR window %s missing in rolling IC for %d features; ICIR set to NaN (no fallback)",
+                           key, missing)
 
     def _iter_time_groups(self, raw_data: pd.DataFrame, mode: str):
         time_index = self._get_time_index(raw_data)
@@ -1594,13 +1794,27 @@ class ICEngine:
                 features_df[feature], label, method
             )
             return {feature: value}
-        values = np.column_stack([label.values, features_df.values])
+        # ICPERF Task 0.4 ㉚：常數標籤 ⇒ 全欄 NaN；常數特徵 ⇒ 該欄 NaN 並自矩陣剔除（scipy.spearmanr 於第 0／1 欄常數時
+        # 回純量 NaN、使 `corr[0, 1:]` 拋 TypeError，且會把他欄一併變 NaN）；相關矩陣一律二維（純量 ⇒ 2×2）。
+        # 無常數欄時與改前同一計算（同一矩陣、同一呼叫）。
+        label_values = np.asarray(label.values, dtype=float)
+        feature_values = np.asarray(features_df.values, dtype=float)
+        ic_out = np.full(feature_values.shape[1], np.nan)
+        if np.all(label_values == label_values[0]):
+            return dict(zip(features_df.columns, ic_out))
+        live = ~np.all(feature_values == feature_values[0], axis=0)
+        if not live.any():
+            return dict(zip(features_df.columns, ic_out))
+        values = np.column_stack([label_values, feature_values if live.all() else feature_values[:, live]])
         if method == "pearson":
             corr = np.corrcoef(values, rowvar=False)
         else:
             corr = stats.spearmanr(values, axis=0).correlation
-        ic_values = corr[0, 1:]
-        return dict(zip(features_df.columns, ic_values.astype(float)))
+        corr = np.asarray(corr, dtype=float)
+        if corr.ndim == 0:
+            corr = np.array([[1.0, float(corr)], [float(corr), 1.0]])
+        ic_out[live] = corr[0, 1:]
+        return dict(zip(features_df.columns, ic_out.astype(float)))
 
     def _has_missing(self, features_df: pd.DataFrame, label: pd.Series) -> bool:
         if label.isna().any():
@@ -1665,50 +1879,43 @@ class ICEngine:
         window: int,
         stride: int,
     ) -> np.ndarray:
+        """逐窗 Pearson（ICPERF Task 0.4 ㉘）：窗內先求均值再累加中心化動差（`_rolling_pearson_numba`）。
+
+        舊版以原值 `cumsum(x)`／`cumsum(x²)`／`cumsum(xy)` 相減求窗內動差，價格水準欄（值大、窗內變異小）相消誤差達 1e-7；
+        改後與逐窗 `scipy.stats.pearsonr` 相對誤差 ≤ 1e-12。窗內任一非有限值或常數 ⇒ 該窗該欄 NaN（同 ④）。
+        """
         if window <= 1:
             return np.empty((0, x_values.shape[1]))
+        if stride < 1:
+            raise ValueError("stride must be >= 1")
 
         n_rows = x_values.shape[0]
         if n_rows < window:
             return np.empty((0, x_values.shape[1]))
 
-        x_raw = x_values.astype(float, copy=False)
-        y_raw = y_values.astype(float, copy=False)
-        n_features = x_raw.shape[1]
-        # ICPERF Task 0.4 ④：窗內任一非有限值 ⇒ 該窗該欄 NaN（同 pit_stats.rolling_window_rank_corr 之窗內非有限處理），
-        # 不污染其他窗——非有限處以 0 代入累積和並另計非有限數（全部有限時與改前逐位元相同，SPEC Task 0.4 ④）
-        fx, fy = np.isfinite(x_raw), np.isfinite(y_raw)
-        x = np.where(fx, x_raw, 0.0)
-        y = np.where(fy, y_raw, 0.0)
-        bad_x = np.vstack([np.zeros((1, n_features)), np.cumsum(~fx, axis=0)])
-        bad_y = np.concatenate(([0], np.cumsum(~fy)))
+        x = np.ascontiguousarray(x_values, dtype=np.float64)
+        y = np.ascontiguousarray(y_values, dtype=np.float64)
+        return _rolling_pearson_numba(x, y, int(window), int(stride))
 
-        csum_x = np.vstack([np.zeros((1, n_features)), np.cumsum(x, axis=0)])
-        csum_x2 = np.vstack([np.zeros((1, n_features)), np.cumsum(x * x, axis=0)])
-        csum_xy = np.vstack([np.zeros((1, n_features)), np.cumsum(x * y[:, None], axis=0)])
-        csum_y = np.concatenate(([0.0], np.cumsum(y)))
-        csum_y2 = np.concatenate(([0.0], np.cumsum(y * y)))
-
-        starts = np.arange(0, n_rows - window + 1, stride)
-        ends = starts + window
-
-        sum_x = csum_x[ends] - csum_x[starts]
-        sum_x2 = csum_x2[ends] - csum_x2[starts]
-        sum_xy = csum_xy[ends] - csum_xy[starts]
-        sum_y = csum_y[ends] - csum_y[starts]
-        sum_y2 = csum_y2[ends] - csum_y2[starts]
-
-        window_size = float(window)
-        cov_num = sum_xy - (sum_x * sum_y[:, None]) / window_size
-        var_x = sum_x2 - (sum_x * sum_x) / window_size
-        var_y = sum_y2 - (sum_y * sum_y) / window_size
-        denom = np.sqrt(var_x * var_y[:, None])
-        with np.errstate(divide="ignore", invalid="ignore"):
-            corr = cov_num / denom
-        corr[~np.isfinite(corr)] = np.nan
-        window_bad = ((bad_x[ends] - bad_x[starts]) > 0) | ((bad_y[ends] - bad_y[starts]) > 0)[:, None]
-        corr[window_bad] = np.nan
-        return corr
+    @staticmethod
+    def _rolling_kendall_matrix(
+        x_values: np.ndarray,
+        y_values: np.ndarray,
+        window: int,
+        stride: int,
+    ) -> np.ndarray:
+        """逐窗 Kendall τ-b（ICPERF Task 0.4 ㉗；`_rolling_kendall_numba`，滑窗整數計數每步 O(window)）。
+        形狀與窗終點同 `_rolling_corr_matrix`；窗內任一非有限值或常數 ⇒ NaN。"""
+        if window <= 1:
+            return np.empty((0, x_values.shape[1]))
+        if stride < 1:
+            raise ValueError("stride must be >= 1")
+        n_rows = x_values.shape[0]
+        if n_rows < window:
+            return np.empty((0, x_values.shape[1]))
+        x = np.ascontiguousarray(x_values, dtype=np.float64)
+        y = np.ascontiguousarray(y_values, dtype=np.float64)
+        return _rolling_kendall_numba(x, y, int(window), int(stride))
 
     def _select_peak_horizon(
         self, horizons: list[int], ic_values: list[float]

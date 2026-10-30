@@ -88,6 +88,11 @@
       "metadata.ic_train_test_split.test_events",
       "metadata.ic_train_test_split.test_rows",
       "metadata.ic_train_test_split.train_rows",
+      "metadata.ic_window_disclosure.ic_mean_source.pooled_point_ic",
+      "metadata.ic_window_disclosure.ic_mean_source.rolling_mean",
+      "metadata.ic_window_disclosure.ic_mean_source.unavailable",
+      "metadata.ic_window_disclosure.icir_window_selection.adjusted_window",
+      "metadata.ic_window_disclosure.icir_window_selection.configured_window",
       "metadata.label_mode.n_neg_batch",
       "metadata.label_mode.n_neg_selection",
       "metadata.label_mode.n_pos_batch",
@@ -103,7 +108,8 @@
       "metadata.split_unify.per_symbol_counts.ETHUSDT",
       "metadata.total_features_input",
       "metadata.total_features_output",
-      "metadata.volume_12h_trend_MAVP_21_TsArgmin_W5.layer"
+      "metadata.volume_12h_trend_MAVP_21_TsArgmin_W5.layer",
+      "summary_table[*].direction"
     ],
     "event": [
       "coverage_analysis.*.effective_start",
@@ -190,6 +196,11 @@
       "metadata.ic_train_test_split.purge_gap",
       "metadata.ic_train_test_split.test_rows",
       "metadata.ic_train_test_split.train_rows",
+      "metadata.ic_window_disclosure.ic_mean_source.pooled_point_ic",
+      "metadata.ic_window_disclosure.ic_mean_source.rolling_mean",
+      "metadata.ic_window_disclosure.ic_mean_source.unavailable",
+      "metadata.ic_window_disclosure.icir_window_selection.adjusted_window",
+      "metadata.ic_window_disclosure.icir_window_selection.configured_window",
       "metadata.label_mode.n_neg_batch",
       "metadata.label_mode.n_neg_selection",
       "metadata.label_mode.n_pos_batch",
@@ -201,7 +212,8 @@
       "metadata.split_unify.per_symbol_counts.ETHUSDT",
       "metadata.total_features_input",
       "metadata.total_features_output",
-      "metadata.volume_12h_trend_MAVP_21_TsArgmin_W5.layer"
+      "metadata.volume_12h_trend_MAVP_21_TsArgmin_W5.layer",
+      "summary_table[*].direction"
     ],
     "global": [
       "coverage_analysis.*.effective_start",
@@ -283,12 +295,15 @@
       "metadata.ic_train_test_split.purge_gap",
       "metadata.ic_train_test_split.test_rows",
       "metadata.ic_train_test_split.train_rows",
+      "metadata.ic_window_disclosure.icir_window_selection.adjusted_window",
+      "metadata.ic_window_disclosure.icir_window_selection.configured_window",
       "metadata.n_samples",
       "metadata.selection_scope.n_tests",
       "metadata.significance.n_tests",
       "metadata.total_features_input",
       "metadata.total_features_output",
-      "metadata.volume_12h_trend_MAVP_21_TsArgmin_W5.layer"
+      "metadata.volume_12h_trend_MAVP_21_TsArgmin_W5.layer",
+      "summary_table[*].direction"
     ]
   }
 }

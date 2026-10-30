@@ -6,6 +6,9 @@
 
 - 資料格：長資料格 L（`icperf_freeze_baseline.LONG_CELL`；sidecar `output_window` 為窗、`source` 為 kline 來源）。
 - 事件（因果，只用 0..t）：窗內第 t 根之 close > 前 `BREAKOUT_BARS` 根（不含 t）之 high 最大值。
+  `BREAKOUT_BARS`＝6（ICPERF SPEC v5.38 Task 0.3 ①：原 24 根之批〔93 筆〕切分後測試段只 19 筆 < `min_test_events` 30 ⇒
+  IC 統計全 null；L 格窗 2,000 根上依各門檻試算之測試段筆數〔grid 第 1,625 根起〕：24⇒19、12⇒28、10⇒31、8⇒36、6⇒41，取 6
+  ＝總 203 筆、測試段約 41 筆，對 30 有餘裕且仍為「突破前 N 根高點」之同一規則族；N 以根數計，不假設交易時段）。
 - 標籤（前瞻，宣告 `lookahead_bars_declared`＝`HORIZON_BARS`）：close[t+h] > close[t] ⇒ 1，否則 0（close_to_close）；
   t+h 超出窗末之事件不收。
 - 其餘欄位：方向 long、進場價 trigger_close、decision_offset_bars 0、scenario B、control_kind
@@ -26,7 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 REPO = Path(__file__).resolve().parents[1]
-BREAKOUT_BARS = 24
+BREAKOUT_BARS = 6
 HORIZON_BARS = 12
 RULE_ID = f"icperf-t03:breakout{BREAKOUT_BARS}:close_gt_prior_high:h{HORIZON_BARS}"
 SOURCE_NAME = "icperf-task03-event-batch"

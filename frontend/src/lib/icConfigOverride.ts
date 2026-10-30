@@ -1,4 +1,16 @@
-import type { ICAnalysisConfig } from './types';
+import type { ICAnalysisConfig, ICDiversificationConfig } from './types';
+
+/**
+ * ICPERF Task 0.4 ㊲：多元化約束之顯示用預設（＝後端 `momentum/Analysis/ic_config_schema.py`
+ * `RedundancyConfig.DiversificationConfig` 之預設；`enabled` 預設關，三數值預設待使用者定）。
+ * 只在使用者尚未調整時作為面板之初始顯示值；未調整前不送出（後端沿用其設定）。
+ */
+export const DEFAULT_DIVERSIFICATION: ICDiversificationConfig = {
+  enabled: false,
+  min_categories: 3,
+  min_data_sources: 2,
+  max_same_category_pct: 0.4,
+};
 
 /**
  * IC 分析請求之 `config_override` 之**唯一**產生點。
@@ -11,6 +23,9 @@ import type { ICAnalysisConfig } from './types';
  *
  * 🔴 放在 `lib/` 而不是留在 hooks：`lib/api.ts` 需要它，而 `api.ts` 匯入 hooks 模組會把
  * React 拉進所有 api 消費者（含可能的 server 端匯入路徑）。本檔無 React 相依。
+ *
+ * ICPERF Task 0.4 ㊲：`config.diversification` 有值時才送 `redundancy.diversification`（整組四鍵）；
+ * 初始狀態（未設定）之 payload 與改前逐字相同。
  */
 export const buildConfigOverride = (config: ICAnalysisConfig) => {
   const thresholds: Record<string, number> = {
@@ -27,6 +42,16 @@ export const buildConfigOverride = (config: ICAnalysisConfig) => {
     thresholds,
     redundancy: {
       correlation_threshold: config.thresholds.correlation_threshold,
+      ...(config.diversification
+        ? {
+            diversification: {
+              enabled: config.diversification.enabled,
+              min_categories: config.diversification.min_categories,
+              min_data_sources: config.diversification.min_data_sources,
+              max_same_category_pct: config.diversification.max_same_category_pct,
+            },
+          }
+        : {}),
     },
     labels: {
       horizons: config.horizons,

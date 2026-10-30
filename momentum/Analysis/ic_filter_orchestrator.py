@@ -1506,6 +1506,8 @@ class ICFilterOrchestrator:
             metadata.get("timeframe") if isinstance(metadata, dict) else None,
             reference_tf=config.ic_calculation.icir.reference_tf,
         )
+        # ICPERF Task 0.4 ㉛：ICIR 窗以 effective config（含 config_override）同步進引擎（引擎建構時只讀一次）
+        self._ic_engine._icir_window = int(config.ic_calculation.icir.window)
         metadata = dict(metadata)
         metadata["ic_window_disclosure"] = {
             "window_unit": "bars",
@@ -1514,6 +1516,7 @@ class ICFilterOrchestrator:
             "timeframe_adjustment": _tf_adjust,
             "adjusted_windows": [int(w) for w in self._ic_engine._adjust_rolling_windows(list(config.ic_calculation.rolling_windows))],
             "icir_role": "threshold",
+            "icir_window_selection": self._ic_engine.icir_window_selection(list(config.ic_calculation.rolling_windows)),
         }
 
         # ── EVTLABEL Task 3.7（`GROK-R1-P0-01` 修補）：區塊置換所需的兩個尺度，
@@ -2223,8 +2226,17 @@ class ICFilterOrchestrator:
         config_override: Optional[dict] = None,
         progress_callback: Optional[Callable] = None,
         timeframe: Optional[str] = None,
+        *,
+        close: Optional[pd.Series] = None,
+        feature_metadata: Optional[dict] = None,
     ) -> dict:
-        """Cross-sectional IC: rank corr(feature_{i,t}, return_{i,t+1}) across symbols at each timestamp."""
+        """Cross-sectional IC: rank corr(feature_{i,t}, return_{i,t+1}) across symbols at each timestamp.
+
+        ICPERF Task 0.4 ㊱：summary 之單調性／多空價差／覆蓋率／換手率／半衰期、相關矩陣與多元化指標依縱向同一定義於
+        跨標的資料計算（定義見 `_xsec_placeholder_stats`）。`close`：與 `features` 同索引層序（時點, 標的）之收盤，供 IC
+        衰減與半衰期（未傳 ⇒ 半衰期 None，原因記 `metadata.cross_sectional_unavailable_fields`）；`feature_metadata`：
+        {特徵: {category, data_source, layer}}，供多元化之三覆蓋率（未傳 ⇒ 三覆蓋率 None 並記原因）。
+        """
 
         config = self._apply_tier_config(self._apply_config_override(config_override))
         self._progress_callback = progress_callback
@@ -2234,6 +2246,9 @@ class ICFilterOrchestrator:
             raise InvalidInputError("features is empty")
         if not isinstance(features.index, pd.MultiIndex) or features.index.nlevels < 2:
             raise InvalidInputError("cross-sectional features must use MultiIndex (timestamp, symbol)")
+        if features.index.duplicated().any():
+            # ICPERF Task 0.4 ㊱：截面面板（時點, 標的）須唯一（分位、換手、截面相關依此建稠密面板；不靜默覆寫）
+            raise InvalidInputError("cross-sectional features have duplicate (timestamp, symbol) rows")
 
         index_names = list(features.index.names)
         symbol_level_idx = features.index.nlevels - 1
@@ -2380,6 +2395,12 @@ class ICFilterOrchestrator:
 
         self._report_progress(1, "cross_sectional", 0.8, "building cross-sectional report")
 
+        # ICPERF Task 0.4 ㊱：summary 五欄、相關矩陣、多元化指標（同分析段；定義見 `_xsec_placeholder_stats`）
+        xsec_stats = self._xsec_placeholder_stats(
+            analysis_df, feature_cols, label_col, symbol_level_idx, config, close, feature_metadata
+        )
+        xsec_fields: dict[str, dict[str, Any]] = xsec_stats["fields"]
+
         summary_table: list[dict[str, Any]] = []
         maxlags_by_feature: dict[str, Any] = {}
         for feature_name in feature_cols:
@@ -2420,23 +2441,30 @@ class ICFilterOrchestrator:
                     "p_value": p_value,
                     "p_value_adj": float("nan"),
                     "ic_hit_rate": ic_hit_rate,
-                    "monotonicity_score": None,
-                    "long_short_spread": None,
-                    "coverage": None,
-                    "turnover_rate": None,
-                    "ic_half_life": None,
+                    # ICPERF Task 0.4 ㊱：五欄依縱向同一定義於跨標的資料計算（`_xsec_placeholder_stats`）
+                    "monotonicity_score": xsec_fields[feature_name]["monotonicity_score"],
+                    "long_short_spread": xsec_fields[feature_name]["long_short_spread"],
+                    "coverage": xsec_fields[feature_name]["coverage"],
+                    "turnover_rate": xsec_fields[feature_name]["turnover_rate"],
+                    "ic_half_life": xsec_fields[feature_name]["ic_half_life"],
                     # ICPERF Task 0.4 ㉓：跨標的路徑不算分組 IC（grouped_ic＝not_applicable）⇒ by_regime 未算
                     **_regime_robust_fields(feature_name, 0, None, None, 0),
-                    # ICPERF Task 0.4 ⑧：跨標的列同算方向欄（截面 IC 序列之有限值中 < 0 之比例為負向勝率）
+                    # ICPERF Task 0.4 ⑧：跨標的列同算方向欄（截面 IC 序列之有限值中 < 0 之比例為負向勝率；方向對齊單調性
+                    # 取 ㊱ 之截面分位均值，同縱向）
                     **_direction_fields(
                         ic_mean,
                         {"icir": icir, "ic_hit_rate": ic_hit_rate,
                          "ic_neg_rate": (float(np.mean(values[np.isfinite(values)] < 0))
                                          if np.isfinite(values).any() else np.nan)},
-                        {},
+                        {"quantile_mean_returns": xsec_fields[feature_name]["quantile_mean_returns"]},
                     ),
                 }
             )
+
+        # ICPERF Task 0.4 ㊱：換手率關 ⇒ 欄缺席（同縱向 `_build_summary_table` 之 ICHC R6 語意）
+        if not config.turnover.enabled:
+            for row in summary_table:
+                row.pop("turnover_rate", None)
 
         # FDR 對該路徑全 feature（n_tests=finite p）；排序按方向對齊之 ICIR（icir_aligned）、不加門檻
         p_values_map: dict[str, float] = {}
@@ -2515,6 +2543,9 @@ class ICFilterOrchestrator:
         }
         if split_meta is not None:
             metadata["ic_train_test_split"] = split_meta
+        if xsec_stats["unavailable"]:
+            # ICPERF Task 0.4 ㊱：本路徑無法計算之欄與原因（封閉值集 XSEC_UNAVAILABLE_REASONS）
+            metadata["cross_sectional_unavailable_fields"] = dict(xsec_stats["unavailable"])
 
         # ICHC Task 3.1：五節由裸空 dict 改契約 status（區分「模式不適用」與「壞了」）
         from momentum.Analysis.ic_config_schema import contract_enum
@@ -2529,11 +2560,13 @@ class ICFilterOrchestrator:
                 "n_timestamps": n_slices,
             },
             "summary_table": summary_table,
-            "ic_decay": dict(_xsec_na),
+            # ICPERF Task 0.4 ㊱：有收盤且衰減開 ⇒ 逐特徵截面 IC 衰減（半衰期之來源）；否則維持 not_applicable
+            "ic_decay": xsec_stats["ic_decay"] if xsec_stats["ic_decay"] is not None else dict(_xsec_na),
             "quantile_returns": dict(_xsec_na),
             "grouped_ic": dict(_xsec_na),
-            "correlation_matrix": {"features": [], "matrix": []},
-            "diversification_metrics": {},
+            # ICPERF Task 0.4 ㊱：平均截面 Pearson 相關（NaN 填 0，同縱向 `_build_correlation_payload`）與其多元化指標
+            "correlation_matrix": self._build_correlation_payload(xsec_stats["corr"]),
+            "diversification_metrics": xsec_stats["diversification"],
             "rolling_ic_series": {
                 name: {"window_cross_sectional": values}
                 for name, values in ic_series.items()
@@ -2557,6 +2590,289 @@ class ICFilterOrchestrator:
         self._report = report
         self._report_progress(2, "cross_sectional", 1.0, "completed")
         return report
+
+    # ── ICPERF Task 0.4 ㊱：跨標的 summary 五欄、相關矩陣、多元化指標 ─────────────────────────────────────────
+    #: 本路徑無法計算之欄之原因（封閉值集；寫入 `metadata.cross_sectional_unavailable_fields`）
+    XSEC_UNAVAILABLE_REASONS: tuple[str, ...] = (
+        "close_not_provided", "decay_analysis_off", "feature_metadata_not_provided",
+    )
+    #: 稠密面板（時點 × 標的 × 特徵）分塊之 float64 位元組上限（記憶體有界；分塊不改數值；排名／分位之暫存約為其 8–10 倍）
+    _XSEC_BLOCK_BYTES: int = 16 * 1024 * 1024
+
+    def _xsec_placeholder_stats(
+        self,
+        analysis_df: pd.DataFrame,
+        feature_cols: list[str],
+        label_col: str,
+        symbol_level_idx: int,
+        config: ICConfig,
+        close: Optional[pd.Series],
+        feature_metadata: Optional[dict],
+    ) -> dict[str, Any]:
+        """跨標的 summary 五欄、相關矩陣、多元化指標（ICPERF Task 0.4 ㊱；與截面 IC 同一分析段）。
+
+        各欄對照縱向產生端之同一定義（業界出處）：
+        - 分位：每時點對該時點特徵有限之標的做 `pd.qcut(x, q, labels=False)`（分位點＝`np.percentile` 線性插值、右閉含
+          最低點）；邊界重複（含有限數 < 2）⇒ 該時點不入（alphalens `utils.quantize_factor` 逐日 qcut 之 `no_raise`）。只用
+          同一時點之特徵，無時間序列歷史 ⇒ 無偷看未來之路徑。q：單調性與多空價差同縱向 `MonotonicityTester`
+          （請求 5、`_select_num_quantiles` 以「特徵有限且標籤有限」之總觀測數判退 3）；換手率同縱向 `TurnoverAnalyzer` 之 5。
+        - `monotonicity_score`：各分位標籤均值（標籤有限之觀測合併平均＝alphalens `mean_return_by_quantile(by_date=False,
+          demeaned=False)`）經 `compute_monotonicity_score`（相鄰兩分位皆有值之差 > 0 之比例）。
+        - `long_short_spread`：最高分位均值 − 最低分位均值（同 `compute_long_short_spread`；任一無值 ⇒ NaN）。
+        - `turnover_rate`：頂分位成分每期變化比例＝alphalens `performance.quantile_turnover`（頂分位標的集合 S_t 依有效
+          時點序，|S_t − S_prev|／|S_t| 之平均；有效時點 < 2 ⇒ NaN）。
+        - `coverage`：非 NaN 列數／分析段列數（同 `CoverageAnalyzer.compute_time_coverage`；面板列＝時點 × 標的）。
+        - `ic_half_life`：各 horizon 之 IC＝每時點截面 Spearman（特徵與前瞻報酬共同非 NaN 之標的 ≥ 2，同截面 IC 之估計量）
+          之平均；前瞻報酬依 `labels.return_type` 於分析段內逐標的計（同縱向切段後之 `_compute_returns`）；擬合與半衰期同
+          `ICEngine._fit_exponential_decay`。未傳收盤／衰減關 ⇒ None 並記原因。
+        - 相關矩陣：每時點截面 Pearson（兩特徵共同有限之標的 ≥ 2 且兩者於共同列皆非常數）之時間平均（Fama–MacBeth 式
+          平均截面相關；縱向為時間軸上之 Pearson，`compute_correlation_matrix`）；無有效時點 ⇒ NaN；對角＝1（任一時點有效）。
+          特徵集合＝本路徑全部輸出特徵（跨標的不設門檻，`total_features_output`＝輸入特徵數）。
+        - 多元化：`compute_diversification_metrics` 同一公式於上列相關矩陣；未傳特徵 metadata ⇒ 三覆蓋率 None 並記原因。
+        """
+        index = analysis_df.index
+        sym_codes, sym_uniques = pd.factorize(index.get_level_values(symbol_level_idx), sort=True)
+        date_codes, date_uniques = pd.factorize(index.droplevel(symbol_level_idx), sort=True)
+        d_codes = np.asarray(date_codes, dtype=np.int64)
+        s_codes = np.asarray(sym_codes, dtype=np.int64)
+        n_dates, n_syms, n_rows = int(len(date_uniques)), int(len(sym_uniques)), int(len(analysis_df))
+        unavailable: dict[str, str] = {}
+
+        values = analysis_df[feature_cols].to_numpy(dtype=np.float64)
+        y_dense = self._xsec_dense(analysis_df[label_col].to_numpy(dtype=np.float64), d_codes, s_codes,
+                                   n_dates, n_syms)
+        y_finite = np.isfinite(y_dense)
+
+        # IC 衰減之前瞻報酬（逐標的、分析段內位置位移，同縱向切段後之 `_compute_returns`）
+        horizons = [int(h) for h in config.ic_calculation.ic_decay_horizons]
+        forward: Optional[dict[int, np.ndarray]] = None
+        if not config.report.include_decay_analysis:
+            unavailable["ic_half_life"] = "decay_analysis_off"
+        elif close is None:
+            unavailable["ic_half_life"] = "close_not_provided"
+        else:
+            close_rows = pd.Series(close).reindex(index).to_numpy(dtype=np.float64)
+            if n_rows and not np.isfinite(close_rows).any():
+                # 收盤之索引（層序、時區）與特徵不對齊 ⇒ 全 NaN；不靜默產出全 NaN 之衰減
+                raise InvalidInputError("cross_sectional close does not align with features index (timestamp, symbol)")
+            forward = {}
+            for h in horizons:
+                fwd_rows = np.full(n_rows, np.nan)
+                for s in range(n_syms):
+                    rows = np.flatnonzero(s_codes == s)
+                    rows = rows[np.argsort(d_codes[rows], kind="stable")]
+                    fwd_rows[rows] = self._ic_engine._compute_returns(
+                        pd.Series(close_rows[rows]), h, config.labels.return_type
+                    ).to_numpy(dtype=np.float64)
+                forward[h] = self._xsec_dense(fwd_rows, d_codes, s_codes, n_dates, n_syms)
+
+        fields: dict[str, dict[str, Any]] = {}
+        decay: dict[str, dict[str, Any]] = {}
+        per_col_bytes = max(1, n_dates * n_syms * 8)
+        chunk = max(1, self._XSEC_BLOCK_BYTES // per_col_bytes)
+        for c0 in range(0, len(feature_cols), chunk):
+            cols = feature_cols[c0:c0 + chunk]
+            block = self._xsec_dense(values[:, c0:c0 + chunk], d_codes, s_codes, n_dates, n_syms)  # [T, S, C]
+            finite = np.isfinite(block)
+            finite_block = np.where(finite, block, np.nan)
+            not_nan = (~np.isnan(block)).sum(axis=(0, 1))
+            n_pool = (finite & y_finite[:, :, None]).sum(axis=(0, 1))
+            q_mono = [self._monotonicity._select_num_quantiles(int(n), 5) for n in n_pool]
+            labels_by_q = {q: self._xsec_qcut_labels(finite_block, q) for q in sorted(set(q_mono) | {5})}
+            decay_ic: dict[int, np.ndarray] = (
+                {h: self._xsec_rank_ic_mean(block, forward[h]) for h in horizons} if forward is not None else {}
+            )
+            for k, name in enumerate(cols):
+                q = q_mono[k]
+                lab = labels_by_q[q][0][:, :, k]
+                agg = (lab >= 0) & y_finite
+                means: dict[str, float] = {}
+                for b in range(q):
+                    sel = agg & (lab == b)
+                    means[f"Q{b + 1}"] = float(np.mean(y_dense[sel])) if sel.any() else float("nan")
+                low, high = means["Q1"], means[f"Q{q}"]
+                spread = float(high - low) if np.isfinite(low) and np.isfinite(high) else float("nan")
+                lab5, valid5 = labels_by_q[5]
+                v_dates = np.flatnonzero(valid5[:, k])
+                if v_dates.size >= 2:
+                    top = lab5[v_dates, :, k] == 4
+                    cur, prev = top[1:], top[:-1]
+                    turnover = float(np.mean((cur & ~prev).sum(axis=1) / cur.sum(axis=1)))
+                else:
+                    turnover = float("nan")
+                half_life: Optional[float] = None
+                if forward is not None:
+                    ic_values = [float(decay_ic[h][k]) for h in horizons]
+                    fit = ICEngine._fit_exponential_decay(horizons, ic_values)
+                    half_life = fit.get("half_life")
+                    # 同縱向 `compute_ic_decay` 之逐特徵鍵（ic_values 為各 horizon 之平均截面 Spearman）
+                    decay[name] = {
+                        "horizons": horizons,
+                        "ic_values": ic_values,
+                        "half_life": half_life,
+                        "peak_horizon": self._ic_engine._select_peak_horizon(horizons, ic_values),
+                        "decay_rate": fit.get("decay_rate"),
+                        "decay_type": fit.get("decay_type"),
+                        "fit_r2": fit.get("r2"),
+                        "fit_warning": fit.get("fit_warning"),
+                        "fit_warning_reason": fit.get("fit_warning_reason"),
+                    }
+                fields[name] = {
+                    "quantile_mean_returns": means,
+                    "monotonicity_score": self._monotonicity.compute_monotonicity_score(
+                        {"quantile_mean_returns": means}
+                    ),
+                    "long_short_spread": spread,
+                    "coverage": float(not_nan[k] / n_rows) if n_rows else float("nan"),
+                    "turnover_rate": turnover,
+                    "ic_half_life": half_life,
+                }
+
+        corr = self._xsec_mean_cross_corr(values, d_codes, s_codes, n_dates, n_syms)
+        corr_df = pd.DataFrame(corr, index=list(feature_cols), columns=list(feature_cols))
+        diversification = self._redundancy.compute_diversification_metrics(
+            list(feature_cols), corr_df, self._filter_feature_metadata(feature_metadata or {})
+        )
+        if not feature_metadata:
+            # 無 metadata 時 `_compute_coverage` 回 0.0——不以 0.0 冒充已算，改 None 並記原因
+            for key in ("category_coverage", "data_source_coverage", "layer_coverage"):
+                diversification[key] = None
+            unavailable["diversification_metrics.metadata_coverage"] = "feature_metadata_not_provided"
+        assert set(unavailable.values()) <= set(self.XSEC_UNAVAILABLE_REASONS)
+        return {"fields": fields, "corr": corr_df, "diversification": diversification, "unavailable": unavailable,
+                "ic_decay": decay if forward is not None else None}
+
+    @staticmethod
+    def _xsec_dense(rows_values: np.ndarray, d_codes: np.ndarray, s_codes: np.ndarray, n_dates: int,
+                    n_syms: int) -> np.ndarray:
+        """面板列值 → 稠密陣列 [時點, 標的, …]（無該列之格為 NaN）。"""
+        out = np.full((n_dates, n_syms) + rows_values.shape[1:], np.nan)
+        out[d_codes, s_codes] = rows_values
+        return out
+
+    @staticmethod
+    def _xsec_qcut_labels(block: np.ndarray, q: int) -> tuple[np.ndarray, np.ndarray]:
+        """`block` [T, S, C]（非有限已為 NaN）→ (分位標籤 int16 [T, S, C]，無效 −1；有效時點遮罩 [T, C])。
+
+        逐 (時點, 特徵) 同 `pd.qcut(x_finite, q, labels=False)`：分位點＝`np.percentile(x, linspace(0,1,q+1)·100)`
+        （線性插值，同 pandas `Series.quantile`）；標籤＝`searchsorted(分位點, x, "left") − 1`、x＝最低點 ⇒ 0；分位點重複
+        （含有限數 < 2）⇒ 該時點無效（pandas `duplicates="raise"`）。"""
+        n_t, n_s, n_c = block.shape
+        count = np.isfinite(block).sum(axis=1)  # [T, C]
+        ordered = np.sort(block, axis=1)  # NaN 排末
+        pct = np.linspace(0.0, 1.0, q + 1) * 100.0
+        edges = np.full((n_t, n_c, q + 1), np.nan)
+        for m in np.unique(count[count >= 2]):
+            tt, cc = np.nonzero(count == m)
+            edges[tt, cc] = np.percentile(ordered[tt, :, cc][:, :m], pct, axis=1).T
+        with np.errstate(invalid="ignore"):
+            valid = (count >= 2) & np.all(np.diff(edges, axis=2) > 0, axis=2)
+            lab = np.maximum((block[:, :, :, None] > edges[:, None, :, :]).sum(axis=3) - 1, 0)
+        ok = np.isfinite(block) & valid[:, None, :]
+        return np.where(ok, lab, -1).astype(np.int16), valid
+
+    @staticmethod
+    def _xsec_rank_ic_mean(block: np.ndarray, y: np.ndarray) -> np.ndarray:
+        """每時點截面 Spearman（特徵與 y 共同非 NaN 之標的 ≥ 2、排名非常數；同 `analyze_cross_sectional` 截面 IC 之
+        先 dropna 再平均排名之 Pearson）之逐特徵平均（無有效時點 ⇒ NaN）。`block` [T, S, C]、`y` [T, S]。"""
+        from scipy.stats import rankdata
+
+        both = ~np.isnan(block) & ~np.isnan(y)[:, :, None]
+        y3 = np.broadcast_to(y[:, :, None], block.shape)
+        xr = rankdata(np.where(both, block, np.nan), axis=1, nan_policy="omit")
+        yr = rankdata(np.where(both, y3, np.nan), axis=1, nan_policy="omit")
+        n = both.sum(axis=1)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            dx = np.where(both, xr - np.where(both, xr, 0.0).sum(axis=1)[:, None, :] / n[:, None, :], 0.0)
+            dy = np.where(both, yr - np.where(both, yr, 0.0).sum(axis=1)[:, None, :] / n[:, None, :], 0.0)
+            vx, vy = (dx * dx).sum(axis=1), (dy * dy).sum(axis=1)
+            r = (dx * dy).sum(axis=1) / np.sqrt(vx * vy)
+        r = np.where((n >= 2) & (vx > 0) & (vy > 0), r, np.nan)
+        out = np.full(block.shape[2], np.nan)
+        for k in range(block.shape[2]):
+            col = r[:, k]
+            col = col[np.isfinite(col)]
+            if col.size:
+                out[k] = float(np.mean(col))
+        return out
+
+    def _xsec_mean_cross_corr(self, values: np.ndarray, d_codes: np.ndarray, s_codes: np.ndarray, n_dates: int,
+                              n_syms: int) -> np.ndarray:
+        """平均截面 Pearson 相關矩陣 [N, N]（定義見 `_xsec_placeholder_stats`）。
+
+        依時點分塊建稠密面板（記憶體 ≤ `_XSEC_BLOCK_BYTES` 量級）：時點內各標的皆有限且非常數之欄，以兩段式標準化後疊成
+        一次矩陣乘積（Σ_s z_i z_j＝該時點 Pearson）；該時點部分標的缺值之欄，逐對以共同有限列兩段式中心化精確計。"""
+        n_feat = values.shape[1]
+        sum_r = np.zeros((n_feat, n_feat))
+        count = np.zeros((n_feat, n_feat))
+        order = np.argsort(d_codes, kind="stable")
+        bounds = np.searchsorted(d_codes[order], np.arange(n_dates + 1))
+        step = max(1, self._XSEC_BLOCK_BYTES // max(1, n_syms * n_feat * 8))
+        for d0 in range(0, n_dates, step):
+            d1 = min(n_dates, d0 + step)
+            rows = order[bounds[d0]:bounds[d1]]
+            local = d_codes[rows] - d0
+            block = self._xsec_dense(values[rows], local, s_codes[rows], d1 - d0, n_syms)
+            present = np.zeros((d1 - d0, n_syms), dtype=bool)
+            present[local, s_codes[rows]] = True
+            self._xsec_corr_accumulate(block, present, sum_r, count)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            corr = np.where(count > 0, sum_r / count, np.nan)
+        corr[np.diag_indices(n_feat)] = np.where(np.diag(count) > 0, 1.0, np.nan)
+        return np.clip(corr, -1.0, 1.0)
+
+    def _xsec_corr_accumulate(self, block: np.ndarray, present: np.ndarray, sum_r: np.ndarray,
+                              count: np.ndarray) -> None:
+        """一塊時點之截面 Pearson 累加至 `sum_r`（Σ_t r_t）與 `count`（有效時點數）。"""
+        n_t, n_s, n_feat = block.shape
+        finite = np.isfinite(block)
+        n_fin = finite.sum(axis=1)  # [T, N]
+        n_pres = present.sum(axis=1)  # [T]
+        hi = np.where(finite, block, -np.inf).max(axis=1)
+        lo = np.where(finite, block, np.inf).min(axis=1)
+        full = (n_fin == n_pres[:, None]) & (n_pres[:, None] >= 2) & (hi > lo)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            mean = np.where(finite, block, 0.0).sum(axis=1) / n_fin
+            dev = np.where(finite, block - mean[:, None, :], 0.0)
+            norm = np.sqrt((dev * dev).sum(axis=1))
+            z = np.where(full[:, None, :], dev / norm[:, None, :], 0.0)
+        flat = z.reshape(n_t * n_s, n_feat)
+        sum_r += flat.T @ flat
+        ind = full.astype(np.float64)
+        count += ind.T @ ind
+        partial = (n_fin >= 2) & (n_fin < n_pres[:, None])
+        p_step = max(1, self._XSEC_BLOCK_BYTES // max(1, n_s * n_feat * 8 * 8))
+        for t in np.flatnonzero(partial.any(axis=1)):
+            p_cols = np.flatnonzero(partial[t])
+            others = np.flatnonzero(~partial[t])
+            x_t, m_t = block[t], finite[t]  # [S, N]
+            for p0 in range(0, len(p_cols), p_step):
+                pc = p_cols[p0:p0 + p_step]
+                r, ok = self._xsec_pair_corr(x_t[:, pc], m_t[:, pc], x_t, m_t)
+                r_val, ok_f = np.where(ok, r, 0.0), ok.astype(np.float64)
+                sum_r[pc, :] += r_val
+                count[pc, :] += ok_f
+                sum_r[np.ix_(others, pc)] += r_val[:, others].T
+                count[np.ix_(others, pc)] += ok_f[:, others].T
+
+    @staticmethod
+    def _xsec_pair_corr(xp: np.ndarray, mp: np.ndarray, x_all: np.ndarray, m_all: np.ndarray
+                        ) -> tuple[np.ndarray, np.ndarray]:
+        """單一時點：欄 `xp` [S, P] 對全部欄 `x_all` [S, N] 之逐對共同有限列 Pearson（兩段式中心化）→ (r [P, N]，有效遮罩)。"""
+        w = mp[:, :, None] & m_all[:, None, :]
+        n = w.sum(axis=0)
+        xs = np.broadcast_to(xp[:, :, None], w.shape)
+        ys = np.broadcast_to(x_all[:, None, :], w.shape)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            mx = np.where(w, xs, 0.0).sum(axis=0) / n
+            my = np.where(w, ys, 0.0).sum(axis=0) / n
+            dx = np.where(w, xs - mx, 0.0)
+            dy = np.where(w, ys - my, 0.0)
+            r = (dx * dy).sum(axis=0) / np.sqrt((dx * dx).sum(axis=0) * (dy * dy).sum(axis=0))
+        nonconst_x = np.where(w, xs, -np.inf).max(axis=0) > np.where(w, xs, np.inf).min(axis=0)
+        nonconst_y = np.where(w, ys, -np.inf).max(axis=0) > np.where(w, ys, np.inf).min(axis=0)
+        ok = (n >= 2) & nonconst_x & nonconst_y
+        return np.clip(np.where(ok, r, 0.0), -1.0, 1.0), ok
 
     @staticmethod
     def _safe_rank_corr(x: pd.Series, y: pd.Series) -> Optional[float]:
@@ -4029,8 +4345,10 @@ class ICFilterOrchestrator:
         return scores, "ic_mean"
 
     def _rolling_warmup_min_rows(self, config: ICConfig, effective_horizon: int) -> int:
-        """stage4 與預檢共用的**同一條**規則：max(依週期換算之 rolling 視窗) ＋ effective_horizon。"""
-        adjusted = self._ic_engine._adjust_rolling_windows(config.ic_calculation.rolling_windows)
+        """stage4 與預檢共用的**同一條**規則：max(依週期換算之 rolling 視窗與 ICIR 窗) ＋ effective_horizon
+        （ICPERF Task 0.4 ㉛：ICIR 窗不在滾動窗集合時另算，其暖機亦須計入）。"""
+        adjusted = list(self._ic_engine._adjust_rolling_windows(config.ic_calculation.rolling_windows))
+        adjusted += self._ic_engine._adjust_rolling_windows([int(config.ic_calculation.icir.window)])
         return int(max(adjusted)) + int(effective_horizon)
 
     def _precheck_rolling_warmup(
@@ -5015,6 +5333,13 @@ class ICFilterOrchestrator:
                 "output_features": 0,
                 "removed_features": [],
             }
+            if self._redundancy.diversification_enabled:
+                # ICPERF Task 0.4 ㊲：開啟時照寫約束記錄（無候選 ⇒ ①②未滿足、③空集合視為滿足）
+                _, redundancy_log["diversification_constraint"] = (
+                    self._redundancy.apply_diversification_constraint(
+                        features_for_redundancy[[]], [], [], ic_scores, self._filter_feature_metadata(metadata)
+                    )
+                )
             if split_context is not None:
                 redundancy_log["scope"] = "test"
             return {
@@ -5030,8 +5355,25 @@ class ICFilterOrchestrator:
             ic_scores,
             method=self._config.redundancy.method,
         )
-        corr_matrix = self._redundancy.compute_correlation_matrix(filtered_df)
         feature_metadata = self._filter_feature_metadata(metadata)
+        if self._redundancy.diversification_enabled:
+            # ICPERF Task 0.4 ㊲：多元化約束（關 ⇒ 本段與改前相同、log 不增鍵）；候選＝通過門檻者，列＝本段所用之列
+            final, constraint_log = self._redundancy.apply_diversification_constraint(
+                features_for_redundancy,
+                list(filtered_df.columns),
+                list(passed_features),
+                ic_scores,
+                feature_metadata,
+            )
+            filtered_df = features_for_redundancy[final].copy()
+            final_set = set(final)
+            redundancy_log = {
+                **redundancy_log,
+                "output_features": int(len(final)),
+                "removed_features": [name for name in passed_features if name not in final_set],
+                "diversification_constraint": constraint_log,
+            }
+        corr_matrix = self._redundancy.compute_correlation_matrix(filtered_df)
         diversification = self._redundancy.compute_diversification_metrics(
             list(filtered_df.columns), corr_matrix, feature_metadata
         )
@@ -5254,7 +5596,11 @@ class ICFilterOrchestrator:
 
         test_arr = np.asarray(test_mask, dtype=bool)
         in_test = test_arr[axis_rows]
-        adjusted_windows = self._ic_engine._adjust_rolling_windows(windows)
+        adjusted_windows = list(self._ic_engine._adjust_rolling_windows(windows))
+        # ICPERF Task 0.4 ㉛：換算後 ICIR 窗不在滾動窗集合時由引擎另算，切測試段時一併保留（否則 ICIR 恆 NaN）
+        icir_window = self._ic_engine._adjusted_icir_window()
+        if icir_window not in adjusted_windows:
+            adjusted_windows.append(icir_window)
         sliced: dict[str, dict] = {name: {} for name in features_df.columns}
 
         for window in adjusted_windows:

@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ICAnalysisConfig, RunInfo } from '@/lib/types';
+import { ICAnalysisConfig, ICDiversificationConfig, RunInfo } from '@/lib/types';
 import { FeatureTierLevel } from '@/lib/types';
+import { DEFAULT_DIVERSIFICATION } from '@/lib/icConfigOverride';
 import FeatureTierPanel from '@/components/ic-analysis/FeatureTierPanel';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -170,6 +171,11 @@ export default function ICConfigPanel({
         ...(patch.thresholds || {}),
       },
     });
+  };
+
+  const diversification: ICDiversificationConfig = config.diversification ?? DEFAULT_DIVERSIFICATION;
+  const updateDiversification = (patch: Partial<ICDiversificationConfig>) => {
+    updateConfig({ diversification: { ...diversification, ...patch } });
   };
 
   const handleSelectRun = (runKey: string) => {
@@ -379,6 +385,52 @@ export default function ICConfigPanel({
             })
           }
           className="w-full accent-cyan-400"
+        />
+      </div>
+
+      {/* ICPERF Task 0.4 ㊲：第 6 段多元化約束（後端 redundancy.diversification）；
+          未調整前不送出（沿用後端設定），一動任何一項即整組明送。 */}
+      <div className="space-y-3 rounded-lg border border-white/10 p-3" data-testid="diversification-settings">
+        <label className="flex items-center justify-between text-sm font-medium text-slate-200">
+          <span>多元化約束</span>
+          <input
+            type="checkbox"
+            aria-label="啟用多元化約束"
+            checked={diversification.enabled}
+            onChange={(event) => updateDiversification({ enabled: event.target.checked })}
+            className="h-4 w-4 accent-cyan-400"
+          />
+        </label>
+        <p className="text-xs text-slate-400">
+          篩選後之特徵組須涵蓋足夠類別與資料來源、且單一類別不過度集中；不足時自通過門檻之候選補入或換入，
+          仍不足則剔除過度集中類別之最低排序者。
+        </p>
+        <NumberInput
+          label="最少類別數"
+          value={diversification.min_categories}
+          onChange={(value) => updateDiversification({ min_categories: Math.round(value) })}
+          min={1}
+          max={50}
+          step={1}
+          disabled={!diversification.enabled}
+        />
+        <NumberInput
+          label="最少資料來源數"
+          value={diversification.min_data_sources}
+          onChange={(value) => updateDiversification({ min_data_sources: Math.round(value) })}
+          min={1}
+          max={50}
+          step={1}
+          disabled={!diversification.enabled}
+        />
+        <NumberInput
+          label="單一類別佔比上限"
+          value={diversification.max_same_category_pct}
+          onChange={(value) => updateDiversification({ max_same_category_pct: value })}
+          min={0.05}
+          max={1}
+          step={0.05}
+          disabled={!diversification.enabled}
         />
       </div>
 
