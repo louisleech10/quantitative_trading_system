@@ -1,0 +1,30 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_correctness.py::test_correctness_receipt_items_and_verdicts tests/momentum/Analysis/test_icperf_correctness.py::test_correctness_receipt_coverage_entries",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "ICPERF Task 0.3 主委：重產收據後只跑兩支收據形狀測試",
+      "created_at": "2026-10-30T13:10:00+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 60,
+  "basis": [
+    "兩支測試只讀 handoffs/run_receipts/*-icperf-correctness.json 並驗形狀與綁定（不跑產品、不讀 kline）；同兩支於全檔實跑中為 [0%]／[2%] 首兩節點（/private/tmp/claude-501/t03-tests.log），秒級；含收集與 import 取上限 60 秒（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-7）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7"
+  ]
+}
