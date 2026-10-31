@@ -1144,6 +1144,40 @@ def test_c_handoff_relative_path_absolute_and_repro_uses_frozen_path(fb: Any, tm
     assert len(calls) == 1 and calls[0]["source_h5"] == str(Path(os.path.abspath(h5)))
 
 
+def _mini_handoff(tmp_path: Path, meta_extra: Mapping[str, Any], drop: Sequence[str] = ()) -> Tuple[Path, Path]:
+    """交接 h5 之最小形（舊格式：features／timestamps／feature_names）與同名 meta；逐特徵鍵＝欄名（減 drop）。"""
+    import h5py
+
+    names = ["f0", "f1", "f2"]
+    h5 = tmp_path / "X_1h_abc.h5"
+    with h5py.File(h5, "w") as f:
+        g = f.create_group("X/1h")
+        g.create_dataset("features", data=np.arange(12, dtype=np.float32).reshape(4, 3), chunks=(4, 1))
+        g.create_dataset("timestamps", data=np.arange(4, dtype=np.int64))
+        g.create_dataset("feature_names", data=np.array(names, dtype=object), dtype=h5py.string_dtype(encoding="utf-8"))
+    meta = {"symbol": "X", "timeframe": "1h", "config_hash": "abc", "ff_run_identity": {"run": 1}, **meta_extra}
+    meta.update({n: {"category": "trend"} for n in names if n not in drop})
+    path = tmp_path / "X_1h_abc_meta.json"
+    path.write_text(json.dumps(meta), encoding="utf-8")
+    return h5, path
+
+
+def test_stage5_subset_meta_keys(fb: Any, tmp_path: Path) -> None:
+    """子集 meta：照抄非逐特徵鍵（含 ICPERF Task 0.4 ㉜ 之 `feature_metadata_version`）與所選欄；
+    交接 meta 缺特徵或有未知非特徵鍵 ⇒ FreezeError（不以鍵數假設判定）。"""
+    h5, meta = _mini_handoff(tmp_path, {"feature_metadata_version": 2})
+    _out_h5, out_meta = fb._write_stage5_subset(h5, meta, 2, SEED, tmp_path / "out")
+    got = json.loads(out_meta.read_text(encoding="utf-8"))
+    assert got["feature_metadata_version"] == 2 and got["ff_run_identity"] == {"run": 1}
+    assert len([k for k in got if k.startswith("f") and k not in fb.HANDOFF_META_KEYS]) == 2
+    for extra, drop in (({"feature_metadata_version": 2, "bogus": 1}, ()), ({}, ("f1",))):
+        d = tmp_path / f"bad_{len(extra)}_{len(drop)}"
+        d.mkdir()
+        h5b, metab = _mini_handoff(d, extra, drop)
+        with pytest.raises(fb.FreezeError, match="交接 meta 與欄名不符"):
+            fb._write_stage5_subset(h5b, metab, 2, SEED, d / "out")
+
+
 # ── §G 凍結檔 gzip 存檔與 volatile 實測判定之秒級契約（SPEC v5.25） ─────────────────────────────────────────
 
 

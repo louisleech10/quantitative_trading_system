@@ -869,6 +869,9 @@ C_HANDOFF_ROOT = "data_cache/icperf_inputs/C_BTCUSDT_1h"
 C_HANDOFF_H5 = (REPO / C_HANDOFF_ROOT / "ic" / "data_cache" / "reports" / "ic_ingest_cache"
                 / "BTCUSDT_1h_fe927783c302dc6232adf0a0087846e8.h5")
 C_HANDOFF_BYTES = 225002383
+#: 交接 `_meta.json` 之非逐特徵鍵：prep.py 之 4 鍵＋ICPERF Task 0.4 ㉜ 之逐特徵 metadata 格式世代
+#: （`api/services/ic_analysis_service.py:70` `IC_FEATURE_METADATA_VERSION_KEY`）
+HANDOFF_META_KEYS = ("symbol", "timeframe", "config_hash", "ff_run_identity", "feature_metadata_version")
 #: SPEC §G (4)：K 線條件式事件（legacy `event_query` 一格，只用 K 線欄位）
 EVENT_QUERY = "close > open"
 #: SPEC §G (b)：隔離 cwd 根以 symlink 自 repo 引入之唯讀輸入（同 `scripts/ffprod_measure.py` 之 `ic_watched`）
@@ -2156,8 +2159,11 @@ def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, o
         cols64 = g["features_f64"][:, f64_sel] if f64_sel.size else None
     if pos != n32:
         raise FreezeError(f"子集讀取欄數 {pos} != {n32}")
-    if len(meta_all) != total + 4:
-        raise FreezeError(f"交接 meta 鍵數 {len(meta_all)} != 欄數 {total} + 4（prep.py 之同一前提）")
+    # 交接 meta＝逐特徵鍵（恰為 feature_names）＋`HANDOFF_META_KEYS` 之非逐特徵鍵；缺特徵或有未知鍵 ⇒ FreezeError
+    missing = [n for n in names if n not in meta_all]
+    unknown = sorted(set(meta_all) - set(names) - set(HANDOFF_META_KEYS))
+    if missing or unknown:
+        raise FreezeError(f"交接 meta 與欄名不符：缺 {len(missing)} 個特徵（例 {missing[:3]}）、未知非特徵鍵 {unknown}")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     h5, meta = out_dir / Path(src_h5).name, out_dir / Path(src_meta).name
@@ -2179,7 +2185,7 @@ def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, o
         g.create_dataset("timestamps", data=ts, compression="gzip")
         g.create_dataset("feature_names", data=np.array([names[int(c)] for c in chosen], dtype=object),
                          dtype=h5py.string_dtype(encoding="utf-8"))
-    out_meta = {k: v for k, v in meta_all.items() if k in ("symbol", "timeframe", "config_hash", "ff_run_identity")}
+    out_meta = {k: v for k, v in meta_all.items() if k in HANDOFF_META_KEYS}
     for c in chosen:
         out_meta[names[int(c)]] = meta_all[names[int(c)]]
     meta.write_text(json.dumps(out_meta, ensure_ascii=False), encoding="utf-8")
