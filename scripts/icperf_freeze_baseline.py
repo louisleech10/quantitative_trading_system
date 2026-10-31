@@ -397,13 +397,17 @@ def _file_sha256(path: str, *, cache: bool = True) -> str:
 
 
 def snapshot_files(roots: Sequence[Path], *, repo_root: Path,
-                   prefixes: Optional[Mapping[str, Path]] = None) -> Dict[str, str]:
+                   prefixes: Optional[Mapping[str, Path]] = None,
+                   exclude_dirs: Sequence[Path] = ()) -> Dict[str, str]:
     """對 `roots` 下全部檔案取 {path_key: 位元組 sha256}；排除任一層名為 `SNAPSHOT_EXCLUDE_DIRS` 之目錄、副檔名為
-    `NUMBA_CACHE_SUFFIXES` 之檔與呼叫當下環境變數 `NUMBA_CACHE_DIR` 所指目錄之整棵（不論副檔名；未設則不排除該目錄）；
+    `NUMBA_CACHE_SUFFIXES` 之檔、呼叫當下環境變數 `NUMBA_CACHE_DIR` 所指目錄之整棵（不論副檔名；未設則不排除該目錄）與
+    `exclude_dirs`（捕獲機制本身之工作根；走訪中遇到該目錄即整棵略過，根本身不受影響——工作根下之 cwd／隔離目錄另為根）；
     不跟隨指向 roots 外之 symlink。雜湊以（解析後路徑、大小、mtime_ns）於本行程快取（`SNAPSHOT_CACHE_RULE`：同 rsync
     之大小＋修改時間取捨，不宣稱偵測內容改變而大小與 mtime_ns 皆不變者）。"""
     nd = os.environ.get("NUMBA_CACHE_DIR")
-    numba_dir = os.path.realpath(nd) if nd else None
+    skip = {os.path.realpath(p) for p in exclude_dirs}
+    if nd:
+        skip.add(os.path.realpath(nd))
     real_roots = [os.path.realpath(r) for r in roots]
     out: Dict[str, str] = {}
     for root in real_roots:
@@ -411,7 +415,7 @@ def snapshot_files(roots: Sequence[Path], *, repo_root: Path,
             continue
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in SNAPSHOT_EXCLUDE_DIRS
-                           and not (numba_dir is not None and os.path.realpath(os.path.join(dirpath, d)) == numba_dir)]
+                           and not (skip and os.path.realpath(os.path.join(dirpath, d)) in skip)]
             for fn in filenames:
                 if fn.endswith(NUMBA_CACHE_SUFFIXES):
                     continue
@@ -646,13 +650,27 @@ def collect_written_files(write_log: Sequence[Mapping[str, Any]], before: Mappin
                           output_roots: Sequence[Path],
                           prefixes: Optional[Mapping[str, Path]] = None) -> Dict[str, Any]:
     """先 `check_scope`；回 {"files": {path_key: describe_file(...)}（差集之新增與變更檔）, "transient": [path_key...]
-    （審計記錄有而差集無變化者，記入不比）, "removed": [path_key...]（執行前存在、執行後消失者）}。"""
+    （審計記錄有而差集無變化者，記入不比）, "removed": [path_key...]（執行前存在、執行後消失者）, "repo_ignored":
+    [path_key...]}。`<repo>/` 鍵依 `repo_key_counted`（SPEC v5.45 §G (2) ③）：未計入者（他行程寫入）不入 files／removed，
+    改列 "repo_ignored"（供覆核，不比）。"""
     check_scope(write_log, output_roots, snapshot_roots)
     diff = snapshot_diff(before, after)
-    written = set(diff["added"]) | set(diff["changed"])
-    files = {k: describe_file(_key_path(k, repo_root, prefixes)) for k in sorted(written)}
     logged = {path_key(Path(e["path"]), repo_root, prefixes) for e in write_log if e.get("path")}
-    return {"files": files, "transient": sorted(logged - written), "removed": diff["removed"]}
+    changed = set(diff["added"]) | set(diff["changed"])
+    ignored = {k for k in changed | set(diff["removed"]) if not repo_key_counted(k, logged)}
+    written = changed - ignored
+    files = {k: describe_file(_key_path(k, repo_root, prefixes)) for k in sorted(written)}
+    return {"files": files, "transient": sorted(logged - written),
+            "removed": [k for k in diff["removed"] if k not in ignored], "repo_ignored": sorted(ignored)}
+
+
+def repo_key_counted(key: str, logged: Set[str]) -> bool:
+    """SPEC v5.45 §G (2) ③：非 `<repo>/` 鍵恆計；`<repo>/` 鍵只在子行程審計所記（`logged`）或位於 `REPO_COUNTED_DIRS`
+    之下時計入。"""
+    head = REPO_KEY_PREFIX + "/"
+    if not key.startswith(head) or key in logged:
+        return True
+    return any(key.startswith(f"{head}{d}/") for d in REPO_COUNTED_DIRS)
 
 
 def _criteria() -> Dict[str, Any]:
@@ -675,12 +693,14 @@ def run_watched(cmd: Sequence[str], *, log_path: Path, env: Mapping[str, str], c
 
 def capture_run(cmd: Sequence[str], *, repo_root: Path, iso_root: Path, output_roots: Sequence[Path],
                 work_dir: Path, extra_roots: Optional[Mapping[str, Path]] = None,
-                env_base: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+                env_base: Optional[Mapping[str, str]] = None,
+                exclude_dirs: Optional[Sequence[Path]] = None) -> Dict[str, Any]:
     """一次請求之寫出捕獲：快照（repo_root＝本次執行之工作目錄、iso_root、`extra_roots` 如 {"<repo>": repo 根}）→
     `run_watched`（`capture_env`，cwd＝repo_root）→ 快照 → `collect_written_files`。回 {"rc", "files", "transient",
-    "removed", "write_log"}；path_key 依 `path_key`（iso_root 之下前綴 `<iso>`）。審計記錄與 sitecustomize 置於
-    `work_dir`（不在快照範圍內；落在其下之寫入屬捕獲機制本身〔回應 pickle、監看堆疊檔〕，不入記錄）。範圍外路徑（含經
-    os.replace／os.rename 落到範圍外之目的地）或輸出根 ⇒ FreezeError；輸出根於執行前即先檢查。"""
+    "removed", "repo_ignored", "write_log"}；path_key 依 `path_key`（iso_root 之下前綴 `<iso>`）。審計記錄與
+    sitecustomize 置於 `work_dir`（快照走訪略過 `exclude_dirs`〔未給＝`[work_dir]`；`freeze_item` 傳整個工作根〕；落在
+    其下之寫入屬捕獲機制本身〔回應 pickle、監看堆疊檔〕，不入記錄）。範圍外路徑（含經 os.replace／os.rename 落到範圍外
+    之目的地）或輸出根 ⇒ FreezeError；輸出根於執行前即先檢查。"""
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     log_path = work_dir / "write_audit.jsonl"
@@ -690,9 +710,10 @@ def capture_run(cmd: Sequence[str], *, repo_root: Path, iso_root: Path, output_r
     prefixes = {"<iso>": Path(iso_root), **dict(extra_roots or {})}
     roots = [Path(repo_root), Path(iso_root)] + [Path(r) for r in (extra_roots or {}).values()]
     check_scope([], output_roots, roots)
-    before = snapshot_files(roots, repo_root=repo_root, prefixes=prefixes)
+    skip = list(exclude_dirs) if exclude_dirs is not None else [work_dir]
+    before = snapshot_files(roots, repo_root=repo_root, prefixes=prefixes, exclude_dirs=skip)
     res = run_watched(cmd, log_path=work_dir / "run.log", env=env, cwd=Path(repo_root))
-    after = snapshot_files(roots, repo_root=repo_root, prefixes=prefixes)
+    after = snapshot_files(roots, repo_root=repo_root, prefixes=prefixes, exclude_dirs=skip)
     log = [e for e in read_write_log(log_path) if not (e.get("path") and _under(e["path"], work_dir))]
     collected = collect_written_files(log, before, after, repo_root=repo_root, snapshot_roots=roots,
                                       output_roots=output_roots, prefixes=prefixes)
@@ -872,10 +893,17 @@ C_HANDOFF_BYTES = 225002383
 #: 交接 `_meta.json` 之非逐特徵鍵：prep.py 之 4 鍵＋ICPERF Task 0.4 ㉜ 之逐特徵 metadata 格式世代
 #: （`api/services/ic_analysis_service.py:70` `IC_FEATURE_METADATA_VERSION_KEY`）
 HANDOFF_META_KEYS = ("symbol", "timeframe", "config_hash", "ff_run_identity", "feature_metadata_version")
-#: 重型跑（freeze／volatile-probe／gen-long-cell）之預設工作根：repo 內 `data_cache/`（`.gitignore:97`）。系統暫存不可放
-#: 跑後仍要用之輸出——macOS `com.apple.bsd.dirhelper` 每日 03:35 清除系統暫存中逾 3 日之檔
-#: （`/System/Library/LaunchDaemons/com.apple.bsd.dirhelper.plist` `CLEAN_FILES_OLDER_THAN_DAYS`＝3，2026-10-31 實查）
-RUNS_ROOT = "data_cache/icperf_inputs/runs"
+#: 重型跑（freeze／volatile-probe／gen-long-cell）之預設工作根：repo 內 `runs/`（`.gitignore` 之 `runs/`，SPEC v5.45
+#: §G (2) ②；`data_cache/` 只放產品程式生成之資料）。系統暫存不可放跑後仍要用之輸出——macOS `com.apple.bsd.dirhelper`
+#: 每日 03:35 清除系統暫存中逾 3 日之檔（`/System/Library/LaunchDaemons/com.apple.bsd.dirhelper.plist`
+#: `CLEAN_FILES_OLDER_THAN_DAYS`＝3，2026-10-31 實查）
+RUNS_ROOT = "runs/icperf"
+#: 工作根說明卡（SPEC v5.45 §G (2) ②）：`new_work_root` 建立時寫入，`scripts/runs_inventory.py` 列表時讀
+RUN_CARD = "README.txt"
+#: `<repo>` 根快照之計入規則（SPEC v5.45 §G (2) ③）：`<repo>/` 鍵只計子行程審計所記者或位於此等目錄之下者（審計不及之
+#: C 層寫入〔h5py／pyarrow〕亦落此處）；其餘（他行程寫入 repo 原始碼、文件、前端建置檔等）記入 "repo_ignored" 不比
+REPO_KEY_PREFIX = "<repo>"
+REPO_COUNTED_DIRS = ("data_cache",)
 #: 系統暫存位置（`tempfile.gettempdir()` 另於執行時加入）：重型跑之輸入與工作根落於其下 ⇒ `preflight` 拒
 SYSTEM_TEMP_ROOTS = ("/tmp", "/private/tmp", "/var/folders", "/private/var/folders")
 #: SPEC §G (4)：K 線條件式事件（legacy `event_query` 一格，只用 K 線欄位）
@@ -1427,13 +1455,25 @@ def in_system_temp(path: Any) -> bool:
     return any(_under(str(path), Path(r)) for r in (*SYSTEM_TEMP_ROOTS, tempfile.gettempdir()) if os.path.exists(r))
 
 
-def new_work_root(prefix: str, repo_root: Path = REPO) -> Path:
-    """重型跑之預設工作根：`<repo_root>/RUNS_ROOT` 下新建之唯一目錄（`tempfile.mkdtemp(dir=...)`），不放系統暫存。"""
+def new_work_root(prefix: str, repo_root: Path = REPO, *, purpose: str = "") -> Path:
+    """重型跑之預設工作根：`<repo_root>/RUNS_ROOT` 下新建之唯一目錄（`<prefix><本地時間>-` 起首，`tempfile.mkdtemp(dir=...)`），
+    不放系統暫存；建立時寫說明卡 `RUN_CARD`（入口、用途、建立時間、git HEAD、何時可刪；SPEC v5.45 §G (2) ②）。"""
     import tempfile
+    import time
 
     base = Path(repo_root) / RUNS_ROOT
     base.mkdir(parents=True, exist_ok=True)
-    return Path(tempfile.mkdtemp(prefix=prefix, dir=str(base)))
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    work = Path(tempfile.mkdtemp(prefix=f"{prefix}{stamp}-", dir=str(base)))
+    (work / RUN_CARD).write_text(
+        f"入口：scripts/icperf_freeze_baseline.py {prefix.rstrip('-')}\n"
+        f"用途：{purpose or 'ICPERF Phase 0 重型跑之工作目錄（各項 cwd／iso／capture）'}\n"
+        f"建立：{time.strftime('%Y-%m-%d %H:%M:%S %z')}\n"
+        f"git HEAD：{_git_head(Path(repo_root)) or '（非 git 工作樹）'}\n"
+        "何時可刪：本次結果已寫入 handoffs/run_receipts/ 之收據（或凍結檔）且已推送後即可整目錄刪除；"
+        "跑失敗者之內容只供除錯，原因寫入收據後可刪。列表：venv/bin/python scripts/runs_inventory.py\n",
+        encoding="utf-8")
+    return work
 
 
 def _handoff_feature_names(h5_path: Path, meta_all: Mapping[str, Any]) -> List[str]:
@@ -1546,8 +1586,9 @@ def freeze_item(item: str, *, request: Mapping[str, Any], repo_root: Path, work_
     `stage5_subset_digests(SUBSET_COLS)`。三根（SPEC §G (b)）：cwd 根＝新建之 `work_root/<item>/cwd`（唯讀輸入
     `data_cache/feature_klines`、`data_cache/feature_klines_longhist`、`config/` 自 `repo_root` 以 symlink 引入，同
     `scripts/ffprod_measure.py` `ic_watched`；快照不跟隨其下之目錄 symlink）、隔離目錄＝`work_root/<item>/iso`
-    （TMPDIR／HOME，前綴 `<iso>`）、`repo_root`（前綴 `<repo>`，抓逃逸寫出）；`capture_run(..., repo_root=<cwd 根>,
-    iso_root=<隔離目錄>, extra_roots={"<repo>": repo_root})`。子行程把回傳物件原樣以 pickle 寫
+    （TMPDIR／HOME，前綴 `<iso>`）、`repo_root`（前綴 `<repo>`，抓逃逸寫出；計入規則見 `repo_key_counted`，走訪略過整個
+    `work_root`）；`capture_run(..., repo_root=<cwd 根>, iso_root=<隔離目錄>, extra_roots={"<repo>": repo_root},
+    exclude_dirs=[work_root])`。子行程把回傳物件原樣以 pickle 寫
     `work_root/<item>/response.pkl`（審計記錄與 sitecustomize 亦置於 `work_root/<item>`，pickle 與記錄不在快照範圍）；
     回之記錄另含 "request"、"output_roots"（cwd 根相對 POSIX）、"roots"＝{"cwd": <cwd 根>, "iso": <隔離目錄>}（解析後
     絕對路徑；boundary_01 之獨立 oracle 以同一組根走訪並比對）、"features"／"selected"（第 (1)、(4) 項，見模組說明）。
@@ -1579,7 +1620,8 @@ def freeze_item(item: str, *, request: Mapping[str, Any], repo_root: Path, work_
     spec_path = cap / "spec.json"
     spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
     res = capture_run(_child_cmd(spec_path), repo_root=cwd, iso_root=iso, output_roots=out_roots, work_dir=cap,
-                      extra_roots={"<repo>": Path(repo_root)}, env_base=_child_env_base())
+                      extra_roots={REPO_KEY_PREFIX: Path(repo_root)}, env_base=_child_env_base(),
+                      exclude_dirs=[Path(work_root)])
     pkl = cap / "response.pkl"
     if res["rc"] != 0 or not pkl.is_file():
         raise FreezeError(f"{item}：子行程 rc={res['rc']}、回應 pickle {'存在' if pkl.is_file() else '不存在'}"
@@ -1595,7 +1637,7 @@ def freeze_item(item: str, *, request: Mapping[str, Any], repo_root: Path, work_
         "request": request,
         "output_roots": [Path(os.path.relpath(os.path.realpath(r), roots["cwd"])).as_posix() for r in out_roots],
         "roots": roots, "response": _response_fields(item, raw), "files": res["files"],
-        "transient": res["transient"], "removed": res["removed"]}
+        "transient": res["transient"], "removed": res["removed"], "repo_ignored": res["repo_ignored"]}
     if feature_tables(item):
         record["features"] = _feature_digests(item, raw)
         record["selected"] = _survivor_names(res["files"], cwd)
@@ -1880,8 +1922,10 @@ def probe_diff(a: Mapping[str, Any], b: Mapping[str, Any]) -> Tuple[List[str], L
         bad += _compare_features("features", a.get("features") or {}, b.get("features") or {}) or ["features：不等"]
     if a.get("selected") != b.get("selected"):
         bad.append("selected：不等")
-    if sorted(a.get("removed") or []) != sorted(b.get("removed") or []):
-        bad.append("removed：執行中刪除之既有檔不同")
+    ra_, rb_ = set(a.get("removed") or []), set(b.get("removed") or [])
+    if ra_ != rb_:
+        bad.append(f"removed：執行中刪除之既有檔不同（只在第一次 {sorted(ra_ - rb_)[:20]}、只在第二次 "
+                   f"{sorted(rb_ - ra_)[:20]}）")
     return vol, bad
 
 
@@ -1892,7 +1936,8 @@ def volatile_probe(*, golden_path: Path = GOLDEN_PATH, repo_root: Path = REPO,
     四項整格輸出之可重現性（"features"／"selected" 不等即無法排除）。自檢：以所得 volatile 項排除後 `compare_capture` 仍有
     問題而無法排除之差異為空 ⇒ FreezeError。回 {"golden_sha256"（凍結檔位元組 sha256）, "work_root", "items": {<項>:
     {"volatile": [...], "unexcludable": [...]}}, "volatile": [<項>:<volatile 項>...], "unexcludable": [...]}。
-    `work_root` 未給 ⇒ `new_work_root`；任何重跑前先以凍結所記之請求 `preflight` 全部項。"""
+    `work_root` 未給 ⇒ `new_work_root`；任何重跑前先以凍結所記之請求 `preflight` 全部項。各項重跑記錄寫
+    `work_root/<項>/PROBE_RECORD`（日後判定規則改變時以 `probe_rejudge` 重判，不必重跑）。"""
     pending = [i for i in OUTPUT_ITEMS if i in PENDING_ITEMS]
     if pending:  # r41 CODEX-R41-P1-04：重跑入口同 freeze，待定項未定前於任何 freeze_item 前即拒
         raise FreezeError(f"SPEC v5.26 第 (6)(7) 項待 Task 0.3 定義，不得重跑：{pending}")
@@ -1901,25 +1946,49 @@ def volatile_probe(*, golden_path: Path = GOLDEN_PATH, repo_root: Path = REPO,
     if missing:
         raise FreezeError(f"凍結檔缺項或其請求：{missing}")
     preflight({i: golden["items"][i]["request"] for i in OUTPUT_ITEMS}, repo_root=Path(repo_root), work_root=work_root)
-    work = Path(work_root) if work_root is not None else new_work_root("icperf-volprobe-", Path(repo_root))
+    work = Path(work_root) if work_root is not None else new_work_root(
+        "icperf-volprobe-", Path(repo_root), purpose="volatile-probe：凍結各項以同請求重跑一次，找每次必異欄位")
     work.mkdir(parents=True, exist_ok=True)
+    recs: Dict[str, Any] = {}
+    for item in OUTPUT_ITEMS:
+        print(f"[icperf-volprobe] {item} 重跑開始", flush=True)
+        recs[item] = freeze_item(item, request=golden["items"][item]["request"], repo_root=Path(repo_root),
+                                 work_root=work)
+        (work / item).mkdir(parents=True, exist_ok=True)
+        (work / item / PROBE_RECORD).write_bytes(_canonical_json(_jsonable(recs[item])))
+    return _probe_judge(golden, recs, golden_path=Path(golden_path), work=work)
+
+
+#: volatile-probe 各項重跑記錄之檔名（`work_root/<項>/` 下）
+PROBE_RECORD = "probe_record.json"
+
+
+def _probe_judge(golden: Mapping[str, Any], recs: Mapping[str, Mapping[str, Any]], *, golden_path: Path,
+                 work: Path) -> Dict[str, Any]:
+    """凍結記錄對重跑記錄逐項 `probe_diff`＋自檢（`volatile_probe` 與 `probe_rejudge` 共用）。"""
     out: Dict[str, Any] = {"golden_sha256": _file_sha256(str(Path(golden_path).resolve()), cache=False),
                            "work_root": str(work), "items": {}, "volatile": [], "unexcludable": []}
     for item in OUTPUT_ITEMS:
-        frozen = (golden.get("items") or {}).get(item)
-        if not frozen or "request" not in frozen:
-            raise FreezeError(f"凍結檔缺 {item} 或其請求")
-        print(f"[icperf-volprobe] {item} 重跑開始", flush=True)
-        rec = freeze_item(item, request=frozen["request"], repo_root=Path(repo_root), work_root=work)
-        recs = [frozen, rec]
-        vol, bad = probe_diff(recs[0], recs[1])
-        residual = compare_capture(recs[0], recs[1], volatile=vol)
+        frozen, rec = golden["items"][item], recs[item]
+        vol, bad = probe_diff(frozen, rec)
+        residual = compare_capture(frozen, rec, volatile=vol)
         if residual and not bad:
             raise FreezeError(f"{item}：volatile 項排除後仍有差異而無法排除之差異為空（判定不一致）：{residual[:5]}")
-        out["items"][item] = {"volatile": vol, "unexcludable": bad}
+        out["items"][item] = {"volatile": vol, "unexcludable": bad, "repo_ignored": len(rec.get("repo_ignored") or [])}
         out["volatile"] += [f"{item}:{v}" for v in vol]
         out["unexcludable"] += [f"{item}:{v}" for v in bad]
     return out
+
+
+def probe_rejudge(work_root: Path, *, golden_path: Path = GOLDEN_PATH) -> Dict[str, Any]:
+    """以 `volatile_probe` 存下之各項重跑記錄（`work_root/<項>/PROBE_RECORD`）重判，不重跑；缺任一項記錄 ⇒ FreezeError。"""
+    golden = load_golden(Path(golden_path))
+    work = Path(work_root)
+    missing = [i for i in OUTPUT_ITEMS if not (work / i / PROBE_RECORD).is_file()]
+    if missing:
+        raise FreezeError(f"{work} 缺重跑記錄（{PROBE_RECORD}）：{missing}")
+    recs = {i: json.loads((work / i / PROBE_RECORD).read_text(encoding="utf-8")) for i in OUTPUT_ITEMS}
+    return _probe_judge(golden, recs, golden_path=Path(golden_path), work=work)
 
 
 def _volatile_present(item_rec: Mapping[str, Any], entry: str) -> bool:
@@ -2430,7 +2499,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         prog="icperf_freeze_baseline.py",
         description="ICPERF Phase 0（docs/ICPERF_SPEC.md §G、Task 0.1／0.2）：凍結改前輸出、可重現性重跑、規模盤點。"
                     "重型（scripts/heavy_commands.json self_watched）：須背景執行，子行程經共用監看。")
-    sub = parser.add_subparsers(dest="cmd", metavar="{freeze,repro,volatile-probe,set-volatile,inventory,measure}")
+    sub = parser.add_subparsers(dest="cmd", metavar="{freeze,repro,volatile-probe,volatile-rejudge,set-volatile,inventory,measure}")
     p = sub.add_parser("freeze", help="凍結 §G 第 (1)–(5) 項，寫凍結檔")
     p.add_argument("--out", type=Path, default=GOLDEN_PATH, help=f"凍結檔（預設 {GOLDEN_PATH.relative_to(REPO)}）")
     p.add_argument("--work-root", type=Path, default=None, help=f"各項隔離工作目錄之根（預設 {RUNS_ROOT} 下新建；項目錄須不存在；不得在系統暫存）")
@@ -2446,6 +2515,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--out", type=Path, required=True, help="實測收據 JSON")
     p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
     p.add_argument("--work-root", type=Path, default=None, help=f"重跑之工作根（預設 {RUNS_ROOT} 下新建；不得在系統暫存）")
+    p = sub.add_parser("volatile-rejudge", help="以 volatile-probe 存下之各項重跑記錄重判（不重跑）")
+    p.add_argument("--out", type=Path, required=True, help="實測收據 JSON")
+    p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
+    p.add_argument("--work-root", type=Path, required=True, help=f"volatile-probe 之工作根（各項下有 {PROBE_RECORD}）")
     p = sub.add_parser("set-volatile", help="把實測收據之 volatile 項寫入凍結檔")
     p.add_argument("--probe", type=Path, required=True, help="volatile-probe 之實測收據")
     p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
@@ -2484,8 +2557,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(json.dumps({**result, "problems": result["problems"][:50], "n_problems": len(result["problems"])},
                              ensure_ascii=False, indent=1))
             return 0 if not result["problems"] else 1
-        if args.cmd == "volatile-probe":
-            result = volatile_probe(golden_path=args.golden, work_root=args.work_root)
+        if args.cmd in ("volatile-probe", "volatile-rejudge"):
+            result = (volatile_probe(golden_path=args.golden, work_root=args.work_root) if args.cmd == "volatile-probe"
+                      else probe_rejudge(args.work_root, golden_path=args.golden))
             Path(args.out).parent.mkdir(parents=True, exist_ok=True)
             Path(args.out).write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
             print(json.dumps({"out": str(args.out), "n_volatile": len(result["volatile"]),

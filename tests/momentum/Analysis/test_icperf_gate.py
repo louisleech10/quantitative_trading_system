@@ -493,9 +493,12 @@ def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, 
         record = fb.freeze_item(item, request=request, repo_root=REPO, work_root=work)
         after = _oracle_walk(_oracle_roots(work / item / "cwd", iso))
         written = {k for k, v in after.items() if before.get(k) != v}
+        ignored_seen = written & set(record.get("repo_ignored") or [])  # SPEC v5.45 §G (2) ③：他行程寫入不計
+        written -= ignored_seen
         with open(work / item / "response.pkl", "rb") as fh:
             raw = pickle.load(fh)
-        out[item] = {"record": record, "raw": raw, "written": written, "fields": _oracle_response_fields(item, raw),
+        out[item] = {"record": record, "raw": raw, "written": written, "ignored_seen": ignored_seen,
+                     "fields": _oracle_response_fields(item, raw),
                      "roots": {"cwd": str((work / item / "cwd").resolve()), "iso": str(iso.resolve())}}
     return out
 
@@ -560,6 +563,12 @@ def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str
         used = run["record"].get("roots") or {}
         assert {r: str(Path(p).resolve()) for r, p in used.items()} == run["roots"], \
             f"{name}：freeze_item 所用之根 {used} != oracle 走訪之根 {run['roots']}"
+        # SPEC v5.45 §G (2) ③：未計入之 `<repo>/` 寫入（他行程）列 repo_ignored——須皆在 data_cache/ 之外、且恰為
+        # oracle 全樹差集所見者（oracle_runs 之 "written" 已扣除；"ignored_seen"＝扣除前之交集）
+        ignored = set(run["record"].get("repo_ignored") or [])
+        assert all(k.startswith("<repo>/") and not k.startswith("<repo>/data_cache/") for k in ignored), \
+            f"{name}：repo_ignored 含非 <repo>/ 或 data_cache/ 下之鍵：{sorted(ignored)[:5]}"
+        assert ignored == run["ignored_seen"], f"{name}：repo_ignored 有 oracle 全樹差集未見之鍵"
 
 
 @pytest.mark.slow
@@ -1319,6 +1328,62 @@ def test_volatile_probe_diff_unexcludable_cases(fb: Any, tmp_path: Path) -> None
     for name, (pa, pb, needle) in cases.items():
         _, bad = fb.probe_diff({**a, **pa}, {**b, **pb})
         assert any(needle in p for p in bad), f"{name}：須列為無法排除之差異（點名 {needle}），實得 {bad}"
+
+
+def test_repo_root_counts_only_audited_or_data_cache_and_skips_work_root(fb: Any, tmp_path: Path) -> None:
+    """SPEC v5.45 §G (2) ③（2026-11-01 volatile-probe 實例：他行程寫 frontend/.next、logs/、HANDOFF.md 與本次工作根自身
+    被計入 ⇒ 185 項無法排除）：`<repo>/` 鍵之新增／變更／刪除，未經子行程審計且不在 data_cache/ 下者不入 files／removed、
+    改列 repo_ignored；經審計者或 data_cache/ 下者照計；工作根位於 repo 內時快照走訪整棵略過（其下之 cwd 根另為根照走）。
+    改壞對照：不給 exclude_dirs 時工作根內檔被走訪到。"""
+    repo, cwd = tmp_path / "repo", tmp_path / "repo" / "runs" / "w" / "item" / "cwd"
+    for rel in ("src.py", "doc.md", "old.txt", "data_cache/old.json", "runs/w/README.txt"):
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text("0", encoding="utf-8")
+    cwd.mkdir(parents=True)
+    roots, prefixes = [cwd, repo], {"<repo>": repo}
+    skip = [repo / "runs" / "w"]
+    before = fb.snapshot_files(roots, repo_root=cwd, prefixes=prefixes, exclude_dirs=skip)
+    assert "<repo>/runs/w/README.txt" not in before
+    assert "<repo>/runs/w/README.txt" in fb.snapshot_files(roots, repo_root=cwd, prefixes=prefixes), "改壞對照"
+    (repo / "src.py").write_text("1", encoding="utf-8")       # 他行程：不計
+    (repo / "doc.md").write_text("1", encoding="utf-8")       # 經審計：計
+    (repo / "data_cache" / "new.json").write_text("{}", encoding="utf-8")  # data_cache：計
+    (repo / "old.txt").unlink()                               # 他行程刪除：不計
+    (repo / "data_cache" / "old.json").unlink()               # data_cache 刪除：計
+    (cwd / "out.json").write_text("{}", encoding="utf-8")     # cwd 根：恆計
+    (repo / "runs" / "w" / "README.txt").write_text("1", encoding="utf-8")  # 工作根：不走訪
+    after = fb.snapshot_files(roots, repo_root=cwd, prefixes=prefixes, exclude_dirs=skip)
+    log = [{"event": "open", "path": str(repo / "doc.md")}]
+    got = fb.collect_written_files(log, before, after, repo_root=cwd, snapshot_roots=roots, output_roots=[],
+                                   prefixes=prefixes)
+    assert sorted(got["files"]) == ["<repo>/data_cache/new.json", "<repo>/doc.md", "out.json"]
+    assert got["removed"] == ["<repo>/data_cache/old.json"]
+    assert got["repo_ignored"] == ["<repo>/old.txt", "<repo>/src.py"]
+
+
+def test_new_work_root_card_and_probe_rejudge_without_rerun(fb: Any, tmp_path: Path) -> None:
+    """SPEC v5.45 §G (2) ②：`new_work_root` 建於 `<repo_root>/RUNS_ROOT`（repo 內 runs/，非 data_cache／系統暫存）並寫說明卡
+    （入口、用途、何時可刪）；volatile-probe 各項重跑記錄存檔後 `probe_rejudge` 不重跑即得與直接判定相同之結果；缺任一項
+    記錄 ⇒ FreezeError。"""
+    assert fb.RUNS_ROOT.split("/")[0] == "runs"
+    w = fb.new_work_root("icperf-volprobe-", tmp_path, purpose="測試用途")
+    card = (w / fb.RUN_CARD).read_text(encoding="utf-8")
+    assert w.parent == tmp_path / fb.RUNS_ROOT and "volprobe" in card and "測試用途" in card and "何時可刪" in card
+    a, b = _probe_pair(fb, tmp_path)
+    golden = {"items": {i: {**a, "request": {"kind": "x"}} for i in OUTPUT_ITEMS}}
+    gpath = tmp_path / "g.json.gz"
+    fb.write_golden(golden, gpath)
+    work = tmp_path / "probe"
+    for i in OUTPUT_ITEMS:
+        (work / i).mkdir(parents=True)
+        (work / i / fb.PROBE_RECORD).write_bytes(fb._canonical_json(b))
+    got = fb.probe_rejudge(work, golden_path=gpath)
+    assert got["unexcludable"] == [] and len(got["volatile"]) == 4 * len(OUTPUT_ITEMS)
+    assert got["volatile"] == fb._probe_judge(fb.load_golden(gpath), {i: b for i in OUTPUT_ITEMS},
+                                              golden_path=gpath, work=work)["volatile"]
+    (work / OUTPUT_ITEMS[0] / fb.PROBE_RECORD).unlink()
+    with pytest.raises(fb.FreezeError, match="缺重跑記錄"):
+        fb.probe_rejudge(work, golden_path=gpath)
 
 
 def test_item_sets_match_spec_and_pending_fail_closed(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

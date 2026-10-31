@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/20261101-icperf-volatile-probe.json",
+      "code_sha256": "a15c050db1ded89910fcbc81ebf5ea740d3d51a67b462c7d7de7bed158c8c765",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 volatile 整格實測重跑；SPEC v5.45 §G (2) ③ <repo> 計入規則、工作根改 runs/icperf、各項重跑記錄存檔）",
+      "created_at": "2026-11-01T01:40:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 14400,
+  "basis": [
+    "前次同請求實測 2026-10-31 21:58 開跑、2026-11-01 01:00 結束（收據 handoffs/run_receipts/20261031-icperf-volatile-probe.json 之檔案 mtime 01:00）約 3 小時；七項全部跑完，失敗原因為判定規則（他行程寫入 repo 與工作根自身被計入 <repo> 快照，185 項），非計算失敗",
+    "本次只改判定與存檔（repo_key_counted、snapshot exclude_dirs、probe_record.json），子行程計算不變 ⇒ 同量級；上限取 4 小時 14400 秒（同前次估時收據）",
+    "各項重跑記錄寫 work_root/<項>/probe_record.json：日後判定規則再改以 volatile-rejudge 重判，不必重跑",
+    "磁碟可用 48 GB（df 實查）；工作根 runs/icperf/（前次工作目錄同量級約 1 GB）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}
