@@ -3,7 +3,7 @@
     "match": {
       "entrypoint": "scripts/icperf_freeze_baseline.py",
       "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py freeze",
-      "code_sha256": "23be6c6e9d3ddea02b6221eab0640116d4cd4e83ff96301f5a08da80cff20fe3",
+      "code_sha256": "61b0337c1a241464882d84e974d65f4aa0f4b622834dff520683e69e6601d37a",
       "data": [],
       "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "hardware": {

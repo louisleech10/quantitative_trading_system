@@ -49,7 +49,9 @@ RECEIPT_GLOB = "*-ffprod-candidates.json"
 FREEZE_SCRIPT = REPO / "scripts" / "ffprod_freeze_baseline.py"
 L2_MATRIX_PROBE = RECEIPTS_DIR / "numview_probes" / "l2_arm_matrix.py"
 DEFAULT_CELL = "C_BTCUSDT_1h"
-DEFAULT_WORK_ROOT = Path(os.environ.get("TMPDIR", "/tmp")) / "ffprod-measure"
+#: repo 內 `data_cache/`（`.gitignore:97`）：生成結果跨日續用（IC 量測、ICPERF C 格交接）；系統暫存遭 macOS dirhelper 每日
+#: 清除逾 3 日之檔（2026-10-30 03:35 清掉原 `$TMPDIR/ffprod-measure` 之 6 次保留生成，實查各目錄 0 檔）
+DEFAULT_WORK_ROOT = REPO / "data_cache" / "ffprod_measure"
 SCHEMA_VERSION = 1
 SPEC_PATH = REPO / "docs" / "FFPROD_SPEC.md"
 #: d* 探針唯一可豁免之自證失敗（差異不可達之觀測本身）；其餘失敗或違規皆不得記 unreachable_difference

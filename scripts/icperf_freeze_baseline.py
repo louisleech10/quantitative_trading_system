@@ -872,6 +872,12 @@ C_HANDOFF_BYTES = 225002383
 #: 交接 `_meta.json` 之非逐特徵鍵：prep.py 之 4 鍵＋ICPERF Task 0.4 ㉜ 之逐特徵 metadata 格式世代
 #: （`api/services/ic_analysis_service.py:70` `IC_FEATURE_METADATA_VERSION_KEY`）
 HANDOFF_META_KEYS = ("symbol", "timeframe", "config_hash", "ff_run_identity", "feature_metadata_version")
+#: 重型跑（freeze／volatile-probe／gen-long-cell）之預設工作根：repo 內 `data_cache/`（`.gitignore:97`）。系統暫存不可放
+#: 跑後仍要用之輸出——macOS `com.apple.bsd.dirhelper` 每日 03:35 清除系統暫存中逾 3 日之檔
+#: （`/System/Library/LaunchDaemons/com.apple.bsd.dirhelper.plist` `CLEAN_FILES_OLDER_THAN_DAYS`＝3，2026-10-31 實查）
+RUNS_ROOT = "data_cache/icperf_inputs/runs"
+#: 系統暫存位置（`tempfile.gettempdir()` 另於執行時加入）：重型跑之輸入與工作根落於其下 ⇒ `preflight` 拒
+SYSTEM_TEMP_ROOTS = ("/tmp", "/private/tmp", "/var/folders", "/private/var/folders")
 #: SPEC §G (4)：K 線條件式事件（legacy `event_query` 一格，只用 K 線欄位）
 EVENT_QUERY = "close > open"
 #: SPEC §G (b)：隔離 cwd 根以 symlink 自 repo 引入之唯讀輸入（同 `scripts/ffprod_measure.py` 之 `ic_watched`）
@@ -1405,6 +1411,105 @@ def c_handoff_identity(*, with_sha256: bool = True, fallback: Optional[Path] = N
     return {"path": str(src), "meta": str(meta), "size": size, "sha256": sha}
 
 
+def check_handoff_meta(meta_all: Mapping[str, Any], names: Sequence[str]) -> None:
+    """交接 meta＝逐特徵鍵（恰為 h5 `feature_names`）＋`HANDOFF_META_KEYS` 之非逐特徵鍵；缺特徵或有未知鍵 ⇒ FreezeError
+    （以鍵集合判定，不假設非特徵鍵數；`_write_stage5_subset` 與 `preflight` 共用）。"""
+    missing = [n for n in names if n not in meta_all]
+    unknown = sorted(set(meta_all) - set(names) - set(HANDOFF_META_KEYS))
+    if missing or unknown:
+        raise FreezeError(f"交接 meta 與欄名不符：缺 {len(missing)} 個特徵（例 {missing[:3]}）、未知非特徵鍵 {unknown}")
+
+
+def in_system_temp(path: Any) -> bool:
+    """`path`（解析 symlink 後）是否落於系統暫存（`SYSTEM_TEMP_ROOTS` 或 `tempfile.gettempdir()`）之下。"""
+    import tempfile
+
+    return any(_under(str(path), Path(r)) for r in (*SYSTEM_TEMP_ROOTS, tempfile.gettempdir()) if os.path.exists(r))
+
+
+def new_work_root(prefix: str, repo_root: Path = REPO) -> Path:
+    """重型跑之預設工作根：`<repo_root>/RUNS_ROOT` 下新建之唯一目錄（`tempfile.mkdtemp(dir=...)`），不放系統暫存。"""
+    import tempfile
+
+    base = Path(repo_root) / RUNS_ROOT
+    base.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=prefix, dir=str(base)))
+
+
+def _handoff_feature_names(h5_path: Path, meta_all: Mapping[str, Any]) -> List[str]:
+    import h5py
+
+    with h5py.File(str(h5_path), "r") as f:
+        raw = f[f"{meta_all['symbol']}/{meta_all['timeframe']}"]["feature_names"][:]
+    return [n.decode() if isinstance(n, bytes) else str(n) for n in raw]
+
+
+def preflight(requests: Mapping[str, Mapping[str, Any]], *, repo_root: Path = REPO,
+              work_root: Optional[Path] = None, expected_c_sha256: Optional[str] = None) -> Dict[str, Any]:
+    """重型跑開跑前之輸入檢查（秒級；任一不合 ⇒ FreezeError，於任何 `freeze_item`／子行程之前）。2026-10-31 凍結兩度於
+    第 (2) 項中斷（C 格交接 h5 遭系統暫存清理、交接 meta 非特徵鍵數過期），皆於第 (1) 項約 44 分鐘後才發現 ⇒ 全部項之
+    輸入改於開跑前一次驗完。
+
+    檢查：`work_root` 與唯讀輸入（`READONLY_INPUTS`）不在系統暫存（`in_system_temp`）且唯讀輸入存在；IC 頁項之
+    `run_dir/feature_manifest.json` 存在且不在系統暫存、`event_import_id` 之批可由服務查得且 records 非空；IC-first 項之
+    判準檔格描述子可解析；第 (2) 項之交接 h5 經 `c_handoff_identity`（存在、大小）、不在系統暫存、`expected_c_sha256`
+    給定則內容 sha256 須等、交接 meta 經 `check_handoff_meta` 對 h5 `feature_names`。回 {"items": {<項>: <檢查摘要>}}。"""
+    problems: List[str] = []
+    out: Dict[str, Any] = {"items": {}}
+    repo_root = Path(repo_root)
+    if work_root is not None and in_system_temp(work_root):
+        problems.append(f"工作根在系統暫存（macOS 逾 3 日自動清除）：{work_root}")
+    for rel in READONLY_INPUTS:
+        p = repo_root / rel
+        if not p.exists():
+            problems.append(f"唯讀輸入不存在：{p}")
+        elif in_system_temp(p):
+            problems.append(f"唯讀輸入在系統暫存：{p}")
+    for item, req in requests.items():
+        kind = req.get("kind")
+        try:
+            if kind == "ic_page":
+                manifest = repo_root / str(req["run_dir"]) / "feature_manifest.json"
+                if not manifest.is_file():
+                    raise FreezeError(f"run 之 feature_manifest.json 不存在：{manifest}")
+                if in_system_temp(manifest):
+                    raise FreezeError(f"run 在系統暫存：{manifest}")
+                summary: Dict[str, Any] = {"run_dir": str(req["run_dir"])}
+                if req.get("event_import_id"):
+                    _ensure_repo_path()
+                    from api.services.case_import_service import get_event_import_service
+
+                    detail = get_event_import_service().get_import(str(req["event_import_id"]))
+                    if detail is None or not (detail.records or []):
+                        raise FreezeError(f"事件匯入批 {req['event_import_id']} 查無或無 records")
+                    summary["event_records"] = len(detail.records)
+                out["items"][item] = summary
+            elif kind == "ic_first":
+                desc = req.get("cell") or {}
+                _cell_descriptor(str(desc.get("id")))
+                out["items"][item] = {"cell": desc.get("id")}
+            elif kind == "stage5":
+                src = req.get("source_h5")
+                ident = c_handoff_identity(with_sha256=expected_c_sha256 is not None,
+                                           fallback=Path(src) if src else None)
+                if in_system_temp(ident["path"]):
+                    raise FreezeError(f"交接 h5 在系統暫存（macOS 逾 3 日自動清除）：{ident['path']}")
+                if expected_c_sha256 is not None and ident["sha256"] != expected_c_sha256:
+                    raise FreezeError(f"交接 h5 內容 sha256 {ident['sha256']} != 凍結所記 {expected_c_sha256}")
+                meta_all = json.loads(Path(ident["meta"]).read_text(encoding="utf-8"))
+                check_handoff_meta(meta_all, _handoff_feature_names(Path(ident["path"]), meta_all))
+                out["items"][item] = {"source_h5": ident["path"], "size": ident["size"], "sha256": ident["sha256"]}
+            else:
+                raise FreezeError(f"請求種類 {kind!r} 無開跑前檢查")
+        except FreezeError as exc:
+            problems.append(f"{item}：{exc}")
+        except Exception as exc:  # 讀檔／服務查詢之例外一律記為該項不合（fail-closed），不中斷其餘項之檢查
+            problems.append(f"{item}：{type(exc).__name__}: {exc}")
+    if problems:
+        raise FreezeError("開跑前檢查未過（未啟動任何執行）：" + "；".join(problems))
+    return out
+
+
 def stage5_subset_digests(n_cols: int, *, seed: int = SEED, expected_sha256: Optional[str] = None,
                           source_h5: Optional[Path] = None) -> Dict[str, Any]:
     """改前基準全特徵 run 交接 h5 之 n_cols 欄巢狀隨機子集（seed 同探針 `icperf_probes/prep.py`）以產品
@@ -1675,13 +1780,13 @@ def _cell_pit_labels(cell: str, work_root: Path) -> Dict[str, Any]:
 def freeze(out_path: Path = GOLDEN_PATH, *, repo_root: Path = REPO, work_root: Optional[Path] = None) -> Dict[str, Any]:
     """依序凍結 `G_ITEMS` 並寫 `out_path`；任一項 FreezeError ⇒ 不寫檔。
 
-    `work_root` 未給 ⇒ 新建暫存目錄（保留供診斷，路徑記於凍結檔 "work_root"）。第 (1) 項另加 "pit_labels"
+    `work_root` 未給 ⇒ `new_work_root`（repo 內 `RUNS_ROOT` 下新建；保留供 volatile 實測與診斷，路徑記於凍結檔
+    "work_root"）。啟動任何執行前先 `preflight` 全部項。第 (1) 項另加 "pit_labels"
     （`_cell_pit_labels`）。凍結檔＝{"schema", "code_state", "volatile": []（FACT-RECEIPT 判定後寫入）,
     "volatile_candidates", "work_root", "items"}；經 `write_golden` 原子寫出（正準 JSON；`.gz` 路徑 gzip 決定性壓縮）。"""
-    import tempfile
-
     requests = {item: default_request(item) for item in G_ITEMS}  # 任一項請求未定（PENDING_ITEMS）⇒ 啟動任何執行前即拒
-    work = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-freeze-"))
+    preflight(requests, repo_root=Path(repo_root), work_root=work_root)
+    work = Path(work_root) if work_root is not None else new_work_root("icperf-freeze-", Path(repo_root))
     work.mkdir(parents=True, exist_ok=True)
     items: Dict[str, Any] = {}
     candidates: List[Dict[str, str]] = []
@@ -1713,6 +1818,7 @@ def repro(n_cols: int = REPRO_COLS, *, golden_path: Path = GOLDEN_PATH) -> Dict[
     if not expected:
         raise FreezeError("凍結檔之 stage5_subset 未記 request.source_sha256，無從驗交接 h5 身分")
     frozen_src = frozen_req.get("source_h5")
+    preflight({"stage5_subset": frozen_req}, expected_c_sha256=str(expected))
     cur = stage5_subset_digests(int(n_cols), seed=int(frozen.get("seed", SEED)), expected_sha256=str(expected),
                                 source_h5=Path(frozen_src) if frozen_src else None)
     problems: List[str] = []
@@ -1785,14 +1891,17 @@ def volatile_probe(*, golden_path: Path = GOLDEN_PATH, repo_root: Path = REPO,
     工作根再跑一次 `freeze_item`，`probe_diff(凍結記錄, 重跑記錄)`——所得即日後改後比對時同一請求之每次必異欄位，並兼驗
     四項整格輸出之可重現性（"features"／"selected" 不等即無法排除）。自檢：以所得 volatile 項排除後 `compare_capture` 仍有
     問題而無法排除之差異為空 ⇒ FreezeError。回 {"golden_sha256"（凍結檔位元組 sha256）, "work_root", "items": {<項>:
-    {"volatile": [...], "unexcludable": [...]}}, "volatile": [<項>:<volatile 項>...], "unexcludable": [...]}。"""
-    import tempfile
-
+    {"volatile": [...], "unexcludable": [...]}}, "volatile": [<項>:<volatile 項>...], "unexcludable": [...]}。
+    `work_root` 未給 ⇒ `new_work_root`；任何重跑前先以凍結所記之請求 `preflight` 全部項。"""
     pending = [i for i in OUTPUT_ITEMS if i in PENDING_ITEMS]
     if pending:  # r41 CODEX-R41-P1-04：重跑入口同 freeze，待定項未定前於任何 freeze_item 前即拒
         raise FreezeError(f"SPEC v5.26 第 (6)(7) 項待 Task 0.3 定義，不得重跑：{pending}")
     golden = load_golden(Path(golden_path))
-    work = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-volprobe-"))
+    missing = [i for i in OUTPUT_ITEMS if "request" not in ((golden.get("items") or {}).get(i) or {})]
+    if missing:
+        raise FreezeError(f"凍結檔缺項或其請求：{missing}")
+    preflight({i: golden["items"][i]["request"] for i in OUTPUT_ITEMS}, repo_root=Path(repo_root), work_root=work_root)
+    work = Path(work_root) if work_root is not None else new_work_root("icperf-volprobe-", Path(repo_root))
     work.mkdir(parents=True, exist_ok=True)
     out: Dict[str, Any] = {"golden_sha256": _file_sha256(str(Path(golden_path).resolve()), cache=False),
                            "work_root": str(work), "items": {}, "volatile": [], "unexcludable": []}
@@ -2026,15 +2135,13 @@ def gen_long_cell(*, repo_root: Path = REPO, work_root: Optional[Path] = None) -
     """生成長資料格 L（SPEC v5.26 Task 0.3、ICPERF-BUDGET-8）：子行程（`_run_child`，經共用監看）以
     `numview_freeze_baseline.generate_cell_run` 於 `LONG_CELL_ROOT` 生成（判準檔以 `long_cell_criteria` 覆寫輸出段）。
     已有 complete 之 sidecar ⇒ 不重生、回其內容；目錄存在而無 sidecar（前次中斷）⇒ FreezeError（不自行刪除，交使用者清）。"""
-    import tempfile
-
     work = Path(repo_root) / LONG_CELL_ROOT.format(cell=LONG_CELL)
     side = _long_cell_sidecar(work)
     if side is not None and side.get("status") == "complete":
         return {"reused": True, "work": str(work), "sidecar": side}
     if work.exists():
         raise FreezeError(f"{work} 已存在而無 complete sidecar（前次生成中斷）；請先移除該目錄再重跑")
-    tmp = Path(work_root) if work_root is not None else Path(tempfile.mkdtemp(prefix="icperf-longcell-"))
+    tmp = Path(work_root) if work_root is not None else new_work_root("icperf-longcell-", Path(repo_root))
     out = tmp / "capture" / "result.json"
     spec = {"task": "gen_long_cell", "work": str(work), "out_json": str(out)}
     result = _run_child(spec, cwd=_prepare_cwd(tmp / "cwd", repo_root), work_dir=tmp / "capture", iso=tmp / "iso")
@@ -2159,11 +2266,7 @@ def _write_stage5_subset(src_h5: Path, src_meta: Path, n_cols: int, seed: int, o
         cols64 = g["features_f64"][:, f64_sel] if f64_sel.size else None
     if pos != n32:
         raise FreezeError(f"子集讀取欄數 {pos} != {n32}")
-    # 交接 meta＝逐特徵鍵（恰為 feature_names）＋`HANDOFF_META_KEYS` 之非逐特徵鍵；缺特徵或有未知鍵 ⇒ FreezeError
-    missing = [n for n in names if n not in meta_all]
-    unknown = sorted(set(meta_all) - set(names) - set(HANDOFF_META_KEYS))
-    if missing or unknown:
-        raise FreezeError(f"交接 meta 與欄名不符：缺 {len(missing)} 個特徵（例 {missing[:3]}）、未知非特徵鍵 {unknown}")
+    check_handoff_meta(meta_all, names)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     h5, meta = out_dir / Path(src_h5).name, out_dir / Path(src_meta).name
@@ -2330,7 +2433,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sub = parser.add_subparsers(dest="cmd", metavar="{freeze,repro,volatile-probe,set-volatile,inventory,measure}")
     p = sub.add_parser("freeze", help="凍結 §G 第 (1)–(5) 項，寫凍結檔")
     p.add_argument("--out", type=Path, default=GOLDEN_PATH, help=f"凍結檔（預設 {GOLDEN_PATH.relative_to(REPO)}）")
-    p.add_argument("--work-root", type=Path, default=None, help="各項隔離工作目錄之根（預設新建暫存目錄；項目錄須不存在）")
+    p.add_argument("--work-root", type=Path, default=None, help=f"各項隔離工作目錄之根（預設 {RUNS_ROOT} 下新建；項目錄須不存在；不得在系統暫存）")
     p.add_argument("--c-handoff", type=Path, default=None,
                    help=f"第 (2) 項之 C 格交接 h5（設環境變數 {C_HANDOFF_ENV}；未給取該變數或本機現值）")
     p = sub.add_parser("repro", help="同一 2,000 欄子集重跑第 5 段，對凍結檔逐位元比")
@@ -2342,7 +2445,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = sub.add_parser("volatile-probe", help="第 (1)(3)(4)(5) 項以凍結所記之整格請求再跑一次，與凍結之差異＝volatile 項")
     p.add_argument("--out", type=Path, required=True, help="實測收據 JSON")
     p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")
-    p.add_argument("--work-root", type=Path, default=None, help="重跑之工作根（預設新建暫存目錄）")
+    p.add_argument("--work-root", type=Path, default=None, help=f"重跑之工作根（預設 {RUNS_ROOT} 下新建；不得在系統暫存）")
     p = sub.add_parser("set-volatile", help="把實測收據之 volatile 項寫入凍結檔")
     p.add_argument("--probe", type=Path, required=True, help="volatile-probe 之實測收據")
     p.add_argument("--golden", type=Path, default=GOLDEN_PATH, help="凍結檔")

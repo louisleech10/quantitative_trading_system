@@ -35,7 +35,8 @@ RECEIPTS_DIR = REPO / "handoffs" / "run_receipts"
 INVENTORY_GLOB = "*-ffprod-inventory.json"
 PROBES_DIR = RECEIPTS_DIR / "numview_probes"
 NUMVIEW_ESTIMATE_RECEIPT = RECEIPTS_DIR / "20261023-numview-estimate.json"
-DEFAULT_WORK_ROOT = Path(os.environ.get("TMPDIR", "/tmp")) / "ffprod-freeze"
+#: repo 內 `data_cache/`（`.gitignore:97`）；不放系統暫存（macOS dirhelper 每日清除逾 3 日之檔，見 `scripts/ffprod_measure.py`）
+DEFAULT_WORK_ROOT = REPO / "data_cache" / "ffprod_freeze"
 
 #: L2 三條生產臂（`FeatureFactory._budget_check_l2` 之回傳值）與各格之環境覆寫（SPEC Task 0.2）。
 L2_ARM_ENV: Dict[str, Dict[str, str]] = {

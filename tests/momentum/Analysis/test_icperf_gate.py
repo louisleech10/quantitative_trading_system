@@ -1129,6 +1129,8 @@ def test_c_handoff_relative_path_absolute_and_repro_uses_frozen_path(fb: Any, tm
 
     monkeypatch.setattr(fb, "_run_child", spy)
     monkeypatch.setattr(fb, "C_HANDOFF_BYTES", 10)
+    pre: List[Mapping[str, Any]] = []  # 開跑前檢查另有專測（test_preflight_*）；此處只驗其收到凍結所記之請求
+    monkeypatch.setattr(fb, "preflight", lambda requests, **kw: pre.append(requests))
     h5 = _small_handoff(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv(C_HANDOFF_ENV, h5.name)
@@ -1142,6 +1144,7 @@ def test_c_handoff_relative_path_absolute_and_repro_uses_frozen_path(fb: Any, tm
     with pytest.raises(_Started):
         fb.repro(2000, golden_path=golden)
     assert len(calls) == 1 and calls[0]["source_h5"] == str(Path(os.path.abspath(h5)))
+    assert len(pre) == 1 and pre[0]["stage5_subset"]["source_h5"] == str(h5)
 
 
 def _mini_handoff(tmp_path: Path, meta_extra: Mapping[str, Any], drop: Sequence[str] = ()) -> Tuple[Path, Path]:
@@ -1176,6 +1179,65 @@ def test_stage5_subset_meta_keys(fb: Any, tmp_path: Path) -> None:
         h5b, metab = _mini_handoff(d, extra, drop)
         with pytest.raises(fb.FreezeError, match="交接 meta 與欄名不符"):
             fb._write_stage5_subset(h5b, metab, 2, SEED, d / "out")
+
+
+def test_preflight_rejects_system_temp_and_default_work_root_persistent(fb: Any, tmp_path: Path) -> None:
+    """系統暫存（macOS dirhelper 每日清除逾 3 日之檔）：`in_system_temp` 對 pytest 暫存目錄（`tempfile.gettempdir()` 之下）
+    與 /tmp 為真、對 repo 之 data_cache 為假；`new_work_root` 建於 `<repo_root>/RUNS_ROOT` 下；`preflight` 對工作根或
+    交接 h5 在系統暫存者 FreezeError（未放寬：pytest 暫存目錄即系統暫存）。"""
+    import tempfile
+
+    assert fb.in_system_temp(tmp_path) and fb.in_system_temp(tempfile.gettempdir()) and fb.in_system_temp("/tmp")
+    assert not fb.in_system_temp(fb.REPO / "data_cache")
+    w = fb.new_work_root("icperf-test-", tmp_path)
+    assert w.is_dir() and w.parent == tmp_path / fb.RUNS_ROOT and w.name.startswith("icperf-test-")
+    h5, _meta = _mini_handoff(tmp_path, {"feature_metadata_version": 2})
+    req = {"kind": "stage5", "item": "stage5_subset", "source_h5": str(h5)}
+    with pytest.raises(fb.FreezeError, match="系統暫存") as exc:
+        fb.preflight({"stage5_subset": req}, work_root=tmp_path / "w")
+    assert "工作根在系統暫存" in str(exc.value)
+
+
+def test_preflight_checks_all_inputs_before_any_run(fb: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`preflight` 逐項驗輸入並彙總全部問題於一次 FreezeError：交接 meta 與 h5 欄名不符（缺特徵／未知鍵）、內容 sha256 != 所記、
+    IC 頁 run 之 manifest 不存在、事件匯入批查無、請求種類未知；全部合格 ⇒ 回逐項摘要。`freeze`／`volatile_probe` 之
+    preflight 不過 ⇒ 不呼叫任何 `freeze_item`（替身被呼叫即 FAIL）。系統暫存判定另有專測，此處置換為恆假以驗其餘檢查。"""
+    monkeypatch.setattr(fb, "in_system_temp", lambda p: False)
+    h5, _meta = _mini_handoff(tmp_path, {"feature_metadata_version": 2})
+    monkeypatch.setattr(fb, "C_HANDOFF_BYTES", h5.stat().st_size)
+    sha = hashlib.sha256(h5.read_bytes()).hexdigest()
+    ok = fb.preflight({"stage5_subset": {"kind": "stage5", "source_h5": str(h5)}}, expected_c_sha256=sha)
+    assert ok["items"]["stage5_subset"] == {"source_h5": str(h5), "size": h5.stat().st_size, "sha256": sha}
+    with pytest.raises(fb.FreezeError, match="sha256"):
+        fb.preflight({"stage5_subset": {"kind": "stage5", "source_h5": str(h5)}}, expected_c_sha256="0" * 64)
+    for extra, drop in (({"bogus": 1}, ()), ({}, ("f1",))):
+        d = tmp_path / f"bad_{len(extra)}_{len(drop)}"
+        d.mkdir()
+        hb, _ = _mini_handoff(d, extra, drop)
+        with pytest.raises(fb.FreezeError, match="交接 meta 與欄名不符"):
+            fb.preflight({"stage5_subset": {"kind": "stage5", "source_h5": str(hb)}})
+    bad = {"a": {"kind": "ic_page", "run_dir": "no/such/run"},
+           "b": {"kind": "ic_page", "run_dir": fb.default_request("ic_report")["run_dir"],
+                 "event_import_id": "no-such-import"},
+           "c": {"kind": "bogus"}}
+    with pytest.raises(fb.FreezeError) as exc:
+        fb.preflight(bad)
+    msg = str(exc.value)
+    assert "a：run 之 feature_manifest.json 不存在" in msg and "b：事件匯入批 no-such-import" in msg and "c：請求種類" in msg
+
+    def must_not_run(*a: Any, **k: Any) -> None:
+        pytest.fail("開跑前檢查未過時不得啟動任何執行")
+
+    monkeypatch.setattr(fb, "freeze_item", must_not_run)
+    monkeypatch.setenv(C_HANDOFF_ENV, str(tmp_path / "missing.h5"))
+    with pytest.raises(fb.FreezeError, match="開跑前檢查未過"):
+        fb.freeze(tmp_path / "g.json.gz", work_root=tmp_path / "w")
+    golden = {"items": {i: {"request": {"kind": "ic_page", "run_dir": "no/such/run"}} for i in OUTPUT_ITEMS}}
+    path = tmp_path / "g2.json.gz"
+    fb.write_golden(golden, path)
+    with pytest.raises(fb.FreezeError, match="開跑前檢查未過"):
+        fb.volatile_probe(golden_path=path, work_root=tmp_path / "w2")
+    assert not (tmp_path / "w").exists() and not (tmp_path / "w2").exists()
 
 
 # ── §G 凍結檔 gzip 存檔與 volatile 實測判定之秒級契約（SPEC v5.25） ─────────────────────────────────────────
@@ -1415,7 +1477,10 @@ def test_volatile_probe_reruns_frozen_request_once(fb: Any, tmp_path: Path, monk
 
     monkeypatch.setattr(fb, "freeze_item", fake_freeze_item)
     monkeypatch.setattr(fb, "PENDING_ITEMS", ())  # 編排驗證情境：第 (6)(7) 項已定義（待定時之拒絕見下一支測試）
+    pre: List[Tuple[Dict[str, Any], int]] = []  # 開跑前檢查另有專測；此處驗其於任何重跑前收到凍結所記之全部請求
+    monkeypatch.setattr(fb, "preflight", lambda requests, **kw: pre.append((dict(requests), len(calls))))
     out = fb.volatile_probe(golden_path=path, work_root=tmp_path / "w")
+    assert pre == [({i: {"item": i} for i in OUTPUT_ITEMS}, 0)]
     assert calls == [(i, {"item": i}) for i in OUTPUT_ITEMS]
     assert out["volatile"] == [f"{i}:response:/generated_at" for i in OUTPUT_ITEMS]
     assert any(u.startswith("event_report:features/x") for u in out["unexcludable"]), out["unexcludable"]

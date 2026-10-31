@@ -45,6 +45,8 @@
       "handoffs/run_receipts/gap2_golden_pre.json",
       "scripts/icperf_event_batch.py",
       "scripts/icperf_correctness_receipt.py",
+      "scripts/ffprod_measure.py",
+      "scripts/ffprod_freeze_baseline.py",
       "tests/momentum/Analysis/test_icperf_deep_factor_return.py",
       "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py",
       "tests/momentum/Analysis/test_icperf_deep_sensitivity_oos.py",
