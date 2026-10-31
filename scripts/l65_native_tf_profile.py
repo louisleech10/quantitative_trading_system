@@ -27,7 +27,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--primary", default="12h")
     parser.add_argument("--secondary", default="1h")
     parser.add_argument("--cache-dir", default="data_cache/feature_klines")
-    parser.add_argument("--out-root", default="data_cache/profiles/l65_profile_native_tf")  # 證據與重跑沿用，不放系統暫存
+    parser.add_argument("--out-root", default="runs/profiles/l65_profile_native_tf")  # 量測中間檔：repo 內 runs/（不放系統暫存、不放 data_cache）
     parser.add_argument("--start-date", default=None)
     parser.add_argument("--end-date", default=None)
     parser.add_argument("--disable-rolling", action="store_true")

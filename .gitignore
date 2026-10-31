@@ -96,6 +96,8 @@ config/user_ic_config.yaml
 # Data cache
 data_cache/
 temp_data/
+# 驗證／量測之中間工作目錄（runs/<批次>/，每目錄附 README.txt；批次收尾由使用者刪；ICPERF SPEC v5.45 §G (2) ②）
+runs/
 *.h5
 *.hdf5
 
