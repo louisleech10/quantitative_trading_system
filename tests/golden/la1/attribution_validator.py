@@ -124,6 +124,18 @@ def symbol_tf_from_index(index: Any) -> Optional[str]:
     return f"{parts[0]}/{parts[1]}"
 
 
+def allowlist_row_key(d: dict[str, Any]) -> tuple:
+    """allowlist 五鍵之可 hash 鍵：old／new 以正準 JSON 表示（regime_kmeans.regime_names 等值為 list；ICPERF Task 0.5）。"""
+    return (d["path"], d["index"], json.dumps(d["old"], sort_keys=True, ensure_ascii=False),
+            json.dumps(d["new"], sort_keys=True, ensure_ascii=False), d["class"])
+
+
+def row_in_other_run_scope(row: dict[str, Any], baseline: dict[str, Any], run_symbol_tfs: set[str]) -> bool:
+    """row index 明指 `run_symbol_tfs` 中另一 SYMBOL/tf（非 `baseline` 之 symbol/tf）⇒ True（跨 symbol 列）。"""
+    st = symbol_tf_from_index(row.get("index"))
+    return st in run_symbol_tfs and st != artifact_symbol_tf(baseline)
+
+
 def artifact_symbol_tf(artifact: Any) -> Optional[str]:
     """baseline/live artifact 的 ``symbol``+``timeframe`` → ``SYMBOL/tf``。"""
     if not isinstance(artifact, dict):

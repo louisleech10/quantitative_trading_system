@@ -1,80 +1,157 @@
 {
-  "content_sha256": "5c96c867dc364e0c9ccdd48613e912030a2a208f138eebf996746db6a015cd32",
+  "content_sha256": "68632d02d53fb1cbd439f91838d01e0aa410edb79189de37df8fce11b661ea81",
   "discover_matrix": [
     {
       "control_kind": "regime_off",
-      "run_wall_s": 16.671,
+      "run_wall_s": 14.092,
       "symbol": "BTCUSDT",
       "timeframe": "1h",
       "volatile_paths": [
         "/generated_at",
         "/metadata/filtered_features_path",
-        "/metadata/filtered_generated_at"
+        "/metadata/filtered_generated_at",
+        "/metadata/stage_timings/stage0_ingestion",
+        "/metadata/stage_timings/stage1_preprocessing",
+        "/metadata/stage_timings/stage2_label_generation",
+        "/metadata/stage_timings/stage3_event_filter",
+        "/metadata/stage_timings/stage4_ic_calculation",
+        "/metadata/stage_timings/stage5_statistical_validation",
+        "/metadata/stage_timings/stage6_redundancy",
+        "/metadata/stage_timings/stage6b_marginal_ic",
+        "/metadata/stage_timings/stage7_report",
+        "/metadata/survivor_output/path",
+        "/metadata/survivor_output/sha256"
       ]
     },
     {
       "control_kind": "ls_off",
-      "run_wall_s": 16.542,
+      "run_wall_s": 23.844,
       "symbol": "BTCUSDT",
       "timeframe": "1h",
       "volatile_paths": [
         "/generated_at",
         "/metadata/filtered_features_path",
-        "/metadata/filtered_generated_at"
+        "/metadata/filtered_generated_at",
+        "/metadata/stage_timings/stage0_ingestion",
+        "/metadata/stage_timings/stage1_preprocessing",
+        "/metadata/stage_timings/stage2_label_generation",
+        "/metadata/stage_timings/stage3_event_filter",
+        "/metadata/stage_timings/stage4_ic_calculation",
+        "/metadata/stage_timings/stage5_statistical_validation",
+        "/metadata/stage_timings/stage6_redundancy",
+        "/metadata/stage_timings/stage6b_marginal_ic",
+        "/metadata/stage_timings/stage7_report",
+        "/metadata/survivor_output/path",
+        "/metadata/survivor_output/sha256"
       ]
     },
     {
       "control_kind": "non_trigger_fallback",
-      "run_wall_s": 16.565,
+      "run_wall_s": 23.772,
       "symbol": "BTCUSDT",
       "timeframe": "1h",
       "volatile_paths": [
         "/generated_at",
         "/metadata/filtered_features_path",
-        "/metadata/filtered_generated_at"
+        "/metadata/filtered_generated_at",
+        "/metadata/stage_timings/stage0_ingestion",
+        "/metadata/stage_timings/stage1_preprocessing",
+        "/metadata/stage_timings/stage2_label_generation",
+        "/metadata/stage_timings/stage3_event_filter",
+        "/metadata/stage_timings/stage4_ic_calculation",
+        "/metadata/stage_timings/stage5_statistical_validation",
+        "/metadata/stage_timings/stage6_redundancy",
+        "/metadata/stage_timings/stage6b_marginal_ic",
+        "/metadata/stage_timings/stage7_report",
+        "/metadata/survivor_output/path",
+        "/metadata/survivor_output/sha256"
       ]
     },
     {
       "control_kind": "regime_off",
-      "run_wall_s": 13.192,
+      "run_wall_s": 14.368,
       "symbol": "ETHUSDT",
       "timeframe": "12h",
       "volatile_paths": [
         "/generated_at",
         "/metadata/filtered_features_path",
-        "/metadata/filtered_generated_at"
+        "/metadata/filtered_generated_at",
+        "/metadata/stage_timings/stage0_ingestion",
+        "/metadata/stage_timings/stage1_preprocessing",
+        "/metadata/stage_timings/stage2_label_generation",
+        "/metadata/stage_timings/stage3_event_filter",
+        "/metadata/stage_timings/stage4_ic_calculation",
+        "/metadata/stage_timings/stage5_statistical_validation",
+        "/metadata/stage_timings/stage6_redundancy",
+        "/metadata/stage_timings/stage6b_marginal_ic",
+        "/metadata/stage_timings/stage7_report",
+        "/metadata/survivor_output/path",
+        "/metadata/survivor_output/sha256"
       ]
     },
     {
       "control_kind": "ls_off",
-      "run_wall_s": 13.277,
+      "run_wall_s": 14.625,
       "symbol": "ETHUSDT",
       "timeframe": "12h",
       "volatile_paths": [
         "/generated_at",
         "/metadata/filtered_features_path",
-        "/metadata/filtered_generated_at"
+        "/metadata/filtered_generated_at",
+        "/metadata/stage_timings/stage0_ingestion",
+        "/metadata/stage_timings/stage1_preprocessing",
+        "/metadata/stage_timings/stage2_label_generation",
+        "/metadata/stage_timings/stage3_event_filter",
+        "/metadata/stage_timings/stage4_ic_calculation",
+        "/metadata/stage_timings/stage5_statistical_validation",
+        "/metadata/stage_timings/stage6_redundancy",
+        "/metadata/stage_timings/stage6b_marginal_ic",
+        "/metadata/stage_timings/stage7_report",
+        "/metadata/survivor_output/path",
+        "/metadata/survivor_output/sha256"
       ]
     },
     {
       "control_kind": "non_trigger_fallback",
-      "run_wall_s": 13.317,
+      "run_wall_s": 14.609,
       "symbol": "ETHUSDT",
       "timeframe": "12h",
       "volatile_paths": [
         "/generated_at",
         "/metadata/filtered_features_path",
-        "/metadata/filtered_generated_at"
+        "/metadata/filtered_generated_at",
+        "/metadata/stage_timings/stage0_ingestion",
+        "/metadata/stage_timings/stage1_preprocessing",
+        "/metadata/stage_timings/stage2_label_generation",
+        "/metadata/stage_timings/stage3_event_filter",
+        "/metadata/stage_timings/stage4_ic_calculation",
+        "/metadata/stage_timings/stage5_statistical_validation",
+        "/metadata/stage_timings/stage6_redundancy",
+        "/metadata/stage_timings/stage6b_marginal_ic",
+        "/metadata/stage_timings/stage7_report",
+        "/metadata/survivor_output/path",
+        "/metadata/survivor_output/sha256"
       ]
     }
   ],
   "observed_pointers": [
     "/generated_at",
     "/metadata/filtered_features_path",
-    "/metadata/filtered_generated_at"
+    "/metadata/filtered_generated_at",
+    "/metadata/stage_timings/stage0_ingestion",
+    "/metadata/stage_timings/stage1_preprocessing",
+    "/metadata/stage_timings/stage2_label_generation",
+    "/metadata/stage_timings/stage3_event_filter",
+    "/metadata/stage_timings/stage4_ic_calculation",
+    "/metadata/stage_timings/stage5_statistical_validation",
+    "/metadata/stage_timings/stage6_redundancy",
+    "/metadata/stage_timings/stage6b_marginal_ic",
+    "/metadata/stage_timings/stage7_report",
+    "/metadata/survivor_output/path",
+    "/metadata/survivor_output/sha256"
   ],
-  "observed_pointers_sha256": "35d57589bc7b4b0d984d75c78bb045e1e2f31b8194d5a766e95d47ddbc11358c",
+  "observed_pointers_sha256": "27ebfc38bea83b25685b2db62782a54236e267aa5d22184782f9737c6756ec52",
   "receipt_note": "paths = union of exact RFC6901 leaf diffs across CONTROL_KINDS×RUNS with isolated tmp; only producer-clear timestamp/tmp-path admitted; numeric/set/order diffs fail closed",
-  "rules_sha256": "763ecc7090c47e730a1f01c1e99d70a9f59bb6cbeb5b26f77cdff0b90a01e5be",
+  "rules_sha256": "bd2bfb9cc2a89372ae3f993216ad0d4acfec88f3093f43dfd782aacd4e8d5599",
   "schema_version": "la1_control_volatile_receipt_v1"
 }

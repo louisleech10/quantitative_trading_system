@@ -25,7 +25,9 @@ from tests.golden.la1.attribution_validator import (
     allowlist_rows_fingerprint,
     deep_equal_json,
     load_allowlist,
+    allowlist_row_key as _diff_key,
     recursive_json_diff,
+    row_in_other_run_scope,
     validate_allowlist_not_expanded,
     validate_b4_attribution,
     validate_diffs_or_raise,
@@ -122,6 +124,10 @@ def _allowlist_row_in_baseline_scope(row: dict, baseline: dict) -> bool:
     對側 baseline；同 path 的 value_sha256 則以 old≠B0 區分。
     """
     path = str(row.get("path") or "")
+    # ICPERF Task 0.5：index 明指另一 run 之 SYMBOL/tf（如 BTC kmeans 之 regime_kmeans.name_set_sha256，B0 兩側同值）
+    # ⇒ 不屬本 baseline 符號域（只比 path＋old 會誤判為本側）
+    if row_in_other_run_scope(row, baseline, {f"{r['symbol']}/{r['timeframe']}" for r in RUNS}):
+        return False
     found, leaf = _resolve_baseline_leaf(baseline, path)
     if not found:
         return False
@@ -988,16 +994,8 @@ def test_b4_cross_symbol_eth_independent() -> None:
     # 共享 allowlist 含 BTC recursive 列；本測只跑 ETH/12h，builder 無法產出
     # BTC leaf → 反向只要求「path 在 ETH baseline 且 old==ETH B0 leaf」。
     # 禁為綠刪 BTC 真 diff（BTC reverse / B4 BTC forward 仍需那些列）。
-    # allowlist P1-1c 五鍵皆為可 hash 標量；recursive walker 偶有 dict leaf
-    # （非 P1-1c 帳本列），建 set 時略過 unhashable，不影響 reverse 比對。
-    produced_keys: set[tuple] = set()
-    for d in all_diffs:
-        key = (d["path"], d["index"], d["old"], d["new"], d["class"])
-        try:
-            hash(key)
-        except TypeError:
-            continue
-        produced_keys.add(key)
+    # 五鍵經 `_diff_key` 以正準 JSON 表示 old／new（list／dict 值亦可 hash，不再略過）
+    produced_keys: set[tuple] = {_diff_key(d) for d in all_diffs}
     required_prefixes = ("xgboost_phases.", "regime_kmeans.")
     n_km_allow = 0
     n_xgb_allow = 0
@@ -1015,7 +1013,7 @@ def test_b4_cross_symbol_eth_independent() -> None:
             n_km_allow += 1
         else:
             n_xgb_allow += 1
-        key = (row["path"], row["index"], row["old"], row["new"], row["class"])
+        key = _diff_key(row)
         assert key in produced_keys, f"allowlist P1-1c row not produced (ETH): {row}"
     assert n_km_allow > 0, "allowlist missing ETH-scoped regime_kmeans.* P1-1c rows"
     assert n_xgb_allow > 0, "allowlist missing ETH-scoped xgboost_phases.* P1-1c rows"

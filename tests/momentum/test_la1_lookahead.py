@@ -22,6 +22,7 @@ collect 不觸 data_cache 副作用。
 from __future__ import annotations
 
 import json
+import re
 import logging
 from collections import Counter
 from pathlib import Path
@@ -43,7 +44,9 @@ from momentum.Analysis.regime_detector import RegimeDetectionResult, RegimeDetec
 from momentum.core.exceptions import InvalidInputError
 from momentum.factories import create_kline_storage_manager, create_regime_detector
 from tests.golden.la1.attribution_validator import (
+    allowlist_row_key,
     load_allowlist,
+    row_in_other_run_scope,
     validate_diffs,
     validate_diffs_or_raise,
 )
@@ -306,9 +309,12 @@ def _allowlist_row_in_baseline_scope(row: dict, baseline: dict) -> bool:
     """列是否屬於本測 baseline 符號域（path 存在且 old==B0 leaf）。
 
     共享 allowlist 混有 BTC+ETH 真 diff：ETH feature 子集 path 不在 BTC
-    baseline；同 path 的 value_sha256/value_counts 則以 old≠B0 區分。
+    baseline；同 path 的 value_sha256/value_counts 則以 old≠B0 區分；index 明指另一 run 之 SYMBOL/tf 者
+    （ICPERF Task 0.5）不屬本側。
     """
     path = str(row.get("path") or "")
+    if row_in_other_run_scope(row, baseline, {f"{r['symbol']}/{r['timeframe']}" for r in RUNS}):
+        return False
     found, leaf = _resolve_baseline_leaf(baseline, path)
     if not found:
         return False
@@ -685,9 +691,7 @@ def _assert_kmeans_pit(
     # 不同 old 的 value_sha256/value_counts）。本測只跑 BTC/1h，builder 無法
     # 產出 ETH leaf → 反向只要求「path 在 BTC baseline 且 old==B0 leaf」。
     # 禁為綠刪 ETH 真 diff（B4 ETH forward 仍需那些列）。
-    produced_keys = {
-        (d["path"], d["index"], d["old"], d["new"], d["class"]) for d in all_diffs
-    }
+    produced_keys = {allowlist_row_key(d) for d in all_diffs}  # old／new 可為 list（regime_names）
     required_prefixes = ("xgboost_phases.", "regime_kmeans.")
     n_km_allow = 0
     n_xgb_allow = 0
@@ -701,11 +705,15 @@ def _assert_kmeans_pit(
         if not _allowlist_row_in_baseline_scope(row, baseline):
             n_cross_symbol_skipped += 1
             continue
+        if re.fullmatch(r"regime_kmeans\.per_regime\.[^.]+", path):
+            # 整個 regime 於 live 消失之物件層列（ICPERF Task 0.5：BTC 1h 樣本外測試段 kmeans 3 名、B0 4 名）：
+            # 屬五路徑 recursive diff（test_b4 BTC 正向比對），PIT builder 只產其下逐葉列（上方 _add）
+            continue
         if path.startswith("regime_kmeans."):
             n_km_allow += 1
         else:
             n_xgb_allow += 1
-        key = (row["path"], row["index"], row["old"], row["new"], row["class"])
+        key = allowlist_row_key(row)
         assert key in produced_keys, f"allowlist P1-1c row not produced: {row}"
     assert n_km_allow > 0, "allowlist missing BTC-scoped regime_kmeans.* P1-1c rows"
     assert n_xgb_allow > 0, "allowlist missing BTC-scoped xgboost_phases.* P1-1c rows"
@@ -1335,11 +1343,15 @@ def test_fallback_loud_and_status(
 
     orch_ok = create_ic_analyzer()
     _isolate_orchestrator_persist(orch_ok)
+    # ICPERF SPEC v5.43 Task 0.5 (a)：BTC 1h 預設窗換算後預檢須測試段 ≥ 1517 列 > 395 列 ⇒ 樣本外請求加視窗覆寫
+    # （`gen_baseline.with_run_windows`，與 golden 產生器同一來源）
+    from tests.golden.la1.gen_baseline import with_run_windows
+
     report_ok = orch_ok.analyze(
         features_path=str(ok_h5.resolve()),
         labels_path="",
         meta_path=str(ok_meta.resolve()),
-        config_override={
+        config_override=with_run_windows(ok_meta, {
             "ic_train_test_split": True,
             "thresholds": {
                 "ic_mean_min": -1.0,
@@ -1352,7 +1364,7 @@ def test_fallback_loud_and_status(
             },
             "grouped_analysis": {"by_regime": False},
             "report": {"include_regime_analysis": False},
-        },
+        }),
         kline_reader=kline_reader,
     )
     assert report_ok.get("analysis_status") == "ok_oos"

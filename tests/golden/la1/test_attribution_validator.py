@@ -711,14 +711,17 @@ def test_zero_diff_justifications_schema() -> None:
 # ---------------------------------------------------------------------------
 # 凍結 fingerprint = **literal 常數**（B4 supp+supp2 雙家授權後 re-stamp）
 # 禁止從 live allowlist 自算 expected（same-count replace 會自動洗成新基準）。
-# 來源：allowlist-supp(384)+supp2(+37 BTC P1-1, +4 added_key) → rows=421
-#      → allowlist_rows_fingerprint(...) = 2e0991f4…b32888
-FROZEN_ALLOWLIST_GIT_REF = "B4-supp2"
+# 來源：allowlist-supp(384)+supp2(+37 BTC P1-1, +4 added_key) → rows=421（B4-supp2）
+# → ICPERF Task 0.5（docs/ICPERF_SPEC.md v5.43；2026-11-01）以 tests/golden/la1/regen_allowlist.py 重錄：rows=470
+#   （P1-1 80→123、P1-1c 134→141、P1-2 141→140、P1-3-obs 66→66；新增／消失之 (path, index) 見
+#   handoffs/run_receipts/20261101-la1-allowlist-summary.json，送 code review 審 diff）
+#      → allowlist_rows_fingerprint(...) = 7be70ddd…4f73bc（含 4 列 added_key，同 B4-supp2）
+FROZEN_ALLOWLIST_GIT_REF = "ICPERF-T0.5"
 FROZEN_ALLOWLIST_ROWS_SHA256 = (
-    "2e0991f45e2d155cd2a683528f338778bca6750f53feacb4f721666173b32888"
+    "7be70ddd613c8efddf125e5d3fe3368ad5f1a061b962cc2d4317985d714f73bc"
 )
-# 契約鎖：B4 收口後 rows 基數（防靜默 append 換綠）
-FROZEN_ALLOWLIST_ROW_COUNT = 421
+# 契約鎖：重錄後 rows 基數（防靜默 append 換綠）
+FROZEN_ALLOWLIST_ROW_COUNT = 470
 
 WASH_CASES = (
     "early_mask_impersonate_p1_1",

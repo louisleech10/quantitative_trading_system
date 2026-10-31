@@ -19,5 +19,82 @@
     "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:3490",
     "reason": "mirrors report generated_at after filtered features write",
     "validator": "iso8601_timestamp"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage0_ingestion",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage1_preprocessing",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage2_label_generation",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage3_event_filter",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage4_ic_calculation",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage5_statistical_validation",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage6_redundancy",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage6b_marginal_ic",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "float",
+    "pointer": "/metadata/stage_timings/stage7_report",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+    "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+    "validator": "nonneg_finite_seconds"
+  },
+  {
+    "expected_type": "str",
+    "pointer": "/metadata/survivor_output/path",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:6540",
+    "reason": "absolute path under process-local sidefx tmp for survivor JSON (GAP-2 Task 4.2)",
+    "validator": "isolated_tmp_json_path"
+  },
+  {
+    "expected_type": "str",
+    "pointer": "/metadata/survivor_output/sha256",
+    "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:6530",
+    "reason": "sha256 of survivor JSON bytes, which embed generated_at and filtered-h5 hash (per-run)",
+    "validator": "sha256_hex"
   }
 ]

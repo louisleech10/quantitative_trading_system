@@ -138,7 +138,26 @@ _ISOLATED_TMP_PATH_RE = re.compile(
 _VALIDATOR_REGEX: dict[str, "re.Pattern[str]"] = {
     "iso8601_timestamp": _ISO8601_TS_RE,
     "isolated_tmp_path": _ISOLATED_TMP_PATH_RE,
+    # ICPERF Task 0.5：GAP-2 Task 4.2（2026-09）起產品寫 `metadata.survivor_output`——倖存者 JSON 落 sidefx tmp、
+    # 其檔 sha256 隨檔內 generated_at／features_source_hash（filtered h5 之時戳屬性）而每次不同；倖存者成員本身由
+    # summary_table 照比
+    "isolated_tmp_json_path": re.compile(
+        r"(?:^|/)(?:var/folders|tmp|private/var/folders).*la1_b0_sidefx_.+/ic_survivors_[^/]+\.json$",
+        re.IGNORECASE,
+    ),
+    "sha256_hex": re.compile(r"^[0-9a-f]{64}$"),
 }
+#: 數值型 volatile 之驗證器（ICPERF Task 0.5：FU-3〔2026-09〕起產品寫 `metadata.stage_timings` 逐段牆鐘秒數，
+#: la1 凍結於 7 月故未列）：有限且 ≥ 0 之 float
+_VALIDATOR_NUMERIC: dict[str, Any] = {
+    "nonneg_finite_seconds": lambda v: isinstance(v, float) and math.isfinite(v) and v >= 0.0,
+}
+#: `metadata.stage_timings` 之鍵（封閉集合；`ic_filter_orchestrator.py` `_timed_stage` 之 stage 名）
+_STAGE_TIMING_KEYS = (
+    "stage0_ingestion", "stage1_preprocessing", "stage2_label_generation", "stage3_event_filter",
+    "stage4_ic_calculation", "stage5_statistical_validation", "stage6_redundancy", "stage6b_marginal_ic",
+    "stage7_report",
+)
 _KNOWN_VOLATILE_PRODUCERS: dict[str, dict[str, str]] = {
     "/generated_at": {
         "expected_type": "str",
@@ -157,6 +176,27 @@ _KNOWN_VOLATILE_PRODUCERS: dict[str, dict[str, str]] = {
         "validator": "isolated_tmp_path",
         "reason": "absolute path under process-local sidefx tmp for filtered HDF5",
         "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:3488",
+    },
+    "/metadata/survivor_output/path": {
+        "expected_type": "str",
+        "validator": "isolated_tmp_json_path",
+        "reason": "absolute path under process-local sidefx tmp for survivor JSON (GAP-2 Task 4.2)",
+        "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:6540",
+    },
+    "/metadata/survivor_output/sha256": {
+        "expected_type": "str",
+        "validator": "sha256_hex",
+        "reason": "sha256 of survivor JSON bytes, which embed generated_at and filtered-h5 hash (per-run)",
+        "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:6530",
+    },
+    **{
+        f"/metadata/stage_timings/{k}": {
+            "expected_type": "float",
+            "validator": "nonneg_finite_seconds",
+            "reason": "per-stage wall-clock seconds (FU-3 _attach_stage_timings)",
+            "producer_ref": "momentum/Analysis/ic_filter_orchestrator.py:1918",
+        }
+        for k in _STAGE_TIMING_KEYS
     },
 }
 
@@ -920,6 +960,13 @@ def validate_volatile_value(value: Any, rule: dict[str, Any]) -> None:
             f"expected {expected} got {got}"
         )
     validator = str(rule.get("validator") or "")
+    if validator in _VALIDATOR_NUMERIC:
+        if not _VALIDATOR_NUMERIC[validator](value):
+            raise ValueError(
+                f"volatile format fail at {rule.get('pointer')}: "
+                f"validator={validator} value={value!r}"
+            )
+        return
     if validator not in _VALIDATOR_REGEX:
         raise ValueError(
             f"unknown validator {validator!r} at {rule.get('pointer')}"
@@ -1188,6 +1235,16 @@ def discover_volatile_pointers(
                     f"left_type={_python_type_name(left)} "
                     f"right_type={_python_type_name(right)}"
                 )
+            # 牆鐘秒數於產品端 round 至 3 位（`ic_filter_orchestrator.py` `_timed_stage`），兩跑可恰相等而未出現在
+            # leaf diff，日後比對時即不定紅 ⇒ 兩跑皆存在且值合法之 stage_timings 鍵一律列入（本質非決定性，同
+            # `tests/momentum/helpers/ichc_run` 之 `_CLOCK_KEYS`）
+            for k in _STAGE_TIMING_KEYS:
+                ptr = f"/metadata/stage_timings/{k}"
+                if rfc6901_exists(r1, ptr) and rfc6901_exists(r2, ptr):
+                    rule = {"pointer": ptr, **_KNOWN_VOLATILE_PRODUCERS[ptr]}
+                    validate_volatile_value(rfc6901_get(r1, ptr), rule)
+                    validate_volatile_value(rfc6901_get(r2, ptr), rule)
+                    observed.append(ptr)
             if bad:
                 raise RuntimeError(
                     "discover_volatile_pointers FAIL nondeterminism: "
@@ -1618,6 +1675,28 @@ def check_control_artifacts() -> None:
     )
 
 
+#: ICPERF SPEC v5.43 Task 0.5 (a)：BTC 1h 之預設窗（`config/ic_config.yaml` rolling_windows [21,63,126]、icir.window 63，
+#: reference_tf 12h ⇒ 1h 換算 ×12 ＝ 1512、756）使樣本外預檢須測試段 ≥ 1517 列（`_rolling_warmup_min_rows`）> tail2000
+#: 之 395 列而退回全樣本 ⇒ 改 [21]／21（換算 252；預檢 257 ≤ 395；同 `tests/momentum/Analysis/test_ic_1a_cut1_split.py`
+#: 之作法）。只套 BTC 1h；ETH 12h 預設窗即過預檢，維持預設以保留預設窗之路徑覆蓋。
+RUN_WINDOW_OVERRIDES: dict[tuple[str, str], dict[str, Any]] = {
+    ("BTCUSDT", "1h"): {"rolling_windows": [21], "icir": {"window": 21}},
+}
+
+
+def with_run_windows(meta_path: Path, config_override: Optional[dict[str, Any]]) -> dict[str, Any]:
+    """依 meta 之 (symbol, timeframe) 把 `RUN_WINDOW_OVERRIDES` 併入 `config_override["ic_calculation"]`（深合併，回新 dict；
+    原有之 ic_calculation 鍵保留）。未列之 (symbol, timeframe) ⇒ 原樣（複本）。"""
+    out = json.loads(json.dumps(config_override or {}))
+    meta = json.loads(Path(meta_path).read_text(encoding="utf-8"))
+    patch = RUN_WINDOW_OVERRIDES.get((str(meta.get("symbol")), str(meta.get("timeframe"))))
+    if patch:
+        ic = out.setdefault("ic_calculation", {})
+        ic["rolling_windows"] = list(patch["rolling_windows"])
+        ic["icir"] = {**(ic.get("icir") or {}), **patch["icir"]}
+    return out
+
+
 def _run_analyze(
     h5_path: Path,
     meta_path: Path,
@@ -1630,7 +1709,7 @@ def _run_analyze(
         features_path=str(h5_path.resolve()),
         labels_path="",
         meta_path=str(meta_path.resolve()),
-        config_override=config_override,
+        config_override=with_run_windows(meta_path, config_override),
         kline_reader=kline_reader,
     )
     return orchestrator, report
