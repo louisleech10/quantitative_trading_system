@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/20261031-icperf-volatile-probe.json",
+      "code_sha256": "74348849ef7c6d79f7d1d341a1755778ee8ba537fbc5203e21cdef897103577b",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 volatile 整格實測；凍結 HEAD c421051d、開跑前檢查 33079ace）",
+      "created_at": "2026-10-31T21:58:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 14400,
+  "basis": [
+    "volatile 實測＝OUTPUT_ITEMS 七項各以凍結所記之整格請求重跑一次（不含第 (2) 項子集與 PIT 標籤）",
+    "同碼凍結實跑 2026-10-31（stat 實查工作目錄建立時間）：ic_report 17:44:49–18:29:13（44 分）；其餘六項 18:58:50（deep_analysis 建立）–21:25:18（event_import_report 建立，該項數分鐘）約 2 小時 30 分；合計約 3 小時 15 分",
+    "上限取 4 小時 14400 秒（同凍結估時收據 handoffs/run_receipts/20261031-icperf-freeze-estimate.json）；本跑為 SPEC §G 業界判定非決定性欄位之同輸入重跑，SPEC 已明列不以小規模代替（小規模漏判整格才出現之欄位）",
+    "磁碟可用 36 GB（df 實查）；工作根 data_cache/icperf_inputs/runs/（凍結工作目錄 849 MB 同量級）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

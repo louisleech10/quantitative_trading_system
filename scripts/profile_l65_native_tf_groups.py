@@ -593,7 +593,8 @@ def main() -> int:
         print(f"BLOCKED: missing {KLINE_CACHE}")
         return 2
 
-    tmp_root = args.tmp_root or Path("/tmp") / f"l65_native_profile_{int(time.time())}"
+    # 量測輸出（profile_results.json 為證據）放 repo 內 data_cache/，不放系統暫存（macOS 會清除）
+    tmp_root = args.tmp_root or PROJECT_ROOT / "data_cache" / "profiles" / f"l65_native_profile_{int(time.time())}"
     tmp_root.mkdir(parents=True, exist_ok=True)
 
     before = _snapshot_data_cache_files()

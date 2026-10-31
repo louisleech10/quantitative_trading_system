@@ -7395,6 +7395,25 @@
    "rewrite_targets": [],
    "ticket": "GOVERNANCE"
   },
+  "tests/governance/test_temp_output_guard.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_temp_output_guard.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/governance/test_template_check_todofmt.py": {
    "claim": [
     "contract"

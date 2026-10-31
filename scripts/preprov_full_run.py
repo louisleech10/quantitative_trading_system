@@ -37,7 +37,7 @@
 輸出約 0.6 GB＋暫存約 8 GB。**須獨占機器**，不得與委員輪或其他重型跑並行。
 
 用法：
-  venv/bin/python scripts/preprov_full_run.py --out-root /private/tmp/preprov_full --receipt /private/tmp/preprov_full/receipt.json
+  venv/bin/python scripts/preprov_full_run.py --out-root data_cache/preprov_full --receipt data_cache/preprov_full/receipt.json
   # 末行輸出 `RUN_DIR=<path>`，接著：
   venv/bin/python scripts/preprov_output_size.py --full-run-dir <path>
 rc：0＝生成完成並寫收據；1＝生成失敗（收據仍寫出，含錯誤）；2＝參數不合（out-root 位於 repo data_cache 下或非空）。

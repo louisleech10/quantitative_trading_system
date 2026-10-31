@@ -5664,8 +5664,9 @@ def _run_subbatch(g: Any, root: Path, manifest_path: str, phase: int, base: str,
         manifest = json.loads(mbytes.decode("utf-8"))
     except (OSError, ValueError) as exc:
         raise TestregError(f"MANIFEST {manifest_path}: 不存在或不可解析") from exc
+    # 分批續跑沿用前次結果（per_file reused）⇒ 放 repo 內 data_cache/，不放系統暫存（macOS 逾 3 日清除）
     out = Path(out).resolve() if out is not None else \
-        Path(tempfile.gettempdir()) / f"testreg_run_p{phase}_{base_sha[:12]}"
+        root / "data_cache" / "testreg_runs" / f"testreg_run_p{phase}_{base_sha[:12]}"
     out.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, PYTHONPATH=str(root))
     changed = _subbatch_changed(g, root, base_sha)

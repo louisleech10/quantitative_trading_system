@@ -87,6 +87,7 @@
 | `spec_xref_check.sh` | 常態檢查 | pre-commit  |
 | `status_marker_check.sh` | 常態檢查 | Stop  |
 | `strategy_wiring_check.sh` | 常態檢查 | 未掛 |
+| `temp_output_guard.sh` | 常態檢查 | PreToolUse  |
 | `template_check.sh` | 常態檢查 | gate gov_check  |
 | `test_template_check.sh` | 一次性驗證 | 未掛 |
 | `testreg_write_guard.sh` | 常態檢查 | PostToolUse pre-commit  |
@@ -122,8 +123,10 @@
 | `heavy_run_guard.py` | 常態檢查 | 未掛 |
 | `ic_wiring_check.py` | 常態檢查 | 未掛 |
 | `patch_locus_check.py` | 常態檢查 | 未掛 |
+| `py_compile_check.py` | 常態檢查 | 未掛 |
 | `register_anchor_check.py` | 常態檢查 | 未掛 |
 | `strategy_wiring_check.py` | 常態檢查 | 未掛 |
+| `temp_output_guard.py` | 常態檢查 | 未掛 |
 | `timeout_write_guard.py` | 常態檢查 | 未掛 |
 | `verification_claim_check.py` | 常態檢查 | pre-commit commit-msg  |
 | `verify_audit_chain.py` | 常態檢查 | 未掛 |
