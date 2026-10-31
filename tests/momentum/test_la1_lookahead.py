@@ -608,12 +608,12 @@ def _assert_kmeans_pit(
             {"f0": short_c.pct_change().fillna(0.0)}, index=short_c.index
         )
         lab = short_c.pct_change().fillna(0.0)
-        raw = pd.DataFrame({"close": short_c, "volume": short_v})
+        # ICPERF Task 0.4 ㊳：第 5 參數改為 volume 序列（原傳整個 raw kline 表再於內部取 volume）
         engine._compute_regime_groups_kmeans(
             feats,
             lab,
             short_c,
-            raw,
+            short_v,
             {
                 "regime_kmeans": {
                     "n_clusters": 4,

@@ -469,7 +469,7 @@ def ref_feature_quality_diagnostics(
         v = features_df[name].to_numpy(dtype=float)
         adf[name] = _ref_adf(v, c["adf_significance"], c["adf_min_samples"])
         ac[name] = _ref_ljungbox(v, c["ljungbox_lags"], c["ljungbox_significance"])
-        nn = int((~np.isnan(v)).sum())
+        nn = int(np.isfinite(v).sum())  # SPEC Task 0.4 ㊴：有效值＝有限值
         cov[name] = {"coverage": float(nn / total) if total > 0 else 0.0, "nan_count": int(total - nn), "total": int(total)}
         if rolling_ic_dict:
             series = rolling_ic_dict.get(name)

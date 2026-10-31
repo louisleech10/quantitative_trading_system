@@ -90,6 +90,38 @@ def rel_tol_for(path: Any) -> float:
     return DERIVED_REL_TOL if tolerance_class(path) == "derived" else REL_TOL
 
 
+#: SPEC v5.42 Task 0.3 ④（r55 群集 A）：相關係數類有界直接統計量（值域 [−1, 1]）之絕對下限，同 `numpy.isclose`
+#: |a−b| ≤ atol＋rtol·|b|；值近 0 時純相對誤差把倍精度捨入（eps 2.2e-16 量級之絕對差）放大成逾 1e-12，故加 atol。
+#: 只適用 `BOUNDED_FIELD_PATTERNS`；其餘直接統計量與衍生量 atol＝0（純相對）。
+BOUNDED_ABS_TOL = 1e-15
+#: 相關係數類有界量之涵蓋鍵（收據 `/…` 形式；滾動／分組／衰減／截面 IC、相關矩陣格、摘要 IC 均值與標準差、邊際 IC、
+#: lag-1 自相關）
+BOUNDED_FIELD_PATTERNS = (
+    r"^/rolling_ic_series/",
+    r"^@rolling_ic_full$",  # 收據工具內部鍵：切測試段前之完整滾動 IC 序列（rolling_ic_icir 項）
+    r"^/ic_decay/[^/]+/ic_values$",
+    r"^/grouped_ic/",
+    r"^/cross_sectional_symbol_ic/matrix/",
+    r"^/correlation_matrix/matrix(/#)*$",
+    r"^/summary_table/#/(ic_mean|ic_std)$",
+    r"^/marginal_ic/.*/(marginal_ic|gross_ic|marginal_ic_train_insample)$",
+    r"^/turnover_analysis/[^/]+/autocorrelation$",
+)
+
+
+def abs_tol_for(path: Any) -> float:
+    """欄位路徑之絕對下限（命中 `BOUNDED_FIELD_PATTERNS` ⇒ `BOUNDED_ABS_TOL`，否則 0）。"""
+    return BOUNDED_ABS_TOL if any(re.search(p, str(path)) for p in BOUNDED_FIELD_PATTERNS) else 0.0
+
+
+def rel_excess(a: float, b: float, path: Any) -> float:
+    """扣除絕對下限後之相對誤差 max(|a−b|−atol, 0)／|b|；b≠0 時 ≤ `rel_tol_for(path)` 等價於
+    `numpy.isclose(a, b, rtol, atol)`；b 為 0 ⇒ 扣除後之絕對誤差（沿用 SPEC v5.39「oracle 為 0 ⇒ 絕對誤差」）。
+    收據工具 `Tally.num` 與本檔一致判準共用。"""
+    d = max(abs(a - b) - abs_tol_for(path), 0.0)
+    return d / abs(b) if b != 0 else d
+
+
 #: SPEC Task 0.3 衰減擬合 ②：產品殘差平方和之容許倍數
 SSR_SLACK = 1e-9
 #: SPEC Task 0.3 衰減擬合 ②：oracle 之 curve_fit 設定（固定起點集合、maxfev；不含產品參數）
@@ -206,11 +238,17 @@ def test_correctness_receipt_items_and_verdicts() -> None:
     （本機無多標的資料，附原因）；逐項 tests 綁定本檔實存之測試（最少項須含 `ITEM_TESTS` 之一）。"""
     receipt = _single(CORRECTNESS_PATTERN)
     assert re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("head") or "")), "收據須記執行時之提交 head"
+    # SPEC v5.42 Task 0.3 ⑫（r55 群集 E）：收據綁其所驗之程式內容（head 恆為建檔時之前一提交，不足以綁定）——程式改動後
+    # 未重產收據 ⇒ 不符
+    assert receipt.get("code_sha256") == _receipt_tool().receipt_code_sha256(), \
+        "收據之 code_sha256 與現行工作樹不符：程式已改而收據未重產"
     assert receipt["tolerance"]["relative"] == REL_TOL
     # SPEC v5.39 ⑪：收據 spec 欄之版本號＝SPEC 首個版本行（不寫死）；④：衍生量門檻同本檔
     assert _spec_version_of(receipt.get("spec")) == _spec_version_of(SPEC_PATH.read_text(encoding="utf-8")), \
         f"收據 spec 欄 {receipt.get('spec')!r} 與 SPEC 現行版本不符"
     assert receipt["tolerance"].get("derived_relative") == DERIVED_REL_TOL, "收據須記衍生量判準（SPEC v5.39 ④）"
+    assert receipt["tolerance"].get("bounded_absolute") == BOUNDED_ABS_TOL and \
+        receipt["tolerance"].get("bounded_patterns") == list(BOUNDED_FIELD_PATTERNS), "收據須記有界量絕對下限（SPEC v5.42 ④）"
     items = receipt["items"]
     assert REQUIRED_ITEMS <= set(items), f"收據缺 SPEC 最少項：{sorted(REQUIRED_ITEMS - set(items))}"
     module = sys.modules[__name__]
@@ -731,9 +769,28 @@ def test_point_ic_matches_scipy(method: str, with_nan: bool) -> None:
     df = _point_inputs(with_nan)
     got = ICEngine({}).compute_ic(df[["a", "b"]], df["label"], method)
     for feat in ("a", "b"):
-        pair = df[[feat, "label"]].dropna()
+        pair = df[[feat, "label"]]
+        pair = pair[np.isfinite(pair.to_numpy(dtype=float)).all(axis=1)]
         exp = float(_SCIPY[method](pair[feat], pair["label"])[0])
         assert _rel(float(got[feat]), exp) <= REL_TOL, f"{method}/{feat}：{got[feat]} vs scipy {exp}"
+
+
+@pytest.mark.parametrize("method", sorted(_SCIPY))
+@pytest.mark.parametrize("with_nan", [False, True])
+def test_point_ic_excludes_inf_like_missing(method: str, with_nan: bool) -> None:
+    """SPEC Task 0.4 ㊴（r55 群集 C）：特徵或標籤含 ±inf ⇒ 該列同缺值剔除（alphalens get_clean_factor 之 np.isfinite），
+    向量化路徑（無 NaN、只含 inf ⇒ 改走逐對）與逐對路徑皆 == scipy 於共同有限列；mutation：產品保留 inf（dropna 或
+    ~isnan）⇒ Spearman 把 inf 排為極值、Pearson 為 NaN，與 oracle 不等。"""
+    df = _point_inputs(with_nan).copy()
+    df.loc[df.index[3], "a"] = np.inf
+    df.loc[df.index[11], "b"] = -np.inf
+    df.loc[df.index[17], "label"] = np.inf
+    got = ICEngine({}).compute_ic(df[["a", "b"]], df["label"], method)
+    for feat in ("a", "b"):
+        pair = df[[feat, "label"]]
+        pair = pair[np.isfinite(pair.to_numpy(dtype=float)).all(axis=1)]
+        exp = float(_SCIPY[method](pair[feat], pair["label"])[0])
+        assert math.isfinite(exp) and _rel(float(got[feat]), exp) <= REL_TOL, f"{method}/{feat}：{got[feat]} vs {exp}"
 
 
 # ── 真實 kline（requires_kline，秒級）─────────────────────────────────────────────────────────────────
@@ -820,7 +877,7 @@ def _ic_oracle(x: Any, y: Any, method: str) -> float:
     """點 IC 之 oracle（同 `compute_ic` 之對齊與 NaN 處理，ic_engine.py:181-210、:1196-1213、:1513-1531）：兩欄共同非 NaN
     列；列數 < 2 或任一常數 ⇒ NaN；否則 scipy 對應函式。"""
     xa, ya = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
-    ok = ~np.isnan(xa) & ~np.isnan(ya)
+    ok = np.isfinite(xa) & np.isfinite(ya)  # SPEC ㊴：±inf 同缺值（alphalens get_clean_factor 之 np.isfinite）
     xa, ya = xa[ok], ya[ok]
     if xa.size < 2 or np.ptp(xa) == 0 or np.ptp(ya) == 0:
         return math.nan
@@ -856,10 +913,18 @@ def _ref_regime_masks(close: pd.Series, low_pct: float = 20.0, high_pct: float =
         return {"bull": c > ema, "bear": c < ema, "high_vol": vol >= hi, "low_vol": vol <= lo}
 
 
+def _ref_regime_masks_sampled(regime_close: pd.Series, keys: pd.Index) -> Dict[str, np.ndarray]:
+    """SPEC Task 0.4 ㊳：regime 遮罩於完整連續收盤（只用 0..t）算出後取樣於分析列之時間鍵；鍵不在序列 ⇒ False。"""
+    full = _ref_regime_masks(regime_close)
+    return {k: pd.Series(m, index=regime_close.index).reindex(keys).fillna(False).to_numpy(dtype=bool)
+            for k, m in full.items()}
+
+
 def _ref_grouped_ic(features: pd.DataFrame, label: pd.Series, close: pd.Series, metadata: Mapping[str, Mapping[str, Any]],
-                    method: str) -> Dict[str, Any]:
+                    method: str, regime_close: Optional[pd.Series] = None) -> Dict[str, Any]:
     """分組 IC 之 oracle（SPEC Task 0.3：依請求方法逐群組以 scipy 重算）：年度、季度（`<年>Q<季>`）、regime 規則四組、
-    metadata 之 category／data_source／layer（值為 None 者不入組）；組內列數 0 ⇒ {}。"""
+    metadata 之 category／data_source／layer（值為 None 者不入組）；組內列數 0 ⇒ {}。`regime_close`（完整連續收盤，
+    索引與 features 同一時間鍵表示）給定 ⇒ regime 遮罩依 SPEC ㊳ 於其上計算再取樣；否則於 `close`（分析列序）上計算。"""
     y = label.to_numpy(dtype=float)
 
     def ic_of(rows: np.ndarray, cols: Sequence[str]) -> Dict[str, float]:
@@ -873,7 +938,9 @@ def _ref_grouped_ic(features: pd.DataFrame, label: pd.Series, close: pd.Series, 
         "by_year": {str(yr): ic_of(np.flatnonzero(idx.year == yr), cols) for yr in sorted(set(idx.year))},
         "by_quarter": {f"{yr}Q{q}": ic_of(np.flatnonzero((idx.year == yr) & (idx.quarter == q)), cols)
                        for yr, q in sorted(set(zip(idx.year, idx.quarter)))},
-        "by_regime": {k: ic_of(np.flatnonzero(m), cols) for k, m in _ref_regime_masks(close).items()},
+        "by_regime": {k: ic_of(np.flatnonzero(m), cols) for k, m in (
+            _ref_regime_masks(close) if regime_close is None else _ref_regime_masks_sampled(regime_close, features.index)
+        ).items()},
     }
     for out_key, meta_key in (("by_category", "category"), ("by_data_source", "data_source"), ("by_layer", "layer")):
         groups: Dict[str, List[str]] = {}
@@ -1127,10 +1194,10 @@ def _split_turnover(d: Mapping[str, Any]) -> Any:
 
 
 def _ref_coverage(x: pd.Series) -> Dict[str, Any]:
-    """`CoverageAnalyzer.compute_all` 單一特徵之 oracle（coverage_analyzer.py:28-60）：非 NaN 比例、首個非 NaN 之位置（無 ⇒ −1）、
-    NaN 數。"""
+    """`CoverageAnalyzer.compute_all` 單一特徵之 oracle：有限值比例、首個有限值之位置（無 ⇒ −1）、非有限值數（SPEC Task 0.4
+    ㊴：NaN、±inf 皆非有效值，同 alphalens get_clean_factor 之 np.isfinite 過濾）。"""
     v = x.to_numpy(dtype=float)
-    ok = ~np.isnan(v)
+    ok = np.isfinite(v)
     return {"coverage": float(ok.sum() / v.size) if v.size else math.nan,
             "effective_start": int(np.argmax(ok)) if ok.any() else -1, "nan_count": int((~ok).sum())}
 
@@ -1798,7 +1865,7 @@ def _ref_cross_sectional(df: pd.DataFrame, label_col: str = XSEC_LABEL) -> Dict[
         y = g[label_col].to_numpy(dtype=float)
         for f in feats:
             x = g[f].to_numpy(dtype=float)
-            m = ~np.isnan(x) & ~np.isnan(y)
+            m = np.isfinite(x) & np.isfinite(y)  # SPEC ㊴：±inf 同缺值
             if m.sum() >= 2:
                 v = _sp(x[m], y[m])
                 if math.isfinite(v):
@@ -1825,7 +1892,7 @@ def _ref_cross_sectional(df: pd.DataFrame, label_col: str = XSEC_LABEL) -> Dict[
         y = g[label_col].to_numpy(dtype=float)
         for f in ranked:
             x = g[f].to_numpy(dtype=float)
-            m = ~np.isnan(x) & ~np.isnan(y)
+            m = np.isfinite(x) & np.isfinite(y)  # SPEC ㊴：±inf 同缺值
             matrix[f][str(sym)] = None if m.sum() < 2 else _none_if_nan(_sp(x[m], y[m]))
     return {"series": series, "summary": summary,
             "symbol_ic": {"symbols": symbols, "features": ranked, "matrix": matrix},
@@ -1909,7 +1976,7 @@ def test_cross_sectional_hit_rate_counts_finite_ic_only() -> None:
         n_nan = 0
         for _, g in df.groupby(level=0, sort=True):
             x, y = g[f].to_numpy(dtype=float), g[XSEC_LABEL].to_numpy(dtype=float)
-            m = ~np.isnan(x) & ~np.isnan(y)
+            m = np.isfinite(x) & np.isfinite(y)  # SPEC ㊴：±inf 同缺值
             n_nan += int(len(g) >= 2 and m.sum() >= 2 and not math.isfinite(_sp(x[m], y[m])))
         series = np.asarray(report["rolling_ic_series"][f]["window_cross_sectional"], dtype=float)
         assert np.isfinite(series).all(), f"{f}：截面 IC 序列含非有限值"
@@ -2519,6 +2586,26 @@ def _receipt_tool() -> Any:
     return sys.modules.get("icperf_receipt_tool_t") or _load("icperf_receipt_tool_t", RECEIPT_TOOL)
 
 
+def test_bounded_abs_tolerance_equals_numpy_isclose() -> None:
+    """SPEC v5.42 ④（r55 群集 A）：`rel_excess(a, b, p) ≤ rel_tol_for(p)` 與 `numpy.isclose(a, b, rtol, atol)` 逐對同判
+    （有界鍵 atol＝1e-15、其餘鍵 atol＝0）；明列邊界：2026-10-31 收據之近 0 Pearson 值對（絕對差約 3.0e-17）於有界鍵一致、
+    於非有界鍵（icir）不一致；絕對差 2e-15 於近 0 有界鍵仍不一致（下限不放寬到捨入以上）。"""
+    prod, orc = -1.2649121565600512e-05, -1.2649121565570104e-05
+    bounded = ["/rolling_ic_series/f/window_252/#", "/grouped_ic/by_year/#/*", "/correlation_matrix/matrix/#",
+               "/summary_table/#/ic_mean", "/ic_decay/f/ic_values", "/turnover_analysis/f/autocorrelation"]
+    unbounded = ["/summary_table/#/icir", "/summary_table/#/long_short_spread"]
+    assert all(abs_tol_for(p) == BOUNDED_ABS_TOL for p in bounded) and all(abs_tol_for(p) == 0.0 for p in unbounded)
+    # b≠0 之對（b＝0 沿用 SPEC v5.39 之「絕對誤差 ≤ rtol」規則，非 isclose 等價，另於下方斷言）
+    pairs = [(prod, orc), (0.5 + 4e-13, 0.5), (0.5 + 6e-13, 0.5), (1e-5 + 2e-15, 1e-5), (-0.3, -0.3), (3e-17, -3e-17)]
+    for p in bounded + unbounded:
+        atol = abs_tol_for(p)
+        for a, b in pairs:
+            assert (rel_excess(a, b, p) <= rel_tol_for(p)) == bool(np.isclose(a, b, rtol=REL_TOL, atol=atol)), (p, a, b)
+    assert rel_excess(prod, orc, bounded[0]) <= REL_TOL < rel_excess(prod, orc, unbounded[0])
+    assert rel_excess(1e-5 + 2e-15, 1e-5, bounded[0]) > REL_TOL
+    assert rel_excess(5e-13, 0.0, unbounded[0]) == 5e-13 and rel_excess(5e-13, 0.0, bounded[0]) == 5e-13 - BOUNDED_ABS_TOL
+
+
 def test_graded_tolerance_closed_list_and_mutation() -> None:
     """SPEC v5.39 ④ 分級判準：(i) 分類表——封閉清單內之衍生量（趨勢各維之斜率／p 值／尾端估計／r_squared、品質診斷之
     有效樣本比與 Ljung–Box 衍生欄，收據鍵與深度欄兩種路徑形式、含 `@` 端到端尾綴）為 1e-9，清單外（判定欄、中心性、ICIR、
@@ -2729,6 +2816,34 @@ def _decaying_vol_close(n: int = 420) -> pd.Series:
     ret = 0.03 * np.exp(-i / 120.0) * np.sin(i / 1.7) + 0.0002
     return pd.Series(100.0 * np.exp(np.cumsum(ret)), index=pd.date_range("2022-01-01", periods=n, freq="D", tz="UTC"),
                      name="close")
+
+
+@pytest.mark.requires_kline
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+def test_regime_masks_on_continuous_history_sampled_at_sparse_rows() -> None:
+    """SPEC Task 0.4 ㊳（r55 群集 B）：regime 指標於完整連續真實收盤（1,200 根 BTCUSDT 1h）只用 0..t 計算後取樣於稀疏分析列
+    （第 300 根起每 7 根一列、共 41 列，同事件匯入批之測試段列數）：產品 `compute_grouped_ic(regime_history=…)` 之
+    by_regime == oracle（`_ref_regime_masks_sampled` ＋逐組 scipy）且四組皆非空；同列以舊行為（分析列序上算）⇒ 41 列 < 56 根
+    使 55 根波動全 NaN ⇒ by_regime＝{}（改前症狀）；無偷看未來：連續序列截至最後分析列與完整序列結果相同。"""
+    close = _real_close(1200)
+    rows = close.index[300::7][:41]
+    i = np.arange(len(rows), dtype=float)
+    feats = pd.DataFrame({"a": np.sin(i / 3.0) + 0.01 * i, "b": ((5 * i) % 9) - 4.0}, index=rows)
+    label = _real_label(close).reindex(rows)
+    raw_rows = pd.DataFrame({"close": close.reindex(rows)})
+    cfg = dict(GROUPED_CONFIG, method="spearman")
+    engine = ICEngine({"methods": ["spearman"]})
+    got = engine.compute_grouped_ic(feats, label, raw_rows, {}, cfg, regime_history=pd.DataFrame({"close": close}),
+                                    regime_keys=rows)
+    exp = _ref_grouped_ic(feats, label, close.reindex(rows), {}, "spearman", regime_close=close)
+    assert all(got["by_regime"][k] for k in ("bull", "bear", "high_vol", "low_vol")), got["by_regime"]
+    _assert_close_tree(got["by_regime"], exp["by_regime"], "by_regime")
+    legacy = ICEngine({"methods": ["spearman"]}).compute_grouped_ic(feats, label, raw_rows, {}, cfg)
+    assert legacy["by_regime"] == {}, "前提失效：舊行為於 41 列上非空"
+    cut = close.loc[:rows[-1]]
+    trunc = ICEngine({"methods": ["spearman"]}).compute_grouped_ic(
+        feats, label, raw_rows, {}, cfg, regime_history=pd.DataFrame({"close": cut}), regime_keys=rows)
+    _assert_close_tree(trunc["by_regime"], got["by_regime"], "by_regime(截至最後分析列)")
 
 
 def test_grouped_ic_regime_without_rows_is_empty() -> None:

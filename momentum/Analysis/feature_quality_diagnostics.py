@@ -188,7 +188,9 @@ class FeatureQualityDiagnostics:
         total = len(features_df)
         results: dict[str, dict] = {}
         for feature_name in features_df.columns:
-            non_nan = int(features_df[feature_name].notna().sum())
+            # ICPERF Task 0.4 ㊴：有效值＝有限值（NaN、±inf 皆非有效；同 coverage_analyzer 與 IC 有限值遮罩）
+            non_nan = int(np.isfinite(pd.to_numeric(features_df[feature_name], errors="coerce")
+                                      .to_numpy(dtype=np.float64)).sum())
             nan_count = int(total - non_nan)
             coverage = float(non_nan / total) if total > 0 else 0.0
             results[feature_name] = {

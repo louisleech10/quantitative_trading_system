@@ -2,8 +2,8 @@
   "fixture_sha256": "55e27b4b671ce7db0133c772764d8bcc387c96aed6fb4d5b369d3c2cdc22b31f",
   "config_hash": "64027ea64515424f39a9b3a04372a97c",
   "case_id": "ic_gatekeeper",
-  "canonical_sha": "5802dbcd7765adfc35924b897e021a237803c5c500f776577be60e9d0483f026",
-  "canonical_sha_legacy": "01eea6092de318891351448e04702b5d9c61b2a2fa57d5b49c676d5099d4782e",
+  "canonical_sha": "33ae6568080f7b521d2a82f722b44727f2da0f7d59a2f5cbf305bac6fc02c557",
+  "canonical_sha_legacy": "5d59b8087d54ed75f5284d35c4d9776eb6929fd79c5676fe7427755b7f8f2009",
   "summary_table": [
     {
       "feature_name": "close_12h_cycle_HT-PHASOR-Quadrature_Std_W34",
@@ -217,7 +217,7 @@
       "coverage": 1.0,
       "turnover_rate": 0.03404255319148936,
       "ic_half_life": 7.052500985663342,
-      "regime_robust": false,
+      "regime_robust": true,
       "regime_robust_reason": null,
       "direction": -1,
       "icir_aligned": 0.033294953432368164,
@@ -239,7 +239,7 @@
       "coverage": 1.0,
       "turnover_rate": 0.03404255319148936,
       "ic_half_life": 3.036395583020044,
-      "regime_robust": false,
+      "regime_robust": true,
       "regime_robust_reason": null,
       "direction": -1,
       "icir_aligned": 0.03170510839598053,
@@ -361,5 +361,5 @@
     }
   },
   "generated_by": "scripts/gap2_freeze_golden.py --write",
-  "ts": "2026-10-30T22:37:20Z"
+  "ts": "2026-10-31T06:45:15Z"
 }

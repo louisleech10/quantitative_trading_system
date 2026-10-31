@@ -1,0 +1,241 @@
+{
+  "ticket": "ICPERF Task 0.4 ㉗／㉘ 四項平衡（code review r55 群集 H）",
+  "generated_at": "2026-10-31",
+  "probe": "handoffs/run_receipts/icperf_probes/rolling_balance.py",
+  "input": "真實 kline data_cache/feature_klines/kline_cache.h5 BTCUSDT 1h（扣前 60 根暖機後 20,292 列）、12 欄只用 0..t 之特徵（含價格水準欄）、標籤 1 根前瞻簡單報酬；每方法獨立行程",
+  "variants": {
+    "before": "596a5596 工作樹（㉗ Kendall 實以 Pearson 計、㉘ 原值累積和相減）",
+    "seq": "改後碼 NUMBA_NUM_THREADS=1",
+    "par": "改後碼預設執行緒（8 核）"
+  },
+  "findings": [
+    "平行與循序 output_sha256 逐對相同（逐位元相同）",
+    "production 窗 252/756/1512：Pearson 改前 0.037 秒（對 scipy 相對誤差 1.1e-9）→ 改後循序 1.11 秒、平行 0.23 秒（5.3e-13）；Kendall 改前 0.034 秒（實為 Pearson，相對誤差 459）→ 循序 4.23 秒、平行 0.97 秒（0）",
+    "峰值 RSS（行程含載入真實資料與 import）改前 325–362 MB、改後 344–376 MB；輸出 JSON：窗 63/252 改前改後皆 10.4–10.5 MB，production 窗改前 15.4 MB → 改後 20.6–20.8 MB（㉛ ICIR 換算窗不在請求窗中時另算一窗之輸出鍵）",
+    "Pearson 窗內兩趟為 O(n·w)：改後仍較改前慢約 6 倍（平行後），換得精度達 1e-12；O(n) 且精度達 1e-12 之算法另於 Task 0.2 逐段量測後評估（Phase 3）"
+  ],
+  "runs": [
+    {
+      "variant": "before",
+      "method": "pearson",
+      "windows": [
+        63,
+        252
+      ],
+      "wall_seconds": 0.02821549999999995,
+      "peak_rss_bytes_after": 325484544,
+      "output_json_bytes": 10499542,
+      "output_sha256": null,
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 960,
+        "max_rel_vs_scipy": 2.2833607000445476E-7,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "before",
+      "method": "pearson",
+      "windows": [
+        252,
+        756,
+        1512
+      ],
+      "wall_seconds": 0.036711583000000214,
+      "peak_rss_bytes_after": 347258880,
+      "output_json_bytes": 15411728,
+      "output_sha256": null,
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 1440,
+        "max_rel_vs_scipy": 1.1254047716557796E-9,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "before",
+      "method": "kendall",
+      "windows": [
+        63,
+        252
+      ],
+      "wall_seconds": 0.0260419999999999,
+      "peak_rss_bytes_after": 353042432,
+      "output_json_bytes": 10499542,
+      "output_sha256": null,
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 960,
+        "max_rel_vs_scipy": 198.92590129138028,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "before",
+      "method": "kendall",
+      "windows": [
+        252,
+        756,
+        1512
+      ],
+      "wall_seconds": 0.0335553329999998,
+      "peak_rss_bytes_after": 362430464,
+      "output_json_bytes": 15411728,
+      "output_sha256": null,
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 1440,
+        "max_rel_vs_scipy": 459.3988579758788,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "seq",
+      "method": "pearson",
+      "windows": [
+        63,
+        252
+      ],
+      "wall_seconds": 0.146742084,
+      "peak_rss_bytes_after": 350781440,
+      "output_json_bytes": 10499677,
+      "output_sha256": "1b788780e892f96ff052866af9708fd2f65999f9582d6644f85c1b832c2cc01a",
+      "numba_num_threads": "1",
+      "precision": {
+        "n_checked": 960,
+        "max_rel_vs_scipy": 5.277117306756965E-13,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "seq",
+      "method": "pearson",
+      "windows": [
+        252,
+        756,
+        1512
+      ],
+      "wall_seconds": 1.1144584579999997,
+      "peak_rss_bytes_after": 371769344,
+      "output_json_bytes": 20655372,
+      "output_sha256": "e2a6634a01399aca97c99d24a4a246877c2da721c6c40e2bbabd930f5d187f74",
+      "numba_num_threads": "1",
+      "precision": {
+        "n_checked": 1440,
+        "max_rel_vs_scipy": 5.277117306756965E-13,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "seq",
+      "method": "kendall",
+      "windows": [
+        63,
+        252
+      ],
+      "wall_seconds": 0.5397084590000003,
+      "peak_rss_bytes_after": 351109120,
+      "output_json_bytes": 10598444,
+      "output_sha256": "32d34289d7675744c06c2eaddee281ab1a2ede8403b0e6d27ae5c2d2df877273",
+      "numba_num_threads": "1",
+      "precision": {
+        "n_checked": 960,
+        "max_rel_vs_scipy": 0.0,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "seq",
+      "method": "kendall",
+      "windows": [
+        252,
+        756,
+        1512
+      ],
+      "wall_seconds": 4.234681792,
+      "peak_rss_bytes_after": 371818496,
+      "output_json_bytes": 20835513,
+      "output_sha256": "0c705f43fcead3e440d3b01f886f16695598f2c3566bc4c079ad0cf60f91ebbc",
+      "numba_num_threads": "1",
+      "precision": {
+        "n_checked": 1440,
+        "max_rel_vs_scipy": 0.0,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "par",
+      "method": "pearson",
+      "windows": [
+        63,
+        252
+      ],
+      "wall_seconds": 0.03606575000000056,
+      "peak_rss_bytes_after": 344276992,
+      "output_json_bytes": 10499677,
+      "output_sha256": "1b788780e892f96ff052866af9708fd2f65999f9582d6644f85c1b832c2cc01a",
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 960,
+        "max_rel_vs_scipy": 5.277117306756965E-13,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "par",
+      "method": "pearson",
+      "windows": [
+        252,
+        756,
+        1512
+      ],
+      "wall_seconds": 0.22792162500000002,
+      "peak_rss_bytes_after": 371965952,
+      "output_json_bytes": 20655372,
+      "output_sha256": "e2a6634a01399aca97c99d24a4a246877c2da721c6c40e2bbabd930f5d187f74",
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 1440,
+        "max_rel_vs_scipy": 5.277117306756965E-13,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "par",
+      "method": "kendall",
+      "windows": [
+        63,
+        252
+      ],
+      "wall_seconds": 0.12745341599999982,
+      "peak_rss_bytes_after": 376176640,
+      "output_json_bytes": 10598444,
+      "output_sha256": "32d34289d7675744c06c2eaddee281ab1a2ede8403b0e6d27ae5c2d2df877273",
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 960,
+        "max_rel_vs_scipy": 0.0,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    },
+    {
+      "variant": "par",
+      "method": "kendall",
+      "windows": [
+        252,
+        756,
+        1512
+      ],
+      "wall_seconds": 0.966000041,
+      "peak_rss_bytes_after": 372719616,
+      "output_json_bytes": 20835513,
+      "output_sha256": "0c705f43fcead3e440d3b01f886f16695598f2c3566bc4c079ad0cf60f91ebbc",
+      "numba_num_threads": null,
+      "precision": {
+        "n_checked": 1440,
+        "max_rel_vs_scipy": 0.0,
+        "max_abs_vs_scipy_near_zero": 0.0
+      }
+    }
+  ]
+}

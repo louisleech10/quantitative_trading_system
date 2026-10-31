@@ -1,0 +1,34 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir /private/tmp/claude-501/r55fix-captures",
+      "code_sha256": "503c84b9dae86afaa27ead73d933724a5f1a8643f462f8d04416ad8cc5a67c23",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "ICPERF r55 修補批（主委；㊳ regime 連續基底、㊴ 非有限值、滾動相關平行化後之全請求擷取）",
+      "created_at": "2026-10-31T09:10:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1800,
+  "basis": [
+    "前次同請求集全擷取（2fbe7598 工作樹，/private/tmp/claude-501/t04d-captures）12 請求皆 rc=0，擷取檔時戳首檔 A.ic_report.pkl 06:45:24、末檔 X.cross_sectional.default.pkl 06:52:11（首請求擷取時間另計，合計約 10 分鐘量級）；本批增量：regime 於完整連續 kline 上計算（每請求多算一次 20,352 根之 EMA／滾動波動，秒級）、滾動 Pearson／Kendall 平行化（實測 4.4–4.9 倍快，handoffs/run_receipts/20261031-icperf-rolling-balance.json）",
+    "估約 10–15 分鐘，取上限 30 分鐘，未逾 2 小時（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-7、-9、-10、-11）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

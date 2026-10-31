@@ -484,6 +484,12 @@ def _tol_for(key: str) -> float:
 
 
 @functools.lru_cache(maxsize=None)
+def _abs_tol_for(key: str) -> float:
+    """涵蓋鍵之絕對下限（SPEC v5.42 ④；`test_icperf_correctness.py` `abs_tol_for`；快取）。"""
+    return float(_oracles().abs_tol_for(key))
+
+
+@functools.lru_cache(maxsize=None)
 def _tol_class(key: str) -> str:
     """涵蓋鍵之判準類別（"direct"／"derived"；`test_icperf_correctness.py` `tolerance_class`）。"""
     return str(_oracles().tolerance_class(key))
@@ -566,7 +572,10 @@ class Tally:
         elif math.isinf(p) or math.isinf(o):
             d = 0.0 if p == o else math.inf
         else:
-            d = abs(p - o) / abs(o) if o != 0 else abs(p - o)
+            # SPEC v5.42 ④：相關係數類有界量扣絕對下限後之相對誤差（numpy.isclose 式；其餘鍵 atol＝0 即純相對；
+            # 同 `test_icperf_correctness.py` `rel_excess`，絕對下限依鍵快取）
+            ex = max(abs(p - o) - _abs_tol_for(key), 0.0)
+            d = ex / abs(o) if o != 0 else ex
         info = p is not None and o is not None and math.isfinite(p) and math.isfinite(o)
         self.n_finite += int(info)
         self.max_rel = max(self.max_rel, d) if math.isfinite(d) else math.inf
@@ -1179,10 +1188,15 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     gcfg = icc["grouped_analysis"]
     fmeta = {c: (meta.get(c) or {}) if isinstance(meta.get(c), dict) else {} for c in F.columns}
     close_g = close_seg.set_axis(F_seg.index)
-    exp_g = O._ref_grouped_ic(F_seg, y_seg, close_g, fmeta, method) if len(F_seg) else {}
-    # 規則型 regime 之空波動守衛（ic_engine.py `_build_regime_rule_masks`：該段 55 根滾動波動無任一有限值 ⇒ by_regime＝{}）
-    vol_seg = close_g.pct_change(fill_method=None).rolling(55).std() if len(F_seg) else close_g
-    if "by_regime" in exp_g and not np.isfinite(vol_seg.to_numpy(dtype=float)).any():
+    # SPEC Task 0.4 ㊳：regime 遮罩於完整連續 kline 收盤（直接讀、float64）只用 0..t 計算，再取樣於分析列；時間鍵表示
+    # 對齊 F_seg 索引（tz-naive ⇒ 依 §C 視為 UTC）
+    seg_tz = pd.DatetimeIndex(F_seg.index).tz
+    regime_close = close_full.set_axis(close_full.index.tz_convert(seg_tz) if seg_tz is not None
+                                       else close_full.index.tz_convert("UTC").tz_localize(None))
+    exp_g = O._ref_grouped_ic(F_seg, y_seg, close_g, fmeta, method, regime_close=regime_close) if len(F_seg) else {}
+    # 規則型 regime 之空波動守衛（ic_engine.py `_build_regime_rule_masks`：完整序列 55 根滾動波動無任一有限值 ⇒ by_regime＝{}）
+    vol_full = regime_close.pct_change(fill_method=None).rolling(55).std()
+    if "by_regime" in exp_g and not np.isfinite(vol_full.to_numpy(dtype=float)).any():
         exp_g["by_regime"] = {}
     got_g = rep.get("grouped_ic") or {}
     if str(gcfg.get("regime_method", "rule")) != "rule":
@@ -1198,7 +1212,8 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     t_rr = T("regime_robust", "由 oracle by_regime（scipy）與逐 regime 有限配對數依 ㉓ 判 True／False／None 與 reason"
              "（test_icperf_regime_robust.py oracle_regime_robust）")
     min_s = int(gcfg.get("regime_robust_min_samples") or 30)
-    masks = O._ref_regime_masks(close_g) if len(F_seg) and exp_g.get("by_regime") != {} else {}
+    masks = (O._ref_regime_masks_sampled(regime_close, F_seg.index)
+             if len(F_seg) and exp_g.get("by_regime") != {} else {})
     yv = y_seg.to_numpy(dtype=float)
     regime_on = bool(gcfg.get("by_regime")) and bool((cfg.get("report") or {}).get("include_regime_analysis", True))
     pc_cache = cache.get("regime_pair_counts") or {}
@@ -2066,8 +2081,9 @@ _PEARSON = {"xfail": "test_rolling_ic_pearson_price_level_matches_scipy_xfail",
             "reason": "SPEC Task 0.4 ㉘ 窗內中心化後（改前以原值累積和計，A 格實測相對誤差至 1e-11 量級），2026-10-31 擷取之 "
                       "A.ic_report.pearson 7,531 值僅 1 值不一致：close_1h_trend_DEMA_89_Skew-W5 window_252 第 190 點，"
                       "產品 −1.2649121565600512e-05、oracle −1.2649121565570104e-05，絕對差約 3.0e-17（低於倍精度 eps "
-                      "2.2e-16），因值近 0 換算相對差 2.4e-12 超過純相對判準 1e-12；判準是否加絕對下限（numpy isclose 式 "
-                      "atol＋rtol·|b|）待 code review r55 裁定",
+                      "2.2e-16），因值近 0 換算相對差 2.4e-12 超過純相對判準 1e-12；code review r55 群集 A 定案相關係數類有界量"
+                      "改 numpy isclose 式（atol 1e-15＋rtol 1e-12·|b|，SPEC v5.42 ④），依新判準該值一致；本項再不一致即"
+                      "屬新錯誤",
             "affected": "default_method＝pearson 之請求：滾動 IC 序列與其 ic_mean／ic_std／icir／勝率／方向欄之低位數；本收據"
                         "資料之門檻判定未因此改變，但不滿足 1e-12"}
 _AUTOCORR = {"xfail": "test_turnover_autocorrelation_constant_series_is_nan_xfail",
@@ -2121,6 +2137,28 @@ def _git_head() -> Optional[str]:
         return out.stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return None
+
+
+def receipt_code_paths() -> List[str]:
+    """收據所驗結果所依賴之程式（SPEC v5.42 Task 0.3 ⑫，r55 群集 E）：IC 分析模組（momentum/Analysis 全部 .py、
+    momentum/core 之 .py）、IC 服務、擷取／收據／事件批腳本、oracle 測試檔與 IC 設定；排序之 repo 相對路徑。"""
+    pats = ("momentum/Analysis/**/*.py", "momentum/core/*.py", "tests/momentum/Analysis/test_icperf_*.py",
+            "tests/api/test_icperf_*.py")
+    found = {str(p.relative_to(REPO)) for pat in pats for p in REPO.glob(pat)
+             if p.is_file() and "__pycache__" not in p.parts}
+    found |= {"api/services/ic_analysis_service.py", "scripts/icperf_correctness_receipt.py",
+              "scripts/icperf_freeze_baseline.py", "scripts/icperf_event_batch.py", "config/ic_config.yaml"}
+    return sorted(found)
+
+
+def receipt_code_sha256() -> str:
+    """`receipt_code_paths` 之工作樹內容雜湊（同估時收據 identity 之 `run_receipt_identity.code_sha256`：逐檔
+    git hash-object 依路徑串接之 sha256，含未提交改動）。收據測試以現行工作樹重算比對，程式改動後未重產收據即不符。"""
+    if str(REPO / "scripts") not in sys.path:
+        sys.path.insert(0, str(REPO / "scripts"))
+    import run_receipt_identity as rid
+
+    return rid.code_sha256(receipt_code_paths(), REPO)
 
 
 def _feature_names_of(cap: Mapping[str, Any]) -> List[str]:
@@ -2354,9 +2392,10 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
     for rid, meta in caps_meta.items():
         requests_out.setdefault(rid, dict(meta))
     return {
-        "head": _git_head(), "spec": f"docs/ICPERF_SPEC.md {spec_version()} Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
+        "head": _git_head(), "code_sha256": receipt_code_sha256(), "spec": f"docs/ICPERF_SPEC.md {spec_version()} Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
         "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         "tolerance": {"relative": REL_TOL, "derived_relative": float(O.DERIVED_REL_TOL),
+                      "bounded_absolute": float(O.BOUNDED_ABS_TOL), "bounded_patterns": list(O.BOUNDED_FIELD_PATTERNS),
                       "derived_fields": list(O.DERIVED_FIELD_PATTERNS), "ssr_slack": SSR_SLACK},
         "data": {"cell": "A_BTCUSDT_1h", "fact_receipt": {rid: rr["facts"] for rid, rr in per_req.items()},
                  "long_cell": "L_BTCUSDT_4h_longhist（handoffs/run_receipts/20261029-icperf-long-cell-4h-longhist.json）",

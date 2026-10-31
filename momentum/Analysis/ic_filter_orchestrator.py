@@ -2384,7 +2384,9 @@ class ICFilterOrchestrator:
             n_slices += 1
             y = group[label_col]
             for feature_name in feature_cols:
-                pair = pd.concat([group[feature_name], y], axis=1).dropna()
+                # ICPERF Task 0.4 ㊴：非有限值（NaN、±inf）視為缺值（dropna 會保留 ±inf）
+                pair = pd.concat([group[feature_name], y], axis=1)
+                pair = pair[np.isfinite(pair.to_numpy(dtype=np.float64)).all(axis=1)]
                 if len(pair) < 2:
                     continue
                 ranked_x = pair.iloc[:, 0].rank(method="average")
@@ -2675,7 +2677,7 @@ class ICFilterOrchestrator:
             block = self._xsec_dense(values[:, c0:c0 + chunk], d_codes, s_codes, n_dates, n_syms)  # [T, S, C]
             finite = np.isfinite(block)
             finite_block = np.where(finite, block, np.nan)
-            not_nan = (~np.isnan(block)).sum(axis=(0, 1))
+            not_nan = finite.sum(axis=(0, 1))  # ㊴：覆蓋＝有限值數（同 coverage_analyzer）
             n_pool = (finite & y_finite[:, :, None]).sum(axis=(0, 1))
             q_mono = [self._monotonicity._select_num_quantiles(int(n), 5) for n in n_pool]
             labels_by_q = {q: self._xsec_qcut_labels(finite_block, q) for q in sorted(set(q_mono) | {5})}
@@ -2773,11 +2775,11 @@ class ICFilterOrchestrator:
 
     @staticmethod
     def _xsec_rank_ic_mean(block: np.ndarray, y: np.ndarray) -> np.ndarray:
-        """每時點截面 Spearman（特徵與 y 共同非 NaN 之標的 ≥ 2、排名非常數；同 `analyze_cross_sectional` 截面 IC 之
-        先 dropna 再平均排名之 Pearson）之逐特徵平均（無有效時點 ⇒ NaN）。`block` [T, S, C]、`y` [T, S]。"""
+        """每時點截面 Spearman（特徵與 y 共同有限之標的 ≥ 2、排名非常數；同 `analyze_cross_sectional` 截面 IC 之
+        先剔除非有限值再平均排名之 Pearson）之逐特徵平均（無有效時點 ⇒ NaN）。`block` [T, S, C]、`y` [T, S]。"""
         from scipy.stats import rankdata
 
-        both = ~np.isnan(block) & ~np.isnan(y)[:, :, None]
+        both = np.isfinite(block) & np.isfinite(y)[:, :, None]  # ㊴：±inf 同缺值
         y3 = np.broadcast_to(y[:, :, None], block.shape)
         xr = rankdata(np.where(both, block, np.nan), axis=1, nan_policy="omit")
         yr = rankdata(np.where(both, y3, np.nan), axis=1, nan_policy="omit")
@@ -2876,7 +2878,8 @@ class ICFilterOrchestrator:
 
     @staticmethod
     def _safe_rank_corr(x: pd.Series, y: pd.Series) -> Optional[float]:
-        pair = pd.concat([x, y], axis=1).dropna()
+        pair = pd.concat([x, y], axis=1)
+        pair = pair[np.isfinite(pair.to_numpy(dtype=np.float64)).all(axis=1)]  # ㊴：±inf 同缺值
         if len(pair) < 2:
             return None
         ranked_x = pair.iloc[:, 0].rank(method="average")
@@ -4954,6 +4957,10 @@ class ICFilterOrchestrator:
         regime_pair_counts: dict[str, dict[str, int]] = {}
         if raw_data_for_ic is not None and config.report.include_regime_analysis:
             self._stage4_checkpoint("grouped_ic", 5)
+            # ICPERF Task 0.4 ㊳：regime 指標於完整連續 kline 上只用 0..t 計算，再取樣於分析列（事件列／測試段列）；
+            # 改前於分析列序上算 EMA／波動，事件路徑列距不等、測試段缺暖機
+            regime_history = raw_data.copy(deep=False)
+            regime_history.index = _utc_instant_key(_normalize_frame_time_index(raw_data, "raw_data"))
             grouped_ic = self._ic_engine.compute_grouped_ic(
                 features_for_ic,
                 label_for_ic,
@@ -4962,6 +4969,8 @@ class ICFilterOrchestrator:
                 # 分組／regime IC 與主 IC 同估計量（同請求 effective method；未帶時引擎退回 methods[0]）
                 {**config.ic_calculation.grouped_analysis.model_dump(), "method": method},
                 regime_pair_counts=regime_pair_counts,
+                regime_history=regime_history,
+                regime_keys=_utc_instant_key(_normalize_ic_time_index(features_for_ic.index, "features_for_ic")),
             )
 
         # LA-2 B3 close carrier：對齊 features_df index

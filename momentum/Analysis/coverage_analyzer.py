@@ -16,6 +16,11 @@ from momentum.FeatureEngineering.feature_reader import FeatureReader
 logger = get_logger(__name__)
 
 
+def _finite_mask(series: pd.Series) -> np.ndarray:
+    """有限值遮罩（ICPERF Task 0.4 ㊴：NaN、±inf 皆非有效值；非數值經 to_numeric 轉 NaN）。"""
+    return np.isfinite(pd.to_numeric(series, errors="coerce").to_numpy(dtype=np.float64))
+
+
 class CoverageAnalyzer:
     """因子覆蓋率分析 — 確保因子在大部分時間點有值。"""
 
@@ -26,19 +31,19 @@ class CoverageAnalyzer:
         self._feature_reader_factory = feature_reader_factory
 
     def compute_time_coverage(self, feature: pd.Series) -> float:
-        """時間覆蓋率: count(非NaN) / total_bars。"""
+        """時間覆蓋率: count(有限值) / total_bars（ICPERF Task 0.4 ㊴：NaN、±inf 皆非有效值，同 IC 計算之有限值遮罩）。"""
 
         total = int(len(feature))
         if total == 0:
             return float("nan")
-        return float(feature.notna().sum() / total)
+        return float(_finite_mask(feature).sum() / total)
 
     def compute_effective_start(self, feature: pd.Series) -> int:
-        """有效起始點: 第一個非 NaN 的 index 位置。"""
+        """有效起始點: 第一個有限值的 index 位置。"""
 
         if feature.empty:
             return -1
-        mask = feature.notna().to_numpy()
+        mask = _finite_mask(feature)
         if not mask.any():
             return -1
         return int(np.argmax(mask))
@@ -51,7 +56,7 @@ class CoverageAnalyzer:
             series = features_df[feature_name]
             coverage = self.compute_time_coverage(series)
             effective_start = self.compute_effective_start(series)
-            nan_count = int(series.isna().sum())
+            nan_count = int((~_finite_mask(series)).sum())  # 非有限值數（NaN 與 ±inf）
             results[feature_name] = {
                 "coverage": coverage,
                 "effective_start": effective_start,
@@ -236,7 +241,7 @@ class CoverageAnalyzer:
                     valid_counts[feature_name][symbol] = 0
                     continue
 
-                valid_count = int(series.notna().sum())
+                valid_count = int(_finite_mask(series).sum())
                 nan_ratio = 1.0 - (valid_count / total)
                 matrix[feature_name][symbol] = float(np.clip(nan_ratio, 0.0, 1.0))
                 valid_counts[feature_name][symbol] = valid_count
@@ -431,7 +436,7 @@ class CoverageAnalyzer:
                     continue
 
                 series = pd.to_numeric(frame[column], errors="coerce")
-                valid_count = int(series.notna().sum())
+                valid_count = int(_finite_mask(series).sum())
                 coverage = float(valid_count / total)
                 matrix[column][symbol] = float(np.clip(coverage, 0.0, 1.0))
 

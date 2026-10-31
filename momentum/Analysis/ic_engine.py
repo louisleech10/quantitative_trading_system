@@ -37,8 +37,10 @@ from momentum.core.protocols import IFeatureReader
 logger = get_logger(__name__)
 
 try:
-    from numba import njit
+    from numba import njit, prange
 except ImportError:  # pragma: no cover
+    prange = range
+
     def njit(*args, **kwargs):  # type: ignore[misc]
         def _decorator(fn):
             return fn
@@ -48,22 +50,23 @@ except ImportError:  # pragma: no cover
         return _decorator
 
 
-@njit(cache=True)
+@njit(cache=True, parallel=True)
 def _rolling_pearson_numba(x: np.ndarray, y: np.ndarray, window: int, stride: int) -> np.ndarray:
     """ICPERF Task 0.4 ㉘：逐窗 Pearson（窗內兩趟：先均值、再中心化動差；不以原值累積和相減）。
 
     窗內該特徵或標籤有任一非有限值、或任一為常數（窗內全等於首值，同 `scipy.stats.pearsonr` 之常數判定）⇒ NaN；
-    結果截於 [−1, 1]（同 scipy）。特徵維於內層迴圈（列主序連續存取），逐窗配置之暫存皆於迴圈外預配。
+    結果截於 [−1, 1]（同 scipy）。特徵維於內層迴圈（列主序連續存取）。各窗互相獨立 ⇒ 窗維 prange 平行（r55 群集 H
+    四項平衡：每窗之運算次序不變，結果逐位元與循序相同）；暫存逐窗配置（執行緒私有）。
     """
     n_bars, n_features = x.shape
     n_out = (n_bars - window) // stride + 1
     out = np.full((n_out, n_features), np.nan)
-    sum_x = np.empty(n_features)
-    sxy = np.empty(n_features)
-    sxx = np.empty(n_features)
-    ok = np.empty(n_features, dtype=np.bool_)
-    varying = np.empty(n_features, dtype=np.bool_)
-    for oi in range(n_out):
+    for oi in prange(n_out):
+        sum_x = np.empty(n_features)
+        sxy = np.empty(n_features)
+        sxx = np.empty(n_features)
+        ok = np.empty(n_features, dtype=np.bool_)
+        varying = np.empty(n_features, dtype=np.bool_)
         start = oi * stride
         y0 = y[start]
         y_ok = True
@@ -120,14 +123,15 @@ def _rolling_pearson_numba(x: np.ndarray, y: np.ndarray, window: int, stride: in
     return out
 
 
-@njit(cache=True)
+@njit(cache=True, parallel=True)
 def _rolling_kendall_numba(x: np.ndarray, y: np.ndarray, window: int, stride: int) -> np.ndarray:
     """ICPERF Task 0.4 ㉗：逐窗 Kendall τ-b（同 `scipy.stats.kendalltau` 預設 variant='b'），滑窗增量維護整數計數。
 
     窗內點對之 S＝Σ sign(xᵢ−xⱼ)·sign(yᵢ−yⱼ)（＝一致對數−不一致對數）、x 同值對數 Tx、y 同值對數 Ty 以整數精確維護：
     新點進窗加上其與窗內各點之貢獻、舊點出窗減去其與窗內其餘點之貢獻（每步 O(window)）；τ-b＝S／√(tot−Tx)／√(tot−Ty)，
     tot＝window(window−1)/2（同 scipy 之運算次序，截於 [−1, 1]）。窗內任一點 x 或 y 非有限 ⇒ NaN（非有限點不入計數）；
-    Tx＝tot 或 Ty＝tot（常數窗）⇒ NaN（同 scipy）。
+    Tx＝tot 或 Ty＝tot（常數窗）⇒ NaN（同 scipy）。各特徵之增量計數互相獨立 ⇒ 特徵維 prange 平行（r55 群集 H 四項平衡；
+    整數計數與每特徵之運算次序不變，結果逐位元與循序相同）；逐特徵暫存為執行緒私有。
     """
     n_bars, n_features = x.shape
     n_out = (n_bars - window) // stride + 1
@@ -136,9 +140,9 @@ def _rolling_kendall_numba(x: np.ndarray, y: np.ndarray, window: int, stride: in
     y_fin = np.empty(n_bars, dtype=np.bool_)
     for t in range(n_bars):
         y_fin[t] = np.isfinite(y[t])
-    xc = np.empty(n_bars)
-    good = np.empty(n_bars, dtype=np.bool_)
-    for fi in range(n_features):
+    for fi in prange(n_features):
+        xc = np.empty(n_bars)
+        good = np.empty(n_bars, dtype=np.bool_)
         for t in range(n_bars):
             xc[t] = x[t, fi]
             good[t] = y_fin[t] and np.isfinite(xc[t])
@@ -735,6 +739,8 @@ class ICEngine:
         config: dict,
         *,
         regime_pair_counts: Optional[dict[str, dict[str, int]]] = None,
+        regime_history: Optional[pd.DataFrame] = None,
+        regime_keys: Optional[pd.Index] = None,
     ) -> dict[str, dict]:
         """分組 IC 分析.
 
@@ -742,6 +748,10 @@ class ICEngine:
             regime_pair_counts: ICPERF Task 0.4 ㉓——呼叫端傳入空 dict 時，`by_regime` 各 regime 之逐特徵（特徵, 標籤）
                 有限配對數就地寫入（`{regime: {feature: n}}`，與 `by_regime` 同一遮罩、同一對齊）；不進回傳之分組 IC
                 輸出（輸出形狀不變）。None ⇒ 不計。
+            regime_history: ICPERF Task 0.4 ㊳——完整連續 kline（含 ``close``，可含 ``volume``；索引為時間鍵、遞增）。給定時
+                regime 指標（規則式 EMA 55／55 根波動／PIT 擴張分位門檻、K-Means 偵測）於此連續序列上只用 0..t 計算，再以
+                ``regime_keys`` 取樣於分析列；未給 ⇒ 於分析列序上計算（舊行為，供無連續 kline 之呼叫端）。
+            regime_keys: 與 ``features_df`` 逐列對齊之時間鍵（同 ``regime_history`` 索引之表示）；``regime_history`` 給定時必填。
         """
 
         grouped_results: dict[str, dict] = {}
@@ -777,6 +787,7 @@ class ICEngine:
             grouped_results["by_regime"] = self._compute_regime_groups(
                 features_df, label, raw_data, config,
                 pair_counts=regime_pair_counts,
+                history=regime_history, keys=regime_keys,
             )
 
         if config.get("by_category"):
@@ -1403,7 +1414,10 @@ class ICEngine:
     def _compute_pairwise_corr(
         self, series: pd.Series, label: pd.Series, method: str
     ) -> float:
-        aligned = pd.concat([series, label], axis=1).dropna()
+        # ICPERF Task 0.4 ㊴（r55 群集 C）：非有限值（NaN、±inf）一律視為缺值（同 alphalens get_clean_factor 之
+        # np.isfinite 過濾、同本模組滾動 IC 之有限值遮罩）；dropna 會保留 ±inf
+        aligned = pd.concat([series, label], axis=1)
+        aligned = aligned[np.isfinite(aligned.to_numpy(dtype=np.float64)).all(axis=1)]
         if aligned.empty:
             return np.nan
 
@@ -1528,23 +1542,48 @@ class ICEngine:
         raw_data: pd.DataFrame,
         config: dict,
         pair_counts: Optional[dict[str, dict[str, int]]] = None,
+        history: Optional[pd.DataFrame] = None,
+        keys: Optional[pd.Index] = None,
     ) -> dict[str, dict]:
-        close = raw_data.get("close")
-        if close is None:
-            return {}
-        close = close.reindex(features_df.index)
+        if history is not None:
+            # ICPERF Task 0.4 ㊳：regime 指標於完整連續 kline 上計算（只用 0..t），再取樣於分析列
+            if keys is None or len(keys) != len(features_df):
+                raise ValueError("regime_keys must align row-by-row with features_df when regime_history is given")
+            if "close" not in history.columns:
+                return {}
+            close = history["close"]
+            volume = history["volume"] if "volume" in history.columns else None
+        else:
+            close = raw_data.get("close")
+            if close is None:
+                return {}
+            close = close.reindex(features_df.index)
+            volume = raw_data.get("volume")
+            if volume is not None:
+                volume = volume.reindex(features_df.index)
+            keys = None
 
         regime_method = config.get("regime_method", "rule")
 
         if regime_method == "kmeans":
             return self._compute_regime_groups_kmeans(
-                features_df, label, close, raw_data, config,
-                pair_counts=pair_counts,
+                features_df, label, close, volume, config,
+                pair_counts=pair_counts, keys=keys,
             )
 
         return self._compute_regime_groups_rule(
-            features_df, label, close, config, pair_counts=pair_counts,
+            features_df, label, close, config, pair_counts=pair_counts, keys=keys,
         )
+
+    @staticmethod
+    def _sample_masks(masks: Mapping[str, pd.Series], keys: Optional[pd.Index],
+                      index: pd.Index) -> dict[str, pd.Series]:
+        """regime 遮罩取樣於分析列（ICPERF Task 0.4 ㊳）：keys 為 None ⇒ 遮罩已在分析列序上；否則依時間鍵取樣，
+        鍵不在連續序列 ⇒ False（不歸任何 regime）。回傳之遮罩索引＝分析列索引。"""
+        if keys is None:
+            return {name: pd.Series(np.asarray(m, dtype=bool), index=index) for name, m in masks.items()}
+        return {name: pd.Series(m.reindex(keys).fillna(False).to_numpy(dtype=bool), index=index)
+                for name, m in masks.items()}
 
     #: 有限配對數逐欄塊之欄數（只限峰值記憶體：每塊 n_rows × 本值之 bool 暫存）
     _PAIR_COUNT_COL_BLOCK = 512
@@ -1652,15 +1691,18 @@ class ICEngine:
         close: pd.Series,
         config: dict,
         pair_counts: Optional[dict[str, dict[str, int]]] = None,
+        keys: Optional[pd.Index] = None,
     ) -> dict[str, dict]:
         """規則式 regime 分組（bull/bear/high_vol/low_vol）。
 
         high/low vol 門檻為 per-t expanding PIT（LA-1 P1-1）；
-        bull/bear 維持 EMA 因果規則不變。pair_counts 見 ``compute_grouped_ic``。
+        bull/bear 維持 EMA 因果規則不變。pair_counts 見 ``compute_grouped_ic``；keys 非 None ⇒ ``close`` 為完整連續
+        序列，遮罩算完再取樣於分析列（ICPERF Task 0.4 ㊳）。
         """
         masks = self._build_regime_rule_masks(close, config)
         if masks is None:
             return {}
+        masks = self._sample_masks(masks, keys, features_df.index)
 
         if pair_counts is not None:
             pair_counts.update(self._regime_finite_pair_counts(
@@ -1684,11 +1726,13 @@ class ICEngine:
         features_df: pd.DataFrame,
         label: pd.Series,
         close: pd.Series,
-        raw_data: pd.DataFrame,
+        volume: Optional[pd.Series],
         config: dict,
         pair_counts: Optional[dict[str, dict[str, int]]] = None,
+        keys: Optional[pd.Index] = None,
     ) -> dict[str, dict]:
-        """K-Means 無監督 regime 分組（pair_counts 見 ``compute_grouped_ic``）。"""
+        """K-Means 無監督 regime 分組（pair_counts 見 ``compute_grouped_ic``；keys 非 None ⇒ ``close``／``volume`` 為完整
+        連續序列，偵測後取樣於分析列，ICPERF Task 0.4 ㊳）。"""
         from momentum.Analysis.regime_detector import RegimeDetector
 
         kmeans_cfg = config.get("regime_kmeans", {})
@@ -1696,10 +1740,6 @@ class ICEngine:
         lookback = kmeans_cfg.get("lookback", 55)
         min_samples = kmeans_cfg.get("min_samples_for_fit", 100)
         refit_interval = kmeans_cfg.get("refit_interval", 50)
-
-        volume = raw_data.get("volume")
-        if volume is not None:
-            volume = volume.reindex(features_df.index)
 
         detector = RegimeDetector(
             n_clusters=n_clusters,
@@ -1713,17 +1753,21 @@ class ICEngine:
         results: dict[str, dict] = {}
         method = config.get("method", self._methods[0])
         # 名稱依字串序（set 之迭代序隨字串雜湊種子而變 ⇒ 輸出鍵序不可重現）
+        labels = np.asarray(detection.labels, dtype=object)
+        if keys is not None:
+            # 完整連續序列之逐根標籤取樣於分析列（鍵不在序列 ⇒ 不歸任何 regime）
+            labels = pd.Series(labels[:len(close)], index=close.index[:len(labels)]).reindex(keys).to_numpy(dtype=object)
         regime_names = sorted(
-            str(name) for name in set(detection.labels)
-            if name and name != "unknown"
+            str(name) for name in set(labels)
+            if isinstance(name, str) and name and name != "unknown"
         )
         if pair_counts is not None:
             pair_counts.update(self._regime_finite_pair_counts(
                 features_df, label,
-                {name: (detection.labels == name)[:len(features_df)] for name in regime_names},
+                {name: (labels == name)[:len(features_df)] for name in regime_names},
             ))
         for regime_name in regime_names:
-            mask = detection.labels == regime_name
+            mask = labels == regime_name
             idx = features_df.index[mask[:len(features_df)]]
             if len(idx) == 0:
                 results[regime_name] = {}
@@ -1817,9 +1861,10 @@ class ICEngine:
         return dict(zip(features_df.columns, ic_out.astype(float)))
 
     def _has_missing(self, features_df: pd.DataFrame, label: pd.Series) -> bool:
-        if label.isna().any():
+        """任一非有限值（NaN、±inf；ICPERF Task 0.4 ㊴）⇒ True，走逐欄有限列配對；逐欄檢查不建整表副本。"""
+        if not np.isfinite(label.to_numpy(dtype=np.float64)).all():
             return True
-        return features_df.isna().any().any()
+        return any(not np.isfinite(features_df[c].to_numpy(dtype=np.float64)).all() for c in features_df.columns)
 
     def _adjust_rolling_windows(self, windows: list[int]) -> list[int]:
         if not self._timeframe:

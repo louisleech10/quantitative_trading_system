@@ -110,7 +110,7 @@ def _ref_quantile_fields(df: pd.DataFrame, feat: str) -> Dict[str, float]:
     sets = [set(lab.index[lab.to_numpy() == 4]) for _, lab in sorted(bins5.items(), key=lambda kv: kv[0])]
     rates = [len(cur - prev) / len(cur) for prev, cur in zip(sets[:-1], sets[1:])]
     turnover = float(np.mean(rates)) if rates else math.nan
-    coverage = float(df[feat].notna().sum() / len(df))
+    coverage = float(np.isfinite(df[feat].to_numpy(dtype=float)).sum() / len(df))  # SPEC ㊴：有效值＝有限值
     return {"monotonicity_score": mono, "long_short_spread": spread, "turnover_rate": turnover, "coverage": coverage,
             "_q": q, "_means": means}
 
@@ -200,7 +200,7 @@ def _ref_decay(df: pd.DataFrame, feat: str, close: pd.Series, horizons: List[int
         for when, g in df.groupby(level=0, sort=True):
             x = g[feat].to_numpy(dtype=float)
             y = fwd[h].loc[g.index].to_numpy(dtype=float)
-            m = ~np.isnan(x) & ~np.isnan(y)
+            m = np.isfinite(x) & np.isfinite(y)  # SPEC ㊴：±inf 同缺值（alphalens get_clean_factor 之 np.isfinite）
             if m.sum() >= 2:
                 v = _sp(x[m], y[m])
                 if math.isfinite(v):
@@ -373,6 +373,11 @@ def test_xsec_placeholder_fields_match_oracle_explicit() -> None:
     _assert_report(report, exp)
     assert "cross_sectional_unavailable_fields" not in report["metadata"] or not report["metadata"][
         "cross_sectional_unavailable_fields"], report["metadata"].get("cross_sectional_unavailable_fields")
+    # SPEC Task 0.4 ㊴（r55 群集 C）：f3 之 ±inf 兩格同缺值——覆蓋只計有限值，且不同於「只剔 NaN」之計數
+    v3 = df["f3"].to_numpy(dtype=float)
+    assert np.isinf(v3).sum() == 2, "f3 未含 ±inf 兩格（前提失效）"
+    row3 = next(r for r in report["summary_table"] if r["feature_name"] == "f3")
+    assert row3["coverage"] == np.isfinite(v3).sum() / len(v3) != (~np.isnan(v3)).sum() / len(v3)
 
 
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
