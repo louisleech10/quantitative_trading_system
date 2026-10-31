@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py gen-c-handoff",
+      "code_sha256": "3c36d3fdfa8e6d7ab7e28a96b64d71427275d50de6ab41dcd0f19a591296442f",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 凍結之第 (2) 項輸入重產：C 格交接 h5 原放系統暫存已遭 macOS 定期清理刪除，改產於持久根 data_cache/icperf_inputs/）",
+      "created_at": "2026-10-31T17:10:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 3600,
+  "basis": [
+    "C 格（BTCUSDT 1h，209,053 欄）特徵生成實測 1059 秒（handoffs/run_receipts/20261026-ffprod-freeze.json 之 C 格 seconds）；本次同一生成定義（scripts/ffprod_measure.py measure_cell(DEFAULT_CELL, \"default\")），不掛探針",
+    "交接 h5 寫出（服務 _materialize_features_for_ic，前次產物 225,002,383 bytes）未曾單獨計時；以生成同量級估，合計約 20–40 分鐘，取上限 3600 秒，未逾 2 小時（docs/ICPERF_SPEC.md §B ICPERF-BUDGET-1 之凍結輸入）",
+    "磁碟可用 36 GB（df 實查）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

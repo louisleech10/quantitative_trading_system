@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py freeze",
+      "code_sha256": "23be6c6e9d3ddea02b6221eab0640116d4cd4e83ff96301f5a08da80cff20fe3",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 重凍；Task 0.3 收據 pass=true、Task 0.4 ①–㊴ 修正後之碼 a8349c9d）",
+      "created_at": "2026-10-31T16:30:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 14400,
+  "basis": [
+    "前次同指令實跑 2 小時 33 分（docs/ICPERF_SPEC.md §G FACT-RECEIPT 凍結實跑 2026-10-29：16:32–19:05，rc=0），落在 §B ICPERF-BUDGET-1 之 80–230 分鐘內",
+    "本次碼差：滾動 Pearson／Kendall 平行化（handoffs/run_receipts/20261031-icperf-rolling-balance.json，production 窗平行 0.23／0.97 秒）、regime 於完整連續 kline 計算（每請求多一次 EMA／滾動波動，秒級）、ICIR 依週期多算一窗；預估與前次同量級，上限沿用前次估時收據之 4 小時（handoffs/run_receipts/20261029-icperf-freeze-estimate.json）；逾 2 小時之省法已於 SPEC §B 列明（改前碼只跑小中規模）",
+    "磁碟可用 36 GB（df 實查）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

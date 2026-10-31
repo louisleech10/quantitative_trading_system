@@ -862,9 +862,12 @@ CELL_FEATURES_ROOT = "data_cache/numview_freeze_runs/{cell}__default/features"
 #: 225,002,383 bytes，`ls -la` 實查）；meta 照 prep.py 同名規則（`<stem>_meta.json`）。不存在、大小或內容 sha256 不符
 #: ⇒ FreezeError（不以他 run 代替）
 C_HANDOFF_ENV = "ICPERF_C_HANDOFF_H5"
-C_HANDOFF_H5 = Path("/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ffprod-measure/C_BTCUSDT_1h/"
-                    "ic__baseline__default/data_cache/reports/ic_ingest_cache/"
-                    "BTCUSDT_1h_fe927783c302dc6232adf0a0087846e8.h5")
+#: C 格交接 h5 之持久根（2026-10-31：原放 macOS 系統暫存 `/var/folders/.../T/ffprod-measure/`，2026-10-30 03:35 遭系統
+#: 定期清理整目錄刪除〔`ls` 實查 0 檔〕，凍結因而中斷；改放 repo 內 `data_cache/`〔`.gitignore:97`，不入版控、不被系統清理〕，
+#: 由子命令 `gen-c-handoff` 以 `scripts/ffprod_measure.py` 同一生成定義〔`measure_cell(DEFAULT_CELL, "default")`〕重產）
+C_HANDOFF_ROOT = "data_cache/icperf_inputs/C_BTCUSDT_1h"
+C_HANDOFF_H5 = (REPO / C_HANDOFF_ROOT / "ic" / "data_cache" / "reports" / "ic_ingest_cache"
+                / "BTCUSDT_1h_fe927783c302dc6232adf0a0087846e8.h5")
 C_HANDOFF_BYTES = 225002383
 #: SPEC §G (4)：K 線條件式事件（legacy `event_query` 一格，只用 K 線欄位）
 EVENT_QUERY = "close > open"
@@ -2035,6 +2038,64 @@ def gen_long_cell(*, repo_root: Path = REPO, work_root: Optional[Path] = None) -
     return {"reused": False, "work": str(work), "sidecar": result}
 
 
+def gen_c_handoff(*, repo_root: Path = REPO) -> Dict[str, Any]:
+    """重產第 (2) 項之 C 格交接 h5 於持久根 `C_HANDOFF_ROOT`：① 以 `scripts/ffprod_measure.py` 之 `generate_watched`
+    （同一生成定義 `measure_cell(DEFAULT_CELL, "default")`、不掛探針；子行程經共用監看）生成 C 格特徵 run 於
+    `<根>/baseline__default`；② 子行程（`_run_child`，cwd＝`<根>/ic`，唯讀輸入以 symlink 引入）以服務
+    `_materialize_features_for_ic` 寫交接 h5（同 `ffprod_measure.ic_in_process` 之前段，不跑 IC 分析）。
+    結果路徑須等於 `C_HANDOFF_H5`（生成定義之 config_hash 變了 ⇒ FreezeError，須同步改常數與 SPEC）；寫 sidecar
+    `<根>/c_handoff.json`（status、h5、meta、size、sha256、run_dir、生成秒數、head）。已有 complete 之 sidecar ⇒ 不重產、
+    回其內容；根目錄存在而無 sidecar（前次中斷）⇒ FreezeError（不自行刪除，交使用者清）。"""
+    root = Path(repo_root) / C_HANDOFF_ROOT
+    side_path = root / "c_handoff.json"
+    if side_path.is_file():
+        side = json.loads(side_path.read_text(encoding="utf-8"))
+        if side.get("status") == "complete":
+            return {"reused": True, **side}
+    if root.exists():
+        raise FreezeError(f"{root} 已存在而無 complete sidecar（前次生成中斷）；請先移除該目錄再重跑")
+    fm = _load("icperf_ffprod_measure", REPO / "scripts" / "ffprod_measure.py")
+    cell = fm.measure_cell(fm.DEFAULT_CELL, "default")
+    gen = fm.generate_watched(cell, {}, root / "baseline__default", fm.expected_seconds(cell))
+    if gen.get("status") != "ok" or not gen.get("run_dir"):
+        raise FreezeError(f"C 格生成未成功：status={gen.get('status')!r} error={gen.get('error')!r}")
+    work = root / "materialize"
+    spec = {"task": "c_handoff", "run_dir": str(gen["run_dir"]), "symbol": str(cell["symbol"]),
+            "timeframe": str(cell["timeframes"][0]), "work": str(work), "out_json": str(work / "result.json")}
+    res = _run_child(spec, cwd=_prepare_cwd(root / "ic", repo_root), work_dir=work, iso=root / "iso")
+    h5 = Path(res["h5"]).resolve()
+    if h5 != Path(C_HANDOFF_H5).resolve():
+        raise FreezeError(f"交接 h5 路徑 {h5} != C_HANDOFF_H5 {C_HANDOFF_H5}（生成定義之 config_hash 已變；同步改常數與 SPEC）")
+    side = {"status": "complete", "h5": str(h5), "meta": str(Path(res["meta"]).resolve()), "size": h5.stat().st_size,
+            "sha256": _file_sha256(str(h5), cache=False), "run_dir": str(gen["run_dir"]),
+            "generation_seconds": gen.get("generation_seconds"), "head": _git_head(Path(repo_root))}
+    side_path.write_text(json.dumps(side, ensure_ascii=False, indent=1), encoding="utf-8")
+    return {"reused": False, **side}
+
+
+def _child_c_handoff(spec: Mapping[str, Any]) -> Dict[str, Any]:
+    """`gen_c_handoff` 之子行程：同 `scripts/ffprod_measure.py` `ic_in_process` 之前段（canonical registry、服務之特徵庫）
+    呼叫 `ICAnalysisService._materialize_features_for_ic`；回 {"h5", "meta"}（解析後絕對路徑）。"""
+    from api.services.ic_analysis_service import ICAnalysisService
+    from momentum.FeatureEngineering.feature_library import FeatureLibrary
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+    from tests.feature_engineering.ffname_helpers import register_canonical_run
+
+    run_dir, work = Path(spec["run_dir"]), Path(spec["work"])
+    work.mkdir(parents=True, exist_ok=True)
+    root = run_dir.parents[2]
+    registry = work / "registry.json"
+    register_canonical_run(run_dir / "feature_manifest.json", registry)
+    svc = ICAnalysisService.__new__(ICAnalysisService)
+    svc._feature_library = FeatureLibrary(FeatureRegistry(registry), FeatureStorage(str(root)),
+                                          feature_reader=FeatureReader(str(root)))
+    features_path, meta_path = svc._materialize_features_for_ic(str(spec["symbol"]), str(spec["timeframe"]),
+                                                                run_dir.name)
+    return {"h5": str(Path(features_path).resolve()), "meta": str(Path(meta_path).resolve())}
+
+
 def _child_gen_long_cell(spec: Mapping[str, Any]) -> Dict[str, Any]:
     """`gen_long_cell` 之子行程：`numview_freeze_baseline._criteria` 換為 `long_cell_criteria` 之結果、估時器之
     `cell_window` 換為 `long_cell_window` 後呼叫 `generate_cell_run`（只在本子行程內換）；回 sidecar（JSON 化）。"""
@@ -2168,7 +2229,7 @@ def _child_main(spec_path: Path) -> int:
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     tasks = {"ic_page": _child_ic_page, "ic_first": _child_ic_first, "stage5": _child_stage5,
              "pit_labels": _child_pit_labels, "stage5_inputs": _child_stage5_inputs,
-             "gen_long_cell": _child_gen_long_cell}
+             "gen_long_cell": _child_gen_long_cell, "c_handoff": _child_c_handoff}
     try:
         if spec.get("task") not in tasks:
             raise FreezeError(f"未知子行程任務：{spec.get('task')!r}")
@@ -2282,6 +2343,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--out", type=Path, default=None, help="寫入結果 JSON（volatile、absent、未入 volatile 之候選全列）")
     p = sub.add_parser("gen-long-cell", help="Task 0.3：生成長資料格 L（A 格同一生成定義、最後 2,000 根）")
     p.add_argument("--out", type=Path, default=None, help="結果 JSON（不給則只印出）")
+    p = sub.add_parser("gen-c-handoff", help="重產第 (2) 項之 C 格交接 h5 於持久根 data_cache/icperf_inputs/")
     p = sub.add_parser("inventory", help="Task 0.2 路徑清冊")
     p.add_argument("--out", type=Path, required=True)
     p = sub.add_parser("measure", help="Task 0.2 規模量測")
@@ -2330,6 +2392,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(json.dumps({"n_volatile": len(result["volatile"]), "absent": result["absent"],
                               "candidates_not_volatile": len(result["candidates_not_volatile"])},
                              ensure_ascii=False, indent=1))
+            return 0
+        if args.cmd == "gen-c-handoff":
+            print(json.dumps(gen_c_handoff(), ensure_ascii=False, indent=1, default=str))
             return 0
         if args.cmd == "gen-long-cell":
             result = gen_long_cell()
