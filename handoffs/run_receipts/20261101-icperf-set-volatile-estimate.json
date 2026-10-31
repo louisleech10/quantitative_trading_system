@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py set-volatile --probe handoffs/run_receipts/20261101-icperf-volatile-probe.json --out handoffs/run_receipts/20261101-icperf-set-volatile.json",
+      "code_sha256": "a15c050db1ded89910fcbc81ebf5ea740d3d51a67b462c7d7de7bed158c8c765",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 set-volatile：把 20261101 實測之 257 項寫入凍結檔）",
+      "created_at": "2026-11-01T04:25:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 300,
+  "basis": [
+    "只讀凍結檔（53,817,146 bytes gzip）與實測收據、驗兩者 sha256、寫回凍結檔一次（gzip 等級 9）；無計算子行程",
+    "上限 300 秒為讀解壓與重壓 53.8 MB 之寬裕上界（凍結時 write_golden 同檔已實跑）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

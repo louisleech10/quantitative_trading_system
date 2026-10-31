@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py repro --out handoffs/run_receipts/20261101-icperf-repro.json",
+      "code_sha256": "a15c050db1ded89910fcbc81ebf5ea740d3d51a67b462c7d7de7bed158c8c765",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.1 可重現性：同一 2,000 欄子集重跑第 5 段，對凍結檔逐位元比）",
+      "created_at": "2026-11-01T04:27:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 3600,
+  "basis": [
+    "第 (2) 項凍結（同一 2,000 欄子集第 5 段）於 2026-10-31 凍結實跑中約 27–30 分鐘",
+    "上限 3600 秒取 2 倍寬裕；開跑前 preflight 驗交接 h5 內容 sha256 等於凍結所記"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}
