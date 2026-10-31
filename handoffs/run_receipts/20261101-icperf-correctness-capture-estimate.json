@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir runs/icperf/correctness-20261101/captures",
+      "code_sha256": "d71777f6f79bb18b077bc31fdca32baf6fffbfdca71f97379a6abdaf7747592c",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.3 收據以最終程式重產：凍結腳本 22b90aa7 改動使收據 code_sha256 須重算）",
+      "created_at": "2026-11-01T04:56:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1800,
+  "basis": [
+    "前次同請求集全擷取（a8349c9d 之碼，r55fix）12 請求約 10 分鐘量級（handoffs/run_receipts/20261031-icperf-correctness-r55fix-full-estimate.json）；本次產品碼與該次相同（之後只改凍結腳本、測試與文件），同量級",
+    "上限 1800 秒；擷取檔放 repo 內 runs/icperf/correctness-20261101/（附 README.txt 說明卡，不放系統暫存）",
+    "2026-11-01 05:00 首跑 12 請求皆 rc=1（相對 --out-dir 於子行程隔離 cwd 解析不到；已修 capture 轉絕對路徑）⇒ 以修後之碼重跑"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

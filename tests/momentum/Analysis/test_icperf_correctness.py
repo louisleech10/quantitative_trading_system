@@ -3171,3 +3171,27 @@ def test_event_label_oracle_matches_product_on_real_batch() -> None:
     same = [eid for eid, v in got.items() if v is not None and exp[eid]["close_to_close"] is not None
             and abs(exp[eid]["close_to_close"] - float(v)) <= 1e-12]
     assert diff and same, f"定因：open[t0] ≠ close[t0−1] 之事件須相異、相同者須相等（相異 {len(diff)}、相同 {len(same)}）"
+
+
+def test_capture_relative_out_dir_passes_absolute_paths_to_child(tmp_path: Path,
+                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
+    """2026-11-01 實例：`capture --out-dir runs/...`（相對）⇒ 子行程 cwd＝隔離目錄，spec 讀不到，12 請求皆 rc=1。
+    相對 `out_dir` 時，傳給子行程之 spec 路徑與 spec 內 `out_pickle`／`registry` 須皆為絕對路徑且落在 out_dir 之下
+    （子行程以替身記錄，不執行產品）。改壞對照：不轉絕對路徑則 spec 路徑為相對。"""
+    rt = _receipt_tool()
+    seen: List[Dict[str, Any]] = []
+
+    def fake_run_watched(cmd: Sequence[str], *, log_path: Path, env: Mapping[str, str], cwd: Path) -> Dict[str, Any]:
+        spec_path = Path(cmd[-1])
+        seen.append({"spec_path": spec_path, "spec": json.loads(spec_path.read_text(encoding="utf-8"))})
+        return {"rc": 0, "status": "ok", "log_path": str(log_path)}
+
+    monkeypatch.setattr(rt._fb(), "run_watched", fake_run_watched)
+    monkeypatch.setattr(rt, "request_for", lambda rid: {"kind": "x", "rid": rid})
+    monkeypatch.chdir(tmp_path)
+    rt.capture(["A.ic_report"], Path("runs/x/captures"))
+    root = (tmp_path / "runs" / "x" / "captures").resolve()
+    assert len(seen) == 1 and seen[0]["spec_path"].is_absolute()
+    for key in ("out_pickle", "registry"):
+        p = Path(seen[0]["spec"][key])
+        assert p.is_absolute() and str(p).startswith(str(root)), f"{key} 須為 out_dir 下之絕對路徑：{p}"

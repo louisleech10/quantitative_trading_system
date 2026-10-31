@@ -426,9 +426,10 @@ def _child_main(spec_path: Path) -> int:
 
 def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
     """逐請求於子行程（共用監看；隔離 cwd 與 TMPDIR）執行並擷取，寫 `out_dir/<id>.pkl`；回 {id: {"rc", "pickle", "log"}}。
-    任一請求失敗 ⇒ 記錄並續跑其餘（收據將該請求記為失敗，不 PASS）。"""
+    任一請求失敗 ⇒ 記錄並續跑其餘（收據將該請求記為失敗，不 PASS）。`out_dir` 先轉絕對路徑（子行程 cwd＝隔離目錄，
+    相對路徑之 spec／pickle 於子行程內解析不到；2026-11-01 `--out-dir runs/...` 12 請求皆 rc=1 實例）。"""
     fb = _fb()
-    out_dir = Path(out_dir)
+    out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     status: Dict[str, Any] = {}
     work_root = out_dir / "_work"
