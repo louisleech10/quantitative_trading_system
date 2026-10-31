@@ -15,7 +15,7 @@
     },
     "meta": {
       "producer": "主委（ICPERF Task 0.1 volatile 整格實測重跑；SPEC v5.45 §G (2) ③ <repo> 計入規則、工作根改 runs/icperf、各項重跑記錄存檔）",
-      "created_at": "2026-11-01T01:40:00+08:00"
+      "created_at": "2026-11-01T01:11:00+08:00"
     }
   },
   "scale": "single",

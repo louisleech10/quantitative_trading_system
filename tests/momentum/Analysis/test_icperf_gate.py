@@ -2233,3 +2233,21 @@ def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) 
     for mutate in schema_bad:
         with pytest.raises(AssertionError):
             run(p, m, mutate)
+
+
+def test_runs_inventory_lists_cards_and_cardless_dirs(tmp_path: Path) -> None:
+    """SPEC v5.45 §G (2) ②：`scripts/runs_inventory.py` 只列不刪——有說明卡之工作目錄讀出入口／用途／何時可刪，runs/ 下
+    無任何說明卡之第一層目錄列為無說明卡（card None）；列表後檔案仍在。"""
+    spec = importlib.util.spec_from_file_location("runs_inventory", REPO / "scripts" / "runs_inventory.py")
+    inv = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(inv)
+    runs = tmp_path / "runs"
+    (runs / "icperf" / "w1").mkdir(parents=True)
+    (runs / "icperf" / "w1" / "README.txt").write_text("入口：x volprobe\n用途：測試\n何時可刪：推送後\n", encoding="utf-8")
+    (runs / "icperf" / "w1" / "a.bin").write_bytes(b"0" * 10)
+    (runs / "loose").mkdir()
+    rows = {Path(r["path"]).relative_to(runs).as_posix(): r for r in inv.entries(runs)}
+    assert sorted(rows) == ["icperf/w1", "loose"]
+    assert rows["icperf/w1"]["card"]["用途"] == "測試" and rows["icperf/w1"]["size"] >= 10
+    assert rows["loose"]["card"] is None
+    assert (runs / "icperf" / "w1" / "a.bin").is_file()
