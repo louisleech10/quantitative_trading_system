@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell --symbol ETHUSDT --out runs/icperf/task02/supplement/gen_long_eth.json",
+      "code_sha256": "dcec8e3eef37408ff3bb0700d2324af8d26792b2b0bccde4dfdb28f691b5f481",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.2 量測前補資料；SPEC v5.52 (b)(c)、v5.53 (c1)、v5.54；code review r65 三家 proceed）",
+      "created_at": "2026-11-01T16:00:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1200,
+  "basis": [
+    "同一生成定義之 BTC 長歷史 L 格實測 99.5 秒（data_cache/numview_freeze_runs/L_BTCUSDT_4h_longhist__default/numview_cell.json 之 seconds）；ETH 長歷史前史 17,039 根、窗 2,000 根與 BTC 相同（precheck-xsec-long 實跑）",
+    "上限沿用 BTC 之估時收據 1200 秒（handoffs/run_receipts/20261029-icperf-long-cell-4h-longhist-estimate.json）",
+    "磁碟可用 45 GB（df 實查）；同時只跑一個重型跑，五個生成依序背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-8",
+    "ICPERF-BUDGET-2"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py gen-icfirst-raw --rows 2000",
+      "code_sha256": "dcec8e3eef37408ff3bb0700d2324af8d26792b2b0bccde4dfdb28f691b5f481",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF Task 0.2 量測前補資料；SPEC v5.52 (b)(c)、v5.53 (c1)、v5.54；code review r65 三家 proceed）",
+      "created_at": "2026-11-01T16:00:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1800,
+  "basis": [
+    "同一生成定義、輸出段 2,000 根；依列數線性外推約 603 秒（推測，未查證：同上，以 500／1000 兩點實測修正）",
+    "上限 1800 秒（三倍裕度）",
+    "磁碟可用 45 GB（df 實查）；同時只跑一個重型跑，五個生成依序背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-2"
+  ]
+}
