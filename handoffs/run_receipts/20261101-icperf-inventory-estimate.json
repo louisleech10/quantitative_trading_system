@@ -3,7 +3,7 @@
     "match": {
       "entrypoint": "scripts/icperf_freeze_baseline.py",
       "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py inventory --out handoffs/run_receipts/20261101-icperf-path-inventory.json",
-      "code_sha256": "ee33e49dfdfe6044ae551e6fb3c3cb2e86fddb854a1cc1c000c19e42a97dc43b",
+      "code_sha256": "dcec8e3eef37408ff3bb0700d2324af8d26792b2b0bccde4dfdb28f691b5f481",
       "data": [],
       "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "hardware": {
@@ -15,7 +15,7 @@
     },
     "meta": {
       "producer": "主委（ICPERF Task 0.2 路徑清冊收據：讀 scripts/icperf_path_inventory.json 驗 schema 後寫出，無計算）",
-      "created_at": "2026-11-01T12:00:00+08:00"
+      "created_at": "2026-11-01T15:30:00+08:00"
     }
   },
   "scale": "single",
