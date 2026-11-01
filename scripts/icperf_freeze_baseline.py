@@ -1,7 +1,9 @@
 """ICPERF Phase 0（docs/ICPERF_SPEC.md §G、Task 0.1／0.2）：以現行碼凍結改前輸出、寫出檔捕獲與比對、規模盤點之路徑清冊。
 
-施工狀態：Task 0.1（凍結、可重現性重跑）入口已實作；Task 0.2 之 `build_path_inventory`／`evaluate_criteria`／
-`measure_inventory` 仍為空殼（`raise NotImplementedError`）。具名驗收見 `tests/momentum/Analysis/test_icperf_gate.py`。
+施工狀態：Task 0.1（凍結、可重現性重跑）入口已實作；Task 0.2 之 `build_path_inventory`（讀定稿清冊
+`scripts/icperf_path_inventory.json` 並驗 schema）／`evaluate_criteria`／`measure_inventory`（路徑實跑＋直接呼叫格，行程內
+計時見 `scripts/icperf_scale_harness.py`；SPEC v5.50）已實作，量測收據待實跑。具名驗收見
+`tests/momentum/Analysis/test_icperf_gate.py`。
 
 子行程（重型計算一律在子行程、經 `run_watched` 啟動；子命令 `_child <spec.json>`，不列於 --help）：
 - 第 (1)(3)(4) 項：`ic_page`——同 `scripts/ffprod_measure.py` 之 `ic_in_process`（服務 `_build_config_override`、
@@ -2440,14 +2442,87 @@ def load_single_receipt(pattern: str, *, repo_root: Path = REPO) -> Dict[str, An
     return json.loads(paths[0].read_text(encoding="utf-8"))
 
 
+#: Task 0.2 路徑清冊之定稿資料（讀碼產出之草稿 `runs/icperf/task02/path-inventory-draft.json` 依 SPEC v5.50 定稿）
+INVENTORY_DATA = "scripts/icperf_path_inventory.json"
+INVENTORY_KEYS = ("id", "stage", "input_axes", "ic_page", "ic_first", "loop", "measure", "no_measure_reason", "evidence",
+                  "coverage_path_id", "unit_axis", "scale_vector", "branch_cell")
+INVENTORY_INPUT_AXES = ("cols", "rows", "passed_cols")
+#: SPEC Task 0.2／5.4 共用 schema 之 scale_vector 軸（v5.49 處置④增 events／symbols／timestamps）
+SCALE_VECTOR_AXES = ("rows", "input_cols", "stage_cols", "survivors", "survivor_pairs", "events", "symbols", "timestamps")
+INVENTORY_LOOPS = ("per_bar", "per_column", "per_group", "none")
+#: Task 0.2 量測之工作根（`runs/`，可重用之中介：子集、各段真實輸入、逐入口記錄）與 scale_probe 收據目錄
+TASK02_ROOT = "runs/icperf/task02"
+TASK02_PROBE_DIR = "handoffs/run_receipts/icperf_task02_scale"
+#: §B ICPERF-BUDGET-2 上界（SPEC v5.7：80 分鐘）
+TASK02_BUDGET_SECONDS = 80 * 60
+#: 2D 核心依欄分塊之工作記憶體上限（SPEC Task 0.2 boundary_20）
+TASK02_CHUNK_CAP = {"bytes": 500_000_000,
+                    "basis": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:172 "
+                             "`_CHUNKED_MEMMAP_MIN_BYTES`＝500,000,000（逾此改 memmap 分塊）；欄分塊寬＝`:873-880` "
+                             "`FFACT_L65_CHUNK_SIZE` 預設 2000 欄"}
+#: scale_probe 行程樹 RSS 取樣間隔（`scripts/scale_probe.py` `_TreeRssSampler` 預設）
+TASK02_SAMPLE_INTERVAL = 0.2
+
+
+def _harness() -> Any:
+    return _load("icperf_t02_scale_harness", REPO / "scripts" / "icperf_scale_harness.py")
+
+
+def inventory_problems(inv: Mapping[str, Any]) -> List[str]:
+    """清冊定稿之 schema 問題（空＝成立）：欄位齊備、id 唯一且為 `模組:限定名`、input_axes／loop 合法、scale_vector ⊆
+    `SCALE_VECTOR_AXES` 且非空不重複、unit_axis.axes ⊆ scale_vector、coverage_path_id 唯一、measure=false 須附理由與碼證、
+    measure=true 之 branch_cell 須為 harness 已知之路徑或直接呼叫格。"""
+    known = set(_harness().RUNNERS)
+    out: List[str] = []
+    entries = inv.get("entries") or []
+    ids = [e.get("id") for e in entries]
+    if len(set(ids)) != len(ids):
+        out.append("清冊入口 id 重複")
+    cps = [e.get("coverage_path_id") for e in entries]
+    if len(set(cps)) != len(cps):
+        out.append("coverage_path_id 重複")
+    for e in entries:
+        eid = e.get("id")
+        miss = [k for k in INVENTORY_KEYS if k not in e]
+        if miss:
+            out.append(f"{eid}：缺欄 {miss}")
+            continue
+        if not re.match(r"^[A-Za-z_][\w.]*:[A-Za-z_][\w.]*$", str(eid)):
+            out.append(f"{eid}：id 須為 模組:限定名")
+        if not e["input_axes"] or not set(e["input_axes"]) <= set(INVENTORY_INPUT_AXES):
+            out.append(f"{eid}：input_axes 非法")
+        if e["loop"] not in INVENTORY_LOOPS:
+            out.append(f"{eid}：loop 非法")
+        sv = e["scale_vector"]
+        if not (isinstance(sv, list) and sv and len(set(sv)) == len(sv) and set(sv) <= set(SCALE_VECTOR_AXES)):
+            out.append(f"{eid}：scale_vector 非法 {sv!r}")
+        elif not set((e["unit_axis"] or {}).get("axes") or ["__none__"]) <= set(sv):
+            out.append(f"{eid}：unit_axis.axes 不在 scale_vector 內")
+        if e["measure"]:
+            if e["branch_cell"] not in known:
+                out.append(f"{eid}：branch_cell {e['branch_cell']!r} 非已知路徑／格")
+        elif not str(e["no_measure_reason"] or "").strip() or not re.match(r"^[\w./-]+\.py:\d+", str(e["evidence"] or "")):
+            out.append(f"{eid}：不量須附理由與碼證 檔:行")
+    return out
+
+
 def build_path_inventory(repo_root: Path = REPO) -> Dict[str, Any]:
-    """讀碼列 Task 0.2 範圍內每一計算入口：{"entries": [{"id": "<模組>:<限定名>", "stage", "input_axes"
-    （⊆ cols／rows／passed_cols）, "ic_page", "ic_first", "loop"（per_bar／per_column／per_group／none）, "measure",
-    "no_measure_reason", "evidence": "<檔>:<行>", "coverage_path_id": <與入口一一對應之字串>, "unit_axis": {"axes":
-    [<scale_vector 鍵>...], "function": <單位成本之複雜度函數，如 "input_cols*rows">}, "scale_vector": [<該入口所用之
-    rows／input_cols／stage_cols／survivors／survivor_pairs>...]}]}（SPEC Task 0.2 路徑清冊；與 Task 5.4 總時間門檻共用 schema；
-    `unit_axis.axes` ⊆ `scale_vector`）。"""
-    raise NotImplementedError(_STUB)
+    """Task 0.2 路徑清冊（SPEC Task 0.2 路徑清冊；v5.50 定稿）：讀 `INVENTORY_DATA` 並驗 schema（`inventory_problems`；不合
+    ⇒ FreezeError）；回 {"entries": [{"id": "<模組>:<限定名>", "stage", "input_axes"（⊆ cols／rows／passed_cols）, "ic_page",
+    "ic_first", "loop"（per_bar／per_column／per_group／none）, "measure", "no_measure_reason", "evidence": "<檔>:<行>",
+    "coverage_path_id", "unit_axis": {"axes", "function"}, "scale_vector": [<`SCALE_VECTOR_AXES` 之子集>], "branch_cell":
+    <量測該入口之路徑實跑或直接呼叫格 id；measure=false 為 None>, ...}], "branch_cells": {id: 說明}, "source", "spec"}
+    （與 Task 5.4 總時間門檻共用 schema；`unit_axis.axes` ⊆ `scale_vector`）。"""
+    path = Path(repo_root) / INVENTORY_DATA
+    inv = json.loads(path.read_text(encoding="utf-8"))
+    problems = inventory_problems(inv)
+    if problems:
+        raise FreezeError(f"{INVENTORY_DATA} 不合：{problems[:10]}")
+    h = _harness()
+    return {"schema": inv.get("schema"), "spec": inv.get("spec"), "source": INVENTORY_DATA,
+            "source_sha256": _file_sha256(str(path), cache=False), "schema_note": inv.get("schema_note"),
+            "branch_cells": {**h.PATHS, **h.CELLS}, "open_questions": inv.get("open_questions"),
+            "pit_call_sites": inv.get("pit_call_sites"), "entries": inv["entries"]}
 
 
 def measured_ids(scale_receipt: Mapping[str, Any]) -> Set[str]:
@@ -2462,12 +2537,16 @@ def uncovered_entries(inventory: Mapping[str, Any], scale_receipt: Mapping[str, 
 
 def evaluate_criteria(entry: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
     """判準①–⑤（SPEC Task 0.2 固定規則；①之門檻引 `scripts/scale_probe.py` 之 SUPERLINEAR_EXPONENT／MIN_R2）；
-    回 {"1".."5": {"result": bool, "basis": str}}。"""
-    raise NotImplementedError(_STUB)
+    回 {"1".."5": {"result": bool, "basis": str, "evidence"}}。實作＝`icperf_scale_harness.evaluate_criteria`（量測收據組裝
+    同用）：① r² ≥ 0.9 且未標 extrapolation_unreliable ⇒ 冪次指數 > 1.2，否則以碼層複雜度（清冊 unit_axis.function）判；
+    ② 有原型下限 ⇒ 單位成本 ≥ 下限 × 10，否則記碼層下限分析、不判超標；③ 同一輸入鍵呼叫 > 1 次；④ 受算欄 − feature_filter
+    請求非空；⑤ 入口區間內最長無 progress_callback 間隔 > 60 秒。"""
+    return _harness().evaluate_criteria(entry, _load("icperf_t02_scale_probe", REPO / "scripts" / "scale_probe.py"))
 
 
 def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = SCALE_POINTS,
-                      out_path: Path) -> Dict[str, Any]:
+                      out_path: Path, row_scales: Optional[Sequence[int]] = None,
+                      session: Optional[str] = None) -> Dict[str, Any]:
     """以 `scripts/scale_probe.py` 量清冊每一需量測入口於 `scales` 之耗時與峰值 RSS（行程樹），並以 `sample <pid>` 取峰值
     Physical footprint（§B 門檻；同 `scripts/measure_ic_footprint.sh` 之工具，只沿用工具、不沿用其取樣停止與超標終止：受測
     行程結束前持續取樣、不因超標中止，SPEC Task 0.2），寫 `out_path`：
@@ -2491,8 +2570,184 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
     入口 id 只取清冊 id；每一點之 seconds／peak_rss_bytes 逐欄抄自其 `scale_probe_receipt`（scale_probe 寫出之收據，
     該收據 points 中 scale＝input_cols〔列長點為 rows〕之點）；`probe`／`row_probe` 為交給 scale_probe 之量測命令
     （cmd 含清冊 id）與其 --data／--config，該收據之 identity.match 須與之逐欄相符（量測前先提交量測碼，`head` 即該提交）；同一收據之三點者 fit／extrapolation_unreliable 等於該收據。
-    500／1000 兩點推估 2000 欄逾 10 分鐘之入口不量 2000 欄點，記 two_point_exception 與碼層複雜度分析。"""
-    raise NotImplementedError(_STUB)
+    500／1000 兩點推估 2000 欄逾 10 分鐘之入口不量 2000 欄點，記 two_point_exception 與碼層複雜度分析。
+
+    v5.49／v5.50 施工（與上列衝突處以此為準）：量測單位＝**路徑實跑**——清冊 `branch_cell` 所列之每一路徑／直接呼叫格於每一
+    規模點經 `scripts/scale_probe.py` 啟動一個行程（`scripts/icperf_scale_harness.py run <run_id> --scale {scale}`；身分＝
+    路徑命令、不含入口 id），行程內重綁全部引用、逐入口計時寫 `TASK02_ROOT/records/<session>/`；本函式依序：①建巢狀子集
+    `TASK02_ROOT/subsets/<N>/`（`_write_stage5_subset`、`SEED`）②先跑 `ic_page_default`（其存直接呼叫格之各段真實輸入）、
+    其餘路徑、再跑直接呼叫格；同 session 已有 scale_probe 收據且逐入口記錄份數相符者沿用不重跑 ③以
+    `icperf_scale_harness.assemble_scale_receipt` 組收據：每點帶 path_run_id、scale_probe 收據路徑與記錄檔路徑，seconds＝
+    同 path_run_id 之逐入口秒數、peak_rss_bytes＝scale_probe 該點、footprint＝harness 於行程結束前之 `sample`；fit＝
+    scale_probe 擬合函式對點（x＝stage_cols）重算。任一入口 0 呼叫、漏量、缺軸 ⇒ 問題清單寫 `<out>.problems.json` 並
+    FreezeError。`row_scales` 給定 ⇒ 支援 rows 軸之路徑／格另跑列長點（固定 `ROW_AXIS_COLS` 欄）。量測碼（harness、清冊）
+    須已提交（`head` 即該提交；boundary_16 以 head 之 blob 重算身分）。"""
+    import time
+
+    h = _harness()
+    scale_probe = _load("icperf_t02_scale_probe", REPO / "scripts" / "scale_probe.py")
+    plan = h.coverage_plan(inventory)
+    if "__uncovered__" in plan:
+        raise FreezeError(f"清冊有未歸屬路徑／格之需量測入口：{plan['__uncovered__'][:10]}")
+    head = _git_head(REPO)
+    if not head or not re.fullmatch(r"[0-9a-f]{40}", head):
+        raise FreezeError(f"取不到量測時之提交 head：{head!r}")
+    dirty = subprocess_dirty(["scripts/icperf_scale_harness.py", INVENTORY_DATA, "scripts/scale_probe.py"])
+    if dirty:
+        raise FreezeError(f"量測碼須先提交（head 即量測碼之提交）：未提交之變更 {dirty}")
+    session = session or time.strftime("%Y%m%dT%H%M%S")
+    root = REPO / TASK02_ROOT
+    records_dir = root / "records" / session
+    probe_dir = REPO / TASK02_PROBE_DIR / session
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    (root / "logs" / session).mkdir(parents=True, exist_ok=True)
+    src = c_handoff_path()
+    src_meta = src.with_name(src.stem + "_meta.json")
+    for n in sorted(set(int(s) for s in scales) | ({h.ROW_AXIS_COLS} if row_scales else set())):
+        sub = root / "subsets" / str(n)
+        if not (sub / src.name).is_file():
+            _write_stage5_subset(src, src_meta, n, SEED, sub)
+    full_cols = _handoff_total_cols(src)
+    order = [r for r in ("ic_page_default", *h.PATHS, *h.CELLS) if r in plan]
+    order = list(dict.fromkeys(order))
+    runs: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    failures: List[str] = []
+    for run_id in order:
+        for axis in h.RUN_AXES[run_id]:
+            if axis == "rows" and not row_scales:
+                continue
+            pts = (list(scales) if axis == "cols" else list(row_scales or ()) if axis == "rows"
+                   else _event_scales(h))
+            # 每次啟動 scale_probe 為一個 attempt（收據與逐入口記錄目錄各自獨立）：最近一次已完成者沿用；未完成者另開新
+            # attempt 重跑（不刪、不混用失敗 attempt 之記錄）
+            attempt, done = _task02_attempt(probe_dir, records_dir, run_id, axis)
+            receipt_path = probe_dir / f"{run_id}-{axis}-a{attempt}.json"
+            att_records = records_dir / f"{run_id}-{axis}-a{attempt}"
+            cmd = [sys.executable, "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis, "--scale", "{scale}",
+                   "--records-dir", att_records.relative_to(REPO).as_posix()]
+            data = _task02_data(run_id, src)
+            config = [INVENTORY_DATA]
+            if not done:
+                probe_cmd = [sys.executable, "scripts/scale_probe.py", "--out", receipt_path.relative_to(REPO).as_posix(),
+                             "--full-scale", str(full_cols if axis == "cols" else max(pts)), "--unit", axis,
+                             "--log-dir", (root / "logs" / session / f"{run_id}-{axis}").relative_to(REPO).as_posix()]
+                for s in pts:
+                    probe_cmd += ["--scale", str(s)]
+                for d in data:
+                    probe_cmd += ["--data", d]
+                for c in config:
+                    probe_cmd += ["--config", c]
+                res = run_watched(probe_cmd + ["--", *cmd], log_path=root / "logs" / session / f"{run_id}-{axis}.log",
+                                  env=_child_env_base(), cwd=REPO)
+                if res["rc"] != 0 or not receipt_path.is_file():
+                    failures.append(f"{run_id}:{axis}：scale_probe rc={res['rc']}（見 {res['log_path']}）")
+                    continue
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            runs[(run_id, axis)] = {"probe": {"cmd": cmd, "data": data, "config": config},
+                                    "receipt_path": receipt_path.relative_to(REPO).as_posix(), "receipt": receipt,
+                                    "records": _task02_records(att_records, run_id, axis)}
+    try:
+        receipt = h.assemble_scale_receipt(inventory, runs, head=head, scale_probe=scale_probe,
+                                           budget_seconds=TASK02_BUDGET_SECONDS,
+                                           sample_interval_seconds=TASK02_SAMPLE_INTERVAL, chunk_cap=TASK02_CHUNK_CAP,
+                                           ram_bytes=_ram_bytes())
+    except h.AssemblyError as exc:
+        problems_path = Path(out_path).with_name(Path(out_path).stem + ".problems.json")
+        problems_path.parent.mkdir(parents=True, exist_ok=True)
+        problems_path.write_text(json.dumps({"session": session, "run_failures": failures, "problems": exc.problems},
+                                            ensure_ascii=False, indent=1), encoding="utf-8")
+        raise FreezeError(f"量測收據組裝失敗：{len(exc.problems)} 條問題、{len(failures)} 個路徑失敗（見 {problems_path}）")
+    if failures:
+        raise FreezeError(f"路徑實跑失敗：{failures}")
+    receipt["session"] = session
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(out_path).write_text(json.dumps(receipt, ensure_ascii=False, indent=1, allow_nan=True), encoding="utf-8")
+    return receipt
+
+
+def subprocess_dirty(paths: Sequence[str]) -> List[str]:
+    """`paths` 中相對 HEAD 有未提交變更（含未追蹤）者。"""
+    import subprocess
+
+    out = []
+    for p in paths:
+        tracked = subprocess.run(["git", "ls-files", "--error-unmatch", p], cwd=REPO, capture_output=True).returncode == 0
+        diff = subprocess.run(["git", "diff", "--quiet", "HEAD", "--", p], cwd=REPO).returncode
+        if not tracked or diff != 0:
+            out.append(p)
+    return out
+
+
+def _handoff_total_cols(src: Path) -> int:
+    """C 格交接 h5 之全序欄數（`h5_feature_precision.feature_layout`；scale_probe 推算之全規模）。"""
+    import h5py
+
+    _ensure_repo_path()
+    from momentum.core import h5_feature_precision as h5fp
+
+    meta_all = json.loads(src.with_name(src.stem + "_meta.json").read_text(encoding="utf-8"))
+    with h5py.File(src, "r") as f:
+        _rows, total, _f64 = h5fp.feature_layout(f[f"{meta_all['symbol']}/{meta_all['timeframe']}"])
+    return int(total)
+
+
+def _event_scales(h: Any) -> List[int]:
+    """events 軸之三點：事件研究批（`icperf_event_batch` 規則）事件數 K 之 K//4、K//2、K。"""
+    k = len(h._event_batch_records(None))
+    return sorted({max(k // 4, 1), max(k // 2, 1), k})
+
+
+def _task02_data(run_id: str, src: Path) -> List[str]:
+    """scale_probe 身分之 --data：C 格交接 h5（ic_page／深度分析／直接呼叫格）或該路徑所讀 run 之 manifest。"""
+    def rel(p: Path) -> str:
+        try:
+            return Path(p).resolve().relative_to(REPO).as_posix()
+        except ValueError:
+            return str(p)
+
+    if run_id in ("post_ic_transform", "cross_sectional"):
+        cells = ("A_BTCUSDT_1h", "A_SOLUSDT_1h") if run_id == "cross_sectional" else (CELL,)
+        return [f"{_cell_run(c)['run_dir']}/feature_manifest.json" for c in cells]
+    if run_id in ("event_import", "event_study"):
+        return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json"]
+    return [rel(src)]
+
+
+def _task02_records(records_dir: Path, run_id: str, axis: str) -> Dict[int, List[Dict[str, Any]]]:
+    """`records_dir/<run_id>/<axis>-<scale>/*.json` ⇒ {scale: [記錄（加 `_record_path`＝repo 相對）...]}。"""
+    out: Dict[int, List[Dict[str, Any]]] = {}
+    base = Path(records_dir) / run_id
+    for d in sorted(base.glob(f"{axis}-*")) if base.is_dir() else []:
+        scale = int(d.name.split("-", 1)[1])
+        for f in sorted(d.glob("*.json")):
+            rec = json.loads(f.read_text(encoding="utf-8"))
+            rec["_record_path"] = f.relative_to(REPO).as_posix()
+            out.setdefault(scale, []).append(rec)
+    return out
+
+
+def _task02_attempt(probe_dir: Path, records_dir: Path, run_id: str, axis: str) -> Tuple[int, bool]:
+    """(run_id, axis) 於本 session 之 attempt：最近一次 attempt 已有 scale_probe 收據且每點之實跑次數＝其逐入口記錄份數
+    ⇒ (該 attempt, True)＝沿用不重跑；否則 (下一個 attempt 編號, False)。"""
+    seen = [int(m.group(1)) for p in Path(probe_dir).glob(f"{run_id}-{axis}-a*.json")
+            if (m := re.search(r"-a(\d+)\.json$", p.name))]
+    seen += [int(m.group(1)) for p in Path(records_dir).glob(f"{run_id}-{axis}-a*")
+             if (m := re.search(r"-a(\d+)$", p.name))]
+    last = max(seen) if seen else 0
+    receipt_path = Path(probe_dir) / f"{run_id}-{axis}-a{last}.json"
+    if last and receipt_path.is_file():
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        recs = _task02_records(Path(records_dir) / f"{run_id}-{axis}-a{last}", run_id, axis)
+        if all(len(recs.get(int(q["scale"]), [])) == int(q.get("runs") or 0) for q in receipt.get("points") or []):
+            return last, True
+    return last + 1, False
+
+
+def _ram_bytes() -> Optional[int]:
+    import subprocess
+
+    res = subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True)
+    return int(res.stdout.strip()) if res.returncode == 0 and res.stdout.strip().isdigit() else None
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -2533,9 +2788,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = sub.add_parser("gen-c-handoff", help="重產第 (2) 項之 C 格交接 h5 於持久根 data_cache/icperf_inputs/")
     p = sub.add_parser("inventory", help="Task 0.2 路徑清冊")
     p.add_argument("--out", type=Path, required=True)
-    p = sub.add_parser("measure", help="Task 0.2 規模量測")
+    p = sub.add_parser("measure", help="Task 0.2 規模量測（路徑實跑＋直接呼叫格，經 scale_probe；重型）")
     p.add_argument("--inventory", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--session", default=None, help="量測 session（同 session 已完成之路徑沿用不重跑；預設本地時間）")
+    p.add_argument("--row-scales", type=int, nargs="*", default=None,
+                   help="列長點（固定 500 欄之末 R 列；不給則不量 row_points）")
     p = sub.add_parser(CHILD_CMD)
     p.add_argument("spec", type=Path)
     args = parser.parse_args(argv)
@@ -2598,12 +2856,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except FreezeError as exc:
         print(f"FreezeError：{exc}", file=sys.stderr)
         return 1
-    if args.cmd == "inventory":
-        inv = build_path_inventory(REPO)
-        Path(args.out).write_text(json.dumps(inv, ensure_ascii=False, indent=1), encoding="utf-8")
-        return 0
-    inventory = json.loads(Path(args.inventory).read_text(encoding="utf-8"))
-    measure_inventory(inventory, out_path=Path(args.out))
+    try:
+        if args.cmd == "inventory":
+            inv = build_path_inventory(REPO)
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(json.dumps(inv, ensure_ascii=False, indent=1), encoding="utf-8")
+            print(json.dumps({"out": str(args.out), "entries": len(inv["entries"]),
+                              "measure": sum(1 for e in inv["entries"] if e["measure"])}, ensure_ascii=False))
+            return 0
+        inventory = json.loads(Path(args.inventory).read_text(encoding="utf-8"))
+        measure_inventory(inventory, out_path=Path(args.out), row_scales=args.row_scales, session=args.session)
+    except FreezeError as exc:
+        print(f"FreezeError：{exc}", file=sys.stderr)
+        return 1
     return 0
 
 

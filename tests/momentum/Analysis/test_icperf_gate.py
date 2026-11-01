@@ -87,8 +87,8 @@ INVENTORY_KEYS = {"id", "stage", "input_axes", "ic_page", "ic_first", "loop", "m
 INPUT_AXES = {"cols", "rows", "passed_cols"}
 LOOPS = {"per_bar", "per_column", "per_group", "none"}
 SCALE_POINTS = {500, 1000, 2000}
-#: SPEC Task 0.2／5.4 共用 schema：scale_vector 之軸（各入口取其所用者）
-SCALE_VECTOR_KEYS = {"rows", "input_cols", "stage_cols", "survivors", "survivor_pairs"}
+#: SPEC Task 0.2／5.4 共用 schema：scale_vector 之軸（各入口取其所用者）；SPEC v5.49 處置④增事件數、標的數、時點數
+SCALE_VECTOR_KEYS = {"rows", "input_cols", "stage_cols", "survivors", "survivor_pairs", "events", "symbols", "timestamps"}
 #: SPEC Task 0.2「記憶體量測與四項機會欄」
 OPPORTUNITY_KEYS = {"time", "memory", "precision", "file_size"}
 OPPORTUNITY_STATUSES = {"none", "planned", "needs_user", "done"}
@@ -1823,12 +1823,13 @@ def _sha_at_commit(head: str, paths: Sequence[str]) -> str:
 
 
 def _assert_receipt_identity(eid: str, rec: Mapping[str, Any], probe: Mapping[str, Any], head: str) -> None:
-    """scale_probe 收據之 identity.match 逐欄等於該入口宣告之量測命令（r11 CODEX-R11-P1-03）：命令須含入口 id；
-    entrypoint／target_argv 照 scale_probe 之取法、data 照現行檔重算（雜湊有快取）、code／config 取量測時提交
-    `head` 之 blob、hardware 等於本機。錯入口、錯 argv、錯資料、改過之量測碼所產之收據即紅。"""
+    """scale_probe 收據之 identity.match 逐欄等於該入口所屬路徑宣告之量測命令（r11 CODEX-R11-P1-03；SPEC v5.50 (e)：
+    身分＝**路徑命令、不含入口 id**——同一路徑實跑量多個入口）；entrypoint／target_argv 照 scale_probe 之取法、data 照
+    現行檔重算（雜湊有快取）、code／config 取量測時提交 `head` 之 blob、hardware 等於本機。錯路徑、錯 argv、錯資料、改過之
+    量測碼所產之收據即紅。"""
     rid = _load("icperf_gate_receipt_identity", REPO / "scripts" / "run_receipt_identity.py")
     cmd = [str(a) for a in probe["cmd"]]
-    assert eid in cmd, f"{eid}：量測命令未指名本入口：{cmd}"
+    assert eid not in cmd, f"{eid}：路徑級量測命令不得含入口 id（SPEC v5.50 (e)）：{cmd}"
     entry = next((t for t in cmd if (REPO / t).is_file() and Path(t).suffix in (".py", ".sh")), cmd[0])
     expected = rid.compute_match(entry, cmd, [], probe["data"], probe["config"])
     expected["code_sha256"] = _sha_at_commit(head, [expected["entrypoint"]] if (REPO / expected["entrypoint"]).is_file()
@@ -1845,14 +1846,63 @@ def _assert_point_bound(eid: str, point: Mapping[str, Any], scale: int, unit: st
     _assert_receipt_identity(eid, rec, probe, head)
     hits = [q for q in rec["points"] if q["scale"] == scale and q["unit"] == unit]
     assert len(hits) == 1, f"{eid}：{point['scale_probe_receipt']} 無 scale={scale}／unit={unit} 之實測點"
-    for k in ("seconds", "peak_rss_bytes"):
+    # SPEC v5.50 (e)：路徑級峰值 RSS 取自 scale_probe 該點；入口秒數改取同 path_run_id 之逐入口計時紀錄（下列）
+    for k in ("peak_rss_bytes",):
         assert point[k] == hits[0][k], f"{eid}：{k} {point[k]} != scale_probe 實測 {hits[0][k]}"
+
+
+def _entry_record(path_str: Any) -> Optional[Dict[str, Any]]:
+    """量測點所引之 repo 內 JSON（逐入口計時紀錄〔scripts/icperf_scale_harness.py 寫出〕或 scale_probe 收據；不存在 ⇒
+    None；不斷言，供問題清單式檢查）。"""
+    src = str(path_str or "")
+    if not src or not (REPO / src).is_file():
+        return None
+    return json.loads((REPO / src).read_text(encoding="utf-8"))
+
+
+def _entry_record_problems(eid: str, m: Mapping[str, Any]) -> List[str]:
+    """SPEC v5.50 (e)：量測收據單一入口之每點（含列長點）之 seconds＝同 path_run_id 之逐入口計時紀錄之該入口秒數；該紀錄之
+    argv＝所屬路徑 scale_probe 命令（`probe`／`row_probe`）於該規模代入後之 harness 參數（同次執行）、點之實跑記錄數＝
+    scale_probe 該點 runs；呼叫次數（扣除拋例外者）≥ 1（0 呼叫不得充作量測，v5.50 (a)）；footprint 不小於該紀錄之受測行程
+    結束前 sample。以問題清單回報（呼叫端單一斷言；不另綁斷言區域名，TESTREG V19 名序不變）。"""
+    out: List[str] = []
+    groups = [(m["points"], m.get("probe"), "cols", "input_cols"),
+              (m.get("row_points") or [], m.get("row_probe"), "rows", "rows")]
+    for points, probe, unit, xkey in groups:
+        for i, point in enumerate(points):
+            scale = point.get(xkey)
+            rec = _entry_record(point.get("scale_probe_receipt")) or {}
+            hit = next((q for q in rec.get("points") or [] if q["scale"] == scale and q["unit"] == unit), {})
+            record = _entry_record(point.get("record_path"))
+            if record is None:
+                out.append(f"{unit} 點 {i}：須引實存之逐入口計時紀錄：{point.get('record_path')!r}")
+                continue
+            if record.get("path_run_id") != point.get("path_run_id"):
+                out.append(f"{unit} 點 {i}：紀錄 path_run_id != 點之 path_run_id")
+            ids = list(point.get("path_run_ids") or [])
+            if point.get("path_run_id") not in ids or len(ids) != hit.get("runs"):
+                out.append(f"{unit} 點 {i}：實跑記錄數 {len(ids)} != scale_probe runs {hit.get('runs')}")
+            want = [str(t).replace("{scale}", str(scale)) for t in (probe or {}).get("cmd", [])[2:]]
+            if record.get("argv") != want:
+                out.append(f"{unit} 點 {i}：紀錄 argv {record.get('argv')} != 量測命令 {want}（非同次執行）")
+            er = (record.get("entries") or {}).get(eid)
+            if not er or int(er.get("calls") or 0) - int(er.get("raised") or 0) < 1:
+                out.append(f"{unit} 點 {i}：{point.get('path_run_id')} 呼叫次數 0（不得以 0 呼叫充作量測）")
+                continue
+            if point.get("seconds") != er.get("seconds"):
+                out.append(f"{unit} 點 {i}：seconds {point.get('seconds')} != 逐入口計時 {er.get('seconds')}")
+            fp = record.get("peak_footprint_bytes")
+            if not (isinstance(fp, int) and fp > 0 and isinstance(point.get("peak_footprint_bytes"), int)
+                    and point["peak_footprint_bytes"] >= fp):
+                out.append(f"{unit} 點 {i}：footprint {point.get('peak_footprint_bytes')} 與紀錄 {fp} 不符")
+    return out
 
 
 def test_boundary_16_three_points_per_entry() -> None:
     """每一入口 points 長度 3（boundary_19 之兩點例外除外）；逐點秒數與峰值 RSS；x 軸同記輸入欄數與實際進段欄數；
-    每一點引用實存之 scale_probe 收據且秒數與峰值 RSS 逐欄等於其實測值（列長點同），且該收據之身分逐欄等於入口宣告之
-    量測命令（`probe`／列長點 `row_probe`：cmd、data、config；code 取收據頂層 `head` 提交）。"""
+    每一點引用實存之所屬**路徑** scale_probe 收據，其身分逐欄等於該路徑之量測命令（`probe`／列長點 `row_probe`：cmd、data、
+    config；code 取收據頂層 `head` 提交；SPEC v5.50 (e)：命令不含入口 id）、峰值 RSS 等於該收據該點；seconds 等於同
+    path_run_id 之逐入口計時紀錄（同次執行之 argv、實跑次數相符、呼叫次數 ≥ 1，`_entry_record_problems`；列長點同）。"""
     inv = _inventory_entries()
     receipt = _single(SCALE_BEFORE_PATTERN)
     head = str(receipt.get("head") or "")
@@ -1879,6 +1929,9 @@ def test_boundary_16_three_points_per_entry() -> None:
     for eid, pts in receipt["entries"].items():
         p = inv.get(eid)
         assert not _entry_schema_problems(pts, p), f"{eid}：量測收據 schema 不合：{_entry_schema_problems(pts, p)}"
+    # SPEC v5.50 (e)：每點 seconds 取自同 path_run_id 之逐入口計時紀錄（同次執行、呼叫次數 ≥ 1）；重用上段區域名（TESTREG V19）
+    for eid, pts in receipt["entries"].items():
+        assert not _entry_record_problems(eid, pts), f"{eid}：逐入口計時紀錄不符：{_entry_record_problems(eid, pts)}"
 
 
 def _entry_schema_problems(m: Mapping[str, Any], inv_entry: Optional[Mapping[str, Any]]) -> List[str]:
@@ -1915,8 +1968,8 @@ def _entry_schema_problems(m: Mapping[str, Any], inv_entry: Optional[Mapping[str
 
 def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
     """擬合指數、r²、判準①–⑤判定結果與依據欄齊備；r² < 0.9 或標 extrapolation_unreliable 者①依據為碼層複雜度分析；
-    ②須有 lower_bound_seconds_per_unit 或碼層下限分析；各點同引一份 scale_probe 收據者，fit 與 extrapolation_unreliable
-    等於該收據。"""
+    ②須有 lower_bound_seconds_per_unit 或碼層下限分析；各點同引一份（路徑級）scale_probe 收據，fit 與
+    extrapolation_unreliable 等於 scale_probe 擬合函式對本入口三點之重算（SPEC v5.50 (e)）。"""
     for eid, m in _scale_entries().items():
         fit = m["fit"]
         assert isinstance(fit["exponent"], (int, float)) and isinstance(fit["r2"], (int, float)), eid
@@ -1924,6 +1977,10 @@ def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
         sources = {str(p.get("scale_probe_receipt") or "") for p in m["points"]}
         if len(sources) == 1:
             rec = _scale_probe_receipt(next(iter(sources)))
+            # SPEC v5.50 (e)：scale_probe 收據為路徑級（路徑全體之擬合）⇒ 逐入口 fit 以 scale_probe 之同一擬合函式對本入口之點
+            # （x＝實際進段欄數 stage_cols、seconds、路徑級峰值 RSS；全規模＝收據 fit_full_scale）重算後比對
+            rec = scale_probe.fit([{"scale": p["stage_cols"], "unit": "cols", "seconds": p["seconds"],
+                                    "peak_rss_bytes": p["peak_rss_bytes"]} for p in m["points"]], m["fit_full_scale"])
             assert fit["exponent"] == rec["fit"]["exponent"] and fit["r2"] == rec["fit"]["r2"], f"{eid}：fit != 收據"
             assert m["extrapolation_unreliable"] == rec["extrapolation_unreliable"], f"{eid}：可靠性旗標 != 收據"
         crit = m["criteria"]
@@ -1940,6 +1997,14 @@ def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
             f"{eid}：②缺下限實測或碼層下限分析"
         # SPEC v5.13 Task 0.2「記憶體量測與四項機會欄」：每入口四鍵齊備且各狀態之必填欄非空
         _assert_opportunities(eid, m)
+        # SPEC v5.50 (e)：同一入口之各點來自同一路徑實跑（一份路徑級 scale_probe 收據），上列重算比對方不落空
+        assert _single_probe_source(m), f"{eid}：各點須引同一份路徑 scale_probe 收據"
+
+
+def _single_probe_source(m: Mapping[str, Any]) -> bool:
+    """量測收據單一入口之各點恰引同一份（非空）scale_probe 收據（SPEC v5.50 (e)：同一路徑實跑）。"""
+    sources = {str(p.get("scale_probe_receipt") or "") for p in m["points"]}
+    return len(sources) == 1 and "" not in sources
 
 
 def _filled(v: Any) -> bool:
@@ -2182,24 +2247,34 @@ def test_boundary_23_heavy_tests_require_shared_watchdog() -> None:
 
 def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) -> None:
     """直接驅動 boundary_16（r12 CODEX-R12-P1-03）：清冊與量測收據以記憶體內最小輸入置換讀取函式；收據身分相符者綠；
-    命令未指名本入口、錯 entrypoint、錯 argv、量測碼與 head 不同 ⇒ boundary_16 紅。身分以 run_receipt_identity 對
+    路徑命令含入口 id（SPEC v5.50 (e)）、錯 entrypoint、錯 argv、量測碼與 head 不同、逐入口計時紀錄不符 ⇒ boundary_16 紅。
+    身分以 run_receipt_identity 對
     repo 內已提交之 scripts/scale_probe.py 產生（不跑量測）。"""
     module = sys.modules[__name__]
     rid = _load("icperf_gate_receipt_identity", REPO / "scripts" / "run_receipt_identity.py")
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True).stdout.strip()
     eid = "m.a:f"
-    probe = {"cmd": ["venv/bin/python", "scripts/scale_probe.py", "--entry", eid], "data": [], "config": []}
+    # SPEC v5.50 (e)：量測命令＝路徑命令（不含入口 id）
+    probe = {"cmd": ["venv/bin/python", "scripts/scale_probe.py", "--path", "p1"], "data": [], "config": []}
     match = rid.compute_match("scripts/scale_probe.py", probe["cmd"], [], [], [])
     match["code_sha256"] = _sha_at_commit(head, ["scripts/scale_probe.py"])
     match["config_sha256"] = _sha_at_commit(head, [])
 
-    def run(entry_probe: Mapping[str, Any], receipt_match: Mapping[str, Any], mutate: Any = None) -> None:
+    def run(entry_probe: Mapping[str, Any], receipt_match: Mapping[str, Any], mutate: Any = None,
+            mutate_record: Any = None) -> None:
         pts = [{"input_cols": n, "stage_cols": n, "seconds": 1.0 * n, "peak_rss_bytes": 1000 + n,
                 "peak_footprint_bytes": 2000 + n, "scale_vector": {"input_cols": n, "stage_cols": n},
-                "scale_probe_receipt": "r.json"} for n in (500, 1000, 2000)]
+                "scale_probe_receipt": "r.json", "path_run_id": f"p1.cols{n}", "path_run_ids": [f"p1.cols{n}"],
+                "record_path": f"rec-{n}.json"} for n in (500, 1000, 2000)]
         probe_rec = {"identity": {"match": dict(receipt_match), "meta": {"producer": "scripts/scale_probe.py"}},
-                     "points": [{"scale": p["input_cols"], "unit": "cols", "seconds": p["seconds"],
+                     "points": [{"scale": p["input_cols"], "unit": "cols", "seconds": 9.0 * p["seconds"], "runs": 1,
                                  "peak_rss_bytes": p["peak_rss_bytes"]} for p in pts]}
+        records = {p["record_path"]: {"path_run_id": p["path_run_id"], "argv": [str(t) for t in entry_probe["cmd"][2:]],
+                                      "peak_footprint_bytes": p["peak_footprint_bytes"],
+                                      "entries": {eid: {"calls": 3, "raised": 0, "seconds": p["seconds"]}}} for p in pts}
+        if mutate_record is not None:
+            mutate_record(records["rec-1000.json"])
+        files = {"r.json": probe_rec, **records}
         axis = {"axes": ["stage_cols"], "function": "stage_cols"}
         scale = {"head": head, "entries": {eid: {"probe": dict(entry_probe), "row_probe": None, "points": pts,
                                                  "coverage_path_id": "cp-m.a:f", "unit_axis": dict(axis)}}}
@@ -2210,11 +2285,12 @@ def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) 
         monkeypatch.setattr(module, "_inventory_entries", lambda: inventory)
         monkeypatch.setattr(module, "_single", lambda pattern: scale)
         monkeypatch.setattr(module, "_scale_probe_receipt", lambda path_str: probe_rec)
+        monkeypatch.setattr(module, "_entry_record", lambda path_str: files.get(str(path_str)))
         test_boundary_16_three_points_per_entry()
 
     run(probe, match)
     bad = [
-        ({**probe, "cmd": ["venv/bin/python", "scripts/scale_probe.py", "--entry", "m.b:g"]}, match),  # 命令未指名本入口
+        ({**probe, "cmd": ["venv/bin/python", "scripts/scale_probe.py", "--entry", eid]}, match),  # 路徑命令含入口 id
         (probe, {**match, "entrypoint": "scripts/run_watched.py"}),  # 錯入口檔
         (probe, {**match, "target_argv": rid.normalize_argv(probe["cmd"] + ["--cols", "9"])}),  # 錯 argv
         (probe, {**match, "code_sha256": "0" * 64}),  # 量測碼與 head 提交不同
@@ -2236,6 +2312,24 @@ def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) 
     ]
     p, m = probe, match  # 重用上段區域名：既有斷言之名序不變（TESTREG V19 normalize ②）
     for mutate in schema_bad:
+        with pytest.raises(AssertionError):
+            run(p, m, mutate)
+    # SPEC v5.50 (e)：逐入口計時紀錄——點之 seconds 與紀錄不符、紀錄 0 呼叫（含全數拋例外）、紀錄非同次執行（argv 不符）、
+    # 點之 path_run_id 與紀錄不符、紀錄缺、實跑記錄數與 scale_probe runs 不符、footprint 小於紀錄 ⇒ boundary_16 紅
+    record_bad = [
+        lambda r: r["entries"][eid].update(seconds=1.5),
+        lambda r: r["entries"][eid].update(calls=0),
+        lambda r: r["entries"][eid].update(raised=3),
+        lambda r: r.update(argv=["--path", "p2"]),
+        lambda r: r.update(path_run_id="other"),
+        lambda r: r["entries"].pop(eid),
+        lambda r: r.update(peak_footprint_bytes=10 ** 9),
+    ]
+    for mutate in record_bad:
+        with pytest.raises(AssertionError):
+            run(p, m, None, mutate)
+    for mutate in (lambda e, i: e["points"][1].update(record_path="missing.json"),
+                   lambda e, i: e["points"][1].update(path_run_ids=["p1.cols1000", "p1.cols1000b"])):
         with pytest.raises(AssertionError):
             run(p, m, mutate)
 
@@ -2268,3 +2362,265 @@ def test_runs_inventory_lists_cards_and_cardless_dirs(tmp_path: Path) -> None:
     assert rows["icperf/w1"]["card"]["用途"] == "測試" and rows["icperf/w1"]["size"] >= 10
     assert rows["loose"]["card"] is None
     assert (runs / "icperf" / "w1" / "a.bin").is_file()
+
+
+# ── Task 0.2 量測工具（scripts/icperf_scale_harness.py；SPEC v5.50 (a)(b)(e)）：秒級契約，不跑量測 ─────────────────
+
+
+@pytest.fixture(scope="module")
+def harness() -> Any:
+    return _load("icperf_gate_scale_harness", REPO / "scripts" / "icperf_scale_harness.py")
+
+
+_TOY_SRC = '''
+def f(x):
+    return x + 1
+
+
+class K:
+    @staticmethod
+    def s(x):
+        return x * 2
+
+    @classmethod
+    def c(cls, x):
+        return x * 3
+
+    def m(self, x):
+        return x * 4
+'''
+_TOY_USER = '''
+from icperf_toy_src import f, K
+
+
+def call_early():
+    return f(1)
+
+
+def call_delayed():
+    from icperf_toy_src import f as g
+    return g(2)
+
+
+def call_methods():
+    return K.s(1) + K().s(1) + K.c(1) + K().m(1)
+'''
+TOY_IDS = ("icperf_toy_src:f", "icperf_toy_src:K.s", "icperf_toy_src:K.c", "icperf_toy_src:K.m")
+
+
+def test_task02_rebind_all_counts_early_bound_and_delayed_calls(harness: Any, tmp_path: Path,
+                                                                monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC v5.50 (a)：`from X import f` 早綁之呼叫端、函式內延遲 import、類別上之 staticmethod／classmethod／方法，經
+    `rebind_all` 後皆計數 ≥ 1（同一 wrapper）；對照組＝只換定義模組屬性（v5.49）時早綁呼叫端計數 0；`restore` 後還原。"""
+    (tmp_path / "icperf_toy_src.py").write_text(_TOY_SRC, encoding="utf-8")
+    (tmp_path / "icperf_toy_user.py").write_text(_TOY_USER, encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    for name in ("icperf_toy_src", "icperf_toy_user"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    src = importlib.import_module("icperf_toy_src")
+    user = importlib.import_module("icperf_toy_user")
+    seen: List[int] = []
+    orig = src.f
+    src.f = lambda x: seen.append(x) or orig(x)  # v5.49 之做法：只換定義模組屬性
+    assert user.call_early() == 2 and seen == [], "對照組：早綁之呼叫端不經定義模組屬性（本測試之分辨力）"
+    src.f = orig
+    targets = harness.resolve_targets(TOY_IDS)
+    assert {t.kind for t in targets.values()} == {"function", "staticmethod", "classmethod"}
+    rec = harness.Recorder(heartbeat=False)
+    binding = harness.rebind_all({eid: t.func for eid, t in targets.items()}, rec)
+    try:
+        assert user.call_early() == 2 and user.call_delayed() == 3 and user.call_methods() == 2 + 2 + 3 + 4
+        assert {eid: rec.stats[eid].calls for eid in TOY_IDS} == {
+            "icperf_toy_src:f": 2, "icperf_toy_src:K.s": 2, "icperf_toy_src:K.c": 1, "icperf_toy_src:K.m": 1}
+        assert binding.counts["icperf_toy_src:f"] >= 2, "定義模組與早綁之呼叫端模組皆須重綁"
+        assert user.f is src.f and getattr(user.f, "__icperf_t02_entry__", None) == "icperf_toy_src:f"
+        assert isinstance(vars(src.K)["s"], staticmethod) and isinstance(vars(src.K)["c"], classmethod)
+        assert rec.stats["icperf_toy_src:f"].seconds >= 0 and rec.stats["icperf_toy_src:f"].outer_calls == 2
+    finally:
+        binding.restore()
+    assert user.f is orig and src.f is orig and vars(src.K)["s"].__func__ is targets["icperf_toy_src:K.s"].func
+    user.call_early()
+    assert rec.stats["icperf_toy_src:f"].calls == 2, "restore 後不得再計數"
+
+
+def test_task02_rebind_all_factor_combiner_delayed_import(harness: Any) -> None:
+    """r61 施工注意（codex）：`factor_combiner.py` 函式內延遲 `from momentum.Analysis.marginal_ic import ...` 於重綁後取到
+    清冊入口 `normal_scores` 之 wrapper（以 AST 取出該延遲 import 原句執行；原句不存在即紅，提醒本測試前提改變）。"""
+    import momentum.Analysis.factor_combiner  # noqa: F401 — 先載入呼叫端模組
+    import momentum.Analysis.marginal_ic as mi
+
+    tree = ast.parse((REPO / "momentum" / "Analysis" / "factor_combiner.py").read_text(encoding="utf-8"))
+    lazy = [n for fn in ast.walk(tree) if isinstance(fn, ast.FunctionDef) for n in ast.walk(fn)
+            if isinstance(n, ast.ImportFrom) and n.module == "momentum.Analysis.marginal_ic"]
+    assert lazy, "factor_combiner.py 之函式內延遲 import 已不存在（本測試前提改變）"
+    assert any("normal_scores" in {a.asname or a.name for a in n.names} for n in lazy)
+    eid = "momentum.Analysis.marginal_ic:normal_scores"
+    target = harness.resolve_target(eid)
+    binding = harness.rebind_all({eid: target.func}, harness.Recorder(heartbeat=False))
+    got: List[Any] = []
+    try:
+        for node in lazy:
+            ns: Dict[str, Any] = {}
+            exec(compile(ast.Module(body=[node], type_ignores=[]), "<factor_combiner lazy import>", "exec"), ns)
+            got += [v for k, v in ns.items() if k == "normal_scores"]
+    finally:
+        binding.restore()
+    assert got and all(getattr(v, "__icperf_t02_entry__", None) == eid for v in got)
+    assert mi.normal_scores is target.func
+
+
+def test_task02_inventory_branch_cells_cover_measured(fb: Any, harness: Any) -> None:
+    """定稿清冊（scripts/icperf_path_inventory.json）：schema 成立；每一 measure=true 入口之 branch_cell 為 harness 之路徑或
+    直接呼叫格（無未歸屬者）；run_ic_first 外層不量且附碼證（SPEC v5.50 (c)）；scale_vector 軸 ⊆ 共用 schema。"""
+    inv = json.loads((REPO / "scripts" / "icperf_path_inventory.json").read_text(encoding="utf-8"))
+    assert fb.inventory_problems(inv) == []
+    plan = harness.coverage_plan(inv)
+    assert "__uncovered__" not in plan and set(plan) <= set(harness.RUNNERS)
+    assert sum(len(v) for v in plan.values()) == sum(1 for e in inv["entries"] if e["measure"])
+    outer = next(e for e in inv["entries"] if e["id"].endswith(":FeatureFactory.run_ic_first"))
+    assert outer["measure"] is False and outer["evidence"].endswith("feature_factory.py:2809")
+    assert all(set(e["scale_vector"]) <= SCALE_VECTOR_KEYS and set(e["input_axes"]) <= INPUT_AXES for e in inv["entries"])
+
+
+T02_E1 = "m.k:Keyed.per_column"
+T02_E2 = "m.n:plain"
+
+
+def _t02_inventory() -> Dict[str, Any]:
+    base = {"ic_page": True, "ic_first": False, "no_measure_reason": None, "evidence": "m/k.py:1"}
+    return {"entries": [
+        {**base, "id": T02_E1, "stage": "5", "input_axes": ["cols", "rows"], "loop": "per_column", "measure": True,
+         "branch_cell": "ic_page_default", "coverage_path_id": "cp-1",
+         "unit_axis": {"axes": ["stage_cols", "rows"], "function": "stage_cols*rows"}, "scale_vector": ["rows", "stage_cols"]},
+        {**base, "id": T02_E2, "stage": "0", "input_axes": ["cols"], "loop": "none", "measure": True,
+         "branch_cell": "ic_page_default", "coverage_path_id": "cp-2",
+         "unit_axis": {"axes": ["input_cols"], "function": "input_cols^2"}, "scale_vector": ["input_cols"]},
+        {**base, "id": "m.x:skip", "stage": "0", "input_axes": ["rows"], "loop": "none", "measure": False,
+         "branch_cell": None, "no_measure_reason": "常數時間", "coverage_path_id": "cp-3",
+         "unit_axis": {"axes": ["rows"], "function": "1"}, "scale_vector": ["rows"]}]}
+
+
+def _t02_runs(exp: float = 1.0, dup: int = 0, intervals: Optional[List[List[float]]] = None,
+              progress: Optional[List[float]] = None, calls2: int = 3, raised2: int = 0, e2_decreasing: bool = False,
+              unrequested: bool = False) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    """合成之路徑實跑（記錄形狀同 icperf_scale_harness.run_one 寫出者）：E1＝輸入鍵入口、秒數 ∝ n^exp；E2＝非鍵入口。"""
+    points, records = [], {}
+    for n in (500, 1000, 2000):
+        def er(keyed: bool, sec: float) -> Dict[str, Any]:
+            return {"calls": 3, "raised": 0, "seconds": sec, "max_rows": 400, "max_cols": n, "keyed": keyed,
+                    "n_keys": 3 if keyed else None, "duplicate_keys": dup if keyed else None,
+                    "max_key_count": (2 if dup else 1) if keyed else None, "duplicate_examples": [],
+                    "computed_columns": [f"c{i}" for i in range(n)] if keyed else None,
+                    "long_intervals": intervals or [], "max_call_seconds": 0.5}
+        e2_sec = 0.002 * (3000 - n) if e2_decreasing else 0.002 * n
+        records[n] = [{"path_run_id": f"ic.cols{n}", "wall_seconds": 10.0, "peak_footprint_bytes": 5000 + n,
+                       "facts": {"input_cols": n, "rows": 500, "survivors": 20, "requested_columns": None},
+                       "progress_times": list(progress or []), "_record_path": f"rec-{n}.json",
+                       "entries": {T02_E1: er(True, 0.001 * n ** exp),
+                                   T02_E2: {**er(False, e2_sec), "calls": calls2, "raised": raised2}}}]
+        points.append({"scale": n, "unit": "cols", "runs": 1, "seconds": 11.0, "peak_rss_bytes": 10 ** 8 + n})
+    cmd = ["venv/bin/python", "scripts/icperf_scale_harness.py", "run", "ic_page_default", "--scale", "{scale}"]
+    runs = {("ic_page_default", "cols"): {"probe": {"cmd": cmd, "data": [], "config": []}, "receipt_path": "r.json",
+                                          "receipt": {"points": points, "projection": {"scale": 209053}},
+                                          "records": records}}
+    if unrequested:
+        rec = {"path_run_id": "post.cols500", "wall_seconds": 1.0, "peak_footprint_bytes": 1,
+               "facts": {"input_cols": 500, "requested_columns": ["c0"]}, "progress_times": [],
+               "entries": {T02_E1: {"calls": 1, "raised": 0, "computed_columns": ["c0", "zz"]}}}
+        runs[("post_ic_transform", "cols")] = {"probe": {"cmd": cmd, "data": [], "config": []}, "receipt_path": "q.json",
+                                               "receipt": {"points": []}, "records": {500: [rec]}}
+    return runs
+
+
+def _t02_assemble(harness: Any, scale_probe: Any, **kw: Any) -> Dict[str, Any]:
+    return harness.assemble_scale_receipt(_t02_inventory(), _t02_runs(**kw), head="0" * 40, scale_probe=scale_probe,
+                                          budget_seconds=BUDGET2_UPPER_SECONDS, sample_interval_seconds=0.2,
+                                          chunk_cap={"bytes": 1, "basis": "x"}, ram_bytes=8 * 1024 ** 3)
+
+
+def test_task02_assemble_receipt_schema(fb: Any, harness: Any, scale_probe: Any) -> None:
+    """量測收據組裝（合成記錄）：入口 id 只取清冊 measure=true 者；每點 seconds＝同 path_run_id 之逐入口秒數（非路徑級
+    scale_probe 秒數）、峰值 RSS＝scale_probe 該點、footprint＝記錄；schema 過 boundary_16 之 `_entry_schema_problems`、
+    四項機會欄過 boundary_17 之 `_assert_opportunities`；fit＝scale_probe.fit 對 (stage_cols, seconds) 重算；meter 同 boundary_20。"""
+    receipt = _t02_assemble(harness, scale_probe)
+    inv = {e["id"]: e for e in _t02_inventory()["entries"]}
+    assert set(receipt["entries"]) == {T02_E1, T02_E2}
+    assert fb.uncovered_entries(_t02_inventory(), receipt) == []
+    for eid, m in receipt["entries"].items():
+        assert not _entry_schema_problems(m, inv[eid]), _entry_schema_problems(m, inv[eid])
+        _assert_opportunities(eid, m)
+        again = scale_probe.fit([{"scale": p["stage_cols"], "unit": "cols", "seconds": p["seconds"],
+                                  "peak_rss_bytes": p["peak_rss_bytes"]} for p in m["points"]], m["fit_full_scale"])
+        assert m["fit"] == {"exponent": again["fit"]["exponent"], "r2": again["fit"]["r2"]}
+        assert m["extrapolation_unreliable"] == again["extrapolation_unreliable"]
+        assert set(m["criteria"]) == {"1", "2", "3", "4", "5"}
+        assert all(isinstance(c["result"], bool) and str(c["basis"]).strip() for c in m["criteria"].values())
+        assert [p["path_run_id"] for p in m["points"]] == ["ic.cols500", "ic.cols1000", "ic.cols2000"]
+        assert [p["peak_rss_bytes"] for p in m["points"]] == [10 ** 8 + n for n in (500, 1000, 2000)]
+        assert [p["peak_footprint_bytes"] for p in m["points"]] == [5000 + n for n in (500, 1000, 2000)]
+        assert all(p["seconds"] != 11.0 for p in m["points"]), "seconds 須取逐入口計時，不得抄路徑級 scale_probe 秒數"
+        assert m["two_point_exception"] is None and len(m["points"]) == 3
+    assert [p["seconds"] for p in receipt["entries"][T02_E2]["points"]] == [1.0, 2.0, 4.0]
+    meter = receipt["meter"]
+    assert meter["tool"] == "scripts/scale_probe.py" and meter["rss_scope"] == "process_tree"
+    assert meter["footprint"]["tool"] == FOOTPRINT_TOOL and meter["footprint"]["sampling"] == "until_target_exit"
+    assert meter["footprint"]["terminate_target_on_exceed"] is False
+
+
+def test_task02_criteria_rules(harness: Any, scale_probe: Any) -> None:
+    """判準①–⑤ 之判定（SPEC Task 0.2 固定規則；v5.50 (b)）：① 冪次擬合 > 1.2（可靠時）／擬合不可靠改碼層複雜度；③ 同一輸入鍵
+    > 1 次；④ 受算欄 − feature_filter 請求非空（取自任一帶 feature_filter 之實跑）；⑤ 入口區間內最長無 progress 間隔 > 60 秒。"""
+    lin = _t02_assemble(harness, scale_probe)["entries"]
+    sup = _t02_assemble(harness, scale_probe, exp=1.5)["entries"]
+    assert lin[T02_E1]["criteria"]["1"]["result"] is False and lin[T02_E1]["criteria"]["1"]["basis"] == "power_fit"
+    assert sup[T02_E1]["criteria"]["1"]["result"] is True and sup[T02_E1]["criteria"]["1"]["basis"] == "power_fit"
+    dec = _t02_assemble(harness, scale_probe, e2_decreasing=True)["entries"][T02_E2]
+    assert dec["extrapolation_unreliable"] is True
+    assert dec["criteria"]["1"]["basis"] == "complexity_analysis" and dec["criteria"]["1"]["result"] is True  # input_cols^2
+    assert lin[T02_E1]["criteria"]["3"]["result"] is False and lin[T02_E2]["criteria"]["3"]["result"] is False
+    dup = _t02_assemble(harness, scale_probe, dup=1)["entries"]
+    assert dup[T02_E1]["criteria"]["3"]["result"] is True and dup[T02_E2]["criteria"]["3"]["result"] is False
+    assert lin[T02_E1]["criteria"]["4"]["result"] is False
+    un = _t02_assemble(harness, scale_probe, unrequested=True)["entries"][T02_E1]["criteria"]["4"]
+    assert un["result"] is True and un["evidence"]["n_unrequested"] == 1 and un["evidence"]["examples"] == ["zz"]
+    gap = _t02_assemble(harness, scale_probe, intervals=[[0.0, 100.0]], progress=[10.0, 20.0])["entries"][T02_E1]
+    assert gap["criteria"]["5"]["result"] is True and gap["criteria"]["5"]["evidence"]["max_gap_seconds"] == 80.0
+    ok = _t02_assemble(harness, scale_probe, intervals=[[0.0, 100.0]], progress=[10.0, 40.0, 70.0, 95.0])["entries"]
+    assert ok[T02_E1]["criteria"]["5"]["result"] is False
+    assert ok[T02_E1]["criteria"]["5"]["evidence"]["max_gap_seconds"] == 30.0
+    assert harness.max_progress_gap([[0.0, 100.0]], []) == 100.0 and harness.max_progress_gap([], [1.0]) == 0.0
+
+
+def test_task02_zero_calls_fail_assembly(harness: Any, scale_probe: Any) -> None:
+    """SPEC v5.50 (a)：measure=true 入口於其路徑實跑之呼叫次數 0（含全部呼叫皆拋例外）⇒ 組裝失敗並點名該入口；
+    所屬格無實跑亦失敗（不得以 0 呼叫或缺量充作量測）。"""
+    for kw in ({"calls2": 0}, {"calls2": 3, "raised2": 3}):
+        with pytest.raises(harness.AssemblyError) as exc:
+            _t02_assemble(harness, scale_probe, **kw)
+        assert any(T02_E2 in p and "呼叫次數 0" in p for p in exc.value.problems)
+        assert not any(T02_E1 in p for p in exc.value.problems)
+    inv = _t02_inventory()
+    inv["entries"][0]["branch_cell"] = "rolling_kendall"
+    with pytest.raises(harness.AssemblyError) as exc:
+        harness.assemble_scale_receipt(inv, _t02_runs(), head="0" * 40, scale_probe=scale_probe, budget_seconds=1.0,
+                                       sample_interval_seconds=0.2, chunk_cap={"bytes": 1, "basis": "x"})
+    assert any(T02_E1 in p and "rolling_kendall" in p for p in exc.value.problems)
+
+
+def test_task02_call_key_and_footprint_parse(harness: Any) -> None:
+    """輸入鍵（判準③）：同值同遮罩同參數 ⇒ 同鍵；值、NaN 位置、q、require_full_q、欄名、symbol 任一不同 ⇒ 不同鍵；`sample`
+    之 Physical footprint (peak) 依單位換算。"""
+    s = pd.Series([1.0, np.nan, 3.0], name="a")
+    k = harness.call_key((s,), {"q": 5, "require_full_q": True}, "BTCUSDT")[0]
+    assert k == harness.call_key((s.copy(),), {"q": 5, "require_full_q": True}, "BTCUSDT")[0]
+    others = [((pd.Series([1.0, 2.0, 3.0], name="a"),), {"q": 5, "require_full_q": True}, "BTCUSDT"),
+              ((pd.Series([np.nan, 1.0, 3.0], name="a"),), {"q": 5, "require_full_q": True}, "BTCUSDT"),
+              ((s,), {"q": 3, "require_full_q": True}, "BTCUSDT"), ((s,), {"q": 5, "require_full_q": False}, "BTCUSDT"),
+              ((s.rename("b"),), {"q": 5, "require_full_q": True}, "BTCUSDT"),
+              ((s,), {"q": 5, "require_full_q": True}, "ETHUSDT")]
+    assert all(harness.call_key(a, kw, c)[0] != k for a, kw, c in others)
+    assert harness.call_key((s,), {}, "")[1] == ["a"]
+    text = "Physical footprint:         6368K\nPhysical footprint (peak):  1.5G\n"
+    assert harness.parse_footprint(text) == int(1.5 * 1024 ** 3)
+    assert harness.parse_footprint("Physical footprint:  20M\n") == 20 * 1024 ** 2
+    assert harness.parse_footprint("nothing") is None

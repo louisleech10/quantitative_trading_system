@@ -1,0 +1,6020 @@
+{
+ "schema": "icperf-t02-path-inventory/2",
+ "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.50",
+ "source": "scripts/icperf_path_inventory.json",
+ "source_sha256": "3ba3440f664099bd8756b6f98f0b5478603d8d8b3a518d92086f64befa9aa263",
+ "schema_note": "ICPERF Task 0.2 路徑清冊草稿（改前，讀碼產出；未實跑任何量測）。範圍依 docs/ICPERF_SPEC.md:100。軸定義：rows＝列數；input_cols＝第 0 段讀入欄數；stage_cols＝實際進入該段之欄數；survivors＝第 6 段倖存欄數（深度分析預設選欄＝倖存欄）；survivor_pairs＝倖存欄兩兩配對數（≈survivors^2/2）。W＝滾動窗長、H＝衰減 horizon 數、G＝分組數、B＝bootstrap 次數、P＝置換次數，皆為設定常數，不入 scale_vector。 v5.50（2026-11-01）定稿：scale_vector 另可含 events（事件數）、symbols（標的數）、timestamps（跨標的時點數）——依 unit_axis.function 之 n_events／n_symbols／n_timestamps 機械導出（SPEC v5.49 處置④）；input_axes 仍 ⊆ cols／rows／passed_cols。branch_cell＝量測該入口之路徑實跑或直接呼叫格之 id（見 branch_cells）；measure=false 者為 null。run_ic_first 外層依 SPEC v5.50 (c) 不量。",
+ "branch_cells": {
+  "ic_page_default": "C 格 N 欄巢狀子集＋IC 頁預設請求 analyze（第 0–7 段）；存直接呼叫格之各段真實輸入",
+  "deep_analysis": "同 ic_page_default 之 analyze 後同一 analyzer 續跑深度分析全部模組",
+  "post_ic_transform": "A 格 run feature_filter N 欄經服務 start_analysis 後 _apply_transforms_sync（rank／zscore／gaussian）",
+  "event_import": "L 格 run feature_filter N 欄＋§G (7) 事件匯入批（event_import_run）",
+  "event_study": "事件研究頁：隔離儲存根之 import_records＋analyze（events 軸＝前 {scale} 筆事件）",
+  "cross_sectional": "A 格 BTCUSDT／SOLUSDT 兩 run 共同 N 欄之跨標的 analyze_cross_sectional",
+  "icfirst_post_generation": "IC-first 之 _run_ic_first_post_generation 整段與子步驟（阻擋：見 _run_icfirst_post_generation）",
+  "rolling_kendall": "存檔第 4 段滾動 IC 輸入＋同一 ICEngine，method=kendall",
+  "rolling_pearson": "存檔第 4 段滾動 IC 輸入＋同一 ICEngine，method=pearson",
+  "redundancy_hierarchical": "存檔第 6 段冗餘輸入（第 5 段通過欄矩陣、IC 分數）＋同一 RedundancyFilter，method=hierarchical",
+  "redundancy_vif": "同上，method=vif",
+  "redundancy_diversification": "同上 greedy 後 apply_diversification_constraint（同一 RedundancyFilter 複本，enabled=True）",
+  "regime_kmeans": "存檔 compute_grouped_ic 輸入（含 regime_history 之 close／volume 與設定）＋同一 ICEngine，regime_method=kmeans",
+  "fit_mode_pit_expanding": "存檔第 1 段輸入＋同一 DataPreprocessor，fit_mode=pit_expanding（percentile；C 格列數 ≤ 512 ⇒ pit_expanding_bounds）",
+  "winsor_mad_pit": "同上，縮尾 method=mad、fit_mode=pit_expanding（pit_expanding_mad）",
+  "standardize_tszscore_pit": "存檔第 1 段輸出＋同一 DataPreprocessor.standardize(method=time_series_zscore, fit_mode=pit_expanding)",
+  "vectorized_ic_no_missing": "存檔第 4 段 compute_ic 輸入取標籤有限列與全有限欄（_has_missing 為 False）＋同一 ICEngine"
+ },
+ "open_questions": [
+  "SPEC 行號已過期：docs/ICPERF_SPEC.md:100 寫 pit_expanding_bounds（:371）、pit_expanding_quantile_thresholds（:416）、pit_expanding_mean_std（:467）、pit_expanding_mad（:511）、factor_return_analyzer.py:319-366；現行 HEAD 實為 pit_stats.py:410、:455、:506、:550 與 factor_return_analyzer.py:354（_pit_expanding_position 定義）。是否需於 SPEC 更正。",
+  "PIT 縮尾／常數判定（pit_expanding_bounds／mad／mean_std、remove_constant_features 逐根迴圈）只在 fit_mode='pit_expanding' 時被走到：ic_train_test_split 預設 True（ic_config_schema.py:460）⇒ 第 1 段走 train_mask；fallback 強制 full_sample（ic_filter_orchestrator.py:1985-1987）。即 IC 頁預設請求不經這些入口，須以 config_override ic_train_test_split=False 量測。另 percentile 方法只在序列長 ≤512 時呼叫 pit_expanding_bounds（data_preprocessor.py:464），>512 走 pandas expanding。量測設計須明列這些非預設格。",
+  "DataPreprocessor.standardize 之 pit_expanding_mean_std 呼叫點（data_preprocessor.py:401）在 IC 頁不可達：PreprocessingConfig（ic_config_schema.py:24-39）無 standardize 欄位，orchestrator 以 model_dump() 建 DataPreprocessor（ic_filter_orchestrator.py:1367）⇒ method 恆 'none'。是否視為死碼或另有呼叫端（全 repo 非測試只此一處 DataPreprocessor(）——待使用者／委員裁定要不要量。",
+  "schema 之 input_axes 只有 cols／rows／passed_cols，事件路徑之主軸為事件數（與 K 線列數不同）；本草稿以 'rows' 表示並在 function 寫 n_events。若 Task 0.2 收據 schema 需區分，須擴增軸（test_icperf_gate.py 是否接受新軸待確認）。同理跨標的路徑之標的數 n_symbols、時點數 n_timestamps 亦無對應軸。",
+  "第 6 段之 stage_cols 定義：本草稿把『進入第 6 段之欄數』（＝第 5 段通過欄數）記為 stage_cols、input_axes 記 passed_cols；深度分析與 post-IC 之欄軸記 survivors。若 SPEC 意圖第 6 段以 passed_cols 為唯一 x 軸，scale_vector 之命名需與 test_icperf_gate.py 對齊。",
+  "跨標的路徑（analyze_cross_sectional，ic_analysis_service.py:1801 由 IC 頁呼叫）是否屬 Task 0.2 範圍？SPEC :100 未列，但其為 IC 篩選之計算；本草稿已納入 ICPERF-T02-58／59／82／83／84／94，若不屬範圍可刪。",
+  "事件研究頁（EventImportService._analyze_with_projection、analyze_tables、event_forward_return_table、evaluate_all_bars）不產 IC、ic_page／ic_first 皆 false；是否屬『事件型路徑』範圍待裁定（ICPERF-T02-188～192）。EventImportService.import_records 之 API 路由呼叫點未追查。",
+  "IC-first 之 run_ic_first 包含完整特徵生成（FF 範圍，非本票）；量測時應以已存在之 L7 raw run 只量 _run_ic_first_post_generation 子步驟，是否可行（需凍結 ctx 與 lease）待確認。",
+  "_apply_feature_filter 在第 1–3 段之後才套用（ic_filter_orchestrator.py:1795），使 feature_filter 指定欄外之欄仍跑完第 0–3 段（含第 1 段逐欄縮尾）——直接命中判準④；IC-first 之 compute_ic_from_l7_raw 則無 feature_filter 概念。是否列為已知施工項待 Phase 1 決定。",
+  "已讀碼看到之重複計算候選（判準③，需呼叫計數證實）：MonotonicityTester.compute_all 每欄 _assign_quantiles 3 次（monotonicity_tester.py:50、:133 經 :78、:197）；TurnoverAnalyzer.compute_all 每欄 pit_expanding_qcut_top_mask 與 pit_expanding_rank 各 2 次（turnover_analyzer.py:73／:154、:99／:170）；compute_grouped_ic by_category／by_data_source／by_layer 每欄以全部列重算點 IC 3 次（ic_engine.py:794-807）；RedundancyFilter.compute_correlation_matrix 於倖存子集重算（ic_filter_orchestrator.py:5385）；K 線於同一 analyze 讀 4–5 次（_read_klines_float64 五個呼叫點）；refilter 整段重跑第 5 段（ic_filter_orchestrator.py:3067）；ParameterSensitivityAnalyzer._compute_rolling_icir 重算與第 4 段同 ICIR 窗之滾動 IC；reporter.save_report 同一 persist 呼叫兩次（:6379、:6408）。",
+  "ICEngine.compute_ic 之向量化分支 _compute_vectorized_ic 以 scipy.stats.spearmanr 建 (stage_cols+1)^2 相關矩陣後只取首列（ic_engine.py:1857-1861），時間／記憶體 ∝ stage_cols^2；但只在全表無非有限值時走到，真實資料（暖機 NaN）多走逐欄分支。量測格需分別造『無缺值』與『有缺值』兩條路徑。",
+  "ICPERF-T02-188 之 callers 未精確到 file:line（事件匯入路由），需補查 api/routes（其餘 callers 已以 grep -n 逐一核對）。"
+ ],
+ "pit_call_sites": [
+  {
+   "callee": "momentum.Analysis.pit_stats:pit_expanding_mean_std",
+   "caller_id": "momentum.Analysis.data_preprocessor:DataPreprocessor.standardize",
+   "site": "momentum/Analysis/data_preprocessor.py:401"
+  },
+  {
+   "callee": "momentum.Analysis.pit_stats:pit_expanding_bounds",
+   "caller_id": "momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_pit",
+   "site": "momentum/Analysis/data_preprocessor.py:465"
+  },
+  {
+   "callee": "momentum.Analysis.pit_stats:pit_expanding_mad",
+   "caller_id": "momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_pit",
+   "site": "momentum/Analysis/data_preprocessor.py:476"
+  },
+  {
+   "callee": "momentum.Analysis.pit_stats:pit_expanding_mean_std",
+   "caller_id": "momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_pit",
+   "site": "momentum/Analysis/data_preprocessor.py:486"
+  },
+  {
+   "callee": "momentum.Analysis.pit_stats:pit_expanding_quantile_thresholds",
+   "caller_id": "momentum.Analysis.ic_engine:ICEngine._build_regime_rule_masks",
+   "site": "momentum/Analysis/ic_engine.py:1676"
+  },
+  {
+   "callee": "momentum.Analysis.pit_stats:pit_expanding_quantile_thresholds",
+   "caller_id": "momentum.Analysis.regime_detector:RegimeDetector._compute_pit_rule_labels",
+   "site": "momentum/Analysis/regime_detector.py:329"
+  },
+  {
+   "callee": "momentum.Analysis.pit_stats:pit_expanding_bounds",
+   "caller_id": "momentum.Analysis.pit_stats:pit_expanding_quantile_thresholds",
+   "site": "momentum/Analysis/pit_stats.py:467"
+  }
+ ],
+ "entries": [
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage0_ingestion",
+   "stage": "0",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:4036",
+   "coverage_path_id": "ICPERF-T02-01",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "第 0 段整段（以 @_timed_stage(\"stage0_ingestion\") 計時）：ICFilterOrchestrator(ICConfig()) 後呼叫 _stage0_ingestion(features_path, labels_path, meta_path, config, kline_reader)；需 IC 交接 h5（features）、可選 labels h5、kline_reader。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1491"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._load_features_hdf5",
+   "stage": "0",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:6557",
+   "coverage_path_id": "ICPERF-T02-02",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "orch._load_features_hdf5(features_path)；輸入為 IC 交接 h5（含 features／features_f64、feature_names、timestamps、metadata_json），回 (features_df, metadata)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4047"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.core.h5_feature_precision:read_feature_frame",
+   "stage": "0",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/core/h5_feature_precision.py:158",
+   "coverage_path_id": "ICPERF-T02-03",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "以 h5py 開 IC 交接 h5 取第一個 group，read_feature_frame(group, feature_names, index) 依 feature_names 全序還原 float32／float64 欄。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:6591"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._load_labels_hdf5",
+   "stage": "0",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:6605",
+   "coverage_path_id": "ICPERF-T02-04",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "orch._load_labels_hdf5(labels_path)；labels_path 為 None 時回 None（標籤改於第 2 段由 kline 生成）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4048",
+    "momentum/Analysis/ic_filter_orchestrator.py:2264"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:_intersect_features_with_kline_period",
+   "stage": "0",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:461",
+   "coverage_path_id": "ICPERF-T02-05",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "_intersect_features_with_kline_period(features_df, meta, kline_reader, event_period_ms=None)；需特徵 DataFrame、metadata（symbol／timeframe）、kline_reader；回裁至 K 線期間之特徵與揭露。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4057"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:_read_klines_float64",
+   "stage": "0",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:1255",
+   "coverage_path_id": "ICPERF-T02-06",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "_read_klines_float64(kline_reader, symbol, timeframe)；同一次 analyze 於第 0、2、3、4 段與期間交集各讀一次 K 線（重複讀取，判準③候選）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:483",
+    "momentum/Analysis/ic_filter_orchestrator.py:4081",
+    "momentum/Analysis/ic_filter_orchestrator.py:4231",
+    "momentum/Analysis/ic_filter_orchestrator.py:4476",
+    "momentum/Analysis/ic_filter_orchestrator.py:4935"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.core.contracts:validate_alignment",
+   "stage": "0",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/core/contracts.py:1103",
+   "coverage_path_id": "ICPERF-T02-07",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "validate_alignment(features_df, label_series, AlignmentSpec(...), close=close, return_kind='log')；只用特徵索引（不讀欄值）＋ sample_size=64 抽樣比對標籤值。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4092",
+    "momentum/Analysis/ic_filter_orchestrator.py:4265"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._validate_input",
+   "stage": "0",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5536",
+   "coverage_path_id": "ICPERF-T02-08",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "orch._validate_input(features_df, labels_df, metadata)；全表 isna().mean() 找 >90% NaN 欄，另逐欄驗 metadata 三鍵。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4111"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:_build_holdout_split_plan",
+   "stage": "0",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:660",
+   "coverage_path_id": "ICPERF-T02-09",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "切分計畫（第 0 段後、第 1 段前，ic_train_test_split 預設 True）：_build_holdout_split_plan(features_df, config, symbol, expected_freq, purge_gap=h, labels_df=labels_df)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1546"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage1_preprocessing",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:4154",
+   "coverage_path_id": "ICPERF-T02-10",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows（train_mask／full_sample）；stage_cols*rows^2（pit_expanding 之 mad／zscore 縮尾與常數判定）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "第 1 段整段：orch._stage1_preprocessing(features_df, metadata, fit_mask=split_context['train_mask'], fit_mode='train_mask'|'pit_expanding'|'full_sample')；fit_mode 不得為 unset。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1681"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor.preprocess",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:130",
+   "coverage_path_id": "ICPERF-T02-11",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "DataPreprocessor(ICConfig().preprocessing.model_dump()).preprocess(features_df, metadata, fit_mask=mask, fit_mode=mode)；依序縮尾→缺值→常數→標準化。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4167"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor.winsorize",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:217",
+   "coverage_path_id": "ICPERF-T02-12",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows（percentile 大 n：stage_cols*rows*log(rows)）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "preprocessor.winsorize(df, method='percentile', lower=1.0, upper=99.0, metadata=metadata, fit_mask=mask, fit_mode=mode)；逐欄呼叫 _clip_series。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:164"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_pit",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:447",
+   "coverage_path_id": "ICPERF-T02-13",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*log(rows)（percentile、n>512：pandas expanding quantile）；stage_cols*rows^2（mad、percentile n≤512）；stage_cols*rows（zscore Welford）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "preprocessor._clip_series_pit(series, method, lower, upper)；只在 fit_mode='pit_expanding'（ic_train_test_split=False 且 fit_mode 非 full_sample）時經 _clip_series 進入；method 三分支各量。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:439"
+   ],
+   "branch_cell": "fit_mode_pit_expanding"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_train",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:498",
+   "coverage_path_id": "ICPERF-T02-14",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "預設路徑（切分成立 ⇒ train_mask）：preprocessor._clip_series_train(series, 'percentile', 1.0, 99.0, fit_mask)；經 pit_train_fit 取 train 列估邊界後 clip 全段。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:442"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_static",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:521",
+   "coverage_path_id": "ICPERF-T02-15",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "preprocessor._clip_series_static(series, method, lower, upper, fit_series_override=train_slice)；full_sample（fallback）與 train_mask 內部共用之單次分位／MAD／zscore 邊界。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:445",
+    "momentum/Analysis/data_preprocessor.py:513"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_train_fit",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": false,
+   "no_measure_reason": "薄包裝：以遮罩取 fit 列後呼叫傳入之 transform_fn，計算成本全在 transform_fn（_clip_series_static／_zscore_transform），已由 ICPERF-T02-14／-15 量測涵蓋（碼證 pit_stats.py:590 起之函式本體只做遮罩與委派）。",
+   "evidence": "momentum/Analysis/pit_stats.py:590",
+   "coverage_path_id": "ICPERF-T02-16",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "pit_train_fit(df, fit_mask, transform_fn)；transform_fn(fit_df, full_df) 回轉換後之 full_df。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:417",
+    "momentum/Analysis/data_preprocessor.py:518"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_expanding_bounds",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:410",
+   "coverage_path_id": "ICPERF-T02-17",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2（逐根對 0..t 有限值 np.quantile；每欄一次）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "pit_expanding_bounds(series, lo_q=0.01, hi_q=0.99, min_samples=MIN_SAMPLES)；單一 1D 序列，回 (lo, hi) Series；第 1 段只在序列長 ≤512 時呼叫（data_preprocessor.py:464），regime 經 pit_expanding_quantile_thresholds 呼叫且序列長＝K 線全長。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:465",
+    "momentum/Analysis/pit_stats.py:467"
+   ],
+   "branch_cell": "fit_mode_pit_expanding"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_expanding_mad",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:550",
+   "coverage_path_id": "ICPERF-T02-18",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows^2（逐根兩次 np.median）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "pit_expanding_mad(series, min_samples=MIN_SAMPLES)；回 (median, MAD) 逐根 Series；只在 fit_mode=pit_expanding 且 winsorization.method='mad' 時被呼叫。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:476"
+   ],
+   "branch_cell": "winsor_mad_pit"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_expanding_mean_std",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:506",
+   "coverage_path_id": "ICPERF-T02-19",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows（Python 逐根 Welford）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "pit_expanding_mean_std(series, min_samples=MIN_SAMPLES)；回 (mean, std ddof=1)；第 1 段 zscore 縮尾（pit_expanding）與 standardize(time_series_zscore) 兩處呼叫。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:486",
+    "momentum/Analysis/data_preprocessor.py:401"
+   ],
+   "branch_cell": "standardize_tszscore_pit"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor.handle_missing",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:275",
+   "coverage_path_id": "ICPERF-T02-20",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "preprocessor.handle_missing(df, max_fill_forward=3, min_coverage=0.3, fit_mask=mask, fit_mode=mode)；全表 ffill，pit 模式逐欄 cumsum 覆蓋率並以 list 存每根布林（記憶體 stage_cols*rows Python bool）。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:180"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor.remove_constant_features",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:315",
+   "coverage_path_id": "ICPERF-T02-21",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows（pit 模式為 Python 逐根 min／max 迴圈；其他模式 nunique）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "preprocessor.remove_constant_features(df, fit_mask=mask, fit_mode=mode)；pit_expanding 模式逐欄 for t in range(n) 純 Python 迴圈（data_preprocessor.py:341）並呼叫 pit_valid_mask。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:194"
+   ],
+   "branch_cell": "fit_mode_pit_expanding"
+  },
+  {
+   "id": "momentum.Analysis.data_preprocessor:DataPreprocessor.standardize",
+   "stage": "1",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/data_preprocessor.py:376",
+   "coverage_path_id": "ICPERF-T02-22",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "preprocessor.standardize(df, method='time_series_zscore', fit_mode='pit_expanding')；IC 頁之 PreprocessingConfig（ic_config_schema.py:24-39）無 standardize 鍵 ⇒ method 恆為 'none' 直接返回，故 ic_page=false；須以含 standardize 之 dict 直接建構 DataPreprocessor 才可量。",
+   "callers": [
+    "momentum/Analysis/data_preprocessor.py:205"
+   ],
+   "branch_cell": "standardize_tszscore_pit"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage2_label_generation",
+   "stage": "2",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:4203",
+   "coverage_path_id": "ICPERF-T02-23",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "orch._stage2_label_generation(None, metadata, config, kline_reader, features_df)；labels_df 已預載時立即返回（只選欄），否則讀 K 線、生成 return_h 並 validate_alignment。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1700"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.FeatureEngineering.labels.label_generator:LabelGenerator.generate_returns_by_type",
+   "stage": "2",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/labels/label_generator.py:86",
+   "coverage_path_id": "ICPERF-T02-24",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "create_label_generator().generate_returns_by_type(close, horizon, 'log'|'simple'|'excess'|'risk_adjusted')；close 為 float64 Series。第 4 段 IC 衰減每個 horizon 再呼叫一次。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4253",
+    "momentum/Analysis/ic_engine.py:1459"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage3_event_filter",
+   "stage": "3",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:4418",
+   "coverage_path_id": "ICPERF-T02-25",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows（event_filter.enabled=False 時常數返回）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "orch._stage3_event_filter(features_df, label_series, metadata, config, kline_reader, event_timestamps=[...], event_label_values={ms: v})；需 config.event_filter.enabled=True 才有計算。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1706"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.event_filter:EventFilter.apply_filter",
+   "stage": "3",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_filter.py:92",
+   "coverage_path_id": "ICPERF-T02-26",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows（query：df.eval；timestamps：index.isin）"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "EventFilter(config.event_filter.model_dump()).apply_filter(kline_df, query=None, timestamps=[pd.Timestamp,...])；filter_base 為 K 線（非特徵表）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4488"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.core.contracts:validate_consumed_label",
+   "stage": "3",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/core/contracts.py:1335",
+   "coverage_path_id": "ICPERF-T02-27",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows（事件列數；逐事件比對 expected_values）"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "validate_consumed_label(filtered_features, filtered_label, label_kind=..., expected_values=event_label_values, event_owners=owners, source_series=normalized_label)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4547",
+    "momentum/Analysis/ic_filter_orchestrator.py:4706"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._resolve_label_mode_and_bind_binary",
+   "stage": "3",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:4610",
+   "coverage_path_id": "ICPERF-T02-28",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows（事件列數）"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "匯入 0/1 標籤模式之綁定：orch._resolve_label_mode_and_bind_binary(info, filtered_features=..., event_binary_labels={...}, label_mode_requested='auto', ...)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4585"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._apply_feature_filter",
+   "stage": "3",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": false,
+   "no_measure_reason": "只做欄名集合運算與 metadata 篩選（ic_filter_orchestrator.py:4746-4820），不讀欄值；但其位置在第 1–3 段之後（呼叫點 :1795），導致第 1 段對未請求欄全量計算——此為判準④之量測對象，應在第 1 段入口以輸入形狀計，不在本入口計時。",
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:4746",
+   "coverage_path_id": "ICPERF-T02-29",
+   "unit_axis": {
+    "axes": [
+     "input_cols"
+    ],
+    "function": "input_cols"
+   },
+   "scale_vector": [
+    "input_cols"
+   ],
+   "call_example": "orch._apply_feature_filter(features_df, metadata, FeatureFilterSchema(include_features=[...]))。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1795"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage4_ic_calculation",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:4851",
+   "coverage_path_id": "ICPERF-T02-30",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*(W+H+G)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "第 4 段整段：orch._stage4_ic_calculation(features_df, label_series, metadata, config, kline_reader, split_context, event_info)；子步驟 ic／rolling_ic／icir_autocorr／ic_decay／grouped_ic。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1800"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine.compute_ic",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:353",
+   "coverage_path_id": "ICPERF-T02-31",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "ICEngine(ICConfig().ic_calculation.model_dump()).compute_ic(features_df, label, 'spearman')；任一非有限值 ⇒ 逐欄 _compute_pairwise_corr（真實資料有暖機 NaN 時為常態），否則整表 _compute_vectorized_ic。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4890",
+    "momentum/Analysis/ic_engine.py:697",
+    "momentum/Analysis/ic_engine.py:773",
+    "momentum/Analysis/ic_engine.py:781",
+    "momentum/Analysis/ic_engine.py:1719",
+    "momentum/Analysis/ic_engine.py:1775",
+    "momentum/Analysis/ic_engine.py:1800",
+    "momentum/Analysis/ic_engine.py:951"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._compute_vectorized_ic",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1830",
+   "coverage_path_id": "ICPERF-T02-32",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*log(rows)（spearman；scipy.stats.spearmanr 會建 (stage_cols+1)^2 相關矩陣 ⇒ 記憶體 stage_cols^2）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine._compute_vectorized_ic(features_df_無缺值, label_無缺值, 'spearman')；注意 stats.spearmanr(values, axis=0) 計算全對全矩陣後只取第 0 列（ic_engine.py:1857-1861），時間與記憶體皆 ∝ stage_cols^2。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:370"
+   ],
+   "branch_cell": "vectorized_ic_no_missing"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._compute_pairwise_corr",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1414",
+   "coverage_path_id": "ICPERF-T02-33",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine._compute_pairwise_corr(feature_series, label_series, 'spearman')；每欄一次 pd.concat＋有限遮罩＋scipy spearmanr。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:378",
+    "momentum/Analysis/ic_engine.py:1837"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._has_missing",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1863",
+   "coverage_path_id": "ICPERF-T02-34",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine._has_missing(features_df, label)；逐欄 np.isfinite 掃描，遇第一個非有限欄即短路。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:367"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine.compute_rolling_ic",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:596",
+   "coverage_path_id": "ICPERF-T02-35",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*(rows/stride)*W*log(W)（每個調整後窗＋ICIR 窗各一次）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine.set_timeframe(tf); engine._icir_window=config.ic_calculation.icir.window; engine.compute_rolling_ic(features_df, label, windows=[...], stride=1, method='spearman')；回 {feature: {window_k: list}}（逐欄 tolist，記憶體 ∝ stage_cols*rows Python float）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4907"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:rolling_window_rank_corr",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:83",
+   "coverage_path_id": "ICPERF-T02-36",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*(rows/stride)*W*log(W)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "rolling_window_rank_corr(x_2d[rows, cols], y_1d, window=W, stride=1)；chunk_size=DEFAULT_CHUNK_FEATURES 分塊、use_numba=True。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:634",
+    "momentum/Analysis/parameter_sensitivity_analyzer.py:274"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:_rolling_window_rank_corr_numba",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:256",
+   "coverage_path_id": "ICPERF-T02-37",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*(rows/stride)*W*log(W)（每窗每欄重排名）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "numba 核心，經 rolling_window_rank_corr 呼叫；每窗終點對 y 窗排名一次、對每欄 x 窗排名後算 Pearson。",
+   "callers": [
+    "momentum/Analysis/pit_stats.py:161"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._rolling_corr_matrix",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1921",
+   "coverage_path_id": "ICPERF-T02-38",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*(rows/stride)*W"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "ICEngine._rolling_corr_matrix(x_2d, y_1d, W, stride)；method='pearson' 時之滾動 IC 路徑。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:643"
+   ],
+   "branch_cell": "rolling_pearson"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:_rolling_pearson_numba",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:54",
+   "coverage_path_id": "ICPERF-T02-39",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*(rows/stride)*W（窗內兩趟中心化）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "_rolling_pearson_numba(x_contig_f64, y_contig_f64, W, stride)。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1943"
+   ],
+   "branch_cell": "rolling_pearson"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._rolling_kendall_matrix",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1946",
+   "coverage_path_id": "ICPERF-T02-40",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*(rows/stride)*W"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "ICEngine._rolling_kendall_matrix(x_2d, y_1d, W, stride)；method='kendall' 時之滾動 IC 路徑。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:638"
+   ],
+   "branch_cell": "rolling_kendall"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:_rolling_kendall_numba",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:127",
+   "coverage_path_id": "ICPERF-T02-41",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*W（滑窗整數計數每步 O(W)）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "_rolling_kendall_numba(x_contig_f64, y_contig_f64, W, stride)。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1963"
+   ],
+   "branch_cell": "rolling_kendall"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._slice_rolling_ic_to_test",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5586",
+   "coverage_path_id": "ICPERF-T02-42",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "orch._slice_rolling_ic_to_test(rolling_ic_full, rolling_features, rolling_label, windows, stride, test_mask)；切分成立時把逐欄滾動 IC list 切到測試段。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4911"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine.compute_icir",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:650",
+   "coverage_path_id": "ICPERF-T02-43",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows/stride"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine.compute_icir(rolling_ic)；逐欄 np.array(list) 後 nanmean／nanstd／勝率。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4923"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine.compute_ic_autocorrelation",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:810",
+   "coverage_path_id": "ICPERF-T02-44",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows/stride"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine.compute_ic_autocorrelation(rolling_ic, lag=1)；逐欄再轉一次 np.array（與 compute_icir 重複轉換同一 list）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4924"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine.compute_ic_decay",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:684",
+   "coverage_path_id": "ICPERF-T02-45",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "H*stage_cols*rows*log(rows) + stage_cols*curve_fit"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine.compute_ic_decay(features_for_ic, close, horizons=config.ic_calculation.ic_decay_horizons, method, return_type)；report.include_decay_analysis 預設 True。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4948"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._compute_returns",
+   "stage": "4",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": false,
+   "no_measure_reason": "每個 horizon 一次之向量化報酬（委派 LabelGenerator.generate_returns_by_type，ic_engine.py:1459），只與列數成線性、與欄數無關；其成本已由 ICPERF-T02-24 量測。",
+   "evidence": "momentum/Analysis/ic_engine.py:1436",
+   "coverage_path_id": "ICPERF-T02-46",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "engine._compute_returns(close, horizon, 'log')。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:696"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._fit_exponential_decay",
+   "stage": "4",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1338",
+   "coverage_path_id": "ICPERF-T02-47",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "stage_cols*4*curve_fit(H 點, maxfev=20000)"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "ICEngine._fit_exponential_decay(horizons, ic_values)；每欄 4 組起點各一次 scipy.optimize.curve_fit；與列數無關。跨標的路徑亦呼叫（ic_filter_orchestrator.py:2708）。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:703",
+    "momentum/Analysis/ic_filter_orchestrator.py:2708"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine.compute_grouped_ic",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:733",
+   "coverage_path_id": "ICPERF-T02-48",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "G*stage_cols*rows*log(rows)（預設 by_year＋by_regime 4 組＋by_category＋by_data_source＋by_layer）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine.compute_grouped_ic(features_for_ic, label_for_ic, raw_data_for_ic, metadata, {**grouped_analysis.model_dump(), 'method': m}, regime_pair_counts={}, regime_history=kline, regime_keys=keys)；report.include_regime_analysis 預設 True。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:4964"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._compute_metadata_groups",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1780",
+   "coverage_path_id": "ICPERF-T02-49",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "3*stage_cols*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "engine._compute_metadata_groups(features_df, label, metadata, 'category'|'data_source'|'layer', method)；每組以全部列重算 compute_ic，每欄之值與第 4 段點 IC 同一計算（by_category／by_data_source／by_layer 預設皆開 ⇒ 每欄點 IC 共重算 3 次，判準③候選）。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:794",
+    "momentum/Analysis/ic_engine.py:799",
+    "momentum/Analysis/ic_engine.py:804"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._compute_regime_groups_rule",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1687",
+   "coverage_path_id": "ICPERF-T02-50",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "4*stage_cols*rows*log(rows) + rows^2（PIT 門檻）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "預設 regime_method='rule'：engine._compute_regime_groups_rule(features_df, label, close_full, config, pair_counts={}, keys=keys)。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1574"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._build_regime_rule_masks",
+   "stage": "4",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1653",
+   "coverage_path_id": "ICPERF-T02-51",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2（pit_expanding_quantile_thresholds 於完整 K 線長之 vol 序列逐根 np.quantile）"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "engine._build_regime_rule_masks(close_full_kline, grouped_config)；只需 close Series（完整連續 K 線），與欄數無關。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1702"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_expanding_quantile_thresholds",
+   "stage": "4",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:455",
+   "coverage_path_id": "ICPERF-T02-52",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "pit_expanding_quantile_thresholds(vol_series, lo_q=0.2, hi_q=0.8, min_samples=100)；直接委派 pit_expanding_bounds（pit_stats.py:467）。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1676",
+    "momentum/Analysis/regime_detector.py:329"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._regime_finite_pair_counts",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1592",
+   "coverage_path_id": "ICPERF-T02-53",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "G*stage_cols*rows（每 512 欄一塊）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "ICEngine._regime_finite_pair_counts(features_df, label, {regime: bool_array})。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1708",
+    "momentum/Analysis/ic_engine.py:1765"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._compute_regime_groups_kmeans",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1724",
+   "coverage_path_id": "ICPERF-T02-54",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "G*stage_cols*rows*log(rows) + KMeans 擴張重擬合"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "非預設：grouped_analysis.regime_method='kmeans'；engine._compute_regime_groups_kmeans(features_df, label, close, volume, config, pair_counts={}, keys=keys)。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1569"
+   ],
+   "branch_cell": "regime_kmeans"
+  },
+  {
+   "id": "momentum.Analysis.regime_detector:RegimeDetector.detect",
+   "stage": "4",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/regime_detector.py:111",
+   "coverage_path_id": "ICPERF-T02-55",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "(rows/refit_interval)*KMeans(rows)"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "RegimeDetector(n_clusters=4, lookback=55, min_samples_for_fit=100, refit_interval=50).detect(close, volume)。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:1751"
+   ],
+   "branch_cell": "regime_kmeans"
+  },
+  {
+   "id": "momentum.Analysis.regime_detector:RegimeDetector._fit_expanding",
+   "stage": "4",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/regime_detector.py:207",
+   "coverage_path_id": "ICPERF-T02-56",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2/refit_interval（每 50 根以擴張前綴重擬合 KMeans）"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "detector._fit_expanding(valid_df, close=close, volume=volume)；valid_df 為 _build_features 之有效列。",
+   "callers": [
+    "momentum/Analysis/regime_detector.py:139"
+   ],
+   "branch_cell": "regime_kmeans"
+  },
+  {
+   "id": "momentum.Analysis.regime_detector:RegimeDetector._compute_pit_rule_labels",
+   "stage": "4",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/regime_detector.py:310",
+   "coverage_path_id": "ICPERF-T02-57",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2（PIT 門檻）"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "detector._compute_pit_rule_labels(close, volume)；由 _fit_expanding 首段與 _fallback_rule_based 呼叫。",
+   "callers": [
+    "momentum/Analysis/regime_detector.py:236",
+    "momentum/Analysis/regime_detector.py:354"
+   ],
+   "branch_cell": "regime_kmeans"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator.analyze_cross_sectional",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:2222",
+   "coverage_path_id": "ICPERF-T02-58",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols",
+     "symbols",
+     "timestamps"
+    ],
+    "function": "n_timestamps*stage_cols*n_symbols*log(n_symbols)（Python 雙層迴圈：時點 × 特徵，ic_filter_orchestrator.py:2381）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "symbols",
+    "timestamps"
+   ],
+   "call_example": "跨標的請求：orch.analyze_cross_sectional(features_multiindex_df, labels_path, config_override, timeframe=tf, close=close, feature_metadata=meta)；features 索引為 (時點, 標的) 兩層。",
+   "callers": [
+    "api/services/ic_analysis_service.py:1801"
+   ],
+   "branch_cell": "cross_sectional"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._build_cross_sectional_symbol_matrix",
+   "stage": "4",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:2892",
+   "coverage_path_id": "ICPERF-T02-59",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols",
+     "symbols"
+    ],
+    "function": "n_symbols*stage_cols*rows_per_symbol*log(rows_per_symbol)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "symbols"
+   ],
+   "call_example": "orch._build_cross_sectional_symbol_matrix(numeric_df, feature_cols, label_col, symbol_level_idx)；逐標的 × 逐特徵 _safe_rank_corr。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:2506"
+   ],
+   "branch_cell": "cross_sectional"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage5_statistical_validation",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5032",
+   "coverage_path_id": "ICPERF-T02-60",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows^2*log(rows)（單調性與換手率之逐根 PIT qcut／rank 主導）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "第 5 段整段：orch._stage5_statistical_validation(features_df, label_series, ic_results, config, event_info, split_context, metadata)；refilter 會整段重跑（ic_filter_orchestrator.py:3067）。既有 2,000 欄點逾 10 分鐘（SPEC :102）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1850",
+    "momentum/Analysis/ic_filter_orchestrator.py:3067"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.statistical_validator:compute_hac_ic_statistics",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/statistical_validator.py:74",
+   "coverage_path_id": "ICPERF-T02-61",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*(rows*log(rows) + rows*L)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "compute_hac_ic_statistics(features_for_stats, label_for_stats, horizon=h, maxlags=None)；逐欄 concat+dropna、rankdata、Newey-West。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5061"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.statistical_validator:_newey_west_bartlett_se",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/statistical_validator.py:35",
+   "coverage_path_id": "ICPERF-T02-62",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*L（L＝max(4(n/100)^{2/9}, h−1)，Python 逐 lag 迴圈）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "_newey_west_bartlett_se(z_1d, maxlags=L)。",
+   "callers": [
+    "momentum/Analysis/statistical_validator.py:136"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.statistical_validator:_spearman_contribution_z",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/statistical_validator.py:59",
+   "coverage_path_id": "ICPERF-T02-63",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "_spearman_contribution_z(x_1d, y_1d)；每欄兩次 rankdata（y 之排名每欄重算，判準③候選）。",
+   "callers": [
+    "momentum/Analysis/statistical_validator.py:131"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.statistical_validator:apply_fdr",
+   "stage": "5",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": false,
+   "no_measure_reason": "每次分析只跑一次之 BH 校正，O(stage_cols·log stage_cols) 純量排序（statistical_validator.py:161-222 委派 adjust_multiple_comparisons），與列數無關、相對逐根 PIT 可忽略。",
+   "evidence": "momentum/Analysis/statistical_validator.py:161",
+   "coverage_path_id": "ICPERF-T02-64",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "stage_cols*log(stage_cols)"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "apply_fdr({feature: p}, alpha, method='fdr_bh')。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5084",
+    "momentum/Analysis/ic_filter_orchestrator.py:2483",
+    "momentum/Analysis/ic_filter_orchestrator.py:5839",
+    "momentum/Analysis/ic_filter_orchestrator.py:5947"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.monotonicity_tester:MonotonicityTester.compute_all",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/monotonicity_tester.py:181",
+   "coverage_path_id": "ICPERF-T02-65",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "3*stage_cols*rows^2*log(rows)（每欄 _assign_quantiles 被呼叫 3 次）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "MonotonicityTester(config.thresholds.model_dump()).compute_all(features_for_stats, label_for_stats)；每欄 compute_quantile_returns（內含一次 compute_long_short_spread）＋再一次 compute_long_short_spread ⇒ 同一 (欄, q) 之 PIT qcut 跑 3 次（判準③）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5144"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.monotonicity_tester:MonotonicityTester.compute_quantile_returns",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/monotonicity_tester.py:34",
+   "coverage_path_id": "ICPERF-T02-66",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "2*stage_cols*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "tester.compute_quantile_returns(feature_series, label_series, num_quantiles=5)。",
+   "callers": [
+    "momentum/Analysis/monotonicity_tester.py:191"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.monotonicity_tester:MonotonicityTester.compute_long_short_spread",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/monotonicity_tester.py:112",
+   "coverage_path_id": "ICPERF-T02-67",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "tester.compute_long_short_spread(feature_series, label_series, num_quantiles=5)；含 scipy ttest_ind。",
+   "callers": [
+    "momentum/Analysis/monotonicity_tester.py:78",
+    "momentum/Analysis/monotonicity_tester.py:197"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.monotonicity_tester:MonotonicityTester._assign_quantiles",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/monotonicity_tester.py:229",
+   "coverage_path_id": "ICPERF-T02-68",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows^2*log(rows)（q=5 失敗時遞迴 q=3 再算一次）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "tester._assign_quantiles(tester._prepare_data(feature, label), num_quantiles=5)。",
+   "callers": [
+    "momentum/Analysis/monotonicity_tester.py:50",
+    "momentum/Analysis/monotonicity_tester.py:133",
+    "momentum/Analysis/monotonicity_tester.py:246",
+    "momentum/Analysis/monotonicity_tester.py:253",
+    "momentum/Analysis/monotonicity_tester.py:261"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_expanding_qcut_label",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:311",
+   "coverage_path_id": "ICPERF-T02-69",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2*log(rows)（逐根對 0..t 有限值 pd.qcut；每欄一次）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "pit_expanding_qcut_label(series, q=5, min_samples=MIN_SAMPLES, duplicates='drop', require_full_q=False|True)。",
+   "callers": [
+    "momentum/Analysis/monotonicity_tester.py:237",
+    "momentum/Analysis/long_short_analyzer.py:56"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:_pit_expanding_qcut_core",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:356",
+   "coverage_path_id": "ICPERF-T02-70",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "_pit_expanding_qcut_core(values_f64, q, min_samples, 'drop', require_full_q)；for t in range(n) 每根重建有限歷史並 pd.qcut(retbins=True)。",
+   "callers": [
+    "momentum/Analysis/pit_stats.py:329",
+    "momentum/Analysis/pit_stats.py:349"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.coverage_analyzer:CoverageAnalyzer.compute_all",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/coverage_analyzer.py:51",
+   "coverage_path_id": "ICPERF-T02-71",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "CoverageAnalyzer().compute_all(features_for_stats)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5147"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.turnover_analyzer:TurnoverAnalyzer.compute_all",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/turnover_analyzer.py:221",
+   "coverage_path_id": "ICPERF-T02-72",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "2*stage_cols*rows^2*log(rows)（頂分位遮罩與 PIT rank 各算 2 次）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "TurnoverAnalyzer(config.turnover.model_dump()).compute_all(features_for_stats)；turnover.enabled 預設 True。compute_quantile_turnover 與 compute_turnover_time_series 各算一次同一 pit_expanding_qcut_top_mask；compute_rank_change_rate 與 compute_turnover_time_series 各算一次同一 pit_expanding_rank（判準③）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5151"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.turnover_analyzer:TurnoverAnalyzer.compute_quantile_turnover",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/turnover_analyzer.py:61",
+   "coverage_path_id": "ICPERF-T02-73",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "analyzer.compute_quantile_turnover(feature_series, num_quantiles=5)。",
+   "callers": [
+    "momentum/Analysis/turnover_analyzer.py:230"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.turnover_analyzer:TurnoverAnalyzer.compute_rank_change_rate",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/turnover_analyzer.py:92",
+   "coverage_path_id": "ICPERF-T02-74",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "analyzer.compute_rank_change_rate(feature_series)。",
+   "callers": [
+    "momentum/Analysis/turnover_analyzer.py:233"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.turnover_analyzer:TurnoverAnalyzer.compute_factor_autocorrelation",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/turnover_analyzer.py:111",
+   "coverage_path_id": "ICPERF-T02-75",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "analyzer.compute_factor_autocorrelation(feature_series)。",
+   "callers": [
+    "momentum/Analysis/turnover_analyzer.py:234"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.turnover_analyzer:TurnoverAnalyzer.compute_turnover_time_series",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/turnover_analyzer.py:129",
+   "coverage_path_id": "ICPERF-T02-76",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "2*stage_cols*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "analyzer.compute_turnover_time_series(feature_series, num_quantiles=5)；另產 JSON 可序列化之逐根 list（記憶體 ∝ stage_cols*rows）。",
+   "callers": [
+    "momentum/Analysis/turnover_analyzer.py:235"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_expanding_qcut_top_mask",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:335",
+   "coverage_path_id": "ICPERF-T02-77",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "pit_expanding_qcut_top_mask(series, q=5, min_samples=MIN_SAMPLES, duplicates='drop')。",
+   "callers": [
+    "momentum/Analysis/turnover_analyzer.py:73",
+    "momentum/Analysis/turnover_analyzer.py:154"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.pit_stats:pit_expanding_rank",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/pit_stats.py:475",
+   "coverage_path_id": "ICPERF-T02-78",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows^2*log(rows)（逐根 pd.Series(hist).rank）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "pit_expanding_rank(series, min_samples=MIN_SAMPLES, ties='average')。",
+   "callers": [
+    "momentum/Analysis/turnover_analyzer.py:99",
+    "momentum/Analysis/turnover_analyzer.py:170"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._build_summary_table",
+   "stage": "5",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5630",
+   "coverage_path_id": "ICPERF-T02-79",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "stage_cols*G"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "orch._build_summary_table(features_df.columns, icir, ic_stats, quantile_results, coverage_results, turnover_results, ic_decay, point_ic=..., grouped_ic=..., regime_pair_counts=..., regime_robust_min_samples=n)；純字典組裝，量測確認是否可忽略。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5158"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._apply_thresholds",
+   "stage": "5",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": false,
+   "no_measure_reason": "逐 summary 列之純量門檻比較（ic_filter_orchestrator.py:5977 起），O(stage_cols)、不讀序列資料，相對第 5 段逐根 PIT 可忽略；refilter 重跑時亦同。",
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5977",
+   "coverage_path_id": "ICPERF-T02-80",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "stage_cols"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "orch._apply_thresholds(summary_table, config.thresholds, alpha, fdr_enabled=True, icir_gate=True, binary_mode=False)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5180"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._merge_binary_statistics",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5881",
+   "coverage_path_id": "ICPERF-T02-81",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*log(rows)（mann_whitney_table 向量化；非匯入 0/1 標籤模式時常數返回）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "匯入 0/1 標籤事件路徑：orch._merge_binary_statistics(summary_table, features_for_stats, event_info, config, alpha_effective=a, fdr_method='fdr_bh')；需 _ic_cache['event_binary_label']。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5175"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:_compute_hac_on_ic_series",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:817",
+   "coverage_path_id": "ICPERF-T02-82",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols",
+     "timestamps"
+    ],
+    "function": "stage_cols*n_timestamps*L"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "timestamps"
+   ],
+   "call_example": "跨標的路徑：_compute_hac_on_ic_series(ic_series_list, horizon=h, maxlags=...)，每特徵一次。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:2427"
+   ],
+   "branch_cell": "cross_sectional"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._xsec_placeholder_stats",
+   "stage": "5",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:2604",
+   "coverage_path_id": "ICPERF-T02-83",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols",
+     "symbols"
+    ],
+    "function": "stage_cols*rows*log(n_symbols)*(Q+H) + stage_cols^2*rows（相關矩陣）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "symbols"
+   ],
+   "call_example": "跨標的 summary 五欄：orch._xsec_placeholder_stats(analysis_df, feature_cols, label_col, symbol_level_idx, config, close, feature_metadata)；逐欄塊建稠密 [T,S,C] 面板（_xsec_dense）、_xsec_qcut_labels、_xsec_rank_ic_mean。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:2401"
+   ],
+   "branch_cell": "cross_sectional"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._build_cross_symbol_validation",
+   "stage": "5",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:2918",
+   "coverage_path_id": "ICPERF-T02-84",
+   "unit_axis": {
+    "axes": [
+     "stage_cols",
+     "symbols"
+    ],
+    "function": "stage_cols*n_symbols"
+   },
+   "scale_vector": [
+    "stage_cols",
+    "symbols"
+   ],
+   "call_example": "orch._build_cross_symbol_validation(symbol_ic_matrix)；只讀逐標的 IC 矩陣（與列數無關）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:2512"
+   ],
+   "branch_cell": "cross_sectional"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage6_redundancy",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5322",
+   "coverage_path_id": "ICPERF-T02-85",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols^2*rows + survivors^2*rows（倖存集合重算相關矩陣）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "survivors"
+   ],
+   "call_example": "第 6 段整段：orch._stage6_redundancy(features_df, passed_features, icir_scores, metadata, split_context)；stage_cols＝第 5 段通過欄數。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1872",
+    "momentum/Analysis/ic_filter_orchestrator.py:3081"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.filter",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:109",
+   "coverage_path_id": "ICPERF-T02-86",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols^2*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "RedundancyFilter(config.redundancy.model_dump()).filter(features_df[passed], ic_scores, method='greedy'|'hierarchical'|'vif')。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5362"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.compute_correlation_matrix",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:182",
+   "coverage_path_id": "ICPERF-T02-87",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols^2*rows（無 NaN：矩陣乘法；有 NaN：pandas corr 逐對 pairwise）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "rf.compute_correlation_matrix(features_df_passed)；filter 內算一次（:131），第 6 段尾對倖存子集再算一次（ic_filter_orchestrator.py:5385，判準③候選：可由已算矩陣取子矩陣）。",
+   "callers": [
+    "momentum/Analysis/redundancy_filter.py:131",
+    "momentum/Analysis/redundancy_filter.py:160",
+    "momentum/Analysis/ic_filter_orchestrator.py:5385"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.greedy_dedup",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:202",
+   "coverage_path_id": "ICPERF-T02-88",
+   "unit_axis": {
+    "axes": [
+     "stage_cols",
+     "survivors"
+    ],
+    "function": "stage_cols*survivors（每候選 corr_matrix.loc[feature, selected]）"
+   },
+   "scale_vector": [
+    "stage_cols",
+    "survivors"
+   ],
+   "call_example": "預設 method='greedy'：rf.greedy_dedup(corr_matrix, ic_scores, threshold=0.7, tiebreaker='icir')。",
+   "callers": [
+    "momentum/Analysis/redundancy_filter.py:133"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.hierarchical_clustering",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:239",
+   "coverage_path_id": "ICPERF-T02-89",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "stage_cols^2*log(stage_cols)（scipy linkage）"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "非預設：redundancy.method='hierarchical'；rf.hierarchical_clustering(corr_matrix, ic_scores, linkage_method='average')。",
+   "callers": [
+    "momentum/Analysis/redundancy_filter.py:140"
+   ],
+   "branch_cell": "redundancy_hierarchical"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.vif_filter",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:277",
+   "coverage_path_id": "ICPERF-T02-90",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "(stage_cols−survivors)*stage_cols*rows*stage_cols^2（每輪對每欄 OLS）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "survivors"
+   ],
+   "call_example": "非預設：redundancy.method='vif'；rf.vif_filter(features_df_passed, max_vif=10.0, ic_scores=scores)。",
+   "callers": [
+    "momentum/Analysis/redundancy_filter.py:146"
+   ],
+   "branch_cell": "redundancy_vif"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter._compute_vif_scores",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:618",
+   "coverage_path_id": "ICPERF-T02-91",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*rows*stage_cols^2"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "rf._compute_vif_scores(data_df)；逐欄 sklearn LinearRegression。",
+   "callers": [
+    "momentum/Analysis/redundancy_filter.py:294"
+   ],
+   "branch_cell": "redundancy_vif"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.apply_diversification_constraint",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:382",
+   "coverage_path_id": "ICPERF-T02-92",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols",
+     "survivors"
+    ],
+    "function": "stage_cols*survivors*rows（逐對 |Pearson| 快取）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "survivors"
+   ],
+   "call_example": "redundancy.diversification.enabled 預設 False（redundancy_filter.py:90）；須以 config_override 開啟：rf.apply_diversification_constraint(features_df, selected, candidates, ic_scores, metadata)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5370",
+    "momentum/Analysis/ic_filter_orchestrator.py:5348"
+   ],
+   "branch_cell": "redundancy_diversification"
+  },
+  {
+   "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.compute_diversification_metrics",
+   "stage": "6",
+   "input_axes": [
+    "passed_cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/redundancy_filter.py:316",
+   "coverage_path_id": "ICPERF-T02-93",
+   "unit_axis": {
+    "axes": [
+     "survivor_pairs"
+    ],
+    "function": "survivor_pairs"
+   },
+   "scale_vector": [
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "rf.compute_diversification_metrics(survivor_names, corr_matrix_survivors, feature_metadata)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5386",
+    "momentum/Analysis/ic_filter_orchestrator.py:2735"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._xsec_mean_cross_corr",
+   "stage": "6",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:2801",
+   "coverage_path_id": "ICPERF-T02-94",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols^2*rows（依時點分塊；部分缺值欄逐對精確計）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "跨標的相關矩陣：orch._xsec_mean_cross_corr(values, d_codes, s_codes, n_dates, n_syms)；注意輸入為全部 feature_cols（未經門檻／冗餘篩選）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:2733"
+   ],
+   "branch_cell": "cross_sectional"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage6b_marginal_ic",
+   "stage": "6b",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:6249",
+   "coverage_path_id": "ICPERF-T02-95",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors^2*rows + survivors*B*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "survivors"
+   ],
+   "call_example": "第 6b 段整段：orch._stage6b_marginal_ic(features_df, label_series, stage5_results, stage6_results, split_context, config, fit_scope='train'|'full_sample')；marginal_ic.enabled 預設 True。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1881",
+    "momentum/Analysis/ic_filter_orchestrator.py:3090"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.marginal_ic:compute_marginal_ic",
+   "stage": "6b",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/marginal_ic.py:302",
+   "coverage_path_id": "ICPERF-T02-96",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*(survivors^2*rows + B*rows*log(rows))（loo／sequential 每候選一次投影＋block bootstrap）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "survivors"
+   ],
+   "call_example": "compute_marginal_ic(features_df, label, train_mask=tr, test_mask=te, survivors=[...], extra_candidates=[...], params=MarginalICParams(...), fit_scope='train')；max_survivors_for_loo／max_removed_candidates 為上限。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:6304"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.marginal_ic:normal_scores",
+   "stage": "6b",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/marginal_ic.py:56",
+   "coverage_path_id": "ICPERF-T02-97",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*log(rows)（以 (欄, 列遮罩) 記憶化）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "normal_scores(x_1d)；秩常態分數。",
+   "callers": [
+    "momentum/Analysis/marginal_ic.py:421",
+    "momentum/Analysis/factor_combiner.py:256"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.marginal_ic:fit_projection",
+   "stage": "6b",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/marginal_ic.py:74",
+   "coverage_path_id": "ICPERF-T02-98",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*survivors^2（每次 OLS 投影）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "fit_projection(z_target_train, Z_basis_train)。",
+   "callers": [
+    "momentum/Analysis/marginal_ic.py:458"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.factor_combiner:block_bootstrap_ci",
+   "stage": "6b",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_combiner.py:44",
+   "coverage_path_id": "ICPERF-T02-99",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*B*rows*log(rows)（Python 逐 bootstrap 迴圈）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "block_bootstrap_ci(stat_fn, (r_te, y_te), block_len=L, n_bootstrap=B, seed=s)。",
+   "callers": [
+    "momentum/Analysis/marginal_ic.py:472",
+    "momentum/Analysis/factor_combiner.py:276"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.factor_combiner:combine_factors",
+   "stage": "6b",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_combiner.py:162",
+   "coverage_path_id": "ICPERF-T02-100",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*log(rows) + B*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "combine_factors(features_df, label, train_mask=tr, test_mask=te, survivors=[...], params=params, fit_scope='train')。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:6308"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._stage7_report",
+   "stage": "7",
+   "input_axes": [
+    "cols",
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5402",
+   "coverage_path_id": "ICPERF-T02-101",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols",
+     "survivors"
+    ],
+    "function": "stage_cols*rows/stride（滾動 IC 取樣與 JSON）+ survivors*rows（倖存特徵寫檔）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "第 7 段整段：orch._stage7_report(features_df, metadata, ic_results, stage5_results, stage6_results, stage0_log, preproc_log, event_info, feature_filter_info, split_context, stage6b_results)；_suppress_persist=False 時寫檔。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:1892",
+    "momentum/Analysis/ic_filter_orchestrator.py:3100"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_reporter:ICReporter.generate_json_report",
+   "stage": "7",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_reporter.py:330",
+   "coverage_path_id": "ICPERF-T02-102",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*min(rows/stride, max_series_points)"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "ICReporter(config.report.model_dump()).generate_json_report(analysis_results, report_meta)；含 _sample_rolling_series、summary／metadata 清洗與 validate_report_against_contract。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5460",
+    "momentum/Analysis/ic_filter_orchestrator.py:2583"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_reporter:ICReporter._sample_rolling_series",
+   "stage": "7",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_reporter.py:987",
+   "coverage_path_id": "ICPERF-T02-103",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*W_count*max_series_points"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "reporter._sample_rolling_series(rolling_ic)；每欄每窗 list 切片取樣至 max_series_points（預設 1000）。",
+   "callers": [
+    "momentum/Analysis/ic_reporter.py:333"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_config_schema:validate_report_against_contract",
+   "stage": "7",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_config_schema.py:644",
+   "coverage_path_id": "ICPERF-T02-104",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "stage_cols"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "validate_report_against_contract(report)；逐節、quantile_returns 逐特徵驗必要鍵。",
+   "callers": [
+    "momentum/Analysis/ic_reporter.py:379"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._build_correlation_payload",
+   "stage": "7",
+   "input_axes": [
+    "passed_cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:6092",
+   "coverage_path_id": "ICPERF-T02-105",
+   "unit_axis": {
+    "axes": [
+     "survivor_pairs"
+    ],
+    "function": "survivors^2（fillna＋tolist）"
+   },
+   "scale_vector": [
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "orch._build_correlation_payload(corr_matrix_survivors)；跨標的路徑輸入為全部 feature_cols 之矩陣（:2570）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5428",
+    "momentum/Analysis/ic_filter_orchestrator.py:2570"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._build_report_metadata",
+   "stage": "7",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:6102",
+   "coverage_path_id": "ICPERF-T02-106",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "stage_cols"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "orch._build_report_metadata(features_df, filtered_df, metadata, event_info, ic_decay, feature_filter_info, scope=..., selection_scope=..., significance=..., ...)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5447"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._persist_outputs",
+   "stage": "7",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:6320",
+   "coverage_path_id": "ICPERF-T02-107",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows（倖存特徵 h5）+ 報告 JSON 大小"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols",
+    "survivors"
+   ],
+   "call_example": "orch._persist_outputs(features_df, filtered_df, report, report_meta, filter_log, stage6b_results=..., event_identity=..., features_path=..., label_series=..., split_context=...)；寫 data_cache 下 filtered h5、report、filter_log、survivor_output。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5474",
+    "momentum/Analysis/ic_filter_orchestrator.py:2066"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_reporter:ICReporter.save_filtered_features",
+   "stage": "7",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_reporter.py:780",
+   "coverage_path_id": "ICPERF-T02-108",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "reporter.save_filtered_features(filtered_df, ...)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:6358"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_reporter:ICReporter.save_report",
+   "stage": "7",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_reporter.py:839",
+   "coverage_path_id": "ICPERF-T02-109",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "stage_cols"
+    ],
+    "function": "stage_cols*min(rows/stride, max_series_points)（JSON 序列化）"
+   },
+   "scale_vector": [
+    "rows",
+    "stage_cols"
+   ],
+   "call_example": "reporter.save_report(report, output_dir, case_id)；同一次 persist 呼叫兩次（ic_filter_orchestrator.py:6379、:6408）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:6379",
+    "momentum/Analysis/ic_filter_orchestrator.py:6408"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._write_survivor_output",
+   "stage": "7",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:6417",
+   "coverage_path_id": "ICPERF-T02-110",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "orch._write_survivor_output(report=..., report_meta=..., metadata=..., filtered_df=..., features_df=..., report_json_path=..., stage6b_results=..., event_identity=..., features_path=..., label_series=..., split_context=...)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:6392"
+   ],
+   "branch_cell": "ic_page_default"
+  },
+  {
+   "id": "momentum.Analysis.ic_reporter:ICReporter.generate_filter_log",
+   "stage": "7",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": false,
+   "no_measure_reason": "只把各段已產之 log 字典併成一份（ic_reporter.py:913-921），常數時間、不讀資料。",
+   "evidence": "momentum/Analysis/ic_reporter.py:913",
+   "coverage_path_id": "ICPERF-T02-111",
+   "unit_axis": {
+    "axes": [
+     "stage_cols"
+    ],
+    "function": "1"
+   },
+   "scale_vector": [
+    "stage_cols"
+   ],
+   "call_example": "reporter.generate_filter_log({stage_name: log})。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5416"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator.run_deep_analysis",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3154",
+   "coverage_path_id": "ICPERF-T02-112",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "Σ 各模組（主導項 survivors*rows^2*log(rows)：factor_returns／long_short 逐根 qcut）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "先 orch.analyze(...) 建 _ic_cache，再 orch.run_deep_analysis(selected_features=None, config_override=None, force_modules=[...])；預設選欄＝第 6 段倖存欄。",
+   "callers": [
+    "api/services/ic_analysis_service.py:2579",
+    "api/services/ic_analysis_service.py:2731"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_factor_return",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3441",
+   "coverage_path_id": "ICPERF-T02-113",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "orch._run_factor_return(selected_features, config)；需 _ic_cache。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_return_analyzer:FactorReturnAnalyzer.compute_batch",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_return_analyzer.py:298",
+   "coverage_path_id": "ICPERF-T02-114",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "create_factor_return_analyzer(config.factor_return.model_dump()).compute_batch(features_df[selected], label_series, horizon=h, top_n=len(selected))。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3455"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_return_analyzer:FactorReturnAnalyzer.compute_factor_returns",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_return_analyzer.py:48",
+   "coverage_path_id": "ICPERF-T02-115",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.compute_factor_returns(feature_series, future_returns, feature_name=n, store_series=True, horizon=h)。",
+   "callers": [
+    "momentum/Analysis/factor_return_analyzer.py:318"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_return_analyzer:FactorReturnAnalyzer._pit_expanding_position",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_return_analyzer.py:354",
+   "coverage_path_id": "ICPERF-T02-116",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)（逐根 np.asarray(hist)＋pd.qcut；不複用 pit_stats）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "FactorReturnAnalyzer._pit_expanding_position(feature_series, num_quantiles=5, warmup_periods=w, eval_positions=None)；staticmethod，只需單一特徵 Series。",
+   "callers": [
+    "momentum/Analysis/factor_return_analyzer.py:120"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_return_analyzer:FactorReturnAnalyzer.compute_risk_metrics",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_return_analyzer.py:188",
+   "coverage_path_id": "ICPERF-T02-117",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.compute_risk_metrics(ls_return_series, ..., bars_per_year=b)。",
+   "callers": [
+    "momentum/Analysis/factor_return_analyzer.py:155"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_factor_centrality",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3493",
+   "coverage_path_id": "ICPERF-T02-118",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "(rows/stride)*W_c*survivors^2"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "orch._run_factor_centrality(selected_features, config)；輸入為 _ic_cache['rolling_ic'] 之倖存欄矩陣。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_centrality_analyzer:FactorCentralityAnalyzer.compute_centrality",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_centrality_analyzer.py:50",
+   "coverage_path_id": "ICPERF-T02-119",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivor_pairs"
+    ],
+    "function": "survivors^2*rows + survivors^3（相關矩陣與特徵分解）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "FactorCentralityAnalyzer(config.factor_centrality.model_dump()).compute_centrality(rolling_ic_matrix_df)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3506",
+    "momentum/Analysis/factor_centrality_analyzer.py:193"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_centrality_analyzer:FactorCentralityAnalyzer.compute_rolling_centrality",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_centrality_analyzer.py:173",
+   "coverage_path_id": "ICPERF-T02-120",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "rows*(survivors^2*W_c + survivors^3)（每窗終點重算一次 compute_centrality）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "analyzer.compute_rolling_centrality(rolling_ic_matrix_df, window=None)；for end in range(W, n+1)（factor_centrality_analyzer.py:191）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3509"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_centrality_analyzer:FactorCentralityAnalyzer.attach_feature_trends",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_centrality_analyzer.py:210",
+   "coverage_path_id": "ICPERF-T02-121",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.attach_feature_trends(centrality, rolling, window=w, trend_config=config.trend_analysis.model_dump())。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3511"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_centrality_analyzer:FactorCentralityAnalyzer.detect_crowding_regime",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_centrality_analyzer.py:239",
+   "coverage_path_id": "ICPERF-T02-122",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.detect_crowding_regime(rolling_centrality_df, feature_name)；每倖存欄一次。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3516"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_trend_analysis",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3525",
+   "coverage_path_id": "ICPERF-T02-123",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*D*rows（D＝趨勢維數）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "orch._run_trend_analysis(selected_features, config)；讀同請求 factor_returns／factor_centrality／long_short 之結果。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.trend_analyzer:TrendAnalyzer.batch_analyze",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/trend_analyzer.py:179",
+   "coverage_path_id": "ICPERF-T02-124",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*D*rows*L"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "TrendAnalyzer(config.trend_analysis.model_dump()).batch_analyze(rolling_ic_matrix, top_n=k, overlap_window=w, dimensions=[...], dimension_inputs={...})。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3543"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.trend_analyzer:TrendAnalyzer.analyze_trend",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/trend_analyzer.py:52",
+   "coverage_path_id": "ICPERF-T02-125",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*D*rows*L（縮尾＋OLS＋HAC 斜率 p 值）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.analyze_trend(series, 'ic', overlap_window=w)；內呼 _hac_slope_pvalue（trend_analyzer.py:96）。",
+   "callers": [
+    "momentum/Analysis/trend_analyzer.py:232"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.trend_analyzer:TrendAnalyzer._hac_slope_pvalue",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/trend_analyzer.py:249",
+   "coverage_path_id": "ICPERF-T02-126",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*D*rows*L"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer._hac_slope_pvalue(x, y, intercept, slope, overlap_window)。",
+   "callers": [
+    "momentum/Analysis/trend_analyzer.py:96"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_parameter_sensitivity",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3640",
+   "coverage_path_id": "ICPERF-T02-127",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W*log(W)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "orch._run_parameter_sensitivity(selected_features, config)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer.batch_analyze",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/parameter_sensitivity_analyzer.py:160",
+   "coverage_path_id": "ICPERF-T02-128",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W*log(W)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "ParameterSensitivityAnalyzer({**config.parameter_sensitivity.model_dump(), 'icir_window': w}).batch_analyze(features_df, labels, metadata=meta, method='spearman', direction={...})；需倖存欄中同族變體 ≥ min_family_size 才有計算。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3649"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer.analyze_from_variants",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/parameter_sensitivity_analyzer.py:76",
+   "coverage_path_id": "ICPERF-T02-129",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "family_size*rows*W*log(W)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.analyze_from_variants(features_df, labels, feature_family=f, variant_params={'variants': [...]}, method='spearman')。",
+   "callers": [
+    "momentum/Analysis/parameter_sensitivity_analyzer.py:181"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer._compute_rolling_icir",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/parameter_sensitivity_analyzer.py:259",
+   "coverage_path_id": "ICPERF-T02-130",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "family_size*rows*W*log(W)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "ParameterSensitivityAnalyzer._compute_rolling_icir(features_family_df, labels, 'spearman', window)；spearman 走 rolling_window_rank_corr（與第 4 段同 ICIR 窗之滾動 IC 重算，判準③候選）。",
+   "callers": [
+    "momentum/Analysis/parameter_sensitivity_analyzer.py:103"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer._rolling_corr",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/parameter_sensitivity_analyzer.py:288",
+   "coverage_path_id": "ICPERF-T02-131",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "family_size*rows*W（Python 逐窗 × 逐欄雙層迴圈）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "非預設 method（pearson／kendall）：ParameterSensitivityAnalyzer._rolling_corr(x_2d, y_1d, window, 'pearson')。",
+   "callers": [
+    "momentum/Analysis/parameter_sensitivity_analyzer.py:276"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_rolling_oos",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3654",
+   "coverage_path_id": "ICPERF-T02-132",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*n_splits*(train_window+test_window)*log"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "orch._run_rolling_oos(selected_features, config)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.rolling_oos_validator:RollingOOSValidator.validate_batch",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/rolling_oos_validator.py:133",
+   "coverage_path_id": "ICPERF-T02-133",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*n_splits*(train_window+test_window)*log"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "RollingOOSValidator(config.rolling_oos.model_dump()).validate_batch(features_df, labels, horizon=h, method='spearman', direction={...}, top_n=k)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3661"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.rolling_oos_validator:RollingOOSValidator.validate",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/rolling_oos_validator.py:45",
+   "coverage_path_id": "ICPERF-T02-134",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*n_splits*(train_window+test_window)*log"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "validator.validate(feature_series, labels, method='spearman', horizon=h, direction=d)；逐 split 兩次 _masked_ic。",
+   "callers": [
+    "momentum/Analysis/rolling_oos_validator.py:155"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_factor_orthogonalization",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3667",
+   "coverage_path_id": "ICPERF-T02-135",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "rows*survivors^2"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "factor_orthogonalization.enabled 預設 False（ic_config_schema.py:301）；須以 force_modules=['factor_orthogonalization'] 或 config_override 開啟：orch._run_factor_orthogonalization(selected, config)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_orthogonalizer:FactorOrthogonalizer.gram_schmidt",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_orthogonalizer.py:24",
+   "coverage_path_id": "ICPERF-T02-136",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "rows*survivors^2（QR）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "FactorOrthogonalizer({**config.factor_orthogonalization.model_dump(), 'icir_scores': icir}).gram_schmidt(factors_df)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3684"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_orthogonalizer:FactorOrthogonalizer.pca_orthogonalize",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_orthogonalizer.py:104",
+   "coverage_path_id": "ICPERF-T02-137",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "rows*survivors^2 + survivors^3"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "method='pca'：analyzer.pca_orthogonalize(factors_df)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3682"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_factor_exposure",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3716",
+   "coverage_path_id": "ICPERF-T02-138",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "factor_exposure.enabled 預設 False（ic_config_schema.py:306）；orch._run_factor_exposure(selected, config)；需 _ic_cache['close_series']。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_exposure_analyzer:FactorExposureAnalyzer.neutralize_factor_matrix",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_exposure_analyzer.py:100",
+   "coverage_path_id": "ICPERF-T02-139",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows（beta_neutral 逐欄 concat；vol_neutral 整表 rolling std）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "FactorExposureAnalyzer(config.factor_exposure.model_dump()).neutralize_factor_matrix(factor_values=df, market_proxy=proxy, mode='none'|'beta_neutral'|'vol_neutral', lookback=n)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3744"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_exposure_analyzer:FactorExposureAnalyzer._apply_beta_neutralization",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_exposure_analyzer.py:134",
+   "coverage_path_id": "ICPERF-T02-140",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer._apply_beta_neutralization(normalized_df, market_proxy)；逐欄 pd.concat+dropna 並逐欄插入新 DataFrame。",
+   "callers": [
+    "momentum/Analysis/factor_exposure_analyzer.py:118"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.factor_exposure_analyzer:FactorExposureAnalyzer.calculate_portfolio_exposure",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/factor_exposure_analyzer.py:181",
+   "coverage_path_id": "ICPERF-T02-141",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.calculate_portfolio_exposure(equal_time_weights, factor_values_df)；每次深度跑呼叫兩次（原值、中和後）。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3751",
+    "momentum/Analysis/ic_filter_orchestrator.py:3752"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_long_short",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3825",
+   "coverage_path_id": "ICPERF-T02-142",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "orch._run_long_short(selected_features, config)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.long_short_analyzer:LongShortAnalyzer.batch_analyze",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/long_short_analyzer.py:175",
+   "coverage_path_id": "ICPERF-T02-143",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "LongShortAnalyzer(config.long_short_analysis.model_dump()).batch_analyze(features_df[selected], label_series, top_n=k)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3831"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.long_short_analyzer:LongShortAnalyzer.analyze",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/long_short_analyzer.py:82",
+   "coverage_path_id": "ICPERF-T02-144",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "analyzer.analyze(feature_series, future_returns, num_quantiles=5)；經 compute_side_masks → compute_pit_bins。",
+   "callers": [
+    "momentum/Analysis/long_short_analyzer.py:185"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.long_short_analyzer:LongShortAnalyzer.compute_pit_bins",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/long_short_analyzer.py:41",
+   "coverage_path_id": "ICPERF-T02-145",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows^2*log(rows)（pit_expanding_qcut_label require_full_q=True，long_short_analyzer.py:56-60）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "LongShortAnalyzer(cfg).compute_pit_bins(feature_series, future_returns=None, num_quantiles=5)；future_returns 刻意不參與分箱。",
+   "callers": [
+    "momentum/Analysis/long_short_analyzer.py:71"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_feature_quality_diagnostics",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3833",
+   "coverage_path_id": "ICPERF-T02-146",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*ADF(rows) + survivors^2*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "orch._run_feature_quality_diagnostics(selected_features, config)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.feature_quality_diagnostics:FeatureQualityDiagnostics.run_full_diagnostics",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/feature_quality_diagnostics.py:232",
+   "coverage_path_id": "ICPERF-T02-147",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*ADF(rows) + survivors^2*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "FeatureQualityDiagnostics(config.feature_quality_diagnostics.model_dump()).run_full_diagnostics(features_df[selected], rolling_ic_dict={...})。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3844"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.feature_quality_diagnostics:FeatureQualityDiagnostics.run_batch_adf_test",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/feature_quality_diagnostics.py:41",
+   "coverage_path_id": "ICPERF-T02-148",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*maxlag^2（statsmodels adfuller autolag）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "diag.run_batch_adf_test(features_df)；逐欄縮尾後 adfuller。",
+   "callers": [
+    "momentum/Analysis/feature_quality_diagnostics.py:237"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.feature_quality_diagnostics:FeatureQualityDiagnostics.run_batch_autocorrelation_test",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/feature_quality_diagnostics.py:101",
+   "coverage_path_id": "ICPERF-T02-149",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*log(rows)（Ljung-Box）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "diag.run_batch_autocorrelation_test(features_df)。",
+   "callers": [
+    "momentum/Analysis/feature_quality_diagnostics.py:238"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.feature_quality_diagnostics:FeatureQualityDiagnostics.redundancy_pre_scan",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/feature_quality_diagnostics.py:203",
+   "coverage_path_id": "ICPERF-T02-150",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivor_pairs"
+    ],
+    "function": "survivors^2*rows*log(rows)（pandas spearman corr）+ survivor_pairs（Python 雙層 iloc）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors",
+    "survivor_pairs"
+   ],
+   "call_example": "diag.redundancy_pre_scan(features_df, method='spearman')。",
+   "callers": [
+    "momentum/Analysis/feature_quality_diagnostics.py:240"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.feature_quality_diagnostics:FeatureQualityDiagnostics.detect_concept_drift",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/feature_quality_diagnostics.py:141",
+   "coverage_path_id": "ICPERF-T02-151",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "diag.detect_concept_drift(rolling_ic_series, feature_name)；CUSUM＋PSI。",
+   "callers": [
+    "momentum/Analysis/feature_quality_diagnostics.py:246"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_net_ic",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:3846",
+   "coverage_path_id": "ICPERF-T02-152",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "orch._run_net_ic(selected_features, config)；需同請求 factor_returns 先跑（series owner）與 _report 之 turnover。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3244"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "momentum.Analysis.net_ic_analyzer:NetICAnalyzer.batch_analyze",
+   "stage": "deep_analysis",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_column",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/net_ic_analyzer.py:425",
+   "coverage_path_id": "ICPERF-T02-153",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*n_cost_steps"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "NetICAnalyzer(config.net_ic_analysis.model_dump()).batch_analyze(summary, turnover_data, factor_return_series={...}, quote_currency=None)。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:3889"
+   ],
+   "branch_cell": "deep_analysis"
+  },
+  {
+   "id": "api.services.ic_analysis_service:ICAnalysisService._apply_transforms_sync",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "api/services/ic_analysis_service.py:2868",
+   "coverage_path_id": "ICPERF-T02-154",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W（rank／gaussian／zscore）+ survivors*rows（h5 寫檔）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "IC 頁第三步：service._apply_transforms_sync(task_id, selected_features, rank=True, zscore=True, gaussian=True, rank_window=252, zscore_windows=[...])；需已完成之 IC 任務（task_info 含 req_features_path 與報告 ff_run_identity）。",
+   "callers": [
+    "api/services/ic_analysis_service.py:2857"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.transform_selected",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:926",
+   "coverage_path_id": "ICPERF-T02-155",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "create_feature_preprocessor(cfg).transform_selected(selected_cols, {'ic_page': df}, config=transform_config, arm=post_ic_entry_arm('ic_page_apply_transforms'))；IC-first 以 ctx.post_ic_arm 與 L7 群組呼叫。",
+   "callers": [
+    "api/services/ic_analysis_service.py:2951",
+    "momentum/FeatureEngineering/feature_factory.py:2996"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.transform",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:882",
+   "coverage_path_id": "ICPERF-T02-156",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "post_ic_preprocessor.transform(selected_frame)；欄數 > FFACT_L65_CHUNK_SIZE 時走 _transform_chunked，否則 _transform_single（optimized 或 legacy 依 forced_arm）。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:993"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_chunked",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2398",
+   "coverage_path_id": "ICPERF-T02-157",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "preprocessor._transform_chunked(features_df, chunk_size)；逐欄塊呼叫 _transform_single。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:916",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:921"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_optimized_df_core",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2204",
+   "coverage_path_id": "ICPERF-T02-158",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "forced_arm='pandas_optimized' 時經 _transform_single_optimized_df 進入；同一陣列上依序 rank→gaussian→zscore。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2193"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_legacy",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2351",
+   "coverage_path_id": "ICPERF-T02-159",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W（每步 df.copy）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "forced_arm='pandas_legacy' 時：preprocessor._transform_single_legacy(features_df)；每步驟各複製整表。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2332"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_rank_transform",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3185",
+   "coverage_path_id": "ICPERF-T02-160",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "legacy 臂：preprocessor._apply_rank_transform(df)（rank_config.window 預設 252）。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2382"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_rank_2d_v2",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3172",
+   "coverage_path_id": "ICPERF-T02-161",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W（pandas rolling rank＋rolling std）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "FeaturePreprocessor._rolling_rank_2d_v2(arr_2d_f64, window=252)；staticmethod，兩臂共用（:2252、:3201）。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2252",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3201"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_gaussian_normalize",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3252",
+   "coverage_path_id": "ICPERF-T02-162",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "legacy 臂：preprocessor._apply_gaussian_normalize(df)；gaussian_normalize.enabled 預設 False。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2387"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._gaussian_2d",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3216",
+   "coverage_path_id": "ICPERF-T02-163",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W（causal：_rolling_rank_numba）"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "FeaturePreprocessor._gaussian_2d(arr_2d, lower=0.001, upper=0.999, causal=True, window=w, min_periods=m)。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2273",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3275"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing._numba_transforms:_rolling_rank_numba",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:34",
+   "coverage_path_id": "ICPERF-T02-164",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "_rolling_rank_numba(arr_2d_f64, window, min_periods)；numba 不可用時改走同檔 :83 之純 Python 後備。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3230"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_adaptive_zscore",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3298",
+   "coverage_path_id": "ICPERF-T02-165",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*n_windows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "legacy 臂：preprocessor._apply_adaptive_zscore(df)。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2392"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_zscore_2d",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2154",
+   "coverage_path_id": "ICPERF-T02-166",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows*n_windows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "FeaturePreprocessor._rolling_zscore_2d(arr_2d, windows=[...], epsilon=1e-8, mode='replace')；兩臂共用。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2306",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3316",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3333"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.preprocessing.stable_mask:mask_incomplete_window_by_input_2d",
+   "stage": "post_ic_transform",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/preprocessing/stable_mask.py:215",
+   "coverage_path_id": "ICPERF-T02-167",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "mask_incomplete_window_by_input_2d(output_2d, step_input_2d, window)；每轉換步驟一次。",
+   "callers": [
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2251",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2272",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:2305",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3200",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3274",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3315"
+   ],
+   "branch_cell": "post_ic_transform"
+  },
+  {
+   "id": "momentum.FeatureEngineering.feature_factory:FeatureFactory.run_ic_first",
+   "stage": "icfirst",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "none",
+   "measure": false,
+   "no_measure_reason": "SPEC v5.50 (c)：外層 run_ic_first 含完整特徵生成（generate_features，feature_factory.py:2863-2867；FFPROD 範圍）——本票只量 _run_ic_first_post_generation（feature_factory.py:2900）之包絡與子步驟；不以子函式時間冒充外層全程",
+   "evidence": "momentum/FeatureEngineering/feature_factory.py:2809",
+   "coverage_path_id": "ICPERF-T02-168",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "特徵生成（FF，不屬本票）+ input_cols*rows*log(rows)（IC 閘）+ survivors*rows*W（post-IC）"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols",
+    "survivors"
+   ],
+   "call_example": "create_feature_factory(...).run_ic_first(symbol, timeframe, config, start_date=s, end_date=e, ic_engine=ICEngine(...), feature_reader=..., ...)；內含完整特徵生成，量測 IC 部分應改量 _run_ic_first_post_generation 或其子入口。",
+   "callers": [
+    "scripts/icperf_freeze_baseline.py:2159"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.FeatureEngineering.feature_factory:FeatureFactory._run_ic_first_post_generation",
+   "stage": "icfirst",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/feature_factory.py:2900",
+   "coverage_path_id": "ICPERF-T02-169",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows*log(rows) + survivors*rows*W"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols",
+    "survivors"
+   ],
+   "call_example": "生成之後之 IC-first 步驟：讀 kline、compute_ic_from_l7_raw、load_columns_v2、transform_selected、write_processed；需已存在之 L7 raw run 目錄與凍結 ctx。",
+   "callers": [
+    "momentum/FeatureEngineering/feature_factory.py:2880"
+   ],
+   "branch_cell": "icfirst_post_generation"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine.compute_ic_from_l7_raw",
+   "stage": "icfirst",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:383",
+   "coverage_path_id": "ICPERF-T02-170",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows*log(rows)（逐群組讀回＋compute_ic）"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "ICEngine(cfg).compute_ic_from_l7_raw(symbol, tf, config_hash, label, feature_reader=FeatureReader(...), ic_threshold=t, selection_window={...}, split_id=...)；快取命中時只做身分比對（:450 起）。",
+   "callers": [
+    "momentum/FeatureEngineering/feature_factory.py:2957",
+    "api/services/ic_analysis_service.py:2484"
+   ],
+   "branch_cell": "icfirst_post_generation"
+  },
+  {
+   "id": "momentum.FeatureEngineering.feature_reader:FeatureReader.stream_groups_v2",
+   "stage": "icfirst",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/feature_reader.py:247",
+   "coverage_path_id": "ICPERF-T02-171",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "input_cols*rows（parquet 讀回）"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "feature_reader.stream_groups_v2(symbol, tf, config_hash, artifact_kind='raw', consumer='strict', sort_groups=True, before_read=cb, on_read_error=cb)。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:533"
+   ],
+   "branch_cell": "icfirst_post_generation"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._compute_l7_raw_group_ic",
+   "stage": "icfirst",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:932",
+   "coverage_path_id": "ICPERF-T02-172",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "input_cols"
+    ],
+    "function": "group_cols*rows*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "input_cols"
+   ],
+   "call_example": "engine._compute_l7_raw_group_ic(group_df=group_df_with_index, label=label, method='spearman', selection_window={...})；select_dtypes＋copy 後 compute_ic。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:540"
+   ],
+   "branch_cell": "icfirst_post_generation"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:ICEngine._write_ic_selected_json_atomic",
+   "stage": "icfirst",
+   "input_axes": [
+    "cols"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_engine.py:1271",
+   "coverage_path_id": "ICPERF-T02-173",
+   "unit_axis": {
+    "axes": [
+     "input_cols"
+    ],
+    "function": "input_cols（ic_scores 全欄 JSON）"
+   },
+   "scale_vector": [
+    "input_cols"
+   ],
+   "call_example": "engine._write_ic_selected_json_atomic(output_path=p, symbol=s, tf=t, config_hash=h, selected=[...], ic_scores={...}, data_fingerprint={...}, ic_params={...}, skipped_groups=[], quality_status='complete')。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:558",
+    "momentum/Analysis/ic_engine.py:1236"
+   ],
+   "branch_cell": "icfirst_post_generation"
+  },
+  {
+   "id": "momentum.FeatureEngineering.feature_reader:FeatureReader.load_columns_v2",
+   "stage": "icfirst",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/feature_reader.py:296",
+   "coverage_path_id": "ICPERF-T02-174",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "feature_reader.load_columns_v2(symbol, tf, config_hash, selected_features, artifact_kind='raw', attach_row_index=True)。",
+   "callers": [
+    "momentum/FeatureEngineering/feature_factory.py:2978"
+   ],
+   "branch_cell": "icfirst_post_generation"
+  },
+  {
+   "id": "momentum.FeatureEngineering.feature_storage:FeatureStorage.write_processed",
+   "stage": "icfirst",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/FeatureEngineering/feature_storage.py:1419",
+   "coverage_path_id": "ICPERF-T02-175",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "survivors"
+    ],
+    "function": "survivors*rows"
+   },
+   "scale_vector": [
+    "rows",
+    "survivors"
+   ],
+   "call_example": "storage.write_processed(symbol, tf, config_hash, processed_groups, row_index=..., layer_results=..., post_ic_arm=..., execution=..., numeric_identity=...)。",
+   "callers": [
+    "momentum/FeatureEngineering/feature_factory.py:3013"
+   ],
+   "branch_cell": "icfirst_post_generation"
+  },
+  {
+   "id": "momentum.Analysis.ic_engine:label_fingerprint",
+   "stage": "icfirst",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": true,
+   "loop": "none",
+   "measure": false,
+   "no_measure_reason": "每次請求只對單一標籤序列做一次 sha256（ic_engine.py:245-259），O(rows) 且與欄數無關，相對 IC 閘全欄計算可忽略。",
+   "evidence": "momentum/Analysis/ic_engine.py:245",
+   "coverage_path_id": "ICPERF-T02-176",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "label_fingerprint(label_series)。",
+   "callers": [
+    "momentum/Analysis/ic_engine.py:999"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "api.services.ic_analysis_service:ICAnalysisService._run_event_label_stages",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "api/services/ic_analysis_service.py:667",
+   "coverage_path_id": "ICPERF-T02-177",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "events"
+    ],
+    "function": "n_events*n_timeframes + bars 讀取（rows）"
+   },
+   "scale_vector": [
+    "rows",
+    "events"
+   ],
+   "call_example": "事件分支唯一入口：service._run_event_label_stages(request（含 event_import_id）, event_batch, features_path, meta_path, ...)；只在 request.event_import_id 存在時被呼叫。",
+   "callers": [
+    "api/services/ic_analysis_service.py:1578",
+    "api/services/ic_analysis_service.py:1886"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.label_value_from_case:prepare_analysis_windows",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/label_value_from_case.py:1032",
+   "coverage_path_id": "ICPERF-T02-178",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "events"
+    ],
+    "function": "n_events*n_timeframes*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "events"
+   ],
+   "call_example": "create_event_sample_pipeline().prepare_analysis_windows(records, bars_by_tf, event_label_spec=spec, event_import_id=id, lookahead_bars_declared=n, timeframe_seconds={...}, feature_timeframe=tf)。",
+   "callers": [
+    "api/services/ic_analysis_service.py:729"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.alignment:align_events",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/alignment.py:113",
+   "coverage_path_id": "ICPERF-T02-179",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "events"
+    ],
+    "function": "n_events*n_timeframes*log(rows)（逐事件 × 逐週期對齊）"
+   },
+   "scale_vector": [
+    "rows",
+    "events"
+   ],
+   "call_example": "align_events(events_df, bars_by_tf, AlignmentConfig(timeframes=(...)))。",
+   "callers": [
+    "momentum/Analysis/event_samples/label_value_from_case.py:1072"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.label_value_from_case:purge_lower_bound_rows",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": false,
+   "no_measure_reason": "逐事件窗純量運算（label_value_from_case.py:707 起），只與事件數成線性、不讀 K 線或特徵，事件數遠小於列數；成本已含於 ICPERF-T02-178 之量測。",
+   "evidence": "momentum/Analysis/event_samples/label_value_from_case.py:707",
+   "coverage_path_id": "ICPERF-T02-180",
+   "unit_axis": {
+    "axes": [
+     "events"
+    ],
+    "function": "n_events"
+   },
+   "scale_vector": [
+    "events"
+   ],
+   "call_example": "purge_lower_bound_rows(windows, lookahead_bars_declared=n, timeframe_seconds={...}, symbols=[...])。",
+   "callers": [
+    "momentum/Analysis/event_samples/label_value_from_case.py:1079"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.event_samples.canonical_holdout:check_feature_run_coverage",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/canonical_holdout.py:361",
+   "coverage_path_id": "ICPERF-T02-181",
+   "unit_axis": {
+    "axes": [
+     "events"
+    ],
+    "function": "n_events"
+   },
+   "scale_vector": [
+    "events"
+   ],
+   "call_example": "check_feature_run_coverage(timeframe_seconds={...}, feature_manifest_time_range={...}, event_windows=prepared0.windows)。",
+   "callers": [
+    "api/services/ic_analysis_service.py:738"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.label_value_from_case:resolve_label_value_at_analyze",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/label_value_from_case.py:1164",
+   "coverage_path_id": "ICPERF-T02-182",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "events"
+    ],
+    "function": "n_events*log(rows)（逐事件 _close_at／_price_at）"
+   },
+   "scale_vector": [
+    "rows",
+    "events"
+   ],
+   "call_example": "pipeline.resolve_label_value_at_analyze(prepared1, bars_by_tf, event_label_spec=spec)。",
+   "callers": [
+    "api/services/ic_analysis_service.py:768"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.label_value_from_case:feature_row_keys",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/label_value_from_case.py:767",
+   "coverage_path_id": "ICPERF-T02-183",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "events"
+    ],
+    "function": "n_events*log(rows)"
+   },
+   "scale_vector": [
+    "rows",
+    "events"
+   ],
+   "call_example": "pipeline.feature_row_keys(prepared1, feature_timeframe=tf, timeframe_seconds={...}, bars_by_tf=bars)。",
+   "callers": [
+    "api/services/ic_analysis_service.py:805"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.label_value_from_case:isolation_terms_rows",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": false,
+   "no_measure_reason": "逐事件窗求隔離列數之純量運算（label_value_from_case.py:867 起），只與事件數線性且不讀資料陣列，可忽略。",
+   "evidence": "momentum/Analysis/event_samples/label_value_from_case.py:867",
+   "coverage_path_id": "ICPERF-T02-184",
+   "unit_axis": {
+    "axes": [
+     "events"
+    ],
+    "function": "n_events"
+   },
+   "scale_vector": [
+    "events"
+   ],
+   "call_example": "pipeline.isolation_terms_rows(windows, lookahead_bars_declared=n, timeframe_seconds={...}, feature_timeframe=tf)。",
+   "callers": [
+    "api/services/ic_analysis_service.py:917"
+   ],
+   "branch_cell": null
+  },
+  {
+   "id": "momentum.Analysis.binary_discrimination:mann_whitney_table",
+   "stage": "event",
+   "input_axes": [
+    "cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "none",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/binary_discrimination.py:57",
+   "coverage_path_id": "ICPERF-T02-185",
+   "unit_axis": {
+    "axes": [
+     "stage_cols",
+     "events"
+    ],
+    "function": "stage_cols*n_events*log(n_events)"
+   },
+   "scale_vector": [
+    "stage_cols",
+    "events"
+   ],
+   "call_example": "mann_whitney_table(features_df_events, y_int01, min_class_n=10)；匯入 0/1 標籤模式第 5 段主統計，置換迴圈內每次再呼叫一次。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5944",
+    "momentum/Analysis/ic_filter_orchestrator.py:5833"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_binary_permutation_and_negative_control",
+   "stage": "event",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5715",
+   "coverage_path_id": "ICPERF-T02-186",
+   "unit_axis": {
+    "axes": [
+     "stage_cols",
+     "events"
+    ],
+    "function": "P*stage_cols*n_events*log(n_events)（倖存者區塊置換＋整批負對照）"
+   },
+   "scale_vector": [
+    "stage_cols",
+    "survivors",
+    "events"
+   ],
+   "call_example": "匯入 0/1 標籤模式：orch._run_binary_permutation_and_negative_control(passed, removed, features_for_stats, config, alpha_effective=a, fdr_method='fdr_bh', fdr_enabled=True)；n_perm＝min(1000, max(200, perm_budget_total // k))。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5190"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "momentum.Analysis.binary_discrimination:block_permutation_table",
+   "stage": "event",
+   "input_axes": [
+    "passed_cols",
+    "rows"
+   ],
+   "ic_page": true,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/binary_discrimination.py:307",
+   "coverage_path_id": "ICPERF-T02-187",
+   "unit_axis": {
+    "axes": [
+     "survivors",
+     "events"
+    ],
+    "function": "P*survivors*n_events*log(n_events)"
+   },
+   "scale_vector": [
+    "survivors",
+    "events"
+   ],
+   "call_example": "block_permutation_table(features_df[passed], y, block_ids, seed=s, n_perm=P)；permutation-major，每次置換對全部候選欄一次 mann_whitney_table。",
+   "callers": [
+    "momentum/Analysis/ic_filter_orchestrator.py:5774"
+   ],
+   "branch_cell": "event_import"
+  },
+  {
+   "id": "api.services.case_import_service:EventImportService.import_records",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "api/services/case_import_service.py:1210",
+   "coverage_path_id": "ICPERF-T02-188",
+   "unit_axis": {
+    "axes": [
+     "events"
+    ],
+    "function": "n_events"
+   },
+   "scale_vector": [
+    "events"
+   ],
+   "call_example": "get_event_import_service().import_records(records, ...)；事件匯入（IC 分析前之事件批建檔），逐筆驗證與正規化。",
+   "callers": [
+    "api/routes（事件匯入端點；未逐一追查）"
+   ],
+   "branch_cell": "event_study"
+  },
+  {
+   "id": "api.services.case_import_service:EventImportService._analyze_with_projection",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": false,
+   "loop": "per_bar",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "api/services/case_import_service.py:1650",
+   "coverage_path_id": "ICPERF-T02-189",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "events"
+    ],
+    "function": "n_events*H*n_boot + rows（全 K 線驗證）"
+   },
+   "scale_vector": [
+    "rows",
+    "events"
+   ],
+   "call_example": "事件頁分析：get_event_import_service().analyze(import_id, req) → _analyze_with_projection；呼叫 pipeline.run_event_study_only_with_params 與 analyze_tables。",
+   "callers": [
+    "api/services/case_import_service.py:1570"
+   ],
+   "branch_cell": "event_study"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.pipeline:EventSamplePipeline.analyze_tables",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/pipeline.py:629",
+   "coverage_path_id": "ICPERF-T02-190",
+   "unit_axis": {
+    "axes": [
+     "rows",
+     "events"
+    ],
+    "function": "n_events*H*n_boot + rows*n_boot"
+   },
+   "scale_vector": [
+    "rows",
+    "events"
+   ],
+   "call_example": "create_event_sample_pipeline().analyze_tables(result, bars_by_tf, horizons=(1,2,4), seed=20260820, n_boot=300)。",
+   "callers": [
+    "api/services/case_import_service.py:1628",
+    "api/services/case_import_service.py:1916",
+    "api/services/case_import_service.py:1979"
+   ],
+   "branch_cell": "event_study"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.tables:event_forward_return_table",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/tables.py:178",
+   "coverage_path_id": "ICPERF-T02-191",
+   "unit_axis": {
+    "axes": [
+     "events"
+    ],
+    "function": "n_events*H*n_boot"
+   },
+   "scale_vector": [
+    "events"
+   ],
+   "call_example": "event_forward_return_table(manifest, receipts, bars_by_tf, split_plan, {'horizons': [...], 'seed': s, 'n_boot': n})。",
+   "callers": [
+    "momentum/Analysis/event_samples/pipeline.py:638"
+   ],
+   "branch_cell": "event_study"
+  },
+  {
+   "id": "momentum.Analysis.event_samples.all_bars_eval:evaluate_all_bars",
+   "stage": "event",
+   "input_axes": [
+    "rows"
+   ],
+   "ic_page": false,
+   "ic_first": false,
+   "loop": "per_group",
+   "measure": true,
+   "no_measure_reason": null,
+   "evidence": "momentum/Analysis/event_samples/all_bars_eval.py:97",
+   "coverage_path_id": "ICPERF-T02-192",
+   "unit_axis": {
+    "axes": [
+     "rows"
+    ],
+    "function": "rows*n_boot"
+   },
+   "scale_vector": [
+    "rows"
+   ],
+   "call_example": "evaluate_all_bars(scores_multiindex_series, bars_by_symbol, cfg, event_split_plan=plan, manifest=manifest)；以全部 K 線為分母。",
+   "callers": [
+    "momentum/Analysis/event_samples/pipeline.py:692"
+   ],
+   "branch_cell": "event_study"
+  }
+ ]
+}
