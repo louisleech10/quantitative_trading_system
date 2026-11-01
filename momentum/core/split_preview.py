@@ -120,6 +120,26 @@ def assert_epoch_ms_array(
     return arr.astype("int64")
 
 
+def epoch_ms_from_datetime_index(index: pd.DatetimeIndex, *, role: str) -> np.ndarray:
+    """`DatetimeIndex` → **epoch 毫秒 int64**，依索引**實際解析度**換算（ICPERF Task 0.4 ㊵）。
+
+    🔴 不得寫 `asi8 // 10**6`：pandas 2 之 `DatetimeIndex` 可為 s／ms／us／ns 任一解析度，`asi8` 是**該解析度**之整數，
+    只有 ns 時除以 10⁶ 才是毫秒（實測 `datetime64[s]` 之 `asi8` 為 1748534400，除後得 1748——不報錯）。
+    先 `as_unit("ns")` 統一再換算；tz-aware 之 `asi8` 本為 UTC 時刻。
+    NaT 或非整毫秒（會被截斷而把兩個不同時刻併成同一鍵）⇒ fail-closed。
+    """
+    idx = pd.DatetimeIndex(index)
+    if idx.hasnans:
+        raise ValueError(f"{role}: 索引含 NaT（fail-closed）")
+    ns = idx.as_unit("ns").asi8
+    if ns.size and bool(np.any(ns % 10 ** 6)):
+        n_bad = int(np.count_nonzero(ns % 10 ** 6))
+        raise ValueError(
+            f"{role}: {n_bad} 個時刻非整毫秒——換成毫秒鍵會截斷、把不同時刻併成同一鍵（fail-closed）"
+        )
+    return (ns // 10 ** 6).astype("int64")
+
+
 def epoch_ms_from_index(index: Any, *, role: str, strictly_increasing: bool = True) -> np.ndarray:
     """把索引正規化為 **epoch 毫秒 int64**（SPLITUNIFY 之唯一時鐘正規化器）。
 
@@ -131,10 +151,8 @@ def epoch_ms_from_index(index: Any, *, role: str, strictly_increasing: bool = Tr
     """
     idx = pd.Index(index)
     if isinstance(idx, pd.DatetimeIndex):
-        if idx.hasnans:
-            raise ValueError(f"{role}: 索引含 NaT（fail-closed）")
         return assert_epoch_ms_array(
-            (idx.asi8 // 10 ** 6).astype("int64"),
+            epoch_ms_from_datetime_index(idx, role=role),
             role=role,
             strictly_increasing=strictly_increasing,
         )
@@ -292,10 +310,8 @@ def holdout_boundary(
         # 🔴 `DatetimeIndex` **也要驗**——R2 我只補了數值分支，Datetime 分支直接繞過，
         #    等於只修了一半（`CODEX-R3-P1-01`／`GROK-R3-P1-01` 兩家獨立命中）。
         if isinstance(index, pd.DatetimeIndex):
-            if index.hasnans:
-                raise ValueError("holdout_boundary: feature_index 含 NaT（fail-closed）")
             assert_epoch_ms_array(
-                (index.asi8 // 10 ** 6).astype("int64"),
+                epoch_ms_from_datetime_index(index, role="holdout_boundary: feature_index"),
                 role="holdout_boundary: feature_index",
                 strictly_increasing=True,
             )
@@ -376,23 +392,34 @@ def count_binary_classes_in_rows(
     **已經算好的** `row_index`（orchestrator 的 `test_plan.row_index`），本函式只做計數 ——
     沒有第二份切分算術，就沒有可漂的東西。
 
-    `binary_labels` 之鍵＝特徵列時間戳（v7 R5-C9 之 last_bar_open_ms；**不是** feature_cutoff_ms），與 `feature_index` 同單位。
+    `binary_labels` 之鍵＝特徵列時間戳之 **epoch 毫秒**（v7 R5-C9 之 last_bar_open_ms；**不是** feature_cutoff_ms）。
+    `feature_index`：`DatetimeIndex`（任一解析度、tz-aware 取 UTC 時刻）或 **epoch 毫秒**整數。
     不在 `feature_index` 上的鍵（期間對齊時已被剔除的事件）不計入，也不 raise。
+
+    🔴 **單一時鐘、單位不明 fail-closed**（ICPERF Task 0.4 ㊵）：兩側一律先換成 epoch 毫秒 int64 再比對。
+    原版對非 `DatetimeIndex` 「原值比對」——IC 交接 h5 之索引是 epoch **秒**（事件路徑無 labels 檔時 stage0 不轉
+    DatetimeIndex），秒對毫秒鍵全表命中 0 ⇒ auto 靜默退回報酬版、明示 imported_binary 誤拒，皆不報錯
+    （真實 L 格事件批實測）。現在 int 秒、混合單位、NaN、非整數、非整毫秒之 `DatetimeIndex` 與秒單位之標籤鍵
+    一律 raise（`assert_epoch_ms_array`／`epoch_ms_from_datetime_index`）；秒須由呼叫端**明確**換算後再傳。
     """
     if binary_labels is None:
         return None
+    if binary_labels:
+        assert_epoch_ms_array(
+            np.fromiter((int(k) for k in binary_labels), dtype="int64", count=len(binary_labels)),
+            role="count_binary_classes_in_rows: binary_labels 之鍵",
+        )
     index = pd.Index(feature_index)
     rows = np.asarray(row_index, dtype=int)
     if len(rows) == 0:
         return {"n_pos": 0, "n_neg": 0}
     selected_index = index[rows]
-    # 🔴 `binary_labels` 之鍵是 **epoch 毫秒整數**，而特徵索引通常是 `DatetimeIndex`
-    #    （內部 ns）。不換算就永遠對不上 ⇒ 計數恆為 0 ⇒ 明示模式恆 raise、auto 恆退回報酬版，
-    #    而且**不會拋任何例外**。本 bug 由 Task 3.4 的 selection-scope 測試抓出來。
+    role = "count_binary_classes_in_rows: feature_index"
     if isinstance(selected_index, pd.DatetimeIndex):
-        selected = set((selected_index.asi8 // 10**6).astype("int64").tolist())
+        selected_ms = epoch_ms_from_datetime_index(selected_index, role=role)
     else:
-        selected = set(np.asarray(selected_index).tolist())
-    n_pos = sum(1 for key, lab in binary_labels.items() if int(lab) == 1 and key in selected)
-    n_neg = sum(1 for key, lab in binary_labels.items() if int(lab) == 0 and key in selected)
+        selected_ms = assert_epoch_ms_array(np.asarray(selected_index), role=role)
+    selected = set(selected_ms.tolist())
+    n_pos = sum(1 for key, lab in binary_labels.items() if int(lab) == 1 and int(key) in selected)
+    n_neg = sum(1 for key, lab in binary_labels.items() if int(lab) == 0 and int(key) in selected)
     return {"n_pos": int(n_pos), "n_neg": int(n_neg)}

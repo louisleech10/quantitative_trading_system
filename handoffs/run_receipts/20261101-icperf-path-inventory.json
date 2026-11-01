@@ -1,8 +1,8 @@
 {
  "schema": "icperf-t02-path-inventory/2",
- "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.55",
+ "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.56",
  "source": "scripts/icperf_path_inventory.json",
- "source_sha256": "d8b9f04070cf69dc0a8c56170931a5182188758ddb1bf35d384ca358fa9fa609",
+ "source_sha256": "1ec850c223ee3ebf0b5d9198116a27699cba45b797fc660978343f5fbf0eb8de",
  "schema_note": "ICPERF Task 0.2 路徑清冊草稿（改前，讀碼產出；未實跑任何量測）。範圍依 docs/ICPERF_SPEC.md:100。軸定義：rows＝列數；input_cols＝第 0 段讀入欄數；stage_cols＝實際進入該段之欄數；survivors＝第 6 段倖存欄數（深度分析預設選欄＝倖存欄）；survivor_pairs＝倖存欄兩兩配對數（≈survivors^2/2）。W＝滾動窗長、H＝衰減 horizon 數、G＝分組數、B＝bootstrap 次數、P＝置換次數，皆為設定常數，不入 scale_vector。 v5.50（2026-11-01）定稿：scale_vector 另可含 events（事件數）、symbols（標的數）、timestamps（跨標的時點數）——依 unit_axis.function 之 n_events／n_symbols／n_timestamps 機械導出（SPEC v5.49 處置④）；input_axes 仍 ⊆ cols／rows／passed_cols。branch_cell＝量測該入口之路徑實跑或直接呼叫格之 id（見 branch_cells）；measure=false 者為 null。run_ic_first 外層依 SPEC v5.50 (c) 不量。 v5.52 (b)（2026-11-01）：事件型路徑之事件樣本列數不記為 rows——event_import／event_study 之入口 rows 若實為事件數 ⇒ input_axes 移除 rows、scale_vector／unit_axis 改 events；input_axes 可為空（僅限 scale_vector 含 events：該入口只隨事件數變）。fixed_axes（選填，{軸: 碼證理由}）＝該路徑內不隨任何請求規模變之軸（事件路徑之 K 線根數），不入 input_axes、不排量測軸，只以觀測值記於 scale_vector。 v5.53 (c0)（2026-11-01，code review r64）：事件路徑之 K 線根數為成本軸（unit_axis.axes 含 rows 之事件入口，如 evaluate_all_bars rows*n_boot）⇒ 該 8 入口之 fixed_axes.rows 移除，由 harness 以隔離 K 線快取複本之三種根數量 rows 軸（`icperf_scale_harness.entry_runs`／`prepare_event_bars`）；input_axes 仍不記 rows（rows 由 unit_axis 判定）；fixed_axes 不得含 unit_axis.axes 之軸（`inventory_problems`）。",
  "branch_cells": {
   "ic_page_default": "C 格 N 欄巢狀子集＋IC 頁預設請求 analyze（第 0–7 段）；存直接呼叫格之各段真實輸入",
@@ -29,7 +29,10 @@
   "orthogonalize_pca": "存檔正交化輸入（gram_schmidt 之 factors）＋同一 FactorOrthogonalizer，pca_orthogonalize（factor_orthogonalization.method=pca 之分支，ic_filter_orchestrator.py:3680-3682）",
   "exposure_beta_neutral": "存檔中和輸入（neutralize_factor_matrix 之 factor_values、market_proxy）＋同一 FactorExposureAnalyzer，mode=beta_neutral（factor_exposure_analyzer.py:117-118）",
   "param_sensitivity_family": "存檔參數敏感度輸入（batch_analyze 之 self／labels／metadata／方法／方向；入選欄）＋同一路徑第 1 段輸出中產品 detect_feature_families 所得之最小完整家族（≥ min_family_size）併入後 batch_analyze（同請求方法；parameter_sensitivity_analyzer.py:178-181）",
-  "param_sensitivity_pearson": "同上，method=pearson（非 spearman 之 _rolling_corr 分支，parameter_sensitivity_analyzer.py:273-276）"
+  "param_sensitivity_pearson": "同上，method=pearson（非 spearman 之 _rolling_corr 分支，parameter_sensitivity_analyzer.py:273-276）",
+  "redundancy_greedy_rows": "存檔第 6 段冗餘輸入（RL<cols>_rows<R>：固定 RL<cols>_rows<最小 R> 之欄集合、值取該 R 點第 1 段輸出之測試段列、IC 分數同 R 點）＋同一 RedundancyFilter，產品預設 method（rows 軸專用）",
+  "param_sensitivity_families": "存檔參數敏感度輸入（DL<cols>_rows<L 格全長> 之 batch_analyze 參數）＋L 格 2,000 欄第 1 段輸出（ic_page_long cols 2000 之存檔 L2000/preprocess）中產品 detect_feature_families 之 ≥3 員家族取 F 族、每族 3 員（只含家族成員欄）＋同一分析器 batch_analyze（同請求方法）",
+  "param_sensitivity_families_pearson": "同上，method=pearson（_rolling_corr 分支之家族數軸）"
  },
  "open_questions": [
   "SPEC 行號已過期：docs/ICPERF_SPEC.md:100 寫 pit_expanding_bounds（:371）、pit_expanding_quantile_thresholds（:416）、pit_expanding_mean_std（:467）、pit_expanding_mad（:511）、factor_return_analyzer.py:319-366；現行 HEAD 實為 pit_stats.py:410、:455、:506、:550 與 factor_return_analyzer.py:354（_pit_expanding_position 定義）。是否需於 SPEC 更正。",
@@ -4061,7 +4064,7 @@
      "rows",
      "survivors"
     ],
-    "function": "family_size*rows*W*log(W)"
+    "function": "survivors*rows*W*log(W)（每族一次呼叫、每次 family_size·rows·W·log(W)；survivors＝n_families×family_size。SPEC v5.56 (o)：家族數軸＝變體 param_sensitivity_families:families〔L 格真實家族、每族 3 員、rows＝L 格全長、家族數三點；calls＝家族數〕；rows 軸＝單族列成長）"
    },
    "scale_vector": [
     "rows",
@@ -4092,7 +4095,7 @@
      "rows",
      "survivors"
     ],
-    "function": "family_size*rows*W*log(W)"
+    "function": "survivors*rows*W*log(W)（每族一次呼叫、每次 family_size·rows·W·log(W)；survivors＝n_families×family_size。SPEC v5.56 (o)：家族數軸＝變體 param_sensitivity_families:families；rows 軸＝單族列成長）"
    },
    "scale_vector": [
     "rows",
@@ -4123,7 +4126,7 @@
      "rows",
      "survivors"
     ],
-    "function": "family_size*rows*W（Python 逐窗 × 逐欄雙層迴圈）"
+    "function": "survivors*rows*W（Python 逐窗 × 逐欄雙層迴圈；每族一次、survivors＝n_families×family_size。SPEC v5.56 (o)：家族數軸＝變體 param_sensitivity_families_pearson:families；rows 軸＝單族列成長）"
    },
    "scale_vector": [
     "rows",
@@ -4934,7 +4937,7 @@
      "rows",
      "survivors"
     ],
-    "function": "survivors*rows*W"
+    "function": "survivors*rows*W（SPEC v5.56 (p)：非預設分支——post_ic_transform 同一實跑內以 FFACT_L65_CHUNK_SIZE=8〔< 倖存欄數〕再呼叫一次 _apply_transforms_sync、Recorder.restricted 只記本入口；塊數＝⌈survivors／8⌉）"
    },
    "scale_vector": [
     "rows",

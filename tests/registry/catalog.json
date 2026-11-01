@@ -1668,6 +1668,26 @@
    "rewrite_targets": [],
    "ticket": "IC-HC"
   },
+  "tests/api/test_icperf_feature_filter_split_metadata.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A12",
+    "A2",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_icperf_feature_filter_split_metadata.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/api/test_icperf_feature_metadata.py": {
    "claim": [
     "correctness"
@@ -9515,6 +9535,27 @@
     "TOLERANCE"
    ],
    "path": "tests/momentum/Analysis/test_icperf_diversification_constraint.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_event_binary_clock.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A2",
+    "A6",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_event_binary_clock.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],

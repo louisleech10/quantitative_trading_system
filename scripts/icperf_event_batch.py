@@ -51,12 +51,32 @@ def _cell_window() -> Dict[str, Any]:
             "output_window": list(side["output_window"]), "source": side["source"]}
 
 
-def build_records(cell: Dict[str, Any]) -> Dict[str, Any]:
-    """依模組說明之規則自真實 kline 建事件列；回 {"records", "kline_digest", "n_bars"}。"""
+#: 突破基準欄（`prior_field`）之可選值；預設 "high"＝凍結批之規則
+PRIOR_FIELDS = ("high", "close")
+
+
+def rule_id(breakout_bars: int = BREAKOUT_BARS, prior_field: str = "high") -> str:
+    """明列規則之 id（參數皆預設＝凍結批 ⇒ 等於 `RULE_ID`）。"""
+    return f"icperf-t03:breakout{int(breakout_bars)}:close_gt_prior_{prior_field}:h{HORIZON_BARS}"
+
+
+def build_records(cell: Dict[str, Any], breakout_bars: int = BREAKOUT_BARS, prior_field: str = "high") -> Dict[str, Any]:
+    """依模組說明之規則自真實 kline 建事件列；回 {"records", "kline_digest", "n_bars"}。
+
+    `breakout_bars`、`prior_field`（ICPERF SPEC v5.56 Task 0.2 (n) 新增之參數；預設＝`BREAKOUT_BARS`、"high"，凍結批
+    〔§G (7)〕之行為與記錄逐位元不變）：規則族「close > 前 N 根 `prior_field` 最大值」之 N 與基準欄（high／close）。Task 0.2
+    事件數軸以較密之規則於同一 L 格窗產生較長之事件批（只於量測之隔離儲存根匯入，不寫 `data_cache/events`、不覆蓋凍結批
+    `EVENT_IMPORT_ID`）。"""
     import h5py
     import numpy as np
     import pandas as pd
 
+    breakout_bars = int(breakout_bars)
+    if breakout_bars < 1:
+        raise ValueError(f"breakout_bars 須 ≥ 1，實得 {breakout_bars}")
+    if prior_field not in PRIOR_FIELDS:
+        raise ValueError(f"prior_field 須為 {PRIOR_FIELDS} 之一，實得 {prior_field!r}")
+    rid = rule_id(breakout_bars, prior_field)
     with h5py.File(cell["source"], "r") as f:
         data = f[f"{cell['symbol']}/{cell['timeframe']}/data"][:]
     ts = data["timestamp"].astype("int64")
@@ -65,7 +85,7 @@ def build_records(cell: Dict[str, Any]) -> Dict[str, Any]:
     frame = pd.DataFrame({"high": data["high"].astype("float64"), "close": data["close"].astype("float64")}, index=idx)
     start, end = (pd.Timestamp(t) for t in cell["output_window"])
     win = frame.loc[start:end]
-    prior_high = frame["high"].shift(1).rolling(BREAKOUT_BARS, min_periods=BREAKOUT_BARS).max().loc[start:end]
+    prior_high = frame[prior_field].shift(1).rolling(breakout_bars, min_periods=breakout_bars).max().loc[start:end]
     future_close = win["close"].shift(-HORIZON_BARS)
     t0_ms = (win.index.asi8 // 1_000_000).astype("int64")
     kline_digest = hashlib.sha256(np.ascontiguousarray(data).tobytes()).hexdigest()
@@ -78,9 +98,9 @@ def build_records(cell: Dict[str, Any]) -> Dict[str, Any]:
             "timeframe": cell["timeframe"], "t0": int(t0_ms[i]), "decision_offset_bars": 0,
             "entry_price_semantic": "trigger_close", "direction": "long", "scenario": "B",
             "label": int(future_close.iloc[i] > close),
-            "label_definition": {"rule_id": RULE_ID, "label_return_mode": "close_to_close",
+            "label_definition": {"rule_id": rid, "label_return_mode": "close_to_close",
                                  "window": {"horizon_bars": HORIZON_BARS},
-                                 "canonical_digest": hashlib.sha256(RULE_ID.encode("utf-8")).hexdigest()},
+                                 "canonical_digest": hashlib.sha256(rid.encode("utf-8")).hexdigest()},
             "control_kind": "user_labeled_same_trigger", "label_origin": "platform_generator",
             "source_file_digest": kline_digest,
             "data_snapshot_digest": f"kline_cache:{cell['symbol']}:{cell['timeframe']}:{int(ts[-1])}",

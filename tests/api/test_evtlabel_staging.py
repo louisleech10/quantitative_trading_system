@@ -87,10 +87,20 @@ def test_single_bad_row_poisons_the_whole_batch():
 # ══════════════════════════════════════════════════════════════════════════
 
 
+#: ICPERF Task 0.4 ㊵：計數函式改為單一時鐘（epoch 毫秒）、單位不明 fail-closed ⇒ 本節輸入改用 epoch 毫秒
+#: （原為無單位小整數 `range(100)`；期望值不變）。第 i 列＝`_MS0 + i` 小時。
+_MS0 = 1_700_000_000_000
+_H = 3_600_000
+
+
+def _ms(i: int) -> int:
+    return _MS0 + i * _H
+
+
 def test_counts_only_rows_handed_in():
     """只數交進來的那些列；訓練段與隔離區的不算——因為它們根本不在 row_index 裡。"""
-    index = list(range(100))
-    labels = {80: 1, 84: 0, 85: 1, 90: 1, 95: 0}
+    index = [_ms(i) for i in range(100)]
+    labels = {_ms(80): 1, _ms(84): 0, _ms(85): 1, _ms(90): 1, _ms(95): 0}
     out = count_binary_classes_in_rows(labels, index, list(range(85, 100)))
     assert out == {"n_pos": 2, "n_neg": 1}
 
@@ -118,17 +128,20 @@ def test_counting_has_no_split_arithmetic_of_its_own():
 
 def test_counting_returns_none_when_no_binary_labels():
     """沒有 0/1 ⇒ None（與「有 0/1 但一個都沒落在測試段」＝(0,0) 是兩件事）。"""
-    assert count_binary_classes_in_rows(None, list(range(10)), [1, 2]) is None
-    assert count_binary_classes_in_rows({}, list(range(10)), [1, 2]) == {"n_pos": 0, "n_neg": 0}
+    index = [_ms(i) for i in range(10)]
+    assert count_binary_classes_in_rows(None, index, [1, 2]) is None
+    assert count_binary_classes_in_rows({}, index, [1, 2]) == {"n_pos": 0, "n_neg": 0}
 
 
 def test_counting_empty_row_index_returns_zeros():
-    assert count_binary_classes_in_rows({5: 1}, list(range(10)), []) == {"n_pos": 0, "n_neg": 0}
+    assert count_binary_classes_in_rows({_ms(5): 1}, [_ms(i) for i in range(10)], []) == {"n_pos": 0, "n_neg": 0}
 
 
 def test_counting_ignores_labels_not_on_the_feature_index():
     """事件時間戳若已被期間對齊剔除 ⇒ 不計入，也不 raise。"""
-    out = count_binary_classes_in_rows({999999: 1, 90: 0}, list(range(100)), list(range(80, 100)))
+    out = count_binary_classes_in_rows(
+        {_ms(999999): 1, _ms(90): 0}, [_ms(i) for i in range(100)], list(range(80, 100))
+    )
     assert out == {"n_pos": 0, "n_neg": 1}
 
 

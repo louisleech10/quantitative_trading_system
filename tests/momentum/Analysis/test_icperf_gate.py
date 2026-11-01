@@ -3745,43 +3745,11 @@ def test_task02_v555_deep_zero_call_cells(harness: Any, tmp_path: Path, monkeypa
 
 
 def test_task02_v555_event_scales_from_split_precheck(fb: Any, harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
-    """SPEC v5.55 (g2)：事件數軸三點由切分預檢選出（不再為 K//4、K//2、K）——`event_axis_precheck` 以產品五階段編排之列鍵與
-    切分求每一前 n 筆之測試段事件數，可達（≥ min_test_events）者取首、中、末，三點各重跑編排與切分複驗；可達點 < 3 ⇒ ok False，
-    凍結腳本開跑前 FreezeError。秒級：本測試以替身取代資料讀取（產品函式之真實資料跑見 `precheck-events` CLI）。"""
-    import contextlib
+    """SPEC v5.55 (g2)：凍結腳本之事件數軸三點取自切分預檢——`_event_scales` 預檢 ok 時回其三點、不成立時 FreezeError；
+    `measure_inventory` 之 events 軸經 `_event_scales(h, root)`。預檢本身之選點與產品實跑判定（v5.56 (j)(n)：等距抽樣、
+    產品計數鏈、effective mode 與二元三入口 calls）由 `test_task02_v556_event_precheck_product_chain` 與
+    `test_task02_v556_event_axis_dense_batch_equidistant` 驗；本測試原「前 n 筆、不經產品實跑」之斷言隨 v5.56 退役。"""
     import inspect
-
-    k_total = 40
-    records = [{"event_id": f"e{i}", "t0": i} for i in range(k_total)]
-    monkeypatch.setattr(harness, "_event_batch_records", lambda n: records[:n] if n else list(records))
-    monkeypatch.setattr(harness, "_limited_request", lambda item, cell, n: {"run_dir": "x", "timeframe": "4h"})
-
-    @contextlib.contextmanager
-    def iso(root: Path, tag: str) -> Any:
-        yield tmp_path
-
-    monkeypatch.setattr(harness, "_prepare_isolation", iso)
-    test_from = 30  # 第 30 筆起落在測試段
-
-    def stage(recs: Sequence[Mapping[str, Any]], work: Path, request: Any, manifest: Path) -> Dict[str, Any]:
-        return {"event_label_owners": {int(r["t0"]): r["event_id"] for r in recs},
-                "event_timestamps": [int(r["t0"]) for r in recs]}
-
-    def counts(staged: Mapping[str, Any], request: Any, manifest: Path, keys: Any = None) -> Dict[str, Any]:
-        ks = list(staged["event_timestamps"] if keys is None else keys)
-        test = sum(1 for x in ks if x >= test_from)
-        return {"oos": test >= floor, "test_events": test, "train_events": len(ks) - test}
-
-    monkeypatch.setattr(harness, "_event_stage", stage)
-    monkeypatch.setattr(harness, "event_split_counts", counts)
-    floor = 3
-    res = harness.event_axis_precheck(tmp_path)
-    assert res["ok"] is True and res["reachable_range"] == [33, 40, 8]
-    assert res["scales"] == [33, 36, 40] and all(p["oos"] for p in res["points"])
-    assert res["scales"] != sorted({k_total // 4, k_total // 2, k_total})
-    floor = 9  # 只剩 2 個可達點（前 39、40 筆）
-    bad = harness.event_axis_precheck(tmp_path)
-    assert bad["ok"] is False and bad["scales"] == [] and "< 3" in bad["reason"]
 
     class H:
         def __init__(self, out: Dict[str, Any]) -> None:
@@ -3818,3 +3786,473 @@ def test_task02_v555_three_points_always_run(fb: Any, harness: Any) -> None:
         pts = harness.axis_scales(run_id, axis, cols_scales=(500, 1000, 2000), row_scales=(1000, 1500, 2000),
                                   event_scales=(192, 197, 203), survivor_scales=(12, 30, 55))
         assert len(pts) == 3 and len(set(pts)) == 3, (run_id, axis, pts)
+
+
+# ── SPEC v5.56 (j)–(p)（code review r67 處置）：量測工具 ────────────────────────────────────────────────────────
+
+
+def _v556_events(k: int, test_from: int, pos_every: int = 2) -> List[Dict[str, Any]]:
+    """合成事件（t0＝epoch 毫秒等距；第 `test_from` 筆起之 t0 落在測試段；標籤每 `pos_every` 筆一個 1）。"""
+    return [{"event_id": f"e{i}", "t0": 1_700_000_000_000 + i * 3_600_000, "label": int(i % pos_every == 0)}
+            for i in range(k)]
+
+
+def test_task02_v556_event_precheck_product_chain(harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """SPEC v5.56 (j)：事件數軸預檢走產品之同一計數鏈——①兩類計數經產品 `split_preview.count_binary_classes_in_rows`（以 run 之
+    post-trim 時間軸〔DatetimeIndex〕之測試段／訓練段列位置呼叫；spy 證其被呼叫且結果＝自寫 oracle）；②三點複驗另以產品實跑
+    （`event_point_product_check`）斷言 effective mode＝imported_binary 且二元三入口 calls ≥ 1，任一點不成立 ⇒ ok False；
+    ③單點判定 `event_product_verdict` 為純函式（例外、非 imported_binary、任一入口 0 呼叫皆不成立）。
+    mutation：①改回自寫鍵比對（不呼叫產品函式）⇒ spy 0 呼叫（紅）；②刪除產品實跑之 effective 斷言 ⇒ return_rule 情境回 ok True
+    （紅）；③verdict 忽略 calls ⇒ 缺呼叫情境回 ok True（紅）。"""
+    import momentum.core.split_preview as sp
+
+    # ① 產品計數函式（plan 直接給：DatetimeIndex 10 列、末 4 列測試段、前 5 列訓練段）
+    idx = pd.date_range("2024-01-01", periods=10, freq="4h")
+    ms = (idx.asi8 // 10 ** 6).astype("int64")
+    plan = {"index": idx, "ms": ms, "test_rows": [6, 7, 8, 9], "train_rows": [0, 1, 2, 3, 4], "min_test_events": 2,
+            "min_events_per_class": 1, "purge_rows": 1, "embargo_rows": 0, "split_reason": None}
+    labels = {int(ms[i]): int(i % 2) for i in (0, 2, 3, 6, 7, 9)}
+    staged = {"event_timestamps": list(labels), "event_binary_labels": labels}
+    seen: List[Any] = []
+    orig = sp.count_binary_classes_in_rows
+
+    def spy(b: Any, fi: Any, rows: Any) -> Any:
+        seen.append((type(pd.Index(fi)).__name__, list(np.asarray(rows))))
+        return orig(b, fi, rows)
+
+    monkeypatch.setattr(sp, "count_binary_classes_in_rows", spy)
+    got = harness.event_split_counts(staged, {}, Path("x"), plan=plan)
+    oracle_test = [labels[int(ms[i])] for i in (6, 7, 9)]
+    oracle_train = [labels[int(ms[i])] for i in (0, 2, 3)]
+    assert (got["test_events"], got["test_pos"], got["test_neg"]) == (3, sum(oracle_test), 3 - sum(oracle_test))
+    assert (got["train_events"], got["train_pos"], got["train_neg"]) == (3, sum(oracle_train), 3 - sum(oracle_train))
+    assert got["oos"] and got["binary"] and got["count_function"].endswith("count_binary_classes_in_rows")
+    assert ("DatetimeIndex", [6, 7, 8, 9]) in seen and ("DatetimeIndex", [0, 1, 2, 3, 4]) in seen
+    sub = harness.event_split_counts(staged, {}, Path("x"), [int(ms[6]), int(ms[0])], plan=plan)
+    assert (sub["test_events"], sub["test_pos"] + sub["test_neg"]) == (1, 1)  # 子集只計其鍵
+
+    # ② 預檢之三點產品實跑斷言（資料讀取以替身；產品實跑之真實資料見 `precheck-events` CLI）
+    records = _v556_events(40, 30)
+    monkeypatch.setattr(harness, "_event_axis_batch", lambda: [dict(r) for r in records])
+    monkeypatch.setattr(harness, "_limited_request", lambda item, cell, n: {"run_dir": "x", "timeframe": "4h"})
+
+    import contextlib
+
+    @contextlib.contextmanager
+    def iso(root: Path, tag: str) -> Any:
+        yield tmp_path
+
+    monkeypatch.setattr(harness, "_prepare_isolation", iso)
+    monkeypatch.setattr(harness, "_event_stage", lambda recs, work, req, man: {
+        "event_label_owners": {int(r["t0"]): r["event_id"] for r in recs},
+        "event_timestamps": [int(r["t0"]) for r in recs],
+        "event_binary_labels": {int(r["t0"]): int(r["label"]) for r in recs}})
+    t_test = int(records[30]["t0"])
+
+    def counts(staged: Mapping[str, Any], request: Any, manifest: Path, keys: Any = None, **kw: Any) -> Dict[str, Any]:
+        ks = list(staged["event_timestamps"] if keys is None else keys)
+        lab = staged["event_binary_labels"]
+        test = [k for k in ks if k >= t_test]
+        pos = sum(lab[k] for k in test)
+        return {"oos": len(test) >= 3, "binary": min(pos, len(test) - pos) >= 1, "test_events": len(test),
+                "train_events": len(ks) - len(test), "test_pos": pos, "test_neg": len(test) - pos}
+
+    monkeypatch.setattr(harness, "event_split_counts", counts)
+    full_calls = {e: 2 for e in harness.EVENT_BINARY_ENTRIES}
+    verdicts: Dict[str, Any] = {}
+    monkeypatch.setattr(harness, "event_point_product_check", lambda recs, work, req: {
+        **harness.event_product_verdict({"effective": verdicts["mode"]}, verdicts["calls"], None), "n": len(recs)})
+    verdicts.update(mode="return_rule", calls=full_calls)
+    bad = harness.event_axis_precheck(tmp_path)
+    assert bad["ok"] is False and len(bad["scales"]) == 3 and "imported_binary" in bad["reason"]
+    assert all(p["product"]["effective_mode"] == "return_rule" for p in bad["points"])
+    verdicts.update(mode="imported_binary")
+    good = harness.event_axis_precheck(tmp_path)
+    assert good["ok"] is True and good["verified_by_product_run"] is True
+    assert all(p["product"]["ok"] for p in good["points"])
+    assert len(bad["attempts"]) == 3  # effective 錯誤（系統性）⇒ 不沿候選續試
+    assert harness.event_axis_precheck(tmp_path, verify=False)["ok"] is False  # 未經產品實跑不得據以開跑
+    # 首選低點因該子集之候選欄使二元某入口 0 呼叫 ⇒ 沿候選序列向中點續試（產品實跑判定），不以 0 呼叫充數
+    lo = good["reachable_range"][0]
+    miss0 = {**full_calls, harness.EVENT_BINARY_ENTRIES[1]: 0}
+    monkeypatch.setattr(harness, "event_point_product_check", lambda recs, work, req: harness.event_product_verdict(
+        {"effective": "imported_binary"}, full_calls if len(recs) > lo + 1 else miss0, None))
+    moved = harness.event_axis_precheck(tmp_path)
+    assert moved["ok"] is True and moved["scales"][0] > lo + 1 and moved["scales"][1:] == good["scales"][1:]
+    assert any(a["role"] == "low" and a["n"] == lo and a["missing_calls"] for a in moved["attempts"])
+    cand = harness.event_point_candidates(list(range(100, 200)))
+    assert cand["low"][0] == 100 and cand["high"][0] == 199 and cand["mid"][0] == 149
+    assert max(cand["low"]) < 149 < min(cand["high"]) and all(len(v) <= harness.EVENT_PRECHECK_MAX_TRIES
+                                                             for v in cand.values())
+
+    # ③ 單點判定
+    v = harness.event_product_verdict
+    assert v({"effective": "imported_binary"}, full_calls, None)["ok"] is True
+    assert v({"effective": "imported_binary"}, full_calls, "ValueError: x")["ok"] is False
+    assert v({"effective": "return_rule"}, full_calls, None)["ok"] is False
+    miss = {**full_calls, harness.EVENT_BINARY_ENTRIES[0]: 0}
+    assert v({"effective": "imported_binary"}, miss, None)["missing_calls"] == [harness.EVENT_BINARY_ENTRIES[0]]
+    assert v({"effective": "imported_binary"}, miss, None)["ok"] is False
+    assert v(None, full_calls, None)["ok"] is False
+
+
+def test_task02_v556_event_axis_dense_batch_equidistant(harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """SPEC v5.56 (n)：事件數軸之 Task 0.2 專用批與等距抽樣——①`event_axis_subset` 取 round(linspace(0, K−1, n)) 之位置（含首末、
+    互異），測試段（時間末段）事件比例隨 n 保留（|比例差| ≤ 1/n＋1/K）；②`icperf_event_batch.build_records` 之新增參數不改凍結批
+    （預設 breakout＝6 之記錄與 rule_id 與不帶參數者逐位元相同），較小之 N 產生同規則族之較密批；③事件數軸兩路徑之子集來源＝
+    `_event_axis_records`（不取凍結批之前 n 筆、不寫 data_cache/events）。mutation：①改回前 n 筆 ⇒ 小 n 之測試段比例 0（紅）；
+    ②預設參數改變 ⇒ 凍結批記錄不等（紅）；③事件數軸改回 `_event_batch_records(n)` ⇒ 源碼斷言紅。"""
+    import h5py
+    import inspect
+
+    k, test_from = 200, 160
+    records = _v556_events(k, test_from)
+    full_frac = (k - test_from) / k
+    for n in (20, 50, 77, 120, 200):
+        sub = harness.event_axis_subset(list(reversed(records)), n)  # 輸入順序不影響（依 t0 排序）
+        assert len(sub) == n and sub[0]["event_id"] == "e0" and sub[-1]["event_id"] == f"e{k - 1}"
+        assert len({r["event_id"] for r in sub}) == n
+        frac = sum(1 for r in sub if int(r["event_id"][1:]) >= test_from) / n
+        assert abs(frac - full_frac) <= 1.0 / n + 1.0 / k, (n, frac)
+    with pytest.raises(harness.HarnessError):
+        harness.event_axis_subset(records, k + 1)
+    assert harness.EVENT_AXIS_SAMPLING.startswith("等距抽樣")
+
+    # ② 建批參數（tmp 真實形狀之 kline 結構陣列；只驗建批碼之參數語意，非資料驗證）
+    eb = harness._load_script("icperf_t02_event_batch", "scripts/icperf_event_batch.py")
+    n_bars = 400
+    rng = np.random.default_rng(3)
+    close = 100.0 + np.cumsum(rng.normal(size=n_bars))
+    arr = np.zeros(n_bars, dtype=[("timestamp", "<i8"), ("high", "<f8"), ("close", "<f8")])
+    arr["timestamp"] = 1_700_000_000_000 + np.arange(n_bars) * 14_400_000
+    arr["close"], arr["high"] = close, close + np.abs(rng.normal(size=n_bars))
+    src = tmp_path / "k.h5"
+    with h5py.File(src, "w") as f:
+        f.create_dataset("BTCUSDT/4h/data", data=arr)
+    ts = pd.to_datetime(arr["timestamp"], unit="ms", utc=True)
+    cell = {"cell": "L", "symbol": "BTCUSDT", "timeframe": "4h", "source": str(src),
+            "output_window": [ts[50].isoformat(), ts[-1].isoformat()]}
+    frozen = eb.build_records(cell)
+    assert frozen == eb.build_records(cell, breakout_bars=eb.BREAKOUT_BARS, prior_field="high")
+    assert eb.rule_id() == eb.RULE_ID == eb.rule_id(eb.BREAKOUT_BARS, "high")
+    assert all(r["label_definition"]["rule_id"] == eb.RULE_ID for r in frozen["records"])
+    dense = eb.build_records(cell, breakout_bars=harness.EVENT_AXIS_BREAKOUT_BARS,
+                             prior_field=harness.EVENT_AXIS_PRIOR_FIELD)
+    assert harness.EVENT_AXIS_BREAKOUT_BARS < eb.BREAKOUT_BARS and harness.EVENT_AXIS_PRIOR_FIELD in eb.PRIOR_FIELDS
+    assert len(dense["records"]) > len(frozen["records"])
+    assert {r["label_definition"]["rule_id"] for r in dense["records"]} == \
+        {eb.rule_id(harness.EVENT_AXIS_BREAKOUT_BARS, harness.EVENT_AXIS_PRIOR_FIELD)} != {eb.RULE_ID}
+    # 規則語意（oracle 自寫）：close > 前 N 根 prior_field 最大值、t+12 根在窗內
+    win = pd.DataFrame({"high": arr["high"], "close": arr["close"]}, index=ts)
+    lvl = win[harness.EVENT_AXIS_PRIOR_FIELD].shift(1).rolling(harness.EVENT_AXIS_BREAKOUT_BARS).max()
+    w = win.loc[ts[50]:]
+    hit = [int(t.value // 10 ** 6) for i, t in enumerate(w.index)
+           if w["close"].iloc[i] > lvl.loc[t] and i + eb.HORIZON_BARS < len(w)]
+    assert [r["t0"] for r in dense["records"]] == hit
+    with pytest.raises(ValueError):
+        eb.build_records(cell, breakout_bars=0)
+    with pytest.raises(ValueError):
+        eb.build_records(cell, prior_field="open")
+
+    # ③ 兩路徑之事件數軸子集來源
+    for fn in (harness._run_event_import, harness._run_event_study):
+        src_code = inspect.getsource(fn)
+        assert "_event_axis_records(" in src_code, fn.__name__
+        assert "EVENT_IMPORT_ID" not in src_code
+    monkeypatch.setattr(harness, "_event_axis_batch", lambda: [dict(r) for r in records])
+    assert [r["event_id"] for r in harness._event_axis_records(20)] == \
+        [r["event_id"] for r in harness.event_axis_subset(records, 20)]
+
+
+def _v556_stage6_cap(harness: Any, frame: pd.DataFrame, scores: Mapping[str, float]) -> Dict[str, Any]:
+    from momentum.Analysis.redundancy_filter import RedundancyFilter
+
+    return {"self": RedundancyFilter({}), "args": (frame, dict(scores)), "kwargs": {"method": "greedy"},
+            "provenance": {"path_run_id": "x"}}
+
+
+def test_task02_v556_redundancy_rows_fixed_column_set(harness: Any, scale_probe: Any, tmp_path: Path,
+                                                       monkeypatch: Any) -> None:
+    """SPEC v5.56 (k)：冗餘格 rows 軸只變列數——①各 R 點之第 6 段輸入欄＝最小 rows 點之欄集合（值取該 R 點第 1 段輸出之測試段
+    列、IC 分數同 R 點且限固定欄；該 R 點自身第 6 段輸入於共同欄須與第 1 段輸出逐值相等，否則拒收）；②`RedundancyFilter.filter`
+    ／`compute_correlation_matrix` 之 rows 軸改由 `redundancy_greedy_rows`（ROW_AXIS_ENTRY_RUN）；③組裝斷言 rows 軸各點欄集合身分
+    與欄數相同；④紀錄頂層 `threshold_branch` 取路徑事實之實際分支。mutation：①改讀 R 點自身欄集合 ⇒ 欄集合不同（紅）；
+    ②刪 ROW_AXIS_ENTRY_RUN ⇒ 第二軸回 ic_page_relaxed（紅）；③組裝不比欄集合 ⇒ 不同欄集合仍組成（紅）；④頂層固定 default
+    ⇒ post_ic rows non_default 紀錄為 default（紅）。"""
+    rng = np.random.default_rng(11)
+    cols_all = [f"f{i}" for i in range(6)]
+
+    def full(rows: int) -> pd.DataFrame:
+        idx = pd.Index(1_700_000_000 + np.arange(rows) * 14_400, dtype="int64")  # 第 1 段輸出之 epoch 秒
+        return pd.DataFrame(rng.normal(size=(rows, len(cols_all))).astype("float32"), index=idx, columns=cols_all)
+
+    pre = {1000: full(20), 1500: full(30)}
+
+    def stage6(rows: int, cols: Sequence[str], corrupt: bool = False) -> pd.DataFrame:
+        f = pre[rows]
+        out = f.iloc[-5:][list(cols)].copy()
+        out.index = pd.to_datetime(out.index.to_numpy(dtype="int64"), unit="s")
+        if corrupt:
+            out.iloc[0, 0] = np.float32(out.iloc[0, 0] + 1.0)
+        return out
+
+    scores = {c: float(i) for i, c in enumerate(cols_all)}
+    caps = {("RL500_rows1000", "redundancy_filter"): _v556_stage6_cap(harness, stage6(1000, ["f0", "f1", "f2"]), scores),
+            ("RL500_rows1500", "redundancy_filter"): _v556_stage6_cap(harness, stage6(1500, ["f1", "f2", "f4", "f5"]),
+                                                                       scores),
+            ("RL500_rows1000", "preprocess"): {"result": (pre[1000], {})},
+            ("RL500_rows1500", "preprocess"): {"result": (pre[1500], {})}}
+    seen: List[str] = []
+
+    def fake_load(stage_dir: Path, name: str, expected: Any = None) -> Dict[str, Any]:
+        seen.append(Path(stage_dir).name)
+        return caps[(Path(stage_dir).name, name)]
+
+    monkeypatch.setattr(harness, "load_capture", fake_load)
+    monkeypatch.setattr(harness, "expected_stage_identity",
+                        lambda ctx, n_rows: {"subset": {"rows": n_rows, "n_cols": 500}, "writer": ["ic_page_relaxed", "rows"]})
+    ctx = _v555_ctx(harness, "redundancy_vif", "rows", 1500, tmp_path)
+    cap = harness.redundancy_stage_capture(ctx, "redundancy_filter")
+    frame, sc = cap["args"]
+    assert list(frame.columns) == ["f0", "f1", "f2"] and frame.shape[0] == 5 and set(sc) == {"f0", "f1", "f2"}
+    assert np.array_equal(frame.to_numpy(), pre[1500].iloc[-5:][["f0", "f1", "f2"]].to_numpy())
+    assert ctx.actual_scale == 1500 and cap["provenance"]["verified_overlap_columns"] == 2
+    ctx1 = _v555_ctx(harness, "redundancy_vif", "rows", 1000, tmp_path)
+    cap1 = harness.redundancy_stage_capture(ctx1, "redundancy_filter")
+    assert cap1["provenance"][harness.COLUMN_SET_KEY] == cap["provenance"][harness.COLUMN_SET_KEY]
+    facts = harness._cell_facts(ctx, cap)
+    assert facts[harness.COLUMN_SET_KEY] == cap["provenance"][harness.COLUMN_SET_KEY] and facts["cell_input_cols"] == 3
+    caps[("RL500_rows1500", "redundancy_filter")] = _v556_stage6_cap(
+        harness, stage6(1500, ["f1", "f2", "f4"], corrupt=True), scores)
+    with pytest.raises(harness.HarnessError, match="逐值相等"):
+        harness.redundancy_stage_capture(ctx, "redundancy_filter")
+    caps[("RL500_rows1500", "redundancy_filter")] = _v556_stage6_cap(harness, stage6(1500, ["f1", "f2"]),
+                                                                       {"f1": 1.0, "f2": 2.0})
+    with pytest.raises(harness.HarnessError, match="IC 分數"):
+        harness.redundancy_stage_capture(ctx, "redundancy_filter")
+
+    # ② 入口級 rows 軸
+    by = {e["id"]: e for e in _v555_inventory()["entries"]}
+    for eid in ("momentum.Analysis.redundancy_filter:RedundancyFilter.filter",
+                "momentum.Analysis.redundancy_filter:RedundancyFilter.compute_correlation_matrix"):
+        assert harness.entry_runs(by[eid]) == (("ic_page_relaxed", "cols"), ("redundancy_greedy_rows", "rows"), True), eid
+    assert harness.RUN_AXES["redundancy_greedy_rows"] == ("rows",) and harness.CELL_GROUP["redundancy_greedy_rows"] == "R"
+    assert "redundancy_greedy_rows" in harness.REDUNDANCY_STAGE_CELLS
+    norm = by["momentum.Analysis.marginal_ic:normal_scores"]
+    assert harness.entry_runs(norm)[1] == ("ic_page_relaxed", "rows")  # 其餘 ic_page_relaxed 入口不改
+
+    # ③ 組裝
+    inv = {"entries": [{"stage": "6", "ic_page": True, "ic_first": False, "loop": "none", "measure": True,
+                        "no_measure_reason": None, "evidence": "m/x.py:1", "id": "m.x:vif",
+                        "input_axes": ["passed_cols", "rows"], "branch_cell": "redundancy_vif", "coverage_path_id": "c1",
+                        "unit_axis": {"axes": ["rows", "stage_cols"], "function": "stage_cols*rows"},
+                        "scale_vector": ["rows", "stage_cols"]}]}
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "budget_seconds": BUDGET2_UPPER_SECONDS,
+          "sample_interval_seconds": 0.2, "chunk_cap": {"bytes": 1, "basis": "x"}, "require_rows": True}
+
+    def runs(shas: Mapping[int, str]) -> Dict[Tuple[str, str], Any]:
+        return {("redundancy_vif", "cols"): _t02_axis_records(
+                    "redundancy_vif", "cols", harness.REDUNDANCY_STAGE_COLS_SCALES, ["m.x:vif"],
+                    lambda s: {"input_cols": s, "rows": 395, "cell_input_cols": s, "requested_columns": None,
+                               harness.COLUMN_SET_KEY: f"c{s}"}),
+                ("redundancy_vif", "rows"): _t02_axis_records(
+                    "redundancy_vif", "rows", (1000, 1500, 2000), ["m.x:vif"],
+                    lambda s: {"input_cols": 500, "rows": s, "cell_input_cols": 7, "requested_columns": None,
+                               harness.COLUMN_SET_KEY: shas[s]})}
+
+    ok = harness.assemble_scale_receipt(inv, runs({1000: "a", 1500: "a", 2000: "a"}), **kw)["entries"]["m.x:vif"]
+    assert {p[harness.COLUMN_SET_KEY] for p in ok["row_points"]} == {"a"}
+    with pytest.raises(harness.AssemblyError) as exc:
+        harness.assemble_scale_receipt(inv, runs({1000: "a", 1500: "b", 2000: "a"}), **kw)
+    assert any("m.x:vif" in p and "欄集合" in p for p in exc.value.problems)
+
+    # ④ 紀錄頂層門檻分支
+    rtb = harness.record_threshold_branch
+    assert rtb("post_ic_transform", "rows", "", {"threshold_branch": "non_default"}) == "non_default"
+    assert rtb("post_ic_transform", "rows", "", {"threshold_branch": "default"}) == "default"
+    assert rtb("redundancy_vif", "rows", "R", {}) == "non_default" and rtb("ic_page_long", "rows", "", {}) == "default"
+    with pytest.raises(harness.HarnessError):
+        rtb("x", "rows", "", {"threshold_branch": "weird"})
+
+
+def test_task02_v556_redundancy_stage_cols_design_points(harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """SPEC v5.56 (l)：冗餘格之 cols 軸＝stage_cols 設計點——①三點＝`REDUNDANCY_STAGE_COLS_SCALES`（嚴格遞增、跨度 ≥ 4 倍；不取
+    cols_scales 500／1000／2000）；②輸入一律讀 `RL<REDUNDANCY_STAGE_SOURCE_COLS>`（ic_page_relaxed 500 欄點之第 6 段真實輸入；不讀
+    RL2000）之 seeded 巢狀子集（SEED 同 `_write_stage5_subset`），IC 分數與 metadata 同步限所選欄；設計點 > 來源欄數 ⇒
+    HarnessError。mutation：①axis_scales 回 cols_scales ⇒ 紅；②改讀 ctx.stage_dir（RL<k>）⇒ 所讀目錄非 RL500（紅）；巢狀被破壞
+    （非 seeded 前綴）⇒ 子集包含斷言紅。"""
+    sc = harness.REDUNDANCY_STAGE_COLS_SCALES
+    assert len(sc) == 3 and list(sc) == sorted(set(sc)) and sc[-1] >= 4 * sc[0]
+    for cell in ("redundancy_hierarchical", "redundancy_vif", "redundancy_diversification"):
+        assert harness.axis_scales(cell, "cols", cols_scales=(500, 1000, 2000), row_scales=(), event_scales=()) == list(sc)
+        assert harness.RUN_AXES[cell] == ("cols", "rows") and harness.CELL_GROUP[cell] == "R"
+    assert harness.axis_scales("ic_page_relaxed", "cols", cols_scales=(500, 1000, 2000), row_scales=(),
+                               event_scales=()) == [500, 1000, 2000]
+    k_src = 20
+    cols = [f"c{i:02d}" for i in range(k_src)]
+    idx = pd.date_range("2024-01-01", periods=12, freq="4h")
+    frame = pd.DataFrame(np.random.default_rng(2).normal(size=(12, k_src)), index=idx, columns=cols)
+    from momentum.Analysis.redundancy_filter import RedundancyFilter
+
+    caps = {"redundancy_filter": {"self": RedundancyFilter({}), "args": (frame, {c: 0.1 for c in cols}),
+                                  "kwargs": {"method": "greedy"}, "provenance": {}},
+            "diversification_metrics": {"self": RedundancyFilter({}), "args": (cols[:3], frame.corr(),
+                                                                                {c: {"category": "t"} for c in cols}),
+                                        "kwargs": {}, "provenance": {}}}
+    seen: List[str] = []
+
+    def fake_load(stage_dir: Path, name: str, expected: Any = None) -> Dict[str, Any]:
+        seen.append(Path(stage_dir).name)
+        assert expected["writer"] == ["ic_page_relaxed", "cols"]
+        return caps[name]
+
+    monkeypatch.setattr(harness, "load_capture", fake_load)
+    monkeypatch.setattr(harness, "relaxed_identity", lambda n, rows=None: {"n_cols": n, "rows": rows})
+    got: Dict[int, List[str]] = {}
+    for k in (4, 8, 16):
+        ctx = _v555_ctx(harness, "redundancy_vif", "cols", k, tmp_path)
+        cap = harness.redundancy_stage_capture(ctx, "redundancy_filter")
+        f, scores = cap["args"]
+        got[k] = list(f.columns)
+        assert f.shape == (12, k) and set(scores) == set(got[k]) and ctx.actual_scale == k
+        assert got[k] == harness.seeded_columns(cols, k)
+        meta = harness.redundancy_stage_capture(ctx, "diversification_metrics")
+        assert set(meta["kwargs"]["metadata"]) == set(got[k])
+    assert set(seen) == {f"RL{harness.REDUNDANCY_STAGE_SOURCE_COLS}"}
+    assert set(got[4]) <= set(got[8]) <= set(got[16]) and got[16] != cols[:16]
+    with pytest.raises(harness.HarnessError, match="資料不足"):
+        harness.redundancy_stage_capture(_v555_ctx(harness, "redundancy_vif", "cols", k_src + 1, tmp_path),
+                                         "redundancy_filter")
+
+
+def test_task02_v556_seeded_request_columns(fb: Any, harness: Any, monkeypatch: Any) -> None:
+    """SPEC v5.56 (m)：harness 請求之選欄改 seeded 隨機巢狀（`np.sort(default_rng(SEED).permutation(K)[:n])` 之位置；同
+    `_write_stage5_subset`）——`_limited_request`（ic_page_relaxed 之 relaxed_request 經之）取 `seeded_columns`、巢狀；凍結項之
+    `small_request` 仍為排序前綴（不改）；路徑事實之指標家族分佈。mutation：`_limited_request` 改回 small_request ⇒ 等於排序前綴
+    （紅）；seeded 非巢狀（每 n 換 seed）⇒ 包含斷言紅；凍結 small_request 被改 ⇒ 前綴斷言紅。"""
+    pool = [f"src_4h_trend_{'AB'[i % 2]}{i // 7}_{i}" for i in range(60)]
+    base = {"kind": "ic_page", "item": "ic_report", "cell": "L", "run_dir": "x", "feature_filter": None,
+            "config_override": {"thresholds": {}}}
+    hfb = harness._fb()  # harness 所用之凍結腳本模組（與 fb fixture 為不同模組物件）
+    monkeypatch.setattr(hfb, "default_request", lambda item, cell=None: copy.deepcopy(base))
+    monkeypatch.setattr(hfb, "_run_feature_names", lambda req: list(pool))
+    perm = np.random.default_rng(hfb.SEED).permutation(len(pool))
+    picks = {}
+    for n in (5, 20, 40):
+        req = harness._limited_request("ic_report", "L", n)
+        picks[n] = req["feature_filter"]["include_features"]
+        assert picks[n] == [pool[int(i)] for i in np.sort(perm[:n])] == harness.seeded_columns(pool, n)
+        assert {k: v for k, v in req.items() if k != "feature_filter"} == \
+            {k: v for k, v in base.items() if k != "feature_filter"}
+    assert set(picks[5]) <= set(picks[20]) <= set(picks[40]) and picks[20] != sorted(pool)[:20]
+    assert hfb.small_request("ic_report", base, 20)["feature_filter"]["include_features"] == sorted(pool)[:20]
+    assert fb.SEED == hfb.SEED
+    with pytest.raises(harness.HarnessError):
+        harness._limited_request("ic_report", "L", 61)
+    dist = harness.family_distribution(["close_4h_trend_BBANDS-Lower_13", "close_4h_trend_BBANDS-Lower_20_Max-W5",
+                                        "hl_4h_trend_SAR_0.02", "close_4h_trend_SMA_5"])
+    assert dist["counts"] == {"close_4h_trend_BBANDS-Lower": 2, "close_4h_trend_SMA": 1, "hl_4h_trend_SAR": 1}
+    assert dist["n_families"] == 3 and dist["max_family_share"] == 0.5 and dist["n_columns"] == 4
+    assert "seeded_nested" in harness.REQUEST_COLUMN_RULE
+
+
+def test_task02_v556_param_family_axis(harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """SPEC v5.56 (o)：參數敏感度家族數軸——①排程：`VARIANT_RUNS` 之 families 軸變體（兩格各一，不改 rows 軸主排程），排在其
+    所讀存檔之寫出實跑（deep_analysis_long rows、ic_page_long cols〔只存 preprocess〕）之後；三點＝`PARAM_FAMILY_SCALES`；
+    ②`param_families_frame`：產品 detect_feature_families 之 ≥3 員家族取 F 族（巢狀）× 每族 3 員、只含家族成員欄，產品對其判定
+    恰 F 族 × 3 員；batch_analyze 之 analyze_from_variants 呼叫數＝F；可用家族不足 ⇒ HarnessError。mutation：併入入選欄或不限
+    3 員 ⇒ 家族大小斷言紅；家族非巢狀 ⇒ 包含斷言紅；不排變體 ⇒ 排程斷言紅。"""
+    from momentum.Analysis.parameter_sensitivity_analyzer import ParameterSensitivityAnalyzer as PSA
+
+    sched = harness.schedule_runs(_v555_inventory())
+    for cell, base in harness.PARAM_FAMILY_CELLS.items():
+        assert harness.VARIANT_RUNS[(cell, "families")] == base and (cell, "families") in sched
+        assert sched.index(("deep_analysis_long", "rows")) < sched.index((cell, "families"))
+        assert sched.index(("ic_page_long", "cols")) < sched.index((cell, "families"))
+        assert harness.axis_scales(cell, "families", cols_scales=(), row_scales=(), event_scales=()) == \
+            list(harness.PARAM_FAMILY_SCALES)
+    assert harness.RUN_AXES["param_sensitivity_family"] == ("rows",)  # rows 軸主排程不改
+    assert ("ic_page_long", "cols") in harness.CAPTURE_RUNS and harness.CAPTURE_ONLY[("ic_page_long", "cols")] == ("preprocess",)
+    lc = _v555_ctx(harness, "ic_page_long", "cols", 2000, tmp_path)
+    assert lc.stage_tag(None) == "L2000"
+    monkeypatch.setattr(harness, "subset_identity", lambda src, n_cols, seed, rows=None: {"n_cols": n_cols, "rows": rows})
+    monkeypatch.setattr(harness, "subset_source", lambda long: Path("x.h5"))
+    assert harness.expected_stage_identity(lc, None)["writer"] == ["ic_page_long", "cols"]
+    assert harness.expected_stage_identity(_v555_ctx(harness, "ic_page_default", "cols", 500, tmp_path), None)["writer"] \
+        == ["ic_page_default", "cols"]
+
+    rng = np.random.default_rng(9)
+    idx = pd.date_range("2024-01-01", periods=150, freq="4h")
+    names = [f"fam{j}_{p}" for j in range(7) for p in (3, 5, 8, 13, 21)[: 3 + (j % 3)]] + ["solo_a", "solo_b"]
+    full = pd.DataFrame(rng.normal(size=(len(idx), len(names))), index=idx, columns=names)
+    labels = pd.Series(rng.normal(size=len(idx)), index=idx)
+    ps = PSA({"icir_window": 20})
+    cap = {"self": ps, "args": (full[["solo_a", "fam0_3"]], labels),
+           "kwargs": {"metadata": None, "method": "spearman", "direction": {}}, "provenance": {}}
+    calls: List[str] = []
+    orig = PSA.analyze_from_variants
+
+    def spy(self: Any, *a: Any, **k: Any) -> Any:
+        calls.append(k.get("feature_family"))
+        return orig(self, *a, **k)
+
+    monkeypatch.setattr(PSA, "analyze_from_variants", spy)
+    fams: Dict[int, List[str]] = {}
+    for f in (2, 4, 7):
+        frame, kwargs, facts = harness.param_families_frame(cap, {"result": (full, {})}, f)
+        got = ps.detect_feature_families(list(frame.columns), None)
+        assert len(got) == f and all(len(v) == 3 for v in got.values()) and frame.shape[1] == 3 * f
+        assert "solo_a" not in frame.columns and facts["survivors"] == 3 * f and facts["families"] == f
+        fams[f] = facts["family_names"]
+        calls.clear()
+        PSA.batch_analyze(ps, frame, **kwargs)
+        assert len(calls) == f
+    assert set(fams[2]) <= set(fams[4]) <= set(fams[7])
+    with pytest.raises(harness.HarnessError, match="資料不足"):
+        harness.param_families_frame(cap, {"result": (full, {})}, 8)
+    with pytest.raises(harness.HarnessError, match="不一致"):
+        harness.param_families_frame(cap, {"result": (full.assign(solo_a=full["solo_a"] + 1.0), {})}, 2)
+
+
+def test_task02_v556_post_ic_chunked_probe_and_optimized_arm(harness: Any, monkeypatch: Any) -> None:
+    """SPEC v5.56 (p)：①`post_ic_chunked_probe` 於 `FFACT_L65_CHUNK_SIZE`＝塊寬下執行同一呼叫、期間 `Recorder.restricted` 只記
+    `_transform_chunked`（其餘入口直通不計）、結束還原環境變數；目標 0 呼叫（設定未生效）或倖存欄 ≤ 塊寬 ⇒ HarnessError；
+    產品 `_resolve_column_chunk_size` 讀同一環境變數；②`_transform_single_optimized_df_core` 於 IC 頁轉換不可達之碼證：契約
+    IC 頁臂＝ic_first 之擇定核心 pandas_legacy、`transform_selected` 只接受該臂、forced_arm＝pandas_legacy 時
+    `_can_use_optimized_dataframe_path` 恆 False。mutation：①不設環境變數 ⇒ 目標 0 呼叫 HarnessError（紅）；不限制記錄 ⇒ 其餘
+    入口計數增加（紅）；②契約臂改 pandas_optimized ⇒ 斷言紅。"""
+    from momentum.FeatureEngineering import numeric_view
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    rec = harness.Recorder(heartbeat=False)
+    other_id = "x.y:other"
+    other = harness._make_wrapper(other_id, lambda: 1, rec=rec)
+    target = harness._make_wrapper(harness.POST_IC_CHUNKED_ENTRY, lambda: other(), rec=rec)
+    other()  # 預設呼叫（全記）
+    monkeypatch.delenv(harness.POST_IC_CHUNK_ENV, raising=False)
+
+    def call() -> None:
+        assert FeaturePreprocessor._resolve_column_chunk_size() == harness.POST_IC_CHUNK_SIZE
+        if os.environ.get(harness.POST_IC_CHUNK_ENV) == str(harness.POST_IC_CHUNK_SIZE):
+            target()
+
+    got = harness.post_ic_chunked_probe(rec, call, harness.POST_IC_CHUNK_SIZE + 5)
+    assert got["calls"] == 1 and got["branch"] == "non_default" and got["n_chunks"] == 2
+    assert rec.stat(other_id).calls == 1 and rec.stat(harness.POST_IC_CHUNKED_ENTRY).calls == 1
+    assert harness.POST_IC_CHUNK_ENV not in os.environ and rec.only is None
+    with pytest.raises(harness.HarnessError, match="0 呼叫"):
+        harness.post_ic_chunked_probe(rec, lambda: None, harness.POST_IC_CHUNK_SIZE + 5)
+    with pytest.raises(harness.HarnessError, match="≤ 塊寬"):
+        harness.post_ic_chunked_probe(rec, call, harness.POST_IC_CHUNK_SIZE)
+    assert harness.POST_IC_CHUNK_SIZE < 12  # < smoke 最小倖存數（RL100 12）
+    import inspect
+
+    src = inspect.getsource(harness._run_post_ic_transform)
+    assert src.count("post_ic_chunked_probe(") == 2  # survivors 軸與 rows 軸皆探
+    # ② optimized core 不可達之碼證（契約與分派）
+    assert numeric_view.post_ic_arm("ic_page_apply_transforms") == numeric_view.post_ic_arm("ic_first") == "pandas_legacy"
+    with pytest.raises(numeric_view.NumericPolicyError):
+        numeric_view.require_post_ic_core("pandas_optimized")
+    fp = FeaturePreprocessor.__new__(FeaturePreprocessor)
+    fp._forced_arm = "pandas_legacy"
+    assert fp._can_use_optimized_dataframe_path() is False

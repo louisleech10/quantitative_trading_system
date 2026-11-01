@@ -99,6 +99,7 @@ from momentum.core.protocols import IKlineReader
 from momentum.core.split_preview import (
     build_row_time_fingerprint,
     count_binary_classes_in_rows as _count_binary_classes_in_rows,
+    epoch_ms_from_datetime_index,
     epoch_ms_from_index,
     holdout_boundary,
 )
@@ -1577,6 +1578,13 @@ class ICFilterOrchestrator:
             train_mask, test_mask = _derive_stage_masks(
                 train_plan, test_plan, features_df.index
             )
+            # 🔴 ICPERF Task 0.4 ㊵：測試段時間戳與選樣預檢之**單一時鐘**。`features_df.index` 於事件路徑是
+            #    交接 h5 之 epoch **秒**（`_load_features_hdf5`；無 labels 檔時 stage0 不轉 DatetimeIndex），
+            #    而 stage3 之事件列是 `_normalize_ic_time_index` 後之 DatetimeIndex、二元標籤鍵是 epoch 毫秒
+            #    ⇒ 原樣交出去，兩處比對全表命中 0、交集空（真實 L 格事件批實測），且不報錯。
+            #    改以本模組 canonical 正規化器（int＝秒、像毫秒即拒）明確轉成 DatetimeIndex 再交出；
+            #    計畫之 `time_bounds`／指紋仍用原始索引（不動既有揭露值）。
+            _split_clock = _normalize_ic_time_index(features_df.index, "features_df")
             split_context = {
                 "train_plan": train_plan,
                 "test_plan": test_plan,
@@ -1585,7 +1593,7 @@ class ICFilterOrchestrator:
                 #    `IndexError: Boolean index has wrong length`（codex 實跑 10 vs 3）。
                 #    改為帶 canonical 測試段**時間戳**，下游一律以「交集」取 selection，
                 #    不用位置遮罩跨物件。
-                "test_timestamps": pd.Index(features_df.index[test_plan.row_index]),
+                "test_timestamps": pd.DatetimeIndex(_split_clock[test_plan.row_index]),
                 "train_mask": train_mask,
                 "test_mask": test_mask,
                 "effective_horizon": effective_horizon,
@@ -1602,7 +1610,7 @@ class ICFilterOrchestrator:
             #    ⇒ 改在**這裡**判：`test_plan.row_index` 就是實際測試段，沒有第二份算術可漂。
             #    仍在 preprocessing **之前**，所以「不必跑完才知道不足」的目的照樣達成。
             selection_counts = _count_binary_classes_in_rows(
-                event_binary_labels, features_df.index, test_plan.row_index
+                event_binary_labels, _split_clock, test_plan.row_index
             )
             if selection_counts is not None:
                 split_context["selection_preview"] = dict(selection_counts)
@@ -1753,10 +1761,10 @@ class ICFilterOrchestrator:
                 #    `ic_train_test_split.test_rows`（K 線列數語意）**不是同一件事**，
                 #    兩者之關係由 `split_unify.json` 之 `test_segment_count_keys` 封閉登記。
                 metadata = dict(metadata)
-                test_index_ms = (
-                    _normalize_ic_time_index(features_df.index, "features_df")[test_mask]
-                    .asi8 // 10 ** 6
-                ).astype("int64")
+                test_index_ms = epoch_ms_from_datetime_index(
+                    _normalize_ic_time_index(features_df.index, "features_df")[test_mask],
+                    role="split_unify: test feature_ts",
+                )
                 metadata["split_unify"] = build_split_unify_disclosure(
                     n_test=test_events,
                     test_timestamps_ms=test_index_ms,
@@ -4642,17 +4650,29 @@ class ICFilterOrchestrator:
         n_neg_batch = int(sum(1 for v in (event_binary_labels or {}).values() if int(v) == 0))
 
         test_stamps = (split_context or {}).get("test_timestamps")
-        if test_stamps is not None:
-            # 交集：`filtered_features` 是事件子集，`test_timestamps` 是全表之測試段。
-            # 兩者都以時間戳表達 ⇒ 交集即「落在測試段裡的事件列」，長度不匹配的問題不存在。
-            sel_idx = pd.Index(filtered_features.index).intersection(pd.Index(test_stamps))
-            selection_scope = "test"
-        else:
-            sel_idx = pd.Index(filtered_features.index)
-            selection_scope = "full_sample"
-        sel_counts = _count_binary_classes_in_rows(
-            event_binary_labels, sel_idx, np.arange(len(sel_idx), dtype=int)
-        ) or {"n_pos": 0, "n_neg": 0}
+        # 🔴 ICPERF Task 0.4 ㊵：兩側先經同一 canonical 正規化器（int＝epoch 秒、像毫秒即拒）與同一 UTC 比對鍵，
+        #    再取交集——原版直接以原型別交集，DatetimeIndex 對 int 秒（或 tz-aware 對 naive）恆為空且不報錯。
+        #    無 0/1（`event_binary_labels` 為 None）⇒ 計數恆 0、不綁定，不需時鐘（不改該路徑之行為）。
+        selection_scope = "test" if test_stamps is not None else "full_sample"
+        sel_counts = {"n_pos": 0, "n_neg": 0}
+        event_rows: Optional[pd.DatetimeIndex] = None
+        if event_binary_labels is not None:
+            event_rows = _utc_instant_key(
+                _normalize_ic_time_index(pd.Index(filtered_features.index), "filtered_features")
+            )
+            if test_stamps is not None:
+                # 交集：`filtered_features` 是事件子集，`test_timestamps` 是全表之測試段。
+                # 兩者都以時間戳表達 ⇒ 交集即「落在測試段裡的事件列」，長度不匹配的問題不存在。
+                sel_idx = event_rows.intersection(
+                    _utc_instant_key(
+                        _normalize_ic_time_index(pd.Index(test_stamps), "split_context.test_timestamps")
+                    )
+                )
+            else:
+                sel_idx = event_rows
+            sel_counts = _count_binary_classes_in_rows(
+                event_binary_labels, sel_idx, np.arange(len(sel_idx), dtype=int)
+            ) or sel_counts
 
         floor = int(config.event_filter.min_events_per_class)
         reason: Optional[str] = None
@@ -4693,7 +4713,9 @@ class ICFilterOrchestrator:
             return info
 
         # ── 綁定：0/1 向量必須過與報酬 label **同一條**契約，再封成 immutable ──
-        idx_ms = (filtered_features.index.asi8 // 10**6).astype("int64")
+        # ICPERF Task 0.4 ㊵：與上方計數同一時鐘（UTC 毫秒，依索引實際解析度換算；不假設 ns）
+        assert event_rows is not None  # effective＝imported_binary ⇒ event_binary_labels 非 None（上方決策）
+        idx_ms = epoch_ms_from_datetime_index(event_rows, role="stage3: filtered_features")
         missing = [int(t) for t in idx_ms if int(t) not in event_binary_labels]
         if missing:
             raise AlignmentViolationError(
@@ -4814,7 +4836,9 @@ class ICFilterOrchestrator:
         if not ordered:
             raise InvalidInputError("feature_filter selected zero features")
 
-        filtered_metadata = self._filter_metadata_for_columns(metadata, set(ordered))
+        filtered_metadata = self._filter_metadata_for_columns(
+            metadata, set(ordered), set(original_columns)
+        )
         info["feature_count_filtered"] = int(len(ordered))
         return features_df.loc[:, ordered], filtered_metadata, info
 
@@ -4836,16 +4860,19 @@ class ICFilterOrchestrator:
         }
 
     @staticmethod
-    def _filter_metadata_for_columns(metadata: dict, selected_columns: set[str]) -> dict:
+    def _filter_metadata_for_columns(
+        metadata: dict, selected_columns: set[str], feature_columns: set[str]
+    ) -> dict:
+        """只剔除**未選中特徵**之逐特徵 metadata；全域鍵（含 dict 值者）一律原樣保留（ICPERF Task 0.4 ㊶）。
+
+        逐特徵鍵＝鍵名為本次輸入特徵欄（`feature_columns`）者。原版以「dict 值且非選中」判特徵，把全域之
+        `ic_train_test_split`、`ic_window_disclosure`、`period_alignment`、`label_mode` 等 dict 一併剔除 ⇒ 已切分之
+        請求帶 feature_filter 時 `_downgrade_branch` 判 `no_holdout_evidence`、報告標 `degraded_full_sample`，不報錯。
+        """
         if not metadata:
             return metadata
-        filtered: dict[str, Any] = {}
-        for key, value in metadata.items():
-            if key in selected_columns:
-                filtered[key] = value
-            elif not isinstance(value, dict):
-                filtered[key] = value
-        return filtered
+        dropped = feature_columns - selected_columns
+        return {key: value for key, value in metadata.items() if key not in dropped}
 
     @_timed_stage("stage4_ic_calculation")
     def _stage4_ic_calculation(

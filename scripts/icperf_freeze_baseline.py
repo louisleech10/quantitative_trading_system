@@ -2848,7 +2848,12 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
     v5.53（code review r64）：(c0) 事件路徑之 K 線根數軸——unit_axis 含 rows 之事件入口排 (event_import|event_study, rows)，
     三種根數＝`event_bar_scales`（固定全部事件），開跑前以 `prepare_event_bars` 於 `TASK02_ROOT/event_bars/` 建隔離截短複本
     （不改 `data_cache/feature_klines/kline_cache.h5`）；(c1) 跨標的長資料之預設切分分支（`VARIANT_RUNS`）——兩長歷史格須已
-    生成且 `xsec_long_precheck` 判預設切分可達，否則開跑前 FreezeError；收據 `variants` 段（`require_variants`）。"""
+    生成且 `xsec_long_precheck` 判預設切分可達，否則開跑前 FreezeError；收據 `variants` 段（`require_variants`）。
+
+    v5.56（code review r67）：(j)(n) events 軸三點＝`_event_scales`（Task 0.2 專用事件批之等距抽樣，三點另以產品實跑驗
+    effective mode＝imported_binary 與二元三入口；不成立 ⇒ 開跑前 FreezeError）；(k)(l) 冗餘格之 cols 軸＝stage_cols 設計點
+    （全規模＝最大設計點）、rows 軸固定欄集合，身分含所讀存檔之 sidecar；(o) 參數敏感度家族數軸＝`VARIANT_RUNS` 之 families
+    軸（`axis_scales` 之 `PARAM_FAMILY_SCALES`）；(p) IC 後轉換之分塊探針於 post_ic_transform 同一實跑內（harness）。"""
     import time
 
     h = _harness()
@@ -2946,7 +2951,10 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
             with open(att_records / TASK02_IDENTITY_FILE, "x", encoding="utf-8") as fh:
                 fh.write(json.dumps(identity, ensure_ascii=False, indent=1, sort_keys=True))
             long_cols = run_id in h.LONG_RUNS or h.CELL_GROUP.get(run_id) == "R"
-            full = (full_cols_long if long_cols and full_cols_long else full_cols) if axis == "cols" else max(pts)
+            # SPEC v5.56 (l)：冗餘格之 cols 軸＝stage_cols 設計點（第 6 段真實輸入之子集）⇒ 全規模＝其最大設計點
+            stage_cols_axis = axis == "cols" and run_id in h.REDUNDANCY_STAGE_CELLS
+            full = (full_cols_long if long_cols and full_cols_long else full_cols) \
+                if axis == "cols" and not stage_cols_axis else max(pts)
             probe_cmd = [sys.executable, "scripts/scale_probe.py", "--out", receipt_path.relative_to(REPO).as_posix(),
                          "--full-scale", str(full), "--unit", axis,
                          "--log-dir", (root / "logs" / session / f"{run_id}-{axis}").relative_to(REPO).as_posix()]
@@ -3047,6 +3055,20 @@ def _task02_data(run_id: str, src: Path, *, axis: str = "cols", long_src: Option
         # SPEC v5.55 (e)：survivors 軸之存檔 IC 任務（ic_page_relaxed 各 cols 點）之身分 sidecar——任務變 ⇒ 身分變
         return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json",
                 *[_repo_rel(h.post_ic_survivors_dir(root, int(n)) / h.SUBSET_IDENTITY_FILE) for n in SCALE_POINTS]]
+    if run_id in h.REDUNDANCY_STAGE_CELLS:
+        # SPEC v5.56 (k)(l)：冗餘格讀 ic_page_relaxed 之第 6 段存檔（cols 軸＝RL<來源欄數>；rows 軸＝RL<cols>_rows<R> 與最小 R 點）
+        # ⇒ 身分另含所讀存檔目錄之身分 sidecar（重寫 ⇒ 身分變）
+        if axis == "cols":
+            tags = [f"RL{int(h.REDUNDANCY_STAGE_SOURCE_COLS)}"]
+        else:
+            tags = [f"RL{h.ROW_AXIS_COLS}_rows{int(r)}" for r in sorted({int(h.ROW_AXIS_SCALES[0]), *map(int, scales)})]
+        return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json",
+                *[_repo_rel(root / "stage_inputs" / t / h.STAGE_IDENTITY_FILE) for t in tags]]
+    if run_id in h.PARAM_FAMILY_CELLS:
+        # SPEC v5.56 (o)：家族數軸讀 DL<cols>_rows<全長>（param_sensitivity）與 L<來源欄數>（preprocess）之存檔
+        return [_repo_rel(long_src if long_src is not None else l_handoff_path()),
+                _repo_rel(root / "stage_inputs" / f"DL{h.ROW_AXIS_COLS}_rows{int(h.LONG_CELL_ROWS)}" / h.STAGE_IDENTITY_FILE),
+                _repo_rel(root / "stage_inputs" / f"L{int(h.PARAM_FAMILY_SOURCE_COLS)}" / h.STAGE_IDENTITY_FILE)]
     if run_id == "ic_page_relaxed" or h.CELL_GROUP.get(run_id) == "R":
         # SPEC v5.55 (d)：非預設門檻分支讀 L 格 run（非交接 h5）；讀其存檔之冗餘格同
         return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json"]
