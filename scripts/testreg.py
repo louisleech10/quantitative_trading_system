@@ -1903,17 +1903,30 @@ def _check_e1(ctx: Context, tomb: Mapping[str, Any], rcpt: Mapping[str, Any], re
         errs.append(hp)
     if rcpt["replacement_nodeid"] not in tomb.get("replaced_by", []):
         errs.append("replacement 不在 replaced_by")
-    tgt = _e1_parts(_engine_for(ctx, f"rev:{rcpt['head']}"), rcpt["nodeid"])
-    rep = _e1_parts(_engine_for(ctx, ctx.tree), rcpt["replacement_nodeid"])
-    if tgt is None or rep is None:
+    # ICPERF SPEC v5.58（code review r69 群集 D）：E1 證據＝**退役當下**舊測與替代測等價——兩側皆取收據 head；
+    # 現行樹只驗替代測仍存在（替代測日後之合法改動由一般測試變更審查負責，不得使同一碑每次提交重報）。
+    #    同提交改名之碑（替代測於收據 head 尚不存在）以現行樹之替代測為退役當下版本；兩版本任一完全等價即通過。
+    head_engine = _engine_for(ctx, f"rev:{rcpt['head']}")
+    tgt = _e1_parts(head_engine, rcpt["nodeid"])
+    rep_now = _e1_parts(_engine_for(ctx, ctx.tree), rcpt["replacement_nodeid"])
+    if tgt is None or rep_now is None:
         return errs + ["target 或 replacement 函式不存在"]
-    if not (tgt["ast"] == rep["ast"] == rcpt["target_ast_sha256"] == rcpt["replacement_ast_sha256"]):
-        errs.append("函式 AST 非完全相同或與收據不符")
-    if not (tgt["fixture_closure"] == rep["fixture_closure"] == rcpt["fixture_closure_sha256"]):
-        errs.append("fixture 閉包不同或與收據不符")
-    if not (tgt["module_context"] == rep["module_context"] == rcpt["module_context_sha256"]):
-        errs.append("模組情境不同或與收據不符")
-    return errs
+    rep_head = _e1_parts(head_engine, rcpt["replacement_nodeid"])
+
+    def _mismatch(rep: Mapping[str, Any]) -> List[str]:
+        out: List[str] = []
+        if not (tgt["ast"] == rep["ast"] == rcpt["target_ast_sha256"] == rcpt["replacement_ast_sha256"]):
+            out.append("函式 AST 非完全相同或與收據不符")
+        if not (tgt["fixture_closure"] == rep["fixture_closure"] == rcpt["fixture_closure_sha256"]):
+            out.append("fixture 閉包不同或與收據不符")
+        if not (tgt["module_context"] == rep["module_context"] == rcpt["module_context_sha256"]):
+            out.append("模組情境不同或與收據不符")
+        return out
+
+    candidates = [_mismatch(r) for r in (rep_head, rep_now) if r is not None]
+    if any(not c for c in candidates):
+        return errs
+    return errs + candidates[-1]
 
 
 def rule_v08(ctx: Context) -> List[Finding]:

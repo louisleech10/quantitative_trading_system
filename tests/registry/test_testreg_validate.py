@@ -336,6 +336,28 @@ def test_e1_exact_duplicate_green(tmp_path):
     assert proc.returncode == 0, proc.stderr
 
 
+def test_e1_replacement_evolves_after_retirement_green(tmp_path):
+    """ICPERF SPEC v5.58（code review r69 群集 D）：E1 證據＝退役當下等價。退役提交後替代測合法改動（另增斷言）⇒ 不得
+    再報 V08（舊版以現行樹之替代測比對收據 head 之舊測，每次提交重報同一碑）。mutation：改回以現行樹比對 ⇒ 本測紅。"""
+    r = _e1_repo(tmp_path, {"tests/test_dup.py": E1_TESTS})
+    _e1_retire(r, "tests/test_dup.py::test_b", "tests/test_dup.py::test_a")
+    r.commit("retire test_b")
+    r.write("tests/test_dup.py", r.read("tests/test_dup.py").replace(
+        "def test_a(two):\n    assert add(1, two) == K\n", "def test_a(two):\n    assert add(1, two) == K\n    assert two == 2\n"))
+    proc = _validate(r)
+    assert proc.returncode == 0 and not rule_lines(proc, "V08"), proc.stderr
+
+
+def test_e1_replacement_deleted_after_retirement_red(tmp_path):
+    """同上：退役後替代測被刪除 ⇒ 仍報 V08（現行樹只驗替代測仍存在）。mutation：拿掉現行樹存在檢查 ⇒ 本測紅。"""
+    r = _e1_repo(tmp_path, {"tests/test_dup.py": E1_TESTS})
+    _e1_retire(r, "tests/test_dup.py::test_b", "tests/test_dup.py::test_a")
+    r.commit("retire test_b")
+    _delete_function(r, "tests/test_dup.py", "test_a")
+    proc = _validate(r)
+    assert proc.returncode != 0 and rule_lines(proc, "V08"), proc.stderr
+
+
 E1_VARIANTS = {"fixture_definition": E1_FIXDIFF, "module_constant": E1_CONSTDIFF, "autouse_fixture": E1_AUTOUSE,
                "pytestmark": E1_MARKED}
 
