@@ -54,7 +54,7 @@ TODO 生成 Prompt V14 — 五類落點（取代 V13 之散文 TODO）
    跨批搬遷時另填 `relocates_to`／`relocates_at`／`reexport`／`tests_stay`。
    - `forbidden` 須涵蓋本票觸及之解耦規則（`CLAUDE.md`「The 7 Decoupling Rules」）、不可違反原則（跨 tier／多 symbol／資料品質／不弱化 NaN·inf gate／不擅改輸出大小）與「不得放寬既有測試斷言」之相關子集——此即舊散文 TODO 全域規則節之落點；可觀測者以具名測試或 `scripts/check_decoupling.sh` 驗之，純前端／文檔可於 `risk_mitigation` 聲明不適用。
    - `forbidden` 之 `observable=false` 者（無法以測試觀測之負向約束）須於 `not_executable` 有同字面之 item。
-   - **無法寫成可執行落點者**一律進 `not_executable`：`reason` 只准 `blocked-by`／`user-ruling`／`needs-research` 三值，並填 `owner` 與 `expiry`（`YYYY-MM-DD`，不得已過期）。
+   - **無法寫成可執行落點者**一律進 `not_executable`：`reason` 只准 `blocked-by`／`user-ruling` 兩值（`needs-research` 只為舊 manifest 相容而仍被機檢接受，新條目不得使用：研究本身排為可執行 Task；2026-11-01 使用者裁定），並填 `owner` 與 `expiry`（`YYYY-MM-DD`，不得已過期）。
    - 某一類為空時（例：治理票無生產模組），於 `not_executable` 加一項 item 恰為該鍵名（`stub_modules`／`test_files`／`contract_jsons`）並附理由。
 5. **實跑收據**（`run_receipts`，資訊性）：已實跑之命令、rc 與誠實邊界；檔置 `handoffs/run_receipts/`。實作前可為空。
 

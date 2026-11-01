@@ -49,7 +49,7 @@ Louis 之個人助理 Javis（Grok 系 bot）↔ Claude 之非同步管道；`to
 **高風險原則 (a)-(d)**：(a) 數值/資料品質 (b) 跨模組/共用路徑 (c) 多 phase/難回退 (d) ML/回測正確性。範例：Feature Factory/cache、IC Gatekeeper、回測引擎。
 
 **固定條款**（使用者定死，出處見 `docs/SCAR_LEDGER.md`）：
-- **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② **code review 之家數與家族＝`docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行（唯一來源；🔴 本檔不得自寫家數——曾寫「2 個」而 ORCH 為「三家全員」，2026-08-12 害主委當場做錯一次）**；實作者不自審；**機器強制** `scripts/review_quorum_check.sh`，接入 `gate.sh` 派下一批 impl 前驗前批 quorum，不足→拒發 token ③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度每 10 分鐘回報一次**
+- **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② **code review 之家數與家族＝`docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行（唯一來源；🔴 本檔不得自寫家數——曾寫「2 個」而 ORCH 為「三家全員」，2026-08-12 害主委當場做錯一次）**；實作者不自審；**機器強制** `scripts/review_quorum_check.sh`，接入 `gate.sh` 派下一批 impl 前驗前批 quorum，不足→拒發 token ③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度約每 10 分鐘在工具呼叫之間寫一行短句回報（不結束回合）**
 - 🔴 **產出端覆蓋鐵律**（2026-08-13 使用者定死，適用**所有**治理 epic）：治理票的檢查
   **必須擋在產出端**（`PreToolUse`／`PostToolUse` hook，寫檔當下就報），**這才能算已完成**；
   擋不了者須在 `docs/GOV_ENFORCEMENT_REGISTRY.md` **具名寫出為什麼**（如 G-7 需 commit 才有
@@ -203,7 +203,7 @@ No hardcoded symbols, prices, or metrics.
 1. §A 涉及型別/形狀/單位須附實跑 receipt 2. 「測真實路徑」finding 不得降級 NON-BLOCKING（除非測試已存在並通過）3. 回歸禁 sanitized fixture（byte-faithful 或真實 ingestion）。事故敘事見 `docs/SCAR_LEDGER.md`。
 
 #### 三方數據正確性簽核鐵律（2026-06-09 定死）
-Feature Factory **資料正確性** scope：生成→計算→merge（多TF對齊）→split→無洩漏。通過條件 = Claude + GPT-5.5 + Composer 2.5 **三方**獨立簽「資料正確」；**任一方有疑→不通過，不靠使用者驗收**。必用真實 kline `data_cache/feature_klines/kline_cache.h5`；禁合成 fixture。驗證策略由委員會自設計並三方互審，可證偽（golden byte 級、PIT 無 look-ahead、跨 symbol/TF 隔離、合併前後值守恆）。**行為不變型重構**：改前 vs 改後 byte 級一致（值/NaN/數量/輸出檔大小不變）。事故敘事見 `docs/SCAR_LEDGER.md`。
+Feature Factory **資料正確性** scope：生成→計算→merge（多TF對齊）→split→無洩漏。通過條件 = 主委（Claude）＋ `scripts/governance_families.json` 之 `active_stampers` 全員各自獨立簽「資料正確」（本檔不寫家族名或型號）；**任一方有疑→不通過，不靠使用者驗收**。必用真實 kline `data_cache/feature_klines/kline_cache.h5`；禁合成 fixture。驗證策略由委員會自設計並三方互審，可證偽（golden byte 級、PIT 無 look-ahead、跨 symbol/TF 隔離、合併前後值守恆）。**行為不變型重構**：改前 vs 改後 byte 級一致（值/NaN/數量/輸出檔大小不變）。事故敘事見 `docs/SCAR_LEDGER.md`。
 
 ---
 
