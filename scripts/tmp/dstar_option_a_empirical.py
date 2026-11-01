@@ -267,7 +267,7 @@ def main() -> int:
     parser.add_argument("--window-start", default="2024-09-01T00:00:00Z")
     parser.add_argument("--window-end", default="2025-05-31T23:00:00Z")
     parser.add_argument("--out-dir", type=Path,
-                        default=PROJECT_ROOT / "data_cache" / "profiles" / "dstar_option_a_empirical")
+                        default=PROJECT_ROOT / "runs" / "profiles" / "dstar_option_a_empirical")
     args = parser.parse_args()
 
     os.environ.setdefault("FFACT_FRACDIFF_APPLY_TO_LAYERS", "L1,L2")

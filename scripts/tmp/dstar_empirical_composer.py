@@ -33,7 +33,7 @@ from momentum.factories import create_feature_factory
 KLINE_DIR = PROJECT_ROOT / "data_cache" / "feature_klines"
 SYMBOLS = ["ETHUSDT", "SOLUSDT", "LINKUSDT", "ADAUSDT"]
 TF = "1h"
-OUT_DIR = PROJECT_ROOT / "data_cache" / "profiles" / "dstar_empirical_composer"  # 證據輸出不放系統暫存
+OUT_DIR = PROJECT_ROOT / "runs" / "profiles" / "dstar_empirical_composer"  # 證據輸出：repo 內 runs/（不放系統暫存、不放 data_cache）
 IC_THRESHOLDS = (0.005, 0.01, 0.02)
 
 
