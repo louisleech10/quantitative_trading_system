@@ -1742,7 +1742,9 @@ def test_boundary_14_inventory_fields_and_scope() -> None:
         assert INVENTORY_KEYS <= set(e), f"{eid}：缺欄 {sorted(INVENTORY_KEYS - set(e))}"
         assert re.match(r"^[A-Za-z_][\w.]*:[A-Za-z_][\w.]*$", eid), f"{eid}：id 須為 模組:函式"
         assert e["stage"] in REQUIRED_STAGES, f"{eid}：所屬段 {e['stage']} 非法"
-        assert e["input_axes"] and set(e["input_axes"]) <= INPUT_AXES, f"{eid}：輸入軸非法"
+        # SPEC v5.52 (b)：事件數不記為 rows ⇒ 只隨事件數變之入口 input_axes 可空（限 scale_vector 含 events）
+        assert (e["input_axes"] or "events" in e.get("scale_vector", [])) and set(e["input_axes"]) <= INPUT_AXES, \
+            f"{eid}：輸入軸非法"
         assert isinstance(e["ic_page"], bool) and isinstance(e["ic_first"], bool), eid
         assert e["loop"] in LOOPS, f"{eid}：迴圈型別非法"
     stages = {e["stage"] for e in entries.values()}
@@ -1905,8 +1907,10 @@ def _entry_record_problems(eid: str, m: Mapping[str, Any]) -> List[str]:
     scale_probe 該點 runs；呼叫次數（扣除拋例外者）≥ 1（0 呼叫不得充作量測，v5.50 (a)）；footprint 不小於該紀錄之受測行程
     結束前 sample。以問題清單回報（呼叫端單一斷言；不另綁斷言區域名，TESTREG V19 名序不變）。"""
     out: List[str] = []
+    # SPEC v5.52 (b)：第二軸之軸名＝收據 row_axis（rows／timestamps／events；缺省 rows）
+    row_ax = m.get("row_axis") or "rows"
     groups = [(m["points"], m.get("probe"), *_point_axis(m)),
-              (m.get("row_points") or [], m.get("row_probe"), "rows", "rows")]
+              (m.get("row_points") or [], m.get("row_probe"), row_ax, row_ax)]
     for points, probe, unit, xkey in groups:
         for i, point in enumerate(points):
             scale = point.get(xkey)
@@ -1960,10 +1964,12 @@ def test_boundary_16_three_points_per_entry() -> None:
             _assert_point_bound(eid, p, p[xkey], unit, m["probe"], head)
         assert len({p[xkey] for p in pts}) == len(pts), f"{eid}：規模點重複"
         if eid in inv and "rows" in inv[eid]["input_axes"]:
+            # SPEC v5.52 (b)：第二軸之軸名明示於收據 row_axis（rows；跨標的＝timestamps）
+            ax = m.get("row_axis") or "rows"
             rows = m["row_points"]
-            assert len(rows) == 3 and len({r["rows"] for r in rows}) == 3, f"{eid}：列數成長元件須三種列長"
+            assert len(rows) == 3 and len({r[ax] for r in rows}) == 3, f"{eid}：列數成長元件須三種列長"
             for r in rows:
-                _assert_point_bound(eid, r, r["rows"], "rows", m["row_probe"], head)
+                _assert_point_bound(eid, r, r[ax], ax, m["row_probe"], head)
     # SPEC v5.19–v5.21 Task 0.2：點數規則（3 點；唯一例外＝帶 two_point_exception 者恰 2 點且不含 2,000 欄點）、
     # coverage_path_id／unit_axis 與清冊一致、每點帶完整 scale_vector 與峰值 Physical footprint
     # 重用上段區域名（pts＝該入口之量測記錄、p＝清冊入口），不另綁新名：既有斷言之名序不變（TESTREG V19 normalize ②）
@@ -1976,6 +1982,13 @@ def test_boundary_16_three_points_per_entry() -> None:
     # SPEC v5.51 (h)(i)：footprint＝同 path_run_id 紀錄之值；紀錄存版控路徑、大小與 sha256 相符（重用上段區域名，TESTREG V19）
     for eid, pts in receipt["entries"].items():
         assert not _record_store_problems(eid, pts), f"{eid}：紀錄存處／footprint 來源不符：{_record_store_problems(eid, pts)}"
+    # SPEC v5.52 (b)：事件型入口之 scale_vector 含 events 而主軸非 events ⇒ 第二軸＝events 三點（軸名明示）；重用上段區域名
+    for eid, pts in receipt["entries"].items():
+        p = inv.get(eid) or {}
+        if "events" in (p.get("scale_vector") or []) and pts.get("axis") != "events" \
+                and "rows" not in (p.get("input_axes") or []):
+            assert pts.get("row_axis") == "events" and len({r["events"] for r in pts.get("row_points") or []}) == 3, \
+                f"{eid}：事件數軸須三點（row_axis＝events）"
 
 
 def _entry_schema_problems(m: Mapping[str, Any], inv_entry: Optional[Mapping[str, Any]]) -> List[str]:
@@ -2916,3 +2929,269 @@ def test_task02_footprint_same_path_run_and_record_store(harness: Any, scale_pro
     (d / "x.json").write_bytes(body)
     got = fb._task02_records(tmp_path, "ic_page_default", "cols")[500][0]
     assert got["_record_bytes"] == len(body) and got["_record_sha256"] == hashlib.sha256(body).hexdigest()
+
+
+# ── SPEC v5.52 (a)–(c)：子集沿用比對來源、各路徑第二軸、IC-first 經 write_raw 之子集（秒級；不跑量測） ─────────────
+
+
+def _t02_handoff(root: Path, values: np.ndarray) -> Path:
+    """交接 h5 舊格式（`features` float32＋`timestamps`＋`feature_names`）與同名 meta——量測工具之秒級契約用（非特徵值驗證）。"""
+    import h5py
+
+    root.mkdir(parents=True, exist_ok=True)
+    names = [f"f{i:02d}" for i in range(values.shape[1])]
+    h5 = root / "X_1h.h5"
+    with h5py.File(h5, "w") as f:
+        g = f.create_group("BTCUSDT/1h")
+        g.create_dataset("features", data=values.astype(np.float32))
+        g.create_dataset("timestamps", data=np.arange(values.shape[0], dtype=np.int64))
+        g.create_dataset("feature_names", data=np.array(names, dtype=object), dtype=h5py.string_dtype(encoding="utf-8"))
+    meta = {"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": "h", "ff_run_identity": {},
+            "feature_metadata_version": 1, **{n: {} for n in names}}
+    (root / "X_1h_meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    return h5
+
+
+def _t02_h5_features(h5: Path) -> np.ndarray:
+    import h5py
+
+    with h5py.File(h5, "r") as f:
+        return np.asarray(f["BTCUSDT/1h/features"][:])
+
+
+def test_task02_subset_reuse_compares_source_identity(harness: Any, tmp_path: Path) -> None:
+    """SPEC v5.52 (a)（r63 群集 A 反例）：既有子集只在 sidecar 之來源身分（內容 sha256、seed、欄數、列長）逐欄相同時沿用；
+    來源內容改變（同形狀）⇒ 重建且子集內容＝新來源之所選欄（舊碼只憑檔案存在 ⇒ 讀到舊子集，本測試之內容斷言即紅）；seed、
+    欄數不同 ⇒ 重建；列長子集同（連帶重建母子集）。存檔目錄之身分與現行來源不符或檔不在 files ⇒ 讀端拒收。"""
+    rng = np.random.default_rng(0)
+    v1 = rng.normal(size=(12, 10))
+    src = _t02_handoff(tmp_path / "src", v1)
+    sub, rdir = tmp_path / "sub", tmp_path / "sub_rows8"
+    h5, _meta, rebuilt = harness.ensure_subset(src, 4, 7, sub)
+    assert rebuilt is True and (sub / harness.SUBSET_IDENTITY_FILE).is_file()
+    ident = json.loads((sub / harness.SUBSET_IDENTITY_FILE).read_text(encoding="utf-8"))
+    assert ident["source_sha256"] == hashlib.sha256(src.read_bytes()).hexdigest()
+    assert (ident["seed"], ident["n_cols"], ident["rows"], ident["source_rows"], ident["source_total_cols"]) == (7, 4, None, 12, 10)
+    first = _t02_h5_features(h5)
+    assert harness.ensure_subset(src, 4, 7, sub)[2] is False  # 同身分 ⇒ 沿用
+    _t02_handoff(tmp_path / "src", v1 + 1.0)  # 來源內容改變（同形狀、同路徑）
+    h5b, _m, rebuilt = harness.ensure_subset(src, 4, 7, sub)
+    assert rebuilt is True
+    chosen = np.sort(np.random.default_rng(7).permutation(10)[:4])
+    assert np.array_equal(_t02_h5_features(h5b), (v1 + 1.0)[:, chosen].astype(np.float32))
+    assert not np.array_equal(_t02_h5_features(h5b), first)
+    assert harness.ensure_subset(src, 4, 8, sub)[2] is True  # seed 不同
+    assert harness.ensure_subset(src, 5, 8, sub)[2] is True  # 欄數不同
+    _r, _m, rebuilt = harness.ensure_subset(src, 5, 8, rdir, rows=8, parent_dir=sub)
+    assert rebuilt is True and harness._h5_rows(rdir / src.name) == 8
+    assert harness.ensure_subset(src, 5, 8, rdir, rows=8, parent_dir=sub)[2] is False
+    _t02_handoff(tmp_path / "src", v1 * 2.0)
+    _r, _m, rebuilt = harness.ensure_subset(src, 5, 8, rdir, rows=8, parent_dir=sub)
+    chosen5 = np.sort(np.random.default_rng(8).permutation(10)[:5])
+    assert rebuilt is True and np.array_equal(_t02_h5_features(rdir / src.name), (v1 * 2.0)[-8:, chosen5].astype(np.float32))
+    # 存檔目錄之身分（stage_identity）：相同且檔在 files ⇒ 可讀；身分不同、status 非 complete、檔不在 files ⇒ 拒收
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    (stage / "preprocess.pkl").write_bytes(pickle.dumps({"self": None, "args": (), "kwargs": {}}))
+    want = {"subset": harness.subset_identity(src, n_cols=5, seed=8, rows=None), "writer": ["ic_page_default", "cols"]}
+    harness.write_identity(stage / harness.STAGE_IDENTITY_FILE, {**want, "status": "complete", "files": ["preprocess"]})
+    assert harness.load_capture(stage, "preprocess", want)["args"] == ()
+    for side in ({**want, "status": "building", "files": ["preprocess"]}, {**want, "status": "complete", "files": []},
+                 {**want, "subset": {**want["subset"], "source_sha256": "0" * 64}, "status": "complete",
+                  "files": ["preprocess"]}):
+        harness.write_identity(stage / harness.STAGE_IDENTITY_FILE, side)
+        with pytest.raises(harness.HarnessError):
+            harness.load_capture(stage, "preprocess", want)
+
+
+def _t02_axis_records(run_id: str, axis: str, scales: Sequence[int], eids: Sequence[str],
+                      facts: Any, actual: Any = "scale") -> Dict[str, Any]:
+    """合成之 (run_id, axis) 實跑（記錄形狀同 run_one 寫出者；秒數 ∝ 規模）；`actual`＝"scale"（actual_scale＝規模）、
+    None（不帶）或函式。"""
+    points, records = [], {}
+    for s in scales:
+        rec = {"path_run_id": f"{run_id}.{axis}{s}", "run_id": run_id, "wall_seconds": 1.0, "peak_footprint_bytes": 9000 + s,
+               "progress_times": [], "_record_path": f"{run_id}-{axis}-{s}.json", "facts": facts(s),
+               "entries": {e: {"calls": 2, "raised": 0, "seconds": 0.001 * s, "max_rows": 0, "max_cols": 0, "keyed": False,
+                               "long_intervals": [], "max_call_seconds": 0.1} for e in eids}}
+        if actual == "scale":
+            rec["actual_scale"] = s
+        elif callable(actual):
+            rec["actual_scale"] = actual(s)
+        records[s] = [rec]
+        points.append({"scale": s, "unit": axis, "runs": 1, "seconds": 2.0, "peak_rss_bytes": 10 ** 8 + s})
+    cmd = ["venv/bin/python", "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis]
+    return {"probe": {"cmd": cmd, "data": [], "config": []}, "receipt_path": f"{run_id}-{axis}.json",
+            "receipt": {"points": points, "projection": {"scale": max(scales)}}, "records": records}
+
+
+def _t02_second_axis_case() -> Tuple[Dict[str, Any], Dict[Tuple[str, str], Any]]:
+    base = {"stage": "x", "ic_page": True, "ic_first": False, "loop": "none", "measure": True, "no_measure_reason": None,
+            "evidence": "m/x.py:1"}
+    inv = {"entries": [
+        {**base, "id": "m.x:cross", "input_axes": ["cols", "rows"], "branch_cell": "cross_sectional", "coverage_path_id": "c1",
+         "unit_axis": {"axes": ["stage_cols", "timestamps"], "function": "stage_cols*n_timestamps"},
+         "scale_vector": ["rows", "stage_cols", "timestamps"]},
+        {**base, "id": "m.x:mw", "input_axes": ["cols"], "branch_cell": "event_import", "coverage_path_id": "c2",
+         "unit_axis": {"axes": ["stage_cols", "events"], "function": "stage_cols*n_events"},
+         "scale_vector": ["stage_cols", "events"]},
+        {**base, "id": "m.x:label", "input_axes": [], "branch_cell": "event_import", "coverage_path_id": "c3",
+         "unit_axis": {"axes": ["events"], "function": "n_events"}, "scale_vector": ["events"]},
+        {**base, "id": "m.x:post", "input_axes": ["passed_cols", "rows"], "branch_cell": "post_ic_transform",
+         "coverage_path_id": "c4", "unit_axis": {"axes": ["rows", "survivors"], "function": "survivors*rows*W"},
+         "scale_vector": ["rows", "survivors"]}]}
+    cols = (500, 1000, 2000)
+    runs = {
+        ("cross_sectional", "cols"): _t02_axis_records("cross_sectional", "cols", cols, ["m.x:cross"], lambda s: {
+            "input_cols": s, "rows": 1000, "symbols": 2, "timestamps": 500, "requested_columns": None}),
+        ("cross_sectional", "timestamps"): _t02_axis_records("cross_sectional", "timestamps", (250, 375, 500), ["m.x:cross"],
+                                                             lambda s: {"input_cols": 500, "rows": 2 * s, "symbols": 2,
+                                                                        "timestamps": s, "requested_columns": None}),
+        ("event_import", "cols"): _t02_axis_records("event_import", "cols", cols, ["m.x:mw"], lambda s: {
+            "input_cols": s, "rows": 2000, "events": 40, "survivors": 3, "requested_columns": None}),
+        ("event_import", "events"): _t02_axis_records("event_import", "events", (10, 20, 40), ["m.x:mw", "m.x:label"],
+                                                      lambda s: {"input_cols": 500, "rows": 2000, "events": s,
+                                                                 "survivors": 3, "requested_columns": None}),
+        ("post_ic_transform", "cols"): _t02_axis_records("post_ic_transform", "cols", cols, ["m.x:post"], lambda s: {
+            "input_cols": s, "rows": 500, "survivors": 7, "requested_columns": None}),
+        ("post_ic_transform", "rows"): _t02_axis_records("post_ic_transform", "rows", (1000, 1500, 2000), ["m.x:post"],
+                                                         lambda s: {"input_cols": 500, "rows": s, "survivors": 9,
+                                                                    "requested_columns": None}),
+    }
+    return inv, runs
+
+
+def test_task02_second_axis_assembly(harness: Any, scale_probe: Any) -> None:
+    """SPEC v5.52 (b)：各路徑之第二軸——跨標的 timestamps、事件型 cols 入口之 events、只隨事件數變之入口以 events 為主軸、
+    post_ic_transform rows；收據明示軸名（row_axis／row_fit.axis）、點之 x 鍵與 scale_vector 為該軸之宣告規模；
+    `require_rows` 下缺任一第二軸實跑 ⇒ 點名該入口；第二軸紀錄未帶或不等於宣告規模之 actual_scale ⇒ 組裝失敗。"""
+    inv, runs = _t02_second_axis_case()
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "budget_seconds": BUDGET2_UPPER_SECONDS,
+          "sample_interval_seconds": 0.2, "chunk_cap": {"bytes": 1, "basis": "x"}, "require_rows": True}
+    got = harness.assemble_scale_receipt(inv, runs, **kw)
+    m = got["entries"]
+    assert m["m.x:cross"]["row_axis"] == "timestamps" and m["m.x:cross"]["row_fit"]["axis"] == "timestamps"
+    assert [p["timestamps"] for p in m["m.x:cross"]["row_points"]] == [250, 375, 500]
+    assert [p["scale_vector"]["timestamps"] for p in m["m.x:cross"]["row_points"]] == [250, 375, 500]
+    assert m["m.x:mw"]["axis"] == "cols" and m["m.x:mw"]["row_axis"] == "events"
+    assert [p["events"] for p in m["m.x:mw"]["row_points"]] == [10, 20, 40]
+    assert m["m.x:label"]["axis"] == "events" and m["m.x:label"]["row_points"] is None
+    assert [p["events"] for p in m["m.x:label"]["points"]] == [10, 20, 40]
+    assert m["m.x:post"]["row_axis"] == "rows" and [p["rows"] for p in m["m.x:post"]["row_points"]] == [1000, 1500, 2000]
+    assert all(p["actual_scale"] == p["rows"] for p in m["m.x:post"]["row_points"])
+    assert got["schedule_coverage"]["uncovered"] == [] and got["schedule_coverage"]["measured"] == 4
+    for drop, victim in ((("cross_sectional", "timestamps"), "m.x:cross"), (("event_import", "events"), "m.x:mw"),
+                         (("post_ic_transform", "rows"), "m.x:post")):
+        with pytest.raises(harness.AssemblyError) as exc:
+            harness.assemble_scale_receipt(inv, {k: v for k, v in runs.items() if k != drop}, **kw)
+        assert any(victim in p for p in exc.value.problems), (drop, exc.value.problems)
+    bad = dict(runs)
+    bad[("cross_sectional", "timestamps")] = _t02_axis_records(
+        "cross_sectional", "timestamps", (250, 375, 500), ["m.x:cross"],
+        lambda s: {"input_cols": 500, "rows": 2 * s, "symbols": 2, "timestamps": s, "requested_columns": None}, actual=None)
+    with pytest.raises(harness.AssemblyError) as exc:  # 第二軸未驗實際點數 ⇒ 拒收
+        harness.assemble_scale_receipt(inv, bad, **kw)
+    assert any("m.x:cross" in p and "實際輸入點數" in p for p in exc.value.problems)
+    bad[("cross_sectional", "timestamps")] = runs[("cross_sectional", "timestamps")]
+    bad[("event_import", "cols")] = _t02_axis_records(
+        "event_import", "cols", (500, 1000, 2000), ["m.x:mw"],
+        lambda s: {"input_cols": s, "rows": 2000, "events": 40, "survivors": 3, "requested_columns": None},
+        actual=lambda s: s - 1)
+    with pytest.raises(harness.AssemblyError) as exc:  # 主軸帶 actual_scale 而不等 ⇒ 拒收
+        harness.assemble_scale_receipt(inv, bad, **kw)
+    assert any("m.x:mw" in p and "實際輸入點數" in p for p in exc.value.problems)
+
+
+def test_task02_schedule_covers_every_measured_entry(fb: Any, harness: Any) -> None:
+    """SPEC v5.52 (b)：由定稿清冊導出之實跑排程（`schedule_runs`，`measure_inventory` 同用）涵蓋每一 measure=true 入口之主軸
+    與第二軸——未涵蓋數由清冊計算為 0（不寫死入口數）；排程之每一軸皆為該路徑／格所支援；事件型入口之事件數不記為 rows
+    （scale_vector 含 events 之 event_import／event_study 入口 input_axes 不含 rows）；input_axes 含 rows 之入口皆有第二軸
+    對應。反例：自排程移除任一第二軸實跑 ⇒ 該格入口被點名未涵蓋。"""
+    inv = json.loads((REPO / "scripts" / "icperf_path_inventory.json").read_text(encoding="utf-8"))
+    assert fb.inventory_problems(inv) == []
+    measured = [e for e in inv["entries"] if e["measure"]]
+    sched = harness.schedule_runs(inv)
+    cov = harness.schedule_coverage(inv, sched)
+    assert cov["uncovered"] == [] and cov["covered"] == cov["measured"] == len(measured)
+    assert all(a in harness.RUN_AXES[r] for r, a in sched)
+    assert sched.index(("ic_page_long", "rows")) < min(sched.index((c, "rows")) for c in harness.CELLS
+                                                       if (c, "rows") in sched)
+    for e in measured:
+        if e["branch_cell"] in harness.EVENT_AXIS_RUN and "events" in e["scale_vector"]:
+            assert "rows" not in e["input_axes"], f"{e['id']}：事件數不得記為 rows（SPEC v5.52 (b)）"
+        if "rows" in e["input_axes"]:
+            assert harness.second_axis_run(e["branch_cell"]) is not None, e["id"]
+        for ax in (e.get("fixed_axes") or {}):
+            assert ax not in e["input_axes"] and ax in e["scale_vector"], e["id"]
+    assert {("cross_sectional", "timestamps"), ("event_import", "events"), ("post_ic_transform", "rows"),
+            ("icfirst_post_generation", "rows"), ("ic_page_long", "rows"), ("deep_analysis_long", "rows")} <= set(sched)
+    for drop in (("cross_sectional", "timestamps"), ("post_ic_transform", "rows"), ("icfirst_post_generation", "rows"),
+                 ("event_import", "events")):
+        miss = harness.schedule_coverage(inv, [x for x in sched if x != drop])["uncovered"]
+        assert miss and all(f"{drop[0]}:{drop[1]}" in u["missing"] for u in miss), drop
+    assert harness.axis_scales("cross_sectional", "timestamps", cols_scales=(), row_scales=(), event_scales=()) \
+        == list(harness.XSEC_TIMESTAMP_SCALES)
+    assert harness.axis_scales("icfirst_post_generation", "rows", cols_scales=(), row_scales=(1, 2, 3), event_scales=()) \
+        == list(harness.ICFIRST_ROW_SCALES)
+    # 清冊 schema：input_axes 空而 scale_vector 無 events、fixed_axes 落在 input_axes ⇒ 問題
+    e0 = copy.deepcopy(next(e for e in measured if e["input_axes"] == [] and "events" in e["scale_vector"]))
+    probe = {**inv, "entries": [{**e0, "scale_vector": ["rows"], "unit_axis": {"axes": ["rows"], "function": "rows"}},
+                                {**e0, "id": e0["id"] + "x", "coverage_path_id": "cp-x", "input_axes": ["rows"],
+                                 "scale_vector": ["rows", "events"], "fixed_axes": {"rows": "x"}}]}
+    probs = fb.inventory_problems(probe)
+    assert any("input_axes 非法" in p for p in probs) and any("fixed_axes" in p for p in probs)
+
+
+def _t02_raw_run(root: Path, n_cols: int = 12, n_rows: int = 30) -> Tuple[str, str, str]:
+    """以產品寫出端 `FeatureStorage.write_raw` 建 raw run（三群組、DatetimeIndex 時間軸；值為確定性亂數）——量測工具之
+    秒級契約用（驗子集重寫與讀取端可讀，非特徵值驗證）。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage, build_timeframe_completeness
+
+    sym, tf, ch = "BTCUSDT", "1h", "cfg0"
+    idx = pd.date_range("2024-01-01", periods=n_rows, freq="h")
+    rng = np.random.default_rng(3)
+    vals = rng.normal(size=(n_rows, n_cols)).astype(np.float32)
+    vals[0, 1] = np.nan
+    names = [f"g{i % 3}_f{i:02d}" for i in range(n_cols)]
+    groups = {f"grp{g}": pd.DataFrame({n: vals[:, i] for i, n in enumerate(names) if i % 3 == g}, index=idx)
+              for g in range(3)}
+    # 生成端之 completeness 證據（同 `generate_features` 落盤之 run：週期三欄＋L1–L6 狀態）⇒ run_status complete，嚴格讀取端可讀
+    FeatureStorage(str(root)).write_raw(sym, tf, ch, groups, row_index=idx,
+                                        timeframe_completeness=build_timeframe_completeness([tf], []),
+                                        layer_status_by_tf={tf: {f"L{i}": ("complete", "") for i in range(1, 7)}})
+    return sym, tf, ch
+
+
+def test_task02_icfirst_subset_via_write_raw(harness: Any, tmp_path: Path) -> None:
+    """SPEC v5.52 (c)：IC-first 之欄子集 run 經產品寫出端 `FeatureStorage.write_raw` 由一次之 raw run 重寫（身分欄由產品寫出端
+    產生）——子集 run 可由產品讀取端（`FeatureReader.load_manifest_v2(consumer=strict)`、`ICEngine._validate_l7_raw_manifest`、
+    `stream_groups_v2`、`load_row_index_v2`）讀出，欄數＝N、群組欄聯集＝所選欄、時間軸與逐欄值（含 NaN）＝來源；巢狀（N 小
+    者 ⊆ N 大者）。反例：所選欄清單與子集不符、子集某欄值被改 ⇒ `verify_icfirst_subset` 大聲失敗。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    src = tmp_path / "src"
+    sym, tf, ch = _t02_raw_run(src)
+    rec = {"symbol": sym, "timeframe": tf, "config_hash": ch}
+    c5 = harness.write_icfirst_subset(src, tmp_path / "c5", sym, tf, ch, 5, 20261027)
+    check = harness.verify_icfirst_subset(src, tmp_path / "c5", rec, c5)
+    assert check["ok"] is True and check["n_cols"] == 5 and check["row_count"] == 30 and len(set(c5)) == 5
+    c8 = harness.write_icfirst_subset(src, tmp_path / "c8", sym, tf, ch, 8, 20261027)
+    assert set(c5) <= set(c8) and harness.verify_icfirst_subset(src, tmp_path / "c8", rec, c8)["n_cols"] == 8
+    with pytest.raises(harness.HarnessError):
+        harness.verify_icfirst_subset(src, tmp_path / "c5", rec, c5[:-1])
+    with pytest.raises(harness.HarnessError):
+        harness.write_icfirst_subset(src, tmp_path / "c12", sym, tf, ch, 12, 20261027)  # N 不得 ≥ raw 欄數
+    # 子集某欄值被改（經同一產品寫出端重寫）⇒ 逐欄值比對失敗
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    reader = FeatureReader(str(tmp_path / "c5"))
+    idx = reader.load_row_index_v2(sym, tf, ch, artifact_kind="raw")
+    groups = {g: f for g, f in reader.stream_groups_v2(sym, tf, ch, "raw", consumer="strict")}
+    gid = sorted(groups)[0]
+    groups[gid] = groups[gid].copy()
+    groups[gid].iloc[3, 0] = groups[gid].iloc[3, 0] + 1.0
+    for g in groups:
+        groups[g].index = idx
+    FeatureStorage(str(tmp_path / "c5")).write_raw(sym, tf, ch, groups, row_index=idx)
+    with pytest.raises(harness.HarnessError, match="值"):
+        harness.verify_icfirst_subset(src, tmp_path / "c5", rec, c5)

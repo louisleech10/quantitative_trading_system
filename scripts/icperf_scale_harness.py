@@ -9,7 +9,10 @@
   venv/bin/python scripts/icperf_scale_harness.py list                 # 列出路徑與直接呼叫格及其所涵蓋之清冊入口數
   venv/bin/python scripts/icperf_scale_harness.py plan                 # 清冊 measure=true 入口 ⇒ branch_cell 對照與未涵蓋者
   venv/bin/python scripts/icperf_scale_harness.py precheck-rows        # v5.51 (a)：列數軸列長之樣本外切分秒級預檢
-  run 之選項：--axis cols|rows|events（預設 cols；rows＝固定 `ROW_AXIS_COLS` 欄、子集列數截為末 {scale} 列；events＝事件數）
+  venv/bin/python scripts/icperf_scale_harness.py coverage             # v5.52 (b)：清冊對實跑排程（主軸＋第二軸）之涵蓋
+  venv/bin/python scripts/icperf_scale_harness.py prepare post-ic-rows|icfirst-subsets   # v5.52 (b)(c)：量測前之存檔輸入
+  run 之選項：--axis cols|rows|events|timestamps（預設 cols；rows＝固定 `ROW_AXIS_COLS` 欄、子集列數截為末 {scale} 列；
+  events＝事件數；timestamps＝跨標的末 {scale} 個時點）
   --inventory <清冊>（預設 scripts/icperf_path_inventory.json）、--out-root <工作根>（預設 runs/icperf/task02）
 
 路徑（`PATHS`）與直接呼叫格（`CELLS`）——入口歸屬以清冊 `branch_cell` 欄為準：
@@ -23,7 +26,13 @@
 - `event_study`：事件研究頁之 `EventImportService.import_records`＋`analyze`（隔離之事件儲存根；批＝`icperf_event_batch`
   規則以 L 格真實 kline 建之事件，events 軸取依 t0 排序之前 {scale} 筆）；另以 feature_run 呼叫投影分支（失敗記錄於收據）。
 - `cross_sectional`：A 格 BTCUSDT／SOLUSDT 兩 run 共同欄之 N 欄（排序前綴）經 `icperf_correctness_receipt._child_cross`。
-- `icfirst_post_generation`：阻擋（見 `_run_icfirst_post_generation` 之碼證）——以 `HarnessError` 回報，不以他物代替。
+- `icfirst_post_generation`：cols 軸＝基準 raw run 經產品寫出端 `FeatureStorage.write_raw` 重寫之 N 欄子集 run（`prepare
+  icfirst-subsets`；`verify_icfirst_subset` 驗 manifest 身分、實際欄數、讀取端可讀與逐欄值）；rows 軸＝三種窗長之生成
+  （`icperf_freeze_baseline.py gen-icfirst-raw --rows R`）各取 `ROW_AXIS_COLS` 欄（SPEC v5.52 (b)(c)）。
+- SPEC v5.52：(a) 子集與存檔輸入之沿用比對來源身分 sidecar（`ensure_subset`、`STAGE_IDENTITY_FILE`）；(b) 各路徑第二軸
+  （`entry_runs`／`schedule_runs`／`schedule_coverage`：post_ic_transform rows〔`prepare post-ic-rows` 之 L 格存檔任務〕、
+  cross_sectional timestamps、event_import events〔隔離儲存根之前 {scale} 筆〕、IC-first rows），每一軸實跑驗實際輸入點數
+  ＝宣告規模（`actual_scale`，不等 ⇒ HarnessError）；`coverage` 子命令列涵蓋。
 - 直接呼叫格（`CELLS`）：讀 `stage_inputs/<N>/` 之真實輸入，以路徑同一設定物件（pickle 之 self）呼叫互斥分支：滾動 IC
   kendall／pearson、冗餘 hierarchical／vif／多元化約束、regime kmeans、fit_mode pit_expanding（C 格 500 列 ≤ 512 ⇒ percentile
   走 `pit_expanding_bounds`）、PIT mad 縮尾、`standardize` 之 time_series_zscore＋pit_expanding、無缺值向量化 IC。
@@ -115,6 +124,21 @@ TASK02_RECORDS_ROOT = "handoffs/run_receipts/icperf_task02_records"
 CRITERION2_FLOOR_SECONDS_PER_UNIT = 1e-10
 #: 跨標的路徑之兩格（A 格同週期兩標的）
 CROSS_CELLS = ("A_BTCUSDT_1h", "A_SOLUSDT_1h")
+#: 跨標的路徑之請求覆寫（同 `icperf_correctness_receipt.REQUESTS["X.cross_sectional"]` 之退回分支）：兩格各 500 列，產品
+#: 全域切分（`ic_filter_orchestrator.py:1003-1034` `_build_cross_sectional_global_split`：oos_test_size 0.2、purge＝horizon、
+#: 每標的測試段 ≥ min_test_rows 131〔`ic_config_schema.py:461-463`〕）於 500 時點之每標的測試段 ≤ 500−400−purge < 131 ⇒ 預設
+#: 切分必拋 InvalidInputError；故跨標的兩格之量測一律明列關切分（不以預設失敗後退回；SPEC v5.39 ⑩ 同法）
+XSEC_OVERRIDE_EXTRA: Dict[str, Any] = {"ic_train_test_split": False}
+#: SPEC v5.52 (b)：跨標的之第二軸＝時點數（截短時間跨度：兩格各取末 T 個共同時點）；兩格各 500 列 ⇒ 三點 250／375／500
+XSEC_TIMESTAMP_SCALES = (250, 375, 500)
+#: SPEC v5.52 (b)(c)：IC-first post-generation 列軸之三種窗長（輸出段根數）：500＝A 格生成定義之 output_bars（沿用 cols 軸之
+#: raw run）、1,000／2,000 各一次生成（`icperf_freeze_baseline.py gen-icfirst-raw --rows R`）；各窗長之 raw run 經
+#: `FeatureStorage.write_raw` 取同一 `ROW_AXIS_COLS` 欄巢狀子集（列軸內欄數不變）
+ICFIRST_ROW_SCALES = (500, 1000, 2000)
+#: SPEC v5.52 (a)：子集與各段存檔輸入之身分 sidecar（來源內容 sha256、seed、欄數、列長；不同 ⇒ 重建，不只憑檔案存在）
+SUBSET_IDENTITY_FILE = "subset_identity.json"
+STAGE_IDENTITY_FILE = "stage_identity.json"
+SUBSET_IDENTITY_SCHEMA = "icperf-t02-subset-identity/1"
 
 #: 路徑實跑（v5.49）：id ⇒ 說明
 PATHS: Dict[str, str] = {
@@ -123,11 +147,16 @@ PATHS: Dict[str, str] = {
                     "rows 軸＝固定 ROW_AXIS_COLS 欄、末 R 列、ROW_AXIS_WINDOW_OVERRIDE（存直接呼叫格之列數軸真實輸入）",
     "deep_analysis": "同 ic_page_default 之 analyze 後同一 analyzer 續跑深度分析全部模組",
     "deep_analysis_long": "同 ic_page_long 之 rows 軸 analyze 後同一 analyzer 續跑深度分析全部模組（深度分析之列數軸）",
-    "post_ic_transform": "A 格 run feature_filter N 欄經服務 start_analysis 後 _apply_transforms_sync（rank／zscore／gaussian）",
-    "event_import": "L 格 run feature_filter N 欄＋§G (7) 事件匯入批（event_import_run）",
+    "post_ic_transform": "A 格 run feature_filter N 欄經服務 start_analysis 後 _apply_transforms_sync（rank／zscore／gaussian）；"
+                         "rows 軸＝L 格存檔之 IC 任務（prepare post-ic-rows）於末 R 列直接呼叫 _apply_transforms_sync",
+    "event_import": "L 格 run feature_filter N 欄＋§G (7) 事件匯入批（event_import_run）；events 軸＝固定 ROW_AXIS_COLS 欄、"
+                    "隔離儲存根之前 {scale} 筆事件",
     "event_study": "事件研究頁：隔離儲存根之 import_records＋analyze（events 軸＝前 {scale} 筆事件）",
-    "cross_sectional": "A 格 BTCUSDT／SOLUSDT 兩 run 共同 N 欄之跨標的 analyze_cross_sectional",
-    "icfirst_post_generation": "IC-first 之 _run_ic_first_post_generation 整段與子步驟（阻擋：見 _run_icfirst_post_generation）",
+    "cross_sectional": "A 格 BTCUSDT／SOLUSDT 兩 run 共同 N 欄之跨標的 analyze_cross_sectional（關切分，XSEC_OVERRIDE_EXTRA）；"
+                       "timestamps 軸＝固定 ROW_AXIS_COLS 欄、末 T 個時點",
+    "icfirst_post_generation": "IC-first 之 _run_ic_first_post_generation 整段與子步驟：cols 軸＝一次生成之 raw run 經 "
+                               "FeatureStorage.write_raw 重寫之 N 欄子集 run（prepare icfirst-subsets）；rows 軸＝窗長 R 之"
+                               "生成經同法取 ROW_AXIS_COLS 欄",
 }
 #: 直接呼叫格（v5.50 (d)）：id ⇒ 說明
 CELLS: Dict[str, str] = {
@@ -164,14 +193,23 @@ CELL_CAPTURES: Dict[str, Tuple[str, ...]] = {
 RUN_AXES: Dict[str, Tuple[str, ...]] = {
     **{c: ("cols", "rows") for c in CELLS},
     "ic_page_default": ("cols",), "ic_page_long": ("cols", "rows"), "deep_analysis": ("cols",),
-    "deep_analysis_long": ("rows",), "post_ic_transform": ("cols",),
-    "event_import": ("cols",), "event_study": ("events",), "cross_sectional": ("cols",),
-    "icfirst_post_generation": ("cols",),
+    "deep_analysis_long": ("rows",), "post_ic_transform": ("cols", "rows"),
+    "event_import": ("cols", "events"), "event_study": ("events",), "cross_sectional": ("cols", "timestamps"),
+    "icfirst_post_generation": ("cols", "rows"),
 }
 ROW_AXIS_RUN.update({"ic_page_default": "ic_page_long", "ic_page_long": "ic_page_long",
-                     "deep_analysis": "deep_analysis_long", **{c: c for c in CELLS}})
+                     "deep_analysis": "deep_analysis_long", "post_ic_transform": "post_ic_transform",
+                     "icfirst_post_generation": "icfirst_post_generation", **{c: c for c in CELLS}})
+#: SPEC v5.52 (b)：清冊 input_axes 之 rows 由非 rows 名之軸實跑代之者（收據 `row_axis` 明示軸名）——跨標的之列數＝時點數 ×
+#: 標的數，以截短時間跨度之時點數為軸
+ROW_AXIS_ALIAS: Dict[str, Tuple[str, str]] = {"cross_sectional": ("cross_sectional", "timestamps")}
+#: SPEC v5.52 (b)：事件型路徑之事件數軸（清冊 scale_vector 含 events 之入口）：所屬格 ⇒ events 軸實跑之 run_id
+EVENT_AXIS_RUN: Dict[str, str] = {"event_import": "event_import", "event_study": "event_study"}
 #: 寫直接呼叫格所需存檔之 (路徑, 軸)：cols 軸取 C 格 ic_page_default、rows 軸取 L 格 ic_page_long
 CAPTURE_RUNS: Tuple[Tuple[str, str], ...] = (("ic_page_default", "cols"), ("ic_page_long", "rows"))
+#: 主軸以外之軸實跑之排程先後（ic_page_long rows 先跑：寫直接呼叫格之列數軸存檔）
+SECOND_AXIS_ORDER: Tuple[str, ...] = ("ic_page_long", "deep_analysis_long", "post_ic_transform", "event_import",
+                                      "cross_sectional", "icfirst_post_generation")
 
 
 def primary_axis(run_id: str) -> str:
@@ -181,8 +219,106 @@ def primary_axis(run_id: str) -> str:
 
 
 def row_scales_for(run_id: str) -> Tuple[int, ...]:
-    """rows 軸實跑之列長：`CELL_ROW_SCALES` 所列之格用其短序列列長，其餘＝`ROW_AXIS_SCALES`。"""
+    """rows 軸實跑之列長：`CELL_ROW_SCALES` 所列之格用其短序列列長、IC-first＝`ICFIRST_ROW_SCALES`（三種窗長之生成），
+    其餘＝`ROW_AXIS_SCALES`。"""
+    if run_id == "icfirst_post_generation":
+        return tuple(ICFIRST_ROW_SCALES)
     return tuple(CELL_ROW_SCALES.get(run_id, ROW_AXIS_SCALES))
+
+
+def second_axis_run(cell: Optional[str]) -> Optional[Tuple[str, str]]:
+    """清冊 input_axes 含 rows 之入口所屬格之第二軸實跑 (run_id, 軸名)：`ROW_AXIS_ALIAS`（跨標的＝timestamps）優先，其次
+    `ROW_AXIS_RUN`（rows）；無 ⇒ None（排程無法涵蓋）。"""
+    if cell in ROW_AXIS_ALIAS:
+        return ROW_AXIS_ALIAS[str(cell)]
+    if cell in ROW_AXIS_RUN:
+        return ROW_AXIS_RUN[str(cell)], "rows"
+    return None
+
+
+def entry_runs(e: Mapping[str, Any]) -> Tuple[Tuple[str, str], Optional[Tuple[str, str]], bool]:
+    """清冊 measure=true 入口所需之實跑（SPEC v5.52 (b)）：(主軸 (run_id, 軸), 第二軸 (run_id, 軸)｜None, 是否需第二軸)。
+    主軸＝所屬格之主軸（`primary_axis`）；事件型格（`EVENT_AXIS_RUN`）之入口若 input_axes 不含 cols／passed_cols 而
+    scale_vector 含 events ⇒ 主軸改 events（只隨事件數變之入口）。第二軸：input_axes 含 rows ⇒ `second_axis_run(格)`（無對應者
+    回 (None, True)＝無法涵蓋）；否則 scale_vector 含 events 之事件型格入口而主軸非 events ⇒ (格, "events")。`fixed_axes`
+    （清冊選填；路徑內不隨請求規模變之軸）不排軸。"""
+    cell = str(e.get("branch_cell"))
+    axes = set(e.get("input_axes") or [])
+    sv = set(e.get("scale_vector") or [])
+    axis = primary_axis(cell)
+    if axis != "events" and cell in EVENT_AXIS_RUN and not axes & {"cols", "passed_cols"} and "events" in sv:
+        axis = "events"
+    primary = (EVENT_AXIS_RUN[cell] if axis == "events" and cell in EVENT_AXIS_RUN else cell, axis)
+    if "rows" in axes:
+        return primary, second_axis_run(cell), True
+    if "events" in sv and axis != "events" and cell in EVENT_AXIS_RUN:
+        return primary, (EVENT_AXIS_RUN[cell], "events"), True
+    return primary, None, False
+
+
+def schedule_runs(inventory: Mapping[str, Any], *, second_axes: bool = True) -> List[Tuple[str, str]]:
+    """由清冊導出實跑排程 [(run_id, 軸)]（`measure_inventory` 同用）：先各入口之主軸（ic_page_default、ic_page_long 先，再
+    其餘路徑、直接呼叫格；ic_page_default 寫 cols 軸存檔），再第二軸（`SECOND_AXIS_ORDER`，ic_page_long rows 先；其後直接
+    呼叫格之 rows 軸，讀 ic_page_long rows 所寫存檔）；去重保序。`second_axes`=False ⇒ 只排主軸。"""
+    prim: List[Tuple[str, str]] = []
+    sec: List[Tuple[str, str]] = []
+    for e in inventory.get("entries") or []:
+        if not e.get("measure"):
+            continue
+        p, s, need = entry_runs(e)
+        prim.append(p)
+        if second_axes and need and s is not None and s[0] is not None:
+            sec.append(s)
+    order = {r: i for i, r in enumerate(("ic_page_default", "ic_page_long", *PATHS, *CELLS))}
+    sorder = {r: i for i, r in enumerate((*SECOND_AXIS_ORDER, *PATHS, *CELLS))}
+    prim = sorted(dict.fromkeys(prim), key=lambda x: (order.get(x[0], len(order)), x[1]))
+    sec = sorted(dict.fromkeys(sec), key=lambda x: (sorder.get(x[0], len(sorder)), x[1]))
+    return list(dict.fromkeys(prim + sec))
+
+
+def schedule_coverage(inventory: Mapping[str, Any], sched: Sequence[Tuple[str, str]]) -> Dict[str, Any]:
+    """排程對清冊之涵蓋（SPEC v5.52 (b)「排程與組裝之 require_rows 同步涵蓋」）：每一 measure=true 入口所需之主軸與第二軸
+    （`entry_runs`）皆在 `sched` 且該軸為該 run 所支援（`RUN_AXES`）⇒ 涵蓋。回 {"measured", "covered", "uncovered": [{"id",
+    "missing": [...]}], "by_axis": {"<run>:<軸>": 入口數}, "fixed_axes": {id: [軸...]}}。"""
+    have = {(r, a) for r, a in sched if a in RUN_AXES.get(r, ())}
+    out: Dict[str, Any] = {"measured": 0, "covered": 0, "uncovered": [], "by_axis": {}, "fixed_axes": {}}
+    for e in inventory.get("entries") or []:
+        if not e.get("measure"):
+            continue
+        out["measured"] += 1
+        p, s, need = entry_runs(e)
+        missing = [f"{p[0]}:{p[1]}"] if p not in have else []
+        if need:
+            if s is None or s[0] is None:
+                missing.append(f"{e.get('branch_cell')}:<無第二軸對應>")
+            elif s not in have:
+                missing.append(f"{s[0]}:{s[1]}")
+        for run in [p] + ([s] if need and s else []):
+            out["by_axis"][f"{run[0]}:{run[1]}"] = out["by_axis"].get(f"{run[0]}:{run[1]}", 0) + 1
+        if e.get("fixed_axes"):
+            out["fixed_axes"][str(e["id"])] = sorted(e["fixed_axes"])
+        if missing:
+            out["uncovered"].append({"id": str(e["id"]), "missing": missing})
+        else:
+            out["covered"] += 1
+    return out
+
+
+def axis_scales(run_id: str, axis: str, *, cols_scales: Sequence[int], row_scales: Sequence[int],
+                event_scales: Sequence[int]) -> List[int]:
+    """(run_id, 軸) 之三規模點：cols＝`cols_scales`；rows＝`CELL_ROW_SCALES`／IC-first 窗長或 `row_scales`；events＝
+    `event_scales`；timestamps＝`XSEC_TIMESTAMP_SCALES`。"""
+    if axis == "cols":
+        return [int(s) for s in cols_scales]
+    if axis == "rows":
+        if run_id in CELL_ROW_SCALES or run_id == "icfirst_post_generation":
+            return list(row_scales_for(run_id))
+        return [int(s) for s in row_scales]
+    if axis == "events":
+        return [int(s) for s in event_scales]
+    if axis == "timestamps":
+        return list(XSEC_TIMESTAMP_SCALES)
+    raise HarnessError(f"未知軸：{axis}")
 
 
 class HarnessError(RuntimeError):
@@ -719,12 +855,15 @@ def _strip_callables(v: Any) -> Any:
     return v
 
 
-def _capture_writer(stage_dir: Path, name: str, with_result: bool, provenance: Mapping[str, Any]) -> Callable:
+def _capture_writer(stage_dir: Path, name: str, with_result: bool, provenance: Mapping[str, Any],
+                    overwrite: bool = False) -> Callable:
+    """存檔寫出端（只存本次實跑之第一次呼叫）。`overwrite`＝存檔目錄之身分與本次子集不同（SPEC v5.52 (a)）⇒ 覆寫既有檔；
+    否則既有檔沿用（同身分之前次實跑已寫）。"""
     def write(args: Tuple[Any, ...], kwargs: Dict[str, Any], result: Any) -> None:
         import pickle
 
         out = stage_dir / f"{name}.pkl"
-        if out.exists():
+        if out.exists() and not overwrite:
             return
         stage_dir.mkdir(parents=True, exist_ok=True)
         self_obj, rest = (args[0], args[1:]) if args and not hasattr(args[0], "shape") else (None, args)
@@ -757,12 +896,21 @@ def stage_input_card(root: Path) -> None:
         encoding="utf-8")
 
 
-def load_capture(stage_dir: Path, name: str) -> Dict[str, Any]:
+def load_capture(stage_dir: Path, name: str, expected: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """讀存檔真實輸入。SPEC v5.52 (a)：`expected` 給定 ⇒ 存檔目錄之 `STAGE_IDENTITY_FILE` 須 status complete 且其身分逐欄等於
+    `expected`（現行來源之子集身分），否則 HarnessError（存檔來自他版來源，不得沿用；須先重跑寫出之路徑）。"""
     import pickle
 
     path = Path(stage_dir) / f"{name}.pkl"
     if not path.is_file():
         raise HarnessError(f"直接呼叫格之存檔真實輸入不存在：{path}（須先跑同一規模點之 ic_page_default 路徑）")
+    if expected is not None:
+        side = read_identity(Path(stage_dir) / STAGE_IDENTITY_FILE) or {}
+        got = {k: side.get(k) for k in expected}
+        if side.get("status") != "complete" or got != json.loads(json.dumps(dict(expected))) \
+                or name not in (side.get("files") or []):
+            raise HarnessError(f"存檔 {stage_dir} 之身分與現行來源不符（SPEC v5.52 (a)；status={side.get('status')!r}）：須先重跑"
+                               f"寫出之路徑 {expected.get('writer')}")
     with open(path, "rb") as fh:
         return pickle.load(fh)
 
@@ -887,8 +1035,13 @@ class RunContext:
         self.out_root, self.work, self.rec, self.head = out_root, work, rec, head
         self.n_cols = int(scale) if axis == "cols" else ROW_AXIS_COLS
         self.n_rows: Optional[int] = int(scale) if axis == "rows" else None
-        #: v5.51 (a)：rows 軸與 L 格路徑之資料源＝L 格交接 h5
-        self.long = axis == "rows" or run_id in LONG_RUNS
+        #: SPEC v5.52 (b)：timestamps 軸（跨標的）之時點數、events 軸之事件數
+        self.n_timestamps: Optional[int] = int(scale) if axis == "timestamps" else None
+        self.n_events: Optional[int] = int(scale) if axis == "events" else None
+        #: v5.51 (a)：rows 軸與 L 格路徑之資料源＝L 格（IC-first 之 rows 軸除外：A 格三種窗長之生成）
+        self.long = (axis == "rows" and run_id != "icfirst_post_generation") or run_id in LONG_RUNS
+        #: SPEC v5.52 (b)：本次實際輸入之規模點數（runner 驗得後設；run_one 對宣告之 scale 驗等）
+        self.actual_scale: Optional[int] = None
 
     @property
     def stage_dir(self) -> Path:
@@ -936,22 +1089,106 @@ def subset_source(long: bool) -> Path:
     return fb.l_handoff_path() if long else fb.c_handoff_path()
 
 
+_SHA_MEMO: Dict[Tuple[str, int, int], str] = {}
+
+
+def file_sha256(path: Path) -> str:
+    """檔案內容 sha256（串流讀；同一行程內以 (realpath, size, mtime_ns) 記憶，來源於行程內不變）。"""
+    p = Path(os.path.realpath(path))
+    st = p.stat()
+    key = (str(p), int(st.st_size), int(st.st_mtime_ns))
+    if key not in _SHA_MEMO:
+        h = hashlib.sha256()
+        with open(p, "rb") as fh:
+            for block in iter(lambda: fh.read(1 << 20), b""):
+                h.update(block)
+        _SHA_MEMO[key] = h.hexdigest()
+    return _SHA_MEMO[key]
+
+
+def _handoff_shape(src_h5: Path) -> Tuple[int, int]:
+    """交接 h5 之（列數, 全序欄數）（`h5_feature_precision.feature_layout`；同 `_write_stage5_subset` 之讀法）。"""
+    import h5py
+
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from momentum.core import h5_feature_precision as h5fp
+
+    meta = json.loads(Path(src_h5).with_name(Path(src_h5).stem + "_meta.json").read_text(encoding="utf-8"))
+    with h5py.File(src_h5, "r") as f:
+        rows, total, _f64 = h5fp.feature_layout(f[f"{meta['symbol']}/{meta['timeframe']}"])
+    return int(rows), int(total)
+
+
+def subset_identity(src_h5: Path, *, n_cols: int, seed: int, rows: Optional[int] = None) -> Dict[str, Any]:
+    """SPEC v5.52 (a)：巢狀子集（與其所衍生之各段存檔輸入）之來源身分＝{來源交接 h5 之路徑、大小、內容 sha256、列數、全序
+    欄數, seed, 子集欄數 n_cols, 子集列長 rows（None＝來源全長）}；任一不同 ⇒ 不沿用、重建。"""
+    src_rows, total = _handoff_shape(src_h5)
+    return {"schema": SUBSET_IDENTITY_SCHEMA, "source": _rel(Path(src_h5)), "source_size": int(Path(src_h5).stat().st_size),
+            "source_sha256": file_sha256(src_h5), "source_rows": src_rows, "source_total_cols": total,
+            "seed": int(seed), "n_cols": int(n_cols), "rows": None if rows is None else int(rows)}
+
+
+def read_identity(path: Path) -> Optional[Dict[str, Any]]:
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def write_identity(path: Path, identity: Mapping[str, Any]) -> None:
+    """身分 sidecar 原子寫（暫存檔 → os.replace）。"""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    tmp = Path(path).with_suffix(".json.part")
+    tmp.write_text(json.dumps(dict(identity), ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def ensure_subset(src_h5: Path, n_cols: int, seed: int, sub_dir: Path, *,
+                  rows: Optional[int] = None, parent_dir: Optional[Path] = None) -> Tuple[Path, Path, bool]:
+    """SPEC v5.52 (a)：`sub_dir` 之 N 欄巢狀子集（`rows` 給定 ⇒ 另截末 R 列，母子集於 `parent_dir`）——`sub_dir` 之
+    `SUBSET_IDENTITY_FILE` 逐欄等於現行來源之 `subset_identity`（來源內容 sha256、seed、欄數、列長）且 h5／meta 皆存在 ⇒
+    沿用；否則重建（覆寫）後寫 sidecar。回 (h5, meta, 是否重建)。"""
+    fb = _fb()
+    src_meta = Path(src_h5).with_name(Path(src_h5).stem + "_meta.json")
+    want = subset_identity(src_h5, n_cols=n_cols, seed=seed, rows=rows)
+    h5, meta = Path(sub_dir) / Path(src_h5).name, Path(sub_dir) / src_meta.name
+    side = Path(sub_dir) / SUBSET_IDENTITY_FILE
+    if h5.is_file() and meta.is_file() and read_identity(side) == json.loads(json.dumps(want)):
+        return h5, meta, False
+    if rows is None:
+        h5, meta = fb._write_stage5_subset(Path(src_h5), src_meta, int(n_cols), int(seed), Path(sub_dir))
+    else:
+        if parent_dir is None:
+            raise HarnessError("ensure_subset：rows 子集須給母子集目錄 parent_dir")
+        ph5, pmeta, _ = ensure_subset(src_h5, n_cols, seed, parent_dir)
+        h5, meta = _truncate_rows(ph5, pmeta, int(rows), Path(sub_dir))
+    write_identity(side, want)
+    return h5, meta, True
+
+
 def _subset_paths(ctx: RunContext) -> Tuple[Path, Path]:
-    """交接 h5（C 格；rows 軸與 L 格路徑＝L 格，v5.51 (a)）之 N 欄巢狀子集（`<out-root>/subsets/<tag>/`；不存在則以
-    `_write_stage5_subset` 建）；rows 軸另截末 R 列。"""
+    """交接 h5（C 格；rows 軸與 L 格路徑＝L 格，v5.51 (a)）之 N 欄巢狀子集（`<out-root>/subsets/<tag>/`）；rows 軸另截末 R
+    列。SPEC v5.52 (a)：經 `ensure_subset` 比對來源身分，不同即重建（不只憑檔案存在）。"""
     fb = _fb()
     src = subset_source(ctx.long)
-    src_meta = src.with_name(src.stem + "_meta.json")
     sub_dir = ctx.out_root / "subsets" / ctx.stage_tag(None)
-    h5, meta = sub_dir / src.name, sub_dir / src_meta.name
-    if not (h5.is_file() and meta.is_file()):
-        h5, meta = fb._write_stage5_subset(src, src_meta, ctx.n_cols, fb.SEED, sub_dir)
-    if ctx.n_rows is not None:
-        rdir = ctx.out_root / "subsets" / ctx.stage_tag(ctx.n_rows)
-        if not (rdir / h5.name).is_file():
-            return _truncate_rows(h5, meta, ctx.n_rows, rdir)
-        return rdir / h5.name, rdir / meta.name
+    if ctx.n_rows is None:
+        h5, meta, _ = ensure_subset(src, ctx.n_cols, fb.SEED, sub_dir)
+        return h5, meta
+    h5, meta, _ = ensure_subset(src, ctx.n_cols, fb.SEED, ctx.out_root / "subsets" / ctx.stage_tag(ctx.n_rows),
+                                rows=ctx.n_rows, parent_dir=sub_dir)
     return h5, meta
+
+
+def expected_stage_identity(ctx: "RunContext", n_rows: Optional[int]) -> Dict[str, Any]:
+    """直接呼叫格所讀存檔目錄之應有身分（SPEC v5.52 (a)）：該存檔所屬子集之 `subset_identity`（現行來源；rows＝存檔子集
+    列長）＋寫出之 (路徑, 軸)。"""
+    fb = _fb()
+    src = subset_source(ctx.long)
+    writer = ("ic_page_long", "rows") if n_rows is not None else ("ic_page_default", "cols")
+    return {"subset": subset_identity(src, n_cols=ctx.n_cols, seed=fb.SEED, rows=n_rows),
+            "writer": list(writer)}
 
 
 def _h5_rows(h5: Path) -> int:
@@ -961,6 +1198,21 @@ def _h5_rows(h5: Path) -> int:
         found: List[int] = []
         f.visititems(lambda k, v: found.append(int(v.shape[0])) if k.endswith("timestamps") else None)
     return found[0] if found else 0
+
+
+def _h5_cols(h5: Path) -> int:
+    """子集交接 h5 之實際欄數（`feature_names` 長度；SPEC v5.52 (b) 驗實際輸入點數＝宣告規模）。"""
+    import h5py
+
+    with h5py.File(h5, "r") as f:
+        found: List[int] = []
+        f.visititems(lambda k, v: found.append(int(v.shape[0])) if k.endswith("feature_names") else None)
+    return found[0] if found else 0
+
+
+def _subset_actual(ctx: "RunContext", h5: Path) -> int:
+    """IC 頁／深度分析路徑之實際輸入點數：cols 軸＝子集實際欄數、rows 軸＝子集實際列數。"""
+    return _h5_rows(h5) if ctx.axis == "rows" else _h5_cols(h5)
 
 
 def _ic_facts(report: Any, analyzer: Any, input_cols: int, rows: int) -> Dict[str, Any]:
@@ -1007,7 +1259,8 @@ def _split_facts(report: Any) -> Dict[str, Any]:
 
 def _run_ic_page_default(ctx: RunContext) -> Dict[str, Any]:
     analyzer, report, h5 = _ic_page_analyze_subset(ctx, _page_request(ctx, "ic_report"))
-    return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), **_split_facts(report), "requested_columns": None}
+    return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), **_split_facts(report), "requested_columns": None,
+            "actual_scale": _subset_actual(ctx, h5)}
 
 
 def _run_deep_analysis(ctx: RunContext) -> Dict[str, Any]:
@@ -1024,7 +1277,7 @@ def _run_deep_analysis(ctx: RunContext) -> Dict[str, Any]:
     deep_report = analyzer.run_deep_analysis(selected, deep_override, ctx.rec.progress, None)
     svc._attach_cross_symbol_context(svc._serialize_deep_report(deep_report), analyzer)
     return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), **_split_facts(report),
-            "deep_selected": len(selected or []), "requested_columns": None}
+            "deep_selected": len(selected or []), "requested_columns": None, "actual_scale": _subset_actual(ctx, h5)}
 
 
 def _service_with_tasks(request: Mapping[str, Any], registry: Path) -> Any:
@@ -1072,8 +1325,107 @@ def _service_analysis(svc: Any, req: Any, rec: Recorder, **start_kwargs: Any) ->
     return task_id, info
 
 
-def _run_post_ic_transform(ctx: RunContext) -> Dict[str, Any]:
+#: IC 後轉換之參數（同 IC 頁第三步預設：rank／zscore／gaussian 全開、rank 窗 252、zscore 窗 [100, 252]）
+POST_IC_ARGS: Tuple[Any, ...] = (True, True, True, 252, [100, 252])
+#: SPEC v5.52 (b)：post_ic_transform 列軸之存檔輸入（L 格 IC 任務；`prepare post-ic-rows` 產生）之目錄與檔名
+POST_IC_ROWS_DIR = "stage_inputs/post_ic_rows"
+POST_IC_ROWS_FILE = "task.pkl"
+
+
+class _NullProgress:
+    """prepare 步驟之進度接收端（不量測；`_service_analysis` 須有 `progress`）。"""
+
+    def progress(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+
+def post_ic_rows_identity() -> Dict[str, Any]:
+    """post_ic_transform 列軸存檔輸入之來源身分（SPEC v5.52 (a)）：L 格 run 之 manifest 路徑、大小、內容 sha256、固定欄數
+    `ROW_AXIS_COLS` 與請求之欄（排序前綴；`small_request`）之 sha256。"""
     fb = _fb()
+    request = _limited_request("ic_report", fb.LONG_CELL, ROW_AXIS_COLS)
+    manifest = REPO / request["run_dir"] / "feature_manifest.json"
+    names = list(request["feature_filter"]["include_features"])
+    return {"schema": SUBSET_IDENTITY_SCHEMA, "source": _rel(manifest), "source_size": int(manifest.stat().st_size),
+            "source_sha256": file_sha256(manifest), "n_cols": ROW_AXIS_COLS, "rows": None,
+            "columns_sha256": hashlib.sha256(json.dumps(names, ensure_ascii=False).encode("utf-8")).hexdigest()}
+
+
+def prepare_post_ic_rows(out_root: Path) -> Dict[str, Any]:
+    """SPEC v5.52 (b)：post_ic_transform 列軸之存檔輸入——L 格 run（4h 2,000 列）以 feature_filter 限 `ROW_AXIS_COLS` 欄經服務
+    `start_analysis` 跑一次 IC 分析（同 cols 軸之服務路徑），存其任務紀錄（`req_*`、`result`〔含報告 run 身分〕、status）與
+    IC 倖存欄於 `<out-root>/POST_IC_ROWS_DIR/`，身分 sidecar＝`post_ic_rows_identity`（不同即重建）。列軸實跑讀此存檔、於末
+    R 列直接呼叫 `_apply_transforms_sync`（不再跑 IC）。倖存欄為空 ⇒ HarnessError（資料不足）。"""
+    import pickle
+
+    fb = _fb()
+    root = (Path(out_root) if Path(out_root).is_absolute() else REPO / out_root) / POST_IC_ROWS_DIR
+    want = post_ic_rows_identity()
+    side = root / SUBSET_IDENTITY_FILE
+    if (root / POST_IC_ROWS_FILE).is_file() and read_identity(side) == json.loads(json.dumps(want)):
+        return {"reused": True, "dir": _rel(root), "identity": want}
+    request = _limited_request("ic_report", fb.LONG_CELL, ROW_AXIS_COLS)
+    with _prepare_isolation(root.parent.parent, "post-ic-rows") as work:
+        svc = _service_with_tasks(request, work / "registry.json")
+        task_id, info = _service_analysis(svc, fb._ic_analyze_request(request), _NullProgress())  # type: ignore[arg-type]
+    survivors = [str(c) for c in info["analyzer"].get_filtered_features().columns]
+    if not survivors:
+        raise HarnessError("prepare post-ic-rows：L 格 IC 倖存欄為空，無法量 IC 後轉換之列軸（資料不足）")
+    task_info = {k: v for k, v in info.items() if str(k).startswith("req_")}
+    task_info.update(status=info.get("status"), result=info.get("result"))
+    payload = {"task_id": task_id, "task_info": task_info, "survivors": survivors, "request": request,
+               "head": _git_head(), "identity": want}
+    root.mkdir(parents=True, exist_ok=True)
+    tmp = root / (POST_IC_ROWS_FILE + ".part")
+    with open(tmp, "wb") as fh:
+        pickle.dump(payload, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    os.replace(tmp, root / POST_IC_ROWS_FILE)
+    write_identity(side, want)
+    return {"reused": False, "dir": _rel(root), "identity": want, "survivors": len(survivors)}
+
+
+def load_post_ic_rows(out_root: Path) -> Dict[str, Any]:
+    """讀 post_ic_transform 列軸存檔輸入；身分 sidecar 須等於現行 `post_ic_rows_identity`（SPEC v5.52 (a)），否則
+    HarnessError（須先跑 `prepare post-ic-rows`）。"""
+    import pickle
+
+    root = Path(out_root) / POST_IC_ROWS_DIR
+    if not (root / POST_IC_ROWS_FILE).is_file() \
+            or read_identity(root / SUBSET_IDENTITY_FILE) != json.loads(json.dumps(post_ic_rows_identity())):
+        raise HarnessError(f"post_ic_transform rows 軸之存檔輸入不存在或身分與現行來源不符：{root}（先跑 `icperf_scale_harness.py "
+                           "prepare post-ic-rows`）")
+    with open(root / POST_IC_ROWS_FILE, "rb") as fh:
+        return pickle.load(fh)
+
+
+def _run_post_ic_transform(ctx: RunContext) -> Dict[str, Any]:
+    """cols 軸：A 格 run 限 N 欄經服務 IC 分析後 `_apply_transforms_sync`（倖存欄）。rows 軸（SPEC v5.52 (b)）：L 格存檔之
+    IC 任務（`load_post_ic_rows`）放入新服務之任務表，`_load_features_for_transforms` 之回傳取末 R 列（實際列數驗等於 R）後
+    直接呼叫 `_apply_transforms_sync`（同一倖存欄、同一參數）。"""
+    fb = _fb()
+    if ctx.axis == "rows":
+        saved = load_post_ic_rows(ctx.out_root)
+        request = saved["request"]
+        svc = _service_with_tasks(request, ctx.work / "registry.json")
+        task_id = str(saved["task_id"])
+        svc._tasks[task_id] = dict(saved["task_info"])
+        orig = svc._load_features_for_transforms
+        seen: Dict[str, int] = {}
+
+        def tail(*args: Any, **kwargs: Any) -> Any:
+            df, identity = orig(*args, **kwargs)
+            if len(df) < int(ctx.n_rows or 0):
+                raise HarnessError(f"post_ic_transform rows {ctx.n_rows} > L 格 run 列數 {len(df)}（資料不足）")
+            out = df.iloc[-int(ctx.n_rows or 0):]
+            seen.update(source_rows=int(len(df)), rows=int(len(out)))
+            return out, identity
+
+        svc._load_features_for_transforms = tail
+        survivors = list(saved["survivors"])
+        svc._apply_transforms_sync(task_id, survivors, *POST_IC_ARGS)
+        return {"input_cols": ROW_AXIS_COLS, "rows": seen.get("rows"), "source_rows": seen.get("source_rows"),
+                "survivors": len(survivors), "requested_columns": list(request["feature_filter"]["include_features"]),
+                "actual_scale": seen.get("rows")}
     request = _limited_request("ic_report", None, ctx.n_cols)
     svc = _service_with_tasks(request, ctx.work / "registry.json")
     task_id, info = _service_analysis(svc, fb._ic_analyze_request(request), ctx.rec)
@@ -1081,10 +1433,10 @@ def _run_post_ic_transform(ctx: RunContext) -> Dict[str, Any]:
     survivors = list(analyzer.get_filtered_features().columns)
     if not survivors:
         raise HarnessError("post_ic_transform：IC 倖存欄為空，無法量 IC 後轉換（資料不足）")
-    svc._apply_transforms_sync(task_id, survivors, True, True, True, 252, [100, 252])
+    svc._apply_transforms_sync(task_id, survivors, *POST_IC_ARGS)
     names = list(request["feature_filter"]["include_features"])
     return {"input_cols": ctx.n_cols, "rows": _manifest_rows(request), "survivors": len(survivors),
-            "requested_columns": names}
+            "requested_columns": names, "actual_scale": len(set(names))}
 
 
 def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
@@ -1094,15 +1446,31 @@ def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
 
     fb = _fb()
     request = _limited_request("event_import_report", None, ctx.n_cols)
+    store = EventImportService()
+    if ctx.axis == "events":
+        # SPEC v5.52 (b)：事件數軸——同一明列規則之事件批（`icperf_event_batch`，依 t0 排序之前 {scale} 筆）匯入本次工作目錄之
+        # 隔離儲存根（不寫 repo 之 data_cache/events），route `_resolve_event_batch` 經 `get_event_import_service()` 讀之
+        # ⇒ 本行程內把該單例指向隔離儲存根；欄數固定 ROW_AXIS_COLS（RunContext）
+        import api.services.case_import_service as cis
+
+        records = _event_batch_records(int(ctx.n_events or 0))
+        store = EventImportService(storage_dir=ctx.work / "events")
+        upload = json.dumps(records, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        resp = store.import_records(records, source_name="icperf-t02-event-import", upload_bytes=upload,
+                                    validate_only=False)
+        cis._event_import_service = store
+        request = {**request, "event_import_id": str(resp.import_id)}
     # 同 `icperf_freeze_baseline.event_import_run`（route `_resolve_event_batch`＋服務 `start_analysis`），另接進度通知
     svc = _service_with_tasks(request, ctx.work / "registry.json")
     req = fb._ic_analyze_request(request)
     _task_id, info = _service_analysis(svc, req, ctx.rec, event_batch=_resolve_event_batch(req))
     analyzer = info.get("analyzer")
-    detail = EventImportService().get_import(str(request["event_import_id"]))
+    detail = store.get_import(str(request["event_import_id"]))
     facts = _ic_facts(info.get("result"), analyzer, ctx.n_cols, _manifest_rows(request))
-    return {**facts, "events": len(detail.records) if detail is not None else None,
-            "requested_columns": list(request["feature_filter"]["include_features"])}
+    events = len(detail.records) if detail is not None else None
+    names = list(request["feature_filter"]["include_features"])
+    return {**facts, "events": events, "requested_columns": names,
+            "actual_scale": events if ctx.axis == "events" else len(set(names))}
 
 
 def _event_batch_records(n_events: Optional[int]) -> List[Dict[str, Any]]:
@@ -1132,11 +1500,54 @@ def _run_event_study(ctx: RunContext) -> Dict[str, Any]:
             symbol=run["symbol"], timeframe=run["timeframe"], config_hash=run["config_hash"])))
     except Exception as exc:  # noqa: BLE001 — 投影分支失敗照記（收據以 raised 判非量測）
         projection_error = f"{type(exc).__name__}: {exc}"
-    return {"input_cols": 0, "rows": 0, "events": len(records), "requested_columns": None,
-            "event_study_ok": out is not None, "projection_error": projection_error}
+    return {"input_cols": 0, "rows": _event_bars_rows(records), "events": len(records), "requested_columns": None,
+            "event_study_ok": out is not None, "projection_error": projection_error, "actual_scale": len(records)}
+
+
+def _event_bars_rows(records: Sequence[Mapping[str, Any]]) -> Optional[int]:
+    """事件路徑所讀全部 K 線之根數（清冊 fixed_axes.rows 之觀測值）：`bars_source._DEFAULT_CACHE` 中事件批 (symbol, 週期)
+    序列之長度（只讀形狀）；取不到 ⇒ None。"""
+    import h5py
+
+    from momentum.Analysis.event_samples import bars_source
+
+    keys = sorted({(str(r.get("symbol")), str(r.get("timeframe"))) for r in records})
+    try:
+        with h5py.File(bars_source._DEFAULT_CACHE, "r") as f:
+            return max(int(f[f"{s}/{t}/data"].shape[0]) for s, t in keys) if keys else None
+    except (OSError, KeyError):
+        return None
+
+
+def _cross_frames(cr: Any, cells: Sequence[Mapping[str, Any]], names: Sequence[str], work: Path,
+                  n_timestamps: Optional[int]) -> Tuple[Any, Any]:
+    """同 `icperf_correctness_receipt._child_cross` 之讀法（逐格以該格 FeatureLibrary `load_multi` 讀、加 `_symbol` 層）；
+    `n_timestamps` 給定 ⇒ 只留兩格聯集時點之末 T 個（截短時間跨度，SPEC v5.52 (b)）。回 (服務實例, cross_df)。"""
+    import pandas as pd
+
+    fb = _fb()
+    frames, svc = [], None
+    for i, cell in enumerate(cells):
+        cs = fb._ic_service(cell, Path(work) / f"registry_{i}.json")
+        svc = svc or cs
+        loaded = cs._feature_library.load_multi([cell["symbol"]], cell["timeframe"],
+                                                config_hashes={cell["symbol"]: cell["config_hash"]})
+        frame = loaded[cell["symbol"]][list(names)].copy()
+        frame["_symbol"] = cell["symbol"]
+        frames.append(frame)
+    if n_timestamps is not None:
+        stamps = sorted(set().union(*[set(f.index) for f in frames]))
+        if len(stamps) < int(n_timestamps):
+            raise HarnessError(f"cross_sectional：兩格聯集時點 {len(stamps)} < timestamps 軸 {n_timestamps}（資料不足）")
+        keep = stamps[-int(n_timestamps):][0]
+        frames = [f[f.index >= keep] for f in frames]
+    return svc, pd.concat(frames, axis=0).set_index("_symbol", append=True)
 
 
 def _run_cross_sectional(ctx: RunContext) -> Dict[str, Any]:
+    """跨標的（A 格 BTCUSDT／SOLUSDT 兩 run 共同欄之排序前綴）：cols 軸＝N 欄；timestamps 軸（SPEC v5.52 (b)）＝固定
+    `ROW_AXIS_COLS` 欄、兩格聯集時點之末 T 個。設定＝IC 頁預設覆寫＋`XSEC_OVERRIDE_EXTRA`（關切分；見該常數之碼證）；
+    其後同 `icperf_correctness_receipt._run_cross`。"""
     fb = _fb()
     cells = [fb.default_request("ic_report", c) for c in CROSS_CELLS]
     common = sorted(set(fb._run_feature_names(cells[0])).intersection(*[set(fb._run_feature_names(c)) for c in cells[1:]]))
@@ -1144,26 +1555,265 @@ def _run_cross_sectional(ctx: RunContext) -> Dict[str, Any]:
         raise HarnessError(f"cross_sectional：兩格共同 raw 欄 {len(common)} < 規模 {ctx.n_cols}（資料不足）")
     names = common[:ctx.n_cols]
     cr = _load_script("icperf_t02_correctness", "scripts/icperf_correctness_receipt.py")
-    out = cr._child_cross({"cells": cells, "feature_filter": {"include_features": names},
-                           "timeframe": cells[0]["timeframe"], "_work": str(ctx.work)})
-    cross_df = out["cross_df"]
-    return {"input_cols": ctx.n_cols, "rows": int(len(cross_df)), "symbols": len(CROSS_CELLS),
-            "timestamps": int(cross_df.index.get_level_values(0).nunique()), "requested_columns": names,
-            "survivors": None}
+    request = {"cells": cells, "feature_filter": {"include_features": names}, "timeframe": cells[0]["timeframe"],
+               "_work": str(ctx.work), "override_extra": dict(XSEC_OVERRIDE_EXTRA)}
+    svc, cross_df = _cross_frames(cr, cells, names, ctx.work, ctx.n_timestamps)
+    # 實際輸入點數取送入產品前之 cross_df（標籤附加後之列數另記）
+    timestamps = int(cross_df.index.get_level_values(0).nunique())
+    in_rows = int(len(cross_df))
+    out = cr._run_cross(svc, cross_df, [c["symbol"] for c in cells], cells[0], request)
+    return {"input_cols": ctx.n_cols, "rows": in_rows, "labeled_rows": int(len(out["cross_df"])),
+            "symbols": len(CROSS_CELLS), "timestamps": timestamps, "requested_columns": names, "survivors": None,
+            "override_extra": dict(XSEC_OVERRIDE_EXTRA),
+            "actual_scale": timestamps if ctx.axis == "timestamps" else len(set(names))}
+
+
+#: SPEC v5.52 (c)：IC-first 子集 run 之工作根（`<out-root>/icfirst_subsets/<tag>/`；可重用之中介，非系統暫存）
+ICFIRST_SUBSETS_DIR = "icfirst_subsets"
+
+
+def icfirst_subset_tag(n_cols: int, rows: Optional[int]) -> str:
+    """子集 run 之目錄名：cols 軸（基準窗長之 raw run）＝`c<N>`；列軸窗長 R（非基準）＝`r<R>_c<N>`。"""
+    base = _fb().icfirst_base_rows()
+    return f"c{int(n_cols)}" if rows is None or int(rows) == base else f"r{int(rows)}_c{int(n_cols)}"
+
+
+def _icfirst_record(rows: Optional[int]) -> Tuple[Dict[str, Any], Path]:
+    fb = _fb()
+    try:
+        rec = fb.icfirst_raw_record(rows=rows)
+    except fb.FreezeError as exc:
+        raise HarnessError(f"icfirst_post_generation：{exc}") from exc
+    return rec, fb.icfirst_raw_root(rows) / fb.ICFIRST_RAW_RECORD
+
+
+def icfirst_subset_identity(n_cols: int, rows: Optional[int]) -> Dict[str, Any]:
+    """IC-first 子集 run 之來源身分（SPEC v5.52 (a)(c)）：raw 記錄檔與其 run 之 feature_manifest.json 之路徑、大小、內容
+    sha256、raw 欄數、公開索引根數＋seed＋子集欄數＋窗長。任一不同 ⇒ 重建。"""
+    fb = _fb()
+    rec, rec_path = _icfirst_record(rows)
+    manifest = Path(rec["features_root"]) / rec["symbol"] / rec["timeframe"] / rec["config_hash"] / "feature_manifest.json"
+    return {"schema": SUBSET_IDENTITY_SCHEMA, "source": _rel(rec_path), "source_size": int(rec_path.stat().st_size),
+            "source_sha256": file_sha256(rec_path), "manifest": _rel(manifest), "manifest_sha256": file_sha256(manifest),
+            "source_total_cols": int(rec["feature_count"]), "source_rows": len(rec.get("features_index") or []),
+            "seed": int(fb.SEED), "n_cols": int(n_cols), "rows": None if rows is None else int(rows)}
+
+
+def _numeric_identity_of(manifest: Mapping[str, Any]) -> Optional[Dict[str, Dict[str, Any]]]:
+    """來源 manifest 之 NUMVIEW D2 身分（鍵名讀契約 `manifest_keys`；生成層級之 fingerprint／algorithm_id／路由身分，與欄子集
+    無關）原樣取出，供 `write_raw(numeric_identity=...)` 由產品寫出端寫入子集 manifest；來源缺 ⇒ None（不寫）。"""
+    from momentum.FeatureEngineering import numeric_view
+
+    keys = numeric_view.load_contract()["manifest_keys"]
+    roles = ("fingerprint", "algorithm_id", "route_identity")
+    node_src = (manifest.get("artifacts") or {}).get("raw") or {}
+    if any(keys[r] not in manifest for r in roles):
+        return None
+    node = {keys[r]: node_src[keys[r]] for r in roles if keys[r] in node_src}  # 來源節點無者不補（不臆造）
+    root = {keys[r]: manifest[keys[r]] for r in roles}
+    if keys.get("observed_arms") in manifest:
+        root[keys["observed_arms"]] = manifest[keys["observed_arms"]]
+    return {"artifact": node, "root": root}
+
+
+def verify_icfirst_subset(src_root: Path, sub_root: Path, rec: Mapping[str, Any], chosen: Sequence[str]) -> Dict[str, Any]:
+    """SPEC v5.52 (c)：子集 run 之驗證（任一不成立 ⇒ HarnessError，大聲失敗）：① 產品讀取端 `FeatureReader.load_manifest_v2
+    (consumer="strict")` 可讀（命名世代閘、完整度、run 狀態）且 `ICEngine._validate_l7_raw_manifest` 通過；② manifest 身分
+    （symbol／tf／config_hash＝來源、raw 節點 complete、total_features＝N、群組欄聯集＝所選 N 欄、row_count＝來源、NUMVIEW 身分
+    頂層與節點＝來源）；③ 時間軸 sidecar（`load_row_index_v2`）逐點＝來源；④ post-generation 之讀回路徑可讀：`stream_groups_v2`
+    逐組讀回之欄數合計＝N、每組列數＝row_count，且逐欄值（含 NaN 位置）＝來源同名欄（位元組級；`numpy.array_equal`
+    equal_nan）。回驗證紀錄（含 time_range 是否與來源相同——非讀取前提，只記錄）。"""
+    import numpy as np
+
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.FeatureEngineering import numeric_view
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    sym, tf, ch = str(rec["symbol"]), str(rec["timeframe"]), str(rec["config_hash"])
+    problems: List[str] = []
+    src_reader, sub_reader = FeatureReader(str(src_root)), FeatureReader(str(sub_root))
+    src_m = src_reader.load_manifest_v2(sym, tf, ch, artifact_kind="raw", consumer="strict")
+    try:
+        sub_m = sub_reader.load_manifest_v2(sym, tf, ch, artifact_kind="raw", consumer="strict")
+        ICEngine._validate_l7_raw_manifest(sub_m, sym, tf, ch)
+    except Exception as exc:  # noqa: BLE001 — 讀取端拒收即驗證失敗
+        raise HarnessError(f"IC-first 子集 run 不可由產品讀取端讀出：{type(exc).__name__}: {exc}") from exc
+    raw = (sub_m.get("artifacts") or {}).get("raw") or {}
+    cols = [str(c) for g in (raw.get("groups") or {}).values() for c in g.get("columns") or []]
+    for k, want in (("symbol", sym), ("tf", tf), ("config_hash", ch)):
+        if str(sub_m.get(k)) != want:
+            problems.append(f"manifest.{k}={sub_m.get(k)!r} != 來源 {want!r}")
+    if raw.get("complete") is not True:
+        problems.append("raw 節點非 complete")
+    if int(raw.get("total_features") or 0) != len(chosen) or sorted(cols) != sorted(chosen) or len(set(cols)) != len(cols):
+        problems.append(f"raw 欄 {len(cols)}／total_features {raw.get('total_features')} != 所選 {len(chosen)} 欄")
+    if int(sub_m.get("row_count") or -1) != int(src_m.get("row_count") or -2):
+        problems.append(f"row_count {sub_m.get('row_count')} != 來源 {src_m.get('row_count')}")
+    keys = numeric_view.load_contract()["manifest_keys"]
+    for r in ("fingerprint", "algorithm_id", "route_identity"):
+        k = keys[r]
+        if sub_m.get(k) != src_m.get(k):
+            problems.append(f"頂層 {k} != 來源")
+        if k in ((src_m.get("artifacts") or {}).get("raw") or {}) and raw.get(k) != src_m["artifacts"]["raw"][k]:
+            problems.append(f"raw 節點 {k} != 來源")
+    src_idx = src_reader.load_row_index_v2(sym, tf, ch, artifact_kind="raw")
+    sub_idx = sub_reader.load_row_index_v2(sym, tf, ch, artifact_kind="raw")
+    if src_idx is None or sub_idx is None or not src_idx.equals(sub_idx):
+        problems.append("時間軸 sidecar 與來源不同（或缺）")
+    src_frames = dict(src_reader.stream_groups_v2(sym, tf, ch, "raw", consumer="strict"))
+    by_col = {str(c): (g, c) for g, f in src_frames.items() for c in f.columns}
+    n_read = 0
+    for _g, frame in sub_reader.stream_groups_v2(sym, tf, ch, "raw", consumer="strict"):
+        n_read += int(frame.shape[1])
+        if int(frame.shape[0]) != int(src_m.get("row_count") or -1):
+            problems.append(f"讀回列數 {frame.shape[0]} != row_count")
+        for c in frame.columns:
+            g, sc = by_col.get(str(c), (None, None))
+            if g is None or not np.array_equal(np.asarray(frame[c].to_numpy()), np.asarray(src_frames[g][sc].to_numpy()),
+                                               equal_nan=True) or frame[c].dtype != src_frames[g][sc].dtype:
+                problems.append(f"欄 {c} 之值或 dtype 與來源不同")
+                break
+    if n_read != len(chosen):
+        problems.append(f"stream_groups_v2 讀回欄數 {n_read} != {len(chosen)}")
+    if problems:
+        raise HarnessError("IC-first 子集 run 驗證失敗（SPEC v5.52 (c)；改走三次生成）：" + "；".join(problems[:10]))
+    src_tr = ((src_m.get("artifacts") or {}).get("raw") or {}).get("time_range")
+    return {"ok": True, "n_cols": len(chosen), "row_count": int(sub_m.get("row_count") or 0),
+            "feature_schema_hash": raw.get("feature_schema_hash"), "group_count": raw.get("group_count"),
+            "time_range": raw.get("time_range"), "source_time_range": src_tr, "time_range_equal": raw.get("time_range") == src_tr,
+            "reader": "FeatureReader.load_manifest_v2(consumer=strict)＋load_row_index_v2＋stream_groups_v2",
+            "validated_by": "ICEngine._validate_l7_raw_manifest"}
+
+
+def write_icfirst_subset(src_root: Path, dst_root: Path, sym: str, tf: str, ch: str, n_cols: int, seed: int) -> List[str]:
+    """`prepare_icfirst_subset` 之寫出核心（秒級測試以產品寫出端所建之 run 驗之）：來源 run 目錄除 `raw/` 外複製至
+    `dst_root/<sym>/<tf>/<ch>/`；來源 raw 群組依 manifest 欄序之 `default_rng(seed).permutation` 前 `n_cols` 個取欄、索引設
+    來源時間軸後經 `FeatureStorage(dst_root).write_raw(..., row_index=來源時間軸, numeric_identity=來源之生成層級身分)` 寫出；
+    回所選欄名（manifest 欄序）。`n_cols` 不在 (0, raw 欄數) 或來源無時間軸 ⇒ HarnessError。"""
+    import shutil
+
+    import numpy as np
+
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    reader = FeatureReader(str(src_root))
+    src_m = reader.load_manifest_v2(sym, tf, ch, artifact_kind="raw", consumer="strict")
+    order = [str(c) for g in ((src_m.get("artifacts") or {}).get("raw") or {}).get("groups", {}).values()
+             for c in g.get("columns") or []]
+    if not 0 < int(n_cols) < len(order):
+        raise HarnessError(f"IC-first 子集欄數 {n_cols} 不在 (0, {len(order)})（raw 欄數；資料不足）")
+    pick = np.sort(np.random.default_rng(int(seed)).permutation(len(order))[:int(n_cols)])
+    chosen = [order[int(i)] for i in pick]
+    keep = set(chosen)
+    row_index = reader.load_row_index_v2(sym, tf, ch, artifact_kind="raw")
+    if row_index is None:
+        raise HarnessError("IC-first raw run 無時間軸 sidecar（舊 run），無法重寫子集")
+    shutil.copytree(Path(src_root) / sym / tf / ch, Path(dst_root) / sym / tf / ch, symlinks=True,
+                    ignore=shutil.ignore_patterns("raw", ".tmp-*", ".previous-*"))
+    groups = {}
+    for gid, frame in reader.stream_groups_v2(sym, tf, ch, "raw", consumer="strict"):
+        cols = [c for c in frame.columns if str(c) in keep]
+        if cols:
+            sub = frame[cols].copy()
+            sub.index = row_index
+            groups[gid] = sub
+    FeatureStorage(str(dst_root)).write_raw(sym, tf, ch, groups, row_index=row_index,
+                                            numeric_identity=_numeric_identity_of(src_m))
+    return chosen
+
+
+def prepare_icfirst_subset(out_root: Path, n_cols: int, rows: Optional[int] = None) -> Dict[str, Any]:
+    """SPEC v5.52 (c)：IC-first 之 N 欄子集 run——以一次生成之 raw run（`rows`＝窗長；None＝基準窗長）經產品寫出端
+    `FeatureStorage.write_raw`（`feature_storage.py:705`）重寫：① run 目錄除 `raw/` 外原樣複製至子集根（manifest 根之 completeness
+    與 NUMVIEW 身分、命名世代由產品寫出端之合併保留，`feature_storage.py:2178-2241`）；② 來源 raw 群組（`stream_groups_v2`）
+    依 manifest 欄序之 `default_rng(SEED).permutation` 前 N 個（巢狀）取欄、索引設為來源時間軸（`load_row_index_v2`；
+    parquet 不存索引，`_build_l7_v2_table` preserve_index=False），`write_raw(..., row_index=來源時間軸, numeric_identity=來源
+    之生成層級身分)` ⇒ 欄數、群組、schema hash、列數、時間範圍、時間軸 sidecar 皆由產品寫出端產生（不手造）；③
+    `verify_icfirst_subset`（不成立 ⇒ HarnessError）。身分 sidecar（`icfirst_subset_identity`＋驗證紀錄）相同 ⇒ 沿用。"""
+    fb = _fb()
+    out_root = Path(out_root) if Path(out_root).is_absolute() else REPO / out_root
+    rec, _rec_path = _icfirst_record(rows)
+    want = icfirst_subset_identity(n_cols, rows)
+    base = out_root / ICFIRST_SUBSETS_DIR / icfirst_subset_tag(n_cols, rows)
+    side = base / SUBSET_IDENTITY_FILE
+    sym, tf, ch = str(rec["symbol"]), str(rec["timeframe"]), str(rec["config_hash"])
+    froot = base / "features"
+    run_dir = froot / sym / tf / ch
+    stored = read_identity(side) or {}
+    if stored.get("identity") == json.loads(json.dumps(want)) and (run_dir / "feature_manifest.json").is_file():
+        return {"reused": True, "dir": _rel(base), **stored}
+    if base.exists():
+        # 身分不同之舊子集：改寫至新世代目錄（不刪既有檔）
+        base = out_root / ICFIRST_SUBSETS_DIR / f"{icfirst_subset_tag(n_cols, rows)}.{time.strftime('%Y%m%dT%H%M%S')}"
+        side, froot = base / SUBSET_IDENTITY_FILE, base / "features"
+        run_dir = froot / sym / tf / ch
+    src_root = Path(rec["features_root"])
+    chosen = write_icfirst_subset(src_root, froot, sym, tf, ch, int(n_cols), int(fb.SEED))
+    check = verify_icfirst_subset(src_root, froot, rec, chosen)
+    payload = {"identity": want, "verification": check, "features_root": _rel(froot), "run_dir": _rel(run_dir),
+               "chosen_sha256": hashlib.sha256(json.dumps(chosen, ensure_ascii=False).encode("utf-8")).hexdigest(),
+               "writer": "momentum.FeatureEngineering.feature_storage:FeatureStorage.write_raw", "head": _git_head()}
+    write_identity(side, payload)
+    return {"reused": False, "dir": _rel(base), **payload}
+
+
+def prepare_icfirst_subsets(out_root: Path, *, n_cols: Sequence[int] = SCALE_POINTS,
+                            rows: Sequence[int] = ICFIRST_ROW_SCALES) -> Dict[str, Any]:
+    """`prepare icfirst-subsets`：cols 軸各 N（基準窗長之 raw run）與列軸各窗長 R（`ROW_AXIS_COLS` 欄）之子集 run
+    （`prepare_icfirst_subset`；R＝基準窗長者與 cols 軸同 tag 沿用）。工作目錄（cwd／TMPDIR）＝`<out-root>/work/prepare-icfirst-
+    <時間>/`（產品之 cwd 相對寫出落此）。任一不成立 ⇒ HarnessError（SPEC v5.52 (c)：改走三次生成）。"""
+    out_root = Path(out_root)
+    with _prepare_isolation(out_root, "icfirst"):
+        done = {f"cols:{int(n)}": prepare_icfirst_subset(out_root, int(n), None) for n in n_cols}
+        done.update({f"rows:{int(r)}": prepare_icfirst_subset(out_root, ROW_AXIS_COLS, int(r)) for r in rows})
+    return done
+
+
+@contextlib.contextmanager
+def _prepare_isolation(out_root: Path, tag: str) -> Iterable[Path]:
+    """prepare 步驟（CLI 單獨行程）之工作目錄隔離（同 `run_one`）：cwd＝`<out-root>/work/prepare-<tag>-<時間>.<pid>/cwd`、
+    本行程之 tempfile 根改指同目錄之 iso（產品之 cwd 相對寫出與 tempfile 落此，不放系統暫存）；結束還原 cwd。"""
+    work = Path(out_root) / "work" / f"prepare-{tag}-{time.strftime('%Y%m%dT%H%M%S')}.{os.getpid()}"
+    (work / "iso").mkdir(parents=True, exist_ok=True)
+    os.environ["TMPDIR"] = str(work / "iso")  # 同 run_one：產品之 tempfile 寫入落本次工作目錄
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    cwd = _fb()._prepare_cwd(work / "cwd")
+    here = os.getcwd()
+    os.chdir(cwd)
+    try:
+        yield work
+    finally:
+        os.chdir(here)
+
+
+def load_icfirst_subset(out_root: Path, n_cols: int, rows: Optional[int]) -> Dict[str, Any]:
+    """讀 IC-first 子集 run 之 sidecar：身分須等於現行 `icfirst_subset_identity` 且驗證 ok（SPEC v5.52 (a)(c)），否則
+    HarnessError（先跑 `prepare icfirst-subsets`）。同 tag 有多世代者取身分相符之最新者。"""
+    want = json.loads(json.dumps(icfirst_subset_identity(n_cols, rows)))
+    tag = icfirst_subset_tag(n_cols, rows)
+    cands = sorted((Path(out_root) / ICFIRST_SUBSETS_DIR).glob(f"{tag}*"), key=lambda p: p.name, reverse=True)
+    for base in cands:
+        if base.name != tag and not base.name.startswith(tag + "."):
+            continue
+        side = read_identity(base / SUBSET_IDENTITY_FILE) or {}
+        if side.get("identity") == want and (side.get("verification") or {}).get("ok") is True:
+            return {**side, "dir": base}
+    raise HarnessError(f"IC-first 子集 run（{tag}）不存在或身分與現行 raw run 不符（先跑 `icperf_scale_harness.py prepare "
+                       "icfirst-subsets`；SPEC v5.52 (c)）")
 
 
 def _run_icfirst_post_generation(ctx: RunContext) -> Dict[str, Any]:
-    """SPEC v5.51 (c)：以 `icperf_freeze_baseline.gen-icfirst-raw` 之 A 格 raw run 與其生成結果 metadata（含 `output_window`
-    五鍵、config_hash；`icfirst_raw_record`）重建 IC-first ctx（`ic_first_context.begin_context`＋`complete_context`，同
-    `run_ic_first` :2844-2848、:2879），於本次工作目錄之 run 複本（post-generation 會寫 processed／ic_selected，不寫回持久根）
-    呼叫 `FeatureFactory._run_ic_first_post_generation`（判準檔 A 格 generation 之 ic_engine_config、ic_threshold、
-    label_horizon、cleanup_raw）。
+    """SPEC v5.51 (c)／v5.52 (c)：以 `icperf_freeze_baseline.gen-icfirst-raw` 之 A 格 raw run 與其生成結果 metadata（含
+    `output_window` 五鍵、config_hash；`icfirst_raw_record`）重建 IC-first ctx（`ic_first_context.begin_context`＋
+    `complete_context`，同 `run_ic_first` :2844-2848、:2879），於本次工作目錄之子集 run 複本（post-generation 會寫 processed／
+    ic_selected，不寫回子集根）呼叫 `FeatureFactory._run_ic_first_post_generation`（判準檔 A 格 generation 之 ic_engine_config、
+    ic_threshold、label_horizon、cleanup_raw）。
 
-    規模：raw run 只有一種欄數（`feature_count`）。以欄子集建 500／1000／2000 欄輸入須先證子集後之 manifest 身分
-    （`artifacts.raw.groups`／`total_features`／`content_sha256`／`numeric_fingerprint`；群組為整檔 parquet，逐欄子集須重寫
-    群組檔）——可行路徑＝經產品寫出端 `FeatureStorage.write_raw`（`feature_storage.py:705`，身分由產品計算）重寫子集，未施工、
-    未實跑驗證 ⇒ `scale` ≠ `feature_count` 一律 HarnessError（不以他物代替）；`scale`＝`feature_count` 之實跑供「post-generation
-    可讀、ctx 可建」之驗證（SPEC v5.51 (c) 第一步）。"""
+    規模：cols 軸 N ⇒ 基準 raw run 經 `FeatureStorage.write_raw` 重寫之 N 欄子集 run（`load_icfirst_subset`；身分由產品寫出端
+    產生並經 `verify_icfirst_subset` 驗過）；rows 軸 R ⇒ 窗長 R 之生成（`gen-icfirst-raw --rows R`）之 `ROW_AXIS_COLS` 欄
+    子集 run。實際輸入點數＝子集 manifest 之 raw total_features（cols）／公開索引根數（rows）。"""
     import shutil
 
     import pandas as pd
@@ -1175,21 +1825,17 @@ def _run_icfirst_post_generation(ctx: RunContext) -> Dict[str, Any]:
     from momentum.FeatureEngineering.feature_reader import FeatureReader
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
-    fb = _fb()
-    try:
-        rec = fb.icfirst_raw_record()
-    except fb.FreezeError as exc:
-        raise HarnessError(f"icfirst_post_generation：{exc}") from exc
-    n_raw = int(rec["feature_count"])
-    if ctx.n_cols != n_raw:
-        raise HarnessError(f"icfirst_post_generation：raw run 只有 {n_raw} 欄一種規模；{ctx.n_cols} 欄之子集須經產品寫出端重寫並"
-                           "先證 manifest 身分（SPEC v5.51 (c)；未施工）——不以他物代替")
+    rows = ctx.n_rows if ctx.axis == "rows" else None
+    rec, rec_path = _icfirst_record(rows)
+    sub = load_icfirst_subset(ctx.out_root, ctx.n_cols, rows)
+    sub_root = REPO / sub["features_root"]
+    n_raw = int(sub["verification"]["n_cols"])
     nfb = _load_script("icperf_t02_numview_freeze_baseline", "scripts/numview_freeze_baseline.py")
     gen_def = rec["generation"]
     label_horizon = str(gen_def["label_horizon"])
     # 寫入隔離同 `_child_ic_first`（`_isolated`：設定檔連結、registry、CGSA、cwd、tempdir、d* 快取導向本次工作目錄）
     with nfb._isolated(ctx.work / "icfirst", {}) as froot:
-        src_run = Path(rec["features_root"]) / rec["symbol"] / rec["timeframe"] / rec["config_hash"]
+        src_run = sub_root / rec["symbol"] / rec["timeframe"] / rec["config_hash"]
         shutil.copytree(src_run, Path(froot) / rec["symbol"] / rec["timeframe"] / rec["config_hash"], symlinks=True)
         factory = create_feature_factory(cache_dir=str(rec["kline_cache_dir"]),
                                          validate_continuity=bool(rec["validate_continuity"]))
@@ -1209,9 +1855,12 @@ def _run_icfirst_post_generation(ctx: RunContext) -> Dict[str, Any]:
             allow_partial_ic=False, label_horizon=label_horizon, cleanup_raw=False, compute_warnings=[],
             start=time.time(), persist=True)
     selected = int((out.metadata or {}).get("selected_count") or 0)
-    return {"input_cols": n_raw, "rows": len(rec["features_index"]), "survivors": selected,
-            "requested_columns": None, "raw_record": _rel(Path(fb.REPO) / fb.ICFIRST_RAW_ROOT / fb.ICFIRST_RAW_RECORD),
-            "ctx_complete": bool(full.complete)}
+    n_rows = len(rec["features_index"])
+    raw_count = int((out.metadata or {}).get("raw_feature_count") or n_raw)
+    return {"input_cols": n_raw, "rows": n_rows, "survivors": selected, "requested_columns": None,
+            "raw_record": _rel(rec_path), "subset": _rel(Path(sub["dir"]) / SUBSET_IDENTITY_FILE),
+            "ctx_complete": bool(full.complete), "raw_feature_count": raw_count,
+            "actual_scale": n_rows if ctx.axis == "rows" else n_raw}
 
 
 def _tail_rows(v: Any, n_src: int, rows: int) -> Any:
@@ -1225,11 +1874,15 @@ def _tail_rows(v: Any, n_src: int, rows: int) -> Any:
 def cell_capture(ctx: RunContext, name: str) -> Dict[str, Any]:
     """直接呼叫格之存檔真實輸入：cols 軸＝C 格 `stage_inputs/<N>/`；rows 軸＝L 格 `stage_inputs/L<cols>_rows<R>/`（由
     ic_page_long rows 軸寫出）。`CELL_ROW_SCALES` 所列之格（短序列分支）之 rows 軸＝最小列長之 L 格存檔取末 R 列（R ≤ 該存檔
-    列數，否則 HarnessError）。"""
+    列數，否則 HarnessError）。SPEC v5.52 (a)：存檔目錄之身分須等於現行來源之子集身分（`expected_stage_identity`）。"""
     if ctx.axis != "rows" or ctx.run_id not in CELL_ROW_SCALES:
-        return load_capture(ctx.stage_dir, name)
+        want = expected_stage_identity(ctx, ctx.n_rows)
+        cap = load_capture(ctx.stage_dir, name, want)
+        # SPEC v5.52 (b)：實際輸入點數＝存檔所屬子集之欄數（cols 軸）／列長（rows 軸），由身分 sidecar 驗得
+        ctx.actual_scale = int(want["subset"]["n_cols"] if ctx.axis == "cols" else want["subset"]["rows"])
+        return cap
     base = ctx.out_root / "stage_inputs" / ctx.stage_tag(ROW_AXIS_SCALES[0])
-    cap = load_capture(base, name)
+    cap = load_capture(base, name, expected_stage_identity(ctx, ROW_AXIS_SCALES[0]))
     frames = [a for a in list(cap["args"]) + list(cap["kwargs"].values()) if hasattr(a, "shape") and len(a.shape) >= 1]
     if not frames:
         raise HarnessError(f"{ctx.run_id}：存檔 {name} 無列軸參數，無法取末 {ctx.n_rows} 列")
@@ -1237,6 +1890,8 @@ def cell_capture(ctx: RunContext, name: str) -> Dict[str, Any]:
     if int(ctx.n_rows or 0) > n_src:
         raise HarnessError(f"{ctx.run_id}：rows {ctx.n_rows} > 存檔列數 {n_src}（資料不足）")
     rows = int(ctx.n_rows or 0)
+    tailed = [_tail_rows(a, n_src, rows) for a in frames]
+    ctx.actual_scale = int(tailed[0].shape[0])
     return {**cap, "args": tuple(_tail_rows(a, n_src, rows) for a in cap["args"]),
             "kwargs": {k: _tail_rows(v, n_src, rows) for k, v in cap["kwargs"].items()},
             "provenance": {**dict(cap.get("provenance") or {}), "tail_rows": rows, "source_rows": n_src}}
@@ -1440,12 +2095,22 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
     rec = Recorder(keyed=keyed, context=f"{run_id}|{axis}|{scale}")
     ctx = RunContext(run_id, axis, scale, root, work, rec, head)
     stage_dir: Optional[Path] = None
+    stage_want: Optional[Dict[str, Any]] = None
     if (run_id, axis) in CAPTURE_RUNS:
         stage_dir = ctx.stage_dir
         stage_input_card(root / "stage_inputs")
         prov = {"path_run_id": path_run_id, "head": head, "axis": axis, "scale": int(scale), "run_id": run_id,
                 "source": "L" if ctx.long else "C"}
-        rec.captures = {eid: _capture_writer(stage_dir, name, with_result, prov)
+        # SPEC v5.52 (a)：存檔目錄之身分（所屬子集之來源內容 sha256、seed、欄數、列長）與本次不同 ⇒ 本次覆寫全部存檔；
+        # 開跑前先把 sidecar 標 building（中斷 ⇒ 讀端拒收），成功後標 complete
+        stage_want = expected_stage_identity(ctx, ctx.n_rows)
+        side = read_identity(stage_dir / STAGE_IDENTITY_FILE) or {}
+        same = side.get("status") == "complete" and {k: side.get(k) for k in stage_want} == json.loads(
+            json.dumps(stage_want))
+        if not same:
+            write_identity(stage_dir / STAGE_IDENTITY_FILE, {**stage_want, "status": "building",
+                                                              "path_run_id": path_run_id})
+        rec.captures = {eid: _capture_writer(stage_dir, name, with_result, prov, overwrite=not same)
                         for eid, (name, with_result) in CAPTURES.items()}
     os.chdir(cwd)
     targets = resolve_targets(e["id"] for e in measured)
@@ -1456,6 +2121,22 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
     finally:
         rec.stop()
         wall = time.time() - started_wall
+    # SPEC v5.52 (b)：每一軸實跑須驗實際輸入點數＝宣告之規模（runner 回 actual_scale；直接呼叫格由存檔身分驗得）；不等或
+    # 未驗 ⇒ 大聲失敗、不寫紀錄
+    if facts.get("actual_scale") is None and ctx.actual_scale is not None:
+        facts["actual_scale"] = int(ctx.actual_scale)
+    if facts.get("actual_scale") is None or int(facts["actual_scale"]) != int(scale):
+        binding.restore()
+        raise HarnessError(f"{run_id}:{axis}：實際輸入點數 {facts.get('actual_scale')!r} != 宣告規模 {int(scale)}"
+                           "（SPEC v5.52 (b)）")
+    if stage_dir is not None and stage_want is not None:
+        # 屬本身分之存檔＝本次成功寫出者（身分不同時）或前次同身分已列者＋本次寫出者（身分相同時）；讀端只認 files 所列
+        written = {CAPTURES[eid][0] for eid in CAPTURES
+                   if rec.stat(eid).captured and rec.stat(eid).capture_error is None
+                   and (stage_dir / f"{CAPTURES[eid][0]}.pkl").is_file()}
+        prior = set((read_identity(stage_dir / STAGE_IDENTITY_FILE) or {}).get("files") or []) if same else set()
+        write_identity(stage_dir / STAGE_IDENTITY_FILE, {**stage_want, "status": "complete", "path_run_id": path_run_id,
+                                                          "files": sorted(written | prior)})
     import resource
 
     ru = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
@@ -1463,7 +2144,8 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
               "kind": "path" if run_id in PATHS else "cell", "axis": axis, "scale": int(scale),
               # 交接 h5 子集之來源格（IC 頁／深度分析路徑與直接呼叫格；其餘路徑讀各自之 run，見 facts）
               "handoff_source": (LONG_CELL_ID if ctx.long else "C") if run_id in SUBSET_RUNS or run_id in CELLS else None,
-              "row_window_override": ROW_AXIS_WINDOW_OVERRIDE if axis == "rows" and run_id in PATHS else None,
+              "row_window_override": ROW_AXIS_WINDOW_OVERRIDE if axis == "rows" and run_id in SUBSET_RUNS else None,
+              "actual_scale": int(facts["actual_scale"]),
               "argv": list(sys.argv[1:] if argv is None else argv), "head": head,
               "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(started_wall)),
               "wall_seconds": wall, "harness_overhead_seconds": rec.overhead_seconds,
@@ -1643,8 +2325,8 @@ def projected_2000_seconds(points: Sequence[Mapping[str, Any]]) -> float:
 
 
 #: 各軸點之 x 鍵（收據點之欄名）與擬合之 x（cols 軸以實際進段欄數 stage_cols 為準，SPEC Task 0.2）
-AXIS_X_KEY = {"cols": "input_cols", "rows": "rows", "events": "events"}
-AXIS_FIT_KEY = {"cols": "stage_cols", "rows": "rows", "events": "events"}
+AXIS_X_KEY = {"cols": "input_cols", "rows": "rows", "events": "events", "timestamps": "timestamps"}
+AXIS_FIT_KEY = {"cols": "stage_cols", "rows": "rows", "events": "events", "timestamps": "timestamps"}
 
 
 def fit_points(points: Sequence[Mapping[str, Any]], axis: str = "cols") -> List[Dict[str, Any]]:
@@ -1676,12 +2358,19 @@ def total_projected_seconds(runs: Mapping[Tuple[str, str], Mapping[str, Any]]) -
 
 
 def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], axis: str,
-           problems: List[str]) -> Optional[Dict[str, Any]]:
+           problems: List[str], require_actual: bool = False) -> Optional[Dict[str, Any]]:
+    """單一規模點（`q`＝scale_probe 收據之點）。SPEC v5.52 (b)：紀錄之 `actual_scale`（runner 驗得之實際輸入點數）有者須等於
+    宣告之規模；`require_actual`（第二軸實跑）⇒ 每份紀錄皆須帶且相等。"""
     eid = e["id"]
     scale = int(q["scale"])
     recs = list((run.get("records") or {}).get(scale) or [])
     if len(recs) != int(q.get("runs") or 0):
         problems.append(f"{eid}：{run['receipt_path']} scale={scale} 之實跑 {q.get('runs')} 次，逐入口記錄 {len(recs)} 份")
+        return None
+    bad = [r.get("path_run_id") for r in recs
+           if ("actual_scale" in r or require_actual) and r.get("actual_scale") != scale]
+    if bad:
+        problems.append(f"{eid}：{axis} 軸 scale={scale} 之實跑 {bad} 實際輸入點數與宣告規模不符或未驗（SPEC v5.52 (b)）")
         return None
     chosen = median_record(recs)
     er = (chosen.get("entries") or {}).get(eid)
@@ -1725,6 +2414,11 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
         # SPEC v5.51 (d)：事件數軸之點以事件數為 x（不要求欄數軸）
         p["events"] = scale
         p["scale_vector"] = {**sv, **({"events": scale} if "events" in sv else {})}
+    if axis == "timestamps":
+        # SPEC v5.52 (b)：跨標的之第二軸＝時點數（截短時間跨度）
+        p["timestamps"] = scale
+        p["scale_vector"] = {**sv, **({"timestamps": scale} if "timestamps" in sv else {})}
+    p["actual_scale"] = chosen.get("actual_scale")
     return p
 
 
@@ -1775,7 +2469,10 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
     fit＝`scale_probe.fit(fit_points(points, 主軸), full)` 重算。任一問題（漏量、呼叫 0、缺軸、缺 footprint）⇒
     AssemblyError（逐條）。兩點例外（v5.51 (g)）：只在頂層合計推估 `total_projected_seconds(runs)` 逾 `budget_seconds` 時，
     cols 軸 500／1000 推估 2000 欄逾 `two_point_seconds` 之入口方收兩點（2,000 欄實測點移 `excluded_points`，不刪資料）；
-    未逾預算者三點皆收。判準②依 `criterion2`（v5.51 (f)），待判者列頂層 `pending_prototype`。"""
+    未逾預算者三點皆收。判準②依 `criterion2`（v5.51 (f)），待判者列頂層 `pending_prototype`。
+    SPEC v5.52 (b)（與上列衝突處以此為準）：主軸與第二軸依 `entry_runs`；第二軸點存 `row_points`、軸名存 `row_axis`
+    （rows／timestamps／events）、實跑存 `row_path`／`row_probe`、擬合存 `row_fit`（含 axis）；第二軸每份紀錄須帶
+    `actual_scale` 且等於宣告之規模（主軸紀錄帶者亦須相等）；`require_rows` 涵蓋全部第二軸；頂層 `schedule_coverage`。"""
     problems: List[str] = []
     all_records = [r for run in runs.values() for recs in (run.get("records") or {}).values() for r in recs]
     total = total_projected_seconds(runs)
@@ -1785,8 +2482,10 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
         if not e.get("measure"):
             continue
         eid, cell = e["id"], e.get("branch_cell")
-        axis = primary_axis(cell) if cell else "cols"
-        run = runs.get((cell, axis)) if cell else None
+        # SPEC v5.52 (b)：主軸與第二軸依 `entry_runs`（事件型只隨事件數變者主軸 events；input_axes 含 rows ⇒ rows／跨標的
+        # timestamps；事件型 cols 入口之 scale_vector 含 events ⇒ events）
+        (prun, axis), second, need_second = entry_runs(e) if cell else ((None, "cols"), None, False)
+        run = runs.get((prun, axis)) if cell else None
         if run is None:
             problems.append(f"{eid}：所屬格 {cell!r} 無 {axis} 軸量測")
             continue
@@ -1796,21 +2495,26 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
             continue
         row_run = None
         row_pts = None
-        if "rows" in (e.get("input_axes") or []):
-            row_run = runs.get((ROW_AXIS_RUN.get(cell, ""), "rows"))
+        row_axis = second[1] if second else None
+        if need_second:
+            row_run = runs.get(second) if second and second[0] else None
             if row_run is None and require_rows:
-                problems.append(f"{eid}：清冊 input_axes 含 rows，所屬格 {cell!r} 無 rows 軸實跑"
-                                f"（ROW_AXIS_RUN 對應 {ROW_AXIS_RUN.get(cell)!r}）")
+                problems.append(f"{eid}：清冊 input_axes 含 rows（或事件型入口 scale_vector 含 events），所屬格 {cell!r} 無"
+                                f"第二軸實跑（對應 {second!r}；SPEC v5.52 (b)）")
         if row_run is not None:
             row_pts = [p for q in sorted(row_run["receipt"]["points"], key=lambda q: int(q["scale"]))
-                       if (p := _point(e, q, row_run, "rows", problems)) is not None]
+                       if (p := _point(e, q, row_run, str(row_axis), problems, require_actual=True)) is not None]
+            if len(row_pts) != len(row_run["receipt"]["points"]):
+                continue
         chosen = [r for run_ in (run, row_run) if run_ for recs in run_["records"].values() for r in [median_record(recs)]]
         full = float((run["receipt"].get("projection") or {}).get("scale")
                      or max(p[AXIS_X_KEY[axis]] for p in pts))
         m: Dict[str, Any] = {"coverage_path_id": e["coverage_path_id"], "unit_axis": e["unit_axis"],
-                             "branch_cell": cell, "path": cell, "axis": axis, "probe": run["probe"],
+                             "branch_cell": cell, "path": prun, "axis": axis, "probe": run["probe"],
                              "row_probe": row_run["probe"] if row_run else None,
-                             "row_path": ROW_AXIS_RUN.get(cell) if row_run else None}
+                             "row_path": second[0] if row_run else None,
+                             "row_axis": row_axis if row_run else None,
+                             "fixed_axes": dict(e.get("fixed_axes") or {}) or None}
         excluded = []
         two_point = None
         if axis == "cols" and budget_exceeded and {500, 1000} <= {p["input_cols"] for p in pts}:
@@ -1825,8 +2529,9 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
         fit = scale_probe.fit(fit_points(pts, axis), full)
         row_fit = None
         if row_pts and len(row_pts) >= 2:
-            rf = scale_probe.fit(fit_points(row_pts, "rows"), float(max(p["rows"] for p in row_pts)))
-            row_fit = {"exponent": rf["fit"]["exponent"], "r2": rf["fit"]["r2"],
+            rf = scale_probe.fit(fit_points(row_pts, str(row_axis)),
+                                 float(max(p[AXIS_X_KEY[str(row_axis)]] for p in row_pts)))
+            row_fit = {"axis": row_axis, "exponent": rf["fit"]["exponent"], "r2": rf["fit"]["r2"],
                        "extrapolation_unreliable": rf["extrapolation_unreliable"]}
         func = str(e["unit_axis"]["function"])
         unit_seconds, units = unit_cost(e, pts, axis)
@@ -1866,6 +2571,8 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                                            "（核心維護之全程峰值；寫於該行程之逐入口紀錄）；行程樹 RSS 取自 scale_probe 收據"}},
             "chunk_cap": dict(chunk_cap),
             "runs": {f"{k[0]}:{k[1]}": {"receipt": v["receipt_path"], "probe": v["probe"]} for k, v in runs.items()},
+            # SPEC v5.52 (b)：實跑對清冊之涵蓋（每一 measure=true 入口之主軸與第二軸皆有實跑）
+            "schedule_coverage": schedule_coverage(inventory, list(runs)),
             "entries": entries}
 
 
@@ -1878,7 +2585,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sub = ap.add_subparsers(dest="cmd")
     p = sub.add_parser("run", help="一個規模點之一次實跑（由 scale_probe 啟動）")
     p.add_argument("run_id", choices=sorted(RUNNERS))
-    p.add_argument("--axis", default="cols", choices=("cols", "rows", "events"))
+    p.add_argument("--axis", default="cols", choices=("cols", "rows", "events", "timestamps"))
     p.add_argument("--scale", type=int, required=True)
     p.add_argument("--records-dir", type=Path, required=True)
     p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
@@ -1888,7 +2595,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
     p = sub.add_parser("precheck-rows", help="v5.51 (a)：列數軸列長之樣本外切分秒級碼層預檢（不跑 IC、不讀資料檔）")
     p.add_argument("--scale", type=int, action="append", default=None, help=f"列長（可多次；預設 {ROW_AXIS_SCALES}）")
+    p = sub.add_parser("coverage", help="v5.52 (b)：清冊 measure=true 入口對實跑排程（主軸＋第二軸）之涵蓋（秒級）")
+    p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
+    p = sub.add_parser("prepare", help="v5.52 (b)(c)：量測前之存檔輸入（post-ic-rows：L 格 IC 任務；icfirst-subsets："
+                                       "write_raw 重寫之 IC-first 子集 run）；中型，由 measure 經共用監看啟動")
+    p.add_argument("what", choices=("post-ic-rows", "icfirst-subsets"))
+    p.add_argument("--out-root", type=Path, default=None)
+    p.add_argument("--n-cols", type=int, action="append", default=None,
+                   help=f"icfirst-subsets 之 cols 軸欄數（可多次；預設 {SCALE_POINTS}）")
+    p.add_argument("--rows", type=int, action="append", default=None,
+                   help=f"icfirst-subsets 之列軸窗長（可多次；預設 {ICFIRST_ROW_SCALES}；各取 ROW_AXIS_COLS 欄）")
     args = ap.parse_args(args_in)
+    if args.cmd == "coverage":
+        inv = load_inventory(args.inventory)
+        cov = schedule_coverage(inv, schedule_runs(inv))
+        print(json.dumps({**cov, "schedule": [f"{r}:{a}" for r, a in schedule_runs(inv)]}, ensure_ascii=False, indent=1))
+        return 0 if not cov["uncovered"] else 1
+    if args.cmd == "prepare":
+        root = Path(args.out_root) if args.out_root is not None else REPO / TASK02_ROOT
+        root = (root if root.is_absolute() else REPO / root).resolve()
+        try:
+            if args.what == "post-ic-rows":
+                res: Any = prepare_post_ic_rows(root)
+            else:
+                res = prepare_icfirst_subsets(root, n_cols=tuple(args.n_cols or SCALE_POINTS),
+                                              rows=tuple(args.rows or ICFIRST_ROW_SCALES))
+        except (HarnessError, _fb().FreezeError) as exc:
+            print(f"HarnessError：{exc}", file=sys.stderr)
+            return 1
+        print(json.dumps(res, ensure_ascii=False, indent=1, default=str))
+        return 0
     if args.cmd == "precheck-rows":
         res = row_axis_precheck(tuple(args.scale) if args.scale else ROW_AXIS_SCALES)
         print(json.dumps(res, ensure_ascii=False, indent=1))

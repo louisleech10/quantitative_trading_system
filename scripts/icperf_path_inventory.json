@@ -1,7 +1,7 @@
 {
   "schema": "icperf-t02-path-inventory/2",
-  "schema_note": "ICPERF Task 0.2 路徑清冊草稿（改前，讀碼產出；未實跑任何量測）。範圍依 docs/ICPERF_SPEC.md:100。軸定義：rows＝列數；input_cols＝第 0 段讀入欄數；stage_cols＝實際進入該段之欄數；survivors＝第 6 段倖存欄數（深度分析預設選欄＝倖存欄）；survivor_pairs＝倖存欄兩兩配對數（≈survivors^2/2）。W＝滾動窗長、H＝衰減 horizon 數、G＝分組數、B＝bootstrap 次數、P＝置換次數，皆為設定常數，不入 scale_vector。 v5.50（2026-11-01）定稿：scale_vector 另可含 events（事件數）、symbols（標的數）、timestamps（跨標的時點數）——依 unit_axis.function 之 n_events／n_symbols／n_timestamps 機械導出（SPEC v5.49 處置④）；input_axes 仍 ⊆ cols／rows／passed_cols。branch_cell＝量測該入口之路徑實跑或直接呼叫格之 id（見 branch_cells）；measure=false 者為 null。run_ic_first 外層依 SPEC v5.50 (c) 不量。",
-  "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.50",
+  "schema_note": "ICPERF Task 0.2 路徑清冊草稿（改前，讀碼產出；未實跑任何量測）。範圍依 docs/ICPERF_SPEC.md:100。軸定義：rows＝列數；input_cols＝第 0 段讀入欄數；stage_cols＝實際進入該段之欄數；survivors＝第 6 段倖存欄數（深度分析預設選欄＝倖存欄）；survivor_pairs＝倖存欄兩兩配對數（≈survivors^2/2）。W＝滾動窗長、H＝衰減 horizon 數、G＝分組數、B＝bootstrap 次數、P＝置換次數，皆為設定常數，不入 scale_vector。 v5.50（2026-11-01）定稿：scale_vector 另可含 events（事件數）、symbols（標的數）、timestamps（跨標的時點數）——依 unit_axis.function 之 n_events／n_symbols／n_timestamps 機械導出（SPEC v5.49 處置④）；input_axes 仍 ⊆ cols／rows／passed_cols。branch_cell＝量測該入口之路徑實跑或直接呼叫格之 id（見 branch_cells）；measure=false 者為 null。run_ic_first 外層依 SPEC v5.50 (c) 不量。 v5.52 (b)（2026-11-01）：事件型路徑之事件樣本列數不記為 rows——event_import／event_study 之入口 rows 若實為事件數 ⇒ input_axes 移除 rows、scale_vector／unit_axis 改 events；input_axes 可為空（僅限 scale_vector 含 events：該入口只隨事件數變）。fixed_axes（選填，{軸: 碼證理由}）＝該路徑內不隨任何請求規模變之軸（事件路徑之 K 線根數），不入 input_axes、不排量測軸，只以觀測值記於 scale_vector。",
+  "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.52",
   "generated_at": "2026-11-01",
   "draft": "runs/icperf/task02/path-inventory-draft.json",
   "draft_base_commit": "f290727a",
@@ -854,9 +854,7 @@
     {
       "id": "momentum.core.contracts:validate_consumed_label",
       "stage": "3",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -866,12 +864,12 @@
       "coverage_path_id": "ICPERF-T02-27",
       "unit_axis": {
         "axes": [
-          "rows"
+          "events"
         ],
-        "function": "rows（事件列數；逐事件比對 expected_values）"
+        "function": "n_events（事件樣本列數＝事件數；逐事件比對 expected_values）"
       },
       "scale_vector": [
-        "rows"
+        "events"
       ],
       "call_example": "validate_consumed_label(filtered_features, filtered_label, label_kind=..., expected_values=event_label_values, event_owners=owners, source_series=normalized_label)。",
       "callers": [
@@ -883,9 +881,7 @@
     {
       "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._resolve_label_mode_and_bind_binary",
       "stage": "3",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -895,12 +891,12 @@
       "coverage_path_id": "ICPERF-T02-28",
       "unit_axis": {
         "axes": [
-          "rows"
+          "events"
         ],
-        "function": "rows（事件列數）"
+        "function": "n_events（事件樣本列數＝事件數）"
       },
       "scale_vector": [
-        "rows"
+        "events"
       ],
       "call_example": "匯入 0/1 標籤模式之綁定：orch._resolve_label_mode_and_bind_binary(info, filtered_features=..., event_binary_labels={...}, label_mode_requested='auto', ...)。",
       "callers": [
@@ -2521,8 +2517,7 @@
       "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._merge_binary_statistics",
       "stage": "5",
       "input_axes": [
-        "cols",
-        "rows"
+        "cols"
       ],
       "ic_page": true,
       "ic_first": false,
@@ -2533,14 +2528,14 @@
       "coverage_path_id": "ICPERF-T02-81",
       "unit_axis": {
         "axes": [
-          "rows",
-          "stage_cols"
+          "stage_cols",
+          "events"
         ],
-        "function": "stage_cols*rows*log(rows)（mann_whitney_table 向量化；非匯入 0/1 標籤模式時常數返回）"
+        "function": "stage_cols*n_events*log(n_events)（mann_whitney_table 向量化；事件樣本列數＝事件數；非匯入 0/1 標籤模式時常數返回）"
       },
       "scale_vector": [
-        "rows",
-        "stage_cols"
+        "stage_cols",
+        "events"
       ],
       "call_example": "匯入 0/1 標籤事件路徑：orch._merge_binary_statistics(summary_table, features_for_stats, event_info, config, alpha_effective=a, fdr_method='fdr_bh')；需 _ic_cache['event_binary_label']。",
       "callers": [
@@ -5525,9 +5520,7 @@
     {
       "id": "api.services.ic_analysis_service:ICAnalysisService._run_event_label_stages",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -5551,14 +5544,15 @@
         "api/services/ic_analysis_service.py:1578",
         "api/services/ic_analysis_service.py:1886"
       ],
-      "branch_cell": "event_import"
+      "branch_cell": "event_import",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     },
     {
       "id": "momentum.Analysis.event_samples.label_value_from_case:prepare_analysis_windows",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -5581,14 +5575,15 @@
       "callers": [
         "api/services/ic_analysis_service.py:729"
       ],
-      "branch_cell": "event_import"
+      "branch_cell": "event_import",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     },
     {
       "id": "momentum.Analysis.event_samples.alignment:align_events",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -5611,7 +5606,10 @@
       "callers": [
         "momentum/Analysis/event_samples/label_value_from_case.py:1072"
       ],
-      "branch_cell": "event_import"
+      "branch_cell": "event_import",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     },
     {
       "id": "momentum.Analysis.event_samples.label_value_from_case:purge_lower_bound_rows",
@@ -5644,9 +5642,7 @@
     {
       "id": "momentum.Analysis.event_samples.canonical_holdout:check_feature_run_coverage",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -5672,9 +5668,7 @@
     {
       "id": "momentum.Analysis.event_samples.label_value_from_case:resolve_label_value_at_analyze",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -5697,14 +5691,15 @@
       "callers": [
         "api/services/ic_analysis_service.py:768"
       ],
-      "branch_cell": "event_import"
+      "branch_cell": "event_import",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     },
     {
       "id": "momentum.Analysis.event_samples.label_value_from_case:feature_row_keys",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": true,
       "ic_first": false,
       "loop": "per_bar",
@@ -5727,7 +5722,10 @@
       "callers": [
         "api/services/ic_analysis_service.py:805"
       ],
-      "branch_cell": "event_import"
+      "branch_cell": "event_import",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     },
     {
       "id": "momentum.Analysis.event_samples.label_value_from_case:isolation_terms_rows",
@@ -5761,8 +5759,7 @@
       "id": "momentum.Analysis.binary_discrimination:mann_whitney_table",
       "stage": "event",
       "input_axes": [
-        "cols",
-        "rows"
+        "cols"
       ],
       "ic_page": true,
       "ic_first": false,
@@ -5793,8 +5790,7 @@
       "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_binary_permutation_and_negative_control",
       "stage": "event",
       "input_axes": [
-        "passed_cols",
-        "rows"
+        "passed_cols"
       ],
       "ic_page": true,
       "ic_first": false,
@@ -5825,8 +5821,7 @@
       "id": "momentum.Analysis.binary_discrimination:block_permutation_table",
       "stage": "event",
       "input_axes": [
-        "passed_cols",
-        "rows"
+        "passed_cols"
       ],
       "ic_page": true,
       "ic_first": false,
@@ -5855,9 +5850,7 @@
     {
       "id": "api.services.case_import_service:EventImportService.import_records",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": false,
       "ic_first": false,
       "loop": "per_bar",
@@ -5883,9 +5876,7 @@
     {
       "id": "api.services.case_import_service:EventImportService._analyze_with_projection",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": false,
       "ic_first": false,
       "loop": "per_bar",
@@ -5908,14 +5899,15 @@
       "callers": [
         "api/services/case_import_service.py:1570"
       ],
-      "branch_cell": "event_study"
+      "branch_cell": "event_study",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     },
     {
       "id": "momentum.Analysis.event_samples.pipeline:EventSamplePipeline.analyze_tables",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": false,
       "ic_first": false,
       "loop": "per_group",
@@ -5940,14 +5932,15 @@
         "api/services/case_import_service.py:1916",
         "api/services/case_import_service.py:1979"
       ],
-      "branch_cell": "event_study"
+      "branch_cell": "event_study",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     },
     {
       "id": "momentum.Analysis.event_samples.tables:event_forward_return_table",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": false,
       "ic_first": false,
       "loop": "per_group",
@@ -5973,9 +5966,7 @@
     {
       "id": "momentum.Analysis.event_samples.all_bars_eval:evaluate_all_bars",
       "stage": "event",
-      "input_axes": [
-        "rows"
-      ],
+      "input_axes": [],
       "ic_page": false,
       "ic_first": false,
       "loop": "per_group",
@@ -5990,13 +5981,17 @@
         "function": "rows*n_boot"
       },
       "scale_vector": [
-        "rows"
+        "rows",
+        "events"
       ],
       "call_example": "evaluate_all_bars(scores_multiindex_series, bars_by_symbol, cfg, event_split_plan=plan, manifest=manifest)；以全部 K 線為分母。",
       "callers": [
         "momentum/Analysis/event_samples/pipeline.py:692"
       ],
-      "branch_cell": "event_study"
+      "branch_cell": "event_study",
+      "fixed_axes": {
+        "rows": "K 線根數：事件路徑一律讀該 symbol／週期之全部 K 線（momentum/Analysis/event_samples/pipeline.py:543-547 bars_from_kline_cache → bars_source.py:20-47 讀全序列；api/services/ic_analysis_service.py:727 同），不隨任何請求規模變 ⇒ 非量測軸；本路徑量測軸＝事件數（SPEC v5.52 (b)），列數只以觀測值記於 scale_vector"
+      }
     }
   ]
 }
