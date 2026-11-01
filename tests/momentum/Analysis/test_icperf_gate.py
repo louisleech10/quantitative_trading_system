@@ -3057,8 +3057,10 @@ def _t02_second_axis_case() -> Tuple[Dict[str, Any], Dict[Tuple[str, str], Any]]
         ("event_import", "events"): _t02_axis_records("event_import", "events", (10, 20, 40), ["m.x:mw", "m.x:label"],
                                                       lambda s: {"input_cols": 500, "rows": 2000, "events": s,
                                                                  "survivors": 3, "requested_columns": None}),
-        ("post_ic_transform", "cols"): _t02_axis_records("post_ic_transform", "cols", cols, ["m.x:post"], lambda s: {
-            "input_cols": s, "rows": 500, "survivors": 7, "requested_columns": None}),
+        # SPEC v5.55 (e)：post_ic_transform 之主軸改 survivors（三點＝ic_page_relaxed 各 cols 點之實際倖存數）
+        ("post_ic_transform", "survivors"): _t02_axis_records("post_ic_transform", "survivors", (40, 90, 170),
+                                                              ["m.x:post"], lambda s: {
+            "input_cols": 500, "rows": 2000, "survivors": s, "requested_columns": None}),
         ("post_ic_transform", "rows"): _t02_axis_records("post_ic_transform", "rows", (1000, 1500, 2000), ["m.x:post"],
                                                          lambda s: {"input_cols": 500, "rows": s, "survivors": 9,
                                                                     "requested_columns": None}),
@@ -3489,3 +3491,330 @@ def test_task02_projection_run_root(harness: Any, tmp_path: Path) -> None:
     with pytest.raises(harness.HarnessError, match="repo 根"):
         with harness.projection_run_root(REPO, run):
             pass
+
+
+# ── SPEC v5.55 (d)(e)(f)(g2)(h)：量測工具補完之秒級契約（不跑量測） ─────────────────────────────────────────────
+
+
+#: SPEC v5.55 (d)：IC 頁預設路徑因第 5 段零通過而 0 呼叫之 8 入口（2026-11-01 估時 problems.json 實查）
+V555_RELAXED_ENTRIES = (
+    "momentum.Analysis.redundancy_filter:RedundancyFilter.filter",
+    "momentum.Analysis.redundancy_filter:RedundancyFilter.compute_correlation_matrix",
+    "momentum.Analysis.redundancy_filter:RedundancyFilter.greedy_dedup",
+    "momentum.Analysis.redundancy_filter:RedundancyFilter.compute_diversification_metrics",
+    "momentum.Analysis.marginal_ic:normal_scores",
+    "momentum.Analysis.marginal_ic:fit_projection",
+    "momentum.Analysis.factor_combiner:block_bootstrap_ci",
+    "momentum.Analysis.ic_reporter:ICReporter.save_filtered_features",
+)
+#: SPEC v5.55 (f)：深度分析預設設定下 0 呼叫之入口 ⇒ 其直接呼叫格
+V555_DEEP_CELLS = {
+    "momentum.Analysis.factor_orthogonalizer:FactorOrthogonalizer.pca_orthogonalize": "orthogonalize_pca",
+    "momentum.Analysis.factor_exposure_analyzer:FactorExposureAnalyzer._apply_beta_neutralization": "exposure_beta_neutral",
+    "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer.analyze_from_variants":
+        "param_sensitivity_family",
+    "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer._compute_rolling_icir":
+        "param_sensitivity_family",
+    "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer._rolling_corr": "param_sensitivity_pearson",
+}
+
+
+def _v555_inventory() -> Dict[str, Any]:
+    return json.loads((REPO / "scripts" / "icperf_path_inventory.json").read_text(encoding="utf-8"))
+
+
+def _v555_ctx(harness: Any, run_id: str, axis: str, scale: int, root: Path) -> Any:
+    return harness.RunContext(run_id, axis, scale, root, root, harness.Recorder(heartbeat=False), None)
+
+
+def test_task02_v555_relaxed_branch_owns_zero_pass_entries(fb: Any, harness: Any, tmp_path: Path) -> None:
+    """SPEC v5.55 (d)：預設路徑因第 5 段零通過而 0 呼叫之 8 入口歸非預設門檻分支 `ic_page_relaxed`（兩軸、寫 R 群組存檔供冗餘
+    三格）；其請求＝L 格 IC 頁請求只覆寫第 5 段門檻（`RELAXED_THRESHOLDS` ⊆ ThresholdsConfig 欄、其餘 config_override 逐鍵
+    相同）；排程先於冗餘格與 IC 後轉換 survivors 軸；存檔目錄依群組分開（不與 IC 頁預設之 L<cols>_rows<R> 相撞）、子集不分群組。
+    路徑事實分別記第 5 段通過數、第 6 段輸入數與存活數，兩段計數不符 ⇒ 拒收。反例：任一入口歸屬改回 ic_page_default ⇒ 紅。"""
+    from momentum.Analysis.ic_config_schema import ThresholdsConfig
+
+    inv = _v555_inventory()
+    assert fb.inventory_problems(inv) == []
+    by = {e["id"]: e for e in inv["entries"]}
+    for eid in V555_RELAXED_ENTRIES:
+        assert by[eid]["measure"] is True and by[eid]["branch_cell"] == "ic_page_relaxed", eid
+    assert "ic_page_relaxed" in harness.PATHS and harness.RUN_AXES["ic_page_relaxed"] == ("cols", "rows")
+    assert harness.ROW_AXIS_RUN["ic_page_relaxed"] == "ic_page_relaxed" and "ic_page_relaxed" in harness.LONG_RUNS
+    assert {("ic_page_relaxed", "cols"), ("ic_page_relaxed", "rows")} <= set(harness.CAPTURE_RUNS)
+    red = ("redundancy_hierarchical", "redundancy_vif", "redundancy_diversification")
+    assert all(harness.CELL_GROUP[c] == "R" for c in red)
+    # 只覆寫第 5 段門檻（其餘同 IC 頁預設）
+    assert harness.RELAXED_THRESHOLDS and set(harness.RELAXED_THRESHOLDS) <= set(ThresholdsConfig.model_fields)
+    base = harness._limited_request("ic_report", fb.LONG_CELL, 20)
+    rel = harness.relaxed_request(20)
+    assert rel["threshold_branch"] == "non_default" and rel["threshold_override"] == harness.RELAXED_THRESHOLDS
+    def strip(r: Mapping[str, Any]) -> Dict[str, Any]:
+        return {k: v for k, v in r.items() if k not in ("config_override", "threshold_branch", "threshold_override")}
+    assert strip(rel) == strip(base)
+    ov_b, ov_r = copy.deepcopy(base["config_override"]), copy.deepcopy(rel["config_override"])
+    assert ov_r.pop("thresholds") == {**ov_b.pop("thresholds"), **harness.RELAXED_THRESHOLDS} and ov_r == ov_b
+    rows_req = harness.relaxed_request(20, rows=1000)
+    assert rows_req["config_override"]["ic_calculation"]["rolling_windows"] == \
+        harness.ROW_AXIS_WINDOW_OVERRIDE["rolling_windows"]
+    # 排程：非預設門檻分支先於讀其存檔／任務者
+    sched = harness.schedule_runs(inv)
+    i = sched.index(("ic_page_relaxed", "cols"))
+    assert i < sched.index(("post_ic_transform", "survivors")) and all(i < sched.index((c, "cols")) for c in red)
+    j = sched.index(("ic_page_relaxed", "rows"))
+    assert all(j < sched.index((c, "rows")) for c in red if (c, "rows") in sched)
+    # 存檔目錄依群組分開；子集不分群組
+    assert _v555_ctx(harness, "ic_page_default", "cols", 500, tmp_path).stage_tag(None) == "500"
+    assert _v555_ctx(harness, "ic_page_long", "rows", 1000, tmp_path).stage_tag(1000) == "L500_rows1000"
+    assert _v555_ctx(harness, "ic_page_relaxed", "cols", 500, tmp_path).stage_tag(None) == "RL500"
+    assert _v555_ctx(harness, "ic_page_relaxed", "rows", 1000, tmp_path).stage_tag(1000) == "RL500_rows1000"
+    cell = _v555_ctx(harness, "redundancy_vif", "cols", 1000, tmp_path)
+    assert cell.stage_tag(None) == "RL1000" and cell.long is True
+    want = harness.expected_stage_identity(cell, None)
+    assert want["writer"] == ["ic_page_relaxed", "cols"] and want["subset"]["kind"] == "relaxed_threshold_run"
+    assert want["subset"]["thresholds"] == harness.RELAXED_THRESHOLDS and want["subset"]["n_cols"] == 1000
+    assert harness.expected_stage_identity(_v555_ctx(harness, "redundancy_vif", "rows", 1500, tmp_path), 1500)["writer"] \
+        == ["ic_page_relaxed", "rows"]
+    # 路徑事實：分別記實值；第 5 段通過數 ≠ 第 6 段輸入數 ⇒ 拒收
+    rep = {"filter_log": {"stage5_thresholds": {"input_features": 500, "output_features": {"count": 120}},
+                          "stage6_redundancy": {"input_features": 120, "output_features": 41}}}
+    facts = harness.relaxed_facts(rep, 40)
+    assert (facts["stage5_input"], facts["stage5_passed"], facts["stage6_input"], facts["stage6_output"],
+            facts["survivors"], facts["threshold_branch"]) == (500, 120, 120, 41, 40, "non_default")
+    rep["filter_log"]["stage6_redundancy"]["input_features"] = 119
+    with pytest.raises(harness.HarnessError, match="第 5 段通過數"):
+        harness.relaxed_facts(rep, 40)
+    # 切分事實取 analyzer 實際所用之遮罩（服務路徑帶 feature_filter 時報告 metadata 不留 ic_train_test_split）
+    class _A:
+        _ic_cache = {"split_context": {"train_mask": np.array([True] * 6 + [False] * 4),
+                                       "test_mask": np.array([False] * 7 + [True] * 3)}}
+    sp = harness._split_facts_from_cache(_A(), {"analysis_status": "degraded_full_sample", "metadata": {}})
+    assert (sp["split_applied"], sp["split_train_rows"], sp["split_test_rows"]) == (True, 6, 3)
+    assert sp["report_analysis_status"] == "degraded_full_sample"
+    _A._ic_cache = {"split_context": None}
+    assert harness._split_facts_from_cache(_A(), {})["split_applied"] is False
+
+
+def test_task02_v555_post_ic_survivors_axis(harness: Any, scale_probe: Any, tmp_path: Path) -> None:
+    """SPEC v5.55 (e)：IC 後轉換主軸＝survivors（清冊 14 入口 unit_axis 含 survivors；rows 為第二軸），三點＝ic_page_relaxed 各
+    cols 點存下之真實 IC 任務之實際倖存數（`post_ic_survivor_scales`；缺、0 或不互異 ⇒ 不成立，不以目標值充數）；規模點 ⇒
+    恰一份存檔任務；組裝之 x 軸＝survivors。反例：主軸改回 cols（只有 cols 軸實跑）⇒ 組裝點名該入口缺 survivors 軸。"""
+    assert harness.primary_axis("post_ic_transform") == "survivors"
+    assert harness.RUN_AXES["post_ic_transform"] == ("survivors", "rows")
+    post = [e for e in _v555_inventory()["entries"] if e["measure"] and e["branch_cell"] == "post_ic_transform"]
+    assert len(post) == 14 and all("survivors" in e["unit_axis"]["axes"] for e in post)
+    for e in post:
+        assert harness.entry_runs(e) == (("post_ic_transform", "survivors"), ("post_ic_transform", "rows"), True), e["id"]
+    with pytest.raises(harness.HarnessError):
+        harness.axis_scales("post_ic_transform", "survivors", cols_scales=(500,), row_scales=(), event_scales=())
+    assert harness.axis_scales("post_ic_transform", "survivors", cols_scales=(500,), row_scales=(), event_scales=(),
+                               survivor_scales=(3, 9, 20)) == [3, 9, 20]
+
+    def save(root: Path, n: int, k: int) -> None:
+        harness.save_post_ic_task(root, n, f"t{n}", {"req_symbol": "BTCUSDT", "status": "completed", "result": {}},
+                                  [f"c{i}" for i in range(k)], {"feature_filter": {"include_features": []}}, {})
+
+    for n, k in ((500, 12), (1000, 30), (2000, 55)):
+        save(tmp_path, n, k)
+    got = harness.post_ic_survivor_scales(tmp_path)
+    assert got["ok"] is True and got["scales"] == [12, 30, 55] and got["by_cols"] == {500: 12, 1000: 30, 2000: 55}
+    assert harness._survivor_task_for(tmp_path, 30)["cols"] == 1000
+    with pytest.raises(harness.HarnessError):
+        harness._survivor_task_for(tmp_path, 31)
+    save(tmp_path, 2000, 30)  # 不互異
+    assert harness.post_ic_survivor_scales(tmp_path)["ok"] is False
+    with pytest.raises(harness.HarnessError):
+        harness._survivor_task_for(tmp_path, 30)
+    save(tmp_path, 2000, 0)  # 0 倖存
+    assert harness.post_ic_survivor_scales(tmp_path)["ok"] is False
+    part = tmp_path / "partial"
+    save(part, 500, 12)  # 缺點
+    assert harness.post_ic_survivor_scales(part)["ok"] is False
+    side = harness.post_ic_survivors_dir(part, 500) / harness.SUBSET_IDENTITY_FILE
+    harness.write_identity(side, {**json.loads(side.read_text(encoding="utf-8")), "thresholds": {"p_value_max": 0.05}})
+    with pytest.raises(harness.HarnessError, match="身分"):
+        harness.load_post_ic_task(part, 500)
+    # 組裝：x 軸＝survivors、點帶非預設門檻分支標記；主軸改回 cols ⇒ 拒收
+    base = {"stage": "post_ic_transform", "ic_page": True, "ic_first": False, "loop": "none", "measure": True,
+            "no_measure_reason": None, "evidence": "m/x.py:1"}
+    inv = {"entries": [{**base, "id": "m.x:post", "input_axes": ["passed_cols", "rows"], "branch_cell": "post_ic_transform",
+                        "coverage_path_id": "c4", "unit_axis": {"axes": ["rows", "survivors"], "function": "survivors*rows*W"},
+                        "scale_vector": ["rows", "survivors"]}]}
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "budget_seconds": BUDGET2_UPPER_SECONDS,
+          "sample_interval_seconds": 0.2, "chunk_cap": {"bytes": 1, "basis": "x"}}
+    runs = {("post_ic_transform", "survivors"): _t02_axis_records(
+        "post_ic_transform", "survivors", (12, 30, 55), ["m.x:post"],
+        lambda s: {"input_cols": 500, "rows": 2000, "survivors": s, "requested_columns": None,
+                   "threshold_branch": "non_default"})}
+    m = harness.assemble_scale_receipt(inv, runs, **kw)["entries"]["m.x:post"]
+    assert m["axis"] == "survivors" and m["fit_axis"] == "survivors"
+    assert [p["survivors"] for p in m["points"]] == [12, 30, 55]
+    assert [p["scale_vector"]["survivors"] for p in m["points"]] == [12, 30, 55]
+    assert all(p["threshold_branch"] == "non_default" for p in m["points"])
+    old = {("post_ic_transform", "cols"): _t02_axis_records(
+        "post_ic_transform", "cols", (500, 1000, 2000), ["m.x:post"],
+        lambda s: {"input_cols": s, "rows": 500, "survivors": 7, "requested_columns": None})}
+    with pytest.raises(harness.AssemblyError) as exc:
+        harness.assemble_scale_receipt(inv, old, **kw)
+    assert any("m.x:post" in p and "survivors" in p for p in exc.value.problems)
+
+
+def test_task02_v555_deep_zero_call_cells(harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """SPEC v5.55 (f)：深度分析預設設定下 0 呼叫之 5 入口之可達條件（碼證：正交化 method 預設 gram_schmidt、中和 mode 預設
+    none、參數敏感度須入選欄含 ≥ min_family_size 之家族且 `_rolling_corr` 另須非 spearman）⇒ 各歸讀深度分析存檔（D 群組）之
+    直接呼叫格；格以非預設設定呼叫該分支（spy 計其呼叫）。反例：pca 格改呼 gram_schmidt、beta 格不傳 beta_neutral、參數敏感度
+    不併入家族或 pearson 格改 spearman ⇒ 目標入口 0 呼叫（紅）。"""
+    from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
+    from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
+    from momentum.Analysis.ic_config_schema import ICConfig
+    from momentum.Analysis.parameter_sensitivity_analyzer import ParameterSensitivityAnalyzer as PSA
+
+    by = {e["id"]: e for e in _v555_inventory()["entries"]}
+    for eid, cell in V555_DEEP_CELLS.items():
+        assert by[eid]["measure"] is True and by[eid]["branch_cell"] == cell, eid
+        assert cell in harness.CELLS and harness.CELL_GROUP[cell] == "D", cell
+        # 參數敏感度兩格只量 rows 軸（C 格子集無 ≥ 3 員家族，見 PARAM_ROWS_ONLY_CELLS 之碼證）；其餘兩軸
+        assert harness.RUN_AXES[cell] == (("rows",) if cell in harness.PARAM_ROWS_ONLY_CELLS else ("cols", "rows")), cell
+        assert harness.entry_runs(by[eid])[0] == (cell, "rows" if cell in harness.PARAM_ROWS_ONLY_CELLS else "cols"), eid
+        assert set(harness.CELL_CAPTURES[cell]) <= {n for n, _r in harness.CAPTURES.values()}, cell
+    assert {("deep_analysis", "cols"), ("deep_analysis_long", "rows")} <= set(harness.CAPTURE_RUNS)
+    cfg = ICConfig()
+    assert cfg.factor_orthogonalization.method == "gram_schmidt" and cfg.factor_exposure.neutralization_mode == "none"
+    assert cfg.global_settings.default_method == "spearman"
+    sched = harness.schedule_runs(_v555_inventory())
+    for cell in set(V555_DEEP_CELLS.values()):
+        if cell not in harness.PARAM_ROWS_ONLY_CELLS:
+            assert sched.index(("deep_analysis", "cols")) < sched.index((cell, "cols"))
+        else:
+            assert (cell, "cols") not in sched
+        assert sched.index(("deep_analysis_long", "rows")) < sched.index((cell, "rows")), cell
+    d = _v555_ctx(harness, "orthogonalize_pca", "rows", 1500, tmp_path)
+    assert d.stage_tag(1500) == "DL500_rows1500" and d.subset_tag(1500) == "L500_rows1500"
+    assert _v555_ctx(harness, "deep_analysis", "cols", 500, tmp_path).stage_tag(None) == "D500"
+    assert harness.expected_stage_identity(d, 1500)["writer"] == ["deep_analysis_long", "rows"]
+
+    rng = np.random.default_rng(5)
+    idx = pd.date_range("2024-01-01", periods=120, freq="4h")
+    names = ["a_5", "a_10", "a_20", "b_3", "b_5", "b_8", "b_13", "x", "y"]
+    full = pd.DataFrame(rng.normal(size=(len(idx), len(names))), index=idx, columns=names)
+    labels = pd.Series(rng.normal(size=len(idx)), index=idx)
+    counts: Dict[str, int] = {}
+
+    def spy(owner: Any, name: str, static: bool = False) -> None:
+        raw = owner.__dict__[name]
+        fn = raw.__func__ if isinstance(raw, staticmethod) else raw
+
+        def wrapped(*a: Any, **k: Any) -> Any:
+            counts[name] = counts.get(name, 0) + 1
+            return fn(*a, **k)
+        monkeypatch.setattr(owner, name, staticmethod(wrapped) if static else wrapped)
+
+    spy(FactorOrthogonalizer, "pca_orthogonalize")
+    spy(FactorExposureAnalyzer, "_apply_beta_neutralization")
+    spy(PSA, "analyze_from_variants")
+    spy(PSA, "_rolling_corr", static=True)
+    ctx = _v555_ctx(harness, "orthogonalize_pca", "cols", 500, tmp_path)
+    caps = {"orthogonalize": {"self": FactorOrthogonalizer({}), "args": (full[["x", "y", "a_5"]],), "kwargs": {},
+                              "provenance": {}},
+            "neutralize": {"self": FactorExposureAnalyzer({}), "args": (),
+                           "kwargs": {"factor_values": full[["x", "y"]], "market_proxy": labels.shift(1), "mode": "none",
+                                      "lookback": 63}, "provenance": {}}}
+    monkeypatch.setattr(harness, "cell_capture", lambda c, name: caps[name])
+    assert harness._cell_pca(ctx)["survivors"] == 3 and counts.get("pca_orthogonalize") == 1
+    assert harness._cell_beta_neutral(ctx)["survivors"] == 2 and counts.get("_apply_beta_neutralization") == 1
+    # 參數敏感度：家族＝產品 detect_feature_families 之最小完整家族（a，3 員）併入入選欄
+    ps = PSA({"icir_window": 20})
+    cap = {"self": ps, "args": (full[["x", "y"]], labels),
+           "kwargs": {"metadata": None, "method": "spearman", "direction": {}}, "provenance": {}}
+    frame, kwargs, facts = harness.param_family_frame(cap, {"result": (full, {})})
+    assert list(frame.columns) == ["x", "y", "a_5", "a_10", "a_20"] and facts["family"] == "a"
+    with pytest.raises(harness.HarnessError, match="不一致"):
+        harness.param_family_frame(cap, {"result": (full.assign(x=full["x"] + 1.0), {})})
+    with pytest.raises(harness.HarnessError, match="參數家族"):
+        harness.param_family_frame(cap, {"result": (full[["x", "y"]], {})})
+    caps.update(param_sensitivity=cap, preprocess={"result": (full, {})})
+    counts.clear()
+    harness._cell_param_sensitivity(None)(ctx)
+    assert counts.get("analyze_from_variants", 0) >= 1 and counts.get("_rolling_corr", 0) == 0  # spearman ⇒ 不走 _rolling_corr
+    counts.clear()
+    harness._cell_param_sensitivity("pearson")(ctx)
+    assert counts.get("analyze_from_variants", 0) >= 1 and counts.get("_rolling_corr", 0) >= 1
+    counts.clear()
+    PSA.batch_analyze(ps, full[["x", "y"]], labels, metadata=None, method="pearson", direction={})
+    assert counts.get("analyze_from_variants", 0) == 0  # 不併入家族（預設入選欄）⇒ 0 呼叫（碼證之對照）
+
+
+def test_task02_v555_event_scales_from_split_precheck(fb: Any, harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """SPEC v5.55 (g2)：事件數軸三點由切分預檢選出（不再為 K//4、K//2、K）——`event_axis_precheck` 以產品五階段編排之列鍵與
+    切分求每一前 n 筆之測試段事件數，可達（≥ min_test_events）者取首、中、末，三點各重跑編排與切分複驗；可達點 < 3 ⇒ ok False，
+    凍結腳本開跑前 FreezeError。秒級：本測試以替身取代資料讀取（產品函式之真實資料跑見 `precheck-events` CLI）。"""
+    import contextlib
+    import inspect
+
+    k_total = 40
+    records = [{"event_id": f"e{i}", "t0": i} for i in range(k_total)]
+    monkeypatch.setattr(harness, "_event_batch_records", lambda n: records[:n] if n else list(records))
+    monkeypatch.setattr(harness, "_limited_request", lambda item, cell, n: {"run_dir": "x", "timeframe": "4h"})
+
+    @contextlib.contextmanager
+    def iso(root: Path, tag: str) -> Any:
+        yield tmp_path
+
+    monkeypatch.setattr(harness, "_prepare_isolation", iso)
+    test_from = 30  # 第 30 筆起落在測試段
+
+    def stage(recs: Sequence[Mapping[str, Any]], work: Path, request: Any, manifest: Path) -> Dict[str, Any]:
+        return {"event_label_owners": {int(r["t0"]): r["event_id"] for r in recs},
+                "event_timestamps": [int(r["t0"]) for r in recs]}
+
+    def counts(staged: Mapping[str, Any], request: Any, manifest: Path, keys: Any = None) -> Dict[str, Any]:
+        ks = list(staged["event_timestamps"] if keys is None else keys)
+        test = sum(1 for x in ks if x >= test_from)
+        return {"oos": test >= floor, "test_events": test, "train_events": len(ks) - test}
+
+    monkeypatch.setattr(harness, "_event_stage", stage)
+    monkeypatch.setattr(harness, "event_split_counts", counts)
+    floor = 3
+    res = harness.event_axis_precheck(tmp_path)
+    assert res["ok"] is True and res["reachable_range"] == [33, 40, 8]
+    assert res["scales"] == [33, 36, 40] and all(p["oos"] for p in res["points"])
+    assert res["scales"] != sorted({k_total // 4, k_total // 2, k_total})
+    floor = 9  # 只剩 2 個可達點（前 39、40 筆）
+    bad = harness.event_axis_precheck(tmp_path)
+    assert bad["ok"] is False and bad["scales"] == [] and "< 3" in bad["reason"]
+
+    class H:
+        def __init__(self, out: Dict[str, Any]) -> None:
+            self.out, self.seen = out, []
+
+        def event_axis_precheck(self, out_root: Any = None) -> Dict[str, Any]:
+            self.seen.append(out_root)
+            return self.out
+
+    ok = H({"ok": True, "scales": [192, 197, 203]})
+    assert fb._event_scales(ok, tmp_path) == ([192, 197, 203], ok.out) and ok.seen == [tmp_path]
+    with pytest.raises(fb.FreezeError, match="g2"):
+        fb._event_scales(H({"ok": False, "scales": [], "reason": "可達點 2 個 < 3"}))
+    src = inspect.getsource(fb.measure_inventory)
+    assert "_event_scales(h, root)" in src  # measure_inventory 之 events 軸三點取自切分預檢
+
+
+def test_task02_v555_three_points_always_run(fb: Any, harness: Any) -> None:
+    """SPEC v5.55 (h)（`docs/NOCAP_SPEC.md:23`）：不新增依推估耗時決定是否啟動某規模點之行為——`measure_inventory` 不引用兩點
+    推估（`projected_2000_seconds`／`two_point_seconds` 只在組裝階段之既有兩點例外標記）；排程之每一 (路徑, 軸) 之規模點
+    恰為該軸宣告之三點（不依任何耗時縮減）。反例：於排程或驅動層依推估秒數略過 2,000 欄點 ⇒ 紅。"""
+    import inspect
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(fb.measure_inventory)))
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} \
+        | {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    assert not names & {"projected_2000_seconds", "total_projected_seconds", "two_point_seconds", "unit_cost",
+                        "fit_points"}, names & {"projected_2000_seconds", "total_projected_seconds", "two_point_seconds"}
+    kws = [k.arg for n in ast.walk(tree) if isinstance(n, ast.Call) for k in n.keywords]
+    assert kws.count("budget_seconds") == 1  # 只傳給組裝（既有兩點例外標記），不用於啟動判定
+    for run_id, axis in harness.schedule_runs(_v555_inventory()):
+        if axis == "rows" and run_id in harness.EVENT_BARS_RUN.values():
+            continue  # K 線根數軸三點由真實快取導出（另測）
+        pts = harness.axis_scales(run_id, axis, cols_scales=(500, 1000, 2000), row_scales=(1000, 1500, 2000),
+                                  event_scales=(192, 197, 203), survivor_scales=(12, 30, 55))
+        assert len(pts) == 3 and len(set(pts)) == 3, (run_id, axis, pts)

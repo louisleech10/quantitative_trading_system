@@ -1,7 +1,7 @@
 {
   "schema": "icperf-t02-path-inventory/2",
   "schema_note": "ICPERF Task 0.2 路徑清冊草稿（改前，讀碼產出；未實跑任何量測）。範圍依 docs/ICPERF_SPEC.md:100。軸定義：rows＝列數；input_cols＝第 0 段讀入欄數；stage_cols＝實際進入該段之欄數；survivors＝第 6 段倖存欄數（深度分析預設選欄＝倖存欄）；survivor_pairs＝倖存欄兩兩配對數（≈survivors^2/2）。W＝滾動窗長、H＝衰減 horizon 數、G＝分組數、B＝bootstrap 次數、P＝置換次數，皆為設定常數，不入 scale_vector。 v5.50（2026-11-01）定稿：scale_vector 另可含 events（事件數）、symbols（標的數）、timestamps（跨標的時點數）——依 unit_axis.function 之 n_events／n_symbols／n_timestamps 機械導出（SPEC v5.49 處置④）；input_axes 仍 ⊆ cols／rows／passed_cols。branch_cell＝量測該入口之路徑實跑或直接呼叫格之 id（見 branch_cells）；measure=false 者為 null。run_ic_first 外層依 SPEC v5.50 (c) 不量。 v5.52 (b)（2026-11-01）：事件型路徑之事件樣本列數不記為 rows——event_import／event_study 之入口 rows 若實為事件數 ⇒ input_axes 移除 rows、scale_vector／unit_axis 改 events；input_axes 可為空（僅限 scale_vector 含 events：該入口只隨事件數變）。fixed_axes（選填，{軸: 碼證理由}）＝該路徑內不隨任何請求規模變之軸（事件路徑之 K 線根數），不入 input_axes、不排量測軸，只以觀測值記於 scale_vector。 v5.53 (c0)（2026-11-01，code review r64）：事件路徑之 K 線根數為成本軸（unit_axis.axes 含 rows 之事件入口，如 evaluate_all_bars rows*n_boot）⇒ 該 8 入口之 fixed_axes.rows 移除，由 harness 以隔離 K 線快取複本之三種根數量 rows 軸（`icperf_scale_harness.entry_runs`／`prepare_event_bars`）；input_axes 仍不記 rows（rows 由 unit_axis 判定）；fixed_axes 不得含 unit_axis.axes 之軸（`inventory_problems`）。",
-  "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.54",
+  "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.55",
   "generated_at": "2026-11-01",
   "draft": "runs/icperf/task02/path-inventory-draft.json",
   "draft_base_commit": "f290727a",
@@ -2701,7 +2701,7 @@
       "callers": [
         "momentum/Analysis/ic_filter_orchestrator.py:5362"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.compute_correlation_matrix",
@@ -2734,7 +2734,7 @@
         "momentum/Analysis/redundancy_filter.py:160",
         "momentum/Analysis/ic_filter_orchestrator.py:5385"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.greedy_dedup",
@@ -2764,7 +2764,7 @@
       "callers": [
         "momentum/Analysis/redundancy_filter.py:133"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.redundancy_filter:RedundancyFilter.hierarchical_clustering",
@@ -2919,7 +2919,7 @@
         "momentum/Analysis/ic_filter_orchestrator.py:5386",
         "momentum/Analysis/ic_filter_orchestrator.py:2735"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._xsec_mean_cross_corr",
@@ -3047,7 +3047,7 @@
         "momentum/Analysis/marginal_ic.py:421",
         "momentum/Analysis/factor_combiner.py:256"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.marginal_ic:fit_projection",
@@ -3078,7 +3078,7 @@
       "callers": [
         "momentum/Analysis/marginal_ic.py:458"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.factor_combiner:block_bootstrap_ci",
@@ -3110,7 +3110,7 @@
         "momentum/Analysis/marginal_ic.py:472",
         "momentum/Analysis/factor_combiner.py:276"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.factor_combiner:combine_factors",
@@ -3390,7 +3390,7 @@
       "callers": [
         "momentum/Analysis/ic_filter_orchestrator.py:6358"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_relaxed"
     },
     {
       "id": "momentum.Analysis.ic_reporter:ICReporter.save_report",
@@ -4045,7 +4045,7 @@
       "callers": [
         "momentum/Analysis/parameter_sensitivity_analyzer.py:181"
       ],
-      "branch_cell": "deep_analysis"
+      "branch_cell": "param_sensitivity_family"
     },
     {
       "id": "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer._compute_rolling_icir",
@@ -4076,7 +4076,7 @@
       "callers": [
         "momentum/Analysis/parameter_sensitivity_analyzer.py:103"
       ],
-      "branch_cell": "deep_analysis"
+      "branch_cell": "param_sensitivity_family"
     },
     {
       "id": "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer._rolling_corr",
@@ -4107,7 +4107,7 @@
       "callers": [
         "momentum/Analysis/parameter_sensitivity_analyzer.py:276"
       ],
-      "branch_cell": "deep_analysis"
+      "branch_cell": "param_sensitivity_pearson"
     },
     {
       "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_rolling_oos",
@@ -4293,7 +4293,7 @@
       "callers": [
         "momentum/Analysis/ic_filter_orchestrator.py:3682"
       ],
-      "branch_cell": "deep_analysis"
+      "branch_cell": "orthogonalize_pca"
     },
     {
       "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_factor_exposure",
@@ -4386,7 +4386,7 @@
       "callers": [
         "momentum/Analysis/factor_exposure_analyzer.py:118"
       ],
-      "branch_cell": "deep_analysis"
+      "branch_cell": "exposure_beta_neutral"
     },
     {
       "id": "momentum.Analysis.factor_exposure_analyzer:FactorExposureAnalyzer.calculate_portfolio_exposure",

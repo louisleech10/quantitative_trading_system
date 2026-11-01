@@ -41,6 +41,11 @@
   `event_bar_scales`），行程內 `bars_source._DEFAULT_CACHE` 改指複本（`redirect_event_bars`，觀測產品實際讀取之根數＝
   actual_scale），不改真實快取；只含 rows 之入口主軸＝rows。(c1) `cross_sectional_long`（`VARIANT_RUNS`）：L 格＋同一生成
   定義之 ETH 4h 長歷史格之預設切分分支；生成前秒級預檢 `precheck-xsec-long`（`xsec_long_precheck`）。
+- SPEC v5.55（code review r66）：(d) `ic_page_relaxed`＝非預設門檻分支（L 格 run 之 IC 頁服務路徑，只覆寫第 5 段門檻
+  `RELAXED_THRESHOLDS`；預設路徑第 5 段零通過而 0 呼叫之 8 入口歸之；存 R 群組存檔供冗餘三格、存 IC 任務供 survivors 軸）；
+  (e) post_ic_transform 主軸＝survivors（`post_ic_survivor_scales`；子命令 `survivor-scales`）；(f) 深度分析 0 呼叫之 5 入口
+  歸讀 D 群組存檔之直接呼叫格（`orthogonalize_pca`／`exposure_beta_neutral`／`param_sensitivity_family`／
+  `param_sensitivity_pearson`）；(g2) 事件數軸三點由 `event_axis_precheck`（子命令 `precheck-events`）選出；(h) 三點固定全跑。
 - 直接呼叫格（`CELLS`）：讀 `stage_inputs/<N>/` 之真實輸入，以路徑同一設定物件（pickle 之 self）呼叫互斥分支：滾動 IC
   kendall／pearson、冗餘 hierarchical／vif／多元化約束、regime kmeans、fit_mode pit_expanding（C 格 500 列 ≤ 512 ⇒ percentile
   走 `pit_expanding_bounds`）、PIT mad 縮尾、`standardize` 之 time_series_zscore＋pit_expanding、無缺值向量化 IC。
@@ -153,9 +158,14 @@ PATHS: Dict[str, str] = {
     "ic_page_default": "C 格 N 欄巢狀子集＋IC 頁預設請求 analyze（第 0–7 段）；存直接呼叫格之各段真實輸入",
     "ic_page_long": "L 格（4h 2,000 列，樣本外切分成立）交接 h5 之 N 欄巢狀子集＋IC 頁預設請求 analyze（樣本外分支入口）；"
                     "rows 軸＝固定 ROW_AXIS_COLS 欄、末 R 列、ROW_AXIS_WINDOW_OVERRIDE（存直接呼叫格之列數軸真實輸入）",
+    "ic_page_relaxed": "SPEC v5.55 (d)：**非預設門檻分支**——L 格 run feature_filter N 欄經服務 start_analysis（IC 頁請求，只覆寫"
+                       "第 5 段門檻 RELAXED_THRESHOLDS）；負責預設路徑因第 5 段零通過而 0 呼叫之第 6／6b／7 段入口；存第 6 段"
+                       "真實輸入（stage_inputs/RL<N>/）供冗餘直接呼叫格、存 IC 任務（POST_IC_SURVIVORS_DIR）供 IC 後轉換 "
+                       "survivors 軸；rows 軸＝固定 ROW_AXIS_COLS 欄、run 載入後取末 R 列、ROW_AXIS_WINDOW_OVERRIDE",
     "deep_analysis": "同 ic_page_default 之 analyze 後同一 analyzer 續跑深度分析全部模組",
     "deep_analysis_long": "同 ic_page_long 之 rows 軸 analyze 後同一 analyzer 續跑深度分析全部模組（深度分析之列數軸）",
-    "post_ic_transform": "A 格 run feature_filter N 欄經服務 start_analysis 後 _apply_transforms_sync（rank／zscore／gaussian）；"
+    "post_ic_transform": "SPEC v5.55 (e)：主軸 survivors＝ic_page_relaxed 各 cols 點存下之真實 IC 任務（POST_IC_SURVIVORS_DIR）"
+                         "直接呼叫 _apply_transforms_sync（rank／zscore／gaussian；倖存欄＝該任務之實際倖存者，不重跑 IC）；"
                          "rows 軸＝L 格存檔之 IC 任務（prepare post-ic-rows）於末 R 列直接呼叫 _apply_transforms_sync",
     "event_import": "L 格 run feature_filter N 欄＋§G (7) 事件匯入批（event_import_run）；events 軸＝固定 ROW_AXIS_COLS 欄、"
                     "隔離儲存根之前 {scale} 筆事件；rows 軸（v5.53 (c0)）＝固定 ROW_AXIS_COLS 欄、全部事件、K 線讀隔離截短"
@@ -183,7 +193,38 @@ CELLS: Dict[str, str] = {
     "winsor_mad_pit": "同上，縮尾 method=mad、fit_mode=pit_expanding（pit_expanding_mad）",
     "standardize_tszscore_pit": "存檔第 1 段輸出＋同一 DataPreprocessor.standardize(method=time_series_zscore, fit_mode=pit_expanding)",
     "vectorized_ic_no_missing": "存檔第 4 段 compute_ic 輸入取標籤有限列與全有限欄（_has_missing 為 False）＋同一 ICEngine",
+    # SPEC v5.55 (f)：深度分析預設設定下 0 呼叫之入口——讀深度分析路徑存之真實輸入（stage_inputs/D<N>/、DL<cols>_rows<R>/）
+    "orthogonalize_pca": "存檔正交化輸入（gram_schmidt 之 factors）＋同一 FactorOrthogonalizer，pca_orthogonalize"
+                         "（factor_orthogonalization.method=pca 之分支，ic_filter_orchestrator.py:3680-3682）",
+    "exposure_beta_neutral": "存檔中和輸入（neutralize_factor_matrix 之 factor_values、market_proxy）＋同一 FactorExposureAnalyzer，"
+                             "mode=beta_neutral（factor_exposure_analyzer.py:117-118）",
+    "param_sensitivity_family": "存檔參數敏感度輸入（batch_analyze 之 self／labels／metadata／方法／方向；入選欄）＋同一路徑第 1 段"
+                                "輸出中產品 detect_feature_families 所得之最小完整家族（≥ min_family_size）併入後 batch_analyze"
+                                "（同請求方法；parameter_sensitivity_analyzer.py:178-181）",
+    "param_sensitivity_pearson": "同上，method=pearson（非 spearman 之 _rolling_corr 分支，parameter_sensitivity_analyzer.py:273-276）",
 }
+#: SPEC v5.55 (d)：非預設門檻分支之第 5 段門檻覆寫（深合併入 IC 頁請求之 `config_override.thresholds`；其餘同 IC 頁預設）。
+#: 選擇依據（碼證）：A／C 格 1h 500 列之 ICIR 恆非有限（ICIR 窗 63 經 12h／1h 換算為 756 > 500 列，`ic_engine.py:1869-1881`；
+#: 2026-11-01 A 格 120 欄請求之 summary_table.icir 全 null）而 `_passes_threshold` 對 NaN 一律不通過（`ic_filter_orchestrator.py:
+#: 6806-6813`、ICIR 閘 `:6047-6050` 於全域路徑恆生效）⇒ C 格任何門檻值皆無法使第 6 段有輸入 ⇒ 資料格改 L 格（4h 2,000 列，
+#: ICIR 有限）。L 格 120 欄預設請求之第 5 段剔除以 p 閘為主（ic_mean 12／icir 8／p_value 95／monotonicity 1，通過 4；2026-11-01
+#: correctness 擷取之 filter log）；p 閘＝`p_value_adj ≤ alpha_effective`（`:6052-6057`）、alpha_effective＝`p_value_max`
+#: （`:5249-5258`），BH q 值與 alpha 無關（`statistical_validator.py:183` `del alpha`）⇒ 只覆寫 `p_value_max`＝1.0（p 值值域上界：
+#: 任一有限 q 皆過 p 閘），其餘五道門檻（ic_mean／icir／勝率／單調性／覆蓋率）維持預設——第 5 段通過數＝真實資料過其餘門檻者
+RELAXED_THRESHOLDS: Dict[str, Any] = {"p_value_max": 1.0}
+#: SPEC v5.55 (e)：IC 後轉換 survivors 軸之存檔輸入（ic_page_relaxed cols 點之 IC 任務）目錄；子目錄＝`RL<N>`
+POST_IC_SURVIVORS_DIR = "stage_inputs/post_ic_survivors"
+#: 存檔目錄之群組前綴（路徑 ⇒ 前綴）：""＝IC 頁預設（C 格 cols／L 格 rows）、"D"＝深度分析、"R"＝非預設門檻分支
+STAGE_GROUP: Dict[str, str] = {"ic_page_default": "", "ic_page_long": "", "deep_analysis": "D", "deep_analysis_long": "D",
+                               "ic_page_relaxed": "R"}
+#: 各群組之寫出路徑：(cols 軸路徑, rows 軸路徑)
+GROUP_WRITERS: Dict[str, Tuple[str, str]] = {"": ("ic_page_default", "ic_page_long"),
+                                             "D": ("deep_analysis", "deep_analysis_long"),
+                                             "R": ("ic_page_relaxed", "ic_page_relaxed")}
+#: 直接呼叫格所讀存檔之群組（未列 ⇒ ""）：冗餘三格讀非預設門檻分支（預設路徑第 6 段 0 輸入，無存檔）；深度四格讀深度分析
+CELL_GROUP: Dict[str, str] = {"redundancy_hierarchical": "R", "redundancy_vif": "R", "redundancy_diversification": "R",
+                              "orthogonalize_pca": "D", "exposure_beta_neutral": "D", "param_sensitivity_family": "D",
+                              "param_sensitivity_pearson": "D"}
 #: 預設路徑實跑時存之各段真實輸入（入口 id ⇒ (存檔名, 是否另存回傳值)）；只存第一次呼叫
 CAPTURES: Dict[str, Tuple[str, bool]] = {
     "momentum.Analysis.data_preprocessor:DataPreprocessor.preprocess": ("preprocess", True),
@@ -192,6 +233,11 @@ CAPTURES: Dict[str, Tuple[str, bool]] = {
     "momentum.Analysis.ic_engine:ICEngine.compute_grouped_ic": ("grouped_ic", False),
     "momentum.Analysis.redundancy_filter:RedundancyFilter.filter": ("redundancy_filter", False),
     "momentum.Analysis.redundancy_filter:RedundancyFilter.compute_diversification_metrics": ("diversification_metrics", False),
+    # SPEC v5.55 (f)：深度分析模組之真實輸入（深度分析路徑寫 D 群組存檔）
+    "momentum.Analysis.factor_orthogonalizer:FactorOrthogonalizer.gram_schmidt": ("orthogonalize", False),
+    "momentum.Analysis.factor_exposure_analyzer:FactorExposureAnalyzer.neutralize_factor_matrix": ("neutralize", False),
+    "momentum.Analysis.parameter_sensitivity_analyzer:ParameterSensitivityAnalyzer.batch_analyze": ("param_sensitivity",
+                                                                                                   False),
 }
 #: 各格所需之存檔
 CELL_CAPTURES: Dict[str, Tuple[str, ...]] = {
@@ -201,18 +247,29 @@ CELL_CAPTURES: Dict[str, Tuple[str, ...]] = {
     "regime_kmeans": ("grouped_ic",), "fit_mode_pit_expanding": ("preprocess",),
     "winsor_mad_pit": ("preprocess",), "standardize_tszscore_pit": ("preprocess",),
     "vectorized_ic_no_missing": ("compute_ic",),
+    "orthogonalize_pca": ("orthogonalize",), "exposure_beta_neutral": ("neutralize",),
+    "param_sensitivity_family": ("param_sensitivity", "preprocess"),
+    "param_sensitivity_pearson": ("param_sensitivity", "preprocess"),
 }
-#: 各路徑／格可用之軸（v5.51 (a)：IC 頁與深度分析之 rows 軸改由 L 格路徑 `ic_page_long`／`deep_analysis_long` 實跑）
+#: SPEC v5.55 (f)：參數敏感度兩格只有 rows 軸（主軸＝rows）。碼證：入口成本＝family_size·rows·W·log(W)（清冊 unit_axis；
+#: 不含欄數軸），且家族須 ≥ min_family_size（`parameter_sensitivity_analyzer.py:178-181`）——C 格交接 h5 之 100／500／1,000／
+#: 2,000 欄巢狀子集（seed 20261027）欄名之名稱樣式家族最大成員數 0／1／1／2（無 ≥ 3 者；L 格 500 欄子集最大 3、≥ 3 者 2 組；
+#: 2026-11-01 smoke `runs/icperf/task02/smoke/inspect_subset_families.py` 實查；C 格 D100 存檔以產品 detect_feature_families
+#: 實跑亦全為單員）⇒ C 格 cols 軸於真實資料不可達；改以 L 格（deep_analysis_long rows 軸之存檔，500 欄）之列數三點量
+PARAM_ROWS_ONLY_CELLS: Tuple[str, ...] = ("param_sensitivity_family", "param_sensitivity_pearson")
+#: 各路徑／格可用之軸（v5.51 (a)：IC 頁與深度分析之 rows 軸改由 L 格路徑 `ic_page_long`／`deep_analysis_long` 實跑）。
+#: SPEC v5.55 (e)：post_ic_transform 之主軸＝survivors（不再有每點重跑整段 IC 之 cols 軸）
 RUN_AXES: Dict[str, Tuple[str, ...]] = {
-    **{c: ("cols", "rows") for c in CELLS},
-    "ic_page_default": ("cols",), "ic_page_long": ("cols", "rows"), "deep_analysis": ("cols",),
-    "deep_analysis_long": ("rows",), "post_ic_transform": ("cols", "rows"),
+    **{c: ("rows",) if c in PARAM_ROWS_ONLY_CELLS else ("cols", "rows") for c in CELLS},
+    "ic_page_default": ("cols",), "ic_page_long": ("cols", "rows"), "ic_page_relaxed": ("cols", "rows"),
+    "deep_analysis": ("cols",), "deep_analysis_long": ("rows",), "post_ic_transform": ("survivors", "rows"),
     "event_import": ("cols", "events", "rows"), "event_study": ("events", "rows"),
     "cross_sectional": ("cols", "timestamps"), "cross_sectional_long": ("cols",),
     "icfirst_post_generation": ("cols", "rows"),
 }
 #: 主軸非 cols 之路徑（SPEC v5.51 (d)：event_study 只有事件數與 K 線根數兩軸，主軸＝events）
-PRIMARY_AXIS: Dict[str, str] = {"event_study": "events"}
+PRIMARY_AXIS: Dict[str, str] = {"event_study": "events", "post_ic_transform": "survivors",
+                                **{c: "rows" for c in PARAM_ROWS_ONLY_CELLS}}
 #: SPEC v5.53 (c0)（code review r64）：事件路徑之 K 線根數軸——清冊 unit_axis.axes 含 rows 之事件入口（K 線根數為成本軸，
 #: 如 `evaluate_all_bars` rows*n_boot）所屬格 ⇒ rows 軸實跑之 run_id。實跑於隔離 K 線快取複本（`prepare_event_bars`：同一
 #: symbol／週期之末 R 根，`<out-root>/EVENT_BARS_DIR/rows<R>/`），行程內 `bars_source._DEFAULT_CACHE` 指向該複本；不改
@@ -229,7 +286,7 @@ XSEC_LONG_CELLS = (LONG_CELL_ID, "L_ETHUSDT_4h_longhist")
 #: 主排程以外之變體實跑 (run_id, 軸) ⇒ 其所變之格（branch_cell）：該格每一 measure=true 入口於變體實跑亦須 calls ≥ 1，
 #: 收據 `variants` 段（不參與 entry_runs 之主軸／第二軸、不取代原格之量測）
 VARIANT_RUNS: Dict[Tuple[str, str], str] = {("cross_sectional_long", "cols"): "cross_sectional"}
-ROW_AXIS_RUN.update({"ic_page_default": "ic_page_long", "ic_page_long": "ic_page_long",
+ROW_AXIS_RUN.update({"ic_page_default": "ic_page_long", "ic_page_long": "ic_page_long", "ic_page_relaxed": "ic_page_relaxed",
                      "deep_analysis": "deep_analysis_long", "post_ic_transform": "post_ic_transform",
                      "icfirst_post_generation": "icfirst_post_generation", **{c: c for c in CELLS}})
 #: SPEC v5.52 (b)：清冊 input_axes 之 rows 由非 rows 名之軸實跑代之者（收據 `row_axis` 明示軸名）——跨標的之列數＝時點數 ×
@@ -237,11 +294,14 @@ ROW_AXIS_RUN.update({"ic_page_default": "ic_page_long", "ic_page_long": "ic_page
 ROW_AXIS_ALIAS: Dict[str, Tuple[str, str]] = {"cross_sectional": ("cross_sectional", "timestamps")}
 #: SPEC v5.52 (b)：事件型路徑之事件數軸（清冊 scale_vector 含 events 之入口）：所屬格 ⇒ events 軸實跑之 run_id
 EVENT_AXIS_RUN: Dict[str, str] = {"event_import": "event_import", "event_study": "event_study"}
-#: 寫直接呼叫格所需存檔之 (路徑, 軸)：cols 軸取 C 格 ic_page_default、rows 軸取 L 格 ic_page_long
-CAPTURE_RUNS: Tuple[Tuple[str, str], ...] = (("ic_page_default", "cols"), ("ic_page_long", "rows"))
+#: 寫直接呼叫格所需存檔之 (路徑, 軸)：cols 軸取 C 格 ic_page_default、rows 軸取 L 格 ic_page_long；SPEC v5.55：非預設門檻
+#: 分支兩軸（R 群組）、深度分析兩路徑（D 群組）
+CAPTURE_RUNS: Tuple[Tuple[str, str], ...] = (("ic_page_default", "cols"), ("ic_page_long", "rows"),
+                                             ("ic_page_relaxed", "cols"), ("ic_page_relaxed", "rows"),
+                                             ("deep_analysis", "cols"), ("deep_analysis_long", "rows"))
 #: 主軸以外之軸實跑之排程先後（ic_page_long rows 先跑：寫直接呼叫格之列數軸存檔）
-SECOND_AXIS_ORDER: Tuple[str, ...] = ("ic_page_long", "deep_analysis_long", "post_ic_transform", "event_import",
-                                      "cross_sectional", "icfirst_post_generation")
+SECOND_AXIS_ORDER: Tuple[str, ...] = ("ic_page_long", "ic_page_relaxed", "deep_analysis_long", "post_ic_transform",
+                                      "event_import", "cross_sectional", "icfirst_post_generation")
 
 
 def primary_axis(run_id: str) -> str:
@@ -316,7 +376,8 @@ def schedule_runs(inventory: Mapping[str, Any], *, second_axes: bool = True) -> 
             continue
         cells.add(str(e.get("branch_cell")))
         p, s, need = entry_runs(e)
-        prim.append(p)
+        # SPEC v5.55 (f)：主軸即 rows 之直接呼叫格（參數敏感度兩格）讀 rows 軸路徑之存檔 ⇒ 排在第二軸段（該路徑之 rows 軸之後）
+        (sec if second_axes and p[1] == "rows" and p[0] in CELLS else prim).append(p)
         if second_axes and need and s is not None and s[0] is not None:
             sec.append(s)
     order = {r: i for i, r in enumerate(("ic_page_default", "ic_page_long", *PATHS, *CELLS))}
@@ -361,12 +422,18 @@ def schedule_coverage(inventory: Mapping[str, Any], sched: Sequence[Tuple[str, s
 
 
 def axis_scales(run_id: str, axis: str, *, cols_scales: Sequence[int], row_scales: Sequence[int],
-                event_scales: Sequence[int], bar_scales: Optional[Sequence[int]] = None) -> List[int]:
+                event_scales: Sequence[int], bar_scales: Optional[Sequence[int]] = None,
+                survivor_scales: Optional[Sequence[int]] = None) -> List[int]:
     """(run_id, 軸) 之三規模點：cols＝`cols_scales`；rows＝`CELL_ROW_SCALES`／IC-first 窗長或 `row_scales`；events＝
     `event_scales`；timestamps＝`XSEC_TIMESTAMP_SCALES`。SPEC v5.53 (c0)：事件路徑之 rows（K 線根數）＝`bar_scales`（不給 ⇒
-    `event_bar_scales()` 由真實快取與事件批導出）。"""
+    `event_bar_scales()` 由真實快取與事件批導出）。SPEC v5.55 (e)：survivors＝`survivor_scales`（不給 ⇒ HarnessError；由
+    `post_ic_survivor_scales` 自 ic_page_relaxed 實跑存下之 IC 任務導出，須於該路徑實跑後取得）。"""
     if axis == "cols":
         return [int(s) for s in cols_scales]
+    if axis == "survivors":
+        if survivor_scales is None:
+            raise HarnessError("survivors 軸之規模點須由 ic_page_relaxed 實跑存下之 IC 任務導出（post_ic_survivor_scales）")
+        return [int(s) for s in survivor_scales]
     if axis == "rows" and run_id in EVENT_BARS_RUN.values():
         return [int(s) for s in (event_bar_scales() if bar_scales is None else bar_scales)]
     if axis == "rows":
@@ -1088,8 +1155,9 @@ def row_axis_precheck(scales: Sequence[int] = ROW_AXIS_SCALES) -> Dict[str, Any]
 # ── 路徑與直接呼叫格之實作 ─────────────────────────────────────────────────────────────────────────────
 
 
-#: 以 L 格為資料源之路徑（cols 軸亦然）；其餘路徑之 rows 軸亦於 L 格（`RunContext.long`）
-LONG_RUNS = ("ic_page_long", "deep_analysis_long")
+#: 以 L 格為資料源之路徑（cols 軸亦然）；其餘路徑之 rows 軸亦於 L 格（`RunContext.long`）。SPEC v5.55 (d)：非預設門檻分支
+#: 於 L 格（樣本外切分成立；組裝驗 split_applied）
+LONG_RUNS = ("ic_page_long", "deep_analysis_long", "ic_page_relaxed")
 #: 讀交接 h5 巢狀子集之路徑
 SUBSET_RUNS = ("ic_page_default", "ic_page_long", "deep_analysis", "deep_analysis_long")
 
@@ -1104,8 +1172,13 @@ class RunContext:
         #: SPEC v5.52 (b)：timestamps 軸（跨標的）之時點數、events 軸之事件數
         self.n_timestamps: Optional[int] = int(scale) if axis == "timestamps" else None
         self.n_events: Optional[int] = int(scale) if axis == "events" else None
-        #: v5.51 (a)：rows 軸與 L 格路徑之資料源＝L 格（IC-first 之 rows 軸除外：A 格三種窗長之生成）
-        self.long = (axis == "rows" and run_id != "icfirst_post_generation") or run_id in LONG_RUNS
+        #: SPEC v5.55 (e)：survivors 軸（IC 後轉換）之倖存欄數
+        self.n_survivors: Optional[int] = int(scale) if axis == "survivors" else None
+        #: SPEC v5.55：存檔目錄之群組（路徑＝`STAGE_GROUP`、直接呼叫格＝`CELL_GROUP`；""＝IC 頁預設、D＝深度、R＝非預設門檻）
+        self.group = STAGE_GROUP.get(run_id, CELL_GROUP.get(run_id, ""))
+        #: v5.51 (a)：rows 軸與 L 格路徑之資料源＝L 格（IC-first 之 rows 軸除外：A 格三種窗長之生成）；讀非預設門檻分支
+        #: 存檔之格（R 群組）兩軸皆 L 格
+        self.long = (axis == "rows" and run_id != "icfirst_post_generation") or run_id in LONG_RUNS or self.group == "R"
         #: SPEC v5.52 (b)：本次實際輸入之規模點數（runner 驗得後設；run_one 對宣告之 scale 驗等）
         self.actual_scale: Optional[int] = None
 
@@ -1113,10 +1186,15 @@ class RunContext:
     def stage_dir(self) -> Path:
         return self.out_root / "stage_inputs" / self.stage_tag(self.n_rows)
 
-    def stage_tag(self, n_rows: Optional[int]) -> str:
+    def subset_tag(self, n_rows: Optional[int]) -> str:
+        """交接 h5 巢狀子集之目錄名（`<out-root>/subsets/<tag>/`；不分群組——同一子集供各群組之路徑共用）。"""
         if n_rows is None:
             return f"L{self.n_cols}" if self.long else str(self.n_cols)
         return f"L{self.n_cols}_rows{int(n_rows)}"
+
+    def stage_tag(self, n_rows: Optional[int]) -> str:
+        """存檔真實輸入之目錄名（`<out-root>/stage_inputs/<tag>/`）：群組前綴（SPEC v5.55；IC 頁預設無前綴）＋子集名。"""
+        return self.group + self.subset_tag(n_rows)
 
 
 def _truncate_rows(src_h5: Path, src_meta: Path, rows: int, out_dir: Path) -> Tuple[Path, Path]:
@@ -1238,11 +1316,11 @@ def _subset_paths(ctx: RunContext) -> Tuple[Path, Path]:
     列。SPEC v5.52 (a)：經 `ensure_subset` 比對來源身分，不同即重建（不只憑檔案存在）。"""
     fb = _fb()
     src = subset_source(ctx.long)
-    sub_dir = ctx.out_root / "subsets" / ctx.stage_tag(None)
+    sub_dir = ctx.out_root / "subsets" / ctx.subset_tag(None)
     if ctx.n_rows is None:
         h5, meta, _ = ensure_subset(src, ctx.n_cols, fb.SEED, sub_dir)
         return h5, meta
-    h5, meta, _ = ensure_subset(src, ctx.n_cols, fb.SEED, ctx.out_root / "subsets" / ctx.stage_tag(ctx.n_rows),
+    h5, meta, _ = ensure_subset(src, ctx.n_cols, fb.SEED, ctx.out_root / "subsets" / ctx.subset_tag(ctx.n_rows),
                                 rows=ctx.n_rows, parent_dir=sub_dir)
     return h5, meta
 
@@ -1251,8 +1329,12 @@ def expected_stage_identity(ctx: "RunContext", n_rows: Optional[int]) -> Dict[st
     """直接呼叫格所讀存檔目錄之應有身分（SPEC v5.52 (a)）：該存檔所屬子集之 `subset_identity`（現行來源；rows＝存檔子集
     列長）＋寫出之 (路徑, 軸)。"""
     fb = _fb()
+    cols_run, rows_run = GROUP_WRITERS[ctx.group]
+    writer = (rows_run, "rows") if n_rows is not None else (cols_run, "cols")
+    if ctx.group == "R":
+        # SPEC v5.55 (d)：非預設門檻分支讀 L 格 run（非交接 h5）⇒ 身分＝run manifest＋請求之欄＋門檻覆寫＋列長
+        return {"subset": relaxed_identity(ctx.n_cols, n_rows), "writer": list(writer)}
     src = subset_source(ctx.long)
-    writer = ("ic_page_long", "rows") if n_rows is not None else ("ic_page_default", "cols")
     return {"subset": subset_identity(src, n_cols=ctx.n_cols, seed=fb.SEED, rows=n_rows),
             "writer": list(writer)}
 
@@ -1321,6 +1403,25 @@ def _split_facts(report: Any) -> Dict[str, Any]:
     sp = md.get("ic_train_test_split") or {}
     return {"split_applied": sp.get("applied"), "split_train_rows": sp.get("train_rows"),
             "split_test_rows": sp.get("test_rows")}
+
+
+def _split_facts_from_cache(analyzer: Any, report: Any) -> Dict[str, Any]:
+    """服務路徑（帶 feature_filter）之切分事實：取 analyzer 實際所用之切分（`_ic_cache["split_context"]` 之 train／test
+    遮罩，`ic_filter_orchestrator.py:5525`；refilter 同用）。報告 metadata 於帶 feature_filter 時不保留 `ic_train_test_split`
+    （`_apply_feature_filter` → `_filter_metadata_for_columns` 剔除非特徵之 dict 值鍵，`ic_filter_orchestrator.py:4816`、
+    `:4838-4847` ⇒ `_downgrade_branch` 判 `no_holdout_evidence`、analysis_status degraded；2026-11-01 smoke 實查），故不以
+    報告 metadata 判切分；報告之 analysis_status 另記（`report_analysis_status`）以顯示此不一致。"""
+    sc = (getattr(analyzer, "_ic_cache", None) or {}).get("split_context")
+    out: Dict[str, Any] = {"split_applied": False, "split_train_rows": None, "split_test_rows": None,
+                           "split_source": "analyzer._ic_cache.split_context",
+                           "report_analysis_status": (report or {}).get("analysis_status")
+                           if isinstance(report, Mapping) else None}
+    if isinstance(sc, Mapping) and sc.get("test_mask") is not None:
+        import numpy as np
+
+        out.update(split_applied=True, split_train_rows=int(np.asarray(sc["train_mask"], dtype=bool).sum()),
+                   split_test_rows=int(np.asarray(sc["test_mask"], dtype=bool).sum()))
+    return out
 
 
 def _run_ic_page_default(ctx: RunContext) -> Dict[str, Any]:
@@ -1405,16 +1506,30 @@ class _NullProgress:
         return None
 
 
-def post_ic_rows_identity() -> Dict[str, Any]:
+def post_ic_rows_identity(branch: str = "default") -> Dict[str, Any]:
     """post_ic_transform 列軸存檔輸入之來源身分（SPEC v5.52 (a)）：L 格 run 之 manifest 路徑、大小、內容 sha256、固定欄數
-    `ROW_AXIS_COLS` 與請求之欄（排序前綴；`small_request`）之 sha256。"""
+    `ROW_AXIS_COLS` 與請求之欄（排序前綴；`small_request`）之 sha256。SPEC v5.55 (e)：`branch`＝"default"（IC 頁預設請求）
+    或 "non_default"（預設請求倖存欄為空時改用之非預設門檻請求 `relaxed_request`；身分另記門檻覆寫）。"""
     fb = _fb()
     request = _limited_request("ic_report", fb.LONG_CELL, ROW_AXIS_COLS)
     manifest = REPO / request["run_dir"] / "feature_manifest.json"
     names = list(request["feature_filter"]["include_features"])
-    return {"schema": SUBSET_IDENTITY_SCHEMA, "source": _rel(manifest), "source_size": int(manifest.stat().st_size),
-            "source_sha256": file_sha256(manifest), "n_cols": ROW_AXIS_COLS, "rows": None,
-            "columns_sha256": hashlib.sha256(json.dumps(names, ensure_ascii=False).encode("utf-8")).hexdigest()}
+    out = {"schema": SUBSET_IDENTITY_SCHEMA, "source": _rel(manifest), "source_size": int(manifest.stat().st_size),
+           "source_sha256": file_sha256(manifest), "n_cols": ROW_AXIS_COLS, "rows": None,
+           "columns_sha256": hashlib.sha256(json.dumps(names, ensure_ascii=False).encode("utf-8")).hexdigest()}
+    if branch != "default":
+        out.update(threshold_branch="non_default", thresholds=dict(RELAXED_THRESHOLDS))
+    return out
+
+
+def _post_ic_rows_saved_identity(root: Path) -> Optional[Dict[str, Any]]:
+    """`root` 之存檔身分等於現行預設或非預設門檻身分者 ⇒ 該身分；否則 None。"""
+    side = read_identity(Path(root) / SUBSET_IDENTITY_FILE)
+    for branch in ("default", "non_default"):
+        want = json.loads(json.dumps(post_ic_rows_identity(branch)))
+        if side == want:
+            return want
+    return None
 
 
 def prepare_post_ic_rows(out_root: Path) -> Dict[str, Any]:
@@ -1426,21 +1541,28 @@ def prepare_post_ic_rows(out_root: Path) -> Dict[str, Any]:
 
     fb = _fb()
     root = (Path(out_root) if Path(out_root).is_absolute() else REPO / out_root) / POST_IC_ROWS_DIR
-    want = post_ic_rows_identity()
     side = root / SUBSET_IDENTITY_FILE
-    if (root / POST_IC_ROWS_FILE).is_file() and read_identity(side) == json.loads(json.dumps(want)):
-        return {"reused": True, "dir": _rel(root), "identity": want}
-    request = _limited_request("ic_report", fb.LONG_CELL, ROW_AXIS_COLS)
-    with _prepare_isolation(root.parent.parent, "post-ic-rows") as work:
-        svc = _service_with_tasks(request, work / "registry.json")
-        task_id, info = _service_analysis(svc, fb._ic_analyze_request(request), _NullProgress())  # type: ignore[arg-type]
-    survivors = [str(c) for c in info["analyzer"].get_filtered_features().columns]
+    saved_identity = _post_ic_rows_saved_identity(root)
+    if (root / POST_IC_ROWS_FILE).is_file() and saved_identity is not None:
+        return {"reused": True, "dir": _rel(root), "identity": saved_identity}
+    # SPEC v5.55 (e)：先以 IC 頁預設請求；倖存欄為空 ⇒ 改用非預設門檻請求（`relaxed_request`），身分與存檔記明
+    survivors: List[str] = []
+    for branch in ("default", "non_default"):
+        request = (_limited_request("ic_report", fb.LONG_CELL, ROW_AXIS_COLS) if branch == "default"
+                   else relaxed_request(ROW_AXIS_COLS))
+        with _prepare_isolation(root.parent.parent, f"post-ic-rows-{branch}") as work:
+            svc = _service_with_tasks(request, work / "registry.json")
+            task_id, info = _service_analysis(svc, fb._ic_analyze_request(request), _NullProgress())  # type: ignore[arg-type]
+        survivors = [str(c) for c in info["analyzer"].get_filtered_features().columns]
+        if survivors:
+            break
+    want = post_ic_rows_identity(branch)
     if not survivors:
-        raise HarnessError("prepare post-ic-rows：L 格 IC 倖存欄為空，無法量 IC 後轉換之列軸（資料不足）")
+        raise HarnessError("prepare post-ic-rows：L 格 IC 倖存欄於預設與非預設門檻請求皆為空，無法量 IC 後轉換之列軸（資料不足）")
     task_info = {k: v for k, v in info.items() if str(k).startswith("req_")}
     task_info.update(status=info.get("status"), result=info.get("result"))
     payload = {"task_id": task_id, "task_info": task_info, "survivors": survivors, "request": request,
-               "head": _git_head(), "identity": want}
+               "head": _git_head(), "identity": want, "threshold_branch": branch}
     root.mkdir(parents=True, exist_ok=True)
     tmp = root / (POST_IC_ROWS_FILE + ".part")
     with open(tmp, "wb") as fh:
@@ -1451,24 +1573,217 @@ def prepare_post_ic_rows(out_root: Path) -> Dict[str, Any]:
 
 
 def load_post_ic_rows(out_root: Path) -> Dict[str, Any]:
-    """讀 post_ic_transform 列軸存檔輸入；身分 sidecar 須等於現行 `post_ic_rows_identity`（SPEC v5.52 (a)），否則
-    HarnessError（須先跑 `prepare post-ic-rows`）。"""
+    """讀 post_ic_transform 列軸存檔輸入；身分 sidecar 須等於現行 `post_ic_rows_identity`（預設或非預設門檻分支；SPEC
+    v5.52 (a)、v5.55 (e)），否則 HarnessError（須先跑 `prepare post-ic-rows`）。"""
     import pickle
 
     root = Path(out_root) / POST_IC_ROWS_DIR
-    if not (root / POST_IC_ROWS_FILE).is_file() \
-            or read_identity(root / SUBSET_IDENTITY_FILE) != json.loads(json.dumps(post_ic_rows_identity())):
+    if not (root / POST_IC_ROWS_FILE).is_file() or _post_ic_rows_saved_identity(root) is None:
         raise HarnessError(f"post_ic_transform rows 軸之存檔輸入不存在或身分與現行來源不符：{root}（先跑 `icperf_scale_harness.py "
                            "prepare post-ic-rows`）")
     with open(root / POST_IC_ROWS_FILE, "rb") as fh:
         return pickle.load(fh)
 
 
-def _run_post_ic_transform(ctx: RunContext) -> Dict[str, Any]:
-    """cols 軸：A 格 run 限 N 欄經服務 IC 分析後 `_apply_transforms_sync`（倖存欄）。rows 軸（SPEC v5.52 (b)）：L 格存檔之
-    IC 任務（`load_post_ic_rows`）放入新服務之任務表，`_load_features_for_transforms` 之回傳取末 R 列（實際列數驗等於 R）後
-    直接呼叫 `_apply_transforms_sync`（同一倖存欄、同一參數）。"""
+# ── SPEC v5.55 (d)(e)：非預設門檻之 IC 頁路徑與 IC 後轉換 survivors 軸 ─────────────────────────────────────────────
+
+
+def relaxed_request(n_cols: int, rows: Optional[int] = None) -> Dict[str, Any]:
+    """非預設門檻分支之請求：L 格 run 之 IC 頁請求（`_limited_request("ic_report", LONG_CELL, n)`：feature_filter＝排序前綴
+    n 欄，同 `prepare_post_ic_rows`）之 `config_override.thresholds` 深合併 `RELAXED_THRESHOLDS`（只覆寫第 5 段門檻，其餘同
+    IC 頁預設）；`rows` 給定 ⇒ 另加列數軸視窗覆寫（`with_row_windows`，同 ic_page_long rows 軸）。請求記 `threshold_branch`
+    ＝"non_default"。"""
     fb = _fb()
+    request = _limited_request("ic_report", fb.LONG_CELL, int(n_cols))
+    ov = json.loads(json.dumps(request["config_override"]))
+    ov["thresholds"] = {**dict(ov.get("thresholds") or {}), **RELAXED_THRESHOLDS}
+    if rows is not None:
+        ov = with_row_windows(ov)
+    return {**request, "config_override": ov, "threshold_branch": "non_default",
+            "threshold_override": dict(RELAXED_THRESHOLDS)}
+
+
+def relaxed_identity(n_cols: int, rows: Optional[int] = None) -> Dict[str, Any]:
+    """非預設門檻分支之存檔身分（SPEC v5.52 (a) 同法）：L 格 run manifest 之路徑／大小／內容 sha256、請求之欄（排序前綴）之
+    sha256、欄數、列長、門檻覆寫、列數軸視窗覆寫（rows 軸）；任一不同 ⇒ 不沿用。"""
+    request = relaxed_request(n_cols, rows)
+    manifest = REPO / request["run_dir"] / "feature_manifest.json"
+    names = list(request["feature_filter"]["include_features"])
+    return {"schema": SUBSET_IDENTITY_SCHEMA, "kind": "relaxed_threshold_run", "source": _rel(manifest),
+            "source_size": int(manifest.stat().st_size), "source_sha256": file_sha256(manifest),
+            "n_cols": int(n_cols), "rows": None if rows is None else int(rows),
+            "columns_sha256": hashlib.sha256(json.dumps(names, ensure_ascii=False).encode("utf-8")).hexdigest(),
+            "thresholds": dict(RELAXED_THRESHOLDS),
+            "row_windows": ROW_AXIS_WINDOW_OVERRIDE if rows is not None else None}
+
+
+def _stage_count(fl: Mapping[str, Any], stage: str, key: str) -> Optional[int]:
+    """filter_log 之段計數（`output_features` 可為 int 或 {"count": int}）；缺 ⇒ None。"""
+    v = (fl.get(stage) or {}).get(key) if isinstance(fl.get(stage), Mapping) else None
+    if isinstance(v, Mapping):
+        v = v.get("count")
+    return int(v) if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def relaxed_facts(report: Any, survivors: int) -> Dict[str, Any]:
+    """非預設門檻分支之路徑事實（SPEC v5.55 (d)：分別記實值，不以目標值充數）：第 5 段輸入數與通過數、第 6 段輸入數與輸出數、
+    去冗餘（含多元化約束）後之存活數（`get_filtered_features` 之欄數）。第 6 段輸入數 ≠ 第 5 段通過數 ⇒ HarnessError（兩者
+    同一集合，`ic_filter_orchestrator.py:5362-5366`）。"""
+    fl = (report or {}).get("filter_log") or {} if isinstance(report, Mapping) else {}
+    out = {"threshold_branch": "non_default", "threshold_override": dict(RELAXED_THRESHOLDS),
+           "stage5_input": _stage_count(fl, "stage5_thresholds", "input_features"),
+           "stage5_passed": _stage_count(fl, "stage5_thresholds", "output_features"),
+           "stage6_input": _stage_count(fl, "stage6_redundancy", "input_features"),
+           "stage6_output": _stage_count(fl, "stage6_redundancy", "output_features"),
+           "survivors": int(survivors)}
+    if out["stage5_passed"] is not None and out["stage6_input"] is not None and out["stage5_passed"] != out["stage6_input"]:
+        raise HarnessError(f"ic_page_relaxed：第 5 段通過數 {out['stage5_passed']} ≠ 第 6 段輸入數 {out['stage6_input']}")
+    return out
+
+
+def post_ic_survivors_dir(out_root: Path, n_cols: int) -> Path:
+    """IC 後轉換 survivors 軸之存檔輸入目錄：`<out-root>/POST_IC_SURVIVORS_DIR/RL<N>/`。"""
+    return Path(out_root) / POST_IC_SURVIVORS_DIR / f"RL{int(n_cols)}"
+
+
+def save_post_ic_task(out_root: Path, n_cols: int, task_id: str, info: Mapping[str, Any], survivors: Sequence[str],
+                      request: Mapping[str, Any], facts: Mapping[str, Any]) -> Path:
+    """存 ic_page_relaxed cols 點之真實 IC 任務（同 `prepare_post_ic_rows` 之存法：`req_*`、`result`、status、倖存欄、請求）
+    於 `post_ic_survivors_dir`，身分 sidecar＝`relaxed_identity(N)`（加 survivors 數）。倖存欄為空 ⇒ 不存（呼叫端已拋）。"""
+    import pickle
+
+    d = post_ic_survivors_dir(out_root, n_cols)
+    want = relaxed_identity(n_cols, None)
+    task_info = {k: v for k, v in info.items() if str(k).startswith("req_")}
+    task_info.update(status=info.get("status"), result=info.get("result"))
+    payload = {"task_id": str(task_id), "task_info": task_info, "survivors": [str(c) for c in survivors],
+               "request": dict(request), "head": _git_head(), "identity": want, "facts": dict(facts)}
+    d.mkdir(parents=True, exist_ok=True)
+    tmp = d / (POST_IC_ROWS_FILE + ".part")
+    with open(tmp, "wb") as fh:
+        pickle.dump(payload, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    os.replace(tmp, d / POST_IC_ROWS_FILE)
+    write_identity(d / SUBSET_IDENTITY_FILE, {**want, "survivors": len(survivors)})
+    return d
+
+
+def load_post_ic_task(out_root: Path, n_cols: int) -> Dict[str, Any]:
+    """讀 survivors 軸之存檔 IC 任務；身分 sidecar 須等於現行 `relaxed_identity(N)`（加 survivors 數），否則 HarnessError
+    （須先跑 `ic_page_relaxed --axis cols --scale N`）。"""
+    import pickle
+
+    d = post_ic_survivors_dir(out_root, n_cols)
+    side = read_identity(d / SUBSET_IDENTITY_FILE) or {}
+    want = json.loads(json.dumps(relaxed_identity(n_cols, None)))
+    if not (d / POST_IC_ROWS_FILE).is_file() or {k: side.get(k) for k in want} != want:
+        raise HarnessError(f"post_ic_transform survivors 軸之存檔 IC 任務不存在或身分與現行來源不符：{d}（先跑 "
+                           f"`icperf_scale_harness.py run ic_page_relaxed --axis cols --scale {n_cols}`）")
+    with open(d / POST_IC_ROWS_FILE, "rb") as fh:
+        saved = pickle.load(fh)
+    if len(saved.get("survivors") or []) != int(side.get("survivors") or -1):
+        raise HarnessError(f"{d}：存檔倖存欄數與身分 sidecar 不符")
+    return saved
+
+
+def post_ic_survivor_scales(out_root: Path, cols_scales: Sequence[int] = SCALE_POINTS) -> Dict[str, Any]:
+    """SPEC v5.55 (e)：survivors 軸三點＝ic_page_relaxed 各 cols 點（`cols_scales`）實跑存下之 IC 任務之實際倖存欄數（秒級；
+    只讀 sidecar 與存檔）。任一點缺存檔、倖存欄為 0、或三點不互異 ⇒ `ok` False（不以目標值充數；須補資料或可達設定後再量）。
+    回 {"ok", "scales"（遞增）, "by_cols": {N: 倖存數}, "reason"}。"""
+    by: Dict[int, int] = {}
+    reason = None
+    for n in cols_scales:
+        try:
+            by[int(n)] = len(load_post_ic_task(out_root, int(n))["survivors"])
+        except HarnessError as exc:
+            reason = str(exc)
+            break
+    vals = [by[n] for n in sorted(by)]
+    if reason is None and (len(vals) != len(list(cols_scales)) or 0 in vals or len(set(vals)) != len(vals)):
+        reason = f"survivors 三點須皆 > 0 且互異：{by}"
+    return {"ok": reason is None, "scales": sorted(vals) if reason is None else [], "by_cols": by, "reason": reason}
+
+
+def _survivor_task_for(out_root: Path, n_survivors: int, cols_scales: Sequence[int] = SCALE_POINTS) -> Dict[str, Any]:
+    """survivors 軸規模點 ⇒ 其倖存欄數恰為 `n_survivors` 之存檔 IC 任務（唯一；否則 HarnessError）。"""
+    hit = []
+    for n in cols_scales:
+        try:
+            saved = load_post_ic_task(out_root, int(n))
+        except HarnessError:
+            continue
+        if len(saved["survivors"]) == int(n_survivors):
+            hit.append((int(n), saved))
+    if len(hit) != 1:
+        raise HarnessError(f"survivors 軸 {n_survivors}：存檔 IC 任務中倖存欄數相符者 {len(hit)} 份（須恰一份；先跑 "
+                           "ic_page_relaxed cols 三點）")
+    return {"cols": hit[0][0], **hit[0][1]}
+
+
+def _tail_feature_library(svc: Any, rows: int, seen: Dict[str, int]) -> None:
+    """本服務實例之 `FeatureLibrary.load_with_identity` 回傳取末 `rows` 列（rows 軸：run 載入後截短，同 `_truncate_rows` 之
+    末 R 列語意；身分不變）；`seen` 記來源與截短後列數。不改產品碼（只換本實例之屬性）。"""
+    lib = svc._feature_library
+    orig = lib.load_with_identity
+
+    def tail(*args: Any, **kwargs: Any) -> Any:
+        df, identity = orig(*args, **kwargs)
+        if len(df) < int(rows):
+            raise HarnessError(f"rows {rows} > run 列數 {len(df)}（資料不足）")
+        out = df.iloc[-int(rows):]
+        seen.update(source_rows=int(len(df)), rows=int(len(out)))
+        return out, identity
+
+    lib.load_with_identity = tail
+
+
+def _run_ic_page_relaxed(ctx: RunContext) -> Dict[str, Any]:
+    """SPEC v5.55 (d)：非預設門檻之 IC 頁路徑——`relaxed_request` 經服務 `start_analysis`（IC 頁之服務路徑，同
+    post_ic_transform 舊 cols 軸／`prepare_post_ic_rows`）；rows 軸以 `_tail_feature_library` 取 run 之末 R 列。第 6 段輸入
+    或倖存欄為 0 ⇒ HarnessError（非預設門檻仍零通過 ⇒ 補資料或可達設定後再量，不寫 0 呼叫之紀錄）。cols 軸另存 IC 任務供
+    survivors 軸（`save_post_ic_task`）。"""
+    fb = _fb()
+    request = relaxed_request(ctx.n_cols, ctx.n_rows)
+    svc = _service_with_tasks(request, ctx.work / "registry.json")
+    seen: Dict[str, int] = {}
+    if ctx.n_rows is not None:
+        _tail_feature_library(svc, int(ctx.n_rows), seen)
+    task_id, info = _service_analysis(svc, fb._ic_analyze_request(request), ctx.rec)
+    analyzer, report = info["analyzer"], info.get("result")
+    try:
+        survivors = [str(c) for c in analyzer.get_filtered_features().columns]
+    except Exception:  # noqa: BLE001 — 無倖存 frame ⇒ 空
+        survivors = []
+    facts = relaxed_facts(report, len(survivors))
+    if not facts["stage6_input"] or not survivors:
+        raise HarnessError(f"ic_page_relaxed {ctx.axis}={ctx.scale}：非預設門檻下第 6 段輸入 {facts['stage6_input']}、倖存 "
+                           f"{len(survivors)}（仍零通過；須補資料或可達設定，SPEC v5.55 (d)）")
+    names = list(request["feature_filter"]["include_features"])
+    rows = seen.get("rows") if ctx.n_rows is not None else _manifest_rows(request)
+    out = {**facts, "input_cols": ctx.n_cols, "rows": rows, "source_rows": seen.get("source_rows"),
+           **_split_facts_from_cache(analyzer, report), "stage_counts": _ic_facts(report, analyzer, ctx.n_cols, int(rows or 0))["stage_counts"],
+           "requested_columns": names, "actual_scale": seen.get("rows") if ctx.n_rows is not None else len(set(names))}
+    if ctx.axis == "cols":
+        out["post_ic_task"] = _rel(save_post_ic_task(ctx.out_root, ctx.n_cols, task_id, info, survivors, request, facts))
+    return out
+
+
+def _run_post_ic_transform(ctx: RunContext) -> Dict[str, Any]:
+    """survivors 軸（SPEC v5.55 (e)，主軸）：ic_page_relaxed cols 點存下之真實 IC 任務（倖存欄數＝宣告之規模，
+    `_survivor_task_for`）放入新服務之任務表後直接呼叫 `_apply_transforms_sync`（該任務之倖存欄、同一參數；不重跑 IC）。
+    rows 軸（SPEC v5.52 (b)）：L 格存檔之 IC 任務（`load_post_ic_rows`）放入新服務之任務表，`_load_features_for_transforms`
+    之回傳取末 R 列（實際列數驗等於 R）後直接呼叫 `_apply_transforms_sync`（同一倖存欄、同一參數）。"""
+    if ctx.axis == "survivors":
+        saved = _survivor_task_for(ctx.out_root, int(ctx.n_survivors or 0))
+        request = saved["request"]
+        svc = _service_with_tasks(request, ctx.work / "registry.json")
+        task_id = str(saved["task_id"])
+        svc._tasks[task_id] = dict(saved["task_info"])
+        survivors = list(saved["survivors"])
+        res = svc._apply_transforms_sync(task_id, survivors, *POST_IC_ARGS)
+        return {"input_cols": int(saved["cols"]), "rows": int(res.get("output_rows") or 0), "survivors": len(survivors),
+                "transformed_cols": res.get("output_cols"), "excluded_features": len(res.get("excluded_features") or []),
+                "threshold_branch": "non_default", "source_task_cols": int(saved["cols"]),
+                "requested_columns": list(request["feature_filter"]["include_features"]), "actual_scale": len(survivors)}
     if ctx.axis == "rows":
         saved = load_post_ic_rows(ctx.out_root)
         request = saved["request"]
@@ -1491,18 +1806,8 @@ def _run_post_ic_transform(ctx: RunContext) -> Dict[str, Any]:
         svc._apply_transforms_sync(task_id, survivors, *POST_IC_ARGS)
         return {"input_cols": ROW_AXIS_COLS, "rows": seen.get("rows"), "source_rows": seen.get("source_rows"),
                 "survivors": len(survivors), "requested_columns": list(request["feature_filter"]["include_features"]),
-                "actual_scale": seen.get("rows")}
-    request = _limited_request("ic_report", None, ctx.n_cols)
-    svc = _service_with_tasks(request, ctx.work / "registry.json")
-    task_id, info = _service_analysis(svc, fb._ic_analyze_request(request), ctx.rec)
-    analyzer = info["analyzer"]
-    survivors = list(analyzer.get_filtered_features().columns)
-    if not survivors:
-        raise HarnessError("post_ic_transform：IC 倖存欄為空，無法量 IC 後轉換（資料不足）")
-    svc._apply_transforms_sync(task_id, survivors, *POST_IC_ARGS)
-    names = list(request["feature_filter"]["include_features"])
-    return {"input_cols": ctx.n_cols, "rows": _manifest_rows(request), "survivors": len(survivors),
-            "requested_columns": names, "actual_scale": len(set(names))}
+                "threshold_branch": saved.get("threshold_branch", "default"), "actual_scale": seen.get("rows")}
+    raise HarnessError(f"post_ic_transform 不支援 {ctx.axis} 軸（SPEC v5.55 (e)：主軸 survivors、第二軸 rows）")
 
 
 def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
@@ -1553,6 +1858,145 @@ def _event_batch_records(n_events: Optional[int]) -> List[Dict[str, Any]]:
             raise HarnessError(f"event_study：events 軸 {n_events} > 批之事件數 {len(records)}（資料不足）")
         records = records[:n_events]
     return records
+
+
+# ── SPEC v5.55 (g2)：事件數軸三點之秒級切分預檢 ──────────────────────────────────────────────────────────────
+
+
+#: 事件數軸預檢之工作子目錄（`<out-root>/work/` 下；隔離之事件儲存根與 cwd，不寫 repo 之 data_cache/events）
+EVENT_PRECHECK_TAG = "precheck-events"
+
+
+def _event_import_batch(records: Sequence[Mapping[str, Any]], store_dir: Path, request: Mapping[str, Any]
+                        ) -> Tuple[Any, Dict[str, Any], Dict[str, Any]]:
+    """同 `_run_event_import` 之事件數軸：`records` 匯入隔離儲存根 `store_dir`（`EventImportService(storage_dir=...)`），
+    本行程內把 route 所讀之單例指向之，經 route `_resolve_event_batch` 取批（產品之同一取得點）。回 (ICAnalyzeRequest,
+    事件批 dict, 請求記錄〔含 event_import_id〕)。"""
+    import api.services.case_import_service as cis
+    from api.routes.ic_analysis import _resolve_event_batch
+    from api.services.case_import_service import EventImportService
+
+    fb = _fb()
+    store = EventImportService(storage_dir=Path(store_dir))
+    upload = json.dumps(list(records), ensure_ascii=False, sort_keys=True).encode("utf-8")
+    resp = store.import_records(list(records), source_name="icperf-t02-event-precheck", upload_bytes=upload,
+                                validate_only=False)
+    cis._event_import_service = store
+    req_rec = {**dict(request), "event_import_id": str(resp.import_id)}
+    req = fb._ic_analyze_request(req_rec)
+    return req, _resolve_event_batch(req), req_rec
+
+
+def event_split_counts(staged: Mapping[str, Any], request: Mapping[str, Any], manifest: Path,
+                       event_keys: Optional[Iterable[int]] = None) -> Dict[str, Any]:
+    """事件路徑之樣本外切分（秒級，不跑 IC）：直接呼叫產品之同一組函式——服務 `_build_config_override`（經
+    `icperf_freeze_baseline._override_for`）並依 `ic_analysis_service.py:1898-1907` 把 embargo 抬至 `lookahead_depth_rows`；
+    `ic_filter_orchestrator.py:1539-1553` 之 purge＝max(effective horizon, `label_window_rows`)、`_build_holdout_split_plan`
+    （時間軸＝run 之 post-trim 特徵索引〔`create_post_trim_index_loader`，同 `_run_event_label_stages` 之處置帳〕）；
+    測試段事件數＝事件列鍵（`staged["event_timestamps"]`；`event_keys` 給定 ⇒ 只計其子集）落在測試段時間戳者
+    （`ic_filter_orchestrator.py:1746-1748`：stage3 後之事件列 ∩ 測試段）；兩類於測試段之數（`_resolve_label_mode_and_bind_binary`
+    之 `sel_counts`，`:4644-4655`）。回 {"oos"（測試段事件數 ≥ `min_test_events`，`:1765-1766`）, "binary"（兩類各 ≥
+    `min_events_per_class`，`:4657-4670`）, "train_events", "test_events", "test_pos", "test_neg", "min_test_events",
+    "min_events_per_class", "purge_rows", "embargo_rows", "split_reason"}。"""
+    import pandas as pd
+
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from momentum.Analysis import ic_filter_orchestrator as orch
+    from momentum.factories import create_ic_analyzer, create_post_trim_index_loader
+
+    fb = _fb()
+    override = dict(fb._override_for(request) or {})
+    override["embargo"] = max(int(override.get("embargo") or 0), int(staged["lookahead_depth_rows"]))
+    analyzer = create_ic_analyzer(override)
+    config = analyzer._apply_tier_config(analyzer._apply_config_override(override))
+    horizon = int(orch._resolve_effective_label_horizon(config, None))
+    purge = max(horizon, int(staged["label_window_rows"]))
+    idx_ns = create_post_trim_index_loader()(Path(manifest).parent)
+    index = pd.DatetimeIndex(pd.to_datetime(pd.Index(idx_ns).astype("int64"), unit="ns"))
+    features = pd.DataFrame(index=index)
+    freq = orch._resolve_expected_freq({"timeframe": str(request["timeframe"])})
+    keys = set(int(k) for k in (staged["event_timestamps"] if event_keys is None else event_keys))
+    binary = {int(k): int(v) for k, v in (staged.get("event_binary_labels") or {}).items()}
+    out: Dict[str, Any] = {"min_test_events": int(config.event_filter.min_test_events),
+                           "min_events_per_class": int(config.event_filter.min_events_per_class),
+                           "purge_rows": purge, "embargo_rows": int(override["embargo"]), "n_events": len(keys),
+                           "oos": False, "binary": False, "train_events": None, "test_events": None, "test_pos": None,
+                           "test_neg": None, "split_reason": None}
+    if not config.ic_train_test_split:
+        out["split_reason"] = "split_disabled"
+        return out
+    split = orch._build_holdout_split_plan(features, config, str(request["symbol"]), freq, purge_gap=purge,
+                                           labels_df=None)
+    if isinstance(split, orch.SkippedResult):
+        out["split_reason"] = "insufficient_data"
+        return out
+    train_plan, test_plan = split
+    ms = (index.asi8 // 10 ** 6).astype("int64")
+    test_ms = set(int(x) for x in ms[test_plan.row_index])
+    train_ms = set(int(x) for x in ms[train_plan.row_index])
+    test_keys = keys & test_ms
+    pos = sum(1 for k in test_keys if binary.get(k) == 1)
+    neg = sum(1 for k in test_keys if binary.get(k) == 0)
+    out.update(train_events=len(keys & train_ms), test_events=len(test_keys), test_pos=pos, test_neg=neg)
+    out["oos"] = bool(len(test_keys) >= out["min_test_events"])
+    out["binary"] = bool(min(pos, neg) >= out["min_events_per_class"])
+    return out
+
+
+def _event_stage(records: Sequence[Mapping[str, Any]], work: Path, request: Mapping[str, Any], manifest: Path
+                 ) -> Dict[str, Any]:
+    """事件批 `records` 經產品五階段編排（`ICAnalysisService._run_event_label_stages`，服務之唯一事件入口；不跑 IC）之結果。"""
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    req, batch, _rec = _event_import_batch(records, work / "events", request)
+    return ICAnalysisService._run_event_label_stages(req, batch, features_path=None, meta_path=None,
+                                                     feature_manifest_path=str(manifest))
+
+
+def event_axis_precheck(out_root: Optional[Path] = None) -> Dict[str, Any]:
+    """SPEC v5.55 (g2)：事件數軸三點之秒級切分預檢（不跑 IC）。事件批＝`_event_batch_records`（依 t0 排序；events 軸取前 n
+    筆，同 `_run_event_import`）；請求＝事件匯入路徑之 events 軸請求（L 格 run、`ROW_AXIS_COLS` 欄）。①全批經產品五階段編排
+    一次，得每事件之特徵列鍵（`event_label_owners`）；②對每一候選 n（1..K）以前 n 筆之列鍵經 `event_split_counts` 求測試段
+    事件數；③可達＝樣本外切分成立且測試段事件數 ≥ `min_test_events`（`oos`）；可達之 n 依序排列，取首、中（整數中位位置）、
+    末三點；④三點各以前 n 筆**重跑**五階段編排與切分（不以全批之列鍵代之）驗其仍可達且三點嚴格遞增。可達點 < 3 或複驗不成立
+    ⇒ `ok` False（呼叫端開跑前 FreezeError；不以關切分冒充預設分支）。回 {"ok", "scales", "points": [{n, train_events,
+    test_events, test_pos, test_neg, oos, binary, ...}], "n_events", "reachable_range", "reason"}。"""
+    fb = _fb()
+    root = Path(out_root) if out_root is not None else REPO / TASK02_ROOT
+    root = (root if root.is_absolute() else REPO / root).resolve()
+    records = _event_batch_records(None)
+    request = _limited_request("event_import_report", None, ROW_AXIS_COLS)
+    manifest = (REPO / request["run_dir"] / "feature_manifest.json").resolve()
+    out: Dict[str, Any] = {"ok": False, "scales": [], "points": [], "n_events": len(records), "reason": None,
+                           "rule": "依 t0 排序之前 n 筆（_event_batch_records）", "run": request["run_dir"],
+                           "reachable_range": None}
+    with _prepare_isolation(root, EVENT_PRECHECK_TAG) as work:
+        full = _event_stage(records, work / "full", request, manifest)
+        owner = {int(k): str(v) for k, v in (full.get("event_label_owners") or {}).items()}
+        key_of = {eid: k for k, eid in owner.items()}
+        reachable: List[int] = []
+        for n in range(1, len(records) + 1):
+            keys = [key_of[str(r["event_id"])] for r in records[:n] if str(r["event_id"]) in key_of]
+            if event_split_counts(full, request, manifest, keys)["oos"]:
+                reachable.append(n)
+        if reachable:
+            out["reachable_range"] = [reachable[0], reachable[-1], len(reachable)]
+        if len(reachable) < 3:
+            out["reason"] = f"可達點 {len(reachable)} 個 < 3（測試段事件數 ≥ min_test_events 之前 n 筆）"
+            return out
+        picks = sorted({reachable[0], reachable[(len(reachable) - 1) // 2], reachable[-1]})
+        for i, n in enumerate(picks):
+            staged = _event_stage(records[:n], work / f"n{n}", request, manifest)
+            pt = {"n": int(n), **event_split_counts(staged, request, manifest)}
+            out["points"].append(pt)
+        out["scales"] = [p["n"] for p in out["points"]]
+        bad = [p["n"] for p in out["points"] if not p["oos"]]
+        if len(out["scales"]) != 3 or bad:
+            out["reason"] = f"三點複驗不成立（非嚴格遞增或不可達：{bad}）"
+            return out
+    out["ok"] = True
+    return out
 
 
 def _run_event_study(ctx: RunContext) -> Dict[str, Any]:
@@ -2494,9 +2938,94 @@ def _cell_vectorized(ctx: RunContext) -> Dict[str, Any]:
     return {**_cell_facts(ctx, cap, frame=f[keep]), "method": method}
 
 
+# ── SPEC v5.55 (f)：深度分析預設設定下 0 呼叫之入口之直接呼叫格（讀深度分析路徑存之真實輸入） ─────────────────────
+
+
+def _cell_pca(ctx: RunContext) -> Dict[str, Any]:
+    """`FactorOrthogonalizer.pca_orthogonalize`（產品於 `factor_orthogonalization.method == "pca"` 時呼叫，
+    `ic_filter_orchestrator.py:3680-3682`；預設 gram_schmidt，`ic_config_schema.py:302`）：存檔 gram_schmidt 之 factors
+    （深度分析入選欄）＋同一正交化器物件。"""
+    cap = cell_capture(ctx, "orthogonalize")
+    obj = cap["self"]
+    factors = inspect.signature(type(obj).gram_schmidt).bind(obj, *cap["args"], **cap["kwargs"]).arguments["factors"]
+    _transformed, summary = type(obj).pca_orthogonalize(obj, factors)
+    return {**_cell_facts(ctx, cap, frame=factors), "survivors": int(factors.shape[1]),
+            "pca_skipped": bool(summary.get("skipped"))}
+
+
+def _cell_beta_neutral(ctx: RunContext) -> Dict[str, Any]:
+    """`FactorExposureAnalyzer._apply_beta_neutralization`（產品於 `neutralization_mode == "beta_neutral"` 時經
+    `neutralize_factor_matrix` 呼叫，`factor_exposure_analyzer.py:117-118`；預設 none，`ic_config_schema.py:308`）：存檔
+    neutralize_factor_matrix 之 factor_values、market_proxy（trailing close-ret，`ic_filter_orchestrator.py:3733-3737`）
+    ＋同一分析器，mode＝beta_neutral。"""
+    cap = cell_capture(ctx, "neutralize")
+    obj = cap["self"]
+    ba = inspect.signature(type(obj).neutralize_factor_matrix).bind(obj, *cap["args"], **cap["kwargs"])
+    values = ba.arguments["factor_values"]
+    _bind_call(type(obj).neutralize_factor_matrix, obj, cap, mode="beta_neutral")
+    return {**_cell_facts(ctx, cap, frame=values), "survivors": int(values.shape[1])}
+
+
+def param_family_frame(cap: Mapping[str, Any], pre: Mapping[str, Any]) -> Tuple[Any, Dict[str, Any], Dict[str, Any]]:
+    """參數敏感度格之輸入：存檔 batch_analyze 之 (self, features_df〔深度分析入選欄〕, labels, metadata, method, direction) 與
+    同一路徑第 1 段輸出（preprocess 存檔之 result，全部 N 欄）。家族＝產品 `detect_feature_families`（metadata 之 indicator
+    分組優先、否則名稱樣式 `^(.+?)_(\\d+)$`，`parameter_sensitivity_analyzer.py:46-74`）於第 1 段輸出全部欄之結果中，成員數 ≥
+    max(min_family_size, 3)（`:172-180`）之最小者（同數取名稱字典序首個；同 `icperf_correctness_receipt.family_aware_subset`
+    之規則）；入選欄須於第 1 段輸出逐值相等（`DataFrame.equals`；不等 ⇒ HarnessError：兩存檔非同一份特徵）。回 (併入家族成員後
+    之 features_df, batch_analyze 之其餘參數, 事實)。"""
+    obj = cap["self"]
+    ba = inspect.signature(type(obj).batch_analyze).bind(obj, *cap["args"], **cap["kwargs"])
+    sel = ba.arguments["features_df"]
+    res = pre.get("result")
+    full = res[0] if isinstance(res, tuple) else res
+    if full is None or not hasattr(full, "columns"):
+        raise HarnessError("param_sensitivity：preprocess 存檔無第 1 段輸出（result）")
+    import pandas as pd
+
+    if not isinstance(full.index, pd.DatetimeIndex) and pd.api.types.is_integer_dtype(full.index):
+        # 第 1 段之時間軸為 epoch 整數（秒或毫秒；2026-11-01 smoke 實查 C 格為秒），其後產品轉為 DatetimeIndex
+        raw_idx = full.index.to_numpy(dtype="int64")
+        unit = "ms" if len(raw_idx) and int(abs(raw_idx).max()) > 10 ** 11 else "s"
+        full = full.set_axis(pd.DatetimeIndex(pd.to_datetime(raw_idx, unit=unit)), axis=0)
+    missing = [c for c in sel.columns if c not in full.columns]
+    if missing or not full.index.equals(sel.index) \
+            or not full[list(sel.columns)].astype("float64").equals(sel.astype("float64")):
+        raise HarnessError(f"param_sensitivity：入選欄與第 1 段輸出不一致（缺 {missing[:5]}）——兩存檔非同一份特徵")
+    full = full.set_axis(sel.index, axis=0)
+    metadata = ba.arguments.get("metadata")
+    threshold = max(int(ba.arguments.get("min_family_size", 3)), int(obj._min_family_size))
+    fams = {k: v for k, v in obj.detect_feature_families(list(full.columns), metadata).items() if len(v) >= threshold}
+    if not fams:
+        raise HarnessError(f"param_sensitivity：第 1 段輸出 {full.shape[1]} 欄無成員數 ≥ {threshold} 之參數家族（資料不足）")
+    fam = min(fams, key=lambda k: (len(fams[k]), k))
+    cols = list(sel.columns) + [c for c in fams[fam] if c not in set(sel.columns)]
+    kwargs = {k: v for k, v in ba.arguments.items() if k not in ("self", "features_df")}
+    facts = {"family": fam, "family_members": len(fams[fam]), "selected": int(sel.shape[1]), "survivors": len(cols)}
+    return full.loc[sel.index, cols], kwargs, facts
+
+
+def _cell_param_sensitivity(method: Optional[str]) -> Callable[[RunContext], Dict[str, Any]]:
+    """`ParameterSensitivityAnalyzer.analyze_from_variants`／`_compute_rolling_icir`（入選欄含 ≥ min_family_size 之參數家族時
+    才呼叫，`parameter_sensitivity_analyzer.py:178-181`、`:103`；深度分析預設入選欄〔top_n〕無家族 ⇒ 0 呼叫）與 `_rolling_corr`
+    （另須 method ≠ spearman，`:273-276`；預設 `global.default_method` spearman，`ic_config_schema.py:19`）：`param_family_frame`
+    之輸入＋同一分析器物件呼叫 batch_analyze（`method` None ⇒ 存檔之請求方法）。"""
+    def run(ctx: RunContext) -> Dict[str, Any]:
+        cap = cell_capture(ctx, "param_sensitivity")
+        pre = cell_capture(ctx, "preprocess")
+        frame, kwargs, facts = param_family_frame(cap, pre)
+        if method is not None:
+            kwargs["method"] = method
+        obj = cap["self"]
+        out = type(obj).batch_analyze(obj, frame, **kwargs)
+        facts.update(method=kwargs.get("method"), families_analyzed=int((out.get("summary") or {}).get("total_families") or 0))
+        return {**_cell_facts(ctx, cap, frame=frame), **facts}
+    return run
+
+
 RUNNERS: Dict[str, Callable[[RunContext], Dict[str, Any]]] = {
     "ic_page_default": _run_ic_page_default,
     "ic_page_long": _run_ic_page_default,
+    "ic_page_relaxed": _run_ic_page_relaxed,
     "deep_analysis": _run_deep_analysis,
     "deep_analysis_long": _run_deep_analysis,
     "post_ic_transform": _run_post_ic_transform,
@@ -2515,6 +3044,10 @@ RUNNERS: Dict[str, Callable[[RunContext], Dict[str, Any]]] = {
     "winsor_mad_pit": _cell_preprocess("pit_expanding", "mad"),
     "standardize_tszscore_pit": _cell_standardize,
     "vectorized_ic_no_missing": _cell_vectorized,
+    "orthogonalize_pca": _cell_pca,
+    "exposure_beta_neutral": _cell_beta_neutral,
+    "param_sensitivity_family": _cell_param_sensitivity(None),
+    "param_sensitivity_pearson": _cell_param_sensitivity("pearson"),
 }
 
 
@@ -2640,7 +3173,11 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
               "kind": "path" if run_id in PATHS else "cell", "axis": axis, "scale": int(scale),
               # 交接 h5 子集之來源格（IC 頁／深度分析路徑與直接呼叫格；其餘路徑讀各自之 run，見 facts）
               "handoff_source": (LONG_CELL_ID if ctx.long else "C") if run_id in SUBSET_RUNS or run_id in CELLS else None,
-              "row_window_override": ROW_AXIS_WINDOW_OVERRIDE if axis == "rows" and run_id in SUBSET_RUNS else None,
+              "row_window_override": ROW_AXIS_WINDOW_OVERRIDE if axis == "rows" and (run_id in SUBSET_RUNS
+                                                                                     or run_id == "ic_page_relaxed") else None,
+              # SPEC v5.55 (d)：非預設門檻分支之實跑與讀其存檔之格（收據與報告標明）
+              "threshold_branch": "non_default" if run_id == "ic_page_relaxed" or ctx.group == "R"
+              or (run_id == "post_ic_transform" and axis == "survivors") else "default",
               "actual_scale": int(facts["actual_scale"]),
               "argv": list(sys.argv[1:] if argv is None else argv), "head": head,
               "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(started_wall)),
@@ -2821,8 +3358,10 @@ def projected_2000_seconds(points: Sequence[Mapping[str, Any]]) -> float:
 
 
 #: 各軸點之 x 鍵（收據點之欄名）與擬合之 x（cols 軸以實際進段欄數 stage_cols 為準，SPEC Task 0.2）
-AXIS_X_KEY = {"cols": "input_cols", "rows": "rows", "events": "events", "timestamps": "timestamps"}
-AXIS_FIT_KEY = {"cols": "stage_cols", "rows": "rows", "events": "events", "timestamps": "timestamps"}
+AXIS_X_KEY = {"cols": "input_cols", "rows": "rows", "events": "events", "timestamps": "timestamps",
+              "survivors": "survivors"}
+AXIS_FIT_KEY = {"cols": "stage_cols", "rows": "rows", "events": "events", "timestamps": "timestamps",
+                "survivors": "survivors"}
 
 
 def fit_points(points: Sequence[Mapping[str, Any]], axis: str = "cols") -> List[Dict[str, Any]]:
@@ -2919,6 +3458,11 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
         # SPEC v5.52 (b)：跨標的之第二軸＝時點數（截短時間跨度）
         p["timestamps"] = scale
         p["scale_vector"] = {**sv, **({"timestamps": scale} if "timestamps" in sv else {})}
+    if axis == "survivors":
+        # SPEC v5.55 (e)：IC 後轉換之主軸＝倖存欄數（ic_page_relaxed 各 cols 點之實際倖存數）
+        p["survivors"] = scale
+        p["scale_vector"] = {**sv, **({"survivors": scale} if "survivors" in sv else {})}
+        p["threshold_branch"] = (chosen.get("facts") or {}).get("threshold_branch")
     p["actual_scale"] = chosen.get("actual_scale")
     return p
 
@@ -3107,7 +3651,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sub = ap.add_subparsers(dest="cmd")
     p = sub.add_parser("run", help="一個規模點之一次實跑（由 scale_probe 啟動）")
     p.add_argument("run_id", choices=sorted(RUNNERS))
-    p.add_argument("--axis", default="cols", choices=("cols", "rows", "events", "timestamps"))
+    p.add_argument("--axis", default="cols", choices=("cols", "rows", "events", "timestamps", "survivors"))
     p.add_argument("--scale", type=int, required=True)
     p.add_argument("--records-dir", type=Path, required=True)
     p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
@@ -3122,6 +3666,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sub.add_parser("precheck-xsec-long", help="v5.53 (c1)：L 格與 ETH 4h 長歷史格之時間重疊、有效列數、預設切分可達性（秒級，"
                                                "只讀 K 線時間戳與收盤）")
     sub.add_parser("event-bar-scales", help="v5.53 (c0)：事件路徑 K 線根數軸之三點（秒級，只讀 K 線時間戳與事件批）")
+    p = sub.add_parser("precheck-events", help="v5.55 (g2)：事件數軸三點之切分預檢（秒級；產品五階段編排＋切分，不跑 IC）")
+    p.add_argument("--out-root", type=Path, default=None)
+    p = sub.add_parser("survivor-scales", help="v5.55 (e)：IC 後轉換 survivors 軸三點（ic_page_relaxed 各 cols 點存下之 IC "
+                                               "任務之實際倖存欄數；秒級）")
+    p.add_argument("--out-root", type=Path, default=None)
+    p.add_argument("--n-cols", type=int, action="append", default=None, help=f"cols 點（可多次；預設 {SCALE_POINTS}）")
     p = sub.add_parser("prepare", help="v5.52 (b)(c)：量測前之存檔輸入（post-ic-rows：L 格 IC 任務；icfirst-subsets："
                                        "write_raw 重寫之 IC-first 子集 run）；中型，由 measure 經共用監看啟動")
     p.add_argument("what", choices=("post-ic-rows", "icfirst-subsets"))
@@ -3133,6 +3683,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = ap.parse_args(args_in)
     if args.cmd == "precheck-xsec-long":
         res = xsec_long_precheck()
+        print(json.dumps(res, ensure_ascii=False, indent=1, default=str))
+        return 0 if res["ok"] else 1
+    if args.cmd == "survivor-scales":
+        root = Path(args.out_root) if args.out_root is not None else REPO / TASK02_ROOT
+        root = (root if root.is_absolute() else REPO / root).resolve()
+        res = post_ic_survivor_scales(root, tuple(args.n_cols or SCALE_POINTS))
+        print(json.dumps(res, ensure_ascii=False, indent=1))
+        return 0 if res["ok"] else 1
+    if args.cmd == "precheck-events":
+        res = event_axis_precheck(args.out_root)
         print(json.dumps(res, ensure_ascii=False, indent=1, default=str))
         return 0 if res["ok"] else 1
     if args.cmd == "event-bar-scales":

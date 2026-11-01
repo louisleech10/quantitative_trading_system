@@ -2899,7 +2899,8 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
                           log_path=root / "logs" / session / f"prepare-{what}.log", env=_child_env_base(), cwd=REPO)
         if res["rc"] != 0:
             raise FreezeError(f"prepare {what} 失敗 rc={res['rc']}（見 {res['log_path']}）")
-    event_scales = _event_scales(h) if any(a == "events" for _r, a in sched) else []
+    # SPEC v5.55 (g2)：事件數軸三點由秒級切分預檢選出（不足三個可達點 ⇒ 開跑前 FreezeError）
+    event_scales, event_precheck = (_event_scales(h, root) if any(a == "events" for _r, a in sched) else ([], None))
     # SPEC v5.53 (c1)：跨標的長資料之預設切分分支（`VARIANT_RUNS`）——兩長歷史格須已生成（開跑前即驗，不成立 ⇒ FreezeError，
     # 不以缺資料略過）；且秒級預檢須判預設切分可達
     if any(x in h.VARIANT_RUNS for x in sched):
@@ -2916,9 +2917,19 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
             h.prepare_event_bars(root, s)
     runs: Dict[Tuple[str, str], Dict[str, Any]] = {}
     failures: List[str] = []
+    survivor_info: Optional[Dict[str, Any]] = None
     for run_id, axis in sched:
+        survivor_scales = None
+        if axis == "survivors":
+            # SPEC v5.55 (e)：survivors 軸三點＝ic_page_relaxed 各 cols 點（排程在前）存下之 IC 任務之實際倖存欄數；不成立
+            # （缺存檔、0 或不互異）⇒ 本路徑記失敗（組裝拒收），不以目標值充數
+            survivor_info = h.post_ic_survivor_scales(root, tuple(int(s) for s in scales))
+            if not survivor_info["ok"]:
+                failures.append(f"{run_id}:{axis}：survivors 三點不成立（{survivor_info['reason']}）")
+                continue
+            survivor_scales = survivor_info["scales"]
         pts = h.axis_scales(run_id, axis, cols_scales=scales, row_scales=row_scales, event_scales=event_scales,
-                            bar_scales=bar_scales)
+                            bar_scales=bar_scales, survivor_scales=survivor_scales)
         cmd_base = [sys.executable, "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis, "--scale", "{scale}"]
         data = _task02_data(run_id, src, axis=axis, long_src=l_src, out_root=root, scales=pts)
         config = [INVENTORY_DATA]
@@ -2934,7 +2945,8 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
             att_records.mkdir(parents=True, exist_ok=True)
             with open(att_records / TASK02_IDENTITY_FILE, "x", encoding="utf-8") as fh:
                 fh.write(json.dumps(identity, ensure_ascii=False, indent=1, sort_keys=True))
-            full = (full_cols_long if run_id in h.LONG_RUNS else full_cols) if axis == "cols" else max(pts)
+            long_cols = run_id in h.LONG_RUNS or h.CELL_GROUP.get(run_id) == "R"
+            full = (full_cols_long if long_cols and full_cols_long else full_cols) if axis == "cols" else max(pts)
             probe_cmd = [sys.executable, "scripts/scale_probe.py", "--out", receipt_path.relative_to(REPO).as_posix(),
                          "--full-scale", str(full), "--unit", axis,
                          "--log-dir", (root / "logs" / session / f"{run_id}-{axis}").relative_to(REPO).as_posix()]
@@ -2961,6 +2973,8 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
                                            require_variants=bool(row_scales),
                                            records_root=records_dir.relative_to(REPO).as_posix())
         receipt["row_axis_precheck"] = precheck
+        receipt["event_axis_precheck"] = event_precheck
+        receipt["survivor_axis"] = survivor_info
     except h.AssemblyError as exc:
         problems_path = Path(out_path).with_name(Path(out_path).stem + ".problems.json")
         problems_path.parent.mkdir(parents=True, exist_ok=True)
@@ -3001,10 +3015,15 @@ def _handoff_total_cols(src: Path) -> int:
     return int(total)
 
 
-def _event_scales(h: Any) -> List[int]:
-    """events 軸之三點：事件研究批（`icperf_event_batch` 規則）事件數 K 之 K//4、K//2、K。"""
-    k = len(h._event_batch_records(None))
-    return sorted({max(k // 4, 1), max(k // 2, 1), k})
+def _event_scales(h: Any, out_root: Optional[Path] = None) -> Tuple[List[int], Dict[str, Any]]:
+    """SPEC v5.55 (g2)：events 軸之三點由秒級切分預檢選出（`icperf_scale_harness.event_axis_precheck`：產品五階段編排＋
+    `_build_holdout_split_plan`，不跑 IC）——三點皆須樣本外切分可達（測試段事件數 ≥ min_test_events）；可達點不足三個或複驗
+    不成立 ⇒ 開跑前 FreezeError（不以關切分冒充預設分支；改前之 K//4、K//2、K 於本批 K//4＝50 筆時測試段為空，2026-11-01
+    估時實跑 `ValueError: split mask must select at least one row`）。回 (三點, 預檢收據)。"""
+    res = h.event_axis_precheck(out_root)
+    if not res.get("ok"):
+        raise FreezeError(f"事件數軸預檢不成立（SPEC v5.55 (g2)）：{json.dumps(res, ensure_ascii=False, default=str)}")
+    return [int(s) for s in res["scales"]], res
 
 
 def _repo_rel(p: Path) -> str:
@@ -3024,6 +3043,13 @@ def _task02_data(run_id: str, src: Path, *, axis: str = "cols", long_src: Option
     if run_id == "post_ic_transform" and axis == "rows":
         return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json",
                 _repo_rel(root / h.POST_IC_ROWS_DIR / h.SUBSET_IDENTITY_FILE)]
+    if run_id == "post_ic_transform" and axis == "survivors":
+        # SPEC v5.55 (e)：survivors 軸之存檔 IC 任務（ic_page_relaxed 各 cols 點）之身分 sidecar——任務變 ⇒ 身分變
+        return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json",
+                *[_repo_rel(h.post_ic_survivors_dir(root, int(n)) / h.SUBSET_IDENTITY_FILE) for n in SCALE_POINTS]]
+    if run_id == "ic_page_relaxed" or h.CELL_GROUP.get(run_id) == "R":
+        # SPEC v5.55 (d)：非預設門檻分支讀 L 格 run（非交接 h5）；讀其存檔之冗餘格同
+        return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json"]
     if run_id in ("post_ic_transform", "cross_sectional"):
         cells = ("A_BTCUSDT_1h", "A_SOLUSDT_1h") if run_id == "cross_sectional" else (CELL,)
         return [f"{_cell_run(c)['run_dir']}/feature_manifest.json" for c in cells]
