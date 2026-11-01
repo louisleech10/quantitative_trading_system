@@ -215,8 +215,11 @@ def test_persisted_report_json_mirrors_survivor_output(default_run):
 
 
 def test_provenance_uses_effective_config():
-    """config_override 改 IC method／label return_type ⇒ 倖存者檔 provenance 反映本次 effective config。"""
-    _, report, _ = _run({"ic_calculation": {"methods": ["kendall"]}, "labels": {"return_type": "log"}})
+    """config_override 改 IC method／label return_type ⇒ 倖存者檔 provenance 反映本次 effective config。
+
+    ICPERF Task 0.4 ㊸：IC 方法之 effective 值＝第 4 段實算所用之 `global.default_method`（IC 頁「IC 方法」映射點）；
+    改前本測試以 `ic_calculation.methods` 覆寫——該欄不改第 4 段估計量，provenance 卻記 kendall（記錄與實算不符）。"""
+    _, report, _ = _run({"global": {"default_method": "kendall"}, "labels": {"return_type": "log"}})
     payload = json.loads(Path(report["metadata"]["survivor_output"]["path"]).read_text(encoding="utf-8"))
     assert payload["provenance"]["ic_method"] == "kendall"
     assert payload["provenance"]["label_return_type"] == "log"

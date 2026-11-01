@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { ICAnalysisConfig, ICDiversificationConfig, RunInfo } from '@/lib/types';
 import { FeatureTierLevel } from '@/lib/types';
-import { DEFAULT_DIVERSIFICATION } from '@/lib/icConfigOverride';
+import { DEFAULT_DIVERSIFICATION, resolveICSettings } from '@/lib/icConfigOverride';
 import FeatureTierPanel from '@/components/ic-analysis/FeatureTierPanel';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -223,6 +223,8 @@ export default function ICConfigPanel({
         onChangeTier={onChangeFeatureTier}
         onToggleFeature={onToggleFeature}
         analysisMode={config.mode}
+        settings={resolveICSettings(config.ic_settings)}
+        onChangeSetting={(key, value) => updateConfig({ ic_settings: { ...(config.ic_settings ?? {}), [key]: value } })}
       />
 
       <div className="space-y-4">

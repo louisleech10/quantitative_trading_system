@@ -126,6 +126,7 @@ class RedundancyFilter:
 
         method = method or self._method
         corr_matrix: Optional[pd.DataFrame] = None
+        vif_insufficient: Optional[dict] = None
 
         if method in {"greedy", "hierarchical"}:
             corr_matrix = self.compute_correlation_matrix(features_df)
@@ -143,11 +144,26 @@ class RedundancyFilter:
                     linkage_method=self._linkage_method,
                 )
         elif method == "vif":
-            selected = self.vif_filter(
-                features_df,
-                max_vif=self._max_vif,
-                ic_scores=ic_scores,
-            )
+            # ICPERF Task 0.4 ㊷（v5.57 處理方式 B）：有效列數 n 相對欄數 k 不足 ⇒ 不跑 VIF、改相關係數貪婪法
+            vif_insufficient = self.vif_sample_check(features_df, self._max_vif)
+            if vif_insufficient is None:
+                selected = self.vif_filter(
+                    features_df,
+                    max_vif=self._max_vif,
+                    ic_scores=ic_scores,
+                )
+            else:
+                selected = self.greedy_dedup(
+                    self.compute_correlation_matrix(features_df),
+                    ic_scores,
+                    threshold=self._corr_threshold,
+                    tiebreaker=self._tiebreaker,
+                )
+                vif_insufficient = {
+                    **vif_insufficient,
+                    "fallback_method": "greedy",
+                    "correlation_threshold": self._corr_threshold,
+                }
         else:
             raise ValueError(f"unsupported redundancy method: {method}")
 
@@ -169,6 +185,8 @@ class RedundancyFilter:
             "removed_features": removed,
             "correlation_threshold": self._corr_threshold,
         }
+        if vif_insufficient is not None:
+            log["vif_sample_insufficient"] = vif_insufficient
 
         logger.info(
             "Redundancy filter completed: method=%s input=%s output=%s",
@@ -280,7 +298,10 @@ class RedundancyFilter:
         max_vif: float = 10.0,
         ic_scores: Optional[dict] = None,
     ) -> list[str]:
-        """VIF 篩選：逐步移除 VIF > threshold 的特徵。"""
+        """VIF 篩選：逐步移除 VIF > threshold 的特徵。
+
+        本函式只做逐步 VIF 本身、不含樣本數判定；產品入口 `filter(method="vif")` 先以 `vif_sample_check`
+        判定，樣本不足時不呼叫本函式（ICPERF Task 0.4 ㊷）。"""
 
         if features_df.empty:
             return []
@@ -312,6 +333,40 @@ class RedundancyFilter:
                 break
 
         return features
+
+    @staticmethod
+    def vif_sample_check(features_df: pd.DataFrame, max_vif: float) -> Optional[dict]:
+        """VIF 樣本數判定（ICPERF Task 0.4 ㊷，SPEC v5.57 處理方式 B）。
+
+        n＝有效列數（同 `vif_filter` 之前處理：逐欄轉數值、丟掉含缺值之列）、k＝欄數。下列任一成立 ⇒ 樣本不足：
+        ① n ≤ k＋1：每欄輔助回歸（k−1 個解釋欄＋截距）殘差自由度 ≤ 1，R² 恆為或近 1，VIF 無鑑別力；
+        ② null 基準 (n−1)/(n−k) ≥ `max_vif`：欄間完全無關時 VIF 之平均尺度已達門檻（平均尺度、非硬界）。
+        k ≤ 1 ⇒ VIF 本不計算（單欄原樣保留），不判定、回 None。
+
+        Returns:
+            樣本不足 ⇒ {"reason", "n", "k", "null_vif_baseline", "max_vif"}（n ≤ k 時基準無定義記 None）；
+            充足 ⇒ None。
+        """
+
+        k = int(features_df.shape[1])
+        if features_df.empty or k <= 1:
+            return None
+        numeric = features_df.apply(pd.to_numeric, errors="coerce")
+        n = int(numeric.notna().all(axis=1).sum())
+        baseline = float((n - 1) / (n - k)) if n > k else None
+        if n <= k + 1:
+            reason = "n_le_k_plus_1"
+        elif baseline is not None and baseline >= float(max_vif):
+            reason = "null_vif_baseline_ge_max_vif"
+        else:
+            return None
+        return {
+            "reason": reason,
+            "n": n,
+            "k": k,
+            "null_vif_baseline": baseline,
+            "max_vif": float(max_vif),
+        }
 
     def compute_diversification_metrics(
         self,

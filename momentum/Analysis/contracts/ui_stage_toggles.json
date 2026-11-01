@@ -33,14 +33,49 @@
     "report_generation",
     "ai_summary"
   ],
-  "_ui_only_doc": "UI 專用、後端無對應旗標之鍵（具名殘留，非幽靈）：它們只影響前端呈現或屬未接線能力；新增這類鍵時必須同時在此列名，否則 vitest 紅。",
-  "ui_only_keys": [
-    "ic_method_selection",
-    "winsorization_method",
-    "monotonicity_test",
-    "return_type_selection",
-    "ic_autocorrelation",
-    "redundancy_method_selection",
-    "vif_filter"
-  ]
+  "_ui_only_doc": "UI 專用、後端無對應旗標之鍵（具名殘留，非幽靈）：它們只影響前端呈現或屬未接線能力；新增這類鍵時必須同時在此列名，否則 vitest 紅。ICPERF Task 0.4 ㊸（v5.57）起原七鍵改歸 setting_keys／merged_keys／disclosed_keys，本清單為空。",
+  "ui_only_keys": [],
+  "_setting_doc": "ICPERF Task 0.4 ㊸：IC 頁方法選擇與門檻開關（使用者 2026-11-01 裁定）。每鍵＝前端 `config.ic_settings.<鍵>` → `config_override` 之 `path`（ICConfig alias 形狀）→ 後端消費點。select＝選單、toggle＝開關。`default`＝後端 `load_ic_config()` 之現行值（pytest 對證）；前端只在值≠default 時送出（預設 payload 與改前逐字相同，§G 凍結請求不變）。`options`＝IC 頁可選值，須 ⊆ schema Literal；schema 有而 IC 頁不可用者列 `unavailable_options` 並附原因（pytest 對證兩者聯集＝schema Literal）。前端 `IC_SETTING_SPECS`（frontend/src/lib/icConfigOverride.ts）須與本節逐值相同（vitest 對證）。",
+  "setting_keys": {
+    "ic_method_selection": {
+      "kind": "select",
+      "path": ["global", "default_method"],
+      "options": ["spearman", "pearson", "kendall"],
+      "default": "spearman"
+    },
+    "winsorization_method": {
+      "kind": "select",
+      "path": ["preprocessing", "winsorization", "method"],
+      "options": ["percentile", "mad", "zscore", "none"],
+      "default": "percentile"
+    },
+    "return_type_selection": {
+      "kind": "select",
+      "path": ["labels", "return_type"],
+      "options": ["simple", "log", "risk_adjusted"],
+      "default": "simple",
+      "unavailable_options": {
+        "excess": "超額報酬需基準價序列；IC 頁標籤由 K 線生成時無基準價來源（label_generator.generate_excess_return 於 benchmark_close 為 None 時 raise），不列入選單"
+      }
+    },
+    "redundancy_method_selection": {
+      "kind": "select",
+      "path": ["redundancy", "method"],
+      "options": ["greedy", "hierarchical", "vif"],
+      "default": "greedy"
+    },
+    "monotonicity_test": {
+      "kind": "toggle",
+      "path": ["thresholds", "monotonicity_gate_enabled"],
+      "default": true
+    }
+  },
+  "_merged_doc": "已併入其他設定鍵之舊 UI 鍵（不另設開關）：vif_filter 併入去重方法選單之 vif 選項（委員 r68 群集 C 三家同意）。",
+  "merged_keys": {
+    "vif_filter": "redundancy_method_selection"
+  },
+  "_disclosed_doc": "只揭露、不設開關之鍵（附原因）：後端無可停用或無輸出之對象，設開關即幽靈。",
+  "disclosed_keys": {
+    "ic_autocorrelation": "第 4 段算出各特徵滾動 IC 之一階自相關（ic_filter_orchestrator 第 4 段 compute_ic_autocorrelation），但該值不進任何篩選門檻、也不進報告輸出；設開關無可影響之對象。實作為報告欄或移除，屬未實作欄位之使用者裁定（SPEC Task 0.4 邊界）"
+  }
 }

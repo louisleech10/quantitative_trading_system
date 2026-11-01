@@ -1,0 +1,86 @@
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import FeatureTierPanel from '@/components/ic-analysis/FeatureTierPanel';
+import ICRunSettingsLine from '@/components/ic-analysis/ICRunSettingsLine';
+import { IC_AUTOCORR_TIP, IC_SETTING_TIPS } from '@/components/ic-analysis/icSettingsText';
+import { DEFAULT_IC_SETTINGS, IC_SETTING_KEYS } from '@/lib/icConfigOverride';
+
+// ICPERF Task 0.4 ㊸：IC 頁方法選擇（四選單＋單調性開關＋IC 自相關揭露）、每項一個 ⓘ、報告頂端「本次設定」一行。
+
+afterEach(() => {
+  cleanup();
+});
+
+function renderPanel(onChangeSetting = vi.fn(), settings = DEFAULT_IC_SETTINGS) {
+  render(
+    <FeatureTierPanel
+      featureTier="intermediate"
+      featureToggles={{}}
+      onChangeTier={vi.fn()}
+      onToggleFeature={vi.fn()}
+      settings={settings}
+      onChangeSetting={onChangeSetting}
+    />,
+  );
+  return onChangeSetting;
+}
+
+describe('FeatureTierPanel 方法選擇', () => {
+  it('五個設定＋IC 自相關各恰一個 ⓘ；文案皆非空且一行（無換行、≤ 80 字）', () => {
+    renderPanel();
+    const box = screen.getByTestId('ic-method-settings');
+    for (const key of [...IC_SETTING_KEYS, 'ic_autocorrelation']) {
+      const row = within(box).getByTestId(`ic-setting-${key}`);
+      expect(within(row).getAllByRole('button', { name: /說明$/ })).toHaveLength(1);
+    }
+    for (const text of [...Object.values(IC_SETTING_TIPS), IC_AUTOCORR_TIP]) {
+      expect(text.trim().length).toBeGreaterThan(0);
+      expect(text).not.toMatch(/\n/);
+      expect(text.length).toBeLessThanOrEqual(80);
+    }
+  });
+
+  it('選單初值＝預設；改選即回呼（鍵, 值）', () => {
+    const onChange = renderPanel();
+    const select = screen.getByRole('combobox', { name: 'IC 方法' }) as HTMLSelectElement;
+    expect(select.value).toBe('spearman');
+    fireEvent.change(select, { target: { value: 'kendall' } });
+    expect(onChange).toHaveBeenCalledWith('ic_method_selection', 'kendall');
+    fireEvent.change(screen.getByRole('combobox', { name: '去重方法' }), { target: { value: 'vif' } });
+    expect(onChange).toHaveBeenLastCalledWith('redundancy_method_selection', 'vif');
+  });
+
+  it('單調性門檻為可關之開關（不再鎖定）', () => {
+    const onChange = renderPanel();
+    const box = screen.getByTestId('ic-setting-monotonicity_test');
+    fireEvent.click(within(box).getByRole('checkbox', { name: '單調性門檻' }));
+    expect(onChange).toHaveBeenCalledWith('monotonicity_test', false);
+  });
+
+  it('收益率選單不含 excess（IC 頁無基準價來源）', () => {
+    renderPanel();
+    const select = screen.getByRole('combobox', { name: '收益率類型' }) as HTMLSelectElement;
+    expect(Array.from(select.options).map((o) => o.value)).toEqual(['simple', 'log', 'risk_adjusted']);
+  });
+});
+
+describe('ICRunSettingsLine 本次設定', () => {
+  it('無快照 ⇒ 不渲染', () => {
+    const { container } = render(<ICRunSettingsLine settings={null} />);
+    expect(container.textContent).toBe('');
+  });
+
+  it('列出全部設定；只有非預設項標記 changed', () => {
+    render(
+      <ICRunSettingsLine settings={{ ...DEFAULT_IC_SETTINGS, ic_method_selection: 'pearson', monotonicity_test: false }} />,
+    );
+    const line = screen.getByTestId('ic-run-settings-line');
+    expect(line.textContent).toContain('本次設定');
+    const changed = IC_SETTING_KEYS.filter(
+      (key) => screen.getByTestId(`ic-run-setting-${key}`).getAttribute('data-changed') === 'true',
+    );
+    expect(changed).toEqual(['ic_method_selection', 'monotonicity_test']);
+    expect(screen.getByTestId('ic-run-setting-monotonicity_test').textContent).toContain('關');
+    expect(screen.getByTestId('ic-run-setting-ic_autocorrelation')).toBeTruthy();
+  });
+});

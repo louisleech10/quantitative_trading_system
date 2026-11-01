@@ -142,6 +142,11 @@ class ThresholdsConfig(BaseModel):
     p_value_max: float = 0.05
     ic_hit_rate_min: float = 0.55
     monotonicity_score_min: float = 0.6
+    #: ICPERF Task 0.4 ㊸：單調性門檻開關（IC 頁「單調性檢定」，鍵映射見 `contracts/ui_stage_toggles.json` 之
+    #  `setting_keys.monotonicity_test`）。True（預設）＝第 5 段照 `monotonicity_score_min` 剔除；False＝第 5 段不以單調性
+    #  剔除，分位報酬照算（分位圖、多空價差仍用），本應被此門檻檢查之特徵記入 `removed_features.monotonicity_skipped_disabled`。
+    #  匯入二元標籤模式本不用此門檻，不受影響。
+    monotonicity_gate_enabled: bool = True
     coverage_min: float = 0.5
     # 🔴 EVTLABEL Task 3.1（R1 推翻共用 `ic_mean_min`）：分辨力效應量之**獨立**門檻。
     #    比較的是 `|rank_biserial|`——rank-biserial r ＝ 2·AUC−1，負值代表「反向但一樣能分」，

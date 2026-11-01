@@ -2,9 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import { Info } from 'lucide-react';
-import { FeatureTierLevel } from '@/lib/types';
+import { FeatureTierLevel, ICMethodSettings } from '@/lib/types';
+import { DEFAULT_IC_SETTINGS, IC_SETTING_KEYS, IC_SETTING_SPECS } from '@/lib/icConfigOverride';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  IC_AUTOCORR_LABEL,
+  IC_AUTOCORR_TIP,
+  IC_SETTING_LABELS,
+  IC_SETTING_OPTION_LABELS,
+  IC_SETTING_TIPS,
+} from '@/components/ic-analysis/icSettingsText';
 
 interface FeatureTierPanelProps {
   featureTier: FeatureTierLevel;
@@ -13,22 +21,91 @@ interface FeatureTierPanelProps {
   onToggleFeature: (key: string) => void;
   /** 分析模式：xsec 無 p 閘，tooltip 需分模式誠實（D-H） */
   analysisMode?: 'global' | 'cross_sectional' | string;
+  /** ICPERF Task 0.4 ㊸：方法選擇與門檻開關之現值（未給＝全預設）。 */
+  settings?: ICMethodSettings;
+  /** ㊸：改一項設定（未給＝唯讀顯示）。 */
+  onChangeSetting?: <K extends keyof ICMethodSettings>(key: K, value: ICMethodSettings[K]) => void;
 }
 
-const LOCKED_KEYS = new Set(['ic_calculation', 'monotonicity_test', 'ai_summary']);
+const LOCKED_KEYS = new Set(['ic_calculation', 'ai_summary']);
+
+/** 一個 ⓘ：滑鼠移入一句話。 */
+function InfoTip({ text, label }: { text: string; label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" aria-label={`${label}說明`} className="text-slate-500 hover:text-slate-300">
+          <Info className="h-3 w-3" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">{text}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** ㊸：IC 頁方法選擇（四個選單）＋單調性門檻開關＋IC 自相關揭露；每項一個 ⓘ。 */
+function MethodSettings({
+  settings,
+  onChangeSetting,
+}: {
+  settings: ICMethodSettings;
+  onChangeSetting?: FeatureTierPanelProps['onChangeSetting'];
+}) {
+  return (
+    <div className="rounded-md border border-white/10 bg-black/10 p-3 space-y-2" data-testid="ic-method-settings">
+      <div className="text-xs text-slate-300">方法選擇</div>
+      {IC_SETTING_KEYS.map((key) => {
+        const spec = IC_SETTING_SPECS[key];
+        const label = IC_SETTING_LABELS[key];
+        const changed = settings[key] !== spec.default;
+        return (
+          <div key={key} className="flex items-center gap-2 text-xs text-slate-200" data-testid={`ic-setting-${key}`}>
+            {spec.kind === 'toggle' ? (
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  aria-label={label}
+                  checked={Boolean(settings[key])}
+                  disabled={!onChangeSetting}
+                  onCheckedChange={(checked) => onChangeSetting?.(key, (checked === true) as ICMethodSettings[typeof key])}
+                />
+                <span className={changed ? 'text-amber-200' : undefined}>{label}</span>
+              </label>
+            ) : (
+              <>
+                <span className={`w-20 shrink-0 ${changed ? 'text-amber-200' : ''}`}>{label}</span>
+                <select
+                  aria-label={label}
+                  value={String(settings[key])}
+                  disabled={!onChangeSetting}
+                  onChange={(e) => onChangeSetting?.(key, e.target.value as ICMethodSettings[typeof key])}
+                  className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-xs text-slate-100"
+                >
+                  {(spec.options ?? []).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {IC_SETTING_OPTION_LABELS[opt] ?? opt}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            <InfoTip text={IC_SETTING_TIPS[key]} label={label} />
+          </div>
+        );
+      })}
+      <div className="flex items-center gap-2 text-xs text-slate-400" data-testid="ic-setting-ic_autocorrelation">
+        <span>{IC_AUTOCORR_LABEL}：不輸出</span>
+        <InfoTip text={IC_AUTOCORR_TIP} label={IC_AUTOCORR_LABEL} />
+      </div>
+    </div>
+  );
+}
 
 const TOGGLES: Array<{ key: string; label: string; tier: 'L1' | 'L2' | 'L3'; tip: string }> = [
-  { key: 'ic_calculation', label: 'IC 計算 (Spearman)', tier: 'L1', tip: '核心 IC 計算流程，必須開啟' },
-  { key: 'ic_method_selection', label: 'IC 方法選擇', tier: 'L1', tip: '支援 spearman/pearson/kendall' },
-  { key: 'winsorization_method', label: 'Winsorization 方法選擇', tier: 'L1', tip: '特徵預處理中的極值處理' },
-  { key: 'monotonicity_test', label: 'Monotonicity Test', tier: 'L1', tip: '核心單調性驗證，必須開啟' },
+  { key: 'ic_calculation', label: 'IC 計算', tier: 'L1', tip: '核心 IC 計算流程，必須開啟；估計量見「方法選擇」之 IC 方法' },
   { key: 'ai_summary', label: 'AI Summary', tier: 'L1', tip: '自動產生摘要' },
-  { key: 'return_type_selection', label: '收益率類型選擇', tier: 'L2', tip: 'simple/log/excess 等收益定義' },
   { key: 'ic_decay', label: 'IC Decay 分析', tier: 'L2', tip: '輸出不同 horizon 的 IC 衰減' },
   { key: 'grouped_ic', label: 'Grouped IC', tier: 'L2', tip: '分群情境下的 IC 表現' },
-  { key: 'ic_autocorrelation', label: 'IC Autocorrelation', tier: 'L2', tip: 'IC 時序自相關指標' },
   { key: 'event_filtering', label: 'Event Filtering', tier: 'L2', tip: '依事件條件篩選樣本' },
-  { key: 'redundancy_method_selection', label: '去重方法選擇', tier: 'L2', tip: 'greedy/hierarchical/vif' },
   { key: 'turnover_analysis', label: 'Turnover Analysis', tier: 'L2', tip: '換手率統計' },
   { key: 'factor_return', label: '單標的因子擇時多空 (Module 1)', tier: 'L2', tip: '單標的因子擇時多空累積報酬與風險指標' },
   { key: 'trend_analysis', label: 'Trend Analysis (Module 3)', tier: 'L2', tip: '趨勢分析與綜合訊號' },
@@ -44,7 +121,6 @@ const TOGGLES: Array<{ key: string; label: string; tier: 'L1' | 'L2' | 'L3'; tip
     // tip 由 resolveToggleTip 依 mode 覆寫；此處為 longitudinal 預設
     tip: '啟用時 p 閘用 BH q（p_value_adj）；關閉時用 HAC raw p。預設 ON',
   },
-  { key: 'vif_filter', label: 'VIF 篩選', tier: 'L3', tip: '高階共線性過濾' },
   { key: 'marginal_ic', label: '邊際 IC／多因子組合', tier: 'L3', tip: '倖存因子 semi-partial 秩 IC（loo／sequential）＋等權組合 IC；預設 ON；關閉 ⇒ 報告節 disabled' },
   { key: 'factor_centrality', label: 'Factor Centrality/PCA (Module 2)', tier: 'L3', tip: 'PCA 因子中心性' },
   { key: 'factor_orthogonalization', label: 'Factor Orthogonalization (Module 6)', tier: 'L3', tip: '因子正交化' },
@@ -68,6 +144,8 @@ export default function FeatureTierPanel({
   onChangeTier,
   onToggleFeature,
   analysisMode,
+  settings = DEFAULT_IC_SETTINGS,
+  onChangeSetting,
 }: FeatureTierPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -96,6 +174,10 @@ export default function FeatureTierPanel({
 
       <div className="text-xs text-slate-400">{desc}</div>
       <div className="text-xs text-slate-300">已啟用 {enabledCount}/{TOGGLES.length} 項功能</div>
+
+      <TooltipProvider>
+        <MethodSettings settings={settings} onChangeSetting={onChangeSetting} />
+      </TooltipProvider>
 
       <button
         type="button"

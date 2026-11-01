@@ -148,6 +148,11 @@ STAGE_OVERRIDE_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 
+#: ICPERF Task 0.4 ㊸：`_hash_config` 於值＝schema 預設時略去之欄（(節, 欄)；欄名形狀＝`ICConfig.model_dump()`）。
+#: 只列「加欄前即存在之設定指紋須保持不變」之後加欄；值非預設時照入雜湊。
+_HASH_OMIT_AT_DEFAULT: tuple[tuple[str, str], ...] = (("thresholds", "monotonicity_gate_enabled"),)
+
+
 #: EVTLABEL Task 2.2：這些鍵**不得**經 `config_override` 傳（`ICConfig` 會靜默吞掉）。
 _ISOLATION_CONTROL_KEYS: frozenset[str] = frozenset(
     {"event_isolation", "event_purge_rows", "label_window_rows", "lookahead_depth_rows"}
@@ -6028,6 +6033,10 @@ class ICFilterOrchestrator:
         }
         if not icir_gate:
             removed["icir_skipped_event_path"] = []   # 事件路徑必有此鍵（診斷欄；即使無人走到 ICIR 檢查）
+        # ICPERF Task 0.4 ㊸：IC 頁「單調性檢定」關 ⇒ 單調性門檻不參與剔除（記錄、不剔除）；開（預設）⇒ 本鍵不出現、行為不變
+        monotonicity_gate = bool(getattr(thresholds, "monotonicity_gate_enabled", True))
+        if not monotonicity_gate and not binary_mode:
+            removed["monotonicity_skipped_disabled"] = []
 
         if binary_mode:
             # 🔴 EVTLABEL Task 3.6：匯入標籤模式之門檻**與報酬版分開**。
@@ -6087,7 +6096,9 @@ class ICFilterOrchestrator:
             ):
                 removed["ic_hit_rate"].append(name)
                 continue
-            if not self._passes_threshold(
+            if not monotonicity_gate:
+                removed["monotonicity_skipped_disabled"].append(name)  # 記錄、不剔除（㊸）
+            elif not self._passes_threshold(
                 aligned["monotonicity_score_aligned"], thresholds.monotonicity_score_min
             ):
                 removed["monotonicity"].append(name)
@@ -6543,7 +6554,9 @@ class ICFilterOrchestrator:
             generated_at=str(report.get("generated_at")),
             fit_mode=str(report_meta.get("fit_mode") or metadata.get("fit_mode") or "unset"),
             pit_stats_version=str(report_meta.get("pit_stats_version") or PIT_STATS_VERSION),
-            ic_method=str(((self._current_config or self._config).ic_calculation.methods or ["spearman"])[0]),
+            # ICPERF Task 0.4 ㊸：記第 4 段實際所用之估計量（`global.default_method`，IC 頁「IC 方法」之映射點）；
+            # 改前取 `ic_calculation.methods[0]`，兩者不同時倖存者檔所記方法與實算不符
+            ic_method=str((self._current_config or self._config).global_settings.default_method),
             label_horizon=int(split_ctx["effective_horizon"]) if split_ctx.get("effective_horizon") is not None else None,
             label_return_type=str((self._current_config or self._config).labels.return_type),
             report_ref=report_ref,
@@ -6728,7 +6741,15 @@ class ICFilterOrchestrator:
         return ICConfig.model_validate(merged)
 
     def _hash_config(self, config: ICConfig) -> str:
-        payload = json.dumps(config.model_dump(), sort_keys=True)
+        data = config.model_dump()
+        # ICPERF Task 0.4 ㊸：後加之欄於預設值時不入雜湊（預設設定之 config_hash 與加欄前逐字相同，倖存者檔 provenance
+        # 與 §G 凍結不因加欄而變）；非預設值照入雜湊（不同設定仍得不同雜湊）
+        for section, field in _HASH_OMIT_AT_DEFAULT:
+            node = data.get(section)
+            default = type(getattr(config, section)).model_fields[field].default
+            if isinstance(node, dict) and field in node and node[field] == default:
+                node.pop(field)
+        payload = json.dumps(data, sort_keys=True)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
     def _apply_tier_config(self, config: ICConfig) -> ICConfig:

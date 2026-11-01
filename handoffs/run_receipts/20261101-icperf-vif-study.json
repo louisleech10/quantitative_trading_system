@@ -17155,5 +17155,199 @@
     }
    }
   }
+ },
+ "v557_implementation": {
+  "kind": "icperf-vif-v557-compare",
+  "spec": "docs/ICPERF_SPEC.md v5.57 Task 0.4 ㊷",
+  "script": "runs/icperf/task04/vif_study/v557_compare.py",
+  "script_sha256": "e2e9a57809cf611da5c5c874ff01758fed0cfcc555da342c9710e86a1b4ceb0c",
+  "before_code_root": "runs/icperf/task04/head_wt (git worktree @ f124b440)",
+  "after_code_root": ". (主 repo 工作區)",
+  "conditions": "每格獨立子行程；threadpool_limits(1)；牆鐘 perf_counter 只量 filter(method='vif') 本身；ru_maxrss 為行程峰值（含載入存檔）",
+  "python": "3.9.6",
+  "machine": "arm64",
+  "results": {
+   "RL100": {
+    "input": "RL100",
+    "sha256": "dda2c5302a81152117baead1433b2cfed3753d6a6ce65b067be24df2bfc2673a",
+    "shape_raw": [
+     395,
+     23
+    ],
+    "n_effective": 395,
+    "k": 23,
+    "null_vif_baseline": 1.0591397849462365,
+    "max_vif": 10.0,
+    "sample_guard": null,
+    "path_after": "vif",
+    "n_selected_before": 13,
+    "n_selected_after": 13,
+    "selected_identical": true,
+    "output_bitwise_identical": true,
+    "log_identical": true,
+    "only_before_vif": [],
+    "only_after": [],
+    "jaccard": 1.0,
+    "after_matches_greedy_reference": null,
+    "before_matches_study_receipt_selection": true,
+    "four_way": {
+     "seconds_before": 0.4073,
+     "seconds_after": 0.3568,
+     "maxrss_mb_peak_before": 265.0,
+     "maxrss_mb_peak_after": 247.1,
+     "maxrss_mb_after_load_before": 265.0,
+     "maxrss_mb_after_load_after": 246.8,
+     "output_shape_before": [
+      395,
+      13
+     ],
+     "output_shape_after": [
+      395,
+      13
+     ],
+     "output_nbytes_before": 41080,
+     "output_nbytes_after": 41080,
+     "study_receipt_seconds_before_blas1": 0.216
+    },
+    "code_sha256_before": "16d0af8629a62ddb7707713e609634d20bed2f01b917de15cc48728d16fb24cd",
+    "code_sha256_after": "4b808c2a937aebbbc359af68fcc80455952c9bc5da0bdd9bc5a39280a100215a"
+   },
+   "RL500": {
+    "input": "RL500",
+    "sha256": "c234a3445dfb3fe536453ea8609dead8451cad36f924c1f49d74554bfae5bb5c",
+    "shape_raw": [
+     395,
+     201
+    ],
+    "n_effective": 394,
+    "k": 201,
+    "null_vif_baseline": 2.0362694300518136,
+    "max_vif": 10.0,
+    "sample_guard": null,
+    "path_after": "vif",
+    "n_selected_before": 68,
+    "n_selected_after": 68,
+    "selected_identical": true,
+    "output_bitwise_identical": true,
+    "log_identical": true,
+    "only_before_vif": [],
+    "only_after": [],
+    "jaccard": 1.0,
+    "after_matches_greedy_reference": null,
+    "before_matches_study_receipt_selection": true,
+    "four_way": {
+     "seconds_before": 105.7594,
+     "seconds_after": 104.5464,
+     "maxrss_mb_peak_before": 254.5,
+     "maxrss_mb_peak_after": 278.5,
+     "maxrss_mb_after_load_before": 249.4,
+     "maxrss_mb_after_load_after": 274.2,
+     "output_shape_before": [
+      395,
+      68
+     ],
+     "output_shape_after": [
+      395,
+      68
+     ],
+     "output_nbytes_before": 214880,
+     "output_nbytes_after": 214880,
+     "study_receipt_seconds_before_blas1": 210.225
+    },
+    "code_sha256_before": "16d0af8629a62ddb7707713e609634d20bed2f01b917de15cc48728d16fb24cd",
+    "code_sha256_after": "4b808c2a937aebbbc359af68fcc80455952c9bc5da0bdd9bc5a39280a100215a"
+   },
+   "RL500_rows1000": {
+    "input": "RL500_rows1000",
+    "sha256": "57dbf4f219db881eb659d08e7bb924f8f7a5bc8ed701cd69697631080b46e5fd",
+    "shape_raw": [
+     195,
+     185
+    ],
+    "n_effective": 195,
+    "k": 185,
+    "null_vif_baseline": 19.4,
+    "max_vif": 10.0,
+    "sample_guard": {
+     "reason": "null_vif_baseline_ge_max_vif",
+     "n": 195,
+     "k": 185,
+     "null_vif_baseline": 19.4,
+     "max_vif": 10.0,
+     "fallback_method": "greedy",
+     "correlation_threshold": 0.7
+    },
+    "path_after": "greedy_fallback",
+    "n_selected_before": 56,
+    "n_selected_after": 62,
+    "selected_identical": false,
+    "output_bitwise_identical": false,
+    "log_identical": false,
+    "only_before_vif": [
+     "close_4h_trend_BBANDS-Upper_13",
+     "close_4h_trend_BBANDS-Lower_20_Kurt-W13",
+     "close_4h_trend_BBANDS-Lower_13_Std-W13",
+     "close_4h_trend_BBANDS-Middle_34_Std-W13",
+     "close_4h_trend_BBANDS-Lower_55_Std-W13",
+     "close_4h_trend_BBANDS-Upper_21_ZScore-W13",
+     "close_4h_trend_BBANDS-Upper_144_Kurt-W5",
+     "close_4h_trend_BBANDS-Upper_13_Rank-W5",
+     "close_4h_trend_BBANDS-Upper_20_Rank-W5",
+     "close_4h_trend_BBANDS-Middle_20_Rank-W5",
+     "close_4h_trend_BBANDS-Lower_89_Rank-W5",
+     "close_4h_trend_BBANDS-Upper_233_Rank-W5",
+     "close_4h_trend_BBANDS-Middle_233_Rank-W5",
+     "close_4h_trend_BBANDS-Upper_21_Std-W5",
+     "close_4h_trend_BBANDS-Lower_233_ZScore-W5"
+    ],
+    "only_after": [
+     "close_4h_trend_BBANDS-Middle_233",
+     "close_4h_trend_BBANDS-Upper_13~55_Cross",
+     "close_4h_trend_BBANDS-Lower_34~144_Cross",
+     "close_4h_trend_BBANDS-Middle_55~233_Ratio",
+     "close_4h_trend_BBANDS-Lower_13_Range-W13",
+     "close_4h_trend_BBANDS-Middle_34_Range-W13",
+     "close_4h_trend_BBANDS-Lower_55_Range-W13",
+     "close_4h_trend_BBANDS-Upper_233_Range-W13",
+     "close_4h_trend_BBANDS-Upper_233_Rank-W13",
+     "close_4h_trend_BBANDS-Lower_55_Slope-W13",
+     "close_4h_trend_BBANDS-Middle_20_Std-W13",
+     "close_4h_trend_BBANDS-Lower_89_Std-W13",
+     "close_4h_trend_BBANDS-Upper_13_ZScore-W13",
+     "close_4h_trend_BBANDS-Lower_89_ZScore-W13",
+     "close_4h_trend_BBANDS-Lower_233_Max-W5",
+     "close_4h_trend_BBANDS-Lower_144_Min-W5",
+     "close_4h_trend_BBANDS-Upper_21_Range-W5",
+     "close_4h_trend_BBANDS-Upper_21_Rank-W5",
+     "close_4h_trend_BBANDS-Lower_233_Rank-W5",
+     "close_4h_trend_BBANDS-Upper_13_ZScore-W5",
+     "close_4h_trend_BBANDS-Middle_20_ZScore-W5"
+    ],
+    "jaccard": 0.5324675324675324,
+    "after_matches_greedy_reference": true,
+    "before_matches_study_receipt_selection": true,
+    "four_way": {
+     "seconds_before": 56.8709,
+     "seconds_after": 0.2211,
+     "maxrss_mb_peak_before": 248.2,
+     "maxrss_mb_peak_after": 274.7,
+     "maxrss_mb_after_load_before": 244.8,
+     "maxrss_mb_after_load_after": 274.4,
+     "output_shape_before": [
+      195,
+      56
+     ],
+     "output_shape_after": [
+      195,
+      62
+     ],
+     "output_nbytes_before": 87360,
+     "output_nbytes_after": 96720,
+     "study_receipt_seconds_before_blas1": 101.888
+    },
+    "code_sha256_before": "16d0af8629a62ddb7707713e609634d20bed2f01b917de15cc48728d16fb24cd",
+    "code_sha256_after": "4b808c2a937aebbbc359af68fcc80455952c9bc5da0bdd9bc5a39280a100215a"
+   }
+  }
  }
 }

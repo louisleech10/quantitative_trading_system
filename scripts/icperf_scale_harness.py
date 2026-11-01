@@ -56,6 +56,13 @@
   （`EVENT_AXIS_BREAKOUT_BARS`）之等距抽樣（`event_axis_subset`）；(o) 參數敏感度家族數軸＝變體實跑
   （`param_sensitivity_families*`、families 軸，`PARAM_FAMILY_SCALES`）；(p) IC 後轉換之 `_transform_chunked` 以
   `FFACT_L65_CHUNK_SIZE` 之同實跑探針量（`post_ic_chunked_probe`、`Recorder.restricted`）。
+- SPEC v5.57（code review r68）：(q) 事件數軸（`event_axis_precheck` 與 event_import events 軸）走非預設門檻之產品完整路徑
+  （`relaxed_event_request`：只覆寫 p_value_max），紀錄門檻分支、實際門檻與第 5 段實值（`event_threshold_facts`）、二元三入口
+  呼叫；event_study 無第 5 段門檻消費點，維持預設；(r) `redundancy_vif` rows 軸固定 stage_cols 中點之 64 欄 seeded 設計點
+  （`REDUNDANCY_ROWS_DESIGN_COLS`；組裝斷言與 cols 軸 64 欄點同欄集合），量測環境不另設 BLAS 執行緒（路徑事實記實值
+  `blas_thread_facts`），VIF 兩入口之時間機會併入收據（`KNOWN_TIME_OPPORTUNITIES`）；(s) 清冊
+  `_transform_single_optimized_df_core` measure=false（IC 頁不可達）；(t) harness 請求之 seeded 選欄（`_limited_request`）
+  涵蓋 event_import 各軸與 post-ic-rows，凍結項 `small_request` 不改。
 - 直接呼叫格（`CELLS`）：讀 `stage_inputs/<N>/` 之真實輸入，以路徑同一設定物件（pickle 之 self）呼叫互斥分支：滾動 IC
   kendall／pearson、冗餘 hierarchical／vif／多元化約束、regime kmeans、fit_mode pit_expanding（C 格 500 列 ≤ 512 ⇒ percentile
   走 `pit_expanding_bounds`）、PIT mad 縮尾、`standardize` 之 time_series_zscore＋pit_expanding、無缺值向量化 IC。
@@ -289,6 +296,26 @@ REDUNDANCY_STAGE_COLS_BASIS = ("三點＝RL500 第 6 段真實輸入（測試段
                                "第 6 段輸入 201 欄 × 395 列；runs/icperf/task02/smoke_v556/records/redundancy_vif/）：vif_filter "
                                "32／64／128 欄 28／451／2,048 秒（_compute_vif_scores 15／36／78 輪），三點皆跑完；hierarchical、"
                                "diversification 三點各 < 3 秒")
+#: SPEC v5.57 (r)：rows 軸改固定 seeded 設計點之冗餘格 ⇒ 欄數。`redundancy_vif` rows 三點固定 64 欄＝stage_cols 中點
+#: （`REDUNDANCY_STAGE_COLS_SCALES[1]`；RL<`REDUNDANCY_STAGE_SOURCE_COLS`> 第 6 段真實輸入之 `seeded_columns(·, 64)`，與 cols 軸
+#: 64 點同一欄集合），欄數成本由 stage_cols 軸量；不量 (k) 之最小 rows 點全部第 6 段輸入（smoke 210 欄，依 stage_cols 曲線
+#: 64→451 秒、128→2,048 秒外推約 6 小時）。greedy（redundancy_greedy_rows）／hierarchical／diversification 之 rows 軸維持 (k)
+#: 之最小 rows 點全部第 6 段輸入：一軸一變數兩法皆滿足；三格每點 < 3 秒（smoke_v556），無成本理由縮小，且該欄集合＝產品於最小
+#: rows 點之實際第 6 段輸入（設計點則為抽樣之子集），每點秒數較大使列數擬合較不受計時雜訊主導；跨入口之可比由收據每點
+#: `cell_input_cols`／scale_vector 記明，不靠同欄數
+REDUNDANCY_ROWS_DESIGN_COLS: Dict[str, int] = {"redundancy_vif": REDUNDANCY_STAGE_COLS_SCALES[1]}
+#: SPEC v5.57 (r)：量測環境不另設 BLAS 執行緒數（量現行碼之實際行為；多執行緒互搶記入機會欄）——冗餘格之路徑事實記此等環境
+#: 變數之實值（未設 ⇒ None）與 threadpoolctl 所見之實際執行緒數
+BLAS_THREAD_ENV_KEYS: Tuple[str, ...] = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+                                         "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS")
+#: SPEC v5.57 (r)：已由研究實測之時間機會（入口 id ⇒ 依據）——組裝時併入 opportunities.time（planned；判準①候選）
+KNOWN_TIME_OPPORTUNITIES: Dict[str, str] = {
+    eid: ("多執行緒 BLAS 小矩陣互搶（handoffs/run_receipts/20261101-icperf-vif-study.json assessment.performance_finding："
+          "產品 vif_filter 每欄 sklearn LinearRegression 於 OpenBLAS 預設多執行緒，RL500_rows1000 整個逐步過程 4,893.8 秒 vs 限 1 "
+          "執行緒 101.9 秒、值差 ≤ 7.3e-11、選欄不變）；Task 0.2 量現行碼不另設執行緒數（SPEC v5.57 (r)），限執行緒改寫排 Phase 2"
+          "、以 statsmodels variance_inflation_factor 為 oracle 同條件改前改後對照")
+    for eid in ("momentum.Analysis.redundancy_filter:RedundancyFilter.vif_filter",
+                "momentum.Analysis.redundancy_filter:RedundancyFilter._compute_vif_scores")}
 #: 冗餘格 rows 軸之固定欄集合紀錄鍵（`_cell_facts` 自存檔 provenance 提至路徑事實；組裝斷言 rows 軸各點相同）
 COLUMN_SET_KEY = "column_set_sha256"
 #: SPEC v5.56 (o)：參數敏感度家族數軸——家族數三點（L 格 2,000 欄第 1 段輸出之 ≥3 員家族；2026-11-01 smoke 名稱樣式計 15 組，
@@ -1779,6 +1806,44 @@ def relaxed_request(n_cols: int, rows: Optional[int] = None) -> Dict[str, Any]:
             "threshold_override": dict(RELAXED_THRESHOLDS)}
 
 
+#: SPEC v5.57 (q)：事件數軸（預檢與 event_import events 軸）之門檻分支事實鍵——請求之實際門檻（深合併後之
+#: `config_override.thresholds`）與覆寫值
+EVENT_AXIS_THRESHOLD_BASIS = ("SPEC v5.57 (q)：事件數軸比照 v5.55 (d) 走非預設門檻之產品完整路徑（只覆寫 p_value_max＝"
+                              "RELAXED_THRESHOLDS）——二元模式 p 閘＝mw_p_value(_adj) ≤ alpha_effective（ic_filter_orchestrator.py"
+                              ":6061-6063）、alpha_effective＝thresholds.p_value_max（:5276-5285）；預設門檻下低點第 5 段無通過欄 ⇒ "
+                              "block_permutation_table 因 `if passed:`（:5796-5801）0 呼叫（smoke_v556 precheck_events_v556_b.json）；"
+                              "其餘二元門檻（rank_biserial_min、binary_unavailable）維持預設")
+
+
+def relaxed_event_request(n_cols: int) -> Dict[str, Any]:
+    """SPEC v5.57 (q)：事件數軸之非預設門檻請求——事件匯入路徑之請求（`_limited_request("event_import_report", None, n)`：
+    L 格 run、feature_filter＝seeded 巢狀 n 欄）之 `config_override.thresholds` 深合併 `RELAXED_THRESHOLDS`（只覆寫
+    `p_value_max`，同 `relaxed_request`；其餘請求欄位〔event_import_id 由呼叫端代入、標籤設定、tier〕同事件匯入預設請求）。
+    請求記 `threshold_branch`＝"non_default"、`threshold_override`。"""
+    request = _limited_request("event_import_report", None, int(n_cols))
+    ov = json.loads(json.dumps(request.get("config_override") or {}))
+    ov["thresholds"] = {**dict(ov.get("thresholds") or {}), **RELAXED_THRESHOLDS}
+    return {**request, "config_override": ov, "threshold_branch": "non_default",
+            "threshold_override": dict(RELAXED_THRESHOLDS)}
+
+
+def event_threshold_facts(request: Mapping[str, Any], report: Any) -> Dict[str, Any]:
+    """SPEC v5.57 (q)：事件數軸一點之門檻事實——請求之分支與實際門檻設定（`config_override.thresholds`）、產品第 5 段之
+    `alpha_effective`／`alpha_source`（報告 `filter_log.stage5_thresholds`，`ic_filter_orchestrator.py:5239-5245`）與第 5 段
+    輸入數、輸出數（實值；缺 ⇒ None）。"""
+    fl = ((report or {}).get("filter_log") or {}) if isinstance(report, Mapping) else {}
+    s5 = fl.get("stage5_thresholds") if isinstance(fl.get("stage5_thresholds"), Mapping) else {}
+    alpha = s5.get("alpha_effective")
+    return {"threshold_branch": str(request.get("threshold_branch") or "default"),
+            "threshold_override": dict(request.get("threshold_override") or {}),
+            "thresholds": dict(((request.get("config_override") or {}).get("thresholds")) or {}),
+            "alpha_effective": float(alpha) if isinstance(alpha, (int, float)) and not isinstance(alpha, bool) else None,
+            "alpha_source": s5.get("alpha_source"),
+            "stage5_input": _stage_count(fl, "stage5_thresholds", "input_features"),
+            "stage5_output": _stage_count(fl, "stage5_thresholds", "output_features"),
+            "threshold_basis": EVENT_AXIS_THRESHOLD_BASIS}
+
+
 def relaxed_identity(n_cols: int, rows: Optional[int] = None) -> Dict[str, Any]:
     """非預設門檻分支之存檔身分（SPEC v5.52 (a) 同法）：L 格 run manifest 之路徑／大小／內容 sha256、請求之欄（seeded 巢狀，
     SPEC v5.56 (m)）之 sha256 與選欄規則、欄數、列長、門檻覆寫、列數軸視窗覆寫（rows 軸）；任一不同 ⇒ 不沿用。"""
@@ -2000,7 +2065,10 @@ def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
     from api.routes.ic_analysis import _resolve_event_batch
 
     fb = _fb()
-    request = _limited_request("event_import_report", None, ctx.n_cols)
+    # SPEC v5.57 (q)：事件數軸走非預設門檻之產品完整路徑（`relaxed_event_request`：只覆寫 p_value_max；與預檢同一請求）；
+    # cols／rows 軸維持事件匯入預設請求
+    request = (relaxed_event_request(ctx.n_cols) if ctx.axis == "events"
+               else _limited_request("event_import_report", None, ctx.n_cols))
     store = EventImportService()
     records: Optional[List[Dict[str, Any]]] = None
     if ctx.axis in ("events", "rows"):
@@ -2034,6 +2102,15 @@ def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
         facts.update(bars_facts(bars))
     if ctx.axis == "events":
         facts.update(event_axis_facts())
+        # SPEC v5.57 (q)：紀錄實際門檻設定與第 5 段實值、二元三入口之本點呼叫數（扣例外）；任一入口 0 呼叫 ⇒ HarnessError
+        # （非預設門檻仍無通過欄 ⇒ 補資料或可達設定後再量，不寫 0 呼叫之紀錄；同 ic_page_relaxed）
+        facts.update(event_threshold_facts(request, info.get("result")))
+        calls = {eid: int(ctx.rec.stat(eid).calls) - int(ctx.rec.stat(eid).raised) for eid in EVENT_BINARY_ENTRIES}
+        facts["binary_calls"] = calls
+        zero = [eid for eid, c in calls.items() if c < 1]
+        if zero:
+            raise HarnessError(f"event_import events={ctx.scale}：非預設門檻下二元入口 0 呼叫 {zero}（第 5 段輸出 "
+                               f"{facts.get('stage5_output')}；SPEC v5.57 (q)）")
     return {**facts, "events": events, "requested_columns": names, "actual_scale": actual}
 
 
@@ -2267,18 +2344,22 @@ def event_point_product_check(records: Sequence[Mapping[str, Any]], work: Path, 
     targets = resolve_targets([*EVENT_BINARY_ENTRIES, EVENT_LABEL_MODE_ENTRY])
     binding = rebind_all({eid: t.func for eid, t in targets.items()}, rec)
     error = None
+    report: Any = None
     try:
         svc = _service_with_tasks(req_rec, Path(work) / "registry.json")
         req = fb._ic_analyze_request(req_rec)
-        _service_analysis(svc, req, rec, event_batch=_resolve_event_batch(req))
+        _tid, info = _service_analysis(svc, req, rec, event_batch=_resolve_event_batch(req))
+        report = info.get("result")
     except Exception as exc:  # noqa: BLE001 — 產品實跑失敗即本點不成立（原因照記）
         error = f"{type(exc).__name__}: {exc}"
     finally:
         binding.restore()
     calls = {eid: int(rec.stat(eid).calls) - int(rec.stat(eid).raised) for eid in EVENT_BINARY_ENTRIES}
     mode = modes[0] if modes else None
+    # SPEC v5.57 (q)：本點之門檻分支、實際門檻設定與第 5 段實值（判定不變：effective＝imported_binary 且三入口 calls ≥ 1）
     return {**event_product_verdict(mode, calls, error), "label_mode": mode, "binary_calls": calls, "error": error,
-            "label_mode_calls": int(rec.stat(EVENT_LABEL_MODE_ENTRY).calls)}
+            "label_mode_calls": int(rec.stat(EVENT_LABEL_MODE_ENTRY).calls),
+            **event_threshold_facts(request, report)}
 
 
 def event_product_verdict(mode: Optional[Mapping[str, Any]], calls: Mapping[str, int], error: Optional[str]
@@ -2318,18 +2399,27 @@ def event_axis_precheck(out_root: Optional[Path] = None, *, verify: bool = True)
     秒／毫秒時鐘不一致使 effective 恆為 return_rule，本預檢據實判不成立）。首選點 effective 已為 imported_binary 而二元某入口
     因該子集之候選欄 0 呼叫（2026-11-01 實測：等距 176 筆之 block_permutation_table 0 呼叫）⇒ 沿 `event_point_candidates` 之
     候選序列向中點續試（每試一次產品實跑；試過者記 `attempts`），不以 0 呼叫充數。`verify`=False ⇒ 只做切分複驗、`ok` 恆 False
-    （僅供探查規則；量測不得以之開跑）。"""
+    （僅供探查規則；量測不得以之開跑）。
+
+    SPEC v5.57 (q)：請求改 `relaxed_event_request`（比照 v5.55 (d) 只覆寫 `p_value_max`；event_import events 軸同一請求），
+    使低點第 5 段有通過欄；產品實跑判定不變（effective＝imported_binary 且三入口 calls ≥ 1）；收據頂層與每點記門檻分支、
+    實際門檻設定、產品第 5 段之 alpha_effective 與輸入／輸出數（`event_threshold_facts`）。"""
     root = Path(out_root) if out_root is not None else REPO / TASK02_ROOT
     root = (root if root.is_absolute() else REPO / root).resolve()
     eb = _load_script("icperf_t02_event_batch", "scripts/icperf_event_batch.py")
     records = _event_axis_batch()
-    request = _limited_request("event_import_report", None, ROW_AXIS_COLS)
+    # SPEC v5.57 (q)：預檢與 event_import events 軸同一非預設門檻請求（只覆寫 p_value_max）；切分不受門檻影響
+    request = relaxed_event_request(ROW_AXIS_COLS)
     manifest = (REPO / request["run_dir"] / "feature_manifest.json").resolve()
     out: Dict[str, Any] = {"ok": False, "scales": [], "points": [], "n_events": len(records), "reason": None,
                            "rule": EVENT_AXIS_SAMPLING,
                            "event_rule": eb.rule_id(EVENT_AXIS_BREAKOUT_BARS, EVENT_AXIS_PRIOR_FIELD),
                            "event_rule_basis": EVENT_AXIS_RULE_BASIS, "run": request["run_dir"],
-                           "reachable_range": None, "span": None, "verified_by_product_run": bool(verify)}
+                           "reachable_range": None, "span": None, "verified_by_product_run": bool(verify),
+                           "threshold_branch": request["threshold_branch"],
+                           "threshold_override": dict(request["threshold_override"]),
+                           "thresholds": dict(request["config_override"]["thresholds"]),
+                           "threshold_basis": EVENT_AXIS_THRESHOLD_BASIS}
     with _prepare_isolation(root, EVENT_PRECHECK_TAG) as work:
         full = _event_stage(records, work / "full", request, manifest)
         owner = {int(k): str(v) for k, v in (full.get("event_label_owners") or {}).items()}
@@ -2396,7 +2486,8 @@ def event_axis_precheck(out_root: Optional[Path] = None, *, verify: bool = True)
             out["reason"] = (f"三點之產品實跑不成立：{not_binary}（effective={modes}；0 呼叫入口={missing}；SPEC v5.56 (j)——effective "
                              "非 imported_binary 為時鐘等系統性問題〔Task 0.4 ㊵〕；effective 已為 imported_binary 而 "
                              "block_permutation_table 0 呼叫＝該子集第 5 段無倖存欄〔產品只對倖存欄置換，"
-                             "ic_filter_orchestrator.py `_run_binary_permutation_and_negative_control` 之 `if passed:`〕，候選已試盡）")
+                             "ic_filter_orchestrator.py `_run_binary_permutation_and_negative_control` 之 `if passed:`〕，候選已試盡；"
+                             f"SPEC v5.57 (q) 非預設門檻 {request['threshold_override']} 下仍不可達 ⇒ 須補資料）")
             return out
     out["ok"] = True
     return out
@@ -2457,6 +2548,12 @@ def _run_event_study(ctx: RunContext) -> Dict[str, Any]:
         facts.update(bars_facts(bars), actual_scale=bars_actual(bars, int(ctx.n_rows or 0)))
     if ctx.axis == "events":
         facts.update(event_axis_facts())
+        # SPEC v5.57 (q)：事件研究頁不經 IC 第 5 段門檻（`EventAnalyzeRequest.config_override` 只入 holdout 之 IC 設定，
+        # api/services/case_import_service.py:1813-1814；event_samples 無 thresholds 之消費點）⇒ 覆寫 p_value_max 為 no-op，
+        # 本路徑維持預設請求；事實記明分支與依據
+        facts.update(threshold_branch="default",
+                     threshold_basis="事件研究頁無第 5 段門檻消費點（case_import_service.py:1813-1814 之 config_override 只入 "
+                                     "resolve_canonical_holdout 之 ic_config）；SPEC v5.57 (q) 之非預設門檻只作用於 event_import")
     return facts
 
 
@@ -3342,13 +3439,34 @@ def redundancy_stage_capture(ctx: RunContext, name: str) -> Dict[str, Any]:
         src_dir = ctx.out_root / "stage_inputs" / src_tag
         src_want = want
     elif ctx.axis == "rows":
-        lo = int(ROW_AXIS_SCALES[0])
-        lo_tag = ctx.stage_tag(lo)
-        base = load_capture(ctx.out_root / "stage_inputs" / lo_tag, "redundancy_filter", expected_stage_identity(ctx, lo))
-        _o, base_args = _stage6_parts(base)
-        cols = [str(c) for c in base_args["features_df"].columns]
-        if not cols:
-            raise HarnessError(f"{ctx.run_id}：{lo_tag} 第 6 段輸入 0 欄（rows 軸固定欄集合為空；SPEC v5.56 (k)）")
+        design = REDUNDANCY_ROWS_DESIGN_COLS.get(ctx.run_id)
+        if design is None:
+            # SPEC v5.56 (k)：固定欄集合＝最小 rows 點之全部第 6 段輸入欄
+            lo = int(ROW_AXIS_SCALES[0])
+            fixed_tag = ctx.stage_tag(lo)
+            base = load_capture(ctx.out_root / "stage_inputs" / fixed_tag, "redundancy_filter",
+                                expected_stage_identity(ctx, lo))
+            _o, base_args = _stage6_parts(base)
+            cols = [str(c) for c in base_args["features_df"].columns]
+            if not cols:
+                raise HarnessError(f"{ctx.run_id}：{fixed_tag} 第 6 段輸入 0 欄（rows 軸固定欄集合為空；SPEC v5.56 (k)）")
+            fixed_prov: Dict[str, Any] = {"fixed_columns_source": fixed_tag}
+        else:
+            # SPEC v5.57 (r)：固定欄集合＝stage_cols 中點之 seeded 設計點（RL<來源欄數> 第 6 段真實輸入之
+            # `seeded_columns(·, design)`，與 cols 軸同欄數點同一欄集合）；設計點 > 來源欄數 ⇒ HarnessError（資料不足）
+            fixed_tag = f"RL{int(REDUNDANCY_STAGE_SOURCE_COLS)}"
+            dwant = {"subset": relaxed_identity(int(REDUNDANCY_STAGE_SOURCE_COLS), None),
+                     "writer": ["ic_page_relaxed", "cols"]}
+            base = load_capture(ctx.out_root / "stage_inputs" / fixed_tag, "redundancy_filter", dwant)
+            _o, base_args = _stage6_parts(base)
+            pool = [str(c) for c in base_args["features_df"].columns]
+            if int(design) > len(pool):
+                raise HarnessError(f"{ctx.run_id}：rows 軸設計點 {design} 欄 > {fixed_tag} 第 6 段輸入 {len(pool)} 欄（資料不足；"
+                                   "SPEC v5.57 (r)）")
+            cols = seeded_columns(pool, int(design), fb.SEED)
+            fixed_prov = {"fixed_columns_source": fixed_tag, "fixed_columns_rule": REQUEST_COLUMN_RULE,
+                          "design_cols": int(design), "design_basis": "SPEC v5.57 (r)：stage_cols 中點之 seeded 設計點",
+                          "stage_cols_total": len(pool)}
         src_want = expected_stage_identity(ctx, ctx.n_rows)
         src_dir = ctx.stage_dir
         cur = load_capture(src_dir, "redundancy_filter", src_want)
@@ -3358,22 +3476,35 @@ def redundancy_stage_capture(ctx: RunContext, name: str) -> Dict[str, Any]:
         res = pre.get("result")
         full = _datetime_axis(res[0] if isinstance(res, tuple) else res)
         own_t = _datetime_axis(own)
+        own_cols = [str(c) for c in own.columns]
         missing = [c for c in cols if c not in full.columns]
-        if missing or not set(own_t.index) <= set(full.index):
-            raise HarnessError(f"{ctx.run_id}：{ctx.stage_tag(ctx.n_rows)} 第 1 段輸出缺固定欄 {missing[:5]} 或缺第 6 段之列")
-        frame = full.loc[own_t.index, cols]
+        missing_own = [c for c in own_cols if c not in full.columns]
+        if missing or missing_own or not set(own_t.index) <= set(full.index):
+            raise HarnessError(f"{ctx.run_id}：{ctx.stage_tag(ctx.n_rows)} 第 1 段輸出缺固定欄 {missing[:5]}、缺第 6 段輸入欄 "
+                               f"{missing_own[:5]} 或缺第 6 段之列")
         dtypes = set(str(t) for t in own.dtypes)
-        if len(dtypes) == 1:
-            frame = frame.astype(next(iter(dtypes)))
-        frame = frame.set_axis(own.index, axis=0)
-        overlap = [c for c in cols if c in set(own.columns)]
-        if not overlap or not frame[overlap].equals(own[overlap]):
-            raise HarnessError(f"{ctx.run_id}：{ctx.stage_tag(ctx.n_rows)} 第 1 段輸出（測試段列）與第 6 段輸入於共同欄 "
-                               f"{len(overlap)} 欄不逐值相等（或無共同欄；SPEC v5.56 (k) 不得以未驗之值代入）")
+
+        def _from_stage1(names: Sequence[str]) -> Any:
+            f = full.loc[own_t.index, list(names)]
+            if len(dtypes) == 1:
+                f = f.astype(next(iter(dtypes)))
+            return f.set_axis(own.index, axis=0)
+
+        frame = _from_stage1(cols)
+        # 取值機制之驗證（SPEC v5.56 (k)，v5.57 (r) 擴為該 R 點自身第 6 段輸入之全部欄）：第 1 段輸出於第 6 段之列（逐欄轉為
+        # 第 6 段輸入之 dtype）須與第 6 段輸入逐值相等（設計點之欄可不在該 R 點第 6 段輸入內，故驗取值機制本身，不只驗與固定欄
+        # 之交集）
+        overlap = [c for c in cols if c in set(own_cols)]
+        own_view = full.loc[own_t.index, list(own.columns)].astype(own.dtypes.to_dict()).set_axis(own.index, axis=0) \
+            if own_cols else None
+        if own_view is None or not own_view.equals(own):
+            raise HarnessError(f"{ctx.run_id}：{ctx.stage_tag(ctx.n_rows)} 第 1 段輸出（測試段列）與第 6 段輸入（{len(own_cols)} 欄）"
+                               "不逐值相等（或第 6 段輸入 0 欄；SPEC v5.56 (k) 不得以未驗之值代入）")
         scores = _restrict_scores(args["ic_scores"], cols, f"{ctx.run_id}:{ctx.stage_tag(ctx.n_rows)}")
-        prov = {"fixed_columns_source": lo_tag, COLUMN_SET_KEY: _columns_sha(cols), "n_columns": len(cols),
+        prov = {**fixed_prov, COLUMN_SET_KEY: _columns_sha(cols), "n_columns": len(cols),
                 "rows": int(frame.shape[0]), "values_source": f"{ctx.stage_tag(ctx.n_rows)}/preprocess.result",
-                "verified_overlap_columns": len(overlap), "own_stage6_columns": int(own.shape[1])}
+                "verified_overlap_columns": len(overlap), "verified_own_columns": len(own_cols),
+                "own_stage6_columns": int(own.shape[1])}
         ctx.actual_scale = int(src_want["subset"]["rows"])
     else:
         raise HarnessError(f"{ctx.run_id}：冗餘格不支援 {ctx.axis} 軸")
@@ -3412,6 +3543,23 @@ def _cell_facts(ctx: RunContext, cap: Mapping[str, Any], frame: Any = None) -> D
     if isinstance(prov, Mapping) and prov.get(COLUMN_SET_KEY):
         # SPEC v5.56 (k)：冗餘格之欄集合身分（rows 軸各點須相同，組裝斷言）
         out[COLUMN_SET_KEY] = prov[COLUMN_SET_KEY]
+    if ctx.run_id in REDUNDANCY_STAGE_CELLS:
+        # SPEC v5.57 (r)：量測環境之 BLAS 執行緒（不另設；記實值）
+        out["blas_threads"] = blas_thread_facts()
+    return out
+
+
+def blas_thread_facts() -> Dict[str, Any]:
+    """SPEC v5.57 (r)：本行程之 BLAS 執行緒環境——`BLAS_THREAD_ENV_KEYS` 各環境變數之實值（未設 ⇒ None；harness 不設），
+    與 threadpoolctl（可匯入時）所見各 BLAS／OpenMP 函式庫之實際執行緒數（不可匯入 ⇒ None）。"""
+    out: Dict[str, Any] = {"env": {k: os.environ.get(k) for k in BLAS_THREAD_ENV_KEYS}, "threadpools": None,
+                           "policy": "SPEC v5.57 (r)：Task 0.2 量現行碼之實際行為，不另設執行緒數"}
+    try:
+        from threadpoolctl import threadpool_info
+    except ImportError:
+        return out
+    out["threadpools"] = [{k: d.get(k) for k in ("user_api", "internal_api", "num_threads", "version")}
+                          for d in threadpool_info()]
     return out
 
 
@@ -3984,9 +4132,12 @@ def _opportunities(eid: str, crit: Mapping[str, Mapping[str, Any]], points: Sequ
     hit = [k for k, c in crit.items() if c["result"] is True]
     pending = [k for k, c in crit.items() if c.get("status") == "pending_prototype"]
     blank = {"before": None, "after": None, "downstream": None, "user_ruling": None}
-    if hit or pending:
+    known = KNOWN_TIME_OPPORTUNITIES.get(eid)
+    if hit or pending or known:
+        # SPEC v5.57 (r)：已有研究實測之時間機會（KNOWN_TIME_OPPORTUNITIES）併入（判準①候選；不改 criteria 之判定）
         why = "；".join(x for x in (f"判準 {'、'.join(hit)} 成立" if hit else "",
-                                    f"判準 {'、'.join(pending)} 待 Phase 1 原型補量（v5.51 (f)）" if pending else "") if x)
+                                    f"判準 {'、'.join(pending)} 待 Phase 1 原型補量（v5.51 (f)）" if pending else "",
+                                    f"已知機會：{known}" if known else "") if x)
         time_o = {"status": "planned", "evidence": f"{why}（見 criteria）", **blank}
     else:
         time_o = {"status": "none", "evidence": "判準①–⑤ 皆不成立（見 criteria 之 evidence）", **blank}
@@ -4126,9 +4277,11 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
     return p
 
 
-def fixed_column_set_problems(eid: str, run_id: Optional[str], points: Sequence[Mapping[str, Any]]) -> List[str]:
+def fixed_column_set_problems(eid: str, run_id: Optional[str], points: Sequence[Mapping[str, Any]], *,
+                              col_points: Optional[Sequence[Mapping[str, Any]]] = None) -> List[str]:
     """SPEC v5.56 (k)：冗餘格（`REDUNDANCY_STAGE_CELLS`）rows 軸各點之 `cell_input_cols` 與欄集合身分（`COLUMN_SET_KEY`）須皆
-    非空且相同（只變列數）；其餘實跑 ⇒ 無問題。"""
+    非空且相同（只變列數）；其餘實跑 ⇒ 無問題。SPEC v5.57 (r)：`REDUNDANCY_ROWS_DESIGN_COLS` 所列之格，rows 軸欄數須＝設計點，
+    且 `col_points`（同格 cols 軸之點）給定時，其中欄數＝設計點之點之欄集合身分須與 rows 軸相同（與 stage_cols 中點同欄集合）。"""
     if run_id not in REDUNDANCY_STAGE_CELLS or not points:
         return []
     shas = [p.get(COLUMN_SET_KEY) for p in points]
@@ -4136,6 +4289,14 @@ def fixed_column_set_problems(eid: str, run_id: Optional[str], points: Sequence[
     if not all(shas) or len(set(shas)) != 1 or not all(isinstance(n, int) and n > 0 for n in ncols) \
             or len(set(ncols)) != 1:
         return [f"{eid}：{run_id} rows 軸各點之第 6 段輸入欄集合或欄數不同（{ncols}；SPEC v5.56 (k) rows 軸須固定欄集合只變列數）"]
+    design = REDUNDANCY_ROWS_DESIGN_COLS.get(str(run_id))
+    if design is not None:
+        if int(ncols[0]) != int(design):
+            return [f"{eid}：{run_id} rows 軸欄數 {ncols[0]} ≠ 設計點 {design}（SPEC v5.57 (r)）"]
+        if col_points is not None:
+            mid = [p.get(COLUMN_SET_KEY) for p in col_points if p.get("cell_input_cols") == int(design)]
+            if mid != [shas[0]]:
+                return [f"{eid}：{run_id} rows 軸欄集合與 cols 軸 {design} 欄點之欄集合不同（{mid}；SPEC v5.57 (r) 須同欄集合）"]
     return []
 
 
@@ -4226,7 +4387,9 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                        if (p := _point(e, q, row_run, str(row_axis), problems, require_actual=True)) is not None]
             if len(row_pts) != len(row_run["receipt"]["points"]):
                 continue
-            fixed = fixed_column_set_problems(eid, second[0] if second else None, row_pts) if row_axis == "rows" else []
+            fixed = fixed_column_set_problems(eid, second[0] if second else None, row_pts,
+                                              col_points=pts if second and prun == second[0] else None) \
+                if row_axis == "rows" else []
             if fixed:
                 problems.extend(fixed)
                 continue

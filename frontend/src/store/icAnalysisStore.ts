@@ -10,6 +10,7 @@ import {
   ICTaskFallback,
   ICTaskWarning,
   ICReport,
+  ICMethodSettings,
   ModuleStatus,
   NetICAnalysisRequest,
   ICSummaryPage,
@@ -66,6 +67,9 @@ interface ICAnalysisState {
   activeTab: 'basic' | 'deep';
   featureTier: FeatureTierLevel;
   featureToggles: Record<string, boolean>;
+  /** ㊸：本次分析送出時之方法選擇與門檻開關（按下分析當下快照；報告頂端「本次設定」讀此，不讀之後又改過之面板值）。 */
+  runSettings: ICMethodSettings | null;
+  setRunSettings: (settings: ICMethodSettings | null) => void;
   setConfig: (config: ICAnalysisConfig) => void;
   updateConfig: (patch: Partial<ICAnalysisConfig>) => void;
   setTask: (taskId: string | null, status?: ICAnalysisStatus) => void;
@@ -138,16 +142,10 @@ export const MODULE_TOGGLE_KEYS = [
 const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<string, boolean>> = {
   foundation: {
     ic_calculation: true,
-    ic_method_selection: true,
-    winsorization_method: true,
-    monotonicity_test: true,
     ai_summary: true,
-    return_type_selection: false,
     ic_decay: false,
     grouped_ic: false,
-    ic_autocorrelation: false,
     event_filtering: false,
-    redundancy_method_selection: false,
     turnover_analysis: false,
     // F5.2 tier truth: foundation 不含 factor_return(仍 false)
     factor_return: false,
@@ -159,23 +157,16 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     net_ic_analysis: false,
     fdr_correction: true,
     marginal_ic: true,
-    vif_filter: false,
     factor_centrality: false,
     factor_orthogonalization: false,
     factor_exposure: false,
   },
   intermediate: {
     ic_calculation: true,
-    ic_method_selection: true,
-    winsorization_method: true,
-    monotonicity_test: true,
     ai_summary: true,
-    return_type_selection: true,
     ic_decay: true,
     grouped_ic: true,
-    ic_autocorrelation: true,
     event_filtering: true,
-    redundancy_method_selection: true,
     turnover_analysis: true,
     // F5.2 tier truth: intermediate 含 factor_return(schema enabled=True)
     factor_return: true,
@@ -187,23 +178,16 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     net_ic_analysis: true,
     fdr_correction: true,
     marginal_ic: true,
-    vif_filter: false,
     factor_centrality: true,
     factor_orthogonalization: false,
     factor_exposure: false,
   },
   advanced: {
     ic_calculation: true,
-    ic_method_selection: true,
-    winsorization_method: true,
-    monotonicity_test: true,
     ai_summary: true,
-    return_type_selection: true,
     ic_decay: true,
     grouped_ic: true,
-    ic_autocorrelation: true,
     event_filtering: true,
-    redundancy_method_selection: true,
     turnover_analysis: true,
     // F5.2 tier truth: advanced 含 factor_return(schema enabled=True)
     factor_return: true,
@@ -215,14 +199,17 @@ const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<
     net_ic_analysis: true,
     fdr_correction: true,
     marginal_ic: true,
-    vif_filter: true,
     factor_centrality: true,
     factor_orthogonalization: true,
     factor_exposure: true,
   },
 };
 
-const LOCKED_TOGGLES = new Set(['ic_calculation', 'monotonicity_test', 'ai_summary']);
+// ICPERF Task 0.4 ㊸：原 ui_only 七鍵（ic_method_selection、winsorization_method、return_type_selection、
+// redundancy_method_selection、monotonicity_test、vif_filter、ic_autocorrelation）不再是 tier 之布林開關——
+// 前五者改為 `config.ic_settings` 之方法選擇／門檻開關（經 `buildConfigOverride` 送後端），vif_filter 併入去重方法之 vif，
+// ic_autocorrelation 只揭露（後端算出但無消費者）；分類見契約 `setting_keys`／`merged_keys`／`disclosed_keys`。
+const LOCKED_TOGGLES = new Set(['ic_calculation', 'ai_summary']);
 
 const defaultDeepAnalysisModules: DeepAnalysisConfig['modules'] = {
   // F5.2 tier truth: custom/default 含 factor_return(schema enabled=True)
@@ -306,6 +293,8 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   activeTab: 'basic',
   featureTier: 'intermediate',
   featureToggles: { ...PRESET_TOGGLES.intermediate },
+  runSettings: null,
+  setRunSettings: (runSettings) => set({ runSettings }),
   setConfig: (config) => set({ config }),
   updateConfig: (patch) =>
     set((state) => {

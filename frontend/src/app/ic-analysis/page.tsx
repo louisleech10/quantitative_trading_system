@@ -37,6 +37,8 @@ import LabelModeBanner from '@/components/ic-analysis/LabelModeBanner';
 import { readLabelRule } from '@/lib/icLabelRule';
 import PeriodAlignmentBanner from '@/components/ic-analysis/PeriodAlignmentBanner';
 import IsolationNote from '@/components/ic-analysis/IsolationNote';
+import ICRunSettingsLine from '@/components/ic-analysis/ICRunSettingsLine';
+import { resolveICSettings } from '@/lib/icConfigOverride';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
 import MarginalICTable from '@/components/ic-analysis/MarginalICTable';
 import EventTablesPanel from '@/components/ic-analysis/EventTablesPanel';
@@ -112,6 +114,8 @@ function ICAnalysisPageContent() {
     setFeatureTier,
     toggleFeature,
     buildDeepAnalysisRequest,
+    runSettings,
+    setRunSettings,
   } = useICAnalysisStore();
 
   const {
@@ -495,6 +499,8 @@ function ICAnalysisPageContent() {
         }
       }
 
+      // ICPERF Task 0.4 ㊸：按下分析當下之方法設定快照（報告頂端「本次設定」讀此，不讀之後又改過之面板值）
+      setRunSettings(resolveICSettings(config.ic_settings));
       await startAnalysis(config);
     } catch (err) {
       const message = err instanceof Error ? err.message : '啟動分析失敗';
@@ -702,6 +708,8 @@ function ICAnalysisPageContent() {
               <ExportButtons taskId={taskId} report={report} summaryTable={summaryTable} targetId={EXPORT_TARGET_ID} />
             </div>
 
+            {/* ICPERF Task 0.4 ㊸：報告頂端一行「本次設定」（非預設項標色）；有報告才顯示 */}
+            {report && <ICRunSettingsLine settings={runSettings} />}
             <DegradedBanner />
             {/* 🔴 SPLITUNIFY Task 4.1（SPEC C-6）：**唯一**的驗證段數字＋來源標籤。
                 掛在降級訊息之後——「這份能不能當 OOS 看」先講，「驗證段有幾個事件」再講。

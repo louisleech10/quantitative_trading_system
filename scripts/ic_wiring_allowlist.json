@@ -9,55 +9,6 @@
       "status": "legacy-informational-toggle"
     },
     {
-      "key": "ic_method_selection",
-      "file": "frontend/src/store/icAnalysisStore.ts",
-      "kind": "ghost_toggle",
-      "finding": "GROK-R1-P1-01",
-      "status": "pending-future-wiring"
-    },
-    {
-      "key": "winsorization_method",
-      "file": "frontend/src/store/icAnalysisStore.ts",
-      "kind": "ghost_toggle",
-      "finding": "GROK-R1-P1-01",
-      "status": "pending-future-wiring"
-    },
-    {
-      "key": "ic_autocorrelation",
-      "file": "frontend/src/store/icAnalysisStore.ts",
-      "kind": "ghost_toggle",
-      "finding": "GROK-R1-P1-01",
-      "status": "pending-future-wiring"
-    },
-    {
-      "key": "redundancy_method_selection",
-      "file": "frontend/src/store/icAnalysisStore.ts",
-      "kind": "ghost_toggle",
-      "finding": "GROK-R1-P1-01",
-      "status": "pending-future-wiring"
-    },
-    {
-      "key": "vif_filter",
-      "file": "frontend/src/store/icAnalysisStore.ts",
-      "kind": "ghost_toggle",
-      "finding": "GROK-R1-P1-01",
-      "status": "pending-future-wiring"
-    },
-    {
-      "key": "monotonicity_test",
-      "file": "frontend/src/store/icAnalysisStore.ts",
-      "kind": "ghost_toggle",
-      "finding": "ICHC-B5-SCAN",
-      "status": "legacy-informational-toggle"
-    },
-    {
-      "key": "return_type_selection",
-      "file": "frontend/src/store/icAnalysisStore.ts",
-      "kind": "ghost_toggle",
-      "finding": "ICHC-B5-SCAN",
-      "status": "legacy-informational-toggle"
-    },
-    {
       "key": "coverage_analysis",
       "file": "momentum/Analysis/ic_filter_orchestrator.py",
       "kind": "orphan_output",

@@ -1,0 +1,30 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/momentum/Analysis/test_icperf_ui_toggles.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -m 'not slow and not requires_kline' tests/momentum/Analysis/test_icperf_ui_toggles.py tests/momentum/test_tier_toggle_sync.py tests/momentum/Analysis/test_icperf_gate.py tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_gap2_stage6b_wiring.py tests/momentum/test_ic_1eb_b2_wiring.py tests/momentum/test_ic_filter_orchestrator.py tests/momentum/Analysis/test_evtlabel_stage5.py tests/momentum/Analysis/test_icperf_correctness.py tests/momentum/Analysis/test_ic_1eb_b5_golden.py tests/api/test_evtwarmup.py tests/momentum/Analysis/test_survivor_contract.py tests/momentum/Analysis/test_ichc_wiring_check.py",
+      "code_sha256": "8b32cce9474ac40d6248c232f55bed8fed5a428d0cc2a81c8206f6dde2e06de2",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "ICPERF Task 0.4 ㊸ 路 U 子代理",
+      "created_at": "2026-11-01T17:12:44+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 900,
+  "basis": [
+    "快速層（-m not slow and not requires_kline）：r68 委員實跑同組含 test_icperf_gate／test_icperf_correctness 等 6 檔 45.36 秒；本批另加受 ㊸ 影響之 orchestrator／survivor／wiring 測試檔約 8 檔，上限 15 分鐘"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7"
+  ]
+}

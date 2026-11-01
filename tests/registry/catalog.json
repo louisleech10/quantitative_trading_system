@@ -9648,6 +9648,68 @@
    "rewrite_targets": [],
    "ticket": "ICPERF"
   },
+  "tests/momentum/Analysis/test_icperf_time_index_resolution.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A15",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_time_index_resolution.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_ui_toggles.py": {
+   "claim": [
+    "contract",
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A12",
+    "A16",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_ui_toggles.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_vif_sample_guard.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "STATISTICAL"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_vif_sample_guard.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/momentum/Analysis/test_icperf_xsec_placeholders.py": {
    "claim": [
     "correctness"

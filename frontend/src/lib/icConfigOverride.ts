@@ -1,4 +1,87 @@
-import type { ICAnalysisConfig, ICDiversificationConfig } from './types';
+import type { ICAnalysisConfig, ICDiversificationConfig, ICMethodSettings } from './types';
+
+/** ㊸：IC 頁設定鍵之規格（kind／後端 config path／選項／預設）。 */
+export interface ICSettingSpec {
+  kind: 'select' | 'toggle';
+  /** `config_override` 之巢狀路徑（ICConfig alias 形狀，如 `global.default_method`）。 */
+  path: readonly string[];
+  options?: readonly string[];
+  default: string | boolean;
+}
+
+/**
+ * ICPERF Task 0.4 ㊸：IC 頁方法選擇與門檻開關之規格——須與 `momentum/Analysis/contracts/ui_stage_toggles.json` 之
+ * `setting_keys` **逐值相同**（`icSettings.test.ts` 對證；契約 ⇔ 後端由 pytest `test_icperf_ui_toggles.py` 對證）。
+ * 原 `vif_filter` 併入去重方法之 `vif` 選項；`ic_autocorrelation` 後端算出但無消費者，只揭露不設開關（契約 `disclosed_keys`）。
+ */
+export const IC_SETTING_SPECS: Record<keyof ICMethodSettings, ICSettingSpec> = {
+  ic_method_selection: {
+    kind: 'select',
+    path: ['global', 'default_method'],
+    options: ['spearman', 'pearson', 'kendall'],
+    default: 'spearman',
+  },
+  winsorization_method: {
+    kind: 'select',
+    path: ['preprocessing', 'winsorization', 'method'],
+    options: ['percentile', 'mad', 'zscore', 'none'],
+    default: 'percentile',
+  },
+  return_type_selection: {
+    kind: 'select',
+    path: ['labels', 'return_type'],
+    options: ['simple', 'log', 'risk_adjusted'],
+    default: 'simple',
+  },
+  redundancy_method_selection: {
+    kind: 'select',
+    path: ['redundancy', 'method'],
+    options: ['greedy', 'hierarchical', 'vif'],
+    default: 'greedy',
+  },
+  monotonicity_test: {
+    kind: 'toggle',
+    path: ['thresholds', 'monotonicity_gate_enabled'],
+    default: true,
+  },
+};
+
+/** ㊸：設定鍵之顯示順序（＝`IC_SETTING_SPECS` 之鍵）。 */
+export const IC_SETTING_KEYS = Object.keys(IC_SETTING_SPECS) as (keyof ICMethodSettings)[];
+
+/** ㊸：全部取預設之設定（＝後端 `load_ic_config()` 之現行值，經契約對證）。 */
+export const DEFAULT_IC_SETTINGS: ICMethodSettings = {
+  ic_method_selection: 'spearman',
+  winsorization_method: 'percentile',
+  return_type_selection: 'simple',
+  redundancy_method_selection: 'greedy',
+  monotonicity_test: true,
+};
+
+/** ㊸：補齊未設定之鍵（未設定＝預設）。 */
+export const resolveICSettings = (settings?: Partial<ICMethodSettings> | null): ICMethodSettings => ({
+  ...DEFAULT_IC_SETTINGS,
+  ...(settings ?? {}),
+});
+
+/** ㊸：值≠預設之鍵（送出與「本次設定」標色皆依此）。 */
+export const nonDefaultICSettingKeys = (settings?: Partial<ICMethodSettings> | null): (keyof ICMethodSettings)[] => {
+  const full = resolveICSettings(settings);
+  return IC_SETTING_KEYS.filter((key) => full[key] !== IC_SETTING_SPECS[key].default);
+};
+
+/** 依路徑寫入巢狀物件（中途節點不存在則建立；既有節點之其他鍵保留）。 */
+const setNested = (target: Record<string, unknown>, path: readonly string[], value: unknown) => {
+  let cursor = target;
+  path.slice(0, -1).forEach((part) => {
+    const next = cursor[part];
+    if (typeof next !== 'object' || next === null) {
+      cursor[part] = {};
+    }
+    cursor = cursor[part] as Record<string, unknown>;
+  });
+  cursor[path[path.length - 1]] = value;
+};
 
 /**
  * ICPERF Task 0.4 ㊲：多元化約束之顯示用預設（＝後端 `momentum/Analysis/ic_config_schema.py`
@@ -26,9 +109,12 @@ export const DEFAULT_DIVERSIFICATION: ICDiversificationConfig = {
  *
  * ICPERF Task 0.4 ㊲：`config.diversification` 有值時才送 `redundancy.diversification`（整組四鍵）；
  * 初始狀態（未設定）之 payload 與改前逐字相同。
+ *
+ * ICPERF Task 0.4 ㊸：`config.ic_settings` 中值≠預設之鍵，依 `IC_SETTING_SPECS[鍵].path` 寫入（與既有 thresholds／
+ * redundancy／labels 節合併，不覆蓋其他鍵）；全為預設或未設定 ⇒ payload 與改前逐字相同。
  */
 export const buildConfigOverride = (config: ICAnalysisConfig) => {
-  const thresholds: Record<string, number> = {
+  const thresholds: Record<string, number | boolean> = {
     ic_mean_min: config.thresholds.ic_mean_min,
     icir_min: config.thresholds.icir_min,
     p_value_max: config.thresholds.p_value_max,
@@ -38,7 +124,7 @@ export const buildConfigOverride = (config: ICAnalysisConfig) => {
     thresholds.monotonicity_score_min = config.thresholds.monotonicity_score_min;
   }
 
-  return {
+  const override = {
     thresholds,
     redundancy: {
       correlation_threshold: config.thresholds.correlation_threshold,
@@ -57,4 +143,10 @@ export const buildConfigOverride = (config: ICAnalysisConfig) => {
       horizons: config.horizons,
     },
   };
+  // ㊸：只送值≠預設之設定鍵（寫入其 path；與上列三節合併）
+  const settings = resolveICSettings(config.ic_settings);
+  nonDefaultICSettingKeys(settings).forEach((key) => {
+    setNested(override as Record<string, unknown>, IC_SETTING_SPECS[key].path, settings[key]);
+  });
+  return override;
 };

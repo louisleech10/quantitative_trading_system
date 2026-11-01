@@ -2065,7 +2065,31 @@ export interface ICAnalysisConfig {
    * 未設定（undefined）⇒ 不送、沿用後端設定（預設關）；使用者一動任何一項即整組明送（含 `enabled`）。
    */
   diversification?: ICDiversificationConfig;
+  /**
+   * ICPERF Task 0.4 ㊸：IC 頁方法選擇與門檻開關（鍵＝`momentum/Analysis/contracts/ui_stage_toggles.json` 之 `setting_keys`）。
+   * 未設定之鍵＝後端預設；`buildConfigOverride` 只在值≠預設時送出（預設 payload 與改前逐字相同）。
+   */
+  ic_settings?: Partial<ICMethodSettings>;
   feature_tiers?: FeatureTierConfig;
+}
+
+/** ㊸：IC 估計量（後端 `global.default_method`）。 */
+export type ICMethodName = 'spearman' | 'pearson' | 'kendall';
+/** ㊸：特徵縮尾方法（後端 `preprocessing.winsorization.method`）。 */
+export type ICWinsorizationMethod = 'percentile' | 'mad' | 'zscore' | 'none';
+/** ㊸：標籤收益率類型（後端 `labels.return_type`；`excess` 於 IC 頁無基準價來源，不列入）。 */
+export type ICReturnType = 'simple' | 'log' | 'risk_adjusted';
+/** ㊸：去重方法（後端 `redundancy.method`；`vif` 即原「VIF 篩選」）。 */
+export type ICRedundancyMethod = 'greedy' | 'hierarchical' | 'vif';
+
+/** ㊸：IC 頁方法選擇與門檻開關之完整值（預設見 `DEFAULT_IC_SETTINGS`）。 */
+export interface ICMethodSettings {
+  ic_method_selection: ICMethodName;
+  winsorization_method: ICWinsorizationMethod;
+  return_type_selection: ICReturnType;
+  redundancy_method_selection: ICRedundancyMethod;
+  /** 單調性門檻是否參與第 5 段篩選（後端 `thresholds.monotonicity_gate_enabled`）。 */
+  monotonicity_test: boolean;
 }
 
 /** 多元化約束設定：相異類別數下限、相異資料來源數下限、單一類別佔比上限、開關。 */

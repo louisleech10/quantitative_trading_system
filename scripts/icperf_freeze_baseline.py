@@ -3060,6 +3060,10 @@ def _task02_data(run_id: str, src: Path, *, axis: str = "cols", long_src: Option
         # ⇒ 身分另含所讀存檔目錄之身分 sidecar（重寫 ⇒ 身分變）
         if axis == "cols":
             tags = [f"RL{int(h.REDUNDANCY_STAGE_SOURCE_COLS)}"]
+        elif run_id in h.REDUNDANCY_ROWS_DESIGN_COLS:
+            # SPEC v5.57 (r)：rows 軸固定欄集合＝RL<來源欄數> 第 6 段輸入之 seeded 設計點 ⇒ 身分含該來源與各 R 點之存檔
+            tags = [f"RL{int(h.REDUNDANCY_STAGE_SOURCE_COLS)}",
+                    *[f"RL{h.ROW_AXIS_COLS}_rows{int(r)}" for r in sorted(set(map(int, scales)))]]
         else:
             tags = [f"RL{h.ROW_AXIS_COLS}_rows{int(r)}" for r in sorted({int(h.ROW_AXIS_SCALES[0]), *map(int, scales)})]
         return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json",
