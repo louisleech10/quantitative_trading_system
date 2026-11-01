@@ -1,8 +1,8 @@
 {
- "head": "df980fdacc97e8ff344688cdf7c583a556cc8898",
+ "head": "55b1dd76a58c157b4eddb1ae488225e0c21bec46",
  "code_sha256": "3c3a5299867ff76d183ada8b29ee382a02ccd29c1c8aed1ea35710d5f5354bcb",
- "spec": "docs/ICPERF_SPEC.md v5.54 Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
- "generated_at": "2026-11-01T06:55:55+00:00",
+ "spec": "docs/ICPERF_SPEC.md v5.55 Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
+ "generated_at": "2026-11-01T08:11:33+00:00",
  "tolerance": {
   "relative": 1e-12,
   "derived_relative": 1e-09,
@@ -6254,7 +6254,7 @@
    "error": null,
    "elapsed_s": 101.37654008300001,
    "peak_rss_bytes": 431112192,
-   "oracle_s": 139.486886042,
+   "oracle_s": 136.328711542,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -8299,7 +8299,7 @@
    "error": null,
    "elapsed_s": 31.340081833000003,
    "peak_rss_bytes": 454475776,
-   "oracle_s": 28.283948750000008,
+   "oracle_s": 28.18338275000002,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -10223,7 +10223,7 @@
    "error": null,
    "elapsed_s": 37.181277209,
    "peak_rss_bytes": 457883648,
-   "oracle_s": 35.767500125,
+   "oracle_s": 35.699197959,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -12172,7 +12172,7 @@
    "error": null,
    "elapsed_s": 38.204428459,
    "peak_rss_bytes": 439222272,
-   "oracle_s": 34.147385041999996,
+   "oracle_s": 33.97171558300002,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -14121,7 +14121,7 @@
    "error": null,
    "elapsed_s": 52.892983292,
    "peak_rss_bytes": 416546816,
-   "oracle_s": 48.20286574999997,
+   "oracle_s": 48.059465166999985,
    "request": {
     "kind": "ic_page",
     "item": "event_report",
@@ -16157,7 +16157,7 @@
    "error": null,
    "elapsed_s": 23.263317042,
    "peak_rss_bytes": 424689664,
-   "oracle_s": 16.59980491700003,
+   "oracle_s": 16.544868624999992,
    "request": {
     "kind": "ic_page",
     "item": "event_report",
@@ -18081,7 +18081,7 @@
    "error": null,
    "elapsed_s": 49.186229333,
    "peak_rss_bytes": 444579840,
-   "oracle_s": 46.89885358400005,
+   "oracle_s": 46.66750487500002,
    "request": {
     "kind": "ic_page",
     "item": "deep_analysis",
@@ -20462,7 +20462,7 @@
    "error": null,
    "elapsed_s": 92.518504125,
    "peak_rss_bytes": 737574912,
-   "oracle_s": 121.17174541700001,
+   "oracle_s": 121.37463712500005,
    "request": {
     "kind": "ic_page",
     "item": "ic_report_long",
@@ -22735,7 +22735,7 @@
    "error": null,
    "elapsed_s": 82.64730470800001,
    "peak_rss_bytes": 784252928,
-   "oracle_s": 71.99863604099994,
+   "oracle_s": 72.02500412500007,
    "request": {
     "kind": "ic_page",
     "item": "deep_analysis_long",
@@ -25134,7 +25134,7 @@
    "error": null,
    "elapsed_s": 17.456393667,
    "peak_rss_bytes": 784613376,
-   "oracle_s": 3.2569382500000756,
+   "oracle_s": 3.2639912920000143,
    "request": {
     "kind": "ic_page",
     "item": "event_import_report",
@@ -29967,7 +29967,7 @@
    "error": null,
    "elapsed_s": 10.820102917,
    "peak_rss_bytes": 283426816,
-   "oracle_s": 56.486841916,
+   "oracle_s": 56.210151709,
    "request": {
     "kind": "cross",
     "item": "ic_report",
@@ -30860,7 +30860,7 @@
    "error": null,
    "elapsed_s": 8.090915749999999,
    "peak_rss_bytes": 302563328,
-   "oracle_s": 11.828061708000064,
+   "oracle_s": 11.837099499999908,
    "request": {
     "kind": "cross_kline",
     "item": "ic_report",
@@ -31924,84 +31924,84 @@
    "elapsed_s": 101.37654008300001,
    "peak_rss_bytes": 431112192,
    "pickle_bytes": 3659005,
-   "oracle_s": 139.486886042
+   "oracle_s": 136.328711542
   },
   "A.ic_report.cov": {
    "wall_s": 32.245639166000004,
    "elapsed_s": 31.340081833000003,
    "peak_rss_bytes": 454475776,
    "pickle_bytes": 758874,
-   "oracle_s": 28.283948750000008
+   "oracle_s": 28.18338275000002
   },
   "A.ic_report.pearson": {
    "wall_s": 38.05054287499999,
    "elapsed_s": 37.181277209,
    "peak_rss_bytes": 457883648,
    "pickle_bytes": 1059302,
-   "oracle_s": 35.767500125
+   "oracle_s": 35.699197959
   },
   "A.ic_report.kendall": {
    "wall_s": 39.33102129100001,
    "elapsed_s": 38.204428459,
    "peak_rss_bytes": 439222272,
    "pickle_bytes": 1058330,
-   "oracle_s": 34.147385041999996
+   "oracle_s": 33.97171558300002
   },
   "A.event_report": {
    "wall_s": 54.04319195900001,
    "elapsed_s": 52.892983292,
    "peak_rss_bytes": 416546816,
    "pickle_bytes": 1760276,
-   "oracle_s": 48.20286574999997
+   "oracle_s": 48.059465166999985
   },
   "A.event_report.cov": {
    "wall_s": 24.314047916999982,
    "elapsed_s": 23.263317042,
    "peak_rss_bytes": 424689664,
    "pickle_bytes": 427628,
-   "oracle_s": 16.59980491700003
+   "oracle_s": 16.544868624999992
   },
   "A.deep_analysis": {
    "wall_s": 50.118938041000035,
    "elapsed_s": 49.186229333,
    "peak_rss_bytes": 444579840,
    "pickle_bytes": 2239130,
-   "oracle_s": 46.89885358400005
+   "oracle_s": 46.66750487500002
   },
   "L.ic_report": {
    "wall_s": 93.42940325000001,
    "elapsed_s": 92.518504125,
    "peak_rss_bytes": 737574912,
    "pickle_bytes": 5278606,
-   "oracle_s": 121.17174541700001
+   "oracle_s": 121.37463712500005
   },
   "L.deep_analysis": {
    "wall_s": 83.56345245799997,
    "elapsed_s": 82.64730470800001,
    "peak_rss_bytes": 784252928,
    "pickle_bytes": 5615472,
-   "oracle_s": 71.99863604099994
+   "oracle_s": 72.02500412500007
   },
   "L.event_import_report": {
    "wall_s": 18.37811887500004,
    "elapsed_s": 17.456393667,
    "peak_rss_bytes": 784613376,
    "pickle_bytes": 851193,
-   "oracle_s": 3.2569382500000756
+   "oracle_s": 3.2639912920000143
   },
   "X.cross_sectional": {
    "wall_s": 11.6673045,
    "elapsed_s": 10.820102917,
    "peak_rss_bytes": 283426816,
    "pickle_bytes": 172654,
-   "oracle_s": 56.486841916
+   "oracle_s": 56.210151709
   },
   "X.cross_sectional.default": {
    "wall_s": 9.003379500000051,
    "elapsed_s": 8.090915749999999,
    "peak_rss_bytes": 302563328,
    "pickle_bytes": 1123677,
-   "oracle_s": 11.828061708000064
+   "oracle_s": 11.837099499999908
   },
   "_receipt_bytes": 996742
  },
