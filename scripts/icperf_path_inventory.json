@@ -483,7 +483,7 @@
       "callers": [
         "momentum/Analysis/data_preprocessor.py:442"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_long"
     },
     {
       "id": "momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_static",
@@ -1346,7 +1346,7 @@
       "callers": [
         "momentum/Analysis/ic_filter_orchestrator.py:4911"
       ],
-      "branch_cell": "ic_page_default"
+      "branch_cell": "ic_page_long"
     },
     {
       "id": "momentum.Analysis.ic_engine:ICEngine.compute_icir",

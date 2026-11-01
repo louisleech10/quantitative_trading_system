@@ -5,9 +5,10 @@
 入口換成同一計數／計時 wrapper，逐入口記錄寫 `<records-dir>/<run_id>/<axis>-<scale>/<path_run_id>.json`。不改產品碼。
 
 用法（重型；由 `scripts/icperf_freeze_baseline.py measure` 經 scale_probe 啟動，不單獨前景跑全規模）：
-  venv/bin/python scripts/icperf_scale_harness.py run <run_id> --axis cols --scale {scale} --records-dir runs/icperf/task02/records/<session>
+  venv/bin/python scripts/icperf_scale_harness.py run <run_id> --axis cols --scale {scale} --records-dir handoffs/run_receipts/icperf_task02_records/<session>/<attempt>
   venv/bin/python scripts/icperf_scale_harness.py list                 # 列出路徑與直接呼叫格及其所涵蓋之清冊入口數
   venv/bin/python scripts/icperf_scale_harness.py plan                 # 清冊 measure=true 入口 ⇒ branch_cell 對照與未涵蓋者
+  venv/bin/python scripts/icperf_scale_harness.py precheck-rows        # v5.51 (a)：列數軸列長之樣本外切分秒級預檢
   run 之選項：--axis cols|rows|events（預設 cols；rows＝固定 `ROW_AXIS_COLS` 欄、子集列數截為末 {scale} 列；events＝事件數）
   --inventory <清冊>（預設 scripts/icperf_path_inventory.json）、--out-root <工作根>（預設 runs/icperf/task02）
 
@@ -29,6 +30,11 @@
 - 資料界限（2026-11-01 smoke 實測）：C 格 500 列於 IC 頁預設請求之切分測試段 95 列 < 最少 131 列 ⇒ 產品改走全樣本重跑
   （`ic_filter_orchestrator.py:1975-1990`，fit_mode=full_sample）——故 `ic_page_default` 量到的是 full_sample 分支
   （`_clip_series_static`）；train_mask 分支（`_clip_series_train`、`_slice_rolling_ic_to_test`）須列數足夠之資料格才走得到。
+- SPEC v5.51 (a)：樣本外分支入口歸 `ic_page_long`（L 格 2,000 列，IC 頁預設請求走樣本外切分）；IC 頁／深度分析／直接呼叫格之
+  rows 軸一律於 L 格（`ic_page_long`／`deep_analysis_long` 之 rows 軸，`ROW_AXIS_SCALES`＋`ROW_AXIS_WINDOW_OVERRIDE`；三列長
+  先過 `split_precheck`）。L 格交接 h5 由 `icperf_freeze_baseline.py gen-l-handoff` 產生（`l_handoff_path`）。
+- SPEC v5.51 (d)：event_study 之主軸＝events（`primary_axis`）；(f) 判準② `criterion2`；(g) 兩點例外依收據合計推估對
+  budget_seconds；(h) footprint 取同 path_run_id 之紀錄；(i) 收據引用之紀錄存 `TASK02_RECORDS_ROOT`（不覆寫）。
 
 逐入口記錄（`EntryStats.to_json`；不存原始值）：呼叫次數、最外層累計牆鐘秒（perf_counter；**含巢狀入口時間**＝inclusive，
 扣除 harness 本身之包裝與雜湊開銷）、呼叫期間峰值 RSS（取樣執行緒＋長呼叫結束時讀取）、首末呼叫之輸入形狀、PIT／逐欄入口
@@ -79,17 +85,44 @@ KEYED_LOOPS = ("per_bar", "per_column")
 RSS_SAMPLE_INTERVAL = 0.2
 #: 呼叫結束時另讀 RSS 之最短呼叫秒數（更短之呼叫讀 RSS 之開銷相對過大）
 END_RSS_MIN_SECONDS = 0.01
-#: rows 軸之固定欄數
+#: rows 軸之固定欄數（L 格交接 h5 之巢狀子集；SPEC v5.51 (a)「固定欄數取 L 格可用欄之子集」）
 ROW_AXIS_COLS = 500
 #: 規模點（SPEC Task 0.2）
 SCALE_POINTS = (500, 1000, 2000)
+#: SPEC v5.51 (a)：列數軸與樣本外分支之資料格＝L 格（`icperf_freeze_baseline.LONG_CELL`，BTCUSDT 4h、2,000 列、raw 3,632 欄）
+LONG_CELL_ID = "L_BTCUSDT_4h_longhist"
+LONG_CELL_TIMEFRAME = "4h"
+LONG_CELL_ROWS = 2000
+#: SPEC v5.51 (a)：列數軸之三種列長（L 格交接 h5 之末 R 列）——須皆過 `split_precheck`（樣本外切分成立）。
+#: IC 頁預設請求於 4h 之預檢（`split_precheck`，2026-11-01 實跑）：最少測試段列數＝max(調整後滾動窗 [63,189,378]、ICIR 窗 189)
+#: ＋horizon 5＝383、`min_test_rows`＝131；測試段列數＝N−⌈0.8N⌉−purge 5 ⇒ 只有 N ≥ 1,940 成立（2,000 列 ⇒ 395，與 SPEC v5.27
+#: 實跑一致）、1,000 列 ⇒ 195 不成立。L 格只有 2,000 列（標籤來源主檔 4h 只 5,088 根）⇒ 依 la1 同法
+#: （`tests/golden/la1/gen_baseline.py` `RUN_WINDOW_OVERRIDES`／`with_run_windows`）加視窗覆寫 `ROW_AXIS_WINDOW_OVERRIDE`
+ROW_AXIS_SCALES = (1000, 1500, 2000)
+#: 列數軸請求之視窗覆寫（深合併入 `config_override["ic_calculation"]`）：只移除預設 [21, 63, 126] 之最長窗 126（ICIR 窗維持
+#: 預設 63）⇒ 4h 最少測試段列數 189＋5＝194 ≤ 1,000 列之測試段 195。三種列長同一覆寫（列數軸內設定不變）；cols 軸不加覆寫
+ROW_AXIS_WINDOW_OVERRIDE: Dict[str, Any] = {"rolling_windows": [21, 63], "icir": {"window": 63}}
+#: 各路徑／格之列數軸實跑（cols 軸所屬路徑 ⇒ rows 軸實跑之路徑；v5.51 (a)：rows 軸一律於 L 格）
+ROW_AXIS_RUN: Dict[str, str] = {}
+#: 列數軸只在短序列分支可達之格（`data_preprocessor.py:464` 長度 ≤ 512 才走 `pit_expanding_bounds`）：其 rows 軸取最小列長
+#: 之 L 格存檔輸入之末 R 列（R ∈ 下列；直接呼叫格不經切分，不需預檢）
+CELL_ROW_SCALES: Dict[str, Tuple[int, ...]] = {"fit_mode_pit_expanding": (128, 256, 512)}
+#: SPEC v5.51 (i)：量測收據引用之逐入口紀錄存處（入版控；不覆寫）；`runs/` 只作執行期暫存（work、子集、存檔輸入）
+TASK02_RECORDS_ROOT = "handoffs/run_receipts/icperf_task02_records"
+#: SPEC v5.51 (f)：判準②之硬體下限（無原型時唯一可碼層斷定「不成立」之依據）：每單位（unit_axis 各軸之積）至少讀一個 8 bytes
+#: 浮點數一次；以本機記憶體頻寬上界 ~100 GB/s 計 ≈ 8e-11 秒，取 1e-10 秒為保守下限（任何實作之每單位秒數皆不低於此）⇒ 實測
+#: 每單位秒數 < 10 × 此值 ⇒ 必未達「下限 × 10」⇒ 判準②為假；其餘無原型者標 pending_prototype（列 Phase 1 原型補量）
+CRITERION2_FLOOR_SECONDS_PER_UNIT = 1e-10
 #: 跨標的路徑之兩格（A 格同週期兩標的）
 CROSS_CELLS = ("A_BTCUSDT_1h", "A_SOLUSDT_1h")
 
 #: 路徑實跑（v5.49）：id ⇒ 說明
 PATHS: Dict[str, str] = {
     "ic_page_default": "C 格 N 欄巢狀子集＋IC 頁預設請求 analyze（第 0–7 段）；存直接呼叫格之各段真實輸入",
+    "ic_page_long": "L 格（4h 2,000 列，樣本外切分成立）交接 h5 之 N 欄巢狀子集＋IC 頁預設請求 analyze（樣本外分支入口）；"
+                    "rows 軸＝固定 ROW_AXIS_COLS 欄、末 R 列、ROW_AXIS_WINDOW_OVERRIDE（存直接呼叫格之列數軸真實輸入）",
     "deep_analysis": "同 ic_page_default 之 analyze 後同一 analyzer 續跑深度分析全部模組",
+    "deep_analysis_long": "同 ic_page_long 之 rows 軸 analyze 後同一 analyzer 續跑深度分析全部模組（深度分析之列數軸）",
     "post_ic_transform": "A 格 run feature_filter N 欄經服務 start_analysis 後 _apply_transforms_sync（rank／zscore／gaussian）",
     "event_import": "L 格 run feature_filter N 欄＋§G (7) 事件匯入批（event_import_run）",
     "event_study": "事件研究頁：隔離儲存根之 import_records＋analyze（events 軸＝前 {scale} 筆事件）",
@@ -127,13 +160,29 @@ CELL_CAPTURES: Dict[str, Tuple[str, ...]] = {
     "winsor_mad_pit": ("preprocess",), "standardize_tszscore_pit": ("preprocess",),
     "vectorized_ic_no_missing": ("compute_ic",),
 }
-#: 各路徑／格可用之軸
+#: 各路徑／格可用之軸（v5.51 (a)：IC 頁與深度分析之 rows 軸改由 L 格路徑 `ic_page_long`／`deep_analysis_long` 實跑）
 RUN_AXES: Dict[str, Tuple[str, ...]] = {
     **{c: ("cols", "rows") for c in CELLS},
-    "ic_page_default": ("cols", "rows"), "deep_analysis": ("cols", "rows"), "post_ic_transform": ("cols",),
+    "ic_page_default": ("cols",), "ic_page_long": ("cols", "rows"), "deep_analysis": ("cols",),
+    "deep_analysis_long": ("rows",), "post_ic_transform": ("cols",),
     "event_import": ("cols",), "event_study": ("events",), "cross_sectional": ("cols",),
     "icfirst_post_generation": ("cols",),
 }
+ROW_AXIS_RUN.update({"ic_page_default": "ic_page_long", "ic_page_long": "ic_page_long",
+                     "deep_analysis": "deep_analysis_long", **{c: c for c in CELLS}})
+#: 寫直接呼叫格所需存檔之 (路徑, 軸)：cols 軸取 C 格 ic_page_default、rows 軸取 L 格 ic_page_long
+CAPTURE_RUNS: Tuple[Tuple[str, str], ...] = (("ic_page_default", "cols"), ("ic_page_long", "rows"))
+
+
+def primary_axis(run_id: str) -> str:
+    """路徑／格之主軸（收據 points 之 x 軸）：只有事件數軸者（event_study）＝"events"，其餘＝"cols"（SPEC v5.51 (d)）。"""
+    axes = RUN_AXES.get(run_id, ())
+    return "events" if axes == ("events",) else "cols"
+
+
+def row_scales_for(run_id: str) -> Tuple[int, ...]:
+    """rows 軸實跑之列長：`CELL_ROW_SCALES` 所列之格用其短序列列長，其餘＝`ROW_AXIS_SCALES`。"""
+    return tuple(CELL_ROW_SCALES.get(run_id, ROW_AXIS_SCALES))
 
 
 class HarnessError(RuntimeError):
@@ -698,7 +747,8 @@ def stage_input_card(root: Path) -> None:
         return
     root.mkdir(parents=True, exist_ok=True)
     card.write_text(
-        "入口：scripts/icperf_scale_harness.py run ic_page_default（scale_probe 啟動之路徑實跑）\n"
+        "入口：scripts/icperf_scale_harness.py run ic_page_default（cols 軸，C 格 <N>/）／ic_page_long --axis rows（L 格 "
+        "L<cols>_rows<R>/）（scale_probe 啟動之路徑實跑）\n"
         "用途：ICPERF Task 0.2 直接呼叫格之各段真實輸入（<N>/<名>.pkl：第 1 段輸入與輸出、第 4 段 compute_ic／滾動 IC／"
         "分組 IC 輸入、第 6 段冗餘輸入與多元化指標輸入；含路徑同一設定之 self 物件；SPEC v5.50 (d)）\n"
         f"建立：{time.strftime('%Y-%m-%d %H:%M:%S %z')}\n"
@@ -729,7 +779,105 @@ def _bind_call(func: Any, self_obj: Any, cap: Mapping[str, Any], **override: Any
     return func(*ba.args, **ba.kwargs)
 
 
+# ── 樣本外切分之秒級碼層預檢（v5.51 (a)） ────────────────────────────────────────────────────────────────
+
+
+def with_row_windows(override: Optional[Mapping[str, Any]],
+                     windows: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """`override`（IC 頁 config_override）深合併列數軸視窗覆寫（預設 `ROW_AXIS_WINDOW_OVERRIDE`）入 `ic_calculation`，回新
+    dict（同 `tests/golden/la1/gen_baseline.py` `with_run_windows`：rolling_windows 取代、icir 鍵合併，其餘鍵保留）。"""
+    patch = ROW_AXIS_WINDOW_OVERRIDE if windows is None else windows
+    out = json.loads(json.dumps(dict(override or {})))
+    ic = out.setdefault("ic_calculation", {})
+    if "rolling_windows" in patch:
+        ic["rolling_windows"] = list(patch["rolling_windows"])
+    if "icir" in patch:
+        ic["icir"] = {**(ic.get("icir") or {}), **dict(patch["icir"])}
+    return out
+
+
+def precheck_override(timeframe: str, *, row_windows: bool) -> Dict[str, Any]:
+    """預檢用之 IC 頁預設請求 override：`icperf_freeze_baseline.IC_PAGE_DEFAULT_PAYLOAD` 經服務 `_build_config_override`
+    （同量測之 `_override_for`；symbol／config_hash 不影響 override，不讀資料檔）；`row_windows` ⇒ 加列數軸視窗覆寫。"""
+    fb = _fb()
+    payload = fb._json_copy(fb.IC_PAGE_DEFAULT_PAYLOAD)
+    request = {"symbol": "BTCUSDT", "timeframe": str(timeframe), "config_hash": "icperf-t02-precheck",
+               "config_override": payload["config_override"], "feature_tiers": payload["feature_tiers"]}
+    override = fb._override_for(request) or {}
+    return with_row_windows(override) if row_windows else dict(override)
+
+
+def split_precheck(n_rows: int, timeframe: str, override: Optional[Mapping[str, Any]], *,
+                   symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    """秒級碼層預檢（不跑 IC）：`n_rows` 列、`timeframe` 之單標的 IC 頁請求（`override`）是否走樣本外切分。直接呼叫產品之
+    同一組函式（`ic_filter_orchestrator.py` analyze 之 :1505-1520 換算視窗、:1535-1576 `_build_holdout_split_plan`
+    〔min_test_rows、purge＝effective horizon〕、:1651-1654 `_precheck_rolling_warmup`〔`_rolling_warmup_min_rows`〕）；
+    時間軸＝`n_rows` 根連續等距之 DatetimeIndex（量測資料為連續之末 R 列，`_truncate_rows`）。labels 檔不預載（IC 頁
+    `labels_path=""`）⇒ horizon 取 `_resolve_effective_label_horizon(config, None)`。回 {"n_rows", "timeframe", "oos": bool,
+    "reason"（None｜insufficient_data｜rolling_warmup_insufficient｜split_disabled）, "train_rows", "test_rows",
+    "min_test_rows", "min_warmup_rows", "effective_horizon", "adjusted_windows", "icir_window"}。"""
+    import pandas as pd
+
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from momentum.Analysis import ic_filter_orchestrator as orch
+    from momentum.factories import create_ic_analyzer
+
+    ov = dict(override) if override else None
+    analyzer = create_ic_analyzer(ov)
+    config = analyzer._apply_tier_config(analyzer._apply_config_override(ov))
+    analyzer._ic_engine.set_timeframe(str(timeframe), reference_tf=config.ic_calculation.icir.reference_tf)
+    horizon = int(orch._resolve_effective_label_horizon(config, None))
+    adjusted = [int(w) for w in analyzer._ic_engine._adjust_rolling_windows(list(config.ic_calculation.rolling_windows))]
+    out: Dict[str, Any] = {"n_rows": int(n_rows), "timeframe": str(timeframe), "oos": False, "reason": None,
+                           "train_rows": None, "test_rows": None, "min_test_rows": int(config.min_test_rows),
+                           "min_warmup_rows": int(analyzer._rolling_warmup_min_rows(config, horizon)),
+                           "effective_horizon": horizon, "adjusted_windows": adjusted,
+                           "icir_window": int(config.ic_calculation.icir.window),
+                           "rolling_windows": [int(w) for w in config.ic_calculation.rolling_windows]}
+    if not config.ic_train_test_split:
+        out["reason"] = "split_disabled"
+        return out
+    freq = orch._resolve_expected_freq({"timeframe": str(timeframe)})
+    index = pd.date_range("2024-01-01", periods=int(n_rows), freq=freq)
+    features = pd.DataFrame(index=index)
+    split = orch._build_holdout_split_plan(features, config, symbol, freq, purge_gap=horizon, labels_df=None)
+    if isinstance(split, orch.SkippedResult):
+        out.update(reason="insufficient_data", **{k: (split.details or {}).get(k) for k in ("train_rows", "test_rows")})
+        return out
+    train_plan, test_plan = split
+    train_mask, test_mask = orch._derive_stage_masks(train_plan, test_plan, features.index)
+    ctx = {"train_mask": train_mask, "test_mask": test_mask, "effective_horizon": horizon}
+    pre = analyzer._precheck_rolling_warmup(features, config, ctx, None, event_conditional=False)
+    out.update(train_rows=int(train_mask.sum()), test_rows=int(test_mask.sum()))
+    if pre is not None:
+        out["reason"] = "rolling_warmup_insufficient"
+        return out
+    out["oos"] = True
+    return out
+
+
+def row_axis_precheck(scales: Sequence[int] = ROW_AXIS_SCALES) -> Dict[str, Any]:
+    """列數軸三種列長之預檢收據：L 格週期下，IC 頁預設請求（無覆寫）與列數軸請求（`ROW_AXIS_WINDOW_OVERRIDE`）逐列長之
+    `split_precheck`，並另驗 ic_page_long 之 cols 軸（L 格全長 `LONG_CELL_ROWS`、無覆寫）。`ok`＝列數軸每一列長與 cols 軸皆
+    走樣本外切分。"""
+    default = precheck_override(LONG_CELL_TIMEFRAME, row_windows=False)
+    rows_ov = precheck_override(LONG_CELL_TIMEFRAME, row_windows=True)
+    by_default = [split_precheck(n, LONG_CELL_TIMEFRAME, default) for n in scales]
+    by_rows = [split_precheck(n, LONG_CELL_TIMEFRAME, rows_ov) for n in scales]
+    cols = split_precheck(LONG_CELL_ROWS, LONG_CELL_TIMEFRAME, default)
+    return {"cell": LONG_CELL_ID, "timeframe": LONG_CELL_TIMEFRAME, "scales": [int(s) for s in scales],
+            "window_override": ROW_AXIS_WINDOW_OVERRIDE, "default_request": by_default, "row_axis_request": by_rows,
+            "cols_axis": cols, "ok": bool(cols["oos"] and all(r["oos"] for r in by_rows))}
+
+
 # ── 路徑與直接呼叫格之實作 ─────────────────────────────────────────────────────────────────────────────
+
+
+#: 以 L 格為資料源之路徑（cols 軸亦然）；其餘路徑之 rows 軸亦於 L 格（`RunContext.long`）
+LONG_RUNS = ("ic_page_long", "deep_analysis_long")
+#: 讀交接 h5 巢狀子集之路徑
+SUBSET_RUNS = ("ic_page_default", "ic_page_long", "deep_analysis", "deep_analysis_long")
 
 
 class RunContext:
@@ -739,11 +887,17 @@ class RunContext:
         self.out_root, self.work, self.rec, self.head = out_root, work, rec, head
         self.n_cols = int(scale) if axis == "cols" else ROW_AXIS_COLS
         self.n_rows: Optional[int] = int(scale) if axis == "rows" else None
+        #: v5.51 (a)：rows 軸與 L 格路徑之資料源＝L 格交接 h5
+        self.long = axis == "rows" or run_id in LONG_RUNS
 
     @property
     def stage_dir(self) -> Path:
-        tag = str(self.n_cols) if self.n_rows is None else f"{self.n_cols}_rows{self.n_rows}"
-        return self.out_root / "stage_inputs" / tag
+        return self.out_root / "stage_inputs" / self.stage_tag(self.n_rows)
+
+    def stage_tag(self, n_rows: Optional[int]) -> str:
+        if n_rows is None:
+            return f"L{self.n_cols}" if self.long else str(self.n_cols)
+        return f"L{self.n_cols}_rows{int(n_rows)}"
 
 
 def _truncate_rows(src_h5: Path, src_meta: Path, rows: int, out_dir: Path) -> Tuple[Path, Path]:
@@ -776,17 +930,24 @@ def _truncate_rows(src_h5: Path, src_meta: Path, rows: int, out_dir: Path) -> Tu
     return h5, meta
 
 
-def _subset_paths(ctx: RunContext) -> Tuple[Path, Path]:
-    """C 格交接 h5 之 N 欄巢狀子集（`<out-root>/subsets/<N>/`；不存在則以 `_write_stage5_subset` 建）；rows 軸另截末 R 列。"""
+def subset_source(long: bool) -> Path:
+    """巢狀子集之來源交接 h5：C 格（`icperf_freeze_baseline.c_handoff_path`）或 L 格（`l_handoff_path`；v5.51 (a)）。"""
     fb = _fb()
-    src = fb.c_handoff_path()
+    return fb.l_handoff_path() if long else fb.c_handoff_path()
+
+
+def _subset_paths(ctx: RunContext) -> Tuple[Path, Path]:
+    """交接 h5（C 格；rows 軸與 L 格路徑＝L 格，v5.51 (a)）之 N 欄巢狀子集（`<out-root>/subsets/<tag>/`；不存在則以
+    `_write_stage5_subset` 建）；rows 軸另截末 R 列。"""
+    fb = _fb()
+    src = subset_source(ctx.long)
     src_meta = src.with_name(src.stem + "_meta.json")
-    sub_dir = ctx.out_root / "subsets" / str(ctx.n_cols)
+    sub_dir = ctx.out_root / "subsets" / ctx.stage_tag(None)
     h5, meta = sub_dir / src.name, sub_dir / src_meta.name
     if not (h5.is_file() and meta.is_file()):
         h5, meta = fb._write_stage5_subset(src, src_meta, ctx.n_cols, fb.SEED, sub_dir)
     if ctx.n_rows is not None:
-        rdir = ctx.out_root / "subsets" / f"{ctx.n_cols}_rows{ctx.n_rows}"
+        rdir = ctx.out_root / "subsets" / ctx.stage_tag(ctx.n_rows)
         if not (rdir / h5.name).is_file():
             return _truncate_rows(h5, meta, ctx.n_rows, rdir)
         return rdir / h5.name, rdir / meta.name
@@ -820,6 +981,9 @@ def _ic_page_analyze_subset(ctx: RunContext, request: Mapping[str, Any]) -> Tupl
     fb = _fb()
     h5, meta = _subset_paths(ctx)
     override = fb._override_for(request)
+    if ctx.axis == "rows":
+        # v5.51 (a)：列數軸三種列長同一視窗覆寫（`ROW_AXIS_WINDOW_OVERRIDE`；三列長皆過 split_precheck）
+        override = with_row_windows(override)
     analyzer = create_ic_analyzer(override)
     report = analyzer.analyze(features_path=str(h5), labels_path="", meta_path=str(meta), config_override=override,
                               progress_callback=ctx.rec.progress,
@@ -827,16 +991,30 @@ def _ic_page_analyze_subset(ctx: RunContext, request: Mapping[str, Any]) -> Tupl
     return analyzer, report, h5
 
 
+def _page_request(ctx: RunContext, item: str) -> Dict[str, Any]:
+    """路徑之 IC 頁請求：L 格資料源（rows 軸、L 格路徑）⇒ `default_request(item, LONG_CELL)`，其餘 C／A 格預設。"""
+    fb = _fb()
+    return fb.default_request(item, fb.LONG_CELL) if ctx.long else fb.default_request(item)
+
+
+def _split_facts(report: Any) -> Dict[str, Any]:
+    """報告 metadata 之切分事實（`ic_train_test_split.applied`、train／test 列數；v5.51 (a) 實跑驗樣本外切分）。"""
+    md = (report or {}).get("metadata") or {} if isinstance(report, Mapping) else {}
+    sp = md.get("ic_train_test_split") or {}
+    return {"split_applied": sp.get("applied"), "split_train_rows": sp.get("train_rows"),
+            "split_test_rows": sp.get("test_rows")}
+
+
 def _run_ic_page_default(ctx: RunContext) -> Dict[str, Any]:
-    analyzer, report, h5 = _ic_page_analyze_subset(ctx, _fb().default_request("ic_report"))
-    return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), "requested_columns": None}
+    analyzer, report, h5 = _ic_page_analyze_subset(ctx, _page_request(ctx, "ic_report"))
+    return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), **_split_facts(report), "requested_columns": None}
 
 
 def _run_deep_analysis(ctx: RunContext) -> Dict[str, Any]:
     from api.models.ic_models import DeepAnalysisRequest
     from api.services.ic_analysis_service import ICAnalysisService
 
-    request = _fb().default_request("deep_analysis")
+    request = _page_request(ctx, "deep_analysis")
     analyzer, report, h5 = _ic_page_analyze_subset(ctx, request)
     svc = ICAnalysisService.__new__(ICAnalysisService)
     deep_request = DeepAnalysisRequest(**request["deep"])
@@ -845,8 +1023,8 @@ def _run_deep_analysis(ctx: RunContext) -> Dict[str, Any]:
                                               top_n=deep_request.top_n)
     deep_report = analyzer.run_deep_analysis(selected, deep_override, ctx.rec.progress, None)
     svc._attach_cross_symbol_context(svc._serialize_deep_report(deep_report), analyzer)
-    return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), "deep_selected": len(selected or []),
-            "requested_columns": None}
+    return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), **_split_facts(report),
+            "deep_selected": len(selected or []), "requested_columns": None}
 
 
 def _service_with_tasks(request: Mapping[str, Any], registry: Path) -> Any:
@@ -975,21 +1153,97 @@ def _run_cross_sectional(ctx: RunContext) -> Dict[str, Any]:
 
 
 def _run_icfirst_post_generation(ctx: RunContext) -> Dict[str, Any]:
-    """SPEC v5.50 (c)：施工時先驗 `_run_ic_first_post_generation` 所需 ctx／lease 可否由既有 L7 raw run 建立——不可：
-    ① `complete_context` 要求生成結果 metadata 之 `output_window` 含 `OUTPUT_WINDOW_KEYS` 五鍵（output_start／output_end／
-    ingest_start／max_warmup_bars／warmup_enabled；`momentum/FeatureEngineering/ic_first_context.py:26`、`:83-95`），既有 run 之
-    manifest `generation_metadata` 無 `output_window`（C 格 `data_cache/icperf_inputs/C_BTCUSDT_1h/baseline__default/.../
-    feature_manifest.json` 與 A 格 IC-first run 皆然，jq 實查），NUMVIEW sidecar `numview_cell.json` 之 `output_window` 只有
-    [start, end] 兩值；② 規模軸 input_cols 須 500／1000／2000 欄之 raw run，既有 IC-first run（A 格 3,193 欄）只有一種欄數，
-    以欄子集另建 raw run 須改寫 manifest 之 content_sha256／numeric_fingerprint 等身分欄——不在本票可證正確之範圍。
-    ⇒ 依 SPEC 列為阻擋並回報，不以他物代替。"""
-    raise HarnessError("icfirst_post_generation 阻擋：既有 L7 raw run 無法建立 ctx（output_window 缺 ingest_start／"
-                       "max_warmup_bars／warmup_enabled，ic_first_context.py:26、:83-95）且無 500／1000／2000 欄之 raw run"
-                       "（見 scripts/icperf_scale_harness.py _run_icfirst_post_generation）")
+    """SPEC v5.51 (c)：以 `icperf_freeze_baseline.gen-icfirst-raw` 之 A 格 raw run 與其生成結果 metadata（含 `output_window`
+    五鍵、config_hash；`icfirst_raw_record`）重建 IC-first ctx（`ic_first_context.begin_context`＋`complete_context`，同
+    `run_ic_first` :2844-2848、:2879），於本次工作目錄之 run 複本（post-generation 會寫 processed／ic_selected，不寫回持久根）
+    呼叫 `FeatureFactory._run_ic_first_post_generation`（判準檔 A 格 generation 之 ic_engine_config、ic_threshold、
+    label_horizon、cleanup_raw）。
+
+    規模：raw run 只有一種欄數（`feature_count`）。以欄子集建 500／1000／2000 欄輸入須先證子集後之 manifest 身分
+    （`artifacts.raw.groups`／`total_features`／`content_sha256`／`numeric_fingerprint`；群組為整檔 parquet，逐欄子集須重寫
+    群組檔）——可行路徑＝經產品寫出端 `FeatureStorage.write_raw`（`feature_storage.py:705`，身分由產品計算）重寫子集，未施工、
+    未實跑驗證 ⇒ `scale` ≠ `feature_count` 一律 HarnessError（不以他物代替）；`scale`＝`feature_count` 之實跑供「post-generation
+    可讀、ctx 可建」之驗證（SPEC v5.51 (c) 第一步）。"""
+    import shutil
+
+    import pandas as pd
+
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering import ic_first_context as icc
+    from momentum.FeatureEngineering.feature_factory import FeatureGenerationResult
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    fb = _fb()
+    try:
+        rec = fb.icfirst_raw_record()
+    except fb.FreezeError as exc:
+        raise HarnessError(f"icfirst_post_generation：{exc}") from exc
+    n_raw = int(rec["feature_count"])
+    if ctx.n_cols != n_raw:
+        raise HarnessError(f"icfirst_post_generation：raw run 只有 {n_raw} 欄一種規模；{ctx.n_cols} 欄之子集須經產品寫出端重寫並"
+                           "先證 manifest 身分（SPEC v5.51 (c)；未施工）——不以他物代替")
+    nfb = _load_script("icperf_t02_numview_freeze_baseline", "scripts/numview_freeze_baseline.py")
+    gen_def = rec["generation"]
+    label_horizon = str(gen_def["label_horizon"])
+    # 寫入隔離同 `_child_ic_first`（`_isolated`：設定檔連結、registry、CGSA、cwd、tempdir、d* 快取導向本次工作目錄）
+    with nfb._isolated(ctx.work / "icfirst", {}) as froot:
+        src_run = Path(rec["features_root"]) / rec["symbol"] / rec["timeframe"] / rec["config_hash"]
+        shutil.copytree(src_run, Path(froot) / rec["symbol"] / rec["timeframe"] / rec["config_hash"], symlinks=True)
+        factory = create_feature_factory(cache_dir=str(rec["kline_cache_dir"]),
+                                         validate_continuity=bool(rec["validate_continuity"]))
+        factory._storage = FeatureStorage(str(froot))
+        config = factory._resolve_config(rec["payload"])
+        partial = icc.begin_context(symbol=rec["symbol"], timeframe=rec["timeframe"], training=rec["training"],
+                                    start=rec["start"], end=rec["end"], selection_window=None, split_id=None,
+                                    label_spec={"kind": "close_forward_return", "horizon": label_horizon})
+        full = icc.complete_context(partial, rec["generation_metadata"])
+        generation = FeatureGenerationResult(
+            features_df=pd.DataFrame(index=pd.DatetimeIndex(rec["features_index"])), labels_df=pd.DataFrame(),
+            metadata=dict(rec["generation_metadata"]), feature_count=n_raw, generation_time=0.0, layer_counts={},
+            config_used={}, compute_warnings=list(rec.get("compute_warnings") or []))
+        out = factory._run_ic_first_post_generation(
+            full, config, generation, label=None, ic_engine=ICEngine(dict(gen_def["ic_engine_config"])),
+            feature_reader=FeatureReader(str(froot)), storage=factory._storage, ic_threshold=gen_def["ic_threshold"],
+            allow_partial_ic=False, label_horizon=label_horizon, cleanup_raw=False, compute_warnings=[],
+            start=time.time(), persist=True)
+    selected = int((out.metadata or {}).get("selected_count") or 0)
+    return {"input_cols": n_raw, "rows": len(rec["features_index"]), "survivors": selected,
+            "requested_columns": None, "raw_record": _rel(Path(fb.REPO) / fb.ICFIRST_RAW_ROOT / fb.ICFIRST_RAW_RECORD),
+            "ctx_complete": bool(full.complete)}
+
+
+def _tail_rows(v: Any, n_src: int, rows: int) -> Any:
+    """存檔參數之末 `rows` 列：首維＝來源列數 `n_src` 之 DataFrame／Series／ndarray 取末 `rows` 列，其餘原樣。"""
+    shape = getattr(v, "shape", None)
+    if not shape or int(shape[0]) != int(n_src):
+        return v
+    return v.iloc[-rows:] if hasattr(v, "iloc") else v[-rows:]
+
+
+def cell_capture(ctx: RunContext, name: str) -> Dict[str, Any]:
+    """直接呼叫格之存檔真實輸入：cols 軸＝C 格 `stage_inputs/<N>/`；rows 軸＝L 格 `stage_inputs/L<cols>_rows<R>/`（由
+    ic_page_long rows 軸寫出）。`CELL_ROW_SCALES` 所列之格（短序列分支）之 rows 軸＝最小列長之 L 格存檔取末 R 列（R ≤ 該存檔
+    列數，否則 HarnessError）。"""
+    if ctx.axis != "rows" or ctx.run_id not in CELL_ROW_SCALES:
+        return load_capture(ctx.stage_dir, name)
+    base = ctx.out_root / "stage_inputs" / ctx.stage_tag(ROW_AXIS_SCALES[0])
+    cap = load_capture(base, name)
+    frames = [a for a in list(cap["args"]) + list(cap["kwargs"].values()) if hasattr(a, "shape") and len(a.shape) >= 1]
+    if not frames:
+        raise HarnessError(f"{ctx.run_id}：存檔 {name} 無列軸參數，無法取末 {ctx.n_rows} 列")
+    n_src = int(frames[0].shape[0])
+    if int(ctx.n_rows or 0) > n_src:
+        raise HarnessError(f"{ctx.run_id}：rows {ctx.n_rows} > 存檔列數 {n_src}（資料不足）")
+    rows = int(ctx.n_rows or 0)
+    return {**cap, "args": tuple(_tail_rows(a, n_src, rows) for a in cap["args"]),
+            "kwargs": {k: _tail_rows(v, n_src, rows) for k, v in cap["kwargs"].items()},
+            "provenance": {**dict(cap.get("provenance") or {}), "tail_rows": rows, "source_rows": n_src}}
 
 
 def _engine_cell(ctx: RunContext, name: str, method_name: str, **override: Any) -> Any:
-    cap = load_capture(ctx.stage_dir, name)
+    cap = cell_capture(ctx, name)
     obj = cap["self"]
     return _bind_call(getattr(type(obj), method_name), obj, cap, **override), cap
 
@@ -1016,8 +1270,8 @@ def _cell_redundancy(method: str) -> Callable[[RunContext], Dict[str, Any]]:
 
 
 def _cell_diversification(ctx: RunContext) -> Dict[str, Any]:
-    cap = load_capture(ctx.stage_dir, "redundancy_filter")
-    meta_cap = load_capture(ctx.stage_dir, "diversification_metrics")
+    cap = cell_capture(ctx, "redundancy_filter")
+    meta_cap = cell_capture(ctx, "diversification_metrics")
     rf = copy.deepcopy(cap["self"])
     rf._div_enabled = True
     sig = inspect.signature(type(rf).filter)
@@ -1032,7 +1286,7 @@ def _cell_diversification(ctx: RunContext) -> Dict[str, Any]:
 
 
 def _cell_kmeans(ctx: RunContext) -> Dict[str, Any]:
-    cap = load_capture(ctx.stage_dir, "grouped_ic")
+    cap = cell_capture(ctx, "grouped_ic")
     eng = cap["self"]
     sig = inspect.signature(type(eng).compute_grouped_ic)
     ba = sig.bind(eng, *cap["args"], **cap["kwargs"])
@@ -1044,7 +1298,7 @@ def _cell_kmeans(ctx: RunContext) -> Dict[str, Any]:
 
 def _cell_preprocess(fit_mode: str, winsor_method: Optional[str] = None) -> Callable[[RunContext], Dict[str, Any]]:
     def run(ctx: RunContext) -> Dict[str, Any]:
-        cap = load_capture(ctx.stage_dir, "preprocess")
+        cap = cell_capture(ctx, "preprocess")
         dp = copy.deepcopy(cap["self"])
         if winsor_method is not None:
             w = (dp._config or {}).get("winsorization")
@@ -1060,7 +1314,7 @@ def _cell_preprocess(fit_mode: str, winsor_method: Optional[str] = None) -> Call
 
 
 def _cell_standardize(ctx: RunContext) -> Dict[str, Any]:
-    cap = load_capture(ctx.stage_dir, "preprocess")
+    cap = cell_capture(ctx, "preprocess")
     res = cap.get("result")
     df = res[0] if isinstance(res, tuple) else res
     if df is None or not hasattr(df, "shape"):
@@ -1073,7 +1327,7 @@ def _cell_standardize(ctx: RunContext) -> Dict[str, Any]:
 def _cell_vectorized(ctx: RunContext) -> Dict[str, Any]:
     import numpy as np
 
-    cap = load_capture(ctx.stage_dir, "compute_ic")
+    cap = cell_capture(ctx, "compute_ic")
     eng = cap["self"]
     ba = inspect.signature(type(eng).compute_ic).bind(eng, *cap["args"], **cap["kwargs"])
     features, label = ba.arguments["features_df"], ba.arguments["label"]
@@ -1092,7 +1346,9 @@ def _cell_vectorized(ctx: RunContext) -> Dict[str, Any]:
 
 RUNNERS: Dict[str, Callable[[RunContext], Dict[str, Any]]] = {
     "ic_page_default": _run_ic_page_default,
+    "ic_page_long": _run_ic_page_default,
     "deep_analysis": _run_deep_analysis,
+    "deep_analysis_long": _run_deep_analysis,
     "post_ic_transform": _run_post_ic_transform,
     "event_import": _run_event_import,
     "event_study": _run_event_study,
@@ -1184,10 +1440,11 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
     rec = Recorder(keyed=keyed, context=f"{run_id}|{axis}|{scale}")
     ctx = RunContext(run_id, axis, scale, root, work, rec, head)
     stage_dir: Optional[Path] = None
-    if run_id == "ic_page_default":
+    if (run_id, axis) in CAPTURE_RUNS:
         stage_dir = ctx.stage_dir
         stage_input_card(root / "stage_inputs")
-        prov = {"path_run_id": path_run_id, "head": head, "axis": axis, "scale": int(scale)}
+        prov = {"path_run_id": path_run_id, "head": head, "axis": axis, "scale": int(scale), "run_id": run_id,
+                "source": "L" if ctx.long else "C"}
         rec.captures = {eid: _capture_writer(stage_dir, name, with_result, prov)
                         for eid, (name, with_result) in CAPTURES.items()}
     os.chdir(cwd)
@@ -1204,6 +1461,9 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
     ru = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     record = {"schema": RECORD_SCHEMA, "path_run_id": path_run_id, "run_id": run_id,
               "kind": "path" if run_id in PATHS else "cell", "axis": axis, "scale": int(scale),
+              # 交接 h5 子集之來源格（IC 頁／深度分析路徑與直接呼叫格；其餘路徑讀各自之 run，見 facts）
+              "handoff_source": (LONG_CELL_ID if ctx.long else "C") if run_id in SUBSET_RUNS or run_id in CELLS else None,
+              "row_window_override": ROW_AXIS_WINDOW_OVERRIDE if axis == "rows" and run_id in PATHS else None,
               "argv": list(sys.argv[1:] if argv is None else argv), "head": head,
               "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(started_wall)),
               "wall_seconds": wall, "harness_overhead_seconds": rec.overhead_seconds,
@@ -1217,7 +1477,9 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
         out_dir = REPO / out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"{path_run_id}.json"
-    out.write_text(json.dumps(record, ensure_ascii=False, allow_nan=True, default=str), encoding="utf-8")
+    # SPEC v5.51 (i)：收據引用之紀錄入版控、不覆寫（同名已存在 ⇒ FileExistsError，不改寫既有紀錄）
+    with open(out, "x", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, ensure_ascii=False, allow_nan=True, default=str))
     binding.restore()
     print(f"[icperf-t02] 已寫 {_rel(out)}（{sum(1 for v in record['entries'].values() if v['calls'])} 入口有呼叫）", flush=True)
     return out
@@ -1272,6 +1534,47 @@ def _superlinear_by_code(function: str) -> bool:
     return bool(re.search(r"\^|log|survivor_pairs", f))
 
 
+#: 碼層下限之單次掃描形式：unit_axis.function 之首項（「（」前）只含規模軸之乘積（無次方、對數、窗長等額外因子）
+_SINGLE_PASS_RE = re.compile(r"^\s*[A-Za-z_]+(\s*\*\s*[A-Za-z_]+)*\s*$")
+#: 規模軸之字面（清冊 unit_axis.function 所用；W、B、L、P 等窗長／重抽樣次數非規模軸）
+_SCALE_TOKENS = {"rows", "input_cols", "stage_cols", "survivors", "events", "n_events", "symbols", "n_symbols", "timestamps"}
+CRITERION2_STATUSES = ("decided", "pending_prototype")
+
+
+def criterion2_order_gap(function: str) -> str:
+    """碼層：現行複雜度（清冊 unit_axis.function 之首項）相對單次掃描下限之階數差——"same_order"（各規模軸之積，與下限
+    同階，差距只可能為常數倍）或 "superlinear"（含次方、對數、窗長／重抽樣等額外因子）。只作 Phase 1 原型之優先序，不作
+    判準②之 10 倍實證（SPEC v5.51 (f)）。"""
+    head = str(function).split("（")[0]
+    tokens = set(re.findall(r"[A-Za-z_]+", head))
+    single = bool(_SINGLE_PASS_RE.match(head)) and not _superlinear_by_code(head) and tokens <= _SCALE_TOKENS
+    return "same_order" if single else "superlinear"
+
+
+def criterion2(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    """判準②（單位成本 ≥ 可達下限 × 10；SPEC Task 0.2 :104、v5.51 (f)）：
+    ① 有原型下限（`lower_bound_seconds_per_unit` > 0）⇒ 數值比 `unit_seconds ≥ 10 × 下限`（basis prototype_lower_bound）；
+    ② 無原型而實測每單位秒數 < 10 × `CRITERION2_FLOOR_SECONDS_PER_UNIT`（任何實作之每單位秒數皆 ≥ 此硬體下限）⇒ 必未達
+    「下限 × 10」⇒ False（basis hardware_floor，可碼層斷定）；③ 其餘無原型者 ⇒ result None、status pending_prototype（碼層
+    分析不足以斷定是否 ≥ 10 倍——漸近階數不作 10 倍實證；列 Phase 1 原型補量），evidence 附現行複雜度、碼層下限與階數差。
+    不得固定 False。"""
+    lb = entry.get("lower_bound_seconds_per_unit")
+    us = entry.get("unit_seconds")
+    func = str((entry.get("unit_axis") or {}).get("function") or "")
+    ev = {"unit_seconds": us, "units": entry.get("units"), "lower_bound": lb, "function": func,
+          "lower_bound_analysis": entry.get("lower_bound_analysis"), "order_gap": criterion2_order_gap(func)}
+    if isinstance(lb, (int, float)) and lb > 0 and isinstance(us, (int, float)):
+        return {"result": bool(us >= 10 * lb), "status": "decided", "basis": "prototype_lower_bound", "evidence": ev}
+    if isinstance(us, (int, float)) and us < 10 * CRITERION2_FLOOR_SECONDS_PER_UNIT:
+        return {"result": False, "status": "decided",
+                "basis": f"hardware_floor（實測每單位 {us:.3g} 秒 < 10 × 硬體下限 {CRITERION2_FLOOR_SECONDS_PER_UNIT:g} 秒）",
+                "evidence": {**ev, "floor_seconds_per_unit": CRITERION2_FLOOR_SECONDS_PER_UNIT}}
+    return {"result": None, "status": "pending_prototype",
+            "basis": "pending_prototype（無原型；碼層分析不足以斷定單位成本是否 ≥ 下限 × 10——漸近階數不作 10 倍實證；"
+                     "列 Phase 1 以向量化／numba 小原型同資料同規模實測補量）",
+            "evidence": ev}
+
+
 def evaluate_criteria(entry: Mapping[str, Any], scale_probe: Any) -> Dict[str, Dict[str, Any]]:
     """判準①–⑤（SPEC Task 0.2 固定規則；①門檻引 scale_probe 之 SUPERLINEAR_EXPONENT／MIN_R2）：`entry` 為組裝中之量測
     記錄（fit、extrapolation_unreliable、unit_axis、complexity_analysis、lower_bound_*、evidence）。回
@@ -1286,13 +1589,7 @@ def evaluate_criteria(entry: Mapping[str, Any], scale_probe: Any) -> Dict[str, D
     else:
         out["1"] = {"result": bool(fit["exponent"] > scale_probe.SUPERLINEAR_EXPONENT), "basis": "power_fit",
                     "evidence": {"exponent": fit["exponent"], "r2": r2}}
-    lb = entry.get("lower_bound_seconds_per_unit")
-    if isinstance(lb, (int, float)) and lb > 0 and entry.get("unit_seconds") is not None:
-        out["2"] = {"result": bool(entry["unit_seconds"] >= 10 * lb), "basis": "prototype_lower_bound",
-                    "evidence": {"unit_seconds": entry["unit_seconds"], "lower_bound": lb}}
-    else:
-        out["2"] = {"result": False, "basis": "lower_bound_analysis（未建原型：數值判定待 Phase 1 原型實測，本收據不判超標）",
-                    "evidence": entry.get("lower_bound_analysis")}
+    out["2"] = criterion2(entry)
     keys = ev.get("keys")
     if keys is None:
         out["3"] = {"result": False, "basis": "非 PIT／逐欄入口：不記輸入鍵（清冊 loop 非 per_bar／per_column）", "evidence": None}
@@ -1317,10 +1614,15 @@ def _opportunities(eid: str, crit: Mapping[str, Mapping[str, Any]], points: Sequ
     """四項機會欄：time＝任一判準成立 ⇒ planned（依據＝成立之判準），否則 none（依據＝各判準不成立之實測）；memory＝峰值
     footprint 逾 RAM×0.5 ⇒ planned，否則 none（依據＝實測峰值）；precision／file_size＝planned（SPEC :104 各段改後四項並列比較，
     改前盤點不改值，依據為該規定）。"""
-    hit = [k for k, c in crit.items() if c["result"]]
+    hit = [k for k, c in crit.items() if c["result"] is True]
+    pending = [k for k, c in crit.items() if c.get("status") == "pending_prototype"]
     blank = {"before": None, "after": None, "downstream": None, "user_ruling": None}
-    time_o = ({"status": "planned", "evidence": f"判準 {'、'.join(hit)} 成立（見 criteria）", **blank} if hit else
-              {"status": "none", "evidence": "判準①–⑤ 皆不成立（見 criteria 之 evidence）", **blank})
+    if hit or pending:
+        why = "；".join(x for x in (f"判準 {'、'.join(hit)} 成立" if hit else "",
+                                    f"判準 {'、'.join(pending)} 待 Phase 1 原型補量（v5.51 (f)）" if pending else "") if x)
+        time_o = {"status": "planned", "evidence": f"{why}（見 criteria）", **blank}
+    else:
+        time_o = {"status": "none", "evidence": "判準①–⑤ 皆不成立（見 criteria 之 evidence）", **blank}
     fps = [int(p["peak_footprint_bytes"]) for p in points if isinstance(p.get("peak_footprint_bytes"), int)]
     over = bool(ram_bytes and fps and max(fps) > ram_bytes * 0.5)
     mem_o = {"status": "planned" if over else "none",
@@ -1340,10 +1642,37 @@ def projected_2000_seconds(points: Sequence[Mapping[str, Any]]) -> float:
     return max(linear, power)
 
 
-def fit_points(points: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
-    """逐入口擬合之輸入：x＝實際進段欄數 stage_cols（SPEC Task 0.2：擬合與單位成本以實際進段欄數為準）、秒數、路徑級峰值 RSS。"""
-    return [{"scale": p["stage_cols"], "unit": "cols", "seconds": p["seconds"], "peak_rss_bytes": p["peak_rss_bytes"]}
+#: 各軸點之 x 鍵（收據點之欄名）與擬合之 x（cols 軸以實際進段欄數 stage_cols 為準，SPEC Task 0.2）
+AXIS_X_KEY = {"cols": "input_cols", "rows": "rows", "events": "events"}
+AXIS_FIT_KEY = {"cols": "stage_cols", "rows": "rows", "events": "events"}
+
+
+def fit_points(points: Sequence[Mapping[str, Any]], axis: str = "cols") -> List[Dict[str, Any]]:
+    """逐入口擬合之輸入：x＝`AXIS_FIT_KEY[axis]`（cols 軸＝實際進段欄數 stage_cols；events 軸＝事件數，v5.51 (d)；rows
+    軸＝列數）、秒數、路徑級峰值 RSS。"""
+    key = AXIS_FIT_KEY[axis]
+    return [{"scale": p[key], "unit": axis, "seconds": p["seconds"], "peak_rss_bytes": p["peak_rss_bytes"]}
             for p in points]
+
+
+def unit_cost(e: Mapping[str, Any], points: Sequence[Mapping[str, Any]], axis: str) -> Tuple[Optional[float], Optional[int]]:
+    """每單位秒數（判準②；SPEC :104「每欄（或每格）秒數」）：取主軸最大點，單位數＝清冊 unit_axis.axes 於該點 scale_vector
+    之值之積（缺或 0 之軸以 1 計）；無點或秒數非有限 ⇒ (None, None)。"""
+    if not points:
+        return None, None
+    p = max(points, key=lambda q: q[AXIS_X_KEY[axis]])
+    units = 1
+    for a in (e.get("unit_axis") or {}).get("axes") or []:
+        v = (p.get("scale_vector") or {}).get(a)
+        units *= int(v) if isinstance(v, int) and v > 0 else 1
+    sec = float(p["seconds"])
+    return (sec / units if units > 0 and sec == sec else None), units
+
+
+def total_projected_seconds(runs: Mapping[Tuple[str, str], Mapping[str, Any]]) -> float:
+    """收據頂層合計推估（SPEC v5.51 (g)）：全部路徑實跑之 scale_probe 收據逐點 seconds × runs 之和（量測全程之牆鐘秒）。"""
+    return float(sum(float(q.get("seconds") or 0.0) * max(int(q.get("runs") or 1), 1)
+                     for run in runs.values() for q in (run.get("receipt") or {}).get("points") or []))
 
 
 def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], axis: str,
@@ -1360,6 +1689,11 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
         problems.append(f"{eid}：{chosen.get('path_run_id')} 呼叫次數 0（包裝未生效或入口不在該路徑；不得以 0 呼叫充作量測）")
         return None
     facts = chosen.get("facts") or {}
+    if (axis == "rows" or chosen.get("run_id") in LONG_RUNS) and "split_applied" in facts \
+            and facts["split_applied"] is not True:
+        # v5.51 (a)：L 格之 IC 頁／深度分析實跑須走樣本外切分（預檢之實跑對證；退回全樣本即非所量之分支）
+        problems.append(f"{eid}：{chosen.get('path_run_id')} 未走樣本外切分（split_applied={facts['split_applied']!r}）")
+        return None
     input_cols = scale if axis == "cols" else int(facts.get("input_cols") or 0)
     stage_cols, source = _stage_cols(e, er, facts, input_cols)
     try:
@@ -1367,20 +1701,30 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
     except KeyError as exc:
         problems.append(str(exc.args[0]))
         return None
-    fps = [r.get("peak_footprint_bytes") for r in recs]
-    if not all(isinstance(v, int) and v > 0 for v in fps):
-        problems.append(f"{eid}：{chosen.get('path_run_id')} 等實跑缺 Physical footprint")
+    # SPEC v5.51 (h)：Physical footprint 取自同 path_run_id 之 harness 紀錄（受測行程結束前 `sample <pid>`）；行程樹峰值 RSS
+    # 取自 scale_probe 收據該點
+    fp = chosen.get("peak_footprint_bytes")
+    if not (isinstance(fp, int) and fp > 0):
+        problems.append(f"{eid}：{chosen.get('path_run_id')} 之紀錄缺 Physical footprint")
         return None
     p: Dict[str, Any] = {"input_cols": input_cols, "stage_cols": stage_cols, "stage_cols_source": source,
                          "seconds": float(er["seconds"]), "calls": int(er["calls"]),
-                         "peak_rss_bytes": int(q["peak_rss_bytes"]), "peak_footprint_bytes": max(int(v) for v in fps),
+                         "peak_rss_bytes": int(q["peak_rss_bytes"]), "peak_footprint_bytes": int(fp),
+                         "rss_source": f"scale_probe:{run['receipt_path']}",
+                         "footprint_source": f"harness_record:{chosen['path_run_id']}",
                          "entry_peak_rss_bytes": er.get("peak_rss_bytes"), "scale_vector": sv,
                          "scale_probe_receipt": run["receipt_path"], "path_run_id": chosen["path_run_id"],
                          "path_run_ids": sorted(str(r["path_run_id"]) for r in recs),
-                         "record_path": chosen.get("_record_path")}
+                         "record_path": chosen.get("_record_path"),
+                         # SPEC v5.51 (i)：紀錄之來源與大小（`_task02_records` 讀檔時記；合成記錄無檔 ⇒ None）
+                         "record_bytes": chosen.get("_record_bytes"), "record_sha256": chosen.get("_record_sha256")}
     if axis == "rows":
         p["rows"] = scale
         p["scale_vector"] = {**sv, **({"rows": scale} if "rows" in sv else {})}
+    if axis == "events":
+        # SPEC v5.51 (d)：事件數軸之點以事件數為 x（不要求欄數軸）
+        p["events"] = scale
+        p["scale_vector"] = {**sv, **({"events": scale} if "events" in sv else {})}
     return p
 
 
@@ -1420,58 +1764,83 @@ def _evidence(e: Mapping[str, Any], chosen: Sequence[Mapping[str, Any]], all_rec
 def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str, str], Mapping[str, Any]], *,
                            head: str, scale_probe: Any, budget_seconds: float, sample_interval_seconds: float,
                            chunk_cap: Mapping[str, Any], ram_bytes: Optional[int] = None,
-                           two_point_seconds: float = 600.0) -> Dict[str, Any]:
-    """組 `<日期>-icperf-scale-before.json`（SPEC Task 0.2 v5.50 (e)）。`runs`＝{(run_id, axis): {"probe": {"cmd", "data",
-    "config"}, "receipt_path": <repo 相對>, "receipt": <scale_probe 收據>, "records": {scale: [逐入口記錄（含
-    `_record_path`）...]}}}。每一 measure=true 入口依 `branch_cell` 取其 cols 軸實跑（rows 軸存在者另組 row_points）：每點
-    seconds＝同 path_run_id（多次實跑取牆鐘中位數者）之逐入口秒數、peak_rss_bytes＝scale_probe 該點、footprint＝該點各次實跑
-    之最大者；fit＝`scale_probe.fit(fit_points(points), full)` 重算。任一問題（漏量、呼叫 0、缺軸、缺 footprint）⇒
-    AssemblyError（逐條）。500／1000 推估 2000 欄逾 `two_point_seconds` ⇒ two_point_exception（boundary_19 現行契約），
-    2,000 欄實測點移至 `excluded_points`（不刪資料）。"""
+                           two_point_seconds: float = 600.0, require_rows: bool = False,
+                           records_root: Optional[str] = None) -> Dict[str, Any]:
+    """組 `<日期>-icperf-scale-before.json`（SPEC Task 0.2 v5.50 (e)、v5.51 (d)(f)(g)(h)(i)）。`runs`＝{(run_id, axis):
+    {"probe": {"cmd", "data", "config"}, "receipt_path": <repo 相對>, "receipt": <scale_probe 收據>, "records": {scale:
+    [逐入口記錄（含 `_record_path`／`_record_bytes`／`_record_sha256`）...]}}}。每一 measure=true 入口依 `branch_cell` 取其
+    主軸實跑（`primary_axis`：event_study＝events 軸，其餘 cols 軸），清冊 input_axes 含 rows 者另取 `ROW_AXIS_RUN[cell]` 之
+    rows 軸實跑組 row_points（L 格，v5.51 (a)；`require_rows` 而缺 ⇒ 問題）：每點 seconds＝同 path_run_id（多次實跑取牆鐘
+    中位數者）之逐入口秒數、peak_rss_bytes＝scale_probe 該點、footprint＝同 path_run_id 之 harness 紀錄（v5.51 (h)）；
+    fit＝`scale_probe.fit(fit_points(points, 主軸), full)` 重算。任一問題（漏量、呼叫 0、缺軸、缺 footprint）⇒
+    AssemblyError（逐條）。兩點例外（v5.51 (g)）：只在頂層合計推估 `total_projected_seconds(runs)` 逾 `budget_seconds` 時，
+    cols 軸 500／1000 推估 2000 欄逾 `two_point_seconds` 之入口方收兩點（2,000 欄實測點移 `excluded_points`，不刪資料）；
+    未逾預算者三點皆收。判準②依 `criterion2`（v5.51 (f)），待判者列頂層 `pending_prototype`。"""
     problems: List[str] = []
     all_records = [r for run in runs.values() for recs in (run.get("records") or {}).values() for r in recs]
+    total = total_projected_seconds(runs)
+    budget_exceeded = bool(total > float(budget_seconds))
     entries: Dict[str, Any] = {}
     for e in inventory.get("entries") or []:
         if not e.get("measure"):
             continue
         eid, cell = e["id"], e.get("branch_cell")
-        run = runs.get((cell, "cols")) if cell else None
+        axis = primary_axis(cell) if cell else "cols"
+        run = runs.get((cell, axis)) if cell else None
         if run is None:
-            problems.append(f"{eid}：所屬格 {cell!r} 無 cols 軸量測")
+            problems.append(f"{eid}：所屬格 {cell!r} 無 {axis} 軸量測")
             continue
         pts = [p for q in sorted(run["receipt"]["points"], key=lambda q: int(q["scale"]))
-               if (p := _point(e, q, run, "cols", problems)) is not None]
+               if (p := _point(e, q, run, axis, problems)) is not None]
         if len(pts) != len(run["receipt"]["points"]):
             continue
-        row_run = runs.get((cell, "rows"))
+        row_run = None
         row_pts = None
+        if "rows" in (e.get("input_axes") or []):
+            row_run = runs.get((ROW_AXIS_RUN.get(cell, ""), "rows"))
+            if row_run is None and require_rows:
+                problems.append(f"{eid}：清冊 input_axes 含 rows，所屬格 {cell!r} 無 rows 軸實跑"
+                                f"（ROW_AXIS_RUN 對應 {ROW_AXIS_RUN.get(cell)!r}）")
         if row_run is not None:
             row_pts = [p for q in sorted(row_run["receipt"]["points"], key=lambda q: int(q["scale"]))
                        if (p := _point(e, q, row_run, "rows", problems)) is not None]
         chosen = [r for run_ in (run, row_run) if run_ for recs in run_["records"].values() for r in [median_record(recs)]]
-        full = float((run["receipt"].get("projection") or {}).get("scale") or max(p["input_cols"] for p in pts))
+        full = float((run["receipt"].get("projection") or {}).get("scale")
+                     or max(p[AXIS_X_KEY[axis]] for p in pts))
         m: Dict[str, Any] = {"coverage_path_id": e["coverage_path_id"], "unit_axis": e["unit_axis"],
-                             "branch_cell": cell, "path": cell, "probe": run["probe"],
-                             "row_probe": row_run["probe"] if row_run else None}
+                             "branch_cell": cell, "path": cell, "axis": axis, "probe": run["probe"],
+                             "row_probe": row_run["probe"] if row_run else None,
+                             "row_path": ROW_AXIS_RUN.get(cell) if row_run else None}
         excluded = []
         two_point = None
-        if {500, 1000} <= {p["input_cols"] for p in pts}:
+        if axis == "cols" and budget_exceeded and {500, 1000} <= {p["input_cols"] for p in pts}:
             proj = projected_2000_seconds(pts)
             if proj > two_point_seconds:
-                two_point = {"projected_2000_seconds": proj,
-                             "note": "boundary_19 現行契約：500／1000 兩點推估 2000 欄逾 10 分鐘 ⇒ 只收兩點"}
+                two_point = {"projected_2000_seconds": proj, "total_projected_seconds": total,
+                             "budget_seconds": float(budget_seconds),
+                             "note": "SPEC v5.51 (g)：收據合計推估逾 budget_seconds，且 500／1000 兩點推估 2000 欄逾 10 分鐘 "
+                                     "⇒ 只收兩點"}
                 excluded = [p for p in pts if p["input_cols"] == 2000]
                 pts = [p for p in pts if p["input_cols"] != 2000]
-        fit = scale_probe.fit(fit_points(pts), full)
+        fit = scale_probe.fit(fit_points(pts, axis), full)
+        row_fit = None
+        if row_pts and len(row_pts) >= 2:
+            rf = scale_probe.fit(fit_points(row_pts, "rows"), float(max(p["rows"] for p in row_pts)))
+            row_fit = {"exponent": rf["fit"]["exponent"], "r2": rf["fit"]["r2"],
+                       "extrapolation_unreliable": rf["extrapolation_unreliable"]}
         func = str(e["unit_axis"]["function"])
+        unit_seconds, units = unit_cost(e, pts, axis)
         m.update({"points": pts, "row_points": row_pts, "excluded_points": excluded, "two_point_exception": two_point,
+                  "fit_axis": AXIS_FIT_KEY[axis],
                   "fit": {"exponent": fit["fit"]["exponent"], "r2": fit["fit"]["r2"]}, "fit_full_scale": full,
                   "fit_reasons": fit["reasons"], "extrapolation_unreliable": fit["extrapolation_unreliable"],
+                  "row_fit": row_fit,
                   "projected_seconds": float(sum(p["seconds"] for p in pts)), "reduction": None,
                   "complexity_analysis": f"碼層複雜度（清冊 unit_axis.function，讀碼 {e.get('evidence')}）：{func}",
+                  "unit_seconds": unit_seconds, "units": units,
                   "lower_bound_seconds_per_unit": None,
                   "lower_bound_analysis": f"未建向量化／numba 小原型；碼層下限＝{'·'.join(e['unit_axis']['axes'])} 之單次"
-                                          f"掃描（每單位常數時間），現行 {func}",
+                                          f"掃描（每單位常數時間），現行 {func}（階數差 {criterion2_order_gap(func)}）",
                   "evidence": _evidence(e, chosen, all_records)})
         crit = evaluate_criteria(m, scale_probe)
         m["criteria"] = crit
@@ -1479,13 +1848,22 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
         entries[eid] = m
     if problems:
         raise AssemblyError(problems)
+    rec_files = {str(r["_record_path"]): r.get("_record_bytes") for r in all_records if r.get("_record_path")}
     return {"schema": RECEIPT_SCHEMA, "head": head, "budget_seconds": budget_seconds,
+            "total_projected_seconds": total, "budget_exceeded": budget_exceeded,
+            "total_projected_basis": "全部路徑實跑之 scale_probe 收據逐點 seconds × runs 之和（SPEC v5.51 (g)）",
+            "pending_prototype": sorted(eid for eid, m in entries.items()
+                                        if m["criteria"]["2"].get("status") == "pending_prototype"),
+            "records": {"root": records_root, "source": "scripts/icperf_scale_harness.py run（scale_probe 啟動之受測行程寫出）",
+                        "n_files": len(rec_files),
+                        "total_bytes": sum(v for v in rec_files.values() if isinstance(v, int))},
             "meter": {"tool": "scripts/scale_probe.py", "rss_scope": "process_tree",
                       "sample_interval_seconds": sample_interval_seconds,
                       "entry_timer": "scripts/icperf_scale_harness.py（行程內重綁全部引用；perf_counter inclusive）",
                       "footprint": {"tool": FOOTPRINT_TOOL, "sampling": "until_target_exit",
-                                    "terminate_target_on_exceed": False,
-                                    "how": "受測行程結束前 `sample <pid> 1` 取 Physical footprint (peak)（核心維護之全程峰值）"}},
+                                    "terminate_target_on_exceed": False, "source": "harness_record_same_path_run_id",
+                                    "how": "同 path_run_id 之受測行程結束前 `sample <pid> 1` 取 Physical footprint (peak)"
+                                           "（核心維護之全程峰值；寫於該行程之逐入口紀錄）；行程樹 RSS 取自 scale_probe 收據"}},
             "chunk_cap": dict(chunk_cap),
             "runs": {f"{k[0]}:{k[1]}": {"receipt": v["receipt_path"], "probe": v["probe"]} for k, v in runs.items()},
             "entries": entries}
@@ -1508,7 +1886,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sub.add_parser("list", help="列出路徑與直接呼叫格")
     p = sub.add_parser("plan", help="清冊 measure=true 入口之 branch_cell 對照")
     p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
+    p = sub.add_parser("precheck-rows", help="v5.51 (a)：列數軸列長之樣本外切分秒級碼層預檢（不跑 IC、不讀資料檔）")
+    p.add_argument("--scale", type=int, action="append", default=None, help=f"列長（可多次；預設 {ROW_AXIS_SCALES}）")
     args = ap.parse_args(args_in)
+    if args.cmd == "precheck-rows":
+        res = row_axis_precheck(tuple(args.scale) if args.scale else ROW_AXIS_SCALES)
+        print(json.dumps(res, ensure_ascii=False, indent=1))
+        return 0 if res["ok"] else 1
     if args.cmd == "run":
         try:
             run_one(args.run_id, axis=args.axis, scale=args.scale, records_dir=args.records_dir,

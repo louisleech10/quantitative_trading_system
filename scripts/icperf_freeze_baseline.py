@@ -2166,6 +2166,109 @@ def _child_ic_first(spec: Mapping[str, Any]) -> Any:
                                     cleanup_raw=bool(generation["cleanup_raw"]))
 
 
+#: SPEC v5.51 (c)：A 格 IC-first 之 raw run（生成前半）持久根與記錄檔。`_run_ic_first_post_generation` 之 ctx 須由
+#: 生成結果 metadata 之 `output_window`（`ic_first_context.OUTPUT_WINDOW_KEYS` 五鍵，`feature_factory.py:357-368`
+#: `_attach_output_window_metadata` 只寫入記憶體中之 `FeatureGenerationResult.metadata`、不落 manifest）與 `config_hash`
+#: 補完（`ic_first_context.complete_context`，:83-95）⇒ 以 A 格現行生成定義（同 `_child_ic_first`）只跑
+#: `generate_features(persist=True)`（同 `run_ic_first` :2866-2869），把該 metadata 原樣記於本記錄
+ICFIRST_RAW_ROOT = "data_cache/icperf_inputs/A_BTCUSDT_1h_icfirst_raw"
+ICFIRST_RAW_RECORD = "icfirst_raw.json"
+
+
+def icfirst_raw_record(repo_root: Path = REPO) -> Dict[str, Any]:
+    """`gen-icfirst-raw` 之記錄（status complete、`output_window` 五鍵齊備、features_root 在持久根之下且其 run 之
+    feature_manifest.json 存在）；不成立 ⇒ FreezeError。"""
+    _ensure_repo_path()
+    from momentum.FeatureEngineering.ic_first_context import OUTPUT_WINDOW_KEYS
+
+    root = (Path(repo_root) / ICFIRST_RAW_ROOT).resolve()
+    path = root / ICFIRST_RAW_RECORD
+    if not path.is_file():
+        raise FreezeError(f"IC-first raw run 未產生：{path} 不存在（先跑 `icperf_freeze_baseline.py gen-icfirst-raw`）")
+    rec = json.loads(path.read_text(encoding="utf-8"))
+    window = (rec.get("generation_metadata") or {}).get("output_window") or {}
+    froot = Path(str(rec.get("features_root") or "")).resolve()
+    run_dir = froot / str(rec.get("symbol")) / str(rec.get("timeframe")) / str(rec.get("config_hash"))
+    if rec.get("status") != "complete" or any(k not in window for k in OUTPUT_WINDOW_KEYS) \
+            or root not in froot.parents or not (run_dir / "feature_manifest.json").is_file():
+        raise FreezeError(f"IC-first raw 記錄不完整（status／output_window 五鍵／run 目錄）：{path}")
+    return rec
+
+
+def gen_icfirst_raw(*, repo_root: Path = REPO) -> Dict[str, Any]:
+    """產生 A 格 IC-first 之 raw run 與完整 `output_window` 記錄於 `ICFIRST_RAW_ROOT`（SPEC v5.51 (c)）：子行程
+    （`_run_child`，經共用監看；cwd＝`<根>/cwd`，特徵根置於 cwd 內，同 `_child_ic_first` 之 `_isolated`）。已有 complete
+    之記錄 ⇒ 不重產；根存在而無記錄 ⇒ FreezeError（不自行刪除）。成本（讀碼估）：A 格 IC-first 整格 NUMVIEW 實跑 150.8 秒
+    （`numview_freeze_runs/A_BTCUSDT_1h__default/numview_cell.json` 之 seconds，含 IC 與 post-IC）之生成前半。"""
+    root = Path(repo_root) / ICFIRST_RAW_ROOT
+    rec_path = root / ICFIRST_RAW_RECORD
+    if rec_path.is_file():
+        rec = json.loads(rec_path.read_text(encoding="utf-8"))
+        if rec.get("status") == "complete":
+            return {"reused": True, **rec}
+    if root.exists():
+        raise FreezeError(f"{root} 已存在而無 complete 記錄（前次中斷）；請先移除該目錄再重跑")
+    work = root / "capture"
+    spec = {"task": "icfirst_raw", "request": default_request("icfirst_post_ic"), "work": str(work),
+            "out_json": str(work / "result.json")}
+    res = _run_child(spec, cwd=_prepare_cwd(root / "cwd", repo_root), work_dir=work, iso=root / "iso")
+    rec = {"status": "complete", **res, "head": _git_head(Path(repo_root))}
+    rec_path.write_text(json.dumps(rec, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    icfirst_raw_record(repo_root)  # 寫後即驗（五鍵、run 目錄）
+    return {"reused": False, **rec}
+
+
+def _child_icfirst_raw(spec: Mapping[str, Any]) -> Dict[str, Any]:
+    """`gen_icfirst_raw` 之子行程：同 `_child_ic_first` 之設定（NUMVIEW 判準檔 A 格定義、輸出段、連續性、隔離特徵根），
+    但只呼叫 `run_ic_first` 之生成前半 `generate_features(symbol, tf, config_override=config.model_dump(by_alias=True),
+    start_date, end_date, persist=True, lease_sink=...)`（`feature_factory.py:2866-2869`；守護與 lease 同 :2864、:2886-2894
+    之收尾）；回 {"symbol", "timeframe", "training", "start", "end", "features_root", "config_hash", "feature_count",
+    "generation_metadata"（JSON 化；含 output_window 五鍵）, "features_index"（生成公開索引之 ISO 字串）, "compute_warnings",
+    "payload"（FactoryConfig 覆寫）, "generation"（判準檔 generation：ic_engine_config、ic_threshold、label_horizon、
+    cleanup_raw）}。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    nfb = _load("icperf_numview_freeze_baseline", REPO / "scripts" / "numview_freeze_baseline.py")
+    est, criteria = nfb._estimator(), nfb._criteria()
+    request = spec["request"]
+    cell, generation = request["cell"], request["generation"]
+    symbol, primary = str(cell["symbol"]), str(cell["timeframes"][0])
+    training = nfb._training_timeframes(cell)
+    payload = est.cell_payload(cell, criteria, training)
+    source = est.cell_source(cell, criteria)
+    start, end = est.cell_window(cell, criteria)
+    continuity = est.continuity_plan(cell, criteria, training)
+    gaps = est.window_gap_violations(continuity, start)
+    if gaps:
+        raise FreezeError(f"{cell['id']}：輸出段內有 K 線缺口（data_gap）：{gaps}")
+    with nfb._isolated(Path.cwd(), {}) as features_root:
+        factory = create_feature_factory(cache_dir=str(source.parent),
+                                         validate_continuity=continuity["validate_continuity"])
+        factory._storage = FeatureStorage(str(features_root))
+        config = factory._resolve_config(payload)
+        sink: list = []
+        protected: list = []
+        factory._protected_run_holder = protected
+        try:
+            result = factory.generate_features(symbol, primary, config_override=config.model_dump(by_alias=True),
+                                               start_date=start, end_date=end, persist=True, lease_sink=sink)
+        finally:
+            factory._protected_run_holder = None
+            for p in protected:
+                p.close()
+            for lease in sink:
+                lease.release()
+        md = json.loads(json.dumps(dict(result.metadata or {}), ensure_ascii=False, default=str))
+        return {"symbol": symbol, "timeframe": primary, "training": list(training), "start": str(start),
+                "end": str(end), "features_root": str(Path(features_root).resolve()),
+                "config_hash": str(md.get("config_hash") or ""), "feature_count": int(result.feature_count),
+                "generation_metadata": md, "features_index": [str(t) for t in result.features_df.index],
+                "compute_warnings": list(result.compute_warnings or []), "payload": payload,
+                "kline_cache_dir": str(source.parent), "validate_continuity": bool(continuity["validate_continuity"]),
+                "generation": _json_copy(generation)}
+
+
 def long_cell_descriptor() -> Dict[str, Any]:
     """長資料格 L 之格描述子：`LONG_CELL_BASE` 之描述子（判準檔格類、標的、週期）改 id 為 `LONG_CELL`。"""
     return {**_cell_descriptor(LONG_CELL_BASE), "id": LONG_CELL}
@@ -2255,6 +2358,57 @@ def gen_c_handoff(*, repo_root: Path = REPO) -> Dict[str, Any]:
     side = {"status": "complete", "h5": str(h5), "meta": str(Path(res["meta"]).resolve()), "size": h5.stat().st_size,
             "sha256": _file_sha256(str(h5), cache=False), "run_dir": str(gen["run_dir"]),
             "generation_seconds": gen.get("generation_seconds"), "head": _git_head(Path(repo_root))}
+    side_path.write_text(json.dumps(side, ensure_ascii=False, indent=1), encoding="utf-8")
+    return {"reused": False, **side}
+
+
+#: SPEC v5.51 (a)：L 格（`LONG_CELL`）之 IC 交接 h5 持久根（Task 0.2 列數軸與樣本外分支之資料源；`gen-l-handoff` 產生）。
+#: L 格 run 已存在（`LONG_CELL_ROOT`，raw 3,632 欄、2,000 列）⇒ 只以服務 `_materialize_features_for_ic` 寫交接 h5（同
+#: `gen_c_handoff` ②，不重新生成特徵）
+L_HANDOFF_ROOT = "data_cache/icperf_inputs/L_BTCUSDT_4h_longhist"
+L_HANDOFF_SIDECAR = "l_handoff.json"
+
+
+def l_handoff_path(repo_root: Path = REPO) -> Path:
+    """L 格交接 h5（`L_HANDOFF_ROOT/l_handoff.json` 之 complete 記錄所指、須在該根之下且存在，同名 `<stem>_meta.json`
+    亦存在）；不成立 ⇒ FreezeError（須先跑 `gen-l-handoff`）。"""
+    root = (Path(repo_root) / L_HANDOFF_ROOT).resolve()
+    side_path = root / L_HANDOFF_SIDECAR
+    if not side_path.is_file():
+        raise FreezeError(f"L 格交接 h5 未產生：{side_path} 不存在（先跑 `icperf_freeze_baseline.py gen-l-handoff`）")
+    side = json.loads(side_path.read_text(encoding="utf-8"))
+    h5 = Path(str(side.get("h5") or "")).resolve()
+    if side.get("status") != "complete" or root not in h5.parents or not h5.is_file() \
+            or not h5.with_name(h5.stem + "_meta.json").is_file():
+        raise FreezeError(f"L 格交接記錄不完整或檔不存在：{side_path}（h5={h5}）")
+    return h5
+
+
+def gen_l_handoff(*, repo_root: Path = REPO) -> Dict[str, Any]:
+    """產生 L 格之 IC 交接 h5 於 `L_HANDOFF_ROOT`（SPEC v5.51 (a)）：子行程（`_run_child`，經共用監看；cwd＝`<根>/ic`）以
+    服務 `_materialize_features_for_ic` 寫交接 h5（同 `gen_c_handoff` ②；L 格 run＝`_cell_run(LONG_CELL)`，不重新生成）；寫
+    sidecar `l_handoff.json`（status、h5、meta、size、sha256、run_dir、config_hash、head）。已有 complete 之 sidecar ⇒ 不重產、
+    回其內容；根目錄存在而無 sidecar ⇒ FreezeError（不自行刪除）。成本（讀碼估）：讀 raw 43 群組 parquet（14 MB）、寫
+    2,000 × 3,632 之 float32 h5（約 29 MB 未壓縮）。"""
+    root = Path(repo_root) / L_HANDOFF_ROOT
+    side_path = root / L_HANDOFF_SIDECAR
+    if side_path.is_file():
+        side = json.loads(side_path.read_text(encoding="utf-8"))
+        if side.get("status") == "complete":
+            return {"reused": True, **side}
+    if root.exists():
+        raise FreezeError(f"{root} 已存在而無 complete sidecar（前次中斷）；請先移除該目錄再重跑")
+    run = _cell_run(LONG_CELL, Path(repo_root))
+    work = root / "materialize"
+    spec = {"task": "c_handoff", "run_dir": str((Path(repo_root) / run["run_dir"]).resolve()), "symbol": run["symbol"],
+            "timeframe": run["timeframe"], "work": str(work), "out_json": str(work / "result.json")}
+    res = _run_child(spec, cwd=_prepare_cwd(root / "ic", repo_root), work_dir=work, iso=root / "iso")
+    h5 = Path(res["h5"]).resolve()
+    if root.resolve() not in h5.parents:
+        raise FreezeError(f"L 格交接 h5 {h5} 不在持久根 {root} 之下")
+    side = {"status": "complete", "cell": LONG_CELL, "h5": str(h5), "meta": str(Path(res["meta"]).resolve()),
+            "size": h5.stat().st_size, "sha256": _file_sha256(str(h5), cache=False), "run_dir": run["run_dir"],
+            "config_hash": run["config_hash"], "head": _git_head(Path(repo_root))}
     side_path.write_text(json.dumps(side, ensure_ascii=False, indent=1), encoding="utf-8")
     return {"reused": False, **side}
 
@@ -2414,7 +2568,7 @@ def _child_main(spec_path: Path) -> int:
     spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     tasks = {"ic_page": _child_ic_page, "ic_first": _child_ic_first, "stage5": _child_stage5,
              "pit_labels": _child_pit_labels, "stage5_inputs": _child_stage5_inputs,
-             "gen_long_cell": _child_gen_long_cell, "c_handoff": _child_c_handoff}
+             "gen_long_cell": _child_gen_long_cell, "c_handoff": _child_c_handoff, "icfirst_raw": _child_icfirst_raw}
     try:
         if spec.get("task") not in tasks:
             raise FreezeError(f"未知子行程任務：{spec.get('task')!r}")
@@ -2453,6 +2607,12 @@ INVENTORY_LOOPS = ("per_bar", "per_column", "per_group", "none")
 #: Task 0.2 量測之工作根（`runs/`，可重用之中介：子集、各段真實輸入、逐入口記錄）與 scale_probe 收據目錄
 TASK02_ROOT = "runs/icperf/task02"
 TASK02_PROBE_DIR = "handoffs/run_receipts/icperf_task02_scale"
+#: SPEC v5.51 (i)：量測收據引用之逐入口紀錄（入版控、不覆寫；`runs/` 只作執行期暫存）
+TASK02_RECORDS_ROOT = "handoffs/run_receipts/icperf_task02_records"
+#: SPEC v5.51 (e)：量測碼身分所涵蓋之檔（任一內容 sha256 不同 ⇒ 不沿用已完成 attempt）
+TASK02_CODE_FILES = ("scripts/icperf_scale_harness.py", "scripts/icperf_path_inventory.json",
+                     "scripts/icperf_freeze_baseline.py", "scripts/scale_probe.py")
+TASK02_IDENTITY_FILE = "identity.json"
 #: §B ICPERF-BUDGET-2 上界（SPEC v5.7：80 分鐘）
 TASK02_BUDGET_SECONDS = 80 * 60
 #: 2D 核心依欄分塊之工作記憶體上限（SPEC Task 0.2 boundary_20）
@@ -2574,7 +2734,9 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
 
     v5.49／v5.50 施工（與上列衝突處以此為準）：量測單位＝**路徑實跑**——清冊 `branch_cell` 所列之每一路徑／直接呼叫格於每一
     規模點經 `scripts/scale_probe.py` 啟動一個行程（`scripts/icperf_scale_harness.py run <run_id> --scale {scale}`；身分＝
-    路徑命令、不含入口 id），行程內重綁全部引用、逐入口計時寫 `TASK02_ROOT/records/<session>/`；本函式依序：①建巢狀子集
+    路徑命令、不含入口 id），行程內重綁全部引用、逐入口計時寫 `TASK02_RECORDS_ROOT/<session>/`（v5.51 (i)：入版控、不覆寫；
+    `TASK02_ROOT` 只放子集、存檔輸入、work 等執行期暫存）；v5.51 (a)：rows 軸（預設 harness `ROW_AXIS_SCALES`）於 L 格、
+    開跑前 `row_axis_precheck` 須成立；v5.51 (e)：沿用 attempt 須量測碼身分全同（`_task02_identity`）；本函式依序：①建巢狀子集
     `TASK02_ROOT/subsets/<N>/`（`_write_stage5_subset`、`SEED`）②先跑 `ic_page_default`（其存直接呼叫格之各段真實輸入）、
     其餘路徑、再跑直接呼叫格；同 session 已有 scale_probe 收據且逐入口記錄份數相符者沿用不重跑 ③以
     `icperf_scale_harness.assemble_scale_receipt` 組收據：每點帶 path_run_id、scale_probe 收據路徑與記錄檔路徑，seconds＝
@@ -2592,65 +2754,94 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
     head = _git_head(REPO)
     if not head or not re.fullmatch(r"[0-9a-f]{40}", head):
         raise FreezeError(f"取不到量測時之提交 head：{head!r}")
-    dirty = subprocess_dirty(["scripts/icperf_scale_harness.py", INVENTORY_DATA, "scripts/scale_probe.py"])
+    dirty = subprocess_dirty(list(TASK02_CODE_FILES))
     if dirty:
         raise FreezeError(f"量測碼須先提交（head 即量測碼之提交）：未提交之變更 {dirty}")
+    # SPEC v5.51 (a)：列數軸三種列長（預設＝harness 之 ROW_AXIS_SCALES）啟動任何實跑前先過秒級碼層預檢（樣本外切分成立）
+    row_scales = tuple(h.ROW_AXIS_SCALES if row_scales is None else (int(s) for s in row_scales))
+    precheck = h.row_axis_precheck(row_scales) if row_scales else None
+    if precheck is not None and not precheck["ok"]:
+        raise FreezeError(f"列數軸預檢不成立（某列長或 L 格 cols 軸未走樣本外切分）：{json.dumps(precheck, ensure_ascii=False)}")
     session = session or time.strftime("%Y%m%dT%H%M%S")
     root = REPO / TASK02_ROOT
-    records_dir = root / "records" / session
+    records_dir = REPO / TASK02_RECORDS_ROOT / session
     probe_dir = REPO / TASK02_PROBE_DIR / session
     probe_dir.mkdir(parents=True, exist_ok=True)
     (root / "logs" / session).mkdir(parents=True, exist_ok=True)
+    inv_by_id = {e["id"]: e for e in inventory.get("entries") or []}
+    need_long = "ic_page_long" in plan or bool(row_scales)
     src = c_handoff_path()
     src_meta = src.with_name(src.stem + "_meta.json")
-    for n in sorted(set(int(s) for s in scales) | ({h.ROW_AXIS_COLS} if row_scales else set())):
+    l_src = l_handoff_path() if need_long else None
+    for n in sorted(set(int(s) for s in scales)):
         sub = root / "subsets" / str(n)
         if not (sub / src.name).is_file():
             _write_stage5_subset(src, src_meta, n, SEED, sub)
+    if l_src is not None:
+        l_meta = l_src.with_name(l_src.stem + "_meta.json")
+        for n in sorted(set(int(s) for s in scales) | ({h.ROW_AXIS_COLS} if row_scales else set())):
+            sub = root / "subsets" / f"L{n}"
+            if not (sub / l_src.name).is_file():
+                _write_stage5_subset(l_src, l_meta, n, SEED, sub)
     full_cols = _handoff_total_cols(src)
-    order = [r for r in ("ic_page_default", *h.PATHS, *h.CELLS) if r in plan]
-    order = list(dict.fromkeys(order))
+    full_cols_long = _handoff_total_cols(l_src) if l_src is not None else None
+    # 實跑排程：各路徑／格之主軸（cols；event_study＝events）；rows 軸＝清冊含 rows 軸之入口所屬格之 ROW_AXIS_RUN（L 格），
+    # ic_page_long 先跑（寫直接呼叫格之列數軸存檔）
+    sched: List[Tuple[str, str]] = []
+    for run_id in dict.fromkeys(("ic_page_default", "ic_page_long", *h.PATHS, *h.CELLS)):
+        if run_id in plan:
+            sched.append((run_id, h.primary_axis(run_id)))
+    if row_scales:
+        need_rows = {h.ROW_AXIS_RUN[c] for c, eids in plan.items() if c in h.ROW_AXIS_RUN
+                     and any("rows" in (inv_by_id.get(x) or {}).get("input_axes", []) for x in eids)}
+        sched += [(r, "rows") for r in dict.fromkeys(("ic_page_long", "deep_analysis_long", *h.CELLS)) if r in need_rows]
     runs: Dict[Tuple[str, str], Dict[str, Any]] = {}
     failures: List[str] = []
-    for run_id in order:
-        for axis in h.RUN_AXES[run_id]:
-            if axis == "rows" and not row_scales:
+    for run_id, axis in sched:
+        pts = (list(scales) if axis == "cols"
+               else list(h.row_scales_for(run_id) if run_id in h.CELL_ROW_SCALES else row_scales) if axis == "rows"
+               else _event_scales(h))
+        cmd_base = [sys.executable, "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis, "--scale", "{scale}"]
+        data = _task02_data(run_id, src, axis=axis, long_src=l_src)
+        config = [INVENTORY_DATA]
+        identity = _task02_identity(head, data=data, config=config, scales=pts, cmd=cmd_base)
+        # 每次啟動 scale_probe 為一個 attempt（收據與逐入口記錄目錄各自獨立）：最近一次已完成、且量測碼身分（HEAD、量測碼
+        # 與清冊內容 sha256、輸入檔身分、規模、命令）全同者方沿用（v5.51 (e)）；其餘另開新 attempt 重跑（不刪、不混用他
+        # attempt 之記錄）
+        attempt, done = _task02_attempt(probe_dir, records_dir, run_id, axis, identity)
+        receipt_path = probe_dir / f"{run_id}-{axis}-a{attempt}.json"
+        att_records = records_dir / f"{run_id}-{axis}-a{attempt}"
+        cmd = cmd_base + ["--records-dir", att_records.relative_to(REPO).as_posix()]
+        if not done:
+            att_records.mkdir(parents=True, exist_ok=True)
+            with open(att_records / TASK02_IDENTITY_FILE, "x", encoding="utf-8") as fh:
+                fh.write(json.dumps(identity, ensure_ascii=False, indent=1, sort_keys=True))
+            full = (full_cols_long if run_id in h.LONG_RUNS else full_cols) if axis == "cols" else max(pts)
+            probe_cmd = [sys.executable, "scripts/scale_probe.py", "--out", receipt_path.relative_to(REPO).as_posix(),
+                         "--full-scale", str(full), "--unit", axis,
+                         "--log-dir", (root / "logs" / session / f"{run_id}-{axis}").relative_to(REPO).as_posix()]
+            for s in pts:
+                probe_cmd += ["--scale", str(s)]
+            for d in data:
+                probe_cmd += ["--data", d]
+            for c in config:
+                probe_cmd += ["--config", c]
+            res = run_watched(probe_cmd + ["--", *cmd], log_path=root / "logs" / session / f"{run_id}-{axis}.log",
+                              env=_child_env_base(), cwd=REPO)
+            if res["rc"] != 0 or not receipt_path.is_file():
+                failures.append(f"{run_id}:{axis}：scale_probe rc={res['rc']}（見 {res['log_path']}）")
                 continue
-            pts = (list(scales) if axis == "cols" else list(row_scales or ()) if axis == "rows"
-                   else _event_scales(h))
-            # 每次啟動 scale_probe 為一個 attempt（收據與逐入口記錄目錄各自獨立）：最近一次已完成者沿用；未完成者另開新
-            # attempt 重跑（不刪、不混用失敗 attempt 之記錄）
-            attempt, done = _task02_attempt(probe_dir, records_dir, run_id, axis)
-            receipt_path = probe_dir / f"{run_id}-{axis}-a{attempt}.json"
-            att_records = records_dir / f"{run_id}-{axis}-a{attempt}"
-            cmd = [sys.executable, "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis, "--scale", "{scale}",
-                   "--records-dir", att_records.relative_to(REPO).as_posix()]
-            data = _task02_data(run_id, src)
-            config = [INVENTORY_DATA]
-            if not done:
-                probe_cmd = [sys.executable, "scripts/scale_probe.py", "--out", receipt_path.relative_to(REPO).as_posix(),
-                             "--full-scale", str(full_cols if axis == "cols" else max(pts)), "--unit", axis,
-                             "--log-dir", (root / "logs" / session / f"{run_id}-{axis}").relative_to(REPO).as_posix()]
-                for s in pts:
-                    probe_cmd += ["--scale", str(s)]
-                for d in data:
-                    probe_cmd += ["--data", d]
-                for c in config:
-                    probe_cmd += ["--config", c]
-                res = run_watched(probe_cmd + ["--", *cmd], log_path=root / "logs" / session / f"{run_id}-{axis}.log",
-                                  env=_child_env_base(), cwd=REPO)
-                if res["rc"] != 0 or not receipt_path.is_file():
-                    failures.append(f"{run_id}:{axis}：scale_probe rc={res['rc']}（見 {res['log_path']}）")
-                    continue
-            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-            runs[(run_id, axis)] = {"probe": {"cmd": cmd, "data": data, "config": config},
-                                    "receipt_path": receipt_path.relative_to(REPO).as_posix(), "receipt": receipt,
-                                    "records": _task02_records(att_records, run_id, axis)}
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        runs[(run_id, axis)] = {"probe": {"cmd": cmd, "data": data, "config": config},
+                                "receipt_path": receipt_path.relative_to(REPO).as_posix(), "receipt": receipt,
+                                "records": _task02_records(att_records, run_id, axis)}
     try:
         receipt = h.assemble_scale_receipt(inventory, runs, head=head, scale_probe=scale_probe,
                                            budget_seconds=TASK02_BUDGET_SECONDS,
                                            sample_interval_seconds=TASK02_SAMPLE_INTERVAL, chunk_cap=TASK02_CHUNK_CAP,
-                                           ram_bytes=_ram_bytes())
+                                           ram_bytes=_ram_bytes(), require_rows=bool(row_scales),
+                                           records_root=records_dir.relative_to(REPO).as_posix())
+        receipt["row_axis_precheck"] = precheck
     except h.AssemblyError as exc:
         problems_path = Path(out_path).with_name(Path(out_path).stem + ".problems.json")
         problems_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2697,49 +2888,81 @@ def _event_scales(h: Any) -> List[int]:
     return sorted({max(k // 4, 1), max(k // 2, 1), k})
 
 
-def _task02_data(run_id: str, src: Path) -> List[str]:
-    """scale_probe 身分之 --data：C 格交接 h5（ic_page／深度分析／直接呼叫格）或該路徑所讀 run 之 manifest。"""
-    def rel(p: Path) -> str:
-        try:
-            return Path(p).resolve().relative_to(REPO).as_posix()
-        except ValueError:
-            return str(p)
+def _repo_rel(p: Path) -> str:
+    try:
+        return Path(p).resolve().relative_to(REPO).as_posix()
+    except ValueError:
+        return str(p)
 
+
+def _task02_data(run_id: str, src: Path, *, axis: str = "cols", long_src: Optional[Path] = None) -> List[str]:
+    """scale_probe 身分之 --data：交接 h5（IC 頁／深度分析／直接呼叫格：C 格；rows 軸與 L 格路徑＝L 格交接 h5，v5.51 (a)）或
+    該路徑所讀 run 之 manifest。"""
+    h = _harness()
     if run_id in ("post_ic_transform", "cross_sectional"):
         cells = ("A_BTCUSDT_1h", "A_SOLUSDT_1h") if run_id == "cross_sectional" else (CELL,)
         return [f"{_cell_run(c)['run_dir']}/feature_manifest.json" for c in cells]
     if run_id in ("event_import", "event_study"):
         return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json"]
-    return [rel(src)]
+    if axis == "rows" or run_id in h.LONG_RUNS:
+        return [_repo_rel(long_src if long_src is not None else l_handoff_path())]
+    return [_repo_rel(src)]
+
+
+def _task02_identity(head: str, *, data: Sequence[str], config: Sequence[str], scales: Sequence[int],
+                     cmd: Sequence[str], repo_root: Path = REPO) -> Dict[str, Any]:
+    """量測碼身分（SPEC v5.51 (e)）：{"head", "code": {`TASK02_CODE_FILES` 各檔: 內容 sha256}, "inputs": [{"path", "size",
+    "sha256"}...]（--data／--config 各檔；不存在者 sha256＝None）, "scales", "cmd"（不含 attempt 專屬之 --records-dir）}。
+    任一不同 ⇒ 不沿用已完成 attempt。"""
+    def ident(rel: str) -> Dict[str, Any]:
+        p = (Path(repo_root) / rel) if not Path(rel).is_absolute() else Path(rel)
+        if not p.is_file():
+            return {"path": str(rel), "size": None, "sha256": None}
+        return {"path": str(rel), "size": p.stat().st_size, "sha256": _file_sha256(os.path.realpath(p))}
+
+    return {"head": str(head),
+            "code": {rel: ident(rel)["sha256"] for rel in TASK02_CODE_FILES},
+            "inputs": [ident(str(d)) for d in list(data) + list(config)],
+            "scales": [int(s) for s in scales], "cmd": [str(c) for c in cmd]}
 
 
 def _task02_records(records_dir: Path, run_id: str, axis: str) -> Dict[int, List[Dict[str, Any]]]:
-    """`records_dir/<run_id>/<axis>-<scale>/*.json` ⇒ {scale: [記錄（加 `_record_path`＝repo 相對）...]}。"""
+    """`records_dir/<run_id>/<axis>-<scale>/*.json` ⇒ {scale: [記錄（加 `_record_path`＝repo 相對、`_record_bytes`、
+    `_record_sha256`＝該檔位元組數與內容 sha256；SPEC v5.51 (i) 記來源與大小）...]}。"""
     out: Dict[int, List[Dict[str, Any]]] = {}
     base = Path(records_dir) / run_id
     for d in sorted(base.glob(f"{axis}-*")) if base.is_dir() else []:
         scale = int(d.name.split("-", 1)[1])
         for f in sorted(d.glob("*.json")):
-            rec = json.loads(f.read_text(encoding="utf-8"))
-            rec["_record_path"] = f.relative_to(REPO).as_posix()
+            raw = f.read_bytes()
+            rec = json.loads(raw.decode("utf-8"))
+            rec["_record_path"] = _repo_rel(f)
+            rec["_record_bytes"] = len(raw)
+            rec["_record_sha256"] = _sha_bytes(raw)
             out.setdefault(scale, []).append(rec)
     return out
 
 
-def _task02_attempt(probe_dir: Path, records_dir: Path, run_id: str, axis: str) -> Tuple[int, bool]:
-    """(run_id, axis) 於本 session 之 attempt：最近一次 attempt 已有 scale_probe 收據且每點之實跑次數＝其逐入口記錄份數
-    ⇒ (該 attempt, True)＝沿用不重跑；否則 (下一個 attempt 編號, False)。"""
+def _task02_attempt(probe_dir: Path, records_dir: Path, run_id: str, axis: str,
+                    identity: Optional[Mapping[str, Any]] = None) -> Tuple[int, bool]:
+    """(run_id, axis) 於本 session 之 attempt：最近一次 attempt 已有 scale_probe 收據、每點之實跑次數＝其逐入口記錄份數，
+    **且**其 `TASK02_IDENTITY_FILE`（開跑前寫）逐欄等於本次之量測碼身分 `identity`（SPEC v5.51 (e)：HEAD、量測碼與清冊內容
+    sha256、輸入檔身分、規模、命令）⇒ (該 attempt, True)＝沿用不重跑；否則（含身分檔缺、`identity` 為 None）⇒
+    (下一個 attempt 編號, False)。"""
     seen = [int(m.group(1)) for p in Path(probe_dir).glob(f"{run_id}-{axis}-a*.json")
             if (m := re.search(r"-a(\d+)\.json$", p.name))]
     seen += [int(m.group(1)) for p in Path(records_dir).glob(f"{run_id}-{axis}-a*")
              if (m := re.search(r"-a(\d+)$", p.name))]
     last = max(seen) if seen else 0
     receipt_path = Path(probe_dir) / f"{run_id}-{axis}-a{last}.json"
-    if last and receipt_path.is_file():
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        recs = _task02_records(Path(records_dir) / f"{run_id}-{axis}-a{last}", run_id, axis)
-        if all(len(recs.get(int(q["scale"]), [])) == int(q.get("runs") or 0) for q in receipt.get("points") or []):
-            return last, True
+    att = Path(records_dir) / f"{run_id}-{axis}-a{last}"
+    if last and receipt_path.is_file() and identity is not None and (att / TASK02_IDENTITY_FILE).is_file():
+        stored = json.loads((att / TASK02_IDENTITY_FILE).read_text(encoding="utf-8"))
+        if stored == json.loads(json.dumps(identity)):
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            recs = _task02_records(att, run_id, axis)
+            if all(len(recs.get(int(q["scale"]), [])) == int(q.get("runs") or 0) for q in receipt.get("points") or []):
+                return last, True
     return last + 1, False
 
 
@@ -2786,6 +3009,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p = sub.add_parser("gen-long-cell", help="Task 0.3：生成長資料格 L（A 格同一生成定義、最後 2,000 根）")
     p.add_argument("--out", type=Path, default=None, help="結果 JSON（不給則只印出）")
     p = sub.add_parser("gen-c-handoff", help="重產第 (2) 項之 C 格交接 h5 於持久根 data_cache/icperf_inputs/")
+    p = sub.add_parser("gen-l-handoff", help="Task 0.2：L 格 IC 交接 h5 於持久根 data_cache/icperf_inputs/（不重新生成特徵）")
+    p = sub.add_parser("gen-icfirst-raw", help="Task 0.2：A 格 IC-first 之 raw run（生成前半）＋完整 output_window 記錄")
     p = sub.add_parser("inventory", help="Task 0.2 路徑清冊")
     p.add_argument("--out", type=Path, required=True)
     p = sub.add_parser("measure", help="Task 0.2 規模量測（路徑實跑＋直接呼叫格，經 scale_probe；重型）")
@@ -2793,7 +3018,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--session", default=None, help="量測 session（同 session 已完成之路徑沿用不重跑；預設本地時間）")
     p.add_argument("--row-scales", type=int, nargs="*", default=None,
-                   help="列長點（固定 500 欄之末 R 列；不給則不量 row_points）")
+                   help="列長點（L 格交接 h5 固定 ROW_AXIS_COLS 欄之末 R 列；不給＝harness 之 ROW_AXIS_SCALES〔須過樣本外"
+                        "切分預檢〕；只給旗標不給值＝不量 row_points）")
     p = sub.add_parser(CHILD_CMD)
     p.add_argument("spec", type=Path)
     args = parser.parse_args(argv)
@@ -2841,6 +3067,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
         if args.cmd == "gen-c-handoff":
             print(json.dumps(gen_c_handoff(), ensure_ascii=False, indent=1, default=str))
+            return 0
+        if args.cmd == "gen-l-handoff":
+            print(json.dumps(gen_l_handoff(), ensure_ascii=False, indent=1, default=str))
+            return 0
+        if args.cmd == "gen-icfirst-raw":
+            print(json.dumps(gen_icfirst_raw(), ensure_ascii=False, indent=1, default=str))
             return 0
         if args.cmd == "gen-long-cell":
             result = gen_long_cell()

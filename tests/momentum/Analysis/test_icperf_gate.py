@@ -1851,6 +1851,45 @@ def _assert_point_bound(eid: str, point: Mapping[str, Any], scale: int, unit: st
         assert point[k] == hits[0][k], f"{eid}：{k} {point[k]} != scale_probe 實測 {hits[0][k]}"
 
 
+def _point_axis(m: Mapping[str, Any]) -> Tuple[str, str]:
+    """量測收據單一入口之主軸 (scale_probe unit, 點之 x 鍵)：SPEC v5.51 (d) 事件數軸＝("events", "events")；其餘＝
+    ("cols", "input_cols")（收據 `axis` 欄；缺省 cols）。"""
+    return ("events", "events") if m.get("axis") == "events" else ("cols", "input_cols")
+
+
+RECORDS_ROOT = "handoffs/run_receipts/icperf_task02_records"
+
+
+def _record_raw(rp: str) -> Optional[bytes]:
+    """repo 內紀錄檔之位元組（不存在 ⇒ None；mutation 測試以記憶體內輸入置換）。"""
+    path = REPO / rp
+    return path.read_bytes() if path.is_file() else None
+
+
+def _record_store_problems(eid: str, m: Mapping[str, Any]) -> List[str]:
+    """SPEC v5.51 (h)(i)：每點（含列長點）之逐入口紀錄存於版控路徑 `RECORDS_ROOT/` 之下、`record_bytes`／`record_sha256`
+    等於該檔實際位元組數與內容 sha256；`peak_footprint_bytes` 等於同 path_run_id 紀錄之 footprint（受測行程 `sample`），
+    `footprint_source` 指該 path_run_id。問題清單（空＝成立）。"""
+    out: List[str] = []
+    for i, p in enumerate(list(m["points"]) + list(m.get("row_points") or [])):
+        rp = str(p.get("record_path") or "")
+        if not rp.startswith(RECORDS_ROOT + "/"):
+            out.append(f"點 {i}：紀錄 {rp!r} 不在 {RECORDS_ROOT}/（v5.51 (i)）")
+            continue
+        raw = _record_raw(rp)
+        if raw is None:
+            out.append(f"點 {i}：紀錄 {rp} 不存在")
+            continue
+        if p.get("record_bytes") != len(raw) or p.get("record_sha256") != hashlib.sha256(raw).hexdigest():
+            out.append(f"點 {i}：紀錄大小／sha256 與收據不符")
+        rec = json.loads(raw.decode("utf-8"))
+        if p.get("peak_footprint_bytes") != rec.get("peak_footprint_bytes"):
+            out.append(f"點 {i}：footprint {p.get('peak_footprint_bytes')} != 同 path_run_id 紀錄 {rec.get('peak_footprint_bytes')}")
+        if p.get("footprint_source") != f"harness_record:{rec.get('path_run_id')}":
+            out.append(f"點 {i}：footprint_source {p.get('footprint_source')!r} 非同 path_run_id 紀錄")
+    return out
+
+
 def _entry_record(path_str: Any) -> Optional[Dict[str, Any]]:
     """量測點所引之 repo 內 JSON（逐入口計時紀錄〔scripts/icperf_scale_harness.py 寫出〕或 scale_probe 收據；不存在 ⇒
     None；不斷言，供問題清單式檢查）。"""
@@ -1866,7 +1905,7 @@ def _entry_record_problems(eid: str, m: Mapping[str, Any]) -> List[str]:
     scale_probe 該點 runs；呼叫次數（扣除拋例外者）≥ 1（0 呼叫不得充作量測，v5.50 (a)）；footprint 不小於該紀錄之受測行程
     結束前 sample。以問題清單回報（呼叫端單一斷言；不另綁斷言區域名，TESTREG V19 名序不變）。"""
     out: List[str] = []
-    groups = [(m["points"], m.get("probe"), "cols", "input_cols"),
+    groups = [(m["points"], m.get("probe"), *_point_axis(m)),
               (m.get("row_points") or [], m.get("row_probe"), "rows", "rows")]
     for points, probe, unit, xkey in groups:
         for i, point in enumerate(points):
@@ -1909,6 +1948,8 @@ def test_boundary_16_three_points_per_entry() -> None:
     assert re.fullmatch(r"[0-9a-f]{40}", head), f"量測收據須記量測時之提交 head：{head!r}"
     for eid, m in receipt["entries"].items():
         pts = m["points"]
+        # SPEC v5.51 (d)：主軸＝收據 axis（event_study＝events，x 為事件數；其餘 cols，x 為輸入欄數）
+        unit, xkey = _point_axis(m)
         if not m.get("two_point_exception"):
             assert len(pts) == 3, f"{eid}：須 3 點，實得 {len(pts)}"
         for p in pts:
@@ -1916,8 +1957,8 @@ def test_boundary_16_three_points_per_entry() -> None:
             assert isinstance(p["peak_rss_bytes"], int) and p["peak_rss_bytes"] > 0, eid
             assert isinstance(p["input_cols"], int) and isinstance(p["stage_cols"], int), eid
             assert 0 <= p["stage_cols"] <= p["input_cols"], f"{eid}：實際進段欄數不得多於輸入欄數"
-            _assert_point_bound(eid, p, p["input_cols"], "cols", m["probe"], head)
-        assert len({p["input_cols"] for p in pts}) == len(pts), f"{eid}：規模點重複"
+            _assert_point_bound(eid, p, p[xkey], unit, m["probe"], head)
+        assert len({p[xkey] for p in pts}) == len(pts), f"{eid}：規模點重複"
         if eid in inv and "rows" in inv[eid]["input_axes"]:
             rows = m["row_points"]
             assert len(rows) == 3 and len({r["rows"] for r in rows}) == 3, f"{eid}：列數成長元件須三種列長"
@@ -1932,6 +1973,9 @@ def test_boundary_16_three_points_per_entry() -> None:
     # SPEC v5.50 (e)：每點 seconds 取自同 path_run_id 之逐入口計時紀錄（同次執行、呼叫次數 ≥ 1）；重用上段區域名（TESTREG V19）
     for eid, pts in receipt["entries"].items():
         assert not _entry_record_problems(eid, pts), f"{eid}：逐入口計時紀錄不符：{_entry_record_problems(eid, pts)}"
+    # SPEC v5.51 (h)(i)：footprint＝同 path_run_id 紀錄之值；紀錄存版控路徑、大小與 sha256 相符（重用上段區域名，TESTREG V19）
+    for eid, pts in receipt["entries"].items():
+        assert not _record_store_problems(eid, pts), f"{eid}：紀錄存處／footprint 來源不符：{_record_store_problems(eid, pts)}"
 
 
 def _entry_schema_problems(m: Mapping[str, Any], inv_entry: Optional[Mapping[str, Any]]) -> List[str]:
@@ -1940,9 +1984,14 @@ def _entry_schema_problems(m: Mapping[str, Any], inv_entry: Optional[Mapping[str
     scale_vector 鍵集＝清冊 scale_vector 且值為非負整數並與點之同名欄相等、每點帶峰值 Physical footprint。拒收缺軸、單位
     歧義或 id 與清冊不一致之收據。以問題清單回報（呼叫端單一斷言；不另綁斷言區域名，TESTREG V19 名序不變）。"""
     out: List[str] = []
-    cols = sorted(p["input_cols"] for p in m["points"])
+    unit, xkey = _point_axis(m)
+    cols = sorted(p[xkey] for p in m["points"])
     want = [500, 1000] if m.get("two_point_exception") else [500, 1000, 2000]
-    if cols != want:
+    if unit == "events":
+        # SPEC v5.51 (d)：事件數軸三相異點（不要求欄數軸；不得帶兩點例外）
+        if len(set(cols)) != 3 or m.get("two_point_exception") or not all(isinstance(x, int) and x > 0 for x in cols):
+            out.append(f"事件數軸規模點 {cols} 須三相異正整數且不帶兩點例外")
+    elif cols != want:
         out.append(f"規模點 {cols} != {want}（兩點例外恰 500／1000 且不含 2,000 欄點；無例外者三點）")
     if inv_entry is None:
         return out + ["量測收據之入口不在清冊"]
@@ -1979,14 +2028,18 @@ def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
             rec = _scale_probe_receipt(next(iter(sources)))
             # SPEC v5.50 (e)：scale_probe 收據為路徑級（路徑全體之擬合）⇒ 逐入口 fit 以 scale_probe 之同一擬合函式對本入口之點
             # （x＝實際進段欄數 stage_cols、seconds、路徑級峰值 RSS；全規模＝收據 fit_full_scale）重算後比對
-            rec = scale_probe.fit([{"scale": p["stage_cols"], "unit": "cols", "seconds": p["seconds"],
+            # SPEC v5.51 (d)：事件數軸者 x＝事件數（收據 fit_axis）
+            fkey = m.get("fit_axis") or "stage_cols"
+            rec = scale_probe.fit([{"scale": p[fkey], "unit": _point_axis(m)[0], "seconds": p["seconds"],
                                     "peak_rss_bytes": p["peak_rss_bytes"]} for p in m["points"]], m["fit_full_scale"])
             assert fit["exponent"] == rec["fit"]["exponent"] and fit["r2"] == rec["fit"]["r2"], f"{eid}：fit != 收據"
             assert m["extrapolation_unreliable"] == rec["extrapolation_unreliable"], f"{eid}：可靠性旗標 != 收據"
         crit = m["criteria"]
         assert set(crit) == {"1", "2", "3", "4", "5"}, f"{eid}：判準鍵 {sorted(crit)}"
         for k, c in crit.items():
-            assert isinstance(c["result"], bool) and str(c["basis"]).strip(), f"{eid}：判準{k} 欄位缺"
+            # SPEC v5.51 (f)：判準②無原型且碼層不足以斷定者 result None＋status pending_prototype（不得固定 False）
+            ok = isinstance(c["result"], bool) or (k == "2" and c["result"] is None and c.get("status") == "pending_prototype")
+            assert ok and str(c["basis"]).strip(), f"{eid}：判準{k} 欄位缺"
         if fit["r2"] < scale_probe.MIN_R2 or m["extrapolation_unreliable"]:
             assert crit["1"]["basis"] == "complexity_analysis", f"{eid}：擬合不可靠時①須以碼層複雜度分析判定"
             assert str(m.get("complexity_analysis") or "").strip(), f"{eid}：缺碼層複雜度分析"
@@ -1999,6 +2052,37 @@ def test_boundary_17_criteria_fields_and_rules(scale_probe: Any) -> None:
         _assert_opportunities(eid, m)
         # SPEC v5.50 (e)：同一入口之各點來自同一路徑實跑（一份路徑級 scale_probe 收據），上列重算比對方不落空
         assert _single_probe_source(m), f"{eid}：各點須引同一份路徑 scale_probe 收據"
+    # SPEC v5.51 (f)：判準②之語意（不得固定 False）——有原型下限 ⇒ 數值比；否則 False 只准硬體下限依據，待判者列頂層
+    # pending_prototype（重用上段區域名，TESTREG V19）
+    receipt = _single(SCALE_BEFORE_PATTERN)
+    for eid, m in receipt["entries"].items():
+        assert not _criterion2_problems(eid, m, receipt), f"{eid}：判準② 語意不符：{_criterion2_problems(eid, m, receipt)}"
+
+
+#: SPEC v5.51 (f)：判準②之硬體下限（每單位秒數；同 scripts/icperf_scale_harness.py CRITERION2_FLOOR_SECONDS_PER_UNIT）
+CRITERION2_FLOOR = 1e-10
+
+
+def _criterion2_problems(eid: str, m: Mapping[str, Any], receipt: Mapping[str, Any]) -> List[str]:
+    """判準②（SPEC Task 0.2 :104、v5.51 (f)）問題清單：有原型下限（> 0）⇒ result＝unit_seconds ≥ 10×下限；無原型 ⇒ result
+    False 只准 basis 以 hardware_floor 起首且 unit_seconds < 10×`CRITERION2_FLOOR`，否則須 result None＋status
+    pending_prototype 且列於收據頂層 pending_prototype；result True 須有原型下限（漸近階數不作 10 倍實證）。"""
+    out: List[str] = []
+    c = m["criteria"]["2"]
+    lb, us = m.get("lower_bound_seconds_per_unit"), m.get("unit_seconds")
+    pending = set(receipt.get("pending_prototype") or [])
+    if isinstance(lb, (int, float)) and lb > 0:
+        if not (isinstance(us, (int, float)) and c["result"] is bool(us >= 10 * lb)):
+            out.append(f"有原型下限 {lb}：result {c['result']!r} != unit_seconds {us} ≥ 10×下限")
+    elif c["result"] is True:
+        out.append("無原型下限不得判 True（漸近階數不作 10 倍實證）")
+    elif c["result"] is False:
+        if not (str(c["basis"]).startswith("hardware_floor") and isinstance(us, (int, float))
+                and us < 10 * CRITERION2_FLOOR):
+            out.append(f"無原型而判 False 須依硬體下限（unit_seconds {us} < {10 * CRITERION2_FLOOR}）")
+    elif not (c["result"] is None and c.get("status") == "pending_prototype" and eid in pending):
+        out.append("無原型且不可碼層斷定 ⇒ result None、status pending_prototype 並列頂層 pending_prototype")
+    return out
 
 
 def _single_probe_source(m: Mapping[str, Any]) -> bool:
@@ -2035,7 +2119,8 @@ def test_boundary_18_scale_points_within_budget() -> None:
     assert isinstance(budget, (int, float)) and 0 < budget <= BUDGET2_UPPER_SECONDS
     for eid, m in receipt["entries"].items():
         cols = {p["input_cols"] for p in m["points"]}
-        assert cols <= SCALE_POINTS, f"{eid}：規模點 {sorted(cols)} 超出 500／1000／2000"
+        # SPEC v5.51 (d)：事件數軸者不以欄數軸規模點判（x＝事件數，由 boundary_16 `_entry_schema_problems` 驗三相異點）
+        assert _point_axis(m)[0] == "events" or cols <= SCALE_POINTS, f"{eid}：規模點 {sorted(cols)} 超出 500／1000／2000"
         if m["projected_seconds"] > budget:
             red = m.get("reduction") or {}
             assert red.get("kind") in ("row_length", "component_timing") and str(red.get("note") or "").strip(), \
@@ -2052,14 +2137,20 @@ def _projected_2000_seconds(points: Sequence[Mapping[str, Any]]) -> float:
 
 
 def test_boundary_19_over_ten_minutes_two_points_annotated() -> None:
-    """500／1000 兩點推估 2000 欄逾 10 分鐘之元件 ⇒ 須帶 two_point_exception、收據不得含其 2000 欄點、附碼層複雜度分析
-    （boundary_16 之唯一例外）；未逾者不得帶例外且須 500／1000／2000 三點。"""
+    """SPEC v5.51 (g)：收據頂層合計推估逾 budget_seconds 時，500／1000 兩點推估 2000 欄逾 10 分鐘之元件 ⇒ 須帶
+    two_point_exception、收據不得含其 2000 欄點、附碼層複雜度分析（boundary_16 之唯一例外）；未逾預算或未逾 10 分鐘者不得帶
+    例外且須 500／1000／2000 三點。事件數軸（v5.51 (d)）者不適用欄數兩點例外。"""
+    receipt = _single(SCALE_BEFORE_PATTERN)
+    over_budget = bool(receipt.get("budget_exceeded"))
     for eid, m in _scale_entries().items():
+        if _point_axis(m)[0] == "events":
+            assert not m.get("two_point_exception"), f"{eid}：事件數軸不得帶兩點例外"
+            continue
         exc = m.get("two_point_exception")
         cols = sorted(p["input_cols"] for p in m["points"])
         assert 500 in cols and 1000 in cols, f"{eid}：須含 500／1000 欄點"
         projected = _projected_2000_seconds(m["points"])
-        if projected > TWO_POINT_SECONDS:
+        if projected > TWO_POINT_SECONDS and over_budget:
             assert exc, f"{eid}：2000 欄推估 {projected:.0f} 秒逾 10 分鐘，須帶 two_point_exception"
             assert cols == [500, 1000], f"{eid}：兩點例外之收據不得含 2000 欄點（實得 {cols}）"
             assert exc["projected_2000_seconds"] > TWO_POINT_SECONDS, f"{eid}：例外之推估值須逾 10 分鐘"
@@ -2067,6 +2158,12 @@ def test_boundary_19_over_ten_minutes_two_points_annotated() -> None:
         else:
             assert not exc, f"{eid}：2000 欄推估 {projected:.0f} 秒未逾 10 分鐘，不得帶 two_point_exception"
             assert cols == [500, 1000, 2000], f"{eid}：未逾 10 分鐘者須三點（實得 {cols}）"
+    # SPEC v5.51 (g)：頂層合計推估＝各路徑 scale_probe 收據逐點 seconds × runs 之和（測試自算，不引收據自述值），
+    # budget_exceeded＝其 > budget_seconds
+    total = sum(float(q.get("seconds") or 0.0) * max(int(q.get("runs") or 1), 1)
+                for r in (receipt.get("runs") or {}).values() for q in _scale_probe_receipt(r["receipt"])["points"])
+    assert abs(float(receipt["total_projected_seconds"]) - total) <= 1e-6 * max(total, 1.0), "合計推估 != scale_probe 收據重算"
+    assert receipt["budget_exceeded"] is (total > float(receipt["budget_seconds"])), "budget_exceeded 與合計推估不符"
 
 
 def test_boundary_20_rss_meter_and_chunk_cap_recorded() -> None:
@@ -2265,16 +2362,23 @@ def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) 
         pts = [{"input_cols": n, "stage_cols": n, "seconds": 1.0 * n, "peak_rss_bytes": 1000 + n,
                 "peak_footprint_bytes": 2000 + n, "scale_vector": {"input_cols": n, "stage_cols": n},
                 "scale_probe_receipt": "r.json", "path_run_id": f"p1.cols{n}", "path_run_ids": [f"p1.cols{n}"],
-                "record_path": f"rec-{n}.json"} for n in (500, 1000, 2000)]
+                "record_path": f"{RECORDS_ROOT}/rec-{n}.json"} for n in (500, 1000, 2000)]
         probe_rec = {"identity": {"match": dict(receipt_match), "meta": {"producer": "scripts/scale_probe.py"}},
                      "points": [{"scale": p["input_cols"], "unit": "cols", "seconds": 9.0 * p["seconds"], "runs": 1,
                                  "peak_rss_bytes": p["peak_rss_bytes"]} for p in pts]}
         records = {p["record_path"]: {"path_run_id": p["path_run_id"], "argv": [str(t) for t in entry_probe["cmd"][2:]],
                                       "peak_footprint_bytes": p["peak_footprint_bytes"],
                                       "entries": {eid: {"calls": 3, "raised": 0, "seconds": p["seconds"]}}} for p in pts}
+        # SPEC v5.51 (h)(i)：紀錄存於 RECORDS_ROOT 之下、點記其大小／sha256 與 footprint 來源（`_record_store_problems`）
+        for p in pts:
+            raw = json.dumps(records[p["record_path"]], sort_keys=True).encode("utf-8")
+            p.update(record_bytes=len(raw), record_sha256=hashlib.sha256(raw).hexdigest(),
+                     footprint_source=f"harness_record:{p['path_run_id']}")
         if mutate_record is not None:
-            mutate_record(records["rec-1000.json"])
+            mutate_record(records[f"{RECORDS_ROOT}/rec-1000.json"])
         files = {"r.json": probe_rec, **records}
+        monkeypatch.setattr(module, "_record_raw", lambda rp: (
+            json.dumps(files[rp], sort_keys=True).encode("utf-8") if rp in files else None))
         axis = {"axes": ["stage_cols"], "function": "stage_cols"}
         scale = {"head": head, "entries": {eid: {"probe": dict(entry_probe), "row_probe": None, "points": pts,
                                                  "coverage_path_id": "cp-m.a:f", "unit_axis": dict(axis)}}}
@@ -2502,7 +2606,7 @@ def _t02_inventory() -> Dict[str, Any]:
 
 def _t02_runs(exp: float = 1.0, dup: int = 0, intervals: Optional[List[List[float]]] = None,
               progress: Optional[List[float]] = None, calls2: int = 3, raised2: int = 0, e2_decreasing: bool = False,
-              unrequested: bool = False) -> Dict[Tuple[str, str], Dict[str, Any]]:
+              unrequested: bool = False, e2_per_col: float = 0.002) -> Dict[Tuple[str, str], Dict[str, Any]]:
     """合成之路徑實跑（記錄形狀同 icperf_scale_harness.run_one 寫出者）：E1＝輸入鍵入口、秒數 ∝ n^exp；E2＝非鍵入口。"""
     points, records = [], {}
     for n in (500, 1000, 2000):
@@ -2512,7 +2616,7 @@ def _t02_runs(exp: float = 1.0, dup: int = 0, intervals: Optional[List[List[floa
                     "max_key_count": (2 if dup else 1) if keyed else None, "duplicate_examples": [],
                     "computed_columns": [f"c{i}" for i in range(n)] if keyed else None,
                     "long_intervals": intervals or [], "max_call_seconds": 0.5}
-        e2_sec = 0.002 * (3000 - n) if e2_decreasing else 0.002 * n
+        e2_sec = 0.002 * (3000 - n) if e2_decreasing else e2_per_col * n
         records[n] = [{"path_run_id": f"ic.cols{n}", "wall_seconds": 10.0, "peak_footprint_bytes": 5000 + n,
                        "facts": {"input_cols": n, "rows": 500, "survivors": 20, "requested_columns": None},
                        "progress_times": list(progress or []), "_record_path": f"rec-{n}.json",
@@ -2554,7 +2658,9 @@ def test_task02_assemble_receipt_schema(fb: Any, harness: Any, scale_probe: Any)
         assert m["fit"] == {"exponent": again["fit"]["exponent"], "r2": again["fit"]["r2"]}
         assert m["extrapolation_unreliable"] == again["extrapolation_unreliable"]
         assert set(m["criteria"]) == {"1", "2", "3", "4", "5"}
-        assert all(isinstance(c["result"], bool) and str(c["basis"]).strip() for c in m["criteria"].values())
+        # SPEC v5.51 (f)：判準②無原型且碼層不足以斷定 ⇒ result None＋pending_prototype；其餘判準 bool
+        assert all((isinstance(c["result"], bool) or (k == "2" and c["status"] == "pending_prototype"))
+                   and str(c["basis"]).strip() for k, c in m["criteria"].items())
         assert [p["path_run_id"] for p in m["points"]] == ["ic.cols500", "ic.cols1000", "ic.cols2000"]
         assert [p["peak_rss_bytes"] for p in m["points"]] == [10 ** 8 + n for n in (500, 1000, 2000)]
         assert [p["peak_footprint_bytes"] for p in m["points"]] == [5000 + n for n in (500, 1000, 2000)]
@@ -2624,3 +2730,189 @@ def test_task02_call_key_and_footprint_parse(harness: Any) -> None:
     assert harness.parse_footprint(text) == int(1.5 * 1024 ** 3)
     assert harness.parse_footprint("Physical footprint:  20M\n") == 20 * 1024 ** 2
     assert harness.parse_footprint("nothing") is None
+
+
+# ── SPEC v5.51 (a)(d)–(i)：量測工具修正之秒級契約（不跑量測） ──────────────────────────────────────────────
+
+
+def test_task02_split_precheck_row_axis(harness: Any) -> None:
+    """v5.51 (a)：秒級碼層預檢（產品 `_build_holdout_split_plan`＋`_precheck_rolling_warmup`）——實跑錨點：4h 2,000 列
+    之 IC 頁預設請求走樣本外（測試段 395 ≥ 383，SPEC v5.27 實跑）、1h 2,000 列退回全樣本（395 < 1,517）、C 格同型 1h
+    500 列不足 min_test_rows；4h 1,000 列預設請求不成立 ⇒ 列數軸須視窗覆寫；harness 選定之三列長於覆寫下皆成立、L 格 cols
+    軸（2,000 列、無覆寫）成立；移除覆寫（mutation）⇒ 1,000 列翻為不成立。樣本外分支入口歸 L 格路徑。"""
+    default_4h = harness.precheck_override("4h", row_windows=False)
+    p2000 = harness.split_precheck(2000, "4h", default_4h)
+    assert p2000["oos"] is True and p2000["test_rows"] == 395 and p2000["min_warmup_rows"] == 383
+    p1h = harness.split_precheck(2000, "1h", harness.precheck_override("1h", row_windows=False))
+    assert p1h["oos"] is False and p1h["reason"] == "rolling_warmup_insufficient" and p1h["min_warmup_rows"] == 1517
+    c500 = harness.split_precheck(500, "1h", harness.precheck_override("1h", row_windows=False))
+    assert c500["oos"] is False and c500["reason"] == "insufficient_data"
+    assert harness.split_precheck(1000, "4h", default_4h)["oos"] is False
+    res = harness.row_axis_precheck()
+    assert res["ok"] is True and res["scales"] == list(harness.ROW_AXIS_SCALES) and len(set(res["scales"])) == 3
+    assert all(r["oos"] for r in res["row_axis_request"]) and res["cols_axis"]["oos"] is True
+    assert res["cols_axis"]["n_rows"] == harness.LONG_CELL_ROWS
+    assert max(harness.ROW_AXIS_SCALES) <= harness.LONG_CELL_ROWS
+    assert harness.split_precheck(min(harness.ROW_AXIS_SCALES), "4h", default_4h)["oos"] is False  # 無覆寫 ⇒ 不成立
+    inv = {e["id"]: e for e in json.loads((REPO / "scripts" / "icperf_path_inventory.json").read_text("utf-8"))["entries"]}
+    for eid in ("momentum.Analysis.data_preprocessor:DataPreprocessor._clip_series_train",
+                "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._slice_rolling_ic_to_test"):
+        assert inv[eid]["branch_cell"] == "ic_page_long", eid
+    assert harness.RUN_AXES["ic_page_long"] == ("cols", "rows") and "rows" not in harness.RUN_AXES["ic_page_default"]
+    plan = harness.coverage_plan({"entries": list(inv.values())})
+    rows_cells = {c for c, ids in plan.items() if any("rows" in inv[i]["input_axes"] for i in ids)}
+    covered = {c for c in rows_cells if c in harness.ROW_AXIS_RUN}
+    assert {"ic_page_default", "ic_page_long", "deep_analysis"} <= covered
+    assert all("rows" in harness.RUN_AXES[harness.ROW_AXIS_RUN[c]] for c in covered)
+
+
+def _t02_event_case(n_events: Sequence[int] = (10, 20, 40)) -> Tuple[Dict[str, Any], Dict[Tuple[str, str], Any]]:
+    eid = "m.ev:analyze"
+    inv = {"entries": [{"id": eid, "stage": "ev", "input_axes": ["rows"], "ic_page": False, "ic_first": False,
+                        "loop": "per_bar", "measure": True, "no_measure_reason": None, "evidence": "m/ev.py:1",
+                        "branch_cell": "event_study", "coverage_path_id": "cp-ev",
+                        "unit_axis": {"axes": ["events"], "function": "n_events"}, "scale_vector": ["events"]}]}
+    points, records = [], {}
+    for k in n_events:
+        records[k] = [{"path_run_id": f"ev.events{k}", "run_id": "event_study", "wall_seconds": 1.0,
+                       "peak_footprint_bytes": 7000 + k, "progress_times": [], "_record_path": f"ev-{k}.json",
+                       "facts": {"input_cols": 0, "rows": 0, "events": k, "requested_columns": None},
+                       "entries": {eid: {"calls": 1, "raised": 0, "seconds": 0.01 * k, "max_rows": 0, "max_cols": 0,
+                                         "keyed": True, "n_keys": 1, "duplicate_keys": 0, "max_key_count": 1,
+                                         "duplicate_examples": [], "computed_columns": [], "long_intervals": [],
+                                         "max_call_seconds": 0.1}}}]
+        points.append({"scale": k, "unit": "events", "runs": 1, "seconds": 2.0, "peak_rss_bytes": 10 ** 8 + k})
+    cmd = ["venv/bin/python", "scripts/icperf_scale_harness.py", "run", "event_study", "--axis", "events"]
+    runs = {("event_study", "events"): {"probe": {"cmd": cmd, "data": [], "config": []}, "receipt_path": "ev.json",
+                                        "receipt": {"points": points, "projection": {"scale": max(n_events)}},
+                                        "records": records}}
+    return inv, runs
+
+
+def test_task02_event_axis_assembly(harness: Any, scale_probe: Any) -> None:
+    """v5.51 (d)：事件研究入口（只有事件數一軸）之組裝以 events 為 x 軸取三點、不要求欄數軸；fit 對 (events, seconds)
+    重算；過 boundary_16 之 `_entry_schema_problems`；缺一點 ⇒ schema 問題。"""
+    inv, runs = _t02_event_case()
+    m = harness.assemble_scale_receipt(inv, runs, head="0" * 40, scale_probe=scale_probe,
+                                       budget_seconds=BUDGET2_UPPER_SECONDS, sample_interval_seconds=0.2,
+                                       chunk_cap={"bytes": 1, "basis": "x"})["entries"]["m.ev:analyze"]
+    assert m["axis"] == "events" and m["fit_axis"] == "events" and m["two_point_exception"] is None
+    assert [p["events"] for p in m["points"]] == [10, 20, 40]
+    assert [p["scale_vector"]["events"] for p in m["points"]] == [10, 20, 40]
+    again = scale_probe.fit([{"scale": p["events"], "unit": "events", "seconds": p["seconds"],
+                              "peak_rss_bytes": p["peak_rss_bytes"]} for p in m["points"]], m["fit_full_scale"])
+    assert m["fit"] == {"exponent": again["fit"]["exponent"], "r2": again["fit"]["r2"]}
+    inv_entry = inv["entries"][0]
+    assert _entry_schema_problems(m, inv_entry) == []
+    assert _entry_schema_problems({**m, "points": m["points"][:2]}, inv_entry)
+    with pytest.raises(harness.AssemblyError) as exc:  # 只有 cols 軸實跑 ⇒ 事件入口無主軸量測
+        harness.assemble_scale_receipt(inv, {("event_study", "cols"): runs[("event_study", "events")]}, head="0" * 40,
+                                       scale_probe=scale_probe, budget_seconds=1.0, sample_interval_seconds=0.2,
+                                       chunk_cap={"bytes": 1, "basis": "x"})
+    assert any("events" in p for p in exc.value.problems)
+
+
+def test_task02_attempt_reuse_requires_identity(fb: Any, tmp_path: Path) -> None:
+    """v5.51 (e)：已完成 attempt 只在量測碼身分（HEAD、量測碼與清冊 sha256、輸入檔身分、規模、命令）全同時沿用；HEAD、
+    量測碼內容、輸入檔內容、規模任一不同 ⇒ 開新 attempt；身分檔缺或未給身分 ⇒ 不沿用（反例）。"""
+    probe_dir, records_dir = tmp_path / "probe", tmp_path / "records"
+    data = tmp_path / "in.bin"
+    data.write_bytes(b"a" * 10)
+    ident = fb._task02_identity("a" * 40, data=[str(data)], config=[], scales=[500], cmd=["x", "{scale}"])
+    assert set(ident["code"]) == set(fb.TASK02_CODE_FILES) and all(ident["code"].values())
+    assert ident["inputs"][0]["sha256"] == hashlib.sha256(b"a" * 10).hexdigest()
+    probe_dir.mkdir()
+    (probe_dir / "p-cols-a1.json").write_text(json.dumps({"points": [{"scale": 500, "runs": 1}]}), encoding="utf-8")
+    att = records_dir / "p-cols-a1"
+    (att / "p" / "cols-500").mkdir(parents=True)
+    (att / "p" / "cols-500" / "r.json").write_text(json.dumps({"path_run_id": "r"}), encoding="utf-8")
+    (att / fb.TASK02_IDENTITY_FILE).write_text(json.dumps(ident), encoding="utf-8")
+    assert fb._task02_attempt(probe_dir, records_dir, "p", "cols", ident) == (1, True)
+    assert fb._task02_attempt(probe_dir, records_dir, "p", "cols", None) == (2, False)
+    assert fb._task02_attempt(probe_dir, records_dir, "p", "cols", {**ident, "head": "b" * 40}) == (2, False)
+    code = dict(ident["code"])
+    code["scripts/icperf_scale_harness.py"] = "0" * 64
+    assert fb._task02_attempt(probe_dir, records_dir, "p", "cols", {**ident, "code": code}) == (2, False)
+    assert fb._task02_attempt(probe_dir, records_dir, "p", "cols", {**ident, "scales": [1000]}) == (2, False)
+    data.write_bytes(b"b" * 11)  # 輸入檔內容變 ⇒ 身分變 ⇒ 不沿用
+    changed = fb._task02_identity("a" * 40, data=[str(data)], config=[], scales=[500], cmd=["x", "{scale}"])
+    assert changed != ident and fb._task02_attempt(probe_dir, records_dir, "p", "cols", changed) == (2, False)
+    (att / fb.TASK02_IDENTITY_FILE).unlink()
+    assert fb._task02_attempt(probe_dir, records_dir, "p", "cols", ident) == (2, False)
+
+
+def test_task02_criterion2_code_level(harness: Any, scale_probe: Any) -> None:
+    """v5.51 (f)：判準②不得固定 False——無原型且每單位秒數高於硬體下限 × 10 ⇒ result None＋pending_prototype（列收據頂層；
+    超線性與同階之碼層階數差只記於 evidence，不作 10 倍實證）；每單位秒數 < 10 × 硬體下限 ⇒ False（hardware_floor）；有原型下限
+    ⇒ 數值比（≥ 10 倍 True、否則 False）。改壞成固定 False（mutation）⇒ 本測試之 pending 斷言翻紅。"""
+    base = {"unit_axis": {"axes": ["stage_cols"], "function": "stage_cols^2"}, "lower_bound_analysis": "x"}
+    c = harness.criterion2({**base, "unit_seconds": 1e-3, "lower_bound_seconds_per_unit": None})
+    assert c["result"] is None and c["status"] == "pending_prototype" and c["evidence"]["order_gap"] == "superlinear"
+    lin = harness.criterion2({**base, "unit_axis": {"axes": ["rows"], "function": "stage_cols*rows（x）"},
+                              "unit_seconds": 1e-3})
+    assert lin["result"] is None and lin["evidence"]["order_gap"] == "same_order"
+    win = harness.criterion2({**base, "unit_axis": {"axes": ["rows"], "function": "survivors*rows*W"}, "unit_seconds": 1})
+    assert win["evidence"]["order_gap"] == "superlinear"
+    floor = harness.criterion2({**base, "unit_seconds": 5e-10})
+    assert floor["result"] is False and floor["status"] == "decided" and floor["basis"].startswith("hardware_floor")
+    assert harness.criterion2({**base, "unit_seconds": 1e-3, "lower_bound_seconds_per_unit": 1e-5})["result"] is True
+    assert harness.criterion2({**base, "unit_seconds": 9e-5, "lower_bound_seconds_per_unit": 1e-5})["result"] is False
+    receipt = _t02_assemble(harness, scale_probe)
+    for eid, m in receipt["entries"].items():
+        assert m["criteria"]["2"]["status"] == "pending_prototype" and m["unit_seconds"] > 0, eid
+        assert _criterion2_problems(eid, m, receipt) == [], _criterion2_problems(eid, m, receipt)
+    assert receipt["pending_prototype"] == sorted(receipt["entries"])
+    fixed = {**receipt["entries"][T02_E1], "criteria": {**receipt["entries"][T02_E1]["criteria"],
+                                                         "2": {"result": False, "basis": "固定", "status": "decided"}}}
+    assert _criterion2_problems(T02_E1, fixed, receipt)  # 固定 False ⇒ 問題
+
+
+def test_task02_two_point_only_when_over_budget(harness: Any, scale_probe: Any) -> None:
+    """v5.51 (g)：某入口 500／1000 推估 2000 欄逾 10 分鐘，但收據合計推估未逾 budget_seconds ⇒ 三點皆收、不帶例外；
+    合計推估逾 budget_seconds ⇒ 該入口兩點例外（2,000 欄點移 excluded_points），其餘入口仍三點。頂層 total_projected_seconds
+    ＝scale_probe 逐點 seconds × runs 之和。"""
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "sample_interval_seconds": 0.2,
+          "chunk_cap": {"bytes": 1, "basis": "x"}}
+    runs = _t02_runs(e2_per_col=0.4)  # E2：500 欄 200 秒、1000 欄 400 秒 ⇒ 推估 2000 欄 800 秒 > 600
+    assert harness.projected_2000_seconds([{"input_cols": 500, "seconds": 200.0},
+                                           {"input_cols": 1000, "seconds": 400.0}]) > TWO_POINT_SECONDS
+    under = harness.assemble_scale_receipt(_t02_inventory(), runs, budget_seconds=BUDGET2_UPPER_SECONDS, **kw)
+    assert under["total_projected_seconds"] == 33.0 and under["budget_exceeded"] is False
+    assert under["entries"][T02_E2]["two_point_exception"] is None and len(under["entries"][T02_E2]["points"]) == 3
+    over = harness.assemble_scale_receipt(_t02_inventory(), runs, budget_seconds=30.0, **kw)
+    assert over["budget_exceeded"] is True
+    m2 = over["entries"][T02_E2]
+    assert m2["two_point_exception"]["projected_2000_seconds"] > TWO_POINT_SECONDS
+    assert [p["input_cols"] for p in m2["points"]] == [500, 1000] and [p["input_cols"] for p in m2["excluded_points"]] == [2000]
+    assert over["entries"][T02_E1]["two_point_exception"] is None and len(over["entries"][T02_E1]["points"]) == 3
+
+
+def test_task02_footprint_same_path_run_and_record_store(harness: Any, scale_probe: Any, fb: Any,
+                                                          tmp_path: Path) -> None:
+    """v5.51 (h)：每點 footprint 取自同 path_run_id（牆鐘中位數者）之紀錄，不取同點他次實跑之最大值；RSS 取 scale_probe。
+    v5.51 (i)：紀錄存處常數＝`handoffs/run_receipts/icperf_task02_records`（兩模組一致）、`_task02_records` 記每檔位元組數與
+    sha256 並傳至點之 record_bytes／record_sha256。"""
+    runs = _t02_runs()
+    run = runs[("ic_page_default", "cols")]
+    run["receipt"]["points"] = [{**q, "runs": 3} for q in run["receipt"]["points"]]
+    for n, recs in run["records"].items():
+        base = recs[0]
+        run["records"][n] = [{**base, "path_run_id": f"ic.cols{n}.{i}", "wall_seconds": w,
+                              "peak_footprint_bytes": fp, "_record_path": f"rec-{n}-{i}.json"}
+                             for i, (w, fp) in enumerate(((5.0, 1000 + n), (10.0, 2000 + n), (20.0, 9_000_000)))]
+    receipt = harness.assemble_scale_receipt(_t02_inventory(), runs, head="0" * 40, scale_probe=scale_probe,
+                                             budget_seconds=BUDGET2_UPPER_SECONDS, sample_interval_seconds=0.2,
+                                             chunk_cap={"bytes": 1, "basis": "x"})
+    for m in receipt["entries"].values():
+        assert [p["path_run_id"] for p in m["points"]] == [f"ic.cols{n}.1" for n in (500, 1000, 2000)]
+        assert [p["peak_footprint_bytes"] for p in m["points"]] == [2000 + n for n in (500, 1000, 2000)]
+        assert all(p["footprint_source"] == f"harness_record:{p['path_run_id']}" for p in m["points"])
+        assert all(p["rss_source"] == "scale_probe:r.json" for p in m["points"])
+    assert receipt["meter"]["footprint"]["source"] == "harness_record_same_path_run_id"
+    assert fb.TASK02_RECORDS_ROOT == harness.TASK02_RECORDS_ROOT == RECORDS_ROOT
+    d = tmp_path / "ic_page_default" / "cols-500"
+    d.mkdir(parents=True)
+    body = json.dumps({"path_run_id": "x", "peak_footprint_bytes": 5}).encode("utf-8")
+    (d / "x.json").write_bytes(body)
+    got = fb._task02_records(tmp_path, "ic_page_default", "cols")[500][0]
+    assert got["_record_bytes"] == len(body) and got["_record_sha256"] == hashlib.sha256(body).hexdigest()
