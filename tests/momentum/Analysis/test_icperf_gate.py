@@ -487,7 +487,12 @@ def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, 
     out: Dict[str, Dict[str, Any]] = {}
     for item in OUTPUT_ITEMS:
         work = tmp_path_factory.mktemp(f"oracle_{item}")
-        request = fb.small_request(item, golden["items"][item]["request"], ORACLE_FEATURES)
+        # 優先取凍結倖存者（同格他項之 "selected" 亦取：深度分析項之記錄不存倖存者，與同格 IC 頁項同請求設定），
+        # 使小規模請求與凍結走同一寫出分支（有倖存者才寫 filtered HDF5）
+        cell = golden["items"][item]["request"].get("cell")
+        prefer = sorted({n for rec in golden["items"].values() if isinstance(rec, dict)
+                         and (rec.get("request") or {}).get("cell") == cell for n in (rec.get("selected") or [])})
+        request = fb.small_request(item, golden["items"][item]["request"], ORACLE_FEATURES, prefer=prefer)
         iso = work / item / "iso"
         before = _oracle_walk(_oracle_roots(work / item / "cwd", iso))
         record = fb.freeze_item(item, request=request, repo_root=REPO, work_root=work)
@@ -2233,6 +2238,18 @@ def test_mutation_boundary_16_receipt_identity(monkeypatch: pytest.MonkeyPatch) 
     for mutate in schema_bad:
         with pytest.raises(AssertionError):
             run(p, m, mutate)
+
+
+def test_small_request_prefers_frozen_survivors(fb: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """boundary_01／02 之小規模 oracle 請求：`prefer`（凍結之倖存者）中屬該 run 者排序後在前、餘額依欄名排序補足；不在該
+    run 之名不入；未給 `prefer` ⇒ 與原行為相同（排序後前 n 個；Task 0.3 收據擷取依此）。"""
+    pool = ["f05", "f01", "f04", "f02", "f03"]
+    monkeypatch.setattr(fb, "_run_feature_names", lambda request: list(pool))
+    req = {"kind": "ic_page"}
+    pick = lambda **kw: fb.small_request("ic_report", req, 3, **kw)["feature_filter"]["include_features"]
+    assert pick() == ["f01", "f02", "f03"]
+    assert pick(prefer=["f05", "zz", "f04"]) == ["f04", "f05", "f01"]
+    assert pick(prefer=["f05", "f04", "f03", "f02"]) == ["f02", "f03", "f04"]
 
 
 def test_runs_inventory_lists_cards_and_cardless_dirs(tmp_path: Path) -> None:

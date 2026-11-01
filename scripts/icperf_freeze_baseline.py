@@ -1060,16 +1060,21 @@ def resolve_output_roots(item: str, request: Mapping[str, Any], repo_root: Path 
     return [Path(repo_root) / r for r in rels]
 
 
-def small_request(item: str, request: Mapping[str, Any], n_features: int) -> Dict[str, Any]:
-    """同一請求（凍結檔所記之 `request`）限縮為前 n_features 個真實特徵（排序後之特徵名；IC 頁為 `feature_filter`，
-    其餘路徑用其對應之選欄設定），其餘設定不變；供 boundary_01／02 之獨立 oracle 以小規模真實請求對照。
+def small_request(item: str, request: Mapping[str, Any], n_features: int,
+                  prefer: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+    """同一請求（凍結檔所記之 `request`）限縮為 n_features 個真實特徵（IC 頁為 `feature_filter`，其餘路徑用其對應之
+    選欄設定），其餘設定不變；供 boundary_01／02 之獨立 oracle 以小規模真實請求對照。
 
-    IC 頁：`feature_filter.include_features`＝該 run raw 欄名排序後之前 n_features 個（`_run_feature_names`）。
+    IC 頁：`feature_filter.include_features`＝`prefer`（凍結記錄之倖存者 "selected"）中屬該 run 者排序後在前，餘額以
+    該 run raw 欄名排序補足至 n_features 個（`_run_feature_names`）——使小規模請求與凍結走同一組寫出分支（有倖存者
+    才寫 filtered HDF5；2026-11-01 只取排序前 20 欄時三項倖存者皆 0，寫出根與凍結不同）。
     IC-first：`FeatureFactory.run_ic_first` 無選欄設定（參數見 `feature_factory.py:2809-2831`），回同一請求不變
     （A 格整格生成；回報 CONTRACT_MISMATCH）。"""
     new = _json_copy(request)
     if new.get("kind") == "ic_page":
-        names = sorted(_run_feature_names(new))[:int(n_features)]
+        pool = sorted(_run_feature_names(new))
+        first = sorted(set(prefer or ()) & set(pool))[:int(n_features)]
+        names = first + [n for n in pool if n not in set(first)][:int(n_features) - len(first)]
         if len(names) < int(n_features):
             raise FreezeError(f"{item}：run 之特徵數 {len(names)} < 請求之 {n_features}")
         new["feature_filter"] = {"include_features": names}
