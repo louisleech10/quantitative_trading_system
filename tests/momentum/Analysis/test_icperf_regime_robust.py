@@ -93,6 +93,23 @@ def _real_kline(rows: int, timeframe: str = "1h", symbol: str = "BTCUSDT") -> pd
     )
 
 
+def _real_kline_all(timeframe: str = "1h", symbol: str = "BTCUSDT") -> pd.DataFrame:
+    """真實 kline 全部歷史（產品 `_read_klines_float64` 之 `read_klines(symbol, timeframe)` 不帶範圍；SPEC ㊳ 之
+    regime_history 即此）。"""
+    with h5py.File(KLINE_CACHE, "r") as f:
+        data = f[f"{symbol}/{timeframe}/data"][:]
+    idx = pd.to_datetime(data["timestamp"].astype("int64"), unit="s", utc=True)
+    return pd.DataFrame(
+        {"close": data["close"].astype("float64"), "volume": data["volume"].astype("float64")}, index=idx
+    )
+
+
+def _sampled(masks_full: Mapping[str, np.ndarray], full_index: pd.Index, keys: pd.Index) -> Dict[str, np.ndarray]:
+    """SPEC ㊳：完整歷史上算出之 regime 遮罩依時間鍵取樣於分析列；鍵不在歷史 ⇒ False。"""
+    return {n: pd.Series(m, index=full_index).reindex(keys).fillna(False).to_numpy(dtype=bool)
+            for n, m in masks_full.items()}
+
+
 def _forward_return(close: pd.Series) -> pd.Series:
     """標籤＝1 根前瞻簡單報酬 close[t+1]／close[t] − 1。"""
     return (close.shift(-1) / close - 1.0).rename("label")
@@ -636,8 +653,11 @@ def test_regime_robust_end_to_end_analyze_and_refilter(tmp_path: Path, regime_me
                           kline_reader=create_kline_storage_manager(cache_dir=str(KLINE_CACHE.parent)))
     scope = _scope_rows(report, feats.index)
     ks, fs, ls = k[scope], feats[scope], label[scope]
-    masks = oracle_rule_masks(ks["close"]) if regime_method == "rule" else _kmeans_masks(
-        oracle_kmeans_labels(ks["close"], ks["volume"]))
+    # SPEC ㊳（a8349c9d）：regime 於完整連續 kline（產品 `regime_history`＝raw_data＝該 symbol／tf 全部歷史）只用 0..t
+    # 算出後取樣於分析列（測試段）；改前於 k[scope] 上算（測試段缺暖機、波動分位起點不同）
+    kh = _real_kline_all("4h")
+    masks = _sampled(oracle_rule_masks(kh["close"]) if regime_method == "rule" else _kmeans_masks(
+        oracle_kmeans_labels(kh["close"], kh["volume"])), kh.index, fs.index)
     oracle = oracle_by_regime(fs, ls, masks, "spearman")
     by = report["grouped_ic"]["by_regime"]
     assert set(by) == set(oracle)
@@ -672,7 +692,8 @@ def test_regime_robust_end_to_end_uses_request_ic_method(tmp_path: Path) -> None
                           kline_reader=create_kline_storage_manager(cache_dir=str(KLINE_CACHE.parent)))
     scope = _scope_rows(report, feats.index)
     ks, fs, ls = k[scope], feats[scope], label[scope]
-    masks = oracle_rule_masks(ks["close"])
+    kh = _real_kline_all("4h")
+    masks = _sampled(oracle_rule_masks(kh["close"]), kh.index, fs.index)  # SPEC ㊳：全部歷史算出後取樣於分析列
     oracle = oracle_by_regime(fs, ls, masks, "pearson")
     spear = oracle_by_regime(fs, ls, masks, "spearman")
     by = report["grouped_ic"]["by_regime"]
