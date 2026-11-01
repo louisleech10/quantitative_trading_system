@@ -21,6 +21,7 @@
   venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/<日期>-icperf-volatile-probe.json
   venv/bin/python scripts/icperf_freeze_baseline.py set-volatile --probe <實測收據>
   venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell [--out <結果 JSON>]   # 估時收據 coverage_path_ids＝ICPERF-BUDGET-8
+  venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell --symbol ETHUSDT     # SPEC v5.53 (c1)：同一生成定義之 ETH 4h 長歷史格（先 precheck-xsec-long、估時）
   venv/bin/python scripts/icperf_freeze_baseline.py inventory --out handoffs/run_receipts/<日期>-icperf-path-inventory.json
   venv/bin/python scripts/icperf_freeze_baseline.py measure --inventory <清冊> --out handoffs/run_receipts/<日期>-icperf-scale-before.json
 
@@ -110,6 +111,16 @@ LONG_CELL_SOURCE = "data_cache/feature_klines_longhist/kline_cache.h5"
 LONG_CELL_LABEL_SOURCE = "data_cache/feature_klines/kline_cache.h5"
 LONG_CELL_BARS = 2000
 LONG_CELL_ROOT = "data_cache/numview_freeze_runs/{cell}__default"
+#: SPEC v5.53 (c1)（code review r64 R1）：跨標的預設切分分支之第二長歷史格——L 格同一生成定義（`LONG_CELL_BASE` 之格類、
+#: 週期、設定覆寫、`LONG_CELL_SOURCE`、`LONG_CELL_BARS`、輸出段規則 `long_cell_window`），只把標的換為
+#: `LONG_CELL_XSEC_SYMBOL`；與 L 格（BTCUSDT 4h）組跨標的長資料（`icperf_scale_harness` 之 `cross_sectional_long`）。
+#: 生成前之秒級預檢（兩標的時間重疊、有效列數、預設切分可達）：`icperf_scale_harness.py precheck-xsec-long`
+#: 夥伴標的＝ETHUSDT（2026-11-01 主委實查：`LONG_CELL_SOURCE` 有 ETHUSDT 4h 19,964 根、無 SOLUSDT 4h ⇒ SOL 不可依同一生成
+#: 定義生成；改 ETH，SPEC 名稱由主委同步）
+LONG_CELL_XSEC_SYMBOL = "ETHUSDT"
+LONG_CELL_XSEC = "L_ETHUSDT_4h_longhist"
+#: 長歷史格之標的 ⇒ 格 id（`gen-long-cell --symbol`）
+LONG_CELLS_BY_SYMBOL = {"BTCUSDT": LONG_CELL, LONG_CELL_XSEC_SYMBOL: LONG_CELL_XSEC}
 
 #: §G (1)–(7)：A 格完整 IC 報告、2,000 欄子集第 5 段、A 格深度分析（全部模組）、A 格 K 線條件式事件 IC 報告、A 格 IC-first
 #: post-IC 輸出（V2 parquet artifact；IC-first 不寫 HDF5）、長資料格 L 之 IC 報告與深度分析（SPEC v5.26 第 (6) 項兩鍵）、
@@ -2295,30 +2306,66 @@ def _child_icfirst_raw(spec: Mapping[str, Any]) -> Dict[str, Any]:
                 "generation": _json_copy(generation)}
 
 
-def long_cell_descriptor() -> Dict[str, Any]:
-    """長資料格 L 之格描述子：`LONG_CELL_BASE` 之描述子（判準檔格類、標的、週期）改 id 為 `LONG_CELL`。"""
-    return {**_cell_descriptor(LONG_CELL_BASE), "id": LONG_CELL}
+def long_cell_descriptor(symbol: Optional[str] = None) -> Dict[str, Any]:
+    """長資料格 L 之格描述子：`LONG_CELL_BASE` 之描述子（判準檔格類、標的、週期）改 id 為 `LONG_CELL`。SPEC v5.53 (c1)：
+    `symbol` 給定且不同於基底標的 ⇒ 同一格類／週期、標的換為 `symbol`、id 取 `LONG_CELLS_BY_SYMBOL`（未列之標的 ⇒
+    FreezeError；不自造格 id）。"""
+    base = _cell_descriptor(LONG_CELL_BASE)
+    if symbol is None or str(symbol) == base["symbol"]:
+        return {**base, "id": LONG_CELL}
+    if str(symbol) not in LONG_CELLS_BY_SYMBOL:
+        raise FreezeError(f"長歷史格未定義標的 {symbol}（LONG_CELLS_BY_SYMBOL：{sorted(LONG_CELLS_BY_SYMBOL)}）")
+    return {**base, "id": LONG_CELLS_BY_SYMBOL[str(symbol)], "symbol": str(symbol)}
 
 
-def long_cell_criteria(criteria: Mapping[str, Any]) -> Dict[str, Any]:
+def long_cell_criteria(criteria: Mapping[str, Any], symbol: Optional[str] = None) -> Dict[str, Any]:
     """NUMVIEW 判準檔之複本：L 格所屬格類之 `output_bars` 改 `LONG_CELL_BARS`、主週期之 K 線來源改 `LONG_CELL_SOURCE`
-    （其餘生成定義不變）。"""
-    desc = long_cell_descriptor()
+    （其餘生成定義不變；與標的無關，`symbol` 只用以取同一格類／週期）。"""
+    desc = long_cell_descriptor(symbol)
     out = _json_copy(criteria)
     out["cell_definitions"][desc["kind"]]["output_bars"] = LONG_CELL_BARS
     out["cell_rules"]["kline_source"]["by_timeframe"][desc["timeframes"][0]] = LONG_CELL_SOURCE
     return out
 
 
-def long_cell_window(repo_root: Path = REPO) -> Tuple[str, str]:
+def long_cell_source_check(symbol: Optional[str] = None, repo_root: Path = REPO) -> Dict[str, Any]:
+    """SPEC v5.53 (c1) 生成前之秒級檢查（只讀 K 線時間戳）：長歷史格之 `<symbol>/<週期>/data` 須同時存在於 `LONG_CELL_SOURCE`
+    （生成之 K 線來源）與 `LONG_CELL_LABEL_SOURCE`（IC 頁標籤來源）。回 {"cell", "symbol", "timeframe", "key",
+    "long_source": {"path", "present", "bars", "first_ts", "last_ts"}, "label_source": {同}, "ok"}。"""
+    import h5py
+
+    desc = long_cell_descriptor(symbol)
+    key = f"{desc['symbol']}/{desc['timeframes'][0]}/data"
+
+    def probe(rel: str) -> Dict[str, Any]:
+        with h5py.File(str(Path(repo_root) / rel), "r") as f:
+            if key not in f:
+                return {"path": rel, "present": False, "bars": 0, "first_ts": None, "last_ts": None}
+            ts = f[key]["timestamp"]
+            return {"path": rel, "present": True, "bars": int(ts.shape[0]), "first_ts": int(ts[0]),
+                    "last_ts": int(ts[-1])}
+
+    long_src, label_src = probe(LONG_CELL_SOURCE), probe(LONG_CELL_LABEL_SOURCE)
+    return {"cell": desc["id"], "symbol": desc["symbol"], "timeframe": desc["timeframes"][0], "key": key,
+            "long_source": long_src, "label_source": label_src,
+            "ok": bool(long_src["present"] and label_src["present"])}
+
+
+def long_cell_window(repo_root: Path = REPO, symbol: Optional[str] = None) -> Tuple[str, str]:
     """L 格輸出段：`LONG_CELL_SOURCE` 主週期序列中時間戳 ≤ `LONG_CELL_LABEL_SOURCE` 同序列末根者之最後 `LONG_CELL_BARS`
-    根之（起, 訖）ISO 字串（UTC）；根數不足或標籤來源末根不在長歷史序列 ⇒ FreezeError。"""
+    根之（起, 訖）ISO 字串（UTC）；根數不足或標籤來源末根不在長歷史序列 ⇒ FreezeError。SPEC v5.53 (c1)：`symbol` 給定 ⇒
+    該標的之同一規則（長歷史檔無該序列 ⇒ FreezeError）。"""
     import h5py
     import numpy as np
     import pandas as pd
 
-    desc = long_cell_descriptor()
+    desc = long_cell_descriptor(symbol)
     key = f"{desc['symbol']}/{desc['timeframes'][0]}/data"
+    check = long_cell_source_check(symbol, repo_root)
+    if not check["ok"]:
+        raise FreezeError(f"{desc['id']}：{key} 不在{'長歷史檔 ' + LONG_CELL_SOURCE if not check['long_source']['present'] else ''}"
+                          f"{'標籤來源 ' + LONG_CELL_LABEL_SOURCE if not check['label_source']['present'] else ''}"
+                          "（資料不足：須先補該標的之長歷史 K 線）")
     with h5py.File(str(Path(repo_root) / LONG_CELL_LABEL_SOURCE), "r") as f:
         end = int(f[key]["timestamp"][-1])
     with h5py.File(str(Path(repo_root) / LONG_CELL_SOURCE), "r") as f:
@@ -2336,11 +2383,18 @@ def _long_cell_sidecar(work: Path) -> Optional[Dict[str, Any]]:
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
 
-def gen_long_cell(*, repo_root: Path = REPO, work_root: Optional[Path] = None) -> Dict[str, Any]:
+def gen_long_cell(*, repo_root: Path = REPO, work_root: Optional[Path] = None,
+                  symbol: Optional[str] = None) -> Dict[str, Any]:
     """生成長資料格 L（SPEC v5.26 Task 0.3、ICPERF-BUDGET-8）：子行程（`_run_child`，經共用監看）以
     `numview_freeze_baseline.generate_cell_run` 於 `LONG_CELL_ROOT` 生成（判準檔以 `long_cell_criteria` 覆寫輸出段）。
-    已有 complete 之 sidecar ⇒ 不重生、回其內容；目錄存在而無 sidecar（前次中斷）⇒ FreezeError（不自行刪除，交使用者清）。"""
-    work = Path(repo_root) / LONG_CELL_ROOT.format(cell=LONG_CELL)
+    已有 complete 之 sidecar ⇒ 不重生、回其內容；目錄存在而無 sidecar（前次中斷）⇒ FreezeError（不自行刪除，交使用者清）。
+    SPEC v5.53 (c1)：`symbol`（如 `LONG_CELL_XSEC_SYMBOL`）⇒ 同一生成定義之該標的長歷史格（格 id＝`LONG_CELLS_BY_SYMBOL`）；
+    啟動子行程前先以 `long_cell_source_check` 驗兩來源檔皆有該序列、`long_cell_window` 驗輸出段可得（不成立 ⇒ FreezeError，
+    不生成）。重型（同 BUDGET-8）：開跑前須先跑 `icperf_scale_harness.py precheck-xsec-long` 並寫估時收據。"""
+    desc = long_cell_descriptor(symbol)
+    if symbol is not None:
+        long_cell_window(Path(repo_root), symbol)  # 生成前預檢：來源缺序列或根數不足 ⇒ FreezeError
+    work = Path(repo_root) / LONG_CELL_ROOT.format(cell=desc["id"])
     side = _long_cell_sidecar(work)
     if side is not None and side.get("status") == "complete":
         return {"reused": True, "work": str(work), "sidecar": side}
@@ -2348,7 +2402,7 @@ def gen_long_cell(*, repo_root: Path = REPO, work_root: Optional[Path] = None) -
         raise FreezeError(f"{work} 已存在而無 complete sidecar（前次生成中斷）；請先移除該目錄再重跑")
     tmp = Path(work_root) if work_root is not None else new_work_root("icperf-longcell-", Path(repo_root))
     out = tmp / "capture" / "result.json"
-    spec = {"task": "gen_long_cell", "work": str(work), "out_json": str(out)}
+    spec = {"task": "gen_long_cell", "work": str(work), "out_json": str(out), "symbol": symbol}
     result = _run_child(spec, cwd=_prepare_cwd(tmp / "cwd", repo_root), work_dir=tmp / "capture", iso=tmp / "iso")
     return {"reused": False, "work": str(work), "sidecar": result}
 
@@ -2464,13 +2518,15 @@ def _child_c_handoff(spec: Mapping[str, Any]) -> Dict[str, Any]:
 
 def _child_gen_long_cell(spec: Mapping[str, Any]) -> Dict[str, Any]:
     """`gen_long_cell` 之子行程：`numview_freeze_baseline._criteria` 換為 `long_cell_criteria` 之結果、估時器之
-    `cell_window` 換為 `long_cell_window` 後呼叫 `generate_cell_run`（只在本子行程內換）；回 sidecar（JSON 化）。"""
+    `cell_window` 換為 `long_cell_window` 後呼叫 `generate_cell_run`（只在本子行程內換）；回 sidecar（JSON 化）。
+    SPEC v5.53 (c1)：`spec["symbol"]`（None＝L 格基底標的）⇒ 同一生成定義之該標的長歷史格。"""
     nfb = _load("icperf_numview_freeze_baseline", REPO / "scripts" / "numview_freeze_baseline.py")
-    criteria = long_cell_criteria(nfb._criteria())
+    symbol = spec.get("symbol")
+    criteria = long_cell_criteria(nfb._criteria(), symbol)
     nfb._criteria = lambda: criteria
-    window = long_cell_window()
+    window = long_cell_window(symbol=symbol)
     nfb._estimator().cell_window = lambda cell, crit: window
-    side = nfb.generate_cell_run(Path(spec["work"]), long_cell_descriptor(), {})
+    side = nfb.generate_cell_run(Path(spec["work"]), long_cell_descriptor(symbol), {})
     return json.loads(json.dumps(side, ensure_ascii=False, default=str))
 
 
@@ -2685,6 +2741,10 @@ def inventory_problems(inv: Mapping[str, Any]) -> List[str]:
                                       and not set(fixed) & set(e["input_axes"])
                                       and all(isinstance(v, str) and v.strip() for v in fixed.values())):
             out.append(f"{eid}：fixed_axes 須為 {{scale_vector 內、不在 input_axes 之軸: 碼證理由}}")
+        # SPEC v5.53 (c0)（code review r64）：unit_axis 所列之軸為成本軸，不得記為不量之 fixed_axes
+        elif fixed is not None and set(fixed) & set((e.get("unit_axis") or {}).get("axes") or []):
+            out.append(f"{eid}：fixed_axes {sorted(set(fixed) & set(e['unit_axis']['axes']))} 為 unit_axis 之成本軸，"
+                       "須排量測軸（SPEC v5.53 (c0)）")
         if e["loop"] not in INVENTORY_LOOPS:
             out.append(f"{eid}：loop 非法")
         sv = e["scale_vector"]
@@ -2783,7 +2843,12 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
     欄數、列長），不同即重建；存檔輸入之讀端驗 `stage_identity.json`。(b) 排程＝`schedule_runs`（主軸＋第二軸：rows／跨標的
     timestamps／事件型 events／IC-first rows），`schedule_coverage` 有未涵蓋者 ⇒ FreezeError；各軸規模點＝`axis_scales`；
     post_ic_transform rows 與 IC-first 先經 `prepare`（共用監看之子行程）建存檔輸入。(c) IC-first cols 軸三規模＝write_raw
-    重寫之子集 run（須先 `gen-icfirst-raw` 與 `gen-icfirst-raw --rows 1000／2000`）。"""
+    重寫之子集 run（須先 `gen-icfirst-raw` 與 `gen-icfirst-raw --rows 1000／2000`）。
+
+    v5.53（code review r64）：(c0) 事件路徑之 K 線根數軸——unit_axis 含 rows 之事件入口排 (event_import|event_study, rows)，
+    三種根數＝`event_bar_scales`（固定全部事件），開跑前以 `prepare_event_bars` 於 `TASK02_ROOT/event_bars/` 建隔離截短複本
+    （不改 `data_cache/feature_klines/kline_cache.h5`）；(c1) 跨標的長資料之預設切分分支（`VARIANT_RUNS`）——兩長歷史格須已
+    生成且 `xsec_long_precheck` 判預設切分可達，否則開跑前 FreezeError；收據 `variants` 段（`require_variants`）。"""
     import time
 
     h = _harness()
@@ -2835,10 +2900,25 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
         if res["rc"] != 0:
             raise FreezeError(f"prepare {what} 失敗 rc={res['rc']}（見 {res['log_path']}）")
     event_scales = _event_scales(h) if any(a == "events" for _r, a in sched) else []
+    # SPEC v5.53 (c1)：跨標的長資料之預設切分分支（`VARIANT_RUNS`）——兩長歷史格須已生成（開跑前即驗，不成立 ⇒ FreezeError，
+    # 不以缺資料略過）；且秒級預檢須判預設切分可達
+    if any(x in h.VARIANT_RUNS for x in sched):
+        for c in h.XSEC_LONG_CELLS:
+            _cell_run(c)
+        xpre = h.xsec_long_precheck()
+        if not xpre["split"]["reachable"]:
+            raise FreezeError(f"跨標的長資料之預設切分預檢不成立：{json.dumps(xpre['split'], ensure_ascii=False)}")
+    # SPEC v5.53 (c0)：事件路徑 K 線根數軸——三種根數之隔離截短快取複本先建（秒級；身分相同者沿用），身分 sidecar 入 --data
+    bar_scales: List[int] = []
+    if any(a == "rows" and r in h.EVENT_BARS_RUN.values() for r, a in sched):
+        bar_scales = list(h.event_bar_scales())
+        for s in bar_scales:
+            h.prepare_event_bars(root, s)
     runs: Dict[Tuple[str, str], Dict[str, Any]] = {}
     failures: List[str] = []
     for run_id, axis in sched:
-        pts = h.axis_scales(run_id, axis, cols_scales=scales, row_scales=row_scales, event_scales=event_scales)
+        pts = h.axis_scales(run_id, axis, cols_scales=scales, row_scales=row_scales, event_scales=event_scales,
+                            bar_scales=bar_scales)
         cmd_base = [sys.executable, "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis, "--scale", "{scale}"]
         data = _task02_data(run_id, src, axis=axis, long_src=l_src, out_root=root, scales=pts)
         config = [INVENTORY_DATA]
@@ -2878,6 +2958,7 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
                                            budget_seconds=TASK02_BUDGET_SECONDS,
                                            sample_interval_seconds=TASK02_SAMPLE_INTERVAL, chunk_cap=TASK02_CHUNK_CAP,
                                            ram_bytes=_ram_bytes(), require_rows=bool(row_scales),
+                                           require_variants=bool(row_scales),
                                            records_root=records_dir.relative_to(REPO).as_posix())
         receipt["row_axis_precheck"] = precheck
     except h.AssemblyError as exc:
@@ -2946,8 +3027,15 @@ def _task02_data(run_id: str, src: Path, *, axis: str = "cols", long_src: Option
     if run_id in ("post_ic_transform", "cross_sectional"):
         cells = ("A_BTCUSDT_1h", "A_SOLUSDT_1h") if run_id == "cross_sectional" else (CELL,)
         return [f"{_cell_run(c)['run_dir']}/feature_manifest.json" for c in cells]
+    if run_id == "cross_sectional_long":
+        # SPEC v5.53 (c1)：跨標的長資料（L 格＋同一生成定義之 ETH 4h 長歷史格）之預設切分分支
+        return [f"{_cell_run(c)['run_dir']}/feature_manifest.json" for c in h.XSEC_LONG_CELLS]
     if run_id in ("event_import", "event_study"):
-        return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json"]
+        out = [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json"]
+        if axis == "rows":
+            # SPEC v5.53 (c0)：K 線根數軸之隔離截短快取複本（`prepare_event_bars`）之身分 sidecar——複本變 ⇒ 身分變
+            out += [_repo_rel(h.event_bars_dir(root, int(s)) / h.SUBSET_IDENTITY_FILE) for s in scales]
+        return out
     if run_id == "icfirst_post_generation":
         out = []
         for s in scales:
@@ -3061,6 +3149,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--out", type=Path, default=None, help="寫入結果 JSON（volatile、absent、未入 volatile 之候選全列）")
     p = sub.add_parser("gen-long-cell", help="Task 0.3：生成長資料格 L（A 格同一生成定義、最後 2,000 根）")
     p.add_argument("--out", type=Path, default=None, help="結果 JSON（不給則只印出）")
+    p.add_argument("--symbol", default=None, choices=sorted(LONG_CELLS_BY_SYMBOL),
+                   help=f"SPEC v5.53 (c1)：同一生成定義之他標的長歷史格（如 {LONG_CELL_XSEC_SYMBOL}＝{LONG_CELL_XSEC}）；不給＝L 格")
     p = sub.add_parser("gen-c-handoff", help="重產第 (2) 項之 C 格交接 h5 於持久根 data_cache/icperf_inputs/")
     p = sub.add_parser("gen-l-handoff", help="Task 0.2：L 格 IC 交接 h5 於持久根 data_cache/icperf_inputs/（不重新生成特徵）")
     p = sub.add_parser("gen-icfirst-raw", help="Task 0.2：A 格 IC-first 之 raw run（生成前半）＋完整 output_window 記錄")
@@ -3130,7 +3220,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(json.dumps(gen_icfirst_raw(rows=args.rows), ensure_ascii=False, indent=1, default=str))
             return 0
         if args.cmd == "gen-long-cell":
-            result = gen_long_cell()
+            result = gen_long_cell(symbol=args.symbol)
             text = json.dumps(result, ensure_ascii=False, indent=1, default=str)
             if args.out is not None:
                 Path(args.out).parent.mkdir(parents=True, exist_ok=True)

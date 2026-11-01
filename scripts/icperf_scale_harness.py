@@ -11,8 +11,10 @@
   venv/bin/python scripts/icperf_scale_harness.py precheck-rows        # v5.51 (a)：列數軸列長之樣本外切分秒級預檢
   venv/bin/python scripts/icperf_scale_harness.py coverage             # v5.52 (b)：清冊對實跑排程（主軸＋第二軸）之涵蓋
   venv/bin/python scripts/icperf_scale_harness.py prepare post-ic-rows|icfirst-subsets   # v5.52 (b)(c)：量測前之存檔輸入
-  run 之選項：--axis cols|rows|events|timestamps（預設 cols；rows＝固定 `ROW_AXIS_COLS` 欄、子集列數截為末 {scale} 列；
-  events＝事件數；timestamps＝跨標的末 {scale} 個時點）
+  venv/bin/python scripts/icperf_scale_harness.py precheck-xsec-long   # v5.53 (c1)：兩長歷史格之重疊、有效列數、預設切分可達
+  venv/bin/python scripts/icperf_scale_harness.py event-bar-scales     # v5.53 (c0)：事件 K 線根數軸之三點
+  run 之選項：--axis cols|rows|events|timestamps（預設 cols；rows＝固定 `ROW_AXIS_COLS` 欄、子集列數截為末 {scale} 列〔事件
+  路徑＝K 線根數〕；events＝事件數；timestamps＝跨標的末 {scale} 個時點）
   --inventory <清冊>（預設 scripts/icperf_path_inventory.json）、--out-root <工作根>（預設 runs/icperf/task02）
 
 路徑（`PATHS`）與直接呼叫格（`CELLS`）——入口歸屬以清冊 `branch_cell` 欄為準：
@@ -33,6 +35,12 @@
   （`entry_runs`／`schedule_runs`／`schedule_coverage`：post_ic_transform rows〔`prepare post-ic-rows` 之 L 格存檔任務〕、
   cross_sectional timestamps、event_import events〔隔離儲存根之前 {scale} 筆〕、IC-first rows），每一軸實跑驗實際輸入點數
   ＝宣告規模（`actual_scale`，不等 ⇒ HarnessError）；`coverage` 子命令列涵蓋。
+- SPEC v5.53（code review r64）：(c0) 事件路徑之 K 線根數軸——清冊 unit_axis.axes 含 rows 之事件入口（8 個，含
+  `evaluate_all_bars` rows*n_boot）不再記 fixed_axes，排 (event_import|event_study, rows)：全部事件固定、K 線讀
+  `<out-root>/event_bars/rows<R>/` 之隔離截短複本（`prepare_event_bars`：同一 symbol／週期之末 R 根；三點
+  `event_bar_scales`），行程內 `bars_source._DEFAULT_CACHE` 改指複本（`redirect_event_bars`，觀測產品實際讀取之根數＝
+  actual_scale），不改真實快取；只含 rows 之入口主軸＝rows。(c1) `cross_sectional_long`（`VARIANT_RUNS`）：L 格＋同一生成
+  定義之 ETH 4h 長歷史格之預設切分分支；生成前秒級預檢 `precheck-xsec-long`（`xsec_long_precheck`）。
 - 直接呼叫格（`CELLS`）：讀 `stage_inputs/<N>/` 之真實輸入，以路徑同一設定物件（pickle 之 self）呼叫互斥分支：滾動 IC
   kendall／pearson、冗餘 hierarchical／vif／多元化約束、regime kmeans、fit_mode pit_expanding（C 格 500 列 ≤ 512 ⇒ percentile
   走 `pit_expanding_bounds`）、PIT mad 縮尾、`standardize` 之 time_series_zscore＋pit_expanding、無缺值向量化 IC。
@@ -150,10 +158,15 @@ PATHS: Dict[str, str] = {
     "post_ic_transform": "A 格 run feature_filter N 欄經服務 start_analysis 後 _apply_transforms_sync（rank／zscore／gaussian）；"
                          "rows 軸＝L 格存檔之 IC 任務（prepare post-ic-rows）於末 R 列直接呼叫 _apply_transforms_sync",
     "event_import": "L 格 run feature_filter N 欄＋§G (7) 事件匯入批（event_import_run）；events 軸＝固定 ROW_AXIS_COLS 欄、"
-                    "隔離儲存根之前 {scale} 筆事件",
-    "event_study": "事件研究頁：隔離儲存根之 import_records＋analyze（events 軸＝前 {scale} 筆事件）",
+                    "隔離儲存根之前 {scale} 筆事件；rows 軸（v5.53 (c0)）＝固定 ROW_AXIS_COLS 欄、全部事件、K 線讀隔離截短"
+                    "複本之末 {scale} 根",
+    "event_study": "事件研究頁：隔離儲存根之 import_records＋analyze（events 軸＝前 {scale} 筆事件；rows 軸〔v5.53 (c0)〕＝"
+                   "全部事件、K 線讀隔離截短複本之末 {scale} 根）",
     "cross_sectional": "A 格 BTCUSDT／SOLUSDT 兩 run 共同 N 欄之跨標的 analyze_cross_sectional（關切分，XSEC_OVERRIDE_EXTRA）；"
                        "timestamps 軸＝固定 ROW_AXIS_COLS 欄、末 T 個時點",
+    "cross_sectional_long": "SPEC v5.53 (c1)：L 格＋同一生成定義之 ETH 4h 長歷史格（XSEC_LONG_CELLS）共同 N 欄之跨標的 "
+                            "analyze_cross_sectional，預設請求（不關切分）⇒ 量全域時間切分分支（cross_sectional 之變體，"
+                            "VARIANT_RUNS；不取代其關切分之兩軸）",
     "icfirst_post_generation": "IC-first 之 _run_ic_first_post_generation 整段與子步驟：cols 軸＝一次生成之 raw run 經 "
                                "FeatureStorage.write_raw 重寫之 N 欄子集 run（prepare icfirst-subsets）；rows 軸＝窗長 R 之"
                                "生成經同法取 ROW_AXIS_COLS 欄",
@@ -194,9 +207,28 @@ RUN_AXES: Dict[str, Tuple[str, ...]] = {
     **{c: ("cols", "rows") for c in CELLS},
     "ic_page_default": ("cols",), "ic_page_long": ("cols", "rows"), "deep_analysis": ("cols",),
     "deep_analysis_long": ("rows",), "post_ic_transform": ("cols", "rows"),
-    "event_import": ("cols", "events"), "event_study": ("events",), "cross_sectional": ("cols", "timestamps"),
+    "event_import": ("cols", "events", "rows"), "event_study": ("events", "rows"),
+    "cross_sectional": ("cols", "timestamps"), "cross_sectional_long": ("cols",),
     "icfirst_post_generation": ("cols", "rows"),
 }
+#: 主軸非 cols 之路徑（SPEC v5.51 (d)：event_study 只有事件數與 K 線根數兩軸，主軸＝events）
+PRIMARY_AXIS: Dict[str, str] = {"event_study": "events"}
+#: SPEC v5.53 (c0)（code review r64）：事件路徑之 K 線根數軸——清冊 unit_axis.axes 含 rows 之事件入口（K 線根數為成本軸，
+#: 如 `evaluate_all_bars` rows*n_boot）所屬格 ⇒ rows 軸實跑之 run_id。實跑於隔離 K 線快取複本（`prepare_event_bars`：同一
+#: symbol／週期之末 R 根，`<out-root>/EVENT_BARS_DIR/rows<R>/`），行程內 `bars_source._DEFAULT_CACHE` 指向該複本；不改
+#: `data_cache/feature_klines/kline_cache.h5`
+EVENT_BARS_RUN: Dict[str, str] = {"event_import": "event_import", "event_study": "event_study"}
+EVENT_BARS_DIR = "event_bars"
+EVENT_BARS_FILE = "kline_cache.h5"
+#: K 線根數軸最小點於最早事件 t0 之前保留之根數（決策偏移 k 之可行域與暖機；`alignment.py:156`、
+#: `label_value_from_case.py:420`、`all_bars_eval._is_eligible` 之 i−k≥0）——三點皆含全部事件及其前 EVENT_BARS_PRE 根
+EVENT_BARS_PRE = 256
+#: SPEC v5.53 (c1)：跨標的長資料之兩格（L 格＋同一生成定義之 ETH 4h 長歷史格，`icperf_freeze_baseline.LONG_CELL_XSEC`；
+#: 長歷史檔無 SOLUSDT 4h，夥伴改 ETHUSDT）
+XSEC_LONG_CELLS = (LONG_CELL_ID, "L_ETHUSDT_4h_longhist")
+#: 主排程以外之變體實跑 (run_id, 軸) ⇒ 其所變之格（branch_cell）：該格每一 measure=true 入口於變體實跑亦須 calls ≥ 1，
+#: 收據 `variants` 段（不參與 entry_runs 之主軸／第二軸、不取代原格之量測）
+VARIANT_RUNS: Dict[Tuple[str, str], str] = {("cross_sectional_long", "cols"): "cross_sectional"}
 ROW_AXIS_RUN.update({"ic_page_default": "ic_page_long", "ic_page_long": "ic_page_long",
                      "deep_analysis": "deep_analysis_long", "post_ic_transform": "post_ic_transform",
                      "icfirst_post_generation": "icfirst_post_generation", **{c: c for c in CELLS}})
@@ -213,9 +245,8 @@ SECOND_AXIS_ORDER: Tuple[str, ...] = ("ic_page_long", "deep_analysis_long", "pos
 
 
 def primary_axis(run_id: str) -> str:
-    """路徑／格之主軸（收據 points 之 x 軸）：只有事件數軸者（event_study）＝"events"，其餘＝"cols"（SPEC v5.51 (d)）。"""
-    axes = RUN_AXES.get(run_id, ())
-    return "events" if axes == ("events",) else "cols"
+    """路徑／格之主軸（收據 points 之 x 軸）：`PRIMARY_AXIS` 所列者（event_study＝"events"），其餘＝"cols"（SPEC v5.51 (d)）。"""
+    return PRIMARY_AXIS.get(run_id, "cols")
 
 
 def row_scales_for(run_id: str) -> Tuple[int, ...]:
@@ -241,30 +272,49 @@ def entry_runs(e: Mapping[str, Any]) -> Tuple[Tuple[str, str], Optional[Tuple[st
     主軸＝所屬格之主軸（`primary_axis`）；事件型格（`EVENT_AXIS_RUN`）之入口若 input_axes 不含 cols／passed_cols 而
     scale_vector 含 events ⇒ 主軸改 events（只隨事件數變之入口）。第二軸：input_axes 含 rows ⇒ `second_axis_run(格)`（無對應者
     回 (None, True)＝無法涵蓋）；否則 scale_vector 含 events 之事件型格入口而主軸非 events ⇒ (格, "events")。`fixed_axes`
-    （清冊選填；路徑內不隨請求規模變之軸）不排軸。"""
+    （清冊選填；路徑內不隨請求規模變之軸）不排軸。
+
+    SPEC v5.53 (c0)（與上列衝突處以此為準）：事件型格（`EVENT_BARS_RUN`）入口之 unit_axis.axes 含 rows（K 線根數為成本軸）⇒
+    須 (格, "rows") 實跑；不含 cols／passed_cols 之事件入口主軸依 unit_axis——含 events ⇒ events（K 線根數為第二軸）、只含
+    rows（如 `evaluate_all_bars`）⇒ rows（scale_vector 含 events 者 events 為第二軸）。同一入口需兩個第二軸 ⇒ (主軸, None,
+    True)＝無法涵蓋（排程點名，不靜默只量其一）。"""
     cell = str(e.get("branch_cell"))
     axes = set(e.get("input_axes") or [])
     sv = set(e.get("scale_vector") or [])
+    ua = set((e.get("unit_axis") or {}).get("axes") or [])
+    bars = cell in EVENT_BARS_RUN and "rows" in ua
     axis = primary_axis(cell)
-    if axis != "events" and cell in EVENT_AXIS_RUN and not axes & {"cols", "passed_cols"} and "events" in sv:
-        axis = "events"
-    primary = (EVENT_AXIS_RUN[cell] if axis == "events" and cell in EVENT_AXIS_RUN else cell, axis)
+    if cell in EVENT_AXIS_RUN and not axes & {"cols", "passed_cols"}:
+        if "events" in ua or ("events" in sv and not bars):
+            axis = "events"
+        elif bars:
+            axis = "rows"
+    run_of = {"events": EVENT_AXIS_RUN, "rows": EVENT_BARS_RUN}.get(axis, {})
+    primary = (run_of.get(cell, cell), axis)
     if "rows" in axes:
         return primary, second_axis_run(cell), True
+    need: List[Tuple[str, str]] = []
     if "events" in sv and axis != "events" and cell in EVENT_AXIS_RUN:
-        return primary, (EVENT_AXIS_RUN[cell], "events"), True
-    return primary, None, False
+        need.append((EVENT_AXIS_RUN[cell], "events"))
+    if bars and axis != "rows":
+        need.append((EVENT_BARS_RUN[cell], "rows"))
+    if len(need) > 1:
+        return primary, None, True
+    return (primary, need[0], True) if need else (primary, None, False)
 
 
 def schedule_runs(inventory: Mapping[str, Any], *, second_axes: bool = True) -> List[Tuple[str, str]]:
     """由清冊導出實跑排程 [(run_id, 軸)]（`measure_inventory` 同用）：先各入口之主軸（ic_page_default、ic_page_long 先，再
     其餘路徑、直接呼叫格；ic_page_default 寫 cols 軸存檔），再第二軸（`SECOND_AXIS_ORDER`，ic_page_long rows 先；其後直接
-    呼叫格之 rows 軸，讀 ic_page_long rows 所寫存檔）；去重保序。`second_axes`=False ⇒ 只排主軸。"""
+    呼叫格之 rows 軸，讀 ic_page_long rows 所寫存檔）；去重保序。`second_axes`=False ⇒ 只排主軸。SPEC v5.53 (c1)：
+    `second_axes` 時另排 `VARIANT_RUNS`（其所變之格有 measure=true 入口者；排最後）。"""
     prim: List[Tuple[str, str]] = []
     sec: List[Tuple[str, str]] = []
+    cells: Set[str] = set()
     for e in inventory.get("entries") or []:
         if not e.get("measure"):
             continue
+        cells.add(str(e.get("branch_cell")))
         p, s, need = entry_runs(e)
         prim.append(p)
         if second_axes and need and s is not None and s[0] is not None:
@@ -273,15 +323,21 @@ def schedule_runs(inventory: Mapping[str, Any], *, second_axes: bool = True) -> 
     sorder = {r: i for i, r in enumerate((*SECOND_AXIS_ORDER, *PATHS, *CELLS))}
     prim = sorted(dict.fromkeys(prim), key=lambda x: (order.get(x[0], len(order)), x[1]))
     sec = sorted(dict.fromkeys(sec), key=lambda x: (sorder.get(x[0], len(sorder)), x[1]))
-    return list(dict.fromkeys(prim + sec))
+    var = [v for v, base in VARIANT_RUNS.items() if second_axes and base in cells]
+    return list(dict.fromkeys(prim + sec + var))
 
 
 def schedule_coverage(inventory: Mapping[str, Any], sched: Sequence[Tuple[str, str]]) -> Dict[str, Any]:
     """排程對清冊之涵蓋（SPEC v5.52 (b)「排程與組裝之 require_rows 同步涵蓋」）：每一 measure=true 入口所需之主軸與第二軸
     （`entry_runs`）皆在 `sched` 且該軸為該 run 所支援（`RUN_AXES`）⇒ 涵蓋。回 {"measured", "covered", "uncovered": [{"id",
-    "missing": [...]}], "by_axis": {"<run>:<軸>": 入口數}, "fixed_axes": {id: [軸...]}}。"""
+    "missing": [...]}], "by_axis": {"<run>:<軸>": 入口數}, "fixed_axes": {id: [軸...]}, "variants": {"<run>:<軸>": {"cell",
+    "scheduled", "entries"}}}（SPEC v5.53 (c1)：變體實跑另列，不影響 covered／uncovered）。"""
     have = {(r, a) for r, a in sched if a in RUN_AXES.get(r, ())}
-    out: Dict[str, Any] = {"measured": 0, "covered": 0, "uncovered": [], "by_axis": {}, "fixed_axes": {}}
+    out: Dict[str, Any] = {"measured": 0, "covered": 0, "uncovered": [], "by_axis": {}, "fixed_axes": {}, "variants": {}}
+    for (vr, va), base in VARIANT_RUNS.items():
+        n = sum(1 for e in inventory.get("entries") or [] if e.get("measure") and e.get("branch_cell") == base)
+        if n:
+            out["variants"][f"{vr}:{va}"] = {"cell": base, "scheduled": (vr, va) in have, "entries": n}
     for e in inventory.get("entries") or []:
         if not e.get("measure"):
             continue
@@ -305,11 +361,14 @@ def schedule_coverage(inventory: Mapping[str, Any], sched: Sequence[Tuple[str, s
 
 
 def axis_scales(run_id: str, axis: str, *, cols_scales: Sequence[int], row_scales: Sequence[int],
-                event_scales: Sequence[int]) -> List[int]:
+                event_scales: Sequence[int], bar_scales: Optional[Sequence[int]] = None) -> List[int]:
     """(run_id, 軸) 之三規模點：cols＝`cols_scales`；rows＝`CELL_ROW_SCALES`／IC-first 窗長或 `row_scales`；events＝
-    `event_scales`；timestamps＝`XSEC_TIMESTAMP_SCALES`。"""
+    `event_scales`；timestamps＝`XSEC_TIMESTAMP_SCALES`。SPEC v5.53 (c0)：事件路徑之 rows（K 線根數）＝`bar_scales`（不給 ⇒
+    `event_bar_scales()` 由真實快取與事件批導出）。"""
     if axis == "cols":
         return [int(s) for s in cols_scales]
+    if axis == "rows" and run_id in EVENT_BARS_RUN.values():
+        return [int(s) for s in (event_bar_scales() if bar_scales is None else bar_scales)]
     if axis == "rows":
         if run_id in CELL_ROW_SCALES or run_id == "icfirst_post_generation":
             return list(row_scales_for(run_id))
@@ -534,7 +593,14 @@ def _feed_array(h: Any, arr: Any) -> None:
     else:
         import pandas as pd
 
-        h.update(pd.util.hash_array(a.reshape(-1).astype(object)).tobytes())
+        flat = a.reshape(-1).astype(object)
+        try:
+            h.update(pd.util.hash_array(flat).tobytes())
+        except TypeError:
+            # 不可雜湊之元素（事件表之 dict 欄，如 `label_definition`；2026-11-01 event_study rows 軸 smoke 於
+            # `align_events` 之輸入鍵實測 TypeError）⇒ 逐元素正準 JSON（鍵排序；非 JSON 型別取 repr）
+            for x in flat:
+                h.update(json.dumps(x, sort_keys=True, ensure_ascii=False, default=repr).encode("utf-8") + b"\x00")
 
 
 def _feed(h: Any, tag: str, v: Any, cols: List[str]) -> None:
@@ -1447,13 +1513,15 @@ def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
     fb = _fb()
     request = _limited_request("event_import_report", None, ctx.n_cols)
     store = EventImportService()
-    if ctx.axis == "events":
+    records: Optional[List[Dict[str, Any]]] = None
+    if ctx.axis in ("events", "rows"):
         # SPEC v5.52 (b)：事件數軸——同一明列規則之事件批（`icperf_event_batch`，依 t0 排序之前 {scale} 筆）匯入本次工作目錄之
         # 隔離儲存根（不寫 repo 之 data_cache/events），route `_resolve_event_batch` 經 `get_event_import_service()` 讀之
-        # ⇒ 本行程內把該單例指向隔離儲存根；欄數固定 ROW_AXIS_COLS（RunContext）
+        # ⇒ 本行程內把該單例指向隔離儲存根；欄數固定 ROW_AXIS_COLS（RunContext）。SPEC v5.53 (c0)：K 線根數軸＝同法匯入
+        # 全部事件（事件數固定），K 線讀隔離截短複本（`event_bars_context`）
         import api.services.case_import_service as cis
 
-        records = _event_batch_records(int(ctx.n_events or 0))
+        records = _event_batch_records(int(ctx.n_events or 0) if ctx.axis == "events" else None)
         store = EventImportService(storage_dir=ctx.work / "events")
         upload = json.dumps(records, ensure_ascii=False, sort_keys=True).encode("utf-8")
         resp = store.import_records(records, source_name="icperf-t02-event-import", upload_bytes=upload,
@@ -1461,16 +1529,20 @@ def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
         cis._event_import_service = store
         request = {**request, "event_import_id": str(resp.import_id)}
     # 同 `icperf_freeze_baseline.event_import_run`（route `_resolve_event_batch`＋服務 `start_analysis`），另接進度通知
-    svc = _service_with_tasks(request, ctx.work / "registry.json")
-    req = fb._ic_analyze_request(request)
-    _task_id, info = _service_analysis(svc, req, ctx.rec, event_batch=_resolve_event_batch(req))
+    with event_bars_context(ctx, records) as bars:
+        svc = _service_with_tasks(request, ctx.work / "registry.json")
+        req = fb._ic_analyze_request(request)
+        _task_id, info = _service_analysis(svc, req, ctx.rec, event_batch=_resolve_event_batch(req))
     analyzer = info.get("analyzer")
     detail = store.get_import(str(request["event_import_id"]))
     facts = _ic_facts(info.get("result"), analyzer, ctx.n_cols, _manifest_rows(request))
     events = len(detail.records) if detail is not None else None
     names = list(request["feature_filter"]["include_features"])
-    return {**facts, "events": events, "requested_columns": names,
-            "actual_scale": events if ctx.axis == "events" else len(set(names))}
+    actual = events if ctx.axis == "events" else len(set(names))
+    if ctx.axis == "rows":
+        actual = bars_actual(bars, int(ctx.n_rows or 0))
+        facts.update(bars_facts(bars))
+    return {**facts, "events": events, "requested_columns": names, "actual_scale": actual}
 
 
 def _event_batch_records(n_events: Optional[int]) -> List[Dict[str, Any]]:
@@ -1492,21 +1564,278 @@ def _run_event_study(ctx: RunContext) -> Dict[str, Any]:
     upload = json.dumps(records, ensure_ascii=False, sort_keys=True).encode("utf-8")
     svc = EventImportService(storage_dir=ctx.work / "events")
     resp = svc.import_records(records, source_name="icperf-t02-event-study", upload_bytes=upload, validate_only=False)
-    out = svc.analyze(resp.import_id, EventAnalyzeRequest())
     run = fb._cell_run(fb.LONG_CELL)
     projection_error = None
+    # SPEC v5.53 (c0)：rows 軸＝全部事件、K 線讀隔離截短複本之末 {scale} 根（`event_bars_context`）
+    with event_bars_context(ctx, records) as bars:
+        out = svc.analyze(resp.import_id, EventAnalyzeRequest())
+        # 投影分支之 FF run 定位（`canonical_holdout.resolve_run_dir`）以模組所在 repo 根之 data_cache/features 為根 ⇒ 於本次
+        # 隔離 cwd 引入 L 格 run（`projection_run_root`）
+        with projection_run_root(ctx.work / "cwd", run) as linked:
+            try:
+                svc.analyze(resp.import_id, EventAnalyzeRequest(feature_run=FeatureRunRef(
+                    symbol=run["symbol"], timeframe=run["timeframe"], config_hash=run["config_hash"])))
+            except Exception as exc:  # noqa: BLE001 — 投影分支失敗照記（收據以 raised 判非量測）
+                projection_error = f"{type(exc).__name__}: {exc}"
+        n_bars = _event_bars_rows(records)
+    facts: Dict[str, Any] = {"input_cols": 0, "rows": n_bars, "events": len(records), "requested_columns": None,
+                             "event_study_ok": out is not None, "projection_error": projection_error,
+                             "projection_run_link": os.path.relpath(linked, REPO), "projection_run": run["run_dir"],
+                             "actual_scale": len(records)}
+    if ctx.axis == "rows":
+        facts.update(bars_facts(bars), actual_scale=bars_actual(bars, int(ctx.n_rows or 0)))
+    return facts
+
+
+@contextlib.contextmanager
+def projection_run_root(cwd: Path, run: Mapping[str, str]) -> Iterable[Path]:
+    """事件研究投影分支（`EventImportService._analyze_with_projection`）之 FF run 定位：產品
+    `momentum/Analysis/event_samples/canonical_holdout.py:66-89` `resolve_run_dir` 於 `repo_root=None` 時以模組所在 repo 根
+    （`Path(__file__).resolve().parents[3]`，:74）之 `data_cache/features/*/*/<config_hash>`（:75）搜尋——不隨 cwd；呼叫端
+    `api/services/case_import_service.py:1715-1716`（locator）與 `canonical_holdout.py:213`（`resolve_canonical_holdout`
+    經 :1816 之 resolver）皆不傳 repo_root。L 格 run 存於 `data_cache/numview_freeze_runs/<L>__default/features/...`，不在該
+    glob 下 ⇒ `feature_run_not_found`。本函式：①於隔離 cwd 之 `data_cache/features/<symbol>/<tf>/<config_hash>` 以 symlink
+    引入真實 run（唯讀；不寫 repo 之 data_cache/features）；②本行程內把 `canonical_holdout.resolve_run_dir` 換為
+    `repo_root` 未給時代入 `cwd` 之 wrapper（兩呼叫端皆於呼叫時取模組屬性，`momentum/factories.py:1411-1417`、
+    `canonical_holdout.py:213`）；離開即還原。不改產品碼。yield 引入之路徑。"""
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from momentum.Analysis.event_samples import canonical_holdout as ch
+
+    src = (REPO / str(run["run_dir"])).resolve()
+    if not (src / "feature_manifest.json").is_file():
+        raise HarnessError(f"投影分支之 FF run 不存在：{src}（config_hash={run.get('config_hash')}）")
+    cwd = Path(cwd).resolve()
+    dst = cwd / ch._FEATURES_DIR / str(run["symbol"]) / str(run["timeframe"]) / str(run["config_hash"])
+    if REPO.resolve() == cwd:
+        raise HarnessError("projection_run_root：cwd 不得為 repo 根（會寫入真實 data_cache/features）")
+    if not os.path.lexists(dst):
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.symlink_to(src, target_is_directory=True)
+    elif Path(os.path.realpath(dst)) != src:
+        raise HarnessError(f"{dst} 已存在且不指向 {src}")
+    orig = ch.resolve_run_dir
+
+    def rooted(ff_run: str, *, symbols: Optional[Sequence[str]] = None, repo_root: Optional[Path] = None) -> Path:
+        return orig(ff_run, symbols=symbols, repo_root=cwd if repo_root is None else repo_root)
+
+    ch.resolve_run_dir = rooted
     try:
-        svc.analyze(resp.import_id, EventAnalyzeRequest(feature_run=FeatureRunRef(
-            symbol=run["symbol"], timeframe=run["timeframe"], config_hash=run["config_hash"])))
-    except Exception as exc:  # noqa: BLE001 — 投影分支失敗照記（收據以 raised 判非量測）
-        projection_error = f"{type(exc).__name__}: {exc}"
-    return {"input_cols": 0, "rows": _event_bars_rows(records), "events": len(records), "requested_columns": None,
-            "event_study_ok": out is not None, "projection_error": projection_error, "actual_scale": len(records)}
+        yield dst
+    finally:
+        ch.resolve_run_dir = orig
+
+
+# ── SPEC v5.53 (c0)：事件路徑 K 線根數軸之隔離截短快取複本 ───────────────────────────────────────────────
+
+
+#: 真實 K 線快取（`bars_source._DEFAULT_CACHE` 於本行程第一次改指前之值；`event_bars_context` 記之）
+_REAL_BARS_CACHE: Optional[Path] = None
+
+
+def real_bars_cache() -> Path:
+    """事件路徑之真實 K 線快取路徑（`momentum/Analysis/event_samples/bars_source.py` `_DEFAULT_CACHE`；本行程已改指者取
+    改指前之值）。"""
+    if _REAL_BARS_CACHE is not None:
+        return _REAL_BARS_CACHE
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from momentum.Analysis.event_samples import bars_source
+
+    return Path(bars_source._DEFAULT_CACHE)
+
+
+def event_bars_dir(out_root: Path, rows: int) -> Path:
+    """根數 `rows` 之隔離截短複本目錄：`<out-root>/EVENT_BARS_DIR/rows<R>/`（內含 `EVENT_BARS_FILE` 與身分 sidecar）。"""
+    return Path(out_root) / EVENT_BARS_DIR / f"rows{int(rows)}"
+
+
+def event_bar_key(records: Sequence[Mapping[str, Any]]) -> Tuple[str, str]:
+    """事件批之 (symbol, 週期)：須恰一組（事件路徑之服務對單一 symbol×週期讀 K 線，`case_import_service.py:1162-1165`；
+    run 週期與觸發週期相同）；否則 HarnessError。"""
+    keys = sorted({(str(r.get("symbol")), str(r.get("timeframe"))) for r in records})
+    if len(keys) != 1:
+        raise HarnessError(f"事件 K 線根數軸：事件批須恰一組 (symbol, 週期)，實得 {keys}")
+    return keys[0]
+
+
+def _dataset_sha256(arr: Any) -> str:
+    """K 線資料集身分（NUMVIEW 判準檔 `cell_rules.kline_source.dataset_sha256` 同規則：sha256(str(dtype.descr) ‖ C 連續位元組)）。"""
+    import numpy as np
+
+    a = np.ascontiguousarray(arr)
+    h = hashlib.sha256(str(a.dtype.descr).encode("utf-8"))
+    h.update(a.tobytes())
+    return h.hexdigest()
+
+
+def _first_event_index(ts: Any, records: Sequence[Mapping[str, Any]]) -> int:
+    """最早事件 t0（epoch 毫秒）於快取時間戳序列 `ts`（epoch 秒或毫秒）之位置；不在序列中 ⇒ HarnessError。"""
+    import numpy as np
+
+    t0 = min(int(r["t0"]) for r in records)
+    key = t0 if int(ts[-1]) > 10 ** 12 else t0 // 1000
+    i = int(np.searchsorted(ts, key, side="left"))
+    if i >= len(ts) or int(ts[i]) != key:
+        raise HarnessError(f"事件 K 線根數軸：最早事件 t0={t0} 不在 K 線快取序列中")
+    return i
+
+
+def event_bar_scales(records: Optional[Sequence[Mapping[str, Any]]] = None,
+                     cache: Optional[Path] = None) -> Tuple[int, int, int]:
+    """K 線根數軸之三點（全部事件固定）：最小＝自最早事件之前 `EVENT_BARS_PRE` 根至序列末之根數、最大＝真實快取該 symbol／
+    週期之全長（截短只去前段，末根不變；事件之答案窗皆在末段內）、中＝兩者之中點（整數）。只讀時間戳（秒級）。最早事件前不足
+    `EVENT_BARS_PRE` 根或三點不嚴格遞增 ⇒ HarnessError（資料不足）。"""
+    import h5py
+
+    records = _event_batch_records(None) if records is None else list(records)
+    sym, tf = event_bar_key(records)
+    with h5py.File(str(cache or real_bars_cache()), "r") as f:
+        ts = f[f"{sym}/{tf}/data"]["timestamp"][:]
+    n = int(len(ts))
+    first = _first_event_index(ts, records)
+    if first < EVENT_BARS_PRE:
+        raise HarnessError(f"事件 K 線根數軸：最早事件前只有 {first} 根 < EVENT_BARS_PRE {EVENT_BARS_PRE}（無截短空間）")
+    lo = n - (first - EVENT_BARS_PRE)
+    mid = (lo + n) // 2
+    if not lo < mid < n:
+        raise HarnessError(f"事件 K 線根數軸：三點 {(lo, mid, n)} 非嚴格遞增（截短空間不足）")
+    return lo, mid, n
+
+
+def event_bars_identity(rows: int, records: Sequence[Mapping[str, Any]], cache: Path) -> Dict[str, Any]:
+    """隔離截短複本之身分（SPEC v5.52 (a) 同法）：來源快取路徑與大小、資料集鍵、來源根數與資料集 sha256、截短根數、
+    最早事件 t0、事件數、`EVENT_BARS_PRE`；任一不同 ⇒ 重建。"""
+    import h5py
+
+    sym, tf = event_bar_key(records)
+    key = f"{sym}/{tf}/data"
+    with h5py.File(str(cache), "r") as f:
+        data = f[key][()]
+    return {"schema": SUBSET_IDENTITY_SCHEMA, "kind": "event_bars", "source": _rel(Path(cache)),
+            "source_size": int(Path(cache).stat().st_size), "key": key, "source_rows": int(len(data)),
+            "source_dataset_sha256": _dataset_sha256(data), "rows": int(rows),
+            "first_event_t0": min(int(r["t0"]) for r in records), "n_events": len(records), "pre_bars": EVENT_BARS_PRE}
+
+
+def prepare_event_bars(out_root: Path, rows: int, *, records: Optional[Sequence[Mapping[str, Any]]] = None,
+                       cache: Optional[Path] = None) -> Dict[str, Any]:
+    """建根數 `rows` 之隔離截短複本 `<out-root>/EVENT_BARS_DIR/rows<R>/EVENT_BARS_FILE`：只含事件批之 `<symbol>/<週期>/data`，
+    取真實快取該資料集之末 `rows` 根（dtype、檔／群組／資料集屬性照抄）；來源只以唯讀開啟（目的檔不得為來源）。身分
+    sidecar＝`event_bars_identity`（相同 ⇒ 沿用）。`rows` 超過來源根數或少於涵蓋全部事件所需 ⇒ HarnessError。回 {"reused",
+    "path", "identity"}。"""
+    import h5py
+
+    records = _event_batch_records(None) if records is None else list(records)
+    src = Path(cache or real_bars_cache()).resolve()
+    d = event_bars_dir(Path(out_root) if Path(out_root).is_absolute() else REPO / out_root, rows).resolve()
+    dst = d / EVENT_BARS_FILE
+    if dst == src:
+        raise HarnessError(f"隔離截短複本之目的檔不得為來源快取：{dst}")
+    want = event_bars_identity(rows, records, src)
+    side = d / SUBSET_IDENTITY_FILE
+    if dst.is_file() and read_identity(side) == json.loads(json.dumps(want)):
+        return {"reused": True, "path": str(dst), "identity": want}
+    key = want["key"]
+    with h5py.File(str(src), "r") as f:
+        ts = f[key]["timestamp"][:]
+        n = int(len(ts))
+        if int(rows) > n:
+            raise HarnessError(f"事件 K 線根數軸 {rows} 根 > 來源 {key} {n} 根（資料不足）")
+        if n - int(rows) > _first_event_index(ts, records):
+            raise HarnessError(f"事件 K 線根數軸 {rows} 根不含最早事件（須 ≥ {n - _first_event_index(ts, records)}）")
+        d.mkdir(parents=True, exist_ok=True)
+        tmp = d / (EVENT_BARS_FILE + ".part")
+        with h5py.File(str(tmp), "w") as g:
+            for k, v in f.attrs.items():
+                g.attrs[k] = v
+            parts = key.split("/")
+            for i in range(1, len(parts)):
+                grp = "/".join(parts[:i])
+                gg = g.require_group(grp)
+                for k, v in f[grp].attrs.items():
+                    gg.attrs[k] = v
+            ds = f[key]
+            out = g.create_dataset(key, data=ds[n - int(rows):], dtype=ds.dtype)
+            for k, v in ds.attrs.items():
+                out.attrs[k] = v
+    os.replace(tmp, dst)
+    write_identity(side, want)
+    return {"reused": False, "path": str(dst), "identity": want}
+
+
+@contextlib.contextmanager
+def redirect_event_bars(path: Path) -> Iterable[List[Dict[str, Any]]]:
+    """本行程內把事件路徑之 K 線來源（`bars_source._DEFAULT_CACHE`；服務經 `EventSamplePipeline.bars_from_kline_cache`、
+    `cache_path=None` 一律讀此值，`pipeline.py:543-547`、`bars_source.py:26`）改指 `path`，並觀測每次讀取（呼叫時 import
+    之 `load_bars_from_kline_cache` 換為記錄所讀快取與各序列根數之 wrapper）；離開時還原。yield 讀取紀錄 list。不改產品碼。"""
+    global _REAL_BARS_CACHE
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from momentum.Analysis.event_samples import bars_source
+
+    orig_cache, orig_load = bars_source._DEFAULT_CACHE, bars_source.load_bars_from_kline_cache
+    if _REAL_BARS_CACHE is None:
+        _REAL_BARS_CACHE = Path(orig_cache)
+    seen: List[Dict[str, Any]] = []
+
+    def observed(symbols: Any, timeframes: Any, *, cache_path: Optional[Path] = None) -> Any:
+        res = orig_load(symbols, timeframes, cache_path=cache_path)
+        seen.append({"cache": str(Path(cache_path) if cache_path else bars_source._DEFAULT_CACHE),
+                     "rows": {f"{s}/{t}": int(len(df)) for s, by in res.items() for t, df in by.items()}})
+        return res
+
+    bars_source._DEFAULT_CACHE = Path(path)
+    bars_source.load_bars_from_kline_cache = observed
+    try:
+        yield seen
+    finally:
+        bars_source._DEFAULT_CACHE = orig_cache
+        bars_source.load_bars_from_kline_cache = orig_load
+
+
+@contextlib.contextmanager
+def event_bars_context(ctx: RunContext, records: Optional[Sequence[Mapping[str, Any]]]) -> Iterable[Dict[str, Any]]:
+    """rows 軸（K 線根數）⇒ 建／沿用 `prepare_event_bars(ctx.out_root, ctx.n_rows)` 並於其內 `redirect_event_bars`；其餘軸
+    ⇒ 不改指。yield {"path", "identity", "reads"}（非 rows 軸 ⇒ path None、reads 空）。"""
+    if ctx.axis != "rows":
+        yield {"path": None, "identity": None, "reads": []}
+        return
+    if records is None:
+        raise HarnessError("事件 K 線根數軸須給事件批")
+    info = prepare_event_bars(ctx.out_root, int(ctx.n_rows or 0), records=records)
+    with redirect_event_bars(Path(info["path"])) as reads:
+        yield {"path": info["path"], "identity": info["identity"], "reads": reads}
+
+
+def bars_actual(bars: Mapping[str, Any], rows: int) -> int:
+    """K 線根數軸之實際輸入點數：產品實際讀取（`redirect_event_bars` 之紀錄）全部來自隔離複本、事件批序列之根數一致 ⇒ 該
+    根數；未讀取、讀自他檔、根數不一致或缺序列 ⇒ HarnessError（不得以宣告值充作實際值）。"""
+    reads = list(bars.get("reads") or [])
+    key = str((bars.get("identity") or {}).get("key") or "")
+    series = key[:-len("/data")] if key.endswith("/data") else key
+    if not reads:
+        raise HarnessError("事件 K 線根數軸：產品未讀取 K 線（實際根數無從驗證）")
+    other = sorted({r["cache"] for r in reads if Path(r["cache"]).resolve() != Path(str(bars["path"])).resolve()})
+    if other:
+        raise HarnessError(f"事件 K 線根數軸：產品讀自隔離複本以外之快取 {other}")
+    got = sorted({r["rows"].get(series) for r in reads})
+    if len(got) != 1 or got[0] is None:
+        raise HarnessError(f"事件 K 線根數軸：各次讀取之 {series} 根數 {got} 不一致或缺")
+    return int(got[0])
+
+
+def bars_facts(bars: Mapping[str, Any]) -> Dict[str, Any]:
+    """rows 軸紀錄之 K 線事實：隔離複本路徑、身分（來源、資料集 sha256、來源根數、截短根數）、產品讀取次數。"""
+    ident = dict(bars.get("identity") or {})
+    return {"bars_cache": _rel(Path(str(bars["path"]))), "bars_rows": ident.get("rows"),
+            "bars_source": ident.get("source"), "bars_source_rows": ident.get("source_rows"),
+            "bars_source_dataset_sha256": ident.get("source_dataset_sha256"), "bars_reads": len(bars.get("reads") or [])}
 
 
 def _event_bars_rows(records: Sequence[Mapping[str, Any]]) -> Optional[int]:
-    """事件路徑所讀全部 K 線之根數（清冊 fixed_axes.rows 之觀測值）：`bars_source._DEFAULT_CACHE` 中事件批 (symbol, 週期)
-    序列之長度（只讀形狀）；取不到 ⇒ None。"""
+    """事件路徑所讀全部 K 線之根數（scale_vector.rows 之觀測值；rows 軸時為隔離截短複本之根數）：`bars_source._DEFAULT_CACHE`
+    中事件批 (symbol, 週期) 序列之長度（只讀形狀）；取不到 ⇒ None。"""
     import h5py
 
     from momentum.Analysis.event_samples import bars_source
@@ -1548,24 +1877,190 @@ def _run_cross_sectional(ctx: RunContext) -> Dict[str, Any]:
     """跨標的（A 格 BTCUSDT／SOLUSDT 兩 run 共同欄之排序前綴）：cols 軸＝N 欄；timestamps 軸（SPEC v5.52 (b)）＝固定
     `ROW_AXIS_COLS` 欄、兩格聯集時點之末 T 個。設定＝IC 頁預設覆寫＋`XSEC_OVERRIDE_EXTRA`（關切分；見該常數之碼證）；
     其後同 `icperf_correctness_receipt._run_cross`。"""
+    return _cross_run(ctx, CROSS_CELLS, dict(XSEC_OVERRIDE_EXTRA))
+
+
+def _cross_run(ctx: RunContext, cell_ids: Sequence[str], override_extra: Mapping[str, Any]) -> Dict[str, Any]:
+    """跨標的之共同實跑：`cell_ids` 各格之 IC 頁預設請求 run、共同 raw 欄之排序前綴 N 欄（巢狀）、`override_extra` 併入
+    IC 頁預設覆寫，其後同 `icperf_correctness_receipt._run_cross`。回路徑事實（含報告之切分 metadata）。"""
     fb = _fb()
-    cells = [fb.default_request("ic_report", c) for c in CROSS_CELLS]
+    cells = [fb.default_request("ic_report", c) for c in cell_ids]
     common = sorted(set(fb._run_feature_names(cells[0])).intersection(*[set(fb._run_feature_names(c)) for c in cells[1:]]))
     if len(common) < ctx.n_cols:
-        raise HarnessError(f"cross_sectional：兩格共同 raw 欄 {len(common)} < 規模 {ctx.n_cols}（資料不足）")
+        raise HarnessError(f"{ctx.run_id}：兩格共同 raw 欄 {len(common)} < 規模 {ctx.n_cols}（資料不足）")
     names = common[:ctx.n_cols]
     cr = _load_script("icperf_t02_correctness", "scripts/icperf_correctness_receipt.py")
     request = {"cells": cells, "feature_filter": {"include_features": names}, "timeframe": cells[0]["timeframe"],
-               "_work": str(ctx.work), "override_extra": dict(XSEC_OVERRIDE_EXTRA)}
+               "_work": str(ctx.work), "override_extra": dict(override_extra)}
     svc, cross_df = _cross_frames(cr, cells, names, ctx.work, ctx.n_timestamps)
     # 實際輸入點數取送入產品前之 cross_df（標籤附加後之列數另記）
     timestamps = int(cross_df.index.get_level_values(0).nunique())
     in_rows = int(len(cross_df))
     out = cr._run_cross(svc, cross_df, [c["symbol"] for c in cells], cells[0], request)
+    md = (out.get("ic_report") or {}).get("metadata") or {} if isinstance(out.get("ic_report"), Mapping) else {}
+    sp = md.get("ic_train_test_split") or {}
     return {"input_cols": ctx.n_cols, "rows": in_rows, "labeled_rows": int(len(out["cross_df"])),
-            "symbols": len(CROSS_CELLS), "timestamps": timestamps, "requested_columns": names, "survivors": None,
-            "override_extra": dict(XSEC_OVERRIDE_EXTRA),
+            "symbols": len(cell_ids), "timestamps": timestamps, "requested_columns": names, "survivors": None,
+            "override_extra": dict(override_extra), "split_applied": sp.get("applied"),
+            "split_train_rows": sp.get("train_rows"), "split_test_rows": sp.get("test_rows"),
+            "split_per_symbol_test_rows": sp.get("per_symbol_test_rows"),
             "actual_scale": timestamps if ctx.axis == "timestamps" else len(set(names))}
+
+
+def _run_cross_sectional_long(ctx: RunContext) -> Dict[str, Any]:
+    """SPEC v5.53 (c1)：跨標的長資料（`XSEC_LONG_CELLS`：L 格＋同一生成定義之 ETH 4h 長歷史格）共同 N 欄、IC 頁預設請求
+    （不關切分）⇒ 產品全域時間切分分支（`ic_filter_orchestrator.py` `_build_cross_sectional_global_split`）；報告未記切分
+    applied ⇒ HarnessError（非所量之分支）。"""
+    facts = _cross_run(ctx, XSEC_LONG_CELLS, {})
+    if facts.get("split_applied") is not True:
+        raise HarnessError(f"cross_sectional_long：報告未走預設切分（split_applied={facts.get('split_applied')!r}）")
+    return facts
+
+
+#: 前史對照之已生成格（`data_cache/numview_freeze_runs/<格>__default/numview_cell.json`）：BTCUSDT 4h 主檔前史（2026-10-29
+#: 實跑 partial，`calibration_insufficient_history` 34 欄）與 L 格（長歷史前史，complete）
+PRE_HISTORY_REFERENCES = ("L_BTCUSDT_4h", LONG_CELL_ID)
+
+
+def pre_history_reference(cell: str, repo_root: Path = REPO) -> Dict[str, Any]:
+    """已生成格之前史對照（只讀 sidecar 與 K 線時間戳）：{cell, source（repo 相對）, output_window, run_status, status,
+    reason_counts, pre_history_bars（來源序列中早於輸出段首根之根數）}；sidecar 不存在 ⇒ {"cell", "missing": True}。"""
+    import h5py
+    import numpy as np
+    import pandas as pd
+
+    side_path = Path(repo_root) / "data_cache" / "numview_freeze_runs" / f"{cell}__default" / "numview_cell.json"
+    if not side_path.is_file():
+        return {"cell": cell, "missing": True}
+    side = json.loads(side_path.read_text(encoding="utf-8"))
+    src = Path(str(side["source"]))
+    src = src if src.is_absolute() else Path(repo_root) / src
+    key = f"{side['symbol']}/{side['primary_tf']}/data"
+    with h5py.File(str(src), "r") as f:
+        ts = np.asarray(f[key]["timestamp"][:], dtype="int64")
+    start = pd.Timestamp(side["output_window"][0])
+    start_i = int(start.value // 10 ** (6 if int(ts[-1]) > 10 ** 12 else 9))
+    try:
+        rel = src.resolve().relative_to(Path(repo_root).resolve()).as_posix()
+    except ValueError:
+        rel = str(src)
+    return {"cell": cell, "source": rel, "output_window": side["output_window"], "run_status": side.get("run_status"),
+            "status": side.get("status"), "reason_counts": side.get("reason_counts"),
+            "pre_history_bars": int(np.sum(ts < start_i))}
+
+
+def xsec_long_precheck(repo_root: Path = REPO) -> Dict[str, Any]:
+    """SPEC v5.53 (c1) 生成前之秒級預檢（只讀 K 線時間戳與收盤；不讀特徵、不跑 IC）：L 格（BTCUSDT 4h）與同一生成定義之
+    `LONG_CELL_XSEC_SYMBOL` 4h 長歷史格——①各標的於生成來源（`LONG_CELL_SOURCE`）與標籤來源（`LONG_CELL_LABEL_SOURCE`）是否
+    有該序列（`long_cell_source_check`）；②以 `long_cell_window` 同一規則（生成來源中 ≤ 標籤來源末根之最後 `LONG_CELL_BARS`
+    根）得各標的輸出段（生成來源缺序列者以標籤來源依同規則得反事實窗，`window_from_generation_source`=False）、前史根數、窗內
+    缺根數、跨標的標籤 return_1（`ic_analysis_service._append_cross_sectional_labels`：標籤來源 log(close[t+1]／close[t])）
+    有限之列數；③兩窗時點重疊；④預設切分可達性——IC 頁預設請求（`precheck_override`）之設定，以兩標的輸出段之（時點, 標的）
+    索引與標籤直接呼叫產品之 `_enforce_cross_sectional_label_coverage` 與 `_build_cross_sectional_global_split`（同
+    `analyze_cross_sectional` :2335-2369；horizon＝`_resolve_cross_sectional_label_horizon("return_1")`）。特徵列假設＝輸出段
+    全部時點（生成前無從得知逐欄缺值；同 L 格）。回 {"symbols": {...}, "overlap", "split", "generation_ready", "ok"}。"""
+    import h5py
+    import numpy as np
+    import pandas as pd
+
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from momentum.Analysis import ic_filter_orchestrator as orch
+    from momentum.core.constants import TIMEFRAME_SECONDS
+    from momentum.factories import create_ic_analyzer
+
+    fb = _fb()
+    root = Path(repo_root)
+    per: Dict[str, Any] = {}
+    windows: Dict[str, Any] = {}
+    labels: Dict[str, Any] = {}
+    for sym in (None, fb.LONG_CELL_XSEC_SYMBOL):
+        desc = fb.long_cell_descriptor(sym)
+        chk = fb.long_cell_source_check(sym, root)
+        tf, key = desc["timeframes"][0], chk["key"]
+        rec: Dict[str, Any] = {"cell": desc["id"], "timeframe": tf, "source_check": chk}
+        per[desc["symbol"]] = rec
+        if not chk["label_source"]["present"]:
+            rec["window"] = None
+            continue
+        with h5py.File(str(root / fb.LONG_CELL_LABEL_SOURCE), "r") as f:
+            lab = f[key][()]
+        lts, lclose = np.asarray(lab["timestamp"], dtype="int64"), np.asarray(lab["close"], dtype="float64")
+        gen_rel = fb.LONG_CELL_SOURCE if chk["long_source"]["present"] else fb.LONG_CELL_LABEL_SOURCE
+        with h5py.File(str(root / gen_rel), "r") as f:
+            gts = np.asarray(f[key]["timestamp"][:], dtype="int64")
+        upto = gts[gts <= int(lts[-1])]
+        win = upto[-fb.LONG_CELL_BARS:]
+        step = int(TIMEFRAME_SECONDS[tf]) * (1000 if int(lts[-1]) > 10 ** 12 else 1)
+        pos = pd.Index(lts).get_indexer(win)
+        nxt = np.where((pos >= 0) & (pos + 1 < len(lts)), pos + 1, -1)
+        ok_pos = (pos >= 0) & (nxt >= 0)
+        c0 = np.where(ok_pos, lclose[np.clip(pos, 0, None)], np.nan)
+        c1 = np.where(ok_pos, lclose[np.clip(nxt, 0, None)], np.nan)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ret = np.where((c0 > 0) & (c1 > 0) & np.isfinite(c0) & np.isfinite(c1), np.log(c1 / c0), np.nan)
+        unit = "ms" if int(lts[-1]) > 10 ** 12 else "s"
+        pre = upto[:len(upto) - len(win)]
+        rec.update({"pre_history_missing_bars": int(np.sum(np.diff(pre) // step - 1)) if len(pre) > 1 else 0,
+                    "pre_history_first_ts": int(pre[0]) if len(pre) else None,
+                    "label_source_pre_history_bars": int(np.sum(lts < int(win[0]))) if len(win) else None})
+        rec.update({"window_from_generation_source": bool(chk["long_source"]["present"]), "window_source": gen_rel,
+                    "window": [pd.Timestamp(int(win[0]), unit=unit, tz="UTC").isoformat(),
+                               pd.Timestamp(int(win[-1]), unit=unit, tz="UTC").isoformat()] if len(win) else None,
+                    "window_bars": int(len(win)), "pre_history_bars": int(len(upto) - len(win)),
+                    "window_missing_bars": int(np.sum(np.diff(win) // step - 1)) if len(win) > 1 else 0,
+                    "window_in_label_source": int(np.sum(pos >= 0)), "label_valid_rows": int(np.isfinite(ret).sum())})
+        windows[desc["symbol"]] = (win, unit)
+        labels[desc["symbol"]] = ret
+    syms = list(windows)
+    overlap = np.intersect1d(*[windows[s][0] for s in syms]) if len(syms) == 2 else np.array([], dtype="int64")
+    out: Dict[str, Any] = {"cells": list(XSEC_LONG_CELLS), "symbols": per,
+                           "overlap": {"timestamps": int(len(overlap)),
+                                       "first_ts": int(overlap[0]) if len(overlap) else None,
+                                       "last_ts": int(overlap[-1]) if len(overlap) else None}}
+    split: Dict[str, Any] = {"reachable": False, "error": None}
+    if len(syms) == 2:
+        override = precheck_override(LONG_CELL_TIMEFRAME, row_windows=False)
+        analyzer = create_ic_analyzer(override)
+        config = analyzer._apply_tier_config(analyzer._apply_config_override(override))
+        horizon_raw = orch._resolve_cross_sectional_label_horizon("return_1")
+        horizon = int(horizon_raw) if horizon_raw is not None else 1
+        frames = []
+        for s in syms:
+            win, unit = windows[s]
+            idx = pd.MultiIndex.from_arrays([pd.to_datetime(win, unit=unit), [s] * len(win)], names=[None, "_symbol"])
+            frames.append(pd.DataFrame({"f": np.zeros(len(win)), "return_1": labels[s]}, index=idx))
+        numeric_df = pd.concat(frames, axis=0)
+        split.update(ic_train_test_split=bool(config.ic_train_test_split), oos_test_size=float(config.oos_test_size),
+                     min_test_rows=int(config.min_test_rows), effective_horizon=horizon, embargo=int(config.embargo))
+        if not config.ic_train_test_split:
+            split["error"] = "split_disabled"
+        else:
+            try:
+                orch._enforce_cross_sectional_label_coverage(numeric_df, "return_1", 1, horizon,
+                                                            config.min_label_coverage_tol)
+                freq = orch.EXPECTED_FREQ_BY_TIMEFRAME[LONG_CELL_TIMEFRAME]
+                _tr, _te, meta = orch._build_cross_sectional_global_split(numeric_df, 1, 0, config, freq, horizon)
+                split.update(reachable=bool(meta.get("applied")), train_rows=meta.get("train_rows"),
+                             test_rows=meta.get("test_rows"), per_symbol_test_rows=meta.get("per_symbol_test_rows"),
+                             train_max_time=meta.get("train_max_time"), test_min_time=meta.get("test_min_time"))
+            except Exception as exc:  # noqa: BLE001 — 產品之切分拒收（InvalidInputError 等）即「不可達」，原因照記
+                split["error"] = f"{type(exc).__name__}: {exc}"
+    out["split"] = split
+    # 前史對照（校準根數由生成前史決定；生成前無從讀逐欄缺額）：已生成之兩格——`PRE_HISTORY_REFERENCES`（主檔前史 ⇒ 校準不足
+    # 而 blocked；長歷史前史 ⇒ complete）——之前史根數與結果，與各標的前史比較
+    refs = [pre_history_reference(c, root) for c in PRE_HISTORY_REFERENCES]
+    out["pre_history_references"] = refs
+    ok_refs = [r["pre_history_bars"] for r in refs if r.get("run_status") == "complete" and r.get("pre_history_bars")]
+    bad_refs = [r["pre_history_bars"] for r in refs if r.get("run_status") == "partial" and r.get("pre_history_bars")]
+    for r in per.values():
+        ph = r.get("pre_history_bars")
+        r["pre_history_vs_references"] = None if ph is None else {
+            "ge_min_complete_reference": bool(ok_refs) and ph >= min(ok_refs),
+            "le_max_short_reference": bool(bad_refs) and ph <= max(bad_refs)}
+    out["generation_ready"] = all(r["source_check"]["ok"] for r in per.values())
+    out["ok"] = bool(out["generation_ready"] and split["reachable"])
+    return out
 
 
 #: SPEC v5.52 (c)：IC-first 子集 run 之工作根（`<out-root>/icfirst_subsets/<tag>/`；可重用之中介，非系統暫存）
@@ -2008,6 +2503,7 @@ RUNNERS: Dict[str, Callable[[RunContext], Dict[str, Any]]] = {
     "event_import": _run_event_import,
     "event_study": _run_event_study,
     "cross_sectional": _run_cross_sectional,
+    "cross_sectional_long": _run_cross_sectional_long,
     "icfirst_post_generation": _run_icfirst_post_generation,
     "rolling_kendall": _cell_rolling("kendall"),
     "rolling_pearson": _cell_rolling("pearson"),
@@ -2358,9 +2854,10 @@ def total_projected_seconds(runs: Mapping[Tuple[str, str], Mapping[str, Any]]) -
 
 
 def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], axis: str,
-           problems: List[str], require_actual: bool = False) -> Optional[Dict[str, Any]]:
+           problems: List[str], require_actual: bool = False, require_split: bool = False) -> Optional[Dict[str, Any]]:
     """單一規模點（`q`＝scale_probe 收據之點）。SPEC v5.52 (b)：紀錄之 `actual_scale`（runner 驗得之實際輸入點數）有者須等於
-    宣告之規模；`require_actual`（第二軸實跑）⇒ 每份紀錄皆須帶且相等。"""
+    宣告之規模；`require_actual`（第二軸實跑）⇒ 每份紀錄皆須帶且相等。SPEC v5.53 (c1)：`require_split`（預設切分之變體實跑）
+    ⇒ 紀錄之 `split_applied` 須為 True。"""
     eid = e["id"]
     scale = int(q["scale"])
     recs = list((run.get("records") or {}).get(scale) or [])
@@ -2382,6 +2879,10 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
             and facts["split_applied"] is not True:
         # v5.51 (a)：L 格之 IC 頁／深度分析實跑須走樣本外切分（預檢之實跑對證；退回全樣本即非所量之分支）
         problems.append(f"{eid}：{chosen.get('path_run_id')} 未走樣本外切分（split_applied={facts['split_applied']!r}）")
+        return None
+    if require_split and facts.get("split_applied") is not True:
+        problems.append(f"{eid}：{chosen.get('path_run_id')} 未走預設切分（split_applied={facts.get('split_applied')!r}；"
+                        "SPEC v5.53 (c1)）")
         return None
     input_cols = scale if axis == "cols" else int(facts.get("input_cols") or 0)
     stage_cols, source = _stage_cols(e, er, facts, input_cols)
@@ -2459,7 +2960,7 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                            head: str, scale_probe: Any, budget_seconds: float, sample_interval_seconds: float,
                            chunk_cap: Mapping[str, Any], ram_bytes: Optional[int] = None,
                            two_point_seconds: float = 600.0, require_rows: bool = False,
-                           records_root: Optional[str] = None) -> Dict[str, Any]:
+                           records_root: Optional[str] = None, require_variants: bool = False) -> Dict[str, Any]:
     """組 `<日期>-icperf-scale-before.json`（SPEC Task 0.2 v5.50 (e)、v5.51 (d)(f)(g)(h)(i)）。`runs`＝{(run_id, axis):
     {"probe": {"cmd", "data", "config"}, "receipt_path": <repo 相對>, "receipt": <scale_probe 收據>, "records": {scale:
     [逐入口記錄（含 `_record_path`／`_record_bytes`／`_record_sha256`）...]}}}。每一 measure=true 入口依 `branch_cell` 取其
@@ -2472,7 +2973,10 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
     未逾預算者三點皆收。判準②依 `criterion2`（v5.51 (f)），待判者列頂層 `pending_prototype`。
     SPEC v5.52 (b)（與上列衝突處以此為準）：主軸與第二軸依 `entry_runs`；第二軸點存 `row_points`、軸名存 `row_axis`
     （rows／timestamps／events）、實跑存 `row_path`／`row_probe`、擬合存 `row_fit`（含 axis）；第二軸每份紀錄須帶
-    `actual_scale` 且等於宣告之規模（主軸紀錄帶者亦須相等）；`require_rows` 涵蓋全部第二軸；頂層 `schedule_coverage`。"""
+    `actual_scale` 且等於宣告之規模（主軸紀錄帶者亦須相等）；`require_rows` 涵蓋全部第二軸；頂層 `schedule_coverage`。
+    SPEC v5.53：(c0) 事件入口之 K 線根數軸依 `entry_runs`（rows 為主軸或第二軸，軸名 `rows`）；(c1) `VARIANT_RUNS` 所變之格
+    之入口另組 `variants`＝{"<run>:<軸>": {"points", "fit", "probe", "split"}}（每點 calls ≥ 1、actual_scale＝宣告、
+    split_applied＝True）；`require_variants` 而缺變體實跑 ⇒ 問題。"""
     problems: List[str] = []
     all_records = [r for run in runs.values() for recs in (run.get("records") or {}).values() for r in recs]
     total = total_projected_seconds(runs)
@@ -2547,6 +3051,24 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                   "lower_bound_analysis": f"未建向量化／numba 小原型；碼層下限＝{'·'.join(e['unit_axis']['axes'])} 之單次"
                                           f"掃描（每單位常數時間），現行 {func}（階數差 {criterion2_order_gap(func)}）",
                   "evidence": _evidence(e, chosen, all_records)})
+        variants: Dict[str, Any] = {}
+        for (vr, va), base in VARIANT_RUNS.items():
+            if cell != base:
+                continue
+            vrun = runs.get((vr, va))
+            if vrun is None:
+                if require_variants:
+                    problems.append(f"{eid}：所屬格 {cell!r} 之變體實跑 {vr}:{va} 缺（SPEC v5.53 (c1)）")
+                continue
+            vpts = [p for q in sorted(vrun["receipt"]["points"], key=lambda q: int(q["scale"]))
+                    if (p := _point(e, q, vrun, va, problems, require_actual=True, require_split=True)) is not None]
+            if len(vpts) != len(vrun["receipt"]["points"]):
+                continue
+            vf = scale_probe.fit(fit_points(vpts, va), float(max(p[AXIS_X_KEY[va]] for p in vpts)))
+            variants[f"{vr}:{va}"] = {"points": vpts, "probe": vrun["probe"], "split": "default",
+                                      "fit": {"axis": va, "exponent": vf["fit"]["exponent"], "r2": vf["fit"]["r2"],
+                                              "extrapolation_unreliable": vf["extrapolation_unreliable"]}}
+        m["variants"] = variants or None
         crit = evaluate_criteria(m, scale_probe)
         m["criteria"] = crit
         m["opportunities"] = _opportunities(eid, crit, pts, ram_bytes)
@@ -2597,6 +3119,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--scale", type=int, action="append", default=None, help=f"列長（可多次；預設 {ROW_AXIS_SCALES}）")
     p = sub.add_parser("coverage", help="v5.52 (b)：清冊 measure=true 入口對實跑排程（主軸＋第二軸）之涵蓋（秒級）")
     p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
+    sub.add_parser("precheck-xsec-long", help="v5.53 (c1)：L 格與 ETH 4h 長歷史格之時間重疊、有效列數、預設切分可達性（秒級，"
+                                               "只讀 K 線時間戳與收盤）")
+    sub.add_parser("event-bar-scales", help="v5.53 (c0)：事件路徑 K 線根數軸之三點（秒級，只讀 K 線時間戳與事件批）")
     p = sub.add_parser("prepare", help="v5.52 (b)(c)：量測前之存檔輸入（post-ic-rows：L 格 IC 任務；icfirst-subsets："
                                        "write_raw 重寫之 IC-first 子集 run）；中型，由 measure 經共用監看啟動")
     p.add_argument("what", choices=("post-ic-rows", "icfirst-subsets"))
@@ -2606,6 +3131,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--rows", type=int, action="append", default=None,
                    help=f"icfirst-subsets 之列軸窗長（可多次；預設 {ICFIRST_ROW_SCALES}；各取 ROW_AXIS_COLS 欄）")
     args = ap.parse_args(args_in)
+    if args.cmd == "precheck-xsec-long":
+        res = xsec_long_precheck()
+        print(json.dumps(res, ensure_ascii=False, indent=1, default=str))
+        return 0 if res["ok"] else 1
+    if args.cmd == "event-bar-scales":
+        try:
+            print(json.dumps({"scales": list(event_bar_scales()), "pre_bars": EVENT_BARS_PRE,
+                              "cache": _rel(real_bars_cache())}, ensure_ascii=False))
+        except HarnessError as exc:
+            print(f"HarnessError：{exc}", file=sys.stderr)
+            return 1
+        return 0
     if args.cmd == "coverage":
         inv = load_inventory(args.inventory)
         cov = schedule_coverage(inv, schedule_runs(inv))

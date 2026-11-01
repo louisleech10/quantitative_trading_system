@@ -2743,6 +2743,11 @@ def test_task02_call_key_and_footprint_parse(harness: Any) -> None:
     assert harness.parse_footprint(text) == int(1.5 * 1024 ** 3)
     assert harness.parse_footprint("Physical footprint:  20M\n") == 20 * 1024 ** 2
     assert harness.parse_footprint("nothing") is None
+    # 不可雜湊元素之物件欄（事件表 dict 欄；2026-11-01 smoke 實測）：同內容（鍵序不同）同鍵、內容不同 ⇒ 不同鍵
+    ev = pd.DataFrame({"label_definition": [{"a": 1, "b": [2]}, {"a": 3}]})
+    kd = harness.call_key((ev,), {}, "BTCUSDT")[0]
+    assert kd == harness.call_key((pd.DataFrame({"label_definition": [{"b": [2], "a": 1}, {"a": 3}]}),), {}, "BTCUSDT")[0]
+    assert kd != harness.call_key((pd.DataFrame({"label_definition": [{"a": 1, "b": [2]}, {"a": 4}]}),), {}, "BTCUSDT")[0]
 
 
 # ── SPEC v5.51 (a)(d)–(i)：量測工具修正之秒級契約（不跑量測） ──────────────────────────────────────────────
@@ -3195,3 +3200,292 @@ def test_task02_icfirst_subset_via_write_raw(harness: Any, tmp_path: Path) -> No
     FeatureStorage(str(tmp_path / "c5")).write_raw(sym, tf, ch, groups, row_index=idx)
     with pytest.raises(harness.HarnessError, match="值"):
         harness.verify_icfirst_subset(src, tmp_path / "c5", rec, c5)
+
+
+# ── SPEC v5.53（code review r64）：(c0) 事件路徑 K 線根數軸、(c1) 跨標的長資料格 ─────────────────────────────────
+
+#: GROK-R64-P1-01 所列 unit_axis.axes 含 rows 而原記 fixed_axes.rows 之事件入口（r64 收斂檔群集 A）
+R64_EVENT_ROWS_ENTRIES = (
+    "momentum.Analysis.event_samples.all_bars_eval:evaluate_all_bars",
+    "api.services.ic_analysis_service:ICAnalysisService._run_event_label_stages",
+    "momentum.Analysis.event_samples.label_value_from_case:prepare_analysis_windows",
+    "momentum.Analysis.event_samples.alignment:align_events",
+    "momentum.Analysis.event_samples.label_value_from_case:resolve_label_value_at_analyze",
+    "momentum.Analysis.event_samples.label_value_from_case:feature_row_keys",
+    "api.services.case_import_service:EventImportService._analyze_with_projection",
+    "momentum.Analysis.event_samples.pipeline:EventSamplePipeline.analyze_tables",
+)
+_T02_4H = 14400
+
+
+def _t02_kline_h5(path: Path, series: Mapping[str, int], *, end: int = 1_777_320_000) -> None:
+    """K 線快取形狀之 h5（`<symbol>/<週期>/data` 結構化資料集，欄同 `kline_cache.h5`；4h 連續網格、末根時間戳＝`end` 秒）——
+    量測工具之秒級契約用（驗截短複本隔離與預檢之碼路，非 K 線值驗證）；檔／群組／資料集屬性供照抄之驗證。"""
+    import h5py
+
+    dt = np.dtype([("timestamp", "<i8"), ("open", "<f4"), ("high", "<f4"), ("low", "<f4"), ("close", "<f4"),
+                   ("volume", "<f4")])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(str(path), "w") as f:
+        f.attrs["origin"] = "icperf-t02-test"
+        for key, n in series.items():
+            a = np.zeros(int(n), dtype=dt)
+            a["timestamp"] = int(end) - _T02_4H * np.arange(int(n) - 1, -1, -1, dtype=np.int64)
+            a["close"] = 100.0 + np.arange(int(n), dtype=np.float32)
+            a["open"] = a["close"] - 0.5
+            a["high"], a["low"], a["volume"] = a["close"] + 1.0, a["close"] - 1.0, 1.0
+            g = f.require_group(key)
+            g.attrs["series"] = key
+            ds = g.create_dataset("data", data=a)
+            ds.attrs["n_source"] = int(n)
+
+
+def test_task02_event_bars_axis_schedule(fb: Any, harness: Any) -> None:
+    """SPEC v5.53 (c0)：定稿清冊中 unit_axis.axes 含 rows 之事件入口（含 GROK-R64-P1-01 所列 8 個）不得記 fixed_axes，排程
+    皆含其格之 (格, rows) K 線根數軸；只含 rows 之 `evaluate_all_bars` 主軸＝rows（events 為第二軸），含 events 者主軸＝events。
+    反例：移除任一 (格, rows) ⇒ 恰該格之此類入口被點名；fixed_axes.rows 放回 ⇒ inventory_problems 點名；同一入口需兩個第二軸
+    ⇒ 無法涵蓋（不靜默只量其一）。"""
+    inv = json.loads((REPO / "scripts" / "icperf_path_inventory.json").read_text(encoding="utf-8"))
+    assert fb.inventory_problems(inv) == []
+    measured = [e for e in inv["entries"] if e["measure"]]
+    bars = [e for e in measured if e["branch_cell"] in harness.EVENT_BARS_RUN and "rows" in e["unit_axis"]["axes"]]
+    assert set(R64_EVENT_ROWS_ENTRIES) <= {e["id"] for e in bars}
+    for e in measured:
+        assert not set(e.get("fixed_axes") or {}) & set(e["unit_axis"]["axes"]), e["id"]
+    sched = harness.schedule_runs(inv)
+    assert all(a in harness.RUN_AXES[r] for r, a in sched)
+    for e in bars:
+        p, s, need = harness.entry_runs(e)
+        want = (harness.EVENT_BARS_RUN[e["branch_cell"]], "rows")
+        assert want in [p] + ([s] if need and s else []) and want in sched, e["id"]
+        assert (p[1] == "events") == ("events" in e["unit_axis"]["axes"]), e["id"]
+    eab = next(e for e in measured if e["id"] == R64_EVENT_ROWS_ENTRIES[0])
+    assert harness.entry_runs(eab) == (("event_study", "rows"), ("event_study", "events"), True)
+    for drop in (("event_study", "rows"), ("event_import", "rows")):
+        miss = harness.schedule_coverage(inv, [x for x in sched if x != drop])["uncovered"]
+        assert {u["id"] for u in miss} == {e["id"] for e in bars if e["branch_cell"] == drop[0]}, drop
+        assert all(f"{drop[0]}:rows" in u["missing"] for u in miss), drop
+    probe = copy.deepcopy(inv)
+    next(e for e in probe["entries"] if e["id"] == eab["id"])["fixed_axes"] = {"rows": "x"}
+    assert any(eab["id"] in p and "成本軸" in p for p in fb.inventory_problems(probe))
+    two = {**copy.deepcopy(eab), "input_axes": ["cols"], "branch_cell": "event_import"}
+    assert harness.entry_runs(two)[1:] == (None, True)
+    assert harness.axis_scales("event_study", "rows", cols_scales=(), row_scales=(1, 2, 3), event_scales=(),
+                               bar_scales=(7, 8, 9)) == [7, 8, 9]
+
+
+def test_task02_event_bars_truncated_cache_isolated(harness: Any, tmp_path: Path) -> None:
+    """SPEC v5.53 (c0)：K 線根數軸之隔離截短複本——三點＝(最早事件前 EVENT_BARS_PRE 根起之根數, 中點, 全長)；複本只含事件
+    批序列之末 R 根（dtype 與屬性照抄）、落於工作根之下、來源位元組不變；身分相同沿用、不同重建；R 不含最早事件、R 超過來源、
+    目的檔即來源 ⇒ 拒收。行程內改指後，產品之 `EventSamplePipeline.bars_from_kline_cache`（服務唯一入口）讀到 R 根，離開即還原；
+    `bars_actual` 只認自複本讀得且根數一致者。"""
+    import h5py
+
+    from momentum.Analysis.event_samples import bars_source
+    from momentum.Analysis.event_samples.pipeline import EventSamplePipeline
+
+    src = tmp_path / "cache" / "kline_cache.h5"
+    _t02_kline_h5(src, {"BTCUSDT/4h": 1000, "ETHUSDT/4h": 50})
+    before = hashlib.sha256(src.read_bytes()).hexdigest()
+    with h5py.File(str(src), "r") as f:
+        ts = f["BTCUSDT/4h/data"]["timestamp"][:]
+    recs = [{"symbol": "BTCUSDT", "timeframe": "4h", "t0": int(ts[i]) * 1000} for i in (700, 600, 900)]
+    lo, mid, hi = harness.event_bar_scales(recs, cache=src)
+    assert (lo, mid, hi) == (1000 - (600 - harness.EVENT_BARS_PRE), (lo + 1000) // 2, 1000)
+    out_root = tmp_path / "runs"
+    info = harness.prepare_event_bars(out_root, lo, records=recs, cache=src)
+    dst = Path(info["path"])
+    assert info["reused"] is False and dst.parent == harness.event_bars_dir(out_root, lo).resolve()
+    assert out_root.resolve() in dst.parents and dst != src.resolve()
+    with h5py.File(str(dst), "r") as g, h5py.File(str(src), "r") as f:
+        assert list(g.keys()) == ["BTCUSDT"] and list(g["BTCUSDT"].keys()) == ["4h"]
+        assert g["BTCUSDT/4h/data"].dtype == f["BTCUSDT/4h/data"].dtype
+        assert np.array_equal(g["BTCUSDT/4h/data"][()], f["BTCUSDT/4h/data"][1000 - lo:])
+        assert g.attrs["origin"] == "icperf-t02-test" and g["BTCUSDT/4h"].attrs["series"] == "BTCUSDT/4h"
+        assert int(g["BTCUSDT/4h/data"].attrs["n_source"]) == 1000
+    assert hashlib.sha256(src.read_bytes()).hexdigest() == before
+    assert info["identity"]["rows"] == lo and info["identity"]["source_rows"] == 1000
+    assert harness.prepare_event_bars(out_root, lo, records=recs, cache=src)["reused"] is True
+    assert harness.prepare_event_bars(out_root, lo, records=recs[:2], cache=src)["reused"] is False  # 身分（事件數）不同
+    for bad_rows in (1000 - 600 - 1, 1001):
+        with pytest.raises(harness.HarnessError):
+            harness.prepare_event_bars(out_root, bad_rows, records=recs, cache=src)
+    same = harness.event_bars_dir(tmp_path / "self", 5) / harness.EVENT_BARS_FILE
+    same.parent.mkdir(parents=True)
+    same.write_bytes(src.read_bytes())
+    with pytest.raises(harness.HarnessError, match="來源"):
+        harness.prepare_event_bars(tmp_path / "self", 5, records=recs, cache=same)
+    with pytest.raises(harness.HarnessError):  # 事件批跨 symbol ⇒ 拒收
+        harness.event_bar_scales(recs + [{"symbol": "ETHUSDT", "timeframe": "4h", "t0": int(ts[-1]) * 1000}], cache=src)
+    real_cache, real_load = bars_source._DEFAULT_CACHE, bars_source.load_bars_from_kline_cache
+    with harness.redirect_event_bars(dst) as reads:
+        got = EventSamplePipeline.bars_from_kline_cache(["BTCUSDT"], ["4h"])
+        assert len(got["BTCUSDT"]["4h"]) == lo
+    assert bars_source._DEFAULT_CACHE == real_cache and bars_source.load_bars_from_kline_cache is real_load
+    assert harness.real_bars_cache() == Path(real_cache)
+    bars = {"path": str(dst), "identity": info["identity"], "reads": reads}
+    assert harness.bars_actual(bars, lo) == lo and harness.bars_facts(bars)["bars_reads"] == 1
+    for bad in ({**bars, "reads": []}, {**bars, "reads": [{"cache": str(src), "rows": {"BTCUSDT/4h": lo}}]},
+                {**bars, "reads": reads + [{"cache": str(dst), "rows": {"BTCUSDT/4h": lo - 1}}]}):
+        with pytest.raises(harness.HarnessError):
+            harness.bars_actual(bad, lo)
+
+
+def test_task02_event_rows_axis_assembly(harness: Any, scale_probe: Any) -> None:
+    """SPEC v5.53 (c0)：事件入口之 K 線根數軸組裝——只含 rows 之入口主軸＝rows（points 之 x 與 scale_vector.rows＝宣告根數，
+    events 為第二軸）；含 rows 與 events 之入口主軸＝events、row_axis＝rows（row_fit.axis＝rows）。反例：缺 (格, rows) 實跑
+    ⇒ 點名該入口；rows 軸紀錄之 actual_scale 不等宣告 ⇒ 拒收。"""
+    base = {"stage": "ev", "ic_page": False, "ic_first": False, "loop": "none", "measure": True, "no_measure_reason": None,
+            "evidence": "m/x.py:1"}
+    inv = {"entries": [
+        {**base, "id": "m.ev:bars", "input_axes": [], "branch_cell": "event_study", "coverage_path_id": "e1",
+         "unit_axis": {"axes": ["rows"], "function": "rows*n_boot"}, "scale_vector": ["rows", "events"]},
+        {**base, "id": "m.ev:both", "input_axes": [], "branch_cell": "event_import", "coverage_path_id": "e2",
+         "unit_axis": {"axes": ["rows", "events"], "function": "n_events*log(rows)"}, "scale_vector": ["rows", "events"]}]}
+    nb, ne = (2238, 3663, 5088), (50, 101, 203)
+
+    def fact(rows: int, events: int, cols: int = 0) -> Dict[str, Any]:
+        return {"input_cols": cols, "rows": rows, "events": events, "survivors": 3, "requested_columns": None}
+
+    runs = {("event_study", "rows"): _t02_axis_records("event_study", "rows", nb, ["m.ev:bars"], lambda s: fact(s, 203)),
+            ("event_study", "events"): _t02_axis_records("event_study", "events", ne, ["m.ev:bars"],
+                                                         lambda s: fact(5088, s)),
+            ("event_import", "events"): _t02_axis_records("event_import", "events", ne, ["m.ev:both"],
+                                                          lambda s: fact(2000, s, 500)),
+            ("event_import", "rows"): _t02_axis_records("event_import", "rows", nb, ["m.ev:both"],
+                                                        lambda s: fact(s, 203, 500))}
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "budget_seconds": BUDGET2_UPPER_SECONDS,
+          "sample_interval_seconds": 0.2, "chunk_cap": {"bytes": 1, "basis": "x"}, "require_rows": True}
+    got = harness.assemble_scale_receipt(inv, runs, **kw)
+    m = got["entries"]
+    assert m["m.ev:bars"]["axis"] == "rows" and m["m.ev:bars"]["path"] == "event_study" and m["m.ev:bars"]["fit_axis"] == "rows"
+    assert [p["rows"] for p in m["m.ev:bars"]["points"]] == list(nb)
+    assert [p["scale_vector"]["rows"] for p in m["m.ev:bars"]["points"]] == list(nb)
+    assert m["m.ev:bars"]["row_axis"] == "events" and [p["events"] for p in m["m.ev:bars"]["row_points"]] == list(ne)
+    assert m["m.ev:both"]["axis"] == "events" and m["m.ev:both"]["row_axis"] == "rows"
+    assert m["m.ev:both"]["row_fit"]["axis"] == "rows" and m["m.ev:both"]["fixed_axes"] is None
+    assert [p["rows"] for p in m["m.ev:both"]["row_points"]] == list(nb)
+    assert all(p["actual_scale"] == p["rows"] for p in m["m.ev:both"]["row_points"])
+    assert got["schedule_coverage"]["uncovered"] == []
+    for drop, victim in ((("event_import", "rows"), "m.ev:both"), (("event_study", "rows"), "m.ev:bars")):
+        with pytest.raises(harness.AssemblyError) as exc:
+            harness.assemble_scale_receipt(inv, {k: v for k, v in runs.items() if k != drop}, **kw)
+        assert any(victim in p for p in exc.value.problems), (drop, exc.value.problems)
+    bad = {**runs, ("event_import", "rows"): _t02_axis_records("event_import", "rows", nb, ["m.ev:both"],
+                                                               lambda s: fact(s, 203, 500), actual=lambda s: s + 1)}
+    with pytest.raises(harness.AssemblyError) as exc:
+        harness.assemble_scale_receipt(inv, bad, **kw)
+    assert any("m.ev:both" in p and "實際輸入點數" in p for p in exc.value.problems)
+
+
+def test_task02_xsec_long_cell_and_variant(fb: Any, harness: Any, scale_probe: Any, tmp_path: Path) -> None:
+    """SPEC v5.53 (c1)：夥伴長歷史格（ETHUSDT 4h；長歷史檔無 SOLUSDT 4h）＝L 格同一生成定義（同格類／週期、同判準檔覆寫，
+    只換標的）；長歷史來源缺該序列 ⇒ 生成前即 FreezeError（不啟動子行程）。秒級預檢（合成 K 線快取形狀之 repo 根）：兩窗
+    重疊、標籤有效列數、預設切分可達（每標的測試段＝產品 `_build_cross_sectional_global_split` 之值）、前史根數與對照格；
+    夥伴序列過短 ⇒ 不可達並記產品之拒收原因。變體實跑
+    `cross_sectional_long` 排入排程且不取代 `cross_sectional` 之關切分兩軸；組裝之 `variants` 段每點須走預設切分，缺變體於
+    `require_variants` 下點名。"""
+    assert harness.XSEC_LONG_CELLS == (fb.LONG_CELL, fb.LONG_CELL_XSEC)
+    assert fb.LONG_CELLS_BY_SYMBOL[fb.LONG_CELL_XSEC_SYMBOL] == fb.LONG_CELL_XSEC
+    crit = fb._criteria()
+    btc, sol = fb.long_cell_descriptor(), fb.long_cell_descriptor(fb.LONG_CELL_XSEC_SYMBOL)
+    assert sol["id"] == fb.LONG_CELL_XSEC and sol["symbol"] == fb.LONG_CELL_XSEC_SYMBOL and btc["id"] == fb.LONG_CELL
+    assert {k: v for k, v in sol.items() if k not in ("id", "symbol")} == {k: v for k, v in btc.items()
+                                                                           if k not in ("id", "symbol")}
+    assert fb.long_cell_criteria(crit, fb.LONG_CELL_XSEC_SYMBOL) == fb.long_cell_criteria(crit)
+    with pytest.raises(fb.FreezeError):
+        fb.long_cell_descriptor("NOSUCHUSDT")
+    assert fb.LONG_CELL_XSEC_SYMBOL == "ETHUSDT" and fb.LONG_CELL_XSEC == "L_ETHUSDT_4h_longhist"
+    px = fb.LONG_CELL_XSEC_SYMBOL
+    root = tmp_path / "repo"
+    end = 1_777_320_000
+    _t02_kline_h5(root / fb.LONG_CELL_SOURCE, {"BTCUSDT/4h": 2600}, end=end + 10 * _T02_4H)
+    _t02_kline_h5(root / fb.LONG_CELL_LABEL_SOURCE, {"BTCUSDT/4h": 2200, f"{px}/4h": 2200}, end=end)
+    chk = fb.long_cell_source_check(fb.LONG_CELL_XSEC_SYMBOL, root)
+    assert chk["ok"] is False and chk["long_source"]["present"] is False and chk["label_source"]["bars"] == 2200
+    with pytest.raises(fb.FreezeError, match="資料不足"):
+        fb.long_cell_window(root, fb.LONG_CELL_XSEC_SYMBOL)
+    with pytest.raises(fb.FreezeError):
+        fb.gen_long_cell(repo_root=root, work_root=tmp_path / "w", symbol=fb.LONG_CELL_XSEC_SYMBOL)
+    assert not (tmp_path / "w").exists() and not (root / fb.LONG_CELL_ROOT.format(cell=fb.LONG_CELL_XSEC)).exists()
+    pre = harness.xsec_long_precheck(root)
+    assert pre["generation_ready"] is False and pre["ok"] is False
+    assert pre["symbols"][px]["window_from_generation_source"] is False
+    assert pre["symbols"]["BTCUSDT"]["window_bars"] == 2000 and pre["symbols"]["BTCUSDT"]["label_valid_rows"] == 1999
+    assert pre["symbols"]["BTCUSDT"]["pre_history_bars"] == 2600 - 10 - 2000
+    assert pre["symbols"]["BTCUSDT"]["label_source_pre_history_bars"] == 200
+    assert pre["overlap"]["timestamps"] == 2000 and pre["split"]["reachable"] is True
+    assert pre["split"]["per_symbol_test_rows"] == {"BTCUSDT": 400, px: 400}
+    assert all(r.get("missing") is True for r in pre["pre_history_references"])  # 合成根無已生成之對照格
+    _t02_kline_h5(root / fb.LONG_CELL_SOURCE, {"BTCUSDT/4h": 2600, f"{px}/4h": 2600}, end=end + 10 * _T02_4H)
+    assert harness.xsec_long_precheck(root)["ok"] is True
+    _t02_kline_h5(root / fb.LONG_CELL_SOURCE, {"BTCUSDT/4h": 2600, f"{px}/4h": 100}, end=end)
+    _t02_kline_h5(root / fb.LONG_CELL_LABEL_SOURCE, {"BTCUSDT/4h": 2200, f"{px}/4h": 100}, end=end)
+    short = harness.xsec_long_precheck(root)
+    assert short["split"]["reachable"] is False and "min_test_rows" in str(short["split"]["error"])
+    # 排程：變體排入、cross_sectional 之關切分兩軸保留；只排主軸時不排變體
+    inv = json.loads((REPO / "scripts" / "icperf_path_inventory.json").read_text(encoding="utf-8"))
+    sched = harness.schedule_runs(inv)
+    assert {("cross_sectional_long", "cols"), ("cross_sectional", "cols"), ("cross_sectional", "timestamps")} <= set(sched)
+    assert ("cross_sectional_long", "cols") not in harness.schedule_runs(inv, second_axes=False)
+    assert harness.XSEC_OVERRIDE_EXTRA == {"ic_train_test_split": False}
+    var = harness.schedule_coverage(inv, sched)["variants"]["cross_sectional_long:cols"]
+    assert var["scheduled"] is True and var["entries"] == sum(
+        1 for e in inv["entries"] if e["measure"] and e["branch_cell"] == "cross_sectional")
+    # 組裝之 variants 段
+    inv2, runs2 = _t02_second_axis_case()
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "budget_seconds": BUDGET2_UPPER_SECONDS,
+          "sample_interval_seconds": 0.2, "chunk_cap": {"bytes": 1, "basis": "x"}, "require_rows": True}
+
+    def vfacts(s: int) -> Dict[str, Any]:
+        return {"input_cols": s, "rows": 4000, "symbols": 2, "timestamps": 2000, "requested_columns": None,
+                "split_applied": True}
+
+    vkey = ("cross_sectional_long", "cols")
+    with_v = {**runs2, vkey: _t02_axis_records(*vkey, (500, 1000, 2000), ["m.x:cross"], vfacts)}
+    got = harness.assemble_scale_receipt(inv2, with_v, require_variants=True, **kw)
+    v = got["entries"]["m.x:cross"]["variants"]["cross_sectional_long:cols"]
+    assert [p["input_cols"] for p in v["points"]] == [500, 1000, 2000] and v["split"] == "default"
+    assert v["fit"]["axis"] == "cols" and got["entries"]["m.x:mw"]["variants"] is None
+    with pytest.raises(harness.AssemblyError) as exc:
+        harness.assemble_scale_receipt(inv2, runs2, require_variants=True, **kw)
+    assert any("m.x:cross" in p and "cross_sectional_long" in p for p in exc.value.problems)
+    assert harness.assemble_scale_receipt(inv2, runs2, **kw)["entries"]["m.x:cross"]["variants"] is None
+    nosplit = {**runs2, vkey: _t02_axis_records(*vkey, (500, 1000, 2000), ["m.x:cross"],
+                                                lambda s: {**vfacts(s), "split_applied": False})}
+    with pytest.raises(harness.AssemblyError) as exc:
+        harness.assemble_scale_receipt(inv2, nosplit, require_variants=True, **kw)
+    assert any("m.x:cross" in p and "預設切分" in p for p in exc.value.problems)
+
+
+def test_task02_projection_run_root(harness: Any, tmp_path: Path) -> None:
+    """事件研究投影分支之 FF run 定位：產品 `canonical_holdout.resolve_run_dir`（repo_root 未給 ⇒ 模組所在 repo 根之
+    data_cache/features）於 `projection_run_root` 內改以隔離 cwd 為根、命中以 symlink 引入之 run（經產品之 locator 出口
+    `create_feature_run_locator` 亦然）；離開即還原（同一 config_hash 於 repo 根找不到 ⇒ 產品之 feature_run_not_found）。
+    反例：run 無 manifest、cwd 為 repo 根 ⇒ 拒收。"""
+    from momentum.Analysis.event_samples import canonical_holdout as ch
+    from momentum.factories import create_feature_run_locator
+
+    run_dir = tmp_path / "store" / "features" / "BTCUSDT" / "4h" / "icperft02probe00000000000000000000"
+    run_dir.mkdir(parents=True)
+    (run_dir / "feature_manifest.json").write_text("{}", encoding="utf-8")
+    run = {"run_dir": str(run_dir), "symbol": "BTCUSDT", "timeframe": "4h", "config_hash": run_dir.name}
+    cwd = tmp_path / "cwd"
+    orig = ch.resolve_run_dir
+    with harness.projection_run_root(cwd, run) as linked:
+        assert linked == cwd.resolve() / "data_cache" / "features" / "BTCUSDT" / "4h" / run_dir.name and linked.is_symlink()
+        assert Path(os.path.realpath(linked)) == run_dir.resolve()
+        locate = create_feature_run_locator()[0]
+        assert locate(run_dir.name, symbols=["BTCUSDT"]) == linked
+        assert ch.resolve_run_dir(run_dir.name, symbols=["BTCUSDT"]) == linked
+    assert ch.resolve_run_dir is orig
+    with pytest.raises(ch.CanonicalHoldoutError, match="feature_run_not_found"):
+        ch.resolve_run_dir(run_dir.name, symbols=["BTCUSDT"])
+    (run_dir / "feature_manifest.json").unlink()
+    with pytest.raises(harness.HarnessError):
+        with harness.projection_run_root(tmp_path / "cwd2", run):
+            pass
+    (run_dir / "feature_manifest.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(harness.HarnessError, match="repo 根"):
+        with harness.projection_run_root(REPO, run):
+            pass
