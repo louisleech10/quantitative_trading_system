@@ -359,6 +359,8 @@ def test_cross_sectional_run_passes_close_and_metadata(labels_path: Optional[str
     service._feature_library = library  # noqa: SLF001
     analyzer = MagicMock()
     analyzer.analyze_cross_sectional.return_value = {"summary_table": []}
+    # ICPERF v5.59 (ae)：服務以 analyzer 之有效設定取跨標的主標籤之收益率類型（替身須給；本條只驗 close／metadata 接線）
+    analyzer.effective_config.return_value.labels.return_type = "simple"
     request = ICAnalyzeRequest(
         features_path="unused.h5", mode="cross_sectional", symbols=symbols, timeframe=TF, labels_path=labels_path
     )

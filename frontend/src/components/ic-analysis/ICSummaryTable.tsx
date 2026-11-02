@@ -23,7 +23,7 @@ import {
   binaryColumnLabels,
   binaryColumnTooltips,
 } from '@/lib/icLabelRule';
-import { IC_AUTOCORR_LABEL, IC_AUTOCORR_REASON_LABELS, IC_AUTOCORR_TIP } from '@/components/ic-analysis/icSettingsText';
+import { IC_AUTOCORR_LABEL, IC_AUTOCORR_REASON_LABELS, icAutocorrTip } from '@/components/ic-analysis/icSettingsText';
 
 interface ICSummaryTableProps {
   /** legacy：直接給列（不分頁、不本地排序——後端序即顯示序）。 */
@@ -436,7 +436,7 @@ export default function ICSummaryTable({
                   <TableHead className="w-[110px]" data-testid="ic-summary-ic-autocorr-head">
                     <span className="inline-flex items-center gap-1">
                       {IC_AUTOCORR_LABEL}
-                      <span title={IC_AUTOCORR_TIP} aria-label={`${IC_AUTOCORR_LABEL}說明`} role="img">
+                      <span title={icAutocorrTip(analysisMode)} aria-label={`${IC_AUTOCORR_LABEL}說明`} role="img">
                         <Info className="h-3 w-3 text-slate-500" />
                       </span>
                     </span>

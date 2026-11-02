@@ -266,7 +266,8 @@ def test_cross_sectional_e2e_real_path_append_and_analyze(tmp_feature_run_env) -
 
     cross_df = pd.concat(frames, axis=0).set_index("_symbol", append=True)
     service = ICAnalysisService()
-    labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
+    # ICPERF v5.59 (ae)：return_type 必填；本條之 oracle 為對數報酬
+    labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME, return_type="log")
     # 獨立 oracle：每列 return_1 ＝ log(下一根 close／本根 close)，下一根須存在於 K 線且兩價皆正
     expected = 0
     with h5py.File(KLINE_H5, "r") as handle:

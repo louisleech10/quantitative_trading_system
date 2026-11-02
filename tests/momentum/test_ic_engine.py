@@ -216,24 +216,21 @@ def test_align_label_to_group_superset_label_takes_group_timestamps():
 
 
 def test_ic_autocorrelation_high_for_stable_series():
-    """IC 自相關在穩定序列上偏高。"""
+    """IC 自相關在穩定序列上偏高（ICPERF v5.59 (ag)：舊 `ICEngine.compute_ic_autocorrelation` 已刪，改測產品唯一實作
+    `ic_lag1_autocorrelation`，序列同產品取 ICIR 窗之 `_select_icir_series`；遞增序列 lag-1＝0.4，== statsmodels acf）。"""
+    from statsmodels.tsa.stattools import acf
+
+    from momentum.Analysis.ic_filter_orchestrator import ic_lag1_autocorrelation
+
     rolling = {
         "feature_pos": {"window_10": [0.2, 0.25, 0.3, 0.35, 0.4]},
     }
     engine = ICEngine({"icir": {"window": 10}})
-    autocorr = engine.compute_ic_autocorrelation(rolling, lag=1)
+    series = engine._select_icir_series(rolling["feature_pos"])
+    value, reason = ic_lag1_autocorrelation(series)
 
-    assert autocorr["feature_pos"] > 0.3
-
-
-def test_ic_autocorrelation_zero_std_branch():
-    """std=0 時應回 NaN。"""
-    engine = ICEngine({"icir": {"window": 5}})
-    rolling = {"f1": {"window_5": [0.1, 0.1, 0.1, 0.1]}}
-
-    autocorr = engine.compute_ic_autocorrelation(rolling, lag=1)
-
-    assert np.isnan(autocorr["f1"])
+    assert reason is None and value > 0.3
+    assert np.isclose(value, acf(np.asarray(series), nlags=1, adjusted=False, fft=False)[1], rtol=1e-12, atol=0.0)
 
 
 def test_compute_ic_empty_and_short_inputs():
@@ -393,19 +390,6 @@ def test_grouped_ic_quarter_and_metadata_groups():
     assert "by_quarter" in grouped
     assert "by_data_source" in grouped
     assert "by_layer" in grouped
-
-
-def test_ic_autocorrelation_edge_cases():
-    """自相關在不足樣本或變異為零時回 NaN。"""
-    engine = ICEngine({"icir": {"window": 10}})
-
-    rolling = {"f1": {"window_10": [0.1]}}
-    autocorr = engine.compute_ic_autocorrelation(rolling, lag=1)
-    assert np.isnan(autocorr["f1"])
-
-    rolling = {"f1": {"window_10": [0.1, 0.1, 0.1]}}
-    autocorr = engine.compute_ic_autocorrelation(rolling, lag=1)
-    assert np.isnan(autocorr["f1"])
 
 
 def test_fit_exponential_decay_edge_cases(monkeypatch):

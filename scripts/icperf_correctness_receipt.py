@@ -260,11 +260,14 @@ def _run_cross(svc: Any, cross_df: Any, symbols: Sequence[str], cell: Mapping[st
     # SPEC Task 0.4 ㊱：同服務分支——逐特徵 metadata（`_feature_metadata_entry`）與 kline 收盤（標籤同一次讀取）交給產品
     feature_metadata = {str(c): svc._feature_metadata_entry(str(c)) for c in cross_df.columns}
     close_out: Dict[str, Any] = {}
-    cross_df = svc._append_cross_sectional_labels(cross_df, list(symbols), request["timeframe"], close_out=close_out)
     override = svc._build_config_override(fb._ic_analyze_request({**cell, "feature_filter": None}))
     extra = dict(request.get("override_extra") or {})
     ov = {**(override or {}), **extra}
     analyzer = create_ic_analyzer(ov)
+    # v5.59 (ae)：同服務分支，主標籤依本次有效 `labels.return_type`
+    cross_df = svc._append_cross_sectional_labels(cross_df, list(symbols), request["timeframe"],
+                                                  return_type=analyzer.effective_config(ov).labels.return_type,
+                                                  close_out=close_out)
     report = analyzer.analyze_cross_sectional(features=cross_df, labels_path=None, config_override=ov,
                                               progress_callback=fb._progress, timeframe=request["timeframe"],
                                               close=close_out.get("close"), feature_metadata=feature_metadata)
@@ -426,9 +429,11 @@ def _child_main(spec_path: Path) -> int:
 
 
 def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
-    """逐請求於子行程（共用監看；隔離 cwd 與 TMPDIR）執行並擷取，寫 `out_dir/<id>.pkl`；回 {id: {"rc", "pickle", "log"}}。
-    任一請求失敗 ⇒ 記錄並續跑其餘（收據將該請求記為失敗，不 PASS）。`out_dir` 先轉絕對路徑（子行程 cwd＝隔離目錄，
-    相對路徑之 spec／pickle 於子行程內解析不到；2026-11-01 `--out-dir runs/...` 12 請求皆 rc=1 實例）。"""
+    """逐請求於子行程（共用監看；隔離 cwd 與 TMPDIR）執行並擷取，寫 `out_dir/<id>.pkl`；回 {id: {"rc", "pickle", "log",
+    "code_sha256", "code_sha256_at_start", "head", ...}}。任一請求失敗 ⇒ 記錄並續跑其餘（收據將該請求記為失敗，不 PASS）。
+    `out_dir` 先轉絕對路徑（子行程 cwd＝隔離目錄，相對路徑之 spec／pickle 於子行程內解析不到；2026-11-01 `--out-dir runs/...`
+    12 請求皆 rc=1 實例）。SPEC Task 0.2 v5.59 (aa)（r70 群集 A）：每請求擷取結束時記**擷取當下**之 `receipt_code_sha256()`
+    與 `head`（另記開始時之 code_sha256：擷取期間程式改動可辨）；`build_receipt` 要求與組收據當下相等。"""
     fb = _fb()
     out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -446,6 +451,7 @@ def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
         spec_path = cap / "spec.json"
         spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
         cmd = [sys.executable, str(Path(__file__).resolve()), CHILD_CMD, str(spec_path)]
+        code_at_start = receipt_code_sha256()
         t0 = time.perf_counter()
         try:
             res = fb.run_watched(cmd, log_path=cap / "run.log",
@@ -456,6 +462,8 @@ def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
             status[rid] = {"rc": None, "pickle": None, "log": str(cap / "run.log"), "error": str(exc)}
         status[rid]["wall_s"] = time.perf_counter() - t0
         status[rid]["pickle_bytes"] = out.stat().st_size if out.is_file() else None
+        status[rid].update({"code_sha256": receipt_code_sha256(), "code_sha256_at_start": code_at_start,
+                            "head": _git_head()})
         print(json.dumps({"request": rid, **status[rid]}, ensure_ascii=False), flush=True)
     (out_dir / "capture_status.json").write_text(json.dumps(status, ensure_ascii=False, indent=1), encoding="utf-8")
     return status
@@ -725,15 +733,37 @@ def _utc(index: Any) -> Any:
     return idx.tz_localize("UTC") if idx.tz is None else idx.tz_convert("UTC")
 
 
-def oracle_label(close: Any, index: Any, horizon: int, return_type: str) -> Any:
-    """主線標籤之 oracle：收盤截至特徵末根（同資料窗），simple＝close[t+h]／close[t]−1、log＝ln 比值；對齊特徵索引。"""
+def oracle_return(c: Any, horizon: int, return_type: str) -> Any:
+    """前瞻報酬之 oracle（numpy 直算，不經 LabelGenerator）：simple＝c[t+h]／c[t]−1；log＝ln 比值；risk_adjusted＝simple／
+    （含 t 之前 21 根一根簡單報酬之樣本標準差 ddof=1，0 ⇒ NaN）；其他定義 ⇒ ValueError（不靜默代入）。"""
     import numpy as np
+    import pandas as pd
 
+    v = c.to_numpy(dtype=np.float64)
+    fwd = np.full(v.size, np.nan)
+    h = int(horizon)
+    if h < v.size:
+        fwd[: v.size - h] = v[h:]
+    if return_type == "log":
+        out = np.log(fwd / v)
+    elif return_type in ("simple", "risk_adjusted"):
+        out = fwd / v - 1.0
+        if return_type == "risk_adjusted":
+            pct = np.append(np.nan, v[1:] / v[:-1] - 1.0)
+            vol = np.full(v.size, np.nan)
+            if v.size >= 21:
+                vol[20:] = np.std(np.lib.stride_tricks.sliding_window_view(pct, 21), axis=1, ddof=1)
+            out = out / np.where(vol == 0.0, np.nan, vol)
+    else:
+        raise ValueError(f"oracle_return：未支援之 return_type {return_type!r}")
+    return pd.Series(out, index=c.index)
+
+
+def oracle_label(close: Any, index: Any, horizon: int, return_type: str) -> Any:
+    """主線標籤之 oracle：收盤截至特徵末根（同資料窗），定義見 `oracle_return`；對齊特徵索引。"""
     idx = _utc(index)
     c = close.loc[: idx.max()]
-    fwd = c.shift(-int(horizon))
-    lab = fwd / c - 1.0 if return_type == "simple" else np.log(fwd / c)
-    return lab.reindex(idx)
+    return oracle_return(c, horizon, return_type).reindex(idx)
 
 
 def oracle_split(n_rows: int, cfg: Mapping[str, Any], purge: int) -> Dict[str, Any]:
@@ -1901,14 +1931,16 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
         return facts
     mh0 = re.match(r"return_(\d+)$", str(label_col[0]))
     h_lab = int(mh0.group(1)) if mh0 else 1
-    # 標籤（跨標的路徑之定義＝服務 `_append_cross_sectional_labels`〔ic_analysis_service.py:3595-3668〕：kline 全序列之 h 根
-    # 對數報酬 ln(close[t+h]／close[t])，欄名 return_<h>；oracle 以 kline_cache.h5 直接讀之收盤〔float64〕逐標的重算）
-    t_l = items.setdefault("label.cross_sectional", Tally("ln(close[t+h]／close[t])（kline_cache.h5 直接讀、float64、kline 全序列）"))
+    # 標籤（跨標的路徑之定義＝服務 `_append_cross_sectional_labels`：kline 全序列之 h 根前瞻報酬，依有效
+    # `labels.return_type`〔v5.59 (ae)〕，欄名 return_<h>；oracle 以 kline_cache.h5 直接讀之收盤〔float64〕逐標的重算）
+    rt_x = str((cfg.get("labels") or {}).get("return_type"))
+    t_l = items.setdefault("label.cross_sectional", Tally("oracle_return（simple／log／risk_adjusted 依有效 labels.return_type；"
+                                                          "kline_cache.h5 直接讀、float64、kline 全序列）"))
     tf = str(cap["request"].get("timeframe"))
     for sym, g in df.groupby(level=-1, sort=True):
         ts = _utc(g.index.get_level_values(0))
         c = read_kline_close(str(sym), tf)
-        lab = np.log(c.shift(-h_lab) / c).reindex(ts).to_numpy(dtype=float)
+        lab = oracle_return(c, h_lab, rt_x).reindex(ts).to_numpy(dtype=float)
         for when, pv, ov in zip(ts, g[label_col[0]].to_numpy(dtype=float), lab):
             t_l.num("@input/label_series", f"{sym}/label@{when}", pv, ov)
     split_meta = (rep.get("metadata") or {}).get("ic_train_test_split") or {}
@@ -2429,6 +2461,23 @@ def _merge_items(per_req: Mapping[str, Mapping[str, Tally]]) -> Dict[str, Dict[s
     return out
 
 
+CAPTURE_IDENTITY_REASON = "擷取與現行程式身分不符"
+
+
+def capture_identity_problem(st: Mapping[str, Any], current_sha: str) -> Optional[str]:
+    """SPEC Task 0.2 v5.59 (aa)：擷取紀錄之程式身分與組收據當下（`current_sha`）不符之原因；相符 ⇒ None。缺 code_sha256、
+    不等、或擷取開始與結束之身分不同（擷取期間程式改動）皆為不符。"""
+    got = st.get("code_sha256")
+    if not got:
+        return "擷取紀錄缺 code_sha256（擷取早於 v5.59 或未記，須以現行程式重擷取）"
+    if got != current_sha:
+        return f"擷取時 {str(got)[:12]} ≠ 現行 {current_sha[:12]}（擷取後程式已改，須重擷取）"
+    start = st.get("code_sha256_at_start")
+    if start is not None and start != got:
+        return f"擷取期間程式改動（開始 {str(start)[:12]}、結束 {str(got)[:12]}）"
+    return None
+
+
 def receipt_fail_reasons(per_req: Mapping[str, Mapping[str, Any]]) -> List[str]:
     """逐請求之 FAIL 原因（SPEC v5.39 ⑦⑧⑨⑩、v5.38 ①②）：unmapped 鍵；逐請求封閉不成立（獨立抽取之回應鍵 ≠ coverage）；
     未逐值對照之統計鍵（逐鍵列出）；unimplemented、metadata-missing 之鍵（逐鍵，任一請求出現即 FAIL）；跨標的任一嘗試失敗；
@@ -2465,7 +2514,8 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
     "cross_request", "four_way", "extra_findings", "pass", "fail_reasons"}。頂層 `items`＝各請求同一 oracle 項之合併；頂層
     `coverage`＝§G (1)(4) 之 A 格小請求（`TOP_COVERAGE_REQUESTS`）回應之涵蓋鍵（同 `test_icperf_correctness.py`
     `_coverage_keys` 規則）；`requests`＝逐請求封閉之 coverage（鍵集合 == 該請求實際回應鍵集合）、items 與狀態計數。
-    PASS ⇔ 全部請求 rc 0、無 unmapped、每一統計鍵於至少一請求 verified／verified-na、全部項一致。"""
+    PASS ⇔ 全部請求 rc 0、每一擷取之程式身分（`capture_status.json` 之 code_sha256）＝組收據當下之 `receipt_code_sha256()`
+    （v5.59 (aa)；不等或缺 ⇒「擷取與現行程式身分不符」）、無 unmapped、每一統計鍵於至少一請求 verified／verified-na、全部項一致。"""
     import datetime as _dt
     import pickle
 
@@ -2477,13 +2527,19 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
     caps_meta: Dict[str, Any] = {}
     top_keys: Dict[str, set] = {}
     fail: List[str] = []
+    # SPEC Task 0.2 v5.59 (aa)（r70 群集 A）：收據之 code_sha256＝組收據當下；每一擷取須於同一程式身分下產生
+    current_sha = receipt_code_sha256()
     for rid in REQUESTS:
         st = status.get(rid)
         if st is None:
             fail.append(f"{rid}：未擷取")
             continue
         caps_meta[rid] = {"rc": st.get("rc"), "wall_s": st.get("wall_s"), "pickle_bytes": st.get("pickle_bytes"),
-                          "error": st.get("error")}
+                          "error": st.get("error"), "code_sha256": st.get("code_sha256"),
+                          "code_sha256_at_start": st.get("code_sha256_at_start"), "head": st.get("head")}
+        ident = capture_identity_problem(st, current_sha)
+        if ident is not None:
+            fail.append(f"{rid}：{CAPTURE_IDENTITY_REASON}（{ident}）")
         if st.get("rc") != 0 or not st.get("pickle"):
             fail.append(f"{rid}：擷取 rc={st.get('rc')}（{st.get('log')}）")
             continue
@@ -2547,7 +2603,7 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
     for rid, meta in caps_meta.items():
         requests_out.setdefault(rid, dict(meta))
     return {
-        "head": _git_head(), "code_sha256": receipt_code_sha256(), "spec": f"docs/ICPERF_SPEC.md {spec_version()} Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
+        "head": _git_head(), "code_sha256": current_sha, "spec": f"docs/ICPERF_SPEC.md {spec_version()} Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
         "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         "tolerance": {"relative": REL_TOL, "derived_relative": float(O.DERIVED_REL_TOL),
                       "bounded_absolute": float(O.BOUNDED_ABS_TOL), "bounded_patterns": list(O.BOUNDED_FIELD_PATTERNS),

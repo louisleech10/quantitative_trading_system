@@ -1,4 +1,35 @@
 {
+  "v559_cross_sectional_5plus": {
+    "spec_item": "Task 0.2 v5.59 (ad)",
+    "script": "runs/icperf/task04/v559/run_v559_xsec5.py",
+    "script_sha256": "10e07273693bbe8e2bb5f7411cd1997bc3c1d428beeb3ae147f1cdbe962f626f",
+    "result_file": "runs/icperf/task04/v559/xsec5.json",
+    "result_sha256": "edd67b45e1d5be9552be35dfd2b400b3c6a4c713c7f993f8c991baca41adc724",
+    "log": "runs/icperf/task04/logs/v559_xsec5.log",
+    "code_state": {
+      "head": "6d6fa6c038e43c56e50e2348560cf5b57b4bf127",
+      "orchestrator_sha256": "08e7de343128a0d84decf66e02ca4c1e79d56eba7a49a5ee159abbb46fcc111d",
+      "service_sha256": "492b4e7839428bcadbde4ed2e344e306042878b642645775504cfaa7bad6cbbe",
+      "note": "工作樹含 v5.59 路 P5／R5 與 v5.60 主委改動（未提交）"
+    },
+    "data_cell": "kline_cache.h5 1h 全部 10 標的（ADA、BCH、BNB、BTC、DOGE、ETH、LINK、SOL、TRX、XRP）末 2000 根，因果特徵 ret1／dev20／vol20／mom10（同收據請求 X.cross_sectional.default）；IC 頁預設請求含預設切分（train 16000、test 4000 列，每標的 400）；主標籤 return_type＝simple（有效設定）",
+    "n_symbols": 10,
+    "two_point_slices_share": 0.0,
+    "slice_size": {"min": 10, "max": 10},
+    "n_series_points_per_method": 1596,
+    "oracle": "逐截面 scipy spearmanr／pearsonr／kendalltau(variant=b)；逐標的同；衰減逐 horizon 同（前瞻報酬 oracle_return 依有效 return_type）；ic_autocorr＝statsmodels acf(nlags=1, adjusted=False, fft=False, missing=conservative)；tested_estimator＝cross_sectional_period_ic_<method>",
+    "oracle_mismatch_counts": {
+      "spearman": {"series": 0, "summary": 0, "symbol_ic": 0, "decay": 0, "ic_autocorr": 0, "tested_estimator": 0},
+      "pearson": {"series": 0, "summary": 0, "symbol_ic": 0, "decay": 0, "ic_autocorr": 0, "tested_estimator": 0},
+      "kendall": {"series": 0, "summary": 0, "symbol_ic": 0, "decay": 0, "ic_autocorr": 0, "tested_estimator": 0}
+    },
+    "method_slice_differences": {
+      "spearman_vs_pearson": {"slices_differ": 1596, "slices_total": 1596},
+      "spearman_vs_kendall": {"slices_differ": 1579, "slices_total": 1596},
+      "pearson_vs_kendall": {"slices_differ": 1596, "slices_total": 1596}
+    },
+    "notes": "v558_cross_sectional（2 標的，每截面三法皆 ±1）不改；本鍵為 ≥5 標的之非退化驗證：三方法逐截面 IC 幾乎全數不同，且三方法對 scipy oracle 全部一致。"
+  },
   "branches": {
     "default": {
       "runs": {

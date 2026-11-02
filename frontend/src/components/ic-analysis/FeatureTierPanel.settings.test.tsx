@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import FeatureTierPanel from '@/components/ic-analysis/FeatureTierPanel';
 import ICRunSettingsLine from '@/components/ic-analysis/ICRunSettingsLine';
-import { IC_AUTOCORR_TIP, IC_SETTING_TIPS } from '@/components/ic-analysis/icSettingsText';
+import { IC_AUTOCORR_TIPS, IC_SETTING_TIPS } from '@/components/ic-analysis/icSettingsText';
 import { DEFAULT_IC_SETTINGS, IC_SETTING_KEYS } from '@/lib/icConfigOverride';
 
 // ICPERF Task 0.4 ㊸：IC 頁方法選擇（四選單＋單調性開關）、每項一個 ⓘ、報告頂端「本次設定」一行。
@@ -35,7 +35,7 @@ describe('FeatureTierPanel 方法選擇', () => {
       expect(within(row).getAllByRole('button', { name: /說明$/ })).toHaveLength(1);
     }
     expect(within(box).queryByTestId('ic-setting-ic_autocorrelation')).toBeNull();
-    for (const text of [...Object.values(IC_SETTING_TIPS), IC_AUTOCORR_TIP]) {
+    for (const text of [...Object.values(IC_SETTING_TIPS), ...Object.values(IC_AUTOCORR_TIPS)]) {
       expect(text.trim().length).toBeGreaterThan(0);
       expect(text).not.toMatch(/\n/);
       expect(text.length).toBeLessThanOrEqual(80);

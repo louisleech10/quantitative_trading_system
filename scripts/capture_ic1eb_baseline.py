@@ -270,7 +270,8 @@ def build_xsec_frame(service: Any, symbols: list[str], timeframe: str, config_ha
         frame["_symbol"] = symbol
         frames.append(frame)
     cross_df = pd.concat(frames, axis=0).set_index("_symbol", append=True)
-    return service._append_cross_sectional_labels(cross_df, symbols, timeframe), selected
+    # ICPERF v5.59 (ae) 後 return_type 必填：IC1EB 基準之跨標的主標籤定義＝log（擷取當時服務固定值）
+    return service._append_cross_sectional_labels(cross_df, symbols, timeframe, return_type="log"), selected
 
 
 def build_return5_labels_h5(timeframe: str) -> Path:

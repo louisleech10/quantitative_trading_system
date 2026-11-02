@@ -78,13 +78,11 @@ class EventFilterConfig(BaseModel):
     #: 置換自檢（Task 3.7）之全批置換次數上限；超過 ⇒ 依特徵數降階並在報告揭露。
     perm_budget_total: int = 200000
     #: 整批負對照（Task 3.7）之置亂重跑次數；q95 以整數 order statistic 取（不插值）。
+    #  ICPERF Task 0.2 v5.59 (ac)：固定跑滿此次數（原牆鐘預算鍵 `negative_control_budget_seconds` 已刪；舊請求帶該鍵
+    #  依本模型預設 extra＝ignore 忽略），耗時以進度回報揭露。
     negative_control_n: int = 50
     #: 置換／置亂之 seed 基數；固定值使同一份資料之結果可重現。
     oracle_seed: int = 20260910
-    #: 整批負對照之時間預算（秒）。🔴 `GROK-R1-P1-03` 實測：10% NaN 之全表 Mann-Whitney
-    #  約 4s/次 ⇒ 50 次約 200s，超過 SPEC 之 120s 驗證閘。超預算時**縮次數並揭露**
-    #  （`negative_control.degraded_by_budget`），不靜默跑滿也不靜默砍。
-    negative_control_budget_seconds: float = 60.0
 
     class SampleSizeTiers(BaseModel):
         sufficient: int = 200

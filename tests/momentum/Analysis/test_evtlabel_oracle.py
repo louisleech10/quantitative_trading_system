@@ -409,7 +409,7 @@ def test_unknown_feature_bar_fails_closed():
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# ⑥ B4 review R1：負對照必須與置亂端**同一程序**；預算降階必須揭露
+# ⑥ B4 review R1：負對照必須與置亂端**同一程序**；次數固定（ICPERF v5.59 (ac) 刪預算降階）
 # ══════════════════════════════════════════════════════════════════════════
 
 
@@ -451,33 +451,9 @@ def test_negative_control_respects_the_fdr_flag():
     assert "if fdr_enabled:" in src and "q_sh = {n: float(tbl_sh.loc[n, \"p_value\"])" in src
 
 
-def test_budget_degradation_is_disclosed_not_silent():
-    """🔴 `GROK-R1-P1-03`：10% NaN 時 50 次負對照實測約 200s（門檻 120）。
-
-    修法不是硬砍次數，是**量一次再決定**；而次數變少會讓 q95 解析度變粗，
-    使用者必須看得到 ⇒ `n_planned`／`n_effective`／`degraded_by_budget` 都要寫出來。
-    """
-    n = 120
-    y = np.array(([1] * 10 + [0] * 10) * 6, dtype=int)
-    rng = np.random.default_rng(5)
-    feats = _frame(n, {f"f{i}": rng.standard_normal(n) for i in range(8)})
-    orch = ICFilterOrchestrator(ICConfig.model_validate({
-        "event_filter": {"min_events_per_class": 5, "negative_control_n": 50,
-                         "oracle_seed": 7, "negative_control_budget_seconds": 0.0},
-    }))
-    _bind(orch, feats, y)
-    _, receipt = orch._run_binary_permutation_and_negative_control(
-        ["f0"], {}, feats, orch._config, alpha_effective=0.05, fdr_method="fdr_bh",
-    )
-    nc = receipt["negative_control"]
-    assert nc["n_planned"] == 50
-    assert nc["n_effective"] == 5, "預算為 0 仍至少跑 5 次（少於 5 次談不上分布）"
-    assert nc["degraded_by_budget"] is True
-    assert len(nc["shuffled_counts"]) == nc["n_effective"]
-
-
 def test_full_budget_is_not_marked_degraded():
-    """預算充足 ⇒ 跑滿且不標降階（避免把正常情況也標成打折）。"""
+    """跑滿 `negative_control_n` 次（ICPERF v5.59 (ac)：次數固定、不依耗時縮減；降階旗標已自收據移除，
+    耗時注入之反例見 `test_icperf_v559_product.py::test_negative_control_runs_planned_count_even_when_first_call_takes_20s`）。"""
     n = 120
     y = np.array(([1] * 10 + [0] * 10) * 6, dtype=int)
     feats = _frame(n, {"f0": np.random.default_rng(5).standard_normal(n)})
@@ -487,4 +463,4 @@ def test_full_budget_is_not_marked_degraded():
         ["f0"], {}, feats, orch._config, alpha_effective=0.05, fdr_method="fdr_bh",
     )
     nc = receipt["negative_control"]
-    assert nc["n_effective"] == 6 and nc["degraded_by_budget"] is False
+    assert nc["n_effective"] == 6 and "degraded_by_budget" not in nc

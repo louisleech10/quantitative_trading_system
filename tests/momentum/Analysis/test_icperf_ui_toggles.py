@@ -279,6 +279,8 @@ def test_config_hash_unchanged_at_default_and_distinct_when_off() -> None:
     default_cfg = ICConfig()
     legacy = default_cfg.model_dump()
     legacy["thresholds"].pop("monotonicity_gate_enabled")
+    # ICPERF v5.59 (ac)：加欄前之 schema 另含其後刪除之 `event_filter.negative_control_budget_seconds`（預設 60.0）
+    legacy["event_filter"].setdefault("negative_control_budget_seconds", 60.0)
     expected = hashlib.md5(json.dumps(legacy, sort_keys=True).encode("utf-8")).hexdigest()
     assert orch._hash_config(default_cfg) == expected
     off = ICConfig.model_validate({"thresholds": {"monotonicity_gate_enabled": False}})
@@ -297,6 +299,8 @@ def _legacy_hash(cfg: ICConfig) -> str:
     data = cfg.model_dump()
     for section, field in _HASH_OMIT_AT_DEFAULT:
         data[section].pop(field, None)
+    # ICPERF v5.59 (ac)：刪欄前之 schema 含 `event_filter.negative_control_budget_seconds`（預設 60.0；該鍵刪後請求值一律被忽略）
+    data["event_filter"].setdefault("negative_control_budget_seconds", 60.0)
     return hashlib.md5(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
 
 

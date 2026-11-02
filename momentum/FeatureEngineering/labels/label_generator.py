@@ -14,6 +14,8 @@ LOOKAHEAD_LABEL_UNSUPPORTED = "LOOKAHEAD_LABEL_UNSUPPORTED"
 WINSORIZED_DISABLED_MSG = (
     f"{LOOKAHEAD_LABEL_UNSUPPORTED}: winsorized return_type is disabled (LA-2 DEC-1)"
 )
+# risk_adjusted 之波動窗（`generate_risk_adjusted_return` 預設與 `backward_warmup_bars` 同源）
+RISK_ADJUSTED_VOL_WINDOW = 21
 
 
 class LabelGenerator:
@@ -64,7 +66,7 @@ class LabelGenerator:
         return asset_ret - bench_ret
 
     def generate_risk_adjusted_return(
-        self, close: pd.Series, horizon: int, vol_window: int = 21
+        self, close: pd.Series, horizon: int, vol_window: int = RISK_ADJUSTED_VOL_WINDOW
     ) -> pd.Series:
         """R / rolling volatility — risk-adjusted return"""
         if vol_window <= 0:
@@ -106,6 +108,20 @@ class LabelGenerator:
             logger.error("Unsupported return_type: %s", return_type)
             raise ValueError(f"Unsupported return_type: {return_type}")
         return dispatch[return_type]()
+
+    def backward_warmup_bars(self, return_type: str) -> int:
+        """`generate_returns_by_type(close, h, return_type)` 開頭因回看窗必然缺值之根數（與 h 無關）。
+
+        risk_adjusted：pct_change 首根缺值＋rolling(vol_window).std 需 vol_window 個報酬 ⇒ 前 vol_window 根缺值；
+        其餘定義只用前瞻 ⇒ 0。供覆蓋率守衛計結構下限（ICPERF v5.60）。
+        """
+        if return_type == "winsorized":
+            raise NotImplementedError(WINSORIZED_DISABLED_MSG)
+        if return_type == "risk_adjusted":
+            return RISK_ADJUSTED_VOL_WINDOW
+        if return_type in ("simple", "log", "excess"):
+            return 0
+        raise ValueError(f"Unsupported return_type: {return_type}")
 
     def horizon_to_bars(self, time_duration: str, timeframe: str) -> int:
         """Convert time_duration to bar count for a given timeframe."""

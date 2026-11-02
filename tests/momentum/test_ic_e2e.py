@@ -166,7 +166,8 @@ class TestICGatekeeperE2E:
             "compute_ic",
             "compute_rolling_ic",
             "compute_icir",
-            "compute_ic_autocorrelation",
+            # ICPERF v5.59 (ag)：`compute_ic_autocorrelation` 已自 ICEngine 刪除（產品 IC 自相關＝模組函式
+            # `ic_lag1_autocorrelation`，以已快取之滾動 IC 序列計，非 IC 重算）
             "compute_ic_decay",
             "compute_grouped_ic",
         ):

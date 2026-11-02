@@ -15,7 +15,7 @@ import ICRunSettingsLine from '@/components/ic-analysis/ICRunSettingsLine';
 import ICSummaryTable from '@/components/ic-analysis/ICSummaryTable';
 import {
   IC_AUTOCORR_REASON_LABELS,
-  IC_AUTOCORR_TIP,
+  IC_AUTOCORR_TIPS,
   IC_SETTING_NOT_APPLICABLE_LABEL,
   IC_SETTING_NOT_APPLICABLE_TIPS,
   IC_SETTING_TIPS_XSEC,
@@ -148,7 +148,8 @@ describe('v5.58 (w) 報告表 IC 自相關欄', () => {
     const head = screen.getByTestId('ic-summary-ic-autocorr-head');
     const tips = within(head).getAllByRole('img', { name: /說明$/ });
     expect(tips).toHaveLength(1);
-    expect(tips[0].getAttribute('title')).toBe(IC_AUTOCORR_TIP);
+    // v5.59 (aj)：ⓘ 分模式（未給 analysisMode ⇒ 預設 global 之縱向句；三模式見 ICSummaryTable.autocorrTip.test.tsx）
+    expect(tips[0].getAttribute('title')).toBe(IC_AUTOCORR_TIPS.global);
     const cells = screen.getAllByTestId('ic-summary-ic-autocorr');
     expect(cells.map((c) => c.textContent)).toEqual(['0.73', '--']);
     expect(cells[1].getAttribute('title')).toBe(IC_AUTOCORR_REASON_LABELS.constant_series);

@@ -2760,6 +2760,208 @@ def inventory_problems(inv: Mapping[str, Any]) -> List[str]:
     return out
 
 
+# ── 清冊之檔:行引用（SPEC Task 0.2 v5.59 (ai)，code review r70 群集 K） ──────────────────────────────────────────
+#: evidence＝入口定義行「<檔>:<行>」（檔＝入口 id 之模組檔、行＝其 def 行）；callers 每元素＝「<檔>:<行>（<所在函式限定名>）」
+#: 或「<檔>:<行>（<所在函式限定名>：<引用式>）」——所在函式＝該行最內層之 def／class 限定名（模組層＝`<module>`）；同一（檔,
+#: 所在函式, 引用式）列出該函式內引用入口名之**全部**行（AST：Name／Attribute 之名＝入口限定名末段；給引用式者只計
+#: `ast.unparse` 等於引用式之 Attribute——同名異物時用，如三分析器之 `compute_all`）；pit_call_sites 之 site 同規則（所在函式＝
+#: caller_id）。行號由 `relocate_inventory_refs` 依符號機械重算（不依版本歷史），`inventory_ref_problems` 驗之。
+INVENTORY_CALLER_RE = re.compile(
+    r"^(?P<path>[\w./-]+\.py):(?P<line>\d+)（(?P<qual><module>|[A-Za-z_][\w.]*)(?:：(?P<expr>[^（）]+))?）$")
+INVENTORY_EVIDENCE_RE = re.compile(r"^(?P<path>[\w./-]+\.py):(?P<line>\d+)$")
+INVENTORY_MODULE_QUAL = "<module>"
+
+
+class _PySource:
+    """單一 .py 之 AST 索引：`defs`＝{限定名: (def 行, 末行)}（def／class，含巢狀與 if／try 區塊內者）；`refs(name, expr)`＝
+    {所在函式限定名: [引用 name 之行（Name 之行、Attribute 之屬性末行），升冪不重複]}（`expr` 非 None ⇒ 只計 `ast.unparse`
+    等於 expr 之 Attribute）。檔不存在或語法錯 ⇒ `error`。"""
+
+    def __init__(self, path: Path) -> None:
+        import ast
+
+        self.error: Optional[str] = None
+        self.defs: Dict[str, Tuple[int, int]] = {}
+        self._refs: Dict[str, Dict[str, List[Tuple[int, Any]]]] = {}
+        try:
+            tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, ValueError) as exc:
+            self.error = f"{type(exc).__name__}: {exc}"
+            return
+
+        def visit(node: Any, qual: List[str]) -> None:
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    name = ".".join(qual + [child.name])
+                    self.defs.setdefault(name, (int(child.lineno), int(child.end_lineno or child.lineno)))
+                    visit(child, qual + [child.name])
+                    continue
+                if isinstance(child, ast.Name):
+                    self._add(child.id, qual, int(child.lineno), None)
+                elif isinstance(child, ast.Attribute):
+                    self._add(child.attr, qual, int(child.end_lineno or child.lineno), child)
+                visit(child, qual)
+
+        visit(tree, [])
+
+    def _add(self, name: str, qual: List[str], line: int, node: Any) -> None:
+        self._refs.setdefault(name, {}).setdefault(".".join(qual) or INVENTORY_MODULE_QUAL, []).append((line, node))
+
+    def refs(self, name: str, expr: Optional[str] = None) -> Dict[str, List[int]]:
+        import ast
+
+        out: Dict[str, List[int]] = {}
+        for q, hits in (self._refs.get(name) or {}).items():
+            lines = sorted({ln for ln, node in hits
+                            if expr is None or (node is not None and ast.unparse(node) == expr)})
+            if lines:
+                out[q] = lines
+        return out
+
+
+def _inventory_sources(repo_root: Path) -> Any:
+    cache: Dict[str, _PySource] = {}
+
+    def get(rel: str) -> _PySource:
+        if rel not in cache:
+            cache[rel] = _PySource(Path(repo_root) / rel)
+        return cache[rel]
+
+    return get
+
+
+def _entry_module_file(eid: str) -> Tuple[str, str]:
+    """入口 id `<模組>:<限定名>` ⇒ (模組檔 repo 相對路徑, 限定名)。"""
+    mod, _, qual = str(eid).partition(":")
+    return mod.replace(".", "/") + ".py", qual
+
+
+def _caller_groups(refs: Sequence[Any]) -> Tuple[Dict[Tuple[str, str, Optional[str]], List[int]], List[str]]:
+    """callers 字串 ⇒ ({(檔, 所在函式, 引用式或 None): [行...]（列出序）}, 不合格式者)。"""
+    groups: Dict[Tuple[str, str, Optional[str]], List[int]] = {}
+    bad: List[str] = []
+    for ref in refs or []:
+        m = INVENTORY_CALLER_RE.match(str(ref))
+        if m is None:
+            bad.append(str(ref))
+            continue
+        groups.setdefault((m["path"], m["qual"], m["expr"]), []).append(int(m["line"]))
+    return groups, bad
+
+
+def _caller_ref(path: str, line: int, qual: str, expr: Optional[str]) -> str:
+    return f"{path}:{line}（{qual}{'：' + expr if expr else ''}）"
+
+
+def inventory_ref_problems(inv: Mapping[str, Any], repo_root: Path = REPO) -> List[str]:
+    """清冊之檔:行引用與現行碼之不符（空＝成立；SPEC v5.59 (ai)）：①evidence 須為「<入口模組檔>:<入口 def 行>」；
+    ②callers 每元素須為「<檔>:<行>（<所在函式>）」、所在函式存在於該檔、且同一（檔, 所在函式）之列出行集合＝該函式內引用
+    入口名之全部行（缺列、多列、行已漂移皆不符）；③pit_call_sites 之 site 同②（所在函式＝caller_id 之限定名、引用名＝callee
+    末段），同一（callee, caller_id）之 site 集合＝全部引用行。"""
+    src = _inventory_sources(repo_root)
+    out: List[str] = []
+
+    def check_group(tag: str, path: str, qual: str, name: str, lines: Sequence[int], expr: Optional[str] = None) -> None:
+        s = src(path)
+        if s.error is not None:
+            out.append(f"{tag}：{path} 無法解析（{s.error}）")
+            return
+        if qual != INVENTORY_MODULE_QUAL and qual not in s.defs:
+            out.append(f"{tag}：{path} 無所在函式 {qual}")
+            return
+        if expr is not None and expr.rsplit(".", 1)[-1] != name:
+            out.append(f"{tag}：{path}（{qual}）引用式 {expr} 之末段非入口名 {name}")
+            return
+        want = s.refs(name, expr).get(qual, [])
+        if len(set(lines)) != len(lines):
+            out.append(f"{tag}：{path}（{qual}）列出行重複 {sorted(lines)}")
+        if sorted(set(lines)) != want:
+            out.append(f"{tag}：{path}（{qual}{'：' + expr if expr else ''}）列出行 {sorted(set(lines))} ≠ 現行引用 "
+                       f"{expr or name} 之行 {want}")
+
+    for e in inv.get("entries") or []:
+        eid = str(e.get("id"))
+        mpath, qual = _entry_module_file(eid)
+        name = qual.rsplit(".", 1)[-1]
+        m = INVENTORY_EVIDENCE_RE.match(str(e.get("evidence") or ""))
+        s = src(mpath)
+        if m is None or m["path"] != mpath:
+            out.append(f"{eid}：evidence {e.get('evidence')!r} 須為「{mpath}:<def 行>」")
+        elif s.error is not None:
+            out.append(f"{eid}：{mpath} 無法解析（{s.error}）")
+        elif qual not in s.defs:
+            out.append(f"{eid}：{mpath} 無入口符號 {qual}")
+        elif int(m["line"]) != s.defs[qual][0]:
+            out.append(f"{eid}：evidence 行 {m['line']} ≠ 現行 def 行 {s.defs[qual][0]}")
+        groups, bad = _caller_groups(e.get("callers") or [])
+        for b in bad:
+            out.append(f"{eid}：callers 元素 {b!r} 須為「<檔>:<行>（<所在函式>）」")
+        for (path, cq, expr), lines in groups.items():
+            check_group(f"{eid} callers", path, cq, name, lines, expr)
+    sites: Dict[Tuple[str, str, str], List[int]] = {}
+    for site in inv.get("pit_call_sites") or []:
+        m = INVENTORY_EVIDENCE_RE.match(str(site.get("site") or ""))
+        cpath, cqual = _entry_module_file(str(site.get("caller_id")))
+        if m is None or m["path"] != cpath:
+            out.append(f"pit_call_sites：site {site.get('site')!r} 須為「{cpath}:<行>」（caller_id {site.get('caller_id')}）")
+            continue
+        sites.setdefault((str(site.get("callee")), cpath, cqual), []).append(int(m["line"]))
+    for (callee, cpath, cqual), lines in sites.items():
+        check_group(f"pit_call_sites {callee}", cpath, cqual, callee.rpartition(":")[2].rsplit(".", 1)[-1], lines)
+    return out
+
+
+def relocate_inventory_refs(inv: Mapping[str, Any], repo_root: Path = REPO) -> Tuple[Dict[str, Any], List[str]]:
+    """依符號重算清冊之檔:行（SPEC v5.59 (ai)；不依版本歷史）：evidence ⇒ 入口現行 def 行；callers 每一（檔, 所在函式）⇒ 該函式
+    內引用入口名之全部現行行（組依原列出序、組內升冪）；pit_call_sites 每一（callee, caller_id）⇒ 全部現行引用行（各一筆）。
+    無法重算者（入口符號或所在函式已不存在、引用 0 行、callers 格式不合）保留原值並記入回傳之問題。回 (新清冊, 問題)。"""
+    import copy
+
+    src = _inventory_sources(repo_root)
+    new = copy.deepcopy(dict(inv))
+    problems: List[str] = []
+    for e in new.get("entries") or []:
+        eid = str(e.get("id"))
+        mpath, qual = _entry_module_file(eid)
+        name = qual.rsplit(".", 1)[-1]
+        s = src(mpath)
+        if s.error is None and qual in s.defs:
+            e["evidence"] = f"{mpath}:{s.defs[qual][0]}"
+        else:
+            problems.append(f"{eid}：{mpath} 無入口符號 {qual}（{s.error or '符號不存在'}）")
+        groups, bad = _caller_groups(e.get("callers") or [])
+        problems.extend(f"{eid}：callers 元素 {b!r} 缺所在函式，無法依符號重算" for b in bad)
+        callers: List[str] = list(bad)
+        for (path, cq, expr), lines in groups.items():
+            cs = src(path)
+            want = cs.refs(name, expr).get(cq, []) if cs.error is None else []
+            if not want:
+                problems.append(f"{eid}：{path}（{cq}）現行無引用 {expr or name} 之行（{cs.error or '函式不存在或已不引用'}）")
+                want = sorted(set(lines))
+            callers.extend(_caller_ref(path, ln, cq, expr) for ln in want)
+        if "callers" in e:
+            e["callers"] = callers
+    if new.get("pit_call_sites") is not None:
+        out_sites: List[Dict[str, Any]] = []
+        seen: Set[Tuple[str, str]] = set()
+        for site in new["pit_call_sites"]:
+            key = (str(site.get("callee")), str(site.get("caller_id")))
+            if key in seen:
+                continue
+            seen.add(key)
+            cpath, cqual = _entry_module_file(key[1])
+            cs = src(cpath)
+            want = cs.refs(key[0].rpartition(":")[2].rsplit(".", 1)[-1]).get(cqual, []) if cs.error is None else []
+            if not want:
+                problems.append(f"pit_call_sites {key}：{cpath}（{cqual}）現行無引用行")
+                out_sites.extend(s for s in new["pit_call_sites"]
+                                 if (str(s.get("callee")), str(s.get("caller_id"))) == key)
+                continue
+            out_sites.extend({**site, "site": f"{cpath}:{ln}"} for ln in want)
+        new["pit_call_sites"] = out_sites
+    return new, problems
+
+
 def build_path_inventory(repo_root: Path = REPO) -> Dict[str, Any]:
     """Task 0.2 路徑清冊（SPEC Task 0.2 路徑清冊；v5.50 定稿）：讀 `INVENTORY_DATA` 並驗 schema（`inventory_problems`；不合
     ⇒ FreezeError）；回 {"entries": [{"id": "<模組>:<限定名>", "stage", "input_axes"（⊆ cols／rows／passed_cols）, "ic_page",
@@ -2769,7 +2971,8 @@ def build_path_inventory(repo_root: Path = REPO) -> Dict[str, Any]:
     （與 Task 5.4 總時間門檻共用 schema；`unit_axis.axes` ⊆ `scale_vector`）。"""
     path = Path(repo_root) / INVENTORY_DATA
     inv = json.loads(path.read_text(encoding="utf-8"))
-    problems = inventory_problems(inv)
+    # SPEC v5.59 (ai)：檔:行引用與現行碼不符亦拒收（行號錯會使後續量測對錯碼；`inventory-refs --write` 依符號重算）
+    problems = inventory_problems(inv) + inventory_ref_problems(inv, repo_root)
     if problems:
         raise FreezeError(f"{INVENTORY_DATA} 不合：{problems[:10]}")
     h = _harness()
@@ -3222,6 +3425,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    help="SPEC v5.52 (b)：列軸窗長（輸出段根數；不給＝生成定義之 output_bars）；重型，開跑前先估時")
     p = sub.add_parser("inventory", help="Task 0.2 路徑清冊")
     p.add_argument("--out", type=Path, required=True)
+    p = sub.add_parser("inventory-refs", help="SPEC v5.59 (ai)：清冊 evidence／callers／pit_call_sites 之檔:行對現行碼之驗證"
+                                              "（--write：依符號重算後寫回清冊；秒級）")
+    p.add_argument("--write", action="store_true")
     p = sub.add_parser("measure", help="Task 0.2 規模量測（路徑實跑＋直接呼叫格，經 scale_probe；重型）")
     p.add_argument("--inventory", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
@@ -3297,6 +3503,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except FreezeError as exc:
         print(f"FreezeError：{exc}", file=sys.stderr)
         return 1
+    if args.cmd == "inventory-refs":
+        path = REPO / INVENTORY_DATA
+        inv = json.loads(path.read_text(encoding="utf-8"))
+        relocate_problems: List[str] = []
+        if args.write:
+            inv, relocate_problems = relocate_inventory_refs(inv, REPO)
+            path.write_text(json.dumps(inv, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        remaining = inventory_ref_problems(inv, REPO)
+        print(json.dumps({"inventory": INVENTORY_DATA, "written": bool(args.write),
+                          "relocate_problems": relocate_problems, "ref_problems": remaining}, ensure_ascii=False, indent=1))
+        return 0 if not remaining and not relocate_problems else 1
     try:
         if args.cmd == "inventory":
             inv = build_path_inventory(REPO)

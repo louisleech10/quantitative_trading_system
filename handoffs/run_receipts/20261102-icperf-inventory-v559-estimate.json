@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py inventory --out handoffs/run_receipts/20261101-icperf-path-inventory.json",
+      "code_sha256": "b6b798f5171af7061ccdff0b245e6f09a11086327b3e5bff64e2715faf444190",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF v5.59／v5.60 清冊收據重產：路 R5 清冊引用重算與 inventory-refs --write 後）",
+      "created_at": "2026-11-02T22:30:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 60,
+  "basis": [
+    "build_path_inventory 只讀清冊 JSON、驗 schema 與引用（inventory_ref_problems）、寫一個 JSON 檔；無子行程、無資料讀取（同 handoffs/run_receipts/20261102-icperf-inventory-v558-estimate.json）",
+    "60 秒為量級估計（inventory-refs --write 同腳本實跑數秒完成，log runs/icperf/task02/logs/v559_inventory_refs_write.log），不作停止條件"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-2"
+  ]
+}

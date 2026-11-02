@@ -1,4 +1,4 @@
-import type { ICMethodSettings } from '@/lib/types';
+import type { ICAnalysisConfig, ICMethodSettings } from '@/lib/types';
 
 /**
  * ICPERF Task 0.4 ㊸：IC 頁方法選擇與門檻開關之顯示文字（面板與報告頂端「本次設定」共用）。
@@ -43,10 +43,13 @@ export const IC_SETTING_TIPS: Record<keyof ICMethodSettings, string> = {
 /**
  * v5.58 (v)：跨標的模式下仍生效之設定之 ⓘ（該模式之消費點與預設不同處；依 `handoffs/run_receipts/20261101-icperf-toggle-impact.json`
  * 之 `v558_cross_sectional` 實測寫成）。未列者沿用 `IC_SETTING_TIPS`。
+ * v5.59 (ae)：跨標的主 IC 標籤改依收益率類型（與 IC 衰減同一定義）；收益率類型句依 kline 4h 10 標的完整歷史實測
+ * （`runs/icperf/task04/v559/xsec_return_type_impact.json`：對數 vs 簡單之截面排序 5,087 截面全同、Spearman／Kendall 主 IC
+ * 逐值相同；除以波動 97% 截面排序改變、主 IC 絕對值明顯變小）。
  */
 export const IC_SETTING_TIPS_XSEC: Partial<Record<keyof ICMethodSettings, string>> = {
   ic_method_selection: '換估計量改每截面 IC、逐標的 IC 與衰減；標的僅兩個時每截面三法皆為 ±1，只逐標的 IC 不同',
-  return_type_selection: '跨標的只影響 IC 衰減與半衰期（主 IC 標籤固定為一根 K 線對數報酬）；秩方法下對數與簡單報酬相同',
+  return_type_selection: '主 IC 標籤與 IC 衰減同依此定義；實測秩方法下對數與簡單報酬結果相同，除以波動約九成七截面排序改變',
 };
 
 /** v5.58 (v)：該模式不適用之標示與 ⓘ（跨標的路徑不做預處理、去重與門檻篩選）。 */
@@ -70,7 +73,20 @@ export const settingTip = (key: keyof ICMethodSettings, mode: string | undefined
 
 /** v5.58 (w)：報告表 IC 自相關欄（契約 `report_keys.ic_autocorrelation`）。 */
 export const IC_AUTOCORR_LABEL = 'IC 自相關';
-export const IC_AUTOCORR_TIP = 'IC 序列前後期之相關，越高 IC 越持續、ICIR 之獨立樣本越少；滾動窗重疊時實測多近 1';
+/**
+ * v5.59 (aj)：IC 自相關 ⓘ 依分析模式分句——縱向為滾動 IC 序列（滾動窗重疊）、跨標的為逐時點截面 IC 序列（各時點獨立算）、
+ * 事件型之滾動窗依事件先後成窗（`ic_filter_orchestrator._ic_autocorr_by_feature`），前後期為事件序而非日曆時間。
+ * 跨標的「實測多近 0」：kline 4h 10 標的完整歷史、三因果特徵 × 三方法 × 三收益率類型之 |IC 自相關| ≤ 0.034
+ * （`runs/icperf/task04/v559/xsec_return_type_impact.json`）。
+ */
+export const IC_AUTOCORR_TIPS: Record<ICAnalysisConfig['mode'], string> = {
+  global: 'IC 序列前後期之相關，越高 IC 越持續、ICIR 之獨立樣本越少；滾動窗重疊時實測多近 1',
+  event: '事件序上 IC 前後期之相關（依事件先後，非日曆時間），越高越持續、ICIR 之獨立樣本越少；滾動窗重疊時多近 1',
+  cross_sectional: '逐時點截面 IC 前後期之相關（未成立之截面計為缺值），越高越持續、ICIR 之獨立樣本越少；實測多近 0',
+};
+/** v5.59 (aj)：依分析模式取 IC 自相關 ⓘ；未知或未給 ⇒ 縱向句（同 `ICSummaryTable` 之 `analysisMode` 預設 global）。 */
+export const icAutocorrTip = (mode: string | undefined): string =>
+  mode === 'cross_sectional' || mode === 'event' ? IC_AUTOCORR_TIPS[mode] : IC_AUTOCORR_TIPS.global;
 /** v5.58 (w)：`ic_autocorr_reason`（值為空時之原因，封閉集合）之顯示。 */
 export const IC_AUTOCORR_REASON_LABELS: Record<string, string> = {
   insufficient_samples: 'IC 序列有效值不足 3 個',

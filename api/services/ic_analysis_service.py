@@ -1790,10 +1790,12 @@ class ICAnalysisService:
                 close_out: Dict[str, Any] = {}
                 labels_path = request.labels_path
                 if not labels_path:
+                    # ICPERF Task 0.2 v5.59 (ae)：主標籤依本次有效 `labels.return_type`（與分析段同一設定解析）
                     cross_df = self._append_cross_sectional_labels(
                         cross_df,
                         symbols_resolved,
                         request.timeframe,
+                        return_type=analyzer.effective_config(config_override).labels.return_type,
                         close_out=close_out,
                     )
 
@@ -3609,10 +3611,14 @@ class ICAnalysisService:
         symbols: List[str],
         timeframe: str,
         *,
+        return_type: str,
         close_out: Optional[Dict[str, Any]] = None,
     ) -> pd.DataFrame:
         """從 kline 為橫截面特徵附加 return_1 標籤欄。
 
+        ICPERF Task 0.2 v5.59 (ae)：標籤＝`generate_returns_by_type(close, 1, return_type)`，`return_type` 為本次請求之有效
+        `labels.return_type`（與縱向標籤及跨標的 IC 衰減同一定義；改前固定一根對數報酬）。必填、無預設——呼叫端須明示，
+        不以舊定義靜默代入。
         ICPERF Task 0.4 ㊱：`close_out` 給定時，於同一次 kline 讀取順帶寫入 `close_out["close"]`＝與回傳框同索引之
         float64 收盤（供 `analyze_cross_sectional(close=…)` 之 IC 衰減與半衰期；不另讀一次 kline）。"""
         from momentum.factories import create_label_generator
@@ -3659,7 +3665,7 @@ class ICAnalysisService:
             label_series = label_generator.generate_returns_by_type(
                 close,
                 1,
-                "log",
+                return_type,
             )
             symbol_mask = working_df.index.get_level_values(symbol_level_idx) == symbol
             if not symbol_mask.any():

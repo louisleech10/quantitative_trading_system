@@ -2978,7 +2978,8 @@ def test_cross_sectional_label_float64_matches_kline_oracle_xfail() -> None:
     df = df[df.index.get_level_values("symbol").isin(["BTCUSDT", "SOLUSDT"])][["ret1", "dev20"]]
     df.index = df.index.set_names(["timestamp", "_symbol"])
     df.index = df.index.set_levels(df.index.levels[0].tz_localize(None), level=0)
-    got = ICAnalysisService._append_cross_sectional_labels(None, df, ["BTCUSDT", "SOLUSDT"], "1h")  # type: ignore[arg-type]
+    got = ICAnalysisService._append_cross_sectional_labels(  # type: ignore[arg-type]
+        None, df, ["BTCUSDT", "SOLUSDT"], "1h", return_type="log")
     for sym in ("BTCUSDT", "SOLUSDT"):
         close = _real_close(20352, sym)
         exp = np.log(close.shift(-1) / close)
@@ -3249,3 +3250,76 @@ def test_capture_relative_out_dir_passes_absolute_paths_to_child(tmp_path: Path,
     for key in ("out_pickle", "registry"):
         p = Path(seen[0]["spec"][key])
         assert p.is_absolute() and str(p).startswith(str(root)), f"{key} 須為 out_dir 下之絕對路徑：{p}"
+
+
+CAPTURE_IDENTITY_REASON = "擷取與現行程式身分不符"
+
+
+def test_capture_records_code_identity_at_capture_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC Task 0.2 v5.59 (aa)（r70 群集 A）：`capture` 於每請求擷取結束時寫入**擷取當下**之 `receipt_code_sha256()` 與
+    `head` 至 `capture_status.json`（另記擷取開始時之 code_sha256，擷取期間程式改動可辨）。子行程以替身記錄、程式身分以替身
+    （擷取期間改動模擬：替身於子行程執行時切換身分）。改壞對照：不記 ⇒ 鍵缺；改記組收據當下之值 ⇒ 不等於替身擷取當下之值。"""
+    rt = _receipt_tool()
+    ident = {"sha": "a" * 64}
+
+    def fake_run_watched(cmd: Sequence[str], *, log_path: Path, env: Mapping[str, str], cwd: Path) -> Dict[str, Any]:
+        if json.loads(Path(cmd[-1]).read_text(encoding="utf-8"))["request"].get("tag") == "drift":
+            ident["sha"] = "b" * 64  # 擷取期間程式改動
+        return {"rc": 0, "status": "ok", "log_path": str(log_path)}
+
+    monkeypatch.setattr(rt._fb(), "run_watched", fake_run_watched)
+    monkeypatch.setattr(rt, "request_for", lambda rid: {"kind": "x", "rid": rid})
+    monkeypatch.setattr(rt, "receipt_code_sha256", lambda: ident["sha"])
+    monkeypatch.setattr(rt, "_git_head", lambda: "c" * 40)
+    out = tmp_path / "runs" / "cap"
+    status = rt.capture(["A.ic_report"], out)
+    on_disk = json.loads((out / "capture_status.json").read_text(encoding="utf-8"))
+    for st in (status["A.ic_report"], on_disk["A.ic_report"]):
+        assert (st.get("code_sha256"), st.get("code_sha256_at_start"), st.get("head")) == ("a" * 64, "a" * 64, "c" * 40), st
+    # 擷取期間改動：結束時之身分＝改動後，開始時之身分保留（build_receipt 據此判不符）
+    monkeypatch.setattr(rt, "request_for", lambda rid: {"kind": "x", "rid": rid, "tag": "drift"})
+    st = rt.capture(["A.ic_report"], tmp_path / "runs" / "cap2")["A.ic_report"]
+    assert (st["code_sha256_at_start"], st["code_sha256"]) == ("a" * 64, "b" * 64), st
+
+
+def _identity_build(rt: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, edit: Any) -> Dict[str, Any]:
+    """`build_receipt` 以替身之逐請求評估（無任何其他 FAIL 原因、全部最少項一致）組收據；`edit(status)` 改擷取紀錄。
+    回收據（現行程式身分＝"f"*64）。"""
+    cap = tmp_path / "caps"
+    cap.mkdir(parents=True, exist_ok=True)
+    pk = cap / "x.pkl"
+    pk.write_bytes(pickle.dumps({"request": {"kind": "x"}, "response": {}}))
+    status = {rid: {"rc": 0, "pickle": str(pk), "log": "x.log", "wall_s": 1.0, "pickle_bytes": 1,
+                    "code_sha256": "f" * 64, "code_sha256_at_start": "f" * 64, "head": "c" * 40}
+              for rid in rt.REQUESTS}
+    edit(status)
+    (cap / "capture_status.json").write_text(json.dumps(status), encoding="utf-8")
+    clean = {"items": {}, "coverage": {}, "unmapped": [], "status_counts": {}, "facts": {}, "closed": True,
+             "closure": {"closed": True, "missing": [], "extra": []}, "uncompared": []}
+    monkeypatch.setattr(rt, "evaluate_request", lambda rid, c, deep: dict(clean))
+    monkeypatch.setattr(rt, "deep_fields", lambda: {})
+    monkeypatch.setattr(rt, "_merge_items", lambda per_req: {
+        iid: {"verdict": "一致", "oracle": "x", "max_rel_diff": 0.0, "requests": {}} for iid in REQUIRED_ITEMS})
+    monkeypatch.setattr(rt, "receipt_code_sha256", lambda: "f" * 64)
+    monkeypatch.setattr(rt, "_git_head", lambda: "c" * 40)
+    return rt.build_receipt(cap)
+
+
+def test_build_receipt_binds_capture_code_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC Task 0.2 v5.59 (aa)（r70 群集 A）：`build_receipt` 要求每一擷取之 code_sha256 與組收據當下相等——不等、缺欄、或
+    擷取期間改動（開始與結束不同）⇒ fail_reasons 加「擷取與現行程式身分不符」（點名請求）、pass=false；全部相等 ⇒ 不因本規則
+    失敗（其餘條件以替身全成立 ⇒ pass=true，證本規則為唯一差異）。改壞對照：build_receipt 不比對擷取身分 ⇒ 前三案 pass=true。"""
+    rt = _receipt_tool()
+    ok = _identity_build(rt, tmp_path / "ok", monkeypatch, lambda s: None)
+    assert ok["pass"] is True and ok["fail_reasons"] == [], ok["fail_reasons"]
+    assert ok["code_sha256"] == "f" * 64
+    assert all(ok["requests"][rid].get("code_sha256") == "f" * 64 for rid in rt.REQUESTS)
+    rid = "A.ic_report"
+    cases = {"changed": lambda s: s[rid].update(code_sha256="e" * 64, code_sha256_at_start="e" * 64),
+             "missing": lambda s: [s[rid].pop("code_sha256"), s[rid].pop("code_sha256_at_start")],
+             "drift": lambda s: s[rid].update(code_sha256_at_start="e" * 64)}
+    for name, edit in cases.items():
+        got = _identity_build(rt, tmp_path / name, monkeypatch, edit)
+        hits = [r for r in got["fail_reasons"] if CAPTURE_IDENTITY_REASON in r]
+        assert got["pass"] is False and len(hits) == 1 and hits[0].startswith(f"{rid}："), (name, got["fail_reasons"])
+        assert len(got["fail_reasons"]) == 1, (name, got["fail_reasons"])

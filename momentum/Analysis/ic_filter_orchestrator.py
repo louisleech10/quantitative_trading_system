@@ -159,6 +159,13 @@ _HASH_OMIT_AT_DEFAULT: tuple[tuple[str, str], ...] = (("thresholds", "monotonici
 #: 輸出之不變仍以 §G 重凍比對驗。
 CONFIG_HASH_VERSION: int = 1
 
+#: ICPERF Task 0.2 v5.59 (ac)：自 schema 刪除之欄（(節, 欄, 刪除前之預設值)）。`_hash_config` 於雜湊 payload 補回其刪除前之
+#: 預設值，使刪欄前後之 config_hash 逐字相同（同 `_HASH_OMIT_AT_DEFAULT` 之向後相容；該欄已無作用，請求中之舊值一律被
+#: schema 忽略，故以刪除前之預設值代表）。
+_HASH_REMOVED_FIELD_LEGACY_DEFAULTS: tuple[tuple[str, str, Any], ...] = (
+    ("event_filter", "negative_control_budget_seconds", 60.0),
+)
+
 
 #: EVTLABEL Task 2.2：這些鍵**不得**經 `config_override` 傳（`ICConfig` 會靜默吞掉）。
 _ISOLATION_CONTROL_KEYS: frozenset[str] = frozenset(
@@ -243,8 +250,9 @@ EXPECTED_FREQ_BY_TIMEFRAME: dict[str, pd.Timedelta] = {
 FDR_ASSUMPTION_NOTE = (
     "BH assumes PRDS; correlated features may yield slight FDR optimism"
 )
+#: 縱向第 5 段 HAC 之被檢定估計量：`compute_hac_ic_statistics` 以逐根 **Spearman** 貢獻序列計 t／p（不收 IC 方法參數），
+#: 故不論 `global.default_method` 為何，被檢定者恆為 Spearman（ICPERF Task 0.2 v5.59 (ab) 實查；HAC 日後改依方法時須同步改）。
 TESTED_ESTIMATOR_BAR_LEVEL = "bar_level_spearman"
-TESTED_ESTIMATOR_XSEC_PERIOD_IC = "cross_sectional_period_ic"
 
 
 def _feature_bar_ms_of(metadata: Optional[dict]) -> int:
@@ -949,8 +957,13 @@ def _enforce_cross_sectional_label_coverage(
     symbol_level_idx: int,
     effective_horizon: int,
     tol: float,
+    *,
+    backward_warmup: int = 0,
 ) -> dict[str, float]:
-    """per-symbol 標籤覆蓋率守衛（D-3：結構性下界，非全域平均）。"""
+    """per-symbol 標籤覆蓋率守衛（D-3：結構性下界，非全域平均）。
+
+    結構下限＝(列數 − 前瞻 − 回看暖機)／列數；`backward_warmup`＝標籤定義開頭必然缺值根數（ICPERF v5.60：risk_adjusted
+    之波動窗；改前只扣前瞻 ⇒ 短歷史週期被誤擋）。容忍度 `tol` 不變。"""
     per_symbol_coverage: dict[str, float] = {}
     for symbol, group in numeric_df.groupby(level=symbol_level_idx, sort=True):
         labels = group[label_col]
@@ -961,19 +974,20 @@ def _enforce_cross_sectional_label_coverage(
             raise InvalidInputError(
                 f"symbol {symbol} has all-NaN labels (fail-closed)"
             )
-        if len_s <= effective_horizon:
+        structural_nan = effective_horizon + int(backward_warmup)
+        if len_s <= structural_nan:
             raise InvalidInputError(
                 f"symbol {symbol} has {len_s} rows, insufficient for "
-                f"forward horizon {effective_horizon}"
+                f"forward horizon {effective_horizon} + label warmup {int(backward_warmup)}"
             )
         coverage_s = float(labels.notna().sum()) / len_s
-        floor_s = (len_s - effective_horizon) / len_s
+        floor_s = (len_s - structural_nan) / len_s
         threshold = floor_s * (1.0 - tol)
         if coverage_s < threshold:
             raise InvalidInputError(
                 f"label coverage too low for {symbol}: "
                 f"actual={coverage_s:.4f}, required>={threshold:.4f} "
-                f"(floor={floor_s:.4f}, horizon={effective_horizon})"
+                f"(floor={floor_s:.4f}, horizon={effective_horizon}, warmup={int(backward_warmup)})"
             )
         per_symbol_coverage[str(symbol)] = coverage_s
     return per_symbol_coverage
@@ -1281,6 +1295,14 @@ def _ic_autocorr_fields(value: tuple[Optional[float], Optional[str]]) -> dict:
 
 #: ICPERF Task 0.2 v5.58 (v)：跨標的路徑可用之 IC 方法（同 `global.default_method` 之 schema Literal）
 XSEC_IC_METHODS: tuple[str, ...] = ("spearman", "pearson", "kendall")
+
+#: ICPERF Task 0.2 v5.59 (ab)：跨標的 HAC 檢定之對象＝逐時點截面 IC 序列，其估計量＝`global.default_method` ⇒
+#: `significance.tested_estimator` 依方法之封閉對映（鍵集合＝`XSEC_IC_METHODS`）。
+TESTED_ESTIMATOR_XSEC_BY_METHOD: dict[str, str] = {
+    "spearman": "cross_sectional_period_ic_spearman",
+    "pearson": "cross_sectional_period_ic_pearson",
+    "kendall": "cross_sectional_period_ic_kendall",
+}
 
 
 def _xsec_pair_ic(x: pd.Series, y: pd.Series, method: str) -> Optional[float]:
@@ -2325,7 +2347,7 @@ class ICFilterOrchestrator:
         {特徵: {category, data_source, layer}}，供多元化之三覆蓋率（未傳 ⇒ 三覆蓋率 None 並記原因）。
         """
 
-        config = self._apply_tier_config(self._apply_config_override(config_override))
+        config = self.effective_config(config_override)  # v5.59 (ae)：服務端主標籤之 return_type 取同一解析
         self._progress_callback = progress_callback
         self._clear_deep_analysis_cache()
 
@@ -2345,6 +2367,8 @@ class ICFilterOrchestrator:
             symbol_level_idx = index_names.index("symbol")
 
         label_col: Optional[str] = None
+        # v5.60：in-frame `return_N`＝服務依 `labels.return_type` 自 kline 導出 ⇒ 覆蓋率守衛扣該定義之回看暖機
+        label_is_return_n = False
         # D-H / CODEX-3：horizon 必須在 `_label` 改名前對原始欄名解析
         horizon_source_name: Optional[str] = None
         sig_horizon: Optional[int] = None
@@ -2387,6 +2411,7 @@ class ICFilterOrchestrator:
                     label_col = chosen
                     horizon_source_name = chosen
                     sig_horizon = _resolve_cross_sectional_label_horizon(chosen)
+                    label_is_return_n = True
                     break
                 if candidate in working_df.columns:
                     label_col = candidate
@@ -2416,6 +2441,11 @@ class ICFilterOrchestrator:
             symbol_level_idx,
             effective_horizon,
             config.min_label_coverage_tol,
+            backward_warmup=(
+                create_label_generator().backward_warmup_bars(config.labels.return_type)
+                if label_is_return_n
+                else 0
+            ),
         )
         mean_coverage = float(np.mean(list(per_symbol_coverage.values())))
 
@@ -2633,7 +2663,7 @@ class ICFilterOrchestrator:
                 },
                 "maxlags": maxlags_meta,
                 "n_tests": int(n_tests),
-                "tested_estimator": TESTED_ESTIMATOR_XSEC_PERIOD_IC,
+                "tested_estimator": TESTED_ESTIMATOR_XSEC_BY_METHOD[xsec_method],
                 "fdr_assumption_note": FDR_ASSUMPTION_NOTE,
             },
         }
@@ -5151,7 +5181,7 @@ class ICFilterOrchestrator:
         序列＝ICIR 所用之同一滾動 IC 序列（`ICEngine._select_icir_series`：換算後 ICIR 窗之鍵；無該鍵 ⇒ 空序列 ⇒
         `insufficient_samples`）。全域序列型與事件型兩路同此：事件型之滾動 IC 依事件列序（非日曆時間）成窗，其自相關即
         事件序上之 IC 持續性，與同列 ICIR（事件路徑為診斷欄）同一序列，故兩路皆適用、不另設不適用原因。
-        取代改前 `ICEngine.compute_ic_autocorrelation`（兩段 Pearson、無消費者）。"""
+        取代改前之兩段 Pearson 舊法（無消費者；v5.59 (ag) 已自 `ICEngine` 刪除）。"""
         return {
             feature: ic_lag1_autocorrelation(self._ic_engine._select_icir_series(windows or {}))
             for feature, windows in (rolling_ic or {}).items()
@@ -5976,26 +6006,13 @@ class ICFilterOrchestrator:
             self._survivor_suppressed_reason = None
             return survivors, receipt
 
-        # 🔴 `GROK-R1-P1-03`（實測 207s，超過 SPEC 之 120s 驗證閘）：整批負對照要跑
-        #    `negative_control_n` 次**全表** Mann-Whitney。乾淨資料 0.5s/次（50 次＝26s，過關），
-        #    但 10% NaN 時 ~4s/次 ⇒ 50 次約 200s。我原本的 benchmark 只跑乾淨資料，
-        #    所以沒看到。修法**不是**硬砍次數：先量一次實際成本，據此決定跑得完幾次，
-        #    **降階必須揭露**（`n_planned`／`n_effective`／`budget_seconds`），
-        #    次數變少 ⇒ q95 之解析度變粗，使用者要看得到這件事。
-        budget_seconds = float(getattr(cfg_ev, "negative_control_budget_seconds", 60.0))
+        # ICPERF Task 0.2 v5.59 (ac)（即 NOCAP Task 5.1）：整批負對照**固定**跑 `negative_control_n` 次全表
+        #    Mann-Whitney——改前依第一次耗時與牆鐘預算縮減次數（`negative_control_budget_seconds`），使 q95 之解析度與
+        #    結果隨機器快慢而變；現不依時間停算，耗時改以子步驟進度（done／total＋ETA）揭露。
         counts: list = []
         n_planned = int(cfg_ev.negative_control_n)
-        n_effective = n_planned
-        elapsed = 0.0
+        _nc_start = _time.perf_counter()
         for i in range(n_planned):
-            if i == 1 and elapsed > 0.0:
-                # 以第一次的實測成本外推；跑不完就縮，但至少跑 5 次（少於 5 次談不上分布）
-                affordable = max(5, int(budget_seconds // elapsed))
-                if affordable < n_planned:
-                    n_effective = affordable
-            if i >= n_effective:
-                break
-            _t0 = _time.perf_counter()
             rng = np.random.default_rng(int(cfg_ev.oracle_seed) + i)
             y_sh = _permute_blocks(rng, y, block_ids)
             tbl_sh = mann_whitney_table(
@@ -6022,8 +6039,7 @@ class ICFilterOrchestrator:
                 ):
                     hits += 1
             counts.append(int(hits))
-            if i == 0:
-                elapsed = _time.perf_counter() - _t0
+            self._report_negative_control_progress(i + 1, n_planned, _time.perf_counter() - _nc_start)
 
         # 整數 order statistic（`method="higher"`），**禁插值**：計數是離散的，
         # 插出來的 12.4 不對應任何一次實驗。
@@ -6036,8 +6052,6 @@ class ICFilterOrchestrator:
             "comparand": "threshold_passed_pre_permutation",
             "n_planned": int(n_planned),
             "n_effective": int(len(counts)),
-            "budget_seconds": budget_seconds,
-            "degraded_by_budget": bool(len(counts) < n_planned),
         }
         if n_threshold_passed <= q95:
             # 隨機也能篩出這麼多 ⇒ 與雜訊無法區分。診斷表保留，但不當結論交出去。
@@ -6045,6 +6059,25 @@ class ICFilterOrchestrator:
         else:
             self._survivor_suppressed_reason = None
         return survivors, receipt
+
+    def _report_negative_control_progress(self, done: int, total: int, elapsed_s: float) -> None:
+        """整批負對照之子步驟進度（ICPERF Task 0.2 v5.59 (ac)：次數固定、耗時以此揭露）。
+
+        沿用 `_report_progress` 之 extra 欄（`sub_step`／`sub_done`／`sub_total`／`eta_seconds`／`eta_state`，前端
+        `useICAnalysis` 與 `icSubProgressLabel` 已消費）；ETA＝已用時間 ÷ 已完成次數 × 剩餘次數，完成時 `eta_state`＝`done`。
+        階段位置沿用第 5 段（`stat_validation`，0.70）至第 6 段（0.82）之間。"""
+        total = max(int(total), 1)
+        frac = min(max(done / total, 0.0), 1.0)
+        remaining = total - int(done)
+        eta = float(elapsed_s) / done * remaining if done > 0 else None
+        state = "done" if remaining <= 0 else ("ok" if eta is not None else "estimating")
+        eta_txt = "完成" if state == "done" else (f"約 {int(round(eta))} 秒" if eta is not None else "預估中")
+        self._report_progress(
+            5, "stat_validation", 0.70 + 0.10 * frac,
+            f"negative_control {done}/{total}（ETA {eta_txt}）",
+            extra={"sub_step": "negative_control", "sub_done": int(done), "sub_total": total,
+                   "eta_seconds": 0.0 if state == "done" else eta, "eta_state": state},
+        )
 
     def _merge_binary_statistics(
         self,
@@ -6862,6 +6895,12 @@ class ICFilterOrchestrator:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Progress callback failed: %s", exc)
 
+    def effective_config(self, config_override: Optional[dict] = None) -> ICConfig:
+        """本次請求之有效設定（建構設定 ＋ 請求覆寫 ＋ tier 套用；同 `analyze`／`analyze_cross_sectional` 之解析）。
+
+        ICPERF Task 0.2 v5.59 (ae)：服務端跨標的主標籤之 `labels.return_type` 取此（與分析段同一解析，不另讀覆寫字典）。"""
+        return self._apply_tier_config(self._apply_config_override(config_override))
+
     def _apply_config_override(self, config_override: Optional[dict]) -> ICConfig:
         if not config_override:
             return self._config
@@ -6885,6 +6924,10 @@ class ICFilterOrchestrator:
             default = type(getattr(config, section)).model_fields[field].default
             if isinstance(node, dict) and field in node and node[field] == default:
                 node.pop(field)
+        for section, field, legacy_default in _HASH_REMOVED_FIELD_LEGACY_DEFAULTS:
+            node = data.get(section)
+            if isinstance(node, dict) and field not in node:
+                node[field] = legacy_default
         # v5.58 (z)：版本 1 之 payload 不含版本欄（與加欄前逐字相同）；版本 ≥ 2 起帶入（見 CONFIG_HASH_VERSION）
         if CONFIG_HASH_VERSION >= 2:
             data["__config_hash_version__"] = CONFIG_HASH_VERSION

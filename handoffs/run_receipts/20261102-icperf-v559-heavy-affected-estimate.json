@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false tests/api/test_framepath_api_h5.py::test_boundary_01_generation_ignores_hand_placed_factory_h5_and_force_flag tests/api/test_framepath_api_h5.py::test_boundary_05_library_and_coverage_read_v2_when_h5_coexists tests/api/test_framepath_api_h5.py::test_boundary_06_explicit_config_hash_missing_artifacts_message_unchanged tests/api/test_icperf_feature_filter_split_metadata.py::test_feature_filter_split_metadata_on_real_l_cell tests/api/test_preprov_ingest_cache.py::test_boundary_01_same_identity_reused_not_rewritten tests/api/test_preprov_ingest_cache.py::test_boundary_02_regenerated_run_rewrites_h5_and_meta tests/api/test_tfwindow.py::test_1h_fixture_window_keys_scaled_by_12 tests/feature_engineering/test_failopen_correctness.py::test_v3_ethusdt_1h_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_multi_tf_btc_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v5_l5_cross_sectional_prefix_no_leakage tests/feature_engineering/test_failopen_correctness.py::test_v5_prefix_no_leakage_after_warmup 'tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[False]' 'tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[True]' 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[False]' 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]' tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_isolation tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_same_factory_no_cache_pollution tests/feature_engineering/test_failopen_correctness.py::test_v7_symbol_order_permutation_invariant tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_slow_solo_a_equals_batch_b_then_a_artifacts tests/feature_engineering/test_icfirstalign_calibration_domain.py::test_boundary_02_no_finite_in_probe_counts_as_late tests/feature_engineering/test_numview_identity.py::test_scheduling_only_keys_change_parallelism_not_values tests/golden/la1/test_b4_golden_rebaseline.py::test_b4_modified_path_attribution_unexpected_zero tests/momentum/Analysis/test_gap2_golden.py::test_budget_bench_receipt tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py::test_golden_redirect_on_off_sha256 tests/momentum/Analysis/test_ic_persist_redirect_isolation.py::test_non_opt_in_subprocesses_never_activate tests/momentum/Analysis/test_icperf_correctness.py::test_correctness_coverage_closed_over_response_keys tests/momentum/Analysis/test_icperf_correctness.py::test_trend_four_dimensions_wide_real_kline_matches_oracle_xfail tests/momentum/Analysis/test_icperf_gate.py::test_boundary_01_frozen_contains_all_g_items tests/momentum/Analysis/test_icperf_gate.py::test_boundary_02_frozen_baseline_content_complete tests/momentum/Analysis/test_icperf_gate.py::test_boundary_03_q_insufficient_labels_nan_as_frozen tests/momentum/Analysis/test_icperf_gate.py::test_boundary_04_all_nan_column_skipped_as_current tests/momentum/Analysis/test_icperf_gate.py::test_freeze_reproducible tests/momentum/Analysis/test_preprov_survivor_identity.py::test_report_and_survivor_identity_equal_task21_identity tests/momentum/test_ic_1eb_b2_wiring.py::test_t22a_mb_fdr_control_independent_and_correlated tests/momentum/test_ic_golden_inputs_names_opaque.py::test_la1_replay_does_not_parse_names tests/momentum/test_la0_lookahead.py::test_after_golden_deep_equal tests/momentum/test_la0_lookahead.py::test_after_golden_split_off_deep_equal 'tests/momentum/test_la1_lookahead.py::test_regime_pit[kmeans]' tests/registry/test_testreg_write_guard.py::test_boundary_07g_widely_imported_helper_decrease_wall_clock tests/test_feature_factory_e2e.py::test_multi_data_source tests/test_feature_factory_e2e.py::test_standard_preset_btcusdt tests/test_feature_factory_e2e.py::test_user_override_rsi_period",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF v5.59／v5.60 收案前重型受影響測試：runs/icperf/task04/v559/deselect.txt 之 45 條 ≥60 秒節點，TEST_SELECTION §4）",
+      "created_at": "2026-11-02T21:54:30+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 21000,
+  "basis": [
+    ".testreg/summary.json 所選 45 節點最近一次 duration_s 合計約 20,630 秒（約 5.7 小時）；歷次最大值合計約 58,488 秒，屬 FFPROD／NUMVIEW 提速前之舊紀錄（例 test_v6_close_time_oracle_matches_pipeline[True] 最大 6,105 秒、最近 725 秒）",
+    "最大者 test_v3_multi_tf_btc_matches_frozen_baseline 最近 2,307 秒、test_ic_1eb_b2_wiring::test_t22a_mb_fdr_control_independent_and_correlated 1,966 秒、test_icperf_gate::test_freeze_reproducible 1,767 秒",
+    "真實資料重測試單組串行（資源互斥），不並行；估時為量級估計，不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-5"
+  ]
+}

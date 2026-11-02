@@ -575,16 +575,19 @@ def test_icir_window_outside_rolling_windows_is_computed(method: str) -> None:
 
 def test_icir_missing_window_key_is_nan_not_first_window() -> None:
     """SPEC ㉛「修正」（不靜默退回）：滾動結果無 ICIR 窗之鍵 ⇒ ic_mean／ic_std／ICIR／勝率與 IC 自相關皆 NaN，不取第一個窗
-    （明列邊界：ICIR 窗 99、只有 window_5）。"""
+    （明列邊界：ICIR 窗 99、只有 window_5）。IC 自相關＝產品唯一實作 `ic_lag1_autocorrelation` 於同一 ICIR 窗序列
+    （ICPERF v5.59 (ag)：舊 `ICEngine.compute_ic_autocorrelation` 已刪）⇒ 無值、原因 insufficient_samples。"""
+    from momentum.Analysis.ic_filter_orchestrator import ic_lag1_autocorrelation
+
     eng = ICEngine({"icir": {"window": 99}})
     rolling = {"f": {"window_5": [0.1, 0.25, 0.3, 0.05, 0.2]}}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         out = eng.compute_icir(rolling)["f"]
-        auto = eng.compute_ic_autocorrelation(rolling)["f"]
+        auto = ic_lag1_autocorrelation(eng._select_icir_series(rolling["f"]))
     for key in ("ic_mean", "ic_std", "icir", "ic_hit_rate"):
         assert math.isnan(out[key]), f"{key}：{out[key]!r}（不得退回 window_5）"
-    assert math.isnan(auto)
+    assert auto == (None, "insufficient_samples")
     assert eng._select_icir_series(rolling["f"]) == []
 
 

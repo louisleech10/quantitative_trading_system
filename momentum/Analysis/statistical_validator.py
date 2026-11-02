@@ -339,19 +339,18 @@ class StatisticalValidator:
 
     @staticmethod
     def _fdr_bh(p_values: dict) -> dict[str, float]:
-        items = [(key, float(value)) for key, value in p_values.items()]
-        items.sort(key=lambda item: item[1])
-        n = len(items)
-        adjusted_values = [0.0] * n
-        for idx, (_, p_value) in enumerate(items, start=1):
-            adjusted_values[idx - 1] = min(p_value * n / idx, 1.0)
+        """Benjamini–Hochberg 校正：委派業界標準 `statsmodels.stats.multitest.multipletests(method="fdr_bh")`
+        （ICPERF Task 0.2 v5.59 (ah)；使用者 2026-11-02「為何不直接套用業界標準函式庫就好？」——改前為自寫 p·n／rank 之
+        逆向累積最小值，與 statsmodels 於末位浮點可不同）。
 
-        for idx in range(n - 2, -1, -1):
-            adjusted_values[idx] = min(
-                adjusted_values[idx], adjusted_values[idx + 1]
-            )
+        檢定集合＝有限 p（NaN／±inf 保位為 NaN、不入集合，同 `apply_fdr` 之 NaN 保位）；值不可轉 float ⇒ 照舊 raise。"""
+        from statsmodels.stats.multitest import multipletests
 
-        adjusted: dict[str, float] = {}
-        for (key, _), adj in zip(items, adjusted_values):
-            adjusted[key] = float(adj)
+        values = {key: float(value) for key, value in p_values.items()}
+        finite_keys = [key for key, value in values.items() if np.isfinite(value)]
+        adjusted: dict[str, float] = {key: float("nan") for key in values}
+        if finite_keys:
+            q = multipletests([values[key] for key in finite_keys], method="fdr_bh")[1]
+            for key, value in zip(finite_keys, q):
+                adjusted[key] = float(value)
         return adjusted

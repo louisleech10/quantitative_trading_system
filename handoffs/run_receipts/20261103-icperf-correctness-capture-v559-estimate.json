@@ -1,0 +1,34 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir runs/icperf/correctness-20261102b/captures",
+      "code_sha256": "aa7e9ed24a30537881a05e6c424520c1bd8a584a3e8f7a1aa5972f59e4c59896",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF v5.59／v5.60 收案前以最終程式重擷取正確性收據：(aa) 收據綁定擷取身分，產品碼改動須重擷取）",
+      "created_at": "2026-11-03T03:23:31+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1800,
+  "basis": [
+    "前次同請求集全擷取（runs/icperf/correctness-20261102/，handoffs/run_receipts/20261101-icperf-correctness.json 各請求 wall_s 合計 1152.4 秒）；v5.59 擷取端 diff 只增跨標的主標籤傳 return_type（(ae)）與擷取身分記錄（(aa)），請求集未變，同量級",
+    "估 1800 秒為量級估計，不作停止條件（NOCAP）；擷取檔放 runs/icperf/correctness-20261102b/"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

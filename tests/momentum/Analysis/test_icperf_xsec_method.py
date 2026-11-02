@@ -11,7 +11,8 @@ Kendall 時畫面與「本次設定」顯示所選方法而實際仍算 Spearman
 2. 逐標的時間序列 IC（`cross_sectional_symbol_ic`）與 IC 衰減逐 horizon 之截面 IC（`ic_decay[*].ic_values`）同用所選方法
    （與縱向 `compute_ic_decay(…, method, …)`、分組 IC 同估計量之規則一致）。
 3. 收益率類型於跨標的模式之消費點＝IC 衰減之前瞻報酬（`_xsec_placeholder_stats` → `ICEngine._compute_returns`；主 IC 之標籤
-   由呼叫端給定，服務端固定為一根 K 線對數報酬）：非預設值 ⇒ 衰減值改變且等於以該定義獨立算之 oracle。
+   由呼叫端給定——服務端自 v5.59 (ae) 起依同一 `labels.return_type` 導出，見 `test_icperf_v559_product.py`）：非預設值 ⇒
+   衰減值改變且等於以該定義獨立算之 oracle。
 4. 縮尾、去重、單調性門檻於跨標的路徑無消費點（不做預處理、不做去重、不設門檻）：非預設值 ⇒ 報告逐鍵相同（證不適用，
    前端據此停用並標「此模式不適用」）。
 
@@ -371,7 +372,7 @@ def test_not_applicable_settings_do_not_change_cross_sectional_report(key: str, 
 
 def _real_xsec_panel(rows: int = 300) -> pd.DataFrame:
     """`data_cache/feature_klines/kline_cache.h5` 4h 全部標的末 `rows` 根：因果特徵（只用 0..t）ret1、dev20、vol20、mom10，
-    標籤 `return_1`＝log(close[t+1]／close[t])（同服務 `_append_cross_sectional_labels`）。"""
+    標籤 `return_1`＝log(close[t+1]／close[t])（同服務 `_append_cross_sectional_labels(..., return_type="log")`）。"""
     import h5py
 
     path = REPO / "data_cache" / "feature_klines" / "kline_cache.h5"

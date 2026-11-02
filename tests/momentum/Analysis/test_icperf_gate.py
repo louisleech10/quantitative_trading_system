@@ -4787,14 +4787,15 @@ def test_task02_v558_event_stage5_facts_and_fixed_cell(harness: Any, tmp_path: P
 
     store: Dict[str, Any] = {}
     hook = harness.binary_capture_hook(store)
-    nc = {"n_observed": 2, "n_consumable": 1, "n_effective": 50, "degraded_by_budget": False}
+    # SPEC v5.59 (ac)：產品負對照固定 negative_control_n 次、receipt 刪牆鐘預算降階旗標 ⇒ 替身 receipt 不含該鍵（缺席不報錯），
+    # 事實不再含任何預算欄
+    nc = {"n_observed": 2, "n_consumable": 1, "n_planned": 50, "n_effective": 50}
     hook((object(), ["a", "b"], {}, None, None), {"alpha_effective": 1.0, "fdr_method": "fdr_bh"},
          (["a"], {"n_perm": 571, "n_blocks": 31, "block_len": 13, "negative_control": nc}))
     assert store["threshold_passed"] == ["a", "b"] and store["survivors"] == ["a"]
     assert harness.binary_receipt_facts(store) == {
         "threshold_passed": 2, "survivors_after_permutation": 1, "n_perm": 571, "n_blocks": 31, "block_len": 13,
-        "negative_control_status": "computed", "negative_control_n_effective": 50,
-        "negative_control_degraded_by_budget": False}
+        "negative_control_status": "computed", "negative_control_n_effective": 50}
     assert harness.binary_receipt_facts(None) is None
 
     # ③ _run_event_import 之第 5 段事實（服務替身；同 test_task02_v557_event_axis_relaxed_thresholds）
@@ -4946,3 +4947,171 @@ def test_task02_v558_optimized_core_flags_false(fb: Any, harness: Any) -> None:
     for rel in ("scripts/icperf_scale_harness.py", "scripts/icperf_freeze_baseline.py", "scripts/scale_probe.py"):
         hit = flag_read.search((REPO / rel).read_text(encoding="utf-8"))
         assert hit is None, (rel, hit.group(0) if hit else None)
+
+
+# ── SPEC v5.59 (ai)：清冊檔:行引用、單位軸呼叫數條件、收據各點記 n_blocks（code review r70 群集 K） ─────────────────
+
+
+V559_CALLER_RE = re.compile(r"^([\w./-]+\.py):(\d+)（(<module>|[A-Za-z_][\w.]*)(?:：([^（）]+))?）$")
+V559_COND = "門檻通過數 k>0 且 n_blocks ≥ 10 時才含"
+
+
+def _v559_defs(path: Path) -> Dict[str, Tuple[int, int]]:
+    """測試自持之 oracle：檔內 def／class 之 {限定名: (def 行, 末行)}（巢狀以 . 串接；if／try 區塊內者亦計）。"""
+    out: Dict[str, Tuple[int, int]] = {}
+
+    def visit(node: ast.AST, qual: List[str]) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                out.setdefault(".".join(qual + [child.name]), (child.lineno, child.end_lineno or child.lineno))
+                visit(child, qual + [child.name])
+            else:
+                visit(child, qual)
+
+    visit(ast.parse(path.read_text(encoding="utf-8")), [])
+    return out
+
+
+def test_task02_v559_inventory_refs_within_stated_functions(fb: Any) -> None:
+    """SPEC v5.59 (ai)：定稿清冊每條 evidence 之檔:行＝入口模組檔之入口 def 行；每條 callers 之檔:行落在所述所在函式之
+    def 範圍內、且該行原文含入口名（給引用式者含引用式）；pit_call_sites 之 site 落在 caller_id 函式內且含 callee 名——以測試
+    自持之 AST／原文 oracle 驗（不經 `inventory_ref_problems`），另驗 `inventory_ref_problems` 為空；call_example／
+    no_measure_reason／unit_axis.function 不得含「.py:<行>」（改引符號，產品改動後不漂移）。mutation：清冊任一 evidence 或
+    callers 行號 ±1 ⇒ 前兩斷言紅；callers 去所在函式 ⇒ 格式斷言紅。"""
+    inv = _v555_inventory()
+    defs_cache: Dict[str, Dict[str, Tuple[int, int]]] = {}
+    lines_cache: Dict[str, List[str]] = {}
+
+    def defs(rel: str) -> Dict[str, Tuple[int, int]]:
+        if rel not in defs_cache:
+            defs_cache[rel] = _v559_defs(REPO / rel)
+        return defs_cache[rel]
+
+    def text(rel: str, line: int) -> str:
+        if rel not in lines_cache:
+            lines_cache[rel] = (REPO / rel).read_text(encoding="utf-8").splitlines()
+        src = lines_cache[rel]
+        return src[line - 1] if 1 <= line <= len(src) else ""
+
+    bad: List[str] = []
+    n_callers = 0
+    for e in inv["entries"]:
+        mod, _, qual = e["id"].partition(":")
+        mpath = mod.replace(".", "/") + ".py"
+        name = qual.rsplit(".", 1)[-1]
+        if e["evidence"] != f"{mpath}:{defs(mpath)[qual][0]}":
+            bad.append(f"{e['id']}：evidence {e['evidence']} ≠ {mpath}:{defs(mpath)[qual][0]}")
+        for c in e.get("callers") or []:
+            n_callers += 1
+            m = V559_CALLER_RE.match(c)
+            if m is None:
+                bad.append(f"{e['id']}：callers {c!r} 格式")
+                continue
+            rel, line, cq, expr = m.group(1), int(m.group(2)), m.group(3), m.group(4)
+            if cq != "<module>":
+                lo, hi = defs(rel)[cq]
+                if not lo <= line <= hi:
+                    bad.append(f"{e['id']}：{c} 不在 {cq} [{lo}, {hi}] 內")
+            if (expr or name) not in text(rel, line) and not (expr and expr.rsplit(".", 1)[-1] in text(rel, line)):
+                bad.append(f"{e['id']}：{c} 之行原文不含 {expr or name}")
+    for s in inv["pit_call_sites"]:
+        rel, line = s["site"].rsplit(":", 1)
+        lo, hi = defs(rel)[s["caller_id"].partition(":")[2]]
+        callee = s["callee"].rpartition(":")[2].rsplit(".", 1)[-1]
+        if not (lo <= int(line) <= hi and callee in text(rel, int(line))):
+            bad.append(f"pit_call_sites {s}")
+    assert not bad, bad[:20]
+    assert n_callers > 200 and inv["pit_call_sites"], "清冊 callers／pit_call_sites 為空（oracle 失效）"
+    assert fb.inventory_ref_problems(inv) == []
+    free = [(e["id"], k) for e in inv["entries"] for k in ("call_example", "no_measure_reason")
+            if re.search(r"\.py:\d", str(e.get(k) or ""))]
+    free += [(e["id"], "unit_axis") for e in inv["entries"] if re.search(r"\.py:\d", e["unit_axis"]["function"])]
+    assert not free, free
+
+
+def test_task02_v559_inventory_ref_relocation(fb: Any, tmp_path: Path) -> None:
+    """SPEC v5.59 (ai)：`relocate_inventory_refs` 依符號重算（不依版本歷史）——合成模組插入行後，evidence 移至新 def 行、
+    callers 每一（檔, 所在函式）重算為該函式內引用入口名之全部行（新增之引用列入、行序升冪）、給引用式者只計該引用式（同名異物
+    不混入）、pit_call_sites 同；`inventory_ref_problems` 於重算前點名漂移／缺列／格式不合、重算後為空。反例：所在函式已刪 ⇒
+    重算記問題且保留原值；callers 無所在函式 ⇒ 無法重算（記問題）。mutation：relocate 不重算 callers ⇒ 漂移斷言紅；refs 不依
+    引用式過濾 ⇒ 同名異物斷言紅；inventory_ref_problems 只驗行存在不驗完整 ⇒ 缺列斷言紅。"""
+    (tmp_path / "m").mkdir()
+    src = textwrap.dedent('''\
+        class A:
+            def run(self):
+                return 1
+
+            def go(self):
+                self.run()
+                self.b.run()
+                return self.run()
+
+
+        def pit(x):
+            return x
+
+
+        def user(x):
+            return pit(x)
+        ''')
+    (tmp_path / "m" / "a.py").write_text(src, encoding="utf-8")
+    inv = {"entries": [
+        {"id": "m.a:A.run", "evidence": "m/a.py:2",
+         "callers": ["m/a.py:6（A.go：self.run）", "m/a.py:8（A.go：self.run）"]},
+        {"id": "m.a:pit", "evidence": "m/a.py:11", "callers": ["m/a.py:16（user）"]}],
+        "pit_call_sites": [{"callee": "m.a:pit", "caller_id": "m.a:user", "site": "m/a.py:16"}]}
+    assert fb.inventory_ref_problems(inv, tmp_path) == []
+    # 同名異物：不給引用式 ⇒ self.b.run 之行亦計入 ⇒ 列出不完整
+    plain = copy.deepcopy(inv)
+    plain["entries"][0]["callers"] = ["m/a.py:6（A.go）", "m/a.py:8（A.go）"]
+    assert any("[6, 8]" in p and "[6, 7, 8]" in p for p in fb.inventory_ref_problems(plain, tmp_path))
+    # 產品改動：上方插入 3 行、go 內新增一處引用
+    (tmp_path / "m" / "a.py").write_text("import os\n\n\n" + src.replace(
+        "        return self.run()", "        self.run()\n        return self.run()"), encoding="utf-8")
+    probs = fb.inventory_ref_problems(inv, tmp_path)
+    assert any("evidence 行 2 ≠ 現行 def 行 5" in p for p in probs) and any("pit_call_sites" in p for p in probs), probs
+    new, rp = fb.relocate_inventory_refs(inv, tmp_path)
+    assert rp == [] and fb.inventory_ref_problems(new, tmp_path) == []
+    assert new["entries"][0]["evidence"] == "m/a.py:5"
+    assert new["entries"][0]["callers"] == ["m/a.py:9（A.go：self.run）", "m/a.py:11（A.go：self.run）",
+                                             "m/a.py:12（A.go：self.run）"]
+    assert new["entries"][1]["callers"] == ["m/a.py:20（user）"] and new["entries"][1]["evidence"] == "m/a.py:15"
+    assert new["pit_call_sites"] == [{"callee": "m.a:pit", "caller_id": "m.a:user", "site": "m/a.py:20"}]
+    # 反例：所在函式已不存在；callers 缺所在函式
+    gone = copy.deepcopy(new)
+    gone["entries"][1]["callers"] = ["m/a.py:20（nope）", "m/a.py:20"]
+    g2, gp = fb.relocate_inventory_refs(gone, tmp_path)
+    assert g2["entries"][1]["callers"] == ["m/a.py:20", "m/a.py:20（nope）"] and len(gp) == 2, gp
+    assert any("無所在函式 nope" in p for p in fb.inventory_ref_problems(gone, tmp_path))
+
+
+def test_task02_v559_binary_unit_axis_condition_and_points_record_n_blocks(fb: Any, harness: Any,
+                                                                           scale_probe: Any) -> None:
+    """SPEC v5.59 (ai)：①定稿清冊 `mann_whitney_table` 與 `_run_binary_permutation_and_negative_control` 之 unit_axis.function
+    寫明呼叫數條件「門檻通過數 k>0 且 n_blocks ≥ 10 時才含置換與負對照」（首項不變，判準①②之解析不受影響）；②量測收據
+    各點記 n_blocks（沿用 `binary_receipt_facts`）——event_import events 軸各點與 mann_whitney 只記不擬合之各點皆記 n_blocks
+    與門檻通過數，非二元點 n_blocks＝None；固定倖存集合格之點取存檔第 5 段收據之 n_blocks。mutation：`_point` 不記
+    n_blocks ⇒ ②紅；`events_fit_exclusion` 不記 ⇒ ②紅；清冊文字刪條件 ⇒ ①紅。"""
+    inv_real = _v555_inventory()
+    funcs = {e["id"]: e["unit_axis"]["function"] for e in inv_real["entries"]
+             if e["id"] in (harness.MW_ENTRY, harness.BINARY_PERM_ENTRY)}
+    assert len(funcs) == 2 and all(V559_COND in f and "負對照" in f and "置換" in f for f in funcs.values()), funcs
+    assert funcs[harness.MW_ENTRY].split("（")[0] == "calls(survivors)*stage_cols*n_events*log(n_events)"
+    assert funcs[harness.BINARY_PERM_ENTRY].split("（")[0] == "P*stage_cols*n_events*log(n_events)"
+
+    inv, runs = _v558_case(harness)
+    blocks = {176: 31, 457: 6, 737: 40}
+    for s, recs in runs[("event_import", "events")]["records"].items():
+        recs[0]["facts"]["binary_receipt"].update(n_blocks=blocks[s], threshold_passed=V558_SURVIVORS[s] + 1)
+    for s, recs in runs[(harness.MW_FIXED_CELL, "events")]["records"].items():
+        recs[0]["facts"]["stage5_at_point"] = {"n_blocks": 12, "threshold_passed": 51}
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "budget_seconds": BUDGET2_UPPER_SECONDS,
+          "sample_interval_seconds": 0.2, "chunk_cap": {"bytes": 1, "basis": "x"}, "require_rows": True,
+          "require_isolation": True}
+    got = harness.assemble_scale_receipt(inv, runs, **kw)
+    m = got["entries"][harness.MW_ENTRY]
+    assert [p["n_blocks"] for p in m["row_points"]] == [31, 6, 40]
+    assert [(p["n_blocks"], p["threshold_passed"]) for p in m["row_fit_excluded"]["points"]] == \
+        [(31, 36), (6, 1), (40, 52)]
+    assert [p.get("n_blocks", "absent") for p in m["points"]] == [None, None, None]  # cols 軸：非二元模式
+    assert [p["n_blocks"] for p in m["isolation"]["points"]] == [12, 12, 12]

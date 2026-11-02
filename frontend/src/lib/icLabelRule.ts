@@ -61,10 +61,9 @@ export interface ICEventLabelRule {
     seed_base?: number;
     block_len?: number;
     comparand?: string;
+    /** ICPERF v5.59 (ac)：次數固定（不依耗時縮減），`n_effective`＝`n_planned`；原 `budget_seconds`／`degraded_by_budget` 已移除。 */
     n_planned?: number;
     n_effective?: number;
-    budget_seconds?: number;
-    degraded_by_budget?: boolean;
   } | null;
 }
 

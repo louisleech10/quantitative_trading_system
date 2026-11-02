@@ -2384,14 +2384,17 @@ def survivor_dependent(e: Mapping[str, Any]) -> bool:
 def events_fit_exclusion(e: Mapping[str, Any], axis: Optional[str], points: Sequence[Mapping[str, Any]]
                          ) -> Optional[Dict[str, Any]]:
     """SPEC v5.58 (x)：events 軸只擬合確實隨事件數變之入口——`axis`＝"events" 且入口倖存數相依（`survivor_dependent`）⇒ 回
-    {"axis", "basis", "points": [{"events", "survivors", "calls", "seconds", "post_stage5_claim"}]}（不擬合；端到端保留事件數與倖存數
-    雙軸及各點呼叫數）；否則 None（照常擬合）。"""
+    {"axis", "basis", "points": [{"events", "survivors", "calls", "seconds", "post_stage5_claim", "n_blocks", "threshold_passed"}]}
+    （不擬合；端到端保留事件數與倖存數雙軸及各點呼叫數；v5.59 (ai)：另記區塊數與門檻通過數——呼叫數條件 k>0 且 n_blocks ≥ 10
+    之兩輸入）；否則 None（照常擬合）。"""
     if axis != "events" or not survivor_dependent(e):
         return None
     return {"axis": "events", "basis": EVENTS_FIT_EXCLUDED_BASIS,
             "points": [{"events": (p.get("scale_vector") or {}).get("events", p.get("events")),
                         "survivors": (p.get("scale_vector") or {}).get("survivors"), "calls": p.get("calls"),
-                        "seconds": p.get("seconds"), "post_stage5_claim": p.get("post_stage5_claim")} for p in points]}
+                        "seconds": p.get("seconds"), "post_stage5_claim": p.get("post_stage5_claim"),
+                        "n_blocks": p.get("n_blocks"),
+                        "threshold_passed": (p.get("binary_receipt") or {}).get("threshold_passed")} for p in points]}
 
 
 def post_stage5_claim(stage5_output: Optional[int], binary: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
@@ -2414,7 +2417,8 @@ def post_stage5_claim(stage5_output: Optional[int], binary: Optional[Mapping[str
 def binary_receipt_facts(captured: Optional[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
     """SPEC v5.58 (x)：第 5 段二元收據之事實（`binary_capture_hook` 所存；未呼叫 `_run_binary_permutation_and_negative_control`
     〔非二元模式〕⇒ None）：門檻通過數 k（置換前）、置換後倖存數、n_perm、區塊數、負對照狀態（"computed"＝實算，否則產品之
-    status 字串）與實算次數——mann_whitney_table 端到端呼叫數之解釋（1＋[k>0 且 n_blocks≥10]·(1＋n_perm)＋負對照次數）。"""
+    status 字串）與實算次數——mann_whitney_table 端到端呼叫數之解釋（1＋[k>0 且 n_blocks≥10]·(1＋n_perm)＋負對照次數）。
+    SPEC v5.59 (ac)：產品之負對照改固定 `negative_control_n` 次、receipt 刪牆鐘預算降階旗標 ⇒ 本函式不讀該鍵（缺席不報錯）。"""
     if not captured:
         return None
     rec = dict(captured.get("receipt") or {})
@@ -2424,8 +2428,7 @@ def binary_receipt_facts(captured: Optional[Mapping[str, Any]]) -> Optional[Dict
             "survivors_after_permutation": len(captured.get("survivors") or []),
             "n_perm": rec.get("n_perm"), "n_blocks": rec.get("n_blocks"), "block_len": rec.get("block_len"),
             "negative_control_status": "computed" if computed else (nc.get("status") if isinstance(nc, Mapping) else None),
-            "negative_control_n_effective": nc.get("n_effective") if computed else 0,
-            "negative_control_degraded_by_budget": nc.get("degraded_by_budget") if computed else None}
+            "negative_control_n_effective": nc.get("n_effective") if computed else 0}
 
 
 def binary_capture_hook(store: Dict[str, Any]) -> Callable[[Tuple[Any, ...], Dict[str, Any], Any], None]:
@@ -4530,6 +4533,11 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
         p["post_stage5_claim"] = facts.get("post_stage5_claim")
         p["binary_receipt"] = facts.get("binary_receipt")
         p["stage5_survivors"] = facts.get("survivors")
+    binary = facts.get("binary_receipt") if "post_stage5_claim" in facts else facts.get("stage5_at_point")
+    if "post_stage5_claim" in facts or "stage5_at_point" in facts:
+        # SPEC v5.59 (ai)：各點記事件區塊數（沿用 `binary_receipt_facts` 之 n_blocks；非二元模式 ⇒ None）——二元入口之呼叫數
+        # 條件「門檻通過數 k>0 且 n_blocks ≥ 10 時才含置換與負對照」之輸入，與 binary_receipt.threshold_passed 並讀
+        p["n_blocks"] = (binary or {}).get("n_blocks")
     return p
 
 
@@ -4868,8 +4876,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.cmd == "coverage":
         inv = load_inventory(args.inventory)
         cov = schedule_coverage(inv, schedule_runs(inv))
-        print(json.dumps({**cov, "schedule": [f"{r}:{a}" for r, a in schedule_runs(inv)]}, ensure_ascii=False, indent=1))
-        return 0 if not cov["uncovered"] else 1
+        # SPEC v5.59 (ai)：清冊檔:行引用與現行碼不符亦不成立（`icperf_freeze_baseline.py inventory-refs --write` 依符號重算）
+        ref_problems = _fb().inventory_ref_problems(inv, REPO)
+        print(json.dumps({**cov, "schedule": [f"{r}:{a}" for r, a in schedule_runs(inv)],
+                          "inventory_ref_problems": ref_problems}, ensure_ascii=False, indent=1))
+        return 0 if not cov["uncovered"] and not ref_problems else 1
     if args.cmd == "prepare":
         root = Path(args.out_root) if args.out_root is not None else REPO / TASK02_ROOT
         root = (root if root.is_absolute() else REPO / root).resolve()

@@ -283,7 +283,8 @@ def test_append_cross_sectional_labels_real_3sym_oracle(
     _require_xsec_run(xsec_hash)
     cross_df = _build_xsec_cross_index(xsec_hash)
     service = ICAnalysisService()
-    labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
+    # ICPERF v5.59 (ae)：return_type 必填；本條之 oracle 為對數報酬（他種定義之 oracle 見 test_icperf_v559_product.py）
+    labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME, return_type="log")
 
     total = len(labeled)
     non_nan = int(labeled["return_1"].notna().sum())
@@ -344,7 +345,7 @@ def test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise(
         lambda cache_dir="data_cache/feature_klines": real_reader,
     )
 
-    labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
+    labeled = service._append_cross_sectional_labels(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME, return_type="log")
     sym_labels = labeled.xs(hole_symbol, level="_symbol")["return_1"]
     assert pd.isna(sym_labels.loc[hole_ts])
 
@@ -412,7 +413,7 @@ def test_append_cross_sectional_labels_mutation_rangeindex_regresses(
     monkeypatch.setattr(service, "_append_cross_sectional_labels", broken_append)
     labeled = broken_append(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
     assert int(labeled["return_1"].notna().sum()) == 0
-    labeled_fixed = original(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME)
+    labeled_fixed = original(cross_df, XSEC_SYMBOLS, XSEC_TIMEFRAME, return_type="log")
     expected = _expected_label_count(cross_df)
     assert expected > 0, "前提不成立：獨立 oracle 無可標記之列"
     assert int(labeled_fixed["return_1"].notna().sum()) == expected

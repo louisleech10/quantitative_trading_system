@@ -807,30 +807,6 @@ class ICEngine:
 
         return grouped_results
 
-    def compute_ic_autocorrelation(
-        self, rolling_ic_results: dict, lag: int = 1
-    ) -> dict[str, float]:
-        """IC autocorrelation (Lag-1)."""
-
-        results: dict[str, float] = {}
-        persistent_count = 0
-        for feature, windows in rolling_ic_results.items():
-            series = self._select_icir_series(windows)
-            values = np.array(series, dtype=float)
-            if values.size <= lag:
-                results[feature] = np.nan
-                continue
-            if np.nanstd(values) == 0:
-                results[feature] = np.nan
-                continue
-            value = float(np.corrcoef(values[:-lag], values[lag:])[0, 1])
-            if value > 0.3:
-                persistent_count += 1
-            results[feature] = value
-        if persistent_count > 0:
-            logger.info("IC autocorr persistent: count=%s", persistent_count)
-        return results
-
     @staticmethod
     def _validate_selection_metadata(
         label_horizon: Optional[str],

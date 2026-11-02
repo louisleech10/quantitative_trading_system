@@ -252,7 +252,8 @@ def run_xsec(
         frames = _xsec_frames_from_premat(symbols, timeframe, config_hash, selected)
 
     cross_df = pd.concat(frames, axis=0).set_index("_symbol", append=True)
-    cross_df = service._append_cross_sectional_labels(cross_df, symbols, timeframe)
+    # ICPERF v5.59 (ae) 後 return_type 必填：IC1EB 基準擷取時跨標的主標籤固定 log，重播沿用以比對凍結基準
+    cross_df = service._append_cross_sectional_labels(cross_df, symbols, timeframe, return_type="log")
     analyzer = create_ic_analyzer(None)
     return analyzer.analyze_cross_sectional(
         features=cross_df,
@@ -292,7 +293,7 @@ def run_xsec_labels_raise(manifest: dict[str, Any]) -> Exception:
         frame["_symbol"] = symbol
         frames.append(frame)
     cross_df = pd.concat(frames, axis=0).set_index("_symbol", append=True)
-    cross_df = service._append_cross_sectional_labels(cross_df, SYMBOLS, "12h")
+    cross_df = service._append_cross_sectional_labels(cross_df, SYMBOLS, "12h", return_type="log")  # 同上：IC1EB 基準定義
     analyzer = create_ic_analyzer(None)
     try:
         analyzer.analyze_cross_sectional(

@@ -9728,6 +9728,27 @@
    "rewrite_targets": [],
    "ticket": "ICPERF"
   },
+  "tests/momentum/Analysis/test_icperf_v559_product.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_v559_product.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/momentum/Analysis/test_icperf_vif_sample_guard.py": {
    "claim": [
     "correctness"
