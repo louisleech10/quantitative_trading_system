@@ -227,6 +227,7 @@
 - **委員審議項（v2 主委定案，請 r2 判定）**：
   - Q1（`timeout` 標記）：保留 9 處宣告並於 `pytest.ini` 註冊（Task 1.4）。理由：移除只在「未安裝外掛」之環境下行為恆等，於已安裝外掛之環境會喪失作者所設之逾時保護，非行為恆等；保留則兩種環境皆不改變現行行為。不安裝外掛（安裝會使該 9 處開始逾時失敗，屬引入新行為）。卡住偵測於閘級執行由 D10 監看承擔；一般手動 pytest 現無逾時保護，此為現況（未因本票變差）。
   - Q2（k 與複查閾值）：k＝20、`duration_regression_rule`（取樣、中位數、門檻皆封閉定義於 schema）。現無同設定多次執行之耗時資料可校準（b1 收據每項僅一次）；此訊號只標記不影響挑選，誤設之代價為複查清單噪音，不減驗證。
+- **N/A：規格刻意翻轉之測試無對應碑型**（2026-11-02，ICPERF code review r70 處置，出處 `handoffs/reconcile/20261102-icperf-x-review-r70/synth.md`；ICPERF SPEC v5.59）：舊測試所守性質被規格刻意改為相反（例：`tests/momentum/Analysis/test_icperf_ui_toggles.py` 之 `test_ic_autocorrelation_has_no_consumer`〔驗無讀取者〕因報告欄上線改為 `test_ic_autocorrelation_is_reported_in_summary`〔驗有讀取者〕）時，E1（完全重複）與 E2（替代測試殺舊目標所殺之 mutant）皆不成立——殺舊目標之 mutant 正是新規格要求之行為。處置＝走測試刪改流程：pre-commit 列 V20 待審清單、委員審清單並於收斂檔引 SPEC 條、`scripts/test_change_review.sh mark` 後放行；禁假造 E2 mutant。不另造碑型之理由：業界做法即以程式碼審查核准測試之刪改，V20 只比對提交前後，翻轉提交之後不再重報。
 - **殘留**：
   - v53／v54 處置總則（諮詢 r20 D-7）：R10、R11、R17、R18、R19、R20 之目標已於 Task 4.4 逐支處置完畢（處置表 `handoffs/run_receipts/testreg-closure-s{1,2,3,45}-dispositions.tsv`；審碼 `handoffs/reconcile/20261010-testreg-b5-review-r{1,2,3}/synth.md`），各條僅留處置去向；R16 改為隔離＋生產修正登記；R12、R13、R14、R15 不變。
   - R1 動態覆蓋對照表（逐行覆蓋率→測試，原 `dynamic_hit`）— `為何現在不做: blocked-by:Task 1.3 記錄器上線後須另收覆蓋邊（ledger 無檔案觸及欄）`；觸發：summary 中 ≥80% 測試檔具 ≥3 筆同 env_class 紀錄；登記處：`白話說明/還沒做的事.md` 第四節。
