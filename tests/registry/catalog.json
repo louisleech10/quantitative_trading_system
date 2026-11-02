@@ -7052,6 +7052,24 @@
    "rewrite_targets": [],
    "ticket": "NOCAP"
   },
+  "tests/governance/test_subagent_delivered.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_subagent_delivered.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "GOVERNANCE"
+  },
   "tests/governance/test_low_risk_impl_requires_reconcile.py": {
    "claim": [
     "contract"
