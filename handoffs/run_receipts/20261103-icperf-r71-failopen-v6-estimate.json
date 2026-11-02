@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（r71 CODEX-R71-P1-02：failopen v6 asof 於本批前碼〔head_wt4＝6d6fa6c0〕與本批碼〔9c96b4ac〕同條件各跑一次，判定記憶體預算拒絕是否本批造成）",
+      "created_at": "2026-11-03T04:01:16+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 700,
+  "basis": [
+    ".testreg/summary.json 本節點 2026-11-02 重型跑中 329 秒即於記憶體預算拒絕而 failed；前次通過 2026-10-19 734 秒（跑完全程）",
+    "兩次（本批前／本批）各約 330–740 秒，單組串行；量級估計，不作停止條件（NOCAP）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-5"
+  ]
+}

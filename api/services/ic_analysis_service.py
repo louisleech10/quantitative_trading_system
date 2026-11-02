@@ -98,6 +98,10 @@ RANDOM_SAMPLE_DESIGN = "unconditional_random"
 #: 規則身分閘要求觸發批之報酬量法必須是這個值（隨機批固定 `close_to_close`；CODEX-R3-P1-02）。
 _IDENTITY_LABEL_RETURN_MODE = "close_to_close"
 
+#: 跨標的：本服務自 kline 導出之 in-frame 標籤欄名（`_append_cross_sectional_labels` 寫入；傳給
+#: `analyze_cross_sectional(generated_label_column=…)` 使覆蓋率守衛只對它扣回看暖機，ICPERF r71）。
+XSEC_GENERATED_LABEL_COLUMN = "return_1"
+
 
 @dataclass(frozen=True)
 class CompareVerdict:
@@ -1808,6 +1812,8 @@ class ICAnalysisService:
                     timeframe=request.timeframe,
                     close=close_out.get("close"),
                     feature_metadata=feature_metadata,
+                    # r71：本服務自 kline 導出標籤時明示其欄名，覆蓋率守衛才扣該 return_type 之回看暖機
+                    generated_label_column=None if labels_path else XSEC_GENERATED_LABEL_COLUMN,
                 )
             else:
                 symbol = request.symbol
@@ -3690,7 +3696,7 @@ class ICAnalysisService:
                             f"label misalignment for {symbol}/{timeframe} at matched timestamps"
                         ),
                     )
-            working_df.loc[symbol_mask, "return_1"] = aligned.to_numpy()
+            working_df.loc[symbol_mask, XSEC_GENERATED_LABEL_COLUMN] = aligned.to_numpy()
             close_values[symbol_mask] = close.reindex(symbol_index).to_numpy(dtype=np.float64)
 
         if close_out is not None:

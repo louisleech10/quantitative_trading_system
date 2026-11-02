@@ -254,6 +254,7 @@ def _run_cross(svc: Any, cross_df: Any, symbols: Sequence[str], cell: Mapping[st
                request: Mapping[str, Any]) -> Dict[str, Any]:
     """跨標的之共同步驟（服務 `_run_analysis` cross_sectional 分支）：`_append_cross_sectional_labels`（kline 衍生標籤）→
     IC 頁預設覆寫（`_build_config_override`）＋請求明列 `override_extra` → `analyze_cross_sectional`；例外原樣拋出。"""
+    from api.services.ic_analysis_service import XSEC_GENERATED_LABEL_COLUMN
     from momentum.factories import create_ic_analyzer
 
     fb = _fb()
@@ -270,7 +271,8 @@ def _run_cross(svc: Any, cross_df: Any, symbols: Sequence[str], cell: Mapping[st
                                                   close_out=close_out)
     report = analyzer.analyze_cross_sectional(features=cross_df, labels_path=None, config_override=ov,
                                               progress_callback=fb._progress, timeframe=request["timeframe"],
-                                              close=close_out.get("close"), feature_metadata=feature_metadata)
+                                              close=close_out.get("close"), feature_metadata=feature_metadata,
+                                              generated_label_column=XSEC_GENERATED_LABEL_COLUMN)
     return {"response": report, "ic_report": report, "cross_df": cross_df,
             "close": close_out.get("close"), "feature_metadata": feature_metadata,
             "attempts": [{"override_extra": extra or None, "ok": True}],

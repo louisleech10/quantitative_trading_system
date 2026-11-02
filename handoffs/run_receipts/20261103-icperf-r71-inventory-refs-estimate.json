@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py inventory-refs --write",
+      "code_sha256": "b6b798f5171af7061ccdff0b245e6f09a11086327b3e5bff64e2715faf444190",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（r71 CODEX-R71-P1-01 修補後 orchestrator 行號位移，清冊 inventory-refs 重算）",
+      "created_at": "2026-11-03T04:32:21+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 60,
+  "basis": [
+    "同 handoffs/run_receipts/20261102-icperf-inventory-refs-v559-estimate.json：只讀清冊 JSON 與所引原始碼、寫一個 JSON 檔，實跑數秒",
+    "60 秒為量級估計，不作停止條件"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-2"
+  ]
+}

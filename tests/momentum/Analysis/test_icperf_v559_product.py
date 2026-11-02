@@ -415,6 +415,45 @@ def test_xsec_coverage_guard_floor_subtracts_warmup_and_still_rejects_extra_nan(
             pd.DataFrame({LABEL: extra}, index=idx), LABEL, 1, h, 0.01, backward_warmup=warm)
 
 
+def _xsec_panel_leading_nan(n: int = 200, lead: int = 21) -> pd.DataFrame:
+    """明列輸入：6 標的 × n 時點、in-frame `return_1` 每標的開頭 lead 根與末根缺值（＝risk_adjusted 暖機之形）。"""
+    rng = np.random.default_rng(20261103)
+    ts = pd.date_range("2024-01-01", periods=n, freq="h")
+    syms = ("AAA", "BBB", "CCC", "DDD", "EEE", "FFF")
+    idx = pd.MultiIndex.from_product([ts, syms], names=["timestamp", "symbol"])
+    lab = rng.standard_normal((n, len(syms)))
+    lab[:lead, :] = np.nan
+    lab[-1, :] = np.nan
+    return pd.DataFrame({"f1": rng.standard_normal(n * len(syms)), LABEL: lab.reshape(-1)}, index=idx)
+
+
+def test_xsec_coverage_warmup_only_for_caller_declared_generated_label() -> None:
+    """r71：暖機扣除只認呼叫端明示之生成標籤欄——同一 in-frame `return_1`（開頭 21 根缺值）× risk_adjusted：
+    未宣告（外部提供之同名標籤）⇒ 依原守衛拒收；宣告 `generated_label_column="return_1"` ⇒ 扣暖機後通過；
+    宣告他欄名 ⇒ 不扣、拒收（改前憑欄名即扣 ⇒ 第一、三條皆通過）。"""
+    cfg = {**NO_SPLIT, "labels": {"return_type": "risk_adjusted"}}
+    with pytest.raises(orch_mod.InvalidInputError, match="label coverage too low"):
+        create_ic_analyzer().analyze_cross_sectional(_xsec_panel_leading_nan(), config_override=dict(cfg))
+    with pytest.raises(orch_mod.InvalidInputError, match="label coverage too low"):
+        create_ic_analyzer().analyze_cross_sectional(_xsec_panel_leading_nan(), config_override=dict(cfg),
+                                                     generated_label_column="return_5")
+    report = create_ic_analyzer().analyze_cross_sectional(_xsec_panel_leading_nan(), config_override=dict(cfg),
+                                                          generated_label_column=LABEL)
+    assert {r["feature_name"] for r in report["summary_table"]} == {"f1"}
+
+
+def test_service_declares_generated_label_column_only_when_it_generates_labels() -> None:
+    """服務跨標的分支：自 kline 導出標籤（無 labels_path）時傳 `generated_label_column`＝其寫入之欄名；給 labels_path 時傳 None。"""
+    import inspect
+
+    from api.services import ic_analysis_service as svc_mod
+
+    src = inspect.getsource(svc_mod.ICAnalysisService)
+    assert "generated_label_column=None if labels_path else XSEC_GENERATED_LABEL_COLUMN" in src
+    assert "working_df.loc[symbol_mask, XSEC_GENERATED_LABEL_COLUMN] = aligned.to_numpy()" in src
+    assert svc_mod.XSEC_GENERATED_LABEL_COLUMN == LABEL
+
+
 @pytest.mark.requires_kline
 @pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_xsec_risk_adjusted_12h_passes_coverage_and_main_ic_equals_decay_h1_via_service() -> None:

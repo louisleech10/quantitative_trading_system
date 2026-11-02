@@ -1,0 +1,34 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir runs/icperf/correctness-20261103/captures",
+      "code_sha256": "2ae83894f7d19f8883f2e77f6849979c5e93273ea26cd13cb7b788d40a6125b0",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（r71 CODEX-R71-P1-01 修補後產品碼改動，依 (aa) 重擷取正確性收據）",
+      "created_at": "2026-11-03T04:33:25+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1800,
+  "basis": [
+    "前次同請求集全擷取（runs/icperf/correctness-20261102b/captures/capture_status.json，12 請求 wall_s 合計約 537 秒）；本次只改跨標的覆蓋率守衛之暖機判定，請求集未變，同量級",
+    "估 1800 秒為量級估計，不作停止條件（NOCAP）；擷取檔放 runs/icperf/correctness-20261103/"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

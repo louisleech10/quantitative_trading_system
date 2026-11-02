@@ -278,6 +278,12 @@
         "reason": "user-ruling",
         "owner": "ICPERF",
         "expiry": "2026-12-31"
+      },
+      {
+        "item": "ICPERF-HAC-1",
+        "reason": "user-ruling",
+        "owner": "ICPERF",
+        "expiry": "2026-12-31"
       }
     ]
   }

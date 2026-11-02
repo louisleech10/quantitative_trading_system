@@ -2338,6 +2338,7 @@ class ICFilterOrchestrator:
         *,
         close: Optional[pd.Series] = None,
         feature_metadata: Optional[dict] = None,
+        generated_label_column: Optional[str] = None,
     ) -> dict:
         """Cross-sectional IC: rank corr(feature_{i,t}, return_{i,t+1}) across symbols at each timestamp.
 
@@ -2345,6 +2346,9 @@ class ICFilterOrchestrator:
         跨標的資料計算（定義見 `_xsec_placeholder_stats`）。`close`：與 `features` 同索引層序（時點, 標的）之收盤，供 IC
         衰減與半衰期（未傳 ⇒ 半衰期 None，原因記 `metadata.cross_sectional_unavailable_fields`）；`feature_metadata`：
         {特徵: {category, data_source, layer}}，供多元化之三覆蓋率（未傳 ⇒ 三覆蓋率 None 並記原因）。
+        `generated_label_column`：呼叫端以本次有效 `labels.return_type` 自 kline 導出之 in-frame 標籤欄名（服務
+        `_append_cross_sectional_labels` 之 `return_1`）；選中之標籤欄等於它時，覆蓋率守衛才扣該定義之回看暖機。
+        未給或選中他欄（外部提供之同名 `return_N` 等）⇒ 不扣暖機（來源不明，不得憑欄名推定其定義）。
         """
 
         config = self.effective_config(config_override)  # v5.59 (ae)：服務端主標籤之 return_type 取同一解析
@@ -2367,8 +2371,6 @@ class ICFilterOrchestrator:
             symbol_level_idx = index_names.index("symbol")
 
         label_col: Optional[str] = None
-        # v5.60：in-frame `return_N`＝服務依 `labels.return_type` 自 kline 導出 ⇒ 覆蓋率守衛扣該定義之回看暖機
-        label_is_return_n = False
         # D-H / CODEX-3：horizon 必須在 `_label` 改名前對原始欄名解析
         horizon_source_name: Optional[str] = None
         sig_horizon: Optional[int] = None
@@ -2411,7 +2413,6 @@ class ICFilterOrchestrator:
                     label_col = chosen
                     horizon_source_name = chosen
                     sig_horizon = _resolve_cross_sectional_label_horizon(chosen)
-                    label_is_return_n = True
                     break
                 if candidate in working_df.columns:
                     label_col = candidate
@@ -2441,9 +2442,11 @@ class ICFilterOrchestrator:
             symbol_level_idx,
             effective_horizon,
             config.min_label_coverage_tol,
+            # v5.60／r71：只對呼叫端明示為「依本次 return_type 自 kline 導出」之欄扣回看暖機（labels_path 時 label_col
+            # 為 `_label`，恆不等於生成欄名 ⇒ 不扣）
             backward_warmup=(
                 create_label_generator().backward_warmup_bars(config.labels.return_type)
-                if label_is_return_n
+                if generated_label_column is not None and label_col == generated_label_column
                 else 0
             ),
         )
