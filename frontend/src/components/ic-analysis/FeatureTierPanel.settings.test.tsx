@@ -5,7 +5,8 @@ import ICRunSettingsLine from '@/components/ic-analysis/ICRunSettingsLine';
 import { IC_AUTOCORR_TIP, IC_SETTING_TIPS } from '@/components/ic-analysis/icSettingsText';
 import { DEFAULT_IC_SETTINGS, IC_SETTING_KEYS } from '@/lib/icConfigOverride';
 
-// ICPERF Task 0.4 ㊸：IC 頁方法選擇（四選單＋單調性開關＋IC 自相關揭露）、每項一個 ⓘ、報告頂端「本次設定」一行。
+// ICPERF Task 0.4 ㊸：IC 頁方法選擇（四選單＋單調性開關）、每項一個 ⓘ、報告頂端「本次設定」一行。
+// v5.58 (w)：IC 自相關改為報告表之欄（ⓘ 在表頭），設定面板與「本次設定」不再列。
 
 afterEach(() => {
   cleanup();
@@ -26,13 +27,14 @@ function renderPanel(onChangeSetting = vi.fn(), settings = DEFAULT_IC_SETTINGS) 
 }
 
 describe('FeatureTierPanel 方法選擇', () => {
-  it('五個設定＋IC 自相關各恰一個 ⓘ；文案皆非空且一行（無換行、≤ 80 字）', () => {
+  it('五個設定各恰一個 ⓘ（IC 自相關不在面板）；文案皆非空且一行（無換行、≤ 80 字）', () => {
     renderPanel();
     const box = screen.getByTestId('ic-method-settings');
-    for (const key of [...IC_SETTING_KEYS, 'ic_autocorrelation']) {
+    for (const key of IC_SETTING_KEYS) {
       const row = within(box).getByTestId(`ic-setting-${key}`);
       expect(within(row).getAllByRole('button', { name: /說明$/ })).toHaveLength(1);
     }
+    expect(within(box).queryByTestId('ic-setting-ic_autocorrelation')).toBeNull();
     for (const text of [...Object.values(IC_SETTING_TIPS), IC_AUTOCORR_TIP]) {
       expect(text.trim().length).toBeGreaterThan(0);
       expect(text).not.toMatch(/\n/);
@@ -81,6 +83,6 @@ describe('ICRunSettingsLine 本次設定', () => {
     );
     expect(changed).toEqual(['ic_method_selection', 'monotonicity_test']);
     expect(screen.getByTestId('ic-run-setting-monotonicity_test').textContent).toContain('關');
-    expect(screen.getByTestId('ic-run-setting-ic_autocorrelation')).toBeTruthy();
+    expect(screen.queryByTestId('ic-run-setting-ic_autocorrelation')).toBeNull();
   });
 });

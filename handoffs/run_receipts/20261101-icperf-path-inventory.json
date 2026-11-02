@@ -1,8 +1,8 @@
 {
  "schema": "icperf-t02-path-inventory/2",
- "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.57",
+ "spec": "docs/ICPERF_SPEC.md Task 0.2 v5.58",
  "source": "scripts/icperf_path_inventory.json",
- "source_sha256": "bc5dca4bac80088d02951681d61e593b4744431dc560f922759b21e82b87652f",
+ "source_sha256": "0c38914ba993de2eabad8130654b520a36e0b19ff87e4d6aa55a1446e3ae4311",
  "schema_note": "ICPERF Task 0.2 路徑清冊草稿（改前，讀碼產出；未實跑任何量測）。範圍依 docs/ICPERF_SPEC.md:100。軸定義：rows＝列數；input_cols＝第 0 段讀入欄數；stage_cols＝實際進入該段之欄數；survivors＝第 6 段倖存欄數（深度分析預設選欄＝倖存欄）；survivor_pairs＝倖存欄兩兩配對數（≈survivors^2/2）。W＝滾動窗長、H＝衰減 horizon 數、G＝分組數、B＝bootstrap 次數、P＝置換次數，皆為設定常數，不入 scale_vector。 v5.50（2026-11-01）定稿：scale_vector 另可含 events（事件數）、symbols（標的數）、timestamps（跨標的時點數）——依 unit_axis.function 之 n_events／n_symbols／n_timestamps 機械導出（SPEC v5.49 處置④）；input_axes 仍 ⊆ cols／rows／passed_cols。branch_cell＝量測該入口之路徑實跑或直接呼叫格之 id（見 branch_cells）；measure=false 者為 null。run_ic_first 外層依 SPEC v5.50 (c) 不量。 v5.52 (b)（2026-11-01）：事件型路徑之事件樣本列數不記為 rows——event_import／event_study 之入口 rows 若實為事件數 ⇒ input_axes 移除 rows、scale_vector／unit_axis 改 events；input_axes 可為空（僅限 scale_vector 含 events：該入口只隨事件數變）。fixed_axes（選填，{軸: 碼證理由}）＝該路徑內不隨任何請求規模變之軸（事件路徑之 K 線根數），不入 input_axes、不排量測軸，只以觀測值記於 scale_vector。 v5.53 (c0)（2026-11-01，code review r64）：事件路徑之 K 線根數為成本軸（unit_axis.axes 含 rows 之事件入口，如 evaluate_all_bars rows*n_boot）⇒ 該 8 入口之 fixed_axes.rows 移除，由 harness 以隔離 K 線快取複本之三種根數量 rows 軸（`icperf_scale_harness.entry_runs`／`prepare_event_bars`）；input_axes 仍不記 rows（rows 由 unit_axis 判定）；fixed_axes 不得含 unit_axis.axes 之軸（`inventory_problems`）。",
  "branch_cells": {
   "ic_page_default": "C 格 N 欄巢狀子集＋IC 頁預設請求 analyze（第 0–7 段）；存直接呼叫格之各段真實輸入",
@@ -32,7 +32,8 @@
   "param_sensitivity_pearson": "同上，method=pearson（非 spearman 之 _rolling_corr 分支，parameter_sensitivity_analyzer.py:273-276）",
   "redundancy_greedy_rows": "存檔第 6 段冗餘輸入（RL<cols>_rows<R>：固定 RL<cols>_rows<最小 R> 之欄集合、值取該 R 點第 1 段輸出之測試段列、IC 分數同 R 點）＋同一 RedundancyFilter，產品預設 method（rows 軸專用）",
   "param_sensitivity_families": "存檔參數敏感度輸入（DL<cols>_rows<L 格全長> 之 batch_analyze 參數）＋L 格 2,000 欄第 1 段輸出（ic_page_long cols 2000 之存檔 L2000/preprocess）中產品 detect_feature_families 之 ≥3 員家族取 F 族、每族 3 員（只含家族成員欄）＋同一分析器 batch_analyze（同請求方法）",
-  "param_sensitivity_families_pearson": "同上，method=pearson（_rolling_corr 分支之家族數軸）"
+  "param_sensitivity_families_pearson": "同上，method=pearson（_rolling_corr 分支之家族數軸）",
+  "mann_whitney_fixed_survivors": "存檔事件數軸真實輸入（event_import events 軸各點 mann_whitney_table 首次呼叫之 features／y／min_class_n，`EVENT_MW_DIR/E<n>/`）限於固定倖存集合（--ref-scale 點之第 5 段倖存欄）＋mann_whitney_table 重複 MW_FIXED_CALLS 次（events 軸；每點同欄集合、只變事件）"
  },
  "open_questions": [
   "SPEC 行號已過期：docs/ICPERF_SPEC.md:100 寫 pit_expanding_bounds（:371）、pit_expanding_quantile_thresholds（:416）、pit_expanding_mean_std（:467）、pit_expanding_mad（:511）、factor_return_analyzer.py:319-366；現行 HEAD 實為 pit_stats.py:410、:455、:506、:550 與 factor_return_analyzer.py:354（_pit_expanding_position 定義）。是否需於 SPEC 更正。",
@@ -1405,7 +1406,7 @@
    "branch_cell": "ic_page_default"
   },
   {
-   "id": "momentum.Analysis.ic_engine:ICEngine.compute_ic_autocorrelation",
+   "id": "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._ic_autocorr_by_feature",
    "stage": "4",
    "input_axes": [
     "cols",
@@ -1416,7 +1417,7 @@
    "loop": "per_column",
    "measure": true,
    "no_measure_reason": null,
-   "evidence": "momentum/Analysis/ic_engine.py:810",
+   "evidence": "momentum/Analysis/ic_filter_orchestrator.py:5148",
    "coverage_path_id": "ICPERF-T02-44",
    "unit_axis": {
     "axes": [
@@ -1429,9 +1430,9 @@
     "rows",
     "stage_cols"
    ],
-   "call_example": "engine.compute_ic_autocorrelation(rolling_ic, lag=1)；逐欄再轉一次 np.array（與 compute_icir 重複轉換同一 list）。",
+   "call_example": "orch._ic_autocorr_by_feature(rolling_ic)；逐特徵取 ICIR 同一滾動 IC 序列（ICEngine._select_icir_series）→ ic_lag1_autocorrelation（statsmodels acf 定義，v5.58 (w)；取代改前 ICEngine.compute_ic_autocorrelation）。",
    "callers": [
-    "momentum/Analysis/ic_filter_orchestrator.py:4924"
+    "momentum/Analysis/ic_filter_orchestrator.py:5070"
    ],
    "branch_cell": "ic_page_default"
   },
@@ -4957,8 +4958,8 @@
     "passed_cols",
     "rows"
    ],
-   "ic_page": true,
-   "ic_first": true,
+   "ic_page": false,
+   "ic_first": false,
    "loop": "none",
    "measure": false,
    "no_measure_reason": "SPEC v5.57 (s)、§N「N/A（v5.57）」條：IC 頁（與 IC-first）post-IC 轉換不可達——契約鎖定擇定核心 pandas_legacy（momentum/FeatureEngineering/contracts/numeric_view.json:9 ic_first 臂、:24 IC 頁 arm_ref＝ic_first；api/services/ic_analysis_service.py:2952 傳 arm=post_ic_entry_arm(\"ic_page_apply_transforms\")；numeric_view.py:194-196 require_post_ic_core 只接受擇定核心；feature_preprocessor.py:966 設 _forced_arm、:2037 forced_arm＝pandas_legacy ⇒ _can_use_optimized_dataframe_path 回 False）。唯一直接呼叫者＝_transform_single_optimized_df（feature_preprocessor.py:2193），其呼叫點 :1814（_transform_single_group_to_arrays，registry 群組）與 :2329（_transform_single）皆以 _can_use_optimized_dataframe_path 為閘；IC 頁以外可達者＝FF 特徵生成 L6.5（feature_factory.py:3882 建前處理器不設 _forced_arm、FFACT_L65_OPTIMIZATION_PROFILE 預設 optimized〔momentum/core/config.py:24-27〕，經 feature_storage.py:1109 transform_registry_groups_to_sink→:1287→:1814，或 transform :917／:924→_transform_single :2329），屬 FFPROD 範圍。觸發：NUMVIEW 契約改 IC 頁臂時改回 measure=true 並量測。",
@@ -5785,12 +5786,14 @@
    "unit_axis": {
     "axes": [
      "stage_cols",
+     "survivors",
      "events"
     ],
-    "function": "stage_cols*n_events*log(n_events)"
+    "function": "calls(survivors)*stage_cols*n_events*log(n_events)（SPEC v5.58 (x)：每次呼叫向量化 stage_cols×n_events；呼叫數隨第 5 段倖存數變——主統計 1 次〔_merge_binary_statistics，ic_filter_orchestrator.py:5976〕＋門檻通過 k>0 且 n_blocks≥10 時區塊置換 1＋P 次〔block_permutation_table，binary_discrimination.py:337、:349；P＝min(1000, max(200, perm_budget_total//k))，ic_filter_orchestrator.py:5789〕＋負對照 n_effective 次〔:5865〕；smoke_v557 三點 741／1／925 次對第 5 段輸出 35／0／51，非隨事件數單調；survivors＝第 5 段倖存數〔filter_log.stage5_thresholds.output_features〕）"
    },
    "scale_vector": [
     "stage_cols",
+    "survivors",
     "events"
    ],
    "call_example": "mann_whitney_table(features_df_events, y_int01, min_class_n=10)；匯入 0/1 標籤模式第 5 段主統計，置換迴圈內每次再呼叫一次。",
@@ -5816,9 +5819,10 @@
    "unit_axis": {
     "axes": [
      "stage_cols",
+     "survivors",
      "events"
     ],
-    "function": "P*stage_cols*n_events*log(n_events)（倖存者區塊置換＋整批負對照）"
+    "function": "P*stage_cols*n_events*log(n_events)（倖存者區塊置換＋整批負對照；SPEC v5.58 (x) 判定：呼叫數固定 1〔二元模式每次分析一次，ic_filter_orchestrator.py:5222〕，但 inclusive 成本隨第 5 段倖存數變——k＝0 不置換、不跑負對照〔:5801 `if passed:`、:5832-5835〕，n_blocks<10 兩者皆不跑〔binary_discrimination.py:333-334、ic_filter_orchestrator.py:5836-5841〕，P 隨 k 變〔:5789〕⇒ 倖存數相依，unit_axis 含 survivors、events 軸不擬合）"
    },
    "scale_vector": [
     "stage_cols",

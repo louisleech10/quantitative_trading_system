@@ -2586,6 +2586,60 @@ def _receipt_tool() -> Any:
     return sys.modules.get("icperf_receipt_tool_t") or _load("icperf_receipt_tool_t", RECEIPT_TOOL)
 
 
+def test_receipt_ic_autocorr_oracle_matches_product() -> None:
+    """SPEC Task 0.2 v5.58 (w)：收據之 IC 一階自相關 oracle（statsmodels acf）與產品 `ic_lag1_autocorrelation` 逐案相同
+    （值與不可算原因）；兩段 Pearson（改前定義）於正常案與 oracle 不同 ⇒ 等式有辨識力。"""
+    from momentum.Analysis.ic_filter_orchestrator import ic_lag1_autocorrelation
+
+    tool = _receipt_tool()
+    cases = {
+        "normal": [0.12, 0.08, 0.15, 0.03, -0.02, 0.05, 0.11, 0.09, -0.04, 0.01, 0.07, 0.13],
+        "missing": [0.12, math.nan, 0.15, 0.03, math.inf, 0.05, 0.11, -math.inf, -0.04, 0.01, math.nan, 0.13],
+        "two_points": [0.1, -0.2], "no_adjacent": [0.1, math.nan, 0.2, math.nan, -0.3],
+        "constant": [0.05, 0.05, 0.05, 0.05], "empty": [],
+    }
+    for name, xs in cases.items():
+        exp, why = tool._acf_lag1_oracle(xs)
+        got, got_why = ic_lag1_autocorrelation(xs)
+        assert got_why == why, f"{name}：原因 {got_why!r} != oracle {why!r}"
+        assert (got is None and exp is None) or math.isclose(got, exp, rel_tol=1e-12, abs_tol=1e-15), (name, got, exp)
+    assert [tool._acf_lag1_oracle(cases[k])[1] for k in ("two_points", "no_adjacent", "constant")] == \
+        ["insufficient_samples", "no_adjacent_pairs", "constant_series"]
+    x = np.asarray(cases["normal"])
+    assert not math.isclose(float(np.corrcoef(x[:-1], x[1:])[0, 1]), tool._acf_lag1_oracle(x)[0], rel_tol=1e-6)
+
+
+def test_receipt_event_binary_oracle_matches_product() -> None:
+    """SPEC Task 0.4 ㊵ 修後之事件 0/1 主統計：收據 oracle（逐欄 scipy mannwhitneyu＋statsmodels fdr_bh＋獨立 status 判定）
+    與產品 `mann_whitney_table`＋`apply_fdr` 逐欄相同；涵蓋含缺值、常數、全缺值、類別低於下限、正常與反向欄。"""
+    from momentum.Analysis.binary_discrimination import mann_whitney_table
+    from momentum.Analysis.statistical_validator import apply_fdr
+
+    tool = _receipt_tool()
+    rng = np.random.default_rng(20261102)
+    y = np.array([1] * 14 + [0] * 16)
+    base = rng.normal(size=30)
+    few_pos = base.copy()
+    few_pos[:8] = np.nan  # 正類只剩 6 個有效值 < 10
+    with_nan = base + 0.8 * y
+    with_nan[[3, 17, 25]] = np.nan
+    F = pd.DataFrame({"signal": base + 1.5 * y, "reverse": base - 1.0 * y, "with_nan": with_nan,
+                      "constant": np.full(30, 2.0), "all_nan": np.full(30, np.nan), "few_pos": few_pos})
+    exp = tool.binary_oracle_rows(F, y, 10)
+    tbl = mann_whitney_table(F, y, min_class_n=10)
+    q, _ = apply_fdr({c: float(tbl.loc[c, "p_value"]) for c in tbl.index}, 0.05, method="fdr_bh")
+    for c in F.columns:
+        e, r = exp[c], tbl.loc[c]
+        for ek, pk in (("auc", "auc"), ("rank_biserial", "rank_biserial"), ("mw_u", "mw_u"), ("mw_p_value", "p_value")):
+            assert np.isclose(float(r[pk]), e[ek], rtol=1e-12, atol=0, equal_nan=True), (c, ek, r[pk], e[ek])
+        assert np.isclose(float(q.get(c, np.nan)), e["mw_p_value_adj"], rtol=1e-12, atol=0, equal_nan=True), (c, q.get(c))
+        assert (int(r["n_pos"]), int(r["n_neg"]), int(r["n_used"]), str(r["status"])) == \
+            (e["n_pos_selection"], e["n_neg_selection"], e["n_used_binary"], e["binary_status"]), c
+    assert [exp[c]["binary_status"] for c in ("constant", "all_nan", "few_pos", "signal")] == \
+        ["unavailable:constant", "unavailable:all_nan", "unavailable:class_below_min", "ok"]
+    assert exp["signal"]["auc"] > 0.5 > exp["reverse"]["auc"]
+
+
 def test_bounded_abs_tolerance_equals_numpy_isclose() -> None:
     """SPEC v5.42 ④（r55 群集 A）：`rel_excess(a, b, p) ≤ rel_tol_for(p)` 與 `numpy.isclose(a, b, rtol, atol)` 逐對同判
     （有界鍵 atol＝1e-15、其餘鍵 atol＝0）；明列邊界：2026-10-31 收據之近 0 Pearson 值對（絕對差約 3.0e-17）於有界鍵一致、

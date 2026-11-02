@@ -4627,3 +4627,322 @@ def test_task02_v557_seeded_requests_event_and_post_ic_rows(harness: Any, tmp_pa
                harness.event_axis_precheck, harness.relaxed_event_request):
         src = inspect.getsource(fn)
         assert "small_request(" not in src and ("_limited_request(" in src or "relaxed_event_request(" in src), fn.__name__
+
+
+# ── SPEC v5.58 (x)(y)（code review r69 處置）：量測工具 ────────────────────────────────────────────────────────
+
+#: smoke_v557 之事件數軸三點（runs/icperf/task02/smoke_v557/precheck_events_v557.json）：第 5 段輸出與 mann_whitney_table 呼叫數
+V558_SURVIVORS = {176: 35, 457: 0, 737: 51}
+V558_MW_CALLS = {176: 741, 457: 1, 737: 925}
+
+
+def _v558_run(run_id: str, axis: str, scales: Sequence[int], facts: Any, entries: Any) -> Dict[str, Any]:
+    """合成之 (run_id, axis) 實跑（記錄形狀同 run_one 寫出者；actual_scale＝規模）：`facts(s)`＝路徑事實、`entries(s)`＝
+    {入口: (calls, seconds, max_cols)}。"""
+    points, records = [], {}
+    for s in scales:
+        ents = {eid: {"calls": c, "raised": 0, "seconds": sec, "max_rows": 0, "max_cols": mc, "keyed": False,
+                      "long_intervals": [], "max_call_seconds": 0.1} for eid, (c, sec, mc) in entries(s).items()}
+        records[s] = [{"path_run_id": f"{run_id}.{axis}{s}", "run_id": run_id, "wall_seconds": 1.0,
+                       "peak_footprint_bytes": 9000 + s, "progress_times": [], "_record_path": f"{run_id}-{axis}-{s}.json",
+                       "facts": facts(s), "entries": ents, "actual_scale": s}]
+        points.append({"scale": s, "unit": axis, "runs": 1, "seconds": 2.0, "peak_rss_bytes": 10 ** 8 + s})
+    cmd = ["venv/bin/python", "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis]
+    return {"probe": {"cmd": cmd, "data": [], "config": []}, "receipt_path": f"{run_id}-{axis}.json",
+            "receipt": {"points": points, "projection": {"scale": max(scales)}}, "records": records}
+
+
+def _v558_case(harness: Any) -> Tuple[Dict[str, Any], Dict[Tuple[str, str], Any]]:
+    """合成：清冊兩個 event_import 入口（mann_whitney_table＝倖存數相依；m.x:merge＝只隨事件數變）、event_import cols／events
+    兩軸（events 軸三點之第 5 段倖存數與 mann_whitney 呼叫數＝smoke_v557 實值）、固定倖存集合之直接呼叫格三點。"""
+    mw = harness.MW_ENTRY
+    base = {"stage": "event", "ic_page": True, "ic_first": False, "loop": "none", "measure": True,
+            "no_measure_reason": None, "evidence": "m/x.py:1", "branch_cell": "event_import"}
+    inv = {"entries": [
+        {**base, "id": mw, "input_axes": ["cols"], "coverage_path_id": "c-mw",
+         "unit_axis": {"axes": ["stage_cols", "survivors", "events"],
+                       "function": "calls(survivors)*stage_cols*n_events*log(n_events)"},
+         "scale_vector": ["stage_cols", "survivors", "events"]},
+        {**base, "id": "m.x:merge", "input_axes": ["cols"], "coverage_path_id": "c-merge",
+         "unit_axis": {"axes": ["stage_cols", "events"], "function": "stage_cols*n_events"},
+         "scale_vector": ["stage_cols", "events"]}]}
+    ev = (176, 457, 737)
+
+    def receipt(s: int) -> Dict[str, Any]:
+        return {"negative_control_status": "unavailable:insufficient_blocks" if V558_SURVIVORS[s] == 0 else "computed"}
+
+    def ev_facts(s: int) -> Dict[str, Any]:
+        return {"input_cols": 500, "rows": 2000, "events": s, "survivors": V558_SURVIVORS[s], "requested_columns": None,
+                "binary_receipt": receipt(s), "post_stage5_claim": harness.post_stage5_claim(V558_SURVIVORS[s], receipt(s))}
+
+    runs = {
+        ("event_import", "cols"): _v558_run(
+            "event_import", "cols", (500, 1000, 2000),
+            lambda s: {"input_cols": s, "rows": 2000, "events": 203, "survivors": 0, "requested_columns": None,
+                       "binary_receipt": None, "post_stage5_claim": harness.post_stage5_claim(0, None)},
+            lambda s: {mw: (1, 1e-4 * s, s - 1), "m.x:merge": (1, 2e-4 * s, s - 1)}),
+        ("event_import", "events"): _v558_run(
+            "event_import", "events", ev, ev_facts,
+            lambda s: {mw: (V558_MW_CALLS[s], 2e-3 * V558_MW_CALLS[s], 499), "m.x:merge": (1, 1e-3 * s, 499)}),
+        (harness.MW_FIXED_CELL, "events"): _v558_run(
+            harness.MW_FIXED_CELL, "events", ev,
+            lambda s: {"input_cols": 51, "rows": s // 6, "events": s, "survivors": 51, "cell_input_cols": 51,
+                       harness.COLUMN_SET_KEY: "sha-fixed", "fixed_survivors_ref_scale": 737, "requested_columns": None},
+            lambda s: {mw: (harness.MW_FIXED_CALLS, 1e-5 * s * harness.MW_FIXED_CALLS, 51)}),
+    }
+    return inv, runs
+
+
+def test_task02_v558_mann_whitney_survivors_axis(fb: Any, harness: Any, scale_probe: Any) -> None:
+    """SPEC v5.58 (x)：①定稿清冊：event_import 需量測入口中倖存數相依者（unit_axis 含 survivors）恰為二元三入口——
+    `mann_whitney_table`（呼叫數隨第 5 段倖存數變，本版改含）、`_run_binary_permutation_and_negative_control`（呼叫數固定、
+    inclusive 成本隨倖存數變，本版改含）、`block_permutation_table`（原即含）；其餘 event_import 入口（第 5 段前）不含；排程含
+    固定倖存集合之直接呼叫格且在 event_import events 軸之後、涵蓋另列 isolation；②組裝：mann_whitney 之 events 軸只記不擬合
+    （row_fit＝None、row_fit_excluded 逐點記事件數、倖存數 35／0／51 與呼叫數 741／1／925），只隨事件數變之入口照常擬合；
+    events 軸各點 scale_vector 含 survivors；中點（倖存 0、負對照未實算）post_stage5_claim.allowed＝False；isolation 三點同欄
+    集合、同呼叫數、seconds_per_call、對事件數擬合；③反例：缺隔離實跑（require_isolation）⇒ 點名；各點欄集合不同 ⇒ 拒收；
+    倖存數相依入口以 events 為主軸 ⇒ 拒收。mutation：events_fit_exclusion 恆回 None ⇒ row_fit 非 None（紅）；清冊
+    mann_whitney 移除 survivors ⇒ ①紅；schedule_runs 不排 ISOLATION_RUNS ⇒ 排程斷言紅；_isolation_section 不驗欄集合 ⇒ 不拋（紅）。"""
+    inv_real = _v555_inventory()
+    assert fb.inventory_problems(inv_real) == []
+    ev_entries = {e["id"]: e for e in inv_real["entries"] if e["measure"] and e["branch_cell"] == "event_import"}
+    dep = {eid for eid, e in ev_entries.items() if harness.survivor_dependent(e)}
+    assert dep == set(harness.EVENT_BINARY_ENTRIES), sorted(dep)
+    assert all("survivors" in ev_entries[eid]["scale_vector"] for eid in dep)
+    sched = harness.schedule_runs(inv_real)
+    iso = (harness.MW_FIXED_CELL, "events")
+    assert iso in sched and sched.index(("event_import", "events")) < sched.index(iso)
+    assert iso not in harness.schedule_runs(inv_real, second_axes=False)
+    cov = harness.schedule_coverage(inv_real, sched)
+    assert cov["uncovered"] == [] and cov["isolation"] == {
+        f"{iso[0]}:{iso[1]}": {"entry": harness.MW_ENTRY, "scheduled": True}}
+    assert harness.schedule_coverage(inv_real, [x for x in sched if x != iso])["isolation"][
+        f"{iso[0]}:{iso[1]}"]["scheduled"] is False
+
+    inv, runs = _v558_case(harness)
+    kw = {"head": "0" * 40, "scale_probe": scale_probe, "budget_seconds": BUDGET2_UPPER_SECONDS,
+          "sample_interval_seconds": 0.2, "chunk_cap": {"bytes": 1, "basis": "x"}, "require_rows": True,
+          "require_isolation": True}
+    got = harness.assemble_scale_receipt(inv, runs, **kw)
+    m = got["entries"][harness.MW_ENTRY]
+    assert m["axis"] == "cols" and m["row_axis"] == "events" and m["row_fit"] is None
+    ex = m["row_fit_excluded"]
+    assert ex["axis"] == "events" and "v5.58 (x)" in ex["basis"]
+    assert [(p["events"], p["survivors"], p["calls"]) for p in ex["points"]] == \
+        [(176, 35, 741), (457, 0, 1), (737, 51, 925)]
+    assert [p["scale_vector"]["survivors"] for p in m["row_points"]] == [35, 0, 51]
+    assert [p["post_stage5_claim"]["allowed"] for p in m["row_points"]] == [True, False, True]
+    mid = m["row_points"][1]["post_stage5_claim"]
+    assert len(mid["reasons"]) == 2 and mid["negative_control_status"] == "unavailable:insufficient_blocks"
+    assert _entry_schema_problems(m, inv["entries"][0]) == []
+    merge = got["entries"]["m.x:merge"]
+    assert merge["row_fit_excluded"] is None and merge["row_fit"]["axis"] == "events"
+    iso_m = m["isolation"]
+    assert iso_m["run"] == f"{iso[0]}:{iso[1]}" and iso_m["calls_per_point"] == harness.MW_FIXED_CALLS
+    assert [p["events"] for p in iso_m["points"]] == [176, 457, 737]
+    assert iso_m["fixed_columns"] == {"n": 51, harness.COLUMN_SET_KEY: "sha-fixed", "ref_scale": 737}
+    assert all(p["seconds_per_call"] == p["seconds"] / harness.MW_FIXED_CALLS for p in iso_m["points"])
+    again = scale_probe.fit([{"scale": p["events"], "unit": "events", "seconds": p["seconds"],
+                              "peak_rss_bytes": p["peak_rss_bytes"]} for p in iso_m["points"]], 737.0)
+    assert (iso_m["fit"]["exponent"], iso_m["fit"]["r2"]) == (again["fit"]["exponent"], again["fit"]["r2"])
+    assert got["entries"]["m.x:merge"].get("isolation") is None
+
+    with pytest.raises(harness.AssemblyError) as exc:  # 缺隔離實跑 ⇒ 點名
+        harness.assemble_scale_receipt(inv, {k: v for k, v in runs.items() if k != iso}, **kw)
+    assert any(harness.MW_ENTRY in p and "隔離" in p for p in exc.value.problems)
+    bad = copy.deepcopy(runs)
+    bad[iso]["records"][457][0]["facts"][harness.COLUMN_SET_KEY] = "sha-other"
+    with pytest.raises(harness.AssemblyError) as exc:  # 各點固定倖存集合不同 ⇒ 拒收
+        harness.assemble_scale_receipt(inv, bad, **kw)
+    assert any("固定倖存集合" in p for p in exc.value.problems)
+    prim = copy.deepcopy(inv)
+    prim["entries"][0]["input_axes"] = []
+    with pytest.raises(harness.AssemblyError) as exc:  # 倖存數相依入口以 events 為主軸 ⇒ 拒收
+        harness.assemble_scale_receipt(prim, runs, **kw)
+    assert any("主軸為 events" in p for p in exc.value.problems)
+
+
+def test_task02_v558_event_stage5_facts_and_fixed_cell(harness: Any, tmp_path: Path, monkeypatch: Any) -> None:
+    """SPEC v5.58 (x)：①`post_stage5_claim`：倖存 > 0 且負對照實算 ⇒ allowed；倖存 0 或負對照未實算 ⇒ 不成立並逐條記理由；
+    倖存缺 ⇒ 不成立；②`binary_capture_hook` 依產品簽名取置換前門檻通過欄、置換後倖存者與收據，`binary_receipt_facts` 記 n_perm、
+    區塊數、負對照狀態；③`_run_event_import`（服務以替身）各軸記 survivors＝第 5 段倖存數、final_survivors＝原 `_ic_facts` 之
+    倖存數、binary_receipt、post_stage5_claim；④event_import events 軸之存檔（`_event_mw_begin`／重綁 wrapper 之首次呼叫／
+    `_event_mw_finish`）與直接呼叫格 `_cell_mw_fixed`：固定倖存集合＝參考點之倖存欄、每點重綁入口恰 MW_FIXED_CALLS 次、
+    各點欄集合身分相同、actual_scale＝存檔驗得之事件數；反例：未給 --ref-scale、參考點倖存為空、缺固定欄、存檔身分不符、
+    首次呼叫未存（status failed）⇒ HarnessError。mutation：claim 不看負對照 ⇒ ①中點 allowed（紅）；survivors 改回原 `_ic_facts`
+    之值 ⇒ ③紅；cell 改用本點倖存欄 ⇒ 欄集合身分不同（紅）；呼叫次數改 1 ⇒ 計數斷言紅。"""
+    import contextlib
+    import importlib
+
+    import api.routes.ic_analysis as ria
+    import api.services.case_import_service as cis
+
+    ok = harness.post_stage5_claim(35, {"negative_control_status": "computed"})
+    assert ok == {"allowed": True, "reasons": [], "stage5_output": 35, "negative_control_status": "computed"}
+    mid = harness.post_stage5_claim(0, {"negative_control_status": "unavailable:insufficient_blocks"})
+    assert mid["allowed"] is False and len(mid["reasons"]) == 2
+    assert harness.post_stage5_claim(7, {"negative_control_status": "skipped:no_survivors"})["allowed"] is False
+    assert harness.post_stage5_claim(3, None)["allowed"] is True  # 非二元模式：只看第 5 段倖存
+    assert harness.post_stage5_claim(None, None)["allowed"] is False
+
+    store: Dict[str, Any] = {}
+    hook = harness.binary_capture_hook(store)
+    nc = {"n_observed": 2, "n_consumable": 1, "n_effective": 50, "degraded_by_budget": False}
+    hook((object(), ["a", "b"], {}, None, None), {"alpha_effective": 1.0, "fdr_method": "fdr_bh"},
+         (["a"], {"n_perm": 571, "n_blocks": 31, "block_len": 13, "negative_control": nc}))
+    assert store["threshold_passed"] == ["a", "b"] and store["survivors"] == ["a"]
+    assert harness.binary_receipt_facts(store) == {
+        "threshold_passed": 2, "survivors_after_permutation": 1, "n_perm": 571, "n_blocks": 31, "block_len": 13,
+        "negative_control_status": "computed", "negative_control_n_effective": 50,
+        "negative_control_degraded_by_budget": False}
+    assert harness.binary_receipt_facts(None) is None
+
+    # ③ _run_event_import 之第 5 段事實（服務替身；同 test_task02_v557_event_axis_relaxed_thresholds）
+    hfb, _pool = _v557_requests(harness, monkeypatch, tmp_path)
+
+    class _Store:
+        def __init__(self, storage_dir: Any = None) -> None:
+            self.n = 0
+
+        def import_records(self, records: Any, **kw: Any) -> Any:
+            self.n = len(records)
+            return type("R", (), {"import_id": "imp-1"})()
+
+        def get_import(self, iid: str) -> Any:
+            return type("D", (), {"records": [None] * self.n})()
+
+    @contextlib.contextmanager
+    def bars(ctx: Any, recs: Any) -> Any:
+        yield {}
+
+    monkeypatch.setattr(cis, "EventImportService", _Store)
+    monkeypatch.setattr(cis, "_event_import_service", getattr(cis, "_event_import_service", None))
+    monkeypatch.setattr(ria, "_resolve_event_batch", lambda req: {"batch": True})
+    monkeypatch.setattr(hfb, "_ic_analyze_request", lambda r: r)
+    monkeypatch.setattr(harness, "event_bars_context", bars)
+    monkeypatch.setattr(harness, "_event_axis_records", lambda n: [{"event_id": f"e{i}"} for i in range(n)])
+    monkeypatch.setattr(harness, "event_axis_facts", lambda: {})
+    monkeypatch.setattr(harness, "_ic_facts", lambda report, analyzer, n, rows: {"survivors": 9})
+    monkeypatch.setattr(harness, "_manifest_rows", lambda req: 2000)
+    monkeypatch.setattr(harness, "_service_with_tasks", lambda request, path: object())
+    out_s5: Dict[str, int] = {"n": 0}
+
+    def analysis(svc: Any, req: Any, rec: Any, **kw: Any) -> Any:
+        for e in harness.EVENT_BINARY_ENTRIES:
+            rec.stat(e).calls += 1
+        return "t", {"analyzer": None, "result": {"filter_log": {"stage5_thresholds": {
+            "input_features": 499, "output_features": out_s5["n"], "alpha_effective": 1.0}}}}
+
+    monkeypatch.setattr(harness, "_service_analysis", analysis)
+    ctx = _v555_ctx(harness, "event_import", "events", 6, tmp_path)
+    ctx.binary_capture = {"threshold_passed": ["a", "b"], "survivors": [],
+                          "receipt": {"n_perm": 571, "n_blocks": 7, "block_len": 13,
+                                      "negative_control": {"status": "unavailable:insufficient_blocks", "n_blocks": 7}}}
+    got = harness._run_event_import(ctx)
+    assert (got["survivors"], got["final_survivors"], got["stage5_output"]) == (0, 9, 0)
+    assert got["binary_receipt"]["negative_control_status"] == "unavailable:insufficient_blocks"
+    assert got["binary_receipt"]["threshold_passed"] == 2 and got["post_stage5_claim"]["allowed"] is False
+    out_s5["n"] = 7
+    got = harness._run_event_import(_v555_ctx(harness, "event_import", "cols", 40, tmp_path))
+    assert (got["survivors"], got["final_survivors"], got["binary_receipt"]) == (7, 9, None)
+    assert got["post_stage5_claim"]["allowed"] is True and got["threshold_branch"] == "default"
+
+    # ④ 存檔與直接呼叫格（真實 mann_whitney_table；身分以替身）
+    ident = {"v": "1"}
+    monkeypatch.setattr(harness, "event_mw_identity", lambda n: {"kind": "event_mw_capture", "events_requested": int(n),
+                                                                 **ident})
+    bd = importlib.import_module("momentum.Analysis.binary_discrimination")
+    mw_func = harness.resolve_target(harness.MW_ENTRY).func
+    cols = [f"c{i}" for i in range(10)]
+
+    def frame(n: int) -> Tuple[pd.DataFrame, np.ndarray]:
+        rng = np.random.default_rng(n)
+        rows = n // 4
+        return pd.DataFrame(rng.normal(size=(rows, len(cols))), columns=cols), (np.arange(rows) % 2).astype("int64")
+
+    def write_point(n: int, survivors: List[str], call_mw: bool = True) -> None:
+        c = _v555_ctx(harness, "event_import", "events", n, tmp_path)
+        state = harness._event_mw_begin(c, f"pr{n}")
+        assert harness.read_identity(harness.event_mw_dir(tmp_path, n) / harness.SUBSET_IDENTITY_FILE)["status"] == "building"
+        c.rec.captures = {harness.MW_ENTRY: state["writer"]}
+        c.binary_capture = {}
+        h = harness.binary_capture_hook(c.binary_capture)
+        binding = harness.rebind_all({harness.MW_ENTRY: mw_func}, c.rec)
+        try:
+            x, y = frame(n)
+            if call_mw:
+                bd.mann_whitney_table(x, y, min_class_n=3)
+                bd.mann_whitney_table(x.iloc[:, :2], y, min_class_n=1)  # 非首次呼叫：不存
+        finally:
+            binding.restore()
+        h((object(), list(survivors) + ["c9"], {}, None, None), {"alpha_effective": 1.0, "fdr_method": "fdr_bh"},
+          (list(survivors), {"n_perm": 200, "n_blocks": 12, "block_len": 3, "negative_control": nc}))
+        harness._event_mw_finish(state, c, {"events": n})
+
+    fixed = ["c1", "c4", "c7"]
+    write_point(176, ["c1"])
+    write_point(457, [])
+    write_point(737, fixed)
+    write_point(900, [])
+    write_point(950, ["c1", "zz"])
+    write_point(990, fixed, call_mw=False)
+    assert harness.read_identity(harness.event_mw_dir(tmp_path, 990) / harness.SUBSET_IDENTITY_FILE)["status"] == "failed"
+    saved = harness.load_event_mw(tmp_path, 457)
+    assert list(saved["mw"]["args"][0].columns) == cols and saved["mw"]["kwargs"] == {"min_class_n": 3}
+    assert saved["events"] == 457 and saved["stage5"]["survivors"] == []
+
+    def cell(n: int, ref: Optional[int]) -> Tuple[Dict[str, Any], Any]:
+        c = _v555_ctx(harness, harness.MW_FIXED_CELL, "events", n, tmp_path)
+        c.ref_scale = ref
+        binding = harness.rebind_all({harness.MW_ENTRY: mw_func}, c.rec)
+        try:
+            return harness._cell_mw_fixed(c), c
+        finally:
+            binding.restore()
+
+    shas = set()
+    for n in (176, 457, 737):
+        facts, c = cell(n, 737)
+        assert c.rec.stat(harness.MW_ENTRY).calls == harness.MW_FIXED_CALLS
+        assert c.rec.stat(harness.MW_ENTRY).max_cols == len(fixed)
+        assert (facts["survivors"], facts["cell_input_cols"], facts["events"]) == (3, 3, n)
+        assert c.actual_scale == n == facts["actual_scale"] and facts["fixed_survivors_ref_scale"] == 737
+        assert facts["selection_rows"] == n // 4 and facts["min_class_n"] == 3
+        shas.add(facts[harness.COLUMN_SET_KEY])
+    assert len(shas) == 1 and shas == {harness._columns_sha(fixed)}
+    with pytest.raises(harness.HarnessError, match="--ref-scale"):
+        cell(176, None)
+    with pytest.raises(harness.HarnessError, match="倖存欄為空"):
+        cell(176, 900)
+    with pytest.raises(harness.HarnessError, match="缺固定倖存欄"):
+        cell(176, 950)
+    with pytest.raises(harness.HarnessError, match="身分"):
+        cell(990, 737)
+    ident["v"] = "2"
+    with pytest.raises(harness.HarnessError, match="身分"):
+        cell(176, 737)
+
+
+def test_task02_v558_optimized_core_flags_false(fb: Any, harness: Any) -> None:
+    """SPEC v5.58 (y)：清冊 `_transform_single_optimized_df_core`（IC 頁／IC-first 不可達，measure=false）之 ic_page／ic_first＝
+    false（與 measure=false、§N 不可達理由一致）；post_ic_transform 段之入口 ic_page⇔measure（可達者皆量）；旗標之下游消費者
+    只有 schema（`INVENTORY_KEYS` 存在、boundary_14 型別為 bool）——排程、涵蓋、歸屬不讀旗標（翻轉旗標不改其結果），且量測工具
+    與凍結腳本之源碼無以旗標取值之寫法。mutation：清冊旗標改回 true ⇒ 首斷言紅；post_ic 某可達入口標 ic_page=false ⇒ 等價斷言紅；
+    harness 新增以 ic_page 過濾之寫法 ⇒ 源碼斷言紅。"""
+    inv = _v555_inventory()
+    e = next(x for x in inv["entries"] if x["id"] == V557_OPT_CORE)
+    assert (e["ic_page"], e["ic_first"], e["measure"], e["branch_cell"]) == (False, False, False, None)
+    assert fb.inventory_problems(inv) == []
+    post = [x for x in inv["entries"] if x["stage"] == "post_ic_transform"]
+    assert {x["id"] for x in post if x["ic_page"]} == {x["id"] for x in post if x["measure"]}
+    flipped = copy.deepcopy(inv)
+    fe = next(x for x in flipped["entries"] if x["id"] == V557_OPT_CORE)
+    fe["ic_page"] = fe["ic_first"] = True
+    assert harness.schedule_runs(flipped) == harness.schedule_runs(inv)
+    assert harness.schedule_coverage(flipped, harness.schedule_runs(flipped)) == \
+        harness.schedule_coverage(inv, harness.schedule_runs(inv))
+    assert harness.coverage_plan(flipped) == harness.coverage_plan(inv)
+    flag_read = re.compile(r"""\[\s*["']ic_(page|first)["']\s*\]|\.get\(\s*["']ic_(page|first)["']""")
+    for rel in ("scripts/icperf_scale_harness.py", "scripts/icperf_freeze_baseline.py", "scripts/scale_probe.py"):
+        hit = flag_read.search((REPO / rel).read_text(encoding="utf-8"))
+        assert hit is None, (rel, hit.group(0) if hit else None)

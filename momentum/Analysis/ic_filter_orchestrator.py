@@ -152,6 +152,13 @@ STAGE_OVERRIDE_PATHS: dict[str, tuple[str, ...]] = {
 #: 只列「加欄前即存在之設定指紋須保持不變」之後加欄；值非預設時照入雜湊。
 _HASH_OMIT_AT_DEFAULT: tuple[tuple[str, str], ...] = (("thresholds", "monotonicity_gate_enabled"),)
 
+#: ICPERF Task 0.2 v5.58 (z)（code review r69 補記 Q2）：`_hash_config` 之雜湊版本。版本 1＝md5(json.dumps(
+#: `ICConfig.model_dump()` 去掉 `_HASH_OMIT_AT_DEFAULT` 中值＝schema 預設之欄, sort_keys=True))——預設設定之雜湊與加欄前之
+#: 演算法逐字相同（向後相容）、非預設值照入雜湊。日後改變雜湊輸入（序列化、略去規則、演算法）者須遞增本值並於 payload
+#: 帶入版本欄（版本 ≥ 2 起 payload 含 `"__config_hash_version__"`），使新舊雜湊不可能碰撞；相容雜湊不證明輸出逐字不變，
+#: 輸出之不變仍以 §G 重凍比對驗。
+CONFIG_HASH_VERSION: int = 1
+
 
 #: EVTLABEL Task 2.2：這些鍵**不得**經 `config_override` 傳（`ICConfig` 會靜默吞掉）。
 _ISOLATION_CONTROL_KEYS: frozenset[str] = frozenset(
@@ -1231,6 +1238,73 @@ def _regime_robust_fields(
     if len(signed) < 2:
         return {"regime_robust": None, "regime_robust_reason": "insufficient_regimes"}
     return {"regime_robust": bool(all(v > 0 for v in signed)), "regime_robust_reason": None}
+
+
+#: ICPERF Task 0.2 v5.58 (w)：`ic_autocorr` 為 None 時之原因（封閉值集；`summary_table.ic_autocorr_reason`）
+IC_AUTOCORR_REASONS: tuple[str, ...] = ("insufficient_samples", "no_adjacent_pairs", "constant_series")
+
+
+def ic_lag1_autocorrelation(values: Any) -> tuple[Optional[float], Optional[str]]:
+    """IC 序列之一階自相關（ICPERF Task 0.2 v5.58 (w)；summary 欄 `ic_autocorr`／`ic_autocorr_reason`）。
+
+    定義＝statsmodels `acf(x, nlags=1, adjusted=False, fft=False, missing="conservative")[1]`（Box–Jenkins 有偏估計）：
+    非有限值（NaN、±inf）視為缺值；均值只用有限值；分子＝相鄰兩點皆有限之 (x_t − m)(x_{t+1} − m) 之和、分母＝有限值之
+    (x_t − m)² 之和（缺值不壓縮序列，保留時間間隔）。回 (值, None)；不可算 ⇒ (None, 原因)：
+    - `insufficient_samples`：有限值 < 3（2 點時此估計量代數上恆為 −0.5，無資訊）；
+    - `no_adjacent_pairs`：無相鄰兩點皆有限（acf 此時回 0，為缺值所致之假值）；
+    - `constant_series`：有限值皆相同（0／0）。
+    用途：IC 持續性；正自相關使 ICIR（均值／標準差）所含之獨立樣本少於序列長度。
+    """
+    x = np.asarray(values if values is not None else [], dtype=np.float64).ravel()
+    finite = np.isfinite(x)
+    n_finite = int(finite.sum())
+    if n_finite < 3:
+        return None, "insufficient_samples"
+    pair = finite[1:] & finite[:-1]
+    if not bool(pair.any()):
+        return None, "no_adjacent_pairs"
+    xf = x[finite]
+    mean = float(xf.sum() / n_finite)
+    dev = np.where(finite, x - mean, 0.0)
+    den = float(dev.dot(dev))
+    if not den > 0.0 or bool(np.all(xf == xf[0])):
+        return None, "constant_series"
+    num = float(dev[1:].dot(dev[:-1]))
+    return num / den, None
+
+
+def _ic_autocorr_fields(value: tuple[Optional[float], Optional[str]]) -> dict:
+    """summary 列之 `ic_autocorr`／`ic_autocorr_reason`（`ic_lag1_autocorrelation` 之回傳）。"""
+    val, reason = value
+    return {"ic_autocorr": val, "ic_autocorr_reason": reason}
+
+
+#: ICPERF Task 0.2 v5.58 (v)：跨標的路徑可用之 IC 方法（同 `global.default_method` 之 schema Literal）
+XSEC_IC_METHODS: tuple[str, ...] = ("spearman", "pearson", "kendall")
+
+
+def _xsec_pair_ic(x: pd.Series, y: pd.Series, method: str) -> Optional[float]:
+    """跨標的之一對序列（單一截面之各標的，或單一標的之時間序列）之 IC（ICPERF Task 0.2 v5.58 (v)）。
+
+    非有限值（NaN、±inf）視為缺值（㊴）；有限對 < 2 或相關未定義（一側常數）⇒ None。`spearman`＝平均秩後 Pearson
+    （改前唯一估計量，逐字保留）；`pearson`＝原值 Pearson；`kendall`＝τ-b（pandas `corr(method="kendall")`＝
+    scipy `kendalltau` 預設 variant "b"，同縱向 `ICEngine._compute_pairwise_corr`）。"""
+    pair = pd.concat([x, y], axis=1)
+    pair = pair[np.isfinite(pair.to_numpy(dtype=np.float64)).all(axis=1)]
+    if len(pair) < 2:
+        return None
+    a, b = pair.iloc[:, 0], pair.iloc[:, 1]
+    if method == "spearman":
+        corr = a.rank(method="average").corr(b.rank(method="average"), method="pearson")
+    elif method in ("pearson", "kendall"):
+        if a.nunique() < 2 or b.nunique() < 2:
+            return None
+        corr = a.corr(b, method=method)
+    else:
+        raise InvalidInputError(f"cross_sectional IC method not supported: {method!r}")
+    if pd.isna(corr):
+        return None
+    return float(corr)
 
 
 def _threshold_view(row: Mapping[str, Any]) -> dict:
@@ -2389,30 +2463,34 @@ class ICFilterOrchestrator:
         grouped_level: Any = time_levels[0] if len(time_levels) == 1 else time_levels
         grouped = analysis_df.groupby(level=grouped_level, sort=True)
         ic_series: dict[str, list[float]] = {column: [] for column in feature_cols}
+        # ICPERF Task 0.2 v5.58 (w)：逐時點序列（未成立之截面記 NaN，保留時間間隔）——IC 一階自相關之輸入
+        ic_series_full: dict[str, list[float]] = {column: [] for column in feature_cols}
         n_slices = 0
+        # ICPERF Task 0.2 v5.58 (v)：截面 IC 之估計量＝IC 頁「IC 方法」（`global.default_method`；改前固定 Spearman）
+        xsec_method = str(config.global_settings.default_method)
+        if xsec_method not in XSEC_IC_METHODS:
+            raise InvalidInputError(f"cross_sectional IC method not supported: {xsec_method!r}")
 
         for _, group in grouped:
             if len(group) < 2:
+                for feature_name in feature_cols:
+                    ic_series_full[feature_name].append(float("nan"))
                 continue
             n_slices += 1
             y = group[label_col]
             for feature_name in feature_cols:
                 # ICPERF Task 0.4 ㊴：非有限值（NaN、±inf）視為缺值（dropna 會保留 ±inf）
-                pair = pd.concat([group[feature_name], y], axis=1)
-                pair = pair[np.isfinite(pair.to_numpy(dtype=np.float64)).all(axis=1)]
-                if len(pair) < 2:
-                    continue
-                ranked_x = pair.iloc[:, 0].rank(method="average")
-                ranked_y = pair.iloc[:, 1].rank(method="average")
-                corr = ranked_x.corr(ranked_y, method="pearson")
-                if pd.notna(corr):
-                    ic_series[feature_name].append(float(corr))
+                corr = _xsec_pair_ic(group[feature_name], y, xsec_method)
+                if corr is not None:
+                    ic_series[feature_name].append(corr)
+                ic_series_full[feature_name].append(float("nan") if corr is None else corr)
 
         self._report_progress(1, "cross_sectional", 0.8, "building cross-sectional report")
 
         # ICPERF Task 0.4 ㊱：summary 五欄、相關矩陣、多元化指標（同分析段；定義見 `_xsec_placeholder_stats`）
         xsec_stats = self._xsec_placeholder_stats(
-            analysis_df, feature_cols, label_col, symbol_level_idx, config, close, feature_metadata
+            analysis_df, feature_cols, label_col, symbol_level_idx, config, close, feature_metadata,
+            method=xsec_method,
         )
         xsec_fields: dict[str, dict[str, Any]] = xsec_stats["fields"]
 
@@ -2473,6 +2551,8 @@ class ICFilterOrchestrator:
                                          if np.isfinite(values).any() else np.nan)},
                         {"quantile_mean_returns": xsec_fields[feature_name]["quantile_mean_returns"]},
                     ),
+                    # ICPERF Task 0.2 v5.58 (w)：逐時點截面 IC 序列（未成立之截面為缺值）之一階自相關
+                    **_ic_autocorr_fields(ic_lag1_autocorrelation(ic_series_full[feature_name])),
                 }
             )
 
@@ -2521,6 +2601,7 @@ class ICFilterOrchestrator:
             feature_cols=ranked_features,
             label_col=label_col,
             symbol_level_idx=symbol_level_idx,
+            method=xsec_method,
         )
         cross_symbol_validation = self._build_cross_symbol_validation(symbol_ic_matrix)
 
@@ -2623,8 +2704,12 @@ class ICFilterOrchestrator:
         config: ICConfig,
         close: Optional[pd.Series],
         feature_metadata: Optional[dict],
+        *,
+        method: str = "spearman",
     ) -> dict[str, Any]:
         """跨標的 summary 五欄、相關矩陣、多元化指標（ICPERF Task 0.4 ㊱；與截面 IC 同一分析段）。
+
+        `method`＝截面 IC 之估計量（ICPERF Task 0.2 v5.58 (v)；IC 頁「IC 方法」），IC 衰減逐 horizon 之截面 IC 同用之。
 
         各欄對照縱向產生端之同一定義（業界出處）：
         - 分位：每時點對該時點特徵有限之標的做 `pd.qcut(x, q, labels=False)`（分位點＝`np.percentile` 線性插值、右閉含
@@ -2637,7 +2722,7 @@ class ICFilterOrchestrator:
         - `turnover_rate`：頂分位成分每期變化比例＝alphalens `performance.quantile_turnover`（頂分位標的集合 S_t 依有效
           時點序，|S_t − S_prev|／|S_t| 之平均；有效時點 < 2 ⇒ NaN）。
         - `coverage`：非 NaN 列數／分析段列數（同 `CoverageAnalyzer.compute_time_coverage`；面板列＝時點 × 標的）。
-        - `ic_half_life`：各 horizon 之 IC＝每時點截面 Spearman（特徵與前瞻報酬共同非 NaN 之標的 ≥ 2，同截面 IC 之估計量）
+        - `ic_half_life`：各 horizon 之 IC＝每時點截面 IC（特徵與前瞻報酬共同有限之標的 ≥ 2，同截面 IC 之估計量 `method`）
           之平均；前瞻報酬依 `labels.return_type` 於分析段內逐標的計（同縱向切段後之 `_compute_returns`）；擬合與半衰期同
           `ICEngine._fit_exponential_decay`。未傳收盤／衰減關 ⇒ None 並記原因。
         - 相關矩陣：每時點截面 Pearson（兩特徵共同有限之標的 ≥ 2 且兩者於共同列皆非常數）之時間平均（Fama–MacBeth 式
@@ -2695,7 +2780,7 @@ class ICFilterOrchestrator:
             q_mono = [self._monotonicity._select_num_quantiles(int(n), 5) for n in n_pool]
             labels_by_q = {q: self._xsec_qcut_labels(finite_block, q) for q in sorted(set(q_mono) | {5})}
             decay_ic: dict[int, np.ndarray] = (
-                {h: self._xsec_rank_ic_mean(block, forward[h]) for h in horizons} if forward is not None else {}
+                {h: self._xsec_ic_mean(block, forward[h], method) for h in horizons} if forward is not None else {}
             )
             for k, name in enumerate(cols):
                 q = q_mono[k]
@@ -2720,7 +2805,7 @@ class ICFilterOrchestrator:
                     ic_values = [float(decay_ic[h][k]) for h in horizons]
                     fit = ICEngine._fit_exponential_decay(horizons, ic_values)
                     half_life = fit.get("half_life")
-                    # 同縱向 `compute_ic_decay` 之逐特徵鍵（ic_values 為各 horizon 之平均截面 Spearman）
+                    # 同縱向 `compute_ic_decay` 之逐特徵鍵（ic_values 為各 horizon 之平均截面 IC，估計量＝`method`）
                     decay[name] = {
                         "horizons": horizons,
                         "ic_values": ic_values,
@@ -2785,6 +2870,45 @@ class ICFilterOrchestrator:
             lab = np.maximum((block[:, :, :, None] > edges[:, None, :, :]).sum(axis=3) - 1, 0)
         ok = np.isfinite(block) & valid[:, None, :]
         return np.where(ok, lab, -1).astype(np.int16), valid
+
+    @classmethod
+    def _xsec_ic_mean(cls, block: np.ndarray, y: np.ndarray, method: str) -> np.ndarray:
+        """每時點截面 IC（估計量＝`method`；特徵與 y 共同有限之標的 ≥ 2、兩側非常數）之逐特徵平均（無有效時點 ⇒ NaN）。
+
+        ICPERF Task 0.2 v5.58 (v)：`spearman`＝`_xsec_rank_ic_mean`（改前唯一路徑，逐字保留）；`pearson`＝原值兩段式中心化；
+        `kendall`＝逐 (時點, 特徵) scipy `kendalltau`（τ-b，同 `_xsec_pair_ic`）。`block` [T, S, C]、`y` [T, S]。"""
+        if method == "spearman":
+            return cls._xsec_rank_ic_mean(block, y)
+        both = np.isfinite(block) & np.isfinite(y)[:, :, None]  # ㊴：±inf 同缺值
+        y3 = np.broadcast_to(y[:, :, None], block.shape)
+        n = both.sum(axis=1)
+        nonconst = (
+            (np.where(both, block, -np.inf).max(axis=1) > np.where(both, block, np.inf).min(axis=1))
+            & (np.where(both, y3, -np.inf).max(axis=1) > np.where(both, y3, np.inf).min(axis=1))
+        )
+        valid = (n >= 2) & nonconst  # [T, C]
+        r = np.full(valid.shape, np.nan)
+        if method == "pearson":
+            with np.errstate(invalid="ignore", divide="ignore"):
+                mx = np.where(both, block, 0.0).sum(axis=1) / n
+                my = np.where(both, y3, 0.0).sum(axis=1) / n
+                dx = np.where(both, block - mx[:, None, :], 0.0)
+                dy = np.where(both, y3 - my[:, None, :], 0.0)
+                rr = (dx * dy).sum(axis=1) / np.sqrt((dx * dx).sum(axis=1) * (dy * dy).sum(axis=1))
+            r = np.where(valid, rr, np.nan)
+        elif method == "kendall":
+            for t, k in zip(*np.nonzero(valid)):
+                m = both[t, :, k]
+                r[t, k] = float(scipy_stats.kendalltau(block[t, m, k], y[t, m])[0])
+        else:
+            raise InvalidInputError(f"cross_sectional IC method not supported: {method!r}")
+        out = np.full(block.shape[2], np.nan)
+        for k in range(block.shape[2]):
+            col = r[:, k]
+            col = col[np.isfinite(col)]
+            if col.size:
+                out[k] = float(np.mean(col))
+        return out
 
     @staticmethod
     def _xsec_rank_ic_mean(block: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -2889,26 +3013,16 @@ class ICFilterOrchestrator:
         ok = (n >= 2) & nonconst_x & nonconst_y
         return np.clip(np.where(ok, r, 0.0), -1.0, 1.0), ok
 
-    @staticmethod
-    def _safe_rank_corr(x: pd.Series, y: pd.Series) -> Optional[float]:
-        pair = pd.concat([x, y], axis=1)
-        pair = pair[np.isfinite(pair.to_numpy(dtype=np.float64)).all(axis=1)]  # ㊴：±inf 同缺值
-        if len(pair) < 2:
-            return None
-        ranked_x = pair.iloc[:, 0].rank(method="average")
-        ranked_y = pair.iloc[:, 1].rank(method="average")
-        corr = ranked_x.corr(ranked_y, method="pearson")
-        if pd.isna(corr):
-            return None
-        return float(corr)
-
     def _build_cross_sectional_symbol_matrix(
         self,
         numeric_df: pd.DataFrame,
         feature_cols: list[str],
         label_col: str,
         symbol_level_idx: int,
+        *,
+        method: str = "spearman",
     ) -> dict[str, Any]:
+        """逐標的 × 逐特徵之時間序列 IC（估計量＝`method`，ICPERF Task 0.2 v5.58 (v)；同截面 IC 之 `_xsec_pair_ic`）。"""
         symbols: list[str] = []
         matrix: dict[str, dict[str, Optional[float]]] = {
             feature_name: {} for feature_name in feature_cols
@@ -2920,7 +3034,7 @@ class ICFilterOrchestrator:
             y = group[label_col]
 
             for feature_name in feature_cols:
-                matrix[feature_name][symbol_name] = self._safe_rank_corr(group[feature_name], y)
+                matrix[feature_name][symbol_name] = _xsec_pair_ic(group[feature_name], y, method)
 
         return {
             "symbols": symbols,
@@ -4953,7 +5067,7 @@ class ICFilterOrchestrator:
         )
         self._stage4_checkpoint("icir_autocorr", 3)
         icir = self._ic_engine.compute_icir(rolling_ic)
-        ic_autocorr = self._ic_engine.compute_ic_autocorrelation(rolling_ic)
+        ic_autocorr = self._ic_autocorr_by_feature(rolling_ic)
 
         ic_decay = {}
         grouped_ic = {}
@@ -5030,6 +5144,18 @@ class ICFilterOrchestrator:
         }
 
         return ic_results
+
+    def _ic_autocorr_by_feature(self, rolling_ic: dict) -> dict[str, tuple[Optional[float], Optional[str]]]:
+        """逐特徵 IC 一階自相關（ICPERF Task 0.2 v5.58 (w)；定義見 `ic_lag1_autocorrelation`）。
+
+        序列＝ICIR 所用之同一滾動 IC 序列（`ICEngine._select_icir_series`：換算後 ICIR 窗之鍵；無該鍵 ⇒ 空序列 ⇒
+        `insufficient_samples`）。全域序列型與事件型兩路同此：事件型之滾動 IC 依事件列序（非日曆時間）成窗，其自相關即
+        事件序上之 IC 持續性，與同列 ICIR（事件路徑為診斷欄）同一序列，故兩路皆適用、不另設不適用原因。
+        取代改前 `ICEngine.compute_ic_autocorrelation`（兩段 Pearson、無消費者）。"""
+        return {
+            feature: ic_lag1_autocorrelation(self._ic_engine._select_icir_series(windows or {}))
+            for feature, windows in (rolling_ic or {}).items()
+        }
 
     @staticmethod
     def _resolve_scope_symbol(
@@ -5201,6 +5327,7 @@ class ICFilterOrchestrator:
             regime_robust_min_samples=int(
                 config.ic_calculation.grouped_analysis.regime_robust_min_samples
             ),
+            ic_autocorr=ic_results.get("ic_autocorr") or {},
         )
 
         # ── EVTLABEL Task 3.6：匯入標籤模式之主統計進表 ────────────────────────
@@ -5544,6 +5671,8 @@ class ICFilterOrchestrator:
             "quote_value_series": ic_results.get("quote_value_series") if isinstance(ic_results, dict) else None,
             "metadata": metadata,
             "icir": ic_results.get("icir", {}),
+            # ICPERF Task 0.2 v5.58 (w)：refilter 重建 summary 時 ic_autocorr 與首跑同一來源
+            "ic_autocorr": ic_results.get("ic_autocorr", {}),
             "rolling_ic": ic_results.get("rolling_ic", {}),
             "ic_decay": ic_results.get("ic_decay", {}),
             "grouped_ic": ic_results.get("grouped_ic", {}),
@@ -5672,8 +5801,12 @@ class ICFilterOrchestrator:
         grouped_ic: Optional[Mapping[str, Any]] = None,
         regime_pair_counts: Optional[Mapping[str, Mapping[str, int]]] = None,
         regime_robust_min_samples: int = 30,
+        ic_autocorr: Optional[Mapping[str, tuple[Optional[float], Optional[str]]]] = None,
     ) -> list[dict]:
         """summary_table 組裝。
+
+        ICPERF Task 0.2 v5.58 (w)：`ic_autocorr`／`ic_autocorr_reason` 取第 4 段 `_ic_autocorr_by_feature` 之結果（同 ICIR
+        序列之一階自相關）；該特徵無結果（第 4 段未產滾動 IC）⇒ None／`insufficient_samples`。
 
         ICPERF Task 0.4 ㉓：`regime_robust`／`regime_robust_reason` 由同請求 `grouped_ic.by_regime` 與其逐 regime 有限配對數
         （`regime_pair_counts`）導出，方向取同列 `direction`（見 `_regime_robust_fields`）。
@@ -5732,6 +5865,9 @@ class ICFilterOrchestrator:
                         regime_pair_counts, regime_robust_min_samples,
                     ),
                     **direction_fields,
+                    **_ic_autocorr_fields(
+                        (ic_autocorr or {}).get(feature) or (None, "insufficient_samples")
+                    ),
                 }
             )
         # ICHC R6 修補（CODEX-R6）：turnover disabled → key 缺席（非 None 值）
@@ -6749,6 +6885,9 @@ class ICFilterOrchestrator:
             default = type(getattr(config, section)).model_fields[field].default
             if isinstance(node, dict) and field in node and node[field] == default:
                 node.pop(field)
+        # v5.58 (z)：版本 1 之 payload 不含版本欄（與加欄前逐字相同）；版本 ≥ 2 起帶入（見 CONFIG_HASH_VERSION）
+        if CONFIG_HASH_VERSION >= 2:
+            data["__config_hash_version__"] = CONFIG_HASH_VERSION
         payload = json.dumps(data, sort_keys=True)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 

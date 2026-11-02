@@ -12,7 +12,8 @@
 3. 每個非預設選項：以契約 path 組 `config_override` → 服務 `_build_config_override` → `create_ic_analyzer`（同 IC 頁
    服務路徑）→ 消費點實際收到該值（spy 於消費函式第一次呼叫即中止，不計算任何數值）；未知值於 schema 驗證拒收。
 4. mutation 自證：映射斷開（path 改錯）⇒ 消費點收到的是預設值、本檔之等式即紅。
-5. `ic_autocorrelation` 之揭露原因（算出但無消費者）以 AST 機械驗證——日後接進報告或門檻即紅，提醒改歸類。
+5. `ic_autocorrelation`（v5.58 (w) 起為 summary 報告欄，契約 `report_keys`）之讀取點以 AST 機械驗證。
+6. config_hash 雜湊版本（v5.58 (z)）：版本明定、預設請求不變、每個非預設設定不同。
 """
 
 from __future__ import annotations
@@ -175,7 +176,9 @@ def _expected(key: str, value: Any) -> Any:
 
 
 def test_seven_keys_each_classified_once_and_ui_only_empty() -> None:
-    groups = [set(SETTINGS), set(CONTRACT["merged_keys"]), set(CONTRACT["disclosed_keys"])]
+    # v5.58 (w)：ic_autocorrelation 自 disclosed_keys 改歸 report_keys（報告欄）⇒ 歸類增一類
+    groups = [set(SETTINGS), set(CONTRACT["merged_keys"]), set(CONTRACT["disclosed_keys"]),
+              set(CONTRACT["report_keys"])]
     assert CONTRACT["ui_only_keys"] == [], "㊸ 後不得再有未接線之 UI 鍵"
     union = set().union(*groups)
     assert union == SEVEN, f"七鍵歸類不全或多鍵：{sorted(union ^ SEVEN)}"
@@ -285,28 +288,58 @@ def test_config_hash_unchanged_at_default_and_distinct_when_off() -> None:
     assert orch._hash_config(other) != expected
 
 
-# ── 5. 揭露鍵之原因機械驗證 ──────────────────────────────────────────────────────────────────────────
+def _legacy_hash(cfg: ICConfig) -> str:
+    """加欄前之演算法：md5(json.dumps(model_dump() 去掉 `_HASH_OMIT_AT_DEFAULT` 全部欄, sort_keys=True))。"""
+    import hashlib
+
+    from momentum.Analysis.ic_filter_orchestrator import _HASH_OMIT_AT_DEFAULT
+
+    data = cfg.model_dump()
+    for section, field in _HASH_OMIT_AT_DEFAULT:
+        data[section].pop(field, None)
+    return hashlib.md5(json.dumps(data, sort_keys=True).encode("utf-8")).hexdigest()
 
 
-def test_ic_autocorrelation_has_no_consumer() -> None:
-    """`ic_autocorr` 只在第 4 段回傳 dict 中出現為鍵；全 `momentum/`、`api/` 無任何讀取（下標／.get）。日後接進報告或門檻
-    ⇒ 本測試紅，須把 `ic_autocorrelation` 自 disclosed_keys 改歸 setting_keys 並補 UI 開關。"""
+def test_config_hash_version_is_declared() -> None:
+    """v5.58 (z)（code review r69 補記 Q2）：雜湊版本明定為 1——版本 1 之 payload 不帶版本欄（＝加欄前演算法）。"""
+    from momentum.Analysis import ic_filter_orchestrator as orch_mod
+
+    assert orch_mod.CONFIG_HASH_VERSION == 1
+    orch = ICFilterOrchestrator.__new__(ICFilterOrchestrator)
+    assert orch._hash_config(ICConfig()) == _legacy_hash(ICConfig())
+
+
+def test_config_hash_default_ic_page_request_unchanged() -> None:
+    """v5.58 (z) 向一：IC 頁預設請求（前端初始 payload，ICPERF §G 凍結請求之形狀）之 effective config ⇒ 雜湊 == 加欄前演算法。"""
+    payload = {"thresholds": {"ic_mean_min": 0.02, "icir_min": 0.5, "p_value_max": 0.05, "monotonicity_score_min": 0.6},
+               "redundancy": {"correlation_threshold": 0.7}, "labels": {"horizons": [1, 2, 3, 5, 8, 13, 21]}}
+    analyzer, cfg = _api_analyzer(payload)
+    assert analyzer._hash_config(cfg) == _legacy_hash(cfg)
+
+
+@pytest.mark.parametrize("key,value", [(k, v) for k in sorted(SETTINGS) for v in _non_default(k)])
+def test_config_hash_differs_for_each_non_default_setting(key: str, value: Any) -> None:
+    """v5.58 (z) 向二：每個 IC 頁設定之每個非預設值 ⇒ 雜湊 ≠ 預設請求（含 `_HASH_OMIT_AT_DEFAULT` 所列之欄）。"""
+    analyzer, base_cfg = _api_analyzer({})
+    _, cfg = _api_analyzer(_nested(SETTINGS[key]["path"], value))
+    assert analyzer._hash_config(cfg) != analyzer._hash_config(base_cfg)
+
+
+# ── 5. 報告鍵：IC 自相關改為 summary 欄（v5.58 (w)）─────────────────────────────────────────────────
+
+
+def test_ic_autocorrelation_is_reported_in_summary() -> None:
+    """v5.58 (w)：`ic_autocorrelation` 自 disclosed_keys 改歸 report_keys；第 4 段之 `ic_autocorr` 由第 5 段
+    `_build_summary_table` 讀取並寫為 summary 欄（AST 驗讀取點存在；值之正確性見 `test_icperf_ic_autocorr_report.py`）。"""
     reads: List[str] = []
-    writes = 0
-    for root in ("momentum", "api"):
-        for path in sorted((REPO / root).rglob("*.py")):
-            if "__pycache__" in path.parts:
-                continue
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant) \
-                        and node.slice.value == "ic_autocorr":
-                    reads.append(f"{path.relative_to(REPO)}:{node.lineno}")
-                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get" \
-                        and node.args and isinstance(node.args[0], ast.Constant) and node.args[0].value == "ic_autocorr":
-                    reads.append(f"{path.relative_to(REPO)}:{node.lineno}")
-                if isinstance(node, ast.Dict):
-                    writes += sum(1 for k in node.keys if isinstance(k, ast.Constant) and k.value == "ic_autocorr")
-    assert writes == 1, f"ic_autocorr 之產生點應恰一處（第 4 段回傳），實得 {writes}"
-    assert reads == [], f"ic_autocorr 已有消費者 {reads} ⇒ 改歸類並補開關"
-    assert "ic_autocorrelation" in CONTRACT["disclosed_keys"]
+    for path in sorted((REPO / "momentum").rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get" \
+                    and node.args and isinstance(node.args[0], ast.Constant) and node.args[0].value == "ic_autocorr":
+                reads.append(f"{path.relative_to(REPO)}")
+    assert "momentum/Analysis/ic_filter_orchestrator.py" in reads, "ic_autocorr 無讀取點 ⇒ 報告欄未接線"
+    assert "ic_autocorrelation" not in CONTRACT["disclosed_keys"]
+    assert CONTRACT["report_keys"]["ic_autocorrelation"]["summary_columns"] == ["ic_autocorr", "ic_autocorr_reason"]

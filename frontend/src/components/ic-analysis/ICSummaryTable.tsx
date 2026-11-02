@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Star } from 'lucide-react';
+import { Info, Star } from 'lucide-react';
 import { ICAnalysisConfig, ICFeatureInfo, ICSummaryPage, SummaryPageParams, WatchlistStatus } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -23,6 +23,7 @@ import {
   binaryColumnLabels,
   binaryColumnTooltips,
 } from '@/lib/icLabelRule';
+import { IC_AUTOCORR_LABEL, IC_AUTOCORR_REASON_LABELS, IC_AUTOCORR_TIP } from '@/components/ic-analysis/icSettingsText';
 
 interface ICSummaryTableProps {
   /** legacy：直接給列（不分頁、不本地排序——後端序即顯示序）。 */
@@ -431,6 +432,15 @@ export default function ICSummaryTable({
                   <TableHead className="w-[120px]" title="方向對齊之 ICIR（方向 × ICIR）：強反向因子與同強度正向因子同值">
                     <SortButton field="icir_aligned" label="對齊 ICIR" />
                   </TableHead>
+                  {/* ICPERF Task 0.2 v5.58 (w)：IC 一階自相關（契約 report_keys.ic_autocorrelation）；一個 ⓘ、滑鼠移入一句話 */}
+                  <TableHead className="w-[110px]" data-testid="ic-summary-ic-autocorr-head">
+                    <span className="inline-flex items-center gap-1">
+                      {IC_AUTOCORR_LABEL}
+                      <span title={IC_AUTOCORR_TIP} aria-label={`${IC_AUTOCORR_LABEL}說明`} role="img">
+                        <Info className="h-3 w-3 text-slate-500" />
+                      </span>
+                    </span>
+                  </TableHead>
                   {isCrossSectional ? (
                     <>
                       <TableHead className="w-[140px]">
@@ -513,6 +523,17 @@ export default function ICSummaryTable({
                       >
                         {item.direction === -1 ? '↓ ' : item.direction === 1 ? '↑ ' : ''}
                         {formatFinite(item.icir_aligned, 3)}
+                      </TableCell>
+                      <TableCell
+                        className="font-mono text-xs text-slate-300"
+                        data-testid="ic-summary-ic-autocorr"
+                        title={
+                          item.ic_autocorr_reason
+                            ? IC_AUTOCORR_REASON_LABELS[item.ic_autocorr_reason] ?? item.ic_autocorr_reason
+                            : undefined
+                        }
+                      >
+                        {formatFinite(item.ic_autocorr, 2)}
                       </TableCell>
                       {isCrossSectional ? (
                         <>

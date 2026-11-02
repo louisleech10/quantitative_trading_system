@@ -2853,7 +2853,10 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
     v5.56（code review r67）：(j)(n) events 軸三點＝`_event_scales`（Task 0.2 專用事件批之等距抽樣，三點另以產品實跑驗
     effective mode＝imported_binary 與二元三入口；不成立 ⇒ 開跑前 FreezeError）；(k)(l) 冗餘格之 cols 軸＝stage_cols 設計點
     （全規模＝最大設計點）、rows 軸固定欄集合，身分含所讀存檔之 sidecar；(o) 參數敏感度家族數軸＝`VARIANT_RUNS` 之 families
-    軸（`axis_scales` 之 `PARAM_FAMILY_SCALES`）；(p) IC 後轉換之分塊探針於 post_ic_transform 同一實跑內（harness）。"""
+    軸（`axis_scales` 之 `PARAM_FAMILY_SCALES`）；(p) IC 後轉換之分塊探針於 post_ic_transform 同一實跑內（harness）。
+
+    v5.58（code review r69）：(x) 排程另含 `ISOLATION_RUNS`（固定倖存集合之 mann_whitney 直接呼叫格，events 軸三點同 event_import
+    events 軸；命令加 `--ref-scale`＝三點最大者；身分含 event_import events 軸各點存檔之 sidecar），組裝 `require_isolation`。"""
     import time
 
     h = _harness()
@@ -2936,6 +2939,10 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
         pts = h.axis_scales(run_id, axis, cols_scales=scales, row_scales=row_scales, event_scales=event_scales,
                             bar_scales=bar_scales, survivor_scales=survivor_scales)
         cmd_base = [sys.executable, "scripts/icperf_scale_harness.py", "run", run_id, "--axis", axis, "--scale", "{scale}"]
+        if run_id == h.MW_FIXED_CELL:
+            # SPEC v5.58 (x)：固定倖存集合＝events 軸三點之最大事件數點之第 5 段倖存欄（測試段事件最多；該點倖存為空 ⇒ 該格
+            # HarnessError，不改取他點）
+            cmd_base += ["--ref-scale", str(max(int(s) for s in pts))]
         data = _task02_data(run_id, src, axis=axis, long_src=l_src, out_root=root, scales=pts)
         config = [INVENTORY_DATA]
         identity = _task02_identity(head, data=data, config=config, scales=pts, cmd=cmd_base)
@@ -2978,7 +2985,7 @@ def measure_inventory(inventory: Mapping[str, Any], *, scales: Sequence[int] = S
                                            budget_seconds=TASK02_BUDGET_SECONDS,
                                            sample_interval_seconds=TASK02_SAMPLE_INTERVAL, chunk_cap=TASK02_CHUNK_CAP,
                                            ram_bytes=_ram_bytes(), require_rows=bool(row_scales),
-                                           require_variants=bool(row_scales),
+                                           require_variants=bool(row_scales), require_isolation=bool(row_scales),
                                            records_root=records_dir.relative_to(REPO).as_posix())
         receipt["row_axis_precheck"] = precheck
         receipt["event_axis_precheck"] = event_precheck
@@ -3082,6 +3089,11 @@ def _task02_data(run_id: str, src: Path, *, axis: str = "cols", long_src: Option
     if run_id == "cross_sectional_long":
         # SPEC v5.53 (c1)：跨標的長資料（L 格＋同一生成定義之 ETH 4h 長歷史格）之預設切分分支
         return [f"{_cell_run(c)['run_dir']}/feature_manifest.json" for c in h.XSEC_LONG_CELLS]
+    if run_id == h.MW_FIXED_CELL:
+        # SPEC v5.58 (x)：固定倖存集合之 mann_whitney 直接呼叫格讀 event_import events 軸各點之存檔（參考點＝三點之最大者，含於
+        # scales）⇒ 身分含各點存檔之身分 sidecar（重寫 ⇒ 身分變）
+        return [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json",
+                *[_repo_rel(h.event_mw_dir(root, int(s)) / h.SUBSET_IDENTITY_FILE) for s in sorted(set(map(int, scales)))]]
     if run_id in ("event_import", "event_study"):
         out = [f"{_cell_run(LONG_CELL)['run_dir']}/feature_manifest.json"]
         if axis == "rows":

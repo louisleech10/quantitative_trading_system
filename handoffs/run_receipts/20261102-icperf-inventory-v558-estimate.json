@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py inventory --out handoffs/run_receipts/20261101-icperf-path-inventory.json",
+      "code_sha256": "2631fb8196bd290849811847063309c800bda257649b1d98506ee53726a72dfa",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF v5.58 清冊收據重產：路 H3 (x)(y) 清冊改動、主委 T02-44 改指向 _ic_autocorr_by_feature）",
+      "created_at": "2026-11-02T14:35:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 60,
+  "basis": [
+    "build_path_inventory 只讀清冊 JSON 並驗 schema、寫一個 JSON 檔；無子行程、無資料讀取（同 handoffs/run_receipts/20261101-icperf-inventory-estimate.json）",
+    "60 秒為量級估計（import 凍結腳本實測 2.3–3.2 秒），不作停止條件"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-2"
+  ]
+}

@@ -3,15 +3,14 @@
 import { useMemo, useState } from 'react';
 import { Info } from 'lucide-react';
 import { FeatureTierLevel, ICMethodSettings } from '@/lib/types';
-import { DEFAULT_IC_SETTINGS, IC_SETTING_KEYS, IC_SETTING_SPECS } from '@/lib/icConfigOverride';
+import { DEFAULT_IC_SETTINGS, IC_SETTING_KEYS, IC_SETTING_SPECS, isICSettingApplicable } from '@/lib/icConfigOverride';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  IC_AUTOCORR_LABEL,
-  IC_AUTOCORR_TIP,
   IC_SETTING_LABELS,
+  IC_SETTING_NOT_APPLICABLE_LABEL,
   IC_SETTING_OPTION_LABELS,
-  IC_SETTING_TIPS,
+  settingTip,
 } from '@/components/ic-analysis/icSettingsText';
 
 interface FeatureTierPanelProps {
@@ -43,13 +42,19 @@ function InfoTip({ text, label }: { text: string; label: string }) {
   );
 }
 
-/** ㊸：IC 頁方法選擇（四個選單）＋單調性門檻開關＋IC 自相關揭露；每項一個 ⓘ。 */
+/**
+ * ㊸：IC 頁方法選擇（四個選單）＋單調性門檻開關；每項一個 ⓘ。
+ * v5.58 (v)：該分析模式不適用之設定（契約 `not_applicable_modes`）停用並標「此模式不適用」；ⓘ 依模式換句。
+ * v5.58 (w)：IC 自相關改為報告表之欄（不再是此處之揭露列）。
+ */
 function MethodSettings({
   settings,
   onChangeSetting,
+  analysisMode,
 }: {
   settings: ICMethodSettings;
   onChangeSetting?: FeatureTierPanelProps['onChangeSetting'];
+  analysisMode?: string;
 }) {
   return (
     <div className="rounded-md border border-white/10 bg-black/10 p-3 space-y-2" data-testid="ic-method-settings">
@@ -57,15 +62,22 @@ function MethodSettings({
       {IC_SETTING_KEYS.map((key) => {
         const spec = IC_SETTING_SPECS[key];
         const label = IC_SETTING_LABELS[key];
-        const changed = settings[key] !== spec.default;
+        const applicable = isICSettingApplicable(key, analysisMode);
+        const changed = applicable && settings[key] !== spec.default;
+        const disabled = !onChangeSetting || !applicable;
         return (
-          <div key={key} className="flex items-center gap-2 text-xs text-slate-200" data-testid={`ic-setting-${key}`}>
+          <div
+            key={key}
+            className={`flex items-center gap-2 text-xs ${applicable ? 'text-slate-200' : 'text-slate-500'}`}
+            data-testid={`ic-setting-${key}`}
+            data-applicable={applicable ? 'true' : 'false'}
+          >
             {spec.kind === 'toggle' ? (
               <label className="flex items-center gap-2">
                 <Checkbox
                   aria-label={label}
                   checked={Boolean(settings[key])}
-                  disabled={!onChangeSetting}
+                  disabled={disabled}
                   onCheckedChange={(checked) => onChangeSetting?.(key, (checked === true) as ICMethodSettings[typeof key])}
                 />
                 <span className={changed ? 'text-amber-200' : undefined}>{label}</span>
@@ -76,9 +88,9 @@ function MethodSettings({
                 <select
                   aria-label={label}
                   value={String(settings[key])}
-                  disabled={!onChangeSetting}
+                  disabled={disabled}
                   onChange={(e) => onChangeSetting?.(key, e.target.value as ICMethodSettings[typeof key])}
-                  className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-xs text-slate-100"
+                  className="flex-1 rounded border border-white/10 bg-black/30 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
                 >
                   {(spec.options ?? []).map((opt) => (
                     <option key={opt} value={opt}>
@@ -88,14 +100,15 @@ function MethodSettings({
                 </select>
               </>
             )}
-            <InfoTip text={IC_SETTING_TIPS[key]} label={label} />
+            {!applicable && (
+              <span className="shrink-0 text-slate-500" data-testid={`ic-setting-na-${key}`}>
+                {IC_SETTING_NOT_APPLICABLE_LABEL}
+              </span>
+            )}
+            <InfoTip text={settingTip(key, analysisMode, applicable)} label={label} />
           </div>
         );
       })}
-      <div className="flex items-center gap-2 text-xs text-slate-400" data-testid="ic-setting-ic_autocorrelation">
-        <span>{IC_AUTOCORR_LABEL}：不輸出</span>
-        <InfoTip text={IC_AUTOCORR_TIP} label={IC_AUTOCORR_LABEL} />
-      </div>
     </div>
   );
 }
@@ -176,7 +189,7 @@ export default function FeatureTierPanel({
       <div className="text-xs text-slate-300">已啟用 {enabledCount}/{TOGGLES.length} 項功能</div>
 
       <TooltipProvider>
-        <MethodSettings settings={settings} onChangeSetting={onChangeSetting} />
+        <MethodSettings settings={settings} onChangeSetting={onChangeSetting} analysisMode={analysisMode} />
       </TooltipProvider>
 
       <button

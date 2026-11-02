@@ -709,7 +709,7 @@ function ICAnalysisPageContent() {
             </div>
 
             {/* ICPERF Task 0.4 ㊸：報告頂端一行「本次設定」（非預設項標色）；有報告才顯示 */}
-            {report && <ICRunSettingsLine settings={runSettings} />}
+            {report && <ICRunSettingsLine settings={runSettings} mode={resultMode} />}
             <DegradedBanner />
             {/* 🔴 SPLITUNIFY Task 4.1（SPEC C-6）：**唯一**的驗證段數字＋來源標籤。
                 掛在降級訊息之後——「這份能不能當 OOS 看」先講，「驗證段有幾個事件」再講。

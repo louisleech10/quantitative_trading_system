@@ -30,9 +30,13 @@ const contract = JSON.parse(
   readFileSync(path.resolve(__dirname, '../../../momentum/Analysis/contracts/ui_stage_toggles.json'), 'utf-8'),
 ) as {
   ui_only_keys: string[];
-  setting_keys: Record<string, { kind: string; path: string[]; options?: string[]; default: string | boolean }>;
+  setting_keys: Record<
+    string,
+    { kind: string; path: string[]; options?: string[]; default: string | boolean; not_applicable_modes?: string[] }
+  >;
   merged_keys: Record<string, string>;
   disclosed_keys: Record<string, string>;
+  report_keys: Record<string, unknown>;
 };
 
 const SEVEN = [
@@ -83,6 +87,8 @@ describe('㊸ 前端設定規格 == 契約', () => {
       expect([...f.path]).toEqual(c.path);
       expect(f.default).toBe(c.default);
       expect(DEFAULT_IC_SETTINGS[key]).toBe(c.default);
+      // v5.58 (v)：模式不適用清單亦逐值相同
+      expect([...(f.not_applicable_modes ?? [])]).toEqual(c.not_applicable_modes ?? []);
       if (c.kind === 'select') {
         expect([...(f.options ?? [])]).toEqual(c.options);
       } else {
@@ -91,12 +97,14 @@ describe('㊸ 前端設定規格 == 契約', () => {
     }
   });
 
-  it('七鍵全歸類：ui_only 為空、契約 setting／merged／disclosed 聯集＝七鍵、vif 併入去重選單', () => {
+  it('七鍵全歸類：ui_only 為空、契約 setting／merged／disclosed／report 聯集＝七鍵、vif 併入去重選單', () => {
     expect(contract.ui_only_keys).toEqual([]);
+    // v5.58 (w)：ic_autocorrelation 自 disclosed_keys 改歸 report_keys
     const all = [
       ...Object.keys(contract.setting_keys),
       ...Object.keys(contract.merged_keys),
       ...Object.keys(contract.disclosed_keys),
+      ...Object.keys(contract.report_keys),
     ];
     expect([...all].sort()).toEqual([...SEVEN].sort());
     expect(contract.merged_keys.vif_filter).toBe('redundancy_method_selection');

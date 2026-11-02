@@ -40,9 +40,43 @@ export const IC_SETTING_TIPS: Record<keyof ICMethodSettings, string> = {
   monotonicity_test: '關閉後不再以分位單調性剔除；實測預設門檻下無差，放寬 p 值時通過數明顯增加',
 };
 
-/** 只揭露、不設開關之項（契約 `disclosed_keys`）。 */
+/**
+ * v5.58 (v)：跨標的模式下仍生效之設定之 ⓘ（該模式之消費點與預設不同處；依 `handoffs/run_receipts/20261101-icperf-toggle-impact.json`
+ * 之 `v558_cross_sectional` 實測寫成）。未列者沿用 `IC_SETTING_TIPS`。
+ */
+export const IC_SETTING_TIPS_XSEC: Partial<Record<keyof ICMethodSettings, string>> = {
+  ic_method_selection: '換估計量改每截面 IC、逐標的 IC 與衰減；標的僅兩個時每截面三法皆為 ±1，只逐標的 IC 不同',
+  return_type_selection: '跨標的只影響 IC 衰減與半衰期（主 IC 標籤固定為一根 K 線對數報酬）；秩方法下對數與簡單報酬相同',
+};
+
+/** v5.58 (v)：該模式不適用之標示與 ⓘ（跨標的路徑不做預處理、去重與門檻篩選）。 */
+export const IC_SETTING_NOT_APPLICABLE_LABEL = '此模式不適用';
+export const IC_SETTING_NOT_APPLICABLE_TIPS: Partial<Record<keyof ICMethodSettings, string>> = {
+  winsorization_method: '跨標的模式不做縮尾預處理，此設定不影響結果',
+  redundancy_method_selection: '跨標的模式不做去重，輸出全部特徵，此設定不影響結果',
+  monotonicity_test: '跨標的模式不設篩選門檻（只排序），此設定不影響結果',
+};
+
+/** v5.58 (v)：依分析模式取一個設定之 ⓘ 文案。 */
+export const settingTip = (key: keyof ICMethodSettings, mode: string | undefined, applicable: boolean): string => {
+  if (!applicable) {
+    return IC_SETTING_NOT_APPLICABLE_TIPS[key] ?? `${IC_SETTING_NOT_APPLICABLE_LABEL}`;
+  }
+  if (mode === 'cross_sectional') {
+    return IC_SETTING_TIPS_XSEC[key] ?? IC_SETTING_TIPS[key];
+  }
+  return IC_SETTING_TIPS[key];
+};
+
+/** v5.58 (w)：報告表 IC 自相關欄（契約 `report_keys.ic_autocorrelation`）。 */
 export const IC_AUTOCORR_LABEL = 'IC 自相關';
-export const IC_AUTOCORR_TIP = '後端有算 IC 一階自相關，但不進報告也不參與篩選，故不設開關（待決定加入報告或移除）';
+export const IC_AUTOCORR_TIP = 'IC 序列前後期之相關，越高 IC 越持續、ICIR 之獨立樣本越少；滾動窗重疊時實測多近 1';
+/** v5.58 (w)：`ic_autocorr_reason`（值為空時之原因，封閉集合）之顯示。 */
+export const IC_AUTOCORR_REASON_LABELS: Record<string, string> = {
+  insufficient_samples: 'IC 序列有效值不足 3 個',
+  no_adjacent_pairs: 'IC 序列無相鄰兩期皆有值',
+  constant_series: 'IC 序列為常數',
+};
 
 /** toggle 值之顯示。 */
 export const onOffLabel = (value: boolean) => (value ? '開' : '關');

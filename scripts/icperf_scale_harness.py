@@ -63,6 +63,12 @@
   `blas_thread_facts`），VIF 兩入口之時間機會併入收據（`KNOWN_TIME_OPPORTUNITIES`）；(s) 清冊
   `_transform_single_optimized_df_core` measure=false（IC 頁不可達）；(t) harness 請求之 seeded 選欄（`_limited_request`）
   涵蓋 event_import 各軸與 post-ic-rows，凍結項 `small_request` 不改。
+- SPEC v5.58（code review r69）：(x) 清冊 `mann_whitney_table`（與 inclusive 成本隨第 5 段倖存數變之
+  `_run_binary_permutation_and_negative_control`；`block_permutation_table` 原即含）之 unit_axis 含 survivors；event_import 各軸
+  紀錄 survivors＝第 5 段倖存數、二元收據與 `post_stage5_claim`（`event_stage5_facts`；倖存 0 或負對照未實算 ⇒ 該點不得宣稱
+  後續統計有實值）；組裝之 events 軸只擬合確實隨事件數變之入口（`events_fit_exclusion`）；固定倖存集合之直接呼叫格
+  `MW_FIXED_CELL`（`ISOLATION_RUNS`；讀 event_import events 軸各點之存檔 `EVENT_MW_DIR/E<n>/`、`--ref-scale` 點之第 5 段倖存欄）
+  隔離單次入口成本。(y) 清冊 `_transform_single_optimized_df_core` 之 ic_page／ic_first＝false（旗標之消費者只有 schema 檢查）。
 - 直接呼叫格（`CELLS`）：讀 `stage_inputs/<N>/` 之真實輸入，以路徑同一設定物件（pickle 之 self）呼叫互斥分支：滾動 IC
   kendall／pearson、冗餘 hierarchical／vif／多元化約束、regime kmeans、fit_mode pit_expanding（C 格 500 列 ≤ 512 ⇒ percentile
   走 `pit_expanding_bounds`）、PIT mad 縮尾、`standardize` 之 time_series_zscore＋pit_expanding、無缺值向量化 IC。
@@ -228,6 +234,11 @@ CELLS: Dict[str, str] = {
                                   "（ic_page_long cols 2000 之存檔 L2000/preprocess）中產品 detect_feature_families 之 ≥3 員"
                                   "家族取 F 族、每族 3 員（只含家族成員欄）＋同一分析器 batch_analyze（同請求方法）",
     "param_sensitivity_families_pearson": "同上，method=pearson（_rolling_corr 分支之家族數軸）",
+    # SPEC v5.58 (x)（code review r69 群集 C）：mann_whitney_table 之單次入口成本——端到端（event_import events 軸）之呼叫數隨
+    # 第 5 段倖存數變（smoke_v557 741／1／925），另以固定倖存集合隔離（`ISOLATION_RUNS`；不取代端到端之兩軸）
+    "mann_whitney_fixed_survivors": "存檔事件數軸真實輸入（event_import events 軸各點 mann_whitney_table 首次呼叫之 features／y／"
+                                    "min_class_n，`EVENT_MW_DIR/E<n>/`）限於固定倖存集合（--ref-scale 點之第 5 段倖存欄）＋"
+                                    "mann_whitney_table 重複 MW_FIXED_CALLS 次（events 軸；每點同欄集合、只變事件）",
 }
 #: SPEC v5.55 (d)：非預設門檻分支之第 5 段門檻覆寫（深合併入 IC 頁請求之 `config_override.thresholds`；其餘同 IC 頁預設）。
 #: 選擇依據（碼證）：A／C 格 1h 500 列之 ICIR 恆非有限（ICIR 窗 63 經 12h／1h 換算為 756 > 500 列，`ic_engine.py:1869-1881`；
@@ -343,11 +354,13 @@ RUN_AXES: Dict[str, Tuple[str, ...]] = {
     # SPEC v5.56 (k)(o)：只供第二軸／變體之格
     "redundancy_greedy_rows": ("rows",),
     **{c: ("families",) for c in PARAM_FAMILY_CELLS},
+    # SPEC v5.58 (x)：固定倖存集合之 mann_whitney 直接呼叫格只有事件數軸
+    "mann_whitney_fixed_survivors": ("events",),
 }
 #: 主軸非 cols 之路徑（SPEC v5.51 (d)：event_study 只有事件數與 K 線根數兩軸，主軸＝events）
 PRIMARY_AXIS: Dict[str, str] = {"event_study": "events", "post_ic_transform": "survivors",
                                 **{c: "rows" for c in PARAM_ROWS_ONLY_CELLS}, "redundancy_greedy_rows": "rows",
-                                **{c: "families" for c in PARAM_FAMILY_CELLS}}
+                                **{c: "families" for c in PARAM_FAMILY_CELLS}, "mann_whitney_fixed_survivors": "events"}
 #: SPEC v5.56 (k)：清冊入口級之 rows 軸實跑（優先於所屬格之 `ROW_AXIS_RUN`）——`RedundancyFilter.filter`／
 #: `compute_correlation_matrix`（branch_cell＝ic_page_relaxed）之 rows 軸改由 `redundancy_greedy_rows`（固定欄集合、只變列數）
 ROW_AXIS_ENTRY_RUN: Dict[str, str] = {
@@ -460,14 +473,19 @@ def schedule_runs(inventory: Mapping[str, Any], *, second_axes: bool = True) -> 
     """由清冊導出實跑排程 [(run_id, 軸)]（`measure_inventory` 同用）：先各入口之主軸（ic_page_default、ic_page_long 先，再
     其餘路徑、直接呼叫格；ic_page_default 寫 cols 軸存檔），再第二軸（`SECOND_AXIS_ORDER`，ic_page_long rows 先；其後直接
     呼叫格之 rows 軸，讀 ic_page_long rows 所寫存檔）；去重保序。`second_axes`=False ⇒ 只排主軸。SPEC v5.53 (c1)：
-    `second_axes` 時另排 `VARIANT_RUNS`（其所變之格有 measure=true 入口者；排最後）。"""
+    `second_axes` 時另排 `VARIANT_RUNS`（其所變之格有 measure=true 入口者；排最後）。SPEC v5.58 (x)：`second_axes` 時另排
+    `ISOLATION_RUNS`（入口 measure=true 者；排於主軸與第二軸之後、變體之前——讀 event_import events 軸之存檔）。"""
     prim: List[Tuple[str, str]] = []
     sec: List[Tuple[str, str]] = []
+    iso: List[Tuple[str, str]] = []
     cells: Set[str] = set()
     for e in inventory.get("entries") or []:
         if not e.get("measure"):
             continue
         cells.add(str(e.get("branch_cell")))
+        if second_axes and str(e.get("id")) in ISOLATION_RUNS:
+            # SPEC v5.58 (x)：入口級之隔離直接呼叫格（讀其所屬格之事件數軸存檔 ⇒ 排在主軸與第二軸之後）
+            iso.append(ISOLATION_RUNS[str(e["id"])])
         p, s, need = entry_runs(e)
         # SPEC v5.55 (f)：主軸即 rows 之直接呼叫格（參數敏感度兩格）讀 rows 軸路徑之存檔 ⇒ 排在第二軸段（該路徑之 rows 軸之後）
         (sec if second_axes and p[1] == "rows" and p[0] in CELLS else prim).append(p)
@@ -478,20 +496,26 @@ def schedule_runs(inventory: Mapping[str, Any], *, second_axes: bool = True) -> 
     prim = sorted(dict.fromkeys(prim), key=lambda x: (order.get(x[0], len(order)), x[1]))
     sec = sorted(dict.fromkeys(sec), key=lambda x: (sorder.get(x[0], len(sorder)), x[1]))
     var = [v for v, base in VARIANT_RUNS.items() if second_axes and base in cells]
-    return list(dict.fromkeys(prim + sec + var))
+    return list(dict.fromkeys(prim + sec + iso + var))
 
 
 def schedule_coverage(inventory: Mapping[str, Any], sched: Sequence[Tuple[str, str]]) -> Dict[str, Any]:
     """排程對清冊之涵蓋（SPEC v5.52 (b)「排程與組裝之 require_rows 同步涵蓋」）：每一 measure=true 入口所需之主軸與第二軸
     （`entry_runs`）皆在 `sched` 且該軸為該 run 所支援（`RUN_AXES`）⇒ 涵蓋。回 {"measured", "covered", "uncovered": [{"id",
     "missing": [...]}], "by_axis": {"<run>:<軸>": 入口數}, "fixed_axes": {id: [軸...]}, "variants": {"<run>:<軸>": {"cell",
-    "scheduled", "entries"}}}（SPEC v5.53 (c1)：變體實跑另列，不影響 covered／uncovered）。"""
+    "scheduled", "entries"}}}（SPEC v5.53 (c1)：變體實跑另列，不影響 covered／uncovered）。SPEC v5.58 (x)：`isolation`＝
+    {"<run>:<軸>": {"entry", "scheduled"}}（`ISOLATION_RUNS` 之入口 measure=true 者；另列，不影響 covered／uncovered）。"""
     have = {(r, a) for r, a in sched if a in RUN_AXES.get(r, ())}
-    out: Dict[str, Any] = {"measured": 0, "covered": 0, "uncovered": [], "by_axis": {}, "fixed_axes": {}, "variants": {}}
+    out: Dict[str, Any] = {"measured": 0, "covered": 0, "uncovered": [], "by_axis": {}, "fixed_axes": {}, "variants": {},
+                           "isolation": {}}
     for (vr, va), base in VARIANT_RUNS.items():
         n = sum(1 for e in inventory.get("entries") or [] if e.get("measure") and e.get("branch_cell") == base)
         if n:
             out["variants"][f"{vr}:{va}"] = {"cell": base, "scheduled": (vr, va) in have, "entries": n}
+    for e in inventory.get("entries") or []:
+        if e.get("measure") and str(e.get("id")) in ISOLATION_RUNS:
+            ir, ia = ISOLATION_RUNS[str(e["id"])]
+            out["isolation"][f"{ir}:{ia}"] = {"entry": str(e["id"]), "scheduled": (ir, ia) in have}
     for e in inventory.get("entries") or []:
         if not e.get("measure"):
             continue
@@ -1301,6 +1325,10 @@ class RunContext:
             or run_id in PARAM_FAMILY_CELLS
         #: SPEC v5.52 (b)：本次實際輸入之規模點數（runner 驗得後設；run_one 對宣告之 scale 驗等）
         self.actual_scale: Optional[int] = None
+        #: SPEC v5.58 (x)：固定倖存集合之參考點（`--ref-scale`；mann_whitney 直接呼叫格用）與 event_import 第 5 段二元收據之
+        #: 存放處（run_one 設 `binary_capture_hook`；未設 ⇒ None）
+        self.ref_scale: Optional[int] = None
+        self.binary_capture: Optional[Dict[str, Any]] = None
 
     @property
     def stage_dir(self) -> Path:
@@ -2100,11 +2128,15 @@ def _run_event_import(ctx: RunContext) -> Dict[str, Any]:
     if ctx.axis == "rows":
         actual = bars_actual(bars, int(ctx.n_rows or 0))
         facts.update(bars_facts(bars))
+    # SPEC v5.58 (x)：各軸皆記第 5 段事實——survivors＝第 5 段倖存數（事件入口 unit_axis／scale_vector 之 survivors；第 6–7 段後
+    # 之數另記 final_survivors）、二元收據（置換前門檻通過數、n_perm、區塊數、負對照狀態）與 post_stage5_claim（第 5 段倖存 0
+    # 或負對照未實算 ⇒ 該點不得宣稱後續統計有實值）。SPEC v5.57 (q)：events 軸之實際門檻設定與第 5 段實值同出於此
+    facts.update(event_stage5_facts(request, info.get("result"), getattr(ctx, "binary_capture", None),
+                                    final_survivors=facts.get("survivors")))
     if ctx.axis == "events":
         facts.update(event_axis_facts())
-        # SPEC v5.57 (q)：紀錄實際門檻設定與第 5 段實值、二元三入口之本點呼叫數（扣例外）；任一入口 0 呼叫 ⇒ HarnessError
-        # （非預設門檻仍無通過欄 ⇒ 補資料或可達設定後再量，不寫 0 呼叫之紀錄；同 ic_page_relaxed）
-        facts.update(event_threshold_facts(request, info.get("result")))
+        # SPEC v5.57 (q)：二元三入口之本點呼叫數（扣例外）；任一入口 0 呼叫 ⇒ HarnessError（非預設門檻仍無通過欄 ⇒ 補資料或
+        # 可達設定後再量，不寫 0 呼叫之紀錄；同 ic_page_relaxed）
         calls = {eid: int(ctx.rec.stat(eid).calls) - int(ctx.rec.stat(eid).raised) for eid in EVENT_BINARY_ENTRIES}
         facts["binary_calls"] = calls
         zero = [eid for eid, c in calls.items() if c < 1]
@@ -2318,6 +2350,175 @@ EVENT_BINARY_ENTRIES: Tuple[str, ...] = (
     "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._run_binary_permutation_and_negative_control",
 )
 EVENT_LABEL_MODE_ENTRY = "momentum.Analysis.ic_filter_orchestrator:ICFilterOrchestrator._resolve_label_mode_and_bind_binary"
+
+# ── SPEC v5.58 (x)（code review r69 群集 C）：mann_whitney_table 之單位軸含倖存數、固定倖存集合之直接呼叫格 ─────────────
+
+#: 二元三入口之個別名（`EVENT_BINARY_ENTRIES` 同序）
+MW_ENTRY = EVENT_BINARY_ENTRIES[0]
+BINARY_PERM_ENTRY = EVENT_BINARY_ENTRIES[2]
+#: 固定倖存集合之直接呼叫格（`CELLS`；events 軸）與其所隔離之清冊入口（入口 id ⇒ (run_id, 軸)）：組裝另組 `isolation` 段，
+#: 不參與 `entry_runs` 之主軸／第二軸、不取代端到端之 events 與倖存數雙軸
+MW_FIXED_CELL = "mann_whitney_fixed_survivors"
+ISOLATION_RUNS: Dict[str, Tuple[str, str]] = {MW_ENTRY: (MW_FIXED_CELL, "events")}
+#: event_import events 軸各點之存檔（`<out-root>/EVENT_MW_DIR/E<n>/`）：mann_whitney_table 首次呼叫（主統計，
+#: `ic_filter_orchestrator.py:5976`：features_for_stats＝第 5 段全部輸入欄之測試段事件列、y＝驗過之 0/1、min_class_n）之 pickle，
+#: 與第 5 段二元收據（`_run_binary_permutation_and_negative_control` 之 passed／倖存者／收據）之 JSON
+EVENT_MW_DIR = "stage_inputs/event_mw"
+EVENT_MW_CAPTURE = "mann_whitney"
+EVENT_MW_STAGE5_FILE = "stage5.json"
+#: 直接呼叫格每點之呼叫次數（固定；每點同次數 ⇒ 秒數之比＝單次成本之比）。依據：產品置換迴圈每點至少 200 次
+#: mann_whitney_table（n_perm＝min(1000, max(200, …))，`ic_filter_orchestrator.py:5789`）；單次為毫秒級（測試段事件數十至百餘列），
+#: 重複以壓低計時解析度之相對誤差。不依耗時增減
+MW_FIXED_CALLS = 200
+#: 第 5 段倖存數相依入口於 events 軸不擬合之依據（組裝 `row_fit_excluded`）
+EVENTS_FIT_EXCLUDED_BASIS = ("SPEC v5.58 (x)：清冊 unit_axis 含 survivors（第 5 段倖存數相依：呼叫數或 inclusive 成本隨第 5 段倖存數變，"
+                             "smoke_v557 mann_whitney_table 741／1／925 次對第 5 段輸出 35／0／51）⇒ events 軸只記事件數、倖存數與"
+                             "各點呼叫數，不對事件數擬合；單次入口成本見 isolation（固定倖存集合之直接呼叫格）")
+
+
+def survivor_dependent(e: Mapping[str, Any]) -> bool:
+    """SPEC v5.58 (x)：清冊入口是否第 5 段倖存數相依（unit_axis.axes 含 survivors）。"""
+    return "survivors" in set((e.get("unit_axis") or {}).get("axes") or [])
+
+
+def events_fit_exclusion(e: Mapping[str, Any], axis: Optional[str], points: Sequence[Mapping[str, Any]]
+                         ) -> Optional[Dict[str, Any]]:
+    """SPEC v5.58 (x)：events 軸只擬合確實隨事件數變之入口——`axis`＝"events" 且入口倖存數相依（`survivor_dependent`）⇒ 回
+    {"axis", "basis", "points": [{"events", "survivors", "calls", "seconds", "post_stage5_claim"}]}（不擬合；端到端保留事件數與倖存數
+    雙軸及各點呼叫數）；否則 None（照常擬合）。"""
+    if axis != "events" or not survivor_dependent(e):
+        return None
+    return {"axis": "events", "basis": EVENTS_FIT_EXCLUDED_BASIS,
+            "points": [{"events": (p.get("scale_vector") or {}).get("events", p.get("events")),
+                        "survivors": (p.get("scale_vector") or {}).get("survivors"), "calls": p.get("calls"),
+                        "seconds": p.get("seconds"), "post_stage5_claim": p.get("post_stage5_claim")} for p in points]}
+
+
+def post_stage5_claim(stage5_output: Optional[int], binary: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """SPEC v5.58 (x)：一點之第 5 段後統計可否宣稱有實值（純函式）。`binary`＝第 5 段二元收據（`binary_receipt_facts`；非二元模式
+    ⇒ None）。不成立之條件：第 5 段倖存數 0（第 6–7 段無輸入）、或二元模式之負對照未實算（`negative_control_status`
+    ≠ "computed"，如 `unavailable:insufficient_blocks`／`skipped:no_survivors`；`ic_filter_orchestrator.py:5832-5841`）；第 5 段
+    倖存數缺 ⇒ 不成立（不猜）。回 {"allowed", "reasons", "stage5_output", "negative_control_status"}。"""
+    reasons: List[str] = []
+    nc = (binary or {}).get("negative_control_status") if binary is not None else None
+    if not isinstance(stage5_output, int) or isinstance(stage5_output, bool):
+        reasons.append("第 5 段倖存數缺（filter_log.stage5_thresholds.output_features）")
+    elif stage5_output == 0:
+        reasons.append("第 5 段倖存數 0：第 6–7 段無輸入，不得宣稱後續統計有實值")
+    if binary is not None and nc != "computed":
+        reasons.append(f"負對照未實算（{nc}）：不得宣稱負對照與其後之可消費倖存者有實值")
+    return {"allowed": not reasons, "reasons": reasons,
+            "stage5_output": stage5_output if isinstance(stage5_output, int) else None, "negative_control_status": nc}
+
+
+def binary_receipt_facts(captured: Optional[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+    """SPEC v5.58 (x)：第 5 段二元收據之事實（`binary_capture_hook` 所存；未呼叫 `_run_binary_permutation_and_negative_control`
+    〔非二元模式〕⇒ None）：門檻通過數 k（置換前）、置換後倖存數、n_perm、區塊數、負對照狀態（"computed"＝實算，否則產品之
+    status 字串）與實算次數——mann_whitney_table 端到端呼叫數之解釋（1＋[k>0 且 n_blocks≥10]·(1＋n_perm)＋負對照次數）。"""
+    if not captured:
+        return None
+    rec = dict(captured.get("receipt") or {})
+    nc = rec.get("negative_control")
+    computed = isinstance(nc, Mapping) and "n_observed" in nc
+    return {"threshold_passed": len(captured.get("threshold_passed") or []),
+            "survivors_after_permutation": len(captured.get("survivors") or []),
+            "n_perm": rec.get("n_perm"), "n_blocks": rec.get("n_blocks"), "block_len": rec.get("block_len"),
+            "negative_control_status": "computed" if computed else (nc.get("status") if isinstance(nc, Mapping) else None),
+            "negative_control_n_effective": nc.get("n_effective") if computed else 0,
+            "negative_control_degraded_by_budget": nc.get("degraded_by_budget") if computed else None}
+
+
+def binary_capture_hook(store: Dict[str, Any]) -> Callable[[Tuple[Any, ...], Dict[str, Any], Any], None]:
+    """SPEC v5.58 (x)：`_run_binary_permutation_and_negative_control` 之 Recorder capture——依原函式簽名取 `passed`（置換前之門檻
+    通過欄）、回傳之倖存者與收據（JSON 化）存入 `store`（不 pickle orchestrator）。簽名於重綁前取（`resolve_target`）。"""
+    sig = inspect.signature(resolve_target(BINARY_PERM_ENTRY).func)
+
+    def cap(args: Tuple[Any, ...], kwargs: Dict[str, Any], result: Any) -> None:
+        passed = sig.bind(*args, **kwargs).arguments.get("passed") or []
+        survivors, receipt = result
+        store.update({"threshold_passed": [str(x) for x in passed], "survivors": [str(x) for x in survivors],
+                      "receipt": json.loads(json.dumps(receipt or {}, default=str))})
+
+    return cap
+
+
+def event_mw_dir(out_root: Path, n_events: int) -> Path:
+    """event_import events 軸 n 點之存檔目錄（`<out-root>/EVENT_MW_DIR/E<n>/`）。"""
+    return Path(out_root) / EVENT_MW_DIR / f"E{int(n_events)}"
+
+
+def event_mw_identity(n_events: int) -> Dict[str, Any]:
+    """SPEC v5.58 (x)：event_import events 軸 n 點存檔之身分（SPEC v5.52 (a) 同法）：L 格 run manifest 之路徑／大小／內容 sha256、
+    請求之欄（seeded 巢狀 `ROW_AXIS_COLS` 欄）sha256、事件批規則與該點等距抽樣事件之 sha256、門檻（`relaxed_event_request`）；
+    任一不同 ⇒ 不沿用。"""
+    eb = _load_script("icperf_t02_event_batch", "scripts/icperf_event_batch.py")
+    request = relaxed_event_request(ROW_AXIS_COLS)
+    manifest = REPO / request["run_dir"] / "feature_manifest.json"
+    names = list(request["feature_filter"]["include_features"])
+    recs = _event_axis_records(int(n_events))
+    return {"schema": SUBSET_IDENTITY_SCHEMA, "kind": "event_mw_capture", "writer": ["event_import", "events"],
+            "events_requested": int(n_events), "source": _rel(manifest), "source_size": int(manifest.stat().st_size),
+            "source_sha256": file_sha256(manifest),
+            "columns_sha256": hashlib.sha256(json.dumps(names, ensure_ascii=False).encode("utf-8")).hexdigest(),
+            "column_rule": REQUEST_COLUMN_RULE,
+            "event_rule": eb.rule_id(EVENT_AXIS_BREAKOUT_BARS, EVENT_AXIS_PRIOR_FIELD),
+            "records_sha256": hashlib.sha256(json.dumps(recs, ensure_ascii=False, sort_keys=True,
+                                                        default=str).encode("utf-8")).hexdigest(),
+            "thresholds": dict(request["config_override"]["thresholds"])}
+
+
+def load_event_mw(out_root: Path, n_events: int) -> Dict[str, Any]:
+    """讀 event_import events 軸 n 點之存檔（SPEC v5.58 (x)）：sidecar 須 status complete 且身分逐欄＝`event_mw_identity(n)`、
+    兩檔皆列於 files，否則 HarnessError（須先重跑 event_import events 軸該點）。回 {"mw": mann_whitney 首次呼叫之存檔,
+    "stage5": 第 5 段二元存檔, "events": 寫出實跑驗得之事件數, "dir"}。"""
+    d = event_mw_dir(out_root, n_events)
+    want = event_mw_identity(n_events)
+    side = read_identity(d / SUBSET_IDENTITY_FILE) or {}
+    if side.get("status") != "complete" or {k: side.get(k) for k in want} != json.loads(json.dumps(want)) \
+            or not {f"{EVENT_MW_CAPTURE}.pkl", EVENT_MW_STAGE5_FILE} <= set(side.get("files") or []):
+        raise HarnessError(f"事件數軸存檔 {_rel(d)} 之身分與現行來源不符或未完成（status={side.get('status')!r}）：須先跑 "
+                           f"event_import --axis events --scale {int(n_events)}（SPEC v5.58 (x)）")
+    mw = load_capture(d, EVENT_MW_CAPTURE)
+    stage5 = json.loads((d / EVENT_MW_STAGE5_FILE).read_text(encoding="utf-8"))
+    return {"mw": mw, "stage5": stage5, "events": side.get("events"), "dir": _rel(d)}
+
+
+def _event_mw_begin(ctx: "RunContext", path_run_id: str) -> Dict[str, Any]:
+    """event_import events 軸實跑之存檔開始（run_one 於重綁前呼叫）：sidecar 標 building（中斷 ⇒ 讀端拒收），回
+    {"dir", "identity", "writer"（mann_whitney_table 之 capture）}。"""
+    d = event_mw_dir(ctx.out_root, int(ctx.n_events or 0))
+    want = event_mw_identity(int(ctx.n_events or 0))
+    write_identity(d / SUBSET_IDENTITY_FILE, {**want, "status": "building", "path_run_id": path_run_id})
+    prov = {"path_run_id": path_run_id, "head": ctx.head, "axis": ctx.axis, "scale": int(ctx.scale), "run_id": ctx.run_id}
+    return {"dir": d, "identity": want, "writer": _capture_writer(d, EVENT_MW_CAPTURE, False, prov, overwrite=True)}
+
+
+def _event_mw_finish(state: Mapping[str, Any], ctx: "RunContext", facts: Mapping[str, Any]) -> None:
+    """event_import events 軸實跑成功（actual_scale 已驗）後：寫第 5 段二元存檔並把 sidecar 標 complete（記驗得之事件數）；
+    mann_whitney 首次呼叫未存成或無二元收據 ⇒ 標 failed（讀端拒收，直接呼叫格大聲失敗）。"""
+    d = Path(state["dir"])
+    st = ctx.rec.stat(MW_ENTRY)
+    binary = getattr(ctx, "binary_capture", None) or {}
+    ok = bool(st.captured and st.capture_error is None and (d / f"{EVENT_MW_CAPTURE}.pkl").is_file() and binary)
+    files: List[str] = [f"{EVENT_MW_CAPTURE}.pkl"] if ok else []
+    if ok:
+        (d / EVENT_MW_STAGE5_FILE).write_text(json.dumps(binary, ensure_ascii=False, indent=1), encoding="utf-8")
+        files.append(EVENT_MW_STAGE5_FILE)
+    write_identity(d / SUBSET_IDENTITY_FILE, {**dict(state["identity"]), "status": "complete" if ok else "failed",
+                                              "events": int(facts["events"]) if isinstance(facts.get("events"), int)
+                                              else None, "files": files,
+                                              "capture_error": st.capture_error, "binary_captured": bool(binary)})
+
+
+def event_stage5_facts(request: Mapping[str, Any], report: Any, binary: Optional[Mapping[str, Any]],
+                       final_survivors: Any = None) -> Dict[str, Any]:
+    """SPEC v5.58 (x)：event_import 一點之第 5 段事實（各軸皆記）——`event_threshold_facts`（門檻分支、實際門檻、第 5 段輸入／
+    輸出數）＋`survivors`＝第 5 段倖存數（`stage5_output`；清冊 survivors 軸於事件入口之值）、`final_survivors`（第 6–7 段後，
+    原 `_ic_facts` 之 survivors）、`binary_receipt`（`binary_receipt_facts`）、`post_stage5_claim`。"""
+    thr = event_threshold_facts(request, report)
+    receipt = binary_receipt_facts(binary)
+    return {**thr, "survivors": thr["stage5_output"], "final_survivors": final_survivors, "binary_receipt": receipt,
+            "post_stage5_claim": post_stage5_claim(thr["stage5_output"], receipt)}
 
 
 def event_point_product_check(records: Sequence[Mapping[str, Any]], work: Path, request: Mapping[str, Any]
@@ -3805,6 +4006,39 @@ def _cell_param_families(method: Optional[str]) -> Callable[[RunContext], Dict[s
     return run
 
 
+def _cell_mw_fixed(ctx: RunContext) -> Dict[str, Any]:
+    """SPEC v5.58 (x)：固定倖存集合之 mann_whitney_table 直接呼叫格（events 軸；真實存檔輸入）。固定倖存集合＝`--ref-scale` 點之
+    第 5 段倖存欄（event_import events 軸該點 `_run_binary_permutation_and_negative_control` 之回傳倖存者，存檔 stage5.json；
+    空 ⇒ HarnessError，不改取他點）；本點之輸入＝event_import events 軸本點 mann_whitney_table 首次呼叫之 features（限固定倖存
+    欄，缺欄 ⇒ HarnessError）、y、min_class_n；經重綁之模組屬性呼叫 `MW_FIXED_CALLS` 次。實際輸入點數＝存檔寫出實跑驗得之事件數。"""
+    if ctx.ref_scale is None:
+        raise HarnessError(f"{MW_FIXED_CELL}：須給 --ref-scale（固定倖存集合之參考事件數點）")
+    ref = load_event_mw(ctx.out_root, int(ctx.ref_scale))
+    fixed = [str(c) for c in (ref["stage5"].get("survivors") or [])]
+    if not fixed:
+        raise HarnessError(f"{MW_FIXED_CELL}：參考點 events={ctx.ref_scale} 之第 5 段倖存欄為空（{ref['dir']}；固定倖存集合不可空，"
+                           "不改取他點——補資料或改參考點後再量）")
+    cap = load_event_mw(ctx.out_root, int(ctx.n_events or 0))
+    mw_cap = cap["mw"]
+    features, y = mw_cap["args"][0], mw_cap["args"][1]
+    missing = [c for c in fixed if c not in set(map(str, features.columns))]
+    if missing:
+        raise HarnessError(f"{MW_FIXED_CELL}：events={ctx.n_events} 之存檔輸入缺固定倖存欄 {missing[:5]}（共 {len(missing)}）")
+    frame = features[fixed]
+    mw = getattr(importlib.import_module(MW_ENTRY.partition(":")[0]), MW_ENTRY.partition(":")[2])
+    for _ in range(MW_FIXED_CALLS):
+        mw(frame, y, **dict(mw_cap["kwargs"]))
+    if not isinstance(cap.get("events"), int):
+        raise HarnessError(f"{MW_FIXED_CELL}：存檔 {cap['dir']} 未記寫出實跑驗得之事件數")
+    ctx.actual_scale = int(cap["events"])
+    return {"input_cols": len(fixed), "rows": int(frame.shape[0]), "events": int(cap["events"]), "survivors": len(fixed),
+            "cell_input_cols": len(fixed), COLUMN_SET_KEY: _columns_sha(fixed), "fixed_survivors_ref_scale": int(ctx.ref_scale),
+            "fixed_survivors_source": ref["dir"], "input_source": cap["dir"], "selection_rows": int(frame.shape[0]),
+            "calls_planned": MW_FIXED_CALLS, "min_class_n": dict(mw_cap["kwargs"]).get("min_class_n"),
+            "stage5_at_point": binary_receipt_facts(cap["stage5"]), "threshold_branch": "non_default",
+            "requested_columns": None, "actual_scale": int(cap["events"])}
+
+
 RUNNERS: Dict[str, Callable[[RunContext], Dict[str, Any]]] = {
     "ic_page_default": _run_ic_page_default,
     "ic_page_long": _run_ic_page_default,
@@ -3834,6 +4068,7 @@ RUNNERS: Dict[str, Callable[[RunContext], Dict[str, Any]]] = {
     "redundancy_greedy_rows": _cell_redundancy(None),
     "param_sensitivity_families": _cell_param_families(None),
     "param_sensitivity_families_pearson": _cell_param_families("pearson"),
+    MW_FIXED_CELL: _cell_mw_fixed,
 }
 
 
@@ -3892,9 +4127,13 @@ def record_threshold_branch(run_id: str, axis: str, group: str, facts: Mapping[s
 
 
 def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_path: Path = INVENTORY_PATH,
-            out_root: Optional[Path] = None, argv: Optional[Sequence[str]] = None) -> Path:
+            out_root: Optional[Path] = None, argv: Optional[Sequence[str]] = None,
+            ref_scale: Optional[int] = None) -> Path:
     """一個規模點之一次實跑：重綁清冊全部 measure=true 入口 ⇒ 執行 `RUNNERS[run_id]` ⇒ 寫逐入口記錄；回記錄檔路徑。
-    工作目錄（cwd／TMPDIR）＝`<out-root>/work/<path_run_id>/`（唯讀輸入以 symlink 引入；產品之 cwd 相對寫出落此）。"""
+    工作目錄（cwd／TMPDIR）＝`<out-root>/work/<path_run_id>/`（唯讀輸入以 symlink 引入；產品之 cwd 相對寫出落此）。
+    SPEC v5.58 (x)：event_import 各軸另以 `binary_capture_hook` 取第 5 段二元收據（路徑事實）；events 軸另存
+    mann_whitney_table 首次呼叫與二元收據於 `EVENT_MW_DIR/E<n>/`（`_event_mw_begin`／`_event_mw_finish`），供
+    `MW_FIXED_CELL`（`ref_scale`＝固定倖存集合之參考點）讀。"""
     if run_id not in RUNNERS:
         raise HarnessError(f"未知路徑／格：{run_id}（{sorted(RUNNERS)}）")
     if axis not in RUN_AXES[run_id]:
@@ -3921,6 +4160,7 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
     head = _git_head()
     rec = Recorder(keyed=keyed, context=f"{run_id}|{axis}|{scale}")
     ctx = RunContext(run_id, axis, scale, root, work, rec, head)
+    ctx.ref_scale = None if ref_scale is None else int(ref_scale)
     stage_dir: Optional[Path] = None
     stage_want: Optional[Dict[str, Any]] = None
     if (run_id, axis) in CAPTURE_RUNS:
@@ -3940,6 +4180,14 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
         only = CAPTURE_ONLY.get((run_id, axis))
         rec.captures = {eid: _capture_writer(stage_dir, name, with_result, prov, overwrite=not same)
                         for eid, (name, with_result) in CAPTURES.items() if only is None or name in only}
+    event_mw: Optional[Dict[str, Any]] = None
+    if run_id == "event_import":
+        # SPEC v5.58 (x)：第 5 段二元收據（各軸）；events 軸另存 mann_whitney_table 首次呼叫（重綁前設 capture）
+        ctx.binary_capture = {}
+        rec.captures[BINARY_PERM_ENTRY] = binary_capture_hook(ctx.binary_capture)
+        if axis == "events":
+            event_mw = _event_mw_begin(ctx, path_run_id)
+            rec.captures[MW_ENTRY] = event_mw["writer"]
     os.chdir(cwd)
     targets = resolve_targets(e["id"] for e in measured)
     binding = rebind_all({eid: t.func for eid, t in targets.items()}, rec)
@@ -3957,6 +4205,8 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
         binding.restore()
         raise HarnessError(f"{run_id}:{axis}：實際輸入點數 {facts.get('actual_scale')!r} != 宣告規模 {int(scale)}"
                            "（SPEC v5.52 (b)）")
+    if event_mw is not None:
+        _event_mw_finish(event_mw, ctx, facts)
     if stage_dir is not None and stage_want is not None:
         # 屬本身分之存檔＝本次成功寫出者（身分不同時）或前次同身分已列者＋本次寫出者（身分相同時）；讀端只認 files 所列
         written = {CAPTURES[eid][0] for eid in CAPTURES
@@ -3978,7 +4228,8 @@ def run_one(run_id: str, *, axis: str, scale: int, records_dir: Path, inventory_
               # `threshold_branch`（實際所讀存檔任務之分支，如 post_ic_transform rows 軸之 `saved["threshold_branch"]`）者以之
               # 為準（原對 post_ic_transform rows 固定 default 而 facts 可為 non_default）
               "threshold_branch": record_threshold_branch(run_id, axis, ctx.group, facts),
-              "actual_scale": int(facts["actual_scale"]),
+              "actual_scale": int(facts["actual_scale"]), "ref_scale": ctx.ref_scale,
+              "event_mw_capture": _rel(Path(event_mw["dir"])) if event_mw is not None else None,
               "argv": list(sys.argv[1:] if argv is None else argv), "head": head,
               "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(started_wall)),
               "wall_seconds": wall, "harness_overhead_seconds": rec.overhead_seconds,
@@ -4274,7 +4525,53 @@ def _point(e: Mapping[str, Any], q: Mapping[str, Any], run: Mapping[str, Any], a
     p["cell_input_cols"] = facts.get("cell_input_cols")
     p[COLUMN_SET_KEY] = facts.get(COLUMN_SET_KEY)
     p["actual_scale"] = chosen.get("actual_scale")
+    if "post_stage5_claim" in facts:
+        # SPEC v5.58 (x)：事件入口之點記第 5 段倖存數（scale_vector.survivors）、二元收據與後續統計可否宣稱有實值
+        p["post_stage5_claim"] = facts.get("post_stage5_claim")
+        p["binary_receipt"] = facts.get("binary_receipt")
+        p["stage5_survivors"] = facts.get("survivors")
     return p
+
+
+def _isolation_section(e: Mapping[str, Any], key: Tuple[str, str], runs: Mapping[Tuple[str, str], Mapping[str, Any]],
+                       problems: List[str], *, required: bool, scale_probe: Any) -> Any:
+    """SPEC v5.58 (x)：入口之隔離直接呼叫格段（`ISOLATION_RUNS`；固定倖存集合之 mann_whitney）：每點經 `_point`（calls ≥ 1、
+    actual_scale＝宣告、footprint），各點欄集合身分與欄數須相同（固定倖存集合）且非空；回 {"run", "axis", "points"（另記
+    seconds_per_call）, "fit"（對事件數）, "probe", "fixed_columns": {"n", COLUMN_SET_KEY, "ref_scale"}}；缺實跑 ⇒ `required`
+    時記問題並回 False、否則 None；點有問題 ⇒ False。"""
+    eid = e["id"]
+    run = runs.get(key)
+    if run is None:
+        if required:
+            problems.append(f"{eid}：隔離直接呼叫格 {key[0]}:{key[1]} 缺（SPEC v5.58 (x) 固定倖存集合之單次入口成本）")
+            return False
+        return None
+    pts = [p for q in sorted(run["receipt"]["points"], key=lambda q: int(q["scale"]))
+           if (p := _point(e, q, run, key[1], problems, require_actual=True)) is not None]
+    if len(pts) != len(run["receipt"]["points"]) or not pts:
+        return False
+    shas = {p.get(COLUMN_SET_KEY) for p in pts}
+    ncols = {p.get("cell_input_cols") for p in pts}
+    if len(shas) != 1 or None in shas or len(ncols) != 1 or not all(isinstance(n, int) and n > 0 for n in ncols):
+        problems.append(f"{eid}：隔離格 {key[0]} 各點之固定倖存集合不同或為空（欄數 {sorted(map(str, ncols))}；SPEC v5.58 (x)）")
+        return False
+    calls = {int(p["calls"]) for p in pts}
+    if len(calls) != 1:
+        problems.append(f"{eid}：隔離格 {key[0]} 各點呼叫數不同（{sorted(calls)}；SPEC v5.58 (x) 每點固定 MW_FIXED_CALLS 次）")
+        return False
+    for p in pts:
+        p["seconds_per_call"] = float(p["seconds"]) / int(p["calls"])
+    refs = {(median_record(recs).get("facts") or {}).get("fixed_survivors_ref_scale") for recs in run["records"].values()}
+    fit = None
+    if len(pts) >= 2:
+        f = scale_probe.fit(fit_points(pts, key[1]), float(max(p[AXIS_X_KEY[key[1]]] for p in pts)))
+        fit = {"axis": key[1], "exponent": f["fit"]["exponent"], "r2": f["fit"]["r2"],
+               "extrapolation_unreliable": f["extrapolation_unreliable"]}
+    return {"run": f"{key[0]}:{key[1]}", "axis": key[1], "points": pts, "probe": run["probe"], "fit": fit,
+            "fixed_columns": {"n": next(iter(ncols)), COLUMN_SET_KEY: next(iter(shas)),
+                              "ref_scale": next(iter(refs)) if len(refs) == 1 else sorted(map(str, refs))},
+            "calls_per_point": next(iter(calls)),
+            "fit_basis": "每點呼叫數固定（MW_FIXED_CALLS）、欄集合固定 ⇒ 秒數對事件數之冪次擬合＝單次入口成本對事件數之擬合"}
 
 
 def fixed_column_set_problems(eid: str, run_id: Optional[str], points: Sequence[Mapping[str, Any]], *,
@@ -4337,7 +4634,8 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                            head: str, scale_probe: Any, budget_seconds: float, sample_interval_seconds: float,
                            chunk_cap: Mapping[str, Any], ram_bytes: Optional[int] = None,
                            two_point_seconds: float = 600.0, require_rows: bool = False,
-                           records_root: Optional[str] = None, require_variants: bool = False) -> Dict[str, Any]:
+                           records_root: Optional[str] = None, require_variants: bool = False,
+                           require_isolation: bool = False) -> Dict[str, Any]:
     """組 `<日期>-icperf-scale-before.json`（SPEC Task 0.2 v5.50 (e)、v5.51 (d)(f)(g)(h)(i)）。`runs`＝{(run_id, axis):
     {"probe": {"cmd", "data", "config"}, "receipt_path": <repo 相對>, "receipt": <scale_probe 收據>, "records": {scale:
     [逐入口記錄（含 `_record_path`／`_record_bytes`／`_record_sha256`）...]}}}。每一 measure=true 入口依 `branch_cell` 取其
@@ -4353,7 +4651,12 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
     `actual_scale` 且等於宣告之規模（主軸紀錄帶者亦須相等）；`require_rows` 涵蓋全部第二軸；頂層 `schedule_coverage`。
     SPEC v5.53：(c0) 事件入口之 K 線根數軸依 `entry_runs`（rows 為主軸或第二軸，軸名 `rows`）；(c1) `VARIANT_RUNS` 所變之格
     之入口另組 `variants`＝{"<run>:<軸>": {"points", "fit", "probe", "split"}}（每點 calls ≥ 1、actual_scale＝宣告、
-    split_applied＝True）；`require_variants` 而缺變體實跑 ⇒ 問題。"""
+    split_applied＝True）；`require_variants` 而缺變體實跑 ⇒ 問題。
+    SPEC v5.58 (x)：倖存數相依入口（`survivor_dependent`：unit_axis 含 survivors）之 events 軸只記不擬合——第二軸 events 之
+    `row_fit`＝None、`row_fit_excluded`（`events_fit_exclusion`：各點事件數、第 5 段倖存數、呼叫數、秒數、post_stage5_claim）；
+    主軸為 events ⇒ 問題。事件入口之點另記 `post_stage5_claim`／`binary_receipt`／`stage5_survivors`（`_point`）。`ISOLATION_RUNS`
+    之入口另組 `isolation`（`_isolation_section`：固定倖存集合之直接呼叫格，每點同欄集合、同呼叫數，對事件數擬合）；
+    `require_isolation` 而缺該實跑 ⇒ 問題。"""
     problems: List[str] = []
     all_records = [r for run in runs.values() for recs in (run.get("records") or {}).values() for r in recs]
     total = total_projected_seconds(runs)
@@ -4413,9 +4716,15 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                                      "⇒ 只收兩點"}
                 excluded = [p for p in pts if p["input_cols"] == 2000]
                 pts = [p for p in pts if p["input_cols"] != 2000]
+        if events_fit_exclusion(e, axis, pts) is not None:
+            # SPEC v5.58 (x)：倖存數相依入口不得以 events 為主軸擬合（清冊須給非 events 之主軸；第二軸 events 只記不擬合）
+            problems.append(f"{eid}：倖存數相依入口（unit_axis 含 survivors）之主軸為 events（SPEC v5.58 (x) events 軸只擬合確實"
+                            "隨事件數變之入口）")
+            continue
         fit = scale_probe.fit(fit_points(pts, axis), full)
         row_fit = None
-        if row_pts and len(row_pts) >= 2:
+        row_fit_excluded = events_fit_exclusion(e, row_axis, row_pts or []) if row_pts else None
+        if row_pts and len(row_pts) >= 2 and row_fit_excluded is None:
             rf = scale_probe.fit(fit_points(row_pts, str(row_axis)),
                                  float(max(p[AXIS_X_KEY[str(row_axis)]] for p in row_pts)))
             row_fit = {"axis": row_axis, "exponent": rf["fit"]["exponent"], "r2": rf["fit"]["r2"],
@@ -4426,7 +4735,7 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                   "fit_axis": AXIS_FIT_KEY[axis],
                   "fit": {"exponent": fit["fit"]["exponent"], "r2": fit["fit"]["r2"]}, "fit_full_scale": full,
                   "fit_reasons": fit["reasons"], "extrapolation_unreliable": fit["extrapolation_unreliable"],
-                  "row_fit": row_fit,
+                  "row_fit": row_fit, "row_fit_excluded": row_fit_excluded,
                   "projected_seconds": float(sum(p["seconds"] for p in pts)), "reduction": None,
                   "complexity_analysis": f"碼層複雜度（清冊 unit_axis.function，讀碼 {e.get('evidence')}）：{func}",
                   "unit_seconds": unit_seconds, "units": units,
@@ -4455,6 +4764,13 @@ def assemble_scale_receipt(inventory: Mapping[str, Any], runs: Mapping[Tuple[str
                                       "fit": {"axis": va, "exponent": vf["fit"]["exponent"], "r2": vf["fit"]["r2"],
                                               "extrapolation_unreliable": vf["extrapolation_unreliable"]}}
         m["variants"] = variants or None
+        m["isolation"] = None
+        if eid in ISOLATION_RUNS:
+            iso = _isolation_section(e, ISOLATION_RUNS[eid], runs, problems, required=require_isolation,
+                                     scale_probe=scale_probe)
+            if iso is False:
+                continue
+            m["isolation"] = iso
         crit = evaluate_criteria(m, scale_probe)
         m["criteria"] = crit
         m["opportunities"] = _opportunities(eid, crit, pts, ram_bytes)
@@ -4498,6 +4814,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--records-dir", type=Path, required=True)
     p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
     p.add_argument("--out-root", type=Path, default=None)
+    p.add_argument("--ref-scale", type=int, default=None,
+                   help=f"SPEC v5.58 (x)：{MW_FIXED_CELL} 之固定倖存集合參考點（event_import events 軸之事件數點）")
     sub.add_parser("list", help="列出路徑與直接呼叫格")
     p = sub.add_parser("plan", help="清冊 measure=true 入口之 branch_cell 對照")
     p.add_argument("--inventory", type=Path, default=INVENTORY_PATH)
@@ -4573,7 +4891,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.cmd == "run":
         try:
             run_one(args.run_id, axis=args.axis, scale=args.scale, records_dir=args.records_dir,
-                    inventory_path=args.inventory, out_root=args.out_root, argv=args_in)
+                    inventory_path=args.inventory, out_root=args.out_root, argv=args_in, ref_scale=args.ref_scale)
         except HarnessError as exc:
             print(f"HarnessError：{exc}", file=sys.stderr)
             return 1

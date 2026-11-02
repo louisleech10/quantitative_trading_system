@@ -29,6 +29,7 @@ import contextlib
 import functools
 import importlib.util
 import json
+import math
 import os
 import re
 import sys
@@ -776,6 +777,129 @@ def oracle_rolling_ic(F: Any, y: Any, window: int, method: str, stride: int = 1)
     return out
 
 
+def binary_oracle_rows(F: Any, yb: Any, min_n: int) -> Dict[str, Dict[str, Any]]:
+    """0/1 分辨力逐欄 oracle（不呼叫產品碼）：逐欄去非有限值後 `scipy.stats.mannwhitneyu`（雙尾、method=auto）；
+    AUC＝U/(n₁n₀)、rank-biserial＝2AUC−1；FDR＝statsmodels `multipletests` fdr_bh（有限 p 之同一集合）；status：無有效值
+    ⇒ all_nan、有效值皆同 ⇒ constant、任一類有效值 < min_n ⇒ class_below_min、否則 ok。"""
+    import numpy as np
+    from scipy import stats
+    from statsmodels.stats.multitest import multipletests
+
+    yb = np.asarray(yb, dtype=int)
+    exp: Dict[str, Dict[str, Any]] = {}
+    for c in F.columns:
+        x = F[c].to_numpy(dtype=float)
+        ok = np.isfinite(x)
+        xp, xn = x[ok & (yb == 1)], x[ok & (yb == 0)]
+        n1, n0 = int(xp.size), int(xn.size)
+        auc = rb = u = p = math.nan
+        if n1 > 0 and n0 > 0:
+            res = stats.mannwhitneyu(xp, xn, alternative="two-sided", method="auto")
+            u, p = float(res.statistic), float(res.pvalue)
+            auc = u / (n1 * n0)
+            rb = 2.0 * auc - 1.0
+        if n1 + n0 == 0:
+            status = "unavailable:all_nan"
+        elif np.unique(x[ok]).size == 1:
+            status = "unavailable:constant"
+        elif min(n1, n0) < int(min_n):
+            status = "unavailable:class_below_min"
+        else:
+            status = "ok"
+        exp[str(c)] = {"auc": auc, "rank_biserial": rb, "mw_u": u, "mw_p_value": p, "n_pos_selection": n1,
+                       "n_neg_selection": n0, "n_used_binary": n1 + n0, "binary_status": status}
+    fin = [c for c in exp if math.isfinite(exp[c]["mw_p_value"])]
+    q = dict(zip(fin, multipletests([exp[c]["mw_p_value"] for c in fin], method="fdr_bh")[1])) if fin else {}
+    for c, e in exp.items():
+        e["mw_p_value_adj"] = float(q.get(c, math.nan))
+    return exp
+
+
+def _evaluate_event_binary(cap: Mapping[str, Any], rep: Mapping[str, Any], F_seg: Any, cfg: Mapping[str, Any],
+                           t: "Tally") -> Dict[str, Any]:
+    """事件匯入 0/1 標籤批之 summary 分辨力欄 vs 獨立重算（SPEC Task 0.4 ㊵ 修後主統計；v5.58 重產收據時補）。"""
+    import numpy as np
+
+    O = _oracles()
+    req = cap["request"]
+    batch = json.loads((REPO / "data_cache" / "events" / f"{req.get('event_import_id')}.json").read_text(encoding="utf-8"))
+    records = list(batch.get("records") or [])
+    declared = (batch.get("lookahead_declaration") or {}).get("lookahead_bars_declared") or \
+        (records[0].get("lookahead_bars_declared") if records else None) or {}
+    spec = O._ref_event_spec(records, declared, O._contract_k_min(), req.get("event_label_spec"))
+    ref = O._ref_event_label_values(records, spec, KLINE_H5)
+    lab_of = {str(r["event_id"]): int(r["label"]) for r in records}
+    by_row: Dict[int, List[int]] = {}
+    for eid, v in ref.items():
+        if v["row_open_ms"] is not None:
+            by_row.setdefault(int(v["row_open_ms"]), []).append(lab_of[str(eid)])
+    rows_ms = [int(ts.value // 1_000_000) for ts in _utc(F_seg.index)]
+    if any(len(by_row.get(r) or []) != 1 for r in rows_ms):
+        t.eq("@event_binary/rows", "rows_map_one_event", False, True)
+        return {"rows": len(rows_ms), "mapped": False}
+    yb = np.asarray([by_row[r][0] for r in rows_ms], dtype=int)
+    min_n = int(((cfg.get("event_filter") or {}).get("min_events_per_class")))
+    rows = {r["feature_name"]: r for r in rep.get("summary_table") or [] if isinstance(r, dict)}
+    exp = binary_oracle_rows(F_seg, yb, min_n)
+    for c, e in exp.items():
+        row = rows.get(c)
+        if row is None:
+            continue
+        for k in ("auc", "rank_biserial", "mw_u", "mw_p_value"):
+            t.num(f"/summary_table/#/{k}", f"{c}/{k}", row.get(k), e[k], feature=c)
+        t.num("/summary_table/#/mw_p_value_adj", f"{c}/mw_p_value_adj", row.get("mw_p_value_adj"),
+              e["mw_p_value_adj"], feature=c)
+        for k in ("n_pos_selection", "n_neg_selection", "n_used_binary", "binary_status"):
+            t.eq(f"/summary_table/#/{k}", f"{c}/{k}", row.get(k), e[k], feature=c)
+    return {"rows": len(rows_ms), "mapped": True, "n_pos": int((yb == 1).sum()), "n_neg": int((yb == 0).sum()),
+            "min_events_per_class": min_n, "n_status_ok": sum(e["binary_status"] == "ok" for e in exp.values())}
+
+
+def _xsec_full_ic_series(df: Any, label_col: str, method: str) -> Dict[str, List[float]]:
+    """逐時點截面 IC 序列（含未成立之截面為 NaN，保留時間間隔；IC 一階自相關之 oracle 輸入）：每時點標的數 < 2 或某特徵
+    與標籤之共同有限值 < 2、或相關不可算 ⇒ NaN；否則以 scipy 對應方法（spearmanr／pearsonr／kendalltau）。"""
+    import numpy as np
+    from scipy import stats
+
+    fn = {"spearman": stats.spearmanr, "pearson": stats.pearsonr, "kendall": stats.kendalltau}[method]
+    feats = [c for c in df.columns if c != label_col]
+    out: Dict[str, List[float]] = {f: [] for f in feats}
+    for _, g in df.groupby(level=0, sort=True):
+        y = g[label_col].to_numpy(dtype=float)
+        for f in feats:
+            v = math.nan
+            if len(g) >= 2:
+                x = g[f].to_numpy(dtype=float)
+                m = np.isfinite(x) & np.isfinite(y)
+                if m.sum() >= 2 and np.unique(x[m]).size > 1 and np.unique(y[m]).size > 1:
+                    v = float(fn(x[m], y[m])[0])
+            out[f].append(v if math.isfinite(v) else math.nan)
+    return out
+
+
+#: IC 一階自相關項之 oracle 說明（縱向＝ICIR 所用 oracle 滾動 IC 序列；跨標的＝oracle 逐截面 IC 序列）
+IC_AUTOCORR_ORACLE = ("IC 序列（縱向＝ICIR 所用 oracle 滾動 IC；跨標的＝oracle 逐時點截面 IC，未成立之截面為缺值）之 statsmodels acf(nlags=1, "
+                      "adjusted=False, fft=False, missing='conservative')；不可算之原因依有限值數／相鄰對／常數獨立判"
+                      "（SPEC Task 0.2 v5.58 (w)）")
+
+
+def _acf_lag1_oracle(values: Sequence[float]) -> "tuple[Optional[float], Optional[str]]":
+    """IC 一階自相關 oracle：statsmodels acf（參數同 SPEC Task 0.2 v5.58 (w) 之定義）；不可算原因獨立判定
+    （有限值 < 3／無相鄰兩點皆有限／有限值皆相同），不呼叫產品碼。"""
+    import numpy as np
+    from statsmodels.tsa.stattools import acf
+
+    x = np.asarray(list(values), dtype=float)
+    fin = np.isfinite(x)
+    if int(fin.sum()) < 3:
+        return None, "insufficient_samples"
+    if not bool((fin[1:] & fin[:-1]).any()):
+        return None, "no_adjacent_pairs"
+    if np.unique(x[fin]).size == 1:
+        return None, "constant_series"
+    return float(acf(np.where(fin, x, np.nan), nlags=1, adjusted=False, fft=False, missing="conservative")[1]), None
+
+
 def bar_hours(index: Any) -> Optional[float]:
     """資料之 K 線間距（小時；時間索引相鄰差之中位數，由資料本身導出，不假設 24 小時交易或特定週期）。"""
     import numpy as np
@@ -996,7 +1120,9 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
                              "index_last": str(F.index[-1]) if len(F) else None}
     # 標籤（獨立讀 kline，float64；SPEC ⑥）
     ev = cache.get("event_info") or {}
-    if str(ev.get("label_source")) == "event_label_value":
+    # SPEC Task 0.4 ㊵ 修後：匯入 0/1 標籤批之 label_source＝imported_binary_label（主統計＝0/1 分辨力），連續標籤 y 仍為
+    # 事件標籤值（次統計 conditional_ic）⇒ 同走事件標籤 oracle；0/1 分辨力另由 `_evaluate_event_binary` 對照
+    if str(ev.get("label_source")) in ("event_label_value", "imported_binary_label"):
         # 事件匯入批（SPEC v5.38 ①）：標籤＝事件管線依分析用 event_label_spec 所算之值（後端預設＝依批次宣告深度之
         # trigger_open／open_to_horizon_close，故與主線 close[t+h]／close[t]−1 不同：基準價為 t0 根開盤，加密資料之
         # open[t0] 與 close[t0−1] 常有微差——此即首份收據 93 筆中 53 筆約 1e-6 之差之成因）；oracle 依明列定義自 kline 重算
@@ -1042,6 +1168,11 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     test_mask = None if sc is None else np.asarray(sc["test_mask"], bool)
     F_seg, y_seg = _seg(F, y, test_mask)
     facts["segment_rows"] = int(len(F_seg))
+    if str(ev.get("label_source")) == "imported_binary_label":
+        t_b = T("event_binary", "0/1 分辨力 oracle：0/1 標籤取匯入批 records 之 label（依 _ref_event_label_values 之列映射，"
+                "不讀產品之 ValidatedBinaryLabel）、列＝測試段；逐欄去缺值後 scipy.stats.mannwhitneyu（雙尾、method=auto）、"
+                "AUC＝U/(n₁n₀)、rank-biserial＝2AUC−1、FDR＝statsmodels multipletests fdr_bh、status 依缺值／類別下限／常數獨立判")
+        facts["event_binary"] = _evaluate_event_binary(cap, rep, F_seg, cfg, t_b)
     # 點 IC（第 4 段 pooled；summary ic_mean 之退回來源）
     fn = {"spearman": "spearmanr", "pearson": "pearsonr", "kendall": "kendalltau"}[method]
     t = T(f"point_ic.{method}", f"scipy.stats.{fn}（兩欄共同非 NaN 列；列數 < 2 或任一常數 ⇒ NaN）")
@@ -1087,6 +1218,7 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
     t_m = T("ic_mean_source", "滾動均值有限 ⇒ 用之，否則 pooled 點 IC（scipy）；來源計數")
     t_d = T("direction", "direction＝sign(ic_mean)、icir_aligned＝d·icir、方向對齊勝率與單調性（SPEC Task 0.4 ⑧）")
     t_hr = T("ic_hit_rate", "滾動 IC（oracle）有限值中 > 0 之比例；無有限值 ⇒ NaN（SPEC Task 0.4 ②）")
+    t_ac = T("ic_autocorr", IC_AUTOCORR_ORACLE)
     src_counts = {"rolling_mean": 0, "pooled_point_ic": 0, "unavailable": 0}
     oracle_rows: Dict[str, Dict[str, Any]] = {}
     icir_cache = cache.get("icir") or {}
@@ -1129,7 +1261,14 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
                 d * o["icir"] if d != 0 and math.isfinite(o["icir"]) else math.nan, feature=c)
         t_d.num("/summary_table/#/ic_hit_rate_aligned", f"{c}/ic_hit_rate_aligned", row.get("ic_hit_rate_aligned"),
                 hit if d > 0 else (neg if d < 0 else math.nan), feature=c)
-    disc = ((rep.get("metadata") or {}).get("ic_window_disclosure") or {}).get("ic_mean_source")
+        exp_ac, exp_why = _acf_lag1_oracle(vals)
+        if exp_why is None:
+            t_ac.num("/summary_table/#/ic_autocorr", f"{c}/ic_autocorr", row.get("ic_autocorr"), exp_ac, feature=c)
+        else:
+            t_ac.eq("/summary_table/#/ic_autocorr", f"{c}/ic_autocorr", row.get("ic_autocorr"), None, feature=c)
+        t_ac.eq("/summary_table/#/ic_autocorr_reason", f"{c}/ic_autocorr_reason", row.get("ic_autocorr_reason"),
+                exp_why, feature=c)
+    disc =((rep.get("metadata") or {}).get("ic_window_disclosure") or {}).get("ic_mean_source")
     if isinstance(disc, dict):
         for k, v in src_counts.items():
             t_m.eq(f"/metadata/ic_window_disclosure/ic_mean_source/{k}", k, disc.get(k), v)
@@ -1785,6 +1924,8 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
         if osp["ok"]:
             seg = df.iloc[np.flatnonzero(osp["test_mask"])]
     exp = O._ref_cross_sectional(seg, label_col[0])
+    full_series = _xsec_full_ic_series(seg, label_col[0], str((cfg.get("global_settings") or {}).get("default_method")
+                                                               or "spearman"))
     srs = rep.get("rolling_ic_series") or {}
     for f, values in exp["series"].items():
         _tree(t, key_of, f"/rolling_ic_series/{_ptr(f)}/window_cross_sectional",
@@ -1805,6 +1946,7 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
     t_h = items.setdefault("hac", Tally("statsmodels OLS HAC（Bartlett、無小樣本修正）＋ scipy t 分布＋現行 fail-closed 邊界"))
     t_q = items.setdefault("fdr", Tally("statsmodels multipletests fdr_bh（同檢定集合）"))
     t_d = items.setdefault("direction", Tally("direction＝sign(ic_mean)、icir_aligned＝d·icir、方向對齊勝率與單調性"))
+    t_ac = items.setdefault("ic_autocorr", Tally(IC_AUTOCORR_ORACLE))
     pv: Dict[str, float] = {}
     directions: Dict[str, int] = {}
     for f, values in exp["series"].items():
@@ -1824,6 +1966,13 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
                 d * s["icir"] if d != 0 and math.isfinite(s["icir"]) else math.nan, feature=f)
         t_d.num("/summary_table/#/ic_hit_rate_aligned", f"xsec/{f}/ic_hit_rate_aligned", row.get("ic_hit_rate_aligned"),
                 s["ic_hit_rate"] if d > 0 else (neg if d < 0 else math.nan), feature=f)
+        exp_ac, exp_why = _acf_lag1_oracle(full_series[f])
+        if exp_why is None:
+            t_ac.num("/summary_table/#/ic_autocorr", f"xsec/{f}/ic_autocorr", row.get("ic_autocorr"), exp_ac, feature=f)
+        else:
+            t_ac.eq("/summary_table/#/ic_autocorr", f"xsec/{f}/ic_autocorr", row.get("ic_autocorr"), None, f)
+        t_ac.eq("/summary_table/#/ic_autocorr_reason", f"xsec/{f}/ic_autocorr_reason", row.get("ic_autocorr_reason"),
+                exp_why, f)
         t.eq("/summary_table/#/regime_robust", f"xsec/{f}/regime_robust", row.get("regime_robust"), None, f)
         t.eq("/summary_table/#/regime_robust_reason", f"xsec/{f}/regime_robust_reason", row.get("regime_robust_reason"),
              "regime_analysis_off", f)
@@ -1885,6 +2034,9 @@ COVERAGE_RULES: List[tuple] = [
     (r"^/summary_table/#/(monotonicity_score|long_short_spread|coverage|turnover_rate)$", "summary_passthrough",
      f"{_ORC}:5326"),
     (r"^/summary_table/#/(regime_robust|regime_robust_reason)$", "regime_robust", f"{_ORC}:1199"),
+    (r"^/summary_table/#/(ic_autocorr|ic_autocorr_reason)$", "ic_autocorr", f"{_ORC}:1247"),
+    (r"^/summary_table/#/(auc|rank_biserial|mw_u|mw_p_value|mw_p_value_adj|n_pos_selection|n_neg_selection|"
+     r"n_used_binary|binary_status)$", "event_binary", "momentum/Analysis/binary_discrimination.py:57"),
     (r"^/summary_table/#/pass_class$", NON_STAT, f"{_ORC}:2199"),
     (r"^/rolling_ic_series/\*/window_cross_sectional$", "cross_sectional", f"{_ORC}:2219"),
     (r"^/rolling_ic_series/", "rolling_ic_series_sampling", f"{_REPT}:987"),
@@ -2056,6 +2208,8 @@ def key_status(key: str, oracle: str, items: Mapping[str, Tally], *, kind: str =
 #: （`<項>.<方法>` 取 `<項>` 之綁定）。
 EXTRA_ITEM_TESTS: Dict[str, tuple] = {
     "label": ("test_label_matches_float64_kline_oracle_on_real_kline",),
+    "ic_autocorr": ("test_receipt_ic_autocorr_oracle_matches_product",),
+    "event_binary": ("test_receipt_event_binary_oracle_matches_product",),
     "split": ("test_full_sample_fallback_aligns_raw_kline_to_features",
               "test_rolling_ic_test_slice_keeps_whole_test_windows_only"),
     "direction": ("test_direction_neutral_thresholds_pass_strong_reverse_factor",

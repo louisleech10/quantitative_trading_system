@@ -85,6 +85,7 @@
 | `spec_fourway_check.sh` | 常態檢查 | 未掛 |
 | `spec_v_task_ref_check.sh` | 常態檢查 | narrow_check_router  |
 | `spec_xref_check.sh` | 常態檢查 | pre-commit  |
+| `stall_watch_required_check.sh` | 常態檢查 | Stop  |
 | `status_marker_check.sh` | 常態檢查 | Stop  |
 | `strategy_wiring_check.sh` | 常態檢查 | 未掛 |
 | `temp_output_guard.sh` | 常態檢查 | PreToolUse  |

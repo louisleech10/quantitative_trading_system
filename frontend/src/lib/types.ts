@@ -2160,6 +2160,13 @@ export interface ICFeatureInfo {
   icir_aligned?: number | null;
   ic_hit_rate_aligned?: number | null;
   monotonicity_score_aligned?: number | null;
+  /**
+   * ICPERF Task 0.2 v5.58 (w)：IC 序列之一階自相關（statsmodels acf lag 1；契約 `ui_stage_toggles.json` 之
+   * `report_keys.ic_autocorrelation`）；不可算 ⇒ null，原因見 `ic_autocorr_reason`。舊 report 可缺欄。
+   */
+  ic_autocorr?: number | null;
+  /** v5.58 (w)：`ic_autocorr` 為 null 之原因 ∈ {insufficient_samples, no_adjacent_pairs, constant_series}；有值時 null。 */
+  ic_autocorr_reason?: string | null;
 }
 
 export interface ICDecayData {

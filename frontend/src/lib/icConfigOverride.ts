@@ -7,6 +7,11 @@ export interface ICSettingSpec {
   path: readonly string[];
   options?: readonly string[];
   default: string | boolean;
+  /**
+   * ICPERF Task 0.2 v5.58 (v)：該設定於其路徑無消費點之分析模式（契約 `not_applicable_modes`）——該模式下控制項停用並標
+   * 「此模式不適用」、不送出、「本次設定」不列。
+   */
+  not_applicable_modes?: readonly string[];
 }
 
 /**
@@ -26,6 +31,7 @@ export const IC_SETTING_SPECS: Record<keyof ICMethodSettings, ICSettingSpec> = {
     path: ['preprocessing', 'winsorization', 'method'],
     options: ['percentile', 'mad', 'zscore', 'none'],
     default: 'percentile',
+    not_applicable_modes: ['cross_sectional'],
   },
   return_type_selection: {
     kind: 'select',
@@ -38,11 +44,13 @@ export const IC_SETTING_SPECS: Record<keyof ICMethodSettings, ICSettingSpec> = {
     path: ['redundancy', 'method'],
     options: ['greedy', 'hierarchical', 'vif'],
     default: 'greedy',
+    not_applicable_modes: ['cross_sectional'],
   },
   monotonicity_test: {
     kind: 'toggle',
     path: ['thresholds', 'monotonicity_gate_enabled'],
     default: true,
+    not_applicable_modes: ['cross_sectional'],
   },
 };
 
@@ -69,6 +77,14 @@ export const nonDefaultICSettingKeys = (settings?: Partial<ICMethodSettings> | n
   const full = resolveICSettings(settings);
   return IC_SETTING_KEYS.filter((key) => full[key] !== IC_SETTING_SPECS[key].default);
 };
+
+/** v5.58 (v)：該設定於此分析模式是否生效（未給模式＝生效）。 */
+export const isICSettingApplicable = (key: keyof ICMethodSettings, mode?: string | null): boolean =>
+  !mode || !(IC_SETTING_SPECS[key].not_applicable_modes ?? []).includes(mode);
+
+/** v5.58 (v)：此分析模式實際生效之設定鍵（顯示順序同 `IC_SETTING_KEYS`）。 */
+export const applicableICSettingKeys = (mode?: string | null): (keyof ICMethodSettings)[] =>
+  IC_SETTING_KEYS.filter((key) => isICSettingApplicable(key, mode));
 
 /** 依路徑寫入巢狀物件（中途節點不存在則建立；既有節點之其他鍵保留）。 */
 const setNested = (target: Record<string, unknown>, path: readonly string[], value: unknown) => {
@@ -143,10 +159,12 @@ export const buildConfigOverride = (config: ICAnalysisConfig) => {
       horizons: config.horizons,
     },
   };
-  // ㊸：只送值≠預設之設定鍵（寫入其 path；與上列三節合併）
+  // ㊸：只送值≠預設之設定鍵（寫入其 path；與上列三節合併）；v5.58 (v)：該模式不適用之設定不送
   const settings = resolveICSettings(config.ic_settings);
-  nonDefaultICSettingKeys(settings).forEach((key) => {
-    setNested(override as Record<string, unknown>, IC_SETTING_SPECS[key].path, settings[key]);
-  });
+  nonDefaultICSettingKeys(settings)
+    .filter((key) => isICSettingApplicable(key, config.mode))
+    .forEach((key) => {
+      setNested(override as Record<string, unknown>, IC_SETTING_SPECS[key].path, settings[key]);
+    });
   return override;
 };

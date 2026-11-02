@@ -2997,5 +2997,279 @@
     "兩分支之 default 格於前一個行程（probe）跑、其餘格於第二行程跑，同 identity；耗時之比例受機器負載影響（default 分支 default 格 158.8s 時另有他路重型），除 VIF（relaxed ×4.6，多執行緒 BLAS）外耗時差不作結論",
     "vif 格以路 P ㊷ 施工中之 redundancy_filter.py（sha256 見 code_state，含 vif_sample_check）跑；本格 n=395、k≤86 ⇒ 樣本判定不觸發，結果即逐步 VIF 本身",
     "Jaccard 兩者皆空記 null；只描述本資料格之方向，不保證普遍結果"
-  ]
+  ],
+  "v558_cross_sectional": {
+    "spec_item": "Task 0.2 v5.58 (v)（Task 0.4 ㊸ 之補）",
+    "identity": {
+      "base_override_sha256": "5fa314c0cc75cab59e13370d993c450b8d31a16e68d41a771f6eea27a36c9a8b",
+      "cells": [
+        "L_BTCUSDT_4h_longhist",
+        "L_ETHUSDT_4h_longhist"
+      ],
+      "columns_sha256": "0ae8a4762618e38006048e2eea0b7d9219c0097fe91c21114447fefa4a09de3e",
+      "common_raw_columns": 3632,
+      "config_hashes": [
+        "2f522a293917655280c483f50d200069",
+        "d9be60038034ab3d239c30255f93dd1f"
+      ],
+      "n_cols": 200,
+      "seed": 20261027,
+      "split": {
+        "applied": true,
+        "per_symbol_test_rows": {
+          "BTCUSDT": 400,
+          "ETHUSDT": 400
+        },
+        "test_min_time": "2026-02-20 08:00:00",
+        "test_rows": 800,
+        "train_rows": 3200
+      },
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ],
+      "timeframe": "4h"
+    },
+    "code_state": {
+      "dirty_product_files": [
+        "M momentum/Analysis/__pycache__/pit_stats._pearson_1d-229.py39.1.nbc",
+        " M momentum/Analysis/__pycache__/pit_stats._pearson_1d-229.py39.nbi",
+        " M momentum/Analysis/__pycache__/pit_stats._rank_average_1d-210.py39.1.nbc",
+        " M momentum/Analysis/__pycache__/pit_stats._rank_average_1d-210.py39.nbi",
+        " M momentum/Analysis/__pycache__/pit_stats._rolling_window_rank_corr_numba-255.py39.1.nbc",
+        " M momentum/Analysis/__pycache__/pit_stats._rolling_window_rank_corr_numba-255.py39.2.nbc",
+        " M momentum/Analysis/__pycache__/pit_stats._rolling_window_rank_corr_numba-255.py39.nbi",
+        " M momentum/Analysis/contracts/ui_stage_toggles.json",
+        " M momentum/Analysis/ic_filter_orchestrator.py",
+        " M momentum/FeatureEngineering/operators/__pycache__/_worldquant_numba._ts_argmax_2d-34.py39.nbi",
+        " M momentum/FeatureEngineering/operators/__pycache__/_worldquant_numba._ts_argmin_2d-57.py39.nbi",
+        " M momentum/FeatureEngineering/preprocessing/__pycache__/_fast_adf_numba._adf_ols_core-44.py39.nbi",
+        " M momentum/FeatureEngineering/utils/__pycache__/nan_stats._chunk_nan_state-11.py39.nbi"
+      ],
+      "head": "18dfc0a2507e153d10f8c44473286f4c2b0cfd9d",
+      "orchestrator_sha256": "5318de56342dca778183406ab3c19b2f1ea276951085a7c227b6f34bc875125f"
+    },
+    "script": "runs/icperf/task04/v558/run_v558_real.py",
+    "oracle": "逐截面 scipy pearsonr／spearmanr／kendalltau(variant=b)；逐標的同；衰減逐 horizon 同（簡單報酬）；ic_autocorr＝statsmodels acf(nlags=1, adjusted=False, fft=False, missing=conservative)",
+    "methods": {
+      "kendall": {
+        "elapsed_seconds": 111.96,
+        "split_applied": true,
+        "n_timestamps": 400,
+        "n_features": 200,
+        "total_features_output": 200,
+        "n_series_points": 73032,
+        "two_point_slices_share": 1.0,
+        "oracle_mismatch_counts": {
+          "decay": 0,
+          "ic_autocorr": 0,
+          "series": 0,
+          "summary": 0,
+          "symbol_ic": 0
+        },
+        "oracle_mismatch_examples": {
+          "decay": [],
+          "ic_autocorr": [],
+          "series": [],
+          "summary": [],
+          "symbol_ic": []
+        },
+        "top20_icir_aligned": [
+          "hl_4h_trend_MIDPRICE_233_Kurt-W5",
+          "close_4h_trend_DEMA_144_Rank-W5",
+          "close_4h_trend_KAMA_55_Rank-W5",
+          "close_4h_trend_MIDPOINT_144_ZScore-W13",
+          "close_4h_trend_MIDPOINT_13_Rank-W13",
+          "close_4h_trend_T3_34_Rank-W13",
+          "hl_4h_trend_SAR_0.02-0.2_Kurt-W13",
+          "close_4h_trend_EMA_89_Rank-W5",
+          "close_4h_trend_WMA_55_Rank-W5",
+          "close_4h_trend_DEMA_34_Skew-W5",
+          "close_4h_trend_MA_21_Slope-W13",
+          "close_4h_trend_MIDPOINT_8~233_Cross",
+          "close_4h_trend_EMA_13~50_Ratio",
+          "close_4h_trend_MIDPOINT_5~21_Cross",
+          "close_4h_trend_DEMA_13~89_Cross",
+          "close_4h_trend_MAMA-FAMA_0.5-0.05_Slope-W5",
+          "close_4h_trend_WMA_144_Skew-W5",
+          "close_4h_trend_BBANDS-Middle_13_Rank-W13",
+          "close_4h_trend_SMA_10_ZScore-W5",
+          "close_4h_trend_EMA_13_ZScore-W5"
+        ],
+        "ic_autocorr_reason_counts": {
+          "None": 200
+        },
+        "vs_spearman": {
+          "symbol_ic_cells_differ": 400,
+          "symbol_ic_cells_total": 400,
+          "top20_only_in_method": [],
+          "top20_only_in_spearman": []
+        }
+      },
+      "pearson": {
+        "elapsed_seconds": 61.4,
+        "split_applied": true,
+        "n_timestamps": 400,
+        "n_features": 200,
+        "total_features_output": 200,
+        "n_series_points": 73032,
+        "two_point_slices_share": 1.0,
+        "oracle_mismatch_counts": {
+          "decay": 0,
+          "ic_autocorr": 0,
+          "series": 0,
+          "summary": 0,
+          "symbol_ic": 0
+        },
+        "oracle_mismatch_examples": {
+          "decay": [],
+          "ic_autocorr": [],
+          "series": [],
+          "summary": [],
+          "symbol_ic": []
+        },
+        "top20_icir_aligned": [
+          "hl_4h_trend_MIDPRICE_233_Kurt-W5",
+          "close_4h_trend_DEMA_144_Rank-W5",
+          "close_4h_trend_KAMA_55_Rank-W5",
+          "close_4h_trend_MIDPOINT_144_ZScore-W13",
+          "close_4h_trend_MIDPOINT_13_Rank-W13",
+          "close_4h_trend_T3_34_Rank-W13",
+          "hl_4h_trend_SAR_0.02-0.2_Kurt-W13",
+          "close_4h_trend_EMA_89_Rank-W5",
+          "close_4h_trend_WMA_55_Rank-W5",
+          "close_4h_trend_DEMA_34_Skew-W5",
+          "close_4h_trend_MA_21_Slope-W13",
+          "close_4h_trend_MIDPOINT_8~233_Cross",
+          "close_4h_trend_EMA_13~50_Ratio",
+          "close_4h_trend_MIDPOINT_5~21_Cross",
+          "close_4h_trend_DEMA_13~89_Cross",
+          "close_4h_trend_MAMA-FAMA_0.5-0.05_Slope-W5",
+          "close_4h_trend_WMA_144_Skew-W5",
+          "close_4h_trend_BBANDS-Middle_13_Rank-W13",
+          "close_4h_trend_SMA_10_ZScore-W5",
+          "close_4h_trend_EMA_13_ZScore-W5"
+        ],
+        "ic_autocorr_reason_counts": {
+          "None": 200
+        },
+        "vs_spearman": {
+          "symbol_ic_cells_differ": 400,
+          "symbol_ic_cells_total": 400,
+          "top20_only_in_method": [],
+          "top20_only_in_spearman": []
+        }
+      },
+      "spearman": {
+        "elapsed_seconds": 37.88,
+        "split_applied": true,
+        "n_timestamps": 400,
+        "n_features": 200,
+        "total_features_output": 200,
+        "n_series_points": 73032,
+        "two_point_slices_share": 1.0,
+        "oracle_mismatch_counts": {
+          "decay": 0,
+          "ic_autocorr": 0,
+          "series": 0,
+          "summary": 0,
+          "symbol_ic": 0
+        },
+        "oracle_mismatch_examples": {
+          "decay": [],
+          "ic_autocorr": [],
+          "series": [],
+          "summary": [],
+          "symbol_ic": []
+        },
+        "top20_icir_aligned": [
+          "hl_4h_trend_MIDPRICE_233_Kurt-W5",
+          "close_4h_trend_DEMA_144_Rank-W5",
+          "close_4h_trend_KAMA_55_Rank-W5",
+          "close_4h_trend_MIDPOINT_144_ZScore-W13",
+          "close_4h_trend_MIDPOINT_13_Rank-W13",
+          "close_4h_trend_T3_34_Rank-W13",
+          "hl_4h_trend_SAR_0.02-0.2_Kurt-W13",
+          "close_4h_trend_EMA_89_Rank-W5",
+          "close_4h_trend_WMA_55_Rank-W5",
+          "close_4h_trend_DEMA_34_Skew-W5",
+          "close_4h_trend_MA_21_Slope-W13",
+          "close_4h_trend_MIDPOINT_8~233_Cross",
+          "close_4h_trend_EMA_13~50_Ratio",
+          "close_4h_trend_MIDPOINT_5~21_Cross",
+          "close_4h_trend_DEMA_13~89_Cross",
+          "close_4h_trend_MAMA-FAMA_0.5-0.05_Slope-W5",
+          "close_4h_trend_WMA_144_Skew-W5",
+          "close_4h_trend_BBANDS-Middle_13_Rank-W13",
+          "close_4h_trend_SMA_10_ZScore-W5",
+          "close_4h_trend_EMA_13_ZScore-W5"
+        ],
+        "ic_autocorr_reason_counts": {
+          "None": 200
+        },
+        "vs_spearman": null
+      }
+    },
+    "notes": [
+      "跨標的路徑不設門檻（total_features_output＝輸入欄數），故以輸出數、對齊 ICIR 前 20 名差集與逐標的 IC 不同格數描述方法之影響",
+      "本格只兩標的 ⇒ 每截面只 2 點，三方法之截面 IC 皆為 ±1（two_point_slices_share）；方法差異只見於逐標的時間序列 IC"
+    ],
+    "longitudinal_ic_autocorr_check": {
+      "analysis_status": "ok_oos",
+      "code_state": {
+        "dirty_product_files": [
+          "M momentum/Analysis/__pycache__/pit_stats._pearson_1d-229.py39.1.nbc",
+          " M momentum/Analysis/__pycache__/pit_stats._pearson_1d-229.py39.nbi",
+          " M momentum/Analysis/__pycache__/pit_stats._rank_average_1d-210.py39.1.nbc",
+          " M momentum/Analysis/__pycache__/pit_stats._rank_average_1d-210.py39.nbi",
+          " M momentum/Analysis/__pycache__/pit_stats._rolling_window_rank_corr_numba-255.py39.1.nbc",
+          " M momentum/Analysis/__pycache__/pit_stats._rolling_window_rank_corr_numba-255.py39.2.nbc",
+          " M momentum/Analysis/__pycache__/pit_stats._rolling_window_rank_corr_numba-255.py39.nbi",
+          " M momentum/Analysis/contracts/ui_stage_toggles.json",
+          " M momentum/Analysis/ic_filter_orchestrator.py",
+          " M momentum/FeatureEngineering/operators/__pycache__/_worldquant_numba._ts_argmax_2d-34.py39.nbi",
+          " M momentum/FeatureEngineering/operators/__pycache__/_worldquant_numba._ts_argmin_2d-57.py39.nbi",
+          " M momentum/FeatureEngineering/preprocessing/__pycache__/_fast_adf_numba._adf_ols_core-44.py39.nbi",
+          " M momentum/FeatureEngineering/utils/__pycache__/nan_stats._chunk_nan_state-11.py39.nbi"
+        ],
+        "head": "18dfc0a2507e153d10f8c44473286f4c2b0cfd9d",
+        "orchestrator_sha256": "5318de56342dca778183406ab3c19b2f1ea276951085a7c227b6f34bc875125f"
+      },
+      "elapsed_seconds": 150.32,
+      "ic_autocorr_quantiles": [
+        0.2338310880237891,
+        0.9790574145522513,
+        0.9851173697588187,
+        0.9906193899790415,
+        0.9963874374908439
+      ],
+      "ic_autocorr_reason_counts": {
+        "None": 182,
+        "insufficient_samples": 17
+      },
+      "icir_window_key": "window_189",
+      "identity": {
+        "base_override_sha256": "5fa314c0cc75cab59e13370d993c450b8d31a16e68d41a771f6eea27a36c9a8b",
+        "n_cols": 199,
+        "seed": 20261027,
+        "source_h5": "data_cache/icperf_inputs/L_BTCUSDT_4h_longhist/ic/data_cache/reports/ic_ingest_cache/BTCUSDT_4h_2f522a293917655280c483f50d200069.h5",
+        "subset_h5": "runs/icperf/task04/toggle_impact/subsets/L200/BTCUSDT_4h_2f522a293917655280c483f50d200069.h5",
+        "subset_h5_sha256": "6dacecbc46a92d84b173bd42bfff2777e75f7fb50185b6a7fdef60412ef2fc48"
+      },
+      "n_valued": 182,
+      "oracle_mismatch_count": 0,
+      "oracle_mismatch_examples": [],
+      "refilter_column_diff_count": 0,
+      "script": "runs/icperf/task04/v558/run_v558_real.py",
+      "series_length_min_max": [
+        202,
+        202
+      ],
+      "split": {
+        "applied": true,
+        "test_rows": 395,
+        "train_rows": 1600
+      }
+    }
+  }
 }
