@@ -370,7 +370,17 @@ def delivered(repo: Path, events: Sequence[dict], rounds: Dict[str, dict], rid: 
         ["bash", str(repo / "scripts" / "completeness_check.sh"), "--single", str(q), "--family", fam, "--round-id", rid],
         capture_output=True, text=True, cwd=str(repo), env=_clean_env(),
     )
-    return proc.returncode == 0
+    if proc.returncode != 0:
+        return False
+    # (iv) 與銷帳出口同一判準（debt_clear.sh「state == failed」支）：CLI 非零退出者，產出檔須帶終結標記
+    #   `VERDICT:` 與 `STATUS: DONE` 才算已交件。缺此條時，failed 而缺標記之家族「重派判已交件、銷帳判未交件」
+    #   ⇒ 兩條出口皆拒之死結（2026-11-03 r87 composer 寫完交件後行程不退出、主控端終止，rc=143）。
+    latest = latest_result(events, rid, fam)
+    if latest is not None and (latest.get("result_state") or "") == "failed":
+        body = q.read_text(encoding="utf-8", errors="replace").splitlines()
+        if not all(any(ln.startswith(tk) for ln in body) for tk in ("VERDICT:", "STATUS: DONE")):
+            return False
+    return True
 
 
 def archive_path(repo: Path, rid: str, fam: str, attempt: int) -> Path:

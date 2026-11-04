@@ -654,6 +654,36 @@ def test_issue_output_registered_completeness_fail_rc0(repo: Repo) -> None:
     assert repo.redispatch(rid, "codex").returncode == 0        # 自動登記殘痕 ⇒ 未交件
 
 
+def _failed_registered_round(r: Repo, body: str) -> str:
+    """CLI 非零退出（failed）後主委重新 register-output 之形（committee_output 在結果列之後）。"""
+    rid = str(uuid.uuid4())
+    expected = open_round(r, rid)
+    out = expected["codex"]
+    r.write(out, body)
+    family_result(r, rid, "codex", "failed", out, sha=sha256_text(body))
+    r.append("committee_output", round_id=rid, family="codex", output_path=out,
+             output_sha256=sha256_text(body), verdict="proceed",
+             blocked_by="@[]", closed="@[]",
+             task_id="20260916-REDISPATCH-T-REVIEW-R1", actor="gate", origin_script="gate.sh")
+    return rid
+
+
+def test_issue_failed_without_terminal_markers_not_delivered_rc0(repo: Repo) -> None:
+    """failed 且產出缺 `STATUS: DONE` ⇒ 銷帳拒收，重派須准（否則兩出口皆拒成死結）。"""
+    rid = _failed_registered_round(repo, "## X\nVERDICT: proceed\nCLOSED:\n")
+    _stub_completeness(repo, "#!/usr/bin/env bash\nexit 0\n")
+    proc = repo.redispatch(rid, "codex")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_issue_failed_with_terminal_markers_delivered_rc1(repo: Repo) -> None:
+    """failed 但產出帶 `VERDICT:` 與 `STATUS: DONE` ⇒ 銷帳可收，重派仍判已交件。"""
+    rid = _failed_registered_round(repo, "## X\nVERDICT: proceed\nSTATUS: DONE\n")
+    _stub_completeness(repo, "#!/usr/bin/env bash\nexit 0\n")
+    proc = repo.redispatch(rid, "codex")
+    assert proc.returncode == 1 and "④" in proc.stderr, proc.stdout + proc.stderr
+
+
 def test_issue_output_registered_sha_mismatch_rc0(repo: Repo) -> None:
     rid, expected = _delivered_round(repo)
     _stub_completeness(repo, "#!/usr/bin/env bash\nexit 0\n")
