@@ -1,0 +1,74 @@
+223,239d222
+< def test_negative_control_budget_key_warns_as_removed_key(caplog: pytest.LogCaptureFixture) -> None:
+<     """依本專案移除鍵慣例（契約 `removed_config_keys`＋`_warn_removed_keys`）：舊設定帶 `event_filter.negative_control_budget_seconds`
+<     ⇒ 發 ICHC-REMOVED-KEY 警告一則（不靜默吞鍵）；不帶 ⇒ 無此警告。"""
+<     import logging
+< 
+<     from momentum.Analysis.ic_config_schema import load_ic_config
+< 
+<     with caplog.at_level(logging.WARNING):
+<         load_ic_config(api_override={"event_filter": {"negative_control_budget_seconds": 60.0}})
+<     hits = [r.getMessage() for r in caplog.records if "ICHC-REMOVED-KEY" in r.getMessage()]
+<     assert len(hits) == 1 and "event_filter.negative_control_budget_seconds" in hits[0], hits
+<     caplog.clear()
+<     with caplog.at_level(logging.WARNING):
+<         load_ic_config(api_override={"event_filter": {"negative_control_n": 7}})
+<     assert not [r for r in caplog.records if "ICHC-REMOVED-KEY" in r.getMessage()]
+< 
+< 
+369c352
+<     缺值位置相同；12h risk_adjusted（波動暖機）見 `test_xsec_risk_adjusted_12h_passes_coverage_and_main_ic_equals_decay_h1_via_service`。"""
+---
+>     缺值位置相同；12h（1,696 根）於 risk_adjusted 時首 21 根波動暖機 NaN 使跨標的標籤覆蓋率守衛（容忍 1%）拒收——見回報。"""
+381,431d363
+< 
+< 
+< @pytest.mark.requires_kline
+< @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+< @pytest.mark.parametrize("return_type", RETURN_TYPES)
+< def test_label_backward_warmup_bars_equals_leading_nan_on_real_kline(return_type: str) -> None:
+<     """`LabelGenerator.backward_warmup_bars(return_type)`（跨標的覆蓋率守衛之結構暖機）== 真實收盤上該定義標籤之開頭連續
+<     缺值數（oracle＝`_oracle_label` 直算，不經 LabelGenerator；每個 12h 標的皆同）。"""
+<     from momentum.factories import create_label_generator
+< 
+<     got = create_label_generator().backward_warmup_bars(return_type)
+<     for sym, close in _kline_closes().items():
+<         lab = _oracle_label(close, return_type)
+<         lead = int(np.argmax(np.isfinite(lab)))
+<         assert got == lead, f"{return_type}/{sym}：暖機 {got} != 開頭缺值 {lead}"
+< 
+< 
+< def test_xsec_coverage_guard_floor_subtracts_warmup_and_still_rejects_extra_nan() -> None:
+<     """守衛結構下限＝(列數 − 前瞻 − 暖機)／列數，容忍度不變：恰為結構缺值 ⇒ 過；再多缺 >1%（相對下限）⇒ 拒收；
+<     暖機=0 時同一列（含 21 根開頭缺值、1,696 列）⇒ 拒收（改前行為，即 12h risk_adjusted 誤擋之形）。"""
+<     n, warm, h = 1696, 21, 1
+<     idx = pd.MultiIndex.from_product([pd.RangeIndex(n), ["S"]], names=["timestamp", "_symbol"])
+<     lab = np.arange(n, dtype=np.float64)
+<     lab[:warm] = np.nan
+<     lab[-h:] = np.nan
+<     df = pd.DataFrame({LABEL: lab}, index=idx)
+<     got = orch_mod._enforce_cross_sectional_label_coverage(df, LABEL, 1, h, 0.01, backward_warmup=warm)
+<     assert got["S"] == (n - h - warm) / n
+<     with pytest.raises(orch_mod.InvalidInputError, match="label coverage too low"):
+<         orch_mod._enforce_cross_sectional_label_coverage(df, LABEL, 1, h, 0.01, backward_warmup=0)
+<     extra = lab.copy()
+<     extra[warm:warm + 17] = np.nan  # 17 / 1674 ≈ 1.02% > 1%
+<     with pytest.raises(orch_mod.InvalidInputError, match="label coverage too low"):
+<         orch_mod._enforce_cross_sectional_label_coverage(
+<             pd.DataFrame({LABEL: extra}, index=idx), LABEL, 1, h, 0.01, backward_warmup=warm)
+< 
+< 
+< @pytest.mark.requires_kline
+< @pytest.mark.filterwarnings("ignore::RuntimeWarning")
+< def test_xsec_risk_adjusted_12h_passes_coverage_and_main_ic_equals_decay_h1_via_service() -> None:
+<     """12h（1,696 根）跨標的 × risk_adjusted 經服務：首 21 根波動暖機為定義上必然之缺值，不得被覆蓋率守衛誤擋；
+<     且主 IC == 衰減 h=1（同上條之報酬定義一致性）。"""
+<     closes = _kline_closes("12h")
+<     report = _run_service_xsec(closes, {**NO_SPLIT, "global": {"default_method": "pearson"},
+<                                         "labels": {"return_type": "risk_adjusted"},
+<                                         "ic_calculation": {"ic_decay_horizons": [1, 2, 3]}}, "12h")
+<     rows = {r["feature_name"]: r for r in report["summary_table"]}
+<     assert set(rows) == {"ret1", "dev20", "mom10"}
+<     for name, row in rows.items():
+<         assert math.isclose(float(row["ic_mean"]), float(report["ic_decay"][name]["ic_values"][0]),
+<                             rel_tol=1e-12, abs_tol=1e-15), name
