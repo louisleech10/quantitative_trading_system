@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/api/test_event_label_alignment.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false tests/api/test_event_label_alignment.py tests/api/test_evtlabel_staging.py tests/api/test_evtwarmup.py tests/api/test_gap3_oos_downgrade.py tests/api/test_gap3_scan_grid.py tests/api/test_ic_analysis_service.py tests/api/test_ic_deep_analysis.py tests/api/test_ic_la1_degraded_gate.py tests/api/test_ic_run_selector.py tests/api/test_ichc_event_timestamps.py tests/api/test_icperf_feature_filter_split_metadata.py tests/api/test_isolation_disclosure.py tests/api/test_period_auto_align.py tests/api/test_preprov_ingest_cache.py tests/api/test_scan_cube.py tests/api/test_splitunify_disclosure.py tests/api/test_stage_progress.py tests/api/test_tfwindow.py tests/feature_engineering/test_ffname_generation_gate.py tests/feature_library/test_phase5.py tests/golden/la1/test_b4_golden_rebaseline.py tests/golden/la2/test_attribution_validator.py tests/momentum/Analysis/test_evtlabel_e2e_realkline.py tests/momentum/Analysis/test_evtlabel_isolation_channel.py tests/momentum/Analysis/test_evtlabel_oracle.py tests/momentum/Analysis/test_evtlabel_stage3.py tests/momentum/Analysis/test_evtlabel_stage5.py tests/momentum/Analysis/test_factor_return_analyzer.py tests/momentum/Analysis/test_factor_return_stopgap.py tests/momentum/Analysis/test_gap2_golden.py tests/momentum/Analysis/test_gap2_stage6b_wiring.py tests/momentum/Analysis/test_gap2_survivor_persist.py tests/momentum/Analysis/test_ic1d_baseline.py tests/momentum/Analysis/test_ic_1a_cut1_golden.py tests/momentum/Analysis/test_ic_1a_cut1_oos.py tests/momentum/Analysis/test_ic_1a_cut1_split.py tests/momentum/Analysis/test_ic_1eb_b5_golden.py tests/momentum/Analysis/test_ic_persist_redirect_golden_ab.py tests/momentum/Analysis/test_ic_persist_redirect_inventory.py tests/momentum/Analysis/test_ic_persist_redirect_isolation.py tests/momentum/Analysis/test_ic_persist_redirect_unit.py tests/momentum/Analysis/test_icfirstalign_fu2.py tests/momentum/Analysis/test_ichc_event_honesty.py tests/momentum/Analysis/test_ichc_p2_golden.py tests/momentum/Analysis/test_ichc_split_metadata.py tests/momentum/Analysis/test_ichc_turnover_gate.py tests/momentum/Analysis/test_ichc_xsec_capability.py tests/momentum/Analysis/test_icperf_correctness.py tests/momentum/Analysis/test_icperf_deep_centrality_trend.py tests/momentum/Analysis/test_icperf_deep_orth_exposure.py tests/momentum/Analysis/test_icperf_deep_quality_netic.py tests/momentum/Analysis/test_icperf_diversification_constraint.py tests/momentum/Analysis/test_icperf_event_binary_clock.py tests/momentum/Analysis/test_icperf_gate.py tests/momentum/Analysis/test_icperf_h5_lossless.py tests/momentum/Analysis/test_icperf_hac_method_bw.py tests/momentum/Analysis/test_icperf_ic_autocorr_report.py tests/momentum/Analysis/test_icperf_regime_robust.py tests/momentum/Analysis/test_icperf_rolling_numerics.py tests/momentum/Analysis/test_icperf_ui_toggles.py tests/momentum/Analysis/test_icperf_v559_product.py tests/momentum/Analysis/test_icperf_vif_sample_guard.py tests/momentum/Analysis/test_icperf_xsec_method.py tests/momentum/Analysis/test_icperf_xsec_placeholders.py tests/momentum/Analysis/test_long_short_analyzer.py tests/momentum/Analysis/test_net_ic_analyzer.py tests/momentum/Analysis/test_preprov_survivor_identity.py tests/momentum/Analysis/test_splitunify_stage3_observation.py tests/momentum/event_samples/test_event_disposition_ledger.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/momentum/test_close_coterminalize.py tests/momentum/test_ic_1eb_b2_wiring.py tests/momentum/test_ic_1eb_b3_xsec.py tests/momentum/test_ic_1eb_b4_fullstack.py tests/momentum/test_ic_config.py tests/momentum/test_ic_crash_real_config.py tests/momentum/test_ic_cross_sectional_cut2.py tests/momentum/test_ic_e2e.py tests/momentum/test_ic_feature_filter.py tests/momentum/test_ic_filter_orchestrator.py tests/momentum/test_ic_golden_inputs_names_opaque.py tests/momentum/test_ic_phase0_golden.py tests/momentum/test_la0_b4_orchestrator.py tests/momentum/test_la0_lookahead.py tests/momentum/test_la1_lookahead.py tests/momentum/test_la2_lookahead.py tests/momentum/test_stage_timings.py tests/momentum/test_statistical_validator.py tests/momentum/test_tier_config.py tests/momentum/test_tier_toggle_sync.py tests/momentum/test_validated_series_is_used_series.py tests/phase25/test_long_short_analyzer.py tests/phase26/test_deep_analysis_integration.py -m 'slow or requires_kline'",
+      "code_sha256": "eaa274e8e74d9a2792f0cc86c465977bf29be68e15c5c6f281702b23dd3b9f64",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF ㊹ v5.68 收案前重型受影響測試：93 個受影響檔之 slow／requires_kline 節點 180 條，TEST_SELECTION §4；清單 runs/icperf/hac_method/heavy_nodes2.txt）",
+      "created_at": "2026-11-04T03:30:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 5400,
+  "basis": [
+    ".testreg/summary.json 所選 180 節點中 172 條最近一次 duration_s 合計約 4,355 秒（runs/icperf/hac_method/heavy_estimate.py）；8 條為本批新測試無紀錄，另留餘裕",
+    "最大者 test_icperf_gate::test_freeze_reproducible 1,736 秒、test_boundary_01_frozen_contains_all_g_items 1,299 秒",
+    "真實資料重測試單組串行（資源互斥），不並行；估時為量級估計，不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-5"
+  ]
+}

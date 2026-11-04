@@ -5,9 +5,8 @@
 
 - (ab) 顯著性 metadata `significance.tested_estimator` 依實際被檢定之估計量：
   - 跨標的：HAC 檢定之對象＝逐時點截面 IC 序列（估計量＝`global.default_method`）⇒ `cross_sectional_period_ic_<method>`。
-  - 縱向：HAC 檢定之對象＝逐根 Spearman 貢獻序列（`statistical_validator.compute_hac_ic_statistics` 不收方法參數）⇒
-    不論 `default_method`，被檢定之估計量恆為 Spearman，字面 `bar_level_spearman` 方為真；本檔以 statsmodels OLS HAC 於
-    Spearman 貢獻序列之 t 值逐值對照證之（若日後 HAC 改依方法，本條紅，字面須同步改）。
+  - 縱向（SPEC v5.63 ㊹ 改依方法）：HAC 檢定之對象＝所選方法之逐根貢獻序列 ⇒ 字面 `bar_level_<method>`；本檔以測試自寫之
+    逐方法貢獻＋論文式 EWC 之 t 值逐值對照證之。
 - (ac) 事件負對照固定跑 `negative_control_n` 次（刪牆鐘預算縮減）；`degraded_by_budget`／`budget_seconds` 不再出現在收據；
   耗時以 `_report_progress` 之子步驟進度揭露。
 - (ae) 跨標的主 IC 標籤依 `labels.return_type`（與 IC 衰減同一定義）：以 `data_cache/feature_klines/kline_cache.h5` 直讀收盤
@@ -97,22 +96,34 @@ def _longitudinal_inputs(n: int = 240) -> tuple[pd.DataFrame, pd.Series]:
     return features, label
 
 
-def _spearman_hac_t_oracle(x: np.ndarray, y: np.ndarray, horizon: int) -> float:
-    """逐根 Spearman 貢獻 z＝zscore(rank x)·zscore(rank y)（ddof=1）之均值 t：statsmodels OLS(z, 1) HAC（Bartlett、無小樣本
-    修正）；L＝max(int(4·(n/100)^(2/9)), horizon−1)（同 SPEC Task 0.3 HAC 項之定義）。"""
-    rx, ry = stats.rankdata(x), stats.rankdata(y)
-    z = ((rx - rx.mean()) / rx.std(ddof=1)) * ((ry - ry.mean()) / ry.std(ddof=1))
+def _method_ewc_t_oracle(x: np.ndarray, y: np.ndarray, method: str) -> float:
+    """逐方法貢獻序列之 EWC t（SPEC v5.63 ㊹ (af)(ag)）：spearman＝zscore(rank)·zscore(rank)、pearson＝zscore·zscore（ddof=1）、
+    kendall＝O(n²) 直算 Hájek 投影（SE 因子 2）；Ω＝論文式餘弦基底 Λ_1..ν 平方均值，ν＝⌊0.4·n^(2/3)⌋（十進位高精度）。"""
+    import decimal
+
+    if method == "spearman":
+        rx, ry = stats.rankdata(x), stats.rankdata(y)
+        z, factor = ((rx - rx.mean()) / rx.std(ddof=1)) * ((ry - ry.mean()) / ry.std(ddof=1)), 1.0
+    elif method == "pearson":
+        z, factor = ((x - x.mean()) / x.std(ddof=1)) * ((y - y.mean()) / y.std(ddof=1)), 1.0
+    else:
+        z = (np.sign(x[:, None] - x[None, :]) * np.sign(y[:, None] - y[None, :])).sum(axis=1) / (x.size - 1)
+        factor = 2.0
     n = z.size
-    lags = max(int(4 * (n / 100.0) ** (2.0 / 9.0)), horizon - 1)
-    fit = sm.OLS(z, np.ones(n)).fit(cov_type="HAC", cov_kwds={"maxlags": lags, "kernel": "bartlett",
-                                                               "use_correction": False})
-    return float(fit.tvalues[0])
+    with decimal.localcontext() as ctx:
+        ctx.prec = 50
+        nu = int((decimal.Decimal("0.4") * decimal.Decimal(n) ** (decimal.Decimal(2) / decimal.Decimal(3)))
+                 .to_integral_value(rounding=decimal.ROUND_FLOOR))
+    t_idx = np.arange(1, n + 1, dtype=float)
+    basis = np.sqrt(2.0 / n) * np.cos(np.pi * np.arange(1, nu + 1, dtype=float)[:, None] * (t_idx[None, :] - 0.5) / n)
+    lam = basis @ (z - z.mean())
+    return float(z.mean() / (factor * math.sqrt(float(np.mean(lam ** 2)) / n)))
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_longitudinal_tested_estimator_is_the_spearman_hac_actually_run(method: str) -> None:
-    """縱向：不論 `default_method`，第 5 段 HAC t 值 == Spearman 貢獻序列之 statsmodels HAC t（相對誤差 ≤ 1e-12）⇒ 被檢定之
-    估計量恆為 Spearman，字面 `bar_level_spearman` 為真；寫成 `bar_level_<method>` 即與實際檢定不符（本條紅）。"""
+def test_longitudinal_tested_estimator_follows_method(method: str) -> None:
+    """縱向（SPEC v5.63 ㊹ (af)；原 `test_longitudinal_tested_estimator_is_the_spearman_hac_actually_run` 改為依方法）：
+    第 5 段 HAC t 值 == 所選方法之貢獻序列 EWC t（相對誤差 ≤ 1e-12），字面 `bar_level_<method>`、`hac_method`＝`ewc_llsw2018`。"""
     features, label = _longitudinal_inputs()
     config = ICConfig.model_validate({**NO_SPLIT, "global": {"default_method": method, "default_horizon": 1},
                                       "labels": {"horizons": [1]}})
@@ -123,12 +134,13 @@ def test_longitudinal_tested_estimator_is_the_spearman_hac_actually_run(method: 
                           "ic_decay": {}},
         config, {"tier": "sufficient"}, metadata={"symbol": "BTCUSDT"},
     )
-    assert stage5["significance"]["tested_estimator"] == "bar_level_spearman"
+    assert stage5["significance"]["tested_estimator"] == f"bar_level_{method}"
+    assert stage5["significance"]["hac_method"] == "ewc_llsw2018"
     for col in features.columns:
         got = float(stage5["ic_stats"][col]["t_stat"])
-        exp = _spearman_hac_t_oracle(features[col].to_numpy(), label.to_numpy(), 1)
-        assert math.isclose(got, exp, rel_tol=1e-12), f"{method}/{col}：產品 HAC t {got!r} != Spearman HAC {exp!r}"
-    # 前提（辨識力）：f0 之 Pearson 與 Spearman 確實不同，故「HAC 等於 Spearman 版」可分辨兩估計量
+        exp = _method_ewc_t_oracle(features[col].to_numpy(), label.to_numpy(), method)
+        assert math.isclose(got, exp, rel_tol=1e-12), f"{method}/{col}：產品 HAC t {got!r} != {method} EWC {exp!r}"
+    # 前提（辨識力）：f0 之 Pearson 與 Spearman 確實不同，故逐方法之 t 可分辨兩估計量
     assert abs(stats.pearsonr(features["f0"], label)[0] - stats.spearmanr(features["f0"], label)[0]) > 0.05
 
 

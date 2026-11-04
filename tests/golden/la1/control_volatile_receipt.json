@@ -1,9 +1,9 @@
 {
-  "content_sha256": "68632d02d53fb1cbd439f91838d01e0aa410edb79189de37df8fce11b661ea81",
+  "content_sha256": "4812a7de3fe9f76a767e3eb91f33c6dec40912cb81648b48fb18efb615706820",
   "discover_matrix": [
     {
       "control_kind": "regime_off",
-      "run_wall_s": 14.092,
+      "run_wall_s": 19.853,
       "symbol": "BTCUSDT",
       "timeframe": "1h",
       "volatile_paths": [
@@ -25,7 +25,7 @@
     },
     {
       "control_kind": "ls_off",
-      "run_wall_s": 23.844,
+      "run_wall_s": 26.96,
       "symbol": "BTCUSDT",
       "timeframe": "1h",
       "volatile_paths": [
@@ -47,7 +47,7 @@
     },
     {
       "control_kind": "non_trigger_fallback",
-      "run_wall_s": 23.772,
+      "run_wall_s": 29.286,
       "symbol": "BTCUSDT",
       "timeframe": "1h",
       "volatile_paths": [
@@ -69,7 +69,7 @@
     },
     {
       "control_kind": "regime_off",
-      "run_wall_s": 14.368,
+      "run_wall_s": 21.501,
       "symbol": "ETHUSDT",
       "timeframe": "12h",
       "volatile_paths": [
@@ -91,7 +91,7 @@
     },
     {
       "control_kind": "ls_off",
-      "run_wall_s": 14.625,
+      "run_wall_s": 20.83,
       "symbol": "ETHUSDT",
       "timeframe": "12h",
       "volatile_paths": [
@@ -113,7 +113,7 @@
     },
     {
       "control_kind": "non_trigger_fallback",
-      "run_wall_s": 14.609,
+      "run_wall_s": 18.641,
       "symbol": "ETHUSDT",
       "timeframe": "12h",
       "volatile_paths": [

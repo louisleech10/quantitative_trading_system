@@ -758,13 +758,25 @@ def control_non_trigger_fallback_config() -> dict[str, Any]:
     return _base_config_override("rule")
 
 
+#: ICPERF SPEC ㊹（規格審查 r95 三家共識，決策 1 (b)）：EWC 預設門檻下兩 symbol × 三 control 第 5 段倖存皆 0
+#: （改前 BTC 1、ETH 2；runs/icperf/hac_method/la1_survivor_probe.log），control 明示放寬 p 門檻以保住倖存者下游路徑
+#: （篩選後特徵檔、倖存者快照、第 6b 段）之覆蓋；其他門檻不變。預設門檻倖存 0 另由測試鎖住。
+CONTROL_SURVIVOR_P_MAX = 1.0
+
+
+def _with_control_survivor_threshold(cfg: dict[str, Any]) -> dict[str, Any]:
+    out = json.loads(json.dumps(cfg))
+    out.setdefault("thresholds", {})["p_value_max"] = CONTROL_SURVIVOR_P_MAX
+    return out
+
+
 def control_config_for_kind(kind: str) -> dict[str, Any]:
     if kind == "regime_off":
-        return control_regime_off_config()
+        return _with_control_survivor_threshold(control_regime_off_config())
     if kind == "ls_off":
-        return control_ls_off_config()
+        return _with_control_survivor_threshold(control_ls_off_config())
     if kind == "non_trigger_fallback":
-        return control_non_trigger_fallback_config()
+        return _with_control_survivor_threshold(control_non_trigger_fallback_config())
     raise ValueError(f"unknown control kind: {kind!r}")
 
 

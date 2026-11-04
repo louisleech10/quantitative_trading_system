@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import copy
 import functools
 import importlib.util
 import json
@@ -54,7 +55,12 @@ COVERAGE_FEATURES = 20
 #: `scripts/icperf_event_batch.py` 依明列規則重建之批（SPEC v5.38 ①；其 FACT-RECEIPT 之 import_id）。跨標的兩請求（SPEC
 #: v5.39 ⑩）：`X.cross_sectional`＝兩格 FF 特徵之退回分支（明列 `override_extra`＝關切分；不以預設失敗後退回）；
 #: `X.cross_sectional.default`＝`kline_cache.h5` 該週期全部標的之末 `rows` 根真實 kline 因果特徵（`XSEC_FEATURES`）之預設
-#: 分支（預設切分須成立，失敗 ⇒ 請求失敗、收據 FAIL）。
+#: 分支（預設切分須成立，失敗 ⇒ 請求失敗、收據 FAIL）。`config_extra`＝深合併入該請求之 `config_override`（產品既有設定鍵）：
+#: SPEC v5.69 ㊹ 資料補足（預設門檻下 L 格倖存 1、警示 0，兩路徑皆無內容可驗）：`L.ic_report.h34`＝L 格 `labels.horizons` 增 34
+#: （既有 Fibonacci 序列之下一項）、`global.default_horizon` 34、門檻照預設，使縱向 EWC 之資料不足警示於真實資料觸發（h＝34 時測試段
+#: 不足滾動暖機 ⇒ 產品退回全樣本，n 約 830–1,970；同輸入 α＝0.05 離線試算 h＝21 警示 0、h＝34 87／120）；`L.ic_report.p1`＝
+#: `thresholds.p_value_max` 1.0（同 la1／GAP-2 golden 之倖存者設定）使邊際 IC 條件集合非空。兩者不合併：α 取自 `p_value_max`
+#: （`ic_filter_orchestrator.py` `_resolve_alpha_policy`），α＝1 時警示依定義不觸發。
 REQUESTS: Dict[str, Dict[str, Any]] = {
     "A.ic_report": {"item": "ic_report", "n_features": 120},
     "A.ic_report.cov": {"item": "ic_report", "n_features": COVERAGE_FEATURES, "sorted": True},
@@ -64,6 +70,11 @@ REQUESTS: Dict[str, Dict[str, Any]] = {
     "A.event_report.cov": {"item": "event_report", "n_features": COVERAGE_FEATURES, "sorted": True},
     "A.deep_analysis": {"item": "deep_analysis", "n_features": 30, "family": True},
     "L.ic_report": {"item": "ic_report_long", "n_features": 120},
+    "L.ic_report.h34": {"item": "ic_report_long", "n_features": 120,
+                        "config_extra": {"labels": {"horizons": [1, 2, 3, 5, 8, 13, 21, 34]},
+                                         "global": {"default_horizon": 34}}},
+    "L.ic_report.p1": {"item": "ic_report_long", "n_features": 120,
+                       "config_extra": {"thresholds": {"p_value_max": 1.0}}},
     "L.deep_analysis": {"item": "deep_analysis_long", "n_features": 30, "family": True},
     "L.event_import_report": {"item": "event_import_report", "n_features": 120,
                               "event_batch_receipt": "handoffs/run_receipts/20261030-icperf-event-batch-4h-b6.json"},
@@ -161,6 +172,14 @@ def kline_symbols(timeframe: str) -> List[str]:
         return sorted(k for k in f.keys() if not k.startswith("_") and f"{k}/{timeframe}/data" in f)
 
 
+def _deep_merge(base: Mapping[str, Any], extra: Mapping[str, Any]) -> Dict[str, Any]:
+    """`extra` 深合併入 `base` 之複本（巢狀 dict 逐鍵合併，其餘值以 `extra` 覆蓋）；不改動輸入。"""
+    out = copy.deepcopy(dict(base))
+    for k, v in extra.items():
+        out[k] = _deep_merge(out[k], v) if isinstance(v, Mapping) and isinstance(out.get(k), Mapping) else copy.deepcopy(v)
+    return out
+
+
 def request_for(req_id: str) -> Dict[str, Any]:
     """請求 id ⇒ 凍結腳本之預設請求加特徵子集（`feature_filter.include_features`）；`sorted` ⇒ 同凍結腳本 `small_request`；
     `family` ⇒ `family_aware_subset`（請求記 `parameter_family`）；`method` ⇒ `config_override.global.default_method`；
@@ -199,6 +218,8 @@ def request_for(req_id: str) -> Dict[str, Any]:
         request["feature_filter"] = {"include_features": subset_names(fb._run_feature_names(request), n)}
     if spec.get("method"):
         request["config_override"] = {**request["config_override"], "global": {"default_method": spec["method"]}}
+    if spec.get("config_extra"):
+        request["config_override"] = _deep_merge(request["config_override"], spec["config_extra"])
     if spec.get("event_batch_receipt"):
         request["event_import_id"] = _event_batch_import_id(spec["event_batch_receipt"])
         request["event_batch_receipt"] = spec["event_batch_receipt"]
@@ -1011,26 +1032,61 @@ def _seg(F: Any, y: Any, mask: Any) -> Any:
     return F.loc[F.index[m]], (y.loc[y.index[m]] if len(y) == len(F) else y.reindex(F.index[m]))
 
 
-def _hac_fail_closed(x: Any, y: Any, horizon: int, maxlags: Any) -> Dict[str, Any]:
-    """HAC t／p 之 oracle（SPEC Task 0.3 鎖定定義；測試檔 `_hac_oracle` 之 statsmodels OLS HAC SE）＋現行 fail-closed 邊界：
-    L＝指定 maxlags 或 max(int(4·(n/100)^(2/9)), h−1)；L ≥ n−1 或 n < max(8, 2L) ⇒ NaN；SE 非有限或 0 ⇒ NaN。"""
+def ls_ar1_oracle(x: Any) -> float:
+    """測試自寫之含截距 AR(1) 最小平方 ρ̂（Andrews 1993 統計量；不呼叫產品 `ls_ar1_coefficient`）：滯後段與前導段各自去均值後
+    Σa0·a1／Σa0²；n < 3 或滯後段零變異 ⇒ NaN。"""
+    import numpy as np
+
+    xa = np.asarray(x, dtype=float)
+    if xa.size < 3:
+        return math.nan
+    a0, a1 = xa[:-1] - xa[:-1].mean(), xa[1:] - xa[1:].mean()
+    den = float((a0 * a0).sum())
+    return float((a0 * a1).sum() / den) if den > 0 else math.nan
+
+
+def warning_oracle(x_valid: Any, horizon: int, method: str, alpha: float) -> tuple:
+    """資料不足警示之期望值（EWC 可算之欄）：ρ̂＝`ls_ar1_oracle`；不可估 ⇒ (`persistence_not_estimable`, None)；否則以
+    實際 n、h、方法、α 呼叫模擬判準 `small_sample_warning`（判準本身之正確性由 ㊹ 具名測試對真值驗）⇒
+    (`small_effective_sample`, detail) 或 (None, None)。"""
+    import numpy as np
+
+    from momentum.Analysis.hac_ewc import small_sample_warning
+
+    rho = ls_ar1_oracle(x_valid)
+    if not math.isfinite(rho):
+        return "persistence_not_estimable", None
+    detail = small_sample_warning(int(np.asarray(x_valid).size), int(horizon), method, float(alpha), rho)
+    return ("small_effective_sample" if detail is not None else None), detail
+
+
+def _hac_fail_closed(x: Any, y: Any, horizon: int, maxlags: Any, method: str = "spearman") -> Dict[str, Any]:
+    """縱向 HAC t／p 之 oracle（SPEC v5.63 ㊹；測試檔 `_hac_oracle`：逐方法貢獻＋論文式 EWC，明示 maxlags 走 statsmodels
+    Newey–West）＋邊界：EWC 之 ν＜1 ⇒ insufficient_sample、一側常數或 Ω≤0 ⇒ degenerate；明示 maxlags 之
+    L ≥ n−1 或 n < max(8, 2L) ⇒ insufficient_sample、SE 非有限或 0 ⇒ degenerate。"""
     import math
 
     import numpy as np
 
     O = _oracles()
-    n = int(np.asarray(x).size)
-    lag = int(maxlags) if maxlags is not None else max(int(4 * (n / 100.0) ** (2.0 / 9.0)), int(horizon) - 1)
-    nan = {"t_stat": math.nan, "p_value": math.nan, "se": math.nan, "n_obs": n, "maxlags": lag}
-    if n < 3 or lag >= n - 1 or n < max(8, 2 * lag):
-        return nan
-    z = O._ref_spearman_z(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
-    if not np.all(np.isfinite(z)):
-        return nan
-    se = O._sm_hac_se(z, lag)
-    if not math.isfinite(se) or se == 0:
-        return nan
-    return O._hac_oracle(np.asarray(x, dtype=float), np.asarray(y, dtype=float), horizon, lag)
+    xa, ya = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    n = int(xa.size)
+    nan = {"t_stat": math.nan, "p_value": math.nan, "se": math.nan, "n_obs": n,
+           "maxlags": int(maxlags) if maxlags is not None else None}
+    if maxlags is not None:
+        lag = int(maxlags)
+        if n < 2 or lag >= n - 1 or n < max(8, 2 * lag):
+            return {**nan, "ewc_dof": None, "inference_status": "insufficient_sample"}
+    else:
+        nu = O._ref_ewc_dof(n) if n >= 1 else 0
+        if nu < 1:
+            return {**nan, "ewc_dof": int(nu), "inference_status": "insufficient_sample"}
+    if n < 2 or np.ptp(xa) == 0 or np.ptp(ya) == 0:
+        return {**nan, "ewc_dof": (None if maxlags is not None else O._ref_ewc_dof(n)), "inference_status": "degenerate"}
+    out = O._hac_oracle(xa, ya, horizon, maxlags, method=method)
+    if not math.isfinite(out["se"]) or out["se"] == 0:
+        return {**nan, "ewc_dof": out["ewc_dof"], "inference_status": "degenerate"}
+    return {**out, "inference_status": "ok"}
 
 
 def _hac_on_series(z: Any, horizon: int, maxlags: Any) -> Dict[str, Any]:
@@ -1405,13 +1461,19 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
             t_rr.eq("/summary_table/#/regime_robust_reason", f"{c}/regime_robust_reason", row.get("regime_robust_reason"),
                     exp_reason, c)
     # 第 5 段：HAC、FDR、逐根 PIT 統計（輸入＝產品第 5 段實際輸入對）
-    t_h = T("hac", "statsmodels OLS HAC（Bartlett、無小樣本修正）＋ scipy t 分布＋現行 fail-closed 邊界；測試自寫 _hac_oracle")
+    t_h = T("hac", "縱向：逐方法貢獻（spearman／pearson 標準化乘積、kendall O(n²) Hájek 投影）＋論文式 EWC 餘弦基底（ν＝⌊0.4n^(2/3)⌋、"
+                   "scipy t_ν）；明示 maxlags 走 statsmodels OLS HAC Bartlett；測試自寫 _hac_oracle（SPEC v5.63 ㊹）")
+    t_w = T("hac_data_warning", "資料不足警示：以實際 n_obs、h、方法、α（metadata significance.fdr.alpha_effective）、"
+                                "測試自寫含截距 AR(1) 最小平方 ρ̂ 重算 hac_ewc.small_sample_warning（驗接線；Andrews 反演、"
+                                "共同隨機數與配對差判準本身由 ㊹ 具名測試驗）")
     t_q = T("fdr", "statsmodels multipletests fdr_bh（同檢定集合：summary 有限 p 值）")
     t_p = T("stage5_pit_stats", "逐根 PIT 參考實作（_ref_monotonicity／_ref_turnover／_ref_coverage；只用 0..t）")
     t_ls = T("long_short_tstat", "測試自寫 PIT 分組重得頂底兩組報酬後 scipy.stats.ttest_ind(nan_policy='omit')")
     t_x = T("summary_passthrough", "summary 列各欄 == 同請求之第 5 段／衰減 oracle 輸出")
     pairs = cap.get("stage5_inputs") or []
     maxlags = (cfg.get("significance") or {}).get("maxlags")
+    alpha_eff = float((((rep.get("metadata") or {}).get("significance") or {}).get("fdr") or {})["alpha_effective"]) \
+        if pairs else math.nan  # 第 5 段有輸入時報告必有 alpha_effective；缺 ⇒ KeyError（不以預設值代替）
     mono_ref: Dict[str, Any] = {}
     if pairs:
         Fs, ys = pairs[0]
@@ -1421,13 +1483,33 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
             x, yy = Fs[c].to_numpy(float), ysr.to_numpy(float)
             ok = np.isfinite(x) & np.isfinite(yy)
             try:
-                o = _hac_fail_closed(x[ok], yy[ok], horizon, maxlags)
+                o = _hac_fail_closed(x[ok], yy[ok], horizon, maxlags, method)
             except Exception as exc:  # noqa: BLE001 — oracle 於邊界輸入失敗 ⇒ 記錄，不中斷
-                o = {"t_stat": math.nan, "p_value": math.nan}
+                o = {"t_stat": math.nan, "p_value": math.nan, "ewc_dof": None, "inference_status": None}
                 t_h.notes.append(f"{c}: oracle {exc!r}")
             if (row := rows.get(c)) is not None:
                 t_h.num("/summary_table/#/t_stat", f"{c}/t_stat", row.get("t_stat"), o["t_stat"], feature=c)
                 t_h.num("/summary_table/#/p_value", f"{c}/p_value", row.get("p_value"), o["p_value"], feature=c)
+                t_h.eq("/summary_table/#/ewc_dof", f"{c}/ewc_dof", row.get("ewc_dof"), o.get("ewc_dof"), c)
+                t_h.eq("/summary_table/#/inference_status", f"{c}/inference_status", row.get("inference_status"),
+                       o.get("inference_status"), c)
+                if o.get("inference_status") == "ok" and maxlags is None:
+                    exp_warning, exp_detail = warning_oracle(x[ok], int(horizon), method, alpha_eff)
+                else:
+                    exp_warning, exp_detail = None, None
+                t_w.eq("/summary_table/#/data_warning", f"{c}/data_warning", row.get("data_warning"), exp_warning, c)
+                got_detail = row.get("data_warning_detail")
+                if isinstance(got_detail, Mapping) or isinstance(exp_detail, Mapping):
+                    # 有警示 ⇒ 回應鍵展開為封閉八子鍵（flatten_fields），逐子鍵對照；一側為 None 者另側每鍵皆不一致
+                    gd, ed = dict(got_detail or {}), dict(exp_detail or {})
+                    for k in sorted(set(gd) | set(ed)):
+                        t_w.eq(f"/summary_table/#/data_warning_detail/{k}", f"{c}/data_warning_detail/{k}",
+                               gd.get(k), ed.get(k), c)
+                else:
+                    t_w.eq("/summary_table/#/data_warning_detail", f"{c}/data_warning_detail", got_detail, exp_detail, c)
+                    if exp_warning is None and o.get("inference_status") == "ok" and maxlags is None:
+                        # oracle 已實際判定未觸發 ⇒ detail 依定義為 null；明列邊界輸入另證於具名測試
+                        t_w.na("/summary_table/#/data_warning_detail", WARNING_NULL_DETAIL_PROOF)
         adj = _fdr({c: _f(r.get("p_value")) for c, r in rows.items()})
         for c, r in rows.items():
             t_q.num("/summary_table/#/p_value_adj", f"{c}/p_value_adj", r.get("p_value_adj"), adj.get(c, math.nan),
@@ -1502,6 +1584,8 @@ def evaluate_ic_report(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str,
 #: SPEC v5.38 ③：邊際 IC 無倖存者時之空葉（marginal_ic.py:347-351 `_empty_result`、factor_combiner.py:202-203 `_empty`）
 #: 之明列邊界證明
 MARGINAL_EMPTY_PROOF = "test_marginal_ic_no_survivors_leaves_are_empty"
+#: 資料不足警示未觸發 ⇒ `data_warning_detail` 為 null 之明列邊界證明（SPEC v5.69）
+WARNING_NULL_DETAIL_PROOF = "tests/momentum/Analysis/test_icperf_hac_method_bw.py::test_warning_known_cases_and_does_not_change_p"
 #: 邊際 IC 逐候選 reason 之非 None 分支（insufficient_rows、residual_degenerate）之明列邊界證明
 MARGINAL_REASON_PROOF = "test_marginal_ic_views_match_statsmodels_oracle"
 
@@ -2062,7 +2146,10 @@ COVERAGE_RULES: List[tuple] = [
     (r"^/summary_table/#/ic_mean$", "ic_mean_source", f"{_ORC}:5303"),
     (r"^/summary_table/#/(direction|icir_aligned|ic_hit_rate_aligned|monotonicity_score_aligned)$", "direction",
      f"{_ORC}:1177"),
-    (r"^/summary_table/#/(t_stat|p_value)$", "hac", "momentum/Analysis/statistical_validator.py:74"),
+    (r"^/summary_table/#/(t_stat|p_value|ewc_dof|inference_status)$", "hac",
+     "momentum/Analysis/statistical_validator.py:111"),
+    (r"^/summary_table/#/(data_warning|data_warning_detail)(/|$)", "hac_data_warning",
+     "momentum/Analysis/statistical_validator.py:215"),
     (r"^/summary_table/#/p_value_adj$", "fdr", "momentum/Analysis/statistical_validator.py:161"),
     (r"^/summary_table/#/ic_half_life$", "ic_decay_fit", f"{_ORC}:5342"),
     (r"^/summary_table/#/(monotonicity_score|long_short_spread|coverage|turnover_rate)$", "summary_passthrough",
@@ -2244,6 +2331,7 @@ EXTRA_ITEM_TESTS: Dict[str, tuple] = {
     "label": ("test_label_matches_float64_kline_oracle_on_real_kline",),
     "ic_autocorr": ("test_receipt_ic_autocorr_oracle_matches_product",),
     "event_binary": ("test_receipt_event_binary_oracle_matches_product",),
+    "hac_data_warning": ("test_receipt_hac_data_warning_oracle_matches_product",),
     "split": ("test_full_sample_fallback_aligns_raw_kline_to_features",
               "test_rolling_ic_test_slice_keeps_whole_test_windows_only"),
     "direction": ("test_direction_neutral_thresholds_pass_strong_reverse_factor",

@@ -1,4 +1,27 @@
-import type { ICAnalysisConfig, ICMethodSettings } from '@/lib/types';
+import type { HacDataWarningDetail, ICAnalysisConfig, ICMethodSettings } from '@/lib/types';
+
+/** ICPERF ㊹：縱向顯著性無法計算之顯示（封閉集合，p／q 欄）。 */
+export const HAC_NOT_COMPUTABLE_LABELS: Record<'insufficient_sample' | 'degenerate', string> = {
+  insufficient_sample: '無法計算：樣本不足',
+  degenerate: '無法計算：序列退化',
+};
+
+/** ICPERF ㊹：持續性不可估（p 照常、資料是否足夠無法判定）之 ⓘ。 */
+export const HAC_PERSISTENCE_NOT_ESTIMABLE_TIP =
+  '無法評估資料是否足夠：此特徵之一階自相關無法估計（例如滯後段為常數），故未做資料不足模擬；p 值照常計算與篩選';
+
+/** ICPERF ㊹：資料不足判定未執行（當下記憶體不足以模擬，可重跑）之 ⓘ。 */
+export const HAC_WARNING_NOT_EVALUATED_TIP =
+  '資料是否足夠之判定未執行：當下可用記憶體不足以完成模擬，可稍後重跑；p 值照常計算與篩選';
+
+const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+/** ICPERF ㊹：資料不足警示之 ⓘ 文案（數值取自 `data_warning_detail` 封閉八鍵）。 */
+export const hacDataWarningTip = (d: HacDataWarningDetail): string =>
+  `資料不足以可靠檢定：樣本外段 ${d.n_obs} 根、標籤 ${d.horizon} 根（約相當於 ${Math.round(d.approx_independent_n)} 筆獨立資料），` +
+  `特徵一階自相關 ${d.phi_hat.toFixed(3)}（中位數不偏估計）；在你設定之顯著水準 ${d.alpha} 下，以同樣本數、同標籤長度、同自相關之簡化模型` +
+  `（特徵 AR(1)、報酬獨立）模擬 ${d.replications} 次，單一檢定之誤判率約 ${pct(d.estimated_null_reject_rate)}（應為 ${pct(d.alpha)}；` +
+  `同條件下設計邊界之對照為 ${pct(d.reference_reject_rate)}）；此為模型近似、非此特徵之實測誤判率，p 值可能偏樂觀`;
 
 /**
  * ICPERF Task 0.4 ㊸：IC 頁方法選擇與門檻開關之顯示文字（面板與報告頂端「本次設定」共用）。
@@ -33,7 +56,7 @@ export const IC_SETTING_OPTION_LABELS: Record<string, string> = {
 
 /** 每個設定一句話（滑鼠移入 ⓘ 顯示）。 */
 export const IC_SETTING_TIPS: Record<keyof ICMethodSettings, string> = {
-  ic_method_selection: '換估計量會改 IC 值與排序；實測 Kendall 結果較接近預設，Pearson 倖存集合變動較大，依資料而異',
+  ic_method_selection: '換估計量會改 IC 值、排序與顯著性 p 值（p 依所選方法檢定）；實測 Kendall 結果較接近預設，Pearson 倖存集合變動較大，依資料而異',
   winsorization_method: '決定極端值如何截斷；實測換方法後第 5 段通過集合約二至四成不同，增減方向依資料而異',
   return_type_selection: '標籤報酬之定義；實測對數報酬與簡單報酬幾乎相同，除以波動時通過集合差異較大',
   redundancy_method_selection: '高相關特徵只留代表之方法；實測階層分群倖存數略少、VIF 倖存較多但耗時明顯較長',

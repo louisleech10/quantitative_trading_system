@@ -16,7 +16,7 @@ from momentum.Analysis.ic_config_schema import ICConfig, load_ic_config
 from momentum.Analysis.ic_filter_orchestrator import (
     FDR_ASSUMPTION_NOTE,
     ICFilterOrchestrator,
-    TESTED_ESTIMATOR_BAR_LEVEL,
+    TESTED_ESTIMATOR_BAR_LEVEL_BY_METHOD,
 )
 from momentum.Analysis.ic_reporter import ICReporter
 from momentum.Analysis.statistical_validator import (
@@ -128,7 +128,7 @@ def test_t21a_stage5_p_matches_kernel_direct():
     features, label = _synth_features_labels(n=300, n_features=3, seed=11)
     config = _lenient_config()
     result = _run_stage5(features, label, config=config)
-    direct = compute_hac_ic_statistics(features, label, horizon=5)
+    direct = compute_hac_ic_statistics(features, label, horizon=5, method="spearman", alpha=0.05)
     for feat in features.columns:
         row_p = next(
             r["p_value"] for r in result["summary_table"] if r["feature_name"] == feat
@@ -151,7 +151,7 @@ def test_t21b_mf_leg_a_hac_pass_leg_b_pooled_fails(monkeypatch):
     config = _lenient_config()
     # 腿 A：新 kernel
     stage5 = _run_stage5(features, label, config=config)
-    direct = compute_hac_ic_statistics(features, label, horizon=5)
+    direct = compute_hac_ic_statistics(features, label, horizon=5, method="spearman", alpha=0.05)
     p_stage = float(stage5["ic_stats"]["f0"]["p_value"])
     p_direct = float(direct["f0"]["p_value"])
     assert np.isclose(p_stage, p_direct, rtol=0, atol=0)
@@ -310,7 +310,7 @@ def _fdr_empirical(
                         horizon = int(split_context["effective_horizon"])
                     else:
                         horizon = int(_resolve_effective_label_horizon(config, None))
-                    ic_stats = compute_hac_ic_statistics(feats, labs, horizon=horizon)
+                    ic_stats = compute_hac_ic_statistics(feats, labs, horizon=horizon, method="spearman", alpha=0.05)
                     alpha_eff, _, _ = orch._resolve_alpha_policy(
                         config, event_info or {}
                     )
@@ -378,7 +378,7 @@ def _fdr_empirical(
                 and float(r["p_value_adj"]) <= alpha
             ]
         else:
-            stats = compute_hac_ic_statistics(features, label, horizon=5)
+            stats = compute_hac_ic_statistics(features, label, horizon=5, method="spearman", alpha=0.05)
             p_dict = {k: float(v["p_value"]) for k, v in stats.items()}
             q_map, _ = apply_fdr(p_dict, alpha)
             rejected = [
@@ -479,7 +479,7 @@ def test_t22b_md_scope_mismatch_turns_red():
     # 錯配：用 train 段算 stats，卻標 test 消費
     train_feats = features.loc[features.index[train_mask]]
     train_lab = label.loc[label.index[train_mask]]
-    bad_stats = compute_hac_ic_statistics(train_feats, train_lab, horizon=5)
+    bad_stats = compute_hac_ic_statistics(train_feats, train_lab, horizon=5, method="spearman", alpha=0.05)
     p_train = {k: float(v["p_value"]) for k, v in bad_stats.items()}
     q_train, _ = apply_fdr(p_train, 0.05)
 
@@ -633,7 +633,7 @@ def test_t23b_report_metadata_contains_selection_scope():
     assert "selection_scope" in meta
     assert meta["selection_scope"]["n_tests"] == stage5["n_tests"]
     assert "significance" in meta
-    assert meta["significance"]["tested_estimator"] == TESTED_ESTIMATOR_BAR_LEVEL
+    assert meta["significance"]["tested_estimator"] == TESTED_ESTIMATOR_BAR_LEVEL_BY_METHOD["spearman"]
     assert meta["significance"]["fdr_assumption_note"] == FDR_ASSUMPTION_NOTE
 
 
@@ -871,7 +871,7 @@ def test_t24_reporter_new_columns_and_old_order_byte():
             "maxlags": 4,
             "n_tests": 2,
             "scope_id": "abc:full",
-            "tested_estimator": TESTED_ESTIMATOR_BAR_LEVEL,
+            "tested_estimator": TESTED_ESTIMATOR_BAR_LEVEL_BY_METHOD["spearman"],
             "fdr_assumption_note": FDR_ASSUMPTION_NOTE,
         }
     }

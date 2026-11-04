@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import tempfile
 from pathlib import Path
@@ -74,10 +75,12 @@ def test_la0_replay_does_not_parse_names_and_equals_golden(monkeypatch):
     pre = json.loads(pre_path.read_text(encoding="utf-8"))
     h5, meta = fixture_paths()
     assert _naming_noted(h5)
-    normal = run_analyze()
+    from scripts.gap2_freeze_golden import SURVIVOR_CONFIG_OVERRIDE  # ICPERF ㊹ r95：同凍結之設定
+
+    normal = run_analyze(config_override=copy.deepcopy(SURVIVOR_CONFIG_OVERRIDE))
     calls: List[str] = []
     assert patch_everywhere(monkeypatch, fn.parse_feature_name, _raising_parse(calls)) >= 1
-    opaque = run_analyze()
+    opaque = run_analyze(config_override=copy.deepcopy(SURVIVOR_CONFIG_OVERRIDE))
     assert calls == []
     assert _gap2_sha(opaque) == _gap2_sha(normal) == pre["canonical_sha"]
 

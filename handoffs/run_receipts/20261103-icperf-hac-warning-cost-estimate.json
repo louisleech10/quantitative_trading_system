@@ -1,0 +1,38 @@
+{
+  "receipt": "ICPERF ㊹ 驗證 ④(f) 施工前量測（資料不足警示模擬之輸入分布與每組成本）",
+  "date": "2026-11-03",
+  "spec": "docs/ICPERF_SPEC.md v5.63 Task 0.4 ㊹",
+  "probes": {
+    "input_distribution": "runs/icperf/hac_method/nobs_cost_probe.py → runs/icperf/hac_method/nobs_cost_probe.log",
+    "fullscale_cost": "runs/icperf/hac_method/cost_fullscale_probe.py → runs/icperf/hac_method/cost_fullscale_probe.log"
+  },
+  "inputs": "runs/icperf/correctness-20261103/captures/{A,L}.ic_report.pkl 之 stage5_inputs（第 5 段實際輸入）",
+  "phi_estimator_in_probe": "滯後一期 Pearson 相關（np.corrcoef(x[:-1], x[1:])）；產品定義改 statsmodels acf(nlags=1)[1]",
+  "cells": {
+    "A_BTCUSDT_1h": {"n_features": 120, "n_obs_min": 176, "n_obs_median": 495, "n_obs_max": 495, "n_obs_distinct": 4,
+                     "n_nodes_touched": 8, "phi_median": 0.98700, "phi_abs_gt_0999": 29, "phi_negative": 0},
+    "L_BTCUSDT_4h": {"n_features": 120, "n_obs_min": 160, "n_obs_median": 390, "n_obs_max": 390, "n_obs_distinct": 4,
+                     "n_nodes_touched": 8, "phi_median": 0.98176, "phi_abs_gt_0999": 18, "phi_negative": 0}
+  },
+  "per_group_cost_R1000_chunk64_seconds": {
+    "n506_h1":   {"pearson": 0.026, "spearman": 0.097, "kendall": 0.088},
+    "n4070_h24": {"pearson": 0.22, "spearman": 0.98, "kendall": 0.80},
+    "n20352_h24": {"pearson": 1.12, "spearman": 5.91, "kendall": 4.81},
+    "n20352_h60": {"pearson": 1.13, "spearman": 5.85, "kendall": 4.55}
+  },
+  "peak_rss_mib_cumulative_process": 253.8,
+  "phi_endpoint_simulation_n4070_h24_pearson": {"0.9999": 0.059, "0.99999": 0.054, "1.0": 0.050, "-1.0": 0.0, "finite_p_each": 1000},
+  "sample_lag1_corr_abs_max_over_2000_series": 0.99977,
+  "per_request_actual_v563": {
+    "probe": "runs/icperf/hac_method/request_cost_probe.py → runs/icperf/hac_method/request_cost_probe.log（φ̂＝statsmodels acf；每特徵取相鄰兩 n 節點 × 相鄰 φ 網格點之聯集＋每節點一組參照）",
+    "A": {"nodes": 8, "groups_union": 34, "groups_upper_bound_nodes_x16": 128,
+          "total_seconds_h1": {"pearson": 0.72, "spearman": 2.44, "kendall": 2.38},
+          "total_seconds_h24": {"pearson": 0.83, "spearman": 2.47, "kendall": 2.11}},
+    "L": {"nodes": 8, "groups_union": 34, "groups_upper_bound_nodes_x16": 128, "skipped_degenerate_or_short": 4,
+          "total_seconds_h1": {"pearson": 0.55, "spearman": 1.89, "kendall": 1.61},
+          "total_seconds_h24": {"pearson": 0.53, "spearman": 1.73, "kendall": 1.88}},
+    "peak_rss_mib_cumulative_process": 202.6
+  },
+  "conclusion": "v5.62 逐特徵直接模擬 φ̂ 絕對值>0.999 者：A 格比例 29/120，於 20 萬欄、n≈2 萬時約需數萬組 × 約 5.9 秒（Spearman）⇒ 不可行。v5.63 φ 網格含值域端點 ±1 後，一次請求之模擬組＝(n 節點, 相鄰 φ 點) 聯集＋每節點一組參照，與特徵數無關、每節點至多 16 組；A／L 實測各 34 組、Spearman 總計 ≤ 2.47 秒。全規模外推（未實測）：組數 ≤ 16 × 觸及 n 節點數，每組 n≈2 萬 Spearman 約 5.9 秒；觸及節點數取決於全規模特徵之 n_obs 相異值，須於 Task 0.2 以 20 萬欄、1h 全樣本實測總耗時與峰值記憶體。不設上限、不截斷。（r88 CODEX-R88-P1-01 指出舊版以「每 (h, 方法) 固定 2 節點、32 組」估 190 秒與 A／L 實際 8 節點不符，已改為上列實跑。）",
+  "not_measured": "Task 0.2 之 20 萬欄全規模總耗時（需完整特徵生成，屬 Task 0.2 量測）；Kendall 產品版需處理並列（原型假設連續無並列）"
+}

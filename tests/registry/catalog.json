@@ -15203,6 +15203,27 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "unknown"
+  },
+  "tests/momentum/Analysis/test_icperf_hac_method_bw.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_hac_method_bw.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
   }
  },
  "tombstones": [

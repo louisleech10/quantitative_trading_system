@@ -71,21 +71,68 @@ def _spearman_contribution_z(x: np.ndarray, y: np.ndarray) -> Optional[np.ndarra
     return u * v
 
 
+#: 縱向 HAC 可用之 IC 方法（同 `global.default_method` 之 schema Literal）。
+HAC_IC_METHODS: frozenset[str] = frozenset({"spearman", "pearson", "kendall"})
+
+
+def _method_contribution(method: str, x: np.ndarray, y: np.ndarray) -> tuple[Optional[np.ndarray], float]:
+    """(af) 逐根貢獻序列與 SE 因子：spearman／pearson 標準化乘積（因子 1）、kendall Hájek 投影（因子 2）。"""
+    from momentum.Analysis.hac_ewc import KENDALL_SE_FACTOR, kendall_projection_h, pearson_contribution_z
+
+    if method == "spearman":
+        return _spearman_contribution_z(x, y), 1.0
+    if method == "pearson":
+        return pearson_contribution_z(x, y), 1.0
+    return kendall_projection_h(x, y), KENDALL_SE_FACTOR
+
+
+def _longitudinal_result(base: dict, *, ewc_dof: Optional[int], inference_status: str,
+                         data_warning_detail: Optional[dict] = None,
+                         persistence_not_estimable: bool = False,
+                         warning_not_evaluated: bool = False) -> dict:
+    """縱向逐特徵結果：共用鍵（`_hac_nan_result` 同集合）＋ ewc_dof／inference_status／data_warning／data_warning_detail。
+
+    data_warning 封閉值：null／`small_effective_sample`（detail 為封閉八鍵）／`persistence_not_estimable`（p 可算但特徵持續性
+    ρ̂ 不可估、無法判定資料是否足夠；detail 為 null）／`warning_not_evaluated`（當下記憶體不足以模擬，可重跑；detail 為 null）。
+    """
+    out = dict(base)
+    out["ewc_dof"] = ewc_dof
+    out["inference_status"] = inference_status
+    if warning_not_evaluated:
+        out["data_warning"] = "warning_not_evaluated"
+    elif persistence_not_estimable:
+        out["data_warning"] = "persistence_not_estimable"
+    else:
+        out["data_warning"] = "small_effective_sample" if data_warning_detail is not None else None
+    out["data_warning_detail"] = data_warning_detail
+    return out
+
+
 def compute_hac_ic_statistics(
     features_df: pd.DataFrame,
     label: pd.Series,
     horizon: int,
     *,
+    method: str,
+    alpha: float,
     maxlags: Optional[int] = None,
 ) -> dict[str, dict]:
-    """逐 bar Spearman 貢獻序列 + Newey-West HAC 顯著性（spearman only）。
+    """縱向第 5 段顯著性（ICPERF SPEC v5.63 ㊹）：逐根貢獻序列依所選 IC 方法，檢定依 LLSW 2018 EWC。
 
-    參數全寫死：auto_bw=int(4*(n_valid/100)**(2/9))；L=max(auto_bw, horizon-1)；
-    p=2*t.sf(|t|, df=n_valid-1)。mean(z) 僅供內部 t 檢定，不回傳 ic_mean。
+    - 預設（未明示 maxlags）：EWC，ν＝⌊0.4·n^(2/3)⌋、p 依 t_ν；fail-closed 只限公式不可定義
+      （ν < 1 ⇒ `insufficient_sample`；一側常數或 Ω 非有限／≤ 0 ⇒ `degenerate`）。可算者照常出 p，
+      另依實際 n_obs、h、方法、α、φ̂ 估資料不足警示（不改 p）。
+    - 明示 maxlags：沿用 Newey–West Bartlett 固定 L 與 t(n−1)（現行行為）。
+
+    Args:
+        method: IC 方法（keyword-only、必傳；spearman／pearson／kendall）。
+        alpha: 第 5 段實際顯著水準 `alpha_effective`（keyword-only、必傳；只供警示）。
 
     Returns:
-        per-feature dict：t_stat / p_value / se / n_obs / maxlags
+        per-feature dict：t_stat／p_value／se／n_obs／maxlags／ewc_dof／inference_status／data_warning／data_warning_detail
     """
+    if method not in HAC_IC_METHODS:
+        raise ValueError(f"method must be one of {sorted(HAC_IC_METHODS)}, got {method!r}")
     if horizon is None or int(horizon) < 1:
         raise ValueError(f"horizon must be >= 1, got {horizon}")
     horizon = int(horizon)
@@ -104,6 +151,12 @@ def compute_hac_ic_statistics(
     if not isinstance(features_df, pd.DataFrame) or features_df.shape[1] == 0:
         return {}
 
+    alpha = float(alpha)
+    if not np.isfinite(alpha):
+        raise ValueError(f"alpha must be finite, got {alpha}")
+
+    from momentum.Analysis.hac_ewc import ewc_test, ls_ar1_coefficient, small_sample_warning
+
     label_s = label if isinstance(label, pd.Series) else pd.Series(label)
     results: dict[str, dict] = {}
 
@@ -111,43 +164,63 @@ def compute_hac_ic_statistics(
         x = features_df[col]
         pair = pd.concat([x, label_s], axis=1, join="inner").dropna()
         n_valid = int(pair.shape[0])
-        if n_valid < 2:
-            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=np.nan)
-            continue
-
-        if maxlags is not None:
-            L = int(maxlags)
-        else:
-            auto_bw = int(4 * (n_valid / 100.0) ** (2.0 / 9.0))
-            L = max(auto_bw, min_lag_floor)
-
-        # fail-closed：先算 L 再判
-        if L >= n_valid - 1 or n_valid < max(8, 2 * L):
-            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=L)
-            continue
-
         x_arr = pair.iloc[:, 0].to_numpy(dtype=float)
         y_arr = pair.iloc[:, 1].to_numpy(dtype=float)
-        z = _spearman_contribution_z(x_arr, y_arr)
+
+        if maxlags is not None:
+            # 明示 maxlags：Newey–West Bartlett 固定 L 與 t(n−1)（現行行為；貢獻序列依方法）
+            L = int(maxlags)
+            if n_valid < 2 or L >= n_valid - 1 or n_valid < max(8, 2 * L):
+                results[str(col)] = _longitudinal_result(
+                    _hac_nan_result(n_obs=n_valid, maxlags=L), ewc_dof=None,
+                    inference_status="insufficient_sample")
+                continue
+            z, se_factor = _method_contribution(method, x_arr, y_arr)
+            se = _newey_west_bartlett_se(z, L) * se_factor if z is not None else float("nan")
+            if z is None or not np.isfinite(se) or se == 0.0:
+                results[str(col)] = _longitudinal_result(
+                    _hac_nan_result(n_obs=n_valid, maxlags=L), ewc_dof=None, inference_status="degenerate")
+                continue
+            t_stat = float(float(np.mean(z)) / se)
+            results[str(col)] = _longitudinal_result(
+                {"t_stat": t_stat, "p_value": float(2.0 * stats.t.sf(abs(t_stat), df=n_valid - 1)),
+                 "se": float(se), "n_obs": n_valid, "maxlags": int(L)},
+                ewc_dof=None, inference_status="ok")
+            continue
+
+        # 預設：EWC（LLSW 2018）
+        nan_base = {"t_stat": np.nan, "p_value": np.nan, "se": np.nan, "n_obs": n_valid, "maxlags": None}
+        z, se_factor = (None, 1.0) if n_valid < 2 else _method_contribution(method, x_arr, y_arr)
+        if n_valid < 2:
+            results[str(col)] = _longitudinal_result(nan_base, ewc_dof=0, inference_status="insufficient_sample")
+            continue
         if z is None:
-            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=L)
-            continue
+            from momentum.Analysis.hac_ewc import ewc_dof as _ewc_dof
 
-        se = _newey_west_bartlett_se(z, L)
-        mean_z = float(np.mean(z))
-        if not np.isfinite(se) or se == 0.0:
-            results[str(col)] = _hac_nan_result(n_obs=n_valid, maxlags=L)
+            nu = _ewc_dof(n_valid)
+            status = "insufficient_sample" if nu < 1 else "degenerate"
+            results[str(col)] = _longitudinal_result(nan_base, ewc_dof=int(nu), inference_status=status)
             continue
-
-        t_stat = float(mean_z / se)
-        p_value = float(2.0 * stats.t.sf(abs(t_stat), df=n_valid - 1))
-        results[str(col)] = {
-            "t_stat": t_stat,
-            "p_value": p_value,
-            "se": float(se),
-            "n_obs": n_valid,
-            "maxlags": int(L),
-        }
+        test = ewc_test(z, se_factor)
+        base = {"t_stat": test["t_stat"], "p_value": test["p_value"], "se": test["se"],
+                "n_obs": n_valid, "maxlags": None}
+        detail: Optional[dict] = None
+        not_estimable = False
+        not_evaluated = False
+        if test["inference_status"] == "ok":
+            # 警示之持續性輸入：含截距 AR(1) 最小平方估計 ρ̂，於模擬端以 Andrews (1993) 中位數不偏反演（SPEC v5.64）
+            rho_hat = ls_ar1_coefficient(x_arr)
+            if np.isfinite(rho_hat):
+                try:
+                    detail = small_sample_warning(n_valid, horizon, method, alpha, rho_hat)
+                except MemoryError as exc:  # 預檢之 WarningSimulationMemoryError 與實際配置失敗皆然：可重試，警示未執行，p／q 照常（SPEC v5.68、r94）
+                    logger.warning("資料不足警示未執行（記憶體不足，可重跑）：%s／%s", col, exc)
+                    not_evaluated = True
+            else:
+                not_estimable = True  # 滯後段常數等致 ρ̂ 不可估：p 照常，警示判定不可用（SPEC v5.67）
+        results[str(col)] = _longitudinal_result(
+            base, ewc_dof=test["ewc_dof"], inference_status=test["inference_status"], data_warning_detail=detail,
+            persistence_not_estimable=not_estimable, warning_not_evaluated=not_evaluated)
 
     return results
 

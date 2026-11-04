@@ -456,15 +456,49 @@ def _ref_spearman_z(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return ((rx - rx.mean()) / rx.std(ddof=1)) * ((ry - ry.mean()) / ry.std(ddof=1))
 
 
-def _hac_oracle(x: np.ndarray, y: np.ndarray, horizon: int, maxlags: Any = None) -> Dict[str, Any]:
-    """HAC t／p 之 oracle（SPEC Task 0.3 鎖定之定義）：自動 L＝max(int(4·(n/100)^(2/9)), horizon−1)；SE＝statsmodels；
-    t＝mean(z)／SE；p＝2·t.sf(|t|, n−1)。"""
+def _ref_method_z(x: np.ndarray, y: np.ndarray, method: str) -> tuple:
+    """測試自寫之逐方法貢獻參考實作與 SE 因子（SPEC ㊹ (af)）：spearman／pearson 標準化乘積（ddof=1）；
+    kendall＝O(n²) 直算 h_i＝(1/(n−1))·Σ_{j≠i} sign(x_i−x_j)·sign(y_i−y_j)，因子 2。"""
+    if method == "spearman":
+        return _ref_spearman_z(x, y), 1.0
+    if method == "pearson":
+        return ((x - x.mean()) / x.std(ddof=1)) * ((y - y.mean()) / y.std(ddof=1)), 1.0
+    sx, sy = np.sign(x[:, None] - x[None, :]), np.sign(y[:, None] - y[None, :])
+    return (sx * sy).sum(axis=1) / (x.size - 1), 2.0
+
+
+def _ref_ewc_dof(n: int) -> int:
+    """ν＝⌊0.4·n^(2/3)⌋，以 50 位十進位精度直算（與產品之整數不等式解法獨立）。"""
+    import decimal
+
+    with decimal.localcontext() as ctx:
+        ctx.prec = 50
+        return int((decimal.Decimal("0.4") * decimal.Decimal(n) ** (decimal.Decimal(2) / decimal.Decimal(3)))
+                   .to_integral_value(rounding=decimal.ROUND_FLOOR))
+
+
+def _hac_oracle(x: np.ndarray, y: np.ndarray, horizon: int, maxlags: Any = None, method: str = "spearman") -> Dict[str, Any]:
+    """縱向 HAC t／p 之 oracle（SPEC v5.63 ㊹；Task 0.3 同步）。
+
+    - 預設（未明示 maxlags）：EWC——論文式餘弦基底矩陣直算 Λ_j＝sqrt(2/n)·Σ_t cos(π·j·(t−½)/n)·(e_t−ē)，
+      Ω＝mean(Λ_1..ν²)，SE＝因子·sqrt(Ω/n)，p＝2·t_ν.sf(|t|)；maxlags 記 None、ewc_dof＝ν。
+    - 明示 maxlags：statsmodels OLS HAC Bartlett（use_correction=False）之 SE×因子，p＝2·t.sf(|t|, n−1)。
+    """
     n = x.size
-    lag = int(maxlags) if maxlags is not None else max(int(4 * (n / 100.0) ** (2.0 / 9.0)), horizon - 1)
-    z = _ref_spearman_z(x, y)
-    se = _sm_hac_se(z, lag)
+    z, factor = _ref_method_z(x, y, method)
+    if maxlags is not None:
+        se = _sm_hac_se(z, int(maxlags)) * factor
+        t = float(np.mean(z)) / se
+        return {"t_stat": t, "p_value": float(2.0 * stats.t.sf(abs(t), df=n - 1)), "se": se, "n_obs": n,
+                "maxlags": int(maxlags), "ewc_dof": None}
+    nu = _ref_ewc_dof(n)
+    tt = np.arange(1, n + 1, dtype=float)
+    basis = np.sqrt(2.0 / n) * np.cos(np.pi * np.arange(1, nu + 1, dtype=float)[:, None] * (tt[None, :] - 0.5) / n)
+    lam = basis @ (z - z.mean())
+    se = factor * math.sqrt(float(np.mean(lam ** 2)) / n)
     t = float(np.mean(z)) / se
-    return {"t_stat": t, "p_value": float(2.0 * stats.t.sf(abs(t), df=n - 1)), "se": se, "n_obs": n, "maxlags": lag}
+    return {"t_stat": t, "p_value": float(2.0 * stats.t.sf(abs(t), df=nu)), "se": se, "n_obs": n,
+            "maxlags": None, "ewc_dof": nu}
 
 
 def _hac_inputs(n: int) -> pd.DataFrame:
@@ -473,32 +507,42 @@ def _hac_inputs(n: int) -> pd.DataFrame:
     return pd.DataFrame({"f": ((7 * i) % 23) - 11.0, "label": ((5 * i + 3) % 19) - 9.0 + 0.05 * i})
 
 
+@pytest.mark.parametrize("method", ["spearman", "pearson", "kendall"])
 @pytest.mark.parametrize("n,horizon", [(40, 1), (40, 5), (64, 3)])
-def test_hac_statistics_match_oracle(n: int, horizon: int) -> None:
-    """`compute_hac_ic_statistics`（statistical_validator.py:74）之 t／p／se／n_obs／maxlags == oracle（se、t、p 相對誤差
-    ≤ 1e-12；整數欄完全相同）。"""
+def test_hac_statistics_match_oracle(n: int, horizon: int, method: str) -> None:
+    """`compute_hac_ic_statistics`（statistical_validator.py）之 t／p／se／n_obs／maxlags／ewc_dof == oracle（EWC，依方法；
+    se、t、p 相對誤差 ≤ 1e-12；整數欄完全相同）。"""
     df = _hac_inputs(n)
-    got = compute_hac_ic_statistics(df[["f"]], df["label"], horizon)["f"]
-    exp = _hac_oracle(df["f"].to_numpy(), df["label"].to_numpy(), horizon)
-    assert got["n_obs"] == exp["n_obs"] and got["maxlags"] == exp["maxlags"]
+    got = compute_hac_ic_statistics(df[["f"]], df["label"], horizon, method=method, alpha=0.05)["f"]
+    exp = _hac_oracle(df["f"].to_numpy(), df["label"].to_numpy(), horizon, method=method)
+    assert got["n_obs"] == exp["n_obs"] and got["maxlags"] is None and got["ewc_dof"] == exp["ewc_dof"]
+    assert got["inference_status"] == "ok"
     for k in ("se", "t_stat", "p_value"):
         assert _rel(got[k], exp[k]) <= REL_TOL, f"{k}：{got[k]} vs oracle {exp[k]}"
 
 
 def test_hac_fail_closed_boundaries() -> None:
-    """SPEC Task 0.3 HAC 邊界（明列輸入）：L＝n_valid−1、n_valid＝max(8, 2L)−1、常數 z 致 SE＝0 ⇒ 現行回 NaN 統計量且
-    n_obs、maxlags 照記。"""
+    """HAC 邊界（明列輸入）。明示 maxlags（Newey–West 固定 L）：L＝n_valid−1、n_valid＝max(8, 2L)−1 ⇒ NaN 統計量且
+    n_obs、maxlags 照記（現行行為）。預設 EWC：常數 z ⇒ `degenerate`；n＝3 ⇒ `insufficient_sample`（ν＜1）；
+    n＝7 照常出 p（SPEC ㊹ 不另設樣本數下限）。"""
     df = _hac_inputs(12)
-    r = compute_hac_ic_statistics(df[["f"]], df["label"], 1, maxlags=11)["f"]  # L＝n_valid−1
+    r = compute_hac_ic_statistics(df[["f"]], df["label"], 1, method="spearman", alpha=0.05, maxlags=11)["f"]
     assert all(math.isnan(r[k]) for k in ("t_stat", "p_value", "se")) and r["n_obs"] == 12 and r["maxlags"] == 11
     df9 = _hac_inputs(9)
-    r = compute_hac_ic_statistics(df9[["f"]], df9["label"], 1, maxlags=5)["f"]  # n_valid＝max(8, 10)−1＝9
+    r = compute_hac_ic_statistics(df9[["f"]], df9["label"], 1, method="spearman", alpha=0.05, maxlags=5)["f"]
     assert all(math.isnan(r[k]) for k in ("t_stat", "p_value", "se")) and r["n_obs"] == 9 and r["maxlags"] == 5
     two = pd.DataFrame({"f": [0.0, 0, 0, 0, 1, 1, 1, 1], "label": [0.0, 0, 0, 0, 1, 1, 1, 1]})  # z 恆＝常數
     z = _ref_spearman_z(two["f"].to_numpy(), two["label"].to_numpy())
-    assert np.ptp(z) == 0.0 and _newey_west_bartlett_se(z, 2) == 0.0, "邊界輸入未得常數 z（前提失效）"
-    r = compute_hac_ic_statistics(two[["f"]], two["label"], 1)["f"]
-    assert all(math.isnan(r[k]) for k in ("t_stat", "p_value", "se")) and r["n_obs"] == 8 and r["maxlags"] == 2
+    assert np.ptp(z) == 0.0, "邊界輸入未得常數 z（前提失效）"
+    r = compute_hac_ic_statistics(two[["f"]], two["label"], 1, method="spearman", alpha=0.05)["f"]
+    assert all(math.isnan(r[k]) for k in ("t_stat", "p_value", "se")) and r["n_obs"] == 8 and r["maxlags"] is None
+    assert r["inference_status"] == "degenerate"
+    df3 = _hac_inputs(3)
+    r = compute_hac_ic_statistics(df3[["f"]], df3["label"], 1, method="spearman", alpha=0.05)["f"]
+    assert r["inference_status"] == "insufficient_sample" and math.isnan(r["p_value"]) and r["ewc_dof"] == 0
+    df7 = _hac_inputs(7)
+    r = compute_hac_ic_statistics(df7[["f"]], df7["label"], 1, method="spearman", alpha=0.05)["f"]
+    assert r["inference_status"] == "ok" and np.isfinite(r["p_value"]) and r["ewc_dof"] == 1
 
 
 # ── 秒級 oracle 定義測試：滾動 IC 之 ic_mean／ic_std／ICIR／勝率 ─────────────────────────────────────────
@@ -812,17 +856,18 @@ def _real_features(close: pd.Series) -> pd.DataFrame:
 
 
 @pytest.mark.requires_kline
+@pytest.mark.parametrize("method", ["spearman", "pearson", "kendall"])
 @pytest.mark.parametrize("horizon", [1, 5])
-def test_hac_statistics_match_oracle_on_real_kline(horizon: int) -> None:
-    """真實 BTCUSDT 1h：HAC t／p／se == oracle（同上之定義；對齊與 NaN 處理照現行之 inner join＋dropna）。"""
+def test_hac_statistics_match_oracle_on_real_kline(horizon: int, method: str) -> None:
+    """真實 BTCUSDT 1h：HAC t／p／se == oracle（EWC，依方法；對齊與 NaN 處理照現行之 inner join＋dropna）。"""
     close = _real_close()
     feats = _real_features(close)
     label = (close.shift(-horizon) / close - 1.0).rename("label")
-    got = compute_hac_ic_statistics(feats, label, horizon)
+    got = compute_hac_ic_statistics(feats, label, horizon, method=method, alpha=0.05)
     for feat in feats.columns:
         pair = pd.concat([feats[feat], label], axis=1, join="inner").dropna()
-        exp = _hac_oracle(pair[feat].to_numpy(), pair["label"].to_numpy(), horizon)
-        assert got[feat]["n_obs"] == exp["n_obs"] and got[feat]["maxlags"] == exp["maxlags"]
+        exp = _hac_oracle(pair[feat].to_numpy(), pair["label"].to_numpy(), horizon, method=method)
+        assert got[feat]["n_obs"] == exp["n_obs"] and got[feat]["ewc_dof"] == exp["ewc_dof"]
         for k in ("se", "t_stat", "p_value"):
             assert _rel(got[feat][k], exp[k]) <= REL_TOL, f"{feat}/{k}：{got[feat][k]} vs oracle {exp[k]}"
 
@@ -2638,6 +2683,38 @@ def test_receipt_event_binary_oracle_matches_product() -> None:
     assert [exp[c]["binary_status"] for c in ("constant", "all_nan", "few_pos", "signal")] == \
         ["unavailable:constant", "unavailable:all_nan", "unavailable:class_below_min", "ok"]
     assert exp["signal"]["auc"] > 0.5 > exp["reverse"]["auc"]
+
+
+def test_receipt_hac_data_warning_oracle_matches_product() -> None:
+    """SPEC ㊹ v5.69：收據之資料不足警示 oracle（`warning_oracle`：測試自寫 LS ρ̂＋實際 n、h、方法、α）與產品
+    `compute_hac_ic_statistics` 之 data_warning／data_warning_detail 逐案相同——近單根特徵×重疊標籤（觸發）、AR(0.5)×短
+    horizon（不觸發）、滯後段常數（ρ̂ 不可估）；三方法各一；oracle ρ̂ 與產品 `ls_ar1_coefficient` 相對誤差 ≤ 1e-12。"""
+    from momentum.Analysis.hac_ewc import ls_ar1_coefficient
+    from momentum.Analysis.statistical_validator import compute_hac_ic_statistics
+
+    tool = _receipt_tool()
+    rng = np.random.default_rng(20261104)
+    n = 339
+    unit = np.cumsum(rng.standard_normal(n))
+    ar = np.empty(n)
+    ar[0] = 0.0
+    for t in range(1, n):
+        ar[t] = 0.5 * ar[t - 1] + rng.standard_normal()
+    shocks = rng.standard_normal(n + 24)
+    lab24 = np.convolve(shocks, np.ones(24), mode="valid")[:n]
+    cases = [("unit_root", unit, lab24, 24, "small_effective_sample"), ("ar05", ar, rng.standard_normal(n), 1, None),
+             ("lag_const", np.array([1.0, 1, 1, 1, 1, 1, 2]), np.array([1.0, 4, 2, 7, 3, 5, 6]), 24,
+              "persistence_not_estimable")]
+    for name, x, y, h, want in cases:
+        for method in ("spearman", "pearson", "kendall"):
+            f = pd.DataFrame({"f": x})
+            got = compute_hac_ic_statistics(f, pd.Series(y), h, method=method, alpha=0.05)["f"]
+            assert got["inference_status"] == "ok", (name, method)
+            exp_w, exp_d = tool.warning_oracle(x, h, method, 0.05)
+            assert (got["data_warning"], got["data_warning_detail"]) == (exp_w, exp_d), (name, method)
+            assert exp_w == want, (name, method, exp_w)
+        r_or, r_pr = tool.ls_ar1_oracle(x), ls_ar1_coefficient(x)
+        assert (math.isnan(r_or) and math.isnan(r_pr)) or math.isclose(r_or, r_pr, rel_tol=1e-12), (name, r_or, r_pr)
 
 
 def test_bounded_abs_tolerance_equals_numpy_isclose() -> None:

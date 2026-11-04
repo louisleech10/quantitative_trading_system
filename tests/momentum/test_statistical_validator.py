@@ -132,12 +132,26 @@ def _statsmodels_hac_oracle(z: np.ndarray, maxlags: int):
     return float(res.bse[0]), float(res.tvalues[0]), float(res.pvalues[0])
 
 
-def _would_fail_closed(n_valid: int, L: int) -> bool:
-    return L >= n_valid - 1 or n_valid < max(8, 2 * L)
+def _ewc_oracle(z: np.ndarray):
+    """LLSW 2018 EWC oracle（論文式餘弦基底矩陣直算；ν＝⌊0.4·n^(2/3)⌋ 以十進位高精度）：回 (se, t, p, ν)。"""
+    import decimal
+
+    n = z.size
+    with decimal.localcontext() as ctx:
+        ctx.prec = 50
+        nu = int((decimal.Decimal("0.4") * decimal.Decimal(n) ** (decimal.Decimal(2) / decimal.Decimal(3)))
+                 .to_integral_value(rounding=decimal.ROUND_FLOOR))
+    t_idx = np.arange(1, n + 1, dtype=float)
+    basis = np.sqrt(2.0 / n) * np.cos(np.pi * np.arange(1, nu + 1, dtype=float)[:, None] * (t_idx[None, :] - 0.5) / n)
+    lam = basis @ (z - z.mean())
+    se = math.sqrt(float(np.mean(lam ** 2)) / n)
+    t = float(z.mean()) / se
+    return se, t, float(2.0 * stats.t.sf(abs(t), df=nu)), nu
 
 
 def test_t11a_hac_matches_statsmodels_oracle():
-    """T-1.1a: se/t/p 與 statsmodels HAC use_t=True allclose(rtol=1e-8)。"""
+    """T-1.1a（SPEC v5.63 ㊹ 改寫）：預設路徑 se/t/p 與 EWC 論文式 oracle allclose(rtol=1e-8)；maxlags 記 None、
+    ewc_dof＝ν。場景同前（n×h 含 h＝63 短序列、ties 重場景）——EWC 無 horizon 上限，h＝63 亦照常出 p。"""
     scenarios = []
     for n in (64, 512):
         for h in (1, 5, 63):
@@ -155,20 +169,13 @@ def test_t11a_hac_matches_statsmodels_oracle():
             x = np.round(x * 0.5, 0)
 
         out = compute_hac_ic_statistics(
-            pd.DataFrame({"feat": x}), pd.Series(y), h
+            pd.DataFrame({"feat": x}), pd.Series(y), h, method="spearman", alpha=0.05
         )["feat"]
-        auto_bw = int(4 * (n / 100.0) ** (2.0 / 9.0))
-        L_expect = max(auto_bw, h - 1)
-
-        if _would_fail_closed(n, L_expect):
-            assert np.isnan(out["p_value"]), f"fail-closed expected n={n} h={h}"
-            assert out["n_obs"] == n
-            continue
 
         z = _spearman_z(x, y)
-        se_o, t_o, p_o = _statsmodels_hac_oracle(z, out["maxlags"])
-        assert out["maxlags"] == L_expect
-        assert out["n_obs"] == n
+        se_o, t_o, p_o, nu = _ewc_oracle(z)
+        assert out["maxlags"] is None and out["ewc_dof"] == nu
+        assert out["n_obs"] == n and out["inference_status"] == "ok"
         assert np.allclose(out["se"], se_o, rtol=1e-8, atol=0.0)
         assert np.allclose(out["t_stat"], t_o, rtol=1e-8, atol=0.0)
         assert np.allclose(out["p_value"], p_o, rtol=1e-8, atol=0.0)
@@ -184,7 +191,7 @@ def test_t11a_explicit_maxlags_floor_raises():
     y = rng.normal(size=64)
     with pytest.raises(ValueError, match="maxlags"):
         compute_hac_ic_statistics(
-            pd.DataFrame({"f": x}), pd.Series(y), horizon=5, maxlags=2
+            pd.DataFrame({"f": x}), pd.Series(y), horizon=5, method="spearman", alpha=0.05, maxlags=2
         )
 
 
@@ -197,7 +204,7 @@ def test_t11a_explicit_maxlags_legal_override():
     x = rng.normal(size=n)
     y = 0.2 * x + rng.normal(size=n)
     out = compute_hac_ic_statistics(
-        pd.DataFrame({"f": x}), pd.Series(y), horizon=h, maxlags=override
+        pd.DataFrame({"f": x}), pd.Series(y), horizon=h, method="spearman", alpha=0.05, maxlags=override
     )["f"]
     assert out["maxlags"] == override
     assert np.isfinite(out["p_value"]) and np.isfinite(out["t_stat"])
@@ -214,16 +221,18 @@ def test_t11a_explicit_maxlags_legal_override():
 
 @pytest.mark.slow_stat
 def test_t11b_ma_ar1_false_positive_size():
-    """T-1.1b / M-A: AR(1) φ=0.9 null×200 — 舊法假陽率≫α，HAC 落 binomial 95% 帶。"""
+    """T-1.1b / M-A: AR(1) φ=0.9 null — 舊法假陽率≫α，HAC（SPEC v5.64 ㊹：預設 EWC）落 binomial 95% 帶。
+    seed 10_000＋s、s＝0..1,999（含原 200 個；原 200 seed 得 3／200 低於舊下限 4，同 DGP 2,000 次實測 5.5%），
+    接受區間依同一二項 95% 規則以 2,000 次重算（諮詢 R4 收斂）。"""
     alpha = 0.05
-    n_seeds = 200
+    n_seeds = 2000
     n = 5000
     h = 5
     phi = 0.9
     # binomial 95% 允收帶（寫死進碼，固定 n_seeds/α）
-    band_lo = int(binom.ppf(0.025, n_seeds, alpha))  # 4
-    band_hi = int(binom.ppf(0.975, n_seeds, alpha))  # 16
-    assert (band_lo, band_hi) == (4, 16)
+    band_lo = int(binom.ppf(0.025, n_seeds, alpha))  # 81
+    band_hi = int(binom.ppf(0.975, n_seeds, alpha))  # 120
+    assert (band_lo, band_hi) == (81, 120)
 
     def _ar1(rng: np.random.Generator, length: int) -> np.ndarray:
         eps = rng.normal(size=length)
@@ -245,7 +254,7 @@ def test_t11b_ma_ar1_false_positive_size():
         if p_old <= alpha:
             old_rej += 1
         p_new = compute_hac_ic_statistics(
-            pd.DataFrame({"f": x}), pd.Series(y), h
+            pd.DataFrame({"f": x}), pd.Series(y), h, method="spearman", alpha=alpha
         )["f"]["p_value"]
         if np.isfinite(p_new) and p_new <= alpha:
             new_rej += 1
@@ -261,29 +270,33 @@ def test_t11b_ma_ar1_false_positive_size():
 
 
 def test_t11c_boundary_table():
-    """T-1.1c: 全NaN / std=0 / h=1 / ties>50% / n=下限出值 / n=下限-1 NaN / h=63 短序列 NaN。"""
+    """T-1.1c（SPEC v5.63 ㊹ 改寫，預設 EWC）：全NaN ⇒ insufficient_sample／std=0 ⇒ degenerate／h=1 出值且 maxlags
+    記 None／ties>50% oracle 恆等／n=8、n=7 皆出值（不另設樣本數下限，原「n=7 NaN」為刻意語意改變）／
+    n=3 ⇒ insufficient_sample／h=63 短序列照常出 p（無 horizon 上限）。"""
     rng = np.random.default_rng(42)
     n = 64
     y = pd.Series(rng.normal(size=n))
+    kw = {"method": "spearman", "alpha": 0.05}
 
     # ① 全 NaN feature
     r = compute_hac_ic_statistics(
-        pd.DataFrame({"f": np.full(n, np.nan)}), y, 5
+        pd.DataFrame({"f": np.full(n, np.nan)}), y, 5, **kw
     )["f"]
     assert np.isnan(r["p_value"]) and r["n_obs"] == 0
+    assert r["inference_status"] == "insufficient_sample"
 
     # ② std=0（常數 rank）
     r = compute_hac_ic_statistics(
-        pd.DataFrame({"f": np.ones(n)}), y, 5
+        pd.DataFrame({"f": np.ones(n)}), y, 5, **kw
     )["f"]
     assert np.isnan(r["p_value"]) and r["n_obs"] == n
+    assert r["inference_status"] == "degenerate"
 
-    # ③ h=1 → L=max(auto_bw,0) 正常出值
+    # ③ h=1 正常出值；EWC 之 maxlags 記 None、ewc_dof＝ν
     x = rng.normal(size=n)
-    r = compute_hac_ic_statistics(pd.DataFrame({"f": x}), y, 1)["f"]
+    r = compute_hac_ic_statistics(pd.DataFrame({"f": x}), y, 1, **kw)["f"]
     assert np.isfinite(r["p_value"])
-    auto_bw = int(4 * (n / 100.0) ** (2.0 / 9.0))
-    assert r["maxlags"] == max(auto_bw, 0)
+    assert r["maxlags"] is None and r["ewc_dof"] == _ewc_oracle(_spearman_z(x, y.to_numpy()))[3]
 
     # ④ ties >50% → 正常出值且 oracle 恆等
     n_tie = n
@@ -292,50 +305,46 @@ def test_t11c_boundary_table():
     )
     y_tie = rng.normal(size=n_tie)
     r = compute_hac_ic_statistics(
-        pd.DataFrame({"f": x_tie}), pd.Series(y_tie), 5
+        pd.DataFrame({"f": x_tie}), pd.Series(y_tie), 5, **kw
     )["f"]
     assert np.isfinite(r["p_value"])
     z = _spearman_z(x_tie, y_tie)
-    se_o, t_o, p_o = _statsmodels_hac_oracle(z, r["maxlags"])
+    se_o, t_o, p_o, _ = _ewc_oracle(z)
     assert np.allclose([r["se"], r["t_stat"], r["p_value"]], [se_o, t_o, p_o], rtol=1e-8)
 
-    # ⑤ n=下限出值、n=下限-1 → NaN（h=1 時下限由 max(8,2L) 與 n 共同決定）
-    # n=8, L=int(4*(0.08)**(2/9))=2 → 8>=max(8,4) 且 2<7 → 出值
+    # ⑤ n=8、n=7 皆出值（ν＝1）；n=3 ⇒ ν＝0 ⇒ insufficient_sample
     x8 = rng.normal(size=8)
     y8 = rng.normal(size=8)
-    r8 = compute_hac_ic_statistics(pd.DataFrame({"f": x8}), pd.Series(y8), 1)["f"]
+    r8 = compute_hac_ic_statistics(pd.DataFrame({"f": x8}), pd.Series(y8), 1, **kw)["f"]
     assert np.isfinite(r8["p_value"]), r8
     r7 = compute_hac_ic_statistics(
-        pd.DataFrame({"f": x8[:7]}), pd.Series(y8[:7]), 1
+        pd.DataFrame({"f": x8[:7]}), pd.Series(y8[:7]), 1, **kw
     )["f"]
-    assert np.isnan(r7["p_value"])
+    assert np.isfinite(r7["p_value"]) and r7["ewc_dof"] == 1 and r7["inference_status"] == "ok"
+    r3 = compute_hac_ic_statistics(
+        pd.DataFrame({"f": x8[:3]}), pd.Series(y8[:3]), 1, **kw
+    )["f"]
+    assert np.isnan(r3["p_value"]) and r3["inference_status"] == "insufficient_sample"
 
-    # ⑥ h=63 短序列 → fail-closed NaN
-    r = compute_hac_ic_statistics(pd.DataFrame({"f": x}), y, 63)["f"]
-    assert np.isnan(r["p_value"])
-    assert r["maxlags"] == max(int(4 * (n / 100.0) ** (2.0 / 9.0)), 62)
+    # ⑥ h=63 短序列 → 照常出 p（EWC 無 horizon 上限；可能附資料不足警示）
+    r = compute_hac_ic_statistics(pd.DataFrame({"f": x}), y, 63, **kw)["f"]
+    assert np.isfinite(r["p_value"]) and r["inference_status"] == "ok"
+    assert r["maxlags"] is None
 
 
 def test_t11d_mi_use_t_not_normal_default():
-    """T-1.1d / M-I: 同資料 statsmodels 預設(Normal)p 與 oracle use_t p 不可 allclose。"""
+    """T-1.1d / M-I（SPEC v5.63 ㊹ 改寫）：p 依 t_ν（ν＝EWC 自由度），同資料以常態分布算之 p 不可 allclose。"""
     n = 32
     h = 1
     rng = np.random.default_rng(20260710)
     x = rng.normal(size=n)
     y = 0.2 * x + rng.normal(size=n)
     z = _spearman_z(x, y)
-    out = compute_hac_ic_statistics(pd.DataFrame({"f": x}), pd.Series(y), h)["f"]
+    out = compute_hac_ic_statistics(pd.DataFrame({"f": x}), pd.Series(y), h, method="spearman", alpha=0.05)["f"]
     assert np.isfinite(out["p_value"])
-    L = out["maxlags"]
-    ones = np.ones((n, 1))
-    res_t = sm.OLS(z, ones).fit(
-        cov_type="HAC", cov_kwds={"maxlags": L}, use_t=True
-    )
-    res_n = sm.OLS(z, ones).fit(cov_type="HAC", cov_kwds={"maxlags": L})
-    assert res_t.use_t is True
-    assert res_n.use_t is False
-    p_oracle = float(res_t.pvalues[0])
-    p_normal = float(res_n.pvalues[0])
+    se_o, t_o, p_oracle, nu = _ewc_oracle(z)
+    p_normal = float(2.0 * stats.norm.sf(abs(t_o)))
+    assert out["ewc_dof"] == nu
     assert np.allclose(out["p_value"], p_oracle, rtol=1e-8)
     assert not np.allclose(p_normal, p_oracle), (
         f"Normal p and t p unexpectedly allclose: {p_normal} vs {p_oracle}"
@@ -424,7 +433,7 @@ def test_t13_block_bootstrap_agrees_with_kernel():
 
     for name, x, y, horizon in cases:
         kernel = compute_hac_ic_statistics(
-            pd.DataFrame({"f": x}), pd.Series(y), horizon
+            pd.DataFrame({"f": x}), pd.Series(y), horizon, method="spearman", alpha=alpha
         )["f"]
         boot = block_bootstrap_ic_pvalue(x, y, horizon, seed=0 if name == "null" else 100)
         assert not boot["skip"], boot.get("skip_reason")
@@ -470,11 +479,11 @@ def test_t13_mutation_kernel_t_times_two_breaks_agreement():
     n, h = 300, 5
     x = rng.normal(size=n)
     y = rng.normal(size=n)
-    kernel = compute_hac_ic_statistics(pd.DataFrame({"f": x}), pd.Series(y), h)["f"]
+    kernel = compute_hac_ic_statistics(pd.DataFrame({"f": x}), pd.Series(y), h, method="spearman", alpha=alpha)["f"]
     boot = block_bootstrap_ic_pvalue(x, y, h, seed=0)
-    # 人為 ×2 t → 重算 p（t 分布）
+    # 人為 ×2 t → 重算 p（t 分布，自由度＝EWC ν）
     t_mut = float(kernel["t_stat"]) * 2.0
-    p_mut = float(2.0 * stats.t.sf(abs(t_mut), df=int(kernel["n_obs"]) - 1))
+    p_mut = float(2.0 * stats.t.sf(abs(t_mut), df=int(kernel["ewc_dof"])))
     bp = float(boot["p_value"])
     agreement = abs(p_mut - bp) <= tol and (p_mut <= alpha) == (bp <= alpha)
     # 在本固定 seed 下 mutation 必須破壞協議，否則本守衛無證偽力

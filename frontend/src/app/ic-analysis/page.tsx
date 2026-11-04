@@ -55,7 +55,7 @@ import { isSectionStatus } from "@/lib/types";
 // SPLITUNIFY Task 10.6：事件掃描請求之三個投影欄，與 IC 分析請求同源（見該函式 docstring）。
 import { buildEventScanRequest } from '@/lib/api';
 import { reshapeGroupedForFeature } from '@/lib/icGrouped';
-import type { GroupedICData, ICDecayData, ICReportLight, QuantileReturnData, SectionStatusObject, SummaryPageParams, TurnoverFeatureData } from '@/lib/types';
+import type { GroupedICData, ICDecayData, ICReportLight, ICSignificanceMeta, QuantileReturnData, SectionStatusObject, SummaryPageParams, TurnoverFeatureData } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import ApplyTransformsResult, { type ApplyTransformsResultData } from '@/components/ic-analysis/ApplyTransformsResult';
 
@@ -709,7 +709,13 @@ function ICAnalysisPageContent() {
             </div>
 
             {/* ICPERF Task 0.4 ㊸：報告頂端一行「本次設定」（非預設項標色）；有報告才顯示 */}
-            {report && <ICRunSettingsLine settings={runSettings} mode={resultMode} />}
+            {report && (
+              <ICRunSettingsLine
+                settings={runSettings}
+                mode={resultMode}
+                significance={(report.metadata?.significance as ICSignificanceMeta | undefined) ?? null}
+              />
+            )}
             <DegradedBanner />
             {/* 🔴 SPLITUNIFY Task 4.1（SPEC C-6）：**唯一**的驗證段數字＋來源標籤。
                 掛在降級訊息之後——「這份能不能當 OOS 看」先講，「驗證段有幾個事件」再講。

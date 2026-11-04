@@ -23,7 +23,15 @@ import {
   binaryColumnLabels,
   binaryColumnTooltips,
 } from '@/lib/icLabelRule';
-import { IC_AUTOCORR_LABEL, IC_AUTOCORR_REASON_LABELS, icAutocorrTip } from '@/components/ic-analysis/icSettingsText';
+import {
+  HAC_NOT_COMPUTABLE_LABELS,
+  HAC_PERSISTENCE_NOT_ESTIMABLE_TIP,
+  HAC_WARNING_NOT_EVALUATED_TIP,
+  IC_AUTOCORR_LABEL,
+  IC_AUTOCORR_REASON_LABELS,
+  hacDataWarningTip,
+  icAutocorrTip,
+} from '@/components/ic-analysis/icSettingsText';
 
 interface ICSummaryTableProps {
   /** legacy：直接給列（不分頁、不本地排序——後端序即顯示序）。 */
@@ -79,6 +87,56 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 /** 共用 finite formatter：非有限 → '--'（CODEX-6；禁前端統計推導） */
+/**
+ * ICPERF ㊹：縱向 p／q 欄——無法計算者顯示原因；有資料不足警示者照常顯示數值並加警示圖示（ⓘ 為警示內容）。
+ */
+function HacPValueCell({ item, field }: { item: ICFeatureInfo; field: 'p_value' | 'p_value_adj' }) {
+  const status = item.inference_status;
+  if (status === 'insufficient_sample' || status === 'degenerate') {
+    return (
+      <span data-testid={`hac-not-computable-${field}`} className="text-slate-500">
+        {HAC_NOT_COMPUTABLE_LABELS[status]}
+      </span>
+    );
+  }
+  const detail = item.data_warning === 'small_effective_sample' ? item.data_warning_detail : null;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {formatFinite(item[field], 4)}
+      {item.data_warning === 'persistence_not_estimable' && (
+        <span
+          data-testid={`hac-persistence-not-estimable-${field}`}
+          title={HAC_PERSISTENCE_NOT_ESTIMABLE_TIP}
+          aria-label={HAC_PERSISTENCE_NOT_ESTIMABLE_TIP}
+          className="text-slate-400"
+        >
+          ?
+        </span>
+      )}
+      {item.data_warning === 'warning_not_evaluated' && (
+        <span
+          data-testid={`hac-warning-not-evaluated-${field}`}
+          title={HAC_WARNING_NOT_EVALUATED_TIP}
+          aria-label={HAC_WARNING_NOT_EVALUATED_TIP}
+          className="text-slate-400"
+        >
+          ?
+        </span>
+      )}
+      {detail && (
+        <span
+          data-testid={`hac-data-warning-${field}`}
+          title={hacDataWarningTip(detail)}
+          aria-label={hacDataWarningTip(detail)}
+          className="text-amber-300"
+        >
+          ⚠
+        </span>
+      )}
+    </span>
+  );
+}
+
 function formatFinite(value: unknown, digits: number): string {
   if (isFiniteNumber(value)) {
     return value.toFixed(digits);
@@ -562,10 +620,10 @@ export default function ICSummaryTable({
                             {formatFinite(item.t_stat, 3)}
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-300">
-                            {formatFinite(item.p_value, 4)}
+                            <HacPValueCell item={item} field="p_value" />
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-300">
-                            {formatFinite(item.p_value_adj, 4)}
+                            <HacPValueCell item={item} field="p_value_adj" />
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-300">
                             {formatFinite(item.monotonicity_score, 2)}

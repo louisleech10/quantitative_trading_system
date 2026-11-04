@@ -42,6 +42,14 @@ describe('FeatureTierPanel 方法選擇', () => {
     }
   });
 
+  it('IC 方法 ⓘ 揭露顯著性 p 值隨所選方法檢定（ICPERF ㊹；EWC 後重測 toggle 影響之結論）', () => {
+    const tip = IC_SETTING_TIPS.ic_method_selection;
+    expect(tip).toMatch(/p 值/);
+    expect(tip).toMatch(/依所選方法/);
+    expect(tip).toMatch(/Kendall 結果較接近預設/);
+    expect(tip).toMatch(/Pearson 倖存集合變動較大/);
+  });
+
   it('選單初值＝預設；改選即回呼（鍵, 值）', () => {
     const onChange = renderPanel();
     const select = screen.getByRole('combobox', { name: 'IC 方法' }) as HTMLSelectElement;

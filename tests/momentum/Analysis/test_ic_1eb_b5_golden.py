@@ -145,15 +145,16 @@ def _assert_nan_p_fails_stage5_gate(feature_name: str, p_value: float) -> None:
 
 
 def test_g3_sample_insufficient_p_nan_gate() -> None:
-    """n_valid < max(8, 2L) → p=NaN → stage5 p 閘 fail（fail-closed）。"""
-    # n=5, h=1 → auto_bw≈2, L=2 → max(8,4)=8 > 5 → fail-closed
-    n = 5
+    """樣本不足（SPEC v5.63 ㊹：EWC ν＝⌊0.4·n^(2/3)⌋ < 1，即 n ≤ 3）→ p=NaN → stage5 p 閘 fail（fail-closed）。"""
+    # n=3, h=1 → ν＝⌊0.4·3^(2/3)⌋＝0 → insufficient_sample（原 n=5 於 EWC 下 ν＝1 可算，屬刻意語意改變）
+    n = 3
     rng = np.random.default_rng(0)
     idx = pd.RangeIndex(n)
     features = pd.DataFrame({"f": rng.normal(size=n)}, index=idx)
     label = pd.Series(rng.normal(size=n), index=idx, name="y")
-    out = compute_hac_ic_statistics(features, label, horizon=1)
+    out = compute_hac_ic_statistics(features, label, horizon=1, method="spearman", alpha=0.05)
     assert "f" in out
+    assert out["f"]["inference_status"] == "insufficient_sample"
     p_nan = float(out["f"]["p_value"])
     assert math.isnan(p_nan)
     # kernel NaN → stage5 p 閘整合（樣本不足）
@@ -172,7 +173,7 @@ def test_g3_all_nan_and_std0_p_nan() -> None:
         },
         index=idx,
     )
-    out = compute_hac_ic_statistics(features, label, horizon=1)
+    out = compute_hac_ic_statistics(features, label, horizon=1, method="spearman", alpha=0.05)
     p_all_nan = float(out["all_nan"]["p_value"])
     p_const = float(out["const"]["p_value"])
     assert math.isnan(p_all_nan)

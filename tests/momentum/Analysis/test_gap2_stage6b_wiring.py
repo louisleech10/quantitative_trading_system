@@ -28,9 +28,25 @@ from tests.momentum.helpers.ichc_run import KLINE_CACHE_DIR, feature_index, fixt
 REPO = Path(__file__).resolve().parents[3]
 
 
+#: 第 6b 段接線測試需第 5 段有倖存者。ICPERF SPEC ㊹ 改 EWC（依方法）後，本 fixture 於預設 p 門檻下無倖存
+#: （持續性特徵之 p 上升，SPEC v5.68 使用者可見數值變化），故呼叫端未自設 `thresholds.p_value_max` 時放寬為 1.0；
+#: 第 6b 段本身之計算不受此門檻影響（其輸入為倖存集合）。
+_SURVIVOR_P_MAX = 1.0
+
+
+def _with_survivor_threshold(config_override: Optional[dict]) -> dict:
+    merged = dict(config_override or {})
+    thresholds = dict(merged.get("thresholds") or {})
+    thresholds.setdefault("p_value_max", _SURVIVOR_P_MAX)
+    merged["thresholds"] = thresholds
+    return merged
+
+
 def _run(config_override: Optional[dict] = None, *, event_timestamps=None, meta_override: Optional[dict] = None) -> Tuple[ICFilterOrchestrator, dict, Path]:
     """同 ichc_run.run_analyze 但回傳 orchestrator（refilter／cache 測試需要）；persist 導 tmp。"""
     from momentum.factories import create_ic_analyzer, create_kline_storage_manager
+
+    config_override = _with_survivor_threshold(config_override)
 
     h5, meta = fixture_paths()
     tmp = Path(tempfile.mkdtemp(prefix="gap2_b4_"))

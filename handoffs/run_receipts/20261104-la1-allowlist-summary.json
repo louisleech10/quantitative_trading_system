@@ -1,0 +1,27 @@
+{
+ "by_class": {
+  "P1-1": {
+   "before": 123,
+   "after": 123
+  },
+  "P1-1c": {
+   "before": 141,
+   "after": 141
+  },
+  "P1-2": {
+   "before": 140,
+   "after": 140
+  },
+  "P1-3-obs": {
+   "before": 66,
+   "after": 66
+  }
+ },
+ "added": [],
+ "removed": [],
+ "new_value_changed": 0,
+ "rows_before": 470,
+ "rows_after": 470,
+ "rows_sha256": "7be70ddd613c8efddf125e5d3fe3368ad5f1a061b962cc2d4317985d714f73bc",
+ "row_count": 470
+}

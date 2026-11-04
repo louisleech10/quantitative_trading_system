@@ -250,9 +250,13 @@ EXPECTED_FREQ_BY_TIMEFRAME: dict[str, pd.Timedelta] = {
 FDR_ASSUMPTION_NOTE = (
     "BH assumes PRDS; correlated features may yield slight FDR optimism"
 )
-#: 縱向第 5 段 HAC 之被檢定估計量：`compute_hac_ic_statistics` 以逐根 **Spearman** 貢獻序列計 t／p（不收 IC 方法參數），
-#: 故不論 `global.default_method` 為何，被檢定者恆為 Spearman（ICPERF Task 0.2 v5.59 (ab) 實查；HAC 日後改依方法時須同步改）。
-TESTED_ESTIMATOR_BAR_LEVEL = "bar_level_spearman"
+#: 縱向第 5 段 HAC 之被檢定估計量：`compute_hac_ic_statistics` 依 `global.default_method` 之逐根貢獻序列計 t／p
+#: （ICPERF SPEC v5.63 ㊹ (af)；封閉對映，spearman 字面不變）。
+TESTED_ESTIMATOR_BAR_LEVEL_BY_METHOD = {
+    "spearman": "bar_level_spearman",
+    "pearson": "bar_level_pearson",
+    "kendall": "bar_level_kendall",
+}
 
 
 def _feature_bar_ms_of(metadata: Optional[dict]) -> int:
@@ -5249,15 +5253,19 @@ class ICFilterOrchestrator:
         else:
             horizon = int(_resolve_effective_label_horizon(config, None))
 
+        # ICPERF ㊹：α 先解析（資料不足警示依當次實際顯著水準），再以 keyword-only 傳入；p／q 不受 α 影響
+        alpha_effective, alpha_source, selection_mode = self._resolve_alpha_policy(
+            config, event_info
+        )
+        hac_ic_method = str(config.global_settings.default_method)
+        explicit_maxlags = _config_significance_maxlags(config)
         ic_stats = compute_hac_ic_statistics(
             features_for_stats,
             label_for_stats,
             horizon=horizon,
-            maxlags=_config_significance_maxlags(config),
-        )
-
-        alpha_effective, alpha_source, selection_mode = self._resolve_alpha_policy(
-            config, event_info
+            method=hac_ic_method,
+            alpha=float(alpha_effective),
+            maxlags=explicit_maxlags,
         )
         fdr_enabled = self._resolve_fdr_enabled(config)
         fdr_method = self._resolve_fdr_method(config)
@@ -5317,7 +5325,14 @@ class ICFilterOrchestrator:
             for v in maxlags_values
             if v is not None and np.isfinite(float(v))
         ]
-        maxlags_meta: Optional[int] = max(finite_maxlags) if finite_maxlags else None
+        hac_method = "newey_west_fixed" if explicit_maxlags is not None else "ewc_llsw2018"
+        maxlags_meta: Optional[int] = (
+            max(finite_maxlags) if (finite_maxlags and hac_method == "newey_west_fixed") else None
+        )
+        universe_stats = [ic_stats.get(f) or {} for f in universe_features]
+        n_obs_vals = [int(s["n_obs"]) for s in universe_stats if s.get("n_obs") is not None]
+        dof_vals = [int(s["ewc_dof"]) for s in universe_stats
+                    if s.get("inference_status") == "ok" and s.get("ewc_dof") is not None]
 
         significance_meta = {
             "fdr": {
@@ -5328,8 +5343,20 @@ class ICFilterOrchestrator:
             "maxlags": maxlags_meta,
             "n_tests": int(n_tests),
             "scope_id": scope_id,
-            "tested_estimator": TESTED_ESTIMATOR_BAR_LEVEL,
+            "tested_estimator": TESTED_ESTIMATOR_BAR_LEVEL_BY_METHOD[hac_ic_method],
             "fdr_assumption_note": FDR_ASSUMPTION_NOTE,
+            "hac_method": hac_method,
+            "horizon": int(horizon),
+            "n_obs_range": [min(n_obs_vals), max(n_obs_vals)] if n_obs_vals else None,
+            "ewc_dof_range": [min(dof_vals), max(dof_vals)] if dof_vals else None,
+            "data_warning_count": int(sum(1 for s in universe_stats if s.get("data_warning") == "small_effective_sample")),
+            "persistence_not_estimable_count": int(sum(
+                1 for s in universe_stats if s.get("data_warning") == "persistence_not_estimable")),
+            "warning_not_evaluated_count": int(sum(
+                1 for s in universe_stats if s.get("data_warning") == "warning_not_evaluated")),
+            "not_computable_count": int(sum(
+                1 for s in universe_stats
+                if s.get("inference_status") in ("insufficient_sample", "degenerate"))),
         }
 
         quantile_results = self._monotonicity.compute_all(
@@ -5883,6 +5910,11 @@ class ICFilterOrchestrator:
                     "p_value": stats_item.get("p_value"),
                     "t_stat": stats_item.get("t_stat"),
                     "p_value_adj": stats_item.get("p_value_adj"),
+                    # ICPERF ㊹：縱向顯著性之自由度、可否計算、資料不足警示（封閉鍵）
+                    "ewc_dof": stats_item.get("ewc_dof"),
+                    "inference_status": stats_item.get("inference_status"),
+                    "data_warning": stats_item.get("data_warning"),
+                    "data_warning_detail": stats_item.get("data_warning_detail"),
                     "ic_hit_rate": icir_item.get("ic_hit_rate"),
                     "monotonicity_score": quantile_item.get(
                         "monotonicity_score"

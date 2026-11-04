@@ -2120,6 +2120,35 @@ export interface FeatureToggleItem {
   category: 'stage' | 'module';
 }
 
+/** ICPERF ㊹：縱向顯著性 p 可否計算（ok／insufficient_sample〔ν < 1〕／degenerate〔序列退化〕）。 */
+export type HacInferenceStatus = 'ok' | 'insufficient_sample' | 'degenerate';
+
+/** ICPERF ㊹：資料不足警示內容（封閉八鍵）。 */
+export interface HacDataWarningDetail {
+  n_obs: number;
+  horizon: number;
+  approx_independent_n: number;
+  phi_hat: number;
+  alpha: number;
+  estimated_null_reject_rate: number;
+  reference_reject_rate: number;
+  replications: number;
+}
+
+/** ICPERF ㊹：報告 `metadata.significance`（縱向第 5 段之顯著性揭露；舊 report 可缺鍵）。 */
+export interface ICSignificanceMeta {
+  hac_method?: 'ewc_llsw2018' | 'newey_west_fixed';
+  horizon?: number;
+  maxlags?: number | null;
+  n_obs_range?: [number, number] | null;
+  ewc_dof_range?: [number, number] | null;
+  data_warning_count?: number;
+  persistence_not_estimable_count?: number;
+  warning_not_evaluated_count?: number;
+  not_computable_count?: number;
+  tested_estimator?: string;
+}
+
 export interface ICFeatureInfo {
   rank: number;
   feature_name: string;
@@ -2148,6 +2177,14 @@ export interface ICFeatureInfo {
   p_value?: number | null;
   /** BH FDR q（p_value_adj）；舊 report 可缺欄 */
   p_value_adj?: number | null;
+  /** ICPERF ㊹：縱向 EWC 自由度 ν（明示 maxlags 之 Newey–West 路徑為 null）；舊 report 可缺欄 */
+  ewc_dof?: number | null;
+  /** ICPERF ㊹：p 可否計算（封閉值）；舊 report 可缺欄 */
+  inference_status?: HacInferenceStatus | null;
+  /** ICPERF ㊹：資料不足警示（封閉值；無警示為 null；`persistence_not_estimable`＝持續性不可估、無法判定）；p／q 照常顯示並參與門檻 */
+  data_warning?: 'small_effective_sample' | 'persistence_not_estimable' | 'warning_not_evaluated' | null;
+  /** ICPERF ㊹：資料不足警示內容（封閉八鍵；無警示為 null） */
+  data_warning_detail?: HacDataWarningDetail | null;
   ic_hit_rate?: number;
   /** HAC t-stat；禁前端 i.i.d. 推導 */
   t_stat?: number | null;

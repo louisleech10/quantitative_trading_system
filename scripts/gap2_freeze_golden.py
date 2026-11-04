@@ -70,12 +70,17 @@ def _fixture_sha256() -> str:
     return hashlib.sha256(h5.read_bytes()).hexdigest()
 
 
+#: ICPERF SPEC ㊹（規格審查 r95 決策 1 (b)）：EWC 預設門檻下本 fixture 第 5 段倖存 0，第 6／6b 段之名稱不解析與
+#: golden 對照將不再被觸及；凍結與重放皆明示放寬 p 門檻以保住倖存者下游路徑（其他門檻不變）。測試 import 本常數。
+SURVIVOR_CONFIG_OVERRIDE: Dict[str, Any] = {"thresholds": {"p_value_max": 1.0}}
+
+
 def _run(sidefx_dir: Path) -> Tuple[Dict[str, Any], str]:
-    """跑一次預設 config；回 (report, config_hash)。"""
+    """跑一次預設 config＋`SURVIVOR_CONFIG_OVERRIDE`；回 (report, config_hash)。"""
     from momentum.factories import create_ic_analyzer  # noqa: F401  # 確保 factories 可載
     from tests.momentum.helpers.ichc_run import run_analyze
 
-    report = run_analyze(config_override=None, sidefx_dir=sidefx_dir)
+    report = run_analyze(config_override=copy.deepcopy(SURVIVOR_CONFIG_OVERRIDE), sidefx_dir=sidefx_dir)
     meta = report.get("metadata") or {}
     # config_hash 取自 metadata.selection_scope.scope_id（＝f"{config_hash}:{split_label}"；orchestrator 未直接輸出 config_hash）
     scope = meta.get("selection_scope") if isinstance(meta.get("selection_scope"), dict) else {}

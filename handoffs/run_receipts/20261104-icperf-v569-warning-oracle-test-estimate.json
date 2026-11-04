@@ -1,0 +1,34 @@
+{
+ "identity": {
+  "match": {
+   "entrypoint": "venv/bin/python",
+   "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false tests/momentum/Analysis/test_icperf_correctness.py::test_receipt_hac_data_warning_oracle_matches_product",
+   "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+   "data": [],
+   "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "hardware": {
+    "cpu": "Apple M1",
+    "cores": 8,
+    "ram_bytes": 8589934592,
+    "os": "Darwin 27.0.0"
+   }
+  },
+  "meta": {
+   "producer": "主委（ICPERF ㊹ v5.69 收據警示 oracle 綁定測試）",
+   "created_at": "2026-11-04T03:36:37+00:00"
+  }
+ },
+ "scale": "single",
+ "estimate_seconds": 300,
+ "basis": [
+  "新增單一測試：9 次 compute_hac_ic_statistics（n≤339）＋9 次警示模擬，每次警示模擬首次建快取約 0.7 秒（runs/icperf/hac_method/stage5_overhead_probe.py）",
+  "估 300 秒為量級估計，不作停止條件（NOCAP）"
+ ],
+ "spec_path": "docs/ICPERF_SPEC.md",
+ "coverage_path_ids": [
+  "ICPERF-BUDGET-7",
+  "ICPERF-BUDGET-9",
+  "ICPERF-BUDGET-10",
+  "ICPERF-BUDGET-11"
+ ]
+}

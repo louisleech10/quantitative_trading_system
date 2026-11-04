@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -23,7 +24,12 @@ import pytest
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO))
 
-from scripts.gap2_freeze_golden import PRE_PATH, _diff_summary, gap2_canonical_sha  # noqa: E402
+from scripts.gap2_freeze_golden import (  # noqa: E402
+    PRE_PATH,
+    SURVIVOR_CONFIG_OVERRIDE,
+    _diff_summary,
+    gap2_canonical_sha,
+)
 from tests.momentum.helpers.ichc_run import run_analyze  # noqa: E402
 from momentum.Analysis import marginal_ic as mic  # noqa: E402
 from momentum.Analysis.factor_combiner import combine_factors  # noqa: E402
@@ -40,8 +46,9 @@ def pre():
 def live_two_runs():
     a_dir = Path(tempfile.mkdtemp(prefix="gap2_golden_a_"))
     b_dir = Path(tempfile.mkdtemp(prefix="gap2_golden_b_"))
-    ra = run_analyze(sidefx_dir=a_dir)
-    rb = run_analyze(sidefx_dir=b_dir)
+    # ICPERF ㊹ r95：同凍結之設定（scripts/gap2_freeze_golden.SURVIVOR_CONFIG_OVERRIDE；保住倖存者下游路徑）
+    ra = run_analyze(config_override=copy.deepcopy(SURVIVOR_CONFIG_OVERRIDE), sidefx_dir=a_dir)
+    rb = run_analyze(config_override=copy.deepcopy(SURVIVOR_CONFIG_OVERRIDE), sidefx_dir=b_dir)
     return ra, rb, a_dir, b_dir
 
 
