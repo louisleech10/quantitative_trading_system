@@ -8,7 +8,8 @@ handoffs/20261030-ICPERF-T04-DEEP-FIX-BRIEF.md）。
 最長之窗。oracle＝`numpy.linalg.eigh`（PCA）、`scipy.stats`（rankdata／linregress／pearsonr／spearmanr）、
 `statsmodels.api.OLS`（含 HAC）與測試自寫之最簡參考實作（`ref_*`，逐條註明產品 `檔:行`）；不呼叫被測模組或其內部函式當
 oracle。Task 0.4 修正後之定義（⑱⑲）為 oracle 之現行定義；CT-5（㉔ 逐特徵中心性趨勢）與 CT-9（㉕ 趨勢其餘三維與
-`dimension_status`）依 SPEC v5.34 使用者裁定實作，oracle＝`statsmodels` OLS `cov_type="HAC"`（`ref_trend_series`）於同請求
+`dimension_status`）依 SPEC v5.34 使用者裁定實作，oracle＝`ref_trend_series`（ICPERF ㊺ B 起：描述 statsmodels OLS、推論不重疊子序列之密集式 Bartlett fixed-b＋特徵分解
+Imhof 精確 p）於同請求
 之逐時點序列（滾動中心性以 `ref_rolling_centrality` 獨立重算；因子報酬 `ls_return_series`、多空 `ls_spread_series` 取來源
 模組輸出，其值另由 `test_icperf_deep_factor_return.py` 之 oracle 對照）。
 
@@ -94,9 +95,9 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     "factor_centrality/features/*/crowded": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:30-32,58,79"},
     "factor_centrality/features/*/risk_level": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:87"},
     "factor_centrality/features/*/percentile_rank": {"oracle": "centrality.rank_pct", "producer": f"{_FC}:73,88"},
-    "factor_centrality/features/*/trend": {"oracle": "centrality.feature_trend_hac（㉔ CT-5）",
+    "factor_centrality/features/*/trend": {"oracle": "centrality.feature_trend_fixedb（㉔ CT-5）",
                                            "producer": f"{_FC}:attach_feature_trends；{_ORC}:_run_factor_centrality"},
-    "factor_centrality/features/*/trend_reason": {"oracle": "centrality.feature_trend_hac（㉔ CT-5）",
+    "factor_centrality/features/*/trend_reason": {"oracle": "centrality.feature_trend_fixedb（㉔ CT-5）",
                                                   "producer": f"{_FC}:attach_feature_trends"},
     "factor_centrality/crowded_features/#": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:76-81,104"},
     "factor_centrality/independent_features/#": {"oracle": "centrality.crowded_relative_rule", "producer": f"{_FC}:77,83,105"},
@@ -107,16 +108,22 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     "factor_centrality/regimes/*/crowding_ratio": {"oracle": "centrality.regime", "producer": f"{_FC}:207-211"},
     "factor_centrality/regimes/*/trend": {"oracle": "centrality.regime_slope", "producer": f"{_FC}:212-218"},
     "factor_centrality/regimes/*/latest": {"oracle": "centrality.regime", "producer": f"{_FC}:225"},
-    "trend_analysis/*/ic_trend/slope": {"oracle": "trend.ols", "producer": f"{_TA}:51-70"},
-    "trend_analysis/*/ic_trend/p_value": {"oracle": "trend.hac", "producer": f"{_TA}:71-72,181-221"},
-    "trend_analysis/*/ic_trend/r_squared": {"oracle": "trend.ols_r2", "producer": f"{_TA}:73"},
-    "trend_analysis/*/ic_trend/tail_estimate": {"oracle": "trend.ols", "producer": f"{_TA}:82"},
-    "trend_analysis/*/ic_trend/trend": {"oracle": "trend.classify", "producer": f"{_TA}:75-80"},
-    "trend_analysis/*/ic_trend/interpretation": {"oracle": "trend.classify", "producer": f"{_TA}:83,230-238"},
+    # ICPERF ㊺ B（SPEC v5.78）：描述用 OLS 欄＋推論用不重疊子序列 Bartlett fixed-b／Imhof 精確 p 欄，四維一體
     **{f"trend_analysis/*/{dim}_trend/{k}": {"oracle": o, "producer": f"{_TA}:analyze_trend；{_ORC}:_trend_dimension_inputs"}
-       for dim in ("centrality", "factor_return", "ls_spread")
-       for k, o in (("slope", "trend.ols"), ("p_value", "trend.hac"), ("r_squared", "trend.ols_r2"),
-                    ("tail_estimate", "trend.ols"), ("trend", "trend.classify"), ("interpretation", "trend.classify"))},
+       for dim in ("ic", "centrality", "factor_return", "ls_spread")
+       for k, o in (("slope", "trend.ols"), ("p_value", "trend.fixedb_imhof"), ("r_squared", "trend.ols_r2"),
+                    ("tail_estimate", "trend.ols"), ("trend", "trend.classify"), ("interpretation", "trend.classify"),
+                    ("inference_slope", "trend.fixedb_ols"), ("inference_se", "trend.fixedb_se"),
+                    ("inference_method", NON_STAT), ("inference_status", "trend.classify"),
+                    ("p_abs_error", "trend.fixedb_imhof"), ("subsample_points", "trend.nonoverlap_select"),
+                    ("subsample_start_pos", "trend.nonoverlap_select"), ("omitted_tail_rows", "trend.nonoverlap_select"),
+                    ("interior_gap_count", "trend.nonoverlap_select"), ("data_warning", "trend.data_warning"),
+                    ("data_warning_detail", "trend.data_warning"))},
+    **{f"trend_analysis/*/{dim}_trend/data_warning_detail/{k}": {
+        "oracle": "trend.data_warning", "producer": f"trend_inference.py:trend_data_warning；{_TA}:analyze_trend"}
+       for dim in ("ic", "centrality", "factor_return", "ls_spread")
+       for k in ("n_obs", "horizon", "approx_independent_n", "phi_hat", "alpha", "estimated_null_reject_rate",
+                 "reference_reject_rate", "replications")},
     "trend_analysis/*/combined_signal/recommendation": {"oracle": "trend.combined_signal", "producer": f"{_TA}:245-285"},
     "trend_analysis/*/combined_signal/reason": {"oracle": "trend.combined_signal", "producer": f"{_TA}:245-285"},
     "trend_analysis/*/combined_signal/action": {"oracle": "trend.combined_signal", "producer": f"{_TA}:245-285"},
@@ -141,10 +148,11 @@ NUMERIC_PATHS = {
     "factor_centrality/features/*/centrality",
     "factor_centrality/features/*/percentile_rank", "factor_centrality/rolling_centrality/*/#",
     "factor_centrality/regimes/*/crowding_ratio", "factor_centrality/regimes/*/latest",
-    "trend_analysis/*/ic_trend/slope", "trend_analysis/*/ic_trend/p_value", "trend_analysis/*/ic_trend/r_squared",
-    "trend_analysis/*/ic_trend/tail_estimate",
-    *{f"trend_analysis/*/{dim}_trend/{k}" for dim in ("centrality", "factor_return", "ls_spread")
-      for k in ("slope", "p_value", "r_squared", "tail_estimate")},
+    *{f"trend_analysis/*/{dim}_trend/{k}" for dim in ("ic", "centrality", "factor_return", "ls_spread")
+      for k in ("slope", "p_value", "r_squared", "tail_estimate", "inference_slope", "inference_se",
+                "data_warning_detail/approx_independent_n", "data_warning_detail/phi_hat",
+                "data_warning_detail/alpha", "data_warning_detail/estimated_null_reject_rate",
+                "data_warning_detail/reference_reject_rate")},
 }
 #: 值域有界於 [0, 1] 且為單位總量之份額者（R²＝r²、|r| ≤ 1；中心性＝單位範數特徵向量分量平方 × 解釋變異比、總和 ≤ 1）：
 #: 兩條獨立數值路徑之絕對誤差約為機器精度 × 單位尺度，值本身趨近 0 時（如 r≈1e-5、分量≈1e-5.5）相對誤差不具意義
@@ -198,6 +206,9 @@ def _stub(rolling_ic: dict) -> Any:
     # ㉕：趨勢各維來源取同請求之深度報告（stub 無 ⇒ 來源模組未執行）；ls_spread 之重疊窗＝標籤 horizon
     stub._deep_horizon = types.MethodType(ICFilterOrchestrator._deep_horizon, stub)
     stub._trend_dimension_inputs = getattr(ICFilterOrchestrator, "_trend_dimension_inputs", None)
+    # ㊺ B(1)：IC 維之來源支撐取快取 `rolling_ic_positions`（stub 無 ⇒ None ⇒ 由 overlap_window 推支撐）
+    stub._ic_trend_support = types.MethodType(ICFilterOrchestrator._ic_trend_support, stub)
+    stub._centrality_support = ICFilterOrchestrator._centrality_support
     return stub
 
 
@@ -442,14 +453,15 @@ def ref_regime(rolling: Mapping[str, List[float]], name: str, cfg: Any) -> dict:
 _CEN_TREND = {"up": "rising", "down": "falling", "flat": "flat"}
 
 
-def ref_feature_trend(values: Any, trend_cfg: Mapping[str, Any], window: int) -> Tuple[Optional[str], Optional[str]]:
-    """㉔（CT-5）逐特徵中心性趨勢：該特徵之滾動中心性序列以 `ref_trend_series`（statsmodels OLS 斜率、`cov_type="HAC"`
-    p 值；頻寬下限＝滾動中心性窗長 `window`〔重疊窗〕；顯著性與 R² 門檻＝trend_analysis 設定）判定，up→rising、
+def ref_feature_trend(values: Any, trend_cfg: Mapping[str, Any], window: int,
+                      support: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Tuple[Optional[str], Optional[str]]:
+    """㉔（CT-5）逐特徵中心性趨勢：該特徵之滾動中心性序列以 `ref_trend_series`（ICPERF ㊺ B：不重疊子序列之
+    fixed-b＋Imhof 精確 p；支撐由滾動中心性窗長 `window` 推〔重疊窗〕；顯著性與 R² 門檻＝trend_analysis 設定）判定，up→rising、
     down→falling、flat→flat；無序列或有效數 < min_samples ⇒ (None, "insufficient_data")；斜率非有限 ⇒
     (None, "indeterminate")。回 (trend, trend_reason)。"""
     if values is None:
         return None, "insufficient_data"
-    res = ref_trend_series(values, trend_cfg, overlap_window=window)
+    res = ref_trend_series(values, trend_cfg, overlap_window=window, support=support)
     if res is None:
         return None, "insufficient_data"
     if res["trend"] not in _CEN_TREND:
@@ -458,7 +470,8 @@ def ref_feature_trend(values: Any, trend_cfg: Mapping[str, Any], window: int) ->
 
 
 def ref_factor_centrality(rolling_ic: dict, selected: Sequence[str], cfg: Mapping[str, Any],
-                          pca_fails: bool = False, trend_cfg: Optional[Mapping[str, Any]] = None) -> Any:
+                          pca_fails: bool = False, trend_cfg: Optional[Mapping[str, Any]] = None,
+                          ic_support: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Any:
     """呼叫端 `_run_factor_centrality` 之參考：矩陣空 ⇒ 略過；centrality 略過 ⇒ 略過；否則併 rolling_centrality（原矩陣）
     與逐欄 regimes；㉔ 逐特徵 trend 以其滾動中心性序列判定（窗長＝min(rolling_window, 列數)）。"""
     names, mat, _ = ref_ic_matrix(rolling_ic, selected)
@@ -470,8 +483,11 @@ def ref_factor_centrality(rolling_ic: dict, selected: Sequence[str], cfg: Mappin
     rolling = ref_rolling_centrality(mat, names, cfg, pca_fails=pca_fails)
     window = min(int(cfg["rolling_window"]), mat.shape[0])
     tcfg = dict(trend_cfg) if trend_cfg is not None else _cfg_t()
+    # ㊺ B(1)：有 IC 位置支撐時中心性第 j 值支撐〔IC 列 j 之起, IC 列 j+W−1 之迄〕（同趨勢 centrality 維）
+    c_sup = ((np.asarray(ic_support[0])[: len(ic_support[0]) - window + 1], np.asarray(ic_support[1])[window - 1:])
+             if ic_support is not None and len(ic_support[0]) >= window else None)
     for name, feat in cen["features"].items():
-        feat["trend"], feat["trend_reason"] = ref_feature_trend(rolling.get(name), tcfg, window)
+        feat["trend"], feat["trend_reason"] = ref_feature_trend(rolling.get(name), tcfg, window, support=c_sup)
     out = dict(cen)
     out["rolling_centrality"] = rolling
     out["regimes"] = {name: ref_regime(rolling, name, cfg) for name in names}
@@ -506,57 +522,183 @@ def ref_hac_lags(n: int, overlap_window: Optional[int]) -> int:
     return auto
 
 
-def ref_trend_series(values: Any, cfg: Mapping[str, Any], overlap_window: Optional[int] = None) -> Optional[dict]:
-    """`analyze_trend`（trend_analyzer.py:27-92）：去 NaN（±inf 保留）；有效數 < min_samples ⇒ None；相異值 ≤ 1 ⇒ 常數結果；
-    winsorize 後以**原始位置**為自變數（⑱ CT-2）以 `statsmodels.api.OLS` 取斜率、截距，R²＝`scipy.stats.pearsonr(x, y)`
-    之 r²；斜率 p 值＝`statsmodels` `cov_type="HAC"`（Bartlett、maxlags＝`ref_hac_lags`、無小樣本修正、t 分布 df＝n−2；⑱
-    CT-1），fail-closed（maxlags ≥ n−1 或 n < max(8, 2·maxlags)）⇒ 1.0；截尾後 y 為常數 ⇒ 斜率 0、p 1、R² 0；含非有限 ⇒
-    斜率／尾端 NaN、p 1、R² 0；tail_estimate＝末一有效位置之擬合值。"""
+def _ref_imhof_tail(lams: np.ndarray) -> float:
+    """獨立 oracle：P(Σλ_jχ²_1 ≥ 0)，以唯一正特徵值正規化、對數空間分段求積（與產品之 SVD 解析譜路徑獨立：本處
+    特徵值取自密集 aa'−c²B 之 eigvalsh）。"""
+    lp = float(np.max(lams))
+    if lp <= 0.0:
+        return 0.0
+    lam = lams / lp
+    lam = lam[np.abs(lam) > 1e-15]
+    vmin = -40.0 - math.log(float(np.sum(np.abs(lam))))
+    logu = (math.log(2.0 / (math.pi * lam.size)) - 0.5 * float(np.sum(np.log(np.abs(lam)))) + 14 * math.log(10)) / (lam.size / 2.0)
+    vmax = max(logu, 5.0, vmin + 1.0)
+
+    def h(v: float) -> float:
+        u = math.exp(v)
+        th = 0.5 * float(np.sum(np.arctan(lam * u)))
+        return math.sin(th) * math.exp(-0.25 * float(np.sum(np.log1p((lam * u) ** 2))))
+
+    from scipy import integrate
+
+    edges = np.linspace(vmin, vmax, 401)
+    total = sum(integrate.quad(h, a, b, limit=200, epsabs=1e-16, epsrel=1e-12)[0] for a, b in zip(edges[:-1], edges[1:]))
+    return 0.5 + (total + 0.5 * float(np.sum(lam)) * math.exp(vmin)) / math.pi
+
+
+def _ref_trend_warning(xs: np.ndarray, ys: np.ndarray, alpha: float, status: str) -> Tuple[Any, Any]:
+    """ICPERF ㊺ B 資料不足警示之接線 oracle（同 ㊹ `warning_oracle` 作法）：只於推論 ok 時判定；受檢序列＝statsmodels
+    OLS 殘差（依 x 序），ρ̂＝測試自寫含截距 LS 一階係數；配對差判準本身由 test_icperf_trend_inference 之具名測試驗。"""
+    from momentum.Analysis import trend_inference as ti
+
+    if status != "ok":
+        return None, None
+    if xs.size - 2 < 2:
+        # 殘差空間維度＝m−2；m＝3 時殘差只有 1 自由度、形狀由設計決定 ⇒ ρ̂ 與 φ 無關、持續性不可辨識
+        return "persistence_not_estimable", None
+    resid = np.asarray(sm.OLS(ys, sm.add_constant(xs)).fit().resid, dtype=float)
+    a, b = resid[:-1] - resid[:-1].mean(), resid[1:] - resid[1:].mean()
+    den = float(a @ a)
+    rho = float(a @ b) / den if den > 0 else math.nan
+    if not math.isfinite(rho):
+        return "persistence_not_estimable", None
+    st = ti.trend_warning_statistics(xs, rho, alpha)
+    if not st["warn"]:
+        return None, None
+    return "small_effective_sample", {
+        "n_obs": int(xs.size), "horizon": 1, "approx_independent_n": float(xs.size), "phi_hat": float(st["phi_hat"]),
+        "alpha": float(alpha), "estimated_null_reject_rate": float(st["r_hat"]),
+        "reference_reject_rate": float(st["r_ref"]), "replications": 1000}
+
+
+def _ref_fixedb_inference(xs: np.ndarray, ys: np.ndarray, alpha: float) -> dict:
+    """獨立 oracle（SPEC v5.78 ㊺ B(3)(4)）：statsmodels OLS 斜率；Bartlett b＝1 之密集式 Ω̂＝(1/m)ΣΣ(1−|t−u|/m)s_t s_u、
+    Var＝m·Ω̂／S_xx²；p＝iid 常態固定設計虛無下 P(|t|≥|t_obs|)，由密集 B（殘差投影 M 直接形成）與 aa'−c²B 之特徵值以
+    `_ref_imhof_tail` 求；封閉狀態 insufficient_points／constant_series／degenerate／ok。"""
+    m = xs.size
+    if m < 3:
+        return {"status": "insufficient_points", "slope": None, "se": None, "p": None, "points": m}
+    if np.all(ys == ys[0]):
+        return {"status": "constant_series", "slope": 0.0, "se": None, "p": None, "points": m}
+    exog = sm.add_constant(xs)
+    fit = sm.OLS(ys, exog).fit()
+    beta = float(fit.params[1])
+    xc = xs - xs.mean()
+    sxx = float(xc @ xc)
+    s = xc * fit.resid
+    t = np.arange(m)
+    omega = float(s @ (1.0 - np.abs(t[:, None] - t[None, :]) / m) @ s) / m
+    var = m * omega / sxx**2
+    if not math.isfinite(var) or var <= 0.0:
+        return {"status": "degenerate", "slope": None, "se": None, "p": None, "points": m}
+    se = math.sqrt(var)
+    a = xc / sxx
+    M = np.eye(m) - exog @ np.linalg.pinv(exog)
+    G = np.diag(np.r_[np.ones(m - 1), 0.0]) @ np.tril(np.ones((m, m))) @ np.diag(xc) @ M
+    B = (2.0 / m) * (G.T @ G) / sxx**2
+    c2 = (beta / se) ** 2
+    A = np.outer(a, a) - c2 * B
+    p = _ref_imhof_tail(np.linalg.eigvalsh((A + A.T) / 2.0))
+    return {"status": "ok", "slope": beta, "se": se, "p": min(max(p, 0.0), 1.0), "points": m,
+            "significant": p <= alpha}
+
+
+def ref_trend_series(values: Any, cfg: Mapping[str, Any], overlap_window: Optional[int] = None,
+                     support: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+                     finite_only: bool = False) -> Optional[dict]:
+    """`analyze_trend`（ICPERF ㊺ B，SPEC v5.78）之獨立 oracle。
+
+    描述（沿用 ⑱）：去 NaN（±inf 保留）；有效數 < min_samples ⇒ None；相異值 ≤ 1 ⇒ 常數（斜率 0、R² 0、尾端＝該值、flat）；
+    winsorize 後以原始位置 statsmodels OLS 取斜率／截距、R²＝pearsonr²；含非有限 ⇒ 斜率／尾端 NaN、R² 0 ⇒ indeterminate。
+    推論：支撐〔起, 迄〕（未給 ⇒〔位置, 位置＋overlap_window−1〕）自首值貪婪選取不交疊值；選取點有限值（x＝支撐迄點、
+    y＝未縮尾原值）以 `_ref_fixedb_inference` 檢定；分類 ok 且 p ≤ α 且描述 R² ≥ 門檻 ⇒ 推論斜率符號，否則 flat；
+    constant_series ⇒ flat；其餘 ⇒ indeterminate。`p_abs_error` 為產品之誤差界、不由 oracle 給（比對端另以界驗 p）。"""
     raw = np.asarray(values, dtype=float).reshape(-1)
+    n_all = raw.size
     mask = ~np.isnan(raw)
     s = raw[mask]
     x = np.flatnonzero(mask).astype(float)
     if s.size < int(cfg["min_samples"]):
         return None
+    if support is None:
+        span = int(overlap_window) if overlap_window else 1
+        start = np.arange(n_all)
+        end = start + max(span, 1) - 1
+    else:
+        start, end = np.asarray(support[0]), np.asarray(support[1])
+    sel: list = []
+    last = None
+    for i in range(n_all):
+        if finite_only and not np.isfinite(raw[i]):
+            continue  # ㊺ B(7)：ls_spread 非持倉點不入設計（不佔支撐）
+        if last is None or start[i] > last:
+            sel.append(i)
+            last = int(end[i])
+    sel_arr = np.asarray(sel, dtype=int)
+    ys_all = raw[sel_arr]
+    fin = np.isfinite(ys_all)
+    xs_fin = end[sel_arr][fin].astype(float)
+    inf = _ref_fixedb_inference(xs_fin, ys_all[fin], float(cfg["significance_level"]))
+    warn, warn_detail = _ref_trend_warning(xs_fin, ys_all[fin], float(cfg["significance_level"]), inf["status"])
+    common = {
+        "data_warning": warn,
+        "data_warning_detail": warn_detail,
+        "inference_method": "bartlett_fixedb_b1_nonoverlap",
+        "inference_status": inf["status"],
+        "inference_slope": inf["slope"],
+        "inference_se": inf["se"],
+        "subsample_points": inf["points"],
+        "subsample_start_pos": int(start[sel_arr[0]]) if sel_arr.size else None,
+        "omitted_tail_rows": int(n_all - 1 - sel_arr[-1]) if sel_arr.size else n_all,
+        "interior_gap_count": int(np.sum(~fin)),
+        "p_value": inf["p"],
+    }
     if np.unique(s).size <= 1:
-        return {"slope": 0.0, "p_value": 1.0, "r_squared": 0.0, "tail_estimate": float(s[0]), "trend": "flat",
-                "interpretation": "序列近乎常數，趨勢為平坦"}
+        # SPEC ㊺ B(4)：描述全同仍依推論狀態分類——constant_series ⇒ flat；選取點不足等 ⇒ indeterminate
+        c_trend = "flat" if inf["status"] in ("constant_series", "ok") else "indeterminate"
+        return {"slope": 0.0, "r_squared": 0.0, "tail_estimate": float(s[0]), "trend": c_trend,
+                "interpretation": _INTERP.get(c_trend, "趨勢不確定"), **common, "_slope_scale": math.nan}
     with np.errstate(invalid="ignore"):
         yw = _ref_winsorize(s)
-    n = yw.size
-    t_abs, df_resid = math.nan, math.nan
     if not np.all(np.isfinite(yw)):
-        slope, intercept, p_value, r2 = math.nan, math.nan, 1.0, 0.0
+        slope, intercept, r2 = math.nan, math.nan, 0.0
     elif np.unique(yw).size == 1:
-        slope, intercept, p_value, r2 = 0.0, float(yw[0]), 1.0, 0.0
+        slope, intercept, r2 = 0.0, float(yw[0]), 0.0
     else:
-        exog = sm.add_constant(x)
-        fit = sm.OLS(yw, exog).fit()
+        fit = sm.OLS(yw, sm.add_constant(x)).fit()
         slope, intercept = float(fit.params[1]), float(fit.params[0])
         r2 = float(stats.pearsonr(x, yw)[0]) ** 2
-        lags = ref_hac_lags(n, overlap_window)
-        if lags >= n - 1 or n < max(8, 2 * lags):
-            p_value = 1.0
-        else:
-            hac = sm.OLS(yw, exog).fit(cov_type="HAC", use_t=True,
-                                       cov_kwds={"maxlags": int(lags), "kernel": "bartlett", "use_correction": False})
-            p_value = float(hac.pvalues[1])
-            t_abs, df_resid = abs(float(hac.tvalues[1])), float(hac.df_resid)
-    if not math.isfinite(p_value):
-        p_value = 1.0
-    trend = _ref_classify(slope, p_value, r2, cfg)
+    if not math.isfinite(slope):
+        trend = "indeterminate"
+    elif inf["status"] == "ok":
+        sig = inf["significant"] and r2 >= float(cfg["r_squared_threshold"])
+        trend = ("up" if inf["slope"] > 0 else "down" if inf["slope"] < 0 else "flat") if sig else "flat"
+    elif inf["status"] == "constant_series":
+        trend = "flat"
+    else:
+        trend = "indeterminate"
     # 斜率之自然尺度＝std(y)／std(x)（斜率 ≈ r·此尺度）：斜率趨近 0 時兩條獨立路徑之差約為機器精度 × 此尺度
     scale = float(np.std(yw) / np.std(x)) if x.size > 1 and np.std(x) > 0 and np.all(np.isfinite(yw)) else math.nan
-    return {"slope": slope, "p_value": p_value, "r_squared": r2, "tail_estimate": float(intercept + slope * x[-1]),
-            "trend": trend, "interpretation": _INTERP.get(trend, "趨勢不確定"), "_t_abs": t_abs, "_df": df_resid,
-            "_slope_scale": scale}
+    return {"slope": slope, "r_squared": r2, "tail_estimate": float(intercept + slope * x[-1]),
+            "trend": trend, "interpretation": _INTERP.get(trend, "趨勢不確定"), **common, "_slope_scale": scale}
 
 
-def ref_combined_signal(ic_trend: Optional[str], centrality_trend: Optional[str],
+def ref_combined_signal(ic_res: Optional[Mapping[str, Any]], centrality_res: Optional[Mapping[str, Any]],
                         half_life: Optional[float]) -> dict:
-    """`_combine_signal`（trend_analyzer.py:245-285）規則表；缺維度 ⇒ "flat"。"""
-    ic = ic_trend or "flat"
-    ce = centrality_trend or "flat"
+    """`_combine_signal`（ICPERF ㊺ B(6)）：任一維缺或非 up／down／flat ⇒「資訊不足」（reason＝可判定維之觀察＋不可判定維與
+    原因〔該維之 inference_status；缺維 ⇒ source_unavailable〕，以「；」相接）；皆可判定 ⇒ 現行規則表。"""
+    words = {"up": "上升", "down": "下降", "flat": "持平"}
+    known, unknown = [], []
+    for label, res in (("IC", ic_res), ("中心性", centrality_res)):
+        tr = res.get("trend") if res else None
+        if tr in words:
+            known.append(f"{label} {words[tr]}")
+        else:
+            unknown.append(f"{label}不可判定：{(res or {}).get('inference_status') or ('source_unavailable' if res is None else 'indeterminate')}")
+    if unknown:
+        return {"recommendation": "資訊不足", "reason": "；".join(known + unknown), "action": "補足資料後重跑"}
+    ic = ic_res["trend"]
+    ce = centrality_res["trend"]
     rec, reason, action = "正常", "訊號穩定", "維持觀察"
     if ic == "down" and ce == "up":
         rec, reason, action = "危險", "IC 下降 + Centrality 上升", "建議降低配置"
@@ -587,7 +729,8 @@ TrendSources = Mapping[str, Any]
 
 def ref_trend_analysis(rolling_ic: dict, selected: Sequence[str], cfg: Mapping[str, Any],
                        overlap_window: Any = None, rolling_stride: int = 1,
-                       sources: Optional[TrendSources] = None, dimensions: Optional[Sequence[str]] = None) -> Any:
+                       sources: Optional[TrendSources] = None, dimensions: Optional[Sequence[str]] = None,
+                       ic_support: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Any:
     """呼叫端 `_run_trend_analysis`＋`batch_analyze`：取矩陣前 max(1, len(selected)) 欄；㉕ 依 `dimensions`（None ⇒
     `cfg["dimensions"]`）逐維：ic 維＝滾動 IC 欄（`overlap_window`：產品收到之值；"from_key" ⇒ 依窗鍵與 stride 導出，⑱）；
     其餘三維取 `sources[dim]`——缺 ⇒ "source_module_off"（來源模組未於本請求執行）、為字串 ⇒ 該狀態、該特徵不在序列表 ⇒
@@ -613,18 +756,22 @@ def ref_trend_analysis(rolling_ic: dict, selected: Sequence[str], cfg: Mapping[s
                 if isinstance(src, str):
                     status[dim] = src
                     continue
-                series_map, ow = src
+                series_map, ow, *rest = src
                 if name not in series_map:
                     status[dim] = "source_skipped"
                     continue
                 values = series_map[name]
-            res = ref_trend_series(values, cfg, overlap_window=ow)
+            sup = ic_support if dim == "ic" else (rest[0] if rest else None)
+            if isinstance(sup, int):
+                # ㊺ B(1)：序列第 j 值位於原列 j·scale（因子報酬每 h 根之格點）⇒〔j·scale, j·scale＋ow−1〕
+                pos = np.arange(len(values)) * sup
+                sup = (pos, pos + max(int(ow or 1), 1) - 1)
+            res = ref_trend_series(values, cfg, overlap_window=ow, support=sup, finite_only=(dim == "ls_spread"))
             if res is None:
                 status[dim] = "insufficient_data"
                 continue
             entry[f"{dim}_trend"] = res
-        entry["combined_signal"] = ref_combined_signal(entry.get("ic_trend", {}).get("trend"),
-                                                       entry.get("centrality_trend", {}).get("trend"), None)
+        entry["combined_signal"] = ref_combined_signal(entry.get("ic_trend"), entry.get("centrality_trend"), None)
         entry["dimension_status"] = status
         out[name] = entry
     return out
@@ -737,6 +884,8 @@ def _verdict_slope(items: List[Tuple[str, Any, Any, float]], tol: float = REL_TO
     （趨勢斜率屬衍生量 ⇒ 1e-9）。"""
     max_rel, n_fin, bad = 0.0, 0, []
     for tag, pv, ov, scale in items:
+        if pv is None and ov is None:
+            continue
         a, b = _to_float(pv), _to_float(ov)
         n_fin += int(math.isfinite(a))
         r = _rel(a, b)
@@ -816,12 +965,14 @@ def _tie_aware_percentiles(ref_features: Dict[str, dict], prod_features: Mapping
 
 def compare_factor_centrality(product_output: Any, rolling_ic: dict, selected_features: Sequence[str],
                               config: Mapping[str, Any],
-                              trend_config: Optional[Mapping[str, Any]] = None) -> Dict[str, Dict[str, Any]]:
+                              trend_config: Optional[Mapping[str, Any]] = None,
+                              ic_support: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Dict[str, Dict[str, Any]]:
     """`results.factor_centrality` 逐欄對照。輸入＝產品公開入口之同一組（`_ic_cache["rolling_ic"]`、selected、
     `config.factor_centrality.model_dump()`、㉔ 逐特徵趨勢所用之 `config.trend_analysis.model_dump()`〔None ⇒ 預設〕）；
-    `product_output` 為產品回傳 dict 或其拋出之例外。`features/*/trend` 之 oracle＝`ref_feature_trend`（statsmodels HAC）。"""
+    `product_output` 為產品回傳 dict 或其拋出之例外。`features/*/trend` 之 oracle＝`ref_feature_trend`（ICPERF ㊺ B fixed-b）。"""
     pca_fails = isinstance(product_output, dict) and "fallback" in product_output.get("pca_summary", {})
-    ref = ref_factor_centrality(rolling_ic, selected_features, config, pca_fails=pca_fails, trend_cfg=trend_config)
+    ref = ref_factor_centrality(rolling_ic, selected_features, config, pca_fails=pca_fails, trend_cfg=trend_config,
+                                ic_support=ic_support)
     if isinstance(ref, RefSkip) or isinstance(product_output, BaseException):
         return _skip_verdict(product_output, ref, "factor_centrality（略過）")
     _tie_aware_percentiles(ref["features"], product_output.get("features", {}))
@@ -841,41 +992,58 @@ def compare_factor_centrality(product_output: Any, rolling_ic: dict, selected_fe
 def compare_trend_analysis(product_output: Any, rolling_ic: dict, selected_features: Sequence[str],
                            config: Mapping[str, Any], rolling_stride: int = 1,
                            overlap_window: Any = "from_key", sources: Optional[TrendSources] = None,
-                           dimensions: Optional[Sequence[str]] = None) -> Dict[str, Dict[str, Any]]:
+                           dimensions: Optional[Sequence[str]] = None,
+                           ic_support: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> Dict[str, Dict[str, Any]]:
     """`results.trend_analysis` 逐欄對照（輸入同產品公開入口；`config`＝`config.trend_analysis.model_dump()`；
     `overlap_window`＝產品 `batch_analyze` 實際收到之值——預設 "from_key"＝依窗鍵與 `rolling_stride` 導出
     ceil(w／stride)，即呼叫端 `_rolling_overlap_window` 之定義；模組端直接呼叫時傳實際值或 None）。㉕ `sources`／
     `dimensions` 見 `ref_trend_analysis`（模組端直接呼叫 `batch_analyze` 未傳 dimensions ⇒ 傳 ["ic"]）。另附端到端項（鍵帶
     `@hac`）：以窗鍵導出之 overlap 重算之 p 值與趨勢（SPEC ⑱）；產品未收到窗長時此項不一致。"""
     ref = ref_trend_analysis(rolling_ic, selected_features, config, overlap_window=overlap_window,
-                             rolling_stride=rolling_stride, sources=sources, dimensions=dimensions)
+                             rolling_stride=rolling_stride, sources=sources, dimensions=dimensions,
+                             ic_support=ic_support)
     if isinstance(ref, RefSkip) or isinstance(product_output, BaseException):
         return _skip_verdict(product_output, ref, "trend_analysis（略過）")
     out = _compare_trees(product_output, ref, "trend_analysis")
 
-    def _pv(reference: dict, dim_key: str = "ic_trend") -> Dict[str, Any]:
-        return _verdict_pvalue([(f"[{n}]", product_output.get(n, {}).get(dim_key, {}).get("p_value"),
-                                 e[dim_key]["p_value"], e[dim_key].get("_t_abs", math.nan),
-                                 e[dim_key].get("_df", math.nan))
-                                for n, e in reference.items() if dim_key in e],
-                               tol=_tol(f"trend_analysis/*/{dim_key}/p_value"))
+    def _p_bound(dim_key: str) -> Dict[str, Any]:
+        """ICPERF ㊺：p 以產品誤差界判——|p_產品 − p_oracle| ≤ p_abs_error＋1e-9（oracle 為獨立求積路徑，其自身求積誤差
+        ≤1e-9）；兩者皆 None（非 ok 狀態）視為一致；`p_abs_error` 須於 p 非 None 時為有限且 ≥ 0、p 為 None 時為 None。"""
+        bad: List[str] = []
+        n_fin = 0
+        for n, e in ref.items():
+            if dim_key not in e:
+                continue
+            got = product_output.get(n, {}).get(dim_key, {})
+            pp, po, eb = got.get("p_value"), e[dim_key]["p_value"], got.get("p_abs_error")
+            if pp is None and po is None:
+                if eb is not None:
+                    bad.append(f"[{n}]: p 為 None 而 p_abs_error={eb!r}")
+                continue
+            if pp is None or po is None or eb is None or not math.isfinite(float(eb)) or float(eb) < 0.0:
+                bad.append(f"[{n}]: 產品 p={pp!r}、err={eb!r} vs oracle {po!r}")
+                continue
+            n_fin += 1
+            if abs(float(pp) - float(po)) > float(eb) + 1e-9:
+                bad.append(f"[{n}]: 產品 {pp!r}±{eb!r} vs oracle {po!r}")
+        return {"verdict": "一致" if not bad else "不一致", "max_rel_diff": None, "n_finite": n_fin,
+                "detail": "; ".join(bad[:5])}
 
     for dim in TREND_DIMS:
-        pkey = f"trend_analysis/*/{dim}_trend/p_value"
-        if pkey in out and "位置不同" not in out[pkey]["detail"] and "未登錄" not in out[pkey]["detail"]:
-            out[pkey] = _pv(ref, f"{dim}_trend")
-        skey = f"trend_analysis/*/{dim}_trend/slope"
-        if skey in out and "位置不同" not in out[skey]["detail"] and "未登錄" not in out[skey]["detail"]:
-            out[skey] = _verdict_slope([(f"[{n}]", product_output.get(n, {}).get(f"{dim}_trend", {}).get("slope"),
-                                         e[f"{dim}_trend"]["slope"], e[f"{dim}_trend"].get("_slope_scale", math.nan))
-                                        for n, e in ref.items() if f"{dim}_trend" in e], tol=_tol(skey))
+        for leaf in ("p_value", "p_abs_error"):
+            key = f"trend_analysis/*/{dim}_trend/{leaf}"
+            if key in out and "位置不同" not in out[key]["detail"] and "未登錄" not in out[key]["detail"]:
+                out[key] = _p_bound(f"{dim}_trend")
+            elif key in out and leaf == "p_abs_error" and "位置不同" in out[key]["detail"]:
+                # 產品恆出 p_abs_error 鍵、oracle 不給其值（以 None 佔位）：位置差只代表 oracle 未列，改以界判
+                out[key] = _p_bound(f"{dim}_trend")
+        for skey_leaf in ("slope", "inference_slope"):
+            skey = f"trend_analysis/*/{dim}_trend/{skey_leaf}"
+            if skey in out and "位置不同" not in out[skey]["detail"] and "未登錄" not in out[skey]["detail"]:
+                out[skey] = _verdict_slope([(f"[{n}]", product_output.get(n, {}).get(f"{dim}_trend", {}).get(skey_leaf),
+                                             e[f"{dim}_trend"][skey_leaf], e[f"{dim}_trend"].get("_slope_scale", math.nan))
+                                            for n, e in ref.items() if f"{dim}_trend" in e], tol=_tol(skey))
     out["trend_analysis/*（鍵集合）"] = _verdict_exact([("", list(product_output), list(ref))])
-    full = ref_trend_analysis(rolling_ic, selected_features, config, overlap_window="from_key",
-                              rolling_stride=rolling_stride, sources=sources, dimensions=dimensions)
-    out["trend_analysis/*/ic_trend/p_value@hac"] = _pv(full)
-    out["trend_analysis/*/ic_trend/trend@hac"] = _verdict_exact(
-        [(f"[{n}]", product_output.get(n, {}).get("ic_trend", {}).get("trend"), e["ic_trend"]["trend"])
-         for n, e in full.items() if "ic_trend" in e])
     return out
 
 
@@ -1118,8 +1286,8 @@ def _shifting_crowding_ic(n: int = 400, seed: int = 16) -> Dict[str, np.ndarray]
 
 
 def test_feature_trend_field_reflects_regime_trend() -> None:
-    """㉔ CT-5（Task 0.3 xfail 轉一般斷言；函式名沿用）：`features.*.trend` == 該特徵滾動中心性序列之 statsmodels OLS＋HAC
-    判定（頻寬下限＝滾動中心性窗長；顯著性與 R² 門檻＝trend_analysis 設定）之映射——不再比 `regimes.*.trend`（後者為未檢定之
+    """㉔ CT-5（Task 0.3 xfail 轉一般斷言；函式名沿用）：`features.*.trend` == 該特徵滾動中心性序列之趨勢判定（ICPERF ㊺ B：
+    描述 OLS＋不重疊子序列 fixed-b／Imhof 推論；支撐由滾動中心性窗長推；顯著性與 R² 門檻＝trend_analysis 設定）之映射——不再比 `regimes.*.trend`（後者為未檢定之
     斜率正負號，非 SPEC ㉔ 之定義）；明列輸入使 rising／falling／flat 三種判定皆出現；trend_reason 為 None。"""
     cols = _shifting_crowding_ic()
     rolling_ic = _ic_dict(cols)
@@ -1133,15 +1301,16 @@ def test_feature_trend_field_reflects_regime_trend() -> None:
     assert set(got.values()) == {"rising", "falling", "flat"}, got
     assert got["a"] == got["b"] == "rising" and got["e"] == got["f"] == "falling", got
     assert all(v["trend_reason"] is None for v in prod["features"].values())
-    # 獨立 oracle 直接重算一欄（不經 compare 之樹對照）：HAC maxlags＝max(自動, 窗長−1)
+    # 獨立 oracle 直接重算一欄（不經 compare 之樹對照）：ICPERF ㊺ B——支撐〔j, j＋39〕（窗長 40）之不重疊子序列上
+    # 密集式 Bartlett fixed-b＋特徵分解 Imhof 精確 p；描述 R² 為縮尾後 pearsonr²
     series = np.asarray(prod["rolling_centrality"]["a"], dtype=float)
     x = np.arange(series.size, dtype=float)
     yw = _ref_winsorize(series)
-    lags = max(int(4 * (series.size / 100.0) ** (2.0 / 9.0)), 40 - 1)
-    hac = sm.OLS(yw, sm.add_constant(x)).fit(cov_type="HAC", use_t=True,
-                                             cov_kwds={"maxlags": lags, "kernel": "bartlett", "use_correction": False})
-    assert float(hac.params[1]) > 0 and float(hac.pvalues[1]) <= cfg_t_sig() and \
-        float(stats.pearsonr(x, yw)[0]) ** 2 >= float(TrendAnalysisConfig().r_squared_threshold)
+    pts = np.arange(0, series.size, 40)
+    pts = pts[np.isfinite(series[pts])]
+    inf = _ref_fixedb_inference(pts + 39.0, series[pts], cfg_t_sig())
+    assert inf["status"] == "ok" and inf["slope"] > 0 and inf["significant"], inf
+    assert float(stats.pearsonr(x, yw)[0]) ** 2 >= float(TrendAnalysisConfig().r_squared_threshold)
 
 
 def cfg_t_sig() -> float:
@@ -1296,7 +1465,7 @@ _T_KINDS = ["up", "down", "noise", "outliers", "constant", "winsor_collapse", "w
 
 def test_trend_analysis_matches_oracle() -> None:
     """明列邊界（顯著上升／下降、雜訊、離群值截尾、常數、截尾後常數、含 inf、樣本不足、中段 NaN〔⑱ CT-2 原始位置〕）經呼叫端
-    （呼叫端未傳窗長 ⇒ HAC 只用自動頻寬）：逐欄 == oracle（statsmodels OLS 斜率、HAC p、pearsonr²、規則表）；selected
+    （呼叫端未傳窗長 ⇒ 每值只涵蓋自身）：逐欄 == oracle（statsmodels OLS 斜率、不重疊 fixed-b／Imhof p、pearsonr²、規則表）；selected
     外之特徵與非 dict 值不入。"""
     rolling_ic = {k: {"window_21": [float(v) for v in _trend_series(k, seed=i)]} for i, k in enumerate(_T_KINDS)}
     rolling_ic["not_selected"] = {"window_21": [0.1] * 30}
@@ -1306,7 +1475,10 @@ def test_trend_analysis_matches_oracle() -> None:
     res = compare_trend_analysis(prod, rolling_ic, sel, cfg)
     _assert_all_consistent(res)
     assert prod["up"]["ic_trend"]["trend"] == "up" and prod["down"]["ic_trend"]["trend"] == "down"
-    assert prod["down"]["combined_signal"]["recommendation"] == "警告"
+    # ICPERF ㊺ B(6)：centrality 維之來源未於本請求執行（source_module_off）⇒ 缺維 ⇒「資訊不足」、保留 IC 觀察
+    assert prod["down"]["combined_signal"] == {"recommendation": "資訊不足",
+                                               "reason": "IC 下降；中心性不可判定：source_unavailable",
+                                               "action": "補足資料後重跑"}
     assert prod["with_inf"]["ic_trend"]["trend"] == "indeterminate" and "ic_trend" not in prod["short"]
     assert set(prod) == set(_T_KINDS)
 
@@ -1339,18 +1511,25 @@ def test_trend_multi_dimension_and_combined_signal(ic_kind: str, cen_kind: Optio
     exp = {"ic_trend": exp_ic, "factor_return_trend": exp_fr}
     if exp_cen is not None:
         exp["centrality_trend"] = exp_cen
-    exp["combined_signal"] = ref_combined_signal(exp_ic["trend"], exp_cen["trend"] if exp_cen else None, half_life)
+    exp["combined_signal"] = ref_combined_signal(exp_ic, exp_cen, half_life)
     assert set(got) == set(exp), (set(got), set(exp))
     for dim in ("ic_trend", "factor_return_trend", "centrality_trend"):
         if dim not in exp:
             continue
         for k in ("slope", "r_squared", "tail_estimate"):
             assert _rel(got[dim][k], exp[dim][k]) <= REL_TOL, f"{dim}/{k}: {got[dim][k]} vs {exp[dim][k]}"
-        assert _p_consistent(got[dim]["p_value"], exp[dim]["p_value"], exp[dim].get("_t_abs", math.nan),
-                             exp[dim].get("_df", math.nan))[0], (
-            f"{dim}/p_value: {got[dim]['p_value']} vs {exp[dim]['p_value']}")
-        assert got[dim]["trend"] == exp[dim]["trend"] and got[dim]["interpretation"] == exp[dim]["interpretation"]
+        _assert_p_within_bound(got[dim], exp[dim], dim)
+        for k in ("trend", "interpretation", "inference_status", "subsample_points", "interior_gap_count"):
+            assert got[dim][k] == exp[dim][k], (dim, k, got[dim][k], exp[dim][k])
     assert got["combined_signal"] == exp["combined_signal"]
+
+
+def _assert_p_within_bound(got: Mapping[str, Any], exp: Mapping[str, Any], tag: str) -> None:
+    """ICPERF ㊺：p 皆 None，或 |p_產品 − p_oracle| ≤ p_abs_error＋1e-9（oracle 為獨立求積路徑）。"""
+    if got["p_value"] is None or exp["p_value"] is None:
+        assert got["p_value"] is None and exp["p_value"] is None and got["p_abs_error"] is None, (tag, got, exp)
+        return
+    assert abs(got["p_value"] - exp["p_value"]) <= got["p_abs_error"] + 1e-9, (tag, got["p_value"], exp["p_value"])
 
 
 def _overlap_ma(n: int, w: int, seed: int) -> np.ndarray:
@@ -1359,20 +1538,21 @@ def _overlap_ma(n: int, w: int, seed: int) -> np.ndarray:
     return np.convolve(e, np.ones(w) / w, mode="valid")
 
 
-def test_trend_p_value_uses_hac_for_overlapping_windows() -> None:
-    """⑱ CT-1 端到端（Task 0.3 xfail 轉綠；呼叫端 `_rolling_overlap_window` 傳 ceil(w／stride)）：重疊窗（w＝100）之移動
-    平均序列經呼叫端，產品 p 值 == statsmodels HAC（Bartlett、maxlags＝max(自動, w−1)）之 p 值。"""
+def test_trend_inference_uses_nonoverlapping_subsample_end_to_end() -> None:
+    """ICPERF ㊺ B（取代 ⑱ CT-1 之固定頻寬 NW 端到端）：重疊窗（w＝100）之移動平均序列經呼叫端（`_rolling_overlap_window`
+    傳 ceil(w／stride)），推論只用支撐不交疊之子序列（間距 100）、p＝Bartlett fixed-b 之 Imhof 精確 p，逐欄 == 獨立 oracle。"""
     cols = {f"s{i}": _overlap_ma(1500, 100, seed=20 + i) for i in range(3)}
     rolling_ic = {k: {"window_100": [float(x) for x in v]} for k, v in cols.items()}
     prod, cfg = _run_t(rolling_ic, list(cols))
     res = compare_trend_analysis(prod, rolling_ic, list(cols), cfg)
     _assert_all_consistent(res)
-    assert res["trend_analysis/*/ic_trend/p_value@hac"]["verdict"] == "一致", res["trend_analysis/*/ic_trend/p_value@hac"]
+    for name in cols:
+        assert prod[name]["ic_trend"]["subsample_points"] == 15  # 1500 值、每 100 取一
 
 
-def test_trend_module_p_value_uses_hac_for_overlapping_windows() -> None:
-    """⑱ CT-1（Task 0.3 xfail 轉綠，模組端）：重疊窗（w＝100）之移動平均序列，`batch_analyze(overlap_window=100)` 之 p 值 ==
-    statsmodels HAC（Bartlett、maxlags＝max(自動, w−1)、無小樣本修正）；同輸入之 iid OLS p 值遠小於之（改前定義）。"""
+def test_trend_module_inference_uses_nonoverlapping_subsample() -> None:
+    """ICPERF ㊺ B（取代 ⑱ CT-1 模組端）：`batch_analyze(overlap_window=100)` 之推論鍵 == 獨立 oracle；同輸入以全部重疊點
+    之 iid OLS p 值遠小於之（重疊序列之虛假顯著，改前現象）。"""
     cols = {f"s{i}": _overlap_ma(1500, 100, seed=20 + i) for i in range(3)}
     rolling_ic = {k: {"window_100": [float(x) for x in v]} for k, v in cols.items()}
     cfg = _config()
@@ -1380,26 +1560,26 @@ def test_trend_module_p_value_uses_hac_for_overlapping_windows() -> None:
     res = compare_trend_analysis(prod, rolling_ic, list(cols), cfg.trend_analysis.model_dump(), overlap_window=100,
                                  dimensions=["ic"])
     _assert_all_consistent(res)
-    assert res["trend_analysis/*/ic_trend/p_value@hac"]["verdict"] == "一致", res["trend_analysis/*/ic_trend/p_value@hac"]
     for name, v in cols.items():
         x = np.arange(v.size, dtype=float)
-        iid_p = float(sm.OLS(_ref_winsorize(v), sm.add_constant(x)).fit().pvalues[1])
+        iid_p = float(sm.OLS(v, sm.add_constant(x)).fit().pvalues[1])
         assert prod[name]["ic_trend"]["p_value"] > iid_p
 
 
-def test_hac_p_value_fail_closed_and_lag_rule() -> None:
-    """HAC 落後期數與 fail-closed 邊界（同 statistical_validator.py:118-127）：n＝40、overlap 20 ⇒ L＝19，n＝40 ≥ 2L＝38
-    可算（== statsmodels）；overlap 21 ⇒ L＝20、n＝40 ≥ 40 可算；overlap 22 ⇒ L＝21、n < 42 ⇒ p＝1。"""
+def test_trend_inference_closed_status_boundaries() -> None:
+    """ICPERF ㊺ B(4)：子序列有限點 < 3 ⇒ insufficient_points、indeterminate；overlap 使子序列點數恰 3 ⇒ 可算；
+    推論狀態、點數、p 皆 == 獨立 oracle。"""
     y = _overlap_ma(40, 10, seed=31) + 0.002 * np.arange(40)
     cfg = _cfg_t(min_samples=5)
     an = TrendAnalyzer(cfg)
-    for ow in (20, 21, 22):
+    for ow in (14, 20, 21):
         got = an.analyze_trend(pd.Series(y), "y", overlap_window=ow)
         exp = ref_trend_series(y, cfg, overlap_window=ow)
-        assert _p_consistent(got["p_value"], exp["p_value"], exp["_t_abs"], exp["_df"])[0], (ow, got, exp)
-    assert an.analyze_trend(pd.Series(y), "y", overlap_window=22)["p_value"] == 1.0
-    tiny = 0.001 * np.arange(6, dtype=float) + np.array([0.003, -0.002, 0.001, 0.004, -0.003, 0.002])
-    assert an.analyze_trend(pd.Series(tiny), "tiny")["p_value"] == ref_trend_series(tiny, cfg)["p_value"] == 1.0
+        assert got["inference_status"] == exp["inference_status"] and got["subsample_points"] == exp["subsample_points"]
+        _assert_p_within_bound(got, exp, f"ow={ow}")
+    assert an.analyze_trend(pd.Series(y), "y", overlap_window=14)["subsample_points"] == 3
+    short = an.analyze_trend(pd.Series(y), "y", overlap_window=21)
+    assert short["inference_status"] == "insufficient_points" and short["trend"] == "indeterminate"
 
 
 def test_trend_slope_uses_time_position_across_nan_gap() -> None:
@@ -1459,7 +1639,8 @@ def _deep_orchestrator(features_df: pd.DataFrame, label: pd.Series, rolling_ic: 
     return orc
 
 
-def _ref_trend_sources(report: Any, rolling_ic: dict, names: Sequence[str], cfg: ICConfig, horizon: int) -> dict:
+def _ref_trend_sources(report: Any, rolling_ic: dict, names: Sequence[str], cfg: ICConfig, horizon: int,
+                       ic_support: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> dict:
     """㉕ 來源之 oracle 端：來源模組於本請求之狀態取 `module_summary`（completed ⇒ 可用；skipped／unavailable ⇒
     "source_skipped"；未執行 ⇒ "source_module_off"）；centrality 序列以 `ref_rolling_centrality` 獨立重算、重疊窗＝
     min(rolling_window, 列數)；factor_return 取 `ls_return_series`（不重疊抽樣 ⇒ None＝自動頻寬）；ls_spread 取
@@ -1477,12 +1658,17 @@ def _ref_trend_sources(report: Any, rolling_ic: dict, names: Sequence[str], cfg:
     if st is None:
         nm, mat, _ = ref_ic_matrix(rolling_ic, names)
         ccfg = cfg.factor_centrality.model_dump()
-        out["centrality"] = (ref_rolling_centrality(mat, nm, ccfg), min(int(ccfg["rolling_window"]), mat.shape[0]))
+        w_c = min(int(ccfg["rolling_window"]), mat.shape[0])
+        # ㊺ B(1)：中心性第 j 值涵蓋 IC 列 j..j+W−1 ⇒〔IC 列 j 之起, IC 列 j+W−1 之迄〕（有 IC 位置支撐時）
+        c_sup = ((np.asarray(ic_support[0])[: len(ic_support[0]) - w_c + 1], np.asarray(ic_support[1])[w_c - 1:])
+                 if ic_support is not None and len(ic_support[0]) >= w_c else None)
+        out["centrality"] = (ref_rolling_centrality(mat, nm, ccfg), w_c, c_sup)
     else:
         out["centrality"] = st
     st = _state("factor_returns")
     out["factor_return"] = st if st is not None else (
-        {n: v["ls_return_series"] for n, v in results["factor_returns"]["value"]["features"].items()}, None)
+        {n: v["ls_return_series"] for n, v in results["factor_returns"]["value"]["features"].items()},
+        int(horizon), int(horizon))  # ㊺ B(1)：格點 j 之支撐〔j·h, j·h＋h−1〕
     st = _state("long_short_analysis")
     out["ls_spread"] = st if st is not None else (
         {n: v["ls_spread_series"] for n, v in results["long_short_analysis"].items() if not v.get("skipped")}, int(horizon))
@@ -1499,7 +1685,7 @@ def _assert_feature_trend_matches_centrality_dim(report: Any) -> None:
 
 def test_trend_analysis_honors_configured_dimensions() -> None:
     """㉕ CT-9（Task 0.3 xfail 轉一般斷言；函式名沿用）四維全開：經 `run_deep_analysis`，trend 排在三個來源模組之後
-    （進度事件序）；每特徵四維皆出、`dimension_status` 空；各維 == statsmodels OLS＋HAC oracle（ic 維頻寬下限＝滾動 IC
+    （進度事件序）；每特徵四維皆出、`dimension_status` 空；各維 == 獨立 oracle（描述 OLS、推論不重疊 fixed-b＋Imhof；ic 維支撐由滾動 IC
     窗長、centrality＝滾動中心性窗長、factor_return 自動、ls_spread＝horizon）；combined_signal == 規則表（實際可得之
     ic／centrality 維）；㉔ 逐特徵中心性趨勢與 centrality 維一致。"""
     h = 3
@@ -1517,7 +1703,6 @@ def test_trend_analysis_honors_configured_dimensions() -> None:
     res = compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(),
                                  sources=_ref_trend_sources(rep, rolling_ic, names, cfg, h))
     _assert_all_consistent(res)
-    assert res["trend_analysis/*/ic_trend/p_value@hac"]["verdict"] == "一致", res["trend_analysis/*/ic_trend/p_value@hac"]
     for dim in TREND_DIMS:
         assert all(f"{dim}_trend" in v for v in prod.values()), dim
     assert all(v["dimension_status"] == {} for v in prod.values())
@@ -1655,7 +1840,8 @@ def _real(symbol: str, wide: bool = False) -> Tuple[dict, List[str], pd.Datetime
 #: 真實 BTCUSDT 7 特徵之中心性約 0.134–0.143（均值約 0.139，最大／均值約 1.03 ⇒ 預設 τ＝1.5 不觸發）：τ＝1.0 ⇒ 門檻＝均值，
 #: 擁擠／非擁擠皆出現（資料充足用）
 REAL_TAU = 1.0
-#: 真實 BNBUSDT 1h 7 特徵之滾動中心性：mom10／dev100／vchg 之 HAC p < 0.01、R² 約 0.084–0.094（預設門檻 0.1 未達）⇒
+#: 真實 BNBUSDT 1h 7 特徵之滾動中心性：mom10／dev100／vchg 之 R² 約 0.084–0.094（預設門檻 0.1 未達；㊺ 前以 HAC 查得 p < 0.01，
+#: ㊺ 後之 fixed-b 判定由 test_feature_trend_reflects_rolling_centrality_on_real_kline 實跑確認至少一特徵非 flat）⇒
 #: R² 門檻 0.05 時判非 flat（資料充足用；㉔ rising／falling 路徑於真實資料實際產出）
 REAL_TREND_R2 = 0.05
 
@@ -1672,7 +1858,16 @@ def test_centrality_trend_fields_closed() -> None:
         config_override={"factor_centrality": cfg.factor_centrality.model_dump()})
     got = _paths(rep.results["factor_centrality"], "factor_centrality") | _paths(
         rep.results["trend_analysis"], "trend_analysis")
-    assert got == set(MODULE_FIELDS), (sorted(got - set(MODULE_FIELDS)), sorted(set(MODULE_FIELDS) - got))
+    # ㊺ B：`data_warning_detail/<鍵>` 只於該維觸發警示時出現（各維呼叫同一 trend_data_warning，屬同一程式路徑）⇒
+    # 未觸發之維缺其子鍵為正確；至少一維於真實資料實際觸發（子鍵封閉八鍵另由 test_icperf_trend_inference 驗）
+    conditional = {p for p in MODULE_FIELDS if "/data_warning_detail/" in p}
+    missing = set(MODULE_FIELDS) - got
+    assert got <= set(MODULE_FIELDS) and missing <= conditional, (sorted(got - set(MODULE_FIELDS)),
+                                                                   sorted(missing - conditional))
+    fired = {p.split("/")[2] for p in got & conditional}
+    assert fired, "真實資料無任何維觸發資料不足警示（警示路徑未實跑）"
+    for dim in fired:
+        assert {p for p in conditional if p.split("/")[2] == dim} <= got, dim
     assert all(v["oracle"] and v["producer"] for v in {**MODULE_FIELDS, **MODULE_FIELDS_FALLBACK}.values())
 
 
@@ -1727,12 +1922,18 @@ def test_rolling_centrality_prefix_invariant_on_real_kline() -> None:
 
 @pytest.mark.requires_kline
 def test_trend_analysis_matches_oracle_on_real_kline() -> None:
-    """真實 BTCUSDT 與 ETHUSDT 1h 經呼叫端（未傳窗長）：逐欄 == oracle（OLS／pearsonr²／HAC 自動頻寬／規則表）；資料充足
-    ——每一浮點欄至少一有限值，趨勢 up／down／flat 與建議 正常／警告 皆出現。"""
+    """真實 BNBUSDT 與 ETHUSDT 1h 經呼叫端（未傳窗長）：逐欄 == oracle（描述 OLS／pearsonr²、推論不重疊 fixed-b＋Imhof、
+    資料不足警示、規則表）；資料充足——每一浮點欄至少一有限值，趨勢 up／down／flat 皆出現。ICPERF ㊺ 後（主委探針
+    runs/icperf/b2c/real_paths_probe.log：10 標的 × 7 特徵之呼叫端 IC 維只 BNBUSDT、ETHUSDT 各 1 條 down、無 up）：
+    up 路徑以「同一真實特徵取負」之滾動 IC（精確變號）走到；呼叫端只有 IC 維 ⇒ 依 SPEC ㊺ B(6) 建議恆「資訊不足」
+    （正常／警告見 test_trend_four_dimensions_on_real_kline）。"""
     finite: Dict[str, int] = {}
     trends, recs = set(), set()
-    for sym in ("BTCUSDT", "ETHUSDT"):
+    for sym in ("BNBUSDT", "ETHUSDT"):
         rolling_ic, names, _ = _real(sym)
+        for n in list(names):
+            rolling_ic[f"neg_{n}"] = {k: [-float(v) for v in vals] for k, vals in rolling_ic[n].items()}
+        names = names + [f"neg_{n}" for n in names]
         prod, cfg = _run_t(rolling_ic, names)
         res = compare_trend_analysis(prod, rolling_ic, names, cfg)
         _assert_all_consistent(res)
@@ -1744,13 +1945,14 @@ def test_trend_analysis_matches_oracle_on_real_kline() -> None:
     missing = [p for p in MODULE_FIELDS if p.startswith("trend_analysis/*/ic_trend/") and p in NUMERIC_PATHS
                and not finite.get(p)]
     assert not missing, f"無有限值之欄：{missing}"
-    assert {"up", "down", "flat"} <= trends and {"正常", "警告"} <= recs, (trends, recs)
+    assert {"up", "down", "flat"} <= trends and recs == {"資訊不足"}, (trends, recs)
 
 
 @pytest.mark.requires_kline
-def test_trend_module_with_window_matches_hac_on_real_kline() -> None:
-    """⑱ CT-1（模組端，真實）：BNBUSDT／ETHUSDT 1h 以 `batch_analyze(overlap_window=252)` ⇒ 逐欄 == HAC oracle（maxlags＝
-    max(自動, 251)）；改前 iid p≈7e-73 判 down 之 BNBUSDT dev20 改判 flat。"""
+def test_trend_module_with_window_matches_fixedb_on_real_kline() -> None:
+    """ICPERF ㊺ B（取代 ⑱ CT-1 真實模組端之 NW 對照）：BNBUSDT／ETHUSDT 1h 以 `batch_analyze(overlap_window=252)` ⇒
+    推論於間距 252 之不重疊子序列、逐欄 == 獨立 oracle（Bartlett fixed-b、Imhof 精確 p）；改前 iid p≈7e-73 判 down 之
+    BNBUSDT dev20 不得判 down。"""
     for sym in ("BNBUSDT", "ETHUSDT"):
         rolling_ic, names, _ = _real(sym)
         cfg = _config()
@@ -1758,19 +1960,17 @@ def test_trend_module_with_window_matches_hac_on_real_kline() -> None:
         res = compare_trend_analysis(prod, rolling_ic, names, cfg.trend_analysis.model_dump(), overlap_window=252,
                                      dimensions=["ic"])
         _assert_all_consistent(res)
-        assert res["trend_analysis/*/ic_trend/trend@hac"]["verdict"] == "一致", res
         if sym == "BNBUSDT":
-            assert prod["dev20"]["ic_trend"]["trend"] == "flat" and prod["dev20"]["ic_trend"]["p_value"] > 0.05
+            assert prod["dev20"]["ic_trend"]["trend"] != "down"
 
 
 @pytest.mark.requires_kline
-def test_trend_p_value_hac_on_real_kline() -> None:
-    """真實 BNBUSDT 1h 經呼叫端：產品之趨勢判定與 p 值 == 依窗鍵導出 overlap（252）之 HAC oracle。"""
+def test_trend_fixedb_on_real_kline_via_caller() -> None:
+    """ICPERF ㊺ B（取代真實資料 HAC 端到端）：真實 BNBUSDT 1h 經呼叫端（overlap 由窗鍵導出 252）：推論各欄 == 獨立 oracle。"""
     rolling_ic, names, _ = _real("BNBUSDT")
     prod, cfg = _run_t(rolling_ic, names)
     res = compare_trend_analysis(prod, rolling_ic, names, cfg)
-    assert res["trend_analysis/*/ic_trend/trend@hac"]["verdict"] == "一致", res["trend_analysis/*/ic_trend/trend@hac"]
-    assert res["trend_analysis/*/ic_trend/p_value@hac"]["verdict"] == "一致", res["trend_analysis/*/ic_trend/p_value@hac"]
+    _assert_all_consistent(res)
 
 
 @pytest.mark.requires_kline
@@ -1787,12 +1987,12 @@ def test_effective_rank_all_eigen_on_real_kline() -> None:
 
 @pytest.mark.requires_kline
 def test_feature_trend_reflects_rolling_centrality_on_real_kline() -> None:
-    """㉔ CT-5（真實；Task 0.3 xfail 轉一般斷言）：`features.*.trend` == 其滾動中心性序列之 statsmodels OLS＋HAC oracle
-    （頻寬下限＝滾動中心性窗長 60）之判定；判為 rising／falling 者方向 == regimes 斜率號。
-    - 真實 BTCUSDT 1h 7 特徵、預設設定：全部 flat 為正確結果（2,190 點滾動中心性之 HAC p 值與 R² 均未達門檻，主委實查
-      BTCUSDT／ETHUSDT／BNBUSDT × 1,800–6,000 根皆然）。
+    """㉔ CT-5（真實；Task 0.3 xfail 轉一般斷言）：`features.*.trend` == 其滾動中心性序列之趨勢 oracle
+    （ICPERF ㊺ B：不重疊 fixed-b＋Imhof；支撐由滾動中心性窗長 60 推）之判定；判為 rising／falling 者方向 == regimes 斜率號。
+    - 真實 BTCUSDT 1h 7 特徵、預設設定：全部 flat 為正確結果（㊺ 前主委以 HAC 實查 BTCUSDT／ETHUSDT／BNBUSDT × 1,800–6,000
+      根皆然；㊺ 之 fixed-b 更保守）。
     - 資料充足（rising／falling 路徑於真實資料實際產出）：真實 BNBUSDT 1h、trend_analysis.r_squared_threshold＝REAL_TREND_R2
-      （mom10／dev100／vchg 之 HAC p < 0.01、R²≈0.08–0.09）⇒ 至少一特徵非 flat，且 == oracle。"""
+      （mom10／dev100／vchg 之 R²≈0.08–0.09）⇒ 至少一特徵非 flat，且 == oracle。"""
     rolling_ic, names, _ = _real("BTCUSDT")
     prod, cfg = _run_c(rolling_ic, names)
     res = compare_factor_centrality(prod, rolling_ic, names, cfg)
@@ -1822,11 +2022,12 @@ def _real_frames(symbol: str) -> Tuple[pd.DataFrame, pd.Series]:
 
 @pytest.mark.requires_kline
 def test_trend_four_dimensions_on_real_kline() -> None:
-    """㉕ CT-9（真實）：真實 BTCUSDT 1h 7 特徵、horizon 1，經 `run_deep_analysis`（因子報酬、中心性、多空、趨勢）：四維逐欄
-    == statsmodels OLS＋HAC oracle、`dimension_status` 空；資料充足——每維至少一特徵得有限斜率；㉔ 與 centrality 維一致
-    （欄位封閉性見 `test_centrality_trend_fields_closed`）。"""
-    rolling_ic, names, _ = _real("BTCUSDT")
-    feats, label = _real_frames("BTCUSDT")
+    """㉕ CT-9（真實）：真實 BNBUSDT 1h 7 特徵、horizon 1，經 `run_deep_analysis`（因子報酬、中心性、多空、趨勢）：四維逐欄
+    == 獨立 oracle（描述 OLS、推論不重疊 fixed-b＋Imhof、資料不足警示）、`dimension_status` 空；資料充足——每維至少一特徵得
+    有限斜率、combined_signal「正常」「警告」皆出現（ICPERF ㊺ 後主委探針 runs/icperf/b2c/real_paths_probe.log：10 標的中
+    BNBUSDT、ETHUSDT 之四維才同時出現兩者）；㉔ 與 centrality 維一致（欄位封閉性見 `test_centrality_trend_fields_closed`）。"""
+    rolling_ic, names, _ = _real("BNBUSDT")
+    feats, label = _real_frames("BNBUSDT")
     rep = _deep_orchestrator(feats, label, rolling_ic, 1).run_deep_analysis(selected_features=names, force_modules=_FOUR)
     prod = rep.results["trend_analysis"]
     cfg = ICConfig()
@@ -1836,6 +2037,8 @@ def test_trend_four_dimensions_on_real_kline() -> None:
         slopes = [v[f"{dim}_trend"]["slope"] for v in prod.values() if f"{dim}_trend" in v]
         assert any(math.isfinite(s) for s in slopes), (dim, slopes)
     assert all(v["dimension_status"] == {} for v in prod.values())
+    recs = {v["combined_signal"]["recommendation"] for v in prod.values()}
+    assert {"正常", "警告"} <= recs, recs
     _assert_feature_trend_matches_centrality_dim(rep)
 
 

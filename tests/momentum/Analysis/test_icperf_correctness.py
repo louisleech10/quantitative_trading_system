@@ -76,6 +76,9 @@ DERIVED_REL_TOL = 1e-9
 #: `@<端到端項>` 尾綴）；特徵段為 `*` 或特徵名。
 DERIVED_FIELD_PATTERNS = (
     r"(^|/)trend_analysis/[^/]+/[a-z_]+_trend/(slope|p_value|t_value|t_stat|tail_estimate|r_squared)(@[a-z_]+)?$",
+    # ICPERF ㊺ B：資料不足警示之 φ̂ 與拒絕率（OLS 殘差 ρ̂ 經中位數函數反解與 φ 網格內插）
+    r"(^|/)trend_analysis/[^/]+/[a-z_]+_trend/data_warning_detail/"
+    r"(phi_hat|estimated_null_reject_rate|reference_reject_rate)(@[a-z_]+)?$",
     r"(^|/)feature_quality_diagnostics/autocorrelation_results/[^/]+/(effective_sample_ratio|ljungbox_stat|p_value)$",
 )
 

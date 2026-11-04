@@ -645,22 +645,30 @@ def test_default_threshold_zero_survivors_on_la1_fixture_is_locked() -> None:
 
 
 def test_cross_sectional_hac_output_unchanged() -> None:
-    """⑥ 跨標的 `_compute_hac_on_ic_series`（共用 `_hac_nan_result`）之輸出鍵集與值相對改前不變，含短序列 fail-closed
-    （㊺ 前不改）：值對 statsmodels OLS HAC Bartlett（use_correction=False）＋t(n−1) 之 oracle。"""
+    """⑥ 跨標的 `_compute_hac_on_ic_series`：㊺ A（SPEC v5.78）後預設改 EWC（另由 test_icperf_xsec_ewc 對論文餘弦
+    oracle 驗值）；本測試守「明示 maxlags ⇒ 沿用改前 Newey–West 固定 L」之值不變：對 statsmodels OLS HAC Bartlett
+    （use_correction=False）＋t(n−1) 之 oracle，鍵集＝改前鍵集＋㊺ 新增推論鍵；短序列 fail-closed。"""
     rng = np.random.default_rng(11)
     ic = 0.02 + 0.05 * _ar1(rng, 120, 0.3)
-    out = orch_mod._compute_hac_on_ic_series(ic, 5)
-    assert set(out) == set(_hac_nan_result())
     n = ic.size
     L = max(int(4 * (n / 100.0) ** (2.0 / 9.0)), 4)
+    out = orch_mod._compute_hac_on_ic_series(ic, 5, maxlags=L)
+    new_keys = {"ewc_dof", "hac_method", "inference_status", "interior_gap_count"}
+    assert set(out) == set(_hac_nan_result()) | new_keys
+    assert out["hac_method"] == "newey_west_fixed" and out["ewc_dof"] is None and out["inference_status"] == "ok"
     fit = sm.OLS(ic, np.ones(n)).fit(cov_type="HAC", cov_kwds={"maxlags": L, "kernel": "bartlett",
                                                                 "use_correction": False})
     se = float(fit.bse[0])
     t = float(ic.mean()) / se
     assert out["maxlags"] == L and out["n_obs"] == n
     assert _rel(out["se"], se) <= 1e-10 and _rel(out["p_value"], float(2 * stats.t.sf(abs(t), df=n - 1))) <= 1e-10
-    short = orch_mod._compute_hac_on_ic_series(ic[:7], 1)
-    assert set(short) == set(_hac_nan_result()) and np.isnan(short["p_value"])
+    default = orch_mod._compute_hac_on_ic_series(ic, 5)
+    assert default["hac_method"] == "ewc_llsw2018" and default["maxlags"] is None
+    short = orch_mod._compute_hac_on_ic_series(ic[:7], 1, maxlags=4)
+    assert set(short) == set(_hac_nan_result()) | new_keys and np.isnan(short["p_value"])
+    assert short["inference_status"] == "insufficient_sample"
+    tiny = orch_mod._compute_hac_on_ic_series(ic[:3], 1)
+    assert np.isnan(tiny["p_value"]) and tiny["inference_status"] == "insufficient_sample"
 
 
 def test_explicit_maxlags_keeps_newey_west_fixed() -> None:

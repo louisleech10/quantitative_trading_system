@@ -102,6 +102,25 @@ describe('ICSummaryTable — 資料不足警示與無法計算（㊹）', () => 
     expect(screen.queryByTestId('hac-data-warning-p_value')).toBeNull();
     expect(screen.queryByTestId('hac-not-computable-p_value')).toBeNull();
   });
+
+  it('㊺ A 跨標的：同一警示格，ⓘ 為逐期 IC 序列版文案；不可算 ⇒ 原因文案', () => {
+    const xs = { ...DETAIL, n_obs: 250, horizon: 1, approx_independent_n: 250, phi_hat: 0.912 };
+    render(
+      <ICSummaryTable
+        data={[
+          row('xw', { inference_status: 'ok', data_warning: 'small_effective_sample', data_warning_detail: xs }),
+          row('xs', { feature_name: 'xs', p_value: null, p_value_adj: null, inference_status: 'degenerate' }),
+        ]}
+        analysisMode="cross_sectional"
+      />,
+    );
+    const tips = screen.getAllByTestId('hac-data-warning-p_value').map((el) => el.getAttribute('title') ?? '');
+    expect(tips).toHaveLength(1);
+    expect(tips[0]).toContain('逐期截面 IC 共 250 期');
+    expect(tips[0]).toContain('IC 序列一階自相關 0.912');
+    expect(tips[0]).not.toContain('標籤');
+    expect(screen.getByTestId('hac-not-computable-p_value').textContent).toBe('無法計算：序列退化');
+  });
 });
 
 describe('ICRunSettingsLine — 顯著性檢定揭露（㊹）', () => {

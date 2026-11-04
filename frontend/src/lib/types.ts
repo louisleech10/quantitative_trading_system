@@ -2634,13 +2634,37 @@ export interface FactorCentralityData {
   independent_features?: string[];
 }
 
+/** ICPERF ㊺ B(4)：趨勢推論之封閉狀態 */
+export type TrendInferenceStatus =
+  | 'ok'
+  | 'insufficient_points'
+  | 'degenerate'
+  | 'constant_series'
+  | 'source_unavailable'
+  | 'below_min_samples'
+  | 'p_numeric_unreliable';
+
 export interface TrendResult {
-  slope?: number;
-  p_value?: number;
-  r_squared?: number;
-  tail_estimate?: number;
+  /** 描述用（1%／99% 縮尾、全部有效點之 OLS） */
+  slope?: number | null;
+  /** 推論用 p（不重疊子序列之 Bartlett fixed-b、Imhof 精確 p；非 ok 狀態為 null） */
+  p_value?: number | null;
+  r_squared?: number | null;
+  tail_estimate?: number | null;
   trend?: 'up' | 'down' | 'flat' | 'indeterminate' | string;
   interpretation?: string;
+  /** ICPERF ㊺ B(5)：推論鍵 */
+  inference_slope?: number | null;
+  inference_se?: number | null;
+  inference_method?: 'bartlett_fixedb_b1_nonoverlap' | string;
+  inference_status?: TrendInferenceStatus | string;
+  p_abs_error?: number | null;
+  subsample_points?: number;
+  subsample_start_pos?: number | null;
+  omitted_tail_rows?: number;
+  interior_gap_count?: number;
+  data_warning?: 'small_effective_sample' | 'persistence_not_estimable' | 'warning_not_evaluated' | null;
+  data_warning_detail?: HacDataWarningDetail | null;
 }
 
 export type TrendAnalysisData = Record<string, {

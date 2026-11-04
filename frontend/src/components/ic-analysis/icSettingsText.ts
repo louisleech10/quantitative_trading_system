@@ -23,6 +23,38 @@ export const hacDataWarningTip = (d: HacDataWarningDetail): string =>
   `（特徵 AR(1)、報酬獨立）模擬 ${d.replications} 次，單一檢定之誤判率約 ${pct(d.estimated_null_reject_rate)}（應為 ${pct(d.alpha)}；` +
   `同條件下設計邊界之對照為 ${pct(d.reference_reject_rate)}）；此為模型近似、非此特徵之實測誤判率，p 值可能偏樂觀`;
 
+/** ICPERF ㊺ A：跨標的資料不足警示之 ⓘ 文案（受檢序列＝逐期截面 IC 序列本身）。 */
+export const xsecDataWarningTip = (d: HacDataWarningDetail): string =>
+  `資料不足以可靠檢定：逐期截面 IC 共 ${d.n_obs} 期，IC 序列一階自相關 ${d.phi_hat.toFixed(3)}（中位數不偏估計）；` +
+  `在你設定之顯著水準 ${d.alpha} 下，以同期數、同自相關之 AR(1) 序列模擬 ${d.replications} 次，單一檢定之誤判率約 ` +
+  `${pct(d.estimated_null_reject_rate)}（應為 ${pct(d.alpha)}；設計邊界之對照為 ${pct(d.reference_reject_rate)}）；` +
+  `此為模型近似、非此特徵之實測誤判率，p 值可能偏樂觀`;
+
+/** ICPERF ㊺ B：趨勢資料不足警示之 ⓘ 文案（受檢序列＝不重疊子序列點之 OLS 殘差）。 */
+export const trendDataWarningTip = (d: HacDataWarningDetail): string =>
+  `趨勢檢定資料不足：不重疊子序列 ${d.n_obs} 點，去趨勢後殘差一階自相關 ${d.phi_hat.toFixed(3)}（中位數不偏估計）；` +
+  `在顯著水準 ${d.alpha} 下，以同一組時間點、同自相關之無趨勢序列模擬 ${d.replications} 次，誤判有趨勢之機率約 ` +
+  `${pct(d.estimated_null_reject_rate)}（應為 ${pct(d.alpha)}；設計邊界之對照為 ${pct(d.reference_reject_rate)}）；` +
+  `上升／下降判定可能偏樂觀`;
+
+/** ICPERF ㊺ B(4)：趨勢推論非 ok 狀態之短原因。 */
+export const TREND_STATUS_LABELS: Record<string, string> = {
+  insufficient_points: '不重疊點不足 3 點',
+  degenerate: '標準誤退化',
+  constant_series: '序列為常數',
+  source_unavailable: '來源資料不可用',
+  below_min_samples: '有效點少於最少樣本數',
+  p_numeric_unreliable: 'p 值數值精度不足以判定',
+};
+
+/** 趨勢四維之中文名。 */
+export const TREND_DIM_LABELS: Record<string, string> = {
+  ic_trend: 'IC',
+  centrality_trend: '中心性',
+  factor_return_trend: '因子報酬',
+  ls_spread_trend: '多空價差',
+};
+
 /**
  * ICPERF Task 0.4 ㊸：IC 頁方法選擇與門檻開關之顯示文字（面板與報告頂端「本次設定」共用）。
  *

@@ -213,6 +213,7 @@ class FactorCentralityAnalyzer:
         rolling_centrality: pd.DataFrame,
         window: int,
         trend_config: Optional[dict] = None,
+        support: Optional[tuple] = None,
     ) -> dict:
         """ICPERF Task 0.4 ㉔（CT-5）：逐特徵 `trend` 由其滾動中心性序列（同請求已算，不另算）判定，就地寫入並回傳。
 
@@ -228,8 +229,11 @@ class FactorCentralityAnalyzer:
             label: Optional[str] = None
             reason: Optional[str] = TREND_REASON_INSUFFICIENT_DATA
             if has_rolling and name in rolling_centrality.columns:
-                result = analyzer.analyze_trend(rolling_centrality[name], str(name), overlap_window=int(window))
-                if not isinstance(result, SkippedResult):
+                # ㊺ B(1)：`support`＝各值來源支撐（同趨勢 centrality 維）；None ⇒ 由 window 推
+                result = analyzer.analyze_trend(rolling_centrality[name], str(name), overlap_window=int(window),
+                                                support=support)
+                # ICPERF ㊺：`below_min_samples` 同舊 Skipped ⇒ insufficient_data；其他非 up／down／flat ⇒ indeterminate
+                if result.get("inference_status") != "below_min_samples":
                     label = _TREND_LABELS.get(str(result.get("trend")))
                     reason = None if label is not None else TREND_REASON_INDETERMINATE
             entry["trend"] = label

@@ -1,8 +1,8 @@
 {
- "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
- "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
- "spec": "docs/ICPERF_SPEC.md v5.69 Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
- "generated_at": "2026-11-04T04:49:04+00:00",
+ "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+ "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+ "spec": "docs/ICPERF_SPEC.md v5.78 Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
+ "generated_at": "2026-11-04T23:03:11+00:00",
  "tolerance": {
   "relative": 1e-12,
   "derived_relative": 1e-09,
@@ -20,6 +20,7 @@
   ],
   "derived_fields": [
    "(^|/)trend_analysis/[^/]+/[a-z_]+_trend/(slope|p_value|t_value|t_stat|tail_estimate|r_squared)(@[a-z_]+)?$",
+   "(^|/)trend_analysis/[^/]+/[a-z_]+_trend/data_warning_detail/(phi_hat|estimated_null_reject_rate|reference_reject_rate)(@[a-z_]+)?$",
    "(^|/)feature_quality_diagnostics/autocorrelation_results/[^/]+/(effective_sample_ratio|ljungbox_stat|p_value)$"
   ],
   "ssr_slack": 1e-09
@@ -1018,7 +1019,7 @@
   },
   "long_cell": "L_BTCUSDT_4h_longhist（handoffs/run_receipts/20261029-icperf-long-cell-4h-longhist.json）",
   "kline": "data_cache/feature_klines/kline_cache.h5",
-  "captures": "runs/icperf/correctness-20261104d/captures"
+  "captures": "runs/icperf/correctness-20261105d/captures"
  },
  "items": {
   "cross_sectional": {
@@ -1067,13 +1068,13 @@
    "max_rel_diff_direct": 1.7243860593174602e-13,
    "max_rel_diff_derived": 0.0,
    "n_compared": 42,
-   "n_finite": 12440,
+   "n_finite": 12433,
    "n_mismatch": 0,
    "requests": {
     "A.deep_analysis": {
      "verdict": "一致",
      "n_compared": 21,
-     "n_finite": 5893,
+     "n_finite": 5890,
      "n_mismatch": 0,
      "max_rel_diff": 3.3984387668659736e-14,
      "examples": [],
@@ -1083,7 +1084,7 @@
     "L.deep_analysis": {
      "verdict": "一致",
      "n_compared": 21,
-     "n_finite": 6547,
+     "n_finite": 6543,
      "n_mismatch": 0,
      "max_rel_diff": 1.7243860593174602e-13,
      "examples": [],
@@ -1398,16 +1399,16 @@
    "verdict": "一致",
    "oracle": "深度模組 trend_analysis：test_icperf_deep_centrality_trend.py 之 compare_*",
    "max_rel_diff": 1.0864954294195558e-11,
-   "max_rel_diff_direct": 0.0,
+   "max_rel_diff_direct": 1.7241784589304332e-13,
    "max_rel_diff_derived": 1.0864954294195558e-11,
-   "n_compared": 62,
-   "n_finite": 1656,
+   "n_compared": 154,
+   "n_finite": 3380,
    "n_mismatch": 0,
    "requests": {
     "A.deep_analysis": {
      "verdict": "一致",
-     "n_compared": 31,
-     "n_finite": 877,
+     "n_compared": 73,
+     "n_finite": 1621,
      "n_mismatch": 0,
      "max_rel_diff": 1.0864954294195558e-11,
      "examples": [],
@@ -1416,8 +1417,8 @@
     },
     "L.deep_analysis": {
      "verdict": "一致",
-     "n_compared": 31,
-     "n_finite": 779,
+     "n_compared": 81,
+     "n_finite": 1759,
      "n_mismatch": 0,
      "max_rel_diff": 1.0774651291371193e-12,
      "examples": [],
@@ -1821,8 +1822,8 @@
   "fdr": {
    "verdict": "一致",
    "oracle": "statsmodels multipletests fdr_bh（同檢定集合：summary 有限 p 值）",
-   "max_rel_diff": 2.0436084826686957e-14,
-   "max_rel_diff_direct": 2.0436084826686957e-14,
+   "max_rel_diff": 1.1597101672026608e-14,
+   "max_rel_diff_direct": 1.1597101672026608e-14,
    "max_rel_diff_derived": 0.0,
    "n_compared": 904,
    "n_finite": 889,
@@ -1953,7 +1954,7 @@
      "n_compared": 20,
      "n_finite": 20,
      "n_mismatch": 0,
-     "max_rel_diff": 2.0436084826686957e-14,
+     "max_rel_diff": 4.462150367169241e-15,
      "examples": [],
      "n_mismatch_features": 0,
      "notes": []
@@ -1963,7 +1964,7 @@
      "n_compared": 4,
      "n_finite": 4,
      "n_mismatch": 0,
-     "max_rel_diff": 7.022259858123983e-15,
+     "max_rel_diff": 1.1597101672026608e-14,
      "examples": [],
      "n_mismatch_features": 0,
      "notes": []
@@ -2116,11 +2117,11 @@
   "hac": {
    "verdict": "一致",
    "oracle": "縱向：逐方法貢獻（spearman／pearson 標準化乘積、kendall O(n²) Hájek 投影）＋論文式 EWC 餘弦基底（ν＝⌊0.4n^(2/3)⌋、scipy t_ν）；明示 maxlags 走 statsmodels OLS HAC Bartlett；測試自寫 _hac_oracle（SPEC v5.63 ㊹）",
-   "max_rel_diff": 2.0326213402887566e-14,
-   "max_rel_diff_direct": 2.0326213402887566e-14,
+   "max_rel_diff": 1.1597101672026608e-14,
+   "max_rel_diff_direct": 1.1597101672026608e-14,
    "max_rel_diff_derived": 0.0,
-   "n_compared": 3568,
-   "n_finite": 3538,
+   "n_compared": 3664,
+   "n_finite": 3634,
    "n_mismatch": 0,
    "requests": {
     "A.ic_report": {
@@ -2245,20 +2246,20 @@
     },
     "X.cross_sectional": {
      "verdict": "一致",
-     "n_compared": 40,
-     "n_finite": 40,
+     "n_compared": 120,
+     "n_finite": 120,
      "n_mismatch": 0,
-     "max_rel_diff": 2.0326213402887566e-14,
+     "max_rel_diff": 4.4236835536591616e-15,
      "examples": [],
      "n_mismatch_features": 0,
      "notes": []
     },
     "X.cross_sectional.default": {
      "verdict": "一致",
-     "n_compared": 8,
-     "n_finite": 8,
+     "n_compared": 24,
+     "n_finite": 24,
      "n_mismatch": 0,
-     "max_rel_diff": 7.022259858123983e-15,
+     "max_rel_diff": 1.1597101672026608e-14,
      "examples": [],
      "n_mismatch_features": 0,
      "notes": []
@@ -2279,7 +2280,7 @@
    "max_rel_diff": 0.0,
    "max_rel_diff_direct": 0.0,
    "max_rel_diff_derived": 0.0,
-   "n_compared": 2369,
+   "n_compared": 2417,
    "n_finite": 783,
    "n_mismatch": 0,
    "requests": {
@@ -2396,6 +2397,26 @@
     "L.event_import_report": {
      "verdict": "一致",
      "n_compared": 240,
+     "n_finite": 0,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "examples": [],
+     "n_mismatch_features": 0,
+     "notes": []
+    },
+    "X.cross_sectional": {
+     "verdict": "一致",
+     "n_compared": 40,
+     "n_finite": 0,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "examples": [],
+     "n_mismatch_features": 0,
+     "notes": []
+    },
+    "X.cross_sectional.default": {
+     "verdict": "一致",
+     "n_compared": 8,
      "n_finite": 0,
      "n_mismatch": 0,
      "max_rel_diff": 0.0,
@@ -7978,15 +7999,15 @@
  "requests": {
   "A.ic_report": {
    "rc": 0,
-   "wall_s": 105.53780437500001,
-   "pickle_bytes": 3667783,
+   "wall_s": 106.760321375,
+   "pickle_bytes": 3672006,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 104.192761959,
-   "peak_rss_bytes": 437436416,
-   "oracle_s": 137.999597625,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 105.504680958,
+   "peak_rss_bytes": 446054400,
+   "oracle_s": 139.928634208,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -10237,15 +10258,15 @@
   },
   "A.ic_report.cov": {
    "rc": 0,
-   "wall_s": 34.293325291,
-   "pickle_bytes": 762210,
+   "wall_s": 33.729527833000006,
+   "pickle_bytes": 766433,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 33.285594167,
-   "peak_rss_bytes": 421052416,
-   "oracle_s": 28.046534250000008,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 32.848188083000004,
+   "peak_rss_bytes": 467845120,
+   "oracle_s": 28.451929750000005,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -12375,15 +12396,15 @@
   },
   "A.ic_report.pearson": {
    "rc": 0,
-   "wall_s": 39.56540666699999,
-   "pickle_bytes": 1063130,
+   "wall_s": 38.807460709,
+   "pickle_bytes": 1067353,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 38.628265250000005,
-   "peak_rss_bytes": 444530688,
-   "oracle_s": 36.649119958,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 37.990979875,
+   "peak_rss_bytes": 460603392,
+   "oracle_s": 37.02784854199999,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -14538,15 +14559,15 @@
   },
   "A.ic_report.kendall": {
    "rc": 0,
-   "wall_s": 42.096182833,
-   "pickle_bytes": 1062158,
+   "wall_s": 41.42007366600001,
+   "pickle_bytes": 1066381,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 41.087366374999995,
-   "peak_rss_bytes": 462569472,
-   "oracle_s": 36.42787333299998,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 40.546081291,
+   "peak_rss_bytes": 460177408,
+   "oracle_s": 36.856921666000005,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -16701,15 +16722,15 @@
   },
   "A.event_report": {
    "rc": 0,
-   "wall_s": 55.13089895800002,
-   "pickle_bytes": 1769053,
+   "wall_s": 55.042537041,
+   "pickle_bytes": 1769436,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 54.03370245799999,
-   "peak_rss_bytes": 414842880,
-   "oracle_s": 49.88205341700001,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 54.075508834,
+   "peak_rss_bytes": 370491392,
+   "oracle_s": 50.51868379199999,
    "request": {
     "kind": "ic_page",
     "item": "event_report",
@@ -18951,15 +18972,15 @@
   },
   "A.event_report.cov": {
    "rc": 0,
-   "wall_s": 24.40651137499998,
-   "pickle_bytes": 430962,
+   "wall_s": 24.304732833000003,
+   "pickle_bytes": 431345,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 23.527704625,
-   "peak_rss_bytes": 440172544,
-   "oracle_s": 16.508190125,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 23.408599332999998,
+   "peak_rss_bytes": 455819264,
+   "oracle_s": 16.666779332999965,
    "request": {
     "kind": "ic_page",
     "item": "event_report",
@@ -21089,15 +21110,15 @@
   },
   "A.deep_analysis": {
    "rc": 0,
-   "wall_s": 51.950776125000004,
-   "pickle_bytes": 2243005,
+   "wall_s": 89.56684362499999,
+   "pickle_bytes": 2269187,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 51.019089333000004,
-   "peak_rss_bytes": 455376896,
-   "oracle_s": 46.31651475000001,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 88.742337125,
+   "peak_rss_bytes": 470794240,
+   "oracle_s": 76.53109641700001,
    "request": {
     "kind": "ic_page",
     "item": "deep_analysis",
@@ -22875,39 +22896,107 @@
      "n_paths": 1,
      "status": "verified"
     },
-    "/results/trend_analysis/*/centrality_trend/interpretation": {
+    "/results/trend_analysis/*/centrality_trend/data_warning": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/centrality_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "insufficient-data"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "insufficient-data"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/interpretation": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "insufficient-data"
     },
     "/results/trend_analysis/*/centrality_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
-     "status": "verified"
+     "status": "insufficient-data"
     },
     "/results/trend_analysis/*/centrality_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
@@ -22931,121 +23020,325 @@
     },
     "/results/trend_analysis/*/dimension_status": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:179",
+     "producer": "momentum/Analysis/trend_analyzer.py:227",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/dimension_status/ls_spread": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:179",
+     "producer": "momentum/Analysis/trend_analyzer.py:227",
      "n_paths": 4,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/data_warning": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/factor_return_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/interpretation": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "insufficient-data"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "insufficient-data"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/interpretation": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:83",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "insufficient-data"
     },
     "/results/trend_analysis/*/ic_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:71",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
-     "status": "verified"
+     "status": "insufficient-data"
     },
     "/results/trend_analysis/*/ic_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:73",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:51",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:82",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:75",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/data_warning": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/interpretation": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
@@ -23078,16 +23371,16 @@
    "closed": true,
    "closure": {
     "closed": true,
-    "n_response_keys": 301,
+    "n_response_keys": 345,
     "missing": [],
     "extra": []
    },
    "uncompared": [],
    "status_counts": {
-    "non-stat": 101,
-    "verified-na": 12,
-    "verified": 186,
-    "insufficient-data": 2
+    "non-stat": 105,
+    "verified-na": 20,
+    "verified": 210,
+    "insufficient-data": 10
    },
    "facts": {
     "symbol": "BTCUSDT",
@@ -23418,7 +23711,7 @@
     "deep.factor_centrality": {
      "verdict": "一致",
      "n_compared": 21,
-     "n_finite": 5893,
+     "n_finite": 5890,
      "n_mismatch": 0,
      "max_rel_diff": 3.3984387668659736e-14,
      "max_rel_diff_direct": 3.3984387668659736e-14,
@@ -23426,11 +23719,11 @@
     },
     "deep.trend_analysis": {
      "verdict": "一致",
-     "n_compared": 31,
-     "n_finite": 877,
+     "n_compared": 73,
+     "n_finite": 1621,
      "n_mismatch": 0,
      "max_rel_diff": 1.0864954294195558e-11,
-     "max_rel_diff_direct": 0.0,
+     "max_rel_diff_direct": 7.067180410200641e-14,
      "max_rel_diff_derived": 1.0864954294195558e-11
     },
     "deep.parameter_sensitivity": {
@@ -23491,15 +23784,15 @@
   },
   "L.ic_report": {
    "rc": 0,
-   "wall_s": 92.96070466699996,
-   "pickle_bytes": 5286084,
+   "wall_s": 102.13546270900002,
+   "pickle_bytes": 5295054,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 92.015100875,
-   "peak_rss_bytes": 756482048,
-   "oracle_s": 119.19619762500002,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 101.023688875,
+   "peak_rss_bytes": 753434624,
+   "oracle_s": 125.408256542,
    "request": {
     "kind": "ic_page",
     "item": "ic_report_long",
@@ -25984,15 +26277,15 @@
   },
   "L.ic_report.h34": {
    "rc": 0,
-   "wall_s": 468.812880375,
-   "pickle_bytes": 22187260,
+   "wall_s": 469.78699966700003,
+   "pickle_bytes": 22271928,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 467.64549625,
-   "peak_rss_bytes": 750796800,
-   "oracle_s": 769.701652,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 468.614794458,
+   "peak_rss_bytes": 703397888,
+   "oracle_s": 785.917653042,
    "request": {
     "kind": "ic_page",
     "item": "ic_report_long",
@@ -28283,15 +28576,15 @@
   },
   "L.ic_report.p1": {
    "rc": 0,
-   "wall_s": 146.46108616699996,
-   "pickle_bytes": 5354497,
+   "wall_s": 147.3562867500001,
+   "pickle_bytes": 5363467,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 145.452175708,
-   "peak_rss_bytes": 780222464,
-   "oracle_s": 159.33109058299988,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 146.33885891699998,
+   "peak_rss_bytes": 742326272,
+   "oracle_s": 161.20968208399995,
    "request": {
     "kind": "ic_page",
     "item": "ic_report_long",
@@ -30864,15 +31157,15 @@
   },
   "L.deep_analysis": {
    "rc": 0,
-   "wall_s": 84.49745062500006,
-   "pickle_bytes": 5619155,
+   "wall_s": 155.7646474159999,
+   "pickle_bytes": 5651365,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 83.60677883299999,
-   "peak_rss_bytes": 759054336,
-   "oracle_s": 71.44676654199998,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 154.7936355,
+   "peak_rss_bytes": 716242944,
+   "oracle_s": 121.50888716700001,
    "request": {
     "kind": "ic_page",
     "item": "deep_analysis_long",
@@ -32668,39 +32961,106 @@
      "n_paths": 1,
      "status": "verified"
     },
+    "/results/trend_analysis/*/centrality_trend/data_warning": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
     "/results/trend_analysis/*/centrality_trend/interpretation": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/centrality_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/centrality_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
@@ -32724,133 +33084,384 @@
     },
     "/results/trend_analysis/*/dimension_status": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:179",
+     "producer": "momentum/Analysis/trend_analyzer.py:227",
      "n_paths": 19,
      "status": "verified"
     },
     "/results/trend_analysis/*/dimension_status/centrality": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:179",
+     "producer": "momentum/Analysis/trend_analyzer.py:227",
      "n_paths": 7,
      "status": "verified"
     },
     "/results/trend_analysis/*/dimension_status/ic": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:179",
+     "producer": "momentum/Analysis/trend_analyzer.py:227",
      "n_paths": 7,
      "status": "verified"
     },
     "/results/trend_analysis/*/dimension_status/ls_spread": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:179",
+     "producer": "momentum/Analysis/trend_analyzer.py:227",
      "n_paths": 4,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/data_warning": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/factor_return_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/interpretation": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/factor_return_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
      "status": "verified"
     },
     "/results/trend_analysis/*/factor_return_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 30,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 13,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/alpha": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/approx_independent_n": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/estimated_null_reject_rate": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/horizon": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/n_obs": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/phi_hat": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/reference_reject_rate": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/data_warning_detail/replications": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_inference.py:382",
+     "n_paths": 10,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/interpretation": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:83",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:71",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:73",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:51",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ic_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:82",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
      "status": "verified"
     },
     "/results/trend_analysis/*/ic_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:75",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 23,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/data_warning": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/data_warning_detail": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified-na",
+     "proof": "tests/momentum/Analysis/test_icperf_trend_inference.py::test_trend_data_warning_cases_and_closed_keys"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "non-stat"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_se": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_slope": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/inference_status": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/interior_gap_count": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/interpretation": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/omitted_tail_rows": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/p_abs_error": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/p_value": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/r_squared": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/slope": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/subsample_points": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
+     "n_paths": 26,
+     "status": "verified"
+    },
+    "/results/trend_analysis/*/ls_spread_trend/subsample_start_pos": {
+     "oracle": "deep.trend_analysis",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/tail_estimate": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
     "/results/trend_analysis/*/ls_spread_trend/trend": {
      "oracle": "deep.trend_analysis",
-     "producer": "momentum/Analysis/trend_analyzer.py:52",
+     "producer": "momentum/Analysis/trend_analyzer.py:59",
      "n_paths": 26,
      "status": "verified"
     },
@@ -32883,15 +33494,15 @@
    "closed": true,
    "closure": {
     "closed": true,
-    "n_response_keys": 306,
+    "n_response_keys": 358,
     "missing": [],
     "extra": []
    },
    "uncompared": [],
    "status_counts": {
-    "non-stat": 101,
-    "verified-na": 12,
-    "verified": 193
+    "non-stat": 105,
+    "verified-na": 18,
+    "verified": 235
    },
    "facts": {
     "symbol": "BTCUSDT",
@@ -33231,7 +33842,7 @@
     "deep.factor_centrality": {
      "verdict": "一致",
      "n_compared": 21,
-     "n_finite": 6547,
+     "n_finite": 6543,
      "n_mismatch": 0,
      "max_rel_diff": 1.7243860593174602e-13,
      "max_rel_diff_direct": 1.7243860593174602e-13,
@@ -33239,11 +33850,11 @@
     },
     "deep.trend_analysis": {
      "verdict": "一致",
-     "n_compared": 31,
-     "n_finite": 779,
+     "n_compared": 81,
+     "n_finite": 1759,
      "n_mismatch": 0,
      "max_rel_diff": 1.0774651291371193e-12,
-     "max_rel_diff_direct": 0.0,
+     "max_rel_diff_direct": 1.7241784589304332e-13,
      "max_rel_diff_derived": 1.0774651291371193e-12
     },
     "deep.parameter_sensitivity": {
@@ -33304,15 +33915,15 @@
   },
   "L.event_import_report": {
    "rc": 0,
-   "wall_s": 18.42655016599997,
-   "pickle_bytes": 908911,
+   "wall_s": 19.419290457999978,
+   "pickle_bytes": 909191,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 17.581040417,
-   "peak_rss_bytes": 768917504,
-   "oracle_s": 4.021850416000007,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 18.514986875,
+   "peak_rss_bytes": 753123328,
+   "oracle_s": 4.03191333299992,
    "request": {
     "kind": "ic_page",
     "item": "event_import_report",
@@ -41361,15 +41972,15 @@
   },
   "X.cross_sectional": {
    "rc": 0,
-   "wall_s": 10.201025625000057,
-   "pickle_bytes": 172960,
+   "wall_s": 12.152631332999817,
+   "pickle_bytes": 174268,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 9.456855625000001,
-   "peak_rss_bytes": 368803840,
-   "oracle_s": 60.005989666000005,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 11.35101575,
+   "peak_rss_bytes": 343392256,
+   "oracle_s": 61.73779337499991,
    "request": {
     "kind": "cross",
     "item": "ic_report",
@@ -41938,6 +42549,18 @@
      "n_paths": 1,
      "status": "non-stat"
     },
+    "/metadata/significance/data_warning_count": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/ewc_dof_range": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 2,
+     "status": "non-stat"
+    },
     "/metadata/significance/fdr/alpha_effective": {
      "oracle": "非統計欄",
      "producer": "momentum/Analysis/ic_reporter.py:345",
@@ -41962,10 +42585,28 @@
      "n_paths": 1,
      "status": "non-stat"
     },
+    "/metadata/significance/hac_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/horizon": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
     "/metadata/significance/maxlags": {
      "oracle": "非統計欄",
      "producer": "momentum/Analysis/ic_reporter.py:345",
      "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/n_obs_range": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 2,
      "status": "non-stat"
     },
     "/metadata/significance/n_tests": {
@@ -41974,7 +42615,19 @@
      "n_paths": 1,
      "status": "non-stat"
     },
+    "/metadata/significance/persistence_not_estimable_count": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
     "/metadata/significance/tested_estimator": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/warning_not_evaluated_count": {
      "oracle": "非統計欄",
      "producer": "momentum/Analysis/ic_reporter.py:345",
      "n_paths": 1,
@@ -42028,9 +42681,27 @@
      "n_paths": 20,
      "status": "verified"
     },
+    "/summary_table/#/data_warning": {
+     "oracle": "hac_data_warning",
+     "producer": "momentum/Analysis/statistical_validator.py:215",
+     "n_paths": 20,
+     "status": "insufficient-data"
+    },
+    "/summary_table/#/data_warning_detail": {
+     "oracle": "hac_data_warning",
+     "producer": "momentum/Analysis/statistical_validator.py:215",
+     "n_paths": 20,
+     "status": "insufficient-data"
+    },
     "/summary_table/#/direction": {
      "oracle": "direction",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:1177",
+     "n_paths": 20,
+     "status": "verified"
+    },
+    "/summary_table/#/ewc_dof": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
      "n_paths": 20,
      "status": "verified"
     },
@@ -42039,6 +42710,12 @@
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:5326",
      "n_paths": 20,
      "status": "non-stat"
+    },
+    "/summary_table/#/hac_method": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
+     "n_paths": 20,
+     "status": "verified"
     },
     "/summary_table/#/ic_autocorr": {
      "oracle": "ic_autocorr",
@@ -42091,6 +42768,18 @@
     "/summary_table/#/icir_aligned": {
      "oracle": "direction",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:1177",
+     "n_paths": 20,
+     "status": "verified"
+    },
+    "/summary_table/#/inference_status": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
+     "n_paths": 20,
+     "status": "verified"
+    },
+    "/summary_table/#/interior_gap_count": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
      "n_paths": 20,
      "status": "verified"
     },
@@ -42178,16 +42867,16 @@
    "closed": true,
    "closure": {
     "closed": true,
-    "n_response_keys": 98,
+    "n_response_keys": 111,
     "missing": [],
     "extra": []
    },
    "uncompared": [],
    "status_counts": {
-    "non-stat": 41,
-    "verified": 53,
+    "non-stat": 48,
+    "verified": 57,
     "verified-na": 3,
-    "insufficient-data": 1
+    "insufficient-data": 3
    },
    "facts": {
     "kind": "cross",
@@ -42241,11 +42930,11 @@
     },
     "hac": {
      "verdict": "一致",
-     "n_compared": 40,
-     "n_finite": 40,
+     "n_compared": 120,
+     "n_finite": 120,
      "n_mismatch": 0,
-     "max_rel_diff": 2.0326213402887566e-14,
-     "max_rel_diff_direct": 2.0326213402887566e-14,
+     "max_rel_diff": 4.4236835536591616e-15,
+     "max_rel_diff_direct": 4.4236835536591616e-15,
      "max_rel_diff_derived": 0.0
     },
     "fdr": {
@@ -42253,8 +42942,8 @@
      "n_compared": 20,
      "n_finite": 20,
      "n_mismatch": 0,
-     "max_rel_diff": 2.0436084826686957e-14,
-     "max_rel_diff_direct": 2.0436084826686957e-14,
+     "max_rel_diff": 4.462150367169241e-15,
+     "max_rel_diff_direct": 4.462150367169241e-15,
      "max_rel_diff_derived": 0.0
     },
     "direction": {
@@ -42274,20 +42963,29 @@
      "max_rel_diff": 2.217846361179857e-16,
      "max_rel_diff_direct": 2.217846361179857e-16,
      "max_rel_diff_derived": 0.0
+    },
+    "hac_data_warning": {
+     "verdict": "一致",
+     "n_compared": 40,
+     "n_finite": 0,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "max_rel_diff_direct": 0.0,
+     "max_rel_diff_derived": 0.0
     }
    }
   },
   "X.cross_sectional.default": {
    "rc": 0,
-   "wall_s": 8.073750833000076,
-   "pickle_bytes": 1123759,
+   "wall_s": 9.085529417000089,
+   "pickle_bytes": 1124095,
    "error": null,
-   "code_sha256": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "code_sha256_at_start": "0e7b9a82f1ec5a2fc3487c167e85206bf23714bc7fc809cdb6aa8ac539a65dde",
-   "head": "fa642d6cce2c6acbead06b0ca11eb57f4784b480",
-   "elapsed_s": 7.29158775,
-   "peak_rss_bytes": 307494912,
-   "oracle_s": 12.55438112500019,
+   "code_sha256": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "code_sha256_at_start": "e793b3569f82cac31762c3716ddc441dff8b55a4c21cd417fe86ed0efe11d131",
+   "head": "2d31075dd6cfa70b7fdef6c4306cd91cf74a5f3a",
+   "elapsed_s": 8.250225665999999,
+   "peak_rss_bytes": 319094784,
+   "oracle_s": 12.941389667000067,
    "request": {
     "kind": "cross_kline",
     "item": "ic_report",
@@ -42998,6 +43696,18 @@
      "n_paths": 1,
      "status": "non-stat"
     },
+    "/metadata/significance/data_warning_count": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/ewc_dof_range": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 2,
+     "status": "non-stat"
+    },
     "/metadata/significance/fdr/alpha_effective": {
      "oracle": "非統計欄",
      "producer": "momentum/Analysis/ic_reporter.py:345",
@@ -43022,10 +43732,28 @@
      "n_paths": 1,
      "status": "non-stat"
     },
+    "/metadata/significance/hac_method": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/horizon": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
     "/metadata/significance/maxlags": {
      "oracle": "非統計欄",
      "producer": "momentum/Analysis/ic_reporter.py:345",
      "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/n_obs_range": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 2,
      "status": "non-stat"
     },
     "/metadata/significance/n_tests": {
@@ -43034,7 +43762,19 @@
      "n_paths": 1,
      "status": "non-stat"
     },
+    "/metadata/significance/persistence_not_estimable_count": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
     "/metadata/significance/tested_estimator": {
+     "oracle": "非統計欄",
+     "producer": "momentum/Analysis/ic_reporter.py:345",
+     "n_paths": 1,
+     "status": "non-stat"
+    },
+    "/metadata/significance/warning_not_evaluated_count": {
      "oracle": "非統計欄",
      "producer": "momentum/Analysis/ic_reporter.py:345",
      "n_paths": 1,
@@ -43088,9 +43828,27 @@
      "n_paths": 4,
      "status": "verified"
     },
+    "/summary_table/#/data_warning": {
+     "oracle": "hac_data_warning",
+     "producer": "momentum/Analysis/statistical_validator.py:215",
+     "n_paths": 4,
+     "status": "insufficient-data"
+    },
+    "/summary_table/#/data_warning_detail": {
+     "oracle": "hac_data_warning",
+     "producer": "momentum/Analysis/statistical_validator.py:215",
+     "n_paths": 4,
+     "status": "insufficient-data"
+    },
     "/summary_table/#/direction": {
      "oracle": "direction",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:1177",
+     "n_paths": 4,
+     "status": "verified"
+    },
+    "/summary_table/#/ewc_dof": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
      "n_paths": 4,
      "status": "verified"
     },
@@ -43099,6 +43857,12 @@
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:5326",
      "n_paths": 4,
      "status": "non-stat"
+    },
+    "/summary_table/#/hac_method": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
+     "n_paths": 4,
+     "status": "verified"
     },
     "/summary_table/#/ic_autocorr": {
      "oracle": "ic_autocorr",
@@ -43151,6 +43915,18 @@
     "/summary_table/#/icir_aligned": {
      "oracle": "direction",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:1177",
+     "n_paths": 4,
+     "status": "verified"
+    },
+    "/summary_table/#/inference_status": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
+     "n_paths": 4,
+     "status": "verified"
+    },
+    "/summary_table/#/interior_gap_count": {
+     "oracle": "hac",
+     "producer": "momentum/Analysis/statistical_validator.py:111",
      "n_paths": 4,
      "status": "verified"
     },
@@ -43238,16 +44014,16 @@
    "closed": true,
    "closure": {
     "closed": true,
-    "n_response_keys": 142,
+    "n_response_keys": 155,
     "missing": [],
     "extra": []
    },
    "uncompared": [],
    "status_counts": {
-    "non-stat": 69,
-    "verified": 70,
+    "non-stat": 76,
+    "verified": 74,
     "verified-na": 2,
-    "insufficient-data": 1
+    "insufficient-data": 3
    },
    "facts": {
     "kind": "cross_kline",
@@ -43326,11 +44102,11 @@
     },
     "hac": {
      "verdict": "一致",
-     "n_compared": 8,
-     "n_finite": 8,
+     "n_compared": 24,
+     "n_finite": 24,
      "n_mismatch": 0,
-     "max_rel_diff": 7.022259858123983e-15,
-     "max_rel_diff_direct": 7.022259858123983e-15,
+     "max_rel_diff": 1.1597101672026608e-14,
+     "max_rel_diff_direct": 1.1597101672026608e-14,
      "max_rel_diff_derived": 0.0
     },
     "fdr": {
@@ -43338,8 +44114,8 @@
      "n_compared": 4,
      "n_finite": 4,
      "n_mismatch": 0,
-     "max_rel_diff": 7.022259858123983e-15,
-     "max_rel_diff_direct": 7.022259858123983e-15,
+     "max_rel_diff": 1.1597101672026608e-14,
+     "max_rel_diff_direct": 1.1597101672026608e-14,
      "max_rel_diff_derived": 0.0
     },
     "direction": {
@@ -43359,114 +44135,123 @@
      "max_rel_diff": 2.3964495004738567e-16,
      "max_rel_diff_direct": 2.3964495004738567e-16,
      "max_rel_diff_derived": 0.0
+    },
+    "hac_data_warning": {
+     "verdict": "一致",
+     "n_compared": 8,
+     "n_finite": 0,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "max_rel_diff_direct": 0.0,
+     "max_rel_diff_derived": 0.0
     }
    }
   }
  },
  "cross_request": {
-  "stat_keys": 402,
+  "stat_keys": 452,
   "unsatisfied": {}
  },
  "four_way": {
   "A.ic_report": {
-   "wall_s": 105.53780437500001,
-   "elapsed_s": 104.192761959,
-   "peak_rss_bytes": 437436416,
-   "pickle_bytes": 3667783,
-   "oracle_s": 137.999597625
+   "wall_s": 106.760321375,
+   "elapsed_s": 105.504680958,
+   "peak_rss_bytes": 446054400,
+   "pickle_bytes": 3672006,
+   "oracle_s": 139.928634208
   },
   "A.ic_report.cov": {
-   "wall_s": 34.293325291,
-   "elapsed_s": 33.285594167,
-   "peak_rss_bytes": 421052416,
-   "pickle_bytes": 762210,
-   "oracle_s": 28.046534250000008
+   "wall_s": 33.729527833000006,
+   "elapsed_s": 32.848188083000004,
+   "peak_rss_bytes": 467845120,
+   "pickle_bytes": 766433,
+   "oracle_s": 28.451929750000005
   },
   "A.ic_report.pearson": {
-   "wall_s": 39.56540666699999,
-   "elapsed_s": 38.628265250000005,
-   "peak_rss_bytes": 444530688,
-   "pickle_bytes": 1063130,
-   "oracle_s": 36.649119958
+   "wall_s": 38.807460709,
+   "elapsed_s": 37.990979875,
+   "peak_rss_bytes": 460603392,
+   "pickle_bytes": 1067353,
+   "oracle_s": 37.02784854199999
   },
   "A.ic_report.kendall": {
-   "wall_s": 42.096182833,
-   "elapsed_s": 41.087366374999995,
-   "peak_rss_bytes": 462569472,
-   "pickle_bytes": 1062158,
-   "oracle_s": 36.42787333299998
+   "wall_s": 41.42007366600001,
+   "elapsed_s": 40.546081291,
+   "peak_rss_bytes": 460177408,
+   "pickle_bytes": 1066381,
+   "oracle_s": 36.856921666000005
   },
   "A.event_report": {
-   "wall_s": 55.13089895800002,
-   "elapsed_s": 54.03370245799999,
-   "peak_rss_bytes": 414842880,
-   "pickle_bytes": 1769053,
-   "oracle_s": 49.88205341700001
+   "wall_s": 55.042537041,
+   "elapsed_s": 54.075508834,
+   "peak_rss_bytes": 370491392,
+   "pickle_bytes": 1769436,
+   "oracle_s": 50.51868379199999
   },
   "A.event_report.cov": {
-   "wall_s": 24.40651137499998,
-   "elapsed_s": 23.527704625,
-   "peak_rss_bytes": 440172544,
-   "pickle_bytes": 430962,
-   "oracle_s": 16.508190125
+   "wall_s": 24.304732833000003,
+   "elapsed_s": 23.408599332999998,
+   "peak_rss_bytes": 455819264,
+   "pickle_bytes": 431345,
+   "oracle_s": 16.666779332999965
   },
   "A.deep_analysis": {
-   "wall_s": 51.950776125000004,
-   "elapsed_s": 51.019089333000004,
-   "peak_rss_bytes": 455376896,
-   "pickle_bytes": 2243005,
-   "oracle_s": 46.31651475000001
+   "wall_s": 89.56684362499999,
+   "elapsed_s": 88.742337125,
+   "peak_rss_bytes": 470794240,
+   "pickle_bytes": 2269187,
+   "oracle_s": 76.53109641700001
   },
   "L.ic_report": {
-   "wall_s": 92.96070466699996,
-   "elapsed_s": 92.015100875,
-   "peak_rss_bytes": 756482048,
-   "pickle_bytes": 5286084,
-   "oracle_s": 119.19619762500002
+   "wall_s": 102.13546270900002,
+   "elapsed_s": 101.023688875,
+   "peak_rss_bytes": 753434624,
+   "pickle_bytes": 5295054,
+   "oracle_s": 125.408256542
   },
   "L.ic_report.h34": {
-   "wall_s": 468.812880375,
-   "elapsed_s": 467.64549625,
-   "peak_rss_bytes": 750796800,
-   "pickle_bytes": 22187260,
-   "oracle_s": 769.701652
+   "wall_s": 469.78699966700003,
+   "elapsed_s": 468.614794458,
+   "peak_rss_bytes": 703397888,
+   "pickle_bytes": 22271928,
+   "oracle_s": 785.917653042
   },
   "L.ic_report.p1": {
-   "wall_s": 146.46108616699996,
-   "elapsed_s": 145.452175708,
-   "peak_rss_bytes": 780222464,
-   "pickle_bytes": 5354497,
-   "oracle_s": 159.33109058299988
+   "wall_s": 147.3562867500001,
+   "elapsed_s": 146.33885891699998,
+   "peak_rss_bytes": 742326272,
+   "pickle_bytes": 5363467,
+   "oracle_s": 161.20968208399995
   },
   "L.deep_analysis": {
-   "wall_s": 84.49745062500006,
-   "elapsed_s": 83.60677883299999,
-   "peak_rss_bytes": 759054336,
-   "pickle_bytes": 5619155,
-   "oracle_s": 71.44676654199998
+   "wall_s": 155.7646474159999,
+   "elapsed_s": 154.7936355,
+   "peak_rss_bytes": 716242944,
+   "pickle_bytes": 5651365,
+   "oracle_s": 121.50888716700001
   },
   "L.event_import_report": {
-   "wall_s": 18.42655016599997,
-   "elapsed_s": 17.581040417,
-   "peak_rss_bytes": 768917504,
-   "pickle_bytes": 908911,
-   "oracle_s": 4.021850416000007
+   "wall_s": 19.419290457999978,
+   "elapsed_s": 18.514986875,
+   "peak_rss_bytes": 753123328,
+   "pickle_bytes": 909191,
+   "oracle_s": 4.03191333299992
   },
   "X.cross_sectional": {
-   "wall_s": 10.201025625000057,
-   "elapsed_s": 9.456855625000001,
-   "peak_rss_bytes": 368803840,
-   "pickle_bytes": 172960,
-   "oracle_s": 60.005989666000005
+   "wall_s": 12.152631332999817,
+   "elapsed_s": 11.35101575,
+   "peak_rss_bytes": 343392256,
+   "pickle_bytes": 174268,
+   "oracle_s": 61.73779337499991
   },
   "X.cross_sectional.default": {
-   "wall_s": 8.073750833000076,
-   "elapsed_s": 7.29158775,
-   "peak_rss_bytes": 307494912,
-   "pickle_bytes": 1123759,
-   "oracle_s": 12.55438112500019
+   "wall_s": 9.085529417000089,
+   "elapsed_s": 8.250225665999999,
+   "peak_rss_bytes": 319094784,
+   "pickle_bytes": 1124095,
+   "oracle_s": 12.941389667000067
   },
-  "_receipt_bytes": 1369727
+  "_receipt_bytes": 1398415
  },
  "extra_findings": [
   {

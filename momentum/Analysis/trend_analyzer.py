@@ -8,8 +8,8 @@ from typing import Mapping, Optional, Sequence
 import numpy as np
 import pandas as pd
 from scipy.stats import linregress
-from scipy.stats import t as student_t
 
+from momentum.Analysis import trend_inference as ti
 from momentum.Analysis.deep_analysis_types import SkippedResult
 from momentum.core.logging import get_logger
 
@@ -39,6 +39,13 @@ class TrendDimensionInput:
     series: Mapping[str, pd.Series] = field(default_factory=dict)
     overlap_window: Optional[int] = None
     status: Optional[str] = None
+    #: ICPERF Task 0.4 ㊺ B(1)：各值之來源支撐〔起, 迄〕原列位置（與 `series` 逐位置對齊、同維各特徵共用）；
+    #: None ⇒ 由 `overlap_window` 推〔位置, 位置＋overlap_window−1〕（未給 ⇒ 每值只涵蓋自身）
+    support: Optional[tuple[np.ndarray, np.ndarray]] = None
+    #: 序列第 j 值位於原列 j·position_scale（如因子報酬每 h 根取一之格點）；support 為 None 時用以推原列位置支撐
+    position_scale: int = 1
+    #: 非有限值＝非持倉點、不入設計（ls_spread，SPEC ㊺ B(7)）⇒ 不重疊選取只在有限值上進行
+    select_finite_only: bool = False
 
 
 class TrendAnalyzer:
@@ -55,66 +62,105 @@ class TrendAnalyzer:
         series_name: str = "",
         *,
         overlap_window: Optional[int] = None,
-    ) -> dict | SkippedResult:
-        """線性趨勢：斜率／截距／R² 為 OLS；斜率 p 值為 HAC（Newey–West，Bartlett 核）。
+        support: Optional[tuple[np.ndarray, np.ndarray]] = None,
+        select_finite_only: bool = False,
+    ) -> dict:
+        """線性趨勢：描述用 OLS（縮尾、全部有效點）＋推論用不重疊子序列之 Bartlett fixed-b 精確 p（ICPERF ㊺ B）。
 
-        ICPERF Task 0.4 ⑱（CT-1、CT-2）：
-        - 自變數 x＝原始位置（去 NaN 不重編，中段缺值不壓縮時間軸）；tail_estimate 為末一有效位置之擬合值。
-        - p 值：maxlags＝max(int(4·(n/100)^(2/9)), overlap_window−1)（同 statistical_validator.py:118-122 之慣例；
-          `overlap_window`＝序列每一值所涵蓋之觀測數，滾動窗 w、步長 1 ⇒ w；未給 ⇒ 只用自動頻寬），無小樣本修正，
-          t 分布 df＝n−2；fail-closed：maxlags ≥ n−1 或 n < max(8, 2·maxlags) ⇒ p 非有限 ⇒ 1.0。
+        `select_finite_only`（ls_spread 維，SPEC ㊺ B(7)）：非有限值＝非持倉點、不入設計 ⇒ 貪婪選取只在有限值上進行
+        （非持倉點不佔支撐；r106 CODEX-P1-03）；其餘維為 False（同維共用位置軸、先選再剔非有限）。
+
+        - 描述（⑱ CT-1、CT-2，不變）：x＝原始位置（去 NaN 不重編），1%／99% 縮尾後 OLS 之 `slope`／`r_squared`／
+          `tail_estimate`（末一有效位置之擬合值）。
+        - 推論（SPEC v5.78 ㊺ B(2)–(5)）：`support`＝各值來源支撐〔起, 迄〕原列位置（與 `time_series` 逐位置對齊）；
+          未給 ⇒〔位置, 位置＋overlap_window−1〕（未給 overlap_window ⇒ 每值只涵蓋自身）。自第一個值起貪婪選取
+          支撐不交疊之值，於選取點之有限值（x＝支撐迄點、y＝未縮尾原值）以 `trend_inference.infer_trend` 檢定。
+        - 分類：`ok` 且 p ≤ α 且描述 r² ≥ 門檻 ⇒ 依推論斜率符號 up／down，否則 flat；`constant_series` ⇒ flat；
+          其餘狀態 ⇒ `indeterminate`；有效點 < `min_samples`（使用者設定）⇒ `below_min_samples`、`indeterminate`。
         """
         raw = pd.Series(time_series, dtype=float).to_numpy(dtype=float)
+        n_all = raw.size
+        if support is None:
+            span = max(1, int(overlap_window)) if overlap_window else 1
+            pos_all = np.arange(n_all, dtype=np.int64)
+            sup_start, sup_end = pos_all, pos_all + span - 1
+        else:
+            sup_start = np.asarray(support[0], dtype=np.int64)
+            sup_end = np.asarray(support[1], dtype=np.int64)
+            if sup_start.size != n_all or sup_end.size != n_all:
+                raise ValueError("support must align with time_series")
+        # 描述用沿用現行：只去 NaN（±inf 保留 ⇒ 描述斜率非有限 ⇒ indeterminate）；推論另於選取點以有限值判定
         valid = ~np.isnan(raw)
         positions = np.flatnonzero(valid).astype(float)
         series = pd.Series(raw[valid])
-        if len(series) < self._min_samples:
-            return SkippedResult(
-                module_name="trend_analysis",
-                reason=f"{series_name or 'series'} insufficient samples",
-                error_type="INSUFFICIENT_DATA",
-            )
 
-        if series.nunique(dropna=True) <= 1:
-            value = float(series.iloc[0]) if not series.empty else 0.0
-            return {
-                "slope": 0.0,
-                "p_value": 1.0,
-                "r_squared": 0.0,
-                "tail_estimate": value,
-                "trend": "flat",
-                "interpretation": "序列近乎常數，趨勢為平坦",
+        def _result(desc: dict, inference: Optional[ti.TrendInference], status: str, trend: str,
+                    sel: Optional[np.ndarray]) -> dict:
+            gaps = int(np.sum(~np.isfinite(raw[sel]))) if sel is not None and sel.size else 0
+            # SPEC ㊺ B 資料不足警示：只於推論 ok 時判定（同 A 只於 EWC ok 時判定）
+            warning = (ti.trend_data_warning(sup_end[sel].astype(float), raw[sel], self._significance)
+                       if status == ti.STATUS_OK and sel is not None
+                       else {"data_warning": None, "data_warning_detail": None})
+            out = {
+                **desc,
+                "p_value": inference.p_value if inference is not None else None,
+                "trend": trend,
+                "interpretation": self._interpret_trend(trend),
+                "inference_slope": inference.slope if inference is not None else None,
+                "inference_se": inference.se if inference is not None else None,
+                "inference_method": ti.INFERENCE_METHOD,
+                "inference_status": status,
+                "p_abs_error": inference.p_abs_error if inference is not None else None,
+                "subsample_points": inference.points if inference is not None else 0,
+                "subsample_start_pos": int(sup_start[sel[0]]) if sel is not None and sel.size else None,
+                "omitted_tail_rows": int(n_all - 1 - sel[-1]) if sel is not None and sel.size else n_all,
+                "interior_gap_count": gaps,
+                **warning,
             }
+            return out
+
+        empty_desc = {"slope": None, "r_squared": None, "tail_estimate": None}
+        if len(series) < self._min_samples:
+            return _result(empty_desc, None, ti.STATUS_BELOW_MIN_SAMPLES, "indeterminate", None)
+
+        if select_finite_only:
+            fin_idx = np.flatnonzero(np.isfinite(raw))
+            sel = fin_idx[ti.select_nonoverlapping(sup_start[fin_idx], sup_end[fin_idx])]
+        else:
+            sel = ti.select_nonoverlapping(sup_start, sup_end)
+        if series.nunique(dropna=True) <= 1:
+            value = float(series.iloc[0])
+            desc = {"slope": 0.0, "r_squared": 0.0, "tail_estimate": value}
+            inf = ti.infer_trend(sup_end[sel].astype(float), raw[sel], self._significance)
+            # 描述全同不代表推論可判定：選取點不足／退化 ⇒ indeterminate（SPEC ㊺ B(4)；r106 CODEX-P1-01）
+            trend = "flat" if inf.status in (ti.STATUS_CONSTANT_SERIES, ti.STATUS_OK) else "indeterminate"
+            return _result(desc, inf, inf.status, trend, sel)
 
         winsorized = self._winsorize(series)
-        x = positions
-        y = winsorized.to_numpy(dtype=float)
         with np.errstate(invalid="ignore", divide="ignore"):
-            reg = linregress(x, y)
-
+            reg = linregress(positions, winsorized.to_numpy(dtype=float))
         slope = float(reg.slope)
-        hac_p = self._hac_slope_pvalue(x, y, float(reg.intercept), slope, overlap_window)
-        p_value = float(hac_p) if np.isfinite(hac_p) else 1.0
         r_squared = float(reg.rvalue ** 2) if np.isfinite(reg.rvalue) else 0.0
-
-        if (not np.isfinite(slope)) or (not np.isfinite(r_squared)):
-            trend = "indeterminate"
-        elif p_value <= self._significance and r_squared >= self._r2_threshold:
-            trend = "up" if slope > 0 else "down" if slope < 0 else "flat"
-        else:
-            trend = "flat"
-
-        tail_estimate = float(reg.intercept + reg.slope * x[-1])
-        interpretation = self._interpret_trend(trend)
-
-        return {
+        desc = {
             "slope": slope,
-            "p_value": p_value,
             "r_squared": r_squared,
-            "tail_estimate": tail_estimate,
-            "trend": trend,
-            "interpretation": interpretation,
+            "tail_estimate": float(reg.intercept + reg.slope * positions[-1]),
         }
+
+        inf = ti.infer_trend(sup_end[sel].astype(float), raw[sel], self._significance)
+        if not np.isfinite(slope):
+            # 描述用斜率非有限（如含 ±inf）：沿用現行 ⇒ indeterminate
+            trend = "indeterminate"
+        elif inf.status == ti.STATUS_OK:
+            if inf.significant and np.isfinite(r_squared) and r_squared >= self._r2_threshold:
+                trend = "up" if inf.slope > 0 else "down" if inf.slope < 0 else "flat"
+            else:
+                trend = "flat"
+        elif inf.status == ti.STATUS_CONSTANT_SERIES:
+            trend = "flat"
+        else:
+            trend = "indeterminate"
+        return _result(desc, inf, inf.status, trend, sel)
 
     def analyze_multi_dimension(
         self,
@@ -152,8 +198,10 @@ class TrendAnalyzer:
             else None
         )
         ls_spread_result = (
+            # ㊺ B(7)：非持倉點不入設計（同 batch_analyze 之 ls_spread；r107 CODEX-P1-01）
             self._ensure_trend_dict(self.analyze_trend(ls_spread_series, "ls_spread",
-                                                       overlap_window=ls_spread_overlap_window))
+                                                       overlap_window=ls_spread_overlap_window,
+                                                       select_finite_only=True))
             if ls_spread_series is not None
             else None
         )
@@ -185,6 +233,7 @@ class TrendAnalyzer:
         overlap_window: Optional[int] = None,
         dimensions: Optional[Sequence[str]] = None,
         dimension_inputs: Optional[Mapping[str, TrendDimensionInput]] = None,
+        ic_support: Optional[tuple[np.ndarray, np.ndarray]] = None,
     ) -> dict[str, dict]:
         """逐特徵多維趨勢（特徵集合＝滾動 IC 矩陣前 top_n 欄）。
 
@@ -216,6 +265,8 @@ class TrendAnalyzer:
                 if dim == "ic":
                     series: Optional[pd.Series] = rolling_ic_matrix[feature_name]
                     lag_window = overlap_window
+                    dim_support = ic_support
+                    finite_only = False
                 else:
                     source = inputs.get(dim)
                     if source is None:
@@ -229,8 +280,17 @@ class TrendAnalyzer:
                         status[dim] = DIMENSION_SOURCE_SKIPPED
                         continue
                     lag_window = source.overlap_window
-                result = self.analyze_trend(series, dim, overlap_window=lag_window)
-                if isinstance(result, SkippedResult):
+                    dim_support = source.support
+                    if dim_support is None and source.position_scale > 1:
+                        # 每值位於原列 j·scale（序列為每 scale 根取一之格點）⇒ 支撐〔j·scale, j·scale＋span−1〕
+                        pos = np.arange(len(series), dtype=np.int64) * int(source.position_scale)
+                        span = max(1, int(lag_window or 1))
+                        dim_support = (pos, pos + span - 1)
+                    finite_only = bool(source.select_finite_only)
+                result = self.analyze_trend(series, dim, overlap_window=lag_window, support=dim_support,
+                                            select_finite_only=finite_only)
+                if result.get("inference_status") == ti.STATUS_BELOW_MIN_SAMPLES:
+                    # 有效觀測 < min_samples：該維不入輸出、記 `dimension_status`；combined_signal 視為缺維 ⇒「資訊不足」
                     status[dim] = DIMENSION_INSUFFICIENT_DATA
                     continue
                 entry[f"{dim}_trend"] = result
@@ -244,49 +304,6 @@ class TrendAnalyzer:
 
         logger.info("Trend analysis completed: %s features", len(selected))
         return results
-
-    @staticmethod
-    def _hac_slope_pvalue(
-        x: np.ndarray,
-        y: np.ndarray,
-        intercept: float,
-        slope: float,
-        overlap_window: Optional[int],
-    ) -> float:
-        """OLS 斜率之 HAC（Newey–West、Bartlett 核、無小樣本修正）雙尾 p 值；不可算 ⇒ NaN。
-
-        cov＝(X'X)⁻¹ S (X'X)⁻¹，S＝Σ_t u_t u_t'＋Σ_{j=1..L} (1−j/(L+1))(Γ_j＋Γ_j')，u_t＝X_t·e_t，
-        Γ_j＝Σ_t u_t u_{t−j}'；t＝slope／se，p＝2·t.sf(|t|, n−2)。
-        """
-        n = int(x.size)
-        if n < 3 or not (np.isfinite(slope) and np.isfinite(intercept)):
-            return float("nan")
-        if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y))):
-            return float("nan")
-        auto_bw = int(4 * (n / 100.0) ** (2.0 / 9.0))
-        lags = auto_bw
-        if overlap_window is not None and int(overlap_window) > 0:
-            lags = max(auto_bw, int(overlap_window) - 1)
-        if lags >= n - 1 or n < max(8, 2 * lags):
-            return float("nan")
-        design = np.column_stack([np.ones(n, dtype=float), x])
-        resid = y - (intercept + slope * x)
-        scores = design * resid[:, None]
-        meat = scores.T @ scores
-        for j in range(1, lags + 1):
-            weight = 1.0 - j / (lags + 1.0)
-            gamma = scores[j:].T @ scores[:-j]
-            meat += weight * (gamma + gamma.T)
-        try:
-            bread = np.linalg.inv(design.T @ design)
-        except np.linalg.LinAlgError:
-            return float("nan")
-        cov = bread @ meat @ bread
-        var = float(cov[1, 1])
-        if not np.isfinite(var) or var <= 0.0:
-            return float("nan")
-        t_stat = slope / float(np.sqrt(var))
-        return float(2.0 * student_t.sf(abs(t_stat), n - 2))
 
     @staticmethod
     def _winsorize(series: pd.Series, lower: float = 0.01, upper: float = 0.99) -> pd.Series:
@@ -308,6 +325,8 @@ class TrendAnalyzer:
     def _ensure_trend_dict(result: dict | SkippedResult) -> dict | None:
         if isinstance(result, SkippedResult):
             return None
+        if result.get("inference_status") == ti.STATUS_BELOW_MIN_SAMPLES:
+            return None
         return result
 
     def _combine_signal(
@@ -316,8 +335,28 @@ class TrendAnalyzer:
         centrality_result: Optional[dict],
         ic_decay_half_life: Optional[float],
     ) -> dict:
-        ic_trend = ic_result.get("trend") if ic_result else "flat"
-        centrality_trend = centrality_result.get("trend") if centrality_result else "flat"
+        """綜合訊號（ICPERF ㊺ B(6)）：ic、centrality 兩維皆可判定 ⇒ 現行規則表；任一缺或 `indeterminate` ⇒
+        「資訊不足」，reason 列不可判定之維與原因並保留可判定維之觀察，不得輸出「正常／訊號穩定」。"""
+        names = {"ic": "IC", "centrality": "中心性"}
+        words = {"up": "上升", "down": "下降", "flat": "持平"}
+        known: list[str] = []
+        unknown: list[str] = []
+        for key, res in (("ic", ic_result), ("centrality", centrality_result)):
+            trend = res.get("trend") if res else None
+            if trend in words:
+                known.append(f"{names[key]} {words[trend]}")
+            else:
+                why = (res or {}).get("inference_status") or ("source_unavailable" if res is None else "indeterminate")
+                unknown.append(f"{names[key]}不可判定：{why}")
+        if unknown:
+            return {
+                "recommendation": "資訊不足",
+                "reason": "；".join(known + unknown),
+                "action": "補足資料後重跑",
+            }
+
+        ic_trend = ic_result.get("trend")
+        centrality_trend = centrality_result.get("trend")
 
         recommendation = "正常"
         reason = "訊號穩定"

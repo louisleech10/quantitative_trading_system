@@ -31,6 +31,7 @@ import {
   IC_AUTOCORR_REASON_LABELS,
   hacDataWarningTip,
   icAutocorrTip,
+  xsecDataWarningTip,
 } from '@/components/ic-analysis/icSettingsText';
 
 interface ICSummaryTableProps {
@@ -89,8 +90,18 @@ function isFiniteNumber(value: unknown): value is number {
 /** 共用 finite formatter：非有限 → '--'（CODEX-6；禁前端統計推導） */
 /**
  * ICPERF ㊹：縱向 p／q 欄——無法計算者顯示原因；有資料不足警示者照常顯示數值並加警示圖示（ⓘ 為警示內容）。
+ * ICPERF ㊺ A：跨標的同一封閉狀態與警示鍵，ⓘ 文案改為逐期 IC 序列版（`crossSectional`）。
  */
-function HacPValueCell({ item, field }: { item: ICFeatureInfo; field: 'p_value' | 'p_value_adj' }) {
+function HacPValueCell({
+  item,
+  field,
+  crossSectional = false,
+}: {
+  item: ICFeatureInfo;
+  field: 'p_value' | 'p_value_adj';
+  crossSectional?: boolean;
+}) {
+  const warningTip = crossSectional ? xsecDataWarningTip : hacDataWarningTip;
   const status = item.inference_status;
   if (status === 'insufficient_sample' || status === 'degenerate') {
     return (
@@ -126,8 +137,8 @@ function HacPValueCell({ item, field }: { item: ICFeatureInfo; field: 'p_value' 
       {detail && (
         <span
           data-testid={`hac-data-warning-${field}`}
-          title={hacDataWarningTip(detail)}
-          aria-label={hacDataWarningTip(detail)}
+          title={warningTip(detail)}
+          aria-label={warningTip(detail)}
           className="text-amber-300"
         >
           ⚠
@@ -604,14 +615,14 @@ export default function ICSummaryTable({
                             {formatFinite(item.t_stat, 3)}
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-300">
-                            {formatFinite(item.p_value, 4)}
+                            <HacPValueCell item={item} field="p_value" crossSectional />
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-300">
                             {/* 無後端 CI 欄 → 誠實 '--'；禁前端 SE 推導 */}
                             {'--'}
                           </TableCell>
                           <TableCell className="font-mono text-xs text-slate-300">
-                            {formatFinite(item.p_value_adj, 4)}
+                            <HacPValueCell item={item} field="p_value_adj" crossSectional />
                           </TableCell>
                         </>
                       ) : (

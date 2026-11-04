@@ -24,7 +24,10 @@ def test_short_time_series_skip():
 
     result = analyzer.analyze_trend(series, "ic")
 
-    assert isinstance(result, SkippedResult)
+    # ICPERF ㊺ B(4)：有效點 < min_samples ⇒ below_min_samples、indeterminate（取代 SkippedResult；不出 p）
+    assert result["inference_status"] == "below_min_samples"
+    assert result["trend"] == "indeterminate" and result["p_value"] is None
+    assert TrendAnalyzer._ensure_trend_dict(result) is None
 
 
 def test_analyze_multi_dimension_combined_signal():

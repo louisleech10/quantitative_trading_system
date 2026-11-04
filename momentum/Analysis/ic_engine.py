@@ -593,6 +593,29 @@ class ICEngine:
             frozen_gate_eligible=quality_status == "complete",
         )
 
+    @staticmethod
+    def rolling_window_positions(
+        label: pd.Series,
+        windows: list[int],
+        stride: int = 1,
+    ) -> dict[str, dict[str, np.ndarray]]:
+        """各滾動窗之首、末列原列位置（ICPERF Task 0.4 ㊺ B(1)；與 `compute_rolling_ic` 同軸、同窗終點）。
+
+        軸＝標籤有限之列（`compute_rolling_ic` 之 ④）；窗終點（1 起算之軸位置）＝window, window+stride, …；
+        回 `{f"window_{w}": {"start": 首列原列位置, "end": 末列原列位置}}`，原列位置＝`label` 之列序（0 起算）。
+        `windows` 須為呼叫端已換算之窗（同 `compute_rolling_ic` 內 `_adjust_rolling_windows` 之結果）。
+        """
+        axis_pos = np.flatnonzero(np.isfinite(label.to_numpy(dtype=float)))
+        out: dict[str, dict[str, np.ndarray]] = {}
+        for window in windows:
+            w = int(window)
+            ends = np.arange(w, axis_pos.size + 1, max(1, int(stride)))
+            out[f"window_{w}"] = {
+                "start": axis_pos[ends - w].astype(np.int64) if ends.size else np.empty(0, np.int64),
+                "end": axis_pos[ends - 1].astype(np.int64) if ends.size else np.empty(0, np.int64),
+            }
+        return out
+
     def compute_rolling_ic(
         self,
         features_df: pd.DataFrame,

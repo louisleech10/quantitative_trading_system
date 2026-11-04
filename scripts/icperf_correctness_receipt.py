@@ -1111,6 +1111,62 @@ def _hac_on_series(z: Any, horizon: int, maxlags: Any) -> Dict[str, Any]:
     return {"t_stat": tval, "p_value": float(2.0 * stats.t.sf(abs(tval), df=n - 1))}
 
 
+def _xsec_ewc_oracle(full: Any, horizon: int, maxlags: Any) -> Dict[str, Any]:
+    """跨標的逐期 IC 序列之顯著性 oracle（SPEC ㊺ A）：非有限值為缺值、中間缺值數＝首末有限值之間之非有限數；等距模型取有限值
+    子序列 z（m 點）。預設＝論文式餘弦基底直算 EWC（測試檔 `_ref_ewc_dof`：ν＝⌊0.4·m^(2/3)⌋ 以 50 位十進位）：ν＜1 ⇒
+    insufficient_sample、z 全同或 Ω 非有限／≤0 ⇒ degenerate；明示 maxlags ⇒ `_hac_on_series`（statsmodels NW）。"""
+    import math
+
+    import numpy as np
+    from scipy import stats
+
+    O = _oracles()
+    full = np.asarray(full, dtype=float)
+    fin = np.isfinite(full)
+    idx = np.flatnonzero(fin)
+    interior = int(np.count_nonzero(~fin[idx[0]: idx[-1] + 1])) if idx.size else 0
+    z = full[fin]
+    m = int(z.size)
+    nan = {"t_stat": math.nan, "p_value": math.nan, "interior_gap_count": interior}
+    if maxlags is not None:
+        o = _hac_on_series(z, horizon, maxlags)
+        lag = int(maxlags)
+        status = ("insufficient_sample" if (m < 2 or lag >= m - 1 or m < max(8, 2 * lag))
+                  else ("ok" if math.isfinite(o["p_value"]) else "degenerate"))
+        return {**o, "ewc_dof": None, "inference_status": status, "hac_method": "newey_west_fixed",
+                "interior_gap_count": interior}
+    nu = O._ref_ewc_dof(m) if m >= 1 else 0
+    base = {"ewc_dof": int(nu), "hac_method": "ewc_llsw2018"}
+    if nu < 1:
+        return {**nan, **base, "inference_status": "insufficient_sample"}
+    if np.ptp(z) == 0:
+        return {**nan, **base, "inference_status": "degenerate"}
+    tt = np.arange(1, m + 1, dtype=float)
+    basis = np.sqrt(2.0 / m) * np.cos(np.pi * np.arange(1, nu + 1, dtype=float)[:, None] * (tt[None, :] - 0.5) / m)
+    omega = float(np.mean((basis @ (z - z.mean())) ** 2))
+    if not math.isfinite(omega) or omega <= 0:
+        return {**nan, **base, "inference_status": "degenerate"}
+    tval = float(np.mean(z)) / math.sqrt(omega / m)
+    return {"t_stat": tval, "p_value": float(2.0 * stats.t.sf(abs(tval), df=nu)), **base, "inference_status": "ok",
+            "interior_gap_count": interior}
+
+
+def _xsec_warning_oracle(z: Any, o: Mapping[str, Any], alpha: float) -> tuple:
+    """跨標的資料不足警示之期望值（SPEC ㊺ A）：只於 EWC 且 ok 時判定；ρ̂＝`ls_ar1_oracle`（測試自寫）；不可估 ⇒
+    persistence_not_estimable；否則以實際 m、h＝1、受檢序列生成器（`series`）、α 呼叫 `small_sample_warning`。"""
+    import numpy as np
+
+    from momentum.Analysis.hac_ewc import small_sample_warning
+
+    if o.get("hac_method") != "ewc_llsw2018" or o.get("inference_status") != "ok":
+        return None, None
+    rho = ls_ar1_oracle(z)
+    if not math.isfinite(rho):
+        return "persistence_not_estimable", None
+    detail = small_sample_warning(int(np.asarray(z).size), 1, "series", float(alpha), rho)
+    return ("small_effective_sample" if detail is not None else None), detail
+
+
 def _fdr(pvals: Mapping[str, Optional[float]]) -> Dict[str, float]:
     """FDR（statsmodels multipletests fdr_bh）於有限 p 值之同一檢定集合；非有限 ⇒ 不入。"""
     import math
@@ -1803,6 +1859,37 @@ def deep_fields() -> Dict[str, Dict[str, str]]:
     return out
 
 
+def _ref_ic_support(cache: Mapping[str, Any], ric: Mapping[str, Any], sel: Sequence[str], horizon: int,
+                    stride: int) -> Any:
+    """趨勢 IC 維之來源支撐 oracle（SPEC ㊺ B(1)）：不讀產品位置快取，由「切分允許列（train∪test；無切分 ⇒ 全部）上之標籤
+    有限列」與「整窗落於測試段」直接導出——IC 維所用窗鍵＝首個選取特徵之最長序列鍵（同產品 `_extract_rolling_ic_series`），
+    第 k 窗〔axis[e−W], axis[e−1]＋h−1〕；窗數須等於該鍵序列長，否則回 None 並由比對端顯示差異。"""
+    import numpy as np
+
+    name = next((n for n in sel if isinstance(ric.get(n), dict) and ric.get(n)), None)
+    if name is None:
+        return None
+    windows = ric[name]
+    key = max(windows, key=lambda k: len(windows.get(k) or []))
+    m = re.fullmatch(r"window_(\d+)", str(key))
+    if not m:
+        return None
+    w = int(m.group(1))
+    feats = cache["features_df"]
+    sc = cache.get("split_context")
+    n = len(feats)
+    train = np.asarray(sc["train_mask"], dtype=bool) if sc else np.zeros(n, dtype=bool)
+    test = np.asarray(sc["test_mask"], dtype=bool) if sc else np.ones(n, dtype=bool)
+    allowed = train | test
+    lab = cache["label_series"].reindex(feats.index).to_numpy(dtype=float)[allowed]
+    axis = np.flatnonzero(np.isfinite(lab))
+    in_test = test[allowed][axis]
+    keep = [e for e in range(w, axis.size + 1, max(1, int(stride))) if in_test[e - 1] and in_test[e - w]]
+    if len(keep) != len(windows[key]):
+        return None
+    return (np.asarray([axis[e - w] for e in keep]), np.asarray([axis[e - 1] for e in keep]) + max(int(horizon), 1) - 1)
+
+
 def evaluate_deep(cap: Mapping[str, Any], items: Dict[str, Tally]) -> Dict[str, Any]:
     """深度十模組（全部模組開，含預設關閉者）之 oracle 對照：各模組以其深度測試檔之 `compare_*`（oracle＝scipy／statsmodels／
     numpy.linalg 或測試自寫逐根 PIT 參考實作，不呼叫被測碼）於產品同一組輸入（`_ic_cache`、selected、有效設定、同請求來源
@@ -1848,12 +1935,14 @@ def evaluate_deep(cap: Mapping[str, Any], items: Dict[str, Tally]) -> Dict[str, 
 
     run("factor_returns", lambda p: FR.compare_factor_return(p, F, y, horizon=h, top_n=len(sel), config=dc["factor_return"]))
     run("long_short_analysis", lambda p: FR.compare_long_short(p, F, y, top_n=len(sel), config=dc["long_short_analysis"]))
+    ic_sup = _ref_ic_support(cache, ric, sel, h, stride)
     run("factor_centrality", lambda p: CT.compare_factor_centrality(p, ric, sel, dc["factor_centrality"],
-                                                                    trend_config=dc["trend_analysis"]))
+                                                                    trend_config=dc["trend_analysis"],
+                                                                    ic_support=ic_sup))
     run("trend_analysis", lambda p: CT.compare_trend_analysis(
         p, ric, sel, dc["trend_analysis"], rolling_stride=stride, overlap_window="from_key",
-        sources=CT._ref_trend_sources(raw, ric, sel, cap["deep_config_obj"], h),
-        dimensions=list(dc["trend_analysis"]["dimensions"])))
+        sources=CT._ref_trend_sources(raw, ric, sel, cap["deep_config_obj"], h, ic_support=ic_sup),
+        dimensions=list(dc["trend_analysis"]["dimensions"]), ic_support=ic_sup))
     run("parameter_sensitivity", lambda p: SO.compare_parameter_sensitivity(
         p, F, y, metadata=meta, config={**dc["parameter_sensitivity"], "icir_window": int(icir_w)}, method=method,
         direction=dirs))
@@ -1885,6 +1974,10 @@ def evaluate_deep(cap: Mapping[str, Any], items: Dict[str, Tally]) -> Dict[str, 
     return status
 
 
+#: ICPERF ㊺ B：趨勢資料不足警示 null 分支之明列證明（iid 不警示、3 點不可辨識、記憶體不足未執行）
+TREND_WARNING_NULL_PROOF = ("tests/momentum/Analysis/test_icperf_trend_inference.py::"
+                            "test_trend_data_warning_cases_and_closed_keys")
+
 #: SPEC v5.38 ③：深度名單類欄位 → 其非空分支之明列邊界觸發測試（`test_icperf_correctness.py` 內實存）
 DEEP_LIST_NA_PROOFS: Dict[str, str] = {
     "/results/factor_centrality/crowded_features": "test_deep_factor_centrality_oracle_suite",
@@ -1896,6 +1989,10 @@ DEEP_LIST_NA_PROOFS: Dict[str, str] = {
     **{f"/results/parameter_sensitivity/{k}": "test_deep_parameter_sensitivity_risk_lists_boundaries"
        for k in ("high_risk_families", "robust_families")},
     "/results/feature_quality_diagnostics/quality_flags/low_coverage": "test_deep_fq_low_coverage_flag_boundaries",
+    # ICPERF ㊺ B：趨勢四維之資料不足警示未觸發（null）分支——四維呼叫同一 trend_data_warning；觸發分支於真實資料
+    # ic／centrality 維 verified，null／不可辨識／未執行分支以明列邊界輸入另證（同 ㊹ WARNING_NULL_DETAIL_PROOF）
+    **{f"/results/trend_analysis/*/{d}_trend/{k}": TREND_WARNING_NULL_PROOF
+       for d in ("ic", "centrality", "factor_return", "ls_spread") for k in ("data_warning", "data_warning_detail")},
 }
 
 
@@ -2065,15 +2162,25 @@ def evaluate_cross(cap: Mapping[str, Any], key_of: "KeyOf", items: Dict[str, Tal
     t_q = items.setdefault("fdr", Tally("statsmodels multipletests fdr_bh（同檢定集合）"))
     t_d = items.setdefault("direction", Tally("direction＝sign(ic_mean)、icir_aligned＝d·icir、方向對齊勝率與單調性"))
     t_ac = items.setdefault("ic_autocorr", Tally(IC_AUTOCORR_ORACLE))
+    t_xw = items.setdefault("hac_data_warning", Tally(
+        "資料不足警示：測試自寫含截距 AR(1) LS ρ̂ 重算 hac_ewc.small_sample_warning（驗接線；判準本身由 ㊹ 具名測試驗）"))
+    alpha_x = float(cfg["thresholds"]["p_value_max"])  # 產品 `_xsec_data_warning` 之 α；缺 ⇒ KeyError（不以預設代替）
     pv: Dict[str, float] = {}
     directions: Dict[str, int] = {}
     for f, values in exp["series"].items():
         z = np.asarray(values, dtype=float)
         z = z[np.isfinite(z)]
-        o = _hac_on_series(z, h, maxlags)
+        # ICPERF ㊺ A：逐期序列（保留原時點）之等距模型＋EWC（明示 maxlags 走固定頻寬 NW）
+        o = _xsec_ewc_oracle(np.asarray(full_series[f], dtype=float), h, maxlags)
         row = rows.get(f) or {}
         t_h.num("/summary_table/#/t_stat", f"xsec/{f}/t_stat", row.get("t_stat"), o["t_stat"], feature=f)
         t_h.num("/summary_table/#/p_value", f"xsec/{f}/p_value", row.get("p_value"), o["p_value"], feature=f)
+        for k in ("ewc_dof", "inference_status", "hac_method", "interior_gap_count"):
+            t_h.eq(f"/summary_table/#/{k}", f"xsec/{f}/{k}", row.get(k), o[k], f)
+        exp_w, exp_d = _xsec_warning_oracle(z, o, alpha_x)
+        t_xw.eq("/summary_table/#/data_warning", f"xsec/{f}/data_warning", row.get("data_warning"), exp_w, f)
+        t_xw.eq("/summary_table/#/data_warning_detail", f"xsec/{f}/data_warning_detail",
+                row.get("data_warning_detail"), exp_d, f)
         pv[f] = o["p_value"]
         s = exp["summary"][f]
         d = 0 if not math.isfinite(s["ic_mean"]) or s["ic_mean"] == 0 else (1 if s["ic_mean"] > 0 else -1)
@@ -2146,7 +2253,7 @@ COVERAGE_RULES: List[tuple] = [
     (r"^/summary_table/#/ic_mean$", "ic_mean_source", f"{_ORC}:5303"),
     (r"^/summary_table/#/(direction|icir_aligned|ic_hit_rate_aligned|monotonicity_score_aligned)$", "direction",
      f"{_ORC}:1177"),
-    (r"^/summary_table/#/(t_stat|p_value|ewc_dof|inference_status)$", "hac",
+    (r"^/summary_table/#/(t_stat|p_value|ewc_dof|inference_status|hac_method|interior_gap_count)$", "hac",
      "momentum/Analysis/statistical_validator.py:111"),
     (r"^/summary_table/#/(data_warning|data_warning_detail)(/|$)", "hac_data_warning",
      "momentum/Analysis/statistical_validator.py:215"),

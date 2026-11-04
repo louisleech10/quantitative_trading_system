@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import statsmodels.api as sm
+from scipy import stats
 
 from momentum.Analysis.ic_config_schema import load_ic_config
 from momentum.Analysis.ic_filter_orchestrator import (
@@ -110,16 +111,23 @@ def test_t31a_xsec_p_not_none_matches_kernel_and_separates_iid() -> None:
     direct = _compute_hac_on_ic_series(values, horizon=1)
     assert np.isclose(float(row["p_value"]), float(direct["p_value"]), atol=0.0, rtol=0.0)
     assert np.isclose(float(row["t_stat"]), float(direct["t_stat"]), atol=0.0, rtol=0.0)
-    assert int(direct["maxlags"]) == int(report["metadata"]["significance"]["maxlags"]) or (
-        int(direct["maxlags"])
-        <= int(report["metadata"]["significance"]["maxlags"])
-    )
+    # ICPERF ㊺ A：預設 EWC（無頻寬）；檢定法與 ν 揭露
+    assert report["metadata"]["significance"]["hac_method"] == "ewc_llsw2018"
+    assert report["metadata"]["significance"]["maxlags"] is None
+    assert row["hac_method"] == "ewc_llsw2018" and row["inference_status"] == "ok"
 
-    # oracle 對齊
+    # oracle 對齊：論文式餘弦基底直算 EWC（LLSW 2018；ν＝⌊0.4m^(2/3)⌋、t_ν）
     z = values[np.isfinite(values)]
-    se_o, t_o, p_o = _statsmodels_hac_oracle(z, int(direct["maxlags"]))
-    assert np.isclose(float(row["t_stat"]), t_o, rtol=1e-8)
-    assert np.isclose(float(row["p_value"]), p_o, rtol=1e-8)
+    m = z.size
+    nu = int(np.floor(0.4 * m ** (2.0 / 3.0)))
+    tt = np.arange(1, m + 1) - 0.5
+    basis = np.sqrt(2.0 / m) * np.cos(np.pi * np.arange(1, nu + 1)[:, None] * tt[None, :] / m)
+    omega = float(np.sum((basis @ (z - z.mean())) ** 2)) / nu
+    t_o = z.mean() / np.sqrt(omega / m)
+    p_o = 2.0 * stats.t.sf(abs(t_o), nu)
+    assert row["ewc_dof"] == nu
+    assert np.isclose(float(row["t_stat"]), t_o, rtol=1e-10)
+    assert np.isclose(float(row["p_value"]), p_o, rtol=1e-10)
 
     iid_t = _iid_t_stat(values)
     assert np.isfinite(iid_t)
@@ -210,19 +218,11 @@ def test_t31b_labels_path_return_5_maxlags_floor() -> None:
     assert report["metadata"]["horizon_unresolved"] is False
     assert report["metadata"]["label_horizon"] == 5
     assert report["metadata"]["horizon_source_name"] == "return_5"
-    maxlags = report["metadata"]["significance"]["maxlags"]
-    assert maxlags is not None
-    assert int(maxlags) >= 4
-
-    # 與 kernel 直算 floor 一致
-    values = np.asarray(
-        report["rolling_ic_series"]["alpha"]["window_cross_sectional"], dtype=float
-    )
-    z = values[np.isfinite(values)]
-    auto_bw = int(4 * (z.size / 100.0) ** (2.0 / 9.0))
-    expected_L = max(auto_bw, 5 - 1)
-    assert int(maxlags) == expected_L
-    assert expected_L >= 4
+    # ICPERF ㊺ A：預設 EWC 不用頻寬（h 只決定 p 可否算與揭露）；h 可解析 ⇒ p 有限
+    assert report["metadata"]["significance"]["hac_method"] == "ewc_llsw2018"
+    assert report["metadata"]["significance"]["maxlags"] is None
+    alpha_row = next(r for r in report["summary_table"] if r["feature_name"] == "alpha")
+    assert np.isfinite(float(alpha_row["p_value"])) and alpha_row["inference_status"] == "ok"
 
 
 def test_t31b_resolve_on_label_renamed_is_none() -> None:
@@ -259,40 +259,37 @@ def test_t31b_mutation_resolve_after_rename_loses_horizon(monkeypatch: pytest.Mo
             config_override={"ic_train_test_split": False},
         )
 
-    # 正確路徑：以原始欄名 return_5 解析 ⇒ h=5、maxlags=max(auto_bw, 4)
+    # 正確路徑：以原始欄名 return_5 解析 ⇒ h=5、p 有限（ICPERF ㊺ A：EWC 不用頻寬，h 以揭露與可算性鑑別）
     report = _run()
-    values = np.asarray(
-        report["rolling_ic_series"]["alpha"]["window_cross_sectional"], dtype=float
-    )
-    z = values[np.isfinite(values)]
-    auto_bw = int(4 * (z.size / 100.0) ** (2.0 / 9.0))
-    assert auto_bw < 4, "前提不成立：n 使 auto_bw ≥ 4，floor 無鑑別力"
-    correct_maxlags = int(report["metadata"]["significance"]["maxlags"])
     assert report["metadata"]["label_horizon"] == 5
-    assert correct_maxlags >= 4
-    assert correct_maxlags == max(auto_bw, 4)
+    alpha_ok = next(r for r in report["summary_table"] if r["feature_name"] == "alpha")
+    assert np.isfinite(float(alpha_ok["p_value"]))
+    # ㊺ A：metadata 顯著性揭露與縱向 ㊹ 同鍵，且與逐列一致
+    sig = report["metadata"]["significance"]
+    rows = report["summary_table"]
+    dofs = [r["ewc_dof"] for r in rows if r["inference_status"] == "ok"]
+    assert sig["hac_method"] == "ewc_llsw2018" and sig["horizon"] == 5
+    assert sig["ewc_dof_range"] == [min(dofs), max(dofs)]
+    assert sig["n_obs_range"][1] <= n_ts
+    assert sig["data_warning_count"] == sum(r["data_warning"] == "small_effective_sample" for r in rows)
 
     original = orch_mod._resolve_cross_sectional_label_horizon
 
-    # mutant ①：改名後才解析（一律吃 `_label`）⇒ h=None ⇒ p 族全 NaN、floor 斷言轉紅
+    # mutant ①：改名後才解析（一律吃 `_label`）⇒ h=None ⇒ p 族全 NaN、label_horizon 斷言轉紅
     monkeypatch.setattr(
         orch_mod, "_resolve_cross_sectional_label_horizon", lambda _name: original("_label")
     )
     mutant = _run()
     assert mutant["metadata"]["label_horizon"] is None
     assert mutant["metadata"]["horizon_unresolved"] is True
-    mutant_maxlags = mutant["metadata"]["significance"]["maxlags"]
-    with pytest.raises((AssertionError, TypeError, ValueError)):
-        assert mutant_maxlags is not None and int(mutant_maxlags) >= 4
+    alpha_m = next(r for r in mutant["summary_table"] if r["feature_name"] == "alpha")
+    assert alpha_m["p_value"] is None or not np.isfinite(float(alpha_m["p_value"]))
 
-    # mutant ②：h 丟失後退回 1 ⇒ maxlags 退回 auto_bw（< 4）⇒ floor 斷言轉紅
+    # mutant ②：h 丟失後退回 1 ⇒ 揭露之 label_horizon 錯為 1（≠ 5）⇒ 斷言轉紅
     monkeypatch.setattr(orch_mod, "_resolve_cross_sectional_label_horizon", lambda _name: 1)
     mutant_h1 = _run()
-    mutant_h1_maxlags = int(mutant_h1["metadata"]["significance"]["maxlags"])
-    assert mutant_h1_maxlags == auto_bw
-    assert mutant_h1_maxlags < correct_maxlags
     with pytest.raises(AssertionError):
-        assert mutant_h1_maxlags >= 4
+        assert mutant_h1["metadata"]["label_horizon"] == 5
 
 
 def test_t31c_horizon_unresolved_p_all_nan() -> None:
@@ -343,15 +340,9 @@ def test_t31_inframe_return_5_no_labels_path() -> None:
     assert report["metadata"]["horizon_unresolved"] is False
     assert report["metadata"]["label_horizon"] == 5
     assert report["metadata"]["horizon_source_name"] == "return_5"
-    maxlags = report["metadata"]["significance"]["maxlags"]
-    assert maxlags is not None
-    assert int(maxlags) >= 4
-    values = np.asarray(
-        report["rolling_ic_series"]["alpha"]["window_cross_sectional"], dtype=float
-    )
-    z = values[np.isfinite(values)]
-    auto_bw = int(4 * (z.size / 100.0) ** (2.0 / 9.0))
-    assert int(maxlags) == max(auto_bw, 5 - 1)
+    # ICPERF ㊺ A：EWC 揭露、無頻寬
+    assert report["metadata"]["significance"]["hac_method"] == "ewc_llsw2018"
+    assert report["metadata"]["significance"]["maxlags"] is None
     # 有限 p（h 可解析）
     alpha_row = next(r for r in report["summary_table"] if r["feature_name"] == "alpha")
     assert np.isfinite(float(alpha_row["p_value"]))
@@ -382,13 +373,10 @@ def test_t31_inframe_multi_return_n_picks_min_n() -> None:
     assert report["metadata"]["horizon_source_name"] == "return_3"
     assert report["metadata"]["label_horizon"] == 3
     assert report["metadata"]["horizon_unresolved"] is False
-    maxlags = int(report["metadata"]["significance"]["maxlags"])
-    values = np.asarray(
-        report["rolling_ic_series"]["alpha"]["window_cross_sectional"], dtype=float
-    )
-    z = values[np.isfinite(values)]
-    auto_bw = int(4 * (z.size / 100.0) ** (2.0 / 9.0))
-    assert maxlags == max(auto_bw, 3 - 1)
+    # ICPERF ㊺ A：EWC 不用頻寬；h＝3 可解析 ⇒ p 有限
+    assert report["metadata"]["significance"]["hac_method"] == "ewc_llsw2018"
+    alpha_row = next(r for r in report["summary_table"] if r["feature_name"] == "alpha")
+    assert np.isfinite(float(alpha_row["p_value"]))
 
 
 def test_t31_inframe_label_beats_return_n() -> None:

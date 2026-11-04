@@ -845,49 +845,80 @@ def _compute_hac_on_ic_series(
     *,
     maxlags: Optional[int] = None,
 ) -> dict:
-    """對 xsec 逐期 IC 序列做 NW HAC（z=IC 本身；L/cap/p 同 D-A）。
+    """跨標的逐期 IC 序列之均值檢定（ICPERF Task 0.4 ㊺ A，SPEC v5.78）。
+
+    - 非有限值（NaN、±inf）一律視為缺值；開頭暖機＝首個有限值之前、尾段＝末個有限值之後、中間缺值＝兩者之間之非
+      有限值（`interior_gap_count`）。推論採 Rho & Vogelsang (2019) 等距模型：有限值依時間序接續（m＝有限值數）。
+    - 預設：LLSW 2018 EWC（`hac_ewc.ewc_test`，se 因子 1）；`hac_method`＝`ewc_llsw2018`；不可算之封閉狀態
+      `insufficient_sample`（ν<1）／`degenerate`（常數或長期變異數非有限／≤0）⇒ p＝NaN。
+    - 明示 `maxlags`：固定頻寬 Newey–West 手動分支（須 ≥ h−1；`hac_method`＝`newey_west_fixed`，同 ㊹ 字面）。
 
     Returns:
-        t_stat / p_value / se / n_obs / maxlags（fail-closed 時統計量 NaN）
+        t_stat／p_value／se／n_obs／maxlags（EWC 為 None）／ewc_dof／inference_status／hac_method／interior_gap_count
     """
     if horizon is None or int(horizon) < 1:
         raise ValueError(f"horizon must be >= 1, got {horizon}")
     horizon = int(horizon)
-    z = np.asarray(values, dtype=float)
-    z = z[np.isfinite(z)]
+    z_all = np.asarray(values, dtype=float)
+    finite = np.isfinite(z_all)
+    idx = np.flatnonzero(finite)
+    interior = int(np.count_nonzero(~finite[idx[0]: idx[-1] + 1])) if idx.size else 0
+    z = z_all[finite]
     n_valid = int(z.size)
-    if n_valid < 2:
-        return _hac_nan_result(n_obs=n_valid, maxlags=np.nan)
 
-    min_lag_floor = horizon - 1
     if maxlags is not None:
+        min_lag_floor = horizon - 1
         maxlags_int = int(maxlags)
         if maxlags_int < min_lag_floor:
             raise ValueError(
                 f"maxlags={maxlags_int} < horizon-1={min_lag_floor}; "
                 "explicit maxlags must be >= horizon-1"
             )
-        L = maxlags_int
-    else:
-        auto_bw = int(4 * (n_valid / 100.0) ** (2.0 / 9.0))
-        L = max(auto_bw, min_lag_floor)
-    if L >= n_valid - 1 or n_valid < max(8, 2 * L):
-        return _hac_nan_result(n_obs=n_valid, maxlags=L)
+        base = {"ewc_dof": None, "hac_method": "newey_west_fixed", "interior_gap_count": interior}
+        if n_valid < 2 or maxlags_int >= n_valid - 1 or n_valid < max(8, 2 * maxlags_int):
+            return {**_hac_nan_result(n_obs=n_valid, maxlags=maxlags_int), **base,
+                    "inference_status": "insufficient_sample"}
+        se = _newey_west_bartlett_se(z, maxlags_int)
+        if not np.isfinite(se) or se == 0.0:
+            return {**_hac_nan_result(n_obs=n_valid, maxlags=maxlags_int), **base, "inference_status": "degenerate"}
+        t_stat = float(np.mean(z) / se)
+        return {"t_stat": t_stat, "p_value": float(2.0 * scipy_stats.t.sf(abs(t_stat), df=n_valid - 1)),
+                "se": float(se), "n_obs": n_valid, "maxlags": maxlags_int, **base, "inference_status": "ok"}
 
-    se = _newey_west_bartlett_se(z, L)
-    mean_z = float(np.mean(z))
-    if not np.isfinite(se) or se == 0.0:
-        return _hac_nan_result(n_obs=n_valid, maxlags=L)
+    from momentum.Analysis.hac_ewc import ewc_test
 
-    t_stat = float(mean_z / se)
-    p_value = float(2.0 * scipy_stats.t.sf(abs(t_stat), df=n_valid - 1))
+    res = ewc_test(z, se_factor=1.0)
     return {
-        "t_stat": t_stat,
-        "p_value": p_value,
-        "se": float(se),
+        "t_stat": float(res["t_stat"]),
+        "p_value": float(res["p_value"]),
+        "se": float(res["se"]),
         "n_obs": n_valid,
-        "maxlags": int(L),
+        "maxlags": None,
+        "ewc_dof": int(res["ewc_dof"]),
+        "inference_status": str(res["inference_status"]),
+        "hac_method": "ewc_llsw2018",
+        "interior_gap_count": interior,
     }
+
+
+def _xsec_data_warning(full_values: np.ndarray, hac: dict, alpha: float) -> dict:
+    """ICPERF Task 0.4 ㊺ A：跨標的資料不足警示——沿用 ㊹ 判準工具（Andrews 1993 中位數不偏 φ̂、共同隨機數、配對差
+    ＞2 個模擬標準誤、`WARNING_SIM_REPLICATIONS`），虛無生成器＝受檢序列本身（有限 IC 序列 z 之 AR(1)(φ̂)，`hac_ewc`
+    之 `series` 方法），對照 ㊹ 之參考持續性。只於 EWC 路徑 `ok` 時判定；data_warning 封閉值同 ㊹。"""
+    from momentum.Analysis.hac_ewc import ls_ar1_coefficient, small_sample_warning
+
+    if hac.get("hac_method") != "ewc_llsw2018" or hac.get("inference_status") != "ok":
+        return {"data_warning": None, "data_warning_detail": None}
+    z = full_values[np.isfinite(full_values)]
+    rho_hat = ls_ar1_coefficient(z)
+    if not np.isfinite(rho_hat):
+        return {"data_warning": "persistence_not_estimable", "data_warning_detail": None}
+    try:
+        detail = small_sample_warning(int(z.size), 1, "series", alpha, rho_hat)
+    except MemoryError as exc:  # 同 ㊹：可重試，警示未執行，p／q 照常
+        logger.warning("跨標的資料不足警示未執行（記憶體不足，可重跑）：%s", exc)
+        return {"data_warning": "warning_not_evaluated", "data_warning_detail": None}
+    return {"data_warning": "small_effective_sample" if detail is not None else None, "data_warning_detail": detail}
 
 
 def _labels_df_has_symbol_dimension(labels_df: pd.DataFrame) -> bool:
@@ -2533,6 +2564,7 @@ class ICFilterOrchestrator:
 
         summary_table: list[dict[str, Any]] = []
         maxlags_by_feature: dict[str, Any] = {}
+        n_obs_by_feature: dict[str, int] = {}  # ㊺ A：metadata 顯著性揭露之 n 範圍
         for feature_name in feature_cols:
             values = np.array(ic_series.get(feature_name, []), dtype=float)
             if values.size == 0:
@@ -2547,19 +2579,27 @@ class ICFilterOrchestrator:
                 ic_hit_rate = float(np.mean(values > 0))
 
             # D-H：h 可解析→HAC t/p；h=None→p 族全 NaN（禁假 horizon 反保守 p）
+            xsec_inference: dict = {"ewc_dof": None, "inference_status": None, "hac_method": None,
+                                    "interior_gap_count": None, "data_warning": None, "data_warning_detail": None}
             if sig_horizon is None:
                 t_stat = float("nan")
                 p_value = float("nan")
                 maxlags_by_feature[feature_name] = np.nan
             else:
+                # ICPERF Task 0.4 ㊺ A：輸入＝保留原時點之逐期序列（未成立截面為缺值），等距模型＋EWC（或明示 maxlags 之 NW）
+                full_values = np.asarray(ic_series_full.get(feature_name, []), dtype=float)
                 hac = _compute_hac_on_ic_series(
-                    values,
+                    full_values,
                     sig_horizon,
                     maxlags=_config_significance_maxlags(config),
                 )
                 t_stat = float(hac["t_stat"]) if hac.get("t_stat") is not None else float("nan")
                 p_value = float(hac["p_value"]) if hac.get("p_value") is not None else float("nan")
                 maxlags_by_feature[feature_name] = hac.get("maxlags", np.nan)
+                n_obs_by_feature[feature_name] = int(hac["n_obs"])
+                xsec_inference = {k: hac.get(k) for k in ("ewc_dof", "inference_status", "hac_method",
+                                                         "interior_gap_count")}
+                xsec_inference.update(_xsec_data_warning(full_values, hac, float(config.thresholds.p_value_max)))
 
             summary_table.append(
                 {
@@ -2590,6 +2630,8 @@ class ICFilterOrchestrator:
                     ),
                     # ICPERF Task 0.2 v5.58 (w)：逐時點截面 IC 序列（未成立之截面為缺值）之一階自相關
                     **_ic_autocorr_fields(ic_lag1_autocorrelation(ic_series_full[feature_name])),
+                    # ICPERF Task 0.4 ㊺ A：檢定法、ν、封閉狀態、中間缺值數與資料不足警示
+                    **xsec_inference,
                 }
             )
 
@@ -2648,6 +2690,13 @@ class ICFilterOrchestrator:
             if v is not None and np.isfinite(float(v))
         ]
         maxlags_meta: Optional[int] = max(finite_maxlags) if finite_maxlags else None
+        # ㊺ A：顯著性揭露與縱向 ㊹ 同鍵（前端「本次設定」行之 h、n、ν、警示欄數）
+        xsec_n_vals = list(n_obs_by_feature.values())
+        xsec_dof_vals = [int(r["ewc_dof"]) for r in summary_table
+                         if r.get("inference_status") == "ok" and r.get("ewc_dof") is not None]
+
+        def _xsec_warn_count(value: str) -> int:
+            return int(sum(1 for r in summary_table if r.get("data_warning") == value))
 
         metadata: dict[str, Any] = {
             "mode": "cross_sectional",
@@ -2669,6 +2718,15 @@ class ICFilterOrchestrator:
                     "alpha_effective": float(alpha_for_fdr),
                 },
                 "maxlags": maxlags_meta,
+                # ICPERF Task 0.4 ㊺ A：檢定法揭露（明示 maxlags ⇒ 固定頻寬 NW；否則 LLSW 2018 EWC）
+                "hac_method": ("newey_west_fixed" if _config_significance_maxlags(config) is not None
+                               else "ewc_llsw2018"),
+                "horizon": sig_horizon,
+                "n_obs_range": [min(xsec_n_vals), max(xsec_n_vals)] if xsec_n_vals else None,
+                "ewc_dof_range": [min(xsec_dof_vals), max(xsec_dof_vals)] if xsec_dof_vals else None,
+                "data_warning_count": _xsec_warn_count("small_effective_sample"),
+                "persistence_not_estimable_count": _xsec_warn_count("persistence_not_estimable"),
+                "warning_not_evaluated_count": _xsec_warn_count("warning_not_evaluated"),
                 "n_tests": int(n_tests),
                 "tested_estimator": TESTED_ESTIMATOR_XSEC_BY_METHOD[xsec_method],
                 "fdr_assumption_note": FDR_ASSUMPTION_NOTE,
@@ -3671,10 +3729,12 @@ class ICFilterOrchestrator:
         if isinstance(centrality, SkippedResult):
             raise InsufficientDataError(centrality.reason)
         rolling = analyzer.compute_rolling_centrality(matrix)
-        # ICPERF Task 0.4 ㉔：逐特徵 trend 由同請求之滾動中心性以 trend 模組同一檢定判定（頻寬下限＝滾動中心性窗長）
+        # ICPERF Task 0.4 ㉔：逐特徵 trend 由同請求之滾動中心性以 trend 模組同一檢定判定；㊺ B(1)：支撐同趨勢 centrality 維
+        window = analyzer.effective_rolling_window(len(matrix))
         centrality = analyzer.attach_feature_trends(
-            centrality, rolling, window=analyzer.effective_rolling_window(len(matrix)),
+            centrality, rolling, window=window,
             trend_config=config.trend_analysis.model_dump(),
+            support=self._centrality_support(self._ic_trend_support(rolling_ic, selected_features, config), window),
         )
         regimes = {
             name: analyzer.detect_crowding_regime(rolling, name)
@@ -3699,20 +3759,25 @@ class ICFilterOrchestrator:
             raise InsufficientDataError("rolling_ic matrix unavailable")
 
         analyzer = TrendAnalyzer(config.trend_analysis.model_dump())
+        # ICPERF Task 0.4 ㊺ B(1)：IC 維來源支撐〔窗首列, 窗末列＋h−1〕；centrality 維由其二層窗推得
+        ic_support = self._ic_trend_support(rolling_ic, selected_features, config)
         # ICPERF Task 0.4 ㉕：依設定 dimensions 逐維餵入同請求來源模組已算之逐時點序列（不另算）
         dimension_inputs = self._trend_dimension_inputs(
             getattr(self, "_deep_run_report", None), config, len(matrix), self._deep_horizon(config),
+            ic_support=ic_support,
         )
-        # ICPERF Task 0.4 ⑱ CT-1：重疊窗之 HAC 頻寬下限＝所用窗長／步長（窗長取 `_extract_rolling_ic_series` 所選之窗鍵）
+        # 無來源支撐（無位置快取）時由 overlap_window（所用窗長／步長）推支撐
         return analyzer.batch_analyze(
             matrix, top_n=len(selected_features),
             overlap_window=self._rolling_overlap_window(rolling_ic, selected_features, config),
+            ic_support=ic_support,
             dimensions=list(config.trend_analysis.dimensions),
             dimension_inputs=dimension_inputs,
         )
 
     @staticmethod
-    def _trend_dimension_inputs(report: Any, config: ICConfig, n_rows: int, horizon: int) -> dict:
+    def _trend_dimension_inputs(report: Any, config: ICConfig, n_rows: int, horizon: int,
+                                ic_support: Optional[tuple] = None) -> dict:
         """ICPERF Task 0.4 ㉕：趨勢 centrality／factor_return／ls_spread 三維之來源（同請求深度報告 `report` 之已算結果）。
 
         來源模組狀態取 `report.module_summary`：completed／completed_partial ⇒ 用其結果；skipped／unavailable ⇒
@@ -3749,7 +3814,8 @@ class ICFilterOrchestrator:
         if state is None:
             window = FactorCentralityAnalyzer(config.factor_centrality.model_dump()).effective_rolling_window(n_rows)
             inputs["centrality"] = TrendDimensionInput(
-                series=_series_map(results["factor_centrality"].get("rolling_centrality")), overlap_window=window)
+                series=_series_map(results["factor_centrality"].get("rolling_centrality")), overlap_window=window,
+                support=ICFilterOrchestrator._centrality_support(ic_support, window))
         else:
             inputs["centrality"] = TrendDimensionInput(status=state)
 
@@ -3759,8 +3825,11 @@ class ICFilterOrchestrator:
             state = DIMENSION_SOURCE_SKIPPED
         if state is None:
             features = (fr.get("value") or {}).get("features") or {}
+            # ㊺ B(1)：格點 j 位於首個有效根起第 j·h 根 ⇒ 支撐〔j·h, j·h＋h−1〕（原點＝首個有效根；檢定量對 x 平移不變）
+            h_fr = max(1, int(horizon))
             inputs["factor_return"] = TrendDimensionInput(
-                series=_series_map({n: v.get("ls_return_series") for n, v in features.items() if isinstance(v, dict)}))
+                series=_series_map({n: v.get("ls_return_series") for n, v in features.items() if isinstance(v, dict)}),
+                overlap_window=h_fr, position_scale=h_fr)
         else:
             inputs["factor_return"] = TrendDimensionInput(status=state)
 
@@ -3770,10 +3839,70 @@ class ICFilterOrchestrator:
             inputs["ls_spread"] = TrendDimensionInput(
                 series=_series_map({n: v.get("ls_spread_series") for n, v in per_feature.items()
                                     if isinstance(v, dict) and not v.get("skipped")}),
-                overlap_window=max(1, int(horizon)))
+                # ㊺ B(7)：非持倉點（NaN）不入設計 ⇒ 不重疊選取只在持倉點上進行
+                overlap_window=max(1, int(horizon)), select_finite_only=True)
         else:
             inputs["ls_spread"] = TrendDimensionInput(status=state)
         return inputs
+
+    @staticmethod
+    def _centrality_support(ic_support: Optional[tuple], window: int) -> Optional[tuple[np.ndarray, np.ndarray]]:
+        """ICPERF Task 0.4 ㊺ B(1)：滾動中心性第 j 值涵蓋滾動 IC 列 j..j+W−1 ⇒ 支撐〔IC 列 j 之起, IC 列 j+W−1 之迄〕
+        （IC 迄已含 h−1）；無 IC 支撐或列數 < W ⇒ None（由 overlap_window 推）。趨勢 centrality 維與 ㉔ 共用。"""
+        if ic_support is None or len(ic_support[0]) < int(window):
+            return None
+        return (np.asarray(ic_support[0])[: len(ic_support[0]) - int(window) + 1],
+                np.asarray(ic_support[1])[int(window) - 1:])
+
+    def _rolling_window_positions_test(
+        self,
+        features_df: pd.DataFrame,
+        label_series: pd.Series,
+        windows: list[int],
+        stride: int,
+        test_mask: Optional[np.ndarray],
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+        """ICPERF Task 0.4 ㊺ B(1)：各（換算後）滾動窗之首末列原列位置（`features_df` 列序）；有 `test_mask` 時依
+        `_slice_rolling_ic_to_test` 同一規則只留窗首、窗尾皆在測試段之窗，與切段後之滾動 IC 序列逐位置對齊。"""
+        label_values = label_series.reindex(features_df.index)
+        adjusted = list(self._ic_engine._adjust_rolling_windows(windows))
+        icir_window = self._ic_engine._adjusted_icir_window()
+        if icir_window not in adjusted:
+            adjusted.append(icir_window)
+        positions = ICEngine.rolling_window_positions(label_values, adjusted, stride)
+        out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+        axis_rows = np.isfinite(label_values.to_numpy(dtype=float))
+        in_test = np.asarray(test_mask, dtype=bool)[axis_rows] if test_mask is not None else None
+        for window in adjusted:
+            key = f"window_{window}"
+            start, end = positions[key]["start"], positions[key]["end"]
+            if in_test is not None:
+                ends = np.arange(window, int(axis_rows.sum()) + 1, max(1, int(stride)))
+                keep = np.asarray([i for i, e in enumerate(ends) if in_test[e - 1] and in_test[e - window]],
+                                  dtype=np.int64)
+                start, end = start[keep], end[keep]
+            out[key] = (start, end)
+        return out
+
+    def _ic_trend_support(self, rolling_ic: dict, selected_features: list[str],
+                          config: ICConfig) -> Optional[tuple[np.ndarray, np.ndarray]]:
+        """ICPERF Task 0.4 ㊺ B(1)：IC 維之來源支撐——`_extract_rolling_ic_series` 所選窗鍵（最長序列者）之各值
+        〔窗首列, 窗末列＋h−1〕（h＝標籤 horizon）；位置數須與該窗鍵序列長度相同，否則 fail-closed。"""
+        positions = (self._ic_cache or {}).get("rolling_ic_positions") or {}
+        for name in selected_features:
+            windows = rolling_ic.get(name)
+            if not isinstance(windows, dict) or not windows:
+                continue
+            best_key = max(windows, key=lambda k: len(windows.get(k, [])) if isinstance(windows.get(k, []), list) else 0)
+            if best_key not in positions:
+                return None
+            start, end = positions[best_key]
+            n_vals = len(windows.get(best_key, []))
+            if start.size != n_vals:
+                raise ValueError(f"rolling IC positions ({start.size}) != series length ({n_vals}) for {best_key}")
+            h = int(self._deep_horizon(config))
+            return start, end + max(h, 1) - 1
+        return None
 
     def _rolling_overlap_window(self, rolling_ic: dict, selected_features: list[str], config: ICConfig) -> Optional[int]:
         """`_extract_rolling_ic_series` 所選窗鍵（最長序列者）之窗長除以步長（向上取整）；無可解析之窗鍵 ⇒ None。"""
@@ -5102,6 +5231,11 @@ class ICFilterOrchestrator:
             if split_context is not None
             else rolling_ic_full
         )
+        # ICPERF Task 0.4 ㊺ B(1)：各滾動窗首末列之原列位置（同軸、同窗終點、同測試段切法），供趨勢推論之來源支撐
+        rolling_ic_positions = self._rolling_window_positions_test(
+            rolling_features, rolling_label, rolling_windows, rolling_stride,
+            rolling_test_mask if split_context is not None else None,
+        )
         self._stage4_checkpoint("icir_autocorr", 3)
         icir = self._ic_engine.compute_icir(rolling_ic)
         ic_autocorr = self._ic_autocorr_by_feature(rolling_ic)
@@ -5170,6 +5304,7 @@ class ICFilterOrchestrator:
             "label_series": label_series,
             "ic_values": ic_values,
             "rolling_ic": rolling_ic,
+            "rolling_ic_positions": rolling_ic_positions,
             "icir": icir,
             "ic_autocorr": ic_autocorr,
             "ic_decay": ic_decay,
@@ -5734,6 +5869,8 @@ class ICFilterOrchestrator:
             # ICPERF Task 0.2 v5.58 (w)：refilter 重建 summary 時 ic_autocorr 與首跑同一來源
             "ic_autocorr": ic_results.get("ic_autocorr", {}),
             "rolling_ic": ic_results.get("rolling_ic", {}),
+            # ICPERF Task 0.4 ㊺ B(1)：各滾動窗首末列原列位置（趨勢 IC／中心性維之來源支撐；`_ic_trend_support` 讀此鍵）
+            "rolling_ic_positions": ic_results.get("rolling_ic_positions", {}),
             "ic_decay": ic_results.get("ic_decay", {}),
             "grouped_ic": ic_results.get("grouped_ic", {}),
             # ICPERF Task 0.4 ㉓：refilter 重建 summary 時 regime_robust 與首跑同一來源

@@ -328,6 +328,9 @@ def _simulate_chunk(node: int, horizon: int, method: str, point: SimPoint, seed:
         z = _ar1_rows(e, REFERENCE_RHO)  # 參照：同一特徵創新建 z 之 AR(1) ρ＝0.7
         return _ewc_pvalues_rows(z, 1.0)
     x = _ar1_rows(e, float(point))
+    if method == "series":
+        # ICPERF ㊺ A：受檢序列本身（逐期截面 IC 序列 z）之 AR(1)(φ)，直接跑 EWC 均值檢定（LLSW 2018 校準 ν 之 DGP）
+        return _ewc_pvalues_rows(x, 1.0)
     ret = _return_innovations(seed, r0, r1, node + horizon)
     cs = np.concatenate([np.zeros((rows, 1)), np.cumsum(ret, axis=1)], axis=1)
     y = cs[:, 1 + horizon : node + 1 + horizon] - cs[:, 1 : node + 1]  # y_t＝Σ_{s=t+1}^{t+h} r_s
