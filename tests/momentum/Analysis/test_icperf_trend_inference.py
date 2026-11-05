@@ -386,3 +386,143 @@ def test_design_cache_bounded_lru(monkeypatch: pytest.MonkeyPatch) -> None:
     lam, mu = ti.design_spectrum_cached(designs[0])  # 重算
     assert lam == first[0] and np.array_equal(mu, first[1])
     assert len(ti._DESIGN_CACHE) == 3
+
+
+# ── SPEC ㊺ v5.80 Imhof 提速（諮詢 r111）：向量化 G7K15 之回歸、失敗偵測與獨立 oracle ──────────────────────
+
+
+def _ref_imhof_quad_prev(lam_pos: float, lam_neg: np.ndarray) -> tuple[float, float]:
+    """改前產品演算法（逐段 scipy quad，400 段對數空間、epsabs=1e-16、epsrel=1e-12）之逐字移植——**同族回歸**用，
+    不作「現行值正確」之獨立證明（SPEC ㊺ v5.80 提速驗收 (1)）。"""
+    from scipy import integrate
+
+    nu = np.asarray(lam_neg, dtype=float)
+    lam = np.r_[1.0, -nu / lam_pos]
+    n = lam.size
+    log_u = (np.log(2.0 / (np.pi * n)) - 0.5 * float(np.sum(np.log(np.abs(lam)))) - np.log(1e-14)) / (n / 2.0)
+    v_min = -40.0 - float(np.log(np.sum(np.abs(lam))))
+    v_max = max(max(float(log_u), 5.0), v_min + 1.0)
+
+    def h(v: float) -> float:
+        u = np.exp(v)
+        return float(np.sin(0.5 * float(np.sum(np.arctan(lam * u))))
+                     * np.exp(-0.25 * float(np.sum(np.log1p((lam * u) ** 2)))))
+
+    edges = np.linspace(v_min, v_max, 401)
+    total = err = 0.0
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        val, e = integrate.quad(h, lo, hi, limit=200, epsabs=1e-16, epsrel=1e-12)
+        total += val
+        err += abs(e)
+    head = 0.5 * float(np.sum(lam)) * float(np.exp(v_min))
+    return 0.5 + (total + head) / np.pi, (err + abs(head)) / np.pi + 1e-14
+
+
+def _extreme_designs() -> list:
+    rng = np.random.default_rng(20261105)
+    near_collinear = np.r_[np.arange(30, dtype=float), 30.0 + 1e-6 * np.abs(rng.standard_normal(10)).cumsum()]
+    base = np.arange(0, 60, 2, dtype=float)
+    near_dup = np.sort(np.r_[base, base + 1e-7])
+    return [("m15", _design(15, seed=7)), ("m400", _design(400, seed=8)),
+            ("m1000", np.sort(rng.choice(np.arange(3000), size=1000, replace=False)).astype(float)),
+            ("near_collinear", near_collinear), ("near_duplicate", near_dup)]
+
+
+@pytest.mark.parametrize("name,x", _extreme_designs())
+def test_imhof_g7k15_matches_previous_quad_within_eps(name: str, x: np.ndarray) -> None:
+    """SPEC ㊺ v5.80 提速驗收 (3)：m＝15／400／1000、近共線、近重複譜於多個 t（含 p≈1e−12 之大 t）——新 p̂ 與改前
+    逐段 quad 之差 ≤ 改前 ε，且新 ε 有限、p̂ 在 [−ε, 1＋ε]。mutation：G7K15 任一 Kronrod 權重改動 ⇒ 差逾 ε 而紅。"""
+    lam_pos, mu = ti.design_spectrum(x)
+    lo_t, hi_t = 1.0, 1e8  # 搜 t 使 p≈1e−12（於 ln t 二分）
+    for _ in range(60):
+        mid = float(np.sqrt(lo_t * hi_t))
+        if ti.imhof_upper_tail(lam_pos, mid * mid * mu)[0] > 1e-12:
+            lo_t = mid
+        else:
+            hi_t = mid
+    for t in (0.3, 1.0, 2.0, 3.5, 8.0, lo_t):
+        p_new, e_new = ti.imhof_upper_tail(lam_pos, t * t * mu)
+        p_old, e_old = _ref_imhof_quad_prev(lam_pos, t * t * mu)
+        assert np.isfinite(p_new) and np.isfinite(e_new), (name, t)
+        assert abs(p_new - p_old) <= e_old, (name, t, p_new, p_old, e_old)
+        assert -e_new <= p_new <= 1.0 + e_new, (name, t)
+
+
+@pytest.mark.parametrize("t", [0.5, 2.0, 30.0, 1e3, 1e6])
+def test_imhof_g7k15_f11_closed_form_extreme_scale(t: float) -> None:
+    """獨立 oracle：單負根 ⇒ P(χ²₁ ≥ t²·χ²₁)＝F(1,1).sf(t²)（`scipy.stats.f`），t 跨 6 個數量級。"""
+    p, eps = ti.imhof_upper_tail(1.0, np.array([t * t]))
+    closed = float(stats.f.sf(t * t, 1, 1))
+    assert abs(p - closed) <= max(eps, 1e-15), (t, p, closed, eps)
+
+
+def test_slope_pvalue_batch_equals_individual_calls() -> None:
+    """p̂ 與奇異值擾動上下界同批求積、各自保留結果：與逐一呼叫 `imhof_upper_tail` 逐位元相同。"""
+    x = _design(60, seed=11)
+    lam_pos, mu = ti.design_spectrum(x)
+    rows = [4.0 * mu, 4.0 * mu * (1 + 1e-13) ** 2, 4.0 * mu * (1 - 1e-13) ** 2]
+    assert ti.imhof_upper_tail_batch(lam_pos, rows) == [ti.imhof_upper_tail(lam_pos, r) for r in rows]
+
+
+def test_imhof_nonconvergence_returns_nan_and_unreliable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """失敗偵測（r111 CODEX-P1-01）：容差不可達且層數上限 0 ⇒ 未收斂回 (nan, nan)；`slope_pvalue` 判不可靠；
+    `critical_t2` 回 NaN（不得以未收斂結果出值）。mutation：耗盡時改回部分和 ⇒ 紅。"""
+    monkeypatch.setattr(ti, "_QUAD_EPSABS", 0.0)
+    monkeypatch.setattr(ti, "_QUAD_EPSREL", 0.0)
+    monkeypatch.setattr(ti, "_QUAD_MAX_DEPTH", 0)
+    x = _design(30, seed=12)
+    lam_pos, mu = ti.design_spectrum(x)
+    p, e = ti.imhof_upper_tail(lam_pos, 4.0 * mu)
+    assert np.isnan(p) and np.isnan(e)
+    ti._DESIGN_CACHE.clear()
+    assert not ti.slope_pvalue(x, 2.0).reliable
+    assert np.isnan(ti.critical_t2(x, 0.05))
+
+
+def test_imhof_piece_limit_returns_nan(monkeypatch: pytest.MonkeyPatch) -> None:
+    """每原段片數上限（同改前 quad limit）：容差不可達時逾限即回 (nan, nan)，不讓片數指數成長。"""
+    monkeypatch.setattr(ti, "_QUAD_EPSABS", 0.0)
+    monkeypatch.setattr(ti, "_QUAD_EPSREL", 0.0)
+    monkeypatch.setattr(ti, "_QUAD_LIMIT", 4)
+    x = _design(30, seed=15)
+    lam_pos, mu = ti.design_spectrum(x)
+    p, e = ti.imhof_upper_tail(lam_pos, 4.0 * mu)
+    assert np.isnan(p) and np.isnan(e)
+
+
+def test_imhof_float_stagnation_returns_nan(monkeypatch: pytest.MonkeyPatch) -> None:
+    """浮點停滯：片寬已低於浮點可分（區間寬 1e−13、400 段）且容差不可達 ⇒ 回 (nan, nan)，不無限細分。"""
+    monkeypatch.setattr(ti, "_QUAD_EPSABS", 0.0)
+    monkeypatch.setattr(ti, "_QUAD_EPSREL", 0.0)
+    lam = np.r_[1.0, -0.5]
+    assert all(np.isnan(v) for v in ti._imhof_one(lam, 1.0, 1.0 + 1e-13))
+
+
+def test_critical_t2_propagates_imhof_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Imhof 回非有限 ⇒ `critical_t2` 回 NaN、`slope_pvalue` 判不可靠（既有 nan 傳播，SPEC ㊺ v5.80）。"""
+    monkeypatch.setattr(ti, "imhof_upper_tail", lambda lam_pos, lam_neg: (float("nan"), float("nan")))
+    x = _design(25, seed=13)
+    ti._DESIGN_CACHE.clear()
+    assert np.isnan(ti.critical_t2(x, 0.05))
+    assert not ti.slope_pvalue(x, 2.0).reliable
+
+
+def test_imhof_matches_mpmath_high_precision_optional() -> None:
+    """選配高精度 oracle（SPEC ㊺ v5.80 (1)；不新增必裝依賴、缺套件不擋）：mpmath tanh-sinh 於 u∈[0,∞) 直接積分
+    Imhof 式（不同積分變數與策略、50 位十進位），與產品 p̂ 差 ≤ 產品 ε。"""
+    mpmath = pytest.importorskip("mpmath")
+    mpmath.mp.dps = 50
+    for m, t in ((15, 2.0), (60, 3.0), (200, 1.5)):
+        x = _design(m, seed=14)
+        lam_pos, mu = ti.design_spectrum(x)
+        nu = (t * t) * mu
+        lam = [mpmath.mpf(1)] + [mpmath.mpf(-float(v) / lam_pos) for v in nu]
+
+        def f(u):
+            th = sum(mpmath.atan(lj * u) for lj in lam) / 2
+            rho = mpmath.exp(sum(mpmath.log(1 + (lj * u) ** 2) for lj in lam) / 4)
+            return mpmath.sin(th) / (u * rho)
+
+        ref = float(mpmath.mpf(1) / 2 + mpmath.quad(f, [0, 1, 10, 100, mpmath.inf]) / mpmath.pi)
+        p, eps = ti.imhof_upper_tail(lam_pos, nu)
+        assert abs(p - ref) <= eps, (m, t, p, ref, eps)

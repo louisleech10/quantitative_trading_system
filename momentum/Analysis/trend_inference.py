@@ -23,7 +23,6 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-from scipy import integrate
 from scipy.optimize import brentq, isotonic_regression
 
 from momentum.Analysis import hac_ewc as he
@@ -159,41 +158,146 @@ def design_spectrum(x: np.ndarray) -> tuple[float, np.ndarray]:
     return 1.0 / sxx, mu
 
 
+#: Imhof 每段求積容差（同改前逐段 scipy quad 之 epsabs／epsrel；SPEC ㊺ v5.80 沿用）
+_QUAD_EPSABS = 1e-16
+_QUAD_EPSREL = 1e-12
+#: 自適應二分層數上限——只作失敗偵測：耗盡即回 (nan, nan)，不以未收斂結果出值（SPEC ㊺ v5.80，r111 CODEX-P1-01）
+_QUAD_MAX_DEPTH = 40
+#: 每原段片數上限（同改前逐段 scipy quad 之 limit＝200）；逾限即未收斂回 (nan, nan)，並界定最壞片數 400×200
+_QUAD_LIMIT = 200
+#: 每批被積函數評估之元素上限（段×15 點×特徵值數），控制暫存記憶體（約 8 bytes × 此值 × 數個暫存陣列）
+_QUAD_CHUNK_ELEMS = 2_000_000
+
+# QUADPACK qk15（Piessens et al. 1983）：Kronrod 15 點節點／權重與內嵌 Gauss 7 點權重
+_XGK = np.array([0.991455371120812639206854697526329, 0.949107912342758524526189684047851,
+                 0.864864423359769072789712788640926, 0.741531185599394439863864773280788,
+                 0.586087235467691130294144845693013, 0.405845151377397166906606412076961,
+                 0.207784955007898467600689403773245, 0.0])
+_WGK = np.array([0.022935322010529224963732008058970, 0.063092092629978553290700663189204,
+                 0.104790010322250183839876322541518, 0.140653259715525918745189590510238,
+                 0.169004726639267902826583426598550, 0.190350578064785409913256402421014,
+                 0.204432940075298892414161999234649, 0.209482141084727828012999174891714])
+_WG = np.array([0.129484966168869693270611432679082, 0.279705391489276667901467771423780,
+                0.381830050505118944950369775488975, 0.417959183673469387755102040816327])
+#: 15 點（−x₁…−x₇, 0, x₇…x₁ 之對稱排列）與對應 Kronrod／Gauss 權重（Gauss 點＝x₂、x₄、x₆ 與 0，其餘權重 0）
+_GK_NODES = np.r_[-_XGK[:-1], _XGK[::-1]]
+_GK_WK = np.r_[_WGK[:-1], _WGK[::-1]]
+_GK_WG = np.zeros(15)
+for _k, _i in enumerate((1, 3, 5, 7)):
+    _GK_WG[np.abs(np.abs(_GK_NODES) - _XGK[_i]) == 0.0] = _WG[_k]
+del _k, _i
+
+
+def _imhof_setup(lam_pos: float, lam_neg: np.ndarray) -> Optional[tuple[np.ndarray, float, float]]:
+    """正規化特徵值 λ＝(1, −ν/λ₊) 與對數空間求積區間 [v_min, v_max]（同改前：v_min＝−40−ln Σ|λ|，v_max＝max(ln U, 5,
+    v_min＋1)，U 取自 Imhof (1961) 式 (3.2) 截斷界 ≤ _TAIL_BOUND）。"""
+    nu = np.asarray(lam_neg, dtype=float)
+    lam = np.r_[1.0, -nu / lam_pos]
+    n = lam.size
+    log_abs = np.log(np.abs(lam))
+    log_u = (np.log(2.0 / (np.pi * n)) - 0.5 * float(np.sum(log_abs)) - np.log(_TAIL_BOUND)) / (n / 2.0)
+    v_min = _V_MIN - float(np.log(np.sum(np.abs(lam))))
+    v_max = max(float(log_u), 5.0, v_min + 1.0)
+    if not (np.isfinite(v_min) and np.isfinite(v_max)):
+        return None
+    return lam, v_min, v_max
+
+
+def _gk15_pieces(lam: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """同一組 λ 之多段 G7K15：回各段 (積分值, QUADPACK dqk15 誤差估計)。被積函數（v＝ln u 空間）
+    sin(½Σatan(λu))·exp(−¼Σlog1p((λu)²))·… 之 v 空間形式＝sin θ(u)／ρ(u)（u＝e^v，du/u＝dv）。
+    誤差估計照 dqk15：abserr＝|K−G|·h，resasc＞0 時 abserr＝resasc·min(1, (200·abserr／resasc)^{1.5})，再取
+    max(50·eps·resabs, abserr)（浮點誤差下限）。按 _QUAD_CHUNK_ELEMS 分批評估以控制暫存記憶體。"""
+    centr = 0.5 * (lo + hi)
+    hlgth = 0.5 * (hi - lo)
+    n_pieces = centr.size
+    per = max(1, _QUAD_CHUNK_ELEMS // (15 * max(1, lam.size)))
+    resk = np.empty(n_pieces)
+    resg = np.empty(n_pieces)
+    resabs = np.empty(n_pieces)
+    resasc = np.empty(n_pieces)
+    for s in range(0, n_pieces, per):
+        sl = slice(s, min(n_pieces, s + per))
+        v = centr[sl, None] + hlgth[sl, None] * _GK_NODES[None, :]
+        lu = np.exp(v)[..., None] * lam
+        theta = 0.5 * np.sum(np.arctan(lu), axis=-1)
+        log_rho = 0.25 * np.sum(np.log1p(lu * lu), axis=-1)
+        f = np.sin(theta) * np.exp(-log_rho)
+        k = f @ _GK_WK
+        resk[sl] = k
+        resg[sl] = f @ _GK_WG
+        resabs[sl] = np.abs(f) @ _GK_WK
+        resasc[sl] = np.abs(f - 0.5 * k[:, None]) @ _GK_WK
+    result = resk * hlgth
+    dh = np.abs(hlgth)
+    resabs = resabs * dh
+    resasc = resasc * dh
+    abserr = np.abs((resk - resg) * hlgth)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        scaled = resasc * np.minimum(1.0, (200.0 * abserr / resasc) ** 1.5)
+    abserr = np.where((resasc != 0.0) & (abserr != 0.0), scaled, abserr)
+    abserr = np.where(resabs > np.finfo(float).tiny / (50.0 * _EPS), np.maximum(50.0 * _EPS * resabs, abserr), abserr)
+    return result, abserr
+
+
+def _imhof_one(lam: np.ndarray, v_min: float, v_max: float) -> tuple[float, float]:
+    """單組 λ 之 Imhof 尾機率：v 空間 400 段均分，每段 G7K15；段之誤差估計 > max(epsabs, epsrel·|值|)·(片寬／原段寬)
+    之片二分重評（片內容差按寬度比例分配，使各原段誤差和 ≤ 改前逐段 quad 之容差）。層數耗盡、片寬不再可分
+    （浮點停滯）或任何量非有限 ⇒ (nan, nan)。"""
+    edges = np.linspace(v_min, v_max, _N_SEGMENTS + 1)
+    seg_w = float(edges[1] - edges[0])
+    lo, hi = edges[:-1], edges[1:]
+    seg = np.arange(_N_SEGMENTS)
+    pieces = np.ones(_N_SEGMENTS, dtype=np.int64)  # 每原段目前累計片數（同改前 quad limit＝_QUAD_LIMIT）
+    total = 0.0
+    err = 0.0
+    for _ in range(_QUAD_MAX_DEPTH + 1):
+        val, e = _gk15_pieces(lam, lo, hi)
+        if not (np.all(np.isfinite(val)) and np.all(np.isfinite(e))):
+            return float("nan"), float("nan")
+        tol = np.maximum(_QUAD_EPSABS, _QUAD_EPSREL * np.abs(val)) * ((hi - lo) / seg_w)
+        ok = e <= tol
+        total += float(np.sum(val[ok]))
+        err += float(np.sum(e[ok]))
+        if ok.all():
+            return total, err
+        lo_b, hi_b, seg_b = lo[~ok], hi[~ok], seg[~ok]
+        mid = 0.5 * (lo_b + hi_b)
+        if np.any((mid <= lo_b) | (mid >= hi_b)):
+            return float("nan"), float("nan")  # 浮點停滯：片寬已不可再分
+        np.add.at(pieces, seg_b, 1)
+        if np.any(pieces > _QUAD_LIMIT):
+            return float("nan"), float("nan")  # 片數逾限＝未收斂（亦界定最壞記憶體與耗時）
+        lo, hi, seg = np.r_[lo_b, mid], np.r_[mid, hi_b], np.r_[seg_b, seg_b]
+    return float("nan"), float("nan")  # 層數耗盡＝未收斂
+
+
+def imhof_upper_tail_batch(lam_pos: float, lam_neg_rows: list) -> list[tuple[float, float]]:
+    """多組負特徵值（同一 λ₊）之 Imhof 尾機率 P(λ₊χ²₁ − Σ_j ν_j χ²₁ ≥ 0)，各組獨立求積、各自回 (p̂, ε)
+    （SPEC ㊺ v5.80：`slope_pvalue` 之 p̂ 與奇異值擾動上下界同批，各自保留收斂與誤差結果）。"""
+    return [imhof_upper_tail(lam_pos, nu) for nu in lam_neg_rows]
+
+
 def imhof_upper_tail(lam_pos: float, lam_neg: np.ndarray) -> tuple[float, float]:
     """P(λ₊χ²₁ − Σ_j ν_j χ²₁ ≥ 0)（ν_j＞0）以 Imhof 反演公式於對數空間分段求積；回 (p̂, ε)。
 
     特徵值以 λ₊ 正規化；v＝ln u 於 [v_min, ln U] 均分 400 段，v_min＝−40−ln Σ|λ|（頭段誤差與特徵值量級無關），
-    U 取自 Imhof 截斷誤差界 ≤1e−14；頭段 [0, e^{v_min}] 以 ½Σλ·e^{v_min} 計。ε＝各段求積誤差估計和＋截斷界＋頭段量。
-    任何中間量非有限 ⇒ 回 (nan, nan)。
+    U 取自 Imhof 截斷誤差界 ≤1e−14；頭段 [0, e^{v_min}] 以 ½Σλ·e^{v_min} 計。各段以向量化自適應 Gauss–Kronrod
+    G7K15（QUADPACK qk15 節點與權重、dqk15 誤差估計）求積（SPEC ㊺ v5.80，取代逐段 scipy quad；r111 共識）。
+    ε＝各段誤差估計和＋截斷界＋頭段量（數值估計、非嚴格誤差界）。未收斂、浮點停滯或任何中間量非有限 ⇒ (nan, nan)。
     """
     nu = np.asarray(lam_neg, dtype=float)
     if not np.isfinite(lam_pos) or lam_pos <= 0.0 or np.any(~np.isfinite(nu)):
         return float("nan"), float("nan")
     if nu.size == 0:
         return 1.0, 0.0
-    lam = np.r_[1.0, -nu / lam_pos]
-    n = lam.size
-    log_abs = np.log(np.abs(lam))
-    # Imhof (1961) 式 (3.2)：∫_U^∞ |·| ≤ 2／(π n U^{n/2} Π|λ_j|^{1/2})
-    log_u = (np.log(2.0 / (np.pi * n)) - 0.5 * float(np.sum(log_abs)) - np.log(_TAIL_BOUND)) / (n / 2.0)
-    v_max = max(float(log_u), 5.0)
-    # 頭段 [0, e^{v_min}]：u→0 時 v 空間被積函數≈½Σλ·u，取 v_min 使 Σ|λ|·e^{v_min}＝e^{−40}
-    v_min = _V_MIN - float(np.log(np.sum(np.abs(lam))))
-    v_max = max(v_max, v_min + 1.0)
-
-    def integrand(v: float) -> float:
-        u = np.exp(v)
-        theta = 0.5 * float(np.sum(np.arctan(lam * u)))
-        log_rho = 0.25 * float(np.sum(np.log1p((lam * u) ** 2)))
-        return float(np.sin(theta) * np.exp(-log_rho))
-
-    edges = np.linspace(v_min, v_max, _N_SEGMENTS + 1)
-    total = 0.0
-    err = 0.0
-    for lo, hi in zip(edges[:-1], edges[1:]):
-        val, e = integrate.quad(integrand, lo, hi, limit=200, epsabs=1e-16, epsrel=1e-12)
-        total += val
-        err += abs(e)
+    setup = _imhof_setup(lam_pos, nu)
+    if setup is None:
+        return float("nan"), float("nan")
+    lam, v_min, v_max = setup
+    total, err = _imhof_one(lam, v_min, v_max)
+    if not (np.isfinite(total) and np.isfinite(err)):
+        return float("nan"), float("nan")
     head = 0.5 * float(np.sum(lam)) * float(np.exp(v_min))
     p_hat = 0.5 + (total + head) / np.pi
     eps = (err + abs(head)) / np.pi + _TAIL_BOUND
@@ -217,11 +321,10 @@ def slope_pvalue(x: np.ndarray, t_obs: float) -> PValue:
     lam_pos, mu = design_spectrum_cached(x)
     if not np.isfinite(lam_pos) or np.any(~np.isfinite(mu)):
         return PValue(float("nan"), float("nan"), False)
-    p_hat, eps = imhof_upper_tail(lam_pos, c2 * mu)
     m = np.asarray(x).size
     delta = m * _EPS
-    p_lo, _ = imhof_upper_tail(lam_pos, c2 * mu * (1.0 + delta) ** 2)
-    p_hi, _ = imhof_upper_tail(lam_pos, c2 * mu * (1.0 - delta) ** 2)
+    (p_hat, eps), (p_lo, _), (p_hi, _) = imhof_upper_tail_batch(
+        lam_pos, [c2 * mu, c2 * mu * (1.0 + delta) ** 2, c2 * mu * (1.0 - delta) ** 2])
     if not all(np.isfinite(v) for v in (p_hat, eps, p_lo, p_hi)):
         return PValue(float("nan"), float("nan"), False)
     eps_total = eps + max(abs(p_hat - p_lo), abs(p_hat - p_hi))

@@ -1,0 +1,62 @@
+{
+ "old": "runs/icperf/correctness-20261105g/captures",
+ "new": "runs/icperf/correctness-20261105h/captures",
+ "requests": {
+  "A.deep_analysis": {
+   "n_leaves": 32510,
+   "keys_only_old": [],
+   "keys_only_new": [],
+   "numeric_diff_by_key": {
+    "p_abs_error": {
+     "n_diff": 56,
+     "max_abs_diff": 6.661339522176984e-16,
+     "example": {
+      "path": "/trend_analysis/close_1h_trend_MA_233_Skew-W5/factor_return_trend/p_abs_error",
+      "old": 1.6290853816956455e-14,
+      "new": 1.5624719864738757e-14
+     }
+    },
+    "p_value": {
+     "n_diff": 30,
+     "max_abs_diff": 3.3306690738754696e-16,
+     "example": {
+      "path": "/trend_analysis/close_1h_trend_EMA_8_Max-W5/ls_spread_trend/p_value",
+      "old": 0.8748197325558454,
+      "new": 0.8748197325558451
+     }
+    }
+   },
+   "nonnumeric_diffs": [],
+   "n_p_values_compared": 56,
+   "max_p_diff_over_old_eps": 0.01962317315014737
+  },
+  "L.deep_analysis": {
+   "n_leaves": 94583,
+   "keys_only_old": [],
+   "keys_only_new": [],
+   "numeric_diff_by_key": {
+    "p_abs_error": {
+     "n_diff": 97,
+     "max_abs_diff": 4.4408854024450423e-16,
+     "example": {
+      "path": "/trend_analysis/close_4h_trend_MIDPOINT_13~144_Ratio/ls_spread_trend/p_abs_error",
+      "old": 1.6979062000370303e-14,
+      "new": 1.65349734601258e-14
+     }
+    },
+    "p_value": {
+     "n_diff": 72,
+     "max_abs_diff": 4.996003610813204e-16,
+     "example": {
+      "path": "/trend_analysis/close_4h_trend_WMA_55_Rank-W13/ic_trend/p_value",
+      "old": 0.03014651281496583,
+      "new": 0.03014651281496633
+     }
+    }
+   },
+   "nonnumeric_diffs": [],
+   "n_p_values_compared": 101,
+   "max_p_diff_over_old_eps": 0.032359395855138244
+  }
+ }
+}

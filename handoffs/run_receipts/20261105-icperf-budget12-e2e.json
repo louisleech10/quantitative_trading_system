@@ -1,0 +1,188 @@
+{
+ "budget_id": "ICPERF-BUDGET-12",
+ "kind": "e2e_trend_four_dims",
+ "spec_path": "docs/ICPERF_SPEC.md",
+ "head": "41b02845bee9d06e97b6b2ee7d3274c3a0f6ff0f",
+ "generated_at": "2026-11-05T13:56:56+00:00",
+ "hardware": {
+  "machine": "arm64",
+  "platform": "macOS-27.0.1-arm64-arm-64bit"
+ },
+ "method": "Task 0.3 真實擷取重放產品 ICFilterOrchestrator._run_trend_analysis（預設四維、真實設計與來源序列、請求測試段），每點獨立子行程、設計快取清空（冷）；牆鐘對入選欄數 k 線性擬合外推",
+ "rows": [
+  {
+   "capture": "runs/icperf/correctness-20261105h/captures/A.deep_analysis.pkl",
+   "k": 10,
+   "dimensions": [
+    "ic",
+    "centrality",
+    "factor_return",
+    "ls_spread"
+   ],
+   "wall_s": 2.607694375,
+   "per_feature_s": 0.2607694375,
+   "trend_results": 40,
+   "subsample_points_median": 33.5,
+   "subsample_points_max": 99,
+   "rss_current_delta_bytes": -4784128,
+   "rss_peak_bytes": 309657600,
+   "rss_peak_delta_bytes": 23035904,
+   "design_cache_entries": 11,
+   "output_json_bytes": 26134
+  },
+  {
+   "capture": "runs/icperf/correctness-20261105h/captures/A.deep_analysis.pkl",
+   "k": 20,
+   "dimensions": [
+    "ic",
+    "centrality",
+    "factor_return",
+    "ls_spread"
+   ],
+   "wall_s": 4.168924833,
+   "per_feature_s": 0.20844624165,
+   "trend_results": 78,
+   "subsample_points_median": 1.0,
+   "subsample_points_max": 99,
+   "rss_current_delta_bytes": -65847296,
+   "rss_peak_bytes": 328581120,
+   "rss_peak_delta_bytes": 23756800,
+   "design_cache_entries": 19,
+   "output_json_bytes": 51153
+  },
+  {
+   "capture": "runs/icperf/correctness-20261105h/captures/A.deep_analysis.pkl",
+   "k": 30,
+   "dimensions": [
+    "ic",
+    "centrality",
+    "factor_return",
+    "ls_spread"
+   ],
+   "wall_s": 5.617330042000001,
+   "per_feature_s": 0.18724433473333335,
+   "trend_results": 116,
+   "subsample_points_median": 1.0,
+   "subsample_points_max": 99,
+   "rss_current_delta_bytes": -66043904,
+   "rss_peak_bytes": 328417280,
+   "rss_peak_delta_bytes": 23412736,
+   "design_cache_entries": 26,
+   "output_json_bytes": 76144
+  },
+  {
+   "capture": "runs/icperf/correctness-20261105h/captures/L.deep_analysis.pkl",
+   "k": 10,
+   "dimensions": [
+    "ic",
+    "centrality",
+    "factor_return",
+    "ls_spread"
+   ],
+   "wall_s": 1.19265225,
+   "per_feature_s": 0.119265225,
+   "trend_results": 27,
+   "subsample_points_median": 78.0,
+   "subsample_points_max": 78,
+   "rss_current_delta_bytes": 11862016,
+   "rss_peak_bytes": 333217792,
+   "rss_peak_delta_bytes": 20611072,
+   "design_cache_entries": 6,
+   "output_json_bytes": 19878
+  },
+  {
+   "capture": "runs/icperf/correctness-20261105h/captures/L.deep_analysis.pkl",
+   "k": 20,
+   "dimensions": [
+    "ic",
+    "centrality",
+    "factor_return",
+    "ls_spread"
+   ],
+   "wall_s": 2.4613312500000006,
+   "per_feature_s": 0.12306656250000003,
+   "trend_results": 65,
+   "subsample_points_median": 75.0,
+   "subsample_points_max": 78,
+   "rss_current_delta_bytes": -2015232,
+   "rss_peak_bytes": 319815680,
+   "rss_peak_delta_bytes": 14254080,
+   "design_cache_entries": 12,
+   "output_json_bytes": 46443
+  },
+  {
+   "capture": "runs/icperf/correctness-20261105h/captures/L.deep_analysis.pkl",
+   "k": 30,
+   "dimensions": [
+    "ic",
+    "centrality",
+    "factor_return",
+    "ls_spread"
+   ],
+   "wall_s": 4.269372000000001,
+   "per_feature_s": 0.14231240000000003,
+   "trend_results": 102,
+   "subsample_points_median": 62.0,
+   "subsample_points_max": 78,
+   "rss_current_delta_bytes": -42811392,
+   "rss_peak_bytes": 333873152,
+   "rss_peak_delta_bytes": 21086208,
+   "design_cache_entries": 22,
+   "output_json_bytes": 71993
+  }
+ ],
+ "extrapolation": {
+  "runs/icperf/correctness-20261105h/captures/A.deep_analysis.pkl": {
+   "points": [
+    [
+     10,
+     2.607694375
+    ],
+    [
+     20,
+     4.168924833
+    ],
+    [
+     30,
+     5.617330042000001
+    ]
+   ],
+   "per_feature_s": 0.15048178335000006,
+   "fixed_s": 1.121680749666666,
+   "extrapolated_hours": {
+    "100": 0.00449162752351852,
+    "1000": 0.042112073361018534,
+    "10000": 0.4183165317360187,
+    "100000": 4.18036111548602,
+    "430000": 17.974524589236026
+   },
+   "rss_peak_max_bytes": 328581120
+  },
+  "runs/icperf/correctness-20261105h/captures/L.deep_analysis.pkl": {
+   "points": [
+    [
+     10,
+     1.19265225
+    ],
+    [
+     20,
+     2.4613312500000006
+    ],
+    [
+     30,
+     4.269372000000001
+    ]
+   ],
+   "per_feature_s": 0.15383598750000002,
+   "fixed_s": -0.4356012499999984,
+   "extrapolated_hours": {
+    "100": 0.004152221527777779,
+    "1000": 0.04261121840277778,
+    "10000": 0.42720118715277783,
+    "100000": 4.273100874652779,
+    "430000": 18.374733062152778
+   },
+   "rss_peak_max_bytes": 333873152
+  }
+ }
+}

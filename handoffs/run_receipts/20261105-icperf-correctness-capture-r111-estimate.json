@@ -1,0 +1,35 @@
+{
+ "identity": {
+  "match": {
+   "entrypoint": "scripts/icperf_correctness_receipt.py",
+   "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir runs/icperf/correctness-20261105h/captures",
+   "code_sha256": "3ca01108a7571d3db6c4de0fa8bc1f1fd903da5fd93feab5a71e03227020fed9",
+   "data": [],
+   "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "hardware": {
+    "cpu": "Apple M1",
+    "cores": 8,
+    "ram_bytes": 8589934592,
+    "os": "Darwin 27.0.0"
+   }
+  },
+  "meta": {
+   "producer": "主委（ICPERF ㊺ r111：Imhof 提速後 Task 0.3 收據重擷取）",
+   "created_at": "2026-11-05T13:07:36+00:00"
+  }
+ },
+ "scale": "single",
+ "estimate_seconds": 2700,
+ "basis": [
+  "前次擷取 runs/icperf/correctness-20261105g（同日，14 請求 rc=0；runs/icperf/hac45/capture_b2d2.log）",
+  "本次產品碼改 Imhof 為向量化 G7K15（趨勢單維每特徵耗時降為改前 1/1.25–1/20，runs/icperf/hac45/speed2.log 等）⇒ 擷取耗時不增，取 2,700 秒",
+  "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行；新目錄 correctness-20261105h，不動 e／f／g（g 為改前比對基準）"
+ ],
+ "spec_path": "docs/ICPERF_SPEC.md",
+ "coverage_path_ids": [
+  "ICPERF-BUDGET-7",
+  "ICPERF-BUDGET-9",
+  "ICPERF-BUDGET-10",
+  "ICPERF-BUDGET-11"
+ ]
+}

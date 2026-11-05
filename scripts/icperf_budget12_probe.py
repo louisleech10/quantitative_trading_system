@@ -166,6 +166,66 @@ GRID: List[dict] = (
 )
 
 
+def measure_e2e(capture: str, k: int) -> dict:
+    """SPEC ㊺ v5.80 提速驗收 (4)（r111）：以 Task 0.3 真實擷取（`<擷取目錄>/<請求>.pkl`）重放產品
+    `ICFilterOrchestrator._run_trend_analysis`——四維（預設 dimensions）、真實設計與來源模組序列、請求之測試段——
+    取前 k 個入選欄，量端到端牆鐘、峰值 RSS 增量與輸出 JSON 位元組。每點獨立子行程（冷快取）。"""
+    import pickle
+
+    import pandas as pd  # noqa: F401（pickle 還原需要）
+
+    from momentum.Analysis import trend_inference as ti
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    with open(capture, "rb") as fh:
+        cap = pickle.load(fh)
+    orch = ICFilterOrchestrator.__new__(ICFilterOrchestrator)
+    orch._ic_cache = cap["cache"]
+    orch._deep_run_report = cap["deep_raw"]
+    cfg = cap["deep_config_obj"]
+    sel = list(cap.get("selected") or [])[:k]
+    ti._DESIGN_CACHE.clear()
+    rss0_cur, rss0_peak = _rss_current(), _rss_peak()
+    t0 = time.perf_counter()
+    out = orch._run_trend_analysis(sel, cfg)
+    wall = time.perf_counter() - t0
+    dims = list(cfg.trend_analysis.dimensions)
+    n_trends = sum(1 for v in out.values() if isinstance(v, dict) for d in dims if f"{d}_trend" in v)
+    points = [int(v[f"{d}_trend"].get("subsample_points") or 0) for v in out.values() if isinstance(v, dict)
+              for d in dims if f"{d}_trend" in v]
+    return {"capture": capture, "k": len(sel), "dimensions": dims, "wall_s": wall,
+            "per_feature_s": wall / max(1, len(sel)), "trend_results": n_trends,
+            "subsample_points_median": float(np.median(points)) if points else None,
+            "subsample_points_max": max(points) if points else None,
+            "rss_current_delta_bytes": _rss_current() - rss0_cur, "rss_peak_bytes": _rss_peak(),
+            "rss_peak_delta_bytes": _rss_peak() - rss0_peak, "design_cache_entries": len(ti._DESIGN_CACHE),
+            "output_json_bytes": len(json.dumps(out, default=str))}
+
+
+def _child_e2e(capture: str, k: int) -> dict:
+    cmd = [sys.executable, str(Path(__file__).resolve()), "e2e-point", "--capture", capture, "--k", str(k)]
+    res = subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(f"e2e {capture} k={k} rc={res.returncode}\n{res.stderr[-2000:]}")
+    return json.loads([ln for ln in res.stdout.splitlines() if ln.startswith("{")][-1])
+
+
+def _e2e_extrapolate(rows: List[dict]) -> Dict[str, dict]:
+    """每擷取：牆鐘對 k 之最小平方直線（截距＝固定成本、斜率＝每入選欄四維成本），外推入選欄數 N 之端到端秒數。"""
+    out: Dict[str, dict] = {}
+    for cap in sorted({r["capture"] for r in rows}):
+        rs = sorted((r for r in rows if r["capture"] == cap), key=lambda r: r["k"])
+        k = np.array([r["k"] for r in rs], dtype=float)
+        w = np.array([r["wall_s"] for r in rs], dtype=float)
+        slope, icpt = (np.polyfit(k, w, 1) if k.size >= 2 else (w[0] / k[0], 0.0))
+        out[cap] = {"points": [[int(a), float(b)] for a, b in zip(k, w)], "per_feature_s": float(slope),
+                    "fixed_s": float(icpt),
+                    "extrapolated_hours": {str(n): float((icpt + slope * n) / 3600.0)
+                                           for n in (100, 1_000, 10_000, 100_000, TARGET_FEATURES)},
+                    "rss_peak_max_bytes": max(r["rss_peak_bytes"] for r in rs)}
+    return out
+
+
 def _child(cell: dict) -> dict:
     cmd = [sys.executable, str(Path(__file__).resolve()), "measure", "--path", cell["path"], "--mode", cell["mode"],
            "--m", str(cell["m"]), "--features", str(cell["features"])]
@@ -232,9 +292,38 @@ def main() -> int:
     m_.add_argument("--features", type=int, required=True)
     a_ = sub.add_parser("all")
     a_.add_argument("--out", required=True)
+    e_ = sub.add_parser("e2e-point")
+    e_.add_argument("--capture", required=True)
+    e_.add_argument("--k", type=int, required=True)
+    ea = sub.add_parser("e2e", help="SPEC ㊺ v5.80 (4)：真實擷取重放 _run_trend_analysis 之端到端多點量測")
+    ea.add_argument("--captures", required=True, help="Task 0.3 擷取目錄")
+    ea.add_argument("--requests", default="A.deep_analysis,L.deep_analysis")
+    ea.add_argument("--ks", default="10,20,30")
+    ea.add_argument("--out", required=True)
     args = ap.parse_args()
-    # 母行程之 `_extrapolate` 亦 import 產品模組（`_hac_cache_bound_bytes`）⇒ 兩子命令皆須
+    # 母行程之 `_extrapolate` 亦 import 產品模組（`_hac_cache_bound_bytes`）⇒ 各子命令皆須
     sys.path.insert(0, str(REPO))
+    if args.cmd == "e2e-point":
+        print(json.dumps(measure_e2e(args.capture, args.k), ensure_ascii=False), flush=True)
+        return 0
+    if args.cmd == "e2e":
+        rows_e = []
+        for req in args.requests.split(","):
+            for k in (int(x) for x in args.ks.split(",")):
+                r = _child_e2e(str(Path(args.captures) / f"{req}.pkl"), k)
+                rows_e.append(r)
+                print(json.dumps({kk: vv for kk, vv in r.items() if kk != "dimensions"}, ensure_ascii=False), flush=True)
+        git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True).stdout.strip()
+        receipt = {"budget_id": "ICPERF-BUDGET-12", "kind": "e2e_trend_four_dims", "spec_path": "docs/ICPERF_SPEC.md",
+                   "head": git, "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                   "hardware": {"machine": platform.machine(), "platform": platform.platform()},
+                   "method": ("Task 0.3 真實擷取重放產品 ICFilterOrchestrator._run_trend_analysis（預設四維、真實設計與來源序列、"
+                              "請求測試段），每點獨立子行程、設計快取清空（冷）；牆鐘對入選欄數 k 線性擬合外推"),
+                   "rows": rows_e, "extrapolation": _e2e_extrapolate(rows_e)}
+        out = REPO / args.out
+        out.write_text(json.dumps(receipt, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print(f"wrote {out.relative_to(REPO)}", flush=True)
+        return 0
     if args.cmd == "measure":
         print(json.dumps(measure(args.path, args.mode, args.m, args.features), ensure_ascii=False), flush=True)
         return 0
