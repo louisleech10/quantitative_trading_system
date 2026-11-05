@@ -19,6 +19,8 @@ from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
 from momentum.core.exceptions import InvalidInputError
 
 N_FEATURES = 45
+#: 審碼 r117：配對記憶體估算相對實測峰值之最低餘裕（係數設計為約 2 倍）
+PAIRWISE_TEST_MARGIN = 1.5
 
 
 def _orchestrator(survivors: Optional[List[str]]) -> tuple[ICFilterOrchestrator, List[str], Dict[str, int]]:
@@ -205,16 +207,20 @@ def test_pairwise_memory_estimate_bounds_measured_peak(module: str) -> None:
         return [lambda: fq.redundancy_pre_scan(df), lambda: fq.redundancy_pre_scan(high)]
 
     a, b = ifo.PAIRWISE_MEMORY_COEFFS[module]
-    # 中心性全路徑於 tracemalloc 下逐窗重算甚慢 ⇒ 取較短 T（仍覆蓋 n² 與 T·n 兩項）
-    shapes = ((150, 60), (200, 100)) if module == "factor_centrality" else ((400, 120), (600, 200))
+    # 中心性全路徑於 tracemalloc 下逐窗重算甚慢 ⇒ 取小 n、長 T（T·n 項主導，辨識 b 係數）；審碼 r117：每次量測前
+    # 先暖機一次，排除一次性配置（lazy import／快取）造成之冷啟動峰值
+    shapes = ((600, 30), (800, 40)) if module == "factor_centrality" else ((400, 120), (600, 200))
     for T, n in shapes:
         df = pd.DataFrame(rng.standard_normal((T, n)), columns=[f"c{i}" for i in range(n)])
         for fn in runs(df):
+            fn()  # 暖機
             tracemalloc.start()
             fn()
             _, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
-            assert peak <= 8 * (a * n * n + b * T * n), (module, T, n, peak)
+            # 審碼 r117：要求估算 ≥ 實測峰值 × PAIRWISE_TEST_MARGIN（SPEC 為約 2 倍，留 allocator／平台變異餘裕）——
+            # 使係數退回 r115 值（品質 (2,3)、中心性 (8,12)）時轉紅，非僅「不低於峰值」
+            assert peak * PAIRWISE_TEST_MARGIN <= 8 * (a * n * n + b * T * n), (module, T, n, peak)
 
 
 def test_centrality_memory_error_not_swallowed_into_dense_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
