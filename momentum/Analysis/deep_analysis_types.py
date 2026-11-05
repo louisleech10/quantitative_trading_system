@@ -29,6 +29,10 @@ class DeepAnalysisReport:
     total_modules: int = 10
     # ICPERF Task 0.4 ⑩：請求明示之模組開關蓋過具名 preset 者（{模組: {"requested", "preset"}}；無則空）
     tier_module_overrides: dict[str, dict] = field(default_factory=dict)
+    # ICPERF Task 0.4 ㊻：候選欄之選取來源與逐欄篩選通過狀態（`ICFilterOrchestrator._deep_candidate_selection`）——
+    # source ∈ {manual, survivors, diagnostic_top_n}、diagnostic_mode、top_n_requested、n_selected、n_survivors、
+    # n_ranked、sort_key、features＝[{feature_name, filter_passed, global_rank}]
+    candidate_selection: dict[str, Any] = field(default_factory=dict)
     completed_count: int = 0
     skipped_count: int = 0
     failed_count: int = 0

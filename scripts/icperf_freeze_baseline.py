@@ -2068,7 +2068,7 @@ def _child_ic_page(spec: Mapping[str, Any]) -> Any:
     """第 (1)(3)(4) 項：同 `ffprod_measure.ic_in_process`（服務 `_build_config_override` 得 override、
     `_materialize_features_for_ic` 物化〔寫 cwd 相對之交接快取〕、`create_ic_analyzer(override).analyze`）；回報告 dict。
     第 (3) 項：同一 analyzer 實例續跑深度分析（服務 `_run_deep_analysis` 之同一步驟：`_build_deep_module_override`、
-    `_resolve_selected_features`、`run_deep_analysis`、`_serialize_deep_report`、`_attach_cross_symbol_context`），回其序列化。"""
+    `run_deep_analysis`〔未手選交核心候選規則，㊻〕、`_serialize_deep_report`、`_attach_cross_symbol_context`），回其序列化。"""
     from api.models.ic_models import DeepAnalysisRequest
 
     request = spec["request"]
@@ -2079,9 +2079,9 @@ def _child_ic_page(spec: Mapping[str, Any]) -> Any:
         return report
     deep_request = DeepAnalysisRequest(**request["deep"])
     deep_override = svc._build_deep_module_override(deep_request)
-    selected = svc._resolve_selected_features(analyzer=analyzer, selected_features=deep_request.selected_features,
-                                              top_n=deep_request.top_n)
-    deep_report = analyzer.run_deep_analysis(selected, deep_override, _progress, None)
+    # ICPERF Task 0.4 ㊻：同服務——手選原樣、未手選交核心候選規則（top_n）
+    deep_report = analyzer.run_deep_analysis(deep_request.selected_features or None, deep_override, _progress, None,
+                                             deep_request.top_n)
     return svc._attach_cross_symbol_context(svc._serialize_deep_report(deep_report), analyzer)
 
 

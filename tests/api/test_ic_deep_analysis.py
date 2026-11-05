@@ -404,8 +404,13 @@ def test_full_analysis_with_deep_analysis_config(sample_paths: dict[str, str]) -
 
 
 def test_deep_analysis_request_validation_top_n() -> None:
+    """ICPERF Task 0.4 ㊻（SPEC v5.81）：top_n 為正整數校驗、不設固定上限（舊 le=200 移除）——0 與負數 422；
+    大值（999）通過校驗，對不存在之任務回 404（非 422）。"""
+    for bad in (0, -1):
+        response = client.post("/api/v1/ic/deep-analysis/nonexistent-task", json={"top_n": bad})
+        assert response.status_code == 422, bad
     response = client.post("/api/v1/ic/deep-analysis/nonexistent-task", json={"top_n": 999})
-    assert response.status_code == 422
+    assert response.status_code == 404
 
 
 def test_full_analysis_request_validation_required_labels_path(sample_paths: dict[str, str]) -> None:

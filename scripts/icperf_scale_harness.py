@@ -1590,9 +1590,10 @@ def _run_deep_analysis(ctx: RunContext) -> Dict[str, Any]:
     svc = ICAnalysisService.__new__(ICAnalysisService)
     deep_request = DeepAnalysisRequest(**request["deep"])
     deep_override = svc._build_deep_module_override(deep_request)
-    selected = svc._resolve_selected_features(analyzer=analyzer, selected_features=deep_request.selected_features,
-                                              top_n=deep_request.top_n)
-    deep_report = analyzer.run_deep_analysis(selected, deep_override, ctx.rec.progress, None)
+    # ICPERF Task 0.4 ㊻：同服務——未手選交核心候選規則；selected＝核心實際選取欄
+    deep_report = analyzer.run_deep_analysis(deep_request.selected_features or None, deep_override, ctx.rec.progress,
+                                             None, deep_request.top_n)
+    selected = [f["feature_name"] for f in deep_report.candidate_selection.get("features", [])]
     svc._attach_cross_symbol_context(svc._serialize_deep_report(deep_report), analyzer)
     return {**_ic_facts(report, analyzer, ctx.n_cols, _h5_rows(h5)), **_split_facts(report),
             "deep_selected": len(selected or []), "requested_columns": None, "actual_scale": _subset_actual(ctx, h5)}

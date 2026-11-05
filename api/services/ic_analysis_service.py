@@ -2577,18 +2577,14 @@ class ICAnalysisService:
             })
 
         try:
-            selected_features = self._resolve_selected_features(
-                analyzer=analyzer,
-                selected_features=request.selected_features,
-                top_n=request.top_n,
-            )
-
+            # ICPERF Task 0.4 ㊻：手選 ⇒ 原樣；未手選 ⇒ 交核心候選規則（倖存中前 top_n；無倖存 ⇒ 全域診斷 Top_n）
             deep_report = await asyncio.to_thread(
                 analyzer.run_deep_analysis,
-                selected_features,
+                request.selected_features or None,
                 override,
                 progress_callback,
                 None,
+                request.top_n,
             )
             serialized = self._serialize_deep_report(deep_report)
             serialized = self._attach_cross_symbol_context(serialized, analyzer)
@@ -2729,18 +2725,15 @@ class ICAnalysisService:
             deep_result: Optional[Dict[str, Any]] = None
             if request.deep_analysis:
                 deep_request = request.deep_analysis_config or DeepAnalysisRequest()
-                selected_features = self._resolve_selected_features(
-                    analyzer=analyzer,
-                    selected_features=deep_request.selected_features,
-                    top_n=deep_request.top_n,
-                )
                 deep_override = self._build_deep_module_override(deep_request)
+                # ICPERF Task 0.4 ㊻：同上，未手選交核心候選規則
                 deep_report = await asyncio.to_thread(
                     analyzer.run_deep_analysis,
-                    selected_features,
+                    deep_request.selected_features or None,
                     deep_override,
                     progress_callback,
                     None,
+                    deep_request.top_n,
                 )
                 deep_result = self._serialize_deep_report(deep_report)
                 deep_result = self._attach_cross_symbol_context(deep_result, analyzer)
@@ -3228,25 +3221,6 @@ class ICAnalysisService:
         }
         # merge 順序:base 先、typed 後 → typed 覆蓋同鍵
         return self._deep_merge(base, typed)
-
-    def _resolve_selected_features(
-        self,
-        analyzer: Any,
-        selected_features: Optional[List[str]],
-        top_n: int,
-    ) -> Optional[List[str]]:
-        if selected_features:
-            return selected_features
-
-        top_features = analyzer.get_top_features(n=top_n)
-        if not top_features:
-            return None
-
-        return [
-            item.get("feature_name")
-            for item in top_features
-            if isinstance(item, dict) and item.get("feature_name")
-        ]
 
     def _serialize_deep_report(self, deep_report: Any) -> Dict[str, Any]:
         if is_dataclass(deep_report):

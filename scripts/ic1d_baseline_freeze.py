@@ -231,6 +231,12 @@ def _write_h5(
 ) -> None:
     """以 IC reader 使用的 flat data/ group schema 寫入暫存 H5。"""
     with h5py.File(path, "w") as handle:
+        if key == "features":
+            # FFNAME SPEC v18 Task 3.4 之 IC 交接 h5 命名世代閘：寫出端蓋現行版（特徵由現行碼自真實 kline 即時算出）；
+            # 缺此屬性時讀取端 FeatureNamingVersionError（ICPERF ㊻ 施工時發現本檔 5 條整合測試自 FFNAME 起紅）
+            from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_version
+
+            stamp_h5_feature_naming_version(handle.attrs)
         group = handle.create_group("data")
         group.create_dataset(key, data=values, compression="gzip")
         group.create_dataset("timestamps", data=timestamps, compression="gzip")

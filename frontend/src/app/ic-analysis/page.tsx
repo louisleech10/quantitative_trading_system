@@ -16,6 +16,8 @@ import SectionStatusNotice from '@/components/ic-analysis/SectionStatusNotice';
 import ExportButtons from '@/components/ic-analysis/ExportButtons';
 import FeatureFilterPanel from '@/components/ic-analysis/FeatureFilterPanel';
 import DeepAnalysisConfigPanel from '@/components/ic-analysis/DeepAnalysisConfigPanel';
+import DeepCandidateNotice from '@/components/ic-analysis/DeepCandidateNotice';
+import { buildDeepCandidateFields, DEEP_TOP_N_OPTIONS } from '@/lib/deepCandidates';
 import FactorReturnChart from '@/components/ic-analysis/FactorReturnChart';
 import FactorCentralityChart from '@/components/ic-analysis/FactorCentralityChart';
 import PCAExplainedChart from '@/components/ic-analysis/PCAExplainedChart';
@@ -89,6 +91,11 @@ function ICAnalysisPageContent() {
     availableFeatures,
     featureFilter,
     selectedFeatures,
+    selectedFeaturesSource,
+    deepTopN,
+    setDeepTopN,
+    deepCandidateSelection,
+    setDeepCandidateSelection,
     deepAnalysisModules,
     netIcConfig,
     deepAnalysisStatus,
@@ -395,8 +402,10 @@ function ICAnalysisPageContent() {
   useEffect(() => {
     if (summaryTable.length === 0) return;
     if (selectedFeatures.length > 0) return;
+    // ㊻：當頁前 30 列之自動預選標為 auto——深度分析時不當手選送出（改由後端全域規則選取）
     setSelectedFeatures(
-      summaryTable.slice(0, 30).map((item: { feature_name: string }) => item.feature_name)
+      summaryTable.slice(0, 30).map((item: { feature_name: string }) => item.feature_name),
+      'auto',
     );
   }, [selectedFeatures.length, setSelectedFeatures, summaryTable]);
 
@@ -516,19 +525,18 @@ function ICAnalysisPageContent() {
       return;
     }
 
-    const candidates = selectedFeatures.length > 0
-      ? selectedFeatures
-      : summaryTable.slice(0, 30).map((item: { feature_name: string }) => item.feature_name);
+    // ㊻（SPEC v5.81）：手選 ⇒ 送 selected_features；自動預選 ⇒ 只送 top_n，由後端對完整 summary_table 全域選取
+    const candidateFields = buildDeepCandidateFields(selectedFeaturesSource, selectedFeatures, deepTopN);
 
     setDeepAnalysisStatus('running');
     setDeepAnalysisProgress(0);
     setIsDeepRunning(true);
     setError(null);
+    setDeepCandidateSelection(null);
 
     try {
       const payload = buildDeepAnalysisRequest({
-        selected_features: candidates,
-        top_n: candidates.length,
+        ...candidateFields,
         config_override: {
           factor_exposure: {
             neutralization_mode: neutralizationMode,
@@ -566,6 +574,7 @@ function ICAnalysisPageContent() {
         }
 
         setDeepAnalysisModuleStatus(response.module_status || []);
+        setDeepCandidateSelection(response.candidate_selection ?? null);
 
         if (response.status === 'completed') {
           setDeepAnalysisStatus('completed');
@@ -916,6 +925,26 @@ function ICAnalysisPageContent() {
                 </div>
               </div>
 
+              {selectedFeaturesSource === 'auto' && (
+                <div className="glass-panel rounded-xl border border-white/10 p-3 text-xs text-gray-200 flex items-center gap-3">
+                  <label htmlFor="deep-top-n">未手選時深度分析候選數 n：</label>
+                  <select
+                    id="deep-top-n"
+                    data-testid="deep-top-n"
+                    value={deepTopN}
+                    onChange={(e) => setDeepTopN(Number(e.target.value))}
+                    className="rounded bg-slate-900/60 border border-white/10 px-2 py-1"
+                  >
+                    {DEEP_TOP_N_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400">
+                    有通過篩選者取其中排名前 n；無任何通過時取全部受檢特徵之前 n 名並標「未通過篩選」（僅供診斷）
+                  </span>
+                </div>
+              )}
+
               <DeepAnalysisConfigPanel
                 selectedFeatureCount={selectedFeatures.length}
                 modules={deepAnalysisModules}
@@ -936,6 +965,8 @@ function ICAnalysisPageContent() {
                   深度分析執行中... {(deepAnalysisProgress * 100).toFixed(0)}%
                 </div>
               )}
+
+              <DeepCandidateNotice selection={deepCandidateSelection} />
 
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'basic' | 'deep')}>
                 <TabsList>

@@ -2526,6 +2526,39 @@ export interface DeepAnalysisResponse {
   module_status?: ModuleStatus[] | null;
   results?: Record<string, unknown> | null;
   error?: string | null;
+  /** ICPERF Task 0.4 ㊻：深度分析候選來源與逐欄篩選通過狀態 */
+  candidate_selection?: DeepCandidateSelection | null;
+}
+
+/** ICPERF Task 0.4 ㊻：候選來源——手選／篩選倖存／無倖存時之診斷 Top_n */
+export type DeepCandidateSource = 'manual' | 'survivors' | 'diagnostic_top_n';
+
+export interface DeepCandidateFeature {
+  feature_name: string;
+  /** 是否通過 IC 篩選；null＝未執行篩選（不得宣稱未通過） */
+  filter_passed: boolean | null;
+  /** 依排序鍵之全域名次（1 起） */
+  global_rank: number | null;
+  /** 原始 p 與全檢定族 BH 調整後 p（取自 summary_table，不在 Top_n 重算） */
+  p_value: number | null;
+  p_value_adj: number | null;
+  mw_p_value: number | null;
+  mw_p_value_adj: number | null;
+}
+
+export interface DeepCandidateSelection {
+  source: DeepCandidateSource;
+  diagnostic_mode: boolean;
+  top_n_requested: number | null;
+  n_selected: number;
+  n_survivors: number | null;
+  n_ranked: number;
+  /** 主報告之檢定數（metadata.significance.n_tests） */
+  n_tests: number | null;
+  /** 主報告之 FDR 設定（metadata.significance.fdr） */
+  fdr: Record<string, unknown> | null;
+  sort_key: string;
+  features: DeepCandidateFeature[];
 }
 
 export type WatchlistStatus = 'candidate' | 'verified' | 'rejected' | 'watching';

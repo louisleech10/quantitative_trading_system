@@ -12,6 +12,7 @@ import {
   ICReport,
   ICMethodSettings,
   ModuleStatus,
+  DeepCandidateSelection,
   NetICAnalysisRequest,
   ICSummaryPage,
   ICFeatureDetail,
@@ -57,6 +58,12 @@ interface ICAnalysisState {
   availableFeatures: FeatureListItem[];
   featureFilter: FeatureFilterConfig;
   selectedFeatures: string[];
+  /** ICPERF Task 0.4 ㊻：選欄來源——auto＝頁面自動預選（深度分析不送 selected_features，交後端全域規則）；manual＝使用者操作 */
+  selectedFeaturesSource: 'auto' | 'manual';
+  /** ㊻：未手選時之深度分析候選數 n（預設 30，可選 50／100） */
+  deepTopN: number;
+  /** ㊻：最近一次深度分析之候選來源與逐欄篩選通過狀態 */
+  deepCandidateSelection: DeepCandidateSelection | null;
   deepAnalysisModules: DeepAnalysisConfig['modules'];
   /** 成本參數(request 欄 net_ic);預設關閉、無寫死 bps。 */
   netIcConfig: NetICAnalysisRequest;
@@ -91,7 +98,9 @@ interface ICAnalysisState {
   setSelectedFeature: (featureName: string | null) => void;
   setAvailableFeatures: (features: FeatureListItem[]) => void;
   setFeatureFilter: (filter: FeatureFilterConfig) => void;
-  setSelectedFeatures: (featureNames: string[]) => void;
+  setSelectedFeatures: (featureNames: string[], source?: 'auto' | 'manual') => void;
+  setDeepTopN: (n: number) => void;
+  setDeepCandidateSelection: (selection: DeepCandidateSelection | null) => void;
   setDeepAnalysisModules: (modules: DeepAnalysisConfig['modules']) => void;
   setNetIcConfig: (config: NetICAnalysisRequest) => void;
   setDeepAnalysisStatus: (status: ICAnalysisState['deepAnalysisStatus']) => void;
@@ -284,6 +293,9 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
     max_features: undefined,
   },
   selectedFeatures: [],
+  selectedFeaturesSource: 'auto',
+  deepTopN: 30,
+  deepCandidateSelection: null,
   deepAnalysisModules: defaultDeepAnalysisModules,
   netIcConfig: { ...defaultNetIcConfig },
   deepAnalysisStatus: 'idle',
@@ -355,7 +367,10 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   setAvailableFeatures: (features) => set({ availableFeatures: features }),
   setFeatureFilter: (filter) =>
     set((state) => ({ featureFilter: { ...state.featureFilter, ...filter } })),
-  setSelectedFeatures: (featureNames) => set({ selectedFeatures: featureNames }),
+  setSelectedFeatures: (featureNames, source = 'manual') =>
+    set({ selectedFeatures: featureNames, selectedFeaturesSource: source }),
+  setDeepTopN: (deepTopN) => set({ deepTopN }),
+  setDeepCandidateSelection: (deepCandidateSelection) => set({ deepCandidateSelection }),
   setDeepAnalysisModules: (modules) => set({ deepAnalysisModules: modules }),
   setNetIcConfig: (netIcConfig) => set({ netIcConfig: { ...netIcConfig } }),
   setDeepAnalysisStatus: (deepAnalysisStatus) => set({ deepAnalysisStatus }),
@@ -476,6 +491,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
       deepAnalysisProgress: 0,
       deepAnalysisReport: null,
       deepAnalysisModuleStatus: [],
+      deepCandidateSelection: null,
       activeTab: 'basic',
       featureTier: 'intermediate',
       featureToggles: { ...PRESET_TOGGLES.intermediate },

@@ -79,7 +79,8 @@ def _reject_net_ic_analysis_in_config_override(
 
 class DeepAnalysisRequest(BaseModel):
     selected_features: Optional[List[str]] = None
-    top_n: int = Field(default=30, ge=1, le=200)
+    # ICPERF Task 0.4 ㊻（SPEC v5.81）：未手選時之候選數；正整數校驗、不設固定上限（使用者規則：驗證範圍不得變成產品限制）
+    top_n: int = Field(default=30, ge=1)
     modules: DeepAnalysisModules = Field(default_factory=DeepAnalysisModules)
     config_override: Optional[Dict[str, Any]] = None
     net_ic: NetICAnalysisRequest = Field(default_factory=NetICAnalysisRequest)
@@ -395,6 +396,8 @@ class DeepAnalysisResponse(BaseModel):
     results: Optional[Dict[str, Any]] = None
     applied_tier: Optional[str] = None
     error: Optional[str] = None
+    # ICPERF Task 0.4 ㊻：候選來源與逐欄篩選通過狀態（`DeepAnalysisReport.candidate_selection`）
+    candidate_selection: Optional[Dict[str, Any]] = None
 
 
 class FeatureListItem(BaseModel):

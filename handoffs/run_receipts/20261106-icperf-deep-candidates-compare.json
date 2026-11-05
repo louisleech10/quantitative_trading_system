@@ -1,0 +1,24 @@
+{
+ "old": "runs/icperf/correctness-20261105h/captures",
+ "new": "runs/icperf/correctness-20261105j/captures",
+ "requests": {
+  "A.deep_analysis": {
+   "n_leaves": 32510,
+   "keys_only_old": [],
+   "keys_only_new": [],
+   "numeric_diff_by_key": {},
+   "nonnumeric_diffs": [],
+   "n_p_values_compared": 56,
+   "max_p_diff_over_old_eps": 0.0
+  },
+  "L.deep_analysis": {
+   "n_leaves": 94583,
+   "keys_only_old": [],
+   "keys_only_new": [],
+   "numeric_diff_by_key": {},
+   "nonnumeric_diffs": [],
+   "n_p_values_compared": 101,
+   "max_p_diff_over_old_eps": 0.0
+  }
+ }
+}

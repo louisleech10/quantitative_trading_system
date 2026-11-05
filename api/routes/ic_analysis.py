@@ -428,6 +428,7 @@ async def get_deep_analysis_result(task_id: str):
             "results": result,
             "applied_tier": status.get("applied_tier", "intermediate"),
             "error": status.get("error"),
+            "candidate_selection": (result.get("candidate_selection") or None) if isinstance(result, dict) else None,
         }
     except HTTPException:
         raise

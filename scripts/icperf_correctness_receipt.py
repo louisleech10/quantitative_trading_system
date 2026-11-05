@@ -403,10 +403,12 @@ def _child_capture(spec: Mapping[str, Any]) -> Dict[str, Any]:
             if request.get("deep") is not None:
                 deep_request = DeepAnalysisRequest(**request["deep"])
                 deep_override = svc._build_deep_module_override(deep_request)
-                selected = svc._resolve_selected_features(analyzer=analyzer,
-                                                          selected_features=deep_request.selected_features,
-                                                          top_n=deep_request.top_n)
-                deep_report = analyzer.run_deep_analysis(selected, deep_override, fb._progress, None)
+                # ICPERF Task 0.4 ㊻：同服務——未手選交核心候選規則；selected＝核心實際選取欄（存在於分析框者）
+                deep_report = analyzer.run_deep_analysis(deep_request.selected_features or None, deep_override,
+                                                         fb._progress, None, deep_request.top_n)
+                cols = analyzer._ic_cache["features_df"].columns
+                selected = [f["feature_name"] for f in deep_report.candidate_selection.get("features", [])
+                            if f["feature_name"] in cols]
                 response = svc._attach_cross_symbol_context(svc._serialize_deep_report(deep_report), analyzer)
                 cfg = analyzer._apply_tier_config(analyzer._apply_config_override(deep_override))
                 cfg, _ = analyzer._apply_explicit_module_requests(cfg, deep_override)
@@ -2290,6 +2292,8 @@ COVERAGE_RULES: List[tuple] = [
     (r"^/(completed_count|skipped_count|failed_count|total_modules|total_execution_time_s|tier_module_overrides|"
      r"deep_analysis_errors)(/|$)", NON_STAT, f"{_ORC}:2988"),
     (r"^/module_summary/", NON_STAT, f"{_ORC}:2937"),
+    # ICPERF Task 0.4 ㊻：候選來源與逐欄篩選通過揭露（p 值為 summary_table 原值之複本、不另算；名次＝排序）
+    (r"^/candidate_selection(/|$)", NON_STAT, f"{_ORC}:3556"),
 ]
 #: SPEC v5.39 ⑨：依 metadata 之鍵 → 其所依之 metadata 欄；該請求任一特徵之該欄為預設值（或來源記為預設／缺）⇒ 該鍵
 #: metadata-missing（category、data_source、layer 皆同；多元化之三涵蓋率依同一 metadata，一併判）

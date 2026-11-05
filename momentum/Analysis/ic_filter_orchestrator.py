@@ -113,6 +113,10 @@ from momentum.Analysis.ic_split_adapter import ICSplitAdapter
 
 logger = get_logger(__name__)
 
+#: ICPERF Task 0.4 ㊻（SPEC v5.81）：篩後無倖存且未手選時之診斷 Top_n 預設（同 API `DeepAnalysisRequest.top_n` 預設；
+#: 30 為呈現與相容之選擇、非統計最佳值——加大 n 不消除贏家詛咒，Top_n 不構成顯著發現；諮詢 r113）
+DEEP_DIAGNOSTIC_TOP_N = 30
+
 
 MODULE_ENABLED_PATHS: dict[str, tuple[str, str]] = {
     "factor_return": ("factor_return", "enabled"),
@@ -3379,8 +3383,9 @@ class ICFilterOrchestrator:
         config_override: Optional[dict] = None,
         progress_callback: Optional[Callable] = None,
         force_modules: Optional[list[str]] = None,
+        top_n: Optional[int] = None,
     ) -> DeepAnalysisReport:
-        """執行 Phase 2.4/2.5 十個深度分析模組並彙總結果。"""
+        """執行 Phase 2.4/2.5 十個深度分析模組並彙總結果。`top_n`：未手選時之候選數（㊻；見 `_deep_candidate_selection`）。"""
 
         if self._ic_cache is None:
             raise InvalidInputError("IC cache is empty, run analyze() first")
@@ -3410,13 +3415,12 @@ class ICFilterOrchestrator:
             logger.info("Deep analysis disabled by tier preset: %s", config.feature_tiers.active_preset)
             return report
 
-        candidate_features = selected_features or []
-        if not candidate_features:
-            if self._filtered_features_df is not None and not self._filtered_features_df.empty:
-                candidate_features = list(self._filtered_features_df.columns)
-            else:
-                candidate_features = list(self._ic_cache["features_df"].columns)
+        # ICPERF Task 0.4 ㊻（SPEC v5.81）：候選規則——手選 ⇒ 用之；未手選且有倖存 ⇒ 倖存欄（給 top_n 則取倖存中排名前
+        # top_n）；未手選且倖存為空 ⇒ 依排序鍵對完整 summary_table 全域取前 n（預設 DEEP_DIAGNOSTIC_TOP_N）並標診斷模式。
+        # 任何情況不再取 features_df 全部欄（舊退路最多 43 萬欄，使用者 2026-11-05 裁定移除）。
+        candidate_features, candidate_selection = self._deep_candidate_selection(selected_features, top_n)
         selected = [f for f in candidate_features if f in self._ic_cache["features_df"].columns]
+        candidate_selection["n_selected"] = len(selected)
 
         cache_key = self._compute_deep_cache_key(selected, config)
         force_set = set(force_modules or [])
@@ -3546,7 +3550,69 @@ class ICFilterOrchestrator:
         # F1 雙審:owner 空時不得服務依賴 series 的 stale net_ic ok
         sanitized = self._sanitize_deep_report_factor_returns(base_report)
         sanitized.tier_module_overrides = dict(tier_module_overrides)
+        sanitized.candidate_selection = candidate_selection
         return self._ensure_net_ic_owner_consistency(sanitized)
+
+    def _deep_candidate_selection(self, selected_features: Optional[list[str]],
+                                  top_n: Optional[int]) -> tuple[list[str], dict]:
+        """ICPERF Task 0.4 ㊻（SPEC v5.81）：深度分析候選欄與其揭露資訊。
+
+        倖存集合＝stage6 後之 `_filtered_features_df.columns`（未執行篩選 ⇒ None，逐欄 `filter_passed` 記 None）。
+        排名＝完整 summary_table 依 `DEFAULT_SORT_KEY`（`icir_aligned`）降冪之 1 起名次（同 `get_top_features`）。"""
+        if top_n is not None and int(top_n) < 1:
+            raise InvalidInputError(f"top_n must be a positive integer, got {top_n}")
+        survivors: Optional[list[str]] = (
+            None if self._filtered_features_df is None else list(self._filtered_features_df.columns)
+        )
+        survivor_set = set(survivors or [])
+        rows = [r for r in self.get_top_features(n=10**12)
+                if isinstance(r, dict) and r.get("feature_name") is not None]
+        ranked = [str(r.get("feature_name")) for r in rows]
+        rank_of = {name: i + 1 for i, name in enumerate(ranked)}
+        row_of = {str(r.get("feature_name")): r for r in rows}
+        sig = ((self._report or {}).get("metadata") or {}).get("significance") or {}
+        if not isinstance(sig, dict):
+            sig = {}
+
+        def _p(name: str, key: str) -> Optional[float]:
+            v = (row_of.get(name) or {}).get(key)
+            try:
+                f = float(v)
+            except (TypeError, ValueError):
+                return None
+            return f if np.isfinite(f) else None
+        if selected_features:
+            source, candidates = "manual", list(selected_features)
+        elif survivors:
+            source = "survivors"
+            if top_n is None:
+                candidates = list(survivors)
+            else:
+                ordered = sorted(survivors, key=lambda f: rank_of.get(f, len(ranked) + 1))
+                candidates = ordered[: int(top_n)]
+        else:
+            source = "diagnostic_top_n"
+            n = int(top_n) if top_n is not None else DEEP_DIAGNOSTIC_TOP_N
+            candidates = ranked[:n]
+        info = {
+            "source": source,
+            "diagnostic_mode": source == "diagnostic_top_n",
+            "top_n_requested": None if top_n is None else int(top_n),
+            "n_survivors": None if survivors is None else len(survivors),
+            "n_ranked": len(ranked),
+            # 主報告之檢定數與 FDR 設定（`metadata.significance`；缺則 None）——畫面同屏揭露多重檢定規模
+            "n_tests": sig.get("n_tests"),
+            "fdr": dict(sig["fdr"]) if isinstance(sig.get("fdr"), dict) else None,
+            "sort_key": DEFAULT_SORT_KEY,
+            "features": [
+                # 原始 p 與全檢定族 BH 調整後 p 取自 summary_table（不在 Top_n 重算；事件二元另帶 mw 版）
+                {"feature_name": f, "filter_passed": None if survivors is None else (f in survivor_set),
+                 "global_rank": rank_of.get(f), "p_value": _p(f, "p_value"), "p_value_adj": _p(f, "p_value_adj"),
+                 "mw_p_value": _p(f, "mw_p_value"), "mw_p_value_adj": _p(f, "mw_p_value_adj")}
+                for f in candidates
+            ],
+        }
+        return candidates, info
 
     @staticmethod
     def _apply_explicit_module_requests(config: ICConfig, config_override: Optional[dict]) -> tuple[ICConfig, dict]:
