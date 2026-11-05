@@ -2657,6 +2657,54 @@ def test_receipt_ic_autocorr_oracle_matches_product() -> None:
     assert not math.isclose(float(np.corrcoef(x[:-1], x[1:])[0, 1]), tool._acf_lag1_oracle(x)[0], rel_tol=1e-6)
 
 
+def test_receipt_candidate_selection_oracle_matches_product() -> None:
+    """ICPERF Task 0.4 ㊻（審碼 r114）：收據 `evaluate_candidate_selection`（自 summary_table 獨立重排序、倖存集合、請求
+    手選／top_n 重算候選規則與逐欄揭露）與產品 `_deep_candidate_selection` 於四案逐值一致：無倖存（診斷）、未執行
+    篩選、有倖存＋top_n、手選混合（MW 檢定族）；並驗 mutation——產品名次錯一位 ⇒ 收據項不一致。"""
+    import types
+
+    from momentum.Analysis.ic_config_schema import ICConfig
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    tool = _receipt_tool()
+    rng = np.random.default_rng(20261106)
+    names = [f"f{i:02d}" for i in range(12)]
+    icir = rng.permutation(np.r_[np.linspace(-1, 1, 10), [np.nan, 0.5]])  # 含非有限與同值（0.5 可能重複）
+    feats = pd.DataFrame(rng.standard_normal((20, 12)), columns=names)
+
+    def case(survivors: Optional[List[str]], deep: Dict[str, Any], mw: bool) -> tuple:
+        table = [{"feature_name": n, "icir_aligned": float(v), "p_value": 0.01 * (i + 1),
+                  "p_value_adj": 0.05 * (i + 1), **({"mw_p_value": None if i == 3 else 0.002 * (i + 1),
+                                                       "mw_p_value_adj": None if i == 3 else 0.004 * (i + 1)}
+                                                      if mw else {})}
+                 for i, (n, v) in enumerate(zip(names, icir))]
+        report = {"summary_table": table,
+                  "metadata": {"significance": {"n_tests": 11, "fdr": {"method": "bh", "enabled": True}}}}
+        orc = ICFilterOrchestrator(ICConfig())
+        orc._ic_cache = {"features_df": feats}
+        orc._filtered_features_df = None if survivors is None else feats[survivors]
+        orc._report = report
+        _, cs = orc._deep_candidate_selection(deep.get("selected_features"), deep.get("top_n"))
+        cs["n_selected"] = sum(1 for f in cs["features"] if f["feature_name"] in feats.columns)
+        cap = {"deep_raw": types.SimpleNamespace(candidate_selection=cs), "ic_report": report,
+               "survivors": survivors, "request": {"deep": deep}, "cache": {"features_df": feats}}
+        items: Dict[str, Any] = {}
+        tool.evaluate_candidate_selection(cap, items)
+        return items["deep.candidate_selection"], cs, cap
+
+    cases = [([], {"top_n": 5}, False), (None, {"top_n": 4}, False), (["f02", "f07", "f09", "f11"], {"top_n": 2}, False),
+             (["f01"], {"selected_features": ["f01", "f05", "f10"], "top_n": 3}, True)]
+    for surv, deep, mw in cases:
+        t, cs, cap = case(surv, deep, mw)
+        assert t.n > 0 and not t.mismatch, (surv, deep, t.mismatch[:3])
+    # mutation：產品第一欄名次 +1 ⇒ 收據項不一致
+    t, cs, cap = case([], {"top_n": 5}, False)
+    cs["features"][0]["global_rank"] += 1
+    items: Dict[str, Any] = {}
+    tool.evaluate_candidate_selection(cap, items)
+    assert items["deep.candidate_selection"].mismatch
+
+
 def test_receipt_event_binary_oracle_matches_product() -> None:
     """SPEC Task 0.4 ㊵ 修後之事件 0/1 主統計：收據 oracle（逐欄 scipy mannwhitneyu＋statsmodels fdr_bh＋獨立 status 判定）
     與產品 `mann_whitney_table`＋`apply_fdr` 逐欄相同；涵蓋含缺值、常數、全缺值、類別低於下限、正常與反向欄。"""

@@ -29,6 +29,7 @@ const SOURCE_LABEL: Record<DeepCandidateSelection['source'], string> = {
   manual: '手選',
   survivors: '篩選倖存',
   diagnostic_top_n: '診斷 Top_n（無倖存）',
+  unscreened_top_n: '診斷 Top_n（未執行篩選）',
 };
 
 export function DeepCandidateNotice({ selection }: Props) {
@@ -37,7 +38,7 @@ export function DeepCandidateNotice({ selection }: Props) {
   const fdrMethod = selection.fdr && typeof selection.fdr.method === 'string' ? selection.fdr.method : null;
   const failed = selection.features.filter((f) => f.filter_passed === false).length;
   const showTable = selection.diagnostic_mode || failed > 0;
-  const useMw = selection.features.some((f) => f.mw_p_value !== null);
+  const useMw = selection.p_family === 'mann_whitney';
   const n = selection.top_n_requested ?? selection.n_selected;
 
   return (
@@ -48,10 +49,16 @@ export function DeepCandidateNotice({ selection }: Props) {
         selection.diagnostic_mode ? 'border-amber-400/50 text-amber-50' : 'border-white/10 text-gray-100'
       }`}
     >
-      {selection.diagnostic_mode && (
+      {selection.source === 'diagnostic_top_n' && (
         <p className="font-semibold" data-testid="deep-candidate-banner">
           ⚠ 未通過篩選、Top_{n}僅供診斷參考——本次 IC 篩選無任何因子通過，以下為依排序鍵取前 {n} 名之診斷結果，
           不代表顯著或有效因子（從大量未通過候選中取前段，其 IC／ICIR 有向上偏誤）。
+        </p>
+      )}
+      {selection.source === 'unscreened_top_n' && (
+        <p className="font-semibold" data-testid="deep-candidate-banner">
+          ⚠ 未執行篩選、Top_{n}僅供診斷參考——本次未執行 IC 門檻篩選，以下為依排序鍵取前 {n} 名之診斷結果，
+          不代表通過篩選或顯著（排名前段之 IC／ICIR 有向上偏誤）。
         </p>
       )}
       {!selection.diagnostic_mode && failed > 0 && (
@@ -63,7 +70,12 @@ export function DeepCandidateNotice({ selection }: Props) {
         <div><dt className="inline text-gray-400">候選來源：</dt><dd className="inline">{SOURCE_LABEL[selection.source]}</dd></div>
         <div><dt className="inline text-gray-400">受檢特徵數：</dt><dd className="inline">{selection.n_ranked}</dd></div>
         {nTests !== null && nTests !== undefined && (
-          <div><dt className="inline text-gray-400">檢定數 N：</dt><dd className="inline">{nTests}</dd></div>
+          <div>
+            <dt className="inline text-gray-400">
+              檢定數 N（{selection.p_family === 'mann_whitney' ? 'MW 檢定族' : 'IC 檢定族'}）：
+            </dt>
+            <dd className="inline">{nTests}</dd>
+          </div>
         )}
         <div>
           <dt className="inline text-gray-400">通過篩選數：</dt>

@@ -125,7 +125,70 @@ def test_screening_not_run_marks_filter_passed_unknown(monkeypatch: pytest.Monke
     rep, _ = _run(orc, monkeypatch, top_n=5)
     cs = rep.candidate_selection
     assert cs["n_survivors"] is None and cs["diagnostic_mode"] is True
+    # 審碼 r114：未執行篩選另立來源，不得與「篩後無倖存」混稱
+    assert cs["source"] == "unscreened_top_n"
     assert all(f["filter_passed"] is None for f in cs["features"])
+
+
+def test_mann_whitney_family_n_tests_and_copies(monkeypatch: pytest.MonkeyPatch) -> None:
+    """事件二元模式（summary_table 帶 mw_p_value）：檢定數 N＝全部受檢特徵中有限 MW p 之數（非 HAC 族之 n_tests），
+    p_family＝mann_whitney；逐欄 mw_p_value／mw_p_value_adj 原樣取自 summary_table（審碼 r114）。"""
+    orc, names, rank = _orchestrator(survivors=[])
+    for i, row in enumerate(orc._report["summary_table"]):
+        row["mw_p_value"] = None if i % 5 == 0 else 0.001 * (i + 1)
+        row["mw_p_value_adj"] = None if i % 5 == 0 else 0.003 * (i + 1)
+    rep, seen = _run(orc, monkeypatch, top_n=10)
+    cs = rep.candidate_selection
+    assert cs["p_family"] == "mann_whitney"
+    assert cs["n_tests"] == sum(1 for i in range(N_FEATURES) if i % 5 != 0) != 44
+    idx = {n: i for i, n in enumerate(names)}
+    for f in cs["features"]:
+        i = idx[f["feature_name"]]
+        want = (None, None) if i % 5 == 0 else (0.001 * (i + 1), 0.003 * (i + 1))
+        assert (f["mw_p_value"], f["mw_p_value_adj"]) == want
+
+
+def test_ic_family_uses_report_n_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    orc, _, _ = _orchestrator(survivors=[])
+    rep, _ = _run(orc, monkeypatch, top_n=3)
+    assert rep.candidate_selection["p_family"] == "ic" and rep.candidate_selection["n_tests"] == 44
+
+
+def test_pairwise_module_unavailable_when_memory_budget_exceeded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """配對模組事前記憶體預算（審碼 r114）：估算＞可用之 1/2 ⇒ 模組 `unavailable`、理由含 insufficient_memory 與
+    估算位元組、不呼叫該模組、不截欄（候選數不變）；非配對模組不受影響。"""
+    import psutil
+
+    orc, _, _ = _orchestrator(survivors=[])
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: type("VM", (), {"available": 1000})())
+    called: List[str] = []
+    monkeypatch.setattr(orc, "_run_factor_centrality", lambda sel, cfg: called.append("c") or {})
+    monkeypatch.setattr(orc, "_run_parameter_sensitivity", lambda sel, cfg: called.append("ps") or {"ok": True})
+    rep = orc.run_deep_analysis(force_modules=["factor_centrality", "parameter_sensitivity"], top_n=30)
+    assert rep.module_summary["factor_centrality"] == "unavailable"
+    assert "insufficient_memory" in rep.results["factor_centrality"]["reason"]
+    assert "30 features" in rep.results["factor_centrality"]["reason"]
+    assert rep.module_summary["parameter_sensitivity"] == "completed" and called == ["ps"]
+    assert rep.candidate_selection["n_selected"] == 30
+
+
+def test_pairwise_guard_passes_when_memory_sufficient() -> None:
+    ICFilterOrchestrator._pairwise_memory_guard("factor_orthogonalization", 30, 500)  # 30 欄 × 500 列遠小於可用量
+    ICFilterOrchestrator._pairwise_memory_guard("trend_analysis", 10**7, 10**7)  # 非配對模組不檢查
+
+
+def test_runtime_memory_error_marks_module_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """執行中配置失敗（MemoryError）⇒ 模組 `unavailable`（明示記憶體不足），不歸內部錯誤、不入 deep_analysis_errors。"""
+    orc, _, _ = _orchestrator(survivors=[])
+
+    def boom(sel: List[str], cfg: Any) -> dict:
+        raise MemoryError("simulated")
+
+    monkeypatch.setattr(orc, "_run_factor_return", boom)
+    rep = orc.run_deep_analysis(force_modules=["factor_returns"], top_n=5)
+    assert rep.module_summary["factor_returns"] == "unavailable"
+    assert rep.results["factor_returns"]["reason"].startswith("insufficient_memory")
+    assert rep.deep_analysis_errors == []
 
 
 @pytest.mark.parametrize("bad", [0, -3])

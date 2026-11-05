@@ -116,6 +116,11 @@ logger = get_logger(__name__)
 #: ICPERF Task 0.4 ㊻（SPEC v5.81）：篩後無倖存且未手選時之診斷 Top_n 預設（同 API `DeepAnalysisRequest.top_n` 預設；
 #: 30 為呈現與相容之選擇、非統計最佳值——加大 n 不消除贏家詛咒，Top_n 不構成顯著發現；諮詢 r113）
 DEEP_DIAGNOSTIC_TOP_N = 30
+#: ㊻（審碼 r114）：n×n 配對之深度模組（相關矩陣／正交化）與其記憶體估算係數（n×n 矩陣份數、T×n 框份數；pandas
+#: corr 之排名框與結果矩陣、正交化前後兩份相關矩陣）——`_pairwise_memory_guard`
+PAIRWISE_DEEP_MODULES = frozenset({"factor_centrality", "factor_orthogonalization", "feature_quality_diagnostics"})
+PAIRWISE_MATRIX_COPIES = 4
+PAIRWISE_FRAME_COPIES = 3
 
 
 MODULE_ENABLED_PATHS: dict[str, tuple[str, str]] = {
@@ -3467,6 +3472,8 @@ class ICFilterOrchestrator:
             for idx, (module_name, runner) in enumerate(run_targets, start=1):
                 module_started = time.perf_counter()
                 try:
+                    # ㊻（SPEC v5.81，審碼 r114）：配對模組事前記憶體預算——不足 ⇒ ModuleUnavailableError（明示、不截欄）
+                    self._pairwise_memory_guard(module_name, len(selected), len(self._ic_cache["features_df"]))
                     result = runner(selected, config)
                     base_report.results[module_name] = result
                     # D-4：factor_exposure 巢狀 factor_attribution.status==unavailable
@@ -3499,6 +3506,12 @@ class ICFilterOrchestrator:
                         str(exc),
                         time.perf_counter() - module_started,
                     )
+                except MemoryError as exc:
+                    # ㊻（審碼 r114）：執行中配置失敗 ⇒ 明示記憶體不足之不可用（不歸內部錯誤、不截欄重跑）
+                    reason = f"insufficient_memory: {module_name} allocation failed for {len(selected)} features ({exc})"
+                    base_report.results[module_name] = {"status": "unavailable", "value": None, "reason": reason}
+                    base_report.module_summary[module_name] = "unavailable"
+                    logger.warning("Deep module unavailable (memory): %s, %s", module_name, reason)
                 except Exception as exc:  # noqa: BLE001
                     skipped = self._classify_and_skip(module_name, exc)
                     base_report.deep_analysis_errors.append(skipped)
@@ -3553,6 +3566,22 @@ class ICFilterOrchestrator:
         sanitized.candidate_selection = candidate_selection
         return self._ensure_net_ic_owner_consistency(sanitized)
 
+    @staticmethod
+    def _pairwise_memory_guard(module_name: str, n_features: int, n_rows: int) -> None:
+        """ICPERF Task 0.4 ㊻（SPEC v5.81，審碼 r114）：配對模組（n×n 相關矩陣）之事前記憶體預算。估算＝8 位元組 ×
+        （PAIRWISE_MATRIX_COPIES·n²＋PAIRWISE_FRAME_COPIES·T·n）；超過當下可用記憶體（psutil）之 1/2 ⇒
+        `ModuleUnavailableError`（理由含估算與可用量；不截欄、不改 n）。非配對模組不檢查。"""
+        if module_name not in PAIRWISE_DEEP_MODULES or n_features <= 0:
+            return
+        import psutil
+
+        need = 8 * (PAIRWISE_MATRIX_COPIES * n_features * n_features + PAIRWISE_FRAME_COPIES * n_rows * n_features)
+        available = int(psutil.virtual_memory().available)
+        if need > available // 2:
+            raise ModuleUnavailableError(
+                f"insufficient_memory: {module_name} needs ~{need} bytes for {n_features} features × {n_rows} rows "
+                f"(n×n pairwise), available {available}; reduce selected features or run on a larger machine")
+
     def _deep_candidate_selection(self, selected_features: Optional[list[str]],
                                   top_n: Optional[int]) -> tuple[list[str], dict]:
         """ICPERF Task 0.4 ㊻（SPEC v5.81）：深度分析候選欄與其揭露資訊。
@@ -3591,17 +3620,23 @@ class ICFilterOrchestrator:
                 ordered = sorted(survivors, key=lambda f: rank_of.get(f, len(ranked) + 1))
                 candidates = ordered[: int(top_n)]
         else:
-            source = "diagnostic_top_n"
+            # 倖存為空 ⇒ 診斷 Top_n；未執行篩選（survivors None）⇒ 另立來源，不得宣稱「無任何因子通過」（審碼 r114）
+            source = "diagnostic_top_n" if survivors is not None else "unscreened_top_n"
             n = int(top_n) if top_n is not None else DEEP_DIAGNOSTIC_TOP_N
             candidates = ranked[:n]
+        # 檢定數 N 須對應畫面所示 p 之檢定族（審碼 r114）：事件二元模式顯示 MW p ⇒ N＝全部受檢特徵中有限 MW p 之數
+        # （= `_merge_binary_statistics` 之 `apply_fdr` 族）；否則＝主報告 `metadata.significance.n_tests`
+        mw_family = any(_p(name, "mw_p_value") is not None for name in ranked)
+        n_tests = sum(1 for name in ranked if _p(name, "mw_p_value") is not None) if mw_family else sig.get("n_tests")
         info = {
             "source": source,
-            "diagnostic_mode": source == "diagnostic_top_n",
+            "diagnostic_mode": source in ("diagnostic_top_n", "unscreened_top_n"),
             "top_n_requested": None if top_n is None else int(top_n),
             "n_survivors": None if survivors is None else len(survivors),
             "n_ranked": len(ranked),
-            # 主報告之檢定數與 FDR 設定（`metadata.significance`；缺則 None）——畫面同屏揭露多重檢定規模
-            "n_tests": sig.get("n_tests"),
+            # 檢定數與 FDR 設定——畫面同屏揭露多重檢定規模；p_family 標所示 p 之檢定族
+            "p_family": "mann_whitney" if mw_family else "ic",
+            "n_tests": n_tests,
             "fdr": dict(sig["fdr"]) if isinstance(sig.get("fdr"), dict) else None,
             "sort_key": DEFAULT_SORT_KEY,
             "features": [

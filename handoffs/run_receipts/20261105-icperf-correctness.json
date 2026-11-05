@@ -1,8 +1,8 @@
 {
- "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
- "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
+ "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+ "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
  "spec": "docs/ICPERF_SPEC.md v5.81 Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
- "generated_at": "2026-11-05T16:20:06+00:00",
+ "generated_at": "2026-11-05T18:46:19+00:00",
  "tolerance": {
   "relative": 1e-12,
   "derived_relative": 1e-09,
@@ -1019,7 +1019,7 @@
   },
   "long_cell": "L_BTCUSDT_4h_longhist（handoffs/run_receipts/20261029-icperf-long-cell-4h-longhist.json）",
   "kline": "data_cache/feature_klines/kline_cache.h5",
-  "captures": "runs/icperf/correctness-20261105j/captures"
+  "captures": "runs/icperf/correctness-20261106l/captures"
  },
  "items": {
   "cross_sectional": {
@@ -1059,6 +1059,43 @@
     "test_cross_sectional_matches_oracle",
     "test_cross_sectional_hit_rate_counts_finite_ic_only",
     "test_cross_sectional_matches_oracle_on_real_kline"
+   ]
+  },
+  "deep.candidate_selection": {
+   "verdict": "一致",
+   "oracle": "深度候選揭露 ㊻：summary_table 獨立重排序、倖存集合、p 複本與檢定族 N 重算",
+   "max_rel_diff": 0.0,
+   "max_rel_diff_direct": 0.0,
+   "max_rel_diff_derived": 0.0,
+   "n_compared": 386,
+   "n_finite": 264,
+   "n_mismatch": 0,
+   "requests": {
+    "A.deep_analysis": {
+     "verdict": "一致",
+     "n_compared": 193,
+     "n_finite": 133,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "examples": [],
+     "n_mismatch_features": 0,
+     "notes": []
+    },
+    "L.deep_analysis": {
+     "verdict": "一致",
+     "n_compared": 193,
+     "n_finite": 131,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "examples": [],
+     "n_mismatch_features": 0,
+     "notes": []
+    }
+   },
+   "mismatch_features": [],
+   "n_mismatch_features": 0,
+   "tests": [
+    "test_receipt_candidate_selection_oracle_matches_product"
    ]
   },
   "deep.factor_centrality": {
@@ -7999,15 +8036,15 @@
  "requests": {
   "A.ic_report": {
    "rc": 0,
-   "wall_s": 107.695856792,
+   "wall_s": 110.398003542,
    "pickle_bytes": 3672006,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 106.326639292,
-   "peak_rss_bytes": 405782528,
-   "oracle_s": 139.304358584,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 109.04423687500001,
+   "peak_rss_bytes": 404766720,
+   "oracle_s": 167.260801833,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -10258,15 +10295,15 @@
   },
   "A.ic_report.cov": {
    "rc": 0,
-   "wall_s": 34.34739008399998,
+   "wall_s": 34.467566417,
    "pickle_bytes": 766433,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 33.366726375,
-   "peak_rss_bytes": 439533568,
-   "oracle_s": 28.34069070800001,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 33.565128042,
+   "peak_rss_bytes": 440025088,
+   "oracle_s": 30.429543500000023,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -12396,15 +12433,15 @@
   },
   "A.ic_report.pearson": {
    "rc": 0,
-   "wall_s": 40.13094674999999,
+   "wall_s": 39.12024558300001,
    "pickle_bytes": 1067353,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 39.176857332999994,
-   "peak_rss_bytes": 420020224,
-   "oracle_s": 36.91256370900001,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 38.210671417,
+   "peak_rss_bytes": 459030528,
+   "oracle_s": 38.67390904199999,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -14559,15 +14596,15 @@
   },
   "A.ic_report.kendall": {
    "rc": 0,
-   "wall_s": 42.581810375,
+   "wall_s": 42.38431187499998,
    "pickle_bytes": 1066381,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 41.668305708,
-   "peak_rss_bytes": 454295552,
-   "oracle_s": 36.606538916999995,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 41.451764,
+   "peak_rss_bytes": 468828160,
+   "oracle_s": 36.650020125,
    "request": {
     "kind": "ic_page",
     "item": "ic_report",
@@ -16722,15 +16759,15 @@
   },
   "A.event_report": {
    "rc": 0,
-   "wall_s": 54.676475291,
+   "wall_s": 54.83908629100003,
    "pickle_bytes": 1769436,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 53.734581417,
-   "peak_rss_bytes": 424263680,
-   "oracle_s": 50.05459716599998,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 53.812127708000006,
+   "peak_rss_bytes": 439091200,
+   "oracle_s": 49.86355170799999,
    "request": {
     "kind": "ic_page",
     "item": "event_report",
@@ -18972,15 +19009,15 @@
   },
   "A.event_report.cov": {
    "rc": 0,
-   "wall_s": 24.389127333000033,
+   "wall_s": 24.483377290999954,
    "pickle_bytes": 431345,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 23.510261875,
-   "peak_rss_bytes": 394231808,
-   "oracle_s": 16.586502584000016,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 23.597681292,
+   "peak_rss_bytes": 430391296,
+   "oracle_s": 16.577512958,
    "request": {
     "kind": "ic_page",
     "item": "event_report",
@@ -21110,15 +21147,15 @@
   },
   "A.deep_analysis": {
    "rc": 0,
-   "wall_s": 57.045991791999995,
-   "pickle_bytes": 2273779,
+   "wall_s": 57.633069917,
+   "pickle_bytes": 2273805,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 56.190576333,
-   "peak_rss_bytes": 462569472,
-   "oracle_s": 55.67077633299999,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 56.772353875,
+   "peak_rss_bytes": 447791104,
+   "oracle_s": 55.647661666999966,
    "request": {
     "kind": "ic_page",
     "item": "deep_analysis",
@@ -21277,112 +21314,120 @@
    },
    "coverage": {
     "/candidate_selection/diagnostic_mode": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/fdr/alpha_effective": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/fdr/enabled": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/fdr/method": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/feature_name": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/filter_passed": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/global_rank": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/mw_p_value": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified-na",
+     "proof": "test_receipt_candidate_selection_oracle_matches_product"
     },
     "/candidate_selection/features/#/mw_p_value_adj": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified-na",
+     "proof": "test_receipt_candidate_selection_oracle_matches_product"
     },
     "/candidate_selection/features/#/p_value": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/p_value_adj": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_ranked": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_selected": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_survivors": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_tests": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
+    },
+    "/candidate_selection/p_family": {
+     "oracle": "deep.candidate_selection",
+     "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
+     "n_paths": 1,
+     "status": "verified"
     },
     "/candidate_selection/sort_key": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/source": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/top_n_requested": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/completed_count": {
      "oracle": "非統計欄",
@@ -23485,15 +23530,15 @@
    "closed": true,
    "closure": {
     "closed": true,
-    "n_response_keys": 364,
+    "n_response_keys": 365,
     "missing": [],
     "extra": []
    },
    "uncompared": [],
    "status_counts": {
-    "non-stat": 123,
-    "verified-na": 20,
-    "verified": 211,
+    "verified": 228,
+    "verified-na": 22,
+    "non-stat": 105,
     "insufficient-data": 10
    },
    "facts": {
@@ -23893,20 +23938,29 @@
      "max_rel_diff": 0.0,
      "max_rel_diff_direct": 0.0,
      "max_rel_diff_derived": 0.0
+    },
+    "deep.candidate_selection": {
+     "verdict": "一致",
+     "n_compared": 193,
+     "n_finite": 133,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "max_rel_diff_direct": 0.0,
+     "max_rel_diff_derived": 0.0
     }
    }
   },
   "L.ic_report": {
    "rc": 0,
-   "wall_s": 93.638131542,
+   "wall_s": 94.51628525000001,
    "pickle_bytes": 5295054,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 92.623247084,
-   "peak_rss_bytes": 753385472,
-   "oracle_s": 120.502787291,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 93.446913917,
+   "peak_rss_bytes": 765722624,
+   "oracle_s": 119.82452433400005,
    "request": {
     "kind": "ic_page",
     "item": "ic_report_long",
@@ -26391,15 +26445,15 @@
   },
   "L.ic_report.h34": {
    "rc": 0,
-   "wall_s": 472.43616791600004,
+   "wall_s": 475.635942667,
    "pickle_bytes": 22271928,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 471.230034625,
-   "peak_rss_bytes": 735854592,
-   "oracle_s": 775.77312025,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 474.475055958,
+   "peak_rss_bytes": 695222272,
+   "oracle_s": 773.9389487910001,
    "request": {
     "kind": "ic_page",
     "item": "ic_report_long",
@@ -28690,15 +28744,15 @@
   },
   "L.ic_report.p1": {
    "rc": 0,
-   "wall_s": 147.150234167,
+   "wall_s": 146.58546470800002,
    "pickle_bytes": 5363467,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 146.18182120900002,
-   "peak_rss_bytes": 758005760,
-   "oracle_s": 160.67803833400012,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 145.53193812499998,
+   "peak_rss_bytes": 756416512,
+   "oracle_s": 159.68924883299997,
    "request": {
     "kind": "ic_page",
     "item": "ic_report_long",
@@ -31271,15 +31325,15 @@
   },
   "L.deep_analysis": {
    "rc": 0,
-   "wall_s": 88.92620179200003,
-   "pickle_bytes": 5655868,
+   "wall_s": 91.21027449999997,
+   "pickle_bytes": 5655894,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 88.02107866600001,
-   "peak_rss_bytes": 771637248,
-   "oracle_s": 84.37958375000017,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 90.156569416,
+   "peak_rss_bytes": 759529472,
+   "oracle_s": 84.13291170799994,
    "request": {
     "kind": "ic_page",
     "item": "deep_analysis_long",
@@ -31438,112 +31492,120 @@
    },
    "coverage": {
     "/candidate_selection/diagnostic_mode": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/fdr/alpha_effective": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/fdr/enabled": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/fdr/method": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/feature_name": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/filter_passed": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/global_rank": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/mw_p_value": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified-na",
+     "proof": "test_receipt_candidate_selection_oracle_matches_product"
     },
     "/candidate_selection/features/#/mw_p_value_adj": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified-na",
+     "proof": "test_receipt_candidate_selection_oracle_matches_product"
     },
     "/candidate_selection/features/#/p_value": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/features/#/p_value_adj": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 30,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_ranked": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_selected": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_survivors": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/n_tests": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
+    },
+    "/candidate_selection/p_family": {
+     "oracle": "deep.candidate_selection",
+     "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
+     "n_paths": 1,
+     "status": "verified"
     },
     "/candidate_selection/sort_key": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/source": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/candidate_selection/top_n_requested": {
-     "oracle": "非統計欄",
+     "oracle": "deep.candidate_selection",
      "producer": "momentum/Analysis/ic_filter_orchestrator.py:3556",
      "n_paths": 1,
-     "status": "non-stat"
+     "status": "verified"
     },
     "/completed_count": {
      "oracle": "非統計欄",
@@ -33722,15 +33784,15 @@
    "closed": true,
    "closure": {
     "closed": true,
-    "n_response_keys": 377,
+    "n_response_keys": 378,
     "missing": [],
     "extra": []
    },
    "uncompared": [],
    "status_counts": {
-    "non-stat": 123,
-    "verified-na": 18,
-    "verified": 236
+    "verified": 253,
+    "verified-na": 20,
+    "non-stat": 105
    },
    "facts": {
     "symbol": "BTCUSDT",
@@ -34138,20 +34200,29 @@
      "max_rel_diff": 0.0,
      "max_rel_diff_direct": 0.0,
      "max_rel_diff_derived": 0.0
+    },
+    "deep.candidate_selection": {
+     "verdict": "一致",
+     "n_compared": 193,
+     "n_finite": 131,
+     "n_mismatch": 0,
+     "max_rel_diff": 0.0,
+     "max_rel_diff_direct": 0.0,
+     "max_rel_diff_derived": 0.0
     }
    }
   },
   "L.event_import_report": {
    "rc": 0,
-   "wall_s": 18.656418207999877,
+   "wall_s": 19.798051416999897,
    "pickle_bytes": 909191,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 17.744062375,
-   "peak_rss_bytes": 722468864,
-   "oracle_s": 4.008617250000043,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 18.881625333000002,
+   "peak_rss_bytes": 750698496,
+   "oracle_s": 4.0082986250001795,
    "request": {
     "kind": "ic_page",
     "item": "event_import_report",
@@ -42200,15 +42271,15 @@
   },
   "X.cross_sectional": {
    "rc": 0,
-   "wall_s": 11.624800208000124,
+   "wall_s": 11.795123583000077,
    "pickle_bytes": 174268,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 10.859838292,
-   "peak_rss_bytes": 354107392,
-   "oracle_s": 61.47712249999995,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 11.003698792000002,
+   "peak_rss_bytes": 362250240,
+   "oracle_s": 61.43314991700004,
    "request": {
     "kind": "cross",
     "item": "ic_report",
@@ -43205,15 +43276,15 @@
   },
   "X.cross_sectional.default": {
    "rc": 0,
-   "wall_s": 8.726323542000046,
+   "wall_s": 9.007349374999876,
    "pickle_bytes": 1124095,
    "error": null,
-   "code_sha256": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "code_sha256_at_start": "acfa49688f65988a7145b0a0847e67662a7f12a91de5b523b0c2ccf4362dfb20",
-   "head": "361bf297655339b8ad910937de3c2cfca3fdb319",
-   "elapsed_s": 7.9623493750000005,
-   "peak_rss_bytes": 315998208,
-   "oracle_s": 12.828985250000187,
+   "code_sha256": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "code_sha256_at_start": "8bc337ca651bc5dd76ad873a756e4d6bd24c0a6cbf2cafb377813eb3fcf2fb3a",
+   "head": "81363bde797d304d7e6228cfc414b8119a98d232",
+   "elapsed_s": 8.162915625,
+   "peak_rss_bytes": 355991552,
+   "oracle_s": 12.86570791600002,
    "request": {
     "kind": "cross_kline",
     "item": "ic_report",
@@ -44377,109 +44448,109 @@
   }
  },
  "cross_request": {
-  "stat_keys": 453,
+  "stat_keys": 472,
   "unsatisfied": {}
  },
  "four_way": {
   "A.ic_report": {
-   "wall_s": 107.695856792,
-   "elapsed_s": 106.326639292,
-   "peak_rss_bytes": 405782528,
+   "wall_s": 110.398003542,
+   "elapsed_s": 109.04423687500001,
+   "peak_rss_bytes": 404766720,
    "pickle_bytes": 3672006,
-   "oracle_s": 139.304358584
+   "oracle_s": 167.260801833
   },
   "A.ic_report.cov": {
-   "wall_s": 34.34739008399998,
-   "elapsed_s": 33.366726375,
-   "peak_rss_bytes": 439533568,
+   "wall_s": 34.467566417,
+   "elapsed_s": 33.565128042,
+   "peak_rss_bytes": 440025088,
    "pickle_bytes": 766433,
-   "oracle_s": 28.34069070800001
+   "oracle_s": 30.429543500000023
   },
   "A.ic_report.pearson": {
-   "wall_s": 40.13094674999999,
-   "elapsed_s": 39.176857332999994,
-   "peak_rss_bytes": 420020224,
+   "wall_s": 39.12024558300001,
+   "elapsed_s": 38.210671417,
+   "peak_rss_bytes": 459030528,
    "pickle_bytes": 1067353,
-   "oracle_s": 36.91256370900001
+   "oracle_s": 38.67390904199999
   },
   "A.ic_report.kendall": {
-   "wall_s": 42.581810375,
-   "elapsed_s": 41.668305708,
-   "peak_rss_bytes": 454295552,
+   "wall_s": 42.38431187499998,
+   "elapsed_s": 41.451764,
+   "peak_rss_bytes": 468828160,
    "pickle_bytes": 1066381,
-   "oracle_s": 36.606538916999995
+   "oracle_s": 36.650020125
   },
   "A.event_report": {
-   "wall_s": 54.676475291,
-   "elapsed_s": 53.734581417,
-   "peak_rss_bytes": 424263680,
+   "wall_s": 54.83908629100003,
+   "elapsed_s": 53.812127708000006,
+   "peak_rss_bytes": 439091200,
    "pickle_bytes": 1769436,
-   "oracle_s": 50.05459716599998
+   "oracle_s": 49.86355170799999
   },
   "A.event_report.cov": {
-   "wall_s": 24.389127333000033,
-   "elapsed_s": 23.510261875,
-   "peak_rss_bytes": 394231808,
+   "wall_s": 24.483377290999954,
+   "elapsed_s": 23.597681292,
+   "peak_rss_bytes": 430391296,
    "pickle_bytes": 431345,
-   "oracle_s": 16.586502584000016
+   "oracle_s": 16.577512958
   },
   "A.deep_analysis": {
-   "wall_s": 57.045991791999995,
-   "elapsed_s": 56.190576333,
-   "peak_rss_bytes": 462569472,
-   "pickle_bytes": 2273779,
-   "oracle_s": 55.67077633299999
+   "wall_s": 57.633069917,
+   "elapsed_s": 56.772353875,
+   "peak_rss_bytes": 447791104,
+   "pickle_bytes": 2273805,
+   "oracle_s": 55.647661666999966
   },
   "L.ic_report": {
-   "wall_s": 93.638131542,
-   "elapsed_s": 92.623247084,
-   "peak_rss_bytes": 753385472,
+   "wall_s": 94.51628525000001,
+   "elapsed_s": 93.446913917,
+   "peak_rss_bytes": 765722624,
    "pickle_bytes": 5295054,
-   "oracle_s": 120.502787291
+   "oracle_s": 119.82452433400005
   },
   "L.ic_report.h34": {
-   "wall_s": 472.43616791600004,
-   "elapsed_s": 471.230034625,
-   "peak_rss_bytes": 735854592,
+   "wall_s": 475.635942667,
+   "elapsed_s": 474.475055958,
+   "peak_rss_bytes": 695222272,
    "pickle_bytes": 22271928,
-   "oracle_s": 775.77312025
+   "oracle_s": 773.9389487910001
   },
   "L.ic_report.p1": {
-   "wall_s": 147.150234167,
-   "elapsed_s": 146.18182120900002,
-   "peak_rss_bytes": 758005760,
+   "wall_s": 146.58546470800002,
+   "elapsed_s": 145.53193812499998,
+   "peak_rss_bytes": 756416512,
    "pickle_bytes": 5363467,
-   "oracle_s": 160.67803833400012
+   "oracle_s": 159.68924883299997
   },
   "L.deep_analysis": {
-   "wall_s": 88.92620179200003,
-   "elapsed_s": 88.02107866600001,
-   "peak_rss_bytes": 771637248,
-   "pickle_bytes": 5655868,
-   "oracle_s": 84.37958375000017
+   "wall_s": 91.21027449999997,
+   "elapsed_s": 90.156569416,
+   "peak_rss_bytes": 759529472,
+   "pickle_bytes": 5655894,
+   "oracle_s": 84.13291170799994
   },
   "L.event_import_report": {
-   "wall_s": 18.656418207999877,
-   "elapsed_s": 17.744062375,
-   "peak_rss_bytes": 722468864,
+   "wall_s": 19.798051416999897,
+   "elapsed_s": 18.881625333000002,
+   "peak_rss_bytes": 750698496,
    "pickle_bytes": 909191,
-   "oracle_s": 4.008617250000043
+   "oracle_s": 4.0082986250001795
   },
   "X.cross_sectional": {
-   "wall_s": 11.624800208000124,
-   "elapsed_s": 10.859838292,
-   "peak_rss_bytes": 354107392,
+   "wall_s": 11.795123583000077,
+   "elapsed_s": 11.003698792000002,
+   "peak_rss_bytes": 362250240,
    "pickle_bytes": 174268,
-   "oracle_s": 61.47712249999995
+   "oracle_s": 61.43314991700004
   },
   "X.cross_sectional.default": {
-   "wall_s": 8.726323542000046,
-   "elapsed_s": 7.9623493750000005,
-   "peak_rss_bytes": 315998208,
+   "wall_s": 9.007349374999876,
+   "elapsed_s": 8.162915625,
+   "peak_rss_bytes": 355991552,
    "pickle_bytes": 1124095,
-   "oracle_s": 12.828985250000187
+   "oracle_s": 12.86570791600002
   },
-  "_receipt_bytes": 1406009
+  "_receipt_bytes": 1408547
  },
  "extra_findings": [
   {

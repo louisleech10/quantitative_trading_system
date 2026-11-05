@@ -412,8 +412,11 @@ def _child_capture(spec: Mapping[str, Any]) -> Dict[str, Any]:
                 response = svc._attach_cross_symbol_context(svc._serialize_deep_report(deep_report), analyzer)
                 cfg = analyzer._apply_tier_config(analyzer._apply_config_override(deep_override))
                 cfg, _ = analyzer._apply_explicit_module_requests(cfg, deep_override)
+                fdf = getattr(analyzer, "_filtered_features_df", None)
                 out.update({"deep_raw": deep_report, "deep_config": cfg.model_dump(), "deep_config_obj": cfg,
                             "selected": list(selected),
+                            # ㊻：倖存集合（未執行篩選 ⇒ None），供 candidate_selection 之 oracle
+                            "survivors": None if fdf is None else [str(c) for c in fdf.columns],
                             "fr_series": dict(getattr(analyzer, "_factor_return_series", {}) or {})})
     override = None
     if svc is not None:
@@ -1974,7 +1977,82 @@ def evaluate_deep(cap: Mapping[str, Any], items: Dict[str, Tally]) -> Dict[str, 
         t = items.get(f"deep.{key.split('/')[2]}")
         if t is not None:
             t.na(key, proof)
+    evaluate_candidate_selection(cap, items)
     return status
+
+
+def evaluate_candidate_selection(cap: Mapping[str, Any], items: Dict[str, Tally]) -> None:
+    """ICPERF Task 0.4 ㊻（審碼 r114）：深度回應 `candidate_selection` 逐值對照。oracle 自擷取之 IC 報告 summary_table
+    獨立重排序（`icir_aligned` 降冪、非有限置末、同值保持原序＝穩定排序）、倖存集合（擷取當下 `_filtered_features_df`
+    欄）、請求之手選／top_n，重算候選規則、逐欄 filter_passed／全域名次／p 複本、檢定族與 N——不呼叫被測之
+    `_deep_candidate_selection`。"""
+    import math
+
+    raw = cap.get("deep_raw")
+    if raw is None:
+        return
+    cs = getattr(raw, "candidate_selection", None) or {}
+    t = items.setdefault("deep.candidate_selection", Tally(
+        "深度候選揭露 ㊻：summary_table 獨立重排序、倖存集合、p 複本與檢定族 N 重算"))
+    rep = cap.get("ic_report") or {}
+    rows = [r for r in rep.get("summary_table") or [] if isinstance(r, dict) and r.get("feature_name") is not None]
+
+    def sort_key(i: int) -> tuple:
+        v = _f(rows[i].get("icir_aligned"))
+        return (-v if v is not None and math.isfinite(v) else math.inf, i)
+
+    order = [str(rows[i]["feature_name"]) for i in sorted(range(len(rows)), key=sort_key)]
+    rank = {n: i + 1 for i, n in enumerate(order)}
+    by_name = {str(r["feature_name"]): r for r in rows}
+
+    def fin(name: str, key: str) -> Optional[float]:
+        v = _f((by_name.get(name) or {}).get(key))
+        return v if v is not None and math.isfinite(v) else None
+
+    survivors = cap.get("survivors")
+    deep_req = (cap.get("request") or {}).get("deep") or {}
+    manual = deep_req.get("selected_features") or None
+    top_n = deep_req.get("top_n")
+    if manual:
+        src, cands = "manual", list(manual)
+    elif survivors:
+        src = "survivors"
+        cands = (sorted(survivors, key=lambda f: rank.get(f, len(order) + 1))[: int(top_n)]
+                 if top_n is not None else list(survivors))
+    else:
+        src = "diagnostic_top_n" if survivors is not None else "unscreened_top_n"
+        cands = order[: int(top_n) if top_n is not None else 30]
+    mw = any(fin(n, "mw_p_value") is not None for n in order)
+    sig = (rep.get("metadata") or {}).get("significance") or {}
+    n_tests = sum(1 for n in order if fin(n, "mw_p_value") is not None) if mw else sig.get("n_tests")
+    cols = set(getattr(cap["cache"]["features_df"], "columns", []))
+    expect = {"source": src, "diagnostic_mode": src in ("diagnostic_top_n", "unscreened_top_n"),
+              "top_n_requested": None if top_n is None else int(top_n),
+              "n_survivors": None if survivors is None else len(survivors), "n_ranked": len(order),
+              "p_family": "mann_whitney" if mw else "ic", "n_tests": n_tests, "sort_key": "icir_aligned",
+              "n_selected": sum(1 for c in cands if c in cols)}
+    for k, v in expect.items():
+        t.eq(f"/candidate_selection/{k}", k, cs.get(k), v)
+    fdr = sig.get("fdr") if isinstance(sig.get("fdr"), dict) else None
+    if fdr is None:
+        t.eq("/candidate_selection/fdr", "fdr", cs.get("fdr"), None)
+    else:
+        for k, v in fdr.items():
+            t.eq(f"/candidate_selection/fdr/{k}", f"fdr/{k}", (cs.get("fdr") or {}).get(k), v)
+    feats = list(cs.get("features") or [])
+    t.eq("/candidate_selection/features/#/feature_name", "features order", [f.get("feature_name") for f in feats], cands)
+    surv = set(survivors or [])
+    for f in feats:
+        n = str(f.get("feature_name"))
+        t.eq("/candidate_selection/features/#/filter_passed", f"{n}/filter_passed", f.get("filter_passed"),
+             None if survivors is None else (n in surv))
+        t.eq("/candidate_selection/features/#/global_rank", f"{n}/global_rank", f.get("global_rank"), rank.get(n))
+        for k in ("p_value", "p_value_adj", "mw_p_value", "mw_p_value_adj"):
+            t.num(f"/candidate_selection/features/#/{k}", f"{n}/{k}", f.get(k), fin(n, k), tol=0.0)
+    if not mw:
+        # 非事件二元請求之 MW 欄依定義為 None（已逐值對照為 None）；有值路徑以綁定測試之 MW 案另證 ⇒ verified-na
+        for k in ("mw_p_value", "mw_p_value_adj"):
+            t.na(f"/candidate_selection/features/#/{k}", "test_receipt_candidate_selection_oracle_matches_product")
 
 
 #: ICPERF ㊺ B：趨勢資料不足警示 null 分支之明列證明（本測試證 iid 不警示與殘差全 0 之 persistence_not_estimable；
@@ -2292,8 +2370,8 @@ COVERAGE_RULES: List[tuple] = [
     (r"^/(completed_count|skipped_count|failed_count|total_modules|total_execution_time_s|tier_module_overrides|"
      r"deep_analysis_errors)(/|$)", NON_STAT, f"{_ORC}:2988"),
     (r"^/module_summary/", NON_STAT, f"{_ORC}:2937"),
-    # ICPERF Task 0.4 ㊻：候選來源與逐欄篩選通過揭露（p 值為 summary_table 原值之複本、不另算；名次＝排序）
-    (r"^/candidate_selection(/|$)", NON_STAT, f"{_ORC}:3556"),
+    # ICPERF Task 0.4 ㊻（審碼 r114）：候選來源與逐欄篩選通過揭露——逐值對照（`evaluate_candidate_selection`）
+    (r"^/candidate_selection(/|$)", "deep.candidate_selection", f"{_ORC}:3556"),
 ]
 #: SPEC v5.39 ⑨：依 metadata 之鍵 → 其所依之 metadata 欄；該請求任一特徵之該欄為預設值（或來源記為預設／缺）⇒ 該鍵
 #: metadata-missing（category、data_source、layer 皆同；多元化之三涵蓋率依同一 metadata，一併判）
@@ -2442,6 +2520,7 @@ def key_status(key: str, oracle: str, items: Mapping[str, Tally], *, kind: str =
 #: 收據項之綁定測試（`test_icperf_correctness.py` 內實存之測試函式名）：SPEC 最少項取該檔 `ITEM_TESTS`；其餘項於此列
 #: （`<項>.<方法>` 取 `<項>` 之綁定）。
 EXTRA_ITEM_TESTS: Dict[str, tuple] = {
+    "deep.candidate_selection": ("test_receipt_candidate_selection_oracle_matches_product",),
     "label": ("test_label_matches_float64_kline_oracle_on_real_kline",),
     "ic_autocorr": ("test_receipt_ic_autocorr_oracle_matches_product",),
     "event_binary": ("test_receipt_event_binary_oracle_matches_product",),

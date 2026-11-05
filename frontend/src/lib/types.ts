@@ -2531,7 +2531,7 @@ export interface DeepAnalysisResponse {
 }
 
 /** ICPERF Task 0.4 ㊻：候選來源——手選／篩選倖存／無倖存時之診斷 Top_n */
-export type DeepCandidateSource = 'manual' | 'survivors' | 'diagnostic_top_n';
+export type DeepCandidateSource = 'manual' | 'survivors' | 'diagnostic_top_n' | 'unscreened_top_n';
 
 export interface DeepCandidateFeature {
   feature_name: string;
@@ -2553,7 +2553,9 @@ export interface DeepCandidateSelection {
   n_selected: number;
   n_survivors: number | null;
   n_ranked: number;
-  /** 主報告之檢定數（metadata.significance.n_tests） */
+  /** 所示 p 之檢定族：ic＝主報告 IC 檢定（metadata.significance.n_tests）；mann_whitney＝事件二元 MW 檢定 */
+  p_family: 'ic' | 'mann_whitney';
+  /** 該檢定族之檢定數 N */
   n_tests: number | null;
   /** 主報告之 FDR 設定（metadata.significance.fdr） */
   fdr: Record<string, unknown> | null;

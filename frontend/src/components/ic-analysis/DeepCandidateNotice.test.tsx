@@ -22,7 +22,7 @@ function feat(name: string, rank: number, passed: boolean | null, p: number, q: 
 function selection(over: Partial<DeepCandidateSelection>): DeepCandidateSelection {
   return {
     source: 'diagnostic_top_n', diagnostic_mode: true, top_n_requested: 30, n_selected: 2, n_survivors: 0,
-    n_ranked: 430000, n_tests: 429876, fdr: { method: 'bh', enabled: true }, sort_key: 'icir_aligned',
+    n_ranked: 430000, p_family: 'ic', n_tests: 429876, fdr: { method: 'bh', enabled: true }, sort_key: 'icir_aligned',
     features: [feat('f_a', 1, false, 0.0123, 0.9876), feat('f_b', 2, false, 0.05, 0.99)],
     ...over,
   };
@@ -90,11 +90,30 @@ describe('DeepCandidateNotice', () => {
 
   it('screening_not_run_label', () => {
     render(<DeepCandidateNotice selection={selection({
-      n_survivors: null, features: [feat('f_a', 1, null, 0.1, 0.5)],
+      source: 'unscreened_top_n', n_survivors: null, features: [feat('f_a', 1, null, 0.1, 0.5)],
     })} />);
     const notice = screen.getByTestId('deep-candidate-notice');
     expect(notice.textContent).toContain('未執行篩選');
+    // 審碼 r114：未執行篩選不得宣稱「無任何因子通過」
+    const banner = screen.getByTestId('deep-candidate-banner');
+    expect(banner.textContent).toContain('未執行篩選、Top_30僅供診斷參考');
+    expect(banner.textContent).not.toContain('無任何因子通過');
     expect(within(screen.getByTestId('deep-candidate-table')).getAllByRole('row')[1].textContent).not.toContain('未通過');
+  });
+
+  it('mann_whitney_family_label_and_columns', () => {
+    render(<DeepCandidateNotice selection={selection({
+      p_family: 'mann_whitney', n_tests: 3000,
+      features: [{ feature_name: 'e1', filter_passed: false, global_rank: 1, p_value: 0.2, p_value_adj: 0.9,
+        mw_p_value: 0.0042, mw_p_value_adj: 0.731 }],
+    })} />);
+    const notice = screen.getByTestId('deep-candidate-notice');
+    expect(notice.textContent).toContain('檢定數 N（MW 檢定族）');
+    expect(notice.textContent).toContain('3000');
+    const row = within(screen.getByTestId('deep-candidate-table')).getAllByRole('row')[1];
+    expect(row.textContent).toContain('0.0042');
+    expect(row.textContent).toContain('0.7310');
+    expect(row.textContent).not.toContain('0.2000');
   });
 
   it('renders nothing without selection', () => {
