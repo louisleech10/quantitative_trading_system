@@ -195,11 +195,19 @@ def test_pairwise_memory_estimate_bounds_measured_peak(module: str) -> None:
             orth = FactorOrthogonalizer({**cfg.factor_orthogonalization.model_dump(), "icir_scores": {}})
             return [lambda: orth.gram_schmidt(df), lambda: orth.pca_orthogonalize(df)]
         if module == "factor_centrality":
-            return [lambda: FactorCentralityAnalyzer(cfg.factor_centrality.model_dump()).compute_centrality(df)]
-        return [lambda: FeatureQualityDiagnostics(cfg.feature_quality_diagnostics.model_dump()).redundancy_pre_scan(df)]
+            def full() -> None:  # 審碼 r116：單次＋滾動全路徑（同 `_run_factor_centrality`）
+                an = FactorCentralityAnalyzer(cfg.factor_centrality.model_dump())
+                an.compute_centrality(df)
+                an.compute_rolling_centrality(df)
+            return [full]
+        fq = FeatureQualityDiagnostics(cfg.feature_quality_diagnostics.model_dump())
+        high = df.iloc[:, :1].to_numpy() + 1e-3 * df  # 審碼 r116：高相關輸入（全部配對入 pairs 清單）之最壞形狀
+        return [lambda: fq.redundancy_pre_scan(df), lambda: fq.redundancy_pre_scan(high)]
 
     a, b = ifo.PAIRWISE_MEMORY_COEFFS[module]
-    for T, n in ((400, 120), (1500, 200)):
+    # 中心性全路徑於 tracemalloc 下逐窗重算甚慢 ⇒ 取較短 T（仍覆蓋 n² 與 T·n 兩項）
+    shapes = ((150, 60), (200, 100)) if module == "factor_centrality" else ((400, 120), (600, 200))
+    for T, n in shapes:
         df = pd.DataFrame(rng.standard_normal((T, n)), columns=[f"c{i}" for i in range(n)])
         for fn in runs(df):
             tracemalloc.start()
@@ -225,6 +233,25 @@ def test_centrality_memory_error_not_swallowed_into_dense_fallback(monkeypatch: 
     with pytest.raises(MemoryError):
         fca.FactorCentralityAnalyzer(ICConfig().factor_centrality.model_dump()).compute_centrality(df)
     assert called == []
+
+
+@pytest.mark.parametrize("target", ["adfuller", "acorr_ljungbox"])
+def test_quality_diagnostics_memory_error_not_swallowed(monkeypatch: pytest.MonkeyPatch, target: str) -> None:
+    """審碼 r116：品質診斷逐欄 ADF／Ljung–Box 之 MemoryError 須上拋（不得降級為 adf_error／ljungbox_error 而模組
+    completed），由深度分析標 unavailable。"""
+    from momentum.Analysis import feature_quality_diagnostics as fqd
+
+    def boom(*a: Any, **k: Any) -> Any:
+        raise MemoryError("simulated")
+
+    monkeypatch.setattr(fqd, target, boom)
+    df = pd.DataFrame(np.random.default_rng(2).standard_normal((120, 3)), columns=list("abc"))
+    diag = fqd.FeatureQualityDiagnostics(ICConfig().feature_quality_diagnostics.model_dump())
+    with pytest.raises(MemoryError):
+        if target == "adfuller":
+            diag.run_batch_adf_test(df)
+        else:
+            diag.run_batch_autocorrelation_test(df)
 
 
 def test_runtime_memory_error_marks_module_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:

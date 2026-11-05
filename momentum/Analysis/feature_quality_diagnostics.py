@@ -85,6 +85,9 @@ class FeatureQualityDiagnostics:
                     "is_stationary": bool(p_value < self._adf_significance) if np.isfinite(p_value) else None,
                     "skipped": False,
                 }
+            except MemoryError:
+                # ICPERF ㊻（審碼 r116）：配置失敗不得降級為逐欄 adf_error；上拋由深度分析標模組 unavailable
+                raise
             except Exception as exc:
                 logger.warning("ADF failed for %s: %s", feature_name, exc)
                 results[feature_name] = {
@@ -125,6 +128,9 @@ class FeatureQualityDiagnostics:
                     "effective_sample_ratio": float(effective_sample_ratio),
                     "skipped": False,
                 }
+            except MemoryError:
+                # ICPERF ㊻（審碼 r116）：同上
+                raise
             except Exception as exc:
                 logger.warning("Ljung-Box failed for %s: %s", feature_name, exc)
                 results[feature_name] = {

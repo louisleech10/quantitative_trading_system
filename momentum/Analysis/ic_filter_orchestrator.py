@@ -116,13 +116,14 @@ logger = get_logger(__name__)
 #: ICPERF Task 0.4 ㊻（SPEC v5.81）：篩後無倖存且未手選時之診斷 Top_n 預設（同 API `DeepAnalysisRequest.top_n` 預設；
 #: 30 為呈現與相容之選擇、非統計最佳值——加大 n 不消除贏家詛咒，Top_n 不構成顯著發現；諮詢 r113）
 DEEP_DIAGNOSTIC_TOP_N = 30
-#: ㊻（審碼 r114／r115）：n×n 配對之深度模組與其記憶體估算係數 (a, b)：估算＝8·(a·n²＋b·T·n) 位元組。係數取產品模組
-#: 實測 tracemalloc 峰值之最小平方擬合（`runs/icperf/hac45/pairwise_module_mem_probe.py`，5 組 T×n：Gram–Schmidt
-#: a≈4.9 b≈7.4、PCA a≈4.4 b≈4.9、中心性 a≈3.7 b≈5.2、品質冗餘掃描 a≈1.0 b≈1.2）之約 2 倍——`_pairwise_memory_guard`
+#: ㊻（審碼 r114／r115／r116）：n×n 配對之深度模組與其記憶體估算係數 (a, b)：估算＝8·(a·n²＋b·T·n) 位元組。係數使
+#: 估算 ≥ 產品模組最壞形狀實測 tracemalloc 峰值之約 2 倍（`runs/icperf/hac45/pairwise_module_mem_probe.py`，5 組 T×n）：
+#: 正交化取 Gram–Schmidt 與 PCA 較大者；中心性取單次＋滾動全路徑（同 `_run_factor_centrality`）；品質診斷取高相關輸入
+#: （全部配對入 pairs 清單）——`_pairwise_memory_guard`
 PAIRWISE_MEMORY_COEFFS: dict[str, tuple[int, int]] = {
     "factor_orthogonalization": (10, 16),
-    "factor_centrality": (8, 12),
-    "feature_quality_diagnostics": (2, 3),
+    "factor_centrality": (8, 24),
+    "feature_quality_diagnostics": (16, 3),
 }
 PAIRWISE_DEEP_MODULES = frozenset(PAIRWISE_MEMORY_COEFFS)
 
