@@ -116,11 +116,15 @@ logger = get_logger(__name__)
 #: ICPERF Task 0.4 ㊻（SPEC v5.81）：篩後無倖存且未手選時之診斷 Top_n 預設（同 API `DeepAnalysisRequest.top_n` 預設；
 #: 30 為呈現與相容之選擇、非統計最佳值——加大 n 不消除贏家詛咒，Top_n 不構成顯著發現；諮詢 r113）
 DEEP_DIAGNOSTIC_TOP_N = 30
-#: ㊻（審碼 r114）：n×n 配對之深度模組（相關矩陣／正交化）與其記憶體估算係數（n×n 矩陣份數、T×n 框份數；pandas
-#: corr 之排名框與結果矩陣、正交化前後兩份相關矩陣）——`_pairwise_memory_guard`
-PAIRWISE_DEEP_MODULES = frozenset({"factor_centrality", "factor_orthogonalization", "feature_quality_diagnostics"})
-PAIRWISE_MATRIX_COPIES = 4
-PAIRWISE_FRAME_COPIES = 3
+#: ㊻（審碼 r114／r115）：n×n 配對之深度模組與其記憶體估算係數 (a, b)：估算＝8·(a·n²＋b·T·n) 位元組。係數取產品模組
+#: 實測 tracemalloc 峰值之最小平方擬合（`runs/icperf/hac45/pairwise_module_mem_probe.py`，5 組 T×n：Gram–Schmidt
+#: a≈4.9 b≈7.4、PCA a≈4.4 b≈4.9、中心性 a≈3.7 b≈5.2、品質冗餘掃描 a≈1.0 b≈1.2）之約 2 倍——`_pairwise_memory_guard`
+PAIRWISE_MEMORY_COEFFS: dict[str, tuple[int, int]] = {
+    "factor_orthogonalization": (10, 16),
+    "factor_centrality": (8, 12),
+    "feature_quality_diagnostics": (2, 3),
+}
+PAIRWISE_DEEP_MODULES = frozenset(PAIRWISE_MEMORY_COEFFS)
 
 
 MODULE_ENABLED_PATHS: dict[str, tuple[str, str]] = {
@@ -3568,14 +3572,15 @@ class ICFilterOrchestrator:
 
     @staticmethod
     def _pairwise_memory_guard(module_name: str, n_features: int, n_rows: int) -> None:
-        """ICPERF Task 0.4 ㊻（SPEC v5.81，審碼 r114）：配對模組（n×n 相關矩陣）之事前記憶體預算。估算＝8 位元組 ×
-        （PAIRWISE_MATRIX_COPIES·n²＋PAIRWISE_FRAME_COPIES·T·n）；超過當下可用記憶體（psutil）之 1/2 ⇒
-        `ModuleUnavailableError`（理由含估算與可用量；不截欄、不改 n）。非配對模組不檢查。"""
+        """ICPERF Task 0.4 ㊻（SPEC v5.81，審碼 r114／r115）：配對模組（n×n）之事前記憶體預算。估算＝8 位元組 ×
+        （a·n²＋b·T·n），(a, b) 依模組取 `PAIRWISE_MEMORY_COEFFS`（實測峰值擬合之約 2 倍）；超過當下可用記憶體
+        （psutil）之 1/2 ⇒ `ModuleUnavailableError`（理由含估算與可用量；不截欄、不改 n）。非配對模組不檢查。"""
         if module_name not in PAIRWISE_DEEP_MODULES or n_features <= 0:
             return
         import psutil
 
-        need = 8 * (PAIRWISE_MATRIX_COPIES * n_features * n_features + PAIRWISE_FRAME_COPIES * n_rows * n_features)
+        a, b = PAIRWISE_MEMORY_COEFFS[module_name]
+        need = 8 * (a * n_features * n_features + b * n_rows * n_features)
         available = int(psutil.virtual_memory().available)
         if need > available // 2:
             raise ModuleUnavailableError(

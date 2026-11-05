@@ -177,6 +177,56 @@ def test_pairwise_guard_passes_when_memory_sufficient() -> None:
     ICFilterOrchestrator._pairwise_memory_guard("trend_analysis", 10**7, 10**7)  # 非配對模組不檢查
 
 
+@pytest.mark.parametrize("module", ["factor_orthogonalization", "factor_centrality", "feature_quality_diagnostics"])
+def test_pairwise_memory_estimate_bounds_measured_peak(module: str) -> None:
+    """審碼 r115：配對模組之記憶體估算 8·(a·n²＋b·T·n) 不低於產品模組實測 tracemalloc 峰值（兩組 T×n；正交化取
+    Gram–Schmidt 與 PCA 兩法較大者）。mutation：係數改回舊 (4, 3) ⇒ 正交化／中心性實測峰值超過估算而紅。"""
+    import tracemalloc
+
+    from momentum.Analysis.factor_centrality_analyzer import FactorCentralityAnalyzer
+    from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
+    from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
+
+    cfg = ICConfig()
+    rng = np.random.default_rng(5)
+
+    def runs(df: pd.DataFrame) -> list:
+        if module == "factor_orthogonalization":
+            orth = FactorOrthogonalizer({**cfg.factor_orthogonalization.model_dump(), "icir_scores": {}})
+            return [lambda: orth.gram_schmidt(df), lambda: orth.pca_orthogonalize(df)]
+        if module == "factor_centrality":
+            return [lambda: FactorCentralityAnalyzer(cfg.factor_centrality.model_dump()).compute_centrality(df)]
+        return [lambda: FeatureQualityDiagnostics(cfg.feature_quality_diagnostics.model_dump()).redundancy_pre_scan(df)]
+
+    a, b = ifo.PAIRWISE_MEMORY_COEFFS[module]
+    for T, n in ((400, 120), (1500, 200)):
+        df = pd.DataFrame(rng.standard_normal((T, n)), columns=[f"c{i}" for i in range(n)])
+        for fn in runs(df):
+            tracemalloc.start()
+            fn()
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            assert peak <= 8 * (a * n * n + b * T * n), (module, T, n, peak)
+
+
+def test_centrality_memory_error_not_swallowed_into_dense_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """審碼 r115：中心性 PCA 配置失敗（MemoryError）須上拋，不得改走更耗記憶體之密集 spearman 相關矩陣退路。"""
+    from momentum.Analysis import factor_centrality_analyzer as fca
+
+    called: List[str] = []
+
+    class BoomPCA:
+        def __init__(self, *a: Any, **k: Any) -> None:
+            raise MemoryError("simulated")
+
+    monkeypatch.setattr(fca, "PCA", BoomPCA)
+    monkeypatch.setattr(pd.DataFrame, "corr", lambda self, *a, **k: called.append("corr") or None)
+    df = pd.DataFrame(np.random.default_rng(1).standard_normal((50, 6)), columns=list("abcdef"))
+    with pytest.raises(MemoryError):
+        fca.FactorCentralityAnalyzer(ICConfig().factor_centrality.model_dump()).compute_centrality(df)
+    assert called == []
+
+
 def test_runtime_memory_error_marks_module_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     """執行中配置失敗（MemoryError）⇒ 模組 `unavailable`（明示記憶體不足），不歸內部錯誤、不入 deep_analysis_errors。"""
     orc, _, _ = _orchestrator(survivors=[])

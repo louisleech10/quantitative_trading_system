@@ -124,6 +124,9 @@ class FactorCentralityAnalyzer:
                 "crowded_features": crowded_features,
                 "independent_features": independent_features,
             }
+        except MemoryError:
+            # ICPERF ㊻（審碼 r115）：配置失敗不得改走更耗記憶體之密集相關矩陣；上拋由深度分析標該模組 unavailable
+            raise
         except Exception as exc:
             logger.warning("PCA centrality fallback due to: %s", exc)
             corr = normalized.corr(method="spearman").abs()
