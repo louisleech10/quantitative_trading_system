@@ -89,6 +89,82 @@ def test_b7b_ls_spread_selects_among_held_points_only() -> None:
     assert multi["subsample_points"] == 40 and multi["subsample_start_pos"] == 1 and multi["interior_gap_count"] == 0
 
 
+def test_b2_ls_spread_and_factor_return_restricted_to_test_segment() -> None:
+    """SPEC ㊺ B(2)：ls_spread／factor_return 趨勢只取支撐起迄皆在測試段之值（手算精確案例）。
+    ls_spread：列 t 支撐〔t, t＋h−1〕；factor_return：格點 j 原列位置＝原點＋j·h，截至首末入選格點、其間未入選者 NaN。
+    無遮罩 ⇒ 原樣；有遮罩缺原點 ⇒ fail-closed；長度不符 ⇒ fail-closed。"""
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator as O
+
+    mask = np.array([False] * 6 + [True] * 6)  # 測試段＝列 6..11
+    ls = [float(i) for i in range(12)]
+    out = O._ls_spread_test_values(ls, 2, mask)
+    # 列 t 入選 ⇔ t≥6 且 t＋1≤11 ⇒ 6..10
+    assert np.array_equal(np.isfinite(out), np.array([False] * 6 + [True] * 5 + [False]))
+    assert out[6:11] == ls[6:11]
+    assert O._ls_spread_test_values(ls, 2, None) is ls
+    with pytest.raises(ValueError):
+        O._ls_spread_test_values(ls[:-1], 2, mask)
+    # factor_return：原點 1、h＝2 ⇒ 格點原列位置 1,3,5,7,9,11；支撐〔p, p＋1〕起迄皆在 6..11 ⇒ 7, 9（11 之迄 12 超出框尾）
+    fr = [10.0, 11.0, 12.0, 13.0, 14.0, 15.0]
+    assert O._factor_return_test_values(fr, 1, 2, mask) == [13.0, 14.0]
+    # 中段非測試格點 ⇒ 截至首末入選、其間 NaN
+    gap = mask.copy()
+    gap[8] = False
+    got = O._factor_return_test_values(fr, 1, 2, gap)  # 7〔7,8〕出局、9〔9,10〕入選 ⇒ 只剩 9
+    assert got == [14.0]
+    mid = np.array([True] * 12)
+    mid[5] = False  # 格點 5〔5,6〕出局 ⇒ 1,3 入選、5 NaN、7,9 入選
+    got = O._factor_return_test_values(fr, 1, 2, mid)
+    assert got[:2] == [10.0, 11.0] and np.isnan(got[2]) and got[3:] == [13.0, 14.0]
+    assert O._factor_return_test_values(fr, 1, 2, np.zeros(12, dtype=bool)) == []
+    assert O._factor_return_test_values(fr, 1, 2, None) is fr
+    with pytest.raises(ValueError):
+        O._factor_return_test_values(fr, None, 2, mask)
+
+
+def test_b2_trend_inputs_ignore_training_segment_outcomes() -> None:
+    """SPEC ㊺ B(2) 反例（r109 委員 RECHECK）：只擾動訓練段之報酬（測試段特徵與報酬不變）⇒ 趨勢 ls_spread／factor_return
+    輸入逐值不變（評估只用測試段結果）；擾動測試段報酬 ⇒ 輸入改變（遮罩非空殼）。持倉為 PIT 擴張分位，訓練段之
+    特徵歷史屬當時已知之過去資訊，依 SPEC 照常使用。"""
+    import types
+
+    from momentum.Analysis.ic_config_schema import ICConfig
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator as O
+    from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
+    from momentum.factories import create_factor_return_analyzer
+
+    rng = np.random.default_rng(7)
+    n, h = 600, 3
+    feats = pd.DataFrame({"f": rng.standard_normal(n)}, index=pd.date_range("2024-01-01", periods=n, freq="h"))
+    ret = pd.Series(rng.standard_normal(n), index=feats.index)
+    mask = np.zeros(n, dtype=bool)
+    mask[450:] = True
+
+    def inputs(r: pd.Series) -> dict:
+        ls = LongShortAnalyzer({}).batch_analyze(feats, r, top_n=1)
+        fr = create_factor_return_analyzer({}).compute_batch(feats, r, horizon=h, top_n=1)
+        report = types.SimpleNamespace(
+            module_summary={"long_short_analysis": "completed", "factor_returns": "completed",
+                            "factor_centrality": "skipped"},
+            results={"long_short_analysis": ls, "factor_returns": fr})
+        got = O._trend_dimension_inputs(report, ICConfig(), n, h, test_mask=mask)
+        return {d: np.asarray(got[d].series["f"], dtype=float) for d in ("ls_spread", "factor_return")}
+
+    base = inputs(ret)
+    perturbed = ret.copy()
+    perturbed.iloc[:440] = rng.standard_normal(440) * 5.0  # 訓練段（含 purge 前）之報酬全換
+    same = inputs(perturbed)
+    for d in base:
+        assert base[d].size > 0 and np.isfinite(base[d]).any(), d
+        assert np.array_equal(base[d], same[d], equal_nan=True), d
+    test_changed = ret.copy()
+    test_changed.iloc[500:520] += 3.0
+    diff = inputs(test_changed)
+    assert any(not np.array_equal(base[d], diff[d], equal_nan=True) for d in base)
+    # ls_spread 非測試列皆為 NaN
+    assert not np.isfinite(base["ls_spread"][:450]).any()
+
+
 def _deep_helpers():
     """共用 test_icperf_deep_centrality_trend.py 之真實資料載入、產品 orchestrator 與獨立 oracle（同一定義，不另寫）。"""
     import importlib.util

@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_hac45_size.py::test_b7_size_adjusted_power_report",
+      "code_sha256": "1544d7f8dbf337a08bf2e9e34f943c6bad2e3f75e86ce3f3ab895365eb09c2ba",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF ㊺ b2d：A⑤／B⑥／B⑦ 研究與 BUDGET-12 量測）",
+      "created_at": "2026-11-05T05:52:16+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 2700.0,
+  "basis": [
+    "B⑦ 9 格×(虛無校正 1＋δ 四值)×1,000 次＝45,000 次；每次只算產品 bartlett_fixedb_slope 之 |t| 與兩對照法（不算 Imhof），以 B⑥ 剖析之非 Imhof 部分約 0.04–0.06 秒估",
+    "與 A⑤／B⑥ 行程並行，餘裕 1.2 倍",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-13"
+  ]
+}

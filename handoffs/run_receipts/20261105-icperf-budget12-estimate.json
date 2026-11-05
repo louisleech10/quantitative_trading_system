@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_budget12_probe.py",
+      "target_argv": "venv/bin/python scripts/icperf_budget12_probe.py all --out handoffs/run_receipts/20261105-icperf-budget12.json",
+      "code_sha256": "7acea579de06cc25e7d778b60f1960aac0725e2696ab69cd4e3e82b2c3379acc",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF ㊺ b2d：A⑤／B⑥／B⑦ 研究與 BUDGET-12 量測）",
+      "created_at": "2026-11-05T08:02:13+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 2400.0,
+  "basis": [
+    "本輪試跑（runs/icperf/hac45/probe_smoke.py）：A 最壞 m＝250 每特徵穩態約 0.01 秒；B 共用 m＝15 約 0.29 秒、B 最壞 m＝15 約 1.17 秒",
+    "GRID：A 六點合計 2,800 特徵（多為毫秒級）；B 共用四點 162 特徵、B 最壞五點 318 特徵（m＝15 之 300 特徵約 350 秒；大 m 點每特徵耗時隨 m 增，估各數十秒至數分鐘）",
+    "須獨占機器（T4，量記憶體）；量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-12"
+  ]
+}

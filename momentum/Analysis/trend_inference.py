@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Optional
 
@@ -211,7 +212,9 @@ def slope_pvalue(x: np.ndarray, t_obs: float) -> PValue:
         return PValue(float("nan"), float("nan"), False)
     if c2 == 0.0:
         return PValue(1.0, 0.0, True)
-    lam_pos, mu = design_spectrum(x)
+    # SPEC ㊺ B(3)：μ「每一設計只算一次，與 c 無關、同設計各特徵共用」——依設計快取（b2d BUDGET-12 量測前發現每特徵
+    # 重算 O(m³) SVD）
+    lam_pos, mu = design_spectrum_cached(x)
     if not np.isfinite(lam_pos) or np.any(~np.isfinite(mu)):
         return PValue(float("nan"), float("nan"), False)
     p_hat, eps = imhof_upper_tail(lam_pos, c2 * mu)
@@ -230,11 +233,28 @@ def slope_pvalue(x: np.ndarray, t_obs: float) -> PValue:
 
 #: 警示模擬之方法鍵（入共同隨機數 seed；與 ㊹ 各 IC 方法之串流分離）
 WARNING_METHOD_KEY = "trend_fixedb_b1"
-_DESIGN_CACHE: dict[bytes, dict] = {}
+#: 設計快取上限（標準有界 LRU；SPEC ㊺ B(3)）：同請求共用設計之 ic／centrality 維恆為最近使用而命中，ls_spread
+#: 每特徵設計本不重用；被淘汰之設計再遇時重算同值（不改任何數值與輸出語意），記憶體與特徵數脫鉤。
+DESIGN_CACHE_MAXSIZE = 256
+_DESIGN_CACHE: "OrderedDict[bytes, dict]" = OrderedDict()
 
 
 def _design_key(x: np.ndarray) -> bytes:
     return hashlib.sha256(np.ascontiguousarray(x, dtype=np.float64).tobytes()).digest()
+
+
+def _design_entry(xv: np.ndarray) -> dict:
+    """取（或建）設計之快取條目並標為最近使用；超過 `DESIGN_CACHE_MAXSIZE` 時淘汰最久未用者。"""
+    key = _design_key(xv)
+    entry = _DESIGN_CACHE.get(key)
+    if entry is None:
+        entry = {}
+        _DESIGN_CACHE[key] = entry
+        while len(_DESIGN_CACHE) > DESIGN_CACHE_MAXSIZE:
+            _DESIGN_CACHE.popitem(last=False)
+    else:
+        _DESIGN_CACHE.move_to_end(key)
+    return entry
 
 
 def _ols_residual_rows(xc: np.ndarray, sxx: float, y: np.ndarray) -> np.ndarray:
@@ -261,11 +281,20 @@ def fixedb_t2_rows(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return t2
 
 
+def design_spectrum_cached(x: np.ndarray) -> tuple[float, np.ndarray]:
+    """:func:`design_spectrum` 之行程內依設計快取（同 `design_median_cached`；快取值與直接計算逐位元相同）。"""
+    xv = np.asarray(x, dtype=float)
+    cache = _design_entry(xv)
+    if "spectrum" not in cache:
+        cache["spectrum"] = design_spectrum(xv)
+    return cache["spectrum"]
+
+
 def critical_t2(x: np.ndarray, alpha: float) -> float:
     """同一設計之精確臨界值 c²_α：P(t² ≥ c²_α｜y iid 常態)＝α（Imhof 尾機率對 c² 嚴格遞減，以 brentq 反解）。
     無負根（μ 空）⇒ p 恆為 1 ⇒ 回 +inf（永不拒絕）。根於 u＝ln c² 上夾擠（每步 ×e²，無字面上下限；r106 CODEX-P1-02），
     只有 Imhof 回非有限或 c² 溢位（數值不可算）才回 NaN。"""
-    lam_pos, mu = design_spectrum(x)
+    lam_pos, mu = design_spectrum_cached(x)
     if mu.size == 0:
         return float("inf")
 
@@ -338,7 +367,7 @@ def trend_warning_statistics(x: np.ndarray, resid_rho_hat: float, alpha: float) 
     s＝sqrt(Σ(D−Δ)²／(R(R−1)))；φ̂＝同設計中位數函數之左廣義逆。"""
 
     xv = np.asarray(x, dtype=float)
-    cache = _DESIGN_CACHE.setdefault(_design_key(xv), {})
+    cache = _design_entry(xv)
     phi_hat = he._left_inverse(design_median_cached(xv), float(resid_rho_hat))
     ckey = ("c2", float(alpha))
     if ckey not in cache:
@@ -373,7 +402,7 @@ MEDIAN_FLAT_TOL = 1e-12
 def design_median_cached(x: np.ndarray) -> np.ndarray:
     """同設計中位數函數（行程內依設計快取）。"""
     xv = np.asarray(x, dtype=float)
-    cache = _DESIGN_CACHE.setdefault(_design_key(xv), {})
+    cache = _design_entry(xv)
     if "median" not in cache:
         cache["median"] = _design_median_function(xv)
     return cache["median"]

@@ -177,6 +177,9 @@ class FactorReturnAnalyzer:
             "long_short_mean_return": float(ls_return_full.mean()),
             "ls_cumulative_sampled": self._sample_series(ls_cumulative, max_points=100),
             "ls_return_series": ls_return_series.tolist(),
+            # ICPERF Task 0.4 ㊺ B(2)：格點原點＝首個有效根之原列位置（輸入特徵列序）；格點 j 之原列位置＝原點＋j·h，
+            # 供趨勢 factor_return 維只取起迄皆在測試段之格點
+            "ls_return_series_origin": int(valid_pos[0]),
             "risk_metrics": risk_metrics,
             "active_bar_count": active_bar_count,
             "turnover": turnover,

@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_hac45_size.py::test_b7_size_adjusted_power_report",
+      "code_sha256": "5546879768d79a33365ca0851f46318880bc1f9a6fa0942029e00cd5d5c13486",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF ㊺ b2d：A⑤／B⑥／B⑦ 研究與 BUDGET-12 量測）",
+      "created_at": "2026-11-05T08:01:35+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 700.0,
+  "basis": [
+    "首輪實跑 runs/icperf/hac45/b7.log：528.00 秒",
+    "r109 後只改注入尺度（σ_LR 由同一虛無校正重複之均值估得、無額外模擬）⇒ 同量級",
+    "與 A⑤＋B⑥ 行程並行；量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-13"
+  ]
+}

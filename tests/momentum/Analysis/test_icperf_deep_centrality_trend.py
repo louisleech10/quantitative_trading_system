@@ -1639,13 +1639,43 @@ def _deep_orchestrator(features_df: pd.DataFrame, label: pd.Series, rolling_ic: 
     return orc
 
 
+def _ref_support_in_test(test_mask: Sequence[bool], start: int, length: int) -> bool:
+    """支撐〔start, start＋length−1〕（原列位置）是否整段落在測試段：逐列檢查（含中間列；測試段為連續區間時與只查
+    起迄等價），迄超出框尾 ⇒ False。"""
+    end = start + length - 1
+    if start < 0 or end >= len(test_mask):
+        return False
+    return all(bool(test_mask[r]) for r in range(start, end + 1))
+
+
+def _ref_ls_spread_test(values: Sequence[float], horizon: int, test_mask: Sequence[bool]) -> List[float]:
+    """㊺ B(2) oracle：ls_spread 第 t 列之報酬支撐〔t, t＋h−1〕不全在測試段 ⇒ 視為非持倉（NaN）。"""
+    return [float(v) if _ref_support_in_test(test_mask, t, horizon) else float("nan") for t, v in enumerate(values)]
+
+
+def _ref_factor_return_test(values: Sequence[float], origin: int, horizon: int,
+                            test_mask: Sequence[bool]) -> List[float]:
+    """㊺ B(2) oracle：因子報酬第 j 格點之原列位置＝origin＋j·h，支撐〔該位置, 該位置＋h−1〕不全在測試段者剔除；
+    序列保留自首個至末個入選格點（格點間距不變），其間剔除者記 NaN；無入選 ⇒ 空序列。"""
+    flags = [_ref_support_in_test(test_mask, origin + j * horizon, horizon) for j in range(len(values))]
+    chosen = [j for j, f in enumerate(flags) if f]
+    if not chosen:
+        return []
+    return [float(values[j]) if flags[j] else float("nan") for j in range(chosen[0], chosen[-1] + 1)]
+
+
 def _ref_trend_sources(report: Any, rolling_ic: dict, names: Sequence[str], cfg: ICConfig, horizon: int,
-                       ic_support: Optional[Tuple[np.ndarray, np.ndarray]] = None) -> dict:
+                       ic_support: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+                       test_mask: Optional[Sequence[bool]] = None) -> dict:
     """㉕ 來源之 oracle 端：來源模組於本請求之狀態取 `module_summary`（completed ⇒ 可用；skipped／unavailable ⇒
     "source_skipped"；未執行 ⇒ "source_module_off"）；centrality 序列以 `ref_rolling_centrality` 獨立重算、重疊窗＝
     min(rolling_window, 列數)；factor_return 取 `ls_return_series`（不重疊抽樣 ⇒ None＝自動頻寬）；ls_spread 取
-    `ls_spread_series`（逐根 h 根前瞻報酬 ⇒ 重疊窗＝horizon）。後兩者之值由 test_icperf_deep_factor_return.py 對照 oracle。"""
+    `ls_spread_series`（逐根 h 根前瞻報酬 ⇒ 重疊窗＝horizon）。後兩者之值由 test_icperf_deep_factor_return.py 對照 oracle。
+    ㊺ B(2)：給 `test_mask`（請求之測試段遮罩，`features_df` 列序）⇒ 後兩者只留報酬支撐整段在測試段之值
+    （`_ref_ls_spread_test`／`_ref_factor_return_test`，逐列檢查之獨立實作）；None ⇒ 不切（無切分）。"""
     summary, results = report.module_summary, report.results
+    tm = None if test_mask is None else [bool(b) for b in np.asarray(test_mask, dtype=bool)]
+    h = int(horizon)
 
     def _state(module: str) -> Optional[str]:
         s = summary.get(module)
@@ -1666,12 +1696,22 @@ def _ref_trend_sources(report: Any, rolling_ic: dict, names: Sequence[str], cfg:
     else:
         out["centrality"] = st
     st = _state("factor_returns")
-    out["factor_return"] = st if st is not None else (
-        {n: v["ls_return_series"] for n, v in results["factor_returns"]["value"]["features"].items()},
-        int(horizon), int(horizon))  # ㊺ B(1)：格點 j 之支撐〔j·h, j·h＋h−1〕
+    if st is None:
+        fr = results["factor_returns"]["value"]["features"]
+        fr_series = {n: (v["ls_return_series"] if tm is None or not isinstance(v["ls_return_series"], list)
+                         else _ref_factor_return_test(v["ls_return_series"], int(v["ls_return_series_origin"]), h, tm))
+                     for n, v in fr.items()}
+        out["factor_return"] = (fr_series, h, h)  # ㊺ B(1)：格點 j 之支撐〔j·h, j·h＋h−1〕（平移不改檢定量）
+    else:
+        out["factor_return"] = st
     st = _state("long_short_analysis")
-    out["ls_spread"] = st if st is not None else (
-        {n: v["ls_spread_series"] for n, v in results["long_short_analysis"].items() if not v.get("skipped")}, int(horizon))
+    if st is None:
+        ls = {n: v["ls_spread_series"] for n, v in results["long_short_analysis"].items() if not v.get("skipped")}
+        if tm is not None:
+            ls = {n: (_ref_ls_spread_test(s, h, tm) if isinstance(s, list) else s) for n, s in ls.items()}
+        out["ls_spread"] = (ls, h)
+    else:
+        out["ls_spread"] = st
     return out
 
 
@@ -1681,6 +1721,39 @@ def _assert_feature_trend_matches_centrality_dim(report: Any) -> None:
     for name, entry in report.results["trend_analysis"].items():
         if name in feats and "centrality_trend" in entry:
             assert feats[name]["trend"] == _CEN_FROM_TREND.get(entry["centrality_trend"]["trend"]), name
+
+
+def test_b2_test_segment_oracle_matches_product_restriction() -> None:
+    """㊺ B(2)：收據 oracle 之測試段限制（`_ref_ls_spread_test`／`_ref_factor_return_test`，逐列檢查）與產品
+    `ICFilterOrchestrator._ls_spread_test_values`／`_factor_return_test_values`（只查起迄）於連續測試段（訓練＋測試
+    切分之實際形狀）逐值相同（NaN 位置同）；含測試段起點恰為格點、迄超出框尾、無入選格點三種邊界。mutation：產品
+    或 oracle 任一處 h−1 改 h 或遮罩取反 ⇒ 紅。"""
+    rng = np.random.default_rng(20261105)
+    cases = [(n, h, origin, start) for n, h, origin, start in
+             [(60, 5, 0, 40), (60, 5, 3, 43), (61, 4, 1, 37), (30, 7, 2, 29), (25, 3, 0, 0), (50, 6, 5, 50)]]
+    for _ in range(30):
+        n = int(rng.integers(20, 120))
+        h = int(rng.integers(1, 9))
+        cases.append((n, h, int(rng.integers(0, h + 3)), int(rng.integers(0, n + 1))))
+    for n, h, origin, start in cases:
+        mask = np.zeros(n, dtype=bool)
+        mask[start:] = True
+        ls = rng.standard_normal(n)
+        ls[rng.random(n) < 0.3] = np.nan
+        got_ls = ICFilterOrchestrator._ls_spread_test_values(ls.tolist(), h, mask)
+        ref_ls = _ref_ls_spread_test(ls.tolist(), h, mask.tolist())
+        np.testing.assert_array_equal(np.asarray(got_ls), np.asarray(ref_ls), err_msg=str((n, h, origin, start)))
+        k = max(0, (n - origin) // h)
+        fr = rng.standard_normal(k).tolist()
+        got_fr = ICFilterOrchestrator._factor_return_test_values(fr, origin, h, mask)
+        ref_fr = _ref_factor_return_test(fr, origin, h, mask.tolist())
+        np.testing.assert_array_equal(np.asarray(got_fr, dtype=float), np.asarray(ref_fr, dtype=float),
+                                      err_msg=str((n, h, origin, start)))
+    # 無入選：測試段為空 ⇒ 兩端皆空序列；ls 全 NaN
+    empty = np.zeros(10, dtype=bool)
+    assert ICFilterOrchestrator._factor_return_test_values([1.0, 2.0], 0, 3, empty) == []
+    assert _ref_factor_return_test([1.0, 2.0], 0, 3, empty.tolist()) == []
+    assert np.isnan(_ref_ls_spread_test([1.0] * 10, 2, empty.tolist())).all()
 
 
 def test_trend_analysis_honors_configured_dimensions() -> None:

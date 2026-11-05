@@ -93,6 +93,8 @@ MODULE_FIELDS: Dict[str, Dict[str, str]] = {
     f"{_FR_FEAT}/ls_cumulative_sampled/#": {"oracle": "fr.ls_cumulative", "producer": f"{FRA}:139-143,172,424-430"},
     # ICPERF Task 0.4 ㉕：趨勢 factor_return 維之逐時點序列＝不重疊擇時多空報酬（h 根格點，格點無有效根 ⇒ NaN）
     f"{_FR_FEAT}/ls_return_series/#": {"oracle": "fr.ls_return_series", "producer": f"{FRA}:compute_factor_returns"},
+    # ICPERF Task 0.4 ㊺ B(2)：格點原點（首個有效根之原列位置）；趨勢 factor_return 維據以只取測試段格點
+    f"{_FR_FEAT}/ls_return_series_origin": {"oracle": "fr.ls_return_series", "producer": f"{FRA}:compute_factor_returns"},
     **{f"{_FR_FEAT}/risk_metrics/{k}": {"oracle": f"fr.risk.{k}", "producer": v} for k, v in _RISK_PRODUCERS.items()},
     f"{_FR_FEAT}/active_bar_count": {"oracle": "fr.position_pit", "producer": f"{FRA}:144,341-398"},
     f"{_FR_FEAT}/turnover": {"oracle": "fr.turnover", "producer": f"{FRA}:145-146"},
@@ -302,6 +304,8 @@ def _ref_fr_feature(feature: pd.Series, y: pd.Series, cfg: Dict[str, Any], h: in
         "long_short_mean_return": float(np.mean(ls)),
         "ls_cumulative_sampled": _ref_sample(cum),
         "ls_return_series": [float(v) for v in series],
+        # ㊺ B(2)：格點原點＝首個有效根之原列位置（輸入特徵列序）
+        "ls_return_series_origin": int(vpos[0]),
         "risk_metrics": ref_risk_metrics(nov, cfg["rf"], ref_bars_per_year(frame_index) / int(h)),
         "active_bar_count": int((pv != 0).sum()),
         "turnover": turnover,

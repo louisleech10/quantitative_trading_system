@@ -3762,9 +3762,11 @@ class ICFilterOrchestrator:
         # ICPERF Task 0.4 ㊺ B(1)：IC 維來源支撐〔窗首列, 窗末列＋h−1〕；centrality 維由其二層窗推得
         ic_support = self._ic_trend_support(rolling_ic, selected_features, config)
         # ICPERF Task 0.4 ㉕：依設定 dimensions 逐維餵入同請求來源模組已算之逐時點序列（不另算）
+        # ㊺ B(2)：與滾動 IC 同一測試段（請求無切分 ⇒ None ⇒ 整段）
+        test_mask = ((self._ic_cache or {}).get("split_context") or {}).get("test_mask")
         dimension_inputs = self._trend_dimension_inputs(
             getattr(self, "_deep_run_report", None), config, len(matrix), self._deep_horizon(config),
-            ic_support=ic_support,
+            ic_support=ic_support, test_mask=test_mask,
         )
         # 無來源支撐（無位置快取）時由 overlap_window（所用窗長／步長）推支撐
         return analyzer.batch_analyze(
@@ -3777,7 +3779,8 @@ class ICFilterOrchestrator:
 
     @staticmethod
     def _trend_dimension_inputs(report: Any, config: ICConfig, n_rows: int, horizon: int,
-                                ic_support: Optional[tuple] = None) -> dict:
+                                ic_support: Optional[tuple] = None,
+                                test_mask: Optional[np.ndarray] = None) -> dict:
         """ICPERF Task 0.4 ㉕：趨勢 centrality／factor_return／ls_spread 三維之來源（同請求深度報告 `report` 之已算結果）。
 
         來源模組狀態取 `report.module_summary`：completed／completed_partial ⇒ 用其結果；skipped／unavailable ⇒
@@ -3786,6 +3789,8 @@ class ICFilterOrchestrator:
         - centrality：`factor_centrality.rolling_centrality`，重疊窗＝滾動中心性實際窗長 min(rolling_window, 列數)
         - factor_return：`factor_returns.value.features.*.ls_return_series`（不重疊抽樣 ⇒ 無重疊、自動頻寬）
         - ls_spread：`long_short_analysis.*.ls_spread_series`（逐根 h 根前瞻報酬 ⇒ 重疊窗＝horizon）
+        `test_mask`（`features_df` 列序之測試段遮罩；None ⇒ 整段）：ls_spread／factor_return 兩維只取支撐起迄皆在
+        測試段之值（ICPERF Task 0.4 ㊺ B(2)；見 :meth:`_ls_spread_test_values`、:meth:`_factor_return_test_values`）。
         """
         from momentum.Analysis.factor_centrality_analyzer import FactorCentralityAnalyzer
         from momentum.Analysis.trend_analyzer import (
@@ -3828,7 +3833,10 @@ class ICFilterOrchestrator:
             # ㊺ B(1)：格點 j 位於首個有效根起第 j·h 根 ⇒ 支撐〔j·h, j·h＋h−1〕（原點＝首個有效根；檢定量對 x 平移不變）
             h_fr = max(1, int(horizon))
             inputs["factor_return"] = TrendDimensionInput(
-                series=_series_map({n: v.get("ls_return_series") for n, v in features.items() if isinstance(v, dict)}),
+                series=_series_map({
+                    n: ICFilterOrchestrator._factor_return_test_values(
+                        v.get("ls_return_series"), v.get("ls_return_series_origin"), h_fr, test_mask)
+                    for n, v in features.items() if isinstance(v, dict)}),
                 overlap_window=h_fr, position_scale=h_fr)
         else:
             inputs["factor_return"] = TrendDimensionInput(status=state)
@@ -3837,13 +3845,58 @@ class ICFilterOrchestrator:
         if state is None:
             per_feature = results["long_short_analysis"]
             inputs["ls_spread"] = TrendDimensionInput(
-                series=_series_map({n: v.get("ls_spread_series") for n, v in per_feature.items()
-                                    if isinstance(v, dict) and not v.get("skipped")}),
+                series=_series_map({
+                    n: ICFilterOrchestrator._ls_spread_test_values(v.get("ls_spread_series"), max(1, int(horizon)),
+                                                                   test_mask)
+                    for n, v in per_feature.items() if isinstance(v, dict) and not v.get("skipped")}),
                 # ㊺ B(7)：非持倉點（NaN）不入設計 ⇒ 不重疊選取只在持倉點上進行
                 overlap_window=max(1, int(horizon)), select_finite_only=True)
         else:
             inputs["ls_spread"] = TrendDimensionInput(status=state)
         return inputs
+
+    @staticmethod
+    def _in_test(test_mask: np.ndarray, start: np.ndarray, end: np.ndarray) -> np.ndarray:
+        """支撐〔start, end〕（原列位置）之起迄皆在測試段者為 True（迄超出框尾 ⇒ False）。"""
+        mask = np.asarray(test_mask, dtype=bool)
+        n = mask.size
+        ok = (start >= 0) & (end < n)
+        out = np.zeros(start.size, dtype=bool)
+        out[ok] = mask[start[ok]] & mask[end[ok]]
+        return out
+
+    @staticmethod
+    def _ls_spread_test_values(values: Any, horizon: int, test_mask: Optional[np.ndarray]) -> Any:
+        """ICPERF Task 0.4 ㊺ B(2)：ls_spread 逐列序列（`features_df` 列序、非持倉 NaN）只留支撐〔t, t＋h−1〕起迄皆在
+        測試段之值，其餘視為非持倉（NaN）；來源模組數值不變（逐時點持倉為 PIT 擴張分位）。test_mask None ⇒ 原樣。"""
+        if test_mask is None or not isinstance(values, list):
+            return values
+        arr = np.asarray(values, dtype=float)
+        if arr.size != np.asarray(test_mask).size:
+            raise ValueError(f"ls_spread series length {arr.size} != test_mask length {np.asarray(test_mask).size}")
+        pos = np.arange(arr.size, dtype=np.int64)
+        keep = ICFilterOrchestrator._in_test(test_mask, pos, pos + int(horizon) - 1)
+        return np.where(keep, arr, np.nan).tolist()
+
+    @staticmethod
+    def _factor_return_test_values(values: Any, origin: Any, horizon: int,
+                                   test_mask: Optional[np.ndarray]) -> Any:
+        """ICPERF Task 0.4 ㊺ B(2)：factor_return 格點序列（格點 j 之原列位置＝origin＋j·h）只留支撐〔原列位置,
+        原列位置＋h−1〕起迄皆在測試段之格點：截至首末入選格點，其間未入選者為 NaN（格點序號平移不改檢定量）。
+        test_mask None ⇒ 原樣；有遮罩而缺 origin ⇒ fail-closed。"""
+        if test_mask is None or not isinstance(values, list):
+            return values
+        if origin is None:
+            raise ValueError("factor_return series lacks ls_return_series_origin; cannot restrict to test segment")
+        arr = np.asarray(values, dtype=float)
+        start = int(origin) + np.arange(arr.size, dtype=np.int64) * int(horizon)
+        keep = ICFilterOrchestrator._in_test(test_mask, start, start + int(horizon) - 1)
+        idx = np.flatnonzero(keep)
+        if idx.size == 0:
+            return []
+        seg = arr[idx[0]: idx[-1] + 1].copy()
+        seg[~keep[idx[0]: idx[-1] + 1]] = np.nan
+        return seg.tolist()
 
     @staticmethod
     def _centrality_support(ic_support: Optional[tuple], window: int) -> Optional[tuple[np.ndarray, np.ndarray]]:

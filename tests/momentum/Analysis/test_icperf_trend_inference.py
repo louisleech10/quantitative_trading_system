@@ -339,3 +339,50 @@ def test_trend_data_warning_memory_error_not_evaluated(monkeypatch: pytest.Monke
     x = _design(30, seed=9)
     out = ti.trend_data_warning(x, np.random.default_rng(1).standard_normal(30), 0.05)
     assert out == {"data_warning": "warning_not_evaluated", "data_warning_detail": None}
+
+
+def test_design_spectrum_computed_once_per_design(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC ㊺ B(3)「μ 每一設計只算一次、同設計各特徵共用」：同設計多次 slope_pvalue／critical_t2 只分解一次；
+    快取值與直接計算逐位元相同、p 與未快取之直接計算相同；不同設計各算一次。"""
+    ti._DESIGN_CACHE.clear()
+    calls = []
+    orig = ti.design_spectrum
+
+    def counting(x: np.ndarray):
+        calls.append(np.asarray(x).size)
+        return orig(x)
+
+    monkeypatch.setattr(ti, "design_spectrum", counting)
+    x = _design(40, seed=5)
+    p_vals = [ti.slope_pvalue(x, t) for t in (0.5, 2.0, 3.5)]
+    ti.critical_t2(x, 0.05)
+    assert calls == [40]
+    lam, mu = orig(x)
+    lam_c, mu_c = ti.design_spectrum_cached(x)
+    assert lam_c == lam and np.array_equal(mu_c, mu)
+    p_direct = ti.imhof_upper_tail(lam, 2.0 ** 2 * mu)[0]
+    assert p_vals[1].p == min(max(p_direct, 0.0), 1.0)
+    ti.slope_pvalue(_design(40, seed=6), 2.0)
+    assert calls == [40, 40]
+
+
+def test_design_cache_bounded_lru(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC ㊺ B(3) 設計快取為有界 LRU：條目數不超過上限、最近使用者保留、被淘汰之設計再遇時重算且值逐位元相同。"""
+    ti._DESIGN_CACHE.clear()
+    monkeypatch.setattr(ti, "DESIGN_CACHE_MAXSIZE", 3)
+    designs = [_design(12, seed=s) for s in range(6)]
+    first = ti.design_spectrum_cached(designs[0])
+    for d in designs[1:3]:
+        ti.design_spectrum_cached(d)
+    ti.design_spectrum_cached(designs[0])  # 標為最近使用 ⇒ 下一次插入淘汰 designs[1]
+    ti.design_spectrum_cached(designs[3])
+    keys = list(ti._DESIGN_CACHE)
+    assert len(keys) == 3
+    assert ti._design_key(designs[1]) not in keys
+    assert keys[-2:] == [ti._design_key(designs[0]), ti._design_key(designs[3])]
+    for d in designs[4:]:  # 快取〔2, 0, 3〕再插入兩個新設計 ⇒ 依序淘汰 2、0
+        ti.design_spectrum_cached(d)
+    assert ti._design_key(designs[0]) not in ti._DESIGN_CACHE  # 已被淘汰
+    lam, mu = ti.design_spectrum_cached(designs[0])  # 重算
+    assert lam == first[0] and np.array_equal(mu, first[1])
+    assert len(ti._DESIGN_CACHE) == 3

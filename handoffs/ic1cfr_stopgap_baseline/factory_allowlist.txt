@@ -8,6 +8,7 @@
 factory_caller|momentum/Analysis/ic_filter_orchestrator.py
 factory_caller|tests/momentum/Analysis/test_factor_return_analyzer.py
 factory_caller|tests/momentum/Analysis/test_icperf_deep_factor_return.py
+factory_caller|tests/momentum/Analysis/test_icperf_trend_wiring.py
 factory_caller|tests/phase26/test_deep_analysis_factories.py
 # section: direct_consumers
 direct_consumer|momentum/factories.py:723:11

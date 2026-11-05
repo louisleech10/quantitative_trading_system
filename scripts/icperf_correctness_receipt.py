@@ -1941,7 +1941,8 @@ def evaluate_deep(cap: Mapping[str, Any], items: Dict[str, Tally]) -> Dict[str, 
                                                                     ic_support=ic_sup))
     run("trend_analysis", lambda p: CT.compare_trend_analysis(
         p, ric, sel, dc["trend_analysis"], rolling_stride=stride, overlap_window="from_key",
-        sources=CT._ref_trend_sources(raw, ric, sel, cap["deep_config_obj"], h, ic_support=ic_sup),
+        sources=CT._ref_trend_sources(raw, ric, sel, cap["deep_config_obj"], h, ic_support=ic_sup,
+                                      test_mask=sc.get("test_mask")),
         dimensions=list(dc["trend_analysis"]["dimensions"]), ic_support=ic_sup))
     run("parameter_sensitivity", lambda p: SO.compare_parameter_sensitivity(
         p, F, y, metadata=meta, config={**dc["parameter_sensitivity"], "icir_window": int(icir_w)}, method=method,

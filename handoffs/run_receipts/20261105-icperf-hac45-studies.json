@@ -1,0 +1,1746 @@
+{
+  "receipt": "ICPERF ㊺ b2d：A⑤ 跨標的 EWC 水準、B⑥ 趨勢 fixed-b 水準、B⑦ 檢定力（SPEC v5.79 判準）",
+  "spec": "docs/ICPERF_SPEC.md v5.79",
+  "git_head": "b2343fda24a88f45a273050413b99959dce2adb9",
+  "worktree_note": "實跑於未提交工作樹；code_sha256 由 run_receipt_identity 對 CODE_PATHS 現值重算並與估時收據相符",
+  "code_paths": [
+    "tests/momentum/Analysis/test_icperf_hac45_size.py",
+    "momentum/Analysis/hac_ewc.py",
+    "momentum/Analysis/trend_inference.py",
+    "momentum/Analysis/trend_analyzer.py",
+    "momentum/Analysis/ic_filter_orchestrator.py",
+    "momentum/Analysis/ic_engine.py",
+    "momentum/Analysis/pit_stats.py",
+    "momentum/Analysis/factor_centrality_analyzer.py",
+    "momentum/Analysis/long_short_analyzer.py",
+    "momentum/Analysis/ic_config_schema.py",
+    "momentum/core/split_preview.py"
+  ],
+  "runs": {
+    "a5b6": {
+      "estimate_receipt": "handoffs/run_receipts/20261105-icperf-hac45-a5b6-r2-estimate.json",
+      "code_sha256": "5546879768d79a33365ca0851f46318880bc1f9a6fa0942029e00cd5d5c13486",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_hac45_size.py::test_a5_xsec_null_rejection_conditional_on_no_warning tests/momentum/Analysis/test_icperf_hac45_size.py::test_b6_trend_null_rejection_conditional_on_no_warning",
+      "pytest_summary": "2 passed in 5220.48s (1:27:00)",
+      "log": "runs/icperf/hac45/a5b6.log",
+      "outputs": {
+        "a5.json": {
+          "study": "A5",
+          "alpha": 0.05,
+          "cells": [
+            {
+              "cell": {
+                "m": 250,
+                "phi": 0.0,
+                "q": 0.0,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=250|phi=0.0|q=0.0|stress=False",
+              "seed": 17179171327694750343,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 102,
+              "unwarned": 2000,
+              "rejected_unwarned": 102,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "None": 2000
+              },
+              "finite_m": {
+                "min": 250,
+                "median": 250.0,
+                "max": 250
+              },
+              "seconds": 1.071,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.051,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.051,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 250,
+                "phi": 0.0,
+                "q": 0.3,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=250|phi=0.0|q=0.3|stress=False",
+              "seed": 1758888155769064894,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 101,
+              "unwarned": 2000,
+              "rejected_unwarned": 101,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "None": 2000
+              },
+              "finite_m": {
+                "min": 152,
+                "median": 175.0,
+                "max": 198
+              },
+              "seconds": 1.515,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.0505,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.0505,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 250,
+                "phi": 0.9,
+                "q": 0.0,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=250|phi=0.9|q=0.0|stress=False",
+              "seed": 7470936135714273107,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 111,
+              "unwarned": 481,
+              "rejected_unwarned": 42,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "small_effective_sample": 1519,
+                "None": 481
+              },
+              "finite_m": {
+                "min": 250,
+                "median": 250.0,
+                "max": 250
+              },
+              "seconds": 0.875,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.0555,
+              "warning_rate": 0.7595000000000001,
+              "unwarned_reject_rate": 0.08731808731808732,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 250,
+                "phi": 0.9,
+                "q": 0.3,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=250|phi=0.9|q=0.3|stress=False",
+              "seed": 4447406291328863313,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 96,
+              "unwarned": 1210,
+              "rejected_unwarned": 71,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "None": 1210,
+                "small_effective_sample": 790
+              },
+              "finite_m": {
+                "min": 148,
+                "median": 175.0,
+                "max": 201
+              },
+              "seconds": 1.154,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.048,
+              "warning_rate": 0.395,
+              "unwarned_reject_rate": 0.05867768595041322,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 250,
+                "phi": 0.99,
+                "q": 0.0,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=250|phi=0.99|q=0.0|stress=False",
+              "seed": 9827301550196217231,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 102,
+              "unwarned": 7,
+              "rejected_unwarned": 1,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "small_effective_sample": 1993,
+                "None": 7
+              },
+              "finite_m": {
+                "min": 250,
+                "median": 250.0,
+                "max": 250
+              },
+              "seconds": 0.828,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.051,
+              "warning_rate": 0.9965,
+              "unwarned_reject_rate": 0.14285714285714285,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 250,
+                "phi": 0.99,
+                "q": 0.3,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=250|phi=0.99|q=0.3|stress=False",
+              "seed": 12300870523153274981,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 101,
+              "unwarned": 224,
+              "rejected_unwarned": 22,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "small_effective_sample": 1776,
+                "None": 224
+              },
+              "finite_m": {
+                "min": 153,
+                "median": 175.0,
+                "max": 200
+              },
+              "seconds": 0.832,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.0505,
+              "warning_rate": 0.888,
+              "unwarned_reject_rate": 0.09821428571428571,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 1000,
+                "phi": 0.0,
+                "q": 0.0,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=1000|phi=0.0|q=0.0|stress=False",
+              "seed": 14444469740557826260,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 76,
+              "unwarned": 2000,
+              "rejected_unwarned": 76,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "None": 2000
+              },
+              "finite_m": {
+                "min": 1000,
+                "median": 1000.0,
+                "max": 1000
+              },
+              "seconds": 2.769,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.038,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.038,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 1000,
+                "phi": 0.0,
+                "q": 0.3,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=1000|phi=0.0|q=0.3|stress=False",
+              "seed": 651870340193429948,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 91,
+              "unwarned": 2000,
+              "rejected_unwarned": 91,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "None": 2000
+              },
+              "finite_m": {
+                "min": 653,
+                "median": 699.0,
+                "max": 743
+              },
+              "seconds": 2.963,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.0455,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.0455,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 1000,
+                "phi": 0.9,
+                "q": 0.0,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=1000|phi=0.9|q=0.0|stress=False",
+              "seed": 11952723313246262320,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 100,
+              "unwarned": 310,
+              "rejected_unwarned": 20,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "small_effective_sample": 1690,
+                "None": 310
+              },
+              "finite_m": {
+                "min": 1000,
+                "median": 1000.0,
+                "max": 1000
+              },
+              "seconds": 2.234,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.05,
+              "warning_rate": 0.845,
+              "unwarned_reject_rate": 0.06451612903225806,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 1000,
+                "phi": 0.9,
+                "q": 0.3,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=1000|phi=0.9|q=0.3|stress=False",
+              "seed": 14972340340184083172,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 101,
+              "unwarned": 1647,
+              "rejected_unwarned": 89,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "None": 1647,
+                "small_effective_sample": 353
+              },
+              "finite_m": {
+                "min": 646,
+                "median": 700.0,
+                "max": 745
+              },
+              "seconds": 2.342,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.0505,
+              "warning_rate": 0.1765,
+              "unwarned_reject_rate": 0.054037644201578625,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 1000,
+                "phi": 0.99,
+                "q": 0.0,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=1000|phi=0.99|q=0.0|stress=False",
+              "seed": 16441472683281126094,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 92,
+              "unwarned": 0,
+              "rejected_unwarned": 0,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "small_effective_sample": 2000
+              },
+              "finite_m": {
+                "min": 1000,
+                "median": 1000.0,
+                "max": 1000
+              },
+              "seconds": 2.115,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.046,
+              "warning_rate": 1.0,
+              "unwarned_reject_rate": null,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "m": 1000,
+                "phi": 0.99,
+                "q": 0.3,
+                "h": 5,
+                "k": 10,
+                "stress": false
+              },
+              "key": "A5|h=5|k=10|m=1000|phi=0.99|q=0.3|stress=False",
+              "seed": 4247018247228261019,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 128,
+              "unwarned": 22,
+              "rejected_unwarned": 5,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "small_effective_sample": 1978,
+                "None": 22
+              },
+              "finite_m": {
+                "min": 650,
+                "median": 700.0,
+                "max": 751
+              },
+              "seconds": 2.407,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.064,
+              "warning_rate": 0.989,
+              "unwarned_reject_rate": 0.22727272727272727,
+              "confirmation_run": {
+                "cell": {
+                  "m": 1000,
+                  "phi": 0.99,
+                  "q": 0.3,
+                  "h": 5,
+                  "k": 10,
+                  "stress": false
+                },
+                "key": "A5|h=5|k=10|m=1000|phi=0.99|q=0.3|stress=False|confirm",
+                "seed": 9283661495836522890,
+                "reps": 20000,
+                "ok": 20000,
+                "rejected": 1078,
+                "unwarned": 265,
+                "rejected_unwarned": 24,
+                "status_counts": {
+                  "ok": 20000
+                },
+                "warning_counts": {
+                  "small_effective_sample": 19735,
+                  "None": 265
+                },
+                "finite_m": {
+                  "min": 641,
+                  "median": 700.0,
+                  "max": 758
+                },
+                "seconds": 22.431
+              },
+              "upper_bound": 127,
+              "initial_pass": false,
+              "confirmation": {
+                "rejected": 1078,
+                "reps": 20000,
+                "reject_rate": 0.0539,
+                "one_sided_p": 0.006397423710461897,
+                "level": 0.0038461538461538464
+              },
+              "pass": true,
+              "verdict": "initial_excess_not_confirmed"
+            },
+            {
+              "cell": {
+                "m": 250,
+                "phi": 0.9,
+                "q": 0.0,
+                "h": 5,
+                "k": "3..10",
+                "stress": true
+              },
+              "key": "A5|h=5|k=3..10|m=250|phi=0.9|q=0.0|stress=True",
+              "seed": 4737617326785535094,
+              "reps": 2000,
+              "ok": 2000,
+              "rejected": 98,
+              "unwarned": 1996,
+              "rejected_unwarned": 98,
+              "status_counts": {
+                "ok": 2000
+              },
+              "warning_counts": {
+                "None": 1996,
+                "small_effective_sample": 4
+              },
+              "finite_m": {
+                "min": 248,
+                "median": 250.0,
+                "max": 250
+              },
+              "seconds": 0.826,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.049,
+              "warning_rate": 0.0020000000000000018,
+              "unwarned_reject_rate": 0.04909819639278557,
+              "upper_bound": 127,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            }
+          ]
+        },
+        "b6.json": {
+          "study": "B6",
+          "alpha": 0.05,
+          "cells": [
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 500,
+                "phi": 0.0,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=500|phi=0.0|w=21",
+              "seed": 15400536522883373732,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 43,
+              "unwarned": 0,
+              "rejected_unwarned": 0,
+              "classified_up_down": 28,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "persistence_not_estimable": 1000
+              },
+              "subsample_points": {
+                "min": 3,
+                "median": 3.0,
+                "max": 3
+              },
+              "seconds": 190.834,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.043,
+              "warning_rate": 1.0,
+              "unwarned_reject_rate": null,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 500,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=500|phi=0.9|w=21",
+              "seed": 275010462532112534,
+              "reps": 1000,
+              "ok": 999,
+              "rejected": 56,
+              "unwarned": 0,
+              "rejected_unwarned": 0,
+              "classified_up_down": 35,
+              "status_counts": {
+                "ok": 999,
+                "degenerate": 1
+              },
+              "warning_counts": {
+                "persistence_not_estimable": 999,
+                "None": 1
+              },
+              "subsample_points": {
+                "min": 3,
+                "median": 3.0,
+                "max": 3
+              },
+              "seconds": 191.582,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.056,
+              "warning_rate": 1.0,
+              "unwarned_reject_rate": null,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 500,
+                "phi": 0.99,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=500|phi=0.99|w=21",
+              "seed": 12983587655687587989,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 55,
+              "unwarned": 0,
+              "rejected_unwarned": 0,
+              "classified_up_down": 29,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "persistence_not_estimable": 1000
+              },
+              "subsample_points": {
+                "min": 3,
+                "median": 3.0,
+                "max": 3
+              },
+              "seconds": 180.797,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.055,
+              "warning_rate": 1.0,
+              "unwarned_reject_rate": null,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.0,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=2000|phi=0.0|w=21",
+              "seed": 14837322520737519281,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 51,
+              "unwarned": 971,
+              "rejected_unwarned": 51,
+              "classified_up_down": 30,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 971,
+                "small_effective_sample": 29
+              },
+              "subsample_points": {
+                "min": 15,
+                "median": 15.0,
+                "max": 15
+              },
+              "seconds": 175.479,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.051,
+              "warning_rate": 0.029000000000000026,
+              "unwarned_reject_rate": 0.05252317198764161,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=2000|phi=0.9|w=21",
+              "seed": 14821825734695757604,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 47,
+              "unwarned": 972,
+              "rejected_unwarned": 47,
+              "classified_up_down": 33,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 972,
+                "small_effective_sample": 28
+              },
+              "subsample_points": {
+                "min": 15,
+                "median": 15.0,
+                "max": 15
+              },
+              "seconds": 172.63,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.047,
+              "warning_rate": 0.028000000000000025,
+              "unwarned_reject_rate": 0.04835390946502058,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.99,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=2000|phi=0.99|w=21",
+              "seed": 2524874000243367562,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 51,
+              "unwarned": 976,
+              "rejected_unwarned": 51,
+              "classified_up_down": 23,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 976,
+                "small_effective_sample": 24
+              },
+              "subsample_points": {
+                "min": 15,
+                "median": 15.0,
+                "max": 15
+              },
+              "seconds": 172.671,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.051,
+              "warning_rate": 0.02400000000000002,
+              "unwarned_reject_rate": 0.05225409836065574,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 5000,
+                "phi": 0.0,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=5000|phi=0.0|w=21",
+              "seed": 13489952601669841974,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 51,
+              "unwarned": 1000,
+              "rejected_unwarned": 51,
+              "classified_up_down": 9,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 1000
+              },
+              "subsample_points": {
+                "min": 39,
+                "median": 39.0,
+                "max": 39
+              },
+              "seconds": 187.037,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.051,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.051,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 5000,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=5000|phi=0.9|w=21",
+              "seed": 17954703978779541015,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 47,
+              "unwarned": 1000,
+              "rejected_unwarned": 47,
+              "classified_up_down": 6,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 1000
+              },
+              "subsample_points": {
+                "min": 39,
+                "median": 39.0,
+                "max": 39
+              },
+              "seconds": 185.403,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.047,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.047,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 5000,
+                "phi": 0.99,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=5000|phi=0.99|w=21",
+              "seed": 18148460267367860695,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 56,
+              "unwarned": 1000,
+              "rejected_unwarned": 56,
+              "classified_up_down": 4,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 1000
+              },
+              "subsample_points": {
+                "min": 39,
+                "median": 39.0,
+                "max": 39
+              },
+              "seconds": 185.44,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.056,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.056,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.0,
+                "w": 63,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=2000|phi=0.0|w=63",
+              "seed": 3441251812474092440,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 45,
+              "unwarned": 603,
+              "rejected_unwarned": 39,
+              "classified_up_down": 40,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 603,
+                "small_effective_sample": 397
+              },
+              "subsample_points": {
+                "min": 5,
+                "median": 5.0,
+                "max": 5
+              },
+              "seconds": 177.454,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.045,
+              "warning_rate": 0.397,
+              "unwarned_reject_rate": 0.06467661691542288,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.99,
+                "w": 63,
+                "h": 5
+              },
+              "key": "B6|dim=ic|h=5|n=2000|phi=0.99|w=63",
+              "seed": 6304009880896575556,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 57,
+              "unwarned": 607,
+              "rejected_unwarned": 48,
+              "classified_up_down": 36,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 607,
+                "small_effective_sample": 393
+              },
+              "subsample_points": {
+                "min": 5,
+                "median": 5.0,
+                "max": 5
+              },
+              "seconds": 176.43,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.057,
+              "warning_rate": 0.393,
+              "unwarned_reject_rate": 0.07907742998352553,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "centrality",
+                "n": 2000,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5,
+                "j": 10
+              },
+              "key": "B6|dim=centrality|h=5|j=10|n=2000|phi=0.9|w=21",
+              "seed": 3410275858596881177,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 40,
+              "unwarned": 560,
+              "rejected_unwarned": 28,
+              "classified_up_down": 8,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "small_effective_sample": 440,
+                "None": 560
+              },
+              "subsample_points": {
+                "min": 4,
+                "median": 4.0,
+                "max": 4
+              },
+              "seconds": 1178.35,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.04,
+              "warning_rate": 0.43999999999999995,
+              "unwarned_reject_rate": 0.05,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            },
+            {
+              "cell": {
+                "dim": "ls_spread",
+                "n": 2000,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5
+              },
+              "key": "B6|dim=ls_spread|h=5|n=2000|phi=0.9|w=21",
+              "seed": 5955849162564347245,
+              "reps": 1000,
+              "ok": 1000,
+              "rejected": 56,
+              "unwarned": 1000,
+              "rejected_unwarned": 56,
+              "classified_up_down": 3,
+              "status_counts": {
+                "ok": 1000
+              },
+              "warning_counts": {
+                "None": 1000
+              },
+              "subsample_points": {
+                "min": 67,
+                "median": 74.0,
+                "max": 78
+              },
+              "seconds": 1995.74,
+              "n_cells_bonferroni": 13,
+              "raw_reject_rate": 0.056,
+              "warning_rate": 0.0,
+              "unwarned_reject_rate": 0.056,
+              "upper_bound": 69,
+              "initial_pass": true,
+              "confirmation": null,
+              "pass": true,
+              "verdict": "pass"
+            }
+          ]
+        }
+      }
+    },
+    "b7": {
+      "estimate_receipt": "handoffs/run_receipts/20261105-icperf-hac45-b7-r2-estimate.json",
+      "code_sha256": "5546879768d79a33365ca0851f46318880bc1f9a6fa0942029e00cd5d5c13486",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_hac45_size.py::test_b7_size_adjusted_power_report",
+      "pytest_summary": "1 passed in 515.02s (0:08:35)",
+      "log": "runs/icperf/hac45/b7.log",
+      "outputs": {
+        "b7.json": {
+          "study": "B7",
+          "alpha": 0.05,
+          "cells": [
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 500,
+                "phi": 0.0,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=500|phi=0.0|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 75,
+              "sigma_lr_null": 0.9594960886861104,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 49.08156523722663,
+                "nw_overlap_fixed_lag": 6.319248425534207,
+                "ewc_overlap": 4.7579221338493705
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.045,
+                  "nw_overlap_fixed_lag": 0.061,
+                  "ewc_overlap": 0.054,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 2,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.054,
+                  "nw_overlap_fixed_lag": 0.083,
+                  "ewc_overlap": 0.078,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 1,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0029544817338097006
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.046,
+                  "nw_overlap_fixed_lag": 0.186,
+                  "ewc_overlap": 0.186,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 1,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.005908963467619401
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.086,
+                  "nw_overlap_fixed_lag": 0.506,
+                  "ewc_overlap": 0.548,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.011817926935238802
+                }
+              },
+              "seconds": 17.121
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 500,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=500|phi=0.9|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 75,
+              "sigma_lr_null": 1.5197676981814845,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 38.38584496233944,
+                "nw_overlap_fixed_lag": 6.297876512031985,
+                "ewc_overlap": 4.528639759986952
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.049,
+                  "nw_overlap_fixed_lag": 0.063,
+                  "ewc_overlap": 0.059,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 1,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.053,
+                  "nw_overlap_fixed_lag": 0.074,
+                  "ewc_overlap": 0.076,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.004679670878137482
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.06,
+                  "nw_overlap_fixed_lag": 0.151,
+                  "ewc_overlap": 0.165,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 1,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.009359341756274965
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.111,
+                  "nw_overlap_fixed_lag": 0.421,
+                  "ewc_overlap": 0.462,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.01871868351254993
+                }
+              },
+              "seconds": 16.528
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 500,
+                "phi": 0.99,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=500|phi=0.99|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 75,
+              "sigma_lr_null": 1.3897217508420714,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 36.99660524967108,
+                "nw_overlap_fixed_lag": 5.7459845378071845,
+                "ewc_overlap": 4.27267540874343
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.05,
+                  "nw_overlap_fixed_lag": 0.056,
+                  "ewc_overlap": 0.048,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.035,
+                  "nw_overlap_fixed_lag": 0.088,
+                  "ewc_overlap": 0.08,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.004279233210385856
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.058,
+                  "nw_overlap_fixed_lag": 0.133,
+                  "ewc_overlap": 0.12,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.008558466420771712
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.102,
+                  "nw_overlap_fixed_lag": 0.444,
+                  "ewc_overlap": 0.43,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.017116932841543423
+                }
+              },
+              "seconds": 17.256
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.0,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=2000|phi=0.0|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 375,
+              "sigma_lr_null": 0.9402894703605117,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 6.1246915740548555,
+                "nw_overlap_fixed_lag": 2.8109451926105398,
+                "ewc_overlap": 2.6277334299336217
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.047,
+                  "nw_overlap_fixed_lag": 0.051,
+                  "ewc_overlap": 0.046,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.049,
+                  "nw_overlap_fixed_lag": 0.092,
+                  "ewc_overlap": 0.082,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.00025896714377389896
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.113,
+                  "nw_overlap_fixed_lag": 0.189,
+                  "ewc_overlap": 0.185,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0005179342875477979
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.325,
+                  "nw_overlap_fixed_lag": 0.578,
+                  "ewc_overlap": 0.559,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0010358685750955958
+                }
+              },
+              "seconds": 49.263
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=2000|phi=0.9|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 375,
+              "sigma_lr_null": 1.5180862647041382,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 6.708896984508751,
+                "nw_overlap_fixed_lag": 3.0462447397496133,
+                "ewc_overlap": 2.712650832207968
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.048,
+                  "nw_overlap_fixed_lag": 0.044,
+                  "ewc_overlap": 0.048,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.052,
+                  "nw_overlap_fixed_lag": 0.067,
+                  "ewc_overlap": 0.077,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0004180994006261583
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.084,
+                  "nw_overlap_fixed_lag": 0.134,
+                  "ewc_overlap": 0.14,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0008361988012523166
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.25,
+                  "nw_overlap_fixed_lag": 0.502,
+                  "ewc_overlap": 0.53,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0016723976025046332
+                }
+              },
+              "seconds": 46.047
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 2000,
+                "phi": 0.99,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=2000|phi=0.99|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 375,
+              "sigma_lr_null": 1.449331160799352,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 6.215244598606882,
+                "nw_overlap_fixed_lag": 2.7073645263058985,
+                "ewc_overlap": 2.4929420340565507
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.041,
+                  "nw_overlap_fixed_lag": 0.047,
+                  "ewc_overlap": 0.048,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.057,
+                  "nw_overlap_fixed_lag": 0.079,
+                  "ewc_overlap": 0.076,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0003991634097006474
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.1,
+                  "nw_overlap_fixed_lag": 0.208,
+                  "ewc_overlap": 0.182,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0007983268194012948
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.258,
+                  "nw_overlap_fixed_lag": 0.571,
+                  "ewc_overlap": 0.565,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0015966536388025896
+                }
+              },
+              "seconds": 45.639
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 5000,
+                "phi": 0.0,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=5000|phi=0.0|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 975,
+              "sigma_lr_null": 0.9753408764025469,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 5.55254997655193,
+                "nw_overlap_fixed_lag": 2.479393949152983,
+                "ewc_overlap": 2.24803069694205
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.08,
+                  "nw_overlap_fixed_lag": 0.081,
+                  "ewc_overlap": 0.081,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.09,
+                  "nw_overlap_fixed_lag": 0.091,
+                  "ewc_overlap": 0.097,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 6.407365492060533e-05
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.152,
+                  "nw_overlap_fixed_lag": 0.212,
+                  "ewc_overlap": 0.219,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.00012814730984121066
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.404,
+                  "nw_overlap_fixed_lag": 0.602,
+                  "ewc_overlap": 0.615,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0002562946196824213
+                }
+              },
+              "seconds": 105.979
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 5000,
+                "phi": 0.9,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=5000|phi=0.9|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 975,
+              "sigma_lr_null": 1.561411462609061,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 5.580816436042068,
+                "nw_overlap_fixed_lag": 2.4565359890151726,
+                "ewc_overlap": 2.260626721099479
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.065,
+                  "nw_overlap_fixed_lag": 0.051,
+                  "ewc_overlap": 0.051,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.086,
+                  "nw_overlap_fixed_lag": 0.075,
+                  "ewc_overlap": 0.076,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.00010257474249751375
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.115,
+                  "nw_overlap_fixed_lag": 0.18,
+                  "ewc_overlap": 0.172,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0002051494849950275
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.38,
+                  "nw_overlap_fixed_lag": 0.639,
+                  "ewc_overlap": 0.634,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.000410298969990055
+                }
+              },
+              "seconds": 104.545
+            },
+            {
+              "cell": {
+                "dim": "ic",
+                "n": 5000,
+                "phi": 0.99,
+                "w": 21,
+                "h": 5
+              },
+              "reps": 1000,
+              "null_key": "B7|dim=ic|h=5|n=5000|phi=0.99|w=21|null",
+              "delta_definition": "β＝δ·σ_LR／L^{3/2}（對序列位置 0..L−1）；σ_LR²＝L·Var(ȳ)，ȳ＝未注入受檢序列之有限值均值，Var 取獨立虛無校正重複之樣本變異",
+              "series_length": 975,
+              "sigma_lr_null": 1.4188746169018176,
+              "delta0_se_with_calibration": 0.009746794344808964,
+              "null_nan_counts": {
+                "product_nonoverlap_fixedb": 0,
+                "nw_overlap_fixed_lag": 0,
+                "ewc_overlap": 0
+              },
+              "size_adjusted_critical_abs_t": {
+                "product_nonoverlap_fixedb": 5.829475304571814,
+                "nw_overlap_fixed_lag": 2.434972576454977,
+                "ewc_overlap": 2.2420389428816265
+              },
+              "size_adjusted_power": {
+                "0": {
+                  "product_nonoverlap_fixedb": 0.053,
+                  "nw_overlap_fixed_lag": 0.051,
+                  "ewc_overlap": 0.049,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0
+                },
+                "2": {
+                  "product_nonoverlap_fixedb": 0.074,
+                  "nw_overlap_fixed_lag": 0.086,
+                  "ewc_overlap": 0.088,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 9.321098374785162e-05
+                },
+                "4": {
+                  "product_nonoverlap_fixedb": 0.121,
+                  "nw_overlap_fixed_lag": 0.186,
+                  "ewc_overlap": 0.193,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.00018642196749570325
+                },
+                "8": {
+                  "product_nonoverlap_fixedb": 0.279,
+                  "nw_overlap_fixed_lag": 0.591,
+                  "ewc_overlap": 0.593,
+                  "nan_counts": {
+                    "product_nonoverlap_fixedb": 0,
+                    "nw_overlap_fixed_lag": 0,
+                    "ewc_overlap": 0
+                  },
+                  "beta": 0.0003728439349914065
+                }
+              },
+              "seconds": 106.148
+            }
+          ]
+        }
+      }
+    }
+  }
+}
