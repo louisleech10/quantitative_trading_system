@@ -1974,7 +1974,9 @@ def evaluate_deep(cap: Mapping[str, Any], items: Dict[str, Tally]) -> Dict[str, 
     return status
 
 
-#: ICPERF ㊺ B：趨勢資料不足警示 null 分支之明列證明（iid 不警示、3 點不可辨識、記憶體不足未執行）
+#: ICPERF ㊺ B：趨勢資料不足警示 null 分支之明列證明（本測試證 iid 不警示與殘差全 0 之 persistence_not_estimable；
+#: 3 點不可辨識與記憶體不足未執行另由同檔 test_trend_data_warning_three_points_not_identifiable、
+#: test_trend_data_warning_memory_error_not_evaluated 證；r108 GROK-P3-02）
 TREND_WARNING_NULL_PROOF = ("tests/momentum/Analysis/test_icperf_trend_inference.py::"
                             "test_trend_data_warning_cases_and_closed_keys")
 

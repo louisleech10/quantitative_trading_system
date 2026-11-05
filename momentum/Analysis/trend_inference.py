@@ -392,7 +392,9 @@ def trend_data_warning(x: np.ndarray, y: np.ndarray, alpha: float) -> dict:
     xc = xv - xv.mean()
     sxx = float(xc @ xc)
     rho_hat = he.ls_ar1_coefficient(_ols_residual_rows(xc, sxx, yv[None, :])[0]) if m >= 3 and sxx > 0 else np.nan
-    if not np.isfinite(rho_hat):
+    # 不可辨識：殘差自由度 m−2 < 2（m < 4：殘差形狀由設計決定、ρ̂ 與 φ 無關），或同設計中位數函數數值平坦
+    # （近共線之設計；r108 GROK-P3-01）——兩者皆 ⇒ persistence_not_estimable
+    if not np.isfinite(rho_hat) or m < 4:
         return {"data_warning": "persistence_not_estimable", "data_warning_detail": None}
     try:
         if float(np.ptp(design_median_cached(xv))) <= MEDIAN_FLAT_TOL:

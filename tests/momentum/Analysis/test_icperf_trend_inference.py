@@ -315,6 +315,18 @@ def test_trend_data_warning_three_points_not_identifiable(x: np.ndarray) -> None
     assert np.ptp(ti._design_median_function(np.arange(4, dtype=float) * 66.0)) > 0.1
 
 
+def test_trend_data_warning_near_collinear_four_points_not_identifiable() -> None:
+    """r108 GROK-P3-01：m＝4 但近共線（中位數函數數值平坦）之設計亦判 persistence_not_estimable；一般 4 點整數設計照常判定
+    （回 None 或 small_effective_sample，不得為 persistence_not_estimable）。"""
+    near = np.array([0.0, 1.0, 1.0 + 1e-12, 2.0])
+    assert np.ptp(ti._design_median_function(near)) <= ti.MEDIAN_FLAT_TOL
+    assert ti.trend_data_warning(near, np.array([0.3, -0.2, 0.5, 0.1]), 0.05)["data_warning"] == \
+        "persistence_not_estimable"
+    regular = np.arange(4, dtype=float) * 66.0
+    assert ti.trend_data_warning(regular, np.array([0.3, -0.2, 0.5, 0.1]), 0.05)["data_warning"] != \
+        "persistence_not_estimable"
+
+
 def test_trend_data_warning_memory_error_not_evaluated(monkeypatch: pytest.MonkeyPatch) -> None:
     """模擬記憶體不足 ⇒ warning_not_evaluated（可重試、p 照常；同 ㊹）。"""
     from momentum.Analysis import hac_ewc as he
