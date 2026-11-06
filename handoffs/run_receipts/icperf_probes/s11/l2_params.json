@@ -1,0 +1,177 @@
+{
+ "schema": "icperf-s11-l2-params/1",
+ "timeframes": {
+  "1h": {
+   "status": "error:RuntimeError:Layer 2 failed: unknown layer failure",
+   "seconds": 2.6,
+   "records": [
+    {
+     "label": "Layer 2:L2.polars",
+     "candidates": [
+      {
+       "branch": "L2.polars",
+       "params": {
+        "rows": 9175,
+        "output_cols": 44827,
+        "max_category_cols": 24640,
+        "category_cols_sum": 44827,
+        "fallback_cols_sum": 24769,
+        "max_fallback_category_cols": 24640,
+        "polars_cols": 20058,
+        "input_cols": 1547,
+        "raw_cols": 10,
+        "workers": 1
+       },
+       "components": {
+        "polars_inputs": 57508900,
+        "polars_frames": 2944514400,
+        "polars_to_pandas": 736128600,
+        "fallback_frames": 1818044600,
+        "category_transient": 5425728000,
+        "return_table": 3290301800,
+        "persist_cast": 1808576000,
+        "persist_chunk": 183500000,
+        "persist_shard": 183500000,
+        "spill": 1645150900,
+        "polars_runtime": 25165824,
+        "segment_constant": 4194304
+       },
+       "planned_anon": 16477162428
+      }
+     ],
+     "limit_bytes_now": null
+    }
+   ],
+   "source": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines"
+  },
+  "4h": {
+   "status": "error:RuntimeError:Layer 2 failed: unknown layer failure",
+   "seconds": 3.7,
+   "records": [
+    {
+     "label": "Layer 2:L2.polars",
+     "candidates": [
+      {
+       "branch": "L2.polars",
+       "params": {
+        "rows": 9175,
+        "output_cols": 44827,
+        "max_category_cols": 24640,
+        "category_cols_sum": 44827,
+        "fallback_cols_sum": 24769,
+        "max_fallback_category_cols": 24640,
+        "polars_cols": 20058,
+        "input_cols": 1547,
+        "raw_cols": 10,
+        "workers": 1
+       },
+       "components": {
+        "polars_inputs": 57508900,
+        "polars_frames": 2944514400,
+        "polars_to_pandas": 736128600,
+        "fallback_frames": 1818044600,
+        "category_transient": 5425728000,
+        "return_table": 3290301800,
+        "persist_cast": 1808576000,
+        "persist_chunk": 183500000,
+        "persist_shard": 183500000,
+        "spill": 1645150900,
+        "polars_runtime": 25165824,
+        "segment_constant": 4194304
+       },
+       "planned_anon": 16477162428
+      }
+     ],
+     "limit_bytes_now": null
+    }
+   ],
+   "source": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines_longhist"
+  },
+  "12h": {
+   "status": "error:RuntimeError:Layer 2 failed: unknown layer failure",
+   "seconds": 2.7,
+   "records": [
+    {
+     "label": "Layer 2:L2.polars",
+     "candidates": [
+      {
+       "branch": "L2.polars",
+       "params": {
+        "rows": 6656,
+        "output_cols": 44827,
+        "max_category_cols": 24640,
+        "category_cols_sum": 44827,
+        "fallback_cols_sum": 24769,
+        "max_fallback_category_cols": 24640,
+        "polars_cols": 20058,
+        "input_cols": 1547,
+        "raw_cols": 10,
+        "workers": 1
+       },
+       "components": {
+        "polars_inputs": 41719808,
+        "polars_frames": 2136096768,
+        "polars_to_pandas": 534024192,
+        "fallback_frames": 1318899712,
+        "category_transient": 3936092160,
+        "return_table": 2386948096,
+        "persist_cast": 1312030720,
+        "persist_chunk": 133120000,
+        "persist_shard": 133120000,
+        "spill": 1193474048,
+        "polars_runtime": 25165824,
+        "segment_constant": 4194304
+       },
+       "planned_anon": 11961411584
+      }
+     ],
+     "limit_bytes_now": null
+    }
+   ],
+   "source": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines_longhist"
+  },
+  "1d": {
+   "status": "error:RuntimeError:Layer 2 failed: unknown layer failure",
+   "seconds": 2.4,
+   "records": [
+    {
+     "label": "Layer 2:L2.polars",
+     "candidates": [
+      {
+       "branch": "L2.polars",
+       "params": {
+        "rows": 3329,
+        "output_cols": 44827,
+        "max_category_cols": 24640,
+        "category_cols_sum": 44827,
+        "fallback_cols_sum": 24769,
+        "max_fallback_category_cols": 24640,
+        "polars_cols": 20058,
+        "input_cols": 1547,
+        "raw_cols": 10,
+        "workers": 1
+       },
+       "components": {
+        "polars_inputs": 20866172,
+        "polars_frames": 1068369312,
+        "polars_to_pandas": 267092328,
+        "fallback_frames": 659648008,
+        "category_transient": 1968637440,
+        "return_table": 1193832664,
+        "persist_cast": 656212480,
+        "persist_chunk": 66580000,
+        "persist_shard": 66580000,
+        "spill": 596916332,
+        "polars_runtime": 25165824,
+        "segment_constant": 4194304
+       },
+       "planned_anon": 5997178532
+      }
+     ],
+     "limit_bytes_now": null
+    }
+   ],
+   "source": "/Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines_longhist"
+  }
+ }
+}

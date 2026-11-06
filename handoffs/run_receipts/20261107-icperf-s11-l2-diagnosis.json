@@ -1,0 +1,63 @@
+{
+  "schema": "icperf-s11-l2-diagnosis/1",
+  "spec": "docs/ICPERF_SPEC.md S11",
+  "consult": "handoffs/reconcile/20261107-icperf-x-consult-r127/synth.md",
+  "code_head": "49a2b0944ab6b059fa695464822af5bde4264705",
+  "rejected_plans": [
+    {
+      "tf": "1h",
+      "rows": 9175,
+      "output_cols": 44827,
+      "max_category_cols": 24640,
+      "planned_anon": 16477162428
+    },
+    {
+      "tf": "4h",
+      "rows": 9175,
+      "output_cols": 44827,
+      "max_category_cols": 24640,
+      "planned_anon": 16477162428
+    },
+    {
+      "tf": "12h",
+      "rows": 6656,
+      "output_cols": 44827,
+      "max_category_cols": 24640,
+      "planned_anon": 11961411584
+    },
+    {
+      "tf": "1d",
+      "rows": 3329,
+      "output_cols": 44827,
+      "max_category_cols": 24640,
+      "planned_anon": 5997178532
+    }
+  ],
+  "measured_l2": [
+    {
+      "kline_rows": 1389,
+      "planned": 2519387092,
+      "increase": 1930184288,
+      "ratio": 0.7661324828284863
+    },
+    {
+      "kline_rows": 2219,
+      "planned": 4007308172,
+      "increase": 2960001256,
+      "ratio": 0.7386507672861852
+    }
+  ],
+  "conditional_estimate_note": "同形狀比值隨列數不變之條件下之線性估計，非原尺寸實測（r127 共識）",
+  "second_point_termination": {
+    "trigger": "swap_volume_low",
+    "last_checkpoint": "{\"label\": \"L3.numba_multi_callback\", \"G\": 1630756808, \"time\": 1793980915.516544}",
+    "source": "momentum/FeatureEngineering/memory_guard.py:297-314 _abort"
+  },
+  "files": {
+    "l2_params.json": "c2eeff98e36ff8f268bc05e76a566097c90cd9dc23afe6b28c8d65af10921fd8",
+    "l2_measure.jsonl": "93163a46589dbb6a957afd4230edcd990818e884932eb4f091492286540d658d",
+    "l2_params_probe.py": "a5d7cd0b3dc4537b3d6956e501694a135061d0b8909103293b861943f259eb14",
+    "l2_measure_probe.py": "996ddcea30e505583d02f878b3fb8c96b6de1b9ba8c6b68050d594ff79234406",
+    "memory_guard_abort_2219rows.json": "2e0d67a75569403eecc0aa25177efe6574cc95ed5aff31f6612f9b92de4a0037"
+  }
+}
