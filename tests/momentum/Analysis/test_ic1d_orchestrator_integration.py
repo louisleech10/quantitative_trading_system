@@ -91,14 +91,32 @@ def _l2_diff(a: Any, b: Any, path: str = "") -> list[str]:
         for i, (x, y) in enumerate(zip(a, b)):
             out += _l2_diff(x, y, f"{path}[{i}]")
         return out
+    if isinstance(a, bool) or isinstance(b, bool):
+        return [] if (type(a) is type(b) and a == b) else [f"{path}: {a!r} vs {b!r}"]
     if _is_num(a) and _is_num(b):
         fa, fb = float(a), float(b)
         if math.isnan(fa) or math.isnan(fb):
             return [] if (math.isnan(fa) and math.isnan(fb)) else [f"{path}: NaN 位置 {fa!r} vs {fb!r}"]
+        # 審碼 r120（CODEX-R120-P1-01、GROK-R120-P1-01）：非有限值先分類——只同號 infinity 相等；容差只用於雙方皆有限
+        if not (math.isfinite(fa) and math.isfinite(fb)):
+            return [] if fa == fb else [f"{path}: 非有限值 {fa!r} vs {fb!r}"]
         if fa == fb or abs(fa - fb) <= REL_TOL * max(abs(fa), abs(fb)):
             return []
         return [f"{path}: {fa!r} vs {fb!r}"]
     return [] if a == b else [f"{path}: {a!r} vs {b!r}"]
+
+
+@pytest.mark.parametrize("a, b, equal", [
+    (1.0, 1.0, True), (1.0, 1.0 + 1e-15, True), (1.0, 1.0 + 1e-9, False),
+    (float("nan"), float("nan"), True), (float("nan"), 1.0, False),
+    (float("inf"), float("inf"), True), (float("-inf"), float("-inf"), True),
+    (float("inf"), 1.0, False), (1.0, float("-inf"), False), (float("-inf"), float("inf"), False),
+    (float("inf"), float("nan"), False), (0, 0.0, True), (True, 1, False),
+])
+def test_l2_diff_classifies_nonfinite_and_tolerance(a: Any, b: Any, equal: bool) -> None:
+    """`_l2_diff` 葉值分類（審碼 r120）：NaN 只等 NaN、±inf 只等同號 inf、有限值 rtol 1e-12、布林不當數值。"""
+    assert (_l2_diff(a, b) == []) is equal
+    assert (_l2_diff({"k": [a]}, {"k": [b]}) == []) is equal
 
 
 def _exposure_hash_from_fe(fe: Any) -> str | None:

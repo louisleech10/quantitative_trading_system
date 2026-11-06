@@ -200,6 +200,14 @@ def test_cli_refuses_heavy_cmd_outside_isolated_copy(fb: Any, monkeypatch: pytes
     assert "SPEC §G ①" in capsys.readouterr().err
 
 
+def test_code_state_head_in_linked_worktree(fb: Any, linked_wt: Dict[str, Any]) -> None:
+    """審碼 r120（CODEX-R120-P2-01、GROK-R120-P2-01）：隔離副本之 `.git` 為 gitdir 指標檔，凍結檔 `code_state.head`
+    須仍為副本 HEAD（不得為 None）；主 repo（目錄型 `.git`、HEAD 為分支 ref）亦同。"""
+    assert fb._git_head(linked_wt["wt"]) == linked_wt["sha"]
+    assert fb._code_state(linked_wt["wt"])["head"] == linked_wt["sha"]
+    assert fb._git_head(linked_wt["main"]) == linked_wt["sha"]
+
+
 def test_isolated_inputs_cover_spec_list(fb: Any) -> None:
     """SPEC §G ① 所列唯讀輸入（feature_klines、feature_klines_longhist、numview_freeze_runs、icperf_inputs、events）。"""
     spec = (REPO / "docs" / "ICPERF_SPEC.md").read_text(encoding="utf-8")

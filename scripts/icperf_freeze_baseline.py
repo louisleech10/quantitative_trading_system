@@ -1838,24 +1838,36 @@ def _volatile_candidates(item: str, raw: Any, files: Mapping[str, Any], cwd: Pat
 
 
 def _git_head(repo_root: Path) -> Optional[str]:
-    """讀 `.git/HEAD`（含 loose ref 與 packed-refs）之提交雜湊；不另啟子行程。讀不到 ⇒ None。"""
+    """讀 `.git/HEAD`（含 loose ref 與 packed-refs）之提交雜湊；不另啟子行程。讀不到 ⇒ None。
+    linked worktree（SPEC §G ① 隔離副本）之 `.git` 為 `gitdir: <路徑>` 指標檔：HEAD 讀該 gitdir，ref 先查該 gitdir、
+    再查其 `commondir` 所指之共用 git 目錄（審碼 r120 CODEX-R120-P2-01／GROK-R120-P2-01）。"""
     git = Path(repo_root) / ".git"
     try:
+        if git.is_file():
+            ptr = git.read_text(encoding="utf-8").strip()
+            if not ptr.startswith("gitdir: "):
+                return None
+            git = (Path(repo_root) / ptr[len("gitdir: "):]).resolve()
         head = (git / "HEAD").read_text(encoding="utf-8").strip()
     except OSError:
         return None
     if not head.startswith("ref: "):
         return head
     ref = head[len("ref: "):]
-    loose = git / ref
-    if loose.is_file():
-        return loose.read_text(encoding="utf-8").strip()
-    packed = git / "packed-refs"
-    if packed.is_file():
-        for line in packed.read_text(encoding="utf-8").splitlines():
-            parts = line.split()
-            if len(parts) == 2 and parts[1] == ref:
-                return parts[0]
+    dirs = [git]
+    common = git / "commondir"
+    if common.is_file():
+        dirs.append((git / common.read_text(encoding="utf-8").strip()).resolve())
+    for d in dirs:
+        loose = d / ref
+        if loose.is_file():
+            return loose.read_text(encoding="utf-8").strip()
+        packed = d / "packed-refs"
+        if packed.is_file():
+            for line in packed.read_text(encoding="utf-8").splitlines():
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == ref:
+                    return parts[0]
     return None
 
 
