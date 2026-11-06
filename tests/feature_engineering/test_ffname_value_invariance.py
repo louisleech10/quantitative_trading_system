@@ -4,7 +4,7 @@
 ④新 run 全部欄名 parse 成功且 `format(parse(n)) == n` ⑤L2 配對簽名集合經映射後相等，差集只准為「同 canonical 身分之
 舊兩分支重複」且逐筆列入收據 ⑥L4 lag 輸入集合＝L1 群組欄＋raw 欄（`volume_*_volume_VolumeMA-Ratio_*`、
 `ohlc_*_pattern_BullishCount_*` 由此新增 lag），新增 lag 欄逐筆列入收據並驗其值＝輸入位移
-⑦manifest `feature_naming_version == CURRENT`。收據 `handoffs/run_receipts/ffname-value-invariance.json` 之值雜湊不符數 == 0。
+⑦manifest `feature_naming_version == CURRENT`。收據 `tests/_golden/ffname/value_invariance_receipt.json`（ICPERF SPEC v5.82 S7 自 `handoffs/run_receipts/ffname-value-invariance.json` 移入，內容不變）之值雜湊不符數 == 0。
 v17：⑥ lag 輸入＝L1 原子欄（不含 `*_L65`、扣 cascade 黑名單）＋raw 欄，位移 oracle 以同設定但關閉縮尾之小 run 比對
 （同週期 raw 與合成 raw 依產生端同一來源，不略過）；⑧ L1 分群單一規則、欄序以「欄集合＋各群組成員」比對，
 合併之舊群組列入收據並由本測試重算。

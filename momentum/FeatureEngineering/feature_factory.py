@@ -1302,10 +1302,6 @@ class FeatureFactory:
             parsed_value = default
         return max(0, parsed_value)
 
-    @staticmethod
-    def _is_numeric_token(token: str) -> bool:
-        return re.fullmatch(r"-?\d+(?:\.\d+)?", token) is not None
-
     @classmethod
     def _parse_l1_column_identity(
         cls,

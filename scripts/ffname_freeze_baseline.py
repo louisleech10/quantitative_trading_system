@@ -59,7 +59,8 @@ if str(REPO) not in sys.path:
 BASELINE_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.json"
 # 審查 r13 P1-05：baseline 不可變之錨——Task 0.1 產出 baseline.json 時一併寫其 sha256（單行 hex），Phase 2 起不得再改
 BASELINE_SHA_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.sha256"
-RECEIPT_PATH = REPO / "handoffs" / "run_receipts" / "ffname-value-invariance.json"
+# ICPERF SPEC v5.82 S7：值不變收據由測試讀取 ⇒ 存受版控 golden（原 handoffs/run_receipts/ffname-value-invariance.json）
+RECEIPT_PATH = REPO / "tests" / "_golden" / "ffname" / "value_invariance_receipt.json"
 CONTRACT_PATH = REPO / "tests" / "_golden" / "ffname" / "contract.json"
 
 BASELINE_SCHEMA = "ffname-baseline-v2"
@@ -1828,7 +1829,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--check", action="store_true", help="只驗既有 baseline.json")
     parser.add_argument("--out", default=str(BASELINE_PATH))
     parser.add_argument("--value-receipt", action="store_true",
-                        help="改後碼態跑 reference 並寫 Task 2.6 收據（handoffs/run_receipts/ffname-value-invariance.json）")
+                        help="改後碼態跑 reference 並寫 Task 2.6 收據（tests/_golden/ffname/value_invariance_receipt.json）")
     parser.add_argument("--full-reference-only", metavar="OUT_JSON", default=None,
                         help="Task 4.3：只跑全量 reference，欄名清單寫入 OUT_JSON（供 scripts/ffname_refreeze.py receipt 沿用）")
     args = parser.parse_args(argv)

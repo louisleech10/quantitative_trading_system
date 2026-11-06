@@ -3932,6 +3932,9 @@ def test_estimate_stalled_target_fails_fast_without_receipt(monkeypatch: pytest.
                 "error": "卡住偵測終止：注入", "child_wall_seconds": 1.0}
 
     monkeypatch.setattr(ESTIMATOR, "_run_target", fake_run)
+    # ICPERF SPEC v5.82 S10：磁碟前置檢查注入足量，使本測試只驗 stalled fail-fast，不隨本機剩餘空間而變
+    #（磁碟不足分支另由 :2202 之測試覆蓋）
+    monkeypatch.setattr(ESTIMATOR, "disk_free_gb", lambda path: ESTIMATOR.MIN_FREE_DISK_GB + 1.0)
     receipts = tmp_path / "receipts"
     receipts.mkdir()
     rc = ESTIMATOR.main(["--work-root", str(tmp_path / "work"), "--receipts-dir", str(receipts),

@@ -408,13 +408,21 @@ def _assert_current_naming_generation(names: Any) -> None:
     assert not bad, f"FF-STAT 基準欄名非現行命名世代（{len(bad)} 欄，例 {sorted(bad)[:3]}）：須依 FF-NAME K1 換鍵"
 
 
+#: 使用者核可之欄集合差異收據與核可紀錄（受版控；ICPERF SPEC v5.82 S6(b) 指名）
+COLUMN_SET_DELTA_RECEIPT = Path(__file__).resolve().parents[2] / "handoffs" / "run_receipts" / \
+    "20260928-ffstat-column-set-delta.json"
+COLUMN_SET_APPROVAL_RECEIPT = Path(__file__).resolve().parents[2] / "handoffs" / "run_receipts" / \
+    "20260928-ffstat-column-set-approval.json"
+
+
 def _ffname_delta_mapping(delta_path: Path) -> Dict[str, str]:
     """FF-NAME SPEC v21 §G 連動：欄集合差異收據（使用者核可紀錄之 sha 綁定其原內容，不改檔）之舊名依改前 worktree
     紀錄器映射換名；映射檔須綁定該收據之 sha256，且涵蓋全部名（查無 ⇒ 失敗）。"""
     import hashlib
 
-    path = Path(__file__).resolve().parents[2] / "handoffs" / "run_receipts" / "ffname_refreeze_maps" / \
-        "ffstat__column_set_delta.json"
+    # ICPERF SPEC v5.82 S7：映射移入受版控 golden（原 handoffs/run_receipts/ffname_refreeze_maps/ffstat__column_set_delta.json，
+    # 內容位元組不變）；缺檔即失敗
+    path = Path(__file__).resolve().parents[2] / "tests" / "_golden" / "ffstat" / "ffname_column_set_delta_map.json"
     assert path.is_file(), f"缺 FF-NAME 欄集合差異映射 {path.name}"
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert doc["source_sha256"] == hashlib.sha256(delta_path.read_bytes()).hexdigest(), "映射未綁定該 delta 收據"
@@ -428,13 +436,13 @@ def approved_base_columns(baseline_columns: Any) -> set:
     未核可之差異不得進入期望。"""
     from momentum.FeatureEngineering.preprocessing import stable_mask as sm
 
-    rr = Path(__file__).resolve().parents[2] / "handoffs" / "run_receipts"
-    deltas = sorted(rr.glob("*-ffstat-column-set-delta.json"))
+    # ICPERF SPEC v5.82 S6(b)：指名讀受版控之 delta 與 approval（原以 glob 取最新 ⇒ 隨機器上多出之未版控同型檔而換期望）
+    deltas = [p for p in (COLUMN_SET_DELTA_RECEIPT,) if p.is_file()]
     assert deltas, "缺欄集合差異收據"
     delta = json.loads(deltas[-1].read_text(encoding="utf-8"))["delta"]
     digest = sm.delta_sha256(delta)
     if delta != CONTRACT["column_set_delta"]["empty"]:
-        approvals = sorted(rr.glob("*-ffstat-column-set-approval.json"))
+        approvals = [p for p in (COLUMN_SET_APPROVAL_RECEIPT,) if p.is_file()]
         assert approvals, "delta 非空而無使用者核可紀錄"
         assert json.loads(approvals[-1].read_text(encoding="utf-8"))["delta_sha256"] == digest
     _assert_current_naming_generation(baseline_columns)

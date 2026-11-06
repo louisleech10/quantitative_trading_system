@@ -170,12 +170,40 @@ def test_dual_public_columns_reads_l65_files(tmp_path: Path) -> None:
     import numpy as np
     import pandas as pd
 
-    stamps = np.arange(5, dtype=np.int64) * 3600
-    pd.DataFrame({"timestamp": stamps}).to_parquet(tmp_path / "timestamps.parquet")
-    pd.DataFrame({"base_x": np.arange(5.0)}).to_parquet(tmp_path / "grp.parquet")
-    pd.DataFrame({"base_x_fracdiff": np.arange(5.0) * 2}).to_parquet(tmp_path / "grp_L65.parquet")
-    names = {n for n, _ in h.dual_public_columns(tmp_path)}
+    run = _minimal_declared_run(tmp_path / "features" / "run", declare_l65=True)
+    # 未宣告之 parquet 置於 artifact 目錄外 ⇒ 不得被讀（列舉只依 manifest 宣告，FFDSTAR Task 1.6）
+    pd.DataFrame({"stray_x": np.arange(5.0)}).to_parquet(run / "stray.parquet")
+    names = {n for n, _ in h.dual_public_columns(tmp_path / "features")}
     assert names == {"base_x", "base_x_fracdiff"}
+
+
+def _minimal_declared_run(run: Path, *, declare_l65: bool) -> Path:
+    """最小 V2 run（ICPERF SPEC v5.82 S4）：根 `timestamps.parquet`（epoch 秒）為 row index、`raw/` 下兩群組檔，
+    manifest 宣告 `grp`（及 `declare_l65` 時之 `grp_L65`）。"""
+    import json
+
+    import numpy as np
+    import pandas as pd
+
+    from tests.feature_engineering.preprov_helpers import MANIFEST_NAME
+
+    (run / "raw").mkdir(parents=True)
+    pd.DataFrame({"timestamp": np.arange(5, dtype=np.int64) * 3600}).to_parquet(run / "timestamps.parquet")
+    pd.DataFrame({"base_x": np.arange(5.0)}).to_parquet(run / "raw" / "grp.parquet")
+    pd.DataFrame({"base_x_fracdiff": np.arange(5.0) * 2}).to_parquet(run / "raw" / "grp_L65.parquet")
+    groups = {"grp": {"path": "raw/grp.parquet"}}
+    if declare_l65:
+        groups["grp_L65"] = {"path": "raw/grp_L65.parquet"}
+    manifest = {"artifacts": {"raw": {"path": "raw", "groups": groups}}, "row_index": {"path": "timestamps.parquet"}}
+    (run / MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
+    return run
+
+
+def test_dual_public_columns_undeclared_l65_rejected(tmp_path: Path) -> None:
+    """S4 反例：manifest 漏宣告 L6.5 群組檔而該檔仍在 artifact 目錄 ⇒ 具名拒絕（不靜默略過、不當作已列舉）。"""
+    _minimal_declared_run(tmp_path / "features" / "run", declare_l65=False)
+    with pytest.raises(ValueError, match="未宣告"):
+        list(h.dual_public_columns(tmp_path / "features"))
 
 
 def test_column_set_reasons_keyed_by_public_tagged_names() -> None:

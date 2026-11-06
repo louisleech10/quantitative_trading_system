@@ -39,6 +39,10 @@ MAIN_REPO = Path(__file__).resolve().parents[1]
 MAPS_DIR = MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_maps"
 # failopen 全窗 sidecar 每份數十 MB（逾 GitHub 50MB 警示線之虞）⇒ 可由 FFNAME_SIDECAR_DIR 導至版控外（收據記絕對路徑）
 SIDECAR_DIR = Path(os.environ.get("FFNAME_SIDECAR_DIR") or (MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_sidecars"))
+# ICPERF SPEC v5.82 S9(A)：sidecar 為收據之證據，原允許導至版控外絕對路徑（曾落於他 session 暫存區，重開後遺失、
+# 收據變不可重驗）⇒ 只准 repo 內路徑（可不入版控，但須在 repo 內、不隨系統暫存清理）
+if not SIDECAR_DIR.resolve().is_relative_to(MAIN_REPO.resolve()):
+    raise SystemExit(f"FFNAME_SIDECAR_DIR 須在 repo 內：{SIDECAR_DIR}")
 RECORD_SCHEMA = "ffname-refreeze-record-v1"
 MAP_SCHEMA = "ffname-refreeze-map-v1"
 CONTRACT_PATH = MAIN_REPO / "tests" / "_golden" / "ffname" / "contract.json"

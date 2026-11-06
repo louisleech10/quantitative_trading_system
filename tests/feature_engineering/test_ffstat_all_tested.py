@@ -104,10 +104,17 @@ def test_mutation_name_exemption_reinstated_is_caught(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(FeaturePreprocessor, "_get_non_stationary_columns", _mutant)
     h.prepare_stat_env(monkeypatch, tmp_path)
-    _, _, result = h.run_stat(tmp_path, h.stat_payload())
-    mutated = {"decisions": h.decisions(result)}
-    with pytest.raises(AssertionError):
-        test_boundary_03_formerly_name_exempt_columns_are_tested(mutated)
+    # ICPERF SPEC v5.82 S5：免檢欄不進 ADF ⇒ 該欄缺 fractional_differencing 步驟狀態，生產端溯源完備性守衛
+    # （run_provenance.build_provenance_table）於落盤前以具名錯誤 fail-closed——此即 mutant 被抓；未變異之同一生成
+    # 不拋（對照：同檔 test_every_column_entering_step_has_pvalue 走同一 run_stat 而綠）。不得以 Exception 通吃。
+    from momentum.FeatureEngineering.run_provenance import ProvenanceExhaustivenessError
+
+    with pytest.raises(ProvenanceExhaustivenessError) as caught:
+        h.run_stat(tmp_path, h.stat_payload())
+    message = str(caught.value)
+    assert "缺步驟狀態 fractional_differencing" in message, message
+    column = message.split("欄 ", 1)[1].split(" 缺步驟狀態", 1)[0]
+    assert is_safe_skip(column), column
 
 
 def test_untested_column_marked_and_not_counted_as_tested() -> None:

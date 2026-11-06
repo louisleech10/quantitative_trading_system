@@ -1,0 +1,16 @@
+{
+ "ambiguous": [],
+ "golden": "tests/_golden/framepath/cgsa_fingerprint.json",
+ "mapped": 0,
+ "mapping": {},
+ "missing": [],
+ "old_name_count": 0,
+ "pre_change_verified": true,
+ "recipe": "framepath",
+ "renamed": 0,
+ "schema_version": "ffname-refreeze-map-v1",
+ "source_head": "c97377299ca9dabfebbc0e229e4eed7e3d4dbc1b",
+ "source_sha256": "8282757e4d70a2114f426a4bfd5b0519d4b7060840cf8e5375f315f9c317a807",
+ "source_tree": "/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/89e273b5-4c96-4468-b2cd-04bbfa381871/scratchpad/wt_c973",
+ "unit": "C9"
+}

@@ -22,7 +22,9 @@ BASELINE_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.json"
 BASELINE_SHA_PATH = REPO / "tests" / "_golden" / "ffname" / "baseline.sha256"
 VECTORS_PATH = REPO / "tests" / "_golden" / "ffname" / "name_vectors.json"
 FREEZE_SCRIPT = REPO / "scripts" / "ffname_freeze_baseline.py"
-VALUE_RECEIPT = REPO / "handoffs" / "run_receipts" / "ffname-value-invariance.json"
+#: ICPERF SPEC v5.82 S7：值不變收據移入受版控 golden（原 handoffs/run_receipts/ffname-value-invariance.json，內容位元組不變）；
+#: 產生端 scripts/ffname_freeze_baseline.py 之 RECEIPT_PATH 同步
+VALUE_RECEIPT = REPO / "tests" / "_golden" / "ffname" / "value_invariance_receipt.json"
 
 CONTRACT: Dict[str, Any] = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
 VALID = CONTRACT["spec_valid_names"]

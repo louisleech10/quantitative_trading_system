@@ -432,7 +432,9 @@ def test_boundary_02_after_baseline_not_written_before_branch_tests_pass() -> No
     missing = [c for c in after["s1_off"]["columns"] if _is_unsafe(c) and c not in raw]
     assert all(is_g6_new_lag(c) for c in missing), [c for c in missing if not is_g6_new_lag(c)]
     # 審查 r1（codex P1-06）：剔除之 ⑥ 欄須為改後基準重凍時已驗位移者（K2 收據：同設定、前處理關之 run 值＝基底位移 k）
-    k2 = json.loads((REPO / "handoffs/run_receipts/ffname_refreeze_k2/ratiounsafe__baseline_after.json").read_text(
+    # ICPERF SPEC v5.82 S7：K2 收據移入受版控 golden（原 handoffs/run_receipts/ffname_refreeze_k2/
+    # ratiounsafe__baseline_after.json，內容位元組不變）
+    k2 = json.loads((REPO / "tests/_golden/ratiounsafe/ffname_k2_baseline_after.json").read_text(
         encoding="utf-8"))
     assert k2.get("g6_shift_verified") is True and set(missing) <= set(k2.get("g6_new_lag") or []), \
         sorted(set(missing) - set(k2.get("g6_new_lag") or []))

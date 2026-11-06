@@ -1008,9 +1008,9 @@
       "evidence": "_slow_path_parallel.py 環境／錯誤判定／ADF p 值"
     },
     "momentum.FeatureEngineering.preprocessing._slow_path_parallel:process_fracdiff_column_values": {
-      "propagates_nan": true,
-      "class": "propagating",
-      "evidence": "_slow_path_parallel.py:123-187 以 _hurst_prior.fractional_difference_values 算值（首有效值起 width−1 列 NaN）"
+      "propagates_nan": false,
+      "class": "dispatcher",
+      "evidence": "_slow_path_parallel.py:133-146 呼叫 _process_fracdiff_column_values，另以執行緒區域收集 ADF 例外記 adf_error（數值不變）"
     },
     "momentum.FeatureEngineering.preprocessing.calibration:_timestamps_ns": {
       "propagates_nan": false,
@@ -2006,6 +2006,146 @@
       "propagates_nan": true,
       "class": "propagating",
       "evidence": "rolling_aggregator.py:1104-1106 set_axis 只改欄名、值原樣搬移（取代改前 add_suffix；NaN 原樣傳遞）"
+    },
+    "momentum.FeatureEngineering.preprocessing._slow_path_parallel:_process_fracdiff_column_values": {
+      "propagates_nan": true,
+      "class": "propagating",
+      "evidence": "_slow_path_parallel.py:149-210 以 _hurst_prior.fractional_difference_values 算值（首有效值起 width−1 列 NaN）；d* 只取校準值、搜尋失敗回 failed 不產值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_optimized_df_core": {
+      "propagates_nan": false,
+      "class": "dispatcher",
+      "evidence": "preprocessing/feature_preprocessor.py:2204-2314 依旗標呼叫 _winsorize_2d_legacy_equivalent／_rolling_zscore_2d／_rolling_rank_2d_v2／_gaussian_2d（各自已分類），並記逐欄執行紀錄"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._adf_error_context": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:2652-2659 執行緒區域之 ADF 檢定所屬欄（只供記事件）；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._decision_context": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:2336-2349 決策與執行紀錄之脈絡（週期／層／輸入欄集合）；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._execution_checkpoint": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:701-710 逐欄執行紀錄快照（回退用）；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._execution_key_timeframe": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:585-593 紀錄鍵之原生週期；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._execution_layer": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:595-602 紀錄之層名；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._execution_scope_group": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:582-583 當次群組脈絡；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._fracdiff_attempt_state": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:712-717 fracdiff 嘗試前之衍生狀態快照；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._primary_zscore_window": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:811-816 回傳 zscore 主窗整數（不產特徵值）；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._provenance_equal": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:738-740 紀錄比對；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._record_execution": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:643-654 逐欄執行狀態紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._record_execution_event": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:675-680 逐欄執行事件紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._record_fast_arm_steps": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:1743-1757 快速臂逐欄狀態紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._record_group": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:682-699 群組表紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._record_input_execution": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:665-673 輸入欄執行紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._record_optimized_noop": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:2195-2202 optimized 臂無工作欄之狀態紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._record_selection": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:656-663 apply_to 選取之紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._restore_fracdiff_attempt_state": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:719-725 還原 fracdiff 嘗試前狀態；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rollback_execution": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:727-735 撤回失敗嘗試之紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._set_execution_field": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:605-610 紀錄欄位冪等寫入；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._set_execution_scope": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:576-580 設定群組紀錄脈絡；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._stationarity_step_context": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:2662-2670 執行緒區域之步驟參數（只供紀錄）；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._store_execution": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:612-641 寫入逐欄執行紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._winsor_applied_fields": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:826-843 回傳縮尾有效設定之紀錄欄位（不產特徵值）；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.execution_groups": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:765-769 回傳群組表；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.execution_records": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:742-763 回傳逐欄執行紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.last_post_ic_execution": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py:771-779 回傳最近一次 post-IC 紀錄；執行紀錄／脈絡，不產特徵值"
     }
   }
 }

@@ -1919,7 +1919,6 @@ def git_commits_after_anchor() -> List[Tuple[str, Set[str]]]:
 BASELINE_RUN_PATH_KEYS = frozenset({"kline_copy", "legacy_kline_dir", "child_env"})
 
 
-FFNAME_RECEIPT_REL = "handoffs/run_receipts/ffname-refreeze.json"
 # time_index_sha256 之輸入含 timestamps.parquet 之相對路徑（含 config hash 目錄，受命名世代鹽影響）⇒ 屬名／鹽衍生，
 # 其時間值由 FF-NAME K2 收據之去路徑 time_values 比對證明不變（scripts/ffname_refreeze.py framepath recipe）
 _FFNAME_FP_SCALARS = ("row_count", "run_status", "completeness", "failure_reasons")
@@ -1939,17 +1938,23 @@ def _ffname_path_receipt_norm(receipt: Any) -> Any:
     return out
 
 
+#: ICPERF SPEC v5.82 S7：FF-NAME 收據之 framepath 項與其 12 個映射檔移入受版控 golden（原 handoffs/run_receipts/
+#: ffname-refreeze.json 之 `files[]` framepath 項與 handoffs/run_receipts/ffname_refreeze_maps/framepath__cgsa_fingerprint__*.json；內容不變）
+FFNAME_RENAME_DIR_REL = "tests/_golden/framepath/ffname_rename"
+
+
 def ffname_framepath_approvals() -> Dict[str, Dict[str, str]]:
-    """FF-NAME SPEC v22：收據 framepath 段核可（決策 refrozen）之格 → 該格之改前→現行欄名映射（改前 worktree 紀錄器）。"""
-    path = REPO / FFNAME_RECEIPT_REL
-    if not path.is_file():
-        return {}
-    receipt = json.loads(path.read_text(encoding="utf-8"))
-    entry = next((e for e in receipt.get("files", []) if e.get("path") == BASELINE_REL), None) or {}
+    """FF-NAME SPEC v22：收據 framepath 段核可（決策 refrozen）之格 → 該格之改前→現行欄名映射（改前 worktree 紀錄器）。
+    讀受版控之 `FFNAME_RENAME_DIR_REL`；收據項之 `map` 欄仍記原 handoffs 路徑，依檔名重定位至同目錄（不改檔）。缺檔即失敗。"""
+    rename_dir = REPO / FFNAME_RENAME_DIR_REL
+    entry = json.loads((rename_dir / "receipt_entry.json").read_text(encoding="utf-8"))  # 缺 ⇒ FileNotFoundError
+    if entry.get("path") != BASELINE_REL:
+        raise ValueError(f"FF-NAME framepath 收據項 path 不符：{entry.get('path')!r}")
     out: Dict[str, Dict[str, str]] = {}
     for unit in entry.get("units") or []:
         if unit.get("decision") == "refrozen" and not unit.get("value_hash_mismatch"):
-            out[str(unit["unit"])] = json.loads((REPO / unit["map"]).read_text(encoding="utf-8"))["mapping"]
+            map_path = rename_dir / Path(unit["map"]).name  # 缺 ⇒ FileNotFoundError
+            out[str(unit["unit"])] = json.loads(map_path.read_text(encoding="utf-8"))["mapping"]
     return out
 
 
@@ -2008,18 +2013,62 @@ def _preprov_structural_only(old_fp: Dict[str, Any], new_fp: Dict[str, Any],
     return keys == {"manifest_sha256"} and (old_fp.get("manifest_sha256"), new_fp.get("manifest_sha256")) == approval
 
 
+NUMVIEW_RECEIPT_REL = "tests/_golden/numview/refreeze_receipt.json"
+#: NUMVIEW Phase 4 結構重凍（config_hash 加鹽後換回去鹽值）於 framepath 可改之 fingerprint 鍵（9891907f；皆為路徑／鹽衍生）
+NUMVIEW_STRUCTURAL_KEYS = frozenset({"manifest_sha256", "time_index_sha256", "path_receipt"})
+
+
+def numview_framepath_approvals() -> Dict[str, Dict[str, Any]]:
+    """ICPERF SPEC v5.82 S2：NUMVIEW 結構重凍收據 framepath 段（已寫入、exit_code 0）中 equal 且剝鹽重算＝凍結值之格 →
+    {before, after, new_fields}（manifest 舊值、新值與其餘可改鍵之新值）。收據受版控，缺 ⇒ 失敗（不回空）。"""
+    receipt = json.loads((REPO / NUMVIEW_RECEIPT_REL).read_text(encoding="utf-8"))  # 缺 ⇒ FileNotFoundError
+    section = next((f for f in receipt.get("files") or [] if f.get("path") == BASELINE_REL), None)
+    if section is None:
+        raise ValueError(f"{NUMVIEW_RECEIPT_REL} 無 {BASELINE_REL} 段")
+    if section.get("written") is not True or section.get("exit_code") != 0:
+        return {}
+    return {str(i["item"]): {"before": i["frozen_before"], "after": i["new_value"],
+                             "new_fields": dict(i.get("new_fields") or {})}
+            for i in section.get("items") or []
+            if i.get("equal") is True and i.get("stripped_recomputed") == i.get("frozen_before")}
+
+
+def _numview_structural_only(old_fp: Dict[str, Any], new_fp: Dict[str, Any],
+                             approval: Optional[Dict[str, Any]]) -> bool:
+    """fingerprint 之差異只在 `NUMVIEW_STRUCTURAL_KEYS` 且含 manifest；manifest 舊→新恰為收據之 (before, after)，
+    其餘改變之鍵逐鍵等於收據 `new_fields`（未列於 new_fields 之鍵不得改變）。"""
+    if approval is None:
+        return False
+    keys = {k for k in set(old_fp) | set(new_fp) if old_fp.get(k) != new_fp.get(k)}
+    if "manifest_sha256" not in keys or not keys <= NUMVIEW_STRUCTURAL_KEYS:
+        return False
+    if (old_fp.get("manifest_sha256"), new_fp.get("manifest_sha256")) != (approval["before"], approval["after"]):
+        return False
+    fields = approval["new_fields"]
+    return all(k in fields and new_fp.get(k) == fields[k] for k in keys - {"manifest_sha256"})
+
+
+def _column_names_changed(old_fp: Dict[str, Any], new_fp: Dict[str, Any]) -> bool:
+    """FF-NAME 換名映射只適用於該格欄名集合實際改變之轉換（S2）。"""
+    return set(old_fp.get("columns") or {}) != set(new_fp.get("columns") or {})
+
+
 def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
                             approvals: Optional[Dict[str, Dict[str, str]]] = None,
-                            preprov: Optional[Dict[str, Tuple[str, str]]] = None) -> List[str]:
+                            preprov: Optional[Dict[str, Tuple[str, str]]] = None,
+                            numview: Optional[Dict[str, Dict[str, Any]]] = None) -> List[str]:
     """基準各版本（依時間序之 (版本名, 基準 JSON)）之承續：後版須含前版每一格，且該格 fingerprint 逐項相等、
     receipt 除 `BASELINE_RUN_PATH_KEYS` 外相等、`code_anchor` 不變；只准新增格（memory 屬量測值不比）。
     FF-NAME SPEC v22：既有格之逐欄值不變；鍵名與名衍生雜湊（column_names_sha256、manifest_sha256、
     stationarity_decisions_sha256、column_count、result_columns.names_sha256）只在收據 framepath 段核可之格可更新
     （`approvals`；預設讀收據）。
     FFDSTAR／PRE-PROV §G：結構重凍只改 `manifest_sha256`，且舊→新恰為重凍收據核可之值（`preprov`；預設讀
-    `tests/_golden/preprov/refreeze_receipt.json`）；其他任一項同時改變即不屬之。"""
+    `tests/_golden/preprov/refreeze_receipt.json`）；其他任一項同時改變即不屬之。
+    NUMVIEW Phase 4 結構重凍（ICPERF SPEC v5.82 S2）：只改 `NUMVIEW_STRUCTURAL_KEYS`，且值恰為 NUMVIEW 重凍收據所記
+    （`numview`；預設讀 `tests/_golden/numview/refreeze_receipt.json`）。FF-NAME 映射只用於欄名集合實際改變之轉換。"""
     approvals = ffname_framepath_approvals() if approvals is None else approvals
     preprov = preprov_framepath_approvals() if preprov is None else preprov
+    numview = numview_framepath_approvals() if numview is None else numview
     errs: List[str] = []
     for (prev_name, prev), (name, cur) in zip(versions, versions[1:]):
         if prev.get("code_anchor") != cur.get("code_anchor"):
@@ -2029,10 +2078,13 @@ def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
             if new is None:
                 errs.append(f"⓪ 基準 {name} 刪除了既有格 {cell}")
                 continue
+            old_fp, new_fp = old.get("fingerprint") or {}, new.get("fingerprint") or {}
             if new.get("fingerprint") != old.get("fingerprint"):
-                if _preprov_structural_only(old.get("fingerprint") or {}, new.get("fingerprint") or {}, preprov.get(cell)):
+                if _preprov_structural_only(old_fp, new_fp, preprov.get(cell)):
                     pass
-                elif cell in approvals:
+                elif _numview_structural_only(old_fp, new_fp, numview.get(cell)):
+                    pass
+                elif cell in approvals and _column_names_changed(old_fp, new_fp):
                     errs += _ffname_rekeyed_cell_errors(cell, old.get("fingerprint") or {}, new.get("fingerprint") or {},
                                                         approvals[cell])
                 else:
@@ -2055,6 +2107,48 @@ def git_baseline_versions() -> List[Tuple[str, Dict[str, Any]]]:
 
 def test_check_0_baseline_existing_cells_preserved():
     assert baseline_lineage_errors(git_baseline_versions()) == []
+
+
+def _numview_transition() -> Tuple[Tuple[str, Dict[str, Any]], Tuple[str, Dict[str, Any]]]:
+    """NUMVIEW Phase 4 結構重凍之相鄰兩版（9891907f 及其前一版）。"""
+    versions = git_baseline_versions()
+    i = next(k for k, (n, _) in enumerate(versions) if n == "9891907f")
+    return versions[i - 1], versions[i]
+
+
+def test_numview_structural_refreeze_accepted_and_tampering_red():
+    """ICPERF SPEC v5.82 S2：NUMVIEW 結構重凍轉換通過；夾帶值改、刪格、改 receipt 非路徑鍵、新 manifest 不等於收據各紅。"""
+    (pn, prev), (cn, cur) = _numview_transition()
+    assert baseline_lineage_errors([(pn, prev), (cn, cur)]) == []
+    cell = "C1"
+
+    tampered = copy.deepcopy(cur)
+    col = next(iter(tampered["cells"][cell]["fingerprint"]["columns"]))
+    tampered["cells"][cell]["fingerprint"]["columns"][col] = {"tampered": True}
+    assert baseline_lineage_errors([(pn, prev), (cn, tampered)]), "夾帶逐欄值改動未被抓"
+
+    dropped = copy.deepcopy(cur)
+    del dropped["cells"][cell]
+    assert f"⓪ 基準 {cn} 刪除了既有格 {cell}" in baseline_lineage_errors([(pn, prev), (cn, dropped)])
+
+    receipt_key = next(k for k in (cur["cells"][cell].get("receipt") or {}) if k not in BASELINE_RUN_PATH_KEYS)
+    rc = copy.deepcopy(cur)
+    rc["cells"][cell]["receipt"][receipt_key] = "tampered"
+    assert f"⓪ 基準 {cn} 改寫了既有格 {cell} 之 receipt" in baseline_lineage_errors([(pn, prev), (cn, rc)])
+
+    wrong_manifest = copy.deepcopy(cur)
+    wrong_manifest["cells"][cell]["fingerprint"]["manifest_sha256"] = "0" * 64
+    assert f"⓪ 基準 {cn} 改寫了既有格 {cell} 之 fingerprint" in \
+        baseline_lineage_errors([(pn, prev), (cn, wrong_manifest)])
+
+
+def test_numview_branch_rejects_structural_key_not_matching_receipt():
+    """S2：可改鍵之新值不等於收據 new_fields（C7 收據所記 time_index_sha256 與舊值同）⇒ 不屬 NUMVIEW 結構重凍。"""
+    (pn, prev), (cn, cur) = _numview_transition()
+    assert numview_framepath_approvals()["C7"]["new_fields"]["time_index_sha256"] != "1" * 64
+    tampered = copy.deepcopy(cur)
+    tampered["cells"]["C7"]["fingerprint"]["time_index_sha256"] = "1" * 64
+    assert f"⓪ 基準 {cn} 改寫了既有格 C7 之 fingerprint" in baseline_lineage_errors([(pn, prev), (cn, tampered)])
 
 
 def test_mutation_baseline_lineage_rewrites_are_red():

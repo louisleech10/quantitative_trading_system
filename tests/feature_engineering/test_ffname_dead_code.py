@@ -19,7 +19,7 @@ from typing import Any, Dict, List
 import pytest
 
 from momentum.factories import create_feature_factory
-from tests.feature_engineering.ffname_helpers import BASELINE_PATH, CONTRACT, REPO, load_freeze_module
+from tests.feature_engineering.ffname_helpers import BASELINE_PATH, CONTRACT, REPO, is_g6_new_lag, load_freeze_module
 from tests.feature_engineering.fftfmeta_golden_helpers import KLINE_DIR, prepare_env
 
 DEAD = CONTRACT["dead_code"]
@@ -87,18 +87,63 @@ def _mapping(baseline: Dict[str, Any]) -> Dict[str, str]:
     return freeze.derive_mapping(parts, {k: p.tf for k, p in parts.items()})
 
 
-def stationarity_mismatches(baseline: Dict[str, Any], current: Dict[str, Any]) -> List[str]:
-    """平穩化決策鍵與決策值經 Task 0.1 身分映射後與 baseline 相等（SPEC v13 Task 4.2）。"""
+def _expected_decisions(baseline: Dict[str, Any]) -> Dict[str, Any]:
     mapping = _mapping(baseline)
-    expected = {mapping.get(k, f"<unmapped:{k}>"): v for k, v in baseline["stationarity_decisions"].items()}
+    return {mapping.get(k, f"<unmapped:{k}>"): v for k, v in baseline["stationarity_decisions"].items()}
+
+
+def stationarity_mismatches(baseline: Dict[str, Any], current: Dict[str, Any]) -> List[str]:
+    """平穩化決策鍵與決策值經 Task 0.1 身分映射後與 baseline 相等（SPEC v13 Task 4.2）。
+    FF-NAME SPEC v21 ⑥ 例外（ICPERF SPEC v5.82 S3）：只豁免「基準缺、現行有、且為 ⑥ 新增 lag」之鍵——改前因欄名啟發式
+    未產生之 lag 欄本無基準；既有鍵之值差、刪鍵、非 ⑥ 之新欄仍列為不符。"""
+    expected = _expected_decisions(baseline)
     got = current["stationarity_decisions"]
     keys = set(expected) | set(got)
-    return sorted(k for k in keys if expected.get(k, "<missing>") != got.get(k, "<missing>"))
+    return sorted(k for k in keys
+                  if expected.get(k, "<missing>") != got.get(k, "<missing>")
+                  and not (k not in expected and k in got and is_g6_new_lag(k)))
 
 
 def test_stationarity_decisions_equal_baseline_after_identity_mapping(baseline, reference_after):
     assert baseline["stationarity_decisions"]
     assert stationarity_mismatches(baseline, reference_after) == []
+
+
+#: 主 repo 實跑（runs/icperf/untracked_scan/stat_decision_diag.log）所見之 ⑥ 新增 lag 欄（基準缺、現行為 L4 正常決策）
+_G6_NEW_LAG = "volume_12h_volume_VolumeMA-Ratio_20_Lag-1"
+
+
+def test_g6_exemption_only_for_new_g6_lag_missing_in_baseline(baseline):
+    """S3 純函式：⑥ 新增 lag（基準缺）豁免；既有鍵改值、刪既有鍵、非 ⑥ 新欄各自仍不符。"""
+    expected = _expected_decisions(baseline)
+    assert _G6_NEW_LAG not in expected and is_g6_new_lag(_G6_NEW_LAG)
+    some_key = sorted(expected)[0]
+    decision = {"timeframe": "12h", "layer": "L4", "fracdiff": False, "d": None}
+
+    assert stationarity_mismatches(baseline, {"stationarity_decisions": dict(expected)}) == []
+    assert stationarity_mismatches(baseline, {"stationarity_decisions": {**expected, _G6_NEW_LAG: decision}}) == []
+
+    changed = {**expected, some_key: {**expected[some_key], "fracdiff": not expected[some_key].get("fracdiff")}}
+    assert stationarity_mismatches(baseline, {"stationarity_decisions": changed}) == [some_key]
+
+    dropped = {k: v for k, v in expected.items() if k != some_key}
+    assert stationarity_mismatches(baseline, {"stationarity_decisions": dropped}) == [some_key]
+
+    assert not is_g6_new_lag("not_a_feature_name")
+    assert stationarity_mismatches(baseline, {"stationarity_decisions": {**expected, "not_a_feature_name": decision}}) \
+        == ["not_a_feature_name"]
+
+
+def test_g6_exemption_does_not_cover_existing_keys(baseline, monkeypatch):
+    """S3：豁免只限「基準缺」——基準已有之 ⑥ lag 樣式鍵（真實基準 0 個，以注入構造）值改變仍不符。"""
+    import sys
+
+    module = sys.modules[__name__]
+    expected = {_G6_NEW_LAG: {"timeframe": "12h", "layer": "L4", "fracdiff": False, "d": None}}
+    monkeypatch.setattr(module, "_expected_decisions", lambda _baseline: dict(expected))
+    changed = {_G6_NEW_LAG: {**expected[_G6_NEW_LAG], "fracdiff": True}}
+    assert stationarity_mismatches(baseline, {"stationarity_decisions": changed}) == [_G6_NEW_LAG]
+    assert stationarity_mismatches(baseline, {"stationarity_decisions": {}}) == [_G6_NEW_LAG]
 
 
 def test_mutation_unmapped_stationarity_keys_detected(baseline, reference_after, monkeypatch):

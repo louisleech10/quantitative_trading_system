@@ -132,8 +132,8 @@
 - 不可做：不得保留第二套標記條件。
 
 **Task 2.6 — 值不變驗收**
-- 目標：§G 全部通過條件。　檔案：`tests/feature_engineering/test_ffname_value_invariance.py`、收據 `handoffs/run_receipts/ffname-value-invariance.json`（含改名差集、L2 合併差集、L4 新增 lag 欄、欄名長度變化）。
-- **驗證**：`pytest tests/feature_engineering/test_ffname_value_invariance.py`（真實 kline）——§G 通過條件 ①–⑦ 全成立；收據 `handoffs/run_receipts/ffname-value-invariance.json` 之值雜湊不符數 == 0。
+- 目標：§G 全部通過條件。　檔案：`tests/feature_engineering/test_ffname_value_invariance.py`、收據 `tests/_golden/ffname/value_invariance_receipt.json`（2026-11-06 依 ICPERF SPEC v5.82 S7 自 `handoffs/run_receipts/ffname-value-invariance.json` 移入受版控，內容不變；含改名差集、L2 合併差集、L4 新增 lag 欄、欄名長度變化）。
+- **驗證**：`pytest tests/feature_engineering/test_ffname_value_invariance.py`（真實 kline）——§G 通過條件 ①–⑦ 全成立；收據 `tests/_golden/ffname/value_invariance_receipt.json` 之值雜湊不符數 == 0。
 - **邊界**：任一通過條件不等 ⇒ 回本 Phase，不得改 golden 遷就。
 - **存活至**：Task 4.3。　**覆蓋風險**：無。
 - 不可做：不以欄數相等代替逐欄雜湊。

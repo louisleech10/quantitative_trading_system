@@ -354,7 +354,10 @@ def test_mutation_binary_signal_prefix_unmasked_is_caught(monkeypatch: pytest.Mo
 
 def test_nan_propagation_inventory_complete() -> None:
     """Task 2.3 ②：盤點收據之步驟集合＝AST 列舉 L2–L6.5 與多週期對齊之步驟函式集合（少一即紅），且每步有碼證與分類。"""
-    receipts = sorted((REPO / "handoffs" / "run_receipts").glob("*-ffstat-nan-propagation-inventory.json"))
+    # ICPERF SPEC v5.82 S6(a)：讀固定受版控盤點（原以 glob 取收據目錄最新一份 ⇒ 隨機器上未版控檔而換期望）；
+    # 產生端 handoffs/run_receipts/ffstat_probes/stable_start_receipts.py inventory --out 本路徑
+    inventory_path = REPO / "tests" / "_golden" / "ffstat" / "nan_propagation_inventory.json"
+    receipts = [p for p in (inventory_path,) if p.is_file()]
     assert receipts, "缺盤點收據（SPEC Task 2.3 檔案段）"
     inventory = json.loads(receipts[-1].read_text(encoding="utf-8"))
     steps = {row["function"]: row for row in inventory["steps"]}
