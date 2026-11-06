@@ -23,7 +23,8 @@
     {"id": "feature_generation_cli", "regex": "scripts/(generate_features|run_feature_factory)\\.py"},
     {"id": "ic_wait_scripts", "regex": "(scripts/(ic1eb_b5_replay|capture_ic1eb_baseline|ic1c_freeze_baseline)\\.py|tests/golden/ic_phase1_(contract|1a_cut1)/freeze_baseline(_new)?\\.py|scripts/measure_ic_footprint\\.sh)\\b", "_phase": "Phase 3 Task 3.1 入口；改經共用監看前歸 wrapped"},
     {"id": "warmup_verify", "regex": "scripts/verify_l1_warmup_requirements\\.py\\b", "_phase": "Phase 4 Task 4.1 入口"},
-    {"id": "pytest_gate_runner", "regex": "(scripts/framepath_affected_gate\\.py\\b(?!.*\\s(--help|-h)\\b)|scripts/testreg\\.py\\b.*\\srun\\b)", "_phase": "Phase 2 Task 2.1 入口"}
+    {"id": "pytest_gate_runner", "regex": "(scripts/framepath_affected_gate\\.py\\b(?!.*\\s(--help|-h)\\b)|scripts/testreg\\.py\\b.*\\srun\\b)", "_phase": "Phase 2 Task 2.1 入口"},
+    {"id": "icperf_isolated_run", "regex": "scripts/icperf_isolated_run\\.py\\b(?!.*\\s--\\s+isolation-check\\b)(?!.*\\s(--help|-h)\\b)", "code_paths": ["scripts/icperf_freeze_baseline.py"], "_doc": "ICPERF SPEC §G ①：於固定提交之 worktree 副本執行凍結腳本之 freeze／volatile-probe／repro（重型，估時收據 coverage_path_ids 同凍結腳本：ICPERF-BUDGET-1／-2 等）；`-- isolation-check` 為秒級例外"}
   ],
   "background_only": [
     {"id": "committee_run", "regex": "scripts/committee_run\\.sh\\b", "estimate_exempt": "委員派工：等外部 CLI 回覆，非本機運算（無規模可估）"},

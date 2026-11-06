@@ -22,12 +22,14 @@
     "tests/momentum/Analysis/test_icperf_xsec_ewc.py",
     "tests/momentum/Analysis/test_icperf_trend_wiring.py",
     "tests/momentum/Analysis/test_icperf_hac45_size.py",
-    "frontend/src/components/ic-analysis/TrendDashboard.test.tsx"
+    "frontend/src/components/ic-analysis/TrendDashboard.test.tsx",
+    "tests/momentum/Analysis/test_icperf_isolated_run.py"
   ],
   "script_acceptance": [
     "scripts/icperf_freeze_baseline.py",
     "scripts/icperf_event_batch.py",
-    "scripts/icperf_correctness_receipt.py"
+    "scripts/icperf_correctness_receipt.py",
+    "scripts/icperf_isolated_run.py"
   ],
   "contract_jsons": [
     "momentum/Analysis/contracts/ic_survivor_contract.json",

@@ -16,9 +16,10 @@
 
 用法（重型，列 `scripts/heavy_commands.json` 之 `self_watched`：須背景、先寫估時收據〔coverage_path_ids＝ICPERF-BUDGET-1／-2〕，
 子行程一律經本檔 `run_watched` 以共用監看啟動）：
-  venv/bin/python scripts/icperf_freeze_baseline.py freeze [--out tests/_golden/icperf/pre_change.json.gz] [--c-handoff <h5>]
-  venv/bin/python scripts/icperf_freeze_baseline.py repro [--cols 2000] [--c-handoff <h5>]
-  venv/bin/python scripts/icperf_freeze_baseline.py volatile-probe --out handoffs/run_receipts/<日期>-icperf-volatile-probe.json
+  # freeze／repro／volatile-probe 須於隔離副本執行（SPEC §G ①；`isolation_problems` 不合格即拒跑），凍結檔路徑給主 repo 絕對路徑：
+  venv/bin/python scripts/icperf_isolated_run.py --commit HEAD --batch icperf/<批次> --receipt <收據> -- freeze --out $PWD/tests/_golden/icperf/pre_change.json.gz
+  venv/bin/python scripts/icperf_isolated_run.py ... -- repro [--cols 2000] --golden <主 repo 凍結檔> [--c-handoff <h5>]
+  venv/bin/python scripts/icperf_isolated_run.py ... -- volatile-probe --golden <主 repo 凍結檔> --out <主 repo>/handoffs/run_receipts/<日期>-icperf-volatile-probe.json
   venv/bin/python scripts/icperf_freeze_baseline.py set-volatile --probe <實測收據>
   venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell [--out <結果 JSON>]   # 估時收據 coverage_path_ids＝ICPERF-BUDGET-8
   venv/bin/python scripts/icperf_freeze_baseline.py gen-long-cell --symbol ETHUSDT     # SPEC v5.53 (c1)：同一生成定義之 ETH 4h 長歷史格（先 precheck-xsec-long、估時）
@@ -88,6 +89,12 @@ REPO = Path(__file__).resolve().parents[1]
 PROBES_DIR = REPO / "handoffs" / "run_receipts" / "numview_probes"
 #: SPEC v5.25 §G：凍結檔以 gzip 存（未壓縮實測 150,530,327 bytes，超 GitHub 單檔 100 MB 上限；壓縮後約 20.7 MB）
 GOLDEN_PATH = REPO / "tests" / "_golden" / "icperf" / "pre_change.json.gz"
+#: SPEC §G ①（v5.48）：使用 `<repo>` 快照比對之重型子命令一律於固定提交之 git worktree 副本執行（經
+#: `scripts/icperf_isolated_run.py`）；副本之 `data_cache/` 只以 symlink 引入 `ISOLATED_INPUTS`（唯讀輸入）。
+ISOLATED_CMDS = ("freeze", "volatile-probe", "repro")
+ISOLATED_COMMIT_ENV = "ICPERF_ISOLATED_COMMIT"
+ISOLATED_INPUTS = ("data_cache/feature_klines", "data_cache/feature_klines_longhist", "data_cache/numview_freeze_runs",
+                   "data_cache/icperf_inputs", "data_cache/events")
 CELL = "A_BTCUSDT_1h"
 SEED = 20261027
 SUBSET_COLS = 2000
@@ -1500,6 +1507,49 @@ def _handoff_feature_names(h5_path: Path, meta_all: Mapping[str, Any]) -> List[s
     with h5py.File(str(h5_path), "r") as f:
         raw = f[f"{meta_all['symbol']}/{meta_all['timeframe']}"]["feature_names"][:]
     return [n.decode() if isinstance(n, bytes) else str(n) for n in raw]
+
+
+def isolation_problems(repo_root: Path = REPO, *, env: Optional[Mapping[str, str]] = None,
+                       outside_paths: Sequence[Path] = ()) -> List[str]:
+    """SPEC §G ①：本行程是否於隔離副本執行；回問題清單（空＝合格）。合格條件：(1) 環境變數 `ISOLATED_COMMIT_ENV` 已設且
+    等於 `repo_root` 之 HEAD；(2) `repo_root` 為 linked worktree（git-dir ≠ git-common-dir，即非主 repo）；(3) 追蹤檔無
+    未提交改動（`__pycache__` 下之 numba 快取除外——產品以 `cache=True` 執行時改寫，非程式碼）；(4) `ISOLATED_INPUTS`
+    皆為指向副本外目錄之 symlink；(5) `outside_paths`（凍結檔讀寫路徑）不在副本內——副本內之凍結檔為該提交所追蹤之舊檔
+    或隨副本棄置，皆非本次所欲。"""
+    import subprocess
+
+    env = os.environ if env is None else env
+    root = Path(repo_root).resolve()
+
+    def git(*a: str) -> str:
+        res = subprocess.run(["git", "-C", str(root), *a], capture_output=True, text=True)
+        return res.stdout.strip() if res.returncode == 0 else ""
+
+    probs: List[str] = []
+    want = str(env.get(ISOLATED_COMMIT_ENV) or "")
+    head = git("rev-parse", "HEAD")
+    if not want:
+        probs.append(f"未設 {ISOLATED_COMMIT_ENV}：{'／'.join(ISOLATED_CMDS)} 須經 scripts/icperf_isolated_run.py 於"
+                     "固定提交之 worktree 副本執行（SPEC §G ①）")
+    elif head != want:
+        probs.append(f"副本 HEAD {head or '（讀不到）'} ≠ 宣告提交 {want}")
+    dirs = git("rev-parse", "--git-dir", "--git-common-dir").splitlines()
+    if len(dirs) != 2 or (root / dirs[0]).resolve() == (root / dirs[1]).resolve():
+        probs.append(f"{root} 非 linked worktree（主 repo 或非 git 目錄）")
+    dirty = [ln for ln in git("status", "--porcelain", "--untracked-files=no").splitlines()
+             if ln.strip() and "__pycache__/" not in ln]
+    if dirty:
+        probs.append(f"副本追蹤檔有未提交改動 {len(dirty)} 項：{dirty[:5]}")
+    for rel in ISOLATED_INPUTS:
+        p = root / rel
+        if not p.is_symlink():
+            probs.append(f"唯讀輸入 {rel} 非 symlink")
+        elif not p.resolve().is_dir() or _under(str(p.resolve()), str(root)):
+            probs.append(f"唯讀輸入 {rel} 未指向副本外之目錄（{p.resolve()}）")
+    for op in outside_paths:
+        if _under(str(Path(op).resolve()), str(root)):
+            probs.append(f"凍結檔路徑 {op} 在副本內（須以主 repo 之絕對路徑給 --out／--golden）")
+    return probs
 
 
 def preflight(requests: Mapping[str, Mapping[str, Any]], *, repo_root: Path = REPO,
@@ -3435,6 +3485,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--row-scales", type=int, nargs="*", default=None,
                    help="列長點（L 格交接 h5 固定 ROW_AXIS_COLS 欄之末 R 列；不給＝harness 之 ROW_AXIS_SCALES〔須過樣本外"
                         "切分預檢〕；只給旗標不給值＝不量 row_points）")
+    p = sub.add_parser("isolated-inputs", help="SPEC §G ①：列隔離副本須以 symlink 引入之唯讀輸入（JSON；秒級）")
+    p = sub.add_parser("isolation-check", help="SPEC §G ①：檢查本行程是否於合格隔離副本（秒級；不合格 rc=1）")
+    p.add_argument("--outside", type=Path, nargs="*", default=[], help="須在副本外之路徑（凍結檔）")
     p = sub.add_parser(CHILD_CMD)
     p.add_argument("spec", type=Path)
     args = parser.parse_args(argv)
@@ -3443,6 +3496,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 2
     if args.cmd == CHILD_CMD:
         return _child_main(args.spec)
+    if args.cmd == "isolated-inputs":
+        print(json.dumps(list(ISOLATED_INPUTS)))
+        return 0
+    if args.cmd in ISOLATED_CMDS or args.cmd == "isolation-check":
+        outside = (list(args.outside) if args.cmd == "isolation-check"
+                   else [x for x in (getattr(args, "out", None), getattr(args, "golden", None)) if x is not None])
+        probs = isolation_problems(REPO, outside_paths=outside)
+        if probs:
+            print("隔離副本檢查不合格（SPEC §G ①）：\n  " + "\n  ".join(probs), file=sys.stderr)
+            return 1
+        if args.cmd == "isolation-check":
+            print(json.dumps({"repo": str(REPO), "head": os.environ.get(ISOLATED_COMMIT_ENV), "ok": True}))
+            return 0
     if getattr(args, "c_handoff", None) is not None:
         os.environ[C_HANDOFF_ENV] = str(args.c_handoff)  # 子行程與 `c_handoff_path` 同讀此變數
     try:

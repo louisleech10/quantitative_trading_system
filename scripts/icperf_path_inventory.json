@@ -5272,7 +5272,7 @@
       ],
       "call_example": "create_feature_factory(...).run_ic_first(symbol, timeframe, config, start_date=s, end_date=e, ic_engine=ICEngine(...), feature_reader=..., ...)；內含完整特徵生成，量測 IC 部分應改量 _run_ic_first_post_generation 或其子入口。",
       "callers": [
-        "scripts/icperf_freeze_baseline.py:2172（_child_ic_first）"
+        "scripts/icperf_freeze_baseline.py:2222（_child_ic_first）"
       ],
       "branch_cell": null
     },

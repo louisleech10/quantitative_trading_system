@@ -5,10 +5,9 @@
 2. 同源斷言：close carrier 經 production `_stage4_ic_calculation` (:2913-2930)
    注入，**非**測試直接塞 `_ic_cache["close_series"]`；
    spy 記 stage4 回傳值，與 cache 等比對（B1）
-3. analyzer real-OLS oracle dump → handoffs/ic1d_baseline/analyzer_oracle.json
-   （獨立 np.linalg.lstsq 為 oracle 源，B3）
+3. analyzer real-OLS oracle：獨立 np.linalg.lstsq 為 oracle 源（B3）；序列化往返只寫測試暫存路徑（r119）
 4. payload.module_summary == report.module_summary（B2）
-5. cache_close_finite 欄存在於 payload（C；不斷言 finite>0）
+5. cache 收盤價載體全有限且逐時刻等於源端（r119 收緊：原只驗欄位存在）
 
 禁合成 fixture 冒充；真實 kline = data_cache/feature_klines/kline_cache.h5。
 """
@@ -337,7 +336,7 @@ def test_d9_mutation_adhoc_ic_cache_overwrite_must_fail() -> None:
             test_close_carrier_via_production_stage4_not_ad_hoc_ic_cache()
 
 
-def test_analyzer_real_ols_oracle_dump() -> None:
+def test_analyzer_real_ols_oracle_dump(tmp_path: Path) -> None:
     """③ analyzer real-OLS oracle：固定種子 dump；獨立 lstsq 驗 alpha/r2/betas/attr。
 
     Bug3：不得只斷言 alpha/r_squared；factor_betas 與 attribution 亦須對齊獨立 lstsq。
@@ -394,8 +393,8 @@ def test_analyzer_real_ols_oracle_dump() -> None:
         assert float(result["factor_betas"][name]) == pytest.approx(ind_betas[name])
         assert float(result["attribution"][name]) == pytest.approx(ind_attr[name])
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    oracle_path = OUT_DIR / "analyzer_oracle.json"
+    # r119（COMPOSER-R119-P2-03、GROK-R119-P1-05）：序列化往返只寫本測試暫存路徑，不寫任何共用位置
+    oracle_path = tmp_path / "analyzer_oracle.json"
     text = json.dumps(oracle, sort_keys=True, allow_nan=False, ensure_ascii=False)
     if not text.endswith("\n"):
         text = text + "\n"
@@ -411,7 +410,7 @@ def test_analyzer_real_ols_oracle_dump() -> None:
         assert float(disk["attribution"][name]) == pytest.approx(ind_attr[name])
 
 
-def test_b3_mutation_analyzer_hardcoded_alpha_must_fail() -> None:
+def test_b3_mutation_analyzer_hardcoded_alpha_must_fail(tmp_path: Path) -> None:
     """B3 mutation：analyzer 硬改 alpha=123 → 與獨立 lstsq 不等 → FAIL。"""
     from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
 
@@ -449,10 +448,10 @@ def test_b3_mutation_analyzer_hardcoded_alpha_must_fail() -> None:
         FactorExposureAnalyzer, "calculate_factor_attribution", _fake_attr
     ):
         with pytest.raises(AssertionError):
-            test_analyzer_real_ols_oracle_dump()
+            test_analyzer_real_ols_oracle_dump(tmp_path)
 
 
-def test_bug3_oracle_betas_mutation_must_fail() -> None:
+def test_bug3_oracle_betas_mutation_must_fail(tmp_path: Path) -> None:
     """Bug3 mutation：patch analyzer 後呼叫主 oracle 測試路徑 → 必須 FAIL。
 
     Codex caveat：不得只重複斷言 pattern；須實際走
@@ -484,7 +483,7 @@ def test_bug3_oracle_betas_mutation_must_fail() -> None:
     ):
         # 走主 oracle 測試（含 factor_betas / attribution 對齊獨立 lstsq）
         with pytest.raises(AssertionError):
-            test_analyzer_real_ols_oracle_dump()
+            test_analyzer_real_ols_oracle_dump(tmp_path)
 
 
 def test_baseline_payload_module_summary_from_report_not_serializer() -> None:
@@ -568,9 +567,83 @@ def test_payload_cache_close_finite_field_present() -> None:
         "C FAIL: cache_close_finite must be present in baseline payload"
     )
     assert "source_close_finite" in payload
-    # 格式 finite/total；**不**斷言 finite>0（production all-NaN 另票）
-    assert isinstance(payload["cache_close_finite"], str)
-    assert "/" in payload["cache_close_finite"] or payload["cache_close_finite"] == "none"
+    # r119（GROK-R119-P1-02、COMPOSER-R119-P2-02、CODEX-R119-P2-02）：舊基準 0/512 即本欄只驗存在所漏；
+    # 收緊為有效數＝總數＝512（fixture N_ROWS）且載體逐時刻等於源端同時刻收盤價
+    from scripts.ic1d_baseline_freeze import validate_baseline_close_carrier
+    from tests.fixtures.ic_api_real_kline import N_ROWS
+
+    assert payload["cache_close_finite"] == f"{N_ROWS}/{N_ROWS}"
+    validate_baseline_close_carrier(source_close, cache_close, orch._ic_cache["features_df"].index)
+
+
+def test_ic1d_current_report_matches_independent_exposure_oracle() -> None:
+    """r119（CODEX-R119-P1-01、COMPOSER-R119-P1-01、GROK-R119-P1-04）：IC1D 格（ETHUSDT 12h）同一次生產執行之實際輸入
+    （候選欄、cache 特徵、收盤價載體、有效設定）對獨立曝險參考實作逐欄一致；產品曝險加偏移 ⇒ 必拒（反例腿）。"""
+    _require_kline()
+    from scripts.ic1d_baseline_freeze import BaselineIntegrityError, verify_exposure_independent_oracle
+
+    orch, report, _src = run_production_deep_analysis(force_modules=["factor_exposure"])
+    out = verify_exposure_independent_oracle(orch, report)
+    assert out["n_fields"] > 0 and len(out["features"]) == 7
+
+    fe = report.results["factor_exposure"]
+    first = next(iter(fe["portfolio_exposure"]))
+    fe["portfolio_exposure"][first] = float(fe["portfolio_exposure"][first]) + 1e-6
+    with pytest.raises(BaselineIntegrityError):
+        verify_exposure_independent_oracle(orch, report)
+
+
+def _carrier_case(case: str) -> tuple[pd.Series, Any, pd.Index]:
+    """`validate_baseline_close_carrier` 之秒級反例：源端以整數 timestamp 為索引，特徵索引為 UTC DatetimeIndex。"""
+    ts = np.arange(1_600_000_000, 1_600_000_000 + 12 * 3600 * 8, 12 * 3600, dtype=np.int64)
+    source = pd.Series(np.linspace(100.0, 107.0, len(ts)), index=pd.Index(ts, name="timestamp"))
+    feat_idx = pd.to_datetime(ts[2:7], unit="s", utc=True)
+    cache = pd.Series(source.loc[ts[2:7]].to_numpy(), index=feat_idx)
+    if case == "nan":
+        cache.iloc[1] = np.nan
+    elif case == "inf":
+        cache.iloc[2] = np.inf
+    elif case == "empty":
+        cache = cache.iloc[:0]
+    elif case == "none":
+        cache = None
+    elif case == "shifted":
+        cache = pd.Series(np.roll(cache.to_numpy(), 1), index=feat_idx)
+    elif case == "index_mismatch":
+        cache = pd.Series(cache.to_numpy(), index=pd.to_datetime(ts[3:8], unit="s", utc=True))
+    return source, cache, feat_idx
+
+
+def test_baseline_close_carrier_ok_case() -> None:
+    from scripts.ic1d_baseline_freeze import validate_baseline_close_carrier
+
+    validate_baseline_close_carrier(*_carrier_case("ok"))
+
+
+@pytest.mark.parametrize("case", ["nan", "inf", "empty", "none", "shifted", "index_mismatch"])
+def test_ic1d_freeze_rejects_partial_nonfinite_close_before_write(
+    case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """r119：收盤價載體一格 NaN／一格 inf／空／None／循環移位／索引不符 ⇒ 凍結於寫任何檔之前拒絕，既有基準位元不變。"""
+    import scripts.ic1d_baseline_freeze as fz
+
+    source, cache, feat_idx = _carrier_case(case)
+    with pytest.raises(fz.BaselineIntegrityError):
+        fz.validate_baseline_close_carrier(source, cache, feat_idx)
+
+    class _Orch:
+        _ic_cache = {"close_series": cache, "features_df": pd.DataFrame(index=feat_idx)}
+
+    existing = tmp_path / "current.json"
+    existing.write_bytes(b'{"sentinel": 1}\n')
+    monkeypatch.setattr(fz, "OUT_DIR", tmp_path)
+    monkeypatch.setattr(fz, "run_production_deep_analysis", lambda **_k: (_Orch(), object(), source))
+    monkeypatch.setattr(fz, "verify_exposure_independent_oracle",
+                        lambda *_a: pytest.fail("收盤價載體不合格時不得進入後續步驟"))
+    with pytest.raises(fz.BaselineIntegrityError):
+        fz.freeze_profile("current")
+    assert existing.read_bytes() == b'{"sentinel": 1}\n'
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["current.json"]
 
 
 def test_provenance_sidecar_holds_volatile_fields() -> None:

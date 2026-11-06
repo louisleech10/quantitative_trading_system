@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -12,13 +9,8 @@ import pytest
 from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
 from momentum.Analysis.ic_config_schema import FactorExposureConfig
 
-# B0 freeze 的 real-OLS oracle（seed=20260721）；B1 逐欄對齊 alpha
-_ORACLE_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "handoffs"
-    / "ic1d_baseline"
-    / "analyzer_oracle.json"
-)
+#: 產品 OLS 對測試內獨立 numpy lstsq 之相對容差（同一線性最小平方解，差異僅浮點路徑）
+ORACLE_REL_TOL = 1e-10
 
 _UNAVAILABLE_KEYS = {"status", "value", "reason"}
 
@@ -126,17 +118,19 @@ def test_b1_intercept_equals_unexplained_and_alpha():
     assert result["intercept"] == result["unexplained"] == result["alpha"]
     assert np.isfinite(result["intercept"])
 
-    # 與 B0 analyzer_oracle.json 基準值逐欄相等（alpha 同源）
-    assert _ORACLE_PATH.is_file(), f"missing oracle: {_ORACLE_PATH}"
-    oracle = json.loads(_ORACLE_PATH.read_text(encoding="utf-8"))
-    assert float(result["alpha"]) == pytest.approx(float(oracle["alpha"]), abs=0.0, rel=0.0)
-    assert float(result["intercept"]) == pytest.approx(float(oracle["alpha"]), abs=0.0, rel=0.0)
-    assert float(result["unexplained"]) == pytest.approx(
-        float(oracle["unexplained"]), abs=0.0, rel=0.0
-    )
-    assert float(result["r_squared"]) == pytest.approx(
-        float(oracle["r_squared"]), abs=0.0, rel=0.0
-    )
+    # r119（COMPOSER-R119-P2-03、GROK-R119-P1-05）：期望值於本測試內以 numpy lstsq 獨立計算（含截距 OLS），
+    # 不讀他測試寫出之檔（舊 analyzer_oracle.json 出自產品 analyzer 本身，非獨立且有執行順序依賴）
+    X = np.column_stack([np.ones(n), factors.to_numpy()])
+    y = portfolio.to_numpy()
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    resid = y - X @ beta
+    r2 = 1.0 - float(resid @ resid) / float(((y - y.mean()) ** 2).sum())
+    assert float(result["alpha"]) == pytest.approx(float(beta[0]), rel=ORACLE_REL_TOL, abs=0.0)
+    assert float(result["intercept"]) == pytest.approx(float(beta[0]), rel=ORACLE_REL_TOL, abs=0.0)
+    assert float(result["unexplained"]) == pytest.approx(float(beta[0]), rel=ORACLE_REL_TOL, abs=0.0)
+    assert float(result["r_squared"]) == pytest.approx(r2, rel=ORACLE_REL_TOL, abs=0.0)
+    for i, name in enumerate(["f1", "f2", "f3"], start=1):
+        assert float(result["factor_betas"][name]) == pytest.approx(float(beta[i]), rel=ORACLE_REL_TOL, abs=0.0)
 
 
 def test_b1_unavailable_branch_has_no_intercept():

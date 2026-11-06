@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""IC 1d B0 baseline 凍結腳本（Task 0.1）。
+"""IC 1d 現行基準凍結腳本（原 B0 Task 0.1；ICPERF 諮詢 r119 改版）。
 
 用法:
-  python scripts/ic1d_baseline_freeze.py --profile p0
-  python scripts/ic1d_baseline_freeze.py --profile p1   # B1 後重跑
-  python scripts/ic1d_baseline_freeze.py --profile p3   # B3 後重跑
+  python scripts/ic1d_baseline_freeze.py --profile current
+
+r119（`handoffs/reconcile/20261106-icperf-x-consult-r119/synth.md`）：基準移至受版控之 `tests/_golden/ic1d/`，只留
+現行基準 `current.json`（舊 p0／p1／p3 係收盤價載體全空時產生之錯值，退役）；寫檔前先驗 (1) 收盤價載體非空、索引等
+於特徵索引、全有限且逐時刻等於源端同時刻收盤價，(2) factor_exposure 與獨立參考實作逐值一致——任一不符即拒寫。
+analyzer OLS oracle 改由測試內即時計算，本腳本不再輸出。
 
 D-9 關鍵契約（與 ic1cfr_stopgap_freeze 的 `_ic_cache` 手塞路徑相反）:
   close carrier **必須**經 production `analyze()` → `_stage4_ic_calculation`
@@ -12,13 +15,8 @@ D-9 關鍵契約（與 ic1cfr_stopgap_freeze 的 `_ic_cache` 手塞路徑相反�
   再由 analyze 收尾寫入 `_ic_cache`。**禁**手動塞 `_ic_cache["close_series"]`。
 
 輸出:
-  handoffs/ic1d_baseline/p0_before.json               （--profile p0；僅確定性 canonical）
-  handoffs/ic1d_baseline/p0_before.provenance.json    （volatile sidecar；不參與 deep no-op）
-  handoffs/ic1d_baseline/p1_after_rename.json
-  handoffs/ic1d_baseline/p1_after_rename.provenance.json
-  handoffs/ic1d_baseline/p3_after_failclosed.json
-  handoffs/ic1d_baseline/p3_after_failclosed.provenance.json
-  handoffs/ic1d_baseline/analyzer_oracle.json          （固定種子 real-OLS）
+  tests/_golden/ic1d/current.json               （--profile current；僅確定性 canonical）
+  tests/_golden/ic1d/current.provenance.json    （volatile sidecar；不參與數值比對）
 
 凍結合約（B0fix-provenance）:
   被 diff 的 golden 只含確定性內容（results / module_summary / fixture_sha256 /
@@ -53,14 +51,12 @@ from api.core.logging import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
 
-OUT_DIR = REPO_ROOT / "handoffs" / "ic1d_baseline"
+OUT_DIR = REPO_ROOT / "tests" / "_golden" / "ic1d"
 KLINE_CACHE = REPO_ROOT / "data_cache" / "feature_klines" / "kline_cache.h5"
 FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "ic_api_real_kline.py"
 
 PROFILE_FILENAMES: dict[str, str] = {
-    "p0": "p0_before.json",
-    "p1": "p1_after_rename.json",
-    "p3": "p3_after_failclosed.json",
+    "current": "current.json",
 }
 ALLOWED_PROFILES: frozenset[str] = frozenset(PROFILE_FILENAMES)
 
@@ -272,8 +268,13 @@ def prepare_real_kline_inputs(
     if kline is None or getattr(kline, "empty", True):
         raise RuntimeError(f"requires_kline: no data for {SYMBOL}/{TIMEFRAME}")
 
-    # C3：源端 close 必須有效（非空非全 NaN）；all-NaN raise 屬另票 production-hardening
-    source_close = pd.to_numeric(kline["close"], errors="coerce")
+    # C3：源端 close 必須有效（非空非全 NaN）。r119：以 kline 之 timestamp 欄為索引（不經產品時間軸正規化），
+    # 供凍結前逐時刻比對 cache 收盤價載體（`validate_baseline_close_carrier`）。
+    source_close = pd.Series(
+        pd.to_numeric(kline["close"], errors="coerce").to_numpy(dtype=np.float64),
+        index=pd.Index(pd.to_numeric(kline["timestamp"], errors="raise").astype(np.int64), name="timestamp"),
+        name="close",
+    )
     if source_close.empty or bool(source_close.isna().all()):
         raise RuntimeError(
             "C3 FAIL: source kline close is empty or all-NaN "
@@ -419,6 +420,67 @@ def _finite_count_label(series: Optional[pd.Series]) -> str:
     return f"{n_fin}/{len(arr)}"
 
 
+class BaselineIntegrityError(RuntimeError):
+    """r119：基準寫入前之完整性檢查不通過（拒寫，既有基準檔不變）。"""
+
+
+def _epoch_keys(index: pd.Index, unit_ref: pd.Index) -> np.ndarray:
+    """特徵時間索引 → 與源端 timestamp 欄同單位之整數 epoch（獨立於產品之時間軸正規化）。
+    源端單位依數量級判定：> 1e11 ⇒ 毫秒，否則秒。"""
+    unit = "ms" if len(unit_ref) and int(np.max(np.abs(unit_ref.to_numpy(dtype=np.int64)))) > 10**11 else "s"
+    if isinstance(index, pd.DatetimeIndex):
+        utc = index.tz_convert("UTC") if index.tz is not None else index.tz_localize("UTC")
+        ns = utc.asi8
+        return ns // (10**6 if unit == "ms" else 10**9)
+    return pd.to_numeric(pd.Series(index), errors="raise").to_numpy(dtype=np.int64)
+
+
+def validate_baseline_close_carrier(source_close: pd.Series, cache_close: Any, feature_index: pd.Index) -> None:
+    """r119（CODEX-R119-P2-02、GROK-R119-P1-02）：IC1D 基準之收盤價載體須非空、索引等於特徵索引、全部有限，且逐時刻
+    等於源端同時刻收盤價（`source_close` 以 kline timestamp 欄為索引）；任一不符 ⇒ BaselineIntegrityError。
+    產品通用載體容許真實缺價（`_validate_close_carrier` 只擋全空），本檢查只用於此固定全有限基準。"""
+    if not isinstance(cache_close, pd.Series) or len(cache_close) == 0:
+        raise BaselineIntegrityError(f"cache 收盤價載體為空或非 Series（{type(cache_close).__name__}）")
+    if not cache_close.index.equals(feature_index):
+        raise BaselineIntegrityError("cache 收盤價載體索引不等於特徵索引")
+    values = pd.to_numeric(cache_close, errors="coerce").to_numpy(dtype=np.float64)
+    n_fin = int(np.isfinite(values).sum())
+    if n_fin != len(values):
+        raise BaselineIntegrityError(f"cache 收盤價載體有非有限值：有效 {n_fin}/{len(values)}")
+    keys = _epoch_keys(feature_index, source_close.index)
+    expected = source_close.reindex(pd.Index(keys)).to_numpy(dtype=np.float64)
+    if not np.array_equal(values, expected):
+        bad = int(np.sum(~(values == expected)))
+        raise BaselineIntegrityError(f"cache 收盤價載體與源端同時刻收盤價不等：{bad}/{len(values)} 根")
+
+
+def verify_exposure_independent_oracle(orch: Any, report: Any) -> dict[str, Any]:
+    """r119（CODEX-R119-P1-01 等）：同一次執行之實際輸入（候選欄、cache 特徵與收盤價載體、有效設定）跑獨立曝險參考實作
+    （`tests/momentum/Analysis/test_icperf_deep_orth_exposure.py` 之 `ref_factor_exposure_analyzer`，不呼叫產品模組）並
+    逐欄比對（數值 rtol 1e-12、NaN 位置、欄集合、集中度離散欄）；不一致 ⇒ BaselineIntegrityError。回比對摘要。"""
+    from tests.momentum.Analysis.test_icperf_deep_orth_exposure import (
+        _all_consistent,
+        compare_factor_exposure_analyzer,
+    )
+
+    cache = orch._ic_cache or {}
+    names = [str(f["feature_name"]) for f in (report.candidate_selection or {}).get("features") or []]
+    if not names:
+        raise BaselineIntegrityError("深度分析候選欄為空，無從驗證 factor_exposure")
+    factors = cache["features_df"][names]
+    fe_cfg = orch._config.factor_exposure
+    product = asdict(report)["results"]["factor_exposure"]
+    res = compare_factor_exposure_analyzer(product, factors, cache.get("close_series"),
+                                           str(fe_cfg.neutralization_mode), int(fe_cfg.neutralization_lookback),
+                                           float(fe_cfg.max_single_exposure))
+    bad = _all_consistent(res)
+    if bad:
+        raise BaselineIntegrityError(f"factor_exposure 與獨立參考實作不一致：{bad[:5]}")
+    rels = [float(r["max_rel_diff"]) for r in res.values() if r.get("max_rel_diff") is not None]
+    return {"n_fields": len(res), "features": names, "neutralization_mode": str(fe_cfg.neutralization_mode),
+            "max_rel_diff": max(rels) if rels else None}
+
+
 def build_baseline_payload(
     report: Any,
     *,
@@ -426,7 +488,7 @@ def build_baseline_payload(
     source_close_finite: Optional[str] = None,
     cache_close_finite: Optional[str] = None,
 ) -> dict[str, Any]:
-    """組 p0/p1/p3 **golden** JSON 本體（僅確定性 canonical 內容）。
+    """組 **golden** JSON 本體（僅確定性 canonical 內容）。
 
     oracle 取得（C2）：module_summary **直接**自 DeepAnalysisReport.module_summary，
     非 `_serialize_deep_analysis`（該 serializer 只出 module_statuses）。
@@ -531,7 +593,7 @@ def build_provenance_sidecar(
 
 
 def provenance_sidecar_path(golden_path: Path) -> Path:
-    """`p0_before.json` → `p0_before.provenance.json`。"""
+    """`current.json` → `current.provenance.json`。"""
     return golden_path.with_name(f"{golden_path.stem}.provenance.json")
 
 
@@ -595,19 +657,20 @@ def freeze_profile(profile: str) -> int:
     orch, report, source_close = run_production_deep_analysis(
         force_modules=["factor_exposure"]
     )
-    # 源端 close 有效（C3）；cache 內 close 可能因 production reindex 產 NaN，不放寬檢查
     src_finite_label = _finite_count_label(source_close)
-    cache_close = None
-    if orch._ic_cache is not None:
-        cache_close = orch._ic_cache.get("close_series")
+    cache = orch._ic_cache or {}
+    cache_close = cache.get("close_series")
     cache_finite_label = _finite_count_label(
         cache_close if isinstance(cache_close, pd.Series) else None
     )
+    # r119：寫任何檔之前驗收盤價載體與獨立 oracle；不符 ⇒ BaselineIntegrityError（既有基準檔不變）
+    validate_baseline_close_carrier(source_close, cache_close, cache["features_df"].index)
+    oracle_check = verify_exposure_independent_oracle(orch, report)
     logger.info(
-        "source_close_finite=%s cache_close_finite=%s "
-        "(C3 source gate only; cache all-NaN = production-hardening 另票)",
+        "source_close_finite=%s cache_close_finite=%s exposure_oracle_fields=%s",
         src_finite_label,
         cache_finite_label,
+        oracle_check["n_fields"],
     )
 
     golden_name = PROFILE_FILENAMES[profile]
@@ -624,14 +687,11 @@ def freeze_profile(profile: str) -> int:
         source_close_finite=src_finite_label,
         cache_close_finite=cache_finite_label,
     )
+    provenance["exposure_oracle_check"] = oracle_check  # r119：獨立 oracle 比對摘要（含實際最大相對差）
     out_path = OUT_DIR / golden_name
     sidecar_path = provenance_sidecar_path(out_path)
     raw_digest = _write_json(out_path, payload)
     prov_digest = _write_json(sidecar_path, provenance)
-
-    oracle = build_analyzer_oracle()
-    oracle_path = OUT_DIR / "analyzer_oracle.json"
-    oracle_digest = _write_json(oracle_path, oracle)
 
     fe_status = payload["module_summary"].get("factor_exposure")
     fe_body = (payload.get("results") or {}).get("factor_exposure") or {}
@@ -649,10 +709,8 @@ def freeze_profile(profile: str) -> int:
     print(f"close_carrier={lineage.get('close_carrier')}")
     print(f"source_close_finite={payload.get('source_close_finite')}")
     print(f"cache_close_finite={payload.get('cache_close_finite')}")
-    print(f"wrote {oracle_path.relative_to(REPO_ROOT).as_posix()}")
-    print(f"analyzer_oracle_sha256={oracle_digest}")
-    print(f"analyzer_oracle.alpha={oracle.get('alpha')}")
-    print(f"analyzer_oracle.r_squared={oracle.get('r_squared')}")
+    print(f"exposure_oracle_fields={oracle_check['n_fields']} features={len(oracle_check['features'])} "
+          f"max_rel_diff={oracle_check['max_rel_diff']!r}")
     print(f"git_head={lineage.get('git_head')}")
     print(f"profile={provenance.get('profile')}")
     return 0
@@ -666,7 +724,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "--profile",
         required=True,
         choices=sorted(ALLOWED_PROFILES),
-        help="baseline profile: p0 | p1 | p3",
+        help="baseline profile: current",
     )
     args = parser.parse_args(argv)
     return freeze_profile(args.profile)

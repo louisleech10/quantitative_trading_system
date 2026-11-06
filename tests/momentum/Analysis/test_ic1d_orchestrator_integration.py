@@ -2,9 +2,9 @@
 
 B3 交付:
 - module_summary["factor_exposure"] == "completed_partial"
-- completed_count 與 p1 baseline 相同（sanitize 後；completed_partial 計入）
+- completed_count 與現行基準（tests/_golden/ic1d/current.json）相同（sanitize 後；completed_partial 計入）
 - results.factor_exposure 三鏡像 factor_attribution 各 exact 恰三鍵 unavailable
-- exposure_hash 不變（哨兵）
+- results 對現行基準逐值 L2（r119 取代舊浮點字串雜湊哨兵）；exposure_hash 驗自洽
 
 B4 交付:
 - test_mutation_stub_restored_must_fail / test_mutation_module_summary_completed_must_fail
@@ -14,6 +14,7 @@ B4 交付:
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,12 @@ from scripts.ic1d_baseline_freeze import (  # noqa: E402
 )
 
 KLINE_CACHE = REPO_ROOT / "data_cache" / "feature_klines" / "kline_cache.h5"
-P1_BASELINE = OUT_DIR / "p1_after_rename.json"
+#: r119：受版控之現行基準（舊 handoffs/ic1d_baseline/p1 係收盤價載體全空時產生，退役）
+P1_BASELINE = OUT_DIR / "current.json"
+#: r119（COMPOSER-R119-P1-02、GROK-R119-P2-01）：浮點逐值比對之相對容差（TEST_DESIGN_CHARTER §A 第 3 類 L2：NaN 位置
+#: 精確＋有限值容差）；雜湊欄不作數值依據，另驗自洽
+REL_TOL = 1e-12
+HASH_KEYS = frozenset({"canonical_sha256", "exposure_hash"})
 
 # 與 orchestrator stub reason 一字對齊（D-4 / Task 3.1）
 ATTR_NOT_WIRED_REASON = (
@@ -61,6 +67,38 @@ def _require_p1() -> dict[str, Any]:
     if not P1_BASELINE.is_file():
         pytest.fail(f"requires p1 baseline: missing {P1_BASELINE}")
     return json.loads(P1_BASELINE.read_text(encoding="utf-8"))
+
+
+def _is_num(x: Any) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def _l2_diff(a: Any, b: Any, path: str = "") -> list[str]:
+    """樹狀逐值比對：dict 鍵集合與 list 長度精確；數值 NaN 位置精確、有限值 |a−b| ≤ REL_TOL·max(|a|,|b|)；其餘葉精確；
+    `HASH_KEYS` 略過（雜湊另驗自洽）。回差異清單。"""
+    if isinstance(a, dict) and isinstance(b, dict):
+        if set(a) != set(b):
+            return [f"{path}: 鍵集合不同 {sorted(map(str, set(a) ^ set(b)))}"]
+        out: list[str] = []
+        for k in a:
+            if k not in HASH_KEYS:
+                out += _l2_diff(a[k], b[k], f"{path}.{k}")
+        return out
+    if isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            return [f"{path}: 長度 {len(a)} vs {len(b)}"]
+        out = []
+        for i, (x, y) in enumerate(zip(a, b)):
+            out += _l2_diff(x, y, f"{path}[{i}]")
+        return out
+    if _is_num(a) and _is_num(b):
+        fa, fb = float(a), float(b)
+        if math.isnan(fa) or math.isnan(fb):
+            return [] if (math.isnan(fa) and math.isnan(fb)) else [f"{path}: NaN 位置 {fa!r} vs {fb!r}"]
+        if fa == fb or abs(fa - fb) <= REL_TOL * max(abs(fa), abs(fb)):
+            return []
+        return [f"{path}: {fa!r} vs {fb!r}"]
+    return [] if a == b else [f"{path}: {a!r} vs {b!r}"]
 
 
 def _exposure_hash_from_fe(fe: Any) -> str | None:
@@ -184,11 +222,19 @@ def test_b3_factor_exposure_completed_partial_and_unavailable_attr():
     for ghost in ("alpha", "r_squared", "attribution", "unexplained", "factor_betas"):
         assert ghost not in fe, f"top-level ghost key still present: {ghost}"
 
-    # exposure_hash 哨兵不變
+    # r119：數值對受版控現行基準逐值 L2（NaN 位置精確、rtol 1e-12；鍵、字串、布林精確）——取代舊浮點字串雜湊哨兵
+    from scripts.ic1d_baseline_freeze import build_baseline_payload
+
+    cur = build_baseline_payload(report, profile="current")
+    diffs = _l2_diff(p1["results"], cur["results"], "results")
+    assert not diffs, f"與現行基準不一致（前 10 項）：{diffs[:10]}"
+    # 雜湊改驗自洽：等於本次輸出之 portfolio_exposure 依產品定義重算之 sha256
+    import hashlib
+
     got_hash = _exposure_hash_from_fe(fe)
-    assert got_hash == p1_hash, (
-        f"exposure_hash changed: p1={p1_hash!r} got={got_hash!r}"
-    )
+    pe = fe.get("portfolio_exposure")
+    assert isinstance(pe, dict) and pe
+    assert got_hash == hashlib.sha256(json.dumps(dict(pe), sort_keys=True, default=str).encode()).hexdigest()
 
 
 def test_force_only_factor_exposure_unavailable():
