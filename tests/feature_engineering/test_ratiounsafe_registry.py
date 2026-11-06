@@ -422,6 +422,19 @@ def test_boundary_01_failopen_baseline_untouched() -> None:
     assert rc == 0
 
 
+#: ICPERF SPEC v5.82 S7：FF-NAME K2 收據（ratiounsafe 改後基準）移入受版控 golden
+FFNAME_K2_RECEIPT = REPO / "tests" / "_golden" / "ratiounsafe" / "ffname_k2_baseline_after.json"
+
+
+def test_ffname_k2_receipt_missing_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """ICPERF SPEC v5.82 S7 缺檔反例（審碼 r125）：K2 收據缺 ⇒ 邊界② 具名失敗，不軟跳。"""
+    import sys
+
+    monkeypatch.setattr(sys.modules[__name__], "FFNAME_K2_RECEIPT", tmp_path / "missing.json")
+    with pytest.raises(FileNotFoundError):
+        test_boundary_02_after_baseline_not_written_before_branch_tests_pass()
+
+
 def test_boundary_02_after_baseline_not_written_before_branch_tests_pass() -> None:
     """Task 2.2 邊界②：改後基準記錄之階段為 after，且其 S1 兩臂之 ratio-unsafe 欄值＝前處理關之原值（即 Task 2.1 已生效）。"""
     after = json.loads((REPO / "tests/_golden/ratiounsafe/baseline_after.json").read_text(encoding="utf-8"))
@@ -434,8 +447,7 @@ def test_boundary_02_after_baseline_not_written_before_branch_tests_pass() -> No
     # 審查 r1（codex P1-06）：剔除之 ⑥ 欄須為改後基準重凍時已驗位移者（K2 收據：同設定、前處理關之 run 值＝基底位移 k）
     # ICPERF SPEC v5.82 S7：K2 收據移入受版控 golden（原 handoffs/run_receipts/ffname_refreeze_k2/
     # ratiounsafe__baseline_after.json，內容位元組不變）
-    k2 = json.loads((REPO / "tests/_golden/ratiounsafe/ffname_k2_baseline_after.json").read_text(
-        encoding="utf-8"))
+    k2 = json.loads(FFNAME_K2_RECEIPT.read_text(encoding="utf-8"))
     assert k2.get("g6_shift_verified") is True and set(missing) <= set(k2.get("g6_new_lag") or []), \
         sorted(set(missing) - set(k2.get("g6_new_lag") or []))
     for col, dig in after["s1_off"]["columns"].items():

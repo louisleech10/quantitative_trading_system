@@ -39,6 +39,8 @@ RECEIPT = REPO / REFREEZE["receipt"]
 #: ICPERF SPEC v5.82 S7：收據之 full_reference 段移入受版控 golden（原 RECEIPT 之 `full_reference`，內容不變）；
 #: 驗現行命名 parse／format 往返，仍服務產品 ⇒ 留常態層
 FULL_REFERENCE = REPO / "tests" / "_golden" / "ffname" / "full_reference.json"
+#: ICPERF SPEC v5.82 S7：framepath 換名映射移入之受版控 golden 目錄
+FRAMEPATH_RENAME_DIR = REPO / "tests" / "_golden" / "framepath" / "ffname_rename"
 SALT_KEY = "_feature_naming_version"
 #: FF-NAME 之後才加入之 config_hash 鹽（NUMVIEW D1；鍵名讀契約）：本檔以 FF-NAME 時之碼態語意重算 hash 時一併剝除
 LATER_SALT_KEYS = (json.loads((REPO / "momentum/FeatureEngineering/contracts/numeric_view.json").read_text(
@@ -615,6 +617,19 @@ def _probe_equivalence_problems(check: Optional[Dict[str, Any]], proof: Optional
     return bad
 
 
+def test_moved_fixtures_missing_fail_closed(tmp_path, monkeypatch):
+    """ICPERF SPEC v5.82 S7 缺檔反例（審碼 r125）：full_reference 與 C7 映射移入之 golden 缺 ⇒ 具名失敗、不軟跳。"""
+    import sys
+
+    module = sys.modules[__name__]
+    monkeypatch.setattr(module, "FULL_REFERENCE", tmp_path / "missing.json")
+    with pytest.raises(FileNotFoundError):
+        test_full_reference_spec_enforced()
+    monkeypatch.setattr(module, "FRAMEPATH_RENAME_DIR", tmp_path / "missing_dir")
+    with pytest.raises(FileNotFoundError):
+        test_framepath_group_key_mapping_and_lag_check()
+
+
 def test_sidecar_dir_must_be_inside_repo(tmp_path):
     """ICPERF SPEC v5.82 S9(A)：重凍工具之 sidecar 目錄（收據證據）只准 repo 內；指向版控外（如系統暫存）⇒ 載入即拒。"""
     import os
@@ -667,7 +682,7 @@ def test_framepath_group_key_mapping_and_lag_check():
     assert tool._lag_shift_ok({}, "1h_L1_trend_EMA/close_trend_EMA_8") == "not_lag"
     # 實跑映射：C7 之每個舊群組鍵 ⇒ 新群組鍵，群組 id 合規則、欄名＝未標記新名
     # ICPERF SPEC v5.82 S7：映射移入受版控 golden（原 MAPS_DIR 下同名檔，內容不變）；缺檔即 FileNotFoundError（不再軟跳）
-    map_path = REPO / "tests" / "_golden" / "framepath" / "ffname_rename" / "framepath__cgsa_fingerprint__C7.json"
+    map_path = FRAMEPATH_RENAME_DIR / "framepath__cgsa_fingerprint__C7.json"
     mapping = json.loads(map_path.read_text(encoding="utf-8"))["mapping"]
     comp = {k: v for k, v in mapping.items() if "/" in k}
     assert comp

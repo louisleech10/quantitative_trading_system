@@ -552,10 +552,26 @@ def test_mutation_raw_lag_off_by_one_is_caught(baseline, current, oracle_run):
         assert raw_lag_mismatch(reader, run, col, shift_fn=lambda s, n: s.shift(n + 1)) > 0, col
 
 
+def _value_receipt() -> dict:
+    """值不變收據（ICPERF SPEC v5.82 S7 移入受版控 golden）；缺 ⇒ FileNotFoundError（不軟跳）。"""
+    import sys
+
+    return json.loads(sys.modules[__name__].VALUE_RECEIPT.read_text(encoding="utf-8"))
+
+
+def test_value_receipt_missing_fails_closed(tmp_path, monkeypatch):
+    """ICPERF SPEC v5.82 S7 缺檔反例（審碼 r125）：值不變收據缺 ⇒ 讀取具名失敗。"""
+    import sys
+
+    monkeypatch.setattr(sys.modules[__name__], "VALUE_RECEIPT", tmp_path / "missing.json")
+    with pytest.raises(FileNotFoundError):
+        _value_receipt()
+
+
 def test_receipt_values_recomputed_by_test(baseline, current):
     """審查 r12 CODEX-R12-P1-02：收據須存在，其自報值由本測試重算後相符（值雜湊不符數、改名清單、欄名長度變化）。"""
     assert VALUE_RECEIPT.is_file()
-    receipt = json.loads(VALUE_RECEIPT.read_text(encoding="utf-8"))
+    receipt = _value_receipt()
     mapping = _mapping(baseline)
     mismatches = cond2(baseline, current, mapping)
     renamed = sorted([o, n] for o, n in mapping.items() if o != n)
@@ -568,7 +584,7 @@ def test_receipt_values_recomputed_by_test(baseline, current):
 def test_receipt_lists_exceptions_one_by_one(baseline, current):
     """①⑤⑥ 之例外逐筆列入收據：L2 合併差集與新增 lag 欄與計算值相等。"""
     mapping = _mapping(baseline)
-    receipt = json.loads(VALUE_RECEIPT.read_text(encoding="utf-8"))
+    receipt = _value_receipt()
     assert sorted(map(list, l2_merged_signatures(baseline, mapping))) == sorted(map(list, receipt["l2_merged"]))
     assert sorted(_new_lag_cols(current, {mapping[o] for o in baseline["columns"]})) == sorted(receipt["l4_new_lag"])
 
@@ -618,7 +634,7 @@ def test_task25_order_groups_stationarity_keys_consistent_after_mapping(baseline
         if group_layer(gid) == "L1" and not gid.endswith("_L65"):
             expected = {f"{i.tf}_L1_{i.category}_{i.indicator}" for i in map(fn.parse_feature_name, cols)}
             assert expected == {gid}, (gid, sorted(expected))
-    receipt = json.loads(VALUE_RECEIPT.read_text(encoding="utf-8"))
+    receipt = _value_receipt()
     assert receipt["l1_group_merges"] == merges
     # (c) 平穩化決策鍵：舊鍵映射＝新鍵扣 ⑥ 新增 lag 欄；多出之鍵只准為新增 lag 欄；映射後之決策值相同
     current_keys = set(current["stationarity_keys"])
@@ -637,7 +653,7 @@ def test_condition_7_manifest_naming_version(current):
 
 
 def test_receipt_value_mismatch_zero_and_sections():
-    receipt = json.loads(VALUE_RECEIPT.read_text(encoding="utf-8"))
+    receipt = _value_receipt()
     for key in ("schema_version", "command", "exit_code"):
         assert key in receipt
     assert receipt["value_hash_mismatch_count"] == 0

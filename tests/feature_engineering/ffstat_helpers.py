@@ -413,6 +413,8 @@ COLUMN_SET_DELTA_RECEIPT = Path(__file__).resolve().parents[2] / "handoffs" / "r
     "20260928-ffstat-column-set-delta.json"
 COLUMN_SET_APPROVAL_RECEIPT = Path(__file__).resolve().parents[2] / "handoffs" / "run_receipts" / \
     "20260928-ffstat-column-set-approval.json"
+#: FF-NAME 欄集合差異映射（ICPERF SPEC v5.82 S7 移入受版控 golden）
+FFNAME_DELTA_MAP = Path(__file__).resolve().parents[2] / "tests" / "_golden" / "ffstat" / "ffname_column_set_delta_map.json"
 
 
 def _ffname_delta_mapping(delta_path: Path) -> Dict[str, str]:
@@ -422,7 +424,7 @@ def _ffname_delta_mapping(delta_path: Path) -> Dict[str, str]:
 
     # ICPERF SPEC v5.82 S7：映射移入受版控 golden（原 handoffs/run_receipts/ffname_refreeze_maps/ffstat__column_set_delta.json，
     # 內容位元組不變）；缺檔即失敗
-    path = Path(__file__).resolve().parents[2] / "tests" / "_golden" / "ffstat" / "ffname_column_set_delta_map.json"
+    path = FFNAME_DELTA_MAP
     assert path.is_file(), f"缺 FF-NAME 欄集合差異映射 {path.name}"
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert doc["source_sha256"] == hashlib.sha256(delta_path.read_bytes()).hexdigest(), "映射未綁定該 delta 收據"

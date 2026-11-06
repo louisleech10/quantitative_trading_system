@@ -352,12 +352,31 @@ def test_mutation_binary_signal_prefix_unmasked_is_caught(monkeypatch: pytest.Mo
         _binary_signal_checks()
 
 
+#: ICPERF SPEC v5.82 S6(a)：固定受版控之 NaN 傳播盤點
+NAN_INVENTORY = REPO / "tests" / "_golden" / "ffstat" / "nan_propagation_inventory.json"
+
+
+def test_missing_fixed_fixtures_fail_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """ICPERF SPEC v5.82 S7 缺檔反例（審碼 r125）：S6／S7 移入或指名之固定檔缺 ⇒ 讀取端具名失敗，不軟跳、不回空。"""
+    missing = tmp_path / "missing.json"
+    monkeypatch.setattr(sys.modules[__name__], "NAN_INVENTORY", missing)
+    with pytest.raises(AssertionError, match="缺盤點收據"):
+        test_nan_propagation_inventory_complete()
+    monkeypatch.setattr(h, "FFNAME_DELTA_MAP", missing)
+    with pytest.raises(AssertionError, match="缺 FF-NAME 欄集合差異映射"):
+        h._ffname_delta_mapping(h.COLUMN_SET_DELTA_RECEIPT)
+    monkeypatch.setattr(h, "COLUMN_SET_DELTA_RECEIPT", missing)
+    with pytest.raises(AssertionError, match="缺欄集合差異收據"):
+        test_column_set_approval_matches_delta()
+    with pytest.raises(AssertionError, match="缺欄集合差異收據"):
+        h.approved_base_columns(set())
+
+
 def test_nan_propagation_inventory_complete() -> None:
     """Task 2.3 ②：盤點收據之步驟集合＝AST 列舉 L2–L6.5 與多週期對齊之步驟函式集合（少一即紅），且每步有碼證與分類。"""
     # ICPERF SPEC v5.82 S6(a)：讀固定受版控盤點（原以 glob 取收據目錄最新一份 ⇒ 隨機器上未版控檔而換期望）；
     # 產生端 handoffs/run_receipts/ffstat_probes/stable_start_receipts.py inventory --out 本路徑
-    inventory_path = REPO / "tests" / "_golden" / "ffstat" / "nan_propagation_inventory.json"
-    receipts = [p for p in (inventory_path,) if p.is_file()]
+    receipts = [p for p in (NAN_INVENTORY,) if p.is_file()]
     assert receipts, "缺盤點收據（SPEC Task 2.3 檔案段）"
     inventory = json.loads(receipts[-1].read_text(encoding="utf-8"))
     steps = {row["function"]: row for row in inventory["steps"]}
@@ -1263,14 +1282,15 @@ def test_mutation_restored_always_true_is_caught(monkeypatch: pytest.MonkeyPatch
 
 def test_column_set_approval_matches_delta() -> None:
     """Task 2.3 ⑦：核可紀錄之 delta sha256＝本次 delta sha256；delta 非空而無核可紀錄即紅。"""
-    rr = REPO / "handoffs" / "run_receipts"
-    deltas = sorted(rr.glob("*-ffstat-column-set-delta.json"))
+    # ICPERF SPEC v5.82 S6(b)（審碼 r125 grok P2-02）：與 approved_base_columns 同讀指名受版控之 delta／approval，
+    # 不以 glob 取最新（收據目錄多出較新之同型檔不得改期望）
+    deltas = [p for p in (h.COLUMN_SET_DELTA_RECEIPT,) if p.is_file()]
     assert deltas, "缺欄集合差異收據"
     delta_doc = json.loads(deltas[-1].read_text(encoding="utf-8"))
     digest = sm.delta_sha256(delta_doc["delta"])
     assert digest == delta_doc["delta_sha256"]
     if delta_doc["delta"] != CONTRACT["column_set_delta"]["empty"]:
-        approvals = sorted(rr.glob("*-ffstat-column-set-approval.json"))
+        approvals = [p for p in (h.COLUMN_SET_APPROVAL_RECEIPT,) if p.is_file()]
         assert approvals, "delta 非空而無使用者核可紀錄"
         approval = json.loads(approvals[-1].read_text(encoding="utf-8"))
         assert set(CONTRACT["column_set_delta"]["approval_fields"]) <= set(approval)

@@ -2116,6 +2116,15 @@ def _numview_transition() -> Tuple[Tuple[str, Dict[str, Any]], Tuple[str, Dict[s
     return versions[i - 1], versions[i]
 
 
+def test_ffname_rename_fixture_missing_fails_closed(monkeypatch):
+    """ICPERF SPEC v5.82 S7 缺檔反例（審碼 r125）：FF-NAME framepath 收據項／映射移入之 golden 缺 ⇒ 具名失敗、不回空。"""
+    import sys
+
+    monkeypatch.setattr(sys.modules[__name__], "FFNAME_RENAME_DIR_REL", "tests/_golden/framepath/__missing__")
+    with pytest.raises(FileNotFoundError):
+        ffname_framepath_approvals()
+
+
 def test_numview_structural_refreeze_accepted_and_tampering_red():
     """ICPERF SPEC v5.82 S2：NUMVIEW 結構重凍轉換通過；夾帶值改、刪格、改 receipt 非路徑鍵、新 manifest 不等於收據各紅。"""
     (pn, prev), (cn, cur) = _numview_transition()
