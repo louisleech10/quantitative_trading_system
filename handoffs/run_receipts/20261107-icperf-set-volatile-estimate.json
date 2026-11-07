@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_freeze_baseline.py",
+      "target_argv": "venv/bin/python scripts/icperf_freeze_baseline.py set-volatile --probe handoffs/run_receipts/20261107-icperf-volatile-probe.json --out handoffs/run_receipts/20261107-icperf-set-volatile.json",
+      "code_sha256": "045344e15256d6b4f95e9111c0ba0498d182b16d607c708be7108b5360febde3",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF §G 重凍之 set-volatile；主 repo HEAD ad488adf、凍結腳本工作區無改動）",
+      "created_at": "2026-11-07T21:20:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 300,
+  "basis": [
+    "只讀凍結檔（56,053,183 bytes gzip，2026-11-07 18:09 新凍）與實測收據 20261107-icperf-volatile-probe.json、驗兩者 sha256、寫回凍結檔一次；無計算子行程",
+    "前次同子命令（估時收據 20261101-icperf-set-volatile-estimate.json 300 秒）：估時收據 mtime 04:22、結果收據 mtime 04:23，約 1 分鐘；本次凍結檔大 4% ⇒ 沿用 300 秒寬裕上界，不作停止條件"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

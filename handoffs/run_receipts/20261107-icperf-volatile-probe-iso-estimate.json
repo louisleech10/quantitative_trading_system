@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_isolated_run.py",
+      "target_argv": "venv/bin/python scripts/icperf_isolated_run.py --commit ad488adf --batch icperf/gfreeze_20261107 --receipt handoffs/run_receipts/20261107-icperf-volatile-probe-iso.json -- volatile-probe --out handoffs/run_receipts/20261107-icperf-volatile-probe.json --golden tests/_golden/icperf/pre_change.json.gz",
+      "code_sha256": "ad00e19e2a418af59de2e78ca4120ab42806b802aee9fd570302b68c38939f9b",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF §G 重凍之 volatile-probe，隔離副本於提交 ad488adf，凍結檔為 2026-11-07 18:09 新凍）",
+      "created_at": "2026-11-07T18:20:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 14400,
+  "basis": [
+    "前次同子命令實跑約 3 小時 5 分（估時收據 20261101-icperf-volatile-probe-estimate.json mtime 01:16、實測收據 20261101-icperf-volatile-probe.json mtime 04:21）",
+    "本次同批凍結實跑 13465 秒（收據 20261107-icperf-g-freeze-iso.json），與前次凍結 3 小時 50 分同量級 ⇒ 探針取同前次估時 4 小時 14400 秒；量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行",
+    "--golden 與 --out 給主 repo 絕對路徑：副本內之預設凍結檔為提交 ad488adf 之舊版，非本次新凍",
+    "空間：2026-11-07 18:1x 實查 df -h /System/Volumes/VM 可用 22Gi，產品記憶體守護門檻 4 GiB"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

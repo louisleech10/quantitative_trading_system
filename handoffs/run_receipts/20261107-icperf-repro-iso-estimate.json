@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_isolated_run.py",
+      "target_argv": "venv/bin/python scripts/icperf_isolated_run.py --commit ad488adf --batch icperf/gfreeze_20261107 --receipt handoffs/run_receipts/20261107-icperf-repro-iso.json -- repro --golden tests/_golden/icperf/pre_change.json.gz --out handoffs/run_receipts/20261107-icperf-repro.json",
+      "code_sha256": "ad00e19e2a418af59de2e78ca4120ab42806b802aee9fd570302b68c38939f9b",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF §G 重凍之可重現性 repro，BUDGET-1 所列；隔離副本於提交 ad488adf，對 2026-11-07 21:18 寫入 volatile 後之凍結檔）",
+      "created_at": "2026-11-07T21:25:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 3600,
+  "basis": [
+    "前次同子命令約 29 分鐘（估時收據 20261101-icperf-repro-estimate.json mtime 04:23、結果收據 20261101-icperf-repro.json mtime 04:52）",
+    "本次凍結之第 (2) 項子集第 5 段：ic_report 目錄 mtime 15:08:35 至 deep_analysis 目錄建立 15:38:08，約 30 分鐘 ⇒ 沿用前次 3600 秒（2 倍寬裕），量級估計、不作停止條件，經 scripts/run_watched.py 背景執行",
+    "--golden／--out 給主 repo 絕對路徑：副本內預設凍結檔為提交 ad488adf 之舊版"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_isolated_run.py",
+      "target_argv": "venv/bin/python scripts/icperf_isolated_run.py --commit ad488adf --batch icperf/gfreeze_20261107 --receipt handoffs/run_receipts/20261107-icperf-g-freeze-iso.json -- freeze --out tests/_golden/icperf/pre_change.json.gz",
+      "code_sha256": "ad00e19e2a418af59de2e78ca4120ab42806b802aee9fd570302b68c38939f9b",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "主委（ICPERF §G 重凍，隔離副本於提交 ad488adf；磁碟清理後 2026-11-07）",
+      "created_at": "2026-11-07T14:20:00+08:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 16200,
+  "basis": [
+    "前次同項凍結實跑約 3 小時 50 分（docs/ICPERF_SPEC.md FACT-RECEIPT 凍結實跑 2026-10-31：17:44–21:34，rc=0）；再前一次 2 小時 33 分（2026-10-29）",
+    "其後碼差（HAC／EWC 顯著性、ic_autocorr 欄、跨標的方法接線、S1–S12）增加逐特徵統計量，取前次 3 小時 50 分加約 15% 為 4.5 小時；量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行",
+    "空間：前次工作目錄 849 MB、隔離副本約 1.1 GiB；2026-11-07 實查換頁卷可用 24Gi（df -h /System/Volumes/VM），產品記憶體守護門檻 4 GiB"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-1"
+  ]
+}

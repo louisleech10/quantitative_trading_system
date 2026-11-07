@@ -1,0 +1,46 @@
+{
+ "schema": "icperf-isolated-run/1",
+ "spec": "docs/ICPERF_SPEC.md §G ①",
+ "commit": "ad488adf2f5b62a484a99dec611ff2f80a434cc5",
+ "worktree": "/Users/louis/Desktop/quantitative_trading_system/runs/icperf/gfreeze_20261107/wt-ad488adf2f5b",
+ "head_before": "ad488adf2f5b62a484a99dec611ff2f80a434cc5",
+ "head_after": "ad488adf2f5b62a484a99dec611ff2f80a434cc5",
+ "argv": [
+  "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python",
+  "scripts/icperf_freeze_baseline.py",
+  "repro",
+  "--golden",
+  "/Users/louis/Desktop/quantitative_trading_system/tests/_golden/icperf/pre_change.json.gz",
+  "--out",
+  "/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20261107-icperf-repro.json"
+ ],
+ "rc": 0,
+ "inputs": {
+  "data_cache/feature_klines": {
+   "n_files": 1,
+   "sha256": "d37250a0abb97b3e3737f82c617857d511002e4e1ab4e9de564d59987c08143b"
+  },
+  "data_cache/feature_klines_longhist": {
+   "n_files": 1,
+   "sha256": "43c2ac439b640667a96910976096db5966321155bcc1d0a92ac434ed0f89a932"
+  },
+  "data_cache/numview_freeze_runs": {
+   "n_files": 989,
+   "sha256": "fc13da3df24bdb3e925aa17b699aba21910f6c155b3c0de36bf46857895fdc71"
+  },
+  "data_cache/icperf_inputs": {
+   "n_files": 14921,
+   "sha256": "8520e46b8537db25d6220f24bacadf95541787b8dac8aa60566207ae71112892"
+  },
+  "data_cache/events": {
+   "n_files": 27,
+   "sha256": "af0ee54fe2edd4c2df2d696602cf3512e88537e35007aba8671618d27cfc4f81"
+  }
+ },
+ "inputs_unchanged": true,
+ "input_changes": [],
+ "n_input_changes": 0,
+ "seconds": 1775.0,
+ "finished_at": "2026-11-07T13:49:10+00:00",
+ "pass": true
+}
