@@ -188,6 +188,72 @@ def test_boundary_12_build_inventory_keeps_unruled(ls: Any, tmp_path: Path) -> N
     assert any(u.get("file") == "momentum/Analysis/gone.py" for u in unruled), "指向不存在候選之裁定須列出"
 
 
+def test_boundary_12b_manual_site_located_by_code_and_drift_detected(ls: Any, tmp_path: Path) -> None:
+    """手動登記點（掃描器不列之上限判定點，如超限時之 raise 行）：依碼 sha 定位到現行行號；碼改即 unruled。"""
+    p = tmp_path / "momentum" / "Analysis" / "a.py"
+    p.parent.mkdir(parents=True)
+    p.write_text("def f(ok):\n    x = 1\n    if not ok:\n        raise ValueError('too many rows')\n", encoding="utf-8")
+    code = "raise ValueError('too many rows')"
+    rule = {"file": "momentum/Analysis/a.py", "code_sha256": hashlib.sha256(code.encode("utf-8")).hexdigest(),
+            "site": "manual", "category": "A", "semantic_type": "1", "needs_fix": True, "batch": "L2",
+            "reason": "逾列數即拒算", "g_impact": {"kind": "none", "items": []}}
+    inv = ls.build_inventory(ls.scan_default_roots(tmp_path), {"rulings": [rule]}, tmp_path)
+    assert [(r["file"], r["line"], r["site"]) for r in inv["rows"]] == [("momentum/Analysis/a.py", 4, "manual")]
+    assert inv["unruled"] == []
+    p.write_text("def f(ok):\n    x = 1\n    if not ok:\n        raise ValueError('too many cols')\n", encoding="utf-8")
+    inv2 = ls.build_inventory(ls.scan_default_roots(tmp_path), {"rulings": [rule]}, tmp_path)
+    assert inv2["rows"] == [] and [u["reason"] for u in inv2["unruled"]] == ["裁定之候選已不存在"]
+
+
+@pytest.mark.parametrize("rel,text", [
+    ("momentum/Analysis/bad.py", "def broken(:\n"),
+    ("momentum/Analysis/contracts/bad.json", '{"max_rows": 1,\n'),
+    ("config/bad.yaml", "a: [1, 2\n"),
+    ("frontend/src/bad.tsx", "export const A = () => <div>;\n"),
+])
+def test_boundary_14_inventory_refuses_parse_errors(ls: Any, tmp_path: Path, rel: str, text: str) -> None:
+    """任一語言 parse 失敗 ⇒ build_inventory 拒產、--inventory 回非 0 且不寫檔（不得把壞檔當無上限）。"""
+    p = tmp_path / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
+    scan_out = ls.scan_default_roots(tmp_path)
+    assert [e["file"] for e in scan_out["errors"]] == [rel]
+    with pytest.raises(ValueError):
+        ls.build_inventory(scan_out, {"rulings": []}, tmp_path)
+    rulings = tmp_path / "rulings.json"
+    rulings.write_text('{"rulings": []}', encoding="utf-8")
+    out = tmp_path / "inv.json"
+    rc = ls.main(["--inventory", "--root", str(tmp_path), "--rulings", str(rulings), "--out", str(out)])
+    assert rc != 0 and not out.exists()
+
+
+def test_boundary_15_symbolic_constant_at_use_sites(ls: Any, tmp_path: Path) -> None:
+    """符號常數追一層：Python 函式預設值、TS 切片引數與 JSX 上下界屬性之使用處皆列，值取宣告。"""
+    py = _src(tmp_path, "d.py", "LIMIT = 50\n\ndef f(n=LIMIT):\n    return n\n")
+    tsx = _src(tmp_path, "c.tsx", "const N = 50;\nexport const f = (xs: number[]) => xs.slice(0, N);\n"
+                                  "export const A = () => <input max={N} />;\n")
+    out = ls.scan([py, tsx])
+    assert any(r["value"] == 50 for r in _rows_at(out, py, 3)), "Python 預設值之符號常數未追"
+    assert any(r["value"] == 50 for r in _rows_at(out, tsx, 2)), "TS 切片之符號常數未追"
+    assert any(r["value"] == 50 for r in _rows_at(out, tsx, 3)), "TS JSX 上下界之符號常數未追"
+
+
+def test_boundary_16_named_limit_sites_without_literal(ls: Any, tmp_path: Path) -> None:
+    """行內無數字之上限判定點與 TS 解構預設、呼叫包裝之具名初值皆入候選。"""
+    py = _src(tmp_path, "e.py", "def f(total_rows, max_rows, xs, top_n):\n    if total_rows > max_rows:\n"
+                                "        raise ValueError\n    return xs[:top_n]\n")
+    tsx = _src(tmp_path, "g.tsx", "import { useState } from 'react';\n"
+                                  "export default function C({ topN = 10 }: { topN?: number }) {\n"
+                                  "  const [maxIterations] = useState(30);\n"
+                                  "  if (topN > maxIterations) return null;\n  return null;\n}\n")
+    out = ls.scan([py, tsx])
+    assert any(r["kind"] == "named_compare" and r["name"] == "max_rows" for r in _rows_at(out, py, 2))
+    assert any(r["kind"] == "named_slice" and r["name"] == "top_n" for r in _rows_at(out, py, 4))
+    assert any(r["value"] == 10 for r in _rows_at(out, tsx, 2)), "TS 解構參數預設未列"
+    assert any(r["value"] == 30 for r in _rows_at(out, tsx, 3)), "TS useState 具名初值未列"
+    assert any(r["kind"] == "ts_named_compare" for r in _rows_at(out, tsx, 4)), "TS 無數字比較式未列"
+
+
 def test_boundary_13_committed_inventory_reproducible(ls: Any) -> None:
     """以同一生成端重產現行機讀表：列集合須等於受版控檔；且無未裁定之候選殘留。"""
     rulings = json.loads((REPO / "tests" / "_golden" / "icperf" / "limit_rulings.json").read_text(encoding="utf-8"))

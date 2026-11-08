@@ -38,7 +38,8 @@
     "scripts/icperf_freeze_baseline.py",
     "scripts/icperf_isolated_run.py",
     "scripts/limit_lint.py",
-    "scripts/limit_scan.py"
+    "scripts/limit_scan.py",
+    "scripts/limit_scan_ts.js"
   ],
   "contract_jsons": [
     "momentum/Analysis/contracts/data_warning_codes.json",
@@ -197,6 +198,7 @@
       "scripts/icperf_freeze_baseline.py",
       "scripts/limit_lint.py",
       "scripts/limit_scan.py",
+      "scripts/limit_scan_ts.js",
       "scripts/phase29_perf_validation_tmp.py",
       "tests/_golden/icperf/limit_inventory.json",
       "tests/_golden/icperf/limit_lint_corpus_receipt.json",
