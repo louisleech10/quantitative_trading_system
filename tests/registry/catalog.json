@@ -9411,6 +9411,125 @@
    ],
    "ticket": "IC-HC"
   },
+  "tests/governance/test_limit_lint.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_limit_lint.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_compare_units.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_compare_units.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_data_warning_codes.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A12",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_data_warning_codes.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A2",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_limit_scan.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_limit_scan.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/momentum/Analysis/test_icperf_correctness.py": {
    "claim": [
     "correctness"

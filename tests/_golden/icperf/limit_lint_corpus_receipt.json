@@ -1,0 +1,4 @@
+{
+  "_doc": "ICPERF SPEC v5.85 Task 0.6 (g)：防上限 checker 逐規則語料收據（以 tests/_golden/icperf/limit_inventory.json 標註語料與具名正負例量 precision／recall；施工前空殼）。",
+  "rules": []
+}
