@@ -301,7 +301,7 @@
         "observable": true
       },
       {
-        "rule": "Phase 0 除 SPEC Task 0.4 所列 ①–㊺（v5.27 ⑥–㉒ 之產品碼位置見 SPEC Task 0.4 擴列表「位置」欄；①–⑤：turnover_analyzer.py:85、:168 頂分位〔pit_stats.py 新增 pit_expanding_qcut_top_mask，pit_expanding_qcut_label 輸出不變〕；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點；v5.26 ④ ic_engine.py:439-444 compute_rolling_ic 與 ic_filter_orchestrator.py:4917-4921 _slice_rolling_ic_to_test 之跨特徵聯合 dropna；⑤ ic_filter_orchestrator.py:1139-1140 _slice_raw_data_by_mask 於 mask 為 None 時依時間軸對齊）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）；Task 0.6（SPEC v5.85）例外：L1／L2 依 tests/_golden/icperf/limit_inventory.json 需修列所改之產品碼（L1 不改輸出、以單元測試驗舊預設輸出不變；L2 改輸出、以宣告差集與獨立 oracle 驗收），範圍以機讀表列為準",
+        "rule": "Phase 0 除 SPEC Task 0.4 所列 ①–㊺（v5.27 ⑥–㉒ 之產品碼位置見 SPEC Task 0.4 擴列表「位置」欄；①–⑤：turnover_analyzer.py:85、:168 頂分位〔pit_stats.py 新增 pit_expanding_qcut_top_mask，pit_expanding_qcut_label 輸出不變〕；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點；v5.26 ④ ic_engine.py:439-444 compute_rolling_ic 與 ic_filter_orchestrator.py:4917-4921 _slice_rolling_ic_to_test 之跨特徵聯合 dropna；⑤ ic_filter_orchestrator.py:1139-1140 _slice_raw_data_by_mask 於 mask 為 None 時依時間軸對齊）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）；Task 0.6（SPEC v5.85）例外：L1／L2 依 tests/_golden/icperf/limit_inventory.json 需修列所改之產品碼（L1 依 SPEC v5.86 (h) f1／f2 驗收（f1 計算結果不變、f2 封閉差異以獨立 oracle 驗）；L2 改輸出、以宣告差集與獨立 oracle 驗收），範圍以機讀表列為準",
         "observable": false
       },
       {
@@ -422,7 +422,7 @@
         "expiry": "2026-12-31"
       },
       {
-        "item": "Phase 0 除 SPEC Task 0.4 所列 ①–㊺（v5.27 ⑥–㉒ 之產品碼位置見 SPEC Task 0.4 擴列表「位置」欄；①–⑤：turnover_analyzer.py:85、:168 頂分位〔pit_stats.py 新增 pit_expanding_qcut_top_mask，pit_expanding_qcut_label 輸出不變〕；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點；v5.26 ④ ic_engine.py:439-444 compute_rolling_ic 與 ic_filter_orchestrator.py:4917-4921 _slice_rolling_ic_to_test 之跨特徵聯合 dropna；⑤ ic_filter_orchestrator.py:1139-1140 _slice_raw_data_by_mask 於 mask 為 None 時依時間軸對齊）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）；Task 0.6（SPEC v5.85）例外：L1／L2 依 tests/_golden/icperf/limit_inventory.json 需修列所改之產品碼（L1 不改輸出、以單元測試驗舊預設輸出不變；L2 改輸出、以宣告差集與獨立 oracle 驗收），範圍以機讀表列為準",
+        "item": "Phase 0 除 SPEC Task 0.4 所列 ①–㊺（v5.27 ⑥–㉒ 之產品碼位置見 SPEC Task 0.4 擴列表「位置」欄；①–⑤：turnover_analyzer.py:85、:168 頂分位〔pit_stats.py 新增 pit_expanding_qcut_top_mask，pit_expanding_qcut_label 輸出不變〕；ic_engine.py:484 勝率分母；ic_engine.py:1168 衰減擬合起點；v5.26 ④ ic_engine.py:439-444 compute_rolling_ic 與 ic_filter_orchestrator.py:4917-4921 _slice_rolling_ic_to_test 之跨特徵聯合 dropna；⑤ ic_filter_orchestrator.py:1139-1140 _slice_raw_data_by_mask 於 mask 為 None 時依時間軸對齊）外不改任何產品碼（momentum/、api/ 其餘一律不動）；Task 0.4 獨立提交且於 Task 0.1 凍結執行前完成，凍結與盤點皆以 Task 0.4 修正後之碼執行（SPEC Task 0.4、§G）；Task 0.6（SPEC v5.85）例外：L1／L2 依 tests/_golden/icperf/limit_inventory.json 需修列所改之產品碼（L1 依 SPEC v5.86 (h) f1／f2 驗收（f1 計算結果不變、f2 封閉差異以獨立 oracle 驗）；L2 改輸出、以宣告差集與獨立 oracle 驗收），範圍以機讀表列為準",
         "reason": "user-ruling",
         "owner": "ICPERF",
         "expiry": "2026-12-31"
