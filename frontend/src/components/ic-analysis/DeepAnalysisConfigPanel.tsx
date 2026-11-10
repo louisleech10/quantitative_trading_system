@@ -132,14 +132,13 @@ export default function DeepAnalysisConfigPanel({
           {netIcConfig.cost_enabled && (
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400" htmlFor="net-ic-cost-bps">
-                成本 (bps，0.1–1000)
+                成本 (bps，≥0.1)
               </label>
               <input
                 id="net-ic-cost-bps"
                 data-testid="net-ic-cost-bps"
                 type="number"
                 min={0.1}
-                max={1000}
                 step={0.1}
                 value={netIcConfig.cost_bps ?? ''}
                 onChange={(event) => handleCostBps(event.target.value)}

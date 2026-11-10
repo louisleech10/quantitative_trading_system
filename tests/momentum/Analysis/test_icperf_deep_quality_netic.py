@@ -701,7 +701,7 @@ def ref_net_ic_analysis(
             drag = None if turnover is None else cost_bps / 10000.0 * turnover
             if drag is not None:
                 drags.append(drag)
-            ladder = sorted({round(min(1000.0, max(0.1, x)), 1)
+            ladder = sorted({round(max(0.1, x), 1)
                              for x in (cost_bps / 2.0, cost_bps, 2.0 * cost_bps, 5.0 * cost_bps)})
             row.update({"cost_bps": cost_bps, "cost_semantics": "per_rebalance_not_annualized", "cost_drag_return": drag,
                         "cost_sensitivity": [{"cost_bps": float(s),
@@ -1129,7 +1129,7 @@ def _net_inputs() -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any], Dict[str, 
                                  {"cost_enabled": True, "cost_bps": 400.0, "participation_rate": 0.05}])
 def test_net_ic_matches_oracle_boundaries(cfg: Dict[str, Any]) -> None:
     """換手率輸入取序列之 mean(|Δposition|)（兩定義重合之輸入）時，全部統計欄（跳過分支與原因、gross、換手率、容量與級距、
-    成本拖累與階梯〔c／2 截 0.1、5c 截 1000、四捨五入 0.1 去重〕、net、損益兩平、獲利、摘要）與 oracle 一致；
+    成本拖累與階梯〔c／2 截 0.1、不設上界（ICPERF Task 0.6 L1a 刪 1000 截斷）、四捨五入 0.1 去重〕、net、損益兩平、獲利、摘要）與 oracle 一致；
     三 profile（gross-only、成本啟用 10／0.15／400 bps）。"""
     summary, turnover, series = _net_inputs()
     out = NetICAnalyzer(cfg).batch_analyze(summary, turnover, factor_return_series=series)

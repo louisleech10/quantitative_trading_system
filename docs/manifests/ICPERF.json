@@ -3,6 +3,7 @@
   "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
   "stub_modules": [],
   "test_files": [
+    "frontend/src/components/ic-analysis/ICConfigPanel.limits.test.tsx",
     "frontend/src/components/ic-analysis/TrendDashboard.test.tsx",
     "tests/golden/la1/test_attribution_validator.py",
     "tests/golden/la1/test_b4_golden_rebaseline.py",
@@ -23,6 +24,8 @@
     "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py",
     "tests/momentum/Analysis/test_icperf_hac_method_bw.py",
     "tests/momentum/Analysis/test_icperf_isolated_run.py",
+    "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py",
+    "tests/momentum/Analysis/test_icperf_limit_l1a_ic_config.py",
     "tests/momentum/Analysis/test_icperf_limit_scan.py",
     "tests/momentum/Analysis/test_icperf_regime_robust.py",
     "tests/momentum/Analysis/test_icperf_trend_inference.py",
@@ -111,6 +114,7 @@
       "frontend/src/components/ic-analysis/FactorCentralityChart.tsx",
       "frontend/src/components/ic-analysis/FeatureFilterPanel.tsx",
       "frontend/src/components/ic-analysis/FeatureTierPanel.settings.test.tsx",
+      "frontend/src/components/ic-analysis/ICConfigPanel.limits.test.tsx",
       "frontend/src/components/ic-analysis/ICConfigPanel.tsx",
       "frontend/src/components/ic-analysis/ICRunSettingsLine.tsx",
       "frontend/src/components/ic-analysis/ICSummaryTable.tsx",
@@ -187,6 +191,7 @@
       "momentum/core/contracts.py",
       "momentum/core/h5_feature_precision.py",
       "momentum/core/protocols.py",
+      "pytest.ini",
       "requirements.txt",
       "scripts/ffprod_freeze_baseline.py",
       "scripts/ffprod_measure.py",
@@ -236,6 +241,8 @@
       "tests/momentum/Analysis/test_icperf_hac45_size.py",
       "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py",
       "tests/momentum/Analysis/test_icperf_hac_method_bw.py",
+      "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py",
+      "tests/momentum/Analysis/test_icperf_limit_l1a_ic_config.py",
       "tests/momentum/Analysis/test_icperf_limit_scan.py",
       "tests/momentum/Analysis/test_icperf_trend_inference.py",
       "tests/momentum/Analysis/test_icperf_trend_wiring.py",
@@ -440,7 +447,7 @@
         "expiry": "2026-12-31"
       },
       {
-        "item": "Task 0.6 L1／L2 逐列具名測試（依 tests/_golden/icperf/limit_inventory.json 需修列逐列產生 oracle 測試；已錨定之固定 L HAC 兩入口與 CPCV max_paths 已先落 test_icperf_hac_fixed_lag.py、test_icperf_cpcv_full_paths.py）",
+        "item": "Task 0.6 L1 第二子批起與 L2 之逐列具名測試（依 L0 git 物件 1eeef821:tests/_golden/icperf/limit_inventory.json 需修列，SPEC v5.86 (h) 逐子批於派工時修訂本清單；L1a〔IC 設定參數上界 36 落點：ic_config_schema.py 24、ICConfigPanel.tsx 7、DeepAnalysisConfigPanel.tsx:142、ic_models.py:58、net_ic_analyzer.py:197／:274、turnover_analyzer.py:215，全為 f1；審碼 r163–r164 收斂〕已落 test_icperf_limit_l1a_ic_config.py 與 ICConfigPanel.limits.test.tsx，覆蓋檢查 test_icperf_limit_l1_coverage.py；已錨定之固定 L HAC 兩入口與 CPCV max_paths 已先落 test_icperf_hac_fixed_lag.py、test_icperf_cpcv_full_paths.py）",
         "reason": "blocked-by",
         "owner": "ICPERF",
         "expiry": "2026-12-31"

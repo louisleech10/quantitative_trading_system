@@ -212,9 +212,9 @@ class TurnoverAnalyzer:
             raise ValueError(
                 f"turnover_rate must be finite and >= 0, got {turnover_rate!r}"
             )
-        if not np.isfinite(bps) or not (0.0 < bps <= 1000.0):
+        if not np.isfinite(bps) or not (bps > 0.0):
             raise ValueError(
-                f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+                f"cost_bps must be finite and > 0, got {cost_bps!r}"
             )
         return float((bps / 10000.0) * t)
 

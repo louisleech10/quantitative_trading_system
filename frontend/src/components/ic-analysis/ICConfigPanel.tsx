@@ -348,16 +348,14 @@ export default function ICConfigPanel({
           label="ICIR 最小值"
           value={config.thresholds.icir_min}
           onChange={(value) => updateConfig({ thresholds: { icir_min: value } })}
-          min={-2}
-          max={3}
           step={0.05}
         />
         <NumberInput
           label="P-Value 最大值"
           value={config.thresholds.p_value_max}
           onChange={(value) => updateConfig({ thresholds: { p_value_max: value } })}
-          min={0.001}
-          max={0.5}
+          min={0}
+          max={1}
           step={0.005}
         />
         <NumberInput
@@ -378,7 +376,7 @@ export default function ICConfigPanel({
         <input
           type="range"
           min={0.3}
-          max={0.95}
+          max={1}
           step={0.01}
           value={config.thresholds.correlation_threshold}
           onChange={(event) =>
@@ -412,7 +410,6 @@ export default function ICConfigPanel({
           value={diversification.min_categories}
           onChange={(value) => updateDiversification({ min_categories: Math.round(value) })}
           min={1}
-          max={50}
           step={1}
           disabled={!diversification.enabled}
         />
@@ -421,7 +418,6 @@ export default function ICConfigPanel({
           value={diversification.min_data_sources}
           onChange={(value) => updateDiversification({ min_data_sources: Math.round(value) })}
           min={1}
-          max={50}
           step={1}
           disabled={!diversification.enabled}
         />

@@ -204,7 +204,7 @@ class MarginalICConfig(BaseModel):
     min_rows_per_regressor: int = Field(default=5, ge=1)
     degenerate_threshold: float = Field(default=1e-10, gt=0.0)
     weights_method: Literal["equal", "ic_weighted"] = "equal"
-    n_bootstrap: int = Field(default=1000, ge=1, le=20000)
+    n_bootstrap: int = Field(default=1000, ge=1)
     bootstrap_seed: int = 20260818
     include_removed_candidates: bool = True
     max_survivors_for_loo: int = Field(default=200, ge=1)
@@ -243,7 +243,7 @@ class FactorReturnConfig(BaseModel):
     # F5.2: enabled=True 最終 flip(F0-F4 全綠後;§R 回退=revert 本 commit)
     # tier truth(D13): foundation 仍不含(deep_enabled=False); intermediate/advanced/custom 入 run
     enabled: bool = True
-    num_quantiles: int = Field(default=5, ge=2, le=20)
+    num_quantiles: int = Field(default=5, ge=2)
     calculate_risk_metrics: bool = True
     risk_free_rate: float = Field(default=0.0, ge=-1.0, le=1.0)
     # F0.1: 分位冷啟動(與 min_samples 獨立);t < warmup_periods → position=0
@@ -254,20 +254,20 @@ class FactorReturnConfig(BaseModel):
 
 class FactorCentralityConfig(BaseModel):
     enabled: bool = True
-    n_components: int = Field(default=5, ge=1, le=50)
-    rolling_window: int = Field(default=60, ge=5, le=500)
+    n_components: int = Field(default=5, ge=1)
+    rolling_window: int = Field(default=60, ge=5)
     # ICPERF Task 0.4 ⑲（CT-10）：已不再使用——中心性總和 ≤ 1，絕對門檻於 p ≥ 4 恆不觸發；改由
     # crowding_threshold_relative 判定（保留欄位以相容既有設定檔，值不影響任何輸出）
     crowded_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
     # ICPERF Task 0.4 ⑲（CT-10）：擁擠門檻相對於平均——擁擠 ⟺ centrality ≥ τ·mean(centrality)（τ／p 恆不觸發，因 centrality ≤ 1／p）
-    crowding_threshold_relative: float = Field(default=1.5, gt=0.0, le=1000.0)
-    min_samples_for_pca: int = Field(default=30, ge=10, le=10000)
+    crowding_threshold_relative: float = Field(default=1.5, gt=0.0, allow_inf_nan=False)
+    min_samples_for_pca: int = Field(default=30, ge=10)
 
 
 class TrendAnalysisConfig(BaseModel):
     enabled: bool = True
-    min_samples: int = Field(default=20, ge=5, le=10000)
-    significance_level: float = Field(default=0.05, gt=0.0, le=0.2)
+    min_samples: int = Field(default=20, ge=5)
+    significance_level: float = Field(default=0.05, gt=0.0, lt=1.0)  # limit-lint: allow=field_upper_bound reason=顯著水準數學值域 0<α<1
     r_squared_threshold: float = Field(default=0.1, ge=0.0, le=1.0)
     dimensions: list[str] = Field(
         default_factory=lambda: ["ic", "centrality", "factor_return", "ls_spread"]
@@ -276,7 +276,7 @@ class TrendAnalysisConfig(BaseModel):
 
 class ParameterSensitivityConfig(BaseModel):
     enabled: bool = True
-    min_family_size: int = Field(default=3, ge=2, le=100)
+    min_family_size: int = Field(default=3, ge=2)
     ic_std_threshold_low: float = Field(default=0.02, ge=0.0, le=1.0)
     ic_std_threshold_high: float = Field(default=0.05, ge=0.0, le=1.0)
     auto_detect_families: bool = True
@@ -284,17 +284,17 @@ class ParameterSensitivityConfig(BaseModel):
 
 class RollingOOSAssessmentThresholds(BaseModel):
     robust_hit_rate: float = Field(default=0.7, ge=0.0, le=1.0)
-    robust_max_degradation: float = Field(default=0.3, ge=0.0, le=5.0)
+    robust_max_degradation: float = Field(default=0.3, ge=0.0, allow_inf_nan=False)
     moderate_hit_rate: float = Field(default=0.5, ge=0.0, le=1.0)
-    moderate_max_degradation: float = Field(default=0.5, ge=0.0, le=5.0)
+    moderate_max_degradation: float = Field(default=0.5, ge=0.0, allow_inf_nan=False)
 
 
 class RollingOOSConfig(BaseModel):
     enabled: bool = True
-    train_window: int = Field(default=252, ge=10, le=20000)
-    test_window: int = Field(default=63, ge=5, le=5000)
-    step: int = Field(default=21, ge=1, le=5000)
-    min_splits: int = Field(default=5, ge=1, le=200)
+    train_window: int = Field(default=252, ge=10)
+    test_window: int = Field(default=63, ge=5)
+    step: int = Field(default=21, ge=1)
+    min_splits: int = Field(default=5, ge=1)
     assessment_thresholds: RollingOOSAssessmentThresholds = Field(
         default_factory=RollingOOSAssessmentThresholds
     )
@@ -309,14 +309,14 @@ class FactorExposureConfig(BaseModel):
     enabled: bool = False
     max_single_exposure: float = Field(default=0.4, ge=0.0, le=1.0)
     neutralization_mode: Literal["none", "beta_neutral", "vol_neutral"] = "none"
-    neutralization_lookback: int = Field(default=63, ge=5, le=5000)
+    neutralization_lookback: int = Field(default=63, ge=5)
     # OLS 歸因最少樣本列數（D-7；預設 10 沿用現行語義，不得擅自調低）
     attribution_min_rows: int = Field(default=10, ge=2)
 
 
 class LongShortAnalysisConfig(BaseModel):
     enabled: bool = True
-    num_quantiles: int = Field(default=5, ge=2, le=20)
+    num_quantiles: int = Field(default=5, ge=2)
     long_quantiles: list[int] = Field(default_factory=lambda: [4, 5])
     short_quantiles: list[int] = Field(default_factory=lambda: [1, 2])
 
@@ -337,15 +337,15 @@ class LongShortAnalysisConfig(BaseModel):
 
 class FeatureQualityDiagnosticsConfig(BaseModel):
     enabled: bool = True
-    adf_significance: float = Field(default=0.05, gt=0.0, le=0.2)
-    ljungbox_lags: int = Field(default=10, ge=1, le=500)
-    ljungbox_significance: float = Field(default=0.05, gt=0.0, le=0.2)
+    adf_significance: float = Field(default=0.05, gt=0.0, lt=1.0)  # limit-lint: allow=field_upper_bound reason=顯著水準數學值域 0<α<1
+    ljungbox_lags: int = Field(default=10, ge=1)
+    ljungbox_significance: float = Field(default=0.05, gt=0.0, lt=1.0)  # limit-lint: allow=field_upper_bound reason=顯著水準數學值域 0<α<1
     coverage_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
     #: ICPERF Task 0.4 ㉖：ADF 最少有限樣本數（少於即 insufficient_samples 跳過；預設同現行 20）
-    adf_min_samples: int = Field(default=20, ge=10, le=100000)
+    adf_min_samples: int = Field(default=20, ge=10)
     #: ICPERF Task 0.4 ㉖：PSI 近期窗＝最近 drift_window 個滾動 IC 觀測，對其之前全部觀測比（觀測不足 ⇒ PSI NaN 並記原因）
-    drift_window: int = Field(default=60, ge=10, le=5000)
-    drift_threshold: float = Field(default=0.25, ge=0.0, le=10.0)
+    drift_window: int = Field(default=60, ge=10)
+    drift_threshold: float = Field(default=0.25, ge=0.0, allow_inf_nan=False)
     redundancy_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
 
 
@@ -360,18 +360,18 @@ class NetICAnalysisConfig(BaseModel):
     @field_validator("cost_bps")
     @classmethod
     def _validate_cost_bps_domain(cls, v: Optional[float]) -> Optional[float]:
-        """非 None 一律驗域(有限且 0<x≤1000);與 enabled 無關。"""
+        """非 None 一律驗域(有限且 >0;ICPERF Task 0.6 L1a 刪無數學依據之 1000 上界);與 enabled 無關。"""
         if v is None:
             return None
         try:
             bps = float(v)
         except (TypeError, ValueError) as exc:
             raise ValueError(
-                f"cost_bps must be finite and in (0, 1000], got {v!r}"
+                f"cost_bps must be finite and > 0, got {v!r}"
             ) from exc
-        if not math.isfinite(bps) or not (0.0 < bps <= 1000.0):
+        if not math.isfinite(bps) or not (bps > 0.0):
             raise ValueError(
-                f"cost_bps must be finite and in (0, 1000], got {v!r}"
+                f"cost_bps must be finite and > 0, got {v!r}"
             )
         return bps
 

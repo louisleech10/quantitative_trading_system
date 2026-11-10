@@ -37,7 +37,7 @@ class NetICAnalysisRequest(BaseModel):
     """Deep analysis 成本參數(typed 一等公民)。
 
     統一 validator 偽碼(TODO Task 2.1 / Task 1.1 ④):
-    - cost_bps 非 None → 一律驗域(有限且 0<x≤1000),與 enabled 無關
+    - cost_bps 非 None → 一律驗域(有限且 >0;ICPERF Task 0.6 L1a 刪無數學依據之 1000 上界),與 enabled 無關
     - cost_enabled=True → 另驗 cost_bps 非 None
     - 0 非法;「無成本」唯一表示=cost_enabled=False
     """
@@ -53,11 +53,11 @@ class NetICAnalysisRequest(BaseModel):
                 bps = float(cost_bps)
             except (TypeError, ValueError) as exc:
                 raise ValueError(
-                    f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+                    f"cost_bps must be finite and > 0, got {cost_bps!r}"
                 ) from exc
-            if not math.isfinite(bps) or not (0.0 < bps <= 1000.0):
+            if not math.isfinite(bps) or not (bps > 0.0):
                 raise ValueError(
-                    f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+                    f"cost_bps must be finite and > 0, got {cost_bps!r}"
                 )
         if self.cost_enabled and cost_bps is None:
             raise ValueError(

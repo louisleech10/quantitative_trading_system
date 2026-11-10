@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider --no-header tests/momentum/Analysis/test_icperf_correctness.py::test_trend_four_dimensions_wide_real_kline_matches_oracle_xfail",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:icperf-l1a-r164",
+      "created_at": "2026-11-10T11:15:38+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 1200,
+  "basis": [
+    "同測試於 runs/limit_audit/l1a/watched_run.log 實測：trend_analysis 模組 827.40 秒（18:24:23 完成），另含因子報酬、中心性、多空模組與 oracle 重算",
+    "單條測試、與其他重型跑互斥執行 ⇒ 量級取 1,200 秒；量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7"
+  ]
+}

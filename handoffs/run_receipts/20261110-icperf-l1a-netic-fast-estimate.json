@@ -1,0 +1,31 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/api/test_ic_deep_analysis.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider --no-header -m 'not slow and not requires_kline' tests/api/test_ic_deep_analysis.py tests/momentum/Analysis/test_factor_return_analyzer.py tests/momentum/Analysis/test_factor_return_stopgap.py tests/momentum/Analysis/test_ichc_capacity_contract.py tests/momentum/Analysis/test_ichc_contract_sync.py tests/momentum/Analysis/test_ichc_turnover_gate.py tests/momentum/Analysis/test_icperf_correctness.py tests/momentum/Analysis/test_icperf_deep_centrality_trend.py tests/momentum/Analysis/test_icperf_deep_quality_netic.py tests/momentum/Analysis/test_icperf_limit_l1_coverage.py tests/momentum/Analysis/test_icperf_limit_l1a_ic_config.py tests/momentum/Analysis/test_net_ic_analyzer.py tests/momentum/test_la0_b4_orchestrator.py tests/momentum/test_turnover_analyzer.py tests/phase24/test_deep_analysis_config.py tests/phase26/test_deep_analysis_factories.py tests/phase26/test_deep_analysis_integration.py",
+      "code_sha256": "c7c9c044bc28b5ca9a7c62f0a23f96c59c43e90128c21077b194f4db65339438",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:icperf-l1a",
+      "created_at": "2026-11-10T12:17:55+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 3600,
+  "basis": [
+    "同 17 檔之快速層（排除 slow、requires_kline）；先前 120 檔直跑 runs/limit_audit/l1a/affected_run.log 合計 10167.94 秒（含 174 條守門即錯之慢測試）",
+    "17 檔為其子集 ⇒ 量級取 3,600 秒；量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7"
+  ]
+}

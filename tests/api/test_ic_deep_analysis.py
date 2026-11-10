@@ -518,9 +518,10 @@ def _net_ic_only_modules() -> dict:
 
 
 def test_cost_bps_range_422() -> None:
-    """T2:0/NaN/inf/1000.1/{cost_enabled:false,cost_bps:NaN}/enabled 缺 bps → 422。
+    """T2:0/NaN/inf/負值/{cost_enabled:false,cost_bps:NaN}/enabled 缺 bps → 422。
 
-    HTTP 可 JSON 字面(0/1000.1/缺 bps/'NaN'/'Infinity')走 TestClient 422;
+    ICPERF Task 0.6 L1a 刪無數學依據之 1000 上界（原 1000.1 案例改負值 -1，定義域＝有限且 >0）。
+    HTTP 可 JSON 字面(0/-1/缺 bps/'NaN'/'Infinity')走 TestClient 422;
     Python float NaN/inf 於 Pydantic 同步路徑斷言 ValidationError(→FastAPI 422 同源)。
     """
     import json as _json
@@ -531,7 +532,7 @@ def test_cost_bps_range_422() -> None:
 
     http_cases = [
         {"net_ic": {"cost_enabled": True, "cost_bps": 0}},
-        {"net_ic": {"cost_enabled": True, "cost_bps": 1000.1}},
+        {"net_ic": {"cost_enabled": True, "cost_bps": -1}},
         {"net_ic": {"cost_enabled": True}},  # enabled 缺 bps
         # codex 建議:HTTP 字串非有限字面(標準 JSON 可序列化)→422
         {"net_ic": {"cost_enabled": True, "cost_bps": "NaN"}},
@@ -571,7 +572,7 @@ def test_cost_bps_range_422() -> None:
         {"cost_enabled": True, "cost_bps": float("nan")},
         {"cost_enabled": True, "cost_bps": float("inf")},
         {"cost_enabled": True, "cost_bps": 0.0},
-        {"cost_enabled": True, "cost_bps": 1000.1},
+        {"cost_enabled": True, "cost_bps": -1.0},
         {"cost_enabled": True, "cost_bps": None},
     ]
     for kwargs in unit_cases:

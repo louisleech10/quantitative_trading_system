@@ -186,17 +186,17 @@ def compute_breakeven_and_net(
     }
 
 def _validate_cost_params(cost_enabled: bool, cost_bps: float | None) -> None:
-    """三層統一 validator 偽碼:非 None 一律驗域;enabled 另驗非 None。"""
+    """三層統一 validator 偽碼:非 None 一律驗域(有限且 >0,L1a 刪 1000 上界);enabled 另驗非 None。"""
     if cost_bps is not None:
         try:
             bps = float(cost_bps)
         except (TypeError, ValueError) as exc:
             raise ValueError(
-                f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+                f"cost_bps must be finite and > 0, got {cost_bps!r}"
             ) from exc
-        if not math.isfinite(bps) or not (0.0 < bps <= 1000.0):
+        if not math.isfinite(bps) or not (bps > 0.0):
             raise ValueError(
-                f"cost_bps must be finite and in (0, 1000], got {cost_bps!r}"
+                f"cost_bps must be finite and > 0, got {cost_bps!r}"
             )
     if cost_enabled and cost_bps is None:
         raise ValueError("cost_enabled=True requires cost_bps to be set (0 is illegal)")
@@ -263,16 +263,16 @@ class NetICAnalyzer:
         cost_bps: float,
         turnover: float,
     ) -> list[dict[str, float]]:
-        """成本階梯掃描:{c/2,c,2c,5c} clamp [0.1,1000] 四捨五入 0.1 去重。
+        """成本階梯掃描:{c/2,c,2c,5c} 下限 0.1(顯示解析度)四捨五入 0.1 去重;不設上界(ICPERF Task 0.6 L1a)。
 
         每項僅 {cost_bps, cost_drag_return};無 net_ic 鍵。
         """
         c = float(cost_bps)
         t = float(turnover)
         raw = [c / 2.0, c, 2.0 * c, 5.0 * c]
-        ladder = sorted(
-            {round(min(1000.0, max(0.1, x)), 1) for x in raw}
-        )
+        if not all(math.isfinite(x) for x in raw):  # 有限輸入倍乘溢位（審查 r163 CODEX-R163-P2-03）：明示錯誤，不夾值
+            raise ValueError(f"cost ladder {{c/2,c,2c,5c}} overflows float64 for cost_bps={cost_bps!r}")
+        ladder = sorted({round(max(0.1, x), 1) for x in raw})
         return [
             {
                 "cost_bps": float(scenario),

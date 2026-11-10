@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir runs/icperf/correctness-20261110a/captures",
+      "code_sha256": "76747412aa6ce9878fecf509c373b4a5d61376607109d20ed8bf0e78cea1058a",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:icperf-l1a",
+      "created_at": "2026-11-10T11:30:00+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 2700,
+  "basis": [
+    "前次估時收據 handoffs/run_receipts/20261106-icperf-correctness-capture-r120-estimate.json 記 correctness-20261106p 實測 1264 秒（14 請求 rc=0）",
+    "L1a 只改設定值域與成本階梯溢位檢查（momentum/Analysis/ic_config_schema.py、net_ic_analyzer.py、turnover_analyzer.py，api/models/ic_models.py），預設請求計算不變 ⇒ 同量級取 2,700 秒",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行；新目錄 correctness-20261110a（822 MB 量級，磁碟剩 56 GiB）"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

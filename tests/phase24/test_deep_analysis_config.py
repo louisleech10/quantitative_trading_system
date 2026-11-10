@@ -60,9 +60,10 @@ def test_net_ic_cost_validator() -> None:
     with pytest.raises(ValueError, match="cost_bps"):
         NetICAnalysisConfig(cost_enabled=True, cost_bps=0.0)
 
-    # 上界
+    # 無數學依據之 1000 上界已刪（ICPERF Task 0.6 L1a）；定義域＝有限且 >0：負值仍拒、逾 1000 可算
     with pytest.raises(ValueError, match="cost_bps"):
-        NetICAnalysisConfig(cost_enabled=False, cost_bps=1000.1)
+        NetICAnalysisConfig(cost_enabled=False, cost_bps=-1.0)
+    assert NetICAnalysisConfig(cost_enabled=False, cost_bps=1000.1).cost_bps == 1000.1
 
     # NaN 即使 disabled 也拒(T-F7)
     with pytest.raises(ValueError, match="cost_bps"):
