@@ -1,4 +1,116 @@
 {
-  "_doc": "ICPERF SPEC v5.85 Task 0.6 (g)：防上限 checker 逐規則語料收據（以 tests/_golden/icperf/limit_inventory.json 標註語料與具名正負例量 precision／recall；施工前空殼）。",
-  "rules": []
+  "_doc": "ICPERF SPEC v5.85 Task 0.6 (g)：防上限 checker 逐規則語料收據。量測欄由 `venv/bin/python scripts/limit_lint.py --corpus-receipt tests/_golden/icperf/limit_lint_corpus_receipt.json` 以 tests/_golden/icperf/limit_inventory.json 為標註語料對現行全部產品 .py 全量重算（命中行 needs_fix＝true 為真陽性，其餘為誤報；recall 分母為該規則所宣稱語法族之 needs_fix 列）；status 與 accept_reason 為依實例之判定，重產時沿用。",
+  "rules": [
+    {
+      "rule": "field_upper_bound",
+      "hits": 144,
+      "true_positives": 91,
+      "precision": 0.6319,
+      "family_needs_fix": 91,
+      "recall": 1.0,
+      "false_positives": [
+        "momentum/Analysis/adversarial_validator.py:24 auc_warning_threshold: float = Field(default=0.55, ge=0.5, le=1.0)",
+        "momentum/Analysis/adversarial_validator.py:25 auc_severe_threshold: float = Field(default=0.70, ge=0.5, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:248 risk_free_rate: float = Field(default=0.0, ge=-1.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:261 crowded_threshold: float = Field(default=0.3, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:271 r_squared_threshold: float = Field(default=0.1, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:280 ic_std_threshold_low: float = Field(default=0.02, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:281 ic_std_threshold_high: float = Field(default=0.05, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:286 robust_hit_rate: float = Field(default=0.7, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:288 moderate_hit_rate: float = Field(default=0.5, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:310 max_single_exposure: float = Field(default=0.4, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:343 coverage_threshold: float = Field(default=0.8, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:349 redundancy_threshold: float = Field(default=0.85, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:358 participation_rate: float = Field(default=0.01, ge=0.0, le=1.0)",
+        "momentum/Analysis/ic_config_schema.py:464 oos_test_size: float = Field(default=0.2, gt=0.0, lt=1.0)",
+        "momentum/Analysis/ic_config_schema.py:467 min_label_coverage_tol: float = Field(default=0.01, ge=0.0, lt=1.0)",
+        "momentum/Analysis/ic_config_schema.py:189 max_same_category_pct: float = Field(default=0.4, gt=0.0, le=1.0)",
+        "momentum/Analysis/model_validation/walk_forward_validator.py:26 auc_threshold: float = Field(default=0.55, ge=0.5, le=1.0)",
+        "momentum/Analysis/sample_weight_calculator.py:22 min_weight: float = Field(default=0.01, ge=0.0, lt=1.0)",
+        "api/models/case_models.py:26 positive_case: int = Field(..., description=\"案例標籤（1=正例，0=反例）\", ge=0, le=1)",
+        "api/models/event_import_models.py:323 test_fraction: float = Field(0.3, gt=0.0, lt=1.0)",
+        "api/models/ic_models.py:119 page_size: int = Field(default=5000, ge=1, le=50000)",
+        "api/models/pattern_analysis_models.py:596 oot_ratio: float = Field(default=0.2, gt=0.0, lt=1.0)",
+        "api/models/requests.py:209 symbols_limit: int = Field(10, description=\"預覽的交易對數量限制\", ge=1, le=50)",
+        "api/models/requests.py:235 cache_ttl_seconds: Optional[int] = Field(None, ge=300, le=86400)",
+        "api/models/responses.py:39 percentage: float = Field(..., description=\"完成百分比\", ge=0, le=100)",
+        "api/models/responses.py:198 time_separation_score: float = Field(..., description=\"時間分離度評分\", ge=0, le=1)",
+        "api/models/responses.py:199 symbol_diversity_score: float = Field(..., description=\"標的多樣性評分\", ge=0, le=1)",
+        "api/models/responses.py:200 market_phase_balance: float = Field(..., description=\"市場階段平衡度\", ge=0, le=1)",
+        "api/models/responses.py:201 overall_quality_score: float = Field(..., description=\"整體品質評分\", ge=0, le=1)",
+        "api/models/strategy_test_models.py:310 le=1.0",
+        "api/models/strategy_test_models.py:361 le=1.0",
+        "api/models/strategy_test_models.py:499 positive_avg_density: float = Field(..., ge=0.0, le=1.0)",
+        "api/models/strategy_test_models.py:500 negative_avg_density: float = Field(..., ge=0.0, le=1.0)",
+        "api/models/strategy_test_models.py:502 p_value: float = Field(..., ge=0.0, le=1.0)",
+        "api/models/training_window_config.py:295 le=1.0",
+        "api/models/training_window_config.py:301 le=1.0",
+        "api/models/training_window_config.py:313 le=1.0",
+        "api/models/training_window_config.py:319 le=1.0",
+        "api/models/training_window_config.py:361 le=1.0",
+        "api/models/training_window_config.py:426 le=1.0",
+        "api/models/training_window_config.py:437 le=1.0",
+        "api/models/training_window_config.py:448 le=1.0",
+        "api/models/training_window_config.py:459 le=1.0",
+        "api/models/training_window_config.py:491 le=1.0",
+        "api/models/training_window_config.py:497 le=1.0",
+        "api/routes/feature_factory.py:566 sample_rows: int = Query(5, ge=1, le=100, description=\"樣本行數\"),",
+        "api/routes/feature_factory.py:568 include_correlation_top_k: int = Query(10, ge=0, le=50, description=\"Top-K 高相關特徵對\"),",
+        "api/routes/feature_factory.py:667 limit: int = Query(50, ge=1, le=1000000),",
+        "api/routes/feature_factory.py:710 limit: int = Query(100, ge=1, le=200000),",
+        "api/routes/feature_factory.py:796 n_bins: int = Query(50, ge=10, le=200),",
+        "api/routes/feature_factory.py:825 sample_features: int = Query(50, ge=10, le=200, description=\"取樣特徵數\"),",
+        "api/routes/ic_analysis.py:488 n: int = Query(30, ge=1, le=500),",
+        "api/routes/ml_pipeline.py:337 limit: int = Query(50, ge=1, le=200, description=\"返回數量限制\"),"
+      ],
+      "false_negatives": [],
+      "status": "block",
+      "accept_reason": "recall 1.0（91／91）。53 誤報逐列皆屬 SPEC (g) 准豁免類：數學值域（比例、機率、AUC、品質分數 ≤1，百分比 ≤100，標籤 0／1，開區間比例 lt=1）與 L0 裁定為可遍歷之頁容量或顯示摘要之 Query（如 ic_models.py:119 page_size、feature_factory.py:667／:710 limit）；新增或修改此類行時以行內 `# limit-lint: allow=field_upper_bound reason=<值域或頁容量>` 豁免，未修改之舊行不觸發（只檢新增或修改行）"
+    },
+    {
+      "rule": "count_gate",
+      "hits": 15,
+      "true_positives": 11,
+      "precision": 0.7333,
+      "family_needs_fix": 11,
+      "recall": 0.9091,
+      "false_positives": [
+        "momentum/Analysis/ic_artifact_writer.py:133 if len(rows) >= limit:",
+        "momentum/Optimization/result_analyzer.py:408 if len(window_trials) >= 2:",
+        "api/services/case_import_service.py:781 if len(bad) >= 3:",
+        "api/services/feature_factory_service.py:3689 if len(alerts) >= MAX_ALERTS:"
+      ],
+      "false_negatives": [
+        "momentum/Analysis/ic_engine.py:1529 if len(years) and (int(years.min()) < 1990 or int(years.max()) > current_year + 1):"
+      ],
+      "status": "block",
+      "accept_reason": "4 誤報皆屬准豁免類或非上限語意，新增或修改此類行時以行內豁免附理由：ic_artifact_writer.py:133 為 limit／offset 分頁讀取（page=None 讀全量）；feature_factory_service.py:3689 為品質警示顯示摘要（全量經 browse_features 分頁含 total）；case_import_service.py:781 為錯誤訊息只列前 3 列（顯示摘要，整檔仍拒收）；result_analyzer.py:408 之 break 屬內層巢狀 if 找到收斂點後跳出搜尋迴圈（非拒絕）。數字界不設大小門檻（r153：個位數上限同擋）；逾量分支之任何 return 皆為分流，例外兩種：另一路徑立即退化回傳（資料足量檢查）、return 以常數索引取用受量物件元素（索引合法性檢查）（r155）；拒絕認分支內及巢狀 if、with、try 內，try 中之 raise 由 except 承接者不計，路徑上之條件行（含 with 全部 context）計入修改判定，不進迴圈（r154–r155）。已知只能刻意構造之能力邊界（r156 三家判 (ii)，repo 內無同型實例，不計入上列語料 FP／FN）：逾量分支以 return 拒絕而另一路徑亦為退化回傳者漏判；return 運算式任意處以常數索引取用受量物件（如錯誤回應帶 xs[0]）者漏判；except 不比對例外型別（承接他型之 except 亦視為吞例外）者漏判；finally 內 return 覆蓋 raise 者誤判。1 漏報為年份值域檢查（比較對象為年份值而非列欄數，屬 SPEC (e) L2「ic_engine.py 年份閘改資料域驗證」），非本規則所指之逾列欄數即拒"
+    },
+    {
+      "rule": "dimension_reduces_precision",
+      "hits": 0,
+      "true_positives": 0,
+      "precision": null,
+      "family_needs_fix": 0,
+      "recall": null,
+      "false_positives": [],
+      "false_negatives": [],
+      "status": "block",
+      "accept_reason": "現行全部產品 .py 零命中（無誤報實例，掛 block 不增噪音）；具名正例 tests/governance/test_limit_lint.py::test_boundary_03_dimension_reduces_precision_flagged。語料無此寫法故 recall 不可量；其他寫法之漏報由審碼覆蓋"
+    },
+    {
+      "rule": "slice_into_statistic",
+      "hits": 0,
+      "true_positives": 0,
+      "precision": null,
+      "family_needs_fix": 1,
+      "recall": 0.0,
+      "false_positives": [],
+      "false_negatives": [
+        "api/services/feature_factory_service.py:5481 clean = clean.iloc[-500:]"
+      ],
+      "status": "block",
+      "accept_reason": "現行全部產品 .py 零命中（無誤報實例）；具名正例 test_boundary_04、test_boundary_16（json.dump 持久結果分支）。1 漏報為跨敘述資料流（先以切片重賦值、後續敘述才入 ADF），超出單一運算式判定範圍；該列已在 L0 機讀表 needs_fix，由 L1／L2 修補與審碼覆蓋"
+    }
+  ]
 }

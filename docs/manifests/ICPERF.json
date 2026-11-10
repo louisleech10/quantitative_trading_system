@@ -38,6 +38,7 @@
     "scripts/icperf_freeze_baseline.py",
     "scripts/icperf_isolated_run.py",
     "scripts/limit_lint.py",
+    "scripts/limit_lint_hook.sh",
     "scripts/limit_scan.py",
     "scripts/limit_scan_ts.js"
   ],
@@ -197,6 +198,7 @@
       "scripts/icperf_event_batch.py",
       "scripts/icperf_freeze_baseline.py",
       "scripts/limit_lint.py",
+      "scripts/limit_lint_hook.sh",
       "scripts/limit_scan.py",
       "scripts/limit_scan_ts.js",
       "scripts/phase29_perf_validation_tmp.py",

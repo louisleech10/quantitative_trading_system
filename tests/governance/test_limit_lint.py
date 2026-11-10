@@ -264,6 +264,125 @@ def test_boundary_14_corpus_receipt_per_rule() -> None:
     assert any(r["status"] == "block" for r in rules.values()), "L3 收案須至少一條高信心規則為 block"
 
 
+@pytest.mark.parametrize("bound", ["2", "8", "9"])
+def test_boundary_21_count_gate_small_numeric_bound(ll: Any, bound: str) -> None:
+    """審碼 r153 CODEX-R153-P1-01：個位數之列欄數上限同為逾量即拒，不以數字大小推定為定義域。"""
+    src = f"def f(features):\n    if len(features) > {bound}:\n        raise ValueError('too many')\n"
+    assert [h["rule"] for h in _high(ll.lint_text("api/services/x.py", src))] == ["count_gate"]
+
+
+@pytest.mark.parametrize("src", [
+    "def f(xs):\n    if len(xs) <= 50:\n        return xs\n    else:\n        raise ValueError('too many')\n",
+    "def f(xs):\n    if len(xs) > 50:\n        if True:\n            raise ValueError('too many')\n    return xs\n",
+    "def f(xs):\n    if not (len(xs) <= 50):\n        return None\n    return xs\n",
+    "def f(xs):\n    assert len(xs) <= 50\n    return xs\n",
+    "import sys\ndef f(xs):\n    if len(xs) > 50:\n        sys.exit(1)\n    return xs\n",
+])
+def test_boundary_22_count_gate_rejection_variants(ll: Any, src: str) -> None:
+    """審碼 r153 GROK-R153-P2-01：else 分支拒絕、巢狀拒絕、not 翻轉、assert、sys.exit 皆為逾量即拒。"""
+    assert "count_gate" in [h["rule"] for h in _high(ll.lint_text("momentum/Analysis/x.py", src))], src
+
+
+def test_boundary_23_changed_rejection_body_flags_unchanged_compare(ll: Any) -> None:
+    """審碼 r153 CODEX-R153-P1-02：比較行未改、只把分支內容改成拒絕 ⇒ 屬新增之容量閘，須回報。"""
+    old = "def f(features):\n    if len(features) > 20:\n        pass\n    return features\n"
+    new = "def f(features):\n    if len(features) > 20:\n        raise ValueError('too many')\n    return features\n"
+    assert [h["rule"] for h in _high(ll.lint_changed("momentum/Analysis/x.py", old, new))] == ["count_gate"]
+    same = "def f(features):\n    if len(features) > 20:\n        raise ValueError('too many')\n    return features\n"
+    assert _high(ll.lint_changed("momentum/Analysis/x.py", same, same + "\n# tail\n")) == [], "未改之舊違例不回報"
+
+
+def test_boundary_24_dimension_rule_requires_precision_name(ll: Any) -> None:
+    """審碼 r153 CODEX-R153-P2-01：一般平均值與依記憶體分塊不是精度參數，不得 high。"""
+    src = ("def f(mem, cols, total, xs):\n    chunk_size = min(1000, mem // len(cols))\n"
+           "    result = max(0.0, total / len(xs))\n    return chunk_size, result\n")
+    assert _high(ll.lint_text("momentum/Analysis/x.py", src)) == []
+
+
+@pytest.mark.parametrize("content", [None, "{", "{\"rules\": []}", "{\"rules\": [{\"rule\": \"field_upper_bound\"}]}"])
+def test_boundary_25_block_mode_fail_closed_on_unusable_receipt(tmp_path: Path, content: Any) -> None:
+    """審碼 r153 GROK-R153-P1-01／COMPOSER-R153-P2-01：收據缺檔、不可解析、空規則或缺 status ⇒ block 模式高信心命中一律擋。"""
+    p = tmp_path / "momentum" / "Analysis" / "x.py"
+    p.parent.mkdir(parents=True)
+    p.write_text("from pydantic import Field\nclass C:\n    n: int = Field(le=5)\n", encoding="utf-8")
+    receipt = tmp_path / "receipt.json"
+    if content is not None:
+        receipt.write_text(content, encoding="utf-8")
+    res = subprocess.run([sys.executable, str(SCRIPT), "--mode", "block", "--receipt", str(receipt),
+                          "--root", str(tmp_path), str(p)], capture_output=True, text=True)
+    assert res.returncode == 2, res.stderr
+
+
+def test_boundary_26_allow_reason_requires_word_character(ll: Any) -> None:
+    """審碼 r153 GROK-R153-P3-01：理由只有標點不算理由。"""
+    src = ("from pydantic import Field\nclass C:\n"
+           "    a: float = Field(gt=0, lt=1)  # limit-lint: allow=field_upper_bound reason=.\n")
+    assert _high(ll.lint_text("api/models/x.py", src)), "reason=. 之豁免無效"
+
+
+@pytest.mark.parametrize("src", [
+    "TOO_MANY = object()\ndef f(xs):\n    if len(xs) > 8:\n        return TOO_MANY\n    return xs\n",
+    "def f(xs, Response):\n    if len(xs) > 8:\n        return Response(status=413)\n    return xs\n",
+    "def f(xs, lock):\n    if len(xs) > 8:\n        with lock:\n            raise ValueError('too many')\n    return xs\n",
+    "def f(xs, cleanup):\n    if len(xs) > 8:\n        try:\n            raise ValueError('too many')\n        finally:\n            cleanup()\n    return xs\n",
+])
+def test_boundary_27_count_gate_sentinel_response_with_try(ll: Any, src: str) -> None:
+    """審碼 r154 CODEX-R154-P1-01：哨兵、錯誤回應、with／try 內之拒絕皆為逾量即拒。"""
+    assert "count_gate" in [h["rule"] for h in _high(ll.lint_text("momentum/Analysis/x.py", src))], src
+
+
+@pytest.mark.parametrize("src", [
+    "def f(xs, compute):\n    if len(xs) >= 2:\n        return compute(xs)\n    return None\n",
+    "def f(xs, compute):\n    if len(xs) >= 2:\n        result = compute(xs)\n        return result\n    return None\n",
+])
+def test_boundary_28_count_gate_data_sufficient_return_not_high(ll: Any, src: str) -> None:
+    """r154 修補之負例：回傳受量資料或分支內算出之結果為資料足量之正常路徑，不是拒絕。"""
+    assert _high(ll.lint_text("momentum/Analysis/x.py", src)) == [], src
+
+
+def test_boundary_29_changed_nested_condition_flags_gate(ll: Any) -> None:
+    """審碼 r154 CODEX-R154-P1-02：只改拒絕路徑上之中間條件（False→True）即新增有效容量閘，須回報。"""
+    old = "def f(xs):\n    if len(xs) > 8:\n        if False:\n            raise ValueError('too many')\n    return xs\n"
+    new = old.replace("if False:", "if True:")
+    assert [h["rule"] for h in _high(ll.lint_changed("momentum/Analysis/x.py", old, new))] == ["count_gate"]
+
+
+@pytest.mark.parametrize("src", [
+    "def f(xs, Response):\n    if len(xs) > 8:\n        error = Response(status=413)\n        return error\n    return xs\n",
+    "def f(xs, Response):\n    if len(xs) > 8:\n        return Response(status=413, detail=str(len(xs)))\n    return xs\n",
+    "def f(xs, compute):\n    if len(xs) > 8:\n        return compute(xs[:8])\n    return compute(xs)\n",
+])
+def test_boundary_30_count_gate_any_early_return_when_fallthrough_is_normal(ll: Any, src: str) -> None:
+    """審碼 r155 CODEX-R155-P1-01：正常路徑在分支之後時，逾量分支之任何 return（變數承接之錯誤回應、
+    帶資料之錯誤訊息、截斷後結果）皆為分流。"""
+    assert "count_gate" in [h["rule"] for h in _high(ll.lint_text("momentum/Analysis/x.py", src))], src
+
+
+@pytest.mark.parametrize("src", [
+    "def f(p, fallback):\n    if len(p.parents) >= 3:\n        return p.parents[2]\n    return fallback\n",
+    "def f(array):\n    if array.ndim == 2 and array.shape[1] >= 2:\n        return array[:, 1]\n    raise ValueError('bad')\n",
+    "def f(parts, name):\n    if len(parts) >= 3:\n        return '_'.join([parts[0]] + parts[2:])\n    return name\n",
+])
+def test_boundary_33_index_guard_not_high(ll: Any, src: str) -> None:
+    """r155 修補之負例：長度檢查保護常數索引取值，非上限。"""
+    assert _high(ll.lint_text("momentum/Analysis/x.py", src)) == [], src
+
+
+def test_boundary_31_changed_second_with_context_flags_gate(ll: Any) -> None:
+    """審碼 r155 CODEX-R155-P1-02：只改 with 之第二個 context（吞例外→傳播）即新增容量拒絕，須回報。"""
+    old = ("from contextlib import nullcontext, suppress\ndef f(xs, lock):\n    if len(xs) > 8:\n"
+           "        with lock, suppress(ValueError):\n            raise ValueError('too many')\n    return xs\n")
+    new = old.replace("with lock, suppress(ValueError):", "with lock, nullcontext():")
+    assert [h["rule"] for h in _high(ll.lint_changed("momentum/Analysis/x.py", old, new))] == ["count_gate"]
+
+
+def test_boundary_32_raise_swallowed_by_except_not_high(ll: Any) -> None:
+    """審碼 r155 CODEX-R155-P2-01：try 內之 raise 由 except 承接即被吞，非拒絕。"""
+    src = ("def f(xs, log):\n    if len(xs) > 8:\n        try:\n            raise ValueError('too many')\n"
+           "        except ValueError:\n            log('noted')\n    return xs\n")
+    assert _high(ll.lint_text("momentum/Analysis/x.py", src)) == []
+
+
 def test_mutation_rule_disabled_detected(ll: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     """改壞 lint_text（濾掉 field_upper_bound）⇒ boundary_01 之斷言翻紅。"""
     real = ll.lint_text

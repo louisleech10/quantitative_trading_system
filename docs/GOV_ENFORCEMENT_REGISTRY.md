@@ -126,6 +126,19 @@ matcher 段之多個工具名以**半形逗號**分隔（`Edit,Write`），**不
    意思只是「該票**已交付的那個檢查**跑在產出端」，不是它沒有殘留。
    五票之狀態與各自殘留見票 SoT 之狀態依據欄。
 
+## 量化主線之產出端檢查（非治理票，不入下方登記表）
+
+下方登記表之「對應票」欄只收治理票全集與白名單（白名單以 `tests/governance/test_govb1_factkey_gen.py`
+集合相等鎖死），量化主線票之產出端檢查登記於本節；掛載點之機械對證由各自之測試承擔。
+
+- **limit_lint**（防上限 checker，`docs/ICPERF_SPEC.md` Task 0.6 (g) L3）：
+  - 產出端：PostToolUse Edit／Write 掛 `bash scripts/limit_lint_hook.sh`，實作 `scripts/limit_lint.py` 之 `_run_hook`。寫產品路徑（`momentum/`、`api/`、`frontend/src/`、`config/`）當下，以 git HEAD 版為舊版，只檢新增或修改的行。
+  - 阻擋範圍：Python 四條高信心規則依語料收據 `tests/_golden/icperf/limit_lint_corpus_receipt.json` 之 status＝block 阻擋。TS／TSX、YAML、JSON 用 L0 掃描器的同一語法解析，只出提示；parse 失敗一律擋。
+  - 兜底：pre-commit 呼叫 `scripts/git_hooks/limit_lint_staged.sh`（同一實作之 `--staged`），涵蓋 Bash 重導、外部編輯器、委員 CLI 等不產生 Edit／Write 事件的寫入。
+  - 機械對證：`tests/governance/test_limit_lint.py::test_boundary_10_mounted_command_blocks_real_write` 以 settings.json 實際掛載之命令處理一次寫入事件；`::test_boundary_11_staged_mode_exit_code_and_pre_commit_wiring` 實跑暫存庫並核對 pre-commit 掛載行。
+  - 現行四條規則皆為 block，無 warn 規則。日後有規則降為 warn 時，於此具名登記「尚未阻擋」、原因、現行覆蓋方式與升級條件。
+  - 能力邊界：跨敘述資料流（先以切片重賦值、後續敘述才入統計）不在單一運算式判定範圍，由審碼覆蓋；count_gate 為語法啟發式，已知可構造之漏判與誤判逐形記於語料收據 count_gate 之 accept_reason（審碼 r153–r156），由審碼覆蓋；hook 可被 `--no-verify` 略過（只擋意外，不擋蓄意）。
+
 ## 登記表
 
 > `強制側` 為產出端者，`掛載點` 會被拿去跟 `.claude/settings.json` 對證。

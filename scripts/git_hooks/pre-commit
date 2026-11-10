@@ -276,4 +276,14 @@ if [ "${_nc_rc}" -ne 0 ]; then
   exit 1
 fi
 
+# ── ICPERF Task 0.6 (g) L3：防上限 checker 之提交時兜底（docs/ICPERF_SPEC.md）─────────────────────────
+#   暫存區相對 HEAD 之新增或修改行；block 規則依 tests/_golden/icperf/limit_lint_corpus_receipt.json。
+#   Edit／Write 寫入已由 PostToolUse scripts/limit_lint_hook.sh 當下攔；此處兜底 Bash 重導、外部編輯器、委員 CLI 之寫入。
+bash scripts/git_hooks/limit_lint_staged.sh
+_ll_rc=$?          # 🔴 rc 直接取，禁經 pipe
+if [ "${_ll_rc}" -ne 0 ]; then
+  echo "pre-commit: 🔴 防上限：新增或修改之上限寫法未依 ICPERF SPEC Task 0.6 (c) 修法矩陣處理——改寫，或屬准豁免類者於該行加 # limit-lint: allow=<rule> reason=<理由>" >&2
+  exit 1
+fi
+
 exec "$py" "$checker" --staged

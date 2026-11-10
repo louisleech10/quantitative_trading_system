@@ -260,6 +260,10 @@
           {
             "type": "command",
             "command": "bash scripts/testreg_write_guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/limit_lint_hook.sh"
           }
         ]
       }
