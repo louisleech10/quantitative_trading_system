@@ -590,13 +590,47 @@ def test_declared_completeness_l1_combinations(tmp_path: Path, monkeypatch: pyte
     assert ("L1.parallel" if parallel == "1" else "L1.serial") in {v for k, v in events if k == "check"}
 
 
+def _ic_admission_precheck_on_run(tmp_path: Path, root: Path, config_hash: str) -> set:
+    """以母體真實生成之 run 走路由同一 IC 分析啟動准入預檢（`precheck_admission`：registry 解析來源 → `estimate("IC.analysis")`），
+    回傳預檢期間實際被估算之分支 ID。准入分支（契約 `admission_branch_ids`）於任務啟動時由准入控制器判定、不經分派點
+    `check`，故其「被宣告」＝於真實產品路徑被估算。來源解析不到 ⇒ ValueError；解析為空 ⇒ 不估算 ⇒ 完整性斷言紅（皆不靜默）。"""
+    from api.models.ic_models import ICAnalyzeRequest
+    from api.services.ic_analysis_service import ICAnalysisService
+    from momentum.FeatureEngineering.feature_library import FeatureLibrary
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+    from tests.feature_engineering.ffname_helpers import register_canonical_run
+
+    registry = tmp_path / "ic_admission_registry" / "registry.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    register_canonical_run(h.run_dir(root, config_hash) / "feature_manifest.json", registry)
+    service = ICAnalysisService(feature_library=FeatureLibrary(
+        FeatureRegistry(registry), FeatureStorage(str(root)), feature_reader=FeatureReader(str(root))))
+    estimated: set = set()
+    real_estimate = mb.estimate
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(mb, "estimate", lambda branch_id, params: (estimated.add(branch_id), real_estimate(branch_id, params))[1])
+        service.precheck_admission(ICAnalyzeRequest(symbol=h.SYMBOL, timeframe=h.PRIMARY, config_hash=config_hash))
+    return estimated
+
+
+def _assert_admission_branches_estimated(estimated: set) -> None:
+    """准入分支（契約 `admission_branch_ids`）須屬分支表 ID，且於真實准入預檢被估算。"""
+    admission = set(C["admission_branch_ids"])
+    assert admission <= set(C["branch_ids"]) and admission <= estimated, \
+        f"准入分支須為分支表 ID 且於真實准入預檢被估算：{sorted(admission)} vs {sorted(estimated)}"
+
+
 def test_branch_table_coverage_over_population(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """(B)：分支表每一 ID 於組合母體中被實際宣告至少一次（含後備、L4–L6、IC、post-IC、校準歸約）。"""
+    """(B)：分支表每一 ID 於組合母體中被實際宣告至少一次（含後備、L4–L6、IC、post-IC、校準歸約）；分派點分支經 `check`
+    宣告，准入分支（契約 `admission_branch_ids`，ICPERF L1b）經真實 IC 分析啟動准入預檢被估算。"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.operators import numba_rolling
     from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
 
     declared: set = set()
+    generated_runs: List[Tuple[Path, str]] = []
     with mb.check_recorder() as recorded:
         for numba, streaming, multi, callback in L3_COMBOS:
             with pytest.MonkeyPatch.context() as mp:
@@ -617,7 +651,9 @@ def test_branch_table_coverage_over_population(tmp_path: Path, monkeypatch: pyte
                 mp.setenv("FFACT_USE_POLARS", polars_env)
                 mp.setenv("FFACT_L2_CATEGORY_WORKERS", workers)
                 mp.setenv("FFACT_LAYER1_PARALLEL", parallel)
-                h.generate_s2(root, h.s2_payload(rolling_aggregation={"enabled": False}))
+                _, generated = h.generate_s2(root, h.s2_payload(rolling_aggregation={"enabled": False}))
+                generated_runs.append((root, str(generated.metadata["config_hash"])))
+        admission_estimated = _ic_admission_precheck_on_run(tmp_path, *generated_runs[0])
         for compact in ("0", "1"):  # r24：真實多週期 [12h, 4h] 之 dense／compact 兩臂（`MTF.align_*` 只在此命中）
             with pytest.MonkeyPatch.context() as mp:
                 root = h.isolated(mp, tmp_path / f"mtf_compact{compact}")
@@ -632,9 +668,11 @@ def test_branch_table_coverage_over_population(tmp_path: Path, monkeypatch: pyte
                                  start_date=h.S2_WINDOW[0], end_date=h.S2_WINDOW[1],
                                  ic_engine=ICEngine({"methods": ["spearman"]}), ic_threshold=0.0, label_horizon="1",
                                  selection_window={"start": h.S2_WINDOW[0], "end": h.S2_WINDOW[1]})
-        declared = {branch for branch, _ in recorded}
+        declared = {branch for branch, _ in recorded} | admission_estimated
     missing = set(C["branch_ids"]) - declared
     assert missing == set(), f"未被組合母體命中之分支 ID：{sorted(missing)}"
+    estimated_by_admission = admission_estimated  # 於 missing 之後綁定：既有斷言之正規化序號不變（TESTREG V19 純增）
+    _assert_admission_branches_estimated(estimated_by_admission)
 
 
 @pytest.mark.parametrize("branch,env", [("L3.numba_multi_callback", {"FFACT_USE_NUMBA_ROLLING": "1"}),

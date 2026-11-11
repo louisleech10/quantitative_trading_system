@@ -146,6 +146,9 @@
     "MTF.align_compact",
     "MTF.align_persist"
   ],
+  "admission_branch_ids": [
+    "IC.analysis"
+  ],
   "branch_components": {
     "L1.serial": [
       "indicator_tables",
