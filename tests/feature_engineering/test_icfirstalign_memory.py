@@ -423,28 +423,33 @@ def test_branch_table_keys_equal_contract() -> None:
     assert set(mb.BRANCH_TABLE) == set(C["branch_ids"])
 
 
-def _shape_params() -> Dict[str, Any]:
-    return {"rows": 1000, "input_cols": 2, "output_cols": 40, "windows": 2, "steps": 7, "buffer_cols": 64,
+#: IC.analysis（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」）之封閉輸入。`windows` 與 L3 分支同名而意義不同
+#: （此為滾動窗清單、L3 為窗數整數），故只覆蓋於 IC.analysis 分支，不併入共用參數。
+_IC_ANALYSIS_PARAMS: Dict[str, Any] = {
+    "sources": [{"rows": 1000, "n_f32": 40, "n_f64": 2}], "cross_sectional": False,
+    "windows": [21, 63, 126], "icir_window": 63, "stride": 1, "method": "spearman",
+    "preprocess": "pit_expanding", "decay_horizons": 7, "redundancy_cols": 10,
+    "deep_modules": ["factor_centrality"], "event_cells": 0}
+
+
+def _shape_params(branch: str = "") -> Dict[str, Any]:
+    base = {"rows": 1000, "input_cols": 2, "output_cols": 40, "windows": 2, "steps": 7, "buffer_cols": 64,
             "chunk_cols": 256, "workers": 4, "categories": 6, "max_category_cols": 20, "category_cols_sum": 52,
             "group_cols": 10, "selected_cols": 5, "n_calibration": 500, "accumulated_cols": 5,
-            "primary_rows": 1200, "source_rows": 400, "source_shards": 3, "align_block_rows": 1024,
-            # IC.analysis（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」）之封閉輸入
-            "sources": [{"rows": 1000, "n_f32": 40, "n_f64": 2}], "cross_sectional": False,
-            "windows": [21, 63, 126], "icir_window": 63, "stride": 1, "method": "spearman",
-            "preprocess": "pit_expanding", "decay_horizons": 7, "redundancy_cols": 10,
-            "deep_modules": ["factor_centrality"], "event_cells": 0}
+            "primary_rows": 1200, "source_rows": 400, "source_shards": 3, "align_block_rows": 1024}
+    return {**base, **_IC_ANALYSIS_PARAMS} if branch == "IC.analysis" else base
 
 
 @pytest.mark.parametrize("branch", C["branch_ids"])
 def test_branch_components_names_and_kinds_match_contract(branch: str) -> None:
-    comps = mb.BRANCH_TABLE[branch](_shape_params())
+    comps = mb.BRANCH_TABLE[branch](_shape_params(branch))
     got = sorted(f"{c.name}:mapped" if c.kind == "mapped" else c.name for c in comps)
     assert got == sorted(C["branch_components"][branch])
 
 
 @pytest.mark.parametrize("branch", C["branch_ids"])
 def test_planned_sums_only_anon_components(branch: str) -> None:
-    comps = mb.BRANCH_TABLE[branch](_shape_params())
+    comps = mb.BRANCH_TABLE[branch](_shape_params(branch))
     assert mb.planned_bytes(comps) == sum(c.nbytes * c.count for c in comps if c.kind == "anon")
 
 
