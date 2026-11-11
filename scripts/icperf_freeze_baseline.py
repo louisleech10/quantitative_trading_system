@@ -1155,7 +1155,7 @@ def _override_for(request: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
 
 def _ic_service(request: Mapping[str, Any], registry: Path) -> Any:
     """同 `scripts/ffprod_measure.py` `ic_in_process`：把請求所指 run 登記於 `registry`（暫存，不在快照範圍），回以該
-    run 之特徵根組 FeatureLibrary 之服務實例（不經 `__init__`）。"""
+    run 之特徵根組 FeatureLibrary 之服務實例（建構子注入、走完整 `__init__`：任務與准入狀態欄同產品）。"""
     _ensure_repo_path()
     from api.services.ic_analysis_service import ICAnalysisService
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
@@ -1168,10 +1168,8 @@ def _ic_service(request: Mapping[str, Any], registry: Path) -> Any:
     root = run_dir.parents[2]
     Path(registry).parent.mkdir(parents=True, exist_ok=True)
     register_canonical_run(run_dir / "feature_manifest.json", Path(registry))
-    svc = ICAnalysisService.__new__(ICAnalysisService)
-    svc._feature_library = FeatureLibrary(FeatureRegistry(Path(registry)), FeatureStorage(str(root)),
-                                          feature_reader=FeatureReader(str(root)))
-    return svc
+    return ICAnalysisService(feature_library=FeatureLibrary(FeatureRegistry(Path(registry)), FeatureStorage(str(root)),
+                                                            feature_reader=FeatureReader(str(root))))
 
 
 class _Stage5InputsCaptured(BaseException):
@@ -2177,17 +2175,10 @@ def event_import_run(request: Mapping[str, Any], registry: Path) -> Dict[str, An
     抬高、`analyzer.analyze`、三元綁定與注入、`_set_result`）之同一步驟；`start_analysis` 以 `asyncio.create_task` 啟動之
     分析於同一事件迴圈內等候完成。回任務 dict 全部欄（含 analyzer 實例）；status ≠ completed ⇒ FreezeError 附 error。"""
     import asyncio
-    import threading
 
     from api.routes.ic_analysis import _resolve_event_batch
 
     svc = _ic_service(request, Path(registry))
-    # `ICAnalysisService.__init__` 之其餘任務狀態欄（`_ic_service` 不經 __init__ 以改指特徵庫；`api/services/ic_analysis_service.py`
-    # 建構子：_tasks、_callbacks、_lock、_last_task_id）
-    svc._lock = threading.Lock()
-    svc._tasks = {}
-    svc._callbacks = {}
-    svc._last_task_id = None
     req = _ic_analyze_request(request)
     event_batch = _resolve_event_batch(req)
 

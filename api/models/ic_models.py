@@ -325,6 +325,8 @@ class ICTaskStatusResponse(BaseModel):
     # 🔴 `current_stage` 為**可擴充集合**，不是固定 enum：GAP-6 之分塊計算會細分更多階段，
     #    測試不得以窮舉相等斷言鎖死（改測試是掩蓋行為變更的常見路徑）。
     feature_count: Optional[int] = None
+    # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：pending 排隊中之等待原因 {need_bytes, have_bytes, measurement_source}
+    wait_reason: Optional[Dict[str, Any]] = None
     # ── `G3-D2` **D4.2／D4.3** 之揭露欄 ─────────────────────────────────────
     # 🔴 同上一段之理由：**不在此宣告就會被 `response_model` 靜默濾掉**。
     #    全部 `Optional` 且預設 `None`＝「本次分析沒有這件事」（非事件分析路徑），

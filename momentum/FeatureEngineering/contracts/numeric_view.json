@@ -224,7 +224,16 @@
         "enters": "route_identity",
         "_literal": "def physical_memory_bytes",
         "_sources": [
-          "momentum/FeatureEngineering/memory_budget.py:455"
+          "momentum/FeatureEngineering/memory_budget.py:468"
+        ]
+      },
+      "ic_admission_snapshot": {
+        "function": "momentum/FeatureEngineering/memory_budget.py::admission_snapshot",
+        "inputs": "darwin＝VM 快照之剩餘可用量與正式預算／非 darwin＝psutil.virtual_memory().available 與實體記憶體×ratio ⇒ IC 分析啟動准入（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」；只決定准入／排隊／need／have，不入計算值）",
+        "enters": "route_identity",
+        "_literal": "def admission_snapshot",
+        "_sources": [
+          "momentum/FeatureEngineering/memory_budget.py:450"
         ]
       }
     },

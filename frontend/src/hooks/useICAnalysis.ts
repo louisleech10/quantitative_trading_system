@@ -15,6 +15,7 @@ import {
 } from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { httpErrorMessage } from '@/lib/httpError';
+import type { MemoryNeedHave } from '@/lib/memoryNeed';
 import { isSubmittableLabelSpec } from '@/lib/eventDimensions';
 // 🔴 SPLITUNIFY `Task 10.6`：`config_override` 之唯一產生點已抽到 `lib/icConfigOverride`，
 //    供本檔（IC 分析請求）與 `lib/api.ts` 之 `buildEventScanRequest`（事件掃描請求）共用。
@@ -61,6 +62,7 @@ export function useICAnalysis() {
     setSubProgress,
     setTaskWarnings,
     setTaskFallback,
+    setWaitReason,
     setEventScanDisclosure,
     setStatus,
     setError,
@@ -288,9 +290,12 @@ export function useICAnalysis() {
         sub_progress?: ICSubProgress | null;
         warnings?: ICTaskWarning[];
         fallback?: ICTaskFallback | null;
+        // ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：排隊中之等待原因（未排隊 ⇒ null）
+        wait_reason?: MemoryNeedHave | null;
       }>(`/task/${taskId}`);
       setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed' | 'cancelled');
       setTaskFallback(status.fallback ?? null);
+      setWaitReason(status.status === 'pending' ? (status.wait_reason ?? null) : null);
       setProgress(status.progress ?? 0, status.current_stage ?? null);
       // Task 6.3：解析不到就是 null，**不填假值**
       setFeatureCount(typeof status.feature_count === "number" ? status.feature_count : null);
@@ -352,7 +357,7 @@ export function useICAnalysis() {
 
       return status;
     },
-    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount, setSubProgress, setTaskWarnings, setTaskFallback, setEventScanDisclosure]
+    [clearTimers, fetchResult, setError, setProgress, setStatus, setFeatureCount, setSubProgress, setTaskWarnings, setTaskFallback, setWaitReason, setEventScanDisclosure]
   );
 
   /** 協作式取消：後端在下一個進度回報點停（預處理每 100 個特徵一點、其餘為階段邊界），狀態變 cancelled。 */

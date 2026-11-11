@@ -3517,6 +3517,9 @@ class ICFilterOrchestrator:
                     base_report.results[module_name] = {"status": "unavailable", "value": None, "reason": reason}
                     base_report.module_summary[module_name] = "unavailable"
                     logger.warning("Deep module unavailable (memory): %s, %s", module_name, reason)
+                except AnalysisCancelled:
+                    # 協作取消（審碼 r169）：不得歸為模組 skipped 而續跑後續模組
+                    raise
                 except Exception as exc:  # noqa: BLE001
                     skipped = self._classify_and_skip(module_name, exc)
                     base_report.deep_analysis_errors.append(skipped)
@@ -4432,6 +4435,9 @@ class ICFilterOrchestrator:
             return
         try:
             callback(payload)
+        except AnalysisCancelled:
+            # 協作取消於進度安全點生效（審碼 r169 CODEX-R169-P1-01／GROK-R169-P1-01）：不得被泛用 except 吞掉
+            raise
         except Exception as exc:  # noqa: BLE001
             logger.warning("Deep progress callback failed: %s", exc)
 
@@ -5832,6 +5838,32 @@ class ICFilterOrchestrator:
             )
         return raw
 
+    def _redundancy_memory_gate(self, n_cols: int, n_rows: int) -> Callable[[], None]:
+        """第 6 段之記憶體判定入口：服務注入之 `stage_memory_gate`（經准入控制器同鎖扣除全部保留量、不足等釋放或
+        need／have；審碼 r169 GROK-R169-P1-02）優先，未注入（獨立使用）⇒ 以即時可用量判定。回傳歸還函式。"""
+        gate = getattr(self, "stage_memory_gate", None)
+        need = int(n_cols) * int(n_cols) * 16 + int(n_rows) * int(n_cols) * 8
+        if gate is not None:
+            return gate(need, [{"name": "stage6_redundancy", "bytes": need}])
+        self._redundancy_memory_check(n_cols, n_rows)
+        return lambda: None
+
+    @staticmethod
+    def _redundancy_memory_check(n_cols: int, n_rows: int) -> None:
+        """第 6 段冗餘移除之執行期記憶體判定（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」；審碼 r168 CODEX-R168-P1-04）。
+
+        通過欄數於分析前未知，啟動准入無法估此段；於此已知通過欄數 n 與列數 T，以與 `memory_budget` 分支 IC.analysis
+        同式之需求（相關矩陣與標準化複本 n²×16 ＋ 選欄複本 T×n×8）對即時可用量判定：不足 ⇒ 明確回報 need／have
+        （`ICMemoryNeedExceedsBudget`，任務以此失敗），不讓運算 OOM；足夠 ⇒ 不影響計算與輸出。分塊化屬 ICPERF Task 3.2。"""
+        from momentum.factories import get_memory_budget, ic_memory_need_error_type
+
+        need = int(n_cols) * int(n_cols) * 16 + int(n_rows) * int(n_cols) * 8
+        snap = get_memory_budget().admission_snapshot()
+        have = int(snap["available_bytes"])
+        if need > have:
+            raise ic_memory_need_error_type()(
+                need, have, [{"name": "stage6_redundancy", "bytes": need}], str(snap.get("source", "")))
+
     @_timed_stage("stage6_redundancy")
     def _stage6_redundancy(
         self,
@@ -5873,6 +5905,7 @@ class ICFilterOrchestrator:
                 **({"scope": "test"} if split_context is not None else {}),
             }
 
+        stage_release = self._redundancy_memory_gate(len(passed_features), len(features_for_redundancy))
         filtered_df, redundancy_log = self._redundancy.filter(
             features_for_redundancy[passed_features],
             ic_scores,
@@ -5904,6 +5937,7 @@ class ICFilterOrchestrator:
         if split_context is not None:
             redundancy_log = {**redundancy_log, "scope": "test"}
 
+        stage_release()  # 歸還第 6 段之額外保留量（中途例外者由任務結束之整體釋放涵蓋）
         return {
             "filtered_df": filtered_df,
             "redundancy_log": redundancy_log,

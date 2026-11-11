@@ -447,6 +447,19 @@ def available_bytes(snapshot: VMSnapshot) -> int:
             + swap_expansion_bytes(snapshot))
 
 
+def admission_snapshot() -> Dict[str, Any]:
+    """IC 分析啟動准入之即時快照（ICPERF SPEC v5.87 (h)「⑤ IC 分析啟動准入」；諮詢 r165 收斂檔 C5）：
+    darwin＝本模組 VM 快照之剩餘可用量 A 與正式預算 R；非 darwin＝psutil `available` 與實體記憶體 × 同一 ratio
+    （同 `momentum/Analysis/ic_filter_orchestrator.py` 深度模組記憶體守護之來源）。回 `source` 供准入紀錄與 need／have。"""
+    if sys.platform == "darwin":
+        return {"available_bytes": int(available_bytes(sample_vm_snapshot())),
+                "budget_bytes": int(configured_budget_bytes()), "source": "darwin_vm_snapshot"}
+    import psutil
+
+    return {"available_bytes": int(psutil.virtual_memory().available),
+            "budget_bytes": int(configured_budget_bytes()), "source": "psutil"}
+
+
 def system_absorbable_bytes(snapshot: VMSnapshot) -> int:
     """准入之可吸收量＝剩餘可用量 A（SPEC v35 取代「換頁擴充計 0」）。"""
     return available_bytes(snapshot)
@@ -770,6 +783,77 @@ def _align_persist(params: Mapping[str, Any]) -> List[Component]:
             _anon("block_cast", 0 if source_float32 else block * cols * 4)]
 
 
+#: IC 分析啟動准入之封閉輸入（ICPERF SPEC v5.87 Task 0.6 (h)「⑤ IC 分析啟動准入」；諮詢 r165 收斂檔 C1）
+IC_ANALYSIS_INPUTS: Tuple[str, ...] = (
+    "sources", "cross_sectional", "windows", "icir_window", "stride", "method", "preprocess",
+    "decay_horizons", "redundancy_cols", "deep_modules", "event_cells",
+)
+#: Python float 物件（24 B）＋清單指標（8 B）：逐窗滾動 IC 以 `.tolist()` 存放（`momentum/Analysis/ic_engine.py:670`）
+_PY_FLOAT_LIST_BYTES = 32
+#: 逐特徵逐 horizon 之衰減結果（dict 項＋float 物件）
+_DECAY_RESULT_BYTES = 64
+
+
+def _ic_analysis(params: Mapping[str, Any]) -> List[Component]:
+    """IC 分析任務新增峰值之保守估算（准入用；成分係數待全程 Physical footprint 校準收據重校，Task 5.3）。
+
+    形式＝留存量（跨階段存活、逐項相加）＋最大之單一階段暫存（階段間不同時存活，取最大者）：
+    - 讀入矩陣：Σ 各來源 列 × (float32 欄 × 4 ＋ float64 欄 × 8)。
+    - 留存：前處理後特徵表（列 × 欄 × 4，`_ic_cache["features_df"]`）、逐窗滾動 IC 清單（欄 × 窗數 × ⌈列/stride⌉ × 32）、
+      衰減結果（欄 × horizon × 64）、冗餘倖存者矩陣（倖存欄² × 8）、深度模組結果（模組數 × n² × 8）。
+    - 階段暫存（取最大）：前處理（`pit_expanding` 3 份、其餘 2 份 列 × 欄 × 4）、滾動 IC（float64 全矩陣與花式索引 2 份）、
+      衰減（float64 2 份＋(欄+1)² 相關矩陣）、冗餘（倖存欄² × 16＋列 × 倖存欄 × 8）、深度模組（Σ 8 × (2n² ＋ 2Tn)）。
+    事件網格逐格串行：同時存活量與格數無關。橫截面多來源：列相加、欄取最大（同一特徵集）。
+    缺封閉輸入或值非法 ⇒ ValueError（不以預設值補）。"""
+    missing = [key for key in IC_ANALYSIS_INPUTS if key not in params]
+    if missing:
+        raise ValueError(f"IC.analysis 缺封閉輸入：{missing}")
+    sources = list(params["sources"] or [])
+    if not sources:
+        raise ValueError("IC.analysis sources 不得為空")
+    rows_list, cols_list, read_bytes = [], [], 0
+    for src in sources:
+        rows, n32, n64 = int(src["rows"]), int(src["n_f32"]), int(src["n_f64"])
+        if rows < 0 or n32 < 0 or n64 < 0:
+            raise ValueError(f"IC.analysis 來源列欄數須非負：{src}")
+        rows_list.append(rows)
+        cols_list.append(n32 + n64)
+        read_bytes += rows * (n32 * 4 + n64 * 8)
+    rows_total = sum(rows_list) if bool(params["cross_sectional"]) else max(rows_list)
+    cols = max(cols_list)
+    cells = rows_total * cols
+    stride = int(params["stride"])
+    if stride < 1:
+        raise ValueError(f"IC.analysis stride 須 ≥ 1：{stride}")
+    windows = {int(w) for w in params["windows"]} | {int(params["icir_window"])}
+    horizons = int(params["decay_horizons"])
+    rcols = int(params["redundancy_cols"])
+    modules = list(params["deep_modules"] or [])
+    if horizons < 0 or rcols < 0 or int(params["event_cells"]) < 0:
+        raise ValueError("IC.analysis decay_horizons／redundancy_cols／event_cells 須非負")
+    n_steps = -(-rows_total // stride)
+    n_deep = min(rcols, cols)
+    pre_copies = 3 if str(params["preprocess"]) == "pit_expanding" else 2
+    stages = {
+        "stage_preprocess": pre_copies * cells * 4,
+        "stage_rolling_ic": 2 * cells * 8,
+        "stage_decay": (2 * cells * 8 + (cols + 1) * (cols + 1) * 8) if horizons else 0,
+        "stage_redundancy": rcols * rcols * 16 + rows_total * rcols * 8,
+        "stage_deep": sum(8 * (2 * n_deep * n_deep + 2 * rows_total * n_deep) for _ in modules),
+    }
+    peak_stage = max(stages, key=lambda k: stages[k])
+    # 成分名固定（分支契約 tests/_golden/icfirstalign/contract.json 之 branch_components 可封閉）；取最大之階段記於 entry
+    return [
+        _anon("read_matrix", read_bytes),
+        _anon("retained_features", cells * 4),
+        _anon("retained_rolling_ic", cols * len(windows) * n_steps * _PY_FLOAT_LIST_BYTES),
+        _anon("retained_decay", cols * horizons * _DECAY_RESULT_BYTES),
+        _anon("retained_redundancy", rcols * rcols * 8),
+        _anon("retained_deep", len(modules) * n_deep * n_deep * 8),
+        Component(name="stage_peak", kind="anon", nbytes=max(int(stages[peak_stage]), 0), entry=peak_stage),
+    ]
+
+
 _BRANCH_FUNCTIONS: Dict[str, Callable[[Mapping[str, Any]], List[Component]]] = {
     "L1.serial": lambda p: _l1(p, parallel=False),
     "L1.parallel": lambda p: _l1(p, parallel=True),
@@ -787,6 +871,7 @@ _BRANCH_FUNCTIONS: Dict[str, Callable[[Mapping[str, Any]], List[Component]]] = {
     "L6": _l4_l6,
     "IC.group_read": _read,
     "IC.selected_read": _read,
+    "IC.analysis": _ic_analysis,
     "PostIC.transform_selected": _post_ic,
     "Calib.group_reduce": _calib_reduce,
     "MTF.align_index": _align_index,

@@ -27,7 +27,6 @@ from api.models.ic_models import (
     ICTaskStatusResponse,
     ICRefilterRequest,
 )
-from api.core.config import settings
 from api.services.ic_analysis_service import ResultRevisionMismatch, ResultValidationError, ic_analysis_service
 from api.services.ic_result_projection import SortByNotAllowed
 from momentum.factories import ic_view_identity_mismatch_error, load_ic_config
@@ -37,72 +36,43 @@ router = APIRouter(prefix="/api/v1/ic")
 logger = get_logger("api.routes.ic_analysis")
 
 
-def _reject_when_over_feature_cap(request, *, entrypoint: str = "analyze") -> None:
-    """GAP-3 UX Task 6.1：**啟動任務之前**擋下特徵數超量之分析請求。
+def _memory_need_detail(err: Any) -> Dict[str, Any]:
+    """IC 分析啟動准入（ICPERF SPEC v5.87 Task 0.6 (h)「⑤ IC 分析啟動准入」）之拒收 detail：單任務估算峰值逾本機
+    正式記憶體預算（取代 GAP-3 UX Task 6.1 之固定欄數上限 80515）。准入在 service 建立任務之前判定，擋下時未建任務、
+    未載入矩陣。reason 字面由契約取得（Task 6.0），本層不硬寫。
 
-    🔴 **本 Task 為過渡止血**：GAP-6 之分塊計算上線後由該機制取代，本函式屆時**一併刪除**
-    （SPEC Task 6.1「存活至 GAP-6」）。不得留著空跑而成為永遠通過的假綠。
-
-    🔴 **必須擋在 `ic_analysis_service.start_analysis` 之前**——Task 6.4 要證明
-    「擋下時未載入大矩陣」，那個證明綁定「cap 檢查在任務建立之前」這個位置；
-    檢查若被移到任務啟動之後，6.4 會量到已載入大矩陣之 footprint 而失去意義。
-
-    🔴 **本閘的責任＝鏡像 service 會實際載入哪個 run**，而不是「看看請求上有沒有寫特徵數」。
-      這句話是 R3 三家一致 finding（`CODEX-R3-P1-01`／`COMPOSER-R3-P1-01`／
-      `GROK-R3-P1-01`＋`P1-02`）換來的。**原本這裡寫著「分析只有兩條路走得成」——那是錯的**，
-      而且錯得很具體：`{"symbol":"BCHUSDT","timeframe":"12h"}`（省略 `config_hash`）與
-      `{"mode":"cross_sectional","symbols":[...]}`（不帶 `cross_sectional_runs`）兩種 payload，
-      閘門的候選全部解析不出 ⇒ 放行，而 service 隨後自己走 `find_latest_materialized`／
-      `load_multi` 載入本機 latest（實測 161,031／161,092，cap 為 80,515）。
-      三家各自實跑同一組對照：不帶 hash ⇒ 200 且 `start_analysis` 被呼叫；補上 hash ⇒ 400、`calls=0`。
-      UI 因 `ICConfigPanel` 強制選 run 而不會走到，**裸 API 與腳本會**。
-
-    🔴 解析不出特徵數 ⇒ **放行**（不擋）。這條**仍然保留**，但適用面已收窄到它原本該有的範圍：
-      呼叫端給了 `features_path`（golden replay／artifact 重放）而該檔又讀不出 shape 時。
-      擋住它會弄壞 golden replay 這個既有消費端。
-      **具名破口**：API 呼叫端硬塞 `features_path` 指向一個 registry 查不到、header 也讀不出的
-      大 run 可繞過本閘；因本 Task 是過渡止血且該路徑非使用者介面之路徑，接受之並具名記錄
-      （見 `docs/GAP3UX_IMPL_HANDOFF.md` 殘留表）。
-
-    🔴 **不提供「強制略過上限」之開關**（SPEC Task 6.1「不可做」）。
-    """
+    🔴 不得叫使用者去做他沒有介面可做的事（2026-08-27 使用者裁定）：訊息只陳述需要與可用、原因與後續（分塊計算
+    ICPERF Task 3.2 完成後同一 run 之需求會下降），不要求使用者縮減特徵數。"""
     from momentum.factories import ic_report_reason
 
-    # 🔴 **本層不得再自行解析**（`CODEX-R4-P1-01`／`P1-03`）。這裡原本有一段手抄的、
-    #    與 service 平行的解析：把候選塞成一袋取 `max()`，而 service 走互斥分支；
-    #    且此處每次 `FeatureRegistry()` 重讀磁碟，而 service 的 registry 在行程啟動時就讀好。
-    #    兩份邏輯、兩份快照 ⇒ 四輪 review 抓到四種不同步（少一味＝該擋沒擋；多一味＝誤擋）。
-    #    現在由「決定要載入什麼的人」回答「它有多大」，鏡像成為結構性質而非人工維護的副本。
-    from momentum.factories import feature_naming_version_error_type
-
-    try:
-        feature_count = ic_analysis_service.resolve_planned_feature_count(
-            request, entrypoint=entrypoint)
-    except feature_naming_version_error_type() as exc:
-        # FF-NAME Task 3.4（v18）：重放之 IC 交接 h5 缺／舊 feature_naming_version ⇒ 啟動前拒收（含重生指引）
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if feature_count is None:
-        return
-    cap = int(settings.ic_analysis_max_features)
-    if feature_count <= cap:
-        return
-    raise HTTPException(status_code=400, detail={
-        # reason 字面由契約取得（Task 6.0）；本層**不得**硬寫
+    gib = float(1 << 30)
+    return {
         "reason": ic_report_reason("analysis_rejected"),
         "message": (
-            # 🔴 **不得叫使用者去做他沒有介面可做的事**（2026-08-27 使用者裁定）。
-            #    原文為「請先縮減特徵數再分析」——本專案沒有任何縮減特徵數的介面，
-            #    那句話把「系統暫時做不到」寫成了「你操作錯了」，是一條死路。
-            f"這個 run 有 {feature_count} 個特徵，本機一次載得下的上限是 {cap}；"
-            f"直接分析會把記憶體吃爆，因此在啟動任務之前就擋下來。"
-            f"上限由實跑量測導出（見 handoffs/run_receipts/gap3ux-b9-footprint.receipt.json），"
-            f"綁本機記憶體大小。"
-            f"這個 run 目前無法分析——分塊計算（GAP-6）上線後本限制會取消；"
-            f"在那之前請改用特徵數較少的 run。"
+            f"這次分析估算需要 {err.need_bytes / gib:.2f} GB 記憶體，超過本機可用於分析的預算 "
+            f"{err.have_bytes / gib:.2f} GB（量測來源 {err.source}），直接執行會把記憶體吃爆，"
+            f"因此在啟動任務之前就擋下來。分塊計算（ICPERF Task 3.2）完成後同一個 run 的需求會下降。"
         ),
-        "feature_count": feature_count,
-        "cap": cap,
-    })
+        "need_bytes": int(err.need_bytes),
+        "have_bytes": int(err.have_bytes),
+        "components": list(err.components),
+        "measurement_source": err.source,
+    }
+
+
+def _start_error_to_http(exc: Exception) -> HTTPException:
+    """啟動前拒收之 HTTP 400：記憶體需求逾預算（結構化 need／have）或交接 h5 命名世代不符（含重生指引）。"""
+    from momentum.factories import ic_memory_need_error_type
+
+    if isinstance(exc, ic_memory_need_error_type()):
+        return HTTPException(status_code=400, detail=_memory_need_detail(exc))
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+def _start_error_types() -> tuple:
+    from momentum.factories import feature_naming_version_error_type, ic_memory_need_error_type
+
+    return (ic_memory_need_error_type(), feature_naming_version_error_type())
 
 
 #: Task 7.0b ③：只給 `event_import_id` 時，`horizon_bars` 之缺省為**字面常數 1**。
@@ -221,14 +191,15 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
 @router.post("/analyze", response_model=ICAnalyzeResponse)
 async def start_ic_analysis(request: ICAnalyzeRequest):
     """Start IC analysis task."""
-    # Task 6.1：**在呼叫 service 之前**，任務尚未建立
-    _reject_when_over_feature_cap(request)
     try:
         # 🔴 **非事件呼叫端之呼叫形狀逐字不變**（SPEC：legacy 路徑行為完全不變）：
         #    沒有 `event_import_id` 時**連 keyword 都不傳**，而不是傳 `event_batch=None`。
         #    差別看似無關緊要，但既有測試以 spy 包住 `start_analysis` 並比對呼叫形狀，
         #    多一個 keyword 就會讓那些 spy 全數 `TypeError`——實際踩到 10 條紅。
-        event_batch = _resolve_event_batch(request)
+        event_batch = _resolve_event_batch(request)  # 便宜之功能拒收（事件批不存在 ⇒ 404）先於記憶體准入
+        # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：**在呼叫 service 之前**預檢（逾預算 ⇒ 400 need／have，任務尚未建立、
+        # 未載入矩陣；GAP-3 UX Task 6.4 之位置）；保留量與排隊於 service 內判定
+        ic_analysis_service.precheck_admission(request)
         if event_batch is None:
             return await ic_analysis_service.start_analysis(request)
         return await ic_analysis_service.start_analysis(request, event_batch=event_batch)
@@ -238,6 +209,8 @@ async def start_ic_analysis(request: ICAnalyzeRequest):
         #    實跑確認：帶不存在的 `event_import_id` 得到 500，body 裡才寫著「404: ... not found」。
         #    ⇒ 這裡必須先原樣放行，否則所有「我方刻意設計的 HTTP 狀態碼」都會被降級成 500。
         raise
+    except _start_error_types() as exc:
+        raise _start_error_to_http(exc) from exc
     except ValueError as exc:
         logger.error("Invalid IC analysis request: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
@@ -382,6 +355,8 @@ async def start_deep_analysis(task_id: str, request: DeepAnalysisRequest):
     """Start deep analysis for an existing IC task."""
     try:
         return await ic_analysis_service.start_deep_analysis(task_id, request)
+    except _start_error_types() as exc:
+        raise _start_error_to_http(exc) from exc
     except ValueError as exc:
         message = str(exc)
         status_code = 404 if "Task not found" in message else 400
@@ -440,10 +415,8 @@ async def get_deep_analysis_result(task_id: str):
 @router.post("/full-analysis", response_model=ICAnalyzeResponse)
 async def start_full_analysis(request: ICFullAnalysisRequest):
     """Start one-shot full analysis workflow."""
-    # Task 6.1：🔴 **本端點原本完全沒套閘門**（`CODEX-R1-P1-01`）——只擋 `/analyze`
-    # 等於留了一扇同樣會把記憶體吃爆的門。閘門要擋的是「啟動分析任務」這件事，
-    # 不是某一個 URL，所以**每個會啟動任務的入口都要套**。
-    _reject_when_over_feature_cap(request, entrypoint="full_analysis")
+    # 🔴 每個會啟動任務的入口都要過記憶體准入（`CODEX-R1-P1-01`）：ICPERF v5.87 (h)「⑤ IC 分析啟動准入」於
+    #    service 建立任務前判定；便宜之功能拒收（下方事件批 fail-closed）先於准入。
     # 🔴 **三家全員（`CODEX-R1-P1-01`／`COMPOSER-R1-P1-03`／`GROK-R1-P1-03`）**：
     #    `ICFullAnalysisRequest` 繼承 `ICAnalyzeRequest` ⇒ 它**收得下** `event_import_id`，
     #    但 `_run_full_analysis` **不跑五階段、不跑 coverage 閘**，只把 `event_timestamps` 透傳
@@ -458,7 +431,15 @@ async def start_full_analysis(request: ICFullAnalysisRequest):
             ),
         })
     try:
+        ic_analysis_service.precheck_admission(request, entrypoint="full_analysis")
+    except _start_error_types() as exc:
+        raise _start_error_to_http(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
         return await ic_analysis_service.start_full_analysis(request)
+    except _start_error_types() as exc:
+        raise _start_error_to_http(exc) from exc
     except ValueError as exc:
         logger.error("Invalid full analysis request: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))

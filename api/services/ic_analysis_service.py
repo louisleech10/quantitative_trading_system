@@ -33,7 +33,13 @@ from momentum.factories import (
     create_feature_library,
     create_feature_preprocessor,
     create_feature_reader,
+    create_ic_admission_controller,
     create_ic_analyzer,
+    get_memory_budget,
+    ic_memory_need_error_type,
+    ic_source_from_features_ref,
+    ic_source_from_registry_entry,
+    load_ic_config,
     create_ic_artifact_writer,
     create_ic_reporter,
     create_kline_storage_manager,
@@ -540,12 +546,21 @@ FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
 class ICAnalysisService:
     """IC analysis service for async task execution."""
 
-    def __init__(self) -> None:
+    def __init__(self, feature_library: Optional[Any] = None) -> None:
+        """`feature_library`：建構子注入（None＝`create_feature_library()`）；量測腳本改指特徵庫時經此走完整建構，
+        不再略過 `__init__` 而漏建任務／准入狀態欄（L1b 擷取 `L.event_import_report` 事故）。"""
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._callbacks: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
         self._lock = threading.Lock()
         self._last_task_id: Optional[str] = None
-        self._feature_library = create_feature_library()
+        self._feature_library = feature_library if feature_library is not None else create_feature_library()
+        # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：取代固定欄數上限；排隊任務於保留量釋放後由 on_admit 啟動
+        self._admission = create_ic_admission_controller()
+        self._admission.on_admit = self._on_admitted
+        self._admission.on_reject = self._on_rejected
+        # 以保留 id 為鍵（每次准入唯一）：排隊中之 (task_id, 啟動函式)；回呼早於登記到達者暫存於 _early_admission
+        self._queued_starts: Dict[str, Tuple[str, Callable[[], None]]] = {}
+        self._early_admission: Dict[str, Any] = {}
 
     @staticmethod
     def _plan_cross_sectional_load(request):
@@ -666,6 +681,237 @@ class ICAnalysisService:
             else self._feature_library.find_latest_materialized(symbol, timeframe)
         )
         return feature_count_from_registry_entry(entry)
+
+    # ------------------------------------------------------------------ ICPERF v5.87 (h)「⑤ IC 分析啟動准入」
+
+    def _resolve_workload_sources(self, request, *, entrypoint: str = "analyze") -> Optional[List[Dict[str, int]]]:
+        """與 `resolve_planned_feature_count` 同分支（同一 registry 快照、同一橫截面載入計畫）之來源規模
+        `{rows, n_f32, n_f64}`；只讀 registry／manifest／檔頭，不載入矩陣。
+        回傳：會實際載入之來源清單（不存在之來源略過——無 run、無檔即無物可載入，交 loader 於載入前報其原錯）；
+        任一存在之來源列數／欄數不可得 ⇒ None（未知不放行）。"""
+        timeframe = getattr(request, "timeframe", None)
+        symbol = getattr(request, "symbol", None)
+
+        def _ref(features_path: Optional[str]) -> Optional[List[Dict[str, int]]]:
+            src = ic_source_from_features_ref(features_path, symbol=symbol, timeframe=timeframe)
+            if src is None:
+                return None
+            return [src] if src else []
+
+        def _entry(entry: Optional[Dict[str, Any]]) -> Optional[List[Dict[str, int]]]:
+            if not entry:
+                return []
+            src = ic_source_from_registry_entry(entry)
+            return [src] if src is not None else None
+
+        if entrypoint == "full_analysis":
+            return _ref(getattr(request, "features_path", None))
+        if getattr(request, "mode", "longitudinal") == "cross_sectional":
+            if not timeframe:
+                return []
+            symbols_resolved, config_hashes = self._plan_cross_sectional_load(request)
+            if symbols_resolved is None:
+                return []
+            self._feature_library.reload_registry()
+            sources: List[Dict[str, int]] = []
+            for sym in dict.fromkeys(symbols_resolved):
+                raw = (config_hashes or {}).get(sym)
+                run_hash = raw.strip() if isinstance(raw, str) else ""
+                got = _entry(self._feature_library.get_entry(sym, timeframe, run_hash) if run_hash
+                             else self._feature_library.find_latest_materialized(sym, timeframe))
+                if got is None:
+                    return None
+                sources.extend(got)
+            return sources
+        features_path = getattr(request, "features_path", None)
+        if features_path:
+            return _ref(features_path)
+        if not (symbol and timeframe):
+            return []
+        config_hash = (getattr(request, "config_hash", None) or "").strip()
+        self._feature_library.reload_registry()
+        return _entry(self._feature_library.get_entry(symbol, timeframe, config_hash) if config_hash
+                      else self._feature_library.find_latest_materialized(symbol, timeframe))
+
+    @staticmethod
+    def _enabled_deep_modules(deep_request: Any) -> List[str]:
+        modules = getattr(deep_request, "modules", None)
+        dumped = modules.model_dump() if hasattr(modules, "model_dump") else dict(modules or {})
+        return sorted(k for k, v in dumped.items() if v is True)
+
+    def resolve_planned_workload(self, request, *, entrypoint: str = "analyze") -> Optional[Dict[str, Any]]:
+        """准入估算之封閉輸入（`memory_budget` 分支 IC.analysis）。設定取本次有效設定（`load_ic_config` 套請求覆寫）。
+        前處理一律以 `pit_expanding`（複本最多之臂）估；冗餘倖存欄數於分析前未知 ⇒ 0（冗餘與深度模組之 n² 段由
+        深度分析再入時以選欄數估、冗餘段之執行期判定屬 ICPERF Task 3.2）。來源不可得 ⇒ None。"""
+        sources = self._resolve_workload_sources(request, entrypoint=entrypoint)
+        if sources is None:
+            return None
+        cfg = load_ic_config(api_override=self._build_config_override(request))
+        calc = cfg.ic_calculation
+        deep_modules: List[str] = []
+        deep_cols = 0
+        if entrypoint == "full_analysis" and getattr(request, "deep_analysis", False):
+            deep_req = getattr(request, "deep_analysis_config", None) or DeepAnalysisRequest()
+            deep_modules = self._enabled_deep_modules(deep_req)
+            deep_cols = len(deep_req.selected_features or []) or int(deep_req.top_n)
+        return {
+            "sources": sources,
+            "cross_sectional": getattr(request, "mode", "longitudinal") == "cross_sectional",
+            "windows": [int(w) for w in calc.rolling_windows],
+            "icir_window": int(calc.icir.window),
+            "stride": int(calc.rolling_stride),
+            "method": ",".join(str(m) for m in calc.methods),
+            "preprocess": "pit_expanding",
+            "decay_horizons": len(calc.ic_decay_horizons),
+            "redundancy_cols": int(deep_cols),
+            "deep_modules": deep_modules,
+            "event_cells": 0,
+        }
+
+    @staticmethod
+    def _estimate_workload(workload: Dict[str, Any]) -> Tuple[int, List[Dict[str, Any]]]:
+        if not workload.get("sources"):
+            return 0, []  # 無物可載入（run／檔不存在）：loader 於載入前報其原錯，不占保留量
+        budget = get_memory_budget()
+        components = budget.estimate("IC.analysis", workload)
+        planned = int(budget.planned_bytes(components))
+        return planned, [{"name": (f"{c.name}:{c.entry}" if getattr(c, "entry", None) else c.name),
+                          "bytes": int(c.nbytes) * int(c.count)}
+                         for c in components if getattr(c, "kind", "anon") == "anon"]
+
+    def precheck_admission(self, request, *, entrypoint: str = "analyze") -> None:
+        """路由於呼叫 `start_*` 之前之預檢（只判定、不保留；GAP-3 UX Task 6.4「擋下時未建任務、未載入矩陣」之位置）：
+        工作量不可得 ⇒ ValueError；單任務估算峰值逾正式預算 ⇒ `ICMemoryNeedExceedsBudget`。保留量與排隊於
+        `start_*` 內同鎖判定（預算可能於兩者之間變動，以後者為準）。"""
+        workload = self.resolve_planned_workload(request, entrypoint=entrypoint)
+        if workload is None:
+            raise ValueError(
+                "無法估算這次 IC 分析的記憶體需求：找不到該 run 的列數或特徵數中繼資料"
+                "（registry／manifest／特徵檔頭皆無）。請重新產生該 run 的特徵後再分析。")
+        planned, components = self._estimate_workload(workload)
+        snap = get_memory_budget().admission_snapshot()
+        if planned > int(snap["budget_bytes"]):
+            raise ic_memory_need_error_type()(planned, int(snap["budget_bytes"]), components, str(snap.get("source", "")))
+
+    def _admit(self, task_id: str, workload: Optional[Dict[str, Any]]) -> Tuple[str, int, str]:
+        """申請保留量（建立任務前呼叫）：工作量不可得 ⇒ ValueError（未知不放行）；單任務逾正式預算 ⇒
+        `ICMemoryNeedExceedsBudget`（路由轉 400 need／have）；回 (`admitted`｜`queued`, 估算峰值, 保留 id)。
+        保留 id 每次准入唯一（`<task_id>#<隨機>`；審碼 r168 CODEX-R168-P1-03／GROK-R168-P1-01）：深度分析再入沿用同一
+        task_id 時不覆寫主任務仍有效之保留量，主任務 worker 之釋放亦不會誤放深度分析之保留量。"""
+        if workload is None:
+            raise ValueError(
+                "無法估算這次 IC 分析的記憶體需求：找不到該 run 的列數或特徵數中繼資料"
+                "（registry／manifest／特徵檔頭皆無）。請重新產生該 run 的特徵後再分析。")
+        planned, components = self._estimate_workload(workload)
+        reservation_id = f"{task_id}#{uuid.uuid4().hex[:12]}"
+        return self._admission.request(reservation_id, planned, components), planned, reservation_id
+
+    async def _release_after(self, reservation_id: str, coroutine: Any) -> None:
+        """worker 真正結束（完成、失敗、取消）後才釋放該次准入之保留量；釋放可重複呼叫。"""
+        try:
+            await coroutine
+        finally:
+            self._admission.release(reservation_id)
+
+    def _launch_or_queue(self, task_id: str, reservation_id: str, state: str, launch: Callable[[], None]) -> None:
+        """admitted ⇒ 立即啟動；queued ⇒ 登記啟動函式，待保留量釋放後由 `_on_admitted` 啟動。
+        登記與出隊／拒收回呼於同一把鎖內（審碼 r168 CODEX-R168-P1-01）：回呼若早於登記到達，先記於 `_early_admission`，
+        登記時即處理，不致任務永久 pending。啟動失敗 ⇒ 釋放、標 failed、原樣上拋。"""
+        if state == "queued":
+            with self._lock:
+                early = self._early_admission.pop(reservation_id, None)
+                if early is None:
+                    self._queued_starts[reservation_id] = (task_id, launch)
+                    return
+            if early != "admitted":
+                self._mark_rejected(task_id, early)
+                return
+            with self._lock:
+                task_info = self._tasks.get(task_id)
+                if task_info is not None:
+                    task_info["status"] = "running"
+        try:
+            launch()
+        except Exception as exc:
+            self._admission.release(reservation_id)
+            with self._lock:
+                task_info = self._tasks.get(task_id)
+                if task_info:
+                    task_info["status"] = "failed"
+                    task_info["sub_progress"] = None  # 終態不留子步驟殘影
+                    task_info["error"] = f"背景工作啟動失敗：{exc}"
+            raise
+
+    def _on_admitted(self, reservation_id: str) -> None:
+        """排隊任務出隊（准入控制器於鎖外回呼）：轉 running 並以背景執行緒啟動；登記尚未完成 ⇒ 記於 `_early_admission`。"""
+        with self._lock:
+            entry = self._queued_starts.pop(reservation_id, None)
+            if entry is None:
+                self._early_admission[reservation_id] = "admitted"
+                return
+            task_id, launch = entry
+            task_info = self._tasks.get(task_id)
+            if task_info is not None:
+                task_info["status"] = "running"
+        try:
+            launch()
+        except Exception as exc:  # noqa: BLE001 — 出隊啟動失敗：釋放並標 failed（不得卡住其餘排隊）
+            logger.error("IC queued task %s failed to start: %s", task_id, exc, exc_info=True)
+            self._admission.release(reservation_id)
+            with self._lock:
+                task_info = self._tasks.get(task_id)
+                if task_info:
+                    task_info["status"] = "failed"
+                    task_info["sub_progress"] = None  # 終態不留子步驟殘影
+                    task_info["error"] = f"背景工作啟動失敗：{exc}"
+
+    def _on_rejected(self, reservation_id: str, err: Any) -> None:
+        """排隊任務已無執行中任務可等、即時可用量仍不足（准入控制器於鎖外回呼）⇒ failed 並附 need／have（不無限等待）。"""
+        with self._lock:
+            entry = self._queued_starts.pop(reservation_id, None)
+            if entry is None:
+                self._early_admission[reservation_id] = err
+                return
+        self._mark_rejected(entry[0], err)
+
+    def _mark_rejected(self, task_id: str, err: Any) -> None:
+        gib = float(1 << 30)
+        with self._lock:
+            task_info = self._tasks.get(task_id)
+            if task_info:
+                task_info["status"] = "failed"
+                task_info["sub_progress"] = None  # 終態不留子步驟殘影
+                task_info["current_stage"] = "failed"
+                task_info["error"] = (
+                    f"記憶體不足：這次分析估算需要 {err.need_bytes / gib:.2f} GB，目前可用 {err.have_bytes / gib:.2f} GB"
+                    f"（量測來源 {err.source}），且已無其他分析可釋放記憶體；請在其他程式釋放記憶體後重送")
+                task_info["wait_reason"] = None
+
+    def _attach_stage_gate(self, analyzer: Any, reservation_id: str) -> None:
+        """注入分析器之階段記憶體閘（第 6 段冗餘等於執行期才知規模之段；審碼 r169 GROK-R169-P1-02）：
+        經准入控制器 `extend` 同鎖扣除全部保留量、不足等他任務釋放或 need／have；回傳歸還函式（`shrink`）。"""
+        admission = self._admission
+
+        def gate(need: int, components: List[Dict[str, Any]]) -> Callable[[], None]:
+            admission.extend(reservation_id, need, components)
+            return lambda: admission.shrink(reservation_id, need)
+
+        try:
+            analyzer.stage_memory_gate = gate
+        except AttributeError:  # 不可設屬性之替身（測試）⇒ 該分析器之第 6 段以即時可用量判定
+            pass
+
+    def _raise_if_cancel_requested(self, task_id: str) -> None:
+        """晚到結果不覆寫：計算完成時若已要求取消 ⇒ 依取消處理、丟棄結果（ICPERF v5.87 (h) ⑦ 取消語意）。
+        取消檢查與「進入收尾」於同一臨界區（審碼 r168 CODEX-R168-P1-02）：未取消 ⇒ 標 `finalizing`，其後之取消要求
+        視同已達終態（`cancel_task` 回 already_terminal），結果經 `_set_result` 單一寫入點提交、不被取消覆寫。"""
+        with self._lock:
+            task_info = self._tasks.get(task_id) or {}
+            requested = bool(task_info.get("cancel_requested"))
+            if not requested and task_info:
+                task_info["finalizing"] = True
+        if requested:
+            raise AnalysisCancelled("cancelled by user before completion; late result discarded")
 
     @staticmethod
     def _run_event_label_stages(
@@ -1666,11 +1912,20 @@ class ICAnalysisService:
         """
         task_id = str(uuid.uuid4())
         config_override = self._build_config_override(request)
-        analyzer = create_ic_analyzer(config_override)
+        # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：建立任務前判定（逾正式預算 ⇒ 例外、不建任務、不載入矩陣）
+        workload = self.resolve_planned_workload(request)
+        state, planned, rid = self._admit(task_id, workload)
+        try:
+            analyzer = create_ic_analyzer(config_override)
+            self._attach_stage_gate(analyzer, rid)
+        except Exception:
+            self._admission.release(rid)
+            self._admission.cancel(rid)
+            raise
 
         task_info = {
             "task_id": task_id,
-            "status": "running",
+            "status": "running" if state == "admitted" else "pending",
             "progress": 0.0,
             "current_stage": None,
             "current_step": None,
@@ -1687,18 +1942,26 @@ class ICAnalysisService:
             "req_config_hash": (request.config_hash or "").strip() or None,
             # GAP-3 UX Task 6.3：這個 run 有幾個特徵（只讀 registry；解析不出來就是 None，不填假值）。
             "feature_count": _resolve_feature_count(request),
+            "workload": workload,
+            "planned_bytes": planned,
+            "reservation_id": rid,
         }
 
         with self._lock:
             self._tasks[task_id] = task_info
             self._last_task_id = task_id
 
-        logger.info("IC analysis task started: %s", task_id)
-        asyncio.create_task(
-            self._run_analysis(task_id, analyzer, request, config_override, event_batch=event_batch)
-        )
+        logger.info("IC analysis task %s: %s", "started" if state == "admitted" else "queued", task_id)
 
-        return {"task_id": task_id, "status": "running"}
+        def _coroutine():
+            return self._release_after(
+                rid, self._run_analysis(task_id, analyzer, request, config_override, event_batch=event_batch))
+
+        if state == "admitted":
+            self._launch_or_queue(task_id, rid, state, lambda: asyncio.create_task(_coroutine()))
+        else:
+            self._launch_or_queue(task_id, rid, state, lambda: self._start_background_coroutine(_coroutine))
+        return {"task_id": task_id, "status": "running" if state == "admitted" else "pending"}
 
     async def _run_analysis(
         self,
@@ -1974,6 +2237,7 @@ class ICAnalysisService:
                     _inject_period_alignment(staged, report)
                     _inject_isolation_source(staged, report)
 
+            self._raise_if_cancel_requested(task_id)  # 晚到結果不覆寫取消
             with self._lock:
                 task_info = self._tasks.get(task_id)
             if task_info:
@@ -2066,10 +2330,27 @@ class ICAnalysisService:
             task_info = self._tasks.get(task_id)
             if not task_info:
                 return None
-            if task_info.get("status") in ("completed", "failed", "cancelled"):
+            if task_info.get("status") in ("completed", "failed", "cancelled") or task_info.get("finalizing"):
+                # finalizing：結果已進入提交（取消檢查與收尾標記同一臨界區），取消要求視同已達終態
                 return "already_terminal"
             task_info["cancel_requested"] = True
-            return "cancel_requested"
+            rid = task_info.get("reservation_id")
+            queued = task_info.get("status") == "pending" and rid in self._queued_starts
+            if queued:
+                # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：排隊中取消 ⇒ 直接 cancelled、不再出隊（未啟動，無 worker 待結束）
+                self._queued_starts.pop(rid, None)
+                task_info["status"] = "cancelled"
+                task_info["sub_progress"] = None  # 終態不留子步驟殘影
+                task_info["current_stage"] = "cancelled"
+                task_info["error"] = "已取消：排隊中取消"
+        if queued:
+            self._admission.cancel(rid)
+            # 與出隊競態：若控制器已於 pop 之後准入（回呼記於 _early_admission），該保留量無 worker 可釋放 ⇒ 此處釋放
+            with self._lock:
+                self._early_admission.pop(rid, None)
+            if self._admission.state(rid) == "admitted":
+                self._admission.release(rid)
+        return "cancel_requested"
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get task status."""
@@ -2100,7 +2381,17 @@ class ICAnalysisService:
                 "fallback": task_info.get("fallback"),
                 "cancel_requested": bool(task_info.get("cancel_requested")),
                 "result_revision": task_info.get("result_revision"),
+                # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：排隊中之等待原因（need／have／量測來源；未排隊 ⇒ None）
+                "wait_reason": None,
             }
+            pending = task_info.get("status") == "pending"
+            rid = task_info.get("reservation_id")
+        if pending and rid:
+            payload["wait_reason"] = self._admission.wait_reason(rid) or None
+        with self._lock:
+            task_info = self._tasks.get(task_id)
+            if not task_info:
+                return None
             # 🔴 `GAP3_EVENT_DISCLOSURE` Task 1.3：降級原因**刻意不進 task status**。
             #    它住 `report.metadata.oos_downgrade`（orchestrator 之單一寫出點），
             #    前端之 `DegradedBanner` 已經在讀 `report.metadata`（同 `event_filter` 那條路）
@@ -2529,31 +2820,58 @@ class ICAnalysisService:
         if analyzer is None:
             raise ValueError(f"Task not found: {task_id}")
 
-        status = self.get_task_status(task_id)
-        if not status:
-            raise ValueError(f"Task not found: {task_id}")
-        if status.get("status") != "completed":
-            raise ValueError(f"Task {task_id} is not ready for deep analysis")
+        # 狀態檢查與轉態同一臨界區（審碼 r168 CODEX-R168-P1-03）：兩個深度分析請求不得同時讀到 completed 而並行
+        with self._lock:
+            task_info = self._tasks.get(task_id)
+            if not task_info:
+                raise ValueError(f"Task not found: {task_id}")
+            if task_info.get("status") != "completed":
+                raise ValueError(f"Task {task_id} is not ready for deep analysis")
+            base_workload = dict(task_info.get("workload") or {})
+            if not base_workload:
+                raise ValueError(f"Task {task_id} 缺工作量紀錄，無法估算深度分析記憶體需求；請重跑 IC 分析")
+            task_info["status"] = "admitting"
+
+        # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：深度分析再入走同一准入（以主任務工作量＋本次模組與選欄數估）
+        deep_workload = {**base_workload, "deep_modules": self._enabled_deep_modules(request),
+                         "redundancy_cols": len(request.selected_features or []) or int(request.top_n)}
+        try:
+            state, planned, rid = self._admit(task_id, deep_workload)
+        except Exception:
+            with self._lock:
+                task_info = self._tasks.get(task_id)
+                if task_info and task_info.get("status") == "admitting":
+                    task_info["status"] = "completed"  # 准入拒收 ⇒ 主任務結果維持可用
+            raise
 
         with self._lock:
             task_info = self._tasks.get(task_id)
             if task_info:
-                task_info["status"] = "running"
+                task_info["status"] = "running" if state == "admitted" else "pending"
                 task_info["current_stage"] = "deep_analysis"
                 task_info["current_step"] = None
                 task_info["progress"] = 0.0
                 task_info["error"] = None
+                task_info["cancel_requested"] = False
+                task_info["finalizing"] = False
+                task_info["planned_bytes"] = planned
+                task_info["reservation_id"] = rid
+        self._attach_stage_gate(analyzer, rid)
 
-        logger.info("Deep analysis started for task: %s", task_id)
-        self._start_background_coroutine(
-            lambda: self._run_deep_analysis(task_id, analyzer, request)
-        )
-        return {"task_id": task_id, "status": "running"}
+        logger.info("Deep analysis %s for task: %s", "started" if state == "admitted" else "queued", task_id)
+        self._launch_or_queue(task_id, rid, state, lambda: self._start_background_coroutine(
+            lambda: self._release_after(rid, self._run_deep_analysis(task_id, analyzer, request))
+        ))
+        return {"task_id": task_id, "status": "running" if state == "admitted" else "pending"}
 
     async def _run_deep_analysis(self, task_id: str, analyzer: Any, request: DeepAnalysisRequest) -> None:
         override = self._build_deep_module_override(request)
 
         def progress_callback(payload: Dict[str, Any]) -> None:
+            with self._lock:
+                if (self._tasks.get(task_id) or {}).get("cancel_requested"):
+                    # 協作取消於進度安全點生效（審碼 r169）：不再跑後續模組
+                    raise AnalysisCancelled("cancelled by user")
             progress = max(0.0, min(1.0, float(payload.get("progress", 0.0))))
             current_step = payload.get("module_name") or payload.get("current_step")
             message = payload.get("message")
@@ -2589,15 +2907,31 @@ class ICAnalysisService:
             serialized = self._serialize_deep_report(deep_report)
             serialized = self._attach_cross_symbol_context(serialized, analyzer)
 
+            cancelled = False
             with self._lock:
                 task_info = self._tasks.get(task_id)
-                if task_info:
+                # 晚到結果不覆寫取消（審碼 r168 CODEX-R168-P1-02）：取消檢查與結果提交同一臨界區
+                cancelled = bool(task_info and task_info.get("cancel_requested"))
+                if task_info and cancelled:
+                    task_info["status"] = "cancelled"
+                    task_info["sub_progress"] = None
+                    task_info["current_stage"] = "deep_analysis"
+                    task_info["current_step"] = "cancelled"
+                    task_info["error"] = "已取消：深度分析於完成前取消，晚到結果已丟棄"
+                elif task_info:
                     task_info["status"] = "completed"
                     task_info["sub_progress"] = None  # 終態後不留上一子步驟的殘影（UAT 2026-09-09：跑完仍顯示 grouped_ic 5/5）
                     task_info["current_stage"] = "deep_analysis"
                     task_info["current_step"] = "completed"
                     task_info["progress"] = 1.0
                     task_info["deep_analysis_result"] = serialized
+            if cancelled:
+                self._notify_callbacks(task_id, {
+                    "task_id": task_id, "stage": "deep_analysis", "current_step": "cancelled",
+                    "progress": task_info.get("progress", 0.0) if task_info else 0.0,
+                    "message": "已取消：深度分析於完成前取消", "status": "cancelled",
+                })
+                return
 
             self._notify_callbacks(task_id, {
                 "task_id": task_id,
@@ -2606,6 +2940,22 @@ class ICAnalysisService:
                 "progress": 1.0,
                 "message": "deep analysis completed",
                 "status": "completed",
+            })
+        except AnalysisCancelled as exc:
+            # 協作取消於深度模組間之進度安全點生效（審碼 r169）⇒ cancelled（非 failed），不寫結果
+            logger.info("Deep analysis task cancelled: %s (%s)", task_id, exc)
+            with self._lock:
+                task_info = self._tasks.get(task_id)
+                if task_info:
+                    task_info["status"] = "cancelled"
+                    task_info["sub_progress"] = None
+                    task_info["current_stage"] = "deep_analysis"
+                    task_info["current_step"] = "cancelled"
+                    task_info["error"] = f"已取消：{exc}"
+            self._notify_callbacks(task_id, {
+                "task_id": task_id, "stage": "deep_analysis", "current_step": "cancelled",
+                "progress": task_info.get("progress", 0.0) if task_info else 0.0,
+                "message": f"已取消：{exc}", "status": "cancelled",
             })
         except Exception as exc:
             logger.error("Deep analysis task failed: %s", exc, exc_info=True)
@@ -2650,11 +3000,20 @@ class ICAnalysisService:
         """Start full analysis task (main + optional deep analysis)."""
         task_id = str(uuid.uuid4())
         config_override = self._build_config_override(request)
-        analyzer = create_ic_analyzer(config_override)
+        # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：同 /analyze，建立任務前判定
+        workload = self.resolve_planned_workload(request, entrypoint="full_analysis")
+        state, planned, rid = self._admit(task_id, workload)
+        try:
+            analyzer = create_ic_analyzer(config_override)
+            self._attach_stage_gate(analyzer, rid)
+        except Exception:
+            self._admission.release(rid)
+            self._admission.cancel(rid)
+            raise
 
         task_info = {
             "task_id": task_id,
-            "status": "running",
+            "status": "running" if state == "admitted" else "pending",
             "progress": 0.0,
             "current_stage": None,
             "current_step": None,
@@ -2667,17 +3026,20 @@ class ICAnalysisService:
             # 🔴 `CODEX-R4-P2-01`：`/full-analysis` 的 task_info 原本**沒有這個欄位**
             #    ⇒ Task 6.3 的特徵數在整個 full-analysis 路徑上一律回 None。
             "feature_count": _resolve_feature_count(request, entrypoint="full_analysis"),
+            "workload": workload,
+            "planned_bytes": planned,
+            "reservation_id": rid,
         }
 
         with self._lock:
             self._tasks[task_id] = task_info
             self._last_task_id = task_id
 
-        logger.info("IC full analysis task started: %s", task_id)
-        self._start_background_coroutine(
-            lambda: self._run_full_analysis(task_id, analyzer, request, config_override)
-        )
-        return {"task_id": task_id, "status": "running"}
+        logger.info("IC full analysis task %s: %s", "started" if state == "admitted" else "queued", task_id)
+        self._launch_or_queue(task_id, rid, state, lambda: self._start_background_coroutine(
+            lambda: self._release_after(rid, self._run_full_analysis(task_id, analyzer, request, config_override))
+        ))
+        return {"task_id": task_id, "status": "running" if state == "admitted" else "pending"}
 
     async def _run_full_analysis(
         self,
@@ -2687,6 +3049,10 @@ class ICAnalysisService:
         config_override: Optional[Dict[str, Any]],
     ) -> None:
         def progress_callback(payload: Dict[str, Any]) -> None:
+            with self._lock:
+                if (self._tasks.get(task_id) or {}).get("cancel_requested"):
+                    # 協作取消於進度安全點生效（審碼 r169）：不再跑後續階段／模組
+                    raise AnalysisCancelled("cancelled by user")
             stage_name = payload.get("stage_name") or payload.get("stage")
             current_step = payload.get("module_name") or payload.get("current_step") or stage_name
             progress = max(0.0, min(1.0, float(payload.get("progress", 0.0))))
@@ -2741,6 +3107,7 @@ class ICAnalysisService:
                     report["deep_analysis_enabled"] = True
                     report["deep_analysis_report"] = deep_result
 
+            self._raise_if_cancel_requested(task_id)  # 晚到結果不覆寫取消
             with self._lock:
                 task_info = self._tasks.get(task_id)
             if task_info:
@@ -2799,6 +3166,19 @@ class ICAnalysisService:
                 full_completed_payload["analysis_status"] = "degraded_full_sample"
                 full_completed_payload["oos_guarantees"] = False
             self._notify_callbacks(task_id, full_completed_payload)
+        except AnalysisCancelled as exc:
+            logger.info("IC full analysis task cancelled: %s (%s)", task_id, exc)
+            with self._lock:
+                task_info = self._tasks.get(task_id)
+                if task_info:
+                    task_info["status"] = "cancelled"
+                    task_info["sub_progress"] = None
+                    task_info["current_stage"] = "cancelled"
+                    task_info["error"] = f"已取消：{exc}"
+            self._notify_callbacks(task_id, {
+                "task_id": task_id, "stage": "cancelled", "progress": task_info.get("progress", 0.0) if task_info else 0.0,
+                "message": f"已取消：{exc}", "status": "cancelled",
+            })
         except Exception as exc:
             logger.error("IC full analysis task failed: %s", exc, exc_info=True)
 

@@ -427,7 +427,12 @@ def _shape_params() -> Dict[str, Any]:
     return {"rows": 1000, "input_cols": 2, "output_cols": 40, "windows": 2, "steps": 7, "buffer_cols": 64,
             "chunk_cols": 256, "workers": 4, "categories": 6, "max_category_cols": 20, "category_cols_sum": 52,
             "group_cols": 10, "selected_cols": 5, "n_calibration": 500, "accumulated_cols": 5,
-            "primary_rows": 1200, "source_rows": 400, "source_shards": 3, "align_block_rows": 1024}
+            "primary_rows": 1200, "source_rows": 400, "source_shards": 3, "align_block_rows": 1024,
+            # IC.analysis（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」）之封閉輸入
+            "sources": [{"rows": 1000, "n_f32": 40, "n_f64": 2}], "cross_sectional": False,
+            "windows": [21, 63, 126], "icir_window": 63, "stride": 1, "method": "spearman",
+            "preprocess": "pit_expanding", "decay_horizons": 7, "redundancy_cols": 10,
+            "deep_modules": ["factor_centrality"], "event_cells": 0}
 
 
 @pytest.mark.parametrize("branch", C["branch_ids"])

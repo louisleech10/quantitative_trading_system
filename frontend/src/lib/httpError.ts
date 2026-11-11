@@ -10,6 +10,8 @@
  * 一律走本函式。
  */
 
+import { memoryNeedHaveText } from './memoryNeed';
+
 /** 從結構化 detail 取訊息；取不到就回 `null`（交給呼叫端的 fallback）。 */
 function messageOf(detail: unknown): string | null {
   if (typeof detail === 'string') return detail.trim() || null;
@@ -45,8 +47,11 @@ function messageOf(detail: unknown): string | null {
   }).filter((s) => s.length > 0);
 
   const tail = failures.length > shown.length ? `（另有 ${failures.length - shown.length} 筆）` : '';
+  // ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：記憶體需求逾預算之拒收帶 need／have（位元組）⇒ 顯示 GB
+  const needHave = memoryNeedHaveText(obj);
   return [
     kind ? `${kind}：${head}` : head,
+    needHave ? `（${needHave}）` : '',
     shown.length > 0 ? `— ${shown.join('；')}${tail}` : '',
   ].filter(Boolean).join(' ');
 }

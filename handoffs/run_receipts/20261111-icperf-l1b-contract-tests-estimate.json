@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -rfE --tb=short tests/feature_engineering/test_numview_identity.py::test_resolve_hardware_readers_registered_in_contract tests/feature_engineering/test_icfirstalign_memory.py::test_branch_table_keys_equal_contract tests/api/test_stage_progress.py::test_terminal_status_clears_sub_progress_in_service_source tests/momentum/Analysis/test_icperf_correctness.py::test_correctness_receipt_items_and_verdicts tests/momentum/Analysis/test_icperf_correctness.py::test_correctness_coverage_closed_over_response_keys tests/momentum/Analysis/test_icperf_event_binary_clock.py::test_event_import_binary_counts_on_real_l_cell tests/api/test_icperf_feature_filter_split_metadata.py::test_feature_filter_split_metadata_on_real_l_cell",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:icperf-l1b",
+      "created_at": "2026-11-11T13:00:00+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 900,
+  "basis": [
+    "5 條契約／收據讀取測試，皆不跑 IC 分析全請求：前 3 條為靜態比對（runs/limit_audit/l1b/affected_run4.log 中秒級失敗）；後 2 條讀 handoffs/run_receipts/20261105-icperf-correctness.json 與 captures 比對",
+    "另 2 條真實 L 格測試（event_import_run／_ic_service 經建構子注入之路徑）：同類 L 格請求於 runs/limit_audit/l1b/capture_l1b2.log 單請求 wall_s 89.58–469.4 秒（L.deep_analysis 89.58、L.ic_report 93.83、L.ic_report.p1 145.97、L.ic_report.h34 469.4）",
+    "同檔全檔前次實跑 299.60 秒（見 20261031-icperf-correctness-t04d-heavy-tests-estimate.json 之 basis）；取量級 900 秒",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7"
+  ]
+}

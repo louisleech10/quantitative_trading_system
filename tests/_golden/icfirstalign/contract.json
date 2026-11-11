@@ -139,6 +139,7 @@
     "L6",
     "IC.group_read",
     "IC.selected_read",
+    "IC.analysis",
     "PostIC.transform_selected",
     "Calib.group_reduce",
     "MTF.align_index",
@@ -283,6 +284,16 @@
     "IC.selected_read": [
       "read",
       "cast",
+      "segment_constant"
+    ],
+    "IC.analysis": [
+      "read_matrix",
+      "retained_features",
+      "retained_rolling_ic",
+      "retained_decay",
+      "retained_redundancy",
+      "retained_deep",
+      "stage_peak",
       "segment_constant"
     ],
     "PostIC.transform_selected": [

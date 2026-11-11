@@ -96,7 +96,6 @@ export default function FeatureFilterPanel({
             <Input
               type="number"
               min={1}
-              max={500}
               value={filter.max_features ?? 30}
               onChange={(event) => onFilterChange({ max_features: Number(event.target.value) })}
               placeholder="最大因子數"

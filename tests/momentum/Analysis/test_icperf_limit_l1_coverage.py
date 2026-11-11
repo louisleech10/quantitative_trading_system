@@ -3,7 +3,8 @@
 施工輸入＝L0 機讀表之不可變 git 物件 `1eeef821:tests/_golden/icperf/limit_inventory.json` 之 L1 needs_fix 列
 （原始三元組 file、L0 line、完整 code_sha256；同 digest 之不同落點不合併）。
 對應來源＝實際收集之測試（不以文字掃描）：
-- pytest：於本行程以 `pytest.main(["--collect-only", ...])` 收集 `tests/momentum/Analysis/test_icperf_limit_l1*.py`，
+- pytest：於本行程以 `pytest.main(["--collect-only", ...])` 收集 `tests/momentum/Analysis/test_icperf_limit_l1*.py` 與
+  `tests/api/test_icperf_limit_l1*.py`（L1b 起），
   取各 item 之 `limit_rows` 標記；帶 skip／xfail 標記之 item 不計。
 - vitest：`npx vitest run --reporter=json` 實際執行 `frontend/src/**/*.limits.test.tsx`，取狀態為 passed 或 failed 之測試
   名稱中 `[rows:檔:L0 行:sha 前 12 碼,…]`（skipped／todo 不計）。
@@ -45,8 +46,9 @@ class _Collector:
 
 
 def _pytest_declared() -> List[Tuple[str, Row]]:
-    files = sorted(str(p) for p in (REPO / "tests" / "momentum" / "Analysis").glob("test_icperf_limit_l1*.py")
-                   if p.name != Path(__file__).name)
+    # ICPERF L1b（審查 r166 GROK-R166-P2-01）：路由層之 limit_rows 宣告位於 tests/api
+    files = sorted(str(p) for d in (REPO / "tests" / "momentum" / "Analysis", REPO / "tests" / "api")
+                   for p in d.glob("test_icperf_limit_l1*.py") if p.name != Path(__file__).name)
     col = _Collector()
     rc = pytest.main(["--collect-only", "-q", "-p", "no:cacheprovider", *files], plugins=[col])
     assert rc == 0, f"收集失敗 rc={rc}"
@@ -113,8 +115,41 @@ def test_l1a_rows_fully_covered(l0: Set[Row], declared: List[Tuple[str, Row]]) -
     assert not missing, missing
 
 
-@pytest.mark.xfail(strict=True, reason="L1 收案前其餘子批尚未施工；全部 305 落點皆有具名測試時本測試轉綠，strict 使其強制移除 xfail")
+L1B_ROWS = {
+    ("api/core/config.py", 30, "3d09a2bc57da300f911c2161adf53bc1da22ee49668445015a87f09ba8028839"),
+    ("api/routes/ic_analysis.py", 87, "119e531ebe6f0593fadcb0e5c8c6ab1a2fb6c847bc4d27d4bc2eac9017086c6b"),
+    ("api/routes/ic_analysis.py", 89, "f1971768baf175f16ff63e47f719cbef67201fee4cb05261190b050012dc8862"),
+    ("api/routes/ic_analysis.py", 453, "f1971768baf175f16ff63e47f719cbef67201fee4cb05261190b050012dc8862"),
+    ("frontend/src/components/ic-analysis/FeatureFilterPanel.tsx", 99,
+     "343dd1a589c858e99f90c06356a13f7431d94e637610812a476d5e85255d5be8"),
+}
+
+
+def test_l1b_rows_fully_covered(l0: Set[Row], declared: List[Tuple[str, Row]]) -> None:
+    """L1b 子批（IC 分析啟動入口；SPEC v5.87 (h)「⑤ IC 分析啟動准入」）：五落點皆為 L0 L1 列且逐一有具名測試
+    （年份閘 ic_engine.py:1529 依裁定改列 L2，不在本子批）。"""
+    assert L1B_ROWS <= l0
+    missing = sorted(L1B_ROWS - {row for _, row in declared})
+    assert not missing, missing
+
+
+def _rebatched_out_of_l1() -> Set[Tuple[str, str]]:
+    """現行裁定檔中已依 SPEC 改列 L2 之 (file, code_sha256)（例：年份閘依 SPEC (e) 改 L2，諮詢 r165 C8）。"""
+    rulings = json.loads((REPO / "tests" / "_golden" / "icperf" / "limit_rulings.json").read_text(encoding="utf-8"))
+    return {(r["file"], r["code_sha256"]) for r in rulings["rulings"] if r.get("needs_fix") is True and r.get("batch") == "L2"}
+
+
+def test_rebatched_rows_are_named() -> None:
+    """改列 L2 之 L0 L1 列逐一具名（禁以重分類靜默縮小 L1 目標）：現行只有年份閘一列。"""
+    l0_keys = {(f, s) for f, _, s in _l0_l1_rows()}
+    assert _rebatched_out_of_l1() & l0_keys == {
+        ("momentum/Analysis/ic_engine.py", "57df8bcd34dedafabacc4a47289dabfdd3a3b8be8fdc71720524951e6d547c90")}
+
+
+@pytest.mark.xfail(strict=True, reason="L1 收案前其餘子批尚未施工；全部 L1 落點（扣除依裁定改列 L2 者）皆有具名測試時本測試轉綠，strict 使其強制移除 xfail")
 def test_all_l1_rows_covered(l0: Set[Row], declared: List[Tuple[str, Row]]) -> None:
-    """L1 收案條件之一：全部 L1 needs_fix 落點皆有具名測試。"""
-    missing = sorted(l0 - {row for _, row in declared})
+    """L1 收案條件之一：全部 L1 needs_fix 落點（扣除依裁定改列 L2 者）皆有具名測試。"""
+    rebatched = _rebatched_out_of_l1()
+    target = {r for r in l0 if (r[0], r[2]) not in rebatched}
+    missing = sorted(target - {row for _, row in declared})
     assert not missing, f"尚缺 {len(missing)} 落點"

@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "scripts/icperf_correctness_receipt.py",
+      "target_argv": "venv/bin/python scripts/icperf_correctness_receipt.py capture --out-dir runs/icperf/correctness-20261111a/captures",
+      "code_sha256": "76747412aa6ce9878fecf509c373b4a5d61376607109d20ed8bf0e78cea1058a",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:icperf-l1b",
+      "created_at": "2026-11-11T12:00:00+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 2700,
+  "basis": [
+    "前次同命令實測：runs/limit_audit/l1a/capture_l1a_outer.log 記 correctness-20261110a 擷取 rc=0、1205 秒（14 請求）",
+    "L1b 改動 IC 分析服務之准入與取消、編排器第 6 段執行期記憶體判定與深度進度取消；預設請求計算不變 ⇒ 同量級取 2,700 秒",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行；新目錄 correctness-20261111a"
+  ],
+  "spec_path": "docs/ICPERF_SPEC.md",
+  "coverage_path_ids": [
+    "ICPERF-BUDGET-7",
+    "ICPERF-BUDGET-9",
+    "ICPERF-BUDGET-10",
+    "ICPERF-BUDGET-11"
+  ]
+}

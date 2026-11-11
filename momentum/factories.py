@@ -701,6 +701,14 @@ def create_ic_analyzer(config: Optional[dict] = None) -> "ICFilterOrchestrator":
     return ICFilterOrchestrator(ic_config)
 
 
+def create_ic_admission_controller() -> Any:
+    """IC 分析啟動准入控制器（ICPERF SPEC v5.87 Task 0.6 (h)「⑤ IC 分析啟動准入」；審查 r166 GROK-R166-P2-02：
+    服務經 factory 取得，不直接 import momentum.Analysis；R3）。快照於判定當下經 `get_memory_budget()` 之模組屬性取得。"""
+    from momentum.Analysis.ic_admission import ICAdmissionController
+
+    return ICAdmissionController(snapshot=lambda: get_memory_budget().admission_snapshot())
+
+
 def create_scan_cube_store() -> Any:
     """掃描結果立方體之讀寫（`SCANCUBE`）。
 
@@ -1108,6 +1116,50 @@ def feature_count_from_manifest(manifest_path: Optional[str]) -> Optional[int]:
     return int(total) if isinstance(total, int) else None
 
 
+def row_count_from_manifest(manifest_path: Optional[str]) -> Optional[int]:
+    """manifest 之列數（根 `row_count`，缺則 `artifacts.raw.row_count`；只讀 JSON）。ICPERF L1b 准入估算之列數來源。"""
+    if not manifest_path:
+        return None
+    path = Path(manifest_path)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    if not path.is_file():
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(manifest, dict):
+        return None
+    for value in (manifest.get("row_count"), ((manifest.get("artifacts") or {}).get("raw") or {}).get("row_count")):
+        if isinstance(value, int):
+            return int(value)
+    return None
+
+
+def ic_source_from_registry_entry(entry: Optional[Dict[str, Any]]) -> Optional[Dict[str, int]]:
+    """registry run 之准入估算來源 `{rows, n_f32, n_f64}`（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」；只讀 registry 與 manifest）。
+    欄數＝`feature_count_from_registry_entry`（registry 與 manifest 取大）；列數＝registry `row_count` 與 manifest 列數取大；
+    特徵庫原生為 float16／float32（交接 h5 時恆 float32 無損，`momentum/core/h5_feature_precision.py`）⇒ n_f64＝0。
+    任一不可得 ⇒ None（呼叫端不得據以放行）。"""
+    if not entry:
+        return None
+    cols = feature_count_from_registry_entry(entry)
+    rows = [r for r in (entry.get("row_count"), row_count_from_manifest(entry.get("hdf5_relative_path")))
+            if isinstance(r, int)]
+    if cols is None or not rows:
+        return None
+    return {"rows": max(rows), "n_f32": int(cols), "n_f64": 0}
+
+
+def ic_memory_need_error_type() -> type:
+    """IC 分析單任務估算峰值逾預算之例外型別（api 經本出口取用，解耦 R3）。"""
+    from momentum.Analysis.ic_admission import ICMemoryNeedExceedsBudget
+
+    return ICMemoryNeedExceedsBudget
+
+
 def feature_count_from_registry_entry(entry: Optional[Dict[str, Any]]) -> Optional[int]:
     """GAP-3 UX Task 6.1：一個 registry entry 的特徵數＝**registry 與 manifest 取大**。
 
@@ -1125,6 +1177,69 @@ def feature_count_from_registry_entry(entry: Optional[Dict[str, Any]]) -> Option
         if isinstance(c, int)
     ]
     return max(counts) if counts else None
+
+
+def _registry_entries_for_ref(features_path: str, *, symbol: Optional[str] = None,
+                              timeframe: Optional[str] = None) -> List[Dict[str, Any]]:
+    """非檔案之 `features_path` 識別字串（如 `parquet:<SYMBOL>:<config_hash>`）對應之 registry entries（保守：多筆時呼叫端取大）。"""
+    # 🔴 `GROK-R2-P2-01`：`features_path` **未必是檔案路徑**——公開 API 也吃
+    #    `parquet:<SYMBOL>:<config_hash>` 這種識別字串。首版只認檔案 ⇒ `is_file()` 為假
+    #    就回 None，繞過復活。改為：把字串切開，任一段命中 registry 之 `config_hash`
+    #    就取該 hash 之**最大** feature_count（跨標的取 max＝保守，寧可多擋不可少擋）。
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    tokens = {t.strip() for t in str(features_path).replace("/", ":").split(":") if t.strip()}
+    if not tokens:
+        return []
+    hits = [
+        e
+        for e in FeatureRegistry().list_all()
+        if str(e.get("config_hash") or "").strip() in tokens
+        and isinstance(e.get("feature_count"), int)
+    ]
+    if not hits:
+        return []
+    # 🔴 `CODEX-R3-P2-02`：識別字串 `parquet:<SYMBOL>:<config_hash>` **自己帶了 symbol**，
+    #    先前一律跨標的取 max ⇒ 會把被選標的的合法小 run 誤報成另一標的的大 run（false-block）。
+    #    只要識別字串裡的某個 token 命中登記中的 symbol，就把範圍收斂到那個標的；
+    #    真正無 scope 的參照（只有 hash）才維持跨標的 max。
+    # 🔴 `CODEX-R4-P2-02`：**只收斂 symbol 不夠**——同一個 hash 可跨 timeframe，
+    #    `parquet:BTCUSDT:<hash>` 會挑到 1h 的大 run 去擋 12h 的小 run（誤擋）。
+    #    呼叫端知道自己要哪個 timeframe／symbol 時一併傳進來收斂；
+    #    識別字串自帶的 token 仍然有效（兩者取交集，先窄後寬）。
+    def _scoped(rows, key, wanted):
+        picked = [e for e in rows if str(e.get(key) or "").strip() == str(wanted)]
+        return picked or rows
+
+    chosen = hits
+    if timeframe:
+        chosen = _scoped(chosen, "timeframe", timeframe)
+    if symbol:
+        chosen = _scoped(chosen, "symbol", symbol)
+    by_token = [e for e in chosen if str(e.get("symbol") or "").strip() in tokens]
+    return by_token or chosen
+
+
+#: `ic_source_from_features_ref` 之「來源不存在」標記（無此檔、registry 亦無對應 run ⇒ 無物可載入，交 loader 報其原錯）
+IC_SOURCE_ABSENT: Dict[str, int] = {}
+
+
+def ic_source_from_features_ref(features_path: Optional[str], *, symbol: Optional[str] = None,
+                                timeframe: Optional[str] = None) -> Optional[Dict[str, int]]:
+    """`features_path`（檔案或識別字串）之准入估算來源：檔案讀檔頭，識別字串經 registry（多筆取欄×列最大者，保守）。
+    回傳：來源規模 dict；`IC_SOURCE_ABSENT`（空 dict）＝檔案不存在且 registry 無對應 run（無物可載入）；
+    None＝來源存在但列數／欄數不可得（呼叫端不得據以放行）。"""
+    if not features_path:
+        return IC_SOURCE_ABSENT
+    if Path(features_path).is_file():
+        return ic_workload_from_features_file(features_path)
+    entries = _registry_entries_for_ref(features_path, symbol=symbol, timeframe=timeframe)
+    if not entries:
+        return IC_SOURCE_ABSENT
+    sources = [ic_source_from_registry_entry(e) for e in entries]
+    if any(s is None for s in sources):
+        return None
+    return max(sources, key=lambda s: s["rows"] * (s["n_f32"] + s["n_f64"]))
 
 
 def feature_count_from_features_file(
@@ -1146,42 +1261,9 @@ def feature_count_from_features_file(
         return None
     path = Path(features_path)
     if not path.is_file():
-        # 🔴 `GROK-R2-P2-01`：`features_path` **未必是檔案路徑**——公開 API 也吃
-        #    `parquet:<SYMBOL>:<config_hash>` 這種識別字串。首版只認檔案 ⇒ `is_file()` 為假
-        #    就回 None，繞過復活。改為：把字串切開，任一段命中 registry 之 `config_hash`
-        #    就取該 hash 之**最大** feature_count（跨標的取 max＝保守，寧可多擋不可少擋）。
-        from momentum.FeatureEngineering.feature_registry import FeatureRegistry
-
-        tokens = {t.strip() for t in str(features_path).replace("/", ":").split(":") if t.strip()}
-        if not tokens:
+        chosen = _registry_entries_for_ref(features_path, symbol=symbol, timeframe=timeframe)
+        if not chosen:
             return None
-        hits = [
-            e
-            for e in FeatureRegistry().list_all()
-            if str(e.get("config_hash") or "").strip() in tokens
-            and isinstance(e.get("feature_count"), int)
-        ]
-        if not hits:
-            return None
-        # 🔴 `CODEX-R3-P2-02`：識別字串 `parquet:<SYMBOL>:<config_hash>` **自己帶了 symbol**，
-        #    先前一律跨標的取 max ⇒ 會把被選標的的合法小 run 誤報成另一標的的大 run（false-block）。
-        #    只要識別字串裡的某個 token 命中登記中的 symbol，就把範圍收斂到那個標的；
-        #    真正無 scope 的參照（只有 hash）才維持跨標的 max。
-        # 🔴 `CODEX-R4-P2-02`：**只收斂 symbol 不夠**——同一個 hash 可跨 timeframe，
-        #    `parquet:BTCUSDT:<hash>` 會挑到 1h 的大 run 去擋 12h 的小 run（誤擋）。
-        #    呼叫端知道自己要哪個 timeframe／symbol 時一併傳進來收斂；
-        #    識別字串自帶的 token 仍然有效（兩者取交集，先窄後寬）。
-        def _scoped(rows, key, wanted):
-            picked = [e for e in rows if str(e.get(key) or "").strip() == str(wanted)]
-            return picked or rows
-
-        chosen = hits
-        if timeframe:
-            chosen = _scoped(chosen, "timeframe", timeframe)
-        if symbol:
-            chosen = _scoped(chosen, "symbol", symbol)
-        by_token = [e for e in chosen if str(e.get("symbol") or "").strip() in tokens]
-        chosen = by_token or chosen
         return max(feature_count_from_registry_entry(e) or 0 for e in chosen) or None
     from momentum.FeatureEngineering import feature_naming as _naming
 
@@ -1191,19 +1273,45 @@ def feature_count_from_features_file(
         with h5py.File(str(path), "r") as handle:
             # FF-NAME Task 3.4（v18）：IC 交接 h5 先過命名世代閘（缺屬性／舊版 ⇒ 拒，不吞為「量不出」）
             assert_h5_feature_naming_version(handle.attrs, path)
-            found: List[int] = []
-
-            def visit(_name: str, obj) -> None:
-                if isinstance(obj, h5py.Dataset) and _name.rsplit("/", 1)[-1] == "features":
-                    if len(obj.shape) == 2:
-                        found.append(int(obj.shape[1]))
-
-            handle.visititems(visit)
+            found = [src["n_f32"] + src["n_f64"] for src in _feature_sources_in_h5(handle)]
         return max(found) if found else None
     except _naming.FeatureNamingVersionError:
         raise
     except Exception:  # noqa: BLE001 — 讀不到就當作解析不出來，不讓量測工具的問題變成閘門的問題
         return None
+
+
+def _feature_sources_in_h5(handle: Any) -> List[Dict[str, int]]:
+    """IC 交接 h5 中每個特徵群組之 `{rows, n_f32, n_f64}`（只讀檔頭）。ICPERF L1b（諮詢 r165 C2）：欄數併入
+    `features_f64`（非 float32 無損欄，`momentum/core/h5_feature_precision.py`）；原只取 `features` 寬度而少算。"""
+    import h5py
+
+    from momentum.core.h5_feature_precision import feature_layout
+
+    out: List[Dict[str, int]] = []
+
+    def visit(_name: str, obj) -> None:
+        if isinstance(obj, h5py.Dataset) and _name.rsplit("/", 1)[-1] == "features" and len(obj.shape) == 2:
+            rows, total, f64_idx = feature_layout(obj.parent)
+            out.append({"rows": int(rows), "n_f32": int(total - len(f64_idx)), "n_f64": int(len(f64_idx))})
+
+    handle.visititems(visit)
+    return out
+
+
+def ic_workload_from_features_file(features_path: Optional[str]) -> Optional[Dict[str, int]]:
+    """IC 分析准入估算之來源規模 `{rows, n_f32, n_f64}`（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」；只讀檔頭、不載入矩陣）。
+    非檔案路徑或讀不到 ⇒ None（呼叫端改以 registry／manifest 解析，未知者不得繞過准入）；多個特徵群組取欄數最大者。"""
+    if not features_path or not Path(features_path).is_file():
+        return None
+    import h5py
+
+    with h5py.File(str(features_path), "r") as handle:
+        assert_h5_feature_naming_version(handle.attrs, features_path)
+        sources = _feature_sources_in_h5(handle)
+    if not sources:
+        return None
+    return max(sources, key=lambda s: s["n_f32"] + s["n_f64"])
 
 
 def ic_report_reason(category: str, index: int = 0) -> str:

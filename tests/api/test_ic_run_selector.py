@@ -280,7 +280,9 @@ def test_service_sees_runs_registered_after_startup(pinned_registry: Path) -> No
 
     writer = FeatureRegistry(path=pinned_registry)
     writer.add({"symbol": SYMBOL, "timeframe": TIMEFRAME, "config_hash": late_hash, "run_status": "complete",
-                "features_path": str(pinned_registry.parent / "missing_late.h5"), "feature_count": 1})
+                "features_path": str(pinned_registry.parent / "missing_late.h5"), "feature_count": 1,
+                # ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：現行 Feature Factory 寫入之 run 帶列數（准入估算之來源）
+                "row_count": 10})
     assert FeatureRegistry(path=pinned_registry).get(SYMBOL, TIMEFRAME, late_hash) is not None, "registry 檔須已含新 run"
     request = ICAnalyzeRequest(symbol=SYMBOL, timeframe=TIMEFRAME, config_hash=late_hash, mode="longitudinal")
     status = asyncio.run(_drive_to_terminal(service, request))

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { MemoryNeedHave } from '@/lib/memoryNeed';
 import {
   DeepAnalysisConfig,
   FeatureTierLevel,
@@ -37,6 +38,8 @@ interface ICAnalysisState {
   taskWarnings: ICTaskWarning[];
   /** 降級重跑（全樣本、無 OOS）之原因——重跑**當下**即揭露；沒有降級 ⇒ null。 */
   taskFallback: ICTaskFallback | null;
+  /** ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：排隊中（pending）之等待原因；未排隊 ⇒ null。 */
+  waitReason: MemoryNeedHave | null;
   /**
    * `G3-D2` D4.2／D4.3：**後端**回傳之事件分析揭露（兩上界、k 雙值、掃描結果）。
    * 🔴 尚未分析 ⇒ `null`，前端**不猜數字**（上界之公式住 producer，重算即第二份實作）。
@@ -85,6 +88,7 @@ interface ICAnalysisState {
   setSubProgress: (subProgress: ICSubProgress | null) => void;
   setTaskWarnings: (warnings: ICTaskWarning[]) => void;
   setTaskFallback: (fallback: ICTaskFallback | null) => void;
+  setWaitReason: (waitReason: MemoryNeedHave | null) => void;
   setEventScanDisclosure: (d: ICEventScanDisclosure | null) => void;
   setStatus: (status: ICAnalysisStatus) => void;
   setReport: (report: ICReport | ICReportLight | null) => void;
@@ -272,6 +276,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   subProgress: null,
   taskWarnings: [],
   taskFallback: null,
+  waitReason: null,
   eventScanDisclosure: null,
   error: null,
   report: null,
@@ -340,12 +345,14 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
       subProgress: null,
       taskWarnings: [],
       taskFallback: null,
+      waitReason: null,
     }),
   setProgress: (progress, currentStage) => set({ progress, currentStage }),
   setFeatureCount: (featureCount) => set({ featureCount }),
   setSubProgress: (subProgress) => set({ subProgress }),
   setTaskWarnings: (taskWarnings) => set({ taskWarnings }),
   setTaskFallback: (taskFallback) => set({ taskFallback }),
+  setWaitReason: (waitReason) => set({ waitReason }),
   setEventScanDisclosure: (eventScanDisclosure) => set({ eventScanDisclosure }),
   setStatus: (status) => set({ status }),
   setReport: (report) =>

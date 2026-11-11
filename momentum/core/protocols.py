@@ -290,6 +290,18 @@ class IMemoryBudget(Protocol):
         """快區 R（實體記憶體 × 比例或設定絕對值；SPEC v35：只管並行准入與選路，不作拒絕理由）。"""
         ...
 
+    def estimate(self, branch_id: str, params: Dict[str, Any]) -> List[Any]:
+        """分支估算成分（不判定；ICPERF v5.87 IC 分析啟動准入之 `IC.analysis` 經此估任務新增峰值）。"""
+        ...
+
+    def planned_bytes(self, components: List[Any]) -> int:
+        """成分中不可回收配置（anon）之總和。"""
+        ...
+
+    def admission_snapshot(self) -> Dict[str, Any]:
+        """准入即時快照 `{available_bytes, budget_bytes, source}`（darwin VM 快照／非 darwin psutil）。"""
+        ...
+
     # 具名例外（SPEC v35）：`GenerationMemoryBudgetExceeded`（機器可用量不足／停止旗標）、
     # `MemoryRerouteNeeded`（域內 worker 估算低估 ⇒ 根串行重試，前者之子類）
     GenerationMemoryBudgetExceeded: type

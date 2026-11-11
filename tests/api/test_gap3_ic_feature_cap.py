@@ -1,10 +1,13 @@
 """GAP-3 UX Task 6.0 驗收（`-k ic_feature_cap`）——IC 錯誤 reason 之登記處。
 
-邊界①：契約 `reasons` 含 `analysis_rejected` 分類且其中有 `feature_count_exceeds_cap`，分類集合逐名等值（原 `len(r) == 4`，EVTWARMUP 加 `oos_downgrade` 後改）。
+邊界①：契約 `reasons` 含 `analysis_rejected` 分類且其中有 `memory_need_exceeds_budget`，分類集合逐名等值（原 `len(r) == 4`，EVTWARMUP 加 `oos_downgrade` 後改）。
 邊界②：`api/` 與 `frontend/src/` 內該字面之硬編碼數 `== 0`（一律由契約取字面）。
 
+ICPERF SPEC v5.87 Task 0.6 (h)「⑤ IC 分析啟動准入」：固定欄數上限刪除，`analysis_rejected` 首項由
+`feature_count_exceeds_cap` 改名為 `memory_need_exceeds_budget`（估算峰值逾本機記憶體預算），其餘不變。
+
 🔴 斷言一律用**成員資格**（`in`）而非等值——Task 7.7 會往**同一個** `analysis_rejected`
-再加兩個 reason，寫成 `== ['feature_count_exceeds_cap']` 會在 7.7 上線時假紅。
+再加兩個 reason，寫成 `== ['memory_need_exceeds_budget']` 會在 7.7 上線時假紅。
 """
 
 from __future__ import annotations
@@ -24,7 +27,8 @@ def test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract():
     c = json.loads(CONTRACT.read_text(encoding="utf-8"))
     r = c["reasons"]
     assert "analysis_rejected" in r
-    assert "feature_count_exceeds_cap" in r["analysis_rejected"]
+    assert "memory_need_exceeds_budget" in r["analysis_rejected"]
+    assert "feature_count_exceeds_cap" not in r["analysis_rejected"]   # 舊名已改，不得並存
     # 分類集合逐名釘住（原 `len(r) == 4` 寫於 GAP-3 Task 6.0；EVTWARMUP B1 39b48531 依規格
     # 新增 `oos_downgrade` 分類後計數過期——改為逐名等值，比計數更嚴：多／少／改名皆紅）
     assert set(r) == {
@@ -36,7 +40,7 @@ def test_gap3_ic_feature_cap_reason_registered_in_ic_side_contract():
     }
     # 🔴 這是**匯入**契約以外的檔：reason 不屬 event_import_contract（那是匯入契約）
     assert not (REPO / "momentum" / "Analysis" / "contracts" / "event_import_contract.json").read_text(
-        encoding="utf-8").count("feature_count_exceeds_cap")
+        encoding="utf-8").count("memory_need_exceeds_budget")
 
 
 def test_gap3_ic_feature_cap_reason_membership_not_equality():
@@ -45,7 +49,7 @@ def test_gap3_ic_feature_cap_reason_membership_not_equality():
     Task 7.7 會往同一分類再加 reason ⇒ 任何寫等值的消費端都會在那時假紅。
     """
     reasons = ic_report_reasons("analysis_rejected")
-    assert "feature_count_exceeds_cap" in reasons          # 成員資格
+    assert "memory_need_exceeds_budget" in reasons         # 成員資格
     assert isinstance(reasons, tuple) and len(reasons) >= 1
     assert ic_report_reason("analysis_rejected") == reasons[0]
 

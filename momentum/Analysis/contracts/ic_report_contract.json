@@ -25,7 +25,7 @@
     ],
     "xsec_not_applicable": ["cross_sectional_mode"],
     "analysis_rejected": [
-      "feature_count_exceeds_cap",
+      "memory_need_exceeds_budget",
       "feature_coverage_insufficient",
       "feature_coverage_unknown_legacy_run",
       "feature_coverage_unknown_timeframe",

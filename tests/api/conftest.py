@@ -48,6 +48,32 @@ class MockQualityComputer:
         }
 
 
+@pytest.fixture(autouse=True)
+def _fresh_ic_admission():
+    """每條測試一個乾淨之 IC 分析准入控制器（ICPERF v5.87 (h)「⑤ IC 分析啟動准入」）。
+
+    TestClient 於每個請求結束即關閉其事件迴圈，`/analyze` 以 `asyncio.create_task` 排入之背景分析隨之銷毀、
+    不跑完 ⇒ 其保留量不會經 worker 結束釋放，會跨測試累積而使後續請求排隊（實際踩到：受影響測試合跑卡在深度分析
+    監看之事件等待）。正式伺服器之事件迴圈常駐，背景任務跑完即釋放，無此情形；本 fixture 只做測試隔離。"""
+    from api.services import ic_analysis_service as svc_mod
+    from momentum.factories import create_ic_admission_controller
+
+    svc = svc_mod.ic_analysis_service
+    saved = (svc._admission, dict(svc._queued_starts), dict(svc._early_admission))  # noqa: SLF001
+    fresh = create_ic_admission_controller()
+    fresh.on_admit = svc._on_admitted  # noqa: SLF001
+    fresh.on_reject = svc._on_rejected  # noqa: SLF001
+    svc._admission = fresh  # noqa: SLF001
+    svc._queued_starts.clear()  # noqa: SLF001
+    svc._early_admission.clear()  # noqa: SLF001
+    yield
+    svc._admission = saved[0]  # noqa: SLF001
+    svc._queued_starts.clear()  # noqa: SLF001
+    svc._queued_starts.update(saved[1])  # noqa: SLF001
+    svc._early_admission.clear()  # noqa: SLF001
+    svc._early_admission.update(saved[2])  # noqa: SLF001
+
+
 @pytest.fixture
 def mock_browse_registrar() -> MockBrowseRegistrar:
     return MockBrowseRegistrar()

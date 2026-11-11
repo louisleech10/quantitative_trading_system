@@ -107,8 +107,9 @@ def test_feature_coverage_gate_02_contract_reasons_final_set():
     contract = json.loads(
         (REPO / "momentum" / "Analysis" / "contracts" / "ic_report_contract.json").read_text("utf-8")
     )
+    # ICPERF v5.87 (h)：首項由 `feature_count_exceeds_cap` 改名為 `memory_need_exceeds_budget`（固定欄數上限改為記憶體准入）
     assert contract["reasons"]["analysis_rejected"] == [
-        "feature_count_exceeds_cap",
+        "memory_need_exceeds_budget",
         "feature_coverage_insufficient",
         "feature_coverage_unknown_legacy_run",
         "feature_coverage_unknown_timeframe",

@@ -1600,14 +1600,8 @@ def _run_deep_analysis(ctx: RunContext) -> Dict[str, Any]:
 
 
 def _service_with_tasks(request: Mapping[str, Any], registry: Path) -> Any:
-    import threading as _th
-
-    svc = _fb()._ic_service(request, registry)
-    svc._lock = _th.Lock()
-    svc._tasks = {}
-    svc._callbacks = {}
-    svc._last_task_id = None
-    return svc
+    # `_ic_service` 經建構子注入走完整 `__init__`（任務與准入狀態欄同產品），不再於此補欄
+    return _fb()._ic_service(request, registry)
 
 
 def _manifest_rows(request: Mapping[str, Any]) -> int:

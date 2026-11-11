@@ -53,6 +53,7 @@ import { useICAnalysis } from '@/hooks/useICAnalysis';
 import { useAutoRefilter } from '@/hooks/useAutoRefilter';
 import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
 import { icFallbackLabel, icSubProgressLabel, icTaskWarningLabel } from "@/lib/icProgressLabel";
+import { memoryNeedHaveText } from "@/lib/memoryNeed";
 import { isSectionStatus } from "@/lib/types";
 // SPLITUNIFY Task 10.6：事件掃描請求之三個投影欄，與 IC 分析請求同源（見該函式 docstring）。
 import { buildEventScanRequest } from '@/lib/api';
@@ -75,6 +76,7 @@ function ICAnalysisPageContent() {
     subProgress,
     taskWarnings,
     taskFallback,
+    waitReason,
     eventScanDisclosure,
     error,
     report,
@@ -643,6 +645,12 @@ function ICAnalysisPageContent() {
                 </div>
               )}
               {/* UAT 2026-09-08：降級重跑當下就講原因（不是卡住）；取消為協作式，下一個回報點停 */}
+              {/* ICPERF v5.87 (h)「⑤ IC 分析啟動准入」：排隊中顯示原因（需要／可用），可沿下方按鈕取消 */}
+              {status === 'pending' && memoryNeedHaveText(waitReason) && (
+                <div className="text-xs text-sky-200 border border-sky-400/30 rounded px-2 py-1" data-testid="ic-task-wait-reason">
+                  {`排隊中：等其他分析釋放記憶體（${memoryNeedHaveText(waitReason)}）`}
+                </div>
+              )}
               {icFallbackLabel(taskFallback) && (
                 <div className="text-xs text-rose-200 border border-rose-400/30 rounded px-2 py-1" data-testid="ic-task-fallback">
                   {icFallbackLabel(taskFallback)}

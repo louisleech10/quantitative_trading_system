@@ -12,23 +12,10 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = Field(default=False, validation_alias="DEBUG")  # 關閉 reload 以避免 sklearn 導入問題
     
-    # GAP-3 UX Task 6.1／6.2：IC 分析之特徵數上限（**過渡止血**，GAP-6 之分塊計算上線後取代）。
-    #
-    # 🔴 這個數字**不是拍腦袋填的**，導出自實跑量測 receipt
-    #    `handoffs/run_receipts/gap3ux-b9-footprint.receipt.json`：
-    #    量測階梯 15／1,348／161,031／218,369，工具＝macOS `sample` 之 Physical footprint
-    #    （**禁 `ps rss`**——同一時刻實測 RSS 72MB vs footprint 5.7GB，差 79 倍）。
-    #    最小超標點＝**161,031**（peak 4.62GB，超過本機 8GB 之一半），重跑兩次 peak 差 0%。
-    #    上限 ＝ 最小超標點 × 安全係數 0.5 ＝ **80,515**。
-    # 🔴 **這個數字綁機器，不是演算法的性質**（`CODEX-R1-P1-05`）：「超標」定義為
-    #    peak > 機器 RAM × 0.5，而本機 RAM 為 8GB。換一台 32GB 的機器重跑，最小超標點
-    #    會往上移、上限也會跟著變。這對**過渡止血**是可接受的（目的就是「別把這台機器吃爆」），
-    #    但**不得**把 80515 當成「這個演算法的固有上限」。
-    #    部署到不同機器時請以 `IC_ANALYSIS_MAX_FEATURES` 覆寫，並重跑量測產生該機器的 receipt。
-    # 🔴 改這個數字**必須**同時更新那份 receipt——無 receipt 不得寫入設定值（Task 6.2 之死線）。
-    ic_analysis_max_features: int = Field(
-        default=80515, validation_alias="IC_ANALYSIS_MAX_FEATURES",
-    )
+    # IC 分析之記憶體准入：原固定特徵數上限 `ic_analysis_max_features`（80515，GAP-3 UX Task 6.1／6.2 過渡止血）
+    # 已由 ICPERF v5.87 Task 0.6 (h)「⑤ IC 分析啟動准入」取代——依任務峰值估算對產品記憶體預算判定
+    # （`momentum/FeatureEngineering/memory_budget.py` 分支 IC.analysis、`momentum/Analysis/ic_admission.py`），
+    # 預算即實體記憶體 × ratio（`FFACT_MEMORY_BUDGET_*` 覆寫），換機自動適用，不再以固定數字設定。
 
     # API設定
     api_prefix: str = "/api/v1"
