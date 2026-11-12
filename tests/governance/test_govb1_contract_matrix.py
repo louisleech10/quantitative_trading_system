@@ -517,8 +517,22 @@ _R_GOVTEST_3 = ("R-GOVTEST-3：GOVB1 期間之凍結不變式（B5 窗 b5_start.
                 "轉綠時 strict 以 XPASS 報紅，須移除本標記並同步登記表")
 
 
+@pytest.fixture(scope="module")
+def live_g7() -> dict[str, subprocess.CompletedProcess[str]]:
+    """live repo 上 `govb1_final_gate.sh --only g7` 只跑一次，供 F2／F3／ambient 三條共用（每次約 735 秒）。
+
+    三條原各自以同一腳本、同一參數（`--only g7`）、同一 cwd（REPO）、同一工作樹狀態（本模組其他測試之改檔皆於
+    finally 還原）各跑一次 ⇒ 同輸入、同程式路徑。F3 之「g7 不汙染工作樹」前後 dirty 數、ambient 之
+    `scripts/gate_check.sh` 狀態，皆於這一次 g7 之前後緊鄰量測，與原各測試內之量測次序相同。"""
+    gate_check_status = _run(["git", "status", "--porcelain", "--", "scripts/gate_check.sh"])
+    before = _run(["bash", "-c", "git status --porcelain | wc -l"])
+    g7 = _run(["bash", str(GATE), "--only", "g7"])
+    after = _run(["bash", "-c", "git status --porcelain | wc -l"])
+    return {"gate_check_status": gate_check_status, "before": before, "g7": g7, "after": after}
+
+
 @pytest.mark.xfail(strict=True, reason=_R_GOVTEST_1)
-def test_t01_f2_frozen_hashes_self_consistent() -> None:
+def test_t01_f2_frozen_hashes_self_consistent(live_g7: dict[str, subprocess.CompletedProcess[str]]) -> None:
     """T-0.1-F2：frozen_hashes 欄位完整 + baseline_dirty 不存在 + g7 可過。"""
     assert FROZEN.is_file() and FROZEN.stat().st_size > 0
     text = FROZEN.read_text(encoding="utf-8")
@@ -527,7 +541,7 @@ def test_t01_f2_frozen_hashes_self_consistent() -> None:
     cat = _run(["git", "cat-file", "-e", f"{parsed['base_commit']}^{{commit}}"])
     assert cat.returncode == 0
     # g7 需本批已 commit；若尚未 commit 則 skip 由 post-commit 實跑補
-    g7 = _run(["bash", str(GATE), "--only", "g7"])
+    g7 = live_g7["g7"]
     if g7.returncode != 0 and "UNSUPPORTED-DELIVERY-SHAPE" in (g7.stderr + g7.stdout):
         pytest.skip("本批尚未 commit；交付語義要求 commit 後 g7 才綠")
     assert g7.returncode == 0, g7.stderr + g7.stdout
@@ -544,16 +558,16 @@ def test_t01_f3_print_plan_nonempty() -> None:
 
 
 @pytest.mark.xfail(strict=True, reason=_R_GOVTEST_1)
-def test_t01_f3_g7_when_committed() -> None:
+def test_t01_f3_g7_when_committed(live_g7: dict[str, subprocess.CompletedProcess[str]]) -> None:
     """T-0.1-F3：commit 後 --only g7 rc=0；主樹 dirty 數不被 oracle 汙染。"""
-    before = _run(["bash", "-c", "git status --porcelain | wc -l"])
+    before = live_g7["before"]
     assert before.returncode == 0
     n_before = int(before.stdout.strip())
-    g7 = _run(["bash", str(GATE), "--only", "g7"])
+    g7 = live_g7["g7"]
     if g7.returncode != 0 and "UNSUPPORTED-DELIVERY-SHAPE" in (g7.stderr + g7.stdout):
         pytest.skip("本批尚未 commit")
     assert g7.returncode == 0, g7.stderr + g7.stdout
-    after = _run(["bash", "-c", "git status --porcelain | wc -l"])
+    after = live_g7["after"]
     n_after = int(after.stdout.strip())
     assert n_after == n_before, f"g7 汙染主樹 dirty: {n_before} → {n_after}"
 
@@ -2032,11 +2046,11 @@ _g7() {
 
 
 @pytest.mark.xfail(strict=True, reason=_R_GOVTEST_1)
-def test_g7_ambient_m_gate_check_not_red() -> None:
+def test_g7_ambient_m_gate_check_not_red(live_g7: dict[str, subprocess.CompletedProcess[str]]) -> None:
     """僅 ambient ` M scripts/gate_check.sh` ⇒ 不紅（task-scoped；禁 epic-wide）。"""
-    st = _run(["git", "status", "--porcelain", "--", "scripts/gate_check.sh"])
+    st = live_g7["gate_check_status"]
     # 現況可為 M 或乾淨；若為 M，g7 必須仍綠
-    proc = _run(["bash", "scripts/govb1_final_gate.sh", "--only", "g7"])
+    proc = live_g7["g7"]
     assert proc.returncode == 0, (
         f"ambient M 不得使 g7 轉紅（task-scoped）\n"
         f"status={st.stdout!r}\n{proc.stdout}\n{proc.stderr}"

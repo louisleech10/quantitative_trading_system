@@ -64,6 +64,11 @@ def expected_identity(manifest: Dict[str, Any], artifact_kind: str = "raw") -> D
         "artifact_kind": artifact_kind,
         "content_sha256": node.get("content_sha256"),
         "provenance_sha256": prov.get("sha256") if isinstance(prov, dict) else None,
+        # NUMVIEW Task 4.2（D2）：artifact 節點之 algorithm_id 與事後路由身分（舊 run 無 ⇒ None）；
+        # 鍵名＝manifest 原文字面（numeric_view.json manifest_keys 之值，feature_factory._numeric_manifest_identity 寫入節點），
+        # 不經產品之 resolve_run_identity／load_contract 取值
+        "algorithm_id": node.get("algorithm_id"),
+        "route_identity": node.get("route_identity"),
     }
     assert set(out) == set(IDENTITY_KEYS), "契約 run_identity_keys 改動須同步本 oracle"
     return out
@@ -90,6 +95,21 @@ def run_analysis(run: Any, request: ICAnalyzeRequest, *, event_batch: Optional[D
     status = (report.get("metadata") or {}).get("survivor_output") or {}
     survivor = json.loads(Path(status["path"]).read_text(encoding="utf-8")) if status.get("path") else None
     return {"report": report, "survivor_status": status, "survivor": survivor, "api": service.get_result(task_id)}
+
+
+def replay_survivor_write(analysis: Dict[str, Any]) -> Dict[str, Any]:
+    """以全域分析那一次 run 之倖存者寫出步驟輸入（`analysis` fixture 於呼叫當下之深拷貝快照），在同一 orchestrator
+    實例上重跑 `_write_survivor_output`（組裝 `build_survivor_output` → 契約驗證 → 落檔），讀回倖存者檔。
+
+    同輸入、同程式路徑之第 0–7 段（IC 計算，約 4,200 秒）不重跑：`_write_survivor_output` 讀之實例狀態
+    （`_survivor_suppressed_reason`／`_event_context`／`_current_config*`／`_reporter`）於 analyze 結束後不再被寫。
+    報告與 API 結果沿用該 run（改壞點只在倖存者 payload，報告 metadata 與 API 之身分與改壞 run 相同）。"""
+    calls = analysis["survivor_write_calls"]
+    assert len(calls) == 1, f"前提不成立：全域分析之倖存者寫出步驟應恰一次，實得 {len(calls)} 次"
+    orchestrator, kwargs = calls[0]
+    status = orchestrator._write_survivor_output(**copy.deepcopy(kwargs))  # noqa: SLF001
+    survivor = json.loads(Path(status["path"]).read_text(encoding="utf-8")) if status.get("path") else None
+    return {"report": analysis["report"], "survivor_status": status, "survivor": survivor, "api": analysis["api"]}
 
 
 def survivor_identity(result: Dict[str, Any]) -> Any:
@@ -128,8 +148,26 @@ def _request(run: Any, **kwargs: Any) -> ICAnalyzeRequest:
 
 @pytest.fixture(scope="module")
 def analysis(env: Dict[str, Any]) -> Dict[str, Any]:
-    """全域（非事件）IC 分析一次。"""
-    return run_analysis(env["run"], _request(env["run"]))
+    """全域（非事件）IC 分析一次。
+
+    同時記錄倖存者寫出步驟（`ICFilterOrchestrator._write_survivor_output`）之實例與輸入快照（呼叫當下深拷貝：
+    之後 persist 會再寫 `report_meta`、服務會正規化 `report`），供 mutation 案重放改壞之寫出步驟，不必為同一輸入
+    重跑整次 IC 分析。記錄器原樣轉呼叫真實方法、回傳其結果，不改本 run 之任何輸出。"""
+    calls: List[Any] = []
+    real_write = orch_mod.ICFilterOrchestrator._write_survivor_output
+
+    def recording_write(self: Any, **kwargs: Any) -> Dict[str, Any]:
+        calls.append((self, copy.deepcopy(kwargs)))
+        return real_write(self, **kwargs)
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(orch_mod.ICFilterOrchestrator, "_write_survivor_output", recording_write)
+    try:
+        result = run_analysis(env["run"], _request(env["run"]))
+    finally:
+        mp.undo()
+    result["survivor_write_calls"] = calls
+    return result
 
 
 @pytest.fixture(scope="module")
@@ -190,9 +228,10 @@ def test_report_and_survivor_identity_equal_task21_identity(env: Dict[str, Any],
 
 
 def test_survivor_contract_requires_ff_run_identity(analysis: Dict[str, Any]) -> None:
-    """契約 `version` +1、`provenance_keys` 含必填之 `ff_run_identity`；驗證器收真實輸出、拒收缺該鍵之新版本輸出。"""
+    """契約 `version` 至少 +1（之後之票可再升版，如 2ffffd93 升至 4）、`provenance_keys` 含必填之 `ff_run_identity`；
+    驗證器收真實輸出、拒收缺該鍵之新版本輸出。"""
     contract = sc.load_survivor_contract()
-    assert contract["version"] == PRE_CHANGE_SURVIVOR_CONTRACT_VERSION + 1
+    assert contract["version"] >= PRE_CHANGE_SURVIVOR_CONTRACT_VERSION + 1
     spec = contract["provenance_keys"]["keys"].get(IDENTITY_KEY)
     assert spec is not None and spec.get("required", True) is True
     payload = analysis["survivor"]
@@ -225,8 +264,12 @@ def test_boundary_02_empty_selection_carries_identity(env: Dict[str, Any], empty
 # ---------------------------------------------------------------- mutation
 
 
-def test_mutation_survivor_takes_stale_ingest_identity(env: Dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：倖存者改寫入 ingest 快取檔之舊身分（同 config_hash、先前 run 之內容身分）⇒ 身分相等案翻轉。"""
+def test_mutation_survivor_takes_stale_ingest_identity(env: Dict[str, Any], analysis: Dict[str, Any],
+                                                      monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：倖存者改寫入 ingest 快取檔之舊身分（同 config_hash、先前 run 之內容身分）⇒ 身分相等案翻轉。
+
+    輸入與全域分析同一（同 request、同 run），差別只在改壞點 `build_survivor_output` ⇒ 不重跑 IC 分析，改在該 run 之
+    orchestrator 上以呼叫當下之輸入重放倖存者寫出步驟（`replay_survivor_write`：組裝→契約驗證→落檔→讀回）。"""
     expected = env["expected"]
     stale = dict(expected, content_sha256=hashlib.sha256(b"stale ingest cache run").hexdigest())
     real = orch_mod.build_survivor_output
@@ -237,6 +280,6 @@ def test_mutation_survivor_takes_stale_ingest_identity(env: Dict[str, Any], monk
         return payload
 
     monkeypatch.setattr(orch_mod, "build_survivor_output", stale_build)
-    result = run_analysis(env["run"], _request(env["run"]))
+    result = replay_survivor_write(analysis)
     assert survivor_identity(result) == stale
     assert not identity_carried(result, expected)
