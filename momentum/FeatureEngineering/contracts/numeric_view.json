@@ -1042,7 +1042,7 @@
       "parser": "bool_text",
       "reason": "uvicorn 存取紀錄開關（api/main.py）；只決定是否寫紀錄（output_only）。",
       "_sources": [
-        "api/main.py:400"
+        "api/main.py:406"
       ]
     }
   },
