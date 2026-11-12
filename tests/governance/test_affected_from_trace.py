@@ -182,6 +182,11 @@ def test_mentions_in_comments_and_docstrings_do_not_taint(tmp_path: Path) -> Non
     (s / "escaped_hash.sh").write_text("echo \\# docs/spec_x.md\n", encoding="utf-8")
     (s / "after_heredoc_comment.sh").write_text("cat <<EOF\nx\nEOF\n# docs/spec_x.md\n", encoding="utf-8")
     (s / "escaped_quote.sh").write_text('echo \\" x\n# docs/spec_x.md\n', encoding="utf-8")  # 跳脫之 " 不開引號
+    # 審碼 r14：字串形式之 __doc__ 存取、數字開頭之 heredoc 終止字
+    (s / "doc_reader_globals.py").write_text(
+        '"""docs/spec_x.md"""\nfrom pathlib import Path\nprint(Path(globals()["__doc__"].strip()).read_text())\n',
+        encoding="utf-8")
+    (s / "heredoc_digit.sh").write_text("sed 's/^# //' <<'0' | xargs cat\n# docs/spec_x.md\n0\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
     taint = aft.tainted_scripts(root, aft._tracked(root),
                                 aft.mention_patterns({"docs/spec_x.md"}, aft._tracked(root)))
@@ -189,7 +194,8 @@ def test_mentions_in_comments_and_docstrings_do_not_taint(tmp_path: Path) -> Non
                  "escaped_quote.sh"):
         assert f"scripts/{name}" not in taint, name
     for name in ("code_str.py", "paren_str.py", "sh_quoted_hash.sh", "sh_len.sh", "reads_spec.sh", "calls_reader.sh",
-                 "doc_reader.py", "heredoc_reader.sh", "heredoc_tab.sh", "multiline_quote.sh", "escaped_hash.sh"):
+                 "doc_reader.py", "heredoc_reader.sh", "heredoc_tab.sh", "multiline_quote.sh", "escaped_hash.sh",
+                 "doc_reader_globals.py", "heredoc_digit.sh"):
         assert f"scripts/{name}" in taint, name
 
 

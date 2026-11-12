@@ -99,7 +99,8 @@ def _strip_py(src: str) -> str:
         toks = list(tokenize.generate_tokens(io.StringIO(src).readline))
     except (tokenize.TokenError, IndentationError, SyntaxError):
         return src
-    keep_docs = any(t.type == tokenize.NAME and t.string in _DOC_CONSUMERS for t in toks)
+    # 原文任何位置（含字串，如 globals()['__doc__']、getattr(m, "__doc__")）出現即保留——寧多選不漏選（審碼 r14）
+    keep_docs = any(name in src for name in _DOC_CONSUMERS)
     out: List[str] = []
     prev = tokenize.NEWLINE
     for tok in toks:
@@ -113,7 +114,8 @@ def _strip_py(src: str) -> str:
     return " ".join(out)
 
 
-_HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)([A-Za-z_]\w*)\2")
+#: heredoc 終止字＝任一字詞（含數字開頭如 <<'0'；審碼 r14）；誤判（如算術 $((x<<2))）只使其後內容原樣保留＝寧多選不漏選
+_HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)([^\s'\"<>;&|()]+)\2")
 
 
 def _strip_sh(src: str) -> str:
