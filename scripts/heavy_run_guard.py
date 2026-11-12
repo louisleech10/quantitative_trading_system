@@ -457,7 +457,7 @@ CHUNKED_SCRIPT = "scripts/run_chunked.py"
 def _chunked_option(argv: List[str], name: str) -> Optional[List[str]]:
     """argv 為分批執行器（非只規劃）時，選項 `name` 之值（`--traces` 可多值）；否則 None。"""
     idx = next((i for i, tok in enumerate(argv) if tok.endswith(CHUNKED_SCRIPT)), None)
-    if idx is None or "--plan-only" in argv[idx + 1:]:
+    if idx is None or any(t in argv[idx + 1:] for t in ("--plan-only", "--check-fresh")):  # 只規劃／只核工作樹指紋 ⇒ 不跑測試
         return None
     rest = argv[idx + 1:]
     if "--" in rest:

@@ -461,7 +461,11 @@ def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
     "code_sha256", "code_sha256_at_start", "head", ...}}。任一請求失敗 ⇒ 記錄並續跑其餘（收據將該請求記為失敗，不 PASS）。
     `out_dir` 先轉絕對路徑（子行程 cwd＝隔離目錄，相對路徑之 spec／pickle 於子行程內解析不到；2026-11-01 `--out-dir runs/...`
     12 請求皆 rc=1 實例）。SPEC Task 0.2 v5.59 (aa)（r70 群集 A）：每請求擷取結束時記**擷取當下**之 `receipt_code_sha256()`
-    與 `head`（另記開始時之 code_sha256：擷取期間程式改動可辨）；`build_receipt` 要求與組收據當下相等。"""
+    與 `head`（另記開始時之 code_sha256：擷取期間程式改動可辨）；`build_receipt` 要求與組收據當下相等。
+    SPEC Task 0.3 ⑫ 修訂（實際執行依賴）：每請求記 `code_paths`＝母行程 `request_for` 之依賴（`trace_deps`）∪ 子行程（含孫
+    行程）之依賴（`deptrace_env`／`collect_child_deps`）∪ `DEPTRACE_PROBED_INPUTS`；`code_sha256`＝依 `code_paths` 於擷取
+    結束時計算，`code_sha256_at_start`＝依擷取開始時之檔案狀態（`code_stat_snapshot`／`code_sha256_since`）；子行程依賴
+    紀錄不全 ⇒ `deptrace_error`（收據 FAIL）。"""
     fb = _fb()
     out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -469,7 +473,9 @@ def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
     work_root = out_dir / "_work"
     work_root.mkdir(parents=True, exist_ok=True)
     for rid in req_ids:
-        request = request_for(rid)
+        snapshot = code_stat_snapshot(REPO)
+        with trace_deps(REPO, exclude=(out_dir,)) as parent_deps:
+            request = request_for(rid)
         work = Path(tempfile.mkdtemp(prefix=f"{rid}-", dir=str(work_root)))
         cap = work / "capture"
         cap.mkdir(parents=True)
@@ -479,19 +485,24 @@ def capture(req_ids: Sequence[str], out_dir: Path) -> Dict[str, Any]:
         spec_path = cap / "spec.json"
         spec_path.write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
         cmd = [sys.executable, str(Path(__file__).resolve()), CHILD_CMD, str(spec_path)]
-        code_at_start = receipt_code_sha256()
+        trace_dir = cap / "deptrace"
         t0 = time.perf_counter()
         try:
             res = fb.run_watched(cmd, log_path=cap / "run.log",
-                                 env=fb.isolated_env(fb._child_env_base(), work / "iso"),
+                                 env=deptrace_env(fb.isolated_env(fb._child_env_base(), work / "iso"), trace_dir, REPO),
                                  cwd=fb._prepare_cwd(work / "cwd"))
             status[rid] = {"rc": res["rc"], "pickle": str(out) if out.is_file() else None, "log": res["log_path"]}
         except fb.FreezeError as exc:
             status[rid] = {"rc": None, "pickle": None, "log": str(cap / "run.log"), "error": str(exc)}
         status[rid]["wall_s"] = time.perf_counter() - t0
         status[rid]["pickle_bytes"] = out.stat().st_size if out.is_file() else None
-        status[rid].update({"code_sha256": receipt_code_sha256(), "code_sha256_at_start": code_at_start,
+        child_paths, dt_error = collect_child_deps(trace_dir, REPO, exclude=(out_dir,))
+        code_paths = sorted(set(parent_deps["paths"]) | set(child_paths) | set(DEPTRACE_PROBED_INPUTS))
+        status[rid].update({"code_paths": code_paths, "code_sha256": receipt_code_sha256(code_paths),
+                            "code_sha256_at_start": code_sha256_since(code_paths, snapshot, REPO),
                             "head": _git_head()})
+        if dt_error:
+            status[rid]["deptrace_error"] = dt_error
         print(json.dumps({"request": rid, **status[rid]}, ensure_ascii=False), flush=True)
     (out_dir / "capture_status.json").write_text(json.dumps(status, ensure_ascii=False, indent=1), encoding="utf-8")
     return status
@@ -2609,26 +2620,352 @@ def _git_head() -> Optional[str]:
         return None
 
 
-def receipt_code_paths() -> List[str]:
-    """收據所驗結果所依賴之程式（SPEC v5.42 Task 0.3 ⑫，r55 群集 E）：IC 分析模組（momentum/Analysis 全部 .py、
-    momentum/core 之 .py）、IC 服務、擷取／收據／事件批腳本、oracle 測試檔與 IC 設定；排序之 repo 相對路徑。"""
+def receipt_code_paths(repo: Optional[Path] = None) -> List[str]:
+    """舊收據（無 `code_paths`）之寬清單（SPEC v5.42 Task 0.3 ⑫，r55 群集 E）：IC 分析模組（momentum/Analysis 全部 .py、
+    momentum/core 之 .py）、IC 服務、擷取／收據／事件批腳本、oracle 測試檔與 IC 設定；排序之 repo 相對路徑。新收據改綁
+    實際執行依賴（`trace_deps`／`collect_child_deps`，收據 `code_paths`），本清單只供相容舊收據。"""
+    root = Path(repo or REPO)
     pats = ("momentum/Analysis/**/*.py", "momentum/core/*.py", "tests/momentum/Analysis/test_icperf_*.py",
             "tests/api/test_icperf_*.py")
-    found = {str(p.relative_to(REPO)) for pat in pats for p in REPO.glob(pat)
+    found = {p.relative_to(root).as_posix() for pat in pats for p in root.glob(pat)
              if p.is_file() and "__pycache__" not in p.parts}
     found |= {"api/services/ic_analysis_service.py", "scripts/icperf_correctness_receipt.py",
               "scripts/icperf_freeze_baseline.py", "scripts/icperf_event_batch.py", "config/ic_config.yaml"}
     return sorted(found)
 
 
-def receipt_code_sha256() -> str:
-    """`receipt_code_paths` 之工作樹內容雜湊（同估時收據 identity 之 `run_receipt_identity.code_sha256`：逐檔
-    git hash-object 依路徑串接之 sha256，含未提交改動）。收據測試以現行工作樹重算比對，程式改動後未重產收據即不符。"""
-    if str(REPO / "scripts") not in sys.path:
-        sys.path.insert(0, str(REPO / "scripts"))
+def _rid() -> Any:
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
     import run_receipt_identity as rid
 
-    return rid.code_sha256(receipt_code_paths(), REPO)
+    return rid
+
+
+def receipt_code_sha256(code_paths: Optional[Sequence[str]] = None, repo: Optional[Path] = None) -> str:
+    """程式身分：`code_paths`（repo 相對路徑）之工作樹內容雜湊（同估時收據 identity 之 `run_receipt_identity.code_sha256`：
+    逐檔 git hash-object 依路徑串接之 sha256，含未提交改動；檔不存在記 missing）。`code_paths` 為 None ⇒ 舊收據之寬清單
+    `receipt_code_paths`（相容）。收據測試以收據之 `code_paths` 於現行工作樹重算比對，所列之檔改動後未重產收據即不符。"""
+    root = Path(repo or REPO)
+    paths = receipt_code_paths(root) if code_paths is None else list(code_paths)
+    return _rid().code_sha256(paths, root)
+
+
+# ── 依賴追蹤：收據綁定實際執行之程式（SPEC Task 0.3 ⑫ 修訂；同 pytest-testmon／Ekstazi 之檔案級依賴） ─────────────
+# capture 子行程（含其孫行程）經注入之 sitecustomize 以 coverage.py 記錄實際執行之 repo .py，另以 audit hook 記錄讀取之
+# repo 檔（設定、契約 JSON 等非 .py 輸入）；母行程之 `request_for` 與 receipt 階段以同法於行程內記錄（`trace_deps`）。
+# 收據 `code_paths`＝各擷取之依賴 ∪ receipt 階段之依賴；`code_sha256` 只對 `code_paths` 計算。
+
+#: 子行程依賴紀錄目錄（注入之 sitecustomize 讀此環境變數；未設 ⇒ 不追蹤）與量測根
+DEPTRACE_ENV = "ICPERF_DEPTRACE_DIR"
+DEPTRACE_ROOT_ENV = "ICPERF_DEPTRACE_ROOT"
+#: 不計入依賴之 repo 頂層目錄：資料與執行產物（data_cache、runs、handoffs〔收據與監看工具，不影響收據內容〕）、版控與
+#: 虛擬環境、工具暫存（各 repo 檔另依 `dep_rel` 排除 __pycache__、node_modules 與位元組碼）
+DEPTRACE_EXCLUDE_TOP = ("data_cache", "runs", "handoffs", ".git", "venv", ".venv", ".claude")
+#: 讀取但不計入依賴之單檔：SPEC 文件（收據 spec 欄之版本另由 `test_correctness_receipt_items_and_verdicts` 比對）
+DEPTRACE_EXCLUDE_FILES = ("docs/ICPERF_SPEC.md",)
+#: 產品以「存在與否」決定是否讀取之選用輸入（`ic_config_schema.load_ic_config` 之 user_path）：不存在時不發生 open，讀取
+#: 紀錄抓不到，故明列恆入 `code_paths`（雜湊記 missing；日後新增該檔即過期）
+DEPTRACE_PROBED_INPUTS = ("config/user_ic_config.yaml",)
+#: 收據 `code_paths` 之必要檔（任一完整 capture＋receipt 必執行／讀取者；缺 ⇒ 依賴追蹤有遺漏，收據 FAIL、收據測試紅）：
+#: 擷取／收據腳本、凍結腳本、oracle 測試檔、IC 服務與分析器、IC 預設設定
+RECEIPT_REQUIRED_PATHS = (
+    "api/services/ic_analysis_service.py", "config/ic_config.yaml", "momentum/Analysis/ic_engine.py",
+    "momentum/Analysis/ic_filter_orchestrator.py", "momentum/factories.py", "scripts/icperf_correctness_receipt.py",
+    "scripts/icperf_freeze_baseline.py", "tests/momentum/Analysis/test_icperf_correctness.py",
+)
+DEPTRACE_REASON = "依賴追蹤失敗"
+_DEPTRACE_STATE = "_icperf_deptrace_state"
+_WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
+
+
+def dep_rel(path: Any, root: Any, exclude: Sequence[Any] = ()) -> Optional[str]:
+    """依賴檔之 repo 相對路徑（posix）：實體路徑在 `root` 下、為現存一般檔、不在 `exclude` 目錄下、不屬
+    `DEPTRACE_EXCLUDE_TOP`／`DEPTRACE_EXCLUDE_FILES`／__pycache__／node_modules／位元組碼；否則 None。"""
+    try:
+        p = os.path.realpath(os.fsdecode(path))
+    except (TypeError, ValueError):
+        return None
+    r = os.path.realpath(str(root))
+    if not p.startswith(r + os.sep):
+        return None
+    for e in exclude:
+        e = os.path.realpath(str(e))
+        if p == e or p.startswith(e + os.sep):
+            return None
+    rel = Path(os.path.relpath(p, r)).as_posix()
+    parts = rel.split("/")
+    if parts[0] in DEPTRACE_EXCLUDE_TOP or rel in DEPTRACE_EXCLUDE_FILES or rel.endswith((".pyc", ".pyo")) \
+            or any(x in ("__pycache__", "node_modules") for x in parts):
+        return None
+    return rel if os.path.isfile(p) else None
+
+
+def deps_from(files: Any, root: Any, exclude: Sequence[Any] = ()) -> List[str]:
+    """路徑集合 → 排序去重之依賴相對路徑（`dep_rel` 過濾）。"""
+    return sorted({r for f in files for r in [dep_rel(f, root, exclude)] if r})
+
+
+def _open_read_path(event: str, args: Any) -> Optional[str]:
+    """audit 事件為讀取式 open（mode 無 w／a／x／+；或 os.open 之 flags 無寫入旗標）⇒ 絕對路徑；否則 None。"""
+    if event != "open" or not args:
+        return None
+    path = args[0]
+    mode = args[1] if len(args) > 1 else None
+    flags = args[2] if len(args) > 2 else None
+    if path is None or isinstance(path, int):
+        return None
+    if isinstance(mode, str):
+        if any(c in mode for c in "wax+"):
+            return None
+    elif isinstance(flags, int) and flags & _WRITE_FLAGS:
+        return None
+    s = os.fsdecode(path)
+    return s if os.path.isabs(s) else os.path.join(os.getcwd(), s)
+
+
+def _deptrace_state() -> Any:
+    """行程內唯一之讀取紀錄狀態（`sys.modules` 具名項，本檔多次載入仍共用）：首次呼叫時安裝 audit hook，讀取式 open 之
+    路徑加入目前全部 sink（集合）；hook 例外一律吞掉（不得影響被量測之 open）。"""
+    import types
+
+    st = sys.modules.get(_DEPTRACE_STATE)
+    if st is None:
+        st = types.ModuleType(_DEPTRACE_STATE)
+        st.sinks = []
+        sys.modules[_DEPTRACE_STATE] = st
+        sinks = st.sinks
+
+        def hook(event: str, args: Any) -> None:
+            if event != "open" or not sinks:
+                return
+            try:
+                p = _open_read_path(event, args)
+                if p is not None:
+                    for s in list(sinks):
+                        s.add(p)
+            except Exception:  # noqa: BLE001 — audit hook 不得改變被量測行程之行為
+                pass
+
+        sys.addaudithook(hook)
+    return st
+
+
+def _cov_scope(root: str) -> Dict[str, Any]:
+    """coverage 量測範圍：`root` 下全部檔，排除 `DEPTRACE_EXCLUDE_TOP`（虛擬環境在 repo 內時不追蹤第三方套件之行）。"""
+    return {"include": [f"{root}/*"], "omit": [f"{root}/{d}/*" for d in DEPTRACE_EXCLUDE_TOP]}
+
+
+def _new_coverage(root: str, data_file: Optional[str], suffix: bool) -> Any:
+    """依 `_cov_scope` 建 coverage.Coverage（不讀任何 coverage 設定檔；「未收集到資料」不警告：依賴為空由呼叫端判）。"""
+    import coverage
+
+    cov = coverage.Coverage(data_file=data_file, data_suffix=suffix, config_file=False, **_cov_scope(root))
+    cov.set_option("run:disable_warnings", ["no-data-collected"])
+    return cov
+
+
+def _remove_sink(st: Any, sink: Any) -> None:
+    for i, s in enumerate(st.sinks):
+        if s is sink:
+            del st.sinks[i]
+            return
+
+
+@contextlib.contextmanager
+def trace_deps(root: Optional[Path] = None, exclude: Sequence[Any] = ()) -> Iterator[Dict[str, Any]]:
+    """行程內依賴追蹤：區塊期間以 coverage.py（in-memory）記錄執行之 `root` 下檔，聯集區塊期間新載入模組之檔與讀取式
+    open 之檔；離開時 `out["paths"]`＝`deps_from(…)`。區塊前已載入、區塊內只取常數而未執行任何行之模組不會被記錄
+    （收據工具本身由 `RECEIPT_REQUIRED_PATHS` 把關）。"""
+    r = os.path.realpath(str(root or REPO))
+    before = set(sys.modules)
+    st = _deptrace_state()
+    reads: set = set()
+    st.sinks.append(reads)
+    cov = _new_coverage(r, None, False)
+    out: Dict[str, Any] = {"paths": [], "root": r}
+    cov.start()
+    try:
+        yield out
+    finally:
+        cov.stop()
+        _remove_sink(st, reads)
+        files = set(cov.get_data().measured_files())
+        files |= {f for n in set(sys.modules) - before for f in [getattr(sys.modules.get(n), "__file__", None)] if f}
+        out["paths"] = deps_from(files | reads, r, exclude)
+
+
+def child_trace_boot(trace_dir: str, root: str) -> None:
+    """子行程（經 `deptrace_sitecustomize_source`）於直譯器啟動時呼叫：寫 `started.<pid>`、以 coverage.py 開始量測（資料檔
+    `trace_dir/.coverage.<後綴>`）、安裝讀取紀錄；結束時（atexit）停止並存檔、寫 `proc.<pid>.json`（讀取之檔、結束時已載入
+    模組之檔）。任何失敗寫 `error.<pid>`（母行程據以 fail-closed）。fork 而未 exec 之子行程不另記（pid 不符即不寫）。"""
+    import atexit
+
+    d = Path(trace_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    pid = os.getpid()
+    (d / f"started.{pid}").write_text("", encoding="utf-8")
+    try:
+        cov = _new_coverage(os.path.realpath(root or str(REPO)), str(d / ".coverage"), True)
+        cov.start()
+    except Exception as exc:  # noqa: BLE001 — 無法量測 ⇒ 記錯（母行程判依賴追蹤失敗）
+        (d / f"error.{pid}").write_text(repr(exc), encoding="utf-8")
+        return
+    st = _deptrace_state()
+    reads: set = set()
+    st.sinks.append(reads)
+
+    def finish() -> None:
+        if os.getpid() != pid:
+            return
+        try:
+            cov.stop()
+            cov.save()
+            mods = sorted({str(f) for m in list(sys.modules.values()) for f in [getattr(m, "__file__", None)] if f})
+            (d / f"proc.{pid}.json").write_text(json.dumps({"reads": sorted(reads), "modules": mods}), encoding="utf-8")
+        except BaseException as exc:  # noqa: BLE001
+            (d / f"error.{pid}").write_text(repr(exc), encoding="utf-8")
+
+    atexit.register(finish)
+
+
+def deptrace_sitecustomize_source() -> str:
+    """注入子行程之 sitecustomize：`DEPTRACE_ENV` 有值 ⇒ 載入本檔（不登記 sys.modules）呼叫 `child_trace_boot`；再串接
+    sys.path 上位於本檔目錄之後之 sitecustomize（同 `icperf_freeze_baseline.capture_sitecustomize_source`；共用監看之注入
+    位於之前、會串接到本檔）。同行程只執行一次。"""
+    return f'''\
+import importlib.util as _dt_iu, os as _dt_os, sys as _dt_sys
+if not getattr(_dt_sys, "_icperf_deptrace_done", False):
+    _dt_sys._icperf_deptrace_done = True
+    _dt_dir = _dt_os.environ.get({DEPTRACE_ENV!r})
+    if _dt_dir:
+        _dt_spec = _dt_iu.spec_from_file_location("_icperf_deptrace_boot", {str(Path(__file__).resolve())!r})
+        _dt_mod = _dt_iu.module_from_spec(_dt_spec)
+        _dt_spec.loader.exec_module(_dt_mod)
+        _dt_mod.child_trace_boot(_dt_dir, _dt_os.environ.get({DEPTRACE_ROOT_ENV!r}) or "")
+    _dt_here = _dt_os.path.dirname(_dt_os.path.abspath(__file__))
+    _dt_paths = [_dt_os.path.abspath(_p or ".") for _p in _dt_sys.path]
+    for _dt_p in (_dt_paths[_dt_paths.index(_dt_here) + 1:] if _dt_here in _dt_paths else []):
+        _dt_cand = _dt_os.path.join(_dt_p, "sitecustomize.py")
+        if _dt_p != _dt_here and _dt_os.path.isfile(_dt_cand):
+            _dt_cs = _dt_iu.spec_from_file_location("_icperf_deptrace_chained_sitecustomize", _dt_cand)
+            _dt_cm = _dt_iu.module_from_spec(_dt_cs)
+            _dt_cs.loader.exec_module(_dt_cm)
+            break
+'''
+
+
+def deptrace_env(base_env: Mapping[str, str], trace_dir: Path, root: Optional[Path] = None) -> Dict[str, str]:
+    """回 `base_env` 之副本：`trace_dir/site/sitecustomize.py`（`deptrace_sitecustomize_source`）之目錄前置 `PYTHONPATH`，
+    `DEPTRACE_ENV`＝`trace_dir`、`DEPTRACE_ROOT_ENV`＝量測根；孫行程繼承同一環境而同樣受量測。"""
+    env = dict(base_env)
+    site = Path(trace_dir) / "site"
+    site.mkdir(parents=True, exist_ok=True)
+    (site / "sitecustomize.py").write_text(deptrace_sitecustomize_source(), encoding="utf-8")
+    env["PYTHONPATH"] = os.pathsep.join([str(site)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+    env[DEPTRACE_ENV] = str(trace_dir)
+    env[DEPTRACE_ROOT_ENV] = os.path.realpath(str(root or REPO))
+    return env
+
+
+def collect_child_deps(trace_dir: Path, root: Optional[Path] = None,
+                       exclude: Sequence[Any] = ()) -> "tuple[List[str], Optional[str]]":
+    """讀 `trace_dir` 之子行程依賴紀錄 ⇒ (依賴相對路徑, 錯誤)：coverage 資料檔之 measured_files ∪ 各行程讀取之檔與已載入
+    模組之檔。錯誤（fail-closed）：無任何行程啟動追蹤；有行程啟動而未完成紀錄（`started.<pid>` 無對應 `proc.<pid>.json`）；
+    任一 `error.<pid>`；全部紀錄之 .py 依賴為空。"""
+    import coverage
+
+    d = Path(trace_dir)
+    r = os.path.realpath(str(root or REPO))
+    started = sorted(p.name.split(".", 1)[1] for p in d.glob("started.*")) if d.is_dir() else []
+    done = {p.name.split(".")[1] for p in d.glob("proc.*.json")} if d.is_dir() else set()
+    errors = [f"{p.name}: {p.read_text(encoding='utf-8')[:200]}" for p in sorted(d.glob("error.*"))] if d.is_dir() else []
+    files: set = set()
+    for p in sorted(d.glob("proc.*.json")) if d.is_dir() else []:
+        rec = json.loads(p.read_text(encoding="utf-8"))
+        files |= set(rec.get("reads") or []) | set(rec.get("modules") or [])
+    for p in sorted(d.glob(".coverage.*")) if d.is_dir() else []:
+        data = coverage.CoverageData(basename=str(p))
+        data.read()
+        files |= set(data.measured_files())
+    paths = deps_from(files, r, exclude)
+    problems = list(errors)
+    if not started:
+        problems.append("子行程未啟動依賴追蹤（無 started 紀錄）")
+    missing = [pid for pid in started if pid not in done]
+    if missing:
+        problems.append(f"行程 {missing} 啟動追蹤而未完成紀錄（異常終止或 os._exit）")
+    if started and not any(p.endswith(".py") for p in paths):
+        problems.append("子行程依賴之 .py 為空")
+    return paths, ("；".join(problems) or None)
+
+
+def code_stat_snapshot(root: Optional[Path] = None) -> Dict[str, "tuple[int, int]"]:
+    """`root` 下可為依賴之檔（`dep_rel` 規則）之 (size, mtime_ns)：擷取開始時記錄，結束時據以判擷取期間之改動。"""
+    r = os.path.realpath(str(root or REPO))
+    out: Dict[str, "tuple[int, int]"] = {}
+    for dirpath, dirnames, filenames in os.walk(r):
+        rel_dir = os.path.relpath(dirpath, r)
+        dirnames[:] = [x for x in dirnames if x not in ("__pycache__", "node_modules")
+                       and not (rel_dir == "." and x in DEPTRACE_EXCLUDE_TOP)]
+        for fn in filenames:
+            p = os.path.join(dirpath, fn)
+            try:
+                s = os.stat(p)
+            except OSError:
+                continue
+            out[Path(os.path.relpath(p, r)).as_posix()] = (int(s.st_size), int(s.st_mtime_ns))
+    return out
+
+
+def code_sha256_since(code_paths: Sequence[str], snapshot: Mapping[str, Any], root: Optional[Path] = None) -> str:
+    """擷取開始時之程式身分（與 `receipt_code_sha256(code_paths)` 同格式）：各檔 (size, mtime_ns) 與 `snapshot` 相同 ⇒ 現行
+    blob 雜湊；開始時不存在且現仍不存在 ⇒ missing；其餘（擷取期間改動、新增或刪除）⇒ `changed-during-capture`。故與結束時
+    之 `receipt_code_sha256(code_paths)` 相等 ⇔ 依賴檔於擷取期間皆未改動。"""
+    import hashlib
+
+    r = Path(os.path.realpath(str(root or REPO)))
+    rid = _rid()
+    parts = []
+    for rel in sorted(set(code_paths)):
+        f = r / rel
+        now = (int(f.stat().st_size), int(f.stat().st_mtime_ns)) if f.is_file() else None
+        then = snapshot.get(rel)
+        then = tuple(then) if then is not None else None
+        if now is None and then is None:
+            x = "missing"
+        elif now != then:
+            x = "changed-during-capture"
+        else:
+            x = rid._blob_sha1(f.read_bytes())
+        parts.append(f"{rel}:{x}")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def receipt_code_identity_problem(receipt: Mapping[str, Any], repo: Optional[Path] = None) -> Optional[str]:
+    """收據之程式身分與現行工作樹不符之原因；相符 ⇒ None。新收據（有 `code_paths`）：須為非空、排序去重之 repo 相對路徑，
+    含 `RECEIPT_REQUIRED_PATHS` 全部，且 `code_sha256`＝依 `code_paths` 於現行工作樹重算；舊收據（無 `code_paths`）⇒ 依寬
+    清單 `receipt_code_paths` 重算（相容）。"""
+    got = receipt.get("code_sha256")
+    if "code_paths" not in receipt:
+        if got != receipt_code_sha256(None, repo):
+            return "收據之 code_sha256 與現行工作樹不符（舊收據無 code_paths，依寬清單）：程式已改而收據未重產"
+        return None
+    paths = receipt.get("code_paths")
+    if not isinstance(paths, list) or not paths:
+        return "收據 code_paths 為空或非清單（依賴追蹤未產出）"
+    bad = [p for p in paths if not isinstance(p, str) or not p or os.path.isabs(p) or ".." in Path(p).parts]
+    if bad:
+        return f"收據 code_paths 含非 repo 相對路徑：{bad[:5]}"
+    if paths != sorted(set(paths)):
+        return "收據 code_paths 須排序且不重複"
+    miss = sorted(set(RECEIPT_REQUIRED_PATHS) - set(paths))
+    if miss:
+        return f"收據 code_paths 缺必要檔 {miss}（依賴追蹤遺漏）"
+    if got != receipt_code_sha256(paths, repo):
+        return "收據之 code_sha256 與現行工作樹不符：code_paths 所列之檔已改而收據未重產"
+    return None
 
 
 def _feature_names_of(cap: Mapping[str, Any]) -> List[str]:
@@ -2798,12 +3135,42 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
     `coverage`＝§G (1)(4) 之 A 格小請求（`TOP_COVERAGE_REQUESTS`）回應之涵蓋鍵（同 `test_icperf_correctness.py`
     `_coverage_keys` 規則）；`requests`＝逐請求封閉之 coverage（鍵集合 == 該請求實際回應鍵集合）、items 與狀態計數。
     PASS ⇔ 全部請求 rc 0、每一擷取之程式身分（`capture_status.json` 之 code_sha256）＝組收據當下之 `receipt_code_sha256()`
-    （v5.59 (aa)；不等或缺 ⇒「擷取與現行程式身分不符」）、無 unmapped、每一統計鍵於至少一請求 verified／verified-na、全部項一致。"""
+    （v5.59 (aa)；不等或缺 ⇒「擷取與現行程式身分不符」）、無 unmapped、每一統計鍵於至少一請求 verified／verified-na、全部項一致。
+    SPEC Task 0.3 ⑫ 修訂（實際執行依賴）：全部擷取紀錄皆有 `code_paths` ⇒ 新收據——各擷取之身分依其 `code_paths` 重算比對；
+    收據 `code_paths`＝各擷取 `code_paths` ∪ 本階段（oracle 對照）之依賴（`trace_deps`），`code_sha256` 依之計算；任一擷取
+    `deptrace_error` 或 `code_paths` 缺 `RECEIPT_REQUIRED_PATHS` ⇒ FAIL。任一擷取無 `code_paths`（舊擷取）⇒ 沿用寬清單、
+    收據不寫 `code_paths`。"""
+    captures = Path(captures)
+    with trace_deps(REPO, exclude=(captures,)) as stage_deps:
+        receipt, status = _build_receipt_traced(captures)
+    if not _status_traced(status):
+        return receipt
+    fail = receipt["fail_reasons"]
+    for rid in REQUESTS:
+        err = (status.get(rid) or {}).get("deptrace_error")
+        if err:
+            fail.append(f"{rid}：{DEPTRACE_REASON}（{err}）")
+    code_paths = sorted(set(stage_deps["paths"]).union(*(st.get("code_paths") or [] for st in status.values())))
+    miss = sorted(set(RECEIPT_REQUIRED_PATHS) - set(code_paths))
+    if miss:
+        fail.append(f"{DEPTRACE_REASON}：收據 code_paths 缺必要檔 {miss}")
+    receipt.update({"code_paths": code_paths, "code_sha256": receipt_code_sha256(code_paths),
+                    "pass": not fail, "fail_reasons": fail})
+    return receipt
+
+
+def _status_traced(status: Mapping[str, Any]) -> bool:
+    """擷取紀錄皆帶 `code_paths`（實際執行依賴之擷取；SPEC Task 0.3 ⑫ 修訂）⇒ True；空或任一缺 ⇒ False（舊擷取）。"""
+    return bool(status) and all(isinstance(st, Mapping) and "code_paths" in st for st in status.values())
+
+
+def _build_receipt_traced(captures: Path) -> "tuple[Dict[str, Any], Dict[str, Any]]":
+    """`build_receipt` 之本體（於 `trace_deps` 內執行）；回 (收據, 擷取紀錄)。擷取身分：帶 `code_paths` 之擷取依其
+    `code_paths` 重算現行身分，否則依寬清單。"""
     import datetime as _dt
     import pickle
 
     O = _oracles()
-    captures = Path(captures)
     status = json.loads((captures / "capture_status.json").read_text(encoding="utf-8"))
     deep = deep_fields()
     per_req: Dict[str, Dict[str, Any]] = {}
@@ -2811,7 +3178,8 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
     top_keys: Dict[str, set] = {}
     fail: List[str] = []
     # SPEC Task 0.2 v5.59 (aa)（r70 群集 A）：收據之 code_sha256＝組收據當下；每一擷取須於同一程式身分下產生
-    current_sha = receipt_code_sha256()
+    traced = _status_traced(status)
+    current_sha = None if traced else receipt_code_sha256()
     for rid in REQUESTS:
         st = status.get(rid)
         if st is None:
@@ -2820,7 +3188,9 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
         caps_meta[rid] = {"rc": st.get("rc"), "wall_s": st.get("wall_s"), "pickle_bytes": st.get("pickle_bytes"),
                           "error": st.get("error"), "code_sha256": st.get("code_sha256"),
                           "code_sha256_at_start": st.get("code_sha256_at_start"), "head": st.get("head")}
-        ident = capture_identity_problem(st, current_sha)
+        if traced:
+            caps_meta[rid].update({"code_paths": st.get("code_paths"), "deptrace_error": st.get("deptrace_error")})
+        ident = capture_identity_problem(st, receipt_code_sha256(st["code_paths"]) if traced else current_sha)
         if ident is not None:
             fail.append(f"{rid}：{CAPTURE_IDENTITY_REASON}（{ident}）")
         if st.get("rc") != 0 or not st.get("pickle"):
@@ -2885,7 +3255,7 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
                     for rid, rr in per_req.items()}
     for rid, meta in caps_meta.items():
         requests_out.setdefault(rid, dict(meta))
-    return {
+    return ({
         "head": _git_head(), "code_sha256": current_sha, "spec": f"docs/ICPERF_SPEC.md {spec_version()} Task 0.3（§B ICPERF-BUDGET-7、-9、-10、-11）",
         "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
         "tolerance": {"relative": REL_TOL, "derived_relative": float(O.DERIVED_REL_TOL),
@@ -2900,7 +3270,7 @@ def build_receipt(captures: Path) -> Dict[str, Any]:
                      for rid, m in caps_meta.items()},
         "extra_findings": EXTRA_FINDINGS,
         "pass": not fail, "fail_reasons": fail,
-    }
+    }, status)
 
 
 def write_receipt(captures: Path, out: Path) -> Dict[str, Any]:

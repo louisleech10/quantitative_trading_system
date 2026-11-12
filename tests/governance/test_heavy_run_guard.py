@@ -965,6 +965,15 @@ def test_ledger_19_chunked_runner_tier_and_estimate(tmp_path: Path, monkeypatch:
     assert _chunked_rc(tmp_path, [f"{_GATE}::test_b"], estimate, extra, background, plan_only) == expected
 
 
+def test_ledger_25_chunked_check_fresh_exempt(tmp_path: Path) -> None:
+    """`--check-fresh <out>` 只核計畫後工作樹指紋、不執行測試 ⇒ 前景亦放行（同 --plan-only）；帶 --select 照常受管。"""
+    out = tmp_path / "out"
+    assert _rc(_bash(f"venv/bin/python {_CHUNKED} --check-fresh {out}", False)) == 0
+    sel = tmp_path / "select.txt"
+    sel.write_text(f"{_GATE}::test_b\n", encoding="utf-8")
+    assert _rc(_bash(f"venv/bin/python {_CHUNKED} --select {sel} --out {out}", False)) == 2
+
+
 def test_ledger_23_chunked_estimate_follows_runner_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """執行器拆批後各批重付共用 fixture 與行程開銷 ⇒ 守衛依其 plan 加總核（r5 CODEX-R5-P1-02）：同檔 a（重型 180）、
     b（0.1，檔內差距 199.9）整檔選取時整份估 180.1，但拆成 heavy[a]＋fast[b] 兩批、各為部分選取 ⇒

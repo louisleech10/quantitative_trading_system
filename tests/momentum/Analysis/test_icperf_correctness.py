@@ -242,9 +242,14 @@ def test_correctness_receipt_items_and_verdicts() -> None:
     receipt = _single(CORRECTNESS_PATTERN)
     assert re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("head") or "")), "收據須記執行時之提交 head"
     # SPEC v5.42 Task 0.3 ⑫（r55 群集 E）：收據綁其所驗之程式內容（head 恆為建檔時之前一提交，不足以綁定）——程式改動後
-    # 未重產收據 ⇒ 不符
-    assert receipt.get("code_sha256") == _receipt_tool().receipt_code_sha256(), \
-        "收據之 code_sha256 與現行工作樹不符：程式已改而收據未重產"
+    # 未重產收據 ⇒ 不符。Task 0.3 ⑫ 修訂：舊收據（無 code_paths）依寬清單重算；新收據依其 `code_paths`（實際執行依賴；
+    # 須非空、排序去重之 repo 相對路徑、含 `RECEIPT_REQUIRED_PATHS`）重算（`receipt_code_identity_problem`）
+    if "code_paths" not in receipt:
+        assert receipt.get("code_sha256") == _receipt_tool().receipt_code_sha256(), \
+            "收據之 code_sha256 與現行工作樹不符：程式已改而收據未重產"
+    else:
+        assert _receipt_tool().receipt_code_identity_problem(receipt) is None, \
+            _receipt_tool().receipt_code_identity_problem(receipt)
     assert receipt["tolerance"]["relative"] == REL_TOL
     # SPEC v5.39 ⑪：收據 spec 欄之版本號＝SPEC 首個版本行（不寫死）；④：衍生量門檻同本檔
     assert _spec_version_of(receipt.get("spec")) == _spec_version_of(SPEC_PATH.read_text(encoding="utf-8")), \
@@ -3397,7 +3402,11 @@ def test_capture_records_code_identity_at_capture_time(tmp_path: Path, monkeypat
 
     monkeypatch.setattr(rt._fb(), "run_watched", fake_run_watched)
     monkeypatch.setattr(rt, "request_for", lambda rid: {"kind": "x", "rid": rid})
-    monkeypatch.setattr(rt, "receipt_code_sha256", lambda: ident["sha"])
+    # Task 0.3 ⑫ 修訂：結束時身分＝`receipt_code_sha256(code_paths)`；開始時身分＝擷取開始之檔案狀態（`code_stat_snapshot`）
+    # 經 `code_sha256_since` 換算——替身令開始狀態即開始當下之身分（真實換算另見 `test_capture_deptrace_*`）
+    monkeypatch.setattr(rt, "receipt_code_sha256", lambda *a, **k: ident["sha"])
+    monkeypatch.setattr(rt, "code_stat_snapshot", lambda *a, **k: ident["sha"])
+    monkeypatch.setattr(rt, "code_sha256_since", lambda paths, snapshot, *a, **k: snapshot)
     monkeypatch.setattr(rt, "_git_head", lambda: "c" * 40)
     out = tmp_path / "runs" / "cap"
     status = rt.capture(["A.ic_report"], out)
@@ -3451,3 +3460,193 @@ def test_build_receipt_binds_capture_code_identity(tmp_path: Path, monkeypatch: 
         hits = [r for r in got["fail_reasons"] if CAPTURE_IDENTITY_REASON in r]
         assert got["pass"] is False and len(hits) == 1 and hits[0].startswith(f"{rid}："), (name, got["fail_reasons"])
         assert len(got["fail_reasons"]) == 1, (name, got["fail_reasons"])
+
+
+# ── Task 0.3 ⑫ 修訂：收據綁定實際執行依賴（code_paths） ─────────────────────────────────────────────────────
+
+
+def _deptrace_repo(root: Path, required: Sequence[str]) -> Path:
+    """秒級替身 repo：`required`（收據必要檔）各一檔、`momentum/Analysis/used.py`（在 code_paths 內）、
+    `momentum/Analysis/unrelated.py`（在寬清單內、不在 code_paths 內）。"""
+    for rel in (*required, "momentum/Analysis/used.py", "momentum/Analysis/unrelated.py"):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(f"# {rel}\n", encoding="utf-8")
+    return root
+
+
+def test_receipt_code_identity_binds_code_paths_only(tmp_path: Path) -> None:
+    """Task 0.3 ⑫ 修訂（收據綁定實際執行依賴）：①改動不在收據 `code_paths` 之檔（即使在舊寬清單內）⇒ 新收據不過期；
+    ②改動 `code_paths` 內之檔 ⇒ 過期；③舊收據（無 `code_paths`）⇒ 依寬清單 `receipt_code_paths`，①之改動即過期；
+    `code_paths` 為空、缺 `RECEIPT_REQUIRED_PATHS`、非排序去重、非 repo 相對路徑 ⇒ 不符（不得因追蹤遺漏而放行）。"""
+    rt = _receipt_tool()
+    root = _deptrace_repo(tmp_path / "repo", rt.RECEIPT_REQUIRED_PATHS)
+    code_paths = sorted({*rt.RECEIPT_REQUIRED_PATHS, "momentum/Analysis/used.py"})
+    assert "momentum/Analysis/unrelated.py" in rt.receipt_code_paths(root)
+    new = {"code_paths": code_paths, "code_sha256": rt.receipt_code_sha256(code_paths, root)}
+    old = {"code_sha256": rt.receipt_code_sha256(None, root)}
+    assert rt.receipt_code_identity_problem(new, root) is None
+    assert rt.receipt_code_identity_problem(old, root) is None
+    # ① 不在 code_paths 之檔改動：新收據不過期；③ 舊收據（寬清單含此檔）過期
+    (root / "momentum/Analysis/unrelated.py").write_text("# changed\n", encoding="utf-8")
+    assert rt.receipt_code_identity_problem(new, root) is None
+    assert "寬清單" in str(rt.receipt_code_identity_problem(old, root))
+    # ② code_paths 內之檔改動 ⇒ 過期
+    (root / "momentum/Analysis/used.py").write_text("# changed\n", encoding="utf-8")
+    assert "已改" in str(rt.receipt_code_identity_problem(new, root))
+    # code_paths 不成立 ⇒ 不符（各以現行工作樹之正確雜湊，唯一差異為 code_paths 本身）
+    req = sorted(rt.RECEIPT_REQUIRED_PATHS)
+    cases = {"為空": [], "缺必要檔": req[1:], "排序": list(reversed(req)), "相對路徑": sorted([*req, "/abs/x.py"])}
+    for word, paths in cases.items():
+        rec = {"code_paths": paths, "code_sha256": rt.receipt_code_sha256(paths, root)}
+        assert word in str(rt.receipt_code_identity_problem(rec, root)), (word, rt.receipt_code_identity_problem(rec, root))
+
+
+_DT_FAKE_CHILD = '''\
+import os, sys
+ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+import pkg_dt.child_mod as cm
+cm.run(ROOT)
+if os.environ.get("DT_HARD_EXIT"):
+    os._exit(0)
+'''
+_DT_CHILD_MOD = '''\
+import os, subprocess, sys
+
+
+def run(root):
+    with open(os.path.join(root, "conf", "x.yaml"), encoding="utf-8") as fh:
+        fh.read()
+    with open(os.path.join(root, "written.txt"), "w", encoding="utf-8") as fh:
+        fh.write("out")
+    env = dict(os.environ)
+    env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
+    subprocess.run([sys.executable, "-c", "import pkg_dt.grand_mod as g; g.f()"], env=env, check=True)
+    if os.environ.get("DT_DRIFT"):
+        with open(__file__, "a", encoding="utf-8") as fh:
+            fh.write("# drift\\n")
+'''
+
+
+def _deptrace_capture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str) -> Dict[str, Any]:
+    """以替身 repo（`rt.REPO`）跑真正之 `capture` 流程：子行程＝替身 `fake_child.py`（以 capture 給之環境與 cwd 啟動），
+    其載入 `pkg_dt.child_mod`、讀 `conf/x.yaml`、寫 `written.txt`、再起孫行程載入 `pkg_dt.grand_mod`；`pkg_dt/unused.py`
+    不載入。回該請求之擷取紀錄。"""
+    import subprocess
+
+    rt = _receipt_tool()
+    root = tmp_path / name / "repo"
+    files = {"fake_child.py": _DT_FAKE_CHILD, "pkg_dt/__init__.py": "", "pkg_dt/child_mod.py": _DT_CHILD_MOD,
+             "pkg_dt/grand_mod.py": "def f():\n    return 1\n", "pkg_dt/unused.py": "X = 1\n", "conf/x.yaml": "a: 1\n"}
+    for rel, text in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text, encoding="utf-8")
+
+    def fake_run_watched(cmd: Sequence[str], *, log_path: Path, env: Mapping[str, str], cwd: Path) -> Dict[str, Any]:
+        r = subprocess.run([sys.executable, str(root / "fake_child.py")], env=dict(env), cwd=str(cwd),
+                           capture_output=True, text=True)
+        Path(log_path).write_text(r.stdout + r.stderr, encoding="utf-8")
+        return {"rc": r.returncode, "status": "ok", "log_path": str(log_path)}
+
+    monkeypatch.setattr(rt, "REPO", root)
+    monkeypatch.setattr(rt._fb(), "run_watched", fake_run_watched)
+    monkeypatch.setattr(rt, "request_for", lambda rid: {"kind": "x", "rid": rid})
+    monkeypatch.setattr(rt, "_git_head", lambda: "c" * 40)
+    st = rt.capture(["A.ic_report"], tmp_path / name / "out")["A.ic_report"]
+    st["_root"], st["_log"] = root, Path(st["log"]).read_text(encoding="utf-8")
+    return st
+
+
+def test_capture_deptrace_records_child_and_grandchild_modules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 0.3 ⑫ 修訂 ④：capture 之 `code_paths` 涵蓋子行程與孫行程實際執行之 repo 模組（coverage.py 經注入之
+    sitecustomize）與讀取之非 .py 輸入（audit hook），不含未執行之模組與寫出之檔；恆含 `DEPTRACE_PROBED_INPUTS`；
+    `code_sha256`＝依 `code_paths` 計算且擷取期間未改動 ⇒ 與 `code_sha256_at_start` 相等。"""
+    rt = _receipt_tool()
+    st = _deptrace_capture(tmp_path, monkeypatch, "ok")
+    assert st["rc"] == 0, st["_log"]
+    assert "deptrace_error" not in st, (st.get("deptrace_error"), st["_log"])
+    paths = set(st["code_paths"])
+    must = {"fake_child.py", "pkg_dt/__init__.py", "pkg_dt/child_mod.py", "pkg_dt/grand_mod.py", "conf/x.yaml",
+            *rt.DEPTRACE_PROBED_INPUTS}
+    assert must <= paths, sorted(must - paths)
+    assert not ({"pkg_dt/unused.py", "written.txt"} & paths), sorted(paths)
+    assert st["code_paths"] == sorted(paths)
+    assert st["code_sha256"] == rt.receipt_code_sha256(st["code_paths"], st["_root"]) == st["code_sha256_at_start"]
+    assert rt.capture_identity_problem(st, rt.receipt_code_sha256(st["code_paths"], st["_root"])) is None
+
+
+def test_capture_deptrace_fail_closed_and_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 0.3 ⑫ 修訂：子行程以 os._exit 結束（atexit 不執行、依賴紀錄不全）⇒ `deptrace_error`（fail-closed）；依賴檔於
+    擷取期間改動（子行程改寫 `pkg_dt/child_mod.py`）⇒ `code_sha256_at_start` ≠ `code_sha256`，`capture_identity_problem`
+    判擷取期間改動。"""
+    rt = _receipt_tool()
+    monkeypatch.setenv("DT_HARD_EXIT", "1")
+    st = _deptrace_capture(tmp_path, monkeypatch, "hard")
+    assert "未完成紀錄" in str(st.get("deptrace_error")), (st.get("deptrace_error"), st["_log"])
+    monkeypatch.delenv("DT_HARD_EXIT")
+    monkeypatch.setenv("DT_DRIFT", "1")
+    st = _deptrace_capture(tmp_path, monkeypatch, "drift")
+    assert "deptrace_error" not in st and "pkg_dt/child_mod.py" in st["code_paths"], (st.get("deptrace_error"), st["_log"])
+    assert st["code_sha256_at_start"] != st["code_sha256"] == rt.receipt_code_sha256(st["code_paths"], st["_root"])
+    assert "擷取期間" in str(rt.capture_identity_problem(st, st["code_sha256"]))
+
+
+def _fake_code_sha(paths: Optional[Sequence[str]] = None, repo: Any = None) -> str:
+    """替身程式身分：無 `paths` ⇒ 寬清單之固定值；否則為路徑清單之雜湊（只依路徑，使身分比對可由 code_paths 推得）。"""
+    import hashlib
+
+    return "f" * 64 if paths is None else hashlib.sha256("\n".join(paths).encode("utf-8")).hexdigest()
+
+
+def _traced_build(rt: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, edit: Any) -> Dict[str, Any]:
+    """同 `_identity_build`，但擷取紀錄帶 `code_paths`（各請求＝必要檔＋一個請求專屬檔）與依之計算之身分；`edit(status)`
+    改擷取紀錄。"""
+    cap = tmp_path / "caps"
+    cap.mkdir(parents=True, exist_ok=True)
+    pk = cap / "x.pkl"
+    pk.write_bytes(pickle.dumps({"request": {"kind": "x"}, "response": {}}))
+    status = {}
+    for i, rid in enumerate(rt.REQUESTS):
+        cp = sorted({*rt.RECEIPT_REQUIRED_PATHS, f"x/req_{i}.py"})
+        status[rid] = {"rc": 0, "pickle": str(pk), "log": "x.log", "wall_s": 1.0, "pickle_bytes": 1, "code_paths": cp,
+                       "code_sha256": _fake_code_sha(cp), "code_sha256_at_start": _fake_code_sha(cp), "head": "c" * 40}
+    edit(status)
+    (cap / "capture_status.json").write_text(json.dumps(status), encoding="utf-8")
+    clean = {"items": {}, "coverage": {}, "unmapped": [], "status_counts": {}, "facts": {}, "closed": True,
+             "closure": {"closed": True, "missing": [], "extra": []}, "uncompared": []}
+    monkeypatch.setattr(rt, "evaluate_request", lambda rid, c, deep: dict(clean))
+    monkeypatch.setattr(rt, "deep_fields", lambda: {})
+    monkeypatch.setattr(rt, "_merge_items", lambda per_req: {
+        iid: {"verdict": "一致", "oracle": "x", "max_rel_diff": 0.0, "requests": {}} for iid in REQUIRED_ITEMS})
+    monkeypatch.setattr(rt, "receipt_code_sha256", _fake_code_sha)
+    monkeypatch.setattr(rt, "_git_head", lambda: "c" * 40)
+    return rt.build_receipt(cap)
+
+
+def test_build_receipt_binds_traced_code_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 0.3 ⑫ 修訂：擷取紀錄皆帶 `code_paths` ⇒ 收據 `code_paths` ⊇ 各擷取 `code_paths` 之聯集（另含 receipt 階段之
+    依賴）、排序去重，`code_sha256` 依之計算，各擷取之身分依其 `code_paths` 重算；任一擷取 `deptrace_error`、聯集缺必要檔、
+    擷取身分不符 ⇒ FAIL（各恰一則原因）；任一擷取無 `code_paths`（舊擷取）⇒ 寬清單、收據不寫 `code_paths`。"""
+    rt = _receipt_tool()
+    ok = _traced_build(rt, tmp_path / "ok", monkeypatch, lambda s: None)
+    assert ok["pass"] is True and ok["fail_reasons"] == [], ok["fail_reasons"]
+    union = set().union(*({*rt.RECEIPT_REQUIRED_PATHS, f"x/req_{i}.py"} for i in range(len(rt.REQUESTS))))
+    assert union <= set(ok["code_paths"]) and ok["code_paths"] == sorted(set(ok["code_paths"])), ok["code_paths"]
+    assert ok["code_sha256"] == _fake_code_sha(ok["code_paths"])
+    rid = "A.ic_report"
+
+    def drop_required(s: Dict[str, Any]) -> None:
+        for st in s.values():
+            st["code_paths"] = [p for p in st["code_paths"] if p != "config/ic_config.yaml"]
+            st["code_sha256"] = st["code_sha256_at_start"] = _fake_code_sha(st["code_paths"])
+
+    cases = {"deptrace": (lambda s: s[rid].update(deptrace_error="boom"), f"{rid}：{rt.DEPTRACE_REASON}"),
+             "required": (drop_required, "缺必要檔 ['config/ic_config.yaml']"),
+             "identity": (lambda s: s[rid].update(code_sha256="e" * 64, code_sha256_at_start="e" * 64),
+                          f"{rid}：{CAPTURE_IDENTITY_REASON}")}
+    for name, (edit, reason) in cases.items():
+        got = _traced_build(rt, tmp_path / name, monkeypatch, edit)
+        assert got["pass"] is False and len(got["fail_reasons"]) == 1 and reason in got["fail_reasons"][0], \
+            (name, got["fail_reasons"])
+    legacy = _traced_build(rt, tmp_path / "legacy", monkeypatch, lambda s: s[rid].pop("code_paths"))
+    assert "code_paths" not in legacy and legacy["code_sha256"] == "f" * 64
