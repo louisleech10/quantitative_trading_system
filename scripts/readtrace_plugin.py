@@ -55,7 +55,9 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 #: 於載入時轉絕對路徑：測試若切換 cwd（os.chdir／monkeypatch.chdir），相對路徑會寫到別處或失敗（2026-11-12 實踩：
 #: INTERNALERROR FileNotFoundError 中止整跑）
-_OUT = str(Path(os.environ.get("READTRACE_OUT", str(REPO / "runs" / "readtrace.jsonl"))).resolve())
+#: 路徑含 `{pid}` 時代入本行程 pid：分批平行跑時每個 pytest 行程各寫一檔（同檔併寫時長行會被拆成多次寫入而交錯）
+_OUT = str(Path(os.environ.get("READTRACE_OUT", str(REPO / "runs" / "readtrace.jsonl"))
+                .replace("{pid}", str(os.getpid()))).resolve())
 _COLLECT_OUT = os.environ.get("READTRACE_COLLECT_OUT")
 _COLLECT_OUT = str(Path(_COLLECT_OUT).resolve()) if _COLLECT_OUT else None
 _current = {"nodeid": None, "phase": None, "files": set(), "procs": [], "proc_cwds": [], "setup_files": set(),

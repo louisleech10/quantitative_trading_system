@@ -56,6 +56,24 @@ def test_records_repo_reads_per_nodeid(tmp_path: Path) -> None:
     assert rec["test_reads_nothing"] == [] and rec["test_writes_only"] == []
 
 
+def test_out_pid_placeholder_one_file_per_process(tmp_path: Path) -> None:
+    """READTRACE_OUT 含 `{pid}` ⇒ 每個 pytest 行程寫各自之檔（平行分批不併寫同檔）；兩行程兩檔、各含全部紀錄。"""
+    test = tmp_path / "test_probe_rt.py"
+    test.write_text(_BODY.format(repo=REPO), encoding="utf-8")
+    for _ in range(2):
+        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-o", "addopts=", "-p", "no:cacheprovider",
+                               "-p", "scripts.readtrace_plugin", "--rootdir", str(tmp_path), str(test)],
+                              cwd=REPO, env={"READTRACE_OUT": str(tmp_path / "rt_{pid}.jsonl"), "PATH": "/usr/bin:/bin"},
+                              capture_output=True, text=True)
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+    files = sorted(tmp_path.glob("rt_*.jsonl"))
+    assert len(files) == 2 and not (tmp_path / "rt_{pid}.jsonl").exists()
+    for f in files:
+        ids = {json.loads(x)["nodeid"].split("::")[-1] for x in f.read_text(encoding="utf-8").splitlines()
+               if "nodeid" in json.loads(x)}
+        assert {"test_reads_ini", "test_reads_nothing", "test_writes_only"} <= ids
+
+
 def test_records_spawned_commands_per_nodeid(tmp_path: Path) -> None:
     """子行程命令逐 nodeid 記錄；未啟動子行程者空。"""
     proc = _run(tmp_path)
