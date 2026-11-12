@@ -158,6 +158,41 @@ def test_builtin_session_fixture_not_a_sharing_basis(tmp_path: Path) -> None:
         "module:tests/e.py::cache", "session:tests::tmp_path_factory"}
 
 
+def test_mentions_in_comments_and_docstrings_do_not_taint(tmp_path: Path) -> None:
+    """腳本只在註解或 docstring 提及改動檔 ⇒ 不算依賴（亦不經其傳染）；程式字串常值、引號內之 `#`、`${#x}` 後之
+    路徑仍算。"""
+    root = _repo(tmp_path)
+    s = root / "scripts"
+    (s / "doc_only.py").write_text('"""讀 docs/spec_x.md 之說明。"""\n# docs/spec_x.md\nprint(1)\n', encoding="utf-8")
+    (s / "calls_doc_only.sh").write_text("python3 scripts/doc_only.py\n", encoding="utf-8")
+    (s / "fn_doc.py").write_text('def f():\n    """docs/spec_x.md"""\n    return 1\n', encoding="utf-8")
+    (s / "code_str.py").write_text('def f():\n    """說明"""\n    return open("docs/spec_x.md").read()\n',
+                                    encoding="utf-8")
+    (s / "paren_str.py").write_text('P = (\n    "docs/spec_x.md",\n)\n', encoding="utf-8")
+    (s / "sh_comment.sh").write_text("#!/bin/bash\n# reads docs/spec_x.md\necho hi  # docs/spec_x.md\n",
+                                     encoding="utf-8")
+    (s / "sh_quoted_hash.sh").write_text('echo "a # docs/spec_x.md"\n', encoding="utf-8")
+    (s / "sh_len.sh").write_text("n=${#arr[@]}; cat docs/spec_x.md\n", encoding="utf-8")
+    # 審碼 r13：docstring 被當資料讀、heredoc 內容、跨行引號、反斜線跳脫之 # ⇒ 仍算依賴
+    (s / "doc_reader.py").write_text('"""docs/spec_x.md"""\nfrom pathlib import Path\nprint(Path(__doc__.strip()).read_text())\n',
+                                     encoding="utf-8")
+    (s / "heredoc_reader.sh").write_text("python3 - <<'PY'\n# docs/spec_x.md\nPY\n", encoding="utf-8")
+    (s / "heredoc_tab.sh").write_text("cat <<-EOF\n\t# docs/spec_x.md\n\tEOF\necho done\n", encoding="utf-8")
+    (s / "multiline_quote.sh").write_text('X="line1\n# docs/spec_x.md"\ncat "$X"\n', encoding="utf-8")
+    (s / "escaped_hash.sh").write_text("echo \\# docs/spec_x.md\n", encoding="utf-8")
+    (s / "after_heredoc_comment.sh").write_text("cat <<EOF\nx\nEOF\n# docs/spec_x.md\n", encoding="utf-8")
+    (s / "escaped_quote.sh").write_text('echo \\" x\n# docs/spec_x.md\n', encoding="utf-8")  # 跳脫之 " 不開引號
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+    taint = aft.tainted_scripts(root, aft._tracked(root),
+                                aft.mention_patterns({"docs/spec_x.md"}, aft._tracked(root)))
+    for name in ("doc_only.py", "calls_doc_only.sh", "fn_doc.py", "sh_comment.sh", "after_heredoc_comment.sh",
+                 "escaped_quote.sh"):
+        assert f"scripts/{name}" not in taint, name
+    for name in ("code_str.py", "paren_str.py", "sh_quoted_hash.sh", "sh_len.sh", "reads_spec.sh", "calls_reader.sh",
+                 "doc_reader.py", "heredoc_reader.sh", "heredoc_tab.sh", "multiline_quote.sh", "escaped_hash.sh"):
+        assert f"scripts/{name}" in taint, name
+
+
 def test_project_never_shadows_builtin_session_fixture_names() -> None:
     """名稱過濾之前提：repo 版控 .py 無同名函式定義（否則根 conftest〔空 baseid〕之同名 fixture 會被誤當內建而不擴散）。"""
     names = "|".join(sorted(aft._BUILTIN_SESSION))

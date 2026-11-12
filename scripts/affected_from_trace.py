@@ -6,7 +6,8 @@
 - `proc-arg:<檔>`：其子行程命令列含改動檔路徑；
 - `proc-dir:<目錄>→<檔>`：其子行程命令列含 repo 內目錄參數（grep -r、rg、find 等掃描整棵樹），改動檔在其下；
 - `proc-script:<腳本>`：其子行程命令列含某 repo 腳本，而該腳本（或其遞迴引用之 repo 腳本）原始碼提及改動檔
-  （提及＝含相對路徑；或含檔名且該檔名於 repo 版控檔中唯一）——子行程內讀檔追不到，以此保守補判。
+  （提及＝可執行內容〔去 `#` 註解與 Python docstring〕含相對路徑；或含檔名且該檔名於 repo 版控檔中唯一）——子行程內
+  讀檔追不到，以此保守補判。
 - `shared-fixture:<命中者>`／`same-file-fixture:<命中者>`：命中發生於 setup 階段（module／session 等 fixture 建立；
   舊紀錄無階段資訊者一律視為可能），則與命中者共用任一非 function 範圍之專案 fixture 之測試亦受影響（pytest 內建
   session fixture 不算共用依據；舊紀錄或命中者只用內建 fixture 者以同檔計）。
@@ -17,14 +18,16 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
 import shlex
 import subprocess
+import tokenize
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 _SCRIPT_SUFFIX = (".sh", ".py")
@@ -85,13 +88,97 @@ def mention_patterns(changed: Iterable[str], tracked: List[str]) -> Dict[str, re
     return out
 
 
+#: 讀取 docstring 作資料之寫法（`__doc__`、`inspect.getdoc`、`help(`）：出現即不去 docstring（保守；審碼 r13 CODEX-R13-P1-01）
+_DOC_CONSUMERS = ("__doc__", "getdoc", "help")
+
+
+def _strip_py(src: str) -> str:
+    """去 Python 之 `#` 註解與語句層級字串（docstring）；程式中之字串常值保留（以路徑讀檔者在此）。程式碼含
+    `_DOC_CONSUMERS` 任一名稱 ⇒ docstring 可能被當資料讀 ⇒ 只去註解。無法斷詞 ⇒ 原文（保守）。"""
+    try:
+        toks = list(tokenize.generate_tokens(io.StringIO(src).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return src
+    keep_docs = any(t.type == tokenize.NAME and t.string in _DOC_CONSUMERS for t in toks)
+    out: List[str] = []
+    prev = tokenize.NEWLINE
+    for tok in toks:
+        if tok.type in (tokenize.COMMENT, tokenize.NL):
+            continue
+        if not keep_docs and tok.type == tokenize.STRING and prev in (tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT):
+            prev = tokenize.NEWLINE  # docstring 後之 NEWLINE 仍屬語句起點
+            continue
+        prev = tok.type
+        out.append(tok.string)
+    return " ".join(out)
+
+
+_HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)([A-Za-z_]\w*)\2")
+
+
+def _strip_sh(src: str) -> str:
+    """去 shell 註解：`#` 位於字詞開頭（行首或空白、`;&|(` 後）且不在引號內才是註解（`$#`、`${#x}`、引號內或反斜線跳脫之
+    `#` 不算）；引號狀態跨行延續；heredoc 內容原樣保留（審碼 r13 CODEX-R13-P1-02）；首行 shebang 保留。"""
+    out: List[str] = []
+    quote = ""
+    pending: List[Tuple[str, bool]] = []  # 本行登記、下一行起生效之 heredoc（終止字、是否 <<- 允許前導 tab）
+    in_doc: Optional[Tuple[str, bool]] = None
+    for n, ln in enumerate(src.splitlines()):
+        if in_doc is not None:
+            out.append(ln)
+            delim, tabs = in_doc
+            if (ln.lstrip("\t") if tabs else ln) == delim:
+                in_doc = pending.pop(0) if pending else None
+            continue
+        cut = len(ln)
+        i = 0
+        while i < len(ln):
+            ch = ln[i]
+            if quote == "'":
+                if ch == "'":
+                    quote = ""
+            elif quote == '"':
+                if ch == "\\":
+                    i += 1
+                elif ch == '"':
+                    quote = ""
+            elif ch == "\\":
+                i += 1
+            elif ch in ("'", '"'):
+                quote = ch
+            elif ch == "#" and (i == 0 or ln[i - 1] in " \t;&|(") and not (n == 0 and i == 0 and ln.startswith("#!")):
+                cut = i
+                break
+            elif ln.startswith("<<", i) and not ln.startswith("<<<", i):
+                m = _HEREDOC.match(ln, i)
+                if m:
+                    pending.append((m.group(3), m.group(1) == "-"))
+                    i = m.end()
+                    continue
+            i += 1
+        out.append(ln[:cut])
+        if pending and not quote:
+            in_doc = pending.pop(0)
+    return "\n".join(out)
+
+
+def _code_text(path: str, src: str) -> str:
+    """腳本之可執行內容（去註解與說明文字）：提及改動檔只在註解／docstring 者不算依賴（2026-11-12 實測：
+    `scripts/run_receipt_identity.py` 之 docstring 提及 `docs/NOCAP_SPEC.md`，經腳本互相引用傳染，選入約 1,750 條不相干之治理測試）。"""
+    if path.endswith(".py"):
+        return _strip_py(src)
+    if path.endswith(".sh"):
+        return _strip_sh(src)
+    return src
+
+
 def tainted_scripts(root: Path, tracked: List[str], patterns: Dict[str, re.Pattern]) -> Dict[str, str]:
-    """repo 腳本 → 其（遞迴）提及之改動檔；遞迴：腳本原始碼提及已污染腳本之相對路徑或唯一檔名。"""
+    """repo 腳本 → 其（遞迴）提及之改動檔；遞迴：腳本可執行內容（去註解與說明文字）提及已污染腳本之相對路徑或唯一檔名。"""
     scripts = [t for t in tracked if t.endswith(_SCRIPT_SUFFIX) and not t.startswith("tests/")]
     text = {}
     for s in scripts:
         try:
-            text[s] = (root / s).read_text(encoding="utf-8", errors="replace")
+            text[s] = _code_text(s, (root / s).read_text(encoding="utf-8", errors="replace"))
         except OSError:
             continue
     taint: Dict[str, str] = {}
