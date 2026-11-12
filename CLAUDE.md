@@ -50,7 +50,7 @@ Louis 之個人助理 Javis（Grok 系 bot）↔ Claude 之非同步管道；`to
 
 **固定條款**（使用者定死，出處見 `docs/SCAR_LEDGER.md`）：
 - **中/大鐵律**：① 完整管線不得跳步（SPEC/TODO/adversarial 都要）② **code review 之家數與家族＝`docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行（唯一來源；🔴 本檔不得自寫家數——曾寫「2 個」而 ORCH 為「三家全員」，2026-08-12 害主委當場做錯一次）**；實作者不自審；**機器強制** `scripts/review_quorum_check.sh`，接入 `gate.sh` 派下一批 impl 前驗前批 quorum，不足→拒發 token ③ 大任務附白話簡述 ④ 省步唯一允許=動工前明列讓使用者**否決** ⑤ **派工進度約每 10 分鐘在工具呼叫之間寫一行短句回報（不結束回合）**
-- **逐項流程（2026-11-12 使用者定，試行）**：中／大任務先寫項目大綱（項目、共用介面、相依順序，委員審大綱），之後一次只取一個項目走完 SPEC→TODO→施工→測試→審碼→提交，完成才開下一項；細則與試行量測見 `docs/MULTI_AGENT_ORCHESTRATION.md`「逐項流程」節。
+- **逐項流程（2026-11-12 使用者定，試行；本專案流程通則，非限單一票）**：中／大任務先寫項目大綱（項目、共用介面、相依順序，委員審大綱），之後一次只取一個項目走完 原型（1–2 小時真實資料實測）→SPEC（驗收寫成測試清單）→TODO→施工→測試→審碼→提交，完成才開下一項；細則與試行量測見 `docs/MULTI_AGENT_ORCHESTRATION.md`「逐項流程」節。
 - 🔴 **產出端覆蓋鐵律**（2026-08-13 使用者定死，適用**所有**治理 epic）：治理票的檢查
   **必須擋在產出端**（`PreToolUse`／`PostToolUse` hook，寫檔當下就報），**這才能算已完成**；
   擋不了者須在 `docs/GOV_ENFORCEMENT_REGISTRY.md` **具名寫出為什麼**（如 G-7 需 commit 才有
