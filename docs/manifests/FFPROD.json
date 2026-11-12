@@ -31,7 +31,10 @@
       "momentum/FeatureEngineering/preprocessing/_fast_adf_numba.py",
       "momentum/FeatureEngineering/polars_adapter.py",
       "momentum/Analysis/data_preprocessor.py",
-      "tests/feature_engineering/preprov_helpers.py"
+      "tests/feature_engineering/preprov_helpers.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/memmap_utils.py",
+      "momentum/FeatureEngineering/operators/rolling_aggregator.py"
     ],
     "callers_now": [
       "momentum/FeatureEngineering/feature_storage.py",
@@ -43,7 +46,9 @@
       "tests/_golden/ffprod/pre_change_fingerprints.json",
       "tests/_golden/ffprod/decisions.json",
       "handoffs/run_receipts/<date>-ffprod-inventory.json",
-      "handoffs/run_receipts/<date>-ffprod-candidates.json"
+      "handoffs/run_receipts/<date>-ffprod-candidates.json",
+      "handoffs/run_receipts/<date>-ffprod-gc-sites.json",
+      "tests/feature_engineering/test_ffprod_gc_sites_receipt.py"
     ],
     "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_ffprod_gate.py && bash scripts/check_decoupling.sh && ! grep -n run_api tests/feature_engineering/test_ffprod_gate.py tests/feature_engineering/test_ffprod_winsor_provenance.py tests/feature_engineering/test_ffprod_removal.py tests/feature_engineering/test_ffprod_decisions.py && bash scripts/gen_fact_key_blocks.sh --check",
     "forbidden": [
