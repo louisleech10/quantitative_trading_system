@@ -72,6 +72,15 @@
 
 每批由主委列「本批改動之函式／檔案 → 依 §1 會執行到它的測試」清單，附理由，交使用者前先自查是否違反 §1 之禁止三項；收案前依 §4 跑重型一次。不得以模組 import 整檔挑選。
 
+過渡工具（2026-11-12；ICPERF L1c 起，§6 完成前沿用，皆在版控並有測試）：
+1. 估時與分層：`venv/bin/python scripts/ledger_durations.py <清單> <前綴> [--traces <讀檔追蹤>...]`（TESTREG ledger 每 nodeid 最近一次**通過**且無量測負擔之紀錄耗時〔2026-11-12 起；失敗紀錄常數秒中止，不代表跑完之耗時〕，分 §4 快速層／重型；選取總估時取 `conservative_estimate`——部分選取且用共用 fixture 之檔另加檔內耗時差距〔共用 fixture 建置成本隨選取轉移〕；清單宜為 `--collect-only` 收集之完整 nodeid——以檔案／目錄輸入時，ledger 外之新測試不在輸出內，另列 `_unexpanded.txt`）；`heavy_run_guard` 機械強制（NOCAP Task 0.3c ④：估時不得低於 ledger 加總、每批 tier＝batch 不得含重型）。
+2. 讀檔／子行程依賴：`READTRACE_OUT=<檔> venv/bin/python -m pytest -p scripts.readtrace_plugin [--trace-select <nodeid 清單>] <候選>`，逐 nodeid 記讀取之 repo 檔與子行程命令（含其工作目錄，供解析命令列相對目錄），另記 setup 階段之子集與非 function 範圍 fixture（共用 fixture 只在第一個使用者 setup 讀檔，選取時擴散給共用者）。
+3. Python 執行依賴（補 2 之盲區：測試以 import 執行改動 .py，不讀檔）：`--cov --cov-config=<include 限改動 .py> --cov-context=test --cov-report=` 跑候選（import 改動模組之測試檔），再 `venv/bin/python scripts/affected_from_coverage.py <資料檔> <改動清單> <前綴>`（函式級依賴，同 §2.1 pytest-testmon；只在 import 期執行之模組／類別層級改動行另列，逐行判讀取端）。pytest-cov 開跑會清除同名資料檔：分段跑須各用不同 `data_file`。
+4. 選取：`venv/bin/python scripts/affected_from_trace.py <trace.jsonl>... --changed <改動檔清單> --out <tsv>`（改動之測試檔本身、讀改動檔、子行程命令列含改動檔或含其上層目錄〔grep -r 等目錄掃描〕、所執行之 repo 腳本提及改動檔；setup 階段命中者擴散至共用專案 fixture 之測試〔pytest 內建 session fixture 如 tmp_path_factory 定義於 repo 外、幾乎每測皆用，不作擴散依據；命中者只用內建者以同檔計〕）∪ 3 之結果。
+5. 追蹤候選：除提及改動檔名者外，凡以子行程、glob／rglob、walk、listdir 掃描 repo 樹之測試檔皆須納入追蹤（目錄掃描會讀到改動檔而原始碼不提其名）。
+6. 執行：選取逾數百條或含重型者以 `venv/bin/python scripts/run_chunked.py --select <nodeid 清單> --out <目錄> [--jobs N]`（背景、估時收據）分批跑——重型各自一批、快速層依檔聚批，每批新 pytest 行程（同一行程跑久了重型測試釋放之記憶體不歸還，後續測試變慢；2026-11-12 實測）；重型批獨占不併跑（兩條重型併跑時單條 footprint 達 6.8 GB），快速層併發時剩餘可用記憶體須夠每個執行中批各預留一份。選取含無通過紀錄或共用 fixture 成本未實測者，估時收據須以 `uncertain_ack` 明示計數。
+追蹤與覆蓋紀錄即依賴紀錄：測試檔與其依賴未變者，下一批沿用其紀錄判定，不重追。§4 門檻 60 秒為 2026-10-26 本檔撰寫時主委所定（對照 Bazel short 逾時 60 秒），非使用者逐字裁定，使用者可改。
+
 ## §6 建置清單（完整；完成以 §8 驗收為準）
 
 建置方式（2026-10-26 使用者核可）：子代理實作、主委驗收、委員審碼（輪數不設限，以漏洞少為準）。防漏三則：
@@ -90,6 +99,7 @@
 9. 首次全量跑建立依賴紀錄（量化約 31 小時＋治理約 2.2 小時，依 `.testreg/summary.json` 加總；記錄負擔另計，實跑才知）；重型真實資料測試串行、輕量可平行；附卡死監看。
 10. 自我驗證（§8）。
 11. 已查得之測試內重複計算（屬 §7，不影響選取正確性）：`tests/momentum/Analysis/test_preprov_survivor_identity.py` 三次 IC 分析各約 4,200 秒、`tests/governance/test_govb1_contract_matrix.py` 三條各跑一次 `govb1_final_gate.sh --only g7`——讀碼確認是否同一計算，同者合併。特徵生成之跨檔重複僅佔重型層 5–8%（2026-10-26 唯讀盤點），不做共用。
+12. 估時精確化（2026-11-12 增；ICPERF L1c 最終受影響跑估 8,555 秒、跑 3 小時 35 分只完成 1,402／6,703 之根因調查）：TESTREG ledger 加記逐測試 setup／call／teardown 耗時與其建立之非 function 範圍 fixture 各自建置耗時（pytest `pytest_fixture_setup` hook），估時＝Σ 測試本身耗時＋本次選取所用每個共用 fixture 之建置耗時各一次（同一行程內只付一次；分批開新行程者每批各付）。起因實測：module 範圍 fixture 之建置成本歸於同 session 第一個使用者，選取子集時轉由他測付（`test_ffname_dead_code.py::test_mutation_unmapped_stationarity_keys_detected` ledger 0.02 秒、子集選取時 239–268 秒）；ICPERF L1c 前 900 條實耗 1,498 秒對 ledger 722 秒，超出之 87% 來自 9 條此類測試。過渡工具（§5）於本項完成前以保守上界代替。
 
 ## §7 範圍外（不得以選取取代）
 

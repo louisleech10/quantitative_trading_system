@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
 
@@ -27,6 +28,13 @@ def _rc(payload: Any) -> int:
 
 
 WRAP = "venv/bin/python scripts/run_watched.py --log /tmp/x.log -- "
+
+
+@pytest.fixture(autouse=True)
+def _empty_ledger(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    """守衛之 TESTREG ledger 判定一律先指向空 ledger（隔離本機紀錄、結果不隨機器而變）；ledger 案（test_ledger_*）
+    以 `_ledger` 改指受控內容。"""
+    monkeypatch.setattr(g, "LEDGER_DIR", tmp_path_factory.mktemp("ledger_empty") / "ledger")
 
 
 @pytest.mark.parametrize("cmd,background,expected", [
@@ -515,3 +523,468 @@ def test_mutation_depth_zero_misses_two_level_chain(monkeypatch: pytest.MonkeyPa
         assert _rc(_bash(f"bash {_chain(1, 'venv/bin/python -m pytest -q')}", False)) == 0
     finally:
         _unchain(1)
+
+
+# ── 估時收據 × TESTREG ledger 交叉檢查（docs/TEST_SELECTION.md §4；2026-11-11 L1c 估時低估事故）────────────────
+
+_GATE = "tests/feature_engineering/test_ffprod_gate.py"
+_LEDGER_ROWS = [(f"{_GATE}::test_a", 300.0), (f"{_GATE}::test_b", 200.0), (f"{_GATE}::test_b", 150.0)]
+
+
+def _ledger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """隔離 ledger：test_a 300 秒、test_b 兩筆取最大 200 秒 ⇒ 全檔加總 500 秒。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "s.jsonl").write_text("".join(json.dumps({"nodeid": n, "duration_s": s, "outcome": "passed"}) + "\n"
+                                       for n, s in _LEDGER_ROWS),
+                               encoding="utf-8")
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+
+
+_CLOSE = {"tier": "close", "tier_reason": "測試：收案跑累積全受影響"}
+
+
+def _ledger_rc(inner: List[str], estimate: float, extra: Dict[str, Any] = None) -> int:
+    rid = _mod("run_receipt_identity")
+    match = rid.compute_match(_GATE, inner, [_GATE], [], [])
+    receipt = REPO / "handoffs" / "run_receipts" / "20261111-hrgledger-guardtest-estimate.json"
+    receipt.write_text(json.dumps({"identity": {"match": match, "meta": {"producer": "test", "created_at": "t"}},
+                                   "scale": "single", "estimate_seconds": estimate, "basis": [],
+                                   "spec_path": "docs/NOCAP_SPEC.md", "coverage_path_ids": ["NOCAP-BUDGET-3"],
+                                   **(extra or {})}), encoding="utf-8")
+    try:
+        return _rc(_bash(WRAP + " ".join(inner), True))
+    finally:
+        receipt.unlink()
+
+
+def test_ledger_01_estimate_below_ledger_sum_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                     capsys: pytest.CaptureFixture) -> None:
+    """tier＝close、收據 60 秒 < ledger 全檔保守估時 500 秒（整檔選取 ⇒ 無共用 fixture 轉移）⇒ 擋，訊息含估時秒數與
+    重型條數。"""
+    _ledger(tmp_path, monkeypatch)
+    assert _ledger_rc(["venv/bin/python", "-m", "pytest", _GATE, "-q"], 60, _CLOSE) == 2
+    err = capsys.readouterr().err
+    assert "保守估時 500 秒" in err and "重型 2 條" in err
+
+
+def test_ledger_02_estimate_at_or_above_sum_allowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """tier＝close、收據 ≥ ledger 加總（500）⇒ 放行（只擋低估）。"""
+    _ledger(tmp_path, monkeypatch)
+    assert _ledger_rc(["venv/bin/python", "-m", "pytest", _GATE, "-q"], 500, _CLOSE) == 0
+
+
+@pytest.mark.parametrize("estimate,expected", [(199, 2), (200, 0)])
+def test_ledger_03_trace_select_sums_listed_nodeids_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                         estimate: float, expected: int) -> None:
+    """`--trace-select <檔>` ⇒ 只加總所列 nodeid（test_b 200 秒），不以全檔 500 秒誤擋（部分選取、無追蹤 ⇒ 共用 fixture
+    成本未知，收據已明示 uncertain_ack）。"""
+    _ledger(tmp_path, monkeypatch)
+    sel = tmp_path / "sel.txt"
+    sel.write_text(f"{_GATE}::test_b\n", encoding="utf-8")
+    inner = ["venv/bin/python", "-m", "pytest", "-q", "-p", "scripts.readtrace_plugin", "--trace-select", str(sel), _GATE]
+    assert _ledger_rc(inner, estimate, {**_CLOSE, **_ACK1}) == expected
+
+
+@pytest.mark.parametrize("narrow", [["-k", "test_a"], ["-m", "slow"], ["--deselect", f"{_GATE}::test_a"]])
+def test_ledger_04_narrowing_options_skip_cross_check(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                      narrow: List[str]) -> None:
+    """含縮小選取選項 ⇒ 實際選取集不可知，不做估時交叉檢查（依檔加總只是上界）⇒ tier＝close 收據 60 秒放行。"""
+    _ledger(tmp_path, monkeypatch)
+    assert _ledger_rc(["venv/bin/python", "-m", "pytest", _GATE, "-q"] + narrow, 60, _CLOSE) == 0
+
+
+@pytest.mark.parametrize("extra,narrow,expected", [
+    ({}, [], 2),                                                    # 未宣告 ⇒ batch ⇒ 含重型擋
+    ({"tier": "batch"}, [], 2),
+    ({"tier": "batch"}, ["-k", "test_a"], 2),                       # 縮小前母集含重型 ⇒ 無從確認 ⇒ 擋
+    ({"tier": "close"}, [], 2),                                     # 非 batch 無理由 ⇒ 擋
+    ({"tier": "nightly", "tier_reason": "x"}, [], 2),               # 不在封閉集合
+    ({"tier": "close", "tier_reason": "L1 收案"}, [], 0),
+    ({"tier": "acceptance", "tier_reason": "SPEC 驗收 X"}, [], 0),
+    ({"tier": "full", "tier_reason": "定期全量"}, [], 0),
+    ({"tier": "fix", "tier_reason": "修復 test_a 後重跑"}, [], 0),
+])
+def test_ledger_07_tier_rules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, extra: Dict[str, Any],
+                              narrow: List[str], expected: int) -> None:
+    """batch（含未宣告）只准快速層；close／acceptance／full／fix 准跑重型但須 tier_reason（TEST_SELECTION §3／§4）。"""
+    _ledger(tmp_path, monkeypatch)
+    assert _ledger_rc(["venv/bin/python", "-m", "pytest", _GATE, "-q"] + narrow, 10_000, extra) == expected
+
+
+def test_ledger_08_batch_fast_only_selection_allowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """tier＝batch 之 --trace-select 只列快速層 nodeid ⇒ 放行（同檔另有重型不影響）。"""
+    _ledger(tmp_path, monkeypatch)
+    d = tmp_path / "ledger"
+    with (d / "s.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"nodeid": f"{_GATE}::test_fast", "duration_s": 2.0, "outcome": "passed"}) + "\n")
+    sel = tmp_path / "sel.txt"
+    sel.write_text(f"{_GATE}::test_fast\n", encoding="utf-8")
+    inner = ["venv/bin/python", "-m", "pytest", "-q", "--trace-select", str(sel), _GATE]
+    assert _ledger_rc(inner, 10, {"tier": "batch", "uncertain_ack": {"unknown": 0, "fixture_cost_unknown": 1}}) == 0
+
+
+_UNLISTED = "tests/zz_unlisted/test_slow_probe.py"
+
+
+@pytest.mark.parametrize("dur,background,wrap,expected", [
+    (120.0, False, False, 2),   # 清單外、ledger 判重型、前景 ⇒ 擋
+    (120.0, True, False, 2),    # 背景但未經共用監看 ⇒ 擋
+    (120.0, True, True, 2),     # 背景＋監看但無估時收據 ⇒ 擋
+    (2.0, False, False, 0),     # 清單外快速層 ⇒ 不受影響
+])
+def test_ledger_09_unlisted_heavy_pytest_detected_by_ledger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                            dur: float, background: bool, wrap: bool,
+                                                            expected: int) -> None:
+    """heavy_commands.json 未列之測試檔，ledger 紀錄耗時 ≥60 秒 ⇒ 視同重型（如 ffstat 系列）；快速層不擋。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "s.jsonl").write_text(json.dumps({"nodeid": f"{_UNLISTED}::test_s", "duration_s": dur, "outcome": "passed"}) + "\n",
+                               encoding="utf-8")
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+    cmd = ("venv/bin/python scripts/run_watched.py --log /tmp/x.log -- " if wrap else "") + \
+        f"venv/bin/python -m pytest {_UNLISTED} -q"
+    assert _rc(_bash(cmd, background)) == expected
+
+
+def test_ledger_10_index_incremental_add_change_delete(tmp_path: Path) -> None:
+    """增量索引：新增檔被讀入、變動檔重讀、刪除檔移除；索引壞 ⇒ 重建。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "a.jsonl").write_text(json.dumps({"nodeid": "tests/t.py::x", "duration_s": 1.0, "outcome": "passed"}) + "\n",
+                               encoding="utf-8")
+    assert ld.load_all(d) == {"tests/t.py::x": 1.0}
+    (d / "b.jsonl").write_text(json.dumps({"nodeid": "tests/t.py::y", "duration_s": 2.0, "outcome": "passed"}) + "\n",
+                               encoding="utf-8")
+    assert ld.load_all(d) == {"tests/t.py::x": 1.0, "tests/t.py::y": 2.0}
+    (d / "a.jsonl").write_text(json.dumps({"nodeid": "tests/t.py::x", "duration_s": 9.0, "outcome": "passed"}) + "\n" * 2,
+                               encoding="utf-8")
+    assert ld.load_all(d)["tests/t.py::x"] == 9.0
+    (d / "b.jsonl").unlink()
+    assert ld.load_all(d) == {"tests/t.py::x": 9.0}
+    (tmp_path / "durations_index.json").write_text("{broken", encoding="utf-8")
+    assert ld.load_all(d) == {"tests/t.py::x": 9.0}
+
+
+@pytest.mark.parametrize("argv,expected", [
+    (["venv/bin/python", "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/a.py::t", "tests/b"],
+     ["tests/a.py::t", "tests/b"]),
+    (["venv/bin/python", "-m", "pytest", "-q"], ["tests"]),
+    (["venv/bin/python", "-m", "pytest", "tests/a.py", "-k", "x"], None),
+    (["venv/bin/python", "-m", "pytest", "tests/a.py", "-mslow"], None),
+    (["venv/bin/python", "scripts/x.py", "tests/a.py"], None),
+])
+def test_ledger_05_pytest_selector_parsing(argv: List[str], expected: Any) -> None:
+    """pytest 之 `-m` 前之 python `-m` 不算縮小選取；帶值選項之值不當測試路徑；無位置參數 ⇒ testpaths。"""
+    assert g._pytest_selectors(argv) == expected
+
+
+def test_ledger_11_collect_only_and_argsfile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """只收集／列資訊之 pytest 不執行測試 ⇒ 不做 ledger 檢查；`@參數檔`（pytest ≥8.2）展開為選取，讀不到 ⇒ None。"""
+    assert not g._is_pytest(["venv/bin/python", "-m", "pytest", "--collect-only", "-q", "tests/a.py"])
+    assert not g._is_pytest(["venv/bin/python", "-m", "pytest", "--co", "tests/a.py"])
+    assert g._is_pytest(["venv/bin/python", "-m", "pytest", "-q", "tests/a.py"])
+    args = tmp_path / "args.txt"
+    args.write_text("tests/a.py::t one\n-q\n\ntests/b\n", encoding="utf-8")
+    monkeypatch.setattr(g, "REPO", tmp_path)
+    assert g._pytest_selectors(["venv/bin/python", "-m", "pytest", "@args.txt"]) == ["tests/a.py::t one", "tests/b"]
+    assert g._pytest_selectors(["venv/bin/python", "-m", "pytest", "@missing.txt"]) is None
+
+
+def test_ledger_13_latest_uninstrumented_record_wins(tmp_path: Path) -> None:
+    """取每 nodeid 最近一次無量測負擔之 session 紀錄（同 pytest-split 存最近一次）；帶 --cov／readtrace 之 session
+    只在無其他紀錄時採用。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+
+    def write(name: str, argv: List[str], rows: Dict[str, float], mtime: int) -> None:
+        p = d / name
+        p.write_text(json.dumps({"kind": "session", "argv_raw": argv}) + "\n"
+                     + "".join(json.dumps({"kind": "test", "nodeid": n, "duration_s": s, "outcome": "passed"}) + "\n"
+                               for n, s in rows.items()),
+                     encoding="utf-8")
+        os.utime(p, ns=(mtime, mtime))
+
+    write("old.jsonl", ["tests/t.py"], {"tests/t.py::a": 500.0, "tests/t.py::b": 9.0}, 1_000_000_000)
+    write("new.jsonl", ["tests/t.py"], {"tests/t.py::a": 20.0}, 2_000_000_000)
+    write("cov.jsonl", ["--cov", "tests/t.py"], {"tests/t.py::a": 900.0, "tests/t.py::c": 70.0}, 3_000_000_000)
+    assert ld.load_all(d) == {"tests/t.py::a": 20.0, "tests/t.py::b": 9.0, "tests/t.py::c": 70.0}
+
+
+@pytest.mark.parametrize("token", ["tests/x/test_a.py", "./tests/x/test_a.py", "tests/x/./test_a.py", "tests/x/",
+                                   "{repo}/tests/x/test_a.py"])
+def test_ledger_14_selector_paths_normalized(tmp_path: Path, token: str) -> None:
+    """`./`、絕對路徑、`/.`、尾斜線之選取與 repo 相對拼字歸屬同一 nodeid 集（pytest 依實際路徑解析）。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "s.jsonl").write_text(json.dumps({"nodeid": "tests/x/test_a.py::t", "duration_s": 3.0, "outcome": "passed"}) + "\n",
+                               encoding="utf-8")
+    assert ld.load_durations([token.format(repo=REPO)], d) == {"tests/x/test_a.py::t": 3.0}
+
+
+def test_ledger_15_cli_flags_unexpanded_file_tokens(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CLI 以檔案／目錄為輸入時，列入 `_unexpanded.txt`（ledger 外之新測試不會出現在 fast／heavy）；nodeid 輸入不列。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "s.jsonl").write_text(json.dumps({"nodeid": "tests/x/test_a.py::old", "duration_s": 1.0, "outcome": "passed"})
+                               + "\n",
+                               encoding="utf-8")
+    monkeypatch.setattr(ld, "LEDGER_DIR", d)
+    lst = tmp_path / "in.txt"
+    lst.write_text("tests/x/test_a.py\ntests/x/test_a.py::old\n", encoding="utf-8")
+    assert ld.main([str(lst), str(tmp_path / "o")]) == 0
+    assert (tmp_path / "o_unexpanded.txt").read_text(encoding="utf-8") == "tests/x/test_a.py\n"
+    assert (tmp_path / "o_fast.txt").read_text(encoding="utf-8") == "tests/x/test_a.py::old\n"
+
+
+def test_ledger_24_cli_nodeid_tokens_not_expanded_to_stale_variants(tmp_path: Path,
+                                                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """nodeid 輸入輸出原 token、不展開成 ledger 之參數化變體（ledger 留有已不存在之舊變體，展開後作選取 ⇒ pytest
+    not found；2026-11-12 實踩）；無同名紀錄者（含聚合 token：參數化基名、類別）一律 unmatched——ledger 不知現有
+    子項全集，取最大或加總皆可能低估（審碼 r9、r10），須以 --collect-only 展開成葉 nodeid 再估。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    _session(d, "s.jsonl", [("tests/x/test_a.py::t[inplace]", 2.0, "passed"), ("tests/x/test_a.py::t[sink]", 70.0, "passed"),
+                            ("tests/x/test_a.py::u", 1.0, "passed")], 1_000_000_000)
+    monkeypatch.setattr(ld, "LEDGER_DIR", d)
+    lst = tmp_path / "in.txt"
+    lst.write_text("tests/x/test_a.py::t\ntests/x/test_a.py::u\ntests/x/test_a.py::new\n", encoding="utf-8")
+    assert ld.main([str(lst), str(tmp_path / "o")]) == 0
+    assert (tmp_path / "o_fast.txt").read_text(encoding="utf-8") == "tests/x/test_a.py::u\n"
+    assert (tmp_path / "o_heavy.txt").read_text(encoding="utf-8") == ""
+    assert (tmp_path / "o_unmatched.txt").read_text(encoding="utf-8") == "tests/x/test_a.py::t\ntests/x/test_a.py::new\n"
+    # 聚合 token：兩參數各 40 秒（最大值 40 會誤入快速層）、類別下只 m1 有紀錄而 m2 為未跑過之新方法（加總 40 會漏 m2）
+    _session(d, "s2.jsonl", [("tests/y/test_b.py::p[a]", 40.0, "passed"), ("tests/y/test_b.py::p[b]", 40.0, "passed"),
+                             ("tests/y/test_b.py::C::m1", 40.0, "passed")], 2_000_000_000)
+    dur, unm = ld.token_durations(["tests/y/test_b.py::p", "tests/y/test_b.py::C", "tests/y/test_b.py::C::m1"],
+                                  ld.load_all(d))
+    assert dur == {"tests/y/test_b.py::C::m1": 40.0} and unm == ["tests/y/test_b.py::p", "tests/y/test_b.py::C"]
+
+
+@pytest.mark.parametrize("narrow", ["-k test_s", "--lf", "--deselect tests/zz_unlisted/test_slow_probe.py::x"])
+def test_ledger_16_unlisted_narrowed_heavy_still_needs_watch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                             narrow: str) -> None:
+    """清單外 pytest 加縮小選取：實際選取不可知，但母集含重型 ⇒ 仍須背景執行（前景擋）。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "s.jsonl").write_text(json.dumps({"nodeid": f"{_UNLISTED}::test_s", "duration_s": 300.0, "outcome": "passed"}) + "\n",
+                               encoding="utf-8")
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+    assert _rc(_bash(f"venv/bin/python -m pytest {_UNLISTED} -q {narrow}", False)) == 2
+
+
+def test_ledger_12_unlisted_collect_only_not_heavy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """清單外 pytest 之選取依 ledger 含重型，但只收集 ⇒ 不視同重型（前景可跑）；同命令執行測試 ⇒ 擋。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "s.jsonl").write_text(json.dumps({"nodeid": f"{_UNLISTED}::test_s", "duration_s": 300.0, "outcome": "passed"}) + "\n",
+                               encoding="utf-8")
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+    assert _rc(_bash(f"venv/bin/python -m pytest --collect-only -q {_UNLISTED}", False)) == 0
+    assert _rc(_bash(f"venv/bin/python -m pytest -q {_UNLISTED}", False)) == 2
+
+
+def test_ledger_06_durations_owner_matching(tmp_path: Path) -> None:
+    """ledger_durations：目錄、檔案、nodeid、參數化變體皆歸屬；同 nodeid 取最大值；他檔不計。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    rows = [("tests/x/test_a.py::T::test_p[1]", 5.0), ("tests/x/test_a.py::T::test_p[1]", 7.0),
+            ("tests/x/test_b.py::test_q", 3.0), ("tests/y/test_c.py::test_r", 11.0)]
+    (d / "s.jsonl").write_text("".join(json.dumps({"nodeid": n, "duration_s": s, "outcome": "passed"}) + "\n"
+                                       for n, s in rows) + "not json\n",
+                               encoding="utf-8")
+    assert ld.load_durations(["tests/x"], d) == {"tests/x/test_a.py::T::test_p[1]": 7.0, "tests/x/test_b.py::test_q": 3.0}
+    assert set(ld.load_durations(["tests/x/test_a.py::T"], d)) == {"tests/x/test_a.py::T::test_p[1]"}
+    assert set(ld.load_durations(["tests/x/test_a.py::T::test_p"], d)) == {"tests/x/test_a.py::T::test_p[1]"}
+    assert ld.load_durations(["tests/x/test_a.py::T::test_p[2]"], d) == {}
+
+
+def test_mutation_ledger_check_removed_misses_underestimate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：交叉檢查回空 ⇒ test_ledger_01 之低估收據放行（鑑別力）。"""
+    _ledger(tmp_path, monkeypatch)
+    monkeypatch.setattr(g, "ledger_problems", lambda *a, **k: [])
+    assert _ledger_rc(["venv/bin/python", "-m", "pytest", _GATE, "-q"], 60, _CLOSE) == 0
+
+
+def test_mutation_ledger_heavy_detection_removed_misses_unlisted(tmp_path: Path,
+                                                                 monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：清單外 ledger 判定回空 ⇒ test_ledger_09 之前景重型放行（鑑別力）。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    (d / "s.jsonl").write_text(json.dumps({"nodeid": f"{_UNLISTED}::test_s", "duration_s": 120.0, "outcome": "passed"}) + "\n",
+                               encoding="utf-8")
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+    monkeypatch.setattr(g, "ledger_heavy_problems", lambda *a, **k: [])
+    assert _rc(_bash(f"venv/bin/python -m pytest {_UNLISTED} -q", False)) == 0
+
+
+def _session(d: Path, name: str, rows: List[Tuple[str, float, str]], mtime: int, argv: List[str] = None) -> None:
+    p = d / name
+    p.write_text(json.dumps({"kind": "session", "argv_raw": argv or ["tests"]}) + "\n"
+                 + "".join(json.dumps({"kind": "test", "nodeid": n, "duration_s": s, "outcome": o}) + "\n"
+                           for n, s, o in rows), encoding="utf-8")
+    os.utime(p, ns=(mtime, mtime))
+
+
+def test_ledger_17_failed_records_not_used_for_estimate(tmp_path: Path) -> None:
+    """估時只採通過紀錄：較新之失敗（數秒即中止）不得取代較舊之通過耗時（2026-11-12 事故：dual_start[4h] 失敗 1.9
+    秒、通過 2,068 秒）；從未通過者不入耗時表（失敗秒數不是耗時；r5 GROK-R5-P1-01），另列 never、估時列 unknown。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    _session(d, "old.jsonl", [("tests/t.py::slow", 2068.0, "passed"), ("tests/t.py::red", 5.0, "failed")], 1_000_000_000)
+    _session(d, "new.jsonl", [("tests/t.py::slow", 1.9, "failed"), ("tests/t.py::red", 0.0, "error")], 2_000_000_000)
+    dur, never, gaps = ld.load_all_detail(d)
+    assert dur == {"tests/t.py::slow": 2068.0}
+    assert never == {"tests/t.py::red"}
+    est, det = ld.conservative_estimate(["tests/t.py::red"], dur, gaps)
+    assert est == 0.0 and det["unknown"] == ["tests/t.py::red"]
+
+
+def test_ledger_18_conservative_estimate_adds_fixture_gap(tmp_path: Path) -> None:
+    """共用 fixture 建置成本隨選取轉移：b 歷史上當付費者時 200 秒、平時 0.1 秒（gap 199.9）⇒ 只選 b（同檔 a 未選）時
+    保守估時 ≥ 200；整檔皆選 ⇒ 不加；追蹤顯示只用 session 範圍 fixture ⇒ 不加。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    _session(d, "s1.jsonl", [("tests/f.py::b", 200.0, "passed")], 1_000_000_000)
+    _session(d, "s2.jsonl", [("tests/f.py::a", 180.0, "passed"), ("tests/f.py::b", 0.1, "passed")], 2_000_000_000)
+    dur, _never, gaps = ld.load_all_detail(d)
+    est, det = ld.conservative_estimate(["tests/f.py::b"], dur, gaps)
+    assert det["selected_sum"] == pytest.approx(0.1) and est == pytest.approx(200.0)
+    assert ld.conservative_estimate(["tests/f.py::a", "tests/f.py::b"], dur, gaps)[0] == pytest.approx(180.1)
+    only_session = {"tests/f.py::b": ["session:::tmp_path_factory"]}
+    assert ld.conservative_estimate(["tests/f.py::b"], dur, gaps, only_session)[0] == pytest.approx(0.1)
+    module = {"tests/f.py::b": ["module:tests/f.py::m"]}
+    est, det = ld.conservative_estimate(["tests/f.py::b"], dur, gaps, module)
+    assert est == pytest.approx(200.0) and det["fixture_cost_unknown"] == ["tests/f.py"]  # 以差距代 ⇒ 標未知
+
+
+def test_ledger_21_fixture_cost_measured_beats_gap(tmp_path: Path) -> None:
+    """付費者固定（a 每次先跑 240 秒、b 每次 0.02 秒）⇒ 差距 0、不可觀測（r5 CODEX-R5-P1-03）：無實測成本時估 0.02 但標
+    fixture_cost_unknown；有讀檔追蹤實測之 fixture 建置秒數 ⇒ 加實測成本、不標未知。專案 session fixture 亦同。"""
+    ld = _mod("ledger_durations")
+    d = tmp_path / "ledger"
+    d.mkdir()
+    for i, name in enumerate(("s1.jsonl", "s2.jsonl")):
+        _session(d, name, [("tests/f.py::a", 240.0, "passed"), ("tests/f.py::b", 0.02, "passed")], 1_000_000_000 + i)
+    dur, _never, gaps = ld.load_all_detail(d)
+    fx = "module:tests/f.py::reference_after"
+    shared = {"tests/f.py::b": [fx, "session:::tmp_path_factory"]}
+    est, det = ld.conservative_estimate(["tests/f.py::b"], dur, gaps, shared)
+    assert est == pytest.approx(0.02) and det["fixture_cost_unknown"] == ["tests/f.py"]
+    trace = tmp_path / "t.jsonl"
+    trace.write_text(json.dumps({"nodeid": "tests/f.py::a", "shared": [fx], "fixture_setup_s": {fx: 239.0}}) + "\n",
+                     encoding="utf-8")
+    costs = ld.load_fixture_costs([trace])
+    est2, det2 = ld.conservative_estimate(["tests/f.py::b"], dur, gaps, shared, costs)
+    assert est2 == pytest.approx(239.02) and det2["fixture_cost_unknown"] == []
+    proj = {"tests/f.py::b": ["session:tests::tmp_feature_run_store"]}
+    assert ld.conservative_estimate(["tests/f.py::b"], dur, gaps, proj)[1]["fixture_cost_unknown"] == [
+        "session:tests::tmp_feature_run_store"]
+
+
+def test_ledger_22_uncertain_selection_requires_ack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """選取含無通過紀錄之 nodeid（從未通過、失敗 1.9 秒）⇒ 收據須 `uncertain_ack` 寫明計數；寫明 ⇒ 放行
+    （r5 GROK-R5-P1-01、COMPOSER-R5-P2-01）。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    _session(d, "s.jsonl", [(f"{_GATE}::test_b", 200.0, "passed"), (f"{_GATE}::test_new", 1.9, "failed")],
+             1_000_000_000)
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+    sel = tmp_path / "sel.txt"
+    sel.write_text(f"{_GATE}::test_b\n{_GATE}::test_new\n", encoding="utf-8")
+    inner = ["venv/bin/python", "-m", "pytest", "-q", "-p", "scripts.readtrace_plugin", "--trace-select", str(sel), _GATE]
+    ack = {"uncertain_ack": {"unknown": 1, "fixture_cost_unknown": 0}}
+    assert _ledger_rc(inner, 300, {**_CLOSE, **ack}) == 0
+    assert _ledger_rc(inner, 300, _CLOSE) == 2
+
+
+def test_ledger_20_guard_uses_conservative_estimate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """守衛以保守估時（含共用 fixture 轉移）核收據：只選同檔之 b（被選加總 0.1 秒、耗時差距 199.9）⇒ 收據 100 秒擋、
+    200 秒放行；簡單加總會放行 100 秒之低估。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    _session(d, "s1.jsonl", [(f"{_GATE}::test_b", 200.0, "passed")], 1_000_000_000)
+    _session(d, "s2.jsonl", [(f"{_GATE}::test_a", 180.0, "passed"), (f"{_GATE}::test_b", 0.1, "passed")],
+             2_000_000_000)
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+    sel = tmp_path / "sel.txt"
+    sel.write_text(f"{_GATE}::test_b\n", encoding="utf-8")
+    inner = ["venv/bin/python", "-m", "pytest", "-q", "-p", "scripts.readtrace_plugin", "--trace-select", str(sel), _GATE]
+    assert _ledger_rc(inner, 200, {**_CLOSE, **_ACK1}) == 0  # 先證收據身分相符（放行），下一行之擋才確屬估時
+    assert _ledger_rc(inner, 100, {**_CLOSE, **_ACK1}) == 2
+
+
+_CHUNKED = "scripts/run_chunked.py"
+
+
+def _chunked_rc(tmp_path: Path, select: List[str], estimate: Optional[float], extra: Dict[str, Any] = None,
+                background: bool = True, plan_only: bool = False) -> int:
+    sel = tmp_path / "select.txt"
+    sel.write_text("".join(f"{n}\n" for n in select), encoding="utf-8")
+    inner = ["venv/bin/python", _CHUNKED, "--select", str(sel), "--out", str(tmp_path / "out")] + (
+        ["--plan-only"] if plan_only else [])
+    receipt = REPO / "handoffs" / "run_receipts" / "20261112-hrgledger-chunkedtest-estimate.json"
+    if estimate is not None:
+        rid = _mod("run_receipt_identity")
+        match = rid.compute_match(_CHUNKED, inner, [], [], [])
+        receipt.write_text(json.dumps({"identity": {"match": match, "meta": {"producer": "test", "created_at": "t"}},
+                                       "scale": "single", "estimate_seconds": estimate, "basis": [],
+                                       "spec_path": "docs/NOCAP_SPEC.md", "coverage_path_ids": ["NOCAP-BUDGET-3"],
+                                       **(extra or {})}), encoding="utf-8")
+    try:
+        return _rc(_bash(" ".join(inner), background))
+    finally:
+        receipt.unlink(missing_ok=True)
+
+
+_ACK1 = {"uncertain_ack": {"unknown": 0, "fixture_cost_unknown": 1}}  # 只選 test_b、無追蹤 ⇒ 該檔共用成本未知
+
+
+@pytest.mark.parametrize("estimate,extra,background,plan_only,expected", [
+    (300, _ACK1, True, False, 2),                 # 未宣告 tier＝batch，選取含重型（test_b 200 秒）⇒ 擋
+    (100, {**_CLOSE, **_ACK1}, True, False, 2),   # close 但估時 100 < 執行器 plan 208（200＋行程開銷 8）⇒ 擋
+    (208, {**_CLOSE, **_ACK1}, True, False, 0),   # close、估時 ≥ plan、未知項已明示 ⇒ 放行
+    (208, _CLOSE, True, False, 2),                # 未知項未明示（uncertain_ack 缺）⇒ 擋
+    (208, {**_CLOSE, **_ACK1}, False, False, 2),  # 前景 ⇒ 擋（重型須背景）
+    (None, None, False, True, 0),                 # --plan-only 只規劃 ⇒ 免
+    (None, _CLOSE, True, False, 2),               # 無收據 ⇒ 擋
+])
+def test_ledger_19_chunked_runner_tier_and_estimate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, estimate: Any,
+                                                    extra: Any, background: bool, plan_only: bool,
+                                                    expected: int) -> None:
+    """分批執行器之 --select 選取同 pytest 套用 tier 與 ledger 保守估時交叉檢查；只規劃者免。"""
+    _ledger(tmp_path, monkeypatch)
+    assert _chunked_rc(tmp_path, [f"{_GATE}::test_b"], estimate, extra, background, plan_only) == expected
+
+
+def test_ledger_23_chunked_estimate_follows_runner_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """執行器拆批後各批重付共用 fixture 與行程開銷 ⇒ 守衛依其 plan 加總核（r5 CODEX-R5-P1-02）：同檔 a（重型 180）、
+    b（0.1，檔內差距 199.9）整檔選取時整份估 180.1，但拆成 heavy[a]＋fast[b] 兩批、各為部分選取 ⇒
+    (180＋199.9＋8)＋(0.1＋199.9＋8)＝595.9。"""
+    d = tmp_path / "ledger"
+    d.mkdir()
+    _session(d, "s1.jsonl", [(f"{_GATE}::test_b", 200.0, "passed")], 1_000_000_000)
+    _session(d, "s2.jsonl", [(f"{_GATE}::test_a", 180.0, "passed"), (f"{_GATE}::test_b", 0.1, "passed")],
+             2_000_000_000)
+    monkeypatch.setattr(g, "LEDGER_DIR", d)
+    # 整份選取無未知項，但拆成兩批後各為部分選取 ⇒ 兩批各有一處共用成本未知（逐批實例數 2；審碼 r6）
+    ack = {"uncertain_ack": {"unknown": 0, "fixture_cost_unknown": 2}}
+    sel = [f"{_GATE}::test_a", f"{_GATE}::test_b"]
+    assert _chunked_rc(tmp_path, sel, 596, {**_CLOSE, **ack}) == 0
+    assert _chunked_rc(tmp_path, sel, 181, {**_CLOSE, **ack}) == 2
+    assert _chunked_rc(tmp_path, sel, 596, _CLOSE) == 2  # 拆批產生之未知項未明示 ⇒ 擋
+
+
+def test_mutation_chunked_selection_unparsed_misses_heavy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：執行器選取解析回 None ⇒ ledger_19 首案（batch 含重型）不再被擋（鑑別力）。"""
+    _ledger(tmp_path, monkeypatch)
+    monkeypatch.setattr(g, "_chunked_option", lambda argv, name: None)
+    assert _chunked_rc(tmp_path, [f"{_GATE}::test_b"], 300) == 0

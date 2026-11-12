@@ -11,6 +11,10 @@ zsh／source）及直接執行之 `.sh`；其所執行之 repo 內 `.sh` 檔內�
 `wrapped` 類另須該命令經 `scripts/run_watched.py` 包裝；`self_watched` 類以原始碼機械對證其確實呼叫共用監看
 `run_watched(`（否則視同未經監看）。引號不成對而無從拆解 ⇒ 退回全文比對（保守）。stdin 讀不到或非 JSON ⇒ 擋。
 
+估時收據另與 TESTREG ledger 交叉檢查（`ledger_problems`）：pytest 命令之 `estimate_seconds` 低於 ledger 對本次選取
+（測試檔／目錄／nodeid，或 `--trace-select <檔>` 所列）之紀錄耗時加總 ⇒ 擋。含 `-k`／`-m`／`--deselect` 等縮小選取者
+無從得知實際選取集，不做此檢查（依檔案加總只是上界）——此類命令須自行以 `scripts/ledger_durations.py` 估時。
+
 用法：`python3 scripts/heavy_run_guard.py`（stdin＝PreToolUse payload；rc 0 放行／2 擋）。
 """
 
@@ -252,7 +256,50 @@ def check(payload: Dict[str, Any], catalog: Dict[str, Any]) -> List[str]:
                 argvs = [_ARGV[text] for text, _w in runs
                          if text in _ARGV and re.search(rule["regex"], text, re.M | re.S)]
                 problems += receipt_problems(rule, argvs)
+    problems += ledger_heavy_problems(runs, catalog, background)
     return problems
+
+
+#: 清單外、經 TESTREG ledger 判定為重型之 pytest（docs/TEST_SELECTION.md §4：紀錄耗時 ≥60 秒）之合成規則
+LEDGER_HEAVY_RULE = {"id": "pytest_ledger_heavy"}
+
+
+def ledger_heavy_problems(runs: List[Tuple[str, bool]], catalog: Dict[str, Any], background: bool) -> List[str]:
+    """清單樣式未命中之 pytest 命令：其（未縮小之）選取依 ledger 含紀錄耗時 ≥60 秒之測試 ⇒ 視同重型（須背景、經共用
+    監看、有估時收據〔含 tier〕）。清單不必逐一列舉重型測試檔（清單外之重型如 ffstat 系列亦攔）。含 -k／-m 等縮小
+    選取者實際選取不可知 ⇒ 以縮小前之母集判「可能含重型」，仍須背景、監看、收據（只選快速層者改列 nodeid 或
+    --trace-select 即可前景跑）；估時低估之核算則只對可確知之選取做（`ledger_problems`）。"""
+    listed = [r["regex"] for kind in ("self_watched", "wrapped", "background_only") for r in catalog.get(kind) or []]
+    out: List[str] = []
+    for text, wrapped in runs:
+        argv = _ARGV.get(text)
+        if not argv or not _is_pytest(argv) or any(re.search(rx, text, re.M | re.S) for rx in listed):
+            continue
+        selectors = _pytest_selectors(argv, strict=False)
+        if not selectors:
+            continue
+        ld = _ld()
+        heavy_ids = sorted(n for n, d in ld.load_durations(selectors, LEDGER_DIR).items() if d >= ld.FAST_LIMIT_S)
+        if not heavy_ids:
+            continue
+        rid = LEDGER_HEAVY_RULE["id"]
+        if not background:
+            out.append(f"{rid}：選取含 {len(heavy_ids)} 條 ledger 紀錄耗時 ≥{ld.FAST_LIMIT_S:.0f} 秒之重型測試（例："
+                       f"{heavy_ids[0]}）⇒ 須背景執行（run_in_background＝true）")
+        elif not wrapped:
+            out.append(f"{rid}：重型 pytest 須經共用監看包裝 `venv/bin/python {WRAPPER} --log <路徑> -- <命令>`")
+        else:
+            out += receipt_problems(LEDGER_HEAVY_RULE, [argv])
+    return out
+
+
+def _ld() -> Any:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("heavy_run_guard_ld", REPO / "scripts" / "ledger_durations.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
 
 
 ESTIMATE_GLOB = "handoffs/run_receipts/*-estimate.json"
@@ -308,6 +355,7 @@ def receipt_problems(rule: Dict[str, Any], argvs: List[List[str]]) -> List[str]:
             spec_text = spec.read_text(encoding="utf-8") if spec.is_file() else ""
             if not rid.estimate_receipt_problems(rec, REPO) and rid.coverage_ids_valid(rec, spec_text):
                 ok = True
+                problems += ledger_problems(rule, rec, argvs)
                 break
         if not ok:
             problems.append(f"{rule['id']}：無相符且欄位齊全之估時收據（{ESTIMATE_GLOB}：identity.match 須與本命令逐欄相符；"
@@ -326,6 +374,208 @@ def receipt_problems(rule: Dict[str, Any], argvs: List[List[str]]) -> List[str]:
                             "等於現行〔程式碼態、資料、設定、硬體〕、≥ 3 個相異規模點且欄位齊全、推算可用；以 "
                             "scripts/scale_probe.py 背景產生；NOCAP Task 0.3b）")
     return problems
+
+
+#: TESTREG ledger（`tests/fixtures/testreg_recorder_plugin.py` 寫入）；測試以 monkeypatch 改指隔離目錄
+LEDGER_DIR = REPO / ".testreg" / "ledger"
+#: pytest 之縮小選取選項：含任一 ⇒ 依檔案加總只是上界，不足以判低估 ⇒ 不做 ledger 交叉檢查
+_PYTEST_NARROWING = ("-k", "-m", "--deselect", "--ignore", "--ignore-glob", "--lf", "--last-failed", "--sw",
+                     "--stepwise")
+#: 上列中帶值者（以空白分隔時其後一個 token 為值）
+_PYTEST_NARROWING_VALUED = ("-k", "-m", "--deselect", "--ignore", "--ignore-glob")
+#: pytest 之帶值選項（其值不是測試路徑）
+_PYTEST_VALUE_OPTS = ("-p", "-o", "-c", "-W", "-r", "--rootdir", "--confcutdir", "--basetemp", "--tb", "--durations",
+                      "--log-file", "--junitxml", "--trace-select")
+
+
+#: 估時收據之測試層級（docs/TEST_SELECTION.md §3／§4）：batch＝每批例行，只准紀錄耗時 <60 秒之快速層；其餘四種
+#: 為必須跑重型之正當情況，准跑重型但須於 `tier_reason` 寫明（守衛不判理由真偽——由收據留痕、審碼與使用者查核）。
+#:   close＝收案跑累積全受影響（§4）；acceptance＝該票規格指定之驗收（§4）；full＝定期全量／首次建依賴紀錄（§4 兜底、
+#:   TESTSEL）；fix＝修復上次失敗之測試後重跑（§3-5）。
+TIERS = frozenset({"batch", "close", "acceptance", "full", "fix"})
+
+
+#: 不執行測試之 pytest 模式（只收集／列資訊）⇒ 無耗時，不做 ledger 檢查
+_PYTEST_NO_RUN = ("--collect-only", "--co", "--fixtures", "--fixtures-per-test", "--markers", "--version", "-h", "--help")
+
+
+def _is_pytest(argv: List[str]) -> bool:
+    """argv 為會執行測試之 pytest 命令（只收集／列資訊之模式不算）。"""
+    return any(Path(tok).name in ("pytest", "py.test") for tok in argv) and not any(
+        tok in _PYTEST_NO_RUN for tok in argv)
+
+
+def _pytest_selectors(argv: List[str], strict: bool = True) -> Optional[List[str]]:
+    """pytest 命令之選取 token（測試檔、目錄或 nodeid）；`--trace-select <檔>` ⇒ 該檔所列 nodeid；無位置參數 ⇒
+    `["tests"]`（pytest.ini testpaths）。非 pytest 或選取檔讀不到 ⇒ None。含縮小選取選項：strict ⇒ None（實際選取集
+    不可知）；非 strict ⇒ 略過該選項，回其所縮小之母集（上界，供 batch 層判「可能含重型」）。"""
+    idx = next((i for i, tok in enumerate(argv) if Path(tok).name in ("pytest", "py.test")), None)
+    if idx is None:
+        return None
+    rest: List[str] = []
+    for tok in argv[idx + 1:]:
+        if tok.startswith("@") and len(tok) > 1:  # pytest ≥8.2 參數檔：每行一個參數
+            try:
+                rest += [ln.strip() for ln in (REPO / tok[1:]).read_text(encoding="utf-8").splitlines() if ln.strip()]
+            except OSError:
+                return None
+        else:
+            rest.append(tok)
+    tokens: List[str] = []
+    select_file: Optional[str] = None
+    i = 0
+    while i < len(rest):
+        tok = rest[i]
+        name = tok.split("=", 1)[0]
+        if name in _PYTEST_NARROWING or (tok[:2] in ("-k", "-m") and len(tok) > 2 and not tok.startswith("--")):
+            if strict:
+                return None
+            i += 2 if (tok in _PYTEST_NARROWING_VALUED) else 1
+            continue
+        if name == "--trace-select":
+            select_file = tok.split("=", 1)[1] if "=" in tok else (rest[i + 1] if i + 1 < len(rest) else None)
+            i += 1 if "=" in tok else 2
+            continue
+        if tok in _PYTEST_VALUE_OPTS:
+            i += 2
+            continue
+        if not tok.startswith("-"):
+            tokens.append(tok)
+        i += 1
+    if select_file is not None:
+        try:
+            return [ln.strip() for ln in (REPO / select_file).read_text(encoding="utf-8").splitlines() if ln.strip()]
+        except OSError:
+            return None
+    return tokens or ["tests"]
+
+
+#: 分批執行器（`scripts/run_chunked.py`）：其選取＝`--select` 檔所列 nodeid，同 pytest 套用層級與估時交叉檢查
+CHUNKED_SCRIPT = "scripts/run_chunked.py"
+
+
+def _chunked_option(argv: List[str], name: str) -> Optional[List[str]]:
+    """argv 為分批執行器（非只規劃）時，選項 `name` 之值（`--traces` 可多值）；否則 None。"""
+    idx = next((i for i, tok in enumerate(argv) if tok.endswith(CHUNKED_SCRIPT)), None)
+    if idx is None or "--plan-only" in argv[idx + 1:]:
+        return None
+    rest = argv[idx + 1:]
+    if "--" in rest:
+        rest = rest[:rest.index("--")]
+    for i, tok in enumerate(rest):
+        if tok == name:
+            vals = []
+            for v in rest[i + 1:]:
+                if v.startswith("--"):
+                    break
+                vals.append(v)
+            return vals
+        if tok.startswith(name + "="):
+            return [tok.split("=", 1)[1]]
+    return None
+
+
+def _chunked_selectors(argv: List[str]) -> Optional[List[str]]:
+    vals = _chunked_option(argv, "--select")
+    if not vals:
+        return None
+    try:
+        return [ln.strip() for ln in (REPO / vals[0]).read_text(encoding="utf-8").splitlines() if ln.strip()]
+    except OSError:
+        return None
+
+
+def _chunked_traces(argv: List[str]) -> List[str]:
+    return _chunked_option(argv, "--traces") or []
+
+
+def ledger_problems(rule: Dict[str, Any], rec: Dict[str, Any], argvs: List[List[str]]) -> List[str]:
+    """估時收據之 `estimate_seconds` 不得低於 TESTREG ledger 對本次選取之紀錄耗時加總（docs/TEST_SELECTION.md §4；
+    業界同類 pytest-split 依最近一次耗時估時）。事故 2026-11-11：L1c 讀檔追蹤以類比估 10,800 秒、ledger 實含重型
+    64,155 秒，跑 3 小時 46 分只完成 12% 才發現。取值見 `scripts/ledger_durations.py`（每 nodeid 最近一次無量測負擔
+    之紀錄）；ledger 無紀錄之測試不計，故本檢查只擋低於現有紀錄之估時、不擋高估。估時非停止條件（NOCAP），
+    提速後首跑之收據照舊紀錄估即可，跑完後紀錄更新。"""
+    ld = _ld()
+    out: List[str] = []
+    for argv in argvs:
+        chunked = _chunked_option(argv, "--select") is not None
+        if not _is_pytest(argv) and not chunked:
+            continue
+        tier = rec.get("tier", "batch")  # 未宣告 ⇒ 最嚴之 batch（含重型即擋，須明示正當情況）
+        if tier not in TIERS:
+            out.append(f"{rule['id']}：pytest 估時收據 {rec.get('_path')} 之 tier＝{tier!r} 不在 {sorted(TIERS)}（batch＝每批"
+                       "例行只跑快速層；close＝收案、acceptance＝規格指定驗收、full＝定期全量／建依賴紀錄、fix＝修復失敗後重跑；"
+                       "docs/TEST_SELECTION.md §3／§4）")
+            continue
+        if tier != "batch" and not str(rec.get("tier_reason") or "").strip():
+            out.append(f"{rule['id']}：tier＝{tier} 准跑重型，但估時收據 {rec.get('_path')} 須以 tier_reason 寫明理由"
+                       "（如收案之票與批、規格驗收之 id、修復之失敗 nodeid）")
+            continue
+        selectors = _chunked_selectors(argv) if chunked else _pytest_selectors(argv)
+        if tier == "batch":
+            loose = selectors if chunked else _pytest_selectors(argv, strict=False)
+            if loose is None:
+                out.append(f"{rule['id']}：tier＝batch 之選取讀不到（--trace-select 檔不存在）⇒ 無從確認未含重型")
+                continue
+            heavy_ids = sorted(n for n, d in ld.load_durations(loose, LEDGER_DIR).items() if d >= ld.FAST_LIMIT_S)
+            if heavy_ids:
+                how = "選取" if selectors is not None else "縮小選取前之母集（含 -k／-m／--deselect 等，實際選取不可知）"
+                out.append(f"{rule['id']}：tier＝batch 之{how}含 {len(heavy_ids)} 條 ledger 紀錄耗時 ≥{ld.FAST_LIMIT_S:.0f} 秒"
+                           f"之重型測試（例：{heavy_ids[0]}）⇒ 每批例行只跑快速層：改列快速層 nodeid 或 --trace-select；"
+                           "確屬必須跑重型者於收據宣告 tier（close／acceptance／full／fix）並寫 tier_reason"
+                           "（docs/TEST_SELECTION.md §3／§4）")
+        if not selectors:
+            continue
+        dur = ld.load_durations(selectors, LEDGER_DIR)
+        every, _never, gaps = ld.load_all_detail(LEDGER_DIR)
+        traces = [REPO / str(t) for t in (rec.get("traces") or (_chunked_traces(argv) if chunked else []))]
+        existing = [p for p in traces if p.is_file()]
+        shared = ld.load_shared(existing) if traces else None
+        costs = ld.load_fixture_costs(existing) if traces else None
+        # 選取＝有通過紀錄者 ∪ 以 nodeid 列出而無通過紀錄者（無紀錄或從未通過 ⇒ 估時未知；r5 GROK-R5-P1-01／COMPOSER-R5-P2-01）
+        selection = list(dur) + [ld.normalize(s) for s in selectors
+                                 if "::" in s and ld.normalize(s) not in dur]
+        total, det = ld.conservative_estimate(selection, every, gaps, shared, costs)
+        want = {"unknown": len(det["unknown"]), "fixture_cost_unknown": len(det["fixture_cost_unknown"])}
+        if chunked:  # 執行器依自身分批計：估時與未知項皆取其 plan（每批各付共用 fixture 與行程開銷；審碼 r5／r6）
+            rc_mod = _load_script("run_chunked")
+            chunks = rc_mod.plan(selection, every, gaps, shared, _chunked_float(argv, "--chunk-seconds", 900.0),
+                                 ld.FAST_LIMIT_S, costs)
+            total = sum(c["estimate_s"] for c in chunks)
+            want = rc_mod.plan_uncertainty(chunks)
+        est = float(rec.get("estimate_seconds") or 0)
+        if total > est + 1e-6:  # 浮點加總誤差（0.1＋199.9 ≠ 200.0）不算低估
+            heavy = sum(1 for d in dur.values() if d >= ld.FAST_LIMIT_S)
+            out.append(f"{rule['id']}：估時收據 {rec.get('_path')} 之 estimate_seconds＝{est:.0f} 低於 TESTREG ledger "
+                       f"保守估時 {total:.0f} 秒（{len(dur)} 條有通過紀錄，含共用 fixture 建置成本"
+                       f"{'與分批重付' if chunked else ''}；其中 ≥{ld.FAST_LIMIT_S:.0f} 秒之重型 {heavy} 條）⇒ 估時改依 "
+                       "`venv/bin/python scripts/ledger_durations.py <清單> <前綴> [--traces <讀檔追蹤>...]` 之 conservative"
+                       "（分批執行器依其 --plan-only 之 estimate_serial）；收據可列 `traces`；每批只跑快速層、重型於收案跑"
+                       "（docs/TEST_SELECTION.md §4）")
+        if any(want.values()) and rec.get("uncertain_ack") != want:
+            out.append(f"{rule['id']}：選取之估時含未知項 {want}（unknown＝無通過紀錄〔新測試、從未通過——失敗紀錄數秒中止不算"
+                       "耗時〕、fixture_cost_unknown＝共用 fixture 建置成本無實測、以耗時差距代〔非上界〕）⇒ 收據須以 "
+                       f"`uncertain_ack` 逐項寫明同一計數 {json.dumps(want)} 並於 basis 說明如何處理（例：先以讀檔追蹤實測 "
+                       "fixture 成本），不得以已知部分之估時充作完整估時（審碼 r5）")
+    return out
+
+
+def _load_script(name: str) -> Any:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(f"heavy_run_guard_{name}", REPO / "scripts" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod
+
+
+def _chunked_float(argv: List[str], name: str, default: float) -> float:
+    vals = _chunked_option(argv, name)
+    try:
+        return float(vals[0]) if vals else default
+    except ValueError:
+        return default
 
 
 def calls_run_watched(path: Path) -> bool:

@@ -11,7 +11,8 @@
     {"id": "numview_precision", "regex": "numview_probes/precision_chain\\.py", "source": "handoffs/run_receipts/numview_probes/precision_chain.py"},
     {"id": "numview_branchdiff", "regex": "numview_probes/postic_branchdiff\\.py", "source": "handoffs/run_receipts/numview_probes/postic_branchdiff.py"},
     {"id": "numview_core_select", "regex": "numview_probes/postic_core_select\\.py", "source": "handoffs/run_receipts/numview_probes/postic_core_select.py"},
-    {"id": "numview_l2_matrix", "regex": "numview_probes/l2_arm_matrix\\.py", "source": "handoffs/run_receipts/numview_probes/l2_arm_matrix.py"}
+    {"id": "numview_l2_matrix", "regex": "numview_probes/l2_arm_matrix\\.py", "source": "handoffs/run_receipts/numview_probes/l2_arm_matrix.py"},
+    {"id": "run_chunked", "regex": "scripts/run_chunked\\.py\\b(?!.*\\s(--plan-only|--help|-h)\\b)", "source": "scripts/run_chunked.py", "_doc": "分批、每批新行程跑 pytest 選取（docs/TEST_SELECTION.md §5 過渡工具 6）；其 --select 選取同 pytest 套用 tier 與 ledger 保守估時交叉檢查（heavy_run_guard._chunked_selectors）；--plan-only 只規劃不執行，免"}
   ],
   "wrapped": [
     {"id": "pytest_heavy", "regex": "pytest\\b.*\\b(test_ffprod_gate|test_ffprod_winsor_provenance|test_numview_acceptance|test_numview_core|test_numview_identity|test_numview_policy|test_failopen_correctness|test_failopen_contract|test_failopen_layers|test_preprov_contract::test_verification_03|test_icfirstalign_memory)\\b"},

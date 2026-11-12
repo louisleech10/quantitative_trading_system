@@ -15590,6 +15590,82 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "ICPERF"
+  },
+  "tests/governance/test_readtrace_plugin.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP",
+   "path": "tests/governance/test_readtrace_plugin.py"
+  },
+  "tests/governance/test_affected_from_trace.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP",
+   "path": "tests/governance/test_affected_from_trace.py"
+  },
+  "tests/governance/test_run_chunked.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP",
+   "path": "tests/governance/test_run_chunked.py"
+  },
+  "tests/governance/test_affected_from_coverage.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP",
+   "path": "tests/governance/test_affected_from_coverage.py"
   }
  },
  "tombstones": [
