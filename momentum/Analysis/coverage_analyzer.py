@@ -21,6 +21,16 @@ def _finite_mask(series: pd.Series) -> np.ndarray:
     return np.isfinite(pd.to_numeric(series, errors="coerce").to_numpy(dtype=np.float64))
 
 
+#: 進度／取消安全點掛鉤 `on_step(phase, processed, total)`（ICPERF Task 0.6 (h) ⑦：任務路徑傳入，可拋取消例外向上傳遞）
+StepHook = Optional[Callable[[str, int, int], None]]
+
+
+def _step(on_step: StepHook, phase: str, processed: int, total: int) -> None:
+    """於每個 symbol 迴圈起點（processed＝已完成數）與迴圈後（processed＝total）呼叫；不吞掛鉤之例外。"""
+    if on_step is not None:
+        on_step(phase, processed, total)
+
+
 class CoverageAnalyzer:
     """因子覆蓋率分析 — 確保因子在大部分時間點有值。"""
 
@@ -188,8 +198,9 @@ class CoverageAnalyzer:
         timeframe: str,
         feature_names: list[str],
         feature_base_path: str = "data_cache/features",
+        on_step: StepHook = None,
     ) -> dict[str, object]:
-        """回傳 features × symbols 的 NaN 比率矩陣。"""
+        """回傳 features × symbols 的 NaN 比率矩陣。`on_step` 為進度／取消安全點掛鉤（每 symbol 一次）。"""
 
         normalized_symbols = [symbol.strip().upper() for symbol in symbols if symbol and symbol.strip()]
         if len(normalized_symbols) == 0:
@@ -206,7 +217,9 @@ class CoverageAnalyzer:
         row_counts: dict[str, int] = {}
         discovered_features: set[str] = set()
 
-        for symbol in dedup_symbols:
+        n_symbols = len(dedup_symbols)
+        for index, symbol in enumerate(dedup_symbols):
+            _step(on_step, "load_symbols", index, n_symbols)
             frame = self._load_symbol_features(symbol, timeframe.strip(), feature_base_path)
             if frame is None:
                 symbol_frames[symbol] = None
@@ -217,6 +230,7 @@ class CoverageAnalyzer:
             row_counts[symbol] = int(frame.shape[0])
             if len(dedup_features) == 0:
                 discovered_features.update(str(column) for column in frame.columns)
+        _step(on_step, "load_symbols", n_symbols, n_symbols)
 
         if len(dedup_features) == 0:
             dedup_features = sorted(discovered_features)
@@ -290,8 +304,9 @@ class CoverageAnalyzer:
         symbols: list[str],
         timeframe: str,
         feature_base_path: str = "data_cache/features",
+        on_step: StepHook = None,
     ) -> dict[str, object]:
-        """group × symbol 平均 coverage（純 manifest nan_ratio，零 parquet 載入）。"""
+        """group × symbol 平均 coverage（純 manifest nan_ratio，零 parquet 載入）。`on_step` 為進度／取消安全點掛鉤。"""
 
         normalized_symbols = [symbol.strip().upper() for symbol in symbols if symbol and symbol.strip()]
         if len(normalized_symbols) == 0:
@@ -306,7 +321,9 @@ class CoverageAnalyzer:
         missing_symbols: list[str] = []
         all_groups: set[str] = set()
 
-        for symbol in dedup_symbols:
+        n_symbols = len(dedup_symbols)
+        for index, symbol in enumerate(dedup_symbols):
+            _step(on_step, "load_manifests", index, n_symbols)
             bundle = self._load_v2_manifest_for_symbol(symbol, tf, feature_base_path)
             if bundle is None:
                 symbol_manifests[symbol] = None
@@ -317,6 +334,7 @@ class CoverageAnalyzer:
             symbol_manifests[symbol] = manifest
             artifact = FeatureReader.get_v2_artifact(manifest, "raw")
             all_groups.update(str(name) for name in artifact.get("groups", {}).keys())
+        _step(on_step, "load_manifests", n_symbols, n_symbols)
 
         matrix: dict[str, dict[str, float | None]] = {
             group_name: {symbol: None for symbol in dedup_symbols} for group_name in all_groups
@@ -385,9 +403,13 @@ class CoverageAnalyzer:
         timeframe: str,
         group_name: str,
         feature_base_path: str = "data_cache/features",
-        top_n: int = 100,
+        top_n: Optional[int] = 100,
+        on_step: StepHook = None,
     ) -> dict[str, object]:
-        """單一 group 的 per-feature coverage（僅載入該 group 欄位）。"""
+        """單一 group 的 per-feature coverage（僅載入該 group 欄位）。
+
+        `top_n`＝None ⇒ 不截斷、回傳完整排序結果（任務路徑；分頁於結果端點自同一快照切片，ICPERF Task 0.6 (h) ③）；
+        整數 ⇒ 依跨 symbol 離散度取前 top_n（同步相容路徑）。`on_step` 為進度／取消安全點掛鉤（每 symbol 一次）。"""
 
         normalized_symbols = [symbol.strip().upper() for symbol in symbols if symbol and symbol.strip()]
         if len(normalized_symbols) == 0:
@@ -405,7 +427,9 @@ class CoverageAnalyzer:
         matrix: dict[str, dict[str, float | None]] = {}
         row_counts: dict[str, int] = {}
 
-        for symbol in dedup_symbols:
+        n_symbols = len(dedup_symbols)
+        for index, symbol in enumerate(dedup_symbols):
+            _step(on_step, "load_group", index, n_symbols)
             bundle = self._load_v2_manifest_for_symbol(symbol, tf, feature_base_path)
             if bundle is None:
                 row_counts[symbol] = 0
@@ -439,6 +463,7 @@ class CoverageAnalyzer:
                 valid_count = int(_finite_mask(series).sum())
                 coverage = float(valid_count / total)
                 matrix[column][symbol] = float(np.clip(coverage, 0.0, 1.0))
+        _step(on_step, "load_group", n_symbols, n_symbols)
 
         dedup_features = sorted(feature_names)
         divergence: dict[str, float] = {}
@@ -456,9 +481,10 @@ class CoverageAnalyzer:
             key=lambda name: divergence.get(name, -1.0),
             reverse=True,
         )
-        limit = max(1, int(top_n))
-        if len(sorted_features) > limit:
-            sorted_features = sorted_features[:limit]
+        if top_n is not None:
+            limit = max(1, int(top_n))
+            if len(sorted_features) > limit:
+                sorted_features = sorted_features[:limit]
 
         return {
             "features": sorted_features,

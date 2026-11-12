@@ -3081,6 +3081,7 @@ export interface GroupCoverageResponsePayload {
   };
 }
 
+/** Group Feature 結果頁（ICPERF Task 0.6 (h) ③）：features／matrix／divergence 為 [offset, offset+limit) 切片，total 為截斷前特徵數。 */
 export interface GroupFeatureCoverageResponsePayload {
   group_name: string;
   features: string[];
@@ -3088,6 +3089,45 @@ export interface GroupFeatureCoverageResponsePayload {
   matrix: Record<string, Record<string, number | null>>;
   divergence: Record<string, number>;
   row_counts: Record<string, number>;
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+// Coverage 背景任務（ICPERF Task 0.6 (h) ⑦；NOCAP Task 5.3 共用背景工作契約）
+export type CoverageTaskState =
+  | 'queued'
+  | 'running'
+  | 'cancelling'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
+
+export interface CoverageTaskCreatedPayload {
+  task_id: string;
+}
+
+export interface CoverageTaskProgress {
+  phase: string;
+  processed: number;
+  total: number;
+  updated_at: string;
+}
+
+export interface CoverageTaskStatusPayload {
+  task_id: string;
+  kind: string;
+  state: CoverageTaskState;
+  progress: CoverageTaskProgress;
+  error: string | null;
+  created_at: string;
+  summary?: Record<string, unknown> | null;
+}
+
+export interface CoverageTaskCancelPayload {
+  task_id: string;
+  cancel: 'cancelling' | 'cancelled' | 'already_terminal';
 }
 
 // ============================================================

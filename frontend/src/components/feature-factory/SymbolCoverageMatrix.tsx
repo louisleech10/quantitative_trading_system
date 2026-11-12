@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  CoverageTaskCreatedPayload,
+  CoverageTaskStatusPayload,
   GroupCoverageResponsePayload,
   GroupFeatureCoverageResponsePayload,
   FeatureRegistryEntry,
@@ -13,15 +15,85 @@ import {
 import { httpErrorMessage } from '@/lib/httpError';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const BROWSER_API = `${API_BASE_URL}/api/v1/feature-browser`;
+
+/**
+ * Coverage 計算為背景任務（ICPERF Task 0.6 (h) ⑦；NOCAP Task 5.3 前端契約）：POST 回 task_id，輪詢狀態至終態
+ * （completed／failed／cancelled／interrupted），**不設次數或時間上限**；網路錯誤依退避重試、不丟棄任務；
+ * 使用者可取消。下鑽結果以 offset／limit 自同一任務之完整結果分頁讀取（③，每頁筆數 ≥ 1、無上界）。
+ */
+const POLL_INTERVAL_MS = 1000;
+/** 網路錯誤退避：自 1 秒起倍增、單次等待最多 16 秒（只是重試間隔，不放棄任務）。 */
+const RETRY_BASE_MS = 1000;
+const RETRY_MAX_MS = 16000;
+const DEFAULT_PAGE_SIZE = 100;
+const TERMINAL_STATES = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
 
 interface SymbolCoverageMatrixProps {
   entries: FeatureRegistryEntry[];
   featureNames?: string[];
 }
 
-function clampTopN(value: number): number {
-  if (!Number.isFinite(value)) return 100;
-  return Math.min(500, Math.max(1, Math.floor(value)));
+/** 伺服器回非 2xx（非網路錯誤）：不重試，直接呈現。 */
+class CoverageHttpError extends Error {}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new CoverageHttpError(httpErrorMessage(body, response.statusText));
+  }
+  return (await response.json()) as T;
+}
+
+/** 輪詢任務狀態至終態；`isActive()` 為假（元件卸載或已發起新任務）即停止並回 null。 */
+async function pollTask(
+  taskId: string,
+  onStatus: (status: CoverageTaskStatusPayload) => void,
+  isActive: () => boolean,
+): Promise<CoverageTaskStatusPayload | null> {
+  let retryDelay = RETRY_BASE_MS;
+  while (isActive()) {
+    let status: CoverageTaskStatusPayload;
+    try {
+      status = await requestJson<CoverageTaskStatusPayload>(`${BROWSER_API}/tasks/${taskId}`);
+      retryDelay = RETRY_BASE_MS;
+    } catch (pollError) {
+      if (pollError instanceof CoverageHttpError) throw pollError;
+      await sleep(retryDelay); // 網路錯誤：退避後重試同一任務
+      retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
+      continue;
+    }
+    if (!isActive()) return null;
+    onStatus(status);
+    if (TERMINAL_STATES.has(status.state)) return status;
+    await sleep(POLL_INTERVAL_MS);
+  }
+  return null;
+}
+
+function terminalMessage(status: CoverageTaskStatusPayload): string | null {
+  if (status.state === 'failed') return `計算失敗：${status.error ?? '未知原因'}`;
+  if (status.state === 'interrupted') return `計算中斷：${status.error ?? '服務重啟'}`;
+  if (status.state === 'cancelled') return '已取消';
+  return null;
+}
+
+function TaskProgress({ status }: { status: CoverageTaskStatusPayload | null }) {
+  if (!status || TERMINAL_STATES.has(status.state)) return null;
+  const { processed, total, updated_at: updatedAt } = status.progress;
+  return (
+    <span className="text-xs text-slate-400">
+      {status.state === 'cancelling' ? '取消中' : '計算中'} {processed} / {total}（更新於 {updatedAt}）
+    </span>
+  );
+}
+
+function pageSizeOf(value: string): number {
+  const parsed = Math.floor(Number(value));
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : DEFAULT_PAGE_SIZE;
 }
 
 function getCellClassFromCoverage(coverage: number | null): string {
@@ -39,7 +111,7 @@ function getCellClassFromCoverage(coverage: number | null): string {
 export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixProps) {
   const [timeframe, setTimeframe] = useState('');
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
-  const [topN, setTopN] = useState(100);
+  const [pageSizeInput, setPageSizeInput] = useState(String(DEFAULT_PAGE_SIZE));
   const [groupPayload, setGroupPayload] = useState<GroupCoverageResponsePayload | null>(null);
   const [drillPayload, setDrillPayload] = useState<GroupFeatureCoverageResponsePayload | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -47,6 +119,23 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
   const [drillLoading, setDrillLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drillError, setDrillError] = useState<string | null>(null);
+  const [groupStatus, setGroupStatus] = useState<CoverageTaskStatusPayload | null>(null);
+  const [drillStatus, setDrillStatus] = useState<CoverageTaskStatusPayload | null>(null);
+  const [groupTaskId, setGroupTaskId] = useState<string | null>(null);
+  const [drillTaskId, setDrillTaskId] = useState<string | null>(null);
+
+  const mountedRef = useRef(true);
+  /** 請求世代：每次發起新計算即遞增，舊世代之晚到回應（task_id、狀態、結果、錯誤）一律丟棄。 */
+  const groupRunRef = useRef(0);
+  const drillRunRef = useRef(0);
+  /** 下鑽讀頁序號：每次讀頁遞增，只採用最新一次讀頁之回應。 */
+  const drillPageRef = useRef(0);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const timeframes = useMemo(() => {
     return Array.from(new Set(entries.map((item) => item.timeframe))).sort();
@@ -103,43 +192,67 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
     });
   };
 
+  const cancelTask = async (taskId: string | null) => {
+    if (!taskId) return;
+    try {
+      await requestJson(`${BROWSER_API}/tasks/${taskId}/cancel`, { method: 'POST' });
+    } catch {
+      // 取消請求失敗不改變輪詢：任務終態仍以狀態端點為準
+    }
+  };
+
   const runGroupCoverage = async () => {
     if (selectedSymbols.length < 2) {
       setError('請至少選擇 2 個 Symbol');
       return;
     }
 
+    const token = ++groupRunRef.current;
+    const isActive = () => mountedRef.current && groupRunRef.current === token;
+    drillRunRef.current += 1; // 主表重算 ⇒ 舊下鑽世代失效（其晚到回應不得寫回已清空之區域）
+    drillPageRef.current += 1;
     setLoading(true);
     setError(null);
+    setGroupStatus(null);
     setDrillPayload(null);
     setSelectedGroup(null);
     setDrillError(null);
+    setDrillStatus(null);
+    setDrillTaskId(null);
+    setDrillLoading(false);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/feature-browser/group-coverage`, {
+      const created = await requestJson<CoverageTaskCreatedPayload>(`${BROWSER_API}/group-coverage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbols: selectedSymbols,
-          timeframe,
-          timeout_seconds: 30,
-        }),
+        body: JSON.stringify({ symbols: selectedSymbols, timeframe }),
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(httpErrorMessage(body, response.statusText));
+      if (!isActive()) return;
+      setGroupTaskId(created.task_id);
+      const final = await pollTask(created.task_id, (status) => setGroupStatus(status), isActive);
+      if (!final || !isActive()) return;
+      if (final.state === 'completed') {
+        const data = await requestJson<GroupCoverageResponsePayload>(`${BROWSER_API}/tasks/${created.task_id}/result`);
+        if (isActive()) setGroupPayload(data);
+      } else {
+        setGroupPayload(null);
+        setError(terminalMessage(final));
       }
-
-      const data = (await response.json()) as GroupCoverageResponsePayload;
-      setGroupPayload(data);
     } catch (fetchError) {
+      if (!isActive()) return;
       setGroupPayload(null);
       setError(fetchError instanceof Error ? fetchError.message : 'Group Coverage 請求失敗');
     } finally {
-      setLoading(false);
+      if (isActive()) setLoading(false);
     }
   };
+
+  const loadDrillPage = useCallback(async (taskId: string, offset: number, limit: number, isActive: () => boolean) => {
+    const page = await requestJson<GroupFeatureCoverageResponsePayload>(
+      `${BROWSER_API}/tasks/${taskId}/result?offset=${offset}&limit=${limit}`,
+    );
+    if (isActive()) setDrillPayload(page);
+  }, []);
 
   const runGroupDrilldown = async (groupName: string) => {
     if (selectedSymbols.length < 2) {
@@ -147,37 +260,56 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
       return;
     }
 
+    const token = ++drillRunRef.current;
+    const isActive = () => mountedRef.current && drillRunRef.current === token;
     setSelectedGroup(groupName);
     setDrillLoading(true);
     setDrillError(null);
+    setDrillStatus(null);
+    setDrillPayload(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/feature-browser/group-feature-coverage`, {
+      const created = await requestJson<CoverageTaskCreatedPayload>(`${BROWSER_API}/group-feature-coverage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbols: selectedSymbols,
-          timeframe,
-          group_name: groupName,
-          top_n: clampTopN(topN),
-          timeout_seconds: 30,
-        }),
+        body: JSON.stringify({ symbols: selectedSymbols, timeframe, group_name: groupName }),
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(httpErrorMessage(body, response.statusText));
+      if (!isActive()) return; // 已發起新下鑽或主表重算：此晚到之 task_id 不得取代現行任務
+      setDrillTaskId(created.task_id);
+      const final = await pollTask(created.task_id, (status) => setDrillStatus(status), isActive);
+      if (!final || !isActive()) return;
+      if (final.state === 'completed') {
+        const pageSeq = ++drillPageRef.current;
+        await loadDrillPage(created.task_id, 0, pageSizeOf(pageSizeInput),
+          () => isActive() && drillPageRef.current === pageSeq);
+      } else {
+        setDrillError(terminalMessage(final));
       }
-
-      const data = (await response.json()) as GroupFeatureCoverageResponsePayload;
-      setDrillPayload(data);
     } catch (fetchError) {
+      if (!isActive()) return;
       setDrillPayload(null);
       setDrillError(fetchError instanceof Error ? fetchError.message : 'Group 下鑽請求失敗');
     } finally {
-      setDrillLoading(false);
+      if (isActive()) setDrillLoading(false);
     }
   };
+
+  const goToDrillPage = async (direction: 1 | -1) => {
+    if (!drillPayload || !drillTaskId) return;
+    const limit = pageSizeOf(pageSizeInput);
+    const offset = Math.max(0, drillPayload.offset + direction * limit);
+    const token = drillRunRef.current;
+    const pageSeq = ++drillPageRef.current;
+    const isActive = () => mountedRef.current && drillRunRef.current === token && drillPageRef.current === pageSeq;
+    try {
+      await loadDrillPage(drillTaskId, offset, limit, isActive);
+    } catch (fetchError) {
+      if (isActive()) setDrillError(fetchError instanceof Error ? fetchError.message : '讀取下一頁失敗');
+    }
+  };
+
+  const groupRunning = loading && groupStatus !== null && !TERMINAL_STATES.has(groupStatus.state);
+  const drillRunning = drillLoading && drillStatus !== null && !TERMINAL_STATES.has(drillStatus.state);
 
   if (timeframes.length === 0) {
     return (
@@ -201,13 +333,12 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
         </select>
 
         <div className="flex items-center gap-2 text-sm text-slate-300">
-          下鑽 top_n
+          下鑽每頁筆數
           <Input
             type="number"
             min={1}
-            max={500}
-            value={topN}
-            onChange={(event) => setTopN(clampTopN(Number(event.target.value)))}
+            value={pageSizeInput}
+            onChange={(event) => setPageSizeInput(event.target.value)}
             className="w-24"
           />
         </div>
@@ -215,6 +346,13 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
         <Button onClick={runGroupCoverage} disabled={loading || selectedSymbols.length < 2}>
           {loading ? '計算中...' : '計算 Group Coverage'}
         </Button>
+
+        {groupRunning && (
+          <Button variant="outline" onClick={() => cancelTask(groupTaskId)}>
+            取消
+          </Button>
+        )}
+        <TaskProgress status={groupStatus} />
 
         {groupPayload?.summary && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -271,8 +409,13 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
       </div>
 
       {error && (
-        <div className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-          {error}
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+          <span>{error}</span>
+          {groupStatus?.state === 'interrupted' && (
+            <Button variant="outline" onClick={runGroupCoverage} disabled={loading}>
+              重送
+            </Button>
+          )}
         </div>
       )}
 
@@ -340,17 +483,48 @@ export default function SymbolCoverageMatrix({ entries }: SymbolCoverageMatrixPr
       )}
 
       {drillError && (
-        <div className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-          {drillError}
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+          <span>{drillError}</span>
+          {drillStatus?.state === 'interrupted' && selectedGroup && (
+            <Button variant="outline" onClick={() => runGroupDrilldown(selectedGroup)} disabled={drillLoading}>
+              重送下鑽
+            </Button>
+          )}
         </div>
       )}
 
       {selectedGroup && (
         <div className="space-y-2">
-          <div className="text-sm text-slate-200">
-            下鑽 Group: <span className="text-cyan-300">{selectedGroup}</span>
-            {drillLoading && <span className="ml-2 text-slate-400">載入中...</span>}
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-200">
+            <span>
+              下鑽 Group: <span className="text-cyan-300">{selectedGroup}</span>
+            </span>
+            {drillLoading && <span className="text-slate-400">載入中...</span>}
+            <TaskProgress status={drillStatus} />
+            {drillRunning && (
+              <Button variant="outline" onClick={() => cancelTask(drillTaskId)}>
+                取消下鑽
+              </Button>
+            )}
           </div>
+
+          {drillPayload && (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+              <span>
+                第 {drillPayload.total === 0 ? 0 : drillPayload.offset + 1}–{drillPayload.offset + drillPayload.features.length} 筆，共 {drillPayload.total} 筆
+              </span>
+              <Button variant="outline" onClick={() => goToDrillPage(-1)} disabled={drillPayload.offset <= 0}>
+                上一頁
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => goToDrillPage(1)}
+                disabled={drillPayload.offset + drillPayload.features.length >= drillPayload.total}
+              >
+                下一頁
+              </Button>
+            </div>
+          )}
 
           {drillPayload && drillPayload.features.length > 0 && (
             <div className="overflow-auto max-h-[360px] rounded border border-white/10">

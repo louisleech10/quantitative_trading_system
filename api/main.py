@@ -27,6 +27,7 @@ from api.services.feature_factory_batch_adapters import (
     FeatureFactoryQualityAdapter,
 )
 from api.services.feature_factory_service import feature_factory_service
+from api.services.feature_browser_service import feature_browser_service
 
 
 batch_service: Optional[FeatureFactoryBatchService] = None
@@ -61,7 +62,12 @@ async def lifespan(app: FastAPI):
             run_deleter=feature_factory_service.delete_run,
         )
         set_feature_factory_batch_service(batch_service)
-    
+
+    # 前一行程未完成之 Coverage 背景任務標 interrupted（NOCAP Task 5.3；ICPERF Task 0.6 L1c）
+    interrupted = feature_browser_service.job_store.mark_interrupted_on_startup()
+    if interrupted:
+        logger.info("已將 %d 筆前次未完成之 Coverage 任務標為 interrupted", interrupted)
+
     logger.info(f"API 服務器啟動成功 - {settings.app_name} v{settings.app_version}")
     logger.info(f"運行環境: {'Production' if settings.is_production() else 'Development'}")
     logger.info(f"API 前綴: {settings.api_prefix}")

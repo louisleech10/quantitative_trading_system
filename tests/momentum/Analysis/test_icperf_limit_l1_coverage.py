@@ -133,6 +133,35 @@ def test_l1b_rows_fully_covered(l0: Set[Row], declared: List[Tuple[str, Row]]) -
     assert not missing, missing
 
 
+_FB_MODELS = "api/models/feature_browser_models.py"
+_FB_ROUTES = "api/routes/feature_browser.py"
+_COV = "momentum/Analysis/coverage_analyzer.py"
+_SCM = "frontend/src/components/feature-factory/SymbolCoverageMatrix.tsx"
+_T7 = "e641c6d7a7d85bd44405edc92533cf1bb665918a875aa7b43f6e1f9ea58cedf2"
+L1C_ROWS = {
+    (_FB_MODELS, 20, _T7), (_FB_MODELS, 42, _T7), (_FB_MODELS, 66, _T7),
+    (_FB_MODELS, 65, "feaf02d40ea28a8c211c4e7afe2bf3a7dc9497499beecd7d2c4e106080d157f7"),
+    (_FB_ROUTES, 53, "0a712e5934f0eeb31a68802861f75e50a7c6ff093af8995a98286fd80e30e9d5"),
+    (_FB_ROUTES, 71, "d260aedf451141596bc46e0e56585bdaf8f97334c6a78f1dc60e4f47d15b0cc9"),
+    (_FB_ROUTES, 92, "3796f758a65eb17391d0f42578eff69e4f1de161f9b3fa08aa85ea6279e0fa02"),
+    (_COV, 388, "47e374d3fe299eb12e95be74bc654d4475f642f693217e7b518cdf923a378771"),
+    (_COV, 460, "505fda6be0d7775a16c3b430b397e45dde176d8da6ca2a4cd4f03b1b889b285c"),
+    (_COV, 461, "2c1854ae8ca8258ed76f20a400702d21a5ffc252c0de2dab308038f1408e6ea6"),
+    (_SCM, 24, "bec607c7198d68a6f3323722b152d8facc3dada75201b5dba47deb1550ca2893"),
+    (_SCM, 125, "014ba6bc49c5b7c70a4baac35fa9c262924a5cc44ca8cf994d53f39b8f3d39a5"),
+    (_SCM, 163, "014ba6bc49c5b7c70a4baac35fa9c262924a5cc44ca8cf994d53f39b8f3d39a5"),
+    (_SCM, 208, "343dd1a589c858e99f90c06356a13f7431d94e637610812a476d5e85255d5be8"),
+}
+
+
+def test_l1c_rows_fully_covered(l0: Set[Row], declared: List[Tuple[str, Row]]) -> None:
+    """L1c 子批（特徵覆蓋率三端點 ⑦ 改任務制＋③ 同一任務結果快照分頁；SPEC v5.86 (h)、審碼 r169 G3）：14 落點皆為
+    L0 L1 列且逐一有具名測試（pytest 10、vitest 4）。"""
+    assert L1C_ROWS <= l0
+    missing = sorted(L1C_ROWS - {row for _, row in declared})
+    assert not missing, missing
+
+
 def _rebatched_out_of_l1() -> Set[Tuple[str, str]]:
     """現行裁定檔中已依 SPEC 改列 L2 之 (file, code_sha256)（例：年份閘依 SPEC (e) 改 L2，諮詢 r165 C8）。"""
     rulings = json.loads((REPO / "tests" / "_golden" / "icperf" / "limit_rulings.json").read_text(encoding="utf-8"))

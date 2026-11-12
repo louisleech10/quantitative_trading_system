@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache",
         validation_alias="KLINE_CACHE_DIR"
     )
+    #: 特徵瀏覽器覆蓋率背景任務紀錄目錄（NOCAP Task 5.3 共用背景工作元件；ICPERF Task 0.6 L1c）
+    feature_browser_jobs_dir: Path = Field(
+        default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache" / "feature_browser_jobs"
+    )
     results_output_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "search_results")
     logs_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "logs")
     

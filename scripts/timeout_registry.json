@@ -1596,6 +1596,12 @@
       "line": "\"_t = time.perf_counter()\\n    while time.perf_counter() - _t < 1.5:\\n        pass\")",
       "class": "D",
       "reason": "測試資料字串中之忙迴圈程式（受測負載）"
+    },
+    {
+      "path": "tests/api/test_icperf_limit_l1c_coverage_tasks.py",
+      "line": "REMOVED_TIME_FIELD = \"timeout_seconds\"",
+      "class": "D",
+      "reason": "負測試：斷言送已移除之請求逾時秒數欄即 422（ICPERF Task 0.6 L1c，施工清單審查 r175），非時間上限"
     }
   ]
 }

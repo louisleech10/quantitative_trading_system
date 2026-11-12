@@ -15548,6 +15548,48 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "ICPERF"
+  },
+  "tests/api/test_icperf_limit_l1c_coverage_tasks.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_icperf_limit_l1c_coverage_tasks.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/api/test_nocap_background_jobs.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_nocap_background_jobs.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
   }
  },
  "tombstones": [
