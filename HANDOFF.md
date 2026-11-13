@@ -358,6 +358,8 @@
 - 🔴 **測試慢的根因是測試本身跑全規模**（2026-11-12 實查）：220 條重型測試佔 ledger 33.8 小時中約 30.3 小時；`docs/TEST_SELECTION.md` §7 曾把「重型測試應否存在」列範圍外，故選取越做越精卻從未改小測試。TESTSEL 收尾 I10 移除此排除並逐條瘦身。
 - 🔴 **testmon 收集期沒有 coverage**（`testmon_core.py:510-519`，coverage 至第一個測試才啟動）：import 期被呼叫之函式改本體 ⇒ 原本 0 選；TESTSEL I2（testsel-leakfix 5a567067）補上。
 - 🔴 **子代理 worktree 之 `core.hooksPath` 指向主 repo 之 hook**：主 repo 在 main 時，worktree 提交跑的是 main 之 pre-commit，testsel 分支新增之 TESTSEL 段不生效（2026-11-12）。
+- 🔴 **TESTSEL 首次全量後至合回 main 前，main 不得提交任何程式狀態路徑**（momentum／api／scripts／tests／pytest.ini／conftest.py／requirements.txt；**`scripts/fact_keys.json` 也在內**）：否則合併後之樹不等於 full 收據之程式狀態，合併閘拒收、全量（6–8 小時）須重跑。期間更新 HANDOFF 生成區塊改在 testsel 整合樹提交（2026-11-13 主委複查發現；詳 handoffs/20261112-testsel-finish-outline.md 末節）。
+- 🔴 **一日撞 5 小時額度三次**（2026-11-13）：同時 7 個 Opus 子代理、各 50–90 萬 token、排鎖時被反覆喚醒。同時至多 1–2 個子代理；久等之重型跑不掛子代理，用單一背景等待程序盯結果檔。
 - 🔴 **session 中途改 `.claude/settings.json` 後，既有 Stop hook（`self_verify_check.sh`）疑似未再觸發**：2026-10-27 改設定加 hook 之後各則回覆漏「（自查：已查證）」而無任何 Stop hook 回灌（使用者「為何最後幾則 (自查：已查證)這類自我檢查這都沒了？」）；手動以本 session transcript 跑該 hook rc=2、0.46 秒，腳本本身正常。推測為中途改設定使 hook 待 `/hooks` 確認（未查證：session 內無法觀察 hook 載入狀態；查證法＝新 session 送一則不含標記之回覆，看是否被回灌）。新 session 開工第一件事：確認 Stop hook 與兩道新 hook 皆觸發。
 - 🔴 **新加之 hook 不會在當前 session 生效**：直接改 `.claude/settings.json` 加之 hook，須於 `/hooks` 選單確認或開新 session 才啟用（2026-10-27 實測：timeout_write_guard 手動跑 rc=2，但同 session 之 Edit 未被擋）。驗 hook 生效須於新 session 實際觸發一次。
 - 🔴 **重型跑前先量成長曲線，不得直接上全規模**（使用者 2026-10-27「軟體和量化業界會這樣直接測大規模到崩潰？」）：IC 全欄在 20.9 萬欄需約 47 小時，事前未量即跑；且違反 2026-09-28「8 GB 跑不動者延至第 16 步」裁定。先以小、中規模 3 點（如 500／1000／2000 欄）實測耗時與 RSS 再推算；建基準與驗證預設只用小中規模、每批重型跑先列預算，逾 2 小時先找省法（使用者「我感覺你所有票都這樣搞，這有符合業界做法嗎？」；NOCAP Task 0.3c）。慢程式（改前碼）不跑全規模。
