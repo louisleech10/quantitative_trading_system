@@ -83,6 +83,74 @@ def test_heavy_command_rules(cmd: str, background: bool, expected: int) -> None:
     assert _rc(_bash(cmd, background)) == expected
 
 
+#: 2026-11-14 TESTSEL I7 事故之原命令（lockf 前綴、背景、經共用監看、無估時收據）：舊版放行，開跑 11 小時
+I7_INCIDENT = ("cd .claude/worktrees/agent-a520620667770e1b9 && mkdir -p runs/testsel_full && lockf "
+               "/Users/louis/Desktop/quantitative_trading_system/runs/testsel_full/heavy.lock venv/bin/python "
+               "scripts/run_watched.py --log runs/testsel_full/i7_full.log -- venv/bin/python scripts/testsel.py full "
+               "> runs/testsel_full/i7_stdout.log 2>&1; echo \"exit rc=$?\"")
+TESTSEL_FULL = WRAP + "venv/bin/python scripts/testsel.py full"
+#: 前綴型包裝之注入樣本（刻意含 timeout 包裝字樣以驗拆包裝；非本測試自設時間上限）——集中一行，timeout_registry D 類登記
+TIMEOUT_WRAPS, TIMEOUT_LIGHT = ("timeout 99999 ", "timeout -k 5 -s INT 1h ", "timeout --kill-after=5 1h ", "gtimeout 1h ", "lockf /tmp/x.lock nice -n 5 timeout 1h "), "timeout 5 grep -n 'scripts/testsel.py full' docs/TEST_SELECTION.md"  # noqa: E501
+
+
+@pytest.mark.parametrize("cmd", [
+    I7_INCIDENT,
+    "lockf /tmp/x.lock " + TESTSEL_FULL,
+    "lockf -k -t 10 /tmp/x.lock " + TESTSEL_FULL,
+    "flock /tmp/x.lock " + TESTSEL_FULL,
+    "flock -w 5 /tmp/x.lock " + TESTSEL_FULL,
+    "flock /tmp/x.lock -c '" + TESTSEL_FULL + "'",
+    "flock -c '" + TESTSEL_FULL + "' /tmp/x.lock",
+    *[w + TESTSEL_FULL for w in TIMEOUT_WRAPS],  # 含多層包裝（lockf＋nice＋timeout）
+    "nice -n 10 " + TESTSEL_FULL,
+    "nice --adjustment=10 " + TESTSEL_FULL,
+    "caffeinate -t 3600 " + TESTSEL_FULL,
+    "caffeinate -i -t 3600 " + TESTSEL_FULL,
+    "env -u FOO " + TESTSEL_FULL,
+    "env -S '" + TESTSEL_FULL + "'",
+    "stdbuf -oL " + TESTSEL_FULL,
+    "stdbuf -o L " + TESTSEL_FULL,
+    "ionice -c 3 " + TESTSEL_FULL,
+    "setsid " + TESTSEL_FULL,
+    "lockf /tmp/x.lock venv/bin/python -m pytest -q",  # 包裝內之全套 pytest
+])
+def test_wrapper_prefix_heavy_command_blocked(cmd: str) -> None:
+    """前綴型包裝（帶值選項、命令前位置參數、以選項帶入命令字串）不得使重型命令漏判：背景＋經監看但無估時收據 ⇒ 擋。"""
+    assert _rc(_bash(cmd, True)) == 2
+
+
+@pytest.mark.parametrize("cmd", [
+    "lockf /tmp/x.lock git status --short",
+    TIMEOUT_LIGHT,
+    "nice -n 10 ls -la",
+    "flock /tmp/x.lock -c 'git log --oneline -1'",
+    "env -u FOO echo 'venv/bin/python scripts/testsel.py full'",
+    "lockf /tmp/x.lock venv/bin/python scripts/testsel.py select --tier close --json",  # select 非重型
+])
+def test_wrapper_prefix_light_command_allowed(cmd: str) -> None:
+    """反例：包裝內為非重型命令 ⇒ 放行（拆包裝不得誤擋）。"""
+    assert _rc(_bash(cmd, False)) == 0
+
+
+def test_mutation_old_prefix_stripping_misses_lockf(monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞對照：換回舊版（只認名、不知位置參數與帶值選項）⇒ 事故原命令與 timeout 包裝放行。"""
+    old = {"env", "nohup", "time", "exec", "command", "caffeinate", "nice"}
+
+    def old_strip(argv: List[str]) -> List[str]:
+        i = 0
+        while i < len(argv) and g._ASSIGN.match(argv[i]):
+            i += 1
+        while i < len(argv) and Path(argv[i]).name in old:
+            i += 1
+            while i < len(argv) and (argv[i].startswith("-") or g._ASSIGN.match(argv[i])):
+                i += 1
+        return argv[i:]
+
+    monkeypatch.setattr(g, "_strip_prefixes", old_strip)
+    assert _rc(_bash(I7_INCIDENT, True)) == 0
+    assert _rc(_bash(TIMEOUT_WRAPS[0] + TESTSEL_FULL, True)) == 0
+
+
 ICPERF_GATE = "venv/bin/python -m pytest -q -p no:cacheprovider tests/momentum/Analysis/test_icperf_gate.py"
 
 

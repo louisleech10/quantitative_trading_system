@@ -34,7 +34,31 @@ WRAPPER = "scripts/run_watched.py"
 
 _SEPARATORS = set(";&|()\n")
 _SHELLS = {"bash", "sh", "zsh", "source", "."}
-_PREFIXES = {"env", "nohup", "time", "exec", "command", "caffeinate", "nice"}
+#: 前綴型包裝命令：名 → (帶值選項〔值為下一個 token〕, 命令前之位置參數個數)。2026-11-14 事故：舊版只列名、不知帶值
+#: 選項與位置參數 ⇒ `lockf <鎖檔> <重型>`、`timeout <秒> <重型>`、`flock <鎖檔> <重型>`、`nice -n 10 <重型>`、
+#: `caffeinate -t N <重型>`、`env -u X <重型>`、`stdbuf -oL <重型>` 皆被當成非啟動器放行，TESTSEL I7 全量因此無估時
+#: 收據即開跑 11 小時。`--opt=值` 單一 token；`--` 結束選項。
+_WRAPPERS: Dict[str, Tuple[frozenset, int]] = {
+    "env": (frozenset({"-u", "--unset", "-C", "--chdir"}), 0),
+    "nohup": (frozenset(), 0),
+    "time": (frozenset({"-f", "--format", "-o", "--output"}), 0),
+    "exec": (frozenset({"-a"}), 0),
+    "command": (frozenset(), 0),
+    "caffeinate": (frozenset({"-t", "-w"}), 0),
+    "nice": (frozenset({"-n", "--adjustment"}), 0),
+    "ionice": (frozenset({"-c", "--class", "-n", "--classdata", "-p", "--pid"}), 0),
+    "stdbuf": (frozenset({"-i", "--input", "-o", "--output", "-e", "--error"}), 0),
+    "setsid": (frozenset(), 0),
+    "sudo": (frozenset({"-u", "--user", "-g", "--group", "-C", "--close-from", "-D", "--chdir", "-h", "--host",
+                        "-p", "--prompt", "-r", "--role", "-t", "--type", "-U", "--other-user"}), 0),
+    "lockf": (frozenset({"-t"}), 1),
+    "flock": (frozenset({"-w", "--wait", "--timeout", "-E", "--conflict-exit-code"}), 1),
+    "timeout": (frozenset({"-k", "--kill-after", "-s", "--signal"}), 1),
+    "gtimeout": (frozenset({"-k", "--kill-after", "-s", "--signal"}), 1),
+}
+_PREFIXES = set(_WRAPPERS)
+#: 以選項帶入命令字串之包裝（`flock <鎖> -c '<命令>'`、`env -S '<命令>'`）：其值即被執行之命令
+_WRAPPER_CMD_OPTS = {"flock": frozenset({"-c", "--command"}), "env": frozenset({"-S", "--split-string"})}
 _ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 MAX_DEPTH = 5  # 執行之 .sh 遞迴展開之深度上限；逾限 ⇒ 擋（fail-closed，NOCAP Task 0.3 v3）
 DEPTH_EXCEEDED = "<heavy_run_guard:depth-exceeded>"
@@ -99,13 +123,35 @@ def _simple_commands(text: str, comments: bool) -> Optional[List[List[str]]]:
 
 
 def _strip_prefixes(argv: List[str]) -> List[str]:
+    """去前置變數與前綴型包裝（`_WRAPPERS`：含帶值選項與命令前位置參數），回傳被執行之命令 argv。以選項帶入命令字串者
+    （`flock … -c '<命令>'`）回傳 `["bash", "-c", <命令>]` 交由殼層分支分析其內層。"""
     i = 0
     while i < len(argv) and _ASSIGN.match(argv[i]):
         i += 1
-    while i < len(argv) and Path(argv[i]).name in _PREFIXES:
+    while i < len(argv) and Path(argv[i]).name in _WRAPPERS:
+        name = Path(argv[i]).name
+        value_opts, n_operands = _WRAPPERS[name]
+        cmd_opts = _WRAPPER_CMD_OPTS.get(name, frozenset())
         i += 1
-        while i < len(argv) and (argv[i].startswith("-") or _ASSIGN.match(argv[i])):
-            i += 1
+        operands = 0
+        while i < len(argv):
+            tok = argv[i]
+            if tok == "--":
+                i += 1
+                continue
+            if tok in cmd_opts and i + 1 < len(argv):
+                return ["bash", "-c", argv[i + 1]]
+            if tok.startswith("-") and tok != "-":
+                i += 2 if tok in value_opts else 1
+                continue
+            if _ASSIGN.match(tok):
+                i += 1
+                continue
+            if operands < n_operands:  # 鎖檔／秒數等命令前位置參數（其後仍可接選項，如 `flock <鎖> -c …`）
+                operands += 1
+                i += 1
+                continue
+            break
     return argv[i:]
 
 

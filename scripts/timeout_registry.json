@@ -1602,6 +1602,12 @@
       "line": "REMOVED_TIME_FIELD = \"timeout_seconds\"",
       "class": "D",
       "reason": "負測試：斷言送已移除之請求逾時秒數欄即 422（ICPERF Task 0.6 L1c，施工清單審查 r175），非時間上限"
+    },
+    {
+      "path": "tests/governance/test_heavy_run_guard.py",
+      "line": "TIMEOUT_WRAPS, TIMEOUT_LIGHT = (\"timeout 99999 \", \"timeout -k 5 -s INT 1h \", \"timeout --kill-after=5 1h \", \"gtimeout 1h \", \"lockf /tmp/x.lock nice -n 5 timeout 1h \"), \"timeout 5 grep -n 'scripts/testsel.py full' docs/TEST_SELECTION.md\"  # noqa: E501",
+      "class": "D",
+      "reason": "heavy_run_guard 拆前綴型包裝之注入樣本（刻意含 timeout 包裝字樣、只作命令字串交守衛判定，不執行；2026-11-14 TESTSEL I7 lockf 漏判事故）"
     }
   ]
 }
