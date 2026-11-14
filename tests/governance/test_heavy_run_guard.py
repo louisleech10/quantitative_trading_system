@@ -1065,3 +1065,84 @@ def test_mutation_chunked_selection_unparsed_misses_heavy(tmp_path: Path, monkey
     _ledger(tmp_path, monkeypatch)
     monkeypatch.setattr(g, "_chunked_option", lambda argv, name: None)
     assert _chunked_rc(tmp_path, [f"{_GATE}::test_b"], 300) == 0
+
+
+# ---------------------------------------------------------------------------------------------- 2026-11-14 加總估時
+# 事故：合併驗證 13 檔 499 條、單條皆 <60 秒、worktree ledger 加總 897 秒（實跑 1,047 秒）；舊版只判單條 ≥60 秒且只讀
+# 本 repo ledger（同 13 檔僅 93 秒）⇒ 未估時即在 worktree 開跑。修：加總 ≥60 秒前景擋、讀 cd 目錄之 ledger、放行時印估時。
+
+_SUM_ROWS = [(f"{_UNLISTED}::test_{i}", 25.0) for i in range(3)]  # 單條 25 秒 <60、加總 75 秒 ≥60
+
+
+def _rows_ledger(d: Path, rows: List[Tuple[str, float]]) -> Path:
+    d.mkdir(parents=True)
+    (d / "s.jsonl").write_text("".join(json.dumps({"nodeid": n, "duration_s": s, "outcome": "passed"}) + "\n"
+                                       for n, s in rows), encoding="utf-8")
+    return d
+
+
+@pytest.mark.parametrize("rows,background,expected", [
+    (_SUM_ROWS, False, 2),                                             # 加總 75 秒前景 ⇒ 擋
+    (_SUM_ROWS, True, 0),                                              # 背景 ⇒ 放行（快速層不要求監看收據）
+    ([(f"{_UNLISTED}::test_{i}", 15.0) for i in range(3)], False, 0),  # 加總 45 秒 <60 ⇒ 前景可跑
+])
+def test_ledger_26_sum_over_limit_foreground_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                     rows: List[Tuple[str, float]], background: bool,
+                                                     expected: int) -> None:
+    monkeypatch.setattr(g, "LEDGER_DIR", _rows_ledger(tmp_path / "ledger", rows))
+    assert _rc(_bash(f"venv/bin/python -m pytest {_UNLISTED} -q", background)) == expected
+
+
+def test_mutation_sum_limit_removed_misses_incident(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：無加總上限（＝舊版只判單條）⇒ 加總 75 秒前景放行（鑑別力）。"""
+    monkeypatch.setattr(g, "LEDGER_DIR", _rows_ledger(tmp_path / "ledger", _SUM_ROWS))
+    monkeypatch.setattr(g, "FOREGROUND_LIMIT_S", float("inf"))
+    assert _rc(_bash(f"venv/bin/python -m pytest {_UNLISTED} -q", False)) == 0
+
+
+@pytest.mark.parametrize("form", ["var_subshell", "abs_cd", "braced_var"])
+def test_ledger_27_cd_directory_ledger_read(tmp_path: Path, form: str) -> None:
+    """本 repo ledger 空、cd 之 worktree ledger 加總 75 秒 ⇒ 前景擋（事故原命令形狀：`W=…; (cd $W && …)`）。"""
+    wt = tmp_path / "wt"
+    _rows_ledger(wt / ".testreg" / "ledger", _SUM_ROWS)
+    inner = f"venv/bin/python -m pytest -q -p no:cacheprovider {_UNLISTED} > /tmp/x.log 2>&1"
+    cmd = {"var_subshell": f"W={wt}; S=/tmp; (cd $W && {inner}; echo \"exit=$?\" >> $S/x.log)",
+           "abs_cd": f"cd {wt} && {inner}",
+           "braced_var": f"W={wt}; cd ${{W}} && {inner}"}[form]
+    assert _rc(_bash(cmd, False)) == 2
+
+
+def test_mutation_cd_ledger_ignored_misses_worktree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：只讀本 repo ledger（＝舊版）⇒ worktree 命令估 0 秒、前景放行（鑑別力）。"""
+    wt = tmp_path / "wt"
+    _rows_ledger(wt / ".testreg" / "ledger", _SUM_ROWS)
+    monkeypatch.setattr(g, "_ledger_dirs", lambda command: ([Path(g.LEDGER_DIR)], []))
+    assert _rc(_bash(f"cd {wt} && venv/bin/python -m pytest {_UNLISTED} -q", False)) == 0
+
+
+@pytest.mark.parametrize("background,expected", [(False, 2), (True, 0)])
+def test_ledger_28_unresolved_cd_needs_background(background: bool, expected: int) -> None:
+    """cd 目錄含無法代入之變數 ⇒ 該目錄 ledger 不可知 ⇒ 前景擋、背景放行。"""
+    assert _rc(_bash(f"(cd $NOWHERE_X && venv/bin/python -m pytest {_UNLISTED} -q)", background)) == expected
+
+
+def test_ledger_29_estimate_printed_on_allow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                            capsys: pytest.CaptureFixture) -> None:
+    """放行之 pytest 一律印估時（systemMessage＋additionalContext）：有紀錄之加總與條數、無紀錄之選取；`2>&1` 之
+    fd 不當選取。"""
+    monkeypatch.setattr(g, "LEDGER_DIR", _rows_ledger(tmp_path / "ledger", _SUM_ROWS))
+    cmd = f"venv/bin/python -m pytest {_UNLISTED} tests/zz_unlisted/test_new.py -q > /tmp/x.log 2>&1"
+    assert _rc(_bash(cmd, True)) == 0
+    out = json.loads(capsys.readouterr().out)
+    msg = out["systemMessage"]
+    assert out["hookSpecificOutput"] == {"hookEventName": "PreToolUse", "additionalContext": msg}
+    assert "≥75 秒" in msg and "有紀錄 3 條" in msg and "無紀錄之選取 1 個" in msg, msg
+    assert _rc(_bash("ls", False)) == 0 and capsys.readouterr().out == ""  # 非 pytest 不印
+
+
+def test_ledger_30_blocked_message_includes_estimate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                    capsys: pytest.CaptureFixture) -> None:
+    monkeypatch.setattr(g, "LEDGER_DIR", _rows_ledger(tmp_path / "ledger", _SUM_ROWS))
+    assert _rc(_bash(f"venv/bin/python -m pytest {_UNLISTED} -q", False)) == 2
+    err = capsys.readouterr().err
+    assert "pytest_ledger_sum" in err and "≥75 秒" in err, err

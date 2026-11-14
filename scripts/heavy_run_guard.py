@@ -15,6 +15,10 @@ zsh／source）及直接執行之 `.sh`；其所執行之 repo 內 `.sh` 檔內�
 （測試檔／目錄／nodeid，或 `--trace-select <檔>` 所列）之紀錄耗時加總 ⇒ 擋。含 `-k`／`-m`／`--deselect` 等縮小選取者
 無從得知實際選取集，不做此檢查（依檔案加總只是上界）——此類命令須自行以 `scripts/ledger_durations.py` 估時。
 
+每條會執行測試之 pytest 皆依 ledger（本 repo＋命令 `cd` 之目錄如 worktree 之 `.testreg/ledger`）估時：放行時以
+systemMessage／additionalContext 印出（不靠主控端記得先估）；清單外者加總 ≥60 秒或 cd 目錄無法代入 ⇒ 須背景執行
+（2026-11-14 事故：13 檔單條皆 <60 秒、加總 897 秒，未估時即開跑）。
+
 用法：`python3 scripts/heavy_run_guard.py`（stdin＝PreToolUse payload；rc 0 放行／2 擋）。
 """
 
@@ -114,6 +118,8 @@ def _simple_commands(text: str, comments: bool) -> Optional[List[List[str]]]:
         if tok and set(tok) <= _SEPARATORS | set("<>"):
             if "<" in tok or ">" in tok:
                 skip_next = True  # 重導向之目標（檔名、`>&` 之 1）非命令
+                if cur and cur[-1].isdigit():
+                    cur.pop()  # `2>&1`、`2>x` 之來源 fd 非參數（否則 `2` 被當成 pytest 選取）
                 continue
             flush(tok)
             continue
@@ -302,31 +308,105 @@ def check(payload: Dict[str, Any], catalog: Dict[str, Any]) -> List[str]:
                 argvs = [_ARGV[text] for text, _w in runs
                          if text in _ARGV and re.search(rule["regex"], text, re.M | re.S)]
                 problems += receipt_problems(rule, argvs)
-    problems += ledger_heavy_problems(runs, catalog, background)
+    problems += ledger_heavy_problems(runs, catalog, background, str(tool_input.get("command") or ""))
     return problems
 
 
 #: 清單外、經 TESTREG ledger 判定為重型之 pytest（docs/TEST_SELECTION.md §4：紀錄耗時 ≥60 秒）之合成規則
 LEDGER_HEAVY_RULE = {"id": "pytest_ledger_heavy"}
+#: 前景 pytest 之估時上限（秒）：選取之 ledger 紀錄加總達此值 ⇒ 須背景執行。2026-11-14 事故：13 檔 499 條、單條皆
+#: <60 秒而加總 897 秒（實跑 1,047 秒），舊版只判單條 ≥60 秒 ⇒ 未估時即開跑、跑到一半說不出何時完。
+FOREGROUND_LIMIT_S = 60.0
+#: 本次判定中每條 pytest 命令之估時說明（`main` 於放行時以 systemMessage／additionalContext 印出，擋下時併入訊息）
+ESTIMATES: List[str] = []
+_VAR = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
 
 
-def ledger_heavy_problems(runs: List[Tuple[str, bool]], catalog: Dict[str, Any], background: bool) -> List[str]:
+def _ledger_dirs(command: str) -> Tuple[List[Path], List[str]]:
+    """估時讀之 ledger 目錄：本 repo＋命令中 `cd <目錄>` 之目錄自己的 `.testreg/ledger`（worktree 之測試碼與耗時可與
+    本 repo 大不同——2026-11-14 實測同 13 檔本 repo ledger 93 秒、worktree ledger 897 秒、實跑 1,047 秒）。目錄中
+    `$X`／`${X}` 以同命令之 `X=值` 代入；代入不了 ⇒ 列入第二回傳值（該目錄之耗時不可知）。"""
+    dirs: List[Path] = [Path(LEDGER_DIR)]
+    unresolved: List[str] = []
+    env: Dict[str, str] = {}
+    for argv in _simple_commands(command, False) or []:
+        i = 0
+        while i < len(argv) and _ASSIGN.match(argv[i]):
+            name, val = argv[i].split("=", 1)
+            env[name] = val
+            i += 1
+        rest = argv[i:]
+        if len(rest) < 2 or rest[0] != "cd":
+            continue
+        target = _VAR.sub(lambda m: env.get(m.group(1) or m.group(2), m.group(0)), rest[-1])
+        if "$" in target or target.startswith("~") or target == "-":
+            unresolved.append(rest[-1])
+            continue
+        led = (Path(target) if Path(target).is_absolute() else REPO / target) / ".testreg" / "ledger"
+        try:
+            if led.is_dir() and all(led.resolve() != d.resolve() for d in dirs):
+                dirs.append(led)
+        except OSError:
+            continue
+    return dirs, unresolved
+
+
+def _merged_durations(ld: Any, selectors: List[str], dirs: List[Path]) -> Dict[str, float]:
+    """各 ledger 目錄對選取之紀錄耗時；同一 nodeid 取最大（不得低估）。"""
+    out: Dict[str, float] = {}
+    for d in dirs:
+        for n, s in ld.load_durations(selectors, d).items():
+            out[n] = max(out.get(n, 0.0), s)
+    return out
+
+
+def _estimate_note(text: str, durations: Dict[str, float], unknown: List[str], dirs: List[Path],
+                   unresolved: List[str]) -> str:
+    total = sum(durations.values())
+    head = f"⏱ pytest 估時（TESTREG ledger 紀錄加總）：≥{total:.0f} 秒（約 {total / 60:.1f} 分；有紀錄 {len(durations)} 條）"
+    if unknown:
+        head += f"；無紀錄之選取 {len(unknown)} 個（耗時未知，例：{unknown[0]}）"
+    if unresolved:
+        head += f"；cd 目錄無法代入 {unresolved[0]}（該目錄 ledger 未讀）"
+    srcs = ", ".join(str(d.relative_to(REPO)) if REPO in d.parents else str(d) for d in dirs)
+    return f"{head}；ledger：{srcs}；命令：{text[:160]}"
+
+
+def ledger_heavy_problems(runs: List[Tuple[str, bool]], catalog: Dict[str, Any], background: bool,
+                          command: str = "") -> List[str]:
     """清單樣式未命中之 pytest 命令：其（未縮小之）選取依 ledger 含紀錄耗時 ≥60 秒之測試 ⇒ 視同重型（須背景、經共用
     監看、有估時收據〔含 tier〕）。清單不必逐一列舉重型測試檔（清單外之重型如 ffstat 系列亦攔）。含 -k／-m 等縮小
     選取者實際選取不可知 ⇒ 以縮小前之母集判「可能含重型」，仍須背景、監看、收據（只選快速層者改列 nodeid 或
-    --trace-select 即可前景跑）；估時低估之核算則只對可確知之選取做（`ledger_problems`）。"""
+    --trace-select 即可前景跑）；估時低估之核算則只對可確知之選取做（`ledger_problems`）。
+    另：每條會執行測試之 pytest（含清單內）皆算 ledger 估時並記入 `ESTIMATES`（放行時印出）；清單外者單條皆 <60 秒
+    但加總 ≥`FOREGROUND_LIMIT_S`、或 cd 目錄無法代入（ledger 不可知）⇒ 須背景執行。ledger 讀本 repo 與命令 cd 之
+    目錄（`_ledger_dirs`）。"""
     listed = [r["regex"] for kind in ("self_watched", "wrapped", "background_only") for r in catalog.get(kind) or []]
     out: List[str] = []
+    ESTIMATES.clear()
+    dirs, unresolved = _ledger_dirs(command) if command else ([Path(LEDGER_DIR)], [])
     for text, wrapped in runs:
         argv = _ARGV.get(text)
-        if not argv or not _is_pytest(argv) or any(re.search(rx, text, re.M | re.S) for rx in listed):
+        if not argv or not _is_pytest(argv):
             continue
         selectors = _pytest_selectors(argv, strict=False)
         if not selectors:
             continue
         ld = _ld()
-        heavy_ids = sorted(n for n, d in ld.load_durations(selectors, LEDGER_DIR).items() if d >= ld.FAST_LIMIT_S)
+        durations = _merged_durations(ld, selectors, dirs)
+        hit = set(ld.matched(selectors, durations))
+        ESTIMATES.append(_estimate_note(text, durations, [t for t in selectors if t not in hit], dirs, unresolved))
+        if any(re.search(rx, text, re.M | re.S) for rx in listed):
+            continue
+        heavy_ids = sorted(n for n, d in durations.items() if d >= ld.FAST_LIMIT_S)
         if not heavy_ids:
+            total = sum(durations.values())
+            if not background and total >= FOREGROUND_LIMIT_S:
+                out.append(f"pytest_ledger_sum：選取之 ledger 紀錄加總 {total:.0f} 秒（{len(durations)} 條，單條皆 "
+                           f"<{ld.FAST_LIMIT_S:.0f} 秒）≥{FOREGROUND_LIMIT_S:.0f} 秒 ⇒ 須背景執行（run_in_background＝true）")
+            elif not background and unresolved:
+                out.append(f"pytest_ledger_sum：cd 目錄 {unresolved[0]} 無法代入 ⇒ 其 ledger 未讀、估時不可知 ⇒ 須背景"
+                           "執行（run_in_background＝true），或改寫成可代入之路徑")
             continue
         rid = LEDGER_HEAVY_RULE["id"]
         if not background:
@@ -654,12 +734,20 @@ def main(stdin: Optional[str] = None) -> int:
     except (OSError, json.JSONDecodeError) as exc:
         print(f"heavy_run_guard: 重型命令清單無效 ⇒ 擋：{exc}", file=sys.stderr)
         return 2
+    ESTIMATES.clear()
     problems = check(payload, catalog)
     if not problems:
+        if ESTIMATES:  # 放行之 pytest：估時一律印出（使用者與主控端皆見，不靠記得先估）
+            note = "\n".join(ESTIMATES)
+            print(json.dumps({"systemMessage": note,
+                              "hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": note}},
+                             ensure_ascii=False))
         return 0
     print("🔴 heavy_run_guard（NOCAP）：重型命令須經共用監看並背景執行——", file=sys.stderr)
     for p in problems:
         print(f"  · {p}", file=sys.stderr)
+    for e in ESTIMATES:
+        print(f"  {e}", file=sys.stderr)
     return 2
 
 
