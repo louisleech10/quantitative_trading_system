@@ -234,6 +234,12 @@ case "$tool_name" in
     if printf '%s' "$fp" | grep -Eiq '(SPEC|TODO|PLAN).*\.md$' && printf '%s' "$fp" | grep -Eq 'docs/'; then
       [ -f "$fp" ] || kind="artifact"
     fi
+    # 逐項流程（2026-11-16 r4 CODEX-R4-P1-02）：新票 TODO 為 manifest（docs/manifests/*.json），同受 artifact 閘（gate.sh 驗大綱已確認）
+    # 已知邊界（r4 COMPOSER-R4-P2-01）：既有 SPEC／manifest 之 Edit 不擋——逐項流程對進行中之票自下一子批起適用，
+    #   擋 Edit 會中斷其既有修訂；新子批之 manifest 為新檔，已受此擋
+    if printf '%s' "$fp" | grep -Eq 'docs/manifests/[^/]+\.json$'; then
+      [ -f "$fp" ] || kind="artifact"
+    fi
     ;;
 esac
 

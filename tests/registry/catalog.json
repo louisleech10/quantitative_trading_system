@@ -6583,6 +6583,25 @@
    "rewrite_targets": [],
    "ticket": "GOVERNANCE"
   },
+  "tests/governance/test_gate_outline_first.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261116-testsel-x-consult-r3/synth.md",
+   "guarantee": [
+    "A16",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_gate_outline_first.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "GOVERNANCE"
+  },
   "tests/governance/test_gate_selfgate_newline.py": {
    "claim": [
     "contract"

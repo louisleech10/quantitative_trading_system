@@ -1,0 +1,45 @@
+{
+  "stub_modules": [],
+  "test_files": [],
+  "script_acceptance": [
+    "runs/testsel_route/i2_check.py"
+  ],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I2_MERGELIST_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "runs/testsel_route/i2_mergelist.json",
+      "runs/testsel_route/i2_check.py"
+    ],
+    "callers_now": [],
+    "callers_later": [
+      "I3（conftest 與 pytest.ini 移植、外掛剝離）",
+      "I6（移除自建機制）"
+    ],
+    "gate_cmd": "venv/bin/python runs/testsel_route/i2_check.py runs/testsel_route/i2_mergelist.json",
+    "forbidden": [
+      {"rule": "不得改任何被分類之檔（整合樹與 main 程式皆唯讀）", "observable": true},
+      {"rule": "I7e 全量期間不得對整合樹寫檔", "observable": true},
+      {"rule": "不得建通用分類框架或自動歸類器", "observable": false},
+      {"rule": "不得以清單自身為母體（母體一律取 git diff 之兩層）", "observable": true}
+    ],
+    "risk_mitigation": [
+      "文件級身分鎖 main_sha／base_sha／head_sha，任一漂移檢查即 rc≠0，須重產",
+      "class 依段落實際行為判，提交前綴只作提示",
+      "改壞對照十種（SPEC Task 1.2）證檢查器鑑別力"
+    ],
+    "coverage_risk": [
+      "「測試確實覆蓋該段」機器不判，交 I3／I6 審碼（SPEC Task 1.1 驗證⑤）"
+    ],
+    "lifecycle": "drop_after_ticket",
+    "not_executable": [
+      {"item": "stub_modules", "reason": "blocked-by", "owner": "claude", "expiry": "2026-12-31"},
+      {"item": "test_files", "reason": "blocked-by", "owner": "claude", "expiry": "2026-12-31"},
+      {"item": "contract_jsons", "reason": "blocked-by", "owner": "claude", "expiry": "2026-12-31"},
+      {"item": "不得建通用分類框架或自動歸類器", "reason": "user-ruling", "owner": "claude", "expiry": "2026-12-31"}
+    ]
+  }
+}

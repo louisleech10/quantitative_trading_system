@@ -557,7 +557,7 @@
         "TESTSEL：全專案測試選取（依賴有變才跑；docs/TEST_SELECTION.md）",
         "進行中",
         "docs/TEST_SELECTION.md",
-        "使用者 2026-10-27 排序第二（NOCAP Phase 0＋2 後）。testsel 分支（7a9ca3e1、255ad017、554af317）於 worktree testsel_int 建置；審碼 r1、r2 已處置；2026-10-28 將 main 併入分支同步（55673580）並修與 NOCAP 共用監看併用之兩缺陷（9fead8a6）；審碼 r3（三家；01b9ad3d 環境指紋改精確名排除 WATCHDOG_STACK_FILE）、r4（codex 2 P1：前綴排除駁回附盤點、合回時點採納回到 r2 處置）。2026-11-12 改序（使用者原話「用最快的速度和最短的時間，把測試會浪費不必要的時間這問題解決，不接收做了又漏東漏西」「你盡可能快速但完整地把測試票所有目標完成，不能有殘留和漏洞，測試內容或時間不合理就就修好，有問題跟委員共識決定」）：TESTSEL 先於 ICPERF 收尾，大綱 handoffs/20261112-testsel-finish-outline.md（I1–I11）。癥結＝220 條重型測試在測試內跑全規模（ledger 33.8 小時中約 30.3 小時），故 I10 重型測試瘦身（每條目標 ≤300 秒、絕不超過 900 秒；需全規模者改一次性驗證收據）為第一優先，不再有「全量 52 小時」之跑法。I1 main 併入 testsel 完成（fc38ec98、d0249d55，未 push）；I2 漏選 17 類全修（testsel-leakfix 5a567067，18 情境修前全漏、修後全選中）；I10 分 G1–G5 五組施工（G3 92709257、G5 73841fed 已提交，其餘施工中）；I3 flaky 隔離、I4 impact 改接、I5 票分支與必要時點全量、I11 耗時預算檢查（ledger >300 秒拒收、具名豁免）由 testsel-ops 施工。2026-11-13：G1–G5、P、T 全部合入 testsel（HEAD 76f0bacc，未 push）；b2 審碼 r1–r6 收斂（r6 三家零 finding）；23 條全規模測試列豁免附小規模姊妹；硬體需求表接入選取與收據；既有紅修綠或列 allowed_red（產品缺陷歸 RM-FFPROD／RM-ICPATH 正式 Task）。下一步：I7 首次全量（約 6–8 小時，接手手冊 handoffs/20261112-testsel-finish-outline.md 末節）→ 真實改動回放對照全跑 → 文件 → 合回 main"
+        "使用者 2026-10-27 排序第二（NOCAP Phase 0＋2 後）。testsel 分支（7a9ca3e1、255ad017、554af317）於 worktree testsel_int 建置；審碼 r1、r2 已處置；2026-10-28 將 main 併入分支同步（55673580）並修與 NOCAP 共用監看併用之兩缺陷（9fead8a6）；審碼 r3（三家；01b9ad3d 環境指紋改精確名排除 WATCHDOG_STACK_FILE）、r4（codex 2 P1：前綴排除駁回附盤點、合回時點採納回到 r2 處置）。2026-11-12 改序（使用者原話「用最快的速度和最短的時間，把測試會浪費不必要的時間這問題解決，不接收做了又漏東漏西」「你盡可能快速但完整地把測試票所有目標完成，不能有殘留和漏洞，測試內容或時間不合理就就修好，有問題跟委員共識決定」）：TESTSEL 先於 ICPERF 收尾，大綱 handoffs/20261112-testsel-finish-outline.md（I1–I11）。癥結＝220 條重型測試在測試內跑全規模（ledger 33.8 小時中約 30.3 小時），故 I10 重型測試瘦身（每條目標 ≤300 秒、絕不超過 900 秒；需全規模者改一次性驗證收據）為第一優先，不再有「全量 52 小時」之跑法。I1 main 併入 testsel 完成（fc38ec98、d0249d55，未 push）；I2 漏選 17 類全修（testsel-leakfix 5a567067，18 情境修前全漏、修後全選中）；I10 分 G1–G5 五組施工（G3 92709257、G5 73841fed 已提交，其餘施工中）；I3 flaky 隔離、I4 impact 改接、I5 票分支與必要時點全量、I11 耗時預算檢查（ledger >300 秒拒收、具名豁免）由 testsel-ops 施工。2026-11-13：G1–G5、P、T 全部合入 testsel（HEAD 76f0bacc，未 push）；b2 審碼 r1–r6 收斂（r6 三家零 finding）；23 條全規模測試列豁免附小規模姊妹；硬體需求表接入選取與收據；既有紅修綠或列 allowed_red（產品缺陷歸 RM-FFPROD／RM-ICPATH 正式 Task）。2026-11-14：I7 首跑中止（外掛使產品碼 gc.collect 逐測試變慢、後段 31 倍）⇒ gc.freeze 根因修、全規模層、逾時告警、testmon 紀錄遺失根因修、測試不寫正式 registry、tmp 保留政策；I7 後新紅 114 條全數修或登記（allowed_red 120，30 條 TESTSEL pending-approval 收案前須清）；fftfmeta 漂移歸因 d229336e 並以 TA-Lib 獨立驗證（testsel HEAD e5f1e186）。2026-11-15～16：I7b／I7e 全量（I7e 段 1–8 至 1,921／2,026，剩 106 條 11-17 於同 commit 補跑 0 failed）。2026-11-17 路線改定（委員 consult r1–r5）：pytest-testmon 只作加速＋盲點補償層＋收案受影響層＋週期全量，自建外掛／收據／合併閘不合回；逐項大綱 handoffs/20261116-testsel-route-outline.md（I1–I7）；I2 合回清單完成；I1 SPEC docs/TESTSEL_I1_REDS_SPEC.md 審查 r10 定案。現況與下一步見 HANDOFF HP-TESTSEL（唯一來源，本列不重述）"
       ],
       [
         "3414",
@@ -2003,8 +2003,8 @@
         "057",
         "HP-TESTSEL",
         "進行中",
-        "handoffs/20261112-testsel-finish-outline.md",
-        "2026-11-12 改序先於 ICPERF 收尾（使用者「用最快的速度和最短的時間，把測試會浪費不必要的時間這問題解決，不接收做了又漏東漏西」「盡可能快速但完整地把測試票所有目標完成，不能有殘留和漏洞」）。癥結＝220 條重型測試在測試內跑全規模；I10 瘦身 G1–G5（多數降至 ≤300 秒，縮小即失去目的之 23 條列 tests/duration_budget_exempt.json 附小規模姊妹；truncation_mr 11 條歸 RM-FULLSCALE ④ 本機不執行）、I2 選取漏選 18 情境全修＋memo 通用規則＋bounded_poll 寫碼閘＋V19 分組編號、I3 flaky 隔離（依賴未變才容忍）、I4 impact 改接、I5 合併閘、I11 耗時預算、已知紅接入收據、硬體需求表接入選取與收據；全部合入 testsel 整合分支（worktree .claude/worktrees/agent-a520620667770e1b9，HEAD 76f0bacc 起，未 push）；b2 審碼 r1–r6 收斂（handoffs/reconcile/20261113-testsel-b2-review-r{1..6}/synth.md，r6 三家零 finding；FRAMEPATH 重凍與 batch1 重凍三家資料正確簽核）。下一步 I7 首次全量（約 6–8 小時）→ ledger 更新後耗時預算複查 → I8 真實改動回放 → I9 TESTREG pending mark＋ledger 複製＋文件＋I11 hook 掛載＋合回 main＋刪除清單交使用者；逐步指令見權威路徑末節「新 session 接手手冊」。省額度：同時至多 1–2 個子代理、久等之重型跑不掛子代理（使用者 2026-11-13）。"
+        "handoffs/20261116-testsel-route-outline.md",
+        "【現況 2026-11-17】路線已改定（委員 consult r1–r5 共識，`handoffs/reconcile/20261116-testsel-x-consult-r1…r5/synth.md`）：業界工具 pytest-testmon 只作加速＋盲點補償層＋收案受影響層＋週期全量；自建機制（testsel 外掛、收據、合併閘、runs/testsel_mon 驅動監看）不合回 main（大綱 I6 撤除）。逐項大綱 handoffs/20261116-testsel-route-outline.md 已確認（I1–I7，順序 I1／I2 → I4 → I3 → I5 → I6 → I7）。進度：I2 逐檔合回清單完成（runs/testsel_route/i2_mergelist.json，審碼 r1／r2 收斂）；I1 之 SPEC docs/TESTSEL_I1_REDS_SPEC.md 審查 r1–r10 銷帳、r10 三家 proceed 定案（handoffs/reconcile/20261117-testseli1-x-review-r1…r10/synth.md）；I1 原型＝紅分類 runs/testsel_route/i1_proto/red_classified.md；I7e 全量（整合樹 d1f57180）段 1–8 跑至 1,921／2,026 後停，剩 106 條於 i7b-probe（同 commit）補跑 103 passed、3 xfailed、0 failed ⇒ 紅清單完整。本日另完成：gate.sh `--outline` 檢查與相對路徑以 repo 根解析；依使用者核可清除測試寫入正式 data_cache（patterns 370 檔全為測試假型態、2 個測試 cube、kline_cache.h5 ETHUSDT/1h 以 Binance 重抓 12,593 筆連續；備份 runs/testsel_route/datacache_backup/）；查出產品數值錯 rolling_aggregator pandas 臂 L3 kurt 於大均值欄最多錯 36.5（預設 numba 臂正確，SPEC Task 2.4）。未提交（全部改動在工作區，提交／推送待使用者確認）。SPEC 定案後增補一項待 TODO 審查輪確認：Task 4.1 加 allowed_red 中 owner_ticket＝TESTSEL 之 30 條收案前歸零（舊計畫項，路線改定時漏接）。2026-11-17 I1 於大綱拆為 I1a 隔離與正式資料／I1b 產品數值修正／I1c 順序污染／I1d 既有紅與收據鏈（大綱 I1 列下方，各附「開 TODO 前先實測」欄）；同日依使用者「就盡量套業界的做法，但那種每項目或任務都要先跑1-2小時這種無法接受，我要全速加速專案開發」改全專案逐項流程：原型＝只實測未知事實（不設時限）、一份 SPEC／TODO 只對一個大綱項、審查中新範圍另開子項、修 finding 整段重查；gate.sh artifact 新增必填 `--item`／`--facts`（tests/governance/test_gate_outline_first.py 26 passed，含委員 commit-r1／r2 所提之欄位誤認、`.` 萬用、cwd 同名檔、子項列第 1 欄帶說明四反例），ORCH「逐項流程」節、CLAUDE.md、templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md §1 第 12／13 題同步。下一步＝I1a：先做大綱該子項「開 TODO 前先實測」→ docs/manifests/TESTSEL_I1A.json（每條邊界一支具名測試＋每檔 test_mutation_*，實作前為紅）→ 委員審 → 施工；建議順序 I1a → I1b → I1d → I1c；收尾唯一清單 runs/testsel_mon/TESTSEL_REMAINING.md 開頭「★★ 新 session 從這裡開始（2026-11-17）」。【歷史】2026-11-12 改序先於 ICPERF；I10 瘦身、I2 選取漏選修、I3 flaky 隔離等合入 testsel 整合分支（worktree .claude/worktrees/agent-a520620667770e1b9，未 push）；I7（11-14）、I7b（11-15）全量各因外掛 gc 變慢、記憶體留存中止並修補（D19 gc.freeze、MallocSpaceEfficient=1）；allowed_red 120 條中 30 條 owner TESTSEL 收案前須清。細節與事件時序見 runs/testsel_mon/TESTSEL_REMAINING.md。省額度：同時至多 1–2 個子代理、久等之重型跑不掛子代理（使用者 2026-11-13）。"
       ]
     ]
   },
@@ -3566,7 +3566,7 @@
         "B-48",
         "PreToolUse:Task,Bash,Write:scripts/gate_check.sh",
         "產出端",
-        "實作位置：scripts/gate_check.sh:259（_gate_precheck_content 之 no-findings-expected 標籤真偽判定，掛 PreToolUse ⇒ debt_clear 指令送出前即判）。工具內部第一層在 scripts/debt_clear.sh:922（_dc_zero_findings_guard，結案前擋）。誠實邊界：本層**不比工具內部更早**（PreToolUse 之後工具緊接著就跑），價值在 defense-in-depth 與「指令字串即可判」，**不得對外稱前移**。逃生口 --zero-findings-verified 落審計（scripts/debt_clear.sh:771）",
+        "實作位置：scripts/gate_check.sh:265（_gate_precheck_content 之 no-findings-expected 標籤真偽判定，掛 PreToolUse ⇒ debt_clear 指令送出前即判）。工具內部第一層在 scripts/debt_clear.sh:922（_dc_zero_findings_guard，結案前擋）。誠實邊界：本層**不比工具內部更早**（PreToolUse 之後工具緊接著就跑），價值在 defense-in-depth 與「指令字串即可判」，**不得對外稱前移**。逃生口 --zero-findings-verified 落審計（scripts/debt_clear.sh:771）",
         "內容型"
       ],
       [
@@ -3590,7 +3590,7 @@
         "B-62",
         "git commit-msg hook（commit 成立前）",
         "豁免",
-        "PreToolUse不可：判定輸入是 commit 訊息全文＋staged 生產檔集合；主控端 Bash 指令字串只有 git commit -F <檔> 字樣，訊息本體在檔內或編輯器，寫入前拿不到。PostToolUse不可：Bash 完成時 commit 已成立，擋不了；且非 Claude 之 commit（委員、使用者）根本不經主控端 hook。部分閘：scripts/git_hooks/commit-msg:41（exec 前獨立呼叫 ticket_batch_check --msg，rc=2 拒 commit）；push 端 scripts/ticket_batch_check.sh:88 之 --push-range 由 gov_check 1c 呼叫（--no-verify 之 commit 在 push 前被抓）",
+        "PreToolUse不可：判定輸入是 commit 訊息全文＋staged 生產檔集合；主控端 Bash 指令字串只有 git commit -F <檔> 字樣，訊息本體在檔內或編輯器，寫入前拿不到。PostToolUse不可：Bash 完成時 commit 已成立，擋不了；且非 Claude 之 commit（委員、使用者）根本不經主控端 hook。部分閘：scripts/git_hooks/commit-msg:41（exec 前獨立呼叫 ticket_batch_check --msg，rc=2 拒 commit）；push 端 scripts/ticket_batch_check.sh:89 之 --push-range 由 gov_check 1c 呼叫（--no-verify 之 commit 在 push 前被抓）",
         "n/a"
       ],
       [
@@ -3678,7 +3678,7 @@
         "B-64",
         "PreToolUse:Task,Bash,Write:scripts/gate_check.sh",
         "產出端",
-        "實作位置：scripts/gate_check.sh:282（_gate_check_redispatch_allow 呼叫：封閉文法之同輪重派指令須有綁定許可、秘密與審計對證、鎖內消費才放行）。發放端 scripts/gate.sh redispatch、棄置例外與銷帳端保存檔處置查核 scripts/debt_clear.sh、開輪路徑檢查 scripts/committee_run.sh、派工器租約與認領 scripts/cx_run.sh 為主委主動呼叫或派工器自身之工具，非寫檔事件",
+        "實作位置：scripts/gate_check.sh:288（_gate_check_redispatch_allow 呼叫：封閉文法之同輪重派指令須有綁定許可、秘密與審計對證、鎖內消費才放行）。發放端 scripts/gate.sh redispatch、棄置例外與銷帳端保存檔處置查核 scripts/debt_clear.sh、開輪路徑檢查 scripts/committee_run.sh、派工器租約與認領 scripts/cx_run.sh 為主委主動呼叫或派工器自身之工具，非寫檔事件",
         "內容型"
       ],
       [

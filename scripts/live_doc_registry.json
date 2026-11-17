@@ -750,6 +750,14 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/TESTSEL_I1_REDS_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
+      "docs/TESTSEL_I2_MERGELIST_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/TESTSPEED_SPEC.md",
       "LIVE-SPEC"
     ],

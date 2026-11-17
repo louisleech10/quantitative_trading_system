@@ -256,6 +256,9 @@ intent=""; risk=""; facts_asked=""; review_role=""; template=""; adversarial=""
 reconcile=""
 task_id=""; output_path=""
 file=""; template_opened=""; sections=""; spec=""; todo=""; manifest=""
+outline=""  # 逐項流程（docs/MULTI_AGENT_ORCHESTRATION.md「逐項流程」節）：建 SPEC／TODO／PLAN 須附委員審過之項目大綱
+item=""     # 逐項流程（2026-11-17 使用者「盡量套業界的做法」）：本文件對應之大綱項 ID（一份文件只對一項；業界小批次）
+facts=""    # 逐項流程：Definition of Ready——未知事實之實測檔（含 FACT-RECEIPT: 行）或「none:<理由>」（無未知者免測，不設時限）
 # `--spec` 出現次數〔`CODEX-R1-P1-01`〕：只看值非空不夠，須知道旗標**有沒有被給**。
 spec_count=0
 todo_count=0   # TODOFMT Task 1.3：--todo 重複給定即拒
@@ -533,6 +536,9 @@ while [ $# -gt 0 ]; do
     --file)            file="${2:-}"; shift 2 ;;
     --template-opened) template_opened="${2:-}"; shift 2 ;;
     --sections)        sections="${2:-}"; shift 2 ;;
+    --outline)         outline="${2:-}"; shift 2 ;;
+    --item)            item="${2:-}"; shift 2 ;;
+    --facts)           facts="${2:-}"; shift 2 ;;
     --spec)            spec="${2:-}"; spec_count=$((spec_count + 1)); shift 2 ;;
     --todo)            todo="${2:-}"; todo_count=$((todo_count + 1)); shift 2 ;;
     --manifest)        manifest="${2:-}"; shift 2 ;;
@@ -1203,8 +1209,87 @@ elif [ "${kind}" = "artifact" ]; then
   [ -n "${file}" ]            || miss file            "目標治理文件路徑"
   [ -n "${template_opened}" ] || miss template-opened "已打開的 canonical template 路徑"
   [ -n "${sections}" ]        || miss sections        "必填章節覆蓋陳述（含 §G Golden 狀態 + 各 N/A 理由）"
-  if [ -n "${template_opened}" ] && [ ! -f "${template_opened}" ]; then
+  # 相對路徑一律以 repo 根解析、不讀 cwd 同名檔（工作目錄在 worktree 時亦然；2026-11-17 I1 SPEC 開閘於 worktree
+  # 工作目錄找不到檔；委員 CODEX-R1-P2-02：先試 cwd 會在 worktree 讀到另一版）；絕對路徑照用
+  _repo_path() { case "$1" in /*) printf '%s' "$1" ;; *) printf '%s' "${REPO_ROOT}/$1" ;; esac; }
+  if [ -n "${template_opened}" ] && [ ! -f "$(_repo_path "${template_opened}")" ]; then
     echo "ERROR: --template-opened 檔不存在:${template_opened}（真實檢查失敗）"; exit 1
+  fi
+  # 逐項流程（2026-11-12 使用者定；2026-11-16 使用者「寫入記憶有屁用，還不是一直錯」⇒ 改機械擋）：
+  #   建 SPEC／TODO／PLAN（docs/ 下 .md，不分大小寫，與 gate_check.sh 產出端同範圍）或 TODO manifest
+  #   （docs/manifests/*.json）前，須附項目大綱且該大綱已**經委員確認通過**：存在某收斂輪，其 synth 修訂標的＝該大綱、
+  #   該輪債已銷（debt_ledger --round-state＝CLOSED）、且該輪全部委員交件末行 VERDICT 皆為 proceed
+  #   （r4 CODEX-R4-P1-01：只看「被收斂檔提到」會放行 blocked／待確認之大綱）。
+  _is_plan_artifact=0
+  if printf '%s' "${file}" | grep -q 'docs/' && printf '%s' "${file}" | grep -Eiq '(SPEC|TODO|PLAN).*\.md$'; then _is_plan_artifact=1; fi
+  if printf '%s' "${file}" | grep -Eq 'docs/manifests/[^/]+\.json$'; then _is_plan_artifact=1; fi
+  if [ "${_is_plan_artifact}" = "1" ]; then
+    [ -n "${outline}" ] || miss outline "項目大綱路徑（逐項流程：先寫大綱交委員審並確認通過，再逐項寫 SPEC／TODO；docs/MULTI_AGENT_ORCHESTRATION.md「逐項流程」節）"
+    if [ -n "${outline}" ]; then
+      [ -f "$(_repo_path "${outline}")" ] || { echo "ERROR: --outline 檔不存在:${outline}"; exit 1; }
+      _rc_dir="${REPO_ROOT}/handoffs/reconcile"; _ledger="${SCRIPT_DIR}/debt_ledger.sh"
+      # 測試隔離：同 BC1 慣例，覆寫僅 GOVERNANCE_TEST_HARNESS=1 才認（正式路徑不得替換審查紀錄來源）
+      if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ]; then
+        _rc_dir="${GATE_RECONCILE_DIR_OVERRIDE:-${_rc_dir}}"; _ledger="${GATE_DEBT_LEDGER_OVERRIDE:-${_ledger}}"
+      fi
+      _outline_ok=0; _outline_seen=0
+      for _syn in "${_rc_dir}"/*/synth.md; do
+        grep -qsF "**修訂標的**：${outline}" "${_syn}" || continue
+        _outline_seen=1; _d="$(dirname "${_syn}")"
+        _rid="$("${VENV_PY}" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("round_id") or "")' "${_d}/sources.lock" 2>/dev/null)" || continue
+        [ -n "${_rid}" ] || continue
+        _st="$(bash "${_ledger}" --round-state "${_rid}" 2>/dev/null)" || continue
+        [ "${_st}" = "CLOSED" ] || continue
+        _all=1; _n=0
+        for _src in "${_d}"/sources/*.md; do
+          [ -f "${_src}" ] || continue
+          _n=$((_n + 1))
+          _v="$(grep -E '^VERDICT:' "${_src}" | tail -1 | sed -e 's/^VERDICT:[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          [ "${_v}" = "proceed" ] || { _all=0; break; }
+        done
+        [ "${_all}" = "1" ] && [ "${_n}" -gt 0 ] && { _outline_ok=1; break; }
+      done
+      if [ "${_outline_ok}" != "1" ]; then
+        if [ "${_outline_seen}" = "1" ]; then
+          echo "ERROR: 大綱尚未經委員確認通過（有收斂輪以其為修訂標的，但無一輪已銷帳且全部委員 VERDICT: proceed）——修訂後再派確認輪:${outline}"
+        else
+          echo "ERROR: 大綱未經委員審查（無 handoffs/reconcile/*/synth.md 以「**修訂標的**：${outline}」為修訂標的）——先派委員審大綱"
+        fi
+        exit 1
+      fi
+      # 業界小批次：一份文件只對應大綱中一個項目（項目列之項目欄以該 ID 起首，如「| I1a 隔離… |」或「| I2 |」）
+      [ -n "${item}" ] || miss item "本文件對應之大綱項 ID（一份 SPEC／TODO 只對一項；審查中出現新範圍改開大綱子項，不併入本文件）"
+      if [ -n "${item}" ]; then
+        # ID 白名單 regex 單一來源＝_role_gate.sh 之 ROLE_GATE_TASK_ID_REGEX（tests/governance/test_rolegate_predispatch.py t3）
+        _id_re="$(sed -n "s/^ROLE_GATE_TASK_ID_REGEX='\(.*\)'\$/\1/p" "${SCRIPT_DIR}/_role_gate.sh")"
+        [ -n "${_id_re}" ] || { echo "ERROR: 讀不到 _role_gate.sh 之 ROLE_GATE_TASK_ID_REGEX（fail-closed）"; exit 1; }
+        printf '%s' "${item}" | grep -Eq "${_id_re}" || { echo "ERROR: --item 只允許英數與 ._-:${item}"; exit 1; }
+        _ofile="$(_repo_path "${outline}")"
+        # 精確字串比對（不經 regex；委員 CODEX-R1-P1-01／GROK-R1-P2-01）：表格列之第 1 欄＝ID，或第 1 欄以「↳」起首（子項列，
+        # 可帶說明文字；委員 r2 三家：真實大綱 I1a 列第 1 欄為「↳ I1 拆分…」）時第 2 欄之首個空白分隔詞＝ID；其他欄位一律不算
+        awk -F'|' -v id="${item}" '
+          function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+          /^[[:space:]]*\|/ {
+            c1 = trim($2); c2 = trim($3); split(c2, w, /[[:space:]]+/)
+            if (c1 == id || (index(c1, "↳") == 1 && w[1] == id)) { found = 1; exit }
+          }
+          END { exit(found ? 0 : 1) }' "${_ofile}" || {
+          echo "ERROR: 大綱中無項目 ${item}（須為大綱表之項目欄起首 ID）:${outline}"; exit 1; }
+      fi
+      # Definition of Ready：未知事實須先實測（不設時限、無未知者以 none:<理由> 宣告）
+      [ -n "${facts}" ] || miss facts "實測事實檔（含 FACT-RECEIPT: 行）或 none:<理由>（無未知事實時）"
+      if [ -n "${facts}" ]; then
+        case "${facts}" in
+          none:*)
+            _why="${facts#none:}"
+            printf '%s' "${_why}" | grep -q '[^[:space:]]' || { echo "ERROR: --facts none: 須附理由"; exit 1; } ;;
+          *)
+            _ffile="$(_repo_path "${facts}")"
+            [ -f "${_ffile}" ] || { echo "ERROR: --facts 檔不存在:${facts}"; exit 1; }
+            grep -q 'FACT-RECEIPT:' "${_ffile}" || { echo "ERROR: --facts 檔無 FACT-RECEIPT: 行（實測命令與輸出）:${facts}"; exit 1; } ;;
+        esac
+      fi
+    fi
   fi
 fi
 
