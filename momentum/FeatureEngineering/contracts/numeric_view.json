@@ -545,7 +545,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/operators/rolling_aggregator.py:204"
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:206"
       ]
     },
     "FFACT_L3_PERSIST_MODE": {
@@ -576,7 +576,7 @@
       ],
       "_sources": [
         "api/services/feature_factory_service.py:598",
-        "momentum/FeatureEngineering/operators/rolling_aggregator.py:137"
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:139"
       ]
     },
     "FFACT_L3_STREAMING_BUFFER_COLS": {
@@ -759,7 +759,7 @@
         "api/services/feature_factory_service.py:595",
         "api/services/hardware_info_service.py:113",
         "api/services/hardware_info_service.py:141",
-        "momentum/FeatureEngineering/operators/rolling_aggregator.py:1019"
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:1051"
       ]
     },
     "FFACT_LAYER4_CHUNK_SIZE": {
@@ -1007,7 +1007,7 @@
         "1"
       ],
       "_sources": [
-        "momentum/FeatureEngineering/operators/rolling_aggregator.py:203"
+        "momentum/FeatureEngineering/operators/rolling_aggregator.py:205"
       ]
     },
     "FFACT_USE_POLARS": {

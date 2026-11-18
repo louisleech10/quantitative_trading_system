@@ -131,32 +131,36 @@ def narrow_stat_payload(training_tfs: Optional[List[str]] = None, **kwargs: Any)
     return payload
 
 
-_L1_ENGINE_PATHS = {
-    "trend": "momentum.FeatureEngineering.atomic.trend_indicators:TrendIndicatorEngine",
-    "momentum": "momentum.FeatureEngineering.atomic.momentum_indicators:MomentumIndicatorEngine",
-    "volatility": "momentum.FeatureEngineering.atomic.volatility_indicators:VolatilityIndicatorEngine",
-    "volume": "momentum.FeatureEngineering.atomic.volume_indicators:VolumeIndicatorEngine",
-    "cycle": "momentum.FeatureEngineering.atomic.cycle_indicators:CycleIndicatorEngine",
-    "statistics": "momentum.FeatureEngineering.atomic.statistics_indicators:StatisticsIndicatorEngine",
-}
+_L1_ENGINE_CATEGORIES = ("trend", "momentum", "volatility", "volume", "cycle", "statistics")
+
+
+def _l1_engine_classes() -> Dict[str, Any]:
+    """L1 各類別之指標引擎類別（函式內靜態 import：延後載入產品模組，且不設動態載入點——本檔在 NUMVIEW 凍結載入閉包內，
+    `test_numview_criteria.test_freeze_load_closure_dynamic_loaders_registered` 要求閉包內動態載入皆登記可解析）。"""
+    from momentum.FeatureEngineering.atomic.cycle_indicators import CycleIndicatorEngine
+    from momentum.FeatureEngineering.atomic.momentum_indicators import MomentumIndicatorEngine
+    from momentum.FeatureEngineering.atomic.statistics_indicators import StatisticsIndicatorEngine
+    from momentum.FeatureEngineering.atomic.trend_indicators import TrendIndicatorEngine
+    from momentum.FeatureEngineering.atomic.volatility_indicators import VolatilityIndicatorEngine
+    from momentum.FeatureEngineering.atomic.volume_indicators import VolumeIndicatorEngine
+
+    return {"trend": TrendIndicatorEngine, "momentum": MomentumIndicatorEngine, "volatility": VolatilityIndicatorEngine,
+            "volume": VolumeIndicatorEngine, "cycle": CycleIndicatorEngine, "statistics": StatisticsIndicatorEngine}
 
 
 def l1_indicator_max_k(category: str, category_node: Dict[str, Any], indicator: Dict[str, Any]) -> Optional[int]:
     """一個 TA-Lib L1 指標設定之各實例 K 最大者；與生產 `l1_output_points.max_l1_k` 同一展開（`engine._resolve_params`）
     與同一 K 規則（`_k_from_table`）。非 TA-Lib 或於轉接層計算者回 None（其 K 不隨設定之週期而變）。"""
-    import importlib
-
     from momentum.FeatureEngineering.atomic import l1_output_points as lop
     from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
 
-    if category not in _L1_ENGINE_PATHS:
+    if category not in _L1_ENGINE_CATEGORIES:
         return None
     TALibWrapper.initialize()
     spec = TALibWrapper.INDICATOR_REGISTRY.get(indicator["name"]) if indicator.get("enabled", True) else None
     if spec is None or spec.computed_in_adapter:
         return None
-    module, cls = _L1_ENGINE_PATHS[category].split(":")
-    engine = getattr(importlib.import_module(module), cls)(dict(category_node), [])
+    engine = _l1_engine_classes()[category](dict(category_node), [])
     params = engine._resolve_params(indicator["name"], dict(indicator))
     return max(lop._k_from_table(lop.table_indicator(spec.talib_func, spec.category), p) for p in params)
 
@@ -164,7 +168,7 @@ def l1_indicator_max_k(category: str, category_node: Dict[str, Any], indicator: 
 def per_indicator_max_k(config: Any) -> Dict[Tuple[str, str], int]:
     """設定中每個 TA-Lib L1 指標（類別, 名）之最大 K（`l1_indicator_max_k`）。"""
     out: Dict[Tuple[str, str], int] = {}
-    for category in _L1_ENGINE_PATHS:
+    for category in _L1_ENGINE_CATEGORIES:
         cat_cfg = getattr(config.atomic_indicators, category)
         if not cat_cfg.enabled:
             continue

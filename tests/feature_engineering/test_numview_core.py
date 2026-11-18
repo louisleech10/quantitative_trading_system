@@ -2127,8 +2127,11 @@ def test_mutation_l2_forced_serial_injection_removed_breaks_precondition(tmp_pat
     排程器回到自然准入：不准入之串行 reason＝`admission:budget`、准入之平行無 serial route——兩者皆非 `no_aux_receipt`
     ⇒ 前提判定紅（確定性，與機器准入無關）。"""
     monkeypatch.setattr(sys.modules[__name__], "FORCE_MTF_SERIAL", False)
+    # 共用快取根改指本測試暫存目錄 ⇒ 全新空根重生、不讀寫正式共用快取（不以無作用之 patch 取得私有根：patch 生成依判準
+    # run_coverage.regen_b4_mutants 須列估時，本測試非 mutant 碼態——審 test_numview_criteria::mutant_rows_violations）
+    monkeypatch.setenv(nh.REGEN_BATCH_ROOT_ENV, str(tmp_path / "private_batch"))
     cell = _cells("B")[0]
-    mutant = _generate(tmp_path, "B", cell, patches=[lambda _mp, _run: None])  # 含 patch ⇒ 私有根、不讀寫共用快取
+    mutant = _generate(tmp_path, "B", cell)
     violations = _two_arm_observation_violations([mutant])
     assert any("強制串行注入未生效" in v for v in violations), (mutant.mtf_routes[:4], violations)
 
