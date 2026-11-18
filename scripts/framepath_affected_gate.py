@@ -536,47 +536,39 @@ FP_EXCLUDES = (":(exclude,glob)**/__pycache__/**", ":(exclude,glob)handoffs/**",
 DATA_INPUTS = ("data_cache/feature_klines/kline_cache.h5",)
 
 # SPEC v25 D14：大機器專用測試登記（RM-FULLSCALE）；機器實體記憶體低於 min_memory_gib 之檔不選入
-HARDWARE_REQUIREMENTS_REL = "tests/hardware_requirements.json"
-_GIB = 1 << 30
+def _hw_module():
+    """讀表與記憶體判斷之唯一實作 `scripts/hardware_requirements.py`（以檔案路徑載入；TESTSEL I4e 收集期外掛共用，不另寫
+    第二份，docs/TESTSEL_I4E_SPEC.md Task 1.1）。"""
+    name = "_hardware_requirements_shared"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(name, str(Path(__file__).resolve().parent / "hardware_requirements.py"))
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return sys.modules[name]
+
+
+HARDWARE_REQUIREMENTS_REL = _hw_module().HARDWARE_REQUIREMENTS_REL
 
 
 def machine_memory_bytes() -> int:
-    """本機實體記憶體位元組（POSIX sysconf；darwin 與 linux 皆可用）。"""
-    return int(os.sysconf("SC_PAGE_SIZE")) * int(os.sysconf("SC_PHYS_PAGES"))
+    """本機實體記憶體位元組（委派 `scripts/hardware_requirements.machine_memory_bytes`；模組屬性供測試替換）。"""
+    return _hw_module().machine_memory_bytes()
 
 
 def load_hardware_requirements(repo: Path) -> List[Dict[str, object]]:
-    """讀並驗大機器專用測試登記；格式不符、路徑非既有 tests/ 下 test_*.py、ticket 非 RM-FULLSCALE、需求非正整數或
-    路徑重複 ⇒ GateError（fail-closed）。檔案不存在 ⇒ 空清單（不排除任何檔＝全照常選入，偏多跑之安全方向）。"""
-    p = Path(repo) / HARDWARE_REQUIREMENTS_REL
-    if not p.is_file():
-        return []
+    """讀並驗大機器專用測試登記（委派 `scripts/hardware_requirements.load_hardware_requirements`）；格式不符 ⇒ GateError
+    （fail-closed）；檔案不存在 ⇒ 空清單。"""
+    hw = _hw_module()
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
-    except ValueError as exc:
-        raise GateError(f"{HARDWARE_REQUIREMENTS_REL} 非合法 JSON：{exc}") from exc
-    entries = data.get("entries") if isinstance(data, dict) else None
-    if not isinstance(entries, list):
-        raise GateError(f"{HARDWARE_REQUIREMENTS_REL} 缺 entries 清單")
-    seen: set = set()
-    for e in entries:
-        path = e.get("path") if isinstance(e, dict) else None
-        mem = e.get("min_memory_gib") if isinstance(e, dict) else None
-        ok = (isinstance(path, str) and re.fullmatch(r"tests/(?:[\w.-]+/)*test_[\w-]+\.py", path)
-              and (Path(repo) / path).is_file() and e.get("ticket") == "RM-FULLSCALE"
-              and isinstance(mem, int) and not isinstance(mem, bool) and mem > 0
-              and isinstance(e.get("reason"), str) and e["reason"].strip() and path not in seen)
-        if not ok:
-            raise GateError(f"{HARDWARE_REQUIREMENTS_REL} 條目不合格式：{e!r}")
-        seen.add(path)
-    return entries
+        return hw.load_hardware_requirements(repo)
+    except hw.HardwareTableError as exc:
+        raise GateError(str(exc)) from exc
 
 
 def hardware_blocked(entries: Sequence[Mapping[str, object]], memory_bytes: int) -> Dict[str, Dict[str, object]]:
-    """純函式：機器記憶體低於需求之登記檔 → {path: {ticket, item, min_memory_gib, machine_memory_gib}}；達標者不列。"""
-    return {str(e["path"]): {"ticket": e["ticket"], "item": e.get("item"), "min_memory_gib": e["min_memory_gib"],
-                             "machine_memory_gib": round(memory_bytes / _GIB, 1)}
-            for e in entries if memory_bytes < int(e["min_memory_gib"]) * _GIB}
+    """純函式：機器記憶體低於需求之登記檔 → {path: {ticket, item, min_memory_gib, machine_memory_gib}}（委派共用實作）。"""
+    return _hw_module().hardware_blocked(entries, memory_bytes)
 
 
 def _file_sha(p: Path) -> str:

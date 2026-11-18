@@ -123,6 +123,7 @@
 | `extract_phase2_expected_flips.py` | 常態檢查 | narrow_check_router  |
 | `heavy_run_guard.py` | 常態檢查 | 未掛 |
 | `ic_wiring_check.py` | 常態檢查 | 未掛 |
+| `l3_moment_bound_check.py` | 常態檢查 | 未掛 |
 | `patch_locus_check.py` | 常態檢查 | 未掛 |
 | `py_compile_check.py` | 常態檢查 | 未掛 |
 | `register_anchor_check.py` | 常態檢查 | 未掛 |

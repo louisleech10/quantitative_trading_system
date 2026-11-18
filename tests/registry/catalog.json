@@ -15994,6 +15994,26 @@
    "rewrite_targets": [],
    "ticket": "TESTSEL"
   },
+  "tests/registry/test_hardware_gate.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A9",
+    "A18"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/registry/test_hardware_gate.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
   "tests/feature_engineering/test_kurt_lower_bound_parity.py": {
    "claim": [
     "correctness"

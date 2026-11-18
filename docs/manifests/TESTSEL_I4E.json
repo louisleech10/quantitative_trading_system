@@ -1,0 +1,84 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/registry/test_hardware_gate.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I4E_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "大綱 I4 拆分審 r1／r2 確認（handoffs/reconcile/20261118-testseli4split-x-review-r2/synth.md）",
+      "開 SPEC 前事實 runs/testsel_route/i4e/i4e_facts.md（7 條 FACT-RECEIPT：d1f57180 唯一實作、main 缺模組與收集期排除、8 GiB SIGKILL 實證）",
+      "紅狀態（施工前，審 r2 處置後）：venv/bin/python -m pytest tests/registry/test_hardware_gate.py ⇒ 17 failed（scripts/hardware_requirements.py 不存在）；施工中增 test_collect_only_not_excluded 為 18 條",
+      "審 r2 後補測 runs/testsel_route/i4e/i4e_facts.md（6 條 FACT-RECEIPT：UsageError 輸出前綴、testmon 須 cacheprovider、trylast 先於 testmon、wrapper 於其他選取之後、被排除之改動測試仍待跑、collect-only 全排除 rc=5）"
+    ],
+    "touches": [
+      "scripts/framepath_affected_gate.py",
+      "tests/conftest.py",
+      "tests/registry/test_hardware_gate.py",
+      "tests/registry/catalog.json"
+    ],
+    "callers_now": [
+      "scripts/framepath_affected_gate.py",
+      "tests/feature_engineering/test_framepath_disposition.py"
+    ],
+    "callers_later": [
+      "I4a 選取器骨架：report.json 之 hardware_blocked 讀 scripts/hardware_requirements.py",
+      "I4f 全規模層：同一收集期掛載點（pytest_collection_modifyitems）掛 slow marker"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/registry/test_hardware_gate.py tests/feature_engineering/test_framepath_disposition.py -k \"hardware\" -q -p no:cacheprovider",
+    "forbidden": [
+      {
+        "rule": "讀表與記憶體判斷只有 scripts/hardware_requirements.py 一份；framepath_affected_gate.py 只委派，不留 os.sysconf 讀取或第二份驗表",
+        "observable": true
+      },
+      {
+        "rule": "排除用 pytest deselect（config.hook.pytest_deselected），不用 skip／xfail",
+        "observable": true
+      },
+      {
+        "rule": "生產碼不加測試用之記憶體注入環境變數或 CLI 旗標",
+        "observable": true
+      },
+      {
+        "rule": "不改 tests/hardware_requirements.json 內容與格式、不改既有測試斷言",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "conftest 註冊外掛屬環境類改動（TEST_SELECTION §3 規則 4）：外掛只在本機記憶體低於登記門檻時 deselect 登記檔，其餘測試之收集與執行不變；記憶體足夠之機器行為與現況相同（test_enough_memory_not_excluded）",
+      "改壞對照：不載外掛 ⇒ 登記檔照跑（test_mutation_plugin_absent_runs_blocked）；比對鍵改為整個 nodeid ⇒ test_parametrized_nodeid_excluded_by_file 紅；< 改 <= ⇒ test_equal_memory_not_excluded 紅；外掛不轉 UsageError ⇒ test_malformed_table_fails_collection 紅（斷言 ERROR: 硬體閘 前綴，審 r2 COMPOSER-R2-P2-01）",
+      "testmon 共存：外掛以 wrapper 於其他選取之後排除；改 trylast ⇒ test_testmon_coexist_excludes_only_would_run 紅（審 r2 CODEX-R2-P2-01）",
+      "collect-only 不排除（nodeid 清單不隨本機記憶體而異）：改壞 ⇒ test_collect_only_not_excluded 紅；施工時 test_framepath_disposition.py::test_mutation_d11_7_inventory_hand_edit_is_red 實測抓到初版此缺陷",
+      "正式掛載：漏加 tests/conftest.py 之註冊 ⇒ test_conftest_registers_hardware_gate_plugin 與 test_real_repo_collect_lists_all_and_run_applies_gate（真實 repo 正式外掛鏈：--collect-only 不排除、本機不足時 --setup-plan 全 deselect）紅（審 r1 CODEX-R1-P1-01／GROK-R1-P1-01）",
+      "framepath 閘回歸：test_framepath_disposition.py::test_mutation_affected_gate_d14_hardware_blocked 原斷言不動"
+    ],
+    "coverage_risk": [
+      "本機為 8 GiB，真實登記檔（min 24 GiB）之排除於收集期即生效；記憶體足夠之分支只能以暫存 repo 注入 32 GiB 驗證"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}
