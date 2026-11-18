@@ -171,6 +171,12 @@
   現行測試逐字載明此行為（`tests/momentum/Analysis/test_ic1d_baseline.py:228`「production 僅拒 None，
   不拒 reindex 後 NaN」）⇒ 索引型別對不上時仍會安靜產出全 NaN carrier，正是本 FU 點名之症狀。
   **落地時之驗收錨點**：`close_series` 全 NaN ⇒ fail-closed，且 mutation（把 carrier 灌成全 NaN）須轉紅。
+- **FU-L2VAL L2 其餘算子之獨立值 oracle**（2026-11-18 自 TESTSEL 移出；量化主線、資料正確性）：L2 只有 Cross／Ratio
+  有對獨立 numpy oracle 之逐格驗證（`tests/feature_engineering/l2_oracle.py`、`test_l2_cross_ratio_oracle.py`、
+  `test_numview_core.py::test_l2_arms_each_match_independent_oracle`）；Distance、Momentum、BinarySignal、SignedStrength、
+  WorldQuant 9 子算子與配對集合規則（哪些欄成對）尚無獨立 oracle，格 C 之兩臂差只比過兩臂（`runs/testsel_route/i1f/l2_oracle_scope.md`）。
+  做法沿用 Cross／Ratio：各臂依實際輸入精度對獨立 oracle（WorldQuant 可用 `scipy.stats.rankdata`、逐窗 `np.argmax`、
+  `np.corrcoef`），真實格 C 資料。依使用者「1.要先確認是否算得對，數據正確才能繼續後面項目」須在依賴這些算子之 IC／回測結論前完成。
 
 ### 🔴 票 MEM-RSS：Feature Factory 之記憶體閘以 RSS 為判準，在 macOS 上可能**漏擋**（2026-08-27 登記；**不插隊**，使用者裁定先做完 B9／IC-Analysis）
 
