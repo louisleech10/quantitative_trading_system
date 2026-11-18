@@ -38,6 +38,7 @@ import copy
 import datetime as _dt
 import functools
 import hashlib
+import heapq
 import importlib.util
 import json
 import math
@@ -4653,21 +4654,68 @@ def _file_of(nodeid: str) -> str:
     return nodeid.split("::")[0]
 
 
-def _review_summary(ctx: Context) -> Optional[Dict[str, List[Dict[str, Any]]]]:
-    """summary 依檔分組（{檔: [(nodeid, 紀錄)…]} 之扁平形：紀錄附 nodeid）；不存在或不合法（同記錄器 read_summary：
-    JSON 不可解析、schema_version／k 不符、形狀不符）⇒ None。"""
-    if "review_summary" not in ctx.extra:
-        s = ctx.schema
-        p = ctx.repo_root / s["summary"]["path"]
-        by_file: Optional[Dict[str, List[Dict[str, Any]]]] = None
+def _summary_rec_from_ledger(rec: Mapping[str, Any], sess: Mapping[str, Any]) -> Dict[str, Any]:
+    return {"session_id": sess["session_id"], "started": sess["started"], "fingerprint": sess["fingerprint"],
+            "duration_class": sess["duration_class"], "outcome": rec["outcome"], "duration_s": rec["duration_s"],
+            "exception_type": rec["exception_type"], "exception_head": rec["exception_head"]}
+
+
+def summary_from_ledger(repo_root: Path, ledger_dir: Optional[Path] = None) -> Optional[Dict[str, List[Dict[str, Any]]]]:
+    """TESTSEL I6（docs/TESTSEL_I6_SPEC.md Task 1.2）：摘要之讀時彙總（唯一實作；記錄器不再每 session 合併 summary.json）。
+
+    語意同原記錄器 `_rebuild`＋`merge_summary` 之保留規則：逐 ledger 檔（依檔名排序）讀入；任一行 JSON 損毀 ⇒ 整檔略過；
+    無 session 紀錄之檔略過；每 nodeid 依 (started, session_id) 排序後保留最近 k 筆（k＝schema `summary.k`）。
+    ledger 目錄不存在 ⇒ None（同原「summary 不存在」）。
+
+    合法性同原讀者（`read_summary`／原 `_review_summary`／`previously_failed_from_summary`／`_summary_nodes`）：彙總結果
+    以 schema `summary.shape` 驗形（nodeid 鍵格式 `nodeid_param`、紀錄欄位格式），任一處不符 ⇒ None（同原「summary 不合法
+    ⇒ 視同不存在」）。實測真實 `.testreg` 含 65 個格式不符之 nodeid（runs/testsel_route/i6/why_summary_none.out），
+    原讀者因此一律視為不存在；本項只移除日常負擔、不改此可觀察行為（是否改為逐筆略過另列 SPEC §N E-3）。
+
+    每 nodeid 以標準 `heapq` 維持大小 k 之最小堆，鍵＝(started, session_id, 讀入序號)；序號使同鍵維持讀入先後，
+    結果與「全收後穩定排序取末 k 筆」逐筆相同，而記憶體只留每 nodeid k 筆（規格審 r4 CODEX-R4-P1-02）。"""
+    s = load_schema(repo_root)
+    d = Path(ledger_dir) if ledger_dir is not None else Path(repo_root) / s["ledger"]["dir"]
+    k = s["summary"]["k"]
+    heaps: Dict[str, List[Tuple[Tuple[str, str, int], Dict[str, Any]]]] = {}
+    if not d.is_dir():
+        return None
+    seq = 0
+    for f in sorted(d.glob("*.jsonl")):
         try:
-            obj = json.loads(p.read_text(encoding="utf-8"))
+            lines = [json.loads(l) for l in f.read_text(encoding="utf-8").splitlines() if l.strip()]
         except (OSError, ValueError):
-            obj = None
-        if isinstance(obj, dict) and obj.get("schema_version") == s["version"] and obj.get("k") == s["summary"]["k"] \
-                and not _seam("validate_shape")(obj, s["summary"]["shape"], s):
+            continue
+        sess = next((x for x in lines if isinstance(x, dict) and x.get("kind") == "session"), None)
+        if sess is None:
+            continue
+        for rec in lines:
+            if isinstance(rec, dict) and rec.get("kind") == "test":
+                item = ((sess["started"], sess["session_id"], seq), _summary_rec_from_ledger(rec, sess))
+                seq += 1
+                h = heaps.setdefault(rec["nodeid"], [])
+                if len(h) < k:
+                    heapq.heappush(h, item)
+                elif item[0] > h[0][0]:
+                    heapq.heapreplace(h, item)
+    key_fmt = re.compile(s["formats"][s["summary"]["shape"]["fields"]["nodes"]["key_format"]])
+    if any(key_fmt.fullmatch(nid) is None for nid in heaps):  # 同 validate_shape 之 fullmatch；鍵不符 ⇒ 全形驗必不合法，先短路
+        return None
+    nodes = {nid: [r for _, r in sorted(h, key=lambda it: it[0])] for nid, h in heaps.items()}
+    if _seam("validate_shape")({"schema_version": s["version"], "k": k, "nodes": nodes}, s["summary"]["shape"], s):
+        return None
+    return nodes
+
+
+def _review_summary(ctx: Context) -> Optional[Dict[str, List[Dict[str, Any]]]]:
+    """summary 依檔分組（{檔: [(nodeid, 紀錄)…]} 之扁平形：紀錄附 nodeid）；來源＝ledger 讀時彙總（TESTSEL I6）。
+    ledger 目錄不存在或彙總不合法 ⇒ None（同原「summary 不存在或不合法 ⇒ None」）。"""
+    if "review_summary" not in ctx.extra:
+        by_file: Optional[Dict[str, List[Dict[str, Any]]]] = None
+        nodes = summary_from_ledger(ctx.repo_root, ctx.ledger_dir)
+        if nodes is not None:
             by_file = collections.defaultdict(list)
-            for nid, recs in obj["nodes"].items():
+            for nid, recs in nodes.items():
                 for r in recs:
                     by_file[_file_of(nid)].append(dict(r, nodeid=nid))
         ctx.extra["review_summary"] = by_file
@@ -5412,19 +5460,11 @@ def resolve_tomb_items(items: Sequence[str], tombstones: Iterable[Mapping[str, A
     return list(dict.fromkeys(resolved)), [rows[k] for k in sorted(rows)]
 
 
-def previously_failed_from_summary(repo_root: Path) -> List[str]:
-    """`previously_failed`：summary 中各 nodeid 依 started 最近一筆之 outcome∈{failed, error, xpassed} 者（排序）；
-    summary 不存在或不合法（同記錄器 read_summary）⇒ []。"""
-    s = load_schema(repo_root)
-    try:
-        obj = json.loads((Path(repo_root) / s["summary"]["path"]).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    if not isinstance(obj, dict) or obj.get("schema_version") != s["version"] or obj.get("k") != s["summary"]["k"] \
-            or _seam("validate_shape")(obj, s["summary"]["shape"], s):
-        return []
+def previously_failed_from_summary(repo_root: Path, ledger_dir: Optional[Path] = None) -> List[str]:
+    """`previously_failed`：摘要（ledger 讀時彙總，TESTSEL I6）中各 nodeid 依 started 最近一筆之 outcome∈{failed, error,
+    xpassed} 者（排序）；ledger 不存在或彙總不合法 ⇒ []（同原 summary 不存在或不合法）。"""
     out = []
-    for nid, recs in obj["nodes"].items():
+    for nid, recs in (summary_from_ledger(repo_root, ledger_dir) or {}).items():
         if recs and max(recs, key=lambda r: (r["started"], r["session_id"]))["outcome"] in ("failed", "error", "xpassed"):
             out.append(nid)
     return sorted(out)
@@ -5845,16 +5885,8 @@ def effect_report(repo_root: Path, scope: Sequence[str] = ()) -> Dict[str, Any]:
 
 
 def _summary_nodes(repo_root: Path) -> Dict[str, List[Dict[str, Any]]]:
-    """summary 之 nodes（合法性同 `previously_failed_from_summary`）；不存在或不合法 ⇒ {}。"""
-    s = load_schema(repo_root)
-    try:
-        obj = json.loads((Path(repo_root) / s["summary"]["path"]).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    if not isinstance(obj, dict) or obj.get("schema_version") != s["version"] or obj.get("k") != s["summary"]["k"] \
-            or _seam("validate_shape")(obj, s["summary"]["shape"], s):
-        return {}
-    return obj["nodes"]
+    """摘要之 nodes（ledger 讀時彙總，TESTSEL I6）；ledger 不存在或彙總不合法 ⇒ {}（同原）。"""
+    return summary_from_ledger(repo_root) or {}
 
 
 def _cli_effect(root: Path, out: Optional[str], recompute: Optional[str], scope: Sequence[str]) -> int:

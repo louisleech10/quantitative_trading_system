@@ -143,7 +143,11 @@ def _only(ids: List[str]) -> str:
 
 
 def _summary(r: TmpRepo) -> Dict[str, Any]:
-    return json.loads(r.read(schema()["summary"]["path"]))
+    """摘要＝ledger 讀時彙總（TESTSEL I6：記錄器不再每 session 合併 summary.json；唯一實作 scripts/testreg.py）。"""
+    import sys as _sys
+    _sys.path.insert(0, str(REPO / "scripts"))
+    import testreg as _tr  # noqa: E402
+    return {"nodes": _tr.summary_from_ledger(REPO, r.p(schema()["ledger"]["dir"])) or {}}
 
 
 # ── ① outcome 彙整與失敗欄位 ────────────────────────────────────────────────────────────────────────
@@ -424,14 +428,48 @@ def test_parallel_sessions_merge_all_records(tmp_path):
     assert len(s["nodes"]["tests/test_b.py::test_b1"]) == 1
 
 
+def _legacy_two_way_merge(tmp_path: Path, *, nolock: bool) -> int:
+    """TESTSEL I6 後記錄器收尾不再合併 summary；`merge_summary` 保留為讀時彙總之舊演算法 oracle。
+    種子摘要只含第一個 session（其餘 ledger 檔暫移出 ⇒ 之後兩次為增量合併、非重建），再以兩個獨立行程
+    （`ProcessPoolExecutor`，各自 PID ⇒ `_atomic_write` 暫存檔不撞名）並行合併另兩個 session；
+    `Future.result()` 使任一 worker 例外直接失敗。nolock ⇒ 拿掉鎖、雙方讀完種子後會合再寫。回傳 a1＋b1 紀錄數。"""
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+
+    from tests.registry.testreg_helpers import legacy_merge_worker
+
+    r = _proj(tmp_path)
+    for f in ("tests/test_a.py", "tests/test_a.py", "tests/test_b.py"):
+        recorded_pytest(r, f)
+    sch = schema()
+    ledger_dir = r.p(sch["ledger"]["dir"])
+    sids = sorted(r.ledger_ids(), key=lambda sid: session_of(r, sid)["started"])
+    parts = {}
+    for sid in sids:
+        lines = r.ledger(sid)
+        parts[sid] = ([x for x in lines if x.get("kind") == "test"], next(x for x in lines if x.get("kind") == "session"))
+    hold = tmp_path / "held"
+    hold.mkdir()
+    for sid in sids[1:]:
+        (ledger_dir / f"{sid}.jsonl").rename(hold / f"{sid}.jsonl")
+    legacy_merge_worker(str(r.root), *parts[sids[0]])
+    with multiprocessing.Manager() as mgr, ProcessPoolExecutor(max_workers=2) as ex:
+        barrier = mgr.Barrier(2) if nolock else None
+        futs = [ex.submit(legacy_merge_worker, str(r.root), *parts[sid], barrier) for sid in sids[1:]]
+        for fut in futs:
+            fut.result()
+    s = json.loads(r.read(sch["summary"]["path"]))
+    return len(s["nodes"].get("tests/test_a.py::test_a1", [])) + len(s["nodes"].get("tests/test_b.py::test_b1", []))
+
+
+def test_legacy_merge_with_lock_keeps_all_records(tmp_path):
+    """正對照：保留 `summary_lock` 之兩個並行合併皆成功且不丟紀錄（種子 a1 一筆＋a1、b1 各一筆）。"""
+    assert _legacy_two_way_merge(tmp_path, nolock=False) == 3
+
+
 def test_mutation_no_lock_loses_records(tmp_path):
-    inj = Inject().prelude(SLOW_READ + "\nimport contextlib").setattr("summary_lock",
-                                                                     "lambda lock_path: contextlib.nullcontext()")
-    r = _proj(tmp_path, conftest=inj.conftest())
-    recorded_pytest(r, "tests/test_a.py")
-    _parallel(r, ["tests/test_a.py", "tests/test_b.py"])
-    s = _summary(r)
-    got = len(s["nodes"].get("tests/test_a.py::test_a1", [])) + len(s["nodes"].get("tests/test_b.py::test_b1", []))
+    """改壞對照：拿掉 `summary_lock`、雙方讀完同一種子後才寫 ⇒ 兩次合併皆成功返回，但後寫者覆蓋先寫者而丟紀錄。"""
+    got = _legacy_two_way_merge(tmp_path, nolock=True)
     assert got < 3
 
 

@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from tests.registry.testreg_helpers import TmpRepo, entry, make_repo, schema
+from tests.registry.testreg_helpers import TmpRepo, entry, make_repo, schema, write_summary_nodes_as_ledger
 
 testreg = importlib.import_module("scripts.testreg")
 
@@ -47,7 +47,7 @@ def _repo(tmp_path: Path, summary_nodes: Dict[str, List[Dict[str, Any]]] = None)
         "tests/feature_engineering/test_gone.py::test_g2": [_rec(4.0), _rec(100.0, "failed"), _rec(6.0)],
         "tests/api/test_part.py::test_p2": [_rec(0.5)],
         "tests/test_keep.py::test_k": [_rec(9.0)]}
-    r.write_json(s["summary"]["path"], {"schema_version": s["version"], "k": s["summary"]["k"], "nodes": nodes})
+    write_summary_nodes_as_ledger(r, nodes)  # TESTSEL I6：摘要改由 ledger 讀時彙總
     return r
 
 

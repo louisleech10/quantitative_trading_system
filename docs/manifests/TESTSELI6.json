@@ -1,0 +1,83 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/registry/test_i6_recorder_optin.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I6_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "P0a 已提交 7d8cdc88",
+      "開 SPEC 前事實與原型 runs/testsel_route/i6/i6_facts.md（現行 12.15／只寫 ledger 5.55／不載 5.11 秒，3 次中位）"
+    ],
+    "touches": [
+      "tests/fixtures/testreg_recorder_plugin.py",
+      "scripts/testreg.py",
+      "tests/registry/test_i6_recorder_optin.py",
+      "tests/registry/catalog.json",
+      "tests/registry/test_testreg_recorder.py",
+      "tests/registry/test_testreg_effect.py",
+      "tests/registry/test_testreg_review.py",
+      "tests/registry/testreg_helpers.py",
+      "tests/registry/fixtures/i6_ledger_subset/"
+    ],
+    "callers_now": [
+      "scripts/framepath_affected_gate.py",
+      "scripts/testreg.py"
+    ],
+    "callers_later": [],
+    "gate_cmd": "venv/bin/python -m pytest tests/registry/test_i6_recorder_optin.py tests/registry/test_testreg_recorder.py tests/registry/test_testreg_effect.py tests/registry/test_testreg_review.py tests/governance/test_run_chunked.py tests/feature_engineering/test_framepath_disposition.py -k 'i6 or recorder or effect or review or chunked or affected_gate' -q -p no:cacheprovider",
+    "forbidden": [
+      {
+        "rule": "不得停寫 ledger、不得改 ledger 紀錄格式",
+        "observable": true
+      },
+      {
+        "rule": "不改任何 V 規則、catalog、測試變更清單審、framepath 閘讀取與 quarantine、heavy_run_guard",
+        "observable": true
+      },
+      {
+        "rule": "previously_failed 判定集合與 review 訊號語意不變；不以 --lf 取代",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "等價測試以真實 .testreg/ledger 子集（24 檔逐位元組複本）逐 session 跑舊 merge_summary 並以舊 read_summary 讀回，與 summary_from_ledger 逐鍵逐筆相等；改壞對照實跑：top-k 不替換 ⇒ 2 條轉紅、拿掉驗形 ⇒ 1 條轉紅；恢復收尾 merge_summary ⇒ summary mtime 斷言轉紅",
+      "時間收據：同命令交錯各 3 次中位，改後 6.79 秒對不載記錄器 5.86 秒，額外 0.93 秒（≤ 1 秒）"
+    ],
+    "coverage_risk": [
+      "讀時彙總於 review／effect／framepath 閘／impact 時付出（實測 real 4.49 秒、峰值 RSS 約 162 MB），不在提交路徑",
+      "E-3（為何現在不做: blocked-by）：真實 summary 有格式不符之 nodeid ⇒ previously_failed 現行恆為 []；改逐筆略過使其生效（310 條／78 檔）之去留併入 I4b（testmon 取代日常選取後定 impact 選取來源）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "E-3",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

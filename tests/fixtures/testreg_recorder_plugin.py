@@ -495,11 +495,11 @@ def _finish() -> None:
     tests = [test_record(sid, nid, _S["order"].get(nid, len(_S["order"])), by_node[nid], _S["root"])
              for nid in sorted(by_node, key=lambda n: _S["order"].get(n, 1 << 30))]
     records = [_S["session"], *tests, *_S["collects"]]
-    written = safe(write_ledger, _S["ledger"], sid, records)
-    if written is not None:
-        safe(merge_summary, _S["root"], _S["schema"], tests, _S["session"])
+    # TESTSEL I6（docs/TESTSEL_I6_SPEC.md Task 1.1）：每 session 只寫 ledger；摘要改由 scripts/testreg.py
+    #   `summary_from_ledger` 讀時彙總（原每 session 讀驗寫 60 MB summary.json，3 次中位 12.15 → 5.55 秒）。
+    safe(write_ledger, _S["ledger"], sid, records)
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:
-    """一次原子寫本 session 之 jsonl，並合併 summary。"""
+    """一次原子寫本 session 之 jsonl（TESTSEL I6 起不再合併 summary；摘要由 scripts/testreg.py 讀時彙總）。"""
     safe(_finish)

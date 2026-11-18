@@ -12,7 +12,8 @@ from typing import Any, Dict, List
 
 import pytest
 
-from tests.registry.testreg_helpers import CATALOG_REL, TmpRepo, entry, enum, fact_keys_rows, make_repo, schema
+from tests.registry.testreg_helpers import (CATALOG_REL, TmpRepo, entry, enum, fact_keys_rows, make_repo, schema,
+                                            write_summary_nodes_as_ledger)
 
 testreg = importlib.import_module("scripts.testreg")
 
@@ -42,8 +43,7 @@ def _rec(started: str, *, fp: str = "a" * 64, dc: str = "b" * 64, outcome: str =
 
 
 def _write_summary(r: TmpRepo, nodes: Dict[str, List[Dict[str, Any]]]) -> None:
-    s = schema()
-    r.write_json(s["summary"]["path"], {"schema_version": s["version"], "k": s["summary"]["k"], "nodes": nodes})
+    write_summary_nodes_as_ledger(r, nodes)  # TESTSEL I6：摘要改由 ledger 讀時彙總
 
 
 def _durations(prior: List[float], latest: float) -> List[Dict[str, Any]]:

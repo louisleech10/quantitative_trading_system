@@ -145,6 +145,55 @@ class TmpRepo:
         return [json.loads(l) for l in self.read(f".testreg/ledger/{session_id}.jsonl").splitlines() if l.strip()]
 
 
+def write_summary_nodes_as_ledger(r: "TmpRepo", nodes: Mapping[str, List[Mapping[str, Any]]]) -> None:
+    """TESTSEL I6：摘要改由 ledger 讀時彙總 ⇒ 測試以等價 ledger 檔（每 session 一檔：session 紀錄＋其 test 紀錄）表達
+    原本直寫 summary.json 之 nodes；`scripts/testreg.py` `summary_from_ledger` 讀回之 nodes 與輸入相同（每 nodeid 依
+    (started, session_id) 排序、保留最近 k 筆）。"""
+    by_sess: Dict[str, Dict[str, Any]] = {}
+    for nid, recs in nodes.items():
+        for rec in recs:
+            s = by_sess.setdefault(rec["session_id"], {
+                "session": {"kind": "session", "session_id": rec["session_id"], "started": rec["started"],
+                            "fingerprint": rec["fingerprint"], "duration_class": rec["duration_class"]},
+                "tests": []})
+            s["tests"].append({"kind": "test", "nodeid": nid, "outcome": rec["outcome"], "duration_s": rec["duration_s"],
+                               "exception_type": rec["exception_type"], "exception_head": rec["exception_head"]})
+    d = r.p(".testreg/ledger")
+    d.mkdir(parents=True, exist_ok=True)
+    for sid, s in by_sess.items():
+        lines = [s["session"], *s["tests"]]
+        (d / f"{sid}.jsonl").write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in lines),
+                                        encoding="utf-8")
+
+
+def legacy_merge_worker(root: str, records: List[Mapping[str, Any]], session: Mapping[str, Any],
+                        barrier: Any = None) -> None:
+    """獨立行程（`concurrent.futures.ProcessPoolExecutor`）中呼叫記錄器保留之舊 `merge_summary`（TESTSEL I6 起僅作 oracle）。
+    給 barrier ⇒ 拿掉 `summary_lock`、讀完種子摘要後於 barrier 會合再寫（無鎖之 lost-update 排程）；本行程任何例外先
+    `barrier.abort()`（使對方 wait 拋 BrokenBarrierError 而非無限等），再經 Future.result() 重拋。"""
+    import contextlib
+    import importlib
+
+    sys.path.insert(0, str(PLUGIN_DIR))
+    rec = importlib.import_module(PLUGIN_MOD)
+    if barrier is not None:
+        orig = rec.read_summary
+
+        def _read_then_meet(path: Path, sch: Mapping[str, Any]) -> Any:
+            out = orig(path, sch)
+            barrier.wait()
+            return out
+
+        rec.read_summary = _read_then_meet
+        rec.summary_lock = lambda lock_path: contextlib.nullcontext()
+    try:
+        rec.merge_summary(Path(root), schema(), list(records), session)
+    except BaseException:
+        if barrier is not None:
+            barrier.abort()
+        raise
+
+
 def make_repo(tmp_path: Path, files: Optional[Mapping[str, str]] = None, *, catalog: bool = True,
               commit: bool = True, name: str = "repo") -> TmpRepo:
     """新 git 倉：工具複本＋.gitignore＋pytest.ini＋最小 fact_keys；files 寫入後，catalog=True 時為其中每個測試檔建
