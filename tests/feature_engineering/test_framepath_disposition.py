@@ -2143,7 +2143,9 @@ def _numview_transition() -> Tuple[Tuple[str, Dict[str, Any]], Tuple[str, Dict[s
 def test_provenance_v2_refreeze_accepted_and_tampering_red():
     """9c930fbf provenance v2 結構重凍：依收據核可通過；manifest 新值不等於收據、另改他鍵、或無收據核可，各紅。"""
     versions = git_baseline_versions()
-    i = next(k for k, (n, _) in enumerate(versions) if n == "9c930fbf")
+    # 9c930fbf 只在 testsel 分支歷史；main 經合回提交 d64efa9d 帶入同一基準（兩提交之 BASELINE_REL 逐位元相同，且為 testsel 於
+    # 9891907f 後對本檔之唯一改動，2026-11-18 實查）⇒ 兩名皆認
+    i = next(k for k, (n, _) in enumerate(versions) if n in ("9c930fbf", "d64efa9d"))
     (pn, prev), (cn, cur) = versions[i - 1], versions[i]
     assert baseline_lineage_errors([(pn, prev), (cn, cur)]) == []
     approved = provenance_v2_framepath_approvals()

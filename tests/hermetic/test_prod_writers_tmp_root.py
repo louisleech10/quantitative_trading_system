@@ -96,8 +96,9 @@ def test_mutation_harness_flags_default_root_writer(tmp_path: Path, monkeypatch:
     assert guard.PROD_DATA_DIRNAME == "data_cache"
 
 
-# 修前（寫入者仍用預設根）之版本釘選：I1a 施工前整合樹 HEAD（main 合入後之 merge commit）
-PRE_FIX_COMMIT = "72258590"
+# 修前（寫入者仍用預設根）之版本釘選：main 合回 I1 前之提交 167e9eb9（d64efa9d~1）。原釘整合樹 72258590 只存在本機
+# testsel 分支、不在 main 歷史亦未推送 ⇒ 自 origin 新 clone 即 `git show` 失敗；三寫入者測試檔於兩提交逐位元相同（2026-11-18 實查）
+PRE_FIX_COMMIT = "167e9eb9"
 WRITERS = [
     (LA2_PROMOTION, "patterns/"),
     (MULTI_RANGE_APPEND, "kline_cache.h5"),
