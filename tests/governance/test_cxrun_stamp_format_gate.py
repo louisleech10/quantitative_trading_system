@@ -15,6 +15,7 @@ from tests.governance.test_govb1_b31_recovery import _deliver, _harness
 
 _SENTINEL_OK = (
     "## CODEX-R1-P3-00\n\n**斷言**: 零 findings sentinel。\n\n**碼證**: 對照組。\n\n"
+    "業界做法: x\n自建判定: 無\n測試耗時: 無\n主委查證: x\n量化從嚴: 不涉\n\n"  # 每輪必答五題（2026-11-18）
     "VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n"
 )
 # 逐字重現 stamp-r3 codex 交件形態：有 **斷言**、無 **碼證**（寫成 **核對**）

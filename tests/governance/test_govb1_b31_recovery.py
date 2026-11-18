@@ -684,12 +684,35 @@ def test_destination_check_does_not_false_positive(tmp_path: Path) -> None:
     #   （純散文交件會以「格式不合規」紅，那是格式閘、不是本條要測的落點閘）。
     proc, latest = _deliver(
         h, name="destok",
-        content="## CODEX-R1-P3-00\n\n**斷言**: 零 findings sentinel。\n\n**碼證**: 對照組。\n\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n",
+        content="## CODEX-R1-P3-00\n\n**斷言**: 零 findings sentinel。\n\n**碼證**: 對照組。\n\n"
+                "業界做法: x\n自建判定: 無\n測試耗時: 無\n主委查證: x\n量化從嚴: 不涉\n\n"  # 每輪必答五題（2026-11-18）
+                "VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n",
         family="codex", stub="preserve",
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert latest.get("result_state") == "success", latest
     assert "落點違規" not in proc.stderr
+
+
+_SENTINEL_NO_ANSWERS = ("## CODEX-R1-P3-00\n\n**斷言**: 零 findings sentinel。\n\n**碼證**: 對照組。\n\n"
+                        "VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n")
+_ANSWERS5 = "業界做法: x\n自建判定: 無\n測試耗時: 無\n主委查證: x\n量化從嚴: 不涉\n\n"
+
+
+@pytest.mark.parametrize("kind", ["stamp", "consult"])
+def test_consult_stamp_missing_mandatory_answers_format_failed(tmp_path: Path, kind: str) -> None:
+    """每輪必答五題（使用者 2026-11-18）：consult／stamp 交件不走 register-output，由 cx_run 格式檢查呼叫
+    `verdict_parse.sh --answers-only` ⇒ 缺五行即 format-failed（rc=3）；補齊五行之對照組 ⇒ success。
+    改壞對照：刪 `_run_format_check_if_needed` 之 consult|stamp 分支 ⇒ 前半轉紅。"""
+    h = _harness(tmp_path, kind=kind)
+    proc, latest = _deliver(h, name=f"noans-{kind}", content=_SENTINEL_NO_ANSWERS, family="codex", stub="preserve")
+    assert proc.returncode == 3, proc.stdout + proc.stderr
+    assert latest.get("result_state") == "format-failed", latest
+    assert "缺必答行" in proc.stderr, proc.stderr[-1500:]
+    ok = _SENTINEL_NO_ANSWERS.replace("VERDICT: proceed", _ANSWERS5 + "VERDICT: proceed")
+    proc2, latest2 = _deliver(h, name=f"ans-{kind}", content=ok, family="codex", stub="preserve")
+    assert proc2.returncode == 0, proc2.stdout + proc2.stderr
+    assert latest2.get("result_state") == "success", latest2
 
 
 def test_destination_violation_also_emits_fixup_line() -> None:

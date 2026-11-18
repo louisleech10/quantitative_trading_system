@@ -11,7 +11,9 @@
 # 拒收條件（SPEC Task 1.2，逐字）：無 `VERDICT:` 行／≥2 行（歧義）／值不在 verdict_values／
 #   blocked 卻無 BLOCKED-BY 或為空／BLOCKED-BY 或 CLOSED 之 ID 前綴家族 ≠ 本產出家族／
 #   BLOCKED-BY 之 ID 不在本檔 `## <ID>` 集合／CLOSED 之 ID 不在同 root 同家歷史產出／
-#   全形冒號 `VERDICT：`（不做寬容轉換，指名）。
+#   全形冒號 `VERDICT：`（不做寬容轉換，指名）；缺每輪必答五行 `業界做法:`／`自建判定:`／`測試耗時:`／`主委查證:`／
+#   `量化從嚴:` 或其內容為空／佔位（2026-11-18 使用者要求；內容對應 templates/COMMITTEE_FINDING_TEMPLATE.md 三節「每輪必查」
+#   與 CLAUDE.md「使用者原則通用量化主線」）。
 # 值集唯一真相源：scripts/governance_verdicts.json（缺 verdict_values 鍵 ⇒ import 期 raise，不 fallback）。
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
@@ -19,25 +21,71 @@ py="${SCRIPT_DIR}/../venv/bin/python"; [ -x "$py" ] || py="$(command -v python3)
 [ -n "$py" ] || { echo "verdict_parse: 無 python3" >&2; exit 2; }
 
 file="${1:-}"; family="${2:-}"; shift 2 2>/dev/null || true
-corpus=""
+corpus=""; answers_only=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --closed-corpus) corpus="${2:-}"; shift 2 ;;
+    # --answers-only：只驗每輪必答五行（consult／stamp 等不走 register-output 之交件，cx_run 格式檢查呼叫）
+    --answers-only) answers_only=1; shift ;;
     *) echo "verdict_parse: 未知參數 $1" >&2; exit 2 ;;
   esac
 done
 [ -n "$file" ] && [ -n "$family" ] || { echo "用法: verdict_parse.sh <output.md> <family> [--closed-corpus <file>]" >&2; exit 2; }
 [ -f "$file" ] || { echo "verdict_parse: 檔不存在: $file" >&2; exit 2; }
 
-"$py" - "$file" "$family" "$corpus" "${SCRIPT_DIR}/governance_verdicts.json" <<'PY'
+"$py" - "$file" "$family" "$corpus" "${SCRIPT_DIR}/governance_verdicts.json" "$answers_only" <<'PY'
 import json, re, sys
-path, family, corpus_path, values_path = sys.argv[1:5]
+path, family, corpus_path, values_path, answers_only = sys.argv[1:6]
 values = json.load(open(values_path, encoding="utf-8"))
 VERDICTS = values["verdict_values"]                      # 缺鍵 ⇒ KeyError（刻意不 fallback）
 ID_RE = re.compile(values["finding_id_regex"])
 text = open(path, encoding="utf-8").read()
 lines = text.splitlines()
 errs: list[str] = []
+
+# 每輪必答五題（使用者 2026-11-18：「是不是又在自建、是不是業界做法 -> 每一次，每一個問委員的brief都一定要包含類似的問句
+#   且一定要委員回答」）：行首半形冒號、同行非空且非佔位、不在 ``` fence 內；全形冒號或前導空白之變體指名拒收。
+#   題目由 cx_run.sh 注入每份提示（同一組前綴）；內容品質（敷衍作答）由收斂時主委逐條核，機檢只擋未作答。
+REQUIRED_ANSWERS = ("業界做法:", "自建判定:", "測試耗時:", "主委查證:", "量化從嚴:")
+_PLACEHOLDER = re.compile(r"^(<[^>]*>|待填|（待填）|TBD|xxx|…|\.\.\.)$", re.I)
+
+
+def _unfenced(ls: list[str]) -> list[str]:
+    out, inside = [], False
+    for l in ls:
+        if l.lstrip().startswith("```"):
+            inside = not inside
+            continue
+        if not inside:
+            out.append(l)
+    return out
+
+
+def _answer_errors(ls: list[str]) -> list[str]:
+    e: list[str] = []
+    body = _unfenced(ls)
+    for pre in REQUIRED_ANSWERS:
+        key = pre[:-1]
+        hits = [l[len(pre):].strip() for l in body if l.startswith(pre)]
+        variants = [l for l in body if not l.startswith(pre) and (l.lstrip().startswith(pre) or l.lstrip().startswith(key + "："))]
+        if variants:
+            e.append(f"必答行 `{pre}` 須行首半形冒號（發現全形冒號或前導空白之變體：{variants[0].strip()[:40]!r}）")
+        if not hits:
+            e.append(f"缺必答行 `{pre} …`（行首、半形冒號、同行作答、不在 fence 內）")
+        elif not any(h and not _PLACEHOLDER.match(h) for h in hits):
+            e.append(f"必答行 `{pre}` 內容為空或佔位")
+    return e
+
+
+if answers_only == "1":
+    errs = _answer_errors(lines)
+    if errs:
+        print("verdict_parse: 拒收（必答） " + path, file=sys.stderr)
+        for x in errs:
+            print("  · " + x, file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({"answers": "ok"}, ensure_ascii=False))
+    sys.exit(0)
 
 fullwidth = [i + 1 for i, l in enumerate(lines) if l.startswith("VERDICT：")]
 if fullwidth:
@@ -94,6 +142,8 @@ if corpus_path:
     for i in closed:
         if ID_RE.match(i) and i.split("-", 1)[0] == fam_up and i not in corpus_ids:
             errs.append(f"CLOSED ID {i} 不在同 root 同家任何歷史產出之 `## <ID>` 集合")
+
+errs.extend(_answer_errors(lines))
 
 if errs:
     print("verdict_parse: 拒收 " + path, file=sys.stderr)

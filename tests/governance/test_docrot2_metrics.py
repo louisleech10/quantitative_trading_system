@@ -374,7 +374,8 @@ def test_cx_run_review_collection_passes_round_id(tmp_path, post, state):
 @pytest.mark.parametrize("post,state", [(False, "success"), (True, "format-failed")])
 def test_cx_run_stamp_collection_passes_round_id(tmp_path, post, state):
     h = _cx_harness(tmp_path, "stamp")
-    text = "## CODEX-R1-P3-00\n\n**斷言**: 本輪逐項核對後無 finding\n\n**碼證**: 探針 rc=0\n"
+    text = ("## CODEX-R1-P3-00\n\n**斷言**: 本輪逐項核對後無 finding\n\n**碼證**: 探針 rc=0\n\n"
+            "業界做法: x\n自建判定: 無\n測試耗時: 無\n主委查證: x\n量化從嚴: 不涉\n")  # 每輪必答五題（2026-11-18）
     proc, latest = _cx_deliver(h, "stamp", text, post=post)
     assert latest.get("result_state") == state, proc.stderr[-2000:]
 

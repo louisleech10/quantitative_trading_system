@@ -79,8 +79,13 @@ def _open_round(h: dict, fams: list[str], *, task: str = TASK, session: str = "s
 def _write_out(h: dict, rel: str, fam_u: str, block: str, *, ids: tuple[str, ...] = ("P1-01",)) -> Path:
     body = "".join(f"## {fam_u}-R2-{i}\n\n**斷言**: x\n\n**碼證**: y\n\n**來源摘要**: a.md#aaaaaaaaaaaa\n\nbody\n\n" for i in ids)
     p = h["root"] / rel
-    p.write_text(body + block + "\nSTATUS: DONE\n", encoding="utf-8")
+    p.write_text(body + _ANSWERS + block + "\nSTATUS: DONE\n", encoding="utf-8")
     return p
+
+
+# 每輪必答五題（scripts/verdict_parse.sh REQUIRED_ANSWERS，2026-11-18）：合法交件須含；缺答之拒收另由
+# test_12_missing_mandatory_answers_rejected 驗
+_ANSWERS = ("業界做法: x\n自建判定: 無\n測試耗時: 無\n主委查證: x\n量化從嚴: 不涉\n\n")
 
 
 def _reg(h: dict, rel: str, *extra: str) -> subprocess.CompletedProcess[str]:
@@ -159,6 +164,22 @@ def test_12_closed_id_of_other_family_rejected(tmp_path: Path) -> None:
     _write_out(h, "handoffs/x-codex.md", "CODEX", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED: GROK-R1-P1-01\n")
     r = _reg(h, "handoffs/x-codex.md")
     assert r.returncode != 0 and "前綴家族" in (r.stdout + r.stderr)
+
+
+@pytest.mark.parametrize("missing", ["業界做法:", "自建判定:", "測試耗時:", "主委查證:", "量化從嚴:"])
+def test_12_missing_mandatory_answers_rejected(tmp_path: Path, missing: str) -> None:
+    """每輪必答五題缺任一題 ⇒ register-output 拒收並指名該題；只填佔位 ⇒ 亦拒收（使用者 2026-11-18 要求委員必答）。"""
+    h = _h(tmp_path); _seed_dispatch(h); _open_round(h, ["codex"])
+    p = _write_out(h, "handoffs/x-codex.md", "CODEX", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\n")
+    p.write_text("".join(l for l in p.read_text(encoding="utf-8").splitlines(True) if not l.startswith(missing)),
+                 encoding="utf-8")
+    r = _reg(h, "handoffs/x-codex.md")
+    assert r.returncode != 0 and missing in (r.stdout + r.stderr), r.stdout + r.stderr
+    assert _events(h, "committee_output") == []
+    p.write_text(p.read_text(encoding="utf-8").replace("VERDICT: proceed", f"{missing} <待填>\nVERDICT: proceed"),
+                 encoding="utf-8")
+    r = _reg(h, "handoffs/x-codex.md")
+    assert r.returncode != 0 and "佔位" in (r.stdout + r.stderr), r.stdout + r.stderr
 
 
 def test_12_proceed_with_expected_path_registers(tmp_path: Path) -> None:

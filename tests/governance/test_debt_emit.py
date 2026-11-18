@@ -2340,6 +2340,8 @@ def _b3_harness(tmp_path: Path) -> dict:
         #   （缺即 bash 127 ⇒ 開債前就死，斷言紅在「檢查沒跑」而非測試本意；同上理由補進清單）
         "prev_review_resolve.sh",
         "verdictgate_check.sh",
+        # 2026-11-18 委員每輪必答五題：cx_run 格式檢查對 consult／stamp 呼叫 verdict_parse.sh --answers-only（缺即 127）
+        "verdict_parse.sh",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():

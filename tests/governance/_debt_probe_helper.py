@@ -30,6 +30,8 @@ DOCROT2_HELPER_SCRIPTS = (
     "governance_verdicts.json",
     "_docrot2_metrics.py",
     "docrot2_metric_contract.json",
+    # 2026-11-18 委員每輪必答五題：cx_run 格式檢查對 consult／stamp 呼叫 verdict_parse.sh --answers-only（缺即 127，檢查沒跑）
+    "verdict_parse.sh",
 )
 
 

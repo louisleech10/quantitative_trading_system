@@ -772,6 +772,8 @@ _write_stub_success_output() {
         printf '**類別**: other\n\n'
         printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
         printf 'stub harness body\n'
+        # 每輪必答五題（verdict_parse.sh REQUIRED_ANSWERS）：stub 一律帶，免 harness 產出必然被拒收之交件
+        printf '\n業界做法: stub harness\n自建判定: 無（stub harness）\n測試耗時: 無（stub harness）\n主委查證: stub harness\n量化從嚴: 不涉（stub harness）\n'
         # VERDICTGATE Task 1.2 測試尾段（harness-only；CX_STUB_TAIL 已綁 CX_STUB_MODE 之 harness 守衛）：
         #   verdict ⇒ 合法機械裁決塊＋STATUS: DONE（走自動註冊）；done ⇒ 只有 STATUS: DONE（觸發拒收）
         case "${CX_STUB_TAIL:-}" in
@@ -791,6 +793,7 @@ _write_stub_success_output() {
         printf '**斷言**: CX_STUB_MODE=success harness stamp sentinel（零 findings）\n\n'
         printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success（stamp）\n\n'
         printf '**類別**: other\n\n'
+        printf '業界做法: stub harness\n自建判定: 無（stub harness）\n測試耗時: 無（stub harness）\n主委查證: stub harness\n量化從嚴: 不涉（stub harness）\n\n'
         printf 'VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n'
       } > "${out}"
       ;;
@@ -869,6 +872,15 @@ _run_format_check_if_needed() {
       bash "${_cc_stamp}" --single "${out}" --family "${fam}" --round-id "${ROUND_ID:-}" >&2 || _rc=$?
     fi
   fi
+  # ── 每輪必答五題：consult／stamp 不走 register-output（review／closure 由 verdict_parse 主路徑擋）⇒ 於此強制
+  #   （使用者 2026-11-18「每一次，每一個問委員的brief都…一定要委員回答」；凍結錨點外側）。缺答 ⇒ 格式不合規。
+  case "${_bk}" in
+    consult|stamp)
+      if [ "${_rc}" -eq 0 ] && [ "${_cli}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
+        bash "${SCRIPT_DIR}/verdict_parse.sh" "${out}" "${fam}" --answers-only >/dev/null || _rc=$?
+      fi
+      ;;
+  esac
   # ── 以下為 Task 4.3 新增（一律在凍結錨點**外側**）──────────────────────────
   # 格式不合規時，補一份**逐條可修補清單**。為保留上方錨點行的字面，
   # 這裡在失敗時**再跑一次** checker 並收集 stderr（只在失敗路徑付出，成功路徑零成本）。
@@ -1113,6 +1125,13 @@ _prepare_and_run() {
   #     實質 sentinel 收斂 → rc=0 ；source 端空殼 sentinel → rc=1 ；--single 空殼 → rc=1
   #   ⚠️ 本句同時取代主委 08-06 誤造的第三種格式（散文「本輪 0 findings」），
   #     避免與舊 P3-00 慣例並存造成三種寫法。
+  # 每輪必答五題（使用者 2026-11-18：「是不是又在自建、是不是業界做法 -> 每一次，每一個問委員的brief都一定要包含類似的問句
+  #   且一定要委員回答」）；review／closure 交件由 verdict_parse.sh 之 REQUIRED_ANSWERS 拒收缺答（同一組行首前綴），
+  #   consult／stamp 由 _run_format_check_if_needed 呼叫 `verdict_parse.sh --answers-only` 判格式不合規。
+  #   以 `!= impl` 判定（不另立 kind 集合：findings-kind 集合須全檔一致，tests/governance/test_cxrun_selfcheck_prompt.py）。
+  if [ "${_bk}" != "impl" ]; then
+      prompt="${prompt} 【每輪必答五題，不論 brief 有無列出，皆須於產出末段各寫一行、行首半形冒號、同行作答，不得留空或佔位】業界做法: <本輪標的所涉之事，主流軟體／量化業界之標準做法為何（附官方文件或標準函式庫名）；本案是否照做，未照做處列出>；自建判定: <本輪標的有無自建工具、治理層、登記表、外掛或驗證機制而業界已有現成做法者；逐項列出並建議以何取代，無則寫「無」並說明查過哪些>；測試耗時: <本輪標的範圍內有無單條逾 60 秒之測試或逾數分鐘之量測；逐項寫其獨有覆蓋與能否改小段真實資料精確比對，無則寫「無」並說明依據>；主委查證: <抽驗 brief 之 fact-verified 與主委陳述至少一條（原因、診斷、比較、預估、駁回理由），寫出你實跑之命令與結果，及是否相符>；量化從嚴: <本輪標的涉及之數值：①先驗對——是否已以獨立 oracle（業界標準函式庫）於真實資料驗證現行值正確；②全功能——是否涵蓋全部現有模組與分支（含預設關閉者）；③資料補足——資料是否足以讓每條路徑實際算出值（INSUFFICIENT_DATA、空序列、整欄 NaN 不算已測）；④有無偷看未來（look-ahead／PIT）；⑤耗時／峰值記憶體／精度／檔案大小四項有無變差；⑥有無新增依牆鐘停止或縮減運算之機制（NOCAP）。不涉數值則寫「不涉」並說明依據>。上列五題之依據為 templates/COMMITTEE_FINDING_TEMPLATE.md 三節「每輪必查」與 CLAUDE.md「使用者原則通用量化主線」，請先讀再答。任一題答案涉及違反業界做法、自建、不合理耗時、主委說法不符或量化正確性未驗者，須同時列為 P1 finding。"
+  fi
   case "${_bk}" in
     review|consult|closure)
       prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} --round-id ${ROUND_ID:-} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。每條 finding（含 sentinel）須有一行 **類別**: <值>，值與標籤同一行，值集見 scripts/governance_verdicts.json 之 finding_category_values。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
