@@ -11,7 +11,8 @@ factory_caller|tests/momentum/Analysis/test_icperf_deep_factor_return.py
 factory_caller|tests/momentum/Analysis/test_icperf_trend_wiring.py
 factory_caller|tests/phase26/test_deep_analysis_factories.py
 # section: direct_consumers
-direct_consumer|momentum/factories.py:723:11
+# 2026-11-18 TESTSEL 收尾：69dfcb82（ICPERF L1b）於上方加 8 行，同一敘述 `return FactorReturnAnalyzer(config or {})` 由 723 移至 731（非新增消費者）
+direct_consumer|momentum/factories.py:731:11
 direct_consumer|scripts/phase29_perf_validation_tmp.py:41:0
 direct_consumer|tests/momentum/Analysis/test_icperf_deep_quality_netic.py:1373:9
 direct_consumer|tests/phase24/test_factor_return_analyzer.py:19:15

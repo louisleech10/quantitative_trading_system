@@ -53,6 +53,10 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         "verify_pretooluse.sh",
     ):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
+    # NOCAP（pre-commit timeout_scan --staged）與 ICPERF L3（git_hooks/limit_lint_staged.sh → limit_lint.py）之依賴：
+    # pre-commit 缺即 fail-closed，迷你 repo 須備齊（同 test_precommit_autofix.py／test_verify_gate_b3.py；斷言不變）。
+    for name in ("timeout_scan.py", "timeout_patterns.json", "timeout_registry.json", "limit_lint.py", "limit_scan.py"):
+        (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
     # DOCROT2 D2B：pre-commit 之活文件兩道判定缺 helper 即 fail-closed ⇒ 迷你 repo 須備齊 helper
     # （缺它時「應擋」各條是因缺檔而擋，不是因假 claim 而擋——假綠）。本檔只測 claim 閘，
     # 故把會暫存之測試文件登記為 LOG 類（兩道判定不適用），斷言不變。同 test_precommit_autofix.py。
@@ -135,6 +139,8 @@ def test_o1_staged_new_unbacked_operational_blocked(tmp_path: Path) -> None:
         check=False,
     )
     assert proc.returncode != 0
+    # 拒絕須來自 claim 閘（scripts/verification_claim_check.py 之違規訊息），非 pre-commit 前段他閘或缺檔
+    assert "operational claim 缺少 VERIFY/REF/SIGNOFF backing" in proc.stderr, proc.stderr
 
 
 def test_o1_staged_partial_stage_fake_claim_still_blocked(tmp_path: Path) -> None:
@@ -153,6 +159,8 @@ def test_o1_staged_partial_stage_fake_claim_still_blocked(tmp_path: Path) -> Non
         check=False,
     )
     assert proc.returncode != 0
+    # 拒絕須來自 claim 閘（scripts/verification_claim_check.py 之違規訊息），非 pre-commit 前段他閘或缺檔
+    assert "operational claim 缺少 VERIFY/REF/SIGNOFF backing" in proc.stderr, proc.stderr
 
 
 # --- O2: REF 檔案路徑 ---

@@ -280,7 +280,7 @@ def test_bounded_poll_codex_counterexamples_blocked(name: str) -> None:
     assert _run(_edit("tests/_bp_probe.py", "", _BP_CODEX[name])) == 2
 
 
-def test_mutation_bounded_poll_r1_extensions_removed() -> None:
+def test_mutation_bounded_poll_r1_extensions_removed(monkeypatch: pytest.MonkeyPatch) -> None:
     """改壞：退回 919f41b5 之規則（只認 range／計數式 while、失敗只看 else 或緊接一個失敗敘述、無遞迴）⇒ 反例 A–D 全放行，
     原命中樣本仍擋（證 A–D 之擋由 r1 擴充造成）。"""
     scan = g._scanner()
@@ -309,7 +309,7 @@ def test_mutation_bounded_poll_r1_extensions_removed() -> None:
                         out.append(st.lineno)
         return out
 
-    scan._bounded_polls = old_rule
+    monkeypatch.setattr(scan, "_bounded_polls", old_rule)
     for name, src in _BP_CODEX.items():
         assert g.violations([("tests/_bp_probe.py", "", src)], [], scan=scan) == [], name
     assert g.violations([("tests/_bp_probe.py", "", _BP_HIT)], [], scan=scan)
@@ -340,11 +340,11 @@ def test_bounded_poll_added_failure_to_existing_loop_blocked(tmp_path: Path) -> 
     assert g.violations(edits, [], scan=scan)
 
 
-def test_mutation_bounded_poll_rule_removed_lets_cap_through() -> None:
+def test_mutation_bounded_poll_rule_removed_lets_cap_through(monkeypatch: pytest.MonkeyPatch) -> None:
     """改壞：拿掉 AST 規則（`_bounded_polls` 恆空）⇒ 命中樣本放行（證上列擋案由該規則造成）。"""
     scan = g._scanner()
     assert g.violations([("tests/_bp_probe.py", "", _BP_HIT)], [], scan=scan)
-    scan._bounded_polls = lambda tree: []
+    monkeypatch.setattr(scan, "_bounded_polls", lambda tree: [])
     assert g.violations([("tests/_bp_probe.py", "", _BP_HIT)], [], scan=scan) == []
 
 
