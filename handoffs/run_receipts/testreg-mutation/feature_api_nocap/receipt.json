@@ -1,0 +1,118 @@
+{
+ "target_nodeid": "tests/api/test_feature_api.py::test_feature_extraction_api",
+ "compare_nodeids": [
+  "tests/api/test_feature_api.py::test_feature_extraction_api"
+ ],
+ "head": "5a567067140d0fef003ff238af8421c23695f44f",
+ "fingerprint": "c1134bd1f54f29bed49fae3bad16a905cb271f4f0fdd338539f41c0a0fe78c04",
+ "target_assertion_lines": [
+  "tests/api/test_feature_api.py:39",
+  "tests/api/test_feature_api.py:41",
+  "tests/api/test_feature_api.py:42",
+  "tests/api/test_feature_api.py:43",
+  "tests/api/test_feature_api.py:51",
+  "tests/api/test_feature_api.py:56",
+  "tests/api/test_feature_api.py:59",
+  "tests/api/test_feature_api.py:63"
+ ],
+ "mutants": [
+  {
+   "id": "m1_status_201",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m1_status_201.patch",
+   "patch_sha256": "70c7acc1def51f124d916c479be0a4b8f7933e8e5c49e9560c4ea1cdf7c4914f",
+   "session_id": "5d77c50f-d874-4f7f-afcf-2c05c675e767",
+   "compare_session_id": "e6eb0588-34e0-4b97-9ecb-469e40c61dba",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:39",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  },
+  {
+   "id": "m2_no_task_id",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m2_no_task_id.patch",
+   "patch_sha256": "5db50103963b525927e57fe31a254180e5d7fa33ddd6248bb73dcd1f6a5ded25",
+   "session_id": "dc607310-5cd7-4e52-8b78-d2fea14b971f",
+   "compare_session_id": "9cf20174-2051-4fba-846c-6d916bf19424",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:41",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  },
+  {
+   "id": "m3_status_queued",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m3_status_queued.patch",
+   "patch_sha256": "1a17b6ed8f530dbbda6d1d9c579142e3fec31652906c5b12ff7045bc831f157d",
+   "session_id": "fc132659-fa8a-441a-a1d3-885296f52828",
+   "compare_session_id": "eac2dce1-3ab9-426f-8b19-64874754ba1f",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:42",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  },
+  {
+   "id": "m4_no_estimated_time",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m4_no_estimated_time.patch",
+   "patch_sha256": "5f3270ef55c02c68e2296c6159762ab7add5b3e8207711965fdf48b3d91fae8b",
+   "session_id": "192db5f3-c519-4ee6-bbf4-636531774217",
+   "compare_session_id": "dab602a5-659a-4ffd-b0bd-09d1f9261c40",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:43",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  },
+  {
+   "id": "m5_task_status_203",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m5_task_status_203.patch",
+   "patch_sha256": "df41db1a5abe61b59727132b1ce1cea13ea3819e078be98570da35a91602b644",
+   "session_id": "ae1f200e-7062-4176-99a6-3dcadb46638e",
+   "compare_session_id": "155a4e2e-c2f1-4a8b-b2c2-0cf073d6bee5",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:51",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  },
+  {
+   "id": "m6_few_features",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m6_few_features.patch",
+   "patch_sha256": "cfe3a797ac8297d8bc1b2cad89e67a3c488aa8a5eb6a22a3e7b26e6d48abed1f",
+   "session_id": "dacc4c76-6aad-40b4-9294-842888608cf3",
+   "compare_session_id": "5b797118-3be8-449c-8600-6658780c3ed4",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:56",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  },
+  {
+   "id": "m7_task_fails",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m7_task_fails.patch",
+   "patch_sha256": "e3a42bbd5f05ff8a0f3970479b04c63e7096e0a158d29ce22158cb10ed329fd8",
+   "session_id": "cf504ef3-4821-446a-8760-023b854fc2f5",
+   "compare_session_id": "7d869cda-8d11-4b6a-abdc-1aa2d798b4c4",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:59",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  },
+  {
+   "id": "m8_never_completes",
+   "patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/m8_never_completes.patch",
+   "patch_sha256": "6a98daf8897ca67e4b8856d99955cc8dec21b6de6536b9bfd35b38410bd9078f",
+   "session_id": "01ca0881-e3a0-4e92-bf4e-7ed12c3bdcbf",
+   "compare_session_id": "2d418bc1-63f3-4be8-b29c-b6f82538f940",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/api/test_feature_api.py:63",
+   "compare_outcomes": {
+    "tests/api/test_feature_api.py::test_feature_extraction_api": "failed"
+   }
+  }
+ ],
+ "compare_patch_path": "handoffs/run_receipts/testreg-mutation/feature_api_nocap/compare.patch",
+ "compare_patch_sha256": "6acf5fcd510b506565fc13a4714ae8f70cab77ccf5edf6be561d83c74c471336"
+}

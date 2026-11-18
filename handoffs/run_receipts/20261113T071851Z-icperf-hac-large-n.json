@@ -1,0 +1,38 @@
+{
+ "receipt": "icperf-hac-large-n",
+ "ts": "20261113T071851Z",
+ "head": "b960a16bed374dfa781d390c5c9bee5b891ee926",
+ "n": 500000,
+ "horizon": 5,
+ "seed": 500,
+ "product_sha256": {
+  "momentum/Analysis/hac_ewc.py": "11d17f86779fb0bda0bfdb0ff518eb03455af910ec43e2e6bd97f6c295bed74a",
+  "momentum/Analysis/statistical_validator.py": "b6a3a80a7fead5b568f1f19782739e7e0dca7d4c323521aef92acc421679b550"
+ },
+ "study_code_sha256": {
+  "scripts/icperf_hac_large_n_receipt.py": "ce466d6610faca7592bf0d84d9203346870b065eacc3f0d2b65c9800dcb5214b"
+ },
+ "env_fingerprint": {
+  "python": "3.9.6",
+  "numpy": "1.26.4",
+  "scipy": "1.13.1",
+  "pandas": "2.3.2",
+  "numba": "0.60.0"
+ },
+ "rerun_when": "PRODUCT_FILES、STUDY_CODE 任一 sha256 或 env_fingerprint 與現行不符",
+ "inference_status": "ok",
+ "p_value": 0.9898318783254797,
+ "data_warning": null,
+ "warning_not_evaluated": null,
+ "chunks_per_simulation": {
+  "491894|-0.5": 250,
+  "491894|0.0": 250,
+  "491894|ref": 250,
+  "516489|-0.5": 333,
+  "516489|0.0": 263,
+  "516489|ref": 250
+ },
+ "wall_time_s": 380.0,
+ "ru_maxrss": 447889408,
+ "ok": true
+}

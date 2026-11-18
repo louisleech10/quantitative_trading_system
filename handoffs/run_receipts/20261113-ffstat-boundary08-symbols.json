@@ -1,0 +1,37 @@
+{
+ "test": "tests/feature_engineering/test_ffstat_calibration.py::test_boundary_08_default_runs_no_column_short",
+ "head": "d0249d551ee5b1f687b356fcebe5abeec731ff9f",
+ "dirty_product_or_tests": true,
+ "rows": [
+  {
+   "symbol": "ETHUSDT",
+   "timeframe": "1h",
+   "outcome": "passed",
+   "detail": null,
+   "seconds": 130.5
+  },
+  {
+   "symbol": "ETHUSDT",
+   "timeframe": "12h",
+   "outcome": "passed",
+   "detail": null,
+   "seconds": 119.9
+  },
+  {
+   "symbol": "BCHUSDT",
+   "timeframe": "1h",
+   "outcome": "passed",
+   "detail": null,
+   "seconds": 113.6
+  },
+  {
+   "symbol": "BCHUSDT",
+   "timeframe": "12h",
+   "outcome": "passed",
+   "detail": null,
+   "seconds": 121.5
+  }
+ ],
+ "all_passed": true,
+ "command": "venv/bin/python handoffs/run_receipts/ffstat_probes/boundary08_symbols_receipt.py handoffs/run_receipts/20261113-ffstat-boundary08-symbols.json"
+}

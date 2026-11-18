@@ -1,0 +1,11 @@
+diff --git a/scripts/ffprod_measure.py b/scripts/ffprod_measure.py
+--- a/scripts/ffprod_measure.py
++++ b/scripts/ffprod_measure.py
+@@ -2481,3 +2481,7 @@
+
+ if __name__ == "__main__":
+     raise SystemExit(main())
++
++
++def _testreg_mutant_m1(cmd):
++    subprocess.run(cmd, timeout=60)

@@ -1,0 +1,37 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_numview_acceptance.py::test_ticket_order_line_36_scoped_ic_first_and_ic_page",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:testsel-i10-g1",
+      "created_at": "2026-11-13T10:05:44+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 120,
+  "basis": [
+    "單一靜態文字檢查（讀 docs/TICKET_ORDER.md 第 4 步列），不生成、不讀資料；ledger 無通過紀錄（unknown 1）⇒ 以函式本體估：只讀一個 md 檔並比對字串，秒級；120 秒為上界",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "uncertain_ack": {
+    "unknown": 1,
+    "fixture_cost_unknown": 0
+  },
+  "tier": "fix",
+  "tier_reason": "主委指示：allowed_red 新增五列須跑 test_prered_allowed_red.py 全檔（精確集合、可收集、綠者不得列入）",
+  "spec_path": "docs/NOCAP_SPEC.md",
+  "coverage_path_ids": [
+    "NOCAP-BUDGET-3"
+  ]
+}

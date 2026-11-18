@@ -1,0 +1,12 @@
+diff --git a/api/services/feature_task_service.py b/api/services/feature_task_service.py
+--- a/api/services/feature_task_service.py
++++ b/api/services/feature_task_service.py
+@@ -221,7 +221,7 @@
+                 } if validate else None
+             }
+             
+-            self.task_manager.update_status(task_id, 'completed', result=result)
++            pass  # mutant m8：不寫 completed，任務停在 running
+             self.task_manager.update_progress(task_id, 100)
+             
+             self.logger.info(f"特徵提取任務完成 - task_id: {task_id}")

@@ -1,0 +1,12 @@
+diff --git a/api/services/feature_task_service.py b/api/services/feature_task_service.py
+--- a/api/services/feature_task_service.py
++++ b/api/services/feature_task_service.py
+@@ -135,7 +135,7 @@
+         
+         return {
+             'task_id': task_id,
+-            'status': 'running',
++            'status': 'queued',
+             'estimated_time': 30  # 預估 30 秒
+         }
+     

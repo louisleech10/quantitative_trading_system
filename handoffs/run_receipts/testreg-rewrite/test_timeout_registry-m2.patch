@@ -1,0 +1,18 @@
+diff --git a/scripts/timeout_registry.json b/scripts/timeout_registry.json
+--- a/scripts/timeout_registry.json
++++ b/scripts/timeout_registry.json
+@@ -1,14 +1,6 @@
+ {
+   "_doc": "NOCAP 白名單（docs/NOCAP_SPEC.md Task 0.2／0.2b）：每列＝{path, class, reason}＋綁定之一——Python 呼叫型＝function（所在函式全名，模組層 <module>）＋callee（被呼叫者）＋literal（逾時參數字面值）；其餘（shell、config、frontend、Python 字串型）＝line（去頭尾空白之整行）；whole_file＝true 只准守衛、掃描器本身與其測試。class 只准 B（等外部方：網路／API／委員 CLI／鎖）、C（短輔助命令之掛住保險）、D（效能斷言／依資源判定／純字串／測試樣本／封存不執行）；A（依牆鐘停止或縮減長運算）不可登記。新增列須於同一提交經審碼。",
+   "entries": [
+-    {
+-      "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+-      "function": "swap_used_mb",
+-      "callee": "subprocess.run",
+-      "literal": "5",
+-      "class": "C",
+-      "reason": "sysctl 讀 swap／實體記憶體之掛住保險（秒級短命令）"
+-    },
+     {
+       "path": "handoffs/run_receipts/numview_probes/_watchdog.py",
+       "function": "physical_memory_mb",

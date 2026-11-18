@@ -1,0 +1,20 @@
+diff --git a/tests/registry/test_timeout_registry.py b/tests/registry/test_timeout_registry.py
+index 810d4054..b2cf1bea 100644
+--- a/tests/registry/test_timeout_registry.py
++++ b/tests/registry/test_timeout_registry.py
+@@ -24,9 +24,13 @@ INJECTED, STRING_ONLY = "    subprocess.run(cmd, timeout=60)\n", "log.info(\"tim
+ 
+ 
+ def test_boundary_12_repo_scan_every_hit_registered_and_not_class_a() -> None:
+-    """全庫（scripts／momentum／api／tests／handoffs probes／config／frontend）每處命中皆已登記且非 A 類。"""
+-    missing = scan.unregistered(scan.scan_repo(REPO), REGISTRY)
++    """全庫（scripts／momentum／api／tests／handoffs probes／config／frontend）每處命中皆已登記且非 A 類，或列於 NOCAP
++    待施工棘輪清單 `scripts/timeout_pending_nocap.json`（blocked-by NOCAP Phase 1／3／4／5 已定義之 Task；主委
++    2026-11-13 裁定以 TESTREG rewrite 改寫本測試語意）：不在清單之未登記命中照擋（新增）；清單列已無對應命中亦紅
++    （修好須移出，只減不增）；清單列 nocap_task 空值 ⇒ load_pending 拒。"""
++    missing, stale = scan.ratchet(scan.scan_repo(REPO), REGISTRY, scan.load_pending())
+     assert missing == [], [f"{h.path}:{h.line} {h.text.strip()}" for h in missing[:20]]
++    assert stale == [], [f"{e['path']}:{e['line_hint']} {e['text']}（已修好，請自棘輪清單移出）" for e in stale[:20]]
+ 
+ 
+ def test_boundary_13_stale_registry_entry_is_red() -> None:

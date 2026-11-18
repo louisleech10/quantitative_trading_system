@@ -1,0 +1,316 @@
+{
+ "receipt": "icperf-hac45-study",
+ "ts": "20261113T014837Z",
+ "head": "a6a439160f6a3f78ebbf93f25474ebc2c1a04856",
+ "product_sha256": {
+  "momentum/Analysis/ic_engine.py": "854f1b2a15e43ccc6286011045eaab7f4b3922f5e674a35fc03df71403f47bd3",
+  "momentum/Analysis/ic_filter_orchestrator.py": "0f726994f7d04203b15665b38be38a277b4b661a708bb0f23aed6bd4c17ead0f",
+  "momentum/Analysis/ic_config_schema.py": "7b328c1b734e925a947ed4a403fd94646fbb5dc2f0cf6c8d171f17ccfdec9a56",
+  "momentum/core/split_preview.py": "3cfc0fa195c5bf06a9f1d6a5b966e57affc3676cd9ad5fee482851162e783516",
+  "momentum/Analysis/factor_centrality_analyzer.py": "0a58fd319c69bedbd9a2f755ed659d09d9c8495ff870e72d889ccedb3744001a",
+  "momentum/Analysis/long_short_analyzer.py": "b6f0b93a5c5e710ea0980138075afc9bf4c7235cf48427530c34323ef7a34497",
+  "momentum/Analysis/trend_analyzer.py": "a1a3e301bb4bda1f64f44c9a1510af1afa30c8a45a78f4e8727da3e1402b23e7",
+  "momentum/Analysis/trend_inference.py": "7608b7897fec97653da0fd6465d990278621299ee960c1b2ceeac05782b9ab78",
+  "momentum/Analysis/hac_ewc.py": "11d17f86779fb0bda0bfdb0ff518eb03455af910ec43e2e6bd97f6c295bed74a",
+  "momentum/Analysis/pit_stats.py": "a36dcd1b051cfc9a0b34b7c82fa2b6b9b295cdb5814562da2275578ae8c5433a"
+ },
+ "study_code_sha256": {
+  "tests/momentum/Analysis/test_icperf_hac45_size.py": "8170825cb2c8eb633cca162a1acec6cede667b7536db9845cdb99c15ad10d10a"
+ },
+ "dirty_paths_at_run": [],
+ "rerun_when": "PRODUCT_FILES 或 STUDY_TEST 任一 sha256 與現行不符",
+ "study": "B7",
+ "ok": true,
+ "seconds": 515.1,
+ "detail_path": "runs/icperf/hac45/b7.json",
+ "cells": [
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 500,
+    "phi": 0.0,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.045,
+     "nw_overlap_fixed_lag": 0.061,
+     "ewc_overlap": 0.054
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.054,
+     "nw_overlap_fixed_lag": 0.083,
+     "ewc_overlap": 0.078
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.046,
+     "nw_overlap_fixed_lag": 0.186,
+     "ewc_overlap": 0.186
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.086,
+     "nw_overlap_fixed_lag": 0.506,
+     "ewc_overlap": 0.548
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 500,
+    "phi": 0.9,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.049,
+     "nw_overlap_fixed_lag": 0.063,
+     "ewc_overlap": 0.059
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.053,
+     "nw_overlap_fixed_lag": 0.074,
+     "ewc_overlap": 0.076
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.06,
+     "nw_overlap_fixed_lag": 0.151,
+     "ewc_overlap": 0.165
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.111,
+     "nw_overlap_fixed_lag": 0.421,
+     "ewc_overlap": 0.462
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 500,
+    "phi": 0.99,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.05,
+     "nw_overlap_fixed_lag": 0.056,
+     "ewc_overlap": 0.048
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.035,
+     "nw_overlap_fixed_lag": 0.088,
+     "ewc_overlap": 0.08
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.058,
+     "nw_overlap_fixed_lag": 0.133,
+     "ewc_overlap": 0.12
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.102,
+     "nw_overlap_fixed_lag": 0.444,
+     "ewc_overlap": 0.43
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 2000,
+    "phi": 0.0,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.047,
+     "nw_overlap_fixed_lag": 0.051,
+     "ewc_overlap": 0.046
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.049,
+     "nw_overlap_fixed_lag": 0.092,
+     "ewc_overlap": 0.082
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.113,
+     "nw_overlap_fixed_lag": 0.189,
+     "ewc_overlap": 0.185
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.325,
+     "nw_overlap_fixed_lag": 0.578,
+     "ewc_overlap": 0.559
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 2000,
+    "phi": 0.9,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.048,
+     "nw_overlap_fixed_lag": 0.044,
+     "ewc_overlap": 0.048
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.052,
+     "nw_overlap_fixed_lag": 0.067,
+     "ewc_overlap": 0.077
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.084,
+     "nw_overlap_fixed_lag": 0.134,
+     "ewc_overlap": 0.14
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.25,
+     "nw_overlap_fixed_lag": 0.502,
+     "ewc_overlap": 0.53
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 2000,
+    "phi": 0.99,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.041,
+     "nw_overlap_fixed_lag": 0.047,
+     "ewc_overlap": 0.048
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.057,
+     "nw_overlap_fixed_lag": 0.079,
+     "ewc_overlap": 0.076
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.1,
+     "nw_overlap_fixed_lag": 0.208,
+     "ewc_overlap": 0.182
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.258,
+     "nw_overlap_fixed_lag": 0.571,
+     "ewc_overlap": 0.565
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 5000,
+    "phi": 0.0,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.08,
+     "nw_overlap_fixed_lag": 0.081,
+     "ewc_overlap": 0.081
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.09,
+     "nw_overlap_fixed_lag": 0.091,
+     "ewc_overlap": 0.097
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.152,
+     "nw_overlap_fixed_lag": 0.212,
+     "ewc_overlap": 0.219
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.404,
+     "nw_overlap_fixed_lag": 0.602,
+     "ewc_overlap": 0.615
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 5000,
+    "phi": 0.9,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.065,
+     "nw_overlap_fixed_lag": 0.051,
+     "ewc_overlap": 0.051
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.086,
+     "nw_overlap_fixed_lag": 0.075,
+     "ewc_overlap": 0.076
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.115,
+     "nw_overlap_fixed_lag": 0.18,
+     "ewc_overlap": 0.172
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.38,
+     "nw_overlap_fixed_lag": 0.639,
+     "ewc_overlap": 0.634
+    }
+   }
+  },
+  {
+   "cell": {
+    "dim": "ic",
+    "n": 5000,
+    "phi": 0.99,
+    "w": 21,
+    "h": 5
+   },
+   "reps": 1000,
+   "size_adjusted_power": {
+    "0": {
+     "product_nonoverlap_fixedb": 0.053,
+     "nw_overlap_fixed_lag": 0.051,
+     "ewc_overlap": 0.049
+    },
+    "2": {
+     "product_nonoverlap_fixedb": 0.074,
+     "nw_overlap_fixed_lag": 0.086,
+     "ewc_overlap": 0.088
+    },
+    "4": {
+     "product_nonoverlap_fixedb": 0.121,
+     "nw_overlap_fixed_lag": 0.186,
+     "ewc_overlap": 0.193
+    },
+    "8": {
+     "product_nonoverlap_fixedb": 0.279,
+     "nw_overlap_fixed_lag": 0.591,
+     "ewc_overlap": 0.593
+    }
+   }
+  }
+ ]
+}

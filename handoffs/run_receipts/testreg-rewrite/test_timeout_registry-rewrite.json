@@ -1,0 +1,51 @@
+{
+ "target_nodeid": "tests/registry/test_timeout_registry.py::test_boundary_12_repo_scan_every_hit_registered_and_not_class_a",
+ "compare_nodeids": [
+  "tests/registry/test_timeout_registry.py::test_boundary_12_repo_scan_every_hit_registered_and_not_class_a"
+ ],
+ "head": "a48f76154a297bb78d600348f9501fde8c6324d1",
+ "fingerprint": "ccf58cd8228a3e0484eb68acb762b205434322f1ae1f5a0af7c7ca5b9de1de74",
+ "target_assertion_lines": [
+  "tests/registry/test_timeout_registry.py:29"
+ ],
+ "mutants": [
+  {
+   "id": "m1",
+   "patch_path": "handoffs/run_receipts/testreg-rewrite/test_timeout_registry-m1.patch",
+   "patch_sha256": "f76f00c46dcf34d5c42ab360f3d2054a9d0fd5679dd4eec08de53b4ebe36df15",
+   "session_id": "d91d1fbc-b7c7-413e-a676-f0d202d527c8",
+   "compare_session_id": "4fbb694d-add9-4f3f-9a89-053738696900",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/registry/test_timeout_registry.py:29",
+   "compare_outcomes": {
+    "tests/registry/test_timeout_registry.py::test_boundary_12_repo_scan_every_hit_registered_and_not_class_a": "failed"
+   }
+  },
+  {
+   "id": "m2",
+   "patch_path": "handoffs/run_receipts/testreg-rewrite/test_timeout_registry-m2.patch",
+   "patch_sha256": "cc700c04a9331c33fee03e6bec114ee2f1ceec858bd9c28cb085950808966d1c",
+   "session_id": "8956dcc4-b7c7-4ee7-bea1-d6251e7947ad",
+   "compare_session_id": "a6bf6fd1-6d88-43a8-a05b-280b7c421c12",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/registry/test_timeout_registry.py:29",
+   "compare_outcomes": {
+    "tests/registry/test_timeout_registry.py::test_boundary_12_repo_scan_every_hit_registered_and_not_class_a": "failed"
+   }
+  },
+  {
+   "id": "m3",
+   "patch_path": "handoffs/run_receipts/testreg-rewrite/test_timeout_registry-m3.patch",
+   "patch_sha256": "0c1478bd4815d0f91cca269a58953e502eb0485555858bbaeaa7aab0b404fc44",
+   "session_id": "386dda3e-652b-4cae-b0fc-d53666850054",
+   "compare_session_id": "80e06be8-fc17-44ec-b294-f3be09ed418a",
+   "target_outcome": "failed",
+   "target_fail_loc": "tests/registry/test_timeout_registry.py:29",
+   "compare_outcomes": {
+    "tests/registry/test_timeout_registry.py::test_boundary_12_repo_scan_every_hit_registered_and_not_class_a": "failed"
+   }
+  }
+ ],
+ "compare_patch_path": "handoffs/run_receipts/testreg-rewrite/test_timeout_registry-compare.patch",
+ "compare_patch_sha256": "1dc89ec0e33173a7686fa27735e3866bb73a0239759afad5afe730faa19e693a"
+}

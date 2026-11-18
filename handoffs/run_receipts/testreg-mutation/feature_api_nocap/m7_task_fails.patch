@@ -1,0 +1,11 @@
+diff --git a/api/services/feature_task_service.py b/api/services/feature_task_service.py
+--- a/api/services/feature_task_service.py
++++ b/api/services/feature_task_service.py
+@@ -156,6 +156,7 @@
+             
+             # Step 1: 載入 K線數據 (20%)
+             self.task_manager.update_progress(task_id, 20)
++            raise RuntimeError('mutant m7')
+             df = await self._load_kline_data(symbol, timeframe)
+             
+             if len(df) == 0:

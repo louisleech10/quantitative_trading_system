@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/governance/test_prered_allowed_red.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_prered_allowed_red.py",
+      "code_sha256": "0b716d87c4d911a5ee2cf516e94bc26a0080ff530e2ef0dca582b6a309cfaf27",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:testsel-i10-g1",
+      "created_at": "2026-11-13T10:01:11+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 600,
+  "basis": [
+    "test_prered_allowed_red.py 四條：est_all ledger 4.9＋13.5＋4.2＋4.3 秒，guard ledger 標其中一條 ≥60 秒；本機上輪實跑全檔約 2–3 分鐘（collect-only 子行程）",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "tier": "fix",
+  "tier_reason": "主委指示：allowed_red 新增五列須跑 test_prered_allowed_red.py 全檔（精確集合、可收集、綠者不得列入）",
+  "spec_path": "docs/NOCAP_SPEC.md",
+  "coverage_path_ids": [
+    "NOCAP-BUDGET-3"
+  ]
+}

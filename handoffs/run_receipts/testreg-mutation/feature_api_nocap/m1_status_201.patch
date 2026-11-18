@@ -1,0 +1,12 @@
+diff --git a/api/routes/feature_engineering.py b/api/routes/feature_engineering.py
+--- a/api/routes/feature_engineering.py
++++ b/api/routes/feature_engineering.py
+@@ -31,7 +31,7 @@
+ @router.post(
+     "/extract",
+     response_model=FeatureExtractionStartResponse,
+-    status_code=status.HTTP_202_ACCEPTED,
++    status_code=status.HTTP_201_CREATED,
+     summary="啟動特徵提取任務",
+     description="根據策略參數提取交易特徵，支持非同步處理"
+ )

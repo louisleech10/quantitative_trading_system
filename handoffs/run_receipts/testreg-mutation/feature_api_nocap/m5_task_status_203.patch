@@ -1,0 +1,11 @@
+diff --git a/api/routes/feature_engineering.py b/api/routes/feature_engineering.py
+--- a/api/routes/feature_engineering.py
++++ b/api/routes/feature_engineering.py
+@@ -82,6 +82,7 @@
+ @router.get(
+     "/task/{task_id}",
+     response_model=FeatureTaskStatusResponse,
++    status_code=203,
+     summary="查詢特徵提取任務狀態",
+     description="獲取特徵提取任務的當前狀態和結果"
+ )

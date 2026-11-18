@@ -1,0 +1,28 @@
+{
+ "receipt": "icperf-hac-large-n",
+ "ts": "20261112T173352Z",
+ "head": "d0249d551ee5b1f687b356fcebe5abeec731ff9f",
+ "n": 500000,
+ "horizon": 5,
+ "seed": 500,
+ "product_sha256": {
+  "momentum/Analysis/hac_ewc.py": "11d17f86779fb0bda0bfdb0ff518eb03455af910ec43e2e6bd97f6c295bed74a",
+  "momentum/Analysis/statistical_validator.py": "b6a3a80a7fead5b568f1f19782739e7e0dca7d4c323521aef92acc421679b550"
+ },
+ "rerun_when": "PRODUCT_FILES 任一 sha256 與現行不符",
+ "inference_status": "ok",
+ "p_value": 0.9898318783254797,
+ "data_warning": null,
+ "warning_not_evaluated": null,
+ "chunks_per_simulation": {
+  "491894|-0.5": 209,
+  "491894|0.0": 250,
+  "491894|ref": 250,
+  "516489|-0.5": 273,
+  "516489|0.0": 301,
+  "516489|ref": 254
+ },
+ "wall_time_s": 388.5,
+ "ru_maxrss": 427081728,
+ "ok": true
+}

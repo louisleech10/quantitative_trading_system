@@ -149,8 +149,9 @@
     },
     {
       "name": "FeaturePreprocessor._transform_single_polars",
-      "status": "kept",
-      "callers": [
+      "status": "deleted",
+      "deleted_by": "d4d97d62 refactor(ffprod): b2 Phase 1（polars 臂無生產呼叫者，連同契約 post_ic_arm_values 之 polars 一併刪除）；2026-11-14 TESTSEL I7 全量查出本收據未同步而改標",
+      "callers_at_generation": [
         "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:901",
         "tests/feature_engineering/preprocessing/test_causal_winsor.py:278",
         "tests/feature_engineering/preprocessing/test_causal_winsor.py:297",

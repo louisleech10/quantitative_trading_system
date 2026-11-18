@@ -1,0 +1,132 @@
+{
+ "receipt": "icperf-hac45-study",
+ "ts": "20261113T014002Z",
+ "head": "a6a439160f6a3f78ebbf93f25474ebc2c1a04856",
+ "product_sha256": {
+  "momentum/Analysis/ic_engine.py": "854f1b2a15e43ccc6286011045eaab7f4b3922f5e674a35fc03df71403f47bd3",
+  "momentum/Analysis/ic_filter_orchestrator.py": "0f726994f7d04203b15665b38be38a277b4b661a708bb0f23aed6bd4c17ead0f",
+  "momentum/Analysis/ic_config_schema.py": "7b328c1b734e925a947ed4a403fd94646fbb5dc2f0cf6c8d171f17ccfdec9a56",
+  "momentum/core/split_preview.py": "3cfc0fa195c5bf06a9f1d6a5b966e57affc3676cd9ad5fee482851162e783516",
+  "momentum/Analysis/factor_centrality_analyzer.py": "0a58fd319c69bedbd9a2f755ed659d09d9c8495ff870e72d889ccedb3744001a",
+  "momentum/Analysis/long_short_analyzer.py": "b6f0b93a5c5e710ea0980138075afc9bf4c7235cf48427530c34323ef7a34497",
+  "momentum/Analysis/trend_analyzer.py": "a1a3e301bb4bda1f64f44c9a1510af1afa30c8a45a78f4e8727da3e1402b23e7",
+  "momentum/Analysis/trend_inference.py": "7608b7897fec97653da0fd6465d990278621299ee960c1b2ceeac05782b9ab78",
+  "momentum/Analysis/hac_ewc.py": "11d17f86779fb0bda0bfdb0ff518eb03455af910ec43e2e6bd97f6c295bed74a",
+  "momentum/Analysis/pit_stats.py": "a36dcd1b051cfc9a0b34b7c82fa2b6b9b295cdb5814562da2275578ae8c5433a"
+ },
+ "study_code_sha256": {
+  "tests/momentum/Analysis/test_icperf_hac45_size.py": "8170825cb2c8eb633cca162a1acec6cede667b7536db9845cdb99c15ad10d10a"
+ },
+ "dirty_paths_at_run": [],
+ "rerun_when": "PRODUCT_FILES 或 STUDY_TEST 任一 sha256 與現行不符",
+ "study": "B6",
+ "ok": true,
+ "seconds": 2655.1,
+ "detail_path": "runs/icperf/hac45/b6.json",
+ "cells": [
+  {
+   "key": "B6|dim=ic|h=5|n=500|phi=0.0|w=21",
+   "reps": 1000,
+   "rejected": 43,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=500|phi=0.9|w=21",
+   "reps": 1000,
+   "rejected": 56,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=500|phi=0.99|w=21",
+   "reps": 1000,
+   "rejected": 55,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=2000|phi=0.0|w=21",
+   "reps": 1000,
+   "rejected": 51,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=2000|phi=0.9|w=21",
+   "reps": 1000,
+   "rejected": 47,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=2000|phi=0.99|w=21",
+   "reps": 1000,
+   "rejected": 51,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=5000|phi=0.0|w=21",
+   "reps": 1000,
+   "rejected": 51,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=5000|phi=0.9|w=21",
+   "reps": 1000,
+   "rejected": 47,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=5000|phi=0.99|w=21",
+   "reps": 1000,
+   "rejected": 56,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=2000|phi=0.0|w=63",
+   "reps": 1000,
+   "rejected": 45,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ic|h=5|n=2000|phi=0.99|w=63",
+   "reps": 1000,
+   "rejected": 57,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=centrality|h=5|j=10|n=2000|phi=0.9|w=21",
+   "reps": 1000,
+   "rejected": 40,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  },
+  {
+   "key": "B6|dim=ls_spread|h=5|n=2000|phi=0.9|w=21",
+   "reps": 1000,
+   "rejected": 56,
+   "upper_bound": 69,
+   "verdict": "pass",
+   "pass": true
+  }
+ ]
+}

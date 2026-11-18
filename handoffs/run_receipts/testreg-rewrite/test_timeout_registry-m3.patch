@@ -1,0 +1,19 @@
+diff --git a/scripts/timeout_pending_nocap.json b/scripts/timeout_pending_nocap.json
+--- a/scripts/timeout_pending_nocap.json
++++ b/scripts/timeout_pending_nocap.json
+@@ -3,4 +3,15 @@
+  "entries": [
+   {
++   "path": "scripts/ffprod_measure.py",
++   "pattern_id": "kwarg_timeout",
++   "function": "_testreg_mutant_m3",
++   "callee": "subprocess.run",
++   "literal": "60",
++   "text": "subprocess.run(cmd, timeout=60)",
++   "line_hint": 1,
++   "nocap_task": "",
++   "category": "腳本"
++  },
++  {
+    "path": "scripts/capture_ic1eb_baseline.py",
+    "pattern_id": "deadline",
