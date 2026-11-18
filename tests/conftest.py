@@ -38,26 +38,28 @@ except ModuleNotFoundError:  # CI 輕量環境（見下段 P1-5）
 #   本機(全依賴)→ 正常載入,IC 測試 fixture 行為不變;
 #   CI(輕量)→ 這些名字為 None,但**只有 IC 測試 fixture/hook 會用到它們**,治理測試不碰 → 不炸。
 # (`from __future__ import annotations` 使 `-> pd.DataFrame` 等註解為字串,import 期不需 pandas。)
-try:
+# TESTSEL I4g（docs/TESTSEL_I4G_SPEC.md Task 1.2）：IC 重依賴（momentum.factories 約 3.6 秒、build_l65_golden、
+# data_manifest）只供 synthetic_l65_dataset／requires_kline_data 兩個 fixture，改於其首次被請求時以 `_ic_deps()` 載入。
+# 名稱維持模組全域（`global` 綁定）：TESTREG V19 將函式內綁定名正規化為序號，改為區域名會使斷言字串改變而誤報。
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # 僅型別註解（`from __future__ import annotations` ⇒ 執行期不需 pandas）
     import pandas as pd
-    from momentum.factories import create_kline_storage_manager
-    from scripts.build_l65_golden import (
-        TEST_INVENTORY_PATH,
-        make_synthetic_l65_dataset,
-        write_test_inventory_from_nodeids,
-    )
-    from tests.fixtures.data_manifest import (
-        ManifestValidationError,
-        verify_kline_entry,
-    )
-    _IC_DEPS_AVAILABLE = True
-except ModuleNotFoundError:  # CI 輕量環境:IC 依賴缺 → 治理測試仍可跑
-    pd = None  # type: ignore[assignment]
-    create_kline_storage_manager = None  # type: ignore[assignment]
-    TEST_INVENTORY_PATH = make_synthetic_l65_dataset = write_test_inventory_from_nodeids = None  # type: ignore[assignment]
-    ManifestValidationError = KeyError  # type: ignore[assignment,misc]
-    verify_kline_entry = None  # type: ignore[assignment]
-    _IC_DEPS_AVAILABLE = False
+
+
+
+def _ic_deps() -> None:
+    """首次呼叫時載入 IC 重依賴並綁定為模組全域名（冪等）。模組層不設佔位值：TESTREG 會把模組層常數賦值代入斷言式，
+    佔位 None 會使斷言字串改變而誤報 V19。"""
+    global create_kline_storage_manager, make_synthetic_l65_dataset, verify_kline_entry, ManifestValidationError
+    if "create_kline_storage_manager" in globals():
+        return
+    from momentum.factories import create_kline_storage_manager as _cksm
+    from scripts.build_l65_golden import make_synthetic_l65_dataset as _msl
+    from tests.fixtures.data_manifest import ManifestValidationError as _mve, verify_kline_entry as _vke
+
+    make_synthetic_l65_dataset, verify_kline_entry, ManifestValidationError = _msl, _vke, _mve
+    create_kline_storage_manager = _cksm
 
 # 離線鐵則(IC1C TODO r7 / codex B2-B2):在任何測試模組 import api.main 之前
 # stub Binance Client.ping,避免 collect/TestClient lifespan 觸外網。
@@ -204,7 +206,7 @@ def pytest_fixture_setup(fixturedef: Any, request: Any) -> Any:
 @pytest.fixture(scope="session")
 def synthetic_l65_dataset() -> pd.DataFrame:
     """Deterministic Layer 6.5 fixture: 1000 rows x 100 mixed-stationarity columns."""
-
+    _ic_deps()
     return make_synthetic_l65_dataset(rows=1000, cols=100, stationary_ratio=0.6)
 
 
@@ -239,6 +241,7 @@ def requires_kline_data() -> Callable[..., pd.DataFrame]:
         min_rows: Optional[int] = None,
         verify_manifest: bool = True,
     ) -> pd.DataFrame:
+        _ic_deps()
         if not FEATURE_KLINE_H5_PATH.is_file():
             pytest.fail(
                 f"requires_kline: missing kline cache file: {FEATURE_KLINE_H5_PATH}"

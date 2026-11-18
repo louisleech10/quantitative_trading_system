@@ -1,0 +1,37 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider --run-fullscale tests/test_feature_factory_e2e.py::test_standard_preset_btcusdt",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:testsel-i4g",
+      "created_at": "2026-11-18T23:15:43+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 930,
+  "uncertain_ack": {
+    "unknown": 0,
+    "fixture_cost_unknown": 1
+  },
+  "basis": [
+    "ledger 527.882 秒、保守估時 927 秒（heavy_run_guard 依 ledger_durations conservative）；全規模層 I4f 預設延後，收案以 --run-fullscale 跑一次",
+    "fixture_cost_unknown＝1：估時非上界；經 run_watched 監看、不設時限（NOCAP）"
+  ],
+  "tier": "fix",
+  "tier_reason": "TESTSEL I4g 收案：請求 requires_kline_data 之全規模層受影響 nodeid 跑一次（SPEC §B TESTSEL-I4G-BUDGET-1）",
+  "spec_path": "docs/TESTSEL_I4G_SPEC.md",
+  "coverage_path_ids": [
+    "TESTSEL-I4G-BUDGET-1"
+  ]
+}

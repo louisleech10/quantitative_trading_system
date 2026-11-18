@@ -10,11 +10,34 @@ from typing import Any
 import pandas as pd
 import h5py
 
-from .feature_extractor import FeatureExtractor, StrategyParams
-from .feature_validator import FeatureValidator
-from .feature_storage import FeatureStorage
-from .feature_factory import FeatureFactory, FeatureGenerationResult
-from .config_manager import ConfigManager
+import importlib as _importlib
+
+# 套件層級匯出改為首次取用才載入（PEP 562 模組層 __getattr__／__dir__，https://peps.python.org/pep-0562/；
+# TESTSEL I4g，docs/TESTSEL_I4G_SPEC.md）：原急切匯入使任何 `momentum.FeatureEngineering.*` 子模組匯入皆帶入
+# feature_factory／feature_validator（statsmodels、numba 預編鏈，約 2.3 秒）。取得之物件與子模組中同名物件為同一物件；
+# 下方 pd.read_hdf 相容補丁仍於本檔執行時生效（時點不變）。
+_LAZY_EXPORTS = {
+	'FeatureExtractor': '.feature_extractor',
+	'StrategyParams': '.feature_extractor',
+	'FeatureValidator': '.feature_validator',
+	'FeatureStorage': '.feature_storage',
+	'FeatureFactory': '.feature_factory',
+	'FeatureGenerationResult': '.feature_factory',
+	'ConfigManager': '.config_manager',
+}
+
+
+def __getattr__(name: str) -> Any:
+	module_name = _LAZY_EXPORTS.get(name)
+	if module_name is None:
+		raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+	value = getattr(_importlib.import_module(module_name, __name__), name)
+	globals()[name] = value
+	return value
+
+
+def __dir__() -> list:
+	return sorted(set(globals()) | set(_LAZY_EXPORTS))
 
 
 # pandas.read_hdf 相容性補丁：支援讀取既有 HDF5 結構 (h5py 格式)

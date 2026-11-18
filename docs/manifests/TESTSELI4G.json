@@ -1,0 +1,79 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/registry/test_i4g_lazy_imports.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I4G_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "I6 已提交 f18630b1",
+      "開 SPEC 前事實與原型 runs/testsel_route/i4g/i4g_facts.md（S2 改前 4.25／原型 2.58 秒，3 次中位）"
+    ],
+    "touches": [
+      "momentum/FeatureEngineering/__init__.py",
+      "tests/conftest.py",
+      "tests/registry/test_i4g_lazy_imports.py",
+      "tests/registry/catalog.json",
+      "tests/registry/fixtures/i4g_affected_fast.txt"
+    ],
+    "callers_now": [
+      "tests/test_phase6_end_to_end.py",
+      "tests/test_phase3_feature_extractor.py",
+      "tests/momentum/test_feature_extractor.py"
+    ],
+    "callers_later": [],
+    "gate_cmd": "venv/bin/python -m pytest tests/registry/test_i4g_lazy_imports.py tests/registry/test_testsel_hermetic.py tests/registry/test_conftest_seed.py tests/test_phase3_feature_extractor.py tests/momentum/test_feature_extractor.py tests/test_phase6_end_to_end.py @tests/registry/fixtures/i4g_affected_fast.txt -q -p no:cacheprovider && venv/bin/python scripts/testreg.py check --helpers tests/conftest.py",
+    "forbidden": [
+      {
+        "rule": "不得移除或延後 pd.read_hdf 相容補丁；不得改子模組內容",
+        "observable": true
+      },
+      {
+        "rule": "不得改 conftest 隔離重導與 Binance 離線存根之生效時點；不得改任何 fixture 回傳值與測試斷言",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "延遲載入以子行程 sys.modules 斷言（含首次經套件取得、快取、取用前 dir）；改壞對照：恢復急切匯入 ⇒ 轉紅",
+      "受影響快速層＝pytest 自身 fixture 解析（item.fixturenames）請求 requires_kline_data／synthetic_l65_dataset 之 113 條 ledger <60 秒 nodeid（tests/registry/fixtures/i4g_affected_fast.txt，pytest 原生 @參數檔）＋三套件層級名稱使用者＋hermetic／seed",
+      "gate_cmd 串接 testreg check --helpers tests/conftest.py（V19 回歸機械擋）",
+      "收案前對最終程式：兩條重型 nodeid 經 run_watched 背景各跑一次（全規模層之 test_standard_preset_btcusdt 須加 --run-fullscale）；全套 --collect-only 收集數改前改後相同（收據）",
+      "時間收據：S2 同命令 3 次中位，改後 ≤ 3 秒"
+    ],
+    "coverage_risk": [
+      "依賴「匯入任一子模組即順帶載入 feature_factory 等」之隱性副作用者：grep 未見屬性式取用，由全套收集與受影響快速層承接",
+      "E-1（為何現在不做: blocked-by）：收案重型兩條（test_v5_slow_solo…、全規模 test_standard_preset_btcusdt）本身之規模必要性與能否縮小資料保留同性質斷言，屬大綱 I8 慢測試處置；I4g 收案已對最終程式實跑兩條皆通過（47.59 秒、522.33 秒）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "E-1",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}
