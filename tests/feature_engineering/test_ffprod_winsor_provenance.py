@@ -5,8 +5,9 @@
 `winsor_min_periods`、`winsor_compute_dtype`；分位端點沿用產品碼 transform context 之 `_q` 鍵名）與值集
 `winsor_method_record_values`（`disabled`、`passthrough`、`not_selected`）；欄 `winsor_method` 值域＝契約
 `winsor_method_values` ∪ `winsor_method_record_values`。真實 kline 短窗生成沿 `tests/feature_engineering/preprov_helpers.py`
-之格（`h1_stat_on` 縮尾開〔生產預設 quantile〕、變體 `h1_winsor_sigma` 縮尾 sigma、`h1_pp_off` 前處理關、`ratio_unsafe`
-比值不安全欄原值通過），逐格單行程串行。
+之格（`h1_stat_off` 縮尾開〔生產預設 quantile〕、本檔變體 `h1_winsor_sigma_stat_off`／`h1_replace_winsor_sigma_stat_off`
+縮尾 sigma〔append／replace〕、`h1_pp_off` 前處理關、`ratio_unsafe` 比值不安全欄原值通過；TESTSEL I10 起一律平穩化關，理由見
+`QUANTILE_CELL` 註解），逐格單行程串行。
 """
 from __future__ import annotations
 
@@ -19,6 +20,34 @@ import pytest
 
 from momentum.FeatureEngineering import run_provenance as rp
 from tests.feature_engineering import preprov_helpers as ph
+
+
+#: TESTSEL I10：縮尾有效設定之紀錄（`FeaturePreprocessor._winsor_applied_fields`）與寫入端契約驗證只依縮尾設定、mode 與群組臂，
+#: 不讀 fracdiff／ADF 之任何狀態（grep 證：該函式與 `run_provenance.winsor_table_errors`／`_fill_winsor` 無平穩化分支）⇒
+#: 本檔之格一律改平穩化關（原 `h1_stat_on`／`h1_winsor_sigma`／`h1_replace_winsor_sigma` 平穩化開，生成主成本在 fracdiff／ADF）。
+#: 臂之前提（append 格含 pandas 臂、replace 格含快速臂）仍由各測試之前提斷言 fail-closed 把關。
+QUANTILE_CELL = "h1_stat_off"
+SIGMA_CELL = "h1_winsor_sigma_stat_off"
+REPLACE_SIGMA_CELL = "h1_replace_winsor_sigma_stat_off"
+
+
+def _stat_off_variants() -> Dict[str, Dict[str, Any]]:
+    stat_off = lambda: ph._stat(["1h"], fracdiff=False, adf=False)  # noqa: E731
+    return {
+        SIGMA_CELL: {**ph.cell_spec("h1_winsor_sigma"), "payload": ph._winsor_sigma(stat_off())},
+        REPLACE_SIGMA_CELL: {**ph.cell_spec("h1_replace_winsor_sigma"),
+                             "payload": ph._winsor_sigma(ph._replace(stat_off()))},
+    }
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _register_stat_off_variants() -> Any:
+    """本檔專用之平穩化關變體登記於 `preprov_helpers.VARIANTS`（模組範圍，結束即還原；不改共用 helper 檔）。"""
+    mp = pytest.MonkeyPatch()
+    for name, spec in _stat_off_variants().items():
+        mp.setitem(ph.VARIANTS, name, spec)
+    yield
+    mp.undo()
 
 
 @pytest.fixture(scope="module")
@@ -91,32 +120,32 @@ def _assert_applied_params(applied: pd.DataFrame, cell: str) -> None:
 
 
 def test_applied_quantile_columns_record_all_params(runs: ph.RunCache) -> None:
-    table = _table(runs, "h1_stat_on")
-    _assert_applied_params(table[table["winsorization"] == "applied"], "h1_stat_on")
+    table = _table(runs, QUANTILE_CELL)
+    _assert_applied_params(table[table["winsorization"] == "applied"], QUANTILE_CELL)
 
 
 def test_applied_sigma_columns_record_all_params(runs: ph.RunCache) -> None:
-    table = _table(runs, "h1_winsor_sigma")
+    table = _table(runs, SIGMA_CELL)
     applied = table[table["winsorization"] == "applied"]
     assert set(applied["_arm"]) - set(FAST_ARMS), "前提：append 格須含 pandas 臂群組（float64 計算路徑須被覆蓋）"
-    _assert_applied_params(applied, "h1_winsor_sigma")
+    _assert_applied_params(applied, SIGMA_CELL)
 
 
 def test_applied_sigma_fast_arm_records_float32(runs: ph.RunCache) -> None:
     """審碼 r1：replace（生產預設）格之 sigma 走快速 numba 臂 ⇒ 該臂群組記 float32、其餘臂記 float64。"""
-    table = _table(runs, "h1_replace_winsor_sigma")
+    table = _table(runs, REPLACE_SIGMA_CELL)
     applied = table[table["winsorization"] == "applied"]
     assert set(applied["_arm"]) & set(FAST_ARMS), "前提：replace 格須含快速臂群組（float32 計算路徑須被覆蓋）"
-    _assert_applied_params(applied, "h1_replace_winsor_sigma")
+    _assert_applied_params(applied, REPLACE_SIGMA_CELL)
 
 
 def test_mutation_wrong_param_value_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     """改壞：紀錄表之值非空但錯（sigma k、window、min periods、分位端點）⇒ 兩 method 之紀錄案轉紅；正確值 ⇒ 綠。
     以 monkeypatch 置換紀錄表來源（不生成）。"""
     module = sys.modules[__name__]
-    cases = (("h1_winsor_sigma", test_applied_sigma_columns_record_all_params,
+    cases = ((SIGMA_CELL, test_applied_sigma_columns_record_all_params,
               (("winsor_sigma_k", 999.0), ("winsor_window", 1), ("winsor_min_periods", 1))),
-             ("h1_stat_on", test_applied_quantile_columns_record_all_params, (("winsor_upper_q", 0.5),)))
+             (QUANTILE_CELL, test_applied_quantile_columns_record_all_params, (("winsor_upper_q", 0.5),)))
     for cell, case, mutants in cases:
         good = pd.DataFrame([{**expected_settings(cell, arm), "winsorization": "applied", "_arm": arm}
                              for arm in ("numba_fast", "pandas_legacy")])
@@ -132,13 +161,13 @@ def test_recorded_method_values_follow_contract(runs: ph.RunCache) -> None:
     contract = rp.load_contract()
     allowed = set(rp.contract_value_set(contract, "winsor_method_values")) | set(
         rp.contract_value_set(contract, "winsor_method_record_values"))
-    for cell in ("h1_stat_on", "h1_winsor_sigma", "h1_replace_winsor_sigma", "h1_pp_off", "ratio_unsafe"):
+    for cell in (QUANTILE_CELL, SIGMA_CELL, REPLACE_SIGMA_CELL, "h1_pp_off", "ratio_unsafe"):
         assert set(_table(runs, cell)["winsor_method"]) <= allowed, cell
 
 
 def test_old_record_contract_version_rejected(runs: ph.RunCache) -> None:
     """舊紀錄（新欄出現前之契約版本）讀取 ⇒ 依 PRE-PROV 既有舊格式處置：契約版本不符即 `ProvenanceIntegrityError`。"""
-    handle = runs.get("h1_stat_on")
+    handle = runs.get(QUANTILE_CELL)
     pointer = dict(ph.provenance_pointer(handle.run_dir, "raw"))
     pointer["contract_version"] = int(rp.load_contract()["version"]) - 1
     with pytest.raises(rp.ProvenanceIntegrityError, match="紀錄契約版本"):
@@ -173,4 +202,4 @@ def test_mutation_missing_winsor_method_rejected(tmp_path: Path, monkeypatch: py
 
     monkeypatch.setattr(rp, "build_provenance_table", broken)
     with pytest.raises(rp.ProvenanceError):
-        ph.generate_short_run(tmp_path, "h1_stat_on")
+        ph.generate_short_run(tmp_path, QUANTILE_CELL)

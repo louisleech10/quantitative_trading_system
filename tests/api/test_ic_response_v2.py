@@ -308,7 +308,7 @@ def test_flag_off_subroutes_unchanged(baseline_task: dict[str, Any]) -> None:
 
 
 def test_export_route_streaming(baseline_task: dict[str, Any]) -> None:
-    deadline = time.monotonic() + 2.0
+    """匯出路由以串流回應：200、附檔名標頭、前 4KB 為 JSON 開頭（逐塊 2 秒期限移至 perf 之下一條，TESTSEL S3）。"""
     chunks: list[bytes] = []
     byte_cap = 4096
 
@@ -320,11 +320,26 @@ def test_export_route_streaming(baseline_task: dict[str, Any]) -> None:
             chunks.append(chunk)
             if sum(len(item) for item in chunks) >= byte_cap:
                 break
-            assert time.monotonic() < deadline
 
     body_prefix = b"".join(chunks)
     assert body_prefix
     assert body_prefix.lstrip().startswith(b"{")
+
+
+@pytest.mark.perf
+def test_export_route_streaming_chunks_within_2s(baseline_task: dict[str, Any]) -> None:
+    """匯出串流前 4KB 之各塊於請求起 2 秒內到達：效能基準，opt-in（TESTSEL S3 自上一條移出之牆鐘期限；
+    同一請求為毫秒級，各自發送不共用）。"""
+    deadline = time.monotonic() + 2.0
+    chunks: list[bytes] = []
+    byte_cap = 4096
+
+    with CLIENT.stream("GET", f"/api/v1/ic/export/{BASELINE_TASK_ID}/json") as response:
+        for chunk in response.iter_bytes():
+            chunks.append(chunk)
+            if sum(len(item) for item in chunks) >= byte_cap:
+                break
+            assert time.monotonic() < deadline
 
 
 def test_no_artifact_uri_none(

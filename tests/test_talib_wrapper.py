@@ -39,8 +39,15 @@ def load_test_data() -> pd.DataFrame:
 
 
 def test_indicator_registry_count():
+    """132 個 TA-Lib 函式＋2247c394（FF 深稽 B1）新增之 close×volume 別名 2 個（Beta_CloseVolume→BETA、
+    Correl_CloseVolume→CORREL；BETA／CORREL 本名改走 hl 輸入）＝134。別名集合精確釘住，任一增刪皆紅。"""
     TALibWrapper.initialize()
-    assert len(TALibWrapper.INDICATOR_REGISTRY) == 132
+    registry = TALibWrapper.INDICATOR_REGISTRY
+    aliases = {name: spec.talib_func for name, spec in registry.items() if name != spec.talib_func}
+    assert aliases == {"Beta_CloseVolume": "BETA", "Correl_CloseVolume": "CORREL"}
+    assert all(target in registry for target in aliases.values())
+    assert len(registry) - len(aliases) == 132
+    assert len(registry) == 134
 
 
 def test_single_series_multi_source():

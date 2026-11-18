@@ -15,6 +15,7 @@ def _train_model(X, y):
 
 
 def test_C1_single_class(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.ones(100, dtype=int)
     y_pred = np.random.uniform(0.2, 0.8, 100)
     result = probability_calibrator.fit_from_predictions(y_true=y_true, y_pred_proba=y_pred, require_receipt=False)
@@ -23,6 +24,7 @@ def test_C1_single_class(probability_calibrator):
 
 
 def test_C2_zero_variance_proba(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.random.binomial(1, 0.5, 120)
     y_pred = np.full(120, 0.5)
     result = probability_calibrator.fit_from_predictions(y_true=y_true, y_pred_proba=y_pred, require_receipt=False)
@@ -31,6 +33,7 @@ def test_C2_zero_variance_proba(probability_calibrator):
 
 
 def test_C3_small_sample_auto_fallback(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.random.binomial(1, 0.5, 40)
     y_pred = np.clip(np.random.normal(0.5, 0.2, 40), 0.01, 0.99)
     result = probability_calibrator.fit_from_predictions(y_true=y_true, y_pred_proba=y_pred, method="auto", require_receipt=False)
@@ -38,6 +41,7 @@ def test_C3_small_sample_auto_fallback(probability_calibrator):
 
 
 def test_C4_isotonic_small_sample_fallback(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.random.binomial(1, 0.5, 200)
     y_pred = np.clip(np.random.normal(0.5, 0.2, 200), 0.01, 0.99)
     result = probability_calibrator.fit_from_predictions(y_true=y_true, y_pred_proba=y_pred, method="isotonic", require_receipt=False)
@@ -45,6 +49,7 @@ def test_C4_isotonic_small_sample_fallback(probability_calibrator):
 
 
 def test_C5_venn_abers_downsampling(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.random.binomial(1, 0.5, 6000)
     y_pred = np.clip(np.random.normal(0.5, 0.2, 6000), 0.01, 0.99)
     result = probability_calibrator.fit_from_predictions(y_true=y_true, y_pred_proba=y_pred, method="venn_abers", require_receipt=False)
@@ -52,6 +57,7 @@ def test_C5_venn_abers_downsampling(probability_calibrator):
 
 
 def test_C6_cv_exceeds_half_samples(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.random.binomial(1, 0.5, 100)
     y_pred = np.clip(np.random.normal(0.5, 0.2, 100), 0.01, 0.99)
     result = probability_calibrator.fit_from_predictions(y_true=y_true, y_pred_proba=y_pred, cv=80, require_receipt=False)
@@ -59,6 +65,7 @@ def test_C6_cv_exceeds_half_samples(probability_calibrator):
 
 
 def test_C7_calibration_degradation_fallback(probability_calibrator, monkeypatch):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.random.binomial(1, 0.5, 200)
     y_pred = np.clip(np.random.normal(0.5, 0.2, 200), 0.01, 0.99)
 
@@ -82,12 +89,14 @@ def test_C7_calibration_degradation_fallback(probability_calibrator, monkeypatch
 
 
 def test_C8_predict_before_fit(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = np.random.randn(10, 3)
     with pytest.raises(ValueError):
         probability_calibrator.predict_calibrated(X)
 
 
 def test_C9_nan_in_predictions(probability_calibrator):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y_true = np.random.binomial(1, 0.5, 120)
     y_pred = np.clip(np.random.normal(0.5, 0.2, 120), 0.01, 0.99)
     y_pred[:10] = np.nan
@@ -96,6 +105,7 @@ def test_C9_nan_in_predictions(probability_calibrator):
 
 
 def test_C10_beta_package_missing_fallback(monkeypatch):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     calibrator = ProbabilityCalibrator()
     y_true = np.random.binomial(1, 0.5, 200)
     y_pred = np.clip(np.random.normal(0.5, 0.2, 200), 0.01, 0.99)

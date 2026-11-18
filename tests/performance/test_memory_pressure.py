@@ -376,10 +376,12 @@ def test_l3_multiwindow_output_matches_estimate_and_rolling_oracle_on_real_kline
     """G-c 改寫（純增）：原檔無測試函式，模組層唯一可執行敘述（sys.path.insert）依原序搬入本函式；phase1–4 剖析
     腳本仍以 python 直跑（規模大、只印不判，不於 pytest 執行）。本函式以真實 kline（kline_cache.h5 首個 symbol／tf
     之前 600 根，open/high/low/close/volume）小規模驗 L3 RollingAggregator 之預設臂：
-    ① 輸出欄數＝phase1 估算式 n_cols × n_win × n_agg 且欄名為 `<欄>_<Agg>_W<w>`；② 每格 float32（記憶體＝列×欄×4
+    ① 輸出欄數＝phase1 估算式 n_cols × n_win × n_agg 且欄名為 FF-NAME `<欄>_<Agg>-W<w>`（產品 formatter 導出）；② 每格 float32（記憶體＝列×欄×4
     bytes，phase1 之 float32 降精度前提）；③ 每窗前 w−1 列為 NaN、其後皆有值；④ mean／std(ddof=1)／min／max／range
     ／zscore 與 numpy sliding_window_view 之獨立 float64 oracle 逐值相符（窗＝含當列之前 w 根，無 look-ahead）。"""
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    _repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    if _repo not in sys.path:  # 不重複插入（TESTSELSLOW 2026-11-15：重複插入使 sys.path 隨 session 增長）
+        sys.path.insert(0, _repo)
     import h5py
     from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator as _RA
 
@@ -395,8 +397,17 @@ def test_l3_multiwindow_output_matches_estimate_and_rolling_oracle_on_real_kline
     labels = {"mean": "Mean", "std": "Std", "min": "Min", "max": "Max", "range": "Range", "zscore": "ZScore"}
     result = _RA({"enabled": True, "windows": windows, "aggregators": aggs, "apply_to": "all"}).compute_all(df)
 
+    # FF-NAME Task 2.4：L3 欄名＝輸入欄＋op 段 `<Agg>-W<w>`；期望欄名由產品 formatter（`RollingAggregator._l3_name`
+    # ＝`feature_naming.append_op_segments`）導出，Agg 標籤須屬文法之 L3 op 封閉集合（不寫死欄名字面）
+    from momentum.FeatureEngineering.feature_naming import L3_OPS
+
+    assert set(labels.values()) <= L3_OPS, sorted(set(labels.values()) - L3_OPS)
+
+    def l3_name(c: str, a: str, w: int) -> str:
+        return _RA._l3_name(c, labels[a], w)
+
     n_rows, n_cols = df.shape
-    expected_names = {f"{c}_{labels[a]}_W{w}" for c in base_cols for a in aggs for w in windows}
+    expected_names = {l3_name(c, a, w) for c in base_cols for a in aggs for w in windows}
     assert result.shape == (n_rows, n_cols * len(windows) * len(aggs)) and set(result.columns) == expected_names, \
         f"L3 輸出欄與 phase1 估算式不符：{result.shape} {sorted(set(result.columns) ^ expected_names)[:6]}"
     assert set(result.dtypes) == {np.dtype(np.float32)} and \
@@ -411,7 +422,7 @@ def test_l3_multiwindow_output_matches_estimate_and_rolling_oracle_on_real_kline
         o_z = (arr[w - 1:] - o_mean) / o_std
 
         def got(a: str) -> np.ndarray:
-            return result[[f"{c}_{labels[a]}_W{w}" for c in base_cols]].to_numpy(dtype=np.float64)
+            return result[[l3_name(c, a, w) for c in base_cols]].to_numpy(dtype=np.float64)
 
         every = np.concatenate([got(a) for a in aggs], axis=1)
         assert np.isnan(every[: w - 1]).all() and np.isfinite(every[w - 1:]).all(), f"W{w} 暖機列 NaN 邊界錯位"

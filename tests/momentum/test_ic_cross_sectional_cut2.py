@@ -78,6 +78,7 @@ def _report_output_hash(report: dict[str, Any]) -> str:
 
 def test_cross_sectional_labels_path_single_axis_raises(tmp_path: Path) -> None:
     """F2: 單軸 labels_path → InvalidInputError fail-closed。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     labels_path = tmp_path / "labels.h5"
     _write_single_axis_labels_h5(labels_path)
     orchestrator = ICFilterOrchestrator(load_ic_config())

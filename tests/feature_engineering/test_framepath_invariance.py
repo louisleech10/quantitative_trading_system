@@ -31,6 +31,27 @@ def baseline():
     return json.loads(BASELINE.read_text(encoding="utf-8"))
 
 
+def test_refreeze_provenance_v2_receipt_binds_baseline(baseline):
+    """d4d97d62（逐欄紀錄契約 v2）所致 manifest_sha256 之結構重凍（`scripts/framepath_refreeze_provenance_v2.py`）：
+    收據逐格無錯、差異路徑只限 `artifacts.<kind>.provenance.{contract_version,sha256}`、有差異⇔值改變、凍結檔之
+    manifest_sha256＝收據新值、收據之凍結檔 sha256＝現行凍結檔位元組、契約版本＝契約檔。"""
+    import hashlib
+
+    from scripts import framepath_refreeze_provenance_v2 as rp
+
+    receipt = json.loads((REPO / rp.RECEIPT_REL).read_text(encoding="utf-8"))
+    items = {item["cell"]: item for item in receipt["items"]}
+    assert tuple(items) == fb.CELLS
+    for cell, item in items.items():
+        assert item["errors"] == [], cell
+        assert all(rp.allowed_path(p) for p in item["diff_paths"]), cell
+        assert bool(item["diff_paths"]) == (item["frozen_before"] != item["new_value"]), cell
+        assert baseline["cells"][cell]["fingerprint"]["manifest_sha256"] == item["new_value"], cell
+    assert receipt["baseline_sha256_after"] == hashlib.sha256(BASELINE.read_bytes()).hexdigest()
+    contract = json.loads((REPO / rp.CONTRACT_REL).read_text(encoding="utf-8"))
+    assert receipt["contract_version"] == int(contract["version"])
+
+
 def test_baseline_frozen_at_head_with_all_cells(baseline):
     assert baseline["code_anchor"].startswith(fb.HEAD_COMMIT_PREFIX) and len(baseline["code_anchor"]) == 40
     assert baseline["code_state_errors"] == []
@@ -180,10 +201,17 @@ def _assert_memory_from_sampler(mem: dict, seen: dict) -> None:
     assert mem["root_missing"] == 0 and mem["readings"] == len(seen["samples"])
 
 
+#: TESTSEL I10：`test_cell_matches_frozen_baseline[C1]` 於同一 spy 下之 (記憶體摘要, spy 觀測) 供 boundary_15 重用（原
+#: boundary_15 為同一核對再跑一次 C1 子行程約 90 秒）；本行程未跑該參數時 boundary_15 自跑（不依賴執行順序之正確性）
+_C1_SAMPLED: dict = {}
+
+
 @pytest.mark.parametrize("cell", fb.CELLS)
 def test_cell_matches_frozen_baseline(baseline, tmp_path, cell, monkeypatch):
     seen = _install_sampler_spy(monkeypatch)
     fresh = fb.run_cell(cell, tmp_path)
+    if cell == "C1":
+        _C1_SAMPLED["C1"] = (copy.deepcopy(fresh["memory"]), copy.deepcopy(seen))
     assert fresh["receipt"]["resume_entered"] is (cell == "C5")
     if cell == "C9":
         # 前置條件以檔案系統實核，不只讀收據字串（審查 r20 CODEX-R20-P1-04）
@@ -335,9 +363,24 @@ def test_boundary_11_c5_resume_entered_is_observed_not_declared(tmp_path):
 
     import pytest as _pytest
 
+    # TESTSEL I10：受測為 resume 分支是否進入與輸出相等（CGSA registry 之 resume，與 L6.5 平穩化正交）⇒ 本案之 C5 改用
+    # 平穩化關之 payload（＝C2 之 payload；repeat＝2、env 等其餘設定仍為 C5），四次生成各約 19 秒（原平穩化開各約 85 秒，
+    # `tests/_golden/framepath/cgsa_fingerprint.json` C2／C5 memory.seconds）。C5 凍結格本身之逐位元比對（平穩化開）仍由
+    # `test_cell_matches_frozen_baseline[C5]` 承擔。
+    real_settings = fb.cell_settings
+
+    def c5_stationarity_off(cell: str) -> dict:
+        settings = real_settings(cell)
+        if cell == "C5":
+            settings["payload"] = real_settings("C2")["payload"]
+        return settings
+
     mp = _pytest.MonkeyPatch()
     mp.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(spy))
+    mp.setattr(fb, "cell_settings", c5_stationarity_off)
     try:
+        assert fb.cell_settings("C5")["repeat"] == 2
+        assert not fb.cell_settings("C5")["payload"]["preprocessing"]["fractional_differencing"]["enabled"]
         normal = fb.generate_cell("C5", tmp_path / "normal")
         normal_calls = list(calls)
         calls.clear()
@@ -419,8 +462,14 @@ def test_boundary_06_injected_readings_refused(monkeypatch, tmp_path):
 def test_boundary_15_memory_summary_comes_from_readings_sampler(monkeypatch, tmp_path):
     """審查 r26 CODEX-R26-P1-02：記憶體摘要須來自 `memory_guard._Readings` 對子行程之實際取樣——以 spy 置換該
     模組屬性跑 C1（真實 kline、單週期秒級）；全部格之同一核對另於 test_cell_matches_frozen_baseline 逐格執行
-    （審查 r27 CODEX-R27-P1-01）。回傳固定健康常數之實作 ⇒ 紅。"""
+    （審查 r27 CODEX-R27-P1-01）。回傳固定健康常數之實作 ⇒ 紅。TESTSEL I10：同行程已跑 `[C1]` 參數 ⇒ 重用其 spy 觀測
+    與記憶體摘要（同一 spy、同一 run_cell("C1")；以回放該次結果之 run_cell 替身＋把該次 spy 觀測填入本案 spy 紀錄），
+    否則自跑。核對式不變。"""
     seen = _install_sampler_spy(monkeypatch)
+    if "C1" in _C1_SAMPLED:
+        sampled_memory, sampled_seen = _C1_SAMPLED["C1"]
+        seen.update(copy.deepcopy(sampled_seen))
+        monkeypatch.setattr(fb, "run_cell", lambda cell, root: {"memory": copy.deepcopy(sampled_memory)})
     _assert_memory_from_sampler(fb.run_cell("C1", tmp_path)["memory"], seen)
 
 

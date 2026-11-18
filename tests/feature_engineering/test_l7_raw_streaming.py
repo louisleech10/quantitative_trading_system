@@ -465,6 +465,9 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
     factory._reference_data_cache = {}
     factory._progress_callback = None
     factory.layer_results = {}
+    # 繞過 __init__ 之手組 factory：補建構子預設（feature_factory.py:228，None ⇒ 列數沿用輸入）；後加之屬性未同步致
+    # AttributeError（TESTSEL I7 後實跑查出）
+    factory._current_output_window = None
 
     raw_data = pd.DataFrame(
         {"close": np.array([10.0, 11.0, 12.0, 13.0], dtype=np.float32)},

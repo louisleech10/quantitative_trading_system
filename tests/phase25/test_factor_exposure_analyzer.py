@@ -46,6 +46,7 @@ def test_zero_absolute_weights_returns_zero_exposure():
 
 def test_factor_attribution_insufficient_rows():
     """B4 去固化：樣本不足 → unavailable 三鍵 + insufficient_rows（禁 r_squared/factor_betas）。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     analyzer = FactorExposureAnalyzer(config={})
     portfolio = pd.Series(np.random.randn(5))
     factors = pd.DataFrame(np.random.randn(5, 2), columns=["f1", "f2"])

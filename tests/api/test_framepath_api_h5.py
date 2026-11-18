@@ -67,6 +67,13 @@ def _library(root: Path, registry_path: Path) -> FeatureLibrary:
     return FeatureLibrary(FeatureRegistry(registry_path), FeatureStorage(str(root)), feature_reader=FeatureReader(str(root)))
 
 
+def _gen_payload() -> Dict[str, Any]:
+    """Task 2.1／2.2 生成案例之真實 kline 設定（TESTSEL I10）：受測為 h5 讀寫鏈之忽略／拒讀／只讀 V2／缺 artifacts 訊息，
+    與平穩化（fracdiff／ADF，生成耗時之大宗）無關 ⇒ 用同一輕量設定但平穩化關（同 FRAMEPATH 凍結格 C2 之形；
+    原平穩化開每次生成約 100 秒，關閉約 19 秒，`tests/_golden/framepath/cgsa_fingerprint.json` C1／C2 memory.seconds）。"""
+    return stat_payload(fracdiff=False, adf=False)
+
+
 def _py_sources(roots):
     for root in roots:
         for p in sorted((REPO / root).rglob("*.py")):
@@ -81,9 +88,9 @@ def test_boundary_01_generation_ignores_hand_placed_factory_h5_and_force_flag(mo
     b = tmp_path / "b"
     prepare_stat_env(monkeypatch, a)
     _write_factory_h5(a / "features" / f"{SYMBOL}_{PRIMARY_TF}_factory.h5")
-    root_a, _f, result_a = run_stat(a, stat_payload(), force_regenerate=False)
+    root_a, _f, result_a = run_stat(a, _gen_payload(), force_regenerate=False)
     prepare_stat_env(monkeypatch, b)
-    root_b, _f, result_b = run_stat(b, stat_payload(), force_regenerate=True)
+    root_b, _f, result_b = run_stat(b, _gen_payload(), force_regenerate=True)
     assert str(result_a.metadata.get("manifest_path", "")).endswith(".json")
     assert "framepath_a" not in set(result_a.features_df.columns)
     fa, fb = base_fingerprints(root_a), base_fingerprints(root_b)
@@ -126,7 +133,7 @@ def _v2_raw_columns(root: Path, config_hash: str) -> set:
 
 def test_boundary_05_library_and_coverage_read_v2_when_h5_coexists(monkeypatch, tmp_path):
     prepare_stat_env(monkeypatch, tmp_path)
-    root, _factory, result = run_stat(tmp_path, stat_payload())
+    root, _factory, result = run_stat(tmp_path, _gen_payload())
     _write_factory_h5(root / f"{SYMBOL}_{PRIMARY_TF}_factory.h5")
     expected = _v2_raw_columns(root, str(result.metadata["config_hash"]))
     lib = _library(root, root / "registry.json")
@@ -143,7 +150,7 @@ def test_boundary_06_explicit_config_hash_missing_artifacts_message_unchanged(mo
     import shutil
 
     prepare_stat_env(monkeypatch, tmp_path)
-    root, _factory, result = run_stat(tmp_path, stat_payload())
+    root, _factory, result = run_stat(tmp_path, _gen_payload())
     config_hash = str(result.metadata["config_hash"])
     _write_factory_h5(root / f"{SYMBOL}_{PRIMARY_TF}_factory.h5")
     for raw_dir in root.rglob("raw"):

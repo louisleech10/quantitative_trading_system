@@ -3,7 +3,10 @@
 既有 `test_ff_fullchain_truncation_mr.py` 13 項於 8GB 本機無法完成（諮詢 r4：校準域合併 4.55GB＋複製 3.29GB，兩度 SIGKILL）。
 基線（C2-1、C2-2、fracdiff 兩項）**直接呼叫既有測試函式本體**，只把其模組內之設定建構函式換成縮小生成範圍版
 （`_small_values_gate_mr_config_payload`／`_small_fracdiff_mr_config_payload`：L1 只 trend＋momentum、資料源 close＋volume、
-L3 窗 5／13；L2、L3 聚合器、L4、L6.5 同既有）。負控制呼叫 `ff_truncation_mr_helpers.run_control_*`——與既有檔同一本體、
+L3 窗 5／13；L2、L3 聚合器、L4、L6.5 同既有）。TESTSEL I10 再縮（每層 seam 保留、寬度與各層最大窗最小化）：L1 只 EMA 5／13、
+SMA 13、RSI 14；L2 各族開（momentum 只 lag 3）；L3 窗 3／5、聚合器全部；L4 lag 1／2；L6.5 縮尾窗 20、zscore 兩窗——
+各層之因果 seam 與寬度無關；全類指標之因果由 `test_ff_fullchain_truncation_allcat_mr.py`（全 10 類、每指標最大週期）
+承擔。fracdiff 設定之 L1 另為全 10 類最小週期（見 `_small_fracdiff_mr_config_payload` 之理由）。負控制呼叫 `ff_truncation_mr_helpers.run_control_*`——與既有檔同一本體、
 只差 `MRScope`（v60：準備證據在捕獲區外、只收因果 gate 之失敗、max_lag 不設上限、校準擾動落在起始日之前）。
 
 誠實邊界：證具名缺陷集合之鑑別力；不證未選指標／參數與全設定等價；完整版登 RM-FULLSCALE。
@@ -83,8 +86,9 @@ def test_small_fracdiff_truncation_invariant(tmp_path, kline_df_module) -> None:
     orig.test_fracdiff_truncation_invariant(tmp_path, kline_df_module)
 
 
-@pytest.mark.xfail(strict=True, reason=orig.test_fracdiff_tail_perturbation_invariant.pytestmark[0].kwargs["reason"])
 def test_small_fracdiff_tail_perturbation_invariant(monkeypatch, tmp_path, kline_df_module) -> None:
+    """既有檔為 strict xfail（storage codec 依全窗值域選型）；TESTSEL I10 之縮小版 fracdiff 設定（全類最小週期）下實跑通過
+    （runs/g1/batch3.log，--runxfail 134.6 秒；strict 下即 XPASS 紅）⇒ 同 test_small_fracdiff_truncation_invariant 改為一般測試。"""
     orig.test_fracdiff_tail_perturbation_invariant(monkeypatch, tmp_path, kline_df_module)
 
 

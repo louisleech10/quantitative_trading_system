@@ -1,0 +1,82 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/feature_engineering/atomic/test_handcoded_reference.py",
+    "tests/feature_engineering/preprocessing/test_fast_adf_gate.py",
+    "tests/performance/test_memory_pressure.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "開 TODO 前實測 runs/testsel_route/v07/v07_facts.md：3 檔 catalog disposition＝rewrite、無改寫收據，被 testsel 2a7b378e／003d1da3 改動；infrastructure_repair（目標檔須零差異）與 additive_rewrite（舊函式須一字不動）皆不成立；handcoded 目標 test_klinger_kvo_ema_from_golden_vf 之期望值以 8 根 bar 算 talib EMA34／55 恆為全 NaN（空心，mutation 收據結構上不可能）；三檔 ledger 最近皆 passed",
+      "處置路徑＝docs/TESTREG_SPEC.md:198 Task 4.4（v53，使用者 2026-10-17 業界裁定：逐目標已審處置、不再要求逐目標收據）；SPEC Task 4.3"
+    ],
+    "touches": [
+      "tests/feature_engineering/atomic/test_handcoded_reference.py",
+      "tests/registry/catalog.json"
+    ],
+    "callers_now": [
+      "scripts/testreg.py",
+      "scripts/test_change_review.sh"
+    ],
+    "callers_later": [
+      "handoffs/run_receipts/testsel-i1h-dispositions.tsv",
+      "提交後之測試變更待審清單（V20 刪空心函式 1 行＋既存 timeout 行）由委員逐條審後 mark"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/feature_engineering/atomic/test_handcoded_reference.py tests/feature_engineering/preprocessing/test_fast_adf_gate.py tests/performance/test_memory_pressure.py -p no:cacheprovider -q && { out=$(venv/bin/python scripts/testreg.py validate 2>&1); vrc=$?; true; } && [ \"$vrc\" -le 1 ] && ! printf '%s\\n' \"$out\" | grep -v '^$' | grep -qvE '^V[0-9]{2} ' && ! printf '%s\\n' \"$out\" | grep -E '^V[0-9]+ tests/(feature_engineering/atomic/test_handcoded_reference|feature_engineering/preprocessing/test_fast_adf_gate|performance/test_memory_pressure)\\.py' | grep -qv '^V20 tests/feature_engineering/atomic/test_handcoded_reference.py::test_klinger_kvo_ema_from_golden_vf:' && jq -e --arg r 'handoffs/reconcile/20261118-testseli1h-b1-review-r1/synth.md' '[.entries[\"tests/feature_engineering/atomic/test_handcoded_reference.py\", \"tests/feature_engineering/preprocessing/test_fast_adf_gate.py\", \"tests/performance/test_memory_pressure.py\"] | (.disposition == \"keep\" and .rewrite_targets == [] and .rewrite_receipt == null and .disposition_ref == $r)] | (length == 3 and all)' tests/registry/catalog.json && ! grep -q 'def test_klinger_kvo_ema_from_golden_vf' tests/feature_engineering/atomic/test_handcoded_reference.py && test -f handoffs/run_receipts/testsel-i1h-dispositions.tsv",
+    "forbidden": [
+      {
+        "rule": "不假造 mutation／additive／infrastructure_repair 收據；不改三檔 entry 之 claim／guarantee／oracle／ticket",
+        "observable": true
+      },
+      {
+        "rule": "test_handcoded_reference.py 只刪空心目標 test_klinger_kvo_ema_from_golden_vf，其餘函式不改；test_fast_adf_gate.py 與 test_memory_pressure.py 不改",
+        "observable": true
+      },
+      {
+        "rule": "不擴及其他 disposition＝rewrite 之 entry",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "空心函式之意圖（KVO 之 EMA 段）由同檔 test_klinger_kvo_matches_independent_oracle_on_real_kline（真實資料獨立 oracle）覆蓋；處置表附其 nodeid 與 gate 中 passed 結果",
+      "gate_cmd 內 jq 斷言三筆 entry 終態（keep、rewrite_targets＝[]、rewrite_receipt＝null、disposition_ref＝本項審碼收斂檔）＋空心函式已刪＋處置表存在（審 r1 處置：testreg.py validate 不檢此一致性）；改壞對照實跑 `bash runs/testsel_route/v07/jq_gate_probe.sh` ⇒ current rc=1、good rc=0、bad_targets（keep 但 rewrite_targets 非空）rc=1、bad_disp rc=1",
+      "gate_cmd 之 validate 段改為過濾判定（施工實跑：validate 於整合樹恆非零，因既存 V07 timeout_registry 與他項未提交之 V02／V19）：輸出中指名三檔之違規列只得為預期之 V20 刪除列；`bash runs/testsel_route/v07/validate_filter_probe.sh` ⇒ 正例 rc=0、三反例 rc=1；改後 gate 實跑 `bash runs/testsel_route/v07/run_gate.sh 2` ⇒ gate_rc=0、13 passed",
+      "提交後之測試變更待審清單須只含 V20 刪空心函式 1 行與既存 timeout 行（SPEC Task 4.3 驗證③；提交後以 `cat .testreg/test_change_review/pending-<sha>.txt` 核對，清單審輪附之）"
+    ],
+    "coverage_risk": [
+      "test_fast_adf_gate.py 目標函式「未掛 requires_kline」仍成立，登為後續修正候選（處置表列，不在本項改）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "run_receipts",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

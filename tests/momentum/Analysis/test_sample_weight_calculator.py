@@ -61,6 +61,7 @@ def test_S8_extreme_label_overlap(sample_weight_calculator, synthetic_timestamps
 
 
 def test_S9_additive_default_coeffs(sample_weight_calculator, synthetic_timestamps):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     y = np.random.binomial(1, 0.3, len(synthetic_timestamps))
     weights = sample_weight_calculator.compute_combined_weights(
         timestamps=synthetic_timestamps,

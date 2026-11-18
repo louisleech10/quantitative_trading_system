@@ -142,6 +142,44 @@ def test_e028_citation_points_into_core() -> None:
 COUPLED_FILE = "test_govb1_factkey_gen.py"
 
 
+def _coupling_refs(src: str) -> set:
+    """耦合處之錨點：`<檔>::<所在函式>#<該函式內第 k 個耦合行>`（以函式名＋序號錨定，不用行號——行號隨檔內任何增刪
+    平移，2026-11-13 實測整表漂移 9–24 行；函式內新增耦合行仍使序號集合多一項而被抓到）。模組層之耦合行記 `<module>`。"""
+    import ast
+
+    funcs = [(n.lineno, n.end_lineno, n.name) for n in ast.walk(ast.parse(src))
+             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    seen: dict = {}
+    out = set()
+    for n, line in enumerate(src.splitlines(), 1):
+        if not re.search(r"(?<!def )_mutate\(|GEN\.read_text", line):
+            continue
+        enc = [f for f in funcs if f[0] <= n <= f[1]]
+        name = min(enc, key=lambda f: f[1] - f[0])[2] if enc else "<module>"
+        seen[name] = seen.get(name, 0) + 1
+        out.add(f"{COUPLED_FILE}::{name}#{seen[name]}")
+    return out
+
+
+def test_coupling_refs_stable_under_shift_and_catch_new_line() -> None:
+    """錨點不隨行號平移而變（檔首插入空行 ⇒ 集合不變；改壞對照：舊之行號錨點此時全部改變）；函式內新增一個耦合行
+    ⇒ 集合多一項（對照表未登記即被 test_coupling_map 抓到）。"""
+    src = (REPO / "tests" / "governance" / COUPLED_FILE).read_text(encoding="utf-8")
+    base = _coupling_refs(src)
+    assert base and _coupling_refs("\n\n\n" + src) == base
+
+    def by_line(s: str) -> set:
+        return {f"{COUPLED_FILE}:{n}" for n, line in enumerate(s.splitlines(), 1)
+                if re.search(r"(?<!def )_mutate\(|GEN\.read_text", line)}
+
+    assert by_line("\n\n\n" + src).isdisjoint(by_line(src))
+    lines = src.splitlines()
+    at = min(int(x.rsplit(":", 1)[1]) for x in by_line(src))  # 第一個耦合行（1 起算），於其後同縮排複製一行
+    lines.insert(at, lines[at - 1])
+    grown = _coupling_refs("\n".join(lines))
+    assert grown - base and len(grown) == len(base) + 1
+
+
 def test_coupling_map_covers_every_bash_source_line() -> None:
     """Task 4.2 驗證：對照表之耦合處集合＝以 grep 列舉之讀寫 bash 原始碼行（集合相等）。
     掃描限 `test_govb1_factkey_gen.py`（其 `GEN`＝`gen_fact_key_blocks.sh`）：其餘檔之 `_mutate(`／`GEN.read_text`
@@ -150,8 +188,7 @@ def test_coupling_map_covers_every_bash_source_line() -> None:
     table = {row["test_ref"] for row in _mutation_map()}
     src = (REPO / "tests" / "governance" / COUPLED_FILE).read_text(encoding="utf-8")
     assert re.search(r'^GEN = REPO / "scripts" / "gen_fact_key_blocks\.sh"$', src, re.M), "GEN 指向漂移"
-    listed = {f"{COUPLED_FILE}:{n}" for n, line in enumerate(src.splitlines(), 1)
-              if re.search(r"(?<!def )_mutate\(|GEN\.read_text", line)}
+    listed = _coupling_refs(src)
     assert table == listed, (sorted(listed - table), sorted(table - listed))
     for p in sorted((REPO / "tests" / "governance").glob("test_*.py")):
         if p.name != COUPLED_FILE and not p.name.startswith("test_fkperf_"):

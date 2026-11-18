@@ -40,7 +40,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import h5py
 import numpy as np
@@ -531,10 +531,13 @@ def _talib_lookback(name: str, params: Dict[str, Any]) -> int:
         return 0
 
 
-def _column_fn(method: Callable[[pd.DataFrame], pd.DataFrame], column: str) -> Callable[[pd.DataFrame], List[np.ndarray]]:
+def _column_fn(method: Callable[[pd.DataFrame], pd.DataFrame],
+               column: Union[str, Callable[[pd.DataFrame], str]]) -> Callable[[pd.DataFrame], List[np.ndarray]]:
+    """`column`：輸出欄名；或依輸入 frame 導出欄名之函式（microstructure 之欄名 source 段依實有輸入欄而定）。"""
     def fn(frame: pd.DataFrame) -> List[np.ndarray]:
         out = method(frame)
-        return [out[column].to_numpy(dtype=np.float64)]
+        name = column(frame) if callable(column) else column
+        return [out[name].to_numpy(dtype=np.float64)]
 
     return fn
 
@@ -650,46 +653,59 @@ def build_catalog(timeframe_hint: str = "1h") -> List[Entry]:
             return method(series) if method.__name__ != "_compute_shannon_entropy" else method(series, source)
         return call
 
-    adv: List[Tuple[str, Dict[str, Any], Callable, str]] = []
+    # FF-NAME（f2440d3b）：輸出欄名一律由各引擎之 `_col`（＝`feature_naming.format_feature_name`，compute／輸出點／
+    # metadata 共用之同一導出）取得，不寫死字面（改前寫死之 `ms_`／`ent_`／`tr_` 前綴舊名於新碼輸出中不存在 ⇒ KeyError）。
+    # microstructure 之 source 段依實有輸入欄而定 ⇒ 欄名於取值時依該 frame 之欄導出。
+    def ms_col(entry: str, *params: Any) -> Callable[[pd.DataFrame], str]:
+        return lambda frame: ms._col(entry, frame.columns, *params)
+
+    adv: List[Tuple[str, Dict[str, Any], Callable, Union[str, Callable[[pd.DataFrame], str]]]] = []
     for w in ms.windows:
-        adv.append(("MS_AMIHUD_ILLIQ", {"window": w}, ms._compute_amihud, f"ms_amihud_illiq_{w}"))
+        adv.append(("MS_AMIHUD_ILLIQ", {"window": w}, ms._compute_amihud, ms_col("MS_AMIHUD_ILLIQ", w)))
     for w in ms.kyle_lambda_windows:
-        adv.append(("MS_KYLE_LAMBDA", {"window": w}, ms._compute_kyle_lambda, f"ms_kyle_lambda_{w}"))
-        adv.append(("MS_ROLL_SPREAD", {"window": w}, ms._compute_roll_spread, f"ms_roll_spread_{w}"))
-        adv.append(("MS_LARGE_TRADE_RATIO", {"window": w}, ms._compute_large_trade_ratio, f"ms_large_trade_ratio_{w}"))
+        adv.append(("MS_KYLE_LAMBDA", {"window": w}, ms._compute_kyle_lambda, ms_col("MS_KYLE_LAMBDA", w)))
+        adv.append(("MS_ROLL_SPREAD", {"window": w}, ms._compute_roll_spread, ms_col("MS_ROLL_SPREAD", w)))
+        adv.append(("MS_LARGE_TRADE_RATIO", {"window": w}, ms._compute_large_trade_ratio,
+                    ms_col("MS_LARGE_TRADE_RATIO", w)))
     for w in ms.cs_spread_smooth:
-        adv.append(("MS_CS_SPREAD", {"window": w}, ms._compute_cs_spread, f"ms_cs_spread_{w}"))
-    adv.append(("MS_OFI_RAW", {}, ms._compute_ofi, "ms_ofi_raw"))
+        adv.append(("MS_CS_SPREAD", {"window": w}, ms._compute_cs_spread, ms_col("MS_CS_SPREAD", w)))
+    adv.append(("MS_OFI_RAW", {}, ms._compute_ofi, ms_col("MS_OFI_RAW")))
     for b in ms.vpin_n_buckets:
-        adv.append(("MS_VPIN", {"n_buckets": b, "sigma_window": max(ms.vpin_n_buckets)}, ms._compute_vpin, f"ms_vpin_{b}"))
+        adv.append(("MS_VPIN", {"n_buckets": b, "sigma_window": max(ms.vpin_n_buckets)}, ms._compute_vpin,
+                    ms_col("MS_VPIN", b)))
     for source in ent.apply_to:
         for w in ent.shannon_windows:
             adv.append(("ENT_SHANNON", {"window": w}, series_method(ent._compute_shannon_entropy, source),
-                        f"ent_shannon_{source}_{w}"))
+                        ent._col("ENT_SHANNON", w, source)))
     for w in ent.windows:
-        adv.append(("ENT_APEN", {"window": w}, series_method(ent._compute_approximate_entropy, "close_return"), f"ent_apen_{w}"))
-        adv.append(("ENT_SAMPEN", {"window": w}, series_method(ent._compute_sample_entropy, "close_return"), f"ent_sampen_{w}"))
+        adv.append(("ENT_APEN", {"window": w}, series_method(ent._compute_approximate_entropy, "close_return"),
+                    ent._col("ENT_APEN", w)))
+        adv.append(("ENT_SAMPEN", {"window": w}, series_method(ent._compute_sample_entropy, "close_return"),
+                    ent._col("ENT_SAMPEN", w)))
         adv.append(("ENT_FRACTAL_DIM", {"window": w}, series_method(ent._compute_fractal_dimension, "close_return"),
-                    f"ent_fractal_dim_{w}"))
+                    ent._col("ENT_FRACTAL_DIM", w)))
     for w in ent.hurst_windows:
-        adv.append(("ENT_HURST", {"window": w}, series_method(ent._compute_hurst, "close_return"), f"ent_hurst_{w}"))
+        adv.append(("ENT_HURST", {"window": w}, series_method(ent._compute_hurst, "close_return"),
+                    ent._col("ENT_HURST", w)))
     for w in ent.perm_windows:
-        adv.append(("ENT_PERM", {"window": w}, series_method(ent._compute_permutation_entropy, "close_return"), f"ent_perm_{w}"))
+        adv.append(("ENT_PERM", {"window": w}, series_method(ent._compute_permutation_entropy, "close_return"),
+                    ent._col("ENT_PERM", w)))
     for alpha in tr.cvar_alphas:
         for w in tr.windows:
             adv.append(("TR_CVAR", {"alpha": alpha, "window": w}, returns_method(tr._compute_cvar),
-                        f"tr_cvar_{int(round(float(alpha) * 100))}pct_{w}"))
+                        tr._col("TR_CVAR", f"{int(round(float(alpha) * 100))}pct", w)))
     for w in tr.rv_windows:
-        for name, col in (("TR_RV_UP", "tr_rv_up"), ("TR_RV_DOWN", "tr_rv_down"), ("TR_RSJ", "tr_rsj")):
-            adv.append((name, {"window": w}, returns_method(tr._compute_rv_decomposition), f"{col}_{w}"))
-        adv.append(("TR_UD_VOL_RATIO", {"window": w}, returns_method(tr._compute_ud_vol_ratio), f"tr_ud_vol_ratio_{w}"))
+        for name in ("TR_RV_UP", "TR_RV_DOWN", "TR_RSJ"):
+            adv.append((name, {"window": w}, returns_method(tr._compute_rv_decomposition), tr._col(name, w)))
+        adv.append(("TR_UD_VOL_RATIO", {"window": w}, returns_method(tr._compute_ud_vol_ratio),
+                    tr._col("TR_UD_VOL_RATIO", w)))
     for w in tr.windows:
-        adv.append(("TR_GPR", {"window": w}, returns_method(tr._compute_gpr), f"tr_gpr_{w}"))
+        adv.append(("TR_GPR", {"window": w}, returns_method(tr._compute_gpr), tr._col("TR_GPR", w)))
     for w in (55, 100):
-        adv.append(("TR_JB", {"window": w}, returns_method(tr._compute_jarque_bera), f"tr_jb_{w}"))
+        adv.append(("TR_JB", {"window": w}, returns_method(tr._compute_jarque_bera), tr._col("TR_JB", w)))
     for w in tr.mdd_windows:
         adv.append(("TR_MDD", {"window": w}, lambda frame: tr._compute_max_drawdown(frame["close"].astype(float)),
-                    f"tr_mdd_{w}"))
+                    tr._col("TR_MDD", w)))
     grouped: Dict[str, Entry] = {}
     for name, params, method, column in adv:
         entry = grouped.setdefault(name, Entry(name, ()))

@@ -190,7 +190,9 @@ def test_preprocess_append_mode() -> None:
     assert any("_zscore-" in col for col in out.columns)  # FF-NAME：L6.5 op 段 `zscore-<w>`
 
 
-def test_preprocess_performance() -> None:
+@pytest.fixture(scope="module")
+def preprocess_1000_cols_run() -> dict:
+    """300 列 × 1,000 欄（winsor＋rank＋zscore，append）轉換一次並計時；正確性與計時兩條共用（TESTSEL S3）。"""
     np.random.seed(123)
     df = pd.DataFrame(np.random.normal(0, 1, (300, 1000)), columns=[f"f{i}" for i in range(1000)])
     pre = FeaturePreprocessor(
@@ -204,7 +206,19 @@ def test_preprocess_performance() -> None:
     start = time.time()
     out = pre.transform(df)
     elapsed = time.time() - start
+    return {"out": out, "elapsed": elapsed}
+
+
+def test_preprocess_1000_cols_output_nonempty(preprocess_1000_cols_run: dict) -> None:
+    """1,000 欄 L6.5 轉換之輸出非空（原效能測試之正確性斷言）。"""
+    out = preprocess_1000_cols_run["out"]
     assert not out.empty
+
+
+@pytest.mark.perf
+def test_preprocess_performance(preprocess_1000_cols_run: dict) -> None:
+    """牆鐘 < 30 秒：效能基準，opt-in（TESTSEL S3）。"""
+    elapsed = preprocess_1000_cols_run["elapsed"]
     assert elapsed < 30
 
 

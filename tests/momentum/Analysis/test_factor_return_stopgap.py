@@ -6,7 +6,6 @@ SPEC/TODO: docs/IC1CFR_FULL_{SPEC,TODO}.md Task F5.1; 延續 stopgap Phase 1 骨
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -258,12 +257,12 @@ def _load_frozen_allowlist(path: Path) -> dict[str, set[str]]:
     return {"factory_callers": factory_callers, "direct_consumers": direct_consumers}
 
 
-def test_factor_return_consumer_allowlist() -> None:
+def test_factor_return_consumer_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
     """現況 AST scan ⊆ 凍結 allowlist;scanner 與 freeze 腳本共用。"""
     assert FACTORY_ALLOWLIST_PATH.is_file(), f"missing {FACTORY_ALLOWLIST_PATH}"
     frozen = _load_frozen_allowlist(FACTORY_ALLOWLIST_PATH)
 
-    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "scripts"))
     from ic1cfr_stopgap_freeze import (  # type: ignore[import-not-found]
         compare_consumer_allowlist,
         scan_factor_return_consumers_ast,
@@ -275,9 +274,9 @@ def test_factor_return_consumer_allowlist() -> None:
     assert not extra_direct, f"new direct consumers outside allowlist: {extra_direct}"
 
 
-def test_consumer_guard_catches_import_alias(tmp_path: Path) -> None:
+def test_consumer_guard_catches_import_alias(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """自證:``from ... import FactorReturnAnalyzer as FRA; FRA(...)`` 必紅。"""
-    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "scripts"))
     from ic1cfr_stopgap_freeze import (  # type: ignore[import-not-found]
         compare_consumer_allowlist,
         scan_factor_return_consumers_ast,
@@ -304,9 +303,9 @@ def test_consumer_guard_catches_import_alias(tmp_path: Path) -> None:
     assert extra_d, f"alias ctor must be outside allowlist, got extra={extra_d!r}"
 
 
-def test_consumer_guard_catches_multi_ctor_same_line(tmp_path: Path) -> None:
+def test_consumer_guard_catches_multi_ctor_same_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """自證:同一 allowlisted 行追加第二 ctor(count>凍結)必紅。"""
-    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    monkeypatch.syspath_prepend(str(REPO_ROOT / "scripts"))
     from ic1cfr_stopgap_freeze import (  # type: ignore[import-not-found]
         DIRECT_CLASS_NAME,
         _ast_collect_calls_in_file,

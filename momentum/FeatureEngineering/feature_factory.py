@@ -344,7 +344,7 @@ class FeatureFactory:
         _memory_budget.assert_disk_backed([
             _memory_budget.mapping_root(run_dir),
             Path(self._storage.base_path),
-            Path.cwd() / "data_cache" / "cgsa_work" if not work_root else Path(work_root).expanduser(),
+            Path.cwd() / _run_paths.default_cgsa_root() if not work_root else Path(work_root).expanduser(),
         ])
 
     def _attach_memory_route_metadata(self, result: "FeatureGenerationResult") -> None:
@@ -1194,7 +1194,7 @@ class FeatureFactory:
         不符、`config_hash`／`algorithm_id` 為空或有標記 ⇒ 不讀其他檔、葉改名移出、建全新空葉（只含身分檔）；
         相符者再依 registry manifest、L7 manifest 狀態與其 `algorithm_id`（D6）決定續跑。"""
         configured_work_dir = os.getenv("FFACT_CGSA_WORK_DIR", "").strip()
-        root = Path(configured_work_dir) if configured_work_dir else Path.cwd() / "data_cache" / "cgsa_work"
+        root = Path(configured_work_dir) if configured_work_dir else Path.cwd() / _run_paths.default_cgsa_root()
         work_dir = cgsa_work_dir(root, symbol, timeframe, config_hash or "", algorithm_id or "unidentified")
         identity = _run_paths.cgsa_identity_payload(symbol, timeframe, config_hash or "", algorithm_id or "")
         identifiable = bool(config_hash) and bool(algorithm_id)

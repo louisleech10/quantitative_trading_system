@@ -43,7 +43,8 @@ _token_fresh() {   # $1=root $2=batch → true|false
 _parse_trailer() {   # stdin=訊息 → stdout=Ticket-Batch 值（空＝無）
   git interpret-trailers --parse 2>/dev/null | awk -F': *' 'tolower($1)=="ticket-batch"{v=$2} END{print v}'
 }
-_prod_of() { grep -E "${PROD_RE}" || true; }
+# 位元組碼／numba 快取（`__pycache__/`）非生產碼：.gitignore 已列，誤入版控者移出時不得被當生產變更（2026-11-14 TESTSEL 移出 80 檔）
+_prod_of() { grep -E "${PROD_RE}" | grep -v '/__pycache__/' || true; }
 
 case "${1:-}" in
   --msg)

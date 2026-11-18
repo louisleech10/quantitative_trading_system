@@ -11,7 +11,7 @@
 mutation：身分改取第二次解析之 manifest 且其間 manifest 被替換 ⇒ 不一致案翻轉；拿掉讀取結束之 sha256 確認 ⇒
 verification_04 翻轉（回 A 之身分＋B 之資料）。
 
-資料：真實 kline 短窗生成（`preprov_helpers.generate_short_run`，格 `h1_stat_on`，本模組只生成一次）；
+資料：真實 kline 短窗生成（`preprov_helpers.generate_short_run`，格見 `CELL`，本模組只生成一次）；
 「舊 run」與「替換之 manifest」皆以該真實 run 之 manifest 刪鍵／改值得之，不造特徵矩陣。
 實作前應為紅：`resolve_run_identity` 為 stub，`FeatureLibrary` 無回傳身分之入口。
 """
@@ -48,7 +48,9 @@ HEAD_PARSES_PER_LOAD = 4
 # b3 審碼 r1（SPEC Task 2.1「讀取一致性」）：一次讀取全程只解析一次 manifest。
 PARSES_PER_LOAD = 1
 
-CELL = "h1_stat_on"
+# TESTSEL I10：受測為 run 身分（manifest 鍵、讀取一致性），與特徵族、平穩化（fracdiff／ADF，生成耗時大宗）正交；最窄格仍寫
+# provenance 紀錄與 content_sha256 ⇒ 用 `ph.VARIANTS["h1_narrow"]`（原 h1_stat_on 每次生成約 88 秒）
+CELL = "h1_narrow"
 TAMPERED_SHA = "f" * 64
 
 

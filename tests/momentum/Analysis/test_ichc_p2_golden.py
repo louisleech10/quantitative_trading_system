@@ -57,7 +57,17 @@ _ICCONFIG_FIELDS_ADDED_SINCE_FREEZE: tuple = (
     ("feature_quality_diagnostics", "adf_min_samples"),
     # ICPERF Task 0.4 ㊲：多元化約束開關（預設 False ⇒ 第 6 段與改前相同）
     ("redundancy", "diversification", "enabled"),
+    # ICPERF Task 0.4 ㊸（5c87e850）：單調性門檻開關（預設 True ⇒ 第 5 段照 monotonicity_score_min 剔除，與改前相同）
+    ("thresholds", "monotonicity_gate_enabled"),
 )
+
+# receipt 凍結（2ffffd93）後自 ICConfig **刪除**之欄 → 凍結當時之預設值（逐項依凍結提交之 ic_config_schema.py 字面）。
+# 雜湊比對前依此精確回填；欄若重新出現於現行 dump ⇒ 斷言失敗，須回頭檢視（不得同時是現行欄又被回填）。
+_ICCONFIG_FIELDS_REMOVED_SINCE_FREEZE: dict = {
+    # ICPERF Task 0.2 v5.59 (ac)（9c96b4ac）：負對照改固定跑滿 negative_control_n 次，刪牆鐘預算鍵；
+    # 凍結時預設 `negative_control_budget_seconds: float = 60.0`（`git show 2ffffd93:momentum/Analysis/ic_config_schema.py:87`）
+    ("event_filter", "negative_control_budget_seconds"): 60.0,
+}
 
 
 def _config_hash_without_post_freeze_fields(helpers) -> str:
@@ -71,6 +81,12 @@ def _config_hash_without_post_freeze_fields(helpers) -> str:
         for key in path[:-1]:
             node = node[key]
         del node[path[-1]]  # 欄若被移除／改名 ⇒ KeyError，須回頭檢視
+    for path, frozen_default in _ICCONFIG_FIELDS_REMOVED_SINCE_FREEZE.items():
+        node = dump
+        for key in path[:-1]:
+            node = node[key]  # 父節點若被移除／改名 ⇒ KeyError，須回頭檢視
+        assert path[-1] not in node, f"已登記為刪除之欄 {path} 仍在現行 ICConfig"
+        node[path[-1]] = frozen_default
     return hashlib.sha256(helpers.canonical_json_bytes(dump)).hexdigest()
 
 

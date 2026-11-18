@@ -10,6 +10,9 @@ from momentum.Analysis.ic_engine import ICEngine
 
 _RUN_PERF = os.getenv("RUN_IC_ENGINE_PERF") == "1"
 
+# TESTSEL S3：本檔兩條皆只斷言牆鐘（無正確性斷言）⇒ 效能基準（perf）；原環境變數 opt-in 保留。
+pytestmark = pytest.mark.perf
+
 
 @pytest.mark.skipif(not _RUN_PERF, reason="Set RUN_IC_ENGINE_PERF=1 to run")
 def test_ic_engine_performance_targets_200x10k():

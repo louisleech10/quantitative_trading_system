@@ -459,6 +459,7 @@ class TestT52NoCrosstalk:
         真碰路徑：呼叫真實 _worker_entry、寫/讀真實 Arrow IPC；只 stub 下游
         generate_features 以攔截 worker 內部 factory 的 _reference_data_cache。
         """
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         from types import SimpleNamespace
 
         from momentum.FeatureEngineering import feature_factory as ff_mod
@@ -647,6 +648,7 @@ class TestArrowIPC:
         pd.testing.assert_frame_equal(df, loaded)
 
     def test_reference_data_roundtrip(self, tmp_path):
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         from momentum.FeatureEngineering.arrow_ipc_utils import (
             read_reference_data_ipc,
             write_reference_data_ipc,

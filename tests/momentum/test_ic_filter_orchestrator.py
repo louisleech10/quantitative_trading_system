@@ -522,6 +522,7 @@ def test_get_filtered_features_returns_copy():
 
 def test_stage0_ingestion_uses_meta_and_reindexes_labels(tmp_path: Path):
     """metadata_json 與 labels reindex 分支。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     timestamps = pd.Index(
         1_704_067_200 + np.arange(120, dtype=np.int64) * 43_200,
         name="timestamp",
@@ -653,6 +654,7 @@ def test_alignment_gate_stage2_normalizes_kline_axis_and_preserves_values():
 
 def test_alignment_gate_stage0_external_labels_reject_rangeindex(tmp_path: Path):
     """Stage0 外部 labels 無時間軸時 fail-closed。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     features = pd.DataFrame(
         {"f1": np.random.randn(120).astype(np.float32)},
         index=pd.Index(
@@ -1135,6 +1137,7 @@ def test_resolve_case_id_and_filtered_path_default():
 
 def test_load_features_hdf5_edge_cases(tmp_path: Path):
     """features HDF5 例外與預設分支。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     orchestrator = ICFilterOrchestrator(load_ic_config())
 
     empty_path = tmp_path / "empty.h5"

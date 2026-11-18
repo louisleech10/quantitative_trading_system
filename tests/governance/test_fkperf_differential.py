@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
@@ -98,24 +97,28 @@ def test_oracle_self_zero_diff_and_real_check_rc0(tmp_path: Path) -> None:
     assert fo.diff(a, b) == []
 
 
-def test_every_case_hits_its_expected_branch(tmp_path: Path) -> None:
-    """Task 0.1 驗證②：每筆語料之 oracle 命中其預期分支標籤（共同前置失敗不得充數）。"""
-    for kind in ("real", "sandbox", "exit", "key_order", "bytes"):
-        for case in fo.corpus(kind):
-            oroot, _ = fo.make_pair(tmp_path / case.case_id, case)
-            out = fo.run_oracle(oroot, case)
-            assert out.rc == case.expect_rc, case.case_id
-            stream = out.stderr if case.expect_rc else out.stdout
-            first = stream.decode("utf-8", "replace").splitlines()[0] if stream else ""
-            assert first == fo.expected_first(case, oroot), (case.case_id, first)
-            shutil.rmtree(tmp_path / case.case_id, ignore_errors=True)  # 逐筆即刪：409 筆沙箱累積為 GB 級
+#: TESTSEL I10：語料多之類別分片（每片取 cases[i::n]，n 片之聯集＝該類全部語料、互不重疊），使每案 ≤ 300 秒
+#: （2026-11-12 load≈7.5 實測逐筆：sandbox 約 1.4 秒×289 筆、exit 約 2.4 秒×119 筆，runs/g5/fk_prof.py；
+#: 2026-11-13 三片實測 421／254／281 秒，首片另付錄製語料之一次性 inner pytest，runs/g5/fk_new.log ⇒ 改六片）。
+_CORPUS_SHARDS = {"real": 1, "sandbox": 6, "exit": 2, "key_order": 1, "bytes": 1}
+_CORPUS_PARAMS = [f"{k}" if n == 1 else f"{k}:{i}/{n}" for k, n in _CORPUS_SHARDS.items() for i in range(n)]
 
 
-@pytest.mark.parametrize("kind", ["real", "sandbox", "exit", "key_order", "bytes"])
+@pytest.mark.parametrize("kind", _CORPUS_PARAMS)
 def test_every_corpus_case_new_equals_oracle(tmp_path: Path, kind: str) -> None:
     """Task 0.1 改法（r5 grok P1-01）：五類語料之每一筆，新實作與 oracle 逐位元組相同（C-1）——
-    不只邊界 01–18 點名者；`check_case` 先斷言 oracle 命中預期分支再比差異。"""
+    不只邊界 01–18 點名者；`check_case` 先斷言 oracle 命中預期分支再比差異。
+
+    兼 Task 0.1 驗證②（每筆語料之 oracle 命中其預期分支標籤）：原獨立之 `test_every_case_hits_its_expected_branch`
+    對同五類全部語料重跑 oracle 一次、斷言 (rc, 首行)＝(expect_rc, expected_first)，與 `check_case`
+    （`_fkperf_oracle.py` 之 `assert (a.rc, got) == (case.expect_rc, expected_first(case, oroot))`）逐項相同，
+    TESTSEL I10 併入本測試（TESTREG 審查 b4 G9 已註記 dup-run）。"""
+    kind, _, shard = kind.partition(":")
     cases = fo.corpus(kind)
+    if shard:
+        i, n = map(int, shard.split("/"))
+        assert n == _CORPUS_SHARDS[kind] and 0 <= i < n, (kind, shard)
+        cases = cases[i::n]
     assert cases, kind
     for case in cases:
         diffs = fo.check_case(tmp_path / case.case_id, case)

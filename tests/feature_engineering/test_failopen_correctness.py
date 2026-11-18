@@ -113,6 +113,21 @@ def _fast_config_payload(**overrides: object) -> dict:
     return payload
 
 
+#: TESTSEL I10：L1 精簡為 trend 兩指標（同 test_v7_cgsa_resume_matches_fresh 自 PRE-RED 起之設定），其餘 L1 類別關、
+#: L2–L4 維持預設。用於受測對象與特徵寬度無關之測試（as-of 對齊 oracle、跨標的隔離、L5 前綴、故障注入）：寬度只改欄數，
+#: 不改對齊／隔離／前綴／注入之程式路徑（各測試於註解寫明其獨有路徑）。
+_NARROW_L1_DISABLED = ("momentum", "volatility", "volume", "cycle", "pattern", "statistics",
+                       "microstructure", "entropy", "tail_risk")
+
+
+def _narrow_atomic_indicators() -> dict:
+    return {
+        "trend": {"enabled": True, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}},
+                                                  {"name": "SMA", "params": {"timeperiod": 13}}]},
+        **{c: {"enabled": False} for c in _NARROW_L1_DISABLED},
+    }
+
+
 def _multi_tf_payload(**overrides: object) -> dict:
     payload = _fast_config_payload()
     payload["timeframes"] = {
@@ -561,7 +576,8 @@ def test_v5_l5_cross_sectional_prefix_no_leakage(
     trunc_end = (
         pd.Timestamp(full_end, tz="UTC") - pd.Timedelta(days=PREFIX_TRUNCATE_DAYS)
     ).strftime("%Y-%m-%d")
-    config = _l5_cross_sectional_payload()
+    # TESTSEL I10：被測為 L5 relative_price（reference 對齊）之前綴無洩漏，與 L1 寬度無關 ⇒ 精簡 L1（L5 設定不變）
+    config = _l5_cross_sectional_payload(atomic_indicators=_narrow_atomic_indicators())
 
     full_result = factory.generate_features(
         ETH_SYMBOL,
@@ -649,7 +665,9 @@ def _load_raw_series(symbol: str, timeframe: str, start: str, end: str) -> tuple
         validate_continuity=False,
     )
     assert raw is not None and not raw.empty
-    ts = np.asarray(raw.index.to_numpy(dtype=np.int64), dtype=np.int64)
+    # TESTSEL I10 實跑抓到：read_klines 之 index 為 RangeIndex（列位置），原以 index 為時間戳 ⇒ 12h／1h 皆為 0..n 之位置，
+    # 邊界段 oracle 對應全為 -1、其 `if boundary_valid.any()` 恆空轉（既有空心斷言）。改取 `timestamp` 欄（epoch 秒）。
+    ts = np.asarray(raw["timestamp"].to_numpy(dtype=np.int64), dtype=np.int64)
     return ts, raw
 
 
@@ -733,7 +751,10 @@ def test_v6_independent_asof_oracle_matches_multi_tf_columns(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """[V-6] 獨立 oracle：idx_map + 首個 1h group 欄位全行 byte 比；含 TF 整除邊界。"""
+    """[V-6] 獨立 oracle：idx_map + 首個 1h group 欄位全行 byte 比；含 TF 整除邊界。
+
+    TESTSEL I10：生成改精簡 L1（`_narrow_atomic_indicators`；oracle 逐群組逐欄比對與 L1 寬度無關）；真實時間戳邊界段
+    補產線 idx_map 對照與「有效對應數 > 0」（原 `if` 可空轉）。"""
     from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
     from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 
@@ -802,7 +823,8 @@ def test_v6_independent_asof_oracle_matches_multi_tf_columns(
                 "primary": "12h",
                 "training": ["12h", "1h"],
                 "alignment_mode": AlignmentMode.OPEN_MINUS.value,
-            }
+            },
+            atomic_indicators=_narrow_atomic_indicators(),
         ),
         force_regenerate=True,
         start_date=start,
@@ -814,6 +836,7 @@ def test_v6_independent_asof_oracle_matches_multi_tf_columns(
     assert int(captured["group_count"]) >= 1
     assert int(captured["column_count"]) >= int(captured["group_count"])
 
+    monkeypatch.undo()  # 邊界段以未替換之產線 build_asof_index_map 對照
     start, end = _short_window_dates(14)
     primary_ts, _ = _load_raw_series(BASELINE_SYMBOL, "12h", start, end)
     source_ts, _ = _load_raw_series(BASELINE_SYMBOL, "1h", start, end)
@@ -830,6 +853,15 @@ def test_v6_independent_asof_oracle_matches_multi_tf_columns(
         source_close_ns = source_ts * NS_PER_SECOND + TIMEFRAME_SECONDS["1h"] * NS_PER_SECOND
         decision_ns = primary_ts * NS_PER_SECOND
         assert np.all(source_close_ns[boundary_idx[boundary_valid]] <= decision_ns[boundary_valid])
+    assert boundary_valid.any(), "真實 14 天窗無任何有效 as-of 對應（本測試空轉）"
+    prod_idx = TimeframeAligner.build_asof_index_map(
+        primary_ts,
+        source_ts,
+        source_dur_ns=TIMEFRAME_SECONDS["1h"] * int(NS_PER_SECOND),
+        primary_dur_ns=TIMEFRAME_SECONDS["12h"] * int(NS_PER_SECOND),
+        mode=mode,
+    )
+    assert np.array_equal(boundary_idx, prod_idx)
 
 
 def test_v6_asof_oracle_boundary_cases() -> None:
@@ -1007,7 +1039,10 @@ def _capture_multi_tf_alignment(
                 "primary": "12h",
                 "training": ["12h", "1h"],
                 "alignment_mode": alignment_mode.value,
-            }
+            },
+            # TESTSEL I10：as-of 對齊 oracle 逐群組逐欄比對，與 L1 寬度無關（`_align_group_array` 對每個 1h 群組一律
+            # 經同一 idx_map 對齊）⇒ 精簡 L1；兩 backend（searchsorted 開／關）× 兩對齊模式之四臂不變
+            atomic_indicators=_narrow_atomic_indicators(),
         ),
         force_regenerate=True,
         start_date=start,
@@ -1066,7 +1101,8 @@ def _run_symbol_hash(
     result = factory.generate_features(
         symbol,
         BASELINE_TIMEFRAME,
-        config_override=_fast_config_payload(),
+        # TESTSEL I10：跨標的隔離／順序不變與 L1 寬度無關（被測為 factory／模組層快取與落盤路徑之標的隔離）⇒ 精簡 L1
+        config_override=_fast_config_payload(atomic_indicators=_narrow_atomic_indicators()),
         force_regenerate=True,
         start_date=start,
         end_date=end,
@@ -1099,7 +1135,8 @@ def test_v7_cross_symbol_same_factory_no_cache_pollution(
     """[V-7] 同一 factory 實例 BTC→ETH→BTC：驗 _reference_data_cache 等無跨 symbol 污染。"""
     factory = _make_factory(monkeypatch, tmp_path)
     start, end = _short_window_dates(14)
-    config = _fast_config_payload()
+    # TESTSEL I10：同 _run_symbol_hash，被測為同一 factory 實例之跨標的快取污染，與 L1 寬度無關 ⇒ 精簡 L1
+    config = _fast_config_payload(atomic_indicators=_narrow_atomic_indicators())
 
     btc_first = factory.generate_features(
         BASELINE_SYMBOL,
@@ -1185,12 +1222,7 @@ def test_v7_cache_cold_hot_identical(
     start, end = _short_window_dates(14)
     config = _multi_tf_payload()
     # 同 test_v7_cgsa_resume_matches_fresh：精簡 L1 使種子品質 complete（續用閘只認 complete）
-    config["atomic_indicators"] = {
-        "trend": {"enabled": True, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}},
-                                                  {"name": "SMA", "params": {"timeperiod": 13}}]},
-        **{c: {"enabled": False} for c in ("momentum", "volatility", "volume", "cycle", "pattern", "statistics",
-                                           "microstructure", "entropy", "tail_risk")},
-    }
+    config["atomic_indicators"] = _narrow_atomic_indicators()
     cold = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
@@ -1241,6 +1273,13 @@ def test_v7_cache_cold_hot_identical(
     assert cold_hash == hot_hash
 
 
+def _cgsa_leaf_manifests(work_dir: Path) -> list[Path]:
+    """CGSA 覆寫根下之 registry manifest（NUMVIEW D7：`<根>/<symbol>_<tf>_<config_hash>/<algorithm_id>/manifest.json`，
+    `run_lifecycle._resolve_cgsa_leaf`／`cgsa_config_layer_dir`；不含 `.stale-*` 等點開頭目錄）。"""
+    return [p for p in sorted(work_dir.glob("*/*/manifest.json"))
+            if p.is_file() and not any(part.startswith(".") for part in p.relative_to(work_dir).parts)]
+
+
 @pytest.mark.requires_kline
 def test_v7_cgsa_resume_matches_fresh(
     monkeypatch: pytest.MonkeyPatch,
@@ -1255,12 +1294,7 @@ def test_v7_cgsa_resume_matches_fresh(
     # PRE-RED Task 2.3：種子須為品質 complete 之 run（續跑閘只認 complete，consumer_gate.is_run_status_cacheable）。
     # 完整 L1 於 14 天窗 nan_ratio 超門檻（cb53ff19 起如實記 partial），且 d229336e 後 1h 全史預熱於 8GB 本機被系統
     # 終止（F-2）⇒ 改精簡 L1（同 ff_artifact_compare_helpers.fast_config_payload 之指標），L2–L4 維持預設。
-    config["atomic_indicators"] = {
-        "trend": {"enabled": True, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}},
-                                                  {"name": "SMA", "params": {"timeperiod": 13}}]},
-        **{c: {"enabled": False} for c in ("momentum", "volatility", "volume", "cycle", "pattern", "statistics",
-                                           "microstructure", "entropy", "tail_risk")},
-    }
+    config["atomic_indicators"] = _narrow_atomic_indicators()
 
     # 先在 shared storage/work_dir 完成一次，作為 one-shot oracle 並建立合法 L7 gate；
     # 再由真實 fail-closed run 覆寫 work_dir，於 1h 中斷留下 12h checkpoint。
@@ -1316,7 +1350,9 @@ def test_v7_cgsa_resume_matches_fresh(
             persist=True,
         )
 
-    partial_manifest = json.loads((work_dir / "manifest.json").read_text(encoding="utf-8"))
+    # TESTSEL I10 實跑抓到（既有紅）：NUMVIEW D7 起 CGSA registry 位於覆寫根下之身分葉（symbol／tf／config_hash／algorithm_id），
+    # 原讀 `<work_dir>/manifest.json` 必 FileNotFoundError。種子與中斷 run 同設定 ⇒ 同一葉（恰一份之斷言見本測試末）。
+    partial_manifest = json.loads(_cgsa_leaf_manifests(work_dir)[0].read_text(encoding="utf-8"))
     partial_groups = list(partial_manifest.get("groups") or [])
     assert partial_groups, "failed run did not persist a resumable checkpoint"
     assert any(str(group.get("timeframe")) == BASELINE_TIMEFRAME for group in partial_groups)
@@ -1365,3 +1401,5 @@ def test_v7_cgsa_resume_matches_fresh(
     )
     assert resumed_group_hash == oneshot_group_hash
     assert resumed.feature_count == oneshot.feature_count
+    leaf_manifests = _cgsa_leaf_manifests(work_dir)
+    assert len(leaf_manifests) == 1, leaf_manifests  # 種子／中斷／續跑同設定 ⇒ 同一身分葉

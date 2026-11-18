@@ -193,6 +193,9 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         "timeout_scan.py",
         "timeout_patterns.json",
         "timeout_registry.json",
+        # ICPERF Task 0.6 (g) L3：pre-commit 呼叫 git_hooks/limit_lint_staged.sh → limit_lint.py（import limit_scan）
+        "limit_lint.py",
+        "limit_scan.py",
         "run_receipt_identity.py",
         "template_balance_legacy.txt",
     ):

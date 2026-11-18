@@ -17,7 +17,7 @@
   },
   "baseline_role": "after_pit_split_off",
   "before_ref": {
-    "features_h5_sha256": "c9fc45f969e635ec09036e4a654f199c315404de7f5a6c7b82b0f184d699618f",
+    "features_h5_sha256": "dc1851335d155f95ac179128162d852aec43ad5cbeeeed259940656b79de24c7",
     "meta_sha256": "36adc08354c61a1173f76865d78c605c6acd85595cc772d66b43ed41bba39144",
     "pit_stats_version": "pre_la0_baseline",
     "schema_version": "la0_b0_v2"

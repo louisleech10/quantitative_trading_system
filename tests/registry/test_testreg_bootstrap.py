@@ -147,7 +147,13 @@ def test_real_repo_catalog_complete_and_valid():
 
 def test_real_repo_bootstrap_receipt_matches_catalog():
     rc = json.loads((REPO / "handoffs/run_receipts/testreg-bootstrap.json").read_text(encoding="utf-8"))
-    cat = json.loads((REPO / CATALOG_REL).read_text(encoding="utf-8"))
+    # 收據＝bootstrap 當時之紀錄 ⇒ 對照 paths_file 加入提交（bootstrap 提交）之 catalog，而非現行 catalog：其後依 TESTREG
+    # 刪除之測試檔（如 d4d97d62、2faac866、d0931a00 刪之 4 檔）其 entry 隨之移除，現行 catalog 之 unknown 數必然漂移
+    # （2026-11-13 實查 256 對 252）。同上一條測試以 `git log --diff-filter=A` 取該提交之做法。
+    add = subprocess.run(["git", "-C", str(REPO), "log", "--diff-filter=A", "--format=%H", "--", PATHS_FILE],
+                         capture_output=True, text=True, check=True).stdout.split()[-1]
+    cat = json.loads(subprocess.run(["git", "-C", str(REPO), "show", f"{add}:{CATALOG_REL}"], capture_output=True,
+                                    text=True, check=True).stdout)
     boot = (REPO / PATHS_FILE).read_text(encoding="utf-8").splitlines()
     assert rc["entries"] == len(boot)
     assert rc["unknown"] == sum(1 for p in boot if cat["entries"].get(p, {}).get("ticket") == "unknown")

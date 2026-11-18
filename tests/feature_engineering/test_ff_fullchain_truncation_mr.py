@@ -202,12 +202,23 @@ def test_mutation_fracdiff_full_fit_d_star_fails(monkeypatch, tmp_path, kline_df
     run_control_fracdiff_full_fit_d_star(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
+def _declare_raw_groups(raw_dir: Path) -> None:
+    """合成 raw 目錄之 run manifest：每個 parquet 一群組（`artifacts.raw.groups[*].path`＝相對 run 目錄）。"""
+    import json
+
+    groups = {p.stem: {"path": f"{raw_dir.name}/{p.name}"} for p in sorted(raw_dir.glob("*.parquet"))}
+    (raw_dir.parent / "feature_manifest.json").write_text(
+        json.dumps({"artifacts": {raw_dir.name: {"groups": groups}}}), encoding="utf-8")
+
+
 def test_b2_sampling_helper_smoke(tmp_path: Path) -> None:
     """秒級 smoke：分層抽樣 + batch 讀邏輯（非全鏈 generate）。"""
-    full_dir = tmp_path / "full"
-    trunc_dir = tmp_path / "trunc"
-    full_dir.mkdir()
-    trunc_dir.mkdir()
+    # FFDSTAR Task 1.6（4baf0fbc）起 raw 群組檔依所屬 run 之 manifest 宣告讀取（`_iter_raw_parquet_frames`）⇒ 合成
+    # 產物須為 run 目錄版型：<run>/raw/*.parquet＋<run>/feature_manifest.json（原平鋪目錄缺 manifest 而 FileNotFoundError）
+    full_dir = tmp_path / "full" / "raw"
+    trunc_dir = tmp_path / "trunc" / "raw"
+    full_dir.mkdir(parents=True)
+    trunc_dir.mkdir(parents=True)
 
     warmup, n_trunc = 5, 20
     rows = np.arange(n_trunc, dtype=np.float32)
@@ -242,6 +253,9 @@ def test_b2_sampling_helper_smoke(tmp_path: Path) -> None:
     trunc_fill = pd.DataFrame({col: rows for col in filler})
     full_fill.to_parquet(full_dir / "1h_L3_rolling_2.parquet")
     trunc_fill.to_parquet(trunc_dir / "1h_L3_rolling_2.parquet")
+
+    _declare_raw_groups(full_dir)
+    _declare_raw_groups(trunc_dir)
 
     common_cols = sorted(set(all_cols))
     col_map = _build_column_frame_map(full_dir)

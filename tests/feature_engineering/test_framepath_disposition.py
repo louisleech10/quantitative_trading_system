@@ -2048,6 +2048,25 @@ def _numview_structural_only(old_fp: Dict[str, Any], new_fp: Dict[str, Any],
     return all(k in fields and new_fp.get(k) == fields[k] for k in keys - {"manifest_sha256"})
 
 
+PROV2_RECEIPT_REL = "tests/_golden/framepath/refreeze_provenance_v2_receipt.json"
+#: d4d97d62 逐欄紀錄契約 v2 之結構重凍（9c930fbf）只可改 manifest 內 provenance 之兩鍵
+PROV2_DIFF_SUFFIXES = (".provenance.contract_version", ".provenance.sha256")
+
+
+def provenance_v2_framepath_approvals() -> Dict[str, Tuple[str, str]]:
+    """FRAMEPATH provenance v2 結構重凍收據（9c930fbf；三家 DATA-CORRECTNESS SIGNED，兩樹值檔雜湊相等）→
+    {格: (manifest 舊值, 新值)}：只取無錯誤、舊樹值＝凍結值、差異路徑全為 provenance 兩鍵之格。收據受版控，缺 ⇒ 失敗。"""
+    receipt = json.loads((REPO / PROV2_RECEIPT_REL).read_text(encoding="utf-8"))  # 缺 ⇒ FileNotFoundError
+    out: Dict[str, Tuple[str, str]] = {}
+    for item in receipt.get("items") or []:
+        paths = list(item.get("diff_paths") or [])
+        if (item.get("changed") is True and not item.get("errors") and paths
+                and item.get("old_tree_value") == item.get("frozen_before")
+                and all(p.endswith(PROV2_DIFF_SUFFIXES) for p in paths)):
+            out[str(item["cell"])] = (item["frozen_before"], item["new_value"])
+    return out
+
+
 def _column_names_changed(old_fp: Dict[str, Any], new_fp: Dict[str, Any]) -> bool:
     """FF-NAME 換名映射只適用於該格欄名集合實際改變之轉換（S2）。"""
     return set(old_fp.get("columns") or {}) != set(new_fp.get("columns") or {})
@@ -2056,7 +2075,8 @@ def _column_names_changed(old_fp: Dict[str, Any], new_fp: Dict[str, Any]) -> boo
 def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
                             approvals: Optional[Dict[str, Dict[str, str]]] = None,
                             preprov: Optional[Dict[str, Tuple[str, str]]] = None,
-                            numview: Optional[Dict[str, Dict[str, Any]]] = None) -> List[str]:
+                            numview: Optional[Dict[str, Dict[str, Any]]] = None,
+                            prov2: Optional[Dict[str, Tuple[str, str]]] = None) -> List[str]:
     """基準各版本（依時間序之 (版本名, 基準 JSON)）之承續：後版須含前版每一格，且該格 fingerprint 逐項相等、
     receipt 除 `BASELINE_RUN_PATH_KEYS` 外相等、`code_anchor` 不變；只准新增格（memory 屬量測值不比）。
     FF-NAME SPEC v22：既有格之逐欄值不變；鍵名與名衍生雜湊（column_names_sha256、manifest_sha256、
@@ -2065,10 +2085,12 @@ def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
     FFDSTAR／PRE-PROV §G：結構重凍只改 `manifest_sha256`，且舊→新恰為重凍收據核可之值（`preprov`；預設讀
     `tests/_golden/preprov/refreeze_receipt.json`）；其他任一項同時改變即不屬之。
     NUMVIEW Phase 4 結構重凍（ICPERF SPEC v5.82 S2）：只改 `NUMVIEW_STRUCTURAL_KEYS`，且值恰為 NUMVIEW 重凍收據所記
-    （`numview`；預設讀 `tests/_golden/numview/refreeze_receipt.json`）。FF-NAME 映射只用於欄名集合實際改變之轉換。"""
+    （`numview`；預設讀 `tests/_golden/numview/refreeze_receipt.json`）。FF-NAME 映射只用於欄名集合實際改變之轉換。
+    FRAMEPATH provenance v2 結構重凍（9c930fbf）：只改 `manifest_sha256`，舊→新恰為 `PROV2_RECEIPT_REL` 所記（`prov2`）。"""
     approvals = ffname_framepath_approvals() if approvals is None else approvals
     preprov = preprov_framepath_approvals() if preprov is None else preprov
     numview = numview_framepath_approvals() if numview is None else numview
+    prov2 = provenance_v2_framepath_approvals() if prov2 is None else prov2
     errs: List[str] = []
     for (prev_name, prev), (name, cur) in zip(versions, versions[1:]):
         if prev.get("code_anchor") != cur.get("code_anchor"):
@@ -2084,6 +2106,8 @@ def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]],
                     pass
                 elif _numview_structural_only(old_fp, new_fp, numview.get(cell)):
                     pass
+                elif _preprov_structural_only(old_fp, new_fp, prov2.get(cell)):
+                    pass  # 同為「只改 manifest_sha256 且恰為收據之舊→新」判準，收據不同
                 elif cell in approvals and _column_names_changed(old_fp, new_fp):
                     errs += _ffname_rekeyed_cell_errors(cell, old.get("fingerprint") or {}, new.get("fingerprint") or {},
                                                         approvals[cell])
@@ -2114,6 +2138,26 @@ def _numview_transition() -> Tuple[Tuple[str, Dict[str, Any]], Tuple[str, Dict[s
     versions = git_baseline_versions()
     i = next(k for k, (n, _) in enumerate(versions) if n == "9891907f")
     return versions[i - 1], versions[i]
+
+
+def test_provenance_v2_refreeze_accepted_and_tampering_red():
+    """9c930fbf provenance v2 結構重凍：依收據核可通過；manifest 新值不等於收據、另改他鍵、或無收據核可，各紅。"""
+    versions = git_baseline_versions()
+    i = next(k for k, (n, _) in enumerate(versions) if n == "9c930fbf")
+    (pn, prev), (cn, cur) = versions[i - 1], versions[i]
+    assert baseline_lineage_errors([(pn, prev), (cn, cur)]) == []
+    approved = provenance_v2_framepath_approvals()
+    cell = next(c for c in approved if (prev["cells"].get(c) or {}).get("fingerprint") != cur["cells"][c]["fingerprint"])
+
+    wrong_after = copy.deepcopy(cur)
+    wrong_after["cells"][cell]["fingerprint"]["manifest_sha256"] = "0" * 64
+    assert baseline_lineage_errors([(pn, prev), (cn, wrong_after)]), "manifest 新值與收據不符未被抓"
+
+    extra_key = copy.deepcopy(cur)
+    extra_key["cells"][cell]["fingerprint"]["column_count"] = -1
+    assert baseline_lineage_errors([(pn, prev), (cn, extra_key)]), "夾帶他鍵改動未被抓"
+
+    assert baseline_lineage_errors([(pn, prev), (cn, cur)], prov2={}), "無收據核可仍放行"
 
 
 def test_ffname_rename_fixture_missing_fails_closed(monkeypatch):

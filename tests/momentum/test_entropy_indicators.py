@@ -92,6 +92,7 @@ def test_entropy_extreme_returns() -> None:
 
 
 def test_hurst_low_r_squared() -> None:
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     data = _make_data()
     data["close"] = np.random.uniform(99.9, 100.1, len(data))
     out = _engine().compute_all(data)
@@ -125,6 +126,7 @@ def test_perm_entropy_invalid_m() -> None:
 def test_hurst_low_r_squared_matches_independent_rs_oracle() -> None:
     """ent_hurst_55 逐列對獨立純 Python R/S 實作（不呼叫生產碼）：暖機後之 NaN 位置（R²<0.1 置 NaN 分支）
     與數值皆須一致，且暖機後同時存在 NaN 與有限值（分支真被鑑別，非只靠暖機 NaN）。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     import math as _m
 
     def _oracle(vals):

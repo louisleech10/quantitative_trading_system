@@ -1,0 +1,162 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/feature_engineering/test_ff_truncation_capture_boundary.py",
+    "tests/feature_engineering/test_numview_baseline.py",
+    "tests/feature_engineering/test_preprov_acceptance.py",
+    "tests/feature_engineering/test_probewinsor.py",
+    "tests/feature_engineering/test_warmup_verify_guards.py",
+    "tests/feature_engineering/test_numview_acceptance.py",
+    "tests/momentum/Analysis/test_ic_persist_redirect_inventory.py",
+    "tests/momentum/Analysis/test_ichc_p2_golden.py",
+    "tests/momentum/Analysis/test_icperf_data_warning_codes.py",
+    "tests/momentum/Analysis/test_icperf_gate.py",
+    "tests/momentum/test_memory_chunking.py",
+    "tests/momentum/test_feature_factory_optimization_perf.py",
+    "tests/test_meta_features.py",
+    "tests/test_talib_wrapper.py",
+    "tests/governance/test_prered_allowed_red.py",
+    "tests/performance/test_memory_pressure.py",
+    "tests/api/test_probewinsor_batch_resume.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20261118-probewinsor-fixedenv-refreeze.json",
+      "cmd": "venv/bin/python ../../../runs/testsel_route/i1d/probewinsor_fixedenv_refreeze.py --write",
+      "rc": 0,
+      "honest_bounds": "只改 tests/_golden/probewinsor/baseline.json 29 格 config_hash 為生成環境（FIXED_ENV）值；值鍵逐位不變；去鹽 29／29 等於 9891907f^ 原凍結值；with_fixed_env 值 29／29 等於 ph.isolated 完整生成環境值（runs/testsel_route/i1d/impl_logs/pw_refreeze_write.json）"
+    }
+  ],
+  "batch_card": {
+    "depends": [
+      "I1a 已提交（testsel 1e134e42）：測試期間正式資料寫入偵測與 golden 保護為本項跑測之安全網",
+      "開 TODO 前實測 runs/testsel_route/i1d/i1d_facts.md（含整合樹紅狀態與 #18 歷史）；逐條表 runs/testsel_route/i1d/i1d_table.md 為非契約之工作筆記",
+      "大綱拆分：I1d → I1d1（本項，不改產品值）／I1d2（postic 7 重生、precision_chain、icperf 正確性收據、e2e 6 補欄值 oracle、#46 inference_se 分級；需重型跑與三方簽核）",
+      "SPEC Task 4.1 修訂：不另建 runs/testsel_route/i1_reds.json 與檢查腳本——紅之處置與理由單一真相源＝版控 tests/_golden/prered/allowed_red.json（精確集合由 tests/governance/test_prered_allowed_red.py EXPECTED 釘死、owner 已完成由 scripts/testreg.py signal_allowed_red_owner_closed 標出）；已修者之漂移原因寫入提交訊息",
+      "整合樹施工前紅狀態（runs/testsel_route/i1d/red_state.log）：55 failed, 36 passed；test_icperf_data_warning_codes.py 整合樹 9 條紅（main 1 條），皆源於契約 codes:{} 空殼",
+      "I1b 快速層實跑（runs/testsel_route/i1b/direct_affected.log）另抓到既有紅 tests/performance/test_memory_pressure.py::test_l3_multiwindow_output_matches_estimate_and_rolling_oracle_on_real_kline：期望欄名寫死舊格式 `<欄>_<Agg>_W<w>`，產品輸出 FF-NAME `<欄>_<Agg>-W<w>`（同錯見 runs/testsel_route/i1_proto/bisect_numba4b.log:29344）；其 oracle 為 numpy sliding_window_view、無 skew／kurt ⇒ 只改期望欄名由產品 formatter 導出",
+      "I1b 施工中（rolling_aggregator／taker_ratio）：本項不碰其 touches，兩項檔案不重疊",
+      "審查 r1 收斂：handoffs/reconcile/20261118-testseli1d1-x-review-r1/synth.md（9 群集全採納）；r2：handoffs/reconcile/20261118-testseli1d1-x-review-r2/synth.md（NUMVIEW 27＋failopen v8 1 移至 I1g；#18 改用收據既有 revisions）"
+    ],
+    "touches": [
+      "tests/feature_engineering/test_ff_truncation_capture_boundary.py",
+      "tests/feature_engineering/ff_truncation_mr_helpers.py",
+      "tests/feature_engineering/test_numview_baseline.py",
+      "tests/feature_engineering/test_preprov_acceptance.py",
+      "tests/_golden/probewinsor/baseline.json",
+      "tests/feature_engineering/test_probewinsor.py",
+      "tests/feature_engineering/probewinsor_helpers.py",
+      "scripts/preprov_refreeze.py",
+      "tests/api/test_probewinsor_batch_resume.py",
+      "handoffs/run_receipts/20261118-probewinsor-fixedenv-refreeze.json",
+      "scripts/verify_l1_warmup_requirements.py",
+      "tests/feature_engineering/test_numview_acceptance.py",
+      "tests/momentum/Analysis/test_ic_persist_redirect_inventory.py",
+      "tests/momentum/Analysis/test_ichc_p2_golden.py",
+      "tests/momentum/Analysis/test_icperf_gate.py",
+      "scripts/icperf_path_inventory.json",
+      "tests/momentum/test_memory_chunking.py",
+      "tests/momentum/test_feature_factory_optimization_perf.py",
+      "tests/test_meta_features.py",
+      "tests/test_talib_wrapper.py",
+      "tests/performance/test_memory_pressure.py",
+      "tests/_golden/prered/allowed_red.json",
+      "tests/governance/test_prered_allowed_red.py",
+      "docs/TESTSEL_I1_REDS_SPEC.md"
+    ],
+    "callers_now": [
+      "tests/feature_engineering/test_warmup_verify_guards.py",
+      "tests/feature_engineering/test_ff_truncation_capture_boundary.py",
+      "tests/governance/test_prered_allowed_red.py",
+      "scripts/testreg.py"
+    ],
+    "callers_later": [
+      "I1d2：postic／precision_chain／#45 icperf 正確性收據／e2e 6／#46 inference_se（皆 tests/momentum/Analysis/test_icperf_correctness.py 等）於 I1 收尾單次重型批處置",
+      "I1 收尾：同次全量正常結束、collection／setup ERROR＝0；本項宣稱已修之 node outcome＝passed；FAILED ⊆ allowed_red.json 之 node；allowed_red 中 owner_ticket＝TESTSEL 之列數＝0",
+      "I7：#8／#9 未入版控本機檔依賴之治理分層"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/feature_engineering/test_ff_truncation_capture_boundary.py tests/feature_engineering/test_numview_baseline.py tests/feature_engineering/test_probewinsor.py::test_boundary_02_master_on_unchanged tests/feature_engineering/test_probewinsor.py::test_boundary_03_master_off_child_off_unchanged tests/feature_engineering/test_probewinsor.py::test_fixedenv_refreeze_receipt_binds_baseline tests/api/test_probewinsor_batch_resume.py::test_boundary_09f_resume_identity_is_factory_identity tests/feature_engineering/test_preprov_acceptance.py::test_mutation_winsor_success_record_removed tests/feature_engineering/test_numview_acceptance.py::test_structural_refreeze_receipt_proves_strip_equals_frozen tests/feature_engineering/test_numview_acceptance.py::test_structural_refreeze_chain_negatives tests/momentum/Analysis/test_ic_persist_redirect_inventory.py tests/momentum/Analysis/test_ichc_p2_golden.py tests/momentum/Analysis/test_icperf_gate.py::test_boundary_09_output_root_outside_snapshot_fails tests/momentum/Analysis/test_icperf_gate.py::test_task02_v559_inventory_refs_within_stated_functions tests/momentum/test_memory_chunking.py tests/test_meta_features.py tests/test_talib_wrapper.py::test_indicator_registry_count tests/performance/test_memory_pressure.py::test_l3_multiwindow_output_matches_estimate_and_rolling_oracle_on_real_kline tests/governance/test_prered_allowed_red.py -p no:cacheprovider -q",
+    "forbidden": [
+      {
+        "rule": "不改產品碼數值路徑（momentum/ 下任何計算）；本項只修測試、測試 helper、驗證腳本欄名導出、登記檔與 touches 所列之 golden／清冊／收據窄例外",
+        "observable": true
+      },
+      {
+        "rule": "不以放寬斷言、skip、xfail、刪測試換綠（無例外）；allowed_red 中 NUMVIEW 落選分支 27 條與 failopen v8 1 條不在本項（移至大綱 I1g），本項不改 test_numview_core.py、test_failopen_frozen_diff.py 及其 allowed_red／EXPECTED 列",
+        "observable": true
+      },
+      {
+        "rule": "凍結檔與收據之窄例外：tests/_golden/probewinsor/baseline.json 只准改各格 config_hash 欄為生成環境（ph.FIXED_ENV）下之值（值鍵逐位不變，以改前改後 `jq 'del(.. | .config_hash?)'` 相等為證，並附去鹽重算等於 9891907f^ 原凍結值）；身分計算（test_probewinsor 之 _hash_of／_identity_of 與 scripts/preprov_refreeze.py run_probewinsor）一律於同一 FIXED_ENV context；新增後續重凍收據 handoffs/run_receipts/20261118-probewinsor-fixedenv-refreeze.json 並登記 FOLLOWUP_REFREEZE_RECEIPTS；scripts/icperf_path_inventory.json 只准依符號重定位行號、不改語意欄；其餘凍結檔與收據（含 handoffs/run_receipts/20261023-numview-estimate.json）零改動",
+        "observable": true
+      },
+      {
+        "rule": "改凍結值、重生資料、需獨立 oracle 驗新值者一律不在本項（歸 I1d2）",
+        "observable": false
+      },
+      {
+        "rule": "allowed_red 移交他票（ICPERF data_warning_codes 9 條、#44）須寫 owner、reason 封閉值與 trigger（原因、驗證之樹、收尾者），並同 commit 改 test_prered_allowed_red.py EXPECTED",
+        "observable": true
+      },
+      {
+        "rule": "測試欄名一律由產品 formatter（feature_naming.format_feature_name 等）導出，不寫死新欄名字面值",
+        "observable": true
+      },
+      {
+        "rule": "不另建測試之外的登記表或檢查腳本（紅之處置只用既有 allowed_red.json）",
+        "observable": true
+      },
+      {
+        "rule": "不寫正式 data_cache；不動 I1b touches（rolling_aggregator.py、binance_provider.py、kline_storage.py、taker_ratio.py、rolling_moments_numpy.py、tests/_golden/ffstat、tests/_golden/icperf/limit_*）",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "逐條處置前重讀 i1d_table.md 證據欄之檔:行與 commit，於整合樹當場以快速層單跑重現紅，改後同命令轉綠",
+      "probewinsor 20 條（審碼 b1 r1 共識）：真因＝NUMVIEW 鹽依環境解析之有效選擇子，baseline 以 pytest 預設環境算、run 以 FIXED_ENV 生成（runs/testsel_route/i1d/impl_logs/pw_proof_before.json：29 格去鹽後皆＝9891907f^ 原凍結值）⇒ 身分計算統一於 FIXED_ENV、baseline config_hash 換為生成環境值、後續重凍收據接鏈；boundary_05／m4／m5 同環境重跑確認仍守原性質。原敘述：以 config_hash_salt 去鹽重算，證明值鍵逐項等於原凍結值，再只更新 baseline.json 之 config_hash 欄（比照 9891907f）；改壞對照：任一格 config_hash 改為錯值 ⇒ boundary_02／03 紅",
+      "#40 warmup：scripts/verify_l1_warmup_requirements.py 之 MS_／ENT_／TR_ 輸出點改由產品 formatter 導出，並補改壞對照（欄名寫回舊格式 ⇒ 紅）；該測試 ledger 70 秒，屬重型，於 I1 收尾單次跑",
+      "Task 3.1：test_numview_acceptance.py 新增參數化 test_structural_refreeze_chain_negatives——竄改 v2 收據 baseline_sha256_before／無後續收據且 sha 不符／中段斷鏈 ⇒ 拒收，正常鏈 ⇒ 接受；以 monkeypatch 收據 dict 呼叫同一驗證邏輯",
+      "#18：估時收據原始 reported_at＝2026-10-22T22:36:04.217434+00:00（git 65bd80c0／ce8d4824／dd12693e），Task 1.2 重估（45f9aceb 移除、14475bc9 改寫為 2026-10-24T00:01:49+00:00）；收據已保存首次值於 `revisions[0].previous_reported_at`（＝2026-10-22T22:36:04.217434+00:00，主委 jq 實查）⇒ `order_violations` 改以 `revisions[*].previous_reported_at` 最早值（無則 `reported_at`）比對凍結 started_at（2026-10-23T06:48:56），收據零改動；改壞對照：最早報告時間晚於凍結 ⇒ 紅",
+      "allowed_red 中 owner TESTSEL 30 條：本項處置 talib 註冊數（2247c394 新增別名）與 perf ms_／ent_／tr_ 前綴 2 條（修測試後自登記移除）；NUMVIEW 落選分支 27 條與 failopen v8 1 條移至大綱 I1g（TESTREG 立碑需 E0／E1／E2 收據而決定閘永紅之落選分支無從產生〔docs/TESTREG_SPEC.md:40〕、NUMVIEW 已完成不可轉 owner〔scripts/fact_keys.json RM-NUMVIEW＝已完成〕——處置於 I1g 原型實測後定）",
+      "ICPERF data_warning_codes 9 條（整合樹）：契約 codes:{} 空殼之施工前紅，登記 owner ICPERF、blocked-by ICPERF Task 0.6 L2；`:150` 已有非空前提斷言",
+      "#8／#9／#44：trigger 寫明驗證之樹為主 repo 本體（未入版控本機檔）；#8／#9 收尾者 I7、#44 為 ICPERF 研究擷取檔 ⇒ owner ICPERF",
+      "子項期間只跑分鐘級受影響測試；重型（#40、perf full_pipeline、whole-file numview_core／preprov）與全量於 I1 收尾單次（使用者 2026-11-17）"
+    ],
+    "coverage_risk": [
+      "#8／#9／#44 依賴主 repo 未入版控本機檔，整合樹內無法轉綠；本項只登記 allowed_red，不宣稱主 repo 已過",
+      "#48 boundary_09：worktree data_cache 為符號連結 resolve 至 repo 外；修法若改測試處理符號連結，須保留『輸出根在快照外 ⇒ 失敗』之意圖並以改壞對照證明",
+      "test_full_pipeline_new_families_emit_columns 用 full_pipeline_run fixture（ledger 無通過紀錄），改後驗證延至 I1 收尾重型批",
+      "ichc #43：新增欄具名剔除、刪除欄依歷史預設精確回填；若須重凍則轉 I1d2"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "改凍結值、重生資料、需獨立 oracle 驗新值者一律不在本項（歸 I1d2）",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

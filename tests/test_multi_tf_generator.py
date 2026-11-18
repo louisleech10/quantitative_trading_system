@@ -393,6 +393,15 @@ _CASES = {
 }
 
 
+def _payload(training_tfs, **overrides) -> dict:
+    """真實 kline 生成之設定：fg.fast_payload 再把 trend 縮為單一指標單一週期（TESTSEL I10）。
+    本節被測者為週期完整性三欄、quality_status、failed_layers 與交叉檢查之呼叫順序，皆與 L1 寬度無關；
+    L3（rolling 5／13）保留——dependency_failed 之注入點為 Layer 3。"""
+    payload = fg.fast_payload(training_tfs, **overrides)
+    payload["atomic_indicators"]["trend"] = {"enabled": True, "indicators": [{"name": "EMA", "periods": [5]}]}
+    return payload
+
+
 def _thread_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     from tests.feature_engineering.test_failopen_producer import install_inprocess_mtf_pool
     install_inprocess_mtf_pool(monkeypatch)
@@ -435,7 +444,7 @@ def _run_case(tmp_path, monkeypatch, path: str, case: str, **overrides):
     elif case == "failed":
         _inject_12h_load(monkeypatch, RuntimeError("injected 12h load failure"))
     training = _CASES[case][0]
-    payload = fg.fast_payload(training, **fg.HEALTHY, allow_partial_timeframes=True, **overrides)
+    payload = _payload(training, **fg.HEALTHY, allow_partial_timeframes=True, **overrides)
     root, _factory, result = fg.generate(tmp_path, payload)
     return root, result
 
@@ -471,7 +480,7 @@ def test_canonical_completeness_dependency_failed_on_12h_reaches_manifest(path, 
     if path == "cgsa_parallel":
         _thread_pool(monkeypatch)
     _inject_layer_status(monkeypatch, "12h", "Layer 3", LayerStatus.dependency_failed)
-    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY, allow_partial_layers=True)
+    payload = _payload(["1h", "12h"], **fg.HEALTHY, allow_partial_layers=True)
     root, _factory, result = fg.generate(tmp_path, payload)
     manifest = fg.l7_manifest(root, "1h", result)
     for source in (manifest, result.metadata):
@@ -487,7 +496,7 @@ def test_boundary_17_canonical_completeness_primary_missing_raises(tmp_path, mon
     ValueError("Primary timeframe data missing…") 不變。"""
     fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV["cgsa_serial"])
     _inject_layer_status(monkeypatch, "1h", "Layer 1", LayerStatus.layer_failed)
-    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY, allow_partial_timeframes=True)
+    payload = _payload(["1h", "12h"], **fg.HEALTHY, allow_partial_timeframes=True)
     with pytest.raises(ValueError, match="Primary timeframe data missing"):
         fg.generate(tmp_path, payload)
 
@@ -496,7 +505,7 @@ def test_boundary_17_canonical_completeness_primary_missing_raises(tmp_path, mon
 def test_boundary_18_canonical_completeness_training_order_kept(tmp_path, monkeypatch) -> None:
     """Task 3.1 邊界②：training 序 ["12h","1h"]（primary 12h）⇒ expected 依 training 序。"""
     fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV["cgsa_serial"])
-    payload = fg.fast_payload(["12h", "1h"], **fg.HEALTHY)
+    payload = _payload(["12h", "1h"], **fg.HEALTHY)
     payload["timeframes"]["primary"] = "12h"
     root, _factory, result = fg.generate(tmp_path, payload, primary_tf="12h")
     manifest = fg.l7_manifest(root, "12h", result)
@@ -509,7 +518,7 @@ def test_boundary_19_canonical_completeness_parallel_error_fail_closed(tmp_path,
     fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV["cgsa_parallel"])
     _thread_pool(monkeypatch)
     _inject_12h_load(monkeypatch, RuntimeError("injected 12h load failure"))
-    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY)
+    payload = _payload(["1h", "12h"], **fg.HEALTHY)
     with pytest.raises(RuntimeError, match="Timeframe 12h failed"):
         fg.generate(tmp_path, payload)
 
@@ -575,7 +584,7 @@ def test_boundary_20_crosscheck_present_timeframes_before_l7_dead_drop(tmp_path,
 
     monkeypatch.setattr(MultiTFGenerator, "_crosscheck_present_timeframes", staticmethod(check))
     monkeypatch.setattr(FeatureFactory, "_layer7_raw_from_cgsa_pipeline", persist)
-    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY)
+    payload = _payload(["1h", "12h"], **fg.HEALTHY)
     payload["nan_strategy"] = {"l7_dead_feature_drop": {"enabled": True, "min_valid_samples": 100}}
     fg.generate(tmp_path, payload)
     assert order == ["crosscheck", "persist"]

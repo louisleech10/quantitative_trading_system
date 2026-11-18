@@ -632,19 +632,33 @@ def test_mutation_session_scope_wired_into_existing_red(ra, tmp_path, monkeypatc
 
 # ── (n) 秒級 ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def test_n_receipt_release_timing(ra, tmp_path):
-    """附成立之純增收據之 pre-commit 放行判定（check --staged）3 次中位 < 5 s。"""
+@pytest.fixture(scope="module")
+def n_receipt_release_runs(ra, tmp_path_factory) -> Dict[str, Any]:
+    """附成立之純增收據之 `check --staged` 連跑 3 次：記各次結果與秒數（TESTSEL S3：放行正確性與計時兩條共用）。"""
     rc = additive_receipt(ra, GB, "ok", ("m_div",), [N_STRICT])
-    r = _work(ra, tmp_path, "t")
+    r = _work(ra, tmp_path_factory.mktemp("n_release"), "t")
     _apply(r, GB, GB_VARIANTS["ok"])
     r.write_json(additive_rel(GB), rc)
     r.stage(GB, additive_rel(GB))
-    secs = []
+    secs, procs = [], []
     for _ in range(3):
         t0 = time.perf_counter()
         proc = r.run("check", "--staged")
         secs.append(time.perf_counter() - t0)
+        procs.append(proc)
+    return {"secs": secs, "procs": procs}
+
+
+def test_n_receipt_release_allows(n_receipt_release_runs):
+    """附成立之純增收據之 pre-commit 放行判定 3 次皆 rc 0（原計時測試之正確性斷言；TESTSEL S3）。"""
+    for proc in n_receipt_release_runs["procs"]:
         assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.perf
+def test_n_receipt_release_timing(n_receipt_release_runs):
+    """附成立之純增收據之 pre-commit 放行判定（check --staged）3 次中位 < 5 s：效能基準，opt-in。"""
+    secs = n_receipt_release_runs["secs"]
     assert statistics.median(secs) < 5.0, secs
 
 

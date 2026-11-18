@@ -526,6 +526,16 @@ def test_real_kline_stream_nan_ratio_matches_written_arrays(
                 "enabled_sources": ["close"],
                 "synthetic_sources": [],
             },
+            # TESTSEL I10：被測為落盤陣列重算之 nan_ratio＝metadata 值、降級原因與狀態一致，與特徵寬度無關 ⇒
+            # atomic 只留 trend／momentum 各一指標（L2 operators、L3 rolling、L4 lag 照預設開，各層仍有欄）
+            "atomic_indicators": {
+                **{c: {"enabled": False} for c in (
+                    "volatility", "volume", "statistics", "cycle", "pattern",
+                    "tail_risk", "microstructure", "entropy",
+                )},
+                "trend": {"enabled": True, "indicators": [{"name": "EMA", "periods": [5, 13]}]},
+                "momentum": {"enabled": True, "indicators": [{"name": "RSI", "periods": [14]}]},
+            },
             "preprocessing": {"enabled": False},
             "nan_strategy": {"l7_dead_feature_drop": {"enabled": False}},
         },

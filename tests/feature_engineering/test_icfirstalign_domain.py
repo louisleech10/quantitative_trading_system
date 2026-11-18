@@ -897,8 +897,15 @@ def test_ic_page_single_process_mode(tmp_path: Path, monkeypatch: pytest.MonkeyP
 def _multi_symbol_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **spy_overrides: Any) -> Dict[str, Any]:
     """`run_multi_symbol` 兩標的、精簡單週期（全史，worker 無起訖）；子行程 cwd＝測試根 ⇒ 特徵寫於測試根之 data_cache/features。"""
     from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering import feature_registry as _fr
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage as _FS
 
     root = h.isolated(monkeypatch, tmp_path)
+    # TESTSEL-HERMETIC（tests/conftest.py）把 FeatureStorage／FeatureRegistry 之預設根改指 session 暫存根；本案例之
+    # 串行臂於根行程內生成、並行臂於子行程（不載入 conftest）生成，兩者須同寫 cwd（＝本測試根，prepare_env 已 chdir）
+    # 之 data_cache/features ⇒ 本測試內還原原始相對預設值（2026-11-15：hermetic 後串行臂寫入暫存根而讀不到 manifest）。
+    monkeypatch.setattr(_fr, "DEFAULT_REGISTRY_PATH", Path("data_cache/features/registry.json"))
+    monkeypatch.setattr(_FS.__init__, "__defaults__", ("data_cache/features",))
     # b3 實作期：prepare_env 於非多週期並行時把 FFACT_CGSA_WORK_DIR 釘為單一目錄 ⇒ 兩標的並行 worker 共用同一
     # CGSA 工作目錄而互刪群組檔（先完成者之 cleanup）；多標的案例改回各 run 依標的分目錄（cwd 已在 tmp）
     monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)

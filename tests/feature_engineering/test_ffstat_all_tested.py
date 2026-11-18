@@ -17,14 +17,9 @@ from tests.feature_engineering import ffstat_helpers as h
 
 @pytest.fixture(scope="module")
 def stat_run(tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Any]:
-    mp = pytest.MonkeyPatch()
-    tmp = tmp_path_factory.mktemp("ffstat_all_tested")
-    try:
-        h.prepare_stat_env(mp, tmp)
-        _, _, result = h.run_stat(tmp, h.stat_payload())
-        return {"decisions": h.decisions(result), "names": list(result.metadata["feature_names"])}
-    finally:
-        mp.undo()
+    """預設 `stat_payload()` run（TESTSEL I10：與 test_ffstat_golden、test_ffstat_calibration 同一 run，session 共用）。"""
+    shared = h.shared_stat_run(tmp_path_factory, "on")
+    return {"decisions": shared["decisions"], "names": list(shared["result"].metadata["feature_names"])}
 
 
 def _assert_pvalue_or_explicitly_empty(dec: Dict[str, Dict[str, Any]]) -> None:
@@ -107,10 +102,11 @@ def test_mutation_name_exemption_reinstated_is_caught(tmp_path: Path, monkeypatc
     # ICPERF SPEC v5.82 S5：免檢欄不進 ADF ⇒ 該欄缺 fractional_differencing 步驟狀態，生產端溯源完備性守衛
     # （run_provenance.build_provenance_table）於落盤前以具名錯誤 fail-closed——此即 mutant 被抓；未變異之同一生成
     # 不拋（對照：同檔 test_every_column_entering_step_has_pvalue 走同一 run_stat 而綠）。不得以 Exception 通吃。
+    # TESTSEL I10：mutant run 改用窄設定（不比基準；EMA 配對之 `_Cross` 欄即免檢子字串欄，足以觸發）。
     from momentum.FeatureEngineering.run_provenance import ProvenanceExhaustivenessError
 
     with pytest.raises(ProvenanceExhaustivenessError) as caught:
-        h.run_stat(tmp_path, h.stat_payload())
+        h.run_stat(tmp_path, h.narrow_stat_payload())
     message = str(caught.value)
     assert "缺步驟狀態 fractional_differencing" in message, message
     column = message.split("欄 ", 1)[1].split(" 缺步驟狀態", 1)[0]

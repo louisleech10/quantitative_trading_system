@@ -148,6 +148,15 @@ def _stat(training: List[str], *, fracdiff: bool, adf: bool) -> Dict[str, Any]:
     return payload
 
 
+def _narrow() -> Dict[str, Any]:
+    """TESTSEL I10：最窄之真實短窗設定（L1 trend＠close、前處理開但平穩化關、運算子與 L3 滾動關）——供只驗 run 身分／
+    IC 快取／倖存者身分傳遞之模組（與特徵族、平穩化正交），仍寫 provenance 紀錄與 content_sha256。"""
+    payload = _stat(["1h"], fracdiff=False, adf=False)
+    payload["operators"] = {"enabled": False}
+    payload["rolling_aggregation"] = {"enabled": False}
+    return payload
+
+
 def _pp_off() -> Dict[str, Any]:
     payload = _stat(["1h"], fracdiff=False, adf=False)
     payload["preprocessing"]["enabled"] = False
@@ -229,6 +238,12 @@ CELLS: Dict[str, Dict[str, Any]] = {
 
 #: 單一 Task 邊界專用之變體（不屬 §V 全格）；`workdir` 指定者與該格共用同一 features 根（同 run 目錄重生）。
 VARIANTS: Dict[str, Dict[str, Any]] = {
+    # TESTSEL I10：身分／IC 快取／倖存者身分模組專用之最窄真實格（見 `_narrow`）
+    "h1_narrow": {"path": "generate", "primary": "1h", "window": WINDOW, "payload": _narrow()},
+    # TESTSEL I10：同 h1_narrow 但輸出窗約 13 個月（約 9,500 根 1h）——IC 之 OOS 切分需測試段 ≥ 滾動暖身最少列
+    # （WINDOW 一個月時 test_rows=140 < 1517 ⇒ 降級全樣本、ICIR 全為 None、門檻階段全數剔除，倖存者恆空）；
+    # 供須走「倖存者非空」寫出路徑之 survivor 身分測試
+    "h1_narrow_long": {"path": "generate", "primary": "1h", "window": ("2025-01-01", WINDOW[1]), "payload": _narrow()},
     # Task 1.4 驗證③：IC 選擇為空（|IC| ≥ 2 不可能成立）
     "ic_first_empty": {**CELLS["ic_first"], "ic_threshold": 2.0, "payload": _stat(["1h"], fracdiff=False, adf=False)},
     # Task 1.4 邊界②：post-IC gaussian 開啟
@@ -675,6 +690,32 @@ class RunCache:
 
     def all_of(self, cell: str) -> List[RunHandle]:
         return [self.get(cell, s) for s in cell_symbols(cell)]
+
+
+class _SharedRunCache(RunCache):
+    """session 共用倉（TESTSEL I10）：同一 pytest 行程內各 PRE-PROV／NUMVIEW 模組之 `runs` 取同一倉，同 (cell, symbol)
+    每行程只生成一次（原各模組各建模組倉、同格重生 5–6 次）。
+
+    前提（共用之安全條件，2026-11-12 逐檔查證）：取用端一律唯讀倉內 run 目錄——要改檔者先 `copytree` 至 tmp
+    （test_preprov_reader `_copy`、test_preprov_helpers `_copy_run`）；mutation 案一律另起根（`generate_short_run`）不經
+    本倉；monkeypatch 皆於 `runs.get` 之後才裝。生成本身經 `_isolate` 全隔離（features 根、d* 快取、CGSA 工作目錄、
+    registry 皆在倉根下），與呼叫之測試無關。`workdir` 變體（與他格共用 features 根、重生即覆寫他格 run 目錄）拒入。"""
+
+    def get(self, cell: str, symbol: str = "BTCUSDT") -> RunHandle:
+        if "workdir" in cell_spec(cell):
+            raise ValueError(f"{cell} 與他格共用 features 根（workdir），不得入共用倉——請另起根 generate_short_run")
+        return super().get(cell, symbol)
+
+
+_SHARED_CACHE: Dict[str, RunCache] = {}
+
+
+def shared_run_cache(tmp_path_factory: pytest.TempPathFactory) -> RunCache:
+    """本 pytest 行程之共用 run 倉（根於 `tmp_path_factory` 之 session 暫存目錄，首次呼叫時建立）。"""
+    base = str(tmp_path_factory.getbasetemp())
+    if base not in _SHARED_CACHE:
+        _SHARED_CACHE[base] = _SharedRunCache(tmp_path_factory.mktemp("preprov_shared"))
+    return _SHARED_CACHE[base]
 
 
 def copy_kline_with_one_bar_changed(dst_dir: Path, *, symbol: str, tf: str, when: str) -> Path:

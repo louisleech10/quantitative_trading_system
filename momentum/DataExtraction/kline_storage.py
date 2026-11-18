@@ -23,6 +23,7 @@ K線數據存儲管理器 - 圖表視覺化專用
 
 import pandas as pd
 import numpy as np
+from momentum.DataExtraction import taker_ratio as _taker_ratio
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
@@ -489,10 +490,8 @@ class KlineStorageManager:
             df['taker_buy_volume'] = df[taker_buy_col].astype('float64')
             df['volume'] = df[volume_col].astype('float64')
 
-            # 避免除以0
-            with np.errstate(divide='ignore', invalid='ignore'):
-                ratio = np.where(df['volume'] > 0, df['taker_buy_volume'] / df['volume'], 0.5)
-            df['taker_ratio'] = np.clip(ratio, 0, 1).astype('float32')
+            # taker_ratio 單一定義（TESTSEL I1b Task 1.7；與 provider 同函式）
+            df['taker_ratio'] = _taker_ratio.compute_taker_ratio(df['volume'], df['taker_buy_volume'])
 
             if quote_col in df.columns:
                 df['quote_volume'] = df[quote_col].astype('float64')

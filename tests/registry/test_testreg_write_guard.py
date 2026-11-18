@@ -1272,8 +1272,15 @@ def test_07z_autouse_fixture_change_decision_equals_full_oracle(tmp_path, monkey
     for rel, old, new in edits:
         _edit(r, rel, old, new)
     if want is None:
-        want = _full_oracle(r, AUTO_FILES)
+        # v54（TESTSEL I2 審碼 r1 群集 C）：序號改按來源分組局部編號後，fixture 展開順序對調不再使舊鍵位移；前提（重排確實
+        # 改變舊鍵、故實作不得以「失去者皆無元素」走免展開判定）於全域編號下驗證，預期判定則依現行 oracle
+        testreg._GLOBAL_ORDINAL = True
+        try:
+            want = _full_oracle(r, AUTO_FILES)
+        finally:
+            testreg._GLOBAL_ORDINAL = False
         assert want, "前提：序號重排須使至少一個測試減少（省略展開順序檢查而逕判不減之實作因此必紅）"
+        want = _full_oracle(r, AUTO_FILES)
     calls = []
     orig = testreg._Engine.elements
     monkeypatch.setattr(testreg._Engine, "elements", lambda self, nid: calls.append(nid) or orig(self, nid))
@@ -1523,6 +1530,20 @@ def head_worktree(tmp_path_factory):
                    env=clean_env())
 
 
+@pytest.fixture(scope="module")
+def wall_clock_runs():
+    """TESTSEL S3：真實規模邊界案之執行記憶化——同一 (案, 參數) 於本模組只跑一次，供「判定正確性」與「牆鐘門檻（perf）」
+    兩條共用（不重複跑 hook／pre-commit）。案函式內之 rc／V19 主體等斷言照舊於執行時檢查；案失敗不寫入快取。"""
+    cache: dict = {}
+
+    def run(key, fn, *args):
+        if key not in cache:
+            cache[key] = fn(*args)
+        return cache[key]
+
+    return run
+
+
 def _hook_times_at(root: Path, rel: str) -> list:
     payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(root / rel)}})
     times = []
@@ -1564,12 +1585,11 @@ def _staged_times_at(root: Path, rel: str, runs: int, want_red: bool) -> list:
     return times
 
 
-@pytest.mark.parametrize("edit", ["unchanged", "comment_appended", "fixture_docstring_added", "import_added"])
-def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, edit):
-    """真實規模（HEAD 全部測試檔）：tests/conftest.py 未改／加註解／為一個 fixture 加說明／於最後一個模組層 import
-    之後加一行無關 import（皆不減斷言）後觸發 hook，10 次牆鐘中位 < 1 s（實作須以差量判定：只對完整展開輪廓減少之
-    名稱反推呼叫者——完整反推實測 245 秒；import 改變不得一律退回完整反推）；同一改動暫存後之 pre-commit
-    （`check --staged`）亦 rc 0 且 10 次中位 < 1 s。每案起點斷言共用工作樹乾淨。"""
+_EDITS_05 = ["unchanged", "comment_appended", "fixture_docstring_added", "import_added"]
+
+
+def _case_05(head_worktree, edit) -> dict:
+    """邊界 05 本體：改動 tests/conftest.py（不減斷言）後 hook 10 次與 pre-commit 10 次皆 rc 0；回傳兩者之秒數。"""
     _assert_clean(head_worktree)
     p = head_worktree / "tests/conftest.py"
     src = p.read_text(encoding="utf-8")
@@ -1594,15 +1614,33 @@ def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, e
         staged = _staged_times_at(head_worktree, "tests/conftest.py", 10, False)
     finally:
         p.write_text(src, encoding="utf-8")
+    return {"times": times, "staged": staged}
+
+
+@pytest.mark.parametrize("edit", _EDITS_05)
+def test_boundary_05_helper_backprop_not_blocked(head_worktree, wall_clock_runs, edit):
+    """真實規模（HEAD 全部測試檔）：tests/conftest.py 未改／加註解／為一個 fixture 加說明／於最後一個模組層 import
+    之後加一行無關 import（皆不減斷言）⇒ hook 10 次與暫存後 pre-commit（`check --staged`）10 次皆 rc 0（斷言於
+    `_hook_times_at`／`_staged_times_at` 內逐次檢查）。牆鐘門檻見 perf 之同名 `_wall_clock_median_under_1s`（TESTSEL S3）。"""
+    wall_clock_runs(("05", edit), _case_05, head_worktree, edit)
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("edit", _EDITS_05)
+def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, wall_clock_runs, edit):
+    """真實規模（HEAD 全部測試檔）：tests/conftest.py 未改／加註解／為一個 fixture 加說明／於最後一個模組層 import
+    之後加一行無關 import（皆不減斷言）後觸發 hook，10 次牆鐘中位 < 1 s（實作須以差量判定：只對完整展開輪廓減少之
+    名稱反推呼叫者——完整反推實測 245 秒；import 改變不得一律退回完整反推）；同一改動暫存後之 pre-commit
+    （`check --staged`）亦 rc 0 且 10 次中位 < 1 s。每案起點斷言共用工作樹乾淨。效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("05", edit), _case_05, head_worktree, edit)
+    times, staged = run["times"], run["staged"]
     assert statistics.median(times) < 1.0, times
     assert statistics.median(staged) < 1.0, staged
 
 
-@pytest.mark.parametrize("edit", ["plugin_removed", "plugins_reordered"])
-def test_boundary_07c_conftest_pytest_plugins_change_wall_clock(head_worktree, edit):
-    """真實規模（審碼 r1 CODEX-R1-P1-02）：tests/conftest.py 之 `pytest_plugins` 移除首個外掛／前後對調 ⇒ hook 與 pre-commit
-    同一 rc 方向；不擋（rc 0）者 10 次中位 < 1 s，必擋者 3 次中位 < 5 s（§C 兩層）。實作不得對外掛做完整呼叫者反推
-    （真實規模分鐘級）。每案起點斷言共用工作樹乾淨。"""
+def _case_07c(head_worktree, edit) -> dict:
+    """邊界 07c 本體：`pytest_plugins` 移除首個外掛／前後對調後，hook 各次與 pre-commit 各次同一 rc 方向；移除外掛時
+    經 usefixtures 套用被移除外掛之含斷言 fixture 之真實測試全數被擋。回傳秒數與是否必擋。"""
     _assert_clean(head_worktree)
     p = head_worktree / "tests/conftest.py"
     src = p.read_text(encoding="utf-8")
@@ -1631,19 +1669,39 @@ def test_boundary_07c_conftest_pytest_plugins_change_wall_clock(head_worktree, e
         staged = _staged_times_at(head_worktree, "tests/conftest.py", runs, blocking)
     finally:
         p.write_text(src, encoding="utf-8")
-    limit = 5.0 if blocking else 1.0
-    assert statistics.median(times) < limit, (edit, blocking, times)
-    assert statistics.median(staged) < limit, (edit, blocking, staged)
     if edit == "plugin_removed":  # SPEC v33：經 usefixtures 套用被移除外掛之含斷言 fixture 之真實測試須全數被擋
         expected = _usefixtures_users(head_worktree, _asserting_fixtures(head_worktree, plugins[0]))
         assert expected, "前提：被移除之外掛須有經 usefixtures 套用之含斷言 fixture（真實樹 ic_persist_redirect）"
         assert blocking and expected <= _v19_subjects(first.stderr), sorted(expected - _v19_subjects(first.stderr))[:5]
+    return {"times": times, "staged": staged, "blocking": blocking}
 
 
-def test_boundary_07d_test_file_class_base_change_wall_clock(head_worktree):
-    """真實規模（v34）：測試檔內一個帶基底之非測試類別改以 object 為基底（類別輪廓減少 ⇒ 全檔比較＋子類別文字預篩，
-    不做完整呼叫者反推——實測完整反推 41 秒）⇒ hook 與 pre-commit 同一 rc 方向；不擋者 10 次中位 < 1 s、必擋者 3 次中位
-    < 5 s。標的由 AST 自 HEAD 測試檔導出（字典序第一個），不寫死。"""
+_EDITS_07C = ["plugin_removed", "plugins_reordered"]
+
+
+@pytest.mark.parametrize("edit", _EDITS_07C)
+def test_boundary_07c_conftest_pytest_plugins_change_verdict(head_worktree, wall_clock_runs, edit):
+    """真實規模（審碼 r1 CODEX-R1-P1-02）：tests/conftest.py 之 `pytest_plugins` 移除首個外掛／前後對調 ⇒ hook 與 pre-commit
+    同一 rc 方向；移除外掛時經 usefixtures 套用之含斷言 fixture 之真實測試全數 V19（斷言於 `_case_07c` 內）。
+    牆鐘門檻見 perf 之 `test_boundary_07c_conftest_pytest_plugins_change_wall_clock`（TESTSEL S3）。"""
+    wall_clock_runs(("07c", edit), _case_07c, head_worktree, edit)
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("edit", _EDITS_07C)
+def test_boundary_07c_conftest_pytest_plugins_change_wall_clock(head_worktree, wall_clock_runs, edit):
+    """真實規模（審碼 r1 CODEX-R1-P1-02）：tests/conftest.py 之 `pytest_plugins` 移除首個外掛／前後對調 ⇒ hook 與 pre-commit
+    同一 rc 方向；不擋（rc 0）者 10 次中位 < 1 s，必擋者 3 次中位 < 5 s（§C 兩層）。實作不得對外掛做完整呼叫者反推
+    （真實規模分鐘級）。每案起點斷言共用工作樹乾淨。效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("07c", edit), _case_07c, head_worktree, edit)
+    times, staged, blocking = run["times"], run["staged"], run["blocking"]
+    limit = 5.0 if blocking else 1.0
+    assert statistics.median(times) < limit, (edit, blocking, times)
+    assert statistics.median(staged) < limit, (edit, blocking, staged)
+
+
+def _case_07d(head_worktree) -> dict:
+    """邊界 07d 本體：測試檔內帶基底之非測試類別改以 object 為基底後，hook 各次與 pre-commit 各次同一 rc 方向；回傳秒數。"""
     _assert_clean(head_worktree)
     rels = subprocess.run(["git", "-C", str(head_worktree), "ls-files", "tests/test_*.py", "tests/**/test_*.py"],
                           capture_output=True, text=True, check=True).stdout.split()
@@ -1681,6 +1739,22 @@ def test_boundary_07d_test_file_class_base_change_wall_clock(head_worktree):
         staged = _staged_times_at(head_worktree, rel, runs, blocking)
     finally:
         p.write_text(src, encoding="utf-8")
+    return {"rel": rel, "times": times, "staged": staged, "blocking": blocking}
+
+
+def test_boundary_07d_test_file_class_base_change_verdict(head_worktree, wall_clock_runs):
+    """真實規模（v34）：測試檔內一個帶基底之非測試類別改以 object 為基底 ⇒ hook 與 pre-commit 同一 rc 方向（斷言於
+    `_case_07d` 內）。標的由 AST 自 HEAD 測試檔導出。牆鐘門檻見 perf 之 `_wall_clock`（TESTSEL S3）。"""
+    wall_clock_runs(("07d",), _case_07d, head_worktree)
+
+
+@pytest.mark.perf
+def test_boundary_07d_test_file_class_base_change_wall_clock(head_worktree, wall_clock_runs):
+    """真實規模（v34）：測試檔內一個帶基底之非測試類別改以 object 為基底（類別輪廓減少 ⇒ 全檔比較＋子類別文字預篩，
+    不做完整呼叫者反推——實測完整反推 41 秒）⇒ hook 與 pre-commit 同一 rc 方向；不擋者 10 次中位 < 1 s、必擋者 3 次中位
+    < 5 s。標的由 AST 自 HEAD 測試檔導出（字典序第一個），不寫死。效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("07d",), _case_07d, head_worktree)
+    rel, times, staged, blocking = run["rel"], run["times"], run["staged"], run["blocking"]
     limit = 5.0 if blocking else 1.0
     assert statistics.median(times) < limit, (rel, blocking, times)
     assert statistics.median(staged) < limit, (rel, blocking, staged)
@@ -1705,11 +1779,9 @@ def _plugin_assert_line(root: Path):
     return None
 
 
-@pytest.mark.parametrize("edit", ["assert_removed", "comment_added"])
-def test_boundary_07e_plugin_fixture_change_wall_clock(head_worktree, edit):
-    """真實規模（第 1 批審碼 r3 CODEX-R3-P1-01／COMPOSER-R3-P1-01）：`pytest_plugins` 外掛內 fixture 刪一行斷言（必擋：經
-    usefixtures 套用之真實測試全數 V19）⇒ hook rc 2、pre-commit rc≠0，各 3 次中位 < 5 s；同處加一行註解（不減）⇒ 皆 rc 0、
-    各 10 次中位 < 1 s（§C 兩層）。實作不得對外掛做完整呼叫者反推（v39 實測 157–176 秒）。每案起點斷言共用工作樹乾淨。"""
+def _case_07e(head_worktree, edit) -> dict:
+    """邊界 07e 本體：外掛 fixture 刪一行斷言（必擋）／加一行註解（不擋）後 hook 與 pre-commit 各次 rc 合預期；必擋時
+    usefixtures 字面請求該 fixture 之真實測試全數 V19。回傳秒數與門檻。"""
     _assert_clean(head_worktree)
     pick = _plugin_assert_line(head_worktree)
     assert pick, "前提：tests/conftest.py 之外掛中有本體含斷言之 fixture（真實樹 ic_persist_redirect）"
@@ -1737,11 +1809,34 @@ def test_boundary_07e_plugin_fixture_change_wall_clock(head_worktree, edit):
         staged = _staged_times_at(head_worktree, rel, runs, blocking)
     finally:
         p.write_text(src, encoding="utf-8")
-    assert statistics.median(times) < limit, (edit, times)
-    assert statistics.median(staged) < limit, (edit, staged)
     if blocking:  # 獨立字面 oracle：以 usefixtures 字面請求該 fixture 之真實測試須全數被擋
         expected = _usefixtures_users(head_worktree, {name})
         assert expected and expected <= _v19_subjects(first.stderr), sorted(expected - _v19_subjects(first.stderr))[:5]
+    return {"times": times, "staged": staged, "limit": limit}
+
+
+_EDITS_07E = ["assert_removed", "comment_added"]
+
+
+@pytest.mark.parametrize("edit", _EDITS_07E)
+def test_boundary_07e_plugin_fixture_change_verdict(head_worktree, wall_clock_runs, edit):
+    """真實規模（第 1 批審碼 r3 CODEX-R3-P1-01／COMPOSER-R3-P1-01）：`pytest_plugins` 外掛內 fixture 刪一行斷言 ⇒ hook rc 2、
+    pre-commit rc≠0 且經 usefixtures 套用之真實測試全數 V19；同處加一行註解（不減）⇒ 皆 rc 0（斷言於 `_case_07e` 內）。
+    牆鐘門檻見 perf 之 `_wall_clock`（TESTSEL S3）。"""
+    wall_clock_runs(("07e", edit), _case_07e, head_worktree, edit)
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("edit", _EDITS_07E)
+def test_boundary_07e_plugin_fixture_change_wall_clock(head_worktree, wall_clock_runs, edit):
+    """真實規模（第 1 批審碼 r3 CODEX-R3-P1-01／COMPOSER-R3-P1-01）：`pytest_plugins` 外掛內 fixture 刪一行斷言（必擋：經
+    usefixtures 套用之真實測試全數 V19）⇒ hook rc 2、pre-commit rc≠0，各 3 次中位 < 5 s；同處加一行註解（不減）⇒ 皆 rc 0、
+    各 10 次中位 < 1 s（§C 兩層）。實作不得對外掛做完整呼叫者反推（v39 實測 157–176 秒）。每案起點斷言共用工作樹乾淨。
+    效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("07e", edit), _case_07e, head_worktree, edit)
+    times, staged, limit = run["times"], run["staged"], run["limit"]
+    assert statistics.median(times) < limit, (edit, times)
+    assert statistics.median(staged) < limit, (edit, staged)
 
 
 AUTOUSE_PROBE = ("import pytest\n\nfrom tests.fixtures.zz_probe_helper import zz_check\n\n\n"
@@ -1815,11 +1910,9 @@ def autouse_worktree(tmp_path_factory):
     subprocess.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(wt)], capture_output=True, env=env)
 
 
-@pytest.mark.parametrize("edit", sorted(AUTOUSE_EDITS))
-def test_boundary_07f_autouse_plugin_fixture_change_wall_clock(autouse_worktree, edit):
-    """真實規模（第 1 批審碼 r3 後主委實測：autouse fixture 刪斷言時逐一展開比較 120 秒）：合成提交上之 autouse 外掛 fixture
-    刪一行斷言／換成較弱斷言／其所呼叫之 helper 模組刪一行斷言（必擋：依 pytest.ini 收集之全部測試函式 V19，以獨立 oracle 比對相等）⇒ hook rc 2、pre-commit
-    rc≠0、各 3 次中位 < 5 s；加一行斷言（不減）⇒ rc 0、各 10 次中位 < 1 s（§C 兩層）。每案起點斷言共用工作樹乾淨。"""
+def _case_07f(autouse_worktree, edit) -> dict:
+    """邊界 07f 本體：合成提交上之 autouse 外掛 fixture／其 helper 改動後 hook 與 pre-commit 各次 rc 合預期；必擋時
+    V19 主體＝依 pytest.ini 收集之全部測試函式（獨立 oracle 相等）。回傳秒數與門檻。"""
     wt = autouse_worktree
     st = subprocess.run(["git", "-C", str(wt), "status", "--porcelain", "--untracked-files=no"], capture_output=True,
                         text=True, check=True, env=clean_env()).stdout
@@ -1847,12 +1940,32 @@ def test_boundary_07f_autouse_plugin_fixture_change_wall_clock(autouse_worktree,
         staged = _staged_times_at(wt, rel, runs, blocking)
     finally:
         p.write_text(src, encoding="utf-8")
-    assert statistics.median(times) < limit, (edit, times)
-    assert statistics.median(staged) < limit, (edit, staged)
     if blocking:
         expected = _collected_real(wt)
         got = _v19_subjects(first.stderr)
         assert got == expected, (len(got), len(expected), sorted(got ^ expected)[:5])
+    return {"times": times, "staged": staged, "limit": limit}
+
+
+@pytest.mark.parametrize("edit", sorted(AUTOUSE_EDITS))
+def test_boundary_07f_autouse_plugin_fixture_change_verdict(autouse_worktree, wall_clock_runs, edit):
+    """真實規模：合成提交上之 autouse 外掛 fixture 刪一行斷言／換成較弱斷言／其所呼叫之 helper 模組刪一行斷言 ⇒ hook rc 2、
+    pre-commit rc≠0 且 V19 主體＝依 pytest.ini 收集之全部測試函式；加一行斷言（不減）⇒ rc 0（斷言於 `_case_07f` 內）。
+    牆鐘門檻見 perf 之 `_wall_clock`（TESTSEL S3）。"""
+    wall_clock_runs(("07f", edit), _case_07f, autouse_worktree, edit)
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("edit", sorted(AUTOUSE_EDITS))
+def test_boundary_07f_autouse_plugin_fixture_change_wall_clock(autouse_worktree, wall_clock_runs, edit):
+    """真實規模（第 1 批審碼 r3 後主委實測：autouse fixture 刪斷言時逐一展開比較 120 秒）：合成提交上之 autouse 外掛 fixture
+    刪一行斷言／換成較弱斷言／其所呼叫之 helper 模組刪一行斷言（必擋：依 pytest.ini 收集之全部測試函式 V19，以獨立 oracle 比對相等）⇒ hook rc 2、pre-commit
+    rc≠0、各 3 次中位 < 5 s；加一行斷言（不減）⇒ rc 0、各 10 次中位 < 1 s（§C 兩層）。每案起點斷言共用工作樹乾淨。
+    效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("07f", edit), _case_07f, autouse_worktree, edit)
+    times, staged, limit = run["times"], run["staged"], run["limit"]
+    assert statistics.median(times) < limit, (edit, times)
+    assert statistics.median(staged) < limit, (edit, staged)
 
 
 def _pick_wide_helper(root: Path):
@@ -1891,10 +2004,8 @@ def _pick_wide_helper(root: Path):
     return None
 
 
-def test_boundary_07g_widely_imported_helper_decrease_wall_clock(head_worktree):
-    """真實規模（主委自查）：被最多測試檔匯入之 helper 模組，刪其一個「有測試字面呼叫」之函式之一行斷言（必擋）⇒ hook rc 2、
-    pre-commit rc≠0、各 3 次中位 < 5 s，且字面呼叫該函式之測試（含寫在 assert 式子內者）全數在 V19 主體。匯入途徑不得取
-    匯入檔之全部測試逐一比較（被 27 檔匯入之 helper 實測約 6–7 秒；式子內呼叫未展開時漏擋）。每案起點斷言共用工作樹乾淨。"""
+def _case_07g(head_worktree) -> dict:
+    """邊界 07g 本體：被最多測試檔匯入之 helper 刪一行斷言後 hook 各次 rc 2、pre-commit 各次 rc≠0，且字面呼叫者全數 V19。"""
     _assert_clean(head_worktree)
     pick = _pick_wide_helper(head_worktree)
     assert pick, "前提：真實樹有被測試檔匯入、含單行斷言且有字面呼叫者之 helper 函式"
@@ -1917,9 +2028,27 @@ def test_boundary_07g_widely_imported_helper_decrease_wall_clock(head_worktree):
         staged = _staged_times_at(head_worktree, rel, 3, True)
     finally:
         p.write_text(src, encoding="utf-8")
+    assert callers <= _v19_subjects(first.stderr), sorted(callers - _v19_subjects(first.stderr))[:5]
+    return {"times": times, "staged": staged}
+
+
+def test_boundary_07g_widely_imported_helper_decrease_verdict(head_worktree, wall_clock_runs):
+    """真實規模（主委自查）：被最多測試檔匯入之 helper 模組，刪其一個「有測試字面呼叫」之函式之一行斷言（必擋）⇒ hook rc 2、
+    pre-commit rc≠0，且字面呼叫該函式之測試（含寫在 assert 式子內者）全數在 V19 主體（斷言於 `_case_07g` 內）。
+    牆鐘門檻見 perf 之 `_wall_clock`（TESTSEL S3）。"""
+    wall_clock_runs(("07g",), _case_07g, head_worktree)
+
+
+@pytest.mark.perf
+def test_boundary_07g_widely_imported_helper_decrease_wall_clock(head_worktree, wall_clock_runs):
+    """真實規模（主委自查）：被最多測試檔匯入之 helper 模組，刪其一個「有測試字面呼叫」之函式之一行斷言（必擋）⇒ hook rc 2、
+    pre-commit rc≠0、各 3 次中位 < 5 s，且字面呼叫該函式之測試（含寫在 assert 式子內者）全數在 V19 主體。匯入途徑不得取
+    匯入檔之全部測試逐一比較（被 27 檔匯入之 helper 實測約 6–7 秒；式子內呼叫未展開時漏擋）。每案起點斷言共用工作樹乾淨。
+    效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("07g",), _case_07g, head_worktree)
+    times, staged = run["times"], run["staged"]
     assert statistics.median(times) < 5.0, times
     assert statistics.median(staged) < 5.0, staged
-    assert callers <= _v19_subjects(first.stderr), sorted(callers - _v19_subjects(first.stderr))[:5]
 
 
 def _asserting_fixtures(root: Path, dotted: str) -> set:
@@ -1969,12 +2098,8 @@ INI_TIMING = {
 }
 
 
-@pytest.mark.parametrize("edit", sorted(INI_TIMING))
-def test_boundary_06_pytest_ini_wall_clock(head_worktree, edit):
-    """真實規模 pytest.ini：加標記註冊、python_functions 只增模式（超集，不檢）⇒ rc 0 且 10 次中位 < 1 s；四項收集設定
-    任一縮減（必擋：全部測試檔 V20，兩樹以單一批次讀取）⇒ rc 2 且 3 次中位 < 5 s（§C 之必擋例外；試作逐檔讀 HEAD 約 20 秒、
-    批次讀取後四項分別約 1.5–2.6 秒——成本為解析全部測試檔以列出消失之 nodeid）；同一改動暫存後之 pre-commit
-    （`check --staged`）同一 rc 方向與同一門檻。每案起點斷言共用工作樹乾淨。"""
+def _case_06(head_worktree, edit) -> dict:
+    """邊界 06 本體：pytest.ini 改動後 hook 各次 rc＝預期（0／2）、pre-commit 各次同一方向；回傳秒數與門檻。"""
     _assert_clean(head_worktree)
     old, new, blocking = INI_TIMING[edit]
     p = head_worktree / "pytest.ini"
@@ -1997,6 +2122,26 @@ def test_boundary_06_pytest_ini_wall_clock(head_worktree, edit):
         staged = _staged_times_at(head_worktree, "pytest.ini", runs, blocking)
     finally:
         p.write_text(src, encoding="utf-8")
+    return {"times": times, "staged": staged, "limit": limit}
+
+
+@pytest.mark.parametrize("edit", sorted(INI_TIMING))
+def test_boundary_06_pytest_ini_verdict(head_worktree, wall_clock_runs, edit):
+    """真實規模 pytest.ini：加標記註冊、python_functions 只增模式（超集，不檢）⇒ rc 0；四項收集設定任一縮減（必擋：全部
+    測試檔 V20）⇒ rc 2；同一改動暫存後之 pre-commit 同一 rc 方向（斷言於 `_case_06` 內）。牆鐘門檻見 perf 之
+    `test_boundary_06_pytest_ini_wall_clock`（TESTSEL S3）。"""
+    wall_clock_runs(("06", edit), _case_06, head_worktree, edit)
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("edit", sorted(INI_TIMING))
+def test_boundary_06_pytest_ini_wall_clock(head_worktree, wall_clock_runs, edit):
+    """真實規模 pytest.ini：加標記註冊、python_functions 只增模式（超集，不檢）⇒ rc 0 且 10 次中位 < 1 s；四項收集設定
+    任一縮減（必擋：全部測試檔 V20，兩樹以單一批次讀取）⇒ rc 2 且 3 次中位 < 5 s（§C 之必擋例外；試作逐檔讀 HEAD 約 20 秒、
+    批次讀取後四項分別約 1.5–2.6 秒——成本為解析全部測試檔以列出消失之 nodeid）；同一改動暫存後之 pre-commit
+    （`check --staged`）同一 rc 方向與同一門檻。每案起點斷言共用工作樹乾淨。效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("06", edit), _case_06, head_worktree, edit)
+    times, staged, limit = run["times"], run["staged"], run["limit"]
     assert statistics.median(times) < limit, times
     assert statistics.median(staged) < limit, staged
 
@@ -2009,10 +2154,8 @@ ROUTE_TIMING = {
 }
 
 
-@pytest.mark.parametrize("edit", sorted(ROUTE_TIMING))
-def test_boundary_07_route_wall_clock_hook_and_precommit(head_worktree, edit):
-    """真實規模之其餘產出端路由（審查 r29）：測試檔、catalog、manifest 各做一個不減檢查之改動 ⇒ hook 與 pre-commit
-    （暫存後直接跑 `check --staged`）皆 rc 0 且各 10 次中位 < 1 s（§C 各自計時）。每案起點斷言共用工作樹乾淨。"""
+def _case_07(head_worktree, edit) -> dict:
+    """邊界 07 本體：測試檔／catalog／manifest 不減改動後 hook 10 次與 pre-commit 10 次皆 rc 0；回傳秒數。"""
     _assert_clean(head_worktree)
     rel, tail = ROUTE_TIMING[edit]
     p = head_worktree / rel
@@ -2023,6 +2166,25 @@ def test_boundary_07_route_wall_clock_hook_and_precommit(head_worktree, edit):
         staged = _staged_times_at(head_worktree, rel, 10, False)
     finally:
         p.write_text(src, encoding="utf-8")
+    return {"times": times, "staged": staged}
+
+
+@pytest.mark.parametrize("edit", sorted(ROUTE_TIMING))
+def test_boundary_07_route_not_blocked_hook_and_precommit(head_worktree, wall_clock_runs, edit):
+    """真實規模之其餘產出端路由（審查 r29）：測試檔、catalog、manifest 各做一個不減檢查之改動 ⇒ hook 與 pre-commit
+    （暫存後直接跑 `check --staged`）各 10 次皆 rc 0（斷言於 `_hook_times_at`／`_staged_times_at` 內逐次檢查）。
+    牆鐘門檻見 perf 之 `test_boundary_07_route_wall_clock_hook_and_precommit`（TESTSEL S3）。"""
+    wall_clock_runs(("07", edit), _case_07, head_worktree, edit)
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("edit", sorted(ROUTE_TIMING))
+def test_boundary_07_route_wall_clock_hook_and_precommit(head_worktree, wall_clock_runs, edit):
+    """真實規模之其餘產出端路由（審查 r29）：測試檔、catalog、manifest 各做一個不減檢查之改動 ⇒ hook 與 pre-commit
+    （暫存後直接跑 `check --staged`）皆 rc 0 且各 10 次中位 < 1 s（§C 各自計時）。每案起點斷言共用工作樹乾淨。
+    效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("07", edit), _case_07, head_worktree, edit)
+    times, staged = run["times"], run["staged"]
     assert statistics.median(times) < 1.0, times
     assert statistics.median(staged) < 1.0, staged
 
@@ -2051,10 +2213,8 @@ def _pick_helper_decrease(root: Path):
     return best[1], best[2]
 
 
-def test_boundary_07b_test_file_helper_decrease_wall_clock(head_worktree):
-    """真實規模最壞之測試檔路由（審查 r30）：最大之「模組內 helper 有斷言」測試檔刪該 helper 一行斷言（必擋：其呼叫者 V19）
-    ⇒ hook rc 2、pre-commit rc≠0，且各 3 次中位 < 5 s（§C 必擋層；試作整檔重算 hook 約 2.7 秒，改只算受影響函式後
-    hook 約 0.77 秒、pre-commit 約 0.95 秒）。每案起點斷言共用工作樹乾淨。"""
+def _case_07b(head_worktree) -> dict:
+    """邊界 07b 本體：最大之「模組內 helper 有斷言」測試檔刪該 helper 一行斷言後 hook 各次 rc 2 且含 V19、pre-commit 各次 rc≠0。"""
     _assert_clean(head_worktree)
     rel, line = _pick_helper_decrease(head_worktree)
     p = head_worktree / rel
@@ -2074,6 +2234,22 @@ def test_boundary_07b_test_file_helper_decrease_wall_clock(head_worktree):
         staged = _staged_times_at(head_worktree, rel, 3, True)
     finally:
         p.write_text(src, encoding="utf-8")
+    return {"times": times, "staged": staged}
+
+
+def test_boundary_07b_test_file_helper_decrease_verdict(head_worktree, wall_clock_runs):
+    """真實規模最壞之測試檔路由（審查 r30）：最大之「模組內 helper 有斷言」測試檔刪該 helper 一行斷言（必擋：其呼叫者 V19）
+    ⇒ hook rc 2、pre-commit rc≠0（斷言於 `_case_07b` 內）。牆鐘門檻見 perf 之 `_wall_clock`（TESTSEL S3）。"""
+    wall_clock_runs(("07b",), _case_07b, head_worktree)
+
+
+@pytest.mark.perf
+def test_boundary_07b_test_file_helper_decrease_wall_clock(head_worktree, wall_clock_runs):
+    """真實規模最壞之測試檔路由（審查 r30）：最大之「模組內 helper 有斷言」測試檔刪該 helper 一行斷言（必擋：其呼叫者 V19）
+    ⇒ hook rc 2、pre-commit rc≠0，且各 3 次中位 < 5 s（§C 必擋層；試作整檔重算 hook 約 2.7 秒，改只算受影響函式後
+    hook 約 0.77 秒、pre-commit 約 0.95 秒）。每案起點斷言共用工作樹乾淨。效能基準，opt-in（TESTSEL S3）。"""
+    run = wall_clock_runs(("07b",), _case_07b, head_worktree)
+    times, staged = run["times"], run["staged"]
     assert statistics.median(times) < 5.0, times
     assert statistics.median(staged) < 5.0, staged
 
@@ -2148,10 +2324,22 @@ def _hook_times(rel: str) -> list:
     return times
 
 
-@pytest.mark.parametrize("rel", ["tests/registry/test_testreg_validate.py", "docs/manifests/TESTREG.json"])
-def test_08_hook_wall_clock_median_under_1s(rel):
-    """⑧：真實 repo（全量 entries）未改動之測試檔／manifest 觸發 hook，10 次牆鐘中位 < 1 s（helper 反推見邊界 05）。"""
-    assert statistics.median(_hook_times(rel)) < 1.0
+_RELS_08 = ["tests/registry/test_testreg_validate.py", "docs/manifests/TESTREG.json"]
+
+
+@pytest.mark.parametrize("rel", _RELS_08)
+def test_08_hook_unchanged_not_blocked(wall_clock_runs, rel):
+    """⑧：真實 repo（全量 entries）未改動之測試檔／manifest 觸發 hook 10 次皆 rc 0，且 tracked 測試檔 ⊆ catalog entries
+    （斷言於 `_hook_times` 內）。牆鐘門檻見 perf 之 `test_08_hook_wall_clock_median_under_1s`（TESTSEL S3）。"""
+    wall_clock_runs(("08", rel), _hook_times, rel)
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("rel", _RELS_08)
+def test_08_hook_wall_clock_median_under_1s(wall_clock_runs, rel):
+    """⑧：真實 repo（全量 entries）未改動之測試檔／manifest 觸發 hook，10 次牆鐘中位 < 1 s（helper 反推見邊界 05）。
+    效能基準，opt-in（TESTSEL S3）。"""
+    assert statistics.median(wall_clock_runs(("08", rel), _hook_times, rel)) < 1.0
 
 
 # ── v41（諮詢 r2：凍結驗收測試自身缺陷之字面對映修正；契約 receipts.literal_fix）──────────────────────────────────

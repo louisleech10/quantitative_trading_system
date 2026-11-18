@@ -169,7 +169,213 @@ def _scan_python(path: str, text: str, patterns: Sequence[Tuple[str, "re.Pattern
                     callee, literal = c[2], c[3]
             hits.append(Hit(path, n, pid, index.func_of_line.get(n, "<module>"), callee, literal, line))
             break
+    if tree is not None:
+        lines = text.splitlines()
+        for ln in _bounded_polls(tree):
+            line = lines[ln - 1] if 0 < ln <= len(lines) else ""
+            hits.append(Hit(path, ln, "bounded_poll", index.func_of_line.get(ln, "<module>"), "", "", line))
     return hits
+
+
+# ---- 「次數×睡眠」形之時間上限（bounded_poll；2026-11-13 TESTSEL I2 補洞：正則看不到不含時間字樣之上限）------------
+#: 以呼叫此名之函式為「失敗」（pytest.fail、self.fail、fail）
+_FAIL_CALLS = frozenset({"fail"})
+_CONST_CALLS = frozenset({"int", "round", "ceil", "floor", "max", "min", "abs"})
+
+
+def _int_consts(tree: ast.AST) -> set:
+    """檔內綁定為數值字面（或常數運算式）之名、以及預設值為數值字面之參數名（迭代界改名／區域常數之繞過）。"""
+    names: set = set()
+    changed = True
+    while changed:  # 常數間接（N = 5; M = N * 2）至不動點
+        changed = False
+        for n in ast.walk(tree):
+            if isinstance(n, (ast.Assign, ast.AnnAssign)) and n.value is not None:
+                targets = n.targets if isinstance(n, ast.Assign) else [n.target]
+                if _is_const_expr(n.value, names):
+                    for t in targets:
+                        if isinstance(t, ast.Name) and t.id not in names:
+                            names.add(t.id)
+                            changed = True
+            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                args = n.args.args + n.args.kwonlyargs
+                defaults = ([None] * (len(n.args.args) - len(n.args.defaults)) + list(n.args.defaults)
+                            + list(n.args.kw_defaults))
+                for a, d in zip(args, defaults):
+                    if d is not None and _is_const_expr(d, names) and a.arg not in names:
+                        names.add(a.arg)
+                        changed = True
+    return names
+
+
+def _is_const_expr(node: ast.AST, consts: set) -> bool:
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, (int, float)) and not isinstance(node.value, bool)
+    if isinstance(node, ast.Name):
+        return node.id in consts or (node.id.isupper() and len(node.id) > 1)
+    if isinstance(node, ast.Attribute):
+        return node.attr.isupper() and len(node.attr) > 1
+    if isinstance(node, ast.UnaryOp):
+        return _is_const_expr(node.operand, consts)
+    if isinstance(node, ast.BinOp):
+        return _is_const_expr(node.left, consts) and _is_const_expr(node.right, consts)
+    if isinstance(node, ast.Call):
+        name = _dotted(node.func).split(".")[-1]
+        return name in _CONST_CALLS and bool(node.args) and all(_is_const_expr(a, consts) for a in node.args)
+    return False
+
+
+def _walk_local(nodes: Sequence[ast.AST]) -> Any:
+    """走訪敘述（不進巢狀函式／類別／lambda）。"""
+    stack = list(nodes)
+    while stack:
+        n = stack.pop()
+        yield n
+        for c in ast.iter_child_nodes(n):
+            if not isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+                stack.append(c)
+
+
+def _has_sleep(body: Sequence[ast.AST]) -> bool:
+    return any(isinstance(n, ast.Call) and _dotted(n.func).split(".")[-1] == "sleep" for n in _walk_local(body))
+
+
+def _is_fail_stmt(st: ast.AST) -> bool:
+    """迴圈耗盡後之失敗：raise、assert 恆假（False／0／None）、呼叫 fail（pytest.fail／self.fail）。"""
+    if isinstance(st, ast.Raise):
+        return True
+    if isinstance(st, ast.Assert):
+        return isinstance(st.test, ast.Constant) and not st.test.value
+    if isinstance(st, ast.Expr) and isinstance(st.value, ast.Call):
+        return _dotted(st.value.func).split(".")[-1] in _FAIL_CALLS
+    return False
+
+
+def _counter_while(st: ast.While, consts: set) -> bool:
+    """`while n < N:`／`while n <= N:`／`while N > n:`／`while n > 0:`（倒數），本體改該計數名（+=／-=／重新賦值）。"""
+    t = st.test
+    if not (isinstance(t, ast.Compare) and len(t.ops) == 1 and len(t.comparators) == 1):
+        return False
+    left, op, right = t.left, t.ops[0], t.comparators[0]
+    if isinstance(op, (ast.Lt, ast.LtE)) and isinstance(left, ast.Name) and _is_const_expr(right, consts):
+        var = left.id
+    elif isinstance(op, (ast.Gt, ast.GtE)) and isinstance(right, ast.Name) and _is_const_expr(left, consts):
+        var = right.id
+    elif isinstance(op, (ast.Gt, ast.GtE, ast.NotEq)) and isinstance(left, ast.Name) and _is_const_expr(right, consts):
+        var = left.id  # 倒數：while n > 0
+    else:
+        return False
+    for n in _walk_local(st.body):
+        if isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Name) and n.target.id == var:
+            return True
+        if isinstance(n, ast.Assign) and any(isinstance(x, ast.Name) and x.id == var for x in n.targets):
+            return True
+    return False
+
+
+def _counter_names(loop: ast.AST) -> set:
+    """迴圈之計數名：for 之目標名（任何可迭代，如 itertools.count／range／enumerate），及本體內 `n += c`／`n = n ± c` 者。"""
+    names: set = set()
+    if isinstance(loop, (ast.For, ast.AsyncFor)):
+        for t in ast.walk(loop.target):
+            if isinstance(t, ast.Name):
+                names.add(t.id)
+    for n in _walk_local(loop.body):
+        if isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Name):
+            names.add(n.target.id)
+        elif isinstance(n, ast.Assign) and isinstance(n.value, ast.BinOp):
+            for t in n.targets:
+                if isinstance(t, ast.Name) and any(isinstance(x, ast.Name) and x.id == t.id for x in ast.walk(n.value)):
+                    names.add(t.id)
+    return names
+
+
+def _cmp_counter_const(test: ast.AST, counters: set, consts: set) -> bool:
+    """條件式比較某計數名與常數（含 and／or、not 內之比較）。"""
+    for n in ast.walk(test):
+        if isinstance(n, ast.Compare):
+            sides = [n.left, *n.comparators]
+            if any(isinstance(s, ast.Name) and s.id in counters for s in sides) and \
+                    any(_is_const_expr(s, consts) for s in sides if not (isinstance(s, ast.Name) and s.id in counters)):
+                return True
+    return False
+
+
+def _fail_branch(st: ast.AST) -> bool:
+    """失敗出口敘述：直接失敗，或 `if …:` 之本體（或 else）含直接失敗（例：迴圈後 `if not done: raise`）。"""
+    if _is_fail_stmt(st):
+        return True
+    return isinstance(st, ast.If) and any(_is_fail_stmt(s) for s in [*st.body, *st.orelse])
+
+
+def _loop_cap(st: ast.AST, consts: set) -> Tuple[bool, bool]:
+    """（迭代界為常數或以計數與常數比較之條件退出, 迴圈本體內以計數條件直接失敗）。"""
+    counters = _counter_names(st)
+    bounded = False
+    if isinstance(st, (ast.For, ast.AsyncFor)):
+        it = st.iter
+        bounded = (isinstance(it, ast.Call) and _dotted(it.func) == "range" and bool(it.args)
+                   and all(_is_const_expr(a, consts) for a in it.args))
+    elif isinstance(st, ast.While):
+        bounded = _counter_while(st, consts) or _cmp_counter_const(st.test, counters, consts)
+    inner_fail = False
+    for n in _walk_local(st.body):
+        if isinstance(n, ast.If) and _cmp_counter_const(n.test, counters, consts):
+            exits = [*n.body, *n.orelse]
+            if any(isinstance(s, (ast.Break, ast.Return)) for s in exits):
+                bounded = True
+            if any(_is_fail_stmt(s) for s in exits):
+                bounded = inner_fail = True
+    return bounded, inner_fail
+
+
+def _recursive_polls(tree: ast.AST, consts: set) -> List[int]:
+    """直接自遞迴之輪詢（codex r1 反例 D）：函式本體含 sleep、以「參數 ± 常數」呼叫自身、且有以該參數與常數比較之
+    分支直接失敗（基底情形 raise／fail）⇒ 函式定義行。"""
+    out: List[int] = []
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) or not _has_sleep(fn.body):
+            continue
+        params = {a.arg for a in [*fn.args.args, *fn.args.kwonlyargs]}
+        stepped = set()
+        for n in _walk_local(fn.body):
+            if isinstance(n, ast.Call) and _dotted(n.func).split(".")[-1] == fn.name:
+                for a in [*n.args, *(k.value for k in n.keywords)]:
+                    if isinstance(a, ast.BinOp) and isinstance(a.left, ast.Name) and a.left.id in params \
+                            and _is_const_expr(a.right, consts):
+                        stepped.add(a.left.id)
+        if not stepped:
+            continue
+        if any(isinstance(n, ast.If) and _cmp_counter_const(n.test, stepped, consts)
+               and any(_is_fail_stmt(s) for s in [*n.body, *n.orelse]) for n in _walk_local(fn.body)):
+            out.append(fn.lineno)
+    return out
+
+
+def _bounded_polls(tree: ast.AST) -> List[int]:
+    """「次數×睡眠」形之時間上限之行號。迴圈（for 任何可迭代、while）：① 本體含 sleep（time.sleep／asyncio.sleep／
+    sleep）；② 迭代界為常數（`range(常數式)`、計數式 `while n < 常數`、或本體內以計數與常數比較之 if 退出〔break／return〕
+    ——涵蓋 `while True` 與 `itertools.count()`）；③ 失敗出口：迴圈 else、緊接迴圈後之敘述、或迴圈後之 `if` 本體為失敗
+    （raise、assert 恆假、fail()），或本體內以計數條件直接失敗。另：直接自遞迴遞減參數＋sleep＋基底失敗之函式
+    （`_recursive_polls`）。只 ①② 而無失敗出口（耗盡後靜默往下）不算。"""
+    consts = _int_consts(tree)
+    out: List[int] = []
+    for parent in ast.walk(tree):
+        for field in ("body", "orelse", "finalbody", "handlers"):
+            block = getattr(parent, field, None)
+            if not isinstance(block, list):
+                continue
+            for i, st in enumerate(block):
+                if not isinstance(st, (ast.For, ast.AsyncFor, ast.While)) or not _has_sleep(st.body):
+                    continue
+                bounded, inner_fail = _loop_cap(st, consts)
+                if not bounded:
+                    continue
+                after = block[i + 1] if i + 1 < len(block) else None
+                if inner_fail or any(_is_fail_stmt(s) for s in st.orelse) or (after is not None and _fail_branch(after)):
+                    out.append(st.lineno)
+    out += _recursive_polls(tree, consts)
+    return sorted(set(out))
 
 
 def _scan_lines(path: str, text: str, patterns: Sequence[Tuple[str, "re.Pattern[str]"]]) -> List[Hit]:
@@ -319,6 +525,48 @@ def unregistered(hits: Sequence[Hit], registry: Sequence[Mapping[str, Any]]) -> 
         if e is None or e.get("class") == "A":
             out.append(h)
     return out
+
+
+PENDING = REPO / "scripts" / "timeout_pending_nocap.json"
+PENDING_FIELDS = ("path", "pattern_id", "function", "callee", "literal", "text", "line_hint", "nocap_task", "category")
+PENDING_CATEGORIES = ("產品碼", "腳本", "探針", "測試")
+
+
+def load_pending(path: Path = PENDING, text: Optional[str] = None) -> List[Dict[str, Any]]:
+    """NOCAP 未施工之既有命中棘輪清單（`scripts/timeout_pending_nocap.json`）：每列欄位恰為 `PENDING_FIELDS`、
+    `nocap_task` 非空（docs/NOCAP_SPEC.md 之 Task 編號）、`category` 屬 `PENDING_CATEGORIES`；任一不符 ⇒ ValueError。"""
+    entries = list(json.loads(text if text is not None else path.read_text(encoding="utf-8"))["entries"])
+    for e in entries:
+        if not isinstance(e, dict) or set(e) != set(PENDING_FIELDS):
+            raise ValueError(f"pending 列欄位須恰為 {PENDING_FIELDS}：{e}")
+        if not isinstance(e["nocap_task"], str) or not e["nocap_task"].strip():
+            raise ValueError(f"pending 列缺 nocap_task（須指向 NOCAP 已定義之 Task）：{e}")
+        if e["category"] not in PENDING_CATEGORIES:
+            raise ValueError(f"pending 列 category 不屬 {PENDING_CATEGORIES}：{e}")
+    return entries
+
+
+def _pending_key(path: str, pattern_id: str, function: str, callee: str, literal: str, text: str) -> Tuple[str, ...]:
+    return (path, pattern_id, function, callee, str(literal), text.strip())
+
+
+def ratchet(hits: Sequence[Hit], registry: Sequence[Mapping[str, Any]],
+            pending: Sequence[Mapping[str, Any]]) -> Tuple[List[Hit], List[Dict[str, Any]]]:
+    """棘輪（業界 baseline 做法）：(未登記且不在 pending 之命中＝新增, pending 中已無對應命中之列＝已修好須移出)。
+    比對以綁定（path、樣式、所在函式、被呼叫者、字面值、去頭尾空白整行）之多重集合，不用行號。"""
+    left: Dict[Tuple[str, ...], List[Dict[str, Any]]] = {}
+    for e in pending:
+        k = _pending_key(e["path"], e["pattern_id"], e["function"], e["callee"], e["literal"], e["text"])
+        left.setdefault(k, []).append(dict(e))
+    new: List[Hit] = []
+    for h in unregistered(hits, registry):
+        k = _pending_key(h.path, h.pattern_id, h.function, h.callee, h.literal, h.text)
+        if left.get(k):
+            left[k].pop()
+        else:
+            new.append(h)
+    stale = [e for rows in left.values() for e in rows]
+    return new, stale
 
 
 def stale_entries(registry: Sequence[Mapping[str, Any]], hits: Sequence[Hit],

@@ -222,7 +222,8 @@ def _no_factory_h5(root: Path) -> bool:
 def test_boundary_10_residual_env_zero_still_generates_cgsa(monkeypatch, tmp_path):
     """殘留 `FFACT_USE_CGSA=0` ⇒ 無作用（不報錯、不分派），仍產 CGSA manifest 且無 `*_factory.h5`。"""
     prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
-    root, _factory, result = run_stat(tmp_path, stat_payload())
+    # TESTSEL I10：受測為殘留環境變數不影響 CGSA 分派，與平穩化無關 ⇒ 平穩化關（同 FRAMEPATH C2 形，約 19 秒對 94 秒）
+    root, _factory, result = run_stat(tmp_path, stat_payload(fracdiff=False, adf=False))
     manifests = sorted(root.rglob("feature_manifest.json"))
     assert len(manifests) == 1
     assert str(result.metadata.get("manifest_path", "")).endswith(".json")

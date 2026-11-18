@@ -492,14 +492,40 @@ def _g1(cell_id: str) -> Dict[str, Any]:
     return g1
 
 
+#: TESTSEL I10（路徑覆蓋，非同測試換標的／週期重複）：IC 頁第三步（`ICAnalysisService._apply_transforms_sync`）之
+#: symbol／timeframe 只用於載入 run（`_load_features_for_transforms`），轉換以 `create_feature_preprocessor(transform_config)`
+#: 建前處理器（無週期脈絡）、窗以根數計；凍結檔四個 G1 格之臂份與臂環境同形（四臂，chunked 臂之 FFACT_L65_CHUNK_SIZE＝
+#: 選欄數−1 ⇒ 各格皆恰兩塊）⇒ 各格走同一組程式路徑、只差資料值。4h／12h／SOL 格之 FF 生成路徑（週期換算、長歷史來源、
+#: 第二資料集）仍由 `test_numview_acceptance.py::test_gate_new_freeze_bitwise_equal_at_current_code` 逐格承擔。
+G1_PATH_CELL = "A_BTCUSDT_1h"
+
+
 def _g1_cell_ids_at_collection() -> List[str]:
-    """收集期列舉凍結檔之 G1 格（每格一參數）；檔缺或無 G1 ⇒ 單一佔位參數，於測試內斷言失敗（不 skip）。"""
+    """收集期取凍結檔之 G1 代表格（`G1_PATH_CELL`）；檔缺、無 G1 或代表格不在 ⇒ 單一佔位參數，於測試內斷言失敗（不 skip）。"""
     try:
         cells = json.loads(nh.PRE_CHANGE_FINGERPRINTS_PATH.read_text(encoding="utf-8"))["cells"]
         ids = sorted(cid for cid, c in cells.items() if isinstance(c, dict) and c.get("g1"))  # 空 g1（B／C）不列
     except (OSError, ValueError, KeyError, TypeError):
         ids = []
-    return ids or ["<frozen_g1_missing>"]
+    return [G1_PATH_CELL] if G1_PATH_CELL in ids else ["<frozen_g1_missing>"]
+
+
+def test_g1_path_cell_arms_same_shape_as_every_frozen_g1_cell() -> None:
+    """`G1_PATH_CELL` 代表性之前提：凍結檔每個 G1 格之臂份集合、臂環境鍵集合與代表格相同，chunked 類臂之分塊門檻皆＝
+    該格選欄數−1（同一分塊路徑）。前提不再成立 ⇒ 紅（須把該格加回參數）。"""
+    cells = json.loads(nh.PRE_CHANGE_FINGERPRINTS_PATH.read_text(encoding="utf-8"))["cells"]
+    g1_cells = {cid: c for cid, c in cells.items() if isinstance(c, dict) and c.get("g1")}
+    assert G1_PATH_CELL in g1_cells
+    ref = g1_cells[G1_PATH_CELL]
+
+    def shape(cell: Mapping[str, Any]) -> Dict[str, Any]:
+        n = len(cell["ic_first_selected"])
+        return {arm: {k: (v == str(n - 1) if k == "FFACT_L65_CHUNK_SIZE" and v != "0" else v)
+                      for k, v in node["env"].items()} for arm, node in cell["g1"].items()}
+
+    for cid, cell in g1_cells.items():
+        assert shape(cell) == shape(ref), cid
+        assert cell.get("g1_source_env") == ref.get("g1_source_env"), cid
 
 
 G1_CELLS = _g1_cell_ids_at_collection()
@@ -1233,7 +1259,7 @@ def test_boundary_38_icpage_arm_locked_ic_first_empty_selection_unchanged(tmp_pa
     from momentum.factories import create_post_ic_transform_config
 
     arm = _assert_locked()
-    handle = ph.RunCache(tmp_path_factory.mktemp("numview_ic_first_empty")).get("ic_first_empty")
+    handle = ph.shared_run_cache(tmp_path_factory).get("ic_first_empty")  # TESTSEL I10：session 共用倉
     node = ph.load_manifest(handle.run_dir)["artifacts"]["processed"]
     assert node["total_features"] == 0 and node["quality_status"] == "empty_selection"
     assert node["post_ic_arm"] == arm
@@ -1332,8 +1358,10 @@ def test_mutation_icpage_arm_locked_post_ic_builder_drops_zscore(tmp_path: Path,
 
 
 def test_mutation_icpage_arm_locked_post_ic_arm_constant_polars(monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutation（Task 3.4）：`POST_IC_ARM` 改回 `"polars"`、或決定紀錄 `report.post_ic_core` 與契約不一致 ⇒ ⑧紅。"""
-    monkeypatch.setattr(icc, "POST_IC_ARM", _spec_arm("polars"))
+    """mutation（Task 3.4）：`POST_IC_ARM` 改回 `"polars"`、或決定紀錄 `report.post_ic_core` 與契約不一致 ⇒ ⑧紅。
+    polars 臂已於 d4d97d62（FFPROD b2）自契約 `post_ic_arm_values` 刪除 ⇒ 直接注入字面（不經 `_spec_arm`），仍須判違規。"""
+    assert "polars" not in nv.load_contract()["post_ic_arm_values"]["values"]
+    monkeypatch.setattr(icc, "POST_IC_ARM", "polars")
     assert core_binding_violations() != []
     monkeypatch.undo()
     record = copy.deepcopy(_decision_record("d_icpage_arm"))

@@ -8,6 +8,7 @@ metadata）之失敗被收；經抽樣層覆蓋守衛之失敗、訊息為覆蓋
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -15,21 +16,36 @@ import pandas as pd
 import pytest
 
 from tests.feature_engineering import ff_truncation_mr_helpers as h
+from tests.feature_engineering import preprov_helpers as ph
+
+
+_GROUP = "1h_L1_trend_EMA_5_L65"
+
+
+def _write_run(run_dir: Path, cols: dict, row_count: int) -> tuple:
+    """依生產 run 目錄版型（`<run>/raw/<群組>.parquet`＋`<run>/feature_manifest.json`）寫一個最小 run。
+
+    FFDSTAR Task 1.6（4baf0fbc）起 helper 只讀 manifest `artifacts.raw.groups[*].path` 宣告之群組檔
+    （`preprov_helpers.declared_group_files`）；manifest 只宣告本檔寫出之單一群組，gate 函式本身不變。"""
+    raw_dir = run_dir / "raw"
+    raw_dir.mkdir(parents=True)
+    rel = f"raw/{_GROUP}.parquet"
+    pd.DataFrame(cols).to_parquet(run_dir / rel)
+    manifest = {"row_count": row_count, "artifacts": {"raw": {"path": "raw", "groups": {_GROUP: {"path": rel}}}}}
+    (run_dir / ph.MANIFEST_NAME).write_text(json.dumps(manifest), encoding="utf-8")
+    return raw_dir, manifest
 
 
 def _pair(tmp_path: Path, full_cols: dict, trunc_cols: dict, *, full_meta=None, trunc_meta=None) -> h.TruncationPair:
-    full_dir, trunc_dir = tmp_path / "full", tmp_path / "trunc"
-    full_dir.mkdir()
-    trunc_dir.mkdir()
-    pd.DataFrame(full_cols).to_parquet(full_dir / "1h_L1_trend_EMA_5_L65.parquet")
-    pd.DataFrame(trunc_cols).to_parquet(trunc_dir / "1h_L1_trend_EMA_5_L65.parquet")
     n = len(next(iter(trunc_cols.values())))
+    full_dir, full_manifest = _write_run(tmp_path / "rf", full_cols, n + 1)
+    trunc_dir, trunc_manifest = _write_run(tmp_path / "rt", trunc_cols, n)
     return h.TruncationPair(
         warmup=1, n_trunc=n,
         full=h.GenerationArtifacts(full_dir, tmp_path / "rf", full_meta or {"symbol": "A", "timeframe": "1h"},
-                                   {"row_count": n + 1}, n + 1),
+                                   full_manifest, n + 1),
         trunc=h.GenerationArtifacts(trunc_dir, tmp_path / "rt", trunc_meta or {"symbol": "A", "timeframe": "1h"},
-                                    {"row_count": n}, n),
+                                    trunc_manifest, n),
     )
 
 

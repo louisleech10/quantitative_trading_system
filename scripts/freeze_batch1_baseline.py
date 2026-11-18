@@ -122,10 +122,25 @@ def run_stream_benchmark() -> tuple[float, int]:
     return float(median(item[0] for item in samples)), int(median(item[1] for item in samples))
 
 
+def _winsor_unmasked(fixture: np.ndarray, *, window: int, min_periods: int) -> np.ndarray:
+    """縮尾計算本身（窗未滿遮罩前）。d229336e（FF-STAT b4 R6 甲，docs/FFSTAT_SPEC.md:84 第①類「只遮罩、不改計算」）起
+    `rolling_winsorize_array` 末段遮窗未滿之列；golden 之 winsor_* 雜湊依 TESTREG 4.4 改寫之測試契約只代表遮罩前之計算
+    （test_batch1_followup.py TestGolden／TestN3 以同法暫停遮罩比對，最終輸出另比獨立參考遮罩）⇒ 凍結程序同法計算，
+    否則重凍會以遮罩後雜湊覆寫而使該兩測試轉紅（TESTSEL I10 G1 實測 2026-11-13）。"""
+    from momentum.FeatureEngineering.preprocessing import stable_mask
+
+    original = stable_mask.mask_incomplete_window_inplace
+    stable_mask.mask_incomplete_window_inplace = lambda values, _window: values
+    try:
+        return rolling_winsorize_array(fixture.copy(), window=window, min_periods=min_periods)
+    finally:
+        stable_mask.mask_incomplete_window_inplace = original
+
+
 def build_baseline() -> dict[str, Any]:
     fixture = _winsor_fixture()
-    default_output = rolling_winsorize_array(fixture.copy(), window=252, min_periods=63)
-    w100_output = rolling_winsorize_array(fixture.copy(), window=100, min_periods=25)
+    default_output = _winsor_unmasked(fixture, window=252, min_periods=63)
+    w100_output = _winsor_unmasked(fixture, window=100, min_periods=25)
     default_hashes = _hash_array(default_output)
     w100_hashes = _hash_array(w100_output)
     perf_wall, perf_peak = run_stream_benchmark()

@@ -133,3 +133,15 @@ def move_to_stale(leaf: Path) -> Path:
         target = leaf.with_name(f"{base}-{sequence}")
     os.rename(leaf, target)
     return target
+
+
+#: CGSA 工作根之預設（未設 `FFACT_CGSA_WORK_DIR`、呼叫端未給根時）；相對路徑，依呼叫當下工作目錄解析（既有語意）
+DEFAULT_CGSA_WORK_ROOT = Path("data_cache") / "cgsa_work"
+
+
+def default_cgsa_root() -> Path:
+    """未給根時之 CGSA 工作根（`feature_factory` 磁碟檢查與工作目錄；`create_run_lifecycle_manager` 之同值預設未接
+    此函式——其產品呼叫端皆明給 cgsa_root）。
+    回相對路徑，呼叫端照原語意解析（`Path.cwd() / ...` 或留相對）。測試行程由 tests/conftest.py 於其解析落在正式
+    data_cache 時改指 session 暫存（TESTSEL-HERMETIC）。"""
+    return DEFAULT_CGSA_WORK_ROOT

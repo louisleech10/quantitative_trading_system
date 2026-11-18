@@ -187,14 +187,37 @@ class TestICGatekeeperE2E:
         assert calls.get("compute_ic", 0) > 0, f"spy 未接上 analyze 之 IC 計算路徑：{calls}"
         calls.clear()
 
-        start = time.perf_counter()
         report = analyzer.refilter({"icir_min": -1.0})
-        elapsed = time.perf_counter() - start
 
         assert calls == {}, f"refilter 重算了 IC：{calls}"
-        assert elapsed < 1.0
         assert "summary_table" in report
         assert len(report["summary_table"]) > 0
+
+    @pytest.mark.perf
+    def test_refilter_elapsed_under_1s(self, tmp_path: Path) -> None:
+        """refilter 牆鐘 < 1 秒：效能基準，opt-in（TESTSEL S3 自 test_refilter_uses_cache 移出之計時斷言；
+        同一 120×6 輸入，毫秒級，故各自計算不共用）。"""
+        features, labels = _make_sample_dataset(n_samples=120, n_features=6)
+
+        features_path = tmp_path / "features.h5"
+        labels_path = tmp_path / "labels.h5"
+        meta_path = tmp_path / "meta.json"
+        _write_features_h5(features_path, features)
+        _write_labels_h5(labels_path, labels)
+        _write_meta_json(meta_path, list(features.columns))
+
+        analyzer = create_ic_analyzer({"thresholds": _lenient_thresholds()})
+        analyzer.analyze(
+            features_path=str(features_path),
+            labels_path=str(labels_path),
+            meta_path=str(meta_path),
+        )
+
+        start = time.perf_counter()
+        analyzer.refilter({"icir_min": -1.0})
+        elapsed = time.perf_counter() - start
+
+        assert elapsed < 1.0
 
 
     def test_event_mode_with_query(self, tmp_path: Path) -> None:
@@ -266,6 +289,7 @@ class TestICGatekeeperE2E:
         ):
             assert key in report
 
+    @pytest.mark.perf
     @pytest.mark.skipif(not _RUN_E2E_PERF, reason="Set RUN_IC_E2E_PERF=1 to run")
     def test_performance_800_features(self, tmp_path: Path) -> None:
         """效能: 800 特徵 × 10K 樣本 < 30 秒。"""

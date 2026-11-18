@@ -352,15 +352,9 @@ def test_calibration_domain_input_bounded_before_output_start(tmp_path: Path, mo
 
 @pytest.fixture(scope="module")
 def user_run(tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Any]:
-    """帶 start_date 之單週期開平穩化 run（Task 2.1 驗證、Task 2.3 邊界②）。"""
-    mp = pytest.MonkeyPatch()
-    tmp = tmp_path_factory.mktemp("ffstat_user")
-    try:
-        h.prepare_stat_env(mp, tmp)
-        root, factory, result = h.run_stat(tmp, h.stat_payload())
-        return {"root": root, "result": result, "decisions": h.decisions(result)}
-    finally:
-        mp.undo()
+    """帶 start_date 之單週期開平穩化 run（Task 2.1 驗證、Task 2.3 邊界②）。TESTSEL I10：與 test_ffstat_golden、
+    test_ffstat_all_tested 同一 `stat_payload()` run，session 共用（`h.shared_stat_run`）。"""
+    return h.shared_stat_run(tmp_path_factory, "on")
 
 
 def test_every_column_calibrated_before_output_start(user_run: Dict[str, Any]) -> None:
@@ -514,23 +508,24 @@ def test_three_entries_same_decisions(tmp_path: Path, monkeypatch: pytest.Monkey
     多週期 worker（parallel）之 1h 欄校準時間上界、N、決策與 d 全同。run_ic_first 之決策讀 factory 之
     `factory_decisions_attr`（契約；L6.5 形成、先於 IC 階段；呼叫前清空以防讀到 generate_features 之殘值）。
     ICFIRSTALIGN Task 2.4：generate_features 改走 CGSA（frame 已刪，RM-FRAMEPATH），run_ic_first 經正式 CGSA
-    生成（不再於 IC 階段拋 AlignmentViolationError ⇒ 結果恆在、決策恆比對）。"""
+    生成（不再於 IC 階段拋 AlignmentViolationError ⇒ 結果恆在、決策恆比對）。
+    TESTSEL I10：三入口改用窄設定（`h.narrow_stat_payload`；同路徑、少重複欄），斷言不變。"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
     attr = CONTRACT["factory_decisions_attr"]
     h.prepare_stat_env(monkeypatch, tmp_path / "gen")
-    root, factory, gen = h.run_stat(tmp_path / "gen", h.stat_payload())
+    root, factory, gen = h.run_stat(tmp_path / "gen", h.narrow_stat_payload())
     assert getattr(factory, attr) == h.decisions(gen)  # 同一物件為 metadata 之來源
     setattr(factory, attr, None)
-    ic = h.ic_first_to_l65(factory, factory._resolve_config(h.stat_payload()),
+    ic = h.ic_first_to_l65(factory, factory._resolve_config(h.narrow_stat_payload()),
                            ic_engine=ICEngine({"methods": ["spearman"]}), feature_reader=FeatureReader(str(root)),
                            ic_threshold=0.0, start_date=h.WINDOW[0], end_date=h.WINDOW[1])
     i = getattr(factory, attr)
     assert i, "run_ic_first 未產生平穩化決策"
     assert h.decisions(ic) == i
     h.prepare_stat_env(monkeypatch, tmp_path / "par", FFACT_MULTI_TF_PARALLEL="1")
-    _, _, par = h.run_stat(tmp_path / "par", h.stat_payload(["1h", "12h"]))
+    _, _, par = h.run_stat(tmp_path / "par", h.narrow_stat_payload(["1h", "12h"]))
     keys = ("calibration_end", "n", "fracdiff", "d", "adf_differenced")
     g, p = h.decisions(gen), h.decisions(par)
     for col, d in g.items():
@@ -717,9 +712,9 @@ def test_ic_first_supplied_layers_unchanged_when_off(tmp_path: Path, monkeypatch
 
 def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 驗證：resume（第二次同設定 run 經 CGSA 工作目錄續跑）時，前置關卡仍涵蓋 L1–L6 已完成之週期，
-    決策與首跑全同；該週期校準讀取錯 ⇒ 零寫入失敗。"""
+    決策與首跑全同；該週期校準讀取錯 ⇒ 零寫入失敗。TESTSEL I10：改用窄設定（續跑路徑與欄寬無關）。"""
     h.prepare_stat_env(monkeypatch, tmp_path, FFACT_MULTI_TF_PARALLEL="0")
-    _, _, first = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]))
+    _, _, first = h.run_stat(tmp_path, h.narrow_stat_payload(["1h", "12h"]))
     seen: list = []
     real = FeatureFactory.run_calibration_preflight
 
@@ -728,7 +723,7 @@ def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pyt
         return real(self, symbol, timeframes, config, output_start)
 
     monkeypatch.setattr(FeatureFactory, "run_calibration_preflight", _spy)
-    _, _, second = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]), force_regenerate=False)
+    _, _, second = h.run_stat(tmp_path, h.narrow_stat_payload(["1h", "12h"]), force_regenerate=False)
     assert seen and set(seen[-1]) == {"1h", "12h"}
     # 第二次 run 讀到首跑寫入之 d* 快取 ⇒ dstar_cache_hit 由 False 轉 True 屬預期（b3b 實跑：差異只在此欄位，825 欄）；
     # 其餘決策欄位（校準時間、N、p 值、fracdiff、d、差分階數、事件）須全同
@@ -739,7 +734,7 @@ def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pyt
     _fail_second_tf_read(monkeypatch)
     before = h.snapshot_tree(tmp_path)
     with pytest.raises(CalibrationError):
-        h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]), force_regenerate=False)
+        h.run_stat(tmp_path, h.narrow_stat_payload(["1h", "12h"]), force_regenerate=False)
     assert h.snapshot_tree(tmp_path) == before
 
 
@@ -819,7 +814,13 @@ def test_boundary_07b_calibration_temp_removed_on_exception(tmp_path: Path, monk
     assert list(h.sys_tmp(tmp_path).glob(CONTRACT["calibration_tmp_prefix"] + "*")) == []
 
 
-@pytest.mark.parametrize("symbol", CONTRACT["cost_measure_symbols"])
+#: TESTSEL I10：測試只留 BTCUSDT（1h、12h 兩格：週期換算與長歷史來源為不同路徑）；ETHUSDT、BCHUSDT 同一生成與校準
+#: 判定碼，「各標的前史是否夠」屬資料性質 ⇒ 一次性收據 `handoffs/run_receipts/ffstat_probes/boundary08_symbols_receipt.py`
+#: （對契約 cost_measure_symbols × cost_measure_timeframes 全格呼叫本測試函式；kline／長歷史資料或校準碼變更時重跑）
+BOUNDARY_08_TEST_SYMBOLS = CONTRACT["cost_measure_symbols"][:1]
+
+
+@pytest.mark.parametrize("symbol", BOUNDARY_08_TEST_SYMBOLS)
 @pytest.mark.parametrize("timeframe", CONTRACT["cost_measure_timeframes"])
 def test_boundary_08_default_runs_no_column_short(symbol: str, timeframe: str, tmp_path: Path,
                                                   monkeypatch: pytest.MonkeyPatch) -> None:
@@ -902,11 +903,15 @@ def _path_of_call() -> str:
     return "unknown"
 
 
-@pytest.mark.parametrize("n", [500, 2000])
+@pytest.mark.parametrize("n", [500])
 @pytest.mark.parametrize("mode", ["serial", "parallel"])
 def test_three_paths_same_n(n: int, mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.2 驗證（r18 codex P1-02）：以呼叫堆疊逐路記 ADF 樣本數——ADF 差分候選、fracdiff 目標篩選、
-    d* 搜尋（循序）與 d* 搜尋（parallel worker，於主程序內執行以使 spy 可見）——每路非空且皆等於 N。"""
+    d* 搜尋（循序）與 d* 搜尋（parallel worker，於主程序內執行以使 spy 可見）——每路非空且皆等於 N。
+    TESTSEL I10：N 只留 500（≠ 1h 預設 1000，驗非預設 N 之傳遞）；原 N＝2000 兩格移除——N 於生產碼無分支：
+    `_stationarity_n_for`→各路 `sample_size` 直傳，唯一依 N 之算式 `_resolve_fracdiff_max_lag`＝min(max(2, N//10), 252)
+    於 N∈[20, 2520) 同一線性段（500→50、2000→200），`adf_pvalue_fast` 之分支依資料（觀測數下限、條件數）不依 N；
+    非預設大 N 經真實 worker 之傳遞另由 test_parallel_real_worker_same_n_and_decisions（N＝2000）驗。"""
     from momentum.FeatureEngineering.preprocessing import _slow_path_parallel as spp
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
@@ -943,12 +948,13 @@ def test_three_paths_same_n(n: int, mode: str, tmp_path: Path, monkeypatch: pyte
 def test_parallel_real_worker_same_n_and_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.2 驗證（r19 codex P2-06）：d* 搜尋走真實子程序 worker（不覆寫 `ParallelSlowPath.map`）、非預設 N=2000
     ⇒ 送往 worker 之每筆 metadata 之 ADF 樣本數皆為 N，且逐欄決策（fracdiff、ADF 階數、d、N）與同 N 之循序路徑全同
-    （循序路徑之 N 已由 `test_three_paths_same_n` 以 spy 驗；worker 內寫死 500 則 d 必有欄不同）。"""
+    （循序路徑之 N 已由 `test_three_paths_same_n` 以 spy 驗；worker 內寫死 500 則 d 必有欄不同）。
+    TESTSEL I10：改用窄設定（`h.narrow_stat_payload`；worker 路徑與欄寬無關，仍有多欄進 fracdiff 走平行分支）。"""
     from momentum.FeatureEngineering.preprocessing import _slow_path_parallel as spp
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
     n = 2000
-    payload = h.stat_payload()
+    payload = h.narrow_stat_payload()
     payload["preprocessing"]["calibration_bars"] = n
     h.prepare_stat_env(monkeypatch, tmp_path / "serial")
     _, _, serial = h.run_stat(tmp_path / "serial", payload)

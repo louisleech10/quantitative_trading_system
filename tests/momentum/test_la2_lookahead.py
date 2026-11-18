@@ -1063,9 +1063,12 @@ def test_pattern_train_mask() -> None:
     assert n_cf_legacy > 0 and n_conf_flip_post == 0
 
 
-def test_pattern_promotion_guard() -> None:
-    """B3：晉升 server 權威（create+PUT）；偽造 client 欄位拒；OOT lift 來源。"""
+def test_pattern_promotion_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """B3：晉升 server 權威（create+PUT）；偽造 client 欄位拒；OOT lift 來源。
+
+    型態存放明給暫存根（TESTSEL I1a Task 1.2：原以產品預設根 `data_cache/patterns` 每跑寫 5 檔＋索引進正式資料）。"""
     from momentum.Analysis.eval_scope_utils import build_service_oot_bundle
+    from momentum.Analysis.pattern_storage import PatternStorage
     from api.services.pattern_management_service import PatternManagementService
 
     artifact = b"promo-artifact-v1"
@@ -1111,7 +1114,12 @@ def test_pattern_promotion_guard() -> None:
         },
     }
     store: dict = {"task-ok": task_result}
+    # 建構子即呼叫 create_pattern_storage()（預設根會 mkdir）⇒ 建構前先導向暫存根
+    from api.services import pattern_management_service as pms
+
+    monkeypatch.setattr(pms, "create_pattern_storage", lambda: PatternStorage(base_path=str(tmp_path / "patterns")))
     svc = PatternManagementService(task_result_lookup=lambda tid: store.get(tid))
+    assert Path(svc.storage.base_path) == tmp_path / "patterns"
 
     # 偽造 client rules/metadata/status → 拒
     bad = svc.create_pattern(

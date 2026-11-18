@@ -126,22 +126,31 @@
     "receipt": "handoffs/run_receipts/20261001-icpostleak-probe_icpage_leak.log"
   },
   "oracle_update_files": [
+    "tests/api/test_numview_ic_page.py",
     "tests/feature_engineering/ff_truncation_mr_helpers.py",
     "tests/feature_engineering/preprocessing/test_causal_winsor.py",
     "tests/feature_engineering/preprocessing/test_ff_causal_golden.py",
-    "tests/feature_engineering/preprocessing/test_l65_native_tf_real_eth.py",
     "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py",
     "tests/feature_engineering/preprocessing/test_native_tf_helpers.py",
+    "tests/feature_engineering/preprov_helpers.py",
     "tests/feature_engineering/test_ff_wrapper_path_correctness.py",
+    "tests/feature_engineering/test_ffname_suffix_ops.py",
     "tests/feature_engineering/test_ffstat_stable_start.py",
     "tests/feature_engineering/test_ic_first_pipeline.py",
+    "tests/feature_engineering/test_icfirstalign_icfirst.py",
+    "tests/feature_engineering/test_icfirstalign_memory.py",
+    "tests/feature_engineering/test_icfirstalign_timeaxis.py",
     "tests/feature_engineering/test_l7_raw_streaming.py",
+    "tests/feature_engineering/test_numview_acceptance.py",
+    "tests/feature_engineering/test_numview_core.py",
+    "tests/feature_engineering/test_numview_policy.py",
+    "tests/feature_engineering/test_preprov_processed.py",
     "tests/feature_engineering/test_ratiounsafe_registry.py",
+    "tests/momentum/Analysis/test_icperf_gate.py",
     "tests/momentum/test_feature_factory_optimization_e2e.py",
     "tests/momentum/test_feature_factory_optimization_perf.py",
     "tests/momentum/test_feature_preprocessor.py",
     "tests/performance/test_memory_pressure.py",
-    "tests/test_feature_factory_batch2c.py",
     "tests/test_feature_factory_config.py",
     "tests/test_l65_parallel.py",
     "tests/test_polars_phase4.py"
@@ -233,12 +242,57 @@
       "assert_like": 47,
       "note": "RATIOUNSAFE（2026-10-03）新增：開 zscore／winsorization 之 registry 分支強制測試；safe 欄比對 HEAD 凍結之 tests/_golden/ratiounsafe/branch_oracle.json",
       "skip_xfail": 0
+    },
+    "tests/api/test_numview_ic_page.py": {
+      "assert_like": 142,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/preprov_helpers.py": {
+      "assert_like": 5,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_ffname_suffix_ops.py": {
+      "assert_like": 30,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_icfirstalign_icfirst.py": {
+      "assert_like": 48,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_icfirstalign_memory.py": {
+      "assert_like": 152,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_icfirstalign_timeaxis.py": {
+      "assert_like": 43,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_numview_acceptance.py": {
+      "assert_like": 276,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_numview_core.py": {
+      "assert_like": 112,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_numview_policy.py": {
+      "assert_like": 59,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_preprov_processed.py": {
+      "assert_like": 39,
+      "skip_xfail": 0
+    },
+    "tests/momentum/Analysis/test_icperf_gate.py": {
+      "assert_like": 929,
+      "skip_xfail": 0
     }
   },
   "oracle_update_counts_rule": {
     "assert_regex_ere": "^\\s*assert |np\\.testing\\.assert|pd\\.testing\\.assert|pytest\\.raises",
     "skip_regex_ere": "pytest\\.mark\\.(skip|xfail)|pytest\\.(skip|xfail)\\(",
-    "frozen_at": "HEAD d31c170e（主委 2026-10-01）"
+    "frozen_at": "HEAD d31c170e（主委 2026-10-01）",
+    "resynced_at": "TESTSEL I7 後（2026-11-14）：清單重取 grep；ICFIRSTALIGN／NUMVIEW／PREPROV／FF-NAME／ICPERF 新增 11 檔補凍結計數（當下值）；FFPROD b2 刪實作後 2 檔不再命中、移出清單但凍結計數保留續驗"
   },
   "registry_chunked_append": {
     "env": {
@@ -250,5 +304,50 @@
     ],
     "spy": "_stream_single_group_chunked_to_sink",
     "note": "chunked 僅於 requires_slow（append 模式或 ADF／fracdiff）時觸發；每塊呼叫 _transform_single（legacy，append 停用 optimized）"
+  },
+  "oracle_update_retired": {
+    "tests/feature_engineering/preprocessing/test_causal_winsor.py": [
+      "d4d97d62 FFPROD b2：assert np.isnan(rank_only[:19]).all()——_registry_fast_transform 之 rank 快速路徑已刪（開啟即拒），被測實作不存在",
+      "d4d97d62 FFPROD b2：assert np.isfinite(rank_only[19:]).all()——同上，rank 快速路徑已刪",
+      "d4d97d62 FFPROD b2：np.testing.assert_allclose(legacy, polars_result)——L6.5 polars 臂已刪（契約 branches 同批移除 polars）",
+      "d4d97d62 FFPROD b2：assert gaussian_calls == [True, True]——transform_registry_groups 原地覆寫入口已刪（契約 branches 同批移除 registry）"
+    ],
+    "tests/feature_engineering/test_ic_first_pipeline.py": [
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert list(left.columns) == list(right.columns)",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert left.index.equals(right.index)",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert left.isna().equals(right.isna())",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：np.testing.assert_allclose(",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert list(post_ic.columns) == selected_features",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert post_ic.index.equals(frame.index)",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert \"beta\" not in post_ic.columns",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert list(result.columns) == [\"alpha\"]",
+      "5584102d FRAMEPATH 刪 frame 產生路徑（被測入口不存在）：assert result.index.equals(frame.index)",
+      "d0931a00 FRAMEPATH 刪舊特徵版面讀取（legacy_format 不存在）：assert b\"schema_version\" not in schema_metadata",
+      "d0931a00 FRAMEPATH 刪舊特徵版面讀取（legacy_format 不存在）：assert loaded_manifest[\"legacy_format\"] is True",
+      "d0931a00 FRAMEPATH 刪舊特徵版面讀取（legacy_format 不存在）：np.testing.assert_allclose("
+    ],
+    "tests/test_l65_parallel.py": [
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert serial_completed == len(arrays)",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert parallel_completed == len(arrays)",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert np.allclose(serial_array, parallel_array, atol=1e-4, equal_nan=True)",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert completed == 4",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert completed == 2",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert full_groups == [\"group_1\"]",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert chunked_groups == [\"group_2\"]",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert completed == 3",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert manifest_writes == [\"write\"]",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert stats[\"manifest_deferred_count\"] == 3.0",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert stats[\"manifest_write_count\"] == 1.0",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert completed == 4",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert submission_order == [\"group_2\", \"group_4\", \"group_3\", \"group_1\"]",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert preprocessor.transform_registry_groups(registry, n_workers=4) == 0",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert preprocessor.transform_registry_groups(registry, n_workers=4) == 1",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert preprocessor.transform_registry_groups(registry, n_workers=3) == 2",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert preprocessor.transform_registry_groups(registry, n_workers=1) == 2",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert captured[\"count\"] == 2",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert completed == 2",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert call_order[0] == \"warmup\"",
+      "d4d97d62 FFPROD b2 刪無生產呼叫者之實作（transform_registry_groups 等，被測實作不存在）：assert call_order[1:] == [\"submit\", \"submit\"]"
+    ]
   }
 }

@@ -54,19 +54,22 @@ def _factory() -> Any:
 
 
 def _hash_of(factory: Any, cell_id: str) -> str:
+    """該格 config_hash（於生成環境 `ph.FIXED_ENV` 計算，與 `ph.run_cell` 之 run 同環境；見 `ph.with_fixed_env`）。"""
     cell = _CELLS[cell_id]
     fam = _FAMILIES[cell["family"]]
-    config = factory._resolve_config(ph.cell_payload(cell))
-    return factory._compute_config_hash(config, _SPEC["symbol"], fam["primary"],
-                                        start_date=fam["window"][0], end_date=fam["window"][1])
+    with ph.with_fixed_env():
+        config = factory._resolve_config(ph.cell_payload(cell))
+        return factory._compute_config_hash(config, _SPEC["symbol"], fam["primary"],
+                                            start_date=fam["window"][0], end_date=fam["window"][1])
 
 
 def _identity_of(factory: Any, cell_id: str) -> str:
-    """公開身分入口 `FeatureFactory.config_identity`（批次續跑核對所用，Task 1.4）。"""
+    """公開身分入口 `FeatureFactory.config_identity`（批次續跑核對所用，Task 1.4）；與 `_hash_of` 同於 `ph.FIXED_ENV`。"""
     cell = _CELLS[cell_id]
     fam = _FAMILIES[cell["family"]]
-    return factory.config_identity(_SPEC["symbol"], fam["primary"], ph.cell_payload(cell),
-                                   fam["window"][0], fam["window"][1])
+    with ph.with_fixed_env():
+        return factory.config_identity(_SPEC["symbol"], fam["primary"], ph.cell_payload(cell),
+                                       fam["window"][0], fam["window"][1])
 
 
 def _hash_violations(factory: Any) -> List[str]:
@@ -195,6 +198,31 @@ def _baseline_add_commit() -> str:
                           cwd=str(ph.REPO), capture_output=True, text=True)
     commits = [c for c in proc.stdout.split() if c]
     return commits[-1] if proc.returncode == 0 and commits else ""
+
+
+_FIXEDENV_REFREEZE_RECEIPT = ph.REPO / "handoffs" / "run_receipts" / "20261118-probewinsor-fixedenv-refreeze.json"
+
+
+def test_fixedenv_refreeze_receipt_binds_baseline() -> None:
+    """TESTSEL I1d1（審碼 b1 r1 裁定①）之後續結構重凍收據：每格去 NUMVIEW 鹽＝9891907f^ 原凍結值（equal）、with_fixed_env 值＝
+    isolated 生成環境值、新值＝現行 baseline 之 config_hash 且＝現行 `_hash_of`；收據之 after sha＝現行 baseline 位元組；
+    收據之 FIXED_ENV＝`ph.FIXED_ENV`。收據鏈接續性另由 test_numview_acceptance 之 refreeze_chain_violations 驗。"""
+    import hashlib
+    import json as _json
+
+    receipt = _json.loads(_FIXEDENV_REFREEZE_RECEIPT.read_text(encoding="utf-8"))
+    assert receipt["exit_code"] == 0 and receipt["errors"] == [] and receipt["values_except_config_hash_equal"] is True
+    assert receipt["fixed_env"] == ph.FIXED_ENV
+    assert receipt["baseline_sha256_after"] == hashlib.sha256(ph.BASELINE_PATH.read_bytes()).hexdigest()
+    frozen = ph.baseline()["cells"]
+    items = {i["cell"]: i for i in receipt["items"]}
+    assert set(items) == set(_CELLS) == set(frozen)
+    factory = _factory()
+    for cell_id, item in items.items():
+        assert item["equal"] is True and item["stripped_recomputed"] == item["origin_frozen"], cell_id
+        assert item["new_value"] == item["isolated_value"] == frozen[cell_id]["config_hash"], cell_id
+        if _CELLS[cell_id]["pp"] or not _CELLS[cell_id]["winsor"]:  # off.w1 格之錨點形不含探測鹽（boundary_05③）
+            assert _hash_of(factory, cell_id) == item["new_value"], cell_id
 
 
 def test_boundary_10_baseline_provenance() -> None:

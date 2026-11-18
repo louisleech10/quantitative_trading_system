@@ -131,9 +131,13 @@ def test_feature_kline_download_chain_values_survive_roundtrip(svc):
     assert df is not None and len(df) == provider.n_bars
     assert list(df.columns) == list(CANONICAL_DTYPE.names)
     assert {c: str(t) for c, t in df.dtypes.items()} == KlineStorageManager.COLUMN_DTYPES
-    # provider 規則：先轉 float32 再相除（見 binance_provider._convert_to_dataframe）
-    expected = (df["taker_buy_volume"].astype("float32") / df["volume"].astype("float32")).astype("float32").clip(0, 1)
-    assert np.array_equal(df["taker_ratio"].to_numpy(), expected.to_numpy())
+    # taker_ratio 單一定義（TESTSEL I1b Task 1.7；原「先轉 float32 再相除」與 legacy 匯入差 1 ulp 而統一）：
+    # 自原始字串以 float64 解析相除、一次捨入為 float32、clip [0,1]——以原始列獨立計算，不讀回存檔之 float32 量
+    raw = _raw_binance_rows(provider.n_bars)
+    v64 = np.array([float(r[5]) for r in raw], dtype=np.float64)
+    tb64 = np.array([float(r[9]) for r in raw], dtype=np.float64)
+    expected = np.clip(np.where(v64 > 0, tb64 / v64, 0.5), 0, 1).astype(np.float32)
+    assert np.array_equal(df["taker_ratio"].to_numpy(), expected)
     # 連續、無重複、升冪
     ts = df["timestamp"].to_numpy()
     assert np.all(np.diff(ts) == TF_SEC)

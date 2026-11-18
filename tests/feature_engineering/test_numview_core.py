@@ -98,6 +98,7 @@ from momentum.FeatureEngineering import run_provenance as rp_mod
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from tests.feature_engineering import ffstat_helpers as fsh
+from tests.feature_engineering import l2_oracle as l2o
 from tests.feature_engineering import numview_helpers as nh
 from tests.feature_engineering import preprov_helpers as ph
 
@@ -162,6 +163,14 @@ def _require_decision(key: str, value: str) -> None:
     """分支測試之前置：決定紀錄 `key` 之選定處置須等於本分支值（fail-closed，不 skip）。"""
     got = nh.decision(key)
     assert got == value, f"決定紀錄 {key}={got!r}，本分支須為 {value!r}（gate 之 -k 選錯分支 ⇒ 紅）"
+
+
+def _only_if_chosen(decision: Tuple[str, str, str]) -> pytest.MarkDecorator:
+    """落選分支測試之收集期條件跳過（TESTSEL I1g，SPEC Task 4.2）：決定紀錄 `decision[0]` 之選定值 ≠ 本分支值 `decision[1]`
+    ⇒ 跳過（落選分支未實作；於 fixture 建立前生效）；決定紀錄日後改選本分支即自動恢復執行，本體 `_require_decision` 照舊把關。"""
+    key, value = decision[0], decision[1]
+    chosen = nh.decision(key)
+    return pytest.mark.skipif(chosen != value, reason=f"NUMVIEW 決定紀錄 {key}＝{chosen}；落選分支 {value} 未實作")
 
 
 def _formal_arm() -> str:
@@ -512,8 +521,16 @@ class CellRun:
     exits: List[LayerExit] = dataclasses.field(default_factory=list)
     l2_use: List[L2Use] = dataclasses.field(default_factory=list)
     l2_arms: List[Tuple[str, pd.DataFrame, pd.DataFrame]] = dataclasses.field(default_factory=list)
+    #: TESTSEL I1f2：與 l2_arms 同序之 L2 呼叫點 layer1 拷貝（tf, layer1）——兩臂獨立 oracle 之輸入
+    l2_inputs: List[Tuple[str, pd.DataFrame]] = dataclasses.field(default_factory=list)
     compute_all_polars_calls: int = 0
     public: Dict[Tuple[int, str], List[Tuple[pd.DataFrame, pd.DataFrame]]] = dataclasses.field(default_factory=dict)
+    mtf_routes: List[Dict[str, Any]] = dataclasses.field(default_factory=list)
+
+
+#: TESTSEL I1f（SPEC Task 3.2）：量測生成令 multi_tf_generator 之排程器走產品既有串行臂（`aux_startup_envelope=None`
+#: ⇒ route reason `no_aux_receipt`），使非主週期於本行程計算、spy 可觀測兩臂；改壞對照以 monkeypatch 關閉。
+FORCE_MTF_SERIAL = True
 
 
 def _layer_data(result: Any) -> pd.DataFrame:
@@ -557,8 +574,31 @@ def _l2_use(run: CellRun, factory: Any, layer: str, layer2: Any, result: Any,
 
 def _install_spies(mp: pytest.MonkeyPatch, run: CellRun) -> None:
     """生成期間之觀測器（只記錄、原樣轉呼叫）：post-IC 呼叫、L1–L6 層出口 dtype、L2 公開落盤、L5／L6 所吃之 L2、
-    `compute_all_polars` 呼叫數。"""
+    `compute_all_polars` 呼叫數；並令多週期排程器走串行臂（`FORCE_MTF_SERIAL`）且記錄其 route 紀錄。"""
     FF = ff_mod.FeatureFactory
+
+    import momentum.factories as factories_mod
+
+    real_create = factories_mod.create_memory_budget_scheduler
+
+    def create_spy(**kwargs: Any) -> Any:
+        is_mtf = sys._getframe(1).f_code.co_filename.endswith("multi_tf_generator.py")
+        if is_mtf and FORCE_MTF_SERIAL:
+            kwargs["aux_startup_envelope"] = None
+        sched = real_create(**kwargs)
+        if is_mtf:
+            real_run = sched.run
+
+            def run_spy(tasks: Any, worker_fn: Any, serial_fn: Any, on_wave_joined: Any) -> Any:
+                try:
+                    return real_run(tasks, worker_fn, serial_fn, on_wave_joined)
+                finally:
+                    run.mtf_routes.extend(dict(r) for r in sched.routes)
+
+            sched.run = run_spy
+        return sched
+
+    mp.setattr(factories_mod, "create_memory_budget_scheduler", create_spy)
 
     real_ts = FeaturePreprocessor.transform_selected
 
@@ -624,6 +664,7 @@ def _install_spies(mp: pytest.MonkeyPatch, run: CellRun) -> None:
         returned = _layer_data(result)
         if new and not returned.empty and not calib:
             run.l2_arms.append((tf, returned.copy(), pd.concat([raw for raw, _c in new], axis=1)))
+            run.l2_inputs.append((tf, _layer_data(layer1).copy()))
         return result
 
     mp.setattr(FF, "_layer2_derived_features", l2_spy)
@@ -682,7 +723,11 @@ def _generate(root: Path, kind: str, cell: Mapping[str, Any], *, env: Optional[M
         found.handle = _freeze().generate_cell(nh.regen_batch_root(), descriptor,
                                                run_kind=nh.regen_core_kind(False), env=env_map)
         return found
-    reuse_without_obs = obs_path is not None and (obs_path.parent / "numview_cell.json").is_file()
+    # TESTSEL I1f（審碼 b1 r1 CODEX-R1-P1-01；SPEC Task 3.2 方向 (a)）：多週期格之觀測生成強制串行（route_identity 隨之
+    # 改變），不得成為共用快取 run ⇒ 一律於本測試私有根生成，共用快取 run 另以自然排程生成（不掛觀測器），兩者逐位元與
+    # 生成身分相等後才寫回觀測
+    force_private = FORCE_MTF_SERIAL and len(list(cell.get("timeframes") or [])) > 1
+    reuse_without_obs = obs_path is not None and (force_private or (obs_path.parent / "numview_cell.json").is_file())
     mp = pytest.MonkeyPatch()
     try:
         _install_spies(mp, run)
@@ -728,6 +773,31 @@ def _generate(root: Path, kind: str, cell: Mapping[str, Any], *, env: Optional[M
                     diff = nh.bitwise_diff(nh.fingerprints(cached.run_dir, artifact),
                                            nh.fingerprints(run.handle.run_dir, artifact))
                     assert diff == [], f"{run.key}：私有根觀測之 run 與共用快取 run 之 {artifact} 不等，拒寫觀測：{diff[:3]}"
+            # manifest 身分（TESTSEL I1f 審碼 b1 r2 CODEX-R2-P1-01）：逐鍵相等，只具名排除排程臂所致之 `route_identity`／
+            # `route_records`（SPEC Task 3.2 方向 (a)：強制串行之量測 run 不作身分基準）與時間戳 `created_at`／`updated_at`；
+            # 根路徑前綴換 <work>（原型實錄：串行 vs 平行之 manifest 差異恰為上列四類＋根路徑，runs/testsel_route/i1f/manifest_diff.sh）
+            def _manifest_identity(handle: Any) -> Any:
+                work = Path(getattr(handle, "work", Path(handle.run_dir).parents[3]))
+                roots = sorted({str(work), str(work.resolve())}, key=len, reverse=True)
+                path = Path(handle.run_dir) / "feature_manifest.json"
+                if not path.is_file():
+                    return None
+
+                def _norm(node: Any) -> Any:
+                    if isinstance(node, dict):
+                        return {k: _norm(v) for k, v in node.items()
+                                if k not in ("route_identity", "route_records", "created_at", "updated_at")}
+                    if isinstance(node, list):
+                        return [_norm(v) for v in node]
+                    if isinstance(node, str):
+                        for root in roots:
+                            node = node.replace(root, "<work>")
+                    return node
+
+                return _norm(json.loads(path.read_text(encoding="utf-8")))
+
+            ours_mf, theirs_mf = _manifest_identity(run.handle), _manifest_identity(cached)
+            assert ours_mf == theirs_mf, f"{run.key}：私有根與共用 run 之 manifest 身分（除具名排除鍵）不等，拒寫觀測"
         obs_path.parent.mkdir(parents=True, exist_ok=True)
         handle, run.handle = run.handle, None
         try:
@@ -888,7 +958,8 @@ def _runs_with_frozen(runs: "_Runs", kind: str, artifact: str) -> List[CellRun]:
     return [runs.get(kind, cells[key]) for key in keys]
 
 
-def test_postic_retained_processed_and_ic_page_bitwise_equal_frozen(runs: _Runs, tmp_path: Path) -> None:
+def test_postic_retained_processed_and_ic_page_bitwise_equal_frozen(runs: _Runs,
+                                                                    tmp_path_factory: pytest.TempPathFactory) -> None:
     """R6-B（v40 註：Task 3.4 後之釘住對象＝擇定核心輸出）：IC-first processed（凍結檔中每個含 processed 之格；Task 3.4
     同提交重凍）對 §G 凍結逐位元相等（`values_native`＋`dtype`＋`nan`、欄集合與欄序，atol=0）；沿用 PRE-PROV
     `ic_first_default` processed 基準（Task 3.4 同提交重凍；legacy 相容比對）。IC 頁輸出之釘住由 Task 3.4 ①
@@ -914,7 +985,7 @@ def test_postic_retained_processed_and_ic_page_bitwise_equal_frozen(runs: _Runs,
             bad.extend(f"{kind}|{key}|processed|{d}" for d in
                        nh.bitwise_diff(node[FROZEN_PROCESSED], nh.fingerprints(run.handle.run_dir, "processed")))
     legacy = json.loads(nh.LEGACY_BASELINE_PATH.read_text(encoding="utf-8"))["cells"]["ic_first_default"]
-    cache = ph.RunCache(tmp_path / "preprov")
+    cache = ph.shared_run_cache(tmp_path_factory)  # TESTSEL I10：與 PRE-PROV 各模組共用（原每次新建倉重生）
     for symbol, node in legacy.items():
         handle = cache.get("ic_first_default", symbol)
         bad.extend(f"preprov|{symbol}|{d}" for d in
@@ -1065,6 +1136,7 @@ def _main_exit_violations(run: CellRun) -> Tuple[List[str], int]:
     return bad, compared
 
 
+@_only_if_chosen(D_MTF)
 def test_mtf_dtype_layer_exits_float32_and_primary_columns_equal_single_tf(runs: _Runs) -> None:
     """D-MTF 改案兩路 oracle：格 B 全部格之 L1–L6 層出口皆 float32 且對同層 float64 回傳 ≤1 ulp（「獨立 float64 重算」
     取該層函式之未轉型回傳，見報告）；格 B 之主週期欄對同 symbol 同週期之格 A 單週期 run 逐位元相等。"""
@@ -1085,6 +1157,7 @@ def test_mtf_dtype_layer_exits_float32_and_primary_columns_equal_single_tf(runs:
     assert bad == [], bad[:30]
 
 
+@_only_if_chosen(D_MTF)
 def test_boundary_31_mtf_dtype_single_training_timeframe_equals_single_tf(runs: _Runs, tmp_path: Path) -> None:
     """邊界②（Task 3.2）：多週期格中只有單一訓練週期（＝主週期）⇒ raw 全表對同 symbol 同週期之單週期格逐位元相等。"""
     _require_decision(D_MTF[0], D_MTF[1])
@@ -1109,6 +1182,7 @@ def _force_preserve_dtype(factory_cls: Any, value: bool) -> Patch:
     return patch
 
 
+@_only_if_chosen(D_MTF)
 def test_mutation_mtf_dtype_preserve_dtype_restored_breaks_exit_dtype(tmp_path: Path) -> None:
     """mutation：改案還原（多週期層間保留 float64）⇒ 層出口 dtype 案紅。"""
     _require_decision(D_MTF[0], D_MTF[1])
@@ -1153,6 +1227,7 @@ def _concat_fp(dfs: List[pd.DataFrame], threshold: int) -> Mapping[str, Any]:
     return nh.frame_fingerprints(out)
 
 
+@_only_if_chosen(D_MEMMAP)
 def test_memmap_dtype_forced_branches_bitwise_equal(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """D-MEMMAP 改案：同輸入（真實 kline 全部 symbol×tf）強制兩支（門檻 0 ⇒ memmap 支、門檻極大 ⇒ 一般 concat 支）
     輸出 dtype 與值逐位元相等。"""
@@ -1168,6 +1243,7 @@ def test_memmap_dtype_forced_branches_bitwise_equal(monkeypatch: pytest.MonkeyPa
     assert bad == [], bad[:30]
 
 
+@_only_if_chosen(D_MEMMAP)
 def test_boundary_30_memmap_dtype_threshold_exact_and_neighbours_identical(monkeypatch: pytest.MonkeyPatch,
                                                                             tmp_path: Path) -> None:
     """邊界①（Task 3.2）：資料量恰等於門檻與 ±1（門檻設為真實輸入之估計位元組 est−1、est、est+1；`concat_with_memmap`
@@ -1199,6 +1275,7 @@ def _coupled_concat(dfs: List[pd.DataFrame], index: Optional[pd.Index] = None,
     return out
 
 
+@_only_if_chosen(D_MEMMAP)
 def test_mutation_memmap_dtype_coupled_breaks_equality(monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：改案還原（合併 dtype 依資料量耦合）⇒ 兩支逐位元案紅。"""
     _require_decision(D_MEMMAP[0], D_MEMMAP[1])
@@ -1263,6 +1340,7 @@ def _winsor_outputs() -> Iterable[Tuple[str, np.ndarray, np.ndarray]]:
         yield f"{symbol}/{tf}", np.asarray(sigma), np.asarray(quantile)
 
 
+@_only_if_chosen(D_WINSOR)
 def test_winsor_dtype_sigma_quantile_same_dtype_and_fracdiff_within_1ulp() -> None:
     """D-WINSOR-DTYPE 改案兩路 oracle：sigma／quantile 兩分支回傳 dtype 相同；後續 fracdiff（`_frac_diff_ffd`）對獨立
     FFD 重算 ≤1 ulp、NaN 遮罩 exact（d 取生產預設 `d_range` 上半之 0.5／0.75／1.0 倍上界、權重門檻取預設）。"""
@@ -1286,6 +1364,7 @@ def test_winsor_dtype_sigma_quantile_same_dtype_and_fracdiff_within_1ulp() -> No
     assert bad == [], bad[:20]
 
 
+@_only_if_chosen(D_WINSOR)
 def test_mutation_winsor_dtype_sigma_float64_restored_breaks_dtype(monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：改案還原（sigma 回 float64、quantile 回 float32）⇒ 兩分支 dtype 相同案紅。"""
     _require_decision(D_WINSOR[0], D_WINSOR[1])
@@ -1527,6 +1606,7 @@ def _readback_violations(section: Mapping[str, Any], write: CodecWrite) -> List[
     return bad
 
 
+@_only_if_chosen(D_CODEC)
 def test_codec_by_provenance_encoding_follows_records_not_names(runs: _Runs, tmp_path: Path,
                                                                 monkeypatch: pytest.MonkeyPatch) -> None:
     """D-CODEC (i)：名含字面而只做 zscore 之真實 raw 欄、及名不含字面而做 rank 之欄，編碼型別皆等於依讀回紀錄與契約
@@ -1539,6 +1619,7 @@ def test_codec_by_provenance_encoding_follows_records_not_names(runs: _Runs, tmp
 
 
 @pytest.mark.parametrize("case", CODEC_CASES)
+@_only_if_chosen(D_CODEC)
 def test_codec_by_provenance_anomalies_lossless_and_recorded(case: str, runs: _Runs, tmp_path: Path,
                                                              monkeypatch: pytest.MonkeyPatch) -> None:
     """D-CODEC (ii)：刪一欄紀錄／複製一欄紀錄／綁定四元改一值（紀錄鍵之週期改為他週期）／步驟狀態改為映射表外之組合
@@ -1597,6 +1678,7 @@ def _tamper_record(mp: pytest.MonkeyPatch) -> None:
     mp.setattr(rp_mod, "write_provenance_table", mutant)
 
 
+@_only_if_chosen(D_CODEC)
 def test_codec_by_provenance_mapping_digest_bound_and_tamper_fails(runs: _Runs, tmp_path: Path,
                                                                    monkeypatch: pytest.MonkeyPatch) -> None:
     """D-CODEC (iii)：正常寫入後 manifest `mapping_sha256`＝自讀回紀錄表依契約正規化獨立重算之值，且 ≠
@@ -1617,6 +1699,7 @@ def test_codec_by_provenance_mapping_digest_bound_and_tamper_fails(runs: _Runs, 
     assert not ph._strict_readable(tampered.handle, "processed")
 
 
+@_only_if_chosen(D_CODEC)
 def test_mutation_codec_by_provenance_digest_vs_file_sha_breaks_normal_write(runs: _Runs, tmp_path: Path,
                                                                              monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：摘要比對改為比 `provenance.sha256`（紀錄檔位元組雜湊）⇒ (iii) 之正常寫入案紅（恆不等而失敗）。"""
@@ -1631,6 +1714,7 @@ def test_mutation_codec_by_provenance_digest_vs_file_sha_breaks_normal_write(run
     assert write.error is not None, "比檔雜湊之 mutant 應使正常寫入失敗"
 
 
+@_only_if_chosen(D_CODEC)
 def test_mutation_codec_by_provenance_readback_check_removed_breaks_tamper(runs: _Runs, tmp_path: Path,
                                                                            monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：移除讀回重算比對 ⇒ (iii) 之竄改案紅（竄改後寫入成功、run 可讀為完整）。"""
@@ -1641,6 +1725,7 @@ def test_mutation_codec_by_provenance_readback_check_removed_breaks_tamper(runs:
     assert write.error is None and ph._strict_readable(write.handle, "processed")
 
 
+@_only_if_chosen(D_CODEC)
 def test_mutation_codec_by_provenance_manifest_without_digest_breaks_binding(runs: _Runs, tmp_path: Path,
                                                                              monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：manifest 不記 `mapping_sha256`（合併後自 processed 節點移除該鍵）⇒ (iii) 紅。"""
@@ -1699,6 +1784,7 @@ def _legacy_name_table(self: Any, pa_module: Any, frame: pd.DataFrame, artifact_
     return pa_module.Table.from_arrays(arrays, names=names), f32, registry
 
 
+@_only_if_chosen(D_CODEC)
 def test_mutation_codec_by_provenance_name_inference_restored_breaks_records(runs: _Runs, tmp_path: Path,
                                                                              monkeypatch: pytest.MonkeyPatch) -> None:
     """mutation：編碼判定改回欄名推斷 ⇒ (i) 之「名不含字面而做 rank」與「名含字面而只做 zscore」案紅。"""
@@ -1740,6 +1826,7 @@ def _anomaly_reencode(always_lossy: bool) -> Callable[[pytest.MonkeyPatch, Mappi
 
 
 @pytest.mark.parametrize("always_lossy", [False, True], ids=["names_fallback", "still_lossy"])
+@_only_if_chosen(D_CODEC)
 def test_mutation_codec_by_provenance_anomaly_fallback_breaks_lossless(always_lossy: bool, runs: _Runs,
                                                                        tmp_path: Path,
                                                                        monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1763,6 +1850,7 @@ def test_mutation_codec_by_provenance_anomaly_fallback_breaks_lossless(always_lo
     assert [n for n, t in types.items() if t in LOSSY_ARROW_TYPES], "異常欄仍有損未被 (ii) 偵測"
 
 
+@_only_if_chosen(D_CODEC)
 def test_boundary_32_codec_by_provenance_zero_selected_no_encoding_zero_row_digest(
         runs: _Runs, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """邊界③（Task 3.2）：processed 零選欄（紀錄零列）⇒ 無欄被編碼；manifest `mapping_sha256`＝讀回之零列紀錄表依契約
@@ -1779,6 +1867,7 @@ def test_boundary_32_codec_by_provenance_zero_selected_no_encoding_zero_row_dige
     assert node.get(section["manifest_key"]) == _mapping_digest(table, section["normalization"])
 
 
+@_only_if_chosen(D_CODEC)
 def test_boundary_33_codec_by_provenance_upgrade_off_no_mapping_lossless(runs: _Runs, tmp_path: Path,
                                                                          monkeypatch: pytest.MonkeyPatch) -> None:
     """邊界④（Task 3.2）：`FFACT_L7_CODEC_UPGRADE` 關 ⇒ 不走映射（`_codec_mapping_from_execution` 呼叫 0 次、不讀紀錄）、
@@ -1801,6 +1890,7 @@ def test_boundary_33_codec_by_provenance_upgrade_off_no_mapping_lossless(runs: _
 
 
 @pytest.mark.parametrize("window", [None, 0, -1], ids=["missing", "zero", "negative"])
+@_only_if_chosen(D_CODEC)
 def test_boundary_34_codec_by_provenance_rank_window_missing_or_nonpositive_float32(
         window: Optional[int], runs: _Runs, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """邊界⑤（Task 3.2）：rank 窗於本次 post-IC 設定缺或非正 ⇒ 做 rank 之欄 float32 並記異常結果。"""
@@ -1876,6 +1966,7 @@ def _l2_uses(run_list: Iterable[CellRun]) -> List[Tuple[str, L2Use]]:
     return [(r.key, u) for r in run_list for u in r.l2_use]
 
 
+@_only_if_chosen(D_L2)
 def test_l2_unified_l5_l6_recomputed_from_public_l2_bitwise(runs: _Runs) -> None:
     """D-L2 統一：格 A＋格 B 全部格之每次 L5／L6 呼叫，所吃之 L2 欄皆在公開落盤 L2 中，且以公開 L2 重算之輸出與實際輸出
     逐位元相等（含校準域實例）。"""
@@ -1906,6 +1997,7 @@ def _l2_other_arm(factory_cls: Any) -> Patch:
     return patch
 
 
+@_only_if_chosen(D_L2)
 def test_mutation_l2_unified_l5_back_to_other_arm_breaks_multi_tf(tmp_path: Path) -> None:
     """mutation：L5／L6 改回吃另一臂 ⇒ 多週期格（L1 float64）之重算逐位元案紅。"""
     _require_decision(D_L2[0], D_L2[1])
@@ -1953,12 +2045,29 @@ def _l2_named_violations(contract: Mapping[str, Any], per_cell: Mapping[str, int
     return [] if named == nonzero else [f"契約具名非零格 {named} ≠ 收據非零格 {nonzero}"]
 
 
+def _two_arm_observation_violations(run_list: Sequence[CellRun]) -> List[str]:
+    """TESTSEL I1f（SPEC Task 3.2）：①每格每週期（格 timeframes 全部，含多週期之非主週期）皆有 L2 兩臂觀測；②多週期格之
+    排程器 route 紀錄含 `point=="scheduler"` 且 `reason=="no_aux_receipt"`（強制串行注入生效之前提——自然不准入之串行
+    為 `admission:budget`）。不含 assert。"""
+    out: List[str] = []
+    for run in run_list:
+        want = [str(tf) for tf in run.cell.get("timeframes") or []]
+        seen = {str(tf) for tf, _ret, _cat in run.l2_arms}
+        out += [f"{run.key}|{tf}：無 L2 兩臂觀測" for tf in want if tf not in seen]
+        if len(want) > 1 and not any(r.get("point") == "scheduler" and r.get("reason") == "no_aux_receipt"
+                                     for r in run.mtf_routes):
+            out.append(f"{run.key}：多週期排程器未見 reason=no_aux_receipt 之 route（強制串行注入未生效）"
+                       f"；routes={run.mtf_routes[:4]}")
+    return out
+
+
 def test_l2_named_matrix_pinned_nonzero_named_and_layers_bitwise(runs: _Runs) -> None:
     """D-L2 具名保留：Task 1.3 矩陣之每格 f32diff 被釘（本模組重跑之格與收據共有之格逐格相等）；收據之非零格（含格 C）
     於契約 `l2_value_sources.nonzero_cells` 恰具名，且重跑非零格 ⊆ 具名；凍結檔具 raw 之格 A／B 之公開 L2 與 L5／L6 欄
     對 §G 凍結逐位元相等（R6-B）。"""
     _require_decision(D_L2[0], D_L2[2])
     run_list = runs.all("A") + runs.all("B")
+    assert _two_arm_observation_violations(run_list) == []  # TESTSEL I1f：每格每週期（含 4h）兩臂皆觀測
     rerun = _per_cell(_l2_matrix_rerun(run_list))
     receipt = _l2_receipt_per_cell()
     # 重跑覆蓋恰為 A＋B 全部格（審碼 b4 r5 CODEX-R5-P1-04：不得以交集掩蓋缺格）
@@ -1983,6 +2092,45 @@ def test_l2_named_matrix_pinned_nonzero_named_and_layers_bitwise(runs: _Runs) ->
         bad.extend(f"{run.key}|{d}" for d in _column_bitwise_diff(
             _frozen_fp(run.kind, run.key, artifact), nh.fingerprints(run.handle.run_dir, "raw"), names))
     assert bad == [], bad[:30]
+
+
+def test_numview_regen_cache_hit_equals_empty_root(runs: _Runs, tmp_path: Path) -> None:
+    """TESTSEL I1f（SPEC Task 3.2）：同 session 之批次共用快取命中（讀回）與全新空根生成之 raw／processed 逐位元相同。"""
+    run = runs.all("B")[0]
+    descriptor = {**dict(run.cell), "kind": "B"}
+    obs = nh.regen_batch_root() / nh.regen_cache_key(descriptor, None) / CORE_OBSERVATIONS
+    assert obs.is_file(), f"前提不成立：共用快取無觀測紀錄 {obs}"
+    hit = _generate(tmp_path / "hit", "B", run.cell)
+    fresh = _freeze().generate_cell(tmp_path / "fresh", descriptor, run_kind=nh.regen_core_kind(True), env=None)
+    for artifact in ("raw", "processed"):
+        ours, theirs = Path(hit.handle.run_dir) / artifact, Path(fresh.run_dir) / artifact
+        assert ours.exists() == theirs.exists(), f"{artifact} 有無不同"
+        if ours.exists():
+            diff = nh.bitwise_diff(nh.fingerprints(fresh.run_dir, artifact), nh.fingerprints(hit.handle.run_dir, artifact))
+            assert diff == [], f"快取命中與空根之 {artifact} 不等：{diff[:3]}"
+
+
+def test_mutation_l2_spy_skips_non_primary_breaks_two_arm_observation(runs: _Runs) -> None:
+    """TESTSEL I1f mutation：spy 略過非主週期之 L2 兩臂紀錄（舊缺陷——4h 於子行程計算、spy 看不到）⇒ 兩臂觀測判定紅。
+    以實際格 B 之觀測資料去除非主週期紀錄（確定性，與機器准入無關）。"""
+    run_list = runs.all("B")
+    assert run_list and _two_arm_observation_violations(run_list) == [], "前提不成立：正案觀測不齊"
+    mutants = [dataclasses.replace(run, l2_arms=[a for a in run.l2_arms if str(a[0]) == str(run.cell["timeframes"][0])])
+               for run in run_list]
+    violations = _two_arm_observation_violations(mutants)
+    assert any("無 L2 兩臂觀測" in v for v in violations), violations
+
+
+def test_mutation_l2_forced_serial_injection_removed_breaks_precondition(tmp_path: Path,
+                                                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    """TESTSEL I1f mutation（審碼 b1 r1 CODEX-R1-P2-02：須實際移除注入）：關閉 `FORCE_MTF_SERIAL` 後於私有根重生格 B——
+    排程器回到自然准入：不准入之串行 reason＝`admission:budget`、准入之平行無 serial route——兩者皆非 `no_aux_receipt`
+    ⇒ 前提判定紅（確定性，與機器准入無關）。"""
+    monkeypatch.setattr(sys.modules[__name__], "FORCE_MTF_SERIAL", False)
+    cell = _cells("B")[0]
+    mutant = _generate(tmp_path, "B", cell, patches=[lambda _mp, _run: None])  # 含 patch ⇒ 私有根、不讀寫共用快取
+    violations = _two_arm_observation_violations([mutant])
+    assert any("強制串行注入未生效" in v for v in violations), (mutant.mtf_routes[:4], violations)
 
 
 def test_mutation_l2_named_contract_drops_cell_breaks_naming(runs: _Runs, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2054,3 +2202,130 @@ def test_boundary_36_core_always_pandas_l2_arm_category_only_consistent(tmp_path
     assert run.compute_all_polars_calls == 0
     assert any(u.l2_columns for u in run.l2_use), "無任何 L5／L6 呼叫吃到 L2 ⇒ 本案無對象"
     assert _consistency_violations(run) == []
+
+
+# ============================================================================================== TESTSEL I1f2
+# SPEC docs/TESTSEL_I1_REDS_SPEC.md Task 3.3 ①：格 B 每週期 Cross／Ratio 兩臂各對 tests/feature_engineering/l2_oracle.py
+# 判 §G 第二層 (i)（兩臂）、(ii)（Polars 臂），(iii) 只記錄（以警告輸出至 gate 摘要，不判定）。
+
+@dataclasses.dataclass
+class _L2Cols:
+    """格 B 某週期之一欄：兩輸入（float64，L2 呼叫點擷取）、兩臂輸出，與 oracle 之兩參考值（各算一次）：
+    ref64＝float64 輸入之真值（category 臂之 (i)、Polars 臂之 (ii)(iii)）；ref32＝float32(L1) 輸入之 oracle 捨入至 float32
+    （Polars 臂之 (i)）。"""
+    tf: str
+    name: str
+    op: str
+    a: np.ndarray
+    b: np.ndarray
+    polars: np.ndarray
+    category: np.ndarray
+    ref64: np.ndarray
+    ref32: np.ndarray
+
+
+def _l2_oracle_columns(run_list: Sequence[CellRun]) -> List[_L2Cols]:
+    """格 B 每週期之 Cross／Ratio 欄（前提斷言：每週期各 268 欄、兩臂欄集相等、兩輸入皆在擷取之 layer1、dtype 依臂）。
+    Ratio 分母遮罩依（週期, 分母欄, 輸入精度）快取——同分母多欄共用，值與逐欄重算相同。"""
+    cols: List[_L2Cols] = []
+    masks: Dict[Tuple[str, str, str], np.ndarray] = {}
+    for run in run_list:
+        assert len(run.l2_inputs) == len(run.l2_arms), (run.key, len(run.l2_inputs), len(run.l2_arms))
+        want = sorted(str(tf) for tf in run.cell.get("timeframes") or [])
+        assert sorted(tf for tf, _l1 in run.l2_inputs) == want, (run.key, [tf for tf, _l1 in run.l2_inputs], want)
+        for (tf, returned, category), (tf_in, layer1) in zip(run.l2_arms, run.l2_inputs):
+            assert tf == tf_in, (run.key, tf, tf_in)
+            names = [str(c) for c in returned.columns]
+            assert set(names) == {str(c) for c in category.columns}, f"{run.key}|{tf}：兩臂欄集不同"
+            counts = {op: sum(n.endswith(f"_{op}") for n in names) for op in ("Cross", "Ratio")}
+            assert counts == {"Cross": 268, "Ratio": 268} and len(names) == 536, (run.key, tf, counts, len(names))
+            category = category.loc[:, ~category.columns.duplicated(keep="first")]
+            l1set = {str(c) for c in layer1.columns}
+            for name in names:
+                a_n, b_n, op = l2o.pair_inputs(name, l1set)
+                pol, cat = returned[name].to_numpy(), category[name].to_numpy()
+                assert pol.dtype == np.float32 and cat.dtype == np.float64, (run.key, tf, name, pol.dtype, cat.dtype)
+                a = layer1[a_n].to_numpy(dtype=np.float64)
+                b = layer1[b_n].to_numpy(dtype=np.float64)
+                a32, b32 = l2o.arm_inputs_float32(a, b)
+                m64 = m32 = None
+                if op == "Ratio":
+                    if (tf, b_n, "float64") not in masks:
+                        masks[(tf, b_n, "float64")] = l2o.denominator_mask(b)
+                        masks[(tf, b_n, "float32")] = l2o.denominator_mask(b32)
+                    m64, m32 = masks[(tf, b_n, "float64")], masks[(tf, b_n, "float32")]
+                cols.append(_L2Cols(tf, name, op, a, b, pol, cat, l2o.oracle(op, a, b, m64),
+                                    l2o.oracle(op, a32, b32, m32).astype(np.float32)))
+    return cols
+
+
+def _l2_criterion_i(col: _L2Cols, polars_ref_input: str = "float32") -> Dict[str, int]:
+    """§G 第二層 (i)：Polars 臂對 float32(L1) oracle（float32 判）、category 臂對 float64 oracle（float64 判）；NaN 位置一致。
+    `polars_ref_input="float64"` 僅供改壞對照（Polars 臂誤對 float64 oracle）。"""
+    ref32 = col.ref32 if polars_ref_input == "float32" else col.ref64.astype(np.float32)
+    out: Dict[str, int] = {}
+    for arm, got, ref in (("polars", col.polars, ref32), ("category", col.category, col.ref64)):
+        out[f"{arm}_nan_mismatch"] = int((np.isnan(got) != np.isnan(ref)).sum())
+        out[f"{arm}_ulp_bad"] = int((~l2o.within_1ulp(got, ref)).sum())
+    return out
+
+
+def _l2_criterion_iii(cols: Sequence[_L2Cols]) -> Dict[str, Dict[str, float]]:
+    """(iii) 只記錄：Polars 臂對 float64 真值以 float32 視角 1 ulp 之超界格數、max abs、max rel、得 0 而真值非 0 格數。"""
+    rec: Dict[str, Dict[str, float]] = {}
+    for col in cols:
+        ref64 = col.ref64
+        fin = np.isfinite(ref64) & np.isfinite(col.polars)
+        bad = fin & ~l2o.within_1ulp(col.polars, ref64.astype(np.float32))
+        with np.errstate(all="ignore"):
+            err = np.abs(col.polars.astype(np.float64) - ref64)
+            rel = np.where(fin & (ref64 != 0), err / np.abs(ref64), 0.0)
+        r = rec.setdefault(col.tf, {"cells_over_1ulp": 0, "max_abs": 0.0, "max_rel": 0.0, "zero_vs_nonzero": 0})
+        r["cells_over_1ulp"] += int(bad.sum())
+        r["max_abs"] = max(r["max_abs"], float(np.max(np.where(fin, err, 0.0))) if fin.any() else 0.0)
+        r["max_rel"] = max(r["max_rel"], float(np.max(rel)) if rel.size else 0.0)
+        r["zero_vs_nonzero"] += int((fin & (col.polars == 0) & (ref64 != 0)).sum())
+    return rec
+
+
+def test_l2_arms_each_match_independent_oracle(runs: _Runs) -> None:
+    """TESTSEL I1f2：格 B 1h／4h 之 Cross／Ratio，兩臂各依 §G 第二層 (i) 0 超界、NaN 位置一致；Polars 臂另依 (ii) 0 超界
+    （Fraction 精確重判）；(iii) 只記錄（警告輸出）。L1 取自 L2 呼叫點擷取之 layer1（落盤 raw 只 500 列且為 float16／32）。"""
+    run_list = runs.all("B")
+    assert run_list and _two_arm_observation_violations(run_list) == []
+    cols = _l2_oracle_columns(run_list)
+    bad: List[str] = []
+    for col in cols:
+        crit = _l2_criterion_i(col)
+        if any(crit.values()):
+            bad.append(f"(i) {col.tf}|{col.name}：{crit}")
+        rep = l2o.judge_bound(col.op, col.a, col.b, col.polars, r=col.ref64)
+        if rep["violations"] or rep["nan_mismatch"]:
+            bad.append(f"(ii) {col.tf}|{col.name}：超界列 {rep['violations'][:5]}、NaN 不一致 {rep['nan_mismatch']}")
+    assert bad == [], bad[:30]
+    import warnings
+    warnings.warn(f"[TESTSEL I1f2 (iii) 只記錄] 格 B Polars 臂對 float64 真值：{_l2_criterion_iii(cols)}", UserWarning)
+
+
+def test_mutation_l2_oracle_one_cell_beyond_bound_detected(runs: _Runs) -> None:
+    """TESTSEL I1f2 改壞對照（用已觀測之格 B 資料、不重生成）：Polars 臂某 Cross 有限格加 2 倍 (ii) 界 ⇒ (ii) 恰報該格。"""
+    cols = [c for c in _l2_oracle_columns(runs.all("B")) if c.op == "Cross"]
+    col = cols[0]
+    ref = col.ref64
+    assert l2o.judge_bound("Cross", col.a, col.b, col.polars)["violations"] == [], "前提不成立：正案已超界"
+    bound = l2o.bound_cross(col.a, col.b, col.polars)
+    fin = np.isfinite(ref) & np.isfinite(col.polars)
+    # 取 err／界最小之有限格：加 2 倍界後經 float32 捨入仍必超界（避免原誤差已近界時捨入回落）
+    with np.errstate(all="ignore"):
+        i = int(np.argmin(np.where(fin, np.abs(col.polars.astype(np.float64) - ref) / bound, np.inf)))
+    mutant = col.polars.copy()
+    mutant[i] = np.float32(np.float64(mutant[i]) + 2.0 * bound[i])
+    assert l2o.judge_bound("Cross", col.a, col.b, mutant)["violations"] == [i], (col.tf, col.name, i)
+
+
+def test_mutation_l2_oracle_wrong_input_precision_detected(runs: _Runs) -> None:
+    """TESTSEL I1f2 改壞對照：Polars 臂改對 float64 oracle 判 (i) ⇒ 超界格數 > 0（證 (i) 確依臂輸入精度、非空判）。"""
+    cols = _l2_oracle_columns(runs.all("B"))
+    right = sum(_l2_criterion_i(c)["polars_ulp_bad"] for c in cols)
+    wrong = sum(_l2_criterion_i(c, polars_ref_input="float64")["polars_ulp_bad"] for c in cols)
+    assert right == 0 and wrong > 0, (right, wrong)

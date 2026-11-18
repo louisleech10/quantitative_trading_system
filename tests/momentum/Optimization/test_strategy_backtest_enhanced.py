@@ -60,6 +60,7 @@ def make_objective(**kwargs):
 
 
 def test_evaluate_returns_target_metric():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(target_metric="expectancy")
     trial = optuna.trial.FixedTrial(
         {
@@ -80,6 +81,7 @@ def test_evaluate_returns_target_metric():
 
 
 def test_evaluate_with_constraints_pass():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(constraints={"max_drawdown": -1.0, "min_win_rate": 0.0, "min_trades": 1})
     trial = optuna.trial.FixedTrial(
         {
@@ -99,6 +101,7 @@ def test_evaluate_with_constraints_pass():
 
 
 def test_evaluate_maxdd_constraint_pruned():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(constraints={"max_drawdown": -0.01, "min_win_rate": 0.0, "min_trades": 0})
     trial = optuna.trial.FixedTrial(
         {
@@ -119,6 +122,7 @@ def test_evaluate_maxdd_constraint_pruned():
 
 
 def test_evaluate_winrate_constraint_pruned():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(constraints={"max_drawdown": -1.0, "min_win_rate": 0.9, "min_trades": 0})
     trial = optuna.trial.FixedTrial(
         {
@@ -139,6 +143,7 @@ def test_evaluate_winrate_constraint_pruned():
 
 
 def test_evaluate_min_trades_pruned():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(constraints={"max_drawdown": -1.0, "min_win_rate": 0.0, "min_trades": 999})
     trial = optuna.trial.FixedTrial(
         {
@@ -159,6 +164,7 @@ def test_evaluate_min_trades_pruned():
 
 
 def test_all_trials_pruned_handling():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(constraints={"max_drawdown": 0.0, "min_win_rate": 1.0, "min_trades": 999})
     trial = optuna.trial.FixedTrial(
         {
@@ -179,6 +185,7 @@ def test_all_trials_pruned_handling():
 
 
 def test_invalid_target_metric():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     prices, predicted_proba, atr_values = make_inputs()
     with pytest.raises(ValueError):
         StrategyBacktestObjective(
@@ -191,6 +198,7 @@ def test_invalid_target_metric():
 
 
 def test_nan_proba_input():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     prices, predicted_proba, atr_values = make_inputs()
     predicted_proba.iloc[0] = np.nan
     objective = StrategyBacktestObjective(
@@ -204,6 +212,7 @@ def test_nan_proba_input():
 
 
 def test_non_continuous_timestamps():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     prices, predicted_proba, atr_values = make_inputs()
     prices.loc[3, "timestamp"] = prices.loc[0, "timestamp"]
     objective = StrategyBacktestObjective(
@@ -216,6 +225,7 @@ def test_non_continuous_timestamps():
 
 
 def test_multi_objective_mode():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(multi_objective=True)
     trial = optuna.trial.FixedTrial(
         {
@@ -237,6 +247,7 @@ def test_multi_objective_mode():
 
 
 def test_create_search_space_params():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     trial = optuna.trial.FixedTrial(
         {
@@ -256,12 +267,14 @@ def test_create_search_space_params():
 
 
 def test_backtest_engine_protocol_injection():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(backtest_engine=StubBacktestEngine())
     assert hasattr(objective.backtest_engine, "run_backtest")
 
 
 @pytest.mark.parametrize("metric", ["expectancy", "sortino_ratio", "calmar_ratio", "sqn"])
 def test_target_metric_variants(metric: str):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(target_metric=metric)
     trial = optuna.trial.FixedTrial(
         {
@@ -281,6 +294,7 @@ def test_target_metric_variants(metric: str):
 
 
 def test_evaluate_stores_trial_user_attrs():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     trial = optuna.trial.FixedTrial(
         {
@@ -301,6 +315,7 @@ def test_evaluate_stores_trial_user_attrs():
 
 
 def test_evaluate_with_empty_backtest_result():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     empty_result = SimpleNamespace(equity_curve=pd.Series([1.0]), trades=[], metrics={}, config={})
     objective = make_objective(backtest_engine=StubBacktestEngine(result=empty_result))
     trial = optuna.trial.FixedTrial(
@@ -321,16 +336,19 @@ def test_evaluate_with_empty_backtest_result():
 
 
 def test_directions_property_multi_objective():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(multi_objective=True)
     assert objective.directions == ["maximize", "minimize"]
 
 
 def test_name_property():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     assert objective.name == "strategy_backtest"
 
 
 def test_length_mismatch_predicted_proba_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     prices, predicted_proba, atr_values = make_inputs()
     with pytest.raises(ValueError, match="predicted_proba"):
         StrategyBacktestObjective(
@@ -342,6 +360,7 @@ def test_length_mismatch_predicted_proba_error():
 
 
 def test_length_mismatch_atr_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     prices, predicted_proba, atr_values = make_inputs()
     with pytest.raises(ValueError, match="atr_values"):
         StrategyBacktestObjective(
@@ -353,17 +372,20 @@ def test_length_mismatch_atr_error():
 
 
 def test_direction_and_directions_defaults():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(multi_objective=False)
     assert objective.direction == "maximize"
     assert objective.directions is None
 
 
 def test_get_pruning_callback_none():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     assert objective.get_pruning_callback(None) is None
 
 
 def test_evaluate_without_create_search_space():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     params = {
         "entry_threshold": 0.7,
@@ -380,6 +402,7 @@ def test_evaluate_without_create_search_space():
 
 
 def test_record_trial_metrics_non_float_value_fallback():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
 
     class TrialSpy:
@@ -418,6 +441,7 @@ class _RecordingEngine:
 
 def test_objective_forwards_timeframe_to_engine():
     """②b 前半：timeframe 給定時，engine 真的收到（傳遞鏈存在）。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     engine = _RecordingEngine()
     objective = make_objective(backtest_engine=engine, timeframe="1h", risk_free_rate=0.0)
     objective.evaluate(
@@ -441,6 +465,7 @@ def test_objective_forwards_timeframe_to_engine():
 
 def test_objective_omits_new_kwargs_when_timeframe_absent():
     """既有路徑（未指定 timeframe）之呼叫形狀逐字不變 ⇒ 舊 engine 實作不破。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     engine = _RecordingEngine()
     objective = make_objective(backtest_engine=engine, target_metric="sharpe_ratio")
     objective.evaluate(
@@ -462,6 +487,7 @@ def test_objective_omits_new_kwargs_when_timeframe_absent():
 
 def test_objective_sharpe_matches_direct_engine_and_differs_from_default():
     """②b 後半：objective 之 sharpe 與 engine 直呼同值，且與 timeframe=None 不等。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     from momentum.Strategy.performance_metrics import PerformanceMetrics
     from momentum.Strategy.vectorized_backtest import VectorizedBacktest
 
@@ -549,6 +575,7 @@ _K1_PARAMS = {
 @pytest.mark.parametrize("engine_cls", [_SwallowEngine, _WrongSourceEngine])
 def test_objective_fails_loud_when_engine_swallows_timeframe(engine_cls):
     """K1：宣告 timeframe 後，engine 未回填／回錯 annualization ⇒ 必須 raise，禁靜默 730。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         backtest_engine=engine_cls(), timeframe="1h", target_metric="sharpe_ratio"
     )
@@ -558,6 +585,7 @@ def test_objective_fails_loud_when_engine_swallows_timeframe(engine_cls):
 
 def test_objective_legacy_path_keeps_730_without_timeframe():
     """未宣告 timeframe 之既有路徑不受 K1 修補影響（legacy 相容，仍回 730 且不 raise）。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(backtest_engine=_SwallowEngine(), target_metric="sharpe_ratio")
     value = objective.evaluate(_K1_PARAMS)
     assert isinstance(value, float)

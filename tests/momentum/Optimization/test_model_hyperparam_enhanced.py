@@ -63,6 +63,7 @@ def make_lightgbm_trial() -> optuna.trial.FixedTrial:
 
 
 def test_evaluate_returns_auc():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     trial = make_lightgbm_trial()
     params = objective.create_search_space(trial)
@@ -72,6 +73,7 @@ def test_evaluate_returns_auc():
 
 
 def test_overfitting_detection_pruned():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     trainer = StubTrainer(perf=SimpleNamespace(in_sample_train_auc=0.95, cv_auc_mean=0.70))
     objective = make_objective(trainer=trainer, max_train_val_gap=0.1)
     trial = make_lightgbm_trial()
@@ -81,6 +83,7 @@ def test_overfitting_detection_pruned():
 
 
 def test_search_space_min_gt_max_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         search_space_override={
             "learning_rate": {"type": "float", "low": 0.2, "high": 0.1},
@@ -91,6 +94,7 @@ def test_search_space_min_gt_max_error():
 
 
 def test_model_training_failure_fatal():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     trainer = StubTrainer(error=RuntimeError("train failed"))
     objective = make_objective(trainer=trainer)
     trial = make_lightgbm_trial()
@@ -100,6 +104,7 @@ def test_model_training_failure_fatal():
 
 
 def test_auc_below_random():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     trainer = StubTrainer(perf=SimpleNamespace(in_sample_train_auc=0.52, cv_auc_mean=0.49))
     objective = make_objective(trainer=trainer, max_train_val_gap=0.2)
     trial = make_lightgbm_trial()
@@ -109,6 +114,7 @@ def test_auc_below_random():
 
 
 def test_zero_features_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = pd.DataFrame(index=range(120))
     y = np.random.randint(0, 2, size=120)
     with pytest.raises(ValueError):
@@ -122,6 +128,7 @@ def test_zero_features_error():
 
 
 def test_small_training_set_warning(caplog):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = pd.DataFrame(np.random.randn(50, 3), columns=["a", "b", "c"])
     y = np.random.randint(0, 2, size=50)
     ModelHyperparamObjective(
@@ -135,6 +142,7 @@ def test_small_training_set_warning(caplog):
 
 
 def test_invalid_model_type():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = pd.DataFrame(np.random.randn(120, 3), columns=["a", "b", "c"])
     y = np.random.randint(0, 2, size=120)
     with pytest.raises(ValueError):
@@ -148,6 +156,7 @@ def test_invalid_model_type():
 
 
 def test_lightgbm_search_space_ranges():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(engine="lightgbm")
     trial = make_lightgbm_trial()
     params = objective.create_search_space(trial)
@@ -160,6 +169,7 @@ def test_lightgbm_search_space_ranges():
 
 
 def test_xgboost_search_space_ranges():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = pd.DataFrame(np.random.randn(200, 6), columns=[f"f{i}" for i in range(6)])
     y = np.random.randint(0, 2, size=200)
     objective = ModelHyperparamObjective(
@@ -192,6 +202,7 @@ def test_xgboost_search_space_ranges():
 
 
 def test_trial_user_attrs_recorded():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     trial = make_lightgbm_trial()
     params = objective.create_search_space(trial)
@@ -206,6 +217,7 @@ def test_trial_user_attrs_recorded():
 
 
 def test_cv_folds_parameter():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     trainer = StubTrainer()
     objective = make_objective(trainer=trainer, cv_folds=7)
     params = objective.create_search_space(make_lightgbm_trial())
@@ -214,6 +226,7 @@ def test_cv_folds_parameter():
 
 
 def test_custom_train_kwargs():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     trainer = StubTrainer()
     objective = make_objective(trainer=trainer, train_kwargs={"early_stopping_rounds": 20})
     params = objective.create_search_space(make_lightgbm_trial())
@@ -222,22 +235,26 @@ def test_custom_train_kwargs():
 
 
 def test_name_property():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     assert objective.name == "model_hyperparam"
 
 
 def test_direction_property():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     assert objective.direction == "maximize"
 
 
 def test_directions_property_none_and_pruning_callback():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     assert objective.directions is None
     assert objective.get_pruning_callback(None) is None
 
 
 def test_numpy_features_path_and_small_sample_warning(caplog):
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = np.random.randn(80, 4)
     y = np.random.randint(0, 2, size=80)
     objective = ModelHyperparamObjective(
@@ -252,6 +269,7 @@ def test_numpy_features_path_and_small_sample_warning(caplog):
 
 
 def test_numpy_features_zero_columns_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = np.random.randn(100)
     y = np.random.randint(0, 2, size=100)
     with pytest.raises(ValueError, match="features"):
@@ -265,6 +283,7 @@ def test_numpy_features_zero_columns_error():
 
 
 def test_empty_labels_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = pd.DataFrame(np.random.randn(120, 3), columns=["a", "b", "c"])
     with pytest.raises(ValueError, match="labels"):
         ModelHyperparamObjective(
@@ -277,6 +296,7 @@ def test_empty_labels_error():
 
 
 def test_create_search_space_unsupported_type_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         search_space_override={
             "weird_param": {"type": "unknown", "low": 1, "high": 2},
@@ -287,6 +307,7 @@ def test_create_search_space_unsupported_type_error():
 
 
 def test_create_search_space_missing_low_high_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         search_space_override={
             "learning_rate": {"type": "float", "low": 0.1},
@@ -297,6 +318,7 @@ def test_create_search_space_missing_low_high_error():
 
 
 def test_create_search_space_empty_categorical_choices_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         search_space_override={
             "boosting_type": {"type": "categorical", "choices": []},
@@ -307,6 +329,7 @@ def test_create_search_space_empty_categorical_choices_error():
 
 
 def test_create_search_space_categorical_branch_success():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         search_space_override={
             "boosting_type": {"type": "categorical", "choices": ["gbdt", "dart"]},
@@ -318,6 +341,7 @@ def test_create_search_space_categorical_branch_success():
 
 
 def test_lightgbm_learning_rate_lower_bound_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         search_space_override={
             "learning_rate": {"type": "float", "low": 0.001, "high": 0.2},
@@ -328,6 +352,7 @@ def test_lightgbm_learning_rate_lower_bound_error():
 
 
 def test_lightgbm_num_leaves_upper_bound_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective(
         search_space_override={
             "num_leaves": {"type": "int", "low": 10, "high": 200},
@@ -338,6 +363,7 @@ def test_lightgbm_num_leaves_upper_bound_error():
 
 
 def test_xgboost_max_depth_upper_bound_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = pd.DataFrame(np.random.randn(200, 3), columns=["a", "b", "c"])
     y = np.random.randint(0, 2, size=200)
     objective = ModelHyperparamObjective(
@@ -355,6 +381,7 @@ def test_xgboost_max_depth_upper_bound_error():
 
 
 def test_evaluate_xgboost_path():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     X = pd.DataFrame(np.random.randn(200, 3), columns=["a", "b", "c"])
     y = np.random.randint(0, 2, size=200)
     trainer = StubTrainer(perf=SimpleNamespace(in_sample_train_auc=0.77, cv_auc_mean=0.74))
@@ -387,6 +414,7 @@ def test_evaluate_xgboost_path():
 
 
 def test_extract_metric_default_and_raise():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     perf = SimpleNamespace()
     assert objective._extract_metric(perf, ["nope"], default=0.66) == pytest.approx(0.66)
@@ -395,17 +423,20 @@ def test_extract_metric_default_and_raise():
 
 
 def test_set_trial_user_attrs_without_trial_no_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     objective._current_trial = None
     objective._set_trial_user_attrs(0.7, 0.6, 0.1)
 
 
 def test_validate_search_space_non_dict_rule_is_ignored():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     objective._validate_search_space({"foo": "bar"})
 
 
 def test_evaluate_engine_else_branch_raises_value_error():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     objective.engine = "invalid"
     with pytest.raises(ValueError, match="不支援的引擎"):
@@ -413,6 +444,7 @@ def test_evaluate_engine_else_branch_raises_value_error():
 
 
 def test_get_search_space_schema_for_frontend():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     objective = make_objective()
     schema = objective.get_search_space_schema()
     assert isinstance(schema, dict)

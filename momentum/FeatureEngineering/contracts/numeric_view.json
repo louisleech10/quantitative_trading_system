@@ -12,7 +12,7 @@
           "momentum/FeatureEngineering/ic_first_context.py:28"
         ],
         "arm=ctx.post_ic_arm,": [
-          "momentum/FeatureEngineering/feature_factory.py:3000"
+          "momentum/FeatureEngineering/feature_factory.py:2996"
         ],
         "_numeric_view.require_post_ic_core(arm)": [
           "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:947"
@@ -24,7 +24,7 @@
       "arm_ref": "ic_first",
       "_sources": {
         "arm=post_ic_entry_arm(\"ic_page_apply_transforms\")": [
-          "api/services/ic_analysis_service.py:2920"
+          "api/services/ic_analysis_service.py:3333"
         ]
       }
     }
@@ -244,10 +244,10 @@
         "_doc": "L2 polars ↔ pandas 選路：只於 L2 設定指紋屬 FeatureFactory.L2_ROUTE_CERTIFIED（既有逐位元收據機制；現為空集合）時經 memory_budget.route 有第二候選，故凡經此點之換臂皆為已認證等價。",
         "_sources": {
           "L2_ROUTE_CERTIFIED": [
-            "momentum/FeatureEngineering/feature_factory.py:1854"
+            "momentum/FeatureEngineering/feature_factory.py:1850"
           ],
           "_memory_budget.route(\"Layer 2\"": [
-            "momentum/FeatureEngineering/feature_factory.py:1859"
+            "momentum/FeatureEngineering/feature_factory.py:1855"
           ]
         }
       }
@@ -295,7 +295,7 @@
         "momentum/FeatureEngineering/feature_config.py:310"
       ],
       "zscore_windows: List[int]": [
-        "api/models/ic_models.py:421"
+        "api/models/ic_models.py:426"
       ],
       "if \"non_empty_when_enabled\" in rules and not windows:": [
         "momentum/FeatureEngineering/numeric_view.py:137"
@@ -677,7 +677,7 @@
       "_sources": [
         "api/services/hardware_info_service.py:110",
         "api/services/hardware_info_service.py:138",
-        "momentum/FeatureEngineering/feature_factory.py:3890"
+        "momentum/FeatureEngineering/feature_factory.py:3886"
       ]
     },
     "FFACT_L7_CODEC_UPGRADE": {
@@ -1105,28 +1105,28 @@
     ],
     "_sources": {
       "numpy": [
-        "requirements.txt:41"
+        "requirements.txt:42"
       ],
       "pandas": [
-        "requirements.txt:48"
+        "requirements.txt:49"
       ],
       "polars": [
-        "requirements.txt:52"
+        "requirements.txt:53"
       ],
       "numba": [
         "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:18"
       ],
       "scipy": [
-        "requirements.txt:46"
+        "requirements.txt:47"
       ],
       "pyarrow": [
-        "requirements.txt:56"
+        "requirements.txt:57"
       ],
       "bottleneck": [
         "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:113"
       ],
       "statsmodels": [
-        "requirements.txt:85"
+        "requirements.txt:90"
       ],
       "ta_lib": [
         "momentum/FeatureEngineering/atomic/talib_wrapper.py:8"

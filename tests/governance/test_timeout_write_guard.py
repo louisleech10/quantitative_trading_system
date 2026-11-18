@@ -217,6 +217,137 @@ def test_boundary_25_precommit_hook_invokes_staged_scan() -> None:
     assert "scripts/timeout_scan.py --staged" in hook
 
 
+# ---- bounded_poll：「次數×睡眠」形之時間上限（2026-11-13 TESTSEL I2 補洞：原正則樣式全不含此形） ----
+_BP_HIT = """\
+def wait(c):
+    for _ in range(60):
+        if c.done():
+            break
+        time.sleep(1)
+    else:
+        pytest.fail("not done in 60 s")
+"""
+_BP_PROGRESSWAIT = """\
+def wait(c):
+    waiter = ProgressWait("c")
+    while not c.done():
+        waiter.check(c.state())
+        time.sleep(1)
+"""
+_BP_WEAK = """\
+def wait(c):
+    for _ in range(60):
+        if c.done():
+            break
+        time.sleep(1)
+    return c.done()
+"""
+_BP_BYPASSES = {
+    "renamed_local_const": (
+        "def wait(c):\n    tries = int(5 / 0.02)\n    for _ in range(tries):\n        if c.done():\n            return\n"
+        "        time.sleep(0.02)\n    raise TimeoutError('x')\n"),
+    "while_counter": (
+        "LIMIT = 250\n\n\ndef wait(c):\n    n = 0\n    while n < LIMIT:\n        n += 1\n        if c.done():\n"
+        "            return\n        time.sleep(0.02)\n    raise RuntimeError('x')\n"),
+    "asyncio_sleep": (
+        "async def wait(c):\n    for _ in range(250):\n        if c.done():\n            break\n"
+        "        await asyncio.sleep(0.02)\n    else:\n        raise TimeoutError('x')\n"),
+    "else_assert_false": (
+        "def wait(c, attempts=60):\n    for _ in range(attempts):\n        if c.done():\n            break\n"
+        "        time.sleep(1)\n    else:\n        assert False, 'x'\n"),
+}
+
+
+# 審碼 r1 CODEX-R1-P1-02 反例 A–D（逐字結構）：計數 break 後 raise、itertools.count、迴圈後 if 判失敗、直接自遞迴
+_BP_CODEX = {
+    "A_while_true_counter_break": (
+        "def wait():\n    i = 0\n    while True:\n        time.sleep(1)\n        i += 1\n        if i >= 10:\n"
+        "            break\n    raise RuntimeError()\n"),
+    "B_itertools_count": (
+        "def wait():\n    for i in itertools.count():\n        time.sleep(1)\n        if i >= 10:\n            break\n"
+        "    raise RuntimeError()\n"),
+    "C_conditional_failure_after_loop": (
+        "def wait(c):\n    completed = False\n    for i in range(10):\n        time.sleep(1)\n"
+        "        completed = c.done()\n    if not completed:\n        raise RuntimeError()\n"),
+    "D_direct_recursion": (
+        "def poll(n=10):\n    if n == 0:\n        raise RuntimeError()\n    time.sleep(1)\n    return poll(n - 1)\n"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_BP_CODEX))
+def test_bounded_poll_codex_counterexamples_blocked(name: str) -> None:
+    """codex r1 反例 A–D ⇒ rc 2。"""
+    assert _run(_edit("tests/_bp_probe.py", "", _BP_CODEX[name])) == 2
+
+
+def test_mutation_bounded_poll_r1_extensions_removed() -> None:
+    """改壞：退回 919f41b5 之規則（只認 range／計數式 while、失敗只看 else 或緊接一個失敗敘述、無遞迴）⇒ 反例 A–D 全放行，
+    原命中樣本仍擋（證 A–D 之擋由 r1 擴充造成）。"""
+    scan = g._scanner()
+
+    def old_rule(tree):
+        consts = scan._int_consts(tree)
+        out = []
+        for parent in scan.ast.walk(tree):
+            for field in ("body", "orelse", "finalbody", "handlers"):
+                block = getattr(parent, field, None)
+                if not isinstance(block, list):
+                    continue
+                for i, st in enumerate(block):
+                    if isinstance(st, (scan.ast.For, scan.ast.AsyncFor)):
+                        it = st.iter
+                        bounded = (isinstance(it, scan.ast.Call) and scan._dotted(it.func) == "range" and bool(it.args)
+                                   and all(scan._is_const_expr(a, consts) for a in it.args))
+                    elif isinstance(st, scan.ast.While):
+                        bounded = scan._counter_while(st, consts)
+                    else:
+                        continue
+                    if not bounded or not scan._has_sleep(st.body):
+                        continue
+                    after = block[i + 1] if i + 1 < len(block) else None
+                    if any(scan._is_fail_stmt(s) for s in st.orelse) or (after is not None and scan._is_fail_stmt(after)):
+                        out.append(st.lineno)
+        return out
+
+    scan._bounded_polls = old_rule
+    for name, src in _BP_CODEX.items():
+        assert g.violations([("tests/_bp_probe.py", "", src)], [], scan=scan) == [], name
+    assert g.violations([("tests/_bp_probe.py", "", _BP_HIT)], [], scan=scan)
+
+
+def test_bounded_poll_cap_blocked() -> None:
+    """迴圈迭代界為常數、本體 sleep、耗盡後失敗（else pytest.fail）⇒ rc 2（test_feature_api 原寫法）。"""
+    assert _run(_edit("tests/_bp_probe.py", "", _BP_HIT)) == 2
+
+
+@pytest.mark.parametrize("name", sorted(_BP_BYPASSES))
+def test_bounded_poll_bypass_forms_blocked(name: str) -> None:
+    """四種繞過寫法（改常數名／區域常數式、計數式 while 後 raise、asyncio.sleep、else 改 assert False）⇒ rc 2。"""
+    assert _run(_edit("scripts/_bp_probe.py", "", _BP_BYPASSES[name])) == 2
+
+
+def test_bounded_poll_progresswait_and_weak_pass() -> None:
+    """ProgressWait 共用等候（無上限）與「耗盡後靜默往下」（無失敗分支）⇒ 放行。"""
+    assert _run(_edit("tests/_bp_probe.py", "", _BP_PROGRESSWAIT)) == 0
+    assert _run(_edit("tests/_bp_probe.py", "", _BP_WEAK)) == 0
+
+
+def test_bounded_poll_added_failure_to_existing_loop_blocked(tmp_path: Path) -> None:
+    """既有之 WEAK 迴圈（迴圈頭不變）只新增 else 失敗分支 ⇒ 仍判新增上限 ⇒ 擋（以寫入前同類命中之差判定）。"""
+    scan = g._scanner()
+    edits = [("tests/_bp_probe.py", _BP_WEAK, _BP_WEAK.replace("    return c.done()\n",
+                                                                "    else:\n        raise TimeoutError('x')\n"))]
+    assert g.violations(edits, [], scan=scan)
+
+
+def test_mutation_bounded_poll_rule_removed_lets_cap_through() -> None:
+    """改壞：拿掉 AST 規則（`_bounded_polls` 恆空）⇒ 命中樣本放行（證上列擋案由該規則造成）。"""
+    scan = g._scanner()
+    assert g.violations([("tests/_bp_probe.py", "", _BP_HIT)], [], scan=scan)
+    scan._bounded_polls = lambda tree: []
+    assert g.violations([("tests/_bp_probe.py", "", _BP_HIT)], [], scan=scan) == []
+
+
 def test_mutation_empty_patterns_lets_cap_through(monkeypatch: pytest.MonkeyPatch) -> None:
     """改壞：掃描器之樣式清空 ⇒ 新增之 `subprocess.run(cmd, timeout=600)` 不再被擋（本檔各擋案之鑑別力）。"""
     scan = g._scanner()

@@ -120,8 +120,20 @@ def violations(edits: Iterable[Tuple[str, str, str]], registry: Sequence[Dict[st
             added[line] = added.get(line, 0) + 1
         if not added:
             continue
+        # bounded_poll（次數×睡眠之上限）：迴圈頭可能未變而只新增 else／其後之失敗敘述 ⇒ 以寫入前內容之同類命中
+        # （所在函式＋迴圈頭）多重集合差判定新增，不看迴圈頭是否為新增行。
+        prev_polls: Dict[Tuple[str, str], int] = {}
+        for h in scan.scan_text(rel, before):
+            if h.pattern_id == "bounded_poll":
+                k = (h.function, h.text.strip())
+                prev_polls[k] = prev_polls.get(k, 0) + 1
         for hit in scan.scan_text(rel, after):
-            if added.get(hit.text, 0) <= 0:
+            if hit.pattern_id == "bounded_poll":
+                k = (hit.function, hit.text.strip())
+                if prev_polls.get(k, 0) > 0:
+                    prev_polls[k] -= 1
+                    continue
+            elif added.get(hit.text, 0) <= 0:
                 continue
             entry = scan.registered(hit, registry)
             if entry is None or entry.get("class") == "A":

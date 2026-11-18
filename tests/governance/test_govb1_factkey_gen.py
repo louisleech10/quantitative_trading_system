@@ -270,10 +270,25 @@ def test_output_has_no_bom_no_crlf_no_timestamp():
 
 
 # R-GOVTEST-5 已由 FKPERF（Python 核心，外部程序數與 key 數無關）關閉：strict xfail 轉 XPASS，依標記原註移除（SPEC Task 4.4）
-def test_generator_runs_under_two_seconds():
+@pytest.fixture(scope="module")
+def generator_default_run() -> dict:
+    """生成器（無引數）於 repo 根跑一次並計時（TESTSEL S3：rc 正確性與牆鐘兩條共用，不重複）。"""
     t0 = time.monotonic()
     r = _gen()
     elapsed = time.monotonic() - t0
+    return {"r": r, "elapsed": elapsed}
+
+
+def test_generator_default_run_rc0(generator_default_run: dict):
+    """生成器無引數於 repo 根須 rc=0（原計時測試之前提斷言，獨立為正確性測試；TESTSEL S3）。"""
+    r = generator_default_run["r"]
+    assert r.returncode == 0, f"生成器 rc={r.returncode}\n{r.stderr}"
+
+
+@pytest.mark.perf
+def test_generator_runs_under_two_seconds(generator_default_run: dict):
+    r = generator_default_run["r"]
+    elapsed = generator_default_run["elapsed"]
     # 須先跑完才算數：提早失敗（rc≠0）一樣很快——2026-09-23 實測某 worktree 生成器 rc=1 只要 0.7s，
     # 曾被誤判為「乾淨樹會過」。
     assert r.returncode == 0, f"生成器 rc={r.returncode}，計時不具意義\n{r.stderr}"
@@ -2606,48 +2621,49 @@ def test_fkperf_prop_missing_receipt_rejected(tmp_path):
 
 _P = "tests/governance/test_govb1_factkey_gen.py::"
 # 對照表（原破壞語意 → 核心錨點；`red_test`＝不經 `_mutate`、以核心直接驗被破壞性質之測試，
-# `fail_substr`＝其斷言訊息）。`test_ref` 為本檔中呼叫 mutation helper 之耦合行（test_fkperf_cutover 以集合相等核對）。
+# `fail_substr`＝其斷言訊息）。`test_ref` 為本檔中呼叫 mutation helper 之耦合處，以 `<檔>::<所在函式>#<函式內序號>` 錨定
+# （不用行號：行號隨檔內增刪平移；test_fkperf_cutover._coupling_refs 以集合相等核對）。
 # 對應不到之原破壞語意（核心無該分支）改寫而非刪除，於 `note` 說明（SPEC Task 4.2 不可做）。
 FKPERF_MUTATION_MAP = [
-    {"test_ref": "test_govb1_factkey_gen.py:397", "core_anchor": _ROWS_SORT_ANCHOR, "core_mutant": _SORT_REMOVED,
+    {"test_ref": "test_govb1_factkey_gen.py::test_t21_m1a_sort_is_load_bearing#1", "core_anchor": _ROWS_SORT_ANCHOR, "core_mutant": _SORT_REMOVED,
      "red_test": _P + "test_fkperf_prop_rows_emitted_sorted", "fail_substr": "生成列未依位元組序排序",
      "note": "原 `\"${REG}\" | LC_ALL=C sort` → `| cat`：拿掉生成排序"},
-    {"test_ref": "test_govb1_factkey_gen.py:425", "core_anchor": _ROWS_SORT_ANCHOR,
+    {"test_ref": "test_govb1_factkey_gen.py::test_t21_m1b_locale_pin_removal_breaks_determinism#1", "core_anchor": _ROWS_SORT_ANCHOR,
      "core_mutant": _SORT_LOCALE_DEPENDENT,
      "red_test": _P + "test_fkperf_prop_output_independent_of_locale", "fail_substr": "輸出隨環境 locale 改變",
      "note": "原拿掉 LC_ALL=C 釘子 → 核心排序改依環境 locale 之 strxfrm"},
-    {"test_ref": "test_govb1_factkey_gen.py:459", "core_anchor": _GEN_BLOCK_END_ANCHOR,
+    {"test_ref": "test_govb1_factkey_gen.py::test_t21_m1c_generation_failure_is_not_swallowed#1", "core_anchor": _GEN_BLOCK_END_ANCHOR,
      "core_mutant": _GEN_BLOCK_END_ANCHOR + "\n        raise RuntimeError(\"gen failed\")",
      "red_test": _P + "test_fkperf_prop_write_then_check_is_rc_zero", "fail_substr": "--write 後 --check 未回 0",
      "note": "原 printf 後 return 1（oracle 之 GEN FAILED 出口屬內部工具失敗，核心無此分支）→ 改寫為生成函式輸出完整區塊後拋例外"},
-    {"test_ref": "test_govb1_factkey_gen.py:1331", "core_anchor": _ROW_WIDTH_ANCHOR, "core_mutant": "                pass",
+    {"test_ref": "test_govb1_factkey_gen.py::test_wl01_mutation_removing_length_check_lets_ragged_rows_through#1", "core_anchor": _ROW_WIDTH_ANCHOR, "core_mutant": "                pass",
      "red_test": _P + "test_fkperf_prop_ragged_rows_rejected", "fail_substr": "參差列未被拒",
      "note": "原 `length == $n` → `length >= 0`：列長比對恆真"},
-    {"test_ref": "test_govb1_factkey_gen.py:1344", "core_anchor": _CHECK_SHAPE_ANCHOR, "core_mutant": "        if False:",
+    {"test_ref": "test_govb1_factkey_gen.py::test_wl01_mutation_removing_shape_call_in_check_lets_bad_render_through#1", "core_anchor": _CHECK_SHAPE_ANCHOR, "core_mutant": "        if False:",
      "red_test": _P + "test_fkperf_prop_check_rejects_bad_render", "fail_substr": "--check 未報非法 render",
      "note": "原 `_fk_validate_shape` 於 --check 之呼叫 → `:`"},
-    {"test_ref": "test_govb1_factkey_gen.py:1638", "core_anchor": _CHECK_CRITERIA_ANCHOR,
+    {"test_ref": "test_govb1_factkey_gen.py::test_wl02_mutation_removing_conflict_check_lets_contradiction_through#1", "core_anchor": _CHECK_CRITERIA_ANCHOR,
      "core_mutant": _CHECK_CRITERIA_REMOVED,
      "red_test": _P + "test_fkperf_prop_check_reports_conflicting_criteria", "fail_substr": "--check 未報互斥判準",
      "note": "原 `_fk_validate_criteria || _fkc_rc=1` → `:`"},
-    {"test_ref": "test_govb1_factkey_gen.py:1652", "core_anchor": _CHECK_RC_SCAN_ANCHOR,
+    {"test_ref": "test_govb1_factkey_gen.py::test_wl02_mutation_removing_rc_scan_lets_outside_claim_through#1", "core_anchor": _CHECK_RC_SCAN_ANCHOR,
      "core_mutant": _CHECK_RC_SCAN_REMOVED,
      "red_test": _P + "test_fkperf_prop_check_reports_rc_claim_outside_block", "fail_substr": "--check 未報區塊外 rc 陳述",
      "note": "原 `_fk_reject_rc_claims_outside_blocks || _fkc_rc=1` → `:`"},
-    {"test_ref": "test_govb1_factkey_gen.py:1766", "core_anchor": _MECH_WILDCARD_ANCHOR,
+    {"test_ref": "test_govb1_factkey_gen.py::_mech_run#1", "core_anchor": _MECH_WILDCARD_ANCHOR,
      "core_mutant": _MECH_WILDCARD_REMOVED,
      "red_test": _P + "test_fkperf_prop_mechanism_scope_wildcard_rejected", "fail_substr": "mechanism_scope 之 wildcard 未被拒",
      "note": "經 `_mech_run(mutate=…)`：原 mechanism_scope 之 wildcard case 守衛 → 永不命中"},
-    {"test_ref": "test_govb1_factkey_gen.py:1766", "core_anchor": _MECH_SUBTREE_ANCHOR,
+    {"test_ref": "test_govb1_factkey_gen.py::_mech_run#1", "core_anchor": _MECH_SUBTREE_ANCHOR,
      "core_mutant": _MECH_SUBTREE_REMOVED,
      "red_test": _P + "test_fkperf_prop_unregistered_mechanism_in_subtree_rejected",
      "fail_substr": "改法子樹未登記機制未被拒",
      "note": "經 `_mech_run(mutate=…)`：原 `_fk_reject_unregistered_mechanisms` 函式首行 return 0"},
-    {"test_ref": "test_govb1_factkey_gen.py:1766", "core_anchor": _MECH_RECEIPT_ANCHOR,
+    {"test_ref": "test_govb1_factkey_gen.py::_mech_run#1", "core_anchor": _MECH_RECEIPT_ANCHOR,
      "core_mutant": _MECH_RECEIPT_REMOVED,
      "red_test": _P + "test_fkperf_prop_missing_receipt_rejected", "fail_substr": "缺檔 receipt 未被拒",
      "note": "經 `_mech_run(mutate=…)`：原 receipt 存在性判定 → `true ||`"},
-    {"test_ref": "test_govb1_factkey_gen.py:2033", "core_anchor": _RAW_KEYS_ANCHOR, "core_mutant": _RAW_KEYS_FAILED,
+    {"test_ref": "test_govb1_factkey_gen.py::test_wl03_jq_failure_is_fail_closed_not_empty_registry#1", "core_anchor": _RAW_KEYS_ANCHOR, "core_mutant": _RAW_KEYS_FAILED,
      "red_test": _P + "test_fkperf_prop_valid_registry_emits_rc_zero", "fail_substr": "合法註冊表生成失敗",
      "note": "原 `_fk_raw_keys` 之 jq 失敗（核心不以 jq 子程序讀 key，無此分支）→ 改寫為讀 key 清單時拋出帶病名之例外"},
 ]

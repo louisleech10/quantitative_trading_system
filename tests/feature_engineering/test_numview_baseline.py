@@ -11,7 +11,7 @@
    剔除後選欄之欄序；不可達臂於收據具 `arm_unreachable`（臂名＋契約條件名＋實際選欄數）且凍結檔無該份；G2 兩份
    （`FFACT_USE_POLARS` 0／1）；格 B 之 G3 raw 與 processed。
 ② 格清單＝判準檔列舉規則套用於 kline_cache.h5 之結果（不得缺格；blocked 格附根數與理由）。
-③ 凍結收據 `started_at` 晚於估時收據 `reported_at`。
+③ 凍結收據 `started_at` 晚於估時收據首次報告時間（`revisions[*].previous_reported_at` 最早值；無修訂紀錄者取 `reported_at`）。
 邊界：09 前史不足 ⇒ 依判準標 blocked、記根數、不降門檻；10 記憶體守護終止 ⇒ blocked-by 硬體並列入 RM-FULLSCALE、不得以縮小
 設定冒充同格；11 選欄數 ≤ 1 ⇒ `pandas_chunked` 不可達、只凍其餘臂份並記 `arm_unreachable`；12 選欄數 0 ⇒ G1 全臂
 `arm_unreachable`、G2／G3 照凍。邊界皆對全部格逐格驗規則（若真實列舉無格觸發，仍對每格驗「若…則…」並直接呼叫凍結腳本之
@@ -438,11 +438,24 @@ def cell_list_violations() -> List[str]:
     return out
 
 
+def first_reported_at(estimate: Mapping[str, Any]) -> datetime:
+    """估時收據之首次報告時間：`revisions[*].previous_reported_at` 之最早值；無修訂紀錄者取 `reported_at`。
+
+    估時收據於凍結後經 NUMVIEW Task 1.2 重估（14475bc9）覆寫頂層 `reported_at`，覆寫前之值由收據自身保存於
+    `revisions[].previous_reported_at`（git 65bd80c0 之原值 2026-10-22T22:36:04.217434+00:00）。順序③之語意是
+    「凍結開始前已有估時報告」，故比對首次報告時間；收據本身不改。"""
+    previous = [r.get("previous_reported_at") for r in (estimate.get("revisions") or []) if isinstance(r, Mapping)]
+    previous = [p for p in previous if p is not None]
+    if previous:
+        return min(_parse_time(p) for p in previous)
+    return _parse_time(estimate.get("reported_at"))
+
+
 def order_violations() -> List[str]:
-    """驗證③：凍結收據 `started_at` 晚於估時收據 `reported_at`。"""
+    """驗證③：凍結收據 `started_at` 晚於估時收據之首次報告時間（`first_reported_at`）。"""
     started = _parse_time(load_freeze_receipt().get("started_at"))
-    reported = _parse_time(load_estimate_receipt().get("reported_at"))
-    return [] if started > reported else [f"started_at {started.isoformat()} 未晚於 reported_at {reported.isoformat()}"]
+    reported = first_reported_at(load_estimate_receipt())
+    return [] if started > reported else [f"started_at {started.isoformat()} 未晚於首次 reported_at {reported.isoformat()}"]
 
 
 # ---------------------------------------------------------------------------------------------- 驗證
@@ -637,12 +650,33 @@ def test_mutation_freeze_cell_removed_turns_cell_list_red(monkeypatch: pytest.Mo
 
 
 def test_mutation_started_before_reported_turns_order_red(monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutation：凍結收據 `started_at` 改為早於估時收據 `reported_at` ⇒ ③紅。"""
-    reported = _parse_time(load_estimate_receipt()["reported_at"])
+    """mutation：凍結收據 `started_at` 改為早於估時收據首次報告時間 ⇒ ③紅。"""
+    reported = first_reported_at(load_estimate_receipt())
     mutated = copy.deepcopy(load_freeze_receipt())
     mutated["started_at"] = (reported - timedelta(seconds=1)).astimezone(timezone.utc).isoformat()
     monkeypatch.setattr(THIS, "load_freeze_receipt", lambda: copy.deepcopy(mutated))
-    assert order_violations(), "mutant 存活：started_at 早於 reported_at 仍判通過"
+    assert order_violations(), "mutant 存活：started_at 早於首次 reported_at 仍判通過"
+
+
+def test_mutation_earliest_report_after_freeze_turns_order_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutation（TESTSEL I1d1 #18）：估時收據最早之 `revisions[*].previous_reported_at` 改為晚於凍結 `started_at` ⇒ ③紅；
+    無修訂紀錄者退回頂層 `reported_at`，其晚於凍結 ⇒ 亦紅。只改載入之複本，收據檔不動。"""
+    started = _parse_time(load_freeze_receipt()["started_at"])
+    later = (started + timedelta(seconds=1)).astimezone(timezone.utc).isoformat()
+    estimate = load_estimate_receipt()
+    assert estimate.get("revisions"), "估時收據應有 revisions（Task 1.2 重估紀錄）⇒ 本 mutation 空轉"
+
+    mutated = copy.deepcopy(estimate)
+    for rev in mutated["revisions"]:
+        rev["previous_reported_at"] = later
+    monkeypatch.setattr(THIS, "load_estimate_receipt", lambda: copy.deepcopy(mutated))
+    assert order_violations(), "mutant 存活：最早報告晚於凍結仍判通過"
+
+    no_rev = copy.deepcopy(estimate)
+    no_rev.pop("revisions")
+    no_rev["reported_at"] = later
+    monkeypatch.setattr(THIS, "load_estimate_receipt", lambda: copy.deepcopy(no_rev))
+    assert order_violations(), "mutant 存活：無修訂紀錄且 reported_at 晚於凍結仍判通過"
 
 
 def test_mutation_estimate_receipt_missing_freeze_script_refuses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

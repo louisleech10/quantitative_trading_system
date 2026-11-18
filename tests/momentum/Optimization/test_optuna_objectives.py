@@ -91,6 +91,7 @@ async def test_optuna_optimizer_pluggable_objective_runs_trials():
 
 
 def test_model_hyperparam_objective_search_space_and_evaluate():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     trainer = DummyTrainer()
     X = pd.DataFrame(np.random.randn(40, 6), columns=[f"f{i}" for i in range(6)])
     y = np.random.randint(0, 2, size=40)
@@ -128,6 +129,7 @@ def test_model_hyperparam_objective_search_space_and_evaluate():
 
 
 def test_strategy_backtest_objective_single_and_multi():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     predicted_proba = pd.Series(np.linspace(0.1, 0.9, 80))
     close = 100 + np.cumsum(np.random.randn(80) * 0.3)
     prices = pd.DataFrame(
@@ -184,6 +186,7 @@ def test_strategy_backtest_objective_single_and_multi():
 
 @pytest.mark.asyncio
 async def test_multi_objective_auto_nsga2_sampler():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     predicted_proba = pd.Series(np.linspace(0.1, 0.9, 60))
     close = 100 + np.cumsum(np.random.randn(60) * 0.2)
     prices = pd.DataFrame(

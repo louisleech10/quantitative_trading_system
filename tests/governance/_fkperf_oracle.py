@@ -86,22 +86,57 @@ def _copy_receipts(root: Path) -> None:
             shutil.copy2(src, dst)
 
 
+_ARCHIVE_CACHE: Dict[str, bytes] = {}
+_OBJECT_STORE: Dict[str, object] = {}
+
+
+def _oracle_archive() -> bytes:
+    """`git archive ORACLE_COMMIT -- SANDBOX_PATHS` 之位元組（ORACLE_COMMIT 固定 ⇒ 行程內只取一次）。"""
+    if "ar" not in _ARCHIVE_CACHE:
+        _ARCHIVE_CACHE["ar"] = subprocess.run(["git", "-C", str(REPO), "archive", ORACLE_COMMIT, "--", *SANDBOX_PATHS],
+                                              capture_output=True, check=True).stdout
+    return _ARCHIVE_CACHE["ar"]
+
+
+def _extract_input_tree(root: Path) -> None:
+    subprocess.run(["tar", "-x", "-C", str(root)], input=_oracle_archive(), check=True)
+    for rel in _SANDBOX_DROP:
+        shutil.rmtree(root / rel, ignore_errors=True)
+    _copy_receipts(root)
+
+
+def _shared_object_store() -> Path:
+    """行程內共用之 git 物件庫：完整輸入樹 `git add -A` 一次所得之 objects 目錄（I10 瘦身）。
+
+    各沙箱 `git init` 後以 `objects/info/alternates` 指向此庫再 `git add -A`：內容已在庫中之 blob 不再壓縮寫出
+    （逐沙箱 2.2–2.8 秒 → 0.18 秒，2026-11-12 實測 runs/g5/fk_time2.py），索引內容與獨立 `git add -A` 逐項相同
+    （`git ls-files -s` 位元組相等，同日實測）；沙箱自身之新物件（建法改動後之檔）照常寫入沙箱 `.git`。
+    git 對 alternates 只讀（至多更新既有物件之 mtime）。暫存目錄由 TemporaryDirectory 於行程結束清除。"""
+    if "objects" not in _OBJECT_STORE:
+        import tempfile
+
+        holder = tempfile.TemporaryDirectory(prefix="fkperf-objstore-")
+        base = Path(holder.name)
+        _extract_input_tree(base)
+        subprocess.run(["git", "init", "-q"], cwd=str(base), check=True)
+        subprocess.run(["git", "add", "-A"], cwd=str(base), check=True, capture_output=True)
+        _OBJECT_STORE["holder"] = holder
+        _OBJECT_STORE["objects"] = (base / ".git" / "objects").resolve()
+    return _OBJECT_STORE["objects"]  # type: ignore[return-value]
+
+
 def build_sandbox_tree(root: Path, *, omit: Sequence[str] = (), git_init: bool = True, minimal: bool = False) -> None:
     """以 `git archive ORACLE_COMMIT -- SANDBOX_PATHS` 建輸入樹＋註冊表引用之 receipt；`omit` 指定要刪之相依檔。
     `minimal=True`：只放入口及註冊表，比照既有 `test_empty_registry_is_rc_zero_not_failure` 之沙箱
-    （完整樹下空註冊表會先撞交接投影檢查，2026-09-23 主委實測）。"""
+    （完整樹下空註冊表會先撞交接投影檢查，2026-09-23 主委實測）。
+    `git_init`：`git init`＋`git add -A`（物件經 alternates 共用 `_shared_object_store`，索引內容同獨立建庫）。"""
     root.mkdir(parents=True, exist_ok=True)
     if minimal:
         (root / "scripts").mkdir(exist_ok=True)
         (root / ENTRY_REL).write_bytes(_oracle_blob(ENTRY_REL))
         (root / REG_REL).write_bytes(_oracle_blob(REG_REL))
     else:
-        ar = subprocess.run(["git", "-C", str(REPO), "archive", ORACLE_COMMIT, "--", *SANDBOX_PATHS],
-                            capture_output=True, check=True).stdout
-        subprocess.run(["tar", "-x", "-C", str(root)], input=ar, check=True)
-        for rel in _SANDBOX_DROP:
-            shutil.rmtree(root / rel, ignore_errors=True)
-        _copy_receipts(root)
+        _extract_input_tree(root)
     for rel in omit:
         p = root / rel
         if p.is_dir() and not p.is_symlink():
@@ -109,7 +144,10 @@ def build_sandbox_tree(root: Path, *, omit: Sequence[str] = (), git_init: bool =
         elif p.exists() or p.is_symlink():
             p.unlink()
     if git_init:
+        store = _shared_object_store()
         subprocess.run(["git", "init", "-q"], cwd=str(root), check=True)
+        (root / ".git" / "objects" / "info").mkdir(parents=True, exist_ok=True)
+        (root / ".git" / "objects" / "info" / "alternates").write_text(f"{store}\n", encoding="utf-8")
         subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
 
 

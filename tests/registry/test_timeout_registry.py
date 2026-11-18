@@ -24,9 +24,13 @@ INJECTED, STRING_ONLY = "    subprocess.run(cmd, timeout=60)\n", "log.info(\"tim
 
 
 def test_boundary_12_repo_scan_every_hit_registered_and_not_class_a() -> None:
-    """全庫（scripts／momentum／api／tests／handoffs probes／config／frontend）每處命中皆已登記且非 A 類。"""
-    missing = scan.unregistered(scan.scan_repo(REPO), REGISTRY)
+    """全庫（scripts／momentum／api／tests／handoffs probes／config／frontend）每處命中皆已登記且非 A 類，或列於 NOCAP
+    待施工棘輪清單 `scripts/timeout_pending_nocap.json`（blocked-by NOCAP Phase 1／3／4／5 已定義之 Task；主委
+    2026-11-13 裁定以 TESTREG rewrite 改寫本測試語意）：不在清單之未登記命中照擋（新增）；清單列已無對應命中亦紅
+    （修好須移出，只減不增）；清單列 nocap_task 空值 ⇒ load_pending 拒。"""
+    missing, stale = scan.ratchet(scan.scan_repo(REPO), REGISTRY, scan.load_pending())
     assert missing == [], [f"{h.path}:{h.line} {h.text.strip()}" for h in missing[:20]]
+    assert stale == [], [f"{e['path']}:{e['line_hint']} {e['text']}（已修好，請自棘輪清單移出）" for e in stale[:20]]
 
 
 def test_boundary_13_stale_registry_entry_is_red() -> None:
@@ -109,3 +113,41 @@ def test_mutation_substring_binding_hides_injected_cap(monkeypatch: pytest.Monke
     monkeypatch.setattr(scan, "registered", lambda h, reg: next(
         (e for e in reg if e["path"] == h.path and e.get("contains", "") in h.text), None))
     assert scan.unregistered(hits, loose) == []
+
+
+# ── NOCAP 未施工既有命中之棘輪（TESTSEL 收尾 E；scripts/timeout_pending_nocap.json）─────────────────────────────
+def _repo_hits_cached() -> list:
+    """全庫掃描一次（本段各測試共用；秒級）。"""
+    if not hasattr(_repo_hits_cached, "hits"):
+        _repo_hits_cached.hits = scan.scan_repo(REPO)  # type: ignore[attr-defined]
+    return list(_repo_hits_cached.hits)  # type: ignore[attr-defined]
+
+
+def test_ratchet_repo_scan_new_hits_blocked_and_fixed_hits_removed() -> None:
+    """棘輪（業界 baseline）：全庫未登記命中扣除 NOCAP 待施工清單後為空（新增照擋）；清單每列皆仍有對應命中（修好須移出，
+    只減不增）；清單每列 nocap_task 非空、category 合法（load_pending 驗）。"""
+    pending = scan.load_pending()
+    new, stale = scan.ratchet(_repo_hits_cached(), REGISTRY, pending)
+    assert new == [], [f"{h.path}:{h.line} {h.text.strip()}" for h in new[:20]]
+    assert stale == [], [f"{e['path']}:{e['line_hint']} {e['text']}（已修好，請自棘輪清單移出）" for e in stale[:20]]
+    assert pending and all(e["nocap_task"].strip() for e in pending)
+
+
+def test_ratchet_mutations_each_turn_red() -> None:
+    """改壞對照：① 新增一處未登記逾時 ⇒ new 多該處；② 刪掉 pending 一處對應之碼（自命中移除）而未移出清單 ⇒ stale 恰該列；
+    ③ pending 加一筆 nocap_task 空值 ⇒ load_pending 拒（ValueError）；④ 拿掉 pending 判斷（空清單）⇒ 清單全部列轉為 new。"""
+    hits, pending = _repo_hits_cached(), scan.load_pending()
+    injected = scan.scan_text("scripts/ffprod_measure.py", "import subprocess\n\ndef go(cmd):\n" + INJECTED)
+    new1, _ = scan.ratchet(hits + injected, REGISTRY, pending)
+    assert [h.text for h in new1] == [h.text for h in injected]
+    victim = pending[0]
+    key = (victim["path"], victim["pattern_id"], victim["function"], victim["callee"], victim["literal"], victim["text"])
+    i = next(k for k, h in enumerate(hits)
+             if (h.path, h.pattern_id, h.function, h.callee, h.literal, h.text.strip()) == key)
+    _, stale2 = scan.ratchet(hits[:i] + hits[i + 1:], REGISTRY, pending)
+    assert stale2 == [victim]
+    bad = {"entries": pending + [dict(victim, nocap_task="")]}
+    with pytest.raises(ValueError, match="nocap_task"):
+        scan.load_pending(text=json.dumps(bad, ensure_ascii=False))
+    new4, _ = scan.ratchet(hits, REGISTRY, [])
+    assert len(new4) == len(pending) and len(pending) > 0

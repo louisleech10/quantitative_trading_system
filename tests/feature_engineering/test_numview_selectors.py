@@ -437,16 +437,29 @@ def test_capability_flags_registered() -> None:
     assert capability_violations(nv.load_contract()) == []
 
 
-def test_selector_gate_runs_under_ten_seconds() -> None:
-    """Task 0.2／4.4：全範圍掃描＋全部檢查＋解析器連動檢查 < 10 秒（SPEC「嚴禁慢閘」）。"""
+@pytest.fixture(scope="module")
+def selector_gate_full_run() -> Dict[str, Any]:
+    """全範圍掃描＋全部檢查＋解析器連動檢查跑一次：回傳兩類違規清單與牆鐘秒數（TESTSEL S3：兩條共用，不重複）。"""
     started = time.monotonic()
     scan = scan_repo()
     contract = nv.load_contract()
     task02 = all_task02_violations(scan, contract)
     link = resolver_link_violations(*record_resolver_reads())
     elapsed = time.monotonic() - started
-    assert elapsed < TIME_BUDGET_SECONDS, f"選擇子閘耗時 {elapsed:.2f}s ≥ {TIME_BUDGET_SECONDS}s"
+    return {"task02": task02, "link": link, "elapsed": elapsed}
+
+
+def test_selector_gate_full_scan_no_violations(selector_gate_full_run: Dict[str, Any]) -> None:
+    """Task 0.2／4.4：全範圍掃描之全部檢查與解析器連動檢查皆無違規（原計時測試之正確性斷言）。"""
+    task02, link = selector_gate_full_run["task02"], selector_gate_full_run["link"]
     assert task02 == [] and link == [], task02 + link
+
+
+@pytest.mark.perf
+def test_selector_gate_runs_under_ten_seconds(selector_gate_full_run: Dict[str, Any]) -> None:
+    """Task 0.2／4.4：全範圍掃描＋全部檢查＋解析器連動檢查 < 10 秒（SPEC「嚴禁慢閘」）：效能基準，opt-in（TESTSEL S3）。"""
+    elapsed = selector_gate_full_run["elapsed"]
+    assert elapsed < TIME_BUDGET_SECONDS, f"選擇子閘耗時 {elapsed:.2f}s ≥ {TIME_BUDGET_SECONDS}s"
 
 
 # ---------------------------------------------------------------------------------------------- 驗證（Task 4.4）

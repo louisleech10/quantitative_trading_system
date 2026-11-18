@@ -113,7 +113,7 @@ def test_search_failure_keeps_original_and_degrades(path: str, tmp_path: Path, m
         _fail_first_parallel_search(monkeypatch)
     else:
         _fail_first_serial_search(monkeypatch)
-    root, _, result = h.run_stat(tmp_path, h.stat_payload())
+    root, _, result = h.run_stat(tmp_path, h.narrow_stat_payload())
     _assert_search_failed_one(root, result, dstar)
 
 
@@ -126,7 +126,7 @@ def warm_cache(tmp_path_factory: pytest.TempPathFactory) -> Path:
     tmp = tmp_path_factory.mktemp("ffstat_warm")
     try:
         dstar = h.prepare_stat_env(mp, tmp)
-        h.run_stat(tmp, h.stat_payload())
+        h.run_stat(tmp, h.narrow_stat_payload())
         assert list(dstar.glob("*.json"))
         return dstar
     finally:
@@ -139,12 +139,20 @@ _CORRUPT = {
     "entries_not_object": lambda text: json.dumps({**json.loads(text), "entries": []}),
 }
 
+#: TESTSEL I10：整合層只留檔級讀失敗之代表（not_json）與欄級讀失敗（get_raises）。檔級四形狀（壞 JSON、頂層陣列、
+#: entries 非物件、載入 OSError）於 `DStarCache._load_or_init` 各走一個分支、皆只設 `load_error`，下游
+#: （`feature_preprocessor` 之 serial 與平行兩處）只看 `load_error` 是否非空 ⇒ 下游同一路徑；各形狀之分支由單元層
+#: test_cache_load_error_distinguished_from_missing（not_json）與 test_cache_structural_damage_is_read_failure
+#: （top_level_array、entries_not_object、load_oserror、missing_entries、bad_row_count）逐一驗
+_INTEGRATION_SHAPES = ["not_json", "get_raises"]
 
-@pytest.mark.parametrize("shape", sorted(_CORRUPT) + ["load_oserror", "get_raises"])
+
+@pytest.mark.parametrize("shape", _INTEGRATION_SHAPES)
 def test_boundary_14_cache_read_failure_event_and_search(shape: str, warm_cache: Path, tmp_path: Path,
                                                           monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 3.1 邊界①：快取三種壞檔形狀、載入 OSError、單欄 cache.get 例外 ⇒ 事件 dstar_cache_read_failed、
-    該欄照常搜尋套用（有 `_fracdiff` 衍生欄或決策明確）、quality_status == partial。"""
+    該欄照常搜尋套用（有 `_fracdiff` 衍生欄或決策明確）、quality_status == partial。
+    （TESTSEL I10：整合層形狀見 `_INTEGRATION_SHAPES`；其餘檔級形狀移單元層。）"""
     dstar = h.prepare_stat_env(monkeypatch, tmp_path)
     for f in warm_cache.glob("*.json"):
         shutil.copy2(f, dstar / f.name)
@@ -173,7 +181,7 @@ def test_boundary_14_cache_read_failure_event_and_search(shape: str, warm_cache:
             return real_get(self, column, col_values)
 
         monkeypatch.setattr(DStarCache, "get", _get)
-    root, _, result = h.run_stat(tmp_path, h.stat_payload())
+    root, _, result = h.run_stat(tmp_path, h.narrow_stat_payload())
     affected = _failed_columns(result, EV["cache_read_failed"])
     assert affected
     dec = h.decisions(result)
@@ -185,7 +193,7 @@ def test_boundary_14_cache_read_failure_event_and_search(shape: str, warm_cache:
 def test_boundary_14b_missing_cache_file_no_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 3.1 邊界①：快取檔不存在（冷快取）⇒ 無 dstar_cache_read_failed 事件。"""
     h.prepare_stat_env(monkeypatch, tmp_path)
-    _, _, result = h.run_stat(tmp_path, h.stat_payload())
+    _, _, result = h.run_stat(tmp_path, h.narrow_stat_payload())
     assert not _failed_columns(result, EV["cache_read_failed"])
     assert not any(r.startswith(EV["cache_read_failed"]) for r in result.metadata["failure_reasons"])
 
@@ -260,7 +268,7 @@ def test_boundary_16_cache_write_failure_applies_and_degrades(where: str, tmp_pa
         monkeypatch.setattr(DStarCache, "set", _set)
     else:
         _fail_dstar_cache_os_replace(monkeypatch)
-    root, _, result = h.run_stat(tmp_path, h.stat_payload())
+    root, _, result = h.run_stat(tmp_path, h.narrow_stat_payload())
     reasons = [r for r in result.metadata["failure_reasons"] if r.startswith(EV["cache_write_failed"] + ":")]
     assert len(reasons) == 1 and int(reasons[0].split(":")[1]) >= 1
     assert result.metadata["quality_status"] == "partial"
@@ -283,7 +291,7 @@ def test_boundary_17_parallel_worker_failure_not_cached(tmp_path: Path, monkeypa
     """Task 3.1 邊界③：parallel worker 搜尋失敗 ⇒ 快取無該欄（主程序先判 status 再寫快取）。"""
     dstar = h.prepare_stat_env(monkeypatch, tmp_path)
     _fail_first_parallel_search(monkeypatch)
-    root, _, result = h.run_stat(tmp_path, h.stat_payload())
+    root, _, result = h.run_stat(tmp_path, h.narrow_stat_payload())
     _assert_search_failed_one(root, result, dstar)
 
 
@@ -292,7 +300,7 @@ def test_boundary_18_all_columns_fail_run_partial(tmp_path: Path, monkeypatch: p
     h.prepare_stat_env(monkeypatch, tmp_path)
     monkeypatch.setattr(FeaturePreprocessor, "_find_min_d",
                         lambda self, series, **kw: (_ for _ in ()).throw(RuntimeError("all fail")))
-    root, _, result = h.run_stat(tmp_path, h.stat_payload(adf=False))
+    root, _, result = h.run_stat(tmp_path, h.narrow_stat_payload(adf=False))
     assert result.metadata["quality_status"] == "partial"
     assert not any(n.endswith("_fracdiff") for n in _derived(root))
 
@@ -341,15 +349,25 @@ def test_mutation_flush_swallows_error_is_caught(tmp_path: Path, monkeypatch: py
         test_flush_atomic_reports_failure(tmp_path, monkeypatch)
 
 
-@pytest.mark.parametrize("damage", ["missing_entries", "bad_row_count"])
-def test_cache_structural_damage_is_read_failure(damage: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize("damage", ["missing_entries", "bad_row_count", "top_level_array", "entries_not_object",
+                                    "load_oserror"])
+def test_cache_structural_damage_is_read_failure(damage: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """b2 審碼 r1 codex P2-01：缺 `entries` 或 header 型別損壞（row_count 非整數）⇒ 記 `load_error`、
-    當空快取（照常搜尋），不得靜默當冷快取、也不得於載入時拋例外中止。"""
+    當空快取（照常搜尋），不得靜默當冷快取、也不得於載入時拋例外中止。
+    TESTSEL I10：自整合層 test_boundary_14 移入之檔級形狀——頂層陣列、entries 非物件（同 `_CORRUPT`）、載入 OSError
+    （同整合層之 `Path.read_text` 注入）——各為 `_load_or_init` 之一個分支，同此斷言。"""
     ctx = PreprocessingContext(symbol=h.SYMBOL, timeframe=h.PRIMARY_TF, config_hash="cfg")
     first = _cache(ctx, tmp_path)
     first.set("col", 0.3, h.kline_frame()["close"].to_numpy()[:500])
     assert first.flush_atomic() is True
-    for f in tmp_path.glob("*.json"):
+    files = list(tmp_path.glob("*.json"))
+    assert files
+    for f in files:
+        if damage in _CORRUPT:
+            f.write_text(_CORRUPT[damage](f.read_text(encoding="utf-8")), encoding="utf-8")
+            continue
+        if damage == "load_oserror":
+            continue
         payload = json.loads(f.read_text(encoding="utf-8"))
         if damage == "missing_entries":
             payload.pop("entries")
@@ -357,6 +375,16 @@ def test_cache_structural_damage_is_read_failure(damage: str, tmp_path: Path) ->
         else:
             payload["row_count"] = "not-an-int"
         f.write_text(json.dumps(payload), encoding="utf-8")
+    if damage == "load_oserror":
+        real_read = Path.read_text
+        targets = {str(f) for f in files}
+
+        def _read(self, *a, **k):
+            if str(self) in targets:
+                raise OSError("injected load failure")
+            return real_read(self, *a, **k)
+
+        monkeypatch.setattr(Path, "read_text", _read)
     reread = _cache(ctx, tmp_path)
     assert getattr(reread, API["load_error_attr"])
     assert reread.get("col", h.kline_frame()["close"].to_numpy()[:500]) is None

@@ -191,9 +191,7 @@ def test_4_data_integrity_validation(env):
 
 @_TZ_XFAIL
 def test_5_performance_benchmark(env):
-    """快取讀取 100 根：不呼叫上游、筆數與值正確，且耗時 < 100ms（原驗收門檻，不放寬）。"""
-    import time
-
+    """快取讀取 100 根：不呼叫上游、筆數與值正確（耗時 < 100ms 之門檻移至 perf 之 test_5_cached_read_100_bars_under_100ms）。"""
     svc, provider, storage, up = env
     t0 = int(up["timestamp"].iloc[0])
     t1 = t0 + 199 * STEP
@@ -201,11 +199,27 @@ def test_5_performance_benchmark(env):
     provider.calls.clear()
 
     s2, e2 = t0 + 30 * STEP, t0 + 129 * STEP  # 100 根
-    t_start = time.perf_counter()
     df = svc.get_kline_data(SYMBOL, TF, _dt(s2), _dt(e2))
-    elapsed = time.perf_counter() - t_start
 
     assert provider.calls == []
     assert len(df) == 100
     _assert_same_bars(df, _expected(up, s2, e2))
+
+
+@pytest.mark.perf
+def test_5_cached_read_100_bars_under_100ms(env):
+    """快取讀取 100 根耗時 < 100ms（原驗收門檻，不放寬）：效能基準，opt-in（TESTSEL S3 自 test_5 移出之計時斷言；
+    同一輸入，毫秒級，故各自計算不共用）。不掛 _TZ_XFAIL：該 xfail 針對值正確性之生產缺陷，與計時無關。"""
+    import time
+
+    svc, provider, storage, up = env
+    t0 = int(up["timestamp"].iloc[0])
+    t1 = t0 + 199 * STEP
+    svc.get_kline_data(SYMBOL, TF, _dt(t0), _dt(t1))
+
+    s2, e2 = t0 + 30 * STEP, t0 + 129 * STEP  # 100 根
+    t_start = time.perf_counter()
+    svc.get_kline_data(SYMBOL, TF, _dt(s2), _dt(e2))
+    elapsed = time.perf_counter() - t_start
+
     assert elapsed < 0.100

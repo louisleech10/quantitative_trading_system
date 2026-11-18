@@ -477,15 +477,42 @@ def _keyed_sources(features: Mapping[str, Any]) -> Set[str]:
     return {x for fields in features.values() for x in fields if not _is_table_field(x)}
 
 
+class _LazyOracleRuns(Mapping):
+    """`oracle_runs` 之逐項延遲計算（TESTSEL I10）：每一輸出項於首次取用時跑一次（同一模組內快取），使 boundary_01 之
+    逐項參數化測試各只付該項之成本（原 module fixture 一次跑完七項，ledger 1,433 秒；2026-11-12 worktree 實測逐項
+    freeze_item 26–207 秒，最慢 icfirst_post_ic 為 A 格整格 IC-first，runs/g5/probe_b01.json），boundary_02 取同一快取。
+    逐項之請求、執行與觀測與原 fixture 迴圈本體逐字相同（`_oracle_run_item`）。"""
+
+    def __init__(self, fb: Any, tmp_path_factory: pytest.TempPathFactory) -> None:
+        self._fb, self._tpf, self._cache = fb, tmp_path_factory, {}
+
+    def __getitem__(self, item: str) -> Dict[str, Any]:
+        if item not in OUTPUT_ITEMS:
+            raise KeyError(item)
+        if item not in self._cache:
+            self._cache[item] = _oracle_run_item(self._fb, self._tpf, item)
+        return self._cache[item]
+
+    def __iter__(self):
+        return iter(OUTPUT_ITEMS)
+
+    def __len__(self) -> int:
+        return len(OUTPUT_ITEMS)
+
+
 @pytest.fixture(scope="module")
-def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Dict[str, Any]]:
+def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Mapping[str, Dict[str, Any]]:
     """每一輸出項對同一小規模真實請求跑一次凍結機制，同時以獨立 oracle 觀測同一次執行。三根（SPEC §G (b)）：cwd 根＝
     `work/<item>/cwd`、隔離目錄＝`work/<item>/iso`（`freeze_item` 契約）、repo 根；`freeze_item` 之記錄須以 "roots" 回報
     其實際所用之 cwd 根與隔離目錄，且與 oracle 前後兩次走訪之根相同（boundary_01 末斷言）。"fields"＝回應全部欄位扣除逐特徵
-    來源之子路徑（SPEC §G 摘要粒度；逐特徵來源由 boundary_02 逐特徵比對）。"""
+    來源之子路徑（SPEC §G 摘要粒度；逐特徵來源由 boundary_02 逐特徵比對）。逐項延遲計算（`_LazyOracleRuns`）。"""
+    return _LazyOracleRuns(fb, tmp_path_factory)
+
+
+def _oracle_run_item(fb: Any, tmp_path_factory: pytest.TempPathFactory, item: str) -> Dict[str, Any]:
     golden = _golden()
     out: Dict[str, Dict[str, Any]] = {}
-    for item in OUTPUT_ITEMS:
+    for item in (item,):
         work = tmp_path_factory.mktemp(f"oracle_{item}")
         # 優先取凍結倖存者（同格他項之 "selected" 亦取：深度分析項之記錄不存倖存者，與同格 IC 頁項同請求設定），
         # 使小規模請求與凍結走同一寫出分支（有倖存者才寫 filtered HDF5）
@@ -505,7 +532,7 @@ def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, 
         out[item] = {"record": record, "raw": raw, "written": written, "ignored_seen": ignored_seen,
                      "fields": _oracle_response_fields(item, raw),
                      "roots": {"cwd": str((work / item / "cwd").resolve()), "iso": str(iso.resolve())}}
-    return out
+    return out[item]
 
 
 # ── Task 0.1 驗證：凍結檔內容 ──────────────────────────────────────────────────────────────────────────
@@ -513,11 +540,15 @@ def oracle_runs(fb: Any, tmp_path_factory: pytest.TempPathFactory) -> Dict[str, 
 
 @pytest.mark.slow
 @pytest.mark.requires_kline
-def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str, Any]]) -> None:
+@pytest.mark.parametrize("oracle_item", OUTPUT_ITEMS)
+def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Mapping[str, Dict[str, Any]], oracle_item: str) -> None:
     """§G (1)–(5) 五項皆在；(1)(2)(4) 逐特徵逐欄位 sha256 非空；(1)(3)(4)(5) 各含回應全部欄位與快照差集之全部寫出檔；
     獨立 oracle：同一小規模真實請求之回應鍵集合（扣除逐特徵來源之子路徑）與 os.walk 三根（cwd 根、`<iso>`、`<repo>`）前後
     差集 == 凍結機制之記錄，凍結檔之欄位與輸出根結構相同；IC-first 凍結檔含 processed/selected.parquet（V2 artifact，不寫
-    HDF5）；記錄回報之根 == oracle 走訪之根。"""
+    HDF5）；記錄回報之根 == oracle 走訪之根。
+
+    TESTSEL I10：獨立 oracle 之比對依輸出項參數化（`oracle_item`），每案只跑該項之小規模請求（`_LazyOracleRuns`），
+    七案合起來＝原單一測試之全部比對；凍結檔本身之內容檢查（秒級）每案皆做。"""
     golden = _golden()
     items = golden["items"]
     missing = [k for k in G_ITEMS if k not in items]
@@ -544,7 +575,7 @@ def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str
     sub = items["stage5_subset"]
     assert sub["seed"] == SEED and sub["n_cols_requested"] == 2000
     assert sub["stage_cols"] == len(sub["features"]) and 0 < sub["stage_cols"] <= 2000
-    for name in OUTPUT_ITEMS:
+    for name in (oracle_item,):
         run, frozen = oracle_runs[name], items[name]
         rec = run["record"]
         assert set(rec["response"]) == run["fields"], (
@@ -563,7 +594,7 @@ def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str
     assert len(selected_parquet) == 1, f"icfirst_post_ic：須恰一個 processed/selected.parquet，實得 {selected_parquet}"
     assert HEX64.match(str(post_ic[selected_parquet[0]].get("sha256") or "")), "icfirst_post_ic：selected.parquet 無 sha256"
     # SPEC §G (b)：freeze_item 之記錄回報所用之 cwd 根與隔離目錄，須與獨立 oracle 前後走訪之根相同（三根前綴之鍵方可比）
-    for name in OUTPUT_ITEMS:
+    for name in (oracle_item,):
         run = oracle_runs[name]
         used = run["record"].get("roots") or {}
         assert {r: str(Path(p).resolve()) for r, p in used.items()} == run["roots"], \
@@ -578,7 +609,7 @@ def test_boundary_01_frozen_contains_all_g_items(oracle_runs: Dict[str, Dict[str
 
 @pytest.mark.slow
 @pytest.mark.requires_kline
-def test_boundary_02_frozen_baseline_content_complete(fb: Any, oracle_runs: Dict[str, Dict[str, Any]]) -> None:
+def test_boundary_02_frozen_baseline_content_complete(fb: Any, oracle_runs: Mapping[str, Dict[str, Any]]) -> None:
     """逐特徵逐欄位值 sha256（原生 dtype 位元組）、NaN 遮罩 sha256、選欄通過集合、PIT 標籤序列 sha256 皆在；
     獨立 oracle（同一小規模請求）：自原始回應之逐特徵表重算欄位集合與數值欄之值／NaN 遮罩 sha256、選欄通過集合，
     與記錄相同；凍結檔對 oracle 只比表結構、與成員無關（見 `_check_item_against_oracle`）；選欄通過集合＝第 6 段後之
@@ -635,18 +666,65 @@ def test_freeze_reproducible(fb: Any) -> None:
         assert rec == frozen["pit_labels"][feat], f"PIT 標籤不可重現：{feat}"
 
 
+#: test_freeze_reproducible 之小規模姊妹測試（TESTSEL I10 追加裁定 2026-11-13：原測試原樣保留）之欄數；子集＝同 seed
+#: permutation 之前 n 欄（`_write_stage5_subset`：`np.sort(default_rng(seed).permutation(total)[:n_cols])`）⇒ 為凍結
+#: 2,000 欄子集之巢狀子集。
+SISTER_COLS = 60
+#: 第 5 段逐特徵欄位中依「進段全部欄」而變者（FDR 一族＝進段全部欄，ic_filter_orchestrator 第 5 段）：只斷言存在與合法，
+#: 不與 2,000 欄凍結比值；其餘欄位逐特徵與凍結逐位元相等。
+STAGE5_UNIVERSE_DEPENDENT = frozenset({"/summary_table/p_value_adj", "/summary_table/pass_class"})
+
+
+@pytest.mark.slow
+@pytest.mark.requires_kline
+def test_freeze_reproducible_small_nested_subset(fb: Any) -> None:
+    """test_freeze_reproducible 之小規模姊妹（同碼路徑：同交接 h5 雜湊驗證→子集 h5→產品 analyze 第 0–5 段→逐特徵摘要＋
+    第 5 段實際輸入對之 PIT 標籤）：凍結子集之巢狀 SISTER_COLS 欄子集重跑，與「改前」凍結（錨點 ad488adf 之 2,000 欄
+    凍結）逐特徵比——FDR 族依賴欄位（STAGE5_UNIVERSE_DEPENDENT）以外之全部欄位、PIT 標籤逐位元相等；進段欄＝子集內
+    凍結有之特徵。小規模驗不到者（small_scale_gap）：FDR 對 2,000 欄全族之 p_value_adj／pass_class 逐位元重現，仍由
+    test_freeze_reproducible（close／full 層）驗；FDR 接線≡BH kernel 另由 test_ic_1eb_b2_wiring t22a 驗。"""
+    frozen = _golden()["items"]["stage5_subset"]
+    assert _sha256_of_file(_c_handoff_file(frozen)) == frozen["request"]["source_sha256"], "交接 h5 內容 != 凍結所記"
+    cur = fb.stage5_subset_digests(SISTER_COLS, seed=SEED, expected_sha256=frozen["request"]["source_sha256"])
+    assert 0 < cur["stage_cols"] <= SISTER_COLS and cur["stage_cols"] == len(cur["features"])
+    extra = set(cur["features"]) - set(frozen["features"])
+    assert not extra, f"{SISTER_COLS} 欄子集非凍結 2,000 欄子集之巢狀子集：{sorted(extra)[:5]}"
+    dependent_seen: Set[str] = set()
+    for feat, fields in cur["features"].items():
+        ref = frozen["features"][feat]
+        assert set(fields) == set(ref), f"{feat}：欄位集合 != 凍結"
+        for field, digest in fields.items():
+            if field in STAGE5_UNIVERSE_DEPENDENT:
+                dependent_seen.add(field)
+                assert HEX64.match(str(digest.get("sha256") or "")), f"{feat}{field}：sha256 缺"
+                continue
+            assert digest == ref[field], f"第 5 段輸出（非 FDR 族欄位）!= 改前凍結：{feat}{field}"
+    assert dependent_seen == STAGE5_UNIVERSE_DEPENDENT, dependent_seen
+    assert set(cur["pit_labels"]) <= set(frozen["pit_labels"]) and set(cur["pit_labels"]) >= set(cur["features"])
+    for feat, rec in cur["pit_labels"].items():
+        assert rec == frozen["pit_labels"][feat], f"PIT 標籤 != 改前凍結：{feat}"
+
+
 # ── Task 0.1 邊界（真實資料） ───────────────────────────────────────────────────────────────────────────
 
 
+@pytest.fixture(scope="module")
+def a_cell(fb: Any) -> Tuple[Any, Any]:
+    """A 格之 (特徵, 標籤)：`fb.load_cell(CELL)`（子行程跑 analyze 至第 5 段入口，ledger 約 170 秒）於本模組只跑一次，
+    boundary_03／04 共用（TESTSEL I10；兩條原各起一次相同子行程）。呼叫端不得就地修改回傳物件（boundary_04 之探針以
+    `.copy()` 另建）。"""
+    return fb.load_cell(CELL)
+
+
 @pytest.mark.requires_kline
-def test_boundary_03_q_insufficient_labels_nan_as_frozen(fb: Any) -> None:
+def test_boundary_03_q_insufficient_labels_nan_as_frozen(fb: Any, a_cell: Tuple[Any, Any]) -> None:
     """A 格 q 不足之特徵（若存在）：凍結之標籤含 NaN，且 PIT 標籤序列 sha256 等於現行碼對該欄重算之值。
     不依賴 A 格恰有此類特徵；q 不足之語意另由 boundary_21 以真實索引上之明列邊界輸入覆蓋。"""
     labels = _golden()["items"]["ic_report"]["pit_labels"]
     cases = {k: v for k, v in labels.items() if v["q_insufficient"] and not v["skipped_all_nan"]}
     if not cases:
         return
-    features, label = fb.load_cell(CELL)
+    features, label = a_cell
     cur = fb.pit_label_digests(features[sorted(cases)], label)
     for feat, rec in cases.items():
         assert rec["label_nan_count"] > 0, f"{feat}：q 不足之欄標籤應含 NaN"
@@ -656,11 +734,11 @@ def test_boundary_03_q_insufficient_labels_nan_as_frozen(fb: Any) -> None:
 
 
 @pytest.mark.requires_kline
-def test_boundary_04_all_nan_column_skipped_as_current(fb: Any) -> None:
+def test_boundary_04_all_nan_column_skipped_as_current(fb: Any, a_cell: Tuple[Any, Any]) -> None:
     """全 NaN 欄於凍結與現行同被跳過；另以真實索引上之全 NaN 欄（明列邊界輸入）驗現行跳過。"""
     labels = _golden()["items"]["ic_report"]["pit_labels"]
     frozen_skipped = {k for k, v in labels.items() if v["skipped_all_nan"]}
-    features, label = fb.load_cell(CELL)
+    features, label = a_cell
     all_nan_now = {c for c in features.columns if bool(features[c].isna().all())}
     assert frozen_skipped == all_nan_now, "凍結之全 NaN 跳過集合 != 現行資料之全 NaN 欄"
     probe = features.iloc[:, :1].copy()
@@ -817,6 +895,23 @@ def test_boundary_08_tmpdir_home_isolated_and_snapshotted(fb: Any, tmp_path: Pat
     assert all(k.startswith("<iso>/") for k in written), f"隔離目錄寫出須以 <iso>/ 前綴記：{sorted(written)}"
 
 
+def _root_within_repo(root: Any) -> bool:
+    """輸出根是否落 repo 內：先以字面（`os.path.abspath`＝相對 cwd 補全後 normpath，不跟隨連結；同原 `Path(r).resolve()`
+    對相對路徑之 cwd 補全）須在 REPO 下；再逐段解析符號連結後仍須在其錨點內。
+    唯一容許之連結錨點＝repo 頂層 `data_cache` 本身為符號連結者（git worktree 整合樹以未追蹤之符號連結共用 repo 本體之
+    資料根；`.claude/worktrees/*/data_cache -> <repo 本體>/data_cache`）——此時 `data_cache/...` 之輸出根以該連結解析後之
+    資料根為錨點；其餘任何一段經連結解析出錨點外（含 `..`、絕對路徑、其他連結）一律判在 repo 外。"""
+    lexical = Path(os.path.abspath(str(root)))
+    if lexical != REPO and REPO not in lexical.parents:
+        return False
+    rel = lexical.relative_to(REPO)
+    anchor = REPO
+    if rel.parts and rel.parts[0] == "data_cache" and (REPO / "data_cache").is_symlink():
+        anchor, rel = REPO / "data_cache", Path(*rel.parts[1:])
+    base, resolved = anchor.resolve(), (anchor / rel).resolve()
+    return resolved == base or base in resolved.parents
+
+
 def test_boundary_09_output_root_outside_snapshot_fails(fb: Any, tmp_path: Path) -> None:
     """請求設定解析出之輸出根落快照範圍外 ⇒ FAIL；範圍內 ⇒ 放行；實際各路徑預設請求之輸出根皆落於所給之 cwd 根內
     （`resolve_output_roots` 之 `repo_root`＝本次執行之 cwd 根，`scripts/icperf_freeze_baseline.py:739-741`）：①參數預設值
@@ -830,11 +925,15 @@ def test_boundary_09_output_root_outside_snapshot_fails(fb: Any, tmp_path: Path)
     assert str(outside.resolve()) in str(exc.value) or str(outside) in str(exc.value)
     ok = _capture(fb, tmp_path, "pass\n", output_roots=[tmp_path / "repo" / "data_cache"], tag="inroot")
     assert ok["rc"] == 0
+    # repo 內判定本身非空轉：repo 外之根、以 `..` 跳出 repo 之根皆判在 repo 外（TESTSEL I1d1 #48：worktree 之 data_cache
+    # 為符號連結，原以 resolve 後字首比對於整合樹恆判 repo 外；改為字面在 repo 內且逐段解析後仍在錨點內）
+    assert not _root_within_repo(outside)
+    assert not _root_within_repo(REPO / ".." / "elsewhere_root")
     for item in [i for i in OUTPUT_ITEMS if i not in PENDING_ITEMS]:  # 待定項見 test_pending_items_fail_closed
         roots = fb.resolve_output_roots(item, fb.default_request(item, CELL))  # 參數預設 repo_root=REPO
         assert roots, f"{item}：未解析出任何輸出根"
         for r in roots:
-            assert str(Path(r).resolve()).startswith(str(REPO.resolve()) + "/"), f"{item}：輸出根 {r} 在 repo 外"
+            assert _root_within_repo(r), f"{item}：輸出根 {r} 在 repo 外"
     for item in [i for i in OUTPUT_ITEMS if i not in PENDING_ITEMS]:
         cwd_root = _isolated_cwd_root(tmp_path / "work", item)
         cwd_roots = fb.resolve_output_roots(item, fb.default_request(item, CELL), cwd_root)
@@ -2595,7 +2694,11 @@ def test_task02_inventory_branch_cells_cover_measured(fb: Any, harness: Any) -> 
     assert "__uncovered__" not in plan and set(plan) <= set(harness.RUNNERS)
     assert sum(len(v) for v in plan.values()) == sum(1 for e in inv["entries"] if e["measure"])
     outer = next(e for e in inv["entries"] if e["id"].endswith(":FeatureFactory.run_ic_first"))
-    assert outer["measure"] is False and outer["evidence"].endswith("feature_factory.py:2809")
+    # 碼證行號依符號導出（TESTSEL I1d1 #49：原寫死 `:2809`，清冊依符號重定位至現行 def 行後即與字面不符；
+    # 行號正確性另由 test_task02_v559_inventory_refs_within_stated_functions 逐條以 AST 驗）
+    ff_rel = "momentum/FeatureEngineering/feature_factory.py"
+    run_ic_first_line = _v559_defs(REPO / ff_rel)["FeatureFactory.run_ic_first"][0]
+    assert outer["measure"] is False and outer["evidence"] == f"{ff_rel}:{run_ic_first_line}"
     assert all(set(e["scale_vector"]) <= SCALE_VECTOR_KEYS and set(e["input_axes"]) <= INPUT_AXES for e in inv["entries"])
 
 

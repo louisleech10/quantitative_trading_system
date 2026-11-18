@@ -450,7 +450,7 @@
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_kurt": {
       "propagates_nan": true,
       "class": "propagating",
-      "evidence": "rolling_aggregator.py:1085 rolling(window).kurt()"
+      "evidence": "rolling_aggregator.py:995 rolling_moments_numpy.rolling_skew_kurt_numpy[:, 1]（TESTSEL I1b Task 2.4 取代 pandas rolling.kurt）"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_low_cardinality_cols": {
       "propagates_nan": false,
@@ -490,7 +490,7 @@
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_skew": {
       "propagates_nan": true,
       "class": "propagating",
-      "evidence": "rolling_aggregator.py:1082 rolling(window).skew()"
+      "evidence": "rolling_aggregator.py:991 rolling_moments_numpy.rolling_skew_kurt_numpy[:, 0]（TESTSEL I1b Task 2.4 取代 pandas rolling.skew）"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_slope": {
       "propagates_nan": true,
@@ -531,6 +531,26 @@
       "propagates_nan": true,
       "class": "propagating",
       "evidence": "rolling_aggregator.py:1156 rolling(window).apply 核心"
+    },
+    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._rolling_moment_frame": {
+      "propagates_nan": true,
+      "class": "propagating",
+      "evidence": "rolling_aggregator.py _rolling_moment_frame 逐欄呼叫 rolling_moments_numpy.rolling_skew_kurt_numpy 取 skew 或 kurt 一項（TESTSEL I1b Task 2.4）"
+    },
+    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._rolling_moment_frames": {
+      "propagates_nan": true,
+      "class": "propagating",
+      "evidence": "rolling_aggregator.py _rolling_moment_frames 逐欄呼叫 rolling_moments_numpy.rolling_skew_kurt_numpy，一次得 skew 與 kurt（TESTSEL I1b 審碼 r1 後）"
+    },
+    "momentum.FeatureEngineering.operators.rolling_moments_numpy:_moments_block": {
+      "propagates_nan": true,
+      "class": "propagating",
+      "evidence": "rolling_moments_numpy.py _moments_block 只寫窗內全有限且非常數之列，其餘維持呼叫端預設 NaN"
+    },
+    "momentum.FeatureEngineering.operators.rolling_moments_numpy:rolling_skew_kurt_numpy": {
+      "propagates_nan": true,
+      "class": "propagating",
+      "evidence": "rolling_moments_numpy.py:27,34 輸出預設 NaN；窗內全有限且非常數才計算（未滿窗與含 NaN 窗 ⇒ NaN）"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._select_columns": {
       "propagates_nan": false,
@@ -2146,6 +2166,11 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py:771-779 回傳最近一次 post-IC 紀錄；執行紀錄／脈絡，不產特徵值"
+    },
+    "momentum.FeatureEngineering.operators.rolling_moments_numpy:_kurt_lower": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "rolling_moments_numpy.py:_kurt_lower 純量下界式（依 n 奇偶），不處理資料列；呼叫端 _moments_block 越界 ⇒ NaN"
     }
   }
 }

@@ -595,8 +595,21 @@ def test_parallel_worker_outer_catch_does_not_swallow_rejection(monkeypatch, tmp
         raise IncompleteDownloadError("K 線回應非遞增或末筆非最大值（拒收，不得落快取）")
 
     _stub_worker_deps(monkeypatch, _reject)
-    with pytest.raises(IncompleteDownloadError, match="symbol=BADSYM"):
-        pse._process_chunk_worker(["BADSYM"], _WorkerCfg(), 1, 2, log_path=str(tmp_path / "w.log"))
+    before = list(logging.getLogger().handlers)
+    try:
+        with pytest.raises(IncompleteDownloadError, match="symbol=BADSYM"):
+            pse._process_chunk_worker(["BADSYM"], _WorkerCfg(), 1, 2, log_path=str(tmp_path / "w.log"))
+    finally:
+        _remove_new_root_handlers(before)  # I1A-HANDLER-FINALLY
+
+
+def _remove_new_root_handlers(before):
+    """主行程內呼叫 `_process_chunk_worker` 會把 worker FileHandler 掛 root（該函式為子行程設計）；測試結束移除並
+    關閉之，免後續測試寫 log 落到已刪之 tmp 目錄（TESTSEL I1a Task 1.4；tests/conftest.py 之守衛另為通用兜底）。"""
+    root = logging.getLogger()
+    for handler in [h for h in root.handlers if h not in before]:
+        root.removeHandler(handler)
+        handler.close()
 
 
 def test_parallel_worker_still_returns_failed_records_for_ordinary_errors(monkeypatch, tmp_path):
@@ -610,7 +623,11 @@ def test_parallel_worker_still_returns_failed_records_for_ordinary_errors(monkey
 
     _stub_worker_deps(monkeypatch, _boom)
     monkeypatch.setattr(pse.time, "sleep", lambda *a, **k: None)
-    out = pse._process_chunk_worker(["OKSYM"], _WorkerCfg(), 0, 1, log_path=str(tmp_path / "w2.log"))
+    before = list(logging.getLogger().handlers)
+    try:
+        out = pse._process_chunk_worker(["OKSYM"], _WorkerCfg(), 0, 1, log_path=str(tmp_path / "w2.log"))
+    finally:
+        _remove_new_root_handlers(before)  # I1A-HANDLER-FINALLY
     assert out["success_results"] == []
     assert len(out["failed_records"]) == 1, f"一般錯誤未記入 failed_records：{out}"
     assert out["failed_records"][0]["symbol"] == "OKSYM"

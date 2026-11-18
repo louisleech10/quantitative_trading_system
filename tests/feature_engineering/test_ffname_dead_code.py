@@ -19,8 +19,15 @@ from typing import Any, Dict, List
 import pytest
 
 from momentum.factories import create_feature_factory
-from tests.feature_engineering.ffname_helpers import BASELINE_PATH, CONTRACT, REPO, is_g6_new_lag, load_freeze_module
-from tests.feature_engineering.fftfmeta_golden_helpers import KLINE_DIR, prepare_env
+from tests.feature_engineering.ffname_helpers import (
+    BASELINE_PATH,
+    CONTRACT,
+    REPO,
+    is_g6_new_lag,
+    load_freeze_module,
+    shared_reference_run,
+)
+from tests.feature_engineering.fftfmeta_golden_helpers import KLINE_DIR
 
 DEAD = CONTRACT["dead_code"]
 SCAN_REPO = REPO
@@ -74,10 +81,8 @@ def baseline() -> Dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def reference_after(tmp_path_factory) -> Dict[str, Any]:
-    tmp = tmp_path_factory.mktemp("ffname_dead_code_reference")
-    with pytest.MonkeyPatch.context() as mp:
-        prepare_env(mp, tmp, FFACT_MULTI_TF_PARALLEL="0")
-        return freeze.run_reference(tmp, record_parts=False)
+    """改後碼態 reference run（TESTSEL I10：與 test_ffname_value_invariance 之 current 同一呼叫，行程內共用）。"""
+    return shared_reference_run(tmp_path_factory, freeze)
 
 
 def _mapping(baseline: Dict[str, Any]) -> Dict[str, str]:

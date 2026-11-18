@@ -233,30 +233,172 @@ def _fracdiff_mr_config_payload() -> Dict[str, Any]:
     }
 
 
-_SMALL_MR_CATEGORIES = ("trend", "momentum")
 _SMALL_MR_SOURCES = ("close", "volume")
-_SMALL_MR_L3_WINDOWS = (5, 13)
+# TESTSEL I10：縮小版再縮——每層 seam 保留、寬度與各層最大窗縮到最小（路徑覆蓋，不是重複）。
+# L1：trend 兩指標（EMA 兩週期使 L2 cross／ratio 之 auto 配對有對象、distance 之 all_trend 有輸入）、
+# momentum 只 RSI（L2 binary_signal 之 RSI 規則有對象）；其餘類別之因果由全類姊妹檔 test_ff_fullchain_truncation_allcat_mr.py
+#（每類別全指標、最大週期）承擔。
+_SMALL_MR_ATOMIC: Dict[str, List[Dict[str, Any]]] = {
+    "trend": [{"name": "EMA", "periods": [5, 13]}, {"name": "SMA", "periods": [13]}],
+    "momentum": [{"name": "RSI", "periods": [14]}],
+}
+_SMALL_MR_L2_MOMENTUM_LAGS = (3,)
+_SMALL_MR_L3_WINDOWS = (3, 5)
+_SMALL_MR_L4_LAGS = (1, 2)
+_SMALL_MR_WINSOR_WINDOW = 20
+_SMALL_MR_ZSCORE_WINDOWS = (20, 30)
+# fracdiff 關閉時其權重寬度仍計入公開域預熱（warmup_window._collect_l65_stack_bars，auto 估 252）；值 MR 不開 fracdiff，
+# 以顯式寬度把此段縮到與其餘層同量級（只影響預熱估計，不影響任何被比對之欄）。
+_SMALL_MR_FRACDIFF_WIDTH_WHEN_OFF = 20
+
+
+def _small_atomic_indicators() -> Dict[str, Any]:
+    return {
+        c: ({"enabled": True, "indicators": [dict(i) for i in _SMALL_MR_ATOMIC[c]]} if c in _SMALL_MR_ATOMIC
+            else {"enabled": False})
+        for c in _ALL_ATOMIC_CATEGORIES
+    }
 
 
 def _apply_small_mr_scope(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """FFSTAT SPEC v59 Task 4.2：只縮生成範圍（L1 類別、資料源、L3 窗），其餘沿用既有 payload。
-    L2 operators 開（worldquant 關）、L3 聚合器全部、L4 開——使 L3 center／L4 shift mutant 之 seam 在場。"""
-    payload["atomic_indicators"] = {c: {"enabled": c in _SMALL_MR_CATEGORIES} for c in _ALL_ATOMIC_CATEGORIES}
+    """FFSTAT SPEC v59 Task 4.2（TESTSEL I10 再縮）：每層 seam 在場、寬度最小。
+    L2 operators 各族開（worldquant 關、momentum 只 1 個 lag）、L3 聚合器全部（窗 3／5）、L4 開（lag 1／2）——
+    使 L3 center／L4 shift mutant 之 seam 與抽樣之層覆蓋守衛（L3 mean、L4 lag_1、縮尾探針層）在場。"""
+    payload["atomic_indicators"] = _small_atomic_indicators()
     payload["data_sources"] = {"enabled_sources": list(_SMALL_MR_SOURCES), "synthetic_sources": []}
-    payload["operators"] = {"enabled": True, "worldquant": {"enabled": False}}
+    payload["operators"] = {
+        "enabled": True,
+        "momentum": {"enabled": True, "lags": list(_SMALL_MR_L2_MOMENTUM_LAGS)},
+        "worldquant": {"enabled": False},
+    }
     payload["rolling_aggregation"] = {"enabled": True, "windows": list(_SMALL_MR_L3_WINDOWS)}
     payload["lag_features"] = {"enabled": True}
+    payload["global"] = {"lag_strategy": "custom", "custom_lags": list(_SMALL_MR_L4_LAGS)}
     return payload
 
 
 def _small_values_gate_mr_config_payload(*, training_tfs: Optional[List[str]] = None) -> Dict[str, Any]:
-    """本機縮小版主 MR 設定（SPEC v59 Task 4.2）：既有 `_values_gate_mr_config_payload` ＋縮小生成範圍。"""
-    return _apply_small_mr_scope(_values_gate_mr_config_payload(training_tfs=training_tfs))
+    """本機縮小版主 MR 設定（SPEC v59 Task 4.2；TESTSEL I10 再縮）：既有 `_values_gate_mr_config_payload`
+    ＋縮小生成範圍；L6.5 四步全開（縮尾、rank、zscore 兩窗、gaussian），縮尾窗縮小。"""
+    payload = _apply_small_mr_scope(_values_gate_mr_config_payload(training_tfs=training_tfs))
+    pp = payload["preprocessing"]
+    pp["winsorization"] = {"enabled": True, "window": _SMALL_MR_WINSOR_WINDOW}
+    pp["adaptive_zscore"] = {"enabled": True, "windows": list(_SMALL_MR_ZSCORE_WINDOWS)}
+    pp["fractional_differencing"] = {"enabled": False, "max_lag": _SMALL_MR_FRACDIFF_WIDTH_WHEN_OFF}
+    return payload
 
 
 def _small_fracdiff_mr_config_payload() -> Dict[str, Any]:
-    """本機縮小版 fracdiff MR 設定（SPEC v59 Task 4.2）：既有 `_fracdiff_mr_config_payload` ＋縮小生成範圍。"""
-    return _apply_small_mr_scope(_fracdiff_mr_config_payload())
+    """本機縮小版 fracdiff MR 設定（SPEC v59 Task 4.2；TESTSEL I10 再縮）：既有 `_fracdiff_mr_config_payload`
+    ＋縮小生成範圍（fracdiff 寬度維持 auto＝由 calibration_bars 推導，長度耦合 mutant 改的正是此解析）。
+    L1 例外：全 10 類**全部指標、各取最小週期**（`_fracdiff_l1_min_period_atomic`）——校準擾動與全量 d* 兩負控制靠「某些欄之
+    平穩性判定或 d* 隨校準段改變」現形：前史 OHLCV 加常數對線性指標之 ADF 不變，須夠寬之非平移不變指標集合；TESTSEL I10
+    實跑：只 3 指標（runs/g1/batch1.log）與 trend＋momentum 最小週期（runs/g1/batch2.log）時校準擾動控制皆未於欄集合／d*
+    現形，全類最小週期（`_l1_all_categories_fracdiff_mr_config_payload`，L2 關）於同一探針則現形。本設定另開 L2 operators
+    （fracdiff 預設套 L1、L2 ⇒ 承擔 L2 欄之 fracdiff seam）。最小週期使窗維持約 600–720 根。"""
+    payload = _apply_small_mr_scope(_fracdiff_mr_config_payload())
+    payload["atomic_indicators"] = _fracdiff_l1_min_period_atomic()
+    return payload
+
+
+def _fracdiff_l1_min_period_atomic() -> Dict[str, Any]:
+    """fracdiff MR 之 L1：全 10 類、每指標最小週期；EMA 另留兩週期——並行 slow path 只在一個群組有 ≥2 個適格欄時
+    走（feature_preprocessor `_apply_fractional_differencing`：`len(eligible_columns) > 1`），每指標單一週期時每群組只
+    1 欄（TESTSEL I10 實跑 batch2：兩個並行負控制皆「並行路徑未被走」）。"""
+    atomic = _atomic_indicators_one_period("min")
+    for ind in atomic["trend"]["indicators"]:
+        if ind.get("name") == "EMA":
+            ind["periods"] = [5, 13]
+    return atomic
+
+
+def _one_period_indicator_def(raw: Dict[str, Any], pick: Callable[..., Any]) -> Dict[str, Any]:
+    """單一 L1 指標定義只留一個週期（`pick`＝max 或 min；週期網格→該值；combos→依最大成分取該者）；其餘參數網格不動
+    （各為不同計算路徑）。"""
+    from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
+
+    out = {k: v for k, v in raw.items() if v is not None and k != "industry_standard"}
+    industry = raw.get("industry_standard") or None
+    periods = raw.get("periods")
+    if isinstance(periods, list) and periods:
+        out["periods"] = [pick(int(p) for p in [*periods, *(industry or [])])]
+    elif isinstance(periods, str):
+        rng = raw.get("period_range") or [5, 233]
+        values = ParameterGenerator.generate(periods, range_min=int(rng[0]), range_max=int(rng[-1]),
+                                             industry_standard=industry)
+        out["periods"] = [pick(int(v) for v in values)]
+        out.pop("period_range", None)
+    combos = raw.get("combos")
+    if isinstance(combos, list) and combos:
+        out["combos"] = [pick(combos, key=lambda c: (max(c) if isinstance(c, list) else c, c))]
+    return out
+
+
+def _one_window_advanced(raw: Dict[str, Any], pick: Callable[..., Any]) -> Dict[str, Any]:
+    """進階類別（microstructure／entropy／tail_risk）：各窗長清單只留一個窗（`pick`）；其餘不動。"""
+    out = dict(raw)
+    for key, value in raw.items():
+        if (isinstance(value, list) and len(value) > 1 and all(isinstance(v, int) and not isinstance(v, bool) for v in value)
+                and any(tag in key for tag in ("window", "bucket", "smooth"))):
+            out[key] = [pick(value)]
+    return out
+
+
+def _atomic_indicators_one_period(which: Literal["max", "min"],
+                                  categories: Tuple[str, ...] = _ALL_ATOMIC_CATEGORIES) -> Dict[str, Any]:
+    """所列 atomic 類別開（其餘關）、每指標只留最大或最小週期（以生產預設設定之指標清單為準，不另列舉）。"""
+    pick = max if which == "max" else min
+    factory = create_feature_factory(cache_dir=KLINE_CACHE_DIR, validate_continuity=False)
+    atomic = factory._resolve_config({}).atomic_indicators
+    out: Dict[str, Any] = {}
+    for category in _ALL_ATOMIC_CATEGORIES:
+        if category not in categories:
+            out[category] = {"enabled": False}
+            continue
+        dumped = getattr(atomic, category).model_dump()
+        if "indicators" in dumped:
+            dumped["indicators"] = [_one_period_indicator_def(i, pick) for i in dumped["indicators"]]
+        else:
+            dumped = _one_window_advanced(dumped, pick)
+        dumped["enabled"] = True
+        out[category] = dumped
+    return out
+
+
+def _atomic_indicators_max_period_only() -> Dict[str, Any]:
+    """全 10 類 atomic 開、每指標只留最大週期。"""
+    return _atomic_indicators_one_period("max")
+
+
+def _l1_all_categories_mr_config_payload(*, training_tfs: Optional[List[str]] = None) -> Dict[str, Any]:
+    """TESTSEL I10 全類姊妹版主 MR：全 10 類 atomic、每指標只留最大週期（各指標之因果＝獨立程式路徑，必須全類）；
+    L2 關、L6.5 只開縮尾（rank／zscore／gaussian 之 seam 由縮小版承擔，與欄來源類別無關；縮尾留著使全類版之縮尾負控制
+    有 seam）；L3（mean、窗 3）與 L4（lag 1）各留一個最小 seam，滿足抽樣之層覆蓋守衛（`_assert_mutation_layer_coverage`）
+    與 L3 center／L4 shift 負控制，並使 L1 全類欄經過 L3／L4 一次。"""
+    payload = _values_gate_mr_config_payload(training_tfs=training_tfs)
+    payload["atomic_indicators"] = _atomic_indicators_max_period_only()
+    payload["operators"] = {"enabled": False}
+    payload["rolling_aggregation"] = {"enabled": True, "windows": [3], "aggregators": {"mean": {"enabled": True}}}
+    payload["lag_features"] = {"enabled": True}
+    payload["global"] = {"lag_strategy": "custom", "custom_lags": [1]}
+    pp = payload["preprocessing"]
+    pp["winsorization"] = {"enabled": True, "window": _SMALL_MR_WINSOR_WINDOW}
+    pp["rank_transform"] = {"enabled": False}
+    pp["adaptive_zscore"] = {"enabled": False}
+    pp["gaussian_normalize"] = {"enabled": False}
+    pp["fractional_differencing"] = {"enabled": False, "max_lag": _SMALL_MR_FRACDIFF_WIDTH_WHEN_OFF}
+    return payload
+
+
+def _l1_all_categories_fracdiff_mr_config_payload() -> Dict[str, Any]:
+    """TESTSEL I10 全類版 fracdiff 設定（全類姊妹檔之 MRScope.fracdiff_payload；全類最小週期 L1 亦供縮小版 fracdiff）：全 10 類 L1、每指標取**最小**週期，L3／L4 同值 MR 之最小 seam，L6.5 只 fracdiff
+    （同 `_fracdiff_mr_config_payload` 之前處理段）。不取最大週期：最大週期使必要窗達約 3,000 根，可比較後綴只剩約 20 根，
+    且長度耦合 mutant 之 max_lag（len//10≈300）落在權重門檻截斷之外而無從注入差異（TESTSEL I10 實跑兩控制皆 DID NOT
+    RAISE）；fracdiff 之 seam 與指標週期無關，全類寬度由最小週期承擔、窗回到 600 根下限。"""
+    payload = _l1_all_categories_mr_config_payload()
+    payload["atomic_indicators"] = _fracdiff_l1_min_period_atomic()
+    payload["preprocessing"] = _fracdiff_mr_config_payload()["preprocessing"]
+    return payload
 
 
 def _bar_window_dates(
@@ -1597,7 +1739,12 @@ def run_control_causal_winsor_full_fit(scope: MRScope, monkeypatch, tmp_path: Pa
     calls = [0]
 
     def _full_fit_winsor(self: FeaturePreprocessor, df: pd.DataFrame) -> pd.DataFrame:
+        from momentum.FeatureEngineering.preprocessing.feature_preprocessor import STEP_WINSOR
+
         columns = self._select_columns(df, self.winsor_config.get("apply_to", "all"))
+        # 生產碼 FFDSTAR Task 1.2 起於選欄後記步驟狀態（run provenance 窮舉）；mutant 只改擬合範圍，記錄照生產寫法，
+        # 否則生成於 provenance 窮舉檢查失敗（非因果 gate）而非被 MR 抓到
+        self._record_selection(df.columns, columns, STEP_WINSOR, "applied", "not_selected")
         if not columns:
             return df
         calls[0] += 1
@@ -1626,7 +1773,7 @@ def run_control_l4_lag_shift_minus_one(scope: MRScope, monkeypatch, tmp_path: Pa
     original_shift = pd.DataFrame.shift
     calls = [0]
 
-    def _lookahead_compute_all(self: LagProcessor, features_df: pd.DataFrame) -> pd.DataFrame:
+    def _lookahead_compute_all(self: LagProcessor, features_df: pd.DataFrame, *args: Any, **kwargs: Any) -> pd.DataFrame:
         def _inverted_shift(df: pd.DataFrame, periods: int = 1, *args: Any, **kwargs: Any) -> pd.DataFrame:
             if isinstance(periods, int) and periods > 0:
                 calls[0] += 1
@@ -1635,7 +1782,8 @@ def run_control_l4_lag_shift_minus_one(scope: MRScope, monkeypatch, tmp_path: Pa
 
         pd.DataFrame.shift = _inverted_shift  # type: ignore[method-assign]
         try:
-            return original_compute_all(self, features_df)
+            # LagProcessor.compute_all 增 column_layers 參數後原寫法 TypeError（L4 失敗而非被抓到）⇒ 參數原樣轉交
+            return original_compute_all(self, features_df, *args, **kwargs)
         finally:
             pd.DataFrame.shift = original_shift  # type: ignore[method-assign]
 

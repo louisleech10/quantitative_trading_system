@@ -78,8 +78,19 @@ def _fast_config_payload(**overrides: object) -> dict:
     return payload
 
 
+def _narrow_atomic_indicators() -> dict:
+    """TESTSEL I10：L1 只開 trend 兩指標（同 test_failopen_correctness `_narrow_atomic_indicators`），L2–L4 維持預設。
+    矩陣③④⑤之注入點為 1h 之 L1 呼叫與 TF 完整性／NaN 比例彙整，與 L1 寬度無關；L1 仍執行（注入點可達）。"""
+    return {
+        "trend": {"enabled": True, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}},
+                                                  {"name": "SMA", "params": {"timeperiod": 13}}]},
+        **{c: {"enabled": False} for c in ("momentum", "volatility", "volume", "cycle", "pattern", "statistics",
+                                           "microstructure", "entropy", "tail_risk")},
+    }
+
+
 def _multi_tf_config_payload(**overrides: object) -> dict:
-    base = _fast_config_payload()
+    base = _fast_config_payload(atomic_indicators=_narrow_atomic_indicators())
     base["timeframes"] = {
         "primary": "12h",
         "training": ["12h", "1h"],
@@ -298,7 +309,7 @@ def test_matrix_nan_ratio_exceeds_marks_partial(
     result = factory.generate_features(
         MATRIX_SYMBOL,
         MATRIX_TF,
-        config_override=_fast_config_payload(max_nan_ratio=0.0),
+        config_override=_fast_config_payload(max_nan_ratio=0.0, atomic_indicators=_narrow_atomic_indicators()),
         force_regenerate=True,
         start_date=start,
         end_date=end,

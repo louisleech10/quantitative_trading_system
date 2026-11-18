@@ -36,9 +36,12 @@ class TestL65ColumnChunking:
                 "window": 20,
                 "apply_to": "all",
             },
+            # NUMVIEW（6971a75c）：zscore 啟用須明給 `windows` 清單（不得以預設窗代替；`numeric_view.
+            # validate_preprocessing_policy`）。原單數 `window: 20` 鍵非 AdaptiveZScoreConfig 欄位、從未被讀，改前實際
+            # 生效者為各臂缺窗時之預設 100（見 test_single_column 註解）⇒ 明給 [100]，所測行為與改前相同
             "adaptive_zscore": {
                 "enabled": zscore,
-                "window": 20,
+                "windows": [100],
                 "apply_to": "all",
             },
         }
@@ -88,7 +91,7 @@ class TestL65ColumnChunking:
         from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
         config = self._make_config()
-        # 列數須超過因果暖機遮罩（rank 20 + adaptive_zscore 讀 `windows` 預設 100 + winsor 20，
+        # 列數須超過因果暖機遮罩（rank 20 + adaptive_zscore `windows` [100] + winsor 20，
         # 共遮前 137 列）；100 列會整欄合法遮成 NaN，與「單欄能處理」無關。改用同類測試之 200 列。
         df = self._make_wide_df(n_rows=200, n_cols=1)
 
@@ -112,6 +115,7 @@ class TestL65ColumnChunking:
 
     def test_constant_columns(self):
         """常數欄位不應拋 exception"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
         config = self._make_config()
@@ -212,6 +216,7 @@ class TestL3StreamingVarianceFilter:
 
     def test_variance_filter_standalone(self):
         """直接測試 _variance_filter"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
 
         df = pd.DataFrame({

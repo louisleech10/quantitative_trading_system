@@ -36,6 +36,7 @@ from tests.feature_engineering.ffname_helpers import (
     load_freeze_module,
     ops_tuple,
     roundtrip_ok,
+    shared_reference_run,
 )
 from tests.feature_engineering.fftfmeta_golden_helpers import prepare_env
 
@@ -50,10 +51,8 @@ def baseline() -> Dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def current(tmp_path_factory) -> Dict[str, Any]:
-    tmp = tmp_path_factory.mktemp("ffname_value_invariance")
-    with pytest.MonkeyPatch.context() as mp:
-        prepare_env(mp, tmp, FFACT_MULTI_TF_PARALLEL="0")
-        return freeze.run_reference(tmp, record_parts=False)
+    """改後碼態 reference run（TESTSEL I10：與 test_ffname_dead_code 之 reference_after 同一呼叫，行程內共用）。"""
+    return shared_reference_run(tmp_path_factory, freeze)
 
 
 def oracle_payload() -> Dict[str, Any]:

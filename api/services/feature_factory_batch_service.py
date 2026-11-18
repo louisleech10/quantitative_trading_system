@@ -170,7 +170,7 @@ class FeatureFactoryBatchService:
         self._running_batch_count: int = 0
         self._max_concurrent_batches: int = 1
         self._task_ttl_seconds: int = 3600
-        self._lock = asyncio.Lock()
+        self._lock = _LazyAsyncLock()  # 首次於事件迴圈內使用才建 asyncio.Lock（見檔末類別說明）
         default_checkpoint_dir = (
             MomentumConfig.from_project_root().data_cache_path / "feature_preprocessing"
         )
@@ -2380,3 +2380,28 @@ def get_feature_factory_batch_service() -> FeatureFactoryBatchService:
     if _feature_factory_batch_service is None:
         raise RuntimeError("FeatureFactoryBatchService has not been initialized")
     return _feature_factory_batch_service
+
+
+class _LazyAsyncLock:
+    """延後建立之 asyncio.Lock：首次於事件迴圈內使用（`async with`／`locked()`）才建立並綁定當下迴圈。
+
+    Python 3.9 之 asyncio.Lock() 於建構當下綁定 get_event_loop()；service 於無目前迴圈之執行緒建構（如前一個
+    asyncio.run() 結束後）即 RuntimeError（TESTSEL I7 實測 9 條順序依賴紅）。置於檔末：不位移本檔既有行號
+    （契約 `_sources` 以 path:line 引用本檔，見 tests/feature_engineering/test_numview_selectors.py）。"""
+
+    def __init__(self) -> None:
+        self._inner: Optional[asyncio.Lock] = None
+
+    def _get(self) -> asyncio.Lock:
+        if self._inner is None:
+            self._inner = asyncio.Lock()
+        return self._inner
+
+    def locked(self) -> bool:
+        return self._inner is not None and self._inner.locked()
+
+    async def __aenter__(self) -> None:
+        await self._get().acquire()
+
+    async def __aexit__(self, *exc: Any) -> None:
+        self._get().release()

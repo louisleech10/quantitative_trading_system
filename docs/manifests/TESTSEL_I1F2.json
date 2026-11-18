@@ -1,0 +1,101 @@
+{
+  "stub_modules": [
+    "tests/feature_engineering/l2_oracle.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_l2_cross_ratio_oracle.py",
+    "tests/feature_engineering/test_numview_core.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "開 TODO 前實測 runs/testsel_route/i1f2/i1f2_facts.md（13 條 FACT-RECEIPT）：格 B 強制串行生成 1h／4h 兩臂皆觀測；L2 呼叫點 layer1 與產品 L1 生成函式回傳 147／147 欄逐位元相同、落盤 raw 不可用；§G 第二層 (i)(ii) 兩臂兩週期 0 超界、(ii) 界被達到（max err/tol＝1.0000）；(iii) Polars 臂 1h 2,860,203 格、4h 605,933 格只記錄；Ratio 遮罩 exact 0 與相對近零兩分支於格 B 0 格觸發（probe_mask_paths.log、probe_mask_all_l1.log）",
+      "SPEC Task 3.3、§G 第二層改寫、§B TESTSEL-I1-BUDGET-8",
+      "I1f 已提交 testsel d6faf1a7（強制串行注入、兩臂觀測、私有根觀測生成；SPEC Task 3.2）"
+    ],
+    "touches": [
+      "tests/feature_engineering/test_numview_core.py",
+      "tests/feature_engineering/test_l2_cross_ratio_oracle.py",
+      "tests/feature_engineering/l2_oracle.py"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/operators/derived_operators.py",
+      "momentum/FeatureEngineering/polars_adapter.py",
+      "momentum/FeatureEngineering/utils/numeric_guards.py"
+    ],
+    "callers_later": [
+      "I1 收尾重型批：test_l2_arms_each_match_independent_oracle 與 BUDGET-7 同一 gate；(iii) 數值入新 L2 收據、三方簽核時判讀",
+      "其餘 L2 算子（Distance、Momentum、BinarySignal、SignedStrength、WorldQuant）之值 oracle 與配對集合規則：沿用本 oracle 方法另立產品驗值項（SPEC §N）"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/feature_engineering/test_l2_cross_ratio_oracle.py -p no:cacheprovider -q && venv/bin/python scripts/run_watched.py --log runs/testsel_route/i1f2/gate_run.watch.log -- venv/bin/python -m pytest 'tests/feature_engineering/test_numview_core.py::test_l2_named_matrix_pinned_nonzero_named_and_layers_bitwise' 'tests/feature_engineering/test_numview_core.py::test_numview_regen_cache_hit_equals_empty_root' 'tests/feature_engineering/test_numview_core.py::test_mutation_l2_spy_skips_non_primary_breaks_two_arm_observation' 'tests/feature_engineering/test_numview_core.py::test_mutation_l2_forced_serial_injection_removed_breaks_precondition' 'tests/feature_engineering/test_numview_core.py::test_l2_arms_each_match_independent_oracle' 'tests/feature_engineering/test_numview_core.py::test_mutation_l2_oracle_one_cell_beyond_bound_detected' 'tests/feature_engineering/test_numview_core.py::test_mutation_l2_oracle_wrong_input_precision_detected' -p no:cacheprovider -q -rs",
+    "forbidden": [
+      {
+        "rule": "不改產品碼與產品契約（含 momentum/FeatureEngineering/contracts/numeric_view.json）；不改 Polars 臂輸入精度（pandas_to_polars 預設 float32 屬產品 D-L2 精度選擇）",
+        "observable": true
+      },
+      {
+        "rule": "tests/feature_engineering/l2_oracle.py 不得 import momentum、不得呼叫產品遮罩或尺度函式（causal_near_zero_mask、causal_denominator_scale、safe_denominator、_safe_denom_expr）",
+        "observable": true
+      },
+      {
+        "rule": "(ii) 之界公式照 SPEC §G 原樣實作，不得近似（例如改用 1 ulp(out)）、不得加調整係數",
+        "observable": true
+      },
+      {
+        "rule": "(iii) 只記錄不判定；不得以 (iii) 超界格數為斷言條件，亦不得省略其輸出",
+        "observable": true
+      },
+      {
+        "rule": "不新增格 B 以外之重型生成；重型段於同一 pytest 行程列齊 I1f（BUDGET-7）4 個 nodeid 與 I1f2 3 個 nodeid，共用 module 範圍 runs fixture 之格 B 生成；不寫正式 data_cache",
+        "observable": true
+      },
+      {
+        "rule": "快速單元只用真實 kline 與 TA-Lib 計算之真實欄，不置入或改寫任何觀測值；不放寬既有斷言與 NaN／inf 閘（SPEC §C）",
+        "observable": true
+      },
+      {
+        "rule": "category 臂 (i) 以 float64 判定（out 與 ref 皆 float64、spacing 取 float64），禁止先轉 float32；不得照抄原型 probe_l2_oracle.judge",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "oracle 輸入精度依臂：Polars 臂 float32(L1)、category 臂 float64（原型兩臂逐位元相等，無容差爭議）；具名改壞 test_mutation_l2_oracle_wrong_input_precision_detected 證 (i) 非空判",
+      "(ii) 改以絕對輸入誤差推導之界（審 r1 CODEX-R1-P1-01）：格 B 重判 0 超界（runs/testsel_route/i1f2/probe_bound_v2.log，max err/界 1h Cross 0.99999976）；近界格以 Fraction 精確重判；test_bound_formulas_cover_exact_error_with_fractions 驗界；test_mutation_l2_oracle_one_cell_beyond_bound_detected 於已觀測資料某 Cross 格加 2 倍界 ⇒ 恰報該格",
+      "遮罩四分支於格 B 無法觸發、真實 STOCHRSI 可觸發（runs/testsel_route/i1f2/probe_osc_branches.log）：快速單元以真實 TA-Lib STOCHRSI 為分母、不置入值；產品尺度對 oracle 逐位元（24 組實測相等）；test_mutation_near_zero_term_removed_breaks_ratio_oracle 改產品共用遮罩 ⇒ 紅；test_mutation_category_judged_in_float32_misses_f64_error 證 category 臂 float64 判定",
+      "重型紅樁：test_numview_core.py 已建 3 個 I1f2 重型 nodeid 之 pytest.fail 樁（不取 fixture），gate_cmd 施工前可收集（審 r1 COMPOSER-R1-P2-01）",
+      "L1 取自 L2 呼叫點擷取之 layer1；新增 CellRun 欄位不改 l2_arms 形狀；_observer_digest 涵蓋 CellRun／_install_spies 原始碼 ⇒ 舊觀測檔自動失效重取",
+      "gate 重型段經 scripts/run_watched.py、背景、估時收據對 SPEC §B TESTSEL-I1-BUDGET-7／-8，於 I1 收尾重型批執行；本 gate 為 I1f 與 I1f2 重型驗收之唯一收尾合併命令（不另跑 TESTSEL_I1F.json gate，免重複生成；審 r1 CODEX-R1-P1-02）；快速段分鐘內"
+    ],
+    "coverage_risk": [
+      "oracle 由輸出欄名反推配對，不驗配對集合規則（SPEC §N 殘留）",
+      "只覆蓋 Cross／Ratio；其餘 L2 算子無值 oracle（SPEC §N 殘留）",
+      "格 B 一例（BTCUSDT 1h＋4h）：多週期非主週期路徑與主週期各一；其他格同碼路徑由 §G 第一層兩臂互比覆蓋"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "run_receipts",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

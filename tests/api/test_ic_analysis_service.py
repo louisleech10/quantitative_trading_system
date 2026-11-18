@@ -421,6 +421,7 @@ def test_append_cross_sectional_labels_mutation_rangeindex_regresses(
 
 def test_cross_sectional_coverage_guard_short_series_all_nan() -> None:
     """F4 邊界: len_s==horizon 全 NaN → InvalidInputError（非靜默通過）。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
     from momentum.Analysis.ic_config_schema import load_ic_config
     from momentum.core.exceptions import InvalidInputError
@@ -442,6 +443,7 @@ def test_cross_sectional_coverage_guard_short_series_all_nan() -> None:
 
 def test_cross_sectional_coverage_guard_all_nan_raises() -> None:
     """F4: 全 NaN label → InvalidInputError。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
     from momentum.Analysis.ic_config_schema import load_ic_config
     from momentum.core.exceptions import InvalidInputError
@@ -463,6 +465,7 @@ def test_cross_sectional_coverage_guard_all_nan_raises() -> None:
 
 def test_cross_sectional_coverage_guard_one_symbol_all_nan_raises() -> None:
     """F4 D-3: 1/3 幣全 NaN → per-symbol raise（全域平均會漏）。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
     from momentum.Analysis.ic_config_schema import load_ic_config
     from momentum.core.exceptions import InvalidInputError

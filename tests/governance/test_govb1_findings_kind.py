@@ -358,15 +358,35 @@ def test_derivation_does_not_apply_to_unrelated_files(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_sample_is_deterministic_and_seed_sensitive() -> None:
-    a = _run(["--sample", "--corpus", "handoffs", "--n", "40", "--seed", "7"]).stdout
-    b = _run(["--sample", "--corpus", "handoffs", "--n", "40", "--seed", "7"]).stdout
-    c = _run(["--sample", "--corpus", "handoffs", "--n", "40", "--seed", "8"]).stdout
+#: 抽樣測試之語料規模：真實 handoffs/*.md 依檔名排序等距取 300 份（含全部 *-brief.md）複製到 tmp。
+#: TESTSEL I10：原以 repo 之 handoffs/ 整目錄為語料（主工作樹含未追蹤交接檔，2026-11 約 10,681 份、隨使用無上限成長；
+#: ledger 98＋54 秒）；抽樣之決定性、seed 敏感與非檔名序三性質與語料份數無關（_sample_paths 對每一路徑同一雜湊排序）。
+_SAMPLE_CORPUS_N = 300
+
+
+@pytest.fixture(scope="module")
+def real_sample_corpus(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    src = sorted(p for p in (REPO_ROOT / "handoffs").glob("*.md") if p.is_file())
+    assert len(src) > _SAMPLE_CORPUS_N, len(src)
+    step = len(src) // _SAMPLE_CORPUS_N
+    picked = set(src[::step][:_SAMPLE_CORPUS_N]) | {p for p in src if p.name.endswith("-brief.md")}
+    dst = tmp_path_factory.mktemp("handoffs_sample")
+    for p in picked:
+        shutil.copy2(p, dst / p.name)
+    return dst
+
+
+def test_sample_is_deterministic_and_seed_sensitive(real_sample_corpus: Path) -> None:
+    corpus = str(real_sample_corpus)
+    a = _run(["--sample", "--corpus", corpus, "--n", "40", "--seed", "7"]).stdout
+    b = _run(["--sample", "--corpus", corpus, "--n", "40", "--seed", "7"]).stdout
+    c = _run(["--sample", "--corpus", corpus, "--n", "40", "--seed", "8"]).stdout
     assert a == b, "同 seed 不可重現 ⇒ receipt 無法被複驗"
     assert a != c, "換 seed 結果相同 ⇒ seed 沒有作用（抽樣可能是固定順序）"
+    assert len([ln for ln in a.splitlines() if ln.strip()]) == 40
 
 
-def test_sample_is_not_filename_ordered() -> None:
+def test_sample_is_not_filename_ordered(real_sample_corpus: Path) -> None:
     """🔴 抽樣不得等價於「檔名排序取前 N」。
 
     檔名帶日期與 session ⇒ 前綴排序會系統性偏向早期輪次，
@@ -375,12 +395,14 @@ def test_sample_is_not_filename_ordered() -> None:
     got = [
         ln.split("\t")[2]
         for ln in _run(
-            ["--sample", "--corpus", "handoffs", "--n", "30", "--seed", "1"]
+            ["--sample", "--corpus", str(real_sample_corpus), "--n", "30", "--seed", "1"]
         ).stdout.splitlines()
         if ln.strip()
     ]
     assert len(got) == 30
-    naive = sorted(str(p) for p in Path(REPO_ROOT / "handoffs").glob("*.md"))[:30]
+    naive = sorted(str(p) for p in real_sample_corpus.glob("*.md"))[:30]
+    # 同形比對（皆為 corpus 絕對路徑前綴）：原以相對 corpus「handoffs」對絕對路徑之 naive 比，路徑形態不同 ⇒ 恆不等（空心）
+    assert set(got) <= set(str(p) for p in real_sample_corpus.glob("*.md"))
     assert got != naive, "抽樣結果等於檔名排序前 N ⇒ 有系統性偏差"
 
 

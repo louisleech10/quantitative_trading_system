@@ -7,6 +7,7 @@ from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
 
 def test_insufficient_ls_samples():
     """n<30 → SkippedResult(INSUFFICIENT_DATA)（模組進入門檻不變）。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     analyzer = LongShortAnalyzer(config={"num_quantiles": 5})
     feature = pd.Series(np.random.randn(20))
     returns = pd.Series(np.random.randn(20) * 0.01)

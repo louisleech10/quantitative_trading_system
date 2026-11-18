@@ -34,6 +34,13 @@ ADF_THRESHOLD = 0.10
 REPORT_PATH = DEFAULT_GOLDEN_DIR / "fast_adf_gate_report.json"
 
 
+@pytest.fixture(autouse=True)
+def _report_to_tmp(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """TESTSEL I7：閘報告寫 tmp_path——測試不得改寫受追蹤檔（原每跑即改 tests/golden/l65/fast_adf_gate_report.json 之
+    generated_at_utc）；受追蹤報告為歷史紀錄，保留不動。判定與斷言不變。"""
+    monkeypatch.setattr(__name__ + ".REPORT_PATH", tmp_path / "fast_adf_gate_report.json")
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 

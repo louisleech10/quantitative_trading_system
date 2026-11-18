@@ -520,8 +520,11 @@ def test_wiring_scan_grid_strips_report_before_returning(tmp_path, monkeypatch):
     results = [{"k": 0, "h": 1, "capability": "available", "reason": None,
                 "n_events": 5, "report": sentinel}]
 
-    monkeypatch.setattr(
-        "momentum.Analysis.scan_cube.DEFAULT_ROOT", tmp_path, raising=False)
+    # `build_cube(root=DEFAULT_ROOT)` 於定義時綁定預設 ⇒ 改 `DEFAULT_ROOT` 無效、原寫入正式
+    # `data_cache/ic_scan_cubes/t1`（TESTSEL I1a Task 1.2 實測）；改其關鍵字預設（同 test_gap3_scan_grid）。
+    from momentum.Analysis import scan_cube
+
+    monkeypatch.setitem(scan_cube.build_cube.__kwdefaults__, "root", tmp_path / "ic_scan_cubes")
     cube = ICAnalysisService._build_scan_cube(service, "t1", object(), results)
     for cell in results:
         cell.pop("report", None)

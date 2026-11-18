@@ -45,6 +45,10 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     for name in ("verification_claim_check.py", "install_verify_hooks.sh"):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
+    # NOCAP（pre-commit timeout_scan --staged）與 ICPERF L3（git_hooks/limit_lint_staged.sh → limit_lint.py）之依賴：
+    # pre-commit 缺即 fail-closed，迷你 repo 須備齊（本檔只測尾隨空白自動修正，斷言不變）。
+    for name in ("timeout_scan.py", "timeout_patterns.json", "timeout_registry.json", "limit_lint.py", "limit_scan.py"):
+        (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
     # DOCROT2 D2B：pre-commit 之活文件兩道判定缺 helper 即 fail-closed ⇒ 迷你 repo 須備齊 helper。
     # 本檔只測尾隨空白自動修正，故把會暫存之測試文件登記為 LOG 類（兩道判定不適用），斷言不變。
     import json as _json

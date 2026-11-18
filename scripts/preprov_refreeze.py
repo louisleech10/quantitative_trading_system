@@ -460,7 +460,9 @@ def content_hash_pairs(hash_pairs: Mapping[str, str]) -> Iterator[Dict[str, str]
 
 def run_probewinsor(frozen_doc: Mapping[str, Any]) -> List[Dict[str, Any]]:
     """probewinsor 各格之 config_hash（只算 hash、不生成；NUMVIEW profile）：錨點形＝去探測鹽；去 NUMVIEW 鹽之錨點形須＝
-    凍結值，新值＝含 NUMVIEW 鹽之錨點形。"""
+    凍結值，新值＝含 NUMVIEW 鹽之錨點形。身分一律經 `test_probewinsor._hash_of` 計算——其於生成環境
+    `probewinsor_helpers.FIXED_ENV`（`with_fixed_env`）內算，NUMVIEW 鹽與 run 實際 config_hash 同環境（TESTSEL I1d1；
+    9891907f 曾於未設 FIXED_ENV 之環境計算，致新值與 run 不可比）。"""
     if SALT_KEY is None:
         raise RefreezeError("probewinsor 只限 NUMVIEW profile")
     import tests.feature_engineering.test_probewinsor as tp

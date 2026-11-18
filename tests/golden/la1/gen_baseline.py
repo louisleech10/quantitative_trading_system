@@ -501,15 +501,21 @@ def _materialize_short_features(
     timeframe: str,
     config_hash: str,
     n_bars: int = FALLBACK_TAIL_BARS,
+    inputs_dir: Optional[Path] = None,
 ) -> tuple[Path, Path]:
-    """短樣本 features（觸發 insufficient_data fallback）。"""
+    """短樣本 features（觸發 insufficient_data fallback）。
+
+    `inputs_dir`：輸出目錄；不給 ⇒ 入庫 `INPUTS_DIR`（正式重生命令之行為不變）。測試須給暫存目錄——原無此參數，
+    b4 測試每跑即改寫入庫 golden 輸入（TESTSEL I1a Task 1.5 實測）。於呼叫時解析模組之 `INPUTS_DIR`（不於定義時綁定）。"""
+    out_dir = Path(inputs_dir) if inputs_dir is not None else INPUTS_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
     features_df = _read_features_h5(full_h5, symbol, timeframe)
     ordered = features_df.sort_index()
     # 取尾段：label lag 尾端 NaN 契約與 full 序列一致；n 仍 < 可過 min_test_rows
     short = ordered.iloc[-n_bars:].copy()
     stem = f"{symbol}_{timeframe}_{config_hash}_fallback_tail{n_bars}"
-    h5_path = INPUTS_DIR / f"{stem}.h5"
-    meta_path = INPUTS_DIR / f"{stem}_meta.json"
+    h5_path = out_dir / f"{stem}.h5"
+    meta_path = out_dir / f"{stem}_meta.json"
     _write_features_h5(h5_path, symbol, timeframe, short)
     meta = _build_meta(
         symbol,

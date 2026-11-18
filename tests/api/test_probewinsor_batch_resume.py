@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Tuple
 import pytest
 
 from api.models.feature_factory_models import BatchGenerateRequest
+from tests._nocap_wait import ProgressWait
 from tests.feature_engineering import probewinsor_helpers as ph
 
 pytestmark = pytest.mark.requires_kline
@@ -100,9 +101,14 @@ def test_boundary_09f_resume_identity_is_factory_identity(batch_service_factory:
     direct = factory._compute_config_hash(factory._resolve_config(payload), "BTCUSDT", "1h",
                                           start_date="2026-01-01", end_date="2026-01-31")
     assert identity("BTCUSDT", "1h") == expected == direct
-    assert expected != ph.baseline()["cells"]["e1h.off.w1"]["config_hash"]
-    assert factory.config_identity("BTCUSDT", "1h", ph.cell_payload(ph.cell_by_id("e1h.on.w1")),
-                                   "2026-01-01", "2026-01-31") == ph.baseline()["cells"]["e1h.on.w1"]["config_hash"]
+    # 錨點凍結 hash 為生成環境（ph.FIXED_ENV）下之值（TESTSEL I1d1 審碼 b1 r1 裁定①；NUMVIEW 鹽隨 os.environ）⇒
+    # 與錨點比較之兩個身分於同一環境計算，比較才只反映設定差（探測鹽）而非環境差
+    with ph.with_fixed_env():
+        off_w1 = factory.config_identity("BTCUSDT", "1h", payload, "2026-01-01", "2026-01-31")
+        on_w1 = factory.config_identity("BTCUSDT", "1h", ph.cell_payload(ph.cell_by_id("e1h.on.w1")),
+                                        "2026-01-01", "2026-01-31")
+    assert off_w1 != ph.baseline()["cells"]["e1h.off.w1"]["config_hash"]
+    assert on_w1 == ph.baseline()["cells"]["e1h.on.w1"]["config_hash"]
 
 
 # 公開入口對每個可解析之完成項各呼叫一次 `FeatureFactory.config_identity`（依完成項順序；參數＝該項與請求之設定、起訖日）
@@ -169,13 +175,15 @@ async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.Monke
 
         monkeypatch.setattr(FeatureFactory, "config_identity", _spy)
     response = await service.resume_batch("batch-probewinsor")
-    for _ in range(250):  # 同 test_feature_factory_batch_resume._wait_until_done 之終止狀態（上限 5 秒）
+    # 同 test_feature_factory_batch_resume._wait_until_done：不設秒數上限，卡死（狀態未變且 CPU 無進度）由 ProgressWait
+    # 判定並留堆疊（NOCAP Task 2.2）
+    waiter = ProgressWait("batch batch-probewinsor")
+    while True:
         status = service.get_status("batch-probewinsor")
         if status and status["status"] in {"completed", "partial", "failed", "paused_ram_gate"}:
             break
+        waiter.check(status)
         await asyncio.sleep(0.02)
-    else:
-        raise TimeoutError("batch-probewinsor 未於 5 秒內結束")
     return response, sorted(calls)
 
 

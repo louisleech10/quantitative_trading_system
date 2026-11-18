@@ -227,24 +227,41 @@ def test_21_d1_gate_substr_no_bypass(tmp_path: Path) -> None:
     assert _got("bash scripts/gate_check.sh", tmp_path / "d1d") == "ALLOW"
 
 
-def test_21_c1_oversize_failclosed_bounded(tmp_path: Path) -> None:
-    """D-2d：4MB 級輸入有界時間內回覆且不 fail-open（尾端真派工仍 BLOCK）。"""
+@pytest.fixture(scope="module")
+def oversize_4mb_decisions(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    """4MB 無害輸入與 4MB＋尾端真派工各判定一次並計時（TESTSEL S3：判定與計時兩條共用，不重複）。"""
     import time
 
-    # 無害 4MB：不得卡死；無家族字樣 → ALLOW（非 fail-open）
+    tmp_path = tmp_path_factory.mktemp("gate_decision_4mb")
     cmd_harmless = "y" * 4_000_000
     t0 = time.perf_counter()
     got_h = _got(cmd_harmless, tmp_path / "d2d_h")
     elapsed_h = time.perf_counter() - t0
-    assert got_h == "ALLOW", f"4MB 無害不得誤擋；got={got_h}"
-    assert elapsed_h < 30.0, f"4MB 無害判定逾時: {elapsed_h:.3f}s"
 
-    # 尾端真派工：不得因長度 fail-open
     cmd_tp = ("y" * 4_000_000) + "; codex exec hi"
     t1 = time.perf_counter()
     got_tp = _got(cmd_tp, tmp_path / "d2d_tp")
     elapsed_tp = time.perf_counter() - t1
+    return {"got_h": got_h, "elapsed_h": elapsed_h, "got_tp": got_tp, "elapsed_tp": elapsed_tp}
+
+
+def test_21_c1_oversize_failclosed_bounded(oversize_4mb_decisions: dict) -> None:
+    """D-2d：4MB 級輸入回覆且不 fail-open（尾端真派工仍 BLOCK）；有界時間之門檻見 perf 之下一條（TESTSEL S3）。"""
+    # 無害 4MB：無家族字樣 → ALLOW（非 fail-open）
+    got_h = oversize_4mb_decisions["got_h"]
+    assert got_h == "ALLOW", f"4MB 無害不得誤擋；got={got_h}"
+
+    # 尾端真派工：不得因長度 fail-open
+    got_tp = oversize_4mb_decisions["got_tp"]
     assert got_tp == "BLOCK", f"4MB 尾端派工不得 fail-open ALLOW；got={got_tp}"
+
+
+@pytest.mark.perf
+def test_21_c1_oversize_decision_under_30s(oversize_4mb_decisions: dict) -> None:
+    """D-2d：4MB 級兩案判定各 < 30 秒：效能基準，opt-in（TESTSEL S3 自上一條移出之計時斷言）。"""
+    elapsed_h = oversize_4mb_decisions["elapsed_h"]
+    assert elapsed_h < 30.0, f"4MB 無害判定逾時: {elapsed_h:.3f}s"
+    elapsed_tp = oversize_4mb_decisions["elapsed_tp"]
     assert elapsed_tp < 30.0, f"4MB 尾端派工判定逾時: {elapsed_tp:.3f}s"
 
 

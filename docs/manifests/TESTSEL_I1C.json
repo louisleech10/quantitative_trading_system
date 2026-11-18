@@ -1,0 +1,64 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/test_numba_rolling.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "開 TODO 前實測 runs/testsel_route/i1c/i1c_facts.md：段 4 之 test_numba_rolling skew／kurt 紅 7 組重放皆未重現（runs/testsel_route/i1_proto/red_classified.md:43-48；含段 4 完整前綴 404 檔 runs/testsel_route/i1_proto/bisect_numba4b.log）；SPEC Task 2.1（I1c 審 r1 改寫）：不另跑專用重放，重放＝I1 收尾全量；本項只做精確 oracle 驗值，Task 2.1 待收尾全量後依邊界①結案，本項不列追蹤項、不登記 allowed_red",
+      "I1b 已證 numba_rolling.rolling_skew_kurt 對精確 oracle：真實 BTCUSDT/1h close／log return 窗 5／13／21 fail＝0；64 欄真實 L1 × 3 窗 3,811,027 窗 skew 0／kurt 1 個 f32 ulp 不符（正確值近 0）",
+      "Task 2.2 之 5 條（test_multi_tf_generator canonical_completeness 4＋boundary_19）已於 allowed_red 登記 owner FFPROD「產品缺陷」，非順序污染——SPEC Task 2.2 驗證已改為 jq 核對登記＋I1 收尾全量 FAILED ⊆ allowed_red；本項不改產品、不刪登記列",
+      "新增真實資料路徑（SPEC Task 2.1 邊界①）：data_cache/feature_klines/kline_cache.h5 BTCUSDT/1h 之 close（大均值）與 log return（小均值）× 窗 [5,13,21]，numba_rolling.rolling_skew_kurt 逐窗對 tests/references/exact_moments.py 依 (i)–(iii) 全分類；I1b 已實測此格兩序列三窗 fail＝0",
+      "Task 2.3（clean_pass_funcs.txt 46 函式）驗證本即定於 I1 收尾全量"
+    ],
+    "touches": [
+      "tests/test_numba_rolling.py",
+      "docs/TESTSEL_I1_REDS_SPEC.md"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/operators/numba_rolling.py",
+      "tests/references/exact_moments.py"
+    ],
+    "callers_later": [
+      "I1 收尾全量：test_numba_rolling 與 clean_pass_funcs.txt 46 函式 FAILED／ERROR＝0；再紅則以失敗明細定因（追蹤項）"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/test_numba_rolling.py -p no:cacheprovider -q",
+    "forbidden": [
+      {
+        "rule": "skew／kurt 之比對不得以 pandas 為基準；改用 tests/references/exact_moments.py 精確有理數 oracle，判準 ≤1 float32 ulp（產品輸出 float32）、兩者皆 NaN 相符、一方 NaN 一方有限即紅",
+        "observable": true
+      },
+      {
+        "rule": "不放寬、不 skip／xfail、不刪測試；原 pandas 比對之性質（極端尺度、單一離群窗、非退化窗）逐條保留為對精確 oracle 之斷言",
+        "observable": true
+      },
+      {
+        "rule": "不改產品碼；不以 xdist／隨機順序掩蓋順序相依",
+        "observable": true
+      },
+      {
+        "rule": "精確 oracle 斷言於任一合成序列或真實 kline 紅（例：近零值超 1 float32 ulp）⇒ 停工 BLOCKED：不放寬、不 skip、不改容差、不改 tests/_golden/prered/allowed_red.json，保留紅並回報明細（nodeid、窗、產品值、精確值、ulp 差）；產品修正與任何登記另案核准；gate_cmd 須全綠才可提交（補測 runs/testsel_route/i1c/probe_exact.log 現有全部輸入 bad=0，預期不觸發）",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "具名 mutation 驗收（施工實跑、記實際 failed nodeid）：以 pandas rolling().skew()／.kurt() 取代 rolling_skew_kurt ⇒ 真實 kline close（大均值；原型 runs/testsel_route/i1_proto/arbiter_kurt.py 實測 pandas kurt 差 36.5）之測試紅",
+      "替換清單含 tests/test_numba_rolling.py 全部 pandas skew／kurt 期望值：test_numba_rolling_skew_vs_pandas、test_numba_rolling_kurt_vs_pandas、test_fused_golden_output_match（tests/test_numba_rolling.py:153）、test_skew_kurt_matches_pandas_on_nondegenerate_windows、test_skew_kurt_preserved_across_extreme_scales、test_skew_kurt_single_outlier_window_preserved；其餘欄名／順序／非矩聚合之比對保留",
+      "精確 oracle 為逐窗 Fraction（tests/references/exact_moments.py），與 I1b 驗收共用同一 oracle"
+    ],
+    "coverage_risk": [
+      "段 4 原紅未能重現，污染源未定位；重放＝I1 收尾全量（SPEC Task 2.1），重現則二分定因並修，未重現則依邊界①結案"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "stub_modules", "reason": "blocked-by", "owner": "claude", "expiry": "2026-12-31"},
+      {"item": "script_acceptance", "reason": "blocked-by", "owner": "claude", "expiry": "2026-12-31"},
+      {"item": "contract_jsons", "reason": "blocked-by", "owner": "claude", "expiry": "2026-12-31"}
+    ]
+  }
+}

@@ -140,50 +140,81 @@ def _mutated_lex(tmp_path: Path, name: str, old: str, new: str) -> Path:
 
 # ---------------------------------------------------------------------------
 # ① 效能（SPEC §V.2 C-5）
+#
+# TESTSEL S3：牆鐘門檻屬效能基準（`perf`，opt-in；結果隨機器負載而變）；同一次判定之 ALLOW／BLOCK 屬正確性，
+# 拆為非 perf 之 `*_verdict*` 測試。每個 (規模, 形狀) 之判定經模組 fixture `c5_decide` 記憶化，只跑一次、兩條共用。
 # ---------------------------------------------------------------------------
 
+_C5_100K_SHAPES = [
+    ("plain", "a"),
+    ("semi", ";"),
+    ("space", " "),
+    ("bslash", "\\"),
+    ("quote", '"a'),
+]
+_C5_500K_SHAPES = [
+    ("plain", "a"),
+    ("semi", ";"),
+    ("space", " "),
+    ("bslash", "\\"),
+    ("quote", '"a'),
+    ("mixed", "a; \\b"),
+]
+_C5_4MB_MAPPING_SHAPES = [("space", " "), ("semi", ";"), ("bslash", "\\")]
 
-@pytest.mark.parametrize(
-    "shape,unit",
-    [
-        ("plain", "a"),
-        ("semi", ";"),
-        ("space", " "),
-        ("bslash", "\\"),
-        ("quote", '"a'),
-    ],
-)
-def test_c5_quoted_100k_under_2s(tmp_path: Path, shape: str, unit: str) -> None:
+
+@pytest.fixture(scope="module")
+def c5_decide(tmp_path_factory: pytest.TempPathFactory):
+    """記憶化之 `_decide`：同一 key（規模＋形狀）於本模組只判定一次，回傳 (BLOCK|ALLOW, 秒數)。"""
+    cache: dict = {}
+
+    def run(key: str, cmd: str) -> tuple[str, float]:
+        if key not in cache:
+            cache[key] = _decide(cmd, tmp_path_factory.mktemp(key))
+        return cache[key]
+
+    return run
+
+
+def _c5_body(unit: str, n: int) -> str:
+    return (unit * (n // len(unit) + 1))[:n]
+
+
+@pytest.mark.parametrize("shape,unit", _C5_100K_SHAPES)
+def test_c5_quoted_100k_verdict_allow(c5_decide, shape: str, unit: str) -> None:
+    """C-5 之正確性部分：引號內 100K 無害字元（各分支形狀）不得誤擋。"""
+    verdict, _elapsed = c5_decide(f"p100_{shape}", f'echo "{_c5_body(unit, 100_000)}"')
+    assert verdict == "ALLOW", f"{shape} 100K 無害字串不得誤擋"
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("shape,unit", _C5_100K_SHAPES)
+def test_c5_quoted_100k_under_2s(c5_decide, shape: str, unit: str) -> None:
     """C-5：引號內 100K 字元 <2s。
 
     🔴 不只測全 a：全 a 只證明「無趣字元多」時快。分隔符／空白／反斜線／
        交替引號各自走不同分支，其中反斜線與交替引號**無法批次**，是真正的下界。
     """
-    body = (unit * (100_000 // len(unit) + 1))[:100_000]
-    verdict, elapsed = _decide(f'echo "{body}"', tmp_path / f"p100_{shape}")
+    _verdict, elapsed = c5_decide(f"p100_{shape}", f'echo "{_c5_body(unit, 100_000)}"')
     assert elapsed < C5_100K_SEC, f"{shape} 100K 逾時 {elapsed:.2f}s（門檻 {C5_100K_SEC}s）"
-    assert verdict == "ALLOW", f"{shape} 100K 無害字串不得誤擋"
 
 
-@pytest.mark.parametrize(
-    "shape,unit",
-    [
-        ("plain", "a"),
-        ("semi", ";"),
-        ("space", " "),
-        ("bslash", "\\"),
-        ("quote", '"a'),
-        ("mixed", "a; \\b"),
-    ],
-)
-def test_c5_quoted_500k_under_5s(tmp_path: Path, shape: str, unit: str) -> None:
-    """C-5：引號內 500K 字元 <5s（SPEC E-2 記載的舊值為 29.92s）。"""
-    body = (unit * (500_000 // len(unit) + 1))[:500_000]
-    verdict, elapsed = _decide(f'echo "{body}"', tmp_path / f"p500_{shape}")
-    assert elapsed < C5_500K_SEC, f"{shape} 500K 逾時 {elapsed:.2f}s（門檻 {C5_500K_SEC}s）"
+@pytest.mark.parametrize("shape,unit", _C5_500K_SHAPES)
+def test_c5_quoted_500k_verdict_allow(c5_decide, shape: str, unit: str) -> None:
+    """C-5 之正確性部分：引號內 500K 無害字元（各分支形狀）不得誤擋。"""
+    verdict, _elapsed = c5_decide(f"p500_{shape}", f'echo "{_c5_body(unit, 500_000)}"')
     assert verdict == "ALLOW", f"{shape} 500K 無害字串不得誤擋"
 
 
+@pytest.mark.perf
+@pytest.mark.parametrize("shape,unit", _C5_500K_SHAPES)
+def test_c5_quoted_500k_under_5s(c5_decide, shape: str, unit: str) -> None:
+    """C-5：引號內 500K 字元 <5s（SPEC E-2 記載的舊值為 29.92s）。"""
+    _verdict, elapsed = c5_decide(f"p500_{shape}", f'echo "{_c5_body(unit, 500_000)}"')
+    assert elapsed < C5_500K_SEC, f"{shape} 500K 逾時 {elapsed:.2f}s（門檻 {C5_500K_SEC}s）"
+
+
+@pytest.mark.perf
 def test_b3r_growth_ratio_is_near_linear_not_quadratic(tmp_path: Path) -> None:
     """成長率斷言：長度加倍，耗時不得超過 `MAX_DOUBLING_RATIO` 倍。
 
@@ -216,36 +247,49 @@ def test_b3r_growth_ratio_is_near_linear_not_quadratic(tmp_path: Path) -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "shape,unit",
-    [("space", " "), ("semi", ";"), ("bslash", "\\")],
-)
-def test_c5_4mb_mapping_heavy_bounded(tmp_path: Path, shape: str, unit: str) -> None:
+@pytest.mark.parametrize("shape,unit", _C5_4MB_MAPPING_SHAPES)
+def test_c5_4mb_mapping_heavy_verdict_allow(c5_decide, shape: str, unit: str) -> None:
+    """C-5 第三條補強之正確性部分：4MB 需要映射之形狀不得誤擋。"""
+    verdict, _elapsed = c5_decide(f"m4_{shape}", f'echo "{_c5_body(unit, 4_000_000)}"')
+    assert verdict == "ALLOW", f"4MB {shape} 無害字串不得誤擋"
+
+
+@pytest.mark.perf
+@pytest.mark.parametrize("shape,unit", _C5_4MB_MAPPING_SHAPES)
+def test_c5_4mb_mapping_heavy_bounded(c5_decide, shape: str, unit: str) -> None:
     """C-5 第三條的補強：4MB **需要映射**的形狀，不只全 a。
 
     出處 `CODEX-R1-P2-01`：原本 4MB 樁只放 `"a" * 4_000_000`，
     走的是「整段無趣、一次搬移」的最順路徑 ⇒ 量不到 XFORM_Q 與逐字路徑在 4MB 的行為。
     """
-    body = (unit * (4_000_000 // len(unit) + 1))[:4_000_000]
-    verdict, elapsed = _decide(f'echo "{body}"', tmp_path / f"m4_{shape}")
+    _verdict, elapsed = c5_decide(f"m4_{shape}", f'echo "{_c5_body(unit, 4_000_000)}"')
     assert elapsed < C5_4MB_SEC, f"4MB {shape} 逾時 {elapsed:.2f}s（上界 {C5_4MB_SEC}s）"
-    assert verdict == "ALLOW", f"4MB {shape} 無害字串不得誤擋"
 
 
-def test_c5_quoted_4mb_bounded_and_not_failopen(tmp_path: Path) -> None:
-    """C-5 第三條：**引號內** 4MB 有界，且尾端真派工仍 BLOCK。
+def test_c5_quoted_4mb_bounded_and_not_failopen(c5_decide) -> None:
+    """C-5 第三條：**引號內** 4MB 無害不誤擋，且尾端真派工仍 BLOCK（有界時間之門檻見 perf 之
+    `test_c5_quoted_4mb_decision_time_bounded`，TESTSEL S3）。
 
     既有的 `test_21_c1_oversize_failclosed_bounded` 用的是**無引號** 4MB，
     那條走 raw grep 捷徑、根本不進前處理 ⇒ 涵蓋不到本次修的路徑。
     """
     body = "a" * 4_000_000
-    verdict_h, t_h = _decide(f'echo "{body}"', tmp_path / "m4h")
-    assert t_h < C5_4MB_SEC, f"4MB 引號內逾時 {t_h:.2f}s"
+    verdict_h, _t_h = c5_decide("m4h", f'echo "{body}"')
     assert verdict_h == "ALLOW", "4MB 無害引號字串不得誤擋"
 
-    verdict_d, t_d = _decide(f'echo "{body}"; codex exec hi', tmp_path / "m4d")
-    assert t_d < C5_4MB_SEC, f"4MB + 尾端派工逾時 {t_d:.2f}s"
+    verdict_d, _t_d = c5_decide("m4d", f'echo "{body}"; codex exec hi')
     assert verdict_d == "BLOCK", "4MB 之後的真派工不得因長度 fail-open"
+
+
+@pytest.mark.perf
+def test_c5_quoted_4mb_decision_time_bounded(c5_decide) -> None:
+    """C-5 第三條：引號內 4MB 兩案判定各 < 上界秒：效能基準，opt-in（TESTSEL S3 自上一條移出之計時斷言）。"""
+    body = "a" * 4_000_000
+    _verdict_h, t_h = c5_decide("m4h", f'echo "{body}"')
+    assert t_h < C5_4MB_SEC, f"4MB 引號內逾時 {t_h:.2f}s"
+
+    _verdict_d, t_d = c5_decide("m4d", f'echo "{body}"; codex exec hi')
+    assert t_d < C5_4MB_SEC, f"4MB + 尾端派工逾時 {t_d:.2f}s"
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +449,7 @@ def test_b3r_next_of_empty_guard_is_load_bearing(tmp_path: Path) -> None:
     pytest.fail("拿掉空字串保護後行為完全不變 ⇒ 該保護無覆蓋，或它根本不承重")
 
 
+@pytest.mark.perf  # TESTSEL S3：以牆鐘倍數判定 mutant（唯一斷言為計時）⇒ 效能基準
 def test_c5_mut_direct_substr_blows_threshold(tmp_path: Path) -> None:
     """把視窗存取還原成直接 substr ⇒ 500K 必須顯著變慢。
 

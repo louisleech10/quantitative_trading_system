@@ -70,6 +70,7 @@ def test_volume_threshold_validation():
 
 def test_volume_threshold_zero_feature_extraction():
     """測試 volume_threshold = 0 時的特徵提取"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n" + "=" * 70)
     print("測試 volume_threshold = 0 時的特徵提取")
     print("=" * 70)

@@ -101,6 +101,8 @@ TIMEOUT_WRAPS, TIMEOUT_LIGHT = ("timeout 99999 ", "timeout -k 5 -s INT 1h ", "ti
     "flock -w 5 /tmp/x.lock " + TESTSEL_FULL,
     "flock /tmp/x.lock -c '" + TESTSEL_FULL + "'",
     "flock -c '" + TESTSEL_FULL + "' /tmp/x.lock",
+    "flock --command='" + TESTSEL_FULL + "' /tmp/x.lock",  # 長選項等號寫法（審碼 r4）
+    "env --split-string='" + TESTSEL_FULL + "'",
     *[w + TESTSEL_FULL for w in TIMEOUT_WRAPS],  # 含多層包裝（lockf＋nice＋timeout）
     "nice -n 10 " + TESTSEL_FULL,
     "nice --adjustment=10 " + TESTSEL_FULL,
@@ -124,6 +126,7 @@ def test_wrapper_prefix_heavy_command_blocked(cmd: str) -> None:
     TIMEOUT_LIGHT,
     "nice -n 10 ls -la",
     "flock /tmp/x.lock -c 'git log --oneline -1'",
+    "flock --command='git log --oneline -1' /tmp/x.lock",
     "env -u FOO echo 'venv/bin/python scripts/testsel.py full'",
     "lockf /tmp/x.lock venv/bin/python scripts/testsel.py select --tier close --json",  # select 非重型
 ])
@@ -299,6 +302,33 @@ def test_run_watched_wrapper_reports_stall_with_diagnosis(tmp_path: Path) -> Non
     log = tmp_path / "hang.log"
     assert rw.main(["--log", str(log), "--", "python3", "-c", "import time; time.sleep(20)"]) == 4
     assert Path(str(log) + ".stall_diagnosis.json").is_file()
+
+
+def test_run_watched_expected_seconds_overrun_alert_and_wait_run(tmp_path: Path) -> None:
+    """2026-11-14 I7 事故（log 於 5,407 秒已寫逾預期、主控只等 exit 行）：`--expected-seconds` 使監看於牆鐘逾
+    判準倍數時於 log 寫「逾預期」行（不終止）；exit 行亦寫入 log；`scripts/wait_run.sh` 見逾預期回 3、
+    `--after-overrun` 只等 exit 回 0、log 目錄不存在回 2（不空等）。"""
+    import dataclasses
+
+    spec = importlib.util.spec_from_file_location("run_watched_mod2", REPO / "scripts" / "run_watched.py")
+    rw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rw)  # type: ignore[union-attr]
+    wd = rw._watchdog()
+    real_load = wd.load_config
+    wd.load_config = lambda criteria: dataclasses.replace(real_load(criteria), check_interval_seconds=0.05,
+                                                          log_stall_seconds=5.0, swap_growth_fraction_of_ram=None)
+    rw._watchdog = lambda: wd
+    log = tmp_path / "over.log"
+    busy = "import time\nfor i in range(30):\n    print(i, flush=True); time.sleep(0.1)"
+    assert rw.main(["--log", str(log), "--expected-seconds", "0.1", "--", "python3", "-c", busy]) == 0
+    text = log.read_text(encoding="utf-8")
+    assert "逾預期" in text and "[run-watched] exit rc=0" in text, text[-500:]
+    waiter = [str(REPO / "scripts" / "wait_run.sh")]
+    assert subprocess.run(["bash", *waiter, str(log)], capture_output=True, text=True).returncode == 3
+    r = subprocess.run(["bash", *waiter, str(log), "--after-overrun"], capture_output=True, text=True)
+    assert r.returncode == 0 and "exit rc=0" in r.stdout
+    assert subprocess.run(["bash", *waiter, str(tmp_path / "nope" / "x.log")],
+                          capture_output=True, text=True).returncode == 2
 
 
 # ── NOCAP SPEC v2–v5 增修（Task 0.3／0.3b／0.3c）；施工前為紅 ─────────────────────────────────────────────
@@ -742,10 +772,40 @@ def test_ledger_10_index_incremental_add_change_delete(tmp_path: Path) -> None:
     (["venv/bin/python", "-m", "pytest", "tests/a.py", "-k", "x"], None),
     (["venv/bin/python", "-m", "pytest", "tests/a.py", "-mslow"], None),
     (["venv/bin/python", "scripts/x.py", "tests/a.py"], None),
+    (["venv/bin/python", "-m", "pytest", "--maxfail", "1", "--testmon-env", "e", "tests/a.py"], ["tests/a.py"]),
+    # 值可省略之 --cov（argparse nargs='?'：下一個非選項 token 為其值）與別名 --config-file／--junit-xml（審碼 r4）
+    (["venv/bin/python", "-m", "pytest", "--cov", "momentum", "-q"], ["tests"]),
+    (["venv/bin/python", "-m", "pytest", "--cov=momentum", "-q"], ["tests"]),
+    (["venv/bin/python", "-m", "pytest", "--cov", "-q", "tests/a.py"], ["tests/a.py"]),
+    (["venv/bin/python", "-m", "pytest", "--config-file", "pytest.ini", "tests"], ["tests"]),
+    (["venv/bin/python", "-m", "pytest", "--junit-xml", "out.xml", "tests/b"], ["tests/b"]),
 ])
 def test_ledger_05_pytest_selector_parsing(argv: List[str], expected: Any) -> None:
     """pytest 之 `-m` 前之 python `-m` 不算縮小選取；帶值選項之值不當測試路徑；無位置參數 ⇒ testpaths。"""
     assert g._pytest_selectors(argv) == expected
+
+
+_PARSER_OPTS_CODE = (
+    "import json\n"
+    "from _pytest.config import _prepareconfig\n"
+    "cfg = _prepareconfig(['-p', 'no:cacheprovider', 'tests/governance/test_heavy_run_guard.py'])\n"
+    "val, opt = set(), set()\n"
+    "for a in cfg._parser._getparser()._actions:\n"
+    "    if a.option_strings and a.nargs != 0:\n"
+    "        (opt if a.nargs == '?' else val).update(a.option_strings)\n"
+    "print(json.dumps({'value': sorted(val), 'optional': sorted(opt)}))\n")
+
+
+def test_ledger_05b_value_options_match_real_pytest_parser() -> None:
+    """守衛之帶值／值可省略選項清單＝pytest 實際 argparse 解析器（核心＋已裝外掛＋本 repo 外掛）之選項：漏一個 ⇒ 該選項
+    之值被當測試選取、全量命令被估成小集合（審碼 r4：`--cov momentum`、`--config-file`、`--junit-xml`）。新外掛加選項即紅。"""
+    proc = subprocess.run([sys.executable, "-c", _PARSER_OPTS_CODE], cwd=str(REPO), capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    real = json.loads(proc.stdout.strip().splitlines()[-1])
+    guard_value = set(g._PYTEST_VALUE_OPTS) | set(g._PYTEST_NARROWING_VALUED)
+    assert set(real["value"]) - guard_value == set(), "守衛缺帶值選項"
+    assert set(real["optional"]) == set(g._PYTEST_OPTIONAL_VALUE_OPTS)
+    assert set(g._PYTEST_VALUE_OPTS) - set(real["value"]) == {"--trace-select"}, "守衛清單含解析器所無之選項（陳舊）"
 
 
 def test_ledger_11_collect_only_and_argsfile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

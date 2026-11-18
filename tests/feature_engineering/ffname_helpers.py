@@ -48,6 +48,26 @@ def load_freeze_module() -> ModuleType:
     return module
 
 
+#: TESTSEL I10：改後碼態 reference run 之行程內共用（value_invariance 之 `current` 與 dead_code 之 `reference_after`
+#: 原各算一次同一呼叫：同 `prepare_env(FFACT_MULTI_TF_PARALLEL="0")`、同 `run_reference(record_parts=False)`）
+_SHARED_REFERENCE: Dict[str, Any] = {}
+
+
+def shared_reference_run(tmp_path_factory: Any, freeze: ModuleType) -> Dict[str, Any]:
+    """同一 pytest 行程內共用之 `freeze.run_reference(tmp, record_parts=False)` 結果（只供 module 範圍 fixture 呼叫；
+    結果唯讀）。不重凍、不動 baseline（`baseline_immutability_problems` 之不可變條件不受影響）。"""
+    import pytest
+
+    from tests.feature_engineering.fftfmeta_golden_helpers import prepare_env
+
+    if "run" not in _SHARED_REFERENCE:
+        tmp = tmp_path_factory.mktemp("ffname_reference_after")
+        with pytest.MonkeyPatch.context() as mp:
+            prepare_env(mp, tmp, FFACT_MULTI_TF_PARALLEL="0")
+            _SHARED_REFERENCE["run"] = freeze.run_reference(tmp, record_parts=False)
+    return _SHARED_REFERENCE["run"]
+
+
 def naming() -> ModuleType:
     import momentum.FeatureEngineering.feature_naming as fn
 

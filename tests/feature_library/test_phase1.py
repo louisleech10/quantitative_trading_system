@@ -15,6 +15,7 @@ import pandas as pd
 
 def test_save_features_to_hdf5_writes_float32() -> None:
     """save_features_to_hdf5 should write float32, not float64."""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
     storage = FeatureStorage()

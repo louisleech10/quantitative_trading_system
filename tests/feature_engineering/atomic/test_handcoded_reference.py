@@ -106,16 +106,6 @@ def test_klinger_vf_worked_example_golden() -> None:
     np.testing.assert_allclose(impl_vf, _KLINGER_EXPECTED_VF, rtol=1e-10, atol=1e-6)
 
 
-def test_klinger_kvo_ema_from_golden_vf() -> None:
-    """EMA34/55 部分用 talib 驗：手算 VF → KVO 應等於 impl 輸出。"""
-    engine = VolumeIndicatorEngine({"indicators": []}, ["close"])
-    impl_kvo = _engine_output(engine, _KLINGER_WORKED_BARS, "Klinger")
-    vf = _KLINGER_EXPECTED_VF.astype(float)
-    expected_kvo = talib.EMA(vf, timeperiod=34) - talib.EMA(vf, timeperiod=55)
-    mask = ~(np.isnan(impl_kvo) | np.isnan(expected_kvo))
-    np.testing.assert_allclose(impl_kvo[mask], expected_kvo[mask], rtol=1e-10, atol=1e-6)
-
-
 def test_klinger_kvo_matches_independent_oracle_on_real_kline() -> None:
     """純增：上列 test_klinger_kvo_ema_from_golden_vf 以 8 根 bar 比 EMA34/55（前 54 根必為 NaN）⇒ 比對空陣列、恆過。
     本案於真實 BTCUSDT 12h（data_cache/feature_klines，≥500 根）以測試內獨立實作之 VF（Stock.Indicators 公式：trend
@@ -167,8 +157,11 @@ def test_handcoded_no_lookahead_invariant(ohlcv_df) -> None:
         np.testing.assert_allclose(full_prefix[mask], trunc_vals[mask], rtol=1e-10, atol=1e-10)
 
 
-def test_handcoded_v0_v1_diff_table_recorded(ohlcv_df) -> None:
-    """§G：記錄 simplified v0 → canonical v1 數值差異（供三方簽核）。"""
+def test_handcoded_v0_v1_diff_table_recorded(ohlcv_df, tmp_path) -> None:
+    """§G：記錄 simplified v0 → canonical v1 數值差異（供三方簽核）。
+
+    TESTSEL I7：輸出寫 tmp_path——測試不得改寫受追蹤檔（資料窗隨 kline 快取變動，原寫回 V0_V1_DIFF_PATH 每跑即改簽核表）；
+    受追蹤之 `V0_V1_DIFF_PATH` 為當時簽核紀錄，保留不動。斷言不變。"""
     engine = VolumeIndicatorEngine({"indicators": []}, ["close"])
     fi_v1 = _engine_output(engine, ohlcv_df, "ForceIndex")
     fi_v0 = ref.force_index_simplified(ohlcv_df).to_numpy(dtype=float)
@@ -191,8 +184,7 @@ def test_handcoded_v0_v1_diff_table_recorded(ohlcv_df) -> None:
             "EOM unchanged (scale-only vs 1e8 ref)"
         ),
     }
-    V0_V1_DIFF_PATH.parent.mkdir(parents=True, exist_ok=True)
-    V0_V1_DIFF_PATH.write_text(json.dumps(table, indent=2), encoding="utf-8")
+    (tmp_path / V0_V1_DIFF_PATH.name).write_text(json.dumps(table, indent=2), encoding="utf-8")
 
     assert table["indicators"]["Klinger"]["corr"] is not None
     assert table["indicators"]["Klinger"]["corr"] < 0.99
@@ -200,8 +192,10 @@ def test_handcoded_v0_v1_diff_table_recorded(ohlcv_df) -> None:
     assert table["indicators"]["ForceIndex"]["corr"] < 0.99
 
 
-def test_literature_reference_diff_table_recorded(ohlcv_df) -> None:
-    """§G：round2 錯 canonical → round3 真 canonical 差異 + ForceIndex 文獻對照。"""
+def test_literature_reference_diff_table_recorded(ohlcv_df, tmp_path) -> None:
+    """§G：round2 錯 canonical → round3 真 canonical 差異 + ForceIndex 文獻對照。
+
+    TESTSEL I7：輸出寫 tmp_path（同上，受追蹤之 `DIFF_TABLE_PATH` 為簽核紀錄、不再被測試改寫）。斷言不變。"""
     engine = VolumeIndicatorEngine({"indicators": []}, ["close"])
     eom_impl = _engine_output(engine, ohlcv_df, "EOM")
     eom_canon = ref.eom_canonical_scaled(ohlcv_df).to_numpy(dtype=float)
@@ -224,8 +218,7 @@ def test_literature_reference_diff_table_recorded(ohlcv_df) -> None:
             "corr round2 vs round3 ~ -0.82 on BTCUSDT/12h"
         ),
     }
-    DIFF_TABLE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    DIFF_TABLE_PATH.write_text(json.dumps(table, indent=2), encoding="utf-8")
+    (tmp_path / DIFF_TABLE_PATH.name).write_text(json.dumps(table, indent=2), encoding="utf-8")
 
     assert table["indicators"]["ForceIndex"]["corr"] is not None
     assert table["indicators"]["ForceIndex"]["corr"] > 0.99
@@ -235,10 +228,15 @@ def test_literature_reference_diff_table_recorded(ohlcv_df) -> None:
 
 
 def test_volume_metadata_no_simplified_variant_on_canonical() -> None:
+    """鍵取自產生端同一身分常數（FF-NAME b2 f2440d3b 改名後，舊字面 `hlcv_volume_ForceIndex`／`…Klinger_34_55` 已不存在
+    ⇒ TESTSEL I7 KeyError）；斷言不變：canonical 兩欄無 variant、EOM 標 simplified。"""
+    from momentum.FeatureEngineering.atomic import volume_indicators as vi
+    from momentum.FeatureEngineering.feature_naming import format_feature_name
+
     meta = VolumeIndicatorEngine({"indicators": []}, ["close"]).get_feature_metadata()
-    for key in ("hlcv_volume_ForceIndex", "hlcv_volume_Klinger_34_55"):
+    for key in (format_feature_name(vi._force_index_identity(13)), format_feature_name(vi._klinger_identity(34, 55))):
         assert "variant" not in meta[key]
-    assert meta["hlcv_volume_EOM_14"].get("variant") == "simplified"
+    assert meta[format_feature_name(vi._eom_identity(14))].get("variant") == "simplified"
 
 
 def test_mutation_eom_multiply_to_divide_fails(ohlcv_df, monkeypatch) -> None:

@@ -21,6 +21,33 @@ from momentum.FeatureEngineering.feature_naming import stamp_h5_feature_naming_v
 client = TestClient(app)
 API = "/api/v1/ic"
 
+_PROD_REGISTRY = __import__("pathlib").Path(__file__).resolve().parents[2] / "data_cache" / "features" / "registry.json"
+
+
+@pytest.fixture()
+def production_registry_readonly(monkeypatch, tmp_path):
+    """以正式 registry 之**副本**為資料來源（本檔兩條「真實 registry 對照」測試用）。
+
+    TESTSEL-HERMETIC（tests/conftest.py）把 `FeatureRegistry()` 預設路徑改指 session 暫存根以防測試寫正式根；
+    本 fixture 把正式 registry 位元組複製到本測試 tmp_path，再把預設路徑與 IC service 既有 registry 實例指向副本並
+    重讀——內容與正式檔相同（真實對照），而 `_load` 之損毀備份、`_locked_mutate` 之 lock、`_persist` 等任何寫入只落
+    副本目錄（審碼 r2 CODEX／GROK-R2-P1-01：只攔 `_persist` 不足）。結束時 monkeypatch 還原。"""
+    import shutil
+
+    from momentum.FeatureEngineering import feature_registry as fr
+
+    if not _PROD_REGISTRY.is_file():
+        pytest.skip("本機無正式 registry（data_cache/features/registry.json）")
+    copy_path = tmp_path / "registry_copy" / "registry.json"
+    copy_path.parent.mkdir(parents=True)
+    shutil.copyfile(_PROD_REGISTRY, copy_path)  # 只讀正式檔一次
+    monkeypatch.setattr(fr, "DEFAULT_REGISTRY_PATH", copy_path)
+    registry = svc_mod.ic_analysis_service._feature_library._registry  # noqa: SLF001
+    monkeypatch.setattr(registry, "_path", copy_path)
+    monkeypatch.setattr(registry, "_entries", list(registry._entries))  # noqa: SLF001 — 結束時還原原清單
+    registry._load()  # noqa: SLF001
+    return copy_path
+
 
 @pytest.fixture()
 def injected_task():
@@ -81,7 +108,7 @@ def test_gap3_ic_progress_fields_no_fake_value_when_unresolvable():
     assert svc_mod._resolve_feature_count(_Req()) is None, "解析不到卻填了假值"
 
 
-def test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis():
+def test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis(production_registry_readonly):
     """🔴 `CODEX-R4-P2-01`：`feature_count` 原本只在「顯式帶 hash 的 `/analyze`」才有值
     ⇒ **隱式 latest 與所有 `/full-analysis`** 一律回 `None`，欄位在最常見的兩種用法下是空的。
 
@@ -111,7 +138,7 @@ def test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis
     assert '"feature_count"' in source, "/full-analysis 的 task_info 沒有 feature_count 鍵"
 
 
-def test_gap3_ic_progress_fields_resolver_reads_registry_only():
+def test_gap3_ic_progress_fields_resolver_reads_registry_only(production_registry_readonly):
     """🔴 解析器只讀 registry、**不開 HDF5**——Task 6.4 要證明「擋下時未載入大矩陣」。
 
     正向對照：真實 registry 內的 `config_hash` 解析得出數字（否則本條退化成恆真）。
@@ -119,11 +146,8 @@ def test_gap3_ic_progress_fields_resolver_reads_registry_only():
     （實測 BTCUSDT/12h 最新一筆是 15 個特徵，而同組合下另有 218,369 的 run）。
     """
     import json as _json
-    from pathlib import Path as _Path
 
-    registry = _json.loads(
-        (_Path(__file__).resolve().parents[2] / "data_cache" / "features" / "registry.json")
-        .read_text(encoding="utf-8"))
+    registry = _json.loads(production_registry_readonly.read_text(encoding="utf-8"))  # 正式 registry 之副本
     with_count = [e for e in registry if isinstance(e.get("feature_count"), int) and e.get("config_hash")]
     if not with_count:
         pytest.skip("本機 registry 無帶 feature_count 之登記，無法做正向對照")

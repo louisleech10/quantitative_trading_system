@@ -25,7 +25,7 @@ pytestmark = pytest.mark.requires_kline
 
 @pytest.fixture(scope="module")
 def runs(tmp_path_factory: pytest.TempPathFactory) -> ph.RunCache:
-    return ph.RunCache(tmp_path_factory.mktemp("preprov_writer"))
+    return ph.shared_run_cache(tmp_path_factory)  # TESTSEL I10：session 共用倉（同格每行程只生成一次）
 
 
 # ---------------------------------------------------------------------------------------------- oracle

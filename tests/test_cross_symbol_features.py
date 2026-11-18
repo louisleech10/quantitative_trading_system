@@ -13,6 +13,7 @@ from momentum.FeatureEngineering.feature_extractor import FeatureExtractor, Stra
 
 def test_cross_symbol_features():
     """測試特徵在不同標的上的表現"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     
     print("=" * 80)
     print("跨標的特徵提取測試")

@@ -351,14 +351,56 @@ def test_median_unbiased_phi_matches_truth() -> None:
     assert a == b == H.median_unbiased_phi(0.97, 500)
 
 
-@pytest.mark.slow
-def test_warning_large_n_chunked_completes() -> None:
-    """④(c) n＝500,000 以分塊完成且 p 正常輸出（任意 n 皆可算；峰值記憶體另入收據）。"""
-    n = 500_000
-    rng = np.random.default_rng(500)
-    f, y = _frame(rng.standard_normal(n), _overlap_label(rng, n, 5))
-    r = compute_hac_ic_statistics(f, y, 5, method="pearson", alpha=0.05)["f"]
+def test_warning_large_n_chunked_completes(monkeypatch) -> None:
+    """④(c) 依可用記憶體自動分塊完成且 p 正常輸出；自動分塊之結果與不受限（單塊）逐值相同。
+
+    TESTSEL I10：原以 n＝500,000 跑滿（ledger 286 秒）。分塊路徑只由 `_rows_per_chunk`（可用記憶體÷單列估計）決定，
+    與 n 無分支 ⇒ 改用已知警示案例（n＝339、h＝24）並把 `psutil.virtual_memory().available` 壓到每塊約 50 列，經生產入口
+    `compute_hac_ic_statistics` 走多塊路徑（斷言每次模擬皆被切成多塊）；n＝500,000 之規模宣稱（可完成、峰值記憶體）改
+    一次性收據 `scripts/icperf_hac_large_n_receipt.py`（hac_ewc.py 改動時重跑）。"""
+    import psutil
+
+    n, h = 339, 24
+    rng = np.random.default_rng(339)
+    # 同 ④(d) 已知警示案例（n＝339、h＝24、近單根特徵）⇒ data_warning_detail 帶模擬所得之 r_hat／r_ref 等值，分塊錯誤
+    # （缺塊、重疊、亂數流錯位）即使結果不同（iid 特徵不觸發警示時 detail＝None，比對看不到模擬值）
+    f, y = _frame(np.cumsum(rng.standard_normal(n)), _overlap_label(rng, n, h))
+    H._NULL_PVALUE_CACHE.clear()
+    H._LS_MEDIAN_CACHE.clear()
+    ref = compute_hac_ic_statistics(f, y, h, method="pearson", alpha=0.05)["f"]
+    assert ref["data_warning"] == "small_effective_sample" and ref["data_warning_detail"], ref
+
+    class _VM:
+        available = 4 * 50 * (2 * 2 * n + h) * 8 * H._ARRAYS_PER_ROW  # 節點 ≤ 2n 時每塊 ≥ 50 列；節點愈小每塊愈多列
+
+    chunks: list = []
+    real_chunk = H._simulate_chunk
+
+    def _counting(node, horizon, method, point, seed, r0, r1):
+        chunks.append((node, point, r0, r1))
+        return real_chunk(node, horizon, method, point, seed, r0, r1)
+
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: _VM())
+    monkeypatch.setattr(H, "_simulate_chunk", _counting)
+    H._NULL_PVALUE_CACHE.clear()
+    H._LS_MEDIAN_CACHE.clear()
+    r = compute_hac_ic_statistics(f, y, h, method="pearson", alpha=0.05)["f"]
     assert r["inference_status"] == "ok" and np.isfinite(r["p_value"])
+    sims: Dict[Any, list] = {}
+    for node, point, r0, r1 in chunks:
+        sims.setdefault((node, point), []).append((r0, r1))
+    assert sims, "警示模擬未執行"
+    for key, parts in sims.items():
+        assert len(parts) > 1, key  # 每次模擬皆多塊
+        assert parts[0][0] == 0 and parts[-1][1] == H.WARNING_SIM_REPLICATIONS, key
+        assert all(a[1] == b[0] for a, b in zip(parts, parts[1:])), key  # 塊間無缺漏無重疊
+    assert set(r) == set(ref)
+    for k in ref:
+        a, b = ref[k], r[k]
+        if isinstance(a, float) and math.isnan(a):
+            assert isinstance(b, float) and math.isnan(b), k
+        else:
+            assert a == b, (k, a, b)
 
 
 # ── ④(d) 已知案例、警示不改 p ───────────────────────────────────────────────────────────────────
@@ -625,14 +667,13 @@ def test_chunk_rows_follow_current_available_memory(monkeypatch) -> None:
 
 
 @pytest.mark.requires_kline
-def test_default_threshold_zero_survivors_on_la1_fixture_is_locked() -> None:
+def test_default_threshold_zero_survivors_on_la1_fixture_is_locked(monkeypatch: pytest.MonkeyPatch) -> None:
     """（規格審查 r95 決策 1）la1 真實 fixture（BTCUSDT 1h、ETHUSDT 12h）於 EWC 預設門檻下第 5 段倖存 0、無
     `filtered_features_path`（使用者可見數值變化：改前 NW 固定頻寬下 BTC 1、ETH 2）；control golden 另以
     `thresholds.p_value_max`＝1.0 保住倖存者下游路徑覆蓋。"""
-    import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "golden" / "la1"))
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "golden" / "la1"))
     import gen_baseline as G  # noqa: E402
 
     for run in G.RUNS:

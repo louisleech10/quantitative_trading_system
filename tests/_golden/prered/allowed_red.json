@@ -1,187 +1,5 @@
 [
   {
-    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_timeframe_seconds_identity",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_covers_cross_sectional_runs",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_receives_its_own_embargo_override",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_summary_is_populated_from_real_shape",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_timeout_keeps_partial_results",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_gets_its_own_analyzer",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_has_its_own_receipt_hash",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_infeasible_cell_is_unavailable_without_killing_others",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_shape_is_exactly_nine_cells",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_mutation_rangeindex_regresses",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_real_3sym_oracle",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
-    "node": "tests/api/test_splitunify_event_scan_projection.py::test_required_real_data_present_or_fail_closed",
-    "owner_ticket": "FFSTORE",
-    "reason": "user-ruling",
-    "state": "owned-by-later-ticket",
-    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
-  },
-  {
     "node": "tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable",
     "owner_ticket": "FFSTORE",
     "reason": "user-ruling",
@@ -208,5 +26,775 @@
     "reason": "user-ruling",
     "state": "owned-by-later-ticket",
     "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/momentum/test_la1_pit_small_scale.py::test_short_series_fallback_labels_equal_full_run_prefix",
+    "owner_ticket": "ICPATH",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "RegimeDetector.detect 短序列 fallback（regime_detector.py:128-139、:347-355）以含暖身之整段 close 算 PIT 規則，長序列以 valid_df（:229-239）——同一時點標籤隨序列長度而變（未來洩漏）；產品修補依量化正確性完整管線，排序維持第 11 步（2026-11-13 使用者同意）；修後本測試轉綠並刪本列"
+  },
+  {
+    "node": "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_serial-skip]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "FFTFMETA_SPEC.md:106-107 非主週期失敗語意被 FFSTAT 預熱恆開（d229336e）之 _resolve_public_window（feature_factory.py:2631）提前載入全部 training 週期破壞；產品修補歸 FFPROD，修後本測試轉綠並刪本列"
+  },
+  {
+    "node": "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_serial-failed]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "FFTFMETA_SPEC.md:106-107 非主週期失敗語意被 FFSTAT 預熱恆開（d229336e）之 _resolve_public_window（feature_factory.py:2631）提前載入全部 training 週期破壞；產品修補歸 FFPROD，修後本測試轉綠並刪本列"
+  },
+  {
+    "node": "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_parallel-skip]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "FFTFMETA_SPEC.md:106-107 非主週期失敗語意被 FFSTAT 預熱恆開（d229336e）之 _resolve_public_window（feature_factory.py:2631）提前載入全部 training 週期破壞；產品修補歸 FFPROD，修後本測試轉綠並刪本列"
+  },
+  {
+    "node": "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_parallel-failed]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "FFTFMETA_SPEC.md:106-107 非主週期失敗語意被 FFSTAT 預熱恆開（d229336e）之 _resolve_public_window（feature_factory.py:2631）提前載入全部 training 週期破壞；產品修補歸 FFPROD，修後本測試轉綠並刪本列"
+  },
+  {
+    "node": "tests/test_multi_tf_generator.py::test_boundary_19_canonical_completeness_parallel_error_fail_closed",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "FFTFMETA_SPEC.md:106-107 非主週期失敗語意被 FFSTAT 預熱恆開（d229336e）之 _resolve_public_window（feature_factory.py:2631）提前載入全部 training 週期破壞；產品修補歸 FFPROD，修後本測試轉綠並刪本列"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_01_response_leaf_unit",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_02_json_file_field_unit_and_sha_not_separate",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_03_json_fields_equal_sha_differs_is_hard_failure",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_04_file_only_one_side_unit",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_05_opaque_and_asymmetric_parse_sha_unit",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_06_hdf5_object_unit_and_bytes_only_hard_failure",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_07_features_pit_selected_stage_removed_item_units",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_08_non_declarable_hard_failures",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_09_volatile_json_excluded_no_unit_no_failure",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_10_units_consistent_with_human_messages",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_11_l4_pass_when_three_conditions_hold",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_12_l4_actual_not_subset_of_declared",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_13_l4_parent_declaration_does_not_cover_leaf",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_14_l4_actual_unit_without_oracle",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_15_l4_declared_unchanged_needs_closed_reason",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_16_l4_hard_failures_block",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_17_source_identity_missing_both_sides_hard_failure",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_18_hdf5_volatile_attrs_excluded",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_19_l4_declared_unit_with_invalid_shape_rejected",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_20_hdf5_object_branches[added]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_20_hdf5_object_branches[dtype]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_20_hdf5_object_branches[kind]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_20_hdf5_object_branches[removed]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_20_hdf5_object_branches[shape]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_21_json_field_added_or_removed[added]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_21_json_field_added_or_removed[removed]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_22_source_identity_missing_one_side_hard_failure[current]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_22_source_identity_missing_one_side_hard_failure[frozen]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_23_parent_id_rejected_even_when_sets_match",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_boundary_24_golden_unit_universe_lists_finest_units",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_compare_units.py::test_mutation_unit_key_collapse_flips_l4",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (f) 施工前紅測試（ac3fdbf6「紅測試與空殼」：檔頭明載 scripts/icperf_freeze_baseline.py 之 compare_golden_units／unit_key／check_l4_diff 施工前不存在）；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_01_default_is_full_mode",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_02_explicit_sampling_reports_actual_and_total",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_03_full_mode_summary_not_sampled",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_04_config_default_null",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_05_api_request_default_and_no_arbitrary_cap",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_06_validate_response_reports_path_summary",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_07_full_mode_split_is_lazy",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py::test_boundary_08_validate_consumes_split_lazily",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 CPCV 完整路徑施工前紅測試（ac3fdbf6）：max_paths 預設 null、path_summary、惰性分割尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_01_contract_registers_existing_and_new_codes",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_02_small_sample_detail_keys_match_product",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_03_all_product_codes_registered",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_04_frontend_types_match_contract",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_05_api_response_roundtrip_and_rejects_unregistered",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_06_new_codes_detail_cover_d_fields",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 L2（(d2) 資料警示代碼契約）施工前紅（ac3fdbf6）：契約 momentum/Analysis/contracts/data_warning_codes.json 之 codes 為空殼 {}，本測試之非空前提斷言（:150「至少須有本票新增之固定 L HAC 碼」）即紅；驗證之樹＝整合樹（TESTSEL I1d1 2026-11-17 實跑紅）與 main 基準樹（main-probe 9f059c65，I1d 實測紅）皆紅；收尾者 ICPERF 該子批施工後轉綠並刪本列（同檔其餘 8 列已於 TESTSEL I7 後登記；TESTSEL I1d1 2026-11-17 補登本列）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_07_precedence_registered_and_matches_product",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_boundary_08_fixed_lag_and_ewc_codes_mutually_exclusive",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_data_warning_codes.py::test_mutation_product_detail_key_dropped_detected",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 (d2) 資料警示代碼契約施工前紅測試（ac3fdbf6）：DataWarningCode、small_effective_sample 等尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_correctness.py::test_correctness_coverage_closed_over_response_keys",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "讀 gitignore 之 runs/icperf/correctness-20261111b/captures/A.deep_analysis.pkl（ICPERF 研究擷取檔，未入版控）：主 repo 本體有該檔、git worktree 整合樹無 ⇒ 只於整合樹紅；驗證之樹＝主 repo 本體（TESTSEL I1d1 2026-11-17 查證：整合樹 ls 無此檔、主 repo 有）；收尾者 ICPERF（擷取檔改入版控 fixture 或測試改不讀 runs/）；TESTSEL I7 治理分層若先處置本機檔依賴，則由 I7 刪本列",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_gate.py::test_boundary_15_measured_ids_cover_inventory",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF 施工清單落點紅測試（1e9ec16e）：Phase 0 規模／凍結量測收據（handoffs/run_receipts/*-icperf-scale-before.json 等）尚未產生；對應 Task 產出收據後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_gate.py::test_boundary_16_three_points_per_entry",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF 施工清單落點紅測試（1e9ec16e）：Phase 0 規模／凍結量測收據（handoffs/run_receipts/*-icperf-scale-before.json 等）尚未產生；對應 Task 產出收據後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_gate.py::test_boundary_17_criteria_fields_and_rules",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF 施工清單落點紅測試（1e9ec16e）：Phase 0 規模／凍結量測收據（handoffs/run_receipts/*-icperf-scale-before.json 等）尚未產生；對應 Task 產出收據後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_gate.py::test_boundary_18_scale_points_within_budget",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF 施工清單落點紅測試（1e9ec16e）：Phase 0 規模／凍結量測收據（handoffs/run_receipts/*-icperf-scale-before.json 等）尚未產生；對應 Task 產出收據後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_gate.py::test_boundary_19_over_ten_minutes_two_points_annotated",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF 施工清單落點紅測試（1e9ec16e）：Phase 0 規模／凍結量測收據（handoffs/run_receipts/*-icperf-scale-before.json 等）尚未產生；對應 Task 產出收據後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_gate.py::test_boundary_20_rss_meter_and_chunk_cap_recorded",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF 施工清單落點紅測試（1e9ec16e）：Phase 0 規模／凍結量測收據（handoffs/run_receipts/*-icperf-scale-before.json 等）尚未產生；對應 Task 產出收據後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_01_ic_series_small_n_computes_with_warning[1]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_01_ic_series_small_n_computes_with_warning[5]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_01_ic_series_small_n_computes_with_warning[6]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_01_ic_series_small_n_computes_with_warning[7]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_04_ic_series_constant_degenerate",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_05_validator_entry_small_n_computes_with_warning[1]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_05_validator_entry_small_n_computes_with_warning[5]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_05_validator_entry_small_n_computes_with_warning[6]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py::test_boundary_05_validator_entry_small_n_computes_with_warning[7]",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 HAC 固定落後期新契約施工前紅測試（ac3fdbf6）：小樣本照常出值等新契約尚未施工；該子批施工後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py::test_every_declared_row_is_an_l0_l1_row",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 L1 覆蓋表（d581a75b 起）：L1 後續子批未完成前宣告列未全覆蓋；L1 收尾後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py::test_l1a_rows_fully_covered",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 L1 覆蓋表（d581a75b 起）：L1 後續子批未完成前宣告列未全覆蓋；L1 收尾後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py::test_l1b_rows_fully_covered",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 L1 覆蓋表（d581a75b 起）：L1 後續子批未完成前宣告列未全覆蓋；L1 收尾後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py::test_l1c_rows_fully_covered",
+    "owner_ticket": "ICPERF",
+    "reason": "blocked-by",
+    "trigger": "ICPERF Task 0.6 L1 覆蓋表（d581a75b 起）：L1 後續子批未完成前宣告列未全覆蓋；L1 收尾後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_ffprod_decisions.py::test_boundary_07_retain_choice_has_empty_changed_targets",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "FFPROD 具名驗收骨架（b70c0343「四個具名驗收」）：量測收據與決定紀錄尚未產生（施工前應為紅）；FFPROD 對應 Phase 產出收據與決定紀錄後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_ffprod_decisions.py::test_decisions_cover_every_measured_candidate",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "FFPROD 具名驗收骨架（b70c0343「四個具名驗收」）：量測收據與決定紀錄尚未產生（施工前應為紅）；FFPROD 對應 Phase 產出收據與決定紀錄後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_ffprod_decisions.py::test_decisions_match_measured_options",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "FFPROD 具名驗收骨架（b70c0343「四個具名驗收」）：量測收據與決定紀錄尚未產生（施工前應為紅）；FFPROD 對應 Phase 產出收據與決定紀錄後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_ffprod_decisions.py::test_every_decision_cites_user_ruling",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "FFPROD 具名驗收骨架（b70c0343「四個具名驗收」）：量測收據與決定紀錄尚未產生（施工前應為紅）；FFPROD 對應 Phase 產出收據與決定紀錄後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出未登記）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_ffprod_gate.py::test_gate_regenerated_cells_match_frozen[C_BTCUSDT_1h]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "FFPROD gate C_BTCUSDT_1h：GenerationMemoryBudgetExceeded（Calib.group_reduce 1h_L2_Momentum 縮尾整群組 rows 20,329×cols 6,700＝10.9 GB＞8 GB；runs/overhead/probe_v3_budget.py 實測，同 test_v3_multi_tf_btc）；FFPROD 逐欄塊縮尾使本機可跑後轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_numview_acceptance.py::test_gate_new_freeze_bitwise_equal_at_current_code[A_BTCUSDT_12h]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "NUMVIEW new_freeze 基準含 polars 臂份，FFPROD b2（d4d97d62）已刪 polars 臂（契約 post_ic_arm_reachability 無 polars）⇒ 重凍腳本 KeyError 'polars'；須於 FFPROD 經三方資料正確簽核後重凍（去 polars 臂份）轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出；另 numview_helpers.regen_batch_kind 未設批次環境變數改取末批 b5）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_numview_acceptance.py::test_gate_new_freeze_bitwise_equal_at_current_code[A_BTCUSDT_1h]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "NUMVIEW new_freeze 基準含 polars 臂份，FFPROD b2（d4d97d62）已刪 polars 臂（契約 post_ic_arm_reachability 無 polars）⇒ 重凍腳本 KeyError 'polars'；須於 FFPROD 經三方資料正確簽核後重凍（去 polars 臂份）轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出；另 numview_helpers.regen_batch_kind 未設批次環境變數改取末批 b5）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_numview_acceptance.py::test_gate_new_freeze_bitwise_equal_at_current_code[A_BTCUSDT_4h]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "NUMVIEW new_freeze 基準含 polars 臂份，FFPROD b2（d4d97d62）已刪 polars 臂（契約 post_ic_arm_reachability 無 polars）⇒ 重凍腳本 KeyError 'polars'；須於 FFPROD 經三方資料正確簽核後重凍（去 polars 臂份）轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出；另 numview_helpers.regen_batch_kind 未設批次環境變數改取末批 b5）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_numview_acceptance.py::test_gate_new_freeze_bitwise_equal_at_current_code[A_SOLUSDT_1h]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "NUMVIEW new_freeze 基準含 polars 臂份，FFPROD b2（d4d97d62）已刪 polars 臂（契約 post_ic_arm_reachability 無 polars）⇒ 重凍腳本 KeyError 'polars'；須於 FFPROD 經三方資料正確簽核後重凍（去 polars 臂份）轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出；另 numview_helpers.regen_batch_kind 未設批次環境變數改取末批 b5）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_numview_acceptance.py::test_gate_new_freeze_bitwise_equal_at_current_code[B_BTCUSDT_1h_4h]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "NUMVIEW new_freeze 基準含 polars 臂份，FFPROD b2（d4d97d62）已刪 polars 臂（契約 post_ic_arm_reachability 無 polars）⇒ 重凍腳本 KeyError 'polars'；須於 FFPROD 經三方資料正確簽核後重凍（去 polars 臂份）轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出；另 numview_helpers.regen_batch_kind 未設批次環境變數改取末批 b5）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_numview_acceptance.py::test_gate_new_freeze_bitwise_equal_at_current_code[C_BTCUSDT_1h]",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "NUMVIEW new_freeze 基準含 polars 臂份，FFPROD b2（d4d97d62）已刪 polars 臂（契約 post_ic_arm_reachability 無 polars）⇒ 重凍腳本 KeyError 'polars'；須於 FFPROD 經三方資料正確簽核後重凍（去 polars 臂份）轉綠並刪本列（2026-11-14 TESTSEL I7 後實跑查出；另 numview_helpers.regen_batch_kind 未設批次環境變數改取末批 b5）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_failopen_correctness.py::test_v3_multi_tf_btc_matches_frozen_baseline",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "GenerationMemoryBudgetExceeded：Calib.group_reduce 1h_L2_Momentum 縮尾整群組（rows 20,329×cols 6,700，winsor_copy 10.9 GB＞8 GB 上限；runs/overhead/probe_v3_budget.py 實測；2026-10-13 曾於本機通過、群組其後變大）；FFPROD 逐欄塊縮尾使本機可跑後轉綠並刪本列（2026-11-14 TESTSEL I7 查出）",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_fftfmeta_golden.py::test_golden_degraded_single_tf_manifest_matches_task_record",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "FF-TFMETA 基準（413836ff 凍結）對現行碼不符。2026-11-14 歸因：git bisect 413836ff..c9737729（runs/overhead/fft_bisect.jsonl；413836ff 重現基準 84／84）⇒ 首個壞提交 d229336e（FF-STAT 第 4 批「預熱恆開＋逐欄穩定點」，三家 APPROVED）：窗內值改以窗前歷史預熱計算（舊碼窗內前段為未收斂或 NaN）。現行值以獨立 oracle 驗證：L6.5 縮尾關閉時 268／268 個 L1 趨勢基底欄與 TA-Lib 直接計算（kline_cache 原始陣列）逐列相等（runs/overhead/fftfmeta_oracle.py）；縮尾開啟時窗內前段差異來自因果縮尾。另 FF-NAME 改名使 8 群組檔名改變。處置：依 HANDOFF 坑（該基準保存 FF-TFMETA 動工前狀態、不可重凍、須有證據遷移）由 FFPROD 以遷移腳本附本歸因收據遷移後轉綠並刪本列。",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/feature_engineering/test_fftfmeta_golden.py::test_golden_multi_tf_features_unchanged_and_timeframes_canonical",
+    "owner_ticket": "FFPROD",
+    "reason": "blocked-by",
+    "trigger": "FF-TFMETA 基準（413836ff 凍結）對現行碼不符。2026-11-14 歸因：git bisect 413836ff..c9737729（runs/overhead/fft_bisect.jsonl；413836ff 重現基準 84／84）⇒ 首個壞提交 d229336e（FF-STAT 第 4 批「預熱恆開＋逐欄穩定點」，三家 APPROVED）：窗內值改以窗前歷史預熱計算（舊碼窗內前段為未收斂或 NaN）。現行值以獨立 oracle 驗證：L6.5 縮尾關閉時 268／268 個 L1 趨勢基底欄與 TA-Lib 直接計算（kline_cache 原始陣列）逐列相等（runs/overhead/fftfmeta_oracle.py）；縮尾開啟時窗內前段差異來自因果縮尾。另 FF-NAME 改名使 8 群組檔名改變。處置：依 HANDOFF 坑（該基準保存 FF-TFMETA 動工前狀態、不可重凍、須有證據遷移）由 FFPROD 以遷移腳本附本歸因收據遷移後轉綠並刪本列。",
+    "state": "owned-by-later-ticket"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_05_helper_backprop_wall_clock_median_under_1s[comment_appended]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_05_helper_backprop_wall_clock_median_under_1s[fixture_docstring_added]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_05_helper_backprop_wall_clock_median_under_1s[import_added]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_05_helper_backprop_wall_clock_median_under_1s[unchanged]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_06_pytest_ini_wall_clock[classes_narrowed]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_06_pytest_ini_wall_clock[files_narrowed]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_06_pytest_ini_wall_clock[functions_narrowed]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_06_pytest_ini_wall_clock[functions_superset]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_06_pytest_ini_wall_clock[marker_added]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_06_pytest_ini_wall_clock[testpaths_narrowed]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07_route_wall_clock_hook_and_precommit[catalog_trailing_newline]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07_route_wall_clock_hook_and_precommit[manifest_trailing_newline]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07_route_wall_clock_hook_and_precommit[test_file_comment]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07c_conftest_pytest_plugins_change_wall_clock[plugins_reordered]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07d_test_file_class_base_change_wall_clock",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07e_plugin_fixture_change_wall_clock[assert_removed]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07e_plugin_fixture_change_wall_clock[comment_added]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07f_autouse_plugin_fixture_change_wall_clock[assert_added]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07f_autouse_plugin_fixture_change_wall_clock[assert_removed]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07f_autouse_plugin_fixture_change_wall_clock[assert_weakened]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07f_autouse_plugin_fixture_change_wall_clock[helper_assert_removed]",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
+  },
+  {
+    "node": "tests/registry/test_testreg_write_guard.py::test_boundary_07g_widely_imported_helper_decrease_wall_clock",
+    "owner_ticket": "TESTREG",
+    "reason": "blocked-by",
+    "state": "owned-by-later-ticket",
+    "trigger": "testreg hook 牆鐘門檻（write_guard perf 條，中位 <1 s／阻擋案 <5 s）於本機實測中位 1.66–2.5 s；main 合回前（167e9eb9）同條即紅（runs/testsel_route/i3_perf_baseline.log），非合回回歸。TESTREG 提速 hook 或依實測重定門檻後刪本列"
   }
 ]

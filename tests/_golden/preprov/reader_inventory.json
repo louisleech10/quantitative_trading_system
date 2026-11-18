@@ -21,19 +21,10 @@
   },
   {
    "path": "scripts/_manifest_listing.py",
-   "qualname": "_guard_no_undeclared",
-   "call": "base.rglob('*')",
-   "occurrence": 0,
-   "line": 133,
-   "class": "unrelated",
-   "reason": "非特徵讀取：未宣告檔守衛（Task 1.6），刻意列舉快照目錄全部實體檔以偵出 manifest 未宣告者並拋錯；列出之檔一律取自宣告"
-  },
-  {
-   "path": "scripts/_manifest_listing.py",
    "qualname": "declared_feature_files",
    "call": "art_dir.rglob('*.parquet')",
    "occurrence": 0,
-   "line": 80,
+   "line": 84,
    "class": "unrelated",
    "reason": "非特徵讀取：未宣告檔守衛（同 tests/feature_engineering/preprov_helpers.declared_feature_files），刻意列舉 artifact 目錄實體 parquet 以偵出 manifest 未宣告者"
   },
@@ -42,9 +33,18 @@
    "qualname": "feature_run_dirs",
    "call": "root.rglob(MANIFEST_NAME)",
    "occurrence": 0,
-   "line": 121,
+   "line": 125,
    "class": "unrelated",
    "reason": "非特徵讀取：列舉 feature_manifest.json 定位 run 目錄，特徵檔再依各 manifest 宣告導出"
+  },
+  {
+   "path": "scripts/_manifest_listing.py",
+   "qualname": "_guard_no_undeclared",
+   "call": "base.rglob('*')",
+   "occurrence": 0,
+   "line": 137,
+   "class": "unrelated",
+   "reason": "非特徵讀取：未宣告檔守衛（Task 1.6），刻意列舉快照目錄全部實體檔以偵出 manifest 未宣告者並拋錯；列出之檔一律取自宣告"
   },
   {
    "path": "scripts/b7_l65_threadpool_microbench.py",
@@ -105,7 +105,7 @@
    "qualname": "main",
    "call": "inputs_dir.iterdir()",
    "occurrence": 0,
-   "line": 554,
+   "line": 555,
    "class": "unrelated",
    "reason": "列舉 IC golden 輸入（h5／暫存 inputs），非特徵 run 目錄"
   },
@@ -141,7 +141,7 @@
    "qualname": "_recipe_probewinsor.record_of",
    "call": "Path(features_root).rglob('*.json')",
    "occurrence": 0,
-   "line": 252,
+   "line": 277,
    "class": "unrelated",
    "reason": "讀 features 根下 JSON（manifest 等）取鍵值作探針紀錄，不列舉特徵檔"
   },
@@ -159,7 +159,7 @@
    "qualname": "_recipe_failopen.combined_artifacts",
    "call": "Path(wd).rglob('*.json')",
    "occurrence": 0,
-   "line": 510,
+   "line": 536,
    "class": "unrelated",
    "reason": "讀 work_dir 下 JSON 產物之遮罩雜湊供等價證明，不列舉特徵檔"
   },
@@ -177,7 +177,7 @@
    "qualname": "_changed_since",
    "call": "os.walk(base)",
    "occurrence": 0,
-   "line": 1788,
+   "line": 1816,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -186,16 +186,79 @@
    "qualname": "rerun_consumers_merge",
    "call": "prior_log_dir.glob('consumers_*.xml')",
    "occurrence": 0,
-   "line": 1863,
+   "line": 1891,
    "class": "unrelated",
    "reason": "列舉原始碼／測試 xml 結果，非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/ffprod_freeze_baseline.py",
+   "qualname": "_generate_in_process",
+   "call": "(Path(features_root) / symbol / primary).glob('*/feature_manifest.json')",
+   "occurrence": 0,
+   "line": 294,
+   "class": "unrelated",
+   "reason": "manifest 定位：只尋找 feature_manifest.json 以取得 run 目錄／config_hash，不把所列檔當特徵讀取（_doc：manifest 定位）"
+  },
+  {
+   "path": "scripts/ffprod_measure.py",
+   "qualname": "_single",
+   "call": "RECEIPTS_DIR.glob(glob)",
+   "occurrence": 0,
+   "line": 242,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/ffprod_measure.py",
+   "qualname": "read_proofs",
+   "call": "Path(proof_dir).glob('proof-*.json')",
+   "occurrence": 0,
+   "line": 1200,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/ffprod_measure.py",
+   "qualname": "read_proofs",
+   "call": "Path(proof_dir).glob('install-error-*.txt')",
+   "occurrence": 0,
+   "line": 1201,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/ffprod_measure.py",
+   "qualname": "run_dir_of",
+   "call": "Path(work).rglob('feature_manifest.json')",
+   "occurrence": 0,
+   "line": 1406,
+   "class": "unrelated",
+   "reason": "manifest 定位：只尋找 feature_manifest.json 以取得 run 目錄／config_hash，不把所列檔當特徵讀取（_doc：manifest 定位）"
+  },
+  {
+   "path": "scripts/ffprod_measure.py",
+   "qualname": "output_bytes",
+   "call": "Path(run_dir).rglob('*')",
+   "occurrence": 0,
+   "line": 1415,
+   "class": "unrelated",
+   "reason": "大小量測：列 run 目錄全部檔只加總位元組數，不讀特徵內容（_doc：大小量測）"
+  },
+  {
+   "path": "scripts/ffprod_measure.py",
+   "qualname": "default_receipt_path",
+   "call": "RECEIPTS_DIR.glob(RECEIPT_GLOB)",
+   "occurrence": 0,
+   "line": 1920,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
   },
   {
    "path": "scripts/framepath_affected_gate.py",
    "qualname": "current_failures",
    "call": "Path(ledger_dir).glob('*.jsonl')",
    "occurrence": 0,
-   "line": 222,
+   "line": 223,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -204,7 +267,7 @@
    "qualname": "probe_hits",
    "call": "Path(probe_dir).glob('*.json')",
    "occurrence": 0,
-   "line": 344,
+   "line": 345,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -213,7 +276,7 @@
    "qualname": "venv_fingerprint",
    "call": "(Path(repo) / 'venv' / 'lib').glob('python*/site-packages/*.dist-info')",
    "occurrence": 0,
-   "line": 394,
+   "line": 395,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -222,7 +285,7 @@
    "qualname": "_listing_state",
    "call": "os.listdir(p)",
    "occurrence": 0,
-   "line": 407,
+   "line": 408,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -231,7 +294,7 @@
    "qualname": "trace_record",
    "call": "Path(trace_dir).glob('*.json')",
    "occurrence": 0,
-   "line": 422,
+   "line": 423,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -240,7 +303,7 @@
    "qualname": "Runner._ledger_names",
    "call": "d.glob('*.jsonl')",
    "occurrence": 0,
-   "line": 741,
+   "line": 793,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -249,7 +312,7 @@
    "qualname": "Runner.run",
    "call": "probe_dir.glob('*.json')",
    "occurrence": 0,
-   "line": 808,
+   "line": 864,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -258,7 +321,7 @@
    "qualname": "Runner.run",
    "call": "trace_dir.glob('*.json*')",
    "occurrence": 0,
-   "line": 812,
+   "line": 868,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -267,7 +330,7 @@
    "qualname": "_dangling_refs",
    "call": "(repo / root).rglob('*.py')",
    "occurrence": 0,
-   "line": 1543,
+   "line": 1599,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -276,7 +339,7 @@
    "qualname": "plan_inputs_digest",
    "call": "d.rglob('*.xml')",
    "occurrence": 0,
-   "line": 1638,
+   "line": 1691,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -285,7 +348,7 @@
    "qualname": "load_times",
    "call": "Path(d).rglob('*.xml')",
    "occurrence": 0,
-   "line": 1780,
+   "line": 1833,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -294,7 +357,7 @@
    "qualname": "plan",
    "call": "(repo / 'tests').rglob('test_*.py')",
    "occurrence": 0,
-   "line": 1853,
+   "line": 1906,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -303,9 +366,18 @@
    "qualname": "main.probe_env",
    "call": "d.glob('*.json')",
    "occurrence": 0,
-   "line": 1999,
+   "line": 2052,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/framepath_refreeze_provenance_v2.py",
+   "qualname": "value_file_hashes",
+   "call": "features_root.rglob('*')",
+   "occurrence": 0,
+   "line": 60,
+   "class": "unrelated",
+   "reason": "位元組快照：列兩樹 run 目錄下全部檔只算 sha256 比對新舊位元組是否相同（_doc：位元組快照），不把所列檔當特徵讀取"
   },
   {
    "path": "scripts/freeze_failopen_baseline.py",
@@ -348,7 +420,7 @@
    "qualname": "_prepare_partial_kline",
    "call": "legacy.iterdir()",
    "occurrence": 0,
-   "line": 320,
+   "line": 326,
    "class": "unrelated",
    "reason": "檢查受控 legacy kline 目錄為空，非特徵 run 目錄"
   },
@@ -357,7 +429,7 @@
    "qualname": "_refused_fingerprint",
    "call": "Path(root).rglob('*')",
    "occurrence": 0,
-   "line": 337,
+   "line": 343,
    "class": "unrelated",
    "reason": "非特徵讀取：拒絕格之殘留檢查（斷言無任何 parquet／manifest 落盤）"
   },
@@ -375,7 +447,7 @@
    "qualname": "_fingerprint",
    "call": "root.rglob(FeatureStorage.L7_V2_MANIFEST_NAME)",
    "occurrence": 0,
-   "line": 430,
+   "line": 443,
    "class": "unrelated",
    "reason": "列舉 manifest 檔讀其過濾內容，不列舉特徵檔"
   },
@@ -416,6 +488,15 @@
    "reason": "列舉事件標籤 golden JSON，非特徵 run 目錄"
   },
   {
+   "path": "scripts/heavy_run_guard.py",
+   "qualname": "_load_receipts",
+   "call": "REPO.glob(pattern)",
+   "occurrence": 0,
+   "line": 459,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
    "path": "scripts/ic1cfr_stopgap_freeze.py",
    "qualname": "scan_factor_return_consumers_ast",
    "call": "root.rglob('*.py')",
@@ -434,6 +515,177 @@
    "reason": "列舉 IC golden 輸入（h5／暫存 inputs），非特徵 run 目錄"
   },
   {
+   "path": "scripts/icperf_correctness_receipt.py",
+   "qualname": "receipt_code_paths",
+   "call": "root.glob(pat)",
+   "occurrence": 0,
+   "line": 2630,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_correctness_receipt.py",
+   "qualname": "collect_child_deps",
+   "call": "d.glob('started.*')",
+   "occurrence": 0,
+   "line": 2881,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_correctness_receipt.py",
+   "qualname": "collect_child_deps",
+   "call": "d.glob('proc.*.json')",
+   "occurrence": 0,
+   "line": 2882,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_correctness_receipt.py",
+   "qualname": "collect_child_deps",
+   "call": "d.glob('error.*')",
+   "occurrence": 0,
+   "line": 2883,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_correctness_receipt.py",
+   "qualname": "collect_child_deps",
+   "call": "d.glob('proc.*.json')",
+   "occurrence": 1,
+   "line": 2885,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_correctness_receipt.py",
+   "qualname": "collect_child_deps",
+   "call": "d.glob('.coverage.*')",
+   "occurrence": 0,
+   "line": 2888,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_correctness_receipt.py",
+   "qualname": "code_stat_snapshot",
+   "call": "os.walk(r)",
+   "occurrence": 0,
+   "line": 2908,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "snapshot_files",
+   "call": "os.walk(root)",
+   "occurrence": 0,
+   "line": 436,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "freeze_item",
+   "call": "item_root.iterdir()",
+   "occurrence": 0,
+   "line": 1678,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "_cell_pit_labels",
+   "call": "base.iterdir()",
+   "occurrence": 0,
+   "line": 1892,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "load_single_receipt",
+   "call": "Path(repo_root).glob(pattern)",
+   "occurrence": 0,
+   "line": 2728,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "_task02_records",
+   "call": "base.glob(f'{axis}-*')",
+   "occurrence": 0,
+   "line": 3395,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "_task02_records",
+   "call": "d.glob('*.json')",
+   "occurrence": 0,
+   "line": 3397,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "_task02_attempt",
+   "call": "Path(probe_dir).glob(f'{run_id}-{axis}-a*.json')",
+   "occurrence": 0,
+   "line": 3413,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_freeze_baseline.py",
+   "qualname": "_task02_attempt",
+   "call": "Path(records_dir).glob(f'{run_id}-{axis}-a*')",
+   "occurrence": 0,
+   "line": 3415,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_isolated_run.py",
+   "qualname": "digest_inputs",
+   "call": "os.walk(root)",
+   "occurrence": 0,
+   "line": 105,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/icperf_scale_harness.py",
+   "qualname": "load_icfirst_subset",
+   "call": "(Path(out_root) / ICFIRST_SUBSETS_DIR).glob(f'{tag}*')",
+   "occurrence": 0,
+   "line": 3460,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/ledger_durations.py",
+   "qualname": "load_all_detail",
+   "call": "d.glob('*.jsonl')",
+   "occurrence": 0,
+   "line": 123,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/limit_scan.py",
+   "qualname": "_iter_default_files",
+   "call": "d.rglob('*')",
+   "occurrence": 0,
+   "line": 285,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
    "path": "scripts/mutation_worktree.py",
    "qualname": "_selftest",
    "call": "(wt / 'tests/golden/la0/inputs').glob('ETHUSDT_12h_*_a0_tail2000.h5')",
@@ -441,6 +693,15 @@
    "line": 239,
    "class": "unrelated",
    "reason": "列舉 IC golden 輸入（h5／暫存 inputs），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/numview_freeze_baseline.py",
+   "qualname": "generate_cell_run",
+   "call": "(work / 'features' / symbol / primary).glob('*/feature_manifest.json')",
+   "occurrence": 0,
+   "line": 339,
+   "class": "unrelated",
+   "reason": "manifest 定位：只尋找 feature_manifest.json 以取得 run 目錄／config_hash，不把所列檔當特徵讀取（_doc：manifest 定位）"
   },
   {
    "path": "scripts/plain_docs_render.py",
@@ -477,6 +738,15 @@
    "line": 324,
    "class": "unrelated",
    "reason": "白話說明 md／html 檔，非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/preprov_full_run.py",
+   "qualname": "_check_out_root",
+   "call": "resolved.iterdir()",
+   "occurrence": 0,
+   "line": 87,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
   },
   {
    "path": "scripts/preprov_output_size.py",
@@ -542,6 +812,33 @@
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
   {
+   "path": "scripts/runs_inventory.py",
+   "qualname": "_size",
+   "call": "os.walk(path)",
+   "occurrence": 0,
+   "line": 29,
+   "class": "unrelated",
+   "reason": "大小量測：列 run 目錄全部檔只加總位元組數，不讀特徵內容（_doc：大小量測）"
+  },
+  {
+   "path": "scripts/runs_inventory.py",
+   "qualname": "entries.walk",
+   "call": "d.iterdir()",
+   "occurrence": 0,
+   "line": 68,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/runs_inventory.py",
+   "qualname": "entries",
+   "call": "runs.iterdir()",
+   "occurrence": 0,
+   "line": 72,
+   "class": "unrelated",
+   "reason": "治理／測試選取／登記工具之檔（ledger、收據、外掛代理、套件路徑、暫存、程式碼態快照），非特徵 run 目錄"
+  },
+  {
    "path": "scripts/splitunify_ic_event_report_diff.py",
    "qualname": "_run_dir",
    "call": "_FEATURES_DIR.glob(f'*/*/{ff_run}')",
@@ -573,9 +870,18 @@
    "qualname": "_review_ledger",
    "call": "d.glob('*.jsonl')",
    "occurrence": 0,
-   "line": 4631,
+   "line": 4685,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
+  },
+  {
+   "path": "scripts/timeout_scan.py",
+   "qualname": "scan_repo",
+   "call": "base.rglob('*')",
+   "occurrence": 0,
+   "line": 425,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
   },
   {
    "path": "scripts/tmp/dstar_empirical_composer.py",
@@ -618,7 +924,7 @@
    "qualname": "_snapshot_data_cache",
    "call": "PRODUCTION_DATA_CACHE.rglob('*')",
    "occurrence": 0,
-   "line": 41,
+   "line": 57,
    "class": "unrelated",
    "reason": "非特徵讀取：正式 data_cache 之零寫入快照（只比路徑集合）"
   },
@@ -627,7 +933,7 @@
    "qualname": "_snapshot_production_features",
    "call": "PRODUCTION_FEATURES_ROOT.rglob('*')",
    "occurrence": 0,
-   "line": 36,
+   "line": 37,
    "class": "unrelated",
    "reason": "非特徵讀取：正式 features 根之零寫入快照（只比路徑集合）"
   },
@@ -645,9 +951,18 @@
    "qualname": "export_task",
    "call": "features_dir.glob('*_filtered.h5')",
    "occurrence": 0,
-   "line": 172,
+   "line": 174,
    "class": "unrelated",
    "reason": "清除 redirect 根下 *_filtered.h5 匯出產物，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/api/test_feature_api.py",
+   "qualname": "_features_snapshot",
+   "call": "_REAL_FEATURES_DIR.iterdir()",
+   "occurrence": 0,
+   "line": 31,
+   "class": "unrelated",
+   "reason": "產品輸出根目錄頂層之 {檔名: (大小, mtime)} 快照，斷言測試未寫入真實目錄（佈局斷言），不讀特徵內容"
   },
   {
    "path": "tests/api/test_feature_factory_service_browse_summary.py",
@@ -663,7 +978,7 @@
    "qualname": "_py_sources",
    "call": "(REPO / root).rglob('*.py')",
    "occurrence": 0,
-   "line": 72,
+   "line": 79,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -672,7 +987,7 @@
    "qualname": "test_boundary_06_explicit_config_hash_missing_artifacts_message_unchanged",
    "call": "root.rglob('raw')",
    "occurrence": 0,
-   "line": 149,
+   "line": 156,
    "class": "unrelated",
    "reason": "定位 raw 目錄以刪除，不讀其內檔"
   },
@@ -681,7 +996,7 @@
    "qualname": "test_boundary_13_v1_and_dead_format_symbols_absent",
    "call": "(REPO / 'frontend' / 'src').rglob('*.ts*')",
    "occurrence": 0,
-   "line": 526,
+   "line": 533,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -765,6 +1080,51 @@
    "line": 155,
    "class": "unrelated",
    "reason": "斷言 tmp 下 pipeline JSON 產物有無，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/api/test_nocap_background_jobs.py",
+   "qualname": "test_every_write_is_atomic_via_os_replace",
+   "call": "tmp_path.iterdir()",
+   "occurrence": 0,
+   "line": 150,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/api/test_numview_ic_page.py",
+   "qualname": "report_files",
+   "call": "reports.rglob('*')",
+   "occurrence": 0,
+   "line": 201,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/api/test_numview_ic_page.py",
+   "qualname": "test_icpage_arm_locked_removed_arm_diffs_listed_in_receipt",
+   "call": "nh.RECEIPTS_DIR.glob(ICPAGE_ARM_LOCK_GLOB)",
+   "occurrence": 0,
+   "line": 922,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/api/test_numview_ic_page.py",
+   "qualname": "_postic_core_receipt",
+   "call": "nh.RECEIPTS_DIR.glob(POSTIC_CORE_RECEIPT_GLOB)",
+   "occurrence": 0,
+   "line": 1060,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/api/test_numview_ic_page.py",
+   "qualname": "_pandas_arm_callers_receipt",
+   "call": "nh.RECEIPTS_DIR.glob(PANDAS_ARM_CALLERS_GLOB)",
+   "occurrence": 0,
+   "line": 1096,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
   },
   {
    "path": "tests/api/test_scan_cube.py",
@@ -867,21 +1227,21 @@
   },
   {
    "path": "tests/feature_engineering/ff_truncation_mr_helpers.py",
-   "qualname": "_run_generation",
-   "call": "d_star_dir.glob(f'd_star_{symbol}_{primary_tf}_*.json')",
-   "occurrence": 0,
-   "line": 380,
-   "class": "unrelated",
-   "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
-  },
-  {
-   "path": "tests/feature_engineering/ff_truncation_mr_helpers.py",
    "qualname": "_iter_raw_parquet_frames",
    "call": "raw_dir.glob('*.parquet')",
    "occurrence": 0,
    "line": 394,
    "class": "feature_run",
    "reason": "glob raw/*.parquet（排除 timestamps.parquet）逐檔讀特徵 frame——以排除檔名代替 manifest 宣告"
+  },
+  {
+   "path": "tests/feature_engineering/ff_truncation_mr_helpers.py",
+   "qualname": "_run_generation",
+   "call": "d_star_dir.glob(f'd_star_{symbol}_{primary_tf}_*.json')",
+   "occurrence": 0,
+   "line": 522,
+   "class": "unrelated",
+   "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
   {
    "path": "tests/feature_engineering/ffstat_helpers.py",
@@ -891,15 +1251,6 @@
    "line": 66,
    "class": "feature_run",
    "reason": "rglob 全部 parquet 取首個輸出時間戳；紀錄檔會被當特徵讀"
-  },
-  {
-   "path": "tests/feature_engineering/ffstat_helpers.py",
-   "qualname": "snapshot_tree",
-   "call": "root.rglob('*')",
-   "occurrence": 0,
-   "line": 128,
-   "class": "unrelated",
-   "reason": "非特徵讀取：目錄零寫入快照（只比雜湊前後不變）"
   },
   {
    "path": "tests/feature_engineering/ffstat_helpers.py",
@@ -921,6 +1272,15 @@
   },
   {
    "path": "tests/feature_engineering/ffstat_helpers.py",
+   "qualname": "snapshot_tree",
+   "call": "root.rglob('*')",
+   "occurrence": 0,
+   "line": 311,
+   "class": "unrelated",
+   "reason": "非特徵讀取：目錄零寫入快照（只比雜湊前後不變）"
+  },
+  {
+   "path": "tests/feature_engineering/ffstat_helpers.py",
    "qualname": "base_fingerprints",
    "call": "root.rglob('*.parquet')",
    "occurrence": 0,
@@ -936,24 +1296,6 @@
    "line": 363,
    "class": "feature_run",
    "reason": "rglob 全部 parquet 取基準欄值；紀錄檔會被當特徵讀"
-  },
-  {
-   "path": "tests/feature_engineering/ffstat_helpers.py",
-   "qualname": "approved_base_columns",
-   "call": "rr.glob('*-ffstat-column-set-delta.json')",
-   "occurrence": 0,
-   "line": 412,
-   "class": "unrelated",
-   "reason": "列舉 handoffs/run_receipts 收據 JSON，非特徵 run 目錄"
-  },
-  {
-   "path": "tests/feature_engineering/ffstat_helpers.py",
-   "qualname": "approved_base_columns",
-   "call": "rr.glob('*-ffstat-column-set-approval.json')",
-   "occurrence": 0,
-   "line": 417,
-   "class": "unrelated",
-   "reason": "列舉 handoffs/run_receipts 收據 JSON，非特徵 run 目錄"
   },
   {
    "path": "tests/feature_engineering/ffstat_helpers.py",
@@ -983,11 +1325,29 @@
    "reason": "glob raw/*.parquet 列群組檔名並讀逐欄指紋（依檔名非 manifest 宣告）"
   },
   {
+   "path": "tests/feature_engineering/numview_helpers.py",
+   "qualname": "current_criteria_path",
+   "call": "GOLDEN_DIR.glob(CRITERIA_GLOB)",
+   "occurrence": 0,
+   "line": 65,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/numview_helpers.py",
+   "qualname": "seam_state_sha256",
+   "call": "REPO.glob(pattern)",
+   "occurrence": 0,
+   "line": 560,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
    "path": "tests/feature_engineering/preprov_helpers.py",
    "qualname": "declared_feature_files",
    "call": "art_dir.rglob('*.parquet')",
    "occurrence": 0,
-   "line": 570,
+   "line": 790,
    "class": "unrelated",
    "reason": "非特徵讀取：未宣告檔守衛，刻意列舉 artifact 目錄實體 parquet 以偵出 manifest 未宣告者"
   },
@@ -996,7 +1356,7 @@
    "qualname": "feature_run_dirs",
    "call": "root.rglob(MANIFEST_NAME)",
    "occurrence": 0,
-   "line": 692,
+   "line": 830,
    "class": "unrelated",
    "reason": "非特徵讀取：列舉 feature_manifest.json 定位 run 目錄，特徵檔再依各 manifest 宣告導出（declared_feature_files_of_run）"
   },
@@ -1005,7 +1365,7 @@
    "qualname": "snapshot_run",
    "call": "art.rglob('*')",
    "occurrence": 0,
-   "line": 809,
+   "line": 1061,
    "class": "unrelated",
    "reason": "非特徵讀取：位元組快照須含未宣告檔，只算 sha256 驗重跑失敗後之回復"
   },
@@ -1014,7 +1374,7 @@
    "qualname": "record_of",
    "call": "features_root.rglob('*.json')",
    "occurrence": 0,
-   "line": 392,
+   "line": 411,
    "class": "unrelated",
    "reason": "讀 features 根下 JSON（manifest 等）取鍵值，不列舉特徵檔"
   },
@@ -1041,7 +1401,7 @@
    "qualname": "_read_d_star_cache_dir",
    "call": "cache_dir.glob('d_star_*.json')",
    "occurrence": 0,
-   "line": 51,
+   "line": 85,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
@@ -1055,11 +1415,20 @@
    "reason": "glob raw/*.parquet 讀落盤欄名（依檔名非 manifest 宣告）"
   },
   {
+   "path": "tests/feature_engineering/test_failopen_correctness.py",
+   "qualname": "_cgsa_leaf_manifests",
+   "call": "work_dir.glob('*/*/manifest.json')",
+   "occurrence": 0,
+   "line": 1279,
+   "class": "unrelated",
+   "reason": "CGSA 覆寫根下 registry manifest.json 之定位（工作目錄，非特徵 run 目錄），不把所列檔當特徵讀取"
+  },
+  {
    "path": "tests/feature_engineering/test_failopen_matrix.py",
    "qualname": "test_matrix_cgsa_tf_failure_rollback_state",
    "call": "work_dir.glob('*1h*')",
    "occurrence": 0,
-   "line": 393,
+   "line": 404,
    "class": "unrelated",
    "reason": "斷言 CGSA 工作目錄無殘留，非特徵 run 目錄"
   },
@@ -1068,18 +1437,45 @@
    "qualname": "test_rollback",
    "call": "(tmp_path / 'cgsa_work').glob('*4h*.npy')",
    "occurrence": 0,
-   "line": 417,
+   "line": 436,
    "class": "unrelated",
    "reason": "斷言 CGSA 工作目錄無殘留 npy，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_failopen_small_scale.py",
+   "qualname": "test_cgsa_sharded_persisted_raw_equals_unsharded",
+   "call": "(tmp_path / 'plain' / 'features').rglob('*')",
+   "occurrence": 0,
+   "line": 102,
+   "class": "unrelated",
+   "reason": "只取檔名判定 shard 落盤檔有無（佈局斷言）；值比對經 _persisted_frame 讀取，不以所列檔當特徵"
+  },
+  {
+   "path": "tests/feature_engineering/test_failopen_small_scale.py",
+   "qualname": "test_cgsa_sharded_persisted_raw_equals_unsharded",
+   "call": "(tmp_path / 'shard' / 'features').rglob('*')",
+   "occurrence": 0,
+   "line": 106,
+   "class": "unrelated",
+   "reason": "只取檔名判定 shard 落盤檔有無（佈局斷言）；值比對經 _persisted_frame 讀取，不以所列檔當特徵"
   },
   {
    "path": "tests/feature_engineering/test_ff_cross_symbol_value_isolation.py",
    "qualname": "test_v5_slow_solo_a_equals_batch_b_then_a_artifacts",
    "call": "batch_dstar_dir.glob('*.json')",
    "occurrence": 0,
-   "line": 526,
+   "line": 580,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_ff_fullchain_truncation_mr.py",
+   "qualname": "_declare_raw_groups",
+   "call": "raw_dir.glob('*.parquet')",
+   "occurrence": 0,
+   "line": 209,
+   "class": "unrelated",
+   "reason": "合成 run 目錄之 manifest 建置：只列本測試剛寫入暫存目錄之 parquet 檔名以宣告群組，不讀特徵值"
   },
   {
    "path": "tests/feature_engineering/test_ffname_derived.py",
@@ -1104,16 +1500,61 @@
    "qualname": "test_ic_analysis_arbitrary_parquet_path_rejected_before_dataframe",
    "call": "manifest.parent.rglob('*.parquet')",
    "occurrence": 0,
-   "line": 448,
+   "line": 450,
    "class": "unrelated",
    "reason": "取 run 內任一 parquet 之位元組作非正規路徑檔；內容不作特徵讀取，拒讀依路徑判定"
+  },
+  {
+   "path": "tests/feature_engineering/test_ffprod_decisions.py",
+   "qualname": "_receipt",
+   "call": "RECEIPTS_DIR.glob('*-ffprod-candidates.json')",
+   "occurrence": 0,
+   "line": 24,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_ffprod_measure.py",
+   "qualname": "test_candidate_set_equals_inventory_measure_items",
+   "call": "fm.RECEIPTS_DIR.glob(fm.INVENTORY_GLOB)",
+   "occurrence": 0,
+   "line": 61,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_ffprod_measure.py",
+   "qualname": "test_plan_generation_count_and_freeze_estimate",
+   "call": "fm.RECEIPTS_DIR.glob(fm.FREEZE_RECEIPT_GLOB)",
+   "occurrence": 0,
+   "line": 79,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_ffprod_removal.py",
+   "qualname": "_inventory",
+   "call": "RECEIPTS_DIR.glob('*-ffprod-inventory.json')",
+   "occurrence": 0,
+   "line": 37,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_ffprod_removal.py",
+   "qualname": "_references",
+   "call": "base.rglob('*.py')",
+   "occurrence": 0,
+   "line": 56,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
   },
   {
    "path": "tests/feature_engineering/test_ffstat_calibration.py",
    "qualname": "test_boundary_07_calibration_domain_leaves_no_files",
    "call": "h.sys_tmp(tmp_path / 'on').glob(prefix + '*')",
    "occurrence": 0,
-   "line": 810,
+   "line": 805,
    "class": "unrelated",
    "reason": "斷言系統暫存／d* 快取目錄之檔集合，非特徵 run 目錄"
   },
@@ -1122,7 +1563,7 @@
    "qualname": "test_boundary_07b_calibration_temp_removed_on_exception",
    "call": "h.sys_tmp(tmp_path).glob(CONTRACT['calibration_tmp_prefix'] + '*')",
    "occurrence": 0,
-   "line": 819,
+   "line": 814,
    "class": "unrelated",
    "reason": "斷言系統暫存／d* 快取目錄之檔集合，非特徵 run 目錄"
   },
@@ -1131,7 +1572,7 @@
    "qualname": "test_boundary_12_n_change_misses_dstar_cache",
    "call": "dstar.iterdir()",
    "occurrence": 0,
-   "line": 989,
+   "line": 995,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
@@ -1140,7 +1581,7 @@
    "qualname": "test_boundary_12_n_change_misses_dstar_cache",
    "call": "dstar.iterdir()",
    "occurrence": 1,
-   "line": 993,
+   "line": 999,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
@@ -1158,7 +1599,7 @@
    "qualname": "_assert_search_failed_one",
    "call": "dstar_dir.glob('*.json')",
    "occurrence": 0,
-   "line": 52,
+   "line": 56,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
@@ -1167,7 +1608,7 @@
    "qualname": "warm_cache",
    "call": "dstar.glob('*.json')",
    "occurrence": 0,
-   "line": 126,
+   "line": 130,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
@@ -1176,7 +1617,7 @@
    "qualname": "test_boundary_14_cache_read_failure_event_and_search",
    "call": "warm_cache.glob('*.json')",
    "occurrence": 0,
-   "line": 145,
+   "line": 157,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
@@ -1185,7 +1626,7 @@
    "qualname": "test_boundary_14_cache_read_failure_event_and_search",
    "call": "dstar.glob('*.json')",
    "occurrence": 0,
-   "line": 147,
+   "line": 159,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄，非特徵 run 目錄"
   },
@@ -1194,7 +1635,7 @@
    "qualname": "test_cache_load_error_distinguished_from_missing",
    "call": "(tmp_path / 'b').glob('*.json')",
    "occurrence": 0,
-   "line": 197,
+   "line": 209,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄（tmp/b）以損毀之，非特徵 run 目錄"
   },
@@ -1203,7 +1644,7 @@
    "qualname": "test_cache_structural_damage_is_read_failure",
    "call": "tmp_path.glob('*.json')",
    "occurrence": 0,
-   "line": 348,
+   "line": 363,
    "class": "unrelated",
    "reason": "列舉 d* 快取 JSON 目錄（tmp）以損毀之，非特徵 run 目錄"
   },
@@ -1248,7 +1689,7 @@
    "qualname": "test_golden_receipt_change_report",
    "call": "(_REPO / 'handoffs' / 'run_receipts').glob('*-ffstat-golden.json')",
    "occurrence": 0,
-   "line": 405,
+   "line": 531,
    "class": "unrelated",
    "reason": "列舉 handoffs/run_receipts 收據 JSON，非特徵 run 目錄"
   },
@@ -1263,19 +1704,10 @@
   },
   {
    "path": "tests/feature_engineering/test_ffstat_stable_start.py",
-   "qualname": "test_nan_propagation_inventory_complete",
-   "call": "(REPO / 'handoffs' / 'run_receipts').glob('*-ffstat-nan-propagation-inventory.json')",
-   "occurrence": 0,
-   "line": 364,
-   "class": "unrelated",
-   "reason": "列舉 handoffs/run_receipts 收據 JSON，非特徵 run 目錄"
-  },
-  {
-   "path": "tests/feature_engineering/test_ffstat_stable_start.py",
    "qualname": "_step_source_files",
    "call": "(base / root).rglob('*.py')",
    "occurrence": 0,
-   "line": 453,
+   "line": 468,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -1290,28 +1722,10 @@
   },
   {
    "path": "tests/feature_engineering/test_ffstat_stable_start.py",
-   "qualname": "test_column_set_approval_matches_delta",
-   "call": "rr.glob('*-ffstat-column-set-delta.json')",
-   "occurrence": 0,
-   "line": 1273,
-   "class": "unrelated",
-   "reason": "列舉 handoffs/run_receipts 收據 JSON，非特徵 run 目錄"
-  },
-  {
-   "path": "tests/feature_engineering/test_ffstat_stable_start.py",
-   "qualname": "test_column_set_approval_matches_delta",
-   "call": "rr.glob('*-ffstat-column-set-approval.json')",
-   "occurrence": 0,
-   "line": 1279,
-   "class": "unrelated",
-   "reason": "列舉 handoffs/run_receipts 收據 JSON，非特徵 run 目錄"
-  },
-  {
-   "path": "tests/feature_engineering/test_ffstat_stable_start.py",
    "qualname": "test_warmup_trim_switch_removed",
    "call": "(REPO / root).rglob('*.py')",
    "occurrence": 0,
-   "line": 1356,
+   "line": 1370,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -1320,7 +1734,7 @@
    "qualname": "test_every_l1_output_column_passes_output_point_contract",
    "call": "(REPO / 'handoffs' / 'run_receipts').glob('*-ffstat-12h-output-points.json')",
    "occurrence": 0,
-   "line": 1385,
+   "line": 1399,
    "class": "unrelated",
    "reason": "列舉 handoffs/run_receipts 收據 JSON，非特徵 run 目錄"
   },
@@ -1383,7 +1797,7 @@
    "qualname": "test_boundary_10_residual_env_zero_still_generates_cgsa",
    "call": "root.rglob('feature_manifest.json')",
    "occurrence": 0,
-   "line": 226,
+   "line": 227,
    "class": "unrelated",
    "reason": "列舉 manifest 檔計數，不列舉特徵檔"
   },
@@ -1392,7 +1806,7 @@
    "qualname": "test_boundary_11_persist_false_runs_cgsa_and_writes_completeness",
    "call": "root.rglob('feature_manifest.json')",
    "occurrence": 0,
-   "line": 242,
+   "line": 243,
    "class": "unrelated",
    "reason": "斷言無 manifest 落盤，不列舉特徵檔"
   },
@@ -1401,7 +1815,7 @@
    "qualname": "_d16_runner_fixture",
    "call": "root.iterdir()",
    "occurrence": 0,
-   "line": 3241,
+   "line": 3447,
    "class": "unrelated",
    "reason": "測試閘之目錄狀態快照（替身），非特徵 run 目錄"
   },
@@ -1410,7 +1824,7 @@
    "qualname": "test_mutation_affected_gate_d16_runner_reuses_by_trace",
    "call": "root.iterdir()",
    "occurrence": 0,
-   "line": 3278,
+   "line": 3484,
    "class": "unrelated",
    "reason": "測試閘之目錄狀態快照（替身），非特徵 run 目錄"
   },
@@ -1419,7 +1833,7 @@
    "qualname": "test_cell_matches_frozen_baseline",
    "call": "legacy.iterdir()",
    "occurrence": 0,
-   "line": 202,
+   "line": 230,
    "class": "unrelated",
    "reason": "斷言受控 legacy 目錄為空，非特徵 run 目錄"
   },
@@ -1428,7 +1842,7 @@
    "qualname": "test_boundary_14_c9_legacy_dir_observed_in_process",
    "call": "legacy.iterdir()",
    "occurrence": 0,
-   "line": 377,
+   "line": 420,
    "class": "unrelated",
    "reason": "斷言受控 legacy 目錄為空，非特徵 run 目錄"
   },
@@ -1437,7 +1851,7 @@
    "qualname": "test_feature_run_dir_and_manifest_atomicity",
    "call": "run_dir.glob('.tmp-*')",
    "occurrence": 0,
-   "line": 297,
+   "line": 303,
    "class": "unrelated",
    "reason": "非特徵讀取：斷言 run 目錄無 .tmp-* 暫存殘留（原子性）"
   },
@@ -1446,7 +1860,7 @@
    "qualname": "test_feature_run_dir_and_manifest_atomicity",
    "call": "run_dir.glob('.previous-*')",
    "occurrence": 0,
-   "line": 298,
+   "line": 304,
    "class": "unrelated",
    "reason": "非特徵讀取：斷言 run 目錄無 .previous-* 備份殘留（原子性）"
   },
@@ -1455,7 +1869,7 @@
    "qualname": "test_boundary_04_disk_precheck_insufficient_raises_named",
    "call": "tmp_root.iterdir()",
    "occurrence": 0,
-   "line": 346,
+   "line": 344,
    "class": "unrelated",
    "reason": "斷言校準暫存／前置租約目錄之殘留，非特徵 run 目錄"
   },
@@ -1464,7 +1878,7 @@
    "qualname": "_tree",
    "call": "root.rglob('*')",
    "occurrence": 0,
-   "line": 485,
+   "line": 483,
    "class": "unrelated",
    "reason": "斷言校準暫存／前置租約目錄之殘留，非特徵 run 目錄"
   },
@@ -1473,7 +1887,7 @@
    "qualname": "test_calibration_gate_runs_under_single_guard_and_mapping_root",
    "call": "base.glob(f'{mb.PRE_LEASE_SCOPE_PREFIX}*')",
    "occurrence": 0,
-   "line": 553,
+   "line": 551,
    "class": "unrelated",
    "reason": "斷言校準暫存／前置租約目錄之殘留，非特徵 run 目錄"
   },
@@ -1482,7 +1896,7 @@
    "qualname": "test_pre_lease_scope_owner_known_from_creation",
    "call": "base.glob(f'{mb.PRE_LEASE_SCOPE_PREFIX}*')",
    "occurrence": 0,
-   "line": 648,
+   "line": 646,
    "class": "unrelated",
    "reason": "斷言校準暫存／前置租約目錄之殘留，非特徵 run 目錄"
   },
@@ -1509,7 +1923,7 @@
    "qualname": "_momentum_sources",
    "call": "(h.REPO / 'momentum').rglob('*.py')",
    "occurrence": 0,
-   "line": 888,
+   "line": 936,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -1518,7 +1932,7 @@
    "qualname": "_stdlib_module_names",
    "call": "stdlib.iterdir()",
    "occurrence": 0,
-   "line": 1257,
+   "line": 1305,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -1527,7 +1941,7 @@
    "qualname": "_stdlib_module_names",
    "call": "dynload.iterdir()",
    "occurrence": 0,
-   "line": 1266,
+   "line": 1314,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -1536,7 +1950,7 @@
    "qualname": "test_probe_stop_loss_keeps_partial_series",
    "call": "tmp_path.rglob(C['guard_files']['abort_receipt'])",
    "occurrence": 0,
-   "line": 1485,
+   "line": 1532,
    "class": "unrelated",
    "reason": "斷言校準暫存／守護收據殘留，非特徵 run 目錄"
   },
@@ -1545,7 +1959,7 @@
    "qualname": "test_raw_streaming_sharded_source_writes_per_shard_part_and_frees",
    "call": "raw_dir.glob('big_group*.parquet')",
    "occurrence": 0,
-   "line": 551,
+   "line": 552,
    "class": "unrelated",
    "reason": "非特徵讀取：斷言寫入端實體分片檔數（落盤佈局）"
   },
@@ -1577,11 +1991,308 @@
    "reason": "glob raw/passthrough_g*.parquet 讀值比對（依檔名非 manifest 宣告）"
   },
   {
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "qualname": "load_receipt",
+   "call": "nh.RECEIPTS_DIR.glob(f'*-numview-{kind}.json')",
+   "occurrence": 0,
+   "line": 155,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "qualname": "test_precision_formal_readiness_rejects_wrong_cell_and_bad_seconds",
+   "call": "nh.RECEIPTS_DIR.glob('*-numview-estimate.json')",
+   "occurrence": 0,
+   "line": 2358,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "qualname": "test_precision_formal_readiness_addenda_type_and_binding",
+   "call": "nh.RECEIPTS_DIR.glob('*-numview-estimate.json')",
+   "occurrence": 0,
+   "line": 2471,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "qualname": "test_postic_core_receipt_mutations",
+   "call": "nh.RECEIPTS_DIR.glob(f'*-numview-{POSTIC_CORE_KIND}.json')",
+   "occurrence": 0,
+   "line": 3224,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "qualname": "test_boundary_59_postic_core_memory_failure_is_no_choice",
+   "call": "nh.RECEIPTS_DIR.glob(f'*-numview-{POSTIC_CORE_KIND}.json')",
+   "occurrence": 0,
+   "line": 3283,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "qualname": "test_boundary_60_postic_core_ratio_unsafe_dropped_counted",
+   "call": "(work / 'features' / side['symbol'] / side['primary_tf']).glob('*/feature_manifest.json')",
+   "occurrence": 0,
+   "line": 3298,
+   "class": "unrelated",
+   "reason": "manifest 定位：只尋找 feature_manifest.json 以取得 run 目錄／config_hash，不把所列檔當特徵讀取（_doc：manifest 定位）"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_acceptance.py",
+   "qualname": "test_boundary_60_postic_core_ratio_unsafe_dropped_counted",
+   "call": "nh.RECEIPTS_DIR.glob(f'*-numview-{POSTIC_CORE_KIND}.json')",
+   "occurrence": 0,
+   "line": 3337,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_baseline.py",
+   "qualname": "_single",
+   "call": "nh.RECEIPTS_DIR.glob(glob)",
+   "occurrence": 0,
+   "line": 106,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_baseline.py",
+   "qualname": "freeze_receipt_criteria_sha256",
+   "call": "nh.RECEIPTS_DIR.glob(FREEZE_RECEIPT_GLOB)",
+   "occurrence": 0,
+   "line": 139,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_cgsa_workdir.py",
+   "qualname": "snapshot",
+   "call": "Path(directory).rglob('*')",
+   "occurrence": 0,
+   "line": 161,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_cgsa_workdir.py",
+   "qualname": "stale_dirs",
+   "call": "Path(leaf).parent.iterdir()",
+   "occurrence": 0,
+   "line": 165,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_cgsa_workdir.py",
+   "qualname": "test_cgsa_delete_run_removes_whole_config_layer",
+   "call": "Path(layer).iterdir()",
+   "occurrence": 0,
+   "line": 487,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_core.py",
+   "qualname": "test_boundary_35_core_always_l2_polars_failure_fallback_consistent",
+   "call": "Path(tmp_path).rglob('feature_manifest.json')",
+   "occurrence": 0,
+   "line": 2189,
+   "class": "unrelated",
+   "reason": "manifest 定位：只尋找 feature_manifest.json 以取得 run 目錄／config_hash，不把所列檔當特徵讀取（_doc：manifest 定位）"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "<module>",
+   "call": "nh.GOLDEN_DIR.glob('preregistered_criteria*.json')",
+   "occurrence": 0,
+   "line": 94,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_criteria_path",
+   "call": "nh.GOLDEN_DIR.glob(CRITERIA_GLOB)",
+   "occurrence": 0,
+   "line": 225,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_receipt_paths",
+   "call": "nh.RECEIPTS_DIR.glob(RECEIPT_GLOB)",
+   "occurrence": 0,
+   "line": 266,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_criteria_name_paths",
+   "call": "nh.GOLDEN_DIR.glob(CRITERIA_GLOB)",
+   "occurrence": 0,
+   "line": 472,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "recompute_trigger",
+   "call": "nh.RECEIPTS_DIR.glob(f'*-numview-{slug}.json')",
+   "occurrence": 0,
+   "line": 633,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_estimate_receipt_path",
+   "call": "nh.RECEIPTS_DIR.glob(GATE.ESTIMATE_RECEIPT_GLOB)",
+   "occurrence": 0,
+   "line": 817,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "gate_call_violations",
+   "call": "PROBES_DIR.glob('*.py')",
+   "occurrence": 0,
+   "line": 1182,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "test_result_identity_binds_seam_and_freeze_groups",
+   "call": "REPO.glob(pattern)",
+   "occurrence": 0,
+   "line": 1530,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_product_sources",
+   "call": "(REPO / root).rglob('*.py')",
+   "occurrence": 0,
+   "line": 2045,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "test_boundary_08_estimate_low_disk_rc1_lists_required_space",
+   "call": "nh.RECEIPTS_DIR.glob(GATE.ESTIMATE_RECEIPT_GLOB)",
+   "occurrence": 0,
+   "line": 2203,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "test_boundary_08_estimate_low_disk_rc1_lists_required_space",
+   "call": "nh.RECEIPTS_DIR.glob(GATE.ESTIMATE_RECEIPT_GLOB)",
+   "occurrence": 1,
+   "line": 2210,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_present_criteria_files",
+   "call": "nh.GOLDEN_DIR.glob(CRITERIA_GLOB)",
+   "occurrence": 0,
+   "line": 2868,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "test_boundary_05_vn_replacement_rule",
+   "call": "nh.GOLDEN_DIR.glob(CRITERIA_GLOB)",
+   "occurrence": 0,
+   "line": 3245,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "test_estimate_stalled_target_fails_fast_without_receipt",
+   "call": "receipts.glob('*-numview-estimate.json')",
+   "occurrence": 0,
+   "line": 3944,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_postic_core_receipt",
+   "call": "nh.RECEIPTS_DIR.glob('*-numview-postic-core-select.json')",
+   "occurrence": 0,
+   "line": 4250,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_criteria.py",
+   "qualname": "_condition_holds",
+   "call": "nh.RECEIPTS_DIR.glob(f\"*-numview-{str(trigger['receipt']).replace('_', '-')}.json\")",
+   "occurrence": 0,
+   "line": 4297,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_identity.py",
+   "qualname": "_files",
+   "call": "Path(root).rglob('*')",
+   "occurrence": 0,
+   "line": 295,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_identity.py",
+   "qualname": "_stale_dirs",
+   "call": "Path(leaf).parent.iterdir()",
+   "occurrence": 0,
+   "line": 962,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_identity.py",
+   "qualname": "_single_leaf",
+   "call": "layer.iterdir()",
+   "occurrence": 0,
+   "line": 1375,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/feature_engineering/test_numview_policy.py",
+   "qualname": "_winsor_inventory",
+   "call": "nh.RECEIPTS_DIR.glob(WINSOR_INVENTORY_GLOB)",
+   "occurrence": 0,
+   "line": 329,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
    "path": "tests/feature_engineering/test_preprov_helpers.py",
    "qualname": "test_verification_01_declared_listing_matches_artifact_files_on_clean_run",
    "call": "(handle.run_dir / 'raw').glob('*.parquet')",
    "occurrence": 0,
-   "line": 218,
+   "line": 249,
    "class": "unrelated",
    "reason": "非特徵讀取：oracle 比對宣告群組檔集合與實體 parquet 集合，須看實體檔"
   },
@@ -1590,7 +2301,7 @@
    "qualname": "test_boundary_03_multi_tf_groups",
    "call": "(handle.run_dir / 'raw').glob('*.parquet')",
    "occurrence": 0,
-   "line": 303,
+   "line": 342,
    "class": "unrelated",
    "reason": "非特徵讀取：oracle 比對宣告群組檔集合與實體 parquet 集合，須看實體檔"
   },
@@ -1599,7 +2310,7 @@
    "qualname": "test_mutation_rglob_listing_accepts_undeclared_parquet.rglob_listing",
    "call": "Path(run_dir).rglob('*.parquet')",
    "occurrence": 0,
-   "line": 315,
+   "line": 354,
    "class": "unrelated",
    "reason": "非特徵讀取：mutation 刻意之改壞讀法（rglob 列舉），驗 oracle 轉紅"
   },
@@ -1635,7 +2346,7 @@
    "qualname": "test_boundary_10e_isolated_links_only_tracked_config",
    "call": "(work / 'config').iterdir()",
    "occurrence": 0,
-   "line": 424,
+   "line": 452,
    "class": "unrelated",
    "reason": "列舉隔離 config 目錄之連結，非特徵 run 目錄"
   },
@@ -1644,7 +2355,7 @@
    "qualname": "test_registry_corrupt_fails_closed",
    "call": "tmp_path.glob('registry.json.corrupt-*')",
    "occurrence": 0,
-   "line": 155,
+   "line": 169,
    "class": "unrelated",
    "reason": "斷言損毀 registry 之隔離檔，非特徵 run 目錄"
   },
@@ -1656,6 +2367,15 @@
    "line": 44,
    "class": "feature_run",
    "reason": "glob raw/*.parquet 讀值作特徵指紋（依檔名非 manifest 宣告）"
+  },
+  {
+   "path": "tests/fixtures/hermetic_guard_plugin.py",
+   "qualname": "_walk",
+   "call": "os.scandir(base)",
+   "occurrence": 0,
+   "line": 62,
+   "class": "unrelated",
+   "reason": "測試隔離外掛：session 前後快照 data_cache 全樹以偵測測試寫入（只比對檔案中繼資料），非讀取特徵 run"
   },
   {
    "path": "tests/fixtures/ic_persist_redirect.py",
@@ -1716,7 +2436,7 @@
    "qualname": "_resolve_la0_feature_inputs",
    "call": "LA0_INPUTS_DIR.glob(run['la0_h5_glob'])",
    "occurrence": 0,
-   "line": 437,
+   "line": 477,
    "class": "unrelated",
    "reason": "列舉 IC golden 輸入（h5／暫存 inputs），非特徵 run 目錄"
   },
@@ -1734,7 +2454,7 @@
    "qualname": "snapshot_tree",
    "call": "os.walk(root, followlinks=True)",
    "occurrence": 0,
-   "line": 201,
+   "line": 239,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -1743,7 +2463,7 @@
    "qualname": "_shared_external_dirs.externals",
    "call": "os.walk(root)",
    "occurrence": 0,
-   "line": 309,
+   "line": 347,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -1851,9 +2571,18 @@
    "qualname": "test_coupling_map_covers_every_bash_source_line",
    "call": "(REPO / 'tests' / 'governance').glob('test_*.py')",
    "occurrence": 0,
-   "line": 156,
+   "line": 193,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/governance/test_gate_outline_first.py",
+   "qualname": "test_hook_ignores_existing_manifest_edit_path",
+   "call": "(REPO / 'docs' / 'manifests').glob('*.json')",
+   "occurrence": 0,
+   "line": 260,
+   "class": "unrelated",
+   "reason": "治理閘測試列舉 docs/manifests 之 TODO manifest JSON，非特徵 run 目錄"
   },
   {
    "path": "tests/governance/test_gate_structured_verdict.py",
@@ -1914,7 +2643,7 @@
    "qualname": "test_wl02_live_criteria_oracle_tests_exist",
    "call": "(REPO / 'tests' / 'governance').glob('*.py')",
    "occurrence": 0,
-   "line": 1685,
+   "line": 1700,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -1923,7 +2652,7 @@
    "qualname": "test_wl03_live_mechanism_oracle_tests_exist",
    "call": "(REPO / 'tests' / 'governance').glob('*.py')",
    "occurrence": 0,
-   "line": 2261,
+   "line": 2276,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -1947,19 +2676,37 @@
   },
   {
    "path": "tests/governance/test_govb1_findings_kind.py",
-   "qualname": "test_sample_is_not_filename_ordered",
-   "call": "Path(REPO_ROOT / 'handoffs').glob('*.md')",
+   "qualname": "real_sample_corpus",
+   "call": "(REPO_ROOT / 'handoffs').glob('*.md')",
    "occurrence": 0,
-   "line": 383,
+   "line": 369,
    "class": "unrelated",
-   "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
+   "reason": "治理文件語料（handoffs/*.md）之抽樣，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/governance/test_govb1_findings_kind.py",
+   "qualname": "test_sample_is_not_filename_ordered",
+   "call": "real_sample_corpus.glob('*.md')",
+   "occurrence": 0,
+   "line": 403,
+   "class": "unrelated",
+   "reason": "治理文件語料（handoffs/*.md）之抽樣，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/governance/test_govb1_findings_kind.py",
+   "qualname": "test_sample_is_not_filename_ordered",
+   "call": "real_sample_corpus.glob('*.md')",
+   "occurrence": 1,
+   "line": 405,
+   "class": "unrelated",
+   "reason": "治理文件語料（handoffs/*.md）之抽樣，非特徵 run 目錄"
   },
   {
    "path": "tests/governance/test_govb1_findings_kind.py",
    "qualname": "test_classifier_has_no_caller_yet",
    "call": "(REPO_ROOT / 'scripts').rglob('*')",
    "occurrence": 0,
-   "line": 451,
+   "line": 473,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -1968,7 +2715,7 @@
    "qualname": "test_classifier_has_no_caller_yet",
    "call": "hooks.rglob('*')",
    "occurrence": 0,
-   "line": 454,
+   "line": 476,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -2045,11 +2792,20 @@
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
   {
+   "path": "tests/governance/test_readtrace_plugin.py",
+   "qualname": "test_out_pid_placeholder_one_file_per_process",
+   "call": "tmp_path.glob('rt_*.jsonl')",
+   "occurrence": 0,
+   "line": 69,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
    "path": "tests/governance/test_redispatch.py",
    "qualname": "test_lease_non_uuid_round_id_ok",
    "call": "repo.audit.parent.glob('redispatch.lease.*')",
    "occurrence": 0,
-   "line": 1376,
+   "line": 1406,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -2058,7 +2814,7 @@
    "qualname": "test_lease_skipped_when_helper_absent",
    "call": "repo.audit.parent.glob('redispatch.lease.*')",
    "occurrence": 0,
-   "line": 1430,
+   "line": 1460,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -2135,11 +2891,65 @@
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
   {
+   "path": "tests/hermetic/_harness.py",
+   "qualname": "files_under",
+   "call": "root.rglob('*')",
+   "occurrence": 0,
+   "line": 71,
+   "class": "unrelated",
+   "reason": "隔離測試輔助：列舉暫存根下全部檔以比對寫入前後，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/hermetic/test_golden_not_rewritten.py",
+   "qualname": "_sha_tree",
+   "call": "root.rglob('*')",
+   "occurrence": 0,
+   "line": 36,
+   "class": "unrelated",
+   "reason": "golden 目錄雜湊／還原與 la0 golden 輸入 h5 列舉（驗證測試不改寫入庫 golden），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/hermetic/test_golden_not_rewritten.py",
+   "qualname": "_GoldenRestore.__init__",
+   "call": "GOLDEN.rglob('*')",
+   "occurrence": 0,
+   "line": 43,
+   "class": "unrelated",
+   "reason": "golden 目錄雜湊／還原與 la0 golden 輸入 h5 列舉（驗證測試不改寫入庫 golden），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/hermetic/test_golden_not_rewritten.py",
+   "qualname": "test_accept_03_materialize_short_features_explicit_dir_writes_only_there",
+   "call": "gb.LA0_INPUTS_DIR.glob(run['la0_h5_glob'])",
+   "occurrence": 0,
+   "line": 84,
+   "class": "unrelated",
+   "reason": "golden 目錄雜湊／還原與 la0 golden 輸入 h5 列舉（驗證測試不改寫入庫 golden），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/hermetic/test_golden_not_rewritten.py",
+   "qualname": "test_boundary_01_official_regen_default_still_writes_inputs_dir",
+   "call": "gb.LA0_INPUTS_DIR.glob(run['la0_h5_glob'])",
+   "occurrence": 0,
+   "line": 101,
+   "class": "unrelated",
+   "reason": "golden 目錄雜湊／還原與 la0 golden 輸入 h5 列舉（驗證測試不改寫入庫 golden），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/hermetic/test_golden_not_rewritten.py",
+   "qualname": "test_mutation_default_dir_rewrites_inputs",
+   "call": "gb.LA0_INPUTS_DIR.glob(run['la0_h5_glob'])",
+   "occurrence": 0,
+   "line": 127,
+   "class": "unrelated",
+   "reason": "golden 目錄雜湊／還原與 la0 golden 輸入 h5 列舉（驗證測試不改寫入庫 golden），非特徵 run 目錄"
+  },
+  {
    "path": "tests/momentum/Analysis/test_gap2_stage6b_wiring.py",
    "qualname": "test_missing_symbol_identity_missing",
    "call": "out_dir.glob('ic_survivors_*.json')",
    "occurrence": 0,
-   "line": 229,
+   "line": 245,
    "class": "unrelated",
    "reason": "斷言倖存者 JSON 未寫出，非特徵 run 目錄"
   },
@@ -2171,11 +2981,20 @@
    "reason": "斷言倖存者 JSON 產物／暫存，非特徵 run 目錄"
   },
   {
+   "path": "tests/momentum/Analysis/test_ic1d_baseline.py",
+   "qualname": "test_ic1d_freeze_rejects_partial_nonfinite_close_before_write",
+   "call": "tmp_path.iterdir()",
+   "occurrence": 0,
+   "line": 646,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
    "path": "tests/momentum/Analysis/test_ic_artifact.py",
    "qualname": "test_artifact_atomic",
    "call": "tmp_path.glob('*.tmp')",
    "occurrence": 0,
-   "line": 175,
+   "line": 194,
    "class": "unrelated",
    "reason": "斷言 IC artifact 原子寫無 .tmp 殘留，非特徵 run 目錄"
   },
@@ -2184,9 +3003,126 @@
    "qualname": "test_sixteen_caller_inventory_is_complete",
    "call": "Path('tests').rglob('*.py')",
    "occurrence": 0,
-   "line": 99,
+   "line": 120,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_correctness.py",
+   "qualname": "_single",
+   "call": "REPO.glob(pattern)",
+   "occurrence": 0,
+   "line": 221,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_data_warning_codes.py",
+   "qualname": "test_boundary_03_all_product_codes_registered",
+   "call": "(REPO / 'momentum').rglob('*.py')",
+   "occurrence": 0,
+   "line": 77,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "qualname": "_single",
+   "call": "REPO.glob(pattern)",
+   "occurrence": 0,
+   "line": 232,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "qualname": "_oracle_walk",
+   "call": "os.walk(root)",
+   "occurrence": 0,
+   "line": 265,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "qualname": "test_golden_gzip_deterministic_roundtrip",
+   "call": "tmp_path.glob('*.tmp')",
+   "occurrence": 0,
+   "line": 1383,
+   "class": "unrelated",
+   "reason": "暫存／工作目錄之佈局、殘留或位元組快照斷言（tmp_path、CGSA 工作目錄層、隔離根），不把所列檔當特徵讀取"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "qualname": "test_no_raw_icir_default_sort",
+   "call": "(REPO / base).rglob('*.py')",
+   "occurrence": 0,
+   "line": 1596,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "qualname": "test_no_raw_icir_default_sort",
+   "call": "(REPO / 'frontend' / 'src').rglob('*.ts*')",
+   "occurrence": 0,
+   "line": 1599,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "qualname": "_pit_callers",
+   "call": "(REPO / 'momentum').rglob('*.py')",
+   "occurrence": 0,
+   "line": 1815,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_gate.py",
+   "qualname": "test_task02_v557_optimized_core_not_measured",
+   "call": "(REPO / root).rglob('*.py')",
+   "occurrence": 0,
+   "line": 4681,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py",
+   "qualname": "_pytest_declared",
+   "call": "d.glob('test_icperf_limit_l1*.py')",
+   "occurrence": 0,
+   "line": 51,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py",
+   "qualname": "_vitest_declared",
+   "call": "(REPO / 'frontend' / 'src').rglob('*.limits.test.tsx')",
+   "occurrence": 0,
+   "line": 59,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_study_receipts_fresh.py",
+   "qualname": "latest_receipt",
+   "call": "Path(receipts_dir if receipts_dir is not None else RECEIPTS).glob(pattern)",
+   "occurrence": 0,
+   "line": 46,
+   "class": "unrelated",
+   "reason": "收據／判準檔／凍結檔／探針記錄之定位與讀取（handoffs/run_receipts、tests/_golden、.testsel 等），非特徵 run 目錄"
+  },
+  {
+   "path": "tests/momentum/Analysis/test_icperf_ui_toggles.py",
+   "qualname": "test_ic_autocorrelation_is_reported_in_summary",
+   "call": "(REPO / 'momentum').rglob('*.py')",
+   "occurrence": 0,
+   "line": 339,
+   "class": "unrelated",
+   "reason": "原始碼掃描（.py／.ts 盤點、靜態檢查、引用清查），非特徵 run 目錄"
   },
   {
    "path": "tests/momentum/Analysis/test_splitunify_canonical_holdout.py",
@@ -2247,7 +3183,7 @@
    "qualname": "test_t25_ghost_significance_filter_absent_in_tree",
    "call": "(root / 'momentum').rglob('*.py')",
    "occurrence": 0,
-   "line": 900,
+   "line": 975,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -2256,7 +3192,7 @@
    "qualname": "test_t25_ghost_significance_filter_absent_in_tree",
    "call": "(root / 'tests').rglob('*.py')",
    "occurrence": 0,
-   "line": 900,
+   "line": 975,
    "class": "unrelated",
    "reason": "列舉原始碼／設定檔作靜態檢查，非特徵 run 目錄"
   },
@@ -2265,7 +3201,7 @@
    "qualname": "test_la1_replay_does_not_parse_names",
    "call": "LA1_INPUTS.glob('BTCUSDT_1h_*_strat_*_tail2000.h5')",
    "occurrence": 0,
-   "line": 86,
+   "line": 89,
    "class": "unrelated",
    "reason": "列舉 IC golden 輸入（h5／暫存 inputs），非特徵 run 目錄"
   },
@@ -2274,7 +3210,7 @@
    "qualname": "_find_fallback_inputs",
    "call": "inputs_dir.glob('BTCUSDT_*_fallback_tail100.h5')",
    "occurrence": 0,
-   "line": 1229,
+   "line": 1237,
    "class": "unrelated",
    "reason": "列舉 IC golden 輸入（h5／暫存 inputs），非特徵 run 目錄"
   },
@@ -2283,7 +3219,7 @@
    "qualname": "_find_ok_inputs",
    "call": "inputs_dir.glob('BTCUSDT_*_tail2000.h5')",
    "occurrence": 0,
-   "line": 1246,
+   "line": 1254,
    "class": "unrelated",
    "reason": "列舉 IC golden 輸入（h5／暫存 inputs），非特徵 run 目錄"
   },
@@ -2292,7 +3228,7 @@
    "qualname": "_pick_symbols",
    "call": "data_cache_dir.glob('*_12h.h5')",
    "occurrence": 0,
-   "line": 42,
+   "line": 43,
    "class": "unrelated",
    "reason": "列舉 data_cache 下 kline h5 選標的，非特徵 run 目錄"
   },
@@ -2337,7 +3273,7 @@
    "qualname": "test_mutation_markers_ignores_list_form.decorators_only",
    "call": "(repo_root / 'tests').rglob('test_*.py')",
    "occurrence": 0,
-   "line": 131,
+   "line": 123,
    "class": "unrelated",
    "reason": "治理／測試登記／閘門工具之檔（ledger、token、收據、hook、腳本原始碼、暫存），非特徵 run 目錄"
   },
@@ -2418,7 +3354,7 @@
    "qualname": "test_t2b5_disk_full_raises_ioerror_and_cleans_staging",
    "call": "output_dir.glob('*.parquet')",
    "occurrence": 0,
-   "line": 282,
+   "line": 285,
    "class": "unrelated",
    "reason": "非特徵讀取：斷言寫入失敗後無 parquet 殘留"
   },
@@ -2427,7 +3363,7 @@
    "qualname": "test_t2b5_disk_full_raises_ioerror_and_cleans_staging",
    "call": "output_dir.iterdir()",
    "occurrence": 0,
-   "line": 285,
+   "line": 288,
    "class": "unrelated",
    "reason": "非特徵讀取：斷言寫入失敗後無 .tmp-raw- 暫存殘留"
   },
@@ -2445,7 +3381,7 @@
    "qualname": "TestT5B3DiskFullMidPersist.test_staging_cleanup_on_error",
    "call": "run_dir.iterdir()",
    "occurrence": 0,
-   "line": 627,
+   "line": 628,
    "class": "unrelated",
    "reason": "非特徵讀取：斷言 run 目錄無 .tmp-raw- 暫存殘留"
   }

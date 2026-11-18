@@ -1,6 +1,6 @@
 """FFDSTAR Task 3.1（docs/FFDSTAR_SPEC.md §V oracle ①–⑥）：真實 kline 全格之整合驗收。
 
-格子＝`preprov_helpers.CELLS`（逐格單行程串行、同模組同格只生成一次）。oracle 皆不讀紀錄自證：
+格子＝`preprov_helpers.CELLS`（逐格單行程串行、同行程同格只生成一次，`ph.shared_run_cache`）。oracle 皆不讀紀錄自證：
 ① 窮盡性（manifest 群組欄聯集 ∪ 觀測器記錄之 L7 dead-drop 欄）；② `d` 以 `FeaturePreprocessor._frac_diff_ffd` 對觀測器
 記錄之 fracdiff 輸入（同校準前史＋公開段之 L6.5 列）重算、依落盤 dtype 逐位元比；③ `applied` 之欄以
 `independent_winsorize` 同參數重算、`ratio_unsafe` 終態之欄等於 L6.5 前值、縮尾不執行之格無 `applied`；
@@ -38,7 +38,7 @@ _PRE_WINDOW_BAR = "2025-12-31 12:00:00"  # 輸出窗（WINDOW）前之一根 1h�
 
 @pytest.fixture(scope="module")
 def runs(tmp_path_factory: pytest.TempPathFactory) -> ph.RunCache:
-    return ph.RunCache(tmp_path_factory.mktemp("preprov_acceptance"))
+    return ph.shared_run_cache(tmp_path_factory)  # TESTSEL I10：session 共用倉（同格每行程只生成一次）
 
 
 def _kinds(handle: ph.RunHandle) -> List[str]:
@@ -126,6 +126,7 @@ def winsor_violations(handle: ph.RunHandle, table: pd.DataFrame = None) -> Tuple
     if replaced and str(pre.mode) != "replace":
         out.append(f"非 replace 模式而輸入欄被平穩化步驟就地改值：{sorted(replaced)[:3]}")
     n_applied = n_unsafe = 0
+    to_recompute: List[str] = []
     for name in sorted(table.index[is_applied]):
         if table.loc[name, "native_timeframe"] != handle.tf or name in obs.l7_dropped or name in replaced:
             continue
@@ -141,15 +142,20 @@ def winsor_violations(handle: ph.RunHandle, table: pd.DataFrame = None) -> Tuple
         if name not in inputs:
             out.append(f"{name}: applied 但非 L6.5 輸入")
             continue
-        values, dtype = ph.stored_columns(handle.run_dir, [name])[name]
+        to_recompute.append(name)
+    unsafe_names = [name for name in sorted(table.index[table["terminal"] == ratio_unsafe])
+                    if name in inputs and name not in obs.l7_dropped]
+    # TESTSEL I10：落盤值一次批讀（原逐欄呼叫 `stored_columns`，每次重讀全部群組檔 schema ⇒ 欄數×檔數次 I/O）；
+    # 批讀缺欄 ⇒ KeyError（同原逐欄取 `[name]` 之語意，不靜默略過）
+    stored = ph.stored_columns(handle.run_dir, to_recompute + unsafe_names)
+    for name in to_recompute:
+        values, dtype = stored[name]
         expected = ph.independent_winsorize(inputs[name][0], pre.winsor_config, pre._rolling_window())
         if not ph.bitwise_equal(ph.as_stored(ph.apply_row_slice(expected, obs), dtype), values):
             out.append(f"{name}: applied 之欄獨立縮尾重算不等於落盤")
         n_applied += 1
-    for name in sorted(table.index[table["terminal"] == ratio_unsafe]):
-        if name not in inputs or name in obs.l7_dropped:
-            continue
-        values, dtype = ph.stored_columns(handle.run_dir, [name])[name]
+    for name in unsafe_names:
+        values, dtype = stored[name]
         if not ph.bitwise_equal(ph.as_stored(ph.apply_row_slice(inputs[name][0], obs), dtype), values):
             out.append(f"{name}: ratio_unsafe 終態之落盤值 ≠ L6.5 前值")
         n_unsafe += 1
@@ -294,7 +300,9 @@ def test_mutation_d_written_fixed(tmp_path_factory: pytest.TempPathFactory, monk
 
 def test_mutation_winsor_success_record_removed(tmp_path_factory: pytest.TempPathFactory,
                                                 monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutation：刪縮尾成功紀錄（applied 改記為其他值）⇒ ③ 轉紅。"""
+    """mutation：刪縮尾成功紀錄（applied 改記為其他值）⇒ 兩層各自轉紅：生產端寫入前縮尾一致性檢查
+    （`run_provenance.write_provenance_table` → `winsor_table_errors`，FFPROD Task 1.2／d4d97d62）於生成時拋
+    `ProvenanceError`（非窮盡性等子類）；將該檢查換為無作用後，測試端 oracle ③ 獨立轉紅（證 oracle 不依賴生產端自檢）。"""
     spec = ph.contract()
     applied = ph.spec_named("winsor_applied", spec)
     other = next(v for v in ph.contract_values("step_status_values.winsorization", spec) if v != applied)
@@ -305,8 +313,12 @@ def test_mutation_winsor_success_record_removed(tmp_path_factory: pytest.TempPat
         return table
 
     monkeypatch.setattr(rp, "build_provenance_table", _mutant_table(drop_applied))
+    with pytest.raises(rp.ProvenanceError, match="縮尾有效設定與縮尾狀態不一致") as guard:
+        ph.generate_short_run(tmp_path_factory.mktemp("preprov_mut_w_guard"), "h1_stat_off")
+    assert type(guard.value) is rp.ProvenanceError, type(guard.value)
+    monkeypatch.setattr(rp, "winsor_table_errors", lambda *args, **kwargs: [])
     handle = ph.generate_short_run(tmp_path_factory.mktemp("preprov_mut_w"), "h1_stat_off")
-    assert winsor_violations(handle)[0] != []
+    assert winsor_violations(handle)[0] != [], "oracle ③ 未獨立轉紅：生產端檢查換為無作用後 mutant 存活"
 
 
 def test_mutation_dead_drop_terminal_skipped(tmp_path_factory: pytest.TempPathFactory,

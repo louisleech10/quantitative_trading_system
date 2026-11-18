@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from pathlib import Path
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -13,8 +15,13 @@ from momentum.FeatureEngineering.operators.numba_rolling import (
     rolling_slope,
 )
 from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
+from tests.references.exact_moments import exact_rolling_skew_kurt, judge_f32_ulp
 
 
+REPO = Path(__file__).resolve().parents[1]
+# skew／kurt 之期望值一律取精確有理數 oracle（tests/references/exact_moments.py）；不以 pandas rolling 為基準——
+# pandas rolling().kurt() 於大均值序列（真實 BTCUSDT/1h close，窗 5）對精確值不符 19,035 窗（TESTSEL I1c 實測）。
+PRODUCT_WINDOWS = [5, 13, 21]
 WINDOWS_SMALL = [5, 21]
 WINDOWS_NINE = [5, 8, 13, 21, 34, 55, 89, 144, 233]
 ALL_AGGS = ["slope", "std", "mean", "rank", "zscore", "skew", "kurt", "min", "max", "range"]
@@ -88,22 +95,49 @@ def test_numba_rolling_zscore_vs_pandas(sample_series: np.ndarray, window: int):
     np.testing.assert_allclose(actual, expected, atol=1e-6, equal_nan=True)
 
 
+def _assert_exact(actual: np.ndarray, ref: np.ndarray, label: str) -> None:
+    """逐窗依 SPEC Task 2.1 (i)–(iii)：兩者有限 ⇒ ≤1 float32 ulp；兩者 NaN ⇒ 相符；其餘即紅。須至少一窗兩者有限。"""
+    bad, finite_both = judge_f32_ulp(actual, ref)
+    assert finite_both > 0, f"{label}: 無兩者皆有限之窗（覆蓋不足）"
+    assert bad == 0, f"{label}: {bad} 窗對精確 oracle 不符（≤1 float32 ulp／NaN 對等）"
+
+
 @pytest.mark.parametrize("window", WINDOWS_SMALL)
-def test_numba_rolling_skew_vs_pandas(sample_series: np.ndarray, window: int):
-    """T3.7: rolling_skew_kurt 的 skew 與 pandas rolling.skew 數值等價。"""
-    expected = pd.Series(sample_series, dtype=np.float64).rolling(window).skew().to_numpy(dtype=np.float64)
+def test_numba_rolling_skew_vs_exact(sample_series: np.ndarray, window: int):
+    """T3.7: rolling_skew_kurt 的 skew 逐窗等於精確 oracle（≤1 float32 ulp、NaN 對等）。"""
     actual = rolling_skew_kurt(sample_series, window)[:, 0].astype(np.float64)
-
-    np.testing.assert_allclose(actual, expected, atol=1e-4, equal_nan=True)
+    _assert_exact(actual, exact_rolling_skew_kurt(sample_series, window)[:, 0], f"skew w={window}")
 
 
 @pytest.mark.parametrize("window", WINDOWS_SMALL)
-def test_numba_rolling_kurt_vs_pandas(sample_series: np.ndarray, window: int):
-    """T3.8: rolling_skew_kurt 的 kurt 與 pandas rolling.kurt 數值等價。"""
-    expected = pd.Series(sample_series, dtype=np.float64).rolling(window).kurt().to_numpy(dtype=np.float64)
+def test_numba_rolling_kurt_vs_exact(sample_series: np.ndarray, window: int):
+    """T3.8: rolling_skew_kurt 的 kurt 逐窗等於精確 oracle（≤1 float32 ulp、NaN 對等）。"""
     actual = rolling_skew_kurt(sample_series, window)[:, 1].astype(np.float64)
+    _assert_exact(actual, exact_rolling_skew_kurt(sample_series, window)[:, 1], f"kurt w={window}")
 
-    np.testing.assert_allclose(actual, expected, atol=1e-4, equal_nan=True)
+
+@pytest.fixture(scope="module")
+def real_btc_1h() -> Dict[str, np.ndarray]:
+    """真實 BTCUSDT/1h（data_cache/feature_klines/kline_cache.h5）：close（大均值）與 log return（小均值）。"""
+    from momentum.DataExtraction.kline_storage import KlineStorageManager
+
+    df = KlineStorageManager(cache_dir=str(REPO / "data_cache" / "feature_klines")).read_klines(
+        "BTCUSDT", "1h", validate_continuity=False)
+    close = df["close"].to_numpy(dtype=np.float64)
+    if len(close) < 1000:
+        pytest.fail("真實 BTCUSDT/1h K 線不足（資料缺件須補齊，不得 skip）")
+    return {"close": close, "logret": np.concatenate([[np.nan], np.diff(np.log(close))])}
+
+
+@pytest.mark.parametrize("window", PRODUCT_WINDOWS)
+@pytest.mark.parametrize("series", ["close", "logret"])
+def test_rolling_skew_kurt_real_kline_vs_exact(real_btc_1h: Dict[str, np.ndarray], series: str, window: int):
+    """SPEC Task 2.1 邊界①：真實 kline 兩序列 × 產品預設窗，skew／kurt 逐窗等於精確 oracle。"""
+    x = real_btc_1h[series]
+    actual = rolling_skew_kurt(x, window).astype(np.float64)
+    ref = exact_rolling_skew_kurt(x, window)
+    _assert_exact(actual[:, 0], ref[:, 0], f"BTCUSDT/1h {series} skew w={window}")
+    _assert_exact(actual[:, 1], ref[:, 1], f"BTCUSDT/1h {series} kurt w={window}")
 
 
 @pytest.mark.parametrize("window", WINDOWS_SMALL)
@@ -175,11 +209,22 @@ def test_fused_golden_output_match(monkeypatch):
 
     assert list(numba_result.columns) == list(pandas_result.columns)
 
+    # skew／kurt：numba 臂逐欄逐窗對精確 oracle（後備臂之精確性由 tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py 驗）
+    moment_cols = set()
+    for src in df.columns:
+        x = df[src].to_numpy(dtype=np.float64)
+        for window in config["windows"]:
+            ref = exact_rolling_skew_kurt(x, window)
+            for k, label in enumerate(("Skew", "Kurt")):
+                name = RollingAggregator._l3_name(src, label, window)
+                assert name in numba_result.columns, f"缺 L3 欄 {name}"
+                _assert_exact(numba_result[name].to_numpy(dtype=np.float64), ref[:, k], name)
+                moment_cols.add(name)
+    assert len(moment_cols) == base.shape[1] * len(config["windows"]) * 2
+
     cols_by_atol: dict[float, list[str]] = defaultdict(list)
-    for column_name in pandas_result.columns:
-        if "_Skew_" in column_name or "_Kurt_" in column_name:
-            cols_by_atol[1e-4].append(column_name)
-        elif "_Slope_" in column_name:
+    for column_name in pandas_result.columns:  # 兩臂互比（含矩欄）原樣保留
+        if "_Slope_" in column_name:
             cols_by_atol[1e-5].append(column_name)
         else:
             cols_by_atol[1e-6].append(column_name)
@@ -393,18 +438,15 @@ def test_skew_kurt_no_explosion_on_constant_transition():
     assert np.isnan(kurt[-30:]).all()
 
 
-def test_skew_kurt_matches_pandas_on_nondegenerate_windows():
-    """REG: where pandas yields a finite non-zero skew, numba must agree."""
+def test_skew_kurt_matches_exact_on_nondegenerate_windows():
+    """REG: 二元 choppy→constant 序列，skew／kurt 逐窗等於精確 oracle（常數窗兩者皆 NaN；非退化窗 ≤1 float32 ulp）。"""
     values = _binary_choppy_then_constant()
-    numba_skew = rolling_skew_kurt(values, 55)[:, 0].astype(np.float64)
-    pandas_skew = pd.Series(values).rolling(55).skew().to_numpy(dtype=np.float64)
-
-    # Compare only on windows pandas considers non-degenerate (|skew| > 1e-9):
-    # constant windows differ by convention (numba=NaN, pandas=0.0) but both mean
-    # "no skewness", which is not a correctness gap.
-    mask = np.isfinite(pandas_skew) & (np.abs(pandas_skew) > 1e-9)
-    assert mask.any()
-    np.testing.assert_allclose(numba_skew[mask], pandas_skew[mask], atol=1e-4)
+    sk = rolling_skew_kurt(values, 55).astype(np.float64)
+    ref = exact_rolling_skew_kurt(values, 55)
+    nondegenerate = np.isfinite(ref[:, 0]) & (np.abs(ref[:, 0]) > 1e-9)
+    assert nondegenerate.any()
+    _assert_exact(sk[:, 0], ref[:, 0], "binary skew w=55")
+    _assert_exact(sk[:, 1], ref[:, 1], "binary kurt w=55")
 
 
 @pytest.mark.parametrize("scale", [1e-10, 1.0, 1e20])
@@ -413,35 +455,32 @@ def test_skew_kurt_preserved_across_extreme_scales(scale: float):
 
     Because skewness is dimensionless, a window with genuine 10%-of-scale
     variance has a well-defined skew at 1e-10, 1.0, or 1e20 alike. Our guard
-    (relative m2/Σx²) preserves all three. NOTE: pandas' rolling().skew() uses an
-    absolute variance floor and WRONGLY nulls the entire 1e-10 series — our fix
-    is strictly more correct there, so parity is only asserted where pandas is
-    also finite.
+    (relative m2/Σx²) preserves all three. 期望值取精確 oracle（pandas 以絕對變異下限把 1e-10 整段判 NaN，不可作基準）。
     """
     rng = np.random.default_rng(7)
     values = (scale + scale * 0.1 * rng.standard_normal(300)).astype(np.float64)
-    numba_skew = rolling_skew_kurt(values, 55)[:, 0].astype(np.float64)
-    pandas_skew = pd.Series(values).rolling(55).skew().to_numpy(dtype=np.float64)
+    sk = rolling_skew_kurt(values, 55).astype(np.float64)
+    ref = exact_rolling_skew_kurt(values, 55)
 
     valid = np.arange(54, len(values))
     # Core requirement: genuine variance must stay finite & defined (not nulled).
-    assert np.isfinite(numba_skew[valid]).all(), f"guard wrongly nulled scale={scale}"
-    # Parity only where pandas is also finite (pandas nulls all of 1e-10).
-    both = valid[np.isfinite(pandas_skew[valid])]
-    if both.size:
-        np.testing.assert_allclose(numba_skew[both], pandas_skew[both], atol=1e-3)
+    assert np.isfinite(sk[valid, 0]).all(), f"guard wrongly nulled scale={scale}"
+    assert np.isfinite(sk[valid, 1]).all(), f"guard wrongly nulled kurt scale={scale}"
+    _assert_exact(sk[:, 0], ref[:, 0], f"skew scale={scale}")
+    _assert_exact(sk[:, 1], ref[:, 1], f"kurt scale={scale}")
 
 
 def test_skew_kurt_single_outlier_window_preserved():
     """REG: a 54:1 window has a real (large) skew — must be kept, not nulled."""
     values = np.ones(60, dtype=np.float64)
     values[0] = 2.0  # one different value; window [0..54] is 54-ones + 1-two
-    skew = rolling_skew_kurt(values, 55)[:, 0].astype(np.float64)
-    pandas_skew = pd.Series(values).rolling(55).skew().to_numpy(dtype=np.float64)
+    sk = rolling_skew_kurt(values, 55).astype(np.float64)
+    ref = exact_rolling_skew_kurt(values, 55)
 
-    assert np.isfinite(skew[54]), "genuine one-outlier skew was wrongly nulled"
-    assert abs(skew[54]) > 1.0
-    np.testing.assert_allclose(skew[54], pandas_skew[54], atol=1e-4)
+    assert np.isfinite(sk[54, 0]), "genuine one-outlier skew was wrongly nulled"
+    assert abs(sk[54, 0]) > 1.0
+    _assert_exact(sk[:, 0], ref[:, 0], "single-outlier skew w=55")
+    _assert_exact(sk[:, 1], ref[:, 1], "single-outlier kurt w=55")
 
 
 def test_skew_kurt_deterministic_on_binary_series():

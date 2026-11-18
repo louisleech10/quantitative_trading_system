@@ -46,14 +46,8 @@ def baseline() -> Dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def on_run(tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Any]:
-    mp = pytest.MonkeyPatch()
-    tmp = tmp_path_factory.mktemp("ffstat_golden_on")
-    try:
-        h.prepare_stat_env(mp, tmp)
-        root, _, result = h.run_stat(tmp, h.stat_payload())
-        return {"root": root, "result": result}
-    finally:
-        mp.undo()
+    """預設 `stat_payload()` run（TESTSEL I10：與 test_ffstat_all_tested、test_ffstat_calibration 同一 run，session 共用）。"""
+    return h.shared_stat_run(tmp_path_factory, "on")
 
 
 def test_golden_baseline_frozen_before_change(baseline: Dict[str, Any]) -> None:
@@ -87,6 +81,75 @@ def test_golden_public_values_unchanged_by_calibration_domain(tmp_path: Path, mo
     assert base_fingerprints(root_on) == base_fingerprints(root_off)
 
 
+def _per_indicator_max_k(config: Any) -> Dict[Any, int]:
+    """設定中每個 TA-Lib L1 指標（類別, 名）之各實例 K 最大者；與生產 `l1_output_points.max_l1_k` 同一展開
+    （`engine._resolve_params`）與同一 K 規則（`_k_from_table`）。"""
+    from momentum.FeatureEngineering.atomic import l1_output_points as lop
+    from momentum.FeatureEngineering.atomic.cycle_indicators import CycleIndicatorEngine
+    from momentum.FeatureEngineering.atomic.momentum_indicators import MomentumIndicatorEngine
+    from momentum.FeatureEngineering.atomic.statistics_indicators import StatisticsIndicatorEngine
+    from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+    from momentum.FeatureEngineering.atomic.trend_indicators import TrendIndicatorEngine
+    from momentum.FeatureEngineering.atomic.volatility_indicators import VolatilityIndicatorEngine
+    from momentum.FeatureEngineering.atomic.volume_indicators import VolumeIndicatorEngine
+
+    TALibWrapper.initialize()
+    engines = {"trend": TrendIndicatorEngine, "momentum": MomentumIndicatorEngine,
+               "volatility": VolatilityIndicatorEngine, "volume": VolumeIndicatorEngine,
+               "cycle": CycleIndicatorEngine, "statistics": StatisticsIndicatorEngine}
+    out: Dict[Any, int] = {}
+    for cat, engine_cls in engines.items():
+        cat_cfg = getattr(config.atomic_indicators, cat)
+        if not cat_cfg.enabled:
+            continue
+        engine = engine_cls(cat_cfg.model_dump(), [])
+        for ind in cat_cfg.indicators:
+            spec = TALibWrapper.INDICATOR_REGISTRY.get(ind.name) if ind.enabled else None
+            if spec is None or spec.computed_in_adapter:
+                continue
+            out[(cat, ind.name)] = max(lop._k_from_table(lop.table_indicator(spec.talib_func, spec.category), p)
+                                       for p in engine._resolve_params(ind.name, ind.model_dump()))
+    return out
+
+
+def test_dual_start_reduction_keeps_deepest_instances() -> None:
+    """TESTSEL I10：雙起點測試之縮減設定（`h.dual_start_paths_payload`）相對預設全設定——類別、指標、資料源、L2 運算子、
+    L3 彙總全同；每個 L1 指標之最大 K（最深實例）不變、M_tf 與各週期預熱深度不變、L2 lag／L3 窗之最大值不變。
+    縮減若丟掉某指標之最深實例或某類路徑即紅（倍數表 K 對週期非處處單調：MAVP 13→21 之 K 為 30→29，故以「每指標
+    最大 K 相等」直接核對，不依單調假設）。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.warmup_window import _collect_l1_warmup_bars, estimate_max_warmup_bars
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    default = factory._resolve_config({})
+    reduced = factory._resolve_config(h.dual_start_paths_payload())
+    d_dump, r_dump = default.model_dump(by_alias=True), reduced.model_dump(by_alias=True)
+    for key in ("data_sources", "rolling_aggregation", "operators", "preprocessing", "nan_strategy", "lag_features"):
+        if key == "rolling_aggregation":
+            assert {k: v for k, v in r_dump[key].items() if k != "windows"} == \
+                {k: v for k, v in d_dump[key].items() if k != "windows"}
+            assert max(r_dump[key]["windows"]) == max(d_dump[key]["windows"])
+            assert min(r_dump[key]["windows"]) == min(d_dump[key]["windows"])
+        elif key == "operators":
+            assert {k: v for k, v in r_dump[key].items() if k != "momentum"} == \
+                {k: v for k, v in d_dump[key].items() if k != "momentum"}
+            lags_d, lags_r = d_dump[key]["momentum"]["lags"], r_dump[key]["momentum"]["lags"]
+            assert (min(lags_r), max(lags_r)) == (min(lags_d), max(lags_d))
+        else:
+            assert r_dump[key] == d_dump[key], key
+    for cat, node in d_dump["atomic_indicators"].items():
+        if isinstance(node, dict):
+            assert r_dump["atomic_indicators"][cat]["enabled"] == node["enabled"], cat
+            assert [i["name"] for i in r_dump["atomic_indicators"][cat].get("indicators") or []] == \
+                [i["name"] for i in node.get("indicators") or []], cat
+    k_default, k_reduced = _per_indicator_max_k(default), _per_indicator_max_k(reduced)
+    assert k_default and k_reduced == k_default, {k: (v, k_reduced.get(k)) for k, v in k_default.items()
+                                                  if k_reduced.get(k) != v}
+    assert _collect_l1_warmup_bars(reduced) == _collect_l1_warmup_bars(default)
+    for tf in h.CONTRACT["dual_start"]["timeframes"]:
+        assert estimate_max_warmup_bars(reduced, tf, [tf]) == estimate_max_warmup_bars(default, tf, [tf]), tf
+
+
 @pytest.mark.parametrize("timeframe", ["1h", "4h", "12h", "1d"])
 def test_dual_start_convergence_default_config(timeframe: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """§G⑦（v40–v43；v50 增 1d；v52 分解判準、4h 改長歷史）：預設全設定、單一原生週期、BTC。
@@ -106,6 +169,25 @@ def test_dual_start_convergence_default_config(timeframe: str, tmp_path: Path, m
         assert report["eligible"], (numbers, report["ineligible"][:10], list(report["column_ineligible"].items())[:10])
     # 12h、1d：逐欄 blocked 之欄與列數即收據（上方 violations 為空已涵蓋可驗部分）；淺欄不得被開脫——
     # 由 test_mutation_dual_start_column_set_is_caught[missing]（刪 B′ 淺欄 ⇒ 上游 L1 有效列 ≥ min_overlap ⇒ 違規）承擔
+
+
+@pytest.mark.parametrize("timeframe", ["1h", "4h"])
+def test_dual_start_convergence_paths_config(timeframe: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """TESTSEL I10 姊妹測試（主委 2026-11-13 追加裁定第 2 項）：test_dual_start_convergence_default_config 之小規模版——
+    同一判準（①②、配對、欄集合可重播、整週期合資格），設定為 `h.dual_start_paths_payload()`：預設設定之全部類別、
+    指標、非週期變體、資料源、L2 運算子、L3 彙總不變，每指標只留最深實例（最大週期、K 最大者）＋配對快週期，L2 lag 與
+    L3 窗只留最小、最大（M_tf 與預熱深度不變，test_dual_start_reduction_keeps_deepest_instances 機械核對）。
+    週期 1h（feature_klines 來源）、4h（長歷史來源）各一格：12h、1d 與 4h 同來源、同一生成碼（`stable_mask.instance_k`
+    無週期參數），只是不同資料，屬原全規模測試之範圍。原測試（預設全設定×四週期，逐實例全規模）原樣保留，只於
+    依賴有變之收案／合併前層跑。"""
+    source = str(_REPO / h.CONTRACT["dual_start"]["timeframes"][timeframe])
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    report = h.dual_start_report(tmp_path, timeframe, h.dual_start_paths_payload(), source)
+    numbers = {k: report[k] for k in ("rows", "rows_b", "m", "f_max", "margin")}
+    assert not report["violations"], list(report["violations"].items())[:10]
+    min_overlap = int(h.CONTRACT["dual_start"]["min_overlap_rows"])
+    assert all(n < min_overlap for n in report["column_ineligible"].values()), numbers
+    assert report["eligible"], (numbers, report["ineligible"][:10], list(report["column_ineligible"].items())[:10])
 
 
 def _small_dual_start_payload() -> Dict[str, Any]:

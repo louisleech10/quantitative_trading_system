@@ -6,7 +6,7 @@
 mutation：倖存者改寫入 ingest 快取檔之舊身分 ⇒ 身分相等案紅。
 
 驅動：經服務入口 `ICAnalysisService._run_analysis`（與 `/analyze` 同一路徑：物化 ingest 快取 → orchestrator →
-報告／倖存者落檔 → 結果寫回 task），以真實 kline 短窗 run（`preprov_helpers`，格 `h1_stat_on`，本模組生成一次）。
+報告／倖存者落檔 → 結果寫回 task），以真實 kline 短窗 run（`preprov_helpers`，格見 `CELL`，本模組生成一次；IC 分析經 `feature_filter` 限於抽樣欄，見 `FILTER_FEATURES`）。
 隔離：orchestrator 與服務之輸出寫死相對路徑（`data_cache/reports`、`data_cache/reports/ic_ingest_cache`、
 `data_cache/features/<sym>_<tf>_filtered.h5`），IC 設定讀相對 `config/`，標籤 kline 讀相對 `data_cache/feature_klines`
 （ic_analysis_service.py:500）⇒ 本模組 cwd 移到 tmp（`config` 以 symlink 指回 repo、kline 目錄常數改絕對路徑），
@@ -48,7 +48,11 @@ IDENTITY_KEY = "ff_run_identity"  # SPEC Task 2.4 之報告／倖存者鍵名
 PRE_CHANGE_SURVIVOR_CONTRACT_VERSION = 2
 # SPEC Task 2.1「`load` 新增回傳身分之入口」未定名；同 tests/feature_engineering/test_preprov_identity.py
 LOAD_WITH_IDENTITY = "load_with_identity"
-CELL = "h1_stat_on"
+# TESTSEL I10：身分傳遞與特徵族、平穩化（fracdiff／ADF，生成耗時大宗）正交；最窄格（L1 trend＠close、前處理開而平穩化關）
+# 仍寫 provenance 與 content_sha256（test_preprov_writer 邊界④同理）。輸出窗取約 13 個月之 `ph.VARIANTS["h1_narrow_long"]`：
+# 一個月窗之 IC 測試段 140 列 < 滾動暖身最少 1,517 列 ⇒ 降級全樣本、ICIR 全為 None、門檻階段全數剔除（2026-11-13 實測
+# 153 欄全數於 ICIR 閘剔除，門檻全放寬亦同），倖存者恆空、主案無從走非空寫出路徑（原 h1_stat_on 同窗同理）
+CELL = "h1_narrow_long"
 
 
 def expected_identity(manifest: Dict[str, Any], artifact_kind: str = "raw") -> Dict[str, Any]:
@@ -142,8 +146,29 @@ def env(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Dict[str, Any]]:
         mp.undo()
 
 
+#: TESTSEL I10：身分傳遞（報告 metadata／API／倖存者 provenance 之 `ff_run_identity`）與 IC 特徵數無關——身分取自
+#: manifest（`expected_identity`），不依欄而變。原全類別格 h1_stat_on 約 3,700 欄、IC 第 0–7 段約 4,200 秒。現格約 13 個月
+#: × 約 150 欄之全欄 IC 估逾 1,000 秒 ⇒ 經生產既有之請求參數 `feature_filter.include_features`（api/models/ic_models.py
+#: `FeatureFilterConfig`；orchestrator `_apply_feature_filter`）限於排序後等距抽樣之 12 欄（決定性；2026-11-13 實測預設門檻
+#: 下倖存 1 欄、IC 約 69 秒）。None ⇒ 不抽樣。主案須走「倖存者非空」之寫出路徑（空選擇由邊界②承擔），由主案前提斷言把關。
+FILTER_FEATURES: Optional[int] = 12
+
+
+def _sampled_features(run: Any) -> List[str]:
+    names = sorted(set(ph.group_columns(Path(run.run_dir), "raw")))
+    assert names, "前提不成立：run 無特徵欄"
+    if FILTER_FEATURES is None:
+        return names
+    count = min(FILTER_FEATURES, len(names))
+    step = len(names) / count
+    return [names[int(i * step)] for i in range(count)]
+
+
 def _request(run: Any, **kwargs: Any) -> ICAnalyzeRequest:
-    return ICAnalyzeRequest(symbol=run.symbol, timeframe=run.tf, config_hash=run.config_hash, **kwargs)
+    features = _sampled_features(run)  # 前提：run 有特徵欄（同時供抽樣模式取欄）
+    feature_filter = None if FILTER_FEATURES is None else {"include_features": features}
+    return ICAnalyzeRequest(symbol=run.symbol, timeframe=run.tf, config_hash=run.config_hash,
+                            feature_filter=feature_filter, **kwargs)
 
 
 @pytest.fixture(scope="module")
@@ -217,6 +242,8 @@ def test_report_and_survivor_identity_equal_task21_identity(env: Dict[str, Any],
     且等於 FeatureLibrary 回傳身分之入口所得）；倖存者 `config_hash`（IC 設定雜湊）語意不變。"""
     run, expected = env["run"], env["expected"]
     assert expected["content_sha256"], "前提不成立：manifest 無 content_sha256（Task 1.3 未落地）"
+    assert analysis["survivor"] is not None and analysis["survivor"]["feature_names"], \
+        "前提不成立：IC 選擇為空（本案須走非空倖存者寫出路徑；空選擇由邊界②承擔）"
     _df, identity = getattr(library_for(run), LOAD_WITH_IDENTITY)(run.symbol, run.tf, config_hash=run.config_hash)
     assert identity.to_dict() == expected
     assert (analysis["report"].get("metadata") or {}).get(IDENTITY_KEY) == expected

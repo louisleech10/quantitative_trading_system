@@ -14,7 +14,7 @@
 feature_registry.py:19）。故每案 `monkeypatch.chdir(tmp)` 後才建服務，並把服務之 FeatureLibrary 換成指向該 run
 隔離特徵根之實例——絕不寫入專案 data_cache。
 身分 oracle 以測試端自 manifest 原文逐鍵取值（不經待測之 `resolve_run_identity`）；鍵集取自契約。
-資料：真實 kline 短窗生成（`preprov_helpers`；格 `h1_stat_on`，原始與「改一根 K 線」各生成一次）。
+資料：真實 kline 短窗生成（`preprov_helpers`；格見 `CELL`，原始與「改一根 K 線」各生成一次）。
 """
 
 from __future__ import annotations
@@ -48,7 +48,9 @@ CONTRACT: Dict[str, Any] = json.loads(rp.CONTRACT_PATH.read_text(encoding="utf-8
 IDENTITY_KEYS: List[str] = list(CONTRACT["run_identity_keys"])
 # SPEC D5 之身分物件於交接 h5 `metadata_json` 與 `_meta.json` 內之鍵名（SPEC 未明定；與報告／倖存者同名）
 IDENTITY_KEY = "ff_run_identity"
-CELL = "h1_stat_on"
+# TESTSEL I10：受測為 IC ingest 快取之身分沿用／重寫，與特徵族、平穩化（fracdiff／ADF，生成耗時大宗）正交；最窄格仍寫
+# provenance 紀錄與 content_sha256 ⇒ 用 `ph.VARIANTS["h1_narrow"]`（原 h1_stat_on 每次生成約 100 秒）
+CELL = "h1_narrow"
 CACHE_REL = Path("data_cache/reports/ic_ingest_cache")
 OLD_NS = 1_600_000_000_000_000_000  # 沿用判定前把快取檔 mtime 撥回之固定值（重寫即不等於此值）
 

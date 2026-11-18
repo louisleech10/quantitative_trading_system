@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from momentum.factories import create_feature_factory
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.mcp.feature_factory_mcp import FeatureFactoryMCP
@@ -68,11 +70,56 @@ def test_mcp_get_feature_metadata():
     assert metadata["indicator"]["name"] == "RSI"
 
 
-def test_mcp_generate_features_returns_dict():
-    mcp = _make_mcp()
-    result = mcp.generate_features("BTCUSDT")
+def _real_mcp(tmp_path, monkeypatch):
+    """真實工廠（K 線＝真實 `data_cache/feature_klines`、特徵根與 CGSA 工作目錄＝tmp_path）之 MCP；回 (mcp, 特徵根字串)。"""
+    from pathlib import Path
+
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    kline_dir = Path(__file__).resolve().parents[1] / "data_cache" / "feature_klines"
+    if not (kline_dir / "kline_cache.h5").is_file():
+        raise FileNotFoundError(f"missing real kline cache: {kline_dir / 'kline_cache.h5'}")
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work"))
+    factory = create_feature_factory(cache_dir=str(kline_dir), validate_continuity=False)
+    features_root = (tmp_path / "features").resolve()
+    factory._storage = FeatureStorage(str(features_root))
+    return FeatureFactoryMCP(factory, ConfigManager()), str(features_root)
+
+
+@pytest.mark.requires_kline
+def test_mcp_generate_features_returns_dict(tmp_path, monkeypatch):
+    """MCP 包裝經真實工廠（真實 kline）端到端生成：成功回摘要（非 error）、摘要欄取自真實結果、落盤於本測試之根。
+
+    TESTSEL I10 改寫：原以預設全設定、預設儲存根（寫入 data_cache）、非強制重生呼叫——約 309～320 秒，且斷言
+    「有 error 或有 feature_count」生成失敗亦過（空心）、快取命中時不經生成。改為：工廠之 K 線來源＝真實
+    `data_cache/feature_klines`、特徵根＝tmp_path、`force_regenerate` 由 MCP 包裝決定（不改產品碼；tmp 根無快取 ⇒ 必真實生成）；
+    設定經 MCP 之 config 參數傳入精簡真實設定（12h 單週期、close 來源、L1 trend 兩指標、前處理關）。包裝層之轉交與失敗
+    分支另由下方替身測試涵蓋；本案守「真實工廠之回傳物件可被包裝層摘要」與「設定經包裝層原樣生效」。"""
+    mcp, features_root = _real_mcp(tmp_path, monkeypatch)
+    config = {
+        "timeframes": {"primary": "12h", "training": ["12h"], "alignment_mode": "open_minus"},
+        "data_sources": {"enabled_sources": ["close"], "synthetic_sources": []},
+        "preprocessing": {"enabled": False},
+        "atomic_indicators": {
+            "trend": {"enabled": True, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}},
+                                                      {"name": "SMA", "params": {"timeperiod": 13}}]},
+            **{c: {"enabled": False} for c in ("momentum", "volatility", "volume", "cycle", "pattern", "statistics",
+                                               "microstructure", "entropy", "tail_risk")},
+        },
+    }
+    result = mcp.generate_features("BTCUSDT", config)
     assert isinstance(result, dict)
     assert "error" in result or "feature_count" in result
+    assert "error" not in result, result.get("error")
+    assert set(result) == {"feature_count", "generation_time", "layer_counts", "metadata", "hdf5_path"}, sorted(result)
+    assert int(result["feature_count"]) > 0
+    assert float(result["generation_time"]) > 0
+    assert result["metadata"].get("config_hash")
+    # 設定經包裝層原樣生效：L1 只有 trend 兩指標之欄（EMA_8／SMA_13），無其他 L1 類別
+    l1_count = int((result["layer_counts"] or {}).get("layer1") or 0)  # 實跑鍵名 layer1..（EMA_8、SMA_13 ⇒ 2）
+    assert 0 < l1_count <= 8, result["layer_counts"]
+    storage_root = features_root  # 落盤於本測試之特徵根（非 data_cache 預設根）
+    assert str(result["hdf5_path"]).startswith(storage_root), (result["hdf5_path"], storage_root)
 
 
 def test_nl2config_converter_no_match():

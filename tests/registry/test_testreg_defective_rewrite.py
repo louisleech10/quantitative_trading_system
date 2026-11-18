@@ -595,17 +595,31 @@ def test_mutation_receipt_condition_always_true_lets_negative_through(dr_base, t
 
 # ── (e) 秒級 ────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def test_e_receipt_release_timing(dr_base, tmp_path):
-    """附成立收據之放行判定（hook）3 次中位 < 5 s（§C 必擋層門檻；收據驗證含 session 重算）。"""
-    r = _work(dr_base, tmp_path, "t")
+@pytest.fixture(scope="module")
+def e_receipt_release_runs(dr_base, tmp_path_factory) -> Dict[str, Any]:
+    """附成立收據之 hook 放行判定連跑 3 次：記各次結果與秒數（TESTSEL S3：放行正確性與計時兩條共用，不重複）。"""
+    r = _work(dr_base, tmp_path_factory.mktemp("e_release"), "t")
     _apply_rewrite(r, "red")
     r.write_json(receipt_rel(NID["test_red"]), red_receipt(dr_base))
-    secs = []
+    secs, procs = [], []
     for _ in range(3):
         t0 = time.perf_counter()
         proc = r.hook(DF)
         secs.append(time.perf_counter() - t0)
+        procs.append(proc)
+    return {"secs": secs, "procs": procs}
+
+
+def test_e_receipt_release_allows(e_receipt_release_runs):
+    """附成立收據之放行判定（hook）3 次皆 rc 0（原計時測試之正確性斷言；TESTSEL S3）。"""
+    for proc in e_receipt_release_runs["procs"]:
         assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.perf
+def test_e_receipt_release_timing(e_receipt_release_runs):
+    """附成立收據之放行判定（hook）3 次中位 < 5 s（§C 必擋層門檻；收據驗證含 session 重算）：效能基準，opt-in。"""
+    secs = e_receipt_release_runs["secs"]
     assert statistics.median(secs) < 5.0, secs
 
 
@@ -749,12 +763,12 @@ def _real_scale_worktree(tmp_path: Path) -> Path:
     return wt
 
 
-def test_v46_digest_index_equals_worktree_real_scale(tmp_path, monkeypatch):
-    """`_digest_with` 之暫存 index 法與暫存 worktree 法於真實規模逐位元相等（改測試檔、改生產檔、兩者疊加、新增檔），
-    且 index 法 7 組（不同補丁組合）合計 < 3 s；`_PatchedTree` 兩法讀出相同。mutant：index 法漏 `--binary` 或
-    改用 worktree 之相對路徑即與 worktree 法不等。"""
+@pytest.fixture(scope="module")
+def v46_digest_real_scale(tmp_path_factory) -> Dict[str, Any]:
+    """真實規模暫存 worktree 上算一次 index 法／worktree 法之 digest 與 `_PatchedTree` 兩法讀出，並計 index 法耗時
+    （TESTSEL S3：逐位元相等之正確性與計時兩條共用同一次計算，不重複建真實規模 worktree）。"""
     import subprocess as _sp
-    wt = _real_scale_worktree(tmp_path)
+    wt = _real_scale_worktree(tmp_path_factory.mktemp("v46_digest"))
     try:
         def mk(rel: str, needle: str, add: str, name: str, new_file: bool = False) -> str:
             pdir = wt / "handoffs/run_receipts/testreg-digest-probe"
@@ -784,24 +798,42 @@ def test_v46_digest_index_equals_worktree_real_scale(tmp_path, monkeypatch):
                        text=True).stdout.strip()
         ctx = testreg.build_context(wt)
         modify_only = [cmb for cmb in combos if c not in cmb]  # 只修改既有檔 ⇒ 走 index 法
-        t0 = time.perf_counter()
-        quick = [testreg._digest_with(ctx, head, cmb) for cmb in modify_only]
-        elapsed = time.perf_counter() - t0
-        fast = [testreg._digest_with(ctx, head, cmb) for cmb in combos]  # 含新增檔者退回 worktree 法（快取已含前者）
-        monkeypatch.setattr(testreg, "_STRUCTURAL_PATCH", __import__("re").compile(r"(?s).*"))  # 強制 worktree 法
-        ctx2 = testreg.build_context(wt)
-        slow = [testreg._digest_with(ctx2, head, cmb) for cmb in combos]
-        assert fast == slow
-        assert quick == [d for d, cmb in zip(fast, combos) if c not in cmb]
-        assert len(set(fast)) == len({tuple(sorted(x)) for x in combos})  # 不同補丁集合 ⇒ 不同 digest
-        assert elapsed < 3.0, elapsed  # index 法 5 組合計（worktree 法單組約 3.6 s）
-        monkeypatch.undo()
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            t0 = time.perf_counter()
+            quick = [testreg._digest_with(ctx, head, cmb) for cmb in modify_only]
+            elapsed = time.perf_counter() - t0
+            fast = [testreg._digest_with(ctx, head, cmb) for cmb in combos]  # 含新增檔者退回 worktree 法（快取已含前者）
+            monkeypatch.setattr(testreg, "_STRUCTURAL_PATCH", __import__("re").compile(r"(?s).*"))  # 強制 worktree 法
+            ctx2 = testreg.build_context(wt)
+            slow = [testreg._digest_with(ctx2, head, cmb) for cmb in combos]
         pa = testreg._PatchedTree(testreg.build_context(wt), head, a).read("tests/registry/test_testreg_markers.py")
-        monkeypatch.setattr(testreg, "_STRUCTURAL_PATCH", __import__("re").compile(r"(?s).*"))
-        pb = testreg._PatchedTree(testreg.build_context(wt), head, a).read("tests/registry/test_testreg_markers.py")
-        assert pa == pb and pa is not None and "# probe a" in pa
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            monkeypatch.setattr(testreg, "_STRUCTURAL_PATCH", __import__("re").compile(r"(?s).*"))
+            pb = testreg._PatchedTree(testreg.build_context(wt), head, a).read("tests/registry/test_testreg_markers.py")
+        return {"combos": combos, "c": c, "quick": quick, "fast": fast, "slow": slow, "elapsed": elapsed,
+                "pa": pa, "pb": pb}
     finally:
         _sp.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(wt)], capture_output=True)
+
+
+def test_v46_digest_index_equals_worktree_real_scale(v46_digest_real_scale):
+    """`_digest_with` 之暫存 index 法與暫存 worktree 法於真實規模逐位元相等（改測試檔、改生產檔、兩者疊加、新增檔）；
+    `_PatchedTree` 兩法讀出相同（index 法耗時門檻見 perf 之 test_v46_digest_index_method_under_3s，TESTSEL S3）。
+    mutant：index 法漏 `--binary` 或改用 worktree 之相對路徑即與 worktree 法不等。"""
+    run = v46_digest_real_scale
+    combos, c, quick, fast, slow = run["combos"], run["c"], run["quick"], run["fast"], run["slow"]
+    pa, pb = run["pa"], run["pb"]
+    assert fast == slow
+    assert quick == [d for d, cmb in zip(fast, combos) if c not in cmb]
+    assert len(set(fast)) == len({tuple(sorted(x)) for x in combos})  # 不同補丁集合 ⇒ 不同 digest
+    assert pa == pb and pa is not None and "# probe a" in pa
+
+
+@pytest.mark.perf
+def test_v46_digest_index_method_under_3s(v46_digest_real_scale):
+    """真實規模 index 法 5 組（只改既有檔之補丁組合）合計 < 3 s：效能基準，opt-in（TESTSEL S3 自上一條移出）。"""
+    elapsed = v46_digest_real_scale["elapsed"]
+    assert elapsed < 3.0, elapsed  # index 法 5 組合計（worktree 法單組約 3.6 s）
 
 
 # ── 實作期追加（修訂審查 r45 處置）：pytest.raises 之 match 期望值端到端 ──────────────────────────────────────────

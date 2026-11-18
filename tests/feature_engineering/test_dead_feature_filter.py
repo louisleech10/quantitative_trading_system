@@ -32,6 +32,7 @@ class TestConstantColumns:
     """nunique<2 的欄位應被列入 constant_cols"""
 
     def test_all_zeros(self) -> None:
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         df = pd.DataFrame({"a": [0.0] * 1000, "b": np.random.randn(1000)})
         dead, diag = find_dead_columns(df, min_valid_samples=100)
         assert "a" in dead
@@ -39,6 +40,7 @@ class TestConstantColumns:
         assert "b" not in dead
 
     def test_all_same_value(self) -> None:
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         df = pd.DataFrame({"a": [42.0] * 500, "b": np.random.randn(500)})
         dead, diag = find_dead_columns(df, min_valid_samples=100)
         assert "a" in diag.constant_cols
@@ -46,6 +48,7 @@ class TestConstantColumns:
 
     def test_all_nan_column(self) -> None:
         # nunique(dropna=True) == 0 < 2 → constant
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         df = pd.DataFrame({"a": [np.nan] * 500, "b": np.random.randn(500)})
         dead, diag = find_dead_columns(df, min_valid_samples=100)
         assert "a" in diag.constant_cols  # nunique=0 < 2
@@ -111,6 +114,7 @@ class TestNotDeadHighNaNRatio:
 
     def test_99pct_nan_but_100_valid_kept(self) -> None:
         """99% NaN 但仍有 100 個有效值 → 保留"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         rows = 20000
         col = np.full(rows, np.nan)
         col[:200] = np.random.randn(200)  # 200 valid（>= 100）
@@ -152,6 +156,7 @@ class TestSafetyInvariants:
 
     def test_I1_returns_frozenset_of_str(self) -> None:
         """I-1: 回傳 type 為 frozenset[str]（非 list/set/dict）"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         df = pd.DataFrame({"a": [1.0] * 1000, "b": np.random.randn(1000)})
         dead, _ = find_dead_columns(df, min_valid_samples=100)
         assert isinstance(dead, frozenset)
@@ -201,6 +206,7 @@ class TestSafetyInvariants:
 
     def test_never_kill_good_features_contract(self) -> None:
         """關鍵契約：100 個明顯有效欄位 → 0 個被列入 dead"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         rows = 5000
         good_df = pd.DataFrame({
             f"good_col_{i}": np.random.randn(rows)
@@ -237,6 +243,7 @@ class TestEdgeCases:
         assert diag.total_dropped == 0
 
     def test_single_column_valid(self) -> None:
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         df = pd.DataFrame({"a": np.random.randn(1000)})
         dead, _ = find_dead_columns(df, min_valid_samples=100)
         assert dead == frozenset()
@@ -274,6 +281,7 @@ class TestEdgeCases:
 
     def test_numeric_and_object_dtypes(self) -> None:
         # 混合 dtype 不應 raise
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         df = pd.DataFrame({
             "num": np.random.randn(1000),
             "obj": ["x"] * 1000,
@@ -289,6 +297,7 @@ class TestDeadColumnMask:
     """numpy-level dead_column_mask（CGSA streaming write 用）。"""
 
     def test_constant_column(self) -> None:
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         arr = np.column_stack([
             np.full(1000, 42.0),          # constant → dead
             np.random.randn(1000),         # ok
@@ -297,6 +306,7 @@ class TestDeadColumnMask:
         assert mask.tolist() == [True, False]
 
     def test_all_nan_column(self) -> None:
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         arr = np.column_stack([
             np.full(1000, np.nan),         # all-NaN → dead
             np.random.randn(1000),
@@ -305,6 +315,7 @@ class TestDeadColumnMask:
         assert mask.tolist() == [True, False]
 
     def test_sparse_50_of_20000(self) -> None:
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         col = np.full(20000, np.nan)
         col[:50] = np.arange(50)
         arr = np.column_stack([col, np.random.randn(20000)])
@@ -327,6 +338,7 @@ class TestDeadColumnMask:
 
     def test_high_nan_ratio_but_enough_valid_kept(self) -> None:
         # 60% NaN 但 valid >= min 且多 distinct → 保留（不以 NaN ratio）
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         rows = 20000
         col = np.random.randn(rows)
         nan_idx = np.random.choice(rows, int(rows * 0.6), replace=False)
@@ -341,6 +353,7 @@ class TestDeadColumnMask:
 
     def test_inf_not_misjudged_constant(self) -> None:
         # 含 inf 但非常數 → nanmin < nanmax 成立 → 不誤判 dead
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         col = np.random.randn(1000)
         col[5] = np.inf
         arr = col.reshape(-1, 1)
@@ -349,11 +362,13 @@ class TestDeadColumnMask:
 
     def test_never_kills_good_features(self) -> None:
         # I-5: 100 個明顯有效欄 → 0 dead
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         arr = np.random.randn(5000, 100)
         mask = dead_column_mask(arr, min_valid_samples=100)
         assert mask.sum() == 0
 
     def test_does_not_mutate_input(self) -> None:
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         arr = np.random.randn(1000, 5)
         snapshot = arr.copy()
         dead_column_mask(arr, min_valid_samples=100)
@@ -391,23 +406,39 @@ class TestSharedStandardContract:
             )
 
 
+@pytest.fixture(scope="module")
+def dead_10k_cols_run() -> dict:
+    """10,000 欄 × 20,000 列（50% NaN；跨 512 欄分塊路徑）跑一次 find_dead_columns：回傳結果與牆鐘秒數。
+
+    TESTSEL S3：牆鐘門檻屬效能基準 ⇒ perf；回傳型別屬正確性 ⇒ 非 perf。兩條共用本次計算（輸入約 1.6GB，只建一次；
+    fixture 只回傳結果與秒數，不持有輸入矩陣）。
+    """
+    np.random.seed(42)
+    n_rows = 20_000
+    n_cols = 10_000
+    data = np.random.randn(n_rows, n_cols)
+    mask = np.random.rand(n_rows, n_cols) < 0.5
+    data[mask] = np.nan
+    df = pd.DataFrame(data, columns=[f"col_{i}" for i in range(n_cols)])
+    t0 = time.perf_counter()
+    dead, _ = find_dead_columns(df, min_valid_samples=100)
+    elapsed = time.perf_counter() - t0
+    return {"dead": dead, "elapsed": elapsed}
+
+
 class TestPerformance:
-    def test_10k_cols_20k_rows_under_10_seconds(self) -> None:
+    def test_10k_cols_20k_rows_returns_frozenset(self, dead_10k_cols_run: dict) -> None:
+        """大規模（多分塊）路徑之回傳型別仍為 frozenset（原效能測試之正確性斷言）。"""
+        dead = dead_10k_cols_run["dead"]
+        assert isinstance(dead, frozenset)
+
+    @pytest.mark.perf
+    def test_10k_cols_20k_rows_under_10_seconds(self, dead_10k_cols_run: dict) -> None:
         # Baseline 對 442K 特徵 × 20K row 估算：~5s × (442/10) ≈ ~220s 一次完整 dead drop
         # 此測試只是基準保護避免演算法退化（per-column Python loop 會花數百秒）
         # threshold 10s 容忍 CI 環境變化（macOS / Linux / 不同負載下 5-7s 屬正常）
-        np.random.seed(42)
-        n_rows = 20_000
-        n_cols = 10_000
-        data = np.random.randn(n_rows, n_cols)
-        mask = np.random.rand(n_rows, n_cols) < 0.5
-        data[mask] = np.nan
-        df = pd.DataFrame(data, columns=[f"col_{i}" for i in range(n_cols)])
-        t0 = time.perf_counter()
-        dead, _ = find_dead_columns(df, min_valid_samples=100)
-        elapsed = time.perf_counter() - t0
+        elapsed = dead_10k_cols_run["elapsed"]
         assert elapsed < 10.0, f"Performance regression: took {elapsed:.2f}s for 10K×20K"
-        assert isinstance(dead, frozenset)
 
 
 

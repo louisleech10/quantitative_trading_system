@@ -1,0 +1,89 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/feature_engineering/test_numview_core.py",
+    "tests/governance/test_prered_allowed_red.py",
+    "tests/feature_engineering/test_failopen_matrix.py",
+    "tests/feature_engineering/test_numview_criteria.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "開 TODO 前實測 runs/testsel_route/i1g/i1g_facts.md：allowed_red owner TESTSEL 共 28 列（test_numview_core 27 nodeid／21 函式＋test_failopen_frozen_diff 1）；NUMVIEW 決定紀錄 d_mtf／d_memmap／d_winsor_dtype／d_codec／d_l2 皆 retain，落選臂記號於 momentum／api 0 命中；failopen v8 限定範圍版已存在 test_failopen_matrix.py test_v8_frozen_doc_covers_every_existing_assertion_change",
+      "審 r1（handoffs/reconcile/20261118-testseli1g-x-review-r1/synth.md）改 B 案：刪落選分支函式會使 test_numview_criteria.py 凍結判準檢查（mutant_rows_violations、_path_registry_ledger_violations）轉紅 ⇒ 不刪，改收集期 pytest.mark.skipif 依決定紀錄條件跳過；SPEC Task 4.2"
+    ],
+    "touches": [
+      "tests/feature_engineering/test_numview_core.py",
+      "tests/feature_engineering/test_failopen_frozen_diff.py",
+      "tests/_golden/prered/allowed_red.json",
+      "tests/governance/test_prered_allowed_red.py",
+      "tests/registry/catalog.json",
+      "docs/TESTREG_SPEC.md"
+    ],
+    "callers_now": [
+      "tests/feature_engineering/numview_helpers.py",
+      "tests/_golden/numview/decisions.json",
+      "tests/_golden/numview/preregistered_criteria_v9.json"
+    ],
+    "callers_later": [
+      "I1 收尾全量：FAILED ⊆ allowed_red、owner TESTSEL＝0（SPEC Task 4.1）",
+      "提交後之測試刪改待審清單（skipif 於 V19 視為斷言歸零、刪檔為 V20）由委員逐條審後 mark"
+    ],
+    "gate_cmd": "out=$(venv/bin/python -m pytest tests/governance/test_prered_allowed_red.py 'tests/feature_engineering/test_failopen_matrix.py::test_v8_frozen_doc_covers_every_existing_assertion_change' 'tests/feature_engineering/test_numview_criteria.py::test_estimate_b4_mutant_generations_listed_and_costed' 'tests/feature_engineering/test_numview_criteria.py::test_estimate_path_registry_closed_and_complete' 'tests/feature_engineering/test_numview_criteria.py::test_boundary_06_criteria_unchanged_after_receipts_defect_recorded' 'tests/feature_engineering/test_numview_core.py::test_boundary_30_memmap_dtype_threshold_exact_and_neighbours_identical' 'tests/feature_engineering/test_numview_core.py::test_boundary_31_mtf_dtype_single_training_timeframe_equals_single_tf' 'tests/feature_engineering/test_numview_core.py::test_boundary_32_codec_by_provenance_zero_selected_no_encoding_zero_row_digest' 'tests/feature_engineering/test_numview_core.py::test_boundary_33_codec_by_provenance_upgrade_off_no_mapping_lossless' 'tests/feature_engineering/test_numview_core.py::test_boundary_34_codec_by_provenance_rank_window_missing_or_nonpositive_float32[missing]' 'tests/feature_engineering/test_numview_core.py::test_boundary_34_codec_by_provenance_rank_window_missing_or_nonpositive_float32[negative]' 'tests/feature_engineering/test_numview_core.py::test_boundary_34_codec_by_provenance_rank_window_missing_or_nonpositive_float32[zero]' 'tests/feature_engineering/test_numview_core.py::test_codec_by_provenance_anomalies_lossless_and_recorded[duplicate]' 'tests/feature_engineering/test_numview_core.py::test_codec_by_provenance_anomalies_lossless_and_recorded[missing]' 'tests/feature_engineering/test_numview_core.py::test_codec_by_provenance_anomalies_lossless_and_recorded[stale]' 'tests/feature_engineering/test_numview_core.py::test_codec_by_provenance_anomalies_lossless_and_recorded[unknown]' 'tests/feature_engineering/test_numview_core.py::test_codec_by_provenance_encoding_follows_records_not_names' 'tests/feature_engineering/test_numview_core.py::test_codec_by_provenance_mapping_digest_bound_and_tamper_fails' 'tests/feature_engineering/test_numview_core.py::test_l2_unified_l5_l6_recomputed_from_public_l2_bitwise' 'tests/feature_engineering/test_numview_core.py::test_memmap_dtype_forced_branches_bitwise_equal' 'tests/feature_engineering/test_numview_core.py::test_mtf_dtype_layer_exits_float32_and_primary_columns_equal_single_tf' 'tests/feature_engineering/test_numview_core.py::test_mutation_codec_by_provenance_anomaly_fallback_breaks_lossless[names_fallback]' 'tests/feature_engineering/test_numview_core.py::test_mutation_codec_by_provenance_anomaly_fallback_breaks_lossless[still_lossy]' 'tests/feature_engineering/test_numview_core.py::test_mutation_codec_by_provenance_digest_vs_file_sha_breaks_normal_write' 'tests/feature_engineering/test_numview_core.py::test_mutation_codec_by_provenance_manifest_without_digest_breaks_binding' 'tests/feature_engineering/test_numview_core.py::test_mutation_codec_by_provenance_name_inference_restored_breaks_records' 'tests/feature_engineering/test_numview_core.py::test_mutation_codec_by_provenance_readback_check_removed_breaks_tamper' 'tests/feature_engineering/test_numview_core.py::test_mutation_l2_unified_l5_back_to_other_arm_breaks_multi_tf' 'tests/feature_engineering/test_numview_core.py::test_mutation_memmap_dtype_coupled_breaks_equality' 'tests/feature_engineering/test_numview_core.py::test_mutation_mtf_dtype_preserve_dtype_restored_breaks_exit_dtype' 'tests/feature_engineering/test_numview_core.py::test_mutation_winsor_dtype_sigma_float64_restored_breaks_dtype' 'tests/feature_engineering/test_numview_core.py::test_winsor_dtype_sigma_quantile_same_dtype_and_fracdiff_within_1ulp' -p no:cacheprovider -q -rs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ \"$rc\" -eq 0 ] && printf '%s\\n' \"$out\" | grep -q ' 27 skipped' && ! printf '%s\\n' \"$out\" | grep '^SKIPPED' | grep -qv 'd_\\(mtf\\|memmap\\|winsor_dtype\\|codec\\|l2\\)' && [ \"$(jq '[.[] | select(.owner_ticket==\"TESTSEL\")] | length' tests/_golden/prered/allowed_red.json)\" = 0 ]",
+    "forbidden": [
+      {
+        "rule": "不刪 test_numview_core.py 任何函式與 helper；該檔 git diff 只含 skipif 裝飾（與必要 import）之新增行、無刪除行；retain 分支測試不改",
+        "observable": true
+      },
+      {
+        "rule": "不改 NUMVIEW 決定紀錄 decisions.json、preregistered_criteria_v9.json、docs/manifests/NUMVIEW.json（已收案票紀錄）",
+        "observable": true
+      },
+      {
+        "rule": "不以函式本體內 pytest.skip 代替收集期 skipif（本體跳過會先建重型 fixture）；不以 xfail 代替；不假造 TESTREG E0／E1／E2 收據",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "SPEC Task 4.2 驗證①③已入 gate_cmd（審 r2 處置）：27 個 nodeid 原樣執行，退出碼 0 須同時滿足 pytest rc=0、摘要含 ' 27 skipped'、每條 SKIPPED reason 含決定鍵 d_mtf／d_memmap／d_winsor_dtype／d_codec／d_l2、owner TESTSEL 列數＝0",
+      "驗證①：jq 計 allowed_red.json 中 `owner_ticket==\"TESTSEL\"` 之列數 ⇒ 0；驗證⑥：ruff check --select F821,F811 tests/feature_engineering/test_numview_core.py 通過（不用 `pytest --collect-only` 收集差集：被 heavy_run_guard 擋，見 `runs/testsel_mon/PROCESS_FRICTION.md` 第 15 條）",
+      "不刪 helper：AST 分析 `runs/testsel_route/i1g/helper_usage.log` 之 21 項專用 helper 僅留作日後改刪除時之依據",
+      "failopen v8：刪檔依據＝範圍至 HEAD 恆紅且與限定範圍版 `test_failopen_matrix.py:190` 重複；`docs/TESTREG_SPEC.md:244` R14 註記此條改由 TESTSEL I1g 刪除",
+      "改壞對照：任一 skipif 條件改恆假 ⇒ 該 nodeid failed；只刪登記列不加 skipif ⇒ 27 failed（施工時實跑記 nodeid）"
+    ],
+    "coverage_risk": [
+      "落選分支 21 函式與其專用 helper 留存（死碼）；決定紀錄改選該分支時自動恢復執行。v8 由限定範圍版與 TESTREG V19／V20 逐提交審涵蓋"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "run_receipts",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

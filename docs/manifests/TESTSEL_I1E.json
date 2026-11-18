@@ -1,0 +1,89 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/feature_engineering/test_kurt_lower_bound_parity.py",
+    "tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "I1b 提交後施工（共用 momentum/FeatureEngineering/operators/rolling_moments_numpy.py）",
+      "開 TODO 前實測與證明 runs/testsel_route/i1e/i1e_facts.md：奇數 n 可達最小超額峰度＝−2n/(n−2)——n≥7 解析證明（正負分組＋Hölder＋Cauchy–Schwarz）、n=5 Lagrange 限縮＋有理數精確證書（runs/testsel_route/i1e/probe_a1b.log）、數值 n≤10001 violations=0；偶數 n＝−2(n−1)/(n−3)（b2−1＝Var(Z²)≥0）",
+      "SPEC Task 2.5（本輪新增送審）",
+      "紅狀態（審查 r2 後，runs/testsel_route/i1e/red_state3.log）：21 failed, 17 passed——accept_02（numba 守衛）5、accept_03（numpy 下界式）9、accept_04 1、boundary_02（numba 容差，奇數 n）5、boundary_03（numpy 容差與比較）1 紅；accept_01 平衡兩點值、boundary_01 偶數 n、boundary_02 偶數 n 現行綠（審查 r2 刪除恆真之元檢查 mutation 測試）"
+    ],
+    "touches": [
+      "momentum/FeatureEngineering/operators/numba_rolling.py",
+      "momentum/FeatureEngineering/operators/rolling_moments_numpy.py",
+      "tests/feature_engineering/test_kurt_lower_bound_parity.py",
+      "tests/_golden/ffstat/nan_propagation_classes.json",
+      "tests/_golden/ffstat/nan_propagation_inventory.json",
+      "tests/_golden/icperf/limit_rulings.json",
+      "tests/_golden/icperf/limit_inventory.json",
+      "tests/registry/catalog.json"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/operators/rolling_aggregator.py",
+      "momentum/FeatureEngineering/operators/__init__.py",
+      "tests/test_numba_rolling.py",
+      "tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py"
+    ],
+    "callers_later": [
+      "I1 收尾：重型批跑 L3 全路徑（預設多窗 numba 臂之守衛改動影響全部 L3 kurt 欄之越界判定；合法值不受影響——可達值必 ≥ 新下界）"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/feature_engineering/test_kurt_lower_bound_parity.py tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py tests/test_numba_rolling.py -p no:cacheprovider -q",
+    "forbidden": [
+      {
+        "rule": "只改 kurt 下界式（依 n 奇偶）；不改上界、偏態界、容差 _MOMENT_BOUND_TOL、退化判定與越界 ⇒ NaN 之約定",
+        "observable": true
+      },
+      {
+        "rule": "兩臂共用同一下界式語意（numba 臂 @njit 函式、numpy 臂 _kurt_lower），不得一臂改一臂不改",
+        "observable": true
+      },
+      {
+        "rule": "不設窗長上限或查表放行（證明涵蓋全部 n）",
+        "observable": true
+      },
+      {
+        "rule": "不以 pandas 為 oracle；驗收用精確界值與真實 BTCUSDT/1h 資料",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "合法值不受影響：新下界＝奇數 n 之可達最小值（證明見 depends），任何真實樣本之 kurt 必 ≥ 新下界，故只會把原本即屬數值錯誤之值改為 NaN",
+      "預設多窗 numba 臂行為改變僅限越界判定；I1b 已實測預設臂於真實資料全窗精確（fail＝0），預期無合法值轉 NaN；I1 收尾重型批覆蓋全路徑",
+      "改壞對照：任一臂下界改回偶數式 ⇒ accept_02（numba，施工前紅狀態即為此對照）／accept_03（numpy 下界式，施工前紅狀態同理）紅；numpy 核心不經 _kurt_lower ⇒ accept_04 紅；移除或擴大容差 ⇒ test_boundary_02_numba_tolerance_unchanged（numba）／test_boundary_03_numpy_tolerance_and_comparison_unchanged（numpy，真實平衡窗之實際值置於下界兩側，經 _moments_block 實際比較）紅；accept_01 之 numba 斷言為 `isfinite and (abs(got−want) ≤ abs(spacing(float32(want))))`",
+      "施工時同步 rolling_moments_numpy 模組 docstring 之界述（改為依 n 奇偶之下界）與 numba_rolling._compute_kurt 註解（審查 r1 COMPOSER-R1-P3-03）",
+      "連帶盤點：FFSTAT NaN 盤點（若新增 numba 函式）與 ICPERF 上限盤點（行錨定）以生成端重產（同 I1b 做法）"
+    ],
+    "coverage_risk": [
+      "越界值無法由真實資料構造（數學上不可達），守衛之『擋』方向以直呼 _compute_kurt／_kurt_lower 驗證，『放』方向以真實資料平衡兩點窗驗證"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

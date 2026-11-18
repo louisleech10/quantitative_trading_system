@@ -167,6 +167,7 @@ def test_train_input_empty_y_and_invalid_eval_size():
 
 
 def test_train_numpy_feature_mismatch_and_missing_names():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     analyzer = LightGBMAnalyzer(params={"n_estimators": 10})
     X = np.random.randn(12, 4)
     y = np.array([0, 1] * 6)
@@ -197,6 +198,7 @@ def test_train_with_custom_params_and_categorical_branch(synthetic_training_data
 
 
 def test_time_series_split_invalid_branches():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     analyzer = LightGBMAnalyzer(params={"n_estimators": 5})
     X = np.random.randn(2, 2)
     y = np.array([0, 1])

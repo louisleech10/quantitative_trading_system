@@ -269,7 +269,9 @@ rm -f "${_tr_log}"
 
 # ── NOCAP Task 0.2b③：其他工具／agent 寫入之時間上限於提交時攔下（docs/NOCAP_SPEC.md）────────────────────
 #   讀暫存區完整內容判綁定（函式＋被呼叫者＋字面值），只對相對 HEAD 新增之行報錯；未登記或 A 類 ⇒ 擋。
-"$py" scripts/timeout_scan.py --staged
+#   `--repo "$ROOT"`：掃「正在提交之 repo」——timeout_scan.py 之預設 repo 以 `__file__` 之 resolve() 推導，以符號連結
+#   佈署時（測試之迷你 repo）會指到連結目標之 repo，於 hook 之 GIT_INDEX_FILE 下 git rc 128（TESTSEL 收尾 A 項查得）。
+"$py" scripts/timeout_scan.py --staged --repo "$ROOT"
 _nc_rc=$?          # 🔴 rc 直接取，禁經 pipe
 if [ "${_nc_rc}" -ne 0 ]; then
   echo "pre-commit: 🔴 NOCAP：新增之逾時／期限寫法未登記或屬 A 類（依牆鐘停止或縮減運算）——改經共用監看，或於 scripts/timeout_registry.json 登記 B／C／D" >&2

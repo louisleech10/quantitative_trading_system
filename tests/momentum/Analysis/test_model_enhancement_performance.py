@@ -6,6 +6,7 @@ import tracemalloc
 
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn.linear_model import LogisticRegression
 
 from api.models.model_enhancement import FullEnhancementRequest
@@ -20,7 +21,8 @@ from momentum.factories import (
 )
 
 
-def _bench(name: str, target_seconds: float, fn):
+def _bench(results: list, name: str, target_seconds: float, fn):
+    """跑一個模組並記錄（名稱, 牆鐘目標秒, 牆鐘秒, tracemalloc 峰值 MB）；斷言由下方兩條測試分別做。"""
     tracemalloc.start()
     start = time.perf_counter()
     fn()
@@ -28,15 +30,22 @@ def _bench(name: str, target_seconds: float, fn):
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     peak_mb = peak / (1024 * 1024)
-
-    assert elapsed <= target_seconds, (
-        f"{name} 超時: elapsed={elapsed:.3f}s > target={target_seconds:.3f}s"
-    )
-    assert peak_mb < 2048, f"{name} 記憶體超限: peak={peak_mb:.2f}MB >= 2048MB"
+    results.append((name, target_seconds, elapsed, peak_mb))
 
 
+_PHASE5_NAMES = [
+    "M1 ProbabilityCalibrator", "M2 WalkForwardValidator", "M3 SampleWeightCalculator", "M4 AdversarialValidator",
+    "M5 CombinatorialPurgedCV", "M6 LearningCurveAnalyzer", "Full Enhancement",
+]
 
-def test_phase5_performance_targets():
+
+@pytest.fixture(scope="module")
+def phase5_bench_runs() -> list:
+    """Phase 5 六模組＋Full Enhancement 依序各跑一次（同一 rng 序列），供記憶體與牆鐘兩條共用（不重複計算）。
+
+    TESTSEL S3：牆鐘目標隨機器負載而變 ⇒ 移至 perf；tracemalloc 峰值量 Python 配置、由程式與輸入決定 ⇒ 留非 perf。
+    """
+    results: list = []
     rng = np.random.default_rng(42)
 
     def run_m1():
@@ -47,7 +56,7 @@ def test_phase5_performance_targets():
             y_true=y_true, y_pred_proba=y_pred, method="auto", require_receipt=False
         )
 
-    _bench("M1 ProbabilityCalibrator", 30.0, run_m1)
+    _bench(results, "M1 ProbabilityCalibrator", 30.0, run_m1)
 
     def run_m2():
         n, f = 5_000, 50
@@ -68,7 +77,7 @@ def test_phase5_performance_targets():
             step_size=100,
         )
 
-    _bench("M2 WalkForwardValidator", 120.0, run_m2)
+    _bench(results, "M2 WalkForwardValidator", 120.0, run_m2)
 
     def run_m3():
         n = 50_000
@@ -83,7 +92,7 @@ def test_phase5_performance_targets():
             combination="multiply",
         )
 
-    _bench("M3 SampleWeightCalculator", 10.0, run_m3)
+    _bench(results, "M3 SampleWeightCalculator", 10.0, run_m3)
 
     def run_m4():
         n_train, n_test, f = 5_000, 5_000, 50
@@ -98,7 +107,7 @@ def test_phase5_performance_targets():
             timestamps=timestamps,
         )
 
-    _bench("M4 AdversarialValidator", 60.0, run_m4)
+    _bench(results, "M4 AdversarialValidator", 60.0, run_m4)
 
     def run_m5():
         n, f = 5_000, 50
@@ -116,7 +125,7 @@ def test_phase5_performance_targets():
             feature_names=X.columns.tolist(),
         )
 
-    _bench("M5 CombinatorialPurgedCV", 180.0, run_m5)
+    _bench(results, "M5 CombinatorialPurgedCV", 180.0, run_m5)
 
     def run_m6():
         n, f = 10_000, 50
@@ -134,7 +143,7 @@ def test_phase5_performance_targets():
             feature_names=X.columns.tolist(),
         )
 
-    _bench("M6 LearningCurveAnalyzer", 120.0, run_m6)
+    _bench(results, "M6 LearningCurveAnalyzer", 120.0, run_m6)
 
     def run_full_enhancement():
         n, f = 2_000, 20
@@ -184,7 +193,24 @@ def test_phase5_performance_targets():
 
         asyncio.run(_run_async())
 
-    _bench("Full Enhancement", 900.0, run_full_enhancement)
+    _bench(results, "Full Enhancement", 900.0, run_full_enhancement)
+    return results
+
+
+def test_phase5_modules_complete_within_memory_budget(phase5_bench_runs: list) -> None:
+    """七項皆跑完（無例外）且各自 tracemalloc 峰值 < 2048MB（原效能測試之記憶體斷言；確定性，留非 perf）。"""
+    assert [name for name, *_ in phase5_bench_runs] == _PHASE5_NAMES
+    for name, _target_seconds, _elapsed, peak_mb in phase5_bench_runs:
+        assert peak_mb < 2048, f"{name} 記憶體超限: peak={peak_mb:.2f}MB >= 2048MB"
+
+
+@pytest.mark.perf
+def test_phase5_performance_targets(phase5_bench_runs: list) -> None:
+    """各項牆鐘 ≤ 目標秒：效能基準，opt-in（TESTSEL S3）。"""
+    for name, target_seconds, elapsed, _peak_mb in phase5_bench_runs:
+        assert elapsed <= target_seconds, (
+            f"{name} 超時: elapsed={elapsed:.3f}s > target={target_seconds:.3f}s"
+        )
 
 
 def test_phase5_full_enhancement_outcomes_are_asserted():

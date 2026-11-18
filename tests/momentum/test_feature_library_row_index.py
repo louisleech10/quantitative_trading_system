@@ -14,6 +14,7 @@ mutation 對照(見 SPEC §V):
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
@@ -35,6 +36,12 @@ def runs(monkeypatch: pytest.MonkeyPatch, tmp_feature_runs: Dict[str, Any]) -> D
         raise RuntimeError("tmp_feature_runs 之 symbol/timeframe 與本檔常數不符")
     monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(tmp_feature_runs["registry"]))
     monkeypatch.chdir(tmp_feature_runs["root"])
+    # 明給讀取根：tests/conftest.py 之 HERMETIC 把 FeatureStorage 預設改為絕對暫存根，chdir 不再生效
+    # ⇒ 讀取指向物化 run 之根（TESTSEL I1a Task 1.3；整合分支曾因此讀空根而紅）
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    monkeypatch.setattr(FeatureStorage.__init__, "__defaults__",
+                        (str(Path(tmp_feature_runs["root"]) / "data_cache" / "features"),))
     return tmp_feature_runs
 
 

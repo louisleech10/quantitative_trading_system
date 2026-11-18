@@ -523,7 +523,8 @@ def live_g7() -> dict[str, subprocess.CompletedProcess[str]]:
 
     三條原各自以同一腳本、同一參數（`--only g7`）、同一 cwd（REPO）、同一工作樹狀態（本模組其他測試之改檔皆於
     finally 還原）各跑一次 ⇒ 同輸入、同程式路徑。F3 之「g7 不汙染工作樹」前後 dirty 數、ambient 之
-    `scripts/gate_check.sh` 狀態，皆於這一次 g7 之前後緊鄰量測，與原各測試內之量測次序相同。"""
+    `scripts/gate_check.sh` 狀態，皆於這一次 g7 之前後緊鄰量測，與原各測試內之量測次序相同。
+    另兩處 g7（`test_r7_v5_*` 於臨時 worktree 之 probe commit、`test_g7_target_m_*` 於改動標的檔後）輸入不同，不共用。"""
     gate_check_status = _run(["git", "status", "--porcelain", "--", "scripts/gate_check.sh"])
     before = _run(["bash", "-c", "git status --porcelain | wc -l"])
     g7 = _run(["bash", str(GATE), "--only", "g7"])
@@ -1288,6 +1289,21 @@ def test_r7_v5_undeclared_space_quote_still_fails_g7() -> None:
 
         # 覆寫為工作區現行 gate（含 r7 grammar 守衛）
         shutil.copy2(GATE, wt / "scripts" / "govb1_final_gate.sh")
+        # TESTSEL I10：base_commit 改為 worktree 起點（探針 commit 之親代）⇒ g7 之 base..HEAD 只含探針 commit
+        # （gate、frozen_hashes 兩宣告路徑＋兩 evil 檔），g7 判定邏輯不變。原沿用凍結 base（62787fe4）時 range 隨 HEAD
+        # 無上限成長（2026-11 約 2,600 commits／5,500 路徑、逐路徑 git log，ledger 742 秒），且 G-7 本已因無關之未宣告
+        # 路徑恆紅 ⇒ 下方「未宣告」字樣可由無關路徑滿足、探針路徑未被真正驗到；縮 range 後另斷言未宣告集合恰為兩 evil 檔。
+        start = wt_run(["git", "rev-parse", "HEAD"])
+        assert start.returncode == 0, start.stderr
+        frozen_wt = wt / "scripts" / "govb1_frozen_hashes.txt"
+        frozen_lines = frozen_wt.read_text(encoding="utf-8").splitlines(keepends=True)
+        n_base = sum(1 for ln in frozen_lines if ln.startswith("base_commit:"))
+        assert n_base == 1, frozen_lines
+        frozen_wt.write_text(
+            "".join(f"base_commit: {start.stdout.strip()}\n" if ln.startswith("base_commit:") else ln
+                    for ln in frozen_lines),
+            encoding="utf-8",
+        )
 
         evil_space = "scripts/r7 evil space.sh"
         evil_quote = 'scripts/r7evil"quote.sh'
@@ -1308,6 +1324,7 @@ def test_r7_v5_undeclared_space_quote_still_fails_g7() -> None:
                 evil_space,
                 evil_quote,
                 "scripts/govb1_final_gate.sh",
+                "scripts/govb1_frozen_hashes.txt",
             ]
         )
         assert add1.returncode == 0, add1.stderr
@@ -1328,6 +1345,16 @@ def test_r7_v5_undeclared_space_quote_still_fails_g7() -> None:
             or 'r7evil"quote.sh' in combined
             or "未宣告" in combined
         ), combined
+        # range 只含探針 commit ⇒ 未宣告集合恰為兩 evil 檔（gate、frozen_hashes 為 manifest allow 宣告路徑）
+        header = "G-7 FAIL: 未宣告即修改:\n"
+        assert header in g7_bad.stderr, combined
+        listed = set()
+        for ln in g7_bad.stderr.split(header, 1)[1].splitlines():
+            if ln == "FAIL g7":  # gate 主迴圈於檢查失敗後印之總結行（非路徑）
+                break
+            if ln:
+                listed.add(ln)
+        assert listed == {evil_space, evil_quote}, listed
     finally:
         _run(["git", "worktree", "remove", "-f", str(wt)])
         _run(["git", "branch", "-D", branch])

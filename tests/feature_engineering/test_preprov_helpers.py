@@ -2,7 +2,7 @@
 
 受測物：`tests/feature_engineering/preprov_helpers.declared_feature_files`（依 manifest 列群組檔之單一函式）與
 `tests/`、`scripts/` 全部掃描型呼叫點之讀法——以清冊 `tests/_golden/preprov/reader_inventory.json`（AST 重掃對證；
-CODEX-R5-P2-03）取代手寫三檔清單。真實 kline 短窗 run（同模組同格只生成一次）；run 目錄之竄改一律在 tmp 複本上做。
+CODEX-R5-P2-03）取代手寫三檔清單。真實 kline 短窗 run（同行程同格只生成一次，`ph.shared_run_cache`）；run 目錄之竄改一律在 tmp 複本上做。
 實作前應為紅；不得以 skip／xfail 暫避。
 """
 
@@ -213,7 +213,7 @@ def feature_run_files_not_manifest_driven(inventory: Mapping[str, Any]) -> List[
 
 @pytest.fixture(scope="module")
 def runs(tmp_path_factory: pytest.TempPathFactory) -> ph.RunCache:
-    return ph.RunCache(tmp_path_factory.mktemp("preprov_helpers"))
+    return ph.shared_run_cache(tmp_path_factory)  # TESTSEL I10：session 共用倉（同格每行程只生成一次）
 
 
 def _copy_run(handle: ph.RunHandle, tmp_path: Path) -> Path:

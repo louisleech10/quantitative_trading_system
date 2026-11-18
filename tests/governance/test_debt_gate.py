@@ -408,16 +408,11 @@ def test_gate_sh_enforces_debt_without_hook(tmp_path: Path) -> None:
     assert not (gate_dir / "dispatch.token").is_file() or "GATE PASS" not in (r.stdout or "")
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "R-GOVTEST-4：帳本核心依 SPEC Task 2.1 改法①禁前置過濾，冷路徑隨 audit 線性成長"
-    "（2026-09-23 實測 7.5MB／70,898 行：核心 122ms、gate_check 148ms）；解法＝RM-P1-6 線 C（債務事件分檔），"
-    "ROADMAP 標停手不排程。線 C 落地轉綠時 strict 以 XPASS 報紅，須移除本標記並同步登記表"))
-def test_gate_check_latency_under_100ms(tmp_path: Path) -> None:
-    """單次 gate_check cold < 100ms（SPEC 字面；真實規模 audit 實測）。
-
-    不得只量 warm／不得放寬 cold 門檻。無 sidecar 快取；cold＝每次直查 ledger。
-    使用真實 audit 副本（若存在）以反映 prod 行數；否則以空 audit 仍 assert cold<100。
-    """
+@pytest.fixture(scope="module")
+def gate_check_real_audit_runs(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    """真實規模 audit 副本＋未來 cutoff：gate_check 連跑三次 cold＋一次 second，記 rc 與毫秒（TESTSEL S3：放行正確性與
+    延遲兩條共用同一組執行，不重複）。"""
+    tmp_path = tmp_path_factory.mktemp("debt_gate_latency")
     root, audit, gate_dir = _setup_repo(tmp_path)
     real_audit = REPO_ROOT / ".claude" / "gate" / "audit.log"
     real_lines = 0
@@ -465,6 +460,32 @@ def test_gate_check_latency_under_100ms(tmp_path: Path) -> None:
         f"cutoff_override=2099-01-01T00:00:00Z"
     )
     print(receipt)
+    return {"samples": samples, "ms_cold": ms_cold, "rc_cold": rc_cold, "rc2": rc2, "ms2": ms2, "receipt": receipt}
+
+
+def test_gate_check_real_audit_future_cutoff_allows(gate_check_real_audit_runs: dict) -> None:
+    """真實規模 audit＋未來 cutoff（無債）⇒ gate_check 四次皆放行（rc 0）。原延遲測試之放行斷言（只驗中位樣本與
+    second）獨立為正確性測試，並擴為四次全驗；延遲門檻留在 perf 之 test_gate_check_latency_under_100ms（TESTSEL S3）。"""
+    runs = gate_check_real_audit_runs
+    rcs = [rc for rc, _ in runs["samples"]] + [runs["rc2"]]
+    assert rcs == [0, 0, 0, 0], f"未來 cutoff 無債應放行: {runs['receipt']}"
+
+
+@pytest.mark.perf
+@pytest.mark.xfail(strict=True, reason=(
+    "R-GOVTEST-4：帳本核心依 SPEC Task 2.1 改法①禁前置過濾，冷路徑隨 audit 線性成長"
+    "（2026-09-23 實測 7.5MB／70,898 行：核心 122ms、gate_check 148ms）；解法＝RM-P1-6 線 C（債務事件分檔），"
+    "ROADMAP 標停手不排程。線 C 落地轉綠時 strict 以 XPASS 報紅，須移除本標記並同步登記表"))
+def test_gate_check_latency_under_100ms(gate_check_real_audit_runs: dict) -> None:
+    """單次 gate_check cold < 100ms（SPEC 字面；真實規模 audit 實測）。
+
+    不得只量 warm／不得放寬 cold 門檻。無 sidecar 快取；cold＝每次直查 ledger。
+    使用真實 audit 副本（若存在）以反映 prod 行數；否則以空 audit 仍 assert cold<100。
+    TESTSEL S3：牆鐘門檻屬效能基準 ⇒ perf（opt-in）；放行正確性另見 test_gate_check_real_audit_future_cutoff_allows。
+    """
+    ms_cold, ms2 = gate_check_real_audit_runs["ms_cold"], gate_check_real_audit_runs["ms2"]
+    rc_cold, rc2 = gate_check_real_audit_runs["rc_cold"], gate_check_real_audit_runs["rc2"]
+    receipt = gate_check_real_audit_runs["receipt"]
 
     # SPEC：單次 gate_check < 100ms——以 cold（無快取）為準，不得放寬
     assert ms_cold < 100.0, f"cold gate_check 須 <100ms: {receipt}"

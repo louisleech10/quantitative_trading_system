@@ -1,0 +1,168 @@
+{
+  "schema": "framepath-refreeze-provenance-v2/1",
+  "reason": "d4d97d62 逐欄紀錄契約 v2",
+  "contract": "momentum/FeatureEngineering/contracts/run_provenance.json",
+  "contract_version": 2,
+  "old_tree": {
+    "repo": "/Users/louis/Desktop/quantitative_trading_system/.claude/worktrees/agent-a345ea55c556c9092/runs/g3/wt_frz",
+    "head": "9891907fdab7749079723615aef71f1feb9901d4"
+  },
+  "new_tree": {
+    "repo": "/Users/louis/Desktop/quantitative_trading_system/.claude/worktrees/agent-a345ea55c556c9092",
+    "head": "8437a1a7efe3418049294d661b7fa4f898b5d8c1"
+  },
+  "baseline_sha256_before": "57b1ae72eadb1306f9031aa392cd6e766cb849de26e165e934baeb3898d09d70",
+  "baseline_sha256_after": "dee62d60dd84964d7107f6b64ce4bc4cc2db3b7ea14cd6202c49f183e5d57689",
+  "items": [
+    {
+      "cell": "C1",
+      "frozen_before": "6f963cba1852207b2068afc1a87746106663d56e6b8791f5d9700cee0328d6c1",
+      "old_tree_value": "6f963cba1852207b2068afc1a87746106663d56e6b8791f5d9700cee0328d6c1",
+      "new_value": "cfc462483322b18b73dd1b6ba3ffd747d20aa00cd44c09cfeb949257a1815a95",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/32965d01895359f892569bbbc51a46bc/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/32965d01895359f892569bbbc51a46bc/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 69,
+      "errors": []
+    },
+    {
+      "cell": "C2",
+      "frozen_before": "82e38417ea73e778b4fc986cba3795b316674eaa5a46b02c0b4e3d8e45a7aac2",
+      "old_tree_value": "82e38417ea73e778b4fc986cba3795b316674eaa5a46b02c0b4e3d8e45a7aac2",
+      "new_value": "fd9ac44238fcb9add5f45300d3ed3e0b92e554b9fe3cae013a2a67e23400aad4",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/da3c58af12cb85b864ce1f5ef08417f3/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/da3c58af12cb85b864ce1f5ef08417f3/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 44,
+      "errors": []
+    },
+    {
+      "cell": "C3",
+      "frozen_before": "c8342265f5b268fc9237a0eb86bbfe7968fe0fdf5e58454bb93da25148965e16",
+      "old_tree_value": "c8342265f5b268fc9237a0eb86bbfe7968fe0fdf5e58454bb93da25148965e16",
+      "new_value": "8f1f9bca9a80f2134722aa0ca28cd9e8660c660d486c52e752f0d53ce2179681",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/cb61d3d0ca2e93e720482e2010fb7478/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/cb61d3d0ca2e93e720482e2010fb7478/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 150,
+      "errors": []
+    },
+    {
+      "cell": "C4-streaming",
+      "frozen_before": "6f963cba1852207b2068afc1a87746106663d56e6b8791f5d9700cee0328d6c1",
+      "old_tree_value": "6f963cba1852207b2068afc1a87746106663d56e6b8791f5d9700cee0328d6c1",
+      "new_value": "cfc462483322b18b73dd1b6ba3ffd747d20aa00cd44c09cfeb949257a1815a95",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/32965d01895359f892569bbbc51a46bc/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/32965d01895359f892569bbbc51a46bc/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 69,
+      "errors": []
+    },
+    {
+      "cell": "C4-hybrid",
+      "frozen_before": "b3a66b39997985b9f8df7bbb5f94404eb5175428f7a882dad2aaa0fdd1b656c9",
+      "old_tree_value": "b3a66b39997985b9f8df7bbb5f94404eb5175428f7a882dad2aaa0fdd1b656c9",
+      "new_value": "0e70fd943798ff9ebb7936e20df16354aadf6eb705e08099a7576494c05686a0",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/557589dd956d3162711f4b35df612dd7/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/557589dd956d3162711f4b35df612dd7/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 69,
+      "errors": []
+    },
+    {
+      "cell": "C5",
+      "frozen_before": "dc7e240beeed323fb988f1fbafb6de56ea3ba0b9644ff88859d1916cf54dd46e",
+      "old_tree_value": "dc7e240beeed323fb988f1fbafb6de56ea3ba0b9644ff88859d1916cf54dd46e",
+      "new_value": "b04fac6b51c4e2cfb0e598758860aad5b5c3e7c0593bda4bb7e576c4597235a7",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/32965d01895359f892569bbbc51a46bc/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/32965d01895359f892569bbbc51a46bc/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 69,
+      "errors": []
+    },
+    {
+      "cell": "C6",
+      "frozen_before": "e1e3e63fca36dad3afe557cd1de86b7999e1b27712af768517ab48b0c1d8378b",
+      "old_tree_value": "e1e3e63fca36dad3afe557cd1de86b7999e1b27712af768517ab48b0c1d8378b",
+      "new_value": "9723d19a0a629c340b639881d8b449e2325b6708aa56a9c05a23cab46bc6578c",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/fb575ac8deb1050dfba2f757882e4c31/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/fb575ac8deb1050dfba2f757882e4c31/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 150,
+      "errors": []
+    },
+    {
+      "cell": "C7",
+      "frozen_before": "2782e6ea3e7b9acf1383740193917caee2391df4768db163778672327e8536cb",
+      "old_tree_value": "2782e6ea3e7b9acf1383740193917caee2391df4768db163778672327e8536cb",
+      "new_value": "2782e6ea3e7b9acf1383740193917caee2391df4768db163778672327e8536cb",
+      "changed": false,
+      "diff_paths": [],
+      "value_files": 0,
+      "errors": []
+    },
+    {
+      "cell": "C8",
+      "frozen_before": "0063775b5527eed592a67caf12daf0ab4b5c575d0dca4bded5cca7e1f50d3b4b",
+      "old_tree_value": "0063775b5527eed592a67caf12daf0ab4b5c575d0dca4bded5cca7e1f50d3b4b",
+      "new_value": "ea323c078a3313d4e32ef21a1b94f5c03c24f0df0d76e518a7059a819cb3d082",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/0cb343e9bd02c8abcdc8fb510cafb807/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/0cb343e9bd02c8abcdc8fb510cafb807/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 37,
+      "errors": []
+    },
+    {
+      "cell": "C9",
+      "frozen_before": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "old_tree_value": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "new_value": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "changed": false,
+      "diff_paths": [],
+      "value_files": 0,
+      "errors": []
+    },
+    {
+      "cell": "C10",
+      "frozen_before": "e20022811225887503faf3fe0f2dc9f1d238ad4021e50e63df2f24faedcac27c",
+      "old_tree_value": "e20022811225887503faf3fe0f2dc9f1d238ad4021e50e63df2f24faedcac27c",
+      "new_value": "6fec633971c66433a92d3f05f5c1bbb98f86a2c651ed71d0bde1fec3ed5c51ef",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/550a17e1fee18c4c4b901a53e2c4c0c2/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/550a17e1fee18c4c4b901a53e2c4c0c2/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 46,
+      "errors": []
+    },
+    {
+      "cell": "C11",
+      "frozen_before": "979f08ef8de32e5f17ee5d17e4fe8724f78bdc4d2a2e2035e6660f38679f78d6",
+      "old_tree_value": "979f08ef8de32e5f17ee5d17e4fe8724f78bdc4d2a2e2035e6660f38679f78d6",
+      "new_value": "be26ddfd68143e8db7895d995b9c956f9b4e1120a7638e45e96189afc3951512",
+      "changed": true,
+      "diff_paths": [
+        "BTCUSDT/1h/3e9521d16166963bb8a77c9ad28ef34d/feature_manifest.json#artifacts.raw.provenance.contract_version",
+        "BTCUSDT/1h/3e9521d16166963bb8a77c9ad28ef34d/feature_manifest.json#artifacts.raw.provenance.sha256"
+      ],
+      "value_files": 82,
+      "errors": []
+    }
+  ]
+}

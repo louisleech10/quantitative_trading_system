@@ -24,8 +24,36 @@ from api.models.training_window_config import (
 
 
 class TestPerformanceTarget:
-    """測試核心性能目標：1000 cases < 10 seconds"""
+    """測試核心性能目標：1000 cases < 10 seconds
 
+    TESTSEL S3：牆鐘門檻屬效能基準（perf，opt-in；結果隨機器負載而變）；1000 案例結果之型別與正負樣本數屬正確性，
+    由 `test_1000_cases_sample_sizes_match_input` 於非 perf 驗證（同一輸入；本計算數秒級，兩條各算一次）。
+    """
+
+    @pytest.mark.slow
+    def test_1000_cases_sample_sizes_match_input(
+        self,
+        signal_analyzer,
+        performance_test_cases,
+        sample_strategy_config,
+        sample_training_window_config
+    ):
+        """1000 個真實案例之分析結果：回傳核心契約型別，正負樣本數等於輸入（原效能測試之結果有效性斷言）。"""
+        positive_cases = performance_test_cases["positive"]
+        negative_cases = performance_test_cases["negative"]
+
+        result = signal_analyzer.analyze_signal_density(
+            positive_cases=positive_cases,
+            negative_cases=negative_cases,
+            strategy_config=sample_strategy_config,
+            window_config=sample_training_window_config
+        )
+
+        assert isinstance(result, SignalDensityResponse)
+        assert result.positive_sample_size == len(positive_cases)
+        assert result.negative_sample_size == len(negative_cases)
+
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_1000_cases_under_10_seconds(
         self,
@@ -83,10 +111,7 @@ class TestPerformanceTarget:
         assert avg_time_per_case < 10.0, \
             f"Average time too high: {avg_time_per_case:.2f}ms > 10ms"
 
-        # 驗證結果有效性
-        assert isinstance(result, SignalDensityResponse)
-        assert result.positive_sample_size == len(positive_cases)
-        assert result.negative_sample_size == len(negative_cases)
+        # 結果有效性斷言已移至非 perf 之 test_1000_cases_sample_sizes_match_input（TESTSEL S3）
 
         print(f"\n✅ 性能測試通過：{total_cases} cases in {elapsed:.2f}s")
 
@@ -102,6 +127,7 @@ class TestPerformanceTarget:
 class TestPerformanceBreakdown:
     """測試性能分解：識別瓶頸"""
 
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_training_window_extraction_performance(
         self,
@@ -137,6 +163,7 @@ class TestPerformanceBreakdown:
 
         print(f"✅ 窗口提取性能合格")
 
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_signal_calculation_performance(
         self,
@@ -169,12 +196,14 @@ class TestPerformanceBreakdown:
 
         print(f"✅ 信號計算性能合格")
 
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_density_calculation_performance(self, signal_analyzer):
         """測試密度計算性能"""
-        # 創建 1000 個信號陣列
+        # 創建 1000 個信號陣列（TESTSEL S3：固定種子，輸入可重現）
+        rng = np.random.default_rng(20261026)
         signals_list = [
-            np.random.choice([0.0, 1.0, np.nan], size=500)
+            rng.choice([0.0, 1.0, np.nan], size=500)
             for _ in range(1000)
         ]
 
@@ -197,12 +226,14 @@ class TestPerformanceBreakdown:
 
         print(f"✅ 密度計算性能合格")
 
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_statistical_test_performance(self, signal_analyzer):
         """測試統計檢驗性能"""
-        # 創建樣本數據
-        positive_densities = np.random.uniform(0.6, 0.9, size=500)
-        negative_densities = np.random.uniform(0.1, 0.4, size=500)
+        # 創建樣本數據（TESTSEL S3：固定種子，輸入可重現）
+        rng = np.random.default_rng(20261026)
+        positive_densities = rng.uniform(0.6, 0.9, size=500)
+        negative_densities = rng.uniform(0.1, 0.4, size=500)
 
         times = []
 
@@ -236,6 +267,7 @@ class TestPerformanceBreakdown:
 class TestScalability:
     """測試可擴展性"""
 
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_performance_scales_linearly(
         self,
@@ -317,6 +349,7 @@ class TestScalability:
 class TestPerformanceRegression:
     """性能回歸測試"""
 
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_baseline_performance_100_cases(
         self,
@@ -358,6 +391,7 @@ class TestPerformanceRegression:
 class TestWorstCasePerformance:
     """最壞情況性能測試"""
 
+    @pytest.mark.perf
     @pytest.mark.slow
     def test_large_window_performance(
         self,

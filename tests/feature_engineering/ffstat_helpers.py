@@ -113,6 +113,174 @@ def stat_payload(training_tfs: Optional[List[str]] = None, *, fracdiff: bool = T
     return payload
 
 
+#: 窄設定之趨勢指標（TESTSEL I10）：EMA 三週期使 L2 Cross／Ratio 各有配對（配對規則最小倍數 3：5→21→89）；
+#: KAMA 144／233、MIDPRICE 34／55 為 `stat_payload` 全設定於 WINDOW（N＝1000）實測進 fracdiff 之 L1 欄（主委探針
+#: runs/g2/probe_full.log：全設定 L1 fracdiff 欄含 KAMA_144、KAMA_233、MIDPRICE_34／55）——EMA 5／21／89 於此窗皆
+#: ADF 平穩（p 0.010–0.027），只用 EMA 則無 fracdiff 欄、d* 路徑不被走到；餘同 `stat_payload`（close、L3 5／13、L6.5）
+NARROW_TREND = [{"name": "EMA", "enabled": True, "periods": [5, 21, 89]},
+                {"name": "KAMA", "enabled": True, "periods": [144, 233]},
+                {"name": "MIDPRICE", "enabled": True, "periods": [34, 55]}]
+
+
+def narrow_stat_payload(training_tfs: Optional[List[str]] = None, **kwargs: Any) -> Dict[str, Any]:
+    """`stat_payload` 之窄版（TESTSEL I10 重型瘦身）：趨勢類只留 `NARROW_TREND`，其餘（資料源、L2 Cross／Ratio、
+    L3、L6.5 fracdiff／ADF 差分、縮尾）不變 ⇒ 平穩化、校準、d* 快取、多週期、續跑等程式路徑與 `stat_payload` 相同，
+    只少同路徑之重複欄。不涉凍結基準之測試（欄集合不比 `baseline.json`）用之。"""
+    payload = stat_payload(training_tfs, **kwargs)
+    payload["atomic_indicators"]["trend"] = {"enabled": True, "indicators": [dict(i) for i in NARROW_TREND]}
+    return payload
+
+
+_L1_ENGINE_PATHS = {
+    "trend": "momentum.FeatureEngineering.atomic.trend_indicators:TrendIndicatorEngine",
+    "momentum": "momentum.FeatureEngineering.atomic.momentum_indicators:MomentumIndicatorEngine",
+    "volatility": "momentum.FeatureEngineering.atomic.volatility_indicators:VolatilityIndicatorEngine",
+    "volume": "momentum.FeatureEngineering.atomic.volume_indicators:VolumeIndicatorEngine",
+    "cycle": "momentum.FeatureEngineering.atomic.cycle_indicators:CycleIndicatorEngine",
+    "statistics": "momentum.FeatureEngineering.atomic.statistics_indicators:StatisticsIndicatorEngine",
+}
+
+
+def l1_indicator_max_k(category: str, category_node: Dict[str, Any], indicator: Dict[str, Any]) -> Optional[int]:
+    """一個 TA-Lib L1 指標設定之各實例 K 最大者；與生產 `l1_output_points.max_l1_k` 同一展開（`engine._resolve_params`）
+    與同一 K 規則（`_k_from_table`）。非 TA-Lib 或於轉接層計算者回 None（其 K 不隨設定之週期而變）。"""
+    import importlib
+
+    from momentum.FeatureEngineering.atomic import l1_output_points as lop
+    from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+
+    if category not in _L1_ENGINE_PATHS:
+        return None
+    TALibWrapper.initialize()
+    spec = TALibWrapper.INDICATOR_REGISTRY.get(indicator["name"]) if indicator.get("enabled", True) else None
+    if spec is None or spec.computed_in_adapter:
+        return None
+    module, cls = _L1_ENGINE_PATHS[category].split(":")
+    engine = getattr(importlib.import_module(module), cls)(dict(category_node), [])
+    params = engine._resolve_params(indicator["name"], dict(indicator))
+    return max(lop._k_from_table(lop.table_indicator(spec.talib_func, spec.category), p) for p in params)
+
+
+def per_indicator_max_k(config: Any) -> Dict[Tuple[str, str], int]:
+    """設定中每個 TA-Lib L1 指標（類別, 名）之最大 K（`l1_indicator_max_k`）。"""
+    out: Dict[Tuple[str, str], int] = {}
+    for category in _L1_ENGINE_PATHS:
+        cat_cfg = getattr(config.atomic_indicators, category)
+        if not cat_cfg.enabled:
+            continue
+        node = cat_cfg.model_dump()
+        for ind in cat_cfg.indicators:
+            k = l1_indicator_max_k(category, node, ind.model_dump())
+            if k is not None:
+                out[(category, ind.name)] = k
+    return out
+
+
+def reduce_indicator_periods(category: str, category_node: Dict[str, Any], *, min_multiplier: int) -> List[Dict[str, Any]]:
+    """TESTSEL I10：每指標只留最深實例——週期型留「最大週期」與「K 最大之週期」（倍數表 K 對週期非處處單調），另留
+    一個配對用之快週期（≤ 最大週期／`min_multiplier` 之最大者，使 L2 Cross／Ratio 仍有同家族配對）；組合型（combos）
+    留最大週期之組合與 K 最大之組合（STOCHRSI 之 K 最大組合為 (21,5,3)＝827，非最大週期之 (55,8,5)＝550）；
+    `ema_periods` 只留最大者。非週期參數變體（matype、stddev、nbdev、SAR 加速度等，各為倍數表之獨立量測條目）不動。
+    每指標最大 K 不變由 test_ffstat_golden 之 test_dual_start_reduction_keeps_deepest_instances 機械核對。"""
+    from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
+
+    def k_of(ind: Dict[str, Any]) -> int:
+        k = l1_indicator_max_k(category, category_node, ind)
+        return -1 if k is None else k
+
+    out: List[Dict[str, Any]] = []
+    for raw in category_node.get("indicators") or []:
+        ind = dict(raw)
+        periods = ind.get("periods")
+        if periods is not None:
+            standard = [int(p) for p in (ind.get("industry_standard") or [])]
+            if isinstance(periods, str):
+                rng = ind.get("period_range") or [5, 233]
+                values = ParameterGenerator.generate(periods, range_min=int(rng[0]), range_max=int(rng[-1]),
+                                                     industry_standard=standard or None)
+            else:
+                values = sorted({int(p) for p in periods} | set(standard))
+            slowest = max(values)
+            deepest = max(values, key=lambda p: (k_of({**ind, "periods": [p], "industry_standard": None}), p))
+            fast = [v for v in values if v * min_multiplier <= slowest]
+            ind["periods"] = sorted({*([max(fast)] if fast else []), deepest, slowest})
+            ind["industry_standard"] = None
+        if ind.get("combos"):
+            combos = [list(c) for c in ind["combos"]]
+            longest = max(combos, key=lambda c: (max(c), c))
+            deepest = max(combos, key=lambda c: (k_of({**ind, "combos": [c]}), c))
+            ind["combos"] = [c for c in combos if c in (longest, deepest)]
+        if ind.get("ema_periods"):
+            ind["ema_periods"] = [max(int(p) for p in ind["ema_periods"])]
+        out.append(ind)
+    return out
+
+
+def _default_config_dump() -> Dict[str, Any]:
+    from momentum.factories import create_feature_factory
+
+    return create_feature_factory(cache_dir=KLINE_DIR, validate_continuity=False)._resolve_config({}).model_dump(
+        by_alias=True)
+
+
+def _pair_min_multiplier() -> int:
+    from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
+
+    return min(int(m) for m in DerivedOperatorEngine._PAIR_MULTIPLIERS)
+
+
+def reduced_default_category(category: str) -> Dict[str, Any]:
+    """預設設定之 `category` 類別節點，指標清單經 `reduce_indicator_periods` 縮減（全部指標與非週期變體保留）。"""
+    node = _default_config_dump()["atomic_indicators"][category]
+    return {**node, "indicators": reduce_indicator_periods(category, node, min_multiplier=_pair_min_multiplier())}
+
+
+def dual_start_paths_payload() -> Dict[str, Any]:
+    """§G⑦ 雙起點對證之路徑覆蓋設定（TESTSEL I10；取代測試內之預設全設定）：預設設定之全部類別、資料源、L2 運算子、
+    L3 彙總、縮尾、L7 死欄過濾不變；縮減只在同一路徑之重複實例——
+    - L1：每指標只留最深實例（最大週期、K 最大者）＋一個配對快週期（`reduce_indicator_periods`）；
+    - L2 momentum lags、L3 視窗：只留最小與最大（窗長分支只有 window ≤ 0／< 2，預設最小值 3 已涵蓋）。
+    最深實例（K 最大）與最大 L2／L3 窗保留 ⇒ M_tf（`_collect_l1_warmup_bars`）與首有效列上界不變。
+    預設全設定之全規模逐實例對證改由 `handoffs/run_receipts/ffstat_probes/dual_start_full_report.py` 一次性收據承擔
+    （L1 每實例之收斂另有倍數表產生腳本 `scripts/verify_l1_warmup_requirements.py` 之逐起點窮舉）。"""
+    dump = _default_config_dump()
+    atomic: Dict[str, Any] = {}
+    for category, node in dump["atomic_indicators"].items():
+        if isinstance(node, dict) and node.get("enabled") and node.get("indicators"):
+            atomic[category] = {**node, "indicators": reduce_indicator_periods(category, node,
+                                                                               min_multiplier=_pair_min_multiplier())}
+    windows = [int(w) for w in dump["rolling_aggregation"]["windows"]]
+    lags = [int(v) for v in dump["operators"]["momentum"]["lags"]]
+    return {"atomic_indicators": atomic,
+            "rolling_aggregation": {"windows": sorted({min(windows), max(windows)})},
+            "operators": {"momentum": {"lags": sorted({min(lags), max(lags)})}}}
+
+
+#: session 內共用之預設 `stat_payload` run（TESTSEL I10：golden／all_tested／calibration 三模組原各算一次同一 run）
+_SHARED_RUNS: Dict[str, Dict[str, Any]] = {}
+
+
+def shared_stat_run(tmp_path_factory: Any, kind: str = "on") -> Dict[str, Any]:
+    """同一 pytest 行程內共用之真實 run（只供 module 範圍 fixture 呼叫；結果唯讀）。`kind`：`on`＝`stat_payload()`；
+    `off`＝`stat_payload(fracdiff=False, adf=False)`。環境同各模組原 fixture（`prepare_stat_env` 於獨立 tmp）。
+    回傳 {tmp, root, result, decisions}。"""
+    import pytest
+
+    if kind not in _SHARED_RUNS:
+        payload = {"on": stat_payload, "off": lambda: stat_payload(fracdiff=False, adf=False)}[kind]()
+        mp = pytest.MonkeyPatch()
+        tmp = tmp_path_factory.mktemp(f"ffstat_shared_{kind}")
+        try:
+            prepare_stat_env(mp, tmp)
+            root, _factory, result = run_stat(tmp, payload)
+        finally:
+            mp.undo()
+        # 平穩化關閉之 run 不寫決策 metadata（`_stationarity_metadata` 回空）⇒ 只有 `on` 取決策
+        _SHARED_RUNS[kind] = {"tmp": tmp, "root": root, "result": result,
+                              "decisions": decisions(result) if kind == "on" else {}}
+    return _SHARED_RUNS[kind]
+
+
 def run_stat(tmp_path: Path, payload: Dict[str, Any], *, start_date: Optional[str] = WINDOW[0],
              end_date: Optional[str] = WINDOW[1], primary_tf: str = PRIMARY_TF, persist: bool = True,
              force_regenerate: bool = True, kline_dir: str = KLINE_DIR) -> Tuple[Path, Any, Any]:

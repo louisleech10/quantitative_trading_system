@@ -27,6 +27,8 @@ import pandas as pd
 import numpy as np
 import time
 import calendar
+
+from momentum.DataExtraction import taker_ratio as _taker_ratio
 import threading
 import os
 import logging
@@ -469,20 +471,15 @@ class BinanceProvider(KlineProviderBase):
         # 類型轉換
         df['timestamp'] = (df['open_time'] / 1000).astype('int64')  # 毫秒轉秒
 
+        # taker_ratio 單一定義（TESTSEL I1b Task 1.7）：自原始字串以 float64 解析相除、一次捨入為 float32、clip [0,1]、
+        # volume≤0 ⇒ 0.5——須於轉 float32 之前計算（原 float32 先除與 legacy 匯入路徑差 1 ulp）。
+        df['taker_ratio'] = _taker_ratio.compute_taker_ratio(
+            df['volume'].astype('float64'), df['taker_buy_volume'].astype('float64'))
+
         for col in ['open', 'high', 'low', 'close', 'volume', 'taker_buy_volume', 'quote_volume']:
             df[col] = df[col].astype('float32')
 
         df['trades'] = df['trades'].astype('int32')
-
-        # 計算taker_ratio（向量化，處理volume=0）
-        df['taker_ratio'] = np.where(
-            df['volume'] > 0,
-            df['taker_buy_volume'] / df['volume'],
-            0.5  # volume=0時默認0.5（中性）
-        ).astype('float32')
-
-        # 確保taker_ratio在0-1範圍
-        df['taker_ratio'] = df['taker_ratio'].clip(0, 1)
 
         # 選擇標準欄位 + 可選欄位
         result = df[[

@@ -51,6 +51,7 @@ def test_report_generation_and_persistence(tmp_path: Path):
 
 def test_save_filtered_features(tmp_path: Path):
     """精選特徵應可輸出為 HDF5。"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     reporter = ICReporter({})
     df = pd.DataFrame(
         np.random.randn(10, 3).astype(np.float32),

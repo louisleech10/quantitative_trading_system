@@ -55,10 +55,15 @@ def _compute_kurt(m2: float, m4: float, count: int, mean: float) -> float:
     excess = n * m4 / (m2 * m2) - 3.0
     result = ((n - 1.0) / ((n - 2.0) * (n - 3.0))) * ((n + 1.0) * excess + 6.0)
     # Exact bounds for the bias-corrected sample excess kurtosis:
-    #   upper = n  (n-1 equal + 1 outlier);  lower = -2(n-1)/(n-3)  (perfect bimodal,
-    #   = -4 at n=5, → -2 as n→∞). Beyond these is numerically impossible.
+    #   upper = n  (n-1 equal + 1 outlier);
+    #   lower（平衡兩點 k／k+1 之可達最小值，依 n 奇偶）：偶數 n＝−2(n−1)/(n−3)；奇數 n＝−2n/(n−2)
+    #   （n=5 為 −10/3，非偶數式之 −4；證明見 runs/testsel_route/i1e/i1e_facts.md，TESTSEL I1e）。
+    #   Beyond these is numerically impossible.
     upper = n
-    lower = -2.0 * (n - 1.0) / (n - 3.0)
+    if count % 2 == 1:
+        lower = -2.0 * n / (n - 2.0)
+    else:
+        lower = -2.0 * (n - 1.0) / (n - 3.0)
     if (
         not np.isfinite(result)
         or result > upper * (1.0 + _MOMENT_BOUND_TOL)

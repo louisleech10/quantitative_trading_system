@@ -16,8 +16,8 @@
     "warmup_runs": 1,
     "workers": 1
   },
-  "perf_peak_bytes": 252030018,
-  "perf_wall_seconds": 1.2597598750000003,
+  "perf_peak_bytes": 255021681,
+  "perf_wall_seconds": 1.360720917000009,
   "winsor_default_mask_hash": "9436130cb8e18231acebd864df78644ef5d53cc4cf0df5df71e28a073c7759ba",
   "winsor_default_value_hash": "0aa586bf37c85fceec973f17a65ef5e59529ab8fd42ec7b1e6bb4c9cbec228b5",
   "winsor_w100_mask_hash": "9436130cb8e18231acebd864df78644ef5d53cc4cf0df5df71e28a073c7759ba",

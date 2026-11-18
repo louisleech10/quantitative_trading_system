@@ -171,9 +171,8 @@ def test_consumed_ids_mismatch_is_loud():
 
 
 def test_uniqueness_matches_bruteforce_and_scales():
-    """R1 `CODEX-R1-P1-02` 三家同判：改 O(n log n) 後語意必須逐筆等同暴力法，且萬級不阻塞。"""
+    """R1 `CODEX-R1-P1-02` 三家同判：改 O(n log n) 後語意必須逐筆等同暴力法，且萬級輸入仍產出有效結果。"""
     import random
-    import time as _time
 
     from momentum.Analysis.event_label_mode import uniqueness_from_windows
 
@@ -205,13 +204,26 @@ def test_uniqueness_matches_bruteforce_and_scales():
         assert got["n_eff"] == pytest.approx(exp["n_eff"])
         assert got["min"] == pytest.approx(exp["min"])
 
-    # 規模：10,000 事件（匯入 50MiB 檔頂之同階）之揭露不得成為阻塞
+    # 規模：10,000 事件（匯入 50MiB 檔頂之同階）之揭露仍產出有效結果（耗時門檻見 perf 之
+    # test_uniqueness_10k_events_under_2s，TESTSEL S3）
+    big = [_Win(f"b{i}", "S", "12h", i * H12, i * H12, i * H12, i * H12 + 3 * H12) for i in range(10_000)]
+    out = uniqueness_from_windows(big)
+    assert out["n_eff"] > 0
+
+
+@pytest.mark.perf
+def test_uniqueness_10k_events_under_2s():
+    """10,000 事件之 uniqueness 揭露 < 2 秒（O(n²) 回歸之效能防護）：效能基準，opt-in（TESTSEL S3 自上一條移出；
+    同一輸入，毫秒級，故各自計算不共用）。"""
+    import time as _time
+
+    from momentum.Analysis.event_label_mode import uniqueness_from_windows
+
     big = [_Win(f"b{i}", "S", "12h", i * H12, i * H12, i * H12, i * H12 + 3 * H12) for i in range(10_000)]
     t0 = _time.perf_counter()
-    out = uniqueness_from_windows(big)
+    uniqueness_from_windows(big)
     elapsed = _time.perf_counter() - t0
     assert elapsed < 2.0, f"10k 事件之 uniqueness 揭露耗時 {elapsed:.2f}s（O(n²) 回歸）"
-    assert out["n_eff"] > 0
 
 
 def test_unknown_mode_formula_is_none_not_blank():

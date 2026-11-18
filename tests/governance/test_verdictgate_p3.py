@@ -175,6 +175,24 @@ def test_32_docs_only_no_trailer_ok(tmp_path: Path) -> None:
     assert _events(h, "ticket_commit") == []
 
 
+def test_32_pycache_only_no_trailer_ok(tmp_path: Path) -> None:
+    """`__pycache__/`（位元組碼、numba 快取）非生產碼：只動快取不需 trailer、不寫 ticket_commit。"""
+    h = _h(tmp_path); _stage(h, *[f"momentum/__pycache__/k{i}.py39.nbi" for i in range(5)])
+    r = _commit(h, "chore: x")
+    assert r.returncode == 0, r.stderr
+    assert _events(h, "ticket_commit") == []
+
+
+def test_32_pycache_with_prod_still_counts_prod_only(tmp_path: Path) -> None:
+    """快取與生產碼同提交：生產碼照判（無 trailer 擋；small 只計生產檔數，快取不計入 >3）。"""
+    h = _h(tmp_path); _stage(h, "momentum/x.py", *[f"momentum/__pycache__/k{i}.nbc" for i in range(5)])
+    r = _commit(h, "feat: x")
+    assert r.returncode != 0 and "Ticket-Batch" in r.stderr
+    r = _commit(h, "feat: x\n\nTicket-Batch: small")
+    assert r.returncode == 0, r.stderr
+    assert _events(h, "ticket_commit")[0]["prod_files"] == ["momentum/x.py"]
+
+
 def test_32_skip_env_bypasses_but_leaves_audit(tmp_path: Path) -> None:
     h = _h(tmp_path); _stage(h, "momentum/x.py")
     r = _commit(h, "feat: x", env_overlay=None) if False else _git(h, "commit", "-q", "-m", "feat: x", env_overlay={"GOVERNANCE_SKIP_COMMITMSG": "1"})

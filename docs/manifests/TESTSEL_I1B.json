@@ -1,0 +1,114 @@
+{
+  "stub_modules": [
+    "momentum/FeatureEngineering/operators/rolling_moments_numpy.py",
+    "momentum/DataExtraction/taker_ratio.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py",
+    "tests/feature_engineering/test_l3_moment_bound_check.py",
+    "tests/momentum/DataExtraction/test_taker_ratio_single_definition.py"
+  ],
+  "script_acceptance": [
+    "scripts/l3_moment_bound_check.py"
+  ],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "I1a 已提交（testsel 1e134e42）：測試期間正式資料寫入偵測與 golden 保護為本項跑測之安全網",
+      "開 TODO 前實測 runs/testsel_route/i1b/i1b_facts.md（大綱 I1b 列）；SPEC Task 2.4 已依實測修訂（先查改理論界檢查且依存檔型別量化——0729db3a 量化後 0 越界、不需重生；四處 pandas 計算點與 FFACT_L3_MULTI_WINDOW=0 生效情形、邊界④⑤）",
+      "大綱拆分：Task 3.2 → I1f；numba 守衛奇數 n 下界 → I1e"
+    ],
+    "touches": [
+      "momentum/FeatureEngineering/operators/rolling_aggregator.py",
+      "momentum/FeatureEngineering/operators/rolling_moments_numpy.py",
+      "momentum/DataExtraction/providers/binance_provider.py",
+      "momentum/DataExtraction/kline_storage.py",
+      "momentum/DataExtraction/taker_ratio.py",
+      "scripts/l3_moment_bound_check.py",
+      "tests/references/exact_moments.py",
+      "tests/fixtures/binance_raw/ETHUSDT_1h_1716235200000_500.json"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/operators/derived_operators.py",
+      "momentum/FeatureEngineering/operators/__init__.py",
+      "tests/test_numba_rolling.py",
+      "tests/test_multi_window_rolling.py",
+      "tests/test_feature_factory_operators.py",
+      "tests/momentum/test_memory_chunking.py"
+    ],
+    "callers_later": [
+      "I1 收尾：taker_ratio provider 改算法後之產品值變動（1 ulp 級）依 §G 三方簽核；scripts/l3_moment_bound_check.py 保留為現存／新生成 run 之 L3 skew／kurt 存檔值必要條件檢查",
+      "I1e：numba_rolling._compute_kurt 奇數 n 下界",
+      "FFPROD／ICPERF：使用 L3 skew／kurt 與 K 線 taker_ratio 之下游"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py tests/feature_engineering/test_l3_moment_bound_check.py tests/momentum/DataExtraction/test_taker_ratio_single_definition.py -p no:cacheprovider -q",
+    "forbidden": [
+      {
+        "rule": "不改 numba 臂（numba_rolling 之 rolling_skew_kurt／fused_* 與 _compute_skew／_compute_kurt 守衛；守衛另於 I1e）",
+        "observable": true
+      },
+      {
+        "rule": "numpy 後備不得呼叫任何 numba 函式；rolling_aggregator 四處（pandas 串流、numba 單窗、非串流、_compute_skew／_compute_kurt）須經模組參照呼叫 rolling_moments_numpy.rolling_skew_kurt_numpy（審碼 r3：單窗臂曾改用 numba 核心以提速，但該核心於真實資料有 1 窗超出 ≤1 float32 ulp 判準，退回 numpy）；binance_provider 與 kline_storage legacy 匯入須經模組參照呼叫 taker_ratio.compute_taker_ratio（使改壞對照可替換）",
+        "observable": true
+      },
+      {
+        "rule": "不得以 pandas rolling 作 oracle；不得放寬為容差斷言掩蓋（skew／kurt 判準＝≤1 float32 ulp 對精確 oracle；taker_ratio 判準＝逐位元）",
+        "observable": true
+      },
+      {
+        "rule": "不弱化 NaN／inf 語意：窗內非有限值與常數窗 ⇒ NaN，低基數欄 skew／kurt 排除不變",
+        "observable": true
+      },
+      {
+        "rule": "不重寫既有庫內 K 線資料（Task 1.7 只修寫入路徑）；data_cache/feature_klines 既有值是否重抓另依 §G 三方簽核",
+        "observable": true
+      },
+      {
+        "rule": "產品值變動（taker_ratio provider 改算法）與任何凍結值／收據更新須三方簽核，不在本批單方面改凍結值或收據",
+        "observable": false
+      },
+      {
+        "rule": "解耦 7 條：momentum 不 import api；新模組只放 momentum/ 下（scripts/l3_moment_bound_check.py 為工具）",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "所有驗收用真實資料：BTCUSDT/1h（data_cache/feature_klines）close 與 log return；taker_ratio 用錄製之 Binance 原始回應（字串值，provider 轉型前擷取），非合成",
+      "精確 oracle（tests/references/exact_moments.py）＝整數滑動冪次和＋Fraction，與逐窗 Fraction 直接計算逐窗相等（原型 exact_sliding.py）；非有限語意對齊 numba _window_moments",
+      "四處 pandas 計算點統一改呼單一函式，四種非預設臂（FFACT_USE_NUMBA_ROLLING=0、FFACT_L3_MULTI_WINDOW=0、FFACT_L3_STREAMING=0、numba 例外後備）逐一以同一 oracle 驗收",
+      "預設臂（多窗 numba）不動；I1b 實測其核心函式 numba_rolling.rolling_skew_kurt 於真實 BTCUSDT/1h close／log return、窗 5／13／21 全窗 fail＝0；另 64 欄真實 L1 × 3 窗之 §B 量測有 kurt 1 窗超 1 float32 ulp（見 coverage_risk 追蹤項，I1 收尾前處置）",
+      "taker_ratio 單一定義＝現行 legacy 路徑算法（float64 相除一次捨入），I1b 實測舊組 1,440 列與之逐位元相等；provider 改後輸出可能變動 1 ulp（屬產品值改動，§G 三方簽核）",
+      "子項期間只跑分鐘級直接受影響測試；重型（全量）於 I1 收尾單次（使用者 2026-11-17）",
+      "暫存記憶體有界（審碼 r1）：numpy 核心依輸出窗分塊，每塊實體暫存 ≤ _SCRATCH_ELEMS（2^20 個 float64），與列數、窗長無關，故不改 L3 記憶體估算式；test_boundary_06_block_size_does_not_change_values 驗分塊不改值（逐位元）、test_boundary_07_scratch_bounded_independent_of_window 驗每塊上界與不漏不重；SPEC §B 四項實測（64／256／1,024 欄 × pandas／numpy／numba 之耗時、峰值 RSS、精度、輸出 bytes）收據 runs/testsel_route/i1b/sec_b/measure.log",
+      "接線（審碼 r2、r3 後定案）：串流兩路徑（pandas 串流、numba 單窗）每次只算所要之一項、不保留另一表（無跨 chunk 快取）；非串流路徑僅在 skew、kurt 皆要且欄集相同時以 _rolling_moment_frames 每欄每窗單呼同取，否則只算一項；四處皆經 rolling_moments_numpy（numba-free）；精度對精確 oracle 0 ulp 不符（pandas kurt 139262，runs/testsel_route/i1b/sec_b/measure.log）"
+    ],
+    "coverage_risk": [
+      "非預設臂耗時代價（產品入口 RollingAggregator.compute_all，真實 L1 1,024 欄 × 窗 5／13／21 × skew＋kurt，runs/testsel_route/i1b/sec_b/measure_product_mem.log，改後整合樹 vs 改前 i7b-probe，同腳本、tracemalloc 模式）：use_numba_off 19.491 s vs 2.88 s、single_window 21.016 s vs 2.715 s、non_streaming 12.922 s vs 4.018 s；tracemalloc 峰值改前改後相同（637.8／637.8、518.6／518.5、3854.9／3854.9 MB）。以正確性優先（pandas kurt 相對誤差 4.87、常數窗給有限值）；預設多窗 numba 臂不受影響（12.827 s vs 13.67 s）。ru_maxrss 於 macOS 同碼三次 898–1693 MB，不作記憶體比較依據",
+      "追蹤項（非本項範圍）：預設臂 numba 核心 numba_rolling.rolling_skew_kurt 於 64 欄真實 L1 × 3 窗共 3,811,027 窗中 kurt 1 窗超出 ≤1 float32 ulp（正確值 −3.26e-07 近 0，runs/testsel_route/i1b/sec_b/precision_results.json）；歸 I1 收尾前定處置（與 I1e 同核心）",
+      "現存 run 只 BTCUSDT/12h 0729db3a 有 L3 skew／kurt；理論界檢查為必要條件，界內之錯值（若有）無法由存檔值判出——存檔 L1 為 float32、L3 由存檔前 float64 算，無法自存檔重算驗值（I1b 實測③）；依存檔型別量化後 0 越界（初版未量化誤報 61,242 值，審查 r1 CODEX-R1-P1-01 指出、probe_f16 實測全部等於界值之 float16 量化）",
+      "manifest 無 L3 臂紀錄、當時 K 線輸入已不可重建（feature_klines 12h 1,696 列 vs run 1,951 列）⇒ 無法判定 0729db3a 生成時走哪一臂；預設多窗 numba 臂本項不改（已知 1 窗超標反例見追蹤項），非預設臂之 run 若存在則其值不可由存檔驗出",
+      "test_accept_01_provider_equals_single_definition 於實作前對錄製資料已逐位元不等；錄製資料若無 float32 先除與 float64 相除不同之列，改壞對照會失效——實測紅狀態已證有差（accept_01／02 紅、mutation 綠）",
+      "test_mutation_m2_fallback_must_not_depend_on_numba 於實作前不拋錯（聚合器尚未呼叫 numpy 模組），實作後方成立",
+      "data_cache/hdf5_cache 另有 BTCUSDT／DOGEUSDT／ETHUSDT／SOLUSDT 12h 舊快取，任一預設 KlineStorageManager 於缺組時自動匯入；本項統一算法後匯入值與 provider 一致，自動匯入行為本身不在本項"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "產品值變動（taker_ratio provider 改算法）與任何凍結值／收據更新須三方簽核，不在本批單方面改凍結值或收據",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

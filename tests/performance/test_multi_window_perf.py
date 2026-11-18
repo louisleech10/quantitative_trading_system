@@ -10,6 +10,8 @@ import pytest
 
 from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
 
+# TESTSEL S3：本檔兩條皆只斷言牆鐘加速比／行程 RSS 增量（無正確性斷言），結果隨機器負載與配置器而變 ⇒ 效能基準（perf）。
+pytestmark = pytest.mark.perf
 
 WINDOWS = [5, 8, 13, 21, 34, 55, 89, 144, 233]
 ALL_AGGS = ["slope", "std", "mean", "rank", "zscore", "skew", "kurt", "min", "max", "range"]

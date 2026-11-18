@@ -1,0 +1,95 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/feature_engineering/test_numview_core.py",
+    "tests/conftest.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "開 TODO 前實測與原型 runs/testsel_route/i1f/i1f_facts.md：快取根 regen_batch_root() 預設 $TMPDIR/numview-regen-batch 跨 session 沿用、鍵不含測試碼與套件版本；spy 漏記 4h 真因＝記憶體預算排程器准入時 4h 於 spawn 子行程計算；原型格 B 串行臂 vs 平行臂 raw 7264／processed 5943 欄逐位元不等 0，串行臂使 route_identity 非空",
+      "SPEC Task 3.2（審 r1 handoffs/reconcile/20261118-testseli1f-x-review-r1/synth.md：方向 (a)、mutation 改強制平行准入、ic_page 納入 pytest_heavy）"
+    ],
+    "touches": [
+      "tests/feature_engineering/test_numview_core.py",
+      "tests/conftest.py",
+      "scripts/heavy_commands.json"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/factories.py",
+      "tests/api/test_numview_ic_page.py"
+    ],
+    "callers_later": [
+      "I1 收尾重型批：§G 4h 重量與三方簽核（新收據替換舊收據）",
+      "產品子項：run 身分隨排程分工改變（route_switch_points 依 caller 逐一取證後三方簽核）"
+    ],
+    "gate_cmd": "grep -q 'test_numview_ic_page' scripts/heavy_commands.json && venv/bin/python scripts/run_watched.py --log runs/testsel_route/i1f/gate_run.watch.log -- venv/bin/python -m pytest 'tests/feature_engineering/test_numview_core.py::test_l2_named_matrix_pinned_nonzero_named_and_layers_bitwise' 'tests/feature_engineering/test_numview_core.py::test_numview_regen_cache_hit_equals_empty_root' 'tests/feature_engineering/test_numview_core.py::test_mutation_l2_spy_skips_non_primary_breaks_two_arm_observation' 'tests/feature_engineering/test_numview_core.py::test_mutation_l2_forced_serial_injection_removed_breaks_precondition' -p no:cacheprovider -q -rs",
+    "forbidden": [
+      {
+        "rule": "不改產品碼與產品契約 momentum/FeatureEngineering/contracts/numeric_view.json；不重凍 tests/_golden/numview/*（方向 (a)）",
+        "observable": true
+      },
+      {
+        "rule": "強制串行只經產品既有參數（momentum.factories.create_memory_budget_scheduler 傳 aux_startup_envelope=None）；不用契約標為 value_affecting 之 FFACT_MULTI_TF_PARALLEL",
+        "observable": true
+      },
+      {
+        "rule": "量測 run 不作共用快取之身分基準；比對排除 route_identity 須於斷言中具名、不得整份略過 manifest 比對",
+        "observable": true
+      },
+      {
+        "rule": "mutation 不以 monkeypatch `memory_budget.admit` 強制平行准入（繞過正式記憶體保護、8GB 機器有 OOM 風險；審 r2）",
+        "observable": true
+      },
+      {
+        "rule": "不在三方簽核前改契約 l2_value_sources.f32diff 或替換舊 L2 收據",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "具名 mutation test_mutation_l2_spy_skips_non_primary_breaks_two_arm_observation：spy 略過非主週期紀錄 ⇒ 兩臂觀測斷言 failed（確定性、與機器准入無關；審 r2 處置：原「強制平行准入」須繞過記憶體保護且無不改產品碼之確定接縫）",
+      "觀測寫回前之 manifest 身分比對（審碼 b1 r2）：逐鍵相等，只具名排除 route_identity／route_records（排程臂）與 created_at／updated_at（時間戳），根路徑前綴換 <work>；原型實錄差異恰為此四類＋根路徑（runs/testsel_route/i1f/manifest_diff.sh），正規化實跑 runs/testsel_route/i1f/run_manifest_norm_probe.sh ⇒ positive_equal=True、兩改壞皆 False",
+      "強制串行注入之存在以正案前提斷言 route reason==\"no_aux_receipt\"（自然不准入為 admission:budget）證，並以 test_mutation_l2_forced_serial_injection_removed_breaks_precondition（移除注入 ⇒ 前提斷言 failed）確定性驗證（審 r3 處置）",
+      "§G 第二層（兩臂各對獨立 oracle）拆至子項 I1f2（施工中實測 runs/testsel_route/i1f/l2_oracle_scope.md：L2 無獨立逐格 oracle、Polars 臂 L1 先轉 float32，判準輸入精度待定）；快取由新增 test_numview_regen_cache_hit_equals_empty_root 驗；gate 首段 grep 驗 scripts/heavy_commands.json 含 test_numview_ic_page",
+      "gate 重型：經 scripts/run_watched.py、背景執行、估時收據對 SPEC §B TESTSEL-I1-BUDGET-7，於 I1 收尾重型批執行",
+      "快取改 session 暫存：同 session 二次執行命中與空根結果逐位元相同（SPEC Task 3.2 驗證）",
+      "串行臂與平行臂值逐位元相同之前提以原型收據 runs/testsel_route/i1f/probe_compare.json 為據，施工時保留探針"
+    ],
+    "coverage_risk": [
+      "格 B 一例證串行／平行等值；另兩個 pool 之換臂未驗，故不認證 scheduler 換臂點（產品子項處理）",
+      "tests/api/test_numview_ic_page.py 改 session 暫存後每 session 真生成，納入 pytest_heavy 由重型守衛管"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "run_receipts",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

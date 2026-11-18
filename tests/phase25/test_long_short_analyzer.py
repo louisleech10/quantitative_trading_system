@@ -6,6 +6,7 @@ from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
 
 
 def test_insufficient_ls_samples():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     analyzer = LongShortAnalyzer(config={"num_quantiles": 5})
     feature = pd.Series(np.random.randn(20))
     returns = pd.Series(np.random.randn(20) * 0.01)
@@ -44,6 +45,7 @@ def test_both_sides_negative_ic():
 
 
 def test_empty_side():
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     analyzer = LongShortAnalyzer(config={"num_quantiles": 2, "long_quantiles": [2], "short_quantiles": [1]})
     feature = pd.Series(np.concatenate([np.zeros(40), np.ones(40)]))
     returns = pd.Series(np.random.randn(80) * 0.01)

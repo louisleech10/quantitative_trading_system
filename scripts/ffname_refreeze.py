@@ -36,6 +36,19 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 MAIN_REPO = Path(__file__).resolve().parents[1]
+
+
+def _main_repo_first() -> None:
+    """MAIN_REPO 置於 sys.path 首位一次：先移除同字串舊項再插入，重複呼叫不使 sys.path 增長（保留原「置首」語意）。
+
+    TESTSELSLOW（2026-11-15）：原各函式內無條件 `sys.path.insert(0, MAIN_REPO)`，逐欄呼叫之輔助函式使同一 pytest 行程
+    之 sys.path 由 42 項增至 3,684 項，其後每次 `importlib.metadata.version()` 逐項列目錄（0.004 s → 0.54 s）。"""
+    p = str(MAIN_REPO)
+    while p in sys.path:
+        sys.path.remove(p)
+    sys.path.insert(0, p)
+
+
 MAPS_DIR = MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_maps"
 # failopen 全窗 sidecar 每份數十 MB（逾 GitHub 50MB 警示線之虞）⇒ 可由 FFNAME_SIDECAR_DIR 導至版控外（收據記絕對路徑）
 SIDECAR_DIR = Path(os.environ.get("FFNAME_SIDECAR_DIR") or (MAIN_REPO / "handoffs" / "run_receipts" / "ffname_refreeze_sidecars"))
@@ -706,7 +719,7 @@ def _tagged_index(frz: Any, inst: Any) -> List[List[str]]:
 
 
 def _freeze_mod() -> Any:
-    sys.path.insert(0, str(MAIN_REPO))
+    _main_repo_first()
     return _load(MAIN_REPO / "scripts" / "ffname_freeze_baseline.py", "ffname_freeze_baseline")
 
 
@@ -950,7 +963,7 @@ def _hash_fix_ratiounsafe(doc: Dict[str, Any], old_doc: Mapping[str, Any]) -> Li
 
 def _hash_fix_calibration(doc: Dict[str, Any], old_doc: Mapping[str, Any]) -> List[str]:
     """icfirstalign 校準封包：`column_set_digest`＝calibration.column_set_digest(欄集合)。改前先驗。"""
-    sys.path.insert(0, str(MAIN_REPO))
+    _main_repo_first()
     from momentum.FeatureEngineering.preprocessing.calibration import column_set_digest
 
     fixed = []
@@ -1112,7 +1125,7 @@ def split_group_key(key: str) -> Tuple[Optional[str], str]:
 
 def tagged_column_of_key(key: str) -> str:
     """欄鍵之標記形欄名：群組鍵以 group_id 之週期（第 1 段）經 `feature_naming.tag_timeframe` 標記其未標記欄名。"""
-    sys.path.insert(0, str(MAIN_REPO))
+    _main_repo_first()
     import momentum.FeatureEngineering.feature_naming as fn
 
     gid, col = split_group_key(key)
@@ -1121,7 +1134,7 @@ def tagged_column_of_key(key: str) -> str:
 
 def framepath_new_group_id(old_gid: str, new_col_untagged: str) -> str:
     """§G ⑧：L1 群組 id＝`{tf}_L1_{category}_{indicator}`（取自新欄名之身分）；其餘層之群組 id 不因命名改變。"""
-    sys.path.insert(0, str(MAIN_REPO))
+    _main_repo_first()
     import momentum.FeatureEngineering.feature_naming as fn
 
     tf, layer = old_gid.split("_")[:2]
@@ -1157,7 +1170,7 @@ def _lag_shift_ok(new_cols: Mapping[str, Any], name: str, unit_tf: Optional[str]
     recipe 以實際 run 讀值驗（sidecar 只有雜湊）。群組鍵 `<gid>/<未標記欄>` 先以群組週期標記後再判（glob 為標記形）；
     非群組鍵而為未標記形者，只在呼叫端給定單元週期（單週期單元之週期，`unit_tf`）時以之標記——不猜週期；
     兩者皆不能 parse ⇒ unparseable（fail-closed）。"""
-    sys.path.insert(0, str(MAIN_REPO))
+    _main_repo_first()
     import fnmatch
 
     import momentum.FeatureEngineering.feature_naming as fn
@@ -1471,7 +1484,7 @@ def _golden_from_new(rel: str, recipe: str, new_record: Mapping[str, Any]) -> st
                               for name, body in sc["references"].items()}}
         return json.dumps(out, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
     if recipe == "icfa_probe":
-        sys.path.insert(0, str(MAIN_REPO))
+        _main_repo_first()
         from scripts import freeze_icfirstalign_baseline as frz
 
         old = json.loads((MAIN_REPO / rel).read_text(encoding="utf-8"))
@@ -2144,7 +2157,7 @@ def write_receipt(salt_path: Path, consumers_path: Optional[Path], full_ref_path
             ok = ok and proof
     full: Dict[str, Any]
     if full_ref_path and full_ref_path.is_file():
-        sys.path.insert(0, str(MAIN_REPO))
+        _main_repo_first()
         frz = _freeze_mod()
         full = frz.full_reference_record(json.loads(full_ref_path.read_text(encoding="utf-8")))
         problems = full_reference_spec_problems(full, contract["full_reference"])

@@ -1201,9 +1201,13 @@ def test_local_helper():
     check_local(add(1, 2))
 '''
 V19_OTHER = "from tests.helpers_v19 import check_four\nfrom momentum.calc import add\n\n\ndef test_shared_too():\n    check_four(add(3, 1))\n"
+# v54（TESTSEL I2 審碼 r1 群集 C）：autouse fixture 新增區域名不得使測試本體之斷言鍵位移
+V19_AUTOUSE = ("import pytest\nfrom momentum.calc import add\n\n\n@pytest.fixture(autouse=True)\ndef _guard():\n"
+               "    yield\n\n\ndef test_c():\n    value = add(1, 2)\n    assert value == 3\n")
 V19_BASE = {"momentum/__init__.py": "", "momentum/calc.py": M_CALC.replace("import warnings\n\n\n", ""),
             "tests/__init__.py": "", "tests/helpers_v19.py": V19_HELPERS, "tests/test_v19.py": V19_TESTS,
-            "tests/test_v19b.py": V19_OTHER}
+            "tests/test_v19b.py": V19_OTHER, "tests/test_v19c.py": V19_AUTOUSE}
+_AUTOUSE_EDIT = ("tests/test_v19c.py", "    yield\n", "    bad = add(0, 0)\n    assert not bad\n    yield\n")
 
 V19_EDITS = {
     # (檔, 舊, 新, 預期 V19 之 nodeid 集合)
@@ -1227,7 +1231,30 @@ V19_EDITS = {
                                         "    assert value > 0\n    assert value < 10\n",
                                         "    value = add(1, 2)\n    _three(value)\n\n\ndef _three(value):\n"
                                         "    assert value == 3\n    assert value > 0\n    assert value < 10\n", set()),
+    "autouse_fixture_new_local_name_ok": (*_AUTOUSE_EDIT, set()),
 }
+
+
+def test_v19_autouse_local_name_group_ordinal_and_global_control(tmp_path):
+    """分組局部編號（v54）：autouse fixture 新增被斷言使用之區域名、測試本體斷言字面不變 ⇒ 不判減；改壞對照：回退全域
+    編號（`_GLOBAL_ORDINAL`）⇒ 測試本體之斷言鍵位移而判減（TESTSEL I2 test_feature_api 之實例：8 項誤報）。另：真實刪除
+    斷言於分組編號下仍判減。"""
+    r = make_repo(tmp_path, V19_BASE)
+    rel, old, new = _AUTOUSE_EDIT
+    r.write(rel, r.read(rel).replace(old, new, 1))
+    nid = "tests/test_v19c.py::test_c"
+    try:
+        for glob, expect_dec in ((False, False), (True, True)):
+            testreg._GLOBAL_ORDINAL = glob
+            dec = testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, tree="HEAD"),
+                                             testreg.assertion_multiset(r.root, nid, tree="worktree"))
+            assert bool(dec) is expect_dec, (glob, dec)
+        testreg._GLOBAL_ORDINAL = False
+        r.write(rel, r.read(rel).replace("    assert value == 3\n", ""))
+        assert testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, tree="HEAD"),
+                                          testreg.assertion_multiset(r.root, nid, tree="worktree"))
+    finally:
+        testreg._GLOBAL_ORDINAL = False
 
 
 def _v19_nodeids(proc) -> set:

@@ -30,6 +30,25 @@ FIXED_ENV = {
 }
 
 
+@contextlib.contextmanager
+def with_fixed_env() -> Iterator[None]:
+    """`os.environ` 暫設為生成環境 `FIXED_ENV`（`isolated` 生成所用之同一組），離開時逐鍵還原（原未設者刪除）。
+
+    config_hash 含 NUMVIEW 鹽（`numeric_view.config_hash_salt`：依 `os.environ` 中契約登記之 value_affecting 選擇子
+    之有效值），故身分計算（`test_probewinsor._hash_of`／`_identity_of`、`scripts/preprov_refreeze.run_probewinsor`）須與
+    生成同一環境，否則與 run 實際 config_hash 不可比（TESTSEL I1d1 #20–39：9891907f 重凍於未設 FIXED_ENV 之環境計算）。"""
+    saved = {key: os.environ.get(key) for key in FIXED_ENV}
+    os.environ.update(FIXED_ENV)
+    try:
+        yield
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
 def contract() -> Dict[str, Any]:
     return json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
 

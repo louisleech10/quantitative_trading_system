@@ -27,6 +27,7 @@ def create_mock_kline_data(n=200):
 
 def test_close_data_source():
     """測試 1: CLOSE 數據源特徵命名"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n========== 測試 1: CLOSE 數據源特徵命名 ==========")
     
     df = create_mock_kline_data()
@@ -66,6 +67,7 @@ def test_close_data_source():
 
 def test_volume_data_source():
     """測試 2: VOLUME 數據源特徵命名"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n========== 測試 2: VOLUME 數據源特徵命名 ==========")
     
     df = create_mock_kline_data()
@@ -104,6 +106,7 @@ def test_volume_data_source():
 
 def test_no_collision():
     """測試 3: 混合配置不會衝突（僅檢查策略特徵）"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n========== 測試 3: 混合配置無衝突驗證 ==========")
     
     df = create_mock_kline_data()
@@ -152,6 +155,7 @@ def test_no_collision():
 
 def test_different_params_same_indicator():
     """測試 4: 相同指標不同參數（僅檢查策略特徵）"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n========== 測試 4: 相同指標不同參數 ==========")
     
     df = create_mock_kline_data()

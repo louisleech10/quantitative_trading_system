@@ -150,6 +150,10 @@ def regen_batch_kind(check_kind: str) -> str:
         return check_kind
     if len(reads) == 1:
         return str(reads[0])
+    if not os.environ.get(REGEN_BATCH_ENV):
+        # NUMVIEW 已收案（2026-10-26，6 批全部提交）：未經批次 gate 設定時（一般全量／fullscale 層）之穩定態＝最終批
+        # （reads_from 末項）。原「未設即 RuntimeError」使本檢查於 gate 外恆紅（TESTSEL I7 後實跑查出 6 條）。
+        return str(reads[-1])
     wanted = f"regen_{os.environ.get(REGEN_BATCH_ENV, '')}"
     if wanted not in reads:
         raise RuntimeError(f"{check_kind} 讀多批 {reads}：須設 {REGEN_BATCH_ENV}（b3／b4／b5）指明現行批次，實得 "

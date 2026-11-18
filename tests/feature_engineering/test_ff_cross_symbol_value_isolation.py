@@ -45,6 +45,57 @@ from tests.feature_engineering.ff_artifact_compare_helpers import (
 # BTCUSDT／ETHUSDT 各約 569 欄前史不足（長窗欄；前史 1,278 根仍約 330 欄）——12h 真實資料約 848 天內不存在全欄足夠
 # 之起始日，故本測試之品質為 v19 partial（assert_full_chain_runtime 只容許該原因）。
 SLOW_PRE_HISTORY_BARS = 1034
+# TESTSEL I10：三次生成（solo A、batch B、batch A）為測試語意不可省；縮欄不縮層——10 個 atomic 類別仍全開
+# （assert_slow_full_chain_config 之下限不變），標準類別各留一指標一週期、進階類別各窗清單只留最小窗；L2–L6.5 照
+# slow_full_chain_config_payload（含 L5 參考標的、L6.5 fracdiff／d*）；輸出窗縮為自起算根起 SLOW_OUTPUT_BARS 根。
+SLOW_OUTPUT_BARS = 100
+_SLOW_NARROW_ATOMIC = {
+    "trend": [{"name": "EMA", "periods": [13]}],
+    "momentum": [{"name": "RSI", "periods": [14]}],
+    "volatility": [{"name": "ATR", "periods": [14]}],
+    "volume": [{"name": "OBV"}],
+    "statistics": [{"name": "STDDEV", "periods": [13]}],
+    "cycle": [{"name": "HT_DCPERIOD"}],
+    "pattern": [{"name": "CDLDOJI"}],
+}
+_SLOW_NARROW_ADVANCED_WINDOWS = {
+    "microstructure": ("windows", "cs_spread_smooth", "kyle_lambda_windows", "vpin_n_buckets", "vpin_zscore_windows"),
+    "entropy": ("windows", "hurst_windows", "perm_windows", "shannon_windows"),
+    "tail_risk": ("windows", "rv_windows", "mdd_windows"),
+}
+
+
+_kline_common_window_dates = kline_full_window_dates
+
+
+def kline_full_window_dates(*klines: pd.DataFrame) -> tuple[str, str]:  # noqa: F811
+    """共同日期窗之終點截至各標的第 SLOW_PRE_HISTORY_BARS＋SLOW_OUTPUT_BARS 根之較早者（TESTSEL I10；不晚於共同窗終點）。"""
+    start, end = _kline_common_window_dates(*klines)
+    capped = min(
+        pd.Timestamp(int(k["timestamp"].astype(np.int64).iloc[SLOW_PRE_HISTORY_BARS + SLOW_OUTPUT_BARS]),
+                     unit="s", tz="UTC")
+        for k in klines
+    ).strftime("%Y-%m-%d")
+    return start, min(end, capped)
+
+
+_slow_full_chain_config_payload_all_atomic = slow_full_chain_config_payload
+
+
+def slow_full_chain_config_payload(reference_symbol: str) -> dict:  # noqa: F811
+    """ff_artifact_compare_helpers.slow_full_chain_config_payload 之 atomic 段縮寬（其餘層不動）：10 類全開、
+    標準類別各一指標一週期、進階類別各窗清單只留生產預設之最小窗。"""
+    from momentum.factories import create_feature_factory
+
+    atomic = create_feature_factory(cache_dir="data_cache/feature_klines", validate_continuity=False)\
+        ._resolve_config({}).atomic_indicators
+    narrowed = {name: {"enabled": True, "indicators": [dict(i) for i in inds]}
+                for name, inds in _SLOW_NARROW_ATOMIC.items()}
+    for name, keys in _SLOW_NARROW_ADVANCED_WINDOWS.items():
+        dumped = getattr(atomic, name).model_dump()
+        narrowed[name] = {"enabled": True, **{k: [min(dumped[k])] for k in keys}}
+    return {**_slow_full_chain_config_payload_all_atomic(reference_symbol=reference_symbol),
+            "atomic_indicators": narrowed}
 
 
 def test_v5_4_run_and_cgsa_paths_are_symbol_scoped(tmp_path: Path) -> None:
@@ -261,7 +312,9 @@ def test_v5_5_l5_reference_cache_uses_reference_symbol_timeframe_key(
 
 def test_v5_reference_cache_source_uses_tuple_key_and_effective_ref_symbol() -> None:
     """污染面靜態 guard：run_multi_symbol IPC 與 L5 cache lookup 使用一致 key。"""
-    source = inspect.getsource(FeatureFactory.run_multi_symbol)
+    # ICFIRSTALIGN b3（a0446501）把 run_multi_symbol 本體移入 _run_multi_symbol_in_domain（外層只包記憶體預算 domain）
+    source = (inspect.getsource(FeatureFactory.run_multi_symbol)
+              + inspect.getsource(FeatureFactory._run_multi_symbol_in_domain))
     lookup_source = inspect.getsource(FeatureFactory._load_reference_if_available)
 
     assert "effective_ref_symbol = config.cross_sectional.reference_symbol or ref_symbol" in source
@@ -352,7 +405,8 @@ def test_mutation_m5_2_reference_cache_poisoning_fails_runtime_values(
     )
     poisoned = _persisted_a(poisoned_factory, poisoned_result)
 
-    relative_price_columns = [column for column in clean.columns if "relative_price" in str(column)]
+    # FF-NAME b2（f2440d3b）起 L5 欄名經 canonical：relative_price → xsec_cross-sectional_relative-price
+    relative_price_columns = [column for column in clean.columns if "relative-price" in str(column)]
     assert relative_price_columns
     with pytest.raises(AssertionError):
         assert_sampled_values_equal(clean, poisoned, columns=relative_price_columns)

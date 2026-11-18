@@ -22,10 +22,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def test_multi_range_append():
-    """測試多個時間範圍的下載，驗證append而非覆蓋"""
-    
-    storage = KlineStorageManager()
+def test_multi_range_append(tmp_path):
+    """測試多個時間範圍的下載，驗證append而非覆蓋
+
+    K 線庫明給暫存 cache_dir（TESTSEL I1a Task 1.2：原以產品預設 `./data_cache/kline_cache.h5` 寫入正式 K 線庫，
+    造成 ETHUSDT/1h 不連續兩段）；仍連 Binance，保留網路下載路徑之覆蓋。"""
+
+    storage = KlineStorageManager(cache_dir=str(tmp_path))
     download_service = KlineDownloadService(storage_manager=storage)
     
     # 註冊 Binance provider

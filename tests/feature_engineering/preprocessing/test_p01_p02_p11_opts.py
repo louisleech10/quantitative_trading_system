@@ -245,6 +245,22 @@ def test_fast_adf_matches_statsmodels_same_spec_and_direction() -> None:
     assert gap < 1e-6, gap
 
 
+@pytest.fixture(scope="module")
+def single_item_n2_run() -> dict:
+    """單一 item（200 列）＋ n_jobs=2 之 loky 並行跑一次：回傳結果與牆鐘秒數（TESTSEL S3：正確性與計時兩條共用）。"""
+    from momentum.FeatureEngineering.preprocessing._slow_path_parallel import (
+        ParallelSlowPath,
+        process_fracdiff_column_values,
+    )
+
+    items = _make_fracdiff_items(n_rows=200, n_cols=1)
+    runner = ParallelSlowPath(n_jobs=2)
+    start = time.perf_counter()
+    results = runner.map(items, process_fracdiff_column_values)
+    elapsed = time.perf_counter() - start
+    return {"results": results, "elapsed": elapsed}
+
+
 class TestP02SlowPathParallel:
     """P0.2: loky 並行 ADF 壓力測試與正確性驗證。"""
 
@@ -296,18 +312,21 @@ class TestP02SlowPathParallel:
         result = runner.map([], self.worker)
         assert result == []
 
-    def test_single_item_n2_does_not_hang(self):
-        """單一 item + n_jobs=2：loky 不應死鎖。"""
-        items = _make_fracdiff_items(n_rows=200, n_cols=1)
-        runner = self.ParallelSlowPath(n_jobs=2)
-        start = time.perf_counter()
-        results = runner.map(items, self.worker)
-        elapsed = time.perf_counter() - start
+    def test_single_item_n2_does_not_hang(self, single_item_n2_run):
+        """單一 item + n_jobs=2：loky 不應死鎖（完成並回傳 1 筆；耗時門檻見 perf 之下一條，TESTSEL S3）。"""
+        results = single_item_n2_run["results"]
         assert len(results) == 1
+
+    @pytest.mark.perf
+    def test_single_item_n2_elapsed_under_60s(self, single_item_n2_run):
+        """單一 item + n_jobs=2 牆鐘 < 60 秒：效能基準，opt-in（TESTSEL S3 自上一條移出；兩條共用同一次執行）。
+        註：真死鎖時 runner.map 不返回，本門檻量不到；它只擋「完成但極慢」。"""
+        elapsed = single_item_n2_run["elapsed"]
         assert elapsed < 60, f"單一 item n_jobs=2 耗時 {elapsed:.1f}s，疑似死鎖"
 
     # ── 壓力測試（較大資料集，量測 RSS 開銷）────────────────────────────────
 
+    @pytest.mark.perf  # TESTSEL S3：唯一斷言為行程 RSS 增量預算（量測報告型壓力測試），結果隨配置器／機器而變
     @pytest.mark.slow
     def test_p02_stress_rss_budget_with_browser_overhead(self):
         """P0.2 壓力測試：量測不同 n_jobs 的 RSS 增量，推算 8GB+瀏覽器下安全上限。

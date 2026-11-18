@@ -47,6 +47,40 @@ def _apply_batch2d_env(monkeypatch: pytest.MonkeyPatch, *, use_cgsa: bool) -> No
         monkeypatch.setenv(key, value)
 
 
+# TESTSEL I10：P4 重跑一致性（兩次生成 NaN mask 逐欄相同）與欄寬無關 ⇒ 生產預設之 7 個標準 atomic 類別各留一指標一週期、
+# L2 momentum 只 1 個 lag、L3 窗 2 個（聚合器全部），其餘層與前處理照生產預設；輸出窗縮為起始日起兩個月。
+# 環境臂（pandas、L6.5 chunk 500、slowpath 序列、nested batch）不變；欄數仍 > chunk 500 ⇒ L6.5 多 chunk 路徑在場。
+_NARROW_ATOMIC = {
+    "trend": [{"name": "EMA", "periods": [13]}],
+    "momentum": [{"name": "RSI", "periods": [14]}],
+    "volatility": [{"name": "ATR", "periods": [14]}],
+    "volume": [{"name": "OBV"}],
+    "statistics": [{"name": "STDDEV", "periods": [13]}],
+    "cycle": [{"name": "HT_DCPERIOD"}],
+    "pattern": [{"name": "CDLDOJI"}],
+}
+_NARROW_END_DATE = "2024-08-01"
+
+
+def _narrow_cgsa_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    import scripts.freeze_batch2d_baseline as fb
+
+    base = fb._base_override
+
+    def _narrow_override() -> Dict[str, Any]:
+        override = base()
+        override["atomic_indicators"] = {
+            name: {"enabled": True, "indicators": [dict(i) for i in indicators]}
+            for name, indicators in _NARROW_ATOMIC.items()
+        }
+        override["operators"] = {"momentum": {"lags": [3]}}
+        override["rolling_aggregation"] = {"windows": [5, 13]}
+        return override
+
+    monkeypatch.setattr(fb, "_base_override", _narrow_override)
+    monkeypatch.setattr(fb, "END_DATE", _NARROW_END_DATE)
+
+
 def _read_d_star_cache_dir(cache_dir: Path) -> Dict[str, float]:
     cache_paths = sorted(cache_dir.glob("d_star_*.json"))
     if not cache_paths:
@@ -219,6 +253,40 @@ class TestP4Parity:
             repeat_payload["frame"]["per_column"],
             common_columns,
             label="CGSA common columns",
+        )
+
+    @pytest.mark.slow
+    @pytest.mark.requires_kline
+    def test_cgsa_narrow_rerun_nan_mask_reproducible(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """TESTSEL I10 小規模姊妹測試（上一條為生產預設全特徵、逾 300 秒，原樣保留列豁免——其「≠ legacy 凍結 sha」只在
+        與凍結同設定時有意義）：同環境臂（pandas、L6.5 chunk 500、slowpath 序列、nested batch）、窄設定（各層仍在、
+        欄數 > L6.5 chunk ⇒ 多 chunk 路徑）兩次 CGSA 生成，逐欄 NaN mask 完全相同。"""
+        _require_real_kline()
+        _apply_batch2d_env(monkeypatch, use_cgsa=True)
+        _narrow_cgsa_run(monkeypatch)
+        monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work"))
+        with tempfile.TemporaryDirectory(prefix="batch2d_narrow_cgsa_") as temp_dir:
+            payload, layers = _run_cgsa(Path(temp_dir))
+        monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work_repeat"))
+        with tempfile.TemporaryDirectory(prefix="batch2d_narrow_cgsa_repeat_") as temp_dir:
+            repeat_payload, _ = _run_cgsa(Path(temp_dir))
+
+        assert payload["frame"]["rows"] > 0
+        assert payload["frame"]["columns"] > int(FREEZE_ENV_DEFAULTS["FFACT_L65_CHUNK_SIZE"])
+        assert payload["manifest_columns"]
+        assert {"L1", "L2", "L3", "L4", "L6"} <= set(layers.values()), sorted(set(layers.values()))
+        common_columns = sorted(
+            set(payload["frame"]["per_column"]) & set(repeat_payload["frame"]["per_column"])
+        )
+        if not common_columns:
+            pytest.fail("CGSA gate vacuous: no live columns overlap repeated run")
+        _assert_nan_mask_gate(
+            payload["frame"]["per_column"],
+            repeat_payload["frame"]["per_column"],
+            common_columns,
+            label="CGSA narrow common columns",
         )
 
 

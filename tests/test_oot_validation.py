@@ -259,6 +259,7 @@ class TestPurgedTimeSeriesSplit:
     
     def test_purge_removes_training_end(self):
         """測試 Purge 移除訓練集末端"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         splitter = PurgedTimeSeriesSplit(
             n_splits=3,
             purge_gap=5,
@@ -281,6 +282,7 @@ class TestPurgedTimeSeriesSplit:
     
     def test_embargo_removes_validation_start(self):
         """測試 Embargo 移除驗證集開頭"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         splitter = PurgedTimeSeriesSplit(
             n_splits=3,
             purge_gap=0,  # 暫時不測試 purge
@@ -297,6 +299,7 @@ class TestPurgedTimeSeriesSplit:
     
     def test_purge_and_embargo_combined(self):
         """測試 Purge 和 Embargo 組合"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         splitter = PurgedTimeSeriesSplit(
             n_splits=3,
             purge_gap=5,
@@ -322,6 +325,7 @@ class TestPurgedTimeSeriesSplit:
 
     def test_insufficient_samples_after_purge(self):
         """測試 Purge 後樣本不足會拋錯"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         splitter = PurgedTimeSeriesSplit(
             n_splits=3,
             purge_gap=5,
@@ -436,6 +440,7 @@ class TestXGBoostAnalyzerOOT:
     
     def test_validate_oot_no_model(self):
         """測試未訓練模型時的錯誤處理"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         analyzer = XGBoostAnalyzer()
         
         X_oot = np.random.randn(50, 10)

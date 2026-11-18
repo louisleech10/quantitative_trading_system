@@ -30,15 +30,26 @@ def test_lightgbm_protocol_and_train_predict():
     analyzer = LightGBMAnalyzer(params={"n_estimators": 20, "num_leaves": 15})
 
     assert isinstance(analyzer, IModelTrainer)
-    started = time.perf_counter()
     performance = analyzer.train_model(X, y, feature_names=feature_names, cv_folds=3)
-    elapsed = time.perf_counter() - started
 
     proba = analyzer.predict_proba(X)
 
     assert analyzer.get_model_type() == "lightgbm"
     assert proba.shape == (len(X), 2)
     assert 0.0 <= performance.cv_auc_mean <= 1.0
+
+
+@pytest.mark.perf
+def test_lightgbm_train_elapsed_under_5s():
+    """160×8、20 棵樹、3 折訓練牆鐘 < 5 秒：效能基準，opt-in（TESTSEL S3 自上一條移出之計時斷言；
+    同一輸入，訓練約數百毫秒級，故各自計算不共用）。"""
+    X, y, feature_names = _make_binary_data()
+    analyzer = LightGBMAnalyzer(params={"n_estimators": 20, "num_leaves": 15})
+
+    started = time.perf_counter()
+    analyzer.train_model(X, y, feature_names=feature_names, cv_folds=3)
+    elapsed = time.perf_counter() - started
+
     assert elapsed < 5.0
 
 

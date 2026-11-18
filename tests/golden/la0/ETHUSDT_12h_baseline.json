@@ -9039,7 +9039,7 @@
     "config_hash": "e53e22906c35363757f4cd49d27f973e",
     "cut_method": "timestamp_tail_sort_index",
     "early_prefix_n": 64,
-    "features_h5_sha256": "dfe038f5ec83efdc31118675604b8507cc441e5fe1f1fb3c71f144a1dbdb9a80",
+    "features_h5_sha256": "55e27b4b671ce7db0133c772764d8bcc387c96aed6fb4d5b369d3c2cdc22b31f",
     "features_path": "tests/golden/la0/inputs/ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e_strat_p2r12_a0_tail2000.h5",
     "index_end": "2026-04-27 12:00:00",
     "index_start": "2024-01-01 00:00:00",

@@ -148,6 +148,12 @@ def test_all_seam_probes_stay_under_root(
     work = tmp_path / "work"
     work.mkdir()
     monkeypatch.chdir(work)
+    # 本測試之「撤除 redirect」對照斷言產品預設根（相對 cwd 之 data_cache/features）落在 cwd 下之假正式根；
+    # tests/conftest.py 之 HERMETIC 把該預設改為絕對暫存根 ⇒ 於已 chdir 至 tmp 之本測試內還原產品預設
+    # （寫入仍只落 tmp 之 work/data_cache；TESTSEL I1a Task 1.3）。
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    monkeypatch.setattr(FeatureStorage.__init__, "__defaults__", ("data_cache/features",))
     # 假 production 根（tmp 下）：對照組撤除 redirect 時之寫入只落 tmp；monkeypatch 測後還原 session 物件
     monkeypatch.setattr(redirect_patch_set, "production_prefix", (work / "data_cache").resolve())
     ctx = redirect_patch_set.activate(tmp_path / seam_id, owner=f"isolation-{seam_id}")

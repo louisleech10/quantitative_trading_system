@@ -34,6 +34,7 @@ def create_mock_data(n=200):
 
 def test_ema_dynamic_extraction():
     """測試 1: EMA 動態提取"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n" + "=" * 70)
     print("測試 1: EMA 動態提取（使用註冊系統）")
     print("=" * 70)
@@ -61,6 +62,7 @@ def test_ema_dynamic_extraction():
 
 def test_rsi_dynamic_extraction():
     """測試 2: RSI 動態提取"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n" + "=" * 70)
     print("測試 2: RSI 動態提取（手動註冊）")
     print("=" * 70)
@@ -98,6 +100,7 @@ def test_rsi_dynamic_extraction():
 
 def test_macd_dynamic_extraction():
     """測試 3: MACD 動態提取"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n" + "=" * 70)
     print("測試 3: MACD 動態提取（手動註冊）")
     print("=" * 70)
@@ -134,6 +137,7 @@ def test_macd_dynamic_extraction():
 
 def test_mixed_indicators():
     """測試 4: 混合多種指標"""
+    np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
     print("\n" + "=" * 70)
     print("測試 4: 混合多種指標（驗證無衝突）")
     print("=" * 70)

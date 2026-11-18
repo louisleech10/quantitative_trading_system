@@ -635,20 +635,46 @@ def test_a5_xsec_null_rejection_conditional_on_no_warning() -> None:
     assert not failed, failed
 
 
-@pytest.mark.slow
+#: TESTSEL I10：B⑥ 之 size 判準（每格拒絕數 ≤ Binomial(1,000, 0.05) 之 Bonferroni 上界）只在全規模（13 格×1,000 次，
+#: ledger 5,170 秒）有鑑別力——次數縮小則上界放寬到驗不出 size 失真 ⇒ 統計性質改一次性研究收據
+#: `scripts/icperf_hac45_study.py b6`（被測產品碼改動時重跑；收據寫 handoffs/run_receipts/）；測試只驗全部 13 格之
+#: 產品路徑接線與判定管線（每格極少次數、固定種子）。B⑦ 同理（研究本體 `scripts/icperf_hac45_study.py b7`）。
+B6_WIRING_REPS = 2
+B7_WIRING_REPS = 20
+
+
 def test_b6_trend_null_rejection_conditional_on_no_warning() -> None:
-    """B⑥ 判準為無條件 size（r109 起；函式名沿用以免改名立碑）；未警示子集之條件拒絕率只報告。"""
-    cells = _judge([b6_run_cell(c) for c in B6_GRID],
-                   rerun=lambda cell, reps, extra: b6_run_cell(cell, reps, extra))
-    _write("b6", {"study": "B6", "alpha": ALPHA, "cells": cells})
-    failed = [c["key"] for c in cells if c["pass"] is not True]
-    assert not failed, failed
+    """B⑥ 接線（小規模）：13 格（ic w21／w63、centrality、ls_spread 全部維度與 n×φ 組合）各以固定種子跑
+    B6_WIRING_REPS 次經產品趨勢推論，計數自洽，並經 `_judge`（含預先登記之確認重跑路徑）得出確定判定。
+    size 統計性質（全規模 1,000 次）見 `scripts/icperf_hac45_study.py b6` 之收據。"""
+    cells = [b6_run_cell(c, reps=B6_WIRING_REPS) for c in B6_GRID]
+    for c in cells:
+        assert c["reps"] == B6_WIRING_REPS, c["key"]
+        assert sum(c["status_counts"].values()) == B6_WIRING_REPS == sum(c["warning_counts"].values()), c["key"]
+        assert 0 <= c["rejected"] <= c["ok"] <= B6_WIRING_REPS, c["key"]
+        assert 0 <= c["rejected_unwarned"] <= c["unwarned"] <= c["ok"], c["key"]
+        assert c["status_counts"].get("ok", 0) >= c["ok"], c["key"]
+    assert {c["cell"]["dim"] for c in cells} == {"ic", "centrality", "ls_spread"}
+    reruns: List[tuple] = []
+
+    def _rerun(cell: dict, reps: int, extra: str) -> dict:
+        reruns.append((cell_key("B6", cell), reps, extra))
+        return b6_run_cell(cell, reps, extra)
+
+    judged = _judge(cells, rerun=_rerun)
+    for c in judged:
+        assert c["pass"] in (True, False) and c["verdict"] in (
+            "pass", "initial_excess_not_confirmed", "confirmed_excess"), c["key"]
+        assert c["n_cells_bonferroni"] == len(B6_GRID)
+        assert c["upper_bound"] == bonferroni_upper_bound(B6_WIRING_REPS, len(B6_GRID))
+        assert (c["confirmation"] is not None) == (not c["initial_pass"]), c["key"]
+    assert all(r[1] == CONFIRM_FACTOR * B6_WIRING_REPS and r[2] == CONFIRM_EXTRA for r in reruns)
 
 
-@pytest.mark.slow
 def test_b7_size_adjusted_power_report() -> None:
-    cells = [b7_run_cell(c) for c in B7_GRID]
-    _write("b7", {"study": "B7", "alpha": ALPHA, "cells": cells})
+    """B⑦ 接線（小規模）：1 格（B7_GRID[0]，n＝500 最短序列；另一格由 test_study_runners_smoke 跑）×
+    B7_WIRING_REPS 次×全部 δ，輸出完整。研究本體（9 格×1,000 次）見 `scripts/icperf_hac45_study.py b7`。"""
+    cells = [b7_run_cell(B7_GRID[0], reps=B7_WIRING_REPS)]
     # 研究輸出、不設門檻（SPEC ㊺ B⑦）；只驗輸出完整：每格每 δ 三方法皆有有限之檢定力值
     for c in cells:
         for d in map(str, B7_DELTAS):

@@ -223,6 +223,80 @@ _CORR_TARGET_RHO = 0.7
 _CORR_LOADING = math.sqrt(_CORR_TARGET_RHO)
 
 
+def _fdr_seed_case(
+    *, n: int, n_null: int, n_true: int, correlated: bool, seed: int
+) -> tuple[pd.DataFrame, pd.Series, list[float]]:
+    """單一 seed 之 (特徵, 標籤, 抽樣 pairwise null-ρ)；亂數抽取順序即原 _fdr_empirical 迴圈本體。"""
+    rng = np.random.default_rng(seed)
+    y = rng.normal(size=n)
+    null_factor = rng.normal(size=n)  # 獨立於 y
+    cols: dict[str, np.ndarray] = {}
+    if correlated:
+        b = math.sqrt(1.0 - _CORR_TARGET_RHO)
+        for i in range(n_null):
+            eps = rng.normal(size=n)
+            cols[f"null_{i}"] = _CORR_LOADING * null_factor + b * eps
+    else:
+        for i in range(n_null):
+            cols[f"null_{i}"] = rng.normal(size=n)
+    for i in range(n_true):
+        cols[f"true_{i}"] = 0.55 * y + math.sqrt(1 - 0.55**2) * rng.normal(size=n)
+    rhos: list[float] = []
+    if correlated and n_null >= 2:
+        # 抽樣 pairwise ρ（前 6 對）供 receipt / 診斷
+        sample_pairs = [(0, 1), (0, 2), (1, 2), (0, 3), (1, 4), (2, 5)]
+        for i, j in sample_pairs:
+            if i < n_null and j < n_null:
+                rhos.append(
+                    float(np.corrcoef(cols[f"null_{i}"], cols[f"null_{j}"])[0, 1])
+                )
+    return pd.DataFrame(cols), pd.Series(y), rhos
+
+
+def _kernel_q_map(features: pd.DataFrame, label: pd.Series, alpha: float) -> dict[str, float]:
+    """FDR kernel：HAC p（h＝5、spearman）→ apply_fdr（全欄 finite-p 為一族）。"""
+    stats = compute_hac_ic_statistics(features, label, horizon=5, method="spearman", alpha=0.05)
+    q_map, _ = apply_fdr({k: float(v["p_value"]) for k, v in stats.items()}, alpha)
+    return {str(k): float(q) for k, q in q_map.items()}
+
+
+def _stage5_q_map(
+    features: pd.DataFrame, label: pd.Series, alpha: float, *, shrink_n_tests: bool = False
+) -> tuple[dict[str, float], float]:
+    """production stage5 之逐欄 p_value_adj 與 alpha_effective（同 _fdr_empirical via_stage5 之設定）。
+
+    shrink_n_tests=True 只供改壞對照（stage5 改成只對前置閘子集做 FDR）。"""
+    cfg = _lenient_config()
+    data = cfg.model_dump(by_alias=True)
+    data["thresholds"]["p_value_max"] = alpha
+    cfg = ICConfig.model_validate(data)
+    orch = ICFilterOrchestrator(cfg)
+    if shrink_n_tests:
+        orig = orch._stage5_statistical_validation
+
+        def _shrunk(features_df, label_series, ic_results, config, event_info, split_context=None, metadata=None):
+            out = orig(features_df, label_series, ic_results, config, event_info,
+                       split_context=split_context, metadata=metadata)
+            pre = {r["feature_name"]: float(r["p_value"]) for r in out["summary_table"]
+                   if np.isfinite(r.get("p_value", np.nan)) and float(r["p_value"]) < 0.2}
+            q_pre, _ = apply_fdr(pre, alpha)
+            for r in out["summary_table"]:
+                r["p_value_adj"] = q_pre.get(r["feature_name"], np.nan)
+            return out
+
+        orch._stage5_statistical_validation = _shrunk  # type: ignore[method-assign]
+    stage5 = orch._stage5_statistical_validation(
+        features,
+        label,
+        _minimal_ic_results(features),
+        cfg,
+        {"tier": "sufficient"},
+        metadata={"symbol": "BTCUSDT"},
+    )
+    q = {str(r["feature_name"]): float(r.get("p_value_adj", np.nan)) for r in stage5["summary_table"]}
+    return q, float(stage5["threshold_log"]["alpha_effective"])
+
+
 def _fdr_empirical(
     *,
     n: int,
@@ -245,32 +319,10 @@ def _fdr_empirical(
     fdrs: list[float] = []
     rhos: list[float] = []
     for s in range(n_seeds):
-        rng = np.random.default_rng(seed0 + s)
-        y = rng.normal(size=n)
-        null_factor = rng.normal(size=n)  # 獨立於 y
-        cols: dict[str, np.ndarray] = {}
-        if correlated:
-            b = math.sqrt(1.0 - _CORR_TARGET_RHO)
-            for i in range(n_null):
-                eps = rng.normal(size=n)
-                cols[f"null_{i}"] = _CORR_LOADING * null_factor + b * eps
-        else:
-            for i in range(n_null):
-                cols[f"null_{i}"] = rng.normal(size=n)
-        for i in range(n_true):
-            cols[f"true_{i}"] = 0.55 * y + math.sqrt(1 - 0.55**2) * rng.normal(size=n)
-        features = pd.DataFrame(cols)
-        label = pd.Series(y)
-        if correlated and n_null >= 2:
-            # 抽樣 pairwise ρ（前 6 對）供 receipt / 診斷
-            sample_pairs = [(0, 1), (0, 2), (1, 2), (0, 3), (1, 4), (2, 5)]
-            for i, j in sample_pairs:
-                if i < n_null and j < n_null:
-                    rhos.append(
-                        float(
-                            np.corrcoef(cols[f"null_{i}"], cols[f"null_{j}"])[0, 1]
-                        )
-                    )
+        features, label, seed_rhos = _fdr_seed_case(
+            n=n, n_null=n_null, n_true=n_true, correlated=correlated, seed=seed0 + s
+        )
+        rhos.extend(seed_rhos)
 
         if via_stage5:
             cfg = _lenient_config()
@@ -393,13 +445,36 @@ def _fdr_empirical(
 
 @pytest.mark.slow_stat
 def test_t22a_mb_fdr_control_independent_and_correlated():
-    """T-2.2a M-B：獨立 null + 相關 null（ρ≈0.7）FDR≤α；允收帶=binomial 95% CI。"""
+    """T-2.2a M-B：獨立 null + 相關 null（ρ≈0.7）FDR≤α；允收帶=binomial 95% CI。
+
+    TESTSEL I10：原每 seed 走一次 production stage5（約 25 秒／seed，profile 熱點 92% 在 stage5 之
+    單調性／換手率 PIT expanding qcut，與 FDR 無關）。改為：①每情境首 seed 斷言 production stage5 之逐欄
+    p_value_adj 與 alpha_effective 等於 FDR kernel（HAC p → apply_fdr）——stage5 之 FDR 接線即 kernel；
+    ②40 seeds 之 FDR 統計性質走 kernel（同一函式、同一輸入，seed 數與允收帶不變）。"""
     alpha = 0.10
     n_seeds = 40  # 預算：B2 hermetic
     # binomial 95% 上界（rate 形）：ppf(0.975,n,α)/n — 禁任意常數帶
     mean_fdr_max = float(binom.ppf(0.975, n_seeds, alpha) / n_seeds)
     assert mean_fdr_max == binom.ppf(0.975, n_seeds, alpha) / n_seeds
 
+    scenarios = (
+        dict(n=400, n_null=40, n_true=5, correlated=False, seed0=1000),
+        dict(n=400, n_null=50, n_true=5, correlated=True, seed0=2000),
+    )
+    # ① production stage5 FDR 接線 ≡ kernel（每情境首 seed；全欄逐值、含 alpha_effective）
+    for sc in scenarios:
+        feats, lab, _ = _fdr_seed_case(
+            n=sc["n"], n_null=sc["n_null"], n_true=sc["n_true"], correlated=sc["correlated"], seed=sc["seed0"]
+        )
+        q_stage5, alpha_eff = _stage5_q_map(feats, lab, alpha)
+        q_kernel = _kernel_q_map(feats, lab, alpha)
+        assert alpha_eff == alpha
+        assert set(q_stage5) == set(q_kernel) == set(map(str, feats.columns))
+        for k in q_kernel:
+            assert q_stage5[k] == pytest.approx(q_kernel[k], rel=1e-12, abs=1e-15), (sc, k)
+        assert any(q <= alpha for q in q_kernel.values()), sc  # 首 seed 即有拒絕，等價比對含拒絕集合
+
+    # ② FDR 統計性質（40 seeds）走 kernel
     fdrs_ind, _ = _fdr_empirical(
         n=400,
         n_null=40,
@@ -408,7 +483,7 @@ def test_t22a_mb_fdr_control_independent_and_correlated():
         n_seeds=n_seeds,
         correlated=False,
         seed0=1000,
-        via_stage5=True,
+        via_stage5=False,
     )
     fdrs_cor, rhos = _fdr_empirical(
         n=400,
@@ -418,7 +493,7 @@ def test_t22a_mb_fdr_control_independent_and_correlated():
         n_seeds=n_seeds,
         correlated=True,
         seed0=2000,
-        via_stage5=True,
+        via_stage5=False,
     )
     assert fdrs_ind, "independent scenario produced no rejections"
     assert fdrs_cor, "correlated scenario produced no rejections"

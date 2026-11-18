@@ -63,9 +63,9 @@ def test_stall_aborts_terminates_workers_and_writes_receipt(tmp_path: Path) -> N
     assert doc["exit_code"] == 3 and doc["abort"] == "stall" and doc["running"] == ["1d BTCUSDT RSI"]
 
 
-def test_task_budget_exceeded_raises_during_scan() -> None:
+def test_task_budget_exceeded_raises_during_scan(monkeypatch: pytest.MonkeyPatch) -> None:
     """執行中預算：deadline 已過 ⇒ 掃描輪第一次檢查即拋（實際耗時之上界，不依估時）。"""
-    sys.path.insert(0, str(ROOT))
+    monkeypatch.syspath_prepend(str(ROOT))
     import scripts.verify_l1_warmup_requirements as v
 
     entry = next(e for e in v.build_catalog() if e.name == "RSI")
@@ -128,9 +128,9 @@ def test_merge_fails_closed_on_missing_symbol_timeframe(tmp_path: Path) -> None:
     assert doc["abort"] == "merge_coverage_missing" and all("ETHUSDT" in m for m in doc["missing"])
 
 
-def test_empty_admissible_starts_not_reported_as_passed() -> None:
+def test_empty_admissible_starts_not_reported_as_passed(monkeypatch: pytest.MonkeyPatch) -> None:
     """b4 審碼 r1 codex P1-01：可採起點集合為空（2K > n−評估窗）⇒ passed=False、no_admissible_starts=True（零次檢查不得記通過）。"""
-    sys.path.insert(0, str(ROOT))
+    monkeypatch.syspath_prepend(str(ROOT))
     import scripts.verify_l1_warmup_requirements as v
 
     entry = next(e for e in v.build_catalog() if e.name == "RSI")
@@ -189,7 +189,7 @@ def test_merge_rejects_criteria_mismatch_and_uncheckable_partial_log(tmp_path: P
     assert proc.returncode == 0, proc.stdout[-800:]
 
 
-def test_infinite_values_in_eval_window_never_pass() -> None:
+def test_infinite_values_in_eval_window_never_pass(monkeypatch: pytest.MonkeyPatch) -> None:
     """b5（Codex 模型評測 gpt-5.6-luna max 反例）：評估窗內 ground truth 或 test 含 ±inf ⇒ 未收斂——
     ①`verify_exhaustive`：P75 下界為 0 時，std 捷徑曾以 inf 尺度把誤差上界算成 0 而回報通過；
     ②`scale_normalized_error`：inf−inf＝NaN 曾經 max 吞掉。兩處皆須回 inf／不通過。
@@ -198,7 +198,7 @@ def test_infinite_values_in_eval_window_never_pass() -> None:
     import numpy as np
     import pandas as pd
 
-    sys.path.insert(0, str(ROOT))
+    monkeypatch.syspath_prepend(str(ROOT))
     from scripts import verify_l1_warmup_requirements as v
 
     def fn(frame):

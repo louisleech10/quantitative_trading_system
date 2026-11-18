@@ -1,0 +1,127 @@
+{
+  "stub_modules": [
+    "tests/fixtures/hermetic_guard_plugin.py"
+  ],
+  "test_files": [
+    "tests/hermetic/test_prod_write_guard.py",
+    "tests/hermetic/test_prod_writers_tmp_root.py",
+    "tests/hermetic/test_hermetic_read_scope.py",
+    "tests/hermetic/test_root_handler_guard.py",
+    "tests/hermetic/test_golden_not_rewritten.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I1_REDS_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "I2 逐檔合回清單（runs/testsel_route/i2_mergelist.json）：I1a 提交使 testsel head 漂移，提交後須重產其身分鎖",
+      "開 TODO 前實測 runs/testsel_route/i1a/i1a_facts.md（大綱 I1a 列）"
+    ],
+    "touches": [
+      "tests/conftest.py",
+      "tests/fixtures/hermetic_guard_plugin.py",
+      "tests/momentum/test_la2_lookahead.py",
+      "tests/test_append_fix.py",
+      "tests/api/test_scan_cube.py",
+      "tests/momentum/test_feature_library_row_index.py",
+      "tests/momentum/Analysis/test_ic_persist_redirect_isolation.py",
+      "tests/fixtures/tmp_feature_runs_plugin.py",
+      "tests/momentum/DataExtraction/test_search_download_pagination.py",
+      "tests/golden/la1/gen_baseline.py",
+      "tests/golden/la1/test_b4_golden_rebaseline.py",
+      "tests/registry/test_testsel_hermetic.py",
+      "docs/TEST_SELECTION.md"
+    ],
+    "callers_now": [
+      "tests/conftest.py",
+      "scripts/build_l65_golden.py",
+      "scripts/restore_golden_inventory.sh",
+      "scripts/framepath_affected_gate.py",
+      "scripts/mutation_worktree.py",
+      "tests/golden/la1/test_b4_golden_rebaseline.py",
+      "tests/momentum/test_la1_lookahead.py",
+      "tests/api/test_ic_la1_degraded_gate.py",
+      "tests/momentum/test_ic_golden_inputs_names_opaque.py",
+      "tests/golden/l65/test_l65_golden.py",
+      "tests/fixtures/tmp_feature_runs_plugin.py",
+      "tests/registry/test_testsel_hermetic.py"
+    ],
+    "callers_later": [
+      "I3：conftest 移植至 main 時 tests/fixtures/hermetic_guard_plugin.py 與 tests/hermetic/ 原樣帶入",
+      "I1b／I1d／I1c：各子項跑受影響測試時以 Task 1.1 全樹偵測為安全網",
+      "I5：週期全量與收案層沿用 Task 1.1 偵測與正式服務行程前提"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/hermetic -m \"not slow\" -p no:cacheprovider -q",
+    "forbidden": [
+      {
+        "rule": "不得寫正式 data_cache：未修之寫入者只在暫存 cwd／暫存專案／data_cache APFS 複本沙盒中跑",
+        "observable": true
+      },
+      {
+        "rule": "不改產品預設路徑（data_cache 字面未經 MomentumConfig 屬 Rule 5 另案，SPEC §N）；Task 1.2 只改測試",
+        "observable": true
+      },
+      {
+        "rule": "不移除 HERMETIC 重導（Task 1.3）",
+        "observable": true
+      },
+      {
+        "rule": "不以跑完再 git checkout／還原作 golden 修法（Task 1.5）",
+        "observable": true
+      },
+      {
+        "rule": "不得 skip／xfail 規避、不得放寬既有測試斷言（含網路失敗不得改 skip）",
+        "observable": true
+      },
+      {
+        "rule": "不改產品 _init_worker_file_logging 語意（子行程用法正確，Task 1.4）",
+        "observable": true
+      },
+      {
+        "rule": "解耦 7 條不得違反（本項只動 tests/ 與 docs/；scripts/check_decoupling.sh 前後一致）",
+        "observable": true
+      },
+      {
+        "rule": "不做逐測試快照；不 chmod 正式目錄",
+        "observable": false
+      }
+    ],
+    "risk_mitigation": [
+      "驗收一律在暫存 cwd／暫存專案／data_cache 複本沙盒：紅狀態下跑未修寫入者也不碰正式資料（i1a_facts.md 方法節；兩次整跑正式 data_cache 前後 0 差異）",
+      "golden 驗收先比對 sha256 再還原（_GoldenRestore），還原不掩蓋改寫",
+      "Task 1.1 只有測試時段內之寫入改 session 結束碼；非測試時段只報（SPEC 邊界②）；正式服務行程存在即標不採計",
+      "Task 1.1 結束碼判定用行程內 logstart／logfinish 時段（同行程精確起訖）；SPEC 所述 TESTREG ledger 對照為列出路徑之事後人工歸因；已知行為：最後一條測試結束後至 sessionfinish 間之寫入歸非測試時段（審查 r1 COMPOSER-R1-P2-02 部分採納）",
+      "Task 1.1 範圍含 rootpath 與 session 開始時 cwd 下之兩棵 data_cache（產品預設根多相對 cwd）；Task 1.2 之改壞對照以修前版本（釘選 72258590）經 -p tests.conftest 跑，驗外掛確由 repo conftest 自動註冊（審查 r1 P1-02）",
+      "偵測抽為 tests/fixtures/hermetic_guard_plugin.py 由 tests/conftest.py 註冊，舊 _PROD_WRITE_DIRS 只報兩頂層目錄之偵測同批移除，不並存兩套",
+      "pagination 兩測試（test_search_download_pagination.py 之 test_parallel_worker_outer_catch_does_not_swallow_rejection、test_parallel_worker_still_returns_failed_records_for_ordinary_errors）之 finally：FINALLY_MARK（# I1A-HANDLER-FINALLY）只加在 finally 區塊內之 handler 清理語句行尾，不得加在 finally: 關鍵字行或非清理行（_strip_finally 整行換 pass；審查 r2 COMPOSER-R2-P3-01）",
+      "pagination 驗收依段 5 實際順序（實測檔內原序不重現、段 5 順序無守衛 11 failed），檔案複製進暫存專案以免載入主 repo 根 conftest",
+      "施工後跑受影響測試：tests/hermetic 全部（含 slow golden 驗收約 11 分）＋ touches 中 7 個測試檔＋la1 golden 之讀者 3 檔（test_la1_lookahead、test_ic_la1_degraded_gate 引用 gen_baseline；test_ic_golden_inputs_names_opaque 讀 la1/inputs:26），依 docs/TEST_SELECTION.md 估時分層",
+      "不改產品計算路徑；NaN／inf gate、輸出大小、跨 tier／多 symbol 原則不涉及"
+    ],
+    "coverage_risk": [
+      "條件式寫入路徑（舊版 K 線匯入、IC full-sample fallback、lifespan job 紀錄改寫、匯入即 mkdir、d* 快取絕對路徑、突變工作樹共用 data_cache）本次實跑未觀察到寫入，無逐條測試，只由 Task 1.1 全樹偵測兜底（i1a_facts.md ② 誠實邊界）；Task 1.2 之 scratch cwd 觀測只涵蓋相對 cwd 之寫入者，絕對路徑寫入者（MomentumConfig／Path(__file__)）只由 Task 1.1 偵測與 test_mutation_scope_back_to_two_dirs_misses_nested_write 鎖範圍承擔（審查 r1 COMPOSER-R1-P1-01）",
+      "test_accept_02_multi_range_append 需連 Binance；離線時驗收紅（原有行為，不得改 skip）",
+      "入庫 la1 BTCUSDT_1h fallback_tail100.h5（sha256 234d3637…）非現行碼所產（重產 3a88c41c…）；I1a 只修寫入位置不重產，是否重產與簽核交審查定",
+      "保持型邊界（test_boundary_02_network_failure_not_skipped、test_boundary_02_tests_read_golden_from_repo、test_boundary_01_unrooted_write_defaults_land_in_hermetic_root、test_boundary_02_rooted_read_reads_given_run）與 3 支觀測法前提／改壞對照（test_mutation_harness_flags_default_root_writer、test_mutation_default_dir_rewrites_inputs、test_mutation_rooted_read_redirected_to_hermetic_fails）於實作前已綠，非紅（r1 修後紅狀態 29 failed, 7 passed, 1 deselected）",
+      "test_mutation_reverted_writer_fails_session_via_repo_conftest[multi_range_append] 與 accept_02 同需連 Binance",
+      "Task 1.1 歸因以 session 內測試起訖時段（logstart／logfinish）為準，未接 TESTREG ledger；xdist 多 worker 未涵蓋（I5 才開 xdist）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "不做逐測試快照；不 chmod 正式目錄",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

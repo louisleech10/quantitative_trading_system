@@ -21,7 +21,7 @@ from momentum.FeatureEngineering.feature_config import CategoryConfig
 from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
 from tests.feature_engineering.ffname_helpers import kline_symbols, last_op_name, ops_tuple, parse_untagged, real_slice, roundtrip_ok
 from tests.feature_engineering.fftfmeta_golden_helpers import fast_payload, l7_manifest, prepare_env
-from tests.feature_engineering.ffstat_helpers import HEALTHY, PRIMARY_TF, SYMBOL, run_stat
+from tests.feature_engineering.ffstat_helpers import HEALTHY, PRIMARY_TF, SYMBOL, reduced_default_category, run_stat
 
 TF = PRIMARY_TF
 L65_OPS = {"fracdiff", "diff", "rank", "gaussian", "zscore"}
@@ -30,6 +30,9 @@ _L3_RE = re.compile(r"^(Mean|Std|Min|Max|Range|Slope|Rank|ZScore|Skew|Kurt)-W\d+
 
 def _payload(mode: str) -> Dict[str, Any]:
     payload = fast_payload([TF], **HEALTHY)
+    # TESTSEL I10：欄名只取決於設定與平穩化決策——趨勢類全部指標與非週期變體保留（各參數 token 格式皆有欄），週期只留
+    # 最深實例＋一個配對快週期（`reduced_default_category`；L2 Cross 仍有同家族配對），去掉同格式之重複週期
+    payload["atomic_indicators"]["trend"] = reduced_default_category("trend")
     payload["data_sources"] = {"enabled_sources": ["close", "taker_ratio"], "synthetic_sources": []}
     payload["operators"] = {"enabled": True, "cross": {"enabled": True}, "ratio": {"enabled": False},
                             "distance": {"enabled": False}, "momentum": {"enabled": False},

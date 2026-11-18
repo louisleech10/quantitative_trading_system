@@ -37,6 +37,15 @@ EXPECTED_CALLERS = {
     "tests/momentum/Analysis/test_icfirstalign_fu2.py",            # ICFIRSTALIGN FU2
     "tests/momentum/Analysis/test_evtlabel_e2e_realkline.py",      # EVTLABEL 3.10 真實 K 線端到端
     "tests/momentum/Analysis/test_splitunify_stage3_observation.py",  # SPLITUNIFY stage3 觀測（Task 4.4 同批改寫）
+    # ── 2026-11-17 補登（TESTSEL I1d1；逐檔確認不寫正式資料，隔離方式附註）────
+    "tests/api/test_gap3_oos_downgrade.py",                         # GAP-3（aeb85794）：各段打樁＋_suppress_persist ⇒ 不落檔
+    "tests/api/test_icperf_feature_filter_split_metadata.py",       # ICPERF（f124b440）：cwd 移至 tmp（_prepare_cwd 只連結唯讀輸入）
+    "tests/momentum/Analysis/test_icperf_diversification_constraint.py",  # ICPERF：呼叫 analyze 之兩測試皆 ic_persist_redirect
+    "tests/momentum/Analysis/test_icperf_rolling_numerics.py",      # ICPERF（2fbe7598）：呼叫 analyze 之兩測試皆 ic_persist_redirect
+    "tests/momentum/Analysis/test_icperf_hac45_size.py",            # ICPERF（eb0fd6f1）：LongShortAnalyzer.analyze 純計算、無寫檔
+    "tests/momentum/Analysis/test_icperf_regime_robust.py",         # ICPERF（f70dc16b）：analyze／refilter 之測試皆 ic_persist_redirect
+    "tests/momentum/Analysis/test_icperf_trend_wiring.py",          # ICPERF（54def887）：實例 _persist_outputs 換無作用
+    "tests/momentum/test_ic_golden_inputs_names_opaque.py",         # FF-NAME（0b196320）：reporter 三寫出導 tmp
     # ── 原有 ────────────────────────────────────────────────────────────────
     "tests/api/test_ic_run_selector.py",
     "tests/fixtures/gen_ic_run_selector_baseline.py",
@@ -88,9 +97,21 @@ def test_s9_s11_helpers_are_not_bypassed() -> None:
     export_source = Path("tests/api/test_export_api.py").read_text()
     assert export_source.count("_export_fixture_filtered_path(") == 2
 
+    # S11：tests/test_feature_factory_e2e.py 於 aeb85794（TESTREG Task 4.4）改寫——生成改由 `_generate`（CGSA work_dir、
+    # registry、features 皆導 tmp_path）承擔，`_create_e2e_factory()` 只剩定義＋1 呼叫（test_minimal_preset）。
+    # 不繞過之意圖：檔內每個 create_feature_factory 呼叫只位於 S11 helper 或 `_generate`，且後者把 storage 換成 tmp_path。
     ff_source = Path("tests/test_feature_factory_e2e.py").read_text()
-    assert len(re.findall(r"_create_e2e_factory\(\)", ff_source)) == 7
+    assert len(re.findall(r"_create_e2e_factory\(\)", ff_source)) == 2
     assert len(re.findall(r"create_feature_factory\(\)", ff_source)) == 1
+    owners = []
+    tree = ast.parse(ff_source)
+    for func in (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)):
+        for call in (n for n in ast.walk(func) if isinstance(n, ast.Call)):
+            if isinstance(call.func, ast.Name) and call.func.id == "create_feature_factory":
+                owners.append(func.name)
+    assert sorted(owners) == ["_create_e2e_factory", "_generate"], owners
+    generate = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_generate")
+    assert re.search(r"factory\._storage = FeatureStorage\(str\(tmp_path / ", ast.get_source_segment(ff_source, generate))
 
 
 def test_sixteen_caller_inventory_is_complete() -> None:

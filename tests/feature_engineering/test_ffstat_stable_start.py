@@ -713,12 +713,12 @@ def _utc(value: Any) -> pd.Timestamp:
 def test_no_start_leak_after_calibration_rows_does_not_change_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.3 ④：改動校準列之後之 close（×1.5）⇒ 決策與 d 不變。"""
     h.prepare_stat_env(monkeypatch, tmp_path / "a")
-    _r, _f, base = h.run_stat(tmp_path / "a", h.stat_payload(), start_date=None)
+    _r, _f, base = h.run_stat(tmp_path / "a", h.narrow_stat_payload(), start_date=None)
     klines = h.kline_copy(tmp_path / "b")
     latest_cal_end = max(pd.Timestamp(r["calibration_end"]) for r in h.decisions(base).values() if r.get("calibration_end"))
     h.scale_kline_close(klines, (latest_cal_end + pd.Timedelta(hours=1)).isoformat(), "2100-01-01", 1.5)
     h.prepare_stat_env(monkeypatch, tmp_path / "b")
-    _r2, _f2, moved = h.run_stat(tmp_path / "b", h.stat_payload(), start_date=None, kline_dir=str(klines))
+    _r2, _f2, moved = h.run_stat(tmp_path / "b", h.narrow_stat_payload(), start_date=None, kline_dir=str(klines))
     for column, record in h.decisions(base).items():
         other = h.decisions(moved)[column]
         assert (record["fracdiff"], record["adf_differenced"], record["d"]) == (other["fracdiff"], other["adf_differenced"], other["d"]), column
@@ -727,12 +727,12 @@ def test_no_start_leak_after_calibration_rows_does_not_change_decisions(tmp_path
 def test_no_start_change_inside_calibration_rows_changes_some_decision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.3 ④：改動校準列內之 close ⇒ 至少一欄決策或 d 改變（證明確實讀校準列）。"""
     h.prepare_stat_env(monkeypatch, tmp_path / "a")
-    _r, _f, base = h.run_stat(tmp_path / "a", h.stat_payload(), start_date=None)
+    _r, _f, base = h.run_stat(tmp_path / "a", h.narrow_stat_payload(), start_date=None)
     klines = h.kline_copy(tmp_path / "b")
     first = h.kline_frame().index[0]
     h.scale_kline_close(klines, first.isoformat(), (first + pd.Timedelta(days=120)).isoformat(), 3.0)
     h.prepare_stat_env(monkeypatch, tmp_path / "b")
-    _r2, _f2, moved = h.run_stat(tmp_path / "b", h.stat_payload(), start_date=None, kline_dir=str(klines))
+    _r2, _f2, moved = h.run_stat(tmp_path / "b", h.narrow_stat_payload(), start_date=None, kline_dir=str(klines))
     changed = [c for c, r in h.decisions(base).items()
                if (r["fracdiff"], r["d"]) != (h.decisions(moved)[c]["fracdiff"], h.decisions(moved)[c]["d"])]
     assert changed
@@ -1485,7 +1485,10 @@ def _path_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> Dic
     # 多週期取 1h＋4h：CGSA 續跑只接 complete 之前次 run（consumer_gate.is_run_status_cacheable），而真實 12h 資料
     # （約 1,700 根）下 KAMA_233 等慢欄之穩定點晚至 2025-12，N＝500 缺 133 欄、N＝100 仍缺 20 欄 ⇒ partial、resume
     # 永不觸發（主委實跑 2026-09-28）；4h 約 5,088 根，預設 N 下全部欄湊滿
-    payload = h.stat_payload(["1h", "4h"])
+    # TESTSEL I10：窄設定（`h.narrow_stat_payload`）——各路徑之分支依環境（級距、平行、續跑）而非欄數：L3 persist mode
+    # 由 `get_l3_persist_mode`（環境／級距）決定、上方 spy 斷言；L6.5 分割門檻（≥ 2,000 欄）與 L3 streaming 緩衝
+    # （≥ 2,000 欄）於原設定下亦未觸及，故縮欄不少路徑
+    payload = h.narrow_stat_payload(["1h", "4h"])
     root, _factory, result = h.run_stat(tmp_path, payload, start_date=None)
     if mode == "resume":
         # r25 codex P1-01：第二次須真走 CGSA 續跑——令快取探測落空，並斷言 resume_from_manifest 被呼叫
@@ -1510,12 +1513,20 @@ def _strip_cache_hit(decisions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str
     return {c: {k: v for k, v in r.items() if k != "dstar_cache_hit"} for c, r in decisions.items()}
 
 
+@pytest.fixture(scope="module")
+def serial_path_run(tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Any]:
+    """⑪ 之比較基準（CGSA 序列）；TESTSEL I10：模組內只算一次（原四格各重算一次同一 run）。"""
+    with pytest.MonkeyPatch.context() as mp:
+        return _path_run(tmp_path_factory.mktemp("cgsa_serial"), mp, "cgsa_serial")
+
+
 @pytest.mark.parametrize("mode", ["cgsa_parallel", "resume", "tier_24gb", "tier_32gb"])
-def test_paths_same_stable_start_and_masks(mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_paths_same_stable_start_and_masks(mode: str, serial_path_run: Dict[str, Any], tmp_path: Path,
+                                           monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.3 ⑪（v49 改寫；r24 codex P1-02）：生產路徑 CGSA 序列、CGSA 平行、resume、24gb（L3 hybrid）與 32gb（L3 in_memory）級距之 stable_start、決策與
     公開輸出全部欄（基礎欄 parquet＋_L65 衍生欄）之 NaN mask 與 float32 值全同，且皆 complete。"""
     key = CONTRACT["stable_start_receipt_key"]
-    base = _path_run(tmp_path / "cgsa_serial", monkeypatch, "cgsa_serial")
+    base = serial_path_run
     other = _path_run(tmp_path / mode, monkeypatch, mode)
     for run in (base, other):
         assert run["result"].metadata.get("quality_status") == "complete", run["result"].metadata.get("failure_reasons")
@@ -1542,7 +1553,8 @@ def _factory_and_config():
     from momentum.factories import create_feature_factory
 
     factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
-    return factory, factory._resolve_config(h.stat_payload())
+    # TESTSEL I10：⑫ 各測試驗 run_ic_first 之窗／狀態／零寫入，與欄寬無關 ⇒ 窄設定（同路徑、少重複欄）
+    return factory, factory._resolve_config(h.narrow_stat_payload())
 
 
 @pytest.mark.parametrize("missing", ["start", "end"])
@@ -1592,8 +1604,8 @@ def test_run_ic_first_uses_own_window_not_previous(tmp_path: Path, monkeypatch: 
     b_start = (pd.Timestamp(a_end) + pd.Timedelta(days=30)).strftime("%Y-%m-%d")
     b_end = (pd.Timestamp(a_end) + pd.Timedelta(days=60)).strftime("%Y-%m-%d")
     factory._storage = FeatureStorage(str(tmp_path / "gen"))
-    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.stat_payload(), start_date=a_start, end_date=a_end)
-    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.stat_payload(), start_date=b_start, end_date=b_end)
+    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.narrow_stat_payload(), start_date=a_start, end_date=a_end)
+    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.narrow_stat_payload(), start_date=b_start, end_date=b_end)
     expected_hash = factory._compute_config_hash(config, h.SYMBOL, h.PRIMARY_TF, start_date=a_start, end_date=a_end)
     for preset in (False, True):
         if preset:
@@ -1626,7 +1638,7 @@ def test_run_ic_first_restores_state_on_all_endings(ending: str, tmp_path: Path,
     h.prepare_stat_env(monkeypatch, tmp_path)
     factory, config = _factory_and_config()
     factory._storage = FeatureStorage(str(tmp_path / "gen"))
-    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.stat_payload(), start_date=h.WINDOW[0], end_date=h.WINDOW[1])
+    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.narrow_stat_payload(), start_date=h.WINDOW[0], end_date=h.WINDOW[1])
     window_before, hash_before = factory._current_output_window, factory._current_config_hash
     w1_start = (pd.Timestamp(h.WINDOW[1]) + pd.Timedelta(days=30)).strftime("%Y-%m-%d")
     w1_end = (pd.Timestamp(h.WINDOW[1]) + pd.Timedelta(days=60)).strftime("%Y-%m-%d")

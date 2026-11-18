@@ -2,7 +2,7 @@
 
 受測物：`FeaturePreprocessor` 之 run 層級執行紀錄容器（存取點經 `preprov_helpers.preprocessor_records`／
 `preprocessor_groups` 單一假設點）、`_merge_decisions_from`、`FeatureFactory._capture_stationarity_decisions`。
-真實 kline 短窗 run（同模組同格只生成一次）；單元案例之特徵值取自真實 run 之落盤欄（非合成）。
+真實 kline 短窗 run（同行程同格只生成一次，`ph.shared_run_cache`）；單元案例之特徵值取自真實 run 之落盤欄（非合成）。
 實作前應為紅；不得以 skip／xfail 暫避。
 """
 
@@ -27,7 +27,7 @@ Key = Tuple[str, str]
 
 @pytest.fixture(scope="module")
 def runs(tmp_path_factory: pytest.TempPathFactory) -> ph.RunCache:
-    return ph.RunCache(tmp_path_factory.mktemp("preprov_collect"))
+    return ph.shared_run_cache(tmp_path_factory)  # TESTSEL I10：session 共用倉（同格每行程只生成一次）
 
 
 # ---------------------------------------------------------------------------------------------- oracle

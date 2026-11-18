@@ -129,7 +129,10 @@ def test_artifact_roundtrip(tmp_path: Path) -> None:
     assert loaded[3]["ic_mean"] == -math.inf
 
 
-def test_artifact_filter_no_full_load(tmp_path: Path) -> None:
+@pytest.fixture(scope="module")
+def artifact_filter_reads(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    """2 萬列與 4 萬列 artifact 各以同一 filter 分頁讀一次，並取樣讀取期間行程 RSS 峰值（兩條共用，不重複）。"""
+    tmp_path = tmp_path_factory.mktemp("ic_artifact_filter")
     row_count = 20_000
     target_features = [f"feature_{index:06d}" for index in range(10, 20)]
     path_small = tmp_path / "small.parquet"
@@ -144,14 +147,30 @@ def test_artifact_filter_no_full_load(tmp_path: Path) -> None:
     large_rows, large_peak = _rss_peak_for(
         lambda: read(path_large, filters=filters, page=5_000)
     )
+    return {"target_features": target_features, "small_rows": small_rows, "small_peak": small_peak,
+            "large_rows": large_rows, "large_peak": large_peak}
+
+
+def test_artifact_filter_no_full_load(artifact_filter_reads: dict) -> None:
+    """filter 讀取只回目標列；輸入加倍時讀取期間 RSS 峰值不隨之成長（同測試內兩次讀取之相對差，屬「不全量載入」之
+    設計性質，保留於非 perf）。整個行程之絕對 RSS 上限受同行程先前測試影響 ⇒ 移至 perf（TESTSEL S3）。"""
+    target_features = artifact_filter_reads["target_features"]
+    small_rows, small_peak = artifact_filter_reads["small_rows"], artifact_filter_reads["small_peak"]
+    large_rows, large_peak = artifact_filter_reads["large_rows"], artifact_filter_reads["large_peak"]
 
     assert len(small_rows) == len(target_features)
     assert len(large_rows) == len(target_features)
     assert {row["feature_name"] for row in small_rows} == set(target_features)
     assert {row["feature_name"] for row in large_rows} == set(target_features)
+    assert large_peak <= small_peak + 128 * 1024**2
+
+
+@pytest.mark.perf
+def test_artifact_filter_process_rss_under_2gb(artifact_filter_reads: dict) -> None:
+    """讀取期間整個 pytest 行程 RSS 峰值 < 2GB：效能／資源基準，opt-in（TESTSEL S3 自上一條移出）。"""
+    small_peak, large_peak = artifact_filter_reads["small_peak"], artifact_filter_reads["large_peak"]
     assert small_peak < 2 * 1024**3
     assert large_peak < 2 * 1024**3
-    assert large_peak <= small_peak + 128 * 1024**2
 
 
 def test_artifact_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

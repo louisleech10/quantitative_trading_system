@@ -68,6 +68,10 @@ PyQt6-Charts==6.9.0
 PyQt6-Charts-Qt6==6.9.1
 PyQt6-Qt6==6.9.1
 PyQt6_sip==13.10.2
+pytest==8.4.2
+pytest-asyncio==1.2.0
+pytest-cov==7.0.0
+pytest-testmon==2.1.4
 python-binance==1.0.35
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1

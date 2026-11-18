@@ -45,6 +45,7 @@ from tests.golden.la1.gen_baseline import (
     _base_config_override,
     _hash_bool_array,
     _mask_payload,
+    _ensure_sidefx_tmp,
     _materialize_short_features,
     _resolve_la0_feature_inputs,
     _run_analyze,
@@ -317,8 +318,10 @@ def _build_live_five_path_artifact(
 
     # ⑤ fallback（triggered 短樣本；與 B0 同形）
     run = next(r for r in RUNS if r["symbol"] == symbol)
+    # 短樣本寫行程暫存（行程結束自清），不改寫入庫 tests/golden/la1/inputs（TESTSEL I1a Task 1.5）
     short_h5, short_meta = _materialize_short_features(
-        h5, symbol, timeframe, run["config_hash"], FALLBACK_TAIL_BARS
+        h5, symbol, timeframe, run["config_hash"], FALLBACK_TAIL_BARS,
+        inputs_dir=_ensure_sidefx_tmp() / "la1_fallback_inputs",
     )
     fb_override = _base_config_override("rule")
     fb_override["min_test_rows"] = 10_000

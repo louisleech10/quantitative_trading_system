@@ -10,7 +10,7 @@ IC 頁第三步之 view 身分。值集、鍵名與正規化規則一律取自�
 """
 
 from __future__ import annotations
-
+import functools
 import json
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
@@ -243,14 +243,14 @@ def detect_capabilities() -> Dict[str, bool]:
 
 
 def library_version(name: str) -> str:
-    """函式庫版本之唯一讀取點（契約 `library_versions` 之發行套件名；`importlib.metadata`）。未安裝 ⇒ 記 `absent`。"""
+    """函式庫版本之唯一讀取點（契約 `library_versions` 之發行套件名；`importlib.metadata`）。未安裝 ⇒ 記 `absent`。行程內依 name 快取（見下）。"""
     import importlib.metadata
 
     try:
         return importlib.metadata.version(name)
     except importlib.metadata.PackageNotFoundError:
         return "absent"
-
+library_version = functools.lru_cache(maxsize=None)(library_version)  # TESTSELSLOW 2026-11-15：importlib.metadata.version 每次逐項列 sys.path 目錄（Py3.9 無快取）；同行程版本不變；行程內裝／換套件後須 cache_clear()；與上行同區塊以免移動契約引用之行號
 
 def _real_items(node: Mapping[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in node.items() if not str(k).startswith("_")}

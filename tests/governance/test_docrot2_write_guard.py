@@ -477,6 +477,12 @@ def _precommit_repo(tmp_path: Path) -> Path:
     (root / "scripts" / "git_hooks").mkdir()
     shutil.copy2(REPO / "scripts" / "git_hooks" / "pre-commit", root / "scripts" / "git_hooks" / "pre-commit")
     (root / "scripts" / "verification_claim_check.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+    # NOCAP（timeout_scan --staged）與 ICPERF L3（limit_lint_staged.sh → limit_lint.py）：pre-commit 缺即 fail-closed
+    shutil.copy2(REPO / "scripts" / "git_hooks" / "limit_lint_staged.sh", root / "scripts" / "git_hooks" / "limit_lint_staged.sh")
+    for name in ("timeout_scan.py", "limit_lint.py", "limit_scan.py"):
+        (root / "scripts" / name).symlink_to(REPO / "scripts" / name)
+    for name in ("timeout_patterns.json", "timeout_registry.json"):  # 實檔：--staged 讀暫存區版（符號連結會讀到連結字串）
+        shutil.copy2(REPO / "scripts" / name, root / "scripts" / name)
     # DOCROT2 D2D：pre-commit ③ --migration 缺殘留清單即 fail-closed；本 fixture 無命中檔，空清單即合規。
     (root / "scripts" / "docrot2_migration_residuals.json").write_text('{"residuals": []}\n', encoding="utf-8")
     _commit_all(root)

@@ -105,6 +105,18 @@
 
 測試本身寫法之效率（共用 fixture、去重複計算）、重型測試應否存在（依路徑覆蓋判準，見 CLAUDE.md「測試／量測設計＝路徑覆蓋」）。
 
+### §7.1 測試不得寫正式資料根（TESTSEL-HERMETIC）
+
+- `tests/conftest.py` 把 `FeatureRegistry()`／`FeatureStorage()` 之預設根改指 session 暫存根。
+- 寫入偵測（`tests/fixtures/hermetic_guard_plugin.py`，由 `tests/conftest.py` 註冊）：session 前後快照 `<rootpath>/data_cache` 與「session 開始時 cwd 下之 `data_cache`」兩棵全樹（新增、修改、刪除；樹內符號連結不跟隨）；變動之 mtime 落在任一測試執行時段內 ⇒ 具名列出路徑並使 **session 結束狀態非零**；落在無測試執行之時段者標「非測試寫入」只報。
+- **執行前提**（全量與受影響集）：不得有並行之正式服務寫入 `data_cache`（API／前端／下載排程停止）。外掛於 session 開始與結束各查一次 `pgrep -ifl 'run_api.py|uvicorn|next dev|next start'`，任一非空即輸出 `[HERMETIC-PRECONDITION]`——該次結果不採計，前提滿足後重跑（`lsof` 只反映當下開檔，不作判定依據）。
+- 測試寫入之資料一律落明給之暫存根（`tmp_path`／依賴注入）；產品預設根多為「相對 cwd 之 `data_cache/...`」（`PatternStorage`、`scan_cube.build_cube`〔`root` 於定義時綁定，須改 `build_cube.__kwdefaults__["root"]`〕、`KlineStorageManager`）。
+- 測試不得改寫入庫 golden：產生 golden 輸入之輔助函式須可給輸出目錄（例 `tests/golden/la1/gen_baseline._materialize_short_features(inputs_dir=…)`）；`--collect-only` 不改寫 `tests/golden/l65/test_inventory.txt`（正式產生者為 `scripts/build_l65_golden.collect_existing_l65_tests`）。
+- 測試若於主行程掛 handler 至 root logger（如呼叫子行程用之 `_init_worker_file_logging`），須於測試結束移除；外掛之 autouse fixture 為通用兜底（只移除該測試期間新增者）。
+- 須以正式 registry 內容做真實對照之測試：把正式 `registry.json` 位元組複製到本測試 tmp_path，預設路徑與既有 registry 實例指向副本（實例：`tests/api/test_gap3_ic_progress_fields.py` 之 `production_registry_readonly`）。不得指回正式路徑再逐一攔截寫入口——`_persist` 以外另有 `_load` 之損毀備份（`.corrupt-*`）與 `_locked_mutate` 之 lock 寫入。
+- 測試替身（假生成等）之寫入根取本測試 tmp_path，不得由傳入之正式路徑（如 kline 快取目錄）往上推（實例：`tests/api/test_batch_retention.py` 之 `_fake_data_root`）。
+- 根行程內生成而依 cwd 相對預設路徑之案例（`prepare_env` 已 chdir 至 tmp）：於該測試內還原原始相對預設值（實例：`tests/feature_engineering/test_icfirstalign_domain.py` 之 `_multi_symbol_run`）。
+
 ## §8 驗收（可證偽）
 
 - 只改某測試獨有執行之一個函式 ⇒ 該測試必被選中；未執行該函式之測試不被選中。

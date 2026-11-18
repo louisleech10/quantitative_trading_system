@@ -504,7 +504,7 @@
     "smoke"
    ],
    "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-b5-review-r1/synth.md",
+   "disposition_ref": "handoffs/reconcile/20261113-testsel-b2-review-r1/synth.md",
    "guarantee": [
     "A12",
     "A19",
@@ -1567,6 +1567,7 @@
   "tests/api/test_ic_response_v2.py": {
    "claim": [
     "contract",
+    "perf",
     "regression"
    ],
    "disposition": "keep",
@@ -1704,6 +1705,48 @@
     "TOLERANCE"
    ],
    "path": "tests/api/test_icperf_feature_metadata.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/api/test_icperf_limit_l1b_ic_admission_route.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_icperf_limit_l1b_ic_admission_route.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/api/test_icperf_limit_l1c_coverage_tasks.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_icperf_limit_l1c_coverage_tasks.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -1892,6 +1935,27 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "unknown"
+  },
+  "tests/api/test_nocap_background_jobs.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_nocap_background_jobs.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
   },
   "tests/api/test_numview_ic_page.py": {
    "claim": [
@@ -2543,8 +2607,8 @@
     "correctness",
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261118-testseli1h-b1-review-r1/synth.md",
    "guarantee": [
     "A12",
     "A14",
@@ -2560,9 +2624,7 @@
    "path": "tests/feature_engineering/atomic/test_handcoded_reference.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/atomic/test_handcoded_reference.py::test_klinger_kvo_ema_from_golden_vf"
-   ],
+   "rewrite_targets": [],
    "ticket": "FF"
   },
   "tests/feature_engineering/atomic/test_prepare_inputs_equivalence.py": {
@@ -2731,8 +2793,8 @@
    "claim": [
     "regression"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r6/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261118-testseli1h-b1-review-r1/synth.md",
    "guarantee": [
     "A15",
     "A3",
@@ -2744,9 +2806,7 @@
    "path": "tests/feature_engineering/preprocessing/test_fast_adf_gate.py",
    "quarantine": [],
    "rewrite_receipt": null,
-   "rewrite_targets": [
-    "tests/feature_engineering/preprocessing/test_fast_adf_gate.py::test_fast_adf_1000_sample_gate"
-   ],
+   "rewrite_targets": [],
    "ticket": "unknown"
   },
   "tests/feature_engineering/preprocessing/test_fast_adf_synthetic.py": {
@@ -3388,24 +3448,6 @@
    "rewrite_targets": [],
    "ticket": "FAIL-OPEN"
   },
-  "tests/feature_engineering/test_failopen_frozen_diff.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-review-r50/synth.md",
-   "guarantee": [
-    "A17"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/feature_engineering/test_failopen_frozen_diff.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "FAIL-OPEN"
-  },
   "tests/feature_engineering/test_failopen_golden.py": {
    "claim": [
     "contract"
@@ -3506,6 +3548,29 @@
     "EXACT"
    ],
    "path": "tests/feature_engineering/test_failopen_producer.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FAIL-OPEN"
+  },
+  "tests/feature_engineering/test_failopen_small_scale.py": {
+   "claim": [
+    "correctness",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A14",
+    "A15",
+    "A2",
+    "A8",
+    "A9"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_failopen_small_scale.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -3626,6 +3691,27 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "FF"
+  },
+  "tests/feature_engineering/test_ff_fullchain_truncation_allcat_mr.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A14",
+    "A2",
+    "A8"
+   ],
+   "oracle": [
+    "METAMORPHIC",
+    "TOLERANCE"
+   ],
+   "path": "tests/feature_engineering/test_ff_fullchain_truncation_allcat_mr.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "FFSTAT"
   },
   "tests/feature_engineering/test_ff_fullchain_truncation_mr.py": {
    "claim": [
@@ -5012,7 +5098,8 @@
   },
   "tests/feature_engineering/test_numview_selectors.py": {
    "claim": [
-    "contract"
+    "contract",
+    "perf"
    ],
    "disposition": "keep",
    "disposition_ref": null,
@@ -5331,6 +5418,26 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "unknown"
+  },
+  "tests/feature_engineering/test_testselslow_syspath_version.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261115-testselslow-x-consult-r2/synth.md",
+   "guarantee": [
+    "A10",
+    "A13",
+    "A7"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/feature_engineering/test_testselslow_syspath_version.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
   },
   "tests/feature_engineering/test_tf_aligner.py": {
    "claim": [
@@ -5667,6 +5774,44 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "CONVERGENCE"
+  },
+  "tests/governance/test_affected_from_coverage.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_affected_from_coverage.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
+  },
+  "tests/governance/test_affected_from_trace.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_affected_from_trace.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
   },
   "tests/governance/test_balance_check.py": {
    "claim": [
@@ -7071,23 +7216,24 @@
    "rewrite_targets": [],
    "ticket": "NOCAP"
   },
-  "tests/governance/test_subagent_delivered.py": {
+  "tests/governance/test_limit_lint.py": {
    "claim": [
     "contract"
    ],
    "disposition": "keep",
    "disposition_ref": null,
    "guarantee": [
-    "A16"
+    "A11",
+    "A6"
    ],
    "oracle": [
     "EXACT"
    ],
-   "path": "tests/governance/test_subagent_delivered.py",
+   "path": "tests/governance/test_limit_lint.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
-   "ticket": "GOVERNANCE"
+   "ticket": "ICPERF"
   },
   "tests/governance/test_low_risk_impl_requires_reconcile.py": {
    "claim": [
@@ -7224,6 +7370,25 @@
    "rewrite_targets": [],
    "ticket": "PRERED"
   },
+  "tests/governance/test_readtrace_plugin.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_readtrace_plugin.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
+  },
   "tests/governance/test_reconcile_completeness_enforced.py": {
    "claim": [
     "contract"
@@ -7340,6 +7505,25 @@
    "rewrite_targets": [],
    "ticket": "GOVERNANCE"
   },
+  "tests/governance/test_run_chunked.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A13",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_run_chunked.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "NOCAP"
+  },
   "tests/governance/test_session_name_guard_wired.py": {
    "claim": [
     "contract"
@@ -7414,6 +7598,24 @@
    "rewrite_receipt": null,
    "rewrite_targets": [],
    "ticket": "P1-6"
+  },
+  "tests/governance/test_subagent_delivered.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/governance/test_subagent_delivered.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "GOVERNANCE"
   },
   "tests/governance/test_sync_check.py": {
    "claim": [
@@ -9430,25 +9632,6 @@
    ],
    "ticket": "IC-HC"
   },
-  "tests/governance/test_limit_lint.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A11",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/governance/test_limit_lint.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
   "tests/momentum/Analysis/test_icperf_compare_units.py": {
    "claim": [
     "contract",
@@ -9464,168 +9647,6 @@
     "EXACT"
    ],
    "path": "tests/momentum/Analysis/test_icperf_compare_units.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_data_warning_codes.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A12",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_data_warning_codes.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py": {
-   "claim": [
-    "correctness"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A15",
-    "A2",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py": {
-   "claim": [
-    "correctness"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A15",
-    "A4",
-    "A6"
-   ],
-   "oracle": [
-    "TOLERANCE"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py": {
-   "claim": [
-    "contract"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A16",
-    "A17"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_limit_l1a_ic_config.py": {
-   "claim": [
-    "contract",
-    "regression"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A16",
-    "A17",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_limit_l1a_ic_config.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/api/test_icperf_limit_l1b_ic_admission_route.py": {
-   "claim": [
-    "contract",
-    "regression"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A16",
-    "A17",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/api/test_icperf_limit_l1b_ic_admission_route.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_limit_l1b_ic_admission.py": {
-   "claim": [
-    "contract",
-    "regression"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A16",
-    "A17",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_limit_l1b_ic_admission.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_limit_scan.py": {
-   "claim": [
-    "contract",
-    "regression"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A16",
-    "A17",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_limit_scan.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -9652,7 +9673,7 @@
    "rewrite_targets": [],
    "ticket": "ICPERF"
   },
-  "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py": {
+  "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py": {
    "claim": [
     "correctness"
    ],
@@ -9660,14 +9681,32 @@
    "disposition_ref": null,
    "guarantee": [
     "A15",
-    "A4",
+    "A2",
     "A6"
    ],
    "oracle": [
-    "EXACT",
-    "TOLERANCE"
+    "EXACT"
    ],
-   "path": "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py",
+   "path": "tests/momentum/Analysis/test_icperf_cpcv_full_paths.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_data_warning_codes.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A12",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_data_warning_codes.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -9688,6 +9727,27 @@
     "EXACT"
    ],
    "path": "tests/momentum/Analysis/test_icperf_deep_candidates.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_deep_centrality_trend.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -9864,6 +9924,67 @@
    "rewrite_targets": [],
    "ticket": "ICPERF"
   },
+  "tests/momentum/Analysis/test_icperf_hac45_size.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_hac45_size.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_hac_fixed_lag.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_hac_method_bw.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_hac_method_bw.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
   "tests/momentum/Analysis/test_icperf_ic_autocorr_report.py": {
    "claim": [
     "correctness"
@@ -9900,6 +10021,88 @@
     "EXACT"
    ],
    "path": "tests/momentum/Analysis/test_icperf_isolated_run.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_limit_l1_coverage.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_limit_l1a_ic_config.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_limit_l1a_ic_config.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_limit_l1b_ic_admission.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_limit_l1b_ic_admission.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_limit_scan.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A16",
+    "A17",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_limit_scan.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -9947,6 +10150,24 @@
    "rewrite_targets": [],
    "ticket": "ICPERF"
   },
+  "tests/momentum/Analysis/test_icperf_study_receipts_fresh.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A17"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_study_receipts_fresh.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
   "tests/momentum/Analysis/test_icperf_time_index_resolution.py": {
    "claim": [
     "correctness"
@@ -9962,6 +10183,48 @@
     "EXACT"
    ],
    "path": "tests/momentum/Analysis/test_icperf_time_index_resolution.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_trend_inference.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_trend_inference.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_trend_wiring.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_trend_wiring.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -10025,6 +10288,27 @@
     "STATISTICAL"
    ],
    "path": "tests/momentum/Analysis/test_icperf_vif_sample_guard.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "ICPERF"
+  },
+  "tests/momentum/Analysis/test_icperf_xsec_ewc.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A4",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/momentum/Analysis/test_icperf_xsec_ewc.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
@@ -12615,6 +12899,27 @@
    "rewrite_targets": [],
    "ticket": "IC-LA1"
   },
+  "tests/momentum/test_la1_pit_small_scale.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A14",
+    "A2",
+    "A8"
+   ],
+   "oracle": [
+    "EXACT",
+    "METAMORPHIC"
+   ],
+   "path": "tests/momentum/test_la1_pit_small_scale.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "IC-LA1"
+  },
   "tests/momentum/test_la2_lookahead.py": {
    "claim": [
     "contract",
@@ -13239,8 +13544,8 @@
    "claim": [
     "smoke"
    ],
-   "disposition": "rewrite",
-   "disposition_ref": "handoffs/reconcile/20261010-testreg-x-consult-r16/synth.md",
+   "disposition": "keep",
+   "disposition_ref": "handoffs/reconcile/20261118-testseli1h-b1-review-r1/synth.md",
    "guarantee": [
     "A10"
    ],
@@ -13636,7 +13941,8 @@
   },
   "tests/registry/test_testreg_defective_rewrite.py": {
    "claim": [
-    "contract"
+    "contract",
+    "perf"
    ],
    "disposition": "keep",
    "disposition_ref": null,
@@ -13759,7 +14065,8 @@
   },
   "tests/registry/test_testreg_repair_additive.py": {
    "claim": [
-    "contract"
+    "contract",
+    "perf"
    ],
    "disposition": "keep",
    "disposition_ref": null,
@@ -13883,12 +14190,32 @@
    "rewrite_targets": [],
    "ticket": "TESTREG"
   },
+  "tests/registry/test_testsel_hermetic.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A18"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/registry/test_testsel_hermetic.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
   "tests/registry/test_timeout_registry.py": {
    "claim": [
     "contract"
    ],
-   "disposition": "keep",
-   "disposition_ref": null,
+   "disposition": "rewrite",
+   "disposition_ref": "handoffs/run_receipts/testreg-rewrite/test_timeout_registry-approval.md",
    "guarantee": [
     "A13",
     "A16"
@@ -13898,8 +14225,10 @@
    ],
    "path": "tests/registry/test_timeout_registry.py",
    "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
+   "rewrite_receipt": "handoffs/run_receipts/testreg-rewrite/test_timeout_registry-rewrite.json",
+   "rewrite_targets": [
+    "tests/registry/test_timeout_registry.py::test_boundary_12_repo_scan_every_hit_registered_and_not_class_a"
+   ],
    "ticket": "NOCAP"
   },
   "tests/test_append_fix.py": {
@@ -14639,6 +14968,7 @@
   },
   "tests/test_kline_data_service.py": {
    "claim": [
+    "perf",
     "smoke"
    ],
    "disposition": "keep",
@@ -15464,111 +15794,7 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
-  "tests/momentum/Analysis/test_icperf_hac_method_bw.py": {
-   "claim": [
-    "correctness"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A15",
-    "A4",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT",
-    "TOLERANCE"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_hac_method_bw.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_trend_inference.py": {
-   "claim": [
-    "correctness"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A15",
-    "A4",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT",
-    "TOLERANCE"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_trend_inference.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_xsec_ewc.py": {
-   "claim": [
-    "correctness"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A15",
-    "A4",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT",
-    "TOLERANCE"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_xsec_ewc.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_trend_wiring.py": {
-   "claim": [
-    "correctness"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A15",
-    "A4",
-    "A6"
-   ],
-   "oracle": [
-    "EXACT",
-    "TOLERANCE"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_trend_wiring.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/momentum/Analysis/test_icperf_hac45_size.py": {
-   "claim": [
-    "correctness"
-   ],
-   "disposition": "keep",
-   "disposition_ref": null,
-   "guarantee": [
-    "A15",
-    "A4",
-    "A6"
-   ],
-   "oracle": [
-    "TOLERANCE"
-   ],
-   "path": "tests/momentum/Analysis/test_icperf_hac45_size.py",
-   "quarantine": [],
-   "rewrite_receipt": null,
-   "rewrite_targets": [],
-   "ticket": "ICPERF"
-  },
-  "tests/api/test_icperf_limit_l1c_coverage_tasks.py": {
+  "tests/hermetic/test_golden_not_rewritten.py": {
    "claim": [
     "contract",
     "regression"
@@ -15576,20 +15802,19 @@
    "disposition": "keep",
    "disposition_ref": null,
    "guarantee": [
-    "A16",
-    "A17",
-    "A6"
+    "A1",
+    "A18"
    ],
    "oracle": [
     "EXACT"
    ],
-   "path": "tests/api/test_icperf_limit_l1c_coverage_tasks.py",
+   "path": "tests/hermetic/test_golden_not_rewritten.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
-   "ticket": "ICPERF"
+   "ticket": "TESTSEL"
   },
-  "tests/api/test_nocap_background_jobs.py": {
+  "tests/hermetic/test_hermetic_read_scope.py": {
    "claim": [
     "contract",
     "regression"
@@ -15597,94 +15822,197 @@
    "disposition": "keep",
    "disposition_ref": null,
    "guarantee": [
-    "A16",
-    "A17",
+    "A1",
+    "A18"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/hermetic/test_hermetic_read_scope.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
+  "tests/hermetic/test_prod_write_guard.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A18"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/hermetic/test_prod_write_guard.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
+  "tests/hermetic/test_prod_writers_tmp_root.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A18"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/hermetic/test_prod_writers_tmp_root.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
+  "tests/hermetic/test_root_handler_guard.py": {
+   "claim": [
+    "contract",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A18"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/hermetic/test_root_handler_guard.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
+  "tests/feature_engineering/test_l2_cross_ratio_oracle.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
     "A6"
    ],
    "oracle": [
-    "EXACT"
+    "EXACT",
+    "TOLERANCE"
    ],
-   "path": "tests/api/test_nocap_background_jobs.py",
+   "path": "tests/feature_engineering/test_l2_cross_ratio_oracle.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
-   "ticket": "ICPERF"
+   "ticket": "TESTSEL"
   },
-  "tests/governance/test_readtrace_plugin.py": {
+  "tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py": {
    "claim": [
-    "contract"
+    "contract",
+    "regression"
    ],
    "disposition": "keep",
    "disposition_ref": null,
    "guarantee": [
-    "A13",
-    "A16"
+    "A1",
+    "A18"
    ],
    "oracle": [
     "EXACT"
    ],
+   "path": "tests/feature_engineering/test_l3_skew_kurt_numpy_arm.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
-   "ticket": "NOCAP",
-   "path": "tests/governance/test_readtrace_plugin.py"
+   "ticket": "TESTSEL"
   },
-  "tests/governance/test_affected_from_trace.py": {
+  "tests/feature_engineering/test_l3_moment_bound_check.py": {
    "claim": [
-    "contract"
+    "contract",
+    "regression"
    ],
    "disposition": "keep",
    "disposition_ref": null,
    "guarantee": [
-    "A13",
-    "A16"
+    "A1",
+    "A18"
    ],
    "oracle": [
     "EXACT"
    ],
+   "path": "tests/feature_engineering/test_l3_moment_bound_check.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
-   "ticket": "NOCAP",
-   "path": "tests/governance/test_affected_from_trace.py"
+   "ticket": "TESTSEL"
   },
-  "tests/governance/test_run_chunked.py": {
+  "tests/momentum/DataExtraction/test_taker_ratio_single_definition.py": {
    "claim": [
-    "contract"
+    "contract",
+    "regression"
    ],
    "disposition": "keep",
    "disposition_ref": null,
    "guarantee": [
-    "A13",
-    "A16"
+    "A1",
+    "A18"
    ],
    "oracle": [
     "EXACT"
    ],
+   "path": "tests/momentum/DataExtraction/test_taker_ratio_single_definition.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
-   "ticket": "NOCAP",
-   "path": "tests/governance/test_run_chunked.py"
+   "ticket": "TESTSEL"
   },
-  "tests/governance/test_affected_from_coverage.py": {
+  "tests/registry/test_conftest_seed.py": {
    "claim": [
-    "contract"
+    "contract",
+    "regression"
    ],
    "disposition": "keep",
    "disposition_ref": null,
    "guarantee": [
-    "A13",
-    "A16"
+    "A13"
    ],
    "oracle": [
-    "EXACT"
+    "EXACT",
+    "METAMORPHIC"
    ],
+   "path": "tests/registry/test_conftest_seed.py",
    "quarantine": [],
    "rewrite_receipt": null,
    "rewrite_targets": [],
-   "ticket": "NOCAP",
-   "path": "tests/governance/test_affected_from_coverage.py"
+   "ticket": "TESTSEL"
+  },
+  "tests/feature_engineering/test_kurt_lower_bound_parity.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A15",
+    "A6"
+   ],
+   "oracle": [
+    "EXACT",
+    "TOLERANCE"
+   ],
+   "path": "tests/feature_engineering/test_kurt_lower_bound_parity.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
   }
  },
  "tombstones": [

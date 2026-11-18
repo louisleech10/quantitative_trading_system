@@ -37,9 +37,18 @@ def _criteria() -> dict:
     return json.loads(nh.current_criteria_path().read_text(encoding="utf-8"))
 
 
+def _say(log: Path, line: str) -> None:
+    """狀態行同時印 stdout 與附加至 log（等待程序 `scripts/wait_run.sh` 只盯 log 即可見 start／stalled／exit）。"""
+    print(line, flush=True)
+    with log.open("a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log", required=True)
+    parser.add_argument("--expected-seconds", type=float, default=None,
+                        help="估時（秒；取自估時收據）：牆鐘逾判準倍數即於 log 寫『逾預期』行（只告警、不終止）")
     parser.add_argument("cmd", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     cmd: List[str] = [c for c in args.cmd if c != "--"] if args.cmd[:1] == ["--"] else list(args.cmd)
@@ -48,18 +57,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     wd = _watchdog()
     log = Path(args.log)
     log.parent.mkdir(parents=True, exist_ok=True)
-    print(f"[run-watched] start {' '.join(cmd)}（log {log}）", flush=True)
-    result = wd.run_watched(cmd, log_path=log, config=wd.load_config(_criteria()), cwd=str(REPO))
+    # start 行只印 stdout：監看以 "w" 開 log（_watchdog.run_watched），先寫入者會被覆寫
+    print(f"[run-watched] start {' '.join(cmd)}（log {log}；估時 {args.expected_seconds or '未給'} 秒）", flush=True)
+    result = wd.run_watched(cmd, log_path=log, config=wd.load_config(_criteria()), cwd=str(REPO),
+                            expected_seconds=args.expected_seconds)
     if result.status == wd.STALLED:
         diag = log.with_name(log.name + ".stall_diagnosis.json")
         diag.write_text(json.dumps({"reason": result.reason, "cause": result.cause, **(result.diagnosis or {})},
                                    ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-        print(f"[run-watched] stalled 原因 {result.cause}：{result.reason}；現場 {diag}；"
-              f"{'程式卡住——依堆疊查因修好再跑，不得直接重跑' if result.cause == wd.CAUSE_HANG else '記憶體不足'}",
-              flush=True)
+        _say(log, f"[run-watched] stalled 原因 {result.cause}：{result.reason}；現場 {diag}；"
+                  f"{'程式卡住——依堆疊查因修好再跑，不得直接重跑' if result.cause == wd.CAUSE_HANG else '記憶體不足'}")
         return 4 if result.cause == wd.CAUSE_HANG else 5
-    print(f"[run-watched] exit rc={result.returncode}（{result.wall_seconds:.0f} 秒"
-          f"{'，逾預期（只記錄）' if result.over_expected else ''}）", flush=True)
+    _say(log, f"[run-watched] exit rc={result.returncode}（{result.wall_seconds:.0f} 秒"
+              f"{'，逾預期（只記錄）' if result.over_expected else ''}）")
     return int(result.returncode or 0)
 
 

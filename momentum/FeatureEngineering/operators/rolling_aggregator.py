@@ -12,6 +12,8 @@ from scipy.stats import rankdata
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering import memmap_utils
 from momentum.FeatureEngineering import memory_budget as _memory_budget
+# TESTSEL I1b Task 2.4：非預設臂之 skew／kurt 一律經此模組（模組參照，非 from-import，使改壞對照可替換）
+from momentum.FeatureEngineering.operators import rolling_moments_numpy as _rmn
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 from momentum.FeatureEngineering.feature_naming import (
     RATIO_UNSAFE_CATEGORIES,
@@ -310,7 +312,7 @@ class RollingAggregator:
                         if not cols:
                             continue
                         sub = chunk_df if len(cols) == chunk_df.shape[1] else chunk_df[cols]
-                        result = sub.rolling(window).skew() if agg_name == "skew" else sub.rolling(window).kurt()
+                        result = self._rolling_moment_frame(sub, window, 0 if agg_name == "skew" else 1)
                     elif agg_name == "range":
                         result = cached["max"] - cached["min"]
                     elif agg_name == "zscore":
@@ -456,7 +458,7 @@ class RollingAggregator:
                         if not cols:
                             continue
                         sub = chunk_df if len(cols) == chunk_df.shape[1] else chunk_df[cols]
-                        result = sub.rolling(window).skew() if agg_name == "skew" else sub.rolling(window).kurt()
+                        result = self._rolling_moment_frame(sub, window, 0 if agg_name == "skew" else 1)
                     else:
                         continue
 
@@ -870,17 +872,20 @@ class RollingAggregator:
                 min_df = rolling.min()
             if any(agg in {"max", "range"} for agg in valid_aggs):
                 max_df = rolling.max()
-            if "skew" in valid_aggs:
-                # Layer 4: drop low-cardinality columns from skew.
-                scols = self._columns_for_agg(list(data.columns), "skew")
+            # Layer 4: drop low-cardinality columns from skew/kurt. 兩者皆要且欄集相同 ⇒ 核心每欄每窗只呼叫一次同時取兩者；
+            # 否則只算所要之一項（不保留未要求之表）。
+            scols = self._columns_for_agg(list(data.columns), "skew") if "skew" in valid_aggs else []
+            kcols = self._columns_for_agg(list(data.columns), "kurt") if "kurt" in valid_aggs else []
+            if scols and kcols and scols == kcols:
+                sub = data if len(scols) == data.shape[1] else data[scols]
+                skew_df, kurt_df = self._rolling_moment_frames(sub, window)
+            else:
                 if scols:
                     sub = data if len(scols) == data.shape[1] else data[scols]
-                    skew_df = sub.rolling(window).skew()
-            if "kurt" in valid_aggs:
-                kcols = self._columns_for_agg(list(data.columns), "kurt")
+                    skew_df = self._rolling_moment_frame(sub, window, 0)
                 if kcols:
                     sub = data if len(kcols) == data.shape[1] else data[kcols]
-                    kurt_df = sub.rolling(window).kurt()
+                    kurt_df = self._rolling_moment_frame(sub, window, 1)
 
             for agg_name in valid_aggs:
                 agg_label = self._format_agg_label(agg_name)
@@ -947,11 +952,38 @@ class RollingAggregator:
         std = series.rolling(window).std()
         return (series - mean) / std.replace(0, np.nan)
 
+    @staticmethod
+    def _rolling_moment_frame(sub: pd.DataFrame, window: int, which: int) -> pd.DataFrame:
+        """逐欄 skew（which=0）／kurt（which=1），以獨立 numpy 兩遍法（`rolling_moments_numpy`）計算，保留 index／columns。
+
+        TESTSEL I1b Task 2.4：取代 pandas `rolling().skew()／.kurt()`——pandas 線上累積算法於大均值欄數值錯
+        （真實 BTCUSDT/1h close 窗 5 kurt 20,348 窗中 19,035 窗超 1 float32 ulp）、常數窗輸出 skew 0／kurt −3。"""
+        values = sub.to_numpy(dtype=np.float64, copy=False)
+        out = np.empty(values.shape, dtype=np.float64)
+        for j in range(values.shape[1]):
+            out[:, j] = _rmn.rolling_skew_kurt_numpy(values[:, j], int(window))[:, which]
+        return pd.DataFrame(out, index=sub.index, columns=sub.columns)
+
+    @staticmethod
+    def _rolling_moment_frames(sub: pd.DataFrame, window: int) -> tuple:
+        """逐欄一次呼叫核心同時得 (skew_df, kurt_df)——核心本即同時算二者，分開呼叫會重算一倍。"""
+        values = sub.to_numpy(dtype=np.float64, copy=False)
+        skew = np.empty(values.shape, dtype=np.float64)
+        kurt = np.empty(values.shape, dtype=np.float64)
+        for j in range(values.shape[1]):
+            both = _rmn.rolling_skew_kurt_numpy(values[:, j], int(window))
+            skew[:, j] = both[:, 0]
+            kurt[:, j] = both[:, 1]
+        return (pd.DataFrame(skew, index=sub.index, columns=sub.columns),
+                pd.DataFrame(kurt, index=sub.index, columns=sub.columns))
+
     def _compute_skew(self, series: pd.Series, window: int) -> pd.Series:
-        return series.rolling(window).skew()
+        return pd.Series(_rmn.rolling_skew_kurt_numpy(series.to_numpy(dtype=np.float64), int(window))[:, 0],
+                         index=series.index, name=series.name)
 
     def _compute_kurt(self, series: pd.Series, window: int) -> pd.Series:
-        return series.rolling(window).kurt()
+        return pd.Series(_rmn.rolling_skew_kurt_numpy(series.to_numpy(dtype=np.float64), int(window))[:, 1],
+                         index=series.index, name=series.name)
 
     def _compute_min(self, series: pd.Series, window: int) -> pd.Series:
         return series.rolling(window).min()

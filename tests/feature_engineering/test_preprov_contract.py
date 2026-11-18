@@ -2,7 +2,7 @@
 
 契約＝`momentum/FeatureEngineering/contracts/run_provenance.json`（唯一真相源）；本檔不列舉任何狀態值，值集一律讀契約。
 ③ 之「實際紀錄中出現之值」取自 §V 全格（`preprov_helpers.CELLS`）與本檔之單元案例之落盤紀錄、manifest 群組表與
-前處理器紀錄；真實 kline 短窗、同模組同格只生成一次。實作前應為紅；不得以 skip／xfail 暫避。
+前處理器紀錄；真實 kline 短窗、同行程同格只生成一次（`ph.shared_run_cache`）。實作前應為紅；不得以 skip／xfail 暫避。
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ UNIT_CALIBRATION_BARS = 100
 
 @pytest.fixture(scope="module")
 def runs(tmp_path_factory: pytest.TempPathFactory) -> ph.RunCache:
-    return ph.RunCache(tmp_path_factory.mktemp("preprov_contract"))
+    return ph.shared_run_cache(tmp_path_factory)  # TESTSEL I10：session 共用倉（同格每行程只生成一次）
 
 
 # ---------------------------------------------------------------------------------------------- oracle（純函式）
@@ -416,6 +416,37 @@ def test_verification_03_observed_values_subset_and_covered(runs: ph.RunCache, m
     merge(observed, observed_from_records(statsmodels_unavailable_records(runs, monkeypatch), spec))
     assert sum(len(v) for v in observed.values()) > 0, "未觀測到任何值 ⇒ ③ 空轉"
     assert coverage_violations(spec, observed) == []
+
+
+#: TESTSEL I10 姊妹測試：verification_03 之「⊆ 契約」半逐單位拆開（每單位只需該格一次生成，單條 ≤300 秒、可獨立選跑）；
+#: 各單位之取值方式與 verification_03 逐字相同。「契約每值至少一格產出」之聯集覆蓋性質須全格，仍只由 verification_03 承擔。
+_SUBSET_UNITS: List[str] = [*ph.CELLS, "h12h1_native_fallback", "ic_first_empty", "ic_first_gaussian",
+                            "h1_replace_sharded"]
+
+
+def _observed_of_unit(runs: ph.RunCache, unit: str, spec: Mapping[str, Any]) -> Dict[str, Set[str]]:
+    observed: Dict[str, Set[str]] = {}
+    if unit in ph.CELLS:
+        for handle in runs.all_of(unit):
+            merge(observed, observed_from_run(handle, spec))
+            pre = ph.observation(handle).l65_preprocessor
+            if pre is not None:
+                merge(observed, observed_from_records(ph.preprocessor_records(pre), spec))
+                merge(observed, observed_from_groups(ph.preprocessor_groups(pre)))
+    elif unit == "h1_replace_sharded":
+        merge(observed, observed_from_groups(ph.preprocessor_groups(ph.observation(runs.get(unit)).l65_preprocessor)))
+    else:
+        merge(observed, observed_from_run(runs.get(unit), spec))
+    return observed
+
+
+@pytest.mark.parametrize("unit", _SUBSET_UNITS)
+def test_verification_03a_observed_values_subset_per_unit(runs: ph.RunCache, unit: str) -> None:
+    """③ 之「實際紀錄值集 ⊆ 契約」逐格／逐變體：該單位觀測值無一不在契約值集（同 `coverage_violations` 之判定）。"""
+    spec = ph.contract()
+    observed = _observed_of_unit(runs, unit, spec)
+    assert sum(len(v) for v in observed.values()) > 0, f"{unit}：未觀測到任何值 ⇒ 空轉"
+    assert [v for v in coverage_violations(spec, observed) if "不在契約" in v] == []
 
 
 def test_verification_01b_source_scope_is_spec_scope() -> None:

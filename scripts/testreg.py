@@ -83,12 +83,23 @@ def _git_out(root: Path, *args: str) -> str:
     return _run_git(root, *args).stdout
 
 
-_HEAD_CACHE: Dict[str, Optional[str]] = {}
+_HEAD_CACHE: Dict[Tuple[str, int, int], Optional[str]] = {}
+
+
+def _repo_identity(root: Path) -> Tuple[str, int, int]:
+    """行程內快取用之倉身分：路徑＋`.git` 之 inode 與 ctime。同一路徑於行程內被刪除後重建為另一倉（pytest
+    tmp_path_retention_policy=failed 下，參數化測試重用截斷後之同名暫存目錄）時鍵不同，不得讀到前一倉之快取。"""
+    resolved = Path(root).resolve()
+    try:
+        st = (resolved / ".git").stat()
+        return (str(resolved), st.st_ino, st.st_ctime_ns)
+    except OSError:
+        return (str(resolved), 0, 0)
 
 
 def _head_sha(root: Path) -> Optional[str]:
-    key = str(Path(root).resolve())
-    if key not in _HEAD_CACHE:  # 單一行程內 HEAD 不變（hook／pre-commit 皆短命行程）
+    key = _repo_identity(root)
+    if key not in _HEAD_CACHE:  # 單一行程內同一倉之 HEAD 不變（hook／pre-commit 皆短命行程）
         proc = _run_git(root, "rev-parse", "--verify", "-q", "HEAD", check=False)
         _HEAD_CACHE[key] = proc.stdout.strip() or None if proc.returncode == 0 else None
     return _HEAD_CACHE[key]
@@ -296,6 +307,8 @@ def _plugin_module():
 _SPECIAL = frozenset({"raises", "warns", "deprecated_call", "fail", "approx", "xfail", "skip"})
 _CHECK_RE = re.compile(r"^(check|verify|validate|expect)_")
 _PLACE = "\x00L"
+#: 具名縫：True ⇒ normalize 回退 v53 之全域序號（改壞對照用；生產恆 False）
+_GLOBAL_ORDINAL = False
 
 
 def _last_name(func: ast.AST) -> Optional[str]:
@@ -861,8 +874,9 @@ class _Engine:
                 if n.id in binding and isinstance(n.ctx, ast.Load):
                     return copy.deepcopy(binding[n.id])
                 if n.id in local:
-                    return ast.copy_location(ast.Name(id=f"{_PLACE}{inst}|{pos[0]:08d}|{pos[1]:04d}|{order[n.id]:04d}|{n.id}",
-                                                      ctx=n.ctx), n)
+                    return ast.copy_location(ast.Name(
+                        id=f"{_PLACE}{inst}|{pos[0]:08d}|{pos[1]:04d}|{order[n.id]:04d}|h:{hpath}::{hfn.name}|{n.id}",
+                        ctx=n.ctx), n)
                 return n
 
         for el in inner:
@@ -927,7 +941,8 @@ class _Engine:
                 def visit_Name(self, n):
                     if n.id in local:
                         return ast.copy_location(ast.Name(
-                            id=f"{_PLACE}{inst}|{pos[0]:08d}|{pos[1] + 1:04d}|{order[n.id]:04d}|{n.id}", ctx=n.ctx), n)
+                            id=f"{_PLACE}{inst}|{pos[0]:08d}|{pos[1] + 1:04d}|{order[n.id]:04d}|f:{name}|{n.id}",
+                            ctx=n.ctx), n)
                     return n
 
             for el in inner:
@@ -939,19 +954,45 @@ class _Engine:
         return self.normalize(fn, els)
 
     def normalize(self, fn: ast.AST, els: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """名稱正規化：測試本體綁定之名與各 fixture／helper 內聯實例之區域名改寫為序號。序號按來源分組局部編號
+        （v54，TESTSEL I2 審碼 r1 群集 C）：測試本體一組（`_T_i`）、各 fixture 實例一組（`_f:<名>#k_i`）、各 helper 內聯
+        實例一組（`_h:<檔>::<函式>#k_i`，k＝同一 helper 之第幾次內聯，依呼叫位置排序），組內沿用原排序鍵。原全域編號下，
+        autouse fixture 或 helper 新增一個被元素使用之區域名即使其後全部名之序號位移、每個斷言鍵都變，V19 誤報減少。
+        `_GLOBAL_ORDINAL` 為具名縫（改壞對照以之回退全域編號）。"""
         bound = _bound_names(fn)
         used: Dict[str, Tuple] = {}
+        group_of: Dict[str, str] = {}
+        inst_pos: Dict[str, Tuple[str, int, int, int]] = {}
         for el in els:
             if el.get("node") is None:
                 continue
             for n in ast.walk(el["node"]):
                 if isinstance(n, ast.Name):
                     if n.id.startswith(_PLACE):
-                        _, line, col, idx, _ = n.id[len(_PLACE):].split("|", 4)
+                        inst, line, col, idx, base, _ = n.id[len(_PLACE):].split("|", 5)
                         used.setdefault(n.id, (int(line), int(col), 1, int(idx)))
+                        group_of.setdefault(n.id, inst)
+                        inst_pos.setdefault(inst, (base, int(line), int(col), int(inst)))
                     elif n.id in bound:
                         used.setdefault(n.id, (*bound[n.id], 0, 0))
-        ordinal = {name: f"_{i}" for i, name in enumerate(sorted(used, key=lambda k: used[k]))}
+                        group_of.setdefault(n.id, "")
+        if _GLOBAL_ORDINAL:
+            ordinal = {name: f"_{i}" for i, name in enumerate(sorted(used, key=lambda k: used[k]))}
+        else:
+            label: Dict[str, str] = {"": "T"}
+            by_base: Dict[str, List[Tuple[int, int, int, str]]] = {}
+            for inst, (base, line, col, num) in inst_pos.items():
+                by_base.setdefault(base, []).append((line, col, num, inst))
+            for base, lst in by_base.items():
+                for k, (_l, _c, _n, inst) in enumerate(sorted(lst)):
+                    label[inst] = f"{base}#{k}"
+            members: Dict[str, List[str]] = {}
+            for name in used:
+                members.setdefault(label[group_of[name]], []).append(name)
+            ordinal = {}
+            for lab, names in members.items():
+                for i, name in enumerate(sorted(names, key=lambda k: used[k])):
+                    ordinal[name] = f"_{lab}_{i}"
 
         class R(ast.NodeTransformer):
             def visit_Name(self, n):
@@ -1072,12 +1113,12 @@ def _tree(ctx: Context) -> "_Tree":
     return ctx.extra["tree_obj"]
 
 
-_ENGINES: Dict[Tuple[str, str], "_Engine"] = {}
+_ENGINES: Dict[Tuple[Tuple[str, int, int], str], "_Engine"] = {}
 
 
 def _shared_engine(root: Path, kind: str) -> "_Engine":
-    """同一短命行程內同一 (repo, 樹) 共用引擎與其解析快取（hook／pre-commit 行程中樹內容不變）。"""
-    key = (str(Path(root).resolve()), kind)
+    """同一短命行程內同一 (repo, 樹) 共用引擎與其解析快取（hook／pre-commit 行程中樹內容不變；倉身分見 `_repo_identity`）。"""
+    key = (_repo_identity(root), kind)
     if key not in _ENGINES:
         _ENGINES[key] = _Engine(_Tree(Path(root), kind))
     return _ENGINES[key]

@@ -120,6 +120,7 @@ class TestSignalDensityAnalyzerDynamicStrategy:
 
     def test_calculate_strategy_signals_three_line(self):
         """測試動態計算 three_line 策略信號"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         # 創建模擬 K線數據
         kline_data = pd.DataFrame({
             'timestamp': range(100),
@@ -170,6 +171,7 @@ class TestSignalDensityAnalyzerDynamicStrategy:
 
     def test_calculate_strategy_signals_short_long_cross(self):
         """測試動態計算 short_long_cross 策略信號"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         kline_data = pd.DataFrame({
             'timestamp': range(100),
             'open': np.random.uniform(40000, 42000, 100),
@@ -212,6 +214,7 @@ class TestSignalDensityAnalyzerDynamicStrategy:
 
     def test_calculate_strategy_signals_mid_long_cross(self):
         """測試動態計算 mid_long_cross 策略信號"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         kline_data = pd.DataFrame({
             'timestamp': range(100),
             'open': np.random.uniform(40000, 42000, 100),
@@ -254,6 +257,7 @@ class TestSignalDensityAnalyzerDynamicStrategy:
 
     def test_invalid_strategy_raises_error(self):
         """測試無效策略會拋出錯誤"""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         kline_data = pd.DataFrame({
             'close': np.random.uniform(40000, 42000, 100)
         })

@@ -1445,14 +1445,29 @@ def regen(tmp_path_factory: pytest.TempPathFactory) -> _Regen:
 
 @pytest.fixture(scope="module")
 def legacy_runs(tmp_path_factory: pytest.TempPathFactory) -> ph.RunCache:
-    return ph.RunCache(tmp_path_factory.mktemp("numview_gate_legacy"))
+    # TESTSEL I10：PRE-PROV session 共用倉——同格與 test_preprov_* 各模組只生成一次（原本條自建倉，11 格全部重生）
+    return ph.shared_run_cache(tmp_path_factory)
 
 
-def test_gate_new_freeze_bitwise_equal_at_current_code(regen: _Regen) -> None:
-    """§G 通過條件（Phase 0／2／4；小時級）：每個凍結格於現行碼重生，G1 每個已凍結臂份（以其環境）、G2、G3 之 `dtype`、`nan`、
+#: TESTSEL I10：§G 兩條閘逐格參數化（原單一測試串行全部格：新凍結 1,996 秒、沿用基準 766 秒），每格一條、可獨立選跑；
+#: 格清單於收集期讀凍結檔，與凍結檔一致由 `test_gate_param_cells_equal_frozen_cells` 斷言（不得漏格）
+_LEGACY_GATE_CELLS: List[str] = sorted(json.loads(nh.LEGACY_BASELINE_PATH.read_text(encoding="utf-8"))["cells"])
+_NEW_FREEZE_GATE_CELLS: List[str] = sorted(json.loads(nh.PRE_CHANGE_FINGERPRINTS_PATH.read_text(encoding="utf-8"))["cells"])
+
+
+def test_gate_param_cells_equal_frozen_cells() -> None:
+    """逐格參數化之格清單＝凍結檔全部格（新凍結、沿用基準各自）；沿用基準格＝PRE-PROV §V 全格。"""
+    assert _NEW_FREEZE_GATE_CELLS == sorted(load_freeze()["cells"]) and _NEW_FREEZE_GATE_CELLS
+    assert _LEGACY_GATE_CELLS == sorted(_json(nh.LEGACY_BASELINE_PATH)["cells"]) == sorted(ph.CELLS)
+
+
+@pytest.mark.parametrize("gate_cell", _NEW_FREEZE_GATE_CELLS)
+def test_gate_new_freeze_bitwise_equal_at_current_code(regen: _Regen, gate_cell: str) -> None:
+    """§G 通過條件（Phase 0／2／4）：每個凍結格於現行碼重生，G1 每個已凍結臂份（以其環境）、G2、G3 之 `dtype`、`nan`、
     `values_native`、`column_set_sha256`、`column_order_sha256` 逐位元等於凍結值；G1 實際臂＝標示臂；臂份集合不增不減
-    （`arm_unreachable` 者不比、不補造）；例外只經已落地之決定紀錄。"""
+    （`arm_unreachable` 者不比、不補造）；例外只經已落地之決定紀錄。逐格參數化（本參數只比 `gate_cell` 一格）。"""
     freeze = load_freeze()
+    freeze = {**freeze, "cells": {gate_cell: freeze["cells"][gate_cell]}}
     exclusions = decision_exclusions()
     violations: List[str] = []
     compared = 0
@@ -1477,10 +1492,12 @@ def test_gate_new_freeze_bitwise_equal_at_current_code(regen: _Regen) -> None:
     assert violations == [], violations[:20]
 
 
-def test_gate_legacy_preprov_baseline_bitwise_equal_at_current_code(legacy_runs: ph.RunCache) -> None:
-    """§G 通過條件（沿用基準；小時級）：PRE-PROV 11 格於現行碼重生（`preprov_helpers.RunCache`），以 `legacy=True` 比 `dtype`
-    與 float32 `values`、`column_set_sha256`（相容條件由 `bitwise_diff` 內之 `assert_legacy_compatible` 斷言）。"""
+@pytest.mark.parametrize("gate_cell", _LEGACY_GATE_CELLS)
+def test_gate_legacy_preprov_baseline_bitwise_equal_at_current_code(legacy_runs: ph.RunCache, gate_cell: str) -> None:
+    """§G 通過條件（沿用基準）：PRE-PROV 11 格於現行碼重生（`preprov_helpers` session 共用倉），以 `legacy=True` 比 `dtype`
+    與 float32 `values`、`column_set_sha256`（相容條件由 `bitwise_diff` 內之 `assert_legacy_compatible` 斷言）。逐格參數化。"""
     baseline = _json(nh.LEGACY_BASELINE_PATH)
+    baseline = {**baseline, "cells": {gate_cell: baseline["cells"][gate_cell]}}
     exclusions = decision_exclusions()
     violations: List[str] = []
     compared = 0
@@ -1545,21 +1562,101 @@ def contract_new_keys() -> Set[str]:
     return keys
 
 
+#: NUMVIEW 結構重凍之後，同一凍結檔之後續結構重凍收據（每份具 `baseline_sha256_before`／`baseline_sha256_after`）。
+#: TESTSEL I1d1（SPEC Task 3.1）：FRAMEPATH v2（d4d97d62 逐欄紀錄契約 v2，`scripts/framepath_refreeze_provenance_v2.py`）
+#: 把 cgsa_fingerprint.json 自 NUMVIEW 收據之 sha256_after 再重凍一次；收據本身之逐格正確性由
+#: tests/feature_engineering/test_framepath_invariance.py::test_refreeze_provenance_v2_receipt_binds_baseline 驗。
+#: probewinsor：TESTSEL I1d1（審碼 b1 r1 裁定①）把 config_hash 換為生成環境 FIXED_ENV 下之值（值鍵不變、去鹽＝9891907f^
+#: 原凍結值；收據逐格記 frozen_before／stripped_recomputed／new_value），身分計算見 probewinsor_helpers.with_fixed_env。
+FOLLOWUP_REFREEZE_RECEIPTS: Dict[str, Tuple[str, ...]] = {
+    "tests/_golden/framepath/cgsa_fingerprint.json": ("tests/_golden/framepath/refreeze_provenance_v2_receipt.json",),
+    "tests/_golden/probewinsor/baseline.json": ("handoffs/run_receipts/20261118-probewinsor-fixedenv-refreeze.json",),
+}
+
+
+def refreeze_chain_violations(path: str, sha256_after: str, current_sha256: str,
+                              followups: Sequence[Mapping[str, Any]]) -> List[str]:
+    """NUMVIEW 重凍收據之 `sha256_after` 須等於現行凍結檔 sha256；或後續收據之 before／after 自該值逐段相接至現行值
+    （每段恰一份收據相接；後續收據須全數用於鏈上——未接上者表示其宣稱之重凍未反映於現行檔）。回違規清單（空＝接受）。"""
+    sha, used = sha256_after, set()
+    while sha != current_sha256:
+        nxt = [i for i, r in enumerate(followups) if i not in used and r.get("baseline_sha256_before") == sha]
+        if len(nxt) != 1:
+            return [f"{path}：收據鏈於 {str(sha)[:12]} 斷（相接之後續收據 {len(nxt)} 份；現行 {current_sha256[:12]}）"]
+        used.add(nxt[0])
+        sha = followups[nxt[0]].get("baseline_sha256_after")
+    unused = [i for i in range(len(followups)) if i not in used]
+    return [f"{path}：後續收據 {len(unused)} 份未接上鏈"] if unused else []
+
+
+def _followup_receipts(path: str) -> List[Dict[str, Any]]:
+    return [_json(REPO / rel) for rel in FOLLOWUP_REFREEZE_RECEIPTS.get(path, ())]
+
+
 def test_structural_refreeze_receipt_proves_strip_equals_frozen() -> None:
     """Task 4.2 驗證⑤（SPEC §G 結構凍結）：重凍收據之剝除鍵涵蓋契約新鍵；每檔 rc=0、每項「剝除新鍵後依原算法重算」＝凍結前值
-    且 `equal` 為 True；`sha256_after` 等於現行凍結檔之 sha256（重凍確已寫入）。"""
+    且 `equal` 為 True；`sha256_after` 等於現行凍結檔之 sha256（重凍確已寫入），或經後續結構重凍收據逐段相接至現行檔
+    （`refreeze_chain_violations`；TESTSEL SPEC Task 3.1）。"""
     receipt = _json(nh.REFREEZE_RECEIPT_PATH)
     # 收據分記 artifact 節點之剝除鍵（stripped_keys）與頂層之剝除鍵（stripped_root_keys；observed_arms 只寫頂層）
     stripped = {str(k) for k in receipt["stripped_keys"]} | {str(k) for k in receipt.get("stripped_root_keys") or []}
     missing = contract_new_keys() - stripped
     assert not missing, f"剝除鍵缺契約新鍵：{sorted(missing)}"
     assert receipt["files"], "重凍收據無任何檔"
+    assert set(FOLLOWUP_REFREEZE_RECEIPTS) <= {e["path"] for e in receipt["files"]}, "後續收據登記之凍結檔不在重凍收據內"
     for entry in receipt["files"]:
         assert entry["exit_code"] == 0 and entry["items"], entry.get("path")
         for item in entry["items"]:
             assert item["equal"] is True and item["frozen_before"] == item["stripped_recomputed"], (entry["path"], item.get("item"))
-        target = REPO / entry["path"]
-        assert entry["written"] is True and hashlib.sha256(target.read_bytes()).hexdigest() == entry["sha256_after"], entry["path"]
+        assert entry["written"] is True, entry["path"]
+        current = hashlib.sha256((REPO / entry["path"]).read_bytes()).hexdigest()
+        assert refreeze_chain_violations(entry["path"], entry["sha256_after"], current,
+                                         _followup_receipts(entry["path"])) == []
+
+
+def _chain_case(case: str) -> Tuple[str, str, List[Dict[str, Any]]]:
+    """(NUMVIEW 收據之 sha256_after, 現行凍結檔 sha256, 後續收據) 之竄改複本（只改載入之 dict，不寫任何檔）。"""
+    path = "tests/_golden/framepath/cgsa_fingerprint.json"
+    entry = next(e for e in _json(nh.REFREEZE_RECEIPT_PATH)["files"] if e["path"] == path)
+    current = hashlib.sha256((REPO / path).read_bytes()).hexdigest()
+    followups = copy.deepcopy(_followup_receipts(path))
+    assert followups and entry["sha256_after"] != current, "前提：cgsa_fingerprint 須經後續收據重凍（否則本測試空轉）"
+    mid = "0" * 64
+    if case == "tampered_before":
+        followups[0]["baseline_sha256_before"] = "f" * 64
+    elif case == "no_followup_sha_mismatch":
+        followups = []
+    elif case == "broken_mid_chain":
+        first, second = copy.deepcopy(followups[0]), copy.deepcopy(followups[0])
+        first["baseline_sha256_after"] = mid
+        second["baseline_sha256_before"] = "1" * 64  # 應為 mid ⇒ 中段斷
+        followups = [first, second]
+    elif case == "unused_followup":
+        followups.append({"baseline_sha256_before": "2" * 64, "baseline_sha256_after": "3" * 64})
+    elif case == "normal_two_links":
+        first, second = copy.deepcopy(followups[0]), copy.deepcopy(followups[0])
+        first["baseline_sha256_after"] = mid
+        second["baseline_sha256_before"] = mid
+        followups = [second, first]  # 順序無關
+    elif case != "normal":
+        raise ValueError(case)
+    return entry["sha256_after"], current, followups
+
+
+@pytest.mark.parametrize("case, accepted", [
+    ("normal", True),
+    ("normal_two_links", True),
+    ("tampered_before", False),
+    ("no_followup_sha_mismatch", False),
+    ("broken_mid_chain", False),
+    ("unused_followup", False),
+])
+def test_structural_refreeze_chain_negatives(case: str, accepted: bool) -> None:
+    """TESTSEL SPEC Task 3.1 邊界與 mutation：竄改後續收據 `baseline_sha256_before`／無後續收據且 sha 不符／鏈斷於中段／
+    多出未接上之後續收據 ⇒ 拒收；現行收據鏈（及等價之兩段鏈）⇒ 接受。與主測試呼叫同一 `refreeze_chain_violations`。"""
+    sha_after, current, followups = _chain_case(case)
+    violations = refreeze_chain_violations("tests/_golden/framepath/cgsa_fingerprint.json", sha_after, current, followups)
+    assert (violations == []) is accepted, violations
 
 
 # ============================================================================================== Task 5.1

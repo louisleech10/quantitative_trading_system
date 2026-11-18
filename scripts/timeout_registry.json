@@ -497,11 +497,11 @@
     },
     {
       "path": "tests/api/test_ic_response_v2.py",
-      "function": "test_export_route_streaming",
+      "function": "test_export_route_streaming_chunks_within_2s",
       "callee": "time.monotonic",
       "literal": "",
       "class": "D",
-      "reason": "串流首段回應之效能斷言（2 秒）"
+      "reason": "串流首段回應之效能斷言（2 秒；TESTSEL S3 自正確性測試移出為 perf 標記之基準）"
     },
     {
       "path": "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py",
@@ -1602,6 +1602,26 @@
       "line": "REMOVED_TIME_FIELD = \"timeout_seconds\"",
       "class": "D",
       "reason": "負測試：斷言送已移除之請求逾時秒數欄即 422（ICPERF Task 0.6 L1c，施工清單審查 r175），非時間上限"
+    },
+    {
+      "path": "handoffs/run_receipts/icfirstalign_probes/calibration_dtype_diff_probe.py",
+      "function": "_peak",
+      "callee": "subprocess.run",
+      "literal": "1800",
+      "class": "D",
+      "reason": "封存不執行：ICFIRSTALIGN 一次性探針；2026-11-13 全文搜 scripts／tests／docs／HANDOFF／CLAUDE.md／settings 無任何執行指令引用，僅 docs/manifests/ICFIRSTALIGN.json batch_card.touches 列為觸及檔（TESTSEL 收尾 E 查證）"
+    },
+    {
+      "path": "scripts/mutation_worktree.py",
+      "line": "for attempt in range(5):",
+      "class": "B",
+      "reason": "等外部方（鎖）：`git worktree add` 寫主 repo 之 .git/worktrees／index，併發執行者撞 index.lock 時退避重試（0.4×n 秒、5 次），失敗即 raise 附 git stderr；等候者為他行程持有之 git 鎖，非本程式之運算（bounded_poll，TESTSEL I2 審碼 r1 擴充後首次命中）"
+    },
+    {
+      "path": "api/services/batch_download_service.py",
+      "line": "for attempt in range(max_retries):",
+      "class": "B",
+      "reason": "等外部方（鎖）：寫 HDF5 kline 檔遇他寫入者持有之檔案鎖時退避重試（max_retries=3、retry_delay 0.1 秒起），用盡即報錯；等候者為檔案鎖之持有者，非本服務之運算（bounded_poll，TESTSEL I2 審碼 r1 擴充後首次命中）"
     },
     {
       "path": "tests/governance/test_heavy_run_guard.py",

@@ -176,6 +176,7 @@ class TestCGSAMultiTFAlignment:
 
     def test_primary_groups_not_aligned(self, tmp_path):
         """Primary TF groups should NOT be modified (no alignment needed)."""
+        np.random.seed(20261026)  # TESTSEL S3：固定全域亂數種子（原未設；測試結果須只取決於程式與資料）
         registry = ColumnGroupRegistry(work_dir=tmp_path)
         n_rows = 10
         original = np.random.randn(n_rows, 3).astype(np.float32)

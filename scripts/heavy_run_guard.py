@@ -147,6 +147,9 @@ def _strip_prefixes(argv: List[str]) -> List[str]:
                 continue
             if tok in cmd_opts and i + 1 < len(argv):
                 return ["bash", "-c", argv[i + 1]]
+            opt, eq, val = tok.partition("=")  # 長選項等號寫法 `--command=<命令>`／`--split-string=<命令>`
+            if eq and opt.startswith("--") and opt in cmd_opts:
+                return ["bash", "-c", val]
             if tok.startswith("-") and tok != "-":
                 i += 2 if tok in value_opts else 1
                 continue
@@ -509,9 +512,21 @@ _PYTEST_NARROWING = ("-k", "-m", "--deselect", "--ignore", "--ignore-glob", "--l
                      "--stepwise")
 #: 上列中帶值者（以空白分隔時其後一個 token 為值）
 _PYTEST_NARROWING_VALUED = ("-k", "-m", "--deselect", "--ignore", "--ignore-glob")
-#: pytest 之帶值選項（其值不是測試路徑）
-_PYTEST_VALUE_OPTS = ("-p", "-o", "-c", "-W", "-r", "--rootdir", "--confcutdir", "--basetemp", "--tb", "--durations",
-                      "--log-file", "--junitxml", "--trace-select")
+#: pytest 之帶值選項（其值不是測試路徑）＝實際 argparse 解析器（pytest 核心＋已裝外掛 testmon／asyncio／cov）中
+#: nargs 非 0／非 '?' 之選項，扣除上列縮小選取者；`--trace-select` 為本守衛專用。與解析器之一致由
+#: tests/governance/test_heavy_run_guard.py 之漂移測試鎖住（新外掛加選項即紅）。
+_PYTEST_VALUE_OPTS = ("-p", "-o", "-c", "-W", "-r", "--trace-select",
+                      "--assert", "--asyncio-mode", "--basetemp", "--capture", "--code-highlight", "--color",
+                      "--confcutdir", "--config-file", "--cov-config", "--cov-context", "--cov-fail-under",
+                      "--cov-precision", "--cov-report", "--doctest-glob", "--doctest-report", "--durations",
+                      "--durations-min", "--import-mode", "--junit-prefix", "--junit-xml", "--junitprefix", "--junitxml",
+                      "--log-auto-indent", "--log-cli-date-format", "--log-cli-format", "--log-cli-level",
+                      "--log-date-format", "--log-disable", "--log-file", "--log-file-date-format", "--log-file-format",
+                      "--log-file-level", "--log-file-mode", "--log-format", "--log-level", "--maxfail", "--override-ini",
+                      "--pastebin", "--pdbcls", "--pythonwarnings", "--rootdir", "--show-capture", "--tb",
+                      "--testmon-env", "--verbosity")
+#: 值可省略之選項（argparse nargs='?'：下一個 token 不以 `-` 開頭即被吃為其值，如 `--cov momentum`）
+_PYTEST_OPTIONAL_VALUE_OPTS = ("--cov", "--debug")
 
 
 #: 估時收據之測試層級（docs/TEST_SELECTION.md §3／§4）：batch＝每批例行，只准紀錄耗時 <60 秒之快速層；其餘四種
@@ -564,6 +579,9 @@ def _pytest_selectors(argv: List[str], strict: bool = True) -> Optional[List[str
             continue
         if tok in _PYTEST_VALUE_OPTS:
             i += 2
+            continue
+        if tok in _PYTEST_OPTIONAL_VALUE_OPTS:
+            i += 2 if i + 1 < len(rest) and not rest[i + 1].startswith("-") else 1
             continue
         if not tok.startswith("-"):
             tokens.append(tok)

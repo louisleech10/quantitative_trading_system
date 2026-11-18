@@ -164,7 +164,7 @@
     "volume_12h_raw_value_Lag-5",
     "volume_12h_raw_value_Lag-8"
    ],
-   "config_hash": "c7d73bb5227b369d2003c99502c01e32",
+   "config_hash": "83aa3aaefbf1e7343a70597b15f5bd95",
    "elapsed_seconds": 3.71,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -1001,7 +1001,7 @@
     "volume_12h_raw_value_Lag-5",
     "volume_12h_raw_value_Lag-8"
    ],
-   "config_hash": "49107f1d869d3d8802fc7d0fac902139",
+   "config_hash": "c0e5a16ed35491999d4a23f3ffcc8566",
    "elapsed_seconds": 2.52,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -1836,7 +1836,7 @@
     "volume_12h_raw_value_Lag-5",
     "volume_12h_raw_value_Lag-8"
    ],
-   "config_hash": "a980628989a874dfb9e476573f1ae778",
+   "config_hash": "a909bd4a4da37e4f5e75ca49944ca4ac",
    "elapsed_seconds": 3.59,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -2669,7 +2669,7 @@
     "volume_12h_raw_value_Lag-5",
     "volume_12h_raw_value_Lag-8"
    ],
-   "config_hash": "1b7217398effa5373ed126fe5ce23862",
+   "config_hash": "6c01cde814953a79fa497e22d72bd904",
    "elapsed_seconds": 3.75,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -3495,7 +3495,7 @@
     "volume_12h_raw_value_Lag-5",
     "volume_12h_raw_value_Lag-8"
    ],
-   "config_hash": "684694bc9703de863cf31288ba7a02ca",
+   "config_hash": "95dedf4fb32b028278dc5faadcc5c13e",
    "elapsed_seconds": 4.12,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -4294,7 +4294,7 @@
     "volume_12h_raw_value_Lag-5",
     "volume_12h_raw_value_Lag-8"
    ],
-   "config_hash": "437fde0212452e77c109c1f17d1c68ee",
+   "config_hash": "6b70286b8189539eefaee80edb198013",
    "elapsed_seconds": 2.62,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -5080,7 +5080,7 @@
     "volume_12h_raw_value_Lag-5",
     "volume_12h_raw_value_Lag-8"
    ],
-   "config_hash": "3a3938011e9a3bec07956012cc512a93",
+   "config_hash": "a15d22ef1f0e93a75badbc5e89360403",
    "elapsed_seconds": 3.91,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -5885,7 +5885,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "c23b0c6bce6696e09f6e2f4caf4d0f7b",
+   "config_hash": "d3f44501f51e3a8b245177405563ac62",
    "elapsed_seconds": 3.61,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -6722,7 +6722,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "6a0abfd2063c537be0e68cb0038fe6ee",
+   "config_hash": "265786c220389d9143d68dca835d3506",
    "elapsed_seconds": 2.75,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -7559,7 +7559,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "06391ed5481e4b8d4a7d0aebbd8b2d53",
+   "config_hash": "7d6932c19855a8c654a326bc491fd07c",
    "elapsed_seconds": 3.85,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -8392,7 +8392,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "00bf71e45d773dd734254488847ba238",
+   "config_hash": "5ced79c556ac032a4ab1bf85b0d109a7",
    "elapsed_seconds": 4.28,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -9386,7 +9386,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "8788359e3b8cbfaaf7f37f49621f3cd1",
+   "config_hash": "b8c6db5c1cafe52f8f98a96f21769c0c",
    "elapsed_seconds": 8.08,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -11028,7 +11028,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "c962fa6fb3b0bd9e826dafb6246ba042",
+   "config_hash": "b622c49e4f10c442539f172b19965535",
    "elapsed_seconds": 9.44,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -12670,7 +12670,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "23ab3c41ae831cd3fe8718799f3a51ce",
+   "config_hash": "a6717f13fb44ffd08395eb188f3f685d",
    "elapsed_seconds": 7.43,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -14308,7 +14308,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "c287942169a559d574285c9e48dbcddb",
+   "config_hash": "0c0e2339db6d9805d1e0f767ca1e5d71",
    "elapsed_seconds": 11.66,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -15950,7 +15950,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "ccaa7c046b2d319ca40f00b259dc90aa",
+   "config_hash": "9195e1340b2a26c6893aac3271e2141f",
    "elapsed_seconds": 7.87,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -17592,7 +17592,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "f0edf60628af9604ebd1963fb1c8b9f5",
+   "config_hash": "5d2dd2f58669342dc3dbef3c298a5cc0",
    "elapsed_seconds": 8.73,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -19320,7 +19320,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "0fcfe7283680538b4c8e51415ab02cb1",
+   "config_hash": "e16fb4d03e49781640fa98e724498877",
    "elapsed_seconds": 23.02,
    "fingerprints": {
     "close_12h_raw_value_Lag-1": {
@@ -21148,7 +21148,7 @@
     "xsec_1h_cross-sectional_idiosyncratic-momentum",
     "xsec_1h_cross-sectional_relative-price"
    ],
-   "config_hash": "74fc3c5667cf3e0f488e7a08734008bb",
+   "config_hash": "d882fc53fc0f274401097e85cfb73bcf",
    "elapsed_seconds": 3.79,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -22000,7 +22000,7 @@
     "xsec_1h_cross-sectional_idiosyncratic-momentum",
     "xsec_1h_cross-sectional_relative-price"
    ],
-   "config_hash": "1476b6b6460764809a1140f9036b8baf",
+   "config_hash": "cd8352a89b8680817e26e33e4d400282",
    "elapsed_seconds": 4.07,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -22852,7 +22852,7 @@
     "xsec_1h_cross-sectional_idiosyncratic-momentum",
     "xsec_1h_cross-sectional_relative-price"
    ],
-   "config_hash": "c85f58cb5ffef2fa837ca483c577fa28",
+   "config_hash": "7f9f94e8e9653684cb01ca13e2ec63a8",
    "elapsed_seconds": 3.98,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -23697,7 +23697,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "d81f4d22591ad0bb6b7ad081fcbc8bd1",
+   "config_hash": "866a863961306df9228101d2c443085a",
    "elapsed_seconds": 1.93,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -24525,7 +24525,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "5b2de38903329d7b986647a7f1ff3d9d",
+   "config_hash": "66ddf633f4a8a3ed9942173e8141146a",
    "elapsed_seconds": 3.72,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -25362,7 +25362,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "3f64d3b13ccb60cb836b15fc0f7ad57b",
+   "config_hash": "d2dca23524a71f1cdbc87571973ea62d",
    "elapsed_seconds": 2.68,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -26206,7 +26206,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "22cb25184792873b74cbdd527f398f9c",
+   "config_hash": "44610c93e78d520e98a95818e099dd35",
    "elapsed_seconds": 8.41,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -27072,7 +27072,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "8ce3dab94fb0c0e50c1c5b05339ed1b0",
+   "config_hash": "f267aca4e3e8d2a34133d484cbc24bff",
    "elapsed_seconds": 9.91,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -32076,7 +32076,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "90eb01b1e4bd8eff780764453f17b850",
+   "config_hash": "8b55818bcc25bca42cf06327a6a64850",
    "elapsed_seconds": 4.44,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -53664,7 +53664,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "d872d9f93723e3df78cf1dc44586c7da",
+   "config_hash": "4b8aea0b64787572d0b9055dcafaad10",
    "elapsed_seconds": 8.84,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {
@@ -75252,7 +75252,7 @@
     "volume_1h_raw_value_Lag-5",
     "volume_1h_raw_value_Lag-8"
    ],
-   "config_hash": "7bbe1f01c78e0a76364ed320db940035",
+   "config_hash": "44493bdc41540c9360e542832448f15e",
    "elapsed_seconds": 17.81,
    "fingerprints": {
     "close_1h_raw_value_Lag-1": {

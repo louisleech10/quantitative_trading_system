@@ -250,10 +250,26 @@ def test_compare_rejects_unknown_target_and_group_granularity_targets() -> None:
     assert fb.compare(group, group, {"missing_feature"}) != []
 
 
-def test_gate_regenerated_cells_match_frozen() -> None:
+def _gate_cell_ids() -> List[str]:
+    """重生對照之格 id（凍結腳本之格描述子；與凍結檔 `cell_list` 之一致性由 `test_gate_cell_params_equal_frozen_cell_list` 守）。"""
+    return [str(cell["id"]) for cell in _load()._CELL_SPECS]
+
+
+def test_gate_cell_params_equal_frozen_cell_list() -> None:
+    """TESTSEL I10：重生對照逐格參數化之格集合＝凍結檔 `cell_list` 之格（依序、無多無少），不得因參數化漏格。"""
+    fb = _load()
+    frozen = json.loads(fb.GOLDEN_PATH.read_text(encoding="utf-8"))
+    assert [str(cell["id"]) for cell in frozen["cell_list"]] == _gate_cell_ids()
+
+
+@pytest.mark.parametrize("cell_id", _gate_cell_ids())
+def test_gate_regenerated_cells_match_frozen(cell_id: str) -> None:
     """§G（Phase 0–2、Phase 4）：現行 HEAD 重生之每格值指紋逐位元等於凍結值。於凍結 HEAD 跑即 SPEC Task 0.2「同格重跑
     兩次值指紋相同」（凍結為第一次、本案為第二次）。Phase 3 之逐候選／逐格對照依 Task 2.2 裁定於 SPEC 修訂版具體化
-    （不得以全部候選 `changed_targets` 之聯集作全域放行），在此之前已有施工之決定 ⇒ 本案拒絕判定。"""
+    （不得以全部候選 `changed_targets` 之聯集作全域放行），在此之前已有施工之決定 ⇒ 本案拒絕判定。
+
+    TESTSEL I10：逐格參數化（原一條測試串行重生 7 格約 1,532 秒；各格各有獨有 covers，格與比對不變），每格獨立一條、
+    可單獨選取與平行；格集合不漏由 `test_gate_cell_params_equal_frozen_cell_list` 守。"""
     fb = _load()
     assert fb.GOLDEN_PATH.exists(), f"改前基準未凍結：{fb.GOLDEN_PATH}"
     frozen = json.loads(fb.GOLDEN_PATH.read_text(encoding="utf-8"))
@@ -262,7 +278,7 @@ def test_gate_regenerated_cells_match_frozen() -> None:
                        if d.get("implemented_commit")]
         assert implemented == [], f"Phase 3 對照尚未具體化（Task 3.x），已施工：{implemented}"
     failures = []
-    for cell in frozen["cell_list"]:
+    for cell in [c for c in frozen["cell_list"] if str(c["id"]) == cell_id] or [{"id": cell_id}]:
         entry = frozen["cells"][cell["id"]]
         if entry.get("status") == "blocked":
             continue

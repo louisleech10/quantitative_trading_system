@@ -124,6 +124,15 @@ async def retention_client_real_browse(monkeypatch, tmp_path, mock_quality_compu
 _RETAIN_SYMBOL = "BTCUSDT"
 _RETAIN_TIMEFRAME = "1h"
 _RETAIN_CONFIG_HASH = "cfg_batch_ret"
+_FAKE_DATA_ROOT: List[Optional[Path]] = [None]
+
+
+@pytest.fixture(autouse=True)
+def _fake_data_root(tmp_path: Path):
+    """假生成（`_compute_success`）之資料根＝本測試 tmp_path，絕不落正式 data_cache。"""
+    _FAKE_DATA_ROOT[0] = tmp_path
+    yield
+    _FAKE_DATA_ROOT[0] = None
 _REGISTRY_COMPARE_KEYS = (
     "symbol",
     "timeframe",
@@ -144,7 +153,13 @@ def _compute_success(
     _end_date: Optional[str] = None,
     **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
 ) -> str:
-    base = Path(cache_dir).parent if cache_dir else Path("/tmp")
+    # 資料根＝本測試之 tmp_path（autouse `_fake_data_root`；retention_client 系 fixture 亦把 settings.data_cache_path
+    # 指同一 tmp_path ⇒ 與 ff_service 讀取處同根）。原以 cache_dir（批次服務傳入之正式 kline 快取目錄）之上層為根 ⇒ 寫入
+    # 正式 data_cache/features 之 run 目錄與 registry（2026-11-15 實見 cfg_batch_ret 兩筆寫入正式 registry；
+    # TESTSEL-HERMETIC 漏洞）。
+    base = _FAKE_DATA_ROOT[0]
+    if base is None:
+        raise AssertionError("_compute_success 須於本檔測試內呼叫（_fake_data_root 未設）")
     run_dir = base / "features" / symbol / timeframe / "cfg_batch_ret"
     run_dir.mkdir(parents=True, exist_ok=True)
     manifest = run_dir / "feature_manifest.json"

@@ -5,9 +5,11 @@ from __future__ import annotations
 import platform
 import resource
 from pathlib import Path
+from typing import Any, Dict
 from unittest.mock import Mock
 
 import numpy as np
+import pytest
 
 try:
     import psutil
@@ -43,8 +45,14 @@ def _make_group(group_id: str, columns: tuple[str, ...]) -> ColumnGroup:
     )
 
 
-def test_cgsa_ram_peak_under_2gb(tmp_path: Path):
-    """T2.13: CGSA per-group validate 路徑的 RSS 峰值應低於 2GB。"""
+@pytest.fixture(scope="module")
+def cgsa_validation_run(tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Any]:
+    """CGSA per-group validate 跑一次：回傳驗證結果與前後行程 RSS（MB）。
+
+    TESTSEL S3：驗證結果（has_inf／coverage）屬正確性；RSS 為整個 pytest 行程之絕對值，受同行程先前測試與配置器
+    影響 ⇒ 該門檻移至 perf 測試。兩條共用本次計算，不重複。
+    """
+    tmp_path = tmp_path_factory.mktemp("cgsa_memory")
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
 
     rows = 50_000
@@ -79,9 +87,21 @@ def test_cgsa_ram_peak_under_2gb(tmp_path: Path):
     rss_before = _rss_mb()
     validation = factory._scan_cgsa_registry_validation(registry)
     rss_after = _rss_mb()
+    return {"validation": validation, "rss_before": rss_before, "rss_after": rss_after}
+
+
+def test_cgsa_validation_no_inf_full_coverage(cgsa_validation_run: Dict[str, Any]) -> None:
+    """T2.13 之正確性部分：三組有限常態資料經 per-group validate ⇒ 無 inf、覆蓋率 > 0.99。"""
+    validation = cgsa_validation_run["validation"]
+    assert validation["has_inf"] is False
+    assert validation["coverage"] > 0.99
+
+
+@pytest.mark.perf
+def test_cgsa_ram_peak_under_2gb(cgsa_validation_run: Dict[str, Any]) -> None:
+    """T2.13: CGSA per-group validate 路徑的 RSS 峰值應低於 2GB。"""
+    rss_before, rss_after = cgsa_validation_run["rss_before"], cgsa_validation_run["rss_after"]
 
     peak_rss_mb = max(rss_before, rss_after)
 
-    assert validation["has_inf"] is False
-    assert validation["coverage"] > 0.99
     assert peak_rss_mb < 2048.0

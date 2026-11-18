@@ -1,24 +1,20 @@
 """GAP-2 B4 Task 4.3 — §G-1 改前==改後 golden、§G-2 決定性、A1-2 identity、預算 bench receipt。
 
 - pre 檔缺 ⇒ **fail**（非 skip）；`gap2_canonical_sha` 自 scripts/gap2_freeze_golden.py import（唯一序列化實作）。
-- bench：合成 k=200 survivors＋200 removed、n=20000（seed 20260818）；`n_regressions==600` 且以獨立 spy 對證
-  （R8 CODEX-R8-P1-07）；wall time／RSS 只寫 receipt（觀測，無閾值——R7 CODEX-R7-P1-03）。
+- bench：合成 survivors／removed（seed 20260818）；`n_regressions==2k+m` 且以獨立 spy 對證（R8 CODEX-R8-P1-07）；
+  測試以小規模（k＝m＝20、n＝2,000）驗計數語意；SPEC 原規模（k＝m＝200、n＝20,000）之 wall time／RSS 觀測
+  （無閾值——R7 CODEX-R7-P1-03）改手動 `scripts/gap2_budget_bench.py --write-receipt`（TESTSEL I10）。
 """
 from __future__ import annotations
 
 import copy
 import hashlib
 import json
-import math
-import resource
 import sys
 import tempfile
-import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
@@ -32,7 +28,6 @@ from scripts.gap2_freeze_golden import (  # noqa: E402
 )
 from tests.momentum.helpers.ichc_run import run_analyze  # noqa: E402
 from momentum.Analysis import marginal_ic as mic  # noqa: E402
-from momentum.Analysis.factor_combiner import combine_factors  # noqa: E402
 from momentum.Analysis.marginal_ic import MarginalICParams, compute_marginal_ic  # noqa: E402
 
 
@@ -83,61 +78,35 @@ def test_g2_section_and_survivor_file_deterministic(live_two_runs):
 
 
 # ---------------------------------------------------------------- 預算 bench（receipt；spy 對證）
+#: TESTSEL I10：計數語意（n_regressions＝2k＋m＝spy 次數、欄數上界 k、超預算視角零 fit）與規模無關 ⇒ 測試以
+#: n＝2,000、k＝m＝20 驗同一路徑；SPEC 原規模（n＝20,000、k＝m＝200）之 wall／RSS 觀測改手動
+#: `venv/bin/python scripts/gap2_budget_bench.py --write-receipt`（原測試每次約 146 秒且把收據寫進 repo；
+#: IC_QUANT_GAP_REGISTRY G2-R7 已建議拆出）。收據改寫 tmp_path。
+_BENCH_N, _BENCH_K, _BENCH_M = 2000, 20, 20
+
+
 def _bench_data():
-    rng = np.random.default_rng(20260818)
-    n, k, m = 20000, 200, 200
-    X = rng.standard_normal((n, k + m))
-    cols = [f"s{i:03d}" for i in range(k)] + [f"r{i:03d}" for i in range(m)]
-    y = 0.02 * X[:, :k].sum(axis=1) + rng.standard_normal(n)
-    df = pd.DataFrame(X, columns=cols)
-    tr = np.zeros(n, dtype=bool)
-    tr[: int(n * 0.6)] = True
-    return df, pd.Series(y), tr, ~tr, cols[:k], cols[k:]
+    """原規模合成資料（n＝20,000、k＝m＝200，seed 20260818；生成式見 scripts/gap2_budget_bench.bench_data）。"""
+    from scripts.gap2_budget_bench import FULL_SCALE, bench_data
+
+    return bench_data(**FULL_SCALE)
 
 
-def test_budget_bench_receipt(monkeypatch):
-    df, y, tr, te, surv, removed = _bench_data()
-    calls = []
-    real = mic.fit_projection
+def test_budget_bench_receipt(tmp_path):
+    from scripts.gap2_budget_bench import budget_bench, write_receipt
 
-    def spy(z_target, z_basis):
-        calls.append(int(np.asarray(z_basis).shape[1]) if np.asarray(z_basis).ndim == 2 else 0)
-        return real(z_target, z_basis)
-
-    monkeypatch.setattr(mic, "fit_projection", spy)
-    p = MarginalICParams(n_bootstrap=1, block_len=5, max_survivors_for_loo=200, max_removed_candidates=200)
-    t0 = time.time()
-    res = compute_marginal_ic(df, y, train_mask=tr, test_mask=te, survivors=surv, extra_candidates=removed, params=p, fit_scope="train")
-    comp = combine_factors(df, y, train_mask=tr, test_mask=te, survivors=surv, params=p, fit_scope="train")
-    wall = time.time() - t0
-    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    n_main = len(calls)
-    assert res.n_regressions == 600 == n_main, (res.n_regressions, n_main)  # spy count == counter == 2k+m
-    assert max(calls) <= 200  # 每次設計矩陣欄數上界（不含截距）
-    assert comp.status == "ok"
+    k, m = _BENCH_K, _BENCH_M
+    r = budget_bench(_BENCH_N, k, m)
+    n_main = r["spy_main"]
+    assert r["n_regressions"] == 2 * k + m == n_main, (r["n_regressions"], n_main)  # spy count == counter == 2k+m
+    assert r["max_design_cols_main"] <= k  # 每次設計矩陣欄數上界（不含截距）
+    assert r["combine_status"] == "ok"
     # 超預算 case：被略過視角無任何 fit call
-    calls.clear()
-    over1 = compute_marginal_ic(df, y, train_mask=tr, test_mask=te, survivors=surv, extra_candidates=[], params=MarginalICParams(n_bootstrap=1, max_survivors_for_loo=199), fit_scope="train")
-    spy_over1 = len(calls)
-    assert spy_over1 == 0 and over1.n_regressions == 0
-    calls.clear()
-    over2 = compute_marginal_ic(df, y, train_mask=tr, test_mask=te, survivors=surv, extra_candidates=removed, params=MarginalICParams(n_bootstrap=1, max_removed_candidates=199), fit_scope="train")
-    spy_over2 = len(calls)
-    assert spy_over2 == 400 == over2.n_regressions
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    receipt = REPO / "handoffs" / "run_receipts" / f"{ts}-gap2-budget-bench.log"
-    receipt.write_text(
-        "\n".join([
-            f"[gap2-budget-bench] ts={ts} n=20000 k=200 m=200 seed=20260818 n_bootstrap=1",
-            f"n_regressions={res.n_regressions} fit_projection_spy={n_main} max_design_cols={max(calls) if calls else 'n/a'}(main run: ≤200)",
-            f"over_budget_survivors(max_survivors_for_loo=199): spy={spy_over1} n_regressions={over1.n_regressions}",
-            f"over_budget_removed(max_removed_candidates=199): spy={spy_over2} n_regressions={over2.n_regressions}",
-            f"wall_time_s={wall:.1f} ru_maxrss={rss} （觀測資料；無通過閾值——R7 CODEX-R7-P1-03；OOM 保護宣稱僅計數上界）",
-            f"composite_ic={comp.composite_ic}",
-        ]) + "\n",
-        encoding="utf-8",
-    )
+    assert r["over1_spy"] == 0 and r["over1_n_regressions"] == 0
+    assert r["over2_spy"] == 2 * k == r["over2_n_regressions"]
+    receipt = write_receipt(r, tmp_path)
     assert receipt.exists()
+    assert f"n_regressions={2 * k + m} fit_projection_spy={2 * k + m}" in receipt.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------- 探針

@@ -567,3 +567,17 @@ def test_resume_not_found():
         assert response.json()["detail"] == "batch not found"
     finally:
         app.dependency_overrides.pop(get_batch_service, None)
+
+
+def test_construct_without_current_event_loop_then_lock_usable(batch_service_factory) -> None:
+    """TESTSEL I7 實測：前序測試之 asyncio.run() 結束即清空主執行緒之目前迴圈；此後建構 service 不得 RuntimeError
+    （Python 3.9 asyncio.Lock() 於建構當下綁定迴圈），且實例鎖於新迴圈內可取得與釋放。"""
+    asyncio.run(asyncio.sleep(0))  # 結束時 set_event_loop(None)：重現全量中之前序狀態
+    service = batch_service_factory()
+
+    async def _use_lock() -> bool:
+        async with service._lock:  # noqa: SLF001
+            return service._lock.locked()  # noqa: SLF001
+
+    assert asyncio.run(_use_lock()) is True
+    assert asyncio.run(_use_lock()) is True  # 第二個新迴圈：鎖於首次使用時綁定，仍可用（未競爭）
