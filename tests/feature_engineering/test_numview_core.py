@@ -958,6 +958,8 @@ def _runs_with_frozen(runs: "_Runs", kind: str, artifact: str) -> List[CellRun]:
     return [runs.get(kind, cells[key]) for key in keys]
 
 
+# 全規模層（小規模姊妹未覆蓋）：A 各格 post-IC 輸入 dtype 屬 float16／float32 之前提與 processed／IC 頁對凍結逐位元（單跑需 A＋B 格重生，581 秒）；B processed 另由同檔 test_numview_core.py:953／962 對照
+@pytest.mark.fullscale
 def test_postic_retained_processed_and_ic_page_bitwise_equal_frozen(runs: _Runs,
                                                                     tmp_path_factory: pytest.TempPathFactory) -> None:
     """R6-B（v40 註：Task 3.4 後之釘住對象＝擇定核心輸出）：IC-first processed（凍結檔中每個含 processed 之格；Task 3.4

@@ -430,6 +430,8 @@ def _assert_mid_segment_pit_post_zero(
 # B1 — regime PIT
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("case", ["rule", "kmeans", "mid_segment"])
+# 全規模層（小規模姊妹未覆蓋）：全長 20,352 根之標籤歸因對 B0 基準與凍結 allowlist 指紋；PIT 無前視性質由姊妹 test_kmeans_regime_labels_are_prefix_invariant 於前 2,400 根 12 個切點逐列驗
+@pytest.mark.fullscale
 def test_regime_pit(
     case: str,
     la1_baseline_paths: Dict[str, Path],

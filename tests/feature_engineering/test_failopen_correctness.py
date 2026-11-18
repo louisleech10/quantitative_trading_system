@@ -425,6 +425,8 @@ def test_v3_healthy_full_run_matches_frozen_baseline() -> None:
 
 
 @pytest.mark.requires_kline
+# 全規模層（小規模姊妹未覆蓋）：全寬 365 天 91,809 欄之層雜湊與 13 個 CGSA 分片 npy 對凍結基準逐位元；成本在欄數（45 天仍 402 秒）。分片串流路徑由姊妹 test_cgsa_sharded_registry_equals_unsharded／test_cgsa_sharded_persisted_raw_equals_unsharded 小規模覆蓋
+@pytest.mark.fullscale
 def test_v3_ethusdt_1h_matches_frozen_baseline() -> None:
     """[V-3] ETHUSDT/1h 健康全量 hash == 凍結 baseline。"""
     if not BASELINE_PATH.is_file():
@@ -441,6 +443,8 @@ def test_v3_ethusdt_1h_matches_frozen_baseline() -> None:
 
 
 @pytest.mark.requires_kline
+# 全規模層（小規模姊妹未覆蓋）：全寬 179,456 欄多週期合併 L7 與產物對凍結基準逐位元；縮窗觸發錨點記憶體預檢（16.3 GB 計畫對 14.1 GB 上限）。合併路徑由姊妹 test_multi_tf_coarse_to_fine_compact_alignment_matches_oracle 與 test_multi_tf_fine_1h_coarse_4h_compact_alignment_matches_oracle 覆蓋
+@pytest.mark.fullscale
 def test_v3_multi_tf_btc_matches_frozen_baseline() -> None:
     """[V-3] BTCUSDT multi-TF merged_L7/artifact hash == 凍結 baseline。"""
     if not BASELINE_PATH.is_file():

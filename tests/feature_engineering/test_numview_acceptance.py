@@ -1462,6 +1462,8 @@ def test_gate_param_cells_equal_frozen_cells() -> None:
 
 
 @pytest.mark.parametrize("gate_cell", _NEW_FREEZE_GATE_CELLS)
+# 全規模層（小規模姊妹未覆蓋）：C 格約 20.9 萬欄全特徵族同開時之分組與落盤 dtype 自動選擇逐位元回歸（1,044 秒）、B 格 1h＋4h IC-first processed 逐位元（380 秒）；欄數相依行為只在全族同開時出現
+@pytest.mark.fullscale
 def test_gate_new_freeze_bitwise_equal_at_current_code(regen: _Regen, gate_cell: str) -> None:
     """§G 通過條件（Phase 0／2／4）：每個凍結格於現行碼重生，G1 每個已凍結臂份（以其環境）、G2、G3 之 `dtype`、`nan`、
     `values_native`、`column_set_sha256`、`column_order_sha256` 逐位元等於凍結值；G1 實際臂＝標示臂；臂份集合不增不減

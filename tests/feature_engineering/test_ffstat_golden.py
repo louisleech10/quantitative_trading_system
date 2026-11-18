@@ -151,6 +151,8 @@ def test_dual_start_reduction_keeps_deepest_instances() -> None:
 
 
 @pytest.mark.parametrize("timeframe", ["1h", "4h", "12h", "1d"])
+# 全規模層（小規模姊妹未覆蓋）：預設全設定每個實例（指標×週期×L2 配對×L3 窗×資料源）之 L1 雙起點收斂與下游逐值相等；12h／1d 長歷史下深欄逐欄 blocked 之實際資料性質。姊妹 test_dual_start_convergence_paths_config 只驗每指標最深實例與最小／最大窗之同一路徑
+@pytest.mark.fullscale
 def test_dual_start_convergence_default_config(timeframe: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """§G⑦（v40–v43；v50 增 1d；v52 分解判準、4h 改長歷史）：預設全設定、單一原生週期、BTC。
     1h、4h、12h：合資格且 ①② 全部成立。1d：使用者 2026-09-29 裁定「日線不夠就先這樣」——深欄資料不足維持

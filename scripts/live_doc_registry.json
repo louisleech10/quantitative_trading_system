@@ -762,6 +762,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/TESTSEL_I4F_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/TESTSPEED_SPEC.md",
       "LIVE-SPEC"
     ],

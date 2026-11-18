@@ -224,6 +224,8 @@ class TestP4Parity:
 
     @pytest.mark.slow
     @pytest.mark.requires_kline
+    # 全規模層（小規模姊妹未覆蓋）：與 legacy 凍結 sha 不等之斷言只在凍結時同一份生產預設全特徵設定下有意義（584 秒）；窄設定 NaN 遮罩可重現性由姊妹 test_cgsa_narrow_rerun_nan_mask_reproducible 承擔
+    @pytest.mark.fullscale
     def test_cgsa_baseline_runs_ic_first_not_legacy_frozen(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:

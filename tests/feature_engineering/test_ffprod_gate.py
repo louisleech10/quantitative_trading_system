@@ -263,6 +263,8 @@ def test_gate_cell_params_equal_frozen_cell_list() -> None:
 
 
 @pytest.mark.parametrize("cell_id", _gate_cell_ids())
+# 全規模層（小規模姊妹未覆蓋）：生產預設全特徵（C 格約 1,059 秒）與多週期 1h＋4h 生產設定（B 格 392 秒）之改前逐位元回歸；縮小即失去生產設定回歸之目的。A／sigma／pandas 臂格單條皆 ≤300 秒
+@pytest.mark.fullscale
 def test_gate_regenerated_cells_match_frozen(cell_id: str) -> None:
     """§G（Phase 0–2、Phase 4）：現行 HEAD 重生之每格值指紋逐位元等於凍結值。於凍結 HEAD 跑即 SPEC Task 0.2「同格重跑
     兩次值指紋相同」（凍結為第一次、本案為第二次）。Phase 3 之逐候選／逐格對照依 Task 2.2 裁定於 SPEC 修訂版具體化

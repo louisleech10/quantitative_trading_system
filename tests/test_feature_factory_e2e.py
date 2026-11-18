@@ -154,6 +154,8 @@ def _persisted_values(factory, result, symbol: str, timeframe: str) -> pd.DataFr
     )
 
 
+# 全規模層（小規模姊妹未覆蓋）：標準 preset 全部指標×週期之 inf／NaN 品質閘（528 秒）；縮寬版 test_standard_preset_btcusdt_narrow 只驗縮後指標
+@pytest.mark.fullscale
 def test_standard_preset_btcusdt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -75,6 +75,7 @@ pytest_plugins = [
     "tests.fixtures.tmp_feature_runs_plugin",  # TESTREG Task 4.4：tmp 物化真實 FF run（lazy）
     "tests.fixtures.hermetic_guard_plugin",  # TESTSEL I1a Task 1.1／1.4：data_cache 全樹寫入偵測、root handler 外洩清理
     "tests.fixtures.hardware_gate_plugin",  # TESTSEL I4e：本機記憶體不足之 RM-FULLSCALE 登記檔收集期具名 deselect
+    "tests.fixtures.fullscale_layer_plugin",  # TESTSEL I4f：全規模層（fullscale）預設延後，--run-fullscale 執行
 ]
 
 FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"

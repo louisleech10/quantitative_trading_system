@@ -88,11 +88,15 @@ def values_gate_mr_pair(
     )
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_c2_1_fullchain_bar_truncation_invariant(values_gate_mr_pair: TruncationPair) -> None:
     """C2-1：截斷尾 k bars → warmup 後前綴因果穩定（交集+分層 gate）。"""
     _assert_truncation_invariants(values_gate_mr_pair)
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_c2_2_tail_perturbation_prefix_invariant(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -117,6 +121,8 @@ def test_c2_2_tail_perturbation_prefix_invariant(
         "修法=storage codec/精度 epic"
     ),
 )
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_fracdiff_truncation_invariant(
     tmp_path: Path,
     kline_df_module: pd.DataFrame,
@@ -140,6 +146,8 @@ def test_fracdiff_truncation_invariant(
         "非 max_lag/conv 問題；storage epic 修 codec 決定論後轉綠"
     ),
 )
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_fracdiff_tail_perturbation_invariant(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -163,6 +171,8 @@ def test_fracdiff_tail_perturbation_invariant(
 FULL_SCOPE = MRScope(values_payload=_values_gate_mr_config_payload, fracdiff_payload=_fracdiff_mr_config_payload)
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_mutation_fracdiff_maxlag_len_coupling_truncation_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """fracdiff mutant：max_lag 依當次長度（不設上限）→ 截斷 MR 必 FAIL。"""
     run_control_fracdiff_maxlag_len_coupling(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
@@ -172,31 +182,43 @@ def test_mutation_fracdiff_maxlag_len_coupling_truncation_fails(monkeypatch, tmp
 #  mutant 只於值 gate 現形 ⇒ 無可辨認之失敗出口；同一 mutant 由截斷版與並行版承接。）
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_mutation_fracdiff_maxlag_len_coupling_parallel_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """fracdiff mutant：parallel slow path 也必須吃到 resolver seam。"""
     run_control_fracdiff_maxlag_len_coupling(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module, parallel=True)
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_mutation_numba_rolling_center_true_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """C2 mutant①：L3 numba rolling 改 center=True → 截斷 MR 必 FAIL。"""
     run_control_numba_rolling_center_true(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_mutation_causal_winsor_full_fit_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """C2 mutant②：causal winsor 改全量 fit → 截斷 MR 必 FAIL。"""
     run_control_causal_winsor_full_fit(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_mutation_l4_lag_shift_minus_one_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """C2 mutant③：L4 lag shift(-lag)（含 fast path）→ 尾端擾動前綴 MR 必 FAIL。"""
     run_control_l4_lag_shift_minus_one(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_mutation_fracdiff_calibration_perturb_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """fracdiff negative control：擾動 full 側起始日之前之前史 → strict 欄集合或 d* gate 必 FAIL。"""
     run_control_fracdiff_calibration_perturb(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
+# 全規模層（小規模姊妹未覆蓋）：屬 RM-FULLSCALE ④（TICKET_ORDER 第 16 步，tests/hardware_requirements.json min_memory_gib 24），本機 8GB 不執行；與縮小版／allcat 姊妹呼叫同一組 run_control_* 只換 MRScope，未證實全寬有獨有路徑——是否改為研究腳本＋新鮮度收據由 FULLSCALE 換機後依 TESTREG 決定（blocked-by：本機無法執行 E2 碑所需之原測試）
+@pytest.mark.fullscale
 def test_mutation_fracdiff_full_fit_d_star_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """fracdiff negative control：d-star 改全量 fit → fracdiff MR 必 FAIL。"""
     run_control_fracdiff_full_fit_d_star(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)

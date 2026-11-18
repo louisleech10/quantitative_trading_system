@@ -644,6 +644,8 @@ def test_boundary_02_frozen_baseline_content_complete(fb: Any, oracle_runs: Mapp
 
 @pytest.mark.slow
 @pytest.mark.requires_kline
+# 全規模層（小規模姊妹未覆蓋）：第 5 段 FDR 族欄（p_value_adj、pass_class）依進段全部 2,000 欄計算，小子集無法重現凍結值（1,767 秒）；其餘逐特徵欄與 PIT 標籤由姊妹 test_freeze_reproducible_small_nested_subset 對錨點逐位元
+@pytest.mark.fullscale
 def test_freeze_reproducible(fb: Any) -> None:
     """SPEC v5.24 Task 0.1 具名（r36 群集 A）：同一 2,000 欄子集（同 seed、同碼路徑、同交接 h5 雜湊）重跑第 5 段 ==
     凍結之全部對應欄（stage_cols 相等、特徵集合相等、逐欄位與 PIT 標籤逐一相等）。第 5 段之 FDR 對進段全部欄計算

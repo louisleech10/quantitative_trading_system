@@ -1,0 +1,88 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/registry/test_fullscale_layer.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I4F_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "I4e 已提交 cffc22f9（外掛慣例：wrapper 晚於其他選取、collect-only 不排除）",
+      "開 SPEC 前事實 runs/testsel_route/i4f/i4f_facts.md（testmon 遇 -m 停用選取、被排除之改動測試仍待跑、d1f57180 全規模清單 23 條現存、手寫 slow 有現行消費者）"
+    ],
+    "touches": [
+      "tests/conftest.py",
+      "pytest.ini",
+      "tests/registry/test_fullscale_layer.py",
+      "tests/registry/catalog.json",
+      "tests/feature_engineering/test_batch2d_dstar_align.py",
+      "tests/feature_engineering/test_failopen_correctness.py",
+      "tests/feature_engineering/test_ff_fullchain_truncation_mr.py",
+      "tests/feature_engineering/test_ffprod_gate.py",
+      "tests/feature_engineering/test_ffstat_golden.py",
+      "tests/feature_engineering/test_numview_acceptance.py",
+      "tests/feature_engineering/test_numview_core.py",
+      "tests/feature_engineering/test_preprov_contract.py",
+      "tests/golden/la1/test_b4_golden_rebaseline.py",
+      "tests/momentum/Analysis/test_icperf_gate.py",
+      "tests/momentum/test_la1_lookahead.py",
+      "tests/test_feature_factory_e2e.py"
+    ],
+    "callers_now": [],
+    "callers_later": [
+      "收案重型批：以 --run-fullscale 具名跑全規模層"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest tests/registry/test_fullscale_layer.py tests/registry/test_hardware_gate.py -q -p no:cacheprovider",
+    "forbidden": [
+      {
+        "rule": "不在 pytest.ini addopts 加 -m（使 testmon 停用選取）；預設延後由外掛依 --run-fullscale 決定",
+        "observable": true
+      },
+      {
+        "rule": "延後用 pytest deselect（config.hook.pytest_deselected），不用 skip／xfail（skip 使 testmon 誤記為已跑）",
+        "observable": true
+      },
+      {
+        "rule": "標記直接寫在測試函式上（官方寫法），不另立登記表；23 條限 d1f57180 全規模清單",
+        "observable": true
+      },
+      {
+        "rule": "不動既有手寫 pytest.mark.slow 與任何斷言、函式本體",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "conftest 註冊外掛屬環境類改動：外掛只延後帶 fullscale 之 23 條；其餘測試之收集與執行不變；手寫 slow 語意不變（test_handwritten_slow_untouched）",
+      "改壞對照：延後移到 yield 前 ⇒ test_testmon_coexist 紅；改為 skip ⇒ test_testmon_coexist 紅；collect-only 亦延後 ⇒ test_collect_only_lists_all 紅；延後條件改看 slow ⇒ test_handwritten_slow_untouched 紅；拿掉任一標記 ⇒ test_d1f57180_fullscale_list_all_marked 紅",
+      "與 I4e 硬體閘共存：test_hardware_and_fullscale_both_registered；tests/registry/test_hardware_gate.py 全綠"
+    ],
+    "coverage_risk": [
+      "真實全規模測試本身不在本項執行（本機 8 GiB，其中 11 條另受硬體閘排除）；本項只驗分層機制",
+      "E-1（blocked-by 原 session 測試耗時計畫）：tests/feature_engineering/test_ff_fullchain_truncation_mr.py 之 11 條全規模測試未證實全寬有獨有路徑（小規模姊妹檔已有同本體正負控制），存廢由原 session 逐條對映後定（審碼 b1 r1 CODEX-R1-P1-01）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

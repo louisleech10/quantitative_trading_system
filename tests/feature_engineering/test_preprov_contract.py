@@ -394,6 +394,8 @@ def test_verification_02_values_match_pattern() -> None:
     assert pattern_violations(spec) == []
 
 
+# 全規模層（小規模姊妹未覆蓋）：契約每個值至少被一格產出之聯集覆蓋，需全部 11 格加 4 個變體（單跑 1,282 秒）；逐單位子集性由姊妹 test_verification_03a_observed_values_subset_per_unit 承擔
+@pytest.mark.fullscale
 def test_verification_03_observed_values_subset_and_covered(runs: ph.RunCache, monkeypatch: pytest.MonkeyPatch) -> None:
     """③ §V 全格之實際紀錄值集 ⊆ 契約；契約每值至少被一格或單元案例產出，否則列 `_unreachable` 附碼證。"""
     spec = ph.contract()

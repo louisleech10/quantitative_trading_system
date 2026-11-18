@@ -867,6 +867,8 @@ def test_control_volatile_rules_and_receipt_files_exist() -> None:
 # ---------------------------------------------------------------------------
 # ③ 修改路徑：完整 recursive five-path diff + P1-3-obs → UNEXPECTED 對帳
 # ---------------------------------------------------------------------------
+# 全規模層（小規模姊妹未覆蓋）：全序列五路徑遞迴差異對 B0 基準與凍結 allowlist 指紋之歸因；需全長序列方可重現基準歸因
+@pytest.mark.fullscale
 def test_b4_modified_path_attribution_unexpected_zero() -> None:
     """BTC 五路徑 recursive diff + P1-3-obs ⊆ allowlist；machine line UNEXPECTED=0。
 
