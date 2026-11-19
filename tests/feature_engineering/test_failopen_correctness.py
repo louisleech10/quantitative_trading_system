@@ -517,6 +517,16 @@ def test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor(
     assert "close_trend_MIDPOINT_233_ZScore-W3" in direct_l3.columns  # FF-NAME v2 文法（op 參數以 `-` 連接）
 
 
+def _v5_prefix_payload() -> dict:
+    """TESTSEL I8 Task 2.3：窄 L1（EMA_8／SMA_13）＋顯式開 L2 worldquant、cross、ratio——逐運算元因果由
+    tests/feature_engineering/test_worldquant_truncation.py 守；本條守「L1→L2（含 worldquant）→L3→落盤」組合前綴。"""
+    return _fast_config_payload(
+        atomic_indicators=_narrow_atomic_indicators(),
+        operators={"enabled": True, "worldquant": {"enabled": True}, "cross": {"enabled": True},
+                   "ratio": {"enabled": True}},
+    )
+
+
 @pytest.mark.requires_kline
 def test_v5_prefix_no_leakage_after_warmup(
     monkeypatch: pytest.MonkeyPatch,
@@ -535,7 +545,7 @@ def test_v5_prefix_no_leakage_after_warmup(
     full_result = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
-        config_override=_fast_config_payload(),
+        config_override=_v5_prefix_payload(),
         force_regenerate=True,
         start_date=full_start,
         end_date=full_end,
@@ -547,7 +557,7 @@ def test_v5_prefix_no_leakage_after_warmup(
     truncated_result = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
-        config_override=_fast_config_payload(),
+        config_override=_v5_prefix_payload(),
         force_regenerate=True,
         start_date=trunc_start,
         end_date=trunc_end,
@@ -1057,36 +1067,34 @@ def _capture_multi_tf_alignment(
     return captured
 
 
-@pytest.mark.parametrize("use_searchsorted", [False, True])
 @pytest.mark.requires_kline
 def test_v6_backend_output_matches_independent_oracle(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    use_searchsorted: bool,
 ) -> None:
-    """[V-6] 各 backend 輸出逐欄對照獨立 oracle（非 backend 互比）。"""
+    """[V-6] 產品 backend 輸出逐欄對照獨立 oracle（非 backend 互比）。
+    TESTSEL I8 Task 2.2：原 `use_searchsorted` False／True 兩參數走同一產品路徑——`TimeframeAligner.build_asof_index_map`
+    恆用 `np.searchsorted`，`FFACT_USE_SEARCHSORTED` 只在無呼叫者之 `align_to_primary` 讀——故只留產品預設值一條。"""
     captured = _capture_multi_tf_alignment(
         monkeypatch,
-        tmp_path / ("ss" if use_searchsorted else "ma"),
-        use_searchsorted=use_searchsorted,
+        tmp_path / "ss",
+        use_searchsorted=True,
     )
     assert int(captured["map_count"]) >= 1
     assert int(captured["group_count"]) >= 1
     assert int(captured["column_count"]) >= int(captured["group_count"])
 
 
-@pytest.mark.parametrize("use_searchsorted", [False, True])
 @pytest.mark.requires_kline
 def test_v6_close_time_oracle_matches_pipeline(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    use_searchsorted: bool,
 ) -> None:
-    """[V-6] close_time 兩 backend：captured groups 全欄各自對 oracle。"""
+    """[V-6] close_time：captured groups 全欄各自對 oracle（TESTSEL I8 Task 2.2：同上，只留產品預設 backend 一條）。"""
     captured = _capture_multi_tf_alignment(
         monkeypatch,
-        tmp_path / ("ss" if use_searchsorted else "ma"),
-        use_searchsorted=use_searchsorted,
+        tmp_path / "ss",
+        use_searchsorted=True,
         alignment_mode=AlignmentMode.CLOSE_TIME,
     )
     if int(captured["map_count"]) == 0:

@@ -1,0 +1,23 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/feature_engineering/test_failopen_correctness.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -p mut_asof_plus1 --durations=0 tests/feature_engineering/test_failopen_correctness.py -k 'test_v6_backend_output or test_v6_close_time'",
+      "code_sha256": "1aca0298f769bb194802b2b150288cfe31f20efa677fb65d96c50bfee8101586",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {"cpu": "Apple M1", "cores": 8, "ram_bytes": 8589934592, "os": "Darwin 27.0.0"}
+    },
+    "meta": {"producer": "claude:testsel-i8", "created_at": "2026-11-19T05:40:00+00:00"}
+  },
+  "scale": "single",
+  "estimate_seconds": 190,
+  "basis": [
+    "改前同命令 4 條 mutant 下實跑 100.67 秒（runs/testsel_route/i8/g22/before.log）；改後 2 條 ⇒ 約一半；保守取 testmon 實量 v6 兩條 97.1＋91.3 ≈ 190 秒",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "tier": "fix",
+  "tier_reason": "TESTSEL I8 Task 2.2 §G 改後收據（SPEC §B TESTSEL-I8-BUDGET-3）",
+  "spec_path": "docs/TESTSEL_I8_SPEC.md",
+  "coverage_path_ids": ["TESTSEL-I8-BUDGET-3"]
+}

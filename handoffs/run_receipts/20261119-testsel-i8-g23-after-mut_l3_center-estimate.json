@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "tests/feature_engineering/test_failopen_correctness.py",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider -p mut_l3_center --durations=0 tests/feature_engineering/test_failopen_correctness.py -k test_v5_prefix_no_leakage_after_warmup",
+      "code_sha256": "93b4f1b3e506871e360e0c8068ccdc5db697e503615fbfad13d66e2d4289fccf",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:testsel-i8",
+      "created_at": "2026-11-19T05:25:07Z"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 320,
+  "basis": [
+    "改後窄 v5_prefix 上界取改前 316.3 秒（實際應較短）",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "tier": "fix",
+  "tier_reason": "TESTSEL I8 §G 收據（SPEC §B TESTSEL-I8-BUDGET-4）",
+  "spec_path": "docs/TESTSEL_I8_SPEC.md",
+  "coverage_path_ids": [
+    "TESTSEL-I8-BUDGET-4"
+  ]
+}

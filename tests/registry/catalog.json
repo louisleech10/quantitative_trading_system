@@ -5508,6 +5508,26 @@
    "rewrite_targets": [],
    "ticket": "ffstat"
   },
+  "tests/feature_engineering/test_worldquant_truncation.py": {
+   "claim": [
+    "correctness"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A14",
+    "A2"
+   ],
+   "oracle": [
+    "EXACT",
+    "METAMORPHIC"
+   ],
+   "path": "tests/feature_engineering/test_worldquant_truncation.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
   "tests/feature_library/test_phase1.py": {
    "claim": [
     "contract"
