@@ -13980,6 +13980,25 @@
    "rewrite_targets": [],
    "ticket": "TESTREG"
   },
+  "tests/registry/test_testreg_g_receipt.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A18"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/registry/test_testreg_g_receipt.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTSEL"
+  },
   "tests/registry/test_testreg_gate_wiring.py": {
    "claim": [
     "contract"

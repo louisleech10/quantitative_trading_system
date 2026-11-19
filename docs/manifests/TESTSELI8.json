@@ -1,0 +1,79 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/registry/test_testreg_g_receipt.py",
+    "tests/feature_engineering/test_worldquant_truncation.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/TESTSEL_I8_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [
+      "SPEC v3 規格審 r3 兩家 proceed（handoffs/reconcile/20261119-testseli8-x-review-r3/synth.md 已銷帳）",
+      "Task 2.3 原型 runs/testsel_route/i8/proto_wq_trunc.py（產品碼 0 不一致、mutant 27／41 截斷點被抓）"
+    ],
+    "touches": [
+      "scripts/testreg.py",
+      "tests/registry/testreg_schema.json",
+      "tests/registry/test_testreg_g_receipt.py",
+      "tests/feature_engineering/test_worldquant_truncation.py",
+      "tests/feature_engineering/test_failopen_correctness.py",
+      "tests/feature_engineering/test_ffstat_calibration.py",
+      "tests/feature_engineering/test_ffstat_stable_start.py",
+      "tests/feature_engineering/test_ff_fullchain_truncation_mr.py",
+      "tests/feature_engineering/test_ff_multitf_truncation_mr.py",
+      "tests/registry/catalog.json"
+    ],
+    "callers_now": [],
+    "callers_later": [],
+    "gate_cmd": "venv/bin/python -m pytest tests/registry/test_testreg_g_receipt.py tests/registry/test_testreg_validate.py tests/feature_engineering/test_worldquant_truncation.py -q -p no:cacheprovider &&venv/bin/python scripts/testreg.py check --paths tests/feature_engineering/test_worldquant_truncation.py tests/feature_engineering/test_failopen_correctness.py tests/feature_engineering/test_ffstat_calibration.py tests/feature_engineering/test_ffstat_stable_start.py",
+    "forbidden": [
+      {
+        "rule": "不改產品碼與產品數值；不放寬任何既有斷言；不以合成資料取代真實 kline",
+        "observable": true
+      },
+      {
+        "rule": "fullchain／multitf 全設定處置不得將 operators.worldquant.enabled 設為 False",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "§G：每族處置前後以 mutant 外掛（runs/testsel_route/i8/mutants/）實跑，原測試抓到之 mutant ⊆ 新測試抓到之集合；收據 runs/testsel_route/i8/<族>/before.log、after.log",
+      "重型受影響測試（failopen v5／v6／v7、ffstat 兩檔、全規模層）經 scripts/run_watched.py 背景，依 §B BUDGET-2～5 估時收據執行；每批只跑受影響測試，全量只於大綱 F 列跑一次",
+      "Task 2.3 ①單元測試先綠且改壞對照成立後方縮 v5_prefix"
+    ],
+    "coverage_risk": [
+      "寬 L1 整鏈前綴移交全規模層（Task 2.4）；Task 2.4 未證 worldquant 仍開且本機可跑前，保留窄 v5_prefix（worldquant 顯式開）為本機守衛",
+      "E-1（為何現在不做: blocked-by）：Task 1.1 過期 95 條重量未完前，Task 2.x 其餘族（preprov、icperf、治理等）之處置對象未定"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "script_acceptance",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "contract_jsons",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "E-1",
+        "reason": "blocked-by",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

@@ -1761,6 +1761,149 @@ def _covered(ctx: Context, entry: Mapping[str, Any]) -> List[str]:
     return _function_nodeids(_tree(ctx), entry["path"])
 
 
+_G_SPEC_REF = "docs/TESTSEL_I8_SPEC.md"
+_FAILED = ("failed", "error")
+
+
+def _plugin_touches_production(ctx: Context, src: str) -> bool:
+    """TESTSEL I8 Task 1.2 規則②：外掛源碼 import production_roots 下之模組，且對其屬性有寫入（Attribute Store 或
+    setattr）——只 pass／只 pytest.fail／只改測試者不成立。"""
+    roots = tuple(r[:-1] if r.endswith("/") else r[:-3] if r.endswith(".py") else r
+                  for r in ctx.schema["receipts"]["E0"]["production_roots"])
+    try:
+        tree_ = ast.parse(src)
+    except SyntaxError:
+        return False
+    hooks = [n.name for n in tree_.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+             and n.name.startswith("pytest_")]
+    if hooks != ["pytest_configure"]:  # r5 GROK-R5-P1-01：只准 pytest_configure，禁 setup／call 等 hook 造假失敗
+        return False
+
+    def prod(mod: Optional[str]) -> bool:
+        return bool(mod) and any(mod == r or mod.startswith(r + ".") for r in roots)
+
+    bound = set()
+    for n in ast.walk(tree_):
+        if isinstance(n, ast.Import):
+            bound |= {(a.asname or a.name.split(".")[0]) for a in n.names if prod(a.name)}
+        elif isinstance(n, ast.ImportFrom) and prod(n.module):
+            bound |= {(a.asname or a.name) for a in n.names}
+
+    def root_name(node: ast.AST) -> Optional[str]:
+        while isinstance(node, ast.Attribute):
+            node = node.value
+        return node.id if isinstance(node, ast.Name) else None
+
+    for n in ast.walk(tree_):
+        targets = n.targets if isinstance(n, ast.Assign) else [n.target] if isinstance(n, ast.AugAssign) else []
+        if any(isinstance(t, ast.Attribute) and root_name(t) in bound for t in targets):
+            return True
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "setattr" and n.args
+                and root_name(n.args[0]) in bound):
+            return True
+    return False
+
+
+def _g_receipt_errors(ctx: Context, entry: Mapping[str, Any], rcpt: Mapping[str, Any], rel: str) -> List[str]:
+    """TESTSEL I8 Task 1.2（docs/TESTSEL_I8_SPEC.md，規則 v2）：§G 前後收據（kind＝g_before_after）——使用者 2026-11-19
+    裁定以「同一 mutant 改前、改後偵測力不降」代替 V19 逐斷言 rewrite 收據。"""
+    shape = validate_shape(rcpt, {"type": "types.receipt_g_before_after"}, ctx.schema)
+    if shape:
+        return shape
+    errs: List[str] = []
+    if rcpt["spec_ref"] != _G_SPEC_REF:
+        errs.append(f"g 收據 spec_ref 須為 {_G_SPEC_REF}")
+    head = rcpt["head"]
+    hp = _receipt_head_problem(ctx, rel, head)
+    if hp:
+        return errs + [hp]  # head 不成立 ⇒ 其後補丁重放與 digest 重算皆無從進行
+    targets = sorted(set(rcpt["targets"]))
+    cov = _covered(ctx, entry)
+    if targets != sorted(cov):  # ①
+        errs.append("g 收據 targets ≠ catalog rewrite_targets")
+    patch = rcpt["narrow_patch_path"]
+    ptext = _tree(ctx).read(patch)
+    if ptext is None or hashlib.sha256(ptext.encode("utf-8")).hexdigest() != rcpt["narrow_patch_sha256"]:
+        errs.append("改窄補丁不存在或 sha256 不符")
+        return errs
+    if set(_patch_paths(ptext)) != {entry["path"]}:
+        errs.append("改窄補丁所及之檔須恰為該測試檔")
+    elif _PatchedTree(ctx, head, patch).read(entry["path"]) != _tree(ctx).read(entry["path"]):  # ③
+        errs.append("改窄補丁套於 head 後之測試檔 ≠ 受驗之樹")
+    after_digest = _digest_with(ctx, head, [patch])
+    # r6 GROK-R6-P1-01：「抓到」之失敗 frame 須落在該 target 函式本體（改前＝head 之檔、改後＝head＋改窄補丁之檔）；
+    # 外掛於 pytest_configure 內動態註冊 hook 造假之失敗 frame 在外掛內，不計
+    head_tree, after_tree = _Tree(ctx.repo_root, f"rev:{head}"), _PatchedTree(ctx, head, patch)
+
+    def fn_span(tree_: Any, t: str) -> Optional[Tuple[str, int, int]]:
+        path_, qual = _split_nodeid(t)
+        fn = _test_functions(tree_.read(path_)).get(qual)
+        return (path_, fn.lineno, fn.end_lineno) if fn is not None else None
+
+    spans = {"before": {t: fn_span(head_tree, t) for t in targets},
+             "after": {t: fn_span(after_tree, t) if after_tree.read(_split_nodeid(t)[0]) is not None
+                       else fn_span(head_tree, t) for t in targets}}
+    any_caught = False
+    for m in rcpt["mutants"]:
+        mid, plugin = m["id"], m["plugin_path"]
+        src = _tree(ctx).read(plugin)
+        if src is None or hashlib.sha256(src.encode("utf-8")).hexdigest() != m["plugin_sha256"]:  # ②
+            errs.append(f"mutant {mid} 外掛不存在或 sha256 不符")
+            continue
+        if not _plugin_touches_production(ctx, src):
+            errs.append(f"mutant {mid} 外掛未改 production_roots 下之產品碼")
+        mod = Path(plugin).stem
+        b, a = m["before_session_id"], m["after_session_id"]
+        sb, sa = _ledger_session(ctx, b), _ledger_session(ctx, a)
+        if b == a or sb is None or sa is None or not sb["session"] or not sa["session"]:
+            errs.append(f"mutant {mid} 之 before／after session 相同或不在 ledger")
+            continue
+        ib, ia = sb["session"], sa["session"]
+        if not (str(ib.get("started")) < str(ia.get("started"))):
+            errs.append(f"mutant {mid} 之 before session 未早於 after")
+        if ib.get("head") != head or ia.get("head") != head:
+            errs.append(f"mutant {mid} 之 session head ≠ 收據 head")
+        if ib.get("diff_digest") != "clean":
+            errs.append(f"mutant {mid} 之 before session 非乾淨樹")
+        if ia.get("diff_digest") != after_digest:
+            errs.append(f"mutant {mid} 之 after session diff_digest ≠ head＋改窄補丁")
+        for side, info in (("before", ib), ("after", ia)):
+            toks = info.get("argv_raw")
+            if isinstance(toks, str):
+                try:
+                    toks = json.loads(toks)
+                except ValueError:
+                    toks = []
+            toks = [str(t) for t in toks] if isinstance(toks, list) else []
+            if not any(toks[i] == "-p" and toks[i + 1] == mod for i in range(len(toks) - 1)):
+                errs.append(f"mutant {mid} 之 {side} session argv 未以 -p {mod} 載入外掛")
+        for side, sid, sess, outs in (("before", b, sb, m["before_outcomes"]), ("after", a, sa, m["after_outcomes"])):
+            if sorted(outs) != targets:  # ①
+                errs.append(f"mutant {mid} 之 {side}_outcomes 鍵 ≠ targets")
+            for t in targets:
+                errs += [f"mutant {mid} {side}：{e}" for e in session_scope_errors(ctx, sid, t)]
+                rec = _fn_record(sess, t)
+                if rec is None or rec["outcome"] != outs.get(t):  # ④
+                    errs.append(f"mutant {mid} 之 {side}_outcomes[{t}] 與 ledger 不符")
+        def caught(sess: Mapping[str, Any], t: str, side: str) -> bool:
+            """抓到＝call 期失敗（r5）且失敗 frame 落在該 target 函式本體（r6）。"""
+            rec = _fn_record(sess, t)
+            span = spans[side][t]
+            if not rec or rec["outcome"] not in _FAILED or rec.get("phase_failed") != "call" or span is None:
+                return False
+            f, lo, hi = span
+            return any(fr.rsplit(":", 1)[0] == f and lo <= int(fr.rsplit(":", 1)[1]) <= hi
+                       for fr in rec.get("fail_frames") or [])
+
+        for t in targets:  # ⑤ 逐 target 單調
+            if caught(sb, t, "before") and not caught(sa, t, "after"):
+                errs.append(f"mutant {mid} 對 {t} 改前抓到、改後抓不到（偵測力下降）")
+        any_caught |= any(caught(sb, t, "before") for t in targets)
+    if not any_caught:  # ⑥
+        errs.append("g 收據無任何 mutant 於改前使 target 失敗（偵測力證明為空）")
+    return errs
+
+
 def _rewrite_receipt_errors(ctx: Context, entry: Mapping[str, Any]) -> List[str]:
     key = ("rw", entry["path"], entry.get("rewrite_receipt"))
     cache = ctx.extra.setdefault("rw_cache", {})
@@ -1769,6 +1912,9 @@ def _rewrite_receipt_errors(ctx: Context, entry: Mapping[str, Any]) -> List[str]
     rcpt, err = _load_receipt(ctx, entry.get("rewrite_receipt"))
     if err:
         cache[key] = [err]
+        return cache[key]
+    if isinstance(rcpt, dict) and rcpt.get("kind") == "g_before_after":
+        cache[key] = _g_receipt_errors(ctx, entry, rcpt, entry["rewrite_receipt"])
         return cache[key]
     shape = validate_shape(rcpt, {"type": "types.receipt_mutation"}, ctx.schema)
     if shape:

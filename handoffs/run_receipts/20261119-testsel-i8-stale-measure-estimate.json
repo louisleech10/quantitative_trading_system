@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "match": {
+      "entrypoint": "venv/bin/python",
+      "target_argv": "venv/bin/python -m pytest -q -p no:cacheprovider --durations=0 @runs/testsel_route/i8/durations/stale_nodeids.txt",
+      "code_sha256": "9f71739c7b8eb3c624f5e75d8cfe6e8ca84fedfe54f264397360b617bd3ec483",
+      "data": [],
+      "config_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "hardware": {
+        "cpu": "Apple M1",
+        "cores": 8,
+        "ram_bytes": 8589934592,
+        "os": "Darwin 27.0.0"
+      }
+    },
+    "meta": {
+      "producer": "claude:testsel-i8",
+      "created_at": "2026-11-19T04:40:00+00:00"
+    }
+  },
+  "scale": "single",
+  "estimate_seconds": 30285,
+  "uncertain_ack": {"unknown": 0, "fixture_cost_unknown": 21},
+  "basis": [
+    "heavy_run_guard 之 TESTREG ledger 保守估時 30285 秒（95 條有通過紀錄，含共用 fixture 建置成本）；舊值加總 22482 秒（runs/testsel_route/i8/durations/slow_rerank.tsv 之 ledger_STALE 95 條）；多條經 I10 縮小（例 tests/momentum/Analysis/test_icperf_hac45_size.py:638-643），實際應遠小於此",
+    "fixture_cost_unknown 21：共用 fixture 建置成本無實測——本跑之 --durations=0 逐條列 setup／call／teardown 即為其實測，跑完併入 slow_rerank.tsv",
+    "量級估計、不作停止條件（NOCAP），經 scripts/run_watched.py 背景執行"
+  ],
+  "tier": "fix",
+  "tier_reason": "TESTSEL I8 Task 1.1 過期耗時重量（SPEC §B TESTSEL-I8-BUDGET-1）",
+  "spec_path": "docs/TESTSEL_I8_SPEC.md",
+  "coverage_path_ids": [
+    "TESTSEL-I8-BUDGET-1"
+  ]
+}
